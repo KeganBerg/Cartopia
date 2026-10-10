@@ -10,6 +10,7 @@ import { Tutorial } from './ui/Tutorial'
 import { Badges } from './ui/Badges'
 import { NeedPanel } from './ui/Need'
 import { RescuePanel } from './ui/Rescue'
+import { BankPanel } from './ui/Bank'
 import { AccountPanel } from './ui/Account'
 import { GoalsPanel, DailyPanel, FlatPanel } from './ui/Goals'
 import { useGame, today } from './game/store'
@@ -46,6 +47,7 @@ export default function App() {
       {panel === 'friends' && <FriendsPanel />}
       {panel === 'need' && <NeedPanel />}
       {panel === 'rescue' && <RescuePanel />}
+      {panel === 'bank' && <BankPanel />}
       <VisitBanner />
       <Tutorial />
       {panel === 'account' && <AccountPanel />}

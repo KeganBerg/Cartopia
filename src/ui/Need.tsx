@@ -54,7 +54,7 @@ export function NeedPanel() {
     const next = s.fuel >= cap ? null : Math.max(0, FUEL_REGEN_SECONDS - Math.floor((now - s.fuelUpdatedAt) / 1000))
     summary = need.missing ? `You need ${need.missing} more fuel${need.what ? ` for ${need.what}` : ''}. You have ${s.fuel}/${cap}.` : `You have ${s.fuel}/${cap} fuel.`
     sources = [
-      { icon: '🅱', title: `Fill up with bucks · B ${REFILL_BUCKS}`, detail: s.fuel >= cap ? 'Your tank is full.' : `Fill your tank to ${cap} right now. You have ${s.bucks} bucks.`, action: { label: `Fill up · B ${REFILL_BUCKS}`, run: s.refillFuel, disabled: s.fuel >= cap } },
+      { icon: '⛽', title: `Fill up with bucks · B ${REFILL_BUCKS}`, detail: s.fuel >= cap ? 'Your tank is full.' : `Fill your tank to ${cap} right now. You have ${s.bucks} bucks.`, action: { label: `Fill up · B ${REFILL_BUCKS}`, run: s.refillFuel, disabled: s.fuel >= cap } },
       { icon: '⏱', title: 'Wait for a refill', detail: next === null ? 'Your tank is full.' : `Fuel refills 1 every minute. Next one in ${next}s.` },
       { icon: '⛽', title: 'Build a Gas Station', detail: `Each one adds +10 to your max fuel. You have ${owned('gas')}.`, action: build('gas') },
       { icon: '⭐', title: 'Level up', detail: 'Leveling up refills your tank and raises the max.' },
@@ -63,6 +63,7 @@ export function NeedPanel() {
   } else if (need.res === 'bucks') {
     summary = need.missing ? `You need ${need.missing} more bucks${need.what ? ` for ${need.what}` : ''}.` : `You have ${s.bucks} bucks.`
     sources = [
+      { icon: '🏦', title: 'Visit the Bank', detail: 'Buy bucks in packs. Bigger packs come with bonus bucks, coins and parts.', action: { label: 'Bank', run: () => s.openPanel('bank') } },
       { icon: '⭐', title: 'Level up', detail: 'Every new level gives +1 buck.' },
       { icon: '📋', title: 'Finish goals', detail: 'Bigger goals pay bucks.', action: { label: 'Goals', run: () => s.openPanel('goals') } },
       { icon: '📅', title: 'Daily bonus day 5', detail: '+1 buck on the fifth day of your streak.' },

@@ -7,6 +7,7 @@ import { Panel } from './Menus'
 export function AccountPanel() {
   const townName = useGame((s) => s.townName)
   const rename = useGame((s) => s.renameTown)
+  const openPanel = useGame((s) => s.openPanel)
   const [user, setUser] = useState<User | null>(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -31,6 +32,7 @@ export function AccountPanel() {
 
   return (
     <Panel title="Menu">
+      <button className="buy bank-menu-btn" onClick={() => openPanel('bank')}>🏦 Bank · get bucks</button>
       <h3>Town name</h3>
       <div className="row">
         <input value={name} maxLength={24} onChange={(e) => setName(e.target.value)} />

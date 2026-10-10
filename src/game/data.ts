@@ -190,6 +190,18 @@ export const GP_ROUNDS = 6
 export const gpRivalPi = (s: GpSeries, round: number, clears: number) => Math.round((s.basePi + round * s.step) * (1 + clears * 0.08))
 export const gpReward = (s: GpSeries, round: number) => s.prize + round * Math.round(s.prize / 4)
 
+// Bank packs. Bigger packs carry a bigger bonus on top of the base rate of
+// 5 bucks per dollar, plus extra coins and parts.
+export type BucksPack = { id: string; name: string; price: number; bucks: number; bonus: number; coins?: number; parts?: number; tag?: string; art: string }
+export const BUCKS_PACKS: BucksPack[] = [
+  { id: 'handful', name: 'Handful of Bucks', price: 1.99, bucks: 10, bonus: 0, art: '💵' },
+  { id: 'stack', name: 'Stack of Bucks', price: 4.99, bucks: 25, bonus: 3, art: '💵💵' },
+  { id: 'bag', name: 'Bag of Bucks', price: 9.99, bucks: 50, bonus: 10, coins: 2500, tag: 'Most popular', art: '💰' },
+  { id: 'vault', name: 'Vault of Bucks', price: 19.99, bucks: 100, bonus: 30, coins: 7500, parts: 25, art: '🏦' },
+  { id: 'truck', name: 'Truckload of Bucks', price: 49.99, bucks: 250, bonus: 100, coins: 25000, parts: 75, art: '🚚' },
+  { id: 'tanker', name: 'Golden Tanker', price: 99.99, bucks: 500, bonus: 250, coins: 60000, parts: 200, tag: 'Best value', art: '🏆' },
+]
+
 export type StatKey = 'rusty' | 'jobs' | 'carsBought' | 'upgrades' | 'racesWon' | 'built' | 'roads' | 'coinsEarned' | 'flatsFixed' | 'rescued' | 'searches' | 'gpWins'
 
 export type GoalDef = { id: string; text: string; stat: StatKey; target: number; coins: number; xp: number; bucks?: number }

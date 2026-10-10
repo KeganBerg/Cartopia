@@ -49,7 +49,7 @@ export function Hud() {
         <Speedometer level={s.level} xp={s.xp} />
         <div className="pills">
           <button className="pill" onClick={() => s.showNeed('coins', 0)}><span className="ico coin-ico">$</span>{n(s.coins)}<span className="plus">+</span></button>
-          <button className="pill" onClick={() => s.showNeed('bucks', 0)}><span className="ico buck-ico">B</span>{n(s.bucks)}<span className="plus">+</span></button>
+          <button className="pill" onClick={() => s.openPanel('bank')}><span className="ico buck-ico">B</span>{n(s.bucks)}<span className="plus">+</span></button>
           <button className="pill" onClick={() => s.showNeed('parts', 0)}><span className="ico parts-ico">⚙</span>{n(s.parts)}<span className="plus">+</span></button>
         </div>
       </div>

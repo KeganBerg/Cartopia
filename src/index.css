@@ -309,6 +309,25 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .mystery-box { font-size: 96px; background: none; border: none; animation: boxwiggle 1s ease-in-out infinite; }
 @keyframes boxwiggle { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-8deg) scale(1.05); } 75% { transform: rotate(8deg) scale(1.05); } }
 
+/* Bank */
+.bank-head { display: flex; gap: 12px; align-items: center; background: #e3f2fd; border: 2px solid #90caf9; border-radius: 14px; padding: 10px 12px; margin-bottom: 12px; }
+.bank-head p { margin: 2px 0 0; font-size: 13px; }
+.bank-ico { width: 40px; height: 40px; font-size: 22px; flex: none; }
+.bank-packs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.bank-pack { position: relative; background: #fff; border: 3px solid #e0e0e0; border-radius: 16px; padding: 14px 10px 10px; display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center; }
+.bank-pack.featured { border-color: #ffca28; background: linear-gradient(#fffde7, #fff); box-shadow: 0 0 0 3px rgba(255,202,40,.3); }
+.pack-art { font-size: 40px; line-height: 1.1; }
+.pack-name { font: 15px var(--display); }
+.pack-bucks { font: 28px var(--display); color: #1e5fbf; }
+.pack-bonus { font-size: 12px; font-weight: 800; color: #2e7d32; }
+.pack-bonus.plain { color: #78909c; }
+.pack-extras { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; font-size: 12px; font-weight: 800; color: #6d4c41; }
+.pack-extras span { background: #fff3e0; border-radius: 8px; padding: 1px 6px; }
+.bank-pack .buy { margin-top: 6px; width: 100%; font-size: 18px; }
+.bank-free { margin-top: 12px; }
+.bank-notice { z-index: 160; }
+.bank-menu-btn { width: 100%; margin-bottom: 4px; background: linear-gradient(#ffd54f, #ff8f00); }
+
 @media (max-width: 600px) {
   .speedo { width: 64px; height: 76px; }
   .speedo svg { width: 64px; height: 64px; }
@@ -369,6 +388,9 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
   .bay .car-swatch { width: 70px; height: 35px; }
   .bay > .buy { grid-column: 1 / -1; }
   .search-map { height: 260px; }
+  .bank-packs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .pack-bucks { font-size: 24px; }
+  .pack-art { font-size: 32px; }
   button.pill { font-size: 13px; }
   .need-ico { width: 40px; height: 40px; font-size: 20px; }
   .plus { width: 13px; height: 13px; font-size: 11px; line-height: 13px; }
