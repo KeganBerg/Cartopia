@@ -87,6 +87,92 @@ function CrewFlag({ x, z }: { x: number; z: number }) {
   )
 }
 
+// Crew House: a corrugated Quonset clubhouse with a roll-up door, a deck out
+// front and flags in the clan's color, so it reads nothing like a storefront.
+function CrewHouse({ m, ghost, sign, bulb, win }: { m: ReturnType<typeof useMat>; ghost?: boolean; sign: boolean; bulb: React.ReactNode; win: React.ReactNode }) {
+  const clan = useGame((s) => s.clanBadge?.color ?? '#ff7043')
+  const r = 0.95
+  const len = 1.5
+  const hx = -0.55
+  return (
+    <group>
+      <mesh position={[0, 0.03, 0]} receiveShadow>
+        <boxGeometry args={[3.9, 0.05, 1.9]} />
+        {m('#ffffff', paverTex(4, 2))}
+      </mesh>
+      {/* Half-buried ribbed tube makes the arched hut. */}
+      <mesh position={[hx, 0.05, -0.1]} rotation-x={Math.PI / 2} castShadow receiveShadow>
+        <cylinderGeometry args={[r, r, len, 14, 1, true]} />
+        <meshStandardMaterial color={ghost ? '#66bb6a' : '#cfd8dc'} metalness={ghost ? 0 : 0.15} roughness={0.55} flatShading side={2} transparent={ghost} opacity={ghost ? 0.55 : 1} />
+      </mesh>
+      {[-1, 1].map((e) => (
+        <mesh key={e} position={[hx, 0.05, -0.1 + e * (len / 2)]} rotation-y={e < 0 ? Math.PI : 0}>
+          <circleGeometry args={[r, 14, 0, Math.PI]} />
+          {m('#37474f')}
+        </mesh>
+      ))}
+      {/* Roll-up garage door with a clan-color racing stripe. */}
+      <mesh position={[hx, 0.42, len / 2 - 0.09]}>
+        <planeGeometry args={[0.95, 0.74]} />
+        {m('#cfd8dc')}
+      </mesh>
+      {[0.2, 0.36, 0.52, 0.68].map((y) => (
+        <mesh key={y} position={[hx, y, len / 2 - 0.085]}>
+          <planeGeometry args={[0.95, 0.015]} />
+          {m('#90a4ae')}
+        </mesh>
+      ))}
+      <mesh position={[hx, 0.44, len / 2 - 0.08]}>
+        <planeGeometry args={[0.95, 0.09]} />
+        <meshStandardMaterial color={ghost ? '#66bb6a' : clan} />
+      </mesh>
+      {/* Porthole windows either side of the door. */}
+      {[-0.68, 0.68].map((dx) => (
+        <mesh key={dx} position={[hx + dx, 0.5, len / 2 - 0.085]}>
+          <circleGeometry args={[0.12, 16]} />
+          {win}
+        </mesh>
+      ))}
+      {/* Clan banner hanging down the arch. */}
+      <mesh position={[hx, 0.86, len / 2 - 0.08]}>
+        <planeGeometry args={[0.36, 0.22]} />
+        <meshStandardMaterial color={ghost ? '#66bb6a' : clan} />
+      </mesh>
+      <mesh position={[hx, 0.86, len / 2 - 0.075]}>
+        <circleGeometry args={[0.07, 12]} />
+        {m('#fffde7')}
+      </mesh>
+      {/* Wooden deck with a picnic table and a glowing fire barrel. */}
+      <mesh position={[1.15, 0.09, 0]} castShadow receiveShadow>
+        <boxGeometry args={[1.35, 0.08, 1.5]} />
+        {m('#8d6e63')}
+      </mesh>
+      {!ghost && (
+        <group position={[1.05, 0.13, -0.15]}>
+          <mesh position={[0, 0.3, 0]} castShadow><boxGeometry args={[0.7, 0.05, 0.36]} />{m('#a1887f')}</mesh>
+          {[-0.28, 0.28].map((x) => <mesh key={x} position={[x, 0.15, 0]}><boxGeometry args={[0.05, 0.3, 0.3]} />{m('#6d4c41')}</mesh>)}
+          {[-0.3, 0.3].map((z) => <mesh key={z} position={[0, 0.17, z]} castShadow><boxGeometry args={[0.7, 0.04, 0.12]} />{m('#a1887f')}</mesh>)}
+          <group position={[0.62, 0, 0.55]}>
+            <mesh position={[0, 0.2, 0]} castShadow><cylinderGeometry args={[0.13, 0.13, 0.4, 12]} />{m('#455a64')}</mesh>
+            <mesh position={[0, 0.41, 0]} rotation-x={-Math.PI / 2}><circleGeometry args={[0.11, 12]} />{bulb}</mesh>
+          </group>
+          <LightPool r={0.6} x={0.62} z={0.55} />
+        </group>
+      )}
+      {!ghost && <CrewFlag x={1.75} z={-0.7} />}
+      {!ghost && <CrewFlag x={-1.85} z={0.75} />}
+      {/* Sign on a frame across the top of the arch. */}
+      {sign && (
+        <group position={[hx, 1.22, len / 2 - 0.15]}>
+          {[-0.5, 0.5].map((x) => <mesh key={x} position={[x, -0.18, -0.02]}><boxGeometry args={[0.04, 0.36, 0.04]} />{m('#37474f')}</mesh>)}
+          <mesh position={[0, 0, -0.03]}><boxGeometry args={[1.28, 0.36, 0.05]} /><meshStandardMaterial color={ghost ? '#66bb6a' : clan} /></mesh>
+          <Sign text="CREW HOUSE" w={1.2} y={0} z={0} bg="#263238" fg="#ffffff" />
+        </group>
+      )}
+    </group>
+  )
+}
+
 function Sign({ text, w, y, z, bg, fg }: { text: string; w: number; y: number; z: number; bg?: string; fg?: string }) {
   return (
     <mesh position={[0, y, z]}>
@@ -620,6 +706,8 @@ export function BuildingModel({ def, ghost, valid }: Props) {
           {sign && <Sign text="GAS" w={1.2} y={1.5} z={0.83} bg={def.roof} fg="#ffffff" />}
         </group>
       )
+    case 'crew':
+      return <CrewHouse m={m} ghost={ghost} sign={!!sign} bulb={bulb} win={win} />
     case 'cinema':
       return (
         <group>
@@ -758,7 +846,6 @@ export function BuildingModel({ def, ghost, valid }: Props) {
               ))}
             </group>
           )}
-          {def.id === 'crew' && !ghost && <CrewFlag x={-W * 0.44} z={D * 0.32} />}
           {def.prop && <RoofProp prop={def.prop} y={h + 0.13} />}
           {def.id === 'motel' && [-1.2, -0.6, 0.6, 1.2].map((x) => (
             <mesh key={x} position={[x, 0.32, D * 0.26 + 0.01]}>

@@ -51,7 +51,7 @@ function CrewBadge({ b }: { b: PlacedBuilding }) {
   return (
     <div className="anchor" ref={anchorRef(b.uid)}>
       <button className="badge badge-crew" style={clan ? { background: clan.color } : undefined} onClick={() => tap(b.uid)} title="Crew House">
-        {clan ? `${clan.emblem} ${clan.tag}` : '🛡️ Find a clan'}
+        {clan ? `${clan.emblem} ${clan.tag}` : '🛡️ Find a crew'}
       </button>
     </div>
   )

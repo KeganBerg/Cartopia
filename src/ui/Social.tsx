@@ -23,13 +23,13 @@ export function useUserId() {
   return uid
 }
 
-// Friends, Leaderboards and Clan share one window with tabs across the top.
+// Friends, Leaderboards and Crew share one window with tabs across the top.
 export function SocialTabs({ current }: { current: PanelId }) {
   const openPanel = useGame((s) => s.openPanel)
   const tabs: { id: PanelId; label: string }[] = [
     { id: 'friends', label: '👫 Friends' },
     { id: 'leaders', label: '🏅 Leaderboards' },
-    { id: 'clan', label: '🛡️ Clan' },
+    { id: 'clan', label: '🛡️ Crew' },
   ]
   return (
     <div className="tabs social-tabs">
@@ -146,7 +146,7 @@ export function LeadersPanel() {
       <SocialTabs current="leaders" />
       <div className="seg scope">
         <button className={scope === 'players' ? 'sel' : ''} onClick={() => setScope('players')}>Players</button>
-        <button className={scope === 'clans' ? 'sel' : ''} onClick={() => setScope('clans')}>Clans</button>
+        <button className={scope === 'clans' ? 'sel' : ''} onClick={() => setScope('clans')}>Crews</button>
       </div>
       <MetricPicker metric={metric} setMetric={setMetric} period={period} setPeriod={setPeriod} />
       <p className="hint board-hint">
@@ -155,7 +155,7 @@ export function LeadersPanel() {
         {metric === 'trophies' && 'Trophies come from race wins, Grand Prix prizes and Rusty finds. '}
         {metric === 'level' && 'Earn XP from jobs, races and goals to level up. '}
         {period === 'week' && <>Weekly boards count gains since Monday and reset in <b>{weekResetsIn()}</b>.</>}
-        {scope === 'clans' && ' Clans are ranked by their members combined.'}
+        {scope === 'clans' && ' Crews are ranked by their members combined.'}
       </p>
       {failed && <p className="hint">Couldn't reach the leaderboard right now. Showing what we have.</p>}
 
@@ -190,7 +190,7 @@ export function LeadersPanel() {
           {!clans && <p className="hint">Loading...</p>}
           {clans && clans.length === 0 && (
             <div className="empty-board">
-              No clans yet. <button className="buy small" onClick={() => openPanel('clan')}>Start the first one</button>
+              No crews yet. <button className="buy small" onClick={() => openPanel('clan')}>Start the first one</button>
             </div>
           )}
           <div className="leaders">
@@ -227,16 +227,16 @@ export function ClanPanel() {
   useEffect(() => { if (uid !== undefined) reload() }, [uid, reload])
 
   return (
-    <Panel title="Clan" wide>
+    <Panel title="Crew" wide>
       <SocialTabs current="clan" />
       {!supabase ? (
-        <p className="hint">Clans need an internet connection.</p>
+        <p className="hint">Crews need an internet connection.</p>
       ) : uid === null ? (
         <div className="clan-signin">
           <span className="big-emblem">🛡️</span>
           <div>
-            <b>Team up in a clan</b>
-            <p>Join up to {CLAN_CAP} drivers, pool your power, wins and trophies, and climb the clan leaderboards together.</p>
+            <b>Team up in a crew</b>
+            <p>Join up to {CLAN_CAP} drivers, pool your power, wins and trophies, and climb the crew leaderboards together.</p>
             <button className="buy" onClick={() => openPanel('account')}>Sign in to join</button>
           </div>
         </div>
@@ -267,7 +267,7 @@ function CrewHouseNudge() {
   return (
     <div className="crew-nudge">
       <span>🏠</span>
-      <div><b>Build a Crew House</b><small>Fly your clan's flag in town and tap it to open this window.</small></div>
+      <div><b>Build a Crew House</b><small>Fly your crew's flag in town and tap it to open this window.</small></div>
       <button className="buy small" onClick={go}>Build · ${n(def.price)}</button>
     </div>
   )
@@ -347,12 +347,12 @@ function ClanHome({ data, uid, onChange }: { data: MyClan; uid: string; onChange
       </div>
 
       <div className="clan-actions">
-        {role === 'leader' && !editing && <button className="buy small alt" onClick={() => setEditing(true)}>✏️ Edit clan</button>}
+        {role === 'leader' && !editing && <button className="buy small alt" onClick={() => setEditing(true)}>✏️ Edit crew</button>}
         {!confirmLeave ? (
-          <button className="sell" onClick={() => setConfirmLeave(true)}>Leave clan</button>
+          <button className="sell" onClick={() => setConfirmLeave(true)}>Leave crew</button>
         ) : (
           <div className="confirm">
-            <span>{leaderLeaving ? 'Leadership passes to your longest-serving member.' : members.length === 1 ? 'You are the last member, so the clan will close.' : 'Leave this clan?'}</span>
+            <span>{leaderLeaving ? 'Leadership passes to your longest-serving member.' : members.length === 1 ? 'You are the last member, so the crew will close.' : 'Leave this crew?'}</span>
             <button className="sell" disabled={busy} onClick={() => act(leaveClan, `You left ${clan.name}`)}>Yes, leave</button>
             <button className="buy small alt" onClick={() => setConfirmLeave(false)}>Stay</button>
           </div>
@@ -371,7 +371,7 @@ function ClanEditor({ clan, onDone }: { clan: Clan; onDone: () => void }) {
   const save = async () => {
     try {
       await updateClan({ description, emblem, color, minLevel })
-      toast('Clan updated')
+      toast('Crew updated')
       onDone()
     } catch (e) {
       toast((e as Error).message)
@@ -438,7 +438,7 @@ function ClanBrowser({ onJoined }: { onJoined: () => void }) {
   const tag = form.tag.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4)
   const valid = form.name.trim().length >= 3 && tag.length >= 2
   const create = async () => {
-    if (coins < CLAN_COST) return showNeed('coins', CLAN_COST - coins, 'a clan')
+    if (coins < CLAN_COST) return showNeed('coins', CLAN_COST - coins, 'a crew')
     setBusy(true)
     try {
       await createClan({ ...form, tag, name: form.name.trim() })
@@ -458,10 +458,10 @@ function ClanBrowser({ onJoined }: { onJoined: () => void }) {
   if (creating) {
     return (
       <div className="clan-form">
-        <h3>Start a clan <small>${n(CLAN_COST)}</small></h3>
+        <h3>Start a crew <small>${n(CLAN_COST)}</small></h3>
         <div className="clan-preview">
           <span className="big-emblem" style={{ background: form.color }}>{form.emblem}</span>
-          <div><b>{form.name.trim() || 'Your clan'}</b> <span className="clan-tag" style={{ background: form.color }}>{tag || 'TAG'}</span></div>
+          <div><b>{form.name.trim() || 'Your crew'}</b> <span className="clan-tag" style={{ background: form.color }}>{tag || 'TAG'}</span></div>
         </div>
         <label>Name<input value={form.name} maxLength={24} placeholder="Midnight Racers" onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
         <label>Tag (2 to 4 letters)<input value={tag} maxLength={4} placeholder="MR" onChange={(e) => setForm({ ...form, tag: e.target.value })} /></label>
@@ -469,7 +469,7 @@ function ClanBrowser({ onJoined }: { onJoined: () => void }) {
         <label>Motto<input value={form.description} maxLength={140} placeholder="Fast cars, faster friends" onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
         <label>Level needed to join<input type="number" min={1} max={99} value={form.minLevel} onChange={(e) => setForm({ ...form, minLevel: Math.max(1, Math.min(99, Number(e.target.value) || 1)) })} /></label>
         <div className="row">
-          <button className="buy" disabled={!valid || busy} onClick={create}>Start clan · ${n(CLAN_COST)}</button>
+          <button className="buy" disabled={!valid || busy} onClick={create}>Start crew · ${n(CLAN_COST)}</button>
           <button className="buy alt" onClick={() => setCreating(false)}>Back</button>
         </div>
       </div>
@@ -479,12 +479,12 @@ function ClanBrowser({ onJoined }: { onJoined: () => void }) {
   return (
     <div className="clan-browser">
       <div className="clan-browser-head">
-        <input className="clan-search" value={search} placeholder="Search clans" onChange={(e) => setSearch(e.target.value)} />
-        <button className="buy" onClick={() => setCreating(true)}>+ Start a clan</button>
+        <input className="clan-search" value={search} placeholder="Search crews" onChange={(e) => setSearch(e.target.value)} />
+        <button className="buy" onClick={() => setCreating(true)}>+ Start a crew</button>
       </div>
       {!shown && <p className="hint">Loading...</p>}
       {shown && shown.length === 0 && (
-        <p className="empty-board">{q ? 'No clans match that search.' : 'No clans yet. Start the first one and invite your friends!'}</p>
+        <p className="empty-board">{q ? 'No crews match that search.' : 'No crews yet. Start the first one and invite your friends!'}</p>
       )}
       <div className="leaders">
         {shown?.map((c) => {

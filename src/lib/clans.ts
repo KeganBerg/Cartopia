@@ -183,9 +183,10 @@ export async function refreshClanBadge(uid: string | null) {
 }
 
 async function rpc<T = unknown>(fn: string, args?: Record<string, unknown>): Promise<T> {
-  if (!supabase) throw new Error('Clans need an internet connection')
+  if (!supabase) throw new Error('Crews need an internet connection')
   const { data, error } = await supabase.rpc(fn, args)
-  if (error) throw new Error(error.message)
+  // The database says "clan"; players see "crew".
+  if (error) throw new Error(error.message.replace(/clan/g, 'crew').replace(/Clan/g, 'Crew'))
   return data as T
 }
 
