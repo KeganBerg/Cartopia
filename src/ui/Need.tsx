@@ -21,12 +21,13 @@ export function NeedPanel() {
     if (d.unique && s.buildings.some((b) => b.def === id)) return { label: '✔ Built', run: () => {}, disabled: true }
     return { label: `Build · $${d.price.toLocaleString()}`, run: () => s.setMode('place', id), disabled: s.coins < d.price }
   }
-  const jobDefs = [...new Set(s.buildings.filter((b) => buildingDef(b.def).jobSeconds).map((b) => b.def))]
+  const jobDefs = [...new Set(s.buildings.filter((b) => isJob(b.def)).map((b) => b.def))]
   const showJobs = () => s.showMe(jobDefs, ready ? 'Tap the flashing $ bubbles to collect.' : 'Tap a flashing ⛽ bubble to start a job.')
   const showParts = (id: string) => () => s.showMe([id], `Tap the flashing bubble on your ${buildingDef(id).name} to start a parts job.`)
   const owned = (id: string) => s.buildings.filter((b) => b.def === id).length
-  const idle = s.buildings.filter((b) => buildingDef(b.def).jobSeconds && b.jobEndsAt === null).length
-  const ready = s.buildings.filter((b) => b.jobEndsAt !== null && now >= b.jobEndsAt).length
+  const isJob = (def: string) => !!buildingDef(def).jobSeconds && buildingDef(def).kind !== 'obstacle'
+  const idle = s.buildings.filter((b) => isJob(b.def) && b.jobEndsAt === null).length
+  const ready = s.buildings.filter((b) => isJob(b.def) && b.jobEndsAt !== null && now >= b.jobEndsAt).length
 
   let sources: Source[] = []
   let summary = ''

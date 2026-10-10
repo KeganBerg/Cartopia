@@ -1,8 +1,9 @@
 import { Vector3 } from 'three'
-import { useGame, type PlacedBuilding } from '../game/store'
-import { buildingDef, carDef } from '../game/data'
+import { useState } from 'react'
+import { useGame, buyablePlots, type PlacedBuilding } from '../game/store'
+import { buildingDef, carDef, plotPrice, START_LAND } from '../game/data'
 import { anchors, anchorRef } from '../scene/anchors'
-import { centerOf } from '../scene/World'
+import { centerOf, plotCenter } from '../scene/World'
 import { useNow } from '../scene/useNow'
 
 function fmt(sec: number) {
@@ -24,13 +25,15 @@ function JobBadge({ b, now }: { b: PlacedBuilding; now: number }) {
     <div className="anchor" ref={anchorRef(b.uid)}>
       <button className={`badge ${ready ? 'badge-ready' : working ? 'badge-working' : 'badge-idle'}${lit ? ' badge-pulse' : ''}`} onClick={() => tap(b.uid)} title={d.name}>
         {ready ? (
-          <span className="coin">$</span>
+          <span className="coin">{d.kind === 'obstacle' ? '✔' : '$'}</span>
         ) : working ? (
           <>
             <span className="clock">⏱</span>
             <span className="bar"><span style={{ width: `${pct * 100}%` }} /></span>
             <span className="time">{fmt(left)}</span>
           </>
+        ) : d.kind === 'obstacle' ? (
+          <span className="start">🪓 ${d.price.toLocaleString()}</span>
         ) : (
           <span className="start">⛽ {d.fuelCost}</span>
         )}
@@ -56,6 +59,37 @@ function RescueBadge({ b, now }: { b: PlacedBuilding; now: number }) {
   )
 }
 
+// For-sale signs over the plots next to town while expanding.
+function ExpandBadges() {
+  const land = useGame((s) => s.land)
+  const coins = useGame((s) => s.coins)
+  const buy = useGame((s) => s.buyPlot)
+  const [pick, setPick] = useState<string | null>(null)
+  const price = plotPrice(land.length - START_LAND.length)
+  return (
+    <>
+      {buyablePlots(land).map(([px, pz]) => {
+        const k = `${px},${pz}`
+        const [cx, cz] = plotCenter(px, pz)
+        anchors.set(`plot:${k}`, new Vector3(cx, 0.5, cz))
+        return (
+          <div key={k} className="anchor" ref={anchorRef(`plot:${k}`)}>
+            {pick === k ? (
+              <span className="badge badge-sale confirm">
+                Buy for ${price.toLocaleString()}?
+                <button className="buy small" onClick={() => { buy(px, pz); setPick(null) }}>Yes</button>
+                <button className="sell" onClick={() => setPick(null)}>✕</button>
+              </span>
+            ) : (
+              <button className={`badge badge-sale${coins < price ? ' broke' : ''}`} onClick={() => setPick(k)}>🪧 For sale · ${price.toLocaleString()}</button>
+            )}
+          </div>
+        )
+      })}
+    </>
+  )
+}
+
 // Bubbles over businesses and broken-down cars, pinned to the 3D scene.
 export function Badges() {
   const now = useNow()
@@ -65,7 +99,9 @@ export function Badges() {
   const visiting = useGame((s) => !!s.visiting)
   const openPanel = useGame((s) => s.openPanel)
   const selectCar = useGame((s) => s.selectCar)
-  if (mode !== 'play' || visiting) return null
+  if (visiting) return null
+  if (mode === 'expand') return <div className="badges"><ExpandBadges /></div>
+  if (mode !== 'play') return null
   return (
     <div className="badges">
       {buildings.filter((b) => buildingDef(b.def).jobSeconds).map((b) => (

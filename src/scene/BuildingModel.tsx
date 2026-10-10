@@ -74,6 +74,51 @@ export function BuildingModel({ def, ghost, valid }: Props) {
   const sign = !ghost && def.sign
 
   switch (def.id) {
+    case 'bush':
+      return (
+        <group>
+          {[[-0.3, 0.1, 0.42], [0.25, -0.2, 0.5], [0.1, 0.3, 0.36]].map(([x, z, r], i) => (
+            <mesh key={i} position={[x, r * 0.8, z]} castShadow>
+              <sphereGeometry args={[r, 10, 8]} />
+              {m(i % 2 ? def.roof : def.color)}
+            </mesh>
+          ))}
+        </group>
+      )
+    case 'rock':
+      return (
+        <group>
+          <mesh position={[0, 0.4, 0]} rotation={[0.3, 0.6, 0.2]} castShadow>
+            <dodecahedronGeometry args={[0.65, 0]} />
+            {m(def.color)}
+          </mesh>
+          <mesh position={[0.5, 0.2, 0.35]} rotation={[0.5, 0.2, 0]} castShadow>
+            <dodecahedronGeometry args={[0.3, 0]} />
+            {m(def.roof)}
+          </mesh>
+        </group>
+      )
+    case 'cactus':
+      return (
+        <group>
+          <mesh position={[0, 0.75, 0]} castShadow>
+            <capsuleGeometry args={[0.2, 1.1, 4, 10]} />
+            {m(def.color)}
+          </mesh>
+          <mesh position={[0.35, 0.85, 0]} rotation-z={-0.2} castShadow>
+            <capsuleGeometry args={[0.12, 0.45, 4, 8]} />
+            {m(def.roof)}
+          </mesh>
+          <mesh position={[-0.32, 1.05, 0]} rotation-z={0.25} castShadow>
+            <capsuleGeometry args={[0.11, 0.35, 4, 8]} />
+            {m(def.roof)}
+          </mesh>
+          <mesh position={[0, 0.06, 0]}>
+            <cylinderGeometry args={[0.55, 0.6, 0.12, 14]} />
+            {m('#d7b77b')}
+          </mesh>
+        </group>
+      )
     case 'tree':
       return (
         <group>

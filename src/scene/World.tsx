@@ -2,13 +2,50 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { MapControls } from '@react-three/drei'
 import { AnchorProjector } from './anchors'
 import { useThree, type ThreeEvent } from '@react-three/fiber'
-import { useGame, canPlace, type PlacedBuilding } from '../game/store'
-import { GRID, TILE, buildingDef } from '../game/data'
+import { useGame, canPlace, buyablePlots, type PlacedBuilding } from '../game/store'
+import { GRID, TILE, PLOT, PLOT_MIN, PLOT_MAX, START_LAND, buildingDef } from '../game/data'
 import { BuildingModel } from './BuildingModel'
 import { TownCars } from './TownCars'
 import { toWorld, toTile, DIRS } from './grid'
 
 const SIZE = GRID * TILE
+// Everything a town could ever own, centred on the origin like the start lot.
+const ALL = (PLOT_MAX - PLOT_MIN + 1) * PLOT * TILE
+
+// World centre of a land plot.
+export const plotCenter = (px: number, pz: number) => toWorld(px * PLOT + (PLOT - 1) / 2, pz * PLOT + (PLOT - 1) / 2)
+
+function Land() {
+  const land = useGame((s) => (s.visiting ? START_LAND : s.land))
+  const mode = useGame((s) => s.mode)
+  const forSale = useMemo(() => (mode === 'expand' ? buyablePlots(land) : []), [land, mode])
+  return (
+    <group>
+      {land.map((k) => {
+        const [px, pz] = k.split(',').map(Number)
+        const [cx, cz] = plotCenter(px, pz)
+        return (
+          <group key={k} position={[cx, 0, cz]}>
+            <mesh rotation-x={-Math.PI / 2} position-y={0.001} receiveShadow>
+              <planeGeometry args={[PLOT * TILE, PLOT * TILE]} />
+              <meshStandardMaterial color="#7ec850" />
+            </mesh>
+            {mode !== 'play' && mode !== 'expand' && <gridHelper args={[PLOT * TILE, PLOT, '#4f8f2f', '#5f9f3f']} position-y={0.005} />}
+          </group>
+        )
+      })}
+      {forSale.map(([px, pz]) => {
+        const [cx, cz] = plotCenter(px, pz)
+        return (
+          <mesh key={`${px},${pz}`} rotation-x={-Math.PI / 2} position={[cx, 0.004, cz]}>
+            <planeGeometry args={[PLOT * TILE - 0.6, PLOT * TILE - 0.6]} />
+            <meshBasicMaterial color="#ffd54f" transparent opacity={0.35} />
+          </mesh>
+        )
+      })}
+    </group>
+  )
+}
 
 export function centerOf(def: string, x: number, z: number): [number, number] {
   const d = buildingDef(def)
@@ -41,7 +78,7 @@ function facing(b: PlacedBuilding, roads: Set<string>) {
 function Building({ b, roads }: { b: PlacedBuilding; roads: Set<string> }) {
   const d = buildingDef(b.def)
   const [cx, cz] = centerOf(b.def, b.x, b.z)
-  const rot = d.kind === 'decor' ? 0 : facing(b, roads)
+  const rot = d.kind === 'decor' || d.kind === 'obstacle' ? 0 : facing(b, roads)
   return (
     <group
       position={[cx, 0, cz]}
@@ -57,7 +94,7 @@ function Building({ b, roads }: { b: PlacedBuilding; roads: Set<string> }) {
       }}
       onPointerOut={() => (document.body.style.cursor = '')}
     >
-      {d.kind !== 'decor' && (
+      {d.kind !== 'decor' && d.kind !== 'obstacle' && (
         <mesh rotation-x={-Math.PI / 2} position-y={0.012} receiveShadow>
           <planeGeometry args={[d.w * TILE - 0.1, d.h * TILE - 0.1]} />
           <meshStandardMaterial color="#e8dcc3" />
@@ -122,6 +159,7 @@ function Interaction() {
   const painting = useRef(false)
   const roads = useGame((s) => s.roads)
   const buildings = useGame((s) => s.buildings)
+  const land = useGame((s) => s.land)
 
   const tileOf = (e: ThreeEvent<PointerEvent | MouseEvent>) => toTile(e.point.x, e.point.z)
 
@@ -158,7 +196,7 @@ function Interaction() {
     const d = buildingDef(placing)
     const ox = hover[0] - Math.floor((d.w - 1) / 2)
     const oz = hover[1] - Math.floor((d.h - 1) / 2)
-    const valid = canPlace({ roads, buildings }, placing, ox, oz)
+    const valid = canPlace({ roads, buildings, land }, placing, ox, oz)
     const [cx, cz] = centerOf(placing, ox, oz)
     ghost = (
       <group position={[cx, 0.02, cz]}>
@@ -193,10 +231,9 @@ function Interaction() {
         }}
         onClick={onClick}
       >
-        <planeGeometry args={[SIZE, SIZE]} />
-        <meshStandardMaterial color="#7ec850" />
+        <planeGeometry args={[ALL, ALL]} />
+        <meshStandardMaterial color="#5aa83a" />
       </mesh>
-      {mode !== 'play' && <gridHelper args={[SIZE, GRID, '#4f8f2f', '#5f9f3f']} position-y={0.005} />}
       {ghost}
       <MapControls
         makeDefault
@@ -221,6 +258,27 @@ function ResponsiveZoom() {
   return null
 }
 
+// Pull the camera back while buying land so the For Sale signs are in view.
+function ExpandZoom() {
+  const camera = useThree((s) => s.camera)
+  const controls = useThree((s) => s.controls) as { target: { set: (x: number, y: number, z: number) => void }; update: () => void } | null
+  const mode = useGame((s) => s.mode)
+  const saved = useRef<number | null>(null)
+  useEffect(() => {
+    if (mode === 'expand' && saved.current === null) {
+      saved.current = camera.zoom
+      camera.zoom = Math.max(12, camera.zoom * 0.5)
+      camera.updateProjectionMatrix()
+    } else if (mode !== 'expand' && saved.current !== null) {
+      camera.zoom = saved.current
+      saved.current = null
+      camera.updateProjectionMatrix()
+    }
+    controls?.update()
+  }, [mode, camera, controls])
+  return null
+}
+
 export function World() {
   const buildings = useGame((s) => (s.visiting ?? s).buildings)
   const roadsList = useGame((s) => (s.visiting ?? s).roads)
@@ -241,11 +299,13 @@ export function World() {
       />
       {/* Grass beyond the buildable lot. */}
       <mesh rotation-x={-Math.PI / 2} position-y={-0.02}>
-        <planeGeometry args={[SIZE * 4, SIZE * 4]} />
+        <planeGeometry args={[SIZE * 8, SIZE * 8]} />
         <meshStandardMaterial color="#5aa83a" />
       </mesh>
       <ResponsiveZoom />
+      <ExpandZoom />
       <Interaction />
+      <Land />
       <Roads />
       {buildings.map((b) => (
         <Building key={b.uid} b={b} roads={roads} />

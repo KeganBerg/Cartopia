@@ -31,7 +31,8 @@ function EditBar() {
   const setMode = useGame((s) => s.setMode)
   const openPanel = useGame((s) => s.openPanel)
   const hint =
-    mode === 'road' ? 'Click or drag to lay road (10 coins per tile)'
+    mode === 'expand' ? 'Tap a For Sale sign to buy the land next to your town'
+    : mode === 'road' ? 'Click or drag to lay road (10 coins per tile)'
     : mode === 'bulldoze' ? 'Click or drag to remove (buildings refund half)'
     : `Click to place ${placing ? BUILDINGS.find((b) => b.id === placing)?.name : ''}`
   return (
@@ -40,6 +41,7 @@ function EditBar() {
       <div className="edit-tools">
         <button className={mode === 'road' ? 'tool active' : 'tool'} onClick={() => setMode('road')}>🛣️ Road</button>
         <button className={mode === 'bulldoze' ? 'tool active' : 'tool'} onClick={() => setMode('bulldoze')}>🚜 Bulldoze</button>
+        <button className={mode === 'expand' ? 'tool active' : 'tool'} onClick={() => setMode('expand')}>🗺 Land</button>
         <button className="tool" onClick={() => openPanel('shop')}>🏪 Shop</button>
         <button className="tool done" onClick={() => setMode('play')}>✔ Done</button>
       </div>

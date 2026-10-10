@@ -3,7 +3,7 @@
 export const GRID = 24
 export const TILE = 2
 
-export type BuildingKind = 'business' | 'gas' | 'parts' | 'showroom' | 'garage' | 'decor' | 'house'
+export type BuildingKind = 'business' | 'gas' | 'parts' | 'showroom' | 'garage' | 'decor' | 'house' | 'obstacle'
 
 export type BuildingDef = {
   id: string
@@ -52,6 +52,10 @@ export const BUILDINGS: BuildingDef[] = [
   { id: 'cinema', name: 'Drive-In', kind: 'business', w: 2, h: 2, price: 6000, unlockLevel: 6, jobSeconds: 600, fuelCost: 6, payout: 1500, xp: 80, color: '#8d6e63', roof: '#3e2723', sign: 'DRIVE-IN', prop: 'popcorn' },
   { id: 'parts', name: 'Parts Depot', kind: 'parts', w: 2, h: 1, price: 5000, unlockLevel: 5, jobSeconds: 480, fuelCost: 4, payout: 200, partsPayout: 15, xp: 45, color: '#1565c0', roof: '#bbdefb', sign: 'PARTS' },
 
+  // Obstacles on newly bought land: pay to clear, wait, then tap to remove.
+  { id: 'bush', name: 'Bushes', kind: 'obstacle', w: 1, h: 1, price: 150, unlockLevel: 99, jobSeconds: 30, xp: 5, color: '#558b2f', roof: '#33691e' },
+  { id: 'rock', name: 'Boulder', kind: 'obstacle', w: 1, h: 1, price: 400, unlockLevel: 99, jobSeconds: 120, xp: 12, color: '#9e9e9e', roof: '#757575' },
+  { id: 'cactus', name: 'Cactus', kind: 'obstacle', w: 1, h: 1, price: 1500, unlockLevel: 99, jobSeconds: 600, xp: 40, color: '#43a047', roof: '#2e7d32' },
   { id: 'house', name: 'House', kind: 'house', w: 1, h: 1, price: 250, unlockLevel: 1, color: '#fff3e0', roof: '#6d4c41' },
   { id: 'tree', name: 'Oak Tree', kind: 'decor', w: 1, h: 1, price: 50, unlockLevel: 1, color: '#43a047', roof: '#2e7d32' },
   { id: 'palm', name: 'Palm Tree', kind: 'decor', w: 1, h: 1, price: 120, unlockLevel: 2, color: '#66bb6a', roof: '#8d6e63' },
@@ -63,6 +67,14 @@ export const BUILDINGS: BuildingDef[] = [
   { id: 'statue', name: 'Golden Car Statue', kind: 'decor', w: 1, h: 1, price: 0, bucks: 3, unlockLevel: 5, color: '#ffd700', roof: '#9e9e9e' },
   { id: 'pond', name: 'Duck Pond', kind: 'decor', w: 2, h: 2, price: 1500, unlockLevel: 4, color: '#4fc3f7', roof: '#81c784' },
 ]
+
+// Land is bought in 8x8 plots. The starting lot is the 3x3 plots covering
+// tiles 0-23; towns can grow two plots out on every side.
+export const PLOT = 8
+export const PLOT_MIN = -2
+export const PLOT_MAX = 4
+export const START_LAND = [0, 1, 2].flatMap((x) => [0, 1, 2].map((z) => `${x},${z}`))
+export const plotPrice = (bought: number) => Math.round((5000 * Math.pow(1.45, bought)) / 500) * 500
 
 export const buildingDef = (id: string) => BUILDINGS.find((b) => b.id === id)!
 

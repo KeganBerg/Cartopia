@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
-  GRID, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS, BUILDINGS,
+  PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS, BUILDINGS,
   upgradeCost, MAX_UPGRADE, RESCUE_SPOTS, RESCUE_PINS, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, type Rarity, GOALS, DAILY_BONUS, PAINTS, PAINT_COST, STRIPE_COST, FLAT_CHANCE, flatFixCost, type UpgradeSlot, type StatKey,
 } from './data'
 import { sfx } from '../lib/sound'
@@ -43,10 +43,11 @@ export type SaveState = {
   junkyard: JunkCar[]
   restoring: Restoring | null
   gp: Record<string, { round: number; clears: number }>
+  land: string[]
   updatedAt: number
 }
 
-export type Mode = 'play' | 'place' | 'road' | 'bulldoze'
+export type Mode = 'play' | 'place' | 'road' | 'bulldoze' | 'expand'
 export type Resource = 'coins' | 'parts' | 'fuel' | 'bucks' | 'level'
 export type Need = { res: Resource; missing: number; what?: string }
 
@@ -97,6 +98,7 @@ type Actions = {
   loadSave: (s: SaveState) => void
   showMe: (defs: string[], text: string) => void
   refillFuel: () => void
+  buyPlot: (px: number, pz: number) => void
   gpResult: (series: string, won: boolean) => void
   closePrize: () => void
   startSearch: (spot: string) => void
@@ -139,9 +141,24 @@ export function occupancy(s: Pick<SaveState, 'roads' | 'buildings'>) {
   return occ
 }
 
-export function canPlace(s: Pick<SaveState, 'roads' | 'buildings'>, def: string, x: number, z: number) {
+export const plotOf = (x: number, z: number) => `${Math.floor(x / PLOT)},${Math.floor(z / PLOT)}`
+export const owns = (land: string[], x: number, z: number) => land.includes(plotOf(x, z))
+
+// Plots next to owned land that can be bought.
+export function buyablePlots(land: string[]) {
+  const out: [number, number][] = []
+  for (let px = PLOT_MIN; px <= PLOT_MAX; px++) {
+    for (let pz = PLOT_MIN; pz <= PLOT_MAX; pz++) {
+      if (land.includes(`${px},${pz}`)) continue
+      if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => land.includes(`${px + dx},${pz + dz}`))) out.push([px, pz])
+    }
+  }
+  return out
+}
+
+export function canPlace(s: Pick<SaveState, 'roads' | 'buildings' | 'land'>, def: string, x: number, z: number) {
   const occ = occupancy(s)
-  return footprint(def, x, z).every(([tx, tz]) => tx >= 0 && tz >= 0 && tx < GRID && tz < GRID && !occ.has(key(tx, tz)))
+  return footprint(def, x, z).every(([tx, tz]) => owns(s.land, tx, tz) && !occ.has(key(tx, tz)))
 }
 
 function starterTown(): SaveState {
@@ -185,6 +202,7 @@ function starterTown(): SaveState {
     junkyard: [],
     restoring: null,
     gp: {},
+    land: [...START_LAND],
     updatedAt: now,
   }
 }
@@ -295,7 +313,7 @@ export const useGame = create<GameState>()(
 
       paintRoad: (x, z) => {
         const s = get()
-        if (x < 0 || z < 0 || x >= GRID || z >= GRID) return
+        if (!owns(s.land, x, z)) return
         if (occupancy(s).has(key(x, z))) return
         if (s.coins < 10) return s.showNeed('coins', 10 - s.coins, 'a road tile')
         set({ roads: [...s.roads, key(x, z)], coins: s.coins - 10, stats: bump(s, 'roads'), updatedAt: Date.now() })
@@ -310,6 +328,7 @@ export const useGame = create<GameState>()(
         const b = s.buildings.find((b) => b.uid === what)!
         const d = buildingDef(b.def)
         if (d.kind === 'showroom' || d.kind === 'garage') return s.toast(`${d.name} can't be removed`)
+        if (d.kind === 'obstacle') return s.toast(`Tap the ${d.name.toLowerCase()} in play mode to clear it`)
         set({
           buildings: s.buildings.filter((o) => o.uid !== what),
           coins: s.coins + Math.floor(d.price / 2),
@@ -325,6 +344,18 @@ export const useGame = create<GameState>()(
         if (d.kind === 'showroom') return s.openPanel('showroom')
         if (d.kind === 'garage') return s.openPanel('garage')
         if (b.def === 'rescue') return s.openPanel('rescue')
+        if (d.kind === 'obstacle') {
+          const now = Date.now()
+          if (b.jobEndsAt === null) {
+            if (s.coins < d.price) return s.showNeed('coins', d.price - s.coins, `clearing the ${d.name.toLowerCase()}`)
+            sfx.start()
+            return set({ coins: s.coins - d.price, buildings: s.buildings.map((o) => (o.uid === buid ? { ...o, jobEndsAt: now + d.jobSeconds! * 1000 } : o)), updatedAt: now })
+          }
+          if (now < b.jobEndsAt) return
+          sfx.coin()
+          s.toast(`Cleared! +${d.xp} XP`)
+          return set({ buildings: s.buildings.filter((o) => o.uid !== buid), ...addXp(s, d.xp!), updatedAt: now })
+        }
         if (!d.jobSeconds) return
         const now = Date.now()
         if (b.jobEndsAt === null) {
@@ -572,6 +603,34 @@ export const useGame = create<GameState>()(
 
       closePrize: () => set({ gpPrize: null }),
 
+      buyPlot: (px, pz) => {
+        const s = get()
+        if (!buyablePlots(s.land).some(([x, z]) => x === px && z === pz)) return
+        const cost = plotPrice(s.land.length - START_LAND.length)
+        if (s.coins < cost) return s.showNeed('coins', cost - s.coins, 'more land')
+        // Scatter a few obstacles on the new plot.
+        const obstacles: PlacedBuilding[] = []
+        const used = new Set<string>()
+        const count = 3 + Math.floor(Math.random() * 4)
+        while (obstacles.length < count) {
+          const x = px * PLOT + Math.floor(Math.random() * PLOT)
+          const z = pz * PLOT + Math.floor(Math.random() * PLOT)
+          if (used.has(key(x, z))) continue
+          used.add(key(x, z))
+          const r = Math.random()
+          obstacles.push({ uid: uid(), def: r < 0.5 ? 'bush' : r < 0.85 ? 'rock' : 'cactus', x, z, jobEndsAt: null })
+        }
+        sfx.buy()
+        s.toast('New land! Clear the obstacles to make room.')
+        set({
+          coins: s.coins - cost,
+          land: [...s.land, `${px},${pz}`],
+          buildings: [...s.buildings, ...obstacles],
+          ...addXp(s, 50),
+          updatedAt: Date.now(),
+        })
+      },
+
       refillFuel: () => {
         const s = get()
         const cap = fuelCap(s)
@@ -736,14 +795,14 @@ export const useGame = create<GameState>()(
 )
 
 export function saveOf(s: GameState): SaveState {
-  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, updatedAt } = s
-  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, updatedAt }
+  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, land, updatedAt } = s
+  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, land, updatedAt }
 }
 
 // Fields added after launch, so older saves load with sensible values.
-function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'gp'> {
+function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'gp' | 'land'> {
   // Saves from before the tutorial existed skip it.
-  return { stats: emptyStats(), claimedGoals: [], lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, gp: {} }
+  return { stats: emptyStats(), claimedGoals: [], lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, gp: {}, land: [...START_LAND] }
 }
 
 export const cleanPlate = (p: string) => p.toUpperCase().replace(/[^A-Z0-9 ]/g, '').trim().slice(0, 7)
