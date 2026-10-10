@@ -1,4 +1,5 @@
 import { TILE, type BuildingDef } from '../game/data'
+import { useGame } from '../game/store'
 import { signTexture } from './signTexture'
 import { CarModel } from './CarModel'
 import type { Texture } from 'three'
@@ -70,6 +71,19 @@ export function LightPool({ r, x = 0, z = 0, y = 0.06 }: { r: number; x?: number
       <planeGeometry args={[r * 2, r * 2]} />
       <primitive object={glowMats.pool} attach="material" dispose={null} />
     </mesh>
+  )
+}
+
+// The Crew House flies a flag in the player's clan color.
+function CrewFlag({ x, z }: { x: number; z: number }) {
+  const color = useGame((s) => s.clanBadge?.color ?? '#ff7043')
+  return (
+    <group position={[x, 0, z]}>
+      <mesh position={[0, 0.8, 0]} castShadow><cylinderGeometry args={[0.025, 0.03, 1.6, 8]} /><meshStandardMaterial color="#cfd8dc" metalness={0.6} roughness={0.4} /></mesh>
+      <mesh position={[0, 1.62, 0]}><sphereGeometry args={[0.05, 8, 8]} /><meshStandardMaterial color="#ffd54f" /></mesh>
+      <mesh position={[0.24, 1.38, 0]} castShadow><boxGeometry args={[0.46, 0.3, 0.02]} /><meshStandardMaterial color={color} /></mesh>
+      <mesh position={[0.24, 1.38, 0.012]}><circleGeometry args={[0.08, 16]} /><meshStandardMaterial color="#fffde7" /></mesh>
+    </group>
   )
 }
 
@@ -744,6 +758,7 @@ export function BuildingModel({ def, ghost, valid }: Props) {
               ))}
             </group>
           )}
+          {def.id === 'crew' && !ghost && <CrewFlag x={-W * 0.44} z={D * 0.32} />}
           {def.prop && <RoofProp prop={def.prop} y={h + 0.13} />}
           {def.id === 'motel' && [-1.2, -0.6, 0.6, 1.2].map((x) => (
             <mesh key={x} position={[x, 0.32, D * 0.26 + 0.01]}>

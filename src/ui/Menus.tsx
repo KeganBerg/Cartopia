@@ -82,8 +82,8 @@ function price(def: { price: number; bucks?: number }) {
 
 const SHOP_GROUPS: { title: string; filter: (b: BuildingDef) => boolean }[] = [
   { title: 'Cars and parts makers', filter: (b) => b.id === 'rescue' || b.kind === 'parts' },
-  { title: 'Businesses', filter: (b) => b.kind === 'business' && b.id !== 'rescue' },
-  { title: 'Services', filter: (b) => b.kind === 'gas' },
+  { title: 'Businesses', filter: (b) => b.kind === 'business' && b.id !== 'rescue' && b.id !== 'crew' },
+  { title: 'Services and clubs', filter: (b) => b.kind === 'gas' || b.id === 'crew' },
   { title: 'Homes and decor', filter: (b) => b.kind === 'house' || b.kind === 'decor' },
 ]
 
@@ -121,6 +121,7 @@ export function ShopPanel() {
                     </div>
                   )}
                   {b.id === 'rescue' && <div className="card-stat">Search for old cars and restore them</div>}
+                  {b.id === 'crew' && <div className="card-stat">Your clan's clubhouse: roster, rank and clan boards</div>}
                   {b.fuelCap && <div className="card-stat">+{b.fuelCap} max fuel</div>}
                   {owned ? <span className="price">✔ Built</span> : locked ? <span className="price">🔒 Level {b.unlockLevel}</span> : price(b)}
                 </button>

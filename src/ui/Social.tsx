@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useGame, type Panel as PanelId } from '../game/store'
-import { CLAN_CAP, CLAN_COLORS, CLAN_COST, CLAN_EMBLEMS, garagePower } from '../game/data'
+import { BUILDINGS, CLAN_CAP, CLAN_COLORS, CLAN_COST, CLAN_EMBLEMS, garagePower } from '../game/data'
 import { supabase } from '../lib/supabase'
 import { fetchTown } from '../lib/friends'
 import {
@@ -219,7 +219,10 @@ export function ClanPanel() {
 
   const reload = useCallback(() => {
     if (!uid) return setMine(null)
-    fetchMyClan(uid).then(setMine).catch(() => setMine(null))
+    fetchMyClan(uid).then((m) => {
+      setMine(m)
+      useGame.setState({ clanBadge: m ? { tag: m.clan.tag, emblem: m.clan.emblem, color: m.clan.color } : null })
+    }).catch(() => setMine(null))
   }, [uid])
   useEffect(() => { if (uid !== undefined) reload() }, [uid, reload])
 
@@ -240,11 +243,33 @@ export function ClanPanel() {
       ) : mine === undefined ? (
         <p className="hint">Loading...</p>
       ) : mine ? (
-        <ClanHome data={mine} uid={uid!} onChange={reload} />
+        <><CrewHouseNudge /><ClanHome data={mine} uid={uid!} onChange={reload} /></>
       ) : (
-        <ClanBrowser onJoined={reload} />
+        <><CrewHouseNudge /><ClanBrowser onJoined={reload} /></>
       )}
     </Panel>
+  )
+}
+
+// Points players without a Crew House at the Shop.
+function CrewHouseNudge() {
+  const hasCrew = useGame((s) => s.buildings.some((b) => b.def === 'crew'))
+  const setMode = useGame((s) => s.setMode)
+  const coins = useGame((s) => s.coins)
+  const level = useGame((s) => s.level)
+  const showNeed = useGame((s) => s.showNeed)
+  const def = BUILDINGS.find((b) => b.id === 'crew')!
+  if (hasCrew) return null
+  const go = () =>
+    level < def.unlockLevel ? showNeed('level', def.unlockLevel, def.name)
+    : coins < def.price ? showNeed('coins', def.price - coins, def.name)
+    : setMode('place', 'crew')
+  return (
+    <div className="crew-nudge">
+      <span>🏠</span>
+      <div><b>Build a Crew House</b><small>Fly your clan's flag in town and tap it to open this window.</small></div>
+      <button className="buy small" onClick={go}>Build · ${n(def.price)}</button>
+    </div>
   )
 }
 

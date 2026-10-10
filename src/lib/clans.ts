@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { demoLeaders } from './friends'
+import { useGame } from '../game/store'
 
 export type Metric = 'power' | 'race_wins' | 'trophies' | 'level'
 export type Period = 'all' | 'week'
@@ -172,6 +173,13 @@ export async function fetchMyClan(uid: string): Promise<MyClan | null> {
   }))
   members.sort((a, b) => Number(b.role === 'leader') - Number(a.role === 'leader') || b.power - a.power)
   return { clan: toClan(c as ClanRow), members, role: mine.role as Member['role'] }
+}
+
+// Keep the Crew House sign in step with the player's clan.
+export async function refreshClanBadge(uid: string | null) {
+  if (!supabase || !uid) return useGame.setState({ clanBadge: null })
+  const { data } = await supabase.from('player_leaderboard').select('clan_tag, clan_emblem, clan_color').eq('owner_id', uid).maybeSingle()
+  useGame.setState({ clanBadge: data?.clan_tag ? { tag: data.clan_tag, emblem: data.clan_emblem, color: data.clan_color } : null })
 }
 
 async function rpc<T = unknown>(fn: string, args?: Record<string, unknown>): Promise<T> {

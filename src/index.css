@@ -294,6 +294,7 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .goal:not(.done) .goal-main { cursor: pointer; }
 .crash-screen { z-index: 300; place-items: center !important; align-items: center !important; padding: 16px !important; }
 .crash-detail { font-size: 11px; word-break: break-word; margin-top: 10px; }
+.badge-crew { background: #455a64; color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,.4); }
 .badge-rescue { background: #fff3e0; color: #5d4037; }
 
 /* Grand Prix */
@@ -551,6 +552,10 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
   .collect-ico { font-size: 24px; }
 }
 /* Leaderboards and clans */
+.crew-nudge { display: flex; gap: 10px; align-items: center; background: #eceff1; border: 2px dashed #90a4ae; border-radius: 12px; padding: 8px 10px; margin-bottom: 10px; }
+.crew-nudge > span { font-size: 26px; }
+.crew-nudge > div { flex: 1; display: flex; flex-direction: column; }
+.crew-nudge small { color: #546e7a; font-weight: 800; }
 .social-tabs { margin-top: 0; }
 .social-tabs .tab { font-size: 14px; padding: 6px 4px; white-space: nowrap; }
 .seg { display: flex; background: #eceff1; border-radius: 12px; padding: 3px; gap: 3px; }

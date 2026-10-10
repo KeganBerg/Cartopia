@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { refreshClanBadge } from './clans'
 import { useGame, saveOf, type SaveState } from '../game/store'
 import { carDef, performance, garagePower } from '../game/data'
 
@@ -178,8 +179,12 @@ export function startCloudSync() {
     if (data.session) syncOnSignIn(data.session.user.id)
   })
   supabase.auth.onAuthStateChange((event, session) => {
-    if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) syncOnSignIn(session.user.id)
+    if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
+      syncOnSignIn(session.user.id)
+      refreshClanBadge(session.user.id).catch(() => {})
+    }
     if (event === 'SIGNED_OUT') {
+      useGame.setState({ clanBadge: null })
       userId = null
       syncingFor = null
       cloudAt = null

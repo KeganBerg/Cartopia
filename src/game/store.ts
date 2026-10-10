@@ -70,6 +70,8 @@ type UiState = {
   highlight: string[] | null
   // A Grand Prix mystery box waiting to be opened.
   gpPrize: { series: string; model: string; color: string } | null
+  // The signed-in player's clan, shown on the Crew House.
+  clanBadge: { tag: string; emblem: string; color: string } | null
 }
 
 type Actions = {
@@ -275,6 +277,7 @@ export const useGame = create<GameState>()(
       need: null,
       search: null,
       highlight: null,
+      clanBadge: null,
       gpPrize: null,
 
       setMode: (mode, placing = null) => set({ mode, placing, panel: null }),
@@ -368,6 +371,7 @@ export const useGame = create<GameState>()(
         if (d.kind === 'showroom') return s.openPanel('showroom')
         if (d.kind === 'garage') return s.openPanel('garage')
         if (b.def === 'rescue') return s.openPanel('rescue')
+        if (b.def === 'crew') return s.openPanel('clan')
         if (d.kind === 'obstacle') {
           const now = Date.now()
           if (b.jobEndsAt === null) {
