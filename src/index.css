@@ -336,7 +336,7 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .bank-menu-btn { width: 100%; margin-bottom: 4px; background: linear-gradient(#ffd54f, #ff8f00); }
 
 /* Challenge inbox */
-.challenge-bell { position: absolute; z-index: 50; top: calc(118px + var(--sat)); right: calc(10px + var(--sar)); width: 44px; height: 44px; border-radius: 12px; border: 3px solid #fff; background: #eceff1; font-size: 22px; box-shadow: 0 3px 0 rgba(0,0,0,.3); display: grid; place-items: center; }
+.challenge-bell { position: relative; width: 44px; height: 44px; border-radius: 12px; border: 3px solid #fff; background: #eceff1; font-size: 22px; box-shadow: 0 3px 0 rgba(0,0,0,.3); display: grid; place-items: center; }
 .challenge-bell.has { background: #fff3e0; border-color: var(--accent); animation: badgepulse 1.2s ease-in-out infinite; }
 .bell-count { position: absolute; top: -8px; right: -8px; min-width: 20px; height: 20px; border-radius: 10px; background: #e53935; color: #fff; font: 12px var(--display); display: grid; place-items: center; padding: 0 4px; border: 2px solid #fff; }
 .bell-off { position: absolute; font-size: 26px; color: #c62828; font-weight: 900; }
@@ -353,7 +353,32 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .skill-row { margin: 4px 0 6px; font-size: 13px; color: #546e7a; }
 .skill-flash { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); font: 18px var(--display); color: #fff; background: rgba(69,39,160,.85); border: 2px solid #fff; border-radius: 12px; padding: 3px 10px; white-space: nowrap; animation: pop .2s ease-out; }
 
+/* Compact phone HUD (hidden on bigger screens) */
+.hud-mobile { display: none; }
+.menu-sound { display: flex; align-items: center; justify-content: space-between; background: #fff; border: 2px solid #e0e0e0; border-radius: 12px; padding: 6px 10px; margin-bottom: 8px; font-weight: 800; }
+
 @media (max-width: 600px) {
+  .hud-left, .hud-center, .hud-right { display: none !important; }
+  .hud-mobile { display: block; position: absolute; z-index: 50; top: 0; left: 0; right: 0; padding: calc(6px + var(--sat)) calc(8px + var(--sar)) 0 calc(8px + var(--sal)); pointer-events: none; }
+  .hud-mobile button { pointer-events: auto; }
+  .hud-strip { display: flex; align-items: center; gap: 6px; background: linear-gradient(rgba(27,31,36,.82), rgba(27,31,36,.7)); border: 2px solid rgba(255,255,255,.75); border-radius: 18px; padding: 4px 6px; box-shadow: 0 3px 0 rgba(0,0,0,.25); pointer-events: auto; }
+  .hud-strip .speedo { width: 50px; height: 50px; flex: none; filter: none; }
+  .hud-strip .speedo svg { width: 50px; height: 50px; }
+  .hud-strip .speedo-level { top: 24px; width: 50px; font-size: 15px; }
+  .hud-strip .speedo-xp { display: none; }
+  .hud-chips { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; min-width: 0; }
+  .chip-stat { display: flex; align-items: center; gap: 4px; min-width: 0; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.25); border-radius: 12px; padding: 1px 6px 1px 2px; color: #fff; font: 13px var(--display); white-space: nowrap; overflow: hidden; }
+  .chip-stat .ico { width: 18px; height: 18px; font-size: 10px; border-width: 1.5px; }
+  .chip-fuel-bar { position: relative; flex: 1; height: 14px; border-radius: 7px; background: #11151a; overflow: hidden; min-width: 40px; }
+  .chip-fuel-bar i { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(#ffee58, #f9a825); }
+  .chip-fuel-bar b { position: absolute; inset: 0; display: grid; place-items: center; font: 10px var(--display); font-weight: normal; color: #fff; text-shadow: 0 1px 1px #000; }
+  .hud-actions { display: flex; gap: 4px; flex: none; }
+  .hud-actions .goals-btn, .hud-actions .challenge-bell { width: 36px; height: 36px; font-size: 17px; border-width: 2px; border-radius: 10px; box-shadow: none; }
+  .hud-actions .bell-count { top: -6px; right: -6px; }
+  .hud-town { display: flex; justify-content: center; align-items: center; gap: 8px; margin: 5px auto 0; width: max-content; max-width: 100%; background: rgba(27,31,36,.7); color: #fff; font: 13px var(--display); border-radius: 12px; padding: 2px 10px; pointer-events: auto; }
+  .hud-town button { background: none; border: none; color: #fff; font: inherit; padding: 0; }
+  .hud-town-name { max-width: 45vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
   .speedo { width: 64px; height: 76px; }
   .speedo svg { width: 64px; height: 64px; }
   .speedo-level { top: 35px; width: 64px; font-size: 17px; }
@@ -438,7 +463,7 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
   .countdown.big { font-size: 72px; }
   .shift-label.big { font-size: 26px; }
 
-  .toasts { top: calc(126px + var(--sat)); width: calc(100% - 24px); }
+  .toasts { top: auto; bottom: calc(96px + var(--sab)); width: calc(100% - 24px); }
   .toast { font-size: 13px; text-align: center; padding: 6px 12px; }
   .challenge-pop { top: calc(126px + var(--sat)); left: 8px; right: 8px; max-width: none; }
   .badge { font-size: 12px; padding: 2px 6px; border-width: 2px; }

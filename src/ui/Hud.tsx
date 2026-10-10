@@ -3,6 +3,7 @@ import { xpToNext, FUEL_REGEN_SECONDS } from '../game/data'
 import { useNow } from '../scene/useNow'
 import { GoalsButton } from './Goals'
 import { MuteButton } from './MuteButton'
+import { ChallengeBell } from './Race'
 
 const n = (v: number) => v.toLocaleString()
 
@@ -70,6 +71,31 @@ export function Hud() {
           <div className="pill trophies">🏆 {s.trophies}</div>
           <GoalsButton />
           <MuteButton />
+        </div>
+        <ChallengeBell />
+      </div>
+      {/* Phones: one compact strip across the top, town label under it. */}
+      <div className="hud-mobile">
+        <div className="hud-strip">
+          <Speedometer level={s.level} xp={s.xp} />
+          <div className="hud-chips">
+            <button className="chip-stat" onClick={() => s.showNeed('coins', 0)}><span className="ico coin-ico">$</span>{n(s.coins)}</button>
+            <button className="chip-stat" onClick={() => s.openPanel('bank')}><span className="ico buck-ico">B</span>{n(s.bucks)}</button>
+            <button className="chip-stat" onClick={() => s.showNeed('parts', 0)}><span className="ico parts-ico">⚙</span>{n(s.parts)}</button>
+            <button className="chip-stat chip-fuel" onClick={() => s.showNeed('fuel', 0)}>
+              <span className="ico fuel-ico">⛽</span>
+              <span className="chip-fuel-bar"><i style={{ width: `${Math.min(100, (s.fuel / cap) * 100)}%` }} /><b>{s.fuel}/{cap}</b></span>
+            </button>
+          </div>
+          <div className="hud-actions">
+            <GoalsButton />
+            <ChallengeBell />
+          </div>
+        </div>
+        <div className="hud-town">
+          <span className="hud-town-name">{s.visiting?.townName ?? s.townName}</span>
+          {!s.visiting && <button onClick={() => s.openPanel('garage')}>🚗 {s.cars.length}</button>}
+          <span>🏆 {s.trophies}</span>
         </div>
       </div>
     </>

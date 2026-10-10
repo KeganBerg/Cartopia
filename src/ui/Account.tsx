@@ -3,6 +3,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { useGame } from '../game/store'
 import { Panel } from './Menus'
+import { MuteButton } from './MuteButton'
 
 export function AccountPanel() {
   const townName = useGame((s) => s.townName)
@@ -33,6 +34,7 @@ export function AccountPanel() {
   return (
     <Panel title="Menu">
       <button className="buy bank-menu-btn" onClick={() => openPanel('bank')}>🏦 Bank · get bucks</button>
+      <div className="menu-sound"><span>Sound</span><MuteButton /></div>
       <h3>Town name</h3>
       <div className="row">
         <input value={name} maxLength={24} onChange={(e) => setName(e.target.value)} />
