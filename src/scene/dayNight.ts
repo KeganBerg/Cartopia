@@ -1,5 +1,6 @@
 import { AdditiveBlending, Color, MeshBasicMaterial, MeshStandardMaterial } from 'three'
 import { glowTex, windowGlowTex, windowTex } from './textures'
+import { decal } from './layers'
 
 // One in-game day lasts 20 real minutes, tied to the clock so every player
 // sees the same time of day. ?time=0..1 pins it (0.5 is midnight) for testing.
@@ -37,8 +38,9 @@ export const glowMats = {
   headlight: new MeshStandardMaterial({ color: '#fffde7', emissive: new Color('#fff3c4'), emissiveIntensity: 0.1 }),
   taillight: new MeshStandardMaterial({ color: '#d32f2f', emissive: new Color('#ff1744'), emissiveIntensity: 0 }),
   screen: new MeshStandardMaterial({ color: '#f5f5f5', emissive: new Color('#b3dcff'), emissiveIntensity: 0 }),
-  pool: new MeshBasicMaterial({ map: glowTex(), color: '#ffcf7a', transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false, toneMapped: false }),
-  beam: new MeshBasicMaterial({ map: glowTex(), color: '#fff2c0', transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false, toneMapped: false }),
+  // Glows lie flat on the ground, so they get a depth nudge to never flicker against it.
+  pool: new MeshBasicMaterial({ map: glowTex(), color: '#ffcf7a', transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false, toneMapped: false, ...decal() }),
+  beam: new MeshBasicMaterial({ map: glowTex(), color: '#fff2c0', transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false, toneMapped: false, ...decal() }),
 }
 
 export function applyNight(n: number) {

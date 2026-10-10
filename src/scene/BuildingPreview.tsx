@@ -31,7 +31,7 @@ function Baker({ queue, onDone }: { queue: BuildingDef[]; onDone: () => void }) 
     if (!g) return
     const size = Math.max(def.w, def.h) * TILE
     const d = 2 + size * 1.2
-    const cam = new Cam(30, FW / FH, 0.1, 100)
+    const cam = new Cam(30, FW / FH, 0.5, 40)
     cam.position.set(d, d * 0.8, d)
     cam.lookAt(0, 0.7 + size * 0.1, 0)
     if (shadow.current) shadow.current.scale.setScalar(size * 0.5)

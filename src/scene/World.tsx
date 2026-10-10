@@ -15,6 +15,7 @@ import { LightPool } from './BuildingModel'
 import { TownCars } from './TownCars'
 import { toWorld, toTile, DIRS } from './grid'
 import { grassTex, paverTex, asphaltTex } from './textures'
+import { LAYER, decal } from './layers'
 
 const SIZE = GRID * TILE
 // Everything a town could ever own, centred on the origin like the start lot.
@@ -34,20 +35,20 @@ function Land() {
         const [cx, cz] = plotCenter(px, pz)
         return (
           <group key={k} position={[cx, 0, cz]}>
-            <mesh rotation-x={-Math.PI / 2} position-y={0.001} receiveShadow>
+            <mesh rotation-x={-Math.PI / 2} position-y={LAYER.land} receiveShadow>
               <planeGeometry args={[PLOT * TILE, PLOT * TILE]} />
               <meshStandardMaterial map={grassTex(PLOT / 2)} />
             </mesh>
-            {mode !== 'play' && mode !== 'expand' && <gridHelper args={[PLOT * TILE, PLOT, '#4f8f2f', '#5f9f3f']} position-y={0.005} />}
+            {mode !== 'play' && mode !== 'expand' && <gridHelper args={[PLOT * TILE, PLOT, '#4f8f2f', '#5f9f3f']} position-y={LAYER.grid} />}
           </group>
         )
       })}
       {forSale.map(([px, pz]) => {
         const [cx, cz] = plotCenter(px, pz)
         return (
-          <mesh key={`${px},${pz}`} rotation-x={-Math.PI / 2} position={[cx, 0.004, cz]}>
+          <mesh key={`${px},${pz}`} rotation-x={-Math.PI / 2} position={[cx, LAYER.grid, cz]}>
             <planeGeometry args={[PLOT * TILE - 0.6, PLOT * TILE - 0.6]} />
-            <meshBasicMaterial color="#ffd54f" transparent opacity={0.35} />
+            <meshBasicMaterial color="#ffd54f" transparent opacity={0.35} depthWrite={false} {...decal()} />
           </mesh>
         )
       })}
@@ -110,7 +111,7 @@ function Building({ b, roads }: { b: PlacedBuilding; roads: Set<string> }) {
       onPointerOut={() => (document.body.style.cursor = '')}
     >
       {d.kind !== 'decor' && d.kind !== 'obstacle' && (
-        <mesh rotation-x={-Math.PI / 2} position-y={0.012} receiveShadow>
+        <mesh rotation-x={-Math.PI / 2} position-y={LAYER.lot} receiveShadow>
           <planeGeometry args={[d.w * TILE - 0.1, d.h * TILE - 0.1]} />
           <meshStandardMaterial map={paverTex(d.w, d.h)} />
         </mesh>
@@ -145,9 +146,9 @@ function Crosswalk({ side }: { side: 'e' | 'w' | 's' | 'n' }) {
   return (
     <group>
       {[-0.45, -0.15, 0.15, 0.45].map((o) => (
-        <mesh key={o} rotation-x={-Math.PI / 2} position={across ? [off, 0.021, o] : [o, 0.021, off]}>
+        <mesh key={o} rotation-x={-Math.PI / 2} position={across ? [off, LAYER.paint, o] : [o, LAYER.paint, off]}>
           <planeGeometry args={across ? [0.34, 0.16] : [0.16, 0.34]} />
-          <meshBasicMaterial color="#f5f5f5" />
+          <meshBasicMaterial color="#f5f5f5" {...decal()} />
         </mesh>
       ))}
     </group>
@@ -174,7 +175,8 @@ function StreetLamp({ side }: { side: 'e' | 'w' | 's' | 'n' }) {
           <primitive object={glowMats.bulb} attach="material" dispose={null} />
         </mesh>
       </group>
-      <LightPool r={0.95} x={0.55} z={half - 0.5} />
+      {/* Above the kerb so the glow spills over the sidewalk too. */}
+      <LightPool r={0.95} x={0.55} z={half - 0.5} y={0.09} />
     </group>
   )
 }
@@ -204,7 +206,7 @@ function Roads() {
         const straightZ = (s || nn) && !e && !w
         return (
           <group key={k} position={[wx, 0, wz]}>
-            <mesh rotation-x={-Math.PI / 2} position-y={0.01} receiveShadow>
+            <mesh rotation-x={-Math.PI / 2} position-y={LAYER.lot} receiveShadow>
               <planeGeometry args={[TILE, TILE]} />
               <meshStandardMaterial map={asphalt} />
             </mesh>
@@ -221,10 +223,10 @@ function Roads() {
               <StreetLamp side={straightX ? ((x + z) % 2 ? 's' : 'n') : ((x + z) % 2 ? 'e' : 'w')} />
             )}
             {straightX && [-0.5, 0.5].map((o) => (
-              <mesh key={o} rotation-x={-Math.PI / 2} position={[o, 0.02, 0]}><planeGeometry args={[0.45, 0.07]} /><meshBasicMaterial color="#fafafa" /></mesh>
+              <mesh key={o} rotation-x={-Math.PI / 2} position={[o, LAYER.paint, 0]}><planeGeometry args={[0.45, 0.07]} /><meshBasicMaterial color="#fafafa" {...decal()} /></mesh>
             ))}
             {straightZ && [-0.5, 0.5].map((o) => (
-              <mesh key={o} rotation-x={-Math.PI / 2} position={[0, 0.02, o]}><planeGeometry args={[0.07, 0.45]} /><meshBasicMaterial color="#fafafa" /></mesh>
+              <mesh key={o} rotation-x={-Math.PI / 2} position={[0, LAYER.paint, o]}><planeGeometry args={[0.07, 0.45]} /><meshBasicMaterial color="#fafafa" {...decal()} /></mesh>
             ))}
           </group>
         )
@@ -321,6 +323,7 @@ function Interaction() {
     <>
       <mesh
         rotation-x={-Math.PI / 2}
+        position-y={LAYER.base}
         receiveShadow
         onPointerMove={onMove}
         onPointerDown={onDown}
@@ -387,7 +390,7 @@ export function World() {
     <>
       <DayNight small={Math.min(window.innerWidth, window.innerHeight) < 700} />
       {/* Grass beyond the buildable lot. */}
-      <mesh rotation-x={-Math.PI / 2} position-y={-0.02}>
+      <mesh rotation-x={-Math.PI / 2} position-y={LAYER.outer}>
         <planeGeometry args={[SIZE * 8, SIZE * 8]} />
         <meshStandardMaterial color={PAL.ground} />
       </mesh>

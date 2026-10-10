@@ -35,7 +35,8 @@ export default function App() {
 
   return (
     <>
-      <Canvas shadows orthographic camera={{ position: [30, 32, 30], zoom: 36, near: 0.1, far: 500 }} dpr={SMALL ? [1, 1.5] : [1, 2]}
+      {/* Camera sits well back with a tight near/far range so depth stays precise and flat layers never flicker. */}
+      <Canvas shadows orthographic camera={{ position: [75, 80, 75], zoom: 36, near: 1, far: 82000 }} dpr={SMALL ? [1, 1.5] : [1, 2]}
         onCreated={({ gl }) => {
           // Let the browser restore the 3D view after it drops the context, instead of leaving it blank.
           gl.domElement.addEventListener('webglcontextlost', (e) => e.preventDefault())
