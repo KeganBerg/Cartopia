@@ -52,18 +52,67 @@ function bestCar(s: SaveState) {
   return best
 }
 
-async function pushSave() {
-  if (!supabase || !userId) return
-  const s = saveOf(useGame.getState())
-  const { error } = await supabase.from('game_saves').upsert({
-    owner_id: userId,
+// updated_at of the cloud row this browser last read or wrote. A push only lands if the row still
+// has it, so a tab left open on another device can never overwrite newer play from here.
+let cloudAt: string | null = null
+let pushing: Promise<void> | null = null
+
+function rowOf(uid: string, s: SaveState) {
+  return {
+    owner_id: uid,
     state: s,
     town_name: s.townName,
     level: s.level,
     best_car: bestCar(s),
     updated_at: new Date(s.updatedAt).toISOString(),
-  })
-  if (error) console.warn('Cloud save failed', error.message)
+  }
+}
+
+function loadCloud(cloud: SaveState, at: string, message: string) {
+  suppress = true
+  useGame.getState().loadSave(cloud)
+  suppress = false
+  cloudAt = at
+  useGame.getState().toast(message)
+}
+
+async function pushSave(): Promise<void> {
+  if (pushing) {
+    await pushing
+    return pushSave()
+  }
+  pushing = (async () => {
+    if (!supabase || !userId) return
+    const uid = userId
+    const row = rowOf(uid, saveOf(useGame.getState()))
+    const { data, error } = cloudAt
+      ? await supabase.from('game_saves').update(row).eq('owner_id', uid).eq('updated_at', cloudAt).select('updated_at')
+      : await supabase.from('game_saves').insert(row).select('updated_at')
+    if (userId !== uid) return
+    // 23505: row created elsewhere first. 23514: the server refused to lower your level.
+    if (error && error.code !== '23505' && error.code !== '23514') return console.warn('Cloud save failed', error.message)
+    if (!error && data && data.length) {
+      cloudAt = data[0].updated_at
+      return
+    }
+    // Another device saved since we last synced (or created the row first): its town wins.
+    await pullNewer(uid, true)
+  })()
+  try {
+    await pushing
+  } finally {
+    pushing = null
+  }
+}
+
+// Load the cloud town when another device has saved since this one last synced.
+async function pullNewer(uid: string, force = false) {
+  if (!supabase) return
+  const { data, error } = await supabase.from('game_saves').select('state, updated_at').eq('owner_id', uid).maybeSingle()
+  if (error || !data || userId !== uid) return
+  if (!force && data.updated_at === cloudAt) return
+  if (saveTimer) clearTimeout(saveTimer)
+  loadCloud(data.state as SaveState, data.updated_at, 'Loaded your latest town from another device')
 }
 
 // On sign-in the cloud save wins. The only exception is unsynced play by this same account
@@ -72,7 +121,8 @@ async function syncOnSignIn(uid: string) {
   if (!supabase || syncingFor === uid || userId === uid) return
   syncingFor = uid
   userId = null
-  const { data, error } = await supabase.from('game_saves').select('state').eq('owner_id', uid).maybeSingle()
+  cloudAt = null
+  const { data, error } = await supabase.from('game_saves').select('state, updated_at').eq('owner_id', uid).maybeSingle()
   if (syncingFor !== uid) return
   syncingFor = null
   if (error) {
@@ -88,16 +138,13 @@ async function syncOnSignIn(uid: string) {
     !cloud ||
     (localIsTheirs && local.updatedAt > cloud.updatedAt && progressScore(local) >= progressScore(cloud))
   userId = uid
+  cloudAt = data?.updated_at ?? null
+  writeOwner(uid)
   if (keepLocal) {
-    writeOwner(uid)
     await pushSave()
   } else {
     if (!localIsTheirs || progressScore(local) > progressScore(cloud!)) backupLocal(local)
-    suppress = true
-    useGame.getState().loadSave(cloud!)
-    suppress = false
-    writeOwner(uid)
-    useGame.getState().toast('Loaded your town from the cloud')
+    loadCloud(cloud!, data!.updated_at, 'Loaded your town from the cloud')
   }
 }
 
@@ -111,6 +158,7 @@ export function startCloudSync() {
     if (event === 'SIGNED_OUT') {
       userId = null
       syncingFor = null
+      cloudAt = null
       if (saveTimer) clearTimeout(saveTimer)
     }
   })
@@ -119,6 +167,18 @@ export function startCloudSync() {
     if (saveTimer) clearTimeout(saveTimer)
     saveTimer = setTimeout(pushSave, 3000)
   })
+  // Coming back to a tab that sat open while you played elsewhere picks up that newer town.
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && userId && !syncingFor) pullNewer(userId)
+      // Leaving the tab (e.g. to pick up another device) saves right away instead of in 3s.
+      if (document.visibilityState === 'hidden' && saveTimer) {
+        clearTimeout(saveTimer)
+        saveTimer = null
+        pushSave()
+      }
+    })
+  }
 }
 
 // A local town that sign-in replaced, offered back only when it is further along than the current one.
