@@ -33,7 +33,7 @@ function DrivingCar({ car, roads, start }: { car: OwnedCar; roads: Set<string>; 
     const g = ref.current
     if (!g) return
     const a = agent.current
-    if (car.flat) {
+    if (car.flat || car.lowFuel) {
       g.rotation.z = 0.06
       const p = anchors.get(`car:${car.uid}`) ?? new Vector3()
       anchors.set(`car:${car.uid}`, p.set(g.position.x, 1.1, g.position.z))
@@ -78,7 +78,7 @@ function DrivingCar({ car, roads, start }: { car: OwnedCar; roads: Set<string>; 
         const s = useGame.getState()
         if (s.mode !== 'play' || s.visiting) return
         s.selectCar(car.uid)
-        s.openPanel(car.flat ? 'flat' : 'garage')
+        s.openPanel(car.flat || car.lowFuel ? 'flat' : 'garage')
       }}
     >
       <CarModel body={def.body} color={car.color} highlight={selected} stripe={car.stripe} />

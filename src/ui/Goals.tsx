@@ -1,5 +1,5 @@
 import { useGame, activeGoals, goalDone, statValue, today } from '../game/store'
-import { DAILY_BONUS, carDef, flatFixCost } from '../game/data'
+import { DAILY_BONUS, carDef, flatFixCost, servicePay, gasCanCost } from '../game/data'
 import { Panel } from './Menus'
 
 export function GoalsButton() {
@@ -67,18 +67,50 @@ export function DailyPanel() {
 
 export function FlatPanel() {
   const s = useGame()
-  const car = s.cars.find((c) => c.uid === s.selectedCar && c.flat)
+  const car = s.cars.find((c) => c.uid === s.selectedCar && (c.flat || c.lowFuel))
   if (!car) return null
   const d = carDef(car.model)
-  const hasRusty = s.buildings.some((b) => b.def === 'rescue')
+  const owns = (def: string) => s.buildings.some((b) => b.def === def)
+  const hasRusty = owns('rescue')
+  if (!car.flat) {
+    return (
+      <Panel title="Out of Gas!">
+        <p>Your <b>{d.name}</b> ran out of gas.</p>
+        <div className="sources">
+          <div className="source">
+            <span className="source-icon">⛽</span>
+            <div><b>Fill up at your Gas Station</b><div className="card-stat">{owns('gas') ? `Your station earns $${servicePay(s.level, 'gas')} and 8 XP.` : 'Build a Gas Station to earn money from every fill-up.'}</div></div>
+            {owns('gas') ? <button className="buy small" onClick={() => s.serviceCar(car.uid, 'gas')}>Fill up · +${servicePay(s.level, 'gas')}</button> : <button className="buy small" onClick={() => s.setMode('place', 'gas')}>Build</button>}
+          </div>
+          <div className="source">
+            <span className="source-icon">🛢</span>
+            <div><b>Bring a gas can</b><div className="card-stat">Quick, but it costs you.</div></div>
+            <button className="buy small alt" onClick={() => s.serviceCar(car.uid, 'can')}>Gas can · ${gasCanCost(s.level)}</button>
+          </div>
+        </div>
+      </Panel>
+    )
+  }
   return (
     <Panel title="Flat Tire!">
       <p>Your <b>{d.name}</b> is stuck on the side of the road.</p>
-      <div className="row">
-        <button className="buy" onClick={() => s.fixFlat(car.uid, false)}>Fix it · ${flatFixCost(s.level)}</button>
-        <button className="buy alt" onClick={() => s.fixFlat(car.uid, true)} disabled={!hasRusty}>Call Rusty's tow · free</button>
+      <div className="sources">
+        <div className="source">
+          <span className="source-icon">🛞</span>
+          <div><b>Send it to your Tire Shop</b><div className="card-stat">{owns('tires') ? `Your shop earns $${servicePay(s.level, 'tires')} and 12 XP.` : s.level < 2 ? 'Tire Shops unlock at level 2 and earn money from every flat.' : 'Build a Tire Shop to earn money from every flat.'}</div></div>
+          {owns('tires') ? <button className="buy small" onClick={() => s.serviceCar(car.uid, 'tires')}>Fix · +${servicePay(s.level, 'tires')}</button> : s.level >= 2 ? <button className="buy small" onClick={() => s.setMode('place', 'tires')}>Build</button> : null}
+        </div>
+        <div className="source">
+          <span className="source-icon">🔧</span>
+          <div><b>Call Rusty's tow</b><div className="card-stat">{hasRusty ? 'Free, plus 15 XP.' : "Build Rusty's Rescue to tow cars for free."}</div></div>
+          <button className="buy small alt" onClick={() => s.fixFlat(car.uid, true)} disabled={!hasRusty}>Tow · free</button>
+        </div>
+        <div className="source">
+          <span className="source-icon">💵</span>
+          <div><b>Pay a mechanic</b><div className="card-stat">Fixed on the spot.</div></div>
+          <button className="buy small alt" onClick={() => s.fixFlat(car.uid, false)}>Fix · ${flatFixCost(s.level)}</button>
+        </div>
       </div>
-      {!hasRusty && <p className="hint">Build Rusty's Rescue to tow cars for free and earn XP.</p>}
     </Panel>
   )
 }

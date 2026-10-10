@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useGame, hasRusty } from '../game/store'
-import { BUILDINGS, CARS, UPGRADE_SLOTS, MAX_UPGRADE, PAINTS, STRIPES, PAINT_COST, STRIPE_COST, carDef, performance, upgradeCost, type BuildingDef } from '../game/data'
+import { BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, PAINTS, STRIPES, PAINT_COST, STRIPE_COST, carDef, performance, upgradeCost, type BuildingDef } from '../game/data'
 import { CarPreview } from '../scene/CarPreview'
 
 export function BottomBar() {
@@ -152,6 +152,7 @@ export function ShowroomPanel() {
               <CarSwatch color={color} body={c.body} />
               <div className="card-name">{c.name}</div>
               <div className="card-stat">PI {pi} · {c.body}</div>
+              <SkillTag model={c.id} />
               <div className="colors">
                 {c.colors.map((col) => (
                   <button key={col} className={col === color ? 'dot sel' : 'dot'} style={{ background: col }} onClick={() => setColorFor({ ...colorFor, [c.id]: col })} />
@@ -168,6 +169,12 @@ export function ShowroomPanel() {
       </div>
     </Panel>
   )
+}
+
+export function SkillTag({ model }: { model: string }) {
+  const sk = carDef(model).skill
+  if (!sk) return null
+  return <span className="skill-tag" title={SKILLS[sk].text}>{SKILLS[sk].icon} {SKILLS[sk].name}</span>
 }
 
 export function CarSwatch({ color, body }: { color: string; body: string }) {
@@ -212,6 +219,7 @@ export function GaragePanel() {
             <CarPreview body={def.body} color={car.color} stripe={car.stripe} />
             <h3>{def.name}{car.plate && <span className="mini-plate">{car.plate}</span>}</h3>
             <div className="pi">Performance Index <b>{performance(def, car.upgrades)}</b></div>
+            {def.skill && <div className="skill-row"><SkillTag model={car.model} /> <small>{SKILLS[def.skill].text}</small></div>}
             {UPGRADE_SLOTS.map((u) => {
               const lvl = car.upgrades[u.id]
               const cost = upgradeCost(def, lvl)

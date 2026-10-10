@@ -345,6 +345,11 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .mute-btn { font: 13px var(--display); background: #eceff1; border: 2px solid #b0bec5; border-radius: 10px; padding: 4px 8px; color: #455a64; }
 .muted-row { grid-template-columns: 1fr auto !important; }
 
+/* Car skills */
+.skill-tag { display: inline-block; font: 11px var(--display); background: #ede7f6; color: #4527a0; border: 1.5px solid #b39ddb; border-radius: 8px; padding: 1px 6px; white-space: nowrap; }
+.skill-row { margin: 4px 0 6px; font-size: 13px; color: #546e7a; }
+.skill-flash { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); font: 18px var(--display); color: #fff; background: rgba(69,39,160,.85); border: 2px solid #fff; border-radius: 12px; padding: 3px 10px; white-space: nowrap; animation: pop .2s ease-out; }
+
 @media (max-width: 600px) {
   .speedo { width: 64px; height: 76px; }
   .speedo svg { width: 64px; height: 64px; }

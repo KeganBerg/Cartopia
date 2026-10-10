@@ -3,7 +3,7 @@ import { useGame, hasRusty, cleanPlate, type Loot } from '../game/store'
 import { RESCUE_SPOTS, RARITY, STORAGE_MAX, carDef, performance, restoreCost, rushBucks, type Rarity } from '../game/data'
 import { useNow } from '../scene/useNow'
 import { CarPreview } from '../scene/CarPreview'
-import { Panel, CarSwatch } from './Menus'
+import { Panel, CarSwatch, SkillTag } from './Menus'
 
 // Where the pins sit on the search map, in percent.
 const PIN_SPOTS: [number, number][] = [[14, 22], [40, 14], [70, 20], [86, 46], [62, 52], [30, 48], [18, 78], [52, 82]]
@@ -90,6 +90,7 @@ function Storage() {
             <JunkSwatch />
             <div className="card-name">{d.name}</div>
             <div className="card-stat"><RarityTag r={c.rarity} /> PI {performance(d, { engine: 0, turbo: 0, tires: 0, weight: 0 })}{d.rescueOnly ? ' · Classic' : ''}</div>
+            <SkillTag model={c.model} />
             <div className="card-stat">⏱ {RARITY[c.rarity].minutes >= 60 ? `${RARITY[c.rarity].minutes / 60}h` : `${RARITY[c.rarity].minutes}m`} to restore</div>
             <button className="buy small" disabled={busy} onClick={() => restore(c.uid)}>{busy ? 'Bay busy' : `Restore · $${restoreCost(d).toLocaleString()}`}</button>
             <button className="scrap" onClick={() => scrap(c.uid)}>Scrap for {RARITY[c.rarity].scrapParts}⚙</button>

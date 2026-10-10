@@ -110,10 +110,10 @@ export function Badges() {
       {buildings.filter((b) => b.def === 'rescue').map((b) => (
         <RescueBadge key={b.uid} b={b} now={now} />
       ))}
-      {cars.filter((c) => c.flat).map((c) => (
+      {cars.filter((c) => c.flat || c.lowFuel).map((c) => (
         <div key={c.uid} className="anchor" ref={anchorRef(`car:${c.uid}`)}>
           <button className="badge badge-flat" title={carDef(c.model).name} onClick={() => { selectCar(c.uid); openPanel('flat') }}>
-            🛞 Flat!
+            {c.flat ? '🛞 Flat!' : '⛽ No gas!'}
           </button>
         </div>
       ))}

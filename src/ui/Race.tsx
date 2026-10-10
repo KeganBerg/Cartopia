@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGame, spendFuel, type OwnedCar } from '../game/store'
-import { CARS, carDef, performance, RACE_FUEL, GP_SERIES, GP_ROUNDS, gpRivalPi, gpReward, type Body, type GpSeries } from '../game/data'
+import { CARS, SKILLS, carDef, performance, RACE_FUEL, GP_SERIES, GP_ROUNDS, gpRivalPi, gpReward, type Body, type GpSeries } from '../game/data'
 import { CarSwatch } from './Menus'
 import { supabase } from '../lib/supabase'
 import { Panel } from './Menus'
@@ -114,10 +114,11 @@ export function RacePanel() {
       <div className="race-cars">
         {cars.map((c) => (
           <button key={c.uid} className={c.uid === car?.uid ? 'chip sel' : 'chip'} onClick={() => setCarId(c.uid)}>
-            <i style={{ background: c.color }} /> {carDef(c.model).name} · PI {pi(c)}
+            <i style={{ background: c.color }} /> {carDef(c.model).name} · PI {pi(c)}{carDef(c.model).skill ? ` ${SKILLS[carDef(c.model).skill!].icon}` : ''}
           </button>
         ))}
       </div>
+      {car && carDef(car.model).skill && <p className="hint">{SKILLS[carDef(car.model).skill!].icon} <b>{SKILLS[carDef(car.model).skill!].name}:</b> {SKILLS[carDef(car.model).skill!].text}</p>}
       <div className="tabs">
         <button className={tab === 'quick' ? 'tab sel' : 'tab'} onClick={() => setTab('quick')}>🏁 Quick race</button>
         <button className={tab === 'gp' ? 'tab sel' : 'tab'} onClick={() => setTab('gp')}>🏆 Grand Prix</button>
@@ -274,14 +275,14 @@ function sampleAt(samples: Sample[], t: number, finished: number | null) {
 
 const fresh = (): Racer => ({ gear: 0, rpm: 0, speed: 0, dist: 0, quality: 1, finished: null })
 
-function step(r: Racer, piVal: number, dt: number, t: number) {
+function step(r: Racer, piVal: number, dt: number, t: number, mul = 1) {
   if (r.finished !== null) return
   const climb = (1.25 - r.gear * 0.16) * (0.85 + piVal / 300)
   // Top gear just holds near the redline; lower gears bounce off the limiter.
   r.rpm = Math.min(r.gear === 3 ? 0.95 : 1.05, r.rpm + climb * dt)
   const overRev = r.rpm >= 1
   const accel = (piVal / 100) * 70 * GEAR_POWER[r.gear] * r.quality * (overRev ? 0.25 : 1) * (0.4 + r.rpm * 0.6)
-  r.speed += accel * dt
+  r.speed += accel * mul * dt
   r.speed *= 1 - 0.04 * dt
   r.dist += r.speed * dt
   if (r.dist >= TRACK) r.finished = t
@@ -302,6 +303,9 @@ function DragRace({ car, rival, onExit, live, prize, onFinish, title }: { car: O
   const me = useRef(fresh())
   const them = useRef(fresh())
   const samples = useRef<Sample[]>([])
+  const def = carDef(car.model)
+  const skillActive = useRef(false)
+  const [skillShown, setSkillShown] = useState(false)
   const t = useRef(0)
   const [, force] = useState(0)
   // Live races wait for both players before counting down.
@@ -372,7 +376,17 @@ function DragRace({ car, rival, onExit, live, prize, onFinish, title }: { car: O
       last = now
       t.current += dt
       const wasDone = me.current.finished !== null
-      step(me.current, myPi, dt, t.current)
+      const sk = def.skill
+      const th0 = them.current
+      let myMul = 1
+      let skillOn = false
+      if (sk === 'launch' && me.current.gear === 0) { myMul = 1.2; skillOn = true }
+      else if (sk === 'nitro' && me.current.gear === 3) { myMul = 1.15; skillOn = true }
+      else if (sk === 'slipstream' && me.current.dist < th0.dist && me.current.dist > 0) { myMul = 1.08; skillOn = true }
+      // In a live race the rival runs on their own device, so Oil Slick boosts us instead.
+      else if (sk === 'oil' && live && t.current < 2.5) { myMul = 1.1; skillOn = true }
+      if (skillOn !== skillActive.current) { skillActive.current = skillOn; setSkillShown(skillOn) }
+      step(me.current, myPi, dt, t.current, myMul)
       const th = them.current
       if (live) {
         if (now - lastSent > 100) {
@@ -392,7 +406,7 @@ function DragRace({ car, rival, onExit, live, prize, onFinish, title }: { car: O
           th.gear++
           th.rpm = 0.35
         }
-        step(th, rival.pi, dt, t.current)
+        step(th, rival.pi, dt, t.current, def.skill === 'oil' && t.current < 2.5 ? 0.9 : 1)
       }
       force((n) => n + 1)
       if (me.current.finished === null) engineRpm(me.current.rpm, me.current.gear)
@@ -414,12 +428,13 @@ function DragRace({ car, rival, onExit, live, prize, onFinish, title }: { car: O
       cancelAnimationFrame(raf)
       stopEngine()
     }
-  }, [countdown, result, myPi, rival, skill, finishRace, live])
+  }, [countdown, result, myPi, rival, skill, finishRace, live, def])
 
   const shift = () => {
     const r = me.current
     if (countdown > 0 || r.gear >= 3 || r.finished !== null) return
-    const s = shiftQuality(r.rpm)
+    let s = shiftQuality(r.rpm)
+    if (def.skill === 'smooth' && s.label === 'Good') s = { q: 1.08, label: 'SMOOTH!' }
     sfx.shift(s.q >= 1)
     r.quality = s.q
     r.gear++
@@ -439,7 +454,6 @@ function DragRace({ car, rival, onExit, live, prize, onFinish, title }: { car: O
     return () => window.removeEventListener('keydown', onKey)
   })
 
-  const def = carDef(car.model)
   const rpmAngle = -210 + Math.min(1.05, me.current.rpm) * 240
   return (
     <Panel title={title ?? `Drag Race vs ${rival.town}`} wide onClose={live ? onExit : undefined}>
@@ -450,6 +464,7 @@ function DragRace({ car, rival, onExit, live, prize, onFinish, title }: { car: O
         </Canvas>
         {countdown > 0 && <div className="countdown big">{countdown}</div>}
         {label && <div className="shift-label big">{label}</div>}
+        {def.skill && skillShown && !result && <div className="skill-flash">{SKILLS[def.skill].icon} {SKILLS[def.skill].name}!</div>}
       </div>
       <div className="strip mini">
         {[
