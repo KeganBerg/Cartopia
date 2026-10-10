@@ -1,0 +1,185 @@
+import { CanvasTexture, RepeatWrapping, SRGBColorSpace, type Texture } from 'three'
+
+// Hand-drawn canvas textures, generated once and shared. Small sizes keep
+// them cheap on phones; repeat settings tile them across bigger surfaces.
+
+const base = new Map<string, CanvasTexture>()
+const tiled = new Map<string, Texture>()
+
+// Deterministic noise so textures look the same on every load.
+function rng(seed: number) {
+  return () => {
+    seed = (seed * 16807) % 2147483647
+    return (seed - 1) / 2147483646
+  }
+}
+
+function make(key: string, size: number, draw: (g: CanvasRenderingContext2D, s: number, r: () => number) => void) {
+  const hit = base.get(key)
+  if (hit) return hit
+  const c = document.createElement('canvas')
+  c.width = c.height = size
+  const g = c.getContext('2d')!
+  draw(g, size, rng(key.length * 7919 + size))
+  const t = new CanvasTexture(c)
+  t.colorSpace = SRGBColorSpace
+  t.wrapS = t.wrapT = RepeatWrapping
+  t.anisotropy = 4
+  base.set(key, t)
+  return t
+}
+
+// The same image tiled `rx` by `ry` times; repeats are per-texture in three.js.
+function rep(t: CanvasTexture, key: string, rx: number, ry: number) {
+  const k = `${key}|${rx}|${ry}`
+  const hit = tiled.get(k)
+  if (hit) return hit
+  const c = t.clone()
+  c.repeat.set(rx, ry)
+  c.needsUpdate = true
+  tiled.set(k, c)
+  return c
+}
+
+function speckle(g: CanvasRenderingContext2D, s: number, r: () => number, colors: string[], n: number, size: number) {
+  for (let i = 0; i < n; i++) {
+    g.fillStyle = colors[Math.floor(r() * colors.length)]
+    g.fillRect(r() * s, r() * s, size * (0.5 + r()), size * (0.5 + r()))
+  }
+}
+
+export const grassTex = (rx = 1, ry = rx) =>
+  rep(make('grass', 128, (g, s, r) => {
+    g.fillStyle = '#7cc54e'
+    g.fillRect(0, 0, s, s)
+    speckle(g, s, r, ['#72bb45', '#86cf58', '#6fb342', '#8fd660'], 900, 3)
+    // A few tiny flowers.
+    speckle(g, s, r, ['#fff59d', '#ffffff'], 10, 2)
+  }), 'grass', rx, ry)
+
+// Light concrete pavers for sidewalks and building lots.
+export const paverTex = (rx = 1, ry = rx) =>
+  rep(make('pavers', 128, (g, s, r) => {
+    g.fillStyle = '#eadfc8'
+    g.fillRect(0, 0, s, s)
+    speckle(g, s, r, ['#e2d5ba', '#f0e6d2', '#ddcfb2'], 500, 3)
+    g.strokeStyle = '#cdbd9c'
+    g.lineWidth = 3
+    const n = 4
+    for (let i = 0; i <= n; i++) {
+      g.beginPath(); g.moveTo(0, (i * s) / n); g.lineTo(s, (i * s) / n); g.stroke()
+      g.beginPath(); g.moveTo((i * s) / n, 0); g.lineTo((i * s) / n, s); g.stroke()
+    }
+  }), 'pavers', rx, ry)
+
+export const asphaltTex = () =>
+  make('asphalt', 128, (g, s, r) => {
+    g.fillStyle = '#9ba1a8'
+    g.fillRect(0, 0, s, s)
+    speckle(g, s, r, ['#8f959c', '#a7adb4', '#949aa1', '#b0b5ba'], 1400, 2)
+  })
+
+// Neutral brick: tinted by the material colour, so every building gets its own shade.
+export const brickTex = (rx = 1, ry = rx) =>
+  rep(make('brick', 128, (g, s, r) => {
+    g.fillStyle = '#d9d4cf'
+    g.fillRect(0, 0, s, s)
+    const rows = 8
+    const bh = s / rows
+    const bw = s / 4
+    for (let y = 0; y < rows; y++) {
+      const off = y % 2 ? bw / 2 : 0
+      for (let x = -1; x < 5; x++) {
+        const v = 0.86 + r() * 0.14
+        const c = Math.round(255 * v)
+        g.fillStyle = `rgb(${c},${c},${c})`
+        g.fillRect(x * bw + off + 2, y * bh + 2, bw - 4, bh - 4)
+      }
+    }
+  }), 'brick', rx, ry)
+
+// Siding for houses: horizontal boards.
+export const sidingTex = (rx = 1, ry = rx) =>
+  rep(make('siding', 64, (g, s) => {
+    g.fillStyle = '#ffffff'
+    g.fillRect(0, 0, s, s)
+    g.fillStyle = '#e3e3e3'
+    for (let y = 0; y < s; y += 8) g.fillRect(0, y + 6, s, 2)
+  }), 'siding', rx, ry)
+
+// Shingles for pitched roofs, tinted by the roof colour.
+export const shingleTex = (rx = 1, ry = rx) =>
+  rep(make('shingle', 64, (g, s, r) => {
+    g.fillStyle = '#ffffff'
+    g.fillRect(0, 0, s, s)
+    for (let y = 0; y < s; y += 8) {
+      const off = (y / 8) % 2 ? 4 : 0
+      for (let x = -8; x < s; x += 8) {
+        const c = Math.round(255 * (0.8 + r() * 0.2))
+        g.fillStyle = `rgb(${c},${c},${c})`
+        g.fillRect(x + off + 1, y + 1, 7, 6)
+      }
+    }
+  }), 'shingle', rx, ry)
+
+export const gravelTex = (rx = 1, ry = rx) =>
+  rep(make('gravel', 64, (g, s, r) => {
+    g.fillStyle = '#e4e6e8'
+    g.fillRect(0, 0, s, s)
+    speckle(g, s, r, ['#cfd3d6', '#f2f3f4', '#c3c8cc'], 400, 2)
+  }), 'gravel', rx, ry)
+
+// Striped shop awning.
+export const awningTex = (a: string, b = '#ffffff') =>
+  make(`awning|${a}|${b}`, 64, (g, s) => {
+    for (let i = 0; i < 8; i++) {
+      g.fillStyle = i % 2 ? b : a
+      g.fillRect((i * s) / 8, 0, s / 8, s)
+    }
+    g.fillStyle = 'rgba(0,0,0,.15)'
+    g.fillRect(0, s - 8, s, 8)
+  })
+
+// Shop window: glass panes with frames and a hint of reflection.
+export const windowTex = () =>
+  make('window', 128, (g, s) => {
+    g.fillStyle = '#eceff1'
+    g.fillRect(0, 0, s, s)
+    const panes = 3
+    const pw = s / panes
+    for (let i = 0; i < panes; i++) {
+      const grd = g.createLinearGradient(i * pw, 0, i * pw + pw, s)
+      grd.addColorStop(0, '#8fd3ff')
+      grd.addColorStop(0.5, '#4f9fd6')
+      grd.addColorStop(1, '#2c6fa3')
+      g.fillStyle = grd
+      g.fillRect(i * pw + 6, 6, pw - 12, s - 12)
+      g.fillStyle = 'rgba(255,255,255,.35)'
+      g.beginPath()
+      g.moveTo(i * pw + 10, s - 20)
+      g.lineTo(i * pw + 26, 10)
+      g.lineTo(i * pw + 36, 10)
+      g.lineTo(i * pw + 20, s - 20)
+      g.fill()
+    }
+  })
+
+// Car rim with spokes, used on the outside face of each wheel.
+export const rimTex = () =>
+  make('rim', 64, (g, s) => {
+    const c = s / 2
+    g.fillStyle = '#1b1b1b'
+    g.fillRect(0, 0, s, s)
+    g.fillStyle = '#e8eaed'
+    g.beginPath(); g.arc(c, c, s * 0.42, 0, Math.PI * 2); g.fill()
+    g.fillStyle = '#9aa0a6'
+    g.beginPath(); g.arc(c, c, s * 0.36, 0, Math.PI * 2); g.fill()
+    g.strokeStyle = '#f5f6f7'
+    g.lineWidth = 5
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2
+      g.beginPath(); g.moveTo(c, c); g.lineTo(c + Math.cos(a) * s * 0.36, c + Math.sin(a) * s * 0.36); g.stroke()
+    }
+    g.fillStyle = '#5f6368'
+    g.beginPath(); g.arc(c, c, s * 0.08, 0, Math.PI * 2); g.fill()
+  })

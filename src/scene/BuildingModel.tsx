@@ -1,13 +1,16 @@
 import { TILE, type BuildingDef } from '../game/data'
 import { signTexture } from './signTexture'
 import { CarModel } from './CarModel'
+import type { Texture } from 'three'
+import { brickTex, sidingTex, shingleTex, gravelTex, awningTex, windowTex } from './textures'
 
 type Props = { def: BuildingDef; ghost?: boolean; valid?: boolean }
 
 // Shared material props so ghost previews render translucent.
 function useMat(ghost?: boolean, valid?: boolean) {
-  return (color: string) => (
+  return (color: string, map?: Texture) => (
     <meshStandardMaterial
+      map={ghost ? null : map ?? null}
       color={ghost ? (valid ? '#66bb6a' : '#ef5350') : color}
       transparent={ghost}
       opacity={ghost ? 0.55 : 1}
@@ -253,16 +256,22 @@ export function BuildingModel({ def, ghost, valid }: Props) {
         <group>
           <mesh position={[0, 0.5, 0]} castShadow receiveShadow>
             <boxGeometry args={[1.3, 1, 1.2]} />
-            {m(def.color)}
+            {m(def.color, sidingTex(1, 1.5))}
           </mesh>
           <mesh position={[0, 1.35, 0]} rotation-y={Math.PI / 4} castShadow>
             <coneGeometry args={[1.15, 0.7, 4]} />
-            {m(def.roof)}
+            {m(def.roof, shingleTex(3, 1.5))}
           </mesh>
           <mesh position={[0, 0.3, 0.61]}>
             <planeGeometry args={[0.3, 0.6]} />
             {m('#795548')}
           </mesh>
+          {[-0.4, 0.4].map((x) => (
+            <mesh key={x} position={[x, 0.6, 0.605]}>
+              <planeGeometry args={[0.28, 0.26]} />
+              {m('#ffffff', windowTex())}
+            </mesh>
+          ))}
         </group>
       )
     case 'showroom':
@@ -376,18 +385,32 @@ export function BuildingModel({ def, ghost, valid }: Props) {
         <group>
           <mesh position={[0, h / 2, -0.1]} castShadow receiveShadow>
             <boxGeometry args={[W * 0.82, h, D * 0.72]} />
-            {m(def.color)}
+            {m(def.color, brickTex(W * 0.6, h * 0.8))}
           </mesh>
+          {/* Flat gravel roof inside a coloured parapet. */}
           <mesh position={[0, h + 0.06, -0.1]} castShadow>
             <boxGeometry args={[W * 0.88, 0.14, D * 0.78]} />
             {m(def.roof)}
           </mesh>
-          <mesh position={[0, 0.75, D * 0.26 + 0.05]} rotation-x={0.5} castShadow>
-            <boxGeometry args={[W * 0.7, 0.04, 0.4]} />
-            {m(def.roof)}
+          <mesh position={[0, h + 0.135, -0.1]} rotation-x={-Math.PI / 2}>
+            <planeGeometry args={[W * 0.78, D * 0.68]} />
+            {m('#ffffff', gravelTex(W, D))}
           </mesh>
-          <mesh position={[0, 0.32, D * 0.26 + 0.01]}>
-            <planeGeometry args={[0.45, 0.62]} />
+          {/* Big shop windows either side of the door. */}
+          <mesh position={[0, 0.42, D * 0.26 + 0.008]}>
+            <planeGeometry args={[W * 0.7, 0.62]} />
+            {m('#ffffff', windowTex())}
+          </mesh>
+          <mesh position={[0, 0.08, D * 0.26 + 0.02]}>
+            <boxGeometry args={[W * 0.82, 0.16, 0.03]} />
+            {m('#eceff1')}
+          </mesh>
+          <mesh position={[0, 0.82, D * 0.26 + 0.2]} rotation-x={0.45} castShadow>
+            <boxGeometry args={[W * 0.76, 0.03, 0.44]} />
+            {m('#ffffff', awningTex(def.roof === '#f5f5f5' || def.roof === '#fff8e1' ? def.color : def.roof))}
+          </mesh>
+          <mesh position={[0, 0.32, D * 0.26 + 0.012]}>
+            <planeGeometry args={[0.4, 0.6]} />
             {m('#4e342e')}
           </mesh>
           {def.prop && <RoofProp prop={def.prop} y={h + 0.13} />}

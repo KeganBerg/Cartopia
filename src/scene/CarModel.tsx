@@ -1,5 +1,7 @@
 import { useMemo } from 'react'
-import { Color } from 'three'
+import { Color, DoubleSide } from 'three'
+import { RoundedBox } from '@react-three/drei'
+import { rimTex } from './textures'
 import type { Body } from '../game/data'
 
 type Shape = {
@@ -14,12 +16,12 @@ type Shape = {
 }
 
 const SHAPES: Record<Body, Shape> = {
-  compact: { len: 0.95, wid: 0.6, body: 0.24, lift: 0.1, cabinLen: 0.58, cabinH: 0.27, cabinZ: -0.06, taper: 0.7, hood: 0, wheel: 0.11 },
-  sedan: { len: 1.22, wid: 0.62, body: 0.22, lift: 0.1, cabinLen: 0.62, cabinH: 0.24, cabinZ: -0.06, taper: 0.72, hood: 0, wheel: 0.11 },
-  sports: { len: 1.22, wid: 0.66, body: 0.17, lift: 0.08, cabinLen: 0.5, cabinH: 0.17, cabinZ: -0.12, taper: 0.62, hood: 0.03, wheel: 0.11, spoiler: true },
-  muscle: { len: 1.32, wid: 0.66, body: 0.23, lift: 0.1, cabinLen: 0.5, cabinH: 0.2, cabinZ: -0.16, taper: 0.75, hood: 0.05, wheel: 0.12, scoop: true },
-  truck: { len: 1.38, wid: 0.7, body: 0.3, lift: 0.17, cabinLen: 0.48, cabinH: 0.3, cabinZ: 0.2, taper: 0.88, hood: 0, wheel: 0.15, bed: true },
-  super: { len: 1.28, wid: 0.72, body: 0.14, lift: 0.07, cabinLen: 0.48, cabinH: 0.15, cabinZ: -0.04, taper: 0.55, hood: 0.02, wheel: 0.11, spoiler: true, scoop: true },
+  compact: { len: 0.95, wid: 0.64, body: 0.27, lift: 0.1, cabinLen: 0.58, cabinH: 0.28, cabinZ: -0.06, taper: 0.72, hood: 0, wheel: 0.15 },
+  sedan: { len: 1.22, wid: 0.66, body: 0.24, lift: 0.1, cabinLen: 0.62, cabinH: 0.25, cabinZ: -0.06, taper: 0.74, hood: 0, wheel: 0.15 },
+  sports: { len: 1.22, wid: 0.7, body: 0.19, lift: 0.08, cabinLen: 0.52, cabinH: 0.18, cabinZ: -0.12, taper: 0.64, hood: 0.03, wheel: 0.15, spoiler: true },
+  muscle: { len: 1.32, wid: 0.7, body: 0.25, lift: 0.1, cabinLen: 0.52, cabinH: 0.21, cabinZ: -0.16, taper: 0.76, hood: 0.05, wheel: 0.16, scoop: true },
+  truck: { len: 1.38, wid: 0.74, body: 0.32, lift: 0.18, cabinLen: 0.5, cabinH: 0.31, cabinZ: 0.2, taper: 0.88, hood: 0, wheel: 0.2, bed: true },
+  super: { len: 1.28, wid: 0.76, body: 0.16, lift: 0.07, cabinLen: 0.5, cabinH: 0.16, cabinZ: -0.04, taper: 0.56, hood: 0.02, wheel: 0.15, spoiler: true, scoop: true },
 }
 
 // Toy-style car built from primitives. Faces +z.
@@ -33,10 +35,9 @@ export function CarModel({ body, color, highlight, stripe }: { body: Body; color
   return (
     <group>
       {/* Lower body with slightly darker skirt. */}
-      <mesh position={[0, s.lift + s.body * 0.55, 0]} castShadow>
-        <boxGeometry args={[s.wid, s.body * 0.9, s.len]} />
+      <RoundedBox args={[s.wid, s.body * 0.95, s.len]} radius={Math.min(0.07, s.body * 0.4)} smoothness={2} position={[0, s.lift + s.body * 0.53, 0]} castShadow>
         {paint}
-      </mesh>
+      </RoundedBox>
       <mesh position={[0, s.lift + 0.03, 0]}>
         <boxGeometry args={[s.wid * 1.02, 0.06, s.len * 0.98]} />
         <meshStandardMaterial color={dark} />
@@ -52,7 +53,7 @@ export function CarModel({ body, color, highlight, stripe }: { body: Body; color
       <group position={[0, top + s.cabinH * 0.5, s.cabinZ]} scale={[s.wid * 0.63, 1, s.cabinLen * 0.72]}>
         <mesh rotation-y={Math.PI / 4}>
           <cylinderGeometry args={[s.taper + (1 - s.taper) * 0.25, 1 - (1 - s.taper) * 0.25, s.cabinH * 0.5, 4, 1]} />
-          <meshStandardMaterial color="#1c2833" metalness={0.8} roughness={0.1} />
+          <meshStandardMaterial color="#3f6f94" metalness={0.6} roughness={0.08} />
         </mesh>
       </group>
       {s.hood > 0 && (
@@ -123,16 +124,16 @@ export function CarModel({ body, color, highlight, stripe }: { body: Body; color
           </mesh>
         </group>
       ))}
-      {/* Wheels with hubcaps. */}
+      {/* Chunky toy wheels with spoked rims. */}
       {[[-wx, wz], [wx, wz], [-wx, -wz], [wx, -wz]].map(([x, z], i) => (
-        <group key={i} position={[x, s.wheel, z]} rotation-z={Math.PI / 2}>
-          <mesh castShadow>
-            <cylinderGeometry args={[s.wheel, s.wheel, 0.1, 14]} />
+        <group key={i} position={[x, s.wheel, z]}>
+          <mesh rotation-z={Math.PI / 2} castShadow>
+            <cylinderGeometry args={[s.wheel, s.wheel, 0.14, 16]} />
             <meshStandardMaterial color="#1a1a1a" roughness={0.9} />
           </mesh>
-          <mesh position={[0, x > 0 ? 0.051 : -0.051, 0]}>
-            <cylinderGeometry args={[s.wheel * 0.55, s.wheel * 0.55, 0.01, 10]} />
-            <meshStandardMaterial color="#eceff1" metalness={0.8} roughness={0.2} />
+          <mesh position={[x > 0 ? 0.071 : -0.071, 0, 0]} rotation-y={x > 0 ? Math.PI / 2 : -Math.PI / 2}>
+            <circleGeometry args={[s.wheel * 0.92, 16]} />
+            <meshStandardMaterial map={rimTex()} metalness={0.5} roughness={0.3} side={DoubleSide} />
           </mesh>
         </group>
       ))}

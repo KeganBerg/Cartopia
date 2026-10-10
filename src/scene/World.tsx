@@ -7,6 +7,7 @@ import { GRID, TILE, PLOT, PLOT_MIN, PLOT_MAX, START_LAND, buildingDef } from '.
 import { BuildingModel } from './BuildingModel'
 import { TownCars } from './TownCars'
 import { toWorld, toTile, DIRS } from './grid'
+import { grassTex, paverTex, asphaltTex } from './textures'
 
 const SIZE = GRID * TILE
 // Everything a town could ever own, centred on the origin like the start lot.
@@ -28,7 +29,7 @@ function Land() {
           <group key={k} position={[cx, 0, cz]}>
             <mesh rotation-x={-Math.PI / 2} position-y={0.001} receiveShadow>
               <planeGeometry args={[PLOT * TILE, PLOT * TILE]} />
-              <meshStandardMaterial color="#7ec850" />
+              <meshStandardMaterial map={grassTex(PLOT / 2)} />
             </mesh>
             {mode !== 'play' && mode !== 'expand' && <gridHelper args={[PLOT * TILE, PLOT, '#4f8f2f', '#5f9f3f']} position-y={0.005} />}
           </group>
@@ -97,10 +98,44 @@ function Building({ b, roads }: { b: PlacedBuilding; roads: Set<string> }) {
       {d.kind !== 'decor' && d.kind !== 'obstacle' && (
         <mesh rotation-x={-Math.PI / 2} position-y={0.012} receiveShadow>
           <planeGeometry args={[d.w * TILE - 0.1, d.h * TILE - 0.1]} />
-          <meshStandardMaterial color="#e8dcc3" />
+          <meshStandardMaterial map={paverTex(d.w, d.h)} />
         </mesh>
       )}
       <BuildingModel def={d} />
+    </group>
+  )
+}
+
+// Raised sidewalk strip along a road edge with no connecting road.
+function Sidewalk({ side }: { side: 'e' | 'w' | 's' | 'n' }) {
+  const half = TILE / 2
+  const w = 0.4
+  const along = side === 'e' || side === 'w'
+  const pos: [number, number, number] =
+    side === 'e' ? [half - w / 2, 0.04, 0] : side === 'w' ? [-half + w / 2, 0.04, 0]
+    : side === 's' ? [0, 0.04, half - w / 2] : [0, 0.04, -half + w / 2]
+  return (
+    <mesh position={pos} receiveShadow>
+      <boxGeometry args={along ? [w, 0.08, TILE] : [TILE, 0.08, w]} />
+      <meshStandardMaterial map={along ? paverTex(0.5, 2) : paverTex(2, 0.5)} />
+    </mesh>
+  )
+}
+
+// Zebra crossing painted across the road near one edge of the tile.
+function Crosswalk({ side }: { side: 'e' | 'w' | 's' | 'n' }) {
+  const half = TILE / 2
+  const across = side === 'e' || side === 'w'
+  const at = half - 0.32
+  const off = side === 'e' || side === 's' ? at : -at
+  return (
+    <group>
+      {[-0.45, -0.15, 0.15, 0.45].map((o) => (
+        <mesh key={o} rotation-x={-Math.PI / 2} position={across ? [off, 0.021, o] : [o, 0.021, off]}>
+          <planeGeometry args={across ? [0.34, 0.16] : [0.16, 0.34]} />
+          <meshBasicMaterial color="#f5f5f5" />
+        </mesh>
+      ))}
     </group>
   )
 }
@@ -109,42 +144,45 @@ function Roads() {
   const roadsList = useGame((s) => (s.visiting ?? s).roads)
   const tiles = useMemo(() => {
     const set = new Set(roadsList)
+    const degree = (x: number, z: number) => DIRS.filter(([dx, dz]) => set.has(`${x + dx},${z + dz}`)).length
     return roadsList.map((k) => {
       const [x, z] = k.split(',').map(Number)
       const n = DIRS.map(([dx, dz]) => set.has(`${x + dx},${z + dz}`))
-      return { k, x, z, n }
+      // Which neighbours are intersections, for crosswalks.
+      const xing = DIRS.map(([dx, dz], i) => n[i] && degree(x + dx, z + dz) >= 3)
+      return { k, x, z, n, xing }
     })
   }, [roadsList])
+  const asphalt = asphaltTex()
 
   return (
     <group>
-      {tiles.map(({ k, x, z, n }) => {
+      {tiles.map(({ k, x, z, n, xing }) => {
         const [wx, wz] = toWorld(x, z)
         const [e, w, s, nn] = n
         const count = n.filter(Boolean).length
         const straightX = (e || w) && !s && !nn
         const straightZ = (s || nn) && !e && !w
-        const half = TILE / 2
         return (
           <group key={k} position={[wx, 0, wz]}>
             <mesh rotation-x={-Math.PI / 2} position-y={0.01} receiveShadow>
               <planeGeometry args={[TILE, TILE]} />
-              <meshStandardMaterial color="#5f646b" />
+              <meshStandardMaterial map={asphalt} />
             </mesh>
-            {/* Curbs on sides with no connecting road. */}
-            {!e && <mesh position={[half - 0.12, 0.04, 0]}><boxGeometry args={[0.24, 0.08, TILE]} /><meshStandardMaterial color="#e8dcc3" /></mesh>}
-            {!w && <mesh position={[-half + 0.12, 0.04, 0]}><boxGeometry args={[0.24, 0.08, TILE]} /><meshStandardMaterial color="#e8dcc3" /></mesh>}
-            {!s && <mesh position={[0, 0.04, half - 0.12]}><boxGeometry args={[TILE, 0.08, 0.24]} /><meshStandardMaterial color="#e8dcc3" /></mesh>}
-            {!nn && <mesh position={[0, 0.04, -half + 0.12]}><boxGeometry args={[TILE, 0.08, 0.24]} /><meshStandardMaterial color="#e8dcc3" /></mesh>}
+            {!e && <Sidewalk side="e" />}
+            {!w && <Sidewalk side="w" />}
+            {!s && <Sidewalk side="s" />}
+            {!nn && <Sidewalk side="n" />}
+            {count < 3 && xing[0] && <Crosswalk side="e" />}
+            {count < 3 && xing[1] && <Crosswalk side="w" />}
+            {count < 3 && xing[2] && <Crosswalk side="s" />}
+            {count < 3 && xing[3] && <Crosswalk side="n" />}
             {straightX && [-0.5, 0.5].map((o) => (
               <mesh key={o} rotation-x={-Math.PI / 2} position={[o, 0.02, 0]}><planeGeometry args={[0.45, 0.07]} /><meshBasicMaterial color="#fafafa" /></mesh>
             ))}
             {straightZ && [-0.5, 0.5].map((o) => (
               <mesh key={o} rotation-x={-Math.PI / 2} position={[0, 0.02, o]}><planeGeometry args={[0.07, 0.45]} /><meshBasicMaterial color="#fafafa" /></mesh>
             ))}
-            {count >= 3 && (
-              <mesh rotation-x={-Math.PI / 2} position-y={0.015}><circleGeometry args={[0.18, 12]} /><meshBasicMaterial color="#ffd54f" /></mesh>
-            )}
           </group>
         )
       })}

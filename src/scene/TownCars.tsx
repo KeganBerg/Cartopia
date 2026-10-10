@@ -81,7 +81,9 @@ function DrivingCar({ car, roads, start }: { car: OwnedCar; roads: Set<string>; 
         s.openPanel(car.flat || car.lowFuel ? 'flat' : 'garage')
       }}
     >
-      <CarModel body={def.body} color={car.color} highlight={selected} stripe={car.stripe} />
+      <group scale={1.3}>
+        <CarModel body={def.body} color={car.color} highlight={selected} stripe={car.stripe} />
+      </group>
     </group>
   )
 }
