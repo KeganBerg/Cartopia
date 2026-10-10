@@ -2,10 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { MapControls } from '@react-three/drei'
 import { AnchorProjector } from './anchors'
 import { useThree, type ThreeEvent } from '@react-three/fiber'
-import { useGame, canPlace, buyablePlots, lotSize, type PlacedBuilding } from '../game/store'
+import { Plane, Vector3 } from 'three'
+import { create } from 'zustand'
+import { useGame, canPlace, buyablePlots, lotSize, movable, type PlacedBuilding } from '../game/store'
 import { GRID, TILE, PLOT, PLOT_MIN, PLOT_MAX, START_LAND, buildingDef } from '../game/data'
 import { BuildingModel } from './BuildingModel'
-import { rotatePlacement, setGhostTurn } from '../game/placement'
+import { rotateCurrent, setGhostTurn, turnOf } from '../game/placement'
+import { sfx } from '../lib/sound'
 import { Clouds } from './Clouds'
 import { DayNight } from './DayNight'
 import { PAL } from './season'
@@ -60,52 +63,65 @@ export function centerOf(def: string, x: number, z: number, rot?: number): [numb
   return toWorld(x + (w - 1) / 2, z + (h - 1) / 2)
 }
 
+// A building being dragged in move mode: where it would land, and which of its
+// tiles the pointer is holding.
+type Drag = { uid: string; x: number; z: number; gx: number; gz: number }
+const useDrag = create<{ drag: Drag | null }>(() => ({ drag: null }))
 
+const GROUND = new Plane(new Vector3(0, 1, 0), 0)
+const hit = new Vector3()
+// Tile under the pointer at ground level, even when the pointer is on a rooftop.
+const groundTile = (e: ThreeEvent<PointerEvent>) => {
+  const p = e.ray.intersectPlane(GROUND, hit)
+  return p ? toTile(p.x, p.z) : toTile(e.point.x, e.point.z)
+}
 
-// Quarter turns that point a building's front at an adjacent road. Non-square lots can only flip.
-function roadTurn(b: Pick<PlacedBuilding, 'def' | 'x' | 'z'>, roads: Set<string>) {
-  const d = buildingDef(b.def)
-  const edge = (dir: 'S' | 'E' | 'N' | 'W') => {
-    for (let i = 0; i < Math.max(d.w, d.h); i++) {
-      const t =
-        dir === 'S' ? [b.x + i, b.z + d.h] : dir === 'N' ? [b.x + i, b.z - 1]
-        : dir === 'E' ? [b.x + d.w, b.z + i] : [b.x - 1, b.z + i]
-      const inRange = dir === 'S' || dir === 'N' ? i < d.w : i < d.h
-      if (inRange && roads.has(`${t[0]},${t[1]}`)) return true
-    }
-    return false
+// Pick a building up. Letting go drops it there if it fits, or snaps it back.
+function startDrag(b: PlacedBuilding, tile: [number, number]) {
+  useGame.getState().select(b.uid)
+  useDrag.setState({ drag: { uid: b.uid, x: b.x, z: b.z, gx: tile[0] - b.x, gz: tile[1] - b.z } })
+  const end = (e: PointerEvent) => {
+    window.removeEventListener('pointerup', end)
+    window.removeEventListener('pointercancel', end)
+    const d = useDrag.getState().drag
+    useDrag.setState({ drag: null })
+    if (!d || e.type === 'pointercancel' || (d.x === b.x && d.z === b.z)) return
+    if (useGame.getState().moveBuilding(d.uid, d.x, d.z)) sfx.click()
+    else sfx.error()
   }
-  const square = d.w === d.h
-  if (edge('S')) return 0
-  if (square && edge('E')) return 1
-  if (edge('N')) return 2
-  if (square && edge('W')) return 3
-  return 0
+  window.addEventListener('pointerup', end)
+  window.addEventListener('pointercancel', end)
 }
-
-// The player's chosen turn, or else face the road. Decorations face south unless turned.
-function turnOf(b: Pick<PlacedBuilding, 'def' | 'x' | 'z' | 'rot'>, roads: Set<string>) {
-  if (b.rot != null) return b.rot
-  const kind = buildingDef(b.def).kind
-  return kind === 'decor' || kind === 'obstacle' ? 0 : roadTurn(b, roads)
-}
-
 
 function Building({ b, roads }: { b: PlacedBuilding; roads: Set<string> }) {
   const d = buildingDef(b.def)
   const [cx, cz] = centerOf(b.def, b.x, b.z, b.rot)
+  // Hidden while dragged away; the ghost shows where it would land.
+  const away = useDrag((g) => g.drag?.uid === b.uid && (g.drag.x !== b.x || g.drag.z !== b.z))
+  if (away) return null
   return (
     <group
       position={[cx, 0, cz]}
       rotation-y={(turnOf(b, roads) * Math.PI) / 2}
+      onPointerDown={(e) => {
+        const s = useGame.getState()
+        if (s.mode !== 'move' || s.visiting || e.button !== 0) return
+        e.stopPropagation()
+        if (!movable(b.def)) return s.toast(`Tap the ${d.name.toLowerCase()} in play mode to clear it`)
+        startDrag(b, groundTile(e))
+      }}
       onClick={(e) => {
         const s = useGame.getState()
+        // In move mode the tap already picked it up; don't let it fall through and deselect.
+        if (s.mode === 'move') return e.stopPropagation()
         if (s.mode !== 'play' || s.visiting || e.delta > 6) return
         e.stopPropagation()
         s.tapBuilding(b.uid)
       }}
       onPointerOver={() => {
-        if (useGame.getState().mode === 'play' && d.kind !== 'decor' && d.kind !== 'house') document.body.style.cursor = 'pointer'
+        const mode = useGame.getState().mode
+        if (mode === 'move' && movable(b.def)) document.body.style.cursor = 'grab'
+        else if (mode === 'play' && d.kind !== 'decor' && d.kind !== 'house') document.body.style.cursor = 'pointer'
       }}
       onPointerOut={() => (document.body.style.cursor = '')}
     >
@@ -237,6 +253,8 @@ function Interaction() {
   const mode = useGame((s) => s.mode)
   const placing = useGame((s) => s.placing)
   const placeRot = useGame((s) => s.placeRot)
+  const selected = useGame((s) => s.selected)
+  const drag = useDrag((g) => g.drag)
   const [hover, setHover] = useState<[number, number] | null>(null)
   const painting = useRef(false)
   const roads = useGame((s) => s.roads)
@@ -244,11 +262,11 @@ function Interaction() {
   const land = useGame((s) => s.land)
   const roadSet = useMemo(() => new Set(roads), [roads])
 
-  // R turns the building being placed on desktop.
+  // R turns the building being placed or moved on desktop.
   useEffect(() => {
-    if (mode !== 'place') return
+    if (mode !== 'place' && mode !== 'move') return
     const onKey = (e: KeyboardEvent) => {
-      if ((e.key === 'r' || e.key === 'R') && !(e.target instanceof HTMLInputElement)) rotatePlacement()
+      if ((e.key === 'r' || e.key === 'R') && !(e.target instanceof HTMLInputElement)) rotateCurrent()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -258,11 +276,25 @@ function Interaction() {
 
   const onMove = (e: ThreeEvent<PointerEvent>) => {
     const t = tileOf(e)
+    if (drag) {
+      const x = t[0] - drag.gx
+      const z = t[1] - drag.gz
+      if (x !== drag.x || z !== drag.z) useDrag.setState({ drag: { ...drag, x, z } })
+      return
+    }
     if (!hover || hover[0] !== t[0] || hover[1] !== t[1]) setHover(t)
     if (painting.current && mode === 'road') useGame.getState().paintRoad(...t)
     if (painting.current && mode === 'bulldoze') useGame.getState().bulldoze(...t)
   }
   const onDown = (e: ThreeEvent<PointerEvent>) => {
+    if (mode === 'move' && selected && e.button === 0) {
+      // Grabbing the ground inside the picked building's lot drags it too.
+      const b = buildings.find((o) => o.uid === selected)
+      const t = tileOf(e)
+      const [w, h] = b ? lotSize(b.def, b.rot) : [0, 0]
+      if (b && t[0] >= b.x && t[0] < b.x + w && t[1] >= b.z && t[1] < b.z + h) startDrag(b, t)
+      return
+    }
     if (mode !== 'road' && mode !== 'bulldoze') return
     if (e.button !== 0) return
     painting.current = true
@@ -272,6 +304,8 @@ function Interaction() {
   }
   const onUp = () => (painting.current = false)
   const onClick = (e: ThreeEvent<MouseEvent>) => {
+    // Tapping open ground lets go of the picked building.
+    if (mode === 'move' && e.delta <= 6 && !drag) return useGame.getState().select(null)
     if (mode !== 'place' || !placing || e.delta > 6) return
     const [x, z] = tileOf(e)
     const d = buildingDef(placing)
@@ -307,6 +341,32 @@ function Interaction() {
         </group>
       </group>
     )
+  } else if (mode === 'move' && selected) {
+    const b = buildings.find((o) => o.uid === selected)
+    if (b) {
+      const d = buildingDef(b.def)
+      const [w, h] = lotSize(b.def, b.rot)
+      const x = drag?.uid === b.uid ? drag.x : b.x
+      const z = drag?.uid === b.uid ? drag.z : b.z
+      const moved = x !== b.x || z !== b.z
+      const valid = !moved || canPlace({ roads, buildings, land }, b.def, x, z, b.rot, b.uid)
+      const [cx, cz] = centerOf(b.def, x, z, b.rot)
+      // Buildings that face the nearest road keep doing so at the new spot.
+      const turn = turnOf({ def: b.def, x, z, rot: b.rot }, roadSet)
+      ghost = (
+        <group position={[cx, 0.02, cz]}>
+          <mesh rotation-x={-Math.PI / 2} position-y={0.03}>
+            <planeGeometry args={[w * TILE, h * TILE]} />
+            <meshBasicMaterial color={!moved ? '#ffd54f' : valid ? '#66bb6a' : '#ef5350'} transparent opacity={0.45} />
+          </mesh>
+          {moved && (
+            <group rotation-y={(turn * Math.PI) / 2}>
+              <BuildingModel def={d} ghost valid={valid} />
+            </group>
+          )}
+        </group>
+      )
+    }
   } else if (hover && (mode === 'road' || mode === 'bulldoze')) {
     const [wx, wz] = toWorld(...hover)
     ghost = (
@@ -337,7 +397,7 @@ function Interaction() {
       {ghost}
       <MapControls
         makeDefault
-        enabled={!(mode === 'road' || mode === 'bulldoze')}
+        enabled={!(mode === 'road' || mode === 'bulldoze' || drag)}
         enableRotate={false}
         minZoom={12}
         maxZoom={90}

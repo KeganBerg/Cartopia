@@ -7,6 +7,7 @@ import { useGame, footprint, lotSize, type OwnedCar, type PlacedBuilding } from 
 import { buildingDef, carDef, performance } from '../game/data'
 import { tripRequests, type TripKind } from '../game/trips'
 import { toWorld, DIRS } from './grid'
+import { turnOf } from '../game/placement'
 import { CarModel } from './CarModel'
 
 const MAX_VISIBLE = 30
@@ -22,6 +23,9 @@ type Agent = {
   timer: number; nextVisit: number
   lane: [number, number, number] // where the car left the road, for pulling in and out
 }
+
+// Tile step out the front door for each quarter turn (0 faces south).
+const FRONT: Tile[] = [[0, 1], [1, 0], [0, -1], [-1, 0]]
 
 const key = (t: Tile) => `${t[0]},${t[1]}`
 const same = (a: Tile, b: Tile) => a[0] === b[0] && a[1] === b[1]
@@ -61,8 +65,11 @@ function stopFor(b: PlacedBuilding, roads: Set<string>): Stop | null {
   if (d.kind === 'decor' || d.kind === 'obstacle' || d.kind === 'house') return null
   const [w, h] = lotSize(b.def, b.rot)
   const [cx, cz] = toWorld(b.x + (w - 1) / 2, b.z + (h - 1) / 2)
-  for (const [fx, fz] of footprint(b.def, b.x, b.z, b.rot)) {
-    for (const [dx, dz] of DIRS) {
+  // Pull up at the front door when a road runs past it, else at any side touching a road.
+  const front = FRONT[turnOf(b, roads)]
+  const sides = [front, ...DIRS.filter(([dx, dz]) => dx !== front[0] || dz !== front[1])]
+  for (const [dx, dz] of sides) {
+    for (const [fx, fz] of footprint(b.def, b.x, b.z, b.rot)) {
       const road: Tile = [fx + dx, fz + dz]
       if (!roads.has(key(road))) continue
       const [tx, tz] = toWorld(fx, fz)
