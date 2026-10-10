@@ -5,6 +5,7 @@ import {
   upgradeCost, MAX_UPGRADE, RESCUE_SPOTS, RESCUE_PINS, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, type Rarity, GOALS, DAILY_BONUS, PAINTS, PAINT_COST, STRIPE_COST, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey,
 } from './data'
 import { sfx } from '../lib/sound'
+import { requestTrip } from './trips'
 
 export type PlacedBuilding = { uid: string; def: string; x: number; z: number; jobEndsAt: number | null }
 export type OwnedCar = { uid: string; model: string; color: string; upgrades: Record<UpgradeSlot, number>; flat?: boolean; lowFuel?: boolean; stripe?: string | null; plate?: string }
@@ -533,6 +534,7 @@ export const useGame = create<GameState>()(
           ...addXp(s, tow ? 15 : 5),
           updatedAt: Date.now(),
         })
+        if (tow) requestTrip(cuid, 'tow')
         s.toast(tow ? "Rusty towed it in and patched it up. +15 XP" : `Tire fixed for $${cost}`)
       },
 
@@ -547,6 +549,7 @@ export const useGame = create<GameState>()(
           const pay = servicePay(s.level, 'tires')
           sfx.coin()
           s.toast(`Your Tire Shop fixed it! +${pay} coins, +12 XP`)
+          requestTrip(cuid, 'tires')
           return set({
             coins: s.coins + pay,
             cars: s.cars.map((c) => (c.uid === cuid ? { ...c, flat: false } : c)),
@@ -562,6 +565,7 @@ export const useGame = create<GameState>()(
           const pay = servicePay(s.level, 'gas')
           sfx.coin()
           s.toast(`Filled up at your Gas Station! +${pay} coins, +8 XP`)
+          requestTrip(cuid, 'gas')
           return set({
             coins: s.coins + pay,
             cars: s.cars.map((c) => (c.uid === cuid ? { ...c, lowFuel: false } : c)),
