@@ -186,7 +186,7 @@ export function SkillTag({ model }: { model: string }) {
 }
 
 export function CarSwatch({ color, body }: { color: string; body: string }) {
-  const low = body === 'sports' || body === 'super'
+  const low = ['sports', 'super', 'wedge', 'roadster', 'coupe'].includes(body)
   return (
     <svg viewBox="0 0 100 50" className="car-swatch">
       <rect x="8" y={low ? 22 : 18} width="84" height={low ? 16 : 20} rx="7" fill={color} />

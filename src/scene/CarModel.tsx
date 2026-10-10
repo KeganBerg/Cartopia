@@ -14,6 +14,12 @@ type Shape = {
   hood: number // hood bulge height
   wheel: number
   spoiler?: boolean; bed?: boolean; scoop?: boolean
+  round?: boolean // domed cabin and soft body, like a bubble car
+  open?: boolean // no roof: windshield and seats only
+  rollbar?: boolean
+  fins?: boolean // fifties tail fins
+  wood?: boolean // wood side panels
+  wing?: boolean // tall rally wing
 }
 
 const SHAPES: Record<Body, Shape> = {
@@ -23,6 +29,14 @@ const SHAPES: Record<Body, Shape> = {
   muscle: { len: 1.32, wid: 0.7, body: 0.25, lift: 0.1, cabinLen: 0.52, cabinH: 0.21, cabinZ: -0.16, taper: 0.76, hood: 0.05, wheel: 0.16, scoop: true },
   truck: { len: 1.38, wid: 0.74, body: 0.32, lift: 0.18, cabinLen: 0.5, cabinH: 0.31, cabinZ: 0.2, taper: 0.88, hood: 0, wheel: 0.2, bed: true },
   super: { len: 1.28, wid: 0.76, body: 0.16, lift: 0.07, cabinLen: 0.5, cabinH: 0.16, cabinZ: -0.04, taper: 0.56, hood: 0.02, wheel: 0.15, spoiler: true, scoop: true },
+  bubble: { len: 0.98, wid: 0.66, body: 0.28, lift: 0.11, cabinLen: 0.6, cabinH: 0.22, cabinZ: -0.04, taper: 0.6, hood: 0, wheel: 0.15, round: true },
+  wagon: { len: 1.36, wid: 0.68, body: 0.25, lift: 0.1, cabinLen: 0.9, cabinH: 0.25, cabinZ: -0.16, taper: 0.9, hood: 0, wheel: 0.15, wood: true },
+  wedge: { len: 1.3, wid: 0.78, body: 0.14, lift: 0.07, cabinLen: 0.56, cabinH: 0.15, cabinZ: 0.02, taper: 0.42, hood: 0, wheel: 0.15, spoiler: true },
+  roadster: { len: 1.08, wid: 0.66, body: 0.2, lift: 0.08, cabinLen: 0.42, cabinH: 0.16, cabinZ: -0.12, taper: 0.7, hood: 0.02, wheel: 0.14, open: true },
+  rally: { len: 1.2, wid: 0.68, body: 0.24, lift: 0.11, cabinLen: 0.6, cabinH: 0.24, cabinZ: -0.06, taper: 0.74, hood: 0.02, wheel: 0.16, scoop: true, wing: true },
+  classic: { len: 1.48, wid: 0.72, body: 0.25, lift: 0.1, cabinLen: 0.56, cabinH: 0.22, cabinZ: -0.08, taper: 0.8, hood: 0, wheel: 0.15, fins: true },
+  offroad: { len: 0.96, wid: 0.7, body: 0.16, lift: 0.2, cabinLen: 0.4, cabinH: 0.2, cabinZ: -0.1, taper: 1, hood: 0, wheel: 0.21, open: true, rollbar: true },
+  coupe: { len: 1.26, wid: 0.72, body: 0.21, lift: 0.08, cabinLen: 0.5, cabinH: 0.2, cabinZ: -0.16, taper: 0.62, hood: 0.03, wheel: 0.16 },
 }
 
 // Toy-style car built from primitives. Faces +z.
@@ -36,27 +50,89 @@ export function CarModel({ body, color, highlight, stripe, beams }: { body: Body
   return (
     <group>
       {/* Lower body with slightly darker skirt. */}
-      <RoundedBox args={[s.wid, s.body * 0.95, s.len]} radius={Math.min(0.07, s.body * 0.4)} smoothness={2} position={[0, s.lift + s.body * 0.53, 0]} castShadow>
+      <RoundedBox args={[s.wid, s.body * 0.95, s.len]} radius={s.round ? s.body * 0.48 : Math.min(0.07, s.body * 0.4)} smoothness={2} position={[0, s.lift + s.body * 0.53, 0]} castShadow>
         {paint}
       </RoundedBox>
       <mesh position={[0, s.lift + 0.03, 0]}>
         <boxGeometry args={[s.wid * 1.02, 0.06, s.len * 0.98]} />
         <meshStandardMaterial color={dark} />
       </mesh>
-      {/* Tapered cabin: a 4-sided frustum rotated so its faces line up with the car. */}
-      <group position={[0, top + s.cabinH / 2, s.cabinZ]} scale={[s.wid * 0.62, 1, s.cabinLen * 0.71]}>
-        <mesh rotation-y={Math.PI / 4} castShadow>
-          <cylinderGeometry args={[s.taper, 1, s.cabinH, 4, 1]} />
+      {s.round ? (
+        <group position={[0, top - 0.02, s.cabinZ]} scale={[s.wid * 0.46, s.cabinH * 1.25, s.cabinLen * 0.58]}>
+          {/* Domed cabin: glass all round under a painted roof cap. */}
+          <mesh castShadow>
+            <sphereGeometry args={[1, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
+            <meshStandardMaterial color="#3f6f94" metalness={0.6} roughness={0.08} />
+          </mesh>
+          <mesh scale={1.02}>
+            <sphereGeometry args={[1, 18, 6, 0, Math.PI * 2, 0, Math.PI * 0.36]} />
+            {paint}
+          </mesh>
+        </group>
+      ) : s.open ? (
+        <group position={[0, top, s.cabinZ]}>
+          {/* Open top: raked windshield, two seats and an optional roll bar. */}
+          <mesh position={[0, s.cabinH * 0.45, s.cabinLen * 0.5]} rotation-x={-0.5}>
+            <boxGeometry args={[s.wid * 0.86, s.cabinH * 0.9, 0.02]} />
+            <meshStandardMaterial color="#9fd3f2" transparent opacity={0.6} metalness={0.4} roughness={0.05} />
+          </mesh>
+          {[-1, 1].map((sd) => (
+            <mesh key={sd} position={[sd * s.wid * 0.2, 0.08, 0]}>
+              <boxGeometry args={[s.wid * 0.28, 0.16, 0.16]} />
+              <meshStandardMaterial color="#3e2723" />
+            </mesh>
+          ))}
+          {s.rollbar && (
+            <mesh position={[0, 0.1, -0.12]}>
+              <torusGeometry args={[s.wid * 0.3, 0.025, 6, 16, Math.PI]} />
+              <meshStandardMaterial color="#cfd8dc" metalness={0.7} roughness={0.25} />
+            </mesh>
+          )}
+        </group>
+      ) : (
+        <>
+          {/* Tapered cabin: a 4-sided frustum rotated so its faces line up with the car. */}
+          <group position={[0, top + s.cabinH / 2, s.cabinZ]} scale={[s.wid * 0.62, 1, s.cabinLen * 0.71]}>
+            <mesh rotation-y={Math.PI / 4} castShadow>
+              <cylinderGeometry args={[s.taper, 1, s.cabinH, 4, 1]} />
+              {paint}
+            </mesh>
+          </group>
+          {/* Glass band around the cabin. */}
+          <group position={[0, top + s.cabinH * 0.5, s.cabinZ]} scale={[s.wid * 0.63, 1, s.cabinLen * 0.72]}>
+            <mesh rotation-y={Math.PI / 4}>
+              <cylinderGeometry args={[s.taper + (1 - s.taper) * 0.25, 1 - (1 - s.taper) * 0.25, s.cabinH * 0.5, 4, 1]} />
+              <meshStandardMaterial color="#3f6f94" metalness={0.6} roughness={0.08} />
+            </mesh>
+          </group>
+        </>
+      )}
+      {s.wood && [-1, 1].map((sd) => (
+        <mesh key={`w${sd}`} position={[sd * (s.wid / 2 + 0.004), s.lift + s.body * 0.55, -0.05]} rotation-y={sd * Math.PI / 2}>
+          <planeGeometry args={[s.len * 0.8, s.body * 0.55]} />
+          <meshStandardMaterial color="#8d5a3b" roughness={0.8} />
+        </mesh>
+      ))}
+      {s.fins && [-1, 1].map((sd) => (
+        <mesh key={`f${sd}`} position={[sd * s.wid * 0.42, top + 0.04, -s.len * 0.38]} rotation-x={-0.25} castShadow>
+          <boxGeometry args={[0.05, 0.1, s.len * 0.26]} />
           {paint}
         </mesh>
-      </group>
-      {/* Glass band around the cabin. */}
-      <group position={[0, top + s.cabinH * 0.5, s.cabinZ]} scale={[s.wid * 0.63, 1, s.cabinLen * 0.72]}>
-        <mesh rotation-y={Math.PI / 4}>
-          <cylinderGeometry args={[s.taper + (1 - s.taper) * 0.25, 1 - (1 - s.taper) * 0.25, s.cabinH * 0.5, 4, 1]} />
-          <meshStandardMaterial color="#3f6f94" metalness={0.6} roughness={0.08} />
-        </mesh>
-      </group>
+      ))}
+      {s.wing && (
+        <group position={[0, top, -s.len / 2 + 0.08]}>
+          {[-1, 1].map((sd) => (
+            <mesh key={sd} position={[sd * s.wid * 0.3, 0.1, 0]}>
+              <boxGeometry args={[0.03, 0.2, 0.04]} />
+              <meshStandardMaterial color="#212121" />
+            </mesh>
+          ))}
+          <mesh position={[0, 0.21, 0]}>
+            <boxGeometry args={[s.wid * 0.9, 0.03, 0.15]} />
+            {paint}
+          </mesh>
+        </group>
+      )}
       {s.hood > 0 && (
         <mesh position={[0, top + s.hood / 2, s.len * 0.28]}>
           <boxGeometry args={[s.wid * 0.5, s.hood, s.len * 0.3]} />
@@ -97,7 +173,7 @@ export function CarModel({ body, color, highlight, stripe, beams }: { body: Body
               <meshStandardMaterial color={stripe} />
             </mesh>
           ))}
-          {[-0.07, 0.07].map((x) => (
+          {!s.open && !s.round && [-0.07, 0.07].map((x) => (
             <mesh key={`r${x}`} position={[x, top + s.cabinH + 0.003, s.cabinZ]}>
               <boxGeometry args={[0.07, 0.006, s.cabinLen * s.taper * 0.95]} />
               <meshStandardMaterial color={stripe} />

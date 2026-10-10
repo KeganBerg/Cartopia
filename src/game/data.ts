@@ -78,7 +78,7 @@ export const plotPrice = (bought: number) => Math.round((5000 * Math.pow(1.45, b
 
 export const buildingDef = (id: string) => BUILDINGS.find((b) => b.id === id)!
 
-export type Body = 'compact' | 'sedan' | 'sports' | 'muscle' | 'truck' | 'super'
+export type Body = 'compact' | 'sedan' | 'sports' | 'muscle' | 'truck' | 'super' | 'bubble' | 'wagon' | 'wedge' | 'roadster' | 'rally' | 'classic' | 'offroad' | 'coupe'
 
 export type SkillId = 'launch' | 'nitro' | 'slipstream' | 'smooth' | 'oil'
 export const SKILLS: Record<SkillId, { name: string; icon: string; text: string }> = {
@@ -107,26 +107,29 @@ export type CarDef = {
   colors: string[]
 }
 
+// Parodies of real cars: the names and shapes nod to the real thing without
+// using any brand or model name. Ids stay fixed so existing saves keep working.
+// Stats follow each real car's relative performance.
 export const CARS: CarDef[] = [
-  { id: 'pip', name: 'Pip Hatch', body: 'compact', price: 800, unlockLevel: 1, power: 18, grip: 30, weight: 30, skill: 'launch', colors: ['#e53935', '#fdd835', '#43a047'] },
-  { id: 'civic', name: 'Commuter LX', body: 'sedan', price: 1500, unlockLevel: 1, power: 24, grip: 32, weight: 40, skill: 'slipstream', colors: ['#1e88e5', '#eeeeee', '#5d4037'] },
-  { id: 'trail', name: 'Trail Pickup', body: 'truck', price: 2600, unlockLevel: 2, power: 32, grip: 28, weight: 70, skill: 'launch', colors: ['#6d4c41', '#c62828', '#37474f'] },
-  { id: 'miata', name: 'Breeze MX', body: 'sports', price: 4200, unlockLevel: 3, power: 34, grip: 48, weight: 25, skill: 'smooth', colors: ['#1e88e5', '#d32f2f', '#fafafa'] },
-  { id: 'stallion', name: 'Stallion 68', body: 'muscle', price: 7000, unlockLevel: 4, power: 52, grip: 34, weight: 55, skill: 'nitro', colors: ['#ff6f00', '#212121', '#2e7d32'] },
-  { id: 'rally', name: 'Rally Evo', body: 'sedan', price: 9500, unlockLevel: 5, power: 50, grip: 58, weight: 40, skill: 'smooth', colors: ['#0d47a1', '#fafafa', '#ffeb3b'] },
-  { id: 'vette', name: 'Sting Ray', body: 'sports', price: 14000, unlockLevel: 6, power: 62, grip: 52, weight: 38, skill: 'slipstream', colors: ['#bdbdbd', '#b71c1c', '#1a237e'] },
-  { id: 'charger', name: 'Thunder RT', body: 'muscle', price: 18000, unlockLevel: 7, power: 70, grip: 42, weight: 58, skill: 'nitro', colors: ['#212121', '#ff5722', '#7b1fa2'] },
-  { id: 'gtr', name: 'Raijin GT', body: 'sports', price: 26000, unlockLevel: 9, power: 76, grip: 66, weight: 45, skill: 'smooth', colors: ['#eceff1', '#263238', '#ff6d00'] },
-  { id: 'lambo', name: 'Toro V12', body: 'super', price: 0, bucks: 40, unlockLevel: 5, power: 88, grip: 72, weight: 35, skill: 'oil', colors: ['#76ff03', '#ffd600', '#ff1744'] },
-  { id: 'hyper', name: 'Vento X', body: 'super', price: 60000, unlockLevel: 12, power: 95, grip: 85, weight: 30, skill: 'nitro', colors: ['#d50000', '#2962ff', '#212121'] },
-  { id: 'bug', name: 'Bubble Bug', body: 'compact', price: 1200, unlockLevel: 1, rescueOnly: true, power: 16, grip: 28, weight: 28, skill: 'launch', colors: ['#80cbc4', '#ffcc80', '#ef9a9a'] },
-  { id: 'woodie', name: 'Woodie Wagon', body: 'sedan', price: 2200, unlockLevel: 1, rescueOnly: true, power: 22, grip: 30, weight: 50, skill: 'slipstream', colors: ['#a1887f', '#fff59d', '#4db6ac'] },
-  { id: 'hauler', name: 'Haybale Hauler', body: 'truck', price: 3000, unlockLevel: 1, rescueOnly: true, power: 30, grip: 26, weight: 75, skill: 'launch', colors: ['#558b2f', '#e65100', '#1565c0'] },
-  { id: 'cruiser', name: 'Cruiser 57', body: 'sedan', price: 5000, unlockLevel: 1, rescueOnly: true, power: 40, grip: 36, weight: 55, skill: 'slipstream', colors: ['#4dd0e1', '#f06292', '#fafafa'] },
-  { id: 'buggy', name: 'Dune Buggy', body: 'compact', price: 6000, unlockLevel: 1, rescueOnly: true, power: 44, grip: 54, weight: 20, skill: 'launch', colors: ['#ff9800', '#cddc39', '#29b6f6'] },
-  { id: 'bandit', name: 'Bandit Coupe', body: 'muscle', price: 8000, unlockLevel: 1, rescueOnly: true, power: 56, grip: 38, weight: 52, skill: 'nitro', colors: ['#212121', '#ffd54f', '#b71c1c'] },
-  { id: 'lemans', name: 'Le Mans 66', body: 'sports', price: 16000, unlockLevel: 1, rescueOnly: true, power: 66, grip: 60, weight: 34, skill: 'smooth', colors: ['#1565c0', '#fafafa', '#c62828'] },
-  { id: 'gullwing', name: 'Gullwing 300', body: 'super', price: 30000, unlockLevel: 1, rescueOnly: true, power: 80, grip: 70, weight: 36, skill: 'oil', colors: ['#cfd8dc', '#b71c1c', '#263238'] },
+  { id: 'pip', name: 'Petite Hooper', body: 'compact', price: 800, unlockLevel: 1, power: 18, grip: 36, weight: 24, skill: 'launch', colors: ['#c62828', '#1b5e20', '#fafafa'] },
+  { id: 'civic', name: 'Handa Civil', body: 'sedan', price: 1500, unlockLevel: 1, power: 24, grip: 34, weight: 36, skill: 'slipstream', colors: ['#1e88e5', '#eeeeee', '#424242'] },
+  { id: 'trail', name: 'Fjord F-Fifty', body: 'truck', price: 2600, unlockLevel: 2, power: 38, grip: 26, weight: 74, skill: 'launch', colors: ['#0d47a1', '#c62828', '#eceff1'] },
+  { id: 'miata', name: 'Mazdah Myata', body: 'roadster', price: 4200, unlockLevel: 3, power: 32, grip: 54, weight: 22, skill: 'smooth', colors: ['#d32f2f', '#1e88e5', '#fafafa'] },
+  { id: 'stallion', name: "Fjord Bore Horse '68", body: 'muscle', price: 7000, unlockLevel: 4, power: 52, grip: 34, weight: 54, skill: 'nitro', colors: ['#1b5e20', '#ff6f00', '#212121'] },
+  { id: 'rally', name: 'Subaroo Rex STI', body: 'rally', price: 9500, unlockLevel: 5, power: 52, grip: 64, weight: 40, skill: 'smooth', colors: ['#0d47a1', '#fafafa', '#ffd600'] },
+  { id: 'vette', name: 'Shevvy Corvex Sting', body: 'sports', price: 14000, unlockLevel: 6, power: 66, grip: 54, weight: 38, skill: 'slipstream', colors: ['#b71c1c', '#bdbdbd', '#ffd600'] },
+  { id: 'charger', name: 'Dodgy Charjer R/T', body: 'muscle', price: 18000, unlockLevel: 7, power: 70, grip: 40, weight: 60, skill: 'nitro', colors: ['#212121', '#ff5722', '#6a1b9a'] },
+  { id: 'gtr', name: 'Nissun G-TAR', body: 'coupe', price: 26000, unlockLevel: 9, power: 78, grip: 70, weight: 46, skill: 'smooth', colors: ['#eceff1', '#263238', '#ff6d00'] },
+  { id: 'lambo', name: 'Lamberjeenie Cowntash', body: 'wedge', price: 0, bucks: 40, unlockLevel: 5, power: 86, grip: 70, weight: 34, skill: 'oil', colors: ['#fdd835', '#d50000', '#fafafa'] },
+  { id: 'hyper', name: 'Bugotty Shiron', body: 'super', price: 60000, unlockLevel: 12, power: 98, grip: 86, weight: 32, skill: 'nitro', colors: ['#1a237e', '#212121', '#d50000'] },
+  { id: 'bug', name: 'Volksvagon Beatle', body: 'bubble', price: 1200, unlockLevel: 1, rescueOnly: true, power: 14, grip: 28, weight: 28, skill: 'launch', colors: ['#80cbc4', '#ffcc80', '#ef9a9a'] },
+  { id: 'woodie', name: 'Country Squirrel Wagon', body: 'wagon', price: 2200, unlockLevel: 1, rescueOnly: true, power: 22, grip: 28, weight: 56, skill: 'slipstream', colors: ['#fafafa', '#fff59d', '#4db6ac'] },
+  { id: 'hauler', name: 'Shevvy 3-Hundo Hauler', body: 'truck', price: 3000, unlockLevel: 1, rescueOnly: true, power: 26, grip: 26, weight: 70, skill: 'launch', colors: ['#558b2f', '#e65100', '#1565c0'] },
+  { id: 'cruiser', name: "Shevvy Bell Heir '57", body: 'classic', price: 5000, unlockLevel: 1, rescueOnly: true, power: 38, grip: 34, weight: 58, skill: 'slipstream', colors: ['#4dd0e1', '#f06292', '#fafafa'] },
+  { id: 'buggy', name: 'Mayors Minx Buggy', body: 'offroad', price: 6000, unlockLevel: 1, rescueOnly: true, power: 34, grip: 56, weight: 18, skill: 'launch', colors: ['#ff9800', '#cddc39', '#29b6f6'] },
+  { id: 'bandit', name: 'Pontiak Trans Ham', body: 'muscle', price: 8000, unlockLevel: 1, rescueOnly: true, power: 56, grip: 38, weight: 54, skill: 'nitro', colors: ['#212121', '#ffd54f', '#b71c1c'] },
+  { id: 'lemans', name: 'Fjord GT-Forty', body: 'super', price: 16000, unlockLevel: 1, rescueOnly: true, power: 72, grip: 62, weight: 32, skill: 'smooth', colors: ['#1565c0', '#fafafa', '#c62828'] },
+  { id: 'gullwing', name: 'Mercy-Daze 300 Gullwing', body: 'coupe', price: 30000, unlockLevel: 1, rescueOnly: true, power: 64, grip: 58, weight: 36, skill: 'oil', colors: ['#cfd8dc', '#b71c1c', '#263238'] },
 ]
 
 // Rusty's Rescue: pay to search a location, tap the pins to send the tow
