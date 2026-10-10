@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useGame } from '../game/store'
+import { useGame, hasRusty } from '../game/store'
 import { BUILDINGS, CARS, UPGRADE_SLOTS, MAX_UPGRADE, PAINTS, STRIPES, PAINT_COST, STRIPE_COST, carDef, performance, upgradeCost, type BuildingDef } from '../game/data'
 import { CarPreview } from '../scene/CarPreview'
 
@@ -69,7 +69,7 @@ function price(def: { price: number; bucks?: number }) {
 }
 
 const SHOP_GROUPS: { title: string; filter: (b: BuildingDef) => boolean }[] = [
-  { title: 'Businesses', filter: (b) => b.kind === 'business' || b.kind === 'parts' },
+  { title: 'Businesses', filter: (b) => (b.kind === 'business' || b.kind === 'parts') },
   { title: 'Services', filter: (b) => b.kind === 'gas' },
   { title: 'Homes and decor', filter: (b) => b.kind === 'house' || b.kind === 'decor' },
 ]
@@ -78,17 +78,22 @@ export function ShopPanel() {
   const level = useGame((s) => s.level)
   const coins = useGame((s) => s.coins)
   const setMode = useGame((s) => s.setMode)
+  const buildings = useGame((s) => s.buildings)
+  const rusty = hasRusty({ buildings })
   return (
     <Panel title="Shop" wide>
       {SHOP_GROUPS.map((g) => (
         <section key={g.title}>
           <h3>{g.title}</h3>
           <div className="cards">
-            {BUILDINGS.filter((b) => b.unlockLevel < 99 && g.filter(b)).map((b) => {
+            {BUILDINGS.filter((b) => b.unlockLevel < 99 && g.filter(b)).sort((a, b) => Number(b.id === 'rescue') - Number(a.id === 'rescue')).map((b) => {
               const locked = level < b.unlockLevel
               const broke = coins < b.price
+              const owned = !!b.unique && buildings.some((o) => o.def === b.id)
+              const highlight = b.id === 'rescue' && !rusty
               return (
-                <button key={b.id} className={`card ${locked ? 'locked' : ''}`} disabled={locked || broke} onClick={() => setMode('place', b.id)}>
+                <button key={b.id} className={`card ${locked ? 'locked' : ''} ${highlight ? 'start-here' : ''}`} disabled={locked || broke || owned} onClick={() => setMode('place', b.id)}>
+                  {highlight && <span className="ribbon">START HERE</span>}
                   <div className="swatch" style={{ background: `linear-gradient(${b.roof} 0 30%, ${b.color} 30%)` }} />
                   <div className="card-name">{b.name}</div>
                   {b.jobSeconds && (
@@ -97,7 +102,7 @@ export function ShopPanel() {
                     </div>
                   )}
                   {b.fuelCap && <div className="card-stat">+{b.fuelCap} max fuel</div>}
-                  {locked ? <span className="price">🔒 Level {b.unlockLevel}</span> : price(b)}
+                  {owned ? <span className="price">✔ Built</span> : locked ? <span className="price">🔒 Level {b.unlockLevel}</span> : price(b)}
                 </button>
               )
             })}
@@ -111,10 +116,23 @@ export function ShopPanel() {
 export function ShowroomPanel() {
   const level = useGame((s) => s.level)
   const buyCar = useGame((s) => s.buyCar)
+  const rusty = useGame((s) => hasRusty(s))
+  const setMode = useGame((s) => s.setMode)
+  const coins = useGame((s) => s.coins)
   const [colorFor, setColorFor] = useState<Record<string, string>>({})
   return (
     <Panel title="Showroom" wide>
-      <div className="cards">
+      {!rusty && (
+        <div className="rusty-lock">
+          <span className="rusty-icon">🔧</span>
+          <div>
+            <b>Build Rusty's Rescue first</b>
+            <p>Rusty tracks down and restores cars for your town. Build his shop to start getting new cars.</p>
+          </div>
+          <button className="buy" disabled={coins < 1000} onClick={() => setMode('place', 'rescue')}>Build · $1,000</button>
+        </div>
+      )}
+      <div className={rusty ? 'cards' : 'cards dimmed'}>
         {CARS.map((c) => {
           const locked = level < c.unlockLevel
           const color = colorFor[c.id] ?? c.colors[0]
@@ -132,7 +150,7 @@ export function ShowroomPanel() {
               {locked ? (
                 <span className="price">🔒 Level {c.unlockLevel}</span>
               ) : (
-                <button className="buy" onClick={() => buyCar(c.id, color)}>Buy {price(c)}</button>
+                <button className="buy" disabled={!rusty} onClick={() => buyCar(c.id, color)}>Buy {price(c)}</button>
               )}
             </div>
           )

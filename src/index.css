@@ -196,6 +196,15 @@ button.card:hover:not(:disabled) { border-color: var(--accent); }
 .badges { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 10; }
 .anchor { position: absolute; left: 0; top: 0; visibility: hidden; pointer-events: auto; padding-bottom: 9px; will-change: transform; }
 
+/* Rusty's Rescue gate */
+.card { position: relative; }
+.card.start-here { border-color: var(--accent); box-shadow: 0 0 0 3px #ffe0b2; }
+.ribbon { position: absolute; top: -9px; left: 50%; transform: translateX(-50%); background: var(--accent); color: #fff; font: 11px var(--display); padding: 2px 8px; border-radius: 8px; white-space: nowrap; }
+.rusty-lock { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; background: #fff3e0; border: 2px solid var(--accent); border-radius: 14px; padding: 10px 12px; margin-bottom: 12px; }
+.rusty-lock p { margin: 2px 0 0; font-size: 13px; color: #5d4037; }
+.rusty-icon { font-size: 30px; }
+.cards.dimmed { opacity: .55; }
+
 /* Friends, visiting, tutorial */
 .leaders { display: flex; flex-direction: column; gap: 6px; }
 .leader { display: grid; grid-template-columns: 34px 1fr auto auto; gap: 10px; align-items: center; background: #fff; border: 2px solid #e0e0e0; border-radius: 12px; padding: 6px 10px; }
@@ -268,6 +277,8 @@ button.card:hover:not(:disabled) { border-color: var(--accent); }
   .day b { font-size: 14px; }
   .rival { grid-template-columns: 16px 1fr; }
   .leader { grid-template-columns: 30px 1fr auto; }
+  .rusty-lock { grid-template-columns: auto 1fr; }
+  .rusty-lock .buy { grid-column: 1 / -1; }
   .leader .buy { grid-column: 1 / -1; }
   .visit-banner { flex-direction: column; gap: 6px; text-align: center; left: 6px; right: 6px; transform: none; }
   .tutorial { bottom: calc(76px + var(--sab)); }

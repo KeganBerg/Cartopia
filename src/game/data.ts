@@ -26,12 +26,17 @@ export type BuildingDef = {
   roof: string
   sign?: string
   // Novelty prop on the roof, like the original's giant donuts and burgers.
+  // Only one per town.
+  unique?: boolean
   prop?: 'donut' | 'burger' | 'cone' | 'tire' | 'pin' | 'popcorn'
 }
 
 export const BUILDINGS: BuildingDef[] = [
   { id: 'showroom', name: 'Showroom', kind: 'showroom', w: 2, h: 2, price: 0, unlockLevel: 99, color: '#cfd8dc', roof: '#eceff1', sign: 'SHOWROOM' },
   { id: 'garage', name: 'My Garage', kind: 'garage', w: 2, h: 2, price: 0, unlockLevel: 99, color: '#b0bec5', roof: '#78909c', sign: 'GARAGE' },
+  // Rusty rescues and restores cars: the first thing a new town builds, and
+  // the Showroom stays locked until it exists.
+  { id: 'rescue', name: "Rusty's Rescue", kind: 'business', w: 2, h: 1, price: 1000, unlockLevel: 1, unique: true, jobSeconds: 240, fuelCost: 3, payout: 320, xp: 30, color: '#a1887f', roof: '#c62828', sign: "RUSTY'S" },
   { id: 'gas', name: 'Gas Station', kind: 'gas', w: 2, h: 1, price: 1500, unlockLevel: 1, fuelCap: 10, color: '#ffca28', roof: '#e53935', sign: 'GAS' },
   { id: 'pizza', name: 'Pizza Place', kind: 'business', w: 1, h: 1, price: 400, unlockLevel: 1, jobSeconds: 30, fuelCost: 1, payout: 60, xp: 5, color: '#c0504d', roof: '#f5f5f5', sign: 'PIZZA' },
   { id: 'donut', name: 'Donut Shop', kind: 'business', w: 1, h: 1, price: 900, unlockLevel: 2, jobSeconds: 90, fuelCost: 2, payout: 160, xp: 12, color: '#f48fb1', roof: '#fff8e1', sign: 'DONUTS', prop: 'donut' },
@@ -46,7 +51,7 @@ export const BUILDINGS: BuildingDef[] = [
   { id: 'stadium', name: 'Speedway', kind: 'business', w: 2, h: 2, price: 20000, unlockLevel: 10, jobSeconds: 1800, fuelCost: 10, payout: 6000, xp: 300, color: '#eceff1', roof: '#c62828', sign: 'SPEEDWAY' },
   { id: 'cinema', name: 'Drive-In', kind: 'business', w: 2, h: 2, price: 6000, unlockLevel: 6, jobSeconds: 600, fuelCost: 6, payout: 1500, xp: 80, color: '#8d6e63', roof: '#3e2723', sign: 'DRIVE-IN', prop: 'popcorn' },
   { id: 'parts', name: 'Parts Depot', kind: 'parts', w: 2, h: 1, price: 5000, unlockLevel: 5, jobSeconds: 480, fuelCost: 4, payout: 200, partsPayout: 15, xp: 45, color: '#1565c0', roof: '#bbdefb', sign: 'PARTS' },
-  { id: 'rescue', name: "Rusty's Rescue", kind: 'business', w: 2, h: 1, price: 9000, unlockLevel: 8, jobSeconds: 900, fuelCost: 8, payout: 2600, xp: 140, color: '#a1887f', roof: '#c62828', sign: "RUSTY'S" },
+
   { id: 'house', name: 'House', kind: 'house', w: 1, h: 1, price: 250, unlockLevel: 1, color: '#fff3e0', roof: '#6d4c41' },
   { id: 'tree', name: 'Oak Tree', kind: 'decor', w: 1, h: 1, price: 50, unlockLevel: 1, color: '#43a047', roof: '#2e7d32' },
   { id: 'palm', name: 'Palm Tree', kind: 'decor', w: 1, h: 1, price: 120, unlockLevel: 2, color: '#66bb6a', roof: '#8d6e63' },
@@ -122,12 +127,13 @@ export const baseFuelCap = (level: number) => 15 + level * 2
 export const FUEL_REGEN_SECONDS = 60
 export const RACE_FUEL = 3
 
-export type StatKey = 'jobs' | 'carsBought' | 'upgrades' | 'racesWon' | 'built' | 'roads' | 'coinsEarned' | 'flatsFixed'
+export type StatKey = 'rusty' | 'jobs' | 'carsBought' | 'upgrades' | 'racesWon' | 'built' | 'roads' | 'coinsEarned' | 'flatsFixed'
 
 export type GoalDef = { id: string; text: string; stat: StatKey; target: number; coins: number; xp: number; bucks?: number }
 
 // Played in order; the first three unclaimed goals are active at once.
 export const GOALS: GoalDef[] = [
+  { id: 'g0', text: "Build Rusty's Rescue", stat: 'rusty', target: 1, coins: 200, xp: 20 },
   { id: 'g1', text: 'Collect from 3 businesses', stat: 'jobs', target: 3, coins: 150, xp: 15 },
   { id: 'g2', text: 'Lay 5 road tiles', stat: 'roads', target: 5, coins: 100, xp: 10 },
   { id: 'g3', text: 'Buy a new car', stat: 'carsBought', target: 1, coins: 300, xp: 25 },

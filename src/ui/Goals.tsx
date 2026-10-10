@@ -1,4 +1,4 @@
-import { useGame, activeGoals, goalDone, today } from '../game/store'
+import { useGame, activeGoals, goalDone, statValue, today } from '../game/store'
 import { DAILY_BONUS, carDef, flatFixCost } from '../game/data'
 import { Panel } from './Menus'
 
@@ -21,7 +21,7 @@ export function GoalsPanel() {
       {goals.length === 0 && <p className="hint">You've finished every goal. More coming soon!</p>}
       <div className="goals">
         {goals.map((g) => {
-          const have = Math.min(g.target, s.stats[g.stat] ?? 0)
+          const have = Math.min(g.target, statValue(s, g.stat))
           const done = goalDone(s, g)
           return (
             <div key={g.id} className={done ? 'goal done' : 'goal'}>
@@ -78,7 +78,7 @@ export function FlatPanel() {
         <button className="buy" onClick={() => s.fixFlat(car.uid, false)}>Fix it · ${flatFixCost(s.level)}</button>
         <button className="buy alt" onClick={() => s.fixFlat(car.uid, true)} disabled={!hasRusty}>Call Rusty's tow · free</button>
       </div>
-      {!hasRusty && <p className="hint">Build Rusty's Rescue (level 8) to tow cars for free and earn XP.</p>}
+      {!hasRusty && <p className="hint">Build Rusty's Rescue to tow cars for free and earn XP.</p>}
     </Panel>
   )
 }

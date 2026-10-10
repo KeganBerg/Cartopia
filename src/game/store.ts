@@ -79,7 +79,7 @@ export type GameState = SaveState & UiState & Actions
 const key = (x: number, z: number) => `${x},${z}`
 let uidCounter = 0
 const uid = () => `${Date.now().toString(36)}${(uidCounter++).toString(36)}${Math.random().toString(36).slice(2, 6)}`
-const emptyStats = (): Record<StatKey, number> => ({ jobs: 0, carsBought: 0, upgrades: 0, racesWon: 0, built: 0, roads: 0, coinsEarned: 0, flatsFixed: 0 })
+const emptyStats = (): Record<StatKey, number> => ({ rusty: 0, jobs: 0, carsBought: 0, upgrades: 0, racesWon: 0, built: 0, roads: 0, coinsEarned: 0, flatsFixed: 0 })
 export const today = () => new Date().toISOString().slice(0, 10)
 const noUpgrades = (): Record<UpgradeSlot, number> => ({ engine: 0, turbo: 0, tires: 0, weight: 0 })
 
@@ -152,10 +152,15 @@ function starterTown(): SaveState {
 
 const bump = (s: SaveState, key: StatKey, by = 1) => ({ ...s.stats, [key]: (s.stats[key] ?? 0) + by })
 
+export const hasRusty = (s: Pick<SaveState, 'buildings'>) => s.buildings.some((b) => b.def === 'rescue')
+
 export function activeGoals(s: Pick<SaveState, 'claimedGoals'>) {
   return GOALS.filter((g) => !s.claimedGoals.includes(g.id)).slice(0, 3)
 }
-export const goalDone = (s: Pick<SaveState, 'stats'>, g: (typeof GOALS)[number]) => (s.stats[g.stat] ?? 0) >= g.target
+// Rusty's Rescue counts from the buildings so older towns that already have one get credit.
+export const statValue = (s: Pick<SaveState, 'stats' | 'buildings'>, key: StatKey) =>
+  key === 'rusty' ? (s.buildings.some((b) => b.def === 'rescue') ? 1 : 0) : (s.stats[key] ?? 0)
+export const goalDone = (s: Pick<SaveState, 'stats' | 'buildings'>, g: (typeof GOALS)[number]) => statValue(s, g.stat) >= g.target
 
 function addXp(s: GameState, amount: number): Partial<GameState> {
   let { level, xp, bucks, coins } = s
@@ -216,16 +221,21 @@ export const useGame = create<GameState>()(
           sfx.error()
           return false
         }
+        if (d.unique && s.buildings.some((o) => o.def === def)) {
+          s.toast(`You already have a ${d.name}`)
+          return false
+        }
         if (s.coins < d.price || s.bucks < (d.bucks ?? 0)) {
           s.toast('Not enough coins')
           return false
         }
+        if (def === 'rescue') setTimeout(() => get().toast("Rusty's open for business! The Showroom is unlocked."), 400)
         sfx.click()
         set({
           coins: s.coins - d.price,
           bucks: s.bucks - (d.bucks ?? 0),
           buildings: [...s.buildings, { uid: uid(), def, x, z, jobEndsAt: null }],
-          stats: bump(s, 'built'),
+          stats: def === 'rescue' ? { ...bump(s, 'built'), rusty: 1 } : bump(s, 'built'),
           ...addXp(s, Math.max(1, Math.round(d.price / 100))),
           updatedAt: Date.now(),
         })
@@ -307,6 +317,10 @@ export const useGame = create<GameState>()(
         const s = get()
         const c = carDef(model)
         if (s.level < c.unlockLevel) return false
+        if (!hasRusty(s)) {
+          s.toast("Build Rusty's Rescue first. Rusty finds you new cars!")
+          return false
+        }
         if (s.coins < c.price || s.bucks < (c.bucks ?? 0)) {
           s.toast('Not enough money')
           return false
