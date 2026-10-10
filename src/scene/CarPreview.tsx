@@ -10,7 +10,7 @@ function Spinner(props: { body: Body; color: string; stripe?: string | null }) {
     if (ref.current) ref.current.rotation.y += dt * 0.6
   })
   return (
-    <group ref={ref} scale={2.2}>
+    <group ref={ref} scale={1.9}>
       <CarModel {...props} />
     </group>
   )
@@ -20,7 +20,7 @@ function Spinner(props: { body: Body; color: string; stripe?: string | null }) {
 export function CarPreview(props: { body: Body; color: string; stripe?: string | null }) {
   return (
     <div className="car-preview">
-      <Canvas camera={{ position: [2.6, 1.8, 2.6], fov: 35 }} dpr={[1, 1.5]} onCreated={({ camera }) => camera.lookAt(0, 0.35, 0)}>
+      <Canvas camera={{ position: [2.6, 1.8, 2.6], fov: 35 }} dpr={[1, 1.5]} onCreated={({ camera }) => camera.lookAt(0, 0.45, 0)}>
         <hemisphereLight args={['#ffffff', '#90a4ae', 1]} />
         <directionalLight position={[3, 5, 2]} intensity={1.4} />
         <mesh rotation-x={-Math.PI / 2}>
