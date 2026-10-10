@@ -278,7 +278,7 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .flat-pop .row { justify-content: center; }
 .flat-pop .sell { margin-top: 0; }
 .haul { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; font-size: 14px; }
-.haul-item { background: #fff; border: 2px solid #e0e0e0; border-radius: 10px; padding: 2px 8px; font-weight: 800; }
+.haul-item { display: inline-flex; align-items: center; gap: 4px; background: #fff; border: 2px solid #e0e0e0; border-radius: 10px; padding: 2px 8px; font-weight: 800; }
 .haul-item.car { border-color: #8e24aa; }
 .search > .buy { width: 100%; }
 .plate-screen { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; }
