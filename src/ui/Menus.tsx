@@ -108,6 +108,7 @@ export function ShopPanel() {
                       ${b.payout}{b.partsPayout ? ` +${b.partsPayout}⚙` : ''} every {b.jobSeconds >= 60 ? `${b.jobSeconds / 60}m` : `${b.jobSeconds}s`} · ⛽{b.fuelCost}
                     </div>
                   )}
+                  {b.id === 'rescue' && <div className="card-stat">Search for old cars and restore them</div>}
                   {b.fuelCap && <div className="card-stat">+{b.fuelCap} max fuel</div>}
                   {owned ? <span className="price">✔ Built</span> : locked ? <span className="price">🔒 Level {b.unlockLevel}</span> : price(b)}
                 </button>
@@ -140,7 +141,7 @@ export function ShowroomPanel() {
         </div>
       )}
       <div className={rusty ? 'cards' : 'cards dimmed'}>
-        {CARS.map((c) => {
+        {CARS.filter((c) => !c.rescueOnly).map((c) => {
           const locked = level < c.unlockLevel
           const color = colorFor[c.id] ?? c.colors[0]
           const pi = performance(c, { engine: 0, turbo: 0, tires: 0, weight: 0 })
@@ -167,7 +168,7 @@ export function ShowroomPanel() {
   )
 }
 
-function CarSwatch({ color, body }: { color: string; body: string }) {
+export function CarSwatch({ color, body }: { color: string; body: string }) {
   const low = body === 'sports' || body === 'super'
   return (
     <svg viewBox="0 0 100 50" className="car-swatch">
@@ -198,7 +199,7 @@ export function GaragePanel() {
             return (
               <button key={c.uid} className={c.uid === car?.uid ? 'garage-item sel' : 'garage-item'} onClick={() => select(c.uid)}>
                 <CarSwatch color={c.color} body={d.body} />
-                <span>{d.name}</span>
+                <span>{d.name}{c.plate && <span className="mini-plate">{c.plate}</span>}</span>
                 <small>PI {performance(d, c.upgrades)}</small>
               </button>
             )
@@ -207,7 +208,7 @@ export function GaragePanel() {
         {car && def && (
           <div className="garage-detail">
             <CarPreview body={def.body} color={car.color} stripe={car.stripe} />
-            <h3>{def.name}</h3>
+            <h3>{def.name}{car.plate && <span className="mini-plate">{car.plate}</span>}</h3>
             <div className="pi">Performance Index <b>{performance(def, car.upgrades)}</b></div>
             {UPGRADE_SLOTS.map((u) => {
               const lvl = car.upgrades[u.id]

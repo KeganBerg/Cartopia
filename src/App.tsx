@@ -9,6 +9,7 @@ import { FriendsPanel, VisitBanner } from './ui/Friends'
 import { Tutorial } from './ui/Tutorial'
 import { Badges } from './ui/Badges'
 import { NeedPanel } from './ui/Need'
+import { RescuePanel } from './ui/Rescue'
 import { AccountPanel } from './ui/Account'
 import { GoalsPanel, DailyPanel, FlatPanel } from './ui/Goals'
 import { useGame, today } from './game/store'
@@ -44,6 +45,7 @@ export default function App() {
       <ChallengePopup />
       {panel === 'friends' && <FriendsPanel />}
       {panel === 'need' && <NeedPanel />}
+      {panel === 'rescue' && <RescuePanel />}
       <VisitBanner />
       <Tutorial />
       {panel === 'account' && <AccountPanel />}

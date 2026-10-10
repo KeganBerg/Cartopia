@@ -2,12 +2,22 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
   GRID, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS, BUILDINGS,
-  upgradeCost, MAX_UPGRADE, GOALS, DAILY_BONUS, PAINTS, PAINT_COST, STRIPE_COST, FLAT_CHANCE, flatFixCost, type UpgradeSlot, type StatKey,
+  upgradeCost, MAX_UPGRADE, RESCUE_SPOTS, RESCUE_PINS, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, type Rarity, GOALS, DAILY_BONUS, PAINTS, PAINT_COST, STRIPE_COST, FLAT_CHANCE, flatFixCost, type UpgradeSlot, type StatKey,
 } from './data'
 import { sfx } from '../lib/sound'
 
 export type PlacedBuilding = { uid: string; def: string; x: number; z: number; jobEndsAt: number | null }
-export type OwnedCar = { uid: string; model: string; color: string; upgrades: Record<UpgradeSlot, number>; flat?: boolean; stripe?: string | null }
+export type OwnedCar = { uid: string; model: string; color: string; upgrades: Record<UpgradeSlot, number>; flat?: boolean; stripe?: string | null; plate?: string }
+// A rusty find waiting in Rusty's storage, and the one car in the restore bay.
+export type JunkCar = { uid: string; model: string; rarity: Rarity }
+export type Restoring = JunkCar & { endsAt: number; minutes: number }
+export type Loot =
+  | { kind: 'car'; model: string; rarity: Rarity }
+  | { kind: 'coins' | 'parts' | 'fuel'; n: number }
+  | { kind: 'trophy' }
+  | { kind: 'nothing' }
+// A search in progress. Not saved: leaving mid-search forfeits it.
+export type Search = { spot: string; pins: Loot[]; revealed: boolean[]; truckAt: number | null; flatAt: number | null; flat: boolean }
 
 export type SaveState = {
   version: 1
@@ -30,6 +40,8 @@ export type SaveState = {
   dailyStreak: number
   helped: Record<string, string>
   tutorial: number
+  junkyard: JunkCar[]
+  restoring: Restoring | null
   updatedAt: number
 }
 
@@ -37,7 +49,7 @@ export type Mode = 'play' | 'place' | 'road' | 'bulldoze'
 export type Resource = 'coins' | 'parts' | 'fuel' | 'bucks' | 'level'
 export type Need = { res: Resource; missing: number; what?: string }
 
-export type Panel = null | 'need' | 'shop' | 'garage' | 'showroom' | 'race' | 'account' | 'goals' | 'daily' | 'flat' | 'friends'
+export type Panel = null | 'need' | 'shop' | 'garage' | 'showroom' | 'race' | 'account' | 'goals' | 'daily' | 'flat' | 'friends' | 'rescue'
 
 // A read-only copy of another player's town while visiting it.
 export type VisitedTown = { ownerId: string; townName: string; level: number; trophies: number; roads: string[]; buildings: PlacedBuilding[]; cars: OwnedCar[] }
@@ -50,6 +62,9 @@ type UiState = {
   toasts: { id: number; text: string }[]
   visiting: VisitedTown | null
   need: Need | null
+  search: Search | null
+  // Building types whose bubbles pulse after a "Show me" tap.
+  highlight: string[] | null
 }
 
 type Actions = {
@@ -77,6 +92,17 @@ type Actions = {
   setTutorial: (step: number) => void
   stripeCar: (uid: string, stripe: string | null) => void
   loadSave: (s: SaveState) => void
+  showMe: (defs: string[], text: string) => void
+  refillFuel: () => void
+  startSearch: (spot: string) => void
+  revealPin: (i: number) => void
+  fixTruck: () => void
+  abandonSearch: () => void
+  towHome: () => void
+  restoreCar: (uid: string) => void
+  rushRestore: () => void
+  collectRestored: (plate: string) => void
+  scrapCar: (uid: string) => void
 }
 
 export type GameState = SaveState & UiState & Actions
@@ -84,7 +110,7 @@ export type GameState = SaveState & UiState & Actions
 const key = (x: number, z: number) => `${x},${z}`
 let uidCounter = 0
 const uid = () => `${Date.now().toString(36)}${(uidCounter++).toString(36)}${Math.random().toString(36).slice(2, 6)}`
-const emptyStats = (): Record<StatKey, number> => ({ rusty: 0, jobs: 0, carsBought: 0, upgrades: 0, racesWon: 0, built: 0, roads: 0, coinsEarned: 0, flatsFixed: 0 })
+const emptyStats = (): Record<StatKey, number> => ({ rusty: 0, jobs: 0, carsBought: 0, upgrades: 0, racesWon: 0, built: 0, roads: 0, coinsEarned: 0, flatsFixed: 0, rescued: 0, searches: 0 })
 export const today = () => new Date().toISOString().slice(0, 10)
 const noUpgrades = (): Record<UpgradeSlot, number> => ({ engine: 0, turbo: 0, tires: 0, weight: 0 })
 
@@ -151,6 +177,8 @@ function starterTown(): SaveState {
     dailyStreak: 0,
     helped: {},
     tutorial: 0,
+    junkyard: [],
+    restoring: null,
     updatedAt: now,
   }
 }
@@ -197,6 +225,8 @@ export const useGame = create<GameState>()(
       toasts: [],
       visiting: null,
       need: null,
+      search: null,
+      highlight: null,
 
       setMode: (mode, placing = null) => set({ mode, placing, panel: null }),
       showNeed: (res, missing, what) => {
@@ -243,7 +273,7 @@ export const useGame = create<GameState>()(
           s.showNeed('bucks', (d.bucks ?? 0) - s.bucks, d.name)
           return false
         }
-        if (def === 'rescue') setTimeout(() => get().toast("Rusty's open for business! The Showroom is unlocked."), 400)
+        if (def === 'rescue') setTimeout(() => get().toast("Rusty's is open! Tap his shop to search for cars. The Showroom is unlocked too."), 400)
         sfx.click()
         set({
           coins: s.coins - d.price,
@@ -287,6 +317,7 @@ export const useGame = create<GameState>()(
         const d = buildingDef(b.def)
         if (d.kind === 'showroom') return s.openPanel('showroom')
         if (d.kind === 'garage') return s.openPanel('garage')
+        if (b.def === 'rescue') return s.openPanel('rescue')
         if (!d.jobSeconds) return
         const now = Date.now()
         if (b.jobEndsAt === null) {
@@ -507,6 +538,161 @@ export const useGame = create<GameState>()(
       },
 
       loadSave: (save) => set({ ...starterDefaults(), ...save }),
+
+      refillFuel: () => {
+        const s = get()
+        const cap = fuelCap(s)
+        if (s.fuel >= cap) return s.toast('Your tank is already full')
+        if (s.bucks < REFILL_BUCKS) return s.showNeed('bucks', REFILL_BUCKS - s.bucks, 'a fuel refill')
+        sfx.buy()
+        s.toast(`Tank filled! +${cap - s.fuel} fuel`)
+        set({ bucks: s.bucks - REFILL_BUCKS, fuel: cap, fuelUpdatedAt: Date.now(), panel: s.panel === 'need' ? null : s.panel, updatedAt: Date.now() })
+      },
+
+      showMe: (defs, text) => {
+        set({ highlight: defs, panel: null, mode: 'play', placing: null })
+        get().toast(text)
+        setTimeout(() => { if (get().highlight === defs) set({ highlight: null }) }, 6000)
+      },
+
+      startSearch: (spotId) => {
+        const s = get()
+        const spot = RESCUE_SPOTS.find((o) => o.id === spotId)
+        if (!spot) return
+        if (!hasRusty(s)) return s.toast("Build Rusty's Rescue first")
+        if (s.level < spot.unlockLevel) return s.showNeed('level', spot.unlockLevel, spot.name)
+        if (s.junkyard.length >= STORAGE_MAX) return s.toast('Storage is full. Restore or scrap a car first.')
+        if (s.coins < spot.cost) return s.showNeed('coins', spot.cost - s.coins, `a search in the ${spot.name}`)
+        sfx.start()
+        set({
+          coins: s.coins - spot.cost,
+          search: rollSearch(spotId),
+          stats: bump(s, 'searches'),
+          updatedAt: Date.now(),
+        })
+      },
+
+      revealPin: (i) => {
+        const s = get()
+        const q = s.search
+        if (!q || q.flat || q.revealed[i]) return
+        if (q.flatAt === i) {
+          sfx.error()
+          return set({ search: { ...q, truckAt: i, flat: true } })
+        }
+        const loot = q.pins[i]
+        if (loot.kind === 'car') sfx.levelUp()
+        else if (loot.kind !== 'nothing') sfx.coin()
+        else sfx.click()
+        set({ search: { ...q, truckAt: i, revealed: q.revealed.map((r, j) => r || j === i) } })
+      },
+
+      fixTruck: () => {
+        const s = get()
+        const q = s.search
+        if (!q?.flat) return
+        if (s.bucks < 1) return s.showNeed('bucks', 1, 'fixing the tow truck')
+        sfx.buy()
+        const i = q.flatAt!
+        set({ bucks: s.bucks - 1, search: { ...q, flat: false, flatAt: null, revealed: q.revealed.map((r, j) => r || j === i) }, updatedAt: Date.now() })
+      },
+
+      abandonSearch: () => {
+        const s = get()
+        if (s.search?.flat) s.toast('The tow truck limped home empty-handed.')
+        set({ search: null })
+      },
+
+      towHome: () => {
+        const s = get()
+        const q = s.search
+        if (!q || q.flat) return
+        const found = q.pins.filter((_, i) => q.revealed[i])
+        let { coins, parts, fuel, trophies } = s
+        const junkyard = [...s.junkyard]
+        const notes: string[] = []
+        let scrapped = 0
+        for (const l of found) {
+          if (l.kind === 'coins') coins += l.n
+          else if (l.kind === 'parts') parts += l.n
+          else if (l.kind === 'fuel') fuel += l.n
+          else if (l.kind === 'trophy') trophies += 1
+          else if (l.kind === 'car') {
+            if (junkyard.length < STORAGE_MAX) {
+              junkyard.push({ uid: uid(), model: l.model, rarity: l.rarity })
+              notes.push(carDef(l.model).name)
+            } else {
+              scrapped += RARITY[l.rarity].scrapParts
+            }
+          }
+        }
+        parts += scrapped
+        sfx.coin()
+        s.toast(notes.length ? `Rusty towed home: ${notes.join(', ')}!` : 'Rusty hauled everything home.')
+        if (scrapped) setTimeout(() => get().toast(`Storage was full, so extra finds were scrapped for ${scrapped} parts.`), 600)
+        set({
+          coins, parts, fuel, trophies, junkyard,
+          search: null,
+          stats: { ...s.stats, coinsEarned: (s.stats.coinsEarned ?? 0) + (coins - s.coins) },
+          ...addXp(s, 10 + notes.length * 10),
+          updatedAt: Date.now(),
+        })
+      },
+
+      restoreCar: (juid) => {
+        const s = get()
+        const car = s.junkyard.find((c) => c.uid === juid)
+        if (!car) return
+        if (s.restoring) return s.toast('The restore bay is busy. Finish that car first.')
+        const cost = restoreCost(carDef(car.model))
+        if (s.coins < cost) return s.showNeed('coins', cost - s.coins, `restoring the ${carDef(car.model).name}`)
+        const minutes = RARITY[car.rarity].minutes
+        sfx.start()
+        set({
+          coins: s.coins - cost,
+          junkyard: s.junkyard.filter((c) => c.uid !== juid),
+          restoring: { ...car, minutes, endsAt: Date.now() + minutes * 60000 },
+          updatedAt: Date.now(),
+        })
+      },
+
+      rushRestore: () => {
+        const s = get()
+        const r = s.restoring
+        if (!r) return
+        const left = r.endsAt - Date.now()
+        if (left <= 0) return
+        const cost = rushBucks(left)
+        if (s.bucks < cost) return s.showNeed('bucks', cost - s.bucks, 'finishing the restore now')
+        sfx.buy()
+        set({ bucks: s.bucks - cost, restoring: { ...r, endsAt: Date.now() }, updatedAt: Date.now() })
+      },
+
+      collectRestored: (plate) => {
+        const s = get()
+        const r = s.restoring
+        if (!r || Date.now() < r.endsAt) return
+        const c = carDef(r.model)
+        sfx.buy()
+        s.toast(`${c.name} restored and added to your garage!`)
+        set({
+          restoring: null,
+          cars: [...s.cars, { uid: r.uid, model: r.model, color: c.colors[0], upgrades: noUpgrades(), plate: cleanPlate(plate) || undefined }],
+          stats: { ...s.stats, rescued: (s.stats.rescued ?? 0) + 1, carsBought: (s.stats.carsBought ?? 0) + 1 },
+          ...addXp(s, 25 + Math.round(c.price / 200)),
+          updatedAt: Date.now(),
+        })
+      },
+
+      scrapCar: (juid) => {
+        const s = get()
+        const car = s.junkyard.find((c) => c.uid === juid)
+        if (!car) return
+        const n = RARITY[car.rarity].scrapParts
+        sfx.coin()
+        s.toast(`Scrapped the ${carDef(car.model).name} for ${n} parts`)
+        set({ junkyard: s.junkyard.filter((c) => c.uid !== juid), parts: s.parts + n, updatedAt: Date.now() })
+      },
     }),
     {
       name: 'cartopia-save',
@@ -517,14 +703,49 @@ export const useGame = create<GameState>()(
 )
 
 export function saveOf(s: GameState): SaveState {
-  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, lastDaily, dailyStreak, helped, tutorial, updatedAt } = s
-  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, lastDaily, dailyStreak, helped, tutorial, updatedAt }
+  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, updatedAt } = s
+  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, updatedAt }
 }
 
 // Fields added after launch, so older saves load with sensible values.
-function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial'> {
+function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring'> {
   // Saves from before the tutorial existed skip it.
-  return { stats: emptyStats(), claimedGoals: [], lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99 }
+  return { stats: emptyStats(), claimedGoals: [], lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null }
+}
+
+export const cleanPlate = (p: string) => p.toUpperCase().replace(/[^A-Z0-9 ]/g, '').trim().slice(0, 7)
+
+const pick = <T,>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)]
+const range = (lo: number, hi: number) => lo + Math.floor(Math.random() * (hi - lo + 1))
+
+function rollCar(spotId: string): Loot {
+  const spot = RESCUE_SPOTS.find((o) => o.id === spotId)!
+  const total = spot.cars.reduce((n, c) => n + RARITY[c.rarity].weight, 0)
+  let r = Math.random() * total
+  for (const c of spot.cars) {
+    r -= RARITY[c.rarity].weight
+    if (r <= 0) return { kind: 'car', ...c }
+  }
+  return { kind: 'car', ...spot.cars[0] }
+}
+
+// Pre-rolls what every pin hides. Each search finds at least one car, and
+// about one in four gives the tow truck a flat partway through.
+function rollSearch(spotId: string): Search {
+  const spot = RESCUE_SPOTS.find((o) => o.id === spotId)!
+  const scale = spot.cost / 500
+  const pins: Loot[] = Array.from({ length: RESCUE_PINS }, () => {
+    const r = Math.random()
+    if (r < 0.1) return rollCar(spotId)
+    if (r < 0.42) return { kind: 'coins', n: Math.round(range(4, 14) * 5 * scale) }
+    if (r < 0.62) return { kind: 'parts', n: range(1, 3) + Math.floor(scale / 3) }
+    if (r < 0.74) return { kind: 'fuel', n: range(1, 3) }
+    if (r < 0.77) return { kind: 'trophy' }
+    return { kind: 'nothing' }
+  })
+  if (!pins.some((p) => p.kind === 'car')) pins[Math.floor(Math.random() * RESCUE_PINS)] = rollCar(spotId)
+  const flatAt = Math.random() < 0.25 ? pick(Array.from({ length: RESCUE_PINS }, (_, i) => i).filter((i) => pins[i].kind !== 'car')) : null
+  return { spot: spotId, pins, revealed: pins.map(() => false), truckAt: null, flatAt: flatAt ?? null, flat: false }
 }
 
 export const spendFuel = (amount: number) => {

@@ -241,6 +241,54 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .tut-skip { background: none; border: none; color: #b0bec5; font-weight: 800; text-decoration: underline; }
 
 /* Phones in portrait. */
+/* Rusty's Rescue */
+.tabs { display: flex; gap: 6px; margin: 12px 0 10px; }
+.tab { flex: 1; font: 15px var(--display); background: #eceff1; color: var(--ink); border: 2px solid #cfd8dc; border-radius: 12px; padding: 7px; }
+.tab.sel { background: #fff3e0; border-color: var(--accent); }
+.bay { display: grid; grid-template-columns: 100px 1fr auto; gap: 10px; align-items: center; background: #efebe9; border: 3px dashed #a1887f; border-radius: 14px; padding: 8px 12px; }
+.bay.done { background: #e8f5e9; border: 3px solid var(--green); }
+.bay.empty { grid-template-columns: auto 1fr; }
+.bay p { margin: 2px 0 0; font-size: 13px; }
+.bay-icon { font-size: 30px; }
+.bay-bar { height: 10px; background: #d7ccc8; border-radius: 6px; overflow: hidden; margin-top: 4px; }
+.bay-bar span { display: block; height: 100%; background: linear-gradient(90deg, #ffb74d, #ff9800); transition: width 1s linear; }
+.rarity { font: 11px var(--display); color: #fff; border-radius: 6px; padding: 1px 6px; vertical-align: middle; letter-spacing: .3px; }
+.rarity-common { background: #78909c; }
+.rarity-scarce { background: #1e88e5; }
+.rarity-rare { background: linear-gradient(90deg, #8e24aa, #ff6d00); }
+.junk-card { background: #faf6f3; }
+.scrap { font: 12px var(--display); background: none; border: none; color: #8d6e63; text-decoration: underline; padding: 2px; }
+.spot-card .spot-icon { font-size: 34px; line-height: 1.1; }
+.search-map { position: relative; height: 300px; border-radius: 16px; border: 3px solid #fff; box-shadow: 0 3px 0 rgba(0,0,0,.2); overflow: hidden; margin: 8px 0; background: radial-gradient(circle at 30% 30%, #9ccc65, #689f38); }
+.map-farm { background: repeating-linear-gradient(35deg, #c5e1a5 0 26px, #dce775 26px 52px); }
+.map-downtown { background: repeating-linear-gradient(0deg, #b0bec5 0 2px, transparent 2px 40px), repeating-linear-gradient(90deg, #b0bec5 0 2px, #cfd8dc 2px 40px); }
+.map-desert { background: radial-gradient(circle at 70% 30%, #ffe0b2, #ffb74d); }
+.map-track { background: radial-gradient(ellipse at center, #81c784 0 40%, #757575 41% 55%, #66bb6a 56%); }
+.map-roads { position: absolute; inset: 0; width: 100%; height: 100%; }
+.map-roads path { fill: none; stroke: #fff8e1; stroke-dasharray: 3 2; opacity: .85; vector-effect: non-scaling-stroke; stroke-width: 6px; }
+.pin { position: absolute; transform: translate(-50%, -100%); font-size: 30px; background: none; border: none; padding: 0; filter: drop-shadow(0 2px 1px rgba(0,0,0,.35)); animation: pinbob 1.4s ease-in-out infinite; }
+.pin:disabled { opacity: 1; cursor: default; }
+.pin.open { animation: none; transform: translate(-50%, -50%); width: 44px; height: 44px; border-radius: 50%; background: #fff; border: 3px solid #ffca28; font-size: 22px; }
+.pin.open.pin-car { border-color: #8e24aa; box-shadow: 0 0 0 4px rgba(142,36,170,.25); }
+@keyframes pinbob { 50% { transform: translate(-50%, -112%); } }
+.truck { position: absolute; transform: translate(-50%, -50%) scaleX(-1); font-size: 34px; transition: left .7s ease-in-out, top .7s ease-in-out; pointer-events: none; filter: drop-shadow(0 2px 1px rgba(0,0,0,.35)); }
+.flat-pop { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(300px, 90%); background: var(--panel); border: 3px solid var(--accent); border-radius: 14px; padding: 12px; text-align: center; box-shadow: 0 6px 20px rgba(0,0,0,.35); }
+.flat-pop p { margin: 4px 0 8px; font-size: 14px; }
+.flat-pop .row { justify-content: center; }
+.flat-pop .sell { margin-top: 0; }
+.haul { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; font-size: 14px; }
+.haul-item { background: #fff; border: 2px solid #e0e0e0; border-radius: 10px; padding: 2px 8px; font-weight: 800; }
+.haul-item.car { border-color: #8e24aa; }
+.search > .buy { width: 100%; }
+.plate-screen { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; }
+.plate-screen .car-preview { width: 100%; }
+.plate-screen h3 { margin: 4px 0 0; }
+.plate-input { width: 220px; text-align: center; font: 30px var(--display); letter-spacing: 4px; text-transform: uppercase; background: #fffde7; border: 4px solid #1a237e; border-radius: 10px; color: #1a237e; padding: 6px; }
+.mini-plate { display: inline-block; margin-left: 6px; font: 10px var(--display); letter-spacing: 1px; background: #fffde7; color: #1a237e; border: 2px solid #1a237e; border-radius: 4px; padding: 0 4px; vertical-align: middle; }
+.badge-pulse { animation: badgepulse .7s ease-in-out infinite; z-index: 5; }
+@keyframes badgepulse { 50% { transform: scale(1.35); box-shadow: 0 0 0 6px rgba(255,202,40,.8), 0 3px 0 rgba(0,0,0,.35); } }
+.badge-rescue { background: #fff3e0; color: #5d4037; }
+
 @media (max-width: 600px) {
   .speedo { width: 64px; height: 76px; }
   .speedo svg { width: 64px; height: 64px; }
@@ -297,6 +345,10 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
   .rival { grid-template-columns: 16px 1fr; }
   .leader { grid-template-columns: 30px 1fr auto; }
   .rusty-lock { grid-template-columns: auto 1fr; }
+  .bay { grid-template-columns: 70px 1fr; }
+  .bay .car-swatch { width: 70px; height: 35px; }
+  .bay > .buy { grid-column: 1 / -1; }
+  .search-map { height: 260px; }
   button.pill { font-size: 13px; }
   .need-ico { width: 40px; height: 40px; font-size: 20px; }
   .plus { width: 13px; height: 13px; font-size: 11px; line-height: 13px; }

@@ -36,7 +36,7 @@ export const BUILDINGS: BuildingDef[] = [
   { id: 'garage', name: 'My Garage', kind: 'garage', w: 2, h: 2, price: 0, unlockLevel: 99, color: '#b0bec5', roof: '#78909c', sign: 'GARAGE' },
   // Rusty rescues and restores cars: the first thing a new town builds, and
   // the Showroom stays locked until it exists.
-  { id: 'rescue', name: "Rusty's Rescue", kind: 'business', w: 2, h: 1, price: 1000, unlockLevel: 1, unique: true, jobSeconds: 240, fuelCost: 3, payout: 320, partsPayout: 3, xp: 30, color: '#a1887f', roof: '#c62828', sign: "RUSTY'S" },
+  { id: 'rescue', name: "Rusty's Rescue", kind: 'business', w: 2, h: 1, price: 1000, unlockLevel: 1, unique: true, color: '#a1887f', roof: '#c62828', sign: "RUSTY'S" },
   { id: 'gas', name: 'Gas Station', kind: 'gas', w: 2, h: 1, price: 1500, unlockLevel: 1, fuelCap: 10, color: '#ffca28', roof: '#e53935', sign: 'GAS' },
   { id: 'pizza', name: 'Pizza Place', kind: 'business', w: 1, h: 1, price: 400, unlockLevel: 1, jobSeconds: 30, fuelCost: 1, payout: 60, xp: 5, color: '#c0504d', roof: '#f5f5f5', sign: 'PIZZA' },
   { id: 'donut', name: 'Donut Shop', kind: 'business', w: 1, h: 1, price: 900, unlockLevel: 2, jobSeconds: 90, fuelCost: 2, payout: 160, xp: 12, color: '#f48fb1', roof: '#fff8e1', sign: 'DONUTS', prop: 'donut' },
@@ -75,6 +75,8 @@ export type CarDef = {
   price: number
   bucks?: number
   unlockLevel: number
+  // Classics that only turn up in Rusty's searches, never in the Showroom.
+  rescueOnly?: boolean
   // Base performance stats out of 100.
   power: number
   grip: number
@@ -94,7 +96,52 @@ export const CARS: CarDef[] = [
   { id: 'gtr', name: 'Raijin GT', body: 'sports', price: 26000, unlockLevel: 9, power: 76, grip: 66, weight: 45, colors: ['#eceff1', '#263238', '#ff6d00'] },
   { id: 'lambo', name: 'Toro V12', body: 'super', price: 0, bucks: 40, unlockLevel: 5, power: 88, grip: 72, weight: 35, colors: ['#76ff03', '#ffd600', '#ff1744'] },
   { id: 'hyper', name: 'Vento X', body: 'super', price: 60000, unlockLevel: 12, power: 95, grip: 85, weight: 30, colors: ['#d50000', '#2962ff', '#212121'] },
+  { id: 'bug', name: 'Bubble Bug', body: 'compact', price: 1200, unlockLevel: 1, rescueOnly: true, power: 16, grip: 28, weight: 28, colors: ['#80cbc4', '#ffcc80', '#ef9a9a'] },
+  { id: 'woodie', name: 'Woodie Wagon', body: 'sedan', price: 2200, unlockLevel: 1, rescueOnly: true, power: 22, grip: 30, weight: 50, colors: ['#a1887f', '#fff59d', '#4db6ac'] },
+  { id: 'hauler', name: 'Haybale Hauler', body: 'truck', price: 3000, unlockLevel: 1, rescueOnly: true, power: 30, grip: 26, weight: 75, colors: ['#558b2f', '#e65100', '#1565c0'] },
+  { id: 'cruiser', name: 'Cruiser 57', body: 'sedan', price: 5000, unlockLevel: 1, rescueOnly: true, power: 40, grip: 36, weight: 55, colors: ['#4dd0e1', '#f06292', '#fafafa'] },
+  { id: 'buggy', name: 'Dune Buggy', body: 'compact', price: 6000, unlockLevel: 1, rescueOnly: true, power: 44, grip: 54, weight: 20, colors: ['#ff9800', '#cddc39', '#29b6f6'] },
+  { id: 'bandit', name: 'Bandit Coupe', body: 'muscle', price: 8000, unlockLevel: 1, rescueOnly: true, power: 56, grip: 38, weight: 52, colors: ['#212121', '#ffd54f', '#b71c1c'] },
+  { id: 'lemans', name: 'Le Mans 66', body: 'sports', price: 16000, unlockLevel: 1, rescueOnly: true, power: 66, grip: 60, weight: 34, colors: ['#1565c0', '#fafafa', '#c62828'] },
+  { id: 'gullwing', name: 'Gullwing 300', body: 'super', price: 30000, unlockLevel: 1, rescueOnly: true, power: 80, grip: 70, weight: 36, colors: ['#cfd8dc', '#b71c1c', '#263238'] },
 ]
+
+// Rusty's Rescue: pay to search a location, tap the pins to send the tow
+// truck out, haul the finds home, then restore them in the bay.
+export type Rarity = 'common' | 'scarce' | 'rare'
+export const RARITY: Record<Rarity, { name: string; weight: number; minutes: number; scrapParts: number }> = {
+  common: { name: 'Common', weight: 60, minutes: 5, scrapParts: 3 },
+  scarce: { name: 'Scarce', weight: 30, minutes: 30, scrapParts: 6 },
+  rare: { name: 'Rare', weight: 10, minutes: 120, scrapParts: 12 },
+}
+
+export type RescueSpot = { id: string; name: string; icon: string; unlockLevel: number; cost: number; cars: { model: string; rarity: Rarity }[] }
+export const RESCUE_SPOTS: RescueSpot[] = [
+  { id: 'suburbs', name: 'Suburbs', icon: '🏘', unlockLevel: 1, cost: 500, cars: [
+    { model: 'pip', rarity: 'common' }, { model: 'civic', rarity: 'common' }, { model: 'bug', rarity: 'common' },
+    { model: 'woodie', rarity: 'scarce' }, { model: 'trail', rarity: 'scarce' }, { model: 'miata', rarity: 'rare' },
+  ] },
+  { id: 'farm', name: 'Countryside', icon: '🌾', unlockLevel: 3, cost: 1500, cars: [
+    { model: 'bug', rarity: 'common' }, { model: 'trail', rarity: 'common' }, { model: 'hauler', rarity: 'common' },
+    { model: 'woodie', rarity: 'scarce' }, { model: 'buggy', rarity: 'scarce' }, { model: 'stallion', rarity: 'rare' },
+  ] },
+  { id: 'downtown', name: 'Downtown', icon: '🏙', unlockLevel: 5, cost: 3500, cars: [
+    { model: 'civic', rarity: 'common' }, { model: 'cruiser', rarity: 'common' }, { model: 'rally', rarity: 'scarce' },
+    { model: 'bandit', rarity: 'scarce' }, { model: 'stallion', rarity: 'scarce' }, { model: 'vette', rarity: 'rare' },
+  ] },
+  { id: 'desert', name: 'Desert', icon: '🌵', unlockLevel: 7, cost: 7000, cars: [
+    { model: 'buggy', rarity: 'common' }, { model: 'hauler', rarity: 'common' }, { model: 'bandit', rarity: 'scarce' },
+    { model: 'charger', rarity: 'scarce' }, { model: 'lemans', rarity: 'rare' }, { model: 'gtr', rarity: 'rare' },
+  ] },
+  { id: 'track', name: 'Old Race Track', icon: '🏁', unlockLevel: 10, cost: 15000, cars: [
+    { model: 'rally', rarity: 'common' }, { model: 'vette', rarity: 'common' }, { model: 'charger', rarity: 'scarce' },
+    { model: 'lemans', rarity: 'scarce' }, { model: 'gullwing', rarity: 'rare' }, { model: 'hyper', rarity: 'rare' },
+  ] },
+]
+export const RESCUE_PINS = 8
+export const STORAGE_MAX = 6
+export const restoreCost = (car: CarDef) => Math.max(200, Math.round((car.price + (car.bucks ?? 0) * 1000) * 0.25 / 10) * 10)
+export const rushBucks = (msLeft: number) => Math.max(1, Math.ceil(msLeft / 1800000))
 
 export const carDef = (id: string) => CARS.find((c) => c.id === id)!
 
@@ -126,17 +173,21 @@ export const xpToNext = (level: number) => Math.round(80 * Math.pow(level, 1.6))
 export const baseFuelCap = (level: number) => 15 + level * 2
 export const FUEL_REGEN_SECONDS = 60
 export const RACE_FUEL = 3
+// Bucks to fill the tank to the cap in one go.
+export const REFILL_BUCKS = 3
 
-export type StatKey = 'rusty' | 'jobs' | 'carsBought' | 'upgrades' | 'racesWon' | 'built' | 'roads' | 'coinsEarned' | 'flatsFixed'
+export type StatKey = 'rusty' | 'jobs' | 'carsBought' | 'upgrades' | 'racesWon' | 'built' | 'roads' | 'coinsEarned' | 'flatsFixed' | 'rescued' | 'searches'
 
 export type GoalDef = { id: string; text: string; stat: StatKey; target: number; coins: number; xp: number; bucks?: number }
 
 // Played in order; the first three unclaimed goals are active at once.
 export const GOALS: GoalDef[] = [
   { id: 'g0', text: "Build Rusty's Rescue", stat: 'rusty', target: 1, coins: 200, xp: 20 },
+  { id: 'r1', text: "Search for cars at Rusty's", stat: 'searches', target: 1, coins: 150, xp: 15 },
+  { id: 'r2', text: 'Restore a rescued car', stat: 'rescued', target: 1, coins: 300, xp: 25, bucks: 1 },
   { id: 'g1', text: 'Collect from 3 businesses', stat: 'jobs', target: 3, coins: 150, xp: 15 },
   { id: 'g2', text: 'Lay 5 road tiles', stat: 'roads', target: 5, coins: 100, xp: 10 },
-  { id: 'g3', text: 'Buy a new car', stat: 'carsBought', target: 1, coins: 300, xp: 25 },
+  { id: 'g3', text: 'Get a new car', stat: 'carsBought', target: 1, coins: 300, xp: 25 },
   { id: 'g4', text: 'Win a drag race', stat: 'racesWon', target: 1, coins: 250, xp: 20 },
   { id: 'g5', text: 'Upgrade a car part', stat: 'upgrades', target: 1, coins: 200, xp: 20 },
   { id: 'g6', text: 'Place 2 new buildings', stat: 'built', target: 2, coins: 300, xp: 25 },
@@ -144,7 +195,8 @@ export const GOALS: GoalDef[] = [
   { id: 'g8', text: 'Collect from 15 businesses', stat: 'jobs', target: 15, coins: 500, xp: 40, bucks: 1 },
   { id: 'g9', text: 'Earn 5,000 coins', stat: 'coinsEarned', target: 5000, coins: 600, xp: 50 },
   { id: 'g10', text: 'Win 5 drag races', stat: 'racesWon', target: 5, coins: 800, xp: 60, bucks: 1 },
-  { id: 'g11', text: 'Buy 3 cars', stat: 'carsBought', target: 3, coins: 1000, xp: 70 },
+  { id: 'g11', text: 'Get 3 new cars', stat: 'carsBought', target: 3, coins: 1000, xp: 70 },
+  { id: 'r3', text: 'Restore 5 rescued cars', stat: 'rescued', target: 5, coins: 3000, xp: 200, bucks: 2 },
   { id: 'g12', text: 'Do 10 upgrades', stat: 'upgrades', target: 10, coins: 1200, xp: 80, bucks: 2 },
   { id: 'g13', text: 'Place 10 new buildings', stat: 'built', target: 10, coins: 1500, xp: 100 },
   { id: 'g14', text: 'Collect from 60 businesses', stat: 'jobs', target: 60, coins: 2500, xp: 150, bucks: 2 },

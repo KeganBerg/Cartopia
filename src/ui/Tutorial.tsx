@@ -7,7 +7,8 @@ const STEPS: { text: string; done?: (s: ReturnType<typeof useGame.getState>) => 
   { text: 'Tap the ⛽ bubble above a Pizza Place to send a car on a job.', done: (s) => s.buildings.some((b) => b.jobEndsAt !== null) || s.stats.jobs > 0 },
   { text: 'Jobs take a little while. When the gold $ bubble pops up, tap it to collect.', done: (s) => s.stats.jobs > 0 },
   { text: "Nice! Now build Rusty's Rescue: open the Shop and look for START HERE. Rusty finds new cars for your town.", done: (s) => s.buildings.some((b) => b.def === 'rescue') },
-  { text: "Rusty's is open! Every car you own drives around your roads. Visit the Showroom to get your next car." },
+  { text: "Rusty's is open! Tap his shop, pick a spot to search, and tap the pins to find old cars.", done: (s) => (s.stats.searches ?? 0) > 0 },
+  { text: 'Tow your finds home, then restore one in Rusty\'s bay. Restored cars drive around your town. You can also buy new ones in the Showroom.' },
   { text: 'Upgrade cars in the Garage, then hit RACE to win coins and trophies. Have fun!' },
 ]
 

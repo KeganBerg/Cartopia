@@ -13,6 +13,7 @@ function fmt(sec: number) {
 function JobBadge({ b, now }: { b: PlacedBuilding; now: number }) {
   const d = buildingDef(b.def)
   const tap = useGame((s) => s.tapBuilding)
+  const lit = useGame((s) => !!s.highlight?.includes(b.def))
   const [cx, cz] = centerOf(b.def, b.x, b.z)
   anchors.set(b.uid, new Vector3(cx, d.w > 1 ? 2.6 : 2.2, cz))
   const ready = b.jobEndsAt !== null && now >= b.jobEndsAt
@@ -21,7 +22,7 @@ function JobBadge({ b, now }: { b: PlacedBuilding; now: number }) {
   const pct = working ? 1 - left / d.jobSeconds! : 0
   return (
     <div className="anchor" ref={anchorRef(b.uid)}>
-      <button className={`badge ${ready ? 'badge-ready' : working ? 'badge-working' : 'badge-idle'}`} onClick={() => tap(b.uid)} title={d.name}>
+      <button className={`badge ${ready ? 'badge-ready' : working ? 'badge-working' : 'badge-idle'}${lit ? ' badge-pulse' : ''}`} onClick={() => tap(b.uid)} title={d.name}>
         {ready ? (
           <span className="coin">$</span>
         ) : working ? (
@@ -33,6 +34,23 @@ function JobBadge({ b, now }: { b: PlacedBuilding; now: number }) {
         ) : (
           <span className="start">⛽ {d.fuelCost}</span>
         )}
+      </button>
+    </div>
+  )
+}
+
+// Rusty's shows what the restore bay is up to.
+function RescueBadge({ b, now }: { b: PlacedBuilding; now: number }) {
+  const tap = useGame((s) => s.tapBuilding)
+  const r = useGame((s) => s.restoring)
+  const lit = useGame((s) => !!s.highlight?.includes('rescue'))
+  const [cx, cz] = centerOf(b.def, b.x, b.z)
+  anchors.set(b.uid, new Vector3(cx, 2.6, cz))
+  const ready = r && now >= r.endsAt
+  return (
+    <div className="anchor" ref={anchorRef(b.uid)}>
+      <button className={`badge ${ready ? 'badge-ready' : 'badge-rescue'}${lit ? ' badge-pulse' : ''}`} onClick={() => tap(b.uid)} title="Rusty's Rescue">
+        {ready ? '🚗 Ready!' : r ? <><span className="clock">🔧</span><span className="time">{fmt(Math.ceil((r.endsAt - now) / 1000))}</span></> : '🔍 Find cars'}
       </button>
     </div>
   )
@@ -52,6 +70,9 @@ export function Badges() {
     <div className="badges">
       {buildings.filter((b) => buildingDef(b.def).jobSeconds).map((b) => (
         <JobBadge key={b.uid} b={b} now={now} />
+      ))}
+      {buildings.filter((b) => b.def === 'rescue').map((b) => (
+        <RescueBadge key={b.uid} b={b} now={now} />
       ))}
       {cars.filter((c) => c.flat).map((c) => (
         <div key={c.uid} className="anchor" ref={anchorRef(`car:${c.uid}`)}>
