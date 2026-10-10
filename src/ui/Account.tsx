@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { useGame } from '../game/store'
 import { Panel } from './Menus'
 import { MuteButton } from './MuteButton'
+import { localBackup, restoreLocalBackup } from '../lib/cloud'
 
 export function AccountPanel() {
   const townName = useGame((s) => s.townName)
@@ -14,6 +15,10 @@ export function AccountPanel() {
   const [password, setPassword] = useState('')
   const [msg, setMsg] = useState('')
   const [name, setName] = useState(townName)
+  const updatedAt = useGame((s) => s.updatedAt)
+  // Recheck after each save change, e.g. once sign-in has swapped in the cloud town.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const backup = useMemo(() => localBackup(), [updatedAt])
 
   useEffect(() => {
     supabase?.auth.getUser().then(({ data }) => setUser(data.user))
@@ -46,6 +51,12 @@ export function AccountPanel() {
       ) : user ? (
         <>
           <p>Signed in as <b>{user.email}</b>. Your town saves to the cloud and other players can race your best car.</p>
+          {backup && (
+            <>
+              <p className="hint">This device has an older town that is further along: {backup.townName}, level {backup.level}, {backup.cars.length} cars.</p>
+              <button className="buy" onClick={restoreLocalBackup}>Restore town from this device</button>
+            </>
+          )}
           <button className="sell" onClick={() => supabase!.auth.signOut()}>Sign out</button>
         </>
       ) : (
