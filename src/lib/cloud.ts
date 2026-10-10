@@ -6,7 +6,6 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null
 // Set only once the sign-in sync has finished, so nothing uploads before the cloud copy is read.
 let userId: string | null = null
 let syncingFor: string | null = null
-let suppress = false
 
 // Which account the save in this browser belongs to. A fresh or guest town has none.
 const OWNER_KEY = 'cartopia-save-owner'
@@ -68,12 +67,27 @@ function rowOf(uid: string, s: SaveState) {
   }
 }
 
+// Swapped out in tests, where jsdom can't navigate.
+export const page = { reload: () => window.location.reload() }
+const TOAST_KEY = 'cartopia-toast'
+// Set while the page reloads into a cloud town, so the old town can't save in the meantime.
+let reloading = false
+
+// Saves the cloud town into this browser, then reloads so every part of the game starts from it.
 function loadCloud(cloud: SaveState, at: string, message: string) {
-  suppress = true
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = null
+  reloading = true
   useGame.getState().loadSave(cloud)
-  suppress = false
+  // Freeze this browser's copy at the cloud town so nothing that happens before the reload replaces it.
+  useGame.persist.setOptions({ storage: { getItem: () => null, setItem: () => {}, removeItem: () => {} } })
   cloudAt = at
-  useGame.getState().toast(message)
+  try {
+    sessionStorage.setItem(TOAST_KEY, message)
+  } catch {
+    // The toast is a nicety.
+  }
+  page.reload()
 }
 
 async function pushSave(): Promise<void> {
@@ -82,7 +96,7 @@ async function pushSave(): Promise<void> {
     return pushSave()
   }
   pushing = (async () => {
-    if (!supabase || !userId) return
+    if (!supabase || !userId || reloading) return
     const uid = userId
     const row = rowOf(uid, saveOf(useGame.getState()))
     const { data, error } = cloudAt
@@ -140,6 +154,8 @@ async function syncOnSignIn(uid: string) {
   userId = uid
   cloudAt = data?.updated_at ?? null
   writeOwner(uid)
+  // This browser already shows the cloud town, e.g. right after the reload below.
+  if (cloud && localIsTheirs && local.updatedAt === cloud.updatedAt) return
   if (keepLocal) {
     await pushSave()
   } else {
@@ -150,6 +166,13 @@ async function syncOnSignIn(uid: string) {
 
 export function startCloudSync() {
   if (!supabase) return
+  try {
+    const message = sessionStorage.getItem(TOAST_KEY)
+    sessionStorage.removeItem(TOAST_KEY)
+    if (message) useGame.getState().toast(message)
+  } catch {
+    // The toast is a nicety.
+  }
   supabase.auth.getSession().then(({ data }) => {
     if (data.session) syncOnSignIn(data.session.user.id)
   })
@@ -163,7 +186,7 @@ export function startCloudSync() {
     }
   })
   useGame.subscribe((s, prev) => {
-    if (suppress || !userId || s.updatedAt === prev.updatedAt) return
+    if (reloading || !userId || s.updatedAt === prev.updatedAt) return
     if (saveTimer) clearTimeout(saveTimer)
     saveTimer = setTimeout(pushSave, 3000)
   })

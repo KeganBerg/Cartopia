@@ -11,8 +11,8 @@ function stamp(iso: string) {
   return iso.replace('Z', '+00:00')
 }
 
-function fakeClient() {
-  let session: { user: { id: string } } | null = null
+function fakeClient(signedInAs?: string) {
+  let session: { user: { id: string } } | null = signedInAs ? { user: { id: signedInAs } } : null
   const listeners: ((event: string, s: typeof session) => void)[] = []
   const client = {
     auth: {
@@ -62,27 +62,37 @@ function fakeClient() {
   return client
 }
 
+type Device = Awaited<ReturnType<typeof boot>>
+
 // Boots a fresh copy of the game, as if opening the site on a device whose browser storage is `storage`.
-async function openGame(storage: Record<string, string>) {
+async function boot(storage: Record<string, string>, signedInAs?: string) {
   vi.resetModules()
   localStorage.clear()
   for (const [k, v] of Object.entries(storage)) localStorage.setItem(k, v)
-  const client = fakeClient()
+  const client = fakeClient(signedInAs)
   vi.doMock('./supabase', () => ({ supabase: client }))
   const { useGame } = await import('../game/store')
   const cloud = await import('./cloud')
+  const device = { client, useGame, reloads: 0, uid: signedInAs, snapshot: () => Object.fromEntries(Object.keys(localStorage).map((k) => [k, localStorage.getItem(k)!])) }
+  cloud.page.reload = () => void device.reloads++
   cloud.startCloudSync()
   await vi.advanceTimersByTimeAsync(10)
-  const snapshot = () => Object.fromEntries(Object.keys(localStorage).map((k) => [k, localStorage.getItem(k)!]))
-  return { client, useGame, snapshot }
+  return device
 }
 
-async function signIn(device: Awaited<ReturnType<typeof openGame>>, uid: string) {
+const openGame = (storage: Record<string, string>) => boot(storage)
+
+// Signs in, following the page reload the game does when it swaps in the cloud town.
+async function signIn(device: Device, uid: string): Promise<Device> {
   device.client.signIn(uid)
   await vi.advanceTimersByTimeAsync(10)
+  if (!device.reloads) return device
+  const reloaded = await boot(device.snapshot(), uid)
+  expect(reloaded.reloads).toBe(0)
+  return reloaded
 }
 
-async function play(device: Awaited<ReturnType<typeof openGame>>, changes: { level: number; townName: string }) {
+async function play(device: Device, changes: { level: number; townName: string }) {
   vi.advanceTimersByTime(1000)
   device.useGame.setState({ ...changes, updatedAt: Date.now() })
   await vi.advanceTimersByTimeAsync(3500)
@@ -102,15 +112,23 @@ afterEach(() => {
 
 describe('moving between devices', () => {
   it('loads the cloud town on a second device instead of uploading its fresh town', async () => {
-    const phone = await openGame({})
-    await signIn(phone, 'kegan')
+    let phone = await openGame({})
+    phone = await signIn(phone, 'kegan')
     await play(phone, { level: 6, townName: 'Phone Town' })
     expect(db.get('kegan')!.state.level).toBe(6)
 
     // Desktop opens later with a brand-new town that is stamped newer than the cloud save.
     vi.advanceTimersByTime(60_000)
-    const desktop = await openGame({})
-    await signIn(desktop, 'kegan')
+    let desktop = await openGame({})
+    const writes = serverWrites
+    desktop.client.signIn('kegan')
+    await vi.advanceTimersByTimeAsync(10)
+    // The page reloads into the cloud town, and the starter town can't save while that happens.
+    expect(desktop.reloads).toBe(1)
+    await play(desktop, { level: 1, townName: 'My Town' })
+    expect(serverWrites).toBe(writes)
+    desktop = await boot(desktop.snapshot(), 'kegan')
+    expect(desktop.reloads).toBe(0)
 
     expect(desktop.useGame.getState().townName).toBe('Phone Town')
     expect(desktop.useGame.getState().level).toBe(6)
@@ -118,30 +136,30 @@ describe('moving between devices', () => {
   })
 
   it('carries progress back and forth across devices', async () => {
-    const phone = await openGame({})
-    await signIn(phone, 'kegan')
+    let phone = await openGame({})
+    phone = await signIn(phone, 'kegan')
     await play(phone, { level: 3, townName: 'Phone Town' })
     const phoneStorage = phone.snapshot()
 
-    const desktop = await openGame({})
-    await signIn(desktop, 'kegan')
+    let desktop = await openGame({})
+    desktop = await signIn(desktop, 'kegan')
     await play(desktop, { level: 4, townName: 'Desk Town' })
     expect(db.get('kegan')!.state.level).toBe(4)
 
     // Reopening the site on the phone picks up the desktop progress.
-    const phoneAgain = await openGame(phoneStorage)
-    await signIn(phoneAgain, 'kegan')
+    let phoneAgain = await openGame(phoneStorage)
+    phoneAgain = await signIn(phoneAgain, 'kegan')
     expect(phoneAgain.useGame.getState().level).toBe(4)
     expect(phoneAgain.useGame.getState().townName).toBe('Desk Town')
   })
 
   it('stops a tab left open on device A from overwriting newer play on device B', async () => {
-    const phone = await openGame({})
-    await signIn(phone, 'kegan')
+    let phone = await openGame({})
+    phone = await signIn(phone, 'kegan')
     await play(phone, { level: 3, townName: 'Phone Town' })
 
-    const desktop = await openGame({})
-    await signIn(desktop, 'kegan')
+    let desktop = await openGame({})
+    desktop = await signIn(desktop, 'kegan')
     await play(desktop, { level: 3, townName: 'Desk Town' })
     expect(db.get('kegan')!.state.townName).toBe('Desk Town')
 
@@ -154,20 +172,20 @@ describe('moving between devices', () => {
   })
 
   it('keeps a guest town when signing in to a brand-new account', async () => {
-    const laptop = await openGame({})
+    let laptop = await openGame({})
     await play(laptop, { level: 2, townName: 'Guest Town' })
-    await signIn(laptop, 'newbie')
+    laptop = await signIn(laptop, 'newbie')
     expect(db.get('newbie')!.state.townName).toBe('Guest Town')
   })
 
   it("never uploads one account's town into another account's save", async () => {
-    const shared = await openGame({})
-    await signIn(shared, 'kegan')
+    let shared = await openGame({})
+    shared = await signIn(shared, 'kegan')
     await play(shared, { level: 5, townName: 'Kegan Town' })
     db.set('nate', { owner_id: 'nate', level: 2, state: { level: 2, townName: 'Nate Town', updatedAt: 1 }, updated_at: '2026-10-10T00:00:00+00:00' })
 
-    const sameBrowser = await openGame(shared.snapshot())
-    await signIn(sameBrowser, 'nate')
+    let sameBrowser = await openGame(shared.snapshot())
+    sameBrowser = await signIn(sameBrowser, 'nate')
     expect(db.get('nate')!.state.townName).toBe('Nate Town')
     expect(sameBrowser.useGame.getState().townName).toBe('Nate Town')
   })
