@@ -71,6 +71,7 @@ type UiState = {
   search: Search | null
   // Building types whose bubbles pulse after a "Show me" tap.
   highlight: string[] | null
+  shopFocus: string | null // building the Shop scrolls to and points out
   // A Grand Prix mystery box waiting to be opened.
   gpPrize: { series: string; model: string; color: string } | null
 }
@@ -79,6 +80,7 @@ type Actions = {
   setMode: (m: Mode, placing?: string | null) => void
   showNeed: (res: Resource, missing: number, what?: string) => void
   openPanel: (p: Panel) => void
+  openShop: (focus?: string) => void
   selectCar: (uid: string | null) => void
   toast: (text: string) => void
   tick: (now: number) => void
@@ -286,6 +288,7 @@ export const useGame = create<GameState>()(
       need: null,
       search: null,
       highlight: null,
+      shopFocus: null,
       gpPrize: null,
 
       setMode: (mode, placing = null) => set((s) => ({ mode, placing, panel: null, placeRot: placing && placing === s.placing ? s.placeRot : null })),
@@ -294,7 +297,8 @@ export const useGame = create<GameState>()(
         sfx.error()
         set({ need: { res, missing: Math.max(0, Math.ceil(missing)), what }, panel: 'need', mode: 'play', placing: null })
       },
-      openPanel: (panel) => set({ panel, mode: 'play', placing: null }),
+      openPanel: (panel) => set({ panel, mode: 'play', placing: null, shopFocus: null }),
+      openShop: (focus) => set({ panel: 'shop', mode: 'play', placing: null, shopFocus: focus ?? null }),
       selectCar: (selectedCar) => set({ selectedCar }),
       toast: (text) => {
         const id = Date.now() + Math.random()

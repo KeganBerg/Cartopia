@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useGame, hasRusty } from '../game/store'
 import { BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, PAINTS, STRIPES, PAINT_COST, STRIPE_COST, carDef, performance, upgradeCost, type BuildingDef } from '../game/data'
 import { CarPreview } from '../scene/CarPreview'
@@ -95,7 +95,13 @@ export function ShopPanel() {
   const setMode = useGame((s) => s.setMode)
   const buildings = useGame((s) => s.buildings)
   const showNeed = useGame((s) => s.showNeed)
+  const focus = useGame((s) => s.shopFocus)
+  const focusRef = useRef<HTMLButtonElement>(null)
   const rusty = hasRusty({ buildings })
+  // A "Build" hint elsewhere opened the Shop: bring that building into view.
+  useEffect(() => {
+    focusRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, [focus])
   return (
     <Panel title="Shop" wide overlay={<PreviewCanvas />}>
       {SHOP_GROUPS.map((g) => (
@@ -107,10 +113,12 @@ export function ShopPanel() {
               const broke = coins < b.price
               const owned = !!b.unique && buildings.some((o) => o.def === b.id)
               const highlight = b.id === 'rescue' && !rusty
+              const focused = b.id === focus
               return (
                 <button
                   key={b.id}
-                  className={`card ${locked ? 'locked' : ''} ${broke && !locked ? 'broke' : ''} ${highlight ? 'start-here' : ''}`}
+                  ref={focused ? focusRef : undefined}
+                  className={`card ${locked ? 'locked' : ''} ${broke && !locked ? 'broke' : ''} ${highlight ? 'start-here' : ''} ${focused ? 'focus' : ''}`}
                   disabled={owned}
                   onClick={() => (locked ? showNeed('level', b.unlockLevel, b.name) : broke ? showNeed('coins', b.price - coins, b.name) : setMode('place', b.id))}
                 >
@@ -139,8 +147,7 @@ export function ShowroomPanel() {
   const level = useGame((s) => s.level)
   const buyCar = useGame((s) => s.buyCar)
   const rusty = useGame((s) => hasRusty(s))
-  const setMode = useGame((s) => s.setMode)
-  const coins = useGame((s) => s.coins)
+  const openShop = useGame((s) => s.openShop)
   const [colorFor, setColorFor] = useState<Record<string, string>>({})
   return (
     <Panel title="Showroom" wide>
@@ -151,7 +158,7 @@ export function ShowroomPanel() {
             <b>Build Rusty's Rescue first</b>
             <p>Rusty tracks down and restores cars for your town. Build his shop to start getting new cars.</p>
           </div>
-          <button className="buy" disabled={coins < 1000} onClick={() => setMode('place', 'rescue')}>Build · $1,000</button>
+          <button className="buy" onClick={() => openShop('rescue')}>Build · $1,000</button>
         </div>
       )}
       <div className={rusty ? 'cards' : 'cards dimmed'}>

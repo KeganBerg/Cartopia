@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Color, type DirectionalLight, type HemisphereLight } from 'three'
 import { PAL } from './season'
+import { setPageTint } from './pageTint'
 import { applyNight, dayPhase, duskAmount, nightAmount } from './dayNight'
 
 const SUN = new Color(PAL.sun)
@@ -37,7 +38,10 @@ export function DayNight({ small }: { small: boolean }) {
       hemi.current.groundColor.copy(GROUND_DAY).lerp(GROUND_NIGHT, n)
       hemi.current.intensity = 0.7 - n * 0.15
     }
-    if (scene.background instanceof Color) scene.background.copy(BG_DAY).lerp(BG_NIGHT, n)
+    if (scene.background instanceof Color) {
+      scene.background.copy(BG_DAY).lerp(BG_NIGHT, n)
+      setPageTint(scene.background)
+    }
   })
   return (
     <>
