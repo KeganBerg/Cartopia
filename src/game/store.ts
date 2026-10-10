@@ -65,6 +65,8 @@ type UiState = {
   placeRot: number | null
   // The placed building picked in move mode, for dragging and rotating.
   selected: string | null
+  // Building type just placed, so the edit bar can offer to build another.
+  again: string | null
   panel: Panel
   selectedCar: string | null
   toasts: { id: number; text: string }[]
@@ -300,6 +302,7 @@ export const useGame = create<GameState>()(
       placing: null,
       placeRot: null,
       selected: null,
+      again: null,
       panel: null,
       selectedCar: null,
       toasts: [],
@@ -311,7 +314,7 @@ export const useGame = create<GameState>()(
       gpPrize: null,
       levelUp: null,
 
-      setMode: (mode, placing = null) => set((s) => ({ mode, placing, panel: null, selected: null, placeRot: placing && placing === s.placing ? s.placeRot : null })),
+      setMode: (mode, placing = null) => set((s) => ({ mode, placing, panel: null, selected: null, again: null, placeRot: placing && placing === s.placing ? s.placeRot : null })),
       select: (selected) => set({ selected }),
       setPlaceRot: (placeRot) => set({ placeRot }),
       showNeed: (res, missing, what) => {

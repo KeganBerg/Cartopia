@@ -36,12 +36,14 @@ function EditBar() {
   const mode = useGame((s) => s.mode)
   const placing = useGame((s) => s.placing)
   const selected = useGame((s) => s.selected)
+  const again = useGame((s) => s.again)
   const setMode = useGame((s) => s.setMode)
   const openPanel = useGame((s) => s.openPanel)
   const hint =
     mode === 'expand' ? 'Tap a For Sale sign to buy the land next to your town'
     : mode === 'road' ? 'Click or drag to lay road (10 coins per tile)'
     : mode === 'bulldoze' ? 'Click or drag to remove (buildings refund half)'
+    : mode === 'move' && again && selected ? 'Built! Rotate or drag it to adjust it'
     : mode === 'move' ? (selected ? 'Drag it to move it, or Rotate to turn it' : 'Drag a building to move it, or tap one to rotate it')
     : `${TOUCH ? 'Tap a spot to preview' : 'Click to place'} ${placing ? BUILDINGS.find((b) => b.id === placing)?.name : ''}${TOUCH ? ', tap it again to build' : ''}. Rotate turns it.`
   return (
@@ -53,6 +55,7 @@ function EditBar() {
         <button className={mode === 'move' ? 'tool active' : 'tool'} onClick={() => setMode('move')}>✋ Move</button>
         <button className={mode === 'expand' ? 'tool active' : 'tool'} onClick={() => setMode('expand')}>🗺 Land</button>
         {((mode === 'place' && placing) || (mode === 'move' && selected)) && <button className="tool" onClick={rotateCurrent} title="Rotate (R)">🔄 Rotate</button>}
+        {mode === 'move' && again && <button className="tool" onClick={() => setMode('place', again)}>➕ Build another</button>}
         <button className="tool" onClick={() => openPanel('shop')}>🏪 Shop</button>
         <button className="tool done" onClick={() => setMode('play')}>✔ Done</button>
       </div>

@@ -334,8 +334,10 @@ function Interaction() {
     const ox = x - Math.floor((w - 1) / 2)
     const oz = z - Math.floor((h - 1) / 2)
     if (useGame.getState().placeBuilding(placing, ox, oz, placeRot ?? undefined)) {
+      // Keep the new building picked so Rotate (and dragging) can still adjust it.
       const s = useGame.getState()
-      if (s.coins < d.price) s.setMode('play')
+      const built = s.buildings[s.buildings.length - 1]
+      useGame.setState({ mode: 'move', placing: null, selected: built.uid, again: s.coins >= d.price && !d.unique ? placing : null })
     }
   }
 
