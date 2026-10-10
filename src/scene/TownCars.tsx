@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { anchors } from './anchors'
-import { Vector3 } from 'three'
+import { MeshStandardMaterial, Vector3 } from 'three'
 import type { Group } from 'three'
 import { useGame, footprint, lotSize, type OwnedCar, type PlacedBuilding } from '../game/store'
-import { buildingDef, carDef, performance } from '../game/data'
+import { TILE, buildingDef, carDef, performance } from '../game/data'
 import { tripRequests, type TripKind } from '../game/trips'
 import { toWorld, DIRS } from './grid'
 import { CarModel } from './CarModel'
@@ -26,14 +26,30 @@ type Agent = {
 }
 
 // Where every car on the road is and which way it faces, so each can keep its distance.
-type Traffic = { x: number; z: number; road: boolean; waitingOn: string | null }
+type Traffic = { x: number; z: number; road: boolean; waitingOn: string | null; atLight?: boolean }
 const traffic = new Map<string, Traffic>()
+// Queued behind a car that is waiting at a red light: also just waiting.
+const blockedAtLight = (id: string | null) => !!id && !!traffic.get(id)?.atLight
 // Centre-to-centre gap a following car keeps, and where it starts to brake.
 const GAP = 1.9
 const BRAKE = 3
 
+// Traffic lights at four-way crossings. One clock drives every signal: north-south
+// traffic gets green, then amber, then east-west does the same.
+const CYCLE = 10
+const GREEN = 4.2
+type Light = 'green' | 'amber' | 'red'
+function lightFor(axis: 'x' | 'z', now: number): Light {
+  const t = (now / 1000) % CYCLE
+  const mine = axis === 'z' ? t : (t + CYCLE / 2) % CYCLE
+  return mine < GREEN ? 'green' : mine < CYCLE / 2 ? 'amber' : 'red'
+}
+// Where a car waits on red, as a share of the way to the crossing's centre.
+const STOP_AT = 0.4
+
 const key = (t: Tile) => `${t[0]},${t[1]}`
 const same = (a: Tile, b: Tile) => a[0] === b[0] && a[1] === b[1]
+const isCrossing = (roads: Set<string>, t: Tile) => DIRS.every(([dx, dz]) => roads.has(key([t[0] + dx, t[1] + dz])))
 
 function pickNext(roads: Set<string>, from: Tile, at: Tile): Tile {
   const options = DIRS.map(([dx, dz]) => [at[0] + dx, at[1] + dz] as Tile).filter((t) => roads.has(key(t)))
@@ -247,10 +263,16 @@ function DrivingCar({ car, roads, start, stops }: { car: OwnedCar; roads: Set<st
         if (o.waitingOn === car.uid && car.uid < id) continue
         if (ahead < gap) { gap = ahead; blocker = id }
       }
-      const go = Math.max(0, Math.min(1, (gap - GAP) / (BRAKE - GAP)))
+      let go = Math.max(0, Math.min(1, (gap - GAP) / (BRAKE - GAP)))
+      // Stop at the line on red or amber; a car already past it carries on.
+      if (a.t < STOP_AT && isCrossing(roads, a.to) && lightFor(a.to[0] !== a.from[0] ? 'x' : 'z', Date.now()) !== 'green') {
+        go = Math.min(go, Math.max(0, (STOP_AT - a.t) * fl - 0.02) / 0.9)
+      }
       a.v += (go - a.v) * Math.min(1, dt * (go < a.v ? 8 : 3))
-      a.wait = go < 0.05 ? a.wait + dt : 0
-      traffic.set(car.uid, { x: g.position.x, z: g.position.z, road: true, waitingOn: go < 0.5 ? blocker : null })
+      const atLight = a.t < STOP_AT && isCrossing(roads, a.to) && STOP_AT - a.t < 0.1
+      // Waiting at a red light is not being stuck.
+      a.wait = go < 0.05 && !atLight && !blockedAtLight(blocker) ? a.wait + dt : 0
+      traffic.set(car.uid, { x: g.position.x, z: g.position.z, road: true, waitingOn: go < 0.5 ? blocker : null, atLight: atLight || blockedAtLight(blocker) })
       // Stuck for a while (a stalled car, a jam): turn around and find another way.
       if (a.wait > 4) {
         a.wait = 0
@@ -322,6 +344,58 @@ function DrivingCar({ car, roads, start, stops }: { car: OwnedCar; roads: Set<st
   )
 }
 
+const lightMats = {
+  z: new MeshStandardMaterial({ color: '#43a047', emissive: '#43a047', emissiveIntensity: 1.2 }),
+  x: new MeshStandardMaterial({ color: '#e53935', emissive: '#e53935', emissiveIntensity: 1.2 }),
+}
+const LIGHT_COLORS: Record<Light, string> = { green: '#4caf50', amber: '#ffb300', red: '#f44336' }
+
+// A signal pole on each corner of a crossing, with a lamp facing each road.
+function TrafficLights({ roads }: { roads: Set<string> }) {
+  const crossings = useMemo(() => [...roads].map((k) => k.split(',').map(Number) as Tile).filter((t) => isCrossing(roads, t)), [roads])
+  useFrame(() => {
+    const now = Date.now()
+    for (const axis of ['x', 'z'] as const) {
+      const c = LIGHT_COLORS[lightFor(axis, now)]
+      lightMats[axis].color.set(c)
+      lightMats[axis].emissive.set(c)
+    }
+  })
+  const c = TILE / 2 - 0.12
+  return (
+    <>
+      {crossings.map((t) => {
+        const [wx, wz] = toWorld(...t)
+        return (
+          <group key={key(t)} position={[wx, 0, wz]}>
+            {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sz]) => (
+              <group key={`${sx}${sz}`} position={[sx * c, 0, sz * c]}>
+                <mesh position-y={0.6}>
+                  <cylinderGeometry args={[0.03, 0.04, 1.2, 6]} />
+                  <meshStandardMaterial color="#37474f" />
+                </mesh>
+                <mesh position-y={1.18}>
+                  <boxGeometry args={[0.22, 0.22, 0.22]} />
+                  <meshStandardMaterial color="#263238" />
+                </mesh>
+                {/* Lamps face the traffic coming along each road. */}
+                <mesh position={[0, 1.18, sz * 0.115]}>
+                  <sphereGeometry args={[0.075, 10, 8]} />
+                  <primitive object={lightMats.z} attach="material" dispose={null} />
+                </mesh>
+                <mesh position={[sx * 0.115, 1.18, 0]}>
+                  <sphereGeometry args={[0.075, 10, 8]} />
+                  <primitive object={lightMats.x} attach="material" dispose={null} />
+                </mesh>
+              </group>
+            ))}
+          </group>
+        )
+      })}
+    </>
+  )
+}
+
 export function TownCars() {
   const roadsList = useGame((s) => (s.visiting ?? s).roads)
   const cars = useGame((s) => (s.visiting ?? s).cars)
@@ -333,6 +407,7 @@ export function TownCars() {
   if (!starts.length) return null
   return (
     <>
+      <TrafficLights roads={roads} />
       {cars.slice(0, MAX_VISIBLE).map((car, i) => (
         <DrivingCar key={`${visitKey}-${car.uid}`} car={car} roads={roads} start={starts[(i * 7919) % starts.length]} stops={stops} />
       ))}
