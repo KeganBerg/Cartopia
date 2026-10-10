@@ -23,7 +23,7 @@ create trigger game_saves_fill_stats before insert or update on public.game_save
   for each row execute function public.fill_save_stats();
 
 -- Gains per player per week (weeks start Monday, UTC).
-create table public.weekly_stats (
+create table if not exists public.weekly_stats (
   owner_id uuid not null references auth.users on delete cascade,
   week_start date not null,
   trophies integer not null default 0,
@@ -34,6 +34,7 @@ create table public.weekly_stats (
 );
 
 alter table public.weekly_stats enable row level security;
+drop policy if exists "weekly stats readable by all" on public.weekly_stats;
 create policy "weekly stats readable by all" on public.weekly_stats for select using (true);
 
 create or replace function public.this_week() returns date
