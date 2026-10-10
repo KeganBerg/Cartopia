@@ -1,10 +1,15 @@
-import { useRef, type RefObject } from 'react'
+import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { BackSide, type Group, type Mesh } from 'three'
+import { BackSide, Color, Object3D, type Group, type InstancedMesh, type Mesh } from 'three'
 import type { Body } from '../game/data'
 import { CarModel } from './CarModel'
 import { signTexture } from './signTexture'
-import { skyTex } from './textures'
+import { skyTex, asphaltTex, paverTex, glowTex } from './textures'
+import { BuildingModel, LightPool } from './BuildingModel'
+import { glowMats, dayPhase, nightAmount } from './dayNight'
+import { PAL } from './season'
+import { useGame } from '../game/store'
+import { BUILDINGS, TILE, buildingDef } from '../game/data'
 
 export type RacerView = { dist: number }
 const SCALE = 0.25 // metres of race distance per world unit
@@ -18,23 +23,150 @@ type Props = {
   theirs: { body: Body; color: string }
 }
 
-function SkyDome() {
+function SkyDome({ tint = '#ffffff' }: { tint?: string }) {
   const ref = useRef<Mesh>(null)
   useFrame(({ camera }) => ref.current?.position.set(camera.position.x, 0, camera.position.z))
   return (
     <mesh ref={ref} raycast={() => null}>
       <sphereGeometry args={[90, 24, 8, 0, Math.PI * 2, 0.9, Math.PI / 2 - 0.75]} />
-      <meshBasicMaterial map={skyTex(4)} side={BackSide} fog={false} depthWrite={false} />
+      <meshBasicMaterial map={skyTex(4)} color={tint} side={BackSide} fog={false} depthWrite={false} />
     </mesh>
   )
 }
 
-// Drag strip seen from a chase camera behind the player's car.
+const ROAD = 1.6 // half width of the street
+const WALK = 1.0 // sidewalk width
+const FALLBACK = ['pizza', 'donut', 'burger', 'diner', 'house', 'motel', 'carwash', 'tires', 'gas', 'bowling', 'icecream', 'house']
+const SHOPS = new Set(['business', 'gas', 'parts', 'tires', 'house'])
+
+type Slot = { z: number; side: -1 | 1; def: string }
+
+// Buildings from the player's own town, repeated down both sides of the street.
+function useStreet(len: number) {
+  const buildings = useGame((s) => s.buildings)
+  return useMemo(() => {
+    const own = [...new Set(buildings.map((b) => b.def))].filter((d) => SHOPS.has(buildingDef(d).kind))
+    const pool = own.length >= 3 ? own : FALLBACK.filter((d) => BUILDINGS.some((b) => b.id === d))
+    const slots: Slot[] = []
+    for (const side of [-1, 1] as const) {
+      let z = -10 + (side > 0 ? 1.5 : 0)
+      let i = side > 0 ? 3 : 0
+      while (z < len + 30) {
+        const def = pool[i++ % pool.length]
+        const w = buildingDef(def).w * TILE
+        slots.push({ z: z + w / 2, side, def })
+        z += w + 1.4 // gap for a tree
+      }
+    }
+    return slots
+  }, [buildings, len])
+}
+
+function Spectators({ len }: { len: number }) {
+  const ref = useRef<InstancedMesh>(null)
+  const heads = useRef<InstancedMesh>(null)
+  const spots = useMemo(() => {
+    const out: { x: number; z: number; phase: number }[] = []
+    for (let i = 0; i < 90; i++) {
+      const side = i % 2 ? 1 : -1
+      // Crowds bunch up at the start and the finish.
+      const z = i < 60 ? -3 + (i / 60) * 18 : len - 8 + ((i - 60) / 30) * 12
+      out.push({ x: side * (ROAD + 0.3 + ((i * 37) % 7) / 10), z: z + ((i * 13) % 5) / 5, phase: i * 1.7 })
+    }
+    return out
+  }, [len])
+  useEffect(() => {
+    const m = ref.current
+    if (!m) return
+    const c = new Color()
+    const colors = ['#e53935', '#1e88e5', '#fdd835', '#43a047', '#8e24aa', '#ff7043', '#fafafa', '#26c6da']
+    spots.forEach((_, i) => m.setColorAt(i, c.set(colors[i % colors.length])))
+    if (m.instanceColor) m.instanceColor.needsUpdate = true
+  }, [spots])
+  const tmp = useMemo(() => new Object3D(), [])
+  useFrame(({ clock }) => {
+    const m = ref.current
+    if (!m) return
+    const t = clock.elapsedTime
+    spots.forEach((p, i) => {
+      // Cheering: little hops.
+      tmp.position.set(p.x, 0.32 + Math.max(0, Math.sin(t * 6 + p.phase)) * 0.12, p.z)
+      tmp.updateMatrix()
+      m.setMatrixAt(i, tmp.matrix)
+      tmp.position.y += 0.3
+      tmp.updateMatrix()
+      heads.current?.setMatrixAt(i, tmp.matrix)
+    })
+    m.instanceMatrix.needsUpdate = true
+    if (heads.current) heads.current.instanceMatrix.needsUpdate = true
+  })
+  return (
+    <>
+      <instancedMesh ref={ref} args={[undefined, undefined, spots.length]} frustumCulled={false}>
+        <capsuleGeometry args={[0.11, 0.3, 3, 6]} />
+        <meshStandardMaterial />
+      </instancedMesh>
+      <instancedMesh ref={heads} args={[undefined, undefined, spots.length]} frustumCulled={false}>
+        <sphereGeometry args={[0.09, 8, 6]} />
+        <meshStandardMaterial color="#f1c27d" />
+      </instancedMesh>
+    </>
+  )
+}
+
+function Banner({ z, text, bg }: { z: number; text: string; bg: string }) {
+  return (
+    <group position={[0, 0, z]}>
+      {[-1, 1].map((sd) => (
+        <mesh key={sd} position={[sd * (ROAD + 0.25), 1.6, 0]}>
+          <boxGeometry args={[0.14, 3.2, 0.14]} />
+          <meshStandardMaterial color="#eceff1" />
+        </mesh>
+      ))}
+      <mesh position={[0, 3.05, 0]} rotation-y={Math.PI}>
+        <planeGeometry args={[ROAD * 2 + 0.5, 0.55]} />
+        <meshBasicMaterial map={signTexture(text, bg, '#ffffff')} toneMapped={false} side={2} />
+      </mesh>
+    </group>
+  )
+}
+
+function Lamp({ z, side }: { z: number; side: 1 | -1 }) {
+  return (
+    <group position={[side * (ROAD + 0.15), 0, z]} rotation-y={side > 0 ? -Math.PI / 2 : Math.PI / 2}>
+      <mesh position={[0, 0.9, 0]}>
+        <cylinderGeometry args={[0.04, 0.06, 1.8, 6]} />
+        <meshStandardMaterial color="#37474f" />
+      </mesh>
+      <mesh position={[0, 1.78, 0.25]}>
+        <boxGeometry args={[0.05, 0.04, 0.5]} />
+        <meshStandardMaterial color="#37474f" />
+      </mesh>
+      <mesh position={[0, 1.72, 0.48]}>
+        <boxGeometry args={[0.16, 0.07, 0.22]} />
+        <primitive object={glowMats.bulb} attach="material" dispose={null} />
+      </mesh>
+      <LightPool r={1} z={0.6} y={0.02} />
+    </group>
+  )
+}
+
+// Main street drag race, lined with the player's own town, seen from a chase camera.
 export function RaceScene({ track, me, them, mine, theirs }: Props) {
   const meRef = useRef<Group>(null)
   const themRef = useRef<Group>(null)
+  const scenery = useRef<(Group | null)[]>([])
   const { camera } = useThree()
   const len = track * SCALE
+  const slots = useStreet(len)
+  const night = useMemo(() => nightAmount(dayPhase()), [])
+  const asphalt = useMemo(() => {
+    const t = asphaltTex().clone()
+    t.repeat.set(1.6, (len + 40) / 2)
+    t.needsUpdate = true
+    return t
+  }, [len])
+  const tint = (day: string, dark: string) => '#' + new Color(day).lerp(new Color(dark), night).getHexString()
 
   useFrame(() => {
     const mz = (me.current?.dist ?? 0) * SCALE
@@ -45,79 +177,90 @@ export function RaceScene({ track, me, them, mine, theirs }: Props) {
     const target = Math.min(mz, len)
     camera.position.lerp({ x: LANE * 0.5, y: 2.2, z: target - 4.2 } as never, 0.15)
     camera.lookAt(LANE * 0.3, 0.3, Math.min(target + 3 + (lead - target) * 0.3, len + 4))
+    // Only draw the stretch of street near the camera.
+    const cz = camera.position.z
+    scenery.current.forEach((g) => {
+      if (g) g.visible = g.position.z > cz - 6 && g.position.z < cz + 48
+    })
   })
 
   return (
     <>
-      <fog attach="fog" args={['#d9f2ff', 25, 70]} />
-      <color attach="background" args={['#3d9bff']} />
-      {/* Sky band around the horizon; the background colour fills above it. */}
-      <SkyDome />
-      <hemisphereLight args={['#ffffff', '#6b8e4e', 0.8]} />
-      <directionalLight position={[5, 10, 2]} intensity={1.5} castShadow />
-      <mesh rotation-x={-Math.PI / 2} position={[0, -0.01, len / 2]} receiveShadow>
-        <planeGeometry args={[80, len + 80]} />
-        <meshStandardMaterial color="#6ab04c" />
+      <fog attach="fog" args={[tint('#d9f2ff', '#1d2740'), 25, 60]} />
+      <color attach="background" args={[tint('#3d9bff', '#0f1730')]} />
+      <SkyDome tint={tint('#ffffff', '#2a3560')} />
+      <hemisphereLight args={[tint('#ffffff', '#6274b8'), PAL.ground, 0.85 - night * 0.4]} />
+      <directionalLight position={[5, 10, 2]} intensity={1.5 - night * 1.1} color={tint(PAL.sun, '#9fb4ff')} />
+      {/* Ground, sidewalks and the street itself. */}
+      <mesh rotation-x={-Math.PI / 2} position={[0, -0.02, len / 2]}>
+        <planeGeometry args={[80, len + 100]} />
+        <meshStandardMaterial color={PAL.ground} />
       </mesh>
-      <mesh rotation-x={-Math.PI / 2} position={[0, 0, len / 2 + 5]} receiveShadow>
-        <planeGeometry args={[3.2, len + 20]} />
-        <meshStandardMaterial color="#4a4f55" />
+      {[-1, 1].map((sd) => (
+        <mesh key={sd} position={[sd * (ROAD + WALK / 2), 0.04, len / 2 + 5]}>
+          <boxGeometry args={[WALK, 0.08, len + 50]} />
+          <meshStandardMaterial map={paverTex(0.5, (len + 50) / 2)} />
+        </mesh>
+      ))}
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0.002, len / 2 + 5]}>
+        <planeGeometry args={[ROAD * 2, len + 50]} />
+        <meshStandardMaterial map={asphalt} />
       </mesh>
       {/* Centre line dashes and edge lines. */}
-      {Array.from({ length: Math.ceil((len + 20) / 2) }, (_, i) => (
-        <mesh key={i} rotation-x={-Math.PI / 2} position={[0, 0.005, i * 2 - 5]}>
+      {Array.from({ length: Math.ceil((len + 30) / 2) }, (_, i) => (
+        <mesh key={i} rotation-x={-Math.PI / 2} position={[0, 0.006, i * 2 - 8]}>
           <planeGeometry args={[0.06, 1]} />
           <meshBasicMaterial color="#fafafa" />
         </mesh>
       ))}
-      {[-1.55, 1.55].map((x) => (
-        <mesh key={x} rotation-x={-Math.PI / 2} position={[x, 0.005, len / 2 + 5]}>
-          <planeGeometry args={[0.08, len + 20]} />
+      {[-1, 1].map((sd) => (
+        <mesh key={sd} rotation-x={-Math.PI / 2} position={[sd * (ROAD - 0.08), 0.006, len / 2 + 5]}>
+          <planeGeometry args={[0.07, len + 50]} />
           <meshBasicMaterial color="#ffd54f" />
         </mesh>
       ))}
-      {/* Start and finish lines. */}
-      <mesh rotation-x={-Math.PI / 2} position={[0, 0.006, -0.6]}>
-        <planeGeometry args={[3.2, 0.15]} />
+      {/* Start grid line and chequered finish. */}
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0.007, -0.6]}>
+        <planeGeometry args={[ROAD * 2, 0.15]} />
         <meshBasicMaterial color="#fafafa" />
       </mesh>
-      <mesh rotation-x={-Math.PI / 2} position={[0, 0.006, len]}>
-        <planeGeometry args={[3.2, 0.5]} />
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0.007, len]}>
+        <planeGeometry args={[ROAD * 2, 0.5]} />
         <meshBasicMaterial map={signTexture('▚▚▚▚▚▚▚▚', '#ffffff', '#111111')} />
       </mesh>
-      <group position={[0, 0, len]}>
-        {[-1.9, 1.9].map((x) => (
-          <mesh key={x} position={[x, 1.2, 0]}>
-            <boxGeometry args={[0.15, 2.4, 0.15]} />
-            <meshStandardMaterial color="#eceff1" />
+      <Banner z={-0.8} text="START" bg="#2e7d32" />
+      <Banner z={len} text="FINISH" bg="#c62828" />
+      <Spectators len={len} />
+      {/* Shops facing the street, with trees in the gaps and lamps on the kerb. */}
+      {slots.map((sl, i) => {
+        const d = buildingDef(sl.def)
+        const depth = d.h * TILE
+        return (
+          <group key={i} ref={(g) => { scenery.current[i] = g }} position={[0, 0, sl.z]}>
+            <group position={[sl.side * (ROAD + WALK + depth / 2 + 0.1), 0, 0]} rotation-y={sl.side < 0 ? Math.PI / 2 : -Math.PI / 2}>
+              <mesh rotation-x={-Math.PI / 2} position-y={0.012}>
+                <planeGeometry args={[d.w * TILE - 0.1, depth - 0.1]} />
+                <meshStandardMaterial map={paverTex(d.w, d.h)} />
+              </mesh>
+              <BuildingModel def={d} />
+            </group>
+            <group position={[sl.side * (ROAD + WALK + 0.9), 0, d.w + 0.7]}>
+              <BuildingModel def={buildingDef(i % 3 ? 'tree' : 'palm')} />
+            </group>
+            {i % 2 === 0 && <Lamp z={d.w + 0.7} side={sl.side} />}
+          </group>
+        )
+      })}
+      {/* Soft shadows under the racers. */}
+      {[meRef, themRef].map((r, i) => (
+        <group key={i} ref={r} scale={1.4}>
+          <mesh rotation-x={-Math.PI / 2} position-y={0.01}>
+            <planeGeometry args={[0.9, 1.5]} />
+            <meshBasicMaterial map={glowTex()} color="#000000" transparent opacity={0.35} depthWrite={false} />
           </mesh>
-        ))}
-        <mesh position={[0, 2.4, 0]} rotation-y={Math.PI}>
-          <planeGeometry args={[3.9, 0.7]} />
-          <meshBasicMaterial map={signTexture('FINISH', '#c62828', '#ffffff')} toneMapped={false} />
-        </mesh>
-      </group>
-      {/* Grandstands and trees for a sense of speed. */}
-      {Array.from({ length: Math.ceil(len / 6) + 4 }, (_, i) => (
-        <group key={i}>
-          <mesh position={[i % 3 === 0 ? -4 : 4.2, 0.6, i * 6]} castShadow>
-            <sphereGeometry args={[0.7, 8, 6]} />
-            <meshStandardMaterial color="#2e7d32" />
-          </mesh>
-          {i % 4 === 1 && (
-            <mesh position={[-3.2, 0.5, i * 6]}>
-              <boxGeometry args={[1.6, 1, 4]} />
-              <meshStandardMaterial color={i % 8 === 1 ? '#1e88e5' : '#e53935'} />
-            </mesh>
-          )}
+          {i === 0 ? <CarModel body={mine.body} color={mine.color} beams={night > 0.3} /> : <CarModel body={theirs.body} color={theirs.color} beams={night > 0.3} />}
         </group>
       ))}
-      <group ref={meRef} scale={1.4}>
-        <CarModel body={mine.body} color={mine.color} />
-      </group>
-      <group ref={themRef} scale={1.4}>
-        <CarModel body={theirs.body} color={theirs.color} />
-      </group>
     </>
   )
 }
