@@ -8,6 +8,7 @@ import { joinLobby, useLive } from './lib/live'
 import { FriendsPanel, VisitBanner } from './ui/Friends'
 import { Tutorial } from './ui/Tutorial'
 import { Badges } from './ui/Badges'
+import { NeedPanel } from './ui/Need'
 import { AccountPanel } from './ui/Account'
 import { GoalsPanel, DailyPanel, FlatPanel } from './ui/Goals'
 import { useGame, today } from './game/store'
@@ -42,6 +43,7 @@ export default function App() {
       {liveRace && <LiveRaceOverlay />}
       <ChallengePopup />
       {panel === 'friends' && <FriendsPanel />}
+      {panel === 'need' && <NeedPanel />}
       <VisitBanner />
       <Tutorial />
       {panel === 'account' && <AccountPanel />}

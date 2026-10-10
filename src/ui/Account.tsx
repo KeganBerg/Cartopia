@@ -61,7 +61,9 @@ export function AccountPanel() {
         <li>Tap a business to send a car on a job. It costs fuel; fuel refills 1 per minute.</li>
         <li>When the coin bubble pops up, tap it to collect coins and XP.</li>
         <li>Buy cars in the Showroom. Every car you own drives around your roads.</li>
-        <li>Upgrade cars in the Garage with coins and parts (Tire Shops and Parts Depots make parts).</li>
+        <li>Build Rusty's Rescue first: he unlocks the Showroom and his jobs pay parts.</li>
+        <li>Upgrade cars in the Garage with coins and parts (⚙). Rusty's, Tire Shops, Parts Depots and Tuner Shops make parts.</li>
+        <li>Short on anything? Tap the coins, parts or fuel counters at the top to see how to get more.</li>
         <li>Race rivals for coins and trophies. Shift in the green zone.</li>
         <li>Level up to unlock new businesses and cars. Gas Stations raise your fuel cap.</li>
       </ul>

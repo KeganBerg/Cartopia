@@ -76,7 +76,7 @@ export function RacePanel() {
   if (race && car) return <DragRace car={car} rival={race} onExit={() => setRace(null)} />
 
   const start = (r: Rival) => {
-    if (!spendFuel(RACE_FUEL)) return useGame.getState().toast(`Racing needs ${RACE_FUEL} fuel`)
+    if (!spendFuel(RACE_FUEL)) return useGame.getState().showNeed('fuel', RACE_FUEL - useGame.getState().fuel, 'a race')
     setRace(r)
   }
 

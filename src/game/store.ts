@@ -34,7 +34,10 @@ export type SaveState = {
 }
 
 export type Mode = 'play' | 'place' | 'road' | 'bulldoze'
-export type Panel = null | 'shop' | 'garage' | 'showroom' | 'race' | 'account' | 'goals' | 'daily' | 'flat' | 'friends'
+export type Resource = 'coins' | 'parts' | 'fuel' | 'bucks' | 'level'
+export type Need = { res: Resource; missing: number; what?: string }
+
+export type Panel = null | 'need' | 'shop' | 'garage' | 'showroom' | 'race' | 'account' | 'goals' | 'daily' | 'flat' | 'friends'
 
 // A read-only copy of another player's town while visiting it.
 export type VisitedTown = { ownerId: string; townName: string; level: number; trophies: number; roads: string[]; buildings: PlacedBuilding[]; cars: OwnedCar[] }
@@ -46,10 +49,12 @@ type UiState = {
   selectedCar: string | null
   toasts: { id: number; text: string }[]
   visiting: VisitedTown | null
+  need: Need | null
 }
 
 type Actions = {
   setMode: (m: Mode, placing?: string | null) => void
+  showNeed: (res: Resource, missing: number, what?: string) => void
   openPanel: (p: Panel) => void
   selectCar: (uid: string | null) => void
   toast: (text: string) => void
@@ -191,8 +196,13 @@ export const useGame = create<GameState>()(
       selectedCar: null,
       toasts: [],
       visiting: null,
+      need: null,
 
       setMode: (mode, placing = null) => set({ mode, placing, panel: null }),
+      showNeed: (res, missing, what) => {
+        sfx.error()
+        set({ need: { res, missing: Math.max(0, Math.ceil(missing)), what }, panel: 'need', mode: 'play', placing: null })
+      },
       openPanel: (panel) => set({ panel, mode: 'play', placing: null }),
       selectCar: (selectedCar) => set({ selectedCar }),
       toast: (text) => {
@@ -225,8 +235,12 @@ export const useGame = create<GameState>()(
           s.toast(`You already have a ${d.name}`)
           return false
         }
-        if (s.coins < d.price || s.bucks < (d.bucks ?? 0)) {
-          s.toast('Not enough coins')
+        if (s.coins < d.price) {
+          s.showNeed('coins', d.price - s.coins, d.name)
+          return false
+        }
+        if (s.bucks < (d.bucks ?? 0)) {
+          s.showNeed('bucks', (d.bucks ?? 0) - s.bucks, d.name)
           return false
         }
         if (def === 'rescue') setTimeout(() => get().toast("Rusty's open for business! The Showroom is unlocked."), 400)
@@ -246,7 +260,7 @@ export const useGame = create<GameState>()(
         const s = get()
         if (x < 0 || z < 0 || x >= GRID || z >= GRID) return
         if (occupancy(s).has(key(x, z))) return
-        if (s.coins < 10) return s.toast('Not enough coins')
+        if (s.coins < 10) return s.showNeed('coins', 10 - s.coins, 'a road tile')
         set({ roads: [...s.roads, key(x, z)], coins: s.coins - 10, stats: bump(s, 'roads'), updatedAt: Date.now() })
       },
 
@@ -277,8 +291,7 @@ export const useGame = create<GameState>()(
         const now = Date.now()
         if (b.jobEndsAt === null) {
           if (s.fuel < d.fuelCost!) {
-            sfx.error()
-            return s.toast(`Need ${d.fuelCost} fuel. Fuel refills 1 per minute.`)
+            return s.showNeed('fuel', d.fuelCost! - s.fuel, `a ${d.name} job`)
           }
           sfx.start()
           const cap = fuelCap(s)
@@ -316,13 +329,20 @@ export const useGame = create<GameState>()(
       buyCar: (model, color) => {
         const s = get()
         const c = carDef(model)
-        if (s.level < c.unlockLevel) return false
+        if (s.level < c.unlockLevel) {
+          s.showNeed('level', c.unlockLevel, c.name)
+          return false
+        }
         if (!hasRusty(s)) {
           s.toast("Build Rusty's Rescue first. Rusty finds you new cars!")
           return false
         }
-        if (s.coins < c.price || s.bucks < (c.bucks ?? 0)) {
-          s.toast('Not enough money')
+        if (s.coins < c.price) {
+          s.showNeed('coins', c.price - s.coins, c.name)
+          return false
+        }
+        if (s.bucks < (c.bucks ?? 0)) {
+          s.showNeed('bucks', (c.bucks ?? 0) - s.bucks, c.name)
           return false
         }
         sfx.buy()
@@ -345,8 +365,12 @@ export const useGame = create<GameState>()(
         const lvl = car.upgrades[slot]
         if (lvl >= MAX_UPGRADE) return false
         const cost = upgradeCost(carDef(car.model), lvl)
-        if (s.coins < cost.coins || s.parts < cost.parts) {
-          s.toast('Not enough coins or parts')
+        if (s.parts < cost.parts) {
+          s.showNeed('parts', cost.parts - s.parts, 'this upgrade')
+          return false
+        }
+        if (s.coins < cost.coins) {
+          s.showNeed('coins', cost.coins - s.coins, 'this upgrade')
           return false
         }
         sfx.buy()
@@ -426,7 +450,7 @@ export const useGame = create<GameState>()(
         const hasRusty = s.buildings.some((b) => b.def === 'rescue')
         const cost = tow && hasRusty ? 0 : flatFixCost(s.level)
         if (tow && !hasRusty) return s.toast("Build Rusty's Rescue to tow for free")
-        if (s.coins < cost) return s.toast('Not enough coins')
+        if (s.coins < cost) return s.showNeed('coins', cost - s.coins, 'the tire repair')
         set({
           coins: s.coins - cost,
           cars: s.cars.map((c) => (c.uid === cuid ? { ...c, flat: false } : c)),
@@ -460,7 +484,8 @@ export const useGame = create<GameState>()(
         if (!car || !paint || car.color === color) return
         const bucks = paint.bucks ?? 0
         const coins = bucks ? 0 : PAINT_COST
-        if (s.coins < coins || s.bucks < bucks) return s.toast('Not enough money')
+        if (s.coins < coins) return s.showNeed('coins', coins - s.coins, 'a paint job')
+        if (s.bucks < bucks) return s.showNeed('bucks', bucks - s.bucks, `${paint.name} paint`)
         set({
           coins: s.coins - coins,
           bucks: s.bucks - bucks,
@@ -477,7 +502,7 @@ export const useGame = create<GameState>()(
         const car = s.cars.find((c) => c.uid === cuid)
         if (!car || (car.stripe ?? null) === stripe) return
         const cost = stripe ? STRIPE_COST : 0
-        if (s.coins < cost) return s.toast('Not enough coins')
+        if (s.coins < cost) return s.showNeed('coins', cost - s.coins, 'racing stripes')
         set({ coins: s.coins - cost, cars: s.cars.map((c) => (c.uid === cuid ? { ...c, stripe } : c)), updatedAt: Date.now() })
       },
 

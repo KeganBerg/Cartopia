@@ -48,9 +48,9 @@ export function Hud() {
       <div className="hud-left">
         <Speedometer level={s.level} xp={s.xp} />
         <div className="pills">
-          <div className="pill"><span className="ico coin-ico">$</span>{n(s.coins)}</div>
-          <div className="pill"><span className="ico buck-ico">B</span>{n(s.bucks)}</div>
-          <div className="pill"><span className="ico parts-ico">⚙</span>{n(s.parts)}</div>
+          <button className="pill" onClick={() => s.showNeed('coins', 0)}><span className="ico coin-ico">$</span>{n(s.coins)}<span className="plus">+</span></button>
+          <button className="pill" onClick={() => s.showNeed('bucks', 0)}><span className="ico buck-ico">B</span>{n(s.bucks)}<span className="plus">+</span></button>
+          <button className="pill" onClick={() => s.showNeed('parts', 0)}><span className="ico parts-ico">⚙</span>{n(s.parts)}<span className="plus">+</span></button>
         </div>
       </div>
       <div className="hud-center">
@@ -58,13 +58,13 @@ export function Hud() {
         {!s.visiting && <button className="my-cars" onClick={() => s.openPanel('garage')}>🚗 <span className="my-cars-label">MY CARS:</span> {s.cars.length}</button>}
       </div>
       <div className="hud-right">
-        <div className="fuel">
+        <button className="fuel" onClick={() => s.showNeed('fuel', 0)}>
           <div className="fuel-bar">
             <div style={{ width: `${Math.min(100, (s.fuel / cap) * 100)}%` }} />
             <span>{s.fuel}/{cap}</span>
           </div>
           <span className="ico fuel-ico">⛽</span>
-        </div>
+        </button>
         <div className="fuel-sub">{nextIn === null ? 'Fuel full' : `+1 fuel in ${nextIn}s`}</div>
         <div className="hud-right-row">
           <div className="pill trophies">🏆 {s.trophies}</div>

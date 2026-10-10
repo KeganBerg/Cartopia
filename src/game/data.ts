@@ -36,7 +36,7 @@ export const BUILDINGS: BuildingDef[] = [
   { id: 'garage', name: 'My Garage', kind: 'garage', w: 2, h: 2, price: 0, unlockLevel: 99, color: '#b0bec5', roof: '#78909c', sign: 'GARAGE' },
   // Rusty rescues and restores cars: the first thing a new town builds, and
   // the Showroom stays locked until it exists.
-  { id: 'rescue', name: "Rusty's Rescue", kind: 'business', w: 2, h: 1, price: 1000, unlockLevel: 1, unique: true, jobSeconds: 240, fuelCost: 3, payout: 320, xp: 30, color: '#a1887f', roof: '#c62828', sign: "RUSTY'S" },
+  { id: 'rescue', name: "Rusty's Rescue", kind: 'business', w: 2, h: 1, price: 1000, unlockLevel: 1, unique: true, jobSeconds: 240, fuelCost: 3, payout: 320, partsPayout: 3, xp: 30, color: '#a1887f', roof: '#c62828', sign: "RUSTY'S" },
   { id: 'gas', name: 'Gas Station', kind: 'gas', w: 2, h: 1, price: 1500, unlockLevel: 1, fuelCap: 10, color: '#ffca28', roof: '#e53935', sign: 'GAS' },
   { id: 'pizza', name: 'Pizza Place', kind: 'business', w: 1, h: 1, price: 400, unlockLevel: 1, jobSeconds: 30, fuelCost: 1, payout: 60, xp: 5, color: '#c0504d', roof: '#f5f5f5', sign: 'PIZZA' },
   { id: 'donut', name: 'Donut Shop', kind: 'business', w: 1, h: 1, price: 900, unlockLevel: 2, jobSeconds: 90, fuelCost: 2, payout: 160, xp: 12, color: '#f48fb1', roof: '#fff8e1', sign: 'DONUTS', prop: 'donut' },
@@ -44,7 +44,7 @@ export const BUILDINGS: BuildingDef[] = [
   { id: 'icecream', name: 'Ice Cream Stand', kind: 'business', w: 1, h: 1, price: 1500, unlockLevel: 3, jobSeconds: 150, fuelCost: 2, payout: 260, xp: 18, color: '#b3e5fc', roof: '#f8bbd0', sign: 'ICE CREAM', prop: 'cone' },
   { id: 'carwash', name: 'Car Wash', kind: 'business', w: 2, h: 1, price: 1800, unlockLevel: 3, jobSeconds: 180, fuelCost: 3, payout: 380, xp: 25, color: '#4fc3f7', roof: '#e1f5fe', sign: 'CAR WASH' },
   { id: 'diner', name: 'Diner', kind: 'business', w: 2, h: 1, price: 3200, unlockLevel: 4, jobSeconds: 300, fuelCost: 4, payout: 700, xp: 40, color: '#90caf9', roof: '#ef5350', sign: 'DINER' },
-  { id: 'tires', name: 'Tire Shop', kind: 'parts', w: 1, h: 1, price: 2500, unlockLevel: 3, jobSeconds: 240, fuelCost: 3, payout: 100, partsPayout: 6, xp: 20, color: '#455a64', roof: '#263238', sign: 'TIRES', prop: 'tire' },
+  { id: 'tires', name: 'Tire Shop', kind: 'parts', w: 1, h: 1, price: 2000, unlockLevel: 2, jobSeconds: 240, fuelCost: 3, payout: 100, partsPayout: 6, xp: 20, color: '#455a64', roof: '#263238', sign: 'TIRES', prop: 'tire' },
   { id: 'bowling', name: 'Bowling Alley', kind: 'business', w: 2, h: 1, price: 4200, unlockLevel: 5, jobSeconds: 420, fuelCost: 4, payout: 950, xp: 55, color: '#7e57c2', roof: '#ede7f6', sign: 'BOWLING', prop: 'pin' },
   { id: 'motel', name: 'Motel', kind: 'business', w: 2, h: 1, price: 5500, unlockLevel: 6, jobSeconds: 720, fuelCost: 5, payout: 1400, xp: 70, color: '#ffe0b2', roof: '#00897b', sign: 'MOTEL' },
   { id: 'tuner', name: 'Tuner Shop', kind: 'parts', w: 2, h: 1, price: 8000, unlockLevel: 7, jobSeconds: 600, fuelCost: 5, payout: 400, partsPayout: 25, xp: 70, color: '#212121', roof: '#ff3d00', sign: 'TUNER' },
