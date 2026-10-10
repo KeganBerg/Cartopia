@@ -1,4 +1,4 @@
--- Initial schema draft for Cartopia. Not applied yet.
+-- Initial schema for Cartopia.
 
 create table public.profiles (
   id uuid primary key references auth.users on delete cascade,
@@ -47,3 +47,16 @@ create policy "car catalog readable by all" on public.car_models for select usin
 create policy "own garage" on public.garage_cars for all using (auth.uid() = owner_id) with check (auth.uid() = owner_id);
 create policy "towns readable by all" on public.town_tiles for select using (true);
 create policy "own town writable" on public.town_tiles for all using (auth.uid() = owner_id) with check (auth.uid() = owner_id);
+
+-- Create a profile row automatically when someone signs up.
+create function public.handle_new_user() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  insert into public.profiles (id) values (new.id);
+  return new;
+end;
+$$;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
