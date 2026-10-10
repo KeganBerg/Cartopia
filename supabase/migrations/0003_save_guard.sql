@@ -3,7 +3,7 @@ alter table public.game_saves add column if not exists previous_state jsonb;
 alter table public.game_saves add column if not exists previous_updated_at timestamptz;
 
 create or replace function public.guard_game_save() returns trigger
-language plpgsql as $$
+language plpgsql set search_path = '' as $$
 begin
   if coalesce((new.state->>'level')::int, 1) < coalesce((old.state->>'level')::int, 1) then
     raise exception 'refusing to replace a level % save with a level % save',
