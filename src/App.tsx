@@ -12,6 +12,7 @@ import { Badges } from './ui/Badges'
 import { NeedPanel } from './ui/Need'
 import { RescuePanel } from './ui/Rescue'
 import { BankPanel } from './ui/Bank'
+import { LevelUpSplash } from './ui/LevelUp'
 import { AccountPanel } from './ui/Account'
 import { GoalsPanel, DailyPanel, FlatPanel } from './ui/Goals'
 import { useGame, today } from './game/store'
@@ -66,6 +67,7 @@ export default function App() {
       {panel === 'daily' && <DailyPanel />}
       {panel === 'flat' && <FlatPanel />}
       <PrizePopup />
+      <LevelUpSplash />
       <Toasts />
     </>
   )
