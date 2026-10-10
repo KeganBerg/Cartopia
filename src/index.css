@@ -151,3 +151,28 @@ button.card:hover:not(:disabled) { border-color: var(--accent); }
   .menu-btn { padding: 6px 8px; font-size: 14px; }
   .garage { grid-template-columns: 1fr; }
 }
+
+.goals-btn { position: relative; width: 44px; height: 44px; font-size: 24px; border-radius: 12px; background: radial-gradient(#fff, #cfd8dc); border: 3px solid #fff; box-shadow: 0 3px 0 rgba(0,0,0,.35); }
+.goal-badge { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; border-radius: 50%; background: var(--green); color: #fff; font-size: 12px; display: grid; place-items: center; border: 2px solid #fff; }
+.goals { display: flex; flex-direction: column; gap: 8px; }
+.goal { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; background: #fff; border: 2px solid #e0e0e0; border-radius: 12px; padding: 8px 10px; }
+.goal.done { border-color: var(--green); background: #f1f8e9; }
+.goal-main small { color: #546e7a; font-weight: 800; font-size: 12px; }
+.bar.wide { width: 100%; margin: 4px 0; height: 10px; }
+.daily { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 12px; }
+.day { background: #fff; border: 2px solid #e0e0e0; border-radius: 12px; padding: 6px 2px; display: flex; flex-direction: column; align-items: center; font-weight: 800; }
+.day b { font: 16px var(--display); color: #8d5a00; }
+.day.today { border-color: var(--accent); background: #fff3e0; transform: scale(1.06); }
+.day.past { opacity: .5; }
+.badge-flat { background: #ffebee; color: #c62828; animation: bob 0.9s ease-in-out infinite; }
+
+.race-3d { position: relative; height: 260px; border-radius: 12px; overflow: hidden; margin-bottom: 8px; background: #8fd3ff; }
+.countdown.big { position: absolute; inset: 0; display: grid; place-items: center; font-size: 96px; color: #fff; text-shadow: 0 4px 0 #c62828; pointer-events: none; }
+.shift-label.big { position: absolute; top: 12px; left: 0; right: 0; text-align: center; font-size: 34px; color: #fff; text-shadow: 0 3px 0 #e65100; pointer-events: none; }
+.strip.mini { padding: 4px; gap: 4px; }
+.strip.mini .lane { height: 26px; }
+.strip.mini .lane-car { height: 12px; width: 28px; bottom: 4px; }
+.strip.mini .lane-name { font-size: 10px; }
+@media (max-width: 640px) { .race-3d { height: 180px; } }
+.bar.wide { background: #e0e0e0; }
+.bar.wide span { background: var(--green); }

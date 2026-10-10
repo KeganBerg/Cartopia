@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGame, spendFuel, type OwnedCar } from '../game/store'
-import { CARS, carDef, performance, RACE_FUEL } from '../game/data'
+import { CARS, carDef, performance, RACE_FUEL, type Body } from '../game/data'
 import { supabase } from '../lib/supabase'
 import { Panel } from './Menus'
+import { Canvas } from '@react-three/fiber'
+import { RaceScene } from '../scene/RaceScene'
 
-type Rival = { id: string; town: string; level: number; carName: string; color: string; pi: number; online: boolean }
+type Rival = { id: string; town: string; level: number; carName: string; color: string; pi: number; online: boolean; body: Body }
 
 const TOWNS = ['Transamsylvania', 'Gearville', 'Piston Peak', 'Nitro Bay', 'Chrome City', 'Rustbelt Row', 'Turbo Falls', 'Muffler Hills']
 const TRACK = 400
@@ -23,6 +25,7 @@ function makeRivals(myPi: number, level: number): Rival[] {
       color: car.colors[Math.floor(Math.random() * car.colors.length)],
       pi: target,
       online: false,
+      body: car.body,
     }
   })
 }
@@ -46,6 +49,7 @@ async function fetchOnlineRivals(): Promise<Rival[]> {
       color: r.best_car.color,
       pi: r.best_car.pi,
       online: true,
+      body: (r.best_car.body ?? 'sedan') as Body,
     }))
 }
 
@@ -199,7 +203,14 @@ function DragRace({ car, rival, onExit }: { car: OwnedCar; rival: Rival; onExit:
   const rpmAngle = -210 + Math.min(1.05, me.current.rpm) * 240
   return (
     <Panel title={`Drag Race vs ${rival.town}`} wide>
-      <div className="strip">
+      <div className="race-3d">
+        <Canvas shadows camera={{ position: [0.4, 2.2, -4], fov: 55 }} dpr={[1, 1.5]}>
+          <RaceScene track={TRACK} me={me} them={them} mine={{ body: def.body, color: car.color }} theirs={{ body: rival.body, color: rival.color }} />
+        </Canvas>
+        {countdown > 0 && <div className="countdown big">{countdown}</div>}
+        {label && <div className="shift-label big">{label}</div>}
+      </div>
+      <div className="strip mini">
         {[
           { name: `You · ${def.name}`, color: car.color, r: me.current },
           { name: `${rival.town} · ${rival.carName}`, color: rival.color, r: them.current },
@@ -222,8 +233,6 @@ function DragRace({ car, rival, onExit }: { car: OwnedCar; rival: Rival; onExit:
         </svg>
         <div className="race-side">
           <div className="speed">{Math.round(me.current.speed * 0.9)} km/h</div>
-          {countdown > 0 && <div className="countdown">{countdown}</div>}
-          {label && <div className="shift-label">{label}</div>}
           {!result ? (
             <button className="big-btn shift-btn" onPointerDown={shift} disabled={countdown > 0 || me.current.gear >= 3}>
               SHIFT ▲

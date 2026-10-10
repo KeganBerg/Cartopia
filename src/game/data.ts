@@ -107,3 +107,39 @@ export const xpToNext = (level: number) => Math.round(80 * Math.pow(level, 1.6))
 export const baseFuelCap = (level: number) => 15 + level * 2
 export const FUEL_REGEN_SECONDS = 60
 export const RACE_FUEL = 3
+
+export type StatKey = 'jobs' | 'carsBought' | 'upgrades' | 'racesWon' | 'built' | 'roads' | 'coinsEarned' | 'flatsFixed'
+
+export type GoalDef = { id: string; text: string; stat: StatKey; target: number; coins: number; xp: number; bucks?: number }
+
+// Played in order; the first three unclaimed goals are active at once.
+export const GOALS: GoalDef[] = [
+  { id: 'g1', text: 'Collect from 3 businesses', stat: 'jobs', target: 3, coins: 150, xp: 15 },
+  { id: 'g2', text: 'Lay 5 road tiles', stat: 'roads', target: 5, coins: 100, xp: 10 },
+  { id: 'g3', text: 'Buy a new car', stat: 'carsBought', target: 1, coins: 300, xp: 25 },
+  { id: 'g4', text: 'Win a drag race', stat: 'racesWon', target: 1, coins: 250, xp: 20 },
+  { id: 'g5', text: 'Upgrade a car part', stat: 'upgrades', target: 1, coins: 200, xp: 20 },
+  { id: 'g6', text: 'Place 2 new buildings', stat: 'built', target: 2, coins: 300, xp: 25 },
+  { id: 'g7', text: 'Fix a flat tire', stat: 'flatsFixed', target: 1, coins: 150, xp: 15 },
+  { id: 'g8', text: 'Collect from 15 businesses', stat: 'jobs', target: 15, coins: 500, xp: 40, bucks: 1 },
+  { id: 'g9', text: 'Earn 5,000 coins', stat: 'coinsEarned', target: 5000, coins: 600, xp: 50 },
+  { id: 'g10', text: 'Win 5 drag races', stat: 'racesWon', target: 5, coins: 800, xp: 60, bucks: 1 },
+  { id: 'g11', text: 'Buy 3 cars', stat: 'carsBought', target: 3, coins: 1000, xp: 70 },
+  { id: 'g12', text: 'Do 10 upgrades', stat: 'upgrades', target: 10, coins: 1200, xp: 80, bucks: 2 },
+  { id: 'g13', text: 'Place 10 new buildings', stat: 'built', target: 10, coins: 1500, xp: 100 },
+  { id: 'g14', text: 'Collect from 60 businesses', stat: 'jobs', target: 60, coins: 2500, xp: 150, bucks: 2 },
+  { id: 'g15', text: 'Earn 50,000 coins', stat: 'coinsEarned', target: 50000, coins: 5000, xp: 250, bucks: 3 },
+  { id: 'g16', text: 'Win 25 drag races', stat: 'racesWon', target: 25, coins: 5000, xp: 250, bucks: 3 },
+]
+
+// Daily login bonus by streak day (repeats the last entry).
+export const DAILY_BONUS = [
+  { coins: 200 },
+  { coins: 400 },
+  { coins: 600, fuel: 5 },
+  { coins: 800, parts: 5 },
+  { coins: 1200, bucks: 1 },
+]
+
+export const FLAT_CHANCE = 0.2
+export const flatFixCost = (level: number) => 50 + level * 25

@@ -1,5 +1,6 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
+import { Html } from '@react-three/drei'
 import type { Group } from 'three'
 import { useGame, type OwnedCar } from '../game/store'
 import { carDef, performance } from '../game/data'
@@ -31,6 +32,11 @@ function DrivingCar({ car, roads, start }: { car: OwnedCar; roads: Set<string>; 
     const g = ref.current
     if (!g) return
     const a = agent.current
+    if (car.flat) {
+      g.rotation.z = 0.06
+      return
+    }
+    g.rotation.z = 0
     // Road under the car was removed: hop to the starting tile again.
     if (!roads.has(`${a.to[0]},${a.to[1]}`) || !roads.has(`${a.from[0]},${a.from[1]}`)) {
       a.from = start
@@ -69,9 +75,24 @@ function DrivingCar({ car, roads, start }: { car: OwnedCar; roads: Set<string>; 
         const s = useGame.getState()
         if (s.mode !== 'play') return
         s.selectCar(car.uid)
-        s.openPanel('garage')
+        s.openPanel(car.flat ? 'flat' : 'garage')
       }}
     >
+      {car.flat && (
+        <Html position={[0, 1.1, 0]} center zIndexRange={[10, 0]}>
+          <button
+            className="badge badge-flat"
+            onClick={(e) => {
+              e.stopPropagation()
+              const s = useGame.getState()
+              s.selectCar(car.uid)
+              s.openPanel('flat')
+            }}
+          >
+            🛞 Flat!
+          </button>
+        </Html>
+      )}
       <CarModel body={def.body} color={car.color} highlight={selected} />
     </group>
   )

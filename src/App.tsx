@@ -5,7 +5,8 @@ import { Hud } from './ui/Hud'
 import { BottomBar, ShopPanel, ShowroomPanel, GaragePanel, Toasts } from './ui/Menus'
 import { RacePanel } from './ui/Race'
 import { AccountPanel } from './ui/Account'
-import { useGame } from './game/store'
+import { GoalsPanel, DailyPanel, FlatPanel } from './ui/Goals'
+import { useGame, today } from './game/store'
 import { startCloudSync } from './lib/cloud'
 
 export default function App() {
@@ -15,6 +16,7 @@ export default function App() {
   useEffect(() => {
     startCloudSync()
     tick(Date.now())
+    if (useGame.getState().lastDaily !== today()) setTimeout(() => useGame.getState().openPanel('daily'), 800)
     const id = setInterval(() => tick(Date.now()), 1000)
     return () => clearInterval(id)
   }, [tick])
@@ -31,6 +33,9 @@ export default function App() {
       {panel === 'garage' && <GaragePanel />}
       {panel === 'race' && <RacePanel />}
       {panel === 'account' && <AccountPanel />}
+      {panel === 'goals' && <GoalsPanel />}
+      {panel === 'daily' && <DailyPanel />}
+      {panel === 'flat' && <FlatPanel />}
       <Toasts />
     </>
   )

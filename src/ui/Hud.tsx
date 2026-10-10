@@ -1,6 +1,7 @@
 import { useGame, fuelCap } from '../game/store'
 import { xpToNext, FUEL_REGEN_SECONDS } from '../game/data'
 import { useNow } from '../scene/useNow'
+import { GoalsButton } from './Goals'
 
 const n = (v: number) => v.toLocaleString()
 
@@ -49,6 +50,7 @@ export function Hud() {
           <div className="pill"><span className="ico coin-ico">$</span>{n(s.coins)}</div>
           <div className="pill"><span className="ico buck-ico">B</span>{n(s.bucks)}</div>
           <div className="pill"><span className="ico parts-ico">⚙</span>{n(s.parts)}</div>
+          <GoalsButton />
         </div>
       </div>
       <div className="hud-center">

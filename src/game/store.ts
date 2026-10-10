@@ -2,11 +2,11 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
   GRID, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS, BUILDINGS,
-  upgradeCost, MAX_UPGRADE, type UpgradeSlot,
+  upgradeCost, MAX_UPGRADE, GOALS, DAILY_BONUS, FLAT_CHANCE, flatFixCost, type UpgradeSlot, type StatKey,
 } from './data'
 
 export type PlacedBuilding = { uid: string; def: string; x: number; z: number; jobEndsAt: number | null }
-export type OwnedCar = { uid: string; model: string; color: string; upgrades: Record<UpgradeSlot, number> }
+export type OwnedCar = { uid: string; model: string; color: string; upgrades: Record<UpgradeSlot, number>; flat?: boolean }
 
 export type SaveState = {
   version: 1
@@ -23,11 +23,15 @@ export type SaveState = {
   roads: string[]
   buildings: PlacedBuilding[]
   cars: OwnedCar[]
+  stats: Record<StatKey, number>
+  claimedGoals: string[]
+  lastDaily: string | null
+  dailyStreak: number
   updatedAt: number
 }
 
 export type Mode = 'play' | 'place' | 'road' | 'bulldoze'
-export type Panel = null | 'shop' | 'garage' | 'showroom' | 'race' | 'account'
+export type Panel = null | 'shop' | 'garage' | 'showroom' | 'race' | 'account' | 'goals' | 'daily' | 'flat'
 
 type UiState = {
   mode: Mode
@@ -52,6 +56,9 @@ type Actions = {
   sellCar: (uid: string) => void
   finishRace: (won: boolean, reward: number) => void
   renameTown: (name: string) => void
+  claimGoal: (id: string) => void
+  claimDaily: () => void
+  fixFlat: (uid: string, tow: boolean) => void
   loadSave: (s: SaveState) => void
 }
 
@@ -60,6 +67,8 @@ export type GameState = SaveState & UiState & Actions
 const key = (x: number, z: number) => `${x},${z}`
 let uidCounter = 0
 const uid = () => `${Date.now().toString(36)}${(uidCounter++).toString(36)}${Math.random().toString(36).slice(2, 6)}`
+const emptyStats = (): Record<StatKey, number> => ({ jobs: 0, carsBought: 0, upgrades: 0, racesWon: 0, built: 0, roads: 0, coinsEarned: 0, flatsFixed: 0 })
+export const today = () => new Date().toISOString().slice(0, 10)
 const noUpgrades = (): Record<UpgradeSlot, number> => ({ engine: 0, turbo: 0, tires: 0, weight: 0 })
 
 export function fuelCap(s: Pick<SaveState, 'level' | 'buildings'>) {
@@ -119,9 +128,20 @@ function starterTown(): SaveState {
       { uid: uid(), model: 'pip', color: '#e53935', upgrades: noUpgrades() },
       { uid: uid(), model: 'civic', color: '#1e88e5', upgrades: noUpgrades() },
     ],
+    stats: emptyStats(),
+    claimedGoals: [],
+    lastDaily: null,
+    dailyStreak: 0,
     updatedAt: now,
   }
 }
+
+const bump = (s: SaveState, key: StatKey, by = 1) => ({ ...s.stats, [key]: (s.stats[key] ?? 0) + by })
+
+export function activeGoals(s: Pick<SaveState, 'claimedGoals'>) {
+  return GOALS.filter((g) => !s.claimedGoals.includes(g.id)).slice(0, 3)
+}
+export const goalDone = (s: Pick<SaveState, 'stats'>, g: (typeof GOALS)[number]) => (s.stats[g.stat] ?? 0) >= g.target
 
 function addXp(s: GameState, amount: number): Partial<GameState> {
   let { level, xp, bucks, coins } = s
@@ -185,6 +205,7 @@ export const useGame = create<GameState>()(
           coins: s.coins - d.price,
           bucks: s.bucks - (d.bucks ?? 0),
           buildings: [...s.buildings, { uid: uid(), def, x, z, jobEndsAt: null }],
+          stats: bump(s, 'built'),
           ...addXp(s, Math.max(1, Math.round(d.price / 100))),
           updatedAt: Date.now(),
         })
@@ -196,7 +217,7 @@ export const useGame = create<GameState>()(
         if (x < 0 || z < 0 || x >= GRID || z >= GRID) return
         if (occupancy(s).has(key(x, z))) return
         if (s.coins < 10) return s.toast('Not enough coins')
-        set({ roads: [...s.roads, key(x, z)], coins: s.coins - 10, updatedAt: Date.now() })
+        set({ roads: [...s.roads, key(x, z)], coins: s.coins - 10, stats: bump(s, 'roads'), updatedAt: Date.now() })
       },
 
       bulldoze: (x, z) => {
@@ -237,9 +258,19 @@ export const useGame = create<GameState>()(
         } else if (now >= b.jobEndsAt) {
           const parts = d.partsPayout ?? 0
           s.toast(`+${d.payout} coins${parts ? `, +${parts} parts` : ''}, +${d.xp} XP`)
+          // Sometimes a car out on the job comes back with a flat.
+          let cars = s.cars
+          const rolling = cars.filter((c) => !c.flat)
+          if (rolling.length > 1 && Math.random() < FLAT_CHANCE) {
+            const victim = rolling[Math.floor(Math.random() * rolling.length)]
+            cars = cars.map((c) => (c.uid === victim.uid ? { ...c, flat: true } : c))
+            setTimeout(() => get().toast(`Oh no, your ${carDef(victim.model).name} got a flat tire! Tap it to fix.`), 600)
+          }
           set({
             coins: s.coins + d.payout!,
             parts: s.parts + parts,
+            cars,
+            stats: { ...bump(s, 'jobs'), coinsEarned: (s.stats.coinsEarned ?? 0) + d.payout! },
             buildings: s.buildings.map((o) => (o.uid === buid ? { ...o, jobEndsAt: null } : o)),
             ...addXp(s, d.xp!),
             updatedAt: now,
@@ -260,6 +291,7 @@ export const useGame = create<GameState>()(
           coins: s.coins - c.price,
           bucks: s.bucks - (c.bucks ?? 0),
           cars: [...s.cars, { uid: uid(), model, color, upgrades: noUpgrades() }],
+          stats: bump(s, 'carsBought'),
           ...addXp(s, 20 + Math.round(c.price / 200)),
           updatedAt: Date.now(),
         })
@@ -281,6 +313,7 @@ export const useGame = create<GameState>()(
           coins: s.coins - cost.coins,
           parts: s.parts - cost.parts,
           cars: s.cars.map((c) => (c.uid === cuid ? { ...c, upgrades: { ...c.upgrades, [slot]: lvl + 1 } } : c)),
+          stats: bump(s, 'upgrades'),
           ...addXp(s, 15 + lvl * 10),
           updatedAt: Date.now(),
         })
@@ -302,6 +335,7 @@ export const useGame = create<GameState>()(
           coins: s.coins + (won ? reward : Math.round(reward * 0.1)),
           trophies: s.trophies + (won ? 1 : 0),
           racesWon: s.racesWon + (won ? 1 : 0),
+          stats: { ...bump(s, 'racesWon', won ? 1 : 0), coinsEarned: (s.stats.coinsEarned ?? 0) + (won ? reward : Math.round(reward * 0.1)) },
           ...addXp(s, won ? 30 : 8),
           updatedAt: Date.now(),
         })
@@ -309,18 +343,77 @@ export const useGame = create<GameState>()(
 
       renameTown: (townName) => set({ townName: townName.slice(0, 24) || 'My Town', updatedAt: Date.now() }),
 
-      loadSave: (save) => set({ ...save }),
+      claimGoal: (id) => {
+        const s = get()
+        const g = GOALS.find((o) => o.id === id)
+        if (!g || s.claimedGoals.includes(id) || !goalDone(s, g)) return
+        s.toast(`Goal complete! +${g.coins} coins${g.bucks ? `, +${g.bucks} bucks` : ''}, +${g.xp} XP`)
+        set({
+          coins: s.coins + g.coins,
+          bucks: s.bucks + (g.bucks ?? 0),
+          claimedGoals: [...s.claimedGoals, id],
+          ...addXp(s, g.xp),
+          updatedAt: Date.now(),
+        })
+      },
+
+      claimDaily: () => {
+        const s = get()
+        const t = today()
+        if (s.lastDaily === t) return
+        const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+        const streak = s.lastDaily === yesterday ? s.dailyStreak + 1 : 1
+        const r = DAILY_BONUS[Math.min(streak, DAILY_BONUS.length) - 1]
+        set({
+          coins: s.coins + r.coins,
+          fuel: s.fuel + (r.fuel ?? 0),
+          parts: s.parts + (r.parts ?? 0),
+          bucks: s.bucks + (r.bucks ?? 0),
+          lastDaily: t,
+          dailyStreak: streak,
+          panel: null,
+          updatedAt: Date.now(),
+        })
+        s.toast(`Daily bonus: +${r.coins} coins`)
+      },
+
+      fixFlat: (cuid, tow) => {
+        const s = get()
+        const car = s.cars.find((c) => c.uid === cuid)
+        if (!car?.flat) return
+        const hasRusty = s.buildings.some((b) => b.def === 'rescue')
+        const cost = tow && hasRusty ? 0 : flatFixCost(s.level)
+        if (tow && !hasRusty) return s.toast("Build Rusty's Rescue to tow for free")
+        if (s.coins < cost) return s.toast('Not enough coins')
+        set({
+          coins: s.coins - cost,
+          cars: s.cars.map((c) => (c.uid === cuid ? { ...c, flat: false } : c)),
+          stats: bump(s, 'flatsFixed'),
+          panel: null,
+          ...addXp(s, tow ? 15 : 5),
+          updatedAt: Date.now(),
+        })
+        s.toast(tow ? "Rusty towed it in and patched it up. +15 XP" : `Tire fixed for $${cost}`)
+      },
+
+      loadSave: (save) => set({ ...starterDefaults(), ...save }),
     }),
     {
       name: 'cartopia-save',
       partialize: (s) => saveOf(s),
+      merge: (persisted, current) => ({ ...current, ...starterDefaults(), ...(persisted as Partial<SaveState>) }),
     },
   ),
 )
 
 export function saveOf(s: GameState): SaveState {
-  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, updatedAt } = s
-  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, updatedAt }
+  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, lastDaily, dailyStreak, updatedAt } = s
+  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, lastDaily, dailyStreak, updatedAt }
+}
+
+// Fields added after launch, so older saves load with sensible values.
+function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'lastDaily' | 'dailyStreak'> {
+  return { stats: emptyStats(), claimedGoals: [], lastDaily: null, dailyStreak: 0 }
 }
 
 export const spendFuel = (amount: number) => {
