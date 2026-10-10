@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { anchors } from './anchors'
 import { Vector3 } from 'three'
@@ -21,7 +21,16 @@ type Agent = {
   mode: Mode; path: Tile[]; stop: Stop | null; tow: boolean
   timer: number; nextVisit: number
   lane: [number, number, number] // where the car left the road, for pulling in and out
+  v: number // 0..1 share of cruising speed, eased so cars brake and pull away smoothly
+  wait: number // seconds spent stopped behind another car
 }
+
+// Where every car on the road is and which way it faces, so each can keep its distance.
+type Traffic = { x: number; z: number; road: boolean; waitingOn: string | null }
+const traffic = new Map<string, Traffic>()
+// Centre-to-centre gap a following car keeps, and where it starts to brake.
+const GAP = 1.9
+const BRAKE = 3
 
 const key = (t: Tile) => `${t[0]},${t[1]}`
 const same = (a: Tile, b: Tile) => a[0] === b[0] && a[1] === b[1]
@@ -34,9 +43,11 @@ function pickNext(roads: Set<string>, from: Tile, at: Tile): Tile {
 }
 
 // Shortest road route between two tiles (breadth-first), excluding the start.
-function route(roads: Set<string>, start: Tile, goal: Tile): Tile[] | null {
+// Shortest road path, optionally around one tile (e.g. a jam the car just turned away from).
+function route(roads: Set<string>, start: Tile, goal: Tile, avoid?: Tile): Tile[] | null {
   if (same(start, goal)) return []
   const prev = new Map<string, string>([[key(start), '']])
+  if (avoid && !same(avoid, goal)) prev.set(key(avoid), '')
   const queue: Tile[] = [start]
   while (queue.length) {
     const cur = queue.shift()!
@@ -115,8 +126,9 @@ function DrivingCar({ car, roads, start, stops }: { car: OwnedCar; roads: Set<st
   const agent = useRef<Agent>({
     from: start, to: pickNext(roads, start, start), t: Math.random(),
     mode: 'roam', path: [], stop: null, tow: false, timer: 0,
-    nextVisit: 15 + Math.random() * 45, lane: [0, 0, 0],
+    nextVisit: 15 + Math.random() * 45, lane: [0, 0, 0], v: 1, wait: 0,
   })
+  useEffect(() => () => void traffic.delete(car.uid), [car.uid])
   const selected = useGame((s) => s.selectedCar === car.uid)
 
   const goTo = (a: Agent, stop: Stop, tow = false) => {
@@ -155,6 +167,7 @@ function DrivingCar({ car, roads, start, stops }: { car: OwnedCar; roads: Set<st
     const stuck = (car.flat || car.lowFuel) && !a.tow
     if (stuck && (a.mode === 'roam' || a.mode === 'route')) {
       g.rotation.z = 0.06
+      traffic.set(car.uid, { x: g.position.x, z: g.position.z, road: true, waitingOn: null })
       anchor()
       return
     }
@@ -163,6 +176,7 @@ function DrivingCar({ car, roads, start, stops }: { car: OwnedCar; roads: Set<st
     if (body.current) body.current.rotation.x = a.tow ? -0.12 : 0
 
     if (a.mode === 'enter' || a.mode === 'leave' || a.mode === 'park') {
+      traffic.set(car.uid, { x: g.position.x, z: g.position.z, road: false, waitingOn: null })
       const s = a.stop!
       if (a.mode === 'park') {
         a.timer -= dt
@@ -213,7 +227,47 @@ function DrivingCar({ car, roads, start, stops }: { car: OwnedCar; roads: Set<st
       }
     }
 
-    a.t += dt * speed * (a.tow ? 0.6 : 0.5)
+    // Brake for the nearest car ahead in this lane.
+    {
+      const [fx0, fz0] = toWorld(...a.from)
+      const [tx0, tz0] = toWorld(...a.to)
+      const fl = Math.hypot(tx0 - fx0, tz0 - fz0) || 1
+      const fx = (tx0 - fx0) / fl
+      const fz = (tz0 - fz0) / fl
+      let gap = Infinity
+      let blocker: string | null = null
+      for (const [id, o] of traffic) {
+        if (id === car.uid || !o.road) continue
+        const rx = o.x - g.position.x
+        const rz = o.z - g.position.z
+        const ahead = rx * fx + rz * fz
+        if (ahead <= 0.05 || ahead > BRAKE) continue
+        if (Math.abs(rx * fz - rz * fx) > 0.5) continue
+        // Two cars waiting on each other at a junction: the lower id goes first.
+        if (o.waitingOn === car.uid && car.uid < id) continue
+        if (ahead < gap) { gap = ahead; blocker = id }
+      }
+      const go = Math.max(0, Math.min(1, (gap - GAP) / (BRAKE - GAP)))
+      a.v += (go - a.v) * Math.min(1, dt * (go < a.v ? 8 : 3))
+      a.wait = go < 0.05 ? a.wait + dt : 0
+      traffic.set(car.uid, { x: g.position.x, z: g.position.z, road: true, waitingOn: go < 0.5 ? blocker : null })
+      // Stuck for a while (a stalled car, a jam): turn around and find another way.
+      if (a.wait > 4) {
+        a.wait = 0
+        const back = a.from
+        a.from = a.to
+        a.to = back
+        a.t = 1 - a.t
+        a.v = 0.3
+        if (a.mode === 'route' && a.stop) {
+          const path = route(roads, a.to, a.stop.road, a.from) ?? route(roads, a.to, a.stop.road)
+          if (path) a.path = path
+          else { a.mode = 'roam'; a.stop = null; a.tow = false }
+        }
+      }
+    }
+
+    a.t += dt * speed * (a.tow ? 0.6 : 0.5) * a.v
     while (a.t >= 1) {
       a.t -= 1
       if (a.mode === 'route' && a.stop && same(a.to, a.stop.road)) {
