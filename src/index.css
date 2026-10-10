@@ -525,14 +525,14 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
   .toast { font-size: 13px; }
 }
 
-/* Shop 3D previews: one canvas over the scrolling list draws every thumbnail. */
+/* 3D thumbnails: one hidden WebGL canvas renders them all onto per-card 2D canvases. */
 .panel { position: relative; }
-.preview-baker { position: fixed !important; left: -10000px; top: 0; pointer-events: none; }
+.preview-renderer { position: fixed !important; left: -10000px; top: 0; pointer-events: none; }
 .thumb3d { --tw: 132px; --th: 104px; width: 100%; height: var(--th); border-radius: 10px; overflow: hidden; display: flex; justify-content: center; background: radial-gradient(ellipse at 50% 70%, #ffffff 0 35%, #e3f2fd 75%); }
 .thumb3d.sm { --tw: 66px; --th: 52px; width: var(--tw); flex: none; border-radius: 8px; }
 .thumb3d.xs { --tw: 44px; --th: 35px; width: var(--tw); flex: none; border-radius: 6px; background: none; }
 .thumb3d.lg { --tw: 198px; --th: 156px; }
-.thumb-strip { width: var(--tw); height: var(--th); flex: none; display: block; }
+.thumb-view { width: var(--tw); height: var(--th); flex: none; display: block; }
 .card.locked .thumb3d { filter: grayscale(1); }
 
 /* Collect and fuel all: round button above the Race button with a recharge ring. */

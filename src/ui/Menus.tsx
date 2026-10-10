@@ -4,7 +4,7 @@ import { BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, PAINTS, STRIPES, P
 import { CarPreview } from '../scene/CarPreview'
 import { CollectAllButton } from './CollectAll'
 import { rotatePlacement } from '../game/placement'
-import { preloadBuildings, BuildingThumb, CarThumb } from '../scene/BuildingPreview'
+import { BuildingThumb, CarThumb } from '../scene/BuildingPreview'
 
 export function BottomBar() {
   const openPanel = useGame((s) => s.openPanel)
@@ -109,7 +109,6 @@ export function ShopPanel() {
   const focus = useGame((s) => s.shopFocus)
   const focusRef = useRef<HTMLButtonElement>(null)
   const rusty = hasRusty({ buildings })
-  useEffect(preloadBuildings, [])
   // A "Build" hint elsewhere opened the Shop: bring that building into view.
   useEffect(() => {
     focusRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
