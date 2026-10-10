@@ -253,6 +253,23 @@ const reward = (r: Rival) => (r.id.startsWith('live:') ? liveReward(r.pi) : 150 
 const liveReward = (oppPi: number) => 300 + oppPi * 8
 
 type Racer = { gear: number; rpm: number; speed: number; dist: number; quality: number; finished: number | null }
+// A live opponent is replayed on our own race clock from the samples they
+// send, so the strip and the result both compare the same race times.
+type Sample = { dist: number; t: number; speed: number }
+function sampleAt(samples: Sample[], t: number, finished: number | null) {
+  if (finished !== null && t >= finished) return TRACK
+  if (!samples.length) return 0
+  const last = samples[samples.length - 1]
+  // Not heard that far yet: extrapolate, but never past the line until they report finishing.
+  if (t >= last.t) return Math.min(finished === null ? TRACK - 0.5 : TRACK, last.dist + last.speed * (t - last.t))
+  let i = samples.length - 1
+  while (i > 0 && samples[i - 1].t > t) i--
+  const a = samples[i - 1] ?? { dist: 0, t: 0, speed: 0 }
+  const b = samples[i]
+  const f = b.t > a.t ? (t - a.t) / (b.t - a.t) : 1
+  return a.dist + (b.dist - a.dist) * Math.max(0, Math.min(1, f))
+}
+
 const fresh = (): Racer => ({ gear: 0, rpm: 0, speed: 0, dist: 0, quality: 1, finished: null })
 
 function step(r: Racer, piVal: number, dt: number, t: number) {
@@ -282,6 +299,7 @@ function DragRace({ car, rival, onExit, live, prize, onFinish, title }: { car: O
   const myPi = pi(car)
   const me = useRef(fresh())
   const them = useRef(fresh())
+  const samples = useRef<Sample[]>([])
   const t = useRef(0)
   const [, force] = useState(0)
   // Live races wait for both players before counting down.
@@ -311,10 +329,12 @@ function DragRace({ car, rival, onExit, live, prize, onFinish, title }: { car: O
       setCountdown(3)
     }
     const ch = raceChannel(live.raceId, {
-      onPos: (d) => (them.current.dist = Math.max(them.current.dist, d)),
+      onPos: (p) => {
+        const last = samples.current[samples.current.length - 1]
+        if (!last || p.t > last.t) samples.current.push(p)
+      },
       onFinish: (ft) => {
         them.current.finished = ft
-        them.current.dist = TRACK
       },
       onGo: go,
       onReady: () => {
@@ -355,12 +375,13 @@ function DragRace({ car, rival, onExit, live, prize, onFinish, title }: { car: O
       if (live) {
         if (now - lastSent > 100) {
           lastSent = now
-          channel.current?.send({ type: 'broadcast', event: 'pos', payload: { dist: me.current.dist } })
+          channel.current?.send({ type: 'broadcast', event: 'pos', payload: { dist: me.current.dist, t: t.current, speed: me.current.speed } })
         }
         if (!wasDone && me.current.finished !== null) {
           myFinishSentAt = now
           channel.current?.send({ type: 'broadcast', event: 'finish', payload: { t: me.current.finished } })
         }
+        th.dist = sampleAt(samples.current, t.current, Number.isFinite(th.finished) ? th.finished : null)
         // Opponent vanished: the race is yours after a grace period.
         if (myFinishSentAt !== null && th.finished === null && now - myFinishSentAt > 15000) th.finished = Infinity
       } else {
@@ -375,7 +396,7 @@ function DragRace({ car, rival, onExit, live, prize, onFinish, title }: { car: O
       if (me.current.finished === null) engineRpm(me.current.rpm, me.current.gear)
       else stopEngine()
       if (me.current.finished !== null && th.finished !== null) {
-        const won = me.current.finished <= th.finished
+        const won = me.current.finished < th.finished || (me.current.finished === th.finished && (!live || live.host))
         stopEngine()
         if (won) sfx.win()
         else sfx.lose()

@@ -100,10 +100,10 @@ export function endLiveRace() {
 }
 
 // Per-race channel: opponent's distance and finish time, plus the start signal.
-export function raceChannel(raceId: string, handlers: { onPos: (dist: number) => void; onFinish: (t: number) => void; onGo: () => void; onReady: () => void }) {
+export function raceChannel(raceId: string, handlers: { onPos: (p: { dist: number; t: number; speed: number }) => void; onFinish: (t: number) => void; onGo: () => void; onReady: () => void }) {
   if (!supabase) return null
   const ch = supabase.channel(`race-${raceId}`, { config: { broadcast: { self: false } } })
-  ch.on('broadcast', { event: 'pos' }, ({ payload }) => handlers.onPos(payload.dist))
+  ch.on('broadcast', { event: 'pos' }, ({ payload }) => handlers.onPos({ dist: payload.dist, t: payload.t ?? 0, speed: payload.speed ?? 0 }))
     .on('broadcast', { event: 'finish' }, ({ payload }) => handlers.onFinish(payload.t))
     .on('broadcast', { event: 'go' }, () => handlers.onGo())
     .on('broadcast', { event: 'ready' }, () => handlers.onReady())
