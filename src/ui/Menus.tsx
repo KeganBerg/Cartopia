@@ -1,0 +1,212 @@
+import { useState } from 'react'
+import { useGame } from '../game/store'
+import { BUILDINGS, CARS, UPGRADE_SLOTS, MAX_UPGRADE, carDef, performance, upgradeCost, type BuildingDef } from '../game/data'
+
+export function BottomBar() {
+  const openPanel = useGame((s) => s.openPanel)
+  const setMode = useGame((s) => s.setMode)
+  const mode = useGame((s) => s.mode)
+  if (mode !== 'play') return <EditBar />
+  return (
+    <>
+      <div className="bottom-bar">
+        <button className="big-btn menu-btn" onClick={() => openPanel('account')}><span>CARTOPIA</span>MENU</button>
+        <button className="icon-btn" onClick={() => openPanel('shop')}><span className="i">🏪</span>SHOP</button>
+        <button className="icon-btn" onClick={() => openPanel('showroom')}><span className="i">🚘</span>SHOWROOM</button>
+        <button className="icon-btn" onClick={() => openPanel('garage')}><span className="i">🔧</span>GARAGE</button>
+        <button className="icon-btn" onClick={() => setMode('road')}><span className="i">🚧</span>EDIT</button>
+      </div>
+      <button className="big-btn race-btn" onClick={() => openPanel('race')}><span className="i">🏆</span>RACE</button>
+    </>
+  )
+}
+
+function EditBar() {
+  const mode = useGame((s) => s.mode)
+  const placing = useGame((s) => s.placing)
+  const setMode = useGame((s) => s.setMode)
+  const openPanel = useGame((s) => s.openPanel)
+  const hint =
+    mode === 'road' ? 'Click or drag to lay road (10 coins per tile)'
+    : mode === 'bulldoze' ? 'Click or drag to remove (buildings refund half)'
+    : `Click to place ${placing ? BUILDINGS.find((b) => b.id === placing)?.name : ''}`
+  return (
+    <div className="edit-bar">
+      <div className="edit-hint">{hint}</div>
+      <div className="edit-tools">
+        <button className={mode === 'road' ? 'tool active' : 'tool'} onClick={() => setMode('road')}>🛣️ Road</button>
+        <button className={mode === 'bulldoze' ? 'tool active' : 'tool'} onClick={() => setMode('bulldoze')}>🚜 Bulldoze</button>
+        <button className="tool" onClick={() => openPanel('shop')}>🏪 Shop</button>
+        <button className="tool done" onClick={() => setMode('play')}>✔ Done</button>
+      </div>
+    </div>
+  )
+}
+
+export function Panel({ title, children, wide }: { title: string; children: React.ReactNode; wide?: boolean }) {
+  const close = useGame((s) => s.openPanel)
+  return (
+    <div className="overlay" onClick={() => close(null)}>
+      <div className={wide ? 'panel wide' : 'panel'} onClick={(e) => e.stopPropagation()}>
+        <div className="panel-head">
+          <h2>{title}</h2>
+          <button className="close" onClick={() => close(null)}>✕</button>
+        </div>
+        <div className="panel-body">{children}</div>
+      </div>
+    </div>
+  )
+}
+
+function price(def: { price: number; bucks?: number }) {
+  if (def.bucks) return <span className="price bucks">B {def.bucks}</span>
+  return <span className="price">$ {def.price.toLocaleString()}</span>
+}
+
+const SHOP_GROUPS: { title: string; filter: (b: BuildingDef) => boolean }[] = [
+  { title: 'Businesses', filter: (b) => b.kind === 'business' || b.kind === 'parts' },
+  { title: 'Services', filter: (b) => b.kind === 'gas' },
+  { title: 'Homes and decor', filter: (b) => b.kind === 'house' || b.kind === 'decor' },
+]
+
+export function ShopPanel() {
+  const level = useGame((s) => s.level)
+  const coins = useGame((s) => s.coins)
+  const setMode = useGame((s) => s.setMode)
+  return (
+    <Panel title="Shop" wide>
+      {SHOP_GROUPS.map((g) => (
+        <section key={g.title}>
+          <h3>{g.title}</h3>
+          <div className="cards">
+            {BUILDINGS.filter((b) => b.unlockLevel < 99 && g.filter(b)).map((b) => {
+              const locked = level < b.unlockLevel
+              const broke = coins < b.price
+              return (
+                <button key={b.id} className={`card ${locked ? 'locked' : ''}`} disabled={locked || broke} onClick={() => setMode('place', b.id)}>
+                  <div className="swatch" style={{ background: `linear-gradient(${b.roof} 0 30%, ${b.color} 30%)` }} />
+                  <div className="card-name">{b.name}</div>
+                  {b.jobSeconds && (
+                    <div className="card-stat">
+                      ${b.payout}{b.partsPayout ? ` +${b.partsPayout}⚙` : ''} every {b.jobSeconds >= 60 ? `${b.jobSeconds / 60}m` : `${b.jobSeconds}s`} · ⛽{b.fuelCost}
+                    </div>
+                  )}
+                  {b.fuelCap && <div className="card-stat">+{b.fuelCap} max fuel</div>}
+                  {locked ? <span className="price">🔒 Level {b.unlockLevel}</span> : price(b)}
+                </button>
+              )
+            })}
+          </div>
+        </section>
+      ))}
+    </Panel>
+  )
+}
+
+export function ShowroomPanel() {
+  const level = useGame((s) => s.level)
+  const buyCar = useGame((s) => s.buyCar)
+  const [colorFor, setColorFor] = useState<Record<string, string>>({})
+  return (
+    <Panel title="Showroom" wide>
+      <div className="cards">
+        {CARS.map((c) => {
+          const locked = level < c.unlockLevel
+          const color = colorFor[c.id] ?? c.colors[0]
+          const pi = performance(c, { engine: 0, turbo: 0, tires: 0, weight: 0 })
+          return (
+            <div key={c.id} className={`card car-card ${locked ? 'locked' : ''}`}>
+              <CarSwatch color={color} body={c.body} />
+              <div className="card-name">{c.name}</div>
+              <div className="card-stat">PI {pi} · {c.body}</div>
+              <div className="colors">
+                {c.colors.map((col) => (
+                  <button key={col} className={col === color ? 'dot sel' : 'dot'} style={{ background: col }} onClick={() => setColorFor({ ...colorFor, [c.id]: col })} />
+                ))}
+              </div>
+              {locked ? (
+                <span className="price">🔒 Level {c.unlockLevel}</span>
+              ) : (
+                <button className="buy" onClick={() => buyCar(c.id, color)}>Buy {price(c)}</button>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </Panel>
+  )
+}
+
+function CarSwatch({ color, body }: { color: string; body: string }) {
+  const low = body === 'sports' || body === 'super'
+  return (
+    <svg viewBox="0 0 100 50" className="car-swatch">
+      <rect x="8" y={low ? 22 : 18} width="84" height={low ? 16 : 20} rx="7" fill={color} />
+      <rect x={body === 'truck' ? 18 : 28} y={low ? 12 : 6} width={body === 'truck' ? 32 : 44} height={low ? 12 : 14} rx="5" fill="#37474f" />
+      <circle cx="26" cy="40" r="7" fill="#212121" />
+      <circle cx="74" cy="40" r="7" fill="#212121" />
+    </svg>
+  )
+}
+
+export function GaragePanel() {
+  const cars = useGame((s) => s.cars)
+  const selected = useGame((s) => s.selectedCar)
+  const select = useGame((s) => s.selectCar)
+  const upgrade = useGame((s) => s.upgradeCar)
+  const sell = useGame((s) => s.sellCar)
+  const car = cars.find((c) => c.uid === selected) ?? cars[0]
+  const def = car && carDef(car.model)
+  return (
+    <Panel title={`My Garage · ${cars.length} cars`} wide>
+      <div className="garage">
+        <div className="garage-list">
+          {cars.map((c) => {
+            const d = carDef(c.model)
+            return (
+              <button key={c.uid} className={c.uid === car?.uid ? 'garage-item sel' : 'garage-item'} onClick={() => select(c.uid)}>
+                <CarSwatch color={c.color} body={d.body} />
+                <span>{d.name}</span>
+                <small>PI {performance(d, c.upgrades)}</small>
+              </button>
+            )
+          })}
+        </div>
+        {car && def && (
+          <div className="garage-detail">
+            <CarSwatch color={car.color} body={def.body} />
+            <h3>{def.name}</h3>
+            <div className="pi">Performance Index <b>{performance(def, car.upgrades)}</b></div>
+            {UPGRADE_SLOTS.map((u) => {
+              const lvl = car.upgrades[u.id]
+              const cost = upgradeCost(def, lvl)
+              return (
+                <div key={u.id} className="upgrade-row">
+                  <span className="up-name">{u.name}</span>
+                  <span className="pips">{Array.from({ length: MAX_UPGRADE }, (_, i) => <i key={i} className={i < lvl ? 'on' : ''} />)}</span>
+                  {lvl < MAX_UPGRADE ? (
+                    <button className="buy small" onClick={() => upgrade(car.uid, u.id)}>${cost.coins.toLocaleString()} + {cost.parts}⚙</button>
+                  ) : (
+                    <span className="maxed">MAX</span>
+                  )}
+                </div>
+              )
+            })}
+            <button className="sell" onClick={() => sell(car.uid)}>Sell for ${Math.floor(def.price * 0.5).toLocaleString()}</button>
+          </div>
+        )}
+      </div>
+    </Panel>
+  )
+}
+
+export function Toasts() {
+  const toasts = useGame((s) => s.toasts)
+  return (
+    <div className="toasts">
+      {toasts.map((t) => (
+        <div key={t.id} className="toast">{t.text}</div>
+      ))}
+    </div>
+  )
+}

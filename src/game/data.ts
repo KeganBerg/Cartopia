@@ -1,0 +1,109 @@
+// Static game data: buildings, cars and the progression curve.
+
+export const GRID = 24
+export const TILE = 2
+
+export type BuildingKind = 'business' | 'gas' | 'parts' | 'showroom' | 'garage' | 'decor' | 'house'
+
+export type BuildingDef = {
+  id: string
+  name: string
+  kind: BuildingKind
+  w: number
+  h: number
+  price: number
+  bucks?: number
+  unlockLevel: number
+  // Businesses: a job costs fuel, runs for `jobSeconds`, then pays out.
+  jobSeconds?: number
+  fuelCost?: number
+  payout?: number
+  xp?: number
+  partsPayout?: number
+  // Gas stations raise the fuel cap.
+  fuelCap?: number
+  color: string
+  roof: string
+  sign?: string
+}
+
+export const BUILDINGS: BuildingDef[] = [
+  { id: 'showroom', name: 'Showroom', kind: 'showroom', w: 2, h: 2, price: 0, unlockLevel: 99, color: '#cfd8dc', roof: '#eceff1', sign: 'SHOWROOM' },
+  { id: 'garage', name: 'My Garage', kind: 'garage', w: 2, h: 2, price: 0, unlockLevel: 99, color: '#b0bec5', roof: '#78909c', sign: 'GARAGE' },
+  { id: 'gas', name: 'Gas Station', kind: 'gas', w: 2, h: 1, price: 1500, unlockLevel: 1, fuelCap: 10, color: '#ffca28', roof: '#e53935', sign: 'GAS' },
+  { id: 'pizza', name: 'Pizza Place', kind: 'business', w: 1, h: 1, price: 400, unlockLevel: 1, jobSeconds: 30, fuelCost: 1, payout: 60, xp: 5, color: '#c0504d', roof: '#f5f5f5', sign: 'PIZZA' },
+  { id: 'donut', name: 'Donut Shop', kind: 'business', w: 1, h: 1, price: 900, unlockLevel: 2, jobSeconds: 90, fuelCost: 2, payout: 160, xp: 12, color: '#f48fb1', roof: '#fff8e1', sign: 'DONUTS' },
+  { id: 'carwash', name: 'Car Wash', kind: 'business', w: 2, h: 1, price: 1800, unlockLevel: 3, jobSeconds: 180, fuelCost: 3, payout: 380, xp: 25, color: '#4fc3f7', roof: '#e1f5fe', sign: 'CAR WASH' },
+  { id: 'diner', name: 'Diner', kind: 'business', w: 2, h: 1, price: 3200, unlockLevel: 4, jobSeconds: 300, fuelCost: 4, payout: 700, xp: 40, color: '#90caf9', roof: '#ef5350', sign: 'DINER' },
+  { id: 'tires', name: 'Tire Shop', kind: 'parts', w: 1, h: 1, price: 2500, unlockLevel: 3, jobSeconds: 240, fuelCost: 3, payout: 100, partsPayout: 6, xp: 20, color: '#455a64', roof: '#263238', sign: 'TIRES' },
+  { id: 'cinema', name: 'Drive-In', kind: 'business', w: 2, h: 2, price: 6000, unlockLevel: 6, jobSeconds: 600, fuelCost: 6, payout: 1500, xp: 80, color: '#8d6e63', roof: '#3e2723', sign: 'DRIVE-IN' },
+  { id: 'parts', name: 'Parts Depot', kind: 'parts', w: 2, h: 1, price: 5000, unlockLevel: 5, jobSeconds: 480, fuelCost: 4, payout: 200, partsPayout: 15, xp: 45, color: '#1565c0', roof: '#bbdefb', sign: 'PARTS' },
+  { id: 'rescue', name: "Rusty's Rescue", kind: 'business', w: 2, h: 1, price: 9000, unlockLevel: 8, jobSeconds: 900, fuelCost: 8, payout: 2600, xp: 140, color: '#a1887f', roof: '#c62828', sign: "RUSTY'S" },
+  { id: 'house', name: 'House', kind: 'house', w: 1, h: 1, price: 250, unlockLevel: 1, color: '#fff3e0', roof: '#6d4c41' },
+  { id: 'tree', name: 'Oak Tree', kind: 'decor', w: 1, h: 1, price: 50, unlockLevel: 1, color: '#43a047', roof: '#2e7d32' },
+  { id: 'palm', name: 'Palm Tree', kind: 'decor', w: 1, h: 1, price: 120, unlockLevel: 2, color: '#66bb6a', roof: '#8d6e63' },
+  { id: 'fountain', name: 'Fountain', kind: 'decor', w: 1, h: 1, price: 800, bucks: 0, unlockLevel: 4, color: '#e0e0e0', roof: '#4fc3f7' },
+]
+
+export const buildingDef = (id: string) => BUILDINGS.find((b) => b.id === id)!
+
+export type Body = 'compact' | 'sedan' | 'sports' | 'muscle' | 'truck' | 'super'
+
+export type CarDef = {
+  id: string
+  name: string
+  body: Body
+  price: number
+  bucks?: number
+  unlockLevel: number
+  // Base performance stats out of 100.
+  power: number
+  grip: number
+  weight: number
+  colors: string[]
+}
+
+export const CARS: CarDef[] = [
+  { id: 'pip', name: 'Pip Hatch', body: 'compact', price: 800, unlockLevel: 1, power: 18, grip: 30, weight: 30, colors: ['#e53935', '#fdd835', '#43a047'] },
+  { id: 'civic', name: 'Commuter LX', body: 'sedan', price: 1500, unlockLevel: 1, power: 24, grip: 32, weight: 40, colors: ['#1e88e5', '#eeeeee', '#5d4037'] },
+  { id: 'trail', name: 'Trail Pickup', body: 'truck', price: 2600, unlockLevel: 2, power: 32, grip: 28, weight: 70, colors: ['#6d4c41', '#c62828', '#37474f'] },
+  { id: 'miata', name: 'Breeze MX', body: 'sports', price: 4200, unlockLevel: 3, power: 34, grip: 48, weight: 25, colors: ['#1e88e5', '#d32f2f', '#fafafa'] },
+  { id: 'stallion', name: 'Stallion 68', body: 'muscle', price: 7000, unlockLevel: 4, power: 52, grip: 34, weight: 55, colors: ['#ff6f00', '#212121', '#2e7d32'] },
+  { id: 'rally', name: 'Rally Evo', body: 'sedan', price: 9500, unlockLevel: 5, power: 50, grip: 58, weight: 40, colors: ['#0d47a1', '#fafafa', '#ffeb3b'] },
+  { id: 'vette', name: 'Sting Ray', body: 'sports', price: 14000, unlockLevel: 6, power: 62, grip: 52, weight: 38, colors: ['#bdbdbd', '#b71c1c', '#1a237e'] },
+  { id: 'charger', name: 'Thunder RT', body: 'muscle', price: 18000, unlockLevel: 7, power: 70, grip: 42, weight: 58, colors: ['#212121', '#ff5722', '#7b1fa2'] },
+  { id: 'gtr', name: 'Raijin GT', body: 'sports', price: 26000, unlockLevel: 9, power: 76, grip: 66, weight: 45, colors: ['#eceff1', '#263238', '#ff6d00'] },
+  { id: 'lambo', name: 'Toro V12', body: 'super', price: 0, bucks: 40, unlockLevel: 5, power: 88, grip: 72, weight: 35, colors: ['#76ff03', '#ffd600', '#ff1744'] },
+  { id: 'hyper', name: 'Vento X', body: 'super', price: 60000, unlockLevel: 12, power: 95, grip: 85, weight: 30, colors: ['#d50000', '#2962ff', '#212121'] },
+]
+
+export const carDef = (id: string) => CARS.find((c) => c.id === id)!
+
+export type UpgradeSlot = 'engine' | 'turbo' | 'tires' | 'weight'
+export const UPGRADE_SLOTS: { id: UpgradeSlot; name: string }[] = [
+  { id: 'engine', name: 'Engine' },
+  { id: 'turbo', name: 'Turbo' },
+  { id: 'tires', name: 'Tires' },
+  { id: 'weight', name: 'Weight Reduction' },
+]
+export const MAX_UPGRADE = 5
+
+export const upgradeCost = (car: CarDef, level: number) => ({
+  coins: Math.round((car.price + (car.bucks ?? 0) * 1000) * 0.15 * (level + 1) + 200),
+  parts: 2 + level * 3,
+})
+
+// Performance index: what races are decided on (plus the driver's shifting).
+export const performance = (car: CarDef, up: Record<UpgradeSlot, number>) => {
+  const power = car.power + up.engine * 4 + up.turbo * 3
+  const grip = car.grip + up.tires * 4
+  const weight = Math.max(5, car.weight - up.weight * 4)
+  return Math.round(power * 0.6 + grip * 0.3 + (100 - weight) * 0.1)
+}
+
+// XP needed to go from `level` to `level + 1`.
+export const xpToNext = (level: number) => Math.round(80 * Math.pow(level, 1.6))
+
+export const baseFuelCap = (level: number) => 15 + level * 2
+export const FUEL_REGEN_SECONDS = 60
+export const RACE_FUEL = 3

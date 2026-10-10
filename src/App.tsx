@@ -1,24 +1,37 @@
+import { useEffect } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { MapControls } from '@react-three/drei'
-import { Town } from './game/Town'
-import { Cars } from './game/Cars'
-import { supabase } from './lib/supabase'
+import { World } from './scene/World'
+import { Hud } from './ui/Hud'
+import { BottomBar, ShopPanel, ShowroomPanel, GaragePanel, Toasts } from './ui/Menus'
+import { RacePanel } from './ui/Race'
+import { AccountPanel } from './ui/Account'
+import { useGame } from './game/store'
+import { startCloudSync } from './lib/cloud'
 
 export default function App() {
+  const panel = useGame((s) => s.panel)
+  const tick = useGame((s) => s.tick)
+
+  useEffect(() => {
+    startCloudSync()
+    tick(Date.now())
+    const id = setInterval(() => tick(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [tick])
+
   return (
     <>
-      <Canvas shadows orthographic camera={{ position: [30, 30, 30], zoom: 28, near: 0.1, far: 500 }}>
-        <color attach="background" args={['#9fd7f5']} />
-        <ambientLight intensity={0.6} />
-        <directionalLight castShadow position={[20, 40, 10]} intensity={1.2} shadow-mapSize={[2048, 2048]} />
-        <Town />
-        <Cars />
-        <MapControls enableRotate={false} minZoom={10} maxZoom={80} />
+      <Canvas shadows orthographic camera={{ position: [30, 32, 30], zoom: 36, near: 0.1, far: 500 }} dpr={[1, 2]}>
+        <World />
       </Canvas>
-      <div className="hud">
-        Cartopia · drag to pan, scroll to zoom
-        {!supabase && ' · offline (no Supabase env set)'}
-      </div>
+      <Hud />
+      <BottomBar />
+      {panel === 'shop' && <ShopPanel />}
+      {panel === 'showroom' && <ShowroomPanel />}
+      {panel === 'garage' && <GaragePanel />}
+      {panel === 'race' && <RacePanel />}
+      {panel === 'account' && <AccountPanel />}
+      <Toasts />
     </>
   )
 }
