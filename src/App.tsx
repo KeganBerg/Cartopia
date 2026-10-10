@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { World } from './scene/World'
 import { Hud } from './ui/Hud'
+import { ThumbBaker } from './scene/BuildingPreview'
 import { BottomBar, ShopPanel, ShowroomPanel, GaragePanel, Toasts } from './ui/Menus'
 import { RacePanel, LiveRaceOverlay, InvitesPanel, PrizePopup } from './ui/Race'
 import { joinLobby, useLive } from './lib/live'
@@ -11,6 +12,7 @@ import { Badges } from './ui/Badges'
 import { NeedPanel } from './ui/Need'
 import { RescuePanel } from './ui/Rescue'
 import { BankPanel } from './ui/Bank'
+import { LevelUpSplash } from './ui/LevelUp'
 import { AccountPanel } from './ui/Account'
 import { GoalsPanel, DailyPanel, FlatPanel } from './ui/Goals'
 import { useGame, today } from './game/store'
@@ -45,6 +47,7 @@ export default function App() {
         <World />
       </Canvas>
       <Badges />
+      <ThumbBaker />
       <Hud />
       <BottomBar />
       {panel === 'shop' && <ShopPanel />}
@@ -64,6 +67,7 @@ export default function App() {
       {panel === 'daily' && <DailyPanel />}
       {panel === 'flat' && <FlatPanel />}
       <PrizePopup />
+      <LevelUpSplash />
       <Toasts />
     </>
   )

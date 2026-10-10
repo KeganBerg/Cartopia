@@ -257,6 +257,9 @@ function Interaction() {
   const drag = useDrag((g) => g.drag)
   const [hover, setHover] = useState<[number, number] | null>(null)
   const painting = useRef(false)
+  // Whether the last press was a finger. Touch has no hover, so a tap previews instead of building.
+  const touch = useRef(false)
+  const controls = useThree((s) => s.controls) as { target: Vector3 } | null
   const roads = useGame((s) => s.roads)
   const buildings = useGame((s) => s.buildings)
   const land = useGame((s) => s.land)
@@ -272,6 +275,13 @@ function Interaction() {
     return () => window.removeEventListener('keydown', onKey)
   }, [mode])
 
+  // Show the ghost mid-screen as soon as placing starts, so Rotate visibly turns it
+  // even before the pointer reaches the town (and on phones, which never hover).
+  useEffect(() => {
+    if (mode !== 'place' || !placing || !controls) return
+    setHover(toTile(controls.target.x, controls.target.z))
+  }, [mode, placing, controls])
+
   const tileOf = (e: ThreeEvent<PointerEvent | MouseEvent>) => toTile(e.point.x, e.point.z)
 
   const onMove = (e: ThreeEvent<PointerEvent>) => {
@@ -282,11 +292,14 @@ function Interaction() {
       if (x !== drag.x || z !== drag.z) useDrag.setState({ drag: { ...drag, x, z } })
       return
     }
+    // A finger dragging across the town is panning; leave the ghost where it was.
+    if (mode === 'place' && e.pointerType === 'touch') return
     if (!hover || hover[0] !== t[0] || hover[1] !== t[1]) setHover(t)
     if (painting.current && mode === 'road') useGame.getState().paintRoad(...t)
     if (painting.current && mode === 'bulldoze') useGame.getState().bulldoze(...t)
   }
   const onDown = (e: ThreeEvent<PointerEvent>) => {
+    touch.current = e.pointerType === 'touch'
     if (mode === 'move' && selected && e.button === 0) {
       // Grabbing the ground inside the picked building's lot drags it too.
       const b = buildings.find((o) => o.uid === selected)
@@ -307,9 +320,16 @@ function Interaction() {
     // Tapping open ground lets go of the picked building.
     if (mode === 'move' && e.delta <= 6 && !drag) return useGame.getState().select(null)
     if (mode !== 'place' || !placing || e.delta > 6) return
-    const [x, z] = tileOf(e)
+    let [x, z] = tileOf(e)
     const d = buildingDef(placing)
     const [w, h] = lotSize(placing, placeRot ?? undefined)
+    if (touch.current) {
+      // Phones: the first tap moves the ghost there; tapping the ghost builds it.
+      const gx = hover ? hover[0] - Math.floor((w - 1) / 2) : NaN
+      const gz = hover ? hover[1] - Math.floor((h - 1) / 2) : NaN
+      if (!(x >= gx && x < gx + w && z >= gz && z < gz + h)) return setHover([x, z])
+      ;[x, z] = hover!
+    }
     // Hover tile is the footprint's centre; convert to its top-left corner.
     const ox = x - Math.floor((w - 1) / 2)
     const oz = z - Math.floor((h - 1) / 2)
@@ -387,7 +407,8 @@ function Interaction() {
         onPointerUp={onUp}
         onPointerLeave={() => {
           painting.current = false
-          setHover(null)
+          // Keep the ghost while the mouse visits the Rotate button.
+          if (mode !== 'place') setHover(null)
         }}
         onClick={onClick}
       >

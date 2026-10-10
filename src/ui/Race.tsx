@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGame, spendFuel, type OwnedCar } from '../game/store'
 import { CARS, SKILLS, carDef, performance, RACE_FUEL, GP_SERIES, GP_ROUNDS, gpRivalPi, gpReward, type Body, type GpSeries } from '../game/data'
-import { CarSwatch } from './Menus'
+import { CarThumb } from '../scene/BuildingPreview'
 import { supabase } from '../lib/supabase'
 import { Panel } from './Menus'
 import { Canvas } from '@react-three/fiber'
@@ -118,7 +118,7 @@ export function RacePanel() {
       <div className="race-cars">
         {cars.map((c) => (
           <button key={c.uid} className={c.uid === car?.uid ? 'chip sel' : 'chip'} onClick={() => setCarId(c.uid)}>
-            <i style={{ background: c.color }} /> {carDef(c.model).name} · PI {pi(c)}{carDef(c.model).skill ? ` ${SKILLS[carDef(c.model).skill!].icon}` : ''}
+            <CarThumb size="xs" color={c.color} body={carDef(c.model).body} stripe={c.stripe} /> {carDef(c.model).name} · PI {pi(c)}{carDef(c.model).skill ? ` ${SKILLS[carDef(c.model).skill!].icon}` : ''}
           </button>
         ))}
       </div>
@@ -241,7 +241,7 @@ export function PrizePopup() {
           </>
         ) : (
           <>
-            <CarSwatch color={prize.color} body={def.body} />
+            <CarThumb size="lg" color={prize.color} body={def.body} />
             <h3>{def.name}</h3>
             <p>PI {performance(def, zero)} · +5 🏆. It's in your garage now.</p>
             <div className="row">
