@@ -49,7 +49,7 @@ export type SaveState = {
   updatedAt: number
 }
 
-export type Mode = 'play' | 'place' | 'road' | 'bulldoze' | 'expand'
+export type Mode = 'play' | 'place' | 'move' | 'road' | 'bulldoze' | 'expand'
 export type Resource = 'coins' | 'parts' | 'fuel' | 'bucks' | 'level'
 export type Need = { res: Resource; missing: number; what?: string }
 
@@ -63,6 +63,10 @@ type UiState = {
   placing: string | null
   // Quarter turns for the building being placed; null follows the nearest road.
   placeRot: number | null
+  // The placed building picked in move mode, for dragging and rotating.
+  selected: string | null
+  // Building type just placed, so the edit bar can offer to build another.
+  again: string | null
   panel: Panel
   selectedCar: string | null
   toasts: { id: number; text: string }[]
@@ -88,6 +92,8 @@ type Actions = {
   tick: (now: number) => void
   placeBuilding: (def: string, x: number, z: number, rot?: number) => boolean
   setPlaceRot: (rot: number | null) => void
+  select: (uid: string | null) => void
+  moveBuilding: (uid: string, x: number, z: number, rot?: number) => boolean
   paintRoad: (x: number, z: number) => void
   bulldoze: (x: number, z: number) => void
   tapBuilding: (uid: string) => void
@@ -153,10 +159,11 @@ export function footprint(def: string, x: number, z: number, rot?: number) {
 }
 
 // Map of tile key -> what occupies it.
-export function occupancy(s: Pick<SaveState, 'roads' | 'buildings'>) {
+// `ignore` leaves out a building that is being moved, so it doesn't block its own new spot.
+export function occupancy(s: Pick<SaveState, 'roads' | 'buildings'>, ignore?: string) {
   const occ = new Map<string, string>()
   for (const r of s.roads) occ.set(r, 'road')
-  for (const b of s.buildings) for (const [x, z] of footprint(b.def, b.x, b.z, b.rot)) occ.set(key(x, z), b.uid)
+  for (const b of s.buildings) if (b.uid !== ignore) for (const [x, z] of footprint(b.def, b.x, b.z, b.rot)) occ.set(key(x, z), b.uid)
   return occ
 }
 
@@ -175,10 +182,13 @@ export function buyablePlots(land: string[]) {
   return out
 }
 
-export function canPlace(s: Pick<SaveState, 'roads' | 'buildings' | 'land'>, def: string, x: number, z: number, rot?: number) {
-  const occ = occupancy(s)
+export function canPlace(s: Pick<SaveState, 'roads' | 'buildings' | 'land'>, def: string, x: number, z: number, rot?: number, ignore?: string) {
+  const occ = occupancy(s, ignore)
   return footprint(def, x, z, rot).every(([tx, tz]) => owns(s.land, tx, tz) && !occ.has(key(tx, tz)))
 }
+
+// Obstacles get cleared, not moved.
+export const movable = (def: string) => buildingDef(def).kind !== 'obstacle'
 
 function starterTown(): SaveState {
   const roads: string[] = []
@@ -291,6 +301,8 @@ export const useGame = create<GameState>()(
       mode: 'play',
       placing: null,
       placeRot: null,
+      selected: null,
+      again: null,
       panel: null,
       selectedCar: null,
       toasts: [],
@@ -302,14 +314,15 @@ export const useGame = create<GameState>()(
       gpPrize: null,
       levelUp: null,
 
-      setMode: (mode, placing = null) => set((s) => ({ mode, placing, panel: null, placeRot: placing && placing === s.placing ? s.placeRot : null })),
+      setMode: (mode, placing = null) => set((s) => ({ mode, placing, panel: null, selected: null, again: null, placeRot: placing && placing === s.placing ? s.placeRot : null })),
+      select: (selected) => set({ selected }),
       setPlaceRot: (placeRot) => set({ placeRot }),
       showNeed: (res, missing, what) => {
         sfx.error()
-        set({ need: { res, missing: Math.max(0, Math.ceil(missing)), what }, panel: 'need', mode: 'play', placing: null })
+        set({ need: { res, missing: Math.max(0, Math.ceil(missing)), what }, panel: 'need', mode: 'play', placing: null, selected: null })
       },
-      openPanel: (panel) => set({ panel, mode: 'play', placing: null, shopFocus: null }),
-      openShop: (focus) => set({ panel: 'shop', mode: 'play', placing: null, shopFocus: focus ?? null }),
+      openPanel: (panel) => set({ panel, mode: 'play', placing: null, selected: null, shopFocus: null }),
+      openShop: (focus) => set({ panel: 'shop', mode: 'play', placing: null, selected: null, shopFocus: focus ?? null }),
       selectCar: (selectedCar) => set({ selectedCar }),
       toast: (text) => {
         const id = Date.now() + Math.random()
@@ -357,6 +370,22 @@ export const useGame = create<GameState>()(
           buildings: [...s.buildings, { uid: uid(), def, x, z, jobEndsAt: null, ...(rot == null ? {} : { rot }) }],
           stats: def === 'rescue' ? { ...bump(s, 'built'), rusty: 1 } : bump(s, 'built'),
           ...addXp(s, Math.max(1, Math.round(d.price / 100))),
+          updatedAt: Date.now(),
+        })
+        return true
+      },
+
+      // Free, and a running job keeps running. Leaving out rot keeps the building's
+      // current turn (or keeps it facing the nearest road if it never had one).
+      moveBuilding: (buid, x, z, rot) => {
+        const s = get()
+        const b = s.buildings.find((o) => o.uid === buid)
+        if (!b || !movable(b.def)) return false
+        const turn = rot ?? b.rot
+        if (!canPlace(s, b.def, x, z, turn, buid)) return false
+        if (b.x === x && b.z === z && b.rot === turn) return true
+        set({
+          buildings: s.buildings.map((o) => (o.uid === buid ? { ...o, x, z, ...(turn == null ? {} : { rot: turn }) } : o)),
           updatedAt: Date.now(),
         })
         return true
@@ -711,7 +740,7 @@ export const useGame = create<GameState>()(
         set({ coins: s.coins - cost, cars: s.cars.map((c) => (c.uid === cuid ? { ...c, lowFuel: false } : c)), panel: null, updatedAt: Date.now() })
       },
 
-      visit: (visiting) => set({ visiting, panel: null, mode: 'play', placing: null, selectedCar: null }),
+      visit: (visiting) => set({ visiting, panel: null, mode: 'play', placing: null, selected: null, selectedCar: null }),
 
       helpFriend: () => {
         const s = get()
@@ -783,7 +812,7 @@ export const useGame = create<GameState>()(
 
       closePrize: () => set({ gpPrize: null }),
       closeLevelUp: () => set({ levelUp: null }),
-      focusShop: (panel, shopFocus) => set({ levelUp: null, panel, shopFocus, mode: 'play', placing: null }),
+      focusShop: (panel, shopFocus) => set({ levelUp: null, panel, shopFocus, mode: 'play', placing: null, selected: null }),
 
       buyPlot: (px, pz) => {
         const s = get()
@@ -824,7 +853,7 @@ export const useGame = create<GameState>()(
       },
 
       showMe: (defs, text) => {
-        set({ highlight: defs, panel: null, mode: 'play', placing: null })
+        set({ highlight: defs, panel: null, mode: 'play', placing: null, selected: null })
         get().toast(text)
         setTimeout(() => { if (get().highlight === defs) set({ highlight: null }) }, 6000)
       },
