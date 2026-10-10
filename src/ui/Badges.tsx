@@ -15,7 +15,7 @@ function JobBadge({ b, now }: { b: PlacedBuilding; now: number }) {
   const d = buildingDef(b.def)
   const tap = useGame((s) => s.tapBuilding)
   const lit = useGame((s) => !!s.highlight?.includes(b.def))
-  const [cx, cz] = centerOf(b.def, b.x, b.z)
+  const [cx, cz] = centerOf(b.def, b.x, b.z, b.rot)
   anchors.set(b.uid, new Vector3(cx, d.w > 1 ? 2.6 : 2.2, cz))
   const ready = b.jobEndsAt !== null && now >= b.jobEndsAt
   const working = b.jobEndsAt !== null && !ready
@@ -47,7 +47,7 @@ function RescueBadge({ b, now }: { b: PlacedBuilding; now: number }) {
   const tap = useGame((s) => s.tapBuilding)
   const r = useGame((s) => s.restoring)
   const lit = useGame((s) => !!s.highlight?.includes('rescue'))
-  const [cx, cz] = centerOf(b.def, b.x, b.z)
+  const [cx, cz] = centerOf(b.def, b.x, b.z, b.rot)
   anchors.set(b.uid, new Vector3(cx, 2.6, cz))
   const ready = r && now >= r.endsAt
   return (

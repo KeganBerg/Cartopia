@@ -2,9 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { MapControls } from '@react-three/drei'
 import { AnchorProjector } from './anchors'
 import { useThree, type ThreeEvent } from '@react-three/fiber'
-import { useGame, canPlace, buyablePlots, type PlacedBuilding } from '../game/store'
+import { useGame, canPlace, buyablePlots, lotSize, type PlacedBuilding } from '../game/store'
 import { GRID, TILE, PLOT, PLOT_MIN, PLOT_MAX, START_LAND, buildingDef } from '../game/data'
 import { BuildingModel } from './BuildingModel'
+import { rotatePlacement, setGhostTurn } from '../game/placement'
 import { Clouds } from './Clouds'
 import { DayNight } from './DayNight'
 import { PAL } from './season'
@@ -54,15 +55,15 @@ function Land() {
   )
 }
 
-export function centerOf(def: string, x: number, z: number): [number, number] {
-  const d = buildingDef(def)
-  return toWorld(x + (d.w - 1) / 2, z + (d.h - 1) / 2)
+export function centerOf(def: string, x: number, z: number, rot?: number): [number, number] {
+  const [w, h] = lotSize(def, rot)
+  return toWorld(x + (w - 1) / 2, z + (h - 1) / 2)
 }
 
 
 
-// Turn a building's front toward an adjacent road. Non-square lots can only flip.
-function facing(b: PlacedBuilding, roads: Set<string>) {
+// Quarter turns that point a building's front at an adjacent road. Non-square lots can only flip.
+function roadTurn(b: Pick<PlacedBuilding, 'def' | 'x' | 'z'>, roads: Set<string>) {
   const d = buildingDef(b.def)
   const edge = (dir: 'S' | 'E' | 'N' | 'W') => {
     for (let i = 0; i < Math.max(d.w, d.h); i++) {
@@ -76,20 +77,27 @@ function facing(b: PlacedBuilding, roads: Set<string>) {
   }
   const square = d.w === d.h
   if (edge('S')) return 0
-  if (square && edge('E')) return Math.PI / 2
-  if (edge('N')) return Math.PI
-  if (square && edge('W')) return -Math.PI / 2
+  if (square && edge('E')) return 1
+  if (edge('N')) return 2
+  if (square && edge('W')) return 3
   return 0
 }
 
+// The player's chosen turn, or else face the road. Decorations face south unless turned.
+function turnOf(b: Pick<PlacedBuilding, 'def' | 'x' | 'z' | 'rot'>, roads: Set<string>) {
+  if (b.rot != null) return b.rot
+  const kind = buildingDef(b.def).kind
+  return kind === 'decor' || kind === 'obstacle' ? 0 : roadTurn(b, roads)
+}
+
+
 function Building({ b, roads }: { b: PlacedBuilding; roads: Set<string> }) {
   const d = buildingDef(b.def)
-  const [cx, cz] = centerOf(b.def, b.x, b.z)
-  const rot = d.kind === 'decor' || d.kind === 'obstacle' ? 0 : facing(b, roads)
+  const [cx, cz] = centerOf(b.def, b.x, b.z, b.rot)
   return (
     <group
       position={[cx, 0, cz]}
-      rotation-y={rot}
+      rotation-y={(turnOf(b, roads) * Math.PI) / 2}
       onClick={(e) => {
         const s = useGame.getState()
         if (s.mode !== 'play' || s.visiting || e.delta > 6) return
@@ -228,11 +236,23 @@ function Roads() {
 function Interaction() {
   const mode = useGame((s) => s.mode)
   const placing = useGame((s) => s.placing)
+  const placeRot = useGame((s) => s.placeRot)
   const [hover, setHover] = useState<[number, number] | null>(null)
   const painting = useRef(false)
   const roads = useGame((s) => s.roads)
   const buildings = useGame((s) => s.buildings)
   const land = useGame((s) => s.land)
+  const roadSet = useMemo(() => new Set(roads), [roads])
+
+  // R turns the building being placed on desktop.
+  useEffect(() => {
+    if (mode !== 'place') return
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.key === 'r' || e.key === 'R') && !(e.target instanceof HTMLInputElement)) rotatePlacement()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [mode])
 
   const tileOf = (e: ThreeEvent<PointerEvent | MouseEvent>) => toTile(e.point.x, e.point.z)
 
@@ -255,10 +275,11 @@ function Interaction() {
     if (mode !== 'place' || !placing || e.delta > 6) return
     const [x, z] = tileOf(e)
     const d = buildingDef(placing)
+    const [w, h] = lotSize(placing, placeRot ?? undefined)
     // Hover tile is the footprint's centre; convert to its top-left corner.
-    const ox = x - Math.floor((d.w - 1) / 2)
-    const oz = z - Math.floor((d.h - 1) / 2)
-    if (useGame.getState().placeBuilding(placing, ox, oz)) {
+    const ox = x - Math.floor((w - 1) / 2)
+    const oz = z - Math.floor((h - 1) / 2)
+    if (useGame.getState().placeBuilding(placing, ox, oz, placeRot ?? undefined)) {
       const s = useGame.getState()
       if (s.coins < d.price) s.setMode('play')
     }
@@ -267,17 +288,23 @@ function Interaction() {
   let ghost = null
   if (hover && mode === 'place' && placing) {
     const d = buildingDef(placing)
-    const ox = hover[0] - Math.floor((d.w - 1) / 2)
-    const oz = hover[1] - Math.floor((d.h - 1) / 2)
-    const valid = canPlace({ roads, buildings, land }, placing, ox, oz)
-    const [cx, cz] = centerOf(placing, ox, oz)
+    const rot = placeRot ?? undefined
+    const [w, h] = lotSize(placing, rot)
+    const ox = hover[0] - Math.floor((w - 1) / 2)
+    const oz = hover[1] - Math.floor((h - 1) / 2)
+    const valid = canPlace({ roads, buildings, land }, placing, ox, oz, rot)
+    const [cx, cz] = centerOf(placing, ox, oz, rot)
+    const turn = turnOf({ def: placing, x: ox, z: oz, rot }, roadSet)
+    setGhostTurn(turn)
     ghost = (
       <group position={[cx, 0.02, cz]}>
         <mesh rotation-x={-Math.PI / 2} position-y={0.03}>
-          <planeGeometry args={[d.w * TILE, d.h * TILE]} />
+          <planeGeometry args={[w * TILE, h * TILE]} />
           <meshBasicMaterial color={valid ? '#66bb6a' : '#ef5350'} transparent opacity={0.4} />
         </mesh>
-        <BuildingModel def={d} ghost valid={valid} />
+        <group rotation-y={(turn * Math.PI) / 2}>
+          <BuildingModel def={d} ghost valid={valid} />
+        </group>
       </group>
     )
   } else if (hover && (mode === 'road' || mode === 'bulldoze')) {

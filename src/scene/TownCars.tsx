@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { anchors } from './anchors'
 import { Vector3 } from 'three'
 import type { Group } from 'three'
-import { useGame, footprint, type OwnedCar, type PlacedBuilding } from '../game/store'
+import { useGame, footprint, lotSize, type OwnedCar, type PlacedBuilding } from '../game/store'
 import { buildingDef, carDef, performance } from '../game/data'
 import { tripRequests, type TripKind } from '../game/trips'
 import { toWorld, DIRS } from './grid'
@@ -59,8 +59,9 @@ function route(roads: Set<string>, start: Tile, goal: Tile): Tile[] | null {
 function stopFor(b: PlacedBuilding, roads: Set<string>): Stop | null {
   const d = buildingDef(b.def)
   if (d.kind === 'decor' || d.kind === 'obstacle' || d.kind === 'house') return null
-  const [cx, cz] = toWorld(b.x + (d.w - 1) / 2, b.z + (d.h - 1) / 2)
-  for (const [fx, fz] of footprint(b.def, b.x, b.z)) {
+  const [w, h] = lotSize(b.def, b.rot)
+  const [cx, cz] = toWorld(b.x + (w - 1) / 2, b.z + (h - 1) / 2)
+  for (const [fx, fz] of footprint(b.def, b.x, b.z, b.rot)) {
     for (const [dx, dz] of DIRS) {
       const road: Tile = [fx + dx, fz + dz]
       if (!roads.has(key(road))) continue
@@ -75,13 +76,13 @@ function stopFor(b: PlacedBuilding, roads: Set<string>): Stop | null {
   let bestD = Infinity
   for (const k of roads) {
     const t = k.split(',').map(Number) as Tile
-    const dd = Math.hypot(t[0] - (b.x + (d.w - 1) / 2), t[1] - (b.z + (d.h - 1) / 2))
+    const dd = Math.hypot(t[0] - (b.x + (w - 1) / 2), t[1] - (b.z + (h - 1) / 2))
     if (dd < bestD) { bestD = dd; best = t }
   }
   if (!best || bestD > 6) return null
   const [rx, rz] = toWorld(...best)
   const len = Math.hypot(rx - cx, rz - cz) || 1
-  const reach = (Math.max(d.w, d.h) / 2) * 2 + 0.2
+  const reach = (Math.max(w, h) / 2) * 2 + 0.2
   const park: [number, number] = [cx + ((rx - cx) / len) * reach, cz + ((rz - cz) / len) * reach]
   return { uid: b.uid, def: b.def, road: best, park, face: Math.atan2(cx - park[0], cz - park[1]) }
 }

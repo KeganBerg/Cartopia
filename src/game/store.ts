@@ -7,7 +7,8 @@ import {
 import { sfx } from '../lib/sound'
 import { requestTrip } from './trips'
 
-export type PlacedBuilding = { uid: string; def: string; x: number; z: number; jobEndsAt: number | null }
+// rot: quarter turns the player chose (0 faces south). Unset means face the nearest road.
+export type PlacedBuilding = { uid: string; def: string; x: number; z: number; jobEndsAt: number | null; rot?: number }
 export type OwnedCar = { uid: string; model: string; color: string; upgrades: Record<UpgradeSlot, number>; flat?: boolean; lowFuel?: boolean; stripe?: string | null; plate?: string }
 // A rusty find waiting in Rusty's storage, and the one car in the restore bay.
 export type JunkCar = { uid: string; model: string; rarity: Rarity }
@@ -60,6 +61,8 @@ export type VisitedTown = { ownerId: string; townName: string; level: number; tr
 type UiState = {
   mode: Mode
   placing: string | null
+  // Quarter turns for the building being placed; null follows the nearest road.
+  placeRot: number | null
   panel: Panel
   selectedCar: string | null
   toasts: { id: number; text: string }[]
@@ -79,7 +82,8 @@ type Actions = {
   selectCar: (uid: string | null) => void
   toast: (text: string) => void
   tick: (now: number) => void
-  placeBuilding: (def: string, x: number, z: number) => boolean
+  placeBuilding: (def: string, x: number, z: number, rot?: number) => boolean
+  setPlaceRot: (rot: number | null) => void
   paintRoad: (x: number, z: number) => void
   bulldoze: (x: number, z: number) => void
   tapBuilding: (uid: string) => void
@@ -129,10 +133,16 @@ export function fuelCap(s: Pick<SaveState, 'level' | 'buildings'>) {
   return baseFuelCap(s.level) + gas
 }
 
-export function footprint(def: string, x: number, z: number) {
+// Lot width and depth in tiles; a quarter turn swaps them.
+export function lotSize(def: string, rot?: number): [number, number] {
   const d = buildingDef(def)
+  return (rot ?? 0) % 2 ? [d.h, d.w] : [d.w, d.h]
+}
+
+export function footprint(def: string, x: number, z: number, rot?: number) {
+  const [w, h] = lotSize(def, rot)
   const tiles: [number, number][] = []
-  for (let dx = 0; dx < d.w; dx++) for (let dz = 0; dz < d.h; dz++) tiles.push([x + dx, z + dz])
+  for (let dx = 0; dx < w; dx++) for (let dz = 0; dz < h; dz++) tiles.push([x + dx, z + dz])
   return tiles
 }
 
@@ -140,7 +150,7 @@ export function footprint(def: string, x: number, z: number) {
 export function occupancy(s: Pick<SaveState, 'roads' | 'buildings'>) {
   const occ = new Map<string, string>()
   for (const r of s.roads) occ.set(r, 'road')
-  for (const b of s.buildings) for (const [x, z] of footprint(b.def, b.x, b.z)) occ.set(key(x, z), b.uid)
+  for (const b of s.buildings) for (const [x, z] of footprint(b.def, b.x, b.z, b.rot)) occ.set(key(x, z), b.uid)
   return occ
 }
 
@@ -159,9 +169,9 @@ export function buyablePlots(land: string[]) {
   return out
 }
 
-export function canPlace(s: Pick<SaveState, 'roads' | 'buildings' | 'land'>, def: string, x: number, z: number) {
+export function canPlace(s: Pick<SaveState, 'roads' | 'buildings' | 'land'>, def: string, x: number, z: number, rot?: number) {
   const occ = occupancy(s)
-  return footprint(def, x, z).every(([tx, tz]) => owns(s.land, tx, tz) && !occ.has(key(tx, tz)))
+  return footprint(def, x, z, rot).every(([tx, tz]) => owns(s.land, tx, tz) && !occ.has(key(tx, tz)))
 }
 
 function starterTown(): SaveState {
@@ -268,6 +278,7 @@ export const useGame = create<GameState>()(
       ...starterTown(),
       mode: 'play',
       placing: null,
+      placeRot: null,
       panel: null,
       selectedCar: null,
       toasts: [],
@@ -277,7 +288,8 @@ export const useGame = create<GameState>()(
       highlight: null,
       gpPrize: null,
 
-      setMode: (mode, placing = null) => set({ mode, placing, panel: null }),
+      setMode: (mode, placing = null) => set((s) => ({ mode, placing, panel: null, placeRot: placing && placing === s.placing ? s.placeRot : null })),
+      setPlaceRot: (placeRot) => set({ placeRot }),
       showNeed: (res, missing, what) => {
         sfx.error()
         set({ need: { res, missing: Math.max(0, Math.ceil(missing)), what }, panel: 'need', mode: 'play', placing: null })
@@ -303,10 +315,10 @@ export const useGame = create<GameState>()(
         }
       },
 
-      placeBuilding: (def, x, z) => {
+      placeBuilding: (def, x, z, rot) => {
         const s = get()
         const d = buildingDef(def)
-        if (!canPlace(s, def, x, z)) {
+        if (!canPlace(s, def, x, z, rot)) {
           sfx.error()
           return false
         }
@@ -327,7 +339,7 @@ export const useGame = create<GameState>()(
         set({
           coins: s.coins - d.price,
           bucks: s.bucks - (d.bucks ?? 0),
-          buildings: [...s.buildings, { uid: uid(), def, x, z, jobEndsAt: null }],
+          buildings: [...s.buildings, { uid: uid(), def, x, z, jobEndsAt: null, ...(rot == null ? {} : { rot }) }],
           stats: def === 'rescue' ? { ...bump(s, 'built'), rusty: 1 } : bump(s, 'built'),
           ...addXp(s, Math.max(1, Math.round(d.price / 100))),
           updatedAt: Date.now(),
