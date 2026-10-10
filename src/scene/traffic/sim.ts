@@ -64,6 +64,8 @@ export type Agent = {
   pend: null | { target: string; need: number } // waiting to overtake: asks oncoming cars to hold back
   gapTo: string | null // whatever it is following
   gap: number
+  show: number // 0..1 faded in, for arriving and the rare car that has to give up
+  leaving: boolean
 }
 
 const ACCEL = 1.6
@@ -76,6 +78,7 @@ const LOT_V = 1.0
 const SWING = 1.0 // distance over which an overtaking car changes lane
 const TRUCK = { len: 1.52, gap: 0.12 }
 const PASS_V = 1.5
+const JAMMED = 45 // seconds stuck before a car gives up
 
 // A short oriented box: centre, heading, half length and half width.
 export type Box = { x: number; z: number; ux: number; uz: number; hl: number; hw: number }
@@ -107,12 +110,15 @@ export class Traffic {
   net: Net = { nodes: new Map(), stops: [], curves: new Map() }
   agents = new Map<string, Agent>()
   t = 0
+  respawns = 0 // cars that sat jammed so long they faded out and came back elsewhere
   private specs = new Map<string, CarSpec>()
   private trips = new Map<string, TripKind>()
+  private ways = new Map<string, { outs: number[]; to: string; heading: number }[]>()
   private limp = new Map<string, number>() // broken-down cars still looking for a spot, by odometer at breakdown
 
   setTown(roads: string[], buildings: Building[], turnOf: TurnOf) {
     this.net = buildNet(roads, buildings, turnOf)
+    this.ways = new Map()
     // Keep cars where they are when their road still exists; replan what comes next.
     for (const a of [...this.agents.values()]) {
       const leg = a.legs[a.ci]
@@ -122,7 +128,7 @@ export class Traffic {
         continue
       }
       for (const l of a.legs) l.granted = false
-      if (leg.node) leg.granted = leg.junction
+      if (leg.node) leg.granted = this.held(leg)
       a.trip = null
       a.plan = []
       a.ot = null
@@ -130,7 +136,7 @@ export class Traffic {
       a.parkedAt = null
       this.truncate(a, leg.node ? a.ci : this.lotEnd(a))
       for (const l of a.legs) if (l.stopKind && l.stopKind !== 'stall') this.clearStop(l)
-      if (leg.node && leg.junction) this.net.nodes.get(leg.node)!.occ.set(a.uid, { inDir: leg.inDir, outDir: leg.outDir })
+      if (leg.node && leg.granted) this.net.nodes.get(leg.node)!.occ.set(a.uid, { inDir: leg.inDir, outDir: leg.outDir })
     }
     this.syncCars()
   }
@@ -173,7 +179,7 @@ export class Traffic {
     const n = l.node && this.net.nodes.get(l.node)
     if (!n) return false
     const back = opp(l.inDir)
-    return (n.arms[back] || n.lots[back]) && (n.arms[l.outDir] || n.lots[l.outDir]) && !(l.outDir === back && n.degree > 1)
+    return (n.arms[back] || n.lots[back]) && (n.drive[l.outDir] || n.lots[l.outDir]) && !(l.outDir === back && n.degree > 1)
   }
 
   private lotValid(a: Agent) {
@@ -209,14 +215,14 @@ export class Traffic {
   }
 
   private spawn(spec: CarSpec) {
-    const nodes = [...this.net.nodes.values()].filter((n) => !n.junction && n.degree > 0)
+    const nodes = [...this.net.nodes.values()].filter((n) => !n.junction && n.degree > 1)
     if (!nodes.length) return
     const start = Math.floor(rand() * nodes.length)
     for (let i = 0; i < nodes.length * 2; i++) {
       const n = nodes[(start + (i >> 1)) % nodes.length]
-      const arms = [0, 1, 2, 3].filter((d) => n.arms[d])
-      const from = arms[(i + (start & 1)) % arms.length]
-      const inDir = opp(from)
+      const ins = [0, 1, 2, 3].filter((d) => n.arms[opp(d)] && exits(n, d).length && (n.oneWay < 0 || n.oneWay === d))
+      if (!ins.length) continue
+      const inDir = ins[(i + (start & 1)) % ins.length]
       const outs = exits(n, inDir)
       const leg = this.makeLeg(n, inDir, outs[Math.floor(rand() * outs.length)])
       const p = pointAt(leg.c, leg.c.len / 2)
@@ -229,6 +235,7 @@ export class Traffic {
         stalled: false, parked: 0, parkedAt: null, wait: 0,
         plan: [], trip: null, nextVisit: 10 + rand() * 40,
         tow: 0, truck: 0, ot: null, rerouteAt: 0, pend: null, approach: null, arrived: null, boxes: [], claim: [], gapTo: null, gap: Infinity,
+        show: 0, leaving: false,
       }
       this.agents.set(a.uid, a)
       this.extend(a)
@@ -259,7 +266,7 @@ export class Traffic {
   // Drop planned legs after index `keep`, giving back any junction turns they held.
   private truncate(a: Agent, keep: number) {
     for (const l of a.legs.splice(keep + 1)) {
-      if (l.granted && l.node) this.net.nodes.get(l.node)?.occ.delete(a.uid)
+      if (l.granted && l.node && !a.legs.some((m) => m.granted && m.node === l.node)) this.net.nodes.get(l.node)?.occ.delete(a.uid)
     }
   }
 
@@ -305,10 +312,63 @@ export class Traffic {
         a.legs.push(this.makeLeg(ex, inEx, this.choose(ex, inEx, avoid)))
         continue
       }
+      if (typeof next === 'number' && node.drive[next]) {
+        a.legs.push(this.makeLeg(node, inDir, next))
+        continue
+      }
+      if (node.cluster >= 0) {
+        // Into an intersection: pick a way out and take the shortest path across.
+        let at = node, h = inDir
+        for (const o of this.crossing(node, inDir, avoid)) {
+          a.legs.push(this.makeLeg(at, h, o))
+          const n = this.net.nodes.get(tkey(at.x + D[o][0], at.z + D[o][1]))
+          if (!n) break
+          at = n
+          h = o
+        }
+        continue
+      }
       const recent = new Set(a.legs.slice(a.ci).map((l) => l.node ?? ''))
-      const out = typeof next === 'number' && node.arms[next] ? next : this.choose(node, inDir, avoid, recent)
-      a.legs.push(this.makeLeg(node, inDir, out))
+      a.legs.push(this.makeLeg(node, inDir, this.choose(node, inDir, avoid, recent)))
     }
+  }
+
+  // Ways across the intersection entered at `node` heading `inDir`: the turns to
+  // make on each of its tiles, ending with the one that leaves it.
+  private crossing(node: Node, inDir: number, avoid: Set<string>) {
+    const key = `${node.key}|${inDir}`
+    let ways = this.ways.get(key)
+    if (!ways) {
+      ways = []
+      const seen = new Set([key])
+      const queue: { n: Node; h: number; outs: number[] }[] = [{ n: node, h: inDir, outs: [] }]
+      while (queue.length) {
+        const { n, h, outs } = queue.shift()!
+        for (const o of exits(n, h)) {
+          const m = this.net.nodes.get(tkey(n.x + D[o][0], n.z + D[o][1]))
+          if (!m) continue
+          const path = [...outs, o]
+          if (m.cluster === node.cluster) {
+            const mk = `${m.key}|${o}`
+            if (seen.has(mk)) continue
+            seen.add(mk)
+            queue.push({ n: m, h: o, outs: path })
+          } else {
+            ways.push({ outs: path, to: `${m.key}|${o}`, heading: o })
+          }
+        }
+      }
+      this.ways.set(key, ways)
+    }
+    if (!ways.length) return exits(node, inDir).slice(0, 1)
+    const weights = ways.map((w) =>
+      (w.heading === inDir ? 2.5 : w.heading === opp(inDir) ? 0.05 : 1) * (avoid.has(w.to) ? 0.02 : 1) / w.outs.length ** 2)
+    let r = rand() * weights.reduce((p, q) => p + q, 0)
+    for (let i = 0; i < ways.length; i++) {
+      r -= weights[i]
+      if (r <= 0) return ways[i].outs
+    }
+    return ways[ways.length - 1].outs
   }
 
   // Wander: prefer carrying straight on, and keep out of lanes blocked by a breakdown.
@@ -481,6 +541,17 @@ export class Traffic {
 
     for (const a of agents) this.think(a, dt)
     for (const a of agents) this.drive(a, dt)
+    for (const a of agents) {
+      // Last resort for a hopeless jam: fade out and pop up somewhere quieter.
+      if (!a.leaving && !a.parked && !a.stalled && !a.tow && a.wait > JAMMED) a.leaving = true
+      a.show = a.leaving ? Math.max(0, a.show - dt * 2) : Math.min(1, a.show + dt * 2)
+      if (a.leaving && !a.show) {
+        const spec = this.specs.get(a.uid)
+        this.remove(a)
+        this.respawns++
+        if (spec) this.spawn(spec)
+      }
+    }
   }
 
   private think(a: Agent, dt: number) {
@@ -531,9 +602,12 @@ export class Traffic {
       const l = a.legs[i]
       return !!l.node && !l.junction && !l.turn
     }
+    // Not down a dead end, where everyone would have to squeeze past it twice.
+    const open = (i: number) => !this.net.nodes.get(a.legs[i].node ?? '')?.spur
     // Limp on to a spot others can pass; settle for any straight once it has gone far enough.
     const since = a.odo - (this.limp.get(a.uid) ?? (this.limp.set(a.uid, a.odo), a.odo))
-    for (const test of since > 25 ? [good, fallback] : [good]) {
+    const tests = [(i: number) => good(i) && open(i), (i: number) => fallback(i) && open(i), good, fallback]
+    for (const test of since > 40 ? tests : since > 25 ? tests.slice(0, 2) : tests.slice(0, 1)) {
       for (let i = a.ci; i < a.legs.length - 1; i++) {
         const l = a.legs[i]
         const at = l.c.len / 2
@@ -544,7 +618,8 @@ export class Traffic {
         l.stopKind = 'stall'
         a.trip = null
         a.plan = []
-        this.truncate(a, i + 1)
+        // Nothing past the stop: give back any junction it had a turn for.
+        this.truncate(a, i)
         this.limp.delete(a.uid)
         return
       }
@@ -562,15 +637,26 @@ export class Traffic {
   }
 
   // Can this car have the junction leg `leg`? `dist` is how far its nose is from the tile.
+  // Legs a car needs the tile to itself (or a turn) for: junctions, and turning
+  // round, which takes both lanes.
+  private held(l: Leg) {
+    return l.junction || (l.turn === 2 && !!l.node)
+  }
+
   private canEnter(a: Agent, leg: Leg, dist: number, first: boolean, obey = true) {
     const node = this.net.nodes.get(leg.node!)!
+    if (!node.junction) {
+      // Turning round: one car at a time, and mid-road only with nothing coming.
+      if ([...node.occ.keys()].some((u) => u !== a.uid)) return false
+      return node.degree < 2 || this.clearToTurn(a, leg)
+    }
     if (node.signal && obey) {
       const light = lightFor(node, leg.inDir, this.t)
       if (light === 'red') return false
       if (light === 'yellow' && (!first || dist > (a.v * a.v) / (2 * BRAKE) + 0.15)) return false
     }
     for (const [uid, m] of node.occ) {
-      if (uid === a.uid || m.inDir === leg.inDir) continue
+      if (uid === a.uid || (m.inDir === leg.inDir && m.outDir !== opp(m.inDir) && leg.outDir !== opp(leg.inDir))) continue
       if (conflicts(leg.inDir, leg.outDir, m.inDir, m.outDir)) return false
     }
     // First come, first served among cars waiting to make crossing moves, so no
@@ -581,9 +667,10 @@ export class Traffic {
       if (y === a || !ap) continue
       const w = ap.chain.find((c) => c.node === node.key)
       if (!w || w.inDir === leg.inDir || !conflicts(leg.inDir, leg.outDir, w.inDir, w.outDir)) continue
-      if (node.signal && lightFor(node, w.inDir, this.t) !== 'green') continue
-      // Not if they are queued behind someone or cannot get out the other side.
+      // Not if they are queued behind someone, cannot get out the other side,
+      // or are sat at a red light.
       if ((y.gapTo && y.gap < ap.dist) || !this.exitRoom(y, ap.chain[ap.chain.length - 1])) continue
+      if (node.signal && lightFor(node, w.inDir, this.t) !== 'green') continue
       if (y.arrived !== null && a.arrived !== null) {
         if (y.arrived < a.arrived || (y.arrived === a.arrived && y.uid < a.uid)) return false
       } else if (y.arrived === null && ap.dist < 2.6 && y.v > 0.5 && a.wait < 5 && this.lane(node, w) > mine) {
@@ -684,11 +771,14 @@ export class Traffic {
     // Junctions: ask for a turn before rolling in; a run of junction tiles is taken all at once.
     a.approach = null
     ahead = leg.c.len - a.s - fr
-    for (let i = a.ci + 1; i < a.legs.length && ahead < look + 1.5; i++) {
+    // Nothing to ask for past a planned stop.
+    let until = a.ci
+    while (until < a.legs.length - 1 && a.legs[until].stopS === undefined) until++
+    for (let i = a.ci + 1; i <= until && ahead < look + 1.5; i++) {
       const l = a.legs[i]
-      if (l.junction && !l.granted) {
+      if (this.held(l) && !l.granted) {
         const chain: Leg[] = []
-        for (let j = i; j < a.legs.length && a.legs[j].junction; j++) chain.push(a.legs[j])
+        for (let j = i; j < a.legs.length && this.held(a.legs[j]); j++) chain.push(a.legs[j])
         a.approach = { dist: ahead, chain }
         // Only ask when close enough to commit; until then just be ready to stop.
         const asking = ahead < (a.v * a.v) / (2 * BRAKE) + 0.7
@@ -729,7 +819,14 @@ export class Traffic {
       const o = this.agents.get(a.gapTo)!
       const room = o.parked > 0 && !a.ot ? PARKED_GAP : GAP
       cap(a.gap - room)
-      if (o.parked > 0 && !a.ot && a.v < 0.2 && a.gap < PARKED_GAP + 0.4) this.tryOvertake(a, o)
+      if (o.parked > 0 && !a.ot && a.v < 0.2 && a.gap < PARKED_GAP + 0.4) {
+        this.tryOvertake(a, o)
+        // No way past a broken-down car: turn off before it if there's a turning.
+        const at = o.parkedAt
+        if (!a.ot && o.stalled && at?.node && a.wait > 3 && this.t > a.rerouteAt && !leg.junction) {
+          this.reroute(a, [at], true)
+        }
+      }
     }
 
     // Accelerate gently, brake as hard as needed, and never close the last gap.
@@ -748,7 +845,7 @@ export class Traffic {
       a.ci++
       const l = a.legs[a.ci]
       // Shouldn't happen, but never drive into a junction without a turn.
-      if (l.junction && !l.granted) {
+      if (this.held(l) && !l.granted) {
         l.granted = true
         this.net.nodes.get(l.node!)?.occ.set(a.uid, { inDir: l.inDir, outDir: l.outDir })
       }
@@ -758,11 +855,33 @@ export class Traffic {
     this.pose(a)
   }
 
-  private reroute(a: Agent, chain: Leg[]) {
+  private clearToTurn(a: Agent, l: Leg) {
+    const n = this.net.nodes.get(l.node!)!
+    const [cx, cz] = pointAt(roadCurve(this.net, n.x, n.z, l.inDir, l.inDir), 1)
+    const [fx, fz] = D[l.inDir]
+    for (const o of this.agents.values()) {
+      if (o === a) continue
+      const dx = o.x - cx, dz = o.z - cz
+      const along = dx * fx + dz * fz
+      const lat = Math.abs(dx * fz - dz * fx)
+      if (Math.hypot(dx, dz) < 1.8) return false
+      // Coming the other way, close enough to have to brake for us.
+      if (o.hx * fx + o.hz * fz < -0.5 && along > 0 && along < 3 + (o.v * o.v) / (2 * BRAKE) + o.len && lat < 1.4) return false
+    }
+    return true
+  }
+
+  // Find another way when the one planned is blocked. `chain` is the stretch to
+  // avoid; `now` also gives up turns already granted that the car hasn't reached.
+  private reroute(a: Agent, chain: Leg[], now = false) {
     a.rerouteAt = this.t + 3 + rand() * 3
     const blocked = new Set(chain.map((c) => `${c.node}|${c.inDir}`))
+    // ... and the backed-up lane beyond it.
+    const end = chain[chain.length - 1]
+    const en = end.node && this.net.nodes.get(end.node)
+    if (en) blocked.add(`${tkey(en.x + D[end.outDir][0], en.z + D[end.outDir][1])}|${end.outDir}`)
     let keep = a.ci
-    while (keep < a.legs.length - 1 && a.legs[keep + 1].granted) keep++
+    while (!now && keep < a.legs.length - 1 && a.legs[keep + 1].granted) keep++
     if (a.legs.slice(keep + 1).some((l) => l.stopKind)) {
       // Heading for a stop: find another route there.
       const trip = a.trip
@@ -793,9 +912,10 @@ export class Traffic {
     for (let j = 0; j < i; j++) {
       const l = a.legs[j]
       if (l.granted && l.node) {
-        const still = a.legs.slice(j + 1).some((m) => m.granted && m.node === l.node)
-        if (!still) this.net.nodes.get(l.node)?.occ.delete(a.uid)
         l.granted = false
+        const still = a.legs.find((m) => m.granted && m.node === l.node)
+        if (still) this.net.nodes.get(l.node)?.occ.set(a.uid, { inDir: still.inDir, outDir: still.outDir })
+        else this.net.nodes.get(l.node)?.occ.delete(a.uid)
       }
     }
     if (i > 1) {

@@ -3,6 +3,9 @@
 // cars can visit, worked out from each building's front door.
 import { GRID, TILE, buildingDef } from '../../game/data'
 import { add, bend, cubic, line, pointAt, type Curve, type V2 } from './curves'
+import { layoutRoads, lightAt, type Light, type RoadLayout } from './layout'
+
+export type { Light } from './layout'
 
 export type Tile = [number, number]
 export type Building = { uid: string; def: string; x: number; z: number; rot?: number }
@@ -26,13 +29,18 @@ export type Node = {
   key: string
   x: number
   z: number
-  arms: boolean[] // road tile next door, per direction
+  arms: boolean[] // road tile next door, per direction (not counting the far side of an avenue)
+  drive: boolean[] // cars may leave this way
+  oneWay: number // avenue side: the only way to drive, else -1
+  cluster: number // the intersection a junction tile belongs to, else -1
   lots: boolean[] // a driveway into a business, per direction
   degree: number // road arms
   junction: boolean // cars need a turn to cross it
-  signal: boolean // four-way junctions get traffic lights
-  offset: number // where its light cycle starts
+  signal: boolean // part of an intersection with traffic lights
+  offset: number // where its intersection's light cycle starts
+  clear: number // its all-red time
   depth: number // junction tiles between here and plain road (0 on plain road)
+  spur: boolean // plain road leading only to a dead end
   occ: Map<string, { inDir: number; outDir: number }> // cars with a turn to cross
 }
 
@@ -48,6 +56,7 @@ export type Stop = {
 }
 
 export type Net = {
+  layout: RoadLayout
   nodes: Map<string, Node>
   stops: Stop[]
   curves: Map<string, Curve>
@@ -105,20 +114,9 @@ const conflictTable: boolean[] = (() => {
 
 export const conflicts = (ai: number, ao: number, bi: number, bo: number) => conflictTable[((ai << 2) | ao) * 16 + ((bi << 2) | bo)]
 
-// Traffic light timing, in seconds: green, yellow, then a short all-red.
-const GREEN = 7
-const YELLOW = 2
-const ALL_RED = 1.2
-const HALF = GREEN + YELLOW + ALL_RED
-export const CYCLE = HALF * 2
-
-export type Light = 'green' | 'yellow' | 'red'
-
-// Light shown to cars heading `inDir` (east-west traffic goes first).
+// Light shown to cars heading `inDir` onto this junction tile.
 export function lightFor(node: Node, inDir: number, t: number): Light {
-  const p = (((t + node.offset) % CYCLE) + CYCLE) % CYCLE
-  const local = inDir < 2 ? p : (p + HALF) % CYCLE
-  return local < GREEN ? 'green' : local < GREEN + YELLOW ? 'yellow' : 'red'
+  return lightAt(node.offset, inDir, t, node.clear)
 }
 
 // Right of way for cars entering heading `inDir`: through roads beat side roads,
@@ -131,20 +129,20 @@ export function priority(node: Node, inDir: number) {
 
 export function buildNet(roadList: string[], buildings: Building[], turnOf: TurnOf): Net {
   const roads = new Set(roadList)
+  const layout = layoutRoads(roads)
   const nodes = new Map<string, Node>()
-  for (const k of roadList) {
-    const [x, z] = k.split(',').map(Number)
-    const arms = D.map(([dx, dz]) => roads.has(tkey(x + dx, z + dz)))
-    const degree = arms.filter(Boolean).length
-    nodes.set(k, {
-      key: k, x, z, arms, lots: [false, false, false, false], degree,
-      junction: degree >= 3, signal: degree === 4,
-      offset: (((x * 7349 + z * 4091) % 97) / 97) * CYCLE,
-      depth: 0,
+  for (const t of layout.tiles.values()) {
+    const arms = t.arms.map((a, d) => a && d !== t.mate)
+    const c = layout.clusters[t.cluster]
+    nodes.set(t.key, {
+      key: t.key, x: t.x, z: t.z, arms, drive: t.drive, oneWay: t.oneWay, cluster: t.cluster,
+      lots: [false, false, false, false], degree: arms.filter(Boolean).length,
+      junction: t.junction, signal: !!c?.signal, offset: c?.offset ?? 0, clear: c?.clear ?? 0,
+      depth: 0, spur: false,
       occ: new Map(),
     })
   }
-  const net: Net = { nodes, stops: [], curves: new Map() }
+  const net: Net = { layout, nodes, stops: [], curves: new Map() }
   // How deep each junction sits inside a block of junction tiles (wide roads, plazas).
   const queue = [...nodes.values()].filter((n) => !n.junction)
   for (const n of nodes.values()) if (n.junction) n.depth = Infinity
@@ -159,6 +157,19 @@ export function buildNet(roadList: string[], buildings: Building[], turnOf: Turn
     }
   }
   for (const n of nodes.values()) if (n.depth === Infinity) n.depth = 1
+  // Dead-end spurs: follow the plain road each way from every dead end.
+  for (const end of nodes.values()) {
+    if (end.degree !== 1) continue
+    let at: Node | undefined = end
+    let from = -1
+    while (at && !at.junction && at.degree <= 2 && !at.spur) {
+      at.spur = true
+      const d: number = at.arms.findIndex((ok, i) => ok && i !== from)
+      if (d < 0) break
+      from = opp(d)
+      at = nodes.get(tkey(at.x + D[d][0], at.z + D[d][1]))
+    }
+  }
   // Gas forecourts first: their driveways turn road tiles into junctions, which no one parks on.
   const sorted = [...buildings].sort((a, b) => Number(b.def === 'gas') - Number(a.def === 'gas'))
   for (const b of sorted) {
@@ -171,7 +182,7 @@ export function buildNet(roadList: string[], buildings: Building[], turnOf: Turn
 // A road tile a car can pull up beside: the road runs straight past with no junction.
 function curbOk(net: Net, k: string, heading: number) {
   const n = net.nodes.get(k)
-  return !!n && n.degree === 2 && !n.junction && n.arms[heading] && n.arms[opp(heading)]
+  return !!n && n.degree === 2 && !n.junction && n.drive[heading] && n.arms[opp(heading)]
 }
 
 function stopFor(net: Net, b: Building, roads: Set<string>, turnOf: TurnOf): Stop | null {
@@ -229,7 +240,7 @@ function gasBay(net: Net, b: Building, turn: number, w: number, h: number, front
   const heading = dirOf(dir([-1, 0]))
   const lotDir = opp(front)
   // The car must be able to arrive heading west (station frame) and leave the exit tile.
-  if (!a.arms[opp(heading)] || !z.arms.some((arm, i) => arm && i !== lotDir)) return null
+  if (!a.arms[opp(heading)] || (a.oneWay >= 0 && a.oneWay !== heading) || !z.drive.some((ok, i) => ok && i !== lotDir)) return null
   const r = 0.75
   const p0: V2 = [1 + LANE, 1]
   const p1: V2 = [1 + LANE - r, 1 - r]
@@ -248,9 +259,17 @@ function gasBay(net: Net, b: Building, turn: number, w: number, h: number, front
 }
 
 // Shortest legal drive from entering tile `start` heading `h` to arriving at
-// `goal` heading `gh`: no U-turns except at dead ends. Returns the direction to
-// leave each tile on the way, not including the goal tile.
+// `goal` heading `gh`: no U-turns except at dead ends, unless there is no other
+// way (a ring road), when a car may turn round on a quiet stretch of road.
+// Returns the direction to leave each tile on the way, not including the goal tile.
 export function route(net: Net, start: string, h: number, goal: string, gh: number, avoid?: Set<string>): number[] | null {
+  return search(net, start, h, goal, gh, avoid, false) ?? search(net, start, h, goal, gh, avoid, true)
+}
+
+// A plain two-way stretch of road a car can turn round on.
+export const uTurnOk = (n: Node) => !n.junction && n.degree === 2 && n.oneWay < 0 && n.lots.every((l) => !l)
+
+function search(net: Net, start: string, h: number, goal: string, gh: number, avoid: Set<string> | undefined, turnRound: boolean) {
   const sk = `${start}|${h}`
   const gk = `${goal}|${gh}`
   const prev = new Map<string, [string, number] | null>([[sk, null]])
@@ -265,7 +284,9 @@ export function route(net: Net, start: string, h: number, goal: string, gh: numb
     const [k, hs] = cur.split('|')
     const node = net.nodes.get(k)
     if (!node) continue
-    for (const o of exits(node, Number(hs))) {
+    const outs = exits(node, Number(hs))
+    if (turnRound && uTurnOk(node) && k !== start) outs.push(opp(Number(hs)))
+    for (const o of outs) {
       const nk = `${tkey(node.x + D[o][0], node.z + D[o][1])}|${o}`
       if (prev.has(nk) || (avoid?.has(nk) && nk !== gk)) continue
       prev.set(nk, [cur, o])
@@ -279,7 +300,7 @@ export function route(net: Net, start: string, h: number, goal: string, gh: numb
 // unless it is a dead end.
 export function exits(node: Node, h: number) {
   const out: number[] = []
-  for (let o = 0; o < 4; o++) if (node.arms[o] && o !== opp(h)) out.push(o)
-  if (!out.length && node.arms[opp(h)]) out.push(opp(h))
+  for (let o = 0; o < 4; o++) if (node.drive[o] && o !== opp(h)) out.push(o)
+  if (!out.length && node.drive[opp(h)]) out.push(opp(h))
   return out
 }
