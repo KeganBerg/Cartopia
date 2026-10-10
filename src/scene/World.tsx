@@ -5,6 +5,7 @@ import { useThree, type ThreeEvent } from '@react-three/fiber'
 import { useGame, canPlace, buyablePlots, type PlacedBuilding } from '../game/store'
 import { GRID, TILE, PLOT, PLOT_MIN, PLOT_MAX, START_LAND, buildingDef } from '../game/data'
 import { BuildingModel } from './BuildingModel'
+import { Clouds } from './Clouds'
 import { TownCars } from './TownCars'
 import { toWorld, toTile, DIRS } from './grid'
 import { grassTex, paverTex, asphaltTex } from './textures'
@@ -350,6 +351,7 @@ export function World() {
       ))}
       <AnchorProjector />
       <TownCars />
+      <Clouds />
     </>
   )
 }

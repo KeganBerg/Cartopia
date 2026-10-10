@@ -183,3 +183,27 @@ export const rimTex = () =>
     g.fillStyle = '#5f6368'
     g.beginPath(); g.arc(c, c, s * 0.08, 0, Math.PI * 2); g.fill()
   })
+
+// Sky: blue gradient with soft cartoon clouds. Used as a dome in races and
+// as the backdrop around the town.
+export const skyTex = (rx = 1) =>
+  rep(make('sky', 512, (g, s, r) => {
+    const grd = g.createLinearGradient(0, 0, 0, s)
+    grd.addColorStop(0, '#3d9bff')
+    grd.addColorStop(0.72, '#8fd0ff')
+    grd.addColorStop(1, '#d9f2ff')
+    g.fillStyle = grd
+    g.fillRect(0, 0, s, s)
+    for (let i = 0; i < 9; i++) {
+      const cx = r() * s
+      const cy = s * (0.45 + r() * 0.35)
+      const w = s * (0.08 + r() * 0.08)
+      g.fillStyle = 'rgba(255,255,255,0.85)'
+      // Drawn three times so clouds crossing the edge wrap seamlessly.
+      for (const dx of [-s, 0, s]) for (let k = 0; k < 5; k++) {
+        g.beginPath()
+        g.ellipse(dx + cx + (k - 2) * w * 0.45, cy - Math.sin((k / 4) * Math.PI) * w * 0.25, w * 0.4, w * 0.28, 0, 0, Math.PI * 2)
+        g.fill()
+      }
+    }
+  }), 'sky', rx, 1)

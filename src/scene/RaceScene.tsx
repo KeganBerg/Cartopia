@@ -1,9 +1,10 @@
 import { useRef, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import type { Group } from 'three'
+import { BackSide, type Group, type Mesh } from 'three'
 import type { Body } from '../game/data'
 import { CarModel } from './CarModel'
 import { signTexture } from './signTexture'
+import { skyTex } from './textures'
 
 export type RacerView = { dist: number }
 const SCALE = 0.25 // metres of race distance per world unit
@@ -15,6 +16,17 @@ type Props = {
   them: RefObject<RacerView>
   mine: { body: Body; color: string }
   theirs: { body: Body; color: string }
+}
+
+function SkyDome() {
+  const ref = useRef<Mesh>(null)
+  useFrame(({ camera }) => ref.current?.position.set(camera.position.x, 0, camera.position.z))
+  return (
+    <mesh ref={ref} raycast={() => null}>
+      <sphereGeometry args={[90, 24, 8, 0, Math.PI * 2, 0.9, Math.PI / 2 - 0.75]} />
+      <meshBasicMaterial map={skyTex(4)} side={BackSide} fog={false} depthWrite={false} />
+    </mesh>
+  )
 }
 
 // Drag strip seen from a chase camera behind the player's car.
@@ -37,8 +49,10 @@ export function RaceScene({ track, me, them, mine, theirs }: Props) {
 
   return (
     <>
-      <color attach="background" args={['#8fd3ff']} />
-      <fog attach="fog" args={['#8fd3ff', 20, 60]} />
+      <fog attach="fog" args={['#d9f2ff', 25, 70]} />
+      <color attach="background" args={['#3d9bff']} />
+      {/* Sky band around the horizon; the background colour fills above it. */}
+      <SkyDome />
       <hemisphereLight args={['#ffffff', '#6b8e4e', 0.8]} />
       <directionalLight position={[5, 10, 2]} intensity={1.5} castShadow />
       <mesh rotation-x={-Math.PI / 2} position={[0, -0.01, len / 2]} receiveShadow>

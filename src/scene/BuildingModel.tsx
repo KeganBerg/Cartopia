@@ -123,31 +123,49 @@ export function BuildingModel({ def, ghost, valid }: Props) {
         </group>
       )
     case 'tree':
+      // Cartoon oak: tapered trunk under a cluster of faceted leaf balls.
       return (
         <group>
-          <mesh position={[0, 0.4, 0]} castShadow>
-            <cylinderGeometry args={[0.12, 0.15, 0.8]} />
-            {m('#6d4c41')}
+          <mesh position={[0, 0.35, 0]} castShadow>
+            <cylinderGeometry args={[0.1, 0.17, 0.7, 7]} />
+            {m('#7b5034')}
           </mesh>
-          <mesh position={[0, 1.15, 0]} castShadow>
-            <sphereGeometry args={[0.6, 12, 10]} />
-            {m(def.color)}
-          </mesh>
+          {([[0, 1.15, 0, 0.55, def.color], [0.32, 0.95, 0.12, 0.38, '#5cb85c'], [-0.3, 0.98, -0.08, 0.4, def.roof], [0.05, 1.5, -0.05, 0.38, '#66c266'], [-0.08, 1.02, 0.32, 0.34, '#4caf50']] as const).map(([x, y, z, r, c], i) => (
+            <mesh key={i} position={[x, y, z]} castShadow>
+              <icosahedronGeometry args={[r, 1]} />
+              <meshStandardMaterial color={ghost ? (valid ? '#66bb6a' : '#ef5350') : c} transparent={ghost} opacity={ghost ? 0.55 : 1} flatShading />
+            </mesh>
+          ))}
         </group>
       )
     case 'palm':
+      // Curved, banded trunk with drooping fronds and coconuts.
       return (
         <group>
-          <mesh position={[0, 0.8, 0]} rotation-z={0.08} castShadow>
-            <cylinderGeometry args={[0.08, 0.13, 1.6]} />
-            {m('#a1887f')}
-          </mesh>
-          {[0, 1, 2, 3, 4, 5].map((i) => (
-            <mesh key={i} position={[0.06, 1.62, 0]} rotation={[0, (i * Math.PI) / 3, -0.5]} castShadow>
-              <boxGeometry args={[0.9, 0.04, 0.22]} />
-              {m(def.color)}
+          {[0, 1, 2, 3, 4].map((i) => (
+            <mesh key={i} position={[i * i * 0.012, 0.18 + i * 0.32, 0]} rotation-z={-0.05 - i * 0.03} castShadow>
+              <cylinderGeometry args={[0.09 - i * 0.008, 0.11 - i * 0.008, 0.34, 7]} />
+              {m(i % 2 ? '#a1887f' : '#8d6e63')}
             </mesh>
           ))}
+          <group position={[0.2, 1.72, 0]}>
+            {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+              <group key={i} rotation-y={(i * Math.PI * 2) / 7}>
+                {[0, 1, 2].map((j) => (
+                  <mesh key={j} position={[0.18 + j * 0.24, 0.02 - j * j * 0.07, 0]} rotation-z={-0.15 - j * 0.35} castShadow>
+                    <boxGeometry args={[0.28, 0.03, 0.2 - j * 0.04]} />
+                    {m(j === 2 ? '#43a047' : def.color)}
+                  </mesh>
+                ))}
+              </group>
+            ))}
+            {[0, 1, 2].map((i) => (
+              <mesh key={`c${i}`} position={[Math.cos(i * 2.1) * 0.1, -0.1, Math.sin(i * 2.1) * 0.1]}>
+                <sphereGeometry args={[0.07, 8, 6]} />
+                {m('#6d4c41')}
+              </mesh>
+            ))}
+          </group>
         </group>
       )
     case 'fountain':
