@@ -13,6 +13,7 @@ import { SeasonFx } from './SeasonFx'
 import { glowMats } from './dayNight'
 import { LightPool } from './BuildingModel'
 import { TownCars } from './TownCars'
+import { Townspeople } from './Townspeople'
 import { toWorld, toTile, DIRS } from './grid'
 import { grassTex, paverTex, asphaltTex } from './textures'
 
@@ -401,6 +402,7 @@ export function World() {
       ))}
       <AnchorProjector />
       <TownCars />
+      <Townspeople />
       <Clouds />
       <SeasonFx small={Math.min(window.innerWidth, window.innerHeight) < 700} />
     </>
