@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useGame, hasRusty } from '../game/store'
 import { BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, PAINTS, STRIPES, PAINT_COST, STRIPE_COST, carDef, performance, upgradeCost, type BuildingDef } from '../game/data'
 import { CarPreview } from '../scene/CarPreview'
@@ -75,6 +75,24 @@ export function Panel({ title, children, wide, onClose, overlay }: { title: stri
   )
 }
 
+// Scrolls to and flashes the card the level-up splash sent the player to.
+function useShopFocus() {
+  const focus = useGame((s) => s.shopFocus)
+  const body = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!focus) return
+    const el = body.current?.querySelector<HTMLElement>(`[data-id="${focus}"]`)
+    // Wait a frame so the panel has laid out before scrolling.
+    const raf = requestAnimationFrame(() => el?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
+    const t = setTimeout(() => useGame.setState({ shopFocus: null }), 2600)
+    return () => {
+      cancelAnimationFrame(raf)
+      clearTimeout(t)
+    }
+  }, [focus])
+  return { body, focus }
+}
+
 function price(def: { price: number; bucks?: number }) {
   if (def.bucks) return <span className="price bucks">B {def.bucks}</span>
   return <span className="price">$ {def.price.toLocaleString()}</span>
@@ -94,8 +112,10 @@ export function ShopPanel() {
   const buildings = useGame((s) => s.buildings)
   const showNeed = useGame((s) => s.showNeed)
   const rusty = hasRusty({ buildings })
+  const { body, focus } = useShopFocus()
   return (
     <Panel title="Shop" wide overlay={<PreviewCanvas />}>
+      <div ref={body}>
       {SHOP_GROUPS.map((g) => (
         <section key={g.title}>
           <h3>{g.title}</h3>
@@ -108,7 +128,8 @@ export function ShopPanel() {
               return (
                 <button
                   key={b.id}
-                  className={`card ${locked ? 'locked' : ''} ${broke && !locked ? 'broke' : ''} ${highlight ? 'start-here' : ''}`}
+                  data-id={b.id}
+                  className={`card ${locked ? 'locked' : ''} ${broke && !locked ? 'broke' : ''} ${highlight ? 'start-here' : ''} ${focus === b.id ? 'focus' : ''}`}
                   disabled={owned}
                   onClick={() => (locked ? showNeed('level', b.unlockLevel, b.name) : broke ? showNeed('coins', b.price - coins, b.name) : setMode('place', b.id))}
                 >
@@ -129,6 +150,7 @@ export function ShopPanel() {
           </div>
         </section>
       ))}
+      </div>
     </Panel>
   )
 }
@@ -140,6 +162,7 @@ export function ShowroomPanel() {
   const setMode = useGame((s) => s.setMode)
   const coins = useGame((s) => s.coins)
   const [colorFor, setColorFor] = useState<Record<string, string>>({})
+  const { body, focus } = useShopFocus()
   return (
     <Panel title="Showroom" wide>
       {!rusty && (
@@ -152,13 +175,13 @@ export function ShowroomPanel() {
           <button className="buy" disabled={coins < 1000} onClick={() => setMode('place', 'rescue')}>Build · $1,000</button>
         </div>
       )}
-      <div className={rusty ? 'cards' : 'cards dimmed'}>
+      <div ref={body} className={rusty ? 'cards' : 'cards dimmed'}>
         {CARS.filter((c) => !c.rescueOnly).map((c) => {
           const locked = level < c.unlockLevel
           const color = colorFor[c.id] ?? c.colors[0]
           const pi = performance(c, { engine: 0, turbo: 0, tires: 0, weight: 0 })
           return (
-            <div key={c.id} className={`card car-card ${locked ? 'locked' : ''}`}>
+            <div key={c.id} data-id={c.id} className={`card car-card ${locked ? 'locked' : ''} ${focus === c.id ? 'focus' : ''}`}>
               <CarSwatch color={color} body={c.body} />
               <div className="card-name">{c.name}</div>
               <div className="card-stat">PI {pi} · {c.body}</div>

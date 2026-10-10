@@ -79,8 +79,9 @@ function Baker({ queue, onDone }: { queue: BuildingDef[]; onDone: () => void }) 
 }
 
 // Bakes any shop strips not made yet, then removes its own WebGL context.
-export function PreviewCanvas() {
-  const [queue] = useState(() => BUILDINGS.filter((b) => b.unlockLevel < 99 && !strips.has(stripKey(b.id))))
+// Pass `defs` to bake just those (the level-up splash only needs a few).
+export function PreviewCanvas({ defs }: { defs?: BuildingDef[] }) {
+  const [queue] = useState(() => (defs ?? BUILDINGS.filter((b) => b.unlockLevel < 99)).filter((b) => !strips.has(stripKey(b.id))))
   const [done, setDone] = useState(queue.length === 0)
   if (done) return null
   return (

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
-  PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS, BUILDINGS,
+  PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS,
   upgradeCost, MAX_UPGRADE, RESCUE_SPOTS, RESCUE_PINS, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, type Rarity, GOALS, DAILY_BONUS, PAINTS, PAINT_COST, STRIPE_COST, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey,
 } from './data'
 import { sfx } from '../lib/sound'
@@ -70,6 +70,10 @@ type UiState = {
   highlight: string[] | null
   // A Grand Prix mystery box waiting to be opened.
   gpPrize: { series: string; model: string; color: string } | null
+  // Level-up splash: the levels just reached and the rewards they paid.
+  levelUp: { from: number; to: number; coins: number; bucks: number } | null
+  // Shop or Showroom card to scroll to and flash, set by the splash.
+  shopFocus: string | null
 }
 
 type Actions = {
@@ -103,6 +107,8 @@ type Actions = {
   buyPlot: (px: number, pz: number) => void
   gpResult: (series: string, won: boolean) => void
   closePrize: () => void
+  closeLevelUp: () => void
+  focusShop: (panel: 'shop' | 'showroom' | 'rescue' | 'race', id: string | null) => void
   startSearch: (spot: string) => void
   revealPin: (i: number) => void
   fixTruck: () => void
@@ -235,10 +241,16 @@ function addXp(s: GameState, amount: number): Partial<GameState> {
   }
   if (!ups.length) return { xp }
   const fresh = { ...s, level }
-  const unlocked = BUILDINGS.filter((d) => d.unlockLevel === level).map((d) => d.name)
   setTimeout(sfx.levelUp, 250)
-  s.toast(`Level up! You're level ${level}. +1 buck${unlocked.length ? `. Unlocked: ${unlocked.join(', ')}` : ''}`)
-  return { level, xp, bucks, coins, fuel: fuelCap(fresh), fuelUpdatedAt: Date.now() }
+  // Fold into a splash that's still open, so two quick level-ups show as one.
+  const prev = s.levelUp
+  const levelUp = {
+    from: prev ? prev.from : s.level,
+    to: level,
+    coins: (prev?.coins ?? 0) + (coins - s.coins),
+    bucks: (prev?.bucks ?? 0) + (bucks - s.bucks),
+  }
+  return { level, xp, bucks, coins, fuel: fuelCap(fresh), fuelUpdatedAt: Date.now(), levelUp }
 }
 
 export const cleanPlate = (p: string) => p.toUpperCase().replace(/[^A-Z0-9 ]/g, '').trim().slice(0, 7)
@@ -276,6 +288,8 @@ export const useGame = create<GameState>()(
       search: null,
       highlight: null,
       gpPrize: null,
+      levelUp: null,
+      shopFocus: null,
 
       setMode: (mode, placing = null) => set({ mode, placing, panel: null }),
       showNeed: (res, missing, what) => {
@@ -755,6 +769,8 @@ export const useGame = create<GameState>()(
       },
 
       closePrize: () => set({ gpPrize: null }),
+      closeLevelUp: () => set({ levelUp: null }),
+      focusShop: (panel, shopFocus) => set({ levelUp: null, panel, shopFocus, mode: 'play', placing: null }),
 
       buyPlot: (px, pz) => {
         const s = get()

@@ -550,3 +550,80 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
   .collect-all { width: 52px; height: 52px; right: calc(10px + var(--sar)); bottom: calc(76px + var(--sab)); }
   .collect-ico { font-size: 24px; }
 }
+
+/* Level-up splash */
+.lvl-overlay { z-index: 170; background: radial-gradient(circle at 50% 40%, rgba(255, 213, 79, .35), rgba(10, 20, 40, .7) 70%); display: flex; align-items: center !important; justify-content: center; padding: calc(12px + var(--sat)) 16px calc(12px + var(--sab)) !important; overflow: hidden; animation: lvl-fade .35s ease-out both; }
+@keyframes lvl-fade { from { opacity: 0; } }
+.lvl-rays { position: absolute; left: 50%; top: 40%; width: 200vmax; height: 200vmax; margin: -100vmax 0 0 -100vmax; pointer-events: none;
+  background: repeating-conic-gradient(rgba(255, 236, 179, .22) 0 9deg, transparent 9deg 22.5deg);
+  -webkit-mask: radial-gradient(circle, #000 0 8%, transparent 45%); mask: radial-gradient(circle, #000 0 8%, transparent 45%);
+  animation: lvl-rays 24s linear infinite, lvl-fade 1s ease-out both; }
+@keyframes lvl-rays { to { transform: rotate(360deg); } }
+.lvl { position: relative; background: var(--panel); border: 4px solid #ffca28; border-radius: 24px; box-shadow: 0 12px 40px rgba(0,0,0,.45), 0 0 0 6px rgba(255, 202, 40, .25);
+  width: min(600px, 100%); min-width: 0; max-height: calc(100dvh - 74px - var(--sat) - var(--sab)); display: flex; flex-direction: column; align-items: center; text-align: center; padding: 58px 18px 16px; margin-top: 50px;
+  animation: lvl-in .55s cubic-bezier(.2, 1.4, .4, 1) .1s both; }
+@keyframes lvl-in { from { transform: translateY(40px) scale(.85); opacity: 0; } }
+.lvl-badge { position: absolute; top: -56px; left: 50%; width: 112px; height: 112px; margin-left: -56px; border-radius: 50%;
+  background: radial-gradient(circle at 40% 30%, #6fb1ff, #1e5fbf 70%); border: 5px solid #fff; box-shadow: 0 6px 0 rgba(0,0,0,.25), 0 0 0 5px #ffca28;
+  animation: lvl-badge .7s cubic-bezier(.2, 1.6, .4, 1) .25s both; }
+@keyframes lvl-badge { from { transform: scale(0) rotate(-120deg); } }
+.lvl-badge-ring { position: absolute; inset: 8px; border-radius: 50%; border: 3px dashed rgba(255,255,255,.45); animation: lvl-rays 10s linear infinite; }
+.lvl-num { position: absolute; inset: 0; overflow: hidden; border-radius: 50%; font: 54px/1 var(--display); color: #fff; text-shadow: 0 3px 0 rgba(0,0,0,.3); }
+.lvl-num span { position: absolute; inset: 0; display: grid; place-items: center; }
+.lvl-num .old { animation: lvl-roll-out .45s cubic-bezier(.6, 0, .4, 1) .8s both; }
+.lvl-num .new { animation: lvl-roll-in .55s cubic-bezier(.2, 1.5, .4, 1) .8s both; }
+@keyframes lvl-roll-out { to { transform: translateY(-100%); opacity: 0; } }
+@keyframes lvl-roll-in { from { transform: translateY(100%); opacity: 0; } }
+.lvl-spark { position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; margin: -5px; border-radius: 50%; background: #ffe082; box-shadow: 0 0 8px #ffca28; opacity: 0;
+  animation: lvl-spark .8s ease-out 1s both; }
+@keyframes lvl-spark { 0% { opacity: 1; transform: rotate(var(--a)) translateY(0) scale(1); } 100% { opacity: 0; transform: rotate(var(--a)) translateY(-90px) scale(.3); } }
+.lvl-title { margin: 0; font: 40px/1.05 var(--display); color: #e65100; text-shadow: 0 3px 0 #ffe0b2; animation: lvl-pop .5s cubic-bezier(.2, 1.6, .4, 1) .9s both; }
+@keyframes lvl-pop { from { transform: scale(.4); opacity: 0; } }
+.lvl-sub { margin: 2px 0 8px; font-weight: 800; color: #546e7a; animation: lvl-up .4s ease-out 1s both; }
+@keyframes lvl-up { from { transform: translateY(10px); opacity: 0; } }
+.lvl-rewards { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; animation: lvl-up .4s ease-out 1.1s both; }
+.lvl-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px 3px 4px; border-radius: 16px; background: #263238; color: #fff; font: 15px var(--display); }
+.lvl-chip:not(:has(.ico)) { padding-left: 10px; }
+.lvl-head { margin: 14px 0 8px; font: 20px var(--display); animation: lvl-up .4s ease-out 1.2s both; }
+.lvl-items { width: 100%; flex: 0 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 176px)); justify-content: center; gap: 10px; padding: 4px 2px 6px; }
+.lvl-item { position: relative; gap: 3px; padding-top: 22px; animation: lvl-card .45s cubic-bezier(.2, 1.5, .4, 1) both; animation-delay: calc(1.3s + var(--i) * 90ms); }
+@keyframes lvl-card { from { transform: translateY(18px) scale(.8); opacity: 0; } }
+button.lvl-item:hover { border-color: var(--accent); transform: translateY(-2px); }
+.lvl-item .thumb3d { height: 96px; }
+.lvl-item .card-name { font-size: 15px; line-height: 1.1; }
+.lvl-tag { position: absolute; top: 4px; left: 6px; font: 11px var(--display); text-transform: uppercase; letter-spacing: .03em; color: #fff; background: var(--blue); padding: 1px 6px; border-radius: 6px; }
+.lvl-go { margin-top: 2px; font: 13px var(--display); color: #fff; background: linear-gradient(#66bb6a, #2e7d32); border-radius: 10px; padding: 3px 10px; }
+.lvl-car, .lvl-emoji { width: 100%; height: 96px; border-radius: 10px; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 70%, #ffffff 0 35%, #e3f2fd 75%); }
+.lvl-car .car-swatch { width: 112px; height: 56px; animation: bob 2.4s ease-in-out infinite; }
+.lvl-emoji { font-size: 48px; }
+.lvl-continue { margin-top: 12px; min-width: 180px; font-size: 20px; padding: 8px 20px; animation: lvl-up .4s ease-out 1.5s both; }
+/* Shop or Showroom card the splash pointed at. */
+.card.focus { border-color: var(--accent); animation: lvl-focus .8s ease-in-out 3; }
+@keyframes lvl-focus { 50% { box-shadow: 0 0 0 6px rgba(255, 152, 0, .45); transform: scale(1.04); } }
+@media (max-width: 600px) {
+  .lvl { padding: 50px 12px 12px; margin-top: 44px; max-height: calc(100dvh - 68px - var(--sat) - var(--sab)); border-radius: 20px; }
+  .lvl-badge { width: 96px; height: 96px; top: -48px; margin-left: -48px; }
+  .lvl-num { font-size: 46px; }
+  .lvl-title { font-size: 32px; }
+  .lvl-items { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .lvl-item .thumb3d, .lvl-car, .lvl-emoji { height: 84px; }
+}
+/* Phone on its side: badge beside the title, items in one scrolling row. */
+@media (max-height: 500px) {
+  .lvl-overlay { padding: 8px calc(8px + var(--sar)) 8px calc(8px + var(--sal)) !important; }
+  .lvl { width: min(760px, 100%); padding: 10px 14px 10px 108px; margin-top: 0; max-height: calc(100dvh - 16px); align-items: stretch; text-align: left; }
+  .lvl-badge { top: 10px; left: 12px; margin-left: 0; width: 80px; height: 80px; }
+  .lvl-num { font-size: 38px; }
+  .lvl-title { font-size: 28px; }
+  .lvl-sub { margin: 0 0 4px; }
+  .lvl-rewards { justify-content: flex-start; }
+  .lvl-head { margin: 8px 0 4px; font-size: 17px; }
+  .lvl-items { display: flex; justify-content: flex-start; overflow-x: auto; overflow-y: hidden; flex: none; }
+  .lvl-item { flex: 0 0 132px; }
+  .lvl-item .thumb3d, .lvl-car, .lvl-emoji { height: 72px; }
+  .lvl-continue { margin-top: 6px; align-self: center; font-size: 17px; padding: 5px 18px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lvl-overlay, .lvl-overlay * { animation-duration: .01s !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; }
+  .lvl-rays { display: none; }
+}
