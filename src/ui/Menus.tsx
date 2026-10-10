@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useGame } from '../game/store'
-import { BUILDINGS, CARS, UPGRADE_SLOTS, MAX_UPGRADE, carDef, performance, upgradeCost, type BuildingDef } from '../game/data'
+import { BUILDINGS, CARS, UPGRADE_SLOTS, MAX_UPGRADE, PAINTS, STRIPES, PAINT_COST, STRIPE_COST, carDef, performance, upgradeCost, type BuildingDef } from '../game/data'
+import { CarPreview } from '../scene/CarPreview'
 
 export function BottomBar() {
   const openPanel = useGame((s) => s.openPanel)
@@ -43,8 +44,9 @@ function EditBar() {
   )
 }
 
-export function Panel({ title, children, wide }: { title: string; children: React.ReactNode; wide?: boolean }) {
-  const close = useGame((s) => s.openPanel)
+export function Panel({ title, children, wide, onClose }: { title: string; children: React.ReactNode; wide?: boolean; onClose?: () => void }) {
+  const openPanel = useGame((s) => s.openPanel)
+  const close = (_: null) => (onClose ? onClose() : openPanel(null))
   return (
     <div className="overlay" onClick={() => close(null)}>
       <div className={wide ? 'panel wide' : 'panel'} onClick={(e) => e.stopPropagation()}>
@@ -155,6 +157,8 @@ export function GaragePanel() {
   const select = useGame((s) => s.selectCar)
   const upgrade = useGame((s) => s.upgradeCar)
   const sell = useGame((s) => s.sellCar)
+  const paint = useGame((s) => s.paintCar)
+  const stripeCar = useGame((s) => s.stripeCar)
   const car = cars.find((c) => c.uid === selected) ?? cars[0]
   const def = car && carDef(car.model)
   return (
@@ -174,7 +178,7 @@ export function GaragePanel() {
         </div>
         {car && def && (
           <div className="garage-detail">
-            <CarSwatch color={car.color} body={def.body} />
+            <CarPreview body={def.body} color={car.color} stripe={car.stripe} />
             <h3>{def.name}</h3>
             <div className="pi">Performance Index <b>{performance(def, car.upgrades)}</b></div>
             {UPGRADE_SLOTS.map((u) => {
@@ -192,6 +196,30 @@ export function GaragePanel() {
                 </div>
               )
             })}
+            <h4>Paint shop <small>${PAINT_COST} · neon and gold B1</small></h4>
+            <div className="paints">
+              {PAINTS.map((p) => (
+                <button
+                  key={p.color}
+                  title={`${p.name}${p.bucks ? ' (1 buck)' : ''}`}
+                  className={p.color === car.color ? 'dot big sel' : p.bucks ? 'dot big premium' : 'dot big'}
+                  style={{ background: p.color }}
+                  onClick={() => paint(car.uid, p.color)}
+                />
+              ))}
+            </div>
+            <h4>Racing stripes <small>${STRIPE_COST}</small></h4>
+            <div className="paints">
+              {STRIPES.map((st) => (
+                <button
+                  key={st ?? 'none'}
+                  title={st ? 'Stripe' : 'No stripe'}
+                  className={(car.stripe ?? null) === st ? 'dot big sel' : 'dot big'}
+                  style={{ background: st ? `linear-gradient(90deg, ${car.color} 0 35%, ${st} 35% 45%, ${car.color} 45% 55%, ${st} 55% 65%, ${car.color} 65%)` : car.color }}
+                  onClick={() => stripeCar(car.uid, st)}
+                >{st ? '' : '∅'}</button>
+              ))}
+            </div>
             <button className="sell" onClick={() => sell(car.uid)}>Sell for ${Math.floor(def.price * 0.5).toLocaleString()}</button>
           </div>
         )}

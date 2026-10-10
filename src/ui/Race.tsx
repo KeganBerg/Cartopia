@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { Panel } from './Menus'
 import { Canvas } from '@react-three/fiber'
 import { RaceScene } from '../scene/RaceScene'
+import { useLive, challenge, refreshPresence, raceChannel, endLiveRace, answer, type LiveRace } from '../lib/live'
 
 type Rival = { id: string; town: string; level: number; carName: string; color: string; pi: number; online: boolean; body: Body }
 
@@ -63,8 +64,12 @@ export function RacePanel() {
   const [online, setOnline] = useState<Rival[]>([])
   const [race, setRace] = useState<Rival | null>(null)
 
+  const livePlayers = useLive((l) => l.players)
+  const outgoing = useLive((l) => l.outgoing)
+
   useEffect(() => {
     fetchOnlineRivals().then(setOnline)
+    refreshPresence()
   }, [])
 
   if (race && car) return <DragRace car={car} rival={race} onExit={() => setRace(null)} />
@@ -84,6 +89,26 @@ export function RacePanel() {
           </button>
         ))}
       </div>
+      {supabase && (
+        <>
+          <h3>Live now <small>(players online this minute, no fuel needed)</small></h3>
+          {livePlayers.length === 0 && <p className="hint">Nobody else is online right now. Open Cartopia in another browser or ask a friend to join!</p>}
+          <div className="rivals">
+            {livePlayers.map((p) => (
+              <div key={p.id} className="rival">
+                <i style={{ background: p.color }} />
+                <div>
+                  <b>{p.town}</b> <span className="tag live">LIVE</span>
+                  <div className="card-stat">Lvl {p.level} · {p.carName} · PI {p.pi}</div>
+                </div>
+                <button className="buy small alt" disabled={!!outgoing} onClick={() => challenge(p.id)}>
+                  {outgoing?.to === p.id ? 'Waiting...' : `Challenge · win $${liveReward(p.pi)}`}
+                </button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
       <h3>Pick a rival <small>(costs ⛽{RACE_FUEL})</small></h3>
       <div className="rivals">
         {[...online, ...rivals].map((r) => (
@@ -103,7 +128,8 @@ export function RacePanel() {
 }
 
 const pi = (c: OwnedCar) => performance(carDef(c.model), c.upgrades)
-const reward = (r: Rival) => 150 + r.pi * 6
+const reward = (r: Rival) => (r.id.startsWith('live:') ? liveReward(r.pi) : 150 + r.pi * 6)
+const liveReward = (oppPi: number) => 300 + oppPi * 8
 
 type Racer = { gear: number; rpm: number; speed: number; dist: number; quality: number; finished: number | null }
 const fresh = (): Racer => ({ gear: 0, rpm: 0, speed: 0, dist: 0, quality: 1, finished: null })
@@ -128,13 +154,15 @@ function shiftQuality(rpm: number) {
   return { q: 0.75, label: 'Early' }
 }
 
-function DragRace({ car, rival, onExit }: { car: OwnedCar; rival: Rival; onExit: () => void }) {
+function DragRace({ car, rival, onExit, live }: { car: OwnedCar; rival: Rival; onExit: () => void; live?: LiveRace }) {
   const myPi = pi(car)
   const me = useRef(fresh())
   const them = useRef(fresh())
   const t = useRef(0)
   const [, force] = useState(0)
-  const [countdown, setCountdown] = useState(3)
+  // Live races wait for both players before counting down.
+  const [countdown, setCountdown] = useState(live ? 99 : 3)
+  const channel = useRef<ReturnType<typeof raceChannel>>(null)
   const [label, setLabel] = useState('')
   const [result, setResult] = useState<null | { won: boolean; myTime: number; theirTime: number }>(null)
   const finishRace = useGame((s) => s.finishRace)
@@ -142,28 +170,81 @@ function DragRace({ car, rival, onExit }: { car: OwnedCar; rival: Rival; onExit:
   const skill = useMemo(() => Array.from({ length: 4 }, () => 0.8 + Math.random() * 0.12), [])
 
   useEffect(() => {
-    if (countdown <= 0) return
+    if (countdown <= 0 || countdown === 99) return
     const id = setTimeout(() => setCountdown((c) => c - 1), 700)
     return () => clearTimeout(id)
   }, [countdown])
 
   useEffect(() => {
+    if (!live) return
+    let started = false
+    let answeredReady = false
+    const go = () => {
+      if (started) return
+      started = true
+      setCountdown(3)
+    }
+    const ch = raceChannel(live.raceId, {
+      onPos: (d) => (them.current.dist = Math.max(them.current.dist, d)),
+      onFinish: (ft) => {
+        them.current.finished = ft
+        them.current.dist = TRACK
+      },
+      onGo: go,
+      onReady: () => {
+        if (live.host) {
+          ch?.send({ type: 'broadcast', event: 'go', payload: {} })
+          go()
+        } else if (!answeredReady) {
+          answeredReady = true
+          ch?.send({ type: 'broadcast', event: 'ready', payload: {} })
+        }
+      },
+    })
+    channel.current = ch
+    // Keep pinging until the race starts in case the first message was missed.
+    const ping = setInterval(() => {
+      if (!started) ch?.send({ type: 'broadcast', event: 'ready', payload: {} })
+    }, 1000)
+    return () => {
+      clearInterval(ping)
+      if (ch && supabase) supabase.removeChannel(ch)
+    }
+  }, [live])
+
+  useEffect(() => {
     if (countdown > 0 || result) return
     let raf = 0
     let last = performance_now()
+    let lastSent = 0
+    let myFinishSentAt: number | null = null
     const loop = () => {
       const now = performance_now()
       const dt = Math.min(0.1, (now - last) / 1000)
       last = now
       t.current += dt
+      const wasDone = me.current.finished !== null
       step(me.current, myPi, dt, t.current)
       const th = them.current
-      if (th.gear < 3 && th.rpm >= skill[th.gear]) {
-        th.quality = shiftQuality(th.rpm).q
-        th.gear++
-        th.rpm = 0.35
+      if (live) {
+        if (now - lastSent > 100) {
+          lastSent = now
+          channel.current?.send({ type: 'broadcast', event: 'pos', payload: { dist: me.current.dist } })
+        }
+        if (!wasDone && me.current.finished !== null) {
+          myFinishSentAt = now
+          channel.current?.send({ type: 'broadcast', event: 'finish', payload: { t: me.current.finished } })
+        }
+        // Opponent vanished: the race is yours after a grace period.
+        if (myFinishSentAt !== null && th.finished === null && now - myFinishSentAt > 15000) th.finished = Infinity
+      } else {
+        if (th.gear < 3 && th.rpm >= skill[th.gear]) {
+          th.quality = shiftQuality(th.rpm).q
+          th.gear++
+          th.rpm = 0.35
+        }
+        step(th, rival.pi, dt, t.current)
       }
-      step(th, rival.pi, dt, t.current)
       force((n) => n + 1)
       if (me.current.finished !== null && th.finished !== null) {
         const won = me.current.finished <= th.finished
@@ -175,7 +256,7 @@ function DragRace({ car, rival, onExit }: { car: OwnedCar; rival: Rival; onExit:
     }
     raf = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(raf)
-  }, [countdown, result, myPi, rival, skill, finishRace])
+  }, [countdown, result, myPi, rival, skill, finishRace, live])
 
   const shift = () => {
     const r = me.current
@@ -202,7 +283,7 @@ function DragRace({ car, rival, onExit }: { car: OwnedCar; rival: Rival; onExit:
   const def = carDef(car.model)
   const rpmAngle = -210 + Math.min(1.05, me.current.rpm) * 240
   return (
-    <Panel title={`Drag Race vs ${rival.town}`} wide>
+    <Panel title={`Drag Race vs ${rival.town}`} wide onClose={live ? onExit : undefined}>
       <div className="race-3d">
         <Canvas shadows camera={{ position: [0.4, 2.2, -4], fov: 55 }} dpr={[1, 1.5]}>
           <RaceScene track={TRACK} me={me} them={them} mine={{ body: def.body, color: car.color }} theirs={{ body: rival.body, color: rival.color }} />
@@ -233,6 +314,7 @@ function DragRace({ car, rival, onExit }: { car: OwnedCar; rival: Rival; onExit:
         </svg>
         <div className="race-side">
           <div className="speed">{Math.round(me.current.speed * 0.9)} km/h</div>
+          {countdown === 99 && <div className="hint">Waiting for {rival.town} to join...</div>}
           {!result ? (
             <button className="big-btn shift-btn" onPointerDown={shift} disabled={countdown > 0 || me.current.gear >= 3}>
               SHIFT ▲
@@ -240,7 +322,7 @@ function DragRace({ car, rival, onExit }: { car: OwnedCar; rival: Rival; onExit:
           ) : (
             <div className={result.won ? 'result win' : 'result lose'}>
               <h3>{result.won ? 'YOU WIN!' : 'You lost'}</h3>
-              <p>{result.myTime.toFixed(2)}s vs {result.theirTime.toFixed(2)}s</p>
+              <p>{result.myTime.toFixed(2)}s vs {Number.isFinite(result.theirTime) ? `${result.theirTime.toFixed(2)}s` : 'did not finish'}</p>
               <p>{result.won ? `+$${reward(rival)} · +1 🏆 · +30 XP` : `+$${Math.round(reward(rival) * 0.1)} · +8 XP`}</p>
               <button className="buy" onClick={onExit}>Back</button>
             </div>
@@ -258,4 +340,30 @@ function arcPath(cx: number, cy: number, r: number, a0: number, a1: number) {
   const [x0, y0] = p(a0)
   const [x1, y1] = p(a1)
   return `M ${x0} ${y0} A ${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1} ${y1}`
+}
+
+// A live race started from a challenge, shown wherever the player is.
+export function LiveRaceOverlay() {
+  const race = useLive((l) => l.race)
+  const cars = useGame((s) => s.cars)
+  const best = useMemo(() => [...cars].sort((a, b) => pi(b) - pi(a))[0], [cars])
+  if (!race || !best) return null
+  const o = race.opponent
+  const rival: Rival = { id: `live:${o.id}`, town: o.town, level: o.level, carName: o.carName, color: o.color, pi: o.pi, online: true, body: o.body }
+  return <DragRace key={race.raceId} car={best} rival={rival} live={race} onExit={endLiveRace} />
+}
+
+export function ChallengePopup() {
+  const inc = useLive((l) => l.incoming)
+  if (!inc) return null
+  return (
+    <div className="challenge-pop">
+      <b>{inc.from.town}</b> challenges you to a drag race!
+      <div className="card-stat">{inc.from.carName} · PI {inc.from.pi}</div>
+      <div className="row">
+        <button className="buy small" onClick={() => answer(true)}>Race!</button>
+        <button className="sell" onClick={() => answer(false)}>Decline</button>
+      </div>
+    </div>
+  )
 }

@@ -93,7 +93,7 @@ function DrivingCar({ car, roads, start }: { car: OwnedCar; roads: Set<string>; 
           </button>
         </Html>
       )}
-      <CarModel body={def.body} color={car.color} highlight={selected} />
+      <CarModel body={def.body} color={car.color} highlight={selected} stripe={car.stripe} />
     </group>
   )
 }

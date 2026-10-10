@@ -176,3 +176,16 @@ button.card:hover:not(:disabled) { border-color: var(--accent); }
 @media (max-width: 640px) { .race-3d { height: 180px; } }
 .bar.wide { background: #e0e0e0; }
 .bar.wide span { background: var(--green); }
+
+.car-preview { height: 170px; border-radius: 12px; overflow: hidden; background: linear-gradient(#eceff1, #fff); margin-bottom: 6px; }
+.garage-detail h4 { font: 16px var(--display); margin: 12px 0 6px; }
+.garage-detail h4 small { font: 12px Nunito, sans-serif; color: #607d8b; }
+.paints { display: flex; flex-wrap: wrap; gap: 6px; }
+.dot.big { width: 28px; height: 28px; font-size: 14px; color: #607d8b; }
+.dot.premium { box-shadow: 0 0 0 2px #ffd54f, 0 0 8px #ffd54f; }
+
+.tag.live { background: #e53935; animation: pulse 1.2s infinite; }
+@keyframes pulse { 50% { opacity: .55; } }
+.challenge-pop { position: absolute; z-index: 150; top: 120px; right: 12px; background: var(--panel); border: 3px solid #fff; border-radius: 16px; padding: 10px 14px; box-shadow: 0 6px 0 rgba(0,0,0,.25); max-width: 280px; animation: pop .25s ease-out; }
+.challenge-pop .row { margin-top: 8px; }
+.challenge-pop .sell { margin-top: 0; }

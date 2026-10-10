@@ -2,11 +2,11 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
   GRID, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS, BUILDINGS,
-  upgradeCost, MAX_UPGRADE, GOALS, DAILY_BONUS, FLAT_CHANCE, flatFixCost, type UpgradeSlot, type StatKey,
+  upgradeCost, MAX_UPGRADE, GOALS, DAILY_BONUS, PAINTS, PAINT_COST, STRIPE_COST, FLAT_CHANCE, flatFixCost, type UpgradeSlot, type StatKey,
 } from './data'
 
 export type PlacedBuilding = { uid: string; def: string; x: number; z: number; jobEndsAt: number | null }
-export type OwnedCar = { uid: string; model: string; color: string; upgrades: Record<UpgradeSlot, number>; flat?: boolean }
+export type OwnedCar = { uid: string; model: string; color: string; upgrades: Record<UpgradeSlot, number>; flat?: boolean; stripe?: string | null }
 
 export type SaveState = {
   version: 1
@@ -59,6 +59,8 @@ type Actions = {
   claimGoal: (id: string) => void
   claimDaily: () => void
   fixFlat: (uid: string, tow: boolean) => void
+  paintCar: (uid: string, color: string) => void
+  stripeCar: (uid: string, stripe: string | null) => void
   loadSave: (s: SaveState) => void
 }
 
@@ -394,6 +396,33 @@ export const useGame = create<GameState>()(
           updatedAt: Date.now(),
         })
         s.toast(tow ? "Rusty towed it in and patched it up. +15 XP" : `Tire fixed for $${cost}`)
+      },
+
+      paintCar: (cuid, color) => {
+        const s = get()
+        const car = s.cars.find((c) => c.uid === cuid)
+        const paint = PAINTS.find((p) => p.color === color)
+        if (!car || !paint || car.color === color) return
+        const bucks = paint.bucks ?? 0
+        const coins = bucks ? 0 : PAINT_COST
+        if (s.coins < coins || s.bucks < bucks) return s.toast('Not enough money')
+        set({
+          coins: s.coins - coins,
+          bucks: s.bucks - bucks,
+          cars: s.cars.map((c) => (c.uid === cuid ? { ...c, color } : c)),
+          ...addXp(s, 5),
+          updatedAt: Date.now(),
+        })
+        s.toast(`Painted ${paint.name}!`)
+      },
+
+      stripeCar: (cuid, stripe) => {
+        const s = get()
+        const car = s.cars.find((c) => c.uid === cuid)
+        if (!car || (car.stripe ?? null) === stripe) return
+        const cost = stripe ? STRIPE_COST : 0
+        if (s.coins < cost) return s.toast('Not enough coins')
+        set({ coins: s.coins - cost, cars: s.cars.map((c) => (c.uid === cuid ? { ...c, stripe } : c)), updatedAt: Date.now() })
       },
 
       loadSave: (save) => set({ ...starterDefaults(), ...save }),

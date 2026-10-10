@@ -3,7 +3,8 @@ import { Canvas } from '@react-three/fiber'
 import { World } from './scene/World'
 import { Hud } from './ui/Hud'
 import { BottomBar, ShopPanel, ShowroomPanel, GaragePanel, Toasts } from './ui/Menus'
-import { RacePanel } from './ui/Race'
+import { RacePanel, LiveRaceOverlay, ChallengePopup } from './ui/Race'
+import { joinLobby, useLive } from './lib/live'
 import { AccountPanel } from './ui/Account'
 import { GoalsPanel, DailyPanel, FlatPanel } from './ui/Goals'
 import { useGame, today } from './game/store'
@@ -11,10 +12,12 @@ import { startCloudSync } from './lib/cloud'
 
 export default function App() {
   const panel = useGame((s) => s.panel)
+  const liveRace = useLive((l) => l.race)
   const tick = useGame((s) => s.tick)
 
   useEffect(() => {
     startCloudSync()
+    joinLobby()
     tick(Date.now())
     if (useGame.getState().lastDaily !== today()) setTimeout(() => useGame.getState().openPanel('daily'), 800)
     const id = setInterval(() => tick(Date.now()), 1000)
@@ -31,7 +34,9 @@ export default function App() {
       {panel === 'shop' && <ShopPanel />}
       {panel === 'showroom' && <ShowroomPanel />}
       {panel === 'garage' && <GaragePanel />}
-      {panel === 'race' && <RacePanel />}
+      {panel === 'race' && !liveRace && <RacePanel />}
+      {liveRace && <LiveRaceOverlay />}
+      <ChallengePopup />
       {panel === 'account' && <AccountPanel />}
       {panel === 'goals' && <GoalsPanel />}
       {panel === 'daily' && <DailyPanel />}

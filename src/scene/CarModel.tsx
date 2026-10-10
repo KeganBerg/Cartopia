@@ -23,7 +23,7 @@ const SHAPES: Record<Body, Shape> = {
 }
 
 // Toy-style car built from primitives. Faces +z.
-export function CarModel({ body, color, highlight }: { body: Body; color: string; highlight?: boolean }) {
+export function CarModel({ body, color, highlight, stripe }: { body: Body; color: string; highlight?: boolean; stripe?: string | null }) {
   const s = SHAPES[body]
   const dark = useMemo(() => '#' + new Color(color).multiplyScalar(0.6).getHexString(), [color])
   const top = s.lift + s.body
@@ -86,6 +86,22 @@ export function CarModel({ body, color, highlight }: { body: Body; color: string
             <meshStandardMaterial color={body === 'super' ? '#212121' : color} />
           </mesh>
         </group>
+      )}
+      {stripe && (
+        <>
+          {[-0.07, 0.07].map((x) => (
+            <mesh key={x} position={[x, top + 0.003, 0]}>
+              <boxGeometry args={[0.07, 0.006, s.len * 0.99]} />
+              <meshStandardMaterial color={stripe} />
+            </mesh>
+          ))}
+          {[-0.07, 0.07].map((x) => (
+            <mesh key={`r${x}`} position={[x, top + s.cabinH + 0.003, s.cabinZ]}>
+              <boxGeometry args={[0.07, 0.006, s.cabinLen * s.taper * 0.95]} />
+              <meshStandardMaterial color={stripe} />
+            </mesh>
+          ))}
+        </>
       )}
       {/* Bumpers. */}
       {[1, -1].map((sd) => (
