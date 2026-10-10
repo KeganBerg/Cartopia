@@ -2,7 +2,7 @@ import { TILE, type BuildingDef } from '../game/data'
 import { signTexture } from './signTexture'
 import { CarModel } from './CarModel'
 import type { Texture } from 'three'
-import { brickTex, sidingTex, shingleTex, gravelTex, awningTex, windowTex } from './textures'
+import { brickTex, sidingTex, shingleTex, gravelTex, awningTex, windowTex, paverTex, shutterTex, pumpTex } from './textures'
 
 type Props = { def: BuildingDef; ghost?: boolean; valid?: boolean }
 
@@ -295,75 +295,197 @@ export function BuildingModel({ def, ghost, valid }: Props) {
     case 'showroom':
       return (
         <group>
+          {/* Paved plaza with a brick plinth under the glass rotunda. */}
           <mesh position={[0, 0.05, 0]} receiveShadow>
             <boxGeometry args={[W * 0.95, 0.1, D * 0.95]} />
-            {m('#e0e0e0')}
+            {m('#ffffff', paverTex(4))}
           </mesh>
-          <mesh position={[0, 1, 0]} castShadow>
-            <cylinderGeometry args={[1.5, 1.5, 1.8, 32]} />
-            <meshStandardMaterial color={ghost ? (valid ? '#66bb6a' : '#ef5350') : '#80deea'} transparent opacity={ghost ? 0.55 : 0.75} metalness={0.3} roughness={0.1} />
+          <mesh position={[0, 0.2, 0]} castShadow receiveShadow>
+            <cylinderGeometry args={[1.62, 1.7, 0.22, 32]} />
+            {m('#b0796b', brickTex(6, 0.4))}
           </mesh>
+          <mesh position={[0, 1.1, 0]} castShadow>
+            <cylinderGeometry args={[1.5, 1.5, 1.6, 32, 1, true]} />
+            <meshStandardMaterial color={ghost ? (valid ? '#66bb6a' : '#ef5350') : '#9be7f5'} transparent opacity={ghost ? 0.55 : 0.55} metalness={0.4} roughness={0.05} side={2} />
+          </mesh>
+          {/* Chrome mullions around the glass. */}
+          {Array.from({ length: 10 }, (_, i) => {
+            const a = (i / 10) * Math.PI * 2
+            return (
+              <mesh key={i} position={[Math.sin(a) * 1.5, 1.1, Math.cos(a) * 1.5]} castShadow>
+                <boxGeometry args={[0.07, 1.6, 0.07]} />
+                <meshStandardMaterial color="#eceff1" metalness={0.6} roughness={0.25} />
+              </mesh>
+            )
+          })}
           <mesh position={[0, 2.05, 0]} castShadow>
-            <cylinderGeometry args={[1.65, 1.65, 0.35, 32]} />
-            {m('#eceff1')}
+            <cylinderGeometry args={[1.7, 1.62, 0.32, 32]} />
+            {m(def.roof)}
+          </mesh>
+          <mesh position={[0, 2.05, 0]}>
+            <cylinderGeometry args={[1.73, 1.73, 0.12, 32]} />
+            {m('#e53935')}
+          </mesh>
+          {/* Display car on a turntable. */}
+          <mesh position={[0, 0.34, 0]}>
+            <cylinderGeometry args={[1.05, 1.05, 0.06, 32]} />
+            <meshStandardMaterial color="#cfd8dc" metalness={0.5} roughness={0.3} />
           </mesh>
           {!ghost && (
-            <mesh position={[0, 0.45, 0]}>
-              <boxGeometry args={[0.9, 0.4, 0.5]} />
-              <meshStandardMaterial color="#d32f2f" metalness={0.4} roughness={0.3} />
-            </mesh>
+            <group position={[0, 0.37, 0]} rotation-y={0.6} scale={1.25}>
+              <CarModel body="sports" color="#d32f2f" />
+            </group>
           )}
-          {sign && <Sign text="SHOWROOM" w={2.4} y={2.05} z={1.67} bg="#eceff1" fg="#37474f" />}
+          {/* Flags at the plaza corners. */}
+          {!ghost && [[-1.75, 1.75, '#e53935'], [1.75, 1.75, '#ffca28'], [1.75, -1.75, '#1e88e5']].map(([x, z, c]) => (
+            <group key={c as string} position={[x as number, 0, z as number]}>
+              <mesh position={[0, 0.9, 0]} castShadow>
+                <cylinderGeometry args={[0.03, 0.03, 1.8]} />
+                {m('#eceff1')}
+              </mesh>
+              <mesh position={[0.2, 1.6, 0]}>
+                <boxGeometry args={[0.4, 0.26, 0.02]} />
+                {m(c as string)}
+              </mesh>
+            </group>
+          ))}
+          {sign && <Sign text="SHOWROOM" w={2.4} y={2.05} z={1.72} bg="#eceff1" fg="#37474f" />}
         </group>
       )
     case 'garage':
       return (
         <group>
+          {/* Brick workshop with a gravel roof and three roll-up doors. */}
           <mesh position={[0, 0.8, -0.3]} castShadow receiveShadow>
             <boxGeometry args={[W * 0.9, 1.6, D * 0.6]} />
-            {m(def.color)}
+            {m('#c9b8ad', brickTex(4, 2))}
           </mesh>
-          <mesh position={[0, 1.65, -0.3]} castShadow>
-            <boxGeometry args={[W * 0.95, 0.12, D * 0.65]} />
+          <mesh position={[0, 1.66, -0.3]} castShadow>
+            <boxGeometry args={[W * 0.95, 0.14, D * 0.65]} />
             {m(def.roof)}
           </mesh>
-          {[-0.95, 0, 0.95].map((x) => (
-            <mesh key={x} position={[x, 0.55, D * 0.3 - 0.29]}>
-              <planeGeometry args={[0.8, 1.05]} />
-              {m('#eceff1')}
-            </mesh>
+          <mesh position={[0, 1.735, -0.3]} rotation-x={-Math.PI / 2}>
+            <planeGeometry args={[W * 0.88, D * 0.58]} />
+            {m('#ffffff', gravelTex(4, 2.4))}
+          </mesh>
+          {[-1.1, 0, 1.1].map((x) => (
+            <group key={x}>
+              <mesh position={[x, 0.55, D * 0.3 - 0.29]}>
+                <planeGeometry args={[0.86, 1.05]} />
+                {m('#ffffff', shutterTex())}
+              </mesh>
+              <mesh position={[x, 1.12, D * 0.3 - 0.28]}>
+                <boxGeometry args={[0.96, 0.08, 0.05]} />
+                {m('#455a64')}
+              </mesh>
+              {/* Wall lamp over each door. */}
+              <mesh position={[x, 1.25, D * 0.3 - 0.26]}>
+                <boxGeometry args={[0.16, 0.06, 0.1]} />
+                <meshStandardMaterial color="#fff59d" emissive="#ffe082" emissiveIntensity={0.6} />
+              </mesh>
+            </group>
           ))}
+          {/* Concrete apron with oil stains and a tyre stack. */}
           <mesh position={[0, 0.03, 1.1]} receiveShadow>
             <boxGeometry args={[W * 0.9, 0.05, 1.2]} />
-            {m('#9e9e9e')}
+            {m('#ffffff', paverTex(4, 1.2))}
           </mesh>
-          {sign && <Sign text="MY GARAGE" w={2.2} y={1.35} z={0.32} bg="#263238" fg="#ffca28" />}
+          {!ghost && [[-0.9, 1.0], [0.4, 1.3]].map(([x, z]) => (
+            <mesh key={x} position={[x, 0.058, z]} rotation-x={-Math.PI / 2}>
+              <circleGeometry args={[0.22, 16]} />
+              <meshBasicMaterial color="#000000" transparent opacity={0.18} />
+            </mesh>
+          ))}
+          {!ghost && [0, 1, 2].map((i) => (
+            <mesh key={i} position={[1.6, 0.1 + i * 0.16, 0.45]} rotation-x={Math.PI / 2} castShadow>
+              <torusGeometry args={[0.16, 0.07, 8, 16]} />
+              {m('#263238')}
+            </mesh>
+          ))}
+          {sign && <Sign text="MY GARAGE" w={2.2} y={1.42} z={0.33} bg="#263238" fg="#ffca28" />}
         </group>
       )
     case 'gas':
       return (
         <group>
-          {[[-1.3, -0.5], [1.3, -0.5], [-1.3, 0.5], [1.3, 0.5]].map(([x, z], i) => (
-            <mesh key={i} position={[x - 0.3, 0.7, z]} castShadow>
-              <cylinderGeometry args={[0.06, 0.06, 1.4]} />
+          {/* Forecourt slab. */}
+          <mesh position={[0, 0.03, 0]} receiveShadow>
+            <boxGeometry args={[W * 0.96, 0.05, D * 0.94]} />
+            {m('#ffffff', paverTex(4, 2))}
+          </mesh>
+          {[[-1.3, -0.5], [0.7, -0.5], [-1.3, 0.5], [0.7, 0.5]].map(([x, z], i) => (
+            <mesh key={i} position={[x, 0.75, z]} castShadow>
+              <boxGeometry args={[0.12, 1.4, 0.12]} />
               {m('#eeeeee')}
             </mesh>
           ))}
-          <mesh position={[-0.3, 1.45, 0]} castShadow>
-            <boxGeometry args={[3, 0.2, 1.5]} />
-            {m(def.roof)}
-          </mesh>
-          {[-1, 0.4].map((x) => (
-            <mesh key={x} position={[x, 0.35, 0]} castShadow>
-              <boxGeometry args={[0.3, 0.7, 0.3]} />
-              {m(def.color)}
-            </mesh>
-          ))}
-          <mesh position={[1.55, 0.5, 0]} castShadow>
-            <boxGeometry args={[0.8, 1, 1.4]} />
+          {/* Canopy with a red band and a lit underside. */}
+          <mesh position={[-0.3, 1.5, 0]} castShadow>
+            <boxGeometry args={[2.6, 0.22, 1.6]} />
             {m('#fafafa')}
           </mesh>
-          {sign && <Sign text="GAS" w={1.2} y={1.45} z={0.76} bg="#e53935" fg="#ffffff" />}
+          <mesh position={[-0.3, 1.5, 0]}>
+            <boxGeometry args={[2.64, 0.1, 1.64]} />
+            {m(def.roof)}
+          </mesh>
+          <mesh position={[-0.3, 1.385, 0]} rotation-x={Math.PI / 2}>
+            <planeGeometry args={[2.4, 1.4]} />
+            <meshStandardMaterial color="#fffde7" emissive="#fff9c4" emissiveIntensity={0.5} />
+          </mesh>
+          {/* Pump island with two pumps. */}
+          <mesh position={[-0.3, 0.1, 0]} receiveShadow>
+            <boxGeometry args={[1.8, 0.1, 0.4]} />
+            {m('#ffca28')}
+          </mesh>
+          {[-0.85, 0.25].map((x) => (
+            <group key={x} position={[x, 0, 0]}>
+              <mesh position={[0, 0.48, 0]} castShadow>
+                <boxGeometry args={[0.34, 0.66, 0.26]} />
+                {m('#fafafa')}
+              </mesh>
+              {[0.131, -0.131].map((z) => (
+                <mesh key={z} position={[0, 0.48, z]} rotation-y={z < 0 ? Math.PI : 0}>
+                  <planeGeometry args={[0.32, 0.64]} />
+                  {m('#ffffff', pumpTex(def.roof))}
+                </mesh>
+              ))}
+            </group>
+          ))}
+          {/* Little shop with a striped awning. */}
+          <mesh position={[1.45, 0.55, -0.1]} castShadow receiveShadow>
+            <boxGeometry args={[0.95, 1.1, 1.5]} />
+            {m(def.color, brickTex(1, 1.2))}
+          </mesh>
+          <mesh position={[1.45, 1.14, -0.1]} castShadow>
+            <boxGeometry args={[1.02, 0.1, 1.58]} />
+            {m(def.roof)}
+          </mesh>
+          <mesh position={[0.97, 0.45, -0.1]} rotation-y={-Math.PI / 2}>
+            <planeGeometry args={[1.2, 0.55]} />
+            {m('#ffffff', windowTex())}
+          </mesh>
+          <mesh position={[0.9, 0.85, -0.1]} rotation-z={0.5} rotation-y={-Math.PI / 2}>
+            <planeGeometry args={[1.35, 0.3]} />
+            {m('#ffffff', awningTex(def.roof))}
+          </mesh>
+          {/* Price sign on a pole. */}
+          {!ghost && (
+            <group position={[-1.8, 0, 0.75]}>
+              <mesh position={[0, 0.8, 0]} castShadow>
+                <cylinderGeometry args={[0.04, 0.04, 1.6]} />
+                {m('#90a4ae')}
+              </mesh>
+              <mesh position={[0, 1.6, 0]} castShadow>
+                <boxGeometry args={[0.5, 0.4, 0.06]} />
+                {m(def.roof)}
+              </mesh>
+              <mesh position={[0, 1.6, 0.032]}>
+                <planeGeometry args={[0.42, 0.32]} />
+                <meshBasicMaterial map={signTexture('⛽ 1.99', '#263238', '#ffca28')} />
+              </mesh>
+            </group>
+          )}
+          {sign && <Sign text="GAS" w={1.2} y={1.5} z={0.83} bg={def.roof} fg="#ffffff" />}
         </group>
       )
     case 'cinema':

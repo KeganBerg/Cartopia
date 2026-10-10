@@ -207,3 +207,35 @@ export const skyTex = (rx = 1) =>
       }
     }
   }), 'sky', rx, 1)
+
+// Roll-up garage door: ribbed slats with a handle bar.
+export const shutterTex = () =>
+  make('shutter', 64, (g, s) => {
+    g.fillStyle = '#f2f4f5'
+    g.fillRect(0, 0, s, s)
+    for (let y = 0; y < s; y += 8) {
+      g.fillStyle = '#d5dadd'
+      g.fillRect(0, y + 6, s, 2)
+      g.fillStyle = '#ffffff'
+      g.fillRect(0, y, s, 1)
+    }
+    g.fillStyle = '#90a4ae'
+    g.fillRect(s * 0.4, s - 8, s * 0.2, 3)
+  })
+
+// Fuel pump face: price screen, logo stripe and hose holster.
+export const pumpTex = (accent: string) =>
+  make(`pump|${accent}`, 64, (g, s) => {
+    g.fillStyle = '#fafafa'
+    g.fillRect(0, 0, s, s)
+    g.fillStyle = accent
+    g.fillRect(0, 0, s, s * 0.22)
+    g.fillStyle = '#263238'
+    g.fillRect(s * 0.15, s * 0.3, s * 0.7, s * 0.22)
+    g.fillStyle = '#76ff03'
+    g.font = `bold ${s * 0.16}px monospace`
+    g.textAlign = 'center'
+    g.fillText('8.88', s / 2, s * 0.47)
+    g.fillStyle = '#37474f'
+    g.fillRect(s * 0.3, s * 0.62, s * 0.4, s * 0.26)
+  })

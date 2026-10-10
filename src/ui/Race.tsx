@@ -14,6 +14,11 @@ type Rival = { id: string; town: string; level: number; carName: string; color: 
 const TOWNS = ['Transamsylvania', 'Gearville', 'Piston Peak', 'Nitro Bay', 'Chrome City', 'Rustbelt Row', 'Turbo Falls', 'Muffler Hills']
 const TRACK = 400
 const GEAR_POWER = [1, 0.85, 0.72, 0.6]
+const zero = { engine: 0, turbo: 0, tires: 0, weight: 0 }
+const pi = (c: OwnedCar) => performance(carDef(c.model), c.upgrades)
+const liveReward = (oppPi: number) => 300 + oppPi * 8
+const reward = (r: Rival) => (r.id.startsWith('live:') ? liveReward(r.pi) : 150 + r.pi * 6)
+const performance_now = () => window.performance.now()
 
 function carNear(target: number) {
   return [...CARS].sort((a, b) => Math.abs(performance(a, zero) - target) - Math.abs(performance(b, zero) - target))[0]
@@ -42,7 +47,6 @@ function makeRivals(myPi: number, level: number): Rival[] {
     }
   })
 }
-const zero = { engine: 0, turbo: 0, tires: 0, weight: 0 }
 
 // Real players' best cars, from their cloud saves.
 async function fetchOnlineRivals(): Promise<Rival[]> {
@@ -251,9 +255,6 @@ export function PrizePopup() {
   )
 }
 
-const pi = (c: OwnedCar) => performance(carDef(c.model), c.upgrades)
-const reward = (r: Rival) => (r.id.startsWith('live:') ? liveReward(r.pi) : 150 + r.pi * 6)
-const liveReward = (oppPi: number) => 300 + oppPi * 8
 
 type Racer = { gear: number; rpm: number; speed: number; dist: number; quality: number; finished: number | null }
 // A live opponent is replayed on our own race clock from the samples they
@@ -509,7 +510,6 @@ function DragRace({ car, rival, onExit, live, prize, onFinish, title }: { car: O
   )
 }
 
-const performance_now = () => window.performance.now()
 
 function arcPath(cx: number, cy: number, r: number, a0: number, a1: number) {
   const p = (a: number) => [cx + r * Math.cos((a * Math.PI) / 180), cy + r * Math.sin((a * Math.PI) / 180)]

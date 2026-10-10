@@ -239,6 +239,8 @@ function addXp(s: GameState, amount: number): Partial<GameState> {
   return { level, xp, bucks, coins, fuel: fuelCap(fresh), fuelUpdatedAt: Date.now() }
 }
 
+export const cleanPlate = (p: string) => p.toUpperCase().replace(/[^A-Z0-9 ]/g, '').trim().slice(0, 7)
+
 export const useGame = create<GameState>()(
   persist(
     (set, get) => ({
@@ -850,7 +852,6 @@ function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'lastDail
   return { stats: emptyStats(), claimedGoals: [], lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, gp: {}, land: [...START_LAND] }
 }
 
-export const cleanPlate = (p: string) => p.toUpperCase().replace(/[^A-Z0-9 ]/g, '').trim().slice(0, 7)
 
 const pick = <T,>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)]
 const range = (lo: number, hi: number) => lo + Math.floor(Math.random() * (hi - lo + 1))
