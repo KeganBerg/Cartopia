@@ -25,7 +25,7 @@ export function AccountPanel() {
     const { error, data } = signUp
       ? await supabase.auth.signUp({ email, password })
       : await supabase.auth.signInWithPassword({ email, password })
-    if (error) return setMsg(error.message)
+    if (error) return setMsg(friendlyAuthError(error.message, signUp))
     setMsg(signUp && !data.session ? 'Check your email to confirm your account, then sign in.' : 'Signed in. Your town now saves to the cloud.')
   }
 
@@ -69,4 +69,18 @@ export function AccountPanel() {
       </ul>
     </Panel>
   )
+}
+
+function friendlyAuthError(message: string, signUp: boolean): string {
+  const m = message.toLowerCase()
+  if (m.includes('rate limit') || m.includes('too many'))
+    return signUp
+      ? 'Too many new accounts were made in the last hour. Try again a bit later, or tap Sign in if you already made one. Your town is still saved in this browser.'
+      : 'Too many tries in a row. Wait a minute and try again.'
+  if (m.includes('email not confirmed')) return 'Your email is not confirmed yet. Open the link we emailed you, then sign in.'
+  if (m.includes('invalid login')) return 'That email and password do not match. Check them, or tap Create account if you are new.'
+  if (m.includes('already registered')) return 'That email already has an account. Tap Sign in instead.'
+  if (m.includes('password')) return 'Passwords need at least 6 characters.'
+  if (m.includes('email')) return 'Please enter a valid email address.'
+  return message
 }
