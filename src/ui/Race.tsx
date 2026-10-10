@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { Panel } from './Menus'
 import { Canvas } from '@react-three/fiber'
 import { RaceScene } from '../scene/RaceScene'
+import { sfx, engineRpm, stopEngine } from '../lib/sound'
 import { useLive, challenge, refreshPresence, raceChannel, endLiveRace, answer, type LiveRace } from '../lib/live'
 
 type Rival = { id: string; town: string; level: number; carName: string; color: string; pi: number; online: boolean; body: Body }
@@ -170,7 +171,9 @@ function DragRace({ car, rival, onExit, live }: { car: OwnedCar; rival: Rival; o
   const skill = useMemo(() => Array.from({ length: 4 }, () => 0.8 + Math.random() * 0.12), [])
 
   useEffect(() => {
-    if (countdown <= 0 || countdown === 99) return
+    if (countdown === 99) return
+    if (countdown >= 0 && countdown <= 3) sfx.countdown(countdown === 0)
+    if (countdown <= 0) return
     const id = setTimeout(() => setCountdown((c) => c - 1), 700)
     return () => clearTimeout(id)
   }, [countdown])
@@ -246,8 +249,13 @@ function DragRace({ car, rival, onExit, live }: { car: OwnedCar; rival: Rival; o
         step(th, rival.pi, dt, t.current)
       }
       force((n) => n + 1)
+      if (me.current.finished === null) engineRpm(me.current.rpm, me.current.gear)
+      else stopEngine()
       if (me.current.finished !== null && th.finished !== null) {
         const won = me.current.finished <= th.finished
+        stopEngine()
+        if (won) sfx.win()
+        else sfx.lose()
         setResult({ won, myTime: me.current.finished, theirTime: th.finished })
         finishRace(won, reward(rival))
         return
@@ -255,13 +263,17 @@ function DragRace({ car, rival, onExit, live }: { car: OwnedCar; rival: Rival; o
       raf = requestAnimationFrame(loop)
     }
     raf = requestAnimationFrame(loop)
-    return () => cancelAnimationFrame(raf)
+    return () => {
+      cancelAnimationFrame(raf)
+      stopEngine()
+    }
   }, [countdown, result, myPi, rival, skill, finishRace, live])
 
   const shift = () => {
     const r = me.current
     if (countdown > 0 || r.gear >= 3 || r.finished !== null) return
     const s = shiftQuality(r.rpm)
+    sfx.shift(s.q >= 1)
     r.quality = s.q
     r.gear++
     r.rpm = 0.35

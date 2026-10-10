@@ -4,6 +4,7 @@ import {
   GRID, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS, BUILDINGS,
   upgradeCost, MAX_UPGRADE, GOALS, DAILY_BONUS, PAINTS, PAINT_COST, STRIPE_COST, FLAT_CHANCE, flatFixCost, type UpgradeSlot, type StatKey,
 } from './data'
+import { sfx } from '../lib/sound'
 
 export type PlacedBuilding = { uid: string; def: string; x: number; z: number; jobEndsAt: number | null }
 export type OwnedCar = { uid: string; model: string; color: string; upgrades: Record<UpgradeSlot, number>; flat?: boolean; stripe?: string | null }
@@ -27,11 +28,16 @@ export type SaveState = {
   claimedGoals: string[]
   lastDaily: string | null
   dailyStreak: number
+  helped: Record<string, string>
+  tutorial: number
   updatedAt: number
 }
 
 export type Mode = 'play' | 'place' | 'road' | 'bulldoze'
-export type Panel = null | 'shop' | 'garage' | 'showroom' | 'race' | 'account' | 'goals' | 'daily' | 'flat'
+export type Panel = null | 'shop' | 'garage' | 'showroom' | 'race' | 'account' | 'goals' | 'daily' | 'flat' | 'friends'
+
+// A read-only copy of another player's town while visiting it.
+export type VisitedTown = { ownerId: string; townName: string; level: number; trophies: number; roads: string[]; buildings: PlacedBuilding[]; cars: OwnedCar[] }
 
 type UiState = {
   mode: Mode
@@ -39,6 +45,7 @@ type UiState = {
   panel: Panel
   selectedCar: string | null
   toasts: { id: number; text: string }[]
+  visiting: VisitedTown | null
 }
 
 type Actions = {
@@ -60,6 +67,9 @@ type Actions = {
   claimDaily: () => void
   fixFlat: (uid: string, tow: boolean) => void
   paintCar: (uid: string, color: string) => void
+  visit: (town: VisitedTown | null) => void
+  helpFriend: () => void
+  setTutorial: (step: number) => void
   stripeCar: (uid: string, stripe: string | null) => void
   loadSave: (s: SaveState) => void
 }
@@ -134,6 +144,8 @@ function starterTown(): SaveState {
     claimedGoals: [],
     lastDaily: null,
     dailyStreak: 0,
+    helped: {},
+    tutorial: 0,
     updatedAt: now,
   }
 }
@@ -159,6 +171,7 @@ function addXp(s: GameState, amount: number): Partial<GameState> {
   if (!ups.length) return { xp }
   const fresh = { ...s, level }
   const unlocked = BUILDINGS.filter((d) => d.unlockLevel === level).map((d) => d.name)
+  setTimeout(sfx.levelUp, 250)
   s.toast(`Level up! You're level ${level}. +1 buck${unlocked.length ? `. Unlocked: ${unlocked.join(', ')}` : ''}`)
   return { level, xp, bucks, coins, fuel: fuelCap(fresh), fuelUpdatedAt: Date.now() }
 }
@@ -172,6 +185,7 @@ export const useGame = create<GameState>()(
       panel: null,
       selectedCar: null,
       toasts: [],
+      visiting: null,
 
       setMode: (mode, placing = null) => set({ mode, placing, panel: null }),
       openPanel: (panel) => set({ panel, mode: 'play', placing: null }),
@@ -198,11 +212,15 @@ export const useGame = create<GameState>()(
       placeBuilding: (def, x, z) => {
         const s = get()
         const d = buildingDef(def)
-        if (!canPlace(s, def, x, z)) return false
+        if (!canPlace(s, def, x, z)) {
+          sfx.error()
+          return false
+        }
         if (s.coins < d.price || s.bucks < (d.bucks ?? 0)) {
           s.toast('Not enough coins')
           return false
         }
+        sfx.click()
         set({
           coins: s.coins - d.price,
           bucks: s.bucks - (d.bucks ?? 0),
@@ -248,7 +266,11 @@ export const useGame = create<GameState>()(
         if (!d.jobSeconds) return
         const now = Date.now()
         if (b.jobEndsAt === null) {
-          if (s.fuel < d.fuelCost!) return s.toast(`Need ${d.fuelCost} fuel. Fuel refills 1 per minute.`)
+          if (s.fuel < d.fuelCost!) {
+            sfx.error()
+            return s.toast(`Need ${d.fuelCost} fuel. Fuel refills 1 per minute.`)
+          }
+          sfx.start()
           const cap = fuelCap(s)
           set({
             fuel: s.fuel - d.fuelCost!,
@@ -259,6 +281,7 @@ export const useGame = create<GameState>()(
           })
         } else if (now >= b.jobEndsAt) {
           const parts = d.partsPayout ?? 0
+          sfx.coin()
           s.toast(`+${d.payout} coins${parts ? `, +${parts} parts` : ''}, +${d.xp} XP`)
           // Sometimes a car out on the job comes back with a flat.
           let cars = s.cars
@@ -288,6 +311,7 @@ export const useGame = create<GameState>()(
           s.toast('Not enough money')
           return false
         }
+        sfx.buy()
         s.toast(`${c.name} added to your garage!`)
         set({
           coins: s.coins - c.price,
@@ -311,6 +335,7 @@ export const useGame = create<GameState>()(
           s.toast('Not enough coins or parts')
           return false
         }
+        sfx.buy()
         set({
           coins: s.coins - cost.coins,
           parts: s.parts - cost.parts,
@@ -349,6 +374,7 @@ export const useGame = create<GameState>()(
         const s = get()
         const g = GOALS.find((o) => o.id === id)
         if (!g || s.claimedGoals.includes(id) || !goalDone(s, g)) return
+        sfx.coin()
         s.toast(`Goal complete! +${g.coins} coins${g.bucks ? `, +${g.bucks} bucks` : ''}, +${g.xp} XP`)
         set({
           coins: s.coins + g.coins,
@@ -398,6 +424,21 @@ export const useGame = create<GameState>()(
         s.toast(tow ? "Rusty towed it in and patched it up. +15 XP" : `Tire fixed for $${cost}`)
       },
 
+      visit: (visiting) => set({ visiting, panel: null, mode: 'play', placing: null, selectedCar: null }),
+
+      helpFriend: () => {
+        const s = get()
+        const v = s.visiting
+        if (!v) return
+        if (s.helped[v.ownerId] === today()) return s.toast('You already helped this town today')
+        const coins = 100 + v.level * 20
+        sfx.coin()
+        s.toast(`You helped ${v.townName}! +${coins} coins, +10 XP`)
+        set({ coins: s.coins + coins, helped: { ...s.helped, [v.ownerId]: today() }, ...addXp(s, 10), updatedAt: Date.now() })
+      },
+
+      setTutorial: (tutorial) => set({ tutorial, updatedAt: Date.now() }),
+
       paintCar: (cuid, color) => {
         const s = get()
         const car = s.cars.find((c) => c.uid === cuid)
@@ -413,6 +454,7 @@ export const useGame = create<GameState>()(
           ...addXp(s, 5),
           updatedAt: Date.now(),
         })
+        sfx.buy()
         s.toast(`Painted ${paint.name}!`)
       },
 
@@ -430,19 +472,20 @@ export const useGame = create<GameState>()(
     {
       name: 'cartopia-save',
       partialize: (s) => saveOf(s),
-      merge: (persisted, current) => ({ ...current, ...starterDefaults(), ...(persisted as Partial<SaveState>) }),
+      merge: (persisted, current) => (persisted ? { ...current, ...starterDefaults(), ...(persisted as Partial<SaveState>) } : current),
     },
   ),
 )
 
 export function saveOf(s: GameState): SaveState {
-  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, lastDaily, dailyStreak, updatedAt } = s
-  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, lastDaily, dailyStreak, updatedAt }
+  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, lastDaily, dailyStreak, helped, tutorial, updatedAt } = s
+  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, lastDaily, dailyStreak, helped, tutorial, updatedAt }
 }
 
 // Fields added after launch, so older saves load with sensible values.
-function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'lastDaily' | 'dailyStreak'> {
-  return { stats: emptyStats(), claimedGoals: [], lastDaily: null, dailyStreak: 0 }
+function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial'> {
+  // Saves from before the tutorial existed skip it.
+  return { stats: emptyStats(), claimedGoals: [], lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99 }
 }
 
 export const spendFuel = (amount: number) => {

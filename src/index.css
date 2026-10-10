@@ -192,6 +192,26 @@ button.card:hover:not(:disabled) { border-color: var(--accent); }
 .race-layout .race-controls { grid-area: ctrl; }
 .tach { width: 150px; height: 150px; }
 
+/* Bubbles pinned over the 3D scene. */
+.badges { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 10; }
+.anchor { position: absolute; left: 0; top: 0; visibility: hidden; pointer-events: auto; padding-bottom: 9px; will-change: transform; }
+
+/* Friends, visiting, tutorial */
+.leaders { display: flex; flex-direction: column; gap: 6px; }
+.leader { display: grid; grid-template-columns: 34px 1fr auto auto; gap: 10px; align-items: center; background: #fff; border: 2px solid #e0e0e0; border-radius: 12px; padding: 6px 10px; }
+.leader.mine { border-color: var(--accent); background: #fff3e0; }
+.rank { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font: 15px var(--display); background: #eceff1; }
+.rank.r1 { background: #ffd54f; } .rank.r2 { background: #e0e0e0; } .rank.r3 { background: #ffab91; }
+.leader-trophies { font: 15px var(--display); }
+.visit-banner { position: absolute; z-index: 60; left: 50%; transform: translateX(-50%); bottom: calc(12px + var(--sab)); background: var(--panel); border: 3px solid #fff; border-radius: 16px; padding: 8px 12px; box-shadow: 0 4px 0 rgba(0,0,0,.3); display: flex; gap: 14px; align-items: center; max-width: calc(100vw - 20px); }
+.visit-title { display: flex; flex-direction: column; font-size: 15px; }
+.visit-title b { font: 18px var(--display); }
+.visit-title small { color: #607d8b; font-weight: 800; }
+.tutorial { position: absolute; z-index: 70; left: 50%; transform: translateX(-50%); bottom: calc(96px + var(--sab)); width: min(420px, calc(100vw - 20px)); background: #263238; color: #fff; border: 3px solid #fff; border-radius: 16px; padding: 10px 14px; box-shadow: 0 6px 0 rgba(0,0,0,.3); animation: pop .25s ease-out; }
+.tutorial p { margin: 4px 0 8px; font-weight: 800; line-height: 1.35; }
+.tut-step { font: 12px var(--display); color: #ffca28; }
+.tut-skip { background: none; border: none; color: #b0bec5; font-weight: 800; text-decoration: underline; }
+
 /* Phones in portrait. */
 @media (max-width: 600px) {
   .speedo { width: 64px; height: 76px; }
@@ -215,7 +235,8 @@ button.card:hover:not(:disabled) { border-color: var(--accent); }
 
   .bottom-bar { left: calc(6px + var(--sal)); right: calc(6px + var(--sar)); bottom: calc(6px + var(--sab)); gap: 2px; justify-content: space-between; align-items: center; }
   .icon-btn { font-size: 10px; gap: 1px; flex: 1; min-width: 0; }
-  .icon-btn .i { width: 42px; height: 42px; font-size: 21px; border-width: 2px; }
+  .icon-btn .i { width: 38px; height: 38px; font-size: 19px; border-width: 2px; }
+  .icon-btn { font-size: 9px; }
   .menu-btn { padding: 6px 7px; font-size: 13px; border-width: 2px; border-radius: 14px; }
   .menu-btn span { display: none; }
   .race-btn { margin-left: 0; padding: 3px 9px; font-size: 13px; border-width: 2px; border-radius: 14px; }
@@ -246,6 +267,11 @@ button.card:hover:not(:disabled) { border-color: var(--accent); }
   .daily { gap: 4px; }
   .day b { font-size: 14px; }
   .rival { grid-template-columns: 16px 1fr; }
+  .leader { grid-template-columns: 30px 1fr auto; }
+  .leader .buy { grid-column: 1 / -1; }
+  .visit-banner { flex-direction: column; gap: 6px; text-align: center; left: 6px; right: 6px; transform: none; }
+  .tutorial { bottom: calc(76px + var(--sab)); }
+  .tutorial p { font-size: 14px; }
   .rival .buy { grid-column: 1 / -1; }
 
   .race-3d { height: 30dvh; min-height: 170px; }

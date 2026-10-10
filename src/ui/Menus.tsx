@@ -7,6 +7,8 @@ export function BottomBar() {
   const openPanel = useGame((s) => s.openPanel)
   const setMode = useGame((s) => s.setMode)
   const mode = useGame((s) => s.mode)
+  const visiting = useGame((s) => !!s.visiting)
+  if (visiting) return null
   if (mode !== 'play') return <EditBar />
   return (
     <>
@@ -15,6 +17,7 @@ export function BottomBar() {
         <button className="icon-btn" onClick={() => openPanel('shop')}><span className="i">🏪</span>SHOP</button>
         <button className="icon-btn" onClick={() => openPanel('showroom')}><span className="i">🚘</span>SHOWROOM</button>
         <button className="icon-btn" onClick={() => openPanel('garage')}><span className="i">🔧</span>GARAGE</button>
+        <button className="icon-btn" onClick={() => openPanel('friends')}><span className="i">👫</span>FRIENDS</button>
         <button className="icon-btn" onClick={() => setMode('road')}><span className="i">🚧</span>EDIT</button>
         <button className="big-btn race-btn" onClick={() => openPanel('race')}><span className="i">🏆</span>RACE</button>
       </div>

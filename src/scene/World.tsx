@@ -1,60 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Html, MapControls } from '@react-three/drei'
+import { MapControls } from '@react-three/drei'
+import { AnchorProjector } from './anchors'
 import { useThree, type ThreeEvent } from '@react-three/fiber'
 import { useGame, canPlace, type PlacedBuilding } from '../game/store'
 import { GRID, TILE, buildingDef } from '../game/data'
 import { BuildingModel } from './BuildingModel'
 import { TownCars } from './TownCars'
 import { toWorld, toTile, DIRS } from './grid'
-import { useNow } from './useNow'
 
 const SIZE = GRID * TILE
 
-function centerOf(def: string, x: number, z: number): [number, number] {
+export function centerOf(def: string, x: number, z: number): [number, number] {
   const d = buildingDef(def)
   return toWorld(x + (d.w - 1) / 2, z + (d.h - 1) / 2)
 }
 
-function fmt(sec: number) {
-  if (sec >= 60) return `${Math.floor(sec / 60)}m ${String(sec % 60).padStart(2, '0')}s`
-  return `${sec}s`
-}
 
-function JobBadge({ b, now }: { b: PlacedBuilding; now: number }) {
-  const d = buildingDef(b.def)
-  const tap = useGame((s) => s.tapBuilding)
-  const mode = useGame((s) => s.mode)
-  if (!d.jobSeconds) return null
-  const [cx, cz] = centerOf(b.def, b.x, b.z)
-  const ready = b.jobEndsAt !== null && now >= b.jobEndsAt
-  const working = b.jobEndsAt !== null && !ready
-  const left = working ? Math.ceil((b.jobEndsAt! - now) / 1000) : 0
-  const pct = working ? 1 - left / d.jobSeconds : 0
-  return (
-    <Html position={[cx, d.w > 1 ? 2.6 : 2.2, cz]} center zIndexRange={[10, 0]} style={{ display: mode === 'play' ? 'block' : 'none' }}>
-      <button
-        className={`badge ${ready ? 'badge-ready' : working ? 'badge-working' : 'badge-idle'}`}
-        onClick={(e) => {
-          e.stopPropagation()
-          tap(b.uid)
-        }}
-        title={d.name}
-      >
-        {ready ? (
-          <span className="coin">$</span>
-        ) : working ? (
-          <>
-            <span className="clock">⏱</span>
-            <span className="bar"><span style={{ width: `${pct * 100}%` }} /></span>
-            <span className="time">{fmt(left)}</span>
-          </>
-        ) : (
-          <span className="start">⛽ {d.fuelCost}</span>
-        )}
-      </button>
-    </Html>
-  )
-}
 
 // Turn a building's front toward an adjacent road. Non-square lots can only flip.
 function facing(b: PlacedBuilding, roads: Set<string>) {
@@ -87,7 +48,7 @@ function Building({ b, roads }: { b: PlacedBuilding; roads: Set<string> }) {
       rotation-y={rot}
       onClick={(e) => {
         const s = useGame.getState()
-        if (s.mode !== 'play' || e.delta > 6) return
+        if (s.mode !== 'play' || s.visiting || e.delta > 6) return
         e.stopPropagation()
         s.tapBuilding(b.uid)
       }}
@@ -108,7 +69,7 @@ function Building({ b, roads }: { b: PlacedBuilding; roads: Set<string> }) {
 }
 
 function Roads() {
-  const roadsList = useGame((s) => s.roads)
+  const roadsList = useGame((s) => (s.visiting ?? s).roads)
   const tiles = useMemo(() => {
     const set = new Set(roadsList)
     return roadsList.map((k) => {
@@ -261,10 +222,9 @@ function ResponsiveZoom() {
 }
 
 export function World() {
-  const buildings = useGame((s) => s.buildings)
-  const roadsList = useGame((s) => s.roads)
+  const buildings = useGame((s) => (s.visiting ?? s).buildings)
+  const roadsList = useGame((s) => (s.visiting ?? s).roads)
   const roads = useMemo(() => new Set(roadsList), [roadsList])
-  const now = useNow()
   return (
     <>
       <color attach="background" args={['#5aa83a']} />
@@ -290,9 +250,7 @@ export function World() {
       {buildings.map((b) => (
         <Building key={b.uid} b={b} roads={roads} />
       ))}
-      {buildings.map((b) => (
-        <JobBadge key={b.uid} b={b} now={now} />
-      ))}
+      <AnchorProjector />
       <TownCars />
     </>
   )

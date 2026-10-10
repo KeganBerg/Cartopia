@@ -5,6 +5,9 @@ import { Hud } from './ui/Hud'
 import { BottomBar, ShopPanel, ShowroomPanel, GaragePanel, Toasts } from './ui/Menus'
 import { RacePanel, LiveRaceOverlay, ChallengePopup } from './ui/Race'
 import { joinLobby, useLive } from './lib/live'
+import { FriendsPanel, VisitBanner } from './ui/Friends'
+import { Tutorial } from './ui/Tutorial'
+import { Badges } from './ui/Badges'
 import { AccountPanel } from './ui/Account'
 import { GoalsPanel, DailyPanel, FlatPanel } from './ui/Goals'
 import { useGame, today } from './game/store'
@@ -29,6 +32,7 @@ export default function App() {
       <Canvas shadows orthographic camera={{ position: [30, 32, 30], zoom: 36, near: 0.1, far: 500 }} dpr={[1, 2]}>
         <World />
       </Canvas>
+      <Badges />
       <Hud />
       <BottomBar />
       {panel === 'shop' && <ShopPanel />}
@@ -37,6 +41,9 @@ export default function App() {
       {panel === 'race' && !liveRace && <RacePanel />}
       {liveRace && <LiveRaceOverlay />}
       <ChallengePopup />
+      {panel === 'friends' && <FriendsPanel />}
+      <VisitBanner />
+      <Tutorial />
       {panel === 'account' && <AccountPanel />}
       {panel === 'goals' && <GoalsPanel />}
       {panel === 'daily' && <DailyPanel />}

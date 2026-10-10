@@ -2,6 +2,7 @@ import { useGame, fuelCap } from '../game/store'
 import { xpToNext, FUEL_REGEN_SECONDS } from '../game/data'
 import { useNow } from '../scene/useNow'
 import { GoalsButton } from './Goals'
+import { MuteButton } from './MuteButton'
 
 const n = (v: number) => v.toLocaleString()
 
@@ -53,8 +54,8 @@ export function Hud() {
         </div>
       </div>
       <div className="hud-center">
-        <div className="town-name">{s.townName}</div>
-        <button className="my-cars" onClick={() => s.openPanel('garage')}>🚗 <span className="my-cars-label">MY CARS:</span> {s.cars.length}</button>
+        <div className="town-name">{s.visiting?.townName ?? s.townName}</div>
+        {!s.visiting && <button className="my-cars" onClick={() => s.openPanel('garage')}>🚗 <span className="my-cars-label">MY CARS:</span> {s.cars.length}</button>}
       </div>
       <div className="hud-right">
         <div className="fuel">
@@ -68,6 +69,7 @@ export function Hud() {
         <div className="hud-right-row">
           <div className="pill trophies">🏆 {s.trophies}</div>
           <GoalsButton />
+          <MuteButton />
         </div>
       </div>
     </>

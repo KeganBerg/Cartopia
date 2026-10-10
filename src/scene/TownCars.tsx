@@ -1,6 +1,7 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Html } from '@react-three/drei'
+import { anchors } from './anchors'
+import { Vector3 } from 'three'
 import type { Group } from 'three'
 import { useGame, type OwnedCar } from '../game/store'
 import { carDef, performance } from '../game/data'
@@ -34,6 +35,8 @@ function DrivingCar({ car, roads, start }: { car: OwnedCar; roads: Set<string>; 
     const a = agent.current
     if (car.flat) {
       g.rotation.z = 0.06
+      const p = anchors.get(`car:${car.uid}`) ?? new Vector3()
+      anchors.set(`car:${car.uid}`, p.set(g.position.x, 1.1, g.position.z))
       return
     }
     g.rotation.z = 0
@@ -73,26 +76,11 @@ function DrivingCar({ car, roads, start }: { car: OwnedCar; roads: Set<string>; 
       onClick={(e) => {
         e.stopPropagation()
         const s = useGame.getState()
-        if (s.mode !== 'play') return
+        if (s.mode !== 'play' || s.visiting) return
         s.selectCar(car.uid)
         s.openPanel(car.flat ? 'flat' : 'garage')
       }}
     >
-      {car.flat && (
-        <Html position={[0, 1.1, 0]} center zIndexRange={[10, 0]}>
-          <button
-            className="badge badge-flat"
-            onClick={(e) => {
-              e.stopPropagation()
-              const s = useGame.getState()
-              s.selectCar(car.uid)
-              s.openPanel('flat')
-            }}
-          >
-            🛞 Flat!
-          </button>
-        </Html>
-      )}
       <CarModel body={def.body} color={car.color} highlight={selected} stripe={car.stripe} />
     </group>
   )
@@ -100,8 +88,9 @@ function DrivingCar({ car, roads, start }: { car: OwnedCar; roads: Set<string>; 
 
 
 export function TownCars() {
-  const roadsList = useGame((s) => s.roads)
-  const cars = useGame((s) => s.cars)
+  const roadsList = useGame((s) => (s.visiting ?? s).roads)
+  const cars = useGame((s) => (s.visiting ?? s).cars)
+  const visitKey = useGame((s) => s.visiting?.ownerId ?? 'home')
   const roads = useMemo(() => new Set(roadsList), [roadsList])
   const starts = useMemo(() => {
     const arr = [...roads].map((k) => k.split(',').map(Number) as [number, number])
@@ -111,7 +100,7 @@ export function TownCars() {
   return (
     <>
       {cars.slice(0, MAX_VISIBLE).map((car, i) => (
-        <DrivingCar key={car.uid} car={car} roads={roads} start={starts[(i * 7919) % starts.length]} />
+        <DrivingCar key={`${visitKey}-${car.uid}`} car={car} roads={roads} start={starts[(i * 7919) % starts.length]} />
       ))}
     </>
   )
