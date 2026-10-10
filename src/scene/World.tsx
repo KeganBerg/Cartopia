@@ -329,7 +329,7 @@ export function World() {
         castShadow
         position={[25, 40, 15]}
         intensity={1.6}
-        shadow-mapSize={[2048, 2048]}
+        shadow-mapSize={Math.min(window.innerWidth, window.innerHeight) < 700 ? [1024, 1024] : [2048, 2048]}
         shadow-camera-left={-30}
         shadow-camera-right={30}
         shadow-camera-top={30}
