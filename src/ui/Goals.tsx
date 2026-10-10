@@ -23,8 +23,7 @@ function goTo(stat: StatKey): void {
       if (s.buildings.some((b) => b.def === 'rescue')) return s.openPanel('rescue')
       const price = buildingDef('rescue').price
       if (s.coins < price) return s.showNeed('coins', price - s.coins, "Rusty's Rescue")
-      s.setMode('place', 'rescue')
-      return s.toast("Tap an empty spot next to a road to build Rusty's Rescue")
+      return s.openShop('rescue')
     }
     case 'searches':
     case 'rescued':
@@ -124,7 +123,7 @@ export function FlatPanel() {
           <div className="source">
             <span className="source-icon">⛽</span>
             <div><b>Fill up at your Gas Station</b><div className="card-stat">{owns('gas') ? `Your station earns $${servicePay(s.level, 'gas')} and 8 XP.` : 'Build a Gas Station to earn money from every fill-up.'}</div></div>
-            {owns('gas') ? <button className="buy small" onClick={() => s.serviceCar(car.uid, 'gas')}>Fill up · +${servicePay(s.level, 'gas')}</button> : <button className="buy small" onClick={() => s.setMode('place', 'gas')}>Build</button>}
+            {owns('gas') ? <button className="buy small" onClick={() => s.serviceCar(car.uid, 'gas')}>Fill up · +${servicePay(s.level, 'gas')}</button> : <button className="buy small" onClick={() => s.openShop('gas')}>Build</button>}
           </div>
           <div className="source">
             <span className="source-icon">🛢</span>
@@ -142,7 +141,7 @@ export function FlatPanel() {
         <div className="source">
           <span className="source-icon">🛞</span>
           <div><b>Send it to your Tire Shop</b><div className="card-stat">{owns('tires') ? `Your shop earns $${servicePay(s.level, 'tires')} and 12 XP.` : s.level < 2 ? 'Tire Shops unlock at level 2 and earn money from every flat.' : 'Build a Tire Shop to earn money from every flat.'}</div></div>
-          {owns('tires') ? <button className="buy small" onClick={() => s.serviceCar(car.uid, 'tires')}>Fix · +${servicePay(s.level, 'tires')}</button> : s.level >= 2 ? <button className="buy small" onClick={() => s.setMode('place', 'tires')}>Build</button> : null}
+          {owns('tires') ? <button className="buy small" onClick={() => s.serviceCar(car.uid, 'tires')}>Fix · +${servicePay(s.level, 'tires')}</button> : s.level >= 2 ? <button className="buy small" onClick={() => s.openShop('tires')}>Build</button> : null}
         </div>
         <div className="source">
           <span className="source-icon">🔧</span>
