@@ -1,5 +1,5 @@
 import { useGame, activeGoals, goalDone, statValue, today } from '../game/store'
-import { DAILY_BONUS, carDef, flatFixCost, servicePay, gasCanCost } from '../game/data'
+import { DAILY_BONUS, buildingDef, carDef, type StatKey, flatFixCost, servicePay, gasCanCost } from '../game/data'
 import { Panel } from './Menus'
 
 export function GoalsButton() {
@@ -11,6 +11,48 @@ export function GoalsButton() {
       📋{done > 0 && <span className="goal-badge">✔</span>}
     </button>
   )
+}
+
+// Take the player to where a goal gets done.
+function goTo(stat: StatKey): void {
+  const s = useGame.getState()
+  const jobDefs = [...new Set(s.buildings.filter((b) => buildingDef(b.def).jobSeconds && buildingDef(b.def).kind !== 'obstacle').map((b) => b.def))]
+  const jobs = () => s.showMe(jobDefs, 'Tap the flashing bubbles to run jobs and collect coins.')
+  switch (stat) {
+    case 'rusty': {
+      if (s.buildings.some((b) => b.def === 'rescue')) return s.openPanel('rescue')
+      const price = buildingDef('rescue').price
+      if (s.coins < price) return s.showNeed('coins', price - s.coins, "Rusty's Rescue")
+      s.setMode('place', 'rescue')
+      return s.toast("Tap an empty spot next to a road to build Rusty's Rescue")
+    }
+    case 'searches':
+    case 'rescued':
+      return s.buildings.some((b) => b.def === 'rescue') ? s.openPanel('rescue') : goTo('rusty')
+    case 'jobs':
+    case 'coinsEarned':
+      return jobs()
+    case 'roads':
+      s.setMode('road')
+      return s.toast('Drag on empty grass to lay road')
+    case 'carsBought':
+      return s.openPanel('showroom')
+    case 'racesWon':
+    case 'gpWins':
+      return s.openPanel('race')
+    case 'upgrades':
+      return s.openPanel('garage')
+    case 'built':
+      return s.openPanel('shop')
+    case 'flatsFixed': {
+      const flat = s.cars.find((c) => c.flat)
+      if (flat) {
+        s.selectCar(flat.uid)
+        return s.openPanel('flat')
+      }
+      return s.showMe(jobDefs, 'Cars sometimes get flats on jobs. Run a few and watch for the 🛞 bubble.')
+    }
+  }
 }
 
 export function GoalsPanel() {
@@ -25,12 +67,14 @@ export function GoalsPanel() {
           const done = goalDone(s, g)
           return (
             <div key={g.id} className={done ? 'goal done' : 'goal'}>
-              <div className="goal-main">
+              <div className="goal-main" role="button" onClick={() => !done && goTo(g.stat)}>
                 <b>{g.text}</b>
                 <div className="bar wide"><span style={{ width: `${(have / g.target) * 100}%` }} /></div>
                 <small>{have.toLocaleString()} / {g.target.toLocaleString()} · Reward ${g.coins}{g.bucks ? ` + B${g.bucks}` : ''} + {g.xp} XP</small>
               </div>
-              <button className="buy small" disabled={!done} onClick={() => s.claimGoal(g.id)}>{done ? 'Collect' : '...'}</button>
+              {done
+                ? <button className="buy small" onClick={() => s.claimGoal(g.id)}>Collect</button>
+                : <button className="buy small alt" onClick={() => goTo(g.stat)}>Go ›</button>}
             </div>
           )
         })}

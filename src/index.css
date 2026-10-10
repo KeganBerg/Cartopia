@@ -291,6 +291,7 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .badge-sale.broke { opacity: .75; }
 .badge-sale.confirm { gap: 6px; padding: 4px 6px 4px 10px; }
 .badge-sale .sell { margin: 0; padding: 2px 8px; }
+.goal:not(.done) .goal-main { cursor: pointer; }
 .badge-rescue { background: #fff3e0; color: #5d4037; }
 
 /* Grand Prix */
