@@ -528,8 +528,9 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .panel { position: relative; }
 .panel-wrap { position: relative; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .panel-wrap > .panel-body { flex: 1 1 auto; min-height: 0; }
-.preview-area { position: absolute; inset: 0; pointer-events: none; }
-.preview-canvas { position: fixed; inset: 0; z-index: 101; }
-.preview-canvas, .preview-canvas * { pointer-events: none !important; }
-.thumb3d { width: 100%; height: 104px; border-radius: 10px; background: radial-gradient(ellipse at 50% 70%, #ffffff 0 35%, #e3f2fd 75%); }
+.preview-baker { position: fixed !important; left: -10000px; top: 0; pointer-events: none; }
+.thumb3d { width: 100%; height: 104px; border-radius: 10px; overflow: hidden; display: flex; justify-content: center; background: radial-gradient(ellipse at 50% 70%, #ffffff 0 35%, #e3f2fd 75%); }
+.thumb-strip { width: 132px; height: 104px; flex: none; background-size: 2640px 104px; background-repeat: no-repeat; animation: thumb-spin 7s steps(20) infinite; }
+@keyframes thumb-spin { from { background-position: 0 0; } to { background-position: -2640px 0; } }
+@media (prefers-reduced-motion: reduce) { .thumb-strip { animation: none; } }
 .card.locked .thumb3d { filter: grayscale(1); }
