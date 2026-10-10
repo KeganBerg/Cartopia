@@ -70,6 +70,24 @@ export function Panel({ title, children, wide, onClose }: { title: string; child
   )
 }
 
+// Scrolls to and flashes the card the level-up splash sent the player to.
+function useShopFocus() {
+  const focus = useGame((s) => s.shopFocus)
+  const body = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!focus) return
+    const el = body.current?.querySelector<HTMLElement>(`[data-id="${focus}"]`)
+    // Wait a frame so the panel has laid out before scrolling.
+    const raf = requestAnimationFrame(() => el?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
+    const t = setTimeout(() => useGame.setState({ shopFocus: null }), 2600)
+    return () => {
+      cancelAnimationFrame(raf)
+      clearTimeout(t)
+    }
+  }, [focus])
+  return { body, focus }
+}
+
 function price(def: { price: number; bucks?: number }) {
   if (def.bucks) return <span className="price bucks">B {def.bucks}</span>
   return <span className="price">$ {def.price.toLocaleString()}</span>
@@ -143,6 +161,7 @@ export function ShowroomPanel() {
   const rusty = useGame((s) => hasRusty(s))
   const openShop = useGame((s) => s.openShop)
   const [colorFor, setColorFor] = useState<Record<string, string>>({})
+  const { body, focus } = useShopFocus()
   return (
     <Panel title="Showroom" wide>
       {!rusty && (
@@ -155,13 +174,13 @@ export function ShowroomPanel() {
           <button className="buy" onClick={() => openShop('rescue')}>Build · $1,000</button>
         </div>
       )}
-      <div className={rusty ? 'cards' : 'cards dimmed'}>
+      <div ref={body} className={rusty ? 'cards' : 'cards dimmed'}>
         {CARS.filter((c) => !c.rescueOnly).map((c) => {
           const locked = level < c.unlockLevel
           const color = colorFor[c.id] ?? c.colors[0]
           const pi = performance(c, { engine: 0, turbo: 0, tires: 0, weight: 0 })
           return (
-            <div key={c.id} className={`card car-card ${locked ? 'locked' : ''}`}>
+            <div key={c.id} data-id={c.id} className={`card car-card ${locked ? 'locked' : ''} ${focus === c.id ? 'focus' : ''}`}>
               <CarThumb color={color} body={c.body} />
               <div className="card-name">{c.name}</div>
               <div className="card-stat">PI {pi} · {c.body}</div>
