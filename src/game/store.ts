@@ -112,6 +112,7 @@ type Actions = {
   rushRestore: () => void
   collectRestored: (plate: string) => void
   scrapCar: (uid: string) => void
+  collectAll: () => void
 }
 
 export type GameState = SaveState & UiState & Actions
@@ -241,6 +242,25 @@ function addXp(s: GameState, amount: number): Partial<GameState> {
 }
 
 export const cleanPlate = (p: string) => p.toUpperCase().replace(/[^A-Z0-9 ]/g, '').trim().slice(0, 7)
+
+// Collect all can be used once a minute; the last use survives a reload.
+export const COLLECT_ALL_MS = 60_000
+export const collectAllListeners = new Set<() => void>()
+export function lastCollectAll() {
+  try {
+    return Number(localStorage.getItem('cartopia-collect-all')) || 0
+  } catch {
+    return 0
+  }
+}
+function setLastCollectAll(t: number) {
+  try {
+    localStorage.setItem('cartopia-collect-all', String(t))
+  } catch {
+    // Private mode: the cooldown just won't survive a reload.
+  }
+  collectAllListeners.forEach((fn) => fn())
+}
 
 export const useGame = create<GameState>()(
   persist(
@@ -399,6 +419,88 @@ export const useGame = create<GameState>()(
             updatedAt: now,
           })
         }
+      },
+
+      // One tap: collect every finished job and cleared obstacle, restart
+      // every idle business while fuel lasts, and fill up cars out of gas.
+      collectAll: () => {
+        const s = get()
+        const now = Date.now()
+        const left = COLLECT_ALL_MS - (now - lastCollectAll())
+        if (left > 0) return s.toast(`Ready again in ${Math.ceil(left / 1000)}s`)
+        let coins = s.coins
+        let parts = s.parts
+        let fuel = s.fuel
+        let xp = 0
+        let collected = 0
+        let started = 0
+        let cleared = 0
+        let earned = 0
+        const removed = new Set<string>()
+        let buildings = s.buildings.map((b) => {
+          const d = buildingDef(b.def)
+          if (!d.jobSeconds || b.jobEndsAt === null || now < b.jobEndsAt) return b
+          if (d.kind === 'obstacle') {
+            removed.add(b.uid)
+            xp += d.xp ?? 0
+            cleared++
+            return b
+          }
+          coins += d.payout ?? 0
+          earned += d.payout ?? 0
+          parts += d.partsPayout ?? 0
+          xp += d.xp ?? 0
+          collected++
+          return { ...b, jobEndsAt: null }
+        }).filter((b) => !removed.has(b.uid))
+        const cap = fuelCap(s)
+        buildings = buildings.map((b) => {
+          const d = buildingDef(b.def)
+          if (!d.jobSeconds || d.kind === 'obstacle' || b.jobEndsAt !== null || fuel < (d.fuelCost ?? 0)) return b
+          fuel -= d.fuelCost ?? 0
+          started++
+          return { ...b, jobEndsAt: now + d.jobSeconds * 1000 }
+        })
+        // Cars out of gas fill up at your Gas Station, if you have one.
+        let cars = s.cars
+        let filled = 0
+        if (s.buildings.some((b) => b.def === 'gas')) {
+          const pay = servicePay(s.level, 'gas')
+          cars = cars.map((c) => {
+            if (!c.lowFuel) return c
+            filled++
+            coins += pay
+            earned += pay
+            xp += 8
+            requestTrip(c.uid, 'gas')
+            return { ...c, lowFuel: false }
+          })
+        }
+        if (!collected && !started && !cleared && !filled) return s.toast('Nothing to collect or fuel right now')
+        setLastCollectAll(now)
+        if (collected || filled) sfx.coin()
+        else sfx.start()
+        const bits = [
+          collected && `collected ${collected} job${collected > 1 ? 's' : ''}`,
+          started && `started ${started}`,
+          filled && `filled up ${filled} car${filled > 1 ? 's' : ''}`,
+          cleared && `cleared ${cleared}`,
+        ].filter(Boolean) as string[]
+        s.toast(`${bits.join(', ').replace(/^./, (c) => c.toUpperCase())}${earned ? `. +${earned} coins` : ''}${parts > s.parts ? `, +${parts - s.parts} parts` : ''}`)
+        if (!started && buildings.some((b) => buildingDef(b.def).jobSeconds && buildingDef(b.def).kind !== 'obstacle' && b.jobEndsAt === null)) {
+          setTimeout(() => get().toast('Out of fuel for the rest. It refills over time.'), 900)
+        }
+        set({
+          buildings,
+          cars,
+          coins,
+          parts,
+          fuel,
+          fuelUpdatedAt: s.fuel >= cap && fuel < cap ? now : s.fuelUpdatedAt,
+          stats: { ...bump(s, 'jobs', collected), coinsEarned: (s.stats.coinsEarned ?? 0) + earned },
+          ...addXp({ ...s, coins }, xp),
+          updatedAt: now,
+        })
       },
 
       buyCar: (model, color) => {

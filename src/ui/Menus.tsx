@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useGame, hasRusty } from '../game/store'
 import { BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, PAINTS, STRIPES, PAINT_COST, STRIPE_COST, carDef, performance, upgradeCost, type BuildingDef } from '../game/data'
 import { CarPreview } from '../scene/CarPreview'
+import { CollectAllButton } from './CollectAll'
 import { PreviewCanvas, BuildingThumb } from '../scene/BuildingPreview'
 
 export function BottomBar() {
@@ -22,6 +23,7 @@ export function BottomBar() {
         <button className="icon-btn" onClick={() => setMode('road')}><span className="i">🚧</span>EDIT</button>
         <button className="big-btn race-btn" onClick={() => openPanel('race')}><span className="i">🏆</span>RACE</button>
       </div>
+      <CollectAllButton />
     </>
   )
 }

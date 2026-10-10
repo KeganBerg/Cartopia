@@ -534,3 +534,19 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 @keyframes thumb-spin { from { background-position: 0 0; } to { background-position: -2640px 0; } }
 @media (prefers-reduced-motion: reduce) { .thumb-strip { animation: none; } }
 .card.locked .thumb3d { filter: grayscale(1); }
+
+/* Collect and fuel all: round button above the Race button with a recharge ring. */
+.collect-all { position: absolute; z-index: 51; right: calc(18px + var(--sar)); bottom: calc(104px + var(--sab)); width: 60px; height: 60px; border-radius: 50%; border: 3px solid #fff; padding: 0; display: grid; place-items: center;
+  background: conic-gradient(#ffca28 var(--pct), #90a4ae 0); box-shadow: 0 4px 0 rgba(0,0,0,.3); }
+.collect-all::before { content: ''; position: absolute; inset: 5px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #fff59d, #f9a825); }
+.collect-all.cooling::before { background: radial-gradient(circle at 40% 35%, #eceff1, #b0bec5); }
+.collect-all.has-work { animation: collect-pulse 1.6s ease-in-out infinite; }
+@keyframes collect-pulse { 50% { transform: scale(1.08); box-shadow: 0 4px 0 rgba(0,0,0,.3), 0 0 0 6px rgba(255, 213, 79, .45); } }
+.collect-ico { position: relative; font-size: 28px; line-height: 1; }
+.collect-all.cooling .collect-ico { opacity: .45; }
+.collect-time { position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); background: #263238; color: #fff; font: 12px var(--display); padding: 1px 6px; border-radius: 8px; }
+.collect-badge { position: absolute; top: -4px; right: -4px; min-width: 20px; height: 20px; border-radius: 10px; background: #e53935; color: #fff; font: 12px var(--display); display: grid; place-items: center; border: 2px solid #fff; }
+@media (max-width: 700px) {
+  .collect-all { width: 52px; height: 52px; right: calc(10px + var(--sar)); bottom: calc(76px + var(--sab)); }
+  .collect-ico { font-size: 24px; }
+}
