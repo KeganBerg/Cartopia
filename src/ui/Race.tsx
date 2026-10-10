@@ -7,7 +7,7 @@ import { Panel } from './Menus'
 import { Canvas } from '@react-three/fiber'
 import { RaceScene } from '../scene/RaceScene'
 import { sfx, engineRpm, stopEngine } from '../lib/sound'
-import { useLive, challenge, refreshPresence, raceChannel, endLiveRace, answer, type LiveRace } from '../lib/live'
+import { useLive, challenge, refreshPresence, raceChannel, endLiveRace, answer, pruneInvites, mute, unmute, setClosed, INVITE_MS, type LiveRace } from '../lib/live'
 
 type Rival = { id: string; town: string; level: number; carName: string; color: string; pi: number; online: boolean; body: Body }
 
@@ -81,6 +81,8 @@ export function RacePanel() {
 
   const livePlayers = useLive((l) => l.players)
   const outgoing = useLive((l) => l.outgoing)
+  const mutedIds = useLive((l) => l.muted)
+  const cooldownTo = useLive((l) => l.cooldownTo)
 
   useEffect(() => {
     fetchOnlineRivals().then(setOnline)
@@ -131,15 +133,15 @@ export function RacePanel() {
           <h3>Live now <small>(players online this minute, no fuel needed)</small></h3>
           {livePlayers.length === 0 && <p className="hint">Nobody else is online right now. Open Cartopia in another browser or ask a friend to join!</p>}
           <div className="rivals">
-            {livePlayers.map((p) => (
+            {livePlayers.filter((p) => !mutedIds[p.id]).map((p) => (
               <div key={p.id} className="rival">
                 <i style={{ background: p.color }} />
                 <div>
                   <b>{p.town}</b> <span className="tag live">LIVE</span>
                   <div className="card-stat">Lvl {p.level} · {p.carName} · PI {p.pi}</div>
                 </div>
-                <button className="buy small alt" disabled={!!outgoing} onClick={() => challenge(p.id)}>
-                  {outgoing?.to === p.id ? 'Waiting...' : `Challenge · win $${liveReward(p.pi)}`}
+                <button className="buy small alt" disabled={!!outgoing || p.closed || (cooldownTo[p.id] ?? 0) > Date.now()} onClick={() => challenge(p.id)}>
+                  {p.closed ? 'Not taking races' : outgoing?.to === p.id ? 'Waiting...' : (cooldownTo[p.id] ?? 0) > Date.now() ? 'Try again soon' : `Challenge · win $${liveReward(p.pi)}`}
                 </button>
               </div>
             ))}
@@ -512,17 +514,79 @@ export function LiveRaceOverlay() {
   return <DragRace key={race.raceId} car={best} rival={rival} live={race} onExit={endLiveRace} />
 }
 
-export function ChallengePopup() {
-  const inc = useLive((l) => l.incoming)
-  if (!inc) return null
+// Challenges land in an inbox instead of popping up over the game.
+export function ChallengeBell() {
+  const count = useLive((l) => l.invites.length)
+  const closed = useLive((l) => l.closed)
+  const openPanel = useGame((s) => s.openPanel)
+  const visiting = useGame((s) => !!s.visiting)
+  useEffect(() => {
+    const id = setInterval(pruneInvites, 1000)
+    return () => clearInterval(id)
+  }, [])
+  if (!supabase || visiting) return null
   return (
-    <div className="challenge-pop">
-      <b>{inc.from.town}</b> challenges you to a drag race!
-      <div className="card-stat">{inc.from.carName} · PI {inc.from.pi}</div>
-      <div className="row">
-        <button className="buy small" onClick={() => answer(true)}>Race!</button>
-        <button className="sell" onClick={() => answer(false)}>Decline</button>
-      </div>
-    </div>
+    <button className={`challenge-bell${count ? ' has' : ''}`} onClick={() => openPanel('invites')} title="Race challenges">
+      🏁{closed && <span className="bell-off">✕</span>}
+      {count > 0 && <span className="bell-count">{count}</span>}
+    </button>
+  )
+}
+
+export function InvitesPanel() {
+  const invites = useLive((l) => l.invites)
+  const muted = useLive((l) => l.muted)
+  const closed = useLive((l) => l.closed)
+  const openPanel = useGame((s) => s.openPanel)
+  const [, tick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => tick((n) => n + 1), 1000)
+    return () => clearInterval(id)
+  }, [])
+  const accept = (raceId: string) => {
+    answer(raceId, true)
+    openPanel(null)
+  }
+  return (
+    <Panel title="Race challenges">
+      <label className="toggle-row">
+        <input type="checkbox" checked={closed} onChange={(e) => setClosed(e.target.checked)} />
+        <span>Don't accept challenges <small>Other players will see you're not taking races.</small></span>
+      </label>
+      {invites.length === 0 ? (
+        <p className="hint">{closed ? 'Challenges are off.' : 'No challenges right now. When someone challenges you, it shows up here.'}</p>
+      ) : (
+        <div className="rivals">
+          {invites.map((i) => (
+            <div key={i.raceId} className="rival invite">
+              <i style={{ background: i.from.color }} />
+              <div>
+                <b>{i.from.town}</b> <span className="tag live">LIVE</span>
+                <div className="card-stat">Lvl {i.from.level} · {i.from.carName} · PI {i.from.pi} · {Math.max(0, Math.ceil((INVITE_MS - (Date.now() - i.at)) / 1000))}s left</div>
+              </div>
+              <div className="invite-actions">
+                <button className="buy small" onClick={() => accept(i.raceId)}>Race!</button>
+                <button className="sell" onClick={() => answer(i.raceId, false)}>Decline</button>
+                <button className="mute-btn" onClick={() => mute(i.from)} title="Ignore all challenges from this player">🔇 Mute</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {Object.keys(muted).length > 0 && (
+        <>
+          <h3>Muted players</h3>
+          <div className="rivals">
+            {Object.entries(muted).map(([id, town]) => (
+              <div key={id} className="rival muted-row">
+                <span>🔇 {town}</span>
+                <button className="buy small alt" onClick={() => unmute(id)}>Unmute</button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+      <p className="hint">Each player can only send you one challenge at a time, and after you decline they have to wait a minute before asking again.</p>
+    </Panel>
   )
 }

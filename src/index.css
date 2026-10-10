@@ -332,6 +332,19 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .bank-notice { z-index: 160; }
 .bank-menu-btn { width: 100%; margin-bottom: 4px; background: linear-gradient(#ffd54f, #ff8f00); }
 
+/* Challenge inbox */
+.challenge-bell { position: absolute; z-index: 50; top: calc(118px + var(--sat)); right: calc(10px + var(--sar)); width: 44px; height: 44px; border-radius: 12px; border: 3px solid #fff; background: #eceff1; font-size: 22px; box-shadow: 0 3px 0 rgba(0,0,0,.3); display: grid; place-items: center; }
+.challenge-bell.has { background: #fff3e0; border-color: var(--accent); animation: badgepulse 1.2s ease-in-out infinite; }
+.bell-count { position: absolute; top: -8px; right: -8px; min-width: 20px; height: 20px; border-radius: 10px; background: #e53935; color: #fff; font: 12px var(--display); display: grid; place-items: center; padding: 0 4px; border: 2px solid #fff; }
+.bell-off { position: absolute; font-size: 26px; color: #c62828; font-weight: 900; }
+.toggle-row { display: flex; gap: 10px; align-items: flex-start; background: #fff; border: 2px solid #e0e0e0; border-radius: 12px; padding: 8px 10px; margin-bottom: 10px; font-weight: 800; cursor: pointer; }
+.toggle-row input { width: 22px; height: 22px; margin: 2px 0 0; flex: none; }
+.toggle-row small { display: block; font-weight: 600; color: #607d8b; }
+.invite-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.invite-actions .sell { margin-top: 0; }
+.mute-btn { font: 13px var(--display); background: #eceff1; border: 2px solid #b0bec5; border-radius: 10px; padding: 4px 8px; color: #455a64; }
+.muted-row { grid-template-columns: 1fr auto !important; }
+
 @media (max-width: 600px) {
   .speedo { width: 64px; height: 76px; }
   .speedo svg { width: 64px; height: 64px; }
@@ -386,6 +399,7 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
   .daily { gap: 4px; }
   .day b { font-size: 14px; }
   .rival { grid-template-columns: 16px 1fr; }
+  .invite-actions { grid-column: 1 / -1; justify-content: flex-start; }
   .leader { grid-template-columns: 30px 1fr auto; }
   .rusty-lock { grid-template-columns: auto 1fr; }
   .bay { grid-template-columns: 70px 1fr; }
