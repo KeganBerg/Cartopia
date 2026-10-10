@@ -9,6 +9,7 @@ import {
   type BoardRow, type Clan, type ClanBadge, type Metric, type MyClan, type Period,
 } from '../lib/clans'
 import { Panel } from './Menus'
+import { isCleanName, NAME_REJECTED } from '../lib/names'
 
 const n = (v: number) => v.toLocaleString()
 
@@ -369,6 +370,7 @@ function ClanEditor({ clan, onDone }: { clan: Clan; onDone: () => void }) {
   const [color, setColor] = useState(clan.color)
   const [minLevel, setMinLevel] = useState(clan.minLevel)
   const save = async () => {
+    if (!isCleanName(description)) return toast(NAME_REJECTED)
     try {
       await updateClan({ description, emblem, color, minLevel })
       toast('Crew updated')
@@ -438,6 +440,7 @@ function ClanBrowser({ onJoined }: { onJoined: () => void }) {
   const tag = form.tag.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4)
   const valid = form.name.trim().length >= 3 && tag.length >= 2
   const create = async () => {
+    if (![form.name, tag, form.description].every(isCleanName)) return toast(NAME_REJECTED)
     if (coins < CLAN_COST) return showNeed('coins', CLAN_COST - coins, 'a crew')
     setBusy(true)
     try {

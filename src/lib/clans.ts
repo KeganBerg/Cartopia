@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import { demoLeaders } from './friends'
 import { useGame } from '../game/store'
+import { displayName, isCleanName } from './names'
 
 export type Metric = 'power' | 'race_wins' | 'trophies' | 'level'
 export type Period = 'all' | 'week'
@@ -83,24 +84,26 @@ type ClanRow = {
   week_levels: number
 }
 
+const cleanTag = (t: string) => (isCleanName(t) ? t : '??')
+
 const toRow = (r: PlayerRow): BoardRow => ({
   ownerId: r.owner_id,
-  townName: r.town_name,
+  townName: displayName(r.town_name, r.owner_id),
   level: r.level,
   trophies: r.trophies,
   raceWins: r.race_wins,
   power: r.power,
   week: { power: r.week_power, race_wins: r.week_race_wins, trophies: r.week_trophies, level: r.week_levels },
-  clan: r.clan_id ? { id: r.clan_id, tag: r.clan_tag!, emblem: r.clan_emblem!, color: r.clan_color! } : null,
+  clan: r.clan_id ? { id: r.clan_id, tag: cleanTag(r.clan_tag!), emblem: r.clan_emblem!, color: r.clan_color! } : null,
 })
 
 const toClan = (r: ClanRow): Clan => ({
   id: r.id,
-  name: r.name,
-  tag: r.tag,
+  name: displayName(r.name, r.id, 'crew'),
+  tag: cleanTag(r.tag),
   emblem: r.emblem,
   color: r.color,
-  description: r.description,
+  description: isCleanName(r.description) ? r.description : '',
   leaderId: r.leader_id,
   memberCap: r.member_cap,
   minLevel: r.min_level,
@@ -179,7 +182,7 @@ export async function fetchMyClan(uid: string): Promise<MyClan | null> {
 export async function refreshClanBadge(uid: string | null) {
   if (!supabase || !uid) return useGame.setState({ clanBadge: null })
   const { data } = await supabase.from('player_leaderboard').select('clan_tag, clan_emblem, clan_color').eq('owner_id', uid).maybeSingle()
-  useGame.setState({ clanBadge: data?.clan_tag ? { tag: data.clan_tag, emblem: data.clan_emblem, color: data.clan_color } : null })
+  useGame.setState({ clanBadge: data?.clan_tag ? { tag: cleanTag(data.clan_tag), emblem: data.clan_emblem, color: data.clan_color } : null })
 }
 
 async function rpc<T = unknown>(fn: string, args?: Record<string, unknown>): Promise<T> {
