@@ -3,7 +3,7 @@ import { Canvas } from '@react-three/fiber'
 import { World } from './scene/World'
 import { Hud } from './ui/Hud'
 import { BottomBar, ShopPanel, ShowroomPanel, GaragePanel, Toasts } from './ui/Menus'
-import { RacePanel, LiveRaceOverlay, ChallengePopup } from './ui/Race'
+import { RacePanel, LiveRaceOverlay, ChallengePopup, PrizePopup } from './ui/Race'
 import { joinLobby, useLive } from './lib/live'
 import { FriendsPanel, VisitBanner } from './ui/Friends'
 import { Tutorial } from './ui/Tutorial'
@@ -52,6 +52,7 @@ export default function App() {
       {panel === 'goals' && <GoalsPanel />}
       {panel === 'daily' && <DailyPanel />}
       {panel === 'flat' && <FlatPanel />}
+      <PrizePopup />
       <Toasts />
     </>
   )

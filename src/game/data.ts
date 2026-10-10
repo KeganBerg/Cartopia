@@ -176,7 +176,21 @@ export const RACE_FUEL = 3
 // Bucks to fill the tank to the cap in one go.
 export const REFILL_BUCKS = 3
 
-export type StatKey = 'rusty' | 'jobs' | 'carsBought' | 'upgrades' | 'racesWon' | 'built' | 'roads' | 'coinsEarned' | 'flatsFixed' | 'rescued' | 'searches'
+// Grand Prix: six races in a row against tougher and tougher rivals. Win
+// all six for a mystery box car. Each repeat of a series gets harder.
+export type GpSeries = { id: string; name: string; unlockLevel: number; minCars: number; basePi: number; step: number; prize: number; box: string[]; rivals: string[] }
+export const GP_SERIES: GpSeries[] = [
+  { id: 'rookie', name: 'Rookie Cup', unlockLevel: 2, minCars: 3, basePi: 22, step: 3, prize: 200, box: ['trail', 'miata', 'woodie', 'cruiser'], rivals: ['Dusty Dan', 'Penny Pistons', 'Lugnut Lou', 'Speedy Sue', 'Gearhead Gus', 'Champ Chuck'] },
+  { id: 'street', name: 'Street Kings', unlockLevel: 5, minCars: 4, basePi: 40, step: 3, prize: 450, box: ['stallion', 'rally', 'buggy', 'bandit'], rivals: ['Nitro Nina', 'Torque Tony', 'Drift Dee', 'Boost Bo', 'Redline Rae', 'King Kurt'] },
+  { id: 'pro', name: 'Pro Circuit', unlockLevel: 8, minCars: 5, basePi: 56, step: 3, prize: 900, box: ['vette', 'charger', 'lemans'], rivals: ['Apex Ava', 'Slick Sam', 'Turbo Tess', 'Clutch Cole', 'Vroom Val', 'Ace Axel'] },
+  { id: 'legends', name: 'Legends Series', unlockLevel: 12, minCars: 6, basePi: 72, step: 3, prize: 1800, box: ['gtr', 'gullwing', 'hyper', 'lambo'], rivals: ['Ghost Rider', 'Lady Luck', 'The Baron', 'Silver Fox', 'Mad Max', 'The Legend'] },
+]
+export const GP_ROUNDS = 6
+// Rival PI for a round; each completed run of the series adds 8%.
+export const gpRivalPi = (s: GpSeries, round: number, clears: number) => Math.round((s.basePi + round * s.step) * (1 + clears * 0.08))
+export const gpReward = (s: GpSeries, round: number) => s.prize + round * Math.round(s.prize / 4)
+
+export type StatKey = 'rusty' | 'jobs' | 'carsBought' | 'upgrades' | 'racesWon' | 'built' | 'roads' | 'coinsEarned' | 'flatsFixed' | 'rescued' | 'searches' | 'gpWins'
 
 export type GoalDef = { id: string; text: string; stat: StatKey; target: number; coins: number; xp: number; bucks?: number }
 
@@ -197,6 +211,7 @@ export const GOALS: GoalDef[] = [
   { id: 'g10', text: 'Win 5 drag races', stat: 'racesWon', target: 5, coins: 800, xp: 60, bucks: 1 },
   { id: 'g11', text: 'Get 3 new cars', stat: 'carsBought', target: 3, coins: 1000, xp: 70 },
   { id: 'r3', text: 'Restore 5 rescued cars', stat: 'rescued', target: 5, coins: 3000, xp: 200, bucks: 2 },
+  { id: 'gp1', text: 'Win a Grand Prix series', stat: 'gpWins', target: 1, coins: 2000, xp: 150, bucks: 2 },
   { id: 'g12', text: 'Do 10 upgrades', stat: 'upgrades', target: 10, coins: 1200, xp: 80, bucks: 2 },
   { id: 'g13', text: 'Place 10 new buildings', stat: 'built', target: 10, coins: 1500, xp: 100 },
   { id: 'g14', text: 'Collect from 60 businesses', stat: 'jobs', target: 60, coins: 2500, xp: 150, bucks: 2 },

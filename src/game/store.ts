@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
   GRID, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS, BUILDINGS,
-  upgradeCost, MAX_UPGRADE, RESCUE_SPOTS, RESCUE_PINS, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, type Rarity, GOALS, DAILY_BONUS, PAINTS, PAINT_COST, STRIPE_COST, FLAT_CHANCE, flatFixCost, type UpgradeSlot, type StatKey,
+  upgradeCost, MAX_UPGRADE, RESCUE_SPOTS, RESCUE_PINS, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, type Rarity, GOALS, DAILY_BONUS, PAINTS, PAINT_COST, STRIPE_COST, FLAT_CHANCE, flatFixCost, type UpgradeSlot, type StatKey,
 } from './data'
 import { sfx } from '../lib/sound'
 
@@ -42,6 +42,7 @@ export type SaveState = {
   tutorial: number
   junkyard: JunkCar[]
   restoring: Restoring | null
+  gp: Record<string, { round: number; clears: number }>
   updatedAt: number
 }
 
@@ -65,6 +66,8 @@ type UiState = {
   search: Search | null
   // Building types whose bubbles pulse after a "Show me" tap.
   highlight: string[] | null
+  // A Grand Prix mystery box waiting to be opened.
+  gpPrize: { series: string; model: string; color: string } | null
 }
 
 type Actions = {
@@ -94,6 +97,8 @@ type Actions = {
   loadSave: (s: SaveState) => void
   showMe: (defs: string[], text: string) => void
   refillFuel: () => void
+  gpResult: (series: string, won: boolean) => void
+  closePrize: () => void
   startSearch: (spot: string) => void
   revealPin: (i: number) => void
   fixTruck: () => void
@@ -110,7 +115,7 @@ export type GameState = SaveState & UiState & Actions
 const key = (x: number, z: number) => `${x},${z}`
 let uidCounter = 0
 const uid = () => `${Date.now().toString(36)}${(uidCounter++).toString(36)}${Math.random().toString(36).slice(2, 6)}`
-const emptyStats = (): Record<StatKey, number> => ({ rusty: 0, jobs: 0, carsBought: 0, upgrades: 0, racesWon: 0, built: 0, roads: 0, coinsEarned: 0, flatsFixed: 0, rescued: 0, searches: 0 })
+const emptyStats = (): Record<StatKey, number> => ({ rusty: 0, jobs: 0, carsBought: 0, upgrades: 0, racesWon: 0, built: 0, roads: 0, coinsEarned: 0, flatsFixed: 0, rescued: 0, searches: 0, gpWins: 0 })
 export const today = () => new Date().toISOString().slice(0, 10)
 const noUpgrades = (): Record<UpgradeSlot, number> => ({ engine: 0, turbo: 0, tires: 0, weight: 0 })
 
@@ -179,6 +184,7 @@ function starterTown(): SaveState {
     tutorial: 0,
     junkyard: [],
     restoring: null,
+    gp: {},
     updatedAt: now,
   }
 }
@@ -227,6 +233,7 @@ export const useGame = create<GameState>()(
       need: null,
       search: null,
       highlight: null,
+      gpPrize: null,
 
       setMode: (mode, placing = null) => set({ mode, placing, panel: null }),
       showNeed: (res, missing, what) => {
@@ -539,6 +546,32 @@ export const useGame = create<GameState>()(
 
       loadSave: (save) => set({ ...starterDefaults(), ...save }),
 
+      gpResult: (seriesId, won) => {
+        const s = get()
+        const series = GP_SERIES.find((o) => o.id === seriesId)
+        if (!series) return
+        const cur = s.gp[seriesId] ?? { round: 0, clears: 0 }
+        const reward = gpReward(series, cur.round)
+        s.finishRace(won, reward)
+        if (!won) return
+        const round = cur.round + 1
+        if (round < GP_ROUNDS) return set({ gp: { ...s.gp, [seriesId]: { ...cur, round } } })
+        const model = series.box[Math.floor(Math.random() * series.box.length)]
+        const def = carDef(model)
+        const color = def.colors[Math.floor(Math.random() * def.colors.length)]
+        setTimeout(sfx.levelUp, 200)
+        set((g) => ({
+          gp: { ...g.gp, [seriesId]: { round: 0, clears: cur.clears + 1 } },
+          gpPrize: { series: seriesId, model, color },
+          cars: [...g.cars, { uid: uid(), model, color, upgrades: noUpgrades() }],
+          trophies: g.trophies + 5,
+          stats: { ...g.stats, carsBought: (g.stats.carsBought ?? 0) + 1, gpWins: (g.stats.gpWins ?? 0) + 1 },
+          updatedAt: Date.now(),
+        }))
+      },
+
+      closePrize: () => set({ gpPrize: null }),
+
       refillFuel: () => {
         const s = get()
         const cap = fuelCap(s)
@@ -703,14 +736,14 @@ export const useGame = create<GameState>()(
 )
 
 export function saveOf(s: GameState): SaveState {
-  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, updatedAt } = s
-  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, updatedAt }
+  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, updatedAt } = s
+  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, updatedAt }
 }
 
 // Fields added after launch, so older saves load with sensible values.
-function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring'> {
+function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'gp'> {
   // Saves from before the tutorial existed skip it.
-  return { stats: emptyStats(), claimedGoals: [], lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null }
+  return { stats: emptyStats(), claimedGoals: [], lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, gp: {} }
 }
 
 export const cleanPlate = (p: string) => p.toUpperCase().replace(/[^A-Z0-9 ]/g, '').trim().slice(0, 7)

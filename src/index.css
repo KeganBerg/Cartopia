@@ -289,6 +289,26 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 @keyframes badgepulse { 50% { transform: scale(1.35); box-shadow: 0 0 0 6px rgba(255,202,40,.8), 0 3px 0 rgba(0,0,0,.35); } }
 .badge-rescue { background: #fff3e0; color: #5d4037; }
 
+/* Grand Prix */
+.gp-list { display: grid; gap: 10px; }
+.gp-card { background: #fff; border: 3px solid #e0e0e0; border-radius: 14px; padding: 10px 12px; display: grid; gap: 6px; }
+.gp-card.locked { opacity: .6; }
+.gp-head { display: flex; align-items: center; gap: 8px; font-size: 17px; }
+.gp-box { margin-left: auto; font-size: 26px; }
+.gp-rounds { display: flex; gap: 6px; }
+.gp-rounds i { font: 14px var(--display); font-style: normal; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: #eceff1; color: #78909c; border: 2px solid #cfd8dc; }
+.gp-rounds i.won { background: var(--green); color: #fff; border-color: #2e7d32; }
+.gp-rounds i.next { background: #fff3e0; color: #e65100; border-color: var(--accent); animation: badgepulse 1.2s ease-in-out infinite; }
+.gp-next, .gp-short { display: flex; align-items: center; gap: 8px; justify-content: space-between; flex-wrap: wrap; font-size: 14px; }
+.prize-overlay { z-index: 160; align-items: center !important; place-items: center !important; padding: 16px !important; animation: fadein .3s ease-out 1.2s both; }
+@keyframes fadein { from { opacity: 0; visibility: hidden; } to { opacity: 1; visibility: visible; } }
+.prize { background: var(--panel); border: 4px solid #ffca28; border-radius: 22px; padding: 18px 22px; text-align: center; width: min(360px, 92vw); box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+.prize h2 { font: 26px var(--display); margin: 0 0 6px; color: #e65100; }
+.prize .car-swatch { width: 200px; height: 100px; }
+.prize .row { justify-content: center; }
+.mystery-box { font-size: 96px; background: none; border: none; animation: boxwiggle 1s ease-in-out infinite; }
+@keyframes boxwiggle { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-8deg) scale(1.05); } 75% { transform: rotate(8deg) scale(1.05); } }
+
 @media (max-width: 600px) {
   .speedo { width: 64px; height: 76px; }
   .speedo svg { width: 64px; height: 64px; }

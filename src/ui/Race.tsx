@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGame, spendFuel, type OwnedCar } from '../game/store'
-import { CARS, carDef, performance, RACE_FUEL, type Body } from '../game/data'
+import { CARS, carDef, performance, RACE_FUEL, GP_SERIES, GP_ROUNDS, gpRivalPi, gpReward, type Body, type GpSeries } from '../game/data'
+import { CarSwatch } from './Menus'
 import { supabase } from '../lib/supabase'
 import { Panel } from './Menus'
 import { Canvas } from '@react-three/fiber'
@@ -13,6 +14,16 @@ type Rival = { id: string; town: string; level: number; carName: string; color: 
 const TOWNS = ['Transamsylvania', 'Gearville', 'Piston Peak', 'Nitro Bay', 'Chrome City', 'Rustbelt Row', 'Turbo Falls', 'Muffler Hills']
 const TRACK = 400
 const GEAR_POWER = [1, 0.85, 0.72, 0.6]
+
+function carNear(target: number) {
+  return [...CARS].sort((a, b) => Math.abs(performance(a, zero) - target) - Math.abs(performance(b, zero) - target))[0]
+}
+
+function gpRival(series: GpSeries, round: number, clears: number): Rival {
+  const target = gpRivalPi(series, round, clears)
+  const car = carNear(target)
+  return { id: `gp-${series.id}-${round}`, town: series.rivals[round], level: series.unlockLevel + round, carName: car.name, color: car.colors[round % car.colors.length], pi: target, online: false, body: car.body }
+}
 
 function makeRivals(myPi: number, level: number): Rival[] {
   const towns = [...TOWNS].sort(() => Math.random() - 0.5)
@@ -64,6 +75,9 @@ export function RacePanel() {
   const [rivals] = useState(() => makeRivals(pi(best), level))
   const [online, setOnline] = useState<Rival[]>([])
   const [race, setRace] = useState<Rival | null>(null)
+  const [gpRace, setGpRace] = useState<{ series: GpSeries; rival: Rival; prize: number } | null>(null)
+  const [tab, setTab] = useState<'quick' | 'gp'>('quick')
+  const gpResult = useGame((s) => s.gpResult)
 
   const livePlayers = useLive((l) => l.players)
   const outgoing = useLive((l) => l.outgoing)
@@ -74,6 +88,18 @@ export function RacePanel() {
   }, [])
 
   if (race && car) return <DragRace car={car} rival={race} onExit={() => setRace(null)} />
+  if (gpRace && car) {
+    return (
+      <DragRace
+        car={car}
+        rival={gpRace.rival}
+        prize={gpRace.prize}
+        title={`${gpRace.series.name} · Race ${Number(gpRace.rival.id.split('-').pop()) + 1} of ${GP_ROUNDS}`}
+        onFinish={(won) => gpResult(gpRace.series.id, won)}
+        onExit={() => { setGpRace(null); setTab('gp') }}
+      />
+    )
+  }
 
   const start = (r: Rival) => {
     if (!spendFuel(RACE_FUEL)) return useGame.getState().showNeed('fuel', RACE_FUEL - useGame.getState().fuel, 'a race')
@@ -90,6 +116,16 @@ export function RacePanel() {
           </button>
         ))}
       </div>
+      <div className="tabs">
+        <button className={tab === 'quick' ? 'tab sel' : 'tab'} onClick={() => setTab('quick')}>🏁 Quick race</button>
+        <button className={tab === 'gp' ? 'tab sel' : 'tab'} onClick={() => setTab('gp')}>🏆 Grand Prix</button>
+      </div>
+      {tab === 'gp' ? (
+        <GrandPrix onRace={(series, rival, prize) => {
+          if (!spendFuel(RACE_FUEL)) return useGame.getState().showNeed('fuel', RACE_FUEL - useGame.getState().fuel, 'a Grand Prix race')
+          setGpRace({ series, rival, prize })
+        }} />
+      ) : <>
       {supabase && (
         <>
           <h3>Live now <small>(players online this minute, no fuel needed)</small></h3>
@@ -123,8 +159,92 @@ export function RacePanel() {
           </div>
         ))}
       </div>
+      </>}
       <p className="hint">Shift when the needle hits the green zone. Space bar works too.</p>
     </Panel>
+  )
+}
+
+function GrandPrix({ onRace }: { onRace: (s: GpSeries, r: Rival, prize: number) => void }) {
+  const level = useGame((s) => s.level)
+  const carCount = useGame((s) => s.cars.length)
+  const gp = useGame((s) => s.gp)
+  const showNeed = useGame((s) => s.showNeed)
+  const openPanel = useGame((s) => s.openPanel)
+  return (
+    <>
+      <p className="hint">Win six races in a row to earn a mystery box car. Lose and you can retry that race. Every repeat of a series gets tougher.</p>
+      <div className="gp-list">
+        {GP_SERIES.map((s) => {
+          const prog = gp[s.id] ?? { round: 0, clears: 0 }
+          const locked = level < s.unlockLevel
+          const short = carCount < s.minCars
+          const rival = gpRival(s, prog.round, prog.clears)
+          const prize = gpReward(s, prog.round)
+          return (
+            <div key={s.id} className={locked ? 'gp-card locked' : 'gp-card'}>
+              <div className="gp-head">
+                <b>{s.name}</b>
+                {prog.clears > 0 && <span className="tag">Won ×{prog.clears}</span>}
+                <span className="gp-box" title={`Mystery box: ${s.box.map((m) => carDef(m).name).join(', ')}`}>🎁</span>
+              </div>
+              <div className="gp-rounds">
+                {Array.from({ length: GP_ROUNDS }, (_, i) => (
+                  <i key={i} className={i < prog.round ? 'won' : i === prog.round ? 'next' : ''}>{i < prog.round ? '✔' : i + 1}</i>
+                ))}
+              </div>
+              <div className="card-stat">Box could hold: {s.box.map((m) => carDef(m).name).join(', ')}</div>
+              {locked ? (
+                <button className="price locked-btn" onClick={() => showNeed('level', s.unlockLevel, s.name)}>🔒 Level {s.unlockLevel}</button>
+              ) : short ? (
+                <div className="gp-short">
+                  <span>You need {s.minCars} cars to enter. You have {carCount}.</span>
+                  <button className="buy small alt" onClick={() => openPanel('rescue')}>Get cars at Rusty's</button>
+                </div>
+              ) : (
+                <div className="gp-next">
+                  <span>Race {prog.round + 1}: <b>{rival.town}</b> · {rival.carName} · PI {rival.pi}</span>
+                  <button className="buy small" onClick={() => onRace(s, rival, prize)}>Race · win ${prize}</button>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </>
+  )
+}
+
+export function PrizePopup() {
+  const prize = useGame((s) => s.gpPrize)
+  const close = useGame((s) => s.closePrize)
+  const openPanel = useGame((s) => s.openPanel)
+  const [open, setOpen] = useState(false)
+  if (!prize) return null
+  const series = GP_SERIES.find((s) => s.id === prize.series)!
+  const def = carDef(prize.model)
+  return (
+    <div className="overlay prize-overlay">
+      <div className="prize">
+        <h2>{series.name} champion!</h2>
+        {!open ? (
+          <>
+            <button className="mystery-box" onClick={() => { sfx.win(); setOpen(true) }}>🎁</button>
+            <p>Tap the mystery box to open it</p>
+          </>
+        ) : (
+          <>
+            <CarSwatch color={prize.color} body={def.body} />
+            <h3>{def.name}</h3>
+            <p>PI {performance(def, zero)} · +5 🏆. It's in your garage now.</p>
+            <div className="row">
+              <button className="buy" onClick={() => { close(); setOpen(false); openPanel('garage') }}>See it</button>
+              <button className="buy alt" onClick={() => { close(); setOpen(false) }}>Nice!</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -155,7 +275,10 @@ function shiftQuality(rpm: number) {
   return { q: 0.75, label: 'Early' }
 }
 
-function DragRace({ car, rival, onExit, live }: { car: OwnedCar; rival: Rival; onExit: () => void; live?: LiveRace }) {
+function DragRace({ car, rival, onExit, live, prize, onFinish, title }: { car: OwnedCar; rival: Rival; onExit: () => void; live?: LiveRace; prize?: number; onFinish?: (won: boolean) => void; title?: string }) {
+  const payout = prize ?? reward(rival)
+  const finishCb = useRef(onFinish)
+  finishCb.current = onFinish
   const myPi = pi(car)
   const me = useRef(fresh())
   const them = useRef(fresh())
@@ -257,7 +380,8 @@ function DragRace({ car, rival, onExit, live }: { car: OwnedCar; rival: Rival; o
         if (won) sfx.win()
         else sfx.lose()
         setResult({ won, myTime: me.current.finished, theirTime: th.finished })
-        finishRace(won, reward(rival))
+        if (finishCb.current) finishCb.current(won)
+        else finishRace(won, reward(rival))
         return
       }
       raf = requestAnimationFrame(loop)
@@ -295,7 +419,7 @@ function DragRace({ car, rival, onExit, live }: { car: OwnedCar; rival: Rival; o
   const def = carDef(car.model)
   const rpmAngle = -210 + Math.min(1.05, me.current.rpm) * 240
   return (
-    <Panel title={`Drag Race vs ${rival.town}`} wide onClose={live ? onExit : undefined}>
+    <Panel title={title ?? `Drag Race vs ${rival.town}`} wide onClose={live ? onExit : undefined}>
       <div className="race-layout">
       <div className="race-3d">
         <Canvas shadows camera={{ position: [0.4, 2.2, -4], fov: 55 }} dpr={[1, 1.5]}>
@@ -336,7 +460,7 @@ function DragRace({ car, rival, onExit, live }: { car: OwnedCar; rival: Rival; o
             <div className={result.won ? 'result win' : 'result lose'}>
               <h3>{result.won ? 'YOU WIN!' : 'You lost'}</h3>
               <p>{result.myTime.toFixed(2)}s vs {Number.isFinite(result.theirTime) ? `${result.theirTime.toFixed(2)}s` : 'did not finish'}</p>
-              <p>{result.won ? `+$${reward(rival)} · +1 🏆 · +30 XP` : `+$${Math.round(reward(rival) * 0.1)} · +8 XP`}</p>
+              <p>{result.won ? `+$${payout} · +1 🏆 · +30 XP` : `+$${Math.round(payout * 0.1)} · +8 XP`}</p>
               <button className="buy" onClick={onExit}>Back</button>
             </div>
           )}
