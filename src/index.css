@@ -1,4 +1,8 @@
 :root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
   --ink: #1f2a33;
   --panel: #fffaf0;
   --accent: #ff9800;
@@ -8,13 +12,13 @@
 }
 * { box-sizing: border-box; }
 html, body, #root { margin: 0; height: 100%; }
-body { font-family: Nunito, system-ui, sans-serif; background: #5aa83a; overflow: hidden; color: var(--ink); user-select: none; }
+body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent; font-family: Nunito, system-ui, sans-serif; background: #5aa83a; overflow: hidden; color: var(--ink); user-select: none; }
 button { font: inherit; cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: 0.55; }
 input { font: inherit; padding: 8px 10px; border-radius: 10px; border: 2px solid #cfd8dc; width: 100%; margin: 4px 0; }
 
 /* HUD */
-.hud-left { position: absolute; z-index: 50; top: 10px; left: 10px; display: flex; gap: 6px; align-items: flex-start; }
+.hud-left { position: absolute; z-index: 50; top: calc(10px + var(--sat)); left: calc(10px + var(--sal)); display: flex; gap: 6px; align-items: flex-start; }
 .speedo { position: relative; width: 88px; height: 100px; filter: drop-shadow(0 3px 3px rgba(0,0,0,.35)); }
 .speedo-level { position: absolute; top: 50px; left: 0; width: 88px; text-align: center; font: 22px var(--display); color: #fff; }
 .speedo-xp { position: absolute; top: 84px; left: 4px; width: 80px; text-align: center; font: 12px var(--display); background: #1b1f24; color: #fff; border-radius: 6px; border: 2px solid #cfd8dc; }
@@ -25,10 +29,10 @@ input { font: inherit; padding: 8px 10px; border-radius: 10px; border: 2px solid
 .buck-ico { background: radial-gradient(#81d4fa, #0277bd); border: 2px solid #e1f5fe; }
 .parts-ico { background: radial-gradient(#bcaaa4, #6d4c41); border: 2px solid #efebe9; }
 .fuel-ico { background: #e53935; border-radius: 6px; font-size: 14px; }
-.hud-center { position: absolute; z-index: 50; top: 10px; left: 50%; transform: translateX(-50%); text-align: center; }
+.hud-center { position: absolute; z-index: 50; top: calc(10px + var(--sat)); left: 50%; transform: translateX(-50%); text-align: center; }
 .town-name { font: 28px var(--display); color: #fff; letter-spacing: 1px; text-shadow: 0 3px 0 #1b1f24, 0 0 8px rgba(0,0,0,.4); -webkit-text-stroke: 1px #1b1f24; }
 .my-cars { margin-top: 4px; padding: 4px 16px; font: 16px var(--display); background: rgba(27,31,36,.85); color: #fff; border: 2px solid #cfd8dc; border-radius: 20px; }
-.hud-right { position: absolute; z-index: 50; top: 10px; right: 10px; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.hud-right { position: absolute; z-index: 50; top: calc(10px + var(--sat)); right: calc(10px + var(--sar)); display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .fuel { display: flex; align-items: center; gap: 6px; }
 .fuel-bar { position: relative; width: 170px; height: 24px; background: #1b1f24; border: 2px solid #cfd8dc; border-radius: 14px; overflow: hidden; }
 .fuel-bar div { height: 100%; background: linear-gradient(#ffee58, #f9a825); transition: width .3s; }
@@ -37,17 +41,18 @@ input { font: inherit; padding: 8px 10px; border-radius: 10px; border: 2px solid
 .trophies { min-width: 0; padding: 2px 12px; }
 
 /* Bottom menu */
-.bottom-bar { position: absolute; z-index: 50; bottom: 10px; left: 10px; display: flex; gap: 8px; align-items: flex-end; }
+.bottom-bar { position: absolute; z-index: 50; bottom: calc(10px + var(--sab)); left: calc(10px + var(--sal)); right: calc(10px + var(--sar)); display: flex; gap: 8px; align-items: flex-end; pointer-events: none; }
+.bottom-bar > * { pointer-events: auto; }
 .big-btn { font: 18px var(--display); color: #fff; border: 3px solid #fff; border-radius: 18px; box-shadow: 0 4px 0 rgba(0,0,0,.35); padding: 8px 14px; }
 .big-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0,0,0,.35); }
 .menu-btn { background: linear-gradient(#5c9ded, #1e5fbf); display: flex; flex-direction: column; align-items: center; line-height: 1; padding: 10px 14px; }
 .menu-btn span { font-size: 11px; background: #c62828; padding: 2px 6px; border-radius: 6px; margin-bottom: 4px; }
 .icon-btn { display: flex; flex-direction: column; align-items: center; gap: 2px; background: none; border: none; font: 14px var(--display); color: #fff; text-shadow: 0 2px 2px #000; }
 .icon-btn .i { font-size: 30px; width: 54px; height: 54px; display: grid; place-items: center; background: radial-gradient(#fff, #cfd8dc); border-radius: 50%; border: 3px solid #fff; box-shadow: 0 3px 0 rgba(0,0,0,.35); text-shadow: none; }
-.race-btn { position: absolute; z-index: 50; bottom: 10px; right: 10px; background: linear-gradient(#ffd54f, #f57f17); display: flex; flex-direction: column; align-items: center; padding: 6px 16px; }
+.race-btn { margin-left: auto; background: linear-gradient(#ffd54f, #f57f17); display: flex; flex-direction: column; align-items: center; padding: 6px 16px; }
 .race-btn .i { font-size: 30px; }
 
-.edit-bar { position: absolute; z-index: 50; bottom: 10px; left: 50%; transform: translateX(-50%); background: var(--panel); border: 3px solid #fff; border-radius: 16px; padding: 8px; box-shadow: 0 4px 0 rgba(0,0,0,.3); text-align: center; max-width: calc(100vw - 20px); }
+.edit-bar { position: absolute; z-index: 50; bottom: calc(10px + var(--sab)); left: 50%; transform: translateX(-50%); background: var(--panel); border: 3px solid #fff; border-radius: 16px; padding: 8px; box-shadow: 0 4px 0 rgba(0,0,0,.3); text-align: center; max-width: calc(100vw - 20px); }
 .edit-hint { font-weight: 800; margin-bottom: 6px; }
 .edit-tools { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
 .tool { font: 16px var(--display); padding: 6px 12px; border-radius: 12px; border: 2px solid #b0bec5; background: #fff; }
@@ -140,17 +145,6 @@ button.card:hover:not(:disabled) { border-color: var(--accent); }
 .toast { background: rgba(27,31,36,.9); color: #fff; font: 16px var(--display); padding: 8px 16px; border-radius: 14px; border: 2px solid #fff; animation: pop .25s ease-out; }
 @keyframes pop { from { transform: scale(.7); opacity: 0; } }
 
-@media (max-width: 640px) {
-  .hud-center { top: 120px; }
-  .town-name { font-size: 20px; }
-  .pill { min-width: 90px; font-size: 14px; }
-  .fuel-bar { width: 110px; }
-  .icon-btn .i { width: 42px; height: 42px; font-size: 22px; }
-  .icon-btn { font-size: 11px; }
-  .bottom-bar { gap: 4px; }
-  .menu-btn { padding: 6px 8px; font-size: 14px; }
-  .garage { grid-template-columns: 1fr; }
-}
 
 .goals-btn { position: relative; width: 44px; height: 44px; font-size: 24px; border-radius: 12px; background: radial-gradient(#fff, #cfd8dc); border: 3px solid #fff; box-shadow: 0 3px 0 rgba(0,0,0,.35); }
 .goal-badge { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; border-radius: 50%; background: var(--green); color: #fff; font-size: 12px; display: grid; place-items: center; border: 2px solid #fff; }
@@ -173,7 +167,6 @@ button.card:hover:not(:disabled) { border-color: var(--accent); }
 .strip.mini .lane { height: 26px; }
 .strip.mini .lane-car { height: 12px; width: 28px; bottom: 4px; }
 .strip.mini .lane-name { font-size: 10px; }
-@media (max-width: 640px) { .race-3d { height: 180px; } }
 .bar.wide { background: #e0e0e0; }
 .bar.wide span { background: var(--green); }
 
@@ -189,3 +182,137 @@ button.card:hover:not(:disabled) { border-color: var(--accent); }
 .challenge-pop { position: absolute; z-index: 150; top: 120px; right: 12px; background: var(--panel); border: 3px solid #fff; border-radius: 16px; padding: 10px 14px; box-shadow: 0 6px 0 rgba(0,0,0,.25); max-width: 280px; animation: pop .25s ease-out; }
 .challenge-pop .row { margin-top: 8px; }
 .challenge-pop .sell { margin-top: 0; }
+
+.hud-right-row { display: flex; gap: 6px; align-items: center; }
+.goals-btn { width: 40px; height: 40px; font-size: 20px; }
+.speedo svg { display: block; }
+.race-layout { display: grid; grid-template-columns: 1fr; grid-template-areas: 'view' 'strip' 'ctrl'; }
+.race-layout .race-3d { grid-area: view; }
+.race-layout .strip { grid-area: strip; }
+.race-layout .race-controls { grid-area: ctrl; }
+.tach { width: 150px; height: 150px; }
+
+/* Phones in portrait. */
+@media (max-width: 600px) {
+  .speedo { width: 64px; height: 76px; }
+  .speedo svg { width: 64px; height: 64px; }
+  .speedo-level { top: 35px; width: 64px; font-size: 17px; }
+  .speedo-xp { top: 60px; left: 2px; width: 60px; font-size: 10px; border-width: 1.5px; }
+  .pills { gap: 4px; margin-top: 2px; }
+  .pill { min-width: 0; font-size: 13px; padding: 1px 9px 1px 2px; gap: 4px; border-width: 1.5px; }
+  .ico { width: 18px; height: 18px; font-size: 11px; }
+  .hud-center { top: calc(96px + var(--sat)); display: flex; align-items: center; gap: 6px; }
+  .town-name { font-size: 17px; -webkit-text-stroke: 0.5px #1b1f24; text-shadow: 0 2px 0 #1b1f24; max-width: 46vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .my-cars { margin: 0; padding: 2px 10px; font-size: 13px; border-width: 1.5px; }
+  .my-cars-label { display: none; }
+  .fuel-bar { width: 104px; height: 20px; border-width: 1.5px; }
+  .fuel-bar span { font-size: 12px; }
+  .fuel-ico { width: 20px; height: 20px; font-size: 11px; }
+  .fuel-sub { font-size: 11px; }
+  .trophies { font-size: 13px; padding: 1px 9px; }
+  .goals-btn { width: 34px; height: 34px; font-size: 17px; border-width: 2px; border-radius: 10px; }
+  .goal-badge { width: 16px; height: 16px; font-size: 10px; }
+
+  .bottom-bar { left: calc(6px + var(--sal)); right: calc(6px + var(--sar)); bottom: calc(6px + var(--sab)); gap: 2px; justify-content: space-between; align-items: center; }
+  .icon-btn { font-size: 10px; gap: 1px; flex: 1; min-width: 0; }
+  .icon-btn .i { width: 42px; height: 42px; font-size: 21px; border-width: 2px; }
+  .menu-btn { padding: 6px 7px; font-size: 13px; border-width: 2px; border-radius: 14px; }
+  .menu-btn span { display: none; }
+  .race-btn { margin-left: 0; padding: 3px 9px; font-size: 13px; border-width: 2px; border-radius: 14px; }
+  .race-btn .i { font-size: 22px; }
+
+  .edit-bar { left: 6px; right: 6px; transform: none; bottom: calc(6px + var(--sab)); padding: 6px; }
+  .edit-hint { font-size: 13px; }
+  .tool { font-size: 13px; padding: 5px 8px; }
+
+  .overlay { padding: 0; align-items: end; }
+  .panel, .panel.wide { width: 100%; max-height: calc(100dvh - 16px - var(--sat)); border-radius: 20px 20px 0 0; border-width: 3px 0 0; }
+  .panel.wide { height: calc(100dvh - 16px - var(--sat)); }
+  .panel-head { padding: 8px 12px; }
+  .panel-head h2 { font-size: 21px; line-height: 1.1; }
+  .close { width: 32px; height: 32px; flex: none; }
+  .panel-body { padding: 10px 12px calc(16px + var(--sab)); }
+  .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .card { padding: 6px; }
+  .card-name { font-size: 15px; }
+  .garage { grid-template-columns: 1fr; gap: 10px; }
+  .garage-list { flex-direction: row; overflow-x: auto; max-height: none; padding-bottom: 4px; }
+  .garage-item { grid-template-columns: 48px auto; min-width: 150px; }
+  .garage-item small { grid-column: 2; }
+  .garage-item .car-swatch { width: 48px; grid-row: span 2; }
+  .car-preview { height: 150px; }
+  .upgrade-row { gap: 6px; font-size: 14px; }
+  .pips i { width: 9px; height: 14px; }
+  .daily { gap: 4px; }
+  .day b { font-size: 14px; }
+  .rival { grid-template-columns: 16px 1fr; }
+  .rival .buy { grid-column: 1 / -1; }
+
+  .race-3d { height: 30dvh; min-height: 170px; }
+  .race-controls { gap: 12px; margin-top: 8px; }
+  .tach { width: 120px; height: 120px; }
+  .race-side { min-width: 0; }
+  .speed { font-size: 22px; }
+  .shift-btn { font-size: 22px; padding: 12px 22px; }
+  .countdown.big { font-size: 72px; }
+  .shift-label.big { font-size: 26px; }
+
+  .toasts { top: calc(126px + var(--sat)); width: calc(100% - 24px); }
+  .toast { font-size: 13px; text-align: center; padding: 6px 12px; }
+  .challenge-pop { top: calc(126px + var(--sat)); left: 8px; right: 8px; max-width: none; }
+  .badge { font-size: 12px; padding: 2px 6px; border-width: 2px; }
+  .coin { width: 28px; height: 28px; font-size: 18px; }
+}
+
+/* Short screens: phones in landscape. */
+@media (max-height: 500px) {
+  .speedo { width: 64px; height: 76px; }
+  .speedo svg { width: 64px; height: 64px; }
+  .speedo-level { top: 35px; width: 64px; font-size: 17px; }
+  .speedo-xp { top: 60px; left: 2px; width: 60px; font-size: 10px; }
+  .pills { gap: 3px; margin-top: 0; }
+  .pill { min-width: 0; font-size: 13px; padding: 1px 9px 1px 2px; gap: 4px; }
+  .ico { width: 18px; height: 18px; font-size: 11px; }
+  .town-name { font-size: 20px; }
+  .my-cars { font-size: 12px; padding: 2px 10px; margin-top: 2px; }
+  .fuel-bar { width: 120px; height: 20px; }
+  .fuel-bar span { font-size: 12px; }
+  .fuel-sub { font-size: 11px; }
+  .trophies { font-size: 13px; }
+  .goals-btn { width: 32px; height: 32px; font-size: 16px; }
+  .bottom-bar { bottom: calc(6px + var(--sab)); gap: 6px; align-items: center; }
+  .icon-btn { font-size: 10px; }
+  .icon-btn .i { width: 38px; height: 38px; font-size: 19px; border-width: 2px; }
+  .menu-btn { padding: 5px 9px; font-size: 13px; }
+  .menu-btn span { display: none; }
+  .race-btn { padding: 3px 12px; font-size: 13px; }
+  .race-btn .i { font-size: 20px; }
+  .edit-bar { bottom: calc(6px + var(--sab)); padding: 5px; }
+  .edit-hint { font-size: 12px; margin-bottom: 4px; }
+  .tool { font-size: 13px; padding: 4px 8px; }
+
+  .overlay { padding: 6px calc(6px + var(--sar)) 6px calc(6px + var(--sal)); }
+  .panel, .panel.wide { max-height: calc(100dvh - 12px); border-width: 3px; }
+  .panel.wide { width: min(980px, 100%); }
+  .panel-head { padding: 4px 12px; }
+  .panel-head h2 { font-size: 19px; }
+  .close { width: 30px; height: 30px; }
+  .panel-body { padding: 8px 12px 10px; }
+  .panel-body h3 { margin: 6px 0; font-size: 16px; }
+  .cards { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  .car-preview { height: 120px; }
+  .garage-list { max-height: calc(100dvh - 90px); }
+
+  .race-layout { grid-template-columns: 1.6fr 1fr; grid-template-areas: 'view ctrl' 'strip ctrl'; column-gap: 12px; }
+  .race-3d { height: calc(100dvh - 140px); min-height: 150px; margin-bottom: 4px; }
+  .race-controls { flex-direction: column; gap: 4px; margin-top: 0; justify-content: center; flex-wrap: nowrap; }
+  .tach { width: 104px; height: 104px; }
+  .race-side { min-width: 0; gap: 4px; }
+  .speed { font-size: 18px; }
+  .shift-btn { font-size: 20px; padding: 10px 20px; }
+  .result h3 { font-size: 22px !important; }
+  .result p { margin: 2px 0; font-size: 13px; }
+  .countdown.big { font-size: 64px; }
+  .toasts { top: calc(80px + var(--sat)); }
+  .toast { font-size: 13px; }
+}

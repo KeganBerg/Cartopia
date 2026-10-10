@@ -50,12 +50,11 @@ export function Hud() {
           <div className="pill"><span className="ico coin-ico">$</span>{n(s.coins)}</div>
           <div className="pill"><span className="ico buck-ico">B</span>{n(s.bucks)}</div>
           <div className="pill"><span className="ico parts-ico">⚙</span>{n(s.parts)}</div>
-          <GoalsButton />
         </div>
       </div>
       <div className="hud-center">
         <div className="town-name">{s.townName}</div>
-        <button className="my-cars" onClick={() => s.openPanel('garage')}>🚗 MY CARS: {s.cars.length}</button>
+        <button className="my-cars" onClick={() => s.openPanel('garage')}>🚗 <span className="my-cars-label">MY CARS:</span> {s.cars.length}</button>
       </div>
       <div className="hud-right">
         <div className="fuel">
@@ -66,7 +65,10 @@ export function Hud() {
           <span className="ico fuel-ico">⛽</span>
         </div>
         <div className="fuel-sub">{nextIn === null ? 'Fuel full' : `+1 fuel in ${nextIn}s`}</div>
-        <div className="pill trophies">🏆 {s.trophies}</div>
+        <div className="hud-right-row">
+          <div className="pill trophies">🏆 {s.trophies}</div>
+          <GoalsButton />
+        </div>
       </div>
     </>
   )

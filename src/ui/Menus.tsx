@@ -16,8 +16,8 @@ export function BottomBar() {
         <button className="icon-btn" onClick={() => openPanel('showroom')}><span className="i">🚘</span>SHOWROOM</button>
         <button className="icon-btn" onClick={() => openPanel('garage')}><span className="i">🔧</span>GARAGE</button>
         <button className="icon-btn" onClick={() => setMode('road')}><span className="i">🚧</span>EDIT</button>
+        <button className="big-btn race-btn" onClick={() => openPanel('race')}><span className="i">🏆</span>RACE</button>
       </div>
-      <button className="big-btn race-btn" onClick={() => openPanel('race')}><span className="i">🏆</span>RACE</button>
     </>
   )
 }

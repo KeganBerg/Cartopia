@@ -1,6 +1,6 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Html, MapControls } from '@react-three/drei'
-import type { ThreeEvent } from '@react-three/fiber'
+import { useThree, type ThreeEvent } from '@react-three/fiber'
 import { useGame, canPlace, type PlacedBuilding } from '../game/store'
 import { GRID, TILE, buildingDef } from '../game/data'
 import { BuildingModel } from './BuildingModel'
@@ -249,6 +249,17 @@ function Interaction() {
   )
 }
 
+// Pick a zoom that frames a similar slice of town on any screen size.
+function ResponsiveZoom() {
+  const camera = useThree((s) => s.camera)
+  const { width, height } = useThree((s) => s.size)
+  useEffect(() => {
+    camera.zoom = Math.min(38, Math.max(18, Math.sqrt(width * height) / 24))
+    camera.updateProjectionMatrix()
+  }, [camera, width, height])
+  return null
+}
+
 export function World() {
   const buildings = useGame((s) => s.buildings)
   const roadsList = useGame((s) => s.roads)
@@ -273,6 +284,7 @@ export function World() {
         <planeGeometry args={[SIZE * 4, SIZE * 4]} />
         <meshStandardMaterial color="#5aa83a" />
       </mesh>
+      <ResponsiveZoom />
       <Interaction />
       <Roads />
       {buildings.map((b) => (
