@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useGame, hasRusty } from '../game/store'
 import { BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, PAINTS, STRIPES, PAINT_COST, STRIPE_COST, carDef, performance, upgradeCost, type BuildingDef } from '../game/data'
 import { CarPreview } from '../scene/CarPreview'
+import { PreviewCanvas, BuildingThumb } from '../scene/BuildingPreview'
 
 export function BottomBar() {
   const openPanel = useGame((s) => s.openPanel)
@@ -49,7 +50,7 @@ function EditBar() {
   )
 }
 
-export function Panel({ title, children, wide, onClose }: { title: string; children: React.ReactNode; wide?: boolean; onClose?: () => void }) {
+export function Panel({ title, children, wide, onClose, overlay }: { title: string; children: React.ReactNode; wide?: boolean; onClose?: () => void; overlay?: React.ReactNode }) {
   const openPanel = useGame((s) => s.openPanel)
   const close = (_: null) => (onClose ? onClose() : openPanel(null))
   return (
@@ -59,7 +60,14 @@ export function Panel({ title, children, wide, onClose }: { title: string; child
           <h2>{title}</h2>
           <button className="close" onClick={() => close(null)}>✕</button>
         </div>
-        <div className="panel-body">{children}</div>
+        {overlay ? (
+          <div className="panel-wrap">
+            <div className="panel-body">{children}</div>
+            {overlay}
+          </div>
+        ) : (
+          <div className="panel-body">{children}</div>
+        )}
       </div>
     </div>
   )
@@ -85,7 +93,7 @@ export function ShopPanel() {
   const showNeed = useGame((s) => s.showNeed)
   const rusty = hasRusty({ buildings })
   return (
-    <Panel title="Shop" wide>
+    <Panel title="Shop" wide overlay={<PreviewCanvas />}>
       {SHOP_GROUPS.map((g) => (
         <section key={g.title}>
           <h3>{g.title}</h3>
@@ -103,7 +111,7 @@ export function ShopPanel() {
                   onClick={() => (locked ? showNeed('level', b.unlockLevel, b.name) : broke ? showNeed('coins', b.price - coins, b.name) : setMode('place', b.id))}
                 >
                   {highlight && <span className="ribbon">START HERE</span>}
-                  <div className="swatch" style={{ background: `linear-gradient(${b.roof} 0 30%, ${b.color} 30%)` }} />
+                  <BuildingThumb def={b} />
                   <div className="card-name">{b.name}</div>
                   {b.jobSeconds && (
                     <div className="card-stat">
