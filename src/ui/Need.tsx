@@ -19,7 +19,7 @@ export function NeedPanel() {
     const d: BuildingDef = buildingDef(id)
     if (s.level < d.unlockLevel) return { label: `🔒 Level ${d.unlockLevel}`, run: () => {}, disabled: true }
     if (d.unique && s.buildings.some((b) => b.def === id)) return { label: '✔ Built', run: () => {}, disabled: true }
-    return { label: `Build · $${d.price.toLocaleString()}`, run: () => s.setMode('place', id), disabled: s.coins < d.price }
+    return { label: `Build · $${d.price.toLocaleString()}`, run: () => s.openShop(id) }
   }
   const isJob = (def: string) => !!buildingDef(def).jobSeconds && buildingDef(def).kind !== 'obstacle'
   const idle = s.buildings.filter((b) => isJob(b.def) && b.jobEndsAt === null).length

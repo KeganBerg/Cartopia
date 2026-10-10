@@ -198,6 +198,7 @@ button.card:hover:not(:disabled) { border-color: var(--accent); }
 
 /* Rusty's Rescue gate */
 .card { position: relative; }
+.card.focus { border-color: var(--accent); animation: collect-pulse 1s ease-in-out 3; }
 .card.start-here { border-color: var(--accent); box-shadow: 0 0 0 3px #ffe0b2; }
 .ribbon { position: absolute; top: -9px; left: 50%; transform: translateX(-50%); background: var(--accent); color: #fff; font: 11px var(--display); padding: 2px 8px; border-radius: 8px; white-space: nowrap; }
 .rusty-lock { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; background: #fff3e0; border: 2px solid var(--accent); border-radius: 14px; padding: 10px 12px; margin-bottom: 12px; }

@@ -8,6 +8,7 @@ import { skyTex, asphaltTex, paverTex, glowTex } from './textures'
 import { BuildingModel, LightPool } from './BuildingModel'
 import { glowMats, dayPhase, nightAmount } from './dayNight'
 import { PAL } from './season'
+import { holdPageTint } from './pageTint'
 import { useGame } from '../game/store'
 import { BUILDINGS, TILE, buildingDef } from '../game/data'
 
@@ -167,6 +168,9 @@ export function RaceScene({ track, me, them, mine, theirs }: Props) {
     return t
   }, [len])
   const tint = (day: string, dark: string) => '#' + new Color(day).lerp(new Color(dark), night).getHexString()
+  // Phone status bar and toolbar take the sky colour while racing.
+  const sky = tint('#3d9bff', '#0f1730')
+  useEffect(() => holdPageTint(sky), [sky])
 
   useFrame(() => {
     const mz = (me.current?.dist ?? 0) * SCALE
