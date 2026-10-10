@@ -266,3 +266,29 @@ export const glowTex = () =>
     g.fillStyle = grd
     g.fillRect(0, 0, s, s)
   })
+
+// Office tower facade: a grid of windows on a pale wall, tinted per building.
+export const towerTex = () =>
+  make('tower', 64, (g, s, r) => {
+    g.fillStyle = '#ffffff'
+    g.fillRect(0, 0, s, s)
+    for (let y = 0; y < 8; y++)
+      for (let x = 0; x < 4; x++) {
+        const v = 120 + Math.floor(r() * 50)
+        g.fillStyle = `rgb(${v},${v + 30},${v + 60})`
+        g.fillRect(x * 16 + 3, y * 8 + 2, 10, 5)
+      }
+  })
+
+// Matching night glow: about half the windows lit.
+export const towerGlowTex = () =>
+  make('towerGlow', 64, (g, s, r) => {
+    g.fillStyle = '#000000'
+    g.fillRect(0, 0, s, s)
+    for (let y = 0; y < 8; y++)
+      for (let x = 0; x < 4; x++) {
+        if (r() < 0.5) continue
+        g.fillStyle = r() < 0.7 ? '#ffd88a' : '#cfe8ff'
+        g.fillRect(x * 16 + 3, y * 8 + 2, 10, 5)
+      }
+  })
