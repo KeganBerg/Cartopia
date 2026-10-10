@@ -1,0 +1,4 @@
+html, body, #root { margin: 0; height: 100%; }
+body { font-family: system-ui, sans-serif; background: #8fd18f; overflow: hidden; }
+.hud { position: absolute; top: 12px; left: 12px; padding: 8px 12px; border-radius: 8px;
+  background: rgba(255,255,255,0.85); font-size: 14px; pointer-events: none; }
