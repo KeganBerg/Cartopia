@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import { useGame, saveOf, type SaveState } from '../game/store'
-import { carDef, performance } from '../game/data'
+import { carDef, performance, garagePower } from '../game/data'
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 // Set only once the sign-in sync has finished, so nothing uploads before the cloud copy is read.
@@ -63,6 +63,7 @@ function rowOf(uid: string, s: SaveState) {
     town_name: s.townName,
     level: s.level,
     best_car: bestCar(s),
+    power: garagePower(s.cars),
     updated_at: new Date(s.updatedAt).toISOString(),
   }
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useGame, hasRusty } from '../game/store'
-import { BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, PAINTS, STRIPES, PAINT_COST, STRIPE_COST, carDef, performance, upgradeCost, type BuildingDef } from '../game/data'
+import { garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, PAINTS, STRIPES, PAINT_COST, STRIPE_COST, carDef, performance, upgradeCost, type BuildingDef } from '../game/data'
 import { CarPreview } from '../scene/CarPreview'
 import { CollectAllButton } from './CollectAll'
 import { PreviewCanvas, BuildingThumb } from '../scene/BuildingPreview'
@@ -210,7 +210,7 @@ export function GaragePanel() {
   const car = cars.find((c) => c.uid === selected) ?? cars[0]
   const def = car && carDef(car.model)
   return (
-    <Panel title={`My Garage · ${cars.length} cars`} wide>
+    <Panel title={`My Garage · ${cars.length} cars · ⚡${garagePower(cars)}`} wide>
       <div className="garage">
         <div className="garage-list">
           {cars.map((c) => {

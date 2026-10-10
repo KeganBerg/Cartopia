@@ -126,6 +126,7 @@ export function RacePanel() {
       <div className="tabs">
         <button className={tab === 'quick' ? 'tab sel' : 'tab'} onClick={() => setTab('quick')}>🏁 Quick race</button>
         <button className={tab === 'gp' ? 'tab sel' : 'tab'} onClick={() => setTab('gp')}>🏆 Grand Prix</button>
+        <button className="tab" onClick={() => useGame.getState().openPanel('leaders')}>🏅 Top racers</button>
       </div>
       {tab === 'gp' ? (
         <GrandPrix onRace={(series, rival, prize) => {

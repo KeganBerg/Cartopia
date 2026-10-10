@@ -285,3 +285,17 @@ export const PAINTS: { color: string; name: string; bucks?: number }[] = [
 export const STRIPES = [null, '#fafafa', '#212121', '#e53935', '#fdd835', '#1e88e5']
 export const PAINT_COST = 150
 export const STRIPE_COST = 100
+
+// Garage power: the combined PI of a player's five best cars.
+export const POWER_CARS = 5
+export const garagePower = (cars: { model: string; upgrades: Record<UpgradeSlot, number> }[]) =>
+  cars
+    .map((c) => performance(carDef(c.model), c.upgrades))
+    .sort((a, b) => b - a)
+    .slice(0, POWER_CARS)
+    .reduce((a, b) => a + b, 0)
+
+export const CLAN_COST = 2000
+export const CLAN_CAP = 20
+export const CLAN_EMBLEMS = ['🏁', '🔥', '⚡', '🦅', '🐺', '💀', '👑', '🚀', '🐉', '⭐', '🏎️', '🛞']
+export const CLAN_COLORS = ['#ff7043', '#e53935', '#8e24aa', '#1e88e5', '#00897b', '#43a047', '#fdd835', '#546e7a']
