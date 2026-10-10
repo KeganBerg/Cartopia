@@ -15,6 +15,8 @@ export function AccountPanel() {
   const [password, setPassword] = useState('')
   const [msg, setMsg] = useState('')
   const [name, setName] = useState(townName)
+  // Follow the town when sign-in swaps in the cloud save while this menu is open.
+  useEffect(() => setName(townName), [townName])
   const updatedAt = useGame((s) => s.updatedAt)
   // Recheck after each save change, e.g. once sign-in has swapped in the cloud town.
   // eslint-disable-next-line react-hooks/exhaustive-deps
