@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { Color, DoubleSide } from 'three'
 import { RoundedBox } from '@react-three/drei'
 import { rimTex } from './textures'
+import { glowMats } from './dayNight'
 import type { Body } from '../game/data'
 
 type Shape = {
@@ -25,7 +26,7 @@ const SHAPES: Record<Body, Shape> = {
 }
 
 // Toy-style car built from primitives. Faces +z.
-export function CarModel({ body, color, highlight, stripe }: { body: Body; color: string; highlight?: boolean; stripe?: string | null }) {
+export function CarModel({ body, color, highlight, stripe, beams }: { body: Body; color: string; highlight?: boolean; stripe?: string | null; beams?: boolean }) {
   const s = SHAPES[body]
   const dark = useMemo(() => '#' + new Color(color).multiplyScalar(0.6).getHexString(), [color])
   const top = s.lift + s.body
@@ -124,6 +125,13 @@ export function CarModel({ body, color, highlight, stripe }: { body: Body; color
           </mesh>
         </group>
       ))}
+      {/* Headlight beams on the road, visible after dark. */}
+      {beams && (
+        <mesh rotation-x={-Math.PI / 2} position={[0, 0.03, s.len / 2 + 0.55]} renderOrder={2}>
+          <planeGeometry args={[s.wid * 1.5, 1.3]} />
+          <primitive object={glowMats.beam} attach="material" dispose={null} />
+        </mesh>
+      )}
       {/* Chunky toy wheels with spoked rims. */}
       {[[-wx, wz], [wx, wz], [-wx, -wz], [wx, -wz]].map(([x, z], i) => (
         <group key={i} position={[x, s.wheel, z]}>

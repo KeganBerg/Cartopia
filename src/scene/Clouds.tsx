@@ -1,6 +1,9 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import type { Group } from 'three'
+import { MeshLambertMaterial, type Group } from 'three'
+import { dayPhase, nightAmount } from './dayNight'
+
+const cloudMat = new MeshLambertMaterial({ color: '#ffffff', emissive: '#dfefff', emissiveIntensity: 0.35, transparent: true, opacity: 0.6, depthWrite: false, flatShading: true })
 
 // A few puffy clouds drifting high over the town. They never cast shadows or
 // catch taps, and wrap around once they leave the map.
@@ -22,6 +25,9 @@ export function Clouds() {
   )
   const refs = useRef<(Group | null)[]>([])
   useFrame((_, dt) => {
+    const n = nightAmount(dayPhase())
+    cloudMat.opacity = 0.6 - n * 0.4
+    cloudMat.emissiveIntensity = 0.35 - n * 0.3
     refs.current.forEach((g, i) => {
       if (!g) return
       g.position.x += clouds[i].v * Math.min(dt, 0.1)
@@ -35,7 +41,7 @@ export function Clouds() {
           {PUFFS.map(([x, y, z, r], k) => (
             <mesh key={k} position={[x, y, z]} raycast={() => null}>
               <icosahedronGeometry args={[r, 1]} />
-              <meshLambertMaterial color="#ffffff" emissive="#dfefff" emissiveIntensity={0.35} transparent opacity={0.6} depthWrite={false} flatShading />
+              <primitive object={cloudMat} attach="material" dispose={null} />
             </mesh>
           ))}
         </group>

@@ -6,6 +6,9 @@ import { useGame, canPlace, buyablePlots, type PlacedBuilding } from '../game/st
 import { GRID, TILE, PLOT, PLOT_MIN, PLOT_MAX, START_LAND, buildingDef } from '../game/data'
 import { BuildingModel } from './BuildingModel'
 import { Clouds } from './Clouds'
+import { DayNight } from './DayNight'
+import { glowMats } from './dayNight'
+import { LightPool } from './BuildingModel'
 import { TownCars } from './TownCars'
 import { toWorld, toTile, DIRS } from './grid'
 import { grassTex, paverTex, asphaltTex } from './textures'
@@ -141,6 +144,31 @@ function Crosswalk({ side }: { side: 'e' | 'w' | 's' | 'n' }) {
   )
 }
 
+// Street lamp on the sidewalk, arm reaching over the road. Lit at night.
+function StreetLamp({ side }: { side: 'e' | 'w' | 's' | 'n' }) {
+  const half = TILE / 2 - 0.18
+  const rot = { s: 0, n: Math.PI, e: Math.PI / 2, w: -Math.PI / 2 }[side]
+  return (
+    <group rotation-y={rot}>
+      <group position={[0.55, 0, half]}>
+        <mesh position={[0, 0.85, 0]} castShadow>
+          <cylinderGeometry args={[0.035, 0.05, 1.7, 6]} />
+          <meshStandardMaterial color="#37474f" />
+        </mesh>
+        <mesh position={[0, 1.68, -0.22]}>
+          <boxGeometry args={[0.05, 0.04, 0.48]} />
+          <meshStandardMaterial color="#37474f" />
+        </mesh>
+        <mesh position={[0, 1.63, -0.44]}>
+          <boxGeometry args={[0.14, 0.06, 0.2]} />
+          <primitive object={glowMats.bulb} attach="material" dispose={null} />
+        </mesh>
+      </group>
+      <LightPool r={0.95} x={0.55} z={half - 0.5} />
+    </group>
+  )
+}
+
 function Roads() {
   const roadsList = useGame((s) => (s.visiting ?? s).roads)
   const tiles = useMemo(() => {
@@ -178,6 +206,10 @@ function Roads() {
             {count < 3 && xing[1] && <Crosswalk side="w" />}
             {count < 3 && xing[2] && <Crosswalk side="s" />}
             {count < 3 && xing[3] && <Crosswalk side="n" />}
+            {/* Street lamps every few tiles along straight roads, alternating sides. */}
+            {(straightX || straightZ) && (x * 7 + z * 5) % 3 === 0 && (
+              <StreetLamp side={straightX ? ((x + z) % 2 ? 's' : 'n') : ((x + z) % 2 ? 'e' : 'w')} />
+            )}
             {straightX && [-0.5, 0.5].map((o) => (
               <mesh key={o} rotation-x={-Math.PI / 2} position={[o, 0.02, 0]}><planeGeometry args={[0.45, 0.07]} /><meshBasicMaterial color="#fafafa" /></mesh>
             ))}
@@ -324,18 +356,7 @@ export function World() {
   const roads = useMemo(() => new Set(roadsList), [roadsList])
   return (
     <>
-      <color attach="background" args={['#5aa83a']} />
-      <hemisphereLight args={['#ffffff', '#6b8e4e', 0.7]} />
-      <directionalLight
-        castShadow
-        position={[25, 40, 15]}
-        intensity={1.6}
-        shadow-mapSize={Math.min(window.innerWidth, window.innerHeight) < 700 ? [1024, 1024] : [2048, 2048]}
-        shadow-camera-left={-30}
-        shadow-camera-right={30}
-        shadow-camera-top={30}
-        shadow-camera-bottom={-30}
-      />
+      <DayNight small={Math.min(window.innerWidth, window.innerHeight) < 700} />
       {/* Grass beyond the buildable lot. */}
       <mesh rotation-x={-Math.PI / 2} position-y={-0.02}>
         <planeGeometry args={[SIZE * 8, SIZE * 8]} />

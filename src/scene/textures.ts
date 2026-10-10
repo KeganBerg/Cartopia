@@ -239,3 +239,29 @@ export const pumpTex = (accent: string) =>
     g.fillStyle = '#37474f'
     g.fillRect(s * 0.3, s * 0.62, s * 0.4, s * 0.26)
   })
+
+// Night-time glow for windows: warm panes, dark frames, matching windowTex.
+export const windowGlowTex = () =>
+  make('windowGlow', 128, (g, s) => {
+    g.fillStyle = '#000000'
+    g.fillRect(0, 0, s, s)
+    const pw = s / 3
+    for (let i = 0; i < 3; i++) {
+      const grd = g.createLinearGradient(0, 6, 0, s - 6)
+      grd.addColorStop(0, '#ffe7a3')
+      grd.addColorStop(1, '#ffb74d')
+      g.fillStyle = grd
+      g.fillRect(i * pw + 6, 6, pw - 12, s - 12)
+    }
+  })
+
+// Soft round light pool, drawn additively under lamps and headlights.
+export const glowTex = () =>
+  make('glow', 64, (g, s) => {
+    const grd = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2)
+    grd.addColorStop(0, 'rgba(255,255,255,1)')
+    grd.addColorStop(0.4, 'rgba(255,255,255,0.45)')
+    grd.addColorStop(1, 'rgba(255,255,255,0)')
+    g.fillStyle = grd
+    g.fillRect(0, 0, s, s)
+  })

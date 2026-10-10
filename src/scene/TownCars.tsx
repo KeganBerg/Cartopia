@@ -82,7 +82,7 @@ function DrivingCar({ car, roads, start }: { car: OwnedCar; roads: Set<string>; 
       }}
     >
       <group scale={1.3}>
-        <CarModel body={def.body} color={car.color} highlight={selected} stripe={car.stripe} />
+        <CarModel body={def.body} color={car.color} highlight={selected} stripe={car.stripe} beams />
       </group>
     </group>
   )
