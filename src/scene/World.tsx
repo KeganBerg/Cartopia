@@ -7,6 +7,8 @@ import { GRID, TILE, PLOT, PLOT_MIN, PLOT_MAX, START_LAND, buildingDef } from '.
 import { BuildingModel } from './BuildingModel'
 import { Clouds } from './Clouds'
 import { DayNight } from './DayNight'
+import { PAL } from './season'
+import { SeasonFx } from './SeasonFx'
 import { glowMats } from './dayNight'
 import { LightPool } from './BuildingModel'
 import { TownCars } from './TownCars'
@@ -303,7 +305,7 @@ function Interaction() {
         onClick={onClick}
       >
         <planeGeometry args={[ALL, ALL]} />
-        <meshStandardMaterial color="#5aa83a" />
+        <meshStandardMaterial color={PAL.ground} />
       </mesh>
       {ghost}
       <MapControls
@@ -360,7 +362,7 @@ export function World() {
       {/* Grass beyond the buildable lot. */}
       <mesh rotation-x={-Math.PI / 2} position-y={-0.02}>
         <planeGeometry args={[SIZE * 8, SIZE * 8]} />
-        <meshStandardMaterial color="#5aa83a" />
+        <meshStandardMaterial color={PAL.ground} />
       </mesh>
       <ResponsiveZoom />
       <ExpandZoom />
@@ -373,6 +375,7 @@ export function World() {
       <AnchorProjector />
       <TownCars />
       <Clouds />
+      <SeasonFx small={Math.min(window.innerWidth, window.innerHeight) < 700} />
     </>
   )
 }

@@ -1,3 +1,4 @@
+import { PAL, SEASON } from './season'
 import { CanvasTexture, RepeatWrapping, SRGBColorSpace, type Texture } from 'three'
 
 // Hand-drawn canvas textures, generated once and shared. Small sizes keep
@@ -49,13 +50,13 @@ function speckle(g: CanvasRenderingContext2D, s: number, r: () => number, colors
 }
 
 export const grassTex = (rx = 1, ry = rx) =>
-  rep(make('grass', 128, (g, s, r) => {
-    g.fillStyle = '#7cc54e'
+  rep(make(`grass|${SEASON}`, 128, (g, s, r) => {
+    g.fillStyle = PAL.grass
     g.fillRect(0, 0, s, s)
-    speckle(g, s, r, ['#72bb45', '#86cf58', '#6fb342', '#8fd660'], 900, 3)
-    // A few tiny flowers.
-    speckle(g, s, r, ['#fff59d', '#ffffff'], 10, 2)
-  }), 'grass', rx, ry)
+    speckle(g, s, r, PAL.grassSpeckle, 900, 3)
+    // Flowers in spring, fallen leaves in fall, sparkle on the snow.
+    speckle(g, s, r, PAL.grassDots, PAL.dots, 2)
+  }), `grass|${SEASON}`, rx, ry)
 
 // Light concrete pavers for sidewalks and building lots.
 export const paverTex = (rx = 1, ry = rx) =>

@@ -3,6 +3,7 @@ import { signTexture } from './signTexture'
 import { CarModel } from './CarModel'
 import type { Texture } from 'three'
 import { glowMats } from './dayNight'
+import { PAL, SEASON } from './season'
 import { brickTex, sidingTex, shingleTex, gravelTex, awningTex, windowTex, paverTex, shutterTex, pumpTex } from './textures'
 
 type Props = { def: BuildingDef; ghost?: boolean; valid?: boolean }
@@ -97,7 +98,7 @@ export function BuildingModel({ def, ghost, valid }: Props) {
           {[[-0.3, 0.1, 0.42], [0.25, -0.2, 0.5], [0.1, 0.3, 0.36]].map(([x, z, r], i) => (
             <mesh key={i} position={[x, r * 0.8, z]} castShadow>
               <sphereGeometry args={[r, 10, 8]} />
-              {m(i % 2 ? def.roof : def.color)}
+              {m(PAL.bush[i % 2])}
             </mesh>
           ))}
         </group>
@@ -136,22 +137,55 @@ export function BuildingModel({ def, ghost, valid }: Props) {
           </mesh>
         </group>
       )
-    case 'tree':
-      // Cartoon oak: tapered trunk under a cluster of faceted leaf balls.
+    case 'tree': {
+      const g = ghost ? (valid ? '#66bb6a' : '#ef5350') : null
+      if (PAL.bare && !ghost) {
+        // Winter: bare branches with snow on the tips.
+        return (
+          <group>
+            <mesh position={[0, 0.5, 0]} castShadow>
+              <cylinderGeometry args={[0.08, 0.16, 1, 7]} />
+              {m('#6d4c41')}
+            </mesh>
+            {[0, 1, 2, 3, 4].map((i) => {
+              const a = i * 1.26
+              const tilt = 0.6 + (i % 2) * 0.25
+              return (
+                <group key={i} position={[0, 0.75 + (i % 3) * 0.18, 0]} rotation={[0, a, tilt]}>
+                  <mesh position={[0, 0.3, 0]} castShadow>
+                    <cylinderGeometry args={[0.025, 0.05, 0.6, 5]} />
+                    {m('#6d4c41')}
+                  </mesh>
+                  <mesh position={[0, 0.62, 0]}>
+                    <icosahedronGeometry args={[0.09, 0]} />
+                    <meshStandardMaterial color="#ffffff" flatShading />
+                  </mesh>
+                </group>
+              )
+            })}
+            <mesh position={[0, 0.02, 0]} rotation-x={-Math.PI / 2}>
+              <circleGeometry args={[0.55, 16]} />
+              <meshStandardMaterial color="#ffffff" />
+            </mesh>
+          </group>
+        )
+      }
+      // Cartoon oak: tapered trunk under a cluster of faceted leaf balls, coloured for the season.
       return (
         <group>
           <mesh position={[0, 0.35, 0]} castShadow>
             <cylinderGeometry args={[0.1, 0.17, 0.7, 7]} />
             {m('#7b5034')}
           </mesh>
-          {([[0, 1.15, 0, 0.55, def.color], [0.32, 0.95, 0.12, 0.38, '#5cb85c'], [-0.3, 0.98, -0.08, 0.4, def.roof], [0.05, 1.5, -0.05, 0.38, '#66c266'], [-0.08, 1.02, 0.32, 0.34, '#4caf50']] as const).map(([x, y, z, r, c], i) => (
+          {([[0, 1.15, 0, 0.55], [0.32, 0.95, 0.12, 0.38], [-0.3, 0.98, -0.08, 0.4], [0.05, 1.5, -0.05, 0.38], [-0.08, 1.02, 0.32, 0.34]] as const).map(([x, y, z, r], i) => (
             <mesh key={i} position={[x, y, z]} castShadow>
               <icosahedronGeometry args={[r, 1]} />
-              <meshStandardMaterial color={ghost ? (valid ? '#66bb6a' : '#ef5350') : c} transparent={ghost} opacity={ghost ? 0.55 : 1} flatShading />
+              <meshStandardMaterial color={g ?? PAL.leaves[i]} transparent={ghost} opacity={ghost ? 0.55 : 1} flatShading />
             </mesh>
           ))}
         </group>
       )
+    }
     case 'palm':
       // Curved, banded trunk with drooping fronds and coconuts.
       return (
@@ -168,7 +202,7 @@ export function BuildingModel({ def, ghost, valid }: Props) {
                 {[0, 1, 2].map((j) => (
                   <mesh key={j} position={[0.18 + j * 0.24, 0.02 - j * j * 0.07, 0]} rotation-z={-0.15 - j * 0.35} castShadow>
                     <boxGeometry args={[0.28, 0.03, 0.2 - j * 0.04]} />
-                    {m(j === 2 ? '#43a047' : def.color)}
+                    {m(j === 2 ? PAL.fronds[1] : PAL.fronds[0])}
                   </mesh>
                 ))}
               </group>
@@ -324,7 +358,7 @@ export function BuildingModel({ def, ghost, valid }: Props) {
           </mesh>
           <mesh position={[0, 1.35, 0]} rotation-y={Math.PI / 4} castShadow>
             <coneGeometry args={[1.15, 0.7, 4]} />
-            {m(def.roof, shingleTex(3, 1.5))}
+            {m(SEASON === 'winter' ? '#f4f8fb' : def.roof, shingleTex(3, 1.5))}
           </mesh>
           <mesh position={[0, 0.3, 0.61]}>
             <planeGeometry args={[0.3, 0.6]} />

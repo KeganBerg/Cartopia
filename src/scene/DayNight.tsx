@@ -1,16 +1,17 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Color, type DirectionalLight, type HemisphereLight } from 'three'
+import { PAL } from './season'
 import { applyNight, dayPhase, duskAmount, nightAmount } from './dayNight'
 
-const SUN = new Color('#ffffff')
+const SUN = new Color(PAL.sun)
 const DUSK = new Color('#ffa463')
 const MOON = new Color('#9fb4ff')
 const SKY_DAY = new Color('#ffffff')
 const SKY_NIGHT = new Color('#6274b8')
 const GROUND_DAY = new Color('#6b8e4e')
 const GROUND_NIGHT = new Color('#1f2a44')
-const BG_DAY = new Color('#5aa83a')
+const BG_DAY = new Color(PAL.ground)
 const BG_NIGHT = new Color('#1b2f2a')
 
 // Sun, sky light and background that follow the shared day/night clock.
@@ -40,7 +41,7 @@ export function DayNight({ small }: { small: boolean }) {
   })
   return (
     <>
-      <color attach="background" args={['#5aa83a']} />
+      <color attach="background" args={[PAL.ground]} />
       <hemisphereLight ref={hemi} args={['#ffffff', '#6b8e4e', 0.7]} />
       <directionalLight
         ref={sun}
