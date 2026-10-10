@@ -120,3 +120,27 @@ export function startCloudSync() {
     saveTimer = setTimeout(pushSave, 3000)
   })
 }
+
+// A local town that sign-in replaced, offered back only when it is further along than the current one.
+export function localBackup(): SaveState | null {
+  try {
+    const raw = localStorage.getItem(BACKUP_KEY)
+    const save = raw ? (JSON.parse(raw).save as SaveState) : null
+    return save && progressScore(save) > progressScore(saveOf(useGame.getState())) ? save : null
+  } catch {
+    return null
+  }
+}
+
+export function restoreLocalBackup() {
+  const save = localBackup()
+  if (!save) return
+  // Stamped now so the restored town is the newest copy and autosaves to the cloud.
+  useGame.getState().loadSave({ ...save, updatedAt: Date.now() })
+  try {
+    localStorage.removeItem(BACKUP_KEY)
+  } catch {
+    // Best effort only.
+  }
+  useGame.getState().toast('Restored your town from this device')
+}
