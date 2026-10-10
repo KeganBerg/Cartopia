@@ -198,6 +198,7 @@ button.card:hover:not(:disabled) { border-color: var(--accent); }
 
 /* Rusty's Rescue gate */
 .card { position: relative; }
+.card.focus { border-color: var(--accent); animation: collect-pulse 1s ease-in-out 3; }
 .card.start-here { border-color: var(--accent); box-shadow: 0 0 0 3px #ffe0b2; }
 .ribbon { position: absolute; top: -9px; left: 50%; transform: translateX(-50%); background: var(--accent); color: #fff; font: 11px var(--display); padding: 2px 8px; border-radius: 8px; white-space: nowrap; }
 .rusty-lock { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; background: #fff3e0; border: 2px solid var(--accent); border-radius: 14px; padding: 10px 12px; margin-bottom: 12px; }
@@ -597,9 +598,6 @@ button.lvl-item:hover { border-color: var(--accent); transform: translateY(-2px)
 .lvl-car .car-swatch { width: 112px; height: 56px; animation: bob 2.4s ease-in-out infinite; }
 .lvl-emoji { font-size: 48px; }
 .lvl-continue { margin-top: 12px; min-width: 180px; font-size: 20px; padding: 8px 20px; animation: lvl-up .4s ease-out 1.5s both; }
-/* Shop or Showroom card the splash pointed at. */
-.card.focus { border-color: var(--accent); animation: lvl-focus .8s ease-in-out 3; }
-@keyframes lvl-focus { 50% { box-shadow: 0 0 0 6px rgba(255, 152, 0, .45); transform: scale(1.04); } }
 @media (max-width: 600px) {
   .lvl { padding: 50px 12px 12px; margin-top: 44px; max-height: calc(100dvh - 68px - var(--sat) - var(--sab)); border-radius: 20px; }
   .lvl-badge { width: 96px; height: 96px; top: -48px; margin-left: -48px; }

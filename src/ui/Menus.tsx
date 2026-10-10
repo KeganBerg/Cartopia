@@ -3,6 +3,7 @@ import { useGame, hasRusty } from '../game/store'
 import { BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, PAINTS, STRIPES, PAINT_COST, STRIPE_COST, carDef, performance, upgradeCost, type BuildingDef } from '../game/data'
 import { CarPreview } from '../scene/CarPreview'
 import { CollectAllButton } from './CollectAll'
+import { rotatePlacement } from '../game/placement'
 import { PreviewCanvas, BuildingThumb } from '../scene/BuildingPreview'
 
 export function BottomBar() {
@@ -37,7 +38,7 @@ function EditBar() {
     mode === 'expand' ? 'Tap a For Sale sign to buy the land next to your town'
     : mode === 'road' ? 'Click or drag to lay road (10 coins per tile)'
     : mode === 'bulldoze' ? 'Click or drag to remove (buildings refund half)'
-    : `Click to place ${placing ? BUILDINGS.find((b) => b.id === placing)?.name : ''}`
+    : `Click to place ${placing ? BUILDINGS.find((b) => b.id === placing)?.name : ''}. Rotate turns it.`
   return (
     <div className="edit-bar">
       <div className="edit-hint">{hint}</div>
@@ -45,6 +46,7 @@ function EditBar() {
         <button className={mode === 'road' ? 'tool active' : 'tool'} onClick={() => setMode('road')}>🛣️ Road</button>
         <button className={mode === 'bulldoze' ? 'tool active' : 'tool'} onClick={() => setMode('bulldoze')}>🚜 Bulldoze</button>
         <button className={mode === 'expand' ? 'tool active' : 'tool'} onClick={() => setMode('expand')}>🗺 Land</button>
+        {mode === 'place' && placing && <button className="tool" onClick={rotatePlacement} title="Rotate (R)">🔄 Rotate</button>}
         <button className="tool" onClick={() => openPanel('shop')}>🏪 Shop</button>
         <button className="tool done" onClick={() => setMode('play')}>✔ Done</button>
       </div>
@@ -111,11 +113,15 @@ export function ShopPanel() {
   const setMode = useGame((s) => s.setMode)
   const buildings = useGame((s) => s.buildings)
   const showNeed = useGame((s) => s.showNeed)
+  const focus = useGame((s) => s.shopFocus)
+  const focusRef = useRef<HTMLButtonElement>(null)
   const rusty = hasRusty({ buildings })
-  const { body, focus } = useShopFocus()
+  // A "Build" hint elsewhere opened the Shop: bring that building into view.
+  useEffect(() => {
+    focusRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, [focus])
   return (
     <Panel title="Shop" wide overlay={<PreviewCanvas />}>
-      <div ref={body}>
       {SHOP_GROUPS.map((g) => (
         <section key={g.title}>
           <h3>{g.title}</h3>
@@ -125,11 +131,12 @@ export function ShopPanel() {
               const broke = coins < b.price
               const owned = !!b.unique && buildings.some((o) => o.def === b.id)
               const highlight = b.id === 'rescue' && !rusty
+              const focused = b.id === focus
               return (
                 <button
                   key={b.id}
-                  data-id={b.id}
-                  className={`card ${locked ? 'locked' : ''} ${broke && !locked ? 'broke' : ''} ${highlight ? 'start-here' : ''} ${focus === b.id ? 'focus' : ''}`}
+                  ref={focused ? focusRef : undefined}
+                  className={`card ${locked ? 'locked' : ''} ${broke && !locked ? 'broke' : ''} ${highlight ? 'start-here' : ''} ${focused ? 'focus' : ''}`}
                   disabled={owned}
                   onClick={() => (locked ? showNeed('level', b.unlockLevel, b.name) : broke ? showNeed('coins', b.price - coins, b.name) : setMode('place', b.id))}
                 >
@@ -150,7 +157,6 @@ export function ShopPanel() {
           </div>
         </section>
       ))}
-      </div>
     </Panel>
   )
 }
@@ -159,8 +165,7 @@ export function ShowroomPanel() {
   const level = useGame((s) => s.level)
   const buyCar = useGame((s) => s.buyCar)
   const rusty = useGame((s) => hasRusty(s))
-  const setMode = useGame((s) => s.setMode)
-  const coins = useGame((s) => s.coins)
+  const openShop = useGame((s) => s.openShop)
   const [colorFor, setColorFor] = useState<Record<string, string>>({})
   const { body, focus } = useShopFocus()
   return (
@@ -172,7 +177,7 @@ export function ShowroomPanel() {
             <b>Build Rusty's Rescue first</b>
             <p>Rusty tracks down and restores cars for your town. Build his shop to start getting new cars.</p>
           </div>
-          <button className="buy" disabled={coins < 1000} onClick={() => setMode('place', 'rescue')}>Build · $1,000</button>
+          <button className="buy" onClick={() => openShop('rescue')}>Build · $1,000</button>
         </div>
       )}
       <div ref={body} className={rusty ? 'cards' : 'cards dimmed'}>
