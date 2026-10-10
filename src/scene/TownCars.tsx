@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { anchors } from './anchors'
 import { MeshStandardMaterial, Vector3 } from 'three'
 import type { Group } from 'three'
-import { useGame, footprint, lotSize, type OwnedCar, type PlacedBuilding } from '../game/store'
+import { useGame, footprint, type OwnedCar, type PlacedBuilding } from '../game/store'
 import { TILE, buildingDef, carDef, performance } from '../game/data'
 import { tripRequests, type TripKind } from '../game/trips'
 import { toWorld, DIRS } from './grid'
@@ -15,13 +15,16 @@ const LANE = 0.42
 
 type Tile = [number, number]
 // A building cars can pull into: the road tile out front and the parking spot.
-type Stop = { uid: string; def: string; road: Tile; park: [number, number]; face: number }
+// dir points from the lot to the road; cars pull over at the kerb in front, parallel to the road.
+type Stop = { uid: string; def: string; road: Tile; park: [number, number]; dir: [number, number] }
 type Mode = 'roam' | 'route' | 'enter' | 'park' | 'leave'
 type Agent = {
   from: Tile; to: Tile; t: number
   mode: Mode; path: Tile[]; stop: Stop | null; tow: boolean
   timer: number; nextVisit: number
   lane: [number, number, number] // where the car left the road, for pulling in and out
+  face: number // heading while pulled over
+  pending: { stop: Stop; tow: boolean } | null // a trip asked for while parked, started once the car is back on the road
   v: number // 0..1 share of cruising speed, eased so cars brake and pull away smoothly
   wait: number // seconds spent stopped behind another car
 }
@@ -90,8 +93,7 @@ function route(roads: Set<string>, start: Tile, goal: Tile, avoid?: Tile): Tile[
 function stopFor(b: PlacedBuilding, roads: Set<string>): Stop | null {
   const d = buildingDef(b.def)
   if (d.kind === 'decor' || d.kind === 'obstacle' || d.kind === 'house') return null
-  const [w, h] = lotSize(b.def, b.rot)
-  const [cx, cz] = toWorld(b.x + (w - 1) / 2, b.z + (h - 1) / 2)
+  // Only buildings that touch a road get visits, so no car ever crosses another lot.
   // Pull up at the front door when a road runs past it, else at any side touching a road.
   const front = FRONT[turnOf(b, roads)]
   const sides = [front, ...DIRS.filter(([dx, dz]) => dx !== front[0] || dz !== front[1])]
@@ -100,25 +102,12 @@ function stopFor(b: PlacedBuilding, roads: Set<string>): Stop | null {
       const road: Tile = [fx + dx, fz + dz]
       if (!roads.has(key(road))) continue
       const [tx, tz] = toWorld(fx, fz)
-      // Park on the lot just inside the edge facing the road, nose to the door.
-      const park: [number, number] = [tx + dx * 0.55, tz + dz * 0.55]
-      return { uid: b.uid, def: b.def, road, park, face: Math.atan2(cx - park[0], cz - park[1]) }
+      // The kerb strip just outside the lot: clear of the building, half on the pavement.
+      const park: [number, number] = [tx + dx * 1.05, tz + dz * 1.05]
+      return { uid: b.uid, def: b.def, road, park, dir: [dx, dz] }
     }
   }
-  // Not beside a road: use the nearest road and park on the lot edge facing it.
-  let best: Tile | null = null
-  let bestD = Infinity
-  for (const k of roads) {
-    const t = k.split(',').map(Number) as Tile
-    const dd = Math.hypot(t[0] - (b.x + (w - 1) / 2), t[1] - (b.z + (h - 1) / 2))
-    if (dd < bestD) { bestD = dd; best = t }
-  }
-  if (!best || bestD > 6) return null
-  const [rx, rz] = toWorld(...best)
-  const len = Math.hypot(rx - cx, rz - cz) || 1
-  const reach = (Math.max(w, h) / 2) * 2 + 0.2
-  const park: [number, number] = [cx + ((rx - cx) / len) * reach, cz + ((rz - cz) / len) * reach]
-  return { uid: b.uid, def: b.def, road: best, park, face: Math.atan2(cx - park[0], cz - park[1]) }
+  return null
 }
 
 function TowTruck() {
@@ -149,7 +138,7 @@ function DrivingCar({ car, roads, start, stops }: { car: OwnedCar; roads: Set<st
   const agent = useRef<Agent>({
     from: start, to: pickNext(roads, start, start), t: Math.random(),
     mode: 'roam', path: [], stop: null, tow: false, timer: 0,
-    nextVisit: 15 + Math.random() * 45, lane: [0, 0, 0], v: 1, wait: 0,
+    nextVisit: 15 + Math.random() * 45, lane: [0, 0, 0], face: 0, pending: null, v: 1, wait: 0,
   })
   useEffect(() => () => void traffic.delete(car.uid), [car.uid])
   const selected = useGame((s) => s.selectedCar === car.uid)
@@ -182,8 +171,11 @@ function DrivingCar({ car, roads, start, stops }: { car: OwnedCar; roads: Set<st
       const want = trip === 'gas' ? 'gas' : trip === 'tires' ? 'tires' : 'rescue'
       const stop = stops.find((s) => s.def === want) ?? (trip === 'tow' ? stops.find((s) => s.def === 'tires') : undefined)
       if (stop) {
-        if (a.mode === 'park' || a.mode === 'enter') a.mode = 'roam'
-        goTo(a, stop, trip === 'tow')
+        // Parked or pulling in: drive back out to the road first, then set off.
+        if (a.mode === 'park' || a.mode === 'enter' || a.mode === 'leave') {
+          a.pending = { stop, tow: trip === 'tow' }
+          if (a.mode !== 'leave') { a.timer = a.mode === 'enter' ? 1 - a.timer : 0; a.mode = 'leave' }
+        } else goTo(a, stop, trip === 'tow')
       }
     }
 
@@ -209,7 +201,7 @@ function DrivingCar({ car, roads, start, stops }: { car: OwnedCar; roads: Set<st
         const k = a.mode === 'enter' ? a.timer : 1 - a.timer
         const e = k * k * (3 - 2 * k)
         g.position.set(a.lane[0] + (s.park[0] - a.lane[0]) * e, 0.02, a.lane[2] + (s.park[1] - a.lane[2]) * e)
-        const target = a.mode === 'enter' ? s.face : Math.atan2(a.lane[0] - s.park[0], a.lane[2] - s.park[1])
+        const target = a.face
         let diff = target - g.rotation.y
         diff = Math.atan2(Math.sin(diff), Math.cos(diff))
         g.rotation.y += diff * Math.min(1, dt * 6)
@@ -221,10 +213,16 @@ function DrivingCar({ car, roads, start, stops }: { car: OwnedCar; roads: Set<st
           } else {
             a.mode = 'roam'
             a.stop = null
+            // Carry on the way the car is facing, so it pulls away instead of spinning round.
+            const ahead: Tile = [s.road[0] + Math.round(Math.sin(a.face)), s.road[1] + Math.round(Math.cos(a.face))]
             a.from = s.road
-            a.to = pickNext(roads, s.road, s.road)
+            a.to = roads.has(key(ahead)) ? ahead : pickNext(roads, s.road, s.road)
             a.t = 0
             a.nextVisit = 25 + Math.random() * 50
+            if (a.pending) {
+              goTo(a, a.pending.stop, a.pending.tow)
+              a.pending = null
+            }
           }
         }
       }
@@ -303,6 +301,11 @@ function DrivingCar({ car, roads, start, stops }: { car: OwnedCar; roads: Set<st
         // Arrived out front: pull in from the lane.
         a.t = 0
         a.lane = [g.position.x, 0, g.position.z]
+        // Pull over parallel to the road, keeping the direction the car was already going.
+        const [sx, sz] = a.stop.dir
+        const f = Math.atan2(-sz, sx)
+        const heading = g.rotation.y
+        a.face = Math.cos(f - heading) >= 0 ? f : f + Math.PI
         a.mode = 'enter'
         a.timer = 0
         anchor()
@@ -320,7 +323,14 @@ function DrivingCar({ car, roads, start, stops }: { car: OwnedCar; roads: Set<st
     // Keep to the right-hand lane.
     const ox = (-dz / len) * LANE
     const oz = (dx / len) * LANE
-    g.position.set(ax + dx * a.t + ox, 0.02, az + dz * a.t + oz)
+    // Ease toward the lane position so corners, lane changes and U-turns flow instead of snapping.
+    const px = ax + dx * a.t + ox
+    const pz = az + dz * a.t + oz
+    if (Math.hypot(px - g.position.x, pz - g.position.z) > 3) g.position.set(px, 0.02, pz)
+    else {
+      const k = Math.min(1, dt * 8)
+      g.position.set(g.position.x + (px - g.position.x) * k, 0.02, g.position.z + (pz - g.position.z) * k)
+    }
     if (len > 0.01) {
       const target = Math.atan2(dx, dz)
       let diff = target - g.rotation.y

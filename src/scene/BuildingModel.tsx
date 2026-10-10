@@ -64,7 +64,7 @@ function RoofProp({ prop, y }: { prop: NonNullable<BuildingDef['prop']>; y: numb
 }
 
 // Warm pool of light on the ground that only shows after dark.
-export function LightPool({ r, x = 0, z = 0, y = 0.06 }: { r: number; x?: number; z?: number; y?: number }) {
+export function LightPool({ r, x = 0, z = 0, y = 0.085 }: { r: number; x?: number; z?: number; y?: number }) {
   return (
     <mesh rotation-x={-Math.PI / 2} position={[x, y, z]} renderOrder={2}>
       <planeGeometry args={[r * 2, r * 2]} />
@@ -321,12 +321,12 @@ export function BuildingModel({ def, ghost, valid }: Props) {
             <meshStandardMaterial color={def.roof} side={2} />
           </mesh>
           {/* Track lane line and a chequered start line. */}
-          <mesh position={[0, 0.062, 0]} rotation-x={-Math.PI / 2}>
+          <mesh position={[0, 0.075, 0]} rotation-x={-Math.PI / 2}>
             <ringGeometry args={[1.53, 1.57, 48]} />
             {m('#fafafa')}
           </mesh>
           {!ghost && (
-            <mesh position={[0, 0.063, 1.55]} rotation-x={-Math.PI / 2}>
+            <mesh position={[0, 0.08, 1.55]} rotation-x={-Math.PI / 2}>
               <planeGeometry args={[0.18, 0.7]} />
               <meshBasicMaterial map={signTexture('▚▚▚▚', '#ffffff', '#111111')} />
             </mesh>
@@ -387,7 +387,7 @@ export function BuildingModel({ def, ghost, valid }: Props) {
             <>
               <LightPool r={0.55} z={0.9} />
               <mesh position={[0, 0.03, 0.7]} receiveShadow><boxGeometry args={[0.42, 0.06, 0.16]} />{m('#bdbdbd')}</mesh>
-              <mesh position={[0, 0.012, 0.85]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.3, 0.3]} />{m('#d7ccc8')}</mesh>
+              <mesh position={[0, 0.035, 0.85]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.3, 0.3]} />{m('#d7ccc8')}</mesh>
               {[-0.75, -0.6, -0.45, -0.3, 0.3, 0.45, 0.6, 0.75].map((x) => (
                 <mesh key={x} position={[x, 0.13, 0.95]} castShadow><boxGeometry args={[0.05, 0.26, 0.03]} />{m('#fafafa')}</mesh>
               ))}
@@ -508,7 +508,7 @@ export function BuildingModel({ def, ghost, valid }: Props) {
           </mesh>
           {!ghost && [-1.1, 0, 1.1].map((x) => <LightPool key={x} r={0.6} x={x} z={0.75} />)}
           {!ghost && [[-0.9, 1.0], [0.4, 1.3]].map(([x, z]) => (
-            <mesh key={x} position={[x, 0.058, z]} rotation-x={-Math.PI / 2}>
+            <mesh key={x} position={[x, 0.07, z]} rotation-x={-Math.PI / 2}>
               <circleGeometry args={[0.22, 16]} />
               <meshBasicMaterial color="#000000" transparent opacity={0.18} />
             </mesh>
@@ -681,7 +681,7 @@ export function BuildingModel({ def, ghost, valid }: Props) {
             <boxGeometry args={[W * 0.76, 0.03, 0.44]} />
             {m('#ffffff', awningTex(def.roof === '#f5f5f5' || def.roof === '#fff8e1' ? def.color : def.roof))}
           </mesh>
-          <mesh position={[0, 0.32, D * 0.26 + 0.012]}>
+          <mesh position={[0, 0.32, D * 0.26 + 0.03]}>
             <planeGeometry args={[0.4, 0.6]} />
             {m('#4e342e')}
           </mesh>
