@@ -3,7 +3,8 @@ import { useGame, hasRusty, cleanPlate, type Loot } from '../game/store'
 import { RESCUE_SPOTS, RARITY, STORAGE_MAX, carDef, performance, restoreCost, rushBucks, type Rarity } from '../game/data'
 import { useNow } from '../scene/useNow'
 import { CarPreview } from '../scene/CarPreview'
-import { Panel, CarSwatch, SkillTag } from './Menus'
+import { Panel, SkillTag } from './Menus'
+import { CarThumb } from '../scene/BuildingPreview'
 
 // Where the pins sit on the search map, in percent.
 const PIN_SPOTS: [number, number][] = [[14, 22], [40, 14], [70, 20], [86, 46], [62, 52], [30, 48], [18, 78], [52, 82]]
@@ -31,20 +32,6 @@ function RarityTag({ r }: { r: Rarity }) {
   return <span className={`rarity rarity-${r}`}>{RARITY[r].name}</span>
 }
 
-// A rusty, sheet-covered car waiting in storage.
-function JunkSwatch() {
-  return (
-    <svg viewBox="0 0 100 50" className="car-swatch">
-      <circle cx="26" cy="41" r="7" fill="#3e2723" />
-      <circle cx="74" cy="41" r="7" fill="#3e2723" />
-      <path d="M6 38 Q10 14 34 10 Q52 4 70 12 Q92 18 94 38 Z" fill="#8d6e63" />
-      <path d="M20 36 Q24 20 36 18 M54 12 Q60 26 58 36 M76 18 Q82 28 80 37" stroke="#6d4c41" strokeWidth="2" fill="none" />
-      <circle cx="44" cy="28" r="3" fill="#bf360c" opacity=".7" />
-      <circle cx="68" cy="30" r="2.5" fill="#bf360c" opacity=".7" />
-    </svg>
-  )
-}
-
 function RestoreBay({ onCollect }: { onCollect: () => void }) {
   const now = useNow()
   const r = useGame((s) => s.restoring)
@@ -56,7 +43,7 @@ function RestoreBay({ onCollect }: { onCollect: () => void }) {
   const pct = done ? 100 : 100 - (left / (r.minutes * 60000)) * 100
   return (
     <div className={done ? 'bay done' : 'bay'}>
-      <CarSwatch color={done ? d.colors[0] : '#a1887f'} body={d.body} />
+      <CarThumb size="sm" color={d.colors[0]} body={d.body} rusty={!done} />
       <div className="bay-info">
         <b>{d.name}</b> <RarityTag r={r.rarity} />
         {done ? (
@@ -87,7 +74,7 @@ function Storage() {
         const d = carDef(c.model)
         return (
           <div key={c.uid} className="card junk-card">
-            <JunkSwatch />
+            <CarThumb color={d.colors[0]} body={d.body} rusty />
             <div className="card-name">{d.name}</div>
             <div className="card-stat"><RarityTag r={c.rarity} /> PI {performance(d, { engine: 0, turbo: 0, tires: 0, weight: 0 })}{d.rescueOnly ? ' · Classic' : ''}</div>
             <SkillTag model={c.model} />
@@ -168,7 +155,7 @@ function SearchMap() {
         <b>Haul:</b>
         {found.length ? found.map((l, i) => {
           const t = lootLabel(l)
-          return <span key={i} className={l.kind === 'car' ? 'haul-item car' : 'haul-item'}>{t.icon} {t.text}{l.kind === 'car' && <> <RarityTag r={l.rarity} /></>}</span>
+          return <span key={i} className={l.kind === 'car' ? 'haul-item car' : 'haul-item'}>{l.kind === 'car' ? <CarThumb size="xs" body={carDef(l.model).body} color={carDef(l.model).colors[0]} rusty /> : t.icon} {t.text}{l.kind === 'car' && <> <RarityTag r={l.rarity} /></>}</span>
         }) : <span className="hint">Nothing yet</span>}
       </div>
       <button className="buy" disabled={q.flat || !q.revealed.some(Boolean)} onClick={home}>🏠 Tow it home</button>

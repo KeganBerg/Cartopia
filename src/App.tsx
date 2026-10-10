@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { World } from './scene/World'
 import { Hud } from './ui/Hud'
+import { ThumbBaker } from './scene/BuildingPreview'
 import { BottomBar, ShopPanel, ShowroomPanel, GaragePanel, Toasts } from './ui/Menus'
 import { RacePanel, LiveRaceOverlay, InvitesPanel, PrizePopup } from './ui/Race'
 import { joinLobby, useLive } from './lib/live'
@@ -11,6 +12,7 @@ import { Badges } from './ui/Badges'
 import { NeedPanel } from './ui/Need'
 import { RescuePanel } from './ui/Rescue'
 import { BankPanel } from './ui/Bank'
+import { LevelUpSplash } from './ui/LevelUp'
 import { AccountPanel } from './ui/Account'
 import { GoalsPanel, DailyPanel, FlatPanel } from './ui/Goals'
 import { useGame, today } from './game/store'
@@ -36,7 +38,7 @@ export default function App() {
   return (
     <>
       {/* Camera sits well back with a tight near/far range so depth stays precise and flat layers never flicker. */}
-      <Canvas shadows orthographic camera={{ position: [75, 80, 75], zoom: 36, near: 1, far: 82000 }} dpr={SMALL ? [1, 1.5] : [1, 2]}
+      <Canvas shadows orthographic camera={{ position: [75, 80, 75], zoom: 36, near: 1, far: 320 }} dpr={SMALL ? [1, 1.5] : [1, 2]}
         onCreated={({ gl }) => {
           // Let the browser restore the 3D view after it drops the context, instead of leaving it blank.
           gl.domElement.addEventListener('webglcontextlost', (e) => e.preventDefault())
@@ -46,6 +48,7 @@ export default function App() {
         <World />
       </Canvas>
       <Badges />
+      <ThumbBaker />
       <Hud />
       <BottomBar />
       {panel === 'shop' && <ShopPanel />}
@@ -65,6 +68,7 @@ export default function App() {
       {panel === 'daily' && <DailyPanel />}
       {panel === 'flat' && <FlatPanel />}
       <PrizePopup />
+      <LevelUpSplash />
       <Toasts />
     </>
   )

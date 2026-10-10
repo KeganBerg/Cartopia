@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
-  PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS, BUILDINGS,
+  PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS,
   upgradeCost, MAX_UPGRADE, RESCUE_SPOTS, RESCUE_PINS, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, type Rarity, GOALS, DAILY_BONUS, PAINTS, PAINT_COST, STRIPE_COST, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey,
 } from './data'
 import { sfx } from '../lib/sound'
@@ -71,14 +71,18 @@ type UiState = {
   search: Search | null
   // Building types whose bubbles pulse after a "Show me" tap.
   highlight: string[] | null
+  shopFocus: string | null // building the Shop scrolls to and points out
   // A Grand Prix mystery box waiting to be opened.
   gpPrize: { series: string; model: string; color: string } | null
+  // Level-up splash: the levels just reached and the rewards they paid.
+  levelUp: { from: number; to: number; coins: number; bucks: number } | null
 }
 
 type Actions = {
   setMode: (m: Mode, placing?: string | null) => void
   showNeed: (res: Resource, missing: number, what?: string) => void
   openPanel: (p: Panel) => void
+  openShop: (focus?: string) => void
   selectCar: (uid: string | null) => void
   toast: (text: string) => void
   tick: (now: number) => void
@@ -107,6 +111,8 @@ type Actions = {
   buyPlot: (px: number, pz: number) => void
   gpResult: (series: string, won: boolean) => void
   closePrize: () => void
+  closeLevelUp: () => void
+  focusShop: (panel: 'shop' | 'showroom' | 'rescue' | 'race', id: string | null) => void
   startSearch: (spot: string) => void
   revealPin: (i: number) => void
   fixTruck: () => void
@@ -245,10 +251,16 @@ function addXp(s: GameState, amount: number): Partial<GameState> {
   }
   if (!ups.length) return { xp }
   const fresh = { ...s, level }
-  const unlocked = BUILDINGS.filter((d) => d.unlockLevel === level).map((d) => d.name)
   setTimeout(sfx.levelUp, 250)
-  s.toast(`Level up! You're level ${level}. +1 buck${unlocked.length ? `. Unlocked: ${unlocked.join(', ')}` : ''}`)
-  return { level, xp, bucks, coins, fuel: fuelCap(fresh), fuelUpdatedAt: Date.now() }
+  // Fold into a splash that's still open, so two quick level-ups show as one.
+  const prev = s.levelUp
+  const levelUp = {
+    from: prev ? prev.from : s.level,
+    to: level,
+    coins: (prev?.coins ?? 0) + (coins - s.coins),
+    bucks: (prev?.bucks ?? 0) + (bucks - s.bucks),
+  }
+  return { level, xp, bucks, coins, fuel: fuelCap(fresh), fuelUpdatedAt: Date.now(), levelUp }
 }
 
 export const cleanPlate = (p: string) => p.toUpperCase().replace(/[^A-Z0-9 ]/g, '').trim().slice(0, 7)
@@ -286,7 +298,9 @@ export const useGame = create<GameState>()(
       need: null,
       search: null,
       highlight: null,
+      shopFocus: null,
       gpPrize: null,
+      levelUp: null,
 
       setMode: (mode, placing = null) => set((s) => ({ mode, placing, panel: null, placeRot: placing && placing === s.placing ? s.placeRot : null })),
       setPlaceRot: (placeRot) => set({ placeRot }),
@@ -294,7 +308,8 @@ export const useGame = create<GameState>()(
         sfx.error()
         set({ need: { res, missing: Math.max(0, Math.ceil(missing)), what }, panel: 'need', mode: 'play', placing: null })
       },
-      openPanel: (panel) => set({ panel, mode: 'play', placing: null }),
+      openPanel: (panel) => set({ panel, mode: 'play', placing: null, shopFocus: null }),
+      openShop: (focus) => set({ panel: 'shop', mode: 'play', placing: null, shopFocus: focus ?? null }),
       selectCar: (selectedCar) => set({ selectedCar }),
       toast: (text) => {
         const id = Date.now() + Math.random()
@@ -767,6 +782,8 @@ export const useGame = create<GameState>()(
       },
 
       closePrize: () => set({ gpPrize: null }),
+      closeLevelUp: () => set({ levelUp: null }),
+      focusShop: (panel, shopFocus) => set({ levelUp: null, panel, shopFocus, mode: 'play', placing: null }),
 
       buyPlot: (px, pz) => {
         const s = get()
