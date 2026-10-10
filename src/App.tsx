@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { World } from './scene/World'
 import { Hud } from './ui/Hud'
+import { ThumbBaker } from './scene/BuildingPreview'
 import { BottomBar, ShopPanel, ShowroomPanel, GaragePanel, Toasts } from './ui/Menus'
 import { RacePanel, LiveRaceOverlay, InvitesPanel, PrizePopup } from './ui/Race'
 import { joinLobby, useLive } from './lib/live'
@@ -46,6 +47,7 @@ export default function App() {
         <World />
       </Canvas>
       <Badges />
+      <ThumbBaker />
       <Hud />
       <BottomBar />
       {panel === 'shop' && <ShopPanel />}

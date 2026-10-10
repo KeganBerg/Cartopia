@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useGame, hasRusty } from '../game/store'
-import { BUILDINGS, CARS, RESCUE_SPOTS, GP_SERIES, baseFuelCap, type BuildingDef } from '../game/data'
-import { PreviewCanvas, BuildingThumb } from '../scene/BuildingPreview'
-import { CarSwatch } from './Menus'
+import { BUILDINGS, CARS, RESCUE_SPOTS, GP_SERIES, baseFuelCap } from '../game/data'
+import { BuildingThumb, CarThumb } from '../scene/BuildingPreview'
 
 type Unlock = {
   key: string
@@ -16,9 +15,8 @@ type Unlock = {
 
 function unlocksBetween(from: number, to: number, rusty: boolean, focus: ReturnType<typeof useGame.getState>['focusShop']) {
   const inRange = (l: number) => l > from && l <= to
-  const buildings = BUILDINGS.filter((b) => b.unlockLevel < 99 && inRange(b.unlockLevel))
   const items: Unlock[] = [
-    ...buildings.map((b): Unlock => ({
+    ...BUILDINGS.filter((b) => b.unlockLevel < 99 && inRange(b.unlockLevel)).map((b): Unlock => ({
       key: `b-${b.id}`,
       name: b.name,
       level: b.unlockLevel,
@@ -33,7 +31,7 @@ function unlocksBetween(from: number, to: number, rusty: boolean, focus: ReturnT
       level: c.unlockLevel,
       tag: 'Car',
       price: c.bucks ? `B ${c.bucks}` : `$ ${c.price.toLocaleString()}`,
-      art: <div className="lvl-car"><CarSwatch color={c.colors[0]} body={c.body} /></div>,
+      art: <CarThumb color={c.colors[0]} body={c.body} />,
       go: () => focus('showroom', c.id),
     })),
     ...RESCUE_SPOTS.filter((r) => inRange(r.unlockLevel)).map((r): Unlock => ({
@@ -55,7 +53,7 @@ function unlocksBetween(from: number, to: number, rusty: boolean, focus: ReturnT
       go: () => focus('race', null),
     })),
   ]
-  return { items, buildings }
+  return items
 }
 
 // The next level that unlocks anything, so a quiet level-up still has something to aim for.
@@ -77,14 +75,13 @@ function Splash({ from, to, coins, bucks }: { from: number; to: number; coins: n
   const close = useGame((s) => s.closeLevelUp)
   const focus = useGame((s) => s.focusShop)
   const rusty = useGame((s) => hasRusty(s))
-  const [{ items, buildings }] = useState(() => unlocksBetween(from, to, rusty, focus))
+  const [items] = useState(() => unlocksBetween(from, to, rusty, focus))
   const [teaser] = useState(() => {
     if (items.length) return null
     const at = nextUnlock(to)
-    return at ? { at, ...unlocksBetween(at - 1, at, rusty, focus) } : null
+    return at ? { at, items: unlocksBetween(at - 1, at, rusty, focus) } : null
   })
   const fuel = baseFuelCap(to) - baseFuelCap(from)
-  const bake: BuildingDef[] = teaser ? teaser.buildings : buildings
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close()
@@ -146,7 +143,6 @@ function Splash({ from, to, coins, bucks }: { from: number; to: number; coins: n
 
         <button className="buy lvl-continue" onClick={close}>Continue</button>
       </div>
-      {bake.length > 0 && <PreviewCanvas defs={bake} />}
     </div>
   )
 }

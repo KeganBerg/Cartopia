@@ -133,17 +133,19 @@ function carGeo(body: Body) {
 }
 
 // Toy-style car: bevelled extruded body and cabin so no edge is a hard box corner. Faces +z.
-export function CarModel({ body, color, highlight, stripe, beams }: { body: Body; color: string; highlight?: boolean; stripe?: string | null; beams?: boolean }) {
+export function CarModel({ body, color, highlight, stripe, beams, rusty }: { body: Body; color: string; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean }) {
   const s = SHAPES[body]
   const g = carGeo(body)
-  const dark = useMemo(() => '#' + new Color(color).multiplyScalar(0.6).getHexString(), [color])
+  // Rusty finds keep a hint of their paint under brown, matte rust.
+  const tint = useMemo(() => (rusty ? '#' + new Color(color).lerp(new Color('#8a5a3c'), 0.72).getHexString() : color), [color, rusty])
+  const dark = useMemo(() => '#' + new Color(tint).multiplyScalar(0.6).getHexString(), [tint])
   const top = g.deck
   const wz = s.len * 0.33
   const wx = s.wid / 2 - 0.02
   const cowl = s.cabinZ + s.cabinLen / 2
   const hoodFront = s.len / 2 - s.len * 0.1
   const lightY = s.lift + (Math.max(s.lift + 0.1, g.hood - s.nose) - s.lift) * 0.7
-  const paint = <meshStandardMaterial color={color} metalness={0.4} roughness={0.3} emissive={highlight ? '#ffffff' : '#000000'} emissiveIntensity={highlight ? 0.25 : 0} />
+  const paint = <meshStandardMaterial color={tint} metalness={rusty ? 0.1 : 0.4} roughness={rusty ? 0.95 : 0.3} emissive={highlight ? '#ffffff' : '#000000'} emissiveIntensity={highlight ? 0.25 : 0} />
   const glassMat = <meshStandardMaterial color="#4f86b0" metalness={0.55} roughness={0.06} />
   return (
     <group>
@@ -255,7 +257,7 @@ export function CarModel({ body, color, highlight, stripe, beams }: { body: Body
           ))}
           <mesh position={[0, 0.13, 0]}>
             <boxGeometry args={[s.wid * 0.95, 0.03, 0.14]} />
-            <meshStandardMaterial color={body === 'super' ? '#212121' : color} />
+            <meshStandardMaterial color={body === 'super' ? '#212121' : tint} />
           </mesh>
         </group>
       )}

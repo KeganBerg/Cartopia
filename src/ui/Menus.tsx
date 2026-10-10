@@ -4,7 +4,7 @@ import { BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, PAINTS, STRIPES, P
 import { CarPreview } from '../scene/CarPreview'
 import { CollectAllButton } from './CollectAll'
 import { rotatePlacement } from '../game/placement'
-import { PreviewCanvas, BuildingThumb } from '../scene/BuildingPreview'
+import { preloadBuildings, BuildingThumb, CarThumb } from '../scene/BuildingPreview'
 
 export function BottomBar() {
   const openPanel = useGame((s) => s.openPanel)
@@ -54,7 +54,7 @@ function EditBar() {
   )
 }
 
-export function Panel({ title, children, wide, onClose, overlay }: { title: string; children: React.ReactNode; wide?: boolean; onClose?: () => void; overlay?: React.ReactNode }) {
+export function Panel({ title, children, wide, onClose }: { title: string; children: React.ReactNode; wide?: boolean; onClose?: () => void }) {
   const openPanel = useGame((s) => s.openPanel)
   const close = (_: null) => (onClose ? onClose() : openPanel(null))
   return (
@@ -64,14 +64,7 @@ export function Panel({ title, children, wide, onClose, overlay }: { title: stri
           <h2>{title}</h2>
           <button className="close" onClick={() => close(null)}>✕</button>
         </div>
-        {overlay ? (
-          <div className="panel-wrap">
-            <div className="panel-body">{children}</div>
-            {overlay}
-          </div>
-        ) : (
-          <div className="panel-body">{children}</div>
-        )}
+        <div className="panel-body">{children}</div>
       </div>
     </div>
   )
@@ -116,12 +109,13 @@ export function ShopPanel() {
   const focus = useGame((s) => s.shopFocus)
   const focusRef = useRef<HTMLButtonElement>(null)
   const rusty = hasRusty({ buildings })
+  useEffect(preloadBuildings, [])
   // A "Build" hint elsewhere opened the Shop: bring that building into view.
   useEffect(() => {
     focusRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
   }, [focus])
   return (
-    <Panel title="Shop" wide overlay={<PreviewCanvas />}>
+    <Panel title="Shop" wide>
       {SHOP_GROUPS.map((g) => (
         <section key={g.title}>
           <h3>{g.title}</h3>
@@ -187,7 +181,7 @@ export function ShowroomPanel() {
           const pi = performance(c, { engine: 0, turbo: 0, tires: 0, weight: 0 })
           return (
             <div key={c.id} data-id={c.id} className={`card car-card ${locked ? 'locked' : ''} ${focus === c.id ? 'focus' : ''}`}>
-              <CarSwatch color={color} body={c.body} />
+              <CarThumb color={color} body={c.body} />
               <div className="card-name">{c.name}</div>
               <div className="card-stat">PI {pi} · {c.body}</div>
               <SkillTag model={c.id} />
@@ -215,18 +209,6 @@ export function SkillTag({ model }: { model: string }) {
   return <span className="skill-tag" title={SKILLS[sk].text}>{SKILLS[sk].icon} {SKILLS[sk].name}</span>
 }
 
-export function CarSwatch({ color, body }: { color: string; body: string }) {
-  const low = ['sports', 'super', 'wedge', 'roadster', 'coupe'].includes(body)
-  return (
-    <svg viewBox="0 0 100 50" className="car-swatch">
-      <rect x="8" y={low ? 22 : 18} width="84" height={low ? 16 : 20} rx="7" fill={color} />
-      <rect x={body === 'truck' ? 18 : 28} y={low ? 12 : 6} width={body === 'truck' ? 32 : 44} height={low ? 12 : 14} rx="5" fill="#37474f" />
-      <circle cx="26" cy="40" r="7" fill="#212121" />
-      <circle cx="74" cy="40" r="7" fill="#212121" />
-    </svg>
-  )
-}
-
 export function GaragePanel() {
   const cars = useGame((s) => s.cars)
   const selected = useGame((s) => s.selectedCar)
@@ -245,7 +227,7 @@ export function GaragePanel() {
             const d = carDef(c.model)
             return (
               <button key={c.uid} className={c.uid === car?.uid ? 'garage-item sel' : 'garage-item'} onClick={() => select(c.uid)}>
-                <CarSwatch color={c.color} body={d.body} />
+                <CarThumb size="sm" color={c.color} body={d.body} stripe={c.stripe} />
                 <span>{d.name}{c.plate && <span className="mini-plate">{c.plate}</span>}</span>
                 <small>PI {performance(d, c.upgrades)}</small>
               </button>
