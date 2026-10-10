@@ -12,7 +12,7 @@ import { SEASON } from './season'
 // time after baking.
 export const FW = 132
 export const FH = 104
-export const FRAMES = 30
+export const FRAMES = 48
 const DPR = typeof window === 'undefined' ? 1 : Math.min(window.devicePixelRatio || 1, 1.5)
 
 type Item = {
@@ -79,7 +79,7 @@ function Baker() {
     const ctx = strip.getContext('2d')!
     for (let f = 0; f < FRAMES; f++) {
       const turn = f / FRAMES
-      const lift = 0.25 + Math.sin(turn * Math.PI * 4) * 0.12
+      const lift = 0.25 + Math.sin(turn * Math.PI * 4) * 0.06
       g.rotation.y = turn * Math.PI * 2
       g.position.y = lift
       shadow.current?.scale.setScalar(item.shadow * (1 - lift * 0.5))

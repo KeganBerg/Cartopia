@@ -460,7 +460,7 @@ function DragRace({ car, rival, onExit, live, prize, onFinish, title }: { car: O
     <Panel title={title ?? `Drag Race vs ${rival.town}`} wide onClose={live ? onExit : undefined}>
       <div className="race-layout">
       <div className="race-3d">
-        <Canvas camera={{ position: [0.4, 2.2, -4], fov: 55 }} dpr={[1, 1.5]}>
+        <Canvas camera={{ position: [0.4, 2.2, -4], fov: 55, near: 0.3, far: 300 }} dpr={[1, 1.5]}>
           <RaceScene track={TRACK} me={me} them={them} mine={{ body: def.body, color: car.color }} theirs={{ body: rival.body, color: rival.color }} />
         </Canvas>
         {countdown > 0 && <div className="countdown big">{countdown}</div>}

@@ -155,7 +155,7 @@ function SearchMap() {
         <b>Haul:</b>
         {found.length ? found.map((l, i) => {
           const t = lootLabel(l)
-          return <span key={i} className={l.kind === 'car' ? 'haul-item car' : 'haul-item'}>{t.icon} {t.text}{l.kind === 'car' && <> <RarityTag r={l.rarity} /></>}</span>
+          return <span key={i} className={l.kind === 'car' ? 'haul-item car' : 'haul-item'}>{l.kind === 'car' ? <CarThumb size="xs" body={carDef(l.model).body} color={carDef(l.model).colors[0]} rusty /> : t.icon} {t.text}{l.kind === 'car' && <> <RarityTag r={l.rarity} /></>}</span>
         }) : <span className="hint">Nothing yet</span>}
       </div>
       <button className="buy" disabled={q.flat || !q.revealed.some(Boolean)} onClick={home}>🏠 Tow it home</button>

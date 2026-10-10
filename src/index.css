@@ -278,7 +278,7 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .flat-pop .row { justify-content: center; }
 .flat-pop .sell { margin-top: 0; }
 .haul { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; font-size: 14px; }
-.haul-item { background: #fff; border: 2px solid #e0e0e0; border-radius: 10px; padding: 2px 8px; font-weight: 800; }
+.haul-item { display: inline-flex; align-items: center; gap: 4px; background: #fff; border: 2px solid #e0e0e0; border-radius: 10px; padding: 2px 8px; font-weight: 800; }
 .haul-item.car { border-color: #8e24aa; }
 .search > .buy { width: 100%; }
 .plate-screen { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; }
@@ -532,9 +532,9 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .thumb3d.sm { --tw: 66px; --th: 52px; width: var(--tw); flex: none; border-radius: 8px; }
 .thumb3d.xs { --tw: 44px; --th: 35px; width: var(--tw); flex: none; border-radius: 6px; background: none; }
 .thumb3d.lg { --tw: 198px; --th: 156px; }
-/* 30 frames per turn over 6 seconds. */
-.thumb-strip { width: var(--tw); height: var(--th); flex: none; background-size: calc(var(--tw) * 30) var(--th); background-repeat: no-repeat; animation: thumb-spin 6s steps(30) infinite; }
-@keyframes thumb-spin { from { background-position: 0 0; } to { background-position: calc(var(--tw) * -30) 0; } }
+/* 48 frames per turn over 8 seconds: small steps read as a smooth spin. */
+.thumb-strip { width: var(--tw); height: var(--th); flex: none; background-size: calc(var(--tw) * 48) var(--th); background-repeat: no-repeat; animation: thumb-spin 8s steps(48) infinite; }
+@keyframes thumb-spin { from { background-position: 0 0; } to { background-position: calc(var(--tw) * -48) 0; } }
 @media (prefers-reduced-motion: reduce) { .thumb-strip { animation: none; } }
 .card.locked .thumb3d { filter: grayscale(1); }
 

@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { anchors } from './anchors'
-import { Vector3 } from 'three'
+import { MeshStandardMaterial, Vector3 } from 'three'
 import type { Group } from 'three'
-import { useGame, footprint, lotSize, type OwnedCar, type PlacedBuilding } from '../game/store'
-import { buildingDef, carDef, performance } from '../game/data'
+import { useGame, footprint, type OwnedCar, type PlacedBuilding } from '../game/store'
+import { TILE, buildingDef, carDef, performance } from '../game/data'
 import { tripRequests, type TripKind } from '../game/trips'
 import { toWorld, DIRS } from './grid'
 import { CarModel } from './CarModel'
@@ -14,26 +14,45 @@ const LANE = 0.42
 
 type Tile = [number, number]
 // A building cars can pull into: the road tile out front and the parking spot.
-type Stop = { uid: string; def: string; road: Tile; park: [number, number]; face: number }
+// dir points from the lot to the road; cars pull over at the kerb in front, parallel to the road.
+type Stop = { uid: string; def: string; road: Tile; park: [number, number]; dir: [number, number] }
 type Mode = 'roam' | 'route' | 'enter' | 'park' | 'leave'
 type Agent = {
   from: Tile; to: Tile; t: number
   mode: Mode; path: Tile[]; stop: Stop | null; tow: boolean
   timer: number; nextVisit: number
   lane: [number, number, number] // where the car left the road, for pulling in and out
+  face: number // heading while pulled over
+  pending: { stop: Stop; tow: boolean } | null // a trip asked for while parked, started once the car is back on the road
   v: number // 0..1 share of cruising speed, eased so cars brake and pull away smoothly
   wait: number // seconds spent stopped behind another car
 }
 
 // Where every car on the road is and which way it faces, so each can keep its distance.
-type Traffic = { x: number; z: number; road: boolean; waitingOn: string | null }
+type Traffic = { x: number; z: number; road: boolean; waitingOn: string | null; atLight?: boolean }
 const traffic = new Map<string, Traffic>()
+// Queued behind a car that is waiting at a red light: also just waiting.
+const blockedAtLight = (id: string | null) => !!id && !!traffic.get(id)?.atLight
 // Centre-to-centre gap a following car keeps, and where it starts to brake.
 const GAP = 1.9
 const BRAKE = 3
 
+// Traffic lights at four-way crossings. One clock drives every signal: north-south
+// traffic gets green, then amber, then east-west does the same.
+const CYCLE = 10
+const GREEN = 4.2
+type Light = 'green' | 'amber' | 'red'
+function lightFor(axis: 'x' | 'z', now: number): Light {
+  const t = (now / 1000) % CYCLE
+  const mine = axis === 'z' ? t : (t + CYCLE / 2) % CYCLE
+  return mine < GREEN ? 'green' : mine < CYCLE / 2 ? 'amber' : 'red'
+}
+// Where a car waits on red, as a share of the way to the crossing's centre.
+const STOP_AT = 0.4
+
 const key = (t: Tile) => `${t[0]},${t[1]}`
 const same = (a: Tile, b: Tile) => a[0] === b[0] && a[1] === b[1]
+const isCrossing = (roads: Set<string>, t: Tile) => DIRS.every(([dx, dz]) => roads.has(key([t[0] + dx, t[1] + dz])))
 
 function pickNext(roads: Set<string>, from: Tile, at: Tile): Tile {
   const options = DIRS.map(([dx, dz]) => [at[0] + dx, at[1] + dz] as Tile).filter((t) => roads.has(key(t)))
@@ -70,32 +89,18 @@ function route(roads: Set<string>, start: Tile, goal: Tile, avoid?: Tile): Tile[
 function stopFor(b: PlacedBuilding, roads: Set<string>): Stop | null {
   const d = buildingDef(b.def)
   if (d.kind === 'decor' || d.kind === 'obstacle' || d.kind === 'house') return null
-  const [w, h] = lotSize(b.def, b.rot)
-  const [cx, cz] = toWorld(b.x + (w - 1) / 2, b.z + (h - 1) / 2)
+  // Only buildings that touch a road get visits, so no car ever crosses another lot.
   for (const [fx, fz] of footprint(b.def, b.x, b.z, b.rot)) {
     for (const [dx, dz] of DIRS) {
       const road: Tile = [fx + dx, fz + dz]
       if (!roads.has(key(road))) continue
       const [tx, tz] = toWorld(fx, fz)
-      // Park on the lot just inside the edge facing the road, nose to the door.
-      const park: [number, number] = [tx + dx * 0.55, tz + dz * 0.55]
-      return { uid: b.uid, def: b.def, road, park, face: Math.atan2(cx - park[0], cz - park[1]) }
+      // The kerb strip just outside the lot: clear of the building, half on the pavement.
+      const park: [number, number] = [tx + dx * 1.05, tz + dz * 1.05]
+      return { uid: b.uid, def: b.def, road, park, dir: [dx, dz] }
     }
   }
-  // Not beside a road: use the nearest road and park on the lot edge facing it.
-  let best: Tile | null = null
-  let bestD = Infinity
-  for (const k of roads) {
-    const t = k.split(',').map(Number) as Tile
-    const dd = Math.hypot(t[0] - (b.x + (w - 1) / 2), t[1] - (b.z + (h - 1) / 2))
-    if (dd < bestD) { bestD = dd; best = t }
-  }
-  if (!best || bestD > 6) return null
-  const [rx, rz] = toWorld(...best)
-  const len = Math.hypot(rx - cx, rz - cz) || 1
-  const reach = (Math.max(w, h) / 2) * 2 + 0.2
-  const park: [number, number] = [cx + ((rx - cx) / len) * reach, cz + ((rz - cz) / len) * reach]
-  return { uid: b.uid, def: b.def, road: best, park, face: Math.atan2(cx - park[0], cz - park[1]) }
+  return null
 }
 
 function TowTruck() {
@@ -126,7 +131,7 @@ function DrivingCar({ car, roads, start, stops }: { car: OwnedCar; roads: Set<st
   const agent = useRef<Agent>({
     from: start, to: pickNext(roads, start, start), t: Math.random(),
     mode: 'roam', path: [], stop: null, tow: false, timer: 0,
-    nextVisit: 15 + Math.random() * 45, lane: [0, 0, 0], v: 1, wait: 0,
+    nextVisit: 15 + Math.random() * 45, lane: [0, 0, 0], face: 0, pending: null, v: 1, wait: 0,
   })
   useEffect(() => () => void traffic.delete(car.uid), [car.uid])
   const selected = useGame((s) => s.selectedCar === car.uid)
@@ -159,8 +164,11 @@ function DrivingCar({ car, roads, start, stops }: { car: OwnedCar; roads: Set<st
       const want = trip === 'gas' ? 'gas' : trip === 'tires' ? 'tires' : 'rescue'
       const stop = stops.find((s) => s.def === want) ?? (trip === 'tow' ? stops.find((s) => s.def === 'tires') : undefined)
       if (stop) {
-        if (a.mode === 'park' || a.mode === 'enter') a.mode = 'roam'
-        goTo(a, stop, trip === 'tow')
+        // Parked or pulling in: drive back out to the road first, then set off.
+        if (a.mode === 'park' || a.mode === 'enter' || a.mode === 'leave') {
+          a.pending = { stop, tow: trip === 'tow' }
+          if (a.mode !== 'leave') { a.timer = a.mode === 'enter' ? 1 - a.timer : 0; a.mode = 'leave' }
+        } else goTo(a, stop, trip === 'tow')
       }
     }
 
@@ -186,7 +194,7 @@ function DrivingCar({ car, roads, start, stops }: { car: OwnedCar; roads: Set<st
         const k = a.mode === 'enter' ? a.timer : 1 - a.timer
         const e = k * k * (3 - 2 * k)
         g.position.set(a.lane[0] + (s.park[0] - a.lane[0]) * e, 0.02, a.lane[2] + (s.park[1] - a.lane[2]) * e)
-        const target = a.mode === 'enter' ? s.face : Math.atan2(a.lane[0] - s.park[0], a.lane[2] - s.park[1])
+        const target = a.face
         let diff = target - g.rotation.y
         diff = Math.atan2(Math.sin(diff), Math.cos(diff))
         g.rotation.y += diff * Math.min(1, dt * 6)
@@ -198,10 +206,16 @@ function DrivingCar({ car, roads, start, stops }: { car: OwnedCar; roads: Set<st
           } else {
             a.mode = 'roam'
             a.stop = null
+            // Carry on the way the car is facing, so it pulls away instead of spinning round.
+            const ahead: Tile = [s.road[0] + Math.round(Math.sin(a.face)), s.road[1] + Math.round(Math.cos(a.face))]
             a.from = s.road
-            a.to = pickNext(roads, s.road, s.road)
+            a.to = roads.has(key(ahead)) ? ahead : pickNext(roads, s.road, s.road)
             a.t = 0
             a.nextVisit = 25 + Math.random() * 50
+            if (a.pending) {
+              goTo(a, a.pending.stop, a.pending.tow)
+              a.pending = null
+            }
           }
         }
       }
@@ -247,10 +261,16 @@ function DrivingCar({ car, roads, start, stops }: { car: OwnedCar; roads: Set<st
         if (o.waitingOn === car.uid && car.uid < id) continue
         if (ahead < gap) { gap = ahead; blocker = id }
       }
-      const go = Math.max(0, Math.min(1, (gap - GAP) / (BRAKE - GAP)))
+      let go = Math.max(0, Math.min(1, (gap - GAP) / (BRAKE - GAP)))
+      // Stop at the line on red or amber; a car already past it carries on.
+      if (a.t < STOP_AT && isCrossing(roads, a.to) && lightFor(a.to[0] !== a.from[0] ? 'x' : 'z', Date.now()) !== 'green') {
+        go = Math.min(go, Math.max(0, (STOP_AT - a.t) * fl - 0.02) / 0.9)
+      }
       a.v += (go - a.v) * Math.min(1, dt * (go < a.v ? 8 : 3))
-      a.wait = go < 0.05 ? a.wait + dt : 0
-      traffic.set(car.uid, { x: g.position.x, z: g.position.z, road: true, waitingOn: go < 0.5 ? blocker : null })
+      const atLight = a.t < STOP_AT && isCrossing(roads, a.to) && STOP_AT - a.t < 0.1
+      // Waiting at a red light is not being stuck.
+      a.wait = go < 0.05 && !atLight && !blockedAtLight(blocker) ? a.wait + dt : 0
+      traffic.set(car.uid, { x: g.position.x, z: g.position.z, road: true, waitingOn: go < 0.5 ? blocker : null, atLight: atLight || blockedAtLight(blocker) })
       // Stuck for a while (a stalled car, a jam): turn around and find another way.
       if (a.wait > 4) {
         a.wait = 0
@@ -274,6 +294,11 @@ function DrivingCar({ car, roads, start, stops }: { car: OwnedCar; roads: Set<st
         // Arrived out front: pull in from the lane.
         a.t = 0
         a.lane = [g.position.x, 0, g.position.z]
+        // Pull over parallel to the road, keeping the direction the car was already going.
+        const [sx, sz] = a.stop.dir
+        const f = Math.atan2(-sz, sx)
+        const heading = g.rotation.y
+        a.face = Math.cos(f - heading) >= 0 ? f : f + Math.PI
         a.mode = 'enter'
         a.timer = 0
         anchor()
@@ -291,7 +316,14 @@ function DrivingCar({ car, roads, start, stops }: { car: OwnedCar; roads: Set<st
     // Keep to the right-hand lane.
     const ox = (-dz / len) * LANE
     const oz = (dx / len) * LANE
-    g.position.set(ax + dx * a.t + ox, 0.02, az + dz * a.t + oz)
+    // Ease toward the lane position so corners, lane changes and U-turns flow instead of snapping.
+    const px = ax + dx * a.t + ox
+    const pz = az + dz * a.t + oz
+    if (Math.hypot(px - g.position.x, pz - g.position.z) > 3) g.position.set(px, 0.02, pz)
+    else {
+      const k = Math.min(1, dt * 8)
+      g.position.set(g.position.x + (px - g.position.x) * k, 0.02, g.position.z + (pz - g.position.z) * k)
+    }
     if (len > 0.01) {
       const target = Math.atan2(dx, dz)
       let diff = target - g.rotation.y
@@ -322,6 +354,58 @@ function DrivingCar({ car, roads, start, stops }: { car: OwnedCar; roads: Set<st
   )
 }
 
+const lightMats = {
+  z: new MeshStandardMaterial({ color: '#43a047', emissive: '#43a047', emissiveIntensity: 1.2 }),
+  x: new MeshStandardMaterial({ color: '#e53935', emissive: '#e53935', emissiveIntensity: 1.2 }),
+}
+const LIGHT_COLORS: Record<Light, string> = { green: '#4caf50', amber: '#ffb300', red: '#f44336' }
+
+// A signal pole on each corner of a crossing, with a lamp facing each road.
+function TrafficLights({ roads }: { roads: Set<string> }) {
+  const crossings = useMemo(() => [...roads].map((k) => k.split(',').map(Number) as Tile).filter((t) => isCrossing(roads, t)), [roads])
+  useFrame(() => {
+    const now = Date.now()
+    for (const axis of ['x', 'z'] as const) {
+      const c = LIGHT_COLORS[lightFor(axis, now)]
+      lightMats[axis].color.set(c)
+      lightMats[axis].emissive.set(c)
+    }
+  })
+  const c = TILE / 2 - 0.12
+  return (
+    <>
+      {crossings.map((t) => {
+        const [wx, wz] = toWorld(...t)
+        return (
+          <group key={key(t)} position={[wx, 0, wz]}>
+            {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sz]) => (
+              <group key={`${sx}${sz}`} position={[sx * c, 0, sz * c]}>
+                <mesh position-y={0.6}>
+                  <cylinderGeometry args={[0.03, 0.04, 1.2, 6]} />
+                  <meshStandardMaterial color="#37474f" />
+                </mesh>
+                <mesh position-y={1.18}>
+                  <boxGeometry args={[0.22, 0.22, 0.22]} />
+                  <meshStandardMaterial color="#263238" />
+                </mesh>
+                {/* Lamps face the traffic coming along each road. */}
+                <mesh position={[0, 1.18, sz * 0.115]}>
+                  <sphereGeometry args={[0.075, 10, 8]} />
+                  <primitive object={lightMats.z} attach="material" dispose={null} />
+                </mesh>
+                <mesh position={[sx * 0.115, 1.18, 0]}>
+                  <sphereGeometry args={[0.075, 10, 8]} />
+                  <primitive object={lightMats.x} attach="material" dispose={null} />
+                </mesh>
+              </group>
+            ))}
+          </group>
+        )
+      })}
+    </>
+  )
+}
+
 export function TownCars() {
   const roadsList = useGame((s) => (s.visiting ?? s).roads)
   const cars = useGame((s) => (s.visiting ?? s).cars)
@@ -333,6 +417,7 @@ export function TownCars() {
   if (!starts.length) return null
   return (
     <>
+      <TrafficLights roads={roads} />
       {cars.slice(0, MAX_VISIBLE).map((car, i) => (
         <DrivingCar key={`${visitKey}-${car.uid}`} car={car} roads={roads} start={starts[(i * 7919) % starts.length]} stops={stops} />
       ))}
