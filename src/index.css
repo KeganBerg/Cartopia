@@ -200,7 +200,8 @@ button.card:hover:not(:disabled) { border-color: var(--accent); }
 
 /* Bubbles pinned over the 3D scene. */
 .badges { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 10; }
-.anchor { position: absolute; left: 0; top: 0; visibility: hidden; pointer-events: auto; padding-bottom: 9px; will-change: transform; }
+.anchor { position: absolute; left: 0; top: 0; visibility: hidden; pointer-events: auto; padding-bottom: 9px; will-change: transform; transition: opacity .25s; }
+.anchor.far { opacity: 0; pointer-events: none; }
 
 /* Rusty's Rescue gate */
 .card { position: relative; }
