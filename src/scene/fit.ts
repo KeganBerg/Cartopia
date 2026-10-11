@@ -35,8 +35,9 @@ const up = new Vector3(0, 1, 0)
 // Places the camera along `dir` (from the model towards the camera) so a
 // spinning model with these bounds fills the frame at every angle, with `pad`
 // of the frame left free around it. `lo`..`hi` is how far the model bobs up,
-// and `floor` the radius of anything drawn on the ground under it.
-export function frame(cam: PerspectiveCamera, b: Bounds, dir: Vector3, opts: { lo?: number; hi?: number; floor?: number; pad?: number } = {}) {
+// and `floor` the radius of anything drawn on the ground under it. Returns
+// the point the camera ends up aimed at.
+export function frame(cam: PerspectiveCamera, b: Bounds, dir: Vector3, opts: { lo?: number; hi?: number; floor?: number; pad?: number } = {}): Vector3 {
   const { lo = 0, hi = 0, floor = 0, pad = 0.08 } = opts
   const back = dir.clone().normalize()
   const right = new Vector3().crossVectors(up, back).normalize()
@@ -80,4 +81,5 @@ export function frame(cam: PerspectiveCamera, b: Bounds, dir: Vector3, opts: { l
   cam.position.copy(look).addScaledVector(back, d)
   cam.lookAt(look)
   cam.updateProjectionMatrix()
+  return look
 }
