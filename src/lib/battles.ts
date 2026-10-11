@@ -5,7 +5,7 @@ import { displayName, isCleanName } from './names'
 import { useGame } from '../game/store'
 import { CLAN_EMBLEMS } from '../game/data'
 
-// Crew battles (supabase/migrations/0048_crew_battles.sql): every week each crew is matched with a
+// Crew battles (supabase/migrations/0050_crew_battles.sql): every week each crew is matched with a
 // rival crew, or a street crew run by the server, and members score battle points by racing.
 // The server keeps the score and decides the winner; a victory (and MVP) chest is a crew chest row
 // the save guard already pays.

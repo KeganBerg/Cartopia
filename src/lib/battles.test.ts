@@ -7,7 +7,7 @@ const battle = (b: Partial<Battle>): Battle => ({ week: '2026-10-05', venue: 'ma
 
 describe('crew battles', () => {
   it('uses the same rules as the server', () => {
-    const sql = readFileSync('supabase/migrations/0048_crew_battles.sql', 'utf8')
+    const sql = readFileSync('supabase/migrations/0050_crew_battles.sql', 'utf8')
     const rules = JSON.parse(sql.match(/crew_battle_rules\(\)[\s\S]*?select '(\{.*?\})'::jsonb/)![1])
     for (const [k, v] of Object.entries(BATTLE_RULES)) expect(rules[k], k).toBe(v)
   })
