@@ -1,0 +1,47 @@
+/* Loading states (Loading.tsx), in the look of the reload splash. */
+.pc-body { position: relative; isolation: isolate; }
+.pc-body img { display: block; width: 100%; height: auto; }
+.pc-paint { position: absolute; inset: 0; mix-blend-mode: multiply; -webkit-mask-size: 100% 100%; mask-size: 100% 100%; }
+
+.lb-tire {
+  width: 18px; height: 18px; flex: none; border-radius: 50%; border: 4px solid #14213d;
+  background: radial-gradient(circle, #e8ecf4 0 22%, #14213d 23% 30%, transparent 31%), conic-gradient(#c3cad8 0 12.5%, #e8ecf4 0 25%, #c3cad8 0 37.5%, #e8ecf4 0 50%, #c3cad8 0 62.5%, #e8ecf4 0 75%, #c3cad8 0 87.5%, #e8ecf4 0);
+  animation: lb-spin .8s linear infinite;
+}
+@keyframes lb-spin { to { transform: rotate(1turn); } }
+
+/* In a panel: a short strip of Main Street with the player's car driving. */
+.load-band { position: relative; margin: 10px 0; height: 118px; border-radius: 16px; overflow: hidden; border: 3px solid #14213d; background: linear-gradient(#7fcdf5, #d8f1ff 70%); box-shadow: 0 4px 0 rgba(20,33,61,.35); }
+.load-band.dusk { background: linear-gradient(#5b4b9a, #ffb37a 70%); }
+.load-band.night { background: linear-gradient(#0d1838, #2b3d72 70%); }
+.lb-scene { position: absolute; inset: 0; }
+.lb-street { position: absolute; left: 0; bottom: 26px; height: 84px; display: flex; width: max-content; animation: lb-scroll 36s linear infinite; }
+.lb-street img { height: 100%; width: auto; flex: none; display: block; }
+.load-band.dusk .lb-street { filter: brightness(.85) saturate(1.1) sepia(.12); }
+@keyframes lb-scroll { to { transform: translateX(-50%); } }
+.lb-road { position: absolute; left: 0; right: 0; bottom: 0; height: 28px; background: #555c6e; border-top: 5px solid #d8d3c6; }
+.lb-road::after { content: ""; position: absolute; left: 0; width: calc(100% + 130px); top: 10px; height: 3px; border-radius: 2px; background: repeating-linear-gradient(90deg, #f4f1e6 0 40px, transparent 40px 90px); animation: lb-roll .6s linear infinite; }
+.load-band.night .lb-road { background: #2c3246; border-top-color: #6f7690; }
+@keyframes lb-roll { to { transform: translateX(-90px); } }
+.lb-car { position: absolute; left: 50%; bottom: 8px; width: 104px; transform: translateX(-50%); animation: lb-bob .3s ease-in-out infinite alternate; }
+.load-band.night .lb-car { filter: brightness(.8); }
+@keyframes lb-bob { to { transform: translate(-50%, 1px); } }
+.lb-label { position: absolute; left: 8px; top: 8px; display: flex; align-items: center; gap: 6px; padding: 3px 10px 3px 4px; border-radius: 99px; border: 2px solid #14213d; background: linear-gradient(#ffe98a, #ffb21a); color: #14213d; font: 15px var(--display); box-shadow: 0 2px 0 #14213d; }
+
+/* Over a full-screen scene until it draws: town, sunburst and the player's car. */
+.load-scene { position: absolute; inset: 0; z-index: 60; overflow: hidden; background: #3f8f3a; transition: opacity .45s ease; --s1: #fff4c9; --s2: #ffc46b; --s3: #ff9b5c; --s4: #ef6f8e; --ray: rgba(255,255,255,.2); }
+.load-scene.dusk { --s1: #ffd9a3; --s2: #ff9d6c; --s3: #d4618f; --s4: #6c4aa1; --ray: rgba(255,236,200,.16); }
+.load-scene.night { background: #18213a; --s1: #5a5fc0; --s2: #3a3f96; --s3: #262b6c; --s4: #151a45; --ray: rgba(170,180,255,.1); }
+.load-scene.out { opacity: 0; pointer-events: none; }
+.ls-town { position: absolute; inset: -4%; background-size: cover; background-position: center; animation: ls-pan 30s ease-in-out infinite alternate; }
+@keyframes ls-pan { from { transform: scale(1.08) translate(-2%, 1%); } to { transform: scale(1.08) translate(2%, -1%); } }
+.ls-sun { position: absolute; left: 50%; top: 50%; width: 120vmin; height: 120vmin; transform: translate(-50%, -50%); border-radius: 50%; overflow: hidden; background: radial-gradient(circle, var(--s1), var(--s2) 30%, var(--s3) 58%, transparent 71%); }
+.ls-sun::before { content: ""; position: absolute; inset: 0; border-radius: 50%; background: repeating-conic-gradient(var(--ray) 0 6deg, transparent 6deg 15deg); -webkit-mask-image: radial-gradient(circle, #000 40%, transparent 70%); mask-image: radial-gradient(circle, #000 40%, transparent 70%); animation: lb-spin 60s linear infinite; }
+.ls-car { position: absolute; left: 50%; top: 50%; width: min(64vw, 360px); transform: translate(-50%, -60%); animation: ls-bob 1.6s ease-in-out infinite alternate; }
+.ls-car::after { content: ""; position: absolute; left: 6%; right: 6%; bottom: 2%; height: 22%; border-radius: 50%; background: radial-gradient(closest-side, rgba(10,14,30,.55), rgba(10,14,30,0)); z-index: -1; }
+.load-scene.night .ls-car .pc-body { filter: brightness(.85); }
+@keyframes ls-bob { to { transform: translate(-50%, -62%); } }
+.ls-pill { position: absolute; left: 50%; bottom: calc(10% + var(--sab, 0px)); transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 9px 22px 9px 12px; border-radius: 99px; border: 3px solid #14213d; background: linear-gradient(#ffe98a, #ffb21a); color: #14213d; font: 19px var(--display); white-space: nowrap; box-shadow: inset 0 3px 0 rgba(255,255,255,.6), 0 5px 0 #14213d, 0 10px 22px rgba(10,16,40,.4); }
+/* .close keeps the game's button look; this only places it. */
+.ls-close { position: absolute; top: calc(8px + var(--sat, 0px)); right: calc(12px + var(--sar, 0px)); }
+@media (prefers-reduced-motion: reduce) { .load-band *, .load-scene *, .load-scene *::before { animation: none !important; } }

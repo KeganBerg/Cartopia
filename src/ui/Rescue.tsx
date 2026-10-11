@@ -8,6 +8,7 @@ import { CarPreview } from '../scene/CarPreview'
 import { Panel, SheetTabs, SkillTag } from './Menus'
 import { CarThumb } from '../scene/BuildingPreview'
 import { RescueScene } from '../scene/RescueScene'
+import { LoadingScene } from './Loading'
 
 function fmt(ms: number) {
   const sec = Math.max(0, Math.ceil(ms / 1000))
@@ -220,6 +221,7 @@ function SearchScreen() {
           onBusy={setBusy}
         />
       </Canvas>
+      <LoadingScene label={`Heading to ${spot.name}`} onClose={() => openPanel(null)} />
       <div className="rf-top">
         <h2>{spot.icon} {spot.name}</h2>
         <button className="close" onClick={() => openPanel(null)} aria-label="Close">✕</button>

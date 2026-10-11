@@ -1,6 +1,7 @@
 // Renders the loading screen's pictures from the real game models (see shoot.mjs).
 // ?what=street&night=0|1  a row of Main Street buildings, side on, on a clear background
 // ?what=car&model=<id>&mask=0|1  a car side on in white paint, or its paint mask
+//   &yaw=<deg> turns it (the hero shot is three quarters on, from above)
 import { createRoot } from 'react-dom/client'
 import { useLayoutEffect, useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
@@ -85,7 +86,7 @@ function Car() {
   const width = +(q.get('w') ?? 3)
   return (
     <>
-      <group ref={g} rotation-y={Math.PI / 2}>
+      <group ref={g} rotation-y={Math.PI / 2 + (+(q.get('yaw') ?? 0) * Math.PI) / 180}>
         <CarModel body={carDef(model).body} model={model} color={mask ? '#ff00ff' : '#ffffff'} />
       </group>
       <Frame width={width} />
