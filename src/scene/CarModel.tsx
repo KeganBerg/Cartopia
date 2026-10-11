@@ -1,4 +1,6 @@
 import { useEffect, useMemo } from 'react'
+import { useThree } from '@react-three/fiber'
+import { chromeEnv } from './chromeEnv'
 import {
   BoxGeometry, BufferGeometry, CircleGeometry, Color, CylinderGeometry, DoubleSide, Euler, ExtrudeGeometry, Matrix4,
   MeshBasicMaterial, MeshStandardMaterial, PlaneGeometry, Quaternion, Shape as ThreeShape, SphereGeometry, TorusGeometry, Vector3,
@@ -8,10 +10,10 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { wheelTex } from './textures'
 import { glowMats } from './dayNight'
-import { fittedMods, isBike, type Body, type ModSlot } from '../game/data'
+import { FINISH_LOOK, fittedMods, isBike, type Body, type Finish, type ModSlot } from '../game/data'
 import { CarMods, RIM_LOOK, carbon, chrome as modChrome, modGeo, modIds } from './CarMods'
 import { carBody, wheelPool, type WheelSlot } from './carBatch'
-import { bake, finishOf, type Finish } from './bake'
+import { bake, finishOf, type Finish as Look } from './bake'
 
 type Shape = {
   len: number; wid: number
@@ -502,24 +504,25 @@ export type WheelRig = { steer: (Group | null)[]; spin: (Group | null)[]; radius
 
 // lean: draw the body as one merged mesh and the wheels from the shared pool (town
 // traffic). Needs `rig`, whose owner places the wheels each frame; no exhaust flames.
-type CarProps = { body: Body; color: string; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean; rig?: WheelRig; mods?: string[] | null; flames?: boolean; lean?: boolean }
+type CarProps = { body: Body; color: string; finish?: Finish | null; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean; rig?: WheelRig; mods?: string[] | null; flames?: boolean; lean?: boolean }
 
 // A lean car: every part baked into two meshes (the parts that cast a shadow and the
 // rest) with the finish it would otherwise be drawn with, except the see-through screen;
 // the wheels' groups stay for steering and rolling but are drawn from the shared wheel pool.
-function LeanCar({ parts, finish, casters, mods, paint, highlight, wheels, radius, width, rims, rig, beams }: {
-  parts: Partial<Record<Part, BufferGeometry>>; finish: Partial<Record<Part, Finish>>; casters: Part[]
-  mods: { body: Body; ids: string[] }; paint: Finish; highlight?: boolean
-  wheels: V3[]; radius: number; width: number; rims?: string; rig: WheelRig; beams: React.ReactNode
+// `extra` is drawn as is (chrome paint, which mirrors its own studio and can't be baked).
+function LeanCar({ parts, looks, casters, mods, modPaint, highlight, wheels, radius, width, rims, rig, beams, extra }: {
+  parts: Partial<Record<Part, BufferGeometry>>; looks: Partial<Record<Part, Look>>; casters: Part[]
+  mods: { body: Body; ids: string[] }; modPaint: Look; highlight?: boolean
+  wheels: V3[]; radius: number; width: number; rims?: string; rig: WheelRig; beams: React.ReactNode; extra?: React.ReactNode
 }) {
-  const key = (Object.keys(finish) as Part[]).map((k) => `${k}:${parts[k] ? 1 : 0}:${JSON.stringify(finish[k])}`).join() + mods.ids.join()
+  const key = (Object.keys(looks) as Part[]).map((k) => `${k}:${parts[k] ? 1 : 0}:${JSON.stringify(looks[k])}`).join() + mods.ids.join() + JSON.stringify(modPaint)
   const geo = useMemo(() => {
-    const shade: [BufferGeometry, Finish][] = []
-    const rest: [BufferGeometry, Finish][] = []
-    for (const k of Object.keys(finish) as Part[]) if (parts[k] && finish[k]) (casters.includes(k) ? shade : rest).push([parts[k]!, finish[k]!])
+    const shade: [BufferGeometry, Look][] = []
+    const rest: [BufferGeometry, Look][] = []
+    for (const k of Object.keys(looks) as Part[]) if (parts[k] && looks[k]) (casters.includes(k) ? shade : rest).push([parts[k]!, looks[k]!])
     // Mod paint and carbon cast shadows; mod chrome doesn't.
     const m = mods.ids.length ? modGeo(mods.body, mods.ids) : {}
-    if (m.paint) shade.push([m.paint, { ...paint, glow: false }])
+    if (m.paint) shade.push([m.paint, modPaint])
     if (m.carbon) shade.push([m.carbon, finishOf(carbon)])
     if (m.chrome) rest.push([m.chrome, finishOf(modChrome)])
     return { shade: shade.length ? bake(shade) : null, rest: rest.length ? bake(rest) : null }
@@ -541,6 +544,7 @@ function LeanCar({ parts, finish, casters, mods, paint, highlight, wheels, radiu
       {geo.shade && <mesh geometry={geo.shade} material={highlight ? carBody.picked : carBody.plain} castShadow />}
       {geo.rest && <mesh geometry={geo.rest} material={highlight ? carBody.picked : carBody.plain} />}
       {parts.screen && <mesh geometry={parts.screen} material={MAT.screen} />}
+      {extra}
       {beams}
       {wheels.map(([x, y, z], i) => (
         <group key={i} position={[x, y, z]} ref={i < (wheels.length === 2 ? 1 : 2) ? (o) => void (rig.steer[i] = o) : undefined}>
@@ -556,8 +560,23 @@ export function CarModel(props: CarProps) {
   return isBike(props.body) ? <BikeModel {...props} /> : <CarBody {...props} />
 }
 
+// The body paint: glossy, matte or chrome. Rust is always flat.
+function PaintMaterial({ color, finish, rusty, highlight }: { color: string; finish?: Finish | null; rusty?: boolean; highlight?: boolean }) {
+  const [metal, rough, lift] = rusty ? [0.1, 0.95, 0] : FINISH_LOOK[finish ?? 'gloss'] ?? FINISH_LOOK.gloss
+  const tint = useMemo(() => (lift ? '#' + new Color(color).lerp(new Color('#ffffff'), lift).getHexString() : color), [color, lift])
+  const gl = useThree((s) => s.gl)
+  const env = !rusty && finish === 'chrome' ? chromeEnv(gl) : null
+  return <meshStandardMaterial key={env ? 'chrome' : 'paint'} color={tint} metalness={metal} roughness={rough} envMap={env} envMapIntensity={env ? 1.3 : 1} emissive={highlight ? '#ffffff' : '#000000'} emissiveIntensity={highlight ? 0.25 : 0} />
+}
+
+// The same paint as PaintMaterial, for baking (any finish but chrome).
+function paintLook(color: string, finish?: Finish | null, rusty?: boolean): Look {
+  const [metal, rough, lift] = rusty ? [0.1, 0.95, 0] : FINISH_LOOK[finish ?? 'gloss'] ?? FINISH_LOOK.gloss
+  return { color: lift ? '#' + new Color(color).lerp(new Color('#ffffff'), lift).getHexString() : color, metal, rough, glow: true }
+}
+
 // Toy-style car: bevelled extruded body and cabin so no edge is a hard box corner. Faces +z.
-function CarBody({ body, color, highlight, stripe, beams, rusty, rig, mods, flames, lean }: CarProps) {
+function CarBody({ body, color, finish, highlight, stripe, beams, rusty, rig, mods, flames, lean }: CarProps) {
   // Rusty finds come home stock.
   const fit = rusty ? {} : fittedMods(mods)
   const s = shapeOf(body)
@@ -576,21 +595,22 @@ function CarBody({ body, color, highlight, stripe, beams, rusty, rig, mods, flam
     </mesh>
   )
   if (lean && rig) {
-    const paint: Finish = { color: tint, metal: rusty ? 0.1 : 0.4, rough: rusty ? 0.95 : 0.3, glow: true }
-    const finish: Partial<Record<Part, Finish>> = {
-      paint, dark: { color: dark }, ...(stripe ? { stripe: { color: stripe } } : {}),
+    const chromed = !rusty && finish === 'chrome'
+    const looks: Partial<Record<Part, Look>> = {
+      ...(chromed ? {} : { paint: paintLook(tint, finish, rusty) }), dark: { color: dark }, ...(stripe ? { stripe: { color: stripe } } : {}),
       black: finishOf(MAT.black), chrome: finishOf(MAT.chrome), glass: finishOf(MAT.glass), seat: finishOf(MAT.seat), wood: finishOf(MAT.wood),
       lamp: finishOf(MAT.lamp), tail: finishOf(MAT.tail), amber: finishOf(MAT.amber),
     }
     return (
-      <LeanCar parts={p} finish={finish} casters={['paint', 'glass']} mods={{ body, ids: modIds(fit) }} paint={paint} highlight={highlight}
-        wheels={[[-wx, s.wheel, wz], [wx, s.wheel, wz], [-wx, s.wheel, -wz], [wx, s.wheel, -wz]]} radius={s.wheel} width={0.14} rims={fit.rims} rig={rig} beams={beam} />
+      <LeanCar parts={p} looks={looks} casters={['paint', 'glass']} mods={{ body, ids: modIds(fit) }} modPaint={{ color: tint, metal: rusty ? 0.1 : 0.4, rough: 0.3 }} highlight={highlight}
+        wheels={[[-wx, s.wheel, wz], [wx, s.wheel, wz], [-wx, s.wheel, -wz], [wx, s.wheel, -wz]]} radius={s.wheel} width={0.14} rims={fit.rims} rig={rig} beams={beam}
+        extra={chromed && <mesh geometry={p.paint} castShadow><PaintMaterial color={tint} finish={finish} highlight={highlight} /></mesh>} />
     )
   }
   return (
     <group>
       <mesh geometry={p.paint} castShadow>
-        <meshStandardMaterial color={tint} metalness={rusty ? 0.1 : 0.4} roughness={rusty ? 0.95 : 0.3} emissive={highlight ? '#ffffff' : '#000000'} emissiveIntensity={highlight ? 0.25 : 0} />
+        <PaintMaterial color={tint} finish={finish} rusty={rusty} highlight={highlight} />
       </mesh>
       {p.dark && (
         <mesh geometry={p.dark}>
@@ -708,7 +728,7 @@ function bikeGeo(body: BikeBody, fit: Partial<Record<ModSlot, string>>): CarGeo 
 }
 
 // Bikes take exhaust and rim mods only.
-function BikeModel({ body, color, highlight, beams, rusty, rig, mods, flames, lean }: CarProps) {
+function BikeModel({ body, color, finish, highlight, beams, rusty, rig, mods, flames, lean }: CarProps) {
   const all = rusty ? {} : fittedMods(mods)
   const fit = { exhaust: all.exhaust, rims: all.rims }
   const bb = body as BikeBody
@@ -726,21 +746,22 @@ function BikeModel({ body, color, highlight, beams, rusty, rig, mods, flames, le
     </mesh>
   )
   if (lean && rig) {
-    const paint: Finish = { color: tint, metal: rusty ? 0.1 : 0.4, rough: rusty ? 0.95 : 0.3, glow: true }
-    const finish: Partial<Record<Part, Finish>> = {
-      paint, dark: { color: dark },
+    const chromed = !rusty && finish === 'chrome'
+    const looks: Partial<Record<Part, Look>> = {
+      ...(chromed ? {} : { paint: paintLook(tint, finish, rusty) }), dark: { color: dark },
       black: finishOf(MAT.black), chrome: finishOf(MAT.chrome), glass: finishOf(MAT.glass), seat: finishOf(MAT.seat),
       lamp: finishOf(MAT.lamp), tail: finishOf(MAT.tail),
     }
     return (
-      <LeanCar parts={p} finish={finish} casters={['paint', 'black']} mods={{ body, ids: modIds(fit) }} paint={paint} highlight={highlight}
-        wheels={[[0, r, wz], [0, r, -wz]]} radius={r} width={0.07} rims={fit.rims} rig={rig} beams={beam} />
+      <LeanCar parts={p} looks={looks} casters={['paint', 'black']} mods={{ body, ids: modIds(fit) }} modPaint={{ color: tint, metal: rusty ? 0.1 : 0.4, rough: 0.3 }} highlight={highlight}
+        wheels={[[0, r, wz], [0, r, -wz]]} radius={r} width={0.07} rims={fit.rims} rig={rig} beams={beam}
+        extra={chromed && <mesh geometry={p.paint} castShadow><PaintMaterial color={tint} finish={finish} highlight={highlight} /></mesh>} />
     )
   }
   return (
     <group>
       <mesh geometry={p.paint} castShadow>
-        <meshStandardMaterial color={tint} metalness={rusty ? 0.1 : 0.4} roughness={rusty ? 0.95 : 0.3} emissive={highlight ? '#ffffff' : '#000000'} emissiveIntensity={highlight ? 0.25 : 0} />
+        <PaintMaterial color={tint} finish={finish} rusty={rusty} highlight={highlight} />
       </mesh>
       {p.dark && (
         <mesh geometry={p.dark}>

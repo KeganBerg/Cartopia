@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { BackSide, Color, Object3D, type PerspectiveCamera, type Group, type InstancedMesh, type Mesh } from 'three'
-import type { Body } from '../game/data'
+import type { Body, Finish } from '../game/data'
 import { CarModel } from './CarModel'
 import { signTexture } from './signTexture'
-import { skyTex, asphaltTex, paverTex, glowTex } from './textures'
+import { skyTex, asphaltTex, paverTex, glowTex, sandTex, grassTex } from './textures'
 import { BuildingModel, LightPool } from './BuildingModel'
 import { glowMats, dayPhase, duskAmount, nightAmount } from './dayNight'
 import { lookFor } from './look'
@@ -31,12 +31,12 @@ type Props = {
   track: number
   me: RefObject<RacerView>
   them: RefObject<RacerView>
-  mine: { body: Body; color: string; mods?: string[] }
+  mine: { body: Body; color: string; finish?: Finish; mods?: string[] }
   theirs: { body: Body; color: string; mods?: string[] }
   venue: Venue
 }
 
-function SkyDome({ tint = '#ffffff' }: { tint?: string }) {
+export function SkyDome({ tint = '#ffffff' }: { tint?: string }) {
   const ref = useRef<Mesh>(null)
   useFrame(({ camera }) => ref.current?.position.set(camera.position.x, 0, camera.position.z))
   return (
@@ -340,7 +340,13 @@ export function RaceScene({ track, me, them, mine, theirs, venue }: Props) {
       {/* Ground, sidewalks and the street itself. */}
       <mesh rotation-x={-Math.PI / 2} position={[0, LAYER.outer, len / 2]}>
         <planeGeometry args={[80, len + 100]} />
-        <meshStandardMaterial color={venue.ground ?? PAL.ground} />
+        {venue.id === 'desert' ? (
+          <meshStandardMaterial map={sandTex(10, (len + 100) / 8)} />
+        ) : venue.id === 'farm' ? (
+          <meshStandardMaterial map={grassTex(10, (len + 100) / 8)} />
+        ) : (
+          <meshStandardMaterial color={venue.ground ?? PAL.ground} />
+        )}
       </mesh>
       {/* The street is static, so it's merged into a few draws like the town. */}
       <Batch version={city ? slots : venue.id}>
@@ -414,7 +420,7 @@ export function RaceScene({ track, me, them, mine, theirs, venue }: Props) {
             <planeGeometry args={[0.9, 1.5]} />
             <meshBasicMaterial map={glowTex()} color="#000000" transparent opacity={0.35} depthWrite={false} {...decal(3)} />
           </mesh>
-          {i === 0 ? <CarModel body={mine.body} color={mine.color} mods={mine.mods} flames beams={night > 0.3} /> : <CarModel body={theirs.body} color={theirs.color} mods={theirs.mods} flames beams={night > 0.3} />}
+          {i === 0 ? <CarModel body={mine.body} color={mine.color} finish={mine.finish} mods={mine.mods} flames beams={night > 0.3} /> : <CarModel body={theirs.body} color={theirs.color} mods={theirs.mods} flames beams={night > 0.3} />}
         </group>
       ))}
     </>

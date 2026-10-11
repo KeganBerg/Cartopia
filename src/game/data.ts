@@ -486,6 +486,34 @@ export const campaignCleared = (done: Record<string, number>, ch: CampaignChapte
 export const campaignPerfect = (done: Record<string, number>, ch: CampaignChapter) =>
   Array.from({ length: CAMPAIGN_RACES }, (_, i) => done[campaignRaceId(ch, i)] ?? 0).every((n) => n >= 3)
 
+// Collection book: every car belongs to one set. Owning every car in a set
+// at once lets the player claim its one-time reward (coins, bucks, trophies, XP).
+// Saves keep the claimed set ids in `claimedSets`; claimed sets stay claimed
+// even if a car from them is sold later.
+export type CarSet = { id: string; name: string; icon: string; cars: string[]; coins: number; bucks: number; trophies: number; xp: number }
+export const CAR_SETS: CarSet[] = [
+  { id: 'daily', name: 'Daily Drivers', icon: '🏘', cars: ['pip', 'civic', 'trail', 'miata'], coins: 1500, bucks: 2, trophies: 5, xp: 60 },
+  { id: 'bikes', name: 'Two Wheels', icon: '🏍', cars: ['zippy', 'baron', 'shinden'], coins: 4000, bucks: 3, trophies: 10, xp: 120 },
+  { id: 'classics', name: "Rusty's Classics", icon: '🔧', cars: ['bug', 'woodie', 'hauler', 'cruiser', 'buggy'], coins: 5000, bucks: 5, trophies: 15, xp: 150 },
+  { id: 'muscle', name: 'Muscle Row', icon: '💪', cars: ['stallion', 'charger', 'hellcat', 'bandit'], coins: 8000, bucks: 5, trophies: 15, xp: 200 },
+  { id: 'track', name: 'Track Legends', icon: '🏁', cars: ['rally', 'vette', 'gtr', 'lemans', 'gullwing'], coins: 15000, bucks: 8, trophies: 25, xp: 300 },
+  { id: 'dream', name: 'Dream Garage', icon: '💎', cars: ['lambo', 'hyper', 'tomahawk'], coins: 30000, bucks: 15, trophies: 40, xp: 500 },
+]
+export const setOwned = (set: CarSet, cars: { model: string }[]) => set.cars.filter((m) => cars.some((c) => c.model === m)).length
+export const setComplete = (set: CarSet, cars: { model: string }[]) => setOwned(set, cars) === set.cars.length
+// Sets the player owns every car of but hasn't claimed yet.
+export const readySets = (s: { cars: { model: string }[]; claimedSets?: string[] }) =>
+  CAR_SETS.filter((set) => !(s.claimedSets ?? []).includes(set.id) && setComplete(set, s.cars))
+// Where to get a car: the Showroom (with its level or bucks price) or Rusty's searches.
+export function carSource(car: CarDef): { icon: string; text: string } {
+  if (car.rescueOnly) {
+    const spot = RESCUE_SPOTS.filter((sp) => sp.cars.some((c) => c.model === car.id)).sort((a, b) => a.unlockLevel - b.unlockLevel)[0]
+    return { icon: '🔧', text: spot ? `Rusty's · ${spot.name}` : "Rusty's" }
+  }
+  if (car.bucks) return { icon: '🚘', text: `Showroom · B${car.bucks}` }
+  return { icon: '🚘', text: `Showroom · Lv ${car.unlockLevel}` }
+}
+
 // Bank packs. Bigger packs carry a bigger bonus on top of the base rate of
 // 5 bucks per dollar, plus extra coins and parts.
 export type BucksPack = { id: string; name: string; price: number; bucks: number; bonus: number; coins?: number; parts?: number; tag?: string; art: string }
@@ -555,6 +583,33 @@ export const PAINTS: { color: string; name: string; bucks?: number }[] = [
 export const STRIPES = [null, '#fafafa', '#212121', '#e53935', '#fdd835', '#1e88e5']
 export const PAINT_COST = 150
 export const STRIPE_COST = 100
+
+// How the paint catches the light. Glossy is the factory finish every car comes with.
+export type Finish = 'gloss' | 'matte' | 'chrome'
+export const FINISHES: { id: Finish; name: string; coins: number; unlockLevel: number; blurb: string }[] = [
+  { id: 'gloss', name: 'Glossy', coins: 150, unlockLevel: 1, blurb: 'Factory shine' },
+  { id: 'matte', name: 'Matte', coins: 400, unlockLevel: 1, blurb: 'Flat, no shine' },
+  { id: 'chrome', name: 'Chrome', coins: 2500, unlockLevel: 8, blurb: 'Mirror metal in your colour' },
+]
+export const finishDef = (id?: Finish | null) => FINISHES.find((f) => f.id === id) ?? FINISHES[0]
+// Material numbers for each finish: [metalness, roughness, how far the colour is lifted towards white].
+export const FINISH_LOOK: Record<Finish, [number, number, number]> = { gloss: [0.4, 0.3, 0], matte: [0.05, 0.92, 0], chrome: [1, 0.12, 0.15] }
+
+export type PaintJob = { color: string; finish: Finish; stripe: string | null }
+// What a paint job costs on a car: each part that changes is charged once. A neon or
+// gold colour costs a buck instead of coins; taking stripes off is free.
+export function paintJobCost(car: { color: string; finish?: Finish; stripe?: string | null }, job: PaintJob) {
+  let coins = 0
+  let bucks = 0
+  if (job.color !== car.color) {
+    const p = PAINTS.find((x) => x.color === job.color)
+    if (p?.bucks) bucks += p.bucks
+    else coins += PAINT_COST
+  }
+  if (job.finish !== (car.finish ?? 'gloss')) coins += finishDef(job.finish).coins
+  if (job.stripe !== (car.stripe ?? null) && job.stripe) coins += STRIPE_COST
+  return { coins, bucks }
+}
 
 // Garage power: the combined PI of a player's five best cars.
 export const POWER_CARS = 5

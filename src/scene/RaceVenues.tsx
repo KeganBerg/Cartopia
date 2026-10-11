@@ -1,11 +1,13 @@
-import { useMemo, useRef, type ReactNode } from 'react'
+import { useLayoutEffect, useMemo, useRef, type ReactNode } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { BufferAttribute, BufferGeometry, Color, Object3D, type Group, type InstancedMesh, type Points } from 'three'
 import { BuildingModel } from './BuildingModel'
 import { glowMats } from './dayNight'
 import { Batch } from './Batch'
-import { PAL } from './season'
-import { buildingDef } from '../game/data'
+import { PAL, SEASON } from './season'
+import { gravelTex, soilTex } from './textures'
+import { CarModel } from './CarModel'
+import { TILE, buildingDef } from '../game/data'
 import type { VenueId } from './venues'
 
 // Scenery for the out-of-town race venues. Everything here is static and sits
@@ -17,13 +19,13 @@ export const WALK = 1.0 // shoulder / sidewalk width
 const EDGE = ROAD + WALK
 
 // Deterministic so a venue looks the same every race.
-function rand(seed: number) {
+export function rand(seed: number) {
   return () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646
 }
 
 type V3 = [number, number, number]
 
-function Box({ p, s, c, ry = 0 }: { p: V3; s: V3; c: string; ry?: number }) {
+export function Box({ p, s, c, ry = 0 }: { p: V3; s: V3; c: string; ry?: number }) {
   return (
     <mesh position={p} scale={s} rotation-y={ry}>
       <boxGeometry />
@@ -32,7 +34,7 @@ function Box({ p, s, c, ry = 0 }: { p: V3; s: V3; c: string; ry?: number }) {
   )
 }
 
-function Cyl({ p, r, h, c, seg = 8, rot }: { p: V3; r: number; h: number; c: string; seg?: number; rot?: V3 }) {
+export function Cyl({ p, r, h, c, seg = 8, rot }: { p: V3; r: number; h: number; c: string; seg?: number; rot?: V3 }) {
   return (
     <mesh position={p} rotation={rot}>
       <cylinderGeometry args={[r, r, h, seg]} />
@@ -41,7 +43,7 @@ function Cyl({ p, r, h, c, seg = 8, rot }: { p: V3; r: number; h: number; c: str
   )
 }
 
-function Cone({ p, r, h, c, seg = 8, ry = 0 }: { p: V3; r: number; h: number; c: string; seg?: number; ry?: number }) {
+export function Cone({ p, r, h, c, seg = 8, ry = 0 }: { p: V3; r: number; h: number; c: string; seg?: number; ry?: number }) {
   return (
     <mesh position={p} rotation-y={ry}>
       <coneGeometry args={[r, h, seg]} />
@@ -50,7 +52,7 @@ function Cone({ p, r, h, c, seg = 8, ry = 0 }: { p: V3; r: number; h: number; c:
   )
 }
 
-function Flat({ x, z, w, d, c, y = 0.015 }: { x: number; z: number; w: number; d: number; c: string; y?: number }) {
+export function Flat({ x, z, w, d, c, y = 0.015 }: { x: number; z: number; w: number; d: number; c: string; y?: number }) {
   return (
     <mesh rotation-x={-Math.PI / 2} position={[x, y, z]}>
       <planeGeometry args={[w, d]} />
@@ -202,55 +204,158 @@ function Beach({ len }: { len: number }) {
   )
 }
 
-// Flat-topped red mesas, cacti and boulders, with a far ridge on the horizon.
+// Red Rock Canyon: layered mesas and spires, saguaros, scrub and grit along
+// the shoulders, a Route-style roadside stop, a rusting pickup and a water tower.
 function Desert({ len }: { len: number }) {
-  const mesas = useMemo(() => along(len, (r) => 6 + r() * 8, 3, -20, len + 80).map(({ z, side, r }) => ({ z, x: side * (EDGE + 7 + r() * 16), w: 4 + r() * 6, d: 4 + r() * 6, h: 2.5 + r() * 7 })), [len])
-  const cacti = useMemo(() => along(len, (r) => 2 + r() * 3, 9).map(({ z, side, r }) => ({ z, x: side * (EDGE + 0.9 + r() * 5), h: 0.9 + r() * 0.9, arm: r() })), [len])
-  const rocks = useMemo(() => along(len, (r) => 3 + r() * 4, 13).map(({ z, side, r }) => ({ z, x: side * (EDGE + 0.6 + r() * 6), s: 0.15 + r() * 0.4 })), [len])
+  const geo = useMemo(() => {
+    const mesas = along(len, (r) => 6 + r() * 8, 3, -20, len + 80).map(({ z, side, r }) => ({ z, x: side * (EDGE + 8 + r() * 16), w: 4 + r() * 6, d: 4 + r() * 6, h: 2.5 + r() * 7, ry: (r() - 0.5) * 0.5, spire: r() < 0.25 }))
+    const saguaros = along(len, (r) => 3 + r() * 4, 9).map(({ z, side, r }) => ({ z, x: side * (EDGE + 2.4 + r() * 6), h: 1.3 + r() * 1.1, arm: r(), ry: r() * 6 }))
+    const small = along(len, (r) => 5 + r() * 6, 19).map(({ z, side, r }) => ({ z, x: side * (EDGE + 0.7 + r() * 1.4), def: r() < 0.65 ? 'cactus' : 'rock' }))
+    const r = rand(23)
+    const near = (n: number, from: number, to: number) =>
+      Array.from({ length: n }, () => {
+        const side = r() < 0.5 ? -1 : 1
+        return { x: side * (EDGE + from + r() ** 1.4 * (to - from)), z: r() * (len + 60) - 14, s: 0.6 + r() * 0.8, ry: r() * 6 }
+      })
+    return { mesas, saguaros, small, grass: near(520, 0.15, 7), sage: near(130, 0.4, 9), grit: near(260, 0.1, 5) }
+  }, [len])
+  const strata = ['#b5532f', '#c8693a', '#a84a2a', '#d4844e']
+  const stop = len * 0.3
   return (
     <group>
-      {mesas.map((m, i) => (
-        <group key={i}>
-          <Box p={[m.x, m.h / 2, m.z]} s={[m.w, m.h, m.d]} c="#b85a32" />
-          <Box p={[m.x, m.h + 0.3, m.z]} s={[m.w * 0.82, 0.6, m.d * 0.82]} c="#d07a46" />
+      {geo.mesas.map((m, i) =>
+        m.spire ? (
+          <group key={i} position={[m.x, 0, m.z]} rotation-y={m.ry}>
+            <Box p={[0, m.h * 0.35, 0]} s={[m.w * 0.35, m.h * 0.7, m.d * 0.35]} c={strata[0]} />
+            <Box p={[0, m.h * 0.85, 0]} s={[m.w * 0.24, m.h * 0.3, m.d * 0.24]} c={strata[1]} />
+            <Box p={[0, m.h + 0.12, 0]} s={[m.w * 0.3, 0.25, m.d * 0.3]} c={strata[3]} />
+          </group>
+        ) : (
+          <group key={i} position={[m.x, 0, m.z]} rotation-y={m.ry}>
+            {/* Bands of rock, each a touch narrower, like the real thing. */}
+            <Box p={[0, m.h * 0.2, 0]} s={[m.w * 1.08, m.h * 0.4, m.d * 1.08]} c={strata[0]} />
+            <Box p={[0, m.h * 0.52, 0]} s={[m.w, m.h * 0.26, m.d]} c={strata[1]} />
+            <Box p={[0, m.h * 0.78, 0]} s={[m.w * 0.94, m.h * 0.28, m.d * 0.94]} c={strata[2]} />
+            <Box p={[0, m.h + 0.15, 0]} s={[m.w * 0.98, 0.3, m.d * 0.98]} c={strata[3]} />
+            {[0, 1, 2, 3].map((k) => {
+              const a = k * 1.7 + i
+              return (
+                <mesh key={k} position={[Math.cos(a) * m.w * 0.6, 0.3, Math.sin(a) * m.d * 0.6]} scale={[0.7, 0.45, 0.6]}>
+                  <dodecahedronGeometry args={[0.8, 0]} />
+                  <meshStandardMaterial color={strata[2]} flatShading />
+                </mesh>
+              )
+            })}
+          </group>
+        ),
+      )}
+      {geo.saguaros.map((c, i) => (
+        <group key={i} position={[c.x, 0, c.z]} rotation-y={c.ry}>
+          <Cyl p={[0, c.h / 2, 0]} r={0.12} h={c.h} c="#4f8a3a" seg={8} />
+          <mesh position={[0, c.h, 0]}><sphereGeometry args={[0.12, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2]} /><meshStandardMaterial color="#4f8a3a" flatShading /></mesh>
+          {[1, -1].map((sd) =>
+            (sd > 0 ? c.arm > 0.25 : c.arm > 0.6) ? (
+              <group key={sd}>
+                <Cyl p={[sd * 0.2, c.h * 0.45, 0]} r={0.07} h={0.24} c="#4f8a3a" seg={7} rot={[0, 0, Math.PI / 2]} />
+                <Cyl p={[sd * 0.3, c.h * (sd > 0 ? 0.6 : 0.55), 0]} r={0.075} h={c.h * 0.32} c="#4f8a3a" seg={7} />
+                <mesh position={[sd * 0.3, c.h * (sd > 0 ? 0.76 : 0.71), 0]}><sphereGeometry args={[0.075, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2]} /><meshStandardMaterial color="#4f8a3a" flatShading /></mesh>
+              </group>
+            ) : null,
+          )}
         </group>
       ))}
-      {cacti.map((c, i) => (
-        <group key={i} position={[c.x, 0, c.z]}>
-          <Cyl p={[0, c.h / 2, 0]} r={0.09} h={c.h} c="#4f8a3a" seg={7} />
-          {c.arm > 0.35 && (
-            <>
-              <Cyl p={[0.16, c.h * 0.5, 0]} r={0.05} h={0.2} c="#4f8a3a" seg={6} rot={[0, 0, Math.PI / 2]} />
-              <Cyl p={[0.25, c.h * 0.62, 0]} r={0.055} h={0.32} c="#4f8a3a" seg={6} />
-            </>
-          )}
-          {c.arm > 0.6 && (
-            <>
-              <Cyl p={[-0.15, c.h * 0.62, 0]} r={0.05} h={0.18} c="#4f8a3a" seg={6} rot={[0, 0, Math.PI / 2]} />
-              <Cyl p={[-0.23, c.h * 0.72, 0]} r={0.05} h={0.26} c="#4f8a3a" seg={6} />
-            </>
-          )}
+      {/* The town's own cactus, boulder and scrub models dot the shoulders. */}
+      {geo.small.map((o, i) => (
+        <group key={i} position={[o.x, 0, o.z]} scale={0.8}>
+          <BuildingModel def={buildingDef(o.def)} />
         </group>
       ))}
-      <Poles len={len} x={EDGE + 0.6} />
-      {/* An old water tower and a roadside diner sign. */}
+      <Scatter spots={geo.grass} colors={['#c9a85c', '#b39550', '#d8bd72', '#9c8a4a']}>
+        <coneGeometry args={[0.07, 0.3, 3]} />
+      </Scatter>
+      <Scatter spots={geo.sage} colors={['#a8b28a', '#9aa57c', '#b5bd96']} y={0.12}>
+        <icosahedronGeometry args={[0.2, 0]} />
+      </Scatter>
+      <Scatter spots={geo.grit} colors={['#a0603a', '#8d5a3b', '#b97a4e']} y={0.03}>
+        <dodecahedronGeometry args={[0.06, 0]} />
+      </Scatter>
+      <Poles len={len} x={-(EDGE + 0.6)} />
+      {/* A roadside stop: gas, a diner and a motel on a gravel lot. */}
+      <mesh rotation-x={-Math.PI / 2} position={[EDGE + 1.6, 0.012, stop + 4.6]}>
+        <planeGeometry args={[3.4, 15]} />
+        <meshStandardMaterial map={gravelTex(2, 8)} color="#d9b98e" />
+      </mesh>
+      <Lot def="gas" side={1} z={stop} />
+      <Lot def="diner" side={1} z={stop + 4.6} />
+      <Lot def="motel" side={1} z={stop + 9.2} />
+      <group position={[EDGE + 0.5, 0, stop + 12]}>
+        <Cyl p={[0, 1.8, 0]} r={0.06} h={3.6} c="#37474f" seg={6} />
+        <Box p={[0, 3.5, 0]} s={[0.12, 0.9, 1.6]} c="#00838f" />
+        <Box p={[-0.07, 3.5, 0]} s={[0.02, 0.6, 1.3]} c="#ffd54f" />
+      </group>
+      {/* An old water tower, a shack and a pickup left to rust. */}
       <group position={[-(EDGE + 6), 0, len * 0.55]}>
         {[-0.7, 0.7].map((dx) => [-0.7, 0.7].map((dz) => <Box key={`${dx}${dz}`} p={[dx, 1.6, dz]} s={[0.1, 3.2, 0.1]} c="#6d4c41" />))}
         <Cyl p={[0, 3.8, 0]} r={1.1} h={1.4} c="#8d6e63" seg={10} />
         <Cone p={[0, 4.8, 0]} r={1.2} h={0.6} c="#6d4c41" seg={10} />
       </group>
-      <group position={[EDGE + 3.5, 0, len * 0.3]}>
+      <group position={[-(EDGE + 3.4), 0, len * 0.72]}>
+        <Box p={[0, 0.6, 0]} s={[2, 1.2, 1.6]} c="#8d6e63" />
+        <Box p={[0, 1.25, 0]} s={[2.3, 0.1, 1.9]} c="#6d4c41" ry={0.05} />
+        <Box p={[1.01, 0.5, 0]} s={[0.02, 0.8, 0.5]} c="#3e2723" />
+        <group position={[0.4, 0, 1.9]} rotation-y={2.3} scale={0.9}>
+          <CarModel body="truck" color="#9a5a35" />
+        </group>
+      </group>
+      <group position={[EDGE + 3.5, 0, len * 0.75]}>
         {[-0.8, 0.8].map((dz) => <Box key={dz} p={[0, 1.2, dz]} s={[0.1, 2.4, 0.1]} c="#6d4c41" />)}
         <Box p={[0, 2.3, 0]} s={[0.08, 1.0, 2.2]} c="#c62828" />
         <Box p={[-0.05, 2.3, 0]} s={[0.02, 0.6, 1.8]} c="#fdd835" />
       </group>
-      {rocks.map((k, i) => (
-        <mesh key={i} position={[k.x, k.s * 0.5, k.z]} scale={[k.s * 1.4, k.s, k.s * 1.2]}>
-          <dodecahedronGeometry args={[1, 0]} />
-          <meshStandardMaterial color="#a65a35" flatShading />
-        </mesh>
-      ))}
     </group>
+  )
+}
+
+// A town building fronting the road, like the shops on Main Street.
+function Lot({ def, side, z, back = 0.3 }: { def: string; side: -1 | 1; z: number; back?: number }) {
+  const d = buildingDef(def)
+  const depth = d.h * TILE
+  return (
+    <group position={[side * (EDGE + back + depth / 2), 0, z]} rotation-y={side < 0 ? Math.PI / 2 : -Math.PI / 2}>
+      <BuildingModel def={d} />
+    </group>
+  )
+}
+
+type Spot = { x: number; z: number; s?: number; ry?: number; y?: number; sy?: number }
+
+// Lots of one small thing (grass, pebbles, corn) as a single instanced draw,
+// each copy tinted from a short list so the patch doesn't look stamped.
+function Scatter({ spots, colors, y = 0, children }: { spots: Spot[]; colors: string[]; y?: number; children: ReactNode }) {
+  const ref = useRef<InstancedMesh>(null)
+  useLayoutEffect(() => {
+    const m = ref.current
+    if (!m) return
+    const o = new Object3D()
+    const c = new Color()
+    spots.forEach((p, i) => {
+      const k = p.s ?? 1
+      o.position.set(p.x, (p.y ?? y) * k, p.z)
+      o.rotation.set(0, p.ry ?? 0, 0)
+      o.scale.set(k, k * (p.sy ?? 1), k)
+      o.updateMatrix()
+      m.setMatrixAt(i, o.matrix)
+      m.setColorAt(i, c.set(colors[i % colors.length]))
+    })
+    m.instanceMatrix.needsUpdate = true
+    if (m.instanceColor) m.instanceColor.needsUpdate = true
+    m.computeBoundingSphere()
+  }, [spots, colors, y])
+  return (
+    <instancedMesh ref={ref} args={[undefined, undefined, spots.length]} raycast={() => null}>
+      {children}
+      <meshStandardMaterial flatShading />
+    </instancedMesh>
   )
 }
 
@@ -339,24 +444,35 @@ function Snow({ len }: { len: number }) {
   )
 }
 
-// Fenced fields: crop rows on the left, a pasture with barns, silos and hay
-// bales on the right, rolling hills behind. Follows the season's colours.
+// Harvest Backroad: a cornfield on the left, a farmstead on the right (house,
+// barn with a gable roof, silo, tractor, duck pond), cows, hay, grass along the
+// fences, and a pumpkin stand in the fall. Follows the season's colours.
 function Farm({ len }: { len: number }) {
-  const crop = PAL.bare ? '#c8b48a' : '#7cb342'
   const wood = '#8d6e63'
   const posts: number[] = []
   for (let z = -12; z < len + 40; z += 1.6) posts.push(z)
-  const bales = useMemo(() => {
+  // Corn: tall and green in summer, golden in the fall, short sprouts in spring, stubble in winter.
+  const corn = { spring: ['#8bc34a', '#7cb342', 0.45], summer: ['#5f9e35', '#4f8a2b', 1.15], fall: ['#c9a84a', '#b8953e', 1.05], winter: ['#bfa77a', '#a8936a', 0.3] }[SEASON] as [string, string, number]
+  const geo = useMemo(() => {
     const r = rand(41)
-    const out = []
-    for (let z = -8; z < len + 40; z += 2.5 + r() * 4) out.push({ z, x: EDGE + 1.6 + r() * 6, ry: r() * 3 })
-    return out
+    const stalks: Spot[] = []
+    for (let row = 0; row < 13; row++) {
+      for (let z = -12; z < len + 40; z += 0.42) stalks.push({ x: -(EDGE + 1.1 + row * 0.62 + (r() - 0.5) * 0.08), z: z + (r() - 0.5) * 0.15, s: 0.85 + r() * 0.3, ry: r() * 6 })
+    }
+    const bales: { x: number; z: number; ry: number }[] = []
+    for (let z = -8; z < len + 40; z += 3 + r() * 5) if (z < len * 0.25 || z > len * 0.48) bales.push({ z, x: EDGE + 1.8 + r() * 3, ry: r() * 3 })
+    const cows = Array.from({ length: 10 }, (_, i) => ({ z: len * 0.5 + (i / 9) * (len * 0.5 + 20) + r() * 3, x: EDGE + 2.2 + r() * 6, ry: r() * 6 }))
+    const grass: Spot[] = Array.from({ length: 700 }, () => {
+      const side = r() < 0.5 ? -1 : 1
+      return { x: side * (EDGE + 0.05 + r() * (side < 0 ? 0.8 : 9)), z: r() * (len + 60) - 14, s: 0.6 + r() * 0.7, ry: r() * 6 }
+    })
+    const flowers: Spot[] = Array.from({ length: 160 }, () => ({ x: EDGE + 0.4 + r() * 8, z: r() * (len + 60) - 14, s: 0.7 + r() * 0.5, y: 0.16 }))
+    const pumpkins: Spot[] = Array.from({ length: 60 }, () => ({ x: EDGE + 0.6 + r() * 2.2, z: len * 0.08 + r() * 6, s: 0.7 + r() * 0.8, sy: 0.75, y: 0.1, ry: r() * 6 }))
+    const trees = along(len, (r2) => 7 + r2() * 9, 47).map(({ z, side, r: r2 }) => ({ z, x: side * (EDGE + (side < 0 ? 10.5 : 11) + r2() * 5) }))
+    return { stalks, bales, cows, grass, flowers, pumpkins, trees }
   }, [len])
-  const cows = useMemo(() => {
-    const r = rand(43)
-    return Array.from({ length: 9 }, (_, i) => ({ z: (i / 8) * (len + 20) - 5 + r() * 4, x: EDGE + 2 + r() * 7, ry: r() * 6 }))
-  }, [len])
-  const trees = useMemo(() => along(len, (r) => 7 + r() * 9, 47).map(({ z, side, r }) => ({ z, x: side * (EDGE + (side < 0 ? 13 : 10) + r() * 5) })), [len])
+  const yard = len * 0.32
+  const barn = len * 0.62
   return (
     <group>
       {[-1, 1].map((sd) => (
@@ -365,46 +481,130 @@ function Farm({ len }: { len: number }) {
           {[0.22, 0.48].map((y) => <Box key={y} p={[sd * (EDGE + 0.35), y, len / 2 + 14]} s={[0.04, 0.06, len + 52]} c={wood} />)}
         </group>
       ))}
-      {Array.from({ length: 16 }, (_, i) => (
-        <Box key={i} p={[-(EDGE + 1.2 + i * 0.7), 0.22, len / 2 + 14]} s={[0.36, 0.44, len + 52]} c={crop} />
-      ))}
-      <Flat x={-(EDGE + 6.6)} z={len / 2 + 14} w={11.4} d={len + 52} c="#6d4c41" y={0.01} />
-      {[0.15, 0.6].map((k) => {
-        const z = len * k
-        const x = EDGE + 6
-        return (
-          <group key={k}>
-            <Box p={[x, 1.1, z]} s={[3.4, 2.2, 4.6]} c="#b71c1c" />
-            <Cone p={[x, 2.75, z]} r={3.3} h={1.1} c="#5d4037" seg={4} ry={Math.PI / 4} />
-            <Box p={[x - 1.71, 0.7, z]} s={[0.02, 1.4, 1.4]} c="#eeeeee" />
-            <Cyl p={[x + 0.6, 1.8, z + 3.6]} r={0.75} h={3.6} c="#cfd8dc" seg={10} />
-            <mesh position={[x + 0.6, 3.6, z + 3.6]}>
-              <sphereGeometry args={[0.75, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2]} />
-              <meshStandardMaterial color="#90a4ae" flatShading />
-            </mesh>
+      {/* Cornfield: ploughed rows and hundreds of stalks in one draw. */}
+      <mesh rotation-x={-Math.PI / 2} position={[-(EDGE + 4.9), 0.012, len / 2 + 14]}>
+        <planeGeometry args={[8.6, len + 52]} />
+        <meshStandardMaterial map={soilTex(1, (len + 52) / 4)} />
+      </mesh>
+      <Scatter spots={geo.stalks} colors={[corn[0], corn[1], corn[0]]} y={corn[2] / 2}>
+        <boxGeometry args={[0.07, corn[2], 0.07]} />
+      </Scatter>
+      <Scatter spots={geo.stalks} colors={[corn[1], corn[0]]} y={corn[2] * 0.62}>
+        <coneGeometry args={[0.2, corn[2] * 0.7, 4]} />
+      </Scatter>
+      {SEASON !== 'winter' && SEASON !== 'spring' && (
+        <Scatter spots={geo.stalks} colors={['#f2d26b', '#e6c35a']} y={corn[2] + 0.08}>
+          <coneGeometry args={[0.03, 0.16, 3]} />
+        </Scatter>
+      )}
+      {/* Grass along the fences and across the pasture, flowers in spring and summer. */}
+      <Scatter spots={geo.grass} colors={PAL.bare ? ['#e8eef2', '#d7dee3'] : [...PAL.leaves.slice(0, 1), '#5a9a3a', '#6fae46', '#4e8a33']}>
+        <coneGeometry args={[0.06, 0.28, 3]} />
+      </Scatter>
+      {SEASON !== 'winter' && SEASON !== 'fall' && (
+        <Scatter spots={geo.flowers} colors={['#fdd835', '#ffffff', '#ec407a', '#ab47bc']}>
+          <octahedronGeometry args={[0.05, 0]} />
+        </Scatter>
+      )}
+      {SEASON === 'fall' && (
+        <>
+          <Scatter spots={geo.pumpkins} colors={['#ef6c00', '#f57c00', '#e65100']}>
+            <sphereGeometry args={[0.14, 8, 6]} />
+          </Scatter>
+          <group position={[EDGE + 1.2, 0, len * 0.08 - 1.2]}>
+            <Box p={[0, 0.4, 0]} s={[0.9, 0.8, 1.4]} c={wood} />
+            <Box p={[0, 0.85, 0]} s={[1.1, 0.06, 1.7]} c="#c62828" />
           </group>
-        )
-      })}
-      {cows.map((c, i) => (
+        </>
+      )}
+      {/* Farmhouse in its yard, with a mailbox at the road. */}
+      <Lot def="house" side={1} z={yard} back={2.2} />
+      <Lot def="house" side={1} z={yard + 2.6} back={4.6} />
+      <group position={[EDGE + 0.75, 0, yard - 1.2]}>
+        <Box p={[0, 0.4, 0]} s={[0.05, 0.8, 0.05]} c={wood} />
+        <Box p={[0, 0.85, 0]} s={[0.2, 0.15, 0.3]} c="#455a64" />
+        <Box p={[0.02, 0.95, -0.12]} s={[0.02, 0.12, 0.04]} c="#e53935" />
+      </group>
+      {[-1.6, 1.8, 4.2].map((dz) => (
+        <group key={dz} position={[EDGE + 6.6, 0, yard + dz]}>
+          <BuildingModel def={buildingDef('tree')} />
+        </group>
+      ))}
+      {/* Red barn with a proper gable roof, white trim and a hayloft door. */}
+      <group position={[EDGE + 5.6, 0, barn]}>
+        <Box p={[0, 1.1, 0]} s={[3.4, 2.2, 4.8]} c="#b71c1c" />
+        {/* Gable ends: a square turned on its corner, squashed to the roof pitch. */}
+        <group position-y={2.2} scale={[1, 0.6, 1]}>
+          <mesh rotation-z={Math.PI / 4}>
+            <boxGeometry args={[2.4, 2.4, 4.78]} />
+            <meshStandardMaterial color="#b71c1c" flatShading />
+          </mesh>
+        </group>
+        {[-1, 1].map((sd) => (
+          <mesh key={sd} position={[sd * 0.85, 2.77, 0]} rotation-z={-sd * 0.54}>
+            <boxGeometry args={[2.15, 0.1, 5.1]} />
+            <meshStandardMaterial color="#5d4037" flatShading />
+          </mesh>
+        ))}
+        <Box p={[0, 3.26, 0]} s={[0.14, 0.1, 5.1]} c="#3e2723" />
+        <Box p={[-1.71, 0.75, 0]} s={[0.03, 1.5, 1.6]} c="#8e1414" />
+        <mesh position={[-1.73, 0.75, 0]} rotation-x={0.75}><boxGeometry args={[0.02, 0.08, 2.1]} /><meshStandardMaterial color="#fafafa" /></mesh>
+        <mesh position={[-1.73, 0.75, 0]} rotation-x={-0.75}><boxGeometry args={[0.02, 0.08, 2.1]} /><meshStandardMaterial color="#fafafa" /></mesh>
+        <Box p={[-1.73, 1.52, 0]} s={[0.02, 0.08, 1.7]} c="#fafafa" />
+        <Box p={[-1.73, 0.75, -0.82]} s={[0.02, 1.55, 0.08]} c="#fafafa" />
+        <Box p={[-1.73, 0.75, 0.82]} s={[0.02, 1.55, 0.08]} c="#fafafa" />
+        <Box p={[-1.73, 1.9, 0]} s={[0.02, 0.5, 0.6]} c="#3e2723" />
+        <Cyl p={[0.6, 1.9, 3.6]} r={0.75} h={3.8} c="#cfd8dc" seg={12} />
+        {[0.8, 1.8, 2.8].map((y) => <Cyl key={y} p={[0.6, y, 3.6]} r={0.77} h={0.06} c="#90a4ae" seg={12} />)}
+        <mesh position={[0.6, 3.8, 3.6]}>
+          <sphereGeometry args={[0.75, 12, 5, 0, Math.PI * 2, 0, Math.PI / 2]} />
+          <meshStandardMaterial color="#90a4ae" flatShading />
+        </mesh>
+        {/* Tractor parked by the barn door. */}
+        <group position={[-2.6, 0, -2.6]} rotation-y={0.6}>
+          <Box p={[0, 0.42, 0.15]} s={[0.5, 0.35, 0.9]} c="#2e7d32" />
+          <Box p={[0, 0.78, -0.2]} s={[0.46, 0.4, 0.4]} c="#2e7d32" />
+          <Box p={[0, 0.98, -0.2]} s={[0.5, 0.04, 0.44]} c="#fdd835" />
+          <Cyl p={[0, 0.8, 0.45]} r={0.03} h={0.4} c="#212121" seg={6} />
+          {[-1, 1].map((sd) => (
+            <group key={sd}>
+              <Cyl p={[sd * 0.32, 0.32, -0.25]} r={0.32} h={0.16} c="#212121" seg={12} rot={[0, 0, Math.PI / 2]} />
+              <Cyl p={[sd * 0.33, 0.32, -0.25]} r={0.14} h={0.17} c="#fdd835" seg={10} rot={[0, 0, Math.PI / 2]} />
+              <Cyl p={[sd * 0.27, 0.17, 0.45]} r={0.17} h={0.1} c="#212121" seg={10} rot={[0, 0, Math.PI / 2]} />
+            </group>
+          ))}
+        </group>
+      </group>
+      <group position={[EDGE + 7.5, 0, len * 0.86]}>
+        <BuildingModel def={buildingDef('pond')} />
+      </group>
+      {geo.cows.map((c, i) => (
         <group key={i} position={[c.x, 0, c.z]} rotation-y={c.ry}>
           <Box p={[0, 0.42, 0]} s={[0.36, 0.32, 0.7]} c="#fafafa" />
           <Box p={[0.12, 0.47, 0.08]} s={[0.14, 0.2, 0.26]} c="#263238" />
+          <Box p={[-0.1, 0.5, -0.15]} s={[0.18, 0.15, 0.2]} c="#263238" />
           <Box p={[0, 0.52, 0.42]} s={[0.22, 0.22, 0.22]} c="#fafafa" />
           <Box p={[0, 0.46, 0.54]} s={[0.16, 0.1, 0.04]} c="#f8bbd0" />
+          {[-1, 1].map((sd) => <Box key={sd} p={[sd * 0.1, 0.66, 0.4]} s={[0.03, 0.08, 0.03]} c="#eeeeee" />)}
           {[-0.12, 0.12].map((dx) => [-0.25, 0.25].map((dz) => <Box key={`${dx}${dz}`} p={[dx, 0.13, dz]} s={[0.07, 0.26, 0.07]} c="#263238" />))}
         </group>
       ))}
-      {/* A scarecrow minding the crops. */}
+      {/* A scarecrow minding the corn. */}
       <group position={[-(EDGE + 4.1), 0, len * 0.4]}>
-        <Box p={[0, 0.8, 0]} s={[0.06, 1.6, 0.06]} c={wood} />
-        <Box p={[0, 1.2, 0]} s={[0.9, 0.05, 0.05]} c={wood} />
-        <Box p={[0, 1.15, 0]} s={[0.4, 0.42, 0.18]} c="#1565c0" />
-        <mesh position={[0, 1.5, 0]}><sphereGeometry args={[0.13, 8, 6]} /><meshStandardMaterial color="#e0c068" flatShading /></mesh>
-        <Cone p={[0, 1.66, 0]} r={0.22} h={0.2} c="#6d4c41" seg={8} />
+        <Box p={[0, 0.9, 0]} s={[0.06, 1.8, 0.06]} c={wood} />
+        <Box p={[0, 1.4, 0]} s={[0.9, 0.05, 0.05]} c={wood} />
+        <Box p={[0, 1.35, 0]} s={[0.4, 0.42, 0.18]} c="#1565c0" />
+        <mesh position={[0, 1.7, 0]}><sphereGeometry args={[0.13, 8, 6]} /><meshStandardMaterial color="#e0c068" flatShading /></mesh>
+        <Cone p={[0, 1.86, 0]} r={0.22} h={0.2} c="#6d4c41" seg={8} />
       </group>
       <Poles len={len} x={-(EDGE + 0.75)} />
-      {bales.map((b, i) => <Cyl key={i} p={[b.x, 0.28, b.z]} r={0.28} h={0.5} c="#e0c068" seg={9} rot={[Math.PI / 2, b.ry, 0]} />)}
-      {trees.map((t, i) => (
+      {geo.bales.map((b, i) => (
+        <group key={i}>
+          <Cyl p={[b.x, 0.28, b.z]} r={0.28} h={0.5} c="#e0c068" seg={10} rot={[Math.PI / 2, b.ry, 0]} />
+          {i % 3 === 0 && <Cyl p={[b.x + 0.25, 0.8, b.z + 0.1]} r={0.28} h={0.5} c="#d4b45a" seg={10} rot={[Math.PI / 2, b.ry + 0.4, 0]} />}
+        </group>
+      ))}
+      {geo.trees.map((t, i) => (
         <group key={i} position={[t.x, 0, t.z]}>
           <BuildingModel def={buildingDef('tree')} />
         </group>
