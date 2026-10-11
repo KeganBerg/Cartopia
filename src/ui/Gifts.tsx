@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { signedInUser } from '../lib/cloud'
 import { useGifts, refreshGifts, claimGifts, sendGift, noteTotals, GIFTS, type GiftItem, type Note } from '../lib/gifts'
 import { Panel } from './Menus'
+import { PlayerName } from './Username'
 
 const REFRESH_MS = 120_000
 
@@ -84,7 +85,7 @@ export function GiftsPanel() {
               <div key={n.id} className="card gift-note">
                 <div className="welcome-ico" aria-hidden>{n.kind === 'help' ? '🤝' : '🎁'}</div>
                 <div className="card-text">
-                  <div className="card-name">{n.fromName}</div>
+                  <div className="card-name"><PlayerName id={n.from} town={n.fromName} /></div>
                   <div className="card-stat">{noteText(n)}</div>
                 </div>
                 <span className="price">+{n.amount} {n.kind === 'parts' ? '⚙' : '⛽'}</span>

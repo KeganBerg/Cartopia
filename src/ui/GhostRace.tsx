@@ -7,6 +7,7 @@ import { fetchTown } from '../lib/friends'
 import { useGhost, runGhost, raceTown, submitRun, sendTaunt, refreshTaunts, markSeen, tauntText, tauntsFor, GHOST_FUEL, type GhostResult, type Taunt } from '../lib/ghosts'
 import { DragRace } from './Race'
 import { Panel } from './Menus'
+import { PlayerName } from './Username'
 
 // Friend ghost races: the race itself, the result card with taunts, and the taunt inbox.
 
@@ -155,7 +156,7 @@ export function TauntsPanel() {
             <div key={t.id} className="card taunt-note">
               <div className="welcome-ico" aria-hidden>{t.won ? '😤' : '😎'}</div>
               <div className="card-text">
-                <div className="card-name">{t.town}</div>
+                <div className="card-name"><PlayerName id={t.from} town={t.town} /></div>
                 <div className="card-stat">{tauntLine(t)}</div>
                 <div className="taunt-quote">“{tauntText(t.taunt)}”</div>
               </div>

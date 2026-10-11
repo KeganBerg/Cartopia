@@ -11,8 +11,11 @@ import {
 import { Panel, SheetTabs } from './Menus'
 import { isCleanName, NAME_REJECTED } from '../lib/names'
 import { CrewGoalCard, useCrewGoal } from './CrewGoal'
+import { openChat, refreshChatRooms, useChat } from '../lib/chat'
 import { CrewBattleCard } from './CrewBattle'
 import { demoBattle, useCrewBattle } from '../lib/battles'
+import { PlayerName } from './Username'
+import { playerName } from '../lib/profiles'
 
 const n = (v: number) => v.toLocaleString()
 
@@ -31,10 +34,13 @@ export function useUserId() {
 export function SocialTabs({ current }: { current: PanelId }) {
   const openPanel = useGame((s) => s.openPanel)
   const chests = useCrewGoal((g) => g.ready) + useCrewBattle((b) => b.ready)
+  const crewChat = useChat((c) => c.unread.crew)
+  const globalChat = useChat((c) => c.unread.global > 0)
   const tabs: { id: PanelId; label: React.ReactNode }[] = [
     { id: 'friends', label: '👫 Friends' },
     { id: 'leaders', label: '🏅 Leaderboards' },
     { id: 'clan', label: <>🛡️ Crew{chests > 0 && <span className="tab-dot">{chests}</span>}</> },
+    { id: 'chat', label: <>💬 Chat{crewChat > 0 ? <span className="tab-dot">{crewChat > 9 ? '9+' : crewChat}</span> : globalChat && <i className="chat-new" />}</> },
     { id: 'meet', label: '🚗 Meet' },
   ]
   return <SheetTabs items={tabs as { id: Exclude<PanelId, null>; label: React.ReactNode }[]} value={current ?? 'friends'} onChange={(id) => openPanel(id)} />
@@ -45,7 +51,7 @@ export function ClanTag({ clan, small }: { clan: ClanBadge | null; small?: boole
   return <span className={small ? 'clan-tag small' : 'clan-tag'} style={{ background: clan.color }}>{clan.emblem} {clan.tag}</span>
 }
 
-function useVisit() {
+export function useVisit() {
   const visit = useGame((s) => s.visit)
   const toast = useGame((s) => s.toast)
   return async (id: string) => {
@@ -170,7 +176,7 @@ export function LeadersPanel() {
               <div key={l.ownerId} className={l.mine ? 'leader board-row mine' : 'leader board-row'}>
                 <span className={`rank r${i + 1}`}>{i + 1}</span>
                 <div className="leader-main">
-                  <b>{l.townName}{l.mine ? ' (you)' : ''}</b>
+                  <b><PlayerName id={l.demo ? null : l.ownerId === 'me' ? uid : l.ownerId} town={l.townName} />{l.mine ? ' (you)' : ''}</b>
                   <div className="card-stat">
                     <ClanTag clan={l.clan} small /> Lvl {l.level}{l.demo ? ' · neighbour' : ''}
                   </div>
@@ -224,6 +230,7 @@ export function ClanPanel() {
     fetchMyClan(uid).then((m) => {
       setMine(m)
       useGame.setState({ clanBadge: m ? { tag: m.clan.tag, emblem: m.clan.emblem, color: m.clan.color } : null })
+      void refreshChatRooms()
     }).catch(() => setMine(null))
   }, [uid])
   useEffect(() => { if (uid !== undefined) reload() }, [uid, reload])
@@ -279,6 +286,7 @@ function CrewHouseNudge() {
 
 function ClanHome({ data, uid, onChange }: { data: MyClan; uid: string; onChange: () => void }) {
   const { clan, members, role } = data
+  const crewChat = useChat((c) => c.unread.crew)
   const toast = useGame((s) => s.toast)
   const go = useVisit()
   const [confirmLeave, setConfirmLeave] = useState(false)
@@ -316,6 +324,7 @@ function ClanHome({ data, uid, onChange }: { data: MyClan; uid: string; onChange
           {clan.description && <p>{clan.description}</p>}
           <small>{clan.members}/{clan.memberCap} members{clan.minLevel > 1 ? ` · level ${clan.minLevel}+ to join` : ''}{rank ? ` · #${rank} by power` : ''}</small>
         </div>
+        <button className="buy small alt clan-chat" onClick={() => openChat('crew')}>💬 Chat{crewChat > 0 && <span className="tab-dot">{crewChat > 9 ? '9+' : crewChat}</span>}</button>
       </div>
       <CrewBattleCard />
       <CrewGoalCard members={members} uid={uid} />
@@ -340,12 +349,12 @@ function ClanHome({ data, uid, onChange }: { data: MyClan; uid: string; onChange
             <div key={m.ownerId} className={me ? 'leader member-row mine' : 'leader member-row'}>
               <span className="rank">{m.role === 'leader' ? '👑' : m.level}</span>
               <div className="leader-main">
-                <b>{m.townName}{me ? ' (you)' : ''}</b>
+                <b><PlayerName id={m.ownerId} town={m.townName} />{me ? ' (you)' : ''}</b>
                 <div className="card-stat">Lvl {m.level} · ⚡ {n(m.power)} · 🏁 {n(m.raceWins)} · 🏆 {n(m.trophies)}</div>
               </div>
               {!me ? <button className="buy small" onClick={() => go(m.ownerId)}>Visit</button> : <span />}
               {role === 'leader' && !me ? (
-                <button className="sell small" disabled={busy} onClick={() => act(() => kickMember(m.ownerId), `${m.townName} was removed`)}>Remove</button>
+                <button className="sell small" disabled={busy} onClick={() => act(() => kickMember(m.ownerId), `${playerName(m.ownerId, m.townName)} was removed`)}>Remove</button>
               ) : <span />}
             </div>
           )

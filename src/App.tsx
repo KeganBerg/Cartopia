@@ -5,9 +5,12 @@ import { World } from './scene/World'
 import { Hud } from './ui/Hud'
 import { FlyLayer } from './ui/Fly'
 import { ThumbRenderer } from './scene/BuildingPreview'
+import { StageCanvas } from './scene/Stage'
 import { BottomBar, ShopPanel, ShowroomPanel, GaragePanel, Toasts } from './ui/Menus'
 import { RacePanel, LiveRaceOverlay, InvitesPanel, PrizePopup, CampaignPrizePopup, TourPrizePopup, EventPrizePopup } from './ui/Race'
 import { joinLobby, useLive } from './lib/live'
+import { chatDemo, startChat } from './lib/chat'
+import { ChatPanel } from './ui/Chat'
 import { FriendsPanel, VisitBanner } from './ui/Friends'
 import { LeadersPanel, ClanPanel } from './ui/Social'
 import { MeetPanel } from './ui/Meet'
@@ -57,6 +60,9 @@ export default function App() {
     startCloudSync()
     startAmbience()
     joinLobby()
+    // ?chatdemo shows sample messages so the chat window can be checked signed out.
+    if (new URLSearchParams(location.search).has('chatdemo')) chatDemo()
+    else startChat()
     tick(Date.now())
     // Checked again when it fires: a cloud save may have loaded since, already claimed today.
     setTimeout(() => { const s = useGame.getState(); if (s.lastDaily !== today() && !s.panel) s.openPanel('daily') }, 800)
@@ -86,6 +92,7 @@ export default function App() {
       <VisitorBadges />
       <ThoughtBubble />
       <ThumbRenderer />
+      <StageCanvas />
       <Hud />
       <BottomBar />
       {panel === 'shop' && <ShopPanel />}
@@ -98,6 +105,7 @@ export default function App() {
       {panel === 'leaders' && <LeadersPanel />}
       {panel === 'clan' && <ClanPanel />}
       {panel === 'meet' && <MeetPanel />}
+      {panel === 'chat' && <ChatPanel />}
       {panel === 'need' && <NeedPanel />}
       {panel === 'upgrade' && <UpgradePanel />}
       {panel === 'rescue' && <RescuePanel />}

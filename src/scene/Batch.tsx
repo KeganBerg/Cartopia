@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, type ReactNode } from 'react'
-import { BufferAttribute, BufferGeometry, Color, Group, Matrix4, Mesh, Texture, type Material } from 'three'
+import { BufferAttribute, BufferGeometry, Color, Group, Matrix4, Mesh, Texture, Vector3, type Material } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { glowMats } from './dayNight'
 import { bake, bakeable, bakedMapMaterial, bakedMaterial, finishOf, textureKey, type Finish } from './bake'
@@ -15,6 +15,9 @@ import { bake, bakeable, bakedMapMaterial, bakedMaterial, finishOf, textureKey, 
 // bake.ts) go further: whatever their colour, they are baked into one mesh per
 // shadow setup and texture image, so dozens of colours, and every tiling of one
 // image, cost one draw.
+// With `cell` set (the town), baked meshes are also split into square cells that
+// many world units wide, so the camera skips the parts of a big town that are off
+// screen instead of pushing every triangle in town through the GPU each frame.
 
 // Materials that change over time (night glow) must be kept by identity.
 const live = new Set<Material>(Object.values(glowMats))
@@ -43,7 +46,17 @@ function prepare(g: BufferGeometry, m: Matrix4, names: string[]) {
   return out
 }
 
-export function Batch({ version, off, children }: { version: unknown; off?: boolean; children: ReactNode }) {
+// Which cell a part's centre falls in; parts bigger than a cell (ground planes) share one.
+const centre = new Vector3()
+function cellOf(g: BufferGeometry, at: Matrix4, size: number) {
+  if (!g.boundingSphere) g.computeBoundingSphere()
+  const s = g.boundingSphere!
+  if (s.radius * at.getMaxScaleOnAxis() > size) return 'wide'
+  centre.copy(s.center).applyMatrix4(at)
+  return `${Math.floor(centre.x / size)},${Math.floor(centre.z / size)}`
+}
+
+export function Batch({ version, off, cell, children }: { version: unknown; off?: boolean; cell?: number; children: ReactNode }) {
   const root = useRef<Group>(null)
   const merged = useRef<Group>(null)
 
@@ -71,10 +84,11 @@ export function Batch({ version, off, children }: { version: unknown; off?: bool
       const map = (mat as { map?: Texture | null }).map
       if (kind === 'plain' || (kind === 'map' && map && names.includes('uv'))) {
         const tex = kind === 'map' ? map! : null
-        const key = `${tex ? textureKey(tex) : ''}#${mesh.castShadow}${mesh.receiveShadow}${mesh.renderOrder}`
+        const at = new Matrix4().multiplyMatrices(inv, mesh.matrixWorld)
+        const key = `${tex ? textureKey(tex) : ''}#${mesh.castShadow}${mesh.receiveShadow}${mesh.renderOrder}${cell && !tex ? `#${cellOf(g, at, cell)}` : ''}`
         let set = bakes.get(key)
         if (!set) bakes.set(key, (set = { mat: tex ? bakedMapMaterial(tex) : baked, uvs: !!tex, cast: mesh.castShadow, receive: mesh.receiveShadow, order: mesh.renderOrder, parts: [] }))
-        set.parts.push([g, finishOf(mat as Parameters<typeof finishOf>[0]), new Matrix4().multiplyMatrices(inv, mesh.matrixWorld)])
+        set.parts.push([g, finishOf(mat as Parameters<typeof finishOf>[0]), at])
         hidden.push(mesh)
         return
       }
@@ -106,15 +120,21 @@ export function Batch({ version, off, children }: { version: unknown; off?: bool
       out.add(m)
       made.push(m)
     }
-    for (const mesh of hidden) mesh.visible = false
+    for (const mesh of hidden) {
+      mesh.visible = false
+      mesh.userData.batched = true
+    }
     return () => {
       for (const m of made) {
         out.remove(m)
         m.geometry.dispose()
       }
-      for (const mesh of hidden) mesh.visible = true
+      for (const mesh of hidden) {
+        mesh.visible = true
+        delete mesh.userData.batched
+      }
     }
-  }, [version, off])
+  }, [version, off, cell])
 
   return (
     <>
