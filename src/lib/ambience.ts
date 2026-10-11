@@ -113,6 +113,8 @@ export class Soundscape {
   private traffic: GainNode
   private trafficTone: BiquadFilterNode
   private wind: GainNode
+  private murmur: GainNode
+  private vowels: BiquadFilterNode[]
   private howl: GainNode
   private howlTone: BiquadFilterNode
   private rain: GainNode
@@ -148,6 +150,14 @@ export class Soundscape {
     this.traffic = this.bed(this.brown, this.trafficTone)
     this.windTone = this.filter('lowpass', 400)
     this.wind = this.bed(this.brown, this.windTone)
+    // People out and about: a soft hubbub of breath-like voices, too far off to
+    // make out words, made from noise through moving vowel-like bands.
+    this.murmur = ctx.createGain()
+    const voice = this.filter('lowpass', 1800, this.murmur)
+    this.vowels = [420, 1100, 650].map((f, i) => this.filter('bandpass', f, voice, i === 1 ? 5 : 7))
+    const split = ctx.createGain()
+    this.vowels.forEach((v) => split.connect(v))
+    this.bed(this.white, split, this.murmur)
     // Strong wind whistles round corners: a narrow band that slides with the gusts.
     this.howlTone = this.filter('bandpass', 600, undefined, 10)
     this.howl = this.bed(this.white, this.howlTone)
@@ -288,6 +298,9 @@ export class Soundscape {
     if (chance(sky.wet * 2.5, dt)) this.drip(t + rand(0, 0.2))
 
     fade(this.traffic, m.traffic * 0.09)
+    // The hubbub swells and dips as voices come and go.
+    this.vowels.forEach((v, i) => v.frequency.setTargetAtTime([rand(300, 750), rand(900, 1900), rand(500, 900)][i], t, 0.08))
+    this.murmur.gain.setTargetAtTime(m.chatter * rand(0.4, 1) * 0.045, t, 0.12)
     fade(this.chorus, m.crickets * 0.07 + m.peepers * 0.02)
     // Wind comes in gusts, and leaves rustle with it.
     if (t >= this.gustAt) {
@@ -341,9 +354,7 @@ export class Soundscape {
     const at = t + rand(0.05, 0.3)
     if (chance(0.11 * m.traffic, dt)) this.carPass(at)
     if (chance(0.006 * m.traffic * (1 - night), dt)) this.horn(at)
-    if (chance(0.2 * m.chatter, dt)) this.chatter(at)
     this.birds(t, m.birds, season)
-    if (chance(0.05 * m.chatter, dt)) this.laugh(at)
     if (chance(0.025 * m.dogs, dt)) this.dog(at)
     if (chance(0.03 * m.traffic * (1 - night), dt)) this.door(at)
     if (season !== 'winter' && chance(0.008 * m.chatter, dt)) this.bell(at)
@@ -433,35 +444,7 @@ export class Soundscape {
   private horn(t: number) {
     const p = rand(-0.8, 0.8)
     const dur = Math.random() < 0.5 ? 0.25 : 0.5
-    for (const fr of [370, 466]) this.blip(t, dur, 0.015, p, (o) => { o.type = 'square'; o.frequency.value = fr }, (d) => this.filter('lowpass', 900, d))
-  }
-
-  // Far-off voices: buzzy syllables through vowel-like filters, too muffled to make out.
-  private chatter(t: number) {
-    const base = [115, 135, 205, 230][Math.floor(Math.random() * 4)]
-    const p = rand(-0.8, 0.8)
-    const n = Math.floor(rand(3, 9))
-    let s = t
-    for (let i = 0; i < n; i++) {
-      const dur = rand(0.09, 0.22)
-      const f0 = base * rand(0.9, 1.2)
-      const f1 = [350, 500, 700][Math.floor(Math.random() * 3)]
-      const f2 = [900, 1300, 1900][Math.floor(Math.random() * 3)]
-      this.blip(s, dur, 0.22, p, (o) => {
-        o.type = 'sawtooth'
-        o.frequency.setValueAtTime(f0, s)
-        o.frequency.linearRampToValueAtTime(f0 * rand(0.85, 1.1), s + dur)
-      }, (d) => {
-        const lp = this.filter('lowpass', 1600, d)
-        const a = this.filter('bandpass', f1, lp, 4)
-        const b = this.filter('bandpass', f2, lp, 6)
-        const split = this.ctx.createGain()
-        split.connect(a)
-        split.connect(b)
-        return split
-      })
-      s += dur + (Math.random() < 0.2 ? rand(0.15, 0.35) : rand(0.02, 0.07))
-    }
+    for (const fr of [370, 466]) this.blip(t, dur, 0.015, p, (o) => { o.type = 'sawtooth'; o.frequency.value = fr }, (d) => this.filter('lowpass', 700, d))
   }
 
   // A few birds sing from their own spots around town, each repeating its
@@ -481,23 +464,6 @@ export class Soundscape {
       const len = sing(this.ctx, this.spot(b.pan, b.dist), b.kind, at, peak, this.white)
       b.next = at + len + rand(2.5, 9)
     })
-  }
-
-  // Short bursts of far-off laughter.
-  private laugh(t: number) {
-    const p = rand(-0.8, 0.8)
-    const f = rand(200, 300)
-    let s = t
-    for (let i = Math.floor(rand(4, 8)), k = 0; i > 0; i--, k++) {
-      const at = s
-      const d = rand(0.07, 0.11)
-      this.blip(at, d, 0.18 * (1 - k * 0.08), p, (o) => {
-        o.type = 'sawtooth'
-        o.frequency.setValueAtTime(f * (1 - k * 0.03), at)
-        o.frequency.linearRampToValueAtTime(f * (0.9 - k * 0.03), at + d)
-      }, (dest) => this.filter('bandpass', rand(700, 1000), this.filter('lowpass', 1500, dest), 3))
-      s += d + rand(0.06, 0.1)
-    }
   }
 
   // A dog a few yards away: one to three barks.

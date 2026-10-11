@@ -61,6 +61,12 @@ const BODY: Record<Body, EngineProfile> = {
   luxury: p({ ppr: 6, idle: 650, redline: 6200, odd: 0.05, roll: 1.4, sub: 0.5, grit: 0.15, noise: 0.15, bright: 0.9, reso: 150, turbo: 0.4, crackle: 0.1, vol: 0.9 }),
   formula: p({ ppr: 5, idle: 3500, redline: 15000, odd: 0.15, roll: 0.95, sub: 0.2, grit: 0.45, noise: 0.35, bright: 1.7, reso: 420, crackle: 0.6, vol: 1.15 }),
   offroad: p({ ppr: 2, idle: 950, redline: 5800, odd: 0.4, roll: 1.0, lump: 0.5, lumpRatio: 0.5, sub: 0.2, grit: 0.55, noise: 0.45, clatter: 0.3, bright: 1.2, reso: 210, crackle: 0.45, vol: 1.05 }),
+  // Big six-cylinder diesel school bus: slow, clattery, air-brake hiss on the turbo.
+  bus: p({ ppr: 3, idle: 600, redline: 3200, odd: 0.35, roll: 1.45, sub: 0.55, grit: 0.3, noise: 0.4, clatter: 0.7, bright: 0.65, reso: 105, turbo: 0.45, vol: 1.1 }),
+  // Turbo-diesel V8 off-roader.
+  tusker: p({ ppr: 4, idle: 700, redline: 4600, odd: 0.25, roll: 1.4, lump: 0.3, lumpRatio: 0.25, sub: 0.6, grit: 0.45, noise: 0.4, clatter: 0.45, bright: 0.8, reso: 115, turbo: 0.6, vol: 1.15 }),
+  // Wheezy old van four.
+  dogvan: p({ ppr: 2, idle: 750, redline: 4400, odd: 0.45, roll: 1.2, lump: 0.4, lumpRatio: 0.5, sub: 0.15, grit: 0.3, noise: 0.35, clatter: 0.4, bright: 0.8, reso: 165, vol: 0.85 }),
 }
 
 const MODEL: Record<string, Partial<EngineProfile>> = {

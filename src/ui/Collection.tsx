@@ -70,6 +70,7 @@ export function useFindCar(showShowroom: (model: string) => void) {
   const openShop = useGame((s) => s.openShop)
   const rusty = useGame((s) => hasRusty(s))
   return (model: string) => {
+    if (carDef(model).season) return openPanel('season')
     if (!carDef(model).rescueOnly) return showShowroom(model)
     if (rusty) openPanel('rescue')
     else openShop('rescue')
