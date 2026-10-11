@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { JUMP_START_DELAY, MAX_RACE_PI, fireBoost, freshRacer, launchRacer, raceFloor, shiftRacer, stepRacer } from './race'
+import { JUMP_START_DELAY, MAX_RACE_PI, dynoPull, fireBoost, freshRacer, launchRacer, raceFloor, shiftRacer, stepRacer } from './race'
 
 const dir = new URL('../../supabase/migrations/', import.meta.url)
 // The newest migration that sets public.race_floor().
@@ -105,5 +105,17 @@ describe('launch and boost', () => {
       stepRacer(r, 68, dt, t)
     }
     expect(clean).toBeLessThan(r.finished!)
+  })
+})
+
+describe('garage dyno', () => {
+  it('gets quicker with every point of PI and never beats the referee', () => {
+    let last = Infinity
+    for (let pi = 10; pi <= 200; pi += 5) {
+      const t = dynoPull(pi)
+      expect(t).toBeLessThan(last)
+      expect(t).toBeGreaterThan(raceFloor(pi))
+      last = t
+    }
   })
 })

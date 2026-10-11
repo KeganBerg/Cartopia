@@ -1370,3 +1370,32 @@ button.book-car { font: inherit; color: inherit; }
 .taunt-sent { color: #2e7d32; font-weight: 800; }
 .taunt-quote { font-weight: 800; color: #5e35b1; }
 .visit-banner .row { flex-wrap: wrap; justify-content: center; }
+
+/* Garage dyno: drawn over the car preview after an upgrade. Tap anywhere to close. */
+.dyno { position: absolute; inset: 0; display: block; width: 100%; padding: 0; border: 0; background: linear-gradient(180deg, rgba(38,50,56,.0) 55%, rgba(38,50,56,.28)); cursor: pointer; font: inherit; color: #263238; text-align: left; animation: dyno-in .25s ease-out; }
+@keyframes dyno-in { from { opacity: 0; } }
+.dyno-tag { position: absolute; top: 6px; left: 6px; font: 12px var(--display); letter-spacing: 2px; color: #fff; background: #263238; border-radius: 6px; padding: 2px 7px; box-shadow: 0 2px 0 rgba(0,0,0,.25); }
+.dyno-skip { position: absolute; bottom: 6px; right: 6px; font-size: 11px; font-weight: 800; color: #fff; background: rgba(38,50,56,.6); border-radius: 999px; padding: 2px 9px; }
+.dyno.done .dyno-skip { opacity: .7; }
+.dyno-gauge { position: absolute; left: 6px; bottom: 6px; width: 72px; height: 72px; filter: drop-shadow(0 2px 2px rgba(0,0,0,.3)); }
+.dg-face { fill: #263238; stroke: #eceff1; stroke-width: 3; }
+.dg-arc { fill: none; stroke: #78909c; stroke-width: 4; }
+.dg-red { fill: none; stroke: #ef5350; stroke-width: 5; }
+.dg-tick { stroke: #eceff1; stroke-width: 2.5; stroke-linecap: round; }
+.dg-gear { fill: #ffca28; font: 16px var(--display); text-anchor: middle; }
+.dg-needle { fill: #ff7043; }
+.dg-hub { fill: #eceff1; }
+.dyno-read { position: absolute; top: 6px; right: 6px; display: grid; gap: 2px; min-width: 128px; padding: 5px 8px; background: rgba(255,255,255,.92); border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,.18); }
+.dr-row { display: grid; grid-template-columns: 44px auto 1fr; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
+.dr-row small { font-size: 10px; font-weight: 800; text-transform: uppercase; color: #78909c; }
+.dr-row b { font: 15px var(--display); }
+.dr-row i { font-style: normal; font-size: 11px; font-weight: 800; color: #607d8b; text-align: right; }
+.dr-row.old b { color: #90a4ae; }
+.dr-row.new b { color: #1b5e20; }
+.dr-gain { justify-self: end; font-size: 12px; font-weight: 900; color: #fff; background: #43a047; border-radius: 999px; padding: 1px 8px; opacity: 0; transform: scale(.6); transition: opacity .2s, transform .3s cubic-bezier(.3,1.6,.5,1); }
+.dr-gain.show { opacity: 1; transform: none; }
+@media (max-width: 560px) {
+  .dyno-gauge { width: 58px; height: 58px; }
+  .dyno-read { min-width: 116px; padding: 4px 7px; }
+  .dr-row b { font-size: 13px; }
+}

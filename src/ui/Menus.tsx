@@ -1,8 +1,9 @@
 import { mergeCandidates } from '../game/merge'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGame, hasRusty, buildPrice } from '../game/store'
 import { activeEvent, garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, carDef, performance, upgradeCost, buildingDef, upgradable, loves, readySets, type BuildingDef } from '../game/data'
-import { CarInspect, CarPreview } from '../scene/CarPreview'
+import { CarInspect, CarPreview, type DynoFeed } from '../scene/CarPreview'
+import { DynoOverlay, type DynoRun } from './Dyno'
 import { CollectAllButton } from './CollectAll'
 import { rotateCurrent } from '../game/placement'
 import { BuildingThumb, CarThumb } from '../scene/BuildingPreview'
@@ -361,6 +362,21 @@ export function GaragePanel() {
   const [painting, setPainting] = useState<{ car: string; job: PaintJob } | null>(null)
   const tryJob = painting && painting.car === car?.uid && tab === 'paint' ? painting.job : null
   const look = car && def && { body: def.body, model: def.id, ...(tryJob ?? jobOf(car)), mods: withMod(car.mods, tryMod) }
+  // After an upgrade or a part goes on, the car does a dyno pull showing the old and new time.
+  const pi = car && def ? performance(def, car.upgrades, car.mods) : 0
+  const [dyno, setDyno] = useState<DynoRun | null>(null)
+  const feed = useMemo<DynoFeed>(() => ({ rpm: 0, speed: 0 }), [])
+  const lastPi = useRef<{ car: string; pi: number } | null>(null)
+  // Only a gain right after a tap here counts, not a save arriving from another device.
+  const tapped = useRef(0)
+  useEffect(() => {
+    if (!car) return
+    const was = lastPi.current
+    lastPi.current = { car: car.uid, pi }
+    if (!was || was.car !== car.uid) return setDyno(null)
+    if (pi <= was.pi || Date.now() - tapped.current > 1500) return
+    setDyno((d) => ({ id: Date.now(), car: car.uid, model: car.model, mods: car.mods, before: d && d.car === car.uid ? d.before : was.pi, after: pi }))
+  }, [car?.uid, pi])
   return (
     <Panel title={`My Garage · ${cars.length} cars · ⚡${garagePower(cars)}`} wide>
       <div className="garage">
@@ -377,14 +393,16 @@ export function GaragePanel() {
           })}
         </div>
         {car && def && (
-          <div className="garage-detail">
+          <div className="garage-detail" onClickCapture={() => { tapped.current = Date.now() }}>
             {inspect ? (
               <>
                 <div className="car-preview" />
                 <CarInspect title={def.name} {...look!} onClose={() => setInspect(false)} />
               </>
             ) : (
-              <CarPreview {...look!} onExpand={() => setInspect(true)} />
+              <CarPreview {...look!} onExpand={() => setInspect(true)} dyno={dyno ? feed : null}>
+                {dyno && <DynoOverlay key={dyno.id} run={dyno} feed={feed} onDone={() => setDyno(null)} />}
+              </CarPreview>
             )}
             <h3>{def.name}{car.plate && <span className="mini-plate">{car.plate}</span>}</h3>
             <div className="pi">Performance Index <b>{performance(def, car.upgrades, car.mods)}</b> <ShowcaseToggle car={car.uid} /></div>
