@@ -294,21 +294,21 @@ export function RacePanel() {
   return (
     <Panel title="Drag Race" wide>
       <SheetTabs
-        items={[{ id: 'quick', label: '🏁 Quick race' }, { id: 'campaign', label: '🗺️ Campaign' }, { id: 'tour', label: '🌍 Pro Tour' }, { id: 'gp', label: '🏆 Grand Prix' }, { id: 'trial', label: '⏱️ Time trial' }, { id: 'arcade', label: '🕹️ Arcade' }, { id: 'top', label: '🏅 Top racers' }] as const}
+        items={[{ id: 'quick', label: '🏁 Quick race' }, { id: 'campaign', label: '🗺️ Campaign' }, { id: 'tour', label: '🌍 Pro Tour' }, { id: 'gp', label: '🏆 Grand Prix' }, { id: 'trial', label: '⏱️ Time trial' }, { id: 'top', label: '🏅 Top racers' }] as const}
         value={tab}
-        onChange={(t) => (t === 'top' ? useGame.getState().openPanel('leaders') : t === 'arcade' ? useGame.getState().openPanel('arcade') : setTab(t))}
+        onChange={(t) => (t === 'top' ? useGame.getState().openPanel('leaders') : setTab(t))}
       />
       {car && (pickCar ? (
         <div className="race-cars">
           {cars.map((c) => (
             <button key={c.uid} className={c.uid === car.uid ? 'chip sel' : 'chip'} onClick={() => { setCarId(c.uid); setPickCar(false) }}>
-              <CarThumb size="xs" color={c.color} finish={c.finish} body={carDef(c.model).body} model={c.model} stripe={c.stripe} mods={c.mods} /> {carDef(c.model).name} · PI {pi(c)}{carDef(c.model).skill ? ` ${SKILLS[carDef(c.model).skill!].icon}` : ''}
+              <CarThumb size="xs" color={c.color} finish={c.finish} skin={c.skin} body={carDef(c.model).body} model={c.model} stripe={c.stripe} mods={c.mods} /> {carDef(c.model).name} · PI {pi(c)}{carDef(c.model).skill ? ` ${SKILLS[carDef(c.model).skill!].icon}` : ''}
             </button>
           ))}
         </div>
       ) : (
         <button className="race-car-pick" onClick={() => setPickCar(true)} disabled={cars.length < 2}>
-          <CarThumb size="sm" color={car.color} finish={car.finish} body={carDef(car.model).body} model={car.model} stripe={car.stripe} mods={car.mods} />
+          <CarThumb size="sm" color={car.color} finish={car.finish} skin={car.skin} body={carDef(car.model).body} model={car.model} stripe={car.stripe} mods={car.mods} />
           <span>
             <small>Racing with</small>
             <b>{carDef(car.model).name} · PI {pi(car)}</b>
@@ -1071,7 +1071,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   return (
     <div className="race-full">
       <Canvas className="rf-canvas" camera={{ position: [0.4, 2.2, -4], fov: 55, near: 0.3, far: 150 }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
-        <RaceScene track={TRACK} me={me} them={them} mine={{ body: def.body, model: car.model, color: car.color, finish: car.finish, mods: car.mods }} theirs={{ body: rival.body, color: rival.color, mods: rival.mods }} venue={venue} weather={weather} night={night} />
+        <RaceScene track={TRACK} me={me} them={them} mine={{ body: def.body, model: car.model, color: car.color, finish: car.finish, skin: car.skin, mods: car.mods }} theirs={{ body: rival.body, color: rival.color, mods: rival.mods }} venue={venue} weather={weather} night={night} />
       </Canvas>
       <div className="rf-top">
         <h2>{title ?? `Drag Race vs ${rival.town}`}</h2>

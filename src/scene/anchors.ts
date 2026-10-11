@@ -21,11 +21,22 @@ const quiet = (el: HTMLElement) => {
   return !!c && (c.contains('badge-working') || c.contains('badge-idle'))
 }
 
+// The top HUD's boxes, re-measured every few frames. A bubble may not sit behind them.
+const HUD = '.hud-left, .hud-center > *, .hud-right > *, .hud-strip, .hud-town, .hud-mobile > .goal-tracker'
+let hud: DOMRect[] = []
+let hudAge = 0
+const underHud = (x: number, y: number, w: number, h: number) =>
+  hud.some((r) => x + w / 2 > r.left && x - w / 2 < r.right && y > r.top && y - h < r.bottom)
+
 export function AnchorProjector() {
   const camera = useThree((s) => s.camera)
   const size = useThree((s) => s.size)
   useFrame(() => {
     placed.length = 0
+    if (hudAge-- <= 0) {
+      hudAge = 20
+      hud = [...document.querySelectorAll(HUD)].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0 && r.height > 0)
+    }
     // Same default zoom as ResponsiveZoom in World.tsx.
     const far = camera.zoom < Math.min(38, Math.max(18, Math.sqrt(size.width * size.height) / 24)) * FAR
     for (const [id, el] of anchorEls) {
@@ -54,6 +65,7 @@ export function AnchorProjector() {
       const hide = far && !clamp && quiet(el)
       el.classList.toggle('far', hide)
       if (hide) {
+        el.classList.remove('under')
         el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`
         continue
       }
@@ -66,7 +78,7 @@ export function AnchorProjector() {
     placed.sort((a, b) => b.y - a.y)
     const top = Math.min(200, size.height / 3)
     const free = (a: Placed, x: number, y: number, upto: number) => {
-      if (x - a.w / 2 < 2 || x + a.w / 2 > size.width - 2 || y - a.h < top) return false
+      if (x - a.w / 2 < 2 || x + a.w / 2 > size.width - 2 || y - a.h < top || underHud(x, y, a.w, a.h)) return false
       for (let j = 0; j < upto; j++) {
         const b = placed[j]
         if (Math.abs(x - b.x) < (a.w + b.w) / 2 && y > b.y - b.h && y - a.h < b.y) return false
@@ -96,6 +108,8 @@ export function AnchorProjector() {
         }
         if (best) [a.x, a.y] = best
       }
+      // Still behind the HUD (a building near the top edge): fade it rather than show half a pill.
+      a.el.classList.toggle('under', !a.fixed && underHud(a.x, a.y, a.w, a.h))
       a.el.style.transform = `translate(${a.x.toFixed(1)}px, ${a.y.toFixed(1)}px) translate(-50%, -100%)`
     }
   })

@@ -887,6 +887,57 @@ export function paintJobCost(car: { color: string; finish?: Finish; stripe?: str
   return { coins, bucks }
 }
 
+// ---- Skins ----
+// Animated patterns that sit at depth inside a car's paint and shift as it turns
+// (drawn by src/scene/skins.ts, picked by `n`). A skin is unlocked once for the whole
+// garage and can go on any car, over any colour and finish, for free.
+// How each is unlocked: reaching a level, claiming a collection set, a season track
+// tier, gems, or only from crates. Saves keep bought and won skins in `skins`;
+// level and set unlocks are worked out from the save, so they can't be lost.
+export type SkinTier = 'rare' | 'epic' | 'legendary'
+export type SkinUnlock = { level: number } | { set: string } | { season: number } | { bucks: number } | { crate: true }
+export type SkinDef = { id: string; n: number; name: string; tier: SkinTier; blurb: string; unlock: SkinUnlock; swatch: string }
+export const SKIN_TIERS: Record<SkinTier, { name: string; color: string }> = {
+  rare: { name: 'Rare', color: '#4fc3f7' },
+  epic: { name: 'Epic', color: '#c77dff' },
+  legendary: { name: 'Legendary', color: '#ffc94d' },
+}
+export const SKINS: SkinDef[] = [
+  { id: 'hexcore', n: 1, name: 'Hexcore', tier: 'rare', blurb: 'Glowing honeycomb with a pulse', unlock: { level: 3 },
+    swatch: 'radial-gradient(circle at 50% 50%, #19e3ff 0 8%, transparent 9%), conic-gradient(from 30deg, #0b2a36, #19e3ff 10%, #0b2a36 20%, #0b2a36 50%, #19e3ff 60%, #0b2a36 70%)' },
+  { id: 'riptide', n: 7, name: 'Riptide', tier: 'rare', blurb: 'Waves rolling at three depths', unlock: { set: 'daily' },
+    swatch: 'repeating-linear-gradient(170deg, #062a4a 0 5px, #6fe7ff 6px 7px, #0a3d6b 8px 12px)' },
+  { id: 'overclock', n: 2, name: 'Overclock', tier: 'rare', blurb: 'Circuit traces with racing data', unlock: { level: 10 },
+    swatch: 'linear-gradient(90deg, transparent 45%, #39ff88 45% 55%, transparent 55%), linear-gradient(0deg, transparent 70%, #39ff88 70% 78%, transparent 78%), #0c2416' },
+  { id: 'static', n: 8, name: 'Static', tier: 'rare', blurb: 'Pixels blinking under the coat', unlock: { bucks: 15 },
+    swatch: 'conic-gradient(#ff29b3 0 25%, #101018 0 50%, #19f2ff 0 75%, #ffe633 0) 0 0 / 10px 10px' },
+  { id: 'deepspace', n: 3, name: 'Deep Space', tier: 'epic', blurb: 'Stars and nebula at every depth', unlock: { season: 10 },
+    swatch: 'radial-gradient(circle at 30% 30%, #fff 0 4%, transparent 5%), radial-gradient(circle at 70% 60%, #cde 0 3%, transparent 4%), radial-gradient(circle at 60% 30%, #7a2aa8, transparent 60%), #05061a' },
+  { id: 'faultline', n: 5, name: 'Fault Line', tier: 'epic', blurb: 'Lava glowing through cracked plates', unlock: { set: 'muscle' },
+    swatch: 'linear-gradient(120deg, #241612 40%, #ff6a00 42%, #ffd54f 44%, #241612 46%), linear-gradient(30deg, #2e1d17 60%, #ff3d00 61%, #2e1d17 63%)' },
+  { id: 'aurora', n: 6, name: 'Aurora', tier: 'epic', blurb: 'Northern lights swaying deep inside', unlock: { bucks: 30 },
+    swatch: 'linear-gradient(170deg, transparent 20%, #3dff9e 40%, transparent 55%, #b24dff 75%, transparent 90%), #051226' },
+  { id: 'prismatic', n: 4, name: 'Prismatic', tier: 'legendary', blurb: 'Holo foil that shifts as you turn', unlock: { season: 20 },
+    swatch: 'linear-gradient(135deg, #ff5f6d, #ffc371, #f9f871, #67f3a4, #4facfe, #b06ab3, #ff5f6d)' },
+  { id: 'horizon', n: 9, name: 'Event Horizon', tier: 'legendary', blurb: 'A turning spiral of fire and violet', unlock: { bucks: 60 },
+    swatch: 'radial-gradient(circle, #000 0 18%, #ff7a1a 24%, #9c3dff 38%, #12051f 60%)' },
+]
+export const skinDef = (id?: string | null) => (id ? SKINS.find((s) => s.id === id) : undefined)
+// The shader number for a car's skin, 0 for none (or one this version doesn't know).
+export const skinNumber = (id?: string | null) => skinDef(id)?.n ?? 0
+// Every skin the player can put on a car right now.
+export function ownedSkins(s: { level: number; claimedSets?: string[]; skins?: string[] }) {
+  return SKINS.filter((d) => {
+    const u = d.unlock
+    if (s.skins?.includes(d.id)) return true
+    if ('level' in u) return s.level >= u.level
+    if ('set' in u) return (s.claimedSets ?? []).includes(u.set)
+    return false
+  }).map((d) => d.id)
+}
+// Season track tiers (1-based) that give a skin on top of their usual prize.
+export const seasonSkin = (tier: number) => SKINS.find((d) => 'season' in d.unlock && d.unlock.season === tier)
+
 // Garage power: the combined PI of a player's five best cars.
 export const POWER_CARS = 5
 export const garagePower = (cars: { model: string; upgrades: Record<UpgradeSlot, number>; mods?: string[] }[]) =>

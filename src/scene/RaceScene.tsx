@@ -36,7 +36,7 @@ type Props = {
   track: number
   me: RefObject<RacerView>
   them: RefObject<RacerView>
-  mine: { body: Body; model?: string; color: string; finish?: Finish; mods?: string[] }
+  mine: { body: Body; model?: string; color: string; finish?: Finish; skin?: string; mods?: string[] }
   theirs: { body: Body; model?: string; color: string; mods?: string[] }
   venue: Venue
   weatherSeed?: string // a live race's id, so both racers get the same weather
@@ -577,7 +577,7 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
             <planeGeometry args={[0.9, 1.5]} />
             <meshBasicMaterial map={glowTex()} color="#000000" transparent opacity={0.35} depthWrite={false} {...decal(3)} />
           </mesh>
-          {i === 0 ? <CarModel body={mine.body} model={mine.model} color={mine.color} finish={mine.finish} mods={mine.mods} flames beams={beams} /> : <CarModel body={theirs.body} model={theirs.model} color={theirs.color} mods={theirs.mods} flames beams={beams} />}
+          {i === 0 ? <CarModel body={mine.body} model={mine.model} color={mine.color} finish={mine.finish} skin={mine.skin} mods={mine.mods} flames beams={beams} /> : <CarModel body={theirs.body} model={theirs.model} color={theirs.color} mods={theirs.mods} flames beams={beams} />}
         </group>
       ))}
     </>

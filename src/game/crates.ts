@@ -98,12 +98,13 @@ export function modChoices(c: CrateDef, level: number, cars: CarLike[]): { car: 
   return out
 }
 
+const roundCoins = (n: number) => Math.max(10, Math.round(n / 10) * 10)
+
 // What a duplicate car turns into: 40% of its value, kept between half and 1.5x the crate's worth.
 export const dupeCoins = (c: CrateDef, level: number, car: CarDef) => {
   const v = crateValue(c, level)
   return roundCoins(Math.min(v * 1.5, Math.max(v * 0.5, carValue(car, level) * 0.4)))
 }
-const roundCoins = (n: number) => Math.max(10, Math.round(n / 10) * 10)
 
 export type CrateDrop =
   | { kind: 'coins'; coins: number; jackpot: boolean }

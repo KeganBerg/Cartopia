@@ -111,6 +111,21 @@ function CrewBadge({ b }: { b: PlacedBuilding }) {
   )
 }
 
+// The arcade games live in the Pixel Palace: a joystick over each one you own opens them.
+// A merged block gets one, over its middle, like its job badge.
+function ArcadeBadge({ b, g }: { b: PlacedBuilding; g?: MergeGroup }) {
+  const open = useGame((s) => s.openPanel)
+  const k = g ? lift(g) : 1
+  const [cx, cz] = g ? groupCenter(g) : centerOf(b.def, b.x, b.z, b.rot)
+  const id = `arc:${b.uid}`
+  anchors.set(id, new Vector3(cx, (3.3 + levelLift(buildingLevel(b))) * k, cz))
+  return (
+    <div className="anchor" ref={anchorRef(id)}>
+      <button className="badge badge-arcade" onClick={() => open('arcade')} title="Arcade games" aria-label="Arcade games">🕹️</button>
+    </div>
+  )
+}
+
 // Rusty's shows what the restore bay is up to.
 function RescueBadge({ b, now }: { b: PlacedBuilding; now: number }) {
   const tap = useGame((s) => s.tapBuilding)
@@ -181,6 +196,9 @@ export function Badges() {
         const g = merges.groups.get(b.uid)
         return <JobBadge key={b.uid} b={b} now={now} g={g} members={g ? buildings.filter((o) => merges.owner.get(o.uid) === b.uid) : undefined} />
       })}
+      {buildings.filter((b) => b.def === 'arcade' && (!merges.owner.has(b.uid) || merges.groups.has(b.uid))).map((b) => (
+        <ArcadeBadge key={`arc:${b.uid}`} b={b} g={merges.groups.get(b.uid)} />
+      ))}
       {buildings.filter((b) => b.def === 'rescue').map((b) => (
         <RescueBadge key={b.uid} b={b} now={now} />
       ))}
