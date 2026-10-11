@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildingDef, carDef, knownBuilding, BUILDINGS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost } from './data'
+import { buildingDef, carDef, knownBuilding, BUILDINGS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost, jobLevel } from './data'
 
 describe('unknown ids from newer builds', () => {
   it('gives an unknown building a harmless stand-in instead of crashing', () => {
@@ -57,5 +57,13 @@ describe('building upgrades', () => {
     expect(upgradable(buildingDef('tree'))).toBe(false)
     expect(upgradable(buildingDef('rock'))).toBe(false)
     expect(upgradable(buildingDef('from-the-future'))).toBe(false)
+  })
+})
+
+describe('jobs locked to the level they started at', () => {
+  it('pays the starting level after a mid-job upgrade', () => {
+    expect(jobLevel({ level: 3 })).toBe(3)
+    expect(jobLevel({ level: 4, jobLevel: 3 })).toBe(3)
+    expect(jobLevel({ level: 2, jobLevel: 9 })).toBe(2)
   })
 })

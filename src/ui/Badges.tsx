@@ -1,7 +1,7 @@
 import { Vector3 } from 'three'
 import { useState } from 'react'
 import { useGame, buyablePlots, type PlacedBuilding } from '../game/store'
-import { buildingDef, buildingLevel, carDef, levelLift, plotPrice, START_LAND, upgradeJobSeconds } from '../game/data'
+import { buildingDef, buildingLevel, jobLevel, carDef, levelLift, plotPrice, START_LAND, upgradeJobSeconds } from '../game/data'
 import { anchors, anchorRef } from '../scene/anchors'
 import { centerOf, plotCenter } from '../scene/World'
 import { useNow } from '../scene/useNow'
@@ -21,7 +21,7 @@ function JobBadge({ b, now }: { b: PlacedBuilding; now: number }) {
   const ready = b.jobEndsAt !== null && now >= b.jobEndsAt
   const working = b.jobEndsAt !== null && !ready
   const left = working ? Math.ceil((b.jobEndsAt! - now) / 1000) : 0
-  const pct = working ? Math.max(0, 1 - left / upgradeJobSeconds(d, lvl)) : 0
+  const pct = working ? Math.max(0, 1 - left / upgradeJobSeconds(d, jobLevel(b))) : 0
   return (
     <div className="anchor" ref={anchorRef(b.uid)}>
       <button className={`badge ${ready ? 'badge-ready' : working ? 'badge-working' : 'badge-idle'}${lit ? ' badge-pulse' : ''}`} onClick={() => tap(b.uid)} title={d.name}>

@@ -2,14 +2,15 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
   PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS,
-  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, upgradePayout, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, type Rarity, GOALS, DAILY_BONUS, PAINTS, PAINT_COST, STRIPE_COST, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey,
+  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePayout, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, type Rarity, GOALS, DAILY_BONUS, PAINTS, PAINT_COST, STRIPE_COST, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey,
 } from './data'
 import { sfx } from '../lib/sound'
 import { requestTrip } from './trips'
 
 // rot: quarter turns the player chose (0 faces south). Unset means face the nearest road.
 // level: upgrade level 1-10 (see MAX_BUILDING_LEVEL); unset means 1.
-export type PlacedBuilding = { uid: string; def: string; x: number; z: number; jobEndsAt: number | null; rot?: number; level?: number }
+// jobLevel: the level the running job started at, so an upgrade mid-job only pays from the next job.
+export type PlacedBuilding = { uid: string; def: string; x: number; z: number; jobEndsAt: number | null; rot?: number; level?: number; jobLevel?: number }
 export type OwnedCar = { uid: string; model: string; color: string; upgrades: Record<UpgradeSlot, number>; flat?: boolean; lowFuel?: boolean; stripe?: string | null; plate?: string }
 // A rusty find waiting in Rusty's storage, and the one car in the restore bay.
 export type JunkCar = { uid: string; model: string; rarity: Rarity }
@@ -458,6 +459,7 @@ export const useGame = create<GameState>()(
         if (!d.jobSeconds) return upgradable(d) ? s.openUpgrade(buid) : undefined
         const now = Date.now()
         const lvl = buildingLevel(b)
+        const jobLvl = jobLevel(b)
         const secs = upgradeJobSeconds(d, lvl)
         if (b.jobEndsAt !== null && now < b.jobEndsAt) return s.openUpgrade(buid)
         if (b.jobEndsAt === null) {
@@ -470,13 +472,13 @@ export const useGame = create<GameState>()(
             fuel: s.fuel - d.fuelCost!,
             // Restart the regen clock if we were sitting at the cap.
             fuelUpdatedAt: s.fuel >= cap ? now : s.fuelUpdatedAt,
-            buildings: s.buildings.map((o) => (o.uid === buid ? { ...o, jobEndsAt: now + secs * 1000 } : o)),
+            buildings: s.buildings.map((o) => (o.uid === buid ? { ...o, jobEndsAt: now + secs * 1000, jobLevel: lvl } : o)),
             updatedAt: now,
           })
         } else {
-          const pay = upgradePayout(d, lvl)
-          const parts = upgradePartsPayout(d, lvl)
-          const xp = upgradeXp(d, lvl)
+          const pay = upgradePayout(d, jobLvl)
+          const parts = upgradePartsPayout(d, jobLvl)
+          const xp = upgradeXp(d, jobLvl)
           sfx.coin()
           s.toast(`+${pay} coins${parts ? `, +${parts} parts` : ''}, +${xp} XP`)
           // Sometimes a car out on the job comes back with a flat.
@@ -494,7 +496,7 @@ export const useGame = create<GameState>()(
             parts: s.parts + parts,
             cars,
             stats: { ...bump(s, 'jobs'), coinsEarned: (s.stats.coinsEarned ?? 0) + pay },
-            buildings: s.buildings.map((o) => (o.uid === buid ? { ...o, jobEndsAt: null } : o)),
+            buildings: s.buildings.map((o) => (o.uid === buid ? { ...o, jobEndsAt: null, jobLevel: undefined } : o)),
             updatedAt: now,
           }))
         }
@@ -530,6 +532,7 @@ export const useGame = create<GameState>()(
           coins: s.coins - cost.coins,
           parts: s.parts - cost.parts,
           buildings: s.buildings.map((o) => (o.uid === buid ? { ...o, level: lvl + 1 } : o)),
+          stats: bump(s, 'upgrades'),
           updatedAt: Date.now(),
         }))
         return true
@@ -560,13 +563,13 @@ export const useGame = create<GameState>()(
             cleared++
             return b
           }
-          const lvl = buildingLevel(b)
+          const lvl = jobLevel(b)
           coins += upgradePayout(d, lvl)
           earned += upgradePayout(d, lvl)
           parts += upgradePartsPayout(d, lvl)
           xp += upgradeXp(d, lvl)
           collected++
-          return { ...b, jobEndsAt: null }
+          return { ...b, jobEndsAt: null, jobLevel: undefined }
         }).filter((b) => !removed.has(b.uid))
         const cap = fuelCap(s)
         buildings = buildings.map((b) => {
@@ -574,7 +577,7 @@ export const useGame = create<GameState>()(
           if (!d.jobSeconds || d.kind === 'obstacle' || b.jobEndsAt !== null || fuel < (d.fuelCost ?? 0)) return b
           fuel -= d.fuelCost ?? 0
           started++
-          return { ...b, jobEndsAt: now + upgradeJobSeconds(d, buildingLevel(b)) * 1000 }
+          return { ...b, jobEndsAt: now + upgradeJobSeconds(d, buildingLevel(b)) * 1000, jobLevel: buildingLevel(b) }
         })
         // Cars out of gas fill up at your Gas Station, if you have one.
         let cars = s.cars
