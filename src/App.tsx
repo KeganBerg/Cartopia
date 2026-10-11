@@ -9,6 +9,7 @@ import { RacePanel, LiveRaceOverlay, InvitesPanel, PrizePopup, CampaignPrizePopu
 import { joinLobby, useLive } from './lib/live'
 import { FriendsPanel, VisitBanner } from './ui/Friends'
 import { LeadersPanel, ClanPanel } from './ui/Social'
+import { MeetPanel } from './ui/Meet'
 import { Tutorial } from './ui/Tutorial'
 import { Badges } from './ui/Badges'
 import { ThoughtBubble } from './ui/Thought'
@@ -78,6 +79,7 @@ export default function App() {
       {panel === 'friends' && <FriendsPanel />}
       {panel === 'leaders' && <LeadersPanel />}
       {panel === 'clan' && <ClanPanel />}
+      {panel === 'meet' && <MeetPanel />}
       {panel === 'need' && <NeedPanel />}
       {panel === 'upgrade' && <UpgradePanel />}
       {panel === 'rescue' && <RescuePanel />}

@@ -7,6 +7,7 @@ import { SocialTabs } from './Social'
 import { GiftButton } from './Gifts'
 import { recordHelp, refreshGifts, HELP_FUEL } from '../lib/gifts'
 import { signedInUser } from '../lib/cloud'
+import { LikeButton } from './Meet'
 
 export function FriendsPanel() {
   // Neighbours show right away; real players merge in when the query returns.
@@ -90,6 +91,7 @@ export function VisitBanner() {
         <small>Lvl {v.level} · 🏆 {v.trophies} · {v.cars.length} cars</small>
       </div>
       <div className="row">
+        <LikeButton owner={v.ownerId} />
         {signedInUser() && <GiftButton to={v.ownerId} />}
         <button className="buy small" disabled={helped} onClick={helpOut} title={`They get +${HELP_FUEL} fuel too`}>{helped ? 'Helped today ✔' : 'Help out'}</button>
         <button className="buy small alt" onClick={() => visit(null)}>🏠 Home</button>

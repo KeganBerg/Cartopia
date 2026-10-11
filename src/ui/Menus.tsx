@@ -13,6 +13,7 @@ import { PaintShop, jobOf } from './Paint'
 import type { PaintJob } from '../game/data'
 import { Icon } from './Icon'
 import { useCrewGoal } from './CrewGoal'
+import { ShowcaseToggle } from './Meet'
 
 // Phones and tablets: no hover, so placing takes a preview tap first.
 const TOUCH = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
@@ -384,7 +385,7 @@ export function GaragePanel() {
               <CarPreview {...look!} onExpand={() => setInspect(true)} />
             )}
             <h3>{def.name}{car.plate && <span className="mini-plate">{car.plate}</span>}</h3>
-            <div className="pi">Performance Index <b>{performance(def, car.upgrades, car.mods)}</b></div>
+            <div className="pi">Performance Index <b>{performance(def, car.upgrades, car.mods)}</b> <ShowcaseToggle car={car.uid} /></div>
             {def.skill && <div className="skill-row"><SkillTag model={car.model} /> <small>{SKILLS[def.skill].text}</small></div>}
             <DriverRow car={car.uid} model={car.model} />
             <div className="garage-tabs" role="tablist">
