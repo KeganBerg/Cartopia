@@ -10,6 +10,7 @@ import { FriendsPanel, VisitBanner } from './ui/Friends'
 import { Tutorial } from './ui/Tutorial'
 import { Badges } from './ui/Badges'
 import { NeedPanel } from './ui/Need'
+import { UpgradePanel } from './ui/Upgrade'
 import { RescuePanel } from './ui/Rescue'
 import { BankPanel } from './ui/Bank'
 import { LevelUpSplash } from './ui/LevelUp'
@@ -58,6 +59,7 @@ export default function App() {
       {panel === 'invites' && <InvitesPanel />}
       {panel === 'friends' && <FriendsPanel />}
       {panel === 'need' && <NeedPanel />}
+      {panel === 'upgrade' && <UpgradePanel />}
       {panel === 'rescue' && <RescuePanel />}
       {panel === 'bank' && <BankPanel />}
       <VisitBanner />

@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useGame, hasRusty } from '../game/store'
-import { BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, PAINTS, STRIPES, PAINT_COST, STRIPE_COST, carDef, performance, upgradeCost, type BuildingDef } from '../game/data'
+import { BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, PAINTS, STRIPES, PAINT_COST, STRIPE_COST, carDef, performance, upgradeCost, buildingDef, upgradable, type BuildingDef } from '../game/data'
 import { CarPreview } from '../scene/CarPreview'
 import { CollectAllButton } from './CollectAll'
 import { rotateCurrent } from '../game/placement'
 import { preloadBuildings, BuildingThumb, CarThumb } from '../scene/BuildingPreview'
+import { ShopUpgrades } from './Upgrade'
 
 // Phones and tablets: no hover, so placing takes a preview tap first.
 const TOUCH = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
@@ -39,6 +40,11 @@ function EditBar() {
   const again = useGame((s) => s.again)
   const setMode = useGame((s) => s.setMode)
   const openPanel = useGame((s) => s.openPanel)
+  const openUpgrade = useGame((s) => s.openUpgrade)
+  const canUpgrade = useGame((s) => {
+    const b = s.selected ? s.buildings.find((o) => o.uid === s.selected) : undefined
+    return !!b && upgradable(buildingDef(b.def))
+  })
   const hint =
     mode === 'expand' ? 'Tap a For Sale sign to buy the land next to your town'
     : mode === 'road' ? 'Click or drag to lay road (10 coins per tile)'
@@ -55,6 +61,7 @@ function EditBar() {
         <button className={mode === 'move' ? 'tool active' : 'tool'} onClick={() => setMode('move')}>✋ Move</button>
         <button className={mode === 'expand' ? 'tool active' : 'tool'} onClick={() => setMode('expand')}>🗺 Land</button>
         {((mode === 'place' && placing) || (mode === 'move' && selected)) && <button className="tool" onClick={rotateCurrent} title="Rotate (R)">🔄 Rotate</button>}
+        {mode === 'move' && selected && canUpgrade && <button className="tool" onClick={() => openUpgrade(selected)}>⬆ Upgrade</button>}
         {mode === 'move' && again && <button className="tool" onClick={() => setMode('place', again)}>➕ Build another</button>}
         <button className="tool" onClick={() => openPanel('shop')}>🏪 Shop</button>
         <button className="tool done" onClick={() => setMode('play')}>✔ Done</button>
@@ -125,6 +132,7 @@ export function ShopPanel() {
   }, [focus])
   return (
     <Panel title="Shop" wide>
+      <ShopUpgrades />
       {SHOP_GROUPS.map((g) => (
         <section key={g.title}>
           <h3>{g.title}</h3>

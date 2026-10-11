@@ -1,7 +1,7 @@
 import { Vector3 } from 'three'
 import { useState } from 'react'
 import { useGame, buyablePlots, type PlacedBuilding } from '../game/store'
-import { buildingDef, carDef, plotPrice, START_LAND } from '../game/data'
+import { buildingDef, buildingLevel, carDef, levelLift, plotPrice, START_LAND, upgradeJobSeconds } from '../game/data'
 import { anchors, anchorRef } from '../scene/anchors'
 import { centerOf, plotCenter } from '../scene/World'
 import { useNow } from '../scene/useNow'
@@ -16,11 +16,12 @@ function JobBadge({ b, now }: { b: PlacedBuilding; now: number }) {
   const tap = useGame((s) => s.tapBuilding)
   const lit = useGame((s) => !!s.highlight?.includes(b.def))
   const [cx, cz] = centerOf(b.def, b.x, b.z, b.rot)
-  anchors.set(b.uid, new Vector3(cx, d.w > 1 ? 2.6 : 2.2, cz))
+  const lvl = buildingLevel(b)
+  anchors.set(b.uid, new Vector3(cx, (d.w > 1 ? 2.6 : 2.2) + levelLift(lvl), cz))
   const ready = b.jobEndsAt !== null && now >= b.jobEndsAt
   const working = b.jobEndsAt !== null && !ready
   const left = working ? Math.ceil((b.jobEndsAt! - now) / 1000) : 0
-  const pct = working ? 1 - left / d.jobSeconds! : 0
+  const pct = working ? Math.max(0, 1 - left / upgradeJobSeconds(d, lvl)) : 0
   return (
     <div className="anchor" ref={anchorRef(b.uid)}>
       <button className={`badge ${ready ? 'badge-ready' : working ? 'badge-working' : 'badge-idle'}${lit ? ' badge-pulse' : ''}`} onClick={() => tap(b.uid)} title={d.name}>
@@ -37,6 +38,7 @@ function JobBadge({ b, now }: { b: PlacedBuilding; now: number }) {
         ) : (
           <span className="start">⛽ {d.fuelCost}</span>
         )}
+        {lvl > 1 && <span className="badge-lvl">{lvl}</span>}
       </button>
     </div>
   )

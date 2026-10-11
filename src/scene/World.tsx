@@ -5,7 +5,7 @@ import { useThree, type ThreeEvent } from '@react-three/fiber'
 import { Plane, Vector3 } from 'three'
 import { create } from 'zustand'
 import { useGame, canPlace, buyablePlots, lotSize, movable, type PlacedBuilding } from '../game/store'
-import { GRID, TILE, PLOT, PLOT_MIN, PLOT_MAX, START_LAND, buildingDef } from '../game/data'
+import { GRID, TILE, PLOT, PLOT_MIN, PLOT_MAX, START_LAND, buildingDef, buildingLevel } from '../game/data'
 import { BuildingModel } from './BuildingModel'
 import { rotateCurrent, setGhostTurn, turnOf } from '../game/placement'
 import { sfx } from '../lib/sound'
@@ -131,7 +131,7 @@ function Building({ b, roads }: { b: PlacedBuilding; roads: Set<string> }) {
           <meshStandardMaterial map={paverTex(d.w, d.h)} />
         </mesh>
       )}
-      <BuildingModel def={d} />
+      <BuildingModel def={d} level={buildingLevel(b)} />
     </group>
   )
 }
@@ -383,7 +383,7 @@ function Interaction() {
           </mesh>
           {moved && (
             <group rotation-y={(turn * Math.PI) / 2}>
-              <BuildingModel def={d} ghost valid={valid} />
+              <BuildingModel def={d} ghost valid={valid} level={buildingLevel(b)} />
             </group>
           )}
         </group>

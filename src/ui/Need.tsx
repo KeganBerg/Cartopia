@@ -28,6 +28,8 @@ export function NeedPanel() {
   const showJobs = () => s.showMe(jobDefs, ready ? 'Tap the flashing $ bubbles to collect.' : 'Tap a flashing ⛽ bubble to start a job.')
   const showParts = (id: string) => () => s.showMe([id], `Tap the flashing bubble on your ${buildingDef(id).name} to start a parts job.`)
   const owned = (id: string) => s.buildings.filter((b) => b.def === id).length
+  // Skip the upgrade tip when the upgrade itself is what they're short for.
+  const upgradableOwned = !need.what?.startsWith('upgrading') && s.buildings.some((b) => isJob(b.def))
 
   let sources: Source[] = []
   let summary = ''
@@ -35,6 +37,7 @@ export function NeedPanel() {
     summary = need.missing ? `You need ${need.missing.toLocaleString()} more coins${need.what ? ` for ${need.what}` : ''}.` : `You have ${s.coins.toLocaleString()} coins. Here's how to earn more.`
     sources = [
       { icon: '🏪', title: 'Run jobs at your businesses', detail: `Tap the ⛽ bubble to start a job, then the $ bubble to collect. ${ready} ready to collect, ${idle} idle right now.`, action: { label: 'Show me', run: showJobs } },
+      ...(upgradableOwned ? [{ icon: '⬆', title: 'Upgrade your businesses', detail: 'Upgraded businesses pay more coins per job and finish sooner. Find them at the top of the Shop.', action: { label: 'Upgrades', run: () => s.openPanel('shop') } }] : []),
       { icon: '🔍', title: "Search at Rusty's", detail: 'Searches can turn up coin stashes along with cars.', action: owned('rescue') ? { label: "Rusty's", run: () => s.openPanel('rescue') } : build('rescue') },
       { icon: '🏆', title: 'Win drag races', detail: `Each race costs ${RACE_FUEL} fuel and pays a few hundred coins.`, action: { label: 'Race', run: () => s.openPanel('race') } },
       { icon: '📋', title: 'Finish goals', detail: 'Goals pay coins, XP and sometimes bucks.', action: { label: 'Goals', run: () => s.openPanel('goals') } },

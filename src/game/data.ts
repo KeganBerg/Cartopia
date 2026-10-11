@@ -94,6 +94,34 @@ function parkedDef(id: string): BuildingDef {
 export const knownBuilding = (id: string) => BUILDINGS.some((b) => b.id === id)
 export const buildingDef = (id: string): BuildingDef => BUILDINGS.find((b) => b.id === id) ?? parkedDef(id)
 
+// Building upgrades: businesses, parts makers and gas stations go from level 1
+// to 10. Each level pays more per job and finishes jobs sooner (a gas station
+// holds more fuel instead). Saves keep the level as `level` on the placed
+// building; a missing level is level 1.
+export const MAX_BUILDING_LEVEL = 10
+export const upgradable = (d: BuildingDef) =>
+  !d.parked && ((!!d.jobSeconds && d.kind !== 'obstacle') || !!d.fuelCap)
+export const buildingLevel = (b: { level?: number }) =>
+  Math.min(MAX_BUILDING_LEVEL, Math.max(1, Math.floor(Number(b.level) || 1)))
+
+// +15% coins and parts and +10% XP per level, 8% shorter jobs (rounded to 5s).
+export const upgradePayout = (d: BuildingDef, level: number) => Math.round((d.payout ?? 0) * (1 + 0.15 * (level - 1)))
+export const upgradePartsPayout = (d: BuildingDef, level: number) => Math.round((d.partsPayout ?? 0) * (1 + 0.15 * (level - 1)))
+export const upgradeXp = (d: BuildingDef, level: number) => Math.round((d.xp ?? 0) * (1 + 0.1 * (level - 1)))
+export const upgradeJobSeconds = (d: BuildingDef, level: number) =>
+  d.jobSeconds ? Math.max(10, Math.round((d.jobSeconds * Math.pow(0.92, level - 1)) / 5) * 5) : 0
+export const upgradeFuelCap = (d: BuildingDef, level: number) => (d.fuelCap ? d.fuelCap + 2 * (level - 1) : 0)
+
+// Cost to go from `level` to `level + 1`: 60% of the build price, 40% more each
+// level, plus parts from level 4 up.
+export const buildingUpgradeCost = (d: BuildingDef, level: number) => ({
+  coins: Math.max(100, Math.round((d.price * 0.6 * Math.pow(1.4, level - 1)) / 50) * 50),
+  parts: level >= 4 ? (level - 2) * 2 : 0,
+})
+export const buildingUpgradeXp = (level: number) => 10 + level * 5
+// Extra model height an upgraded building gains, on the same lot.
+export const levelLift = (level = 1) => 0.26 * (Math.min(MAX_BUILDING_LEVEL, Math.max(1, level)) - 1)
+
 export type Body = 'compact' | 'sedan' | 'sports' | 'muscle' | 'truck' | 'super' | 'bubble' | 'wagon' | 'wedge' | 'roadster' | 'rally' | 'classic' | 'offroad' | 'coupe'
 
 export type SkillId = 'launch' | 'nitro' | 'slipstream' | 'smooth' | 'oil'
