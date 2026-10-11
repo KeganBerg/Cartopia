@@ -1432,7 +1432,7 @@ function RaceResult({ won, myTime, theirTime, cash, xp, rival, note, noContest, 
       ))}
       <div className="rr-card">
         <div className="rr-icon">{won ? '🏆' : '🏁'}</div>
-        <h3 className="rr-title">{noContest ? 'NO RESULT' : won ? 'YOU WIN!' : 'SO CLOSE!'}</h3>
+        <h3 className="rr-title">{noContest ? 'NO RESULT' : won ? 'YOU WIN!' : margin !== null && margin < 0.3 ? 'SO CLOSE!' : 'OUTRUN!'}</h3>
         {!noContest && (
           <p className="rr-sub">
             {won ? `You beat ${rival}` : `${rival} took it`}

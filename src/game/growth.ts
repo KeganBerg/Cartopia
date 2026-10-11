@@ -39,6 +39,7 @@ export const GROWTH: Record<string, [string, string]> = {
   carwash: ['Wash Center', 'Bubble Car Spa'],
   parts: ['Parts Center', 'Parts Superstore'],
   bodyshop: ['Paint Center', 'Custom Paint Studio'],
+  rescue: ["Rusty's Recovery Yard", "Rusty's Restoration Works"],
 }
 
 export const grows = (id: string) => id in GROWTH

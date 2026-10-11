@@ -348,7 +348,10 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .flat-pop .row { justify-content: center; }
 .flat-pop .sell { margin-top: 0; }
 .haul-item { display: inline-flex; align-items: center; gap: 4px; background: #fff; border: 2px solid #e0e0e0; border-radius: 10px; padding: 2px 8px; font-weight: 800; }
-.haul-item.car { border-color: #8e24aa; }
+.haul-item.car { border-color: #8e24aa; padding-left: 3px; }
+.haul-item.car.rr-common { border-color: #90a4ae; }
+.haul-item.car.rr-scarce { border-color: #1e88e5; }
+.haul-item.car.rr-rare { border-color: #ff6d00; box-shadow: 0 0 8px rgba(255,179,0,.7); }
 .plate-screen { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; }
 .plate-screen .car-preview { width: 100%; }
 .plate-screen h3 { margin: 4px 0 0; }
@@ -1495,6 +1498,21 @@ button.book-car { font: inherit; color: inherit; }
 @media (prefers-reduced-motion: reduce) { .rf-boost-fx { animation: none; } .boost-btn.full:not(:disabled) { animation: none; } }
 @media (max-height: 500px) { .boost-btn { width: 64px; height: 64px; } .boost-btn span { font-size: 22px; } .boost-btn small { font-size: 10px; } }
 @media (max-width: 420px) { .boost-btn { width: 70px; height: 70px; } .rf-buttons { gap: 8px; } }
+/* Phone held upright: tach, boost and SHIFT must fit side by side with the speed above them. */
+@media (max-width: 430px) and (min-height: 501px) {
+  .rf-bottom { gap: 8px; }
+  .rf-bottom .tach { width: 108px; height: 108px; }
+  .rf-side { min-width: 0; }
+  .rf-speed { font-size: 34px; }
+  .rf-speed small { font-size: 15px; }
+  .race-full .shift-btn { font-size: 24px; padding: 18px 18px; }
+}
+@media (max-width: 370px) and (min-height: 501px) {
+  .rf-bottom .tach { width: 94px; height: 94px; }
+  .boost-btn { width: 62px; height: 62px; }
+  .boost-btn span { font-size: 22px; }
+  .race-full .shift-btn { font-size: 21px; padding: 16px 14px; }
+}
 
 /* Car Meet (src/ui/Meet.tsx) */
 .meet-mine { background: #fff8e1; border: 2px solid #ffca28; border-radius: 12px; padding: 8px 10px; margin-bottom: 8px; }

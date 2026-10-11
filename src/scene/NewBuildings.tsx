@@ -8,6 +8,7 @@ import { Facade, Upright } from './mergeScale'
 import { glowMats, onNight } from './dayNight'
 import { ClubLife } from './ClubLife'
 import { CLUB } from './clubLayout'
+import { LED_COUNT, ledFront, ledWindows } from './clubLeds'
 import { MeshBasicMaterial, MeshStandardMaterial, Color } from 'three'
 import { PAL, SEASON } from './season'
 import { LAYER, decal } from './layers'
@@ -131,6 +132,8 @@ type Shell = {
   m: Mat
   // Height of the first row of upper-floor windows.
   rowFrom?: number
+  // A window's material by its place on the grid (column + floor), in place of `win`.
+  winAt?: (i: number) => ReactNode
   win: ReactNode
   bulb: ReactNode
   ghost?: boolean
@@ -154,7 +157,8 @@ type Shell = {
 }
 
 // A flat-roofed building that grows a floor of windows every other upgrade level.
-export function ShellBuilding({ m, win, bulb, ghost, lvl, w, d, h0, z0 = -0.15, x0 = 0, wall, tex = 'brick', roof, sign, signBg = '#fffde7', signFg = '#c62828', shopfront, grow = 1, rowFrom = 1.25, children }: Shell) {
+export function ShellBuilding({ m, win, bulb, ghost, lvl, w, d, h0, z0 = -0.15, x0 = 0, wall, tex = 'brick', roof, sign, signBg = '#fffde7', signFg = '#c62828', shopfront, grow = 1, rowFrom = 1.25, winAt, children }: Shell) {
+  const pane = (i: number) => (winAt ? winAt(i) : win)
   const h = h0 + levelLift(lvl) * grow
   const zf = z0 + d / 2
   const rx = Math.max(1, Math.round(w * 0.6))
@@ -199,15 +203,15 @@ export function ShellBuilding({ m, win, bulb, ghost, lvl, w, d, h0, z0 = -0.15, 
       {[-1, 1].map((sd) => (
         <mesh key={sd} position={[sd * (w / 2 + 0.006), h0 * 0.55, z0]} rotation-y={(sd * Math.PI) / 2}>
           <planeGeometry args={[0.42, 0.42]} />
-          {win}
+          {pane(sd < 0 ? 0 : 3)}
         </mesh>
       ))}
       <Facade at={[0, 0, zf]} len={w}>
-        {(L) => rows.map((y) => colsFor(L).map((x) => (
+        {(L) => rows.map((y, r) => colsFor(L).map((x, c) => (
           <group key={`${y}${x}`}>
             <mesh position={[x, y, 0.006]}>
               <planeGeometry args={[0.36, 0.38]} />
-              {win}
+              {pane(r + c + 1)}
             </mesh>
             {lvl >= 4 && <Box m={m} at={[x, y - 0.22, 0.04]} s={[0.42, 0.04, 0.08]} c="#fafafa" />}
           </group>
@@ -215,10 +219,10 @@ export function ShellBuilding({ m, win, bulb, ghost, lvl, w, d, h0, z0 = -0.15, 
       </Facade>
       {[-1, 1].map((sd) => (
         <Facade key={sd} at={[sd * (w / 2 + 0.006), 0, z0]} ry={(sd * Math.PI) / 2} len={d}>
-          {(L) => rows.map((y) => (L > 2 ? colsFor(L) : [0]).map((x) => (
+          {(L) => rows.map((y, r) => (L > 2 ? colsFor(L) : [0]).map((x, c) => (
             <mesh key={`${y}${x}`} position={[x, y, 0]}>
               <planeGeometry args={[0.36, 0.38]} />
-              {win}
+              {pane(sd < 0 ? r + c + 1 : r + c + 4)}
             </mesh>
           )))}
         </Facade>
@@ -750,7 +754,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
       const ropeR = (gap * gap / 4 + sag * sag) / (2 * sag)
       const ropeArc = 2 * Math.asin(gap / 2 / ropeR)
       return (
-        <ShellBuilding {...shell} w={w} d={d} h0={1.3} z0={z0} wall="#3a2160" roof="#d500f9" shopfront={null} rowFrom={1.6}>
+        <ShellBuilding {...shell} w={w} d={d} h0={1.3} z0={z0} wall="#3a2160" roof="#d500f9" shopfront={null} rowFrom={1.6} winAt={ghost ? undefined : (i) => <primitive object={ledWindows[i % LED_COUNT]} attach="material" dispose={null} />}>
           {/* Entrance: gold-framed double doors with porthole windows, up one step. */}
           <Box m={m} at={[dx, 0.4, zf + 0.012]} s={[0.54, 0.8, 0.024]} c={GOLD} shadow={false} />
           {[-1, 1].map((sd) => (
@@ -856,7 +860,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           <Box m={m} at={[0.5, 0.55, zf + 0.006]} s={[1.96, 0.46, 0.012]} c="#120818" shadow={false} />
           <mesh position={[0.5, 0.55, zf + 0.014]}>
             <planeGeometry args={[1.9, 0.4]} />
-            {glow('danceFloor', '#7c4dff')}
+            {ghost ? m('#7c4dff') : <primitive object={ledFront} attach="material" dispose={null} />}
           </mesh>
           {/* The name in lights over the door, with a neon owl beside it. */}
           {signs && (
