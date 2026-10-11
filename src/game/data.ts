@@ -410,13 +410,14 @@ export const upgradeCost = (car: CarDef, level: number) => ({
 // fitted mod ids as `mods` on each car (missing means none) and every part
 // bought for that car as `ownedMods`, so a swapped-out part can go back on for
 // free. Ids stay fixed so saves keep working.
-export type ModSlot = 'spoiler' | 'exhaust' | 'kit' | 'hood' | 'rims'
+export type ModSlot = 'spoiler' | 'exhaust' | 'kit' | 'hood' | 'rims' | 'tires'
 export const MOD_SLOTS: { id: ModSlot; name: string; icon: string; stat: string }[] = [
   { id: 'spoiler', name: 'Spoilers', icon: '🪽', stat: 'Downforce for more grip' },
   { id: 'exhaust', name: 'Exhausts', icon: '💨', stat: 'Freer flow for more power' },
   { id: 'kit', name: 'Body Kits', icon: '🏎', stat: 'Lighter panels and better grip' },
   { id: 'hood', name: 'Hoods', icon: '🔥', stat: 'More air for more power' },
   { id: 'rims', name: 'Rims', icon: '🛞', stat: 'Lighter wheels' },
+  { id: 'tires', name: 'Tires', icon: '🌧️', stat: 'Hold the strip in rain, snow and sand' },
 ]
 
 // Whether a part can go on this body: special parts on their own bodies only, regular parts
@@ -438,6 +439,9 @@ export type ModDef = {
   // A special part made for these bodies only, or a regular part that makes no sense on these bodies.
   only?: Body[]
   notOn?: Body[]
+  // Tires: how much of each slick surface (rain, snow, desert sand) they cancel in races, 0..1.
+  // They add no PI, so they never move the referee's time floors (see grip.ts).
+  tread?: { wet?: number; snow?: number; dust?: number }
 }
 
 // Bodies that swap regular spoilers, kits or hoods for parts of their own.
@@ -480,6 +484,10 @@ export const MODS: ModDef[] = [
   { id: 'windscreen', slot: 'hood', only: BIKE_BODIES, name: 'Touring Windscreen', unlockLevel: 2, coins: 1200, parts: 0, bucks: 0, power: 1, grip: 0, weight: 0 },
   { id: 'campod', slot: 'hood', only: ['formula'], name: 'Onboard Camera', unlockLevel: 11, coins: 2000, parts: 4, bucks: 0, power: 1, grip: 0, weight: 0 },
   { id: 'bargeboards', slot: 'kit', only: ['formula'], name: 'Bargeboards', unlockLevel: 11, coins: 0, parts: 0, bucks: 10, power: 0, grip: 3, weight: -3 },
+  { id: 'raintires', slot: 'tires', name: 'Rain Tires', unlockLevel: 3, coins: 2500, parts: 4, bucks: 0, power: 0, grip: 0, weight: 0, tread: { wet: 1 } },
+  { id: 'sandtires', slot: 'tires', name: 'Sand Paddles', unlockLevel: 4, coins: 3000, parts: 5, bucks: 0, power: 0, grip: 0, weight: 0, tread: { dust: 1 } },
+  { id: 'snowstuds', slot: 'tires', name: 'Studded Snow Tires', unlockLevel: 4, coins: 3500, parts: 6, bucks: 0, power: 0, grip: 0, weight: 0, tread: { snow: 1 } },
+  { id: 'allweather', slot: 'tires', name: 'All-Weather Compound', unlockLevel: 7, coins: 0, parts: 0, bucks: 12, power: 0, grip: 0, weight: 0, tread: { wet: 0.7, snow: 0.7, dust: 0.7 } },
   { id: 'forged', slot: 'rims', name: 'Forged Black', unlockLevel: 7, coins: 7000, parts: 12, bucks: 0, power: 0, grip: 2, weight: -3 },
 ]
 

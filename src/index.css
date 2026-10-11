@@ -1286,6 +1286,28 @@ button.book-car { font: inherit; color: inherit; }
 }
 .rv-tag { background: var(--rv); color: #fff; }
 .rv-result .rr-loot span .ico { padding: 0; border: none; width: 18px; height: 18px; display: inline-block; vertical-align: -3px; animation: none; }
+/* Race launch and boost. */
+.race-full .countdown.big.go { color: #76ff03; text-shadow: 0 4px 0 #1b5e20; animation: pop .15s ease-out; }
+.rf-buttons { display: flex; align-items: center; gap: 12px; }
+.race-full .shift-btn.launch { background: linear-gradient(#76ff03, #2e7d32); }
+.boost-btn { position: relative; width: 84px; height: 84px; flex: none; border-radius: 50%; border: 3px solid #fff; padding: 0; display: grid; place-content: center; color: #fff; font-family: var(--display); cursor: pointer;
+  background: radial-gradient(circle, #263238 0 56%, transparent 57%), conic-gradient(#ff9100 0 var(--fill), rgba(255,255,255,.18) var(--fill) 100%); box-shadow: 0 4px 0 rgba(0,0,0,.35); }
+.boost-btn span { font-size: 28px; line-height: 1; }
+.boost-btn small { font-size: 12px; letter-spacing: .5px; }
+.boost-btn:disabled { opacity: .55; cursor: default; }
+.boost-btn.full:not(:disabled) { animation: boost-ready .7s ease-in-out infinite; }
+.boost-btn.burning { opacity: 1; animation: none; box-shadow: 0 0 0 5px rgba(255,145,0,.6), 0 0 26px 8px rgba(255,109,0,.7); }
+@keyframes boost-ready { 50% { transform: scale(1.08); box-shadow: 0 4px 0 rgba(0,0,0,.35), 0 0 0 6px rgba(255,145,0,.45); } }
+/* Speed streaks round the edges of the screen while the boost burns. */
+.rf-boost-fx { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: screen;
+  background: repeating-conic-gradient(from 0deg at 50% 55%, rgba(255,214,140,.32) 0 1.2deg, transparent 1.2deg 7deg);
+  -webkit-mask: radial-gradient(ellipse at 50% 55%, transparent 38%, #000 75%); mask: radial-gradient(ellipse at 50% 55%, transparent 38%, #000 75%);
+  animation: boost-streak .12s linear infinite; }
+@keyframes boost-streak { 50% { transform: scale(1.04); opacity: .8; } }
+@media (prefers-reduced-motion: reduce) { .rf-boost-fx { animation: none; } .boost-btn.full:not(:disabled) { animation: none; } }
+@media (max-height: 500px) { .boost-btn { width: 64px; height: 64px; } .boost-btn span { font-size: 22px; } .boost-btn small { font-size: 10px; } }
+@media (max-width: 420px) { .boost-btn { width: 70px; height: 70px; } .rf-buttons { gap: 8px; } }
+
 /* Car Meet (src/ui/Meet.tsx) */
 .meet-mine { background: #fff8e1; border: 2px solid #ffca28; border-radius: 12px; padding: 8px 10px; margin-bottom: 8px; }
 .meet-head { display: flex; align-items: center; gap: 8px; }
