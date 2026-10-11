@@ -7,6 +7,7 @@ import { dayPhase, isNight, nightAmount } from '../game/clock'
 import { SEASON, type Season } from '../scene/season'
 import { onTownHold, townHeld } from '../scene/renderGate'
 import { useGame } from '../game/store'
+import { pickSpecies, sing, type Species } from './birdsong'
 
 // How much of each layer plays, 0 to 1, for how dark it is and the season.
 export type Mix = {
@@ -20,6 +21,8 @@ export type Mix = {
   crickets: number
   peepers: number
   owls: number
+  yard: number // mowers and sprinklers
+  dogs: number
 }
 
 export function ambientMix(night: number, season: Season): Mix {
@@ -36,6 +39,8 @@ export function ambientMix(night: number, season: Season): Mix {
     crickets: night * by({ winter: 0, spring: 0.2, summer: 1, fall: 0.7 }),
     peepers: night * by({ winter: 0, spring: 1, summer: 0.3, fall: 0 }),
     owls: night * by({ winter: 0.7, spring: 0.4, summer: 0.4, fall: 0.7 }),
+    yard: day * by({ winter: 0, spring: 0.6, summer: 1, fall: 0.25 }),
+    dogs: day * 0.8 + night * 0.15,
   }
 }
 
@@ -57,6 +62,23 @@ function noiseBuffer(ctx: BaseAudioContext, seconds: number, brown: boolean) {
 }
 
 type Voice = { o: OscillatorNode; g: GainNode; next: number }
+// A bird singing from one spot, repeating its song now and then like a real one.
+type Singer = { kind: Species; pan: number; dist: number; next: number }
+
+// A short room-like echo tail (decaying stereo noise), so sounds sit in a space.
+function echoTail(ctx: BaseAudioContext, seconds: number) {
+  const buf = ctx.createBuffer(2, Math.floor(ctx.sampleRate * seconds), ctx.sampleRate)
+  for (let c = 0; c < 2; c++) {
+    const d = buf.getChannelData(c)
+    let lp = 0
+    for (let i = 0; i < d.length; i++) {
+      const x = i / d.length
+      lp += 0.35 * (Math.random() * 2 - 1 - lp) // soften the highs a little
+      d[i] = i < ctx.sampleRate * 0.012 ? 0 : lp * Math.pow(1 - x, 3)
+    }
+  }
+  return buf
+}
 
 // The sound graph and its scheduler. step() is called a few times a second
 // and schedules a little ahead, so it also drives an offline render in tests.
@@ -80,6 +102,8 @@ export class Soundscape {
   private cicadaOn = false
   private beatAt = 0
   private last = -1
+  private room: ConvolverNode
+  private singers: Singer[] = []
 
   constructor(ctx: BaseAudioContext, dest: AudioNode) {
     this.ctx = ctx
@@ -88,6 +112,9 @@ export class Soundscape {
     this.out.connect(dest)
     this.white = noiseBuffer(ctx, 2, false)
     this.brown = noiseBuffer(ctx, 4, true)
+    this.room = ctx.createConvolver()
+    this.room.buffer = echoTail(ctx, 1.6)
+    this.room.connect(this.out)
 
     // Beds: looping noise shaped into a steady layer, faded in and out by step().
     this.trafficTone = this.filter('lowpass', SEASON === 'winter' ? 170 : 300) // snow muffles the town
@@ -114,12 +141,31 @@ export class Soundscape {
     return f
   }
 
-  private pan(p: number): AudioNode {
-    if (!this.ctx.createStereoPanner) return this.out
-    const s = this.ctx.createStereoPanner()
-    s.pan.value = p
+  // Where a one-off sound plays from: a stereo position, plus some echo.
+  private pan(p: number, wet = 0.2): AudioNode {
+    const s: AudioNode = this.ctx.createStereoPanner ? this.ctx.createStereoPanner() : this.ctx.createGain()
+    if ('pan' in s) (s as StereoPannerNode).pan.value = p
     s.connect(this.out)
+    const w = this.ctx.createGain()
+    w.gain.value = wet
+    s.connect(w).connect(this.room)
     return s
+  }
+
+  // Far-off sounds are duller, quieter and echoier (dist 0 near, 1 far).
+  private spot(p: number, dist: number) {
+    return this.filter('lowpass', 9000 - dist * 6000, this.pan(p, 0.15 + dist * 0.4))
+  }
+
+  private noiseHit(t: number, dur: number, peak: number, dest: AudioNode, buf = this.white) {
+    const src = this.ctx.createBufferSource()
+    const g = this.ctx.createGain()
+    src.buffer = buf
+    g.gain.setValueAtTime(peak, t)
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
+    src.connect(g).connect(dest)
+    src.start(t, rand(0, 1))
+    src.stop(t + dur + 0.02)
   }
 
   private bed(buf: AudioBuffer, into: AudioNode, gain?: GainNode) {
@@ -206,6 +252,7 @@ export class Soundscape {
       const gust = Math.random()
       this.gustAt = t + rand(2, 6)
       this.windTone.frequency.setTargetAtTime(300 + gust * 600, t, 1.2)
+      if (gust > 0.75 && season !== 'summer') this.chimes(t + 0.5, m.wind)
       fade(this.wind, m.wind * (0.03 + gust * 0.08))
       fade(this.leaves, m.leaves * (0.004 + gust * gust * 0.03))
     }
@@ -250,8 +297,16 @@ export class Soundscape {
     const at = t + rand(0.05, 0.3)
     if (chance(0.11 * m.traffic, dt)) this.carPass(at)
     if (chance(0.006 * m.traffic * (1 - night), dt)) this.horn(at)
-    if (chance(0.12 * m.chatter, dt)) this.chatter(at)
-    if (chance(0.3 * m.birds, dt)) this.bird(at, season)
+    if (chance(0.2 * m.chatter, dt)) this.chatter(at)
+    this.birds(t, m.birds, season)
+    if (chance(0.05 * m.chatter, dt)) this.laugh(at)
+    if (chance(0.025 * m.dogs, dt)) this.dog(at)
+    if (chance(0.03 * m.traffic * (1 - night), dt)) this.door(at)
+    if (season !== 'winter' && chance(0.008 * m.chatter, dt)) this.bell(at)
+    if (chance(0.004 * (1 - night), dt)) this.plane(at)
+    if (chance(0.006 * m.yard, dt)) this.mower(at)
+    if (chance(0.004 * m.yard, dt)) this.sprinkler(at)
+    if (chance(0.004 * (1 - night) * (season === 'winter' ? 0.3 : 1), dt)) this.hammer(at)
     if (chance(0.035 * m.crows, dt)) this.crow(at)
     if (chance(0.022 * m.owls, dt)) this.owl(at)
 
@@ -270,28 +325,64 @@ export class Soundscape {
     }
   }
 
+  // A car driving past: road rumble, engine hum that drops in pitch as it
+  // passes (Doppler) and tyre hiss, panning across. Some are trucks or scooters.
   private carPass(t: number) {
-    const dur = rand(3, 5.5)
-    const src = this.ctx.createBufferSource()
-    src.buffer = this.brown
-    const f = this.filter('bandpass', 300, undefined, 1.2)
+    const kind = Math.random()
+    const truck = kind < 0.15
+    const scooter = kind > 0.92
+    const dur = truck ? rand(5, 7) : scooter ? rand(2.5, 3.5) : rand(3, 5.5)
+    const mid = t + dur * 0.5
+    const near = rand(0.4, 1)
     const g = this.ctx.createGain()
     const from = Math.random() < 0.5 ? -0.9 : 0.9
-    const p = this.ctx.createStereoPanner?.()
-    f.frequency.setValueAtTime(260, t)
-    f.frequency.linearRampToValueAtTime(rand(550, 800), t + dur * 0.5)
-    f.frequency.linearRampToValueAtTime(220, t + dur)
     g.gain.setValueAtTime(0.0001, t)
-    g.gain.exponentialRampToValueAtTime(rand(0.12, 0.22), t + dur * 0.5)
+    g.gain.exponentialRampToValueAtTime(near, mid)
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
-    src.connect(f).connect(g)
+    const p = this.ctx.createStereoPanner?.()
     if (p) {
       p.pan.setValueAtTime(from, t)
       p.pan.linearRampToValueAtTime(-from, t + dur)
-      g.connect(p).connect(this.out)
-    } else g.connect(this.out)
-    src.start(t, rand(0, 3))
-    src.stop(t + dur + 0.1)
+      g.connect(p)
+    }
+    const dest = p ?? g
+    dest.connect(this.out)
+    const w = this.ctx.createGain()
+    w.gain.value = 0.15
+    dest.connect(w).connect(this.room)
+
+    const rumble = this.ctx.createBufferSource()
+    rumble.buffer = this.brown
+    const f = this.filter('bandpass', 300, g, 1.2)
+    f.frequency.setValueAtTime(260, t)
+    f.frequency.linearRampToValueAtTime(rand(550, 800), mid)
+    f.frequency.linearRampToValueAtTime(220, t + dur)
+    const rg = this.ctx.createGain()
+    rg.gain.value = truck ? 0.22 : 0.14
+    rumble.connect(rg).connect(f)
+    rumble.start(t, rand(0, 3))
+    rumble.stop(t + dur + 0.1)
+
+    const hiss = this.ctx.createBufferSource()
+    hiss.buffer = this.white
+    hiss.loop = true
+    const hg = this.ctx.createGain()
+    hg.gain.value = scooter ? 0.004 : 0.012
+    hiss.connect(this.filter('bandpass', 1400, undefined, 0.6)).connect(hg).connect(g)
+    hiss.start(t)
+    hiss.stop(t + dur + 0.1)
+
+    const hum = this.ctx.createOscillator()
+    hum.type = 'sawtooth'
+    const hz = truck ? rand(40, 55) : scooter ? rand(130, 170) : rand(65, 100)
+    hum.frequency.setValueAtTime(hz * 1.04, t)
+    hum.frequency.setValueAtTime(hz * 1.04, mid - 0.25)
+    hum.frequency.linearRampToValueAtTime(hz * 0.95, mid + 0.25)
+    const eg = this.ctx.createGain()
+    eg.gain.value = truck ? 0.05 : scooter ? 0.025 : 0.03
+    hum.connect(this.filter('lowpass', scooter ? 1200 : 450)).connect(eg).connect(g)
+    hum.start(t)
+    hum.stop(t + dur + 0.1)
   }
 
   private horn(t: number) {
@@ -328,33 +419,141 @@ export class Soundscape {
     }
   }
 
-  private bird(t: number, season: Season) {
+  // A few birds sing from their own spots around town, each repeating its
+  // song every few seconds; now and then one flies off and another arrives.
+  private birds(t: number, level: number, season: Season) {
+    const want = Math.round(level * 4 + 0.3)
+    while (this.singers.length < want) this.singers.push({ kind: pickSpecies(season), pan: rand(-0.95, 0.95), dist: rand(0, 1), next: t + rand(0.2, 5) })
+    if (this.singers.length > want) this.singers.length = want
+    this.singers.forEach((b, i) => {
+      if (b.next > t + 0.4) return
+      if (Math.random() < 0.12) {
+        this.singers[i] = { kind: pickSpecies(season), pan: rand(-0.95, 0.95), dist: rand(0, 1), next: t + rand(2, 8) }
+        return
+      }
+      const at = Math.max(b.next, t)
+      const peak = 0.05 * (1 - b.dist * 0.6) * (b.kind === 'dove' ? 1.6 : 1)
+      const len = sing(this.ctx, this.spot(b.pan, b.dist), b.kind, at, peak, this.white)
+      b.next = at + len + rand(2.5, 9)
+    })
+  }
+
+  // Short bursts of far-off laughter.
+  private laugh(t: number) {
+    const p = rand(-0.8, 0.8)
+    const f = rand(200, 300)
+    let s = t
+    for (let i = Math.floor(rand(4, 8)), k = 0; i > 0; i--, k++) {
+      const at = s
+      const d = rand(0.07, 0.11)
+      this.blip(at, d, 0.18 * (1 - k * 0.08), p, (o) => {
+        o.type = 'sawtooth'
+        o.frequency.setValueAtTime(f * (1 - k * 0.03), at)
+        o.frequency.linearRampToValueAtTime(f * (0.9 - k * 0.03), at + d)
+      }, (dest) => this.filter('bandpass', rand(700, 1000), this.filter('lowpass', 1500, dest), 3))
+      s += d + rand(0.06, 0.1)
+    }
+  }
+
+  // A dog a few yards away: one to three barks.
+  private dog(t: number) {
     const p = rand(-0.9, 0.9)
-    const kind = Math.floor(Math.random() * (season === 'winter' ? 1 : 3))
-    if (kind === 0) {
-      // "fee-bee": the chickadee's two-note whistle, heard all year.
-      const f = rand(3600, 4000)
-      this.blip(t, 0.32, 0.045, p, (o) => { o.frequency.value = f })
-      this.blip(t + 0.4, 0.3, 0.04, p, (o) => { o.frequency.setValueAtTime(f * 0.86, t + 0.4); o.frequency.linearRampToValueAtTime(f * 0.84, t + 0.7) })
-    } else if (kind === 1) {
-      // A run of quick downward chirps.
-      const n = Math.floor(rand(3, 7))
-      const f = rand(3200, 5000)
-      for (let i = 0; i < n; i++) {
-        const s = t + i * rand(0.09, 0.13)
-        this.blip(s, 0.07, 0.035, p, (o) => { o.frequency.setValueAtTime(f, s); o.frequency.exponentialRampToValueAtTime(f * 0.6, s + 0.07) })
-      }
-    } else {
-      // A robin-like warble of sliding notes.
-      let s = t
-      for (let i = 0; i < Math.floor(rand(3, 6)); i++) {
-        const a = rand(2300, 3400)
-        const b = a * rand(0.8, 1.25)
-        const d = rand(0.12, 0.2)
-        const at = s
-        this.blip(at, d, 0.04, p, (o) => { o.frequency.setValueAtTime(a, at); o.frequency.linearRampToValueAtTime(b, at + d) })
-        s += d + rand(0.05, 0.12)
-      }
+    const dist = rand(0.3, 1)
+    const big = Math.random() < 0.5
+    const f = big ? rand(280, 360) : rand(500, 650)
+    const dest = this.spot(p, dist)
+    for (let i = Math.floor(rand(1, 4)); i > 0; i--) {
+      const at = t
+      const tone = this.filter('bandpass', big ? 900 : 1500, dest, 2)
+      const g = this.ctx.createGain()
+      g.gain.value = 0.35 * (1 - dist * 0.5)
+      g.connect(tone)
+      this.blip(at, 0.14, 1, 0, (o) => {
+        o.type = 'sawtooth'
+        o.frequency.setValueAtTime(f, at)
+        o.frequency.linearRampToValueAtTime(f * 1.25, at + 0.03)
+        o.frequency.exponentialRampToValueAtTime(f * 0.7, at + 0.14)
+      }, () => g)
+      this.noiseHit(at, 0.08, 0.05 * (1 - dist * 0.5), tone)
+      t += rand(0.3, 0.6)
+    }
+  }
+
+  // A car door or trunk shutting down the street.
+  private door(t: number) {
+    const dest = this.filter('lowpass', 500, this.spot(rand(-0.9, 0.9), rand(0.3, 1)))
+    this.noiseHit(t, 0.12, 0.35, dest, this.brown)
+    this.noiseHit(t, 0.03, 0.04, dest)
+  }
+
+  // "Ding ding": a bicycle bell.
+  private bell(t: number) {
+    const p = rand(-0.8, 0.8)
+    const f = rand(2100, 2500)
+    for (const at of [t, t + 0.22]) for (const [mult, v] of [[1, 0.03], [2.76, 0.012], [5.4, 0.006]]) this.blip(at, 0.7, v, p, (o) => { o.frequency.value = f * mult })
+  }
+
+  // A plane high overhead: a slow, wide whoosh.
+  private plane(t: number) {
+    const dur = rand(18, 26)
+    const src = this.ctx.createBufferSource()
+    src.buffer = this.brown
+    src.loop = true
+    const f = this.filter('bandpass', 350, undefined, 0.8)
+    f.frequency.setValueAtTime(250, t)
+    f.frequency.linearRampToValueAtTime(600, t + dur * 0.45)
+    f.frequency.linearRampToValueAtTime(200, t + dur)
+    const g = this.ctx.createGain()
+    g.gain.setValueAtTime(0.0001, t)
+    g.gain.exponentialRampToValueAtTime(0.18, t + dur * 0.45)
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
+    src.connect(f).connect(g).connect(this.pan(rand(-0.5, 0.5), 0.3))
+    src.start(t)
+    src.stop(t + dur + 0.1)
+  }
+
+  // A lawn mower in a back yard, coming and going as it does its rows.
+  private mower(t: number) {
+    const dur = rand(20, 35)
+    const o = this.ctx.createOscillator()
+    o.type = 'sawtooth'
+    o.frequency.value = rand(26, 32)
+    const g = this.ctx.createGain()
+    g.gain.setValueAtTime(0.0001, t)
+    for (let s = 0; s < dur; s += 4) g.gain.linearRampToValueAtTime(rand(0.008, 0.03), t + s + 2)
+    g.gain.linearRampToValueAtTime(0, t + dur)
+    o.connect(this.filter('bandpass', 350, undefined, 0.9)).connect(g).connect(this.spot(rand(-0.9, 0.9), rand(0.5, 1)))
+    o.start(t)
+    o.stop(t + dur + 0.1)
+  }
+
+  // A lawn sprinkler ticking round.
+  private sprinkler(t: number) {
+    const dest = this.filter('highpass', 3000, this.spot(rand(-0.9, 0.9), rand(0.2, 0.8)))
+    const n = Math.floor(rand(30, 60))
+    for (let i = 0; i < n; i++) this.noiseHit(t + i * 0.14, 0.05, 0.05, dest)
+  }
+
+  // Someone hammering on a project down the block.
+  private hammer(t: number) {
+    const dest = this.filter('bandpass', rand(600, 1100), this.spot(rand(-0.9, 0.9), rand(0.5, 1)), 3)
+    let s = t
+    for (let i = Math.floor(rand(4, 10)); i > 0; i--) {
+      this.noiseHit(s, 0.05, 0.4, dest)
+      s += rand(0.45, 0.7)
+    }
+  }
+
+  // Wind chimes on a porch, rung by a gust.
+  private chimes(t: number, wind: number) {
+    const scale = [1, 9 / 8, 5 / 4, 3 / 2, 5 / 3, 2]
+    const p = rand(-0.6, 0.6)
+    const root = rand(880, 1100)
+    for (let i = Math.floor(rand(2, 6)); i > 0; i--) {
+      const f = root * scale[Math.floor(Math.random() * scale.length)]
+      const at = t + rand(0, 1.5)
+      this.blip(at, 2.2, 0.008 * wind, p, (o) => { o.frequency.value = f })
+      this.blip(at, 1.2, 0.003 * wind, p, (o) => { o.frequency.value = f * 2.76 })
     }
   }
 

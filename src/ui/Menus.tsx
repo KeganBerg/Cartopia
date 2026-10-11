@@ -1,6 +1,7 @@
+import { mergeCandidates } from '../game/merge'
 import { useEffect, useRef, useState } from 'react'
 import { useGame, hasRusty, buildPrice } from '../game/store'
-import { garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, carDef, performance, upgradeCost, buildingDef, upgradable, loves, readySets, type BuildingDef } from '../game/data'
+import { activeEvent, garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, carDef, performance, upgradeCost, buildingDef, upgradable, loves, readySets, type BuildingDef } from '../game/data'
 import { CarInspect, CarPreview } from '../scene/CarPreview'
 import { CollectAllButton } from './CollectAll'
 import { rotateCurrent } from '../game/placement'
@@ -49,8 +50,10 @@ function EditBar() {
     const b = s.selected ? s.buildings.find((o) => o.uid === s.selected) : undefined
     return !!b && upgradable(buildingDef(b.def))
   })
+  const canMerge = useGame((s) => (s.mode === 'merge' ? mergeCandidates(s.buildings).length > 0 || s.buildings.some((b) => b.merge) : true))
   const hint =
     mode === 'expand' ? 'Tap a For Sale sign to buy the land next to your town'
+    : mode === 'merge' ? (canMerge ? 'Tap 🧩 to merge matching buildings into one big one' : 'Put 2 or 4 matching buildings (same level) side by side to merge them')
     : mode === 'road' ? 'Click or drag to lay road (10 coins per tile)'
     : mode === 'bulldoze' ? 'Click or drag to remove (buildings refund half)'
     : mode === 'move' && again && selected ? 'Built! Rotate or drag it to adjust it'
@@ -64,6 +67,7 @@ function EditBar() {
         <button className={mode === 'bulldoze' ? 'tool active' : 'tool'} onClick={() => setMode('bulldoze')}>🚜 Bulldoze</button>
         <button className={mode === 'move' ? 'tool active' : 'tool'} onClick={() => setMode('move')}>✋ Move</button>
         <button className={mode === 'expand' ? 'tool active' : 'tool'} onClick={() => setMode('expand')}>🗺 Land</button>
+        <button className={mode === 'merge' ? 'tool active' : 'tool'} onClick={() => setMode('merge')}>🧩 Merge</button>
         {((mode === 'place' && placing) || (mode === 'move' && selected)) && <button className="tool" onClick={rotateCurrent} title="Rotate (R)">🔄 Rotate</button>}
         {mode === 'move' && selected && canUpgrade && <button className="tool" onClick={() => openUpgrade(selected)}>⬆ Upgrade</button>}
         {mode === 'move' && again && <button className="tool" onClick={() => setMode('place', again)}>➕ Build another</button>}
@@ -124,12 +128,14 @@ export function SheetTabs<T extends string>({ items, value, onChange }: { items:
   )
 }
 
-type ShopTab = 'cars' | 'business' | 'services' | 'homes' | 'upgrades'
+type ShopTab = 'cars' | 'business' | 'services' | 'homes' | 'event' | 'upgrades'
 const SHOP_GROUPS: { id: Exclude<ShopTab, 'upgrades'>; label: string; filter: (b: BuildingDef) => boolean }[] = [
   { id: 'cars', label: '🔧 Cars & parts', filter: (b) => b.id === 'rescue' || b.kind === 'parts' },
   { id: 'business', label: '🍕 Businesses', filter: (b) => b.kind === 'business' && b.id !== 'rescue' && b.id !== 'crew' && !b.service },
   { id: 'services', label: '⛽ Services', filter: (b) => b.kind === 'gas' || b.id === 'crew' || !!b.service },
-  { id: 'homes', label: '🏡 Homes', filter: (b) => b.kind === 'house' || b.kind === 'decor' },
+  { id: 'homes', label: '🏡 Homes', filter: (b) => (b.kind === 'house' || b.kind === 'decor') && !b.event },
+  // Limited-time decorations for the running event (the tab only shows while it runs).
+  { id: 'event', label: '🎃 Spooky', filter: (b) => !!b.event && b.event === activeEvent()?.id },
 ]
 // The Shop reopens on the tab it was left on.
 let lastShopTab: ShopTab = 'cars'
@@ -152,7 +158,7 @@ export function ShopPanel() {
   const focusRef = useRef<HTMLButtonElement>(null)
   const rusty = hasRusty({ buildings })
   const canUpgrade = buildings.some((b) => upgradable(buildingDef(b.def)))
-  const [tab, setTabState] = useState<ShopTab>(() => shopTabFor(focus) ?? (!rusty ? 'cars' : lastShopTab === 'upgrades' && !canUpgrade ? 'cars' : lastShopTab))
+  const [tab, setTabState] = useState<ShopTab>(() => shopTabFor(focus) ?? (!rusty ? 'cars' : (lastShopTab === 'upgrades' && !canUpgrade) || (lastShopTab === 'event' && !activeEvent()) ? 'cars' : lastShopTab))
   const setTab = (t: ShopTab) => {
     lastShopTab = t
     setTabState(t)
@@ -164,7 +170,8 @@ export function ShopPanel() {
     const raf = requestAnimationFrame(() => focusRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' }))
     return () => cancelAnimationFrame(raf)
   }, [focus])
-  const tabs: { id: ShopTab; label: React.ReactNode }[] = [...SHOP_GROUPS, ...(canUpgrade ? [{ id: 'upgrades' as const, label: '⬆ Upgrades' }] : [])]
+  const ev = activeEvent()
+  const tabs: { id: ShopTab; label: React.ReactNode }[] = [...SHOP_GROUPS.filter((g) => g.id !== 'event' || ev), ...(canUpgrade ? [{ id: 'upgrades' as const, label: '⬆ Upgrades' }] : [])]
   const group = SHOP_GROUPS.find((g) => g.id === tab)
   return (
     <Panel title="Shop" wide>
@@ -189,6 +196,7 @@ export function ShopPanel() {
                 >
                   {highlight && <span className="ribbon">START HERE</span>}
                   {sale.deal && !locked && <span className="ribbon deal">DEAL</span>}
+                  {b.event && <span className="ribbon spooky">LIMITED</span>}
                   <BuildingThumb def={b} />
                   <div className="card-text">
                     <div className="card-name">{b.name}</div>
@@ -262,7 +270,7 @@ export function ShowroomPanel() {
           return (
             <div key={c.id} data-id={c.id} className={`card car-card ${locked ? 'locked' : ''} ${focus === c.id ? 'focus' : ''}`}>
               <button className="thumb-look" aria-label={`Take a closer look at the ${c.name}`} onClick={() => setInspect(c.id)}>
-                <CarThumb color={color} body={c.body} />
+                <CarThumb color={color} body={c.body} model={c.id} />
                 <span className="look-badge">🔍</span>
               </button>
               <div className="card-name">{c.name}{c.legendary && <> <span className="rarity rarity-legendary">Legendary</span></>}</div>
@@ -284,7 +292,7 @@ export function ShowroomPanel() {
         })}
       </div>
       </>}
-      {look && <CarInspect title={look.name} body={look.body} color={colorFor[look.id] ?? look.colors[0]} onClose={() => setInspect(null)} />}
+      {look && <CarInspect title={look.name} body={look.body} model={look.id} color={colorFor[look.id] ?? look.colors[0]} onClose={() => setInspect(null)} />}
     </Panel>
   )
 }
@@ -346,7 +354,7 @@ export function GaragePanel() {
   // A paint job being tried on, cleared when another car is picked.
   const [painting, setPainting] = useState<{ car: string; job: PaintJob } | null>(null)
   const tryJob = painting && painting.car === car?.uid && tab === 'paint' ? painting.job : null
-  const look = car && def && { body: def.body, ...(tryJob ?? jobOf(car)), mods: withMod(car.mods, tryMod) }
+  const look = car && def && { body: def.body, model: def.id, ...(tryJob ?? jobOf(car)), mods: withMod(car.mods, tryMod) }
   return (
     <Panel title={`My Garage · ${cars.length} cars · ⚡${garagePower(cars)}`} wide>
       <div className="garage">
@@ -355,7 +363,7 @@ export function GaragePanel() {
             const d = carDef(c.model)
             return (
               <button key={c.uid} className={c.uid === car?.uid ? 'garage-item sel' : 'garage-item'} onClick={() => select(c.uid)}>
-                <CarThumb size="sm" color={c.color} finish={c.finish} body={d.body} stripe={c.stripe} mods={c.mods} />
+                <CarThumb size="sm" color={c.color} finish={c.finish} body={d.body} model={d.id} stripe={c.stripe} mods={c.mods} />
                 <span>{d.name}{c.plate && <span className="mini-plate">{c.plate}</span>}</span>
                 <small>PI {performance(d, c.upgrades, c.mods)}</small>
               </button>

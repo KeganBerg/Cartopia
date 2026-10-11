@@ -4,6 +4,7 @@ import { supabase } from './supabase'
 import { useGame } from '../game/store'
 import { CARS, MODS, carDef, performance, type Body } from '../game/data'
 import { displayName, isCleanName } from './names'
+import { joinRefereed } from './referee'
 
 // Live drag racing over Supabase Realtime. A shared lobby channel carries
 // presence and challenges; each race gets its own channel for positions.
@@ -226,12 +227,21 @@ export function refreshPresence() {
   lobby?.track(myCard())
 }
 
-export function challenge(to: string) {
+export async function challenge(to: string) {
   const l = useLive.getState()
   if (l.outgoing || (l.cooldownTo[to] ?? 0) > Date.now()) return
   const raceId = crypto.randomUUID()
-  sentIds.add(raceId)
   useLive.setState({ outgoing: { raceId, to } })
+  // Claim the race on the server before its id goes out to the lobby, so nobody
+  // else in the lobby can take the id first and block the race.
+  const ok = await joinRefereed(raceId, l.players.find((p) => p.id === to)?.uid)
+  if (useLive.getState().outgoing?.raceId !== raceId) return
+  if (!ok) {
+    useLive.setState({ outgoing: null })
+    useGame.getState().toast("Couldn't send the challenge. Try again in a moment.")
+    return
+  }
+  sentIds.add(raceId)
   lobby?.send({ type: 'broadcast', event: 'challenge', payload: { to, raceId, from: myCard() } })
   // Give up if nobody answers.
   setTimeout(() => {

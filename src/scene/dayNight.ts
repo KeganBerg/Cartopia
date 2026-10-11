@@ -38,15 +38,18 @@ export function onNight(f: (n: number) => void) {
   f(nightNow)
 }
 
-export function applyNight(n: number) {
-  glowMats.window.emissiveIntensity = n * 1.3
-  glowMats.bulb.emissiveIntensity = 0.2 + n * 2.2
-  glowMats.headlight.emissiveIntensity = 0.1 + n * 2
-  glowMats.taillight.emissiveIntensity = n * 1.2
+// `gloom` (0..1) is daytime darkness from bad weather: drivers switch their
+// headlights on and street lamps come up, though windows and neon wait for night.
+export function applyNight(n: number, gloom = 0) {
+  const lamps = Math.max(n, gloom * 0.8)
+  glowMats.window.emissiveIntensity = Math.max(n, gloom * 0.4) * 1.3
+  glowMats.bulb.emissiveIntensity = 0.2 + lamps * 2.2
+  glowMats.headlight.emissiveIntensity = 0.1 + Math.max(n, gloom) * 2
+  glowMats.taillight.emissiveIntensity = Math.max(n, gloom) * 1.2
   glowMats.screen.color.setScalar(0.72 + n * 0.16)
-  glowMats.pool.opacity = n * 0.75
-  glowMats.beam.opacity = n * 0.5
-  for (const m of [glowMats.pool, glowMats.beam]) m.visible = n > 0.02
+  glowMats.pool.opacity = lamps * 0.75
+  glowMats.beam.opacity = Math.max(n, gloom) * 0.5
+  for (const m of [glowMats.pool, glowMats.beam]) m.visible = m.opacity > 0.01
   for (const m of [glowMats.neonPink, glowMats.neonCyan, glowMats.neonViolet]) m.emissiveIntensity = 0.05 + n * 1.5
   glowMats.danceFloor.emissiveIntensity = n * 1.3
   nightNow = n

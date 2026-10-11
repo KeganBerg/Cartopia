@@ -20,9 +20,11 @@ import { DealsPanel } from './ui/Deals'
 import { LevelUpSplash } from './ui/LevelUp'
 import { AccountPanel } from './ui/Account'
 import { WelcomeBack } from './ui/WelcomeBack'
+import { GiftWatcher, GiftsPanel } from './ui/Gifts'
 import { GoalsPanel, DailyPanel, FlatPanel } from './ui/Goals'
 import { useGame, today } from './game/store'
 import { startCloudSync } from './lib/cloud'
+import './lib/rescue'
 import { startAmbience } from './lib/ambience'
 import { useTownPaused } from './scene/renderGate'
 
@@ -84,6 +86,8 @@ export default function App() {
       {panel === 'daily' && <DailyPanel />}
       {panel === 'flat' && <FlatPanel />}
       <WelcomeBack />
+      <GiftWatcher />
+      {panel === 'gifts' && <GiftsPanel />}
       <PrizePopup />
       <CampaignPrizePopup />
       <LevelUpSplash />

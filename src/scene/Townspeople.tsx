@@ -74,6 +74,8 @@ const PARK_GO: Record<string, [string, string]> = {
   busstop: ['🚌', 'catching the bus'], hotdog: ['🌭', 'getting a hot dog'], flagpole: ['🚩', 'going to see the town flag'],
   arch: ['🏁', 'taking a photo at the finish line'], playground: ['🛝', 'heading to the playground'], gazebo: ['🎶', 'going to the gazebo'],
   clocktower: ['🕰️', 'meeting a friend at the clock tower'],
+  pumpkins: ['🎃', 'picking a pumpkin'], scarecrow: ['🌾', 'going to see the scarecrow'],
+  graves: ['👻', 'daring a friend to visit the graveyard'], deadtree: ['🦇', 'going to see the haunted tree'],
 }
 const PARK_AT: Record<string, [string, string]> = {
   bench: ['🪑', 'resting on the bench'], fountain: ['⛲', 'watching the fountain'], pond: ['🦆', 'watching the ducks'],
@@ -82,19 +84,23 @@ const PARK_AT: Record<string, [string, string]> = {
   busstop: ['🚌', 'waiting for the bus'], hotdog: ['🌭', 'eating a hot dog'], flagpole: ['🚩', 'saluting the town flag'],
   arch: ['📸', 'posing under the finish line'], playground: ['🛝', 'playing on the swings'], gazebo: ['🎶', 'listening to the band'],
   clocktower: ['🕰️', 'waiting by the clock tower'],
+  pumpkins: ['🎃', 'picking out a pumpkin'], scarecrow: ['🌾', 'taking a selfie with the scarecrow'],
+  graves: ['👻', 'telling ghost stories'], deadtree: ['🦇', 'spotting bats in the haunted tree'],
 }
 
 // Where to stand at each decoration, as a distance from its middle.
 const SPOT: Record<string, number> = {
   bench: 0.06, fountain: 0.98, flowers: 0.86, tree: 0.5, palm: 0.5, statue: 0.78, lamp: 0.45, billboard: 0.7,
   pine: 0.7, picnic: 0.45, busstop: -0.22, hotdog: 0.5, flagpole: 0.6, arch: 0.4, gazebo: 0.25, clocktower: 0.8,
+  pumpkins: 0.6, scarecrow: 0.55, graves: 0.65, deadtree: 0.6,
 }
 // How long people linger, in seconds.
 const LINGER: Record<string, [number, number]> = {
   bench: [10, 24], fountain: [5, 12], statue: [4, 9], pond: [6, 14],
   picnic: [12, 26], busstop: [8, 18], hotdog: [4, 8], gazebo: [8, 18], playground: [10, 22], clocktower: [4, 9],
+  pumpkins: [5, 12], graves: [4, 9],
 }
-const PARKS = new Set(['bench', 'fountain', 'flowers', 'tree', 'palm', 'statue', 'pond', 'pine', 'picnic', 'busstop', 'hotdog', 'flagpole', 'arch', 'gazebo', 'clocktower'])
+const PARKS = new Set(['bench', 'fountain', 'flowers', 'tree', 'palm', 'statue', 'pond', 'pine', 'picnic', 'busstop', 'hotdog', 'flagpole', 'arch', 'gazebo', 'clocktower', 'pumpkins', 'scarecrow', 'graves', 'deadtree'])
 // Big decorations people walk up to, like the duck pond.
 const BIG_PARKS = new Set(['pond', 'playground'])
 // Seats: benches and the bus stop face out the front; at a picnic table people face the table.
