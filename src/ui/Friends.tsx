@@ -7,6 +7,7 @@ import { SocialTabs } from './Social'
 import { GiftButton } from './Gifts'
 import { recordHelp, refreshGifts, HELP_FUEL } from '../lib/gifts'
 import { signedInUser } from '../lib/cloud'
+import { GhostButton } from './GhostRace'
 
 export function FriendsPanel() {
   // Neighbours show right away; real players merge in when the query returns.
@@ -78,7 +79,8 @@ export function VisitBanner() {
   const helped = useGame((s) => (s.visiting ? s.helped[s.visiting.ownerId] === today() : false))
   const help = useGame((s) => s.helpFriend)
   const visit = useGame((s) => s.visit)
-  if (!v) return null
+  const racing = useGame((s) => s.panel === 'ghost')
+  if (!v || racing) return null
   const helpOut = () => {
     help()
     recordHelp(v.ownerId)
@@ -91,6 +93,7 @@ export function VisitBanner() {
       </div>
       <div className="row">
         {signedInUser() && <GiftButton to={v.ownerId} />}
+        <GhostButton town={v} />
         <button className="buy small" disabled={helped} onClick={helpOut} title={`They get +${HELP_FUEL} fuel too`}>{helped ? 'Helped today ✔' : 'Help out'}</button>
         <button className="buy small alt" onClick={() => visit(null)}>🏠 Home</button>
       </div>
