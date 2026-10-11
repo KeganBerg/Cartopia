@@ -121,3 +121,41 @@ export function RivalResult({ match, won, bet, bonus, myTime, theirTime, onBet, 
     </div>
   )
 }
+
+// The town rival's tile on the Race menu hub: face, taunt, and a one-tap race.
+export function RivalTile({ onRace }: { onRace: (m: RivalMatch) => void }) {
+  const now = useNow(1000)
+  const level = useGame((s) => s.level)
+  const progress = useGame((s) => s.rivals ?? NONE)
+  const showNeed = useGame((s) => s.showNeed)
+  const cur = currentRival(level, progress, now)
+  if (!cur) {
+    return (
+      <div className="rm-tile rm-rival rv-idle">
+        <span className="rm-face" aria-hidden>🏆</span>
+        <div className="rm-rmid"><span className="rm-tag">RIVALS</span><b className="rm-ttl">Town champ!</b><span className="rm-bub">No rival dares race you.</span></div>
+      </div>
+    )
+  }
+  const { def, visit, locked, away } = cur
+  const m = rivalMatch(def, visit, level)
+  const left = Math.max(0, Math.ceil((away - now) / 60000))
+  const line = locked ? `Rolls into town at level ${def.unlockLevel}.` : away ? `Tuning up. Back in ${left}m.` : visit === 0 ? def.lines.intro : def.lines.back[visit - 1]
+  return (
+    <div className={`rm-tile rm-rival${locked || away ? ' rv-idle' : ''}`} style={{ ['--rv' as string]: def.color }}>
+      <span className="rm-face" aria-hidden>{locked ? '❔' : def.icon}</span>
+      <div className="rm-rmid">
+        <span className="rm-tag">{locked ? 'RIVAL' : away ? 'RIVAL AWAY' : 'RIVAL IN TOWN'}</span>
+        <b className="rm-ttl">{locked ? '???' : def.name} {!locked && <Pips n={visit} />}</b>
+        <span className="rm-bub">{line}</span>
+      </div>
+      {locked ? (
+        <button className="buy small alt" onClick={() => showNeed('level', def.unlockLevel, def.name)}>🔒 Lv{def.unlockLevel}</button>
+      ) : away ? (
+        <button className="buy small alt" disabled>⏱ {left}m</button>
+      ) : (
+        <button className="buy rm-go" onClick={() => onRace(m)}>🏁 ${money(m.prize)}<small>⛽{RACE_FUEL}</small></button>
+      )}
+    </div>
+  )
+}

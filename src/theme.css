@@ -75,6 +75,12 @@ html {
   box-shadow: inset 0 2px 0 rgba(255,255,255,.4), 0 3px 0 rgba(0,0,0,.35);
 }
 :root .close .gi { filter: drop-shadow(0 1.5px 0 rgba(0,0,0,.35)); }
+.panel-back { flex: none; display: grid; place-items: center; padding: 0; cursor: pointer; }
+:root .panel-back {
+  width: 36px; height: 36px; border-radius: 12px; background: linear-gradient(#ffd84a, #ffa41a); border: 3px solid var(--line); color: var(--line);
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.5), 0 3px 0 rgba(0,0,0,.35);
+}
+:root .panel-back:active { transform: translateY(2px); box-shadow: inset 0 2px 0 rgba(255,255,255,.5), 0 1px 0 rgba(0,0,0,.35); }
 :root .sheet-tabs { background: var(--sheet); border-bottom: 2px solid #c6d7ee; gap: 6px; }
 :root .sheet-tabs button { background: #fff; color: #4a6283; border: 2px solid #b9cde8; border-radius: 12px; box-shadow: 0 2px 0 #b9cde8; }
 :root .sheet-tabs button.sel { background: linear-gradient(#ffd84a, #ffa41a); color: var(--line); border-color: var(--line); box-shadow: inset 0 2px 0 rgba(255,255,255,.5), 0 3px 0 rgba(0,0,0,.3); }
