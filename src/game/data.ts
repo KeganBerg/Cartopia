@@ -346,7 +346,7 @@ export const RESCUE_SPOTS: RescueSpot[] = [
     { model: 'bandit', rarity: 'scarce' }, { model: 'stallion', rarity: 'scarce' }, { model: 'vette', rarity: 'rare' },
   ] },
   { id: 'desert', name: 'Desert', icon: '🌵', unlockLevel: 7, cost: 7000, cars: [
-    { model: 'buggy', rarity: 'common' }, { model: 'hauler', rarity: 'common' }, { model: 'bandit', rarity: 'scarce' },
+    { model: 'buggy', rarity: 'common' }, { model: 'bandit', rarity: 'common' }, { model: 'stallion', rarity: 'scarce' },
     { model: 'charger', rarity: 'scarce' }, { model: 'lemans', rarity: 'rare' }, { model: 'gtr', rarity: 'rare' }, { model: 'speedster', rarity: 'rare' },
   ] },
   { id: 'track', name: 'Old Race Track', icon: '🏁', unlockLevel: 10, cost: 15000, cars: [
