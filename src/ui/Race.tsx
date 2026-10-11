@@ -110,6 +110,7 @@ export function RacePanel() {
   const campaignResult = useGame((s) => s.campaignResult)
 
   const livePlayers = useLive((l) => l.players)
+  const liveSignedIn = useLive((l) => l.signedIn)
   const outgoing = useLive((l) => l.outgoing)
   const mutedIds = useLive((l) => l.muted)
   const cooldownTo = useLive((l) => l.cooldownTo)
@@ -202,7 +203,8 @@ export function RacePanel() {
       {supabase && (
         <>
           <h3>Live now <small>(players online this minute, no fuel needed)</small></h3>
-          {livePlayers.length === 0 && <p className="hint">Nobody else is online right now. Open Cartopia in another browser or ask a friend to join!</p>}
+          {!liveSignedIn ? <p className="hint">Sign in from the Menu to race other players live.</p>
+            : livePlayers.length === 0 && <p className="hint">Nobody else is online right now. Open Cartopia in another browser or ask a friend to join!</p>}
           <div className="rivals">
             {livePlayers.filter((p) => !mutedIds[p.id]).map((p) => (
               <div key={p.id} className="rival">
@@ -527,47 +529,58 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
     if (!live) return
     let started = false
     let answeredReady = false
+    let disposed = false
+    let ch: ReturnType<typeof raceChannel> = null
+    let ping: ReturnType<typeof setInterval> | undefined
     const go = () => {
       if (started) return
       started = true
       setCountdown(3)
     }
-    const ch = raceChannel(live.raceId, {
-      onPos: (p) => {
-        const last = samples.current[samples.current.length - 1]
-        if (!last || p.t > last.t) samples.current.push(p)
-      },
-      onFinish: (ft) => {
-        them.current.finished = ft
-      },
-      onGo: go,
-      onLeave: () => {
-        if (started) return
-        useGame.getState().toast(`${live.opponent.town} called off the race`)
-        onExit()
-      },
-      onReady: () => {
-        if (live.host) {
-          ch?.send({ type: 'broadcast', event: 'go', payload: {} })
-          go()
-        } else if (!answeredReady) {
-          answeredReady = true
-          ch?.send({ type: 'broadcast', event: 'ready', payload: {} })
-        }
-      },
-    })
-    channel.current = ch
     const uid = live.opponent.uid
+    // The race channel is private to the two racers on the server's copy of the race, so join that first.
     joined.current = joinRefereed(live.raceId, uid)
     joined.current.then((ok) => {
-      if (!ok) refereed.current = 'no'
+      if (disposed) return
+      if (!ok) {
+        refereed.current = 'no'
+        useGame.getState().toast("Couldn't start the live race on the server. Try again in a moment.")
+        onExit()
+        return
+      }
+      ch = raceChannel(live.raceId, {
+        onPos: (p) => {
+          const last = samples.current[samples.current.length - 1]
+          if (!last || p.t > last.t) samples.current.push(p)
+        },
+        onFinish: (ft) => {
+          them.current.finished = ft
+        },
+        onGo: go,
+        onLeave: () => {
+          if (started) return
+          useGame.getState().toast(`${live.opponent.town} called off the race`)
+          onExit()
+        },
+        onReady: () => {
+          if (live.host) {
+            ch?.send({ type: 'broadcast', event: 'go', payload: {} })
+            go()
+          } else if (!answeredReady) {
+            answeredReady = true
+            ch?.send({ type: 'broadcast', event: 'ready', payload: {} })
+          }
+        },
+      })
+      channel.current = ch
+      // Keep pinging until the race starts in case the first message was missed.
+      ping = setInterval(() => {
+        if (!started) ch?.send({ type: 'broadcast', event: 'ready', payload: {} })
+      }, 1000)
     })
     if (uid) serverPi(uid).then((p) => p !== null && setServerRivalPi(p)).catch(() => {})
-    // Keep pinging until the race starts in case the first message was missed.
-    const ping = setInterval(() => {
-      if (!started) ch?.send({ type: 'broadcast', event: 'ready', payload: {} })
-    }, 1000)
     return () => {
+      disposed = true
       clearInterval(ping)
       // Leaving before the start tells the other player instead of leaving them waiting.
       if (!started) ch?.send({ type: 'broadcast', event: 'leave', payload: {} })
