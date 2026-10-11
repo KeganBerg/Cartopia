@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildingDef, carDef, knownBuilding, BUILDINGS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost, jobLevel, performance, fittedMods, modStats, modCost, MODS, MOD_SLOTS, CARS, takesDriver, loves, driverPayout, skillBoost, skillDrag, liveSkillBoost, SKILLS } from './data'
+import { buildingDef, carDef, knownBuilding, BUILDINGS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost, jobLevel, performance, fittedMods, modStats, modCost, MODS, MOD_SLOTS, ownedMods, CARS, takesDriver, loves, driverPayout, skillBoost, skillDrag, liveSkillBoost, SKILLS } from './data'
 
 describe('unknown ids from newer builds', () => {
   it('gives an unknown building a harmless stand-in instead of crashing', () => {
@@ -149,5 +149,13 @@ describe('race skills', () => {
   })
   it('gives every skill to at least one car', () => {
     for (const id of Object.keys(SKILLS)) expect(CARS.some((c) => c.skill === id), id).toBe(true)
+  })
+})
+
+describe('owned mods', () => {
+  it('owns whatever is fitted, plus everything bought for the car', () => {
+    expect(ownedMods({ mods: ['gtwing'] })).toEqual(['gtwing'])
+    expect(ownedMods({ mods: ['gtwing'], ownedMods: ['ducktail', 'gtwing', 'future-mod'] })).toEqual(['ducktail', 'gtwing'])
+    expect(ownedMods({})).toEqual([])
   })
 })

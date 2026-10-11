@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { Box3, Vector3, type Group } from 'three'
+import type { Group } from 'three'
 import { useGame } from '../game/store'
 import {
   buildingDef, buildingLevel, upgradable, upgradePayout, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap,
@@ -9,6 +9,7 @@ import {
 import { workingDriver, type PlacedBuilding } from '../game/store'
 import { CarThumb } from '../scene/BuildingPreview'
 import { BuildingModel } from '../scene/BuildingModel'
+import { seat } from '../scene/fit'
 import { Panel } from './Menus'
 
 const n = (v: number) => v.toLocaleString()
@@ -24,22 +25,7 @@ function Spinner({ def, level }: { def: BuildingDef; level: number }) {
   const ref = useRef<Group>(null)
   const inner = useRef<Group>(null)
   useLayoutEffect(() => {
-    const g = inner.current
-    const spin = ref.current
-    if (!g || !spin) return
-    // Measure unrotated and unscaled, so the last level's fit doesn't leak in.
-    const turn = spin.rotation.y
-    spin.rotation.y = 0
-    g.scale.setScalar(1)
-    g.position.set(0, 0, 0)
-    spin.updateMatrixWorld(true)
-    const box = new Box3().setFromObject(g)
-    spin.rotation.y = turn
-    const size = box.getSize(new Vector3())
-    const center = box.getCenter(new Vector3())
-    const k = Math.min(FIT_H / size.y, FIT_W / Math.hypot(size.x, size.z))
-    g.scale.setScalar(k)
-    g.position.set(-center.x * k, -box.min.y * k, -center.z * k)
+    if (inner.current && ref.current) seat(inner.current, ref.current, (b) => Math.min(FIT_H / b.h, FIT_W / (b.r * 2)))
   }, [def, level])
   useFrame((_, dt) => {
     if (ref.current) ref.current.rotation.y += dt * 0.5
@@ -216,7 +202,6 @@ export function ShopUpgrades() {
   const coins = useGame((s) => s.coins)
   const parts = useGame((s) => s.parts)
   const openUpgrade = useGame((s) => s.openUpgrade)
-  const [all, setAll] = useState(false)
   const order = (id: string) => BUILDINGS.findIndex((d) => d.id === id)
   // Cheapest next upgrade first; maxed-out buildings last.
   const costOf = (b: (typeof buildings)[number]) =>
@@ -225,13 +210,11 @@ export function ShopUpgrades() {
     .filter((b) => upgradable(buildingDef(b.def)))
     .sort((a, b) => costOf(a) - costOf(b) || order(a.def) - order(b.def))
   if (!sorted.length) return null
-  const FEW = 4
-  const mine = all ? sorted : sorted.slice(0, FEW)
   return (
     <section>
-      <h3>Upgrade your buildings <small>Taller, fancier, more coins, faster jobs</small></h3>
+      <p className="hint">Upgraded buildings grow taller and fancier, pay more coins and finish jobs sooner. Cheapest first.</p>
       <div className="upgrade-list">
-        {mine.map((b) => {
+        {sorted.map((b) => {
           const d = buildingDef(b.def)
           const lvl = buildingLevel(b)
           const max = lvl >= MAX_BUILDING_LEVEL
@@ -246,9 +229,6 @@ export function ShopUpgrades() {
           )
         })}
       </div>
-      {sorted.length > FEW && (
-        <button className="upgrade-more" onClick={() => setAll(!all)}>{all ? 'Show fewer' : `Show all ${sorted.length}`}</button>
-      )}
     </section>
   )
 }

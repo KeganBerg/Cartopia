@@ -165,25 +165,49 @@ export const windowTex = () =>
     }
   })
 
-// Car rim with spokes, used on the outside face of each wheel.
-export const rimTex = () =>
-  make('rim', 64, (g, s) => {
-    const c = s / 2
-    g.fillStyle = '#1b1b1b'
-    g.fillRect(0, 0, s, s)
-    g.fillStyle = '#e8eaed'
-    g.beginPath(); g.arc(c, c, s * 0.42, 0, Math.PI * 2); g.fill()
-    g.fillStyle = '#9aa0a6'
-    g.beginPath(); g.arc(c, c, s * 0.36, 0, Math.PI * 2); g.fill()
-    g.strokeStyle = '#f5f6f7'
-    g.lineWidth = 5
-    for (let i = 0; i < 5; i++) {
-      const a = (i / 5) * Math.PI * 2
-      g.beginPath(); g.moveTo(c, c); g.lineTo(c + Math.cos(a) * s * 0.36, c + Math.sin(a) * s * 0.36); g.stroke()
-    }
-    g.fillStyle = '#5f6368'
-    g.beginPath(); g.arc(c, c, s * 0.08, 0, Math.PI * 2); g.fill()
-  })
+// Car wheel atlas: the spoked rim on the left half (mapped onto the wheel's
+// faces) and the tyre's tread on the right half (wrapped round its edge), so a
+// whole wheel draws with one material.
+let wheelAtlas: CanvasTexture | null = null
+export function wheelTex() {
+  if (wheelAtlas) return wheelAtlas
+  const c = document.createElement('canvas')
+  c.width = 128
+  c.height = 64
+  const g = c.getContext('2d')!
+  const s = 64
+  const m = s / 2
+  g.fillStyle = '#1b1b1b'
+  g.fillRect(0, 0, 128, 64)
+  // Sidewall ring, then the rim, its dish and five spokes.
+  g.fillStyle = '#262626'
+  g.beginPath(); g.arc(m, m, s * 0.48, 0, Math.PI * 2); g.fill()
+  g.fillStyle = '#e8eaed'
+  g.beginPath(); g.arc(m, m, s * 0.4, 0, Math.PI * 2); g.fill()
+  g.fillStyle = '#80868b'
+  g.beginPath(); g.arc(m, m, s * 0.34, 0, Math.PI * 2); g.fill()
+  g.strokeStyle = '#f5f6f7'
+  g.lineCap = 'round'
+  g.lineWidth = 6
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2 - Math.PI / 2
+    g.beginPath(); g.moveTo(m, m); g.lineTo(m + Math.cos(a) * s * 0.35, m + Math.sin(a) * s * 0.35); g.stroke()
+  }
+  g.fillStyle = '#bdc1c6'
+  g.beginPath(); g.arc(m, m, s * 0.12, 0, Math.PI * 2); g.fill()
+  g.fillStyle = '#5f6368'
+  g.beginPath(); g.arc(m, m, s * 0.06, 0, Math.PI * 2); g.fill()
+  // Chunky tread blocks round the tyre.
+  g.fillStyle = '#2e2e2e'
+  for (let x = 64; x < 128; x += 4) {
+    g.fillRect(x, 6, 2, 22)
+    g.fillRect(x + 2, 36, 2, 22)
+  }
+  wheelAtlas = new CanvasTexture(c)
+  wheelAtlas.colorSpace = SRGBColorSpace
+  wheelAtlas.anisotropy = 4
+  return wheelAtlas
+}
 
 // Sky: blue gradient with soft cartoon clouds. Used as a dome in races and
 // as the backdrop around the town.

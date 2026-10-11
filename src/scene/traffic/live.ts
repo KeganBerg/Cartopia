@@ -1,7 +1,6 @@
 // The one traffic sim the town scene drives, shared so other things in town
 // (people on the pavements, say) can see the cars and the lights.
 import { Traffic } from './sim'
-import { lightAt } from './layout'
 
 export const liveTraffic = new Traffic()
 
@@ -19,5 +18,5 @@ export function crossingSignal(tile: string, side: number): 'walk' | 'wait' | nu
   if (!c?.signal) return null
   // Cars turning in from the cross street still use the crossing, so keep an
   // eye on them even on 'walk'.
-  return lightAt(c.offset, side, liveTraffic.t, c.clear) === 'red' ? 'walk' : 'wait'
+  return liveTraffic.lightOf(c.id, side) === 'red' ? 'walk' : 'wait'
 }
