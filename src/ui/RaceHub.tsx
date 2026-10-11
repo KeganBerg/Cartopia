@@ -9,7 +9,7 @@ import { supabase } from '../lib/supabase'
 import { venue as venueById } from '../scene/venues'
 import { CarThumb } from '../scene/BuildingPreview'
 import { RivalTile, type RivalMatch } from './Rivals'
-import { artClass, artStyle } from './venueArt'
+import { artStyle } from './venueArt'
 
 // The Race menu's front page: every race mode as a tile on one screen, each
 // showing its next race, so nothing needs scrolling to find.
@@ -65,7 +65,7 @@ export function RaceHub({ onOpen, onCampaign, onTour, onRival }: { onOpen: (t: H
 
   return (
     <div className="rm-hub">
-      <div className={`rm-tile rm-camp rm-photo${artClass(ch.venue)}`} style={artStyle(ch.venue)} {...tile('campaign')}>
+      <div className="rm-tile rm-camp rm-photo" style={artStyle('camp', ch.venue)} {...tile('campaign')}>
         <span className="rm-tag">CAMPAIGN</span>
         <b className="rm-ttl">{ch.name}</b>
         <span className="rm-meta">Chapter {ci + 1} of {CAMPAIGN.length} · ⭐ {stars}/{maxStars}</span>
@@ -75,7 +75,7 @@ export function RaceHub({ onOpen, onCampaign, onTour, onRival }: { onOpen: (t: H
         )}
       </div>
 
-      <div className={`rm-tile rm-tour rm-photo${artClass(leg.venue, leg.night)}${tourOpen ? '' : ' rm-locked'}`} style={artStyle(leg.venue, leg.night)} {...tile('tour')}>
+      <div className={`rm-tile rm-tour rm-photo${tourOpen ? '' : ' rm-locked'}`} style={artStyle('tour', leg.venue, leg.night)} {...tile('tour')}>
         <span className="rm-tag">PRO TOUR</span>
         <b className="rm-ttl">{leg.night ? `${tv.name} at Midnight` : `${tv.name} ${leg.name}`}</b>
         {tourOpen ? (
@@ -88,14 +88,14 @@ export function RaceHub({ onOpen, onCampaign, onTour, onRival }: { onOpen: (t: H
 
       <RivalTile onRace={onRival} />
 
-      <div className={`rm-tile rm-gp rm-photo${level < series.unlockLevel ? ' rm-locked' : ''}`} style={artStyle('main')} {...tile('gp')}>
+      <div className={`rm-tile rm-gp rm-photo${level < series.unlockLevel ? ' rm-locked' : ''}`} style={artStyle('gp')} {...tile('gp')}>
         <span className="rm-tag">GRAND PRIX</span>
         <b className="rm-ttl">{series.name}</b>
         <span className="rm-meta"><Rounds round={round} /></span>
         <span className="rm-meta">🎁 Mystery car at race {GP_ROUNDS}</span>
       </div>
 
-      <div className={`rm-tile rm-trial rm-photo${artClass(trial.id)}`} style={artStyle(trial.id)} {...tile('trial')}>
+      <div className="rm-tile rm-trial rm-photo" style={artStyle('trial', trial.id)} {...tile('trial')}>
         <span className="rm-tag">TIME TRIAL</span>
         <b className="rm-ttl">{trial.name}</b>
         <span className="rm-meta">⏱️ {best !== null ? `${best.toFixed(3)}s` : 'No time yet'}</span>
