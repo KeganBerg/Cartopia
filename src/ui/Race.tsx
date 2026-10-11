@@ -218,7 +218,7 @@ export function RacePanel() {
                     Waiting... Cancel
                   </button>
                 ) : (
-                  <button className="buy small alt" disabled={!!outgoing || p.closed || (cooldownTo[p.id] ?? 0) > Date.now()} onClick={() => challenge(p.id)}>
+                  <button className="buy small alt" disabled={!!outgoing || p.closed || (cooldownTo[p.id] ?? 0) > Date.now()} onClick={() => void challenge(p.id)}>
                     {p.closed ? 'Not taking races' : (cooldownTo[p.id] ?? 0) > Date.now() ? 'Try again soon' : `Challenge · win $${liveReward(p.pi)}`}
                   </button>
                 )}
