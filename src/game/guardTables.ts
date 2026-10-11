@@ -1,6 +1,6 @@
 // Tables the server's save guard uses to check restores and Grand Prix wins
 // (supabase/migrations/0016_econ_restore_gp.sql, 0022_rescue_rolls.sql). guardTables.test.ts keeps them in step.
-import { BARN_RARITY, GP_ROUNDS, GP_SERIES, RARITY, RESCUE_CAR_CHANCE, RESCUE_PINS, RESCUE_SPOTS, VISITORS, VISIT_GAP_MIN, VISITS_PER_DAY, type Rarity } from './data'
+import { BARN_PER_DAY, BARN_RARITY, GP_ROUNDS, GP_SERIES, RARITY, RESCUE_CAR_CHANCE, RESCUE_PINS, RESCUE_SPOTS, VISITORS, VISIT_GAP_MIN, VISITS_PER_DAY, type Rarity } from './data'
 import { MAX_RACE_PI, freshRacer, raceFloor, stepRacer } from './race'
 
 // Pins in one search, and the chance each one hides a car.
@@ -77,5 +77,6 @@ export function visitorTable() {
     gap: VISIT_GAP_MIN,
     perDay: VISITS_PER_DAY,
     barn: BARN_RARITY,
+    barnPerDay: BARN_PER_DAY,
   }
 }

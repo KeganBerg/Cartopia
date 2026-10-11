@@ -2,7 +2,8 @@
 -- turns up: a street racer to beat, a tourist who tips, a mystery car to tap before it drives off,
 -- or a tip for Rusty about a barn find.
 --   * visitor_next() decides who comes and fixes the prize from the saved level. One visitor at a
---     time, at most one every VISIT_GAP_MIN minutes and VISITS_PER_DAY a UTC day (data.ts).
+--     time, at most one every VISIT_GAP_MIN minutes and VISITS_PER_DAY a UTC day, and at most
+--     BARN_PER_DAY barn tips a day, mostly commons (data.ts).
 --   * visitor_claim() pays a visitor once, before it leaves, and numbers each claim (seq 1, 2, 3...).
 --     A barn find is a car Rusty found: it goes into econ_private.rescue_finds like a search's, so
 --     the save guard takes it into storage (0022), at no search cost.
@@ -43,7 +44,7 @@ language plpgsql security definer set search_path = '' as $$
 declare
   me uuid := auth.uid();
   -- visitors:begin
-  t jsonb := $visitors${"kinds":{"racer":{"weight":30,"minutes":5,"coins":100,"coinsPerLevel":25,"xp":0,"xpPerLevel":0,"parts":3,"bucksChance":0.05},"tourist":{"weight":35,"minutes":5,"coins":50,"coinsPerLevel":10,"xp":5,"xpPerLevel":1,"parts":0,"bucksChance":0},"mystery":{"weight":25,"minutes":0.5,"coins":100,"coinsPerLevel":20,"xp":10,"xpPerLevel":2,"parts":2,"bucksChance":0.1},"barn":{"weight":10,"minutes":10,"coins":0,"coinsPerLevel":0,"xp":0,"xpPerLevel":0,"parts":0,"bucksChance":0}},"gap":4,"perDay":30,"barn":{"common":30,"scarce":50,"rare":20}}$visitors$::jsonb;
+  t jsonb := $visitors${"kinds":{"racer":{"weight":30,"minutes":5,"coins":60,"coinsPerLevel":15,"xp":0,"xpPerLevel":0,"parts":3,"bucksChance":0.05},"tourist":{"weight":40,"minutes":5,"coins":30,"coinsPerLevel":6,"xp":3,"xpPerLevel":1,"parts":0,"bucksChance":0},"mystery":{"weight":25,"minutes":0.5,"coins":60,"coinsPerLevel":12,"xp":10,"xpPerLevel":2,"parts":2,"bucksChance":0.1},"barn":{"weight":5,"minutes":10,"coins":0,"coinsPerLevel":0,"xp":0,"xpPerLevel":0,"parts":0,"bucksChance":0}},"gap":4,"perDay":30,"barn":{"common":70,"scarce":25,"rare":5},"barnPerDay":1}$visitors$::jsonb;
   -- visitors:end
   cur public.town_visits;
   last_at timestamptz;
@@ -81,7 +82,9 @@ begin
     return jsonb_build_object('wait', 60);
   end if;
   rusty := coalesce(p_barn, false) and jsonb_typeof(st -> 'buildings') = 'array'
-    and exists (select 1 from jsonb_array_elements(st -> 'buildings') b where b ->> 'def' = 'rescue');
+    and exists (select 1 from jsonb_array_elements(st -> 'buildings') b where b ->> 'def' = 'rescue')
+    and (select count(*) from public.town_visits v where v.owner_id = me and v.kind = 'barn'
+         and v.created_at >= date_trunc('day', now() at time zone 'utc') at time zone 'utc') < (t ->> 'barnPerDay')::int;
   for k, p in select e.key, e.value from jsonb_each(t -> 'kinds') e loop
     if k <> 'barn' or rusty then total := total + (p ->> 'weight')::numeric; end if;
   end loop;
@@ -113,7 +116,7 @@ declare
   spots jsonb := $barnspots${"suburbs":{"unlock":1,"cars":[["pip","common"],["civic","common"],["bug","common"],["woodie","scarce"],["trail","scarce"],["miata","rare"]]},"farm":{"unlock":3,"cars":[["bug","common"],["trail","common"],["hauler","common"],["woodie","scarce"],["buggy","scarce"],["stallion","rare"]]},"downtown":{"unlock":5,"cars":[["civic","common"],["cruiser","common"],["rally","scarce"],["bandit","scarce"],["stallion","scarce"],["vette","rare"]]},"desert":{"unlock":7,"cars":[["buggy","common"],["hauler","common"],["bandit","scarce"],["charger","scarce"],["lemans","rare"],["gtr","rare"],["speedster","rare"]]},"track":{"unlock":10,"cars":[["rally","common"],["vette","common"],["charger","scarce"],["lemans","scarce"],["gullwing","rare"],["hyper","rare"]]}}$barnspots$::jsonb;
   -- barnspots:end
   -- visitors:begin
-  t jsonb := $visitors${"kinds":{"racer":{"weight":30,"minutes":5,"coins":100,"coinsPerLevel":25,"xp":0,"xpPerLevel":0,"parts":3,"bucksChance":0.05},"tourist":{"weight":35,"minutes":5,"coins":50,"coinsPerLevel":10,"xp":5,"xpPerLevel":1,"parts":0,"bucksChance":0},"mystery":{"weight":25,"minutes":0.5,"coins":100,"coinsPerLevel":20,"xp":10,"xpPerLevel":2,"parts":2,"bucksChance":0.1},"barn":{"weight":10,"minutes":10,"coins":0,"coinsPerLevel":0,"xp":0,"xpPerLevel":0,"parts":0,"bucksChance":0}},"gap":4,"perDay":30,"barn":{"common":30,"scarce":50,"rare":20}}$visitors$::jsonb;
+  t jsonb := $visitors${"kinds":{"racer":{"weight":30,"minutes":5,"coins":60,"coinsPerLevel":15,"xp":0,"xpPerLevel":0,"parts":3,"bucksChance":0.05},"tourist":{"weight":40,"minutes":5,"coins":30,"coinsPerLevel":6,"xp":3,"xpPerLevel":1,"parts":0,"bucksChance":0},"mystery":{"weight":25,"minutes":0.5,"coins":60,"coinsPerLevel":12,"xp":10,"xpPerLevel":2,"parts":2,"bucksChance":0.1},"barn":{"weight":5,"minutes":10,"coins":0,"coinsPerLevel":0,"xp":0,"xpPerLevel":0,"parts":0,"bucksChance":0}},"gap":4,"perDay":30,"barn":{"common":70,"scarce":25,"rare":5},"barnPerDay":1}$visitors$::jsonb;
   -- visitors:end
   v public.town_visits;
   n int;
