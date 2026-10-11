@@ -165,10 +165,11 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
     case 'academy': {
       const h = 1.15 + lift
       // Learners slalom east past the cones, swing round the far end, cruise back
-      // along the outer lane and round again: wide enough bends to steer through.
+      // along the outer lane and round again. The two lanes sit far enough apart
+      // that cars passing each other on them never touch.
       const weave = smoothLoop([
-        [-1.35, 0.62], [-0.9, 0.51], [-0.45, 0.75], [0, 0.99], [0.45, 0.75], [0.9, 0.51], [1.3, 0.62], [1.55, 0.85],
-        [1.6, 1.15], [1.45, 1.42], [1.1, 1.52], [0, 1.52], [-1.1, 1.52], [-1.45, 1.42], [-1.6, 1.15], [-1.55, 0.82],
+        [-1.2, 0.63], [-0.8, 0.5], [-0.4, 0.68], [0, 0.86], [0.4, 0.68], [0.8, 0.5], [1.2, 0.63], [1.55, 0.88],
+        [1.62, 1.12], [1.5, 1.42], [1.15, 1.58], [0, 1.6], [-1.15, 1.58], [-1.5, 1.42], [-1.62, 1.12], [-1.55, 0.88],
       ])
       return (
         <group>
@@ -177,8 +178,9 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
           <Paint m={m} at={[0, 0.062, 1.9]} s={[3.8, 0.04]} />
           <Paint m={m} at={[0, 0.062, -0.3]} s={[3.8, 0.04]} />
           {[-1, 1].map((sd) => <Paint key={sd} m={m} at={[sd * 1.9, 0.062, 0.8]} s={[0.04, 2.2]} />)}
-          <Paint m={m} at={[0, 0.062, 0.75]} s={[2.6, 0.02]} c={YELLOW} />
-          {[-0.9, 0, 0.9].map((x) => <Cone key={x} m={m} at={[x, 0.06, 0.75]} />)}
+          <Paint m={m} at={[0, 0.062, 0.68]} s={[2.6, 0.02]} c={YELLOW} />
+          {/* Each cone sits on the far side of the line from where the learners pass it. */}
+          {([[-0.8, 0.86], [0, 0.5], [0.8, 0.86]] as const).map(([x, z]) => <Cone key={x} m={m} at={[x, 0.06, z]} />)}
           {[-0.25, 0, 0.25, 0.5].map((x) => <Paint key={x} m={m} at={[x - 1.0, 0.063, 0.0]} s={[0.12, 0.42]} />)}
           <Paint m={m} at={[-0.4, 0.063, -0.08]} s={[0.06, 0.4]} />
           {/* Parallel parking box with cones at its corners. */}
