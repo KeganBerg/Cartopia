@@ -259,7 +259,7 @@ export function ShowroomPanel() {
           return (
             <div key={c.id} data-id={c.id} className={`card car-card ${locked ? 'locked' : ''} ${focus === c.id ? 'focus' : ''}`}>
               <button className="thumb-look" aria-label={`Take a closer look at the ${c.name}`} onClick={() => setInspect(c.id)}>
-                <CarThumb color={color} body={c.body} />
+                <CarThumb color={color} body={c.body} model={c.id} />
                 <span className="look-badge">🔍</span>
               </button>
               <div className="card-name">{c.name}{c.legendary && <> <span className="rarity rarity-legendary">Legendary</span></>}</div>
@@ -281,7 +281,7 @@ export function ShowroomPanel() {
         })}
       </div>
       </>}
-      {look && <CarInspect title={look.name} body={look.body} color={colorFor[look.id] ?? look.colors[0]} onClose={() => setInspect(null)} />}
+      {look && <CarInspect title={look.name} body={look.body} model={look.id} color={colorFor[look.id] ?? look.colors[0]} onClose={() => setInspect(null)} />}
     </Panel>
   )
 }
@@ -343,7 +343,7 @@ export function GaragePanel() {
   // A paint job being tried on, cleared when another car is picked.
   const [painting, setPainting] = useState<{ car: string; job: PaintJob } | null>(null)
   const tryJob = painting && painting.car === car?.uid && tab === 'paint' ? painting.job : null
-  const look = car && def && { body: def.body, ...(tryJob ?? jobOf(car)), mods: withMod(car.mods, tryMod) }
+  const look = car && def && { body: def.body, model: def.id, ...(tryJob ?? jobOf(car)), mods: withMod(car.mods, tryMod) }
   return (
     <Panel title={`My Garage · ${cars.length} cars · ⚡${garagePower(cars)}`} wide>
       <div className="garage">
@@ -352,7 +352,7 @@ export function GaragePanel() {
             const d = carDef(c.model)
             return (
               <button key={c.uid} className={c.uid === car?.uid ? 'garage-item sel' : 'garage-item'} onClick={() => select(c.uid)}>
-                <CarThumb size="sm" color={c.color} finish={c.finish} body={d.body} stripe={c.stripe} mods={c.mods} />
+                <CarThumb size="sm" color={c.color} finish={c.finish} body={d.body} model={d.id} stripe={c.stripe} mods={c.mods} />
                 <span>{d.name}{c.plate && <span className="mini-plate">{c.plate}</span>}</span>
                 <small>PI {performance(d, c.upgrades, c.mods)}</small>
               </button>

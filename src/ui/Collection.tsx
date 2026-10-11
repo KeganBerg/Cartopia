@@ -45,7 +45,7 @@ function SetRow({ set, onFind }: { set: CarSet; onFind: (model: string) => void 
           if (mine) {
             return (
               <div key={m} className="book-car" title={def.name}>
-                <CarThumb size="sm" color={mine.color} body={def.body} stripe={mine.stripe} mods={mine.mods} />
+                <CarThumb size="sm" color={mine.color} body={def.body} model={def.id} stripe={mine.stripe} mods={mine.mods} />
                 <span className="book-car-name">{def.name}</span>
               </div>
             )
@@ -53,7 +53,7 @@ function SetRow({ set, onFind }: { set: CarSet; onFind: (model: string) => void 
           const src = carSource(def)
           return (
             <button key={m} className="book-car missing" title={`${def.name}: ${src.text}`} onClick={() => onFind(m)}>
-              <CarThumb size="sm" color="#37474f" body={def.body} />
+              <CarThumb size="sm" color="#37474f" body={def.body} model={def.id} />
               <span className="book-car-name">{def.name}</span>
               <span className="book-src">{src.icon} {src.text}</span>
             </button>
