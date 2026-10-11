@@ -1,13 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { Canvas } from '@react-three/fiber'
+import { NeutralToneMapping } from 'three'
 import { useGame, hasRusty, type Loot } from '../game/store'
 import { RESCUE_SPOTS, RARITY, STORAGE_MAX, carDef, performance, restoreCost, rushBucks, type Rarity } from '../game/data'
 import { useNow } from '../scene/useNow'
 import { CarPreview } from '../scene/CarPreview'
 import { Panel, SkillTag } from './Menus'
 import { CarThumb } from '../scene/BuildingPreview'
-
-// Where the pins sit on the search map, in percent.
-const PIN_SPOTS: [number, number][] = [[14, 22], [40, 14], [70, 20], [86, 46], [62, 52], [30, 48], [18, 78], [52, 82]]
+import { RescueScene } from '../scene/RescueScene'
 
 function fmt(ms: number) {
   const sec = Math.max(0, Math.ceil(ms / 1000))
@@ -111,54 +111,94 @@ function SpotList() {
   )
 }
 
-function SearchMap() {
+// The search, full screen: Rusty's tow truck drives a 3D lot (RescueScene)
+// and the controls float over it, like a race.
+function SearchScreen() {
   const q = useGame((s) => s.search)!
   const bucks = useGame((s) => s.bucks)
   const reveal = useGame((s) => s.revealPin)
   const fix = useGame((s) => s.fixTruck)
   const abandon = useGame((s) => s.abandonSearch)
   const home = useGame((s) => s.towHome)
+  const openPanel = useGame((s) => s.openPanel)
   const spot = RESCUE_SPOTS.find((o) => o.id === q.spot)!
-  const found = q.pins.filter((l, i) => q.revealed[i] && l.kind !== 'nothing')
+  const [autoPicked, setAuto] = useState(false)
+  const [leaving, setLeaving] = useState(false)
+  const [busy, setBusy] = useState(true)
+  const [found, setFound] = useState<{ i: number; n: number } | null>(null)
   const left = q.revealed.filter((r) => !r).length
-  const truck = q.truckAt === null ? [50, 50] : PIN_SPOTS[q.truckAt]
+  const haul = q.pins.map((l, i) => ({ l, i })).filter(({ l, i }) => q.revealed[i] && l.kind !== 'nothing')
+  const started = q.revealed.some(Boolean)
+  const auto = autoPicked && left > 0
+
+  useEffect(() => {
+    if (!found) return
+    const id = setTimeout(() => setFound(null), 1900)
+    return () => clearTimeout(id)
+  }, [found])
+
+  const pop = found ? q.pins[found.i] : null
+  const popLabel = pop ? lootLabel(pop) : null
   return (
-    <div className="search">
-      <p className="hint">{left ? `Tap the red pins to send Rusty's tow truck. ${left} left to check in the ${spot.name}.` : 'Every pin checked. Tow it all home!'}</p>
-      <div className={`search-map map-${spot.id}`}>
-        <svg className="map-roads" viewBox="0 0 100 100" preserveAspectRatio="none">
-          <path d="M14 22 L40 14 L70 20 L86 46 L62 52 L30 48 L18 78 L52 82" />
-          <path d="M50 50 L62 52 M50 50 L30 48" />
-        </svg>
-        {PIN_SPOTS.map(([x, y], i) => {
-          const open = q.revealed[i]
-          const l = lootLabel(q.pins[i])
-          return (
-            <button key={i} className={open ? `pin open ${q.pins[i].kind === 'car' ? 'pin-car' : ''}` : 'pin'} style={{ left: `${x}%`, top: `${y}%` }} onClick={() => reveal(i)} disabled={open || q.flat}>
-              {open ? l.icon : '📍'}
-            </button>
-          )
+    <div className="race-full rescue-full">
+      <Canvas className="rf-canvas" camera={{ position: [0, 14, 12], fov: 42, near: 0.5, far: 200 }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
+        <RescueScene
+          search={q}
+          fast={auto}
+          auto={auto}
+          leaving={leaving}
+          onArrive={reveal}
+          onFound={(i) => setFound((f) => ({ i, n: (f?.n ?? 0) + 1 }))}
+          onLeft={home}
+          onBusy={setBusy}
+        />
+      </Canvas>
+      <div className="rf-top">
+        <h2>{spot.icon} {spot.name}</h2>
+        <button className="close" onClick={() => openPanel(null)} aria-label="Close">✕</button>
+      </div>
+      <div className="rs-dots" aria-label={`${left} spots left`}>
+        {q.revealed.map((r, i) => {
+          const l = q.pins[i]
+          return <span key={i} className={r ? (l.kind === 'car' ? `rs-dot open car rr-${l.rarity}` : 'rs-dot open') : 'rs-dot'}>{r ? lootLabel(l).icon : ''}</span>
         })}
-        <span className="truck" style={{ left: `${truck[0] + 7}%`, top: `${truck[1] + 6}%` }}>🛻</span>
-        {q.flat && (
-          <div className="flat-pop">
-            <b>🛞 The tow truck got a flat!</b>
-            <p>Fix it to keep searching, or head home empty-handed.</p>
+      </div>
+      {!started && !busy && !auto && <div className="rs-coach">👆 Tap a glowing spot</div>}
+      {pop && popLabel && (
+        <div key={found!.n} className={pop.kind === 'car' ? `rs-found car rr-${pop.rarity}` : 'rs-found'}>
+          {pop.kind === 'car' ? <CarThumb size="xs" body={carDef(pop.model).body} color={carDef(pop.model).colors[0]} rusty /> : <span className="rs-found-icon">{popLabel.icon}</span>}
+          <b>{popLabel.text}</b>
+          {pop.kind === 'car' && <RarityTag r={pop.rarity} />}
+        </div>
+      )}
+      {q.flat && (
+        <div className="rs-flat-wrap">
+          <div className="flat-pop rs-flat">
+            <b>🛞 Flat tire!</b>
             <div className="row">
               <button className="buy" onClick={fix}>Fix · B 1{bucks < 1 ? ' (need 1)' : ''}</button>
               <button className="sell" onClick={abandon}>Go home</button>
             </div>
           </div>
-        )}
+        </div>
+      )}
+      <div className="rs-bottom">
+        <div className="rs-haul">
+          {haul.length ? haul.map(({ l, i }) => {
+            const t = lootLabel(l)
+            return (
+              <span key={i} className={l.kind === 'car' ? 'haul-item car' : 'haul-item'}>
+                {l.kind === 'car' ? <CarThumb size="xs" body={carDef(l.model).body} color={carDef(l.model).colors[0]} rusty /> : t.icon} {l.kind === 'car' ? <RarityTag r={l.rarity} /> : t.text}
+              </span>
+            )
+          }) : <span className="rs-empty">🛻 Haul is empty</span>}
+        </div>
+        <div className="rs-actions">
+          <button className="sell rs-leave" onClick={abandon} disabled={leaving}>Leave</button>
+          {left > 0 && <button className={auto ? 'buy alt rs-auto on' : 'buy alt rs-auto'} onClick={() => setAuto((a) => !a)} disabled={q.flat || leaving}>{auto ? '⏸ Stop' : '⏩ Search all'}</button>}
+          <button className={left ? 'buy rs-home' : 'buy rs-home ready'} disabled={q.flat || !started || leaving} onClick={() => { setAuto(false); setLeaving(true) }}>🏠 Tow home</button>
+        </div>
       </div>
-      <div className="haul">
-        <b>Haul:</b>
-        {found.length ? found.map((l, i) => {
-          const t = lootLabel(l)
-          return <span key={i} className={l.kind === 'car' ? 'haul-item car' : 'haul-item'}>{l.kind === 'car' ? <CarThumb size="xs" body={carDef(l.model).body} color={carDef(l.model).colors[0]} rusty /> : t.icon} {t.text}{l.kind === 'car' && <> <RarityTag r={l.rarity} /></>}</span>
-        }) : <span className="hint">Nothing yet</span>}
-      </div>
-      <button className="buy" disabled={q.flat || !q.revealed.some(Boolean)} onClick={home}>🏠 Tow it home</button>
     </div>
   )
 }
@@ -184,22 +224,13 @@ function PlateScreen({ onDone }: { onDone: () => void }) {
 export function RescuePanel() {
   const rusty = useGame((s) => hasRusty(s))
   const searching = useGame((s) => !!s.search)
-  const abandon = useGame((s) => s.abandonSearch)
-  const openPanel = useGame((s) => s.openPanel)
   const junkCount = useGame((s) => s.junkyard.length)
   const [tab, setTab] = useState<'find' | 'storage'>(junkCount ? 'storage' : 'find')
   const [naming, setNaming] = useState(false)
 
   if (!rusty) return null
   if (naming) return <Panel title="Restored!" onClose={() => setNaming(false)}><PlateScreen onDone={() => setNaming(false)} /></Panel>
-  if (searching) {
-    return (
-      <Panel title="Searching for cars" wide onClose={() => openPanel(null)}>
-        <SearchMap />
-        <button className="tut-skip" onClick={abandon}>Leave without the haul</button>
-      </Panel>
-    )
-  }
+  if (searching) return <SearchScreen />
   return (
     <Panel title="Rusty's Rescue" wide>
       <p className="hint">Rusty searches for old cars, then fixes them up in his bay. Rescued cars join your town, and some classics can only be found here.</p>
