@@ -1,3 +1,4 @@
+import { mergeCandidates } from '../game/merge'
 import { useEffect, useRef, useState } from 'react'
 import { useGame, hasRusty } from '../game/store'
 import { garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, carDef, performance, upgradeCost, buildingDef, upgradable, loves, readySets, type BuildingDef } from '../game/data'
@@ -49,8 +50,10 @@ function EditBar() {
     const b = s.selected ? s.buildings.find((o) => o.uid === s.selected) : undefined
     return !!b && upgradable(buildingDef(b.def))
   })
+  const canMerge = useGame((s) => (s.mode === 'merge' ? mergeCandidates(s.buildings).length > 0 || s.buildings.some((b) => b.merge) : true))
   const hint =
     mode === 'expand' ? 'Tap a For Sale sign to buy the land next to your town'
+    : mode === 'merge' ? (canMerge ? 'Tap 🧩 to merge 4 matching buildings into one big one' : 'Put 4 matching buildings (same level) in a square to merge them')
     : mode === 'road' ? 'Click or drag to lay road (10 coins per tile)'
     : mode === 'bulldoze' ? 'Click or drag to remove (buildings refund half)'
     : mode === 'move' && again && selected ? 'Built! Rotate or drag it to adjust it'
@@ -64,6 +67,7 @@ function EditBar() {
         <button className={mode === 'bulldoze' ? 'tool active' : 'tool'} onClick={() => setMode('bulldoze')}>🚜 Bulldoze</button>
         <button className={mode === 'move' ? 'tool active' : 'tool'} onClick={() => setMode('move')}>✋ Move</button>
         <button className={mode === 'expand' ? 'tool active' : 'tool'} onClick={() => setMode('expand')}>🗺 Land</button>
+        <button className={mode === 'merge' ? 'tool active' : 'tool'} onClick={() => setMode('merge')}>🧩 Merge</button>
         {((mode === 'place' && placing) || (mode === 'move' && selected)) && <button className="tool" onClick={rotateCurrent} title="Rotate (R)">🔄 Rotate</button>}
         {mode === 'move' && selected && canUpgrade && <button className="tool" onClick={() => openUpgrade(selected)}>⬆ Upgrade</button>}
         {mode === 'move' && again && <button className="tool" onClick={() => setMode('place', again)}>➕ Build another</button>}

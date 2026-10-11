@@ -7,12 +7,14 @@ import {
 import { sfx } from '../lib/sound'
 import { msUntilNight } from './clock'
 import { requestTrip, requestVisit } from './trips'
+import { groupOf, mergeCandidates, applyMerge, applySplit } from './merge'
 
 // rot: quarter turns the player chose (0 faces south). Unset means face the nearest road.
 // level: upgrade level 1-10 (see MAX_BUILDING_LEVEL); unset means 1.
 // jobLevel: the level the running job started at, so an upgrade mid-job only pays from the next job.
 // car: uid of the owned car assigned to drive for this business (see DRIVER_BONUS).
-export type PlacedBuilding = { uid: string; def: string; x: number; z: number; jobEndsAt: number | null; rot?: number; level?: number; jobLevel?: number; car?: string }
+// merge: set on the top-left building of a merged 2x2 or 4x4 block (see merge.ts).
+export type PlacedBuilding = { uid: string; def: string; x: number; z: number; jobEndsAt: number | null; rot?: number; level?: number; jobLevel?: number; car?: string; merge?: number }
 export type OwnedCar = { uid: string; model: string; color: string; upgrades: Record<UpgradeSlot, number>; flat?: boolean; lowFuel?: boolean; stripe?: string | null; finish?: Finish; plate?: string; mods?: string[]; ownedMods?: string[] }
 // A rusty find waiting in Rusty's storage, and the one car in the restore bay.
 export type JunkCar = { uid: string; model: string; rarity: Rarity }
@@ -69,7 +71,7 @@ export type SaveState = {
   updatedAt: number
 }
 
-export type Mode = 'play' | 'place' | 'move' | 'road' | 'bulldoze' | 'expand'
+export type Mode = 'play' | 'place' | 'move' | 'road' | 'bulldoze' | 'expand' | 'merge'
 export type Resource = 'coins' | 'parts' | 'fuel' | 'bucks' | 'level'
 export type Need = { res: Resource; missing: number; what?: string }
 
@@ -122,6 +124,8 @@ type Actions = {
   moveBuilding: (uid: string, x: number, z: number, rot?: number) => boolean
   paintRoad: (x: number, z: number) => void
   bulldoze: (x: number, z: number) => void
+  mergeBlock: (anchor: string, size: number) => void
+  splitBlock: (uid: string) => void
   tapBuilding: (uid: string) => void
   openUpgrade: (uid: string) => void
   upgradeBuilding: (uid: string) => boolean
@@ -428,6 +432,55 @@ function addXp(s: GameState, amount: number): Partial<GameState> {
 
 // Apply an action's changes, then its XP. Level-up bonuses add on top of the
 // action's own coins and bucks instead of replacing them.
+// A tap on a merged business works the whole block as one: collect every
+// finished job, otherwise start every idle one the fuel covers, otherwise
+// show its upgrades. Each building still runs and pays its own job.
+function tapMerged(s: GameState, set: (p: Partial<GameState>) => void, uids: string[]): void {
+  const now = Date.now()
+  const members = s.buildings.filter((o) => uids.includes(o.uid))
+  const d = buildingDef(members[0].def)
+  const ready = members.filter((o) => o.jobEndsAt !== null && now >= o.jobEndsAt)
+  if (ready.length) {
+    let pay = 0, parts = 0, xp = 0
+    for (const o of ready) {
+      pay += driverPayout(d, jobLevel(o), workingDriver(s, o))
+      parts += upgradePartsPayout(d, jobLevel(o))
+      xp += upgradeXp(d, jobLevel(o))
+    }
+    const done = new Set(ready.map((o) => o.uid))
+    sfx.coin()
+    s.toast(`+${pay.toLocaleString()} coins${parts ? `, +${parts} parts` : ''}, +${xp} XP`)
+    return set(withXp(s, xp, {
+      coins: s.coins + pay,
+      parts: s.parts + parts,
+      stats: { ...s.stats, jobs: (s.stats.jobs ?? 0) + ready.length, coinsEarned: (s.stats.coinsEarned ?? 0) + pay },
+      buildings: s.buildings.map((o) => (done.has(o.uid) ? { ...o, jobEndsAt: null, jobLevel: undefined } : o)),
+      updatedAt: now,
+    }))
+  }
+  const idle = members.filter((o) => o.jobEndsAt === null)
+  if (!idle.length) return s.openUpgrade(members[0].uid)
+  if (!isOpen(d, now)) return s.toast(`The ${d.name} only opens at night. Doors open in ${Math.max(1, Math.ceil(msUntilNight(now) / 60000))} min.`)
+  const cost = d.fuelCost ?? 0
+  const n = cost ? Math.min(idle.length, Math.floor(s.fuel / cost)) : idle.length
+  if (!n) return s.showNeed('fuel', cost * idle.length - s.fuel, `the merged ${d.name}`)
+  if (n < idle.length) s.toast(`Fuel for ${n} of ${idle.length} jobs. The rest start when you tap again.`)
+  sfx.start()
+  const go = new Set(idle.slice(0, n).map((o) => o.uid))
+  for (const o of idle.slice(0, n)) if (o.car) requestVisit(o.car, o.uid)
+  const cap = fuelCap(s)
+  set({
+    fuel: s.fuel - n * cost,
+    fuelUpdatedAt: s.fuel >= cap ? now : s.fuelUpdatedAt,
+    buildings: s.buildings.map((o) => {
+      if (!go.has(o.uid)) return o
+      const lvl = buildingLevel(o)
+      return { ...o, jobEndsAt: now + upgradeJobSeconds(d, lvl) * 1000, jobLevel: lvl }
+    }),
+    updatedAt: now,
+  })
+}
+
 function withXp(s: GameState, amount: number, patch: Partial<GameState>): Partial<GameState> {
   return { ...patch, ...addXp({ ...s, ...patch }, amount) }
 }
@@ -548,6 +601,7 @@ export const useGame = create<GameState>()(
         const s = get()
         const b = s.buildings.find((o) => o.uid === buid)
         if (!b || !movable(b.def)) return false
+        if (groupOf(s.buildings, buid)) return false
         const turn = rot ?? b.rot
         if (!canPlace(s, b.def, x, z, turn, buid)) return false
         if (b.x === x && b.z === z && b.rot === turn) return true
@@ -577,6 +631,7 @@ export const useGame = create<GameState>()(
         if (d.kind === 'showroom' || d.kind === 'garage') return s.toast(`${d.name} can't be removed`)
         if (d.parked) return s.toast('This one is coming in a future update, so it stays put')
         if (d.kind === 'obstacle') return s.toast(`Tap the ${d.name.toLowerCase()} in play mode to clear it`)
+        if (groupOf(s.buildings, b.uid)) return s.toast(`Split your merged ${d.name} first (Edit, then Merge)`)
         // Upgrades would be lost, and a drag can sweep over a building by accident.
         if (buildingLevel(b) > 1) return s.toast(`Your ${d.name} is upgraded, so it can't be bulldozed. Use Move to put it somewhere else.`)
         set({
@@ -584,6 +639,24 @@ export const useGame = create<GameState>()(
           coins: s.coins + Math.floor(d.price / 2),
           updatedAt: Date.now(),
         })
+      },
+
+      mergeBlock: (anchor, size) => {
+        const s = get()
+        const c = mergeCandidates(s.buildings).find((o) => o.anchor.uid === anchor && o.size === size)
+        if (!c) return
+        sfx.buy()
+        const d = buildingDef(c.anchor.def)
+        s.toast(size === 4 ? `Giant ${d.name}! 16 in one.` : `Merged 4 into one big ${d.name}!`)
+        set({ buildings: applyMerge(s.buildings, c), updatedAt: Date.now() })
+      },
+
+      splitBlock: (uid) => {
+        const s = get()
+        const g = groupOf(s.buildings, uid)
+        if (!g) return
+        sfx.click()
+        set({ buildings: applySplit(s.buildings, g), updatedAt: Date.now() })
       },
 
       tapBuilding: (buid) => {
@@ -609,6 +682,8 @@ export const useGame = create<GameState>()(
         }
         // Gas stations and houses have no jobs; a tap shows their upgrades.
         if (!d.jobSeconds) return upgradable(d) ? s.openUpgrade(buid) : undefined
+        const merged = groupOf(s.buildings, buid)
+        if (merged) return tapMerged(s, set, merged.members.map((o) => o.uid))
         const now = Date.now()
         const lvl = buildingLevel(b)
         const jobLvl = jobLevel(b)
@@ -664,7 +739,7 @@ export const useGame = create<GameState>()(
         const s = get()
         const b = s.buildings.find((o) => o.uid === buid)
         if (!b || s.visiting || !upgradable(buildingDef(b.def))) return
-        set({ panel: 'upgrade', upgrading: buid })
+        set({ panel: 'upgrade', upgrading: groupOf(s.buildings, buid)?.anchor.uid ?? buid })
       },
 
       upgradeBuilding: (buid) => {
@@ -674,7 +749,10 @@ export const useGame = create<GameState>()(
         const d = buildingDef(b.def)
         const lvl = buildingLevel(b)
         if (!upgradable(d) || lvl >= MAX_BUILDING_LEVEL) return false
-        const cost = buildingUpgradeCost(d, lvl)
+        // A merged block upgrades all its buildings together, so they stay merged.
+        const ids = new Set(groupOf(s.buildings, buid)?.members.map((o) => o.uid) ?? [buid])
+        const one = buildingUpgradeCost(d, lvl)
+        const cost = { coins: one.coins * ids.size, parts: one.parts * ids.size }
         const what = `upgrading your ${d.name}`
         if (s.coins < cost.coins) {
           s.showNeed('coins', cost.coins - s.coins, what)
@@ -686,11 +764,11 @@ export const useGame = create<GameState>()(
         }
         sfx.buy()
         s.toast(`${d.name} is now level ${lvl + 1}!`)
-        set(withXp(s, buildingUpgradeXp(lvl), {
+        set(withXp(s, buildingUpgradeXp(lvl) * ids.size, {
           coins: s.coins - cost.coins,
           parts: s.parts - cost.parts,
-          buildings: s.buildings.map((o) => (o.uid === buid ? { ...o, level: lvl + 1 } : o)),
-          stats: bump(s, 'upgrades'),
+          buildings: s.buildings.map((o) => (ids.has(o.uid) ? { ...o, level: lvl + 1 } : o)),
+          stats: bump(s, 'upgrades', ids.size),
           updatedAt: Date.now(),
         }))
         return true
