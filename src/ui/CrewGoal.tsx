@@ -6,6 +6,8 @@ import { chestsReady, fetchCrewGoal, openCrewChestOn, type CrewGoal, type CrewWe
 import { signedInUser } from '../lib/cloud'
 import { supabase } from '../lib/supabase'
 import { useNow } from '../scene/useNow'
+import { PlayerName } from './Username'
+import { playerName } from '../lib/profiles'
 
 const n = (v: number) => v.toLocaleString()
 
@@ -114,9 +116,9 @@ export function CrewGoalCard({ members, uid }: { members: Member[]; uid: string 
         {roster.map((m) => {
           const p = pts.get(m.ownerId) ?? 0
           return (
-            <span key={m.ownerId} className={`crew-chip${p === 0 ? ' idle' : ''}${m.ownerId === uid ? ' me' : ''}`} title={`${m.townName}: ${p} points`}>
+            <span key={m.ownerId} className={`crew-chip${p === 0 ? ' idle' : ''}${m.ownerId === uid ? ' me' : ''}`} title={`${playerName(m.ownerId, m.townName)}: ${p} points`}>
               <i style={{ width: `${Math.min(100, (p / share) * 100)}%` }} />
-              <em>{m.ownerId === uid ? 'You' : m.townName}</em>
+              <em>{m.ownerId === uid ? 'You' : <PlayerName id={m.ownerId} town={m.townName} />}</em>
               <b>{p === 0 ? '💤' : n(p)}</b>
             </span>
           )

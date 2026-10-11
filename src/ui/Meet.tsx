@@ -8,6 +8,7 @@ import { signedInUser } from '../lib/cloud'
 import { CarThumb } from '../scene/BuildingPreview'
 import { Panel } from './Menus'
 import { SocialTabs } from './Social'
+import { PlayerName } from './Username'
 
 const Thumb = ({ car, size }: { car: OwnedCar; size?: 'sm' }) => {
   const d = carDef(car.model)
@@ -98,7 +99,7 @@ function DisplayRow({ d }: { d: Display }) {
   return (
     <div className="meet-row">
       <div className="meet-who">
-        <b>{d.townName}</b>
+        <b><PlayerName id={d.demo ? null : d.ownerId} town={d.townName} /></b>
         <div className="card-stat">Lvl {d.level}{d.demo ? ' · neighbour' : ''}</div>
       </div>
       <div className="meet-cars">

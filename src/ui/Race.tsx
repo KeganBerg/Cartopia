@@ -28,6 +28,7 @@ import { TOUR_RACES, tourLeg, tourLegOf, tourIsBoss, tourRivalPi, tourShift, tou
 import type { WeatherKind } from '../game/weather'
 import { WEEKLY_EVENTS, EVENT_RACES, eventBonus, eventFor, eventIsBoss, eventPrize, eventProgress, eventRivalPi, eventShift, nextEventWeek } from '../game/events'
 import { msToNextWeek, skinDef, SKIN_TIERS } from '../game/data'
+import { playerName } from '../lib/profiles'
 
 // skill: the rival car's race skill. AI rivals use it; live players use theirs on their own device.
 // shift: how cleanly an AI rival shifts, 0 (sloppy) to 1 (always perfect, the default).
@@ -412,7 +413,7 @@ export function RacePanel() {
               <div key={r.id} className="rm-qc" style={{ ['--qc' as string]: r.color }}>
                 <span className="rm-qc-top"><CarThumb size="sm" color={r.color} body={r.body} mods={r.mods} />{r.online && <span className="tag">PLAYER</span>}</span>
                 <span className="rm-qc-body">
-                  <b>{r.town}</b>
+                  <b>{r.online ? <PlayerName id={r.id} town={r.town} /> : r.town}</b>
                   <span className="rm-qc-chips"><span>Lv {r.level}</span><span className="rm-pi">PI {r.pi}</span>{r.skill && <span title={`${SKILLS[r.skill].name}: ${SKILLS[r.skill].text}`}>{SKILLS[r.skill].icon}</span>}</span>
                   <button className="buy small" onClick={() => start(r)}>🏁 ${reward(r)} <small>⛽{RACE_FUEL}</small></button>
                 </span>
@@ -1362,7 +1363,7 @@ export function LiveRaceOverlay() {
   const best = useMemo(() => [...cars].sort((a, b) => pi(b) - pi(a))[0], [cars])
   if (!race || !best) return null
   const o = race.opponent
-  const rival: Rival = { id: `live:${o.id}`, town: displayName(o.town, o.id), level: o.level, carName: o.carName, color: o.color, pi: o.pi, online: true, body: o.body, mods: o.mods }
+  const rival: Rival = { id: `live:${o.id}`, town: playerName(o.uid, o.town), level: o.level, carName: o.carName, color: o.color, pi: o.pi, online: true, body: o.body, mods: o.mods }
   return <DragRace key={race.raceId} car={best} rival={rival} live={race} onExit={endLiveRace} />
 }
 

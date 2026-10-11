@@ -222,7 +222,7 @@ export function VisitBanner() {
   return (
     <div className="visit-banner">
       <div className="visit-title">
-        Visiting <b>{v.townName}</b>
+        Visiting <b>{v.townName}</b>{!v.ownerId.startsWith('demo-') && <VisitUser id={v.ownerId} />}
         <small>Lvl {v.level} · 🏆 {v.trophies} · {v.cars.length} cars</small>
       </div>
       <div className="row">
@@ -253,4 +253,9 @@ function AddFriendButton({ id }: { id: string }) {
     <button className="buy small alt" disabled={busy} title="Send a friend request"
       onClick={async () => { setBusy(true); await addFriend({ id }); setBusy(false) }}>+ 👫</button>
   )
+}
+
+function VisitUser({ id }: { id: string }) {
+  const name = usePlayerName(id, '')
+  return name.startsWith('@') ? <span className="visit-user"> {name}</span> : null
 }
