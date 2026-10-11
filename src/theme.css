@@ -189,3 +189,22 @@ html {
 :root .boost-btn small { color: #ffd84a; }
 :root .skill-flash { border: 2.5px solid var(--line); border-radius: 14px; box-shadow: 0 3px 0 rgba(0,0,0,.35); text-shadow: 0 1.5px 0 rgba(0,0,0,.4); }
 :root .skill-flash.theirs { background: linear-gradient(#ff6b6b, #d6283b); }
+
+/* Race: keep the venue card and skill flashes clear of the lane strip (no overlap). */
+:root .rf-venue, :root .race-full .skill-flash { top: calc(134px + var(--sat)); }
+:root .race-full .skill-flash.theirs { top: calc(180px + var(--sat)); }
+@media (min-width: 900px) {
+  :root .rf-venue, :root .race-full .skill-flash { top: calc(150px + var(--sat)); }
+  :root .race-full .skill-flash.theirs { top: calc(196px + var(--sat)); }
+}
+@media (max-height: 500px) {
+  :root .rf-venue, :root .race-full .skill-flash { top: calc(106px + var(--sat)); }
+  :root .race-full .skill-flash.theirs { top: calc(146px + var(--sat)); }
+  :root .rf-venue { padding: 3px 12px 3px 3px; gap: 8px; }
+  :root .rf-venue-ico { width: 30px; height: 30px; font-size: 18px; border-radius: 10px; }
+  :root .rf-venue-txt b { font-size: 16px; }
+}
+
+/* Tutorial tip sits above the build toolbar instead of on top of it. */
+body:has(.edit-bar) .tutorial { bottom: calc(150px + var(--sab)); }
+@media (max-width: 600px) { body:has(.edit-bar) .tutorial { bottom: calc(118px + var(--sab)); } }
