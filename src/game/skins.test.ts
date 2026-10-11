@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import { useGame } from './store'
-import { CAR_SETS, SKINS, ownedSkins, seasonSkin, skinNumber } from './data'
+import { CAR_SETS, MOD_SKINS, SKINS, ownedModSkins, ownedSkins, seasonSkin, skinNumber } from './data'
 
 const car = { uid: 's1', model: 'pip', color: '#fff', upgrades: { engine: 0, turbo: 0, tires: 0, weight: 0 } }
 const g = () => useGame.getState()
@@ -56,5 +56,36 @@ describe('skinning a car', () => {
     expect(g().grantSkin('prismatic')).toBe(false)
     expect(g().grantSkin('nope')).toBe(false)
     expect(g().skins).toEqual(['prismatic'])
+  })
+})
+
+describe('mod skins', () => {
+  const modded = { ...car, uid: 'm1', mods: ['gtwing', 'blower'] }
+  it('have their own pool, unlocked apart from body skins', () => {
+    expect(new Set(MOD_SKINS.map((s) => s.id)).size).toBe(MOD_SKINS.length)
+    for (const s of MOD_SKINS) expect(SKINS.map((b) => b.id)).not.toContain(s.id)
+    expect(ownedModSkins({ level: 7, claimedSets: ['tuners'] })).toEqual(['ember', 'hexplate', 'neonpulse'])
+    expect(ownedModSkins({ level: 1, modSkins: [] })).toEqual([])
+  })
+  it('mix and match per fitted part', () => {
+    useGame.setState({ level: 7, bucks: 0, modSkins: [], claimedSets: [], cars: [modded] })
+    expect(g().skinMod('m1', 'spoiler', 'ember')).toBe(true)
+    expect(g().skinMod('m1', 'hood', 'hexplate')).toBe(true)
+    expect(g().cars[0].modSkin).toEqual({ spoiler: 'ember', hood: 'hexplate' })
+    // No exhaust fitted, so nothing to skin there.
+    expect(g().skinMod('m1', 'exhaust', 'ember')).toBe(false)
+    expect(g().skinMod('m1', 'spoiler', null)).toBe(true)
+    expect(g().cars[0].modSkin).toEqual({ hood: 'hexplate' })
+  })
+  it('sells gem mod skins once and grants crate ones once', () => {
+    useGame.setState({ level: 1, bucks: 40, modSkins: [], claimedSets: [], cars: [modded] })
+    expect(g().skinMod('m1', 'spoiler', 'goldleaf')).toBe(true)
+    expect(g().bucks).toBe(20)
+    expect(g().skinMod('m1', 'hood', 'goldleaf')).toBe(true)
+    expect(g().bucks).toBe(20)
+    expect(g().skinMod('m1', 'hood', 'starlight')).toBe(false)
+    expect(g().grantModSkin('starlight')).toBe(true)
+    expect(g().grantModSkin('starlight')).toBe(false)
+    expect(g().skinMod('m1', 'hood', 'starlight')).toBe(true)
   })
 })
