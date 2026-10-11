@@ -6,8 +6,7 @@ import { TRACK, freshRacer, stepRacer, shiftQuality, launchRacer, shiftRacer, fi
 import { CarThumb } from '../scene/BuildingPreview'
 import { supabase } from '../lib/supabase'
 import { Panel } from './Menus'
-import { Canvas } from '@react-three/fiber'
-import { NeutralToneMapping } from 'three'
+import { StageSlot, useStageReady, warmStage } from '../scene/Stage'
 import { RaceScene, startLights, finishView } from '../scene/RaceScene'
 import { pickVenue, venue as venueById } from '../scene/venues'
 import { sfx } from '../lib/sound'
@@ -112,7 +111,10 @@ export function openRaceTab(tab: RaceTab) {
   useGame.getState().openPanel('race')
 }
 
+const RACE_CAM = { position: [0.4, 2.2, -4] as [number, number, number], fov: 55, near: 0.3, far: 150 }
+
 export function RacePanel() {
+  useEffect(() => warmStage(), [])
   const cars = useGame((s) => s.cars)
   const level = useGame((s) => s.level)
   const best = useMemo(() => [...cars].sort((a, b) => pi(b) - pi(a))[0], [cars])
@@ -945,6 +947,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   }, [])
 
   useEffect(() => () => void (startLights.n = 99), [])
+  const stageReady = useStageReady()
   useEffect(() => {
     startLights.n = countdown
     if (countdown === 99) return
@@ -954,10 +957,14 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       sound.current?.countdown(countdown === 0)
       if (countdown === 0) sound.current?.launch(Math.min(1, myPi / 200), Math.min(1, rivalRef.current.pi / 200))
     }
-    if (countdown <= 0) return
+  }, [countdown])
+  useEffect(() => {
+    if (countdown === 99 || countdown <= 0) return
+    // The lights hold on 3 until the scene is drawing (its shaders compile in the background).
+    if (countdown === 3 && !live && !stageReady) return
     const id = setTimeout(() => setCountdown((c) => c - 1), 700)
     return () => clearTimeout(id)
-  }, [countdown])
+  }, [countdown, stageReady])
 
   useEffect(() => {
     if (!live) return
@@ -1190,14 +1197,22 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
     return () => window.removeEventListener('keydown', onKey)
   })
 
+  // The race screen redraws every frame (dials, lanes); the 3D scene only changes with
+  // its inputs, so it's built once rather than re-rendered sixty times a second.
+  const mineLook = useMemo(() => ({ body: def.body, model: car.model, color: car.color, finish: car.finish, skin: car.skin, modSkin: car.modSkin, mods: car.mods }), [def.body, car.model, car.color, car.finish, car.skin, car.modSkin, car.mods])
+  const theirLook = useMemo(() => ({ body: rival.body, color: rival.color, mods: rival.mods }), [rival.body, rival.color, rival.mods])
+  const photo = useRef(() => flash('PHOTO FINISH!', 2200))
+  const scene = useMemo(
+    () => <RaceScene track={TRACK} me={me} them={them} mine={mineLook} theirs={theirLook} venue={venue} weather={weather} night={night} onPhoto={() => photo.current()} />,
+    [mineLook, theirLook, venue, weather, night],
+  )
+
   const rpmAngle = -210 + Math.min(1.05, me.current.rpm) * 240
   const close = live ? onExit : () => useGame.getState().openPanel(null)
   // One full-screen view: the street fills the screen and the controls float over it.
   return (
     <div className="race-full">
-      <Canvas className="rf-canvas" camera={{ position: [0.4, 2.2, -4], fov: 55, near: 0.3, far: 150 }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
-        <RaceScene track={TRACK} me={me} them={them} mine={{ body: def.body, model: car.model, color: car.color, finish: car.finish, skin: car.skin, modSkin: car.modSkin, mods: car.mods }} theirs={{ body: rival.body, color: rival.color, mods: rival.mods }} venue={venue} weather={weather} night={night} onPhoto={() => flash('PHOTO FINISH!', 2200)} />
-      </Canvas>
+      <StageSlot cam={RACE_CAM}>{scene}</StageSlot>
       <div className="rf-top">
         <h2>{title ?? `Drag Race vs ${rival.town}`}</h2>
         <button className="close" onClick={close} aria-label="Leave race">✕</button>
