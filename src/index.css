@@ -1256,3 +1256,17 @@ button.book-car { font: inherit; color: inherit; }
 .alerts-card .one-line { white-space: nowrap; }
 .alerts-x { width: 30px; height: 30px; flex: none; border: none; border-radius: 50%; background: #eceff1; font-weight: 800; color: #546e7a; }
 @media (max-width: 600px) { .alerts-card { bottom: calc(78px + var(--sab)); font-size: 13px; } }
+
+/* Friend ghost races */
+.ghost-btn { background: #7e57c2; }
+.ghost-times { display: flex; gap: 8px; justify-content: center; margin: 2px 0 10px; }
+.ghost-times span { flex: 1; display: flex; flex-direction: column; background: #eceff1; border-radius: 12px; padding: 4px 8px; }
+.ghost-times span.win { background: #e8f5e9; box-shadow: inset 0 0 0 2px #66bb6a; }
+.ghost-times small { color: #607d8b; font-weight: 800; font-size: 12px; }
+.ghost-times b { font: 20px var(--display); }
+.taunt-pick { margin-bottom: 12px; }
+.taunt-pick > small { display: block; color: #607d8b; font-weight: 800; margin-bottom: 4px; }
+.taunt-pick > div { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
+.taunt-pick .chip { font-size: 13px; padding: 4px 9px; }
+.taunt-sent { color: #2e7d32; font-weight: 800; }
+.taunt-quote { font-weight: 800; color: #5e35b1; }
