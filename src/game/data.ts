@@ -129,6 +129,9 @@ export const upgradable = (d: BuildingDef) =>
   !d.parked && ((!!d.jobSeconds && d.kind !== 'obstacle') || !!d.fuelCap)
 export const buildingLevel = (b: { level?: number }) =>
   Math.min(MAX_BUILDING_LEVEL, Math.max(1, Math.floor(Number(b.level) || 1)))
+// The level a running job pays at: locked when it started (older saves: the current level).
+export const jobLevel = (b: { level?: number; jobLevel?: number }) =>
+  b.jobLevel == null ? buildingLevel(b) : buildingLevel({ level: Math.min(b.jobLevel, buildingLevel(b)) })
 
 // +15% coins and parts and +10% XP per level, 8% shorter jobs (rounded to 5s).
 export const upgradePayout = (d: BuildingDef, level: number) => Math.round((d.payout ?? 0) * (1 + 0.15 * (level - 1)))
@@ -325,7 +328,7 @@ export const GOALS: GoalDef[] = [
   { id: 'g2', text: 'Lay 5 road tiles', stat: 'roads', target: 5, coins: 100, xp: 10 },
   { id: 'g3', text: 'Get a new car', stat: 'carsBought', target: 1, coins: 300, xp: 25 },
   { id: 'g4', text: 'Win a drag race', stat: 'racesWon', target: 1, coins: 250, xp: 20 },
-  { id: 'g5', text: 'Upgrade a car part', stat: 'upgrades', target: 1, coins: 200, xp: 20 },
+  { id: 'g5', text: 'Upgrade a car part or a building', stat: 'upgrades', target: 1, coins: 200, xp: 20 },
   { id: 'g6', text: 'Place 2 new buildings', stat: 'built', target: 2, coins: 300, xp: 25 },
   { id: 'g7', text: 'Fix a flat tire', stat: 'flatsFixed', target: 1, coins: 150, xp: 15 },
   { id: 'g8', text: 'Collect from 15 businesses', stat: 'jobs', target: 15, coins: 500, xp: 40, bucks: 1 },
