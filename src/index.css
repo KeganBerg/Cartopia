@@ -944,3 +944,13 @@ button.lvl-item:hover { border-color: var(--accent); transform: translateY(-2px)
 .rival-skill { color: #6a1b9a; font-weight: 800; white-space: nowrap; }
 .skill-flash.theirs { background: rgba(183,28,28,.88); }
 .race-full .skill-flash.theirs { top: calc(158px + var(--sat)); }
+
+/* Welcome back */
+.welcome-sub { margin: 0 0 10px; }
+.welcome-rewards { justify-content: center; margin-bottom: 12px; animation: none; }
+.welcome-list { grid-template-columns: 1fr; }
+.welcome-list .card { min-height: 52px; }
+.welcome-ico { width: 76px; flex: none; display: grid; place-items: center; font-size: 30px; }
+.welcome-actions { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 12px; text-align: center; }
+.welcome-actions .hint { margin: 0; font-size: 13px; }
+.welcome-collect { font-size: 20px; padding: 8px 32px; }
