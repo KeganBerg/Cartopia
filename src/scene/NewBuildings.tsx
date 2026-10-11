@@ -4,7 +4,7 @@ import { levelLift, type BuildingDef } from '../game/data'
 import { growthStage } from '../game/growth'
 import { signTexture } from './signTexture'
 import { CarModel } from './CarModel'
-import { Upright } from './mergeScale'
+import { Facade, Upright } from './mergeScale'
 import { glowMats, onNight } from './dayNight'
 import { ClubLife } from './ClubLife'
 import { CLUB } from './clubLayout'
@@ -161,7 +161,8 @@ export function ShellBuilding({ m, win, bulb, ghost, lvl, w, d, h0, z0 = -0.15, 
   const wallTex = tex === 'brick' ? brickTex(rx, Math.max(1, Math.round(h))) : sidingTex(rx, Math.max(1, Math.round(h * 1.5)))
   const rows: number[] = []
   for (let y = rowFrom; y + 0.2 <= h - 0.12; y += 0.55) rows.push(y)
-  const cols = w > 2 ? [-1.2, -0.4, 0.4, 1.2].filter((x) => Math.abs(x) < w / 2 - 0.2) : [-w * 0.27, w * 0.27]
+  // Window columns across a front `L` long (twice w along a merged pair).
+  const colsFor = (L: number) => (L > 2 ? Array.from({ length: Math.ceil(L / 0.8) * 2 }, (_, i) => (i - Math.ceil(L / 0.8) + 0.5) * 0.8).filter((x) => Math.abs(x) < L / 2 - 0.2) : [-L * 0.27, L * 0.27])
   const sw = Math.min(w * 0.8, 2.4)
   return (
     <group position={[x0, 0, 0]}>
@@ -201,24 +202,26 @@ export function ShellBuilding({ m, win, bulb, ghost, lvl, w, d, h0, z0 = -0.15, 
           {win}
         </mesh>
       ))}
-      {rows.map((y) => (
-        <group key={y}>
-          {cols.map((x) => (
-            <group key={x}>
-              <mesh position={[x, y, zf + 0.006]}>
-                <planeGeometry args={[0.36, 0.38]} />
-                {win}
-              </mesh>
-              {lvl >= 4 && <Box m={m} at={[x, y - 0.22, zf + 0.04]} s={[0.42, 0.04, 0.08]} c="#fafafa" />}
-            </group>
-          ))}
-          {[-1, 1].map((sd) => (
-            <mesh key={sd} position={[sd * (w / 2 + 0.006), y, z0]} rotation-y={(sd * Math.PI) / 2}>
+      <Facade at={[0, 0, zf]} len={w}>
+        {(L) => rows.map((y) => colsFor(L).map((x) => (
+          <group key={`${y}${x}`}>
+            <mesh position={[x, y, 0.006]}>
               <planeGeometry args={[0.36, 0.38]} />
               {win}
             </mesh>
-          ))}
-        </group>
+            {lvl >= 4 && <Box m={m} at={[x, y - 0.22, 0.04]} s={[0.42, 0.04, 0.08]} c="#fafafa" />}
+          </group>
+        )))}
+      </Facade>
+      {[-1, 1].map((sd) => (
+        <Facade key={sd} at={[sd * (w / 2 + 0.006), 0, z0]} ry={(sd * Math.PI) / 2} len={d}>
+          {(L) => rows.map((y) => (L > 2 ? colsFor(L) : [0]).map((x) => (
+            <mesh key={`${y}${x}`} position={[x, y, 0]}>
+              <planeGeometry args={[0.36, 0.38]} />
+              {win}
+            </mesh>
+          )))}
+        </Facade>
       ))}
       {!ghost && <Trims m={m} lvl={lvl} w={w} d={d} h={h} z0={z0} flag={roof} />}
       {!ghost && sign && (

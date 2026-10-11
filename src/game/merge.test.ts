@@ -93,10 +93,10 @@ describe('merging buildings', () => {
   it('stretches a pair along its length', () => {
     const [g] = mergeCandidates([b('pizza', 0, 0), b('pizza', 1, 0)])
     expect(groupTurn(g, new Set())).toBe(0)
-    expect(groupScale(g, 0)).toEqual([2, 1.5, 1])
+    expect(groupScale(g, 0)).toEqual([2, 1, 1])
     const [t] = mergeCandidates([b('pizza', 0, 0), b('pizza', 0, 1)])
     expect(groupTurn(t, new Set(['1,1']))).toBe(1)
-    expect(groupScale(t, 1)).toEqual([2, 1.5, 1])
+    expect(groupScale(t, 1)).toEqual([2, 1, 1])
   })
 
   it('faces the merged building at a road along its edge', () => {

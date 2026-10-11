@@ -17,7 +17,7 @@ import { FLAT, isKept, propLimit } from './keepShape'
 // its own), or wrap it in <Upright>; if a small piece really must stretch with
 // the walls, wrap it in <Stretch>.
 
-const PAIRS: [number, number, number][] = [[2, 1.5, 1], [1, 1.5, 2]]
+const PAIRS: [number, number, number][] = [[2, 1, 1], [1, 1, 2]]
 const LEVELS = [1, 4, 7, 10]
 const ROUND = /Cylinder|Cone|Sphere|Circle|Torus|Capsule|Lathe|Ring|hedron|Tube/
 

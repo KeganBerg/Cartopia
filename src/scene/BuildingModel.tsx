@@ -2,7 +2,7 @@ import { TILE, levelLift, type BuildingDef } from '../game/data'
 import { useGame } from '../game/store'
 import { signTexture } from './signTexture'
 import { CarModel } from './CarModel'
-import { Upright } from './mergeScale'
+import { Upright, useBays } from './mergeScale'
 import { ObstacleDetail, BenchDetail, BillboardDetail, DriveInDetail, FlowerDetail, FountainDetail, GarageDetail, HouseDetail, LampDetail, PondDetail, ShopDetail, SpeedwayDetail, StatueDetail, TreeDetail } from './BuildingDetail'
 import { NEW_MODELS, NewBuildingModel } from './NewBuildings'
 import { OFFICE_MODELS, OfficeModel } from './OfficeBuildings'
@@ -392,6 +392,7 @@ function Sign({ text, w, y, z, bg, fg }: { text: string; w: number; y: number; z
 }
 
 export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
+  const [bx] = useBays()
   const m = useMat(ghost, valid)
   const lvl = Math.min(10, Math.max(1, Math.floor(level) || 1))
   const lift = levelLift(lvl)
@@ -1085,7 +1086,10 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
       const F = D * 0.36 - 0.1 // front wall, where the windows and door hang
       const rows: number[] = []
       for (let y = 1.25; y + 0.2 <= h - 0.12; y += 0.55) rows.push(y)
-      const cols = def.w > 1 ? [-1.2, -0.4, 0.4, 1.2] : [-0.42, 0.42]
+      const one = def.w > 1 ? [-1.2, -0.4, 0.4, 1.2] : [-0.42, 0.42]
+      // A merged pair's front is twice as long: the row repeats once per shop
+      // width, squeezed back into the model's frame (the pair stretches it out).
+      const cols = bx > 1 ? [-1, 1].flatMap((o) => one.map((x) => (x + o * W * 0.41) / bx)) : one
       return (
         <group>
           <mesh position={[0, h / 2, -0.1]} castShadow receiveShadow>
@@ -1241,7 +1245,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
               <meshStandardMaterial color={x < 0 ? '#29b6f6' : '#ffca28'} roughness={1} />
             </mesh>
           ))}
-          {def.prop && <RoofProp prop={def.prop} y={h + 0.13} />}
+          {def.prop && <Upright><RoofProp prop={def.prop} y={h + 0.13} /></Upright>}
           {def.id === 'motel' && [-1.2, -0.6, 0.6, 1.2].map((x) => (
             <mesh key={x} position={[x, 0.32, F + 0.012]}>
               <planeGeometry args={[0.3, 0.55]} />

@@ -3,6 +3,7 @@ import type { Texture } from 'three'
 import { homeStage, type BuildingDef } from '../game/data'
 import { brickTex, shingleTex, sidingTex } from './textures'
 import { SEASON } from './season'
+import { Facade } from './mergeScale'
 
 // Upgraded houses (level 2-10) on the same 1x1 lot: a bigger, nicer house at
 // levels 2-3, a brick apartment block at 4-6 (one more floor each level) and a
@@ -18,23 +19,27 @@ const flat = (color: string) => <meshStandardMaterial color={color} flatShading 
 
 // Windows on all four walls of a w x d box: `n` across each wall on every
 // floor height in `ys`. `front: false` leaves the front wall bare (for doors).
+// A merged pair's longer faces get more columns (see Facade).
 function Windows({ w, d, ys, n, win, size = [0.22, 0.22], front = true }: { w: number; d: number; ys: number[]; n: number; win: ReactNode; size?: [number, number]; front?: boolean }) {
   const out: ReactNode[] = []
-  for (const y of ys)
-    for (let side = front ? 0 : 1; side < 4; side++) {
-      const along = side % 2 === 0 ? w : d
-      const off = (side % 2 === 0 ? d : w) / 2 + 0.006
-      for (let i = 0; i < n; i++) {
-        const t = ((i + 0.5) / n - 0.5) * along * 0.86
-        const p: [number, number, number] = side === 0 ? [t, y, off] : side === 1 ? [off, y, -t] : side === 2 ? [-t, y, -off] : [-off, y, t]
-        out.push(
-          <mesh key={`${y}:${side}:${i}`} position={p} rotation-y={(side * Math.PI) / 2}>
-            <planeGeometry args={size} />
-            {win}
-          </mesh>,
-        )
-      }
-    }
+  for (let side = front ? 0 : 1; side < 4; side++) {
+    const along = side % 2 === 0 ? w : d
+    const off = (side % 2 === 0 ? d : w) / 2 + 0.006
+    const at: [number, number, number] = side === 0 ? [0, 0, off] : side === 1 ? [off, 0, 0] : side === 2 ? [0, 0, -off] : [-off, 0, 0]
+    out.push(
+      <Facade key={side} at={at} ry={(side * Math.PI) / 2} len={along}>
+        {(L) => {
+          const k = Math.round((n * L) / along)
+          return ys.flatMap((y) => Array.from({ length: k }, (_, i) => (
+            <mesh key={`${y}:${i}`} position={[((i + 0.5) / k - 0.5) * L * 0.86, y, 0]}>
+              <planeGeometry args={size} />
+              {win}
+            </mesh>
+          )))
+        }}
+      </Facade>,
+    )
+  }
   return <group>{out}</group>
 }
 
