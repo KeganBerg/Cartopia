@@ -5,7 +5,7 @@ import type { Group, Mesh } from 'three'
 import { anchors } from './anchors'
 import { useGame, type OwnedCar } from '../game/store'
 import { TILE, carDef, performance } from '../game/data'
-import { tripRequests } from '../game/trips'
+import { tripRequests, visitRequests } from '../game/trips'
 import { pedestrianCrossings } from '../game/walkGraph'
 import { turnOf } from '../game/placement'
 import { toWorld, DIRS } from './grid'
@@ -210,12 +210,20 @@ export function TownCars() {
   useEffect(() => {
     sim.setCars(specs, max)
   }, [specs, max, town])
+  const homesKey = buildings.map((b) => (b.car ? `${b.car}>${b.uid}` : '')).join()
+  useEffect(() => {
+    sim.homes = new Map(buildings.filter((b) => b.car).map((b) => [b.car!, b.uid]))
+  }, [homesKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // One step of the whole town per frame, before the cars are drawn.
   useFrame((_, dt) => {
     for (const [uid, kind] of tripRequests) {
       sim.requestTrip(uid, kind)
       tripRequests.delete(uid)
+    }
+    for (const [uid, building] of visitRequests) {
+      sim.requestVisit(uid, building)
+      visitRequests.delete(uid)
     }
     sim.step(dt)
   }, -1)

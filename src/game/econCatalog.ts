@@ -1,6 +1,6 @@
 import {
   BUILDINGS, CARS, GOALS, GP_SERIES, MAX_BUILDING_LEVEL, RESCUE_SPOTS, buildingUpgradeCost, buildingUpgradeXp, upgradable,
-  upgradeFuelCap, upgradeJobSeconds, upgradePartsPayout, upgradePayout, upgradeXp, type BuildingDef,
+  upgradeFuelCap, upgradeJobSeconds, FAVORITE_BONUS, upgradePartsPayout, upgradePayout, upgradeXp, type BuildingDef,
 } from './data'
 
 const LEVELS = Array.from({ length: MAX_BUILDING_LEVEL }, (_, i) => i + 1)
@@ -49,5 +49,6 @@ export function econCatalog() {
     xp += buildingUpgradeXp(l)
     return before
   })
-  return { cars, buildings, goals, gp, rescue, upgradeXpTo }
+  // A driver adds at most this share to a business's coins (see driverPayout).
+  return { cars, buildings, goals, gp, rescue, upgradeXpTo, driverBonus: FAVORITE_BONUS }
 }

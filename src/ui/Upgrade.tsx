@@ -4,8 +4,10 @@ import { Box3, Sphere, type Group } from 'three'
 import { useGame } from '../game/store'
 import {
   buildingDef, buildingLevel, upgradable, upgradePayout, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap,
-  buildingUpgradeCost, MAX_BUILDING_LEVEL, BUILDINGS, type BuildingDef,
+  buildingUpgradeCost, MAX_BUILDING_LEVEL, BUILDINGS, CARS, takesDriver, loves, driverPayout, carDef, type BuildingDef,
 } from '../game/data'
+import { workingDriver, type PlacedBuilding } from '../game/store'
+import { CarThumb } from '../scene/BuildingPreview'
 import { BuildingModel } from '../scene/BuildingModel'
 import { Panel } from './Menus'
 
@@ -62,6 +64,80 @@ function Pips({ level }: { level: number }) {
   )
 }
 
+// Who drives for this business: pick one of your cars, favourites first.
+function Driver({ b, d }: { b: PlacedBuilding; d: BuildingDef }) {
+  const cars = useGame((s) => s.cars)
+  const buildings = useGame((s) => s.buildings)
+  const assign = useGame((s) => s.assignCar)
+  const s = useGame()
+  const [picking, setPicking] = useState(false)
+  const lvl = buildingLevel(b)
+  const car = cars.find((c) => c.uid === b.car)
+  const base = upgradePayout(d, lvl)
+  const fans = CARS.filter((c) => loves(c, d.id))
+  const workplace = (uid: string) => buildings.find((o) => o.car === uid && o.uid !== b.uid)
+  const sorted = [...cars].sort((x, y) => Number(loves(carDef(y.model), d.id)) - Number(loves(carDef(x.model), d.id)))
+  const anyFan = cars.some((c) => loves(carDef(c.model), d.id))
+
+  if (car && !picking) {
+    const cd = carDef(car.model)
+    const broken = car.flat || car.lowFuel
+    return (
+      <div className="driver">
+        <div className="driver-head">Driver</div>
+        <div className="driver-car">
+          <CarThumb size="sm" color={car.color} body={cd.body} stripe={car.stripe} />
+          <div>
+            <b>{cd.name}</b>
+            <div className={broken ? 'driver-bonus off' : 'driver-bonus'}>
+              {broken ? 'No bonus until it is fixed' : `${loves(cd, d.id) ? '❤️ Loves it · +25%' : '+10%'} · $${n(driverPayout(d, lvl, workingDriver(s, b)))} a job`}
+            </div>
+          </div>
+          <button className="buy small alt" onClick={() => setPicking(true)}>Change</button>
+        </div>
+        {broken && (
+          <button className="upgrade-short" onClick={() => { s.selectCar(car.uid); s.openPanel('flat') }}>
+            {car.flat ? '🛞 It has a flat tire.' : '⛽ It ran out of gas.'} Fix it to get the bonus back.
+          </button>
+        )}
+        {!broken && !loves(cd, d.id) && fans.length > 0 && (
+          <p className="card-stat driver-tip">A car that loves the {d.name} earns +25%: {fans.map((c) => c.name).join(', ')}.</p>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="driver">
+      <div className="driver-head">
+        {car ? 'Pick a new driver' : 'Put a car to work here'}
+        {picking && <button className="driver-cancel" onClick={() => setPicking(false)}>Cancel</button>}
+      </div>
+      <p className="card-stat driver-tip">A driver adds +10% to every job (${n(Math.round(base * 1.1))}), or +25% (${n(Math.round(base * 1.25))}) if it ❤️ loves the {d.name}.</p>
+      <div className="driver-list">
+        {sorted.map((c) => {
+          const cd = carDef(c.model)
+          const fan = loves(cd, d.id)
+          const at = workplace(c.uid)
+          return (
+            <button key={c.uid} className={`driver-pick${fan ? ' fan' : ''}${c.uid === b.car ? ' sel' : ''}`} onClick={() => { assign(b.uid, c.uid); setPicking(false) }}>
+              <CarThumb size="xs" color={c.color} body={cd.body} stripe={c.stripe} />
+              <span className="driver-pick-name">{cd.name}{(at || c.flat || c.lowFuel) && <small>{[at && `at ${buildingDef(at.def).name}`, c.flat && '🛞 flat tire', c.lowFuel && '⛽ out of gas'].filter(Boolean).join(' · ')}</small>}</span>
+              <span className="driver-pick-bonus">{fan ? '❤️ +25%' : '+10%'}</span>
+            </button>
+          )
+        })}
+      </div>
+      {car && <button className="driver-remove" onClick={() => { assign(b.uid, null); setPicking(false) }}>Take {carDef(car.model).name} off this job</button>}
+      {!anyFan && fans.length > 0 && (
+        <button className="upgrade-short" onClick={() => s.focusShop(fans.some((f) => !f.rescueOnly) ? 'showroom' : 'rescue', fans.find((f) => !f.rescueOnly)?.id ?? null)}>
+          None of your cars love the {d.name} yet. These do: {fans.map((c) => c.name).join(', ')}. How do I get one?
+        </button>
+      )}
+    </div>
+  )
+}
+
 export function UpgradePanel() {
   const s = useGame()
   const b = s.buildings.find((o) => o.uid === s.upgrading)
@@ -78,7 +154,8 @@ export function UpgradePanel() {
 
   const rows: { label: string; now: string; next: string }[] = []
   if (d.jobSeconds) {
-    rows.push({ label: 'Coins per job', now: `$${n(upgradePayout(d, lvl))}`, next: `$${n(upgradePayout(d, next))}` })
+    const driver = workingDriver(s, b)
+    rows.push({ label: driver ? 'Coins per job (with driver)' : 'Coins per job', now: `$${n(driverPayout(d, lvl, driver))}`, next: `$${n(driverPayout(d, next, driver))}` })
     if (d.partsPayout) rows.push({ label: 'Parts per job', now: `⚙ ${upgradePartsPayout(d, lvl)}`, next: `⚙ ${upgradePartsPayout(d, next)}` })
     rows.push({ label: 'Job time', now: time(upgradeJobSeconds(d, lvl)), next: time(upgradeJobSeconds(d, next)) })
     rows.push({ label: 'XP per job', now: `${upgradeXp(d, lvl)}`, next: `${upgradeXp(d, next)}` })
@@ -113,6 +190,7 @@ export function UpgradePanel() {
             )}
           </>
         )}
+        {takesDriver(d) && <Driver b={b} d={d} />}
       </div>
     </Panel>
   )

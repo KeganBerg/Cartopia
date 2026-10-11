@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildingDef, carDef, knownBuilding, BUILDINGS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost } from './data'
+import { buildingDef, carDef, knownBuilding, BUILDINGS, CARS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost, takesDriver, loves, driverPayout } from './data'
 
 describe('unknown ids from newer builds', () => {
   it('gives an unknown building a harmless stand-in instead of crashing', () => {
@@ -57,5 +57,28 @@ describe('building upgrades', () => {
     expect(upgradable(buildingDef('tree'))).toBe(false)
     expect(upgradable(buildingDef('rock'))).toBe(false)
     expect(upgradable(buildingDef('from-the-future'))).toBe(false)
+  })
+})
+
+describe('drivers', () => {
+  it('only loves businesses that take a driver, and every such business has fans', () => {
+    for (const c of CARS) {
+      expect(c.likes.length, c.id).toBe(2)
+      for (const id of c.likes) expect(knownBuilding(id) && takesDriver(buildingDef(id)), `${c.id} -> ${id}`).toBe(true)
+    }
+    for (const d of BUILDINGS.filter(takesDriver)) {
+      expect(CARS.some((c) => loves(c, d.id)), d.id).toBe(true)
+    }
+  })
+
+  it('pays +10% with any driver and +25% with one that loves the place', () => {
+    const pizza = buildingDef('pizza')
+    expect(driverPayout(pizza, 1, null)).toBe(60)
+    expect(driverPayout(pizza, 1, carDef('trail'))).toBe(66)
+    expect(driverPayout(pizza, 1, carDef('pip'))).toBe(75)
+    expect(driverPayout(pizza, 3, carDef('pip'))).toBe(Math.round(upgradePayout(pizza, 3) * 1.25))
+    expect(takesDriver(buildingDef('gas'))).toBe(false)
+    expect(takesDriver(buildingDef('rock'))).toBe(false)
+    expect(carDef('future-car').likes).toEqual([])
   })
 })
