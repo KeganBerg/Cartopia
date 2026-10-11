@@ -147,6 +147,7 @@ export function FlyLayer() {
   useEffect(() => {
     layerEl = layer.current
     const off = onFx((e) => {
+      if (e.kind === 'helped') return flyFrom(e.el ?? anchorEls.get(e.uid) ?? null, e)
       if (e.kind !== 'collect') return
       const froms = [...new Set(e.uids)].map(source).filter((p): p is [number, number] => !!p).slice(0, 6)
       if (!froms.length) froms.push([window.innerWidth / 2, window.innerHeight / 2])

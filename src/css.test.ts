@@ -23,7 +23,7 @@ function problems(css: string): string[] {
 }
 
 describe('stylesheets', () => {
-  for (const file of ['index.css', 'theme.css', 'ui/crates.css', 'ui/race-menu.css']) {
+  for (const file of ['index.css', 'theme.css', 'ui/crates.css', 'ui/chat.css', 'ui/race-menu.css']) {
     it(`${file} has balanced braces`, () => {
       expect(problems(readFileSync(new URL(`./${file}`, import.meta.url), 'utf8'))).toEqual([])
     })

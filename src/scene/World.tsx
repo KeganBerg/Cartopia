@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { MapControls } from '@react-three/drei'
-import { AnchorProjector } from './anchors'
+import { AnchorProjector, anchorEls } from './anchors'
 import { useThree, type ThreeEvent } from '@react-three/fiber'
 import { Plane, Vector3 } from 'three'
 import { create } from 'zustand'
@@ -34,6 +34,8 @@ import { layoutRoads } from './traffic/layout'
 import { LAYER, decal } from './layers'
 import { Ear } from './Ear'
 import { WorldFx, PopGroup, usePops } from './WorldFx'
+import { helpable } from '../game/help'
+import { helpBuilding } from '../lib/help'
 
 // The countryside ground: wide enough to never show its edge, an odd number of
 // 16-unit repeats so its meadow texture lines up with the plots'.
@@ -203,6 +205,12 @@ function Building({ b, roads, group }: { b: PlacedBuilding; roads: Set<string>; 
           held = false
           return e.stopPropagation()
         }
+        // In a friend's town, tapping a shop that's asking for help helps it.
+        const ask = s.visiting && s.mode === 'play' && e.delta <= 6 ? anchorEls.get(b.uid)?.querySelector('.badge-help') : null
+        if (ask) {
+          e.stopPropagation()
+          return void helpBuilding(b.uid, ask)
+        }
         if (s.mode !== 'play' || s.visiting || e.delta > 6) return
         e.stopPropagation()
         s.tapBuilding(b.uid)
@@ -210,7 +218,7 @@ function Building({ b, roads, group }: { b: PlacedBuilding; roads: Set<string>; 
       onPointerOver={() => {
         const mode = useGame.getState().mode
         if (mode === 'move' && movable(b.def)) document.body.style.cursor = 'grab'
-        else if (mode === 'play' && d.kind !== 'decor') document.body.style.cursor = 'pointer'
+        else if (mode === 'play' && d.kind !== 'decor' && (!useGame.getState().visiting || helpable(d))) document.body.style.cursor = 'pointer'
       }}
       onPointerOut={() => (document.body.style.cursor = '')}
     >
@@ -676,7 +684,7 @@ export function World() {
       <ExpandZoom />
       <Interaction />
       {/* Pieces move while building or dragging, so merging waits for plain play. */}
-      <Batch version={layout} off={mode !== 'play'}>
+      <Batch version={layout} off={mode !== 'play'} cell={24}>
         <Land />
         <GrassTufts land={land} roads={roadsList} buildings={buildings} />
         <Roads />

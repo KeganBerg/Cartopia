@@ -20,7 +20,7 @@ export default async () => {
   const due = (await res.json()) as Due[]
   if (!due.length) return new Response('nothing due')
 
-  webpush.setVapidDetails('https://cartopia2026.netlify.app', vapidPublic, vapid)
+  webpush.setVapidDetails('https://cartopia.lol', vapidPublic, vapid)
   const gone: string[] = []
   let sent = 0
   await Promise.all(due.map(async (d) => {

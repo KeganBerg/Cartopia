@@ -1,5 +1,6 @@
 // Static game data: buildings, cars and the progression curve.
 
+import { growthName } from './growth'
 import { isNight } from './clock'
 
 export const GRID = 24
@@ -227,9 +228,9 @@ const HOME_NAMES: Record<HomeStage, string> = { house: 'House', apartments: 'Apa
 const TRAILER_NAMES: Record<HomeStage, string> = { house: 'Trailer Home', apartments: 'Double-Wide', tower: 'Trailer Court' }
 const RESIDENTS = [2, 3, 4, 6, 8, 10, 13, 16, 20, 24]
 export const houseResidents = (level: number) => RESIDENTS[Math.min(MAX_BUILDING_LEVEL, Math.max(1, level)) - 1]
-// What a building is called at a level (only homes change name).
+// What a building is called at a level: homes and growing businesses (game/growth.ts) change name.
 export const levelName = (d: BuildingDef, level: number) =>
-  d.kind !== 'house' ? d.name : (d.id === 'trailer' ? TRAILER_NAMES : HOME_NAMES)[homeStage(level)]
+  d.kind !== 'house' ? growthName(d.id, d.name, level) : (d.id === 'trailer' ? TRAILER_NAMES : HOME_NAMES)[homeStage(level)]
 export const buildingUpgradeXp = (level: number) => 10 + level * 5
 // Extra model height an upgraded building gains, on the same lot.
 export const levelLift = (level = 1) => 0.26 * (Math.min(MAX_BUILDING_LEVEL, Math.max(1, level)) - 1)
@@ -919,10 +920,10 @@ export function paintJobCost(car: { color: string; finish?: Finish; stripe?: str
 // (drawn by src/scene/skins.ts, picked by `n`). A skin is unlocked once for the whole
 // garage and can go on any car, over any colour and finish, for free.
 // How each is unlocked: reaching a level, claiming a collection set, a season track
-// tier, gems, or only from crates. Saves keep bought and won skins in `skins`;
+// tier, gems, only from crates, or only by clearing a weekly event (game/events.ts). Saves keep bought and won skins in `skins`;
 // level and set unlocks are worked out from the save, so they can't be lost.
 export type SkinTier = 'rare' | 'epic' | 'legendary'
-export type SkinUnlock = { level: number } | { set: string } | { season: number } | { bucks: number } | { crate: true }
+export type SkinUnlock = { level: number } | { set: string } | { season: number } | { bucks: number } | { crate: true } | { event: string }
 export type SkinDef = { id: string; n: number; name: string; tier: SkinTier; blurb: string; unlock: SkinUnlock; swatch: string }
 export const SKIN_TIERS: Record<SkinTier, { name: string; color: string }> = {
   rare: { name: 'Rare', color: '#4fc3f7' },
@@ -970,6 +971,19 @@ export const SKINS: SkinDef[] = [
     swatch: 'radial-gradient(circle at 50% 0, #e6b830 0 30%, #0f5a33 55%, #ff5a00 58% 62%, transparent 63%) 0 0 / 12px 10px, #071a10' },
   { id: 'kaleido', n: 24, name: 'Kaleido', tier: 'legendary', blurb: 'Stained glass turning in a kaleidoscope', unlock: { crate: true },
     swatch: 'conic-gradient(#ff4d6d, #ffb703, #3ddc97, #4cc9f0, #7b2cbf, #ff4d6d)' },
+  // Weekly event exclusives (game/events.ts): never sold, never in crates.
+  { id: 'hoarfrost', n: 28, name: 'Hoarfrost', tier: 'legendary', blurb: 'Frost ferns creeping over glass, snow drifting under it', unlock: { event: 'whiteout' },
+    swatch: 'repeating-conic-gradient(from 10deg at 30% 70%, #eaf6ff 0 4deg, transparent 4deg 22deg), radial-gradient(circle at 60% 30%, #9fd4ff, #1d3b5c 75%)' },
+  { id: 'harvestmoon', n: 29, name: 'Harvest Moon', tier: 'legendary', blurb: 'A giant moon rising behind swaying wheat and fireflies', unlock: { event: 'harvestmoon' },
+    swatch: 'linear-gradient(0deg, #1a0d05 0 22%, transparent 22%), radial-gradient(circle at 55% 45%, #ffd27a 0 20%, #ff8a2a 26%, transparent 28%), linear-gradient(180deg, #0b0a2a, #3a1d3f)' },
+  { id: 'beacon', n: 30, name: 'Beacon', tier: 'legendary', blurb: 'A lighthouse beam sweeping through night fog', unlock: { event: 'foghorn' },
+    swatch: 'conic-gradient(from 200deg at 20% 80%, transparent 0 20deg, #fff6c8 24deg 34deg, transparent 40deg), linear-gradient(180deg, #2b3a4d, #0a1420)' },
+  { id: 'rainglass', n: 31, name: 'Rain Glass', tier: 'legendary', blurb: 'Raindrops running over a blur of neon city lights', unlock: { event: 'neondownpour' },
+    swatch: 'radial-gradient(circle at 25% 35%, #ff4fd8 0 10%, transparent 18%), radial-gradient(circle at 70% 60%, #33e1ff 0 12%, transparent 20%), radial-gradient(circle at 55% 25%, #ffd84a 0 6%, transparent 12%), #0b0b1e' },
+  { id: 'shallows', n: 32, name: 'Shallows', tier: 'legendary', blurb: 'Sunlight dancing over sand ripples under clear water', unlock: { event: 'shallows' },
+    swatch: 'repeating-radial-gradient(ellipse at 40% 60%, #e8fff9 0 1px, transparent 2px 7px), linear-gradient(160deg, #3fe0d0, #1a8fa8 60%, #d8c08a)' },
+  { id: 'mirage', n: 33, name: 'Mirage', tier: 'legendary', blurb: 'Heat haze rippling over dunes under a white-hot sun', unlock: { event: 'mirage' },
+    swatch: 'radial-gradient(circle at 50% 30%, #fffbe6 0 10%, transparent 14%), repeating-linear-gradient(170deg, #e0843a 0 6px, #f6b25e 7px 10px), linear-gradient(180deg, #ffd9a0, #c4572a)' },
 ]
 export const skinDef = (id?: string | null) => (id ? SKINS.find((s) => s.id === id) : undefined)
 // The shader number for a car's skin, 0 for none (or one this version doesn't know).

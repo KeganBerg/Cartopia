@@ -223,7 +223,9 @@ function TrafficSignals({ roads }: { roads: string[] }) {
     }
     return out
   }, [lights])
-  // One instanced mesh per lamp look (unlit, red, yellow, green); each lamp shows in exactly one.
+  // One instanced mesh per lamp look (unlit, red, yellow, green). Each lamp sits in exactly
+  // one of them, packed at the front so the meshes only draw the lamps they show (count),
+  // not every lamp in town four times over.
   const lamps = useRef<(InstancedMesh | null)[]>([])
   // Which look each lamp is showing now (-1 before the first frame).
   const shown = useMemo(() => new Int8Array(spots.length).fill(-1), [spots])
@@ -239,11 +241,17 @@ function TrafficSignals({ roads }: { roads: string[] }) {
           if (shown[j] === look) continue
           shown[j] = look
           changed = true
-          meshes.forEach((m, n) => m?.setMatrixAt(j, n === look ? spots[j] : hidden))
         }
       }
     })
-    if (changed) for (const m of meshes) if (m) m.instanceMatrix.needsUpdate = true
+    if (!changed) return
+    meshes.forEach((m, n) => {
+      if (!m) return
+      let c = 0
+      for (let j = 0; j < spots.length; j++) if (shown[j] === n) m.setMatrixAt(c++, spots[j])
+      m.count = c
+      m.instanceMatrix.needsUpdate = true
+    })
   })
 
   return (

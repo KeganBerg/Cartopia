@@ -6,16 +6,16 @@ import { TRACK, freshRacer, stepRacer, shiftQuality, launchRacer, shiftRacer, fi
 import { CarThumb } from '../scene/BuildingPreview'
 import { supabase } from '../lib/supabase'
 import { Panel } from './Menus'
-import { Canvas } from '@react-three/fiber'
-import { NeutralToneMapping } from 'three'
+import { StageSlot, useStageReady, warmStage } from '../scene/Stage'
 import { RaceScene, startLights, finishView } from '../scene/RaceScene'
 import { pickVenue, venue as venueById } from '../scene/venues'
 import { sfx } from '../lib/sound'
 import { raceAudio, type RaceAudio } from '../lib/engineAudio'
+import { PlayerName } from './Username'
 import { useLive, challenge, cancelChallenge, refreshPresence, raceChannel, endLiveRace, answer, pruneInvites, mute, unmute, setClosed, INVITE_MS, type LiveRace } from '../lib/live'
 import { displayName } from '../lib/names'
 import { joinRefereed, reportFinish, serverPi, type Verdict } from '../lib/referee'
-import { ghostDist, trialWeek, TRIAL_FUEL } from '../game/trial'
+import { ghostDist, shortLeft, trialWeek, TRIAL_FUEL } from '../game/trial'
 import { raceWeather } from '../game/weather'
 import { carGrip, conditions, conditionsNote, gripMul, spinning } from '../game/grip'
 import { TrialTab, TrialResult, beginTrialRun, type TrialRun } from './TimeTrial'
@@ -26,6 +26,8 @@ import { artStyle } from './venueArt'
 import './race-menu.css'
 import { TOUR_RACES, tourLeg, tourLegOf, tourIsBoss, tourRivalPi, tourShift, tourSkills, tourRivalName, tourPrize, tourLegBonus } from '../game/tour'
 import type { WeatherKind } from '../game/weather'
+import { WEEKLY_EVENTS, EVENT_RACES, eventBonus, eventFor, eventIsBoss, eventPrize, eventProgress, eventRivalPi, eventShift, nextEventWeek } from '../game/events'
+import { msToNextWeek, skinDef, SKIN_TIERS } from '../game/data'
 
 // skill: the rival car's race skill. AI rivals use it; live players use theirs on their own device.
 // shift: how cleanly an AI rival shifts, 0 (sloppy) to 1 (always perfect, the default).
@@ -109,7 +111,10 @@ export function openRaceTab(tab: RaceTab) {
   useGame.getState().openPanel('race')
 }
 
+const RACE_CAM = { position: [0.4, 2.2, -4] as [number, number, number], fov: 55, near: 0.3, far: 150 }
+
 export function RacePanel() {
+  useEffect(() => warmStage(), [])
   const cars = useGame((s) => s.cars)
   const level = useGame((s) => s.level)
   const best = useMemo(() => [...cars].sort((a, b) => pi(b) - pi(a))[0], [cars])
@@ -121,6 +126,7 @@ export function RacePanel() {
   const [gpRace, setGpRace] = useState<{ series: GpSeries; rival: Rival; prize: number } | null>(null)
   const [cRace, setCRace] = useState<{ chapter: CampaignChapter; race: number; rival: Rival; prize: number } | null>(null)
   const [tRace, setTRace] = useState<{ race: number; rival: Rival; prize: number } | null>(null)
+  const [eRace, setERace] = useState<{ race: number; rival: Rival; prize: number } | null>(null)
   const [tab, setTab] = useState<RaceTab>(() => {
     const t = nextRaceTab
     nextRaceTab = 'hub'
@@ -143,6 +149,9 @@ export function RacePanel() {
   const gpResult = useGame((s) => s.gpResult)
   const campaignResult = useGame((s) => s.campaignResult)
   const tourResult = useGame((s) => s.tourResult)
+  const eventResult = useGame((s) => s.eventResult)
+  const ev = eventProgress(useGame((s) => s.event))
+  const evBase = ev?.pi ?? (best ? pi(best) : 0)
 
   const livePlayers = useLive((l) => l.players)
   const liveSignedIn = useLive((l) => l.signedIn)
@@ -284,6 +293,23 @@ export function RacePanel() {
     )
   }
 
+  if (eRace && car) {
+    const e = eventFor()
+    return (
+      <DragRace
+        car={car}
+        rival={eRace.rival}
+        prize={eRace.prize}
+        venueId={e.venue}
+        night={e.night}
+        sky={e.sky}
+        title={`📅 ${e.name} · ${eventIsBoss(eRace.race) ? 'Boss race' : `Race ${eRace.race + 1} of ${EVENT_RACES}`}`}
+        onFinish={(won) => eventResult(won)}
+        onExit={() => { setERace(null); setTab('event') }}
+      />
+    )
+  }
+
   function startRival(match: RivalMatch, n = 0) {
     if (waiting()) return
     if (!spendFuel(RACE_FUEL)) return useGame.getState().showNeed('fuel', RACE_FUEL - useGame.getState().fuel, 'a rival race')
@@ -308,6 +334,14 @@ export function RacePanel() {
     if (!spendFuel(RACE_FUEL)) return useGame.getState().showNeed('fuel', RACE_FUEL - useGame.getState().fuel, 'a Pro Tour race')
     setTRace({ race: tourWon, rival: tourRival(tourWon), prize: tourPrize(tourWon) })
   }
+  const startEvent = () => {
+    if (waiting()) return
+    if ((ev?.won ?? 0) >= EVENT_RACES) return
+    if (!spendFuel(RACE_FUEL)) return useGame.getState().showNeed('fuel', RACE_FUEL - useGame.getState().fuel, 'an event race')
+    useGame.getState().eventEnter(evBase)
+    const p = eventProgress(useGame.getState().event)!
+    setERace({ race: p.won, rival: eventRival(p.pi, p.won), prize: eventPrize(p.pi, p.won) })
+  }
   const startGp = (series: GpSeries, rival: Rival, prize: number) => {
     if (waiting()) return
     if (!spendFuel(RACE_FUEL)) return useGame.getState().showNeed('fuel', RACE_FUEL - useGame.getState().fuel, 'a Grand Prix race')
@@ -322,23 +356,27 @@ export function RacePanel() {
   })()
   const go = tab === 'campaign' && campNext >= 0 ? { label: `$${campaignReward(CAMPAIGN[campSel], campNext, true).toLocaleString()}`, onClick: () => startCampaign(campSel, campNext) }
     : tab === 'tour' && campaignCleared(done, CAMPAIGN[0]) ? { label: `$${tourPrize(tourWon).toLocaleString()}`, onClick: startTour }
+    : tab === 'event' && (ev?.won ?? 0) < EVENT_RACES ? { label: `$${eventPrize(evBase, ev?.won ?? 0).toLocaleString()}`, onClick: startEvent }
     : null
   const stars = Object.values(done).reduce((a, n) => a + n, 0)
-  const TITLES: Record<RaceTab, string> = { hub: 'Race', quick: 'Quick Race', campaign: 'Campaign', tour: 'Pro Tour', gp: 'Grand Prix', trial: 'Time Trial' }
+  const TITLES: Record<RaceTab, string> = { hub: 'Race', quick: 'Quick Race', campaign: 'Campaign', tour: 'Pro Tour', gp: 'Grand Prix', trial: 'Time Trial', event: 'Weekly Event' }
   const chip = tab === 'campaign' ? `⭐ ${stars}/${CAMPAIGN.length * CAMPAIGN_RACES * 3}`
     : tab === 'tour' ? `🌍 ${tourWon.toLocaleString()} wins`
     : tab === 'gp' ? '🏆 Win 6 in a row'
+    : tab === 'event' ? `⏳ ${shortLeft(msToNextWeek())}`
     : null
 
   return (
     <Panel title={TITLES[tab]} wide className="race-panel" onBack={tab === 'hub' ? undefined : () => setTab('hub')} head={chip && <span className="rm-head-chip">{chip}</span>}>
       <div className={`rm-screen rm-s-${tab}`}>
         {tab === 'hub' ? (
-          <RaceHub onOpen={setTab} onCampaign={startCampaign} onTour={startTour} onRival={(m) => startRival(m)} />
+          <RaceHub onOpen={setTab} onCampaign={startCampaign} onTour={startTour} onEvent={startEvent} onRival={(m) => startRival(m)} />
         ) : tab === 'campaign' ? (
           <Campaign sel={campSel} setSel={setCampSel} onTour={() => setTab('tour')} onRace={(ci, i) => startCampaign(ci, i)} />
         ) : tab === 'tour' ? (
           <Tour onCampaign={() => setTab('campaign')} onRace={startTour} />
+        ) : tab === 'event' ? (
+          <WeeklyEvent base={evBase} car={car} onRace={startEvent} />
         ) : tab === 'trial' ? (
           car && <TrialTab myPi={pi(car)} onRun={startTrial} />
         ) : tab === 'gp' ? (
@@ -357,7 +395,7 @@ export function RacePanel() {
                 <div key={p.id} className="rm-qc rm-qc-live" style={{ ['--qc' as string]: p.color }}>
                   <span className="rm-qc-top"><CarThumb size="sm" color={p.color} body={p.body} mods={p.mods} /><span className="tag live">LIVE</span></span>
                   <span className="rm-qc-body">
-                    <b>{p.town}</b>
+                    <b><PlayerName id={p.uid} town={p.town} /></b>
                     <span className="rm-qc-chips"><span>Lv {p.level}</span><span className="rm-pi">PI {p.pi}</span></span>
                     {outgoing?.to === p.id ? (
                       <button className="buy small alt" onClick={cancelChallenge} title="Waiting for an answer. Tap to call it off.">⏳ Cancel</button>
@@ -383,7 +421,7 @@ export function RacePanel() {
           </div>
         )}
       </div>
-      <RaceBar cars={cars} car={car} onPick={setCarId} go={go} note={tab === 'gp' ? 'Races every round' : undefined} />
+      <RaceBar cars={cars} car={car} onPick={setCarId} go={go} note={tab === 'gp' ? 'Races every round' : tab === 'event' ? 'Back next week' : undefined} />
     </Panel>
   )
 }
@@ -605,6 +643,104 @@ function Tour({ onRace, onCampaign }: { onRace: () => void; onCampaign: () => vo
   )
 }
 
+function eventRival(base: number, race: number): Rival {
+  const e = eventFor()
+  const target = eventRivalPi(base, race)
+  const car = carNear(target)
+  return {
+    id: `event-${e.id}-${race}`, town: e.rivals[race], level: 0, carName: car.name, color: car.colors[race % car.colors.length],
+    pi: target, online: false, body: car.body, skill: race >= 2 ? car.skill : undefined, shift: eventShift(race), boss: eventIsBoss(race),
+  }
+}
+
+// Weekly event (game/events.ts): this week's series, its exclusive skin shown on
+// your own car, and its five races.
+function WeeklyEvent({ base, car, onRace }: { base: number; car: OwnedCar | undefined; onRace: () => void }) {
+  const p = eventProgress(useGame((s) => s.event))
+  const owned = useGame((s) => s.skins ?? [])
+  const e = eventFor()
+  const won = p?.won ?? 0
+  const skin = skinDef(e.skin)!
+  const has = owned.includes(e.skin)
+  const v = venueById(e.venue)
+  const next = eventFor(nextEventWeek())
+  const d = car ? carDef(car.model) : CARS[0]
+  return (
+    <div className="rm-split rm-event" style={{ '--ev': e.color } as React.CSSProperties}>
+      <div className="rm-left">
+        <div className="rm-banner rm-photo" style={artStyle('tour', e.venue, e.night)}>
+          <span className="rm-eyebrow">{v.icon} {v.name} · {e.night ? '🌙 Night' : 'Day'} · {SKY_ICON[e.sky]}</span>
+          <b className="rm-ttl">{e.name}</b>
+          <span className="rm-ev-blurb">{e.blurb}</span>
+          <span className="rm-chips">
+            <span>{won} of {EVENT_RACES} won</span>
+            <span title="Next week's event">Next: {next.name}</span>
+          </span>
+        </div>
+        <div className={`rm-ev-prize${won >= EVENT_RACES ? ' got' : ''}`}>
+          <CarThumb size="sm" color={car?.color ?? d.colors[0]} finish={car?.finish} skin={e.skin} body={d.body} model={d.id} stripe={car?.stripe} mods={car?.mods} />
+          <span className="rm-ev-ptxt">
+            <small>{won >= EVENT_RACES ? 'WON' : has ? 'ALREADY YOURS' : 'EXCLUSIVE PRIZE'}</small>
+            <b>{skin.name}</b>
+            <span><i className="skin-chip" style={{ background: skin.swatch }} /> <em style={{ background: SKIN_TIERS[skin.tier].color }}>{SKIN_TIERS[skin.tier].name}</em> skin</span>
+            <small>{won >= EVENT_RACES ? 'Fit it in the Paint Shop' : has ? `Win again for $${(eventBonus(base) * 2).toLocaleString()}` : `Beat the boss · +$${eventBonus(base).toLocaleString()}`}</small>
+          </span>
+        </div>
+      </div>
+      <div className="rm-right">
+        <div className="rm-rows">
+          {Array.from({ length: EVENT_RACES }, (_, i) => {
+            const r = eventRival(base, i)
+            const beat = i < won
+            const isNext = i === won
+            return (
+              <div key={i} className={`rm-row${r.boss ? ' boss' : ''}${!beat && !isNext ? ' locked' : ''}${isNext ? ' next' : ''}${beat ? ' done' : ''}`}>
+                <span className="rm-step">{beat ? '✔' : r.boss ? '👑' : i + 1}</span>
+                <CarThumb size="xs" color={r.color} body={r.body} skin={r.boss ? e.skin : undefined} />
+                <div className="rm-who">
+                  <b>{r.town}</b>
+                  <small>PI {r.pi}{r.skill && <span className="rival-skill" title={`${SKILLS[r.skill].name}: ${SKILLS[r.skill].text}`}> {SKILLS[r.skill].icon}</span>}{r.boss && ' · 🎨 Skin'}</small>
+                </div>
+                {beat ? <span className="tour-beat">Beaten</span> : (
+                  <button className="buy small" disabled={!isNext} onClick={onRace}>
+                    {isNext ? `🏁 $${eventPrize(base, i).toLocaleString()}` : '🔒'}
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function EventPrizePopup() {
+  const prize = useGame((s) => s.eventPrize)
+  const close = useGame((s) => s.closeEventPrize)
+  const cars = useGame((s) => s.cars)
+  if (!prize) return null
+  const e = WEEKLY_EVENTS.find((x) => x.id === prize.id)
+  if (!e) return null
+  const skin = skinDef(e.skin)!
+  const top = [...cars].sort((a, b) => pi(b) - pi(a))[0]
+  const d = top ? carDef(top.model) : CARS[0]
+  return (
+    <div className="overlay prize-overlay">
+      <div className="prize ev-prize">
+        <h2>{e.name} cleared!</h2>
+        <CarThumb size="lg" color={top?.color ?? d.colors[0]} finish={top?.finish} skin={e.skin} body={d.body} model={d.id} stripe={top?.stripe} mods={top?.mods} />
+        <h3>{prize.skin ? <>🎨 {skin.name} skin unlocked</> : <>You already have {skin.name}</>}</h3>
+        <p className="camp-prize"><span>💵 +${prize.coins.toLocaleString()}</span></p>
+        <p>{prize.skin ? 'An event exclusive. Put it on any car in the Paint Shop.' : 'Double bonus instead.'} Next week: {eventFor(nextEventWeek()).name}.</p>
+        <div className="row">
+          <button className="buy" onClick={close}>Awesome!</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function TourPrizePopup() {
   const prize = useGame((s) => s.tourPrize)
   const close = useGame((s) => s.closeTourPrize)
@@ -710,7 +846,7 @@ const step = stepRacer
 // trial: a solo run against a ghost that finishes in `target` seconds; the run ends when you cross the line.
 // resultView: replaces the usual result card.
 type Result = { won: boolean; myTime: number; theirTime: number }
-export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title, venueId, trial, resultView, night, weatherSeed }: { car: OwnedCar; rival: Rival; onExit: () => void; live?: LiveRace; prize?: number; onFinish?: (won: boolean, myTime: number, theirTime: number) => number | void; title?: string; venueId?: string; trial?: { target: number }; resultView?: (r: Result) => ReactNode; night?: boolean; weatherSeed?: string }) {
+export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title, venueId, trial, resultView, night, weatherSeed, sky }: { car: OwnedCar; rival: Rival; onExit: () => void; live?: LiveRace; prize?: number; onFinish?: (won: boolean, myTime: number, theirTime: number) => number | void; title?: string; venueId?: string; trial?: { target: number }; resultView?: (r: Result) => ReactNode; night?: boolean; weatherSeed?: string; sky?: WeatherKind }) {
   // A signed-in live rival's PI comes from the server, not from their browser.
   const [serverRivalPi, setServerRivalPi] = useState<number | null>(null)
   const rival = useMemo(() => (serverRivalPi === null ? shownRival : { ...shownRival, pi: serverRivalPi }), [shownRival, serverRivalPi])
@@ -736,7 +872,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   // The sky over the strip, rolled once: a live race from its id (both racers match), the weekly
   // time trial from its week (everyone races the same conditions), a Pro Tour race from its number
   // (so the card can show it), anything else from the town.
-  const [weather] = useState(() => raceWeather(venue.id, live?.raceId ?? (trial ? `trial-${trialWeek()}` : weatherSeed)))
+  const [weather] = useState(() => raceWeather(venue.id, live?.raceId ?? (trial ? `trial-${trialWeek()}` : weatherSeed), live ? undefined : sky))
   // What the weather and venue do to each car's grip (see grip.ts). AI rivals race on stock tires.
   const grip = useMemo(() => conditions(weather.kind, venue.id, carGrip(def, car.upgrades, car.mods), car.mods), [weather, venue, def, car.upgrades, car.mods])
   const theirGrip = useMemo(() => conditions(weather.kind, venue.id, CARS.find((c) => c.name === shownRival.carName)?.grip ?? 50), [weather, venue, shownRival.carName])
@@ -802,6 +938,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   }, [])
 
   useEffect(() => () => void (startLights.n = 99), [])
+  const stageReady = useStageReady()
   useEffect(() => {
     startLights.n = countdown
     if (countdown === 99) return
@@ -811,10 +948,14 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       sound.current?.countdown(countdown === 0)
       if (countdown === 0) sound.current?.launch(Math.min(1, myPi / 200), Math.min(1, rivalRef.current.pi / 200))
     }
-    if (countdown <= 0) return
+  }, [countdown])
+  useEffect(() => {
+    if (countdown === 99 || countdown <= 0) return
+    // The lights hold on 3 until the scene is drawing (its shaders compile in the background).
+    if (countdown === 3 && !live && !stageReady) return
     const id = setTimeout(() => setCountdown((c) => c - 1), 700)
     return () => clearTimeout(id)
-  }, [countdown])
+  }, [countdown, stageReady])
 
   useEffect(() => {
     if (!live) return
@@ -1047,14 +1188,22 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
     return () => window.removeEventListener('keydown', onKey)
   })
 
+  // The race screen redraws every frame (dials, lanes); the 3D scene only changes with
+  // its inputs, so it's built once rather than re-rendered sixty times a second.
+  const mineLook = useMemo(() => ({ body: def.body, model: car.model, color: car.color, finish: car.finish, skin: car.skin, modSkin: car.modSkin, mods: car.mods }), [def.body, car.model, car.color, car.finish, car.skin, car.modSkin, car.mods])
+  const theirLook = useMemo(() => ({ body: rival.body, color: rival.color, mods: rival.mods }), [rival.body, rival.color, rival.mods])
+  const photo = useRef(() => flash('PHOTO FINISH!', 2200))
+  const scene = useMemo(
+    () => <RaceScene track={TRACK} me={me} them={them} mine={mineLook} theirs={theirLook} venue={venue} weather={weather} night={night} onPhoto={() => photo.current()} />,
+    [mineLook, theirLook, venue, weather, night],
+  )
+
   const rpmAngle = -210 + Math.min(1.05, me.current.rpm) * 240
   const close = live ? onExit : () => useGame.getState().openPanel(null)
   // One full-screen view: the street fills the screen and the controls float over it.
   return (
     <div className="race-full">
-      <Canvas className="rf-canvas" camera={{ position: [0.4, 2.2, -4], fov: 55, near: 0.3, far: 150 }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
-        <RaceScene track={TRACK} me={me} them={them} mine={{ body: def.body, model: car.model, color: car.color, finish: car.finish, skin: car.skin, modSkin: car.modSkin, mods: car.mods }} theirs={{ body: rival.body, color: rival.color, mods: rival.mods }} venue={venue} weather={weather} night={night} onPhoto={() => flash('PHOTO FINISH!', 2200)} />
-      </Canvas>
+      <StageSlot cam={RACE_CAM}>{scene}</StageSlot>
       <div className="rf-top">
         <h2>{title ?? `Drag Race vs ${rival.town}`}</h2>
         <button className="close" onClick={close} aria-label="Leave race">✕</button>
@@ -1264,7 +1413,7 @@ export function InvitesPanel() {
             <div key={i.raceId} className="rival invite">
               <i style={{ background: i.from.color }} />
               <div>
-                <b>{i.from.town}</b> <span className="tag live">LIVE</span>
+                <b><PlayerName id={i.from.uid} town={i.from.town} /></b> <span className="tag live">LIVE</span>
                 <div className="card-stat">Lvl {i.from.level} · {i.from.carName} · PI {i.from.pi} · {Math.max(0, Math.ceil((INVITE_MS - (Date.now() - i.at)) / 1000))}s left</div>
               </div>
               <div className="invite-actions">

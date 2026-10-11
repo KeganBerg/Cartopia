@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { ALLOWED, ANYWHERE, WHOLE_WORD, displayName, isCleanName } from './names'
+import { ALLOWED, ANYWHERE, WHOLE_WORD, displayName, isCleanChat, isCleanName } from './names'
 
 describe('isCleanName', () => {
   it('blocks slurs, including spaced and leetspeak spellings', () => {
@@ -11,6 +11,19 @@ describe('isCleanName', () => {
   it('allows ordinary names, even ones containing a blocked piece', () => {
     for (const n of ['Ram Ranch', 'Polio Folio', 'Peacock Point', 'Raccoon City', 'Spice Market', 'Classic Motors', 'Scunthorpe', 'Torpedo Bay', 'Cucumber Lane', 'Midnight Racers']) {
       expect(isCleanName(n), n).toBe(true)
+    }
+  })
+})
+
+describe('isCleanChat', () => {
+  it('blocks bad words in a sentence, spaced out or in leetspeak', () => {
+    for (const t of ['you are a b1tch', 'f u c k this', 'what the sh!t', 'nice ass', 'go away n i g g a']) {
+      expect(isCleanChat(t), t).toBe(false)
+    }
+  })
+  it("doesn't join ordinary words into a bad one", () => {
+    for (const t of ['push it to the limit', 'this hit hard', 'gg nice race', 'see you at the docks', 'a cocktail at the classic diner', 'pass it on']) {
+      expect(isCleanChat(t), t).toBe(true)
     }
   })
 })
