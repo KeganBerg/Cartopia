@@ -53,6 +53,8 @@ export function DayNight({ small }: { small: boolean }) {
         position={[25, 40, 15]}
         intensity={1.6}
         shadow-mapSize={small ? [1024, 1024] : [2048, 2048]}
+        shadow-bias={-0.0004}
+        shadow-normalBias={0.02}
         shadow-camera-left={-30}
         shadow-camera-right={30}
         shadow-camera-top={30}

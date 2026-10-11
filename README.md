@@ -33,5 +33,5 @@ npm run dev
 - `src/scene/` 3D town, building and car models, cars driving the road graph
 - `src/ui/` HUD, shop, showroom, garage, drag race, account
 - `src/lib/cloud.ts` Supabase save sync (newest save wins)
-- `supabase/migrations/` database schema
+- `supabase/migrations/` database schema; `0005_economy_guard.sql` checks every cloud save so coins, bucks, XP, cars and race wins can't be edited in the browser (prices it checks come from `src/game/econCatalog.ts`)
 - `netlify.toml` build and SPA redirect config

@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
+import { refreshClanBadge } from './clans'
 import { useGame, saveOf, type SaveState } from '../game/store'
-import { carDef, performance } from '../game/data'
+import { carDef, performance, garagePower } from '../game/data'
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 // Set only once the sign-in sync has finished, so nothing uploads before the cloud copy is read.
@@ -63,6 +64,7 @@ function rowOf(uid: string, s: SaveState) {
     town_name: s.townName,
     level: s.level,
     best_car: bestCar(s),
+    power: garagePower(s.cars),
     updated_at: new Date(s.updatedAt).toISOString(),
   }
 }
@@ -100,13 +102,15 @@ async function pushSave(): Promise<void> {
     const uid = userId
     const row = rowOf(uid, saveOf(useGame.getState()))
     const { data, error } = cloudAt
-      ? await supabase.from('game_saves').update(row).eq('owner_id', uid).eq('updated_at', cloudAt).select('updated_at')
-      : await supabase.from('game_saves').insert(row).select('updated_at')
+      ? await supabase.from('game_saves').update(row).eq('owner_id', uid).eq('updated_at', cloudAt).select('updated_at, corrections')
+      : await supabase.from('game_saves').insert(row).select('updated_at, corrections')
     if (userId !== uid) return
     // 23505: row created elsewhere first. 23514: the server refused to lower your level.
     if (error && error.code !== '23505' && error.code !== '23514') return console.warn('Cloud save failed', error.message)
     if (!error && data && data.length) {
       cloudAt = data[0].updated_at
+      // The server trimmed something it couldn't verify (see 0005_economy_guard.sql): play on from its copy.
+      if (data[0].corrections) await pullNewer(uid, true, 'Your town was synced with the server')
       return
     }
     // Another device saved since we last synced (or created the row first): its town wins.
@@ -120,13 +124,13 @@ async function pushSave(): Promise<void> {
 }
 
 // Load the cloud town when another device has saved since this one last synced.
-async function pullNewer(uid: string, force = false) {
+async function pullNewer(uid: string, force = false, message = 'Loaded your latest town from another device') {
   if (!supabase) return
   const { data, error } = await supabase.from('game_saves').select('state, updated_at').eq('owner_id', uid).maybeSingle()
   if (error || !data || userId !== uid) return
   if (!force && data.updated_at === cloudAt) return
   if (saveTimer) clearTimeout(saveTimer)
-  loadCloud(data.state as SaveState, data.updated_at, 'Loaded your latest town from another device')
+  loadCloud(data.state as SaveState, data.updated_at, message)
 }
 
 // On sign-in the cloud save wins. The only exception is unsynced play by this same account
@@ -177,8 +181,12 @@ export function startCloudSync() {
     if (data.session) syncOnSignIn(data.session.user.id)
   })
   supabase.auth.onAuthStateChange((event, session) => {
-    if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) syncOnSignIn(session.user.id)
+    if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
+      syncOnSignIn(session.user.id)
+      refreshClanBadge(session.user.id).catch(() => {})
+    }
     if (event === 'SIGNED_OUT') {
+      useGame.setState({ clanBadge: null })
       userId = null
       syncingFor = null
       cloudAt = null
