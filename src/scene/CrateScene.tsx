@@ -14,8 +14,9 @@ import { LAYER, decal } from './layers'
 import { concreteTex, corrugatedTex, glowTex, shutterTex } from './textures'
 import { signTexture } from './signTexture'
 import { ToolChest, TyreStack, useFitCamera } from './ArcadeScenery'
-import { SKINNED_SLOTS, carDef, fittedMods, modDef, modFits, type Body, type Finish, type SkinnedSlot } from '../game/data'
-import { dropTier, type CrateDef, type CrateDrop } from '../game/crates'
+import { tickSkins, withSkin } from './skins'
+import { SKINNED_SLOTS, carDef, fittedMods, modDef, modFits, modSkinNumber, skinNumber, type Body, type Finish, type SkinnedSlot } from '../game/data'
+import { dropTier, type CrateDef, type CrateDrop, type CrateId } from '../game/crates'
 import { bumpSound, crashSound, dingSound } from '../lib/arcadeSound'
 import { sfx } from '../lib/sound'
 
@@ -175,16 +176,27 @@ function Panel({ wood, frame, crystal }: { wood: MeshStandardMaterial; frame: Me
   )
 }
 
+// Each crate's boards wear one of the car skins, livelier the rarer the crate: Street the
+// pulsing Hexcore honeycomb, Garage Overclock's racing circuits, Gold the glinting Gold Leaf
+// flakes and Diamond the Prismatic holo foil. Drawn in the crate's own space (see withSkin).
+const CRATE_SKIN: Record<CrateId, number> = {
+  street: skinNumber('hexcore'), garage: skinNumber('overclock'), gold: modSkinNumber('goldleaf'), diamond: skinNumber('prismatic'),
+}
+const SKIN_SCALE = 0.5
+
 function CrateModel({ def, glow, parts }: { def: CrateDef; glow: string; parts: React.RefObject<CrateParts> }) {
   const crystal = def.id === 'diamond'
   const gold = def.id === 'gold'
+  // Where the crate is, so its pattern rides along with it as it drops, hops and sways.
+  const origin = useMemo(() => ({ value: new Vector3() }), [])
   const mats = useMemo(() => {
     const map = plankTex()
-    const wood = crystal
-      ? new MeshStandardMaterial({ color: def.look.wood, emissive: new Color(def.look.wood), emissiveIntensity: 0.35, transparent: true, opacity: 0.55, roughness: 0.05, metalness: 0.2, depthWrite: false })
-      : new MeshStandardMaterial({ map, color: def.look.wood, roughness: gold ? 0.35 : 0.85, metalness: gold ? 0.55 : 0 })
+    const n = CRATE_SKIN[def.id]
+    const wood = new MeshStandardMaterial({ map: crystal ? null : map, color: def.look.wood, roughness: crystal ? 0.15 : gold ? 0.35 : 0.7, metalness: crystal ? 0.35 : gold ? 0.55 : 0.05 })
+    wood.onBeforeCompile = (sh) => withSkin(sh, String(n), false, { origin, scale: SKIN_SCALE })
+    wood.customProgramCacheKey = () => `crate-skin-${n}`
     const frame = crystal
-      ? new MeshStandardMaterial({ color: '#eceff1', metalness: 1, roughness: 0.18 })
+      ? new MeshStandardMaterial({ color: '#f5f7fa', metalness: 0.55, roughness: 0.28, emissive: '#cfd8dc', emissiveIntensity: 0.25 })
       : new MeshStandardMaterial({ map, color: new Color(def.look.wood).multiplyScalar(gold ? 0.8 : 0.72), roughness: 0.8, metalness: gold ? 0.5 : 0 })
     const band = new MeshStandardMaterial({ color: def.look.band, metalness: gold || crystal ? 1 : 0.75, roughness: gold ? 0.22 : 0.4 })
     const bolt = new MeshStandardMaterial({ color: gold ? '#ffe082' : '#b0bec5', metalness: 1, roughness: 0.3 })
@@ -192,8 +204,12 @@ function CrateModel({ def, glow, parts }: { def: CrateDef; glow: string; parts: 
     return { wood, frame, band, bolt, core }
   }, [def, glow, crystal, gold])
   useEffect(() => () => Object.values(mats).forEach((m) => m.dispose()), [mats])
-  const label = useMemo(() => labelTex(def.name, def.id === 'garage' ? '#f5f5f5' : '#3e2723'), [def])
   const p = parts.current
+  useFrame(() => {
+    tickSkins()
+    p.root?.getWorldPosition(origin.value)
+  })
+  const label = useMemo(() => labelTex(def.name, def.id === 'garage' ? '#f5f5f5' : '#3e2723'), [def])
   // Panels: front (+z), back, left, right; each hinged at its bottom outside edge.
   const sides: { pos: [number, number, number]; ry: number }[] = [
     { pos: [0, 0, S / 2], ry: 0 }, { pos: [0, 0, -S / 2], ry: Math.PI }, { pos: [-S / 2, 0, 0], ry: -Math.PI / 2 }, { pos: [S / 2, 0, 0], ry: Math.PI / 2 },
@@ -530,16 +546,27 @@ function PrizeCar({ look }: { look: CarLook }) {
   )
 }
 
-// A shower of gold coins thrown out of the crate, bouncing on the floor.
+// A shower of gold coins thrown out of the crate: each one tumbles through the
+// air, bounces once or twice, then slides to a stop lying flat on the floor.
 const COINS = 70
+const COIN_R = 0.11
+const COIN_H = 0.025
+// Snap an angle to the nearest face-up/face-down orientation.
+const flatOf = (a: number) => Math.round(a / Math.PI) * Math.PI
 function CoinBurst({ start }: { start: React.RefObject<number | null> }) {
   const ref = useRef<InstancedMesh>(null)
   const tmp = useMemo(() => new Object3D(), [])
+  const run = useRef<number | null>(null)
   const coins = useMemo(() => {
     const r = rng(41)
     return Array.from({ length: COINS }, (_, i) => {
       const a = r() * Math.PI * 2, sp = 1.2 + r() * 2.6
-      return { vx: Math.cos(a) * sp, vy: 4.5 + r() * 3.5, vz: Math.sin(a) * sp * 0.7 + 0.6, delay: (i / COINS) * 0.5, spin: 6 + r() * 10, x: 0, y: 0, z: 0, tx: r() * 6, sx: 0, sy: 0, sz: 0, live: false }
+      return {
+        vx: Math.cos(a) * sp, vy: 4.5 + r() * 3.5, vz: Math.sin(a) * sp * 0.7 + 0.6, delay: (i / COINS) * 0.5,
+        // Flip rate (end over end) and a slower wobble, both in radians/second.
+        flip: (8 + r() * 10) * (r() < 0.5 ? -1 : 1), wob: (r() - 0.5) * 6, yaw: r() * Math.PI * 2,
+        x: 0, y: 0, z: 0, sx: 0, sy: 0, sz: 0, rx: r() * 6, rz: 0, wx: 0, wz: 0, bounces: 0, rest: false, fl: 0, live: false,
+      }
     })
   }, [])
   useFrame((state, rawDt) => {
@@ -547,25 +574,54 @@ function CoinBurst({ start }: { start: React.RefObject<number | null> }) {
     if (!m || start.current == null) return
     const dt = Math.min(rawDt, 1 / 30)
     const t = state.clock.elapsedTime - start.current
+    // A new crate opening throws the whole shower again.
+    if (run.current !== start.current) {
+      run.current = start.current
+      for (const c of coins) c.live = false
+    }
     coins.forEach((c, i) => {
       if (t < c.delay) {
         tmp.position.set(0, -10, 0)
-      } else {
-        if (!c.live) Object.assign(c, { live: true, x: 0, y: S * 0.8, z: 0, sx: c.vx, sy: c.vy, sz: c.vz })
+        tmp.updateMatrix()
+        m.setMatrixAt(i, tmp.matrix)
+        return
+      }
+      if (!c.live) Object.assign(c, { live: true, x: 0, y: S * 0.8, z: 0, sx: c.vx, sy: c.vy, sz: c.vz, wx: c.flip, wz: c.wob, bounces: 0, rest: false })
+      const floor = Math.hypot(c.x, c.z) < 1.5 ? LIFT : 0
+      if (!c.rest) {
         c.sy -= 14 * dt
         c.x += c.sx * dt
         c.y += c.sy * dt
         c.z += c.sz * dt
-        const floor = Math.hypot(c.x, c.z) < 1.5 ? LIFT + 0.02 : 0.02
-        if (c.y < floor) {
-          c.y = floor
-          c.sy = Math.abs(c.sy) * 0.35
-          c.sx *= 0.6
-          c.sz *= 0.6
+        c.rx += c.wx * dt
+        c.rz += c.wz * dt
+        // How high the tilted coin's lowest rim sits above its centre.
+        const reach = COIN_R * Math.min(1, Math.hypot(Math.sin(c.rx), Math.sin(c.rz))) + COIN_H / 2
+        if (c.y < floor + reach && c.sy < 0) {
+          c.y = floor + reach
+          c.bounces++
+          // Each hit loses most of the spin and height; after a couple it lies down.
+          c.sy = Math.abs(c.sy) * (c.bounces === 1 ? 0.38 : 0.22)
+          c.sx *= 0.55
+          c.sz *= 0.55
+          c.wx *= 0.4
+          c.wz *= 0.3
+          if (c.bounces >= 3 || c.sy < 0.8) Object.assign(c, { rest: true, fl: floor })
         }
-        tmp.position.set(c.x, c.y, c.z)
+      } else {
+        // Slide to a stop and settle flat: no more spinning on the floor.
+        const k = 1 - Math.exp(-12 * dt)
+        c.sx *= 1 - Math.min(1, 6 * dt)
+        c.sz *= 1 - Math.min(1, 6 * dt)
+        c.x += c.sx * dt
+        c.z += c.sz * dt
+        c.rx += (flatOf(c.rx) - c.rx) * k
+        c.rz += (flatOf(c.rz) - c.rz) * k
+        const reach = COIN_R * Math.min(1, Math.hypot(Math.sin(c.rx), Math.sin(c.rz))) + COIN_H / 2
+        c.y = c.fl + reach
       }
-      tmp.rotation.set(c.tx + t * c.spin * (c.sy !== 0 && c.y > 0.05 ? 1 : 0.1), 0, t * c.spin * 0.3)
+      tmp.position.set(c.x, c.y, c.z)
+      tmp.rotation.set(c.rx, c.yaw, c.rz, 'YXZ')
       tmp.updateMatrix()
       m.setMatrixAt(i, tmp.matrix)
     })
@@ -573,7 +629,7 @@ function CoinBurst({ start }: { start: React.RefObject<number | null> }) {
   })
   return (
     <instancedMesh ref={ref} args={[undefined, undefined, COINS]} castShadow frustumCulled={false}>
-      <cylinderGeometry args={[0.11, 0.11, 0.025, 16]} />
+      <cylinderGeometry args={[COIN_R, COIN_R, COIN_H, 16]} />
       <meshStandardMaterial color="#ffc107" metalness={0.9} roughness={0.25} emissive="#ff8f00" emissiveIntensity={0.25} />
     </instancedMesh>
   )

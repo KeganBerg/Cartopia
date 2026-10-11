@@ -610,7 +610,8 @@ export const CAMPAIGN: CampaignChapter[] = [
 export const campaignRaceId = (ch: CampaignChapter, i: number) => `${ch.id}-${i}`
 export const campaignRivalPi = (ch: CampaignChapter, i: number) => Math.round(ch.pi[0] + ((ch.pi[1] - ch.pi[0]) * i) / (CAMPAIGN_RACES - 1))
 // How cleanly a rival shifts, 0 (early, sloppy) to 1 (every shift perfect), across the whole campaign.
-export const campaignShift = (chIndex: number, i: number) => Math.min(1, (chIndex + i / (CAMPAIGN_RACES - 1)) / (CAMPAIGN.length - 1))
+// Even the first rival shifts decently, so race 1 can't be won with eyes closed.
+export const campaignShift = (chIndex: number, i: number) => Math.min(1, 0.35 + 0.65 * (chIndex + i / (CAMPAIGN_RACES - 1)) / (CAMPAIGN.length - 1))
 // Rivals use their car's skill from the third chapter on; bosses always do.
 export const campaignRivalSkills = (chIndex: number, i: number) => chIndex >= 2 || i === CAMPAIGN_RACES - 1
 // The first win of each race pays the most; replays pay about a quick race.

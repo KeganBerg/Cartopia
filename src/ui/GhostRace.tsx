@@ -77,7 +77,7 @@ function GhostResultCard({ myTime, onAgain, onExit }: { myTime: number; onAgain:
     <div className={won ? 'rr win' : 'rr lose'}>
       <div className="rr-card ghost-card">
         <div className="rr-icon">{won ? '🏆' : '👻'}</div>
-        <h3 className="rr-title">{won ? 'GHOST BEATEN!' : 'SO CLOSE!'}</h3>
+        <h3 className="rr-title">{won ? 'GHOST BEATEN!' : Math.abs(gap) < 0.3 ? 'SO CLOSE!' : 'OUTRUN!'}</h3>
         <p className="rr-sub">{won ? `${secs(gap)} faster than ${ghost.town}` : `${ghost.town}'s ghost won by ${secs(gap)}`}</p>
         <div className="ghost-times">
           <span className={won ? 'win' : ''}><small>You</small><b>{secs(time)}</b></span>

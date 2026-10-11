@@ -5,11 +5,16 @@ import { signTexture } from './signTexture'
 import { glowMats } from './dayNight'
 import { decal } from './layers'
 import { concreteTex, corrugatedTex, gravelTex } from './textures'
+import { Crane, Crusher } from './TrailerJunkyard'
+import { growthStage } from '../game/growth'
 
 // Rusty's Rescue: a rust-red Quonset workshop with a car up on the lift out
 // front, his tow truck parked by the gate and a fenced junkyard full of crushed
 // cars, tyres and drums. Lot is 2x1 tiles and faces +z, like the rest of town.
 // Every piece is a plain static mesh, so Batch bakes the lot into a few draws.
+// It grows like the other businesses: at level 4 (Recovery Yard) a tracked
+// crane moves into the junkyard, and at 7 (Restoration Works) a car crusher
+// joins it and the car on the lift comes out gleaming.
 
 type V3 = [number, number, number]
 type Mat = (color: string, map?: Texture) => ReactNode
@@ -75,6 +80,7 @@ function Drum({ m, at, c }: { m: Mat; at: V3; c: string }) {
 export function RustysYard({ m, ghost, sign, bulb, win, lvl, lift }: Props) {
   // The crushed-car stack and the roadside sign grow with upgrades.
   const stack = 2 + Math.min(4, Math.round(lift / 0.5))
+  const stage = growthStage(lvl)
   const pole = 1.35 + lift * 0.5
   const qTop = QY + QR
   const qLen = QZ1 - QZ0
@@ -166,7 +172,7 @@ export function RustysYard({ m, ghost, sign, bulb, win, lvl, lift }: Props) {
           ))}
           <Box m={m} at={[0, 0.82, 0]} s={[0.8, 0.04, 0.05]} c="#ffb300" />
           <group position={[0, 0.215, 0]} scale={0.55}>
-            <CarModel body="classic" color="#5d8aa8" rusty />
+            {stage === 3 ? <CarModel body="classic" color="#c62828" finish="gloss" /> : <CarModel body="classic" color="#5d8aa8" rusty />}
           </group>
           {/* Toolbox and a wheel off the car. */}
           <Box m={m} at={[0.62, 0.16, 0.18]} s={[0.2, 0.28, 0.14]} c="#d32f2f" />
@@ -199,25 +205,43 @@ export function RustysYard({ m, ghost, sign, bulb, win, lvl, lift }: Props) {
             <Crushed key={i} m={m} at={[1.45 + ((i * 37) % 5) * 0.012 - 0.02, 0.12 + i * 0.135, -0.6 + (i % 2) * 0.03]} c={['#7b8f6a', '#a35d3a', '#6a7f99', '#b39b5a', '#8a6f8f', '#9b5145'][i % 6]} rot={(i % 3) * 0.12 - 0.1} />
           ))}
           {/* A rusted-out shell waiting its turn. */}
-          <group position={[0.74, 0.05, -0.5]} rotation-y={0.5} scale={0.45}>
-            <CarModel body="sedan" color="#8d6e63" rusty />
-          </group>
+          {stage === 1 && (
+            <group position={[0.74, 0.05, -0.5]} rotation-y={0.5} scale={0.45}>
+              <CarModel body="sedan" color="#8d6e63" rusty />
+            </group>
+          )}
           {/* Tyre pile and oil drums. */}
           {[[0.48, 0.09, -0.12], [0.7, 0.09, -0.12], [0.59, 0.09, 0.05], [0.59, 0.19, -0.04]].map((p, i) => (
             <Tyre key={i} m={m} at={p as V3} rot={[-Math.PI / 2, 0, i * 0.4]} />
           ))}
-          <Drum m={m} at={[1.78, 0.05, -0.12]} c="#1e88e5" />
-          <Drum m={m} at={[1.6, 0.05, -0.08]} c="#e53935" />
-          <Drum m={m} at={[1.75, 0.05, 0.08]} c="#43a047" />
+          {stage < 3 && (
+            <>
+              <Drum m={m} at={[1.78, 0.05, -0.12]} c="#1e88e5" />
+              <Drum m={m} at={[1.6, 0.05, -0.08]} c="#e53935" />
+              <Drum m={m} at={[1.75, 0.05, 0.08]} c="#43a047" />
+            </>
+          )}
+          {/* Recovery Yard: a tracked crane swinging over the junk. */}
+          {stage >= 2 && (
+            <group position={[0.86, 0.05, -0.45]} rotation-y={Math.PI} scale={0.62}>
+              <Crane m={m} at={[0, 0, 0]} />
+            </group>
+          )}
+          {/* Restoration Works: a crusher for what can't be saved. */}
+          {stage === 3 && (
+            <group position={[1.5, 0.05, -0.08]} scale={0.6}>
+              <Crusher m={m} at={[0, 0, 0]} bulb={bulb} />
+            </group>
+          )}
           {/* Engine hoist with a block hanging off its chain. */}
-          <group position={[1.08, 0.05, -0.15]} rotation-y={-0.4}>
+          {stage === 1 && <group position={[1.08, 0.05, -0.15]} rotation-y={-0.4}>
             <Box m={m} at={[0, 0.02, 0]} s={[0.05, 0.04, 0.5]} c="#c62828" />
             <Box m={m} at={[0, 0.3, -0.18]} s={[0.05, 0.6, 0.05]} c="#c62828" />
             <Box m={m} at={[0, 0.6, -0.02]} s={[0.05, 0.05, 0.4]} c="#c62828" rot={[-0.25, 0, 0]} />
             <Box m={m} at={[0, 0.5, 0.16]} s={[0.012, 0.14, 0.012]} c="#212121" shadow={false} />
             <Box m={m} at={[0, 0.36, 0.16]} s={[0.16, 0.13, 0.12]} c="#607d8b" />
             <Box m={m} at={[0, 0.45, 0.16]} s={[0.12, 0.04, 0.1]} c="#455a64" />
-          </group>
+          </group>}
         </>
       )}
 

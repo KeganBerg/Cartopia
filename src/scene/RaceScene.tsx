@@ -238,7 +238,11 @@ function StartLights() {
   const lit = useMemo(() => LIT.map((c) => new Color(c)), [])
   const go = useMemo(() => new Color('#00e676'), [])
   useEffect(() => () => lamps.forEach((m) => m.dispose()), [lamps])
-  useFrame(() => {
+  const group = useRef<Group>(null)
+  useFrame(({ camera }) => {
+    // The chase camera rides at the bar's height: drop the bar just before the camera reaches
+    // it, so it never sweeps through the frame as big blurred lamps.
+    if (group.current) group.current.visible = camera.position.z < -0.85 - 1.6 || camera.position.y < 2 || camera.position.y > 3.6
     const n = startLights.n
     lamps.forEach((m, i) => {
       if (n === 0) m.color.copy(go)
@@ -247,7 +251,7 @@ function StartLights() {
     })
   })
   return (
-    <group position={[0, 2.5, -0.85]}>
+    <group ref={group} position={[0, 2.5, -0.85]}>
       <mesh position={[0, 0.32, 0]}>
         <boxGeometry args={[0.05, 0.3, 0.05]} />
         <meshStandardMaterial color="#263238" />
