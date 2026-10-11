@@ -68,7 +68,7 @@ export function Hud() {
         </button>
         <div className="fuel-sub">{nextIn === null ? 'Fuel full' : `+1 fuel in ${nextIn}s`}</div>
         <div className="hud-right-row">
-          <div className="pill trophies">🏆 {s.trophies}</div>
+          <button className="pill trophies" title="Leaderboards" onClick={() => s.openPanel('leaders')}>🏆 {s.trophies}</button>
           <GoalsButton />
           <MuteButton />
         </div>
@@ -95,7 +95,7 @@ export function Hud() {
         <div className="hud-town">
           <span className="hud-town-name">{s.visiting?.townName ?? s.townName}</span>
           {!s.visiting && <button onClick={() => s.openPanel('garage')}>🚗 {s.cars.length}</button>}
-          <span>🏆 {s.trophies}</span>
+          <button onClick={() => s.openPanel('leaders')}>🏆 {s.trophies}</button>
         </div>
       </div>
     </>
