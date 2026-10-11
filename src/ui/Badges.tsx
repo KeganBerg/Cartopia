@@ -13,19 +13,19 @@ function fmt(sec: number) {
   return `${sec}s`
 }
 
-const lotW = (b: PlacedBuilding) => ((b.rot ?? 0) % 2 ? buildingDef(b.def).h : buildingDef(b.def).w)
-const lotH = (b: PlacedBuilding) => ((b.rot ?? 0) % 2 ? buildingDef(b.def).w : buildingDef(b.def).h)
+// Badge height over a merged block: as tall as its model grows (see groupScale).
+const lift = (g: MergeGroup) => (g.cols === g.rows ? g.cols : 1.5)
 
-// `members` is the whole block for a merged business: one badge for all of it.
-function JobBadge({ b, now, members = [b] }: { b: PlacedBuilding; now: number; members?: PlacedBuilding[] }) {
+// `g` and `members` are the whole block for a merged business: one badge for all of it.
+function JobBadge({ b, now, g, members = [b] }: { b: PlacedBuilding; now: number; g?: MergeGroup; members?: PlacedBuilding[] }) {
   const d = buildingDef(b.def)
   const tap = useGame((s) => s.tapBuilding)
   const lit = useGame((s) => !!s.highlight?.includes(b.def))
   // A driver at work: a heart when it loves the place, a wrench when it needs fixing.
   const driver = useGame((s) => (b.car ? s.cars.find((c) => c.uid === b.car) : undefined))
   const n = members.length
-  const k = Math.sqrt(n)
-  const [cx, cz] = n > 1 ? groupCenter({ x: b.x, z: b.z, w: lotW(b) * k, h: lotH(b) * k }) : centerOf(b.def, b.x, b.z, b.rot)
+  const k = g ? lift(g) : 1
+  const [cx, cz] = g ? groupCenter(g) : centerOf(b.def, b.x, b.z, b.rot)
   const lvl = buildingLevel(b)
   anchors.set(b.uid, new Vector3(cx, ((d.w > 1 ? 2.6 : 2.2) + levelLift(lvl)) * k, cz))
   const ready = members.some((o) => o.jobEndsAt !== null && now >= o.jobEndsAt)
@@ -78,14 +78,14 @@ function MergeBadges() {
   return (
     <>
       {candidates.map((c) => (
-        <div key={`m:${c.anchor.uid}:${c.size}`} className="anchor" ref={pin(`m:${c.anchor.uid}:${c.size}`, c, 1.2 * c.size)}>
-          <button className="badge badge-merge-go" onClick={() => merge(c.anchor.uid, c.size)} title={`Merge ${c.members.length} ${buildingDef(c.anchor.def).name}`}>
+        <div key={`m:${c.anchor.uid}:${c.code}`} className="anchor" ref={pin(`m:${c.anchor.uid}:${c.code}`, c, 1.2 * lift(c))}>
+          <button className={`badge badge-merge-go${c.members.length === 2 ? ' pair' : ''}`} onClick={() => merge(c.anchor.uid, c.code)} title={`Merge ${c.members.length} ${buildingDef(c.anchor.def).name}`}>
             🧩 Merge ×{c.members.length}
           </button>
         </div>
       ))}
       {[...merges.groups.values()].map((g) => (
-        <div key={`s:${g.anchor.uid}`} className="anchor" ref={pin(`s:${g.anchor.uid}`, g, 0.6 * g.size)}>
+        <div key={`s:${g.anchor.uid}`} className="anchor" ref={pin(`s:${g.anchor.uid}`, g, 0.6 * lift(g))}>
           <button className="badge badge-split" onClick={() => split(g.anchor.uid)} title="Split it back up">✂️ Split</button>
         </div>
       ))}
@@ -176,7 +176,7 @@ export function Badges() {
       {buildings.filter((b) => buildingDef(b.def).jobSeconds && (!merges.owner.has(b.uid) || merges.groups.has(b.uid))).map((b) => {
         // Members come from the live list so their timers stay current.
         const g = merges.groups.get(b.uid)
-        return <JobBadge key={b.uid} b={b} now={now} members={g ? buildings.filter((o) => merges.owner.get(o.uid) === b.uid) : undefined} />
+        return <JobBadge key={b.uid} b={b} now={now} g={g} members={g ? buildings.filter((o) => merges.owner.get(o.uid) === b.uid) : undefined} />
       })}
       {buildings.filter((b) => b.def === 'rescue').map((b) => (
         <RescueBadge key={b.uid} b={b} now={now} />
