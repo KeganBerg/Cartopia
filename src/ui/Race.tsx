@@ -550,6 +550,13 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   const [label, setLabel] = useState('')
   const labelTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const [result, setResult] = useState<null | { won: boolean; myTime: number; theirTime: number; note?: string; counted?: boolean; stars?: number }>(null)
+  // The result card waits a moment so both cars can be seen rolling through the finish.
+  const [cardUp, setCardUp] = useState(false)
+  useEffect(() => {
+    if (!result) return
+    const id = setTimeout(() => setCardUp(true), 1400)
+    return () => clearTimeout(id)
+  }, [result])
   // Live races between signed-in players: 'yes' once the server is refereeing, 'no' to decide here.
   const refereed = useRef<'pending' | 'yes' | 'no'>(live ? 'pending' : 'no')
   const joined = useRef<Promise<boolean> | null>(null)
@@ -868,7 +875,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       {def.skill && skillShown && !result && <div className="skill-flash">{SKILLS[def.skill].icon} {SKILLS[def.skill].name}!</div>}
       {theirSkill && theirShown && !result && <div className="skill-flash theirs">{rival.town}: {SKILLS[theirSkill].icon} {SKILLS[theirSkill].name}!</div>}
       {theirBoost && !theirShown && !result && <div className="skill-flash theirs">{rival.town}: 🔥 Boost!</div>}
-      {result && resultView ? resultView(result) : result ? (
+      {result && !cardUp ? null : result && resultView ? resultView(result) : result ? (
         <RaceResult won={result.won} myTime={result.myTime} theirTime={result.theirTime} cash={result.counted === false ? 0 : result.won ? payout : Math.round(payout * 0.1)} xp={result.counted === false ? 0 : result.won ? 30 : 8} rival={rival.town} note={result.note} noContest={result.counted === false} stars={result.stars} onExit={onExit} />
       ) : (
         <div className="rf-bottom">
