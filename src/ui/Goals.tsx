@@ -237,7 +237,9 @@ export function GoalsPanel() {
 // The next story goal, pinned under the HUD so there's always a clear next step.
 export function GoalTracker() {
   const s = useGame()
-  const g = activeGoals(s)[0]
+  // A finished goal shows first, so the tracker turns green when there's something to collect.
+  const goals = activeGoals(s)
+  const g = goals.find((o) => goalDone(s, o)) ?? goals[0]
   if (!g || s.visiting || s.mode !== 'play' || s.tutorial < 99) return null
   const have = Math.min(g.target, statValue(s, g.stat, g.def))
   const done = have >= g.target
