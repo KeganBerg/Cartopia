@@ -5,6 +5,7 @@ import { CarModel } from './CarModel'
 import { ObstacleDetail, BenchDetail, BillboardDetail, DriveInDetail, FlowerDetail, FountainDetail, GarageDetail, HouseDetail, LampDetail, PondDetail, ShopDetail, SpeedwayDetail, StatueDetail, TreeDetail } from './BuildingDetail'
 import { NEW_MODELS, NewBuildingModel } from './NewBuildings'
 import { HouseLevels } from './HouseLevels'
+import { RustysYard } from './RustysYard'
 import type { Texture } from 'three'
 import { glowMats } from './dayNight'
 import { tickMovie } from './movie'
@@ -837,6 +838,8 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
         </group>
       )
     }
+    case 'rescue':
+      return <RustysYard m={m} ghost={ghost} sign={!!sign} bulb={bulb} win={win} lvl={lvl} lift={lift} />
     case 'crew':
       return <CrewHouse m={m} ghost={ghost} sign={!!sign} bulb={bulb} win={win} />
     case 'cinema': {
@@ -1072,15 +1075,6 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
               <meshStandardMaterial color={x < 0 ? '#29b6f6' : '#ffca28'} roughness={1} />
             </mesh>
           ))}
-          {def.id === 'rescue' && !ghost && (
-            <group position={[W * 0.44, 0, D * 0.3]}>
-              {/* Scrap pile: a rusty shell and some old tyres. */}
-              <mesh position={[0, 0.14, 0.15]} rotation-y={0.4} castShadow><boxGeometry args={[0.32, 0.22, 0.55]} />{m('#a1663a')}</mesh>
-              {[0, 1].map((i) => (
-                <mesh key={i} position={[0.05, 0.06 + i * 0.12, -0.3]} rotation-x={Math.PI / 2}><torusGeometry args={[0.12, 0.05, 8, 14]} />{m('#3e2723')}</mesh>
-              ))}
-            </group>
-          )}
           {def.prop && <RoofProp prop={def.prop} y={h + 0.13} />}
           {def.id === 'motel' && [-1.2, -0.6, 0.6, 1.2].map((x) => (
             <mesh key={x} position={[x, 0.32, F + 0.012]}>

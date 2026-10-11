@@ -256,21 +256,81 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .tabs { display: flex; gap: 4px; margin: 10px 0 8px; background: var(--seg); border-radius: 12px; padding: 3px; }
 .tab { flex: 1; font: 14px var(--display); background: none; color: #546e7a; border: none; border-radius: 9px; padding: 7px; }
 .tab.sel { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.15); }
-.bay { display: grid; grid-template-columns: 100px 1fr auto; gap: 10px; align-items: center; background: #efebe9; border: 3px dashed #a1887f; border-radius: 14px; padding: 8px 12px; }
-.bay.done { background: #e8f5e9; border: 3px solid var(--green); }
-.bay.empty { grid-template-columns: auto 1fr; }
-.bay p { margin: 2px 0 0; font-size: 13px; }
-.bay-icon { font-size: 30px; }
-.bay-bar { height: 10px; background: #d7ccc8; border-radius: 6px; overflow: hidden; margin-top: 4px; }
-.bay-bar span { display: block; height: 100%; background: linear-gradient(90deg, #ffb74d, #ff9800); transition: width 1s linear; }
+/* Restore bay: the car up on Rusty's lift, over a hazard-striped floor. */
+.bay { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; width: 100%; margin-bottom: 10px; padding: 8px 12px 8px 8px; border-radius: 16px; border: 2.5px solid var(--line); background: linear-gradient(#41506a, #2a3550); color: #fff; box-shadow: inset 0 2px 0 rgba(255,255,255,.15), 0 3px 0 rgba(0,0,0,.3); text-align: left; font: inherit; }
+.bay-lift { position: relative; display: grid; place-items: center; width: 92px; height: 62px; border-radius: 10px; overflow: hidden; background: radial-gradient(ellipse at 50% 40%, #6b7a94, #3a4660 75%); }
+.bay-lift::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 7px; background: repeating-linear-gradient(-45deg, #ffca28 0 6px, #263238 6px 12px); }
+.bay-lift .thumb3d { position: relative; z-index: 1; background: none; animation: bayLift 2.6s ease-in-out infinite; }
+.bay-lift::before { content: ''; position: absolute; left: 12px; right: 12px; bottom: 10px; height: 4px; border-radius: 2px; background: #ffb300; box-shadow: 0 0 0 1.5px #14213d; }
+@keyframes bayLift { 50% { transform: translateY(-3px); } }
+.bay-spark { position: absolute; z-index: 2; right: 14px; bottom: 16px; width: 6px; height: 6px; border-radius: 50%; background: #fff59d; box-shadow: 0 0 8px 3px #ffca28; animation: baySpark .9s steps(2) infinite; }
+@keyframes baySpark { 50% { opacity: 0; transform: translate(-30px, 4px) scale(.6); } }
+.bay-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.bay-info b { font: 17px var(--display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 2px 0 rgba(0,0,0,.35); }
+.bay-info small { font: 14px var(--display); color: #cfe0ff; }
+.bay-bar { height: 12px; background: #1b2438; border: 2px solid #14213d; border-radius: 8px; overflow: hidden; }
+.bay-bar span { display: block; height: 100%; background: repeating-linear-gradient(-45deg, #ffd54f 0 8px, #ffb300 8px 16px); background-size: 22px 22px; transition: width 1s linear; animation: bayBar 1s linear infinite; }
+@keyframes bayBar { to { background-position: 22px 0; } }
+.bay-btn { white-space: nowrap; display: inline-flex; align-items: center; gap: 3px; }
+.bay.done { background: linear-gradient(#5ccf5c, #2a9a39); }
+.bay.done .bay-lift { background: radial-gradient(ellipse at 50% 40%, #fffde7, #a5d6a7 80%); }
+.bay.done .bay-btn { background: linear-gradient(#ffd84a, #ffa41a); border-color: #14213d; color: #14213d; text-shadow: 0 1px 0 rgba(255,255,255,.5); animation: coach 1.2s ease-in-out infinite; }
+.bay-ready { color: #fff !important; }
+.bay.empty { cursor: pointer; background: #fff; color: var(--ink); border: 2.5px dashed #9fb6d6; box-shadow: none; }
+.bay.empty .bay-lift { background: #e8f1fc; }
+.bay.empty .bay-lift::before { display: none; }
+.bay.empty .bay-info b { text-shadow: none; }
+.bay.empty .bay-info small { color: #607d8b; }
+.bay-wrench { font-size: 26px; position: relative; z-index: 1; animation: bob 1.4s ease-in-out infinite; }
+.bay-go { font: 30px var(--display); color: #2f7ff0; padding-right: 4px; }
+.rs-ico { width: 15px; height: 15px; font-size: 9px; display: inline-grid; vertical-align: -2px; margin: 0 1px 0 3px; border-width: 1px; }
+.tab-count { display: inline-block; min-width: 30px; margin-left: 4px; padding: 0 5px; border-radius: 8px; background: rgba(20,33,61,.12); font-size: 12px; }
+.tab-count.full { background: #e53935; color: #fff; }
+.rs-full { width: 100%; margin-bottom: 8px; padding: 7px 10px; border-radius: 12px; border: 2px solid #ef9a9a; background: #ffebee; color: #b71c1c; font: 14px var(--display); }
+.rs-empty-card { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 22px 12px; border-radius: 16px; border: 2.5px dashed #9fb6d6; background: #fff; color: var(--ink); font: inherit; cursor: pointer; }
+.rs-empty-card span { font-size: 34px; animation: bob 1.4s ease-in-out infinite; }
+.rs-empty-card b { font: 18px var(--display); }
+.rs-empty-card small { color: #607d8b; font-weight: 800; }
+/* Storage rows: rusty car, tags, and a big Restore button with its price. */
+.junk-rows .card { padding-right: 6px; }
+.junk-rows .card .thumb3d { background: radial-gradient(ellipse at 50% 70%, #fff8f0 0 35%, #f1e2d3 80%); }
+.junk-card.rr-scarce { border-color: #90caf9; }
+.junk-card.rr-rare { border-color: #ffb74d; background: linear-gradient(90deg, #fff7e8, #fff 40%); }
+.junk-tags { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.classic-tag { font: 11px var(--display); color: #5d4037; background: #ffe0b2; border-radius: 6px; padding: 1px 6px; }
+.junk-meta { display: flex; align-items: center; gap: 8px; font: 13px var(--display); color: #546e7a; white-space: nowrap; }
+.junk-meta .scrap { margin-left: auto; display: inline-flex; align-items: center; text-decoration: none; padding: 2px 8px; border-radius: 8px; background: #efebe9; color: #6d4c41; }
+.junk-go { flex: none; display: flex; flex-direction: column; align-items: center; min-width: 92px; padding: 5px 10px; font-size: 16px; line-height: 1.1; }
+.junk-go small { display: inline-flex; align-items: center; font-size: 13px; }
+.junk-go.broke:not(:disabled) { background: linear-gradient(#ff8a8a, #d6283b); border-color: #8a1020; }
+.junk-go:disabled { opacity: .55; }
+/* Search lots: a coloured tile per lot and the best cars it can turn up. */
+.spot-rows .spot-card { padding: 6px 10px 6px 6px; }
+.spot-card .spot-icon { flex: none; display: grid; place-items: center; width: 62px; height: 56px; border-radius: 12px; font-size: 32px; background: linear-gradient(color-mix(in srgb, var(--spot) 60%, #fff), var(--spot)); border: 2px solid rgba(20,33,61,.55); box-shadow: inset 0 2px 0 rgba(255,255,255,.4), 0 2px 0 rgba(0,0,0,.15); }
+.spot-finds { display: flex; gap: 4px; }
+.spot-find { display: grid; place-items: center; border-radius: 8px; background: #f2f6fb; border: 1.5px solid #dbe5f1; }
+.cards.rows .spot-find .thumb3d.xs { --tw: 46px; --th: 34px; width: var(--tw); height: var(--th); }
+.spot-find.rr-rare { background: #fff3e0; border-color: #ffb74d; }
+.spot-find.rr-scarce { background: #e3f2fd; border-color: #90caf9; }
+.spot-card.locked .spot-icon, .spot-card.locked .spot-find { filter: grayscale(1); opacity: .6; }
+.spot-card .price { display: inline-flex; align-items: center; white-space: nowrap; }
+.spot-rows .card-text, .junk-rows .card-text { min-width: 0; }
+@media (max-width: 600px) {
+  .bay { gap: 8px; padding-right: 8px; }
+  .bay-lift { width: 74px; height: 56px; }
+  .bay-info b { font-size: 15px; }
+  .bay-btn { padding: 6px 9px; font-size: 14px; }
+  .junk-go { min-width: 80px; padding: 5px 6px; font-size: 15px; }
+  .junk-rows .card .thumb3d { --tw: 64px; --th: 52px; width: 64px; }
+  .spot-card .spot-icon { width: 50px; height: 50px; font-size: 26px; }
+  .cards.rows .spot-find .thumb3d.xs { --tw: 38px; --th: 30px; }
+}
 .rarity { font: 11px var(--display); color: #fff; border-radius: 6px; padding: 1px 6px; vertical-align: middle; letter-spacing: .3px; }
 .rarity-common { background: #78909c; }
 .rarity-scarce { background: #1e88e5; }
 .rarity-rare { background: linear-gradient(90deg, #8e24aa, #ff6d00); }
 .rarity-legendary { background: linear-gradient(90deg, #b8860b, #ffd54f, #b8860b); color: #3e2723; box-shadow: 0 0 6px rgba(255, 213, 79, .8); }
-.junk-card { background: #faf6f3; }
 .scrap { font: 12px var(--display); background: none; border: none; color: #8d6e63; text-decoration: underline; padding: 2px; }
-.spot-card .spot-icon { font-size: 34px; line-height: 1.1; }
 .flat-pop { width: min(300px, 90%); background: var(--panel); border: 3px solid var(--accent); border-radius: 14px; padding: 12px; text-align: center; box-shadow: 0 6px 20px rgba(0,0,0,.35); }
 .flat-pop p { margin: 4px 0 8px; font-size: 14px; }
 .flat-pop .row { justify-content: center; }
@@ -507,9 +567,6 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
   .invite-actions { grid-column: 1 / -1; justify-content: flex-start; }
   .leader { grid-template-columns: 30px 1fr auto; }
   .rusty-lock { grid-template-columns: auto 1fr; }
-  .bay { grid-template-columns: 70px 1fr; }
-  .bay .car-swatch { width: 70px; height: 35px; }
-  .bay > .buy { grid-column: 1 / -1; }
   .bank-packs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .pack-bucks { font-size: 24px; }
   .pack-art { font-size: 32px; }

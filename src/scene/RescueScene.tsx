@@ -150,6 +150,40 @@ function Puffs({ color, count = 12, loop, dur = 1.1, spread = 1.5, y = 0.15 }: {
   )
 }
 
+// A one-off burst of glinting chips in a find's rarity colour, thrown up and
+// falling back under gravity.
+function Sparkles({ color, count = 16, delay = 0 }: { color: string; count?: number; delay?: number }) {
+  const ref = useRef<InstancedMesh>(null)
+  const t0 = useRef(-1)
+  const seeds = useMemo(() => Array.from({ length: count }, (_, i) => ({ a: (i / count) * Math.PI * 2 + (i % 3) * 0.4, out: 1.2 + ((i * 29) % 10) / 6, up: 3 + ((i * 17) % 10) / 3, spin: 4 + (i % 5) })), [count])
+  const [done, setDone] = useState(false)
+  useFrame(({ clock }) => {
+    const m = ref.current
+    if (!m) return
+    if (t0.current < 0) t0.current = clock.elapsedTime
+    const age = (clock.elapsedTime - t0.current) / SLOW - delay
+    if (age > 1.3) return setDone(true)
+    m.visible = age > 0
+    if (age <= 0) return
+    seeds.forEach((p, i) => {
+      const r = p.out * age
+      tmp.position.set(Math.cos(p.a) * r, 0.5 + p.up * age - 4.5 * age * age, Math.sin(p.a) * r)
+      tmp.rotation.set(age * p.spin, age * p.spin * 0.7, 0)
+      tmp.scale.setScalar(Math.max(0.001, 1 - age / 1.3))
+      tmp.updateMatrix()
+      m.setMatrixAt(i, tmp.matrix)
+    })
+    m.instanceMatrix.needsUpdate = true
+  })
+  if (done) return null
+  return (
+    <instancedMesh ref={ref} args={[undefined, undefined, count]} visible={false} frustumCulled={false} raycast={() => null}>
+      <octahedronGeometry args={[0.09, 0]} />
+      <meshBasicMaterial color={color} toneMapped={false} />
+    </instancedMesh>
+  )
+}
+
 // ---- What a spot turns out to hold ----
 
 function Gear() {
@@ -249,6 +283,14 @@ function SearchSpot({ i, at: p, loot, open, gone, tarp, pad, speed, onPick, onFo
   const column = useRef<MeshBasicMaterial>(null)
   const item = useRef<Group>(null)
   const flash = useRef<MeshBasicMaterial>(null)
+  const beam = useRef<MeshBasicMaterial>(null)
+  // The tarp flies off away from the road.
+  const away = useMemo(() => {
+    const dx = p.x - p.rx
+    const dz = p.z - p.rz
+    const l = Math.hypot(dx, dz) || 1
+    return [dx / l, dz / l] as const
+  }, [p])
   const [stage, setStage] = useState<'shut' | 'opening' | 'open'>(open ? 'open' : 'shut')
   if (open && stage === 'shut') setStage('opening')
   const car = loot.kind === 'car'
@@ -265,20 +307,29 @@ function SearchSpot({ i, at: p, loot, open, gone, tarp, pad, speed, onPick, onFo
     if (column.current) column.current.opacity = fade * (0.12 + pulse * 0.1)
     if (beacon.current) {
       beacon.current.visible = fade > 0.01
-      beacon.current.children[2]?.position.set(0, 2.1 + Math.sin(now * 2.4 + i) * 0.18, 0)
+      beacon.current.children[2]?.position.set(0, 1.75 + Math.abs(Math.sin(now * 2.4 + i)) * 0.3, 0)
       beacon.current.children[2]?.rotation.set(0, now * 1.6, 0)
       beacon.current.scale.setScalar(1 + pulse * 0.04)
     }
-    // Tarp lifts, spins away and shrinks.
+    // Tarp: a shiver as the hook catches it, then it's whipped off away from
+    // the road, tumbling, and only shrinks away once it's well clear.
     const g = tarpRef.current
     if (g) {
-      g.visible = t < 0.75
+      g.visible = t < 0.9
       if (t >= 0) {
-        const k = clamp01(t / 0.75)
-        g.position.y = k * k * 2.6
-        g.rotation.set(k * 1.2, k * 2.4, k * 0.6)
-        g.scale.setScalar(Math.max(0.001, 1 - k))
+        const shake = clamp01(t / 0.15)
+        const k = clamp01((t - 0.12) / 0.7)
+        const e = 1 - (1 - k) ** 2
+        g.position.set(away[0] * e * 2.4, Math.sin(k * Math.PI) * 1.3 + e * 0.4, away[1] * e * 2.4)
+        g.rotation.set(e * 2.6 * away[1] + Math.sin(t * 90) * 0.06 * (1 - k) * shake, e * 1.4, -e * 2.6 * away[0] + Math.sin(t * 70) * 0.05 * (1 - k) * shake, 'YXZ')
+        g.scale.setScalar(Math.max(0.001, 1 - clamp01((k - 0.6) / 0.4)))
       }
+    }
+    // A rarity beam shoots up as a car is uncovered.
+    if (beam.current) {
+      const b = t < 0.2 || gone ? 0 : clamp01(1 - (t - 0.2) / 1.1)
+      beam.current.opacity = b * (car ? (loot.rarity === 'rare' ? 0.75 : loot.rarity === 'scarce' ? 0.5 : 0.28) : 0.18)
+      beam.current.visible = b > 0.01
     }
     // The find rises into view, then idles.
     const it = item.current
@@ -321,14 +372,32 @@ function SearchSpot({ i, at: p, loot, open, gone, tarp, pad, speed, onPick, onFo
       </mesh>
       {stage !== 'open' && (
         <group ref={tarpRef}>
-          <mesh position-y={0.1} scale={[0.78, 0.48, 1.08]} rotation-y={p.yaw}>
-            <sphereGeometry args={[1, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
-            <meshStandardMaterial color={tarp} roughness={0.9} flatShading />
-          </mesh>
-          <mesh position={[0, 0.3, 0]} rotation-y={p.yaw} scale={[0.82, 0.36, 0.1]}>
-            <torusGeometry args={[1, 0.05, 4, 16, Math.PI]} />
-            <meshStandardMaterial color="#d7ccc8" />
-          </mesh>
+          {/* A lumpy tarp over who-knows-what, tied down with rope. */}
+          <group rotation-y={p.yaw}>
+            <mesh position-y={0.05} scale={[0.72, 0.42, 1.05]}>
+              <sphereGeometry args={[1, 9, 6, 0, Math.PI * 2, 0, Math.PI / 2]} />
+              <meshStandardMaterial color={tarp} roughness={0.9} flatShading />
+            </mesh>
+            <mesh position={[0.04, 0.3, -0.12]} scale={[0.5, 0.3, 0.52]} rotation-y={0.2}>
+              <sphereGeometry args={[1, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2]} />
+              <meshStandardMaterial color={tarp} roughness={0.9} flatShading />
+            </mesh>
+            {[-0.42, 0.38].map((z) => (
+              <mesh key={z} position={[0, 0.06, z]} rotation-y={Math.PI / 2} scale={[1, z < 0 ? 0.62 : 0.78, 1]}>
+                <torusGeometry args={[0.68 - Math.abs(z) * 0.25, 0.022, 4, 14, Math.PI]} />
+                <meshStandardMaterial color="#e3c98f" />
+              </mesh>
+            ))}
+            {/* Corner of the tarp flapping loose, and a brick holding the other. */}
+            <mesh position={[0.62, 0.05, 0.62]} rotation={[-1.2, 0.5, 0]}>
+              <planeGeometry args={[0.32, 0.26]} />
+              <meshStandardMaterial color={tarp} roughness={0.9} side={2} />
+            </mesh>
+            <mesh position={[-0.66, 0.07, -0.58]}>
+              <boxGeometry args={[0.18, 0.1, 0.1]} />
+              <meshStandardMaterial color="#a1553a" />
+            </mesh>
+          </group>
         </group>
       )}
       {stage !== 'open' && (
@@ -337,13 +406,17 @@ function SearchSpot({ i, at: p, loot, open, gone, tarp, pad, speed, onPick, onFo
             <ringGeometry args={[1.0, 1.22, 36]} />
             <meshBasicMaterial ref={ring} color="#ffd54f" transparent depthWrite={false} blending={AdditiveBlending} toneMapped={false} />
           </mesh>
-          <mesh position-y={1.8} raycast={() => null}>
-            <cylinderGeometry args={[0.95, 1.05, 3.6, 20, 1, true]} />
+          <mesh position-y={1.3} raycast={() => null}>
+            <cylinderGeometry args={[0.55, 0.9, 2.6, 20, 1, true]} />
             <meshBasicMaterial ref={column} color="#ffe082" transparent depthWrite={false} blending={AdditiveBlending} side={2} toneMapped={false} />
           </mesh>
           <group>
             <mesh rotation-x={Math.PI} raycast={() => null}>
-              <coneGeometry args={[0.2, 0.42, 4]} />
+              <coneGeometry args={[0.22, 0.38, 4]} />
+              <meshStandardMaterial color="#ffca28" emissive="#ffb300" emissiveIntensity={0.9} flatShading />
+            </mesh>
+            <mesh position-y={0.3} raycast={() => null}>
+              <boxGeometry args={[0.13, 0.26, 0.13]} />
               <meshStandardMaterial color="#ffca28" emissive="#ffb300" emissiveIntensity={0.9} flatShading />
             </mesh>
           </group>
@@ -370,7 +443,12 @@ function SearchSpot({ i, at: p, loot, open, gone, tarp, pad, speed, onPick, onFo
               <SmallLoot kind={loot.kind} />
             )}
           </group>
+          <mesh position-y={2.4} visible={false} raycast={() => null}>
+            <cylinderGeometry args={[0.32, 0.6, 4.8, 16, 1, true]} />
+            <meshBasicMaterial ref={beam} map={glowTex()} color={glow} transparent opacity={0} depthWrite={false} blending={AdditiveBlending} side={2} toneMapped={false} />
+          </mesh>
           {stage === 'opening' && <Puffs color={pad} />}
+          {stage === 'opening' && <Sparkles delay={0.3 / speed} color={car ? RARITY_GLOW[loot.rarity] : '#ffe082'} count={car ? (loot.rarity === 'rare' ? 28 : 18) : 10} />}
         </>
       )}
     </group>
@@ -386,6 +464,10 @@ const TILT = 0.22 // boom rise per unit of reach
 const STEP = 0.05 // trail sample spacing
 const TOW_GAP = 1.5 // spacing of towed cars
 const BED_SCALE = 0.5
+// The truck is drawn a size up from the town's so it reads on a phone.
+const TS = 1.2
+const TOW_FIRST = TOW_GAP + 0.15 // the first towed car clears the longer truck
+const DUST = 14
 
 type Pose = { a: number; len: number; drop: number }
 
@@ -456,6 +538,13 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
   const hook = useRef<Group>(null)
   const carried = useRef<Group>(null)
   const towed = useRef<(Group | null)[]>([])
+  const body = useRef<Group>(null)
+  const lamps = useRef<(MeshStandardMaterial | null)[]>([])
+  const dust = useRef<InstancedMesh>(null)
+  const dustAt = useRef(Array.from({ length: DUST }, () => ({ x: 0, z: 0, t: -9 })))
+  const dustNext = useRef(0)
+  // The hook swings on its cable: offset from under the boom tip, and its speed.
+  const sway = useRef({ x: 0, z: 0, vx: 0, vz: 0, tx: 0, tz: 0, tvx: 0, tvz: 0, pitch: 0, lastV: 0 })
   const q = useRef(search)
   q.current = search
   const opts = useRef({ fast, auto, leaving, onArrive, onLeft, onBusy })
@@ -637,9 +726,16 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
     // Trail of where the truck has been. Seeded with the road it came in on.
     const tr = trail.current
     if (!tr.length) for (let j = 160; j > 0; j--) tr.push({ x, z: z + j * STEP, yaw: s.yaw })
+    // Samples sit exactly STEP apart, however far the truck moved this frame,
+    // so a distance back along the trail is always the same number of samples.
     const last = tr[tr.length - 1]
-    if (Math.hypot(x - last.x, z - last.z) >= STEP) {
-      tr.push({ x, z, yaw: s.yaw })
+    const gap = Math.hypot(x - last.x, z - last.z)
+    if (gap >= STEP) {
+      const n = Math.floor(gap / STEP)
+      for (let j = 1; j <= n; j++) {
+        const f = (j * STEP) / gap
+        tr.push({ x: last.x + (x - last.x) * f, z: last.z + (z - last.z) * f, yaw: lerpAngle(last.yaw, s.yaw, f) })
+      }
       if (tr.length > 1200) tr.splice(0, tr.length - 1200)
     }
     const behind = (d: number) => tr[Math.max(0, tr.length - 1 - Math.round(d / STEP))]
@@ -647,17 +743,18 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
     // Truck-local point to world.
     const cos = Math.cos(s.yaw)
     const sin = Math.sin(s.yaw)
-    const local = (lx: number, ly: number, lz: number): [number, number, number] => [x + lx * cos + lz * sin, ly, z - lx * sin + lz * cos]
+    const local = (lx: number, ly: number, lz: number): [number, number, number] => [x + (lx * cos + lz * sin) * TS, ly * TS, z + (-lx * sin + lz * cos) * TS]
 
     // The crane: a post at the back of the bed with a boom that swings
     // round, lowers its hook onto a find and lifts it aboard.
     const [px, py, pz] = local(0, PIVOT_Y, PIVOT_Z)
-    const rest: Pose = cars.length ? { a: s.yaw + Math.PI, len: 0.75, drop: 0.5 } : { a: s.yaw + Math.PI, len: 0.5, drop: 0.22 }
+    const rest: Pose = cars.length ? { a: s.yaw + Math.PI, len: 0.75 * TS, drop: 0.5 } : { a: s.yaw + Math.PI, len: 0.5 * TS, drop: 0.22 }
     let pose = rest
     const g = grab.current
     let carriedAt: [number, number, number] | null = null
     let carriedYaw = 0
     let carriedScale = 1
+    let dangling = false
     if (g) {
       const sp = L.spots[g.i]
       const loot = sq.pins[g.i]
@@ -673,13 +770,14 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
       const lifted: Pose = { a: ta, len: reach, drop: Math.max(0.3, tipY - itemTop - 0.6) }
       // Small finds go into the bed; cars swing round behind to be towed.
       const slot = bedSlot(smalls.length)
-      const bedReach = slot[2] - PIVOT_Z
-      const dest: Pose = isCar ? { a: s.yaw + Math.PI, len: 0.75, drop: 0.5 } : { a: s.yaw, len: bedReach, drop: PIVOT_Y + bedReach * TILT - slot[1] - hang * BED_SCALE }
+      const bedReach = (slot[2] - PIVOT_Z) * TS
+      const dest: Pose = isCar ? { a: s.yaw + Math.PI, len: 0.75 * TS, drop: 0.5 } : { a: s.yaw, len: bedReach, drop: PIVOT_Y * TS + bedReach * TILT - slot[1] * TS - hang * BED_SCALE * TS }
       const e = (v: number) => v * v * (3 - 2 * v)
       if (u < 0.45) pose = mix(rest, over, e(u / 0.45))
       else if (u < 0.7) pose = mix(over, down, e((u - 0.45) / 0.25))
       else if (u < 1.15) pose = mix(down, lifted, e((u - 0.7) / 0.45))
       else pose = mix(lifted, dest, e(clamp01((u - 1.15) / 0.5)))
+      dangling = u < 1.15
       if (u >= 0.7 && !g.held) {
         g.held = true
         setHolding(g.i)
@@ -691,7 +789,7 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
         carriedYaw = sp.yaw
         if (isCar) {
           // Ease into its place in the tow line.
-          const b = behind(TOW_GAP + cars.length * TOW_GAP)
+          const b = behind(TOW_FIRST + cars.length * TOW_GAP)
           const w = e(back)
           at3 = [at3[0] + (b.x - at3[0]) * w, at3[1] + (0.1 - at3[1]) * w, at3[2] + (b.z - at3[2]) * w]
           carriedYaw = lerpAngle(sp.yaw, b.yaw, w)
@@ -700,7 +798,7 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
           const w = e(back)
           const b = local(...slot)
           at3 = [at3[0] + (b[0] - at3[0]) * w * w, at3[1] + (b[1] - at3[1]) * w * w, at3[2] + (b[2] - at3[2]) * w * w]
-          carriedScale = 1.4 + (BED_SCALE - 1.4) * w
+          carriedScale = 1.4 + (BED_SCALE * TS - 1.4) * w
           carriedYaw = lerpAngle(sp.yaw, s.yaw, w)
         }
         carriedAt = at3
@@ -712,6 +810,34 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
       }
     }
     const tip = tipOf(px, py, pz, pose)
+    // Swing: the hook lags behind the boom tip and sways back under it.
+    const sw = sway.current
+    if (dt > 0) {
+      const tvx = (tip[0] - sw.tx) / dt
+      const tvz = (tip[2] - sw.tz) / dt
+      if (sw.tx || sw.tz) {
+        sw.vx -= (tvx - sw.tvx) * 0.9
+        sw.vz -= (tvz - sw.tvz) * 0.9
+      }
+      sw.tvx = tvx
+      sw.tvz = tvz
+      sw.tx = tip[0]
+      sw.tz = tip[2]
+      const kk = 9 / Math.max(0.3, pose.drop + 0.3)
+      sw.vx += (-kk * kk * sw.x - 3.2 * sw.vx) * dt
+      sw.vz += (-kk * kk * sw.z - 3.2 * sw.vz) * dt
+      sw.x += sw.vx * dt
+      sw.z += sw.vz * dt
+      const cap = 0.45 * Math.max(0.2, pose.drop)
+      const l = Math.hypot(sw.x, sw.z)
+      if (l > cap) {
+        sw.x *= cap / l
+        sw.z *= cap / l
+      }
+    }
+    const hx = tip[0] + sw.x
+    const hz = tip[2] + sw.z
+    const hy = tip[1] - Math.sqrt(Math.max(0.0001, pose.drop * pose.drop - sw.x * sw.x - sw.z * sw.z))
     const bm = boom.current
     if (bm) {
       const len = Math.max(0.05, pose.len)
@@ -722,15 +848,20 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
     }
     const cb = cable.current
     if (cb) {
-      cb.position.set(tip[0], tip[1] - pose.drop / 2, tip[2])
-      cb.scale.set(1, Math.max(0.01, pose.drop), 1)
+      cb.position.set((tip[0] + hx) / 2, (tip[1] + hy) / 2, (tip[2] + hz) / 2)
+      cb.rotation.set(-Math.atan2(sw.z, tip[1] - hy), 0, Math.atan2(sw.x, tip[1] - hy), 'XZY')
+      cb.scale.set(1, Math.max(0.01, Math.hypot(sw.x, sw.z, tip[1] - hy)), 1)
       cb.visible = s.mode !== 'gone'
     }
     const hk = hook.current
     if (hk) {
-      hk.position.set(tip[0], tip[1] - pose.drop, tip[2])
+      hk.position.set(hx, hy, hz)
       hk.rotation.y = pose.a
       hk.visible = s.mode !== 'gone'
+    }
+    if (carriedAt && dangling) {
+      // Still dangling from the hook: swing with it.
+      carriedAt = [carriedAt[0] + sw.x, carriedAt[1] + (hy - (tip[1] - pose.drop)), carriedAt[2] + sw.z]
     }
     const cg = carried.current
     if (cg && carriedAt) {
@@ -742,27 +873,65 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
     cars.forEach((_, n) => {
       const c = towed.current[n]
       if (!c) return
-      const b = behind(TOW_GAP + n * TOW_GAP)
+      const b = behind(TOW_FIRST + n * TOW_GAP)
       c.position.set(b.x, n === 0 ? 0.1 : 0, b.z)
       c.rotation.set(n === 0 ? -0.12 : 0, b.yaw, 0, 'YXZ')
     })
+
+    // The truck rocks back as it pulls away and dips its nose when it brakes.
+    const accel = dt > 0 ? (s.v - sw.lastV) / dt : 0
+    sw.lastV = s.v
+    sw.pitch += (Math.max(-0.07, Math.min(0.07, -accel * 0.006)) - sw.pitch) * Math.min(1, dt * 8)
+    if (body.current) body.current.rotation.x = sw.pitch
+    // Amber beacons flash while Rusty's out working.
+    const flashOn = busy || s.v > 0.1
+    lamps.current.forEach((l, j) => {
+      if (l) l.emissiveIntensity = flashOn ? (Math.sin(now * 12 + j * Math.PI) > 0 ? 2.2 : 0.15) : 0.3
+    })
+    // Dust kicked up off the back wheels while driving.
+    const dm = dust.current
+    if (dm) {
+      const da = dustAt.current
+      if (s.v > 1.2 && s.mode !== 'gone' && now >= dustNext.current) {
+        dustNext.current = now + 0.07
+        const slot = da.reduce((o, p, j) => (p.t < da[o].t ? j : o), 0)
+        const [bx, , bz] = local((Math.random() - 0.5) * 0.4, 0, -0.62)
+        da[slot] = { x: bx, z: bz, t: now }
+      }
+      da.forEach((p, j) => {
+        const age = (now - p.t) / 0.9
+        if (age < 0 || age > 1) tmp.scale.setScalar(0.001)
+        else tmp.scale.setScalar((0.35 + age * 0.9) * (1 - age * 0.6))
+        tmp.position.set(p.x, 0.12 + age * 0.35, p.z)
+        tmp.rotation.set(0, j, 0)
+        tmp.updateMatrix()
+        dm.setMatrixAt(j, tmp.matrix)
+      })
+      dm.instanceMatrix.needsUpdate = true
+    }
 
     // Camera: frames the whole lot, drifts a little toward the truck, and
     // leans in while a find is being revealed.
     const reveal = s.focus >= 0 && ((now - s.focusAt) * k < 1.8 || sq.flat || !!g)
     const f = reveal ? L.spots[s.focus] : null
     const lean = s.spur > 0 ? 0 : 0.18
-    const gx = f ? f.x * 0.45 : x * lean
-    const gz = f ? f.z * 0.45 : z * lean
-    const gd = fitD * (f ? 0.72 : 1)
+    const gx = f ? (f.x + x) * 0.32 : x * lean
+    const gz = f ? (f.z + z) * 0.32 : z * lean
+    const gd = fitD * (f ? 0.6 : 1)
     const v = view.current
     if (!v.d) Object.assign(v, { x: gx, z: gz, d: gd })
     const ease = 1 - Math.exp(-dt * 2.6)
     v.x += (gx - v.x) * ease
     v.z += (gz - v.z) * ease
     v.d += (gd - v.d) * ease
-    camera.position.set(v.x, Math.sin(tilt) * v.d, v.z + Math.cos(tilt) * v.d)
-    camera.lookAt(v.x, 0, v.z)
+    // A thump when a rare car comes out from under the tarp.
+    const fl = f ? sq.pins[s.focus] : null
+    const since = (now - s.focusAt) * k - 0.35
+    const kick = fl?.kind === 'car' && fl.rarity !== 'common' && since > 0 && since < 0.45 ? (1 - since / 0.45) * (fl.rarity === 'rare' ? 0.16 : 0.08) : 0
+    const jx = kick ? Math.sin(now * 61) * kick : 0
+    const jz = kick ? Math.cos(now * 53) * kick : 0
+    camera.position.set(v.x + jx, Math.sin(tilt) * v.d, v.z + Math.cos(tilt) * v.d + jz)
+    camera.lookAt(v.x + jx, 0, v.z + jz)
   })
 
   const road = useMemo(() => ribbon(L, 0, HALF, LAYER.lot), [L])
@@ -824,11 +993,29 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
         <SearchSpot key={i} i={i} at={p} loot={search.pins[i]} open={search.revealed[i]} gone={holding === i || taken.includes(i)} tarp={theme.tarp[i % theme.tarp.length]} pad={theme.pad} speed={speed} onPick={pick} onFound={onFound} />
       ))}
       <group ref={truck}>
-        <TowTruck rig={rig} crane />
-        {/* Crane post, and the small finds riding in the bed. */}
+        <group scale={TS}>
+        <group ref={body}>
+          <TowTruck rig={rig} crane />
+          {/* Flashing beacons on the cab roof. */}
+          {[-0.13, 0.13].map((lx, j) => (
+            <mesh key={lx} position={[lx, 0.99, -0.15]}>
+              <boxGeometry args={[0.12, 0.07, 0.12]} />
+              <meshStandardMaterial ref={(m) => void (lamps.current[j] = m)} color="#ffb300" emissive="#ff8f00" emissiveIntensity={0.3} toneMapped={false} />
+            </mesh>
+          ))}
+        </group>
+        {/* Crane post with a striped base, and the small finds riding in the bed. */}
         <mesh position={[0, (PIVOT_Y + 0.5) / 2, PIVOT_Z]}>
           <boxGeometry args={[0.1, PIVOT_Y - 0.5, 0.1]} />
           <meshStandardMaterial color="#37474f" />
+        </mesh>
+        <mesh position={[0, 0.62, PIVOT_Z]}>
+          <cylinderGeometry args={[0.1, 0.12, 0.1, 10]} />
+          <meshStandardMaterial color="#ffca28" />
+        </mesh>
+        <mesh position={[0, PIVOT_Y, PIVOT_Z]}>
+          <sphereGeometry args={[0.07, 10, 8]} />
+          <meshStandardMaterial color="#ffca28" metalness={0.4} roughness={0.4} />
         </mesh>
         {taken
           .filter((i) => search.pins[i].kind !== 'car')
@@ -846,19 +1033,28 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
             <Puffs color="#9e9e9e" count={8} loop dur={1.4} />
           </group>
         )}
+        </group>
       </group>
+      <instancedMesh ref={dust} args={[undefined, undefined, DUST]} frustumCulled={false} raycast={() => null}>
+        <icosahedronGeometry args={[0.22, 0]} />
+        <meshStandardMaterial color={theme.pad} transparent opacity={0.6} depthWrite={false} flatShading />
+      </instancedMesh>
       <mesh ref={boom} raycast={() => null}>
-        <boxGeometry args={[0.08, 0.08, 1]} />
-        <meshStandardMaterial color="#37474f" />
+        <boxGeometry args={[0.1, 0.1, 1]} />
+        <meshStandardMaterial color="#ffb300" />
       </mesh>
       <mesh ref={cable} raycast={() => null}>
         <boxGeometry args={[0.02, 1, 0.02]} />
         <meshStandardMaterial color="#212121" />
       </mesh>
       <group ref={hook}>
-        <mesh position-y={-0.08} rotation-y={Math.PI / 2} raycast={() => null}>
-          <torusGeometry args={[0.07, 0.022, 6, 12, Math.PI * 1.4]} />
-          <meshStandardMaterial color="#ffca28" metalness={0.6} roughness={0.3} />
+        <mesh position-y={-0.02} raycast={() => null}>
+          <boxGeometry args={[0.1, 0.06, 0.06]} />
+          <meshStandardMaterial color="#37474f" />
+        </mesh>
+        <mesh position-y={-0.11} rotation-y={Math.PI / 2} raycast={() => null}>
+          <torusGeometry args={[0.08, 0.026, 6, 12, Math.PI * 1.4]} />
+          <meshStandardMaterial color="#cfd8dc" metalness={0.6} roughness={0.3} />
         </mesh>
       </group>
       {holding !== null && (
