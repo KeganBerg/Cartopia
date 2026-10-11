@@ -31,7 +31,7 @@ function unlocksBetween(from: number, to: number, rusty: boolean, focus: ReturnT
       level: c.unlockLevel,
       tag: 'Car',
       price: c.bucks ? `B ${c.bucks}` : `$ ${c.price.toLocaleString()}`,
-      art: <CarThumb color={c.colors[0]} body={c.body} />,
+      art: <CarThumb color={c.colors[0]} body={c.body} model={c.id} />,
       go: () => focus('showroom', c.id),
     })),
     ...RESCUE_SPOTS.filter((r) => inRange(r.unlockLevel)).map((r): Unlock => ({

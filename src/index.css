@@ -1140,3 +1140,8 @@ button.book-car { font: inherit; color: inherit; }
 .ribbon.spooky { background: linear-gradient(90deg, #ef6c00, #6a1b9a); }
 .goal-head.event span { color: #ef6c00; font-weight: 700; }
 .menu-sound small { font-weight: 400; color: #78909c; }
+/* Merged buildings: block size on the job badge, and the Merge tool's buttons. */
+.badge-merge { position: absolute; top: -9px; left: -9px; height: 18px; line-height: 15px; font-size: 11px; background: #5e35b1; color: #fff; border: 2px solid #fff; border-radius: 9px; padding: 0 4px; }
+.badge-merge-go { background: #7e57c2; color: #fff; border-color: #fff; font-size: 15px; text-shadow: 0 1px 1px rgba(0,0,0,.35); animation: badge-bob 1.6s ease-in-out infinite; }
+.badge-split { background: #fff; color: #4527a0; border-color: #b39ddb; font-size: 13px; }
+@keyframes badge-bob { 50% { transform: translateY(-3px); } }

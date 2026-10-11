@@ -4,7 +4,7 @@ import { BackSide, Color, Object3D, type PerspectiveCamera, type Group, type Ins
 import type { Body, Finish } from '../game/data'
 import { CarModel } from './CarModel'
 import { signTexture } from './signTexture'
-import { skyTex, asphaltTex, paverTex, glowTex, sandTex, grassTex } from './textures'
+import { skyTex, asphaltTex, paverTex, glowTex, sandTex, grassTex, beachSandTex, snowTex, concreteTex } from './textures'
 import { BuildingModel, LightPool } from './BuildingModel'
 import { glowMats, dayPhase, duskAmount, nightAmount } from './dayNight'
 import { lookFor } from './look'
@@ -31,8 +31,8 @@ type Props = {
   track: number
   me: RefObject<RacerView>
   them: RefObject<RacerView>
-  mine: { body: Body; color: string; finish?: Finish; mods?: string[] }
-  theirs: { body: Body; color: string; mods?: string[] }
+  mine: { body: Body; model?: string; color: string; finish?: Finish; mods?: string[] }
+  theirs: { body: Body; model?: string; color: string; mods?: string[] }
   venue: Venue
 }
 
@@ -342,6 +342,12 @@ export function RaceScene({ track, me, them, mine, theirs, venue }: Props) {
         <planeGeometry args={[80, len + 100]} />
         {venue.id === 'desert' ? (
           <meshStandardMaterial map={sandTex(10, (len + 100) / 8)} />
+        ) : venue.id === 'beach' ? (
+          <meshStandardMaterial map={beachSandTex(10, (len + 100) / 8)} />
+        ) : venue.id === 'snow' ? (
+          <meshStandardMaterial map={snowTex(10, (len + 100) / 8)} />
+        ) : venue.id === 'docks' ? (
+          <meshStandardMaterial map={concreteTex(16, (len + 100) / 5)} />
         ) : venue.id === 'farm' ? (
           <meshStandardMaterial map={grassTex(10, (len + 100) / 8)} />
         ) : (
@@ -420,7 +426,7 @@ export function RaceScene({ track, me, them, mine, theirs, venue }: Props) {
             <planeGeometry args={[0.9, 1.5]} />
             <meshBasicMaterial map={glowTex()} color="#000000" transparent opacity={0.35} depthWrite={false} {...decal(3)} />
           </mesh>
-          {i === 0 ? <CarModel body={mine.body} color={mine.color} finish={mine.finish} mods={mine.mods} flames beams={night > 0.3} /> : <CarModel body={theirs.body} color={theirs.color} mods={theirs.mods} flames beams={night > 0.3} />}
+          {i === 0 ? <CarModel body={mine.body} model={mine.model} color={mine.color} finish={mine.finish} mods={mine.mods} flames beams={night > 0.3} /> : <CarModel body={theirs.body} model={theirs.model} color={theirs.color} mods={theirs.mods} flames beams={night > 0.3} />}
         </group>
       ))}
     </>
