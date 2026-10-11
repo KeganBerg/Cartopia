@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildingDef, carDef, knownBuilding, BUILDINGS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost, jobLevel, performance, fittedMods, modStats, modCost, MODS, MOD_SLOTS, ownedMods, CARS, takesDriver, loves, driverPayout, skillBoost, skillDrag, liveSkillBoost, SKILLS , CAMPAIGN, CAMPAIGN_RACES, campaignRivalPi, campaignReward, campaignShift, campaignStars, CAR_SETS, carSource, readySets } from './data'
+import { buildingDef, carDef, knownBuilding, BUILDINGS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost, jobLevel, performance, fittedMods, modStats, modCost, MODS, MOD_SLOTS, modFits, ownedMods, CARS, takesDriver, loves, driverPayout, skillBoost, skillDrag, liveSkillBoost, SKILLS , CAMPAIGN, CAMPAIGN_RACES, campaignRivalPi, campaignReward, campaignShift, campaignStars, CAR_SETS, carSource, readySets } from './data'
 import { MAX_RACE_PI } from './race'
 import { VENUES } from '../scene/venues'
 
@@ -113,11 +113,20 @@ describe('car mods', () => {
 
   it('stays smaller than maxed Garage upgrades', () => {
     const car = carDef('civic')
-    const best = MOD_SLOTS.map((s) => MODS.filter((m) => m.slot === s.id).at(-1)!.id)
+    const best = MOD_SLOTS.map((s) => MODS.filter((m) => m.slot === s.id && modFits(m, car.body)).at(-1)!.id)
     const modGain = performance(car, none, best) - performance(car, none)
     const upGain = performance(car, { engine: 5, turbo: 5, tires: 5, weight: 5 }) - performance(car, none)
     expect(modGain).toBeGreaterThan(5)
     expect(modGain).toBeLessThan(upGain / 2)
+  })
+
+  it('gives every vehicle a part for every slot, none stronger than the generic best', () => {
+    const top = (s: string, k: 'power' | 'grip') => Math.max(...MODS.filter((m) => m.slot === s && !m.only).map((m) => m[k]))
+    for (const c of CARS) for (const s of MOD_SLOTS) expect(MODS.some((m) => m.slot === s.id && modFits(m, c.body))).toBe(true)
+    for (const m of MODS.filter((x) => x.only)) {
+      expect(m.power).toBeLessThanOrEqual(top(m.slot, 'power'))
+      expect(m.grip).toBeLessThanOrEqual(top(m.slot, 'grip') + 1)
+    }
   })
 
   it('prices every mod in coins or bucks, never both', () => {

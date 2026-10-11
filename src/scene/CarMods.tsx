@@ -307,7 +307,8 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
     const dish = new CylinderGeometry(0.17, 0.05, 0.07, 18)
     dish.rotateX(-0.6)
     dish.translate(0, f.deck + 0.37, z)
-    p.chrome.push(dish)
+    p.paint.push(dish)
+    p.chrome.push(new TorusGeometry(0.17, 0.012, 5, 18).rotateX(Math.PI / 2 - 0.6).translate(0, f.deck + 0.405, z - 0.02))
     p.carbon.push(new CylinderGeometry(0.012, 0.012, 0.16, 5).rotateX(-0.6).translate(0, f.deck + 0.44, z - 0.05))
     p.carbon.push(new SphereGeometry(0.025, 8, 6).translate(0, f.deck + 0.5, z - 0.09))
   },
