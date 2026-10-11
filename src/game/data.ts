@@ -287,11 +287,81 @@ export const upgradeCost = (car: CarDef, level: number) => ({
   parts: 2 + level * 3,
 })
 
+// Car mods: bolt-on parts you can see on the car (in town, in races and in
+// every preview), one per slot. Unlike Garage upgrades, which tune what's under
+// the skin in five steps, a mod is a single visible part with a fixed price and
+// a small stat bump, and the same mod costs the same on any car. Saves list the
+// fitted mod ids as `mods` on each car (missing means none). Swapping a slot
+// replaces the old part. Ids stay fixed so saves keep working.
+export type ModSlot = 'spoiler' | 'exhaust' | 'kit' | 'hood' | 'rims'
+export const MOD_SLOTS: { id: ModSlot; name: string; icon: string; stat: string }[] = [
+  { id: 'spoiler', name: 'Spoilers', icon: '🪽', stat: 'Downforce for more grip' },
+  { id: 'exhaust', name: 'Exhausts', icon: '💨', stat: 'Freer flow for more power' },
+  { id: 'kit', name: 'Body Kits', icon: '🏎', stat: 'Lighter panels and better grip' },
+  { id: 'hood', name: 'Hoods', icon: '🔥', stat: 'More air for more power' },
+  { id: 'rims', name: 'Rims', icon: '🛞', stat: 'Lighter wheels' },
+]
+
+export type ModDef = {
+  id: string
+  slot: ModSlot
+  name: string
+  unlockLevel: number
+  coins: number
+  parts: number
+  bucks: number
+  // Stat changes, on the same scale as CarDef stats (weight goes down).
+  power: number
+  grip: number
+  weight: number
+}
+
+export const MODS: ModDef[] = [
+  { id: 'ducktail', slot: 'spoiler', name: 'Ducktail Lip', unlockLevel: 2, coins: 1200, parts: 0, bucks: 0, power: 0, grip: 2, weight: 0 },
+  { id: 'gtwing', slot: 'spoiler', name: 'GT Wing', unlockLevel: 5, coins: 4000, parts: 10, bucks: 0, power: 0, grip: 4, weight: 0 },
+  { id: 'attackwing', slot: 'spoiler', name: 'Time Attack Wing', unlockLevel: 8, coins: 0, parts: 0, bucks: 12, power: 0, grip: 6, weight: 0 },
+  { id: 'twintips', slot: 'exhaust', name: 'Twin Tips', unlockLevel: 2, coins: 1000, parts: 0, bucks: 0, power: 2, grip: 0, weight: 0 },
+  { id: 'sidepipes', slot: 'exhaust', name: 'Side Pipes', unlockLevel: 4, coins: 3500, parts: 8, bucks: 0, power: 4, grip: 0, weight: 0 },
+  { id: 'flamepipes', slot: 'exhaust', name: 'Flame Throwers', unlockLevel: 8, coins: 0, parts: 0, bucks: 10, power: 6, grip: 0, weight: 0 },
+  { id: 'streetkit', slot: 'kit', name: 'Street Kit', unlockLevel: 3, coins: 1500, parts: 0, bucks: 0, power: 0, grip: 1, weight: -2 },
+  { id: 'widebody', slot: 'kit', name: 'Widebody', unlockLevel: 6, coins: 6000, parts: 15, bucks: 0, power: 0, grip: 3, weight: -3 },
+  { id: 'carbonkit', slot: 'kit', name: 'Carbon Race Kit', unlockLevel: 10, coins: 0, parts: 0, bucks: 15, power: 0, grip: 3, weight: -6 },
+  { id: 'vented', slot: 'hood', name: 'Vented Hood', unlockLevel: 2, coins: 800, parts: 0, bucks: 0, power: 1, grip: 0, weight: -1 },
+  { id: 'ramscoop', slot: 'hood', name: 'Ram Scoop', unlockLevel: 4, coins: 3000, parts: 6, bucks: 0, power: 3, grip: 0, weight: 0 },
+  { id: 'blower', slot: 'hood', name: 'Supercharger', unlockLevel: 7, coins: 8000, parts: 20, bucks: 0, power: 5, grip: 0, weight: 0 },
+  { id: 'chrome', slot: 'rims', name: 'Chrome Spokes', unlockLevel: 1, coins: 600, parts: 0, bucks: 0, power: 0, grip: 0, weight: -1 },
+  { id: 'goldmesh', slot: 'rims', name: 'Gold Mesh', unlockLevel: 4, coins: 2500, parts: 5, bucks: 0, power: 0, grip: 1, weight: -2 },
+  { id: 'forged', slot: 'rims', name: 'Forged Black', unlockLevel: 7, coins: 7000, parts: 12, bucks: 0, power: 0, grip: 2, weight: -3 },
+]
+
+// Unknown ids (a mod from a newer build) give nothing and draw nothing.
+export const modDef = (id: string): ModDef | undefined => MODS.find((m) => m.id === id)
+export const modStats = (id: string) => {
+  const m = modDef(id)
+  return { power: m?.power ?? 0, grip: m?.grip ?? 0, weight: m?.weight ?? 0 }
+}
+export const modCost = (id: string) => {
+  const m = modDef(id)
+  return { coins: m?.coins ?? 0, parts: m?.parts ?? 0, bucks: m?.bucks ?? 0 }
+}
+// The fitted mod in each slot (the first known one wins if a save lists two).
+export const fittedMods = (mods?: string[] | null): Partial<Record<ModSlot, string>> => {
+  const out: Partial<Record<ModSlot, string>> = {}
+  for (const id of Array.isArray(mods) ? mods : []) {
+    const m = modDef(id)
+    if (m && !out[m.slot]) out[m.slot] = id
+  }
+  return out
+}
+export const modXp = (id: string) => 10 + (modDef(id)?.unlockLevel ?? 0) * 3
+
 // Performance index: what races are decided on (plus the driver's shifting).
-export const performance = (car: CarDef, up: Record<UpgradeSlot, number>) => {
-  const power = car.power + up.engine * 4 + up.turbo * 3
-  const grip = car.grip + up.tires * 4
-  const weight = Math.max(5, car.weight - up.weight * 4)
+export const performance = (car: CarDef, up: Record<UpgradeSlot, number>, mods?: string[] | null) => {
+  const m = Object.values(fittedMods(mods)).map(modStats)
+  const sum = (k: 'power' | 'grip' | 'weight') => m.reduce((a, x) => a + x[k], 0)
+  const power = car.power + up.engine * 4 + up.turbo * 3 + sum('power')
+  const grip = car.grip + up.tires * 4 + sum('grip')
+  const weight = Math.max(5, car.weight - up.weight * 4 + sum('weight'))
   return Math.round(power * 0.6 + grip * 0.3 + (100 - weight) * 0.1)
 }
 
@@ -390,9 +460,9 @@ export const STRIPE_COST = 100
 
 // Garage power: the combined PI of a player's five best cars.
 export const POWER_CARS = 5
-export const garagePower = (cars: { model: string; upgrades: Record<UpgradeSlot, number> }[]) =>
+export const garagePower = (cars: { model: string; upgrades: Record<UpgradeSlot, number>; mods?: string[] }[]) =>
   cars
-    .map((c) => performance(carDef(c.model), c.upgrades))
+    .map((c) => performance(carDef(c.model), c.upgrades, c.mods))
     .sort((a, b) => b - a)
     .slice(0, POWER_CARS)
     .reduce((a, b) => a + b, 0)

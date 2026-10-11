@@ -1,5 +1,5 @@
 import {
-  BUILDINGS, CARS, GOALS, GP_SERIES, MAX_BUILDING_LEVEL, RESCUE_SPOTS, buildingUpgradeCost, buildingUpgradeXp, upgradable,
+  BUILDINGS, CARS, GOALS, GP_SERIES, MAX_BUILDING_LEVEL, MODS, RESCUE_SPOTS, modXp, buildingUpgradeCost, buildingUpgradeXp, upgradable,
   upgradeFuelCap, upgradeJobSeconds, FAVORITE_BONUS, upgradePartsPayout, upgradePayout, upgradeXp, type BuildingDef,
 } from './data'
 
@@ -49,6 +49,9 @@ export function econCatalog() {
     xp += buildingUpgradeXp(l)
     return before
   })
+  const mods = Object.fromEntries(
+    MODS.map((m) => [m.id, { slot: m.slot, coins: m.coins, parts: m.parts, bucks: m.bucks, power: m.power, grip: m.grip, weight: m.weight, xp: modXp(m.id) }]),
+  )
   // A driver adds at most this share to a business's coins (see driverPayout).
-  return { cars, buildings, goals, gp, rescue, upgradeXpTo, driverBonus: FAVORITE_BONUS }
+  return { cars, buildings, goals, gp, rescue, upgradeXpTo, mods, driverBonus: FAVORITE_BONUS }
 }

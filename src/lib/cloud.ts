@@ -123,6 +123,21 @@ async function pushSave(): Promise<void> {
   }
 }
 
+// The signed-in account whose town this browser is playing, once sign-in sync is done.
+export const signedInUser = () => userId
+
+// Saves now instead of in a few seconds, e.g. so a live race uses the car you just upgraded.
+export async function flushSave() {
+  if (!userId) return
+  if (saveTimer) {
+    clearTimeout(saveTimer)
+    saveTimer = null
+    await pushSave()
+  } else if (pushing) {
+    await pushing
+  }
+}
+
 // Load the cloud town when another device has saved since this one last synced.
 async function pullNewer(uid: string, force = false, message = 'Loaded your latest town from another device') {
   if (!supabase) return
