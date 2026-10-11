@@ -270,6 +270,12 @@ export function RescuePanel() {
   const junkCount = useGame((s) => s.junkyard.length)
   const [tab, setTab] = useState<'find' | 'storage'>(junkCount ? 'storage' : 'find')
   const [naming, setNaming] = useState(false)
+  // Back from a search with finds: show them, so the next step (restore one) is right there.
+  const [wasSearching, setWasSearching] = useState(searching)
+  if (wasSearching !== searching) {
+    setWasSearching(searching)
+    if (!searching && junkCount) setTab('storage')
+  }
 
   if (!rusty) return null
   if (naming) return <Panel title="Restored!" onClose={() => setNaming(false)}><PlateScreen onDone={() => setNaming(false)} /></Panel>

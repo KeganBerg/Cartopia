@@ -687,7 +687,7 @@ export function World() {
       <ExpandZoom />
       <Interaction />
       {/* Pieces move while building or dragging, so merging waits for plain play. */}
-      <Batch version={layout} off={mode !== 'play'}>
+      <Batch version={layout} off={mode !== 'play'} cell={24}>
         <Land />
         <GrassTufts land={land} roads={roadsList} buildings={buildings} />
         <Roads />

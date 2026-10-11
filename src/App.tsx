@@ -5,9 +5,12 @@ import { World } from './scene/World'
 import { Hud } from './ui/Hud'
 import { FlyLayer } from './ui/Fly'
 import { ThumbRenderer } from './scene/BuildingPreview'
+import { StageCanvas } from './scene/Stage'
 import { BottomBar, ShopPanel, ShowroomPanel, GaragePanel, Toasts } from './ui/Menus'
 import { RacePanel, LiveRaceOverlay, InvitesPanel, PrizePopup, CampaignPrizePopup, TourPrizePopup, EventPrizePopup } from './ui/Race'
 import { joinLobby, useLive } from './lib/live'
+import { chatDemo, startChat } from './lib/chat'
+import { ChatPanel } from './ui/Chat'
 import { FriendsPanel, VisitBanner } from './ui/Friends'
 import { LeadersPanel, ClanPanel } from './ui/Social'
 import { MeetPanel } from './ui/Meet'
@@ -25,6 +28,7 @@ import { AccountPanel } from './ui/Account'
 import { AlertsCard } from './ui/Alerts'
 import { WelcomeBack } from './ui/WelcomeBack'
 import { GiftWatcher, GiftsPanel } from './ui/Gifts'
+import { UsernameWatcher } from './ui/Username'
 import { GhostRacePanel, TauntWatcher, TauntsPanel } from './ui/GhostRace'
 import { GoalsPanel, DailyPanel, FlatPanel } from './ui/Goals'
 import { SeasonPanel } from './ui/Season'
@@ -36,6 +40,7 @@ import './lib/crates'
 import { startAmbience } from './lib/ambience'
 import { useTownPaused } from './scene/renderGate'
 import { useCrewGoalWatcher } from './ui/CrewGoal'
+import { BattlePanel, useCrewBattleWatcher } from './ui/CrewBattle'
 import { VisitorBadges, StreetRaceCard } from './ui/Visitors'
 import { visitorTick, forceVisitor } from './lib/visitors'
 import type { VisitorKind } from './game/data'
@@ -49,11 +54,15 @@ export default function App() {
   const tick = useGame((s) => s.tick)
   const townPaused = useTownPaused()
   useCrewGoalWatcher()
+  useCrewBattleWatcher()
 
   useEffect(() => {
     startCloudSync()
     startAmbience()
     joinLobby()
+    // ?chatdemo shows sample messages so the chat window can be checked signed out.
+    if (new URLSearchParams(location.search).has('chatdemo')) chatDemo()
+    else startChat()
     tick(Date.now())
     // Checked again when it fires: a cloud save may have loaded since, already claimed today.
     setTimeout(() => { const s = useGame.getState(); if (s.lastDaily !== today() && !s.panel) s.openPanel('daily') }, 800)
@@ -83,6 +92,7 @@ export default function App() {
       <VisitorBadges />
       <ThoughtBubble />
       <ThumbRenderer />
+      <StageCanvas />
       <Hud />
       <BottomBar />
       {panel === 'shop' && <ShopPanel />}
@@ -95,12 +105,14 @@ export default function App() {
       {panel === 'leaders' && <LeadersPanel />}
       {panel === 'clan' && <ClanPanel />}
       {panel === 'meet' && <MeetPanel />}
+      {panel === 'chat' && <ChatPanel />}
       {panel === 'need' && <NeedPanel />}
       {panel === 'upgrade' && <UpgradePanel />}
       {panel === 'rescue' && <RescuePanel />}
       {panel === 'bank' && <BankPanel />}
       {panel === 'deals' && <DealsPanel />}
       {panel === 'crates' && <CratesPanel />}
+      {panel === 'battle' && <BattlePanel />}
       <VisitBanner />
       <Tutorial />
       <AlertsCard />
@@ -111,6 +123,7 @@ export default function App() {
       {panel === 'flat' && <FlatPanel />}
       <WelcomeBack />
       <GiftWatcher />
+      <UsernameWatcher />
       {panel === 'gifts' && <GiftsPanel />}
       <StreetRaceCard />
       <TauntWatcher />
