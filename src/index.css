@@ -1489,6 +1489,7 @@ button.book-car { font: inherit; color: inherit; }
   .arc-hud { top: calc(36px + var(--sat)); }
   .arc-btn { width: 60px; height: 60px; font-size: 24px; }
   .arc-count { font-size: 72px; }
+}
 
 /* Garage dyno: drawn over the car preview after an upgrade. Tap anywhere to close. */
 .dyno { position: absolute; inset: 0; display: block; width: 100%; padding: 0; border: 0; background: linear-gradient(180deg, rgba(38,50,56,.0) 55%, rgba(38,50,56,.28)); cursor: pointer; font: inherit; color: #263238; text-align: left; animation: dyno-in .25s ease-out; }
@@ -1517,6 +1518,8 @@ button.book-car { font: inherit; color: inherit; }
   .dyno-gauge { width: 58px; height: 58px; }
   .dyno-read { min-width: 116px; padding: 4px 7px; }
   .dr-row b { font-size: 13px; }
+}
+
 /* ---- Animations: coins flying to the HUD, badge pops, panel close, chest burst ---- */
 .fly-layer { position: fixed; inset: 0; z-index: 400; pointer-events: none; overflow: hidden; }
 .fly { position: absolute; left: 0; top: 0; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; display: grid; place-items: center; font: 13px var(--display); will-change: transform; }
