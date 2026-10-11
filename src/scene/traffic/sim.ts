@@ -83,12 +83,12 @@ const TURN_V = 1.15
 const UTURN_V = 0.7
 const LOT_V = 1.0
 const SWING = 1.0 // distance over which an overtaking car changes lane
-const TRUCK = { len: 1.52, gap: 0.12 }
+const TRUCK = { len: 1.0, gap: 0.1 } // the tow truck at its town size (TownCars townScale)
 const PASS_V = 1.5
 // Our directions (east, west, south, north) as walkGraph's crosswalk sides (south, east, north, west).
 const SIDE = [1, 3, 0, 2]
 const STOP_LINE = 0.6 // how far short of an intersection cars wait
-const PULL = 0.9 // how far a broken-down car pulls over onto the verge, clear of its lane
+const PULL = 1.04 // how far a broken-down car pulls over onto the verge, clear of its lane and the sidewalk
 const PULL_RAMP = 1.4 // distance over which it eases off the road (and back on)
 const PULL_FLAT = 0.9 // either side of the spot, where it is all the way over
 const JAMMED = 45 // seconds stuck before a car gives up
@@ -1364,6 +1364,9 @@ export class Traffic {
   private tryOvertake(a: Agent, p: Agent) {
     // A car limping on a flat still gets round one parked in its way.
     if (a.tow) return
+    // Too close behind it to swing out without clipping its back corner (it pulled up
+    // after we'd queued): wait for it to go instead.
+    if (2 * LANE * smooth(a.gap / SWING) < (a.wid + p.wid) / 2 + 0.04) return
     const pass = a.gap + p.len + a.len + 0.25
     const need = pass + SWING + a.len / 2
     // Straight road the whole way: no junctions, no corners (it would meet whoever is

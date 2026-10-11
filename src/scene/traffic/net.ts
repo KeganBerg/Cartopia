@@ -13,8 +13,9 @@ export type TurnOf = (b: Building, roads: Set<string>) => number
 
 // Directions match grid.ts DIRS: east, west, south, north. Opposite is d ^ 1.
 export const D: V2[] = [[1, 0], [-1, 0], [0, 1], [0, -1]]
-// Distance from a road's centre line to the middle of a lane.
-export const LANE = 0.44
+// Distance from a road's centre line to the middle of a lane. The asphalt
+// between the two 0.4-wide sidewalks is 1.2 across, so each lane is 0.6 wide.
+export const LANE = 0.3
 const H = TILE / 2
 
 export const opp = (d: number) => d ^ 1
@@ -95,7 +96,7 @@ export function turnRank(inDir: number, outDir: number) {
 
 // Which pairs of moves through a junction cross or merge. Moves from the same
 // side just queue behind each other, so they never conflict.
-const CONFLICT = 0.86 // just under the gap between two lanes, so opposite traffic can pass
+const CONFLICT = 2 * LANE - 0.02 // just under the gap between two lanes, so opposite traffic can pass
 const conflictTable: boolean[] = (() => {
   const out: boolean[] = []
   const pts = (i: number, o: number) => {

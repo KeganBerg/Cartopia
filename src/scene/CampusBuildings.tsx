@@ -5,7 +5,7 @@ import { Upright } from './mergeScale'
 import { PAL } from './season'
 import { asphaltTex, brickTex, grassTex, paverTex, sidingTex, shingleTex } from './textures'
 import { Box, Cyl, Sign, Pool, Bulbs, Flag, ShellBuilding, BlockCar, GOLD, SNOW, type Mat, type V3 } from './NewBuildings'
-import { Crowd, StudentCars } from './CampusLife'
+import { Crowd, LearnerCar, StudentCars } from './CampusLife'
 import { loop, track, playMove, routeMove } from './campusPaths'
 
 // Schools, the university and the driving academy: the big late-game lots.
@@ -217,8 +217,8 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
             {[[-0.8, -0.45], [0.8, -0.45], [-0.8, 0.45], [0.8, 0.45]].map(([x, z]) => <Box key={`${x}${z}`} m={m} at={[x, 0.45, z]} s={[0.07, 0.9, 0.07]} c="#90a4ae" />)}
             <Box m={m} at={[0, 0.93, 0]} s={[1.8, 0.06, 1.1]} c={roofSnow('#ff6f00')} />
             {[-0.4, 0.4].map((x) => <Paint key={x} m={m} at={[x, 0.063, 0]} s={[0.03, 0.9]} />)}
-            {live && <BlockCar m={m} at={[-0.4, 0.06, 0.05]} c="#1e88e5" rot={Math.PI} />}
-            {live && lvl < 7 && <BlockCar m={m} at={[0.4, 0.06, 0.05]} c="#fafafa" rot={Math.PI} />}
+            {live && <group position={[-0.4, 0.06, 0.05]}><Upright><LearnerCar i={1} rot={Math.PI} /></Upright></group>}
+            {live && lvl < 7 && <group position={[0.4, 0.06, 0.05]}><Upright><LearnerCar i={0} rot={Math.PI} /></Upright></group>}
           </group>
           {live && <Tree m={m} at={[-1.75, 0.06, -0.55]} s={0.7} />}
           {live && <Lamp m={m} bulb={bulb} ghost={ghost} at={[1.85, 0.06, 0.2]} />}
