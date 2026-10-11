@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
   PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS,
-  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePayout, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, type Rarity, GOALS, DAILY_BONUS, PAINTS, PAINT_COST, STRIPE_COST, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp,
+  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePayout, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, type Rarity, GOALS, DAILY_BONUS, PAINTS, PAINT_COST, STRIPE_COST, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, ownedMods,
 } from './data'
 import { sfx } from '../lib/sound'
 import { requestTrip } from './trips'
@@ -11,7 +11,7 @@ import { requestTrip } from './trips'
 // level: upgrade level 1-10 (see MAX_BUILDING_LEVEL); unset means 1.
 // jobLevel: the level the running job started at, so an upgrade mid-job only pays from the next job.
 export type PlacedBuilding = { uid: string; def: string; x: number; z: number; jobEndsAt: number | null; rot?: number; level?: number; jobLevel?: number }
-export type OwnedCar = { uid: string; model: string; color: string; upgrades: Record<UpgradeSlot, number>; flat?: boolean; lowFuel?: boolean; stripe?: string | null; plate?: string; mods?: string[] }
+export type OwnedCar = { uid: string; model: string; color: string; upgrades: Record<UpgradeSlot, number>; flat?: boolean; lowFuel?: boolean; stripe?: string | null; plate?: string; mods?: string[]; ownedMods?: string[] }
 // A rusty find waiting in Rusty's storage, and the one car in the restore bay.
 export type JunkCar = { uid: string; model: string; rarity: Rarity }
 export type Restoring = JunkCar & { endsAt: number; minutes: number }
@@ -119,7 +119,7 @@ type Actions = {
   helpFriend: () => void
   setTutorial: (step: number) => void
   stripeCar: (uid: string, stripe: string | null) => void
-  // Fit a mod (replacing whatever is in its slot), or pass a slot name's mod with remove to take it off.
+  // Fit a mod (replacing whatever is in its slot; buys it first if this car doesn't own it), or take it off with remove.
   modCar: (uid: string, modId: string, remove?: boolean) => boolean
   loadSave: (s: SaveState) => void
   showMe: (defs: string[], text: string) => void
@@ -847,10 +847,18 @@ export const useGame = create<GameState>()(
         if (!car || !m) return false
         const others = (car.mods ?? []).filter((id) => modDef(id)?.slot !== m.slot)
         if (remove) {
-          set({ cars: s.cars.map((c) => (c.uid === cuid ? { ...c, mods: others } : c)), updatedAt: Date.now() })
+          // Taken-off parts stay owned.
+          set({ cars: s.cars.map((c) => (c.uid === cuid ? { ...c, mods: others, ownedMods: ownedMods(c) } : c)), updatedAt: Date.now() })
           return true
         }
         if ((car.mods ?? []).includes(modId)) return false
+        const owned = ownedMods(car)
+        if (owned.includes(modId)) {
+          // Already bought for this car: putting it back on is free.
+          set({ cars: s.cars.map((c) => (c.uid === cuid ? { ...c, mods: [...others, modId], ownedMods: owned } : c)), updatedAt: Date.now() })
+          s.toast(`${m.name} back on!`)
+          return true
+        }
         if (s.level < m.unlockLevel) {
           s.showNeed('level', m.unlockLevel, m.name)
           return false
@@ -872,7 +880,7 @@ export const useGame = create<GameState>()(
           coins: s.coins - m.coins,
           parts: s.parts - m.parts,
           bucks: s.bucks - m.bucks,
-          cars: s.cars.map((c) => (c.uid === cuid ? { ...c, mods: [...others, modId] } : c)),
+          cars: s.cars.map((c) => (c.uid === cuid ? { ...c, mods: [...others, modId], ownedMods: [...owned, modId] } : c)),
           ...addXp(s, modXp(modId)),
           updatedAt: Date.now(),
         })
