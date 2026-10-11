@@ -62,6 +62,7 @@ export function NeedPanel() {
       { icon: '⛽', title: `Fill up with bucks · B ${REFILL_BUCKS}`, detail: s.fuel >= cap ? 'Your tank is full.' : `Fill your tank to ${cap} right now. You have ${s.bucks} bucks.`, action: { label: `Fill up · B ${REFILL_BUCKS}`, run: s.refillFuel, disabled: s.fuel >= cap } },
       { icon: '⏱', title: 'Wait for a refill', detail: next === null ? 'Your tank is full.' : `Fuel refills 1 every minute. Next one in ${next}s.` },
       { icon: '⛽', title: 'Build a Gas Station', detail: `Each one adds +10 to your max fuel. You have ${owned('gas')}.`, action: build('gas') },
+      ...(owned('house') ? [{ icon: '🏡', title: 'Upgrade your homes', detail: 'Every home level adds +1 to your max fuel. Find them under Upgrades in the Shop.', action: { label: 'Upgrades', run: () => s.openShop('upgrades') } }] : []),
       { icon: '⭐', title: 'Level up', detail: 'Leveling up refills your tank and raises the max.' },
       { icon: '📅', title: 'Daily bonus day 3', detail: '+5 fuel on the third day of your streak.' },
     ]

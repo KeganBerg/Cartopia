@@ -1,6 +1,10 @@
 // Tiny synthesized sound effects, so the game ships no audio files.
+// Everything audible shares one AudioContext and goes through one master
+// output, so the Sound toggle silences it all. Other audio (the town ambience,
+// race engines) gets both from audioContext() and audioOut().
 
 let ctx: AudioContext | null = null
+let master: GainNode | null = null
 let muted = (() => {
   try {
     return localStorage.getItem('cartopia-muted') === '1'
@@ -11,38 +15,34 @@ let muted = (() => {
 
 let volume = (() => {
   try {
-    const v = Number(localStorage.getItem('cartopia-volume'))
-    return localStorage.getItem('cartopia-volume') !== null && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0.8
+    const v = localStorage.getItem('cartopia-volume')
+    return v !== null && Number.isFinite(Number(v)) ? Math.min(1, Math.max(0, Number(v))) : 0.8
   } catch {
     return 0.8
   }
 })()
 
 const listeners = new Set<() => void>()
-// Everything plays through one master gain, so the volume setting covers every sound.
-let master: GainNode | null = null
 
 function audio() {
   if (muted) return null
   if (!ctx) {
     try {
       ctx = new AudioContext()
+      master = ctx.createGain()
+      master.gain.value = volume
+      master.connect(ctx.destination)
     } catch {
       return null
     }
-    master = ctx.createGain()
-    master.gain.value = volume
-    master.connect(ctx.destination)
   }
   if (ctx.state === 'suspended') ctx.resume()
   return ctx
 }
 
-// The shared audio context and master output, or null while muted.
-export const audioCtx = audio
-export function soundOut(): AudioNode | null {
-  return audio() ? master : null
-}
+// The shared context and master output for other synthesised audio; null while muted.
+export const audioContext = () => audio()
+export const audioOut = (): AudioNode | null => (audio() ? master : null)
 
 // iPhone: audio may only start inside a tap, and the ring/silent switch mutes
 // web audio unless the page asks for media playback.
@@ -53,18 +53,18 @@ if (typeof window !== 'undefined') {
   } catch {
     /* not supported */
   }
+  const events = ['pointerdown', 'touchend', 'keydown']
   const unlock = () => {
     const a = audio()
     if (!a) return
     // A silent blip inside the gesture is what actually unlocks iOS.
-    const b = a.createBuffer(1, 1, 22050)
     const src = a.createBufferSource()
-    src.buffer = b
+    src.buffer = a.createBuffer(1, 1, 22050)
     src.connect(a.destination)
     src.start()
-    if (a.state === 'running') ['pointerdown', 'touchend', 'keydown'].forEach((e) => window.removeEventListener(e, unlock, true))
+    if (a.state === 'running') events.forEach((e) => window.removeEventListener(e, unlock, true))
   }
-  ;['pointerdown', 'touchend', 'keydown'].forEach((e) => window.addEventListener(e, unlock, true))
+  events.forEach((e) => window.addEventListener(e, unlock, true))
 }
 
 export const isMuted = () => muted
@@ -106,7 +106,7 @@ function tone(freq: number, start: number, dur: number, type: OscillatorType = '
   g.gain.setValueAtTime(0.0001, t)
   g.gain.exponentialRampToValueAtTime(vol, t + 0.01)
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
-  o.connect(g).connect(master ?? a.destination)
+  o.connect(g).connect(master!)
   o.start(t)
   o.stop(t + dur + 0.02)
 }
@@ -125,8 +125,10 @@ export const sfx = {
     tone(392, 0, 0.35, 'square', 0.06)
     tone(494, 0, 0.35, 'square', 0.05)
   },
-  // A soft chime on a clean shift; the engine itself plays the gear change.
-  shift: (good: boolean) => { if (good) tone(1568, 0, 0.12, 'sine', 0.035) },
+  // A soft chime on a clean shift; the race engine plays the gear change itself.
+  shift: (good: boolean) => {
+    if (good) tone(1568, 0, 0.12, 'sine', 0.035)
+  },
   win: () => [523, 659, 784, 659, 1047].forEach((f, i) => tone(f, i * 0.12, 0.25, 'triangle', 0.13)),
   lose: () => [392, 330, 262].forEach((f, i) => tone(f, i * 0.16, 0.3, 'triangle', 0.1)),
   countdown: (go: boolean) => tone(go ? 880 : 440, 0, go ? 0.4 : 0.15, 'square', 0.08),

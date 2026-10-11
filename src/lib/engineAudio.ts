@@ -3,7 +3,7 @@
 // by the race sim's rpm. Plus gear changes, launches, turbo blow-off, exhaust pops,
 // and the crowd at the finish.
 
-import { audioCtx, soundOut, onStopEngine, onMuteChange, isMuted } from './sound'
+import { audioContext, audioOut, onStopEngine, onMuteChange, isMuted } from './sound'
 import { CARS, carDef, type Body, type CarDef } from '../game/data'
 
 export type EngineProfile = {
@@ -24,6 +24,7 @@ export type EngineProfile = {
   whine: number // 0-1, supercharger or hybrid whine
   crackle: number // 0-1, pops on lift and shifts
   vol: number
+  electric?: boolean // motor whine that rises with speed, no gear changes heard
 }
 
 const BASE: EngineProfile = {
@@ -52,6 +53,12 @@ const BODY: Record<Body, EngineProfile> = {
   bubble: p({ ppr: 2, idle: 850, redline: 4800, odd: 0.45, roll: 1.1, lump: 0.4, lumpRatio: 0.5, sub: 0.1, grit: 0.3, noise: 0.3, clatter: 0.4, bright: 0.95, reso: 200, vol: 0.85 }),
   wagon: p({ ppr: 4, idle: 650, redline: 4200, odd: 0.2, roll: 1.5, lump: 0.35, lumpRatio: 0.25, sub: 0.4, grit: 0.25, noise: 0.25, bright: 0.7, reso: 120, vol: 0.95 }),
   classic: p({ ppr: 4, idle: 650, redline: 5000, odd: 0.15, roll: 1.5, lump: 0.45, lumpRatio: 0.25, sub: 0.5, grit: 0.3, noise: 0.25, bright: 0.75, reso: 125, crackle: 0.2 }),
+  hatch: p({ ppr: 2, idle: 950, redline: 7200, odd: 0.25, roll: 1.1, sub: 0.15, grit: 0.4, noise: 0.35, bright: 1.25, reso: 230, turbo: 0.85, crackle: 0.55, vol: 0.95 }),
+  van: p({ ppr: 2, idle: 800, redline: 4600, odd: 0.4, roll: 1.2, lump: 0.35, lumpRatio: 0.5, sub: 0.15, grit: 0.25, noise: 0.3, clatter: 0.35, bright: 0.8, reso: 170, vol: 0.85 }),
+  suv: p({ ppr: 3, idle: 750, redline: 5600, odd: 0.2, roll: 1.3, lump: 0.15, lumpRatio: 1 / 3, sub: 0.45, grit: 0.35, noise: 0.3, bright: 0.9, reso: 140, turbo: 0.4, crackle: 0.2, vol: 1 }),
+  ev: p({ electric: true, ppr: 1, idle: 0, redline: 0, odd: 0, roll: 2.2, sub: 0.2, grit: 0.05, noise: 0.2, bright: 1.6, reso: 600, whine: 0.9, crackle: 0, vol: 0.8 }),
+  luxury: p({ ppr: 6, idle: 650, redline: 6200, odd: 0.05, roll: 1.4, sub: 0.5, grit: 0.15, noise: 0.15, bright: 0.9, reso: 150, turbo: 0.4, crackle: 0.1, vol: 0.9 }),
+  formula: p({ ppr: 5, idle: 3500, redline: 15000, odd: 0.15, roll: 0.95, sub: 0.2, grit: 0.45, noise: 0.35, bright: 1.7, reso: 420, crackle: 0.6, vol: 1.15 }),
   offroad: p({ ppr: 2, idle: 950, redline: 5800, odd: 0.4, roll: 1.0, lump: 0.5, lumpRatio: 0.5, sub: 0.2, grit: 0.55, noise: 0.45, clatter: 0.3, bright: 1.2, reso: 210, crackle: 0.45, vol: 1.05 }),
 }
 
@@ -72,6 +79,14 @@ const MODEL: Record<string, Partial<EngineProfile>> = {
   // Smooth straight-six grand tourer.
   gullwing: { ppr: 3, turbo: 0, redline: 6800, lump: 0, roll: 1.25, bright: 1.0, crackle: 0.25 },
   lambo: { crackle: 0.85 },
+  // Rotary drift car: buzzy, high-revving brap.
+  kitsune: { ppr: 2, redline: 9000, odd: 0.55, lump: 0.2, lumpRatio: 0.5, turbo: 0.6, crackle: 0.8, grit: 0.5, reso: 260 },
+  // Trophy truck: big open V8.
+  stomper: { ppr: 4, idle: 750, redline: 6000, lump: 0.5, lumpRatio: 0.25, clatter: 0, turbo: 0, grit: 0.6, noise: 0.45, crackle: 0.5, bright: 1, vol: 1.2 },
+  // Air-cooled flat-four with a rasp.
+  speedster: { odd: 0.35, lump: 0.35, lumpRatio: 0.5, redline: 6200, clatter: 0.2, crackle: 0.35 },
+  // V12 hybrid hypercar: screaming and silky, with an electric whine on top.
+  zenith: { ppr: 6, redline: 9500, lump: 0, odd: 0.08, turbo: 0, whine: 0.5, bright: 1.55, crackle: 0.8, reso: 260 },
 }
 
 export function engineProfile(modelId?: string, body?: Body): EngineProfile {
@@ -328,9 +343,10 @@ export class EngineVoice {
   }
 
   // Race frames: the sim's rpm (0-1.05) and whether the throttle is down.
-  drive(rpm: number, throttle = 1) {
+  drive(rpm: number, gear = 0, throttle = 1) {
     this.mode = 'race'
-    this.target = rpm
+    // An electric motor has no gears to hear: its whine follows road speed instead.
+    this.target = this.prof.electric ? Math.min(1, (gear + Math.min(1, rpm)) / 3.95) : rpm
     this.throttle = throttle
   }
 
@@ -342,6 +358,7 @@ export class EngineVoice {
 
   // Gear change: throttle cut, clunk, then turbo blow-off or exhaust pops.
   shift() {
+    if (this.prof.electric) return
     const a = this.a
     const t = a.currentTime
     this.cutUntil = t + 0.09
@@ -434,11 +451,11 @@ export class EngineVoice {
     let thr = this.throttle
     if (t < this.cutUntil) thr = 0
     // Bouncing off the limiter chops the throttle about 18 times a second.
-    if (this.mode === 'race' && this.rpm >= 0.995 && Math.floor(t * 18) % 2 === 0) thr = 0.1
-    const realRpm = prof.idle + (prof.redline - prof.idle) * r
+    if (this.mode === 'race' && !prof.electric && this.rpm >= 0.995 && Math.floor(t * 18) % 2 === 0) thr = 0.1
+    const realRpm = prof.electric ? 600 + 14000 * r : prof.idle + (prof.redline - prof.idle) * r
     // Tiny unsteadiness at idle so it never sounds like a test tone.
-    const wob = r < 0.1 ? 1 + Math.sin(t * 7.3) * 0.012 + Math.sin(t * 2.1) * 0.01 : 1
-    const fire = (realRpm / 60) * prof.ppr * wob
+    const wob = r < 0.1 && !prof.electric ? 1 + Math.sin(t * 7.3) * 0.012 + Math.sin(t * 2.1) * 0.01 : 1
+    const fire = prof.electric ? 60 + 900 * r : (realRpm / 60) * prof.ppr * wob
     const tc = now ? 0 : 0.02
     const set = (pp: AudioParam, v: number) => (now ? pp.setValueAtTime(v, t) : pp.setTargetAtTime(v, t, tc))
     set(this.main.frequency, fire)
@@ -557,8 +574,8 @@ export class RaceAudio {
 
   private ensure() {
     if (this.closed || this.me || isMuted()) return !!this.me
-    const a = audioCtx()
-    const dest = soundOut()
+    const a = audioContext()
+    const dest = audioOut()
     if (!a || !dest) return false
     // A limiter keeps two roaring engines and a crowd from clipping on phone speakers.
     const out = a.createDynamicsCompressor()
@@ -591,14 +608,14 @@ export class RaceAudio {
   }
 
   // Each frame of the race.
-  frame(me: { rpm: number; finished: number | null; dist: number }, them: { rpm: number; finished: number | null; dist: number }) {
+  frame(me: { rpm: number; gear: number; finished: number | null; dist: number }, them: { rpm: number; gear: number; finished: number | null; dist: number }) {
     if (!this.ensure()) return
-    if (me.finished === null) this.me!.drive(me.rpm)
+    if (me.finished === null) this.me!.drive(me.rpm, me.gear)
     else if (!this.finished.me) {
       this.finished.me = true
       this.me!.coast()
     }
-    if (them.finished === null) this.them!.drive(them.rpm)
+    if (them.finished === null) this.them!.drive(them.rpm, them.gear)
     else if (!this.finished.them) {
       this.finished.them = true
       this.them!.coast()
