@@ -1,6 +1,6 @@
 import {
   BUILDINGS, CAMPAIGN, CAR_SETS, CAMPAIGN_RACES, CARS, GOALS, GP_SERIES, campaignRaceId, MAX_BUILDING_LEVEL, MODS, RESCUE_SPOTS, modXp, buildingUpgradeCost, buildingUpgradeXp, upgradable,
-  upgradeFuelCap, upgradeJobSeconds, FAVORITE_BONUS, DEAL_SLOTS, dealSave, QUEST_PAY, TASKS_PER_PERIOD, upgradePartsPayout, upgradePayout, upgradeXp, type BuildingDef,
+  upgradeFuelCap, upgradeJobSeconds, FAVORITE_BONUS, DEAL_SLOTS, dealSave, QUEST_PAY, CREW_CHEST, TASKS_PER_PERIOD, upgradePartsPayout, upgradePayout, upgradeXp, type BuildingDef,
   SEASON_START, SEASON_DAYS, STARS_PER_TIER, SEASON_STARS, SEASON_TIERS, SEASON_CAR_BUCKS, seasonCars,
 } from './data'
 
@@ -74,6 +74,8 @@ export function econCatalog() {
     step: DEAL_SLOTS.map((s) => s.step),
     save: Object.fromEntries(DEAL_SLOTS.flatMap((s) => s.deals).map((d) => [d.id, dealSave(d)])),
   }
+  // Crew chests: paid once per chest the server recorded in public.crew_chests.
+  const crew = { chest: CREW_CHEST }
   // A driver adds at most this share to a business's coins (see driverPayout).
-  return { cars, buildings, goals, gp, rescue, upgradeXpTo, mods, driverBonus: FAVORITE_BONUS, campaign, sets, quests, season, deals }
+  return { cars, buildings, goals, gp, rescue, upgradeXpTo, mods, driverBonus: FAVORITE_BONUS, campaign, sets, quests, season, deals, crew }
 }

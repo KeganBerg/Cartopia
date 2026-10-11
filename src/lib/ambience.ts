@@ -7,6 +7,9 @@ import { dayPhase, isNight, nightAmount } from '../game/clock'
 import { SEASON, type Season } from '../scene/season'
 import { onTownHold, townHeld } from '../scene/renderGate'
 import { useGame } from '../game/store'
+import { liveTraffic } from '../scene/traffic/live'
+import type { Agent } from '../scene/traffic/sim'
+import { toWorld } from '../scene/grid'
 import { pickSpecies, sing, type Species } from './birdsong'
 import { onThunder, weatherNow } from '../game/weather'
 
@@ -24,6 +27,7 @@ export type Mix = {
   owls: number
   yard: number // mowers and sprinklers
   dogs: number
+  nightlife: number // far-off music and people out late
 }
 
 export function ambientMix(night: number, season: Season): Mix {
@@ -31,7 +35,7 @@ export function ambientMix(night: number, season: Season): Mix {
   const by = (v: Record<Season, number>) => v[season]
   return {
     traffic: day * 0.9 + night * 0.2,
-    chatter: day * by({ winter: 0.45, spring: 0.9, summer: 1, fall: 0.8 }),
+    chatter: day * by({ winter: 0.45, spring: 0.9, summer: 1, fall: 0.8 }) + night * by({ winter: 0.12, spring: 0.22, summer: 0.3, fall: 0.22 }),
     birds: day * by({ winter: 0.1, spring: 1, summer: 0.75, fall: 0.35 }),
     crows: day * by({ winter: 0.8, spring: 0.15, summer: 0.1, fall: 0.5 }),
     cicadas: day * by({ winter: 0, spring: 0, summer: 0.85, fall: 0.15 }),
@@ -42,6 +46,7 @@ export function ambientMix(night: number, season: Season): Mix {
     owls: night * by({ winter: 0.7, spring: 0.4, summer: 0.4, fall: 0.7 }),
     yard: day * by({ winter: 0, spring: 0.6, summer: 1, fall: 0.25 }),
     dogs: day * 0.8 + night * 0.15,
+    nightlife: night * by({ winter: 0.5, spring: 0.75, summer: 1, fall: 0.8 }),
   }
 }
 
@@ -84,6 +89,13 @@ function noiseBuffer(ctx: BaseAudioContext, seconds: number, brown: boolean) {
 }
 
 type Voice = { o: OscillatorNode; g: GainNode; next: number }
+// An open nightclub in town: where it is on screen (-1 left .. 1 right).
+export type Club = { pan: number }
+// Where a point in the town sits left to right on screen, -1..1 (set by the scene).
+let ear = (x: number, z: number) => Math.max(-1, Math.min(1, (x - z) / 40))
+export function setEar(f: (x: number, z: number) => number) {
+  ear = f
+}
 // A bird singing from one spot, repeating its song now and then like a real one.
 type Singer = { kind: Species; pan: number; dist: number; next: number }
 
@@ -114,6 +126,10 @@ export class Soundscape {
   private trafficTone: BiquadFilterNode
   private wind: GainNode
   private murmur: GainNode
+  private music: GainNode
+  private wall: BiquadFilterNode
+  private musicPan: StereoPannerNode | null
+  private beat = 0
   private vowels: BiquadFilterNode[]
   private howl: GainNode
   private howlTone: BiquadFilterNode
@@ -158,6 +174,16 @@ export class Soundscape {
     const split = ctx.createGain()
     this.vowels.forEach((v) => split.connect(v))
     this.bed(this.white, split, this.murmur)
+    // Club music heard through the walls: everything but the bass is soaked up.
+    this.music = ctx.createGain()
+    this.music.gain.value = 0
+    this.musicPan = ctx.createStereoPanner ? ctx.createStereoPanner() : null
+    this.wall = this.filter('lowpass', 400, this.music)
+    if (this.musicPan) this.music.connect(this.musicPan).connect(this.out)
+    else this.music.connect(this.out)
+    const echo = ctx.createGain()
+    echo.gain.value = 0.3
+    this.music.connect(echo).connect(this.room)
     // Strong wind whistles round corners: a narrow band that slides with the gusts.
     this.howlTone = this.filter('bandpass', 600, undefined, 10)
     this.howl = this.bed(this.white, this.howlTone)
@@ -256,14 +282,14 @@ export class Soundscape {
   }
 
   // A one-off tone: an oscillator with a quick envelope, cleaned up after.
-  private blip(t: number, dur: number, peak: number, p: number, setup: (o: OscillatorNode) => void, through?: (n: AudioNode) => AudioNode) {
+  private blip(t: number, dur: number, peak: number, p: number | null, setup: (o: OscillatorNode) => void, through?: (n: AudioNode) => AudioNode) {
     const o = this.ctx.createOscillator()
     const g = this.ctx.createGain()
     setup(o)
     g.gain.setValueAtTime(0.0001, t)
     g.gain.exponentialRampToValueAtTime(peak, t + Math.min(0.03, dur / 3))
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
-    const dest = this.pan(p)
+    const dest = p === null ? this.out : this.pan(p)
     o.connect(g).connect(through ? through(dest) : dest)
     o.start(t)
     o.stop(t + dur + 0.05)
@@ -285,7 +311,7 @@ export class Soundscape {
     this.out.gain.setTargetAtTime(v, t, fade)
   }
 
-  step(t: number, night: number, season: Season, club: boolean, sky: Sky = CALM) {
+  step(t: number, night: number, season: Season, club: Club | boolean | null, sky: Sky = CALM) {
     const dt = this.last < 0 ? 0.2 : Math.min(1, t - this.last)
     this.last = t
     const m = weatherMix(ambientMix(night, season), sky)
@@ -300,7 +326,9 @@ export class Soundscape {
     fade(this.traffic, m.traffic * 0.09)
     // The hubbub swells and dips as voices come and go.
     this.vowels.forEach((v, i) => v.frequency.setTargetAtTime([rand(300, 750), rand(900, 1900), rand(500, 900)][i], t, 0.08))
-    this.murmur.gain.setTargetAtTime(m.chatter * rand(0.4, 1) * 0.045, t, 0.12)
+    // Outside an open club there's a little crowd hanging about.
+    const crowd = m.chatter + (club ? 0.3 * m.nightlife : 0)
+    this.murmur.gain.setTargetAtTime(crowd * rand(0.4, 1) * 0.045, t, 0.12)
     fade(this.chorus, m.crickets * 0.07 + m.peepers * 0.02)
     // Wind comes in gusts, and leaves rustle with it.
     if (t >= this.gustAt) {
@@ -365,17 +393,69 @@ export class Soundscape {
     if (chance(0.035 * m.crows, dt)) this.crow(at)
     if (chance(0.022 * m.owls, dt)) this.owl(at)
 
-    // The nightclub's bass leaks out while it's open.
-    if (!club) this.beatAt = 0
-    else {
-      if (this.beatAt < t) this.beatAt = t + 0.1
-      while (this.beatAt < t + 0.5) {
-        const b = this.beatAt
-        this.blip(b, 0.22, 0.08, 0.3, (o) => {
-          o.frequency.setValueAtTime(120, b)
-          o.frequency.exponentialRampToValueAtTime(45, b + 0.12)
-        }, (d) => this.filter('lowpass', 300, d))
-        this.beatAt += 60 / 122
+    this.clubMusic(t, club, m.nightlife)
+  }
+
+  // Night music: a house beat and bassline thumping through the walls of your
+  // own nightclub while it's open, or faintly from somewhere across town.
+  private clubMusic(t: number, club: Club | boolean | null, nightlife: number) {
+    const near = club ? 1 : 0
+    const level = near ? 0.55 : nightlife * 0.18
+    this.music.gain.setTargetAtTime(level, t, 2)
+    this.wall.frequency.setTargetAtTime(near ? 600 : 220, t, 1)
+    if (this.musicPan) this.musicPan.pan.setTargetAtTime(typeof club === 'object' && club ? club.pan * 0.8 : 0.4, t, 0.5)
+    if (level < 0.01) {
+      this.beatAt = 0
+      return
+    }
+    const sixteenth = 60 / 122 / 4
+    if (this.beatAt < t) this.beatAt = t + 0.1
+    // A four-bar bassline (A, A, C, G), off the beat like house music.
+    const roots = [55, 55, 65.41, 49]
+    while (this.beatAt < t + 0.5) {
+      const b = this.beatAt
+      const k = this.beat % 16
+      if (k % 4 === 0) {
+        this.blip(b, 0.25, 0.6, null, (o) => {
+          o.frequency.setValueAtTime(110, b)
+          o.frequency.exponentialRampToValueAtTime(45, b + 0.1)
+        }, () => this.wall)
+      }
+      if (k % 4 === 2) {
+        const f = roots[Math.floor(this.beat / 16) % 4]
+        this.blip(b, sixteenth * 1.8, 0.16, null, (o) => {
+          o.type = 'sawtooth'
+          o.frequency.value = f * (this.beat % 32 === 30 ? 2 : 1)
+        }, () => this.wall)
+      }
+      if (near && (k === 4 || k === 12)) this.noiseHit(b, 0.09, 0.12, this.filter('bandpass', 1300, this.wall, 1.2))
+      this.beat++
+      this.beatAt += sixteenth
+    }
+  }
+
+  // A car horn: a tap, a double toot or a long lean on it when someone's stuck.
+  honk(t: number, pan: number, mood: number) {
+    const pairs = [[415, 523], [349, 440], [392, 494], [311, 392]]
+    const [f1, f2] = pairs[Math.floor(Math.random() * pairs.length)]
+    const parts = mood < 0.4 ? [[0, 0.13]] : mood < 0.8 ? [[0, 0.1], [0.18, 0.16]] : [[0, rand(0.6, 0.95)]]
+    const dest = this.pan(pan, 0.25)
+    const tone = this.filter('lowpass', 2200, this.filter('peaking', 900, dest, 1))
+    for (const [at, dur] of parts) {
+      const s0 = t + at
+      for (const f of [f1, f2]) {
+        const o = this.ctx.createOscillator()
+        const g = this.ctx.createGain()
+        o.type = 'sawtooth'
+        o.frequency.setValueAtTime(f * rand(0.995, 1.005), s0)
+        o.frequency.linearRampToValueAtTime(f * 0.97, s0 + dur + 0.04)
+        g.gain.setValueAtTime(0, s0)
+        g.gain.linearRampToValueAtTime(0.05, s0 + 0.015)
+        g.gain.setValueAtTime(0.05, s0 + dur)
+        g.gain.linearRampToValueAtTime(0, s0 + dur + 0.04)
+        o.connect(g).connect(tone)
+        o.start(s0)
+        o.stop(s0 + dur + 0.06)
       }
     }
   }
@@ -660,10 +740,53 @@ let quietSince = 0
 
 const target = () => (settings.on && !isMuted() && !townHeld() && !document.hidden ? settings.volume : 0)
 
-function clubOpen() {
+function clubOpen(): Club | null {
+  if (!isNight()) return null
   const s = useGame.getState()
   const buildings = s.visiting ? s.visiting.buildings : s.buildings
-  return isNight() && buildings.some((b) => b.def === 'club')
+  const c = buildings.find((b) => b.def === 'club')
+  if (!c) return null
+  const [x, z] = toWorld(c.x, c.z)
+  return { pan: ear(x, z) }
+}
+
+// Drivers stuck behind someone lose patience and honk: behind a car pulled up
+// or broken down, or after a long wait in a jam. Each waits its own while
+// first, honks at most once per hold-up, and the town keeps it to one honk at a time.
+export class HonkWatch {
+  private patience = new Map<string, { after: number; done: boolean }>()
+  private last = -Infinity
+  private random: () => number
+  constructor(random = Math.random) {
+    this.random = random
+  }
+
+  // The cars that honk now (t in seconds).
+  check(cars: Map<string, Agent>, t: number): Agent[] {
+    const out: Agent[] = []
+    for (const uid of this.patience.keys()) if (!cars.has(uid)) this.patience.delete(uid)
+    for (const a of cars.values()) {
+      let p = this.patience.get(a.uid)
+      if (!p || a.wait < 0.1) {
+        p = { after: 2.5 + this.random() * 3.5, done: false }
+        this.patience.set(a.uid, p)
+      }
+      if (p.done || a.parked || a.stalled || a.leaving || a.tow || !a.gapTo || a.gap > 1.6) continue
+      const o = cars.get(a.gapTo)
+      const blocked = !!o && (o.parked > 0 || o.stalled)
+      if (!(blocked ? a.wait > p.after : a.wait > p.after + 5)) continue
+      p.done = true
+      if (t - this.last < 2.5 || this.random() < 0.25) continue
+      this.last = t
+      out.push(a)
+    }
+    return out
+  }
+}
+
+const watch = new HonkWatch()
+function honks(s: Soundscape, t: number) {
+  for (const a of watch.check(liveTraffic.agents, t)) s.honk(t + rand(0, 0.2), ear(a.x, a.z), Math.min(1, Math.random() * 0.8 + (a.wait > 12 ? 0.4 : 0)))
 }
 
 function tick() {
@@ -675,6 +798,7 @@ function tick() {
     quietSince = 0
     scape.level(v, t)
     scape.step(t + 0.05, nightAmount(dayPhase()), SEASON, clubOpen(), weatherNow())
+    honks(scape, t + 0.05)
   } else if (scape) {
     scape.level(0, t, 0.25)
     // Tear the graph down once it has faded, so nothing runs while silent.

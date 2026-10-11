@@ -1158,6 +1158,37 @@ button.book-car { font: inherit; color: inherit; }
 @media (max-height: 500px) { .hud-center .goal-tracker { display: none; } }
 @media (max-width: 600px) { .goal-tracker { margin-top: 4px; font-size: 12px; padding: 2px 8px 2px 3px; } }
 
+/* Crew weekly goal: shared progress bar, who chipped in, and the crew chest. */
+.crew-goal { margin: 10px 0; padding: 10px; border-radius: 14px; background: #fff; border: 2px solid #e0e0e0; }
+.crew-goal.reached { border-color: #ffb300; }
+.crew-goal.loading { text-align: center; }
+.crew-goal-head { display: flex; align-items: center; justify-content: space-between; font: 16px var(--display); }
+.crew-goal-reset { font: 13px var(--display); color: #78909c; }
+.crew-track { position: relative; display: flex; align-items: center; margin: 8px 0 4px; }
+.crew-bar { display: block; flex: 1; height: 14px; border-radius: 7px; background: #e0e6ea; overflow: hidden; }
+.crew-bar > span { display: block; height: 100%; border-radius: 7px; background: linear-gradient(90deg, #43a047, #7cb342); transition: width .4s; }
+.crew-goal.reached .crew-bar > span { background: linear-gradient(90deg, #ffb300, #ffca28); }
+.crew-chest-ico { flex: none; margin-left: -10px; width: 34px; height: 34px; display: grid; place-items: center; font-size: 22px; border-radius: 50%; background: #fff; border: 2px solid #e0e6ea; }
+.crew-chest-ico.ready { border-color: #ffb300; animation: chest-glow 1.4s ease-in-out infinite; }
+.crew-goal-nums { display: flex; justify-content: space-between; align-items: baseline; font: 14px var(--display); color: #546e7a; }
+.crew-goal-nums b { font-size: 18px; color: var(--ink); font-weight: normal; }
+.crew-legend { font-size: 12px; color: #90a4ae; }
+.crew-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.crew-chip { position: relative; display: inline-flex; align-items: center; gap: 5px; max-width: 150px; padding: 3px 8px; border-radius: 10px; background: #eef2f5; overflow: hidden; font: 12px var(--display); color: #37474f; }
+.crew-chip > i { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(67,160,71,.3); }
+.crew-chip > em, .crew-chip > b { position: relative; font-style: normal; font-weight: normal; }
+.crew-chip > em { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.crew-chip.idle { color: #90a4ae; }
+.crew-chip.me { outline: 2px solid var(--blue); }
+.crew-chest { margin-top: 8px; }
+.crew-chest.last-week { margin: 0 0 8px; }
+.crew-need { font: 12px var(--display); color: #e65100; }
+.crew-mini { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; width: 100%; margin-top: 8px; padding: 6px 10px 6px 6px; border-radius: 12px; border: 1.5px solid #cfd8dc; background: #fff; text-align: left; }
+.crew-mini.ready { border: 2px solid #ffb300; background: #fff8e1; }
+.crew-mini-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; font: 14px var(--display); }
+.crew-mini-main b { font-weight: normal; }
+.crew-mini .crew-bar { flex: none; height: 8px; }
+.crew-mini small { font: 12px var(--display); color: #78909c; }
 /* Limited-time event items and goals */
 .ribbon.spooky { background: linear-gradient(90deg, #ef6c00, #6a1b9a); }
 .goal-head.event span { color: #ef6c00; font-weight: 700; }
