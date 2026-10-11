@@ -183,7 +183,7 @@ function WireFence({ m, z }: { m: Mat; z: number }) {
   )
 }
 
-function DoubleWide({ m, win, bulb, lvl, color, roof, ghost }: { m: Mat; win: ReactNode; bulb: ReactNode; lvl: number; color: string; roof: string; ghost?: boolean }) {
+function DoubleWide({ m, win, bulb, lvl, color, roof, trim, ghost }: { m: Mat; win: ReactNode; bulb: ReactNode; lvl: number; color: string; roof: string; trim: string; ghost?: boolean }) {
   const w = 1.5, d = 0.95, h = 0.56
   const z0 = -0.3
   const zf = z0 + d / 2
@@ -201,7 +201,7 @@ function DoubleWide({ m, win, bulb, lvl, color, roof, ghost }: { m: Mat; win: Re
       {[-0.55, -0.25, 0.42].map((x) => (
         <group key={x}>
           <mesh position={[x, 0.45, zf + 0.004]}><planeGeometry args={[0.2, 0.2]} />{win}</mesh>
-          {[-1, 1].map((sd) => <Box key={sd} m={m} at={[x + sd * 0.13, 0.45, zf + 0.01]} s={[0.05, 0.21, 0.01]} c={roof} shadow={false} />)}
+          {[-1, 1].map((sd) => <Box key={sd} m={m} at={[x + sd * 0.13, 0.45, zf + 0.01]} s={[0.05, 0.21, 0.01]} c={trim} shadow={false} />)}
         </group>
       ))}
       {[-1, 1].map((sd) => (
@@ -283,7 +283,7 @@ function TrailerHome({ m, win, bulb, ghost, lvl, color, roof }: EdgeProps) {
     return (
       <group>
         <Box m={m} at={[0.78, 0.02, 0.45]} s={[0.4, 0.04, 1.05]} c="#ffffff" t={gravelTex(1, 2)} shadow={false} />
-        <DoubleWide m={m} win={win} bulb={bulb} lvl={lvl} color={color} roof={stripe} ghost={ghost} />
+        <DoubleWide m={m} win={win} bulb={bulb} lvl={lvl} color={color} roof="#6d7b84" trim={stripe} ghost={ghost} />
         {yard && (
           <group>
             <Flamingo m={m} at={[-0.7, 0, 0.75]} rot={0.5} />
@@ -467,10 +467,10 @@ function Junkyard({ m, win, bulb, ghost, lvl, lift }: EdgeProps) {
         <Patch key={i} at={[x, 0.058, z]} r={r} c="#000000" opacity={0.22} sx={1.4} />
       ))}
       {panels.map(([x, z, side], i) => (
-        <Box key={i} m={m} at={[x, 0.42 + (i % 3) * 0.03, z]} s={side ? [0.03, 0.84 + (i % 2) * 0.06, 0.32] : [0.32, 0.84 + (i % 2) * 0.06, 0.03]}
+        <Box key={i} m={m} at={[x, 0.31 + (i % 3) * 0.02, z]} s={side ? [0.03, 0.62 + (i % 2) * 0.05, 0.32] : [0.32, 0.62 + (i % 2) * 0.05, 0.03]}
           c={['#90a4ae', '#a1887f', '#78909c', '#b0855f', '#8d9a8e'][i % 5]} t={corrugatedTex(1, 1)} />
       ))}
-      {[-1.88, 1.88].map((x) => [-1.88, -0.6, 0.65].map((z) => <Box key={`${x}${z}`} m={m} at={[x, 0.48, z]} s={[0.06, 0.96, 0.06]} c="#546e7a" />))}
+      {[-1.88, 1.88].map((x) => [-1.88, -0.6, 0.65].map((z) => <Box key={`${x}${z}`} m={m} at={[x, 0.36, z]} s={[0.06, 0.72, 0.06]} c="#546e7a" />))}
       {/* Chain-link front with barbed wire on top, either side of the gate. */}
       {[[-1.88, -0.48], [0.78, 1.88]].map(([a, b]) => (
         <group key={a}>
@@ -569,7 +569,7 @@ function Junkyard({ m, win, bulb, ghost, lvl, lift }: EdgeProps) {
             <mesh position={[0, 0.24, 0]} rotation-x={Math.PI / 2} castShadow><torusGeometry args={[0.06, 0.02, 6, 8]} />{m('#b0bec5')}</mesh>
           </group>
           <Crane m={m} at={[0.75, 0.05, -0.55]} />
-          <Crusher m={m} at={[1.05, 0.05, 0.55]} bulb={bulb} />
+          <group position={[1.1, 0.05, 0.6]} scale={0.72}><Crusher m={m} at={[0, 0, 0]} bulb={bulb} /></group>
           {/* Floodlights for the night shift. */}
           {[[-0.4, -1.75], [1.7, 1.6]].map(([x, z]) => (
             <group key={x} position={[x, 0, z]}>
