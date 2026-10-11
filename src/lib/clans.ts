@@ -200,3 +200,26 @@ export const leaveClan = () => rpc('leave_clan')
 export const kickMember = (id: string) => rpc('kick_clan_member', { p_member: id })
 export const updateClan = (a: { description: string; emblem: string; color: string; minLevel: number }) =>
   rpc('update_clan', { p_description: a.description, p_emblem: a.emblem, p_color: a.color, p_min_level: a.minLevel })
+
+// Crew weekly goal (supabase/migrations/0022_crew_weekly_goal.sql). Weeks are named by their Monday (UTC).
+export type CrewWeek = {
+  week: string
+  target: number
+  points: number
+  reached: boolean
+  mine: number
+  opened: boolean
+  members: { id: string; points: number; jobs: number; races: number }[]
+}
+export type CrewGoal = { rules: { minPoints: number; memberCap: number }; chests: number; payable: boolean; current: CrewWeek | null; last: CrewWeek | null }
+
+export async function fetchCrewGoal(): Promise<CrewGoal | null> {
+  if (!supabase) return null
+  return rpc<CrewGoal | null>('crew_goal')
+}
+
+// Chests the player can open right now: this week's once the crew hits its goal, and last week's if missed.
+export const chestsReady = (g: CrewGoal | null) =>
+  !g || !g.payable ? 0 : [g.current, g.last].filter((w) => w && w.reached && !w.opened && w.mine >= g.rules.minPoints).length
+
+export const openCrewChestOn = (week: string) => rpc<number>('open_crew_chest', { p_week: week })

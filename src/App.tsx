@@ -24,6 +24,7 @@ import { useGame, today } from './game/store'
 import { startCloudSync } from './lib/cloud'
 import { startAmbience } from './lib/ambience'
 import { useTownPaused } from './scene/renderGate'
+import { useCrewGoalWatcher } from './ui/CrewGoal'
 
 // Phones get a lighter renderer: lower pixel ratio keeps iOS from dropping the WebGL context.
 const SMALL = typeof window !== 'undefined' && Math.min(window.innerWidth, window.innerHeight) < 700
@@ -33,6 +34,7 @@ export default function App() {
   const liveRace = useLive((l) => l.race)
   const tick = useGame((s) => s.tick)
   const townPaused = useTownPaused()
+  useCrewGoalWatcher()
 
   useEffect(() => {
     startCloudSync()

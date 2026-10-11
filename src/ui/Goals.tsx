@@ -10,6 +10,7 @@ import {
 import { Panel, SheetTabs, openGarageTab } from './Menus'
 import { openRaceTab } from './Race'
 import { useNow } from '../scene/useNow'
+import { CrewGoalMini } from './CrewGoal'
 
 export function GoalsButton() {
   const ready = useGame(claimable)
@@ -197,6 +198,7 @@ function Tasks({ period }: { period: Period }) {
         </div>
         {opened ? <span className="goal-check">✔</span> : <button className="buy small" disabled={!ready} onClick={() => s.claimChest(period)}>{ready ? 'Open' : '🔒'}</button>}
       </div>
+      {period === 'weekly' && <CrewGoalMini />}
     </>
   )
 }
