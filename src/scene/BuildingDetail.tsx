@@ -4,6 +4,7 @@ import { PAL } from './season'
 import { CarModel } from './CarModel'
 import { decal, LAYER } from './layers'
 import { manholeTex } from './textures'
+import { Upright, useMergeScale } from './mergeScale'
 
 // Small dressing that makes buildings and props read as lived-in: trims,
 // pipes, bins, curbs and so on. Everything here is static and reuses the
@@ -119,9 +120,13 @@ export function SpeedwayDetail({ sh, roof }: { sh: number; roof: string }) {
   )
 }
 
-// Drive-in: a snack bar with a popcorn bucket on the roof, and two cars
-// parked up watching the film.
+// Drive-in: a snack bar with a popcorn bucket on the roof, and cars parked
+// up watching the film beside speaker posts. A merged drive-in is drawn
+// scaled up, so its cars and posts undo that scale and the lot fills the
+// bigger footprint with more rows instead.
 export function DriveInDetail() {
+  const [sx, sy, sz] = useMergeScale()
+  const merged = sx !== 1 || sy !== 1 || sz !== 1
   return (
     <group>
       <group position={[1.2, 0, 1.3]}>
@@ -149,12 +154,83 @@ export function DriveInDetail() {
           ))}
         </group>
       </group>
-      {[[-0.45, '#1e88e5'], [0.45, '#fdd835']].map(([x, col]) => (
-        <group key={x as number} position={[x as number, 0.05, 0.32]} rotation-y={Math.PI}>
-          <CarModel body={x === -0.45 ? 'classic' : 'compact'} color={col as string} />
+      {merged ? <DriveInLot sx={sx} sz={sz} /> : (
+        <>
+          {[[-0.45, '#1e88e5'], [0.45, '#fdd835']].map(([x, col]) => (
+            <group key={x as number} position={[x as number, 0.05, 0.32]} rotation-y={Math.PI}>
+              <CarModel body={x === -0.45 ? 'classic' : 'compact'} color={col as string} />
+            </group>
+          ))}
+          {[[-0.9, -0.2], [0, -0.2], [0.9, -0.2], [-0.9, 0.9], [0, 0.9]].map(([x, z], i) => <SpeakerPost key={i} x={x} z={z} />)}
+        </>
+      )}
+    </group>
+  )
+}
+
+function SpeakerPost({ x, z }: { x: number; z: number }) {
+  return (
+    <group position={[x, 0, z]}>
+      <mesh position={[0, 0.25, 0]}><cylinderGeometry args={[0.025, 0.025, 0.5, 6]} />{c('#78909c')}</mesh>
+      <mesh position={[0, 0.5, 0]}><boxGeometry args={[0.12, 0.08, 0.06]} />{c('#37474f')}</mesh>
+    </group>
+  )
+}
+
+const LOT_BODIES = ['classic', 'compact', 'sedan', 'coupe', 'wagon', 'hatch', 'muscle', 'suv'] as const
+const LOT_COLORS = ['#1e88e5', '#fdd835', '#e53935', '#43a047', '#fafafa', '#8e24aa', '#fb8c00', '#00897b', '#546e7a']
+// Most a merged lot parks, so a giant 4x4 drive-in stays cheap to build.
+const LOT_MAX = 30
+
+// Rows of cars facing the screen, laid out in town units over a merged lot.
+// Positions are in the model's scaled space; each car and post sits in an
+// Upright at true size. A few bays stay empty so the lot doesn't look tiled.
+function DriveInLot({ sx, sz }: { sx: number; sz: number }) {
+  const bay = 1.15 // car to car across a row
+  const cols = Math.max(2, Math.floor((3 * sx) / bay))
+  // The lot runs from just behind the screen to the back fence.
+  const front = -0.6 * sz + 0.55
+  const back = 1.45 * sz - 0.6
+  const rows = sz === 1 ? 1 : Math.max(1, Math.floor((back - front) / 1.45) + 1)
+  const rowZ = (r: number) => (rows === 1 ? 0.32 : front + ((back - front) * r) / (rows - 1))
+  // The snack bar stands in the back corner (model space 1.2, 1.3), about
+  // 1 x 0.86 across; keep a car clear of it, with a wider gap on the road
+  // side where the tall stand would hide a car from the camera.
+  const snack = (x: number, z: number) => x > 1.2 * sx - 0.5 * sx - 0.9 && Math.abs(z - 1.3 * sz) < 0.43 * sz + 0.6
+  const cars: { x: number; z: number; i: number }[] = []
+  const posts: [number, number][] = []
+  for (let r = 0; r < rows; r++) {
+    const z = rowZ(r)
+    for (let i = 0; i <= cols; i++) {
+      const x = (i - cols / 2) * bay
+      if (!snack(x, z - 0.52)) posts.push([x, z - 0.52])
+    }
+    for (let i = 0; i < cols; i++) {
+      const x = (i + 0.5 - cols / 2) * bay
+      if (snack(x, z)) continue
+      const n = r * 31 + i * 7
+      // Leave about one bay in five empty, never the front row's middle.
+      if ((Math.imul(n + 1, 0x9e3779b1) >>> 0) % 5 === 0 && !(r === 0 && Math.abs(x) < bay)) continue
+      cars.push({ x, z, i: n })
+    }
+  }
+  return (
+    <>
+      {cars.slice(0, LOT_MAX).map(({ x, z, i }) => (
+        <group key={`${x},${z}`} position={[x / sx, 0.05, z / sz]}>
+          <Upright size={1}>
+            <group rotation-y={Math.PI}>
+              <CarModel body={LOT_BODIES[i % LOT_BODIES.length]} color={LOT_COLORS[(i * 5) % LOT_COLORS.length]} />
+            </group>
+          </Upright>
         </group>
       ))}
-    </group>
+      {posts.map(([x, z]) => (
+        <group key={`${x},${z}`} position={[x / sx, 0, z / sz]}>
+          <Upright size={1}><SpeakerPost x={0} z={0} /></Upright>
+        </group>
+      ))}
+    </>
   )
 }
 

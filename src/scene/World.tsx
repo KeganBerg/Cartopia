@@ -9,6 +9,7 @@ import { TILE, PLOT, PLOT_MIN, PLOT_MAX, START_LAND, buildingDef, buildingLevel 
 import { BuildingModel } from './BuildingModel'
 import { rotateCurrent, setGhostTurn, turnOf } from '../game/placement'
 import { mergeGroups, groupTurn, groupScale, type MergeGroup } from '../game/merge'
+import { MergeScale } from './mergeScale'
 import { sfx } from '../lib/sound'
 import { Clouds } from './Clouds'
 import { DayNight } from './DayNight'
@@ -164,6 +165,8 @@ function holdToMove(b: PlacedBuilding, e: ThreeEvent<PointerEvent>) {
   window.addEventListener('pointercancel', watch.up)
 }
 
+const ONE: [number, number, number] = [1, 1, 1]
+
 // `group` is set on the top-left building of a merged block: it stands in,
 // scaled up, for the whole block. The others in the block draw nothing.
 function Building({ b, roads, group }: { b: PlacedBuilding; roads: Set<string>; group?: MergeGroup }) {
@@ -217,9 +220,11 @@ function Building({ b, roads, group }: { b: PlacedBuilding; roads: Set<string>; 
         </mesh>
       )}
       <group scale={[sx, sy, sz]}>
-        <PopGroup uid={b.uid}>
-          <BuildingModel def={d} level={buildingLevel(b)} />
-        </PopGroup>
+        <MergeScale.Provider value={group ? [sx, sy, sz] : ONE}>
+          <PopGroup uid={b.uid}>
+            <BuildingModel def={d} level={buildingLevel(b)} />
+          </PopGroup>
+        </MergeScale.Provider>
       </group>
     </group>
   )
