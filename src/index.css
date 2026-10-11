@@ -262,6 +262,7 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .rarity-common { background: #78909c; }
 .rarity-scarce { background: #1e88e5; }
 .rarity-rare { background: linear-gradient(90deg, #8e24aa, #ff6d00); }
+.rarity-legendary { background: linear-gradient(90deg, #b8860b, #ffd54f, #b8860b); color: #3e2723; box-shadow: 0 0 6px rgba(255, 213, 79, .8); }
 .junk-card { background: #faf6f3; }
 .scrap { font: 12px var(--display); background: none; border: none; color: #8d6e63; text-decoration: underline; padding: 2px; }
 .spot-card .spot-icon { font-size: 34px; line-height: 1.1; }
