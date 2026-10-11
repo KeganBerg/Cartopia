@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { MAX_RACE_PI, freshRacer, raceFloor, stepRacer } from './race'
+import { MAX_RACE_PI, dynoPull, freshRacer, raceFloor, stepRacer } from './race'
 
 const dir = new URL('../../supabase/migrations/', import.meta.url)
 // The newest migration that sets public.race_floor().
@@ -29,6 +29,18 @@ describe('live race referee', () => {
         }
         expect(r.finished!).toBeGreaterThan(raceFloor(pi))
       }
+    }
+  })
+})
+
+describe('garage dyno', () => {
+  it('gets quicker with every point of PI and never beats the referee', () => {
+    let last = Infinity
+    for (let pi = 10; pi <= 200; pi += 5) {
+      const t = dynoPull(pi)
+      expect(t).toBeLessThan(last)
+      expect(t).toBeGreaterThan(raceFloor(pi))
+      last = t
     }
   })
 })
