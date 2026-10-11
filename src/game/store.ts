@@ -8,6 +8,7 @@ import { sfx } from '../lib/sound'
 import { msUntilNight } from './clock'
 import { requestTrip, requestVisit } from './trips'
 import { trialPrize } from './trial'
+import { RIVALS, RIVAL_VISITS, RIVAL_BACK_MS, type RivalProgress } from './rivals'
 import { groupOf, mergeCandidates, applyMerge, applySplit } from './merge'
 import { togglePick } from './meet'
 
@@ -71,12 +72,18 @@ export type SaveState = {
   claimedSets: string[]
   // Crew chests opened. The server guard pays one chest per crew_chests row it holds for this player.
   crewChests: number
+  // Town visitor prizes collected: the server's number for the latest claim (visitor_claim()). The
+  // guard pays the prizes of the claims this goes up by.
+  visits: number
   // Season track: the season number, stars earned in it, and tiers (0-based) collected.
   season: SeasonProgress | null
   // Daily deals used today (UTC), by deal id. The server guard allows each discount once a day.
   deals: { day: string; used: string[] } | null
   // Weekly time trial prizes claimed, by week (its Monday, YYYY-MM-DD), with the place that paid.
   trials: { claimed: Record<string, number> }
+  // Town rivals: times each one has been beaten (0-3) and when a beaten one comes back.
+  // The server guard pays a rival's bonus once, when they're first beaten three times.
+  rivals: Record<string, RivalProgress>
   // Car uids on show at the Car Meet and cruising Main Street (see game/meet.ts).
   showcase: string[]
   land: string[]
@@ -180,8 +187,14 @@ type Actions = {
   // Records a campaign race; returns the stars earned (0 for a loss).
   campaignResult: (chapter: string, race: number, myTime: number, theirTime: number) => number
   closeCampaignPrize: () => void
+  // Records a race against the town rival at this prize. Returns the rival's one-time bonus when this win made them quit.
+  rivalResult: (id: string, won: boolean, prize: number) => { coins: number; bucks: number; trophies: number } | null
+  // Settles a double-or-nothing rematch: wins the stake again, or gives it back.
+  rivalBet: (won: boolean, stake: number) => void
   // Pays a finished week's time trial prize (the place comes from the server's board).
   claimTrialPrize: (week: string, place: number) => void
+  // Pays a town visitor's prize (fixed by the server for signed-in players); seq is the server's claim number.
+  visitorPrize: (p: { coins: number; xp: number; parts: number; bucks: number; seq?: number; car?: JunkCar | null }) => void
   closePrize: () => void
   closeLevelUp: () => void
   focusShop: (panel: 'shop' | 'showroom' | 'rescue' | 'race', id: string | null) => void
@@ -314,7 +327,9 @@ export function starterTown(): SaveState {
     campaign: {},
     claimedSets: [],
     crewChests: 0,
+    visits: 0,
     trials: { claimed: {} },
+    rivals: {},
     deals: null,
     showcase: [],
     land: [...START_LAND],
@@ -1150,6 +1165,17 @@ export const useGame = create<GameState>()(
         }))
       },
 
+      visitorPrize: (p) => {
+        const s = get()
+        set(withXp(s, p.xp, {
+          coins: s.coins + p.coins, parts: s.parts + p.parts, bucks: s.bucks + p.bucks,
+          visits: Math.max(s.visits ?? 0, p.seq ?? 0),
+          junkyard: p.car ? [...s.junkyard, p.car] : s.junkyard,
+          stats: { ...s.stats, coinsEarned: (s.stats.coinsEarned ?? 0) + p.coins },
+          updatedAt: Date.now(),
+        }))
+      },
+
       claimDaily: () => {
         const s = get()
         const t = today()
@@ -1404,6 +1430,42 @@ export const useGame = create<GameState>()(
 
       closeCampaignPrize: () => set({ campaignPrize: null }),
 
+      rivalResult: (id, won, prize) => {
+        const s = get()
+        const def = RIVALS.find((r) => r.id === id)
+        if (!def) return null
+        s.finishRace(won, prize)
+        if (!won) return null
+        const beaten = Math.min(RIVAL_VISITS, (s.rivals[id]?.beaten ?? 0) + 1)
+        const quit = beaten >= RIVAL_VISITS && (s.rivals[id]?.beaten ?? 0) < RIVAL_VISITS
+        const rivals = { ...get().rivals, [id]: beaten < RIVAL_VISITS ? { beaten, back: Date.now() + RIVAL_BACK_MS } : { beaten } }
+        if (!quit) {
+          set({ rivals, updatedAt: Date.now() })
+          return null
+        }
+        setTimeout(sfx.levelUp, 200)
+        set((g) => ({
+          rivals,
+          coins: g.coins + def.coins,
+          bucks: g.bucks + def.bucks,
+          trophies: g.trophies + def.trophies,
+          stats: { ...g.stats, coinsEarned: (g.stats.coinsEarned ?? 0) + def.coins },
+          updatedAt: Date.now(),
+        }))
+        return { coins: def.coins, bucks: def.bucks, trophies: def.trophies }
+      },
+
+      rivalBet: (won, stake) => {
+        const s = get()
+        const amount = won ? stake : -Math.min(stake, s.coins)
+        set({
+          coins: s.coins + amount,
+          racesWon: s.racesWon + (won ? 1 : 0),
+          stats: { ...bump(s, 'racesWon', won ? 1 : 0), races: (s.stats.races ?? 0) + 1, coinsEarned: (s.stats.coinsEarned ?? 0) + Math.max(0, amount) },
+          updatedAt: Date.now(),
+        })
+      },
+
       claimTrialPrize: (week, place) => {
         const s = get()
         if (s.trials.claimed[week] !== undefined || !(place >= 1)) return
@@ -1647,14 +1709,14 @@ export const useGame = create<GameState>()(
 )
 
 export function saveOf(s: GameState): SaveState {
-  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, season, deals, trials, showcase, land, updatedAt } = s
-  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, season, deals, trials, showcase, land, updatedAt }
+  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, season, deals, trials, rivals, showcase, land, updatedAt } = s
+  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, season, deals, trials, rivals, showcase, land, updatedAt }
 }
 
 // Fields added after launch, so older saves load with sensible values.
-function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'quests' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'gp' | 'campaign' | 'claimedSets' | 'crewChests' | 'season' | 'deals' | 'trials' | 'showcase' | 'land'> {
+function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'quests' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'gp' | 'campaign' | 'claimedSets' | 'crewChests' | 'visits' | 'season' | 'deals' | 'trials' | 'rivals' | 'showcase' | 'land'> {
   // Saves from before the tutorial existed skip it.
-  return { stats: emptyStats(), claimedGoals: [], quests: null, lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, gp: {}, campaign: {}, claimedSets: [], crewChests: 0, season: null, deals: null, trials: { claimed: {} }, showcase: [], land: [...START_LAND] }
+  return { stats: emptyStats(), claimedGoals: [], quests: null, lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, gp: {}, campaign: {}, claimedSets: [], crewChests: 0, visits: 0, season: null, deals: null, trials: { claimed: {} }, rivals: {}, showcase: [], land: [...START_LAND] }
 }
 
 

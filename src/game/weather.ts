@@ -1,5 +1,6 @@
 import { DAY_MS } from './clock'
 import { SEASON, type Season } from '../scene/season'
+import type { VenueId } from '../scene/venues'
 
 // Town weather. Like the clock, it's worked out from the real time, so every
 // player sees the same shower at the same moment. Time is cut into spells of a
@@ -162,4 +163,45 @@ export function seedRoll(seed: string) {
 
 export function strike(delay: number, loud: number) {
   for (const f of thunder) f(delay, loud)
+}
+
+// Every venue has its own skies: drizzle and fog on the docks, dust storms in
+// the canyon, blizzards up the pass. A live race rolls its weather from the race
+// id, so both racers see the same sky. Otherwise bad weather in town carries
+// over to the race (adjusted for the venue), and a clear day rolls the venue's own.
+const VENUE_SKIES: Record<VenueId, [WeatherKind, number][]> = {
+  main: [['clear', 45], ['rain', 20], ['storm', 12], ['drizzle', 10], ['fog', 13]],
+  beach: [['clear', 45], ['rain', 15], ['storm', 15], ['fog', 15], ['wind', 10]],
+  desert: [['clear', 45], ['dust', 35], ['wind', 20]],
+  snow: [['clear', 35], ['snow', 40], ['blizzard', 25]],
+  farm: [['clear', 45], ['rain', 18], ['storm', 14], ['fog', 13], ['drizzle', 10]],
+  docks: [['clear', 40], ['fog', 25], ['drizzle', 15], ['rain', 10], ['storm', 10]],
+}
+const AS_SNOW: Partial<Record<WeatherKind, WeatherKind>> = { rain: 'snow', drizzle: 'snow', storm: 'blizzard' }
+const IN_DESERT: Partial<Record<WeatherKind, WeatherKind>> = { rain: 'dust', drizzle: 'clear', storm: 'dust', snow: 'wind', blizzard: 'dust', fog: 'clear' }
+
+function rollVenue(venue: VenueId, roll: number): WeatherKind {
+  const odds = VENUE_SKIES[venue]
+  let r = roll * odds.reduce((s, [, w]) => s + w, 0)
+  for (const [k, w] of odds) if ((r -= w) < 0) return k
+  return 'clear'
+}
+
+export function raceWeather(venue: VenueId, seed?: string): Weather {
+  let kind: WeatherKind
+  const town = weatherNow()
+  if (PIN) kind = town.kind
+  else if (seed) kind = rollVenue(venue, seedRoll(seed))
+  else kind = town.kind !== 'clear' && town.strength > 0.3 ? town.kind : rollVenue(venue, Math.random())
+  if (venue === 'snow') kind = AS_SNOW[kind] ?? kind
+  else if (venue === 'desert') kind = IN_DESERT[kind] ?? kind
+  // Winter rain falls as snow everywhere but the desert.
+  else if (SEASON === 'winter') kind = AS_SNOW[kind] ?? kind
+  const f = FEEL[kind]
+  return {
+    kind, strength: 1, flash: 0,
+    rain: f.rain, snow: f.snow, cloud: f.cloud, haze: f.haze, wind: f.wind, dust: f.dust,
+    wet: f.rain > 0 ? 1 : 0,
+    cover: f.snow > 0 ? 0.85 : venue === 'snow' || venue === 'desert' ? 0 : town.cover,
+  }
 }

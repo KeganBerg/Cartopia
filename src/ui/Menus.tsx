@@ -1,8 +1,9 @@
 import { mergeCandidates } from '../game/merge'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGame, hasRusty, buildPrice } from '../game/store'
 import { activeEvent, garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, carDef, performance, upgradeCost, buildingDef, upgradable, loves, readySets, type BuildingDef } from '../game/data'
-import { CarInspect, CarPreview } from '../scene/CarPreview'
+import { CarInspect, CarPreview, type DynoFeed } from '../scene/CarPreview'
+import { DynoOverlay, type DynoRun } from './Dyno'
 import { CollectAllButton } from './CollectAll'
 import { rotateCurrent } from '../game/placement'
 import { BuildingThumb, CarThumb } from '../scene/BuildingPreview'
@@ -13,6 +14,7 @@ import { PaintShop, jobOf } from './Paint'
 import type { PaintJob } from '../game/data'
 import { Icon } from './Icon'
 import { useCrewGoal } from './CrewGoal'
+import { useRivalWaiting } from './Rivals'
 import { ShowcaseToggle } from './Meet'
 
 // Phones and tablets: no hover, so placing takes a preview tap first.
@@ -25,6 +27,7 @@ export function BottomBar() {
   const visiting = useGame((s) => !!s.visiting)
   const setsReady = useGame((s) => readySets(s).length)
   const crewChests = useCrewGoal((g) => g.ready)
+  const rival = useRivalWaiting()
   if (visiting) return null
   if (mode !== 'play') return <EditBar />
   return (
@@ -35,7 +38,7 @@ export function BottomBar() {
         <button className="icon-btn" onClick={() => openPanel('garage')}><span className="i i-garage"><Icon name="wrench" /></span>GARAGE</button>
         <button className="icon-btn" onClick={() => openPanel('friends')}><span className="i i-friends"><Icon name="friends" />{crewChests > 0 && <span className="btn-dot">{crewChests}</span>}</span>FRIENDS</button>
         <button className="icon-btn" onClick={() => setMode('road')}><span className="i i-edit"><Icon name="cone" /></span>EDIT</button>
-        <button className="big-btn race-btn" onClick={() => openPanel('race')}><span className="i"><Icon name="flag" /></span>RACE</button>
+        <button className="big-btn race-btn" onClick={() => openPanel('race')}><span className="i"><Icon name="flag" />{rival && <span className="btn-dot" title="Your rival is in town">!</span>}</span>RACE</button>
       </div>
       <CollectAllButton />
     </>
@@ -56,27 +59,27 @@ function EditBar() {
   })
   const canMerge = useGame((s) => (s.mode === 'merge' ? mergeCandidates(s.buildings).length > 0 || s.buildings.some((b) => b.merge) : true))
   const hint =
-    mode === 'expand' ? 'Tap a For Sale sign to buy the land next to your town'
-    : mode === 'merge' ? (canMerge ? 'Tap 🧩 to merge matching buildings into one big one' : 'Put 2 or 4 matching buildings (same level) side by side to merge them')
-    : mode === 'road' ? 'Click or drag to lay road (10 coins per tile)'
-    : mode === 'bulldoze' ? 'Click or drag to remove (buildings refund half)'
-    : mode === 'move' && again && selected ? 'Built! Rotate or drag it to adjust it'
-    : mode === 'move' ? (selected ? 'Drag it to move it, or Rotate to turn it' : 'Drag a building to move it, or tap one to rotate it')
-    : `${TOUCH ? 'Tap a spot to preview' : 'Click to place'} ${placing ? BUILDINGS.find((b) => b.id === placing)?.name : ''}${TOUCH ? ', tap it again to build' : ''}. Rotate turns it.`
+    mode === 'expand' ? 'Tap a For Sale sign to buy land'
+    : mode === 'merge' ? (canMerge ? 'Tap a Merge badge to combine buildings' : 'Put 2 or 4 matching buildings side by side')
+    : mode === 'road' ? 'Drag to lay road · $10 a tile'
+    : mode === 'bulldoze' ? 'Drag to remove · buildings refund half'
+    : mode === 'move' && again && selected ? 'Built! Drag or rotate it'
+    : mode === 'move' ? (selected ? 'Drag to move, or rotate it' : 'Drag a building, or tap one to pick it')
+    : `${TOUCH ? 'Tap to preview, tap again to build' : 'Click to place'} ${placing ? BUILDINGS.find((b) => b.id === placing)?.name : ''}`
   return (
     <div className="edit-bar">
       <div className="edit-hint">{hint}</div>
       <div className="edit-tools">
-        <button className={mode === 'road' ? 'tool active' : 'tool'} onClick={() => setMode('road')}><Icon name="road" size={18} />Road</button>
-        <button className={mode === 'bulldoze' ? 'tool active' : 'tool'} onClick={() => setMode('bulldoze')}><Icon name="bulldoze" size={18} />Bulldoze</button>
-        <button className={mode === 'move' ? 'tool active' : 'tool'} onClick={() => setMode('move')}><Icon name="move" size={18} />Move</button>
-        <button className={mode === 'expand' ? 'tool active' : 'tool'} onClick={() => setMode('expand')}><Icon name="land" size={18} />Land</button>
-        <button className={mode === 'merge' ? 'tool active' : 'tool'} onClick={() => setMode('merge')}><Icon name="merge" size={18} />Merge</button>
-        {((mode === 'place' && placing) || (mode === 'move' && selected)) && <button className="tool" onClick={rotateCurrent} title="Rotate (R)"><Icon name="rotate" size={18} />Rotate</button>}
-        {mode === 'move' && selected && canUpgrade && <button className="tool" onClick={() => openUpgrade(selected)}><Icon name="up" size={18} />Upgrade</button>}
-        {mode === 'move' && again && <button className="tool" onClick={() => setMode('place', again)}><Icon name="plus" size={18} />Build another</button>}
-        <button className="tool" onClick={() => openPanel('shop')}><Icon name="shop" size={18} />Shop</button>
-        <button className="tool done" onClick={() => setMode('play')}><Icon name="check" size={18} />Done</button>
+        <button className={mode === 'road' ? 'tool active' : 'tool'} onClick={() => setMode('road')}><Icon name="road" size={22} /><span>Road</span></button>
+        <button className={mode === 'bulldoze' ? 'tool active' : 'tool'} onClick={() => setMode('bulldoze')}><Icon name="bulldoze" size={22} /><span>Bulldoze</span></button>
+        <button className={mode === 'move' ? 'tool active' : 'tool'} onClick={() => setMode('move')}><Icon name="move" size={22} /><span>Move</span></button>
+        <button className={mode === 'expand' ? 'tool active' : 'tool'} onClick={() => setMode('expand')}><Icon name="land" size={22} /><span>Land</span></button>
+        <button className={mode === 'merge' ? 'tool active' : 'tool'} onClick={() => setMode('merge')}><Icon name="merge" size={22} /><span>Merge</span></button>
+        {((mode === 'place' && placing) || (mode === 'move' && selected)) && <button className="tool" onClick={rotateCurrent} title="Rotate (R)"><Icon name="rotate" size={22} /><span>Rotate</span></button>}
+        {mode === 'move' && selected && canUpgrade && <button className="tool" onClick={() => openUpgrade(selected)}><Icon name="up" size={22} /><span>Upgrade</span></button>}
+        {mode === 'move' && again && <button className="tool" onClick={() => setMode('place', again)}><Icon name="plus" size={22} /><span>Again</span></button>}
+        <button className="tool" onClick={() => openPanel('shop')}><Icon name="shop" size={22} /><span>Shop</span></button>
+        <button className="tool done" onClick={() => setMode('play')}><Icon name="check" size={22} /><span>Done</span></button>
       </div>
     </div>
   )
@@ -359,6 +362,21 @@ export function GaragePanel() {
   const [painting, setPainting] = useState<{ car: string; job: PaintJob } | null>(null)
   const tryJob = painting && painting.car === car?.uid && tab === 'paint' ? painting.job : null
   const look = car && def && { body: def.body, model: def.id, ...(tryJob ?? jobOf(car)), mods: withMod(car.mods, tryMod) }
+  // After an upgrade or a part goes on, the car does a dyno pull showing the old and new time.
+  const pi = car && def ? performance(def, car.upgrades, car.mods) : 0
+  const [dyno, setDyno] = useState<DynoRun | null>(null)
+  const feed = useMemo<DynoFeed>(() => ({ rpm: 0, speed: 0 }), [])
+  const lastPi = useRef<{ car: string; pi: number } | null>(null)
+  // Only a gain right after a tap here counts, not a save arriving from another device.
+  const tapped = useRef(0)
+  useEffect(() => {
+    if (!car) return
+    const was = lastPi.current
+    lastPi.current = { car: car.uid, pi }
+    if (!was || was.car !== car.uid) return setDyno(null)
+    if (pi <= was.pi || Date.now() - tapped.current > 1500) return
+    setDyno((d) => ({ id: Date.now(), car: car.uid, model: car.model, mods: car.mods, before: d && d.car === car.uid ? d.before : was.pi, after: pi }))
+  }, [car?.uid, pi])
   return (
     <Panel title={`My Garage · ${cars.length} cars · ⚡${garagePower(cars)}`} wide>
       <div className="garage">
@@ -375,14 +393,16 @@ export function GaragePanel() {
           })}
         </div>
         {car && def && (
-          <div className="garage-detail">
+          <div className="garage-detail" onClickCapture={() => { tapped.current = Date.now() }}>
             {inspect ? (
               <>
                 <div className="car-preview" />
                 <CarInspect title={def.name} {...look!} onClose={() => setInspect(false)} />
               </>
             ) : (
-              <CarPreview {...look!} onExpand={() => setInspect(true)} />
+              <CarPreview {...look!} onExpand={() => setInspect(true)} dyno={dyno ? feed : null}>
+                {dyno && <DynoOverlay key={dyno.id} run={dyno} feed={feed} onDone={() => setDyno(null)} />}
+              </CarPreview>
             )}
             <h3>{def.name}{car.plate && <span className="mini-plate">{car.plate}</span>}</h3>
             <div className="pi">Performance Index <b>{performance(def, car.upgrades, car.mods)}</b> <ShowcaseToggle car={car.uid} /></div>

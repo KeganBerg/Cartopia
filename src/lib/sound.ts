@@ -156,6 +156,27 @@ export const sfx = {
     pluck(d, t + 0.44, hz('C3'), 0.12)
   }),
   lose: () => play(arp(['A3', 'F3', 'D3'], 0.2, pluck, 0.3)),
+  // Boost: a rising rush of filtered noise.
+  boost: () => play((d, t) => {
+    const len = 0.7
+    const buf = d.ctx.createBuffer(1, Math.floor(d.ctx.sampleRate * len), d.ctx.sampleRate)
+    const data = buf.getChannelData(0)
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1
+    const src = d.ctx.createBufferSource()
+    src.buffer = buf
+    const bp = d.ctx.createBiquadFilter()
+    bp.type = 'bandpass'
+    bp.Q.value = 1.2
+    bp.frequency.setValueAtTime(400, t)
+    bp.frequency.exponentialRampToValueAtTime(2600, t + len)
+    const g = d.ctx.createGain()
+    g.gain.setValueAtTime(0.0001, t)
+    g.gain.exponentialRampToValueAtTime(0.16, t + 0.08)
+    g.gain.exponentialRampToValueAtTime(0.0001, t + len)
+    src.connect(bp).connect(g).connect(d.out)
+    src.start(t)
+    src.stop(t + len)
+  }),
   countdown: (go: boolean) => play((d, t) => {
     if (!go) return woodblock(d, t, 900, 0.12)
     for (const n of ['C5', 'E5', 'G5']) glock(d, t, hz(n), 0.05, 1)

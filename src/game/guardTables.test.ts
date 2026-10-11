@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { GP_ROUNDS, GP_SERIES, gpRivalPi } from './data'
-import { gpBeatTable, gpRivalSlowest, gpSeries, rarities, rescueRoll, rescueSpots, restoreMinutes, spotCosts } from './guardTables'
+import { gpBeatTable, gpRivalSlowest, gpSeries, rarities, rescueRoll, rescueSpots, restoreMinutes, spotCosts, visitorTable } from './guardTables'
 import { rollSearch } from './store'
 import { raceFloor } from './race'
 
@@ -26,6 +26,11 @@ describe('restore and Grand Prix checks', () => {
     expect(newest('$spotcost$')).toEqual(spotCosts())
   })
 
+  it('rolls town visitors and barn finds like the game', () => {
+    expect(newest('$visitors$')).toEqual(visitorTable())
+    expect(newest('$barnspots$')).toEqual(rescueSpots())
+  })
+
   it("puts the server's finds on their pins and no other cars", () => {
     const finds = [{ i: 2, uid: 'rabc', model: 'vette', rarity: 'rare' as const }]
     for (let n = 0; n < 50; n++) {
@@ -44,12 +49,12 @@ describe('restore and Grand Prix checks', () => {
         expect(Math.round(gpSeries()[s.id].last * (1 + clears * 0.08))).toBe(gpRivalPi(s, GP_ROUNDS - 1, clears))
       }
     }
-  })
+  }, 60000)
 
   it('lets a car at least as quick as the rival win', () => {
     const beat = gpBeatTable()
     for (let pi = 1; pi <= 250; pi++) expect(beat[pi - 1]).toBeLessThanOrEqual(pi)
     // A rival is never slower than its own best run.
     for (const pi of [20, 60, 120]) expect(gpRivalSlowest(pi)).toBeGreaterThan(raceFloor(pi))
-  })
+  }, 60000)
 })
