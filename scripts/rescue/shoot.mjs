@@ -83,4 +83,10 @@ for (let k = 0; k < marks.length; k++) {
   await step(marks[k])
   await shot(`${tag}-${names[k] ?? k}`)
 }
+// HAUL=1: tow home and shoot the haul card.
+if (process.env.HAUL) {
+  await p.evaluate(() => document.querySelector('.rs-home')?.click())
+  await step(9)
+  await shot(`${tag}-7-haul`)
+}
 await b.close()

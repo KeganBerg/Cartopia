@@ -1220,6 +1220,34 @@ button.lvl-item:hover { border-color: var(--accent); transform: translateY(-2px)
 .rs-actions .rs-home:disabled, .rs-actions .rs-auto:disabled { opacity: .55; }
 .rs-actions .rs-home.ready:not(:disabled) { animation: coach 1.2s ease-in-out infinite; box-shadow: 0 3px 0 rgba(0,0,0,.25), 0 0 14px rgba(102,187,106,.9); }
 @media (min-width: 700px) { .rs-bottom { align-items: center; } .rs-actions, .rs-haul { width: 100%; max-width: 560px; } }
+.rs-dot.here { background: rgba(255,213,79,.85); animation: rs-here .35s ease-in-out infinite alternate; }
+@keyframes rs-here { to { transform: scale(1.18); box-shadow: 0 0 10px rgba(255,213,79,.95); } }
+.rs-haul .haul-item { animation: haul-in .45s cubic-bezier(.3,1.6,.5,1); }
+@keyframes haul-in { from { transform: scale(1.6); box-shadow: 0 0 16px rgba(255,213,79,1); } }
+.count-bump { display: inline-block; animation: count-bump .3s ease-out; }
+@keyframes count-bump { from { transform: scale(1.35); color: #f57f17; } }
+.rs-fly { position: fixed; left: 0; top: 0; z-index: 3; margin: -22px 0 0 -22px; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; background: #fff; border: 3px solid #ffca28; box-shadow: 0 4px 10px rgba(0,0,0,.3), 0 0 14px rgba(255,213,79,.9); font-size: 24px; pointer-events: none; opacity: 0; will-change: transform; }
+.rs-fly.car { width: 56px; height: 44px; margin: -22px 0 0 -28px; border-radius: 14px; }
+.rs-fly.rr-scarce { border-color: #1e88e5; box-shadow: 0 4px 10px rgba(0,0,0,.3), 0 0 16px rgba(66,165,245,.95); }
+.rs-fly.rr-rare { border-color: #ff6d00; box-shadow: 0 4px 10px rgba(0,0,0,.3), 0 0 22px rgba(255,179,0,1); }
+.rs-found.rr-rare b { color: #e65100; }
+.haul-card { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 4px 0 8px; }
+.haul-hero { font-size: 44px; line-height: 1; animation: haul-hero .9s cubic-bezier(.3,1.5,.5,1); }
+@keyframes haul-hero { from { transform: translateX(-120px) rotate(-8deg); opacity: 0; } }
+.haul-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.haul-car { width: 128px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 6px; border-radius: 14px; background: #fff; border: 3px solid #b0bec5; box-shadow: 0 3px 0 rgba(0,0,0,.15); text-align: center; opacity: 0; transform: scale(.4); }
+.haul-car b { font-size: 13px; line-height: 1.15; }
+.haul-car.in { opacity: 1; transform: none; transition: transform .4s cubic-bezier(.3,1.7,.5,1), opacity .15s; }
+.haul-car.rr-scarce { border-color: #1e88e5; box-shadow: 0 3px 0 rgba(0,0,0,.15), 0 0 12px rgba(66,165,245,.6); }
+.haul-car.rr-rare { border-color: #ff6d00; box-shadow: 0 3px 0 rgba(0,0,0,.15), 0 0 18px rgba(255,179,0,.9); }
+.haul-car.rr-rare.in { animation: haul-glow 1.4s ease-in-out .4s infinite alternate; }
+@keyframes haul-glow { to { box-shadow: 0 3px 0 rgba(0,0,0,.15), 0 0 28px rgba(255,179,0,1); } }
+.haul-sums { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; font-size: 16px; }
+.haul-sums .haul-item { opacity: 0; transform: scale(.4); }
+.haul-sums .haul-item.in { opacity: 1; transform: none; transition: transform .35s cubic-bezier(.3,1.7,.5,1), opacity .15s; }
+.haul-sums .haul-item.xp { border-color: #ffca28; }
+.haul-go .buy { min-width: 200px; font-size: 18px; }
+@media (prefers-reduced-motion: reduce) { .haul-car, .haul-sums .haul-item { opacity: 1; transform: none; } }
 
 /* Paint shop: finishes, and the try-on bar that holds the Buy button. */
 .try-bar { display: flex; align-items: center; gap: 8px; min-height: 40px; margin: 8px 0 2px; padding: 6px 8px 6px 12px; border-radius: 12px; background: var(--seg); font-size: 13px; color: #546e7a; }

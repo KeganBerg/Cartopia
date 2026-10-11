@@ -1813,10 +1813,7 @@ export const useGame = create<GameState>()(
           sfx.error()
           return set({ search: { ...q, truckAt: i, flat: true } })
         }
-        const loot = q.pins[i]
-        if (loot.kind === 'car') sfx.levelUp()
-        else if (loot.kind !== 'nothing') sfx.coin()
-        else sfx.click()
+        // The search scene plays the reveal's build-up and sting itself, in time with the tarp.
         set({ search: { ...q, truckAt: i, revealed: q.revealed.map((r, j) => r || j === i) } })
       },
 
@@ -1860,8 +1857,7 @@ export const useGame = create<GameState>()(
           }
         }
         parts += scrapped
-        sfx.coin()
-        s.toast(notes.length ? `Rusty towed home: ${notes.join(', ')}!` : 'Rusty hauled everything home.')
+        // Rusty's panel shows the haul card with its fanfare.
         if (scrapped) setTimeout(() => get().toast(`Storage was full, so extra finds were scrapped for ${scrapped} parts.`), 600)
         set(withXp(s, 10 + notes.length * 10, {
           coins, parts, fuel, trophies, junkyard,
