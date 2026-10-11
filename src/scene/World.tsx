@@ -22,8 +22,9 @@ import { TownCars } from './TownCars'
 import { Townspeople } from './Townspeople'
 import { Batch } from './Batch'
 import { Manhole } from './BuildingDetail'
+import { GrassTufts } from './Tufts'
 import { toWorld, toTile, DIRS } from './grid'
-import { grassTex, paverTex, asphaltTex } from './textures'
+import { grassTex, paverTex, asphaltTex, drainTex } from './textures'
 import { layoutRoads } from './traffic/layout'
 import { LAYER, decal } from './layers'
 
@@ -47,7 +48,7 @@ function Land() {
           <group key={k} position={[cx, 0, cz]}>
             <mesh rotation-x={-Math.PI / 2} position-y={LAYER.land} receiveShadow>
               <planeGeometry args={[PLOT * TILE, PLOT * TILE]} />
-              <meshStandardMaterial map={grassTex(PLOT / 2)} />
+              <meshStandardMaterial map={grassTex(PLOT / 4)} />
             </mesh>
             {mode !== 'play' && mode !== 'expand' && <gridHelper args={[PLOT * TILE, PLOT, '#4f8f2f', '#5f9f3f']} position-y={LAYER.grid} />}
           </group>
@@ -224,9 +225,9 @@ function Sidewalk({ side, drain }: { side: 'e' | 'w' | 's' | 'n'; drain?: boolea
         <meshStandardMaterial color="#cfd8dc" />
       </mesh>
       {drain && (
-        <mesh rotation-x={-Math.PI / 2} position={along ? [pos[0] - Math.sign(pos[0]) * (w / 2 + 0.05), LAYER.paint, 0.5] : [0.5, LAYER.paint, pos[2] - Math.sign(pos[2]) * (w / 2 + 0.05)]}>
-          <planeGeometry args={along ? [0.1, 0.26] : [0.26, 0.1]} />
-          <meshStandardMaterial color="#3a3f44" {...decal()} />
+        <mesh rotation={[-Math.PI / 2, 0, along ? 0 : Math.PI / 2]} position={along ? [pos[0] - Math.sign(pos[0]) * (w / 2 + 0.06), LAYER.paint, 0.5] : [0.5, LAYER.paint, pos[2] - Math.sign(pos[2]) * (w / 2 + 0.06)]}>
+          <planeGeometry args={[0.12, 0.3]} />
+          <meshStandardMaterial map={drainTex()} {...decal()} />
         </mesh>
       )}
     </group>
@@ -359,6 +360,7 @@ function Roads() {
         const straightX = !junction && (e || w) && !s && !nn
         const straightZ = !junction && (s || nn) && !e && !w
         const avenue = oneWay >= 0
+        const plain = (straightX || straightZ) && !xing.some(Boolean)
         // Lamps go on the outside edge of an avenue.
         const outer = avenue ? SIDES[mate ^ 1] : null
         return (
@@ -367,9 +369,10 @@ function Roads() {
               <planeGeometry args={[TILE, TILE]} />
               <meshStandardMaterial map={asphalt} />
             </mesh>
-            {SIDES.map((sd, i) => !arms[i] && <Sidewalk key={sd} side={sd} drain={(x * 2 + z + i) % 4 === 0} />)}
+            {/* Drains and manholes only on plain straight stretches, clear of crossings. */}
+            {SIDES.map((sd, i) => !arms[i] && <Sidewalk key={sd} side={sd} drain={plain && (x * 2 + z + i) % 4 === 0} />)}
             {(straightX || straightZ) && (x * 5 + z * 3) % 7 === 0 && <Hydrant side={straightX ? ((x + z) % 2 ? 'n' : 's') : ((x + z) % 2 ? 'w' : 'e')} />}
-            {(straightX || straightZ) && (x * 3 + z * 7) % 5 === 1 && <Manhole x={straightX ? 0.25 : 0.45} z={straightX ? 0.45 : 0.25} />}
+            {plain && (x * 3 + z * 7) % 5 === 1 && <Manhole x={straightX ? 0 : 0.45} z={straightX ? 0.45 : 0} />}
             {SIDES.map((sd, i) => xing[i] && <Crosswalk key={sd} side={sd} />)}
             {xing.map((on, i) => on && (oneWay < 0 || oneWay === i) && <StopLine key={i} side={i} />)}
             {/* Street lamps every few tiles along straight roads, alternating sides. */}
@@ -628,6 +631,7 @@ export function World() {
       {/* Pieces move while building or dragging, so merging waits for plain play. */}
       <Batch version={layout} off={mode !== 'play'}>
         <Land />
+        <GrassTufts land={land} roads={roadsList} buildings={buildings} />
         <Roads />
         {buildings.map((b) => (
           <Building key={b.uid} b={b} roads={roads} />

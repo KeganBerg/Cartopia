@@ -1,5 +1,5 @@
 import { PAL, SEASON } from './season'
-import { CanvasTexture, RepeatWrapping, SRGBColorSpace, type Texture } from 'three'
+import { CanvasTexture, Color, RepeatWrapping, SRGBColorSpace, type Texture } from 'three'
 
 // Hand-drawn canvas textures, generated once and shared. Small sizes keep
 // them cheap on phones; repeat settings tile them across bigger surfaces.
@@ -49,14 +49,42 @@ function speckle(g: CanvasRenderingContext2D, s: number, r: () => number, colors
   }
 }
 
+// Grass: soft light and dark patches so the lawn isn't one flat colour, short
+// blades, the odd clover clump, then the season's flowers, leaves or sparkle.
+// One image spans four tiles; blobs wrap round the edges so the seams vanish.
 export const grassTex = (rx = 1, ry = rx) =>
-  rep(make(`grass|${SEASON}`, 128, (g, s, r) => {
+  rep(make(`grass2|${SEASON}`, 256, (g, s, r) => {
     g.fillStyle = PAL.grass
     g.fillRect(0, 0, s, s)
-    speckle(g, s, r, PAL.grassSpeckle, 900, 3)
+    const wrapped = (x: number, y: number, draw: (x: number, y: number) => void) => {
+      for (const ox of [-s, 0, s]) for (const oy of [-s, 0, s]) draw(x + ox, y + oy)
+    }
+    const shades = [-0.1, 0.08, -0.06, 0.1].map((l) => `#${new Color(PAL.grass).offsetHSL(0, 0, l).getHexString()}`)
+    for (let i = 0; i < 18; i++) {
+      const x = r() * s, y = r() * s, rad = 18 + r() * 40, squash = 0.6 + r() * 0.4, turn = r() * 3
+      g.globalAlpha = 0.5
+      g.fillStyle = shades[i % shades.length]
+      wrapped(x, y, (cx, cy) => { g.beginPath(); g.ellipse(cx, cy, rad, rad * squash, turn, 0, Math.PI * 2); g.fill() })
+    }
+    g.globalAlpha = 1
+    speckle(g, s, r, PAL.grassSpeckle, 2400, 3)
+    // Blades: short slanted strokes, darker at the root side.
+    g.lineWidth = 1
+    for (let i = 0; i < 1600; i++) {
+      const x = r() * s, y = r() * s, len = 3 + r() * 4, lean = (r() - 0.5) * 3
+      g.strokeStyle = PAL.grassSpeckle[Math.floor(r() * PAL.grassSpeckle.length)]
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x + lean, y - len); g.stroke()
+    }
+    if (SEASON !== 'winter') {
+      g.fillStyle = PAL.grassSpeckle[2]
+      for (let i = 0; i < 10; i++) {
+        const x = r() * s, y = r() * s
+        for (let k = 0; k < 5; k++) wrapped(x + (r() - 0.5) * 8, y + (r() - 0.5) * 8, (cx, cy) => { g.beginPath(); g.arc(cx, cy, 2.2, 0, Math.PI * 2); g.fill() })
+      }
+    }
     // Flowers in spring, fallen leaves in fall, sparkle on the snow.
-    speckle(g, s, r, PAL.grassDots, PAL.dots, 2)
-  }), `grass|${SEASON}`, rx, ry)
+    speckle(g, s, r, PAL.grassDots, PAL.dots * 4, 2)
+  }), `grass2|${SEASON}`, rx, ry)
 
 // Light concrete pavers for sidewalks and building lots.
 export const paverTex = (rx = 1, ry = rx) =>
@@ -315,4 +343,39 @@ export const towerGlowTex = () =>
         g.fillStyle = r() < 0.7 ? '#ffd88a' : '#cfe8ff'
         g.fillRect(x * 16 + 3, y * 8 + 2, 10, 5)
       }
+  })
+
+// Cast-iron manhole cover: a pale rim round a diamond-tread lid with two
+// lifting holes. Drawn to fill the square so a circleGeometry shows the lid.
+export const manholeTex = () =>
+  make('manhole', 64, (g, s) => {
+    const m = s / 2
+    g.fillStyle = '#6f777c'
+    g.fillRect(0, 0, s, s)
+    g.fillStyle = '#a7afb4'
+    g.beginPath(); g.arc(m, m, m, 0, Math.PI * 2); g.fill()
+    g.fillStyle = '#7f888d'
+    g.beginPath(); g.arc(m, m, m * 0.8, 0, Math.PI * 2); g.fill()
+    g.save()
+    g.beginPath(); g.arc(m, m, m * 0.8, 0, Math.PI * 2); g.clip()
+    g.strokeStyle = '#9ba4a9'
+    g.lineWidth = 2
+    for (let i = -s; i < s * 2; i += 8) {
+      g.beginPath(); g.moveTo(i, 0); g.lineTo(i + s, s); g.stroke()
+      g.beginPath(); g.moveTo(i, s); g.lineTo(i + s, 0); g.stroke()
+    }
+    g.restore()
+    g.fillStyle = '#4b5257'
+    for (const dx of [-0.42, 0.42]) {
+      g.beginPath(); g.ellipse(m + dx * m, m, 3, 2, 0, 0, Math.PI * 2); g.fill()
+    }
+  })
+
+// Gutter drain grate: a steel frame with slots running across it.
+export const drainTex = () =>
+  make('drain', 32, (g, s) => {
+    g.fillStyle = '#9aa2a7'
+    g.fillRect(0, 0, s, s)
+    g.fillStyle = '#3d4348'
+    for (let y = 4; y < s - 4; y += 6) g.fillRect(5, y, s - 10, 3)
   })
