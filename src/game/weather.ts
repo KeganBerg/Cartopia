@@ -10,22 +10,24 @@ import { SEASON, type Season } from '../scene/season'
 // Other parts of the game (sounds, visuals) read weatherNow() each frame, and
 // onThunder() fires a little after each lightning flash.
 
-export type WeatherKind = 'clear' | 'rain' | 'storm' | 'drizzle' | 'fog' | 'wind' | 'snow' | 'blizzard'
-export const WEATHER_KINDS: WeatherKind[] = ['clear', 'rain', 'storm', 'drizzle', 'fog', 'wind', 'snow', 'blizzard']
+// 'dust' only blows through the desert race venue; the town never rolls it.
+export type WeatherKind = 'clear' | 'rain' | 'storm' | 'drizzle' | 'fog' | 'wind' | 'snow' | 'blizzard' | 'dust'
+export const WEATHER_KINDS: WeatherKind[] = ['clear', 'rain', 'storm', 'drizzle', 'fog', 'wind', 'snow', 'blizzard', 'dust']
 
 // What a kind looks like at full strength. All 0..1.
 // rain/snow: how hard it falls. cloud: how overcast and dim. haze: how far you can see
-// (fog, whiteout). wind: how hard it blows.
-type Feel = { rain: number; snow: number; cloud: number; haze: number; wind: number }
+// (fog, whiteout). wind: how hard it blows. dust: blowing sand.
+type Feel = { rain: number; snow: number; cloud: number; haze: number; wind: number; dust: number }
 export const FEEL: Record<WeatherKind, Feel> = {
-  clear: { rain: 0, snow: 0, cloud: 0, haze: 0, wind: 0 },
-  rain: { rain: 0.6, snow: 0, cloud: 0.65, haze: 0.15, wind: 0.3 },
-  storm: { rain: 1, snow: 0, cloud: 1, haze: 0.25, wind: 0.7 },
-  drizzle: { rain: 0.25, snow: 0, cloud: 0.5, haze: 0.3, wind: 0.15 },
-  fog: { rain: 0, snow: 0, cloud: 0.35, haze: 0.9, wind: 0 },
-  wind: { rain: 0, snow: 0, cloud: 0.25, haze: 0.05, wind: 1 },
-  snow: { rain: 0, snow: 0.55, cloud: 0.55, haze: 0.3, wind: 0.2 },
-  blizzard: { rain: 0, snow: 1, cloud: 0.8, haze: 0.8, wind: 1 },
+  clear: { rain: 0, snow: 0, cloud: 0, haze: 0, wind: 0, dust: 0 },
+  rain: { rain: 0.6, snow: 0, cloud: 0.65, haze: 0.15, wind: 0.3, dust: 0 },
+  storm: { rain: 1, snow: 0, cloud: 1, haze: 0.25, wind: 0.7, dust: 0 },
+  drizzle: { rain: 0.25, snow: 0, cloud: 0.5, haze: 0.3, wind: 0.15, dust: 0 },
+  fog: { rain: 0, snow: 0, cloud: 0.35, haze: 0.9, wind: 0, dust: 0 },
+  wind: { rain: 0, snow: 0, cloud: 0.25, haze: 0.05, wind: 1, dust: 0 },
+  snow: { rain: 0, snow: 0.55, cloud: 0.55, haze: 0.3, wind: 0.2, dust: 0 },
+  blizzard: { rain: 0, snow: 1, cloud: 0.8, haze: 0.8, wind: 1, dust: 0 },
+  dust: { rain: 0, snow: 0, cloud: 0.3, haze: 0.6, wind: 1, dust: 1 },
 }
 
 // Odds of each kind per spell, by season. Summer fog only rolls in the morning.
@@ -100,6 +102,7 @@ function feelAt(now: number, out: Feel & { kind: WeatherKind; strength: number }
   out.cloud = f.cloud * s
   out.haze = f.haze * s
   out.wind = f.wind * s
+  out.dust = f.dust * s
   // Even a calm spell has a breath of wind, and storms gust.
   out.wind = Math.min(1, out.wind * (0.8 + 0.3 * Math.sin(now / 2300) + 0.2 * Math.sin(now / 900)))
   return out
@@ -108,7 +111,7 @@ function feelAt(now: number, out: Feel & { kind: WeatherKind; strength: number }
 // Wet ground and snow cover build up over a spell and linger after it, so they're
 // stepped through the last couple of spells.
 const STEP_MS = 5000
-const scratch = { kind: 'clear' as WeatherKind, strength: 0, rain: 0, snow: 0, cloud: 0, haze: 0, wind: 0 }
+const scratch = { kind: 'clear' as WeatherKind, strength: 0, rain: 0, snow: 0, cloud: 0, haze: 0, wind: 0, dust: 0 }
 function groundAt(now: number) {
   if (PIN) return { wet: FEEL[PIN].rain > 0 ? 1 : 0, cover: FEEL[PIN].snow > 0 ? 1 : 0 }
   let wet = 0, cover = 0
@@ -124,7 +127,7 @@ function groundAt(now: number) {
   return { wet, cover }
 }
 
-export const weather: Weather = { kind: 'clear', strength: 0, rain: 0, snow: 0, cloud: 0, haze: 0, wind: 0, wet: 0, cover: 0, flash: 0 }
+export const weather: Weather = { kind: 'clear', strength: 0, rain: 0, snow: 0, cloud: 0, haze: 0, wind: 0, dust: 0, wet: 0, cover: 0, flash: 0 }
 let lastAt = -Infinity
 let groundStamp = -1
 
@@ -150,6 +153,13 @@ export function onThunder(f: Thunder) {
   thunder.add(f)
   return () => { thunder.delete(f) }
 }
+// A repeatable 0..1 roll from a string (a live race id), the same on both racers' screens.
+export function seedRoll(seed: string) {
+  let h = 2166136261
+  for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619)
+  return hash(h)
+}
+
 export function strike(delay: number, loud: number) {
   for (const f of thunder) f(delay, loud)
 }

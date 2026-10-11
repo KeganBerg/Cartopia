@@ -1203,3 +1203,9 @@ button.book-car { font: inherit; color: inherit; }
   .deal-cost { font-size: 10px; }
   .deal-off { font-size: 11px; padding: 1px 5px; }
 }
+/* Job alerts: the one-off offer card */
+.alerts-card { position: absolute; z-index: 120; left: 50%; transform: translateX(-50%); bottom: calc(96px + var(--sab)); display: flex; align-items: center; gap: 8px; max-width: calc(100vw - 24px); background: #fff; border: 3px solid #1e5fbf; border-radius: 14px; padding: 6px 6px 6px 12px; font-weight: 800; box-shadow: 0 4px 0 rgba(0,0,0,.3); animation: pop .25s ease-out; }
+.alerts-card .buy.small { margin: 0; }
+.alerts-card .one-line { white-space: nowrap; }
+.alerts-x { width: 30px; height: 30px; flex: none; border: none; border-radius: 50%; background: #eceff1; font-weight: 800; color: #546e7a; }
+@media (max-width: 600px) { .alerts-card { bottom: calc(78px + var(--sab)); font-size: 13px; } }

@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
   PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS,
-  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, activeEvent, DAILY_BONUS, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modSlotsFor, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower, seasonNumber, seasonOf, SEASON_STARS, SEASON_TIERS, STARS_PER_TIER, SEASON_CAR_BUCKS, dealsFor, dealOffer, type DealDef, type DealKind,
+  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, activeEvent, DAILY_BONUS, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modFits, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower, seasonNumber, seasonOf, SEASON_STARS, SEASON_TIERS, STARS_PER_TIER, SEASON_CAR_BUCKS, dealsFor, dealOffer, type DealDef, type DealKind,
 } from './data'
 import { sfx } from '../lib/sound'
 import { msUntilNight } from './clock'
@@ -1247,7 +1247,7 @@ export const useGame = create<GameState>()(
         const car = s.cars.find((c) => c.uid === cuid)
         const m = modDef(modId)
         if (!car || !m) return false
-        if (!remove && !modSlotsFor(carDef(car.model).body).some((x) => x.id === m.slot)) return false
+        if (!remove && !modFits(m, carDef(car.model).body)) return false
         const others = (car.mods ?? []).filter((id) => modDef(id)?.slot !== m.slot)
         if (remove) {
           // Taken-off parts stay owned.

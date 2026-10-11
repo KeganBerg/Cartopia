@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useGame } from '../game/store'
 import { Panel, SheetTabs } from './Menus'
 import { AmbienceControl, MuteButton } from './MuteButton'
-import { notifyOn, notifySupported, setNotify } from '../lib/notify'
+import { AlertsMenu } from './Alerts'
 import { localBackup, restoreLocalBackup } from '../lib/cloud'
 import { isCleanName, NAME_REJECTED } from '../lib/names'
 
@@ -52,7 +52,7 @@ export function AccountPanel() {
       <button className="buy bank-menu-btn" onClick={() => openPanel('bank')}>🏦 Bank · get bucks</button>
       <div className="menu-sound"><span>Sound</span><MuteButton /></div>
       <AmbienceControl />
-      {notifySupported() && <NotifyToggle />}
+      <AlertsMenu />
       <h3>Town name</h3>
       <div className="row">
         <input value={name} maxLength={24} onChange={(e) => setName(e.target.value)} />
@@ -114,15 +114,3 @@ function friendlyAuthError(message: string, signUp: boolean): string {
   return message
 }
 
-// Reminders when jobs finish or fuel refills while the game is in a background tab.
-function NotifyToggle() {
-  const [on, setOn] = useState(notifyOn)
-  const denied = Notification.permission === 'denied'
-  return (
-    <div className="menu-sound">
-      <span>Job alerts{denied && <small> · blocked in browser</small>}</span>
-      <button className="goals-btn" title={on ? 'Alerts on' : 'Alerts off'} disabled={denied}
-        onClick={async () => setOn(await setNotify(!on))}>{on ? '🔔' : '🔕'}</button>
-    </div>
-  )
-}

@@ -19,6 +19,7 @@ import { BankPanel } from './ui/Bank'
 import { DealsPanel } from './ui/Deals'
 import { LevelUpSplash } from './ui/LevelUp'
 import { AccountPanel } from './ui/Account'
+import { AlertsCard } from './ui/Alerts'
 import { WelcomeBack } from './ui/WelcomeBack'
 import { GiftWatcher, GiftsPanel } from './ui/Gifts'
 import { GoalsPanel, DailyPanel, FlatPanel } from './ui/Goals'
@@ -82,6 +83,7 @@ export default function App() {
       {panel === 'deals' && <DealsPanel />}
       <VisitBanner />
       <Tutorial />
+      <AlertsCard />
       {panel === 'account' && <AccountPanel />}
       {panel === 'goals' && <GoalsPanel />}
       {panel === 'season' && <SeasonPanel />}
