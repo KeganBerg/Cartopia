@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { BackSide, Color, Object3D, type Group, type InstancedMesh, type Mesh } from 'three'
+import { BackSide, Color, Object3D, type PerspectiveCamera, type Group, type InstancedMesh, type Mesh } from 'three'
 import type { Body } from '../game/data'
 import { CarModel } from './CarModel'
 import { signTexture } from './signTexture'
@@ -10,6 +10,7 @@ import { glowMats, dayPhase, nightAmount } from './dayNight'
 import { PAL } from './season'
 import { holdPageTint } from './pageTint'
 import { useGame } from '../game/store'
+import { Skyline } from './Skyline'
 import { BUILDINGS, TILE, buildingDef } from '../game/data'
 
 export type RacerView = { dist: number }
@@ -147,7 +148,7 @@ function Lamp({ z, side }: { z: number; side: 1 | -1 }) {
         <boxGeometry args={[0.16, 0.07, 0.22]} />
         <primitive object={glowMats.bulb} attach="material" dispose={null} />
       </mesh>
-      <LightPool r={1} z={0.6} y={0.02} />
+      <LightPool r={1} z={0.6} y={0.05} />
     </group>
   )
 }
@@ -157,7 +158,7 @@ export function RaceScene({ track, me, them, mine, theirs }: Props) {
   const meRef = useRef<Group>(null)
   const themRef = useRef<Group>(null)
   const scenery = useRef<(Group | null)[]>([])
-  const { camera } = useThree()
+  const { camera, size } = useThree()
   const len = track * SCALE
   const slots = useStreet(len)
   const night = useMemo(() => nightAmount(dayPhase()), [])
@@ -171,6 +172,13 @@ export function RaceScene({ track, me, them, mine, theirs }: Props) {
   // Phone status bar and toolbar take the sky colour while racing.
   const sky = tint('#3d9bff', '#0f1730')
   useEffect(() => holdPageTint(sky), [sky])
+  // Full screen on a phone is tall and narrow: widen the view so the street still fills it.
+  useEffect(() => {
+    const cam = camera as PerspectiveCamera
+    const aspect = size.width / size.height
+    cam.fov = aspect < 1 ? Math.min(72, 55 / Math.max(aspect, 0.45) ** 0.35) : 55
+    cam.updateProjectionMatrix()
+  }, [camera, size])
 
   useFrame(() => {
     const mz = (me.current?.dist ?? 0) * SCALE
@@ -179,7 +187,9 @@ export function RaceScene({ track, me, them, mine, theirs }: Props) {
     themRef.current?.position.set(-LANE, 0, tz)
     const lead = Math.max(mz, tz)
     const target = Math.min(mz, len)
-    camera.position.lerp({ x: LANE * 0.5, y: 2.2, z: target - 4.2 } as never, 0.15)
+    // Tall phone screens get a higher, further-back chase view.
+    const tall = size.height > size.width
+    camera.position.lerp({ x: LANE * 0.5, y: tall ? 2.7 : 2.2, z: target - (tall ? 5.2 : 4.2) } as never, 0.15)
     camera.lookAt(LANE * 0.3, 0.3, Math.min(target + 3 + (lead - target) * 0.3, len + 4))
     // Only draw the stretch of street near the camera.
     const cz = camera.position.z
@@ -190,7 +200,7 @@ export function RaceScene({ track, me, them, mine, theirs }: Props) {
 
   return (
     <>
-      <fog attach="fog" args={[tint('#d9f2ff', '#1d2740'), 25, 60]} />
+      <fog attach="fog" args={[tint('#d9f2ff', '#1d2740'), 28, 105]} />
       <color attach="background" args={[tint('#3d9bff', '#0f1730')]} />
       <SkyDome tint={tint('#ffffff', '#2a3560')} />
       <hemisphereLight args={[tint('#ffffff', '#6274b8'), PAL.ground, 0.85 - night * 0.4]} />
@@ -206,35 +216,36 @@ export function RaceScene({ track, me, them, mine, theirs }: Props) {
           <meshStandardMaterial map={paverTex(0.5, (len + 50) / 2)} />
         </mesh>
       ))}
-      <mesh rotation-x={-Math.PI / 2} position={[0, 0.002, len / 2 + 5]}>
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0.01, len / 2 + 5]}>
         <planeGeometry args={[ROAD * 2, len + 50]} />
         <meshStandardMaterial map={asphalt} />
       </mesh>
       {/* Centre line dashes and edge lines. */}
       {Array.from({ length: Math.ceil((len + 30) / 2) }, (_, i) => (
-        <mesh key={i} rotation-x={-Math.PI / 2} position={[0, 0.006, i * 2 - 8]}>
+        <mesh key={i} rotation-x={-Math.PI / 2} position={[0, 0.03, i * 2 - 8]}>
           <planeGeometry args={[0.06, 1]} />
           <meshBasicMaterial color="#fafafa" />
         </mesh>
       ))}
       {[-1, 1].map((sd) => (
-        <mesh key={sd} rotation-x={-Math.PI / 2} position={[sd * (ROAD - 0.08), 0.006, len / 2 + 5]}>
+        <mesh key={sd} rotation-x={-Math.PI / 2} position={[sd * (ROAD - 0.08), 0.03, len / 2 + 5]}>
           <planeGeometry args={[0.07, len + 50]} />
           <meshBasicMaterial color="#ffd54f" />
         </mesh>
       ))}
       {/* Start grid line and chequered finish. */}
-      <mesh rotation-x={-Math.PI / 2} position={[0, 0.007, -0.6]}>
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0.04, -0.6]}>
         <planeGeometry args={[ROAD * 2, 0.15]} />
         <meshBasicMaterial color="#fafafa" />
       </mesh>
-      <mesh rotation-x={-Math.PI / 2} position={[0, 0.007, len]}>
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0.04, len]}>
         <planeGeometry args={[ROAD * 2, 0.5]} />
         <meshBasicMaterial map={signTexture('▚▚▚▚▚▚▚▚', '#ffffff', '#111111')} />
       </mesh>
       <Banner z={-0.8} text="START" bg="#2e7d32" />
       <Banner z={len} text="FINISH" bg="#c62828" />
       <Spectators len={len} />
+      <Skyline len={len} edge={ROAD + WALK + 4.2} night={night} />
       {/* Shops facing the street, with trees in the gaps and lamps on the kerb. */}
       {slots.map((sl, i) => {
         const d = buildingDef(sl.def)
@@ -258,7 +269,7 @@ export function RaceScene({ track, me, them, mine, theirs }: Props) {
       {/* Soft shadows under the racers. */}
       {[meRef, themRef].map((r, i) => (
         <group key={i} ref={r} scale={1.4}>
-          <mesh rotation-x={-Math.PI / 2} position-y={0.01}>
+          <mesh rotation-x={-Math.PI / 2} position-y={0.05}>
             <planeGeometry args={[0.9, 1.5]} />
             <meshBasicMaterial map={glowTex()} color="#000000" transparent opacity={0.35} depthWrite={false} />
           </mesh>

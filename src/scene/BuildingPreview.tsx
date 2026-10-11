@@ -6,13 +6,16 @@ import { BuildingModel } from './BuildingModel'
 import { CarModel } from './CarModel'
 import { SEASON } from './season'
 
-// Shop, showroom and garage thumbnails are baked once into strips of frames
-// (one full turn with a gentle bob) and played back as plain images. They
-// scroll with the page like any picture, so they never jitter, and cost no GPU
-// time after baking.
+// Shop, showroom and garage thumbnails are baked once into sheets of frames
+// (one full turn with a gentle bob), then played back on small 2D canvases that
+// scroll with the page like any picture, so they never jitter. Playback runs
+// every display frame and blends each pair of neighbouring frames, so the spin
+// is smooth at the screen's full refresh rate.
 export const FW = 132
 export const FH = 104
-export const FRAMES = 30
+export const FRAMES = 64
+const COLS = 8
+const SPIN_MS = 8000
 const DPR = typeof window === 'undefined' ? 1 : Math.min(window.devicePixelRatio || 1, 1.5)
 
 type Item = {
@@ -24,7 +27,7 @@ type Item = {
   model: () => ReactNode
 }
 
-const strips = new Map<string, string>()
+const strips = new Map<string, CanvasImageSource>()
 const queue: Item[] = []
 const queued = new Set<string>()
 const listeners = new Set<() => void>()
@@ -74,32 +77,54 @@ function Baker() {
     const w = Math.round(FW * DPR)
     const h = Math.round(FH * DPR)
     const strip = document.createElement('canvas')
-    strip.width = w * FRAMES
-    strip.height = h
+    strip.width = w * COLS
+    strip.height = h * Math.ceil(FRAMES / COLS)
     const ctx = strip.getContext('2d')!
     for (let f = 0; f < FRAMES; f++) {
       const turn = f / FRAMES
-      const lift = 0.25 + Math.sin(turn * Math.PI * 4) * 0.12
+      const lift = 0.25 + Math.sin(turn * Math.PI * 4) * 0.06
       g.rotation.y = turn * Math.PI * 2
       g.position.y = lift
       shadow.current?.scale.setScalar(item.shadow * (1 - lift * 0.5))
       gl.render(scene, cam)
-      // Card backdrop baked in, so the strip can be a small JPEG.
-      const bg = ctx.createRadialGradient(f * w + w / 2, h * 0.7, 0, f * w + w / 2, h * 0.7, w * 0.75)
+      // Card backdrop baked in, so the sheet can be a small JPEG.
+      const x = (f % COLS) * w
+      const y = Math.floor(f / COLS) * h
+      const bg = ctx.createRadialGradient(x + w / 2, y + h * 0.7, 0, x + w / 2, y + h * 0.7, w * 0.75)
       bg.addColorStop(0, '#ffffff')
       bg.addColorStop(0.45, '#ffffff')
       bg.addColorStop(1, '#e3f2fd')
       ctx.fillStyle = bg
-      ctx.fillRect(f * w, 0, w, h)
-      ctx.drawImage(gl.domElement, f * w, 0, w, h)
+      ctx.fillRect(x, y, w, h)
+      ctx.drawImage(gl.domElement, x, y, w, h)
     }
-    strips.set(item.key, strip.toDataURL('image/jpeg', 0.85))
-    queue.shift()
-    queued.delete(item.key)
-    notify()
-    // Hand the browser a frame before baking the next one.
-    const t = setTimeout(() => setItem(queue[0]), 16)
-    return () => clearTimeout(t)
+    let t = 0
+    let live = true
+    const next = () => {
+      queue.shift()
+      queued.delete(item.key)
+      notify()
+      // Hand the browser a frame before baking the next one.
+      if (live) t = window.setTimeout(() => setItem(queue[0]), 16)
+    }
+    // A JPEG keeps memory low; the browser decodes it again only when drawn.
+    strip.toBlob(
+      (blob) => {
+        if (!blob) return next()
+        const img = new Image()
+        img.src = URL.createObjectURL(blob)
+        img.decode().then(
+          () => (strips.set(item.key, img), next()),
+          () => next(),
+        )
+      },
+      'image/jpeg',
+      0.85,
+    )
+    return () => {
+      live = false
+      clearTimeout(t)
+    }
   }, [item, gl, scene])
 
   // A request that arrives after the queue ran dry restarts the baker.
@@ -145,12 +170,69 @@ export function preloadBuildings() {
 
 type Size = 'xs' | 'sm' | 'lg'
 
+// One animation loop draws every thumbnail that is on screen.
+const players = new Map<HTMLCanvasElement, { key: string; seen: boolean }>()
+let loop = 0
+const still = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
+
+function draw(now: number) {
+  loop = players.size ? requestAnimationFrame(draw) : 0
+  const pos = still ? 0 : ((now % SPIN_MS) / SPIN_MS) * FRAMES
+  const f = Math.floor(pos)
+  const blend = pos - f
+  for (const [canvas, p] of players) {
+    const img = p.seen && strips.get(p.key)
+    if (!img) continue
+    const ctx = canvas.getContext('2d')
+    if (!ctx) continue
+    const w = canvas.width
+    const h = canvas.height
+    const frame = (i: number, alpha: number) => {
+      i %= FRAMES
+      ctx.globalAlpha = alpha
+      ctx.drawImage(img, (i % COLS) * w, Math.floor(i / COLS) * h, w, h, 0, 0, w, h)
+    }
+    frame(f, 1)
+    if (blend > 0.02) frame(f + 1, blend)
+  }
+}
+
+let watcher: IntersectionObserver | undefined
+function watch() {
+  watcher ??= new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      const p = players.get(e.target as HTMLCanvasElement)
+      if (p) p.seen = e.isIntersecting
+    }
+  })
+  return watcher
+}
+
 function Thumb({ item, size }: { item: Item; size?: Size }) {
   useEffect(() => request(item))
-  const src = useSyncExternalStore(subscribe, () => strips.get(item.key))
+  const ref = useRef<HTMLCanvasElement>(null)
+  const key = item.key
+  useEffect(() => {
+    const canvas = ref.current
+    if (!canvas) return
+    players.set(canvas, { key, seen: typeof IntersectionObserver === 'undefined' })
+    if (typeof IntersectionObserver !== 'undefined') watch().observe(canvas)
+    if (!loop) loop = requestAnimationFrame(draw)
+    return () => {
+      players.delete(canvas)
+      watcher?.unobserve(canvas)
+    }
+  }, [key])
+  const ready = useSyncExternalStore(subscribe, () => strips.has(key))
   return (
     <div className={size ? `thumb3d ${size}` : 'thumb3d'}>
-      {src && <div className="thumb-strip" style={{ backgroundImage: `url(${src})` }} />}
+      <canvas
+        ref={ref}
+        className="thumb-strip"
+        width={Math.round(FW * DPR)}
+        height={Math.round(FH * DPR)}
+        style={{ visibility: ready ? 'visible' : 'hidden' }}
+      />
     </div>
   )
 }

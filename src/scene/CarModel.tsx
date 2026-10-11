@@ -290,17 +290,57 @@ export function CarModel({ body, color, highlight, stripe, beams, rusty }: { bod
           <meshStandardMaterial color="#cfd8dc" metalness={0.7} roughness={0.25} />
         </RoundedBox>
       ))}
-      {/* Lights. */}
+      {/* Front: headlights either side of a grille (or a low intake on sleek cars), and a number plate. */}
+      {(() => {
+        const z = s.len / 2 + 0.004
+        const roundLamps = s.round || body === 'classic' || body === 'offroad' || body === 'compact' || body === 'truck'
+        const bigGrille = body === 'muscle' || body === 'truck' || body === 'classic' || body === 'wagon'
+        const sleek = body === 'super' || body === 'wedge' || body === 'bubble'
+        return (
+          <group>
+            {[-1, 1].map((sd) => (
+              <group key={sd} position={[sd * s.wid * 0.3, lightY, z]}>
+                {roundLamps ? (
+                  <mesh><circleGeometry args={[0.045, 16]} /><meshBasicMaterial color="#fffde7" /></mesh>
+                ) : (
+                  <mesh rotation-z={sd * 0.12}><planeGeometry args={[0.14, 0.04]} /><meshBasicMaterial color="#fffde7" /></mesh>
+                )}
+              </group>
+            ))}
+            {!sleek && (
+              <RoundedBox args={[s.wid * (bigGrille ? 0.42 : 0.3), bigGrille ? 0.07 : 0.045, 0.01]} radius={0.004} smoothness={1} position={[0, lightY - 0.005, z]}>
+                <meshStandardMaterial color={bigGrille ? '#b0bec5' : '#1c1c1c'} metalness={bigGrille ? 0.7 : 0.2} roughness={0.4} />
+              </RoundedBox>
+            )}
+            {sleek && body !== 'bubble' && (
+              <mesh position={[0, s.lift + 0.12, z]}><planeGeometry args={[s.wid * 0.6, 0.035]} /><meshBasicMaterial color="#141414" /></mesh>
+            )}
+            <mesh position={[0, s.lift + 0.12, s.len / 2 + 0.035]}><planeGeometry args={[0.11, 0.04]} /><meshBasicMaterial color="#fafafa" /></mesh>
+          </group>
+        )
+      })()}
+      {/* Rear: wide tail lights and a number plate. */}
       {[-1, 1].map((sd) => (
-        <group key={sd}>
-          <mesh position={[sd * s.wid * 0.3, lightY, s.len / 2 + 0.003]}>
-            <circleGeometry args={[0.045, 14]} />
-            <meshBasicMaterial color="#fffde7" />
+        <mesh key={`t${sd}`} position={[sd * s.wid * 0.3, s.lift + (top - s.lift) * 0.68, -s.len / 2 - 0.004]} rotation-y={Math.PI}>
+          <planeGeometry args={[0.15, 0.045]} />
+          <meshBasicMaterial color="#ff1744" />
+        </mesh>
+      ))}
+      <mesh position={[0, s.lift + 0.13, -s.len / 2 - 0.035]} rotation-y={Math.PI}><planeGeometry args={[0.11, 0.045]} /><meshBasicMaterial color="#fafafa" /></mesh>
+      {/* Door seams, handles and mirrors on closed cars. */}
+      {!s.open && !s.round && [-1, 1].map((sd) => (
+        <group key={`d${sd}`}>
+          <mesh position={[sd * (s.wid / 2 + 0.003), (s.lift + 0.07 + top) / 2, s.cabinZ + s.cabinLen * 0.08]} rotation-y={sd * Math.PI / 2}>
+            <planeGeometry args={[0.008, top - s.lift - 0.11]} />
+            <meshBasicMaterial color={dark} />
           </mesh>
-          <mesh position={[sd * s.wid * 0.32, s.lift + s.body * 0.6, -s.len / 2 - 0.002]} rotation-y={Math.PI}>
-            <planeGeometry args={[0.13, 0.06]} />
-            <meshBasicMaterial color="#ff1744" />
+          <mesh position={[sd * (s.wid / 2 + 0.004), top - 0.05, s.cabinZ + s.cabinLen * 0.08 - 0.06]} rotation-y={sd * Math.PI / 2}>
+            <planeGeometry args={[0.05, 0.012]} />
+            <meshBasicMaterial color="#cfd8dc" />
           </mesh>
+          <RoundedBox args={[0.06, 0.04, 0.03]} radius={0.012} smoothness={1} position={[sd * (s.wid * 0.4 + 0.03), top + 0.05, cowl - 0.04]}>
+            {paint}
+          </RoundedBox>
         </group>
       ))}
       {/* Headlight beams on the road, visible after dark. */}
