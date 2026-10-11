@@ -1,13 +1,14 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
-  PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS, BUILDINGS,
+  PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS,
   upgradeCost, MAX_UPGRADE, RESCUE_SPOTS, RESCUE_PINS, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, type Rarity, GOALS, DAILY_BONUS, PAINTS, PAINT_COST, STRIPE_COST, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey,
 } from './data'
 import { sfx } from '../lib/sound'
 import { requestTrip } from './trips'
 
-export type PlacedBuilding = { uid: string; def: string; x: number; z: number; jobEndsAt: number | null }
+// rot: quarter turns the player chose (0 faces south). Unset means face the nearest road.
+export type PlacedBuilding = { uid: string; def: string; x: number; z: number; jobEndsAt: number | null; rot?: number }
 export type OwnedCar = { uid: string; model: string; color: string; upgrades: Record<UpgradeSlot, number>; flat?: boolean; lowFuel?: boolean; stripe?: string | null; plate?: string }
 // A rusty find waiting in Rusty's storage, and the one car in the restore bay.
 export type JunkCar = { uid: string; model: string; rarity: Rarity }
@@ -48,7 +49,7 @@ export type SaveState = {
   updatedAt: number
 }
 
-export type Mode = 'play' | 'place' | 'road' | 'bulldoze' | 'expand'
+export type Mode = 'play' | 'place' | 'move' | 'road' | 'bulldoze' | 'expand'
 export type Resource = 'coins' | 'parts' | 'fuel' | 'bucks' | 'level'
 export type Need = { res: Resource; missing: number; what?: string }
 
@@ -60,6 +61,12 @@ export type VisitedTown = { ownerId: string; townName: string; level: number; tr
 type UiState = {
   mode: Mode
   placing: string | null
+  // Quarter turns for the building being placed; null follows the nearest road.
+  placeRot: number | null
+  // The placed building picked in move mode, for dragging and rotating.
+  selected: string | null
+  // Building type just placed, so the edit bar can offer to build another.
+  again: string | null
   panel: Panel
   selectedCar: string | null
   toasts: { id: number; text: string }[]
@@ -68,20 +75,27 @@ type UiState = {
   search: Search | null
   // Building types whose bubbles pulse after a "Show me" tap.
   highlight: string[] | null
+  shopFocus: string | null // building the Shop scrolls to and points out
   // A Grand Prix mystery box waiting to be opened.
   gpPrize: { series: string; model: string; color: string } | null
   // The signed-in player's clan, shown on the Crew House.
   clanBadge: { tag: string; emblem: string; color: string } | null
+  // Level-up splash: the levels just reached and the rewards they paid.
+  levelUp: { from: number; to: number; coins: number; bucks: number } | null
 }
 
 type Actions = {
   setMode: (m: Mode, placing?: string | null) => void
   showNeed: (res: Resource, missing: number, what?: string) => void
   openPanel: (p: Panel) => void
+  openShop: (focus?: string) => void
   selectCar: (uid: string | null) => void
   toast: (text: string) => void
   tick: (now: number) => void
-  placeBuilding: (def: string, x: number, z: number) => boolean
+  placeBuilding: (def: string, x: number, z: number, rot?: number) => boolean
+  setPlaceRot: (rot: number | null) => void
+  select: (uid: string | null) => void
+  moveBuilding: (uid: string, x: number, z: number, rot?: number) => boolean
   paintRoad: (x: number, z: number) => void
   bulldoze: (x: number, z: number) => void
   tapBuilding: (uid: string) => void
@@ -105,6 +119,8 @@ type Actions = {
   buyPlot: (px: number, pz: number) => void
   gpResult: (series: string, won: boolean) => void
   closePrize: () => void
+  closeLevelUp: () => void
+  focusShop: (panel: 'shop' | 'showroom' | 'rescue' | 'race', id: string | null) => void
   startSearch: (spot: string) => void
   revealPin: (i: number) => void
   fixTruck: () => void
@@ -131,18 +147,25 @@ export function fuelCap(s: Pick<SaveState, 'level' | 'buildings'>) {
   return baseFuelCap(s.level) + gas
 }
 
-export function footprint(def: string, x: number, z: number) {
+// Lot width and depth in tiles; a quarter turn swaps them.
+export function lotSize(def: string, rot?: number): [number, number] {
   const d = buildingDef(def)
+  return (rot ?? 0) % 2 ? [d.h, d.w] : [d.w, d.h]
+}
+
+export function footprint(def: string, x: number, z: number, rot?: number) {
+  const [w, h] = lotSize(def, rot)
   const tiles: [number, number][] = []
-  for (let dx = 0; dx < d.w; dx++) for (let dz = 0; dz < d.h; dz++) tiles.push([x + dx, z + dz])
+  for (let dx = 0; dx < w; dx++) for (let dz = 0; dz < h; dz++) tiles.push([x + dx, z + dz])
   return tiles
 }
 
 // Map of tile key -> what occupies it.
-export function occupancy(s: Pick<SaveState, 'roads' | 'buildings'>) {
+// `ignore` leaves out a building that is being moved, so it doesn't block its own new spot.
+export function occupancy(s: Pick<SaveState, 'roads' | 'buildings'>, ignore?: string) {
   const occ = new Map<string, string>()
   for (const r of s.roads) occ.set(r, 'road')
-  for (const b of s.buildings) for (const [x, z] of footprint(b.def, b.x, b.z)) occ.set(key(x, z), b.uid)
+  for (const b of s.buildings) if (b.uid !== ignore) for (const [x, z] of footprint(b.def, b.x, b.z, b.rot)) occ.set(key(x, z), b.uid)
   return occ
 }
 
@@ -161,10 +184,13 @@ export function buyablePlots(land: string[]) {
   return out
 }
 
-export function canPlace(s: Pick<SaveState, 'roads' | 'buildings' | 'land'>, def: string, x: number, z: number) {
-  const occ = occupancy(s)
-  return footprint(def, x, z).every(([tx, tz]) => owns(s.land, tx, tz) && !occ.has(key(tx, tz)))
+export function canPlace(s: Pick<SaveState, 'roads' | 'buildings' | 'land'>, def: string, x: number, z: number, rot?: number, ignore?: string) {
+  const occ = occupancy(s, ignore)
+  return footprint(def, x, z, rot).every(([tx, tz]) => owns(s.land, tx, tz) && !occ.has(key(tx, tz)))
 }
+
+// Obstacles get cleared, not moved.
+export const movable = (def: string) => buildingDef(def).kind !== 'obstacle'
 
 function starterTown(): SaveState {
   const roads: string[] = []
@@ -237,10 +263,16 @@ function addXp(s: GameState, amount: number): Partial<GameState> {
   }
   if (!ups.length) return { xp }
   const fresh = { ...s, level }
-  const unlocked = BUILDINGS.filter((d) => d.unlockLevel === level).map((d) => d.name)
   setTimeout(sfx.levelUp, 250)
-  s.toast(`Level up! You're level ${level}. +1 buck${unlocked.length ? `. Unlocked: ${unlocked.join(', ')}` : ''}`)
-  return { level, xp, bucks, coins, fuel: fuelCap(fresh), fuelUpdatedAt: Date.now() }
+  // Fold into a splash that's still open, so two quick level-ups show as one.
+  const prev = s.levelUp
+  const levelUp = {
+    from: prev ? prev.from : s.level,
+    to: level,
+    coins: (prev?.coins ?? 0) + (coins - s.coins),
+    bucks: (prev?.bucks ?? 0) + (bucks - s.bucks),
+  }
+  return { level, xp, bucks, coins, fuel: fuelCap(fresh), fuelUpdatedAt: Date.now(), levelUp }
 }
 
 export const cleanPlate = (p: string) => p.toUpperCase().replace(/[^A-Z0-9 ]/g, '').trim().slice(0, 7)
@@ -270,6 +302,9 @@ export const useGame = create<GameState>()(
       ...starterTown(),
       mode: 'play',
       placing: null,
+      placeRot: null,
+      selected: null,
+      again: null,
       panel: null,
       selectedCar: null,
       toasts: [],
@@ -278,14 +313,19 @@ export const useGame = create<GameState>()(
       search: null,
       highlight: null,
       clanBadge: null,
+      shopFocus: null,
       gpPrize: null,
+      levelUp: null,
 
-      setMode: (mode, placing = null) => set({ mode, placing, panel: null }),
+      setMode: (mode, placing = null) => set((s) => ({ mode, placing, panel: null, selected: null, again: null, placeRot: placing && placing === s.placing ? s.placeRot : null })),
+      select: (selected) => set({ selected }),
+      setPlaceRot: (placeRot) => set({ placeRot }),
       showNeed: (res, missing, what) => {
         sfx.error()
-        set({ need: { res, missing: Math.max(0, Math.ceil(missing)), what }, panel: 'need', mode: 'play', placing: null })
+        set({ need: { res, missing: Math.max(0, Math.ceil(missing)), what }, panel: 'need', mode: 'play', placing: null, selected: null })
       },
-      openPanel: (panel) => set({ panel, mode: 'play', placing: null }),
+      openPanel: (panel) => set({ panel, mode: 'play', placing: null, selected: null, shopFocus: null }),
+      openShop: (focus) => set({ panel: 'shop', mode: 'play', placing: null, selected: null, shopFocus: focus ?? null }),
       selectCar: (selectedCar) => set({ selectedCar }),
       toast: (text) => {
         const id = Date.now() + Math.random()
@@ -306,10 +346,10 @@ export const useGame = create<GameState>()(
         }
       },
 
-      placeBuilding: (def, x, z) => {
+      placeBuilding: (def, x, z, rot) => {
         const s = get()
         const d = buildingDef(def)
-        if (!canPlace(s, def, x, z)) {
+        if (!canPlace(s, def, x, z, rot)) {
           sfx.error()
           return false
         }
@@ -330,9 +370,25 @@ export const useGame = create<GameState>()(
         set({
           coins: s.coins - d.price,
           bucks: s.bucks - (d.bucks ?? 0),
-          buildings: [...s.buildings, { uid: uid(), def, x, z, jobEndsAt: null }],
+          buildings: [...s.buildings, { uid: uid(), def, x, z, jobEndsAt: null, ...(rot == null ? {} : { rot }) }],
           stats: def === 'rescue' ? { ...bump(s, 'built'), rusty: 1 } : bump(s, 'built'),
           ...addXp(s, Math.max(1, Math.round(d.price / 100))),
+          updatedAt: Date.now(),
+        })
+        return true
+      },
+
+      // Free, and a running job keeps running. Leaving out rot keeps the building's
+      // current turn (or keeps it facing the nearest road if it never had one).
+      moveBuilding: (buid, x, z, rot) => {
+        const s = get()
+        const b = s.buildings.find((o) => o.uid === buid)
+        if (!b || !movable(b.def)) return false
+        const turn = rot ?? b.rot
+        if (!canPlace(s, b.def, x, z, turn, buid)) return false
+        if (b.x === x && b.z === z && b.rot === turn) return true
+        set({
+          buildings: s.buildings.map((o) => (o.uid === buid ? { ...o, x, z, ...(turn == null ? {} : { rot: turn }) } : o)),
           updatedAt: Date.now(),
         })
         return true
@@ -355,6 +411,7 @@ export const useGame = create<GameState>()(
         const b = s.buildings.find((b) => b.uid === what)!
         const d = buildingDef(b.def)
         if (d.kind === 'showroom' || d.kind === 'garage') return s.toast(`${d.name} can't be removed`)
+        if (d.parked) return s.toast('This one is coming in a future update, so it stays put')
         if (d.kind === 'obstacle') return s.toast(`Tap the ${d.name.toLowerCase()} in play mode to clear it`)
         set({
           buildings: s.buildings.filter((o) => o.uid !== what),
@@ -571,6 +628,7 @@ export const useGame = create<GameState>()(
         if (s.cars.length <= 1) return s.toast('You need at least one car')
         const car = s.cars.find((c) => c.uid === cuid)
         if (!car) return
+        if (carDef(car.model).parked) return s.toast('This car is coming in a future update, so it stays in your garage')
         const value = Math.floor(carDef(car.model).price * 0.5)
         set({ cars: s.cars.filter((c) => c.uid !== cuid), coins: s.coins + value, selectedCar: null, updatedAt: Date.now() })
       },
@@ -688,7 +746,7 @@ export const useGame = create<GameState>()(
         set({ coins: s.coins - cost, cars: s.cars.map((c) => (c.uid === cuid ? { ...c, lowFuel: false } : c)), panel: null, updatedAt: Date.now() })
       },
 
-      visit: (visiting) => set({ visiting, panel: null, mode: 'play', placing: null, selectedCar: null }),
+      visit: (visiting) => set({ visiting, panel: null, mode: 'play', placing: null, selected: null, selectedCar: null }),
 
       helpFriend: () => {
         const s = get()
@@ -759,6 +817,8 @@ export const useGame = create<GameState>()(
       },
 
       closePrize: () => set({ gpPrize: null }),
+      closeLevelUp: () => set({ levelUp: null }),
+      focusShop: (panel, shopFocus) => set({ levelUp: null, panel, shopFocus, mode: 'play', placing: null, selected: null }),
 
       buyPlot: (px, pz) => {
         const s = get()
@@ -799,7 +859,7 @@ export const useGame = create<GameState>()(
       },
 
       showMe: (defs, text) => {
-        set({ highlight: defs, panel: null, mode: 'play', placing: null })
+        set({ highlight: defs, panel: null, mode: 'play', placing: null, selected: null })
         get().toast(text)
         setTimeout(() => { if (get().highlight === defs) set({ highlight: null }) }, 6000)
       },
@@ -892,6 +952,7 @@ export const useGame = create<GameState>()(
         const s = get()
         const car = s.junkyard.find((c) => c.uid === juid)
         if (!car) return
+        if (carDef(car.model).parked) return s.toast('This car is coming in a future update. Check back soon!')
         if (s.restoring) return s.toast('The restore bay is busy. Finish that car first.')
         const cost = restoreCost(carDef(car.model))
         if (s.coins < cost) return s.showNeed('coins', cost - s.coins, `restoring the ${carDef(car.model).name}`)
@@ -937,6 +998,7 @@ export const useGame = create<GameState>()(
         const s = get()
         const car = s.junkyard.find((c) => c.uid === juid)
         if (!car) return
+        if (carDef(car.model).parked) return s.toast('This car is coming in a future update, so it stays in storage')
         const n = RARITY[car.rarity].scrapParts
         sfx.coin()
         s.toast(`Scrapped the ${carDef(car.model).name} for ${n} parts`)

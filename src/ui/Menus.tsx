@@ -1,9 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useGame, hasRusty } from '../game/store'
 import { garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, PAINTS, STRIPES, PAINT_COST, STRIPE_COST, carDef, performance, upgradeCost, type BuildingDef } from '../game/data'
 import { CarPreview } from '../scene/CarPreview'
 import { CollectAllButton } from './CollectAll'
-import { PreviewCanvas, BuildingThumb } from '../scene/BuildingPreview'
+import { rotateCurrent } from '../game/placement'
+import { preloadBuildings, BuildingThumb, CarThumb } from '../scene/BuildingPreview'
+
+// Phones and tablets: no hover, so placing takes a preview tap first.
+const TOUCH = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
 
 export function BottomBar() {
   const openPanel = useGame((s) => s.openPanel)
@@ -31,20 +35,27 @@ export function BottomBar() {
 function EditBar() {
   const mode = useGame((s) => s.mode)
   const placing = useGame((s) => s.placing)
+  const selected = useGame((s) => s.selected)
+  const again = useGame((s) => s.again)
   const setMode = useGame((s) => s.setMode)
   const openPanel = useGame((s) => s.openPanel)
   const hint =
     mode === 'expand' ? 'Tap a For Sale sign to buy the land next to your town'
     : mode === 'road' ? 'Click or drag to lay road (10 coins per tile)'
     : mode === 'bulldoze' ? 'Click or drag to remove (buildings refund half)'
-    : `Click to place ${placing ? BUILDINGS.find((b) => b.id === placing)?.name : ''}`
+    : mode === 'move' && again && selected ? 'Built! Rotate or drag it to adjust it'
+    : mode === 'move' ? (selected ? 'Drag it to move it, or Rotate to turn it' : 'Drag a building to move it, or tap one to rotate it')
+    : `${TOUCH ? 'Tap a spot to preview' : 'Click to place'} ${placing ? BUILDINGS.find((b) => b.id === placing)?.name : ''}${TOUCH ? ', tap it again to build' : ''}. Rotate turns it.`
   return (
     <div className="edit-bar">
       <div className="edit-hint">{hint}</div>
       <div className="edit-tools">
         <button className={mode === 'road' ? 'tool active' : 'tool'} onClick={() => setMode('road')}>🛣️ Road</button>
         <button className={mode === 'bulldoze' ? 'tool active' : 'tool'} onClick={() => setMode('bulldoze')}>🚜 Bulldoze</button>
+        <button className={mode === 'move' ? 'tool active' : 'tool'} onClick={() => setMode('move')}>✋ Move</button>
         <button className={mode === 'expand' ? 'tool active' : 'tool'} onClick={() => setMode('expand')}>🗺 Land</button>
+        {((mode === 'place' && placing) || (mode === 'move' && selected)) && <button className="tool" onClick={rotateCurrent} title="Rotate (R)">🔄 Rotate</button>}
+        {mode === 'move' && again && <button className="tool" onClick={() => setMode('place', again)}>➕ Build another</button>}
         <button className="tool" onClick={() => openPanel('shop')}>🏪 Shop</button>
         <button className="tool done" onClick={() => setMode('play')}>✔ Done</button>
       </div>
@@ -52,7 +63,7 @@ function EditBar() {
   )
 }
 
-export function Panel({ title, children, wide, onClose, overlay }: { title: string; children: React.ReactNode; wide?: boolean; onClose?: () => void; overlay?: React.ReactNode }) {
+export function Panel({ title, children, wide, onClose }: { title: string; children: React.ReactNode; wide?: boolean; onClose?: () => void }) {
   const openPanel = useGame((s) => s.openPanel)
   const close = (_: null) => (onClose ? onClose() : openPanel(null))
   return (
@@ -62,17 +73,28 @@ export function Panel({ title, children, wide, onClose, overlay }: { title: stri
           <h2>{title}</h2>
           <button className="close" onClick={() => close(null)}>✕</button>
         </div>
-        {overlay ? (
-          <div className="panel-wrap">
-            <div className="panel-body">{children}</div>
-            {overlay}
-          </div>
-        ) : (
-          <div className="panel-body">{children}</div>
-        )}
+        <div className="panel-body">{children}</div>
       </div>
     </div>
   )
+}
+
+// Scrolls to and flashes the card the level-up splash sent the player to.
+function useShopFocus() {
+  const focus = useGame((s) => s.shopFocus)
+  const body = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!focus) return
+    const el = body.current?.querySelector<HTMLElement>(`[data-id="${focus}"]`)
+    // Wait a frame so the panel has laid out before scrolling.
+    const raf = requestAnimationFrame(() => el?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
+    const t = setTimeout(() => useGame.setState({ shopFocus: null }), 2600)
+    return () => {
+      cancelAnimationFrame(raf)
+      clearTimeout(t)
+    }
+  }, [focus])
+  return { body, focus }
 }
 
 function price(def: { price: number; bucks?: number }) {
@@ -93,9 +115,16 @@ export function ShopPanel() {
   const setMode = useGame((s) => s.setMode)
   const buildings = useGame((s) => s.buildings)
   const showNeed = useGame((s) => s.showNeed)
+  const focus = useGame((s) => s.shopFocus)
+  const focusRef = useRef<HTMLButtonElement>(null)
   const rusty = hasRusty({ buildings })
+  useEffect(preloadBuildings, [])
+  // A "Build" hint elsewhere opened the Shop: bring that building into view.
+  useEffect(() => {
+    focusRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, [focus])
   return (
-    <Panel title="Shop" wide overlay={<PreviewCanvas />}>
+    <Panel title="Shop" wide>
       {SHOP_GROUPS.map((g) => (
         <section key={g.title}>
           <h3>{g.title}</h3>
@@ -105,10 +134,12 @@ export function ShopPanel() {
               const broke = coins < b.price
               const owned = !!b.unique && buildings.some((o) => o.def === b.id)
               const highlight = b.id === 'rescue' && !rusty
+              const focused = b.id === focus
               return (
                 <button
                   key={b.id}
-                  className={`card ${locked ? 'locked' : ''} ${broke && !locked ? 'broke' : ''} ${highlight ? 'start-here' : ''}`}
+                  ref={focused ? focusRef : undefined}
+                  className={`card ${locked ? 'locked' : ''} ${broke && !locked ? 'broke' : ''} ${highlight ? 'start-here' : ''} ${focused ? 'focus' : ''}`}
                   disabled={owned}
                   onClick={() => (locked ? showNeed('level', b.unlockLevel, b.name) : broke ? showNeed('coins', b.price - coins, b.name) : setMode('place', b.id))}
                 >
@@ -138,9 +169,9 @@ export function ShowroomPanel() {
   const level = useGame((s) => s.level)
   const buyCar = useGame((s) => s.buyCar)
   const rusty = useGame((s) => hasRusty(s))
-  const setMode = useGame((s) => s.setMode)
-  const coins = useGame((s) => s.coins)
+  const openShop = useGame((s) => s.openShop)
   const [colorFor, setColorFor] = useState<Record<string, string>>({})
+  const { body, focus } = useShopFocus()
   return (
     <Panel title="Showroom" wide>
       {!rusty && (
@@ -150,17 +181,17 @@ export function ShowroomPanel() {
             <b>Build Rusty's Rescue first</b>
             <p>Rusty tracks down and restores cars for your town. Build his shop to start getting new cars.</p>
           </div>
-          <button className="buy" disabled={coins < 1000} onClick={() => setMode('place', 'rescue')}>Build · $1,000</button>
+          <button className="buy" onClick={() => openShop('rescue')}>Build · $1,000</button>
         </div>
       )}
-      <div className={rusty ? 'cards' : 'cards dimmed'}>
+      <div ref={body} className={rusty ? 'cards' : 'cards dimmed'}>
         {CARS.filter((c) => !c.rescueOnly).map((c) => {
           const locked = level < c.unlockLevel
           const color = colorFor[c.id] ?? c.colors[0]
           const pi = performance(c, { engine: 0, turbo: 0, tires: 0, weight: 0 })
           return (
-            <div key={c.id} className={`card car-card ${locked ? 'locked' : ''}`}>
-              <CarSwatch color={color} body={c.body} />
+            <div key={c.id} data-id={c.id} className={`card car-card ${locked ? 'locked' : ''} ${focus === c.id ? 'focus' : ''}`}>
+              <CarThumb color={color} body={c.body} />
               <div className="card-name">{c.name}</div>
               <div className="card-stat">PI {pi} · {c.body}</div>
               <SkillTag model={c.id} />
@@ -188,18 +219,6 @@ export function SkillTag({ model }: { model: string }) {
   return <span className="skill-tag" title={SKILLS[sk].text}>{SKILLS[sk].icon} {SKILLS[sk].name}</span>
 }
 
-export function CarSwatch({ color, body }: { color: string; body: string }) {
-  const low = ['sports', 'super', 'wedge', 'roadster', 'coupe'].includes(body)
-  return (
-    <svg viewBox="0 0 100 50" className="car-swatch">
-      <rect x="8" y={low ? 22 : 18} width="84" height={low ? 16 : 20} rx="7" fill={color} />
-      <rect x={body === 'truck' ? 18 : 28} y={low ? 12 : 6} width={body === 'truck' ? 32 : 44} height={low ? 12 : 14} rx="5" fill="#37474f" />
-      <circle cx="26" cy="40" r="7" fill="#212121" />
-      <circle cx="74" cy="40" r="7" fill="#212121" />
-    </svg>
-  )
-}
-
 export function GaragePanel() {
   const cars = useGame((s) => s.cars)
   const selected = useGame((s) => s.selectedCar)
@@ -218,7 +237,7 @@ export function GaragePanel() {
             const d = carDef(c.model)
             return (
               <button key={c.uid} className={c.uid === car?.uid ? 'garage-item sel' : 'garage-item'} onClick={() => select(c.uid)}>
-                <CarSwatch color={c.color} body={d.body} />
+                <CarThumb size="sm" color={c.color} body={d.body} stripe={c.stripe} />
                 <span>{d.name}{c.plate && <span className="mini-plate">{c.plate}</span>}</span>
                 <small>PI {performance(d, c.upgrades)}</small>
               </button>
