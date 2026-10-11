@@ -118,8 +118,11 @@ export class Traffic {
   // People on each zebra crossing, keyed "x,z:side" (the road tile it's painted
   // on and the side facing the intersection, in walkGraph SIDES order).
   walkers: ReadonlyMap<string, number> = new Map()
+  // The business each driver works for (car uid -> building uid): it drops in there most.
+  homes: ReadonlyMap<string, string> = new Map()
   private specs = new Map<string, CarSpec>()
   private trips = new Map<string, TripKind>()
+  private visits = new Map<string, string>()
   private ways = new Map<string, { outs: number[]; to: string; heading: number }[]>()
   private limp = new Map<string, number>() // broken-down cars still looking for a spot, by odometer at breakdown
 
@@ -158,6 +161,11 @@ export class Traffic {
 
   requestTrip(uid: string, kind: TripKind) {
     this.trips.set(uid, kind)
+  }
+
+  // Drive to one business (by building uid), e.g. a driver starting its shift.
+  requestVisit(uid: string, building: string) {
+    this.visits.set(uid, building)
   }
 
   private syncCars() {
@@ -583,6 +591,11 @@ export class Traffic {
       // Can't plan a way there from here yet (mid-junction, say): try again next frame.
       if (!stop || this.startTrip(a, stop, trip)) this.trips.delete(a.uid)
     }
+    const visit = this.visits.get(a.uid)
+    if (visit && !a.parked && !a.stalled && !a.trip && !a.tow) {
+      const stop = this.net.stops.find((s) => s.uid === visit)
+      if (!stop || this.startTrip(a, stop, 'visit')) this.visits.delete(a.uid)
+    }
     if (a.tow === 1 && this.roomAhead(a, a.len / 2 + TRUCK.gap + TRUCK.len + 0.1)) a.tow = 2
     if (a.tow === 2) a.truck = Math.min(1, a.truck + dt * 2.5)
     if (a.tow === 3) {
@@ -600,7 +613,9 @@ export class Traffic {
         a.nextVisit = 25 + rand() * 45
         const busy = new Set([...this.agents.values()].map((o) => o.trip?.stop.uid))
         const free = this.net.stops.filter((s) => !busy.has(s.uid))
-        if (free.length) this.startTrip(a, free[Math.floor(rand() * free.length)], 'visit')
+        const home = free.find((s) => s.uid === this.homes.get(a.uid))
+        if (home && rand() < 0.6) this.startTrip(a, home, 'visit')
+        else if (free.length) this.startTrip(a, free[Math.floor(rand() * free.length)], 'visit')
       }
     }
     this.extend(a)

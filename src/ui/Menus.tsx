@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useGame, hasRusty } from '../game/store'
-import { garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, PAINTS, STRIPES, PAINT_COST, STRIPE_COST, carDef, performance, upgradeCost, buildingDef, upgradable, type BuildingDef } from '../game/data'
+import { garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, PAINTS, STRIPES, PAINT_COST, STRIPE_COST, carDef, performance, upgradeCost, buildingDef, upgradable, loves, type BuildingDef } from '../game/data'
 import { CarPreview } from '../scene/CarPreview'
 import { CollectAllButton } from './CollectAll'
 import { rotateCurrent } from '../game/placement'
@@ -202,6 +202,7 @@ export function ShowroomPanel() {
               <div className="card-name">{c.name}</div>
               <div className="card-stat">PI {pi} · {c.body}</div>
               <SkillTag model={c.id} />
+              <LovesTag model={c.id} />
               <div className="colors">
                 {c.colors.map((col) => (
                   <button key={col} className={col === color ? 'dot sel' : 'dot'} style={{ background: col }} onClick={() => setColorFor({ ...colorFor, [c.id]: col })} />
@@ -224,6 +225,29 @@ export function SkillTag({ model }: { model: string }) {
   const sk = carDef(model).skill
   if (!sk) return null
   return <span className="skill-tag" title={SKILLS[sk].text}>{SKILLS[sk].icon} {SKILLS[sk].name}</span>
+}
+
+// The businesses a car loves to drive for, e.g. "❤️ Pizza Place, Donut Shop".
+export function LovesTag({ model }: { model: string }) {
+  const likes = carDef(model).likes
+  if (!likes.length) return null
+  return <div className="loves-tag" title="Assign it to one of these for +25% coins per job">❤️ {likes.map((id) => buildingDef(id).name).join(', ')}</div>
+}
+
+// Where a car works, or which businesses it would love to.
+function DriverRow({ car, model }: { car: string; model: string }) {
+  const job = useGame((s) => s.buildings.find((b) => b.car === car))
+  const openUpgrade = useGame((s) => s.openUpgrade)
+  const def = carDef(model)
+  if (job) {
+    const d = buildingDef(job.def)
+    return (
+      <button className="driver-row" onClick={() => openUpgrade(job.uid)}>
+        🧑‍🔧 Drives for your <b>{d.name}</b> · {loves(def, d.id) ? '❤️ +25%' : '+10%'} coins
+      </button>
+    )
+  }
+  return <div className="driver-row idle"><LovesTag model={model} /><small>Tap a busy business to put this car to work there.</small></div>
 }
 
 export function GaragePanel() {
@@ -261,6 +285,7 @@ export function GaragePanel() {
             <h3>{def.name}{car.plate && <span className="mini-plate">{car.plate}</span>}</h3>
             <div className="pi">Performance Index <b>{performance(def, car.upgrades, car.mods)}</b></div>
             {def.skill && <div className="skill-row"><SkillTag model={car.model} /> <small>{SKILLS[def.skill].text}</small></div>}
+            <DriverRow car={car.uid} model={car.model} />
             <div className="garage-tabs" role="tablist">
               {([['tune', '🔧 Upgrades'], ['mods', '🪽 Mods'], ['paint', '🎨 Paint']] as const).map(([id, label]) => (
                 <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'sel' : ''} onClick={() => setTab(id)}>{label}</button>
