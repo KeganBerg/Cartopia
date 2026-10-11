@@ -33,6 +33,8 @@ export type BuildingDef = {
   prop?: 'donut' | 'burger' | 'cone' | 'tire' | 'pin' | 'popcorn'
   // Listed under Services in the Shop (fire and police stations).
   service?: boolean
+  // A small decoration townspeople can't stroll across (it fills its tile edge to edge).
+  solid?: boolean
   // Only open at night (the nightclub): jobs can only start after dark.
   nightOnly?: boolean
   // Stand-in for a building this build doesn't know (see buildingDef).
@@ -92,13 +94,13 @@ export const BUILDINGS: BuildingDef[] = [
   { id: 'statue', name: 'Golden Car Statue', kind: 'decor', w: 1, h: 1, price: 0, bucks: 3, unlockLevel: 5, color: '#ffd700', roof: '#9e9e9e' },
   { id: 'pond', name: 'Duck Pond', kind: 'decor', w: 2, h: 2, price: 1500, unlockLevel: 4, color: '#4fc3f7', roof: '#81c784' },
   { id: 'pine', name: 'Pine Tree', kind: 'decor', w: 1, h: 1, price: 60, unlockLevel: 1, color: '#2e7d32', roof: '#6d4c41' },
-  { id: 'hedge', name: 'Hedge', kind: 'decor', w: 1, h: 1, price: 40, unlockLevel: 1, color: '#33691e', roof: '#558b2f' },
-  { id: 'fence', name: 'Picket Fence', kind: 'decor', w: 1, h: 1, price: 30, unlockLevel: 1, color: '#fafafa', roof: '#eceff1' },
+  { id: 'hedge', name: 'Hedge', kind: 'decor', solid: true, w: 1, h: 1, price: 40, unlockLevel: 1, color: '#33691e', roof: '#558b2f' },
+  { id: 'fence', name: 'Picket Fence', kind: 'decor', solid: true, w: 1, h: 1, price: 30, unlockLevel: 1, color: '#fafafa', roof: '#eceff1' },
   { id: 'picnic', name: 'Picnic Table', kind: 'decor', w: 1, h: 1, price: 90, unlockLevel: 2, color: '#a1887f', roof: '#e53935' },
   { id: 'busstop', name: 'Bus Stop', kind: 'decor', w: 1, h: 1, price: 200, unlockLevel: 2, color: '#90caf9', roof: '#37474f' },
   { id: 'hotdog', name: 'Hot Dog Cart', kind: 'decor', w: 1, h: 1, price: 350, unlockLevel: 3, color: '#eceff1', roof: '#fdd835' },
   { id: 'flagpole', name: 'Flag Pole', kind: 'decor', w: 1, h: 1, price: 300, unlockLevel: 3, color: '#2e7d32', roof: '#eceff1' },
-  { id: 'arch', name: 'Finish Line Arch', kind: 'decor', w: 1, h: 1, price: 0, bucks: 2, unlockLevel: 4, color: '#212121', roof: '#e53935' },
+  { id: 'arch', name: 'Finish Line Arch', kind: 'decor', solid: true, w: 1, h: 1, price: 0, bucks: 2, unlockLevel: 4, color: '#212121', roof: '#e53935' },
   { id: 'playground', name: 'Playground', kind: 'decor', w: 2, h: 2, price: 1800, unlockLevel: 5, color: '#ef9a9a', roof: '#1e88e5' },
   { id: 'gazebo', name: 'Gazebo', kind: 'decor', w: 1, h: 1, price: 1200, unlockLevel: 6, color: '#fafafa', roof: '#2e7d32' },
   { id: 'clocktower', name: 'Clock Tower', kind: 'decor', w: 1, h: 1, price: 3500, unlockLevel: 8, color: '#b0796b', roof: '#37474f' },
@@ -886,6 +888,91 @@ export function paintJobCost(car: { color: string; finish?: Finish; stripe?: str
   if (job.stripe !== (car.stripe ?? null) && job.stripe) coins += STRIPE_COST
   return { coins, bucks }
 }
+
+// ---- Skins ----
+// Animated patterns that sit at depth inside a car's paint and shift as it turns
+// (drawn by src/scene/skins.ts, picked by `n`). A skin is unlocked once for the whole
+// garage and can go on any car, over any colour and finish, for free.
+// How each is unlocked: reaching a level, claiming a collection set, a season track
+// tier, gems, or only from crates. Saves keep bought and won skins in `skins`;
+// level and set unlocks are worked out from the save, so they can't be lost.
+export type SkinTier = 'rare' | 'epic' | 'legendary'
+export type SkinUnlock = { level: number } | { set: string } | { season: number } | { bucks: number } | { crate: true }
+export type SkinDef = { id: string; n: number; name: string; tier: SkinTier; blurb: string; unlock: SkinUnlock; swatch: string }
+export const SKIN_TIERS: Record<SkinTier, { name: string; color: string }> = {
+  rare: { name: 'Rare', color: '#4fc3f7' },
+  epic: { name: 'Epic', color: '#c77dff' },
+  legendary: { name: 'Legendary', color: '#ffc94d' },
+}
+export const SKINS: SkinDef[] = [
+  { id: 'hexcore', n: 1, name: 'Hexcore', tier: 'rare', blurb: 'Glowing honeycomb with a pulse', unlock: { level: 3 },
+    swatch: 'radial-gradient(circle at 50% 50%, #19e3ff 0 8%, transparent 9%), conic-gradient(from 30deg, #0b2a36, #19e3ff 10%, #0b2a36 20%, #0b2a36 50%, #19e3ff 60%, #0b2a36 70%)' },
+  { id: 'riptide', n: 7, name: 'Riptide', tier: 'rare', blurb: 'Waves rolling at three depths', unlock: { set: 'daily' },
+    swatch: 'repeating-linear-gradient(170deg, #062a4a 0 5px, #6fe7ff 6px 7px, #0a3d6b 8px 12px)' },
+  { id: 'overclock', n: 2, name: 'Overclock', tier: 'rare', blurb: 'Circuit traces with racing data', unlock: { level: 10 },
+    swatch: 'linear-gradient(90deg, transparent 45%, #39ff88 45% 55%, transparent 55%), linear-gradient(0deg, transparent 70%, #39ff88 70% 78%, transparent 78%), #0c2416' },
+  { id: 'static', n: 8, name: 'Static', tier: 'rare', blurb: 'Pixels blinking under the coat', unlock: { bucks: 15 },
+    swatch: 'conic-gradient(#ff29b3 0 25%, #101018 0 50%, #19f2ff 0 75%, #ffe633 0) 0 0 / 10px 10px' },
+  { id: 'deepspace', n: 3, name: 'Deep Space', tier: 'epic', blurb: 'Stars and nebula at every depth', unlock: { season: 10 },
+    swatch: 'radial-gradient(circle at 30% 30%, #fff 0 4%, transparent 5%), radial-gradient(circle at 70% 60%, #cde 0 3%, transparent 4%), radial-gradient(circle at 60% 30%, #7a2aa8, transparent 60%), #05061a' },
+  { id: 'faultline', n: 5, name: 'Fault Line', tier: 'epic', blurb: 'Lava glowing through cracked plates', unlock: { set: 'muscle' },
+    swatch: 'linear-gradient(120deg, #241612 40%, #ff6a00 42%, #ffd54f 44%, #241612 46%), linear-gradient(30deg, #2e1d17 60%, #ff3d00 61%, #2e1d17 63%)' },
+  { id: 'aurora', n: 6, name: 'Aurora', tier: 'epic', blurb: 'Northern lights swaying deep inside', unlock: { bucks: 30 },
+    swatch: 'linear-gradient(170deg, transparent 20%, #3dff9e 40%, transparent 55%, #b24dff 75%, transparent 90%), #051226' },
+  { id: 'prismatic', n: 4, name: 'Prismatic', tier: 'legendary', blurb: 'Holo foil that shifts as you turn', unlock: { season: 20 },
+    swatch: 'linear-gradient(135deg, #ff5f6d, #ffc371, #f9f871, #67f3a4, #4facfe, #b06ab3, #ff5f6d)' },
+  { id: 'horizon', n: 9, name: 'Event Horizon', tier: 'legendary', blurb: 'A turning spiral of fire and violet', unlock: { bucks: 60 },
+    swatch: 'radial-gradient(circle, #000 0 18%, #ff7a1a 24%, #9c3dff 38%, #12051f 60%)' },
+  { id: 'coldsnap', n: 10, name: 'Cold Snap', tier: 'legendary', blurb: 'Shattered ice in white and teal', unlock: { bucks: 50 },
+    swatch: 'linear-gradient(115deg, #d9eef0 0 28%, #0d2a33 29% 30%, #7fc3cb 31% 52%, #0d2a33 53% 54%, #3f8e99 55% 74%, #0d2a33 75% 76%, #eef8f9 77%)' },
+]
+export const skinDef = (id?: string | null) => (id ? SKINS.find((s) => s.id === id) : undefined)
+// The shader number for a car's skin, 0 for none (or one this version doesn't know).
+export const skinNumber = (id?: string | null) => skinDef(id)?.n ?? 0
+// Every skin the player can put on a car right now.
+export function ownedSkins(s: { level: number; claimedSets?: string[]; skins?: string[] }, pool = SKINS) {
+  return pool.filter((d) => {
+    const u = d.unlock
+    if (s.skins?.includes(d.id)) return true
+    if ('level' in u) return s.level >= u.level
+    if ('set' in u) return (s.claimedSets ?? []).includes(u.set)
+    return false
+  }).map((d) => d.id)
+}
+// Season track tiers (1-based) that give a skin on top of their usual prize.
+export const seasonSkin = (tier: number) => SKINS.find((d) => 'season' in d.unlock && d.unlock.season === tier)
+
+// ---- Mod skins ----
+// A second pool, for bolt-on parts: each fitted spoiler, exhaust, body kit and hood
+// can wear its own skin, separate from the body's, so effects mix and match. Unlocked
+// once for the garage like body skins; saves keep bought and won ones in `modSkins`
+// and each car's choices in `modSkin` (by slot).
+export type SkinnedSlot = 'spoiler' | 'exhaust' | 'kit' | 'hood'
+export const SKINNED_SLOTS: SkinnedSlot[] = ['spoiler', 'exhaust', 'kit', 'hood']
+export const MOD_SKINS: SkinDef[] = [
+  { id: 'ember', n: 11, name: 'Ember', tier: 'rare', blurb: 'Flames rolling back off the part', unlock: { level: 5 },
+    swatch: 'linear-gradient(0deg, #2a0700, #ff3d00 40%, #ffb300 70%, #fff3b0)' },
+  { id: 'hexplate', n: 1, name: 'Hex Plate', tier: 'rare', blurb: 'Glowing honeycomb armour', unlock: { level: 7 },
+    swatch: 'conic-gradient(from 30deg, #0b2a36, #19e3ff 10%, #0b2a36 20%, #0b2a36 50%, #19e3ff 60%, #0b2a36 70%)' },
+  { id: 'neonpulse', n: 12, name: 'Neon Pulse', tier: 'rare', blurb: 'Neon bands sweeping front to back', unlock: { set: 'tuners' },
+    swatch: 'repeating-linear-gradient(90deg, #12001f 0 6px, #ff2bd6 7px 9px, #12001f 10px 14px, #2be8ff 15px 16px)' },
+  { id: 'goldleaf', n: 14, name: 'Gold Leaf', tier: 'epic', blurb: 'Gold flakes glinting at every depth', unlock: { bucks: 20 },
+    swatch: 'radial-gradient(circle at 30% 30%, #fff8d0 0 6%, transparent 7%), radial-gradient(circle at 65% 60%, #fff 0 4%, transparent 5%), linear-gradient(135deg, #8a5a00, #ffd34d 50%, #a06a00)' },
+  { id: 'carbonprism', n: 13, name: 'Carbon Prism', tier: 'epic', blurb: 'Carbon weave over a rainbow sheen', unlock: { season: 15 },
+    swatch: 'repeating-linear-gradient(45deg, rgba(0,0,0,.75) 0 3px, transparent 3px 6px), linear-gradient(135deg, #ff5f6d, #f9f871, #67f3a4, #4facfe, #b06ab3)' },
+  { id: 'starlight', n: 3, name: 'Starlight', tier: 'epic', blurb: 'A pocket of deep space', unlock: { crate: true },
+    swatch: 'radial-gradient(circle at 30% 30%, #fff 0 4%, transparent 5%), radial-gradient(circle at 70% 60%, #cde 0 3%, transparent 4%), #05061a' },
+  { id: 'holofoil', n: 4, name: 'Holo Foil', tier: 'legendary', blurb: 'Rainbow foil that rolls as you turn', unlock: { bucks: 35 },
+    swatch: 'linear-gradient(135deg, #ff5f6d, #ffc371, #f9f871, #67f3a4, #4facfe, #b06ab3)' },
+  { id: 'rime', n: 10, name: 'Rime', tier: 'legendary', blurb: 'Shattered ice to match Cold Snap', unlock: { bucks: 40 },
+    swatch: 'linear-gradient(115deg, #d9eef0 0 28%, #0d2a33 29% 30%, #7fc3cb 31% 52%, #0d2a33 53% 54%, #3f8e99 55% 74%, #0d2a33 75% 76%, #eef8f9 77%)' },
+]
+export const modSkinDef = (id?: string | null) => (id ? MOD_SKINS.find((s) => s.id === id) : undefined)
+export const modSkinNumber = (id?: string | null) => modSkinDef(id)?.n ?? 0
+// Every mod skin the player can put on a part right now.
+export const ownedModSkins = (s: { level: number; claimedSets?: string[]; modSkins?: string[] }) =>
+  ownedSkins({ level: s.level, claimedSets: s.claimedSets, skins: s.modSkins }, MOD_SKINS)
+export const seasonModSkin = (tier: number) => MOD_SKINS.find((d) => 'season' in d.unlock && d.unlock.season === tier)
 
 // Garage power: the combined PI of a player's five best cars.
 export const POWER_CARS = 5

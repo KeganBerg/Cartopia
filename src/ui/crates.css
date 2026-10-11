@@ -1,0 +1,69 @@
+/* Crate Depot: the full-screen 3D depot with a compact picker docked at the bottom. */
+.crate-full { background: #120c1c; }
+.crate-wallet { display: flex; gap: 6px; pointer-events: none; }
+.crate-wallet span { display: flex; align-items: center; gap: 4px; padding: 2px 10px 2px 4px; background: rgba(18,12,28,.7); border: 2px solid rgba(255,255,255,.6); border-radius: 16px; font: 15px var(--display); color: #fff; }
+
+.crate-dock { position: absolute; left: 50%; bottom: calc(10px + var(--sab)); transform: translateX(-50%); width: min(520px, calc(100vw - 16px - var(--sal) - var(--sar))); display: flex; flex-direction: column; gap: 6px; }
+.crate-pick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.crate-tab { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 2px 5px; background: rgba(24,18,38,.82); border: 2px solid rgba(255,255,255,.25); border-radius: 14px; color: #fff; font: 13px var(--display); transition: transform .15s, border-color .15s, background .15s; }
+.crate-tab b { font-weight: normal; line-height: 1; }
+.crate-tab.sel { border-color: #fff; background: rgba(60,40,90,.92); transform: translateY(-3px); box-shadow: 0 4px 0 rgba(0,0,0,.35), 0 0 16px rgba(255,255,255,.18); }
+.crate-tab.locked { opacity: .62; }
+.ct-price { display: flex; align-items: center; gap: 3px; font: 12px var(--display); color: #ffe082; }
+.ct-price.gem { color: #b3e5fc; }
+
+/* A tiny crate in each tab: planks, two bands and a glow at the seams. */
+.crate-ico { position: relative; width: 34px; height: 30px; border-radius: 4px; background: repeating-linear-gradient(var(--wood) 0 6px, rgba(0,0,0,.35) 6px 7px); box-shadow: inset 0 0 0 2px rgba(0,0,0,.35), 0 0 10px var(--glow); }
+.crate-ico i { position: absolute; left: -1px; right: -1px; height: 4px; background: var(--band); border-radius: 1px; }
+.crate-ico i:nth-child(1) { top: 5px; }
+.crate-ico i:nth-child(2) { bottom: 5px; }
+.crate-ico i:nth-child(3) { left: 50%; right: auto; top: 0; bottom: 0; width: 4px; height: auto; transform: translateX(-50%); opacity: .7; }
+.crate-ico.diamond { background: linear-gradient(135deg, #b3e5fc, #4fc3f7 45%, #e1f5fe 55%, #29b6f6); }
+.crate-ico.gold { background: repeating-linear-gradient(#ffd54f 0 6px, #b8860b 6px 7px); }
+.crate-tab.sel .crate-ico { animation: crate-bob 1.4s ease-in-out infinite; }
+@keyframes crate-bob { 50% { transform: translateY(-2px) rotate(-3deg); } }
+
+.crate-odds { background: rgba(24,18,38,.82); border: 2px solid rgba(255,255,255,.25); border-radius: 14px; padding: 5px; }
+.crate-odds-row { display: flex; gap: 4px; }
+.crate-odds .odd { min-width: 0; display: flex; align-items: center; justify-content: center; gap: 3px; padding: 3px 4px; border-radius: 9px; font: 13px var(--display); color: #fff; border: none; white-space: nowrap; }
+.crate-odds .odd b { font-weight: normal; font-size: 13px; }
+.crate-odds .odd small { font-size: 10px; opacity: .8; }
+.odd.coins { background: linear-gradient(#f9a825, #c17900); }
+.odd.mod { background: linear-gradient(#9575cd, #5e35b1); }
+.odd.car { background: linear-gradient(#ff9800, #e65100); cursor: pointer; }
+.crate-cars { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin-top: 5px; max-height: 128px; overflow-y: auto; }
+.crate-car { display: flex; flex-direction: column; align-items: center; background: rgba(255,255,255,.08); border-radius: 8px; padding: 2px 3px 1px; }
+.crate-car small { font: 11px var(--display); color: #ffe0b2; }
+.crate-none { font: 13px var(--display); color: #cfd8dc; padding: 6px; }
+
+.crate-open { font: 22px var(--display); color: #fff; padding: 9px 12px; border: 3px solid #fff; border-radius: 16px; background: linear-gradient(#66bb6a, #2e7d32); box-shadow: 0 4px 0 rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; gap: 6px; }
+.crate-open.gem { background: linear-gradient(#4fc3f7, #1565c0); }
+.crate-open:disabled { filter: saturate(.6) brightness(.85); }
+.crate-open:not(:disabled):active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0,0,0,.4); }
+
+.crate-skip { position: absolute; left: 50%; bottom: calc(22px + var(--sab)); transform: translateX(-50%); font: 15px var(--display); color: rgba(255,255,255,.75); text-shadow: 0 1px 3px #000; pointer-events: none; animation: crate-pulse 1.2s ease-in-out infinite; }
+@keyframes crate-pulse { 50% { opacity: .4; } }
+
+/* The prize card under the reveal, edged in the prize's glow. */
+.crate-prize { position: absolute; left: 50%; bottom: calc(12px + var(--sab)); transform: translateX(-50%); width: min(520px, calc(100vw - 16px - var(--sal) - var(--sar))); display: grid; grid-template-columns: auto 1fr; grid-template-areas: 'icon text' 'act act'; gap: 6px 10px; align-items: center; padding: 10px 12px; background: rgba(20,14,32,.9); border: 3px solid var(--glow); border-radius: 18px; box-shadow: 0 0 24px var(--glow), 0 4px 0 rgba(0,0,0,.4); animation: prize-in .45s cubic-bezier(.2,1.4,.4,1) both; }
+.cp-icon { grid-area: icon; font-size: 34px; line-height: 1; filter: drop-shadow(0 0 8px var(--glow)); }
+.cp-text { grid-area: text; display: flex; flex-direction: column; min-width: 0; }
+.cp-text small { font: 13px var(--display); color: var(--glow); text-transform: uppercase; letter-spacing: .5px; }
+.cp-text b { font: 22px var(--display); font-weight: normal; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cp-actions { grid-area: act; display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+.cp-actions .buy.small { display: flex; align-items: center; gap: 3px; }
+.crate-prize.tier3 .cp-text b { background: linear-gradient(90deg, #fff, #ffe082, #fff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+@keyframes prize-in { from { transform: translate(-50%, 30px) scale(.9); opacity: 0; } }
+
+/* Wide screens: the picker stands on the right and the crate on the left. */
+@media (min-width: 900px) and (min-aspect-ratio: 5/4) {
+  .crate-dock { left: auto; right: calc(16px + var(--sar)); bottom: 50%; transform: translateY(50%); width: 340px; }
+  .crate-pick { grid-template-columns: repeat(2, 1fr); }
+  .crate-tab { padding: 8px 4px 7px; font-size: 15px; }
+  .crate-prize { left: auto; right: calc(16px + var(--sar)); bottom: 50%; transform: translateY(50%); width: 360px; animation-name: prize-in-side; }
+  @keyframes prize-in-side { from { transform: translate(30px, 50%) scale(.92); opacity: 0; } }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crate-tab.sel .crate-ico, .crate-skip, .crate-prize { animation: none; }
+}

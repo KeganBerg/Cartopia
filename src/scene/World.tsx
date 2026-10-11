@@ -5,17 +5,17 @@ import { useThree, type ThreeEvent } from '@react-three/fiber'
 import { Plane, Vector3 } from 'three'
 import { create } from 'zustand'
 import { useGame, canPlace, buyablePlots, lotSize, movable, type PlacedBuilding } from '../game/store'
-import { GRID, TILE, PLOT, PLOT_MIN, PLOT_MAX, START_LAND, buildingDef, buildingLevel } from '../game/data'
+import { TILE, PLOT, PLOT_MIN, PLOT_MAX, START_LAND, buildingDef, buildingLevel } from '../game/data'
 import { BuildingModel } from './BuildingModel'
 import { rotateCurrent, setGhostTurn, turnOf } from '../game/placement'
-import { mergeGroups, groupTurn, groupScale, type MergeGroup } from '../game/merge'
+import { mergeGroups, groupOf, groupTurn, groupScale, type MergeGroup } from '../game/merge'
+import { MergeScale } from './mergeScale'
 import { sfx } from '../lib/sound'
 import { Clouds } from './Clouds'
 import { DayNight } from './DayNight'
 import { PostFx } from './PostFx'
 import { SkyEnv } from './SkyEnv'
 import { townLook } from './look'
-import { PAL } from './season'
 import { SeasonFx } from './SeasonFx'
 import { glowMats } from './dayNight'
 import { LightPool } from './BuildingModel'
@@ -24,8 +24,10 @@ import { Townspeople } from './Townspeople'
 import { Batch } from './Batch'
 import { Manhole } from './BuildingDetail'
 import { GrassTufts } from './Tufts'
+import { Outskirts } from './Outskirts'
+import { RoadWear, StreetProp, PROPS } from './Roadside'
 import { toWorld, toTile, DIRS } from './grid'
-import { grassTex, paverTex, drainTex } from './textures'
+import { grassTex, paverTex, drainTex, meadowTex } from './textures'
 import { roadMat } from './weatherLook'
 import { Weather } from './Weather'
 import { layoutRoads } from './traffic/layout'
@@ -33,7 +35,9 @@ import { LAYER, decal } from './layers'
 import { Ear } from './Ear'
 import { WorldFx, PopGroup, usePops } from './WorldFx'
 
-const SIZE = GRID * TILE
+// The countryside ground: wide enough to never show its edge, an odd number of
+// 16-unit repeats so its meadow texture lines up with the plots'.
+const OUTER = 16 * 25
 // Everything a town could ever own, centred on the origin like the start lot.
 const ALL = (PLOT_MAX - PLOT_MIN + 1) * PLOT * TILE
 
@@ -161,6 +165,8 @@ function holdToMove(b: PlacedBuilding, e: ThreeEvent<PointerEvent>) {
   window.addEventListener('pointercancel', watch.up)
 }
 
+const ONE: [number, number, number] = [1, 1, 1]
+
 // `group` is set on the top-left building of a merged block: it stands in,
 // scaled up, for the whole block. The others in the block draw nothing.
 function Building({ b, roads, group }: { b: PlacedBuilding; roads: Set<string>; group?: MergeGroup }) {
@@ -186,7 +192,8 @@ function Building({ b, roads, group }: { b: PlacedBuilding; roads: Set<string>; 
         if (s.mode !== 'move') return
         e.stopPropagation()
         if (!movable(b.def)) return s.toast(`Tap the ${d.name.toLowerCase()} in play mode to clear it`)
-        if (group) return s.toast(`Split the merged ${d.name} first to move it (Merge tool)`)
+        // A merged block can be picked to turn it, but only moves once split.
+        if (group) return s.select(b.uid)
         startDrag(b, groundTile(e), e.pointerId)
       }}
       onClick={(e) => {
@@ -214,9 +221,11 @@ function Building({ b, roads, group }: { b: PlacedBuilding; roads: Set<string>; 
         </mesh>
       )}
       <group scale={[sx, sy, sz]}>
-        <PopGroup uid={b.uid}>
-          <BuildingModel def={d} level={buildingLevel(b)} />
-        </PopGroup>
+        <MergeScale.Provider value={group ? [sx, sy, sz] : ONE}>
+          <PopGroup uid={b.uid}>
+            <BuildingModel def={d} level={buildingLevel(b)} />
+          </PopGroup>
+        </MergeScale.Provider>
       </group>
     </group>
   )
@@ -400,6 +409,11 @@ function Roads() {
             {/* A lamp lighting the corner where a side road meets the street. */}
             {junction && arms.filter(Boolean).length === 3 && <StreetLamp side={SIDES[arms.indexOf(false)]} />}
             {avenue && outer && !xing.some(Boolean) && (x * 7 + z * 5) % 3 === 0 && <StreetLamp side={outer} />}
+            <RoadWear kerbs={SIDES.filter((_, i) => !arms[i])} plain={plain} alongX={!!straightX} h={((x * 73 + z * 151) % 97) / 97} />
+            {/* Sidewalk furniture on some straight stretches, on the side without a lamp. */}
+            {plain && (x * 11 + z * 13) % 4 === 0 && (
+              <StreetProp kind={PROPS[(x * 5 + z * 3) % PROPS.length]} side={straightX ? ((x + z) % 2 ? 'n' : 's') : ((x + z) % 2 ? 'w' : 'e')} at={-0.2} />
+            )}
             {(straightX || straightZ) && <Dashes alongX={straightX} />}
             {avenue && <Dashes alongX={oneWay < 2} />}
             {avenue && (mate === 0 || mate === 2) && <Median side={mate} />}
@@ -425,6 +439,7 @@ function Interaction() {
   const buildings = useGame((s) => s.buildings)
   const land = useGame((s) => s.land)
   const roadSet = useMemo(() => new Set(roads), [roads])
+  const pickedBlock = useMemo(() => (mode === 'move' && selected ? groupOf(buildings, selected) : undefined), [mode, selected, buildings])
 
   // R turns the building being placed or moved on desktop.
   useEffect(() => {
@@ -466,6 +481,7 @@ function Interaction() {
       const b = buildings.find((o) => o.uid === selected)
       const t = tileOf(e)
       const [w, h] = b ? lotSize(b.def, b.rot) : [0, 0]
+      if (pickedBlock) return
       if (b && t[0] >= b.x && t[0] < b.x + w && t[1] >= b.z && t[1] < b.z + h) startDrag(b, t, e.pointerId)
       return
     }
@@ -524,6 +540,15 @@ function Interaction() {
         </group>
       </group>
     )
+  } else if (pickedBlock) {
+    // A picked merged block: highlight its whole footprint.
+    const [cx, cz] = groupCenter(pickedBlock)
+    ghost = (
+      <mesh rotation-x={-Math.PI / 2} position={[cx, 0.05, cz]}>
+        <planeGeometry args={[pickedBlock.w * TILE, pickedBlock.h * TILE]} />
+        <meshBasicMaterial color="#ffd54f" transparent opacity={0.45} />
+      </mesh>
+    )
   } else if (mode === 'move' && selected) {
     const b = buildings.find((o) => o.uid === selected)
     if (b) {
@@ -577,7 +602,7 @@ function Interaction() {
         onClick={onClick}
       >
         <planeGeometry args={[ALL, ALL]} />
-        <meshStandardMaterial color={PAL.ground} />
+        <meshStandardMaterial map={meadowTex(ALL / 16)} />
       </mesh>
       {ghost}
       <MapControls
@@ -640,11 +665,13 @@ export function World() {
   return (
     <>
       <DayNight small={Math.min(window.innerWidth, window.innerHeight) < 700} />
-      {/* Grass beyond the buildable lot. */}
+      {/* Countryside beyond the buildable lot. Its meadow lines up with the one under
+          unbought plots (both repeat every 16 units from a half-repeat offset). */}
       <mesh rotation-x={-Math.PI / 2} position-y={LAYER.outer}>
-        <planeGeometry args={[SIZE * 8, SIZE * 8]} />
-        <meshStandardMaterial color={PAL.ground} />
+        <planeGeometry args={[OUTER, OUTER]} />
+        <meshStandardMaterial map={meadowTex(OUTER / 16)} />
       </mesh>
+      <Outskirts land={land} roads={roadsList} small={Math.min(window.innerWidth, window.innerHeight) < 700} />
       <ResponsiveZoom />
       <ExpandZoom />
       <Interaction />

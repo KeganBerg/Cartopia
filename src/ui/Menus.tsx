@@ -1,6 +1,6 @@
-import { mergeCandidates } from '../game/merge'
+import { groupOf, mergeCandidates } from '../game/merge'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useGame, hasRusty, buildPrice } from '../game/store'
+import { useGame, hasRusty, buildPrice, type OwnedCar } from '../game/store'
 import { reducedMotion } from '../game/fx'
 import { activeEvent, garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, carDef, performance, upgradeCost, buildingDef, upgradable, loves, readySets, type BuildingDef } from '../game/data'
 import { CarInspect, CarPreview, type DynoFeed } from '../scene/CarPreview'
@@ -13,7 +13,8 @@ import { ShopUpgrades } from './Upgrade'
 import { ModShop, withMod } from './Mods'
 import { CollectionBook, useFindCar } from './Collection'
 import { PaintShop, jobOf } from './Paint'
-import type { PaintJob } from '../game/data'
+import { SkinPicker } from './Skins'
+import type { PaintJob, SkinnedSlot } from '../game/data'
 import { Icon } from './Icon'
 import { useCrewGoal } from './CrewGoal'
 import { useRivalWaiting } from './Rivals'
@@ -60,6 +61,7 @@ function EditBar() {
     const b = s.selected ? s.buildings.find((o) => o.uid === s.selected) : undefined
     return !!b && upgradable(buildingDef(b.def))
   })
+  const pickedMerged = useGame((s) => !!s.selected && !!groupOf(s.buildings, s.selected))
   const canMerge = useGame((s) => (s.mode === 'merge' ? mergeCandidates(s.buildings).length > 0 || s.buildings.some((b) => b.merge) : true))
   const hint =
     mode === 'expand' ? 'Tap a For Sale sign to buy land'
@@ -67,7 +69,7 @@ function EditBar() {
     : mode === 'road' ? 'Drag to lay road · $10 a tile'
     : mode === 'bulldoze' ? 'Drag to remove · buildings refund half'
     : mode === 'move' && again && selected ? 'Built! Drag or rotate it'
-    : mode === 'move' ? (selected ? 'Drag to move, or rotate it' : 'Drag a building, or tap one to pick it')
+    : mode === 'move' ? (selected ? (pickedMerged ? 'Rotate turns the whole block. Split it to move it' : 'Drag to move, or rotate it') : 'Drag a building, or tap one to pick it')
     : `${TOUCH ? 'Tap to preview, tap again to build' : 'Click to place'} ${placing ? BUILDINGS.find((b) => b.id === placing)?.name : ''}`
   return (
     <div className="edit-bar">
@@ -347,6 +349,14 @@ function DriverRow({ car, model }: { car: string; model: string }) {
   return <div className="driver-row idle"><LovesTag model={model} /><small>Tap a busy business to put this car to work there.</small></div>
 }
 
+// A car's mod skins with one slot changed (null takes that slot's skin off).
+const withSlot = (m: OwnedCar['modSkin'], slot: SkinnedSlot, skin: string | null) => {
+  const next = { ...m }
+  if (skin) next[slot] = skin
+  else delete next[slot]
+  return next
+}
+
 type GarageTab = 'tune' | 'mods' | 'paint'
 let nextGarageTab: GarageTab = 'tune'
 // Opens the Garage on a given tab (goals use it for paint and mods).
@@ -375,7 +385,14 @@ export function GaragePanel() {
   // A paint job being tried on, cleared when another car is picked.
   const [painting, setPainting] = useState<{ car: string; job: PaintJob } | null>(null)
   const tryJob = painting && painting.car === car?.uid && tab === 'paint' ? painting.job : null
-  const look = car && def && { body: def.body, model: def.id, ...(tryJob ?? jobOf(car)), mods: withMod(car.mods, tryMod) }
+  // A skin being tried on (null: trying no skin), cleared when another car is picked.
+  const [skinning, setSkinning] = useState<{ car: string; skin: string | null } | null>(null)
+  const trySkin = skinning && skinning.car === car?.uid && tab === 'paint' ? skinning.skin : undefined
+  // A mod skin being tried on one slot's part, cleared when another car is picked.
+  const [modSkinning, setModSkinning] = useState<{ car: string; slot: SkinnedSlot; skin: string | null } | null>(null)
+  const tryModSkin = modSkinning && modSkinning.car === car?.uid && tab === 'mods' ? modSkinning : null
+  const modSkin = car && tryModSkin ? withSlot(car.modSkin, tryModSkin.slot, tryModSkin.skin) : car?.modSkin
+  const look = car && def && { body: def.body, model: def.id, ...(tryJob ?? jobOf(car)), skin: trySkin === undefined ? car.skin : trySkin, modSkin, mods: withMod(car.mods, tryMod) }
   // After an upgrade or a part goes on, the car does a dyno pull showing the old and new time.
   const pi = car && def ? performance(def, car.upgrades, car.mods) : 0
   const [dyno, setDyno] = useState<DynoRun | null>(null)
@@ -399,7 +416,7 @@ export function GaragePanel() {
             const d = carDef(c.model)
             return (
               <button key={c.uid} className={c.uid === car?.uid ? 'garage-item sel' : 'garage-item'} onClick={() => select(c.uid)}>
-                <CarThumb size="sm" color={c.color} finish={c.finish} body={d.body} model={d.id} stripe={c.stripe} mods={c.mods} />
+                <CarThumb size="sm" color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} body={d.body} model={d.id} stripe={c.stripe} mods={c.mods} />
                 <span>{d.name}{c.plate && <span className="mini-plate">{c.plate}</span>}</span>
                 <small>PI {performance(d, c.upgrades, c.mods)}</small>
               </button>
@@ -418,7 +435,7 @@ export function GaragePanel() {
                 <CarPreview {...look!} onExpand={() => setInspect(true)} dyno={dyno ? feed : null}>
                   {dyno && <DynoOverlay key={dyno.id} run={dyno} feed={feed} onDone={() => setDyno(null)} />}
                 </CarPreview>
-                {tab === 'paint' && <div className="paint-sweep" key={`${look!.color}|${look!.finish}|${look!.stripe}`} aria-hidden />}
+                {tab === 'paint' && <div className="paint-sweep" key={`${look!.color}|${look!.finish}|${look!.stripe}|${look!.skin ?? ''}`} aria-hidden />}
               </div>
             )}
             <h3>{def.name}{car.plate && <span className="mini-plate">{car.plate}</span>}</h3>
@@ -430,7 +447,7 @@ export function GaragePanel() {
                 <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'sel' : ''} onClick={() => setTab(id)}>{label}</button>
               ))}
             </div>
-            {tab === 'mods' && <ModShop car={car} trying={tryMod} setTrying={(id) => setTrying(id ? { car: car.uid, mod: id } : null)} />}
+            {tab === 'mods' && <ModShop car={car} trying={tryMod} setTrying={(id) => setTrying(id ? { car: car.uid, mod: id } : null)} skinTry={tryModSkin} setSkinTry={(t) => setModSkinning(t ? { car: car.uid, ...t } : null)} />}
             {tab === 'tune' && UPGRADE_SLOTS.map((u) => {
               const lvl = car.upgrades[u.id]
               const cost = upgradeCost(def, lvl)
@@ -446,6 +463,7 @@ export function GaragePanel() {
                 </div>
               )
             })}
+            {tab === 'paint' && <SkinPicker car={car} trying={trySkin} setTrying={(skin) => setSkinning(skin === undefined ? null : { car: car.uid, skin })} />}
             {tab === 'paint' && <PaintShop car={car} job={tryJob ?? jobOf(car)} setJob={(job) => setPainting(job ? { car: car.uid, job } : null)} />}
             <button className="sell" onClick={() => sell(car.uid)}>Sell for ${Math.floor(def.price * 0.5).toLocaleString()}</button>
           </div>

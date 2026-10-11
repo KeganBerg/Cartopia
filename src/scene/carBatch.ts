@@ -8,7 +8,8 @@ import { bakedMaterial } from './bake'
 //   shadow and the rest, and every car shares one material (carBody);
 // - every wheel in town is an instance of one shared mesh per rim finish (wheelPool).
 
-export const carBody = { plain: bakedMaterial(), picked: bakedMaterial(true) }
+// Skins ride on a per-vertex number in the same material, so a skinned car costs no extra draw.
+export const carBody = { plain: bakedMaterial(false, null, true), picked: bakedMaterial(true, null, true) }
 
 // Every town wheel is an instance of a unit wheel (radius 1, width 1), scaled to size per instance.
 const CAP = 200

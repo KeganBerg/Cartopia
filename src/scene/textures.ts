@@ -261,6 +261,16 @@ export const skyTex = (rx = 1) =>
     }
   }), 'sky', rx, 1)
 
+// Chequered flag: black and white squares, two rows high.
+export const checkerTex = (rx = 1) =>
+  rep(make('checker', 64, (g, s) => {
+    g.fillStyle = '#ffffff'
+    g.fillRect(0, 0, s, s)
+    g.fillStyle = '#111111'
+    const q = s / 4
+    for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) if ((x + y) % 2) g.fillRect(x * q, y * q, q, q)
+  }), 'checker', rx, 1)
+
 // Roll-up garage door: ribbed slats with a handle bar.
 export const shutterTex = () =>
   make('shutter', 64, (g, s) => {
@@ -568,3 +578,95 @@ export const corrugatedTex = (rx = 1, ry = rx, across = false) =>
     }
     g.globalAlpha = 1
   }), across ? 'corrugated-x' : 'corrugated', rx, ry)
+
+// Wild meadow for unbought land and the countryside: the season's rougher,
+// darker grass with long tangled blades, clumps and bare earth showing through.
+// One image spans eight tiles; blobs wrap so the seams vanish.
+export const meadowTex = (rx = 1, ry = rx) =>
+  rep(make(`meadow|${SEASON}`, 256, (g, s, r) => {
+    g.fillStyle = PAL.ground
+    g.fillRect(0, 0, s, s)
+    const wrapped = (x: number, y: number, draw: (x: number, y: number) => void) => {
+      for (const ox of [-s, 0, s]) for (const oy of [-s, 0, s]) draw(x + ox, y + oy)
+    }
+    const shades = [-0.09, 0.07, -0.05, 0.09, -0.12].map((l) => `#${new Color(PAL.ground).offsetHSL(0.01 * (r() - 0.5), 0, l).getHexString()}`)
+    for (let i = 0; i < 26; i++) {
+      const x = r() * s, y = r() * s, rad = 14 + r() * 46, squash = 0.5 + r() * 0.5, turn = r() * 3
+      g.globalAlpha = 0.45
+      g.fillStyle = shades[i % shades.length]
+      wrapped(x, y, (cx, cy) => { g.beginPath(); g.ellipse(cx, cy, rad, rad * squash, turn, 0, Math.PI * 2); g.fill() })
+    }
+    // Bare earth (or ice under the snow) in a few worn spots.
+    g.globalAlpha = 0.35
+    g.fillStyle = SEASON === 'winter' ? '#c9d6e0' : '#8a7a52'
+    for (let i = 0; i < 5; i++) {
+      const x = r() * s, y = r() * s, rad = 5 + r() * 9
+      wrapped(x, y, (cx, cy) => { g.beginPath(); g.ellipse(cx, cy, rad, rad * 0.7, r() * 3, 0, Math.PI * 2); g.fill() })
+    }
+    g.globalAlpha = 1
+    const blades = [...PAL.grassSpeckle, `#${new Color(PAL.ground).offsetHSL(0, 0, -0.14).getHexString()}`]
+    speckle(g, s, r, blades, 1800, 3)
+    g.lineWidth = 1.2
+    for (let i = 0; i < 2600; i++) {
+      const x = r() * s, y = r() * s, len = 4 + r() * 7, lean = (r() - 0.5) * 5
+      g.strokeStyle = blades[Math.floor(r() * blades.length)]
+      g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + lean * 0.3, y - len * 0.6, x + lean, y - len); g.stroke()
+    }
+    speckle(g, s, r, PAL.grassDots, PAL.dots * 3, 2)
+  }), `meadow|${SEASON}`, rx, ry)
+
+// Road wear, four cells side by side, each drawn on transparent: hairline
+// cracks, a darker tar patch with sealed seams, an oil stain, and grime that
+// collects along the kerb. Lay them as decals over the asphalt.
+export const roadWearTex = () =>
+  make('roadwear', 256, (g, s, r) => {
+    g.clearRect(0, 0, s, s)
+    const c = s / 4
+    // Cracks: branching dark lines.
+    g.strokeStyle = 'rgba(45,48,52,0.85)'
+    g.lineCap = 'round'
+    const crack = (x: number, y: number, a: number, len: number, w: number, depth: number) => {
+      let px = x, py = y
+      for (let i = 0; i < len; i++) {
+        a += (r() - 0.5) * 0.9
+        const nx = px + Math.cos(a) * 4, ny = py + Math.sin(a) * 4
+        g.lineWidth = w * (1 - i / len) + 0.5
+        g.beginPath(); g.moveTo(px, py); g.lineTo(nx, ny); g.stroke()
+        if (depth > 0 && r() < 0.18) crack(nx, ny, a + (r() < 0.5 ? 1 : -1) * (0.6 + r() * 0.6), len * 0.45, w * 0.6, depth - 1)
+        px = Math.min(c - 4, Math.max(4, nx)); py = Math.min(s - 4, Math.max(4, ny))
+      }
+    }
+    for (let k = 0; k < 3; k++) crack(c / 2 + (r() - 0.5) * 20, 10 + k * 80, Math.PI / 2 + (r() - 0.5) * 0.6, 18, 2.2, 2)
+    // Patch: a darker, smoother rectangle with a black sealed edge.
+    g.fillStyle = 'rgba(70,74,80,0.3)'
+    g.fillRect(c + 10, 30, c - 20, s - 60)
+    for (let i = 0; i < 300; i++) {
+      g.fillStyle = r() < 0.5 ? 'rgba(60,63,68,0.35)' : 'rgba(120,124,130,0.3)'
+      g.fillRect(c + 10 + r() * (c - 22), 30 + r() * (s - 62), 2, 2)
+    }
+    g.strokeStyle = 'rgba(30,32,35,0.55)'
+    g.lineWidth = 2
+    g.strokeRect(c + 10, 30, c - 20, s - 60)
+    // Oil stain: soft dark blob with a faint rainbow-free sheen ring.
+    const grad = g.createRadialGradient(c * 2.5, s / 2, 2, c * 2.5, s / 2, c * 0.45)
+    grad.addColorStop(0, 'rgba(25,25,28,0.7)')
+    grad.addColorStop(0.6, 'rgba(35,35,40,0.35)')
+    grad.addColorStop(1, 'rgba(40,40,45,0)')
+    g.fillStyle = grad
+    g.beginPath(); g.ellipse(c * 2.5, s / 2, c * 0.45, c * 0.8, 0, 0, Math.PI * 2); g.fill()
+    for (let i = 0; i < 6; i++) {
+      g.fillStyle = 'rgba(25,25,28,0.45)'
+      g.beginPath(); g.arc(c * 2.5 + (r() - 0.5) * c * 0.7, s / 2 + (r() - 0.5) * c * 1.4, 2 + r() * 5, 0, Math.PI * 2); g.fill()
+    }
+    // Kerb grime: dark at the kerb (left edge of the cell), fading towards the lane.
+    const k = g.createLinearGradient(c * 3, 0, c * 4, 0)
+    k.addColorStop(0, 'rgba(60,58,52,0.75)')
+    k.addColorStop(0.35, 'rgba(70,68,62,0.3)')
+    k.addColorStop(1, 'rgba(80,80,80,0)')
+    g.fillStyle = k
+    g.fillRect(c * 3, 0, c, s)
+    for (let i = 0; i < 120; i++) {
+      g.fillStyle = `rgba(${r() < 0.5 ? '90,80,60' : '50,50,50'},${0.3 + r() * 0.4})`
+      g.fillRect(c * 3 + r() * r() * c * 0.6, r() * s, 1.5 + r() * 2, 1.5 + r() * 2)
+    }
+  })

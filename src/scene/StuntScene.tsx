@@ -341,7 +341,7 @@ export function StuntScene({ me, input, running, onHud, onEnd }: {
       <group ref={car} position={[START_X, 0, 0]}>
         <CarShadow len={LEN} wid={f.wid * sc} />
         <group scale={sc}>
-          <CarModel body={me.body} model={me.model} color={me.color} finish={me.finish} mods={me.mods} beams={view.beams} flames />
+          <CarModel body={me.body} model={me.model} color={me.color} finish={me.finish} skin={me.skin} modSkin={me.modSkin} mods={me.mods} beams={view.beams} flames />
         </group>
       </group>
     </>

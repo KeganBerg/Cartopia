@@ -69,6 +69,7 @@ function MergeBadges() {
   const buildings = useGame((s) => s.buildings)
   const merge = useGame((s) => s.mergeBlock)
   const split = useGame((s) => s.splitBlock)
+  const rotate = useGame((s) => s.rotateBlock)
   const { merges, candidates } = useMemo(() => {
     const merges = mergeGroups(buildings)
     return { merges, candidates: mergeCandidates(buildings, merges) }
@@ -89,7 +90,10 @@ function MergeBadges() {
       ))}
       {[...merges.groups.values()].map((g) => (
         <div key={`s:${g.anchor.uid}`} className="anchor" ref={pin(`s:${g.anchor.uid}`, g, 0.6 * lift(g))}>
-          <button className="badge badge-split" onClick={() => split(g.anchor.uid)} title="Split it back up">✂️ Split</button>
+          <span className="merge-tools">
+            <button className="badge badge-split" onClick={() => rotate(g.anchor.uid)} title="Turn it">🔄</button>
+            <button className="badge badge-split" onClick={() => split(g.anchor.uid)} title="Split it back up">✂️ Split</button>
+          </span>
         </div>
       ))}
     </>
@@ -107,6 +111,21 @@ function CrewBadge({ b }: { b: PlacedBuilding }) {
       <button className="badge badge-crew" style={clan ? { background: clan.color } : undefined} onClick={() => tap(b.uid)} title="Crew House">
         {clan ? `${clan.emblem} ${clan.tag}` : '🛡️ Find a crew'}
       </button>
+    </div>
+  )
+}
+
+// The arcade games live in the Pixel Palace: a joystick over each one you own opens them.
+// A merged block gets one, over its middle, like its job badge.
+function ArcadeBadge({ b, g }: { b: PlacedBuilding; g?: MergeGroup }) {
+  const open = useGame((s) => s.openPanel)
+  const k = g ? lift(g) : 1
+  const [cx, cz] = g ? groupCenter(g) : centerOf(b.def, b.x, b.z, b.rot)
+  const id = `arc:${b.uid}`
+  anchors.set(id, new Vector3(cx, (3.3 + levelLift(buildingLevel(b))) * k, cz))
+  return (
+    <div className="anchor" ref={anchorRef(id)}>
+      <button className="badge badge-arcade" onClick={() => open('arcade')} title="Arcade games" aria-label="Arcade games">🕹️</button>
     </div>
   )
 }
@@ -181,6 +200,9 @@ export function Badges() {
         const g = merges.groups.get(b.uid)
         return <JobBadge key={b.uid} b={b} now={now} g={g} members={g ? buildings.filter((o) => merges.owner.get(o.uid) === b.uid) : undefined} />
       })}
+      {buildings.filter((b) => b.def === 'arcade' && (!merges.owner.has(b.uid) || merges.groups.has(b.uid))).map((b) => (
+        <ArcadeBadge key={`arc:${b.uid}`} b={b} g={merges.groups.get(b.uid)} />
+      ))}
       {buildings.filter((b) => b.def === 'rescue').map((b) => (
         <RescueBadge key={b.uid} b={b} now={now} />
       ))}

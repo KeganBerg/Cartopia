@@ -8,7 +8,7 @@ import { sfx } from '../lib/sound'
 // Pieces every arcade game screen shares: fuel, the 3-2-1, and the result card.
 
 export const pi = (c: OwnedCar) => performance(carDef(c.model), c.upgrades, c.mods)
-export const look = (c: OwnedCar): ChaseCar => ({ body: carDef(c.model).body, model: c.model, color: c.color, finish: c.finish, mods: c.mods })
+export const look = (c: OwnedCar): ChaseCar => ({ body: carDef(c.model).body, model: c.model, color: c.color, finish: c.finish, skin: c.skin, modSkin: c.modSkin, mods: c.mods })
 
 // Every run costs a little fuel, like a race.
 export function payFuel(what: string) {

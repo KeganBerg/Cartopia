@@ -2,6 +2,7 @@ import { TILE, levelLift, type BuildingDef } from '../game/data'
 import { useGame } from '../game/store'
 import { signTexture } from './signTexture'
 import { CarModel } from './CarModel'
+import { Upright } from './mergeScale'
 import { ObstacleDetail, BenchDetail, BillboardDetail, DriveInDetail, FlowerDetail, FountainDetail, GarageDetail, HouseDetail, LampDetail, PondDetail, ShopDetail, SpeedwayDetail, StatueDetail, TreeDetail } from './BuildingDetail'
 import { NEW_MODELS, NewBuildingModel } from './NewBuildings'
 import { HouseLevels } from './HouseLevels'
@@ -116,6 +117,10 @@ export function LightPool({ r, x = 0, z = 0, y = 0.075 }: { r: number; x?: numbe
   )
 }
 
+// Clan-colored parts stay out of the Batch merge: the color can arrive after
+// the town is merged, and a merged copy would keep the old one.
+const LIVE = { noBatch: true }
+
 // The Crew House flies a flag in the player's clan color.
 function CrewFlag({ x, z }: { x: number; z: number }) {
   const color = useGame((s) => s.clanBadge?.color ?? '#ff7043')
@@ -123,7 +128,7 @@ function CrewFlag({ x, z }: { x: number; z: number }) {
     <group position={[x, 0, z]}>
       <mesh position={[0, 0.8, 0]} castShadow><cylinderGeometry args={[0.025, 0.03, 1.6, 8]} /><meshStandardMaterial color="#cfd8dc" metalness={0.6} roughness={0.4} /></mesh>
       <mesh position={[0, 1.62, 0]}><sphereGeometry args={[0.05, 8, 8]} /><meshStandardMaterial color="#ffd54f" /></mesh>
-      <mesh position={[0.24, 1.38, 0]} castShadow><boxGeometry args={[0.46, 0.3, 0.02]} /><meshStandardMaterial color={color} /></mesh>
+      <mesh position={[0.24, 1.38, 0]} castShadow userData={LIVE}><boxGeometry args={[0.46, 0.3, 0.02]} /><meshStandardMaterial color={color} /></mesh>
       <mesh position={[0.24, 1.38, 0.012]}><circleGeometry args={[0.08, 16]} /><meshStandardMaterial color="#fffde7" /></mesh>
     </group>
   )
@@ -164,7 +169,7 @@ function CrewHouse({ m, ghost, sign, bulb, win }: { m: ReturnType<typeof useMat>
           {m('#90a4ae')}
         </mesh>
       ))}
-      <mesh position={[hx, 0.44, len / 2 - 0.08]}>
+      <mesh userData={LIVE} position={[hx, 0.44, len / 2 - 0.08]}>
         <planeGeometry args={[0.95, 0.09]} />
         <meshStandardMaterial color={ghost ? '#66bb6a' : clan} />
       </mesh>
@@ -176,7 +181,7 @@ function CrewHouse({ m, ghost, sign, bulb, win }: { m: ReturnType<typeof useMat>
         </mesh>
       ))}
       {/* Clan banner hanging down the arch. */}
-      <mesh position={[hx, 0.86, len / 2 - 0.08]}>
+      <mesh userData={LIVE} position={[hx, 0.86, len / 2 - 0.08]}>
         <planeGeometry args={[0.36, 0.22]} />
         <meshStandardMaterial color={ghost ? '#66bb6a' : clan} />
       </mesh>
@@ -207,7 +212,7 @@ function CrewHouse({ m, ghost, sign, bulb, win }: { m: ReturnType<typeof useMat>
       {sign && (
         <group position={[hx, 1.22, len / 2 - 0.15]}>
           {[-0.5, 0.5].map((x) => <mesh key={x} position={[x, -0.18, -0.02]}><boxGeometry args={[0.04, 0.36, 0.04]} />{m('#37474f')}</mesh>)}
-          <mesh position={[0, 0, -0.03]}><boxGeometry args={[1.28, 0.36, 0.05]} /><meshStandardMaterial color={ghost ? '#66bb6a' : clan} /></mesh>
+          <mesh userData={LIVE} position={[0, 0, -0.03]}><boxGeometry args={[1.28, 0.36, 0.05]} /><meshStandardMaterial color={ghost ? '#66bb6a' : clan} /></mesh>
           <Sign text="CREW HOUSE" w={1.2} y={0} z={0} bg="#263238" fg="#ffffff" />
         </group>
       )}
@@ -257,7 +262,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
       </group>
     )
 
-  if (NEW_MODELS.has(def.id)) return <NewBuildingModel def={def} ghost={ghost} m={m} win={win} bulb={bulb} level={lvl} />
+  if (NEW_MODELS.has(def.id)) return <NewBuildingModel def={def} ghost={ghost} valid={valid} m={m} win={win} bulb={bulb} level={lvl} />
 
   switch (def.id) {
     case 'bush':
@@ -462,8 +467,12 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
       return (
         <group>
           <mesh position={[0, 0.35, 0]} castShadow><boxGeometry args={[1, 0.7, 1]} />{m(def.roof)}</mesh>
-          <group position={[0, 0.7, 0]} rotation-y={0.6} scale={1.2}>
-            {ghost ? <mesh position-y={0.25}><boxGeometry args={[0.7, 0.4, 1.2]} />{m(def.color)}</mesh> : <CarModel body="super" color={def.color} />}
+          <group position={[0, 0.7, 0]}>
+            <Upright>
+              <group rotation-y={0.6} scale={1.2}>
+                {ghost ? <mesh position-y={0.25}><boxGeometry args={[0.7, 0.4, 1.2]} />{m(def.color)}</mesh> : <CarModel body="super" color={def.color} />}
+              </group>
+            </Upright>
           </group>
           {!ghost && <StatueDetail stone={def.roof} />}
         </group>
@@ -875,13 +884,6 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
           ) : (
             <DriveInDetail />
           )}
-          {/* Speaker posts in the lot and a projector beam on the screen. */}
-          {!ghost && [[-0.9, -0.2], [0, -0.2], [0.9, -0.2], [-0.9, 0.9], [0, 0.9]].map(([x, z], i) => (
-            <group key={i} position={[x, 0, z]}>
-              <mesh position={[0, 0.25, 0]}><cylinderGeometry args={[0.025, 0.025, 0.5, 6]} />{m('#78909c')}</mesh>
-              <mesh position={[0, 0.5, 0]}><boxGeometry args={[0.12, 0.08, 0.06]} />{m('#37474f')}</mesh>
-            </group>
-          ))}
           {/* The film: one shared animated texture, kept out of Batch by its live material. */}
           {!ghost && (
             <mesh position={[0, 1.4 + sl, -1.42]}>

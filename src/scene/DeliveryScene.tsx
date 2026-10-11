@@ -295,7 +295,7 @@ export function DeliveryScene({ me, input, running, onHud, onEnd }: {
       <group ref={car} position={[start.x, 0, start.z]} rotation-y={start.h}>
         <CarShadow len={LEN} wid={f.wid * sc} />
         <group scale={sc}>
-          <CarModel body={me.body} model={me.model} color={me.color} finish={me.finish} mods={me.mods} beams={view.beams} />
+          <CarModel body={me.body} model={me.model} color={me.color} finish={me.finish} skin={me.skin} modSkin={me.modSkin} mods={me.mods} beams={view.beams} />
         </group>
         {/* The pizza box on the roof while there's an order on board. */}
         <group ref={box} position={[0, f.deck * sc + 0.06, -0.1]} visible={false}>
