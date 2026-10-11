@@ -11,7 +11,9 @@ import { HouseLevels } from './HouseLevels'
 import { TRAILER_JUNK, TrailerJunkModel } from './TrailerJunkyard'
 import { PARK_STYLES, ParkStyleModel } from './ParkStyles'
 import { RustysYard } from './RustysYard'
+import { glassMat } from './OfficeBuildings'
 import { GROWTH_MODELS, GrowthModel } from './GrowthTowers'
+import { growthStage } from '../game/growth'
 import type { Texture } from 'three'
 import { glowMats } from './dayNight'
 import { tickMovie } from './movie'
@@ -110,6 +112,155 @@ function RoofProp({ prop, y }: { prop: NonNullable<BuildingDef['prop']>; y: numb
     case 'popcorn':
       return null
   }
+}
+
+// The grown Speedway: a roof canopy over the stands and a big screen in the gap
+// (level 4), then a full ring roof with VIP suites and light pylons (level 7).
+function SpeedwayGrown({ m, sh, roof, lvl, ghost }: { m: ReturnType<typeof useMat>; sh: number; roof: string; lvl: number; ghost?: boolean }) {
+  const full = growthStage(lvl) === 3
+  const a0 = full ? 0 : Math.PI * 0.15
+  const arc = full ? Math.PI * 2 : Math.PI * 1.1
+  const y = sh + (full ? 0.75 : 0.45)
+  const posts = full ? 16 : 9
+  const gap = Math.PI * 1.7
+  return (
+    <group>
+      {/* Canopy: a sloped ring on slim posts round the back of the stands. */}
+      <mesh position={[0, y, 0]} castShadow>
+        <cylinderGeometry args={[1.45, 2.1, 0.22, 48, 1, true, a0, arc]} />
+        <meshStandardMaterial color="#eceff1" side={2} />
+      </mesh>
+      <mesh position={[0, y + 0.115, 0]}>
+        <cylinderGeometry args={[2.11, 2.11, 0.04, 48, 1, true, a0, arc]} />
+        <meshStandardMaterial color={lvl >= 10 ? GOLD : roof} metalness={lvl >= 10 ? 0.5 : 0} side={2} />
+      </mesh>
+      {Array.from({ length: posts }, (_, i) => {
+        const a = a0 + (arc * (i + (full ? 0 : 0.5))) / posts
+        // A full ring hangs from the back posts only, so the view into the bowl stays open.
+        if (full && Math.sin(a) + Math.cos(a) > 0.2) return null
+        return (
+          <mesh key={i} position={[Math.sin(a) * 2.08, y / 2, Math.cos(a) * 2.08]} castShadow>
+            <boxGeometry args={[0.05, y, 0.05]} />
+            {m('#b0bec5')}
+          </mesh>
+        )
+      })}
+      {full && (
+        <group>
+          {/* VIP suites: a glass band under the roof, all the way round. */}
+          <mesh position={[0, sh + 0.42, 0]}>
+            <cylinderGeometry args={[1.98, 1.98, 0.32, 48, 1, true]} />
+            {ghost ? m('#90caf9') : <primitive object={glassMat('#90caf9')} attach="material" dispose={null} />}
+          </mesh>
+          {!ghost && [0.25, 0.75, 1.25, 1.75].map((t) => {
+            const a = Math.PI * t
+            return (
+              <group key={t} position={[Math.sin(a) * 2.3, 0, Math.cos(a) * 2.3]}>
+                <mesh position={[0, (y + 1.4) / 2, 0]} castShadow><cylinderGeometry args={[0.04, 0.07, y + 1.4, 6]} />{m('#90a4ae')}</mesh>
+                <mesh position={[0, y + 1.45, 0]} rotation-y={a + Math.PI}><boxGeometry args={[0.5, 0.26, 0.06]} /><primitive object={glowMats.bulb} attach="material" dispose={null} /></mesh>
+              </group>
+            )
+          })}
+          {!ghost && <Lights from={[-1.4, y + 0.16, 1.45]} to={[1.4, y + 0.16, 1.45]} n={14} />}
+        </group>
+      )}
+      {/* The big screen, on two legs in the gap of the stands (over the roof when it's a full ring). */}
+      {!ghost && (
+        <group position={[Math.sin(gap) * 1.55, 0, Math.cos(gap) * 1.55]} rotation-y={gap + Math.PI}>
+          {[-0.4, 0.4].map((x) => <mesh key={x} position={[x, (full ? y + 0.6 : 0.9) / 2, 0]} castShadow><boxGeometry args={[0.06, full ? y + 0.6 : 0.9, 0.06]} />{m('#455a64')}</mesh>)}
+          <mesh position={[0, full ? y + 0.9 : 1.2, 0]} castShadow><boxGeometry args={[1.0, 0.6, 0.08]} />{m('#263238')}</mesh>
+          <mesh position={[0, full ? y + 0.9 : 1.2, 0.045]}><planeGeometry args={[0.92, 0.52]} /><primitive object={glowMats.screen} attach="material" dispose={null} /></mesh>
+        </group>
+      )}
+    </group>
+  )
+}
+
+// A lattice tower: four legs with cross bracing every `step`.
+function Truss({ m, at, h, w = 0.3, c = '#90a4ae' }: { m: ReturnType<typeof useMat>; at: [number, number, number]; h: number; w?: number; c?: string }) {
+  const n = Math.max(1, Math.floor(h / 0.4))
+  return (
+    <group position={at}>
+      {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => <mesh key={`${sx}${sz}`} position={[(sx * w) / 2, h / 2, (sz * w) / 2]} castShadow><boxGeometry args={[0.035, h, 0.035]} />{m(c)}</mesh>))}
+      {Array.from({ length: n }, (_, i) => (
+        <group key={i}>
+          {[0, Math.PI / 2, Math.PI, Math.PI * 1.5].map((ry) => (
+            <group key={ry} rotation-y={ry}>
+              <mesh position={[0, (i + 0.5) * (h / n), w / 2]} rotation-z={i % 2 ? 0.7 : -0.7}><boxGeometry args={[0.015, Math.hypot(w, h / n), 0.015]} />{m(c)}</mesh>
+            </group>
+          ))}
+        </group>
+      ))}
+    </group>
+  )
+}
+
+// A tall roadside pylon with a sign box on top.
+function Pylon({ m, at, h, w, text, bg, fg, frame }: { m: ReturnType<typeof useMat>; at: [number, number, number]; h: number; w: number; text: string; bg: string; fg: string; frame: string }) {
+  return (
+    <group position={at}>
+      {[-1, 1].map((sd) => <mesh key={sd} position={[(sd * w) / 3, h / 2, 0]} castShadow><boxGeometry args={[0.07, h, 0.07]} />{m('#90a4ae')}</mesh>)}
+      <mesh position={[0, h + w / 8, 0]} castShadow><boxGeometry args={[w + 0.1, w / 4 + 0.1, 0.1]} />{m(frame)}</mesh>
+      <Sign text={text} w={w} y={h + w / 8} z={0.056} bg={bg} fg={fg} />
+      <Lights from={[-w / 2, h + w / 4 + 0.09, 0.06]} to={[w / 2, h + w / 4 + 0.09, 0.06]} n={8} />
+    </group>
+  )
+}
+
+// The grown gas station: a tall price pylon (level 4), then a travel centre with
+// solar panels on the canopy and a second, taller pylon (level 7).
+function GasGrown({ m, lvl, cl, ghost, roof }: { m: ReturnType<typeof useMat>; lvl: number; cl: number; ghost?: boolean; roof: string }) {
+  const big = growthStage(lvl) === 3
+  if (ghost) return null
+  return (
+    <group>
+      <Pylon m={m} at={[-1.55, 0, -0.85]} h={big ? 3.4 : 2.6} w={0.9} text={big ? 'TRAVEL' : 'GAS'} bg={roof} fg="#ffffff" frame="#fafafa" />
+      <group position={[-1.55, big ? 3.0 : 2.2, -0.82]}>
+        <mesh><boxGeometry args={[0.7, 0.28, 0.06]} />{m('#263238')}</mesh>
+        <mesh position={[0, 0, 0.035]}><planeGeometry args={[0.62, 0.22]} /><meshBasicMaterial map={signTexture('⛽ 1.89', '#263238', '#ffca28')} /></mesh>
+      </group>
+      {big && (
+        <group>
+          {/* Solar panels across the canopy roof. */}
+          {[-0.75, -0.25, 0.25, 0.75].flatMap((x) => [-0.55, 0.05].map((z) => (
+            <mesh key={`${x}${z}`} position={[x, 1.66 + cl, -0.2 + z + 0.25]} rotation-x={-0.25}>
+              <boxGeometry args={[0.44, 0.02, 0.5]} />
+              <meshStandardMaterial color="#1a237e" metalness={0.4} roughness={0.3} />
+            </mesh>
+          )))}
+          {/* EV chargers along the side. */}
+          {[0.1, 0.45].map((z) => (
+            <group key={z} position={[1.88, 0, z]}>
+              <mesh position={[0, 0.3, 0]} castShadow><boxGeometry args={[0.12, 0.6, 0.18]} />{m('#eceff1')}</mesh>
+              <mesh position={[-0.061, 0.42, 0]} rotation-y={-Math.PI / 2}><planeGeometry args={[0.1, 0.1]} /><primitive object={glowMats.bulb} attach="material" dispose={null} /></mesh>
+              <mesh position={[0, 0.62, 0]}><boxGeometry args={[0.14, 0.04, 0.2]} />{m('#43a047')}</mesh>
+            </group>
+          ))}
+        </group>
+      )}
+    </group>
+  )
+}
+
+// The grown Drive-In: a marquee on a pole by the gate (level 4), then truss
+// towers either side of the screen with spotlights on top (level 7).
+function DriveInGrown({ m, lvl, sl, ghost, roof }: { m: ReturnType<typeof useMat>; lvl: number; sl: number; ghost?: boolean; roof: string }) {
+  if (ghost) return null
+  const big = growthStage(lvl) === 3
+  return (
+    <group>
+      <Pylon m={m} at={[1.55, 0, 1.55]} h={big ? 2.4 : 1.8} w={1.0} text="MOVIES" bg="#fafafa" fg="#3e2723" frame={roof} />
+      {big && [-1.75, 1.75].map((x) => (
+        <group key={x}>
+          <Truss m={m} at={[x, 0, -1.5]} h={3.2 + sl} />
+          <mesh position={[x, 3.28 + sl, -1.5]} castShadow><boxGeometry args={[0.4, 0.08, 0.4]} />{m('#455a64')}</mesh>
+          <mesh position={[x, 3.42 + sl, -1.45]} rotation-x={-0.6}><cylinderGeometry args={[0.1, 0.08, 0.2, 10]} />{m('#eceff1')}</mesh>
+          <mesh position={[x, 3.48 + sl, -1.38]} rotation-x={-0.6}><circleGeometry args={[0.08, 10]} /><primitive object={glowMats.bulb} attach="material" dispose={null} /></mesh>
+        </group>
+      ))}
+      {big && <Lights from={[-1.75, 3.33 + sl, -1.38]} to={[1.75, 3.33 + sl, -1.38]} n={16} />}
+    </group>
+  )
 }
 
 // Warm pool of light on the ground that only shows after dark.
@@ -560,6 +711,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             return <Flag key={t} x={Math.sin(a) * 1.95} y={sh + 0.1} z={Math.cos(a) * 1.95} color={def.roof} star={lvl >= 10} />
           })}
           {!ghost && <SpeedwayDetail sh={sh} roof={def.roof} />}
+          {lvl >= 4 && <SpeedwayGrown m={m} sh={sh} roof={def.roof} lvl={lvl} ghost={ghost} />}
           {sign && <Sign text="SPEEDWAY" w={2} y={1.25 + lift * 0.5} z={0} bg="#c62828" fg="#ffffff" />}
         </group>
       )
@@ -854,6 +1006,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             </mesh>
           )}
           {sign && <Sign text="GAS" w={1.2} y={1.5 + cl} z={0.58} bg={def.roof} fg="#ffffff" />}
+          {lvl >= 4 && <GasGrown m={m} lvl={lvl} cl={cl} ghost={ghost} roof={def.roof} />}
         </group>
       )
     }
@@ -920,6 +1073,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
               <Sign text="DRIVE-IN" w={1.9} y={2.7 + sl} z={-1.435} bg="#fafafa" fg="#3e2723" />
             </group>
           )}
+          {lvl >= 4 && <DriveInGrown m={m} lvl={lvl} sl={sl} ghost={ghost} roof={def.roof} />}
         </group>
       )
     }
