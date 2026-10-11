@@ -129,6 +129,8 @@ export function Trims({ m, lvl, w, d, h, z0, flag }: { m: Mat; lvl: number; w: n
 
 type Shell = {
   m: Mat
+  // Height of the first row of upper-floor windows.
+  rowFrom?: number
   win: ReactNode
   bulb: ReactNode
   ghost?: boolean
@@ -152,13 +154,13 @@ type Shell = {
 }
 
 // A flat-roofed building that grows a floor of windows every other upgrade level.
-export function ShellBuilding({ m, win, bulb, ghost, lvl, w, d, h0, z0 = -0.15, x0 = 0, wall, tex = 'brick', roof, sign, signBg = '#fffde7', signFg = '#c62828', shopfront, grow = 1, children }: Shell) {
+export function ShellBuilding({ m, win, bulb, ghost, lvl, w, d, h0, z0 = -0.15, x0 = 0, wall, tex = 'brick', roof, sign, signBg = '#fffde7', signFg = '#c62828', shopfront, grow = 1, rowFrom = 1.25, children }: Shell) {
   const h = h0 + levelLift(lvl) * grow
   const zf = z0 + d / 2
   const rx = Math.max(1, Math.round(w * 0.6))
   const wallTex = tex === 'brick' ? brickTex(rx, Math.max(1, Math.round(h))) : sidingTex(rx, Math.max(1, Math.round(h * 1.5)))
   const rows: number[] = []
-  for (let y = 1.25; y + 0.2 <= h - 0.12; y += 0.55) rows.push(y)
+  for (let y = rowFrom; y + 0.2 <= h - 0.12; y += 0.55) rows.push(y)
   const cols = w > 2 ? [-1.2, -0.4, 0.4, 1.2].filter((x) => Math.abs(x) < w / 2 - 0.2) : [-w * 0.27, w * 0.27]
   const sw = Math.min(w * 0.8, 2.4)
   return (
@@ -745,7 +747,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
       const ropeR = (gap * gap / 4 + sag * sag) / (2 * sag)
       const ropeArc = 2 * Math.asin(gap / 2 / ropeR)
       return (
-        <ShellBuilding {...shell} w={w} d={d} h0={1.3} z0={z0} wall="#3a2160" roof="#d500f9" shopfront={null}>
+        <ShellBuilding {...shell} w={w} d={d} h0={1.3} z0={z0} wall="#3a2160" roof="#d500f9" shopfront={null} rowFrom={1.6}>
           {/* Entrance: gold-framed double doors with porthole windows, up one step. */}
           <Box m={m} at={[dx, 0.4, zf + 0.012]} s={[0.54, 0.8, 0.024]} c={GOLD} shadow={false} />
           {[-1, 1].map((sd) => (
@@ -855,29 +857,45 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           </mesh>
           {/* The name in lights over the door, with a neon owl beside it. */}
           {signs && (
-            <group position={[0.35, 1.04, zf + 0.03]}>
-              <Box m={m} at={[0, 0, -0.012]} s={[1.68, 0.44, 0.03]} c="#12061f" shadow={false} />
+            <group position={[0.35, 1.03, zf + 0.03]}>
+              <Box m={m} at={[0, 0, -0.012]} s={[1.68, 0.42, 0.03]} c="#12061f" shadow={false} />
               <mesh position-z={0.006}>
-                <planeGeometry args={[1.6, 0.4]} />
+                <planeGeometry args={[1.52, 0.38]} />
                 <primitive object={signs.name} attach="material" dispose={null} />
               </mesh>
             </group>
           )}
-          <group position={[-1.32, 1.06, zf + 0.04]}>
-            {[-0.1, 0.1].map((x) => (
-              <mesh key={x} position={[x, 0.04, 0]}>
-                <torusGeometry args={[0.075, 0.016, 6, 14]} />
-                {glow('neonCyan', '#00e5ff')}
-              </mesh>
+          {/* A neon owl on its own dark panel beside the sign: ears, big eyes, beak and a wing curve. */}
+          <group position={[-1.36, 1.03, zf]}>
+            <Box m={m} at={[0, 0, 0.012]} s={[0.44, 0.38, 0.024]} c="#12061f" shadow={false} />
+            {[-1, 1].map((sd) => (
+              <group key={sd}>
+                <mesh position={[sd * 0.085, 0.03, 0.038]}>
+                  <torusGeometry args={[0.07, 0.014, 6, 16]} />
+                  {glow('neonCyan', '#00e5ff')}
+                </mesh>
+                <mesh position={[sd * 0.085, 0.03, 0.03]}>
+                  <circleGeometry args={[0.022, 10]} />
+                  {glow('neonPink', '#ff2bd6')}
+                </mesh>
+                <mesh position={[sd * 0.13, 0.155, 0.038]} rotation-z={-sd * 0.5}>
+                  <boxGeometry args={[0.014, 0.08, 0.014]} />
+                  {glow('neonViolet', '#b04dff')}
+                </mesh>
+              </group>
             ))}
-            <mesh position={[0, -0.07, 0]} rotation-x={Math.PI / 2}>
-              <coneGeometry args={[0.035, 0.08, 4]} />
+            <mesh position={[0, -0.06, 0.04]} rotation-x={Math.PI / 2}>
+              <coneGeometry args={[0.03, 0.07, 4]} />
               {glow('neonPink', '#ff2bd6')}
+            </mesh>
+            <mesh position={[0, -0.04, 0.038]} rotation-z={Math.PI * 1.15}>
+              <torusGeometry args={[0.16, 0.012, 5, 18, Math.PI * 0.7]} />
+              {glow('neonViolet', '#b04dff')}
             </mesh>
           </group>
           {/* Neon edges: corners and a band under the roof. */}
           {[-1, 1].map((sd) => tube('neonPink', [sd * (w / 2 + 0.005), h / 2, zf + 0.01], [0.035, h - 0.08, 0.035]))}
-          {tube('neonCyan', [0, h - 0.17, zf + 0.02], [w, 0.035, 0.03])}
+          {tube('neonCyan', [0, h - 0.04, zf + 0.02], [w, 0.035, 0.03])}
           {tube('neonViolet', [0.5, 0.33, zf + 0.02], [1.96, 0.03, 0.03])}
           {/* Rooftop dance floor with a DJ booth, speakers, a mirror ball and a glowing rail. */}
           <mesh position={[0, floor.y, floor.z]} rotation-x={-Math.PI / 2}>
