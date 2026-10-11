@@ -4,10 +4,11 @@ import { bake, bakeable } from './bake'
 
 describe('baking plain parts together', () => {
   it('only takes materials whose look a vertex can carry', () => {
-    expect(bakeable(new MeshStandardMaterial({ color: '#c62828', roughness: 0.4, metalness: 0.2, emissive: '#ff0000', emissiveIntensity: 2 }))).toBe(true)
-    expect(bakeable(new MeshStandardMaterial({ side: DoubleSide }))).toBe(true)
-    expect(bakeable(new MeshBasicMaterial({ color: '#fafafa' }))).toBe(true)
-    expect(bakeable(new MeshStandardMaterial({ map: new Texture() }))).toBe(false)
+    expect(bakeable(new MeshStandardMaterial({ color: '#c62828', roughness: 0.4, metalness: 0.2, emissive: '#ff0000', emissiveIntensity: 2 }))).toBe('plain')
+    expect(bakeable(new MeshStandardMaterial({ side: DoubleSide }))).toBe('plain')
+    expect(bakeable(new MeshBasicMaterial({ color: '#fafafa' }))).toBe('plain')
+    expect(bakeable(new MeshStandardMaterial({ map: new Texture() }))).toBe('map')
+    expect(bakeable(new MeshStandardMaterial({ map: new Texture(), emissiveMap: new Texture() }))).toBe(false)
     expect(bakeable(new MeshStandardMaterial({ transparent: true, opacity: 0.5 }))).toBe(false)
     expect(bakeable(new MeshStandardMaterial({ flatShading: true }))).toBe(false)
     expect(bakeable(new MeshBasicMaterial({ toneMapped: false }))).toBe(false)

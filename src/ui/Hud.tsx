@@ -4,6 +4,7 @@ import { useNow } from '../scene/useNow'
 import { GoalsButton, GoalTracker } from './Goals'
 import { MuteButton } from './MuteButton'
 import { ChallengeBell } from './Race'
+import { GiftBell } from './Gifts'
 
 const n = (v: number) => v.toLocaleString()
 
@@ -75,7 +76,10 @@ export function Hud() {
           <GoalsButton />
           <MuteButton />
         </div>
-        <ChallengeBell />
+        <div className="hud-right-row">
+          <ChallengeBell />
+          <GiftBell />
+        </div>
       </div>
       {/* Phones: one compact strip across the top, town label under it. */}
       <div className="hud-mobile">
@@ -93,6 +97,7 @@ export function Hud() {
           <div className="hud-actions">
             <GoalsButton />
             <ChallengeBell />
+            <GiftBell />
           </div>
         </div>
         <div className="hud-town">

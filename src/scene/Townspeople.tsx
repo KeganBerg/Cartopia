@@ -3,7 +3,7 @@ import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { Color, Matrix4, Object3D, Vector3 } from 'three'
 import type { InstancedMesh } from 'three'
 import { useGame, type PlacedBuilding } from '../game/store'
-import { START_LAND, buildingDef } from '../game/data'
+import { START_LAND, buildingDef, buildingLevel, houseResidents } from '../game/data'
 import { buildWalkGraph, findPath, pedestrianCrossings, stepsFor, transit, sideOf, SIDES, type Pt, type Step, type WalkGraph, type WalkNode } from '../game/walkGraph'
 import { anchors } from './anchors'
 import { liveTraffic, crossingSignal } from './traffic/live'
@@ -26,8 +26,7 @@ const LEG_SIDES = [-1, 1]
 // rope and wait for the bouncer to let them in.
 
 const SMALL = typeof window !== 'undefined' && Math.min(window.innerWidth, window.innerHeight) < 700
-const MAX_PEOPLE = SMALL ? 16 : 36
-const PER_HOUSE = 2
+const MAX_PEOPLE = SMALL ? 20 : 44
 // Extra residents as the town levels up: one more for every two levels.
 const extraPeople = (level: number) => Math.min(10, Math.floor(level / 2))
 const LEG = 0.24
@@ -75,6 +74,8 @@ const PARK_GO: Record<string, [string, string]> = {
   busstop: ['🚌', 'catching the bus'], hotdog: ['🌭', 'getting a hot dog'], flagpole: ['🚩', 'going to see the town flag'],
   arch: ['🏁', 'taking a photo at the finish line'], playground: ['🛝', 'heading to the playground'], gazebo: ['🎶', 'going to the gazebo'],
   clocktower: ['🕰️', 'meeting a friend at the clock tower'],
+  pumpkins: ['🎃', 'picking a pumpkin'], scarecrow: ['🌾', 'going to see the scarecrow'],
+  graves: ['👻', 'daring a friend to visit the graveyard'], deadtree: ['🦇', 'going to see the haunted tree'],
 }
 const PARK_AT: Record<string, [string, string]> = {
   bench: ['🪑', 'resting on the bench'], fountain: ['⛲', 'watching the fountain'], pond: ['🦆', 'watching the ducks'],
@@ -83,19 +84,23 @@ const PARK_AT: Record<string, [string, string]> = {
   busstop: ['🚌', 'waiting for the bus'], hotdog: ['🌭', 'eating a hot dog'], flagpole: ['🚩', 'saluting the town flag'],
   arch: ['📸', 'posing under the finish line'], playground: ['🛝', 'playing on the swings'], gazebo: ['🎶', 'listening to the band'],
   clocktower: ['🕰️', 'waiting by the clock tower'],
+  pumpkins: ['🎃', 'picking out a pumpkin'], scarecrow: ['🌾', 'taking a selfie with the scarecrow'],
+  graves: ['👻', 'telling ghost stories'], deadtree: ['🦇', 'spotting bats in the haunted tree'],
 }
 
 // Where to stand at each decoration, as a distance from its middle.
 const SPOT: Record<string, number> = {
   bench: 0.06, fountain: 0.98, flowers: 0.86, tree: 0.5, palm: 0.5, statue: 0.78, lamp: 0.45, billboard: 0.7,
   pine: 0.7, picnic: 0.45, busstop: -0.22, hotdog: 0.5, flagpole: 0.6, arch: 0.4, gazebo: 0.25, clocktower: 0.8,
+  pumpkins: 0.6, scarecrow: 0.55, graves: 0.65, deadtree: 0.6,
 }
 // How long people linger, in seconds.
 const LINGER: Record<string, [number, number]> = {
   bench: [10, 24], fountain: [5, 12], statue: [4, 9], pond: [6, 14],
   picnic: [12, 26], busstop: [8, 18], hotdog: [4, 8], gazebo: [8, 18], playground: [10, 22], clocktower: [4, 9],
+  pumpkins: [5, 12], graves: [4, 9],
 }
-const PARKS = new Set(['bench', 'fountain', 'flowers', 'tree', 'palm', 'statue', 'pond', 'pine', 'picnic', 'busstop', 'hotdog', 'flagpole', 'arch', 'gazebo', 'clocktower'])
+const PARKS = new Set(['bench', 'fountain', 'flowers', 'tree', 'palm', 'statue', 'pond', 'pine', 'picnic', 'busstop', 'hotdog', 'flagpole', 'arch', 'gazebo', 'clocktower', 'pumpkins', 'scarecrow', 'graves', 'deadtree'])
 // Big decorations people walk up to, like the duck pond.
 const BIG_PARKS = new Set(['pond', 'playground'])
 // Seats: benches and the bus stop face out the front; at a picnic table people face the table.
@@ -199,6 +204,8 @@ export function Townspeople() {
   const land = useGame((s) => (s.visiting ? (s.visiting.land ?? START_LAND) : s.land))
   const visitKey = useGame((s) => s.visiting?.ownerId ?? 'home')
   const level = useGame((s) => (s.visiting ?? s).level)
+  // How many live in each home ("uid:residents,..."): upgraded houses hold more.
+  const homeSizes = useGame((s) => (s.visiting ?? s).buildings.filter((b) => buildingDef(b.def).kind === 'house').map((b) => `${b.uid}:${houseResidents(buildingLevel(b))}`).join(','))
   const graph = useMemo(() => {
     void footprint
     const s = useGame.getState()
@@ -220,7 +227,7 @@ export function Townspeople() {
   const dogHead = useRef<InstancedMesh>(null)
   const hits = useRef<InstancedMesh>(null)
 
-  // Two people per house plus a few more as the town levels up (or a few
+  // Two people per house (more in upgraded ones) plus a few more as the town levels up (or a few
   // visitors in a town with no houses yet).
   // People who already exist keep walking; anyone mid-walk re-plans on the new streets.
   useEffect(() => {
@@ -228,10 +235,17 @@ export function Townspeople() {
     const fallback = graph.nodes.find((n): n is Extract<WalkNode, { kind: 'b' }> => n.kind === 'b')
     const wanted: { id: string; home: Extract<WalkNode, { kind: 'b' }> }[] = []
     if (homes.length) {
-      for (let i = 0; i < PER_HOUSE; i++) for (const h of homes) wanted.push({ id: `${visitKey}:${h.uid}:${i}`, home: h })
+      // Round-robin over homes, so when the cap kicks in it trims the extra residents of big homes, not whole streets.
+      const sizes = new Map(homeSizes.split(',').map((e) => [e.slice(0, e.lastIndexOf(':')), Number(e.slice(e.lastIndexOf(':') + 1))]))
+      const size = (h: (typeof homes)[number]) => sizes.get(h.uid) ?? houseResidents(1)
+      const most = Math.max(...homes.map(size))
+      for (let i = 0; i < most; i++) for (const h of homes) if (i < size(h)) wanted.push({ id: `${visitKey}:${h.uid}:${i}`, home: h })
+      const count = new Map(homes.map((h) => [h.uid, size(h)]))
       for (let i = 0; i < extraPeople(level); i++) {
         const h = homes[i % homes.length]
-        wanted.push({ id: `${visitKey}:${h.uid}:${PER_HOUSE + Math.floor(i / homes.length)}`, home: h })
+        const n = count.get(h.uid)!
+        count.set(h.uid, n + 1)
+        wanted.push({ id: `${visitKey}:${h.uid}:${n}`, home: h })
       }
     } else if (fallback) {
       for (let i = 0; i < 4; i++) wanted.push({ id: `${visitKey}:${fallback.uid}:${i}`, home: fallback })
@@ -276,7 +290,7 @@ export function Townspeople() {
       if (crossing) p.steps.unshift(crossing)
       p.si = 0
     }
-  }, [graph, visitKey, level])
+  }, [graph, visitKey, level, homeSizes])
 
   const dummy = useMemo(() => {
     const o = new Object3D()

@@ -8,6 +8,7 @@ import { useGame, canPlace, buyablePlots, lotSize, movable, type PlacedBuilding 
 import { GRID, TILE, PLOT, PLOT_MIN, PLOT_MAX, START_LAND, buildingDef, buildingLevel } from '../game/data'
 import { BuildingModel } from './BuildingModel'
 import { rotateCurrent, setGhostTurn, turnOf } from '../game/placement'
+import { mergeGroups, groupTurn, groupScale, type MergeGroup } from '../game/merge'
 import { sfx } from '../lib/sound'
 import { Clouds } from './Clouds'
 import { DayNight } from './DayNight'
@@ -24,7 +25,9 @@ import { Batch } from './Batch'
 import { Manhole } from './BuildingDetail'
 import { GrassTufts } from './Tufts'
 import { toWorld, toTile, DIRS } from './grid'
-import { grassTex, paverTex, asphaltTex, drainTex } from './textures'
+import { grassTex, paverTex, drainTex } from './textures'
+import { roadMat } from './weatherLook'
+import { Weather } from './Weather'
 import { layoutRoads } from './traffic/layout'
 import { LAYER, decal } from './layers'
 
@@ -71,6 +74,9 @@ export function centerOf(def: string, x: number, z: number, rot?: number): [numb
   const [w, h] = lotSize(def, rot)
   return toWorld(x + (w - 1) / 2, z + (h - 1) / 2)
 }
+
+// Middle of a merged block.
+export const groupCenter = (g: Pick<MergeGroup, 'x' | 'z' | 'w' | 'h'>) => toWorld(g.x + (g.w - 1) / 2, g.z + (g.h - 1) / 2)
 
 // A building being dragged in move mode: where it would land, and which of its
 // tiles the pointer is holding.
@@ -153,27 +159,32 @@ function holdToMove(b: PlacedBuilding, e: ThreeEvent<PointerEvent>) {
   window.addEventListener('pointercancel', watch.up)
 }
 
-function Building({ b, roads }: { b: PlacedBuilding; roads: Set<string> }) {
+// `group` is set on the top-left building of a merged block: it stands in,
+// scaled up, for the whole block. The others in the block draw nothing.
+function Building({ b, roads, group }: { b: PlacedBuilding; roads: Set<string>; group?: MergeGroup }) {
   const d = buildingDef(b.def)
-  const [cx, cz] = centerOf(b.def, b.x, b.z, b.rot)
+  const [cx, cz] = group ? groupCenter(group) : centerOf(b.def, b.x, b.z, b.rot)
+  const turn = group ? groupTurn(group, roads) : turnOf(b, roads)
+  const [sx, sy, sz] = group ? groupScale(group, turn) : [1, 1, 1]
   // Hidden while dragged away; the ghost shows where it would land.
   const away = useDrag((g) => g.drag?.uid === b.uid && (g.drag.x !== b.x || g.drag.z !== b.z))
   if (away) return null
   return (
     <group
       position={[cx, 0, cz]}
-      rotation-y={(turnOf(b, roads) * Math.PI) / 2}
+      rotation-y={(turn * Math.PI) / 2}
       onPointerDown={(e) => {
         const s = useGame.getState()
         if (s.visiting || e.button !== 0) return
         if (s.mode === 'play') {
           held = false
-          if (movable(b.def)) holdToMove(b, e)
+          if (movable(b.def) && !group) holdToMove(b, e)
           return
         }
         if (s.mode !== 'move') return
         e.stopPropagation()
         if (!movable(b.def)) return s.toast(`Tap the ${d.name.toLowerCase()} in play mode to clear it`)
+        if (group) return s.toast(`Split the merged ${d.name} first to move it (Merge tool)`)
         startDrag(b, groundTile(e), e.pointerId)
       }}
       onClick={(e) => {
@@ -190,17 +201,19 @@ function Building({ b, roads }: { b: PlacedBuilding; roads: Set<string> }) {
       onPointerOver={() => {
         const mode = useGame.getState().mode
         if (mode === 'move' && movable(b.def)) document.body.style.cursor = 'grab'
-        else if (mode === 'play' && d.kind !== 'decor' && d.kind !== 'house') document.body.style.cursor = 'pointer'
+        else if (mode === 'play' && d.kind !== 'decor') document.body.style.cursor = 'pointer'
       }}
       onPointerOut={() => (document.body.style.cursor = '')}
     >
       {d.kind !== 'decor' && d.kind !== 'obstacle' && (
         <mesh rotation-x={-Math.PI / 2} position-y={LAYER.lot} receiveShadow>
-          <planeGeometry args={[d.w * TILE - 0.1, d.h * TILE - 0.1]} />
-          <meshStandardMaterial map={paverTex(d.w, d.h)} />
+          <planeGeometry args={[d.w * TILE * sx - 0.1, d.h * TILE * sz - 0.1]} />
+          <meshStandardMaterial map={paverTex(d.w * sx, d.h * sz)} />
         </mesh>
       )}
-      <BuildingModel def={d} level={buildingLevel(b)} />
+      <group scale={[sx, sy, sz]}>
+        <BuildingModel def={d} level={buildingLevel(b)} />
+      </group>
     </group>
   )
 }
@@ -350,7 +363,8 @@ function Roads() {
       return { ...t, xing }
     })
   }, [roadsList])
-  const asphalt = asphaltTex()
+  // Shared so rain and snow can change every road at once (weatherLook.ts).
+  const asphalt = roadMat()
 
   return (
     <group>
@@ -367,7 +381,7 @@ function Roads() {
           <group key={k} position={[wx, 0, wz]}>
             <mesh rotation-x={-Math.PI / 2} position-y={LAYER.lot} receiveShadow>
               <planeGeometry args={[TILE, TILE]} />
-              <meshStandardMaterial map={asphalt} />
+              <primitive object={asphalt} attach="material" dispose={null} />
             </mesh>
             {/* Drains and manholes only on plain straight stretches, clear of crossings. */}
             {SIDES.map((sd, i) => !arms[i] && <Sidewalk key={sd} side={sd} drain={plain && (x * 2 + z + i) % 4 === 0} />)}
@@ -614,9 +628,10 @@ export function World() {
   const mode = useGame((s) => s.mode)
   // Rebuild the merged town only when something's footprint changes, not on every job timer.
   const layout = useMemo(
-    () => [buildings.map((b) => `${b.uid}:${b.def}:${b.x}:${b.z}:${b.rot}:${b.level ?? 1}`).join(), roadsList.join(), land.join()].join('/'),
+    () => [buildings.map((b) => `${b.uid}:${b.def}:${b.x}:${b.z}:${b.rot}:${b.level ?? 1}:${b.merge ?? ''}`).join(), roadsList.join(), land.join()].join('/'),
     [buildings, roadsList, land],
   )
+  const merges = useMemo(() => mergeGroups(buildings), [layout]) // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <>
       <DayNight small={Math.min(window.innerWidth, window.innerHeight) < 700} />
@@ -633,15 +648,16 @@ export function World() {
         <Land />
         <GrassTufts land={land} roads={roadsList} buildings={buildings} />
         <Roads />
-        {buildings.map((b) => (
-          <Building key={b.uid} b={b} roads={roads} />
-        ))}
+        {buildings.map((b) =>
+          merges.owner.has(b.uid) && !merges.groups.has(b.uid) ? null : <Building key={b.uid} b={b} roads={roads} group={merges.groups.get(b.uid)} />,
+        )}
       </Batch>
       <AnchorProjector />
       <TownCars />
       <Townspeople />
       <Clouds />
       <SeasonFx small={Math.min(window.innerWidth, window.innerHeight) < 700} />
+      <Weather small={Math.min(window.innerWidth, window.innerHeight) < 700} />
       <SkyEnv />
       <PostFx look={townLook} town tiltShift />
     </>

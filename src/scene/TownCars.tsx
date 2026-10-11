@@ -100,7 +100,7 @@ function TownCar({ car }: { car: OwnedCar }) {
         }}
       >
         <group ref={body} scale={SCALE}>
-          <CarModel body={def.body} color={car.color} finish={car.finish} highlight={selected} stripe={car.stripe} mods={car.mods} beams rig={rig} lean />
+          <CarModel body={def.body} model={def.id} color={car.color} finish={car.finish} highlight={selected} stripe={car.stripe} mods={car.mods} beams rig={rig} lean />
         </group>
       </group>
       <group ref={truck} visible={false}>

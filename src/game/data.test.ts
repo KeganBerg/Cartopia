@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildingDef, carDef, knownBuilding, BUILDINGS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost, jobLevel, performance, fittedMods, modStats, modCost, MODS, MOD_SLOTS, modFits, ownedMods, CARS, takesDriver, loves, driverPayout, skillBoost, skillDrag, liveSkillBoost, SKILLS , CAMPAIGN, CAMPAIGN_RACES, campaignRivalPi, campaignReward, campaignShift, campaignStars, CAR_SETS, carSource, readySets } from './data'
+import { buildingDef, carDef, knownBuilding, BUILDINGS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost, jobLevel, houseResidents, levelName, performance, fittedMods, modStats, modCost, MODS, MOD_SLOTS, modFits, ownedMods, CARS, takesDriver, loves, driverPayout, skillBoost, skillDrag, liveSkillBoost, SKILLS , CAMPAIGN, CAMPAIGN_RACES, campaignRivalPi, campaignReward, campaignShift, campaignStars, CAR_SETS, carSource, readySets } from './data'
 import { MAX_RACE_PI } from './race'
 import { VENUES } from '../scene/venues'
 
@@ -42,6 +42,9 @@ describe('building upgrades', () => {
         if (d.jobSeconds) {
           expect(upgradePayout(d, l + 1)).toBeGreaterThan(upgradePayout(d, l))
           expect(upgradeJobSeconds(d, l + 1)).toBeLessThanOrEqual(upgradeJobSeconds(d, l))
+        } else if (d.kind === 'house') {
+          expect(houseResidents(l + 1)).toBeGreaterThan(houseResidents(l))
+          expect(upgradeFuelCap(d, l + 1)).toBe(upgradeFuelCap(d, l) + 1)
         } else {
           expect(upgradeFuelCap(d, l + 1)).toBeGreaterThan(upgradeFuelCap(d, l))
         }
@@ -51,14 +54,24 @@ describe('building upgrades', () => {
     }
   })
 
-  it('only upgrades businesses, parts makers and gas stations', () => {
+  it('only upgrades businesses, parts makers, gas stations and houses', () => {
     expect(upgradable(buildingDef('pizza'))).toBe(true)
+    expect(upgradable(buildingDef('house'))).toBe(true)
     expect(upgradable(buildingDef('tuner'))).toBe(true)
     expect(upgradable(buildingDef('gas'))).toBe(true)
     expect(upgradable(buildingDef('rescue'))).toBe(false)
     expect(upgradable(buildingDef('tree'))).toBe(false)
     expect(upgradable(buildingDef('rock'))).toBe(false)
     expect(upgradable(buildingDef('from-the-future'))).toBe(false)
+  })
+
+  it('grows houses into apartments at 4 and a tower at 7', () => {
+    const house = buildingDef('house')
+    expect([1, 3, 4, 6, 7, 10].map((l) => levelName(house, l))).toEqual(['House', 'House', 'Apartments', 'Apartments', 'Sky Tower', 'Sky Tower'])
+    expect(levelName(buildingDef('pizza'), 8)).toBe(buildingDef('pizza').name)
+    expect(houseResidents(1)).toBe(2)
+    expect(buildingUpgradeCost(house, 1)).toEqual({ coins: 300, parts: 0 })
+    expect([1, 2, 10].map((l) => upgradeFuelCap(house, l))).toEqual([0, 1, 9])
   })
 })
 
