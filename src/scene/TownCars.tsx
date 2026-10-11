@@ -15,6 +15,14 @@ import { CarModel, carSize, wheelRig, type WheelRig } from './CarModel'
 import { wheelPool } from './carBatch'
 import { liveTraffic as sim } from './traffic/live'
 import { layoutRoads, type Light } from './traffic/layout'
+import { useVisitors, tapVisitor, type Visitor } from '../lib/visitors'
+
+const visitKeyIsAway = (key: string) => key !== 'home'
+// A visitor's car as a town car (its uid starts "visitor:", which the traffic sim fades out on leaving).
+const visitorCar = (v: Visitor): OwnedCar => ({
+  uid: `visitor:${v.id}`, model: v.model, color: v.color, upgrades: { engine: 0, turbo: 0, tires: 0, weight: 0 },
+  stripe: v.kind === 'racer' ? '#fafafa' : null,
+})
 
 // Town cars are drawn a little smaller than in the garage so two fit side by side.
 const SCALE = 1.1
@@ -43,7 +51,8 @@ export function TowTruck({ rig, crane }: { rig?: WheelRig; crane?: boolean }) {
   )
 }
 
-function TownCar({ car }: { car: OwnedCar }) {
+// onTap: what tapping it does instead of opening the garage (a visitor's car).
+function TownCar({ car, onTap }: { car: OwnedCar; onTap?: () => void }) {
   const ref = useRef<Group>(null)
   const body = useRef<Group>(null)
   const truck = useRef<Group>(null)
@@ -96,6 +105,7 @@ function TownCar({ car }: { car: OwnedCar }) {
           e.stopPropagation()
           const s = useGame.getState()
           if (s.mode !== 'play' || s.visiting) return
+          if (onTap) return onTap()
           s.selectCar(car.uid)
           s.openPanel(car.flat || car.lowFuel ? 'flat' : 'garage')
         }}
@@ -309,9 +319,17 @@ export function TownCars() {
     }),
     [cars, stars],
   )
+  // A visitor's car drives round town too (src/lib/visitors.ts), on top of the usual cap.
+  const visitor = useVisitors((v) => (v.visitor && v.visitor.kind !== 'barn' && !visitKeyIsAway(visitKey) ? v.visitor : null))
+  const guest = useMemo(() => (visitor ? visitorCar(visitor) : null), [visitor?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  const guestGone = !!visitor?.gone
   useEffect(() => {
-    sim.setCars(specs, max)
-  }, [specs, max, town])
+    if (!guest || guestGone) return sim.setCars(specs, max)
+    const size = carSize(carDef(guest.model).body)
+    const kind = visitor!.kind
+    const spec = { uid: guest.uid, len: size.len * SCALE, wid: size.wid * SCALE, cruise: kind === 'racer' ? 2.6 : kind === 'mystery' ? 2.2 : 1.4, stalled: false }
+    sim.setCars([spec, ...specs], max + 1)
+  }, [specs, max, town, guest, guestGone]) // eslint-disable-line react-hooks/exhaustive-deps
   const homesKey = buildings.map((b) => (b.car ? `${b.car}>${b.uid}` : '')).join()
   useEffect(() => {
     sim.homes = new Map(buildings.filter((b) => b.car).map((b) => [b.car!, b.uid]))
@@ -359,6 +377,7 @@ export function TownCars() {
       {shown.map((car) => (
         <TownCar key={`${visitKey}-${car.uid}`} car={car} />
       ))}
+      {guest && <TownCar key={guest.uid} car={guest} onTap={tapVisitor} />}
       <ShowcaseStars uids={stars} />
     </>
   )

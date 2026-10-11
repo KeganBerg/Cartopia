@@ -1257,6 +1257,23 @@ button.book-car { font: inherit; color: inherit; }
 .alerts-x { width: 30px; height: 30px; flex: none; border: none; border-radius: 50%; background: #eceff1; font-weight: 800; color: #546e7a; }
 @media (max-width: 600px) { .alerts-card { bottom: calc(78px + var(--sab)); font-size: 13px; } }
 
+/* Surprise visitors: the bubble over a visitor's car (or Rusty's, for a barn tip) and the street racer's card. */
+.badge-visitor { animation: bob 0.9s ease-in-out infinite; font-size: 15px; z-index: 4; }
+.badge-visitor-racer { background: linear-gradient(#ff7043, #d84315); color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,.4); }
+.badge-visitor-tourist { background: radial-gradient(#fff8e1, #ffecb3); color: var(--ink); }
+.badge-visitor-mystery { background: linear-gradient(#5e35b1, #311b92); color: #fff; animation: badgepulse .6s ease-in-out infinite; }
+.badge-visitor-barn { background: #fff3e0; color: #5d4037; }
+/* Off screen: pinned to the edge, smaller and without its pointer. */
+.anchor.edge .badge-visitor { transform: scale(.85); opacity: .92; }
+.anchor.edge .badge-visitor::after { display: none; }
+.street-card { display: flex; align-items: center; gap: 12px; }
+.street-card > div { display: flex; flex-direction: column; gap: 2px; }
+.street-prize { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 12px 0; font-weight: 700; }
+.street-prize .chip { padding: 2px 8px; }
+.street-prize .chip.free { border-color: #a5d6a7; background: #e8f5e9; }
+.street-actions { display: flex; gap: 10px; }
+.street-actions .buy { flex: 1; }
+.street-actions .ghost { background: none; border: 2px solid #cfd8dc; border-radius: 12px; padding: 6px 12px; font-weight: 800; color: var(--ink); }
 /* Town rival */
 .race-btn .i { position: relative; }
 .rv-card { --rv: #ff7043; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; margin: 4px 0 10px; padding: 8px 10px; border-radius: 14px; background: linear-gradient(100deg, color-mix(in srgb, var(--rv) 22%, #fff), #fff 70%); border: 2px solid color-mix(in srgb, var(--rv) 60%, #fff); }
