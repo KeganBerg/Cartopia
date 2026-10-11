@@ -38,6 +38,7 @@ import { startCloudSync } from './lib/cloud'
 import './lib/rescue'
 import './lib/crates'
 import { startAmbience } from './lib/ambience'
+import { startMusic } from './lib/townMusic'
 import { useTownPaused } from './scene/renderGate'
 import { useCrewGoalWatcher } from './ui/CrewGoal'
 import { BattlePanel, useCrewBattleWatcher } from './ui/CrewBattle'
@@ -59,6 +60,7 @@ export default function App() {
   useEffect(() => {
     startCloudSync()
     startAmbience()
+    startMusic()
     joinLobby()
     // ?chatdemo shows sample messages so the chat window can be checked signed out.
     if (new URLSearchParams(location.search).has('chatdemo')) chatDemo()

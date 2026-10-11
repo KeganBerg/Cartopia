@@ -87,6 +87,68 @@ export function woodblock({ ctx, out }: Dest, t: number, freq = 1200, vol = 0.1)
   o.stop(t + 0.1)
 }
 
+// Electric piano: a sine tine struck by a decaying FM bark, like a Rhodes.
+// Soft and round low down, bell-like when played harder.
+export function epiano({ ctx, out }: Dest, t: number, freq: number, vol = 0.08, decay = 2.4) {
+  const c = ctx.createOscillator()
+  const m = ctx.createOscillator()
+  const mg = ctx.createGain()
+  const g = ctx.createGain()
+  c.frequency.value = freq
+  m.frequency.value = freq
+  mg.gain.setValueAtTime(freq * 1.6, t)
+  mg.gain.exponentialRampToValueAtTime(freq * 0.08, t + 0.9)
+  m.connect(mg).connect(c.frequency)
+  g.gain.setValueAtTime(0, t)
+  g.gain.linearRampToValueAtTime(vol, t + 0.006)
+  g.gain.exponentialRampToValueAtTime(vol * 0.45, t + 0.35)
+  g.gain.exponentialRampToValueAtTime(0.0001, t + decay)
+  c.connect(g).connect(out)
+  c.start(t)
+  m.start(t)
+  c.stop(t + decay + 0.05)
+  m.stop(t + decay + 0.05)
+  // The tine's metallic ping on the attack.
+  partial({ ctx, out }, t, freq * 7.1, vol * 0.06, 0.12, 0.002)
+}
+
+// Shaker: a short burst of bright noise, for a light groove under music.
+let shakeBuf: AudioBuffer | null = null
+export function shaker({ ctx, out }: Dest, t: number, vol = 0.02, len = 0.07) {
+  if (!shakeBuf || shakeBuf.sampleRate !== ctx.sampleRate) {
+    shakeBuf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.2), ctx.sampleRate)
+    const d = shakeBuf.getChannelData(0)
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1
+  }
+  const src = ctx.createBufferSource()
+  src.buffer = shakeBuf
+  const f = ctx.createBiquadFilter()
+  f.type = 'bandpass'
+  f.frequency.value = 7000
+  f.Q.value = 0.9
+  const g = ctx.createGain()
+  g.gain.setValueAtTime(0, t)
+  g.gain.linearRampToValueAtTime(vol, t + len * 0.35)
+  g.gain.exponentialRampToValueAtTime(0.0001, t + len)
+  src.connect(f).connect(g).connect(out)
+  src.start(t, Math.random() * 0.1)
+  src.stop(t + len + 0.02)
+}
+
+// A soft, rounded kick drum: a sine that drops in pitch.
+export function softKick({ ctx, out }: Dest, t: number, vol = 0.12) {
+  const o = ctx.createOscillator()
+  const g = ctx.createGain()
+  o.frequency.setValueAtTime(110, t)
+  o.frequency.exponentialRampToValueAtTime(48, t + 0.12)
+  g.gain.setValueAtTime(0, t)
+  g.gain.linearRampToValueAtTime(vol, t + 0.004)
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.32)
+  o.connect(g).connect(out)
+  o.start(t)
+  o.stop(t + 0.35)
+}
+
 // Note names to frequencies, for readable melodies.
 const NOTES: Record<string, number> = { C: -9, D: -7, E: -5, F: -4, G: -2, A: 0, B: 2 }
 export function hz(name: string) {
