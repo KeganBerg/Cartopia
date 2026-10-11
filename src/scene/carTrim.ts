@@ -1,6 +1,7 @@
 import { BoxGeometry, CircleGeometry, CylinderGeometry, Euler, PlaneGeometry, Quaternion, SphereGeometry, TorusGeometry, Vector3 } from 'three'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import type { Kit, Part } from './CarModel'
+import type { RimStyle } from './carWheels'
 
 // Per-model trim: the bits that make two cars on the same body tell apart up
 // close (a sunroof, hood pins, a roof rack, a spare wheel, a gold bird on the
@@ -21,8 +22,11 @@ export type TrimFrame = {
   front: number // half the length: the nose is at +front, the tail at -front
   wz: number // axle distance from the middle
   lightY: number // headlight height
+  plateY: number // front number plate height
+  nose: (y: number) => [number, number, number] // the nose surface at height y: [z, y, tilt]
   ty: number // tail light height
   roofY: number; roofLen: number; roofZ: number // 0 roofLen: no roof
+  exhaust: boolean // an exhaust mod is fitted
   closed: boolean
 }
 
@@ -33,45 +37,48 @@ type Feature =
   | 'sideExhaust' | 'sideStripe' | 'chromeBelt' | 'fenderVents' | 'eyebrows' | 'roundel'
   | 'splitter' | 'canards' | 'bullBar' | 'overriders' | 'snorkel' | 'toolbox' | 'crates' | 'humps'
   | 'stopArm' | 'roofHatches' | 'schoolSign' | 'crossingArm' | 'busMirrors' | 'bone'
+  | 'drl' | 'hoodCreases' | 'meshGrille' | 'popups' | 'quadTails' | 'tripleTails' | 'sideSkirts' | 'rearWiper' | 'diffuserFins'
+  | 'centerExhaust' | 'stepBars' | 'ladder' | 'tailgateLettering' | 'fuelCap' | 'towStrap' | 'headlightTape' | 'chromeTrimWindow'
+  | 'roofSeams' | 'chargePort'
 
 // What each car gets on top of its body's own detail. Ids not in this build
 // (another thread's newer cars) are simply skipped.
 const TRIMS: Record<string, Feature[]> = {
-  pip: ['roofRack', 'roofBox', 'visors'],
-  civic: ['sunroof', 'visors', 'chromeBelt'],
-  trail: ['bullBar', 'toolbox', 'towHitch', 'snorkel'],
-  miata: ['rearRack', 'hoodVents'],
-  stallion: ['hoodPins', 'sideStripe', 'louvers'],
-  rally: ['lightPods', 'roofScoop', 'roundel', 'splitter'],
-  vette: ['sideExhaust', 'fenderVents', 'ttop'],
-  charger: ['tailBand', 'hoodPins', 'chromeBelt'],
-  hellcat: ['hoodVents', 'splitter', 'canards'],
-  gtr: ['splitter', 'canards', 'fenderVents', 'sunroof'],
+  pip: ['roofRack', 'roofBox', 'visors', 'rearWiper'],
+  civic: ['sunroof', 'visors', 'chromeBelt', 'drl', 'hoodCreases'],
+  trail: ['bullBar', 'toolbox', 'towHitch', 'snorkel', 'stepBars', 'tailgateLettering'],
+  miata: ['rearRack', 'hoodVents', 'popups'],
+  stallion: ['hoodPins', 'sideStripe', 'louvers', 'tripleTails'],
+  rally: ['lightPods', 'roofScoop', 'roundel', 'splitter', 'headlightTape', 'towStrap', 'fuelCap'],
+  vette: ['sideExhaust', 'fenderVents', 'ttop', 'popups', 'quadTails'],
+  charger: ['tailBand', 'hoodPins', 'chromeBelt', 'fuelCap', 'hoodCreases'],
+  hellcat: ['hoodVents', 'splitter', 'canards', 'drl', 'diffuserFins'],
+  gtr: ['splitter', 'canards', 'fenderVents', 'sunroof', 'quadTails', 'drl', 'sideSkirts'],
   tomahawk: ['stowage', 'spare', 'beacon'],
-  lambo: ['deckLouvers', 'roofScoop', 'splitter'],
-  hyper: ['sharkFin', 'hoodVents', 'canards', 'splitter'],
+  lambo: ['deckLouvers', 'roofScoop', 'splitter', 'popups', 'diffuserFins', 'centerExhaust'],
+  hyper: ['sharkFin', 'hoodVents', 'canards', 'splitter', 'diffuserFins', 'drl', 'sideSkirts'],
   bug: ['rearRack', 'overriders', 'sideStripe'],
-  woodie: ['surfboard', 'chromeBelt', 'overriders'],
-  hauler: ['beacon', 'crates', 'towHitch', 'bullBar'],
-  cruiser: ['twoTone', 'continental', 'chromeBelt'],
+  woodie: ['surfboard', 'chromeBelt', 'overriders', 'chromeTrimWindow', 'rearWiper'],
+  hauler: ['beacon', 'crates', 'towHitch', 'bullBar', 'tailgateLettering', 'stepBars'],
+  cruiser: ['twoTone', 'continental', 'chromeBelt', 'chromeTrimWindow', 'hoodCreases'],
   buggy: ['whip', 'spare', 'bullBar'],
-  bandit: ['hoodChevron', 'ttop', 'louvers'],
-  lemans: ['roundel', 'splitter', 'sharkFin', 'lightPods'],
-  gullwing: ['eyebrows', 'hoodBulges', 'chromeBelt'],
+  bandit: ['hoodChevron', 'ttop', 'louvers', 'meshGrille', 'sideSkirts'],
+  lemans: ['roundel', 'splitter', 'sharkFin', 'lightPods', 'headlightTape', 'fuelCap', 'diffuserFins'],
+  gullwing: ['eyebrows', 'hoodBulges', 'chromeBelt', 'chromeTrimWindow', 'roofSeams'],
   // Cars from the More cars set.
-  camper: ['roofRack', 'surfboard', 'overriders'],
-  hotshot: ['hoodVents', 'sideStripe', 'roundel'],
-  ridgeback: ['roofRack', 'snorkel', 'bullBar', 'towHitch'],
-  kitsune: ['canards', 'fenderVents', 'sideStripe', 'splitter'],
-  current: ['panoRoof', 'sideStripe'],
-  salon: ['ornament', 'chromeBelt', 'twoTone'],
-  stomper: ['lightBar', 'bullBar', 'snorkel', 'crates'],
-  zenith: ['sharkFin', 'canards', 'deckLouvers', 'splitter'],
-  speedster: ['humps', 'roundel', 'rearRack'],
+  camper: ['roofRack', 'surfboard', 'overriders', 'ladder', 'chromeTrimWindow'],
+  hotshot: ['hoodVents', 'sideStripe', 'roundel', 'meshGrille', 'towStrap', 'rearWiper', 'drl'],
+  ridgeback: ['roofRack', 'snorkel', 'bullBar', 'towHitch', 'stepBars', 'rearWiper'],
+  kitsune: ['canards', 'fenderVents', 'sideStripe', 'splitter', 'towStrap', 'drl', 'sideSkirts'],
+  current: ['panoRoof', 'sideStripe', 'drl', 'chargePort', 'hoodCreases'],
+  salon: ['ornament', 'chromeBelt', 'twoTone', 'chromeTrimWindow', 'hoodCreases'],
+  stomper: ['lightBar', 'bullBar', 'snorkel', 'crates', 'stepBars', 'tailgateLettering'],
+  zenith: ['sharkFin', 'canards', 'deckLouvers', 'splitter', 'diffuserFins', 'centerExhaust', 'drl'],
+  speedster: ['humps', 'roundel', 'rearRack', 'fuelCap'],
   schoolbus: ['stopArm', 'roofHatches', 'schoolSign', 'crossingArm', 'busMirrors'],
   tusker: ['stowage', 'towHitch', 'whip'],
   shaggy: ['roofRack', 'bone', 'towHitch'],
-  nightfall: ['splitter', 'canards', 'deckLouvers', 'fenderVents'],
+  nightfall: ['splitter', 'canards', 'deckLouvers', 'fenderVents', 'diffuserFins', 'drl', 'centerExhaust'],
 }
 
 const box = (w: number, h: number, d: number) => new BoxGeometry(w, h, d)
@@ -89,9 +96,10 @@ function bar(k: Kit, part: Part, a: V3, b: V3, t: number) {
 
 // Small finishing touches every car gets: badges front and back, and characters on the plates.
 function badges(k: Kit, f: TrimFrame) {
-  k.add('chrome', disc(0.018, 12), [0, f.lightY + 0.04, f.front + 0.012])
+  const [bz, by, bt] = f.nose(f.lightY + 0.04)
+  k.add('chrome', disc(0.018, 12), [0, by, bz + 0.008], [bt, 0, 0])
   k.add('chrome', box(0.07, 0.012, 0.004), [0, f.ty + 0.045, -f.front - 0.006])
-  for (const [z, y, sd] of [[f.front + 0.037, f.lift + 0.12, 1], [-f.front - 0.037, f.lift + 0.13, -1]] as const)
+  for (const [z, y, sd] of [[f.front + 0.034, f.plateY, 1], [-f.front - 0.037, f.lift + 0.13, -1]] as const)
     for (const x of [-0.032, 0, 0.032]) k.add('dark', plane(0.018, 0.016), [x, y, z], [0, sd < 0 ? Math.PI : 0, 0])
 }
 
@@ -101,6 +109,110 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
   const { wid, len, lift, top, hoodY, front, roofY, roofLen, roofZ, wz, wheel } = t
   const roof = roofLen > 0
   switch (f) {
+    case 'drl':
+      // LED brows over the headlights.
+      for (const sd of SIDES) {
+        const [z, y, rx] = t.nose(t.lightY + 0.036)
+        k.add('lamp', plane(0.12, 0.007), [sd * wid * 0.3, y, z + 0.006], [rx, 0, sd * 0.2])
+      }
+      return
+    case 'hoodCreases':
+      for (const sd of SIDES) k.add('dark', box(0.006, 0.003, (t.hoodFront - t.cowl) * 0.85), [sd * wid * 0.27, hoodY + 0.002, (t.cowl + t.hoodFront) / 2])
+      return
+    case 'meshGrille': {
+      // Honeycomb dots across the grille.
+      const [z, y, rx] = t.nose(t.lightY)
+      for (let r = -1; r <= 1; r++) for (let i = -4; i <= 4; i++) k.add('black', disc(0.006, 6), [i * 0.022 + (r % 2 ? 0.011 : 0), y + r * 0.014, z + 0.009], [rx, 0, 0])
+      return
+    }
+    case 'popups':
+      // Pop-up lamp lids flush in the front of the hood: a seam round each and a dark edge.
+      for (const sd of SIDES) {
+        const x = sd * wid * 0.3
+        const z = t.hoodFront - 0.07
+        k.add('dark', box(0.13, 0.003, 0.004), [x, hoodY + 0.002, z + 0.04])
+        k.add('dark', box(0.13, 0.003, 0.004), [x, hoodY + 0.002, z - 0.04])
+        for (const e of [-1, 1]) k.add('dark', box(0.004, 0.003, 0.08), [x + e * 0.065, hoodY + 0.002, z])
+      }
+      return
+    case 'quadTails':
+      // Two round lamps a side with chrome rings, over the stock cluster.
+      for (const sd of SIDES) for (const lx of [0.2, 0.36]) {
+        k.add('black', disc(0.034, 14), [sd * wid * lx, t.ty, -front - 0.007], [0, Math.PI, 0])
+        k.add('tail', disc(0.027, 14), [sd * wid * lx, t.ty, -front - 0.008], [0, Math.PI, 0])
+        k.add('chrome', new TorusGeometry(0.03, 0.004, 3, 14), [sd * wid * lx, t.ty, -front - 0.009])
+      }
+      return
+    case 'tripleTails':
+      // Three upright bars in each tail light.
+      for (const sd of SIDES) {
+        k.add('black', plane(0.16, 0.065), [sd * wid * 0.3, t.ty, -front - 0.007], [0, Math.PI, 0])
+        for (const i of [-1, 0, 1]) k.add('tail', plane(0.036, 0.05), [sd * wid * 0.3 + i * 0.048, t.ty, -front - 0.008], [0, Math.PI, 0])
+      }
+      return
+    case 'sideSkirts':
+      for (const sd of SIDES) k.add('black', box(0.03, 0.025, wz * 2 - wheel * 2.4), [sd * (wid / 2 + 0.01), lift + 0.035, 0])
+      return
+    case 'rearWiper': {
+      if (!roof) return
+      const z0 = roofZ - roofLen / 2 - 0.02
+      k.add('black', box(0.12, 0.008, 0.01), [0.03, (roofY + top) / 2 - 0.02, (z0 + t.cabinZ - t.cabinLen / 2) / 2 - 0.012], [0, 0, 0.3])
+      return
+    }
+    case 'diffuserFins':
+      k.add('black', box(wid * 0.8, 0.012, 0.09), [0, lift + 0.035, -front + 0.01])
+      for (let i = -3; i <= 3; i++) k.add('black', box(0.008, 0.055, 0.09), [i * wid * 0.11, lift + 0.055, -front + 0.01])
+      return
+    case 'centerExhaust':
+      if (t.exhaust) return
+      for (const x of [-0.035, 0.035]) {
+        k.add('chrome', cyl(0.022, 0.022, 0.06, 12), [x, lift + 0.1, -front - 0.01], [Math.PI / 2, 0, 0])
+        k.add('black', disc(0.016, 10), [x, lift + 0.1, -front - 0.041], [0, Math.PI, 0])
+      }
+      return
+    case 'stepBars':
+      for (const sd of SIDES) {
+        k.add('chrome', rbox(0.05, 0.02, wz * 2 - wheel * 2.6, 0.008), [sd * (wid / 2 + 0.035), lift + 0.01, 0])
+        for (const z of [-0.5, 0.5]) k.add('black', box(0.04, 0.03, 0.02), [sd * (wid / 2 + 0.015), lift + 0.02, z * (wz * 2 - wheel * 2.8)])
+      }
+      return
+    case 'ladder': {
+      const x = -wid * 0.3
+      for (const sd of [-1, 1]) k.add('chrome', box(0.01, top + 0.06 - lift, 0.01), [x + sd * 0.04, (top + lift) / 2 + 0.06, -front - 0.025])
+      for (let y = lift + 0.08; y < roofY; y += 0.06) k.add('chrome', box(0.08, 0.008, 0.008), [x, y, -front - 0.025])
+      return
+    }
+    case 'tailgateLettering':
+      for (let i = 0; i < 4; i++) k.add('chrome', plane(0.045, 0.035), [(i - 1.5) * 0.06, top - 0.045, -front - 0.006], [0, Math.PI, 0])
+      return
+    case 'fuelCap':
+      // Racing filler on the left rear quarter.
+      k.add('chrome', cyl(0.03, 0.03, 0.01, 14), [-wid * 0.36, top + 0.004, -front + 0.2])
+      k.add('black', disc(0.012, 8), [-wid * 0.36, top + 0.0095, -front + 0.2], [-Math.PI / 2, 0, 0])
+      return
+    case 'towStrap':
+      k.add('tail', box(0.035, 0.05, 0.008), [wid * 0.3, lift + 0.05, front + 0.03])
+      return
+    case 'headlightTape':
+      // X of tape over each headlight, endurance style.
+      for (const sd of SIDES) {
+        const [z, y, rx] = t.nose(t.lightY)
+        for (const a of [-0.35, 0.35]) k.add('black', plane(0.15, 0.008), [sd * wid * 0.3, y, z + 0.008], [rx, 0, a])
+      }
+      return
+    case 'chromeTrimWindow':
+      if (!roof) return
+      for (const sd of SIDES) k.add('chrome', box(0.006, 0.01, t.cabinLen * 0.86), [sd * wid * 0.404, top + 0.022, t.cabinZ])
+      return
+    case 'roofSeams':
+      if (!roof) return
+      k.add('chrome', box(0.012, 0.004, roofLen * 0.95), [0, roofY + 0.002, roofZ])
+      for (const sd of SIDES) k.add('dark', box(0.004, 0.003, roofLen * 0.9), [sd * wid * 0.3, roofY + 0.002, roofZ])
+      return
+    case 'chargePort':
+      k.add('dark', plane(0.04, 0.03), [-(wid / 2 + 0.004), top - 0.05, wz + wheel * 1.25], [0, -Math.PI / 2, 0])
+      k.add('lamp', plane(0.012, 0.012), [-(wid / 2 + 0.006), top - 0.05, wz + wheel * 1.25], [0, -Math.PI / 2, 0])
+      return
     case 'roofRack':
       if (!roof) return
       for (const sd of SIDES) {
@@ -365,6 +477,9 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
   }
 }
 
+// Whether a model carries a feature (CarModel leaves out stock parts it replaces).
+export const hasTrim = (model: string | undefined, f: Feature) => !!model && !!TRIMS[model]?.includes(f)
+
 export function trimCar(k: Kit, model: string | undefined, t: TrimFrame) {
   badges(k, t)
   // roofY is the top of the glass; the painted roof panel's rounded edge sits on it.
@@ -396,3 +511,47 @@ export function trimBike(k: Kit, model: string | undefined, b: { r: number; wz: 
     for (const sd of SIDES) k.add('dark', plane(0.18, 0.04), [sd * 0.083, b.r + 0.04, 0.04], [0, (sd * Math.PI) / 2, -0.1])
   }
 }
+
+// How each model's cabin and wheels look up close: the rim style and colour, brake
+// caliper colour (none: plain dark), seat colour, and whitewall tyres. Only cars drawn
+// whole use these; town traffic keeps its pooled wheels and solid glass.
+export type CarStyle = { rim: RimStyle; rimColor?: string; caliper?: string; seat?: string; ww?: boolean }
+const STYLES: Record<string, CarStyle> = {
+  pip: { rim: 'steel', rimColor: '#e6e8ea', seat: '#546e7a' },
+  civic: { rim: 'five', seat: '#37474f' },
+  trail: { rim: 'steel', rimColor: '#eceff1', seat: '#5d4037' },
+  miata: { rim: 'split', seat: '#7b3b2a' },
+  stallion: { rim: 'deep', rimColor: '#eceff1', seat: '#1c1c1c' },
+  rally: { rim: 'five', rimColor: '#d4a72c', caliper: '#e53935', seat: '#263238' },
+  vette: { rim: 'split', caliper: '#ffca28', seat: '#1c1c1c' },
+  charger: { rim: 'deep', rimColor: '#5f6368', caliper: '#e53935', seat: '#1c1c1c' },
+  hellcat: { rim: 'split', rimColor: '#2b2b2b', caliper: '#e53935', seat: '#4a1010' },
+  gtr: { rim: 'mesh', rimColor: '#b08d57', caliper: '#ff6d00', seat: '#1c1c1c' },
+  tomahawk: { rim: 'beadlock', rimColor: '#3a3a3a', seat: '#3e2723' },
+  camper: { rim: 'steel', rimColor: '#f5f5f5', ww: true, seat: '#a1887f' },
+  hotshot: { rim: 'mesh', rimColor: '#f5f5f5', caliper: '#e53935', seat: '#212121' },
+  ridgeback: { rim: 'beadlock', rimColor: '#9e9e9e', seat: '#4e342e' },
+  kitsune: { rim: 'deep', rimColor: '#c9a227', caliper: '#ff4081', seat: '#212121' },
+  current: { rim: 'turbine', rimColor: '#dfe3e6', caliper: '#29b6f6', seat: '#eceff1' },
+  salon: { rim: 'classic', ww: true, seat: '#d7b98e' },
+  stomper: { rim: 'beadlock', rimColor: '#2a2a2a', seat: '#263238' },
+  monoposto: { rim: 'five', rimColor: '#2a2a2a', caliper: '#e53935' },
+  zenith: { rim: 'split', rimColor: '#1d1d1d', caliper: '#ff6d00', seat: '#263238' },
+  schoolbus: { rim: 'steel', rimColor: '#2f2f2f', seat: '#2e7d32' },
+  shaggy: { rim: 'steel', rimColor: '#e0e0e0', ww: true, seat: '#8d6e63' },
+  tusker: { rim: 'beadlock', rimColor: '#5d5d3a', seat: '#3e2723' },
+  lambo: { rim: 'deep', rimColor: '#e0e0e0', caliper: '#fdd835', seat: '#1c1c1c' },
+  hyper: { rim: 'mesh', rimColor: '#1e1e1e', caliper: '#d50000', seat: '#1a237e' },
+  bug: { rim: 'steel', rimColor: '#ffffff', ww: true, seat: '#d7ccc8' },
+  woodie: { rim: 'classic', ww: true, seat: '#c8a27a' },
+  hauler: { rim: 'steel', rimColor: '#c62828', seat: '#5d4037' },
+  cruiser: { rim: 'classic', ww: true, seat: '#f8bbd0' },
+  buggy: { rim: 'beadlock', rimColor: '#eceff1', seat: '#212121' },
+  bandit: { rim: 'turbine', rimColor: '#c9a227', seat: '#1c1c1c' },
+  lemans: { rim: 'mesh', rimColor: '#d4d4d4', caliper: '#e53935', seat: '#263238' },
+  gullwing: { rim: 'classic', seat: '#b71c1c' },
+  speedster: { rim: 'wire', seat: '#6d4c41' },
+  nightfall: { rim: 'turbine', rimColor: '#1d1d1d', caliper: '#00e5ff', seat: '#311b92' },
+}
+// A car this build doesn't know gets plain five-spokes.
+export const carStyle = (model?: string): CarStyle => (model && STYLES[model]) || { rim: 'five' }
