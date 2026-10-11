@@ -7,6 +7,7 @@ import {
   buildingUpgradeCost, MAX_BUILDING_LEVEL, houseResidents, levelName, buildingUpgradeXp, BUILDINGS, CARS, takesDriver, loves, driverPayout, carDef, type BuildingDef,
 } from '../game/data'
 import { workingDriver, type PlacedBuilding } from '../game/store'
+import { groupOf, mergeGroups } from '../game/merge'
 import { CarThumb } from '../scene/BuildingPreview'
 import { BuildingModel } from '../scene/BuildingModel'
 import { frame, seat } from '../scene/fit'
@@ -95,7 +96,7 @@ function Driver({ b, d }: { b: PlacedBuilding; d: BuildingDef }) {
       <div className="driver">
         <div className="driver-head">Driver</div>
         <div className="driver-car">
-          <CarThumb size="sm" color={car.color} finish={car.finish} body={cd.body} stripe={car.stripe} />
+          <CarThumb size="sm" color={car.color} finish={car.finish} body={cd.body} model={cd.id} stripe={car.stripe} />
           <div>
             <b>{cd.name}</b>
             <div className={broken ? 'driver-bonus off' : 'driver-bonus'}>
@@ -130,7 +131,7 @@ function Driver({ b, d }: { b: PlacedBuilding; d: BuildingDef }) {
           const at = workplace(c.uid)
           return (
             <button key={c.uid} className={`driver-pick${fan ? ' fan' : ''}${c.uid === b.car ? ' sel' : ''}`} onClick={() => { assign(b.uid, c.uid); setPicking(false) }}>
-              <CarThumb size="xs" color={c.color} finish={c.finish} body={cd.body} stripe={c.stripe} />
+              <CarThumb size="xs" color={c.color} finish={c.finish} body={cd.body} model={cd.id} stripe={c.stripe} />
               <span className="driver-pick-name">{cd.name}{(at || c.flat || c.lowFuel) && <small>{[at && `at ${buildingDef(at.def).name}`, c.flat && '🛞 flat tire', c.lowFuel && '⛽ out of gas'].filter(Boolean).join(' · ')}</small>}</span>
               <span className="driver-pick-bonus">{fan ? '❤️ +25%' : '+10%'}</span>
             </button>
@@ -157,25 +158,30 @@ export function UpgradePanel() {
   const lvl = buildingLevel(b)
   const max = lvl >= MAX_BUILDING_LEVEL
   const next = max ? lvl : lvl + 1
-  const cost = buildingUpgradeCost(d, lvl)
+  // A merged block shows and upgrades all its buildings at once.
+  const members = groupOf(s.buildings, b.uid)?.members ?? [b]
+  const k = members.length
+  const one = buildingUpgradeCost(d, lvl)
+  const cost = { coins: one.coins * k, parts: one.parts * k }
+  const sum = (f: (o: PlacedBuilding) => number) => members.reduce((t, o) => t + f(o), 0)
   const shortCoins = Math.max(0, cost.coins - s.coins)
   const shortParts = Math.max(0, cost.parts - s.parts)
 
   const rows: { label: string; now: string; next: string }[] = []
   if (d.jobSeconds) {
-    const driver = workingDriver(s, b)
-    rows.push({ label: driver ? 'Coins per job (with driver)' : 'Coins per job', now: `$${n(driverPayout(d, lvl, driver))}`, next: `$${n(driverPayout(d, next, driver))}` })
-    if (d.partsPayout) rows.push({ label: 'Parts per job', now: `⚙ ${upgradePartsPayout(d, lvl)}`, next: `⚙ ${upgradePartsPayout(d, next)}` })
+    const driver = members.some((o) => workingDriver(s, o))
+    rows.push({ label: driver ? 'Coins per job (with driver)' : 'Coins per job', now: `$${n(sum((o) => driverPayout(d, lvl, workingDriver(s, o))))}`, next: `$${n(sum((o) => driverPayout(d, next, workingDriver(s, o))))}` })
+    if (d.partsPayout) rows.push({ label: 'Parts per job', now: `⚙ ${upgradePartsPayout(d, lvl) * k}`, next: `⚙ ${upgradePartsPayout(d, next) * k}` })
     rows.push({ label: 'Job time', now: time(upgradeJobSeconds(d, lvl)), next: time(upgradeJobSeconds(d, next)) })
-    rows.push({ label: 'XP per job', now: `${upgradeXp(d, lvl)}`, next: `${upgradeXp(d, next)}` })
+    rows.push({ label: 'XP per job', now: `${upgradeXp(d, lvl) * k}`, next: `${upgradeXp(d, next) * k}` })
   }
-  if (upgradeFuelCap(d, next) > 0) rows.push({ label: 'Max fuel', now: `+${upgradeFuelCap(d, lvl)}`, next: `+${upgradeFuelCap(d, next)}` })
+  if (upgradeFuelCap(d, next) > 0) rows.push({ label: 'Max fuel', now: `+${upgradeFuelCap(d, lvl) * k}`, next: `+${upgradeFuelCap(d, next) * k}` })
   if (d.kind === 'house') {
     rows.push({ label: 'Building', now: levelName(d, lvl), next: levelName(d, next) })
-    rows.push({ label: 'Residents', now: `${houseResidents(lvl)}`, next: `${houseResidents(next)}` })
-    rows.push({ label: 'Upgrade XP', now: '', next: `+${buildingUpgradeXp(lvl)}` })
+    rows.push({ label: 'Residents', now: `${houseResidents(lvl) * k}`, next: `${houseResidents(next) * k}` })
+    rows.push({ label: 'Upgrade XP', now: '', next: `+${buildingUpgradeXp(lvl) * k}` })
   }
-  const name = levelName(d, lvl)
+  const name = levelName(d, lvl) + (k > 1 ? ` ×${k}` : '')
 
   return (
     <Panel title={`${name} · Level ${lvl}`} onClose={close}>
@@ -221,10 +227,12 @@ export function ShopUpgrades() {
   const openUpgrade = useGame((s) => s.openUpgrade)
   const order = (id: string) => BUILDINGS.findIndex((d) => d.id === id)
   // Cheapest next upgrade first; maxed-out buildings last.
+  const merges = mergeGroups(buildings)
+  const size = (b: (typeof buildings)[number]) => merges.groups.get(b.uid)?.members.length ?? 1
   const costOf = (b: (typeof buildings)[number]) =>
-    buildingLevel(b) >= MAX_BUILDING_LEVEL ? Infinity : buildingUpgradeCost(buildingDef(b.def), buildingLevel(b)).coins
+    buildingLevel(b) >= MAX_BUILDING_LEVEL ? Infinity : buildingUpgradeCost(buildingDef(b.def), buildingLevel(b)).coins * size(b)
   const sorted = buildings
-    .filter((b) => upgradable(buildingDef(b.def)))
+    .filter((b) => upgradable(buildingDef(b.def)) && (!merges.owner.has(b.uid) || merges.groups.has(b.uid)))
     .sort((a, b) => costOf(a) - costOf(b) || order(a.def) - order(b.def))
   if (!sorted.length) return null
   return (
@@ -235,11 +243,13 @@ export function ShopUpgrades() {
           const d = buildingDef(b.def)
           const lvl = buildingLevel(b)
           const max = lvl >= MAX_BUILDING_LEVEL
-          const cost = buildingUpgradeCost(d, lvl)
+          const k = size(b)
+          const one = buildingUpgradeCost(d, lvl)
+          const cost = { coins: one.coins * k, parts: one.parts * k }
           const afford = coins >= cost.coins && parts >= cost.parts
           return (
             <button key={b.uid} className={`upgrade-row${afford && !max ? ' ready' : ''}`} onClick={() => openUpgrade(b.uid)}>
-              <span className="upgrade-row-name">{levelName(d, lvl)}</span>
+              <span className="upgrade-row-name">{levelName(d, lvl)}{k > 1 ? ` ×${k}` : ''}</span>
               <Pips level={lvl} />
               <span className="price">{max ? '⭐ Max' : `$${n(cost.coins)}${cost.parts ? ` ⚙${cost.parts}` : ''}`}</span>
             </button>

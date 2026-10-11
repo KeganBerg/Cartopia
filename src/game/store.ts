@@ -2,24 +2,26 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
   PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS,
-  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, DAILY_BONUS, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modSlotsFor, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower,
+  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, activeEvent, DAILY_BONUS, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modFits, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower, seasonNumber, seasonOf, SEASON_STARS, SEASON_TIERS, STARS_PER_TIER, SEASON_CAR_BUCKS, dealsFor, dealOffer, type DealDef, type DealKind,
 } from './data'
 import { sfx } from '../lib/sound'
 import { msUntilNight } from './clock'
 import { requestTrip, requestVisit } from './trips'
 import { trialPrize } from './trial'
+import { groupOf, mergeCandidates, applyMerge, applySplit } from './merge'
 
 // rot: quarter turns the player chose (0 faces south). Unset means face the nearest road.
 // level: upgrade level 1-10 (see MAX_BUILDING_LEVEL); unset means 1.
 // jobLevel: the level the running job started at, so an upgrade mid-job only pays from the next job.
 // car: uid of the owned car assigned to drive for this business (see DRIVER_BONUS).
-export type PlacedBuilding = { uid: string; def: string; x: number; z: number; jobEndsAt: number | null; rot?: number; level?: number; jobLevel?: number; car?: string }
+// merge: set on the top-left building of a merged 2x2 or 4x4 block (see merge.ts).
+export type PlacedBuilding = { uid: string; def: string; x: number; z: number; jobEndsAt: number | null; rot?: number; level?: number; jobLevel?: number; car?: string; merge?: number }
 export type OwnedCar = { uid: string; model: string; color: string; upgrades: Record<UpgradeSlot, number>; flat?: boolean; lowFuel?: boolean; stripe?: string | null; finish?: Finish; plate?: string; mods?: string[]; ownedMods?: string[] }
 // A rusty find waiting in Rusty's storage, and the one car in the restore bay.
 export type JunkCar = { uid: string; model: string; rarity: Rarity }
 export type Restoring = JunkCar & { endsAt: number; minutes: number }
 export type Loot =
-  | { kind: 'car'; model: string; rarity: Rarity }
+  | { kind: 'car'; model: string; rarity: Rarity; uid?: string }
   | { kind: 'coins' | 'parts' | 'fuel'; n: number }
   | { kind: 'trophy' }
   | { kind: 'nothing' }
@@ -66,17 +68,22 @@ export type SaveState = {
   campaign: Record<string, number>
   // Collection book sets whose one-time reward has been claimed.
   claimedSets: string[]
+  // Season track: the season number, stars earned in it, and tiers (0-based) collected.
+  season: SeasonProgress | null
+  // Daily deals used today (UTC), by deal id. The server guard allows each discount once a day.
+  deals: { day: string; used: string[] } | null
   // Weekly time trial prizes claimed, by week (its Monday, YYYY-MM-DD), with the place that paid.
   trials: { claimed: Record<string, number> }
   land: string[]
   updatedAt: number
 }
+export type SeasonProgress = { n: number; stars: number; claimed: number[] }
 
-export type Mode = 'play' | 'place' | 'move' | 'road' | 'bulldoze' | 'expand'
+export type Mode = 'play' | 'place' | 'move' | 'road' | 'bulldoze' | 'expand' | 'merge'
 export type Resource = 'coins' | 'parts' | 'fuel' | 'bucks' | 'level'
 export type Need = { res: Resource; missing: number; what?: string }
 
-export type Panel = null | 'need' | 'shop' | 'garage' | 'showroom' | 'race' | 'account' | 'goals' | 'daily' | 'flat' | 'friends' | 'rescue' | 'bank' | 'invites' | 'leaders' | 'clan' | 'upgrade' | 'welcome'
+export type Panel = null | 'need' | 'shop' | 'garage' | 'showroom' | 'race' | 'account' | 'goals' | 'daily' | 'flat' | 'friends' | 'rescue' | 'bank' | 'invites' | 'leaders' | 'clan' | 'upgrade' | 'welcome' | 'gifts' | 'season' | 'deals'
 
 // A read-only copy of another player's town while visiting it.
 export type VisitedTown = { ownerId: string; townName: string; level: number; trophies: number; roads: string[]; buildings: PlacedBuilding[]; cars: OwnedCar[]; land?: string[] }
@@ -125,6 +132,8 @@ type Actions = {
   moveBuilding: (uid: string, x: number, z: number, rot?: number) => boolean
   paintRoad: (x: number, z: number) => void
   bulldoze: (x: number, z: number) => void
+  mergeBlock: (anchor: string, size: number) => void
+  splitBlock: (uid: string) => void
   tapBuilding: (uid: string) => void
   openUpgrade: (uid: string) => void
   upgradeBuilding: (uid: string) => boolean
@@ -138,6 +147,7 @@ type Actions = {
   claimGoal: (id: string) => void
   claimTask: (period: Period, id: string) => void
   claimChest: (period: Period) => void
+  claimTier: (tier: number) => void
   claimSet: (id: string) => void
   claimDaily: () => void
   fixFlat: (uid: string, tow: boolean) => void
@@ -146,11 +156,14 @@ type Actions = {
   visit: (town: VisitedTown | null) => void
   helpFriend: () => void
   setTutorial: (step: number) => void
+  // Fuel and parts friends left for you (already checked and claimed server-side).
+  receiveGifts: (fuel: number, parts: number) => void
   // Fit a mod (replacing whatever is in its slot; buys it first if this car doesn't own it), or take it off with remove.
   modCar: (uid: string, modId: string, remove?: boolean) => boolean
   loadSave: (s: SaveState) => void
   showMe: (defs: string[], text: string) => void
   refillFuel: () => void
+  buyDeal: (id: string) => boolean
   buyPlot: (px: number, pz: number) => void
   gpResult: (series: string, won: boolean) => void
   // Records a campaign race; returns the stars earned (0 for a loss).
@@ -175,6 +188,17 @@ type Actions = {
 }
 
 export type GameState = SaveState & UiState & Actions
+
+// Cars a signed-in player's search finds come from the server (rescue_roll() in
+// supabase/migrations/0022_rescue_rolls.sql), which keeps them so the guard can tell real
+// finds from made-up ones. src/lib/rescue.ts plugs it in; null means roll here (guests, or a server
+// without it yet).
+export type ServerFind = { i: number; uid: string; model: string; rarity: Rarity }
+let rescueRoller: ((spot: string) => Promise<ServerFind[] | null>) | null = null
+let rolling = false
+export const setRescueRoller = (f: typeof rescueRoller) => {
+  rescueRoller = f
+}
 
 const key = (x: number, z: number) => `${x},${z}`
 let uidCounter = 0
@@ -268,6 +292,7 @@ export function starterTown(): SaveState {
     stats: emptyStats(),
     claimedGoals: [],
     quests: null,
+    season: null,
     lastDaily: null,
     dailyStreak: 0,
     helped: {},
@@ -278,6 +303,7 @@ export function starterTown(): SaveState {
     campaign: {},
     claimedSets: [],
     trials: { claimed: {} },
+    deals: null,
     land: [...START_LAND],
     updatedAt: now,
   }
@@ -333,13 +359,21 @@ type StatSource = Pick<SaveState, 'stats' | 'buildings' | 'level' | 'cars' | 'la
 
 // Story goals showing now: the first three unclaimed ones the player's level allows.
 export function activeGoals(s: Pick<SaveState, 'claimedGoals' | 'level'>) {
-  return GOALS.filter((g) => !s.claimedGoals.includes(g.id) && s.level >= (g.level ?? 1)).slice(0, 3)
+  return GOALS.filter((g) => !g.event && !s.claimedGoals.includes(g.id) && s.level >= (g.level ?? 1)).slice(0, 3)
 }
+// The running event's goals, claimed ones included (shown ticked).
+export function eventGoals(now = Date.now()) {
+  const e = activeEvent(now)
+  return e ? GOALS.filter((g) => g.event === e.id) : []
+}
+export const goalOpen = (s: Pick<SaveState, 'claimedGoals' | 'level'>, g: GoalDef) =>
+  !s.claimedGoals.includes(g.id) && s.level >= (g.level ?? 1) && (g.event ? activeEvent()?.id === g.event : true)
 export function statValue(s: StatSource, key: StatKey, def?: string): number {
   switch (key) {
     // Rusty's Rescue counts from the buildings so older towns that already have one get credit.
     case 'rusty': return s.buildings.some((b) => b.def === 'rescue') ? 1 : 0
     case 'owns': return s.buildings.some((b) => b.def === def) ? 1 : 0
+    case 'spooky': return s.buildings.filter((b) => buildingDef(b.def).event === 'spooky').length
     case 'level': return s.level
     case 'carsOwned': return s.cars.length
     case 'drivers': return s.buildings.filter((b) => b.car && s.cars.some((c) => c.uid === b.car)).length
@@ -369,6 +403,21 @@ export const periodDone = (q: Quests | null, period: Period) => (period === 'dai
 export const chestOpened = (q: Quests | null, period: Period) => !!(period === 'daily' ? q?.dayChest : q?.weekChest)
 
 // Starts a new day or week of tasks when the calendar has moved on. Returns null when nothing changed.
+// This season's progress, starting fresh when a new season begins.
+export function currentSeason(s: Pick<SaveState, 'season'>, now = Date.now()): SeasonProgress {
+  const n = seasonNumber(now)
+  return s.season && s.season.n === n ? s.season : { n, stars: 0, claimed: [] }
+}
+export const tierReady = (p: SeasonProgress, tier: number) => !p.claimed.includes(tier) && p.stars >= (tier + 1) * STARS_PER_TIER
+export const seasonClaimable = (s: Pick<SaveState, 'season'>) => {
+  const p = currentSeason(s)
+  return SEASON_TIERS.filter((_, i) => tierReady(p, i)).length
+}
+const addStars = (s: Pick<SaveState, 'season'>, n: number): SeasonProgress => {
+  const p = currentSeason(s)
+  return { ...p, stars: p.stars + n }
+}
+
 export function rolledQuests(s: Pick<SaveState, 'quests' | 'stats' | 'level' | 'buildings'>, now = Date.now()): Quests | null {
   const day = dayKey(now)
   const week = weekKey(now)
@@ -386,7 +435,7 @@ export function rolledQuests(s: Pick<SaveState, 'quests' | 'stats' | 'level' | '
 
 // Everything ready to collect: finished story goals, tasks and chests.
 export function claimable(s: GameState) {
-  const goals = activeGoals(s).filter((g) => goalDone(s, g)).length
+  const goals = [...activeGoals(s), ...eventGoals()].filter((g) => goalOpen(s, g) && goalDone(s, g)).length
   let tasks = 0
   for (const p of ['daily', 'weekly'] as const) {
     const done = periodDone(s.quests, p)
@@ -423,11 +472,91 @@ function addXp(s: GameState, amount: number): Partial<GameState> {
 
 // Apply an action's changes, then its XP. Level-up bonuses add on top of the
 // action's own coins and bucks instead of replacing them.
+// A tap on a merged business works the whole block as one: collect every
+// finished job, otherwise start every idle one the fuel covers, otherwise
+// show its upgrades. Each building still runs and pays its own job.
+function tapMerged(s: GameState, set: (p: Partial<GameState>) => void, uids: string[]): void {
+  const now = Date.now()
+  const members = s.buildings.filter((o) => uids.includes(o.uid))
+  const d = buildingDef(members[0].def)
+  const ready = members.filter((o) => o.jobEndsAt !== null && now >= o.jobEndsAt)
+  if (ready.length) {
+    let pay = 0, parts = 0, xp = 0
+    for (const o of ready) {
+      pay += driverPayout(d, jobLevel(o), workingDriver(s, o))
+      parts += upgradePartsPayout(d, jobLevel(o))
+      xp += upgradeXp(d, jobLevel(o))
+    }
+    const done = new Set(ready.map((o) => o.uid))
+    sfx.coin()
+    s.toast(`+${pay.toLocaleString()} coins${parts ? `, +${parts} parts` : ''}, +${xp} XP`)
+    return set(withXp(s, xp, {
+      coins: s.coins + pay,
+      parts: s.parts + parts,
+      stats: { ...s.stats, jobs: (s.stats.jobs ?? 0) + ready.length, coinsEarned: (s.stats.coinsEarned ?? 0) + pay },
+      buildings: s.buildings.map((o) => (done.has(o.uid) ? { ...o, jobEndsAt: null, jobLevel: undefined } : o)),
+      updatedAt: now,
+    }))
+  }
+  const idle = members.filter((o) => o.jobEndsAt === null)
+  if (!idle.length) return s.openUpgrade(members[0].uid)
+  if (!isOpen(d, now)) return s.toast(`The ${d.name} only opens at night. Doors open in ${Math.max(1, Math.ceil(msUntilNight(now) / 60000))} min.`)
+  const cost = d.fuelCost ?? 0
+  const n = cost ? Math.min(idle.length, Math.floor(s.fuel / cost)) : idle.length
+  if (!n) return s.showNeed('fuel', cost * idle.length - s.fuel, `the merged ${d.name}`)
+  if (n < idle.length) s.toast(`Fuel for ${n} of ${idle.length} jobs. The rest start when you tap again.`)
+  sfx.start()
+  const go = new Set(idle.slice(0, n).map((o) => o.uid))
+  for (const o of idle.slice(0, n)) if (o.car) requestVisit(o.car, o.uid)
+  const cap = fuelCap(s)
+  set({
+    fuel: s.fuel - n * cost,
+    fuelUpdatedAt: s.fuel >= cap ? now : s.fuelUpdatedAt,
+    buildings: s.buildings.map((o) => {
+      if (!go.has(o.uid)) return o
+      const lvl = buildingLevel(o)
+      return { ...o, jobEndsAt: now + upgradeJobSeconds(d, lvl) * 1000, jobLevel: lvl }
+    }),
+    updatedAt: now,
+  })
+}
+
 function withXp(s: GameState, amount: number, patch: Partial<GameState>): Partial<GameState> {
   return { ...patch, ...addXp({ ...s, ...patch }, amount) }
 }
 
 export const cleanPlate = (p: string) => p.toUpperCase().replace(/[^A-Z0-9 ]/g, '').trim().slice(0, 7)
+
+// Daily deals: today's three, which are used up, and the deal (if any) that discounts an item.
+export const dealUsed = (s: Pick<SaveState, 'deals'>, id: string, day = today()) => s.deals?.day === day && s.deals.used.includes(id)
+export function liveDeal(s: Pick<SaveState, 'deals' | 'level'>, kind: DealKind, item?: string): DealDef | null {
+  const d = dealsFor(today()).find((x) => x.kind === kind && x.item === item)
+  return d && !dealUsed(s, d.id) && s.level >= dealOffer(d).unlockLevel ? d : null
+}
+export const openDeals = (s: Pick<SaveState, 'deals' | 'level'>) =>
+  dealsFor(today()).filter((d) => !dealUsed(s, d.id) && s.level >= dealOffer(d).unlockLevel).length
+const spendDeal = (s: Pick<SaveState, 'deals'>, d: DealDef | null) =>
+  d ? { deals: { day: today(), used: [...(s.deals?.day === today() ? s.deals.used : []), d.id] } } : {}
+// What placing a building costs today, after any deal on it.
+export function buildPrice(s: Pick<SaveState, 'deals' | 'level'>, def: string) {
+  const d = buildingDef(def)
+  const deal = d.kind === 'decor' ? liveDeal(s, 'decor', def) : null
+  return deal ? { coins: dealOffer(deal).now.coins, bucks: dealOffer(deal).now.bucks, deal } : { coins: d.price, bucks: d.bucks ?? 0, deal: null }
+}
+// What a mod costs today, after any deal on it (deals only cut the coins).
+export function modPrice(s: Pick<SaveState, 'deals' | 'level'>, modId: string) {
+  const m = modDef(modId)
+  const deal = liveDeal(s, 'mod', modId)
+  return { coins: deal ? dealOffer(deal).now.coins : m?.coins ?? 0, parts: m?.parts ?? 0, bucks: m?.bucks ?? 0, deal }
+}
+// What a paint job costs today: a finish deal cuts the finish part of the bill.
+export function paintPrice(s: Pick<SaveState, 'deals' | 'level'>, car: OwnedCar, job: PaintJob) {
+  const cost = paintJobCost(car, job)
+  const deal = job.finish !== (car.finish ?? 'gloss') ? liveDeal(s, 'paint', job.finish) : null
+  if (!deal) return { ...cost, deal: null }
+  const o = dealOffer(deal)
+  return { coins: cost.coins - (o.was.coins - o.now.coins), bucks: cost.bucks, deal }
+}
 
 // Collect all can be used once a minute; the last use survives a reload.
 export const COLLECT_ALL_MS = 60_000
@@ -513,23 +642,29 @@ export const useGame = create<GameState>()(
           sfx.error()
           return false
         }
+        if (d.event && activeEvent()?.id !== d.event) {
+          s.toast(`The ${d.name} comes back next event`)
+          return false
+        }
         if (d.unique && s.buildings.some((o) => o.def === def)) {
           s.toast(`You already have a ${d.name}`)
           return false
         }
-        if (s.coins < d.price) {
-          s.showNeed('coins', d.price - s.coins, d.name)
+        const cost = buildPrice(s, def)
+        if (s.coins < cost.coins) {
+          s.showNeed('coins', cost.coins - s.coins, d.name)
           return false
         }
-        if (s.bucks < (d.bucks ?? 0)) {
-          s.showNeed('bucks', (d.bucks ?? 0) - s.bucks, d.name)
+        if (s.bucks < cost.bucks) {
+          s.showNeed('bucks', cost.bucks - s.bucks, d.name)
           return false
         }
         if (def === 'rescue') setTimeout(() => get().toast("Rusty's is open! Tap his shop to search for cars. The Showroom is unlocked too."), 400)
         sfx.click()
         set(withXp(s, Math.max(1, Math.round(d.price / 100)), {
-          coins: s.coins - d.price,
-          bucks: s.bucks - (d.bucks ?? 0),
+          coins: s.coins - cost.coins,
+          bucks: s.bucks - cost.bucks,
+          ...spendDeal(s, cost.deal),
           buildings: [...s.buildings, { uid: uid(), def, x, z, jobEndsAt: null, ...(rot == null ? {} : { rot }) }],
           stats: bump(s, 'built'),
           updatedAt: Date.now(),
@@ -543,6 +678,7 @@ export const useGame = create<GameState>()(
         const s = get()
         const b = s.buildings.find((o) => o.uid === buid)
         if (!b || !movable(b.def)) return false
+        if (groupOf(s.buildings, buid)) return false
         const turn = rot ?? b.rot
         if (!canPlace(s, b.def, x, z, turn, buid)) return false
         if (b.x === x && b.z === z && b.rot === turn) return true
@@ -572,6 +708,7 @@ export const useGame = create<GameState>()(
         if (d.kind === 'showroom' || d.kind === 'garage') return s.toast(`${d.name} can't be removed`)
         if (d.parked) return s.toast('This one is coming in a future update, so it stays put')
         if (d.kind === 'obstacle') return s.toast(`Tap the ${d.name.toLowerCase()} in play mode to clear it`)
+        if (groupOf(s.buildings, b.uid)) return s.toast(`Split your merged ${d.name} first (Edit, then Merge)`)
         // Upgrades would be lost, and a drag can sweep over a building by accident.
         if (buildingLevel(b) > 1) return s.toast(`Your ${d.name} is upgraded, so it can't be bulldozed. Use Move to put it somewhere else.`)
         set({
@@ -579,6 +716,24 @@ export const useGame = create<GameState>()(
           coins: s.coins + Math.floor(d.price / 2),
           updatedAt: Date.now(),
         })
+      },
+
+      mergeBlock: (anchor, size) => {
+        const s = get()
+        const c = mergeCandidates(s.buildings).find((o) => o.anchor.uid === anchor && o.code === size)
+        if (!c) return
+        sfx.buy()
+        const d = buildingDef(c.anchor.def)
+        s.toast(size === 4 ? `Giant ${d.name}! 16 in one.` : `Merged ${c.members.length} into one big ${d.name}!`)
+        set({ buildings: applyMerge(s.buildings, c), updatedAt: Date.now() })
+      },
+
+      splitBlock: (uid) => {
+        const s = get()
+        const g = groupOf(s.buildings, uid)
+        if (!g) return
+        sfx.click()
+        set({ buildings: applySplit(s.buildings, g), updatedAt: Date.now() })
       },
 
       tapBuilding: (buid) => {
@@ -604,6 +759,8 @@ export const useGame = create<GameState>()(
         }
         // Gas stations and houses have no jobs; a tap shows their upgrades.
         if (!d.jobSeconds) return upgradable(d) ? s.openUpgrade(buid) : undefined
+        const merged = groupOf(s.buildings, buid)
+        if (merged) return tapMerged(s, set, merged.members.map((o) => o.uid))
         const now = Date.now()
         const lvl = buildingLevel(b)
         const jobLvl = jobLevel(b)
@@ -659,7 +816,7 @@ export const useGame = create<GameState>()(
         const s = get()
         const b = s.buildings.find((o) => o.uid === buid)
         if (!b || s.visiting || !upgradable(buildingDef(b.def))) return
-        set({ panel: 'upgrade', upgrading: buid })
+        set({ panel: 'upgrade', upgrading: groupOf(s.buildings, buid)?.anchor.uid ?? buid })
       },
 
       upgradeBuilding: (buid) => {
@@ -669,7 +826,10 @@ export const useGame = create<GameState>()(
         const d = buildingDef(b.def)
         const lvl = buildingLevel(b)
         if (!upgradable(d) || lvl >= MAX_BUILDING_LEVEL) return false
-        const cost = buildingUpgradeCost(d, lvl)
+        // A merged block upgrades all its buildings together, so they stay merged.
+        const ids = new Set(groupOf(s.buildings, buid)?.members.map((o) => o.uid) ?? [buid])
+        const one = buildingUpgradeCost(d, lvl)
+        const cost = { coins: one.coins * ids.size, parts: one.parts * ids.size }
         const what = `upgrading your ${d.name}`
         if (s.coins < cost.coins) {
           s.showNeed('coins', cost.coins - s.coins, what)
@@ -681,11 +841,11 @@ export const useGame = create<GameState>()(
         }
         sfx.buy()
         s.toast(`${d.name} is now level ${lvl + 1}!`)
-        set(withXp(s, buildingUpgradeXp(lvl), {
+        set(withXp(s, buildingUpgradeXp(lvl) * ids.size, {
           coins: s.coins - cost.coins,
           parts: s.parts - cost.parts,
-          buildings: s.buildings.map((o) => (o.uid === buid ? { ...o, level: lvl + 1 } : o)),
-          stats: bump(s, 'upgrades'),
+          buildings: s.buildings.map((o) => (ids.has(o.uid) ? { ...o, level: lvl + 1 } : o)),
+          stats: bump(s, 'upgrades', ids.size),
           updatedAt: Date.now(),
         }))
         return true
@@ -796,6 +956,7 @@ export const useGame = create<GameState>()(
       buyCar: (model, color) => {
         const s = get()
         const c = carDef(model)
+        if (c.season || c.rescueOnly) return false
         if (s.level < c.unlockLevel) {
           s.showNeed('level', c.unlockLevel, c.name)
           return false
@@ -877,7 +1038,7 @@ export const useGame = create<GameState>()(
       claimGoal: (id) => {
         const s = get()
         const g = GOALS.find((o) => o.id === id)
-        if (!g || s.claimedGoals.includes(id) || !goalDone(s, g) || s.level < (g.level ?? 1)) return
+        if (!g || !goalOpen(s, g) || !goalDone(s, g)) return
         sfx.coin()
         s.toast(`Goal complete! +${g.coins} coins${g.bucks ? `, +${g.bucks} bucks` : ''}, +${g.xp} XP`)
         set(withXp(s, g.xp, {
@@ -896,9 +1057,10 @@ export const useGame = create<GameState>()(
         if (!q || !slot || done.includes(id) || !taskDone(s, period, slot)) return
         const pay = payAt(QUEST_PAY[period].task, s.level)
         sfx.coin()
-        s.toast(`Task done! +${pay.coins.toLocaleString()} coins, +${pay.xp} XP`)
+        const stars = period === 'daily' ? SEASON_STARS.dailyTask : SEASON_STARS.weeklyTask
+        s.toast(`Task done! +${pay.coins.toLocaleString()} coins, +${pay.xp} XP, +${stars} ⭐`)
         const quests = period === 'daily' ? { ...q, dayDone: [...done, id] } : { ...q, weekDone: [...done, id] }
-        set(withXp(s, pay.xp, { coins: s.coins + pay.coins, quests, updatedAt: Date.now() }))
+        set(withXp(s, pay.xp, { coins: s.coins + pay.coins, quests, season: addStars(s, stars), updatedAt: Date.now() }))
       },
 
       claimChest: (period) => {
@@ -908,12 +1070,32 @@ export const useGame = create<GameState>()(
         const c = QUEST_PAY[period].chest
         const pay = payAt(c, s.level)
         setTimeout(sfx.levelUp, 150)
-        s.toast(`Chest opened! +${pay.coins.toLocaleString()} coins, +${c.parts} parts${c.bucks ? `, +${c.bucks} bucks` : ''}${c.fuel ? `, +${c.fuel} fuel` : ''}`)
+        const stars = period === 'daily' ? SEASON_STARS.dailyChest : SEASON_STARS.weeklyChest
+        s.toast(`Chest opened! +${pay.coins.toLocaleString()} coins, +${c.parts} parts${c.bucks ? `, +${c.bucks} bucks` : ''}${c.fuel ? `, +${c.fuel} fuel` : ''}, +${stars} ⭐`)
         const quests = period === 'daily' ? { ...q, dayChest: true } : { ...q, weekChest: true }
         set(withXp(s, pay.xp, {
           coins: s.coins + pay.coins, parts: s.parts + c.parts, bucks: s.bucks + c.bucks, fuel: s.fuel + c.fuel,
-          quests, updatedAt: Date.now(),
+          quests, season: addStars(s, stars), updatedAt: Date.now(),
         }))
+      },
+
+      claimTier: (tier) => {
+        const s = get()
+        const p = currentSeason(s)
+        const prize = SEASON_TIERS[tier]
+        if (!prize || !tierReady(p, tier)) return
+        const season = { ...p, claimed: [...p.claimed, tier] }
+        const now = Date.now()
+        const car = prize.car ? seasonOf(p.n).car : undefined
+        setTimeout(sfx.levelUp, 150)
+        if (car) {
+          const d = carDef(car)
+          s.toast(`🏁 Season prize! The ${d.name} is yours.`)
+          return set({ season, cars: [...s.cars, { uid: uid(), model: car, color: d.colors[0], upgrades: noUpgrades() }], updatedAt: now })
+        }
+        const bucks = prize.bucks + (prize.car ? SEASON_CAR_BUCKS : 0)
+        s.toast(`Tier ${tier + 1}! ${[prize.coins && `+${prize.coins.toLocaleString()} coins`, prize.parts && `+${prize.parts} parts`, bucks && `+${bucks} bucks`].filter(Boolean).join(', ')}`)
+        set({ season, coins: s.coins + prize.coins, parts: s.parts + prize.parts, bucks: s.bucks + bucks, updatedAt: now })
       },
 
       claimSet: (id) => {
@@ -1028,6 +1210,13 @@ export const useGame = create<GameState>()(
 
       setTutorial: (tutorial) => set({ tutorial, updatedAt: Date.now() }),
 
+      receiveGifts: (fuel, parts) => {
+        const s = get()
+        sfx.coin()
+        s.toast(`Collected${fuel ? ` +${fuel} ⛽` : ''}${parts ? ` +${parts} ⚙` : ''} from friends`)
+        set({ fuel: s.fuel + fuel, parts: s.parts + parts, updatedAt: Date.now() })
+      },
+
       // Colour, finish and stripes in one paint job, tried on in the garage first.
       paintCar: (cuid, job) => {
         const s = get()
@@ -1040,7 +1229,7 @@ export const useGame = create<GameState>()(
           s.toast(`${fin.name} unlocks at level ${fin.unlockLevel}`)
           return false
         }
-        const { coins, bucks } = paintJobCost(car, job)
+        const { coins, bucks, deal } = paintPrice(s, car, job)
         const recolour = job.color !== car.color || job.finish !== (car.finish ?? 'gloss')
         if (!recolour && job.stripe === (car.stripe ?? null)) return false
         if (s.coins < coins) { s.showNeed('coins', coins - s.coins, 'a paint job'); return false }
@@ -1048,6 +1237,7 @@ export const useGame = create<GameState>()(
         const patch = {
           coins: s.coins - coins,
           bucks: s.bucks - bucks,
+          ...spendDeal(s, deal),
           cars: s.cars.map((c) => (c.uid === cuid ? { ...c, color: job.color, finish: job.finish === 'gloss' ? undefined : job.finish, stripe: job.stripe } : c)),
           stats: bump(s, 'painted'),
           updatedAt: Date.now(),
@@ -1063,7 +1253,7 @@ export const useGame = create<GameState>()(
         const car = s.cars.find((c) => c.uid === cuid)
         const m = modDef(modId)
         if (!car || !m) return false
-        if (!remove && !modSlotsFor(carDef(car.model).body).some((x) => x.id === m.slot)) return false
+        if (!remove && !modFits(m, carDef(car.model).body)) return false
         const others = (car.mods ?? []).filter((id) => modDef(id)?.slot !== m.slot)
         if (remove) {
           // Taken-off parts stay owned.
@@ -1082,23 +1272,25 @@ export const useGame = create<GameState>()(
           s.showNeed('level', m.unlockLevel, m.name)
           return false
         }
-        if (s.bucks < m.bucks) {
-          s.showNeed('bucks', m.bucks - s.bucks, `the ${m.name}`)
+        const cost = modPrice(s, modId)
+        if (s.bucks < cost.bucks) {
+          s.showNeed('bucks', cost.bucks - s.bucks, `the ${m.name}`)
           return false
         }
-        if (s.parts < m.parts) {
-          s.showNeed('parts', m.parts - s.parts, `the ${m.name}`)
+        if (s.parts < cost.parts) {
+          s.showNeed('parts', cost.parts - s.parts, `the ${m.name}`)
           return false
         }
-        if (s.coins < m.coins) {
-          s.showNeed('coins', m.coins - s.coins, `the ${m.name}`)
+        if (s.coins < cost.coins) {
+          s.showNeed('coins', cost.coins - s.coins, `the ${m.name}`)
           return false
         }
         sfx.buy()
         set({
-          coins: s.coins - m.coins,
-          parts: s.parts - m.parts,
-          bucks: s.bucks - m.bucks,
+          coins: s.coins - cost.coins,
+          parts: s.parts - cost.parts,
+          bucks: s.bucks - cost.bucks,
+          ...spendDeal(s, cost.deal),
           cars: s.cars.map((c) => (c.uid === cuid ? { ...c, mods: [...others, modId], ownedMods: [...owned, modId] } : c)),
           stats: bump(s, 'modsBought'),
           ...addXp(s, modXp(modId)),
@@ -1225,6 +1417,27 @@ export const useGame = create<GameState>()(
         set({ bucks: s.bucks - REFILL_BUCKS, fuel: cap, fuelUpdatedAt: Date.now(), panel: s.panel === 'need' ? null : s.panel, updatedAt: Date.now() })
       },
 
+      // Supplies deals (parts and fuel) are bought straight from the Deals panel.
+      buyDeal: (id) => {
+        const s = get()
+        const d = dealsFor(today()).find((x) => x.id === id)
+        if (!d || (d.kind !== 'parts' && d.kind !== 'fuel') || dealUsed(s, id)) return false
+        const o = dealOffer(d)
+        if (d.kind === 'fuel' && s.fuel >= fuelCap(s)) { s.toast('Your tank is already full'); return false }
+        if (s.coins < o.now.coins) { s.showNeed('coins', o.now.coins - s.coins, o.name); return false }
+        if (s.bucks < o.now.bucks) { s.showNeed('bucks', o.now.bucks - s.bucks, o.name); return false }
+        sfx.buy()
+        set({
+          coins: s.coins - o.now.coins,
+          bucks: s.bucks - o.now.bucks,
+          ...(d.kind === 'parts' ? { parts: s.parts + (d.n ?? 0) } : { fuel: fuelCap(s), fuelUpdatedAt: Date.now() }),
+          ...spendDeal(s, d),
+          updatedAt: Date.now(),
+        })
+        s.toast(d.kind === 'parts' ? `+${d.n} parts!` : 'Tank filled!')
+        return true
+      },
+
       showMe: (defs, text) => {
         set({ highlight: defs, panel: null, mode: 'play', placing: null, selected: null })
         get().toast(text)
@@ -1239,13 +1452,25 @@ export const useGame = create<GameState>()(
         if (s.level < spot.unlockLevel) return s.showNeed('level', spot.unlockLevel, spot.name)
         if (s.junkyard.length >= STORAGE_MAX) return s.toast('Storage is full. Restore or scrap a car first.')
         if (s.coins < spot.cost) return s.showNeed('coins', spot.cost - s.coins, `a search in the ${spot.name}`)
-        sfx.start()
-        set({
-          coins: s.coins - spot.cost,
-          search: rollSearch(spotId),
-          stats: bump(s, 'searches'),
-          updatedAt: Date.now(),
-        })
+        const go = (finds: ServerFind[] | null) => {
+          const g = get()
+          if (g.search || g.coins < spot.cost) return
+          sfx.start()
+          set({
+            coins: g.coins - spot.cost,
+            search: rollSearch(spotId, finds),
+            stats: bump(g, 'searches'),
+            updatedAt: Date.now(),
+          })
+        }
+        if (!rescueRoller) return go(null)
+        if (rolling) return
+        rolling = true
+        rescueRoller(spotId)
+          .then(go, () => get().toast("Rusty's radio can't reach the yard. Check your connection and try again."))
+          .finally(() => {
+            rolling = false
+          })
       },
 
       revealPin: (i) => {
@@ -1295,7 +1520,7 @@ export const useGame = create<GameState>()(
           else if (l.kind === 'trophy') trophies += 1
           else if (l.kind === 'car') {
             if (junkyard.length < STORAGE_MAX) {
-              junkyard.push({ uid: uid(), model: l.model, rarity: l.rarity })
+              junkyard.push({ uid: l.uid ?? uid(), model: l.model, rarity: l.rarity })
               notes.push(carDef(l.model).name)
             } else {
               scrapped += RARITY[l.rarity].scrapParts
@@ -1379,14 +1604,14 @@ export const useGame = create<GameState>()(
 )
 
 export function saveOf(s: GameState): SaveState {
-  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, trials, land, updatedAt } = s
-  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, trials, land, updatedAt }
+  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, season, deals, trials, land, updatedAt } = s
+  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, season, deals, trials, land, updatedAt }
 }
 
 // Fields added after launch, so older saves load with sensible values.
-function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'quests' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'gp' | 'campaign' | 'claimedSets' | 'trials' | 'land'> {
+function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'quests' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'gp' | 'campaign' | 'claimedSets' | 'season' | 'deals' | 'trials' | 'land'> {
   // Saves from before the tutorial existed skip it.
-  return { stats: emptyStats(), claimedGoals: [], quests: null, lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, gp: {}, campaign: {}, claimedSets: [], trials: { claimed: {} }, land: [...START_LAND] }
+  return { stats: emptyStats(), claimedGoals: [], quests: null, lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, gp: {}, campaign: {}, claimedSets: [], season: null, deals: null, trials: { claimed: {} }, land: [...START_LAND] }
 }
 
 
@@ -1406,18 +1631,20 @@ function rollCar(spotId: string): Loot {
 
 // Pre-rolls what every pin hides. Each search finds at least one car, and
 // about one in four gives the tow truck a flat partway through.
-function rollSearch(spotId: string): Search {
+export function rollSearch(spotId: string, finds: ServerFind[] | null = null): Search {
   const spot = RESCUE_SPOTS.find((o) => o.id === spotId)!
   const scale = spot.cost / 500
   const pins: Loot[] = Array.from({ length: RESCUE_PINS }, () => {
-    const r = Math.random()
-    if (r < 0.1) return rollCar(spotId)
+    // With server finds, every other pin hides something else.
+    const r = finds ? RESCUE_CAR_CHANCE + Math.random() * (1 - RESCUE_CAR_CHANCE) : Math.random()
+    if (r < RESCUE_CAR_CHANCE) return rollCar(spotId)
     if (r < 0.42) return { kind: 'coins', n: Math.round(range(4, 14) * 5 * scale) }
     if (r < 0.62) return { kind: 'parts', n: range(1, 3) + Math.floor(scale / 3) }
     if (r < 0.74) return { kind: 'fuel', n: range(1, 3) }
     if (r < 0.77) return { kind: 'trophy' }
     return { kind: 'nothing' }
   })
+  for (const f of finds ?? []) if (f.i >= 0 && f.i < RESCUE_PINS) pins[f.i] = { kind: 'car', model: f.model, rarity: f.rarity, uid: f.uid }
   if (!pins.some((p) => p.kind === 'car')) pins[Math.floor(Math.random() * RESCUE_PINS)] = rollCar(spotId)
   const flatAt = Math.random() < 0.25 ? pick(Array.from({ length: RESCUE_PINS }, (_, i) => i).filter((i) => pins[i].kind !== 'car')) : null
   return { spot: spotId, pins, revealed: pins.map(() => false), truckAt: null, flatAt: flatAt ?? null, flat: false }

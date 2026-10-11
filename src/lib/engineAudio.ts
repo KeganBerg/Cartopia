@@ -60,6 +60,12 @@ const BODY: Record<Body, EngineProfile> = {
   luxury: p({ ppr: 6, idle: 650, redline: 6200, odd: 0.05, roll: 1.4, sub: 0.5, grit: 0.15, noise: 0.15, bright: 0.9, reso: 150, turbo: 0.4, crackle: 0.1, vol: 0.9 }),
   formula: p({ ppr: 5, idle: 3500, redline: 15000, odd: 0.15, roll: 0.95, sub: 0.2, grit: 0.45, noise: 0.35, bright: 1.7, reso: 420, crackle: 0.6, vol: 1.15 }),
   offroad: p({ ppr: 2, idle: 950, redline: 5800, odd: 0.4, roll: 1.0, lump: 0.5, lumpRatio: 0.5, sub: 0.2, grit: 0.55, noise: 0.45, clatter: 0.3, bright: 1.2, reso: 210, crackle: 0.45, vol: 1.05 }),
+  // Big six-cylinder diesel school bus: slow, clattery, air-brake hiss on the turbo.
+  bus: p({ ppr: 3, idle: 600, redline: 3200, odd: 0.35, roll: 1.45, sub: 0.55, grit: 0.3, noise: 0.4, clatter: 0.7, bright: 0.65, reso: 105, turbo: 0.45, vol: 1.1 }),
+  // Turbo-diesel V8 off-roader.
+  tusker: p({ ppr: 4, idle: 700, redline: 4600, odd: 0.25, roll: 1.4, lump: 0.3, lumpRatio: 0.25, sub: 0.6, grit: 0.45, noise: 0.4, clatter: 0.45, bright: 0.8, reso: 115, turbo: 0.6, vol: 1.15 }),
+  // Wheezy old van four.
+  dogvan: p({ ppr: 2, idle: 750, redline: 4400, odd: 0.45, roll: 1.2, lump: 0.4, lumpRatio: 0.5, sub: 0.15, grit: 0.3, noise: 0.35, clatter: 0.4, bright: 0.8, reso: 165, vol: 0.85 }),
 }
 
 const MODEL: Record<string, Partial<EngineProfile>> = {
@@ -134,7 +140,7 @@ function curve(key: string, f: (x: number) => number) {
 }
 // Half-wave spikes: turns a sine into a pulse train for ticks and lope.
 const spike = () => curve('spike', (x) => Math.pow(Math.max(0, x), 6))
-const drive = (amt: number) => curve(`drive${amt.toFixed(2)}`, (x) => Math.tanh(x * (1 + amt * 6)) / Math.tanh(1 + amt * 6))
+const drive = (amt: number) => curve(`drive${amt.toFixed(2)}`, (x) => Math.tanh(x * (1 + amt * 2.2)) / Math.tanh(1 + amt * 2.2))
 
 // A one-shot burst of filtered noise.
 function burst(a: AudioContext, out: AudioNode, at: number, dur: number, vol: number, type: BiquadFilterType, f0: number, f1: number, q = 1) {
@@ -266,7 +272,6 @@ export class EngineVoice {
     // Cheap cars: thin and buzzy with a rattle. Expensive: deep, layered and clean.
     prof.odd = Math.min(0.9, prof.odd + (1 - q) * 0.35)
     prof.sub *= 0.35 + 0.65 * q
-    prof.clatter = Math.min(1, prof.clatter + (1 - q) * 0.2)
     prof.crackle *= 0.4 + 0.8 * q
     prof.turbo *= 0.6 + 0.4 * q
     prof.vol *= 0.8 + 0.3 * q
@@ -277,10 +282,14 @@ export class EngineVoice {
     this.out.gain.value = 0.0001
     this.pan = a.createStereoPanner()
     this.pan.pan.value = opts.pan ?? 0
-    this.out.connect(this.pan).connect(dest)
+    const smooth = a.createBiquadFilter()
+    smooth.type = 'lowpass'
+    smooth.frequency.value = 5200
+    smooth.Q.value = 0.5
+    this.out.connect(smooth).connect(this.pan).connect(dest)
 
     // Engine tone: harmonic pulse wave at the firing rate.
-    const n = Math.round(10 + q * 22)
+    const n = Math.round(8 + q * 10)
     const real = new Float32Array(n + 1)
     const imag = new Float32Array(n + 1)
     for (let k = 1; k <= n; k++) {
@@ -332,7 +341,7 @@ export class EngineVoice {
     hp.frequency.value = 160 - 130 * q
     this.lp = a.createBiquadFilter()
     this.lp.type = 'lowpass'
-    this.lp.Q.value = 0.9 + q * 0.8
+    this.lp.Q.value = 0.7 + q * 0.5
     const res = a.createBiquadFilter()
     res.type = 'peaking'
     res.frequency.value = prof.reso
@@ -355,14 +364,15 @@ export class EngineVoice {
     // Ticks: diesel clatter, air-cooled valvetrain, cheap-car rattle.
     const nz2 = noise(a)
     const thp = a.createBiquadFilter()
-    thp.type = 'highpass'
-    thp.frequency.value = 2200
+    thp.type = 'bandpass'
+    thp.frequency.value = 1600
+    thp.Q.value = 1.2
     this.tickGain = a.createGain()
     this.tickGain.gain.value = 0
     const tshape = a.createWaveShaper()
     tshape.curve = spike()
     const tdepth = a.createGain()
-    tdepth.gain.value = prof.clatter * 0.5
+    tdepth.gain.value = prof.clatter * 0.3
     this.tick.connect(tshape).connect(tdepth).connect(this.tickGain.gain)
     nz2.connect(thp).connect(this.tickGain).connect(this.out)
 
@@ -511,11 +521,11 @@ export class EngineVoice {
     set(this.lope.frequency, fire * prof.lumpRatio)
     set(this.tick.frequency, fire)
     const load = 0.3 + 0.7 * thr
-    set(this.lp.frequency, Math.min(16000, (220 + fire * (2.2 + 4 * thr) + r * 2600 * thr) * prof.bright))
+    set(this.lp.frequency, Math.min(4200, (200 + fire * (2 + 2.5 * thr) + r * 1400 * thr) * prof.bright))
     set(this.engGain.gain, (0.32 + 0.4 * r) * load)
-    set(this.nf.frequency, Math.min(9000, 300 + fire * 5))
-    set(this.noiseGain.gain, prof.noise * (0.05 + 0.3 * r * thr + 0.05 * r))
-    set(this.tickGain.gain, prof.clatter * (0.04 + 0.05 * (1 - r)) * (0.5 + 0.5 * load))
+    set(this.nf.frequency, Math.min(1800, 200 + fire * 2))
+    set(this.noiseGain.gain, prof.noise * (0.015 + 0.08 * r * thr))
+    set(this.tickGain.gain, prof.clatter * (0.02 + 0.03 * (1 - r)) * (0.5 + 0.5 * load))
     // Boost builds with revs under load and bleeds off when lifting.
     this.boost += ((thr > 0.5 ? r : 0) - this.boost) * (thr > 0.5 ? 0.08 : 0.3)
     set(this.whistle.frequency, 1800 + this.boost * 5200)
@@ -540,7 +550,7 @@ export class Crowd {
     this.out.gain.value = 0.0001
     this.out.connect(dest)
     // Several voices' worth of band-limited babble, each wobbling at its own rate.
-    for (const [f, rate] of [[480, 3.1], [900, 4.3], [1500, 5.7], [2400, 2.6]]) {
+    for (const [f, rate] of [[420, 3.1], [750, 4.3], [1200, 5.7]]) {
       const n = noise(this.a)
       const bp = a.createBiquadFilter()
       bp.type = 'bandpass'
@@ -558,7 +568,7 @@ export class Crowd {
       lfo.start()
       this.srcs.push(n, lfo)
     }
-    this.out.gain.setTargetAtTime(0.025, a.currentTime, 0.5)
+    this.out.gain.setTargetAtTime(0.006, a.currentTime, 0.5)
   }
 
   // The cars cross the line: the crowd erupts; louder with whistles when you win.
@@ -569,7 +579,7 @@ export class Crowd {
     const peak = won ? 0.2 : 0.09
     this.out.gain.cancelScheduledValues(t)
     this.out.gain.setTargetAtTime(peak, t, 0.12)
-    this.out.gain.setTargetAtTime(0.035, t + 1.6, 0.9)
+    this.out.gain.setTargetAtTime(0.012, t + 1.6, 0.9)
     const whistles = won ? 4 : 1
     for (let i = 0; i < whistles; i++) {
       const at = t + 0.15 + Math.random() * 1.2

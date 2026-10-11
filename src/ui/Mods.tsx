@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useGame, type OwnedCar } from '../game/store'
-import { MODS, carDef, modSlotsFor, fittedMods, modDef, ownedMods, performance, type ModDef, type ModSlot } from '../game/data'
+import { useGame, modPrice, type OwnedCar } from '../game/store'
+import { MODS, MOD_SLOTS, carDef, modFits, fittedMods, modDef, ownedMods, performance, type ModDef, type ModSlot } from '../game/data'
 
 // The car's mods with `tryId` swapped into its slot, for previewing before buying.
 export function withMod(mods: string[] | undefined, tryId: string | null) {
@@ -18,27 +18,26 @@ function statLine(m: ModDef) {
     .join(' · ')
 }
 
-function price(m: ModDef) {
+function price(m: ModDef, coins = m.coins) {
   if (m.bucks) return `B ${m.bucks}`
-  return `$${m.coins.toLocaleString()}${m.parts ? ` + ${m.parts}⚙` : ''}`
+  return `$${coins.toLocaleString()}${m.parts ? ` + ${m.parts}⚙` : ''}`
 }
 
 // Mod shop for one car: pick a slot, tap a part to try it on the preview, then fit it.
 export function ModShop({ car, trying, setTrying }: { car: OwnedCar; trying: string | null; setTrying: (id: string | null) => void }) {
   const level = useGame((s) => s.level)
   const modCar = useGame((s) => s.modCar)
+  const deals = useGame((s) => s.deals)
   const def = carDef(car.model)
-  const slots = modSlotsFor(def.body)
-  const [pick, setSlot] = useState<ModSlot>('spoiler')
-  const slot = slots.some((s) => s.id === pick) ? pick : slots[0].id
-  const fit = fittedMods(car.mods)
+  const [slot, setSlot] = useState<ModSlot>('spoiler')
+  const fit = fittedMods(car.mods, def.body)
   const owned = ownedMods(car)
   const basePi = performance(def, car.upgrades, car.mods)
-  const info = slots.find((s) => s.id === slot)!
+  const info = MOD_SLOTS.find((s) => s.id === slot)!
   return (
     <div className="mods">
       <div className="mod-tabs" role="tablist">
-        {slots.map((s) => (
+        {MOD_SLOTS.map((s) => (
           <button
             key={s.id}
             role="tab"
@@ -54,12 +53,13 @@ export function ModShop({ car, trying, setTrying }: { car: OwnedCar; trying: str
       </div>
       <p className="mod-hint">{info.stat}. Tap a part to try it on.</p>
       <div className="mod-list">
-        {MODS.filter((m) => m.slot === slot).map((m) => {
+        {MODS.filter((m) => m.slot === slot && modFits(m, def.body)).map((m) => {
           const fitted = fit[slot] === m.id
           const have = owned.includes(m.id)
           const locked = !have && level < m.unlockLevel
           const pi = performance(def, car.upgrades, withMod(car.mods, m.id))
           const gain = pi - basePi
+          const deal = modPrice({ deals, level }, m.id)
           return (
             <div
               key={m.id}
@@ -79,7 +79,7 @@ export function ModShop({ car, trying, setTrying }: { car: OwnedCar; trying: str
                 <button
                   className={m.bucks ? 'buy small premium' : 'buy small'}
                   onClick={(e) => { e.stopPropagation(); if (modCar(car.uid, m.id)) setTrying(null) }}
-                >Buy · {price(m)}</button>
+                >{deal.deal && <span className="deal-tag">DEAL</span>}Buy · {deal.deal && <s>{price(m)}</s>} {price(m, deal.coins)}</button>
               )}
             </div>
           )

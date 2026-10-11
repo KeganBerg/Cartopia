@@ -5,11 +5,14 @@ import { PAL } from './season'
 import { setPageTint } from './pageTint'
 import { applyNight, dayPhase, duskAmount, nightAmount } from './dayNight'
 import { fxState, gradeColor, lightDir, lookFor, townLook } from './look'
+import { weatherNow } from '../game/weather'
+import { gloomOf, hazeColor, weatherLook } from './weatherLook'
 
 const BG_DAY = new Color(PAL.ground)
 const BG_NIGHT = new Color('#16233a')
 const BG_DUSK = new Color('#7a6a52')
 const page = new Color()
+const haze = new Color()
 
 // Sun, sky light and background that follow the shared day/night clock.
 // Colours come from the shared look (look.ts), which also drives the grade.
@@ -21,12 +24,13 @@ export function DayNight({ small }: { small: boolean }) {
     const phase = dayPhase()
     const n = nightAmount(phase)
     const dusk = duskAmount(phase)
+    const w = weatherNow()
     // Nothing visible changes between frames most of the time.
-    const key = Math.round(phase * 2000) + (fxState.on ? 0 : 1e4)
+    const key = Math.round(phase * 2000) + (fxState.on ? 0 : 1e4) + Math.round(w.cloud * 200) * 1e5 + Math.round(w.haze * 200) * 1e8 + Math.round(w.flash * 100) * 1e11
     if (key === last.current) return
     last.current = key
-    applyNight(n)
-    const look = lookFor(n, dusk, townLook)
+    applyNight(n, gloomOf(w))
+    const look = weatherLook(lookFor(n, dusk, townLook), w)
     scene.environmentIntensity = look.env
     if (sun.current) {
       sun.current.color.copy(look.sun)
@@ -40,6 +44,7 @@ export function DayNight({ small }: { small: boolean }) {
     }
     if (scene.background instanceof Color) {
       scene.background.copy(BG_DAY).lerp(BG_NIGHT, n).lerp(BG_DUSK, dusk * 0.25)
+      if (w.haze > 0) scene.background.lerp(hazeColor(haze, w, n), w.haze * 0.8)
       // The phone status bar sits at the top edge, so match the graded colour there.
       page.copy(scene.background)
       setPageTint(fxState.on ? gradeColor(page, look.grade) : page)

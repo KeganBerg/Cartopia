@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { BufferAttribute, BufferGeometry, Color, DoubleSide, Object3D, Shape, ShapeGeometry, type InstancedMesh } from 'three'
 import { SEASON } from './season'
 import { dayPhase, nightAmount } from './dayNight'
+import { weatherNow } from '../game/weather'
 
 type Fx = { colors: readonly string[]; fall: number; sway: number; size: number; shape: 'leaf' | 'petal' | 'flake' }
 const FX: Record<'fall' | 'winter' | 'spring', Fx> = {
@@ -14,13 +15,15 @@ const FX: Record<'fall' | 'winter' | 'spring', Fx> = {
 const SPAN = 56
 const TOP = 22
 const PARKED = -100 // below the ground, out of sight
-const isNight = () => nightAmount(dayPhase()) > 0.5
+// Nothing new takes off at night, or while rain knocks leaves and petals down.
+const isNight = () => nightAmount(dayPhase()) > 0.5 || weatherNow().rain > 0.15
 // In the morning a parked flake rejoins after about this many seconds on average,
 // so the sky fills from the top gradually rather than all at once.
 const REJOIN_S = 6
 
 // A shared breeze: a steady drift plus slow gusts, so everything leans the same way.
-const wind = (t: number) => 0.6 + Math.sin(t * 0.23) * 0.5 + Math.max(0, Math.sin(t * 0.61)) * 0.9
+// Windy weather and blizzards blow it much harder.
+const wind = (t: number) => (0.6 + Math.sin(t * 0.23) * 0.5 + Math.max(0, Math.sin(t * 0.61)) * 0.9) * (1 + weatherNow().wind * 3)
 
 type Flier = { x: Float32Array; y: Float32Array; z: Float32Array; seed: Float32Array }
 

@@ -364,7 +364,7 @@ function SearchSpot({ i, at: p, loot, open, gone, tarp, pad, speed, onPick, onFo
           <group ref={item} visible={born.current}>
             {car ? (
               <group rotation-y={p.yaw}>
-                <CarModel body={carDef(loot.model).body} color={carDef(loot.model).colors[0]} rusty />
+                <CarModel body={carDef(loot.model).body} model={loot.model} color={carDef(loot.model).colors[0]} rusty />
               </group>
             ) : (
               <SmallLoot kind={loot.kind} />
@@ -397,7 +397,7 @@ const tipOf = (px: number, py: number, pz: number, p: Pose): [number, number, nu
 const bedSlot = (n: number): [number, number, number] => [n % 2 ? 0.17 : -0.17, 0.66 + Math.floor(n / 4) * 0.2, -0.28 - (Math.floor(n / 2) % 2) * 0.26]
 
 function LootModel({ loot }: { loot: Loot }) {
-  if (loot.kind === 'car') return <CarModel body={carDef(loot.model).body} color={carDef(loot.model).colors[0]} rusty />
+  if (loot.kind === 'car') return <CarModel body={carDef(loot.model).body} model={loot.model} color={carDef(loot.model).colors[0]} rusty />
   return <SmallLoot kind={loot.kind} />
 }
 

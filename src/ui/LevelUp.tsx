@@ -16,7 +16,7 @@ type Unlock = {
 function unlocksBetween(from: number, to: number, rusty: boolean, focus: ReturnType<typeof useGame.getState>['focusShop']) {
   const inRange = (l: number) => l > from && l <= to
   const items: Unlock[] = [
-    ...BUILDINGS.filter((b) => b.unlockLevel < 99 && inRange(b.unlockLevel)).map((b): Unlock => ({
+    ...BUILDINGS.filter((b) => b.unlockLevel < 99 && !b.event && inRange(b.unlockLevel)).map((b): Unlock => ({
       key: `b-${b.id}`,
       name: b.name,
       level: b.unlockLevel,
@@ -25,13 +25,13 @@ function unlocksBetween(from: number, to: number, rusty: boolean, focus: ReturnT
       art: <BuildingThumb def={b} />,
       go: () => focus('shop', b.id),
     })),
-    ...CARS.filter((c) => !c.rescueOnly && inRange(c.unlockLevel)).map((c): Unlock => ({
+    ...CARS.filter((c) => !c.rescueOnly && !c.season && inRange(c.unlockLevel)).map((c): Unlock => ({
       key: `c-${c.id}`,
       name: c.name,
       level: c.unlockLevel,
       tag: 'Car',
       price: c.bucks ? `B ${c.bucks}` : `$ ${c.price.toLocaleString()}`,
-      art: <CarThumb color={c.colors[0]} body={c.body} />,
+      art: <CarThumb color={c.colors[0]} body={c.body} model={c.id} />,
       go: () => focus('showroom', c.id),
     })),
     ...RESCUE_SPOTS.filter((r) => inRange(r.unlockLevel)).map((r): Unlock => ({
@@ -58,7 +58,7 @@ function unlocksBetween(from: number, to: number, rusty: boolean, focus: ReturnT
 
 // The next level that unlocks anything, so a quiet level-up still has something to aim for.
 function nextUnlock(level: number) {
-  const levels = [...BUILDINGS.filter((b) => b.unlockLevel < 99), ...CARS.filter((c) => !c.rescueOnly), ...RESCUE_SPOTS, ...GP_SERIES]
+  const levels = [...BUILDINGS.filter((b) => b.unlockLevel < 99 && !b.event), ...CARS.filter((c) => !c.rescueOnly && !c.season), ...RESCUE_SPOTS, ...GP_SERIES]
     .map((x) => x.unlockLevel)
     .filter((l) => l > level)
   return levels.length ? Math.min(...levels) : null
