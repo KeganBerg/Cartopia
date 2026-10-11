@@ -151,12 +151,12 @@ export function startChat() {
   }, 15000)
 }
 
+let pickedRoom: Room | null = null
 // Open the chat window on a room.
 export function openChat(room: Room) {
   pickedRoom = room
   useGame.getState().openPanel('chat')
 }
-let pickedRoom: Room | null = null
 // The room the chat window opens on: the one asked for, else crew when it has news.
 export function firstRoom(): Room {
   const r = pickedRoom ?? (useChat.getState().unread.crew > 0 ? 'crew' : 'global')
