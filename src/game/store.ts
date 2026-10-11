@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
   PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS,
-  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, DAILY_BONUS, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modSlotsFor, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower,
+  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, DAILY_BONUS, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modSlotsFor, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower,
 } from './data'
 import { sfx } from '../lib/sound'
 import { msUntilNight } from './clock'
@@ -18,7 +18,7 @@ export type OwnedCar = { uid: string; model: string; color: string; upgrades: Re
 export type JunkCar = { uid: string; model: string; rarity: Rarity }
 export type Restoring = JunkCar & { endsAt: number; minutes: number }
 export type Loot =
-  | { kind: 'car'; model: string; rarity: Rarity }
+  | { kind: 'car'; model: string; rarity: Rarity; uid?: string }
   | { kind: 'coins' | 'parts' | 'fuel'; n: number }
   | { kind: 'trophy' }
   | { kind: 'nothing' }
@@ -170,6 +170,17 @@ type Actions = {
 }
 
 export type GameState = SaveState & UiState & Actions
+
+// Cars a signed-in player's search finds come from the server (rescue_roll() in
+// supabase/migrations/0022_rescue_rolls.sql), which keeps them so the guard can tell real
+// finds from made-up ones. src/lib/rescue.ts plugs it in; null means roll here (guests, or a server
+// without it yet).
+export type ServerFind = { i: number; uid: string; model: string; rarity: Rarity }
+let rescueRoller: ((spot: string) => Promise<ServerFind[] | null>) | null = null
+let rolling = false
+export const setRescueRoller = (f: typeof rescueRoller) => {
+  rescueRoller = f
+}
 
 const key = (x: number, z: number) => `${x},${z}`
 let uidCounter = 0
@@ -1218,13 +1229,25 @@ export const useGame = create<GameState>()(
         if (s.level < spot.unlockLevel) return s.showNeed('level', spot.unlockLevel, spot.name)
         if (s.junkyard.length >= STORAGE_MAX) return s.toast('Storage is full. Restore or scrap a car first.')
         if (s.coins < spot.cost) return s.showNeed('coins', spot.cost - s.coins, `a search in the ${spot.name}`)
-        sfx.start()
-        set({
-          coins: s.coins - spot.cost,
-          search: rollSearch(spotId),
-          stats: bump(s, 'searches'),
-          updatedAt: Date.now(),
-        })
+        const go = (finds: ServerFind[] | null) => {
+          const g = get()
+          if (g.search || g.coins < spot.cost) return
+          sfx.start()
+          set({
+            coins: g.coins - spot.cost,
+            search: rollSearch(spotId, finds),
+            stats: bump(g, 'searches'),
+            updatedAt: Date.now(),
+          })
+        }
+        if (!rescueRoller) return go(null)
+        if (rolling) return
+        rolling = true
+        rescueRoller(spotId)
+          .then(go, () => get().toast("Rusty's radio can't reach the yard. Check your connection and try again."))
+          .finally(() => {
+            rolling = false
+          })
       },
 
       revealPin: (i) => {
@@ -1274,7 +1297,7 @@ export const useGame = create<GameState>()(
           else if (l.kind === 'trophy') trophies += 1
           else if (l.kind === 'car') {
             if (junkyard.length < STORAGE_MAX) {
-              junkyard.push({ uid: uid(), model: l.model, rarity: l.rarity })
+              junkyard.push({ uid: l.uid ?? uid(), model: l.model, rarity: l.rarity })
               notes.push(carDef(l.model).name)
             } else {
               scrapped += RARITY[l.rarity].scrapParts
@@ -1385,18 +1408,20 @@ function rollCar(spotId: string): Loot {
 
 // Pre-rolls what every pin hides. Each search finds at least one car, and
 // about one in four gives the tow truck a flat partway through.
-function rollSearch(spotId: string): Search {
+export function rollSearch(spotId: string, finds: ServerFind[] | null = null): Search {
   const spot = RESCUE_SPOTS.find((o) => o.id === spotId)!
   const scale = spot.cost / 500
   const pins: Loot[] = Array.from({ length: RESCUE_PINS }, () => {
-    const r = Math.random()
-    if (r < 0.1) return rollCar(spotId)
+    // With server finds, every other pin hides something else.
+    const r = finds ? RESCUE_CAR_CHANCE + Math.random() * (1 - RESCUE_CAR_CHANCE) : Math.random()
+    if (r < RESCUE_CAR_CHANCE) return rollCar(spotId)
     if (r < 0.42) return { kind: 'coins', n: Math.round(range(4, 14) * 5 * scale) }
     if (r < 0.62) return { kind: 'parts', n: range(1, 3) + Math.floor(scale / 3) }
     if (r < 0.74) return { kind: 'fuel', n: range(1, 3) }
     if (r < 0.77) return { kind: 'trophy' }
     return { kind: 'nothing' }
   })
+  for (const f of finds ?? []) if (f.i >= 0 && f.i < RESCUE_PINS) pins[f.i] = { kind: 'car', model: f.model, rarity: f.rarity, uid: f.uid }
   if (!pins.some((p) => p.kind === 'car')) pins[Math.floor(Math.random() * RESCUE_PINS)] = rollCar(spotId)
   const flatAt = Math.random() < 0.25 ? pick(Array.from({ length: RESCUE_PINS }, (_, i) => i).filter((i) => pins[i].kind !== 'car')) : null
   return { spot: spotId, pins, revealed: pins.map(() => false), truckAt: null, flatAt: flatAt ?? null, flat: false }
