@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { CARS, GP_ROUNDS } from './data'
-import { AI_BOOST_GEAR, freshRacer, fireBoost, shiftRacer, stepRacer } from './race'
+import { AI_BOOST_GEAR, aiReaction, freshRacer, fireBoost, launchRacer, shiftRacer, stepRacer, type Racer } from './race'
+import { gpBeatTable } from './guardTables'
 import { DIST, RACE_DISTS, buildOf, character, characterMul, gpDist, tourDist, type RaceDist } from './distance'
 
 // A clean run over a distance by a car of this PI and build.
@@ -50,4 +51,41 @@ describe('race distances', () => {
     const builds = new Set(CARS.map((c) => buildOf(character(c))))
     expect(builds).toEqual(new Set(['sprinter', 'allrounder', 'longhaul']))
   })
+})
+
+// The server checks a Grand Prix win with gpBeatTable(), worked out over a quarter mile. Over a
+// longer race a lower-PI car has less of a chance against a rival, so the table never turns away
+// a real win: for each rival, the lowest PI that can beat it over a mile is at least the table's.
+describe('the Grand Prix check over a mile', () => {
+  const SKILL: ((r: Racer, t: number) => number)[] = [() => 1, (r) => (r.gear === 0 ? 1.2 : 1), (r) => (r.gear === 3 ? 1.15 : 1), () => 1.08, (_, t) => (t < 2.5 ? 1.1 : 1), (r) => (r.gear <= 1 ? 1.1 : 1), (r) => (r.gear === 1 ? 1.1 : 1)]
+  const L = DIST.mile.m
+  const best = (pi: number) => {
+    let b = Infinity
+    for (const sk of SKILL) for (const at of [0.9, 0.93]) for (let f = 0; f < 4; f += 0.25) {
+      const r = freshRacer()
+      let t = 0
+      while (r.finished === null && t < 100) { t += 1 / 120; if (r.gear < 3 && r.rpm >= at) shiftRacer(r, 1.08); if (t >= f) fireBoost(r); stepRacer(r, pi, 1 / 120, t, sk(r, t), L) }
+      b = Math.min(b, r.finished!)
+    }
+    return b * 0.975
+  }
+  const slowest = (pi: number) => {
+    let w = 0
+    for (const drag of [() => 1, (_: Racer, t: number) => (t < 2.5 ? 0.9 : 1), (r: Racer) => (r.gear === 1 ? 0.9 : 1)]) for (let at = 0.8; at <= 0.92 + 1e-9; at += 0.04) {
+      const r = freshRacer(false)
+      const re = aiReaction(1, 1)
+      let t = 0
+      while (r.finished === null && t < 100) { t += 1 / 120; if (!r.launched && t >= re) launchRacer(r, re); if (r.launched && r.gear < 3 && r.rpm >= at) shiftRacer(r, 1.08); if (r.gear >= AI_BOOST_GEAR) fireBoost(r); stepRacer(r, pi, 1 / 120, t, drag(r, t), L) }
+      w = Math.max(w, r.finished!)
+    }
+    return w * 1.03
+  }
+  it('needs at least the quarter-mile PI', () => {
+    const table = gpBeatTable()
+    for (const rival of [37, 71, 110]) {
+      const need = table[rival - 1]
+      // One PI under the table's answer can't win the mile either.
+      expect(best(need - 1)).toBeGreaterThanOrEqual(slowest(rival))
+    }
+  }, 120000)
 })
