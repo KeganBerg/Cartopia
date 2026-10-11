@@ -541,7 +541,7 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .thumb3d.sm { --tw: 66px; --th: 52px; width: var(--tw); flex: none; border-radius: 8px; }
 .thumb3d.xs { --tw: 44px; --th: 35px; width: var(--tw); flex: none; border-radius: 6px; background: none; }
 .thumb3d.lg { --tw: 198px; --th: 156px; }
-.thumb-view { width: var(--tw); height: var(--th); flex: none; display: block; }
+.thumb-view { width: 100%; height: 100%; flex: none; display: block; }
 .card.locked .thumb3d { filter: grayscale(1); }
 
 /* Collect and fuel all: round button above the Race button with a recharge ring. */
