@@ -3,11 +3,12 @@ import { createPortal } from 'react-dom'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { MOUSE, TOUCH, Vector3, type Group, type PerspectiveCamera } from 'three'
-import type { Body } from '../game/data'
+import type { Body, Finish } from '../game/data'
 import { CarModel } from './CarModel'
 import { frame, seat, type Bounds } from './fit'
+import { SkyEnv } from './SkyEnv'
 
-type Look = { body: Body; color: string; stripe?: string | null; mods?: string[] | null }
+type Look = { body: Body; color: string; finish?: Finish | null; stripe?: string | null; mods?: string[] | null }
 
 // How big the car's bounding sphere is made, so long trucks and tiny bubble cars both fill the view.
 const FIT = 1.05
@@ -128,6 +129,7 @@ function Stage({ look, big, onExpand }: { look: Look; big?: boolean; onExpand?: 
   return (
     <>
       <Canvas camera={{ position: VIEW.toArray(), fov: 35 }} dpr={big ? [1, 2] : [1, 1.5]}>
+        <SkyEnv />
         <hemisphereLight args={['#ffffff', '#90a4ae', 1]} />
         <directionalLight position={[3, 5, 2]} intensity={1.4} />
         <mesh rotation-x={-Math.PI / 2}>

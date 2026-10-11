@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { BackSide, Color, Object3D, type PerspectiveCamera, type Group, type InstancedMesh, type Mesh } from 'three'
-import type { Body } from '../game/data'
+import type { Body, Finish } from '../game/data'
 import { CarModel } from './CarModel'
 import { signTexture } from './signTexture'
 import { skyTex, asphaltTex, paverTex, glowTex } from './textures'
@@ -30,7 +30,7 @@ type Props = {
   track: number
   me: RefObject<RacerView>
   them: RefObject<RacerView>
-  mine: { body: Body; color: string; mods?: string[] }
+  mine: { body: Body; color: string; finish?: Finish; mods?: string[] }
   theirs: { body: Body; color: string; mods?: string[] }
   venue: Venue
 }
@@ -361,7 +361,7 @@ export function RaceScene({ track, me, them, mine, theirs, venue }: Props) {
             <planeGeometry args={[0.9, 1.5]} />
             <meshBasicMaterial map={glowTex()} color="#000000" transparent opacity={0.35} depthWrite={false} {...decal(3)} />
           </mesh>
-          {i === 0 ? <CarModel body={mine.body} color={mine.color} mods={mine.mods} flames beams={night > 0.3} /> : <CarModel body={theirs.body} color={theirs.color} mods={theirs.mods} flames beams={night > 0.3} />}
+          {i === 0 ? <CarModel body={mine.body} color={mine.color} finish={mine.finish} mods={mine.mods} flames beams={night > 0.3} /> : <CarModel body={theirs.body} color={theirs.color} mods={theirs.mods} flames beams={night > 0.3} />}
         </group>
       ))}
     </>

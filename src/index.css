@@ -976,3 +976,16 @@ button.lvl-item:hover { border-color: var(--accent); transform: translateY(-2px)
 .car-inspect .cp-hint { bottom: 14px; font-size: 13px; padding: 4px 12px; }
 .thumb-look { position: relative; display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
 .look-badge { position: absolute; right: 4px; bottom: 4px; width: 26px; height: 26px; border-radius: 50%; background: rgba(255,255,255,.9); box-shadow: 0 1px 3px rgba(0,0,0,.25); display: grid; place-items: center; font-size: 13px; pointer-events: none; }
+
+/* Paint shop: finishes, and the try-on bar that holds the Buy button. */
+.try-bar { display: flex; align-items: center; gap: 8px; min-height: 40px; margin: 8px 0 2px; padding: 6px 8px 6px 12px; border-radius: 12px; background: var(--seg); font-size: 13px; color: #546e7a; }
+.try-bar.on { position: sticky; top: 0; z-index: 2; background: #fff8e1; border: 1.5px solid #ffcc80; color: #37474f; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+.try-what { flex: 1; min-width: 0; }
+.try-bar .buy { flex: none; }
+.try-cancel { flex: none; border: none; background: none; color: #607d8b; font-weight: 800; text-decoration: underline; padding: 4px; }
+.finishes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.fin-opt { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px; border-radius: 12px; border: 1.5px solid #dfe5ea; background: #fff; font: 14px var(--display); color: #37474f; }
+.fin-opt small { font: 700 12px Nunito, sans-serif; color: #607d8b; }
+.fin-opt.sel { border-color: var(--blue); box-shadow: 0 0 0 2px var(--blue) inset; }
+.fin-opt.locked { opacity: .55; }
+.finish-chip { width: 34px; height: 22px; border-radius: 8px; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
