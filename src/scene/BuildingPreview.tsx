@@ -112,7 +112,7 @@ function Renderer() {
   const { gl, scene } = useThree()
   const groups = useRef(new Map<string, Group>())
   const shadow = useRef<Mesh>(null)
-  const cam = useRef(new PerspectiveCamera(30, 1, 0.1, 100))
+  const cam = useRef(new PerspectiveCamera(30, 1, 0.5, 40))
   useSyncExternalStore(subscribe, () => version)
 
   // Priority 1 takes over rendering from the default loop.

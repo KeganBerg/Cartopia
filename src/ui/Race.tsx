@@ -462,7 +462,7 @@ function DragRace({ car, rival, onExit, live, prize, onFinish, title }: { car: O
   // One full-screen view: the street fills the screen and the controls float over it.
   return (
     <div className="race-full">
-      <Canvas className="rf-canvas" camera={{ position: [0.4, 2.2, -4], fov: 55, near: 0.3, far: 300 }} dpr={[1, 1.5]}>
+      <Canvas className="rf-canvas" camera={{ position: [0.4, 2.2, -4], fov: 55, near: 0.3, far: 150 }} dpr={[1, 1.5]}>
         <RaceScene track={TRACK} me={me} them={them} mine={{ body: def.body, color: car.color }} theirs={{ body: rival.body, color: rival.color }} />
       </Canvas>
       <div className="rf-top">

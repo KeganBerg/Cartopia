@@ -5,6 +5,7 @@ import { CarModel } from './CarModel'
 import type { Texture } from 'three'
 import { glowMats } from './dayNight'
 import { PAL, SEASON } from './season'
+import { LAYER, decal } from './layers'
 import { brickTex, sidingTex, shingleTex, gravelTex, awningTex, windowTex, paverTex, shutterTex, pumpTex } from './textures'
 
 type Props = { def: BuildingDef; ghost?: boolean; valid?: boolean }
@@ -65,7 +66,7 @@ function RoofProp({ prop, y }: { prop: NonNullable<BuildingDef['prop']>; y: numb
 }
 
 // Warm pool of light on the ground that only shows after dark.
-export function LightPool({ r, x = 0, z = 0, y = 0.085 }: { r: number; x?: number; z?: number; y?: number }) {
+export function LightPool({ r, x = 0, z = 0, y = 0.075 }: { r: number; x?: number; z?: number; y?: number }) {
   return (
     <mesh rotation-x={-Math.PI / 2} position={[x, y, z]} renderOrder={2}>
       <planeGeometry args={[r * 2, r * 2]} />
@@ -278,9 +279,9 @@ export function BuildingModel({ def, ghost, valid }: Props) {
                 </group>
               )
             })}
-            <mesh position={[0, 0.02, 0]} rotation-x={-Math.PI / 2}>
+            <mesh position={[0, LAYER.lot, 0]} rotation-x={-Math.PI / 2}>
               <circleGeometry args={[0.55, 16]} />
-              <meshStandardMaterial color="#ffffff" />
+              <meshStandardMaterial color="#ffffff" {...decal()} />
             </mesh>
           </group>
         )
@@ -436,14 +437,14 @@ export function BuildingModel({ def, ghost, valid }: Props) {
             <meshStandardMaterial color={def.roof} side={2} />
           </mesh>
           {/* Track lane line and a chequered start line. */}
-          <mesh position={[0, 0.075, 0]} rotation-x={-Math.PI / 2}>
+          <mesh position={[0, 0.07, 0]} rotation-x={-Math.PI / 2}>
             <ringGeometry args={[1.53, 1.57, 48]} />
-            {m('#fafafa')}
+            <meshStandardMaterial color={ghost ? (valid ? '#66bb6a' : '#ef5350') : '#fafafa'} transparent={ghost} opacity={ghost ? 0.55 : 1} {...decal()} />
           </mesh>
           {!ghost && (
             <mesh position={[0, 0.08, 1.55]} rotation-x={-Math.PI / 2}>
               <planeGeometry args={[0.18, 0.7]} />
-              <meshBasicMaterial map={signTexture('▚▚▚▚', '#ffffff', '#111111')} />
+              <meshBasicMaterial map={signTexture('▚▚▚▚', '#ffffff', '#111111')} {...decal(2)} />
             </mesh>
           )}
           {/* Crowd: coloured seat rows along the stands. */}
@@ -458,7 +459,7 @@ export function BuildingModel({ def, ghost, valid }: Props) {
             <group key={x} position={[x, 0, z]}>
               <mesh position={[0, 1.1, 0]} castShadow><cylinderGeometry args={[0.04, 0.06, 2.2, 6]} />{m('#90a4ae')}</mesh>
               <mesh position={[0, 2.25, 0]} rotation-y={Math.atan2(-x, -z)}><boxGeometry args={[0.4, 0.22, 0.06]} />{bulb}</mesh>
-              <LightPool r={1.3} x={-x * 0.5} z={-z * 0.5} />
+              <LightPool r={1.3} x={-x * 0.5} z={-z * 0.5} y={0.1} />
             </group>
           ))}
           {sign && <Sign text="SPEEDWAY" w={2} y={1.25} z={0} bg="#c62828" fg="#ffffff" />}
@@ -502,7 +503,7 @@ export function BuildingModel({ def, ghost, valid }: Props) {
             <>
               <LightPool r={0.55} z={0.9} />
               <mesh position={[0, 0.03, 0.7]} receiveShadow><boxGeometry args={[0.42, 0.06, 0.16]} />{m('#bdbdbd')}</mesh>
-              <mesh position={[0, 0.035, 0.85]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.3, 0.3]} />{m('#d7ccc8')}</mesh>
+              <mesh position={[0, LAYER.lot + 0.015, 0.85]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.3, 0.3]} /><meshStandardMaterial color="#d7ccc8" {...decal()} /></mesh>
               {[-0.75, -0.6, -0.45, -0.3, 0.3, 0.45, 0.6, 0.75].map((x) => (
                 <mesh key={x} position={[x, 0.13, 0.95]} castShadow><boxGeometry args={[0.05, 0.26, 0.03]} />{m('#fafafa')}</mesh>
               ))}
@@ -595,7 +596,7 @@ export function BuildingModel({ def, ghost, valid }: Props) {
             <boxGeometry args={[W * 0.95, 0.14, D * 0.65]} />
             {m(def.roof)}
           </mesh>
-          <mesh position={[0, 1.735, -0.3]} rotation-x={-Math.PI / 2}>
+          <mesh position={[0, 1.745, -0.3]} rotation-x={-Math.PI / 2}>
             <planeGeometry args={[W * 0.88, D * 0.58]} />
             {m('#ffffff', gravelTex(4, 2.4))}
           </mesh>
@@ -623,9 +624,9 @@ export function BuildingModel({ def, ghost, valid }: Props) {
           </mesh>
           {!ghost && [-1.1, 0, 1.1].map((x) => <LightPool key={x} r={0.6} x={x} z={0.75} />)}
           {!ghost && [[-0.9, 1.0], [0.4, 1.3]].map(([x, z]) => (
-            <mesh key={x} position={[x, 0.07, z]} rotation-x={-Math.PI / 2}>
+            <mesh key={x} position={[x, 0.065, z]} rotation-x={-Math.PI / 2}>
               <circleGeometry args={[0.22, 16]} />
-              <meshBasicMaterial color="#000000" transparent opacity={0.18} />
+              <meshBasicMaterial color="#000000" transparent opacity={0.18} depthWrite={false} {...decal()} />
             </mesh>
           ))}
           {!ghost && [0, 1, 2].map((i) => (
@@ -660,7 +661,7 @@ export function BuildingModel({ def, ghost, valid }: Props) {
             <boxGeometry args={[2.64, 0.1, 1.64]} />
             {m(def.roof)}
           </mesh>
-          <mesh position={[-0.3, 1.385, 0]} rotation-x={Math.PI / 2}>
+          <mesh position={[-0.3, 1.375, 0]} rotation-x={Math.PI / 2}>
             <planeGeometry args={[2.4, 1.4]} />
             {bulb}
           </mesh>
@@ -676,7 +677,7 @@ export function BuildingModel({ def, ghost, valid }: Props) {
                 <boxGeometry args={[0.34, 0.66, 0.26]} />
                 {m('#fafafa')}
               </mesh>
-              {[0.131, -0.131].map((z) => (
+              {[0.137, -0.137].map((z) => (
                 <mesh key={z} position={[0, 0.48, z]} rotation-y={z < 0 ? Math.PI : 0}>
                   <planeGeometry args={[0.32, 0.64]} />
                   {m('#ffffff', pumpTex(def.roof))}
@@ -693,7 +694,7 @@ export function BuildingModel({ def, ghost, valid }: Props) {
             <boxGeometry args={[1.02, 0.1, 1.58]} />
             {m(def.roof)}
           </mesh>
-          <mesh position={[0.97, 0.45, -0.1]} rotation-y={-Math.PI / 2}>
+          <mesh position={[0.965, 0.45, -0.1]} rotation-y={-Math.PI / 2}>
             <planeGeometry args={[1.2, 0.55]} />
             {win}
           </mesh>
@@ -712,7 +713,7 @@ export function BuildingModel({ def, ghost, valid }: Props) {
                 <boxGeometry args={[0.5, 0.4, 0.06]} />
                 {m(def.roof)}
               </mesh>
-              <mesh position={[0, 1.6, 0.032]}>
+              <mesh position={[0, 1.6, 0.037]}>
                 <planeGeometry args={[0.42, 0.32]} />
                 <meshBasicMaterial map={signTexture('⛽ 1.99', '#263238', '#ffca28')} />
               </mesh>
@@ -764,12 +765,13 @@ export function BuildingModel({ def, ghost, valid }: Props) {
             </mesh>
           )}
           {!ghost && <LightPool r={1.2} x={1.2} z={1.3} />}
-          {sign && <Sign text="DRIVE-IN" w={2.4} y={1.6} z={-1.42} bg="#fafafa" fg="#3e2723" />}
+          {sign && <Sign text="DRIVE-IN" w={2.4} y={1.6} z={-1.41} bg="#fafafa" fg="#3e2723" />}
         </group>
       )
     default: {
       // Generic storefront: body, roof trim, awning and a sign over the door.
       const h = def.w > 1 ? 1.5 : 1.3
+      const F = D * 0.36 - 0.1 // front wall, where the windows and door hang
       return (
         <group>
           <mesh position={[0, h / 2, -0.1]} castShadow receiveShadow>
@@ -781,43 +783,43 @@ export function BuildingModel({ def, ghost, valid }: Props) {
             <boxGeometry args={[W * 0.88, 0.14, D * 0.78]} />
             {m(def.roof)}
           </mesh>
-          <mesh position={[0, h + 0.135, -0.1]} rotation-x={-Math.PI / 2}>
+          <mesh position={[0, h + 0.14, -0.1]} rotation-x={-Math.PI / 2}>
             <planeGeometry args={[W * 0.78, D * 0.68]} />
             {m('#ffffff', gravelTex(W, D))}
           </mesh>
           {/* Big shop windows either side of the door. */}
-          <mesh position={[0, 0.42, D * 0.26 + 0.008]}>
+          <mesh position={[0, 0.42, F + 0.005]}>
             <planeGeometry args={[W * 0.7, 0.62]} />
             {win}
           </mesh>
-          <mesh position={[0, 0.08, D * 0.26 + 0.02]}>
+          <mesh position={[0, 0.08, F + 0.015]}>
             <boxGeometry args={[W * 0.82, 0.16, 0.03]} />
             {m('#eceff1')}
           </mesh>
-          <mesh position={[0, 0.82, D * 0.26 + 0.2]} rotation-x={0.45} castShadow>
+          <mesh position={[0, 0.82, F + 0.2]} rotation-x={0.45} castShadow>
             <boxGeometry args={[W * 0.76, 0.03, 0.44]} />
             {m('#ffffff', awningTex(def.roof === '#f5f5f5' || def.roof === '#fff8e1' ? def.color : def.roof))}
           </mesh>
-          <mesh position={[0, 0.32, D * 0.26 + 0.03]}>
+          <mesh position={[0, 0.32, F + 0.036]}>
             <planeGeometry args={[0.4, 0.6]} />
             {m('#4e342e')}
           </mesh>
           {/* Door frame, step and wall lamps either side. */}
-          <mesh position={[0, 0.33, D * 0.26 + 0.016]}>
+          <mesh position={[0, 0.33, F + 0.02]}>
             <boxGeometry args={[0.5, 0.68, 0.02]} />
             {m('#eceff1')}
           </mesh>
-          <mesh position={[0, 0.03, D * 0.26 + 0.12]} receiveShadow>
+          <mesh position={[0, 0.03, F + 0.12]} receiveShadow>
             <boxGeometry args={[0.6, 0.06, 0.22]} />
             {m('#cfd8dc')}
           </mesh>
           {[-0.36, 0.36].map((x) => (
-            <mesh key={x} position={[x, 0.7, D * 0.26 + 0.05]}>
+            <mesh key={x} position={[x, 0.7, F + 0.05]}>
               <boxGeometry args={[0.08, 0.1, 0.08]} />
               {bulb}
             </mesh>
           ))}
-          {!ghost && <LightPool r={0.7} z={D * 0.26 + 0.45} />}
+          {!ghost && <LightPool r={0.7} z={F + 0.35} />}
           {/* Side windows on the right-hand wall. */}
           {[-0.35, 0.25].map((z) => (
             <mesh key={z} position={[W * 0.41 + 0.006, h * 0.55, z - 0.1]} rotation-y={Math.PI / 2}>
@@ -827,7 +829,7 @@ export function BuildingModel({ def, ghost, valid }: Props) {
           ))}
           {/* Planters by the door. */}
           {!ghost && [-1, 1].map((sd) => (
-            <group key={sd} position={[sd * (W * 0.41 - 0.12), 0, D * 0.26 + 0.15]}>
+            <group key={sd} position={[sd * (W * 0.41 - 0.12), 0, F + 0.15]}>
               <mesh position={[0, 0.09, 0]} castShadow><boxGeometry args={[0.2, 0.18, 0.2]} />{m('#8d6e63')}</mesh>
               <mesh position={[0, 0.25, 0]} castShadow><icosahedronGeometry args={[0.13, 0]} /><meshStandardMaterial color="#43a047" flatShading /></mesh>
             </group>
@@ -836,18 +838,18 @@ export function BuildingModel({ def, ghost, valid }: Props) {
           {!def.prop && !ghost && (
             <group position={[W * 0.22, h + 0.14, -0.3]}>
               <mesh position={[0, 0.12, 0]} castShadow><boxGeometry args={[0.36, 0.24, 0.3]} />{m('#b0bec5')}</mesh>
-              <mesh position={[0, 0.245, 0]} rotation-x={-Math.PI / 2}><circleGeometry args={[0.1, 12]} />{m('#546e7a')}</mesh>
+              <mesh position={[0, 0.25, 0]} rotation-x={-Math.PI / 2}><circleGeometry args={[0.1, 12]} />{m('#546e7a')}</mesh>
               <mesh position={[-0.45, 0.12, 0.1]} castShadow><cylinderGeometry args={[0.05, 0.05, 0.24, 8]} />{m('#90a4ae')}</mesh>
             </group>
           )}
           {def.id === 'tires' && !ghost && [0, 1, 2, 3].map((i) => (
-            <mesh key={i} position={[-W * 0.36, 0.08 + i * 0.13, D * 0.26 + 0.42]} rotation-x={Math.PI / 2} castShadow>
+            <mesh key={i} position={[-W * 0.36, 0.08 + i * 0.13, F + 0.32]} rotation-x={Math.PI / 2} castShadow>
               <torusGeometry args={[0.15, 0.065, 8, 16]} />
               {m('#212121')}
             </mesh>
           ))}
           {def.id === 'carwash' && !ghost && [-0.45, 0.45].map((x) => (
-            <mesh key={x} position={[x, 0.6, D * 0.26 + 0.12]} castShadow>
+            <mesh key={x} position={[x, 0.6, F + 0.15]} castShadow>
               <cylinderGeometry args={[0.13, 0.13, 0.9, 10]} />
               <meshStandardMaterial color={x < 0 ? '#29b6f6' : '#ffca28'} roughness={1} />
             </mesh>
@@ -863,13 +865,13 @@ export function BuildingModel({ def, ghost, valid }: Props) {
           )}
           {def.prop && <RoofProp prop={def.prop} y={h + 0.13} />}
           {def.id === 'motel' && [-1.2, -0.6, 0.6, 1.2].map((x) => (
-            <mesh key={x} position={[x, 0.32, D * 0.26 + 0.01]}>
+            <mesh key={x} position={[x, 0.32, F + 0.012]}>
               <planeGeometry args={[0.3, 0.55]} />
               {m('#00897b')}
             </mesh>
           ))}
           {def.id === 'carwash' && (
-            <mesh position={[0, 0.6, D * 0.26 + 0.02]}>
+            <mesh position={[0, 0.6, F + 0.012]}>
               <planeGeometry args={[1.4, 1]} />
               {m('#0277bd')}
             </mesh>
