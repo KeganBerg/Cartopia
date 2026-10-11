@@ -154,6 +154,30 @@ function SpotList() {
   )
 }
 
+// What's aboard the tow truck: each car with its rarity, then the small
+// finds added up into one chip per kind.
+function Haul({ items }: { items: Loot[] }) {
+  const sum = { coins: 0, parts: 0, fuel: 0, trophy: 0 }
+  for (const l of items) {
+    if (l.kind === 'coins' || l.kind === 'parts' || l.kind === 'fuel') sum[l.kind] += l.n
+    else if (l.kind === 'trophy') sum.trophy++
+  }
+  return (
+    <>
+      {items.map((l, i) => l.kind === 'car' && (
+        <span key={i} className={`haul-item car rr-${l.rarity}`} title={carDef(l.model).name}>
+          <CarThumb size="xs" body={carDef(l.model).body} model={l.model} color={carDef(l.model).colors[0]} rusty />
+          <RarityTag r={l.rarity} />
+        </span>
+      ))}
+      {sum.coins > 0 && <span className="haul-item"><span className="ico coin-ico rs-ico">$</span>{sum.coins.toLocaleString()}</span>}
+      {sum.parts > 0 && <span className="haul-item"><span className="ico parts-ico rs-ico">⚙</span>{sum.parts}</span>}
+      {sum.fuel > 0 && <span className="haul-item">⛽ {sum.fuel}</span>}
+      {sum.trophy > 0 && <span className="haul-item">🏆{sum.trophy > 1 ? ` ${sum.trophy}` : ''}</span>}
+    </>
+  )
+}
+
 // The search, full screen: Rusty's tow truck drives a 3D lot (RescueScene)
 // and the controls float over it, like a race.
 function SearchScreen() {
@@ -227,14 +251,7 @@ function SearchScreen() {
       )}
       <div className="rs-bottom">
         <div className="rs-haul">
-          {haul.length ? haul.map(({ l, i }) => {
-            const t = lootLabel(l)
-            return (
-              <span key={i} className={l.kind === 'car' ? 'haul-item car' : 'haul-item'}>
-                {l.kind === 'car' ? <CarThumb size="xs" body={carDef(l.model).body} color={carDef(l.model).colors[0]} rusty /> : t.icon} {l.kind === 'car' ? <RarityTag r={l.rarity} /> : t.text}
-              </span>
-            )
-          }) : <span className="rs-empty">🛻 Haul is empty</span>}
+          {haul.length ? <Haul items={haul.map(({ l }) => l)} /> : <span className="rs-empty">🛻 Haul is empty</span>}
         </div>
         <div className="rs-actions">
           <button className="sell rs-leave" onClick={abandon} disabled={leaving}>Leave</button>

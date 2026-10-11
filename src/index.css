@@ -348,7 +348,10 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .flat-pop .row { justify-content: center; }
 .flat-pop .sell { margin-top: 0; }
 .haul-item { display: inline-flex; align-items: center; gap: 4px; background: #fff; border: 2px solid #e0e0e0; border-radius: 10px; padding: 2px 8px; font-weight: 800; }
-.haul-item.car { border-color: #8e24aa; }
+.haul-item.car { border-color: #8e24aa; padding-left: 3px; }
+.haul-item.car.rr-common { border-color: #90a4ae; }
+.haul-item.car.rr-scarce { border-color: #1e88e5; }
+.haul-item.car.rr-rare { border-color: #ff6d00; box-shadow: 0 0 8px rgba(255,179,0,.7); }
 .plate-screen { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; }
 .plate-screen .car-preview { width: 100%; }
 .plate-screen h3 { margin: 4px 0 0; }

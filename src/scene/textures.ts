@@ -756,3 +756,82 @@ export const helipadTex = (ring: string, mark: string, cross = false) =>
     g.fillRect(146 * u, 76 * u, 22 * u, 104 * u)
     g.fillRect(88 * u, 117 * u, 80 * u, 22 * u)
   })
+
+// Packed yard dirt, tinted by the material colour: a pale neutral base with
+// darker patches, pebbles and the odd oil spot. Rusty's search lots use it in
+// brown, sand or grey.
+export const dirtTex = (rx = 1, ry = rx) =>
+  rep(make('dirt', 256, (g, s, r) => {
+    g.fillStyle = '#e6e1d9'
+    g.fillRect(0, 0, s, s)
+    for (let i = 0; i < 26; i++) {
+      g.globalAlpha = 0.22
+      g.fillStyle = i % 3 ? '#cfc7bb' : '#f4f0ea'
+      const x = r() * s
+      const y = r() * s
+      const rx2 = 18 + r() * 46
+      const ry2 = 10 + r() * 30
+      const a = r() * 3
+      // Wrap blobs round the edges so the tiles join without seams.
+      for (const dx of [-s, 0, s]) for (const dy of [-s, 0, s]) {
+        g.beginPath()
+        g.ellipse(x + dx, y + dy, rx2, ry2, a, 0, Math.PI * 2)
+        g.fill()
+      }
+    }
+    g.globalAlpha = 1
+    speckle(g, s, r, ['#d6cfc4', '#efebe5', '#c9c1b4', '#bdb4a6'], 2600, 2)
+    speckle(g, s, r, ['#a1978a', '#8f8679', '#b3ab9f'], 160, 4)
+    g.globalAlpha = 0.18
+    g.fillStyle = '#3a3633'
+    for (let i = 0; i < 3; i++) {
+      g.beginPath()
+      g.ellipse(r() * s, r() * s, 8 + r() * 10, 5 + r() * 6, r() * 3, 0, Math.PI * 2)
+      g.fill()
+    }
+    g.globalAlpha = 1
+  }), 'dirt', rx, ry)
+
+// A worn track lying along u: two darker tyre ruts with tread marks, a paler
+// crown between them and loose gravel at the edges. Neutral, so the material
+// colour picks dirt, sand or asphalt.
+export const trackTex = () =>
+  make('track', 128, (g, s, r) => {
+    g.fillStyle = '#e8e3dc'
+    g.fillRect(0, 0, s, s)
+    speckle(g, s, r, ['#d9d3ca', '#f1ede8', '#cdc6bc'], 1400, 2)
+    for (const c of [0.3, 0.7]) {
+      const y = c * s
+      const grd = g.createLinearGradient(0, y - 14, 0, y + 14)
+      grd.addColorStop(0, 'rgba(120,112,102,0)')
+      grd.addColorStop(0.5, 'rgba(120,112,102,0.6)')
+      grd.addColorStop(1, 'rgba(120,112,102,0)')
+      g.fillStyle = grd
+      g.fillRect(0, y - 14, s, 28)
+      g.fillStyle = 'rgba(80,74,68,0.35)'
+      for (let x = 0; x < s; x += 6) g.fillRect(x, y - 6, 2, 12)
+    }
+    // Gravel thrown to the edges.
+    for (const y0 of [0, s - 10]) {
+      g.fillStyle = 'rgba(255,255,255,0.35)'
+      g.fillRect(0, y0, s, 10)
+      for (let i = 0; i < 90; i++) {
+        g.fillStyle = r() > 0.5 ? '#a49b8f' : '#c7bfb3'
+        g.fillRect(r() * s, y0 + r() * 10, 2 + r() * 2, 2 + r() * 2)
+      }
+    }
+  })
+
+// A light beam on an open cylinder: bright at the foot, fading out upward.
+export const beamTex = () =>
+  make('beam', 64, (g, s) => {
+    const grd = g.createLinearGradient(0, s, 0, 0)
+    grd.addColorStop(0, 'rgba(255,255,255,1)')
+    grd.addColorStop(0.35, 'rgba(255,255,255,0.5)')
+    grd.addColorStop(1, 'rgba(255,255,255,0)')
+    g.fillStyle = grd
+    g.fillRect(0, 0, s, s)
+  })
+
+// Asphalt tiled `rx` by `ry`, for long streets.
+export const roadTex = (rx = 1, ry = rx) => rep(asphaltTex(), 'asphalt', rx, ry)

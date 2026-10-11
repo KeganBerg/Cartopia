@@ -2,6 +2,8 @@ import { useMemo } from 'react'
 import { BuildingModel } from './BuildingModel'
 import { Box, Cone, Cyl, rand } from './RaceVenues'
 import { PAL } from './season'
+import type { Texture } from 'three'
+import { dirtTex, paverTex, roadTex } from './textures'
 import { buildingDef, type BuildingDef } from '../game/data'
 
 // The neighbourhoods around Rusty's search lots. Laid out like real places:
@@ -31,11 +33,11 @@ export function lotBounds(L: LotLayout) {
 }
 
 // A flat strip lying on the ground.
-function Strip({ x, z, w, d, c, y = 0.012 }: { x: number; z: number; w: number; d: number; c: string; y?: number }) {
+function Strip({ x, z, w, d, c, y = 0.012, t }: { x: number; z: number; w: number; d: number; c: string; y?: number; t?: Texture }) {
   return (
     <mesh rotation-x={-Math.PI / 2} position={[x, y, z]}>
       <planeGeometry args={[w, d]} />
-      <meshStandardMaterial color={c} roughness={0.95} />
+      <meshStandardMaterial color={c} roughness={0.95} map={t} />
     </mesh>
   )
 }
@@ -44,31 +46,6 @@ function Model({ def, p, ry = 0, s = 1, level = 1 }: { def: BuildingDef | string
   return (
     <group position={p} rotation-y={ry} scale={s}>
       <BuildingModel def={typeof def === 'string' ? buildingDef(def) : def} level={level} />
-    </group>
-  )
-}
-
-// Post-and-rail fence round a rectangle, with a gap for the way in at the front.
-function LotFence({ X, Z, c, gap = 1.6 }: { X: number; Z: number; c: string; gap?: number }) {
-  const posts: [number, number][] = []
-  for (let x = -X; x <= X + 0.01; x += 2) {
-    posts.push([x, -Z])
-    if (Math.abs(x) > gap) posts.push([x, Z])
-  }
-  for (let z = -Z + 2; z < Z - 0.01; z += 2) posts.push([-X, z], [X, z])
-  const halfFront = (X - gap) / 2
-  return (
-    <group>
-      {posts.map(([x, z], i) => <Box key={i} p={[x, 0.3, z]} s={[0.09, 0.6, 0.09]} c={c} />)}
-      {[0.22, 0.46].map((y) => (
-        <group key={y}>
-          <Box p={[0, y, -Z]} s={[X * 2, 0.05, 0.04]} c={c} />
-          <Box p={[-X, y, 0]} s={[0.04, 0.05, Z * 2]} c={c} />
-          <Box p={[X, y, 0]} s={[0.04, 0.05, Z * 2]} c={c} />
-          <Box p={[-gap - halfFront, y, Z]} s={[halfFront * 2, 0.05, 0.04]} c={c} />
-          <Box p={[gap + halfFront, y, Z]} s={[halfFront * 2, 0.05, 0.04]} c={c} />
-        </group>
-      ))}
     </group>
   )
 }
@@ -95,7 +72,7 @@ function gridAround(X: number, Z: number, sw: number, block: number): Grid {
   return { xs, zs, blocks, sw }
 }
 
-function Streets({ g, road, walk, reach = 30 }: { g: Grid; road: string; walk?: string; reach?: number }) {
+function Streets({ g, road, walk, reach = 30, paved = true }: { g: Grid; road: string; walk?: string; reach?: number; paved?: boolean }) {
   const zMin = g.zs[0] - reach
   const zMax = g.zs[3] + reach
   const xMin = g.xs[0] - reach
@@ -104,14 +81,14 @@ function Streets({ g, road, walk, reach = 30 }: { g: Grid; road: string; walk?: 
     <group>
       {g.xs.map((x) => (
         <group key={`x${x}`}>
-          <Strip x={x} z={(zMin + zMax) / 2} w={g.sw * 2} d={zMax - zMin} c={road} />
-          {walk && [-1, 1].map((sd) => <Strip key={sd} x={x + sd * (g.sw + 0.2)} z={(zMin + zMax) / 2} w={0.4} d={zMax - zMin} c={walk} y={0.008} />)}
+          <Strip x={x} z={(zMin + zMax) / 2} w={g.sw * 2} d={zMax - zMin} c={road} t={paved ? roadTex(g.sw, (zMax - zMin) / 2) : dirtTex(g.sw / 2, (zMax - zMin) / 4)} />
+          {walk && [-1, 1].map((sd) => <Strip key={sd} x={x + sd * (g.sw + 0.2)} z={(zMin + zMax) / 2} w={0.4} d={zMax - zMin} c={walk} y={0.008} t={paverTex(0.4, zMax - zMin)} />)}
         </group>
       ))}
       {g.zs.map((z) => (
         <group key={`z${z}`}>
-          <Strip x={(xMin + xMax) / 2} z={z} w={xMax - xMin} d={g.sw * 2} c={road} />
-          {walk && [-1, 1].map((sd) => <Strip key={sd} x={(xMin + xMax) / 2} z={z + sd * (g.sw + 0.2)} w={xMax - xMin} d={0.4} c={walk} y={0.008} />)}
+          <Strip x={(xMin + xMax) / 2} z={z} w={xMax - xMin} d={g.sw * 2} c={road} t={paved ? roadTex((xMax - xMin) / 2, g.sw) : dirtTex((xMax - xMin) / 4, g.sw / 2)} />
+          {walk && [-1, 1].map((sd) => <Strip key={sd} x={(xMin + xMax) / 2} z={z + sd * (g.sw + 0.2)} w={xMax - xMin} d={0.4} c={walk} y={0.008} t={paverTex(xMax - xMin, 0.4)} />)}
         </group>
       ))}
     </group>
@@ -163,7 +140,7 @@ function Suburbs({ L }: { L: LotLayout }) {
   }, [g])
   return (
     <group>
-      <Streets g={g} road="#5f646a" walk="#cfd3d6" />
+      <Streets g={g} road="#e3e6e8" walk="#ffffff" />
       {houses.map((h, i) => {
         const [fx, fz] = facing(h.ry)
         // A driveway beside the house, and maybe a tree in the front yard.
@@ -177,26 +154,8 @@ function Suburbs({ L }: { L: LotLayout }) {
           </group>
         )
       })}
-      <LotFence X={X} Z={Z} c="#8d6e63" />
-      <InnerTrees L={L} ids={['tree', 'tree', 'pine']} />
     </group>
   )
-}
-
-// A few trees in the middle of the loop, kept clear of the spots.
-function InnerTrees({ L, ids, s = 0.75 }: { L: LotLayout; ids: string[]; s?: number }) {
-  const spots = useMemo(() => {
-    const out: [number, number][] = []
-    const tall = L.rz > L.rx
-    for (let k = -3; k <= 3; k++) {
-      const x = tall ? 0 : k * 1.6
-      const z = tall ? k * 1.6 : 0
-      const clear = L.spots.every((p) => Math.hypot(p.x - x, p.z - z) > 2.2) && L.pts.every(([px, pz]) => Math.hypot(px - x, pz - z) > 1.4)
-      if (clear) out.push([x, z])
-    }
-    return out
-  }, [L])
-  return <group>{spots.map(([x, z], i) => <Model key={i} def={ids[i % ids.length]} p={[x, 0, z]} s={s} />)}</group>
 }
 
 // ---- Downtown ----
@@ -244,14 +203,13 @@ function Downtown({ L }: { L: LotLayout }) {
   }, [g])
   return (
     <group>
-      <Streets g={g} road="#3f4449" walk="#b0b6bb" />
+      <Streets g={g} road="#c4c9cd" walk="#eceff1" />
       {shops.map((s, i) => <Model key={i} def={s.def} p={[s.x, 0, s.z]} ry={s.ry} />)}
       {lamps.map(([x, z], i) => <Model key={i} def="lamp" p={[x, 0, z]} s={0.6} />)}
       {/* An old parking lot: bays painted round the edge. */}
       {Array.from({ length: Math.floor((X * 2) / 1.1) }, (_, i) => -X + 0.55 + i * 1.1).flatMap((x) =>
         [-1, 1].map((sd) => <Strip key={`${x}${sd}`} x={x} z={sd * (Z - 0.55)} w={0.05} d={1.1} c="#cfd8dc" y={0.02} />)
       )}
-      <LotFence X={X} Z={Z} c="#78909c" />
     </group>
   )
 }
@@ -304,15 +262,13 @@ function Farm({ L }: { L: LotLayout }) {
   const g = useMemo(() => gridAround(X, Z, 0.5, 9), [X, Z])
   return (
     <group>
-      <Streets g={g} road="#a7845c" reach={20} />
+      <Streets g={g} road="#e8c79c" reach={20} paved={false} />
       {g.blocks.map(({ r, ix, iz }, i) =>
         ix === 0 && iz === 0 ? <Farmstead key={i} r={r} /> : <Field key={i} r={{ x0: r.x0 + 0.3, x1: r.x1 - 0.3, z0: r.z0 + 0.3, z1: r.z1 - 0.3 }} c={CROPS[i % CROPS.length]} along={(ix + iz) % 2 === 0} />
       )}
       {/* Tree lines along the outermost lanes. */}
       {[g.xs[0] - 1.4, g.xs[3] + 1.4].map((x) => Array.from({ length: 14 }, (_, k) => <Model key={`${x}${k}`} def="pine" p={[x, 0, g.zs[0] + k * 3]} s={0.85} />))}
       {Array.from({ length: Math.ceil((g.xs[3] - g.xs[0]) / 3) }, (_, k) => <Model key={k} def="pine" p={[g.xs[0] + k * 3, 0, g.zs[0] - 1.4]} s={0.85} />)}
-      <LotFence X={X} Z={Z} c="#8d6e4a" />
-      <InnerTrees L={L} ids={['tree']} s={0.7} />
     </group>
   )
 }
@@ -347,7 +303,7 @@ function Desert({ L }: { L: LotLayout }) {
   }, [X, Z, hwy])
   return (
     <group>
-      <Strip x={0} z={hwy} w={140} d={1.6} c="#55595e" />
+      <Strip x={0} z={hwy} w={140} d={1.6} c="#d6dadd" t={roadTex(70, 1)} />
       <Strip x={0} z={hwy} w={140} d={0.06} c="#ffd54f" y={0.016} />
       {/* Telephone poles along the highway. */}
       {Array.from({ length: 16 }, (_, k) => (k - 7.5) * 6).map((x) => (
@@ -392,7 +348,6 @@ function Desert({ L }: { L: LotLayout }) {
           </mesh>
         )
       })}
-      <LotFence X={X} Z={Z} c="#8d6e4a" />
     </group>
   )
 }
@@ -449,7 +404,6 @@ function Track({ L }: { L: LotLayout }) {
       {Array.from({ length: Math.floor((Z * 2) / 1.3) }, (_, k) => <Strip key={k} x={X + 4.5} z={-Z + 0.65 + k * 1.3} w={4.4} d={0.05} c="#eceff1" y={0.016} />)}
       {Array.from({ length: Math.floor((X * 2 + 16) / 3) }, (_, k) => <Model key={`t${k}`} def="tree" p={[-X - 8 + k * 3, 0, stand - 6]} s={0.9} />)}
       {Array.from({ length: Math.floor((Z * 2 + 6) / 3) }, (_, k) => [-1, 1].map((sd) => <Model key={`s${k}${sd}`} def="tree" p={[sd * (X + 8.5), 0, -Z - 3 + k * 3]} s={0.9} />))}
-      <LotFence X={X + 0.2} Z={Z + 0.2} c="#90a4ae" />
     </group>
   )
 }
