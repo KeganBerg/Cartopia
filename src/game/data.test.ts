@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildingDef, carDef, knownBuilding, BUILDINGS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost } from './data'
+import { buildingDef, carDef, knownBuilding, BUILDINGS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost, jobLevel, performance, fittedMods, modStats, modCost, MODS, MOD_SLOTS, ownedMods, CARS, takesDriver, loves, driverPayout } from './data'
 
 describe('unknown ids from newer builds', () => {
   it('gives an unknown building a harmless stand-in instead of crashing', () => {
@@ -57,5 +57,79 @@ describe('building upgrades', () => {
     expect(upgradable(buildingDef('tree'))).toBe(false)
     expect(upgradable(buildingDef('rock'))).toBe(false)
     expect(upgradable(buildingDef('from-the-future'))).toBe(false)
+  })
+})
+
+describe('drivers', () => {
+  it('only loves businesses that take a driver, and every such business has fans', () => {
+    for (const c of CARS) {
+      expect(c.likes.length, c.id).toBe(3)
+      for (const id of c.likes) expect(knownBuilding(id) && takesDriver(buildingDef(id)), `${c.id} -> ${id}`).toBe(true)
+    }
+    for (const d of BUILDINGS.filter(takesDriver)) {
+      expect(CARS.some((c) => loves(c, d.id)), d.id).toBe(true)
+    }
+  })
+
+  it('pays +10% with any driver and +25% with one that loves the place', () => {
+    const pizza = buildingDef('pizza')
+    expect(driverPayout(pizza, 1, null)).toBe(60)
+    expect(driverPayout(pizza, 1, carDef('trail'))).toBe(66)
+    expect(driverPayout(pizza, 1, carDef('pip'))).toBe(75)
+    expect(driverPayout(pizza, 3, carDef('pip'))).toBe(Math.round(upgradePayout(pizza, 3) * 1.25))
+    expect(takesDriver(buildingDef('gas'))).toBe(false)
+    expect(takesDriver(buildingDef('rock'))).toBe(false)
+    expect(carDef('future-car').likes).toEqual([])
+  })
+})
+
+describe('jobs locked to the level they started at', () => {
+  it('pays the starting level after a mid-job upgrade', () => {
+    expect(jobLevel({ level: 3 })).toBe(3)
+    expect(jobLevel({ level: 4, jobLevel: 3 })).toBe(3)
+    expect(jobLevel({ level: 2, jobLevel: 9 })).toBe(2)
+  })
+})
+
+describe('car mods', () => {
+  const none = { engine: 0, turbo: 0, tires: 0, weight: 0 }
+
+  it('adds fitted mod stats to the performance index', () => {
+    const pip = carDef('pip')
+    const base = performance(pip, none)
+    expect(performance(pip, none, [])).toBe(base)
+    expect(performance(pip, none, ['flamepipes'])).toBe(Math.round((pip.power + 6) * 0.6 + pip.grip * 0.3 + (100 - pip.weight) * 0.1))
+    expect(performance(pip, none, MODS.map((m) => m.id))).toBeGreaterThan(base)
+  })
+
+  it('counts one mod per slot and ignores unknown ids', () => {
+    expect(fittedMods(['ducktail', 'gtwing', 'future-mod', 'chrome'])).toEqual({ spoiler: 'ducktail', rims: 'chrome' })
+    expect(fittedMods(undefined)).toEqual({})
+    expect(modStats('future-mod')).toEqual({ power: 0, grip: 0, weight: 0 })
+    expect(modCost('future-mod')).toEqual({ coins: 0, parts: 0, bucks: 0 })
+  })
+
+  it('stays smaller than maxed Garage upgrades', () => {
+    const car = carDef('civic')
+    const best = MOD_SLOTS.map((s) => MODS.filter((m) => m.slot === s.id).at(-1)!.id)
+    const modGain = performance(car, none, best) - performance(car, none)
+    const upGain = performance(car, { engine: 5, turbo: 5, tires: 5, weight: 5 }) - performance(car, none)
+    expect(modGain).toBeGreaterThan(5)
+    expect(modGain).toBeLessThan(upGain / 2)
+  })
+
+  it('prices every mod in coins or bucks, never both', () => {
+    for (const m of MODS) {
+      expect(new Set(MODS.map((x) => x.id)).size).toBe(MODS.length)
+      expect(m.bucks > 0).toBe(m.coins === 0 && m.parts === 0)
+    }
+  })
+})
+
+describe('owned mods', () => {
+  it('owns whatever is fitted, plus everything bought for the car', () => {
+    expect(ownedMods({ mods: ['gtwing'] })).toEqual(['gtwing'])
+    expect(ownedMods({ mods: ['gtwing'], ownedMods: ['ducktail', 'gtwing', 'future-mod'] })).toEqual(['ducktail', 'gtwing'])
+    expect(ownedMods({})).toEqual([])
   })
 })

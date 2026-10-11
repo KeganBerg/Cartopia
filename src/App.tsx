@@ -36,7 +36,8 @@ export default function App() {
     startCloudSync()
     joinLobby()
     tick(Date.now())
-    if (useGame.getState().lastDaily !== today()) setTimeout(() => useGame.getState().openPanel('daily'), 800)
+    // Checked again when it fires: a cloud save may have loaded since, already claimed today.
+    setTimeout(() => { const s = useGame.getState(); if (s.lastDaily !== today() && !s.panel) s.openPanel('daily') }, 800)
     const id = setInterval(() => tick(Date.now()), 1000)
     return () => clearInterval(id)
   }, [tick])

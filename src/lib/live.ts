@@ -4,11 +4,13 @@ import { supabase } from './supabase'
 import { useGame } from '../game/store'
 import { carDef, performance, type Body } from '../game/data'
 import { displayName } from './names'
+import { signedInUser } from './cloud'
 
 // Live drag racing over Supabase Realtime. A shared lobby channel carries
 // presence and challenges; each race gets its own channel for positions.
 
-export type LivePlayer = { id: string; town: string; level: number; carName: string; color: string; body: Body; pi: number; closed?: boolean }
+// uid: the signed-in account, which lets the server referee the race (guests have none).
+export type LivePlayer = { id: string; uid?: string | null; town: string; level: number; carName: string; color: string; body: Body; pi: number; mods?: string[]; closed?: boolean }
 export type Invite = { raceId: string; from: LivePlayer; at: number }
 export type LiveRace = { raceId: string; opponent: LivePlayer; host: boolean }
 
@@ -67,9 +69,9 @@ let lobby: RealtimeChannel | null = null
 
 function myCard(): LivePlayer {
   const s = useGame.getState()
-  const best = [...s.cars].sort((a, b) => performance(carDef(b.model), b.upgrades) - performance(carDef(a.model), a.upgrades))[0]
+  const best = [...s.cars].sort((a, b) => performance(carDef(b.model), b.upgrades, b.mods) - performance(carDef(a.model), a.upgrades, a.mods))[0]
   const d = carDef(best.model)
-  return { id: myId, town: displayName(s.townName, myId), level: s.level, carName: d.name, color: best.color, body: d.body, pi: performance(d, best.upgrades), closed: useLive.getState().closed }
+  return { id: myId, uid: signedInUser(), town: displayName(s.townName, myId), level: s.level, carName: d.name, color: best.color, body: d.body, pi: performance(d, best.upgrades, best.mods), mods: best.mods, closed: useLive.getState().closed }
 }
 
 export function joinLobby() {

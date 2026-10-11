@@ -1,5 +1,6 @@
+import { useEffect } from 'react'
 import { useGame, activeGoals, goalDone, statValue, today } from '../game/store'
-import { DAILY_BONUS, buildingDef, carDef, type StatKey, flatFixCost, servicePay, gasCanCost } from '../game/data'
+import { DAILY_BONUS, buildingDef, buildingLevel, upgradable, MAX_BUILDING_LEVEL, carDef, type StatKey, flatFixCost, servicePay, gasCanCost } from '../game/data'
 import { Panel } from './Menus'
 
 export function GoalsButton() {
@@ -40,7 +41,8 @@ function goTo(stat: StatKey): void {
     case 'gpWins':
       return s.openPanel('race')
     case 'upgrades':
-      return s.openPanel('garage')
+      // Building upgrades count too; the Shop lists them when there's one to do.
+      return s.openPanel(s.buildings.some((b) => upgradable(buildingDef(b.def)) && buildingLevel(b) < MAX_BUILDING_LEVEL) ? 'shop' : 'garage')
     case 'built':
       return s.openPanel('shop')
     case 'flatsFixed': {
@@ -88,7 +90,10 @@ export function DailyPanel() {
   const claim = useGame((s) => s.claimDaily)
   const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
   const day = last === yesterday ? streak + 1 : 1
-  if (last === today()) return null
+  const claimed = last === today()
+  // A cloud save can arrive already claimed for today: close instead of leaving an invisible panel.
+  useEffect(() => { if (claimed) useGame.getState().openPanel(null) }, [claimed])
+  if (claimed) return null
   return (
     <Panel title="Daily Bonus">
       <p className="hint">Come back every day for bigger rewards.</p>
