@@ -2,12 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { AdditiveBlending, BufferAttribute, BufferGeometry, Object3D, type Group, type InstancedMesh, type Mesh, type MeshBasicMaterial, type MeshStandardMaterial, type PerspectiveCamera } from 'three'
 import type { Loot, Search } from '../game/store'
-import { buildingDef, carDef, type Rarity } from '../game/data'
+import { carDef, type Rarity } from '../game/data'
 import { CarModel, wheelRig } from './CarModel'
-import { BuildingModel } from './BuildingModel'
 import { TowTruck } from './TownCars'
 import { Batch } from './Batch'
-import { Box, Cone, Cyl, Flat, rand } from './RaceVenues'
+import { LotScenery } from './RescueLots'
 import { PostFx } from './PostFx'
 import { SkyEnv } from './SkyEnv'
 import { holdTown } from './renderGate'
@@ -86,12 +85,6 @@ function at(L: Pick<Layout, 'pts' | 'cum' | 'len'>, s: number) {
   return { x: a[0] + (b[0] - a[0]) * f, z: a[1] + (b[1] - a[1]) * f, tx: (b[0] - a[0]) / seg, tz: (b[1] - a[1]) / seg }
 }
 
-function roadDist(L: Layout, x: number, z: number) {
-  let best = Infinity
-  for (let i = 0; i < N; i += 2) best = Math.min(best, (L.pts[i][0] - x) ** 2 + (L.pts[i][1] - z) ** 2)
-  return Math.sqrt(best)
-}
-
 // A flat strip following the loop, `off` out from its centre line.
 function ribbon(L: Layout, off: number, half: number, y: number) {
   const g = new BufferGeometry()
@@ -113,184 +106,6 @@ function ribbon(L: Layout, off: number, half: number, y: number) {
   g.setAttribute('uv', new BufferAttribute(uv, 2))
   g.setIndex(idx)
   return g
-}
-
-// Spots for scenery: clear of the road, the search spots and the way in.
-function scatter(L: Layout, seed: number, step: number, clear: number) {
-  const r = rand(seed)
-  const out: { x: number; z: number; a: number; b: number; front: boolean }[] = []
-  for (let x = -26; x <= 26; x += step) {
-    for (let z = -24; z <= L.rz + 14; z += step) {
-      const px = x + (r() - 0.5) * step * 0.7
-      const pz = z + (r() - 0.5) * step * 0.7
-      const a = r()
-      const b = r()
-      if (Math.abs(px) < 1.2 + clear * 0.6 && pz > L.rz - 1.5) continue
-      if (roadDist(L, px, pz) < clear) continue
-      if (L.spots.some((s) => (s.x - px) ** 2 + (s.z - pz) ** 2 < (clear + 0.5) ** 2)) continue
-      out.push({ x: px, z: pz, a, b, front: pz > L.rz - 0.5 })
-    }
-  }
-  return out
-}
-
-const faceIn = (x: number, z: number) => Math.atan2(-x, -z)
-
-function Model({ id, x, z, ry = 0, s = 1 }: { id: string; x: number; z: number; ry?: number; s?: number }) {
-  return (
-    <group position={[x, 0, z]} rotation-y={ry} scale={s}>
-      <BuildingModel def={buildingDef(id)} />
-    </group>
-  )
-}
-
-function Suburbs({ L }: { L: Layout }) {
-  const items = useMemo(() => scatter(L, 11, 2.7, 2.5), [L])
-  return (
-    <group>
-      {items.map((p, i) => {
-        if (p.front) return p.a < 0.3 ? <Model key={i} id="tree" x={p.x} z={p.z} s={0.7} /> : p.a < 0.6 ? <Model key={i} id="flowers" x={p.x} z={p.z} /> : null
-        if (p.a < 0.45) return <Model key={i} id="house" x={p.x} z={p.z} ry={Math.round(faceIn(p.x, p.z) / (Math.PI / 2)) * (Math.PI / 2)} />
-        if (p.a < 0.78) return <Model key={i} id="tree" x={p.x} z={p.z} s={0.8 + p.b * 0.4} />
-        if (p.a < 0.88) return <Model key={i} id="pine" x={p.x} z={p.z} />
-        return <Model key={i} id="fence" x={p.x} z={p.z} ry={p.b > 0.5 ? Math.PI / 2 : 0} />
-      })}
-    </group>
-  )
-}
-
-function Farm({ L }: { L: Layout }) {
-  const items = useMemo(() => scatter(L, 23, 4.4, 3.1), [L])
-  const crops = ['#e6c157', '#9ccc65', '#d4a84a', '#7cb342']
-  return (
-    <group>
-      {items.map((p, i) => {
-        if (p.a < 0.5 || p.front) {
-          const c = crops[Math.floor(p.b * crops.length)]
-          return (
-            <group key={i}>
-              <Flat x={p.x} z={p.z} w={3.8} d={3.8} c={c} y={0.01} />
-              {[-1.2, -0.4, 0.4, 1.2].map((dx) => <Flat key={dx} x={p.x + dx} z={p.z} w={0.18} d={3.6} c="#8d6e4a" y={0.02} />)}
-            </group>
-          )
-        }
-        if (p.a < 0.62)
-          return (
-            <group key={i} position={[p.x, 0, p.z]} rotation-y={faceIn(p.x, p.z)}>
-              <Box p={[0, 0.9, 0]} s={[2.2, 1.8, 2.8]} c="#b33a2e" />
-              <Cone p={[0, 2.25, 0]} r={2.05} h={0.9} c="#5d4037" seg={4} ry={Math.PI / 4} />
-              <Box p={[0, 0.6, 1.41]} s={[1, 1.2, 0.04]} c="#fafafa" />
-            </group>
-          )
-        if (p.a < 0.7)
-          return (
-            <group key={i}>
-              <Cyl p={[p.x, 1.4, p.z]} r={0.6} h={2.8} c="#b0bec5" seg={12} />
-              <Cone p={[p.x, 3.05, p.z]} r={0.66} h={0.5} c="#78909c" seg={12} />
-            </group>
-          )
-        if (p.a < 0.86)
-          return (
-            <group key={i}>
-              {[0, 1, 2].map((k) => <Cyl key={k} p={[p.x + k * 0.55 - 0.55, 0.25, p.z + (k % 2) * 0.3]} r={0.25} h={0.45} c="#d9b44a" seg={10} rot={[0, 0, Math.PI / 2]} />)}
-            </group>
-          )
-        return <Model key={i} id="pine" x={p.x} z={p.z} s={0.9 + p.b * 0.3} />
-      })}
-    </group>
-  )
-}
-
-const CITY = ['diner', 'bowling', 'motel', 'market', 'police', 'firehouse', 'bodyshop', 'parts', 'pizza', 'donut', 'coffee', 'arcade', 'burger', 'carwash']
-
-function Downtown({ L }: { L: Layout }) {
-  const items = useMemo(() => scatter(L, 37, 4.4, 3.3), [L])
-  return (
-    <group>
-      {items.map((p, i) => {
-        if (p.front) return p.a < 0.4 ? <Model key={i} id="lamp" x={p.x} z={p.z} /> : p.a < 0.6 ? <Model key={i} id="bench" x={p.x} z={p.z} /> : null
-        const id = CITY[Math.floor(p.a * CITY.length)]
-        return <Model key={i} id={id} x={p.x} z={p.z} ry={Math.round(faceIn(p.x, p.z) / (Math.PI / 2)) * (Math.PI / 2)} />
-      })}
-    </group>
-  )
-}
-
-function Desert({ L }: { L: Layout }) {
-  const items = useMemo(() => scatter(L, 41, 2.9, 2.3), [L])
-  return (
-    <group>
-      {items.map((p, i) => {
-        const far = Math.abs(p.x) > L.rx + 6 || p.z < -L.rz - 5
-        if (far && p.a < 0.3) {
-          const w = 3 + p.b * 4
-          const h = 1.6 + p.a * 8
-          return (
-            <group key={i}>
-              <Box p={[p.x, h / 2, p.z]} s={[w, h, w * 0.8]} c="#b85a32" />
-              <Box p={[p.x, h + 0.25, p.z]} s={[w * 0.82, 0.5, w * 0.65]} c="#d07a46" />
-            </group>
-          )
-        }
-        if (p.a < 0.6) {
-          const h = 0.9 + p.b
-          return (
-            <group key={i} position={[p.x, 0, p.z]}>
-              <Cyl p={[0, h / 2, 0]} r={0.12} h={h} c="#4f8a3a" seg={7} />
-              {p.b > 0.35 && (
-                <>
-                  <Cyl p={[0.2, h * 0.5, 0]} r={0.06} h={0.26} c="#4f8a3a" seg={6} rot={[0, 0, Math.PI / 2]} />
-                  <Cyl p={[0.32, h * 0.64, 0]} r={0.07} h={0.36} c="#4f8a3a" seg={6} />
-                </>
-              )}
-            </group>
-          )
-        }
-        if (p.a < 0.85)
-          return (
-            <mesh key={i} position={[p.x, 0.15, p.z]} scale={[0.5 + p.b * 0.4, 0.35 + p.b * 0.3, 0.45 + p.b * 0.3]}>
-              <dodecahedronGeometry args={[1, 0]} />
-              <meshStandardMaterial color="#a65a35" flatShading />
-            </mesh>
-          )
-        return null
-      })}
-    </group>
-  )
-}
-
-function Track({ L }: { L: Layout }) {
-  const items = useMemo(() => scatter(L, 53, 3.2, 2.6), [L])
-  const stand = -(L.rz + 5.2)
-  return (
-    <group>
-      {/* An old grandstand along the back straight. */}
-      {[0, 1, 2, 3].map((k) => <Box key={k} p={[0, 0.3 + k * 0.45, stand - k * 0.7]} s={[L.rx * 2 + 4, 0.6 + k * 0.9, 0.8]} c={k % 2 ? '#90a4ae' : '#b0bec5'} />)}
-      <Box p={[0, 3.6, stand - 2.6]} s={[L.rx * 2 + 4.6, 0.12, 2.6]} c="#c62828" />
-      {items.map((p, i) => {
-        if (p.z < stand + 1.6 && Math.abs(p.x) < L.rx + 3) return null
-        if (p.a < 0.35)
-          return (
-            <group key={i}>
-              {[0, 1, 2].map((k) => <Cyl key={k} p={[p.x, 0.12 + k * 0.2, p.z]} r={0.3} h={0.2} c={k % 2 ? '#fafafa' : '#263238'} seg={12} />)}
-            </group>
-          )
-        if (p.front) return null
-        if (p.a < 0.55) return <Model key={i} id="tree" x={p.x} z={p.z} />
-        if (p.a < 0.65) return <Model key={i} id="billboard" x={p.x} z={p.z} ry={faceIn(p.x, p.z)} />
-        if (p.a < 0.75) return <Model key={i} id="lamp" x={p.x} z={p.z} />
-        return null
-      })}
-    </group>
-  )
-}
-
-function Scenery({ theme, L }: { theme: string; L: Layout }) {
-  if (theme === 'farm') return <Farm L={L} />
-  if (theme === 'downtown') return <Downtown L={L} />
-  if (theme === 'desert') return <Desert L={L} />
-  if (theme === 'track') return <Track L={L} />
-  return <Suburbs L={L} />
 }
 
 // ---- Effects ----
@@ -1003,7 +818,7 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
             ))}
           </group>
         ))}
-        <Scenery theme={search.spot} L={L} />
+        <LotScenery theme={search.spot} L={L} />
       </Batch>
       {L.spots.map((p, i) => (
         <SearchSpot key={i} i={i} at={p} loot={search.pins[i]} open={search.revealed[i]} gone={holding === i || taken.includes(i)} tarp={theme.tarp[i % theme.tarp.length]} pad={theme.pad} speed={speed} onPick={pick} onFound={onFound} />
