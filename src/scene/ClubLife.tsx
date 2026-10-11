@@ -4,6 +4,7 @@ import { AdditiveBlending, CanvasTexture, Color, DoubleSide, MeshBasicMaterial, 
 import type { Group, InstancedMesh } from 'three'
 import { dayPhase, isNight, nightAmount } from '../game/clock'
 import { CLUB } from './clubLayout'
+import { driveClubLeds } from './clubLeds'
 
 // The moving parts of the nightclub, shown only while it's open: people
 // dancing on the rooftop floor, the bouncer at the door and two searchlights
@@ -70,6 +71,7 @@ export function ClubLife({ lvl, roofY, roofZ, floorY, floorZ, floorW, floorD }: 
   }, [n, dancers])
 
   useFrame(({ clock }) => {
+    driveClubLeds()
     const t = torso.current
     const hd = head.current
     const ar = arms.current
