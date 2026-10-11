@@ -50,7 +50,7 @@ export function econCatalog() {
     return before
   })
   const mods = Object.fromEntries(
-    MODS.map((m) => [m.id, { slot: m.slot, coins: m.coins, parts: m.parts, bucks: m.bucks, power: m.power, grip: m.grip, weight: m.weight, xp: modXp(m.id) }]),
+    MODS.map((m) => [m.id, { slot: m.slot, coins: m.coins, parts: m.parts, bucks: m.bucks, power: m.power, grip: m.grip, weight: m.weight, xp: modXp(m.id), ...(m.only ? { only: m.only } : {}), ...(m.notOn ? { notOn: m.notOn } : {}) }]),
   )
   // Campaign chapters: the one-time bonuses for clearing one and for three stars on all its races.
   const campaign = Object.fromEntries(CAMPAIGN.map((c) => [c.id, {
