@@ -16,16 +16,20 @@ import { NeedPanel } from './ui/Need'
 import { UpgradePanel } from './ui/Upgrade'
 import { RescuePanel } from './ui/Rescue'
 import { BankPanel } from './ui/Bank'
+import { DealsPanel } from './ui/Deals'
 import { LevelUpSplash } from './ui/LevelUp'
 import { AccountPanel } from './ui/Account'
+import { AlertsCard } from './ui/Alerts'
 import { WelcomeBack } from './ui/WelcomeBack'
 import { GiftWatcher, GiftsPanel } from './ui/Gifts'
 import { GoalsPanel, DailyPanel, FlatPanel } from './ui/Goals'
+import { SeasonPanel } from './ui/Season'
 import { useGame, today } from './game/store'
 import { startCloudSync } from './lib/cloud'
 import './lib/rescue'
 import { startAmbience } from './lib/ambience'
 import { useTownPaused } from './scene/renderGate'
+import { useCrewGoalWatcher } from './ui/CrewGoal'
 
 // Phones get a lighter renderer: lower pixel ratio keeps iOS from dropping the WebGL context.
 const SMALL = typeof window !== 'undefined' && Math.min(window.innerWidth, window.innerHeight) < 700
@@ -35,6 +39,7 @@ export default function App() {
   const liveRace = useLive((l) => l.race)
   const tick = useGame((s) => s.tick)
   const townPaused = useTownPaused()
+  useCrewGoalWatcher()
 
   useEffect(() => {
     startCloudSync()
@@ -77,10 +82,13 @@ export default function App() {
       {panel === 'upgrade' && <UpgradePanel />}
       {panel === 'rescue' && <RescuePanel />}
       {panel === 'bank' && <BankPanel />}
+      {panel === 'deals' && <DealsPanel />}
       <VisitBanner />
       <Tutorial />
+      <AlertsCard />
       {panel === 'account' && <AccountPanel />}
       {panel === 'goals' && <GoalsPanel />}
+      {panel === 'season' && <SeasonPanel />}
       {panel === 'daily' && <DailyPanel />}
       {panel === 'flat' && <FlatPanel />}
       <WelcomeBack />
