@@ -11,14 +11,6 @@ import { RescueScene, type ScreenAt } from '../scene/RescueScene'
 import { rescueSfx } from '../lib/sound'
 import { buzz } from '../lib/haptics'
 
-function fmt(ms: number) {
-  const sec = Math.max(0, Math.ceil(ms / 1000))
-  const h = Math.floor(sec / 3600)
-  const m = Math.floor((sec % 3600) / 60)
-  const s = sec % 60
-  return h ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}m ${String(s).padStart(2, '0')}s`
-}
-
 function lootLabel(l: Loot) {
   switch (l.kind) {
     case 'car': return { icon: '🚗', text: carDef(l.model).name }
@@ -36,88 +28,124 @@ function RarityTag({ r }: { r: Rarity }) {
   return <span className={`rarity rarity-${r}`}>{RARITY[r].name}</span>
 }
 
-// The restore bay: the car up on Rusty's lift, a progress bar and its timer.
-function RestoreBay({ onCollect, onPick }: { onCollect: () => void; onPick: () => void }) {
+// The restore bay, the hero of Rusty's: a lit garage with the car up on the
+// lift, a ring timer and one button. Empty, it waits for a car from the lot.
+function Ring({ pct, children }: { pct: number; children: React.ReactNode }) {
+  const c = 2 * Math.PI * 25
+  return (
+    <span className="bay-ring">
+      <svg viewBox="0 0 62 62" aria-hidden="true">
+        <circle cx="31" cy="31" r="25" className="track" />
+        <circle cx="31" cy="31" r="25" className="fill" strokeDasharray={c} strokeDashoffset={c * (1 - pct / 100)} transform="rotate(-90 31 31)" />
+      </svg>
+      <span>{children}</span>
+    </span>
+  )
+}
+
+function BayHero({ onCollect, compact }: { onCollect: () => void; compact?: boolean }) {
   const now = useNow()
   const r = useGame((s) => s.restoring)
   const rush = useGame((s) => s.rushRestore)
   if (!r)
-    return (
-      <button className="bay empty" onClick={onPick}>
-        <span className="bay-lift"><span className="bay-wrench">🔧</span></span>
-        <span className="bay-info"><b>Bay is free</b><small>Pick a car to fix up</small></span>
-        <span className="bay-go">›</span>
-      </button>
+    return compact ? null : (
+      <div className="bayhero empty">
+        <div className="bay-stage"><span className="bay-wrench">🔧</span></div>
+        <div className="bay-side">
+          <b>Bay is free</b>
+          <small>Pick a car from your lot ↓</small>
+        </div>
+      </div>
     )
   const d = carDef(r.model)
   const left = r.endsAt - now
   const done = left <= 0
-  const pct = done ? 100 : 100 - (left / (r.minutes * 60000)) * 100
+  const pct = done ? 100 : Math.max(0, 100 - (left / (r.minutes * 60000)) * 100)
   return (
-    <div className={done ? 'bay done' : 'bay'}>
-      <span className="bay-lift">
-        <CarThumb size="sm" color={d.colors[0]} body={d.body} model={d.id} rusty={!done} />
-        {!done && <span className="bay-spark" />}
-      </span>
-      <div className="bay-info">
-        <b>{d.name}</b>
-        {done ? (
-          <small className="bay-ready"><RarityTag r={r.rarity} /> ✨ Good as new!</small>
-        ) : (
-          <>
-            <div className="bay-bar"><span style={{ width: `${pct}%` }} /></div>
-            <small><RarityTag r={r.rarity} /> 🔧 {fmt(left)}</small>
-          </>
-        )}
+    <div className={`bayhero${done ? ' done' : ''}${compact ? ' compact' : ''}`}>
+      <div className="bay-stage">
+        <CarThumb size={compact ? 'sm' : undefined} color={d.colors[0]} body={d.body} model={d.id} rusty={!done} />
+        {!done && <><span className="bay-spark" /><span className="bay-spark b" /></>}
       </div>
-      {done
-        ? <button className="buy bay-btn" onClick={onCollect}>Collect</button>
-        : <button className="buy alt small bay-btn" onClick={rush}>Finish · <span className="ico buck-ico rs-ico">💎</span>{rushBucks(left)}</button>}
+      <div className="bay-side">
+        <b>{d.name}</b>
+        <div className="bay-row">
+          <Ring pct={pct}>{done ? '✨' : clock(left)}</Ring>
+          <small><RarityTag r={r.rarity} />{done ? ' Good as new!' : " Rusty's on it"}</small>
+        </div>
+        {done
+          ? <button className="buy bay-btn collect" onClick={onCollect}>✨ Collect</button>
+          : <button className="buy alt bay-btn" onClick={rush}>Finish now · <span className="ico buck-ico rs-ico">💎</span>{rushBucks(left)}</button>}
+      </div>
     </div>
   )
+}
+
+// Short clock for the ring timer: 3:12, or 1h05 for long restores.
+function clock(ms: number) {
+  const sec = Math.max(0, Math.ceil(ms / 1000))
+  const h = Math.floor(sec / 3600)
+  const m = Math.floor((sec % 3600) / 60)
+  return h ? `${h}h${String(m).padStart(2, '0')}` : `${m}:${String(sec % 60).padStart(2, '0')}`
 }
 
 function restoreTime(minutes: number) {
   return minutes >= 60 ? `${minutes / 60}h` : `${minutes}m`
 }
 
-function Storage({ onFind }: { onFind: () => void }) {
+// Rusty's lot: a parking spot for every car he can keep. Tap one to fix it up.
+function Lot({ onFind }: { onFind: () => void }) {
   const junk = useGame((s) => s.junkyard)
   const busy = useGame((s) => !!s.restoring)
   const coins = useGame((s) => s.coins)
   const restore = useGame((s) => s.restoreCar)
   const scrap = useGame((s) => s.scrapCar)
-  if (!junk.length)
-    return (
-      <button className="rs-empty-card" onClick={onFind}>
-        <span>🔍</span>
-        <b>Storage is empty</b>
-        <small>Search a lot to find old cars</small>
-      </button>
-    )
+  const [sel, setSel] = useState<string | null>(null)
+  const best = [...junk].sort((a, b) => RARITY_ORDER[b.rarity] - RARITY_ORDER[a.rarity])[0]
+  const picked = junk.find((c) => c.uid === sel) ?? best
+  const empty = Math.max(0, STORAGE_MAX - junk.length)
+  const d = picked && carDef(picked.model)
+  const cost = d ? restoreCost(d) : 0
   return (
-    <div className="cards rows junk-rows">
-      {junk.map((c) => {
-        const d = carDef(c.model)
-        const cost = restoreCost(d)
-        return (
-          <div key={c.uid} className={`card junk-card rr-${c.rarity}`}>
-            <CarThumb color={d.colors[0]} body={d.body} model={d.id} rusty />
-            <div className="card-text">
-              <div className="card-name">{d.name}</div>
-              <div className="junk-tags"><RarityTag r={c.rarity} /><SkillTag model={c.model} />{d.rescueOnly && <span className="classic-tag">Classic</span>}</div>
-              <div className="junk-meta">
-                <span>PI {performance(d, { engine: 0, turbo: 0, tires: 0, weight: 0 })}</span>
-                <span>⏱ {restoreTime(RARITY[c.rarity].minutes)}</span>
-                <button className="scrap" onClick={() => scrap(c.uid)} title="Scrap for parts">♻ +{RARITY[c.rarity].scrapParts}<span className="ico parts-ico rs-ico">⚙</span></button>
-              </div>
+    <div className="lot">
+      <div className="lot-head"><b>Your lot</b><span>{junk.length ? 'Tap a car to fix it up' : 'Rusty tows finds here'}</span></div>
+      <div className="lot-spots">
+        {junk.map((c) => {
+          const cd = carDef(c.model)
+          return (
+            <button key={c.uid} className={`lot-spot rr-${c.rarity}${picked?.uid === c.uid ? ' sel' : ''}`} onClick={() => setSel(c.uid)} aria-pressed={picked?.uid === c.uid}>
+              <CarThumb color={cd.colors[0]} body={cd.body} model={cd.id} rusty />
+              <span className="lot-name">{cd.name}</span>
+              <RarityTag r={c.rarity} />
+            </button>
+          )
+        })}
+        {Array.from({ length: empty }, (_, i) => (
+          <button key={`e${i}`} className="lot-spot open" onClick={onFind} aria-label="Empty spot: search for cars">
+            <span>P</span>
+          </button>
+        ))}
+      </div>
+      {picked && d ? (
+        <div className={`lot-pick rr-${picked.rarity}`}>
+          <div className="lot-pick-info">
+            <b>{d.name}</b>
+            <div className="junk-tags"><RarityTag r={picked.rarity} /><SkillTag model={picked.model} />{d.rescueOnly && <span className="classic-tag">Classic</span>}</div>
+            <div className="junk-meta">
+              <span>PI {performance(d, { engine: 0, turbo: 0, tires: 0, weight: 0 })}</span>
+              <span>⏱ {restoreTime(RARITY[picked.rarity].minutes)}</span>
             </div>
-            <button className={`buy junk-go${coins < cost ? ' broke' : ''}`} disabled={busy} onClick={() => restore(c.uid)}>
+          </div>
+          <div className="lot-acts">
+            <button className="scrap" onClick={() => { scrap(picked.uid); setSel(null) }} title="Scrap for parts">♻ +{RARITY[picked.rarity].scrapParts}<span className="ico parts-ico rs-ico">⚙</span></button>
+            <button className={`buy junk-go${coins < cost ? ' broke' : ''}`} disabled={busy} onClick={() => { restore(picked.uid); setSel(null) }}>
               {busy ? <>🔧<small>Bay busy</small></> : <>Restore<small><span className="ico coin-ico rs-ico">$</span>{cost.toLocaleString()}</small></>}
             </button>
           </div>
-        )
-      })}
+        </div>
+      ) : (
+        <button className="buy alt lot-find" onClick={onFind}>🔍 Search a lot for cars</button>
+      )}
     </div>
   )
 }
@@ -470,18 +498,23 @@ export function RescuePanel() {
     )
   const tabs = [
     { id: 'find' as const, label: '🔍 Find cars' },
-    { id: 'storage' as const, label: <>📦 Storage <span className={junkCount >= STORAGE_MAX ? 'tab-count full' : 'tab-count'}>{junkCount}/{STORAGE_MAX}</span></> },
+    { id: 'storage' as const, label: <>🚗 My lot <span className={junkCount >= STORAGE_MAX ? 'tab-count full' : 'tab-count'}>{junkCount}/{STORAGE_MAX}</span></> },
   ]
   return (
     <Panel title="Rusty's Rescue" wide>
       <SheetTabs items={tabs} value={tab} onChange={setTab} />
-      <RestoreBay onCollect={() => setNaming(true)} onPick={() => setTab(junkCount ? 'storage' : 'find')} />
       {tab === 'find' ? (
         <>
-          {junkCount >= STORAGE_MAX && <button className="rs-full" onClick={() => setTab('storage')}>📦 Storage full · restore or scrap a car</button>}
+          <BayHero compact onCollect={() => setNaming(true)} />
+          {junkCount >= STORAGE_MAX && <button className="rs-full" onClick={() => setTab('storage')}>🚗 Your lot is full · restore or scrap a car</button>}
           <SpotList />
         </>
-      ) : <Storage onFind={() => setTab('find')} />}
+      ) : (
+        <div className="rusty-home">
+          <BayHero onCollect={() => setNaming(true)} />
+          <Lot onFind={() => setTab('find')} />
+        </div>
+      )}
     </Panel>
   )
 }
