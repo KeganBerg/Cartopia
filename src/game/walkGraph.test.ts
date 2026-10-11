@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { buildWalkGraph, findPath, stepsFor, type Pt, type WalkBuilding } from './walkGraph'
 import { buildingDef, START_LAND } from './data'
 import { toTile, toWorld } from '../scene/grid'
+import { layoutRoads } from '../scene/traffic/layout'
 
 // The starter town: a loop road with a cross street.
 const roads = new Set<string>()
@@ -84,5 +85,23 @@ describe('walking network', () => {
   it('reaches every house from every other house', () => {
     const houses = buildings.filter((o) => o.def === 'house')
     for (const a of houses) for (const c of houses) if (a !== c) expect(findPath(g, g.buildingNode.get(a.uid)!, g.buildingNode.get(c.uid)!)).not.toBeNull()
+  })
+
+  it('crosses a divided avenue on both halves of the zebra crossing', () => {
+    // An east-west avenue (rows 10 and 11) with a street crossing it at x = 11.
+    const ave = new Set<string>()
+    for (let x = 2; x <= 20; x++) ave.add(`${x},10`).add(`${x},11`)
+    for (let z = 2; z <= 20; z++) ave.add(`11,${z}`)
+    const north = b('house', 5, 9)
+    const south = b('house', 5, 12, 2)
+    const ga = buildWalkGraph(ave, [north, south], START_LAND)
+    const route = findPath(ga, ga.buildingNode.get(north.uid)!, ga.buildingNode.get(south.uid)!)
+    expect(route).not.toBeNull()
+    const crossings = route!.edges.filter((e) => e.cross).map((e) => e.cross!.tile)
+    // One leg over each side of the avenue, on the same zebra crossing (the
+    // nearest is at the avenue's west end, where it meets the end junction).
+    expect(crossings.sort()).toEqual(['3,10', '3,11'])
+    const layout = layoutRoads(ave)
+    expect(layout.tiles.get('2,10')!.junction).toBe(true)
   })
 })
