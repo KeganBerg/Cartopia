@@ -19,6 +19,8 @@ import { ghostDist, trialWeek, TRIAL_FUEL } from '../game/trial'
 import { raceWeather } from '../game/weather'
 import { carGrip, conditions, conditionsNote, gripMul, spinning } from '../game/grip'
 import { TrialTab, TrialResult, beginTrialRun, type TrialRun } from './TimeTrial'
+import { claim as claimVisitor, leave as leaveVisitor, setRacing, type Visitor } from '../lib/visitors'
+import { RivalCard, RivalResult, type RivalMatch, type RivalBonus } from './Rivals'
 
 // skill: the rival car's race skill. AI rivals use it; live players use theirs on their own device.
 // shift: how cleanly an AI rival shifts, 0 (sloppy) to 1 (always perfect, the default).
@@ -89,6 +91,13 @@ const JOIN_PATIENCE_MS = 30000
 
 type RaceTab = 'quick' | 'campaign' | 'gp' | 'trial'
 let nextRaceTab: RaceTab = 'quick'
+// A street racer visiting town (src/lib/visitors.ts): the race opens straight away, at no fuel.
+let nextStreet: Visitor | null = null
+export function openStreetRace(v: Visitor) {
+  nextStreet = v
+  nextRaceTab = 'quick'
+  useGame.getState().openPanel('race')
+}
 // Opens the Race menu on a given tab (goals use it to send players to the campaign or Grand Prix).
 export function openRaceTab(tab: RaceTab) {
   nextRaceTab = tab
@@ -112,7 +121,16 @@ export function RacePanel() {
     return t
   })
   const [pickCar, setPickCar] = useState(false)
+  const [street, setStreet] = useState<Visitor | null>(() => {
+    const v = nextStreet
+    nextStreet = null
+    if (v) setRacing(true)
+    return v
+  })
   const [trial, setTrial] = useState<(TrialRun & { n: number }) | null>(null)
+  // The town rival race; bet: the double-or-nothing rematch. n remounts the race for each run.
+  const [rv, setRv] = useState<{ match: RivalMatch; bet: boolean; n: number } | null>(null)
+  const rvBonus = useRef<RivalBonus>(null)
   const gpResult = useGame((s) => s.gpResult)
   const campaignResult = useGame((s) => s.campaignResult)
 
@@ -121,6 +139,9 @@ export function RacePanel() {
   const outgoing = useLive((l) => l.outgoing)
   const mutedIds = useLive((l) => l.muted)
   const cooldownTo = useLive((l) => l.cooldownTo)
+
+  // Closing the race menu ends a street race too.
+  useEffect(() => () => setRacing(false), [])
 
   useEffect(() => {
     fetchOnlineRivals().then(setOnline)
@@ -142,6 +163,26 @@ export function RacePanel() {
   }
 
   if (race && car) return <DragRace car={car} rival={race} onExit={() => setRace(null)} />
+  if (street && car) {
+    const rival: Rival = { id: `street-${street.id}`, town: street.name, level, carName: carDef(street.model).name, color: street.color, pi: street.pi, online: false, body: street.body, skill: carDef(street.model).skill }
+    return (
+      <DragRace
+        car={car}
+        rival={rival}
+        title="🏁 Street challenge"
+        onFinish={(won) => {
+          useGame.getState().finishRace(won, reward(rival))
+          setRacing(false)
+          if (won) void claimVisitor()
+          else {
+            useGame.getState().toast(`${street.name.split(' from ')[0]} smoked you and drove off laughing.`)
+            leaveVisitor()
+          }
+        }}
+        onExit={() => { setRacing(false); setStreet(null); useGame.getState().openPanel(null) }}
+      />
+    )
+  }
   if (gpRace && car) {
     return (
       <DragRace
@@ -177,6 +218,30 @@ export function RacePanel() {
     )
   }
 
+  if (rv && car) {
+    const { match, bet } = rv
+    return (
+      <DragRace
+        key={rv.n}
+        car={car}
+        rival={match.rival}
+        prize={match.prize}
+        title={bet ? `🎲 Double or nothing · $${match.prize.toLocaleString()}` : `${match.def.icon} ${match.def.name} · Round ${match.visit + 1} of 3`}
+        onFinish={(won) => {
+          if (bet) useGame.getState().rivalBet(won, match.prize)
+          else rvBonus.current = useGame.getState().rivalResult(match.def.id, won, match.prize)
+        }}
+        resultView={(r) => (
+          <RivalResult match={match} won={r.won} bet={bet} bonus={bet ? null : rvBonus.current} myTime={r.myTime} theirTime={r.theirTime}
+            onBet={() => setRv({ match, bet: true, n: rv.n + 1 })}
+            onRetry={() => startRival(match, rv.n + 1)}
+            onExit={() => setRv(null)} />
+        )}
+        onExit={() => setRv(null)}
+      />
+    )
+  }
+
   if (cRace && car) {
     return (
       <DragRace
@@ -189,6 +254,13 @@ export function RacePanel() {
         onExit={() => { setCRace(null); setTab('campaign') }}
       />
     )
+  }
+
+  function startRival(match: RivalMatch, n = 0) {
+    if (waiting()) return
+    if (!spendFuel(RACE_FUEL)) return useGame.getState().showNeed('fuel', RACE_FUEL - useGame.getState().fuel, 'a rival race')
+    rvBonus.current = null
+    setRv({ match, bet: false, n })
   }
 
   const start = (r: Rival) => {
@@ -238,6 +310,7 @@ export function RacePanel() {
           setGpRace({ series, rival, prize })
         }} />
       ) : <>
+      <RivalCard onRace={(m) => startRival(m)} />
       {supabase && (
         <>
           <h3>Live now <small>(players online this minute, no fuel needed)</small></h3>
@@ -561,6 +634,13 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   const [label, setLabel] = useState('')
   const labelTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const [result, setResult] = useState<null | { won: boolean; myTime: number; theirTime: number; note?: string; counted?: boolean; stars?: number }>(null)
+  // The result card waits a moment so both cars can be seen rolling through the finish.
+  const [cardUp, setCardUp] = useState(false)
+  useEffect(() => {
+    if (!result) return
+    const id = setTimeout(() => setCardUp(true), 1400)
+    return () => clearTimeout(id)
+  }, [result])
   // Live races between signed-in players: 'yes' once the server is refereeing, 'no' to decide here.
   const refereed = useRef<'pending' | 'yes' | 'no'>(live ? 'pending' : 'no')
   const joined = useRef<Promise<boolean> | null>(null)
@@ -863,7 +943,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
           </div>
         ))}
       </div>
-      {countdown > 0 && !result && <div className="rf-venue">{venue.icon} {venue.name}{gripNote && <small>{gripNote}</small>}</div>}
+      {countdown > 0 && !result && <div className={`rf-venue v-${venue.id}`}><span className="rf-venue-ico">{venue.icon}</span><span className="rf-venue-txt"><small>{gripNote ?? 'Race venue'}</small><b>{venue.name}</b></span></div>}
       {spin && !label && !result && <div className="rf-spin">💨 Wheelspin</div>}
       {countdown > 0 && countdown !== 99 && <div className="countdown big">{countdown}</div>}
       {countdown === 0 && !me.current.launched && !result && <div className="countdown big go">GO!</div>}
@@ -882,7 +962,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       {def.skill && skillShown && !result && <div className="skill-flash">{SKILLS[def.skill].icon} {SKILLS[def.skill].name}!</div>}
       {theirSkill && theirShown && !result && <div className="skill-flash theirs">{rival.town}: {SKILLS[theirSkill].icon} {SKILLS[theirSkill].name}!</div>}
       {theirBoost && !theirShown && !result && <div className="skill-flash theirs">{rival.town}: 🔥 Boost!</div>}
-      {result && resultView ? resultView(result) : result ? (
+      {result && !cardUp ? null : result && resultView ? resultView(result) : result ? (
         <RaceResult won={result.won} myTime={result.myTime} theirTime={result.theirTime} cash={result.counted === false ? 0 : result.won ? payout : Math.round(payout * 0.1)} xp={result.counted === false ? 0 : result.won ? 30 : 8} rival={rival.town} note={result.note} noContest={result.counted === false} stars={result.stars} onExit={onExit} />
       ) : (
         <div className="rf-bottom">
