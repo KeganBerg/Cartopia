@@ -27,6 +27,8 @@ const RANGE_LO = edge(PLOT_MIN)
 const RANGE_HI = edge(PLOT_MAX + 1)
 // The forest runs out this far; the outer ground ends well past it.
 const FAR = 92
+// Lone trees dot the open country out to here.
+const WILD = 170
 
 export type Spot = { x: number; z: number; ry?: number; s?: number; sy?: number; tint?: string }
 
@@ -178,6 +180,14 @@ function forestSpots() {
       if (r() < 0.3) push(out, 'tuft', { x: jx - 1.3, z: jz + 1.4, ry: r() * 6, s: 1.6, sy: 1.3, tint: GRASS[Math.floor(r() * GRASS.length)] })
       if (r() < 0.06) push(out, 'rock', { x: jx + 1.6, z: jz - 1.5, ry: r() * 6, s: 1.2 + r() * 1.5 })
     }
+  // Past the woods, open country dotted with lone trees and copses.
+  for (let i = 0; i < 700; i++) {
+    const x = (r() - 0.5) * 2 * WILD, z = (r() - 0.5) * 2 * WILD
+    if (Math.max(Math.abs(x), Math.abs(z)) < FAR || inFarm(x, z, 3) || inLake(x, z, 3)) continue
+    const k = r()
+    push(out, k < 0.35 ? 'oakA' : k < 0.6 ? 'oakB' : 'pine', { x, z, ry: r() * 6, s: 1.6 + r() * 1.2, tint: TINT[Math.floor(r() * 4)] })
+    if (r() < 0.4) push(out, 'bush', { x: x + 1.4, z: z - 0.8, ry: r() * 6, s: 1.2 + r() * 0.6 })
+  }
   // Meadow edges round the clearings, reeds at the water.
   const clear = (x: number, z: number) => (inFarm(x, z, 1.5) && !inFarm(x, z, -0.5)) || (inLake(x, z, 3) && !inLake(x, z, 0.6))
   for (let i = 0; i < 1600; i++) {
