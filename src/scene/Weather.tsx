@@ -6,8 +6,8 @@ import {
 } from 'three'
 import { FEEL, seedRoll, strike, weatherNow, type Weather as WeatherState, type WeatherKind } from '../game/weather'
 import { SEASON } from './season'
-import { dayPhase, nightAmount } from './dayNight'
-import { groundUniforms, hazeColor } from './weatherLook'
+import { applyNight, dayPhase, nightAmount } from './dayNight'
+import { gloomOf, groundUniforms, hazeColor } from './weatherLook'
 import type { Look } from './look'
 import type { VenueId } from './venues'
 
@@ -147,6 +147,7 @@ function frameFor(camera: Camera, out: Frame, race: boolean) {
 
 const RAIN_DAY = new Color('#d6e2ee')
 const RAIN_NIGHT = new Color('#8c9ab5')
+const SNOW_NIGHT = new Color('#9fabc4')
 
 type Sizes = { rain: number; splash: number; snow: number }
 
@@ -219,7 +220,7 @@ function Precip({ sizes, race, get }: { sizes: Sizes; race: boolean; get: () => 
     s.uWind.value.set(gust * 1.4, gust * 0.5)
     // Blowing sand rides the snow layer: tan grains racing sideways.
     const sand = w.dust > w.snow
-    s.uColor.value.set(sand ? '#b48650' : '#ffffff')
+    s.uColor.value.set(sand ? '#b48650' : '#ffffff').lerp(SNOW_NIGHT, sand ? 0 : night * 0.6)
     s.uOpacity.value = sand ? 0.7 : 0.95
     if (sand) {
       s.uSpeed.value = race ? 1.2 : 1.5
@@ -250,6 +251,9 @@ function Precip({ sizes, race, get }: { sizes: Sizes; race: boolean; get: () => 
 // the whole scene, then thunder (for sound) a moment later.
 const SEGS = 22
 const flashCurve = (t: number) => (t < 0 ? 0 : t < 0.07 ? 1 : t < 0.13 ? 0.25 : t < 0.2 ? 0.85 : Math.max(0, 0.85 * (1 - (t - 0.2) / 0.45)))
+// Players who ask for less motion get one soft glow per strike instead of a flicker.
+const calm = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
+const softFlash = (t: number) => (t < 0 ? 0 : 0.3 * Math.max(0, 1 - Math.abs(t - 0.25) / 0.25))
 
 function Lightning({ race, get }: { race: boolean; get: () => WeatherState }) {
   const camera = useThree((s) => s.camera)
@@ -319,7 +323,7 @@ function Lightning({ race, get }: { race: boolean; get: () => WeatherState }) {
       const far = Math.random()
       strike(400 + far * 2200, 1 - far * 0.6)
     } else if (!stormy && s.next < t + 2) s.next = t + 2 + Math.random() * 4
-    const f = flashCurve(t - s.at)
+    const f = (calm ? softFlash : flashCurve)(t - s.at)
     w.flash = f
     const m = bolt.material as MeshBasicMaterial
     m.opacity = Math.min(1, f * 1.4)
@@ -427,6 +431,13 @@ export function RaceWeather({ w, look }: { w: WeatherState; look: Look }) {
   const scene = useThree((s) => s.scene)
   const camera = useThree((s) => s.camera)
   const base = useRef<{ near: number; far: number; color: Color; exposure: number } | null>(null)
+  // Street lamps and headlights come on in a race-day storm, and go back to the
+  // town's weather afterwards.
+  useEffect(() => {
+    const night = nightAmount(dayPhase())
+    applyNight(night, gloomOf(w))
+    return () => applyNight(nightAmount(dayPhase()), gloomOf(weatherNow()))
+  }, [w])
   useEffect(() => {
     const f = scene.fog
     if (f instanceof Fog) {
