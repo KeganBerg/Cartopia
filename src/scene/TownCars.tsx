@@ -11,7 +11,7 @@ import { turnOf } from '../game/placement'
 import { toWorld, DIRS } from './grid'
 import { CarModel, carSize, wheelRig } from './CarModel'
 import { liveTraffic as sim } from './traffic/live'
-import { layoutRoads, lightAt, type Light } from './traffic/layout'
+import { layoutRoads, type Light } from './traffic/layout'
 
 // Town cars are drawn a little smaller than in the garage so two fit side by side.
 const SCALE = 1.1
@@ -52,7 +52,10 @@ function TownCar({ car }: { car: OwnedCar }) {
     if (!g) return
     g.visible = !!a
     if (truck.current) truck.current.visible = false
-    if (!a) return
+    if (!a) {
+      anchors.delete(`car:${car.uid}`)
+      return
+    }
     g.position.set(a.x, 0.02, a.z)
     g.rotation.y = a.yaw
     g.scale.setScalar(Math.max(0.001, a.show))
@@ -112,7 +115,7 @@ const ORDER: Light[] = ['red', 'yellow', 'green']
 // its arm reaching over the lane and its lamps facing the waiting cars.
 function TrafficSignals({ roads }: { roads: string[] }) {
   const signals = useMemo(() => {
-    const out: { key: string; x: number; z: number; yaw: number; offset: number; heading: number; clear: number }[] = []
+    const out: { key: string; x: number; z: number; yaw: number; cluster: number; heading: number }[] = []
     const { tiles, clusters } = layoutRoads(roads)
     for (const c of clusters) {
       if (!c.signal) continue
@@ -129,7 +132,7 @@ function TrafficSignals({ roads }: { roads: string[] }) {
           z: cz + dz * along + rz * side,
           // Local +z faces back down the road at the cars.
           yaw: Math.atan2(-dx, -dz),
-          offset: c.offset, heading: e.heading, clear: c.clear,
+          cluster: c.id, heading: e.heading,
         })
       }
     }
@@ -138,7 +141,7 @@ function TrafficSignals({ roads }: { roads: string[] }) {
   const lamps = useRef<(Mesh | null)[]>([])
   useFrame(() => {
     signals.forEach((s, i) => {
-      const now = lightAt(s.offset, s.heading, sim.t, s.clear)
+      const now = sim.lightOf(s.cluster, s.heading)
       ORDER.forEach((l, k) => {
         for (const m of [lamps.current[i * 6 + k * 2], lamps.current[i * 6 + k * 2 + 1]]) if (m) m.material = now === l ? lit[l] : dark
       })
