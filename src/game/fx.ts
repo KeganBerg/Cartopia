@@ -8,6 +8,8 @@ export type FxEvent =
   | { kind: 'built'; uid: string }
   | { kind: 'upgraded'; uids: string[] }
   | { kind: 'cleared'; uid: string }
+  // You helped a business in a friend's town; `el` is the badge you tapped.
+  | { kind: 'helped'; uid: string; coins: number; parts: number; xp: number; el: Element | null }
 
 type Listener = (e: FxEvent) => void
 const listeners = new Set<Listener>()
