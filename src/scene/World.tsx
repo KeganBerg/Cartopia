@@ -16,6 +16,7 @@ import { SeasonFx } from './SeasonFx'
 import { glowMats } from './dayNight'
 import { LightPool } from './BuildingModel'
 import { TownCars } from './TownCars'
+import { Batch } from './Batch'
 import { toWorld, toTile, DIRS } from './grid'
 import { grassTex, paverTex, asphaltTex } from './textures'
 
@@ -526,6 +527,13 @@ export function World() {
   const buildings = useGame((s) => (s.visiting ?? s).buildings)
   const roadsList = useGame((s) => (s.visiting ?? s).roads)
   const roads = useMemo(() => new Set(roadsList), [roadsList])
+  const land = useGame((s) => (s.visiting ? START_LAND : s.land))
+  const mode = useGame((s) => s.mode)
+  // Rebuild the merged town only when something's footprint changes, not on every job timer.
+  const layout = useMemo(
+    () => [buildings.map((b) => `${b.uid}:${b.def}:${b.x}:${b.z}:${b.rot}`).join(), roadsList.join(), land.join()].join('/'),
+    [buildings, roadsList, land],
+  )
   return (
     <>
       <DayNight small={Math.min(window.innerWidth, window.innerHeight) < 700} />
@@ -537,11 +545,14 @@ export function World() {
       <ResponsiveZoom />
       <ExpandZoom />
       <Interaction />
-      <Land />
-      <Roads />
-      {buildings.map((b) => (
-        <Building key={b.uid} b={b} roads={roads} />
-      ))}
+      {/* Pieces move while building or dragging, so merging waits for plain play. */}
+      <Batch version={layout} off={mode !== 'play'}>
+        <Land />
+        <Roads />
+        {buildings.map((b) => (
+          <Building key={b.uid} b={b} roads={roads} />
+        ))}
+      </Batch>
       <AnchorProjector />
       <TownCars />
       <Clouds />
