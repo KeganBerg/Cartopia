@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest'
-import { useGame, readyRewards } from './store'
-import { CAMPAIGN, CAMPAIGN_RACES, campaignReward, carDef, upgradeCost, xpToNext } from './data'
+import { describe, expect, it, vi } from 'vitest'
+import { useGame, readyRewards, today, buildPrice, paintPrice } from './store'
+import { CAMPAIGN, CAMPAIGN_RACES, DEALS, DEAL_SLOTS, buildingDef, campaignReward, carDef, dealOffer, dealsFor, finishDef, modDef, upgradeCost, xpToNext } from './data'
 
 describe('level-up bonuses', () => {
   it('add on top of a race reward instead of replacing it', () => {
@@ -28,7 +28,8 @@ describe('level-up bonuses', () => {
 describe('car mods', () => {
   it('keeps swapped-out parts so they go back on for free', () => {
     const car = { uid: 'm1', model: 'pip', color: '#fff', upgrades: { engine: 0, turbo: 0, tires: 0, weight: 0 } }
-    useGame.setState({ level: 10, xp: 0, coins: 10000, parts: 50, bucks: 0, levelUp: null, cars: [car] })
+    // Today's deals all used, so full prices apply whatever the date.
+    useGame.setState({ level: 10, xp: 0, coins: 10000, parts: 50, bucks: 0, levelUp: null, cars: [car], deals: { day: today(), used: DEALS.map((d) => d.id) } })
     const g = () => useGame.getState()
     expect(g().modCar('m1', 'ducktail')).toBe(true)
     expect(g().modCar('m1', 'gtwing')).toBe(true)
@@ -165,5 +166,67 @@ describe('collection sets', () => {
     expect([g().coins, g().bucks, g().trophies, g().xp]).toEqual([1500, 2, 5, 60])
     g().claimSet('daily')
     expect(g().coins).toBe(1500)
+  })
+})
+
+describe('daily deals', () => {
+  const car = { uid: 'd1', model: 'pip', color: '#e53935', upgrades: { engine: 0, turbo: 0, tires: 0, weight: 0 } }
+  const g = () => useGame.getState()
+
+  it('picks one deal per slot, the same for a given day, rotating day to day', () => {
+    expect(dealsFor('2026-10-11')).toEqual(dealsFor('2026-10-11'))
+    expect(dealsFor('2026-10-11').map((d) => d.id)).toEqual(DEAL_SLOTS.map((s, i) => {
+      const n = Date.UTC(2026, 9, 11) / 86400000
+      return s.deals[(n * s.step + i) % s.deals.length].id
+    }))
+    const week = new Set(Array.from({ length: 7 }, (_, i) => dealsFor(`2026-10-${String(11 + i).padStart(2, '0')}`)[2].id))
+    expect(week.size).toBeGreaterThan(4)
+    for (const d of DEALS) {
+      const o = dealOffer(d)
+      expect(o.now.coins + o.now.bucks * 1000).toBeLessThan(o.was.coins + o.was.bucks * 1000)
+    }
+  })
+
+  it('sells each of today\'s deals once at the deal price', () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    // Two weeks covers both car-shop kinds (mods and paint) and every supplies deal.
+    for (let day = 0; day < 14; day++) {
+      vi.setSystemTime(Date.UTC(2026, 9, 11 + day, 12))
+      useGame.setState({ level: 20, xp: 0, coins: 50000, parts: 100, bucks: 20, fuel: 0, levelUp: null, cars: [car], deals: null })
+      const [supplies, carDeal, decor] = dealsFor(today())
+      // Supplies: bought straight from the panel, then sold out.
+      const o = dealOffer(supplies)
+      expect(g().buyDeal(supplies.id)).toBe(true)
+      expect(g().coins).toBe(50000 - o.now.coins)
+      expect(g().bucks).toBe(20 - o.now.bucks)
+      expect(g().buyDeal(supplies.id)).toBe(false)
+      // Decor: the Shop price drops for one build.
+      const b = buildingDef(decor.item!)
+      expect(buildPrice(g(), b.id).coins).toBe(dealOffer(decor).now.coins)
+      useGame.setState({ deals: { day: today(), used: [...g().deals!.used, decor.id] } })
+      expect(buildPrice(g(), b.id)).toMatchObject({ coins: b.price, deal: null })
+      // Car deals: the mod or finish is cheaper until it's bought once.
+      const before = g().coins
+      if (carDeal.kind === 'mod') {
+        expect(g().modCar('d1', carDeal.item!)).toBe(true)
+        expect(before - g().coins).toBe(dealOffer(carDeal).now.coins)
+        expect(modDef(carDeal.item!)!.coins).toBe(dealOffer(carDeal).was.coins)
+      } else {
+        const job = { color: car.color, finish: carDeal.item as 'matte' | 'chrome', stripe: null }
+        expect(paintPrice(g(), g().cars[0], job).coins).toBe(dealOffer(carDeal).now.coins)
+        expect(g().paintCar('d1', job)).toBe(true)
+        expect(before - g().coins).toBe(dealOffer(carDeal).now.coins)
+        expect(finishDef(job.finish).coins).toBe(dealOffer(carDeal).was.coins)
+      }
+      expect(g().deals).toEqual({ day: today(), used: [supplies.id, decor.id, carDeal.id] })
+    }
+    vi.useRealTimers()
+  })
+
+  it('forgets yesterday\'s purchases', () => {
+    const [supplies] = dealsFor(today())
+    useGame.setState({ level: 20, coins: 50000, bucks: 20, fuel: 0, deals: { day: '2000-01-01', used: [supplies.id] } })
+    expect(g().buyDeal(supplies.id)).toBe(true)
+    expect(g().deals).toEqual({ day: today(), used: [supplies.id] })
   })
 })

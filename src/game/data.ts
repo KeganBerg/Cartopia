@@ -260,6 +260,8 @@ export type CarDef = {
   unlockLevel: number
   // Classics that only turn up in Rusty's searches, never in the Showroom.
   rescueOnly?: boolean
+  // Season track prize: only ever given by that season's last tier (season number).
+  season?: number
   // Race perk, like the original's car special skills.
   skill?: SkillId
   // Businesses this car loves working at (building ids): it earns them a bigger bonus.
@@ -317,6 +319,7 @@ export const CARS: CarDef[] = [
   { id: 'lemans', name: 'Liberty Endurance GT', body: 'super', price: 16000, unlockLevel: 1, rescueOnly: true, power: 72, grip: 62, weight: 32, skill: 'smooth', likes: ['stadium', 'parts', 'police'], colors: ['#1565c0', '#fafafa', '#c62828'] },
   { id: 'gullwing', name: 'Silver Wing 300', body: 'coupe', price: 30000, unlockLevel: 1, rescueOnly: true, power: 64, grip: 58, weight: 36, skill: 'oil', likes: ['motel', 'bowling', 'parkade'], colors: ['#cfd8dc', '#b71c1c', '#263238'] },
   { id: 'speedster', name: 'Fairhaven Speedster', body: 'roadster', price: 12000, unlockLevel: 1, rescueOnly: true, power: 58, grip: 46, weight: 26, skill: 'nitro', likes: ['cinema', 'diner', 'stadium'], colors: ['#1565c0', '#eceff1', '#b71c1c'] },
+  { id: 'nightfall', name: 'Aether Nightfall', body: 'wedge', price: 24000, unlockLevel: 1, season: 1, power: 78, grip: 72, weight: 30, skill: 'slipstream', likes: ['club', 'cinema', 'arcade'], colors: ['#311b92', '#00e5ff', '#212121'] },
 ]
 
 // Rusty's Rescue: pay to search a location, tap the pins to send the tow
@@ -598,6 +601,8 @@ export const CAR_SETS: CarSet[] = [
   { id: 'grandtour', name: 'Grand Tour', icon: '🎩', cars: ['salon', 'speedster', 'monoposto'], coins: 20000, bucks: 10, trophies: 30, xp: 350 },
   { id: 'heavy', name: 'Heavy Duty', icon: '🚌', cars: ['schoolbus', 'tusker'], coins: 6000, bucks: 3, trophies: 10, xp: 150 },
   { id: 'dream', name: 'Dream Garage', icon: '💎', cars: ['lambo', 'hyper', 'tomahawk', 'zenith'], coins: 30000, bucks: 15, trophies: 40, xp: 500 },
+  // Season track prizes; each season adds its car here.
+  { id: 'seasons', name: 'Season Rides', icon: '🏁', cars: ['nightfall'], coins: 5000, bucks: 3, trophies: 10, xp: 150 },
 ]
 export const setOwned = (set: CarSet, cars: { model: string }[]) => set.cars.filter((m) => cars.some((c) => c.model === m)).length
 export const setComplete = (set: CarSet, cars: { model: string }[]) => setOwned(set, cars) === set.cars.length
@@ -606,6 +611,7 @@ export const readySets = (s: { cars: { model: string }[]; claimedSets?: string[]
   CAR_SETS.filter((set) => !(s.claimedSets ?? []).includes(set.id) && setComplete(set, s.cars))
 // Where to get a car: the Showroom (with its level or bucks price) or Rusty's searches.
 export function carSource(car: CarDef): { icon: string; text: string } {
+  if (car.season) return { icon: '🏁', text: `Season ${car.season} prize` }
   if (car.rescueOnly) {
     const spot = RESCUE_SPOTS.filter((sp) => sp.cars.some((c) => c.model === car.id)).sort((a, b) => a.unlockLevel - b.unlockLevel)[0]
     return { icon: '🔧', text: spot ? `Rusty's · ${spot.name}` : "Rusty's" }
@@ -769,6 +775,37 @@ export function weekKey(t = Date.now()) {
 export const msToNextDay = (t = Date.now()) => 86400000 - (t % 86400000)
 export const msToNextWeek = (t = Date.now()) => msToNextDay(t) + ((7 - ((new Date(t).getUTCDay() + 6) % 7) - 1) * 86400000)
 
+// ---- Season track ----
+// Six-week seasons, numbered from the first one. Stars come from daily and weekly task rewards, and
+// every STARS_PER_TIER stars unlock the next tier's prize. The last tier gives the season's own car.
+export const SEASON_START = Date.UTC(2026, 9, 5) // Monday 5 Oct 2026, 00:00 UTC
+export const SEASON_DAYS = 42
+export const STARS_PER_TIER = 8
+export const SEASON_STARS = { dailyTask: 1, dailyChest: 3, weeklyTask: 3, weeklyChest: 6 }
+export type SeasonDef = { n: number; name: string; icon: string; car?: string }
+const SEASON_NAMES: Omit<SeasonDef, 'n'>[] = [
+  { name: 'Midnight Run', icon: '🌙', car: 'nightfall' },
+]
+export const seasonNumber = (t = Date.now()) => Math.max(1, Math.floor((t - SEASON_START) / (SEASON_DAYS * 86400000)) + 1)
+export function seasonOf(n: number): SeasonDef {
+  const d = SEASON_NAMES[n - 1]
+  return d ? { n, ...d } : { n, name: `Season ${n}`, icon: '🏁' }
+}
+export const seasonEndsAt = (n: number) => SEASON_START + n * SEASON_DAYS * 86400000
+// The last tier of a season without its own car pays bucks instead.
+export const SEASON_CAR_BUCKS = 15
+export const seasonCars = () => Object.fromEntries(SEASON_NAMES.flatMap((d, i) => (d.car ? [[String(i + 1), d.car]] : [])))
+
+export type SeasonPrize = { coins: number; parts: number; bucks: number; car?: boolean }
+// 30 tiers: coins and parts most of the way, bucks every fifth tier, the car (or bucks) at the end.
+export const SEASON_TIERS: SeasonPrize[] = Array.from({ length: 30 }, (_, i): SeasonPrize => {
+  const t = i + 1
+  if (t === 30) return { coins: 0, parts: 0, bucks: 0, car: true }
+  if (t % 5 === 0) return { coins: 0, parts: 0, bucks: t / 5 + 1 }
+  if (t % 2 === 0) return { coins: 0, parts: 5 + Math.floor(t / 3) * 2, bucks: 0 }
+  return { coins: 500 + t * 150, parts: 0, bucks: 0 }
+})
+
 // Picks a period's tasks: a fixed shuffle per key, so every device draws the same three.
 export function drawTasks(pool: TaskDef[], key: string, level: number, owned: (def: string) => boolean) {
   let h = 2166136261
@@ -854,3 +891,76 @@ export const CLAN_COST = 2000
 export const CLAN_CAP = 20
 export const CLAN_EMBLEMS = ['🏁', '🔥', '⚡', '🦅', '🐺', '💀', '👑', '🚀', '🐉', '⭐', '🏎️', '🛞']
 export const CLAN_COLORS = ['#ff7043', '#e53935', '#8e24aa', '#1e88e5', '#00897b', '#43a047', '#fdd835', '#546e7a']
+
+// Daily deals: three discounted items a day, the same for everyone, each usable once.
+// Each slot rotates through its own list by UTC day number: list[(day * step + slot) % length].
+// The server guard rebuilds the same three from econ_catalog().deals, so keep the formula simple.
+export type DealKind = 'parts' | 'fuel' | 'decor' | 'mod' | 'paint'
+export type DealDef = { id: string; kind: DealKind; item?: string; n?: number; off: number }
+export const DEAL_SLOTS: { name: string; step: number; deals: DealDef[] }[] = [
+  {
+    name: 'Supplies', step: 3, deals: [
+      { id: 'parts10', kind: 'parts', n: 10, off: 0.4 },
+      { id: 'fuel', kind: 'fuel', off: 0.67 },
+      { id: 'parts25', kind: 'parts', n: 25, off: 0.4 },
+      { id: 'parts50', kind: 'parts', n: 50, off: 0.4 },
+    ],
+  },
+  {
+    name: 'Car shop', step: 5, deals: [
+      ...(['chrome', 'twintips', 'vented', 'ducktail', 'streetkit'] as const).map((m) => ({ id: `mod-${m}`, kind: 'mod' as const, item: m, off: 0.4 })),
+      { id: 'paint-matte', kind: 'paint', item: 'matte', off: 0.5 },
+      ...(['goldmesh', 'ramscoop', 'sidepipes', 'gtwing', 'widebody', 'blower', 'forged'] as const).map((m) => ({ id: `mod-${m}`, kind: 'mod' as const, item: m, off: 0.3 })),
+      { id: 'paint-chrome', kind: 'paint', item: 'chrome', off: 0.4 },
+    ],
+  },
+  {
+    name: 'Town', step: 3, deals: (['fountain', 'pond', 'playground', 'gazebo', 'clocktower', 'billboard', 'hotdog', 'statue'] as const)
+      .map((b) => ({ id: `decor-${b}`, kind: 'decor' as const, item: b, off: 0.4 })),
+  },
+]
+export const DEALS: DealDef[] = DEAL_SLOTS.flatMap((s) => s.deals)
+export const dealDef = (id: string) => DEALS.find((d) => d.id === id)
+export const dayNumber = (day: string) => Math.floor(Date.parse(`${day}T00:00:00Z`) / 86400000)
+export const dealsFor = (day: string): DealDef[] => {
+  const n = dayNumber(day)
+  return DEAL_SLOTS.map((s, i) => s.deals[(((n * s.step + i) % s.deals.length) + s.deals.length) % s.deals.length])
+}
+
+const off10 = (n: number, off: number) => Math.round((n * (1 - off)) / 10) * 10
+export type DealOffer = { name: string; icon: string; unlockLevel: number; was: { coins: number; bucks: number }; now: { coins: number; bucks: number }; parts: number }
+// What a deal sells and for how much. `parts` is the parts price of a mod (never discounted).
+export function dealOffer(d: DealDef): DealOffer {
+  switch (d.kind) {
+    case 'parts': {
+      const n = d.n ?? 0
+      return { name: `${n} Parts`, icon: '⚙', unlockLevel: 1, was: { coins: n * 50, bucks: 0 }, now: { coins: off10(n * 50, d.off), bucks: 0 }, parts: 0 }
+    }
+    case 'fuel':
+      return { name: 'Full tank', icon: '⛽', unlockLevel: 1, was: { coins: 0, bucks: REFILL_BUCKS }, now: { coins: 0, bucks: Math.max(1, Math.round(REFILL_BUCKS * (1 - d.off))) }, parts: 0 }
+    case 'decor': {
+      const b = buildingDef(d.item ?? '')
+      return {
+        name: b.name, icon: '🌳', unlockLevel: b.unlockLevel,
+        was: { coins: b.price, bucks: b.bucks ?? 0 },
+        now: { coins: off10(b.price, d.off), bucks: b.bucks ? Math.max(1, Math.round(b.bucks * (1 - d.off))) : 0 },
+        parts: 0,
+      }
+    }
+    case 'mod': {
+      const m = modDef(d.item ?? '')
+      return { name: m?.name ?? 'Mod', icon: '🪽', unlockLevel: m?.unlockLevel ?? 1, was: { coins: m?.coins ?? 0, bucks: 0 }, now: { coins: off10(m?.coins ?? 0, d.off), bucks: 0 }, parts: m?.parts ?? 0 }
+    }
+    case 'paint': {
+      const f = finishDef(d.item as Finish)
+      return { name: `${f.name} paint`, icon: '🎨', unlockLevel: f.unlockLevel, was: { coins: f.coins, bucks: 0 }, now: { coins: off10(f.coins, d.off), bucks: 0 }, parts: 0 }
+    }
+  }
+}
+// How much town worth a deal adds beyond what was paid, for the server guard. Fuel and
+// paint aren't part of town worth, so they need no allowance.
+export const dealSave = (d: DealDef) => {
+  if (d.kind === 'fuel' || d.kind === 'paint') return 0
+  const o = dealOffer(d)
+  return o.was.coins - o.now.coins
+}

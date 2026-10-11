@@ -16,12 +16,14 @@ import { NeedPanel } from './ui/Need'
 import { UpgradePanel } from './ui/Upgrade'
 import { RescuePanel } from './ui/Rescue'
 import { BankPanel } from './ui/Bank'
+import { DealsPanel } from './ui/Deals'
 import { LevelUpSplash } from './ui/LevelUp'
 import { AccountPanel } from './ui/Account'
 import { AlertsCard } from './ui/Alerts'
 import { WelcomeBack } from './ui/WelcomeBack'
 import { GiftWatcher, GiftsPanel } from './ui/Gifts'
 import { GoalsPanel, DailyPanel, FlatPanel } from './ui/Goals'
+import { SeasonPanel } from './ui/Season'
 import { useGame, today } from './game/store'
 import { startCloudSync } from './lib/cloud'
 import './lib/rescue'
@@ -78,11 +80,13 @@ export default function App() {
       {panel === 'upgrade' && <UpgradePanel />}
       {panel === 'rescue' && <RescuePanel />}
       {panel === 'bank' && <BankPanel />}
+      {panel === 'deals' && <DealsPanel />}
       <VisitBanner />
       <Tutorial />
       <AlertsCard />
       {panel === 'account' && <AccountPanel />}
       {panel === 'goals' && <GoalsPanel />}
+      {panel === 'season' && <SeasonPanel />}
       {panel === 'daily' && <DailyPanel />}
       {panel === 'flat' && <FlatPanel />}
       <WelcomeBack />
