@@ -54,6 +54,7 @@ const ITEMS: Record<string, { size: [number, number, number]; color: string; emo
   tacos: { size: [0.14, 0.05, 0.1], color: '#ffca28', emoji: '🌮', thing: 'tacos' },
   market: { size: [0.16, 0.14, 0.1], color: '#d7a86e', emoji: '🛒', thing: 'groceries' },
   hotdog: { size: [0.12, 0.04, 0.05], color: '#e0a052', emoji: '🌭', thing: 'a hot dog' },
+  offices: { size: [0.16, 0.12, 0.04], color: '#4e342e', emoji: '💼', thing: 'their briefcase' },
 }
 
 // Thought bubbles: what someone is off to do, and what they're doing when they get there.
@@ -66,6 +67,8 @@ const SHOP_THOUGHTS: Record<string, [string, string]> = {
   coffee: ['☕', 'grabbing a coffee'], tacos: ['🌮', 'getting tacos'], lube: ['🛢', 'booking an oil change'], arcade: ['🕹️', 'chasing a high score'],
   bodyshop: ['🎨', 'picking a new paint colour'], market: ['🛒', 'doing the grocery run'], firehouse: ['🚒', 'visiting the firefighters'],
   police: ['👮', 'dropping by the police station'], parkade: ['🅿️', 'fetching the car from the garage'],
+  offices: ['💼', 'heading in to the office'], hq: ['📊', 'off to a big meeting at HQ'], glasstower: ['🏙️', 'riding the lift up the Glass Tower'],
+  hospital: ['🏥', 'visiting a friend in hospital'], helipad: ['🚁', 'booking a helicopter tour'],
   academy: ['🚗', 'off to a driving lesson'], school: ['🎒', 'picking the kids up from school'], highschool: ['🏈', 'going to the big game'],
   university: ['🎓', 'heading to a lecture'],
 }

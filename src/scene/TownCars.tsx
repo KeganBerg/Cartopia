@@ -16,6 +16,7 @@ import { wheelPool } from './carBatch'
 import { liveTraffic as sim } from './traffic/live'
 import { layoutRoads, type Light } from './traffic/layout'
 import { useVisitors, tapVisitor, type Visitor } from '../lib/visitors'
+import { AMBULANCE, TownAmbulance } from './ServiceVehicles'
 
 // Buses run the school routes: they drop in at schools more than anywhere else.
 const SCHOOLS = ['school', 'highschool', 'university']
@@ -327,17 +328,25 @@ export function TownCars() {
   const visitor = useVisitors((v) => (v.visitor && v.visitor.kind !== 'barn' && !visitKeyIsAway(visitKey) ? v.visitor : null))
   const guest = useMemo(() => (visitor ? visitorCar(visitor) : null), [visitor?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const guestGone = !!visitor?.gone
+  // Each hospital (up to two) runs an ambulance round town on top of the usual cap.
+  const hospitals = useMemo(() => buildings.filter((b) => b.def === 'hospital').slice(0, 2).map((b) => b.uid), [townKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  const ambulances = useMemo(
+    () => hospitals.map((h) => ({ uid: `ambulance:${h}`, len: AMBULANCE.len * SCALE, wid: AMBULANCE.wid * SCALE, cruise: 2.2, stalled: false })),
+    [hospitals],
+  )
   useEffect(() => {
-    if (!guest || guestGone) return sim.setCars(specs, max)
+    const all = [...ambulances, ...specs]
+    const cap = max + ambulances.length
+    if (!guest || guestGone) return sim.setCars(all, cap)
     const size = carSize(carDef(guest.model).body)
     const kind = visitor!.kind
     const spec = { uid: guest.uid, len: size.len * SCALE, wid: size.wid * SCALE, cruise: kind === 'racer' ? 2.6 : kind === 'mystery' ? 2.2 : 1.4, stalled: false }
-    sim.setCars([spec, ...specs], max + 1)
-  }, [specs, max, town, guest, guestGone]) // eslint-disable-line react-hooks/exhaustive-deps
+    sim.setCars([spec, ...all], cap + 1)
+  }, [specs, ambulances, max, town, guest, guestGone]) // eslint-disable-line react-hooks/exhaustive-deps
   const homesKey = buildings.map((b) => (b.car ? `${b.car}>${b.uid}` : '')).join()
   useEffect(() => {
-    sim.homes = new Map(buildings.filter((b) => b.car).map((b) => [b.car!, b.uid]))
-  }, [homesKey]) // eslint-disable-line react-hooks/exhaustive-deps
+    sim.homes = new Map([...buildings.filter((b) => b.car).map((b): [string, string] => [b.car!, b.uid]), ...hospitals.map((h): [string, string] => [`ambulance:${h}`, h])])
+  }, [homesKey, hospitals]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // The shared wheel meshes for every town car (see carBatch.ts).
   const pool = useRef<Group>(null)
@@ -382,6 +391,7 @@ export function TownCars() {
         <TownCar key={`${visitKey}-${car.uid}`} car={car} />
       ))}
       {guest && <TownCar key={guest.uid} car={guest} onTap={tapVisitor} />}
+      {hospitals.map((h) => <TownAmbulance key={`${visitKey}-${h}`} uid={`ambulance:${h}`} home={h} scale={SCALE} />)}
       <ShowcaseStars uids={stars} />
     </>
   )

@@ -68,7 +68,7 @@ export function Pool({ r, x = 0, z = 0 }: { r: number; x?: number; z?: number })
 }
 
 // Neon tubes stay lit day and night; one material per colour keeps them mergeable.
-function Neon({ at, s, c }: { at: V3; s: V3; c: string }) {
+export function Neon({ at, s, c }: { at: V3; s: V3; c: string }) {
   return (
     <mesh position={at}>
       <boxGeometry args={s} />
@@ -234,7 +234,7 @@ function Wheel({ m, at }: { m: Mat; at: V3 }) {
 }
 
 // Patio table under a parasol.
-function Parasol({ m, at, c }: { m: Mat; at: V3; c: string }) {
+export function Parasol({ m, at, c }: { m: Mat; at: V3; c: string }) {
   return (
     <group position={at}>
       <Cyl m={m} at={[0, 0.2, 0]} r={0.16} h={0.03} c="#fafafa" seg={10} />

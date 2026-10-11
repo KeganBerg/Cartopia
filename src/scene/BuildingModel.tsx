@@ -5,6 +5,7 @@ import { CarModel } from './CarModel'
 import { Upright } from './mergeScale'
 import { ObstacleDetail, BenchDetail, BillboardDetail, DriveInDetail, FlowerDetail, FountainDetail, GarageDetail, HouseDetail, LampDetail, PondDetail, ShopDetail, SpeedwayDetail, StatueDetail, TreeDetail } from './BuildingDetail'
 import { NEW_MODELS, NewBuildingModel } from './NewBuildings'
+import { OFFICE_MODELS, OfficeModel } from './OfficeBuildings'
 import { CAMPUS_MODELS, CampusModel } from './CampusBuildings'
 import { HouseLevels } from './HouseLevels'
 import { RustysYard } from './RustysYard'
@@ -264,6 +265,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
     )
 
   if (NEW_MODELS.has(def.id)) return <NewBuildingModel def={def} ghost={ghost} valid={valid} m={m} win={win} bulb={bulb} level={lvl} />
+  if (OFFICE_MODELS.has(def.id)) return <OfficeModel def={def} ghost={ghost} m={m} bulb={bulb} level={lvl} />
   if (CAMPUS_MODELS.has(def.id)) return <CampusModel def={def} ghost={ghost} m={m} win={win} bulb={bulb} level={lvl} />
 
   switch (def.id) {

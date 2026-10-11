@@ -78,6 +78,13 @@ export const BUILDINGS: BuildingDef[] = [
   // Only open after dark: neon on at dusk, a line at the door and a rooftop dance floor.
   { id: 'club', name: 'Neon Owl Nightclub', kind: 'business', nightOnly: true, w: 2, h: 1, price: 8800, unlockLevel: 6, jobSeconds: 300, fuelCost: 4, payout: 750, xp: 60, color: '#1a1035', roof: '#d500f9', sign: 'NEON OWL' },
   { id: 'parts', name: 'Parts Depot', kind: 'parts', w: 2, h: 1, price: 8000, unlockLevel: 5, jobSeconds: 480, fuelCost: 4, payout: 160, partsPayout: 15, xp: 45, color: '#1565c0', roof: '#bbdefb', sign: 'PARTS' },
+  // Offices, heli pad and hospital: the big-town end of the ladder, from a
+  // low-rise business park at 10 up to a glass tower in the 30s.
+  { id: 'offices', name: 'Business Park', kind: 'business', w: 2, h: 1, price: 16500, unlockLevel: 10, jobSeconds: 900, fuelCost: 6, payout: 1500, xp: 100, color: '#d7ccc8', roof: '#455a64', sign: 'BUSINESS PARK' },
+  { id: 'hospital', name: 'Mercy General Hospital', kind: 'business', service: true, w: 2, h: 2, price: 48000, unlockLevel: 18, jobSeconds: 1800, fuelCost: 10, payout: 4000, xp: 280, color: '#eceff1', roof: '#c62828', sign: 'HOSPITAL' },
+  { id: 'hq', name: 'Corporate HQ', kind: 'business', w: 2, h: 1, price: 82000, unlockLevel: 24, jobSeconds: 2700, fuelCost: 12, payout: 6250, xp: 440, color: '#90a4ae', roof: '#1e3a5f', sign: 'APEXCORP' },
+  { id: 'helipad', name: 'Skyhook Heliport', kind: 'business', w: 2, h: 2, price: 115000, unlockLevel: 28, jobSeconds: 3000, fuelCost: 14, payout: 7850, xp: 520, color: '#cfd8dc', roof: '#ff6f00', sign: 'HELIPORT' },
+  { id: 'glasstower', name: 'Glass Tower', kind: 'business', w: 2, h: 2, price: 185000, unlockLevel: 32, jobSeconds: 3600, fuelCost: 16, payout: 9600, xp: 700, color: '#80cbc4', roof: '#263238', sign: 'HORIZON' },
   // Schools, university and driving academy: big late-game jobs that keep the
   // long climb to level 40 stocked. The academy's students earn less but learn
   // fast (more XP per fuel); the university is one campus per town.
@@ -292,7 +299,7 @@ export type CarDef = {
 // Stats follow each real car's relative performance.
 export const CARS: CarDef[] = [
   { id: 'pip', name: 'Kipper Pocket', body: 'compact', price: 800, unlockLevel: 1, power: 18, grip: 36, weight: 24, skill: 'launch', likes: ['pizza', 'academy', 'market'], colors: ['#c62828', '#1b5e20', '#fafafa'] },
-  { id: 'civic', name: 'Kazumi Commuter', body: 'sedan', price: 1500, unlockLevel: 1, power: 24, grip: 34, weight: 36, skill: 'slipstream', likes: ['pizza', 'diner', 'coffee'], colors: ['#1e88e5', '#eeeeee', '#424242'] },
+  { id: 'civic', name: 'Kazumi Commuter', body: 'sedan', price: 1500, unlockLevel: 1, power: 24, grip: 34, weight: 36, skill: 'slipstream', likes: ['pizza', 'diner', 'offices'], colors: ['#1e88e5', '#eeeeee', '#424242'] },
   { id: 'trail', name: 'Ironside Workhorse', body: 'truck', price: 3500, unlockLevel: 3, power: 38, grip: 26, weight: 74, skill: 'torque', likes: ['tires', 'parts', 'lube'], colors: ['#0d47a1', '#c62828', '#eceff1'] },
   { id: 'miata', name: 'Kazumi Zephyr', body: 'roadster', price: 7000, unlockLevel: 5, power: 32, grip: 54, weight: 22, skill: 'smooth', likes: ['icecream', 'cinema', 'arcade'], colors: ['#d32f2f', '#1e88e5', '#fafafa'] },
   { id: 'stallion', name: "Liberty Bore Horse '68", body: 'muscle', price: 14000, unlockLevel: 7, power: 52, grip: 34, weight: 54, skill: 'nitro', likes: ['burger', 'stadium', 'firehouse'], colors: ['#1b5e20', '#ff6f00', '#212121'] },
@@ -300,7 +307,7 @@ export const CARS: CarDef[] = [
   { id: 'vette', name: 'Liberty Sidewinder', body: 'sports', price: 55000, unlockLevel: 15, power: 66, grip: 54, weight: 38, skill: 'slipstream', likes: ['motel', 'stadium', 'police'], colors: ['#b71c1c', '#bdbdbd', '#ffd600'] },
   { id: 'charger', name: 'Liberty Brawler', body: 'muscle', price: 42000, unlockLevel: 13, power: 70, grip: 40, weight: 60, skill: 'nitro', likes: ['burger', 'highschool', 'lube'], colors: ['#212121', '#ff5722', '#6a1b9a'] },
   { id: 'hellcat', name: 'Liberty Hellhound 707', body: 'widebody', price: 80000, unlockLevel: 18, power: 80, grip: 46, weight: 62, skill: 'launch', likes: ['tuner', 'stadium', 'bodyshop'], colors: ['#c62828', '#7b1fa2', '#9ccc65'] },
-  { id: 'gtr', name: 'Kazumi Ronin GT', body: 'coupe', price: 115000, unlockLevel: 22, power: 78, grip: 70, weight: 46, skill: 'smooth', likes: ['tuner', 'bowling', 'arcade'], colors: ['#eceff1', '#263238', '#ff6d00'] },
+  { id: 'gtr', name: 'Kazumi Ronin GT', body: 'coupe', price: 115000, unlockLevel: 22, power: 78, grip: 70, weight: 46, skill: 'smooth', likes: ['tuner', 'hq', 'arcade'], colors: ['#eceff1', '#263238', '#ff6d00'] },
   { id: 'tomahawk', name: 'Ironside Tomahawk', body: 'tank', price: 420000, unlockLevel: 36, legendary: true, power: 100, grip: 94, weight: 60, skill: 'launch', likes: ['stadium', 'police', 'firehouse'], colors: ['#556b2f', '#37474f', '#c9a227'] },
   { id: 'zippy', name: 'Kipper Zip 50', body: 'scooter', price: 2100, unlockLevel: 2, power: 14, grip: 30, weight: 8, skill: 'slipstream', likes: ['pizza', 'coffee', 'icecream'], colors: ['#4dd0e1', '#fdd835', '#f48fb1'] },
   { id: 'baron', name: 'Liberty Road Baron', body: 'chopper', price: 16000, unlockLevel: 7, power: 46, grip: 36, weight: 30, skill: 'nitro', likes: ['diner', 'burger', 'bowling'], colors: ['#212121', '#b71c1c', '#1565c0'] },
@@ -309,18 +316,18 @@ export const CARS: CarDef[] = [
   { id: 'hotshot', name: 'Kazumi Hot Shot RS', body: 'hatch', price: 7000, unlockLevel: 5, power: 36, grip: 50, weight: 26, skill: 'launch', likes: ['arcade', 'tuner', 'coffee'], colors: ['#eceff1', '#d32f2f', '#1e88e5'] },
   { id: 'ridgeback', name: 'Kodiak Ridgeback 4x4', body: 'suv', price: 10000, unlockLevel: 6, power: 44, grip: 46, weight: 62, skill: 'torque', likes: ['tires', 'parts', 'firehouse'], colors: ['#ff6f00', '#33691e', '#eceff1'] },
   { id: 'kitsune', name: 'Kazumi Kitsune Drift', body: 'coupe', price: 20000, unlockLevel: 9, power: 48, grip: 58, weight: 30, skill: 'smooth', likes: ['tuner', 'arcade', 'bodyshop'], colors: ['#fafafa', '#212121', '#ff4081'] },
-  { id: 'current', name: 'Sparkline Current', body: 'ev', price: 62000, unlockLevel: 16, power: 72, grip: 52, weight: 50, skill: 'launch', likes: ['coffee', 'market', 'parkade'], colors: ['#eceff1', '#b71c1c', '#263238'] },
-  { id: 'salon', name: 'Regent Grand Salon', body: 'luxury', price: 0, bucks: 45, unlockLevel: 11, power: 64, grip: 50, weight: 70, skill: 'slipstream', likes: ['motel', 'university', 'market'], colors: ['#1a1a2e', '#eceff1', '#6d1b1b'] },
+  { id: 'current', name: 'Sparkline Current', body: 'ev', price: 62000, unlockLevel: 16, power: 72, grip: 52, weight: 50, skill: 'launch', likes: ['university', 'market', 'parkade'], colors: ['#eceff1', '#b71c1c', '#263238'] },
+  { id: 'salon', name: 'Regent Grand Salon', body: 'luxury', price: 0, bucks: 45, unlockLevel: 11, power: 64, grip: 50, weight: 70, skill: 'slipstream', likes: ['motel', 'hq', 'market'], colors: ['#1a1a2e', '#eceff1', '#6d1b1b'] },
   { id: 'stomper', name: 'Ironside Dune Stomper', body: 'truck', price: 36000, unlockLevel: 12, power: 66, grip: 44, weight: 72, skill: 'torque', likes: ['tires', 'stadium', 'lube'], colors: ['#424242', '#1565c0', '#ff6d00'] },
   { id: 'monoposto', name: 'Veloce Monoposto 1', body: 'formula', price: 220000, unlockLevel: 30, power: 90, grip: 90, weight: 20, skill: 'smooth', likes: ['stadium', 'tuner', 'parkade'], colors: ['#d50000', '#eceff1', '#00897b'] },
-  { id: 'zenith', name: 'Aether Zenith R', body: 'super', price: 550000, unlockLevel: 40, legendary: true, power: 100, grip: 96, weight: 26, skill: 'nitro', likes: ['stadium', 'parkade', 'police'], colors: ['#212121', '#1e88e5', '#ff6d00'] },
+  { id: 'zenith', name: 'Aether Zenith R', body: 'super', price: 550000, unlockLevel: 40, legendary: true, power: 100, grip: 96, weight: 26, skill: 'nitro', likes: ['stadium', 'glasstower', 'police'], colors: ['#212121', '#1e88e5', '#ff6d00'] },
   { id: 'schoolbus', name: 'Ironside Scholar 72', body: 'bus', price: 6500, unlockLevel: 4, power: 30, grip: 26, weight: 90, skill: 'slipstream', likes: ['diner', 'arcade', 'school'], colors: ['#fbc02d', '#ff8f00', '#eceff1'] },
   { id: 'shaggy', name: 'Lakeside Shaggy Hound', body: 'dogvan', price: 8000, unlockLevel: 5, power: 26, grip: 30, weight: 66, skill: 'oil', likes: ['burger', 'donut', 'icecream'], colors: ['#d7ccc8', '#a1887f', '#9e9e9e'] },
-  { id: 'tusker', name: 'Kodiak Tusker Scout', body: 'tusker', price: 95000, unlockLevel: 20, power: 70, grip: 72, weight: 58, skill: 'torque', likes: ['police', 'firehouse', 'tires'], colors: ['#6b7a3a', '#c2a36b', '#eceff1'] },
+  { id: 'tusker', name: 'Kodiak Tusker Scout', body: 'tusker', price: 95000, unlockLevel: 20, power: 70, grip: 72, weight: 58, skill: 'torque', likes: ['police', 'helipad', 'tires'], colors: ['#6b7a3a', '#c2a36b', '#eceff1'] },
   { id: 'lambo', name: 'Veloce Corrida V12', body: 'wedge', price: 0, bucks: 90, unlockLevel: 26, power: 86, grip: 70, weight: 34, skill: 'oil', likes: ['cinema', 'club', 'parkade'], colors: ['#fdd835', '#d50000', '#fafafa'] },
   { id: 'hyper', name: 'Veloce Hyperion', body: 'super', price: 300000, unlockLevel: 33, power: 98, grip: 86, weight: 32, skill: 'nitro', likes: ['stadium', 'tuner', 'parkade'], colors: ['#1a237e', '#212121', '#d50000'] },
   { id: 'bug', name: 'Bumble Bubble', body: 'bubble', price: 1200, unlockLevel: 1, rescueOnly: true, power: 14, grip: 28, weight: 28, skill: 'freeze', likes: ['icecream', 'donut', 'coffee'], colors: ['#80cbc4', '#ffcc80', '#ef9a9a'] },
-  { id: 'woodie', name: 'Lakeside Woodie Wagon', body: 'wagon', price: 2200, unlockLevel: 1, rescueOnly: true, power: 22, grip: 28, weight: 56, skill: 'slipstream', likes: ['diner', 'carwash', 'market'], colors: ['#fafafa', '#fff59d', '#4db6ac'] },
+  { id: 'woodie', name: 'Lakeside Woodie Wagon', body: 'wagon', price: 2200, unlockLevel: 1, rescueOnly: true, power: 22, grip: 28, weight: 56, skill: 'slipstream', likes: ['diner', 'hospital', 'market'], colors: ['#fafafa', '#fff59d', '#4db6ac'] },
   { id: 'hauler', name: 'Old Faithful Hauler', body: 'truck', price: 3000, unlockLevel: 1, rescueOnly: true, power: 26, grip: 26, weight: 70, skill: 'torque', likes: ['parts', 'carwash', 'tacos'], colors: ['#558b2f', '#e65100', '#1565c0'] },
   { id: 'cruiser', name: "Sunset Cruiser '57", body: 'classic', price: 5000, unlockLevel: 1, rescueOnly: true, power: 38, grip: 34, weight: 58, skill: 'freeze', likes: ['cinema', 'diner', 'firehouse'], colors: ['#4dd0e1', '#f06292', '#fafafa'] },
   { id: 'buggy', name: 'Dune Skipper Buggy', body: 'offroad', price: 6000, unlockLevel: 1, rescueOnly: true, power: 34, grip: 56, weight: 18, skill: 'launch', likes: ['icecream', 'tires', 'tacos'], colors: ['#ff9800', '#cddc39', '#29b6f6'] },
