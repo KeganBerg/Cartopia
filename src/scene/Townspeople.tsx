@@ -7,7 +7,7 @@ import { START_LAND, buildingDef, buildingLevel, houseResidents } from '../game/
 import { buildWalkGraph, findPath, pedestrianCrossings, stepsFor, transit, sideOf, SIDES, type Pt, type Step, type WalkGraph, type WalkNode } from '../game/walkGraph'
 import { anchors } from './anchors'
 import { liveTraffic, crossingSignal } from './traffic/live'
-import { useThought } from '../game/thoughts'
+import { useThought, placeChip } from '../game/thoughts'
 import { SEASON } from './season'
 import { SHIRTS, PANTS, SKIN, HAIR, BEANIES } from './people'
 import { dayPhase, nightAmount } from './dayNight'
@@ -307,7 +307,7 @@ export function Townspeople() {
     const p = people.current[e.instanceId]
     if (!p || p.state === 'inside') return
     e.stopPropagation()
-    useThought.setState({ id: p.id, text: thought(p), until: performance.now() + 6000 })
+    useThought.setState({ id: p.id, text: thought(p), ...where(p), until: performance.now() + 6000 })
   }
 
   useFrame((_, rawDt) => {
@@ -455,7 +455,7 @@ export function Townspeople() {
         <meshStandardMaterial />
       </instancedMesh>
       <instancedMesh ref={hits} args={[undefined, undefined, MAX_PEOPLE]} frustumCulled={false} onClick={onTap}>
-        <boxGeometry args={[0.45, 0.9, 0.45]} />
+        <boxGeometry args={SMALL ? [0.6, 1, 0.6] : [0.45, 0.9, 0.45]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} colorWrite={false} />
       </instancedMesh>
     </group>
@@ -703,7 +703,18 @@ function followThought(list: Person[]) {
   }
   anchors.set('person', bubbleAt.set(p.pos[0], 1.2, p.pos[1]))
   const text = thought(p)
-  if (text !== th.text) useThought.setState({ text })
+  const w = where(p)
+  if (text !== th.text || w.where !== th.where || w.there !== th.there) useThought.setState({ text, ...w })
+}
+
+// The chip for where someone is headed ("☕ Coffee"), and whether they're there yet.
+function where(p: Person): { where: string; there: boolean } {
+  const d = p.dest
+  const there = p.state === 'linger' || p.state === 'queue'
+  if (!d || d.kind === 'jog') return { where: p.type === 'jogger' ? '🏃 Around the block' : '🚶 Around town', there: false }
+  if (d.kind === 'home') return { where: '🏠 Home', there }
+  if (d.kind === 'friend') return { where: "🏡 A neighbour's", there }
+  return { where: placeChip(d.def, (SHOP_THOUGHTS[d.def] ?? PARK_GO[d.def])?.[0]), there }
 }
 
 // One line for the thought bubble: who it is and what they're up to.
