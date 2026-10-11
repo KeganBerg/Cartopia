@@ -16,7 +16,7 @@ type Unlock = {
 function unlocksBetween(from: number, to: number, rusty: boolean, focus: ReturnType<typeof useGame.getState>['focusShop']) {
   const inRange = (l: number) => l > from && l <= to
   const items: Unlock[] = [
-    ...BUILDINGS.filter((b) => b.unlockLevel < 99 && inRange(b.unlockLevel)).map((b): Unlock => ({
+    ...BUILDINGS.filter((b) => b.unlockLevel < 99 && !b.event && inRange(b.unlockLevel)).map((b): Unlock => ({
       key: `b-${b.id}`,
       name: b.name,
       level: b.unlockLevel,
@@ -58,7 +58,7 @@ function unlocksBetween(from: number, to: number, rusty: boolean, focus: ReturnT
 
 // The next level that unlocks anything, so a quiet level-up still has something to aim for.
 function nextUnlock(level: number) {
-  const levels = [...BUILDINGS.filter((b) => b.unlockLevel < 99), ...CARS.filter((c) => !c.rescueOnly), ...RESCUE_SPOTS, ...GP_SERIES]
+  const levels = [...BUILDINGS.filter((b) => b.unlockLevel < 99 && !b.event), ...CARS.filter((c) => !c.rescueOnly), ...RESCUE_SPOTS, ...GP_SERIES]
     .map((x) => x.unlockLevel)
     .filter((l) => l > level)
   return levels.length ? Math.min(...levels) : null

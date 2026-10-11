@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
   PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS,
-  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, DAILY_BONUS, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modSlotsFor, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower,
+  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, activeEvent, DAILY_BONUS, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modSlotsFor, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower,
 } from './data'
 import { sfx } from '../lib/sound'
 import { msUntilNight } from './clock'
@@ -75,7 +75,7 @@ export type Mode = 'play' | 'place' | 'move' | 'road' | 'bulldoze' | 'expand' | 
 export type Resource = 'coins' | 'parts' | 'fuel' | 'bucks' | 'level'
 export type Need = { res: Resource; missing: number; what?: string }
 
-export type Panel = null | 'need' | 'shop' | 'garage' | 'showroom' | 'race' | 'account' | 'goals' | 'daily' | 'flat' | 'friends' | 'rescue' | 'bank' | 'invites' | 'leaders' | 'clan' | 'upgrade' | 'welcome'
+export type Panel = null | 'need' | 'shop' | 'garage' | 'showroom' | 'race' | 'account' | 'goals' | 'daily' | 'flat' | 'friends' | 'rescue' | 'bank' | 'invites' | 'leaders' | 'clan' | 'upgrade' | 'welcome' | 'gifts'
 
 // A read-only copy of another player's town while visiting it.
 export type VisitedTown = { ownerId: string; townName: string; level: number; trophies: number; roads: string[]; buildings: PlacedBuilding[]; cars: OwnedCar[]; land?: string[] }
@@ -147,6 +147,8 @@ type Actions = {
   visit: (town: VisitedTown | null) => void
   helpFriend: () => void
   setTutorial: (step: number) => void
+  // Fuel and parts friends left for you (already checked and claimed server-side).
+  receiveGifts: (fuel: number, parts: number) => void
   // Fit a mod (replacing whatever is in its slot; buys it first if this car doesn't own it), or take it off with remove.
   modCar: (uid: string, modId: string, remove?: boolean) => boolean
   loadSave: (s: SaveState) => void
@@ -342,13 +344,21 @@ type StatSource = Pick<SaveState, 'stats' | 'buildings' | 'level' | 'cars' | 'la
 
 // Story goals showing now: the first three unclaimed ones the player's level allows.
 export function activeGoals(s: Pick<SaveState, 'claimedGoals' | 'level'>) {
-  return GOALS.filter((g) => !s.claimedGoals.includes(g.id) && s.level >= (g.level ?? 1)).slice(0, 3)
+  return GOALS.filter((g) => !g.event && !s.claimedGoals.includes(g.id) && s.level >= (g.level ?? 1)).slice(0, 3)
 }
+// The running event's goals, claimed ones included (shown ticked).
+export function eventGoals(now = Date.now()) {
+  const e = activeEvent(now)
+  return e ? GOALS.filter((g) => g.event === e.id) : []
+}
+export const goalOpen = (s: Pick<SaveState, 'claimedGoals' | 'level'>, g: GoalDef) =>
+  !s.claimedGoals.includes(g.id) && s.level >= (g.level ?? 1) && (g.event ? activeEvent()?.id === g.event : true)
 export function statValue(s: StatSource, key: StatKey, def?: string): number {
   switch (key) {
     // Rusty's Rescue counts from the buildings so older towns that already have one get credit.
     case 'rusty': return s.buildings.some((b) => b.def === 'rescue') ? 1 : 0
     case 'owns': return s.buildings.some((b) => b.def === def) ? 1 : 0
+    case 'spooky': return s.buildings.filter((b) => buildingDef(b.def).event === 'spooky').length
     case 'level': return s.level
     case 'carsOwned': return s.cars.length
     case 'drivers': return s.buildings.filter((b) => b.car && s.cars.some((c) => c.uid === b.car)).length
@@ -395,7 +405,7 @@ export function rolledQuests(s: Pick<SaveState, 'quests' | 'stats' | 'level' | '
 
 // Everything ready to collect: finished story goals, tasks and chests.
 export function claimable(s: GameState) {
-  const goals = activeGoals(s).filter((g) => goalDone(s, g)).length
+  const goals = [...activeGoals(s), ...eventGoals()].filter((g) => goalOpen(s, g) && goalDone(s, g)).length
   let tasks = 0
   for (const p of ['daily', 'weekly'] as const) {
     const done = periodDone(s.quests, p)
@@ -571,6 +581,10 @@ export const useGame = create<GameState>()(
           sfx.error()
           return false
         }
+        if (d.event && activeEvent()?.id !== d.event) {
+          s.toast(`The ${d.name} comes back next event`)
+          return false
+        }
         if (d.unique && s.buildings.some((o) => o.def === def)) {
           s.toast(`You already have a ${d.name}`)
           return false
@@ -643,11 +657,11 @@ export const useGame = create<GameState>()(
 
       mergeBlock: (anchor, size) => {
         const s = get()
-        const c = mergeCandidates(s.buildings).find((o) => o.anchor.uid === anchor && o.size === size)
+        const c = mergeCandidates(s.buildings).find((o) => o.anchor.uid === anchor && o.code === size)
         if (!c) return
         sfx.buy()
         const d = buildingDef(c.anchor.def)
-        s.toast(size === 4 ? `Giant ${d.name}! 16 in one.` : `Merged 4 into one big ${d.name}!`)
+        s.toast(size === 4 ? `Giant ${d.name}! 16 in one.` : `Merged ${c.members.length} into one big ${d.name}!`)
         set({ buildings: applyMerge(s.buildings, c), updatedAt: Date.now() })
       },
 
@@ -960,7 +974,7 @@ export const useGame = create<GameState>()(
       claimGoal: (id) => {
         const s = get()
         const g = GOALS.find((o) => o.id === id)
-        if (!g || s.claimedGoals.includes(id) || !goalDone(s, g) || s.level < (g.level ?? 1)) return
+        if (!g || !goalOpen(s, g) || !goalDone(s, g)) return
         sfx.coin()
         s.toast(`Goal complete! +${g.coins} coins${g.bucks ? `, +${g.bucks} bucks` : ''}, +${g.xp} XP`)
         set(withXp(s, g.xp, {
@@ -1110,6 +1124,13 @@ export const useGame = create<GameState>()(
       },
 
       setTutorial: (tutorial) => set({ tutorial, updatedAt: Date.now() }),
+
+      receiveGifts: (fuel, parts) => {
+        const s = get()
+        sfx.coin()
+        s.toast(`Collected${fuel ? ` +${fuel} ⛽` : ''}${parts ? ` +${parts} ⚙` : ''} from friends`)
+        set({ fuel: s.fuel + fuel, parts: s.parts + parts, updatedAt: Date.now() })
+      },
 
       // Colour, finish and stripes in one paint job, tried on in the garage first.
       paintCar: (cuid, job) => {
