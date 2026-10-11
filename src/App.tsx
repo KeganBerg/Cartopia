@@ -6,7 +6,7 @@ import { Hud } from './ui/Hud'
 import { FlyLayer } from './ui/Fly'
 import { ThumbRenderer } from './scene/BuildingPreview'
 import { BottomBar, ShopPanel, ShowroomPanel, GaragePanel, Toasts } from './ui/Menus'
-import { RacePanel, LiveRaceOverlay, InvitesPanel, PrizePopup, CampaignPrizePopup, TourPrizePopup } from './ui/Race'
+import { RacePanel, LiveRaceOverlay, InvitesPanel, PrizePopup, CampaignPrizePopup, TourPrizePopup, EventPrizePopup } from './ui/Race'
 import { joinLobby, useLive } from './lib/live'
 import { FriendsPanel, VisitBanner } from './ui/Friends'
 import { LeadersPanel, ClanPanel } from './ui/Social'
@@ -120,6 +120,7 @@ export default function App() {
       <PrizePopup />
       <CampaignPrizePopup />
       <TourPrizePopup />
+      <EventPrizePopup />
       <LevelUpSplash />
       <Toasts />
       <FlyLayer />
