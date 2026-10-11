@@ -267,14 +267,17 @@ export function BlockCar({ m, at, c, rot = 0 }: { m: Mat; at: V3; c: string; rot
 // Nightclub signs: dim by day and lit after dusk; the CLOSED plaque only shows by day.
 // Built on first use (the textures need a canvas) and kept by identity so Batch
 // merges them without baking in the glow.
-let clubSigns: { name: MeshStandardMaterial; closed: MeshBasicMaterial } | null = null
+let clubSigns: { name: MeshStandardMaterial; closed: MeshBasicMaterial; mat: MeshStandardMaterial; vip: MeshBasicMaterial } | null = null
 function clubSignMats() {
   if (clubSigns) return clubSigns
   const tex = signTexture('NEON OWL', '#12061f', '#ff4fd8')
   const name = new MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: new Color('#ffffff'), emissiveIntensity: 0.15, toneMapped: false })
   const closed = new MeshBasicMaterial({ map: signTexture('CLOSED', '#fafafa', '#c62828'), toneMapped: false })
   name.userData.live = closed.userData.live = true
-  const signs = { name, closed }
+  // The welcome mat's lettering lies on the mat, so it's drawn as a decal.
+  const mat = new MeshStandardMaterial({ map: signTexture('NEON OWL', '#141018', '#ffc107'), roughness: 0.9, ...decal() })
+  const vip = new MeshBasicMaterial({ map: signTexture('VIP', '#7f0000', '#ffd54f'), toneMapped: false })
+  const signs = { name, closed, mat, vip }
   onNight((n) => {
     signs.name.emissiveIntensity = 0.15 + n * 1.1
     signs.closed.visible = n < 0.5
@@ -729,34 +732,120 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
       const signs = ghost ? null : clubSignMats()
       const floor = { y: h + 0.15, z: z0 + 0.06, w: w - 0.5, d: d - 0.36 }
       const posts = Array.from({ length: 6 }, (_, i) => CLUB.ropeFrom + ((CLUB.ropeTo - CLUB.ropeFrom) * i) / 5)
+      const dx = CLUB.doorX
+      // Every flat layer at the door sits a clear step above the one under it,
+      // so nothing lies flush with the lot paving and flickers (see coplanar.test.tsx).
+      const step = LAYER.lot + 0.04
+      const rug = LAYER.lot + 0.016
+      const rugEnd = 0.92
+      // Ropes hang as arcs of a circle between the posts.
+      const gap = posts[1] - posts[0]
+      const sag = 0.05
+      const ropeY = LAYER.lot + 0.27
+      const ropeR = (gap * gap / 4 + sag * sag) / (2 * sag)
+      const ropeArc = 2 * Math.asin(gap / 2 / ropeR)
       return (
         <ShellBuilding {...shell} w={w} d={d} h0={1.3} z0={z0} wall="#3a2160" roof="#d500f9" shopfront={null}>
-          {/* Entrance: a black door under a neon-edged canopy, red carpet to the street. */}
-          <Box m={m} at={[CLUB.doorX, 0.38, zf + 0.012]} s={[0.5, 0.76, 0.02]} c="#ffc107" shadow={false} />
-          <mesh position={[CLUB.doorX, 0.36, zf + 0.024]}>
-            <planeGeometry args={[0.42, 0.7]} />
-            {m('#120818')}
-          </mesh>
+          {/* Entrance: gold-framed double doors with porthole windows, up one step. */}
+          <Box m={m} at={[dx, 0.4, zf + 0.012]} s={[0.54, 0.8, 0.024]} c={GOLD} shadow={false} />
+          {[-1, 1].map((sd) => (
+            <group key={sd} position={[dx + sd * 0.105, 0, zf + 0.032]}>
+              <Box m={m} at={[0, step + 0.34, 0]} s={[0.2, 0.68, 0.016]} c="#1a0b24" shadow={false} />
+              <mesh position={[0, 0.6, 0.0095]}>
+                <circleGeometry args={[0.045, 14]} />
+                {glow('neonViolet', '#b04dff')}
+              </mesh>
+              <mesh position={[0, 0.6, 0.01]}>
+                <torusGeometry args={[0.05, 0.009, 5, 16]} />
+                {m(GOLD)}
+              </mesh>
+              <Cyl m={m} at={[-sd * 0.05, 0.28, 0.022]} r={0.008} h={0.1} c={GOLD} seg={6} />
+              {[0.24, 0.32].map((y) => <Box key={y} m={m} at={[-sd * 0.05, y, 0.014]} s={[0.014, 0.014, 0.016]} c={GOLD} shadow={false} />)}
+            </group>
+          ))}
           {signs && (
-            <mesh position={[CLUB.doorX, 0.46, zf + 0.03]}>
-              <planeGeometry args={[0.36, 0.09]} />
+            <mesh position={[dx, 0.43, zf + 0.045]}>
+              <planeGeometry args={[0.32, 0.08]} />
               <primitive object={signs.closed} attach="material" dispose={null} />
             </mesh>
           )}
-          <Box m={m} at={[CLUB.doorX, 0.84, zf + 0.24]} s={[0.66, 0.05, 0.48]} c="#120818" />
-          {tube('neonViolet', [CLUB.doorX, 0.84, zf + 0.485], [0.66, 0.03, 0.03])}
-          {[-0.3, 0.3].map((x) => <Cyl key={x} m={m} at={[CLUB.doorX + x, 0.42, zf + 0.44]} r={0.018} h={0.84} c="#ffc107" seg={6} />)}
-          <Box m={m} at={[CLUB.doorX, 0.012, (zf + 0.99) / 2]} s={[0.4, 0.016, 0.99 - zf]} c="#c62828" shadow={false} />
-          {/* Velvet rope for the line, gold posts and red rope. */}
-          {posts.map((x) => (
-            <group key={x} position={[x, 0, CLUB.ropeZ]}>
-              <Cyl m={m} at={[0, 0.15, 0]} r={0.018} h={0.3} c="#ffc107" seg={6} />
-              <Cyl m={m} at={[0, 0.01, 0]} r={0.05} h={0.02} c="#ffc107" seg={8} />
-              <mesh position={[0, 0.31, 0]}><sphereGeometry args={[0.028, 8, 6]} />{m('#ffc107')}</mesh>
+          {/* A dark granite doorstep with a gold nosing. */}
+          <Box m={m} at={[dx, (LAYER.lot + step) / 2, zf + 0.07]} s={[0.62, step - LAYER.lot, 0.14]} c="#2e2933" shadow={false} />
+          <Box m={m} at={[dx, step - 0.001, zf + 0.135]} s={[0.62, 0.014, 0.02]} c={GOLD} shadow={false} />
+          {/* Wall sconces either side of the door. */}
+          {[-1, 1].map((sd) => (
+            <group key={sd} position={[dx + sd * 0.36, 0.56, zf]}>
+              <Box m={m} at={[0, 0, 0.008]} s={[0.07, 0.14, 0.016]} c={GOLD} shadow={false} />
+              <mesh position={[0, 0.01, 0.03]}>
+                <boxGeometry args={[0.04, 0.09, 0.03]} />
+                {glow('neonPink', '#ff2bd6')}
+              </mesh>
             </group>
           ))}
-          {posts.slice(1).map((x, i) => (
-            <Box key={x} m={m} at={[(x + posts[i]) / 2, 0.25, CLUB.ropeZ]} s={[x - posts[i] - 0.03, 0.022, 0.022]} c="#b71c1c" shadow={false} />
+          {/* The canopy: neon-edged, a row of marquee bulbs under its lip, gold poles. */}
+          <Box m={m} at={[dx, 0.84, zf + 0.24]} s={[0.66, 0.05, 0.48]} c="#120818" />
+          {tube('neonViolet', [dx, 0.84, zf + 0.485], [0.66, 0.03, 0.03])}
+          {[-1, 1].map((sd) => tube('neonViolet', [dx + sd * 0.33, 0.84, zf + 0.23], [0.03, 0.03, 0.46]))}
+          {Array.from({ length: 7 }, (_, i) => (
+            <mesh key={i} position={[dx - 0.27 + i * 0.09, 0.8, zf + 0.44]}>
+              <sphereGeometry args={[0.017, 6, 5]} />
+              {ghost ? m('#fff8e1') : bulb}
+            </mesh>
+          ))}
+          {[-1, 1].map((sd) => (
+            <group key={sd} position={[dx + sd * 0.3, 0, zf + 0.44]}>
+              <Cyl m={m} at={[0, 0.42, 0]} r={0.018} h={0.84} c={GOLD} seg={6} />
+              <Cyl m={m} at={[0, LAYER.lot + 0.012, 0]} r={0.034} r2={0.04} h={0.024} c={GOLD} seg={8} />
+            </group>
+          ))}
+          {/* Red carpet from the step to the street, edged in gold, a welcome mat at the door. */}
+          <Box m={m} at={[dx, (LAYER.lot + 0.002 + rug) / 2, (zf + 0.14 + rugEnd) / 2]} s={[0.42, rug - LAYER.lot - 0.002, rugEnd - zf - 0.14]} c="#b71c1c" shadow={false} />
+          {[-1, 1].map((sd) => (
+            <Box key={sd} m={m} at={[dx + sd * 0.2, LAYER.lot + 0.011, (zf + 0.14 + rugEnd) / 2]} s={[0.025, 0.022, rugEnd - zf - 0.14]} c={GOLD} shadow={false} />
+          ))}
+          <Box m={m} at={[dx, LAYER.lot + 0.011, rugEnd]} s={[0.45, 0.022, 0.025]} c={GOLD} shadow={false} />
+          <Box m={m} at={[dx, rug + 0.005, zf + 0.25]} s={[0.34, 0.01, 0.17]} c="#141018" shadow={false} />
+          {signs && (
+            <mesh position={[dx, rug + 0.012, zf + 0.25]} rotation-x={-Math.PI / 2}>
+              <planeGeometry args={[0.3, 0.075]} />
+              <primitive object={signs.mat} attach="material" dispose={null} />
+            </mesh>
+          )}
+          {/* The bouncer's podium, with a reading lamp and the guest list. */}
+          <group position={[-1.6, 0, 0.55]}>
+            <Box m={m} at={[0, (LAYER.lot + 0.3) / 2, 0]} s={[0.15, 0.3 - LAYER.lot, 0.11]} c="#1c1022" />
+            <Box m={m} at={[0, 0.26, 0]} s={[0.158, 0.014, 0.118]} c={GOLD} shadow={false} />
+            <Box m={m} at={[0, 0.315, 0.01]} rot={[0.35, 0, 0]} s={[0.19, 0.02, 0.15]} c="#2a1a33" />
+            <Box m={m} at={[0.02, 0.33, 0.016]} rot={[0.35, 0, 0]} s={[0.08, 0.008, 0.1]} c="#fafafa" shadow={false} />
+            <Cyl m={m} at={[-0.06, 0.37, -0.04]} r={0.006} h={0.1} c={GOLD} seg={5} />
+            <mesh position={[-0.06, 0.42, -0.02]} rotation-x={0.6}>
+              <coneGeometry args={[0.025, 0.035, 8, 1, true]} />
+              {ghost ? m('#fff8e1') : bulb}
+            </mesh>
+          </group>
+          {/* Velvet rope for the line: gold stanchions, red ropes hanging between them. */}
+          {posts.map((x, i) => (
+            <group key={x} position={[x, 0, CLUB.ropeZ]}>
+              <Cyl m={m} at={[0, LAYER.lot + 0.007, 0]} r={0.045} r2={0.055} h={0.014} c={GOLD} seg={10} />
+              <Cyl m={m} at={[0, LAYER.lot + 0.025, 0]} r={0.016} r2={0.032} h={0.022} c={GOLD} seg={8} />
+              <Cyl m={m} at={[0, LAYER.lot + 0.16, 0]} r={0.014} h={0.27} c={GOLD} seg={6} />
+              <mesh position={[0, LAYER.lot + 0.3, 0]}><sphereGeometry args={[0.026, 8, 6]} />{m(GOLD)}</mesh>
+              {i > 0 && (
+                <mesh position={[-gap / 2, ropeY - sag + ropeR, 0]} rotation-z={-Math.PI / 2 - ropeArc / 2}>
+                  <torusGeometry args={[ropeR, 0.011, 5, 10, ropeArc]} />
+                  {m('#9e0f1e')}
+                </mesh>
+              )}
+              {i === 0 && signs && (
+                <group position={[0, LAYER.lot + 0.19, 0.022]}>
+                  <Box m={m} at={[0, 0, 0]} s={[0.15, 0.065, 0.012]} c={GOLD} shadow={false} />
+                  <mesh position-z={0.0075}>
+                    <planeGeometry args={[0.13, 0.0325]} />
+                    <primitive object={signs.vip} attach="material" dispose={null} />
+                  </mesh>
+                </group>
+              )}
+            </group>
           ))}
           {/* Club lights through the front window. */}
           <Box m={m} at={[0.5, 0.55, zf + 0.006]} s={[1.96, 0.46, 0.012]} c="#120818" shadow={false} />
