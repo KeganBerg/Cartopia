@@ -1,7 +1,7 @@
 import { useGame, fuelCap } from '../game/store'
 import { xpToNext, FUEL_REGEN_SECONDS } from '../game/data'
 import { useNow } from '../scene/useNow'
-import { GoalsButton, GoalTracker } from './Goals'
+import { GoalTracker } from './Goals'
 import { SeasonButton } from './Season'
 import { MuteButton } from './MuteButton'
 import { DealsButton } from './Deals'
@@ -80,7 +80,6 @@ export function Hud() {
           <button className="pill trophies" title="Leaderboards" onClick={() => s.openPanel('leaders')}><Icon name="trophy" size={16} /> {compact(s.trophies)}</button>
           <SeasonButton />
           <DealsButton />
-          <GoalsButton />
           <MuteButton />
         </div>
         <div className="hud-right-row">
@@ -98,14 +97,13 @@ export function Hud() {
             <button className="chip-stat" onClick={() => s.showNeed('parts', 0)}><span className="ico cur-ico" data-fly="parts"><PartsIcon /></span><Roll value={s.parts} format={compact} /></button>
             <button className="chip-stat chip-fuel" onClick={() => s.showNeed('fuel', 0)}>
               <span className="ico cur-ico"><FuelIcon /></span>
-              <span className="chip-fuel-bar"><i style={{ width: s.fuel > 0 ? `max(14px, ${Math.min(100, (s.fuel / cap) * 100)}%)` : 0 }} /><b>{compact(s.fuel)}/{compact(cap)}</b></span>
+              <span className="chip-fuel-bar"><i style={{ width: s.fuel > 0 ? `max(4px, ${Math.min(100, (s.fuel / cap) * 100)}%)` : 0 }} /><b>{compact(s.fuel)}/{compact(cap)}</b></span>
             </button>
           </div>
           <div className="hud-actions">
             <SeasonButton />
             <DealsButton />
-            <GoalsButton />
-            <ChallengeBell />
+              <ChallengeBell />
             <GiftBell />
           </div>
         </div>

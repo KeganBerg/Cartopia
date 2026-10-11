@@ -6,6 +6,7 @@ import { activeEvent, garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_U
 import { CarInspect, CarPreview, type DynoFeed } from '../scene/CarPreview'
 import { DynoOverlay, type DynoRun } from './Dyno'
 import { CollectAllButton } from './CollectAll'
+import { GoalsButton } from './Goals'
 import { rotateCurrent } from '../game/placement'
 import { BuildingThumb, CarThumb } from '../scene/BuildingPreview'
 import { ShopUpgrades } from './Upgrade'
@@ -41,6 +42,7 @@ export function BottomBar() {
         <button className="icon-btn" onClick={() => setMode('road')}><span className="i i-edit"><Icon name="cone" /></span>EDIT</button>
         <button className="big-btn race-btn" onClick={() => openPanel('race')}><span className="i"><Icon name="flag" />{rival && <span className="btn-dot" title="Your rival is in town">!</span>}</span>RACE</button>
       </div>
+      <GoalsButton />
       <CollectAllButton />
     </>
   )
