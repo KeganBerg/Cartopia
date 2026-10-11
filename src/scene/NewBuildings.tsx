@@ -677,7 +677,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
               </group>
             ))}
           </group>
-          <group position={[1.35, h + 0.14, z0 - d / 2 + 0.15]}>
+          <group position={[1.05, h + 0.14, z0 - d / 2 + 0.15]}>
             <Cyl m={m} at={[0, 0.45, 0]} r={0.02} h={0.9} c="#9e9e9e" seg={6} />
             <Box m={m} at={[-0.2, 0.89, 0.12]} rot={[0, 0.5, 0]} s={[0.5, 0.02, 0.02]} c="#9e9e9e" shadow={false} />
             <mesh position={[-0.42, 0.74, 0.25]} castShadow>
@@ -685,16 +685,16 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
               <meshStandardMaterial color="#eceff1" metalness={0.9} roughness={0.15} flatShading />
             </mesh>
           </group>
-          {/* Searchlight lamps behind the club. */}
+          {/* Searchlight lamps on the roof's back corners, so the beams start above the building. */}
           {[-1, 1].map((sd) => (
-            <group key={sd} position={[sd * 1.78, 0, -0.8]}>
+            <group key={sd} position={[sd * CLUB.lampX, h + 0.135, z0 + CLUB.lampZ]}>
               <Cyl m={m} at={[0, 0.08, 0]} r={0.12} r2={0.14} h={0.16} c="#37474f" seg={10} />
               <Cyl m={m} at={[0, 0.2, 0]} r={0.09} h={0.08} c="#eceff1" seg={10} />
             </group>
           ))}
           {!ghost && <Pool r={0.8} x={CLUB.doorX} z={0.8} />}
           {!ghost && <Pool r={0.9} x={0.75} z={0.85} />}
-          {!ghost && <ClubLife lvl={lvl} floorY={floor.y} floorZ={floor.z} floorW={floor.w} floorD={floor.d} />}
+          {!ghost && <ClubLife lvl={lvl} roofY={h + 0.135} roofZ={z0} floorY={floor.y} floorZ={floor.z} floorW={floor.w} floorD={floor.d} />}
         </ShellBuilding>
       )
     }

@@ -8,6 +8,7 @@ export function skinSource(d: SkinDef) {
   if ('set' in u) return `📘 ${CAR_SETS.find((s) => s.id === u.set)?.name ?? 'Set'}`
   if ('season' in u) return `🏁 Tier ${u.season}`
   if ('bucks' in u) return `💎 ${u.bucks}`
+  if ('event' in u) return '📅 Event'
   return '🎁 Crates'
 }
 
