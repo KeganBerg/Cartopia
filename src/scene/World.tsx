@@ -25,7 +25,9 @@ import { Batch } from './Batch'
 import { Manhole } from './BuildingDetail'
 import { GrassTufts } from './Tufts'
 import { toWorld, toTile, DIRS } from './grid'
-import { grassTex, paverTex, asphaltTex, drainTex } from './textures'
+import { grassTex, paverTex, drainTex } from './textures'
+import { roadMat } from './weatherLook'
+import { Weather } from './Weather'
 import { layoutRoads } from './traffic/layout'
 import { LAYER, decal } from './layers'
 
@@ -359,7 +361,8 @@ function Roads() {
       return { ...t, xing }
     })
   }, [roadsList])
-  const asphalt = asphaltTex()
+  // Shared so rain and snow can change every road at once (weatherLook.ts).
+  const asphalt = roadMat()
 
   return (
     <group>
@@ -376,7 +379,7 @@ function Roads() {
           <group key={k} position={[wx, 0, wz]}>
             <mesh rotation-x={-Math.PI / 2} position-y={LAYER.lot} receiveShadow>
               <planeGeometry args={[TILE, TILE]} />
-              <meshStandardMaterial map={asphalt} />
+              <primitive object={asphalt} attach="material" dispose={null} />
             </mesh>
             {/* Drains and manholes only on plain straight stretches, clear of crossings. */}
             {SIDES.map((sd, i) => !arms[i] && <Sidewalk key={sd} side={sd} drain={plain && (x * 2 + z + i) % 4 === 0} />)}
@@ -652,6 +655,7 @@ export function World() {
       <Townspeople />
       <Clouds />
       <SeasonFx small={Math.min(window.innerWidth, window.innerHeight) < 700} />
+      <Weather small={Math.min(window.innerWidth, window.innerHeight) < 700} />
       <SkyEnv />
       <PostFx look={townLook} town tiltShift />
     </>
