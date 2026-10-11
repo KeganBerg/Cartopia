@@ -1,17 +1,18 @@
 // Keeps slurs and crude words out of the names other players see:
-// town names, crew names, tags and mottos.
+// town names, crew names, tags and mottos. public.name_ok() in the database uses the same
+// lists for crews (supabase/migrations/0015_security_hardening.sql; names.test.ts checks).
 
 // Matched anywhere inside a name once it is squashed (so "N i g g a" and "n1gg@" count).
-const ANYWHERE = [
+export const ANYWHERE = [
   'nigg', 'nigr', 'niga', 'nlgg', 'faggot', 'fagot', 'faggit', 'kike', 'chink', 'spic', 'wetback', 'beaner',
   'tranny', 'retard', 'raghead', 'towelhead', 'coon', 'gook', 'paki', 'dyke', 'kkk', 'hitler', 'nazi',
   'fuck', 'fuk', 'shit', 'cunt', 'bitch', 'whore', 'slut', 'cock', 'dick', 'pussy', 'penis', 'vagina',
   'porn', 'rape', 'molest', 'pedo', 'jizz', 'twat', 'wank', 'bastard', 'asshole', 'dildo', 'anal',
 ]
 // Only matched as a whole word, because they hide inside harmless words ("class", "Scunthorpe").
-const WHOLE_WORD = ['ass', 'fag', 'nig', 'tit', 'tits', 'sex', 'hoe', 'hoes', 'jap', 'homo', 'cum']
+export const WHOLE_WORD = ['ass', 'fag', 'nig', 'tit', 'tits', 'sex', 'hoe', 'hoes', 'jap', 'homo', 'cum']
 // Harmless words that contain a blocked piece.
-const ALLOWED = ['cocktail', 'peacock', 'hitchcock', 'dickens', 'scunthorpe', 'cockpit', 'shuttlecock', 'raccoon', 'cocoon', 'tycoon', 'spice', 'spicy', 'conspicuous', 'racoon', 'torpedo', 'pedometer', 'cockatoo', 'cockroach', 'gamecock', 'cumulus', 'cucumber', 'circumference', 'document', 'analog', 'analysis', 'canal', 'banal', 'pakistan', 'grape', 'drape', 'scrape', 'therapist']
+export const ALLOWED = ['cocktail', 'peacock', 'hitchcock', 'dickens', 'scunthorpe', 'cockpit', 'shuttlecock', 'raccoon', 'cocoon', 'tycoon', 'spice', 'spicy', 'conspicuous', 'racoon', 'torpedo', 'pedometer', 'cockatoo', 'cockroach', 'gamecock', 'cumulus', 'cucumber', 'circumference', 'document', 'analog', 'analysis', 'canal', 'banal', 'pakistan', 'grape', 'drape', 'scrape', 'therapist']
 
 const LEET: Record<string, string> = { '0': 'o', '1': 'i', '!': 'i', '|': 'i', '3': 'e', '4': 'a', '@': 'a', '5': 's', '$': 's', '7': 't', '+': 't', '8': 'b', '9': 'g' }
 
