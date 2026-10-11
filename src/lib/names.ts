@@ -34,3 +34,18 @@ export function displayName(name: string, id: string, kind: 'town' | 'crew' = 't
 }
 
 export const NAME_REJECTED = "That name isn't allowed. Try something else."
+
+// Chat lines: isCleanName() on each word, and on runs of one- or two-letter words joined up,
+// so "f u c k" is caught but "push it" isn't read as one word. public.chat_ok() matches this.
+export function isCleanChat(text: string): boolean {
+  let run = ''
+  for (const w of text.trim().split(/\s+/)) {
+    if (!isCleanName(w)) return false
+    if (w.length <= 2) run += w
+    else {
+      if (!isCleanName(run)) return false
+      run = ''
+    }
+  }
+  return isCleanName(run)
+}
