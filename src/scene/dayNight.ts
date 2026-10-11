@@ -1,6 +1,7 @@
 import { AdditiveBlending, Color, MeshBasicMaterial, MeshStandardMaterial } from 'three'
 import { glowTex, windowGlowTex, windowTex } from './textures'
 import { decal } from './layers'
+import { movieTex } from './movie'
 
 // One in-game day lasts 20 real minutes, tied to the clock so every player
 // sees the same time of day. ?time=0..1 pins it (0.5 is midnight) for testing.
@@ -37,7 +38,9 @@ export const glowMats = {
   bulb: new MeshStandardMaterial({ color: '#fff8e1', emissive: new Color('#ffcc66'), emissiveIntensity: 0.2 }),
   headlight: new MeshStandardMaterial({ color: '#fffde7', emissive: new Color('#fff3c4'), emissiveIntensity: 0.1 }),
   taillight: new MeshStandardMaterial({ color: '#d32f2f', emissive: new Color('#ff1744'), emissiveIntensity: 0 }),
-  screen: new MeshStandardMaterial({ color: '#f5f5f5', emissive: new Color('#b3dcff'), emissiveIntensity: 0 }),
+  // The Drive-In's film plays unlit so it reads like a lit screen, a touch
+  // dimmer by day when the sun washes it out.
+  screen: new MeshBasicMaterial({ map: movieTex(), toneMapped: false }),
   // Glows lie flat on the ground, so they get a depth nudge to never flicker against it.
   pool: new MeshBasicMaterial({ map: glowTex(), color: '#ffcf7a', transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false, toneMapped: false, ...decal() }),
   beam: new MeshBasicMaterial({ map: glowTex(), color: '#fff2c0', transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false, toneMapped: false, ...decal() }),
@@ -48,7 +51,7 @@ export function applyNight(n: number) {
   glowMats.bulb.emissiveIntensity = 0.2 + n * 2.2
   glowMats.headlight.emissiveIntensity = 0.1 + n * 2
   glowMats.taillight.emissiveIntensity = n * 1.2
-  glowMats.screen.emissiveIntensity = n * 1.1
+  glowMats.screen.color.setScalar(0.7 + n * 0.3)
   glowMats.pool.opacity = n * 0.75
   glowMats.beam.opacity = n * 0.5
   for (const m of [glowMats.pool, glowMats.beam]) m.visible = n > 0.02
