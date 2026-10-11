@@ -9,6 +9,7 @@ import { anchors } from './anchors'
 import { liveTraffic, crossingSignal } from './traffic/live'
 import { useThought } from '../game/thoughts'
 import { SEASON } from './season'
+import { SHIRTS, PANTS, SKIN, HAIR, BEANIES } from './people'
 import { dayPhase, nightAmount } from './dayNight'
 
 // Townspeople: little figures like the race crowd who live in the houses and
@@ -27,11 +28,6 @@ const LEG = 0.24
 // Figures are modelled at race-crowd proportions and drawn a little bigger so they read from the town camera.
 const SCALE = 1.3
 
-const SHIRTS = ['#e53935', '#1e88e5', '#fdd835', '#43a047', '#8e24aa', '#ff7043', '#fafafa', '#26c6da', '#ec407a', '#5c6bc0']
-const PANTS = ['#37474f', '#1565c0', '#5d4037', '#212121', '#78909c', '#283593']
-const SKIN = ['#f5d0b5', '#e0ac8a', '#c68863', '#8d5a3b', '#5c3a24', '#f1c27d']
-const HAIR = ['#3e2723', '#212121', '#6d4c41', '#fbc02d', '#bf360c', '#9e9e9e']
-const BEANIES = ['#d32f2f', '#1976d2', '#388e3c', '#fbc02d', '#7b1fa2']
 
 const NAMES = ['Alex', 'Sam', 'Jordan', 'Riley', 'Casey', 'Morgan', 'Taylor', 'Jamie', 'Quinn', 'Avery', 'Rowan', 'Skyler', 'Drew', 'Kai', 'Robin', 'Charlie', 'Frankie', 'Jesse', 'Remy', 'Sage']
 const DOGS = ['Biscuit', 'Rocket', 'Pepper', 'Daisy', 'Turbo', 'Maple', 'Nugget', 'Scout']
