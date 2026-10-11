@@ -25,7 +25,7 @@ input { font: inherit; padding: 8px 10px; border-radius: 10px; border: 2px solid
 .speedo:active { transform: scale(.92); }
 /* Menu badge sits just outside the gauge rim (top-right), never on it. */
 .speedo-menu { position: absolute; top: -6px; right: -16px; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; line-height: 1; color: #fff; background: linear-gradient(#5c9ded, #1e5fbf); border: 2px solid #fff; box-shadow: 0 2px 0 rgba(0,0,0,.3); }
-.speedo-level { position: absolute; top: 50px; left: 0; width: 88px; text-align: center; font: 22px var(--display); color: #fff; }
+.speedo-level { position: absolute; top: 59px; left: 0; width: 88px; text-align: center; font: 20px/1 var(--display); color: #fff; }
 .speedo-xp { position: absolute; top: 84px; left: 4px; width: 80px; text-align: center; font: 12px var(--display); background: #1b1f24; color: #fff; border-radius: 6px; border: 2px solid #cfd8dc; }
 .pills { display: flex; flex-direction: column; gap: 5px; margin-top: 4px; }
 .pill { display: flex; align-items: center; gap: 6px; min-width: 120px; padding: 2px 12px 2px 3px; background: rgba(27,31,36,.85); color: #fff; font: 17px var(--display); border-radius: 20px; border: 2px solid #cfd8dc; }
@@ -372,7 +372,7 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
   .hud-strip { display: flex; align-items: center; gap: 6px; background: linear-gradient(rgba(27,31,36,.82), rgba(27,31,36,.7)); border: 2px solid rgba(255,255,255,.75); border-radius: 18px; padding: 4px 6px; box-shadow: 0 3px 0 rgba(0,0,0,.25); pointer-events: auto; }
   .hud-strip .speedo { width: 50px; height: 50px; flex: none; margin-right: 22px; filter: none; }
   .hud-strip .speedo svg { width: 50px; height: 50px; }
-  .hud-strip .speedo-level { top: 24px; width: 50px; font-size: 15px; }
+  .hud-strip .speedo-level { top: 32px; width: 50px; font-size: 13px; line-height: 1; }
   .hud-strip .speedo-xp { display: none; }
   .hud-strip .speedo-menu { width: 18px; height: 18px; font-size: 10px; top: -4px; right: -19px; border-width: 1.5px; }
   .hud-chips { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; min-width: 0; }
@@ -390,8 +390,8 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 
   .speedo { width: 64px; height: 76px; }
   .speedo svg { width: 64px; height: 64px; }
-  .speedo-level { top: 35px; width: 64px; font-size: 17px; }
-  .speedo-xp { top: 60px; left: 2px; width: 60px; font-size: 10px; border-width: 1.5px; }
+  .speedo-level { top: 46px; line-height: 1; width: 64px; font-size: 15px; }
+  .speedo-xp { top: 62px; left: 2px; width: 60px; font-size: 10px; border-width: 1.5px; }
   .pills { gap: 4px; margin-top: 2px; }
   .pill { min-width: 0; font-size: 13px; padding: 1px 9px 1px 2px; gap: 4px; border-width: 1.5px; }
   .ico { width: 18px; height: 18px; font-size: 11px; }
@@ -484,8 +484,8 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
   button.pill { font-size: 13px; }
   .speedo { width: 64px; height: 76px; }
   .speedo svg { width: 64px; height: 64px; }
-  .speedo-level { top: 35px; width: 64px; font-size: 17px; }
-  .speedo-xp { top: 60px; left: 2px; width: 60px; font-size: 10px; }
+  .speedo-level { top: 46px; line-height: 1; width: 64px; font-size: 15px; }
+  .speedo-xp { top: 62px; left: 2px; width: 60px; font-size: 10px; }
   .speedo { margin-right: 20px; }
   .speedo-menu { width: 20px; height: 20px; font-size: 11px; top: -6px; right: -16px; }
   .pills { gap: 3px; margin-top: 0; }

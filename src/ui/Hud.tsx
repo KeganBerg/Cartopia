@@ -32,7 +32,7 @@ function Speedometer({ level, xp, onClick }: { level: number; xp: number; onClic
           y2={44 + 28 * Math.sin((angle * Math.PI) / 180)}
           stroke="#ff1744" strokeWidth="3" strokeLinecap="round"
         />
-        <circle cx="44" cy="44" r="5" fill="#eceff1" />
+        <circle cx="44" cy="44" r="4" fill="#eceff1" />
       </svg>
       <div className="speedo-level">{level}</div>
       <div className="speedo-xp">{n(xp)} XP</div>
