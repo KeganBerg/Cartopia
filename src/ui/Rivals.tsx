@@ -1,6 +1,6 @@
 import { useGame } from '../game/store'
 import { CARS, RACE_FUEL, carDef, performance } from '../game/data'
-import { RIVALS, RIVAL_VISITS, currentRival, rivalPi, rivalPrize, rivalShift, type RivalDef } from '../game/rivals'
+import { RIVALS, RIVAL_VISITS, currentRival, rivalLadderPi, rivalPi, rivalPrize, rivalShift, type RivalDef } from '../game/rivals'
 import { CarThumb } from '../scene/BuildingPreview'
 import { useNow } from '../scene/useNow'
 
@@ -10,13 +10,13 @@ const money = (n: number) => (n >= 1000 ? `${Math.round(n / 100) / 10}k` : `${n}
 
 export type RivalMatch = { def: RivalDef; visit: number; prize: number; rival: { id: string; town: string; level: number; carName: string; color: string; pi: number; online: false; body: ReturnType<typeof carDef>['body']; skill?: ReturnType<typeof carDef>['skill']; shift: number; boss: boolean } }
 
-// The race against this rival on this visit.
-export function rivalMatch(def: RivalDef, visit: number, level: number): RivalMatch {
-  const pi = rivalPi(def, visit)
+// The race against this rival on this visit, in a car close to your best one (myPi).
+export function rivalMatch(def: RivalDef, visit: number, level: number, myPi?: number): RivalMatch {
+  const pi = rivalPi(def, visit, myPi)
   const car = [...CARS].sort((a, b) => Math.abs(performance(a, zero) - pi) - Math.abs(performance(b, zero) - pi))[0]
   const idx = RIVALS.indexOf(def)
   return {
-    def, visit, prize: rivalPrize(pi),
+    def, visit, prize: rivalPrize(rivalLadderPi(def, visit)),
     rival: {
       id: `rival-${def.id}`, town: `${def.icon} ${def.name}`, level: Math.max(level, def.unlockLevel), carName: car.name, color: def.color, pi,
       online: false, body: car.body, skill: idx >= 2 || visit === RIVAL_VISITS - 1 ? car.skill : undefined, shift: rivalShift(def, visit), boss: visit === RIVAL_VISITS - 1,
@@ -43,10 +43,11 @@ export function RivalCard({ onRace }: { onRace: (m: RivalMatch) => void }) {
   const level = useGame((s) => s.level)
   const progress = useGame((s) => s.rivals ?? NONE)
   const showNeed = useGame((s) => s.showNeed)
+  const myPi = useGame((s) => Math.max(10, ...s.cars.map((c) => performance(carDef(c.model), c.upgrades, c.mods))))
   const cur = currentRival(level, progress, now)
   if (!cur) return <div className="rv-card rv-done">🏆 <b>Town champ!</b> <small>No rival dares race you.</small></div>
   const { def, visit, locked, away } = cur
-  const m = rivalMatch(def, visit, level)
+  const m = rivalMatch(def, visit, level, myPi)
   const left = Math.max(0, Math.ceil((away - now) / 60000))
   const line = locked ? `Rolls into town at level ${def.unlockLevel}.` : away ? `Tuning up. Back in ${left}m.` : visit === 0 ? def.lines.intro : def.lines.back[visit - 1]
   return (
