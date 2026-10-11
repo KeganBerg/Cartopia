@@ -79,6 +79,8 @@ const LOT_V = 1.0
 const SWING = 1.0 // distance over which an overtaking car changes lane
 const TRUCK = { len: 1.52, gap: 0.12 }
 const PASS_V = 1.5
+// Our directions (east, west, south, north) as walkGraph's crosswalk sides (south, east, north, west).
+const SIDE = [1, 3, 0, 2]
 const STOP_LINE = 0.6 // how far short of an intersection cars wait
 const JAMMED = 45 // seconds stuck before a car gives up
 
@@ -113,6 +115,9 @@ export class Traffic {
   agents = new Map<string, Agent>()
   t = 0
   respawns = 0 // cars that sat jammed so long they faded out and came back elsewhere
+  // People on each zebra crossing, keyed "x,z:side" (the road tile it's painted
+  // on and the side facing the intersection, in walkGraph SIDES order).
+  walkers: ReadonlyMap<string, number> = new Map()
   private specs = new Map<string, CarSpec>()
   private trips = new Map<string, TripKind>()
   private ways = new Map<string, { outs: number[]; to: string; heading: number }[]>()
@@ -746,6 +751,19 @@ export class Traffic {
     return priority(node, leg.inDir)
   }
 
+  // Someone on the zebra crossing this car would drive over going into the
+  // intersection (painted on the tile it comes from) or out of it (on the tile it leaves by).
+  private zebraBusy(prev: Leg | undefined, chain: Leg[]) {
+    if (!this.walkers.size) return false
+    const first = chain[0]
+    const last = chain[chain.length - 1]
+    if (!first.junction) return false
+    if (prev?.node && this.walkers.get(`${prev.node}:${SIDE[first.inDir]}`)) return true
+    const n = this.net.nodes.get(last.node!)!
+    const out = tkey(n.x + D[last.outDir][0], n.z + D[last.outDir][1])
+    return !!this.walkers.get(`${out}:${SIDE[opp(last.outDir)]}`)
+  }
+
   // Room to clear the junction: don't pull in if the lane beyond is backed up.
   private exitRoom(a: Agent, leg: Leg) {
     const n = this.net.nodes.get(leg.node!)!
@@ -854,7 +872,7 @@ export class Traffic {
         if (asking) a.arrived ??= this.t
         // Through a cluster of junction tiles, only the first light counts.
         const lit = chain.findIndex((c) => this.net.nodes.get(c.node!)!.signal)
-        const ok = asking && chain.every((c, k) => this.canEnter(a, c, ahead, k === 0, k === lit)) && this.exitRoom(a, chain[chain.length - 1])
+        const ok = asking && chain.every((c, k) => this.canEnter(a, c, ahead, k === 0, k === lit)) && this.exitRoom(a, chain[chain.length - 1]) && !this.zebraBusy(a.legs[i - 1], chain)
         if (ok) {
           a.arrived = null
           for (const c of chain) {

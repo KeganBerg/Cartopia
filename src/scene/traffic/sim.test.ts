@@ -132,6 +132,43 @@ describe('town traffic', () => {
     expect([...bumps]).toEqual([])
   })
 
+  it('stops for people on the zebra crossings', () => {
+    seedRandom(3)
+    const t = new Traffic()
+    t.setTown(grid(3, 4), [], turnOf)
+    t.setCars(cars(8), 8)
+    const SIDE = [1, 3, 0, 2]
+    const zebras: string[] = []
+    for (const r of t.net.layout.tiles.values()) {
+      if (r.junction) continue
+      for (let d = 0; d < 4; d++) {
+        const n = t.net.layout.tiles.get(`${r.x + [1, -1, 0, 0][d]},${r.z + [0, 0, 1, -1][d]}`)
+        if (r.arms[d] && n?.junction) zebras.push(`${r.key}:${SIDE[d]}`)
+      }
+    }
+    const walkers = new Map<string, number>()
+    t.walkers = walkers
+    const inside = new Map<string, number>()
+    let crossedWhileBusy = 0
+    let movedAfter = 0
+    run(t, 70, (tr, at) => {
+      if (at >= 10 && at < 40) for (const z of zebras) walkers.set(z, 1)
+      else walkers.clear()
+      for (const a of tr.agents.values()) {
+        const l = a.legs[a.ci]
+        const was = inside.get(a.uid)
+        const now = l.junction ? a.ci : -1
+        // Rolling onto a junction tile from the road while every crossing is busy.
+        if (now >= 0 && was === -1 && at > 12 && at < 40 && !a.legs[a.ci - 1]?.junction) crossedWhileBusy++
+        if (now >= 0 && was === -1 && at > 41) movedAfter++
+        inside.set(a.uid, now)
+      }
+    })
+    expect(zebras.length).toBeGreaterThan(8)
+    expect(crossedWhileBusy).toBe(0)
+    expect(movedAfter).toBeGreaterThan(0)
+  })
+
   it('tows a car to Rusty\'s curb', () => {
     seedRandom(9)
     const t = new Traffic()
