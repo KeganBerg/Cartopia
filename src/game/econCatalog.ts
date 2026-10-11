@@ -1,6 +1,6 @@
 import {
   BUILDINGS, CAMPAIGN, CAMPAIGN_RACES, CARS, GOALS, GP_SERIES, campaignRaceId, MAX_BUILDING_LEVEL, MODS, RESCUE_SPOTS, modXp, buildingUpgradeCost, buildingUpgradeXp, upgradable,
-  upgradeFuelCap, upgradeJobSeconds, FAVORITE_BONUS, upgradePartsPayout, upgradePayout, upgradeXp, type BuildingDef,
+  upgradeFuelCap, upgradeJobSeconds, FAVORITE_BONUS, QUEST_PAY, TASKS_PER_PERIOD, upgradePartsPayout, upgradePayout, upgradeXp, type BuildingDef,
 } from './data'
 
 const LEVELS = Array.from({ length: MAX_BUILDING_LEVEL }, (_, i) => i + 1)
@@ -57,6 +57,8 @@ export function econCatalog() {
     unlock: c.unlockLevel, races: Array.from({ length: CAMPAIGN_RACES }, (_, i) => campaignRaceId(c, i)),
     coins: c.coins, bucks: c.bucks, trophies: c.trophies, starBucks: c.starBucks,
   }]))
+  // Daily and weekly tasks: at most `count` task rewards and one chest per UTC day / ISO week.
+  const quests = Object.fromEntries((['daily', 'weekly'] as const).map((p) => [p, { count: TASKS_PER_PERIOD, ...QUEST_PAY[p] }]))
   // A driver adds at most this share to a business's coins (see driverPayout).
-  return { cars, buildings, goals, gp, rescue, upgradeXpTo, mods, driverBonus: FAVORITE_BONUS, campaign }
+  return { cars, buildings, goals, gp, rescue, upgradeXpTo, mods, driverBonus: FAVORITE_BONUS, campaign, quests }
 }

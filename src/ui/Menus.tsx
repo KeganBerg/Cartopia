@@ -289,6 +289,14 @@ function DriverRow({ car, model }: { car: string; model: string }) {
   return <div className="driver-row idle"><LovesTag model={model} /><small>Tap a busy business to put this car to work there.</small></div>
 }
 
+type GarageTab = 'tune' | 'mods' | 'paint'
+let nextGarageTab: GarageTab = 'tune'
+// Opens the Garage on a given tab (goals use it for paint and mods).
+export function openGarageTab(tab: GarageTab) {
+  nextGarageTab = tab
+  useGame.getState().openPanel('garage')
+}
+
 export function GaragePanel() {
   const cars = useGame((s) => s.cars)
   const selected = useGame((s) => s.selectedCar)
@@ -299,7 +307,11 @@ export function GaragePanel() {
   const stripeCar = useGame((s) => s.stripeCar)
   const car = cars.find((c) => c.uid === selected) ?? cars[0]
   const def = car && carDef(car.model)
-  const [tab, setTab] = useState<'tune' | 'mods' | 'paint'>('tune')
+  const [tab, setTab] = useState<GarageTab>(() => {
+    const t = nextGarageTab
+    nextGarageTab = 'tune'
+    return t
+  })
   // A mod being tried on in the preview, cleared when another car is picked.
   const [trying, setTrying] = useState<{ car: string; mod: string } | null>(null)
   const tryMod = trying && trying.car === car?.uid && tab === 'mods' ? trying.mod : null

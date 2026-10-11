@@ -1,7 +1,7 @@
 import { useGame, fuelCap } from '../game/store'
 import { xpToNext, FUEL_REGEN_SECONDS } from '../game/data'
 import { useNow } from '../scene/useNow'
-import { GoalsButton } from './Goals'
+import { GoalsButton, GoalTracker } from './Goals'
 import { MuteButton } from './MuteButton'
 import { ChallengeBell } from './Race'
 
@@ -59,6 +59,7 @@ export function Hud() {
       <div className="hud-center">
         <div className="town-name">{s.visiting?.townName ?? s.townName}</div>
         {!s.visiting && <button className="my-cars" onClick={() => s.openPanel('garage')}>🚗 <span className="my-cars-label">MY CARS:</span> {s.cars.length}</button>}
+        <GoalTracker />
       </div>
       <div className="hud-right">
         <button className="fuel" onClick={() => s.showNeed('fuel', 0)}>
@@ -99,6 +100,7 @@ export function Hud() {
           {!s.visiting && <button onClick={() => s.openPanel('garage')}>🚗 {s.cars.length}</button>}
           <button onClick={() => s.openPanel('leaders')}>🏆 {s.trophies}</button>
         </div>
+        <GoalTracker />
       </div>
     </>
   )
