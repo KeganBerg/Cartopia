@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ambientMix } from './ambience'
+import { ambientMix, noiseBuffer } from './ambience'
 
 describe('ambientMix', () => {
   it('plays crickets on summer nights and traffic by day', () => {
@@ -54,5 +54,24 @@ describe('weatherMix', () => {
     expect(snow.traffic).toBeLessThan(ambientMix(0, 'winter').traffic)
     expect(snow.leaves).toBe(0)
     for (const v of Object.values(storm)) expect(v).toBeLessThanOrEqual(1)
+  })
+})
+
+describe('noiseBuffer', () => {
+  // Just enough of an AudioContext to fill a buffer.
+  const ctx = {
+    sampleRate: 8000,
+    createBuffer: (_c: number, len: number) => {
+      const data = new Float32Array(len)
+      return { getChannelData: () => data, length: len }
+    },
+  } as unknown as BaseAudioContext
+  it('loops brown noise without a jump at the seam', () => {
+    for (let k = 0; k < 20; k++) {
+      const d = noiseBuffer(ctx, 4, true).getChannelData(0)
+      let step = 0
+      for (let i = 1; i < d.length; i++) step = Math.max(step, Math.abs(d[i] - d[i - 1]))
+      expect(Math.abs(d[d.length - 1] - d[0])).toBeLessThanOrEqual(step)
+    }
   })
 })

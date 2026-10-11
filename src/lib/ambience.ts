@@ -75,7 +75,7 @@ export function weatherMix(m: Mix, sky: Sky): Mix {
 const rand = (a: number, b: number) => a + Math.random() * (b - a)
 const chance = (perSecond: number, dt: number) => Math.random() < perSecond * dt
 
-function noiseBuffer(ctx: BaseAudioContext, seconds: number, brown: boolean) {
+export function noiseBuffer(ctx: BaseAudioContext, seconds: number, brown: boolean) {
   const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * seconds), ctx.sampleRate)
   const d = buf.getChannelData(0)
   let last = 0
@@ -85,6 +85,13 @@ function noiseBuffer(ctx: BaseAudioContext, seconds: number, brown: boolean) {
       last = (last + 0.02 * w) / 1.02
       d[i] = last * 3.5
     } else d[i] = w
+  }
+  // Brown noise wanders, so its end and start don't meet: looped as a bed
+  // (traffic, wind, rain) that jump thumps every few seconds. Tilt it so they do.
+  if (brown) {
+    const n = d.length - 1
+    const step = d[n] - d[0]
+    for (let i = 0; i <= n; i++) d[i] -= (step * i) / n
   }
   return buf
 }
