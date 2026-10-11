@@ -1,5 +1,5 @@
 import { Vector3 } from 'three'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type CSSProperties } from 'react'
 import { useGame, buyablePlots, type PlacedBuilding } from '../game/store'
 import { buildingDef, buildingLevel, jobLevel, carDef, loves, levelLift, plotPrice, START_LAND, upgradeJobSeconds, isOpen } from '../game/data'
 import { msUntilNight } from '../game/clock'
@@ -12,6 +12,8 @@ function fmt(sec: number) {
   if (sec >= 60) return `${Math.floor(sec / 60)}m ${String(sec % 60).padStart(2, '0')}s`
   return `${sec}s`
 }
+// Phones show only the biggest unit, next to a progress ring.
+const short = (sec: number) => (sec >= 3600 ? `${Math.floor(sec / 3600)}h` : sec >= 60 ? `${Math.ceil(sec / 60)}m` : `${sec}s`)
 
 // Badge height over a merged block: as tall as its model grows (see groupScale).
 const lift = (g: MergeGroup) => (g.cols === g.rows ? g.cols : 1.5)
@@ -41,9 +43,10 @@ function JobBadge({ b, now, g, members = [b] }: { b: PlacedBuilding; now: number
           <span className="coin">{d.kind === 'obstacle' ? '✔' : '$'}</span>
         ) : working ? (
           <>
-            <span className="clock">⏱</span>
+            <span className="clock" style={{ '--p': `${pct * 360}deg` } as CSSProperties}>⏱</span>
             <span className="bar"><span style={{ width: `${pct * 100}%` }} /></span>
             <span className="time">{fmt(left)}</span>
+            <span className="time-short">{short(left)}</span>
           </>
         ) : !isOpen(d, now) ? (
           <span className="start">🌙 {fmt(Math.max(1, Math.ceil(msUntilNight(now) / 1000)))}</span>
