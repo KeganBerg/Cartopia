@@ -231,7 +231,7 @@ export function ShowroomPanel() {
           return (
             <div key={c.id} data-id={c.id} className={`card car-card ${locked ? 'locked' : ''} ${focus === c.id ? 'focus' : ''}`}>
               <CarThumb color={color} body={c.body} />
-              <div className="card-name">{c.name}</div>
+              <div className="card-name">{c.name}{c.legendary && <> <span className="rarity rarity-legendary">Legendary</span></>}</div>
               <div className="card-stat">PI {pi} · {c.body}</div>
               <SkillTag model={c.id} />
               <LovesTag model={c.id} />
