@@ -455,3 +455,26 @@ describe('town traffic', () => {
     })
   }
 })
+
+describe('honking', () => {
+  it('drivers stuck behind someone honk now and then, never the stuck car itself', async () => {
+    const { HonkWatch } = await import('../../lib/ambience')
+    seedRandom(3)
+    const t = new Traffic()
+    t.setTown(grid(3, 3), [], turnOf)
+    t.setCars(cars(16), 16)
+    let r = 0.37
+    const watch = new HonkWatch(() => (r = (r * 9301 + 0.4927) % 1))
+    const times: number[] = []
+    run(t, 240, (tr, at) => {
+      for (const a of watch.check(tr.agents, at)) {
+        expect(a.parked).toBe(0)
+        expect(a.stalled).toBe(false)
+        expect(a.wait).toBeGreaterThan(2)
+        times.push(at)
+      }
+    })
+    expect(times.length).toBeGreaterThan(0)
+    for (let i = 1; i < times.length; i++) expect(times[i] - times[i - 1]).toBeGreaterThanOrEqual(2.5)
+  })
+})
