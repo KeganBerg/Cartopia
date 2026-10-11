@@ -79,6 +79,8 @@ const SMOKE = [new Color('#cfd8dc'), new Color('#eceff1'), new Color('#b0bec5')]
 const SUDS = [new Color('#e1f5fe'), new Color('#ffffff'), new Color('#b3e5fc')]
 const GOLD = [new Color('#ffd54f'), new Color('#fff59d'), new Color('#ffffff')]
 const LEAF = [new Color('#7cb342'), new Color('#558b2f'), new Color('#9ccc65')]
+// Thank-you sparkles over a business you helped in a friend's town.
+const THANKS = [new Color('#ff80ab'), new Color('#69f0ae'), new Color('#ffd54f'), new Color('#ffffff')]
 const STONE = [new Color('#9e9e9e'), new Color('#bdbdbd'), new Color('#757575')]
 const pick = (c: Color[]) => c[(Math.random() * c.length) | 0]
 
@@ -145,6 +147,28 @@ export function WorldFx({ small }: { small: boolean }) {
           for (let i = 0; i < 12; i++) {
             const a = (i / 12) * Math.PI * 2
             add(0, { x: cx + Math.cos(a) * r, y: 0.1, z: cz + Math.sin(a) * r, vx: Math.cos(a) * 1.5, vy: 0.3, vz: Math.sin(a) * 1.5, life: 0.6, size: 0.3, grow: 1, spin: 0, drag: 3, lift: 0, color: pick(DUST) })
+          }
+        } else if (e.kind === 'helped') {
+          addPop([e.uid], 'upgraded')
+          const b = town.find((o) => o.uid === e.uid)
+          if (!b) return
+          const f = footprint(b.def, b.x, b.z, b.rot)
+          const top = buildingDef(b.def).w > 1 ? 2 : 1.6
+          // A spiral of sparkles climbing round the shop, then a shower from the roof.
+          const n = small ? 18 : 28
+          for (let i = 0; i < n; i++) {
+            const a = (i / n) * Math.PI * 4
+            const r = Math.max(f.w, f.h) * 0.45
+            add(1, { x: f.cx + Math.cos(a) * r, y: 0.2 + (i / n) * top, z: f.cz + Math.sin(a) * r, vx: -Math.sin(a) * 1.6, vy: 1.4 + Math.random(), vz: Math.cos(a) * 1.6, life: 1 + Math.random() * 0.4, size: 0.2 + Math.random() * 0.14, grow: -0.5, spin: 7, drag: 1, lift: -0.8, color: pick(THANKS) })
+          }
+          for (let i = 0; i < (small ? 8 : 14); i++) {
+            const a = Math.random() * Math.PI * 2
+            add(1, { x: f.cx, y: top + 0.4, z: f.cz, vx: Math.cos(a) * 2, vy: 3 + Math.random() * 1.5, vz: Math.sin(a) * 2, life: 0.9, size: 0.18, grow: -0.3, spin: 9, drag: 0.6, lift: -7, color: pick(GOLD) })
+          }
+          // A little dust swept off the forecourt.
+          for (let i = 0; i < 8; i++) {
+            const a = (i / 8) * Math.PI * 2
+            add(0, { x: f.cx + Math.cos(a) * f.w * 0.4, y: 0.1, z: f.cz + Math.sin(a) * f.h * 0.4, vx: Math.cos(a) * 1.2, vy: 0.3, vz: Math.sin(a) * 1.2, life: 0.6, size: 0.26, grow: 1, spin: 0, drag: 3, lift: 0, color: pick(DUST) })
           }
         } else if (e.kind === 'cleared') {
           const b = town.find((o) => o.uid === e.uid)

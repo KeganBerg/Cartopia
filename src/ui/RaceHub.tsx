@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useGame, type OwnedCar } from '../game/store'
-import { CAMPAIGN, CAMPAIGN_RACES, GP_ROUNDS, GP_SERIES, RACE_FUEL, SKILLS, campaignCleared, campaignRaceId, campaignReward, carDef, msToNextWeek, performance } from '../game/data'
+import { CAMPAIGN, CAMPAIGN_RACES, GP_ROUNDS, GP_SERIES, RACE_FUEL, SKILLS, campaignCleared, campaignRaceId, campaignReward, carDef, msToNextWeek, performance, skinDef } from '../game/data'
+import { EVENT_RACES, eventFor, eventPrize, eventProgress } from '../game/events'
 import { TOUR_RACES, tourLeg, tourLegOf, tourPrize, tourRivalName } from '../game/tour'
 import { shortLeft, trialVenue, trialWeek } from '../game/trial'
 import { localBest } from '../lib/trialServer'
@@ -14,7 +15,7 @@ import { artClass, artStyle } from './venueArt'
 // The Race menu's front page: every race mode as a tile on one screen, each
 // showing its next race, so nothing needs scrolling to find.
 
-export type HubTab = 'quick' | 'campaign' | 'tour' | 'gp' | 'trial'
+export type HubTab = 'quick' | 'campaign' | 'tour' | 'gp' | 'trial' | 'event'
 
 const money = (n: number) => (n >= 10000 ? `$${Math.round(n / 1000)}k` : `$${n.toLocaleString()}`)
 
@@ -31,7 +32,7 @@ export function Pips({ n, of, dark }: { n: number; of: number; dark?: boolean })
   return <span className={dark ? 'rm-pips dark' : 'rm-pips'} aria-label={`${n} of ${of}`}>{Array.from({ length: of }, (_, i) => <i key={i} className={i < n ? 'on' : ''} />)}</span>
 }
 
-export function RaceHub({ onOpen, onCampaign, onTour, onRival }: { onOpen: (t: HubTab) => void; onCampaign: (ci: number, race: number) => void; onTour: () => void; onRival: (m: RivalMatch) => void }) {
+export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival }: { onOpen: (t: HubTab) => void; onCampaign: (ci: number, race: number) => void; onTour: () => void; onEvent: () => void; onRival: (m: RivalMatch) => void }) {
   const level = useGame((s) => s.level)
   const done = useGame((s) => s.campaign)
   const won = useGame((s) => s.tour ?? 0)
@@ -54,6 +55,15 @@ export function RaceHub({ onOpen, onCampaign, onTour, onRival }: { onOpen: (t: H
   const series = GP_SERIES.find((s) => (gp[s.id]?.round ?? 0) > 0 && level >= s.unlockLevel)
     ?? GP_SERIES.find((s) => level >= s.unlockLevel && carCount >= s.minCars) ?? GP_SERIES[0]
   const round = gp[series.id]?.round ?? 0
+
+  const cars = useGame((s) => s.cars)
+  const evp = eventProgress(useGame((s) => s.event))
+  const ev = eventFor()
+  const evWon = evp?.won ?? 0
+  const evBase = evp?.pi ?? cars.reduce((m, c) => Math.max(m, performance(carDef(c.model), c.upgrades, c.mods)), 0)
+  const evSkin = skinDef(ev.skin)!
+  const evHas = useGame((s) => (s.skins ?? []).includes(ev.skin))
+  const evCar = [...cars].sort((a, b) => performance(carDef(b.model), b.upgrades, b.mods) - performance(carDef(a.model), a.upgrades, a.mods))[0]
 
   const week = trialWeek()
   const trial = trialVenue(week)
@@ -87,6 +97,22 @@ export function RaceHub({ onOpen, onCampaign, onTour, onRival }: { onOpen: (t: H
       </div>
 
       <RivalTile onRace={onRival} />
+
+      <div className={`rm-tile rm-ev rm-photo${artClass(ev.venue, ev.night)}`} style={{ ...artStyle(ev.venue, ev.night), '--ev': ev.color } as React.CSSProperties} {...tile('event')}>
+        {evCar && (
+          <span className="rm-ev-car" aria-hidden>
+            <CarThumb size="xs" color={evCar.color} finish={evCar.finish} skin={ev.skin} body={carDef(evCar.model).body} model={evCar.model} stripe={evCar.stripe} mods={evCar.mods} />
+          </span>
+        )}
+        <span className="rm-ev-mid">
+          <span className="rm-tag">WEEKLY EVENT · ⏳ {shortLeft(msToNextWeek())}</span>
+          <b className="rm-ttl">{ev.name}</b>
+          <span className="rm-meta"><Pips n={evWon} of={EVENT_RACES} /> <span className="rm-ev-skin"><i style={{ background: evSkin.swatch }} />{evSkin.name}{evHas ? ' ✔' : ''}</span></span>
+        </span>
+        {evWon < EVENT_RACES
+          ? <button className="buy small rm-go" onClick={stop(onEvent)}>🏁 {money(eventPrize(evBase, evWon))}<small>⛽{RACE_FUEL}</small></button>
+          : <span className="rm-ev-done">✔ Cleared</span>}
+      </div>
 
       <div className={`rm-tile rm-gp rm-photo${level < series.unlockLevel ? ' rm-locked' : ''}`} style={artStyle('main')} {...tile('gp')}>
         <span className="rm-tag">GRAND PRIX</span>

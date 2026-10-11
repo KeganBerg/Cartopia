@@ -214,4 +214,7 @@ html {
 
 /* Tutorial tip sits above the build toolbar instead of on top of it. */
 body:has(.edit-bar) .tutorial { bottom: calc(150px + var(--sab)); }
-@media (max-width: 600px) { body:has(.edit-bar) .tutorial { bottom: calc(118px + var(--sab)); } }
+@media (max-width: 600px) {
+  body:has(.edit-bar) .tutorial { bottom: calc(118px + var(--sab)); }
+  body:has(.edit-bar):has(.tutorial) .toasts { bottom: calc(188px + var(--sab)); }
+}

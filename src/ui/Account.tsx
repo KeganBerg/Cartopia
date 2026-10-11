@@ -7,6 +7,7 @@ import { AmbienceControl, MuteButton } from './MuteButton'
 import { AlertsMenu } from './Alerts'
 import { localBackup, restoreLocalBackup } from '../lib/cloud'
 import { isCleanName, NAME_REJECTED } from '../lib/names'
+import { UsernameRow } from './Username'
 
 type MenuTab = 'town' | 'account' | 'help'
 const MENU_TABS = [{ id: 'town', label: '🏠 Town' }, { id: 'account', label: '👤 Account' }, { id: 'help', label: '❓ How to play' }] as const
@@ -39,7 +40,7 @@ export function AccountPanel() {
     if (!supabase) return
     setMsg('...')
     const { error, data } = signUp
-      ? await supabase.auth.signUp({ email, password })
+      ? await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } })
       : await supabase.auth.signInWithPassword({ email, password })
     if (error) return setMsg(friendlyAuthError(error.message, signUp))
     setMsg(signUp && !data.session ? 'Check your email to confirm your account, then sign in.' : 'Signed in. Your town now saves to the cloud.')
@@ -65,6 +66,7 @@ export function AccountPanel() {
       ) : user ? (
         <>
           <p>Signed in as <b>{user.email}</b>. Your town saves to the cloud and other players can race your best car.</p>
+          <UsernameRow />
           {backup && (
             <>
               <p className="hint">This device has an older town that is further along: {backup.townName}, level {backup.level}, {backup.cars.length} cars.</p>
