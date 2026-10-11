@@ -89,3 +89,15 @@ describe('mod skins', () => {
     expect(g().skinMod('m1', 'hood', 'starlight')).toBe(true)
   })
 })
+
+describe('skin shaders', () => {
+  it('draw every skin and mod skin number', async () => {
+    const { readFileSync } = await import('node:fs')
+    const glsl = readFileSync('src/scene/skins.ts', 'utf8')
+    for (const s of [...SKINS, ...MOD_SKINS]) expect(glsl, s.id).toContain(`id == ${s.n})`)
+  })
+  it('keep a share of each pool for crates only', () => {
+    expect(SKINS.filter((s) => 'crate' in s.unlock).length).toBeGreaterThanOrEqual(5)
+    expect(MOD_SKINS.filter((s) => 'crate' in s.unlock).length).toBeGreaterThanOrEqual(5)
+  })
+})
