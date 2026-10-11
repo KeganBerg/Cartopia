@@ -57,7 +57,7 @@ export function RivalCard({ onRace }: { onRace: (m: RivalMatch) => void }) {
           <span className="tag rv-tag">RIVAL</span>
           <b>{locked ? '???' : def.name}</b>
           {!locked && <Pips n={visit} />}
-          <span className="rv-bonus" title={`Beat them ${RIVAL_VISITS} times for a one-time bonus`}>🏁×{RIVAL_VISITS}: ${money(def.coins)} <span className="ico buck-ico">B</span>{def.bucks} 🏆{def.trophies}</span>
+          <span className="rv-bonus" title={`Beat them ${RIVAL_VISITS} times for a one-time bonus`}>🏁×{RIVAL_VISITS}: ${money(def.coins)} <span className="ico buck-ico">💎</span>{def.bucks} 🏆{def.trophies}</span>
         </div>
         <div className="rv-bubble">{line}</div>
         {!locked && !away && (
@@ -98,7 +98,7 @@ export function RivalResult({ match, won, bet, bonus, myTime, theirTime, onBet, 
           {bet ? <span>{won ? `💵 +$${prize.toLocaleString()}` : `💸 −$${prize.toLocaleString()}`}</span>
             : <span>💵 +${(won ? prize : Math.round(prize * 0.1)).toLocaleString()}</span>}
           {bonus && <span style={{ animationDelay: '.3s' }}>💰 +${bonus.coins.toLocaleString()}</span>}
-          {bonus && <span style={{ animationDelay: '.45s' }}><span className="ico buck-ico">B</span> +{bonus.bucks}</span>}
+          {bonus && <span style={{ animationDelay: '.45s' }}><span className="ico buck-ico">💎</span> +{bonus.bucks}</span>}
           {bonus && <span style={{ animationDelay: '.6s' }}>🏆 +{bonus.trophies + 1}</span>}
         </div>
         {offer ? (

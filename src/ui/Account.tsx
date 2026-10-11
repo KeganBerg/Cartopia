@@ -49,7 +49,7 @@ export function AccountPanel() {
     <Panel title="Menu">
       <SheetTabs items={MENU_TABS} value={tab} onChange={(t) => { lastTab = t; setTab(t) }} />
       {tab === 'town' && <>
-      <button className="buy bank-menu-btn" onClick={() => openPanel('bank')}>🏦 Bank · get bucks</button>
+      <button className="buy bank-menu-btn" onClick={() => openPanel('bank')}>🏦 Bank · get gems</button>
       <div className="menu-sound"><span>Sound</span><MuteButton /></div>
       <AmbienceControl />
       <AlertsMenu />

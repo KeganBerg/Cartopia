@@ -22,10 +22,10 @@ export function BankPanel() {
   return (
     <Panel title="Bank" wide>
       <div className="bank-head">
-        <span className="ico buck-ico bank-ico">B</span>
+        <span className="ico buck-ico bank-ico">💎</span>
         <div>
-          <b>You have {bucks} bucks</b>
-          <p>Use bucks to finish restores, refill fuel, fix the tow truck, and buy premium cars and paint.</p>
+          <b>You have {bucks} gems</b>
+          <p>Use gems to finish restores, refill fuel, fix the tow truck, and buy premium cars and paint.</p>
         </div>
       </div>
       <div className="bank-packs">
@@ -37,8 +37,8 @@ export function BankPanel() {
               {p.tag && <span className="ribbon">{p.tag}</span>}
               <div className="pack-art">{p.art}</div>
               <div className="pack-name">{p.name}</div>
-              <div className="pack-bucks">B {total}</div>
-              {p.bonus > 0 ? <div className="pack-bonus">{p.bucks} + {p.bonus} bonus ({pct}% more)</div> : <div className="pack-bonus plain">{p.bucks} bucks</div>}
+              <div className="pack-bucks">💎 {total}</div>
+              {p.bonus > 0 ? <div className="pack-bonus">{p.bucks} + {p.bonus} bonus ({pct}% more)</div> : <div className="pack-bonus plain">{p.bucks} gems</div>}
               {(p.coins || p.parts) && (
                 <div className="pack-extras">
                   {p.coins ? <span>+ ${p.coins.toLocaleString()}</span> : null}
@@ -53,7 +53,7 @@ export function BankPanel() {
       <div className="source bank-free">
         <span className="source-icon">⭐</span>
         <div>
-          <b>Free bucks</b>
+          <b>Free gems</b>
           <div className="card-stat">Level up, finish goals and keep your daily streak going.</div>
         </div>
         <button className="buy small alt" onClick={() => showNeed('bucks', 0)}>How</button>

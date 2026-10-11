@@ -7,7 +7,7 @@ import { anchorEls } from '../scene/anchors'
 
 type Res = 'coins' | 'parts' | 'xp' | 'bucks'
 const TARGET: Record<Res, string> = { coins: '[data-fly=coins]', parts: '[data-fly=parts]', xp: '.speedo', bucks: '[data-fly=bucks]' }
-const FACE: Record<Res, string> = { coins: '$', parts: '⚙', xp: '★', bucks: 'B' }
+const FACE: Record<Res, string> = { coins: '$', parts: '⚙', xp: '★', bucks: '💎' }
 // When the coins land, so counters can wait for them before rolling up.
 export const FLIGHT_MS = 900
 
@@ -111,7 +111,7 @@ function burst(froms: [number, number][], e: Amounts) {
     if (e.parts) launch(root, p, 'parts', Math.max(1, Math.round(each / 3)), d + 120)
     if (e.xp) launch(root, p, 'xp', Math.max(1, Math.round(each / 3)), d + 200)
   })
-  const bits = [e.coins && `+${e.coins.toLocaleString()}`, e.bucks && `+${e.bucks}B`, e.parts && `+${e.parts}⚙`, e.xp && `+${e.xp} XP`].filter(Boolean)
+  const bits = [e.coins && `+${e.coins.toLocaleString()}`, e.bucks && `+${e.bucks}💎`, e.parts && `+${e.parts}⚙`, e.xp && `+${e.xp} XP`].filter(Boolean)
   if (bits.length) label(root, froms[0], bits.join('  '))
   if (quiet) for (const r of ['coins', 'bucks', 'parts'] as const) if (e[r]) bump(r)
 }

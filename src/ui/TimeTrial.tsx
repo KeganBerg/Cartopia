@@ -14,7 +14,7 @@ export type TrialRun = { target: number; ghost: string; venue: string }
 
 const MEDAL = ['🥇', '🥈', '🥉']
 const place = (n: number) => MEDAL[n - 1] ?? `#${n}`
-const Bucks = ({ n }: { n: number }) => <><span className="ico buck-ico">B</span>{n}</>
+const Bucks = ({ n }: { n: number }) => <><span className="ico buck-ico">💎</span>{n}</>
 const money = (n: number) => (n >= 1000 ? `$${n / 1000}k` : `$${n}`)
 const weekOf = (week: string) => new Date(`${week}T00:00:00Z`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' })
 

@@ -23,7 +23,7 @@ function statLine(m: ModDef) {
 }
 
 function price(m: ModDef, coins = m.coins) {
-  if (m.bucks) return `B ${m.bucks}`
+  if (m.bucks) return `💎 ${m.bucks}`
   return `$${coins.toLocaleString()}${m.parts ? ` + ${m.parts}⚙` : ''}`
 }
 

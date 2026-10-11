@@ -1100,7 +1100,7 @@ export const useGame = create<GameState>()(
         const g = GOALS.find((o) => o.id === id)
         if (!g || !goalOpen(s, g) || !goalDone(s, g)) return
         sfx.coin()
-        s.toast(`Goal complete! +${g.coins} coins${g.bucks ? `, +${g.bucks} bucks` : ''}, +${g.xp} XP`)
+        s.toast(`Goal complete! +${g.coins} coins${g.bucks ? `, +${g.bucks} gems` : ''}, +${g.xp} XP`)
         set(withXp(s, g.xp, {
           coins: s.coins + g.coins,
           bucks: s.bucks + (g.bucks ?? 0),
@@ -1131,7 +1131,7 @@ export const useGame = create<GameState>()(
         const pay = payAt(c, s.level)
         setTimeout(sfx.levelUp, 150)
         const stars = period === 'daily' ? SEASON_STARS.dailyChest : SEASON_STARS.weeklyChest
-        s.toast(`Chest opened! +${pay.coins.toLocaleString()} coins, +${c.parts} parts${c.bucks ? `, +${c.bucks} bucks` : ''}${c.fuel ? `, +${c.fuel} fuel` : ''}, +${stars} ⭐`)
+        s.toast(`Chest opened! +${pay.coins.toLocaleString()} coins, +${c.parts} parts${c.bucks ? `, +${c.bucks} gems` : ''}${c.fuel ? `, +${c.fuel} fuel` : ''}, +${stars} ⭐`)
         const quests = period === 'daily' ? { ...q, dayChest: true } : { ...q, weekChest: true }
         set(withXp(s, pay.xp, {
           coins: s.coins + pay.coins, parts: s.parts + c.parts, bucks: s.bucks + c.bucks, fuel: s.fuel + c.fuel,
@@ -1154,7 +1154,7 @@ export const useGame = create<GameState>()(
           return set({ season, cars: [...s.cars, { uid: uid(), model: car, color: d.colors[0], upgrades: noUpgrades() }], updatedAt: now })
         }
         const bucks = prize.bucks + (prize.car ? SEASON_CAR_BUCKS : 0)
-        s.toast(`Tier ${tier + 1}! ${[prize.coins && `+${prize.coins.toLocaleString()} coins`, prize.parts && `+${prize.parts} parts`, bucks && `+${bucks} bucks`].filter(Boolean).join(', ')}`)
+        s.toast(`Tier ${tier + 1}! ${[prize.coins && `+${prize.coins.toLocaleString()} coins`, prize.parts && `+${prize.parts} parts`, bucks && `+${bucks} gems`].filter(Boolean).join(', ')}`)
         set({ season, coins: s.coins + prize.coins, parts: s.parts + prize.parts, bucks: s.bucks + bucks, updatedAt: now })
       },
 
@@ -1163,7 +1163,7 @@ export const useGame = create<GameState>()(
         const set_ = CAR_SETS.find((o) => o.id === id)
         if (!set_ || s.claimedSets.includes(id) || !setComplete(set_, s.cars)) return
         setTimeout(sfx.levelUp, 200)
-        s.toast(`${set_.icon} ${set_.name} complete! +${set_.coins.toLocaleString()} coins, +${set_.bucks} bucks, +${set_.trophies} 🏆`)
+        s.toast(`${set_.icon} ${set_.name} complete! +${set_.coins.toLocaleString()} coins, +${set_.bucks} gems, +${set_.trophies} 🏆`)
         set(withXp(s, set_.xp, {
           coins: s.coins + set_.coins,
           bucks: s.bucks + set_.bucks,
@@ -1179,7 +1179,7 @@ export const useGame = create<GameState>()(
         const c = CREW_CHEST
         const pay = payAt(c, s.level)
         setTimeout(sfx.levelUp, 150)
-        s.toast(`Crew chest opened! +${pay.coins.toLocaleString()} coins, +${c.parts} parts, +${c.bucks} bucks`)
+        s.toast(`Crew chest opened! +${pay.coins.toLocaleString()} coins, +${c.parts} parts, +${c.bucks} gems`)
         set(withXp(s, pay.xp, {
           coins: s.coins + pay.coins, parts: s.parts + c.parts, bucks: s.bucks + c.bucks, fuel: s.fuel + c.fuel,
           crewChests: (s.crewChests ?? 0) + 1,

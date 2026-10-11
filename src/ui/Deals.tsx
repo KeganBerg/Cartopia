@@ -12,7 +12,7 @@ const left = (ms: number) => {
 }
 
 const cost = (c: { coins: number; bucks: number }, parts = 0) =>
-  [c.coins && `$${c.coins.toLocaleString()}`, c.bucks && `B ${c.bucks}`, parts && `${parts}⚙`].filter(Boolean).join(' + ') || 'Free'
+  [c.coins && `$${c.coins.toLocaleString()}`, c.bucks && `💎 ${c.bucks}`, parts && `${parts}⚙`].filter(Boolean).join(' + ') || 'Free'
 
 // HUD button: a price tag with the number of deals still open today.
 export function DealsButton() {
