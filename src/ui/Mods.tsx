@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useGame, type OwnedCar } from '../game/store'
-import { MODS, MOD_SLOTS, carDef, fittedMods, modDef, performance, type ModDef, type ModSlot } from '../game/data'
+import { MODS, MOD_SLOTS, carDef, fittedMods, modDef, ownedMods, performance, type ModDef, type ModSlot } from '../game/data'
 
 // The car's mods with `tryId` swapped into its slot, for previewing before buying.
 export function withMod(mods: string[] | undefined, tryId: string | null) {
@@ -30,6 +30,7 @@ export function ModShop({ car, trying, setTrying }: { car: OwnedCar; trying: str
   const [slot, setSlot] = useState<ModSlot>('spoiler')
   const def = carDef(car.model)
   const fit = fittedMods(car.mods)
+  const owned = ownedMods(car)
   const basePi = performance(def, car.upgrades, car.mods)
   const info = MOD_SLOTS.find((s) => s.id === slot)!
   return (
@@ -53,7 +54,8 @@ export function ModShop({ car, trying, setTrying }: { car: OwnedCar; trying: str
       <div className="mod-list">
         {MODS.filter((m) => m.slot === slot).map((m) => {
           const fitted = fit[slot] === m.id
-          const locked = level < m.unlockLevel
+          const have = owned.includes(m.id)
+          const locked = !have && level < m.unlockLevel
           const pi = performance(def, car.upgrades, withMod(car.mods, m.id))
           const gain = pi - basePi
           return (
@@ -66,20 +68,22 @@ export function ModShop({ car, trying, setTrying }: { car: OwnedCar; trying: str
               <div className="mod-stats">{statLine(m)}</div>
               <div className="mod-pi">{fitted ? `PI ${basePi}` : `PI ${basePi} → ${pi}`}{!fitted && gain > 0 && <b> +{gain}</b>}</div>
               {fitted ? (
-                <button className="mod-remove" onClick={(e) => { e.stopPropagation(); modCar(car.uid, m.id, true) }}>✔ Fitted · Remove</button>
+                <button className="mod-remove" onClick={(e) => { e.stopPropagation(); modCar(car.uid, m.id, true) }}>✔ Fitted · Take off</button>
+              ) : have ? (
+                <button className="buy small owned" onClick={(e) => { e.stopPropagation(); if (modCar(car.uid, m.id)) setTrying(null) }}>Equip</button>
               ) : locked ? (
                 <button className="price locked-btn" onClick={(e) => { e.stopPropagation(); modCar(car.uid, m.id) }}>🔒 Level {m.unlockLevel}</button>
               ) : (
                 <button
                   className={m.bucks ? 'buy small premium' : 'buy small'}
                   onClick={(e) => { e.stopPropagation(); if (modCar(car.uid, m.id)) setTrying(null) }}
-                >{fit[slot] ? 'Swap' : 'Fit'} · {price(m)}</button>
+                >Buy · {price(m)}</button>
               )}
             </div>
           )
         })}
       </div>
-      {fit[slot] && <p className="mod-hint small">Swapping replaces the {modDef(fit[slot]!)!.name}; removed parts aren't refunded.</p>}
+      <p className="mod-hint small">Parts you buy stay with this car, so you can swap back for free.</p>
     </div>
   )
 }

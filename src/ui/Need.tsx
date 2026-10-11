@@ -49,6 +49,7 @@ export function NeedPanel() {
     sources = [
       { icon: '🔧', title: "Rusty's Rescue searches", detail: owned('rescue') ? 'Searches turn up parts, and you can scrap cars in storage for 3 to 12 parts.' : 'Build Rusty\'s to search for cars and parts.', action: owned('rescue') ? { label: "Rusty's", run: () => s.openPanel('rescue') } : build('rescue') },
       { icon: '🛞', title: 'Tire Shop · 6 parts per job (level 2)', detail: `You have ${owned('tires')}. Build more for more parts.`, action: owned('tires') ? { label: 'Show me', run: showParts('tires') } : build('tires') },
+      { icon: '🛢', title: 'Lube & Go · 8 parts per job (level 4)', detail: `You have ${owned('lube')}.`, action: owned('lube') ? { label: 'Show me', run: showParts('lube') } : build('lube') },
       { icon: '📦', title: 'Parts Depot · 15 parts per job (level 5)', detail: `You have ${owned('parts')}.`, action: owned('parts') ? { label: 'Show me', run: showParts('parts') } : build('parts') },
       { icon: '🏁', title: 'Tuner Shop · 25 parts per job (level 7)', detail: `You have ${owned('tuner')}.`, action: owned('tuner') ? { label: 'Show me', run: showParts('tuner') } : build('tuner') },
       { icon: '📅', title: 'Daily bonus day 4', detail: '+5 parts on the fourth day of your streak.' },
