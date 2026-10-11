@@ -10,15 +10,16 @@ import { useNow } from '../scene/useNow'
 const n = (v: number) => v.toLocaleString()
 
 // The signed-in player's crew goal, shared by the Crew window, the Friends button dot and the Goals sheet.
-export const useCrewGoal = create<{ goal: CrewGoal | null; ready: number }>(() => ({ goal: null, ready: 0 }))
+// failed: the server has no crew goal yet (migration not run) or can't be reached, so nothing shows.
+export const useCrewGoal = create<{ goal: CrewGoal | null; ready: number; failed: boolean }>(() => ({ goal: null, ready: 0, failed: false }))
 
 let lastReady = 0
 export async function refreshCrewGoal() {
   if (!supabase || !signedInUser()) return useCrewGoal.setState({ goal: null, ready: 0 })
   const goal = await fetchCrewGoal().catch(() => undefined)
-  if (goal === undefined) return
+  if (goal === undefined) return useCrewGoal.setState({ failed: true })
   const ready = chestsReady(goal)
-  useCrewGoal.setState({ goal, ready })
+  useCrewGoal.setState({ goal, ready, failed: false })
   const s = useGame.getState()
   // A chest the server recorded but this town never got paid for (e.g. the tab closed mid-open).
   if (goal && signedInUser() && goal.chests > (s.crewChests ?? 0) && !s.visiting) {
@@ -82,9 +83,11 @@ function useOpen() {
 // The crew's shared weekly target, who has chipped in, and the chest at the end.
 export function CrewGoalCard({ members, uid }: { members: Member[]; uid: string }) {
   const goal = useCrewGoal((g) => g.goal)
+  const failed = useCrewGoal((g) => g.failed)
   const now = useNow()
   const { busy, open } = useOpen()
   const w = goal?.current
+  if (failed && !w) return null
   if (!goal || !w) return <div className="crew-goal loading"><span className="hint">Loading crew goal...</span></div>
   const min = goal.rules.minPoints
   const pct = Math.min(100, (w.points / Math.max(1, w.target)) * 100)
