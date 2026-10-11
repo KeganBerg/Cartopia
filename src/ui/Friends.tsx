@@ -5,7 +5,9 @@ import { supabase } from '../lib/supabase'
 import { Panel } from './Menus'
 import { SocialTabs } from './Social'
 import { GiftButton } from './Gifts'
-import { recordHelp, refreshGifts, HELP_FUEL } from '../lib/gifts'
+import { refreshGifts } from '../lib/gifts'
+import { useHelp, helpsLeft, loadHelps } from '../lib/help'
+import { HELPS_PER_TOWN } from '../game/help'
 import { signedInUser } from '../lib/cloud'
 import { LikeButton } from './Meet'
 import { GhostButton } from './GhostRace'
@@ -45,7 +47,7 @@ export function FriendsPanel() {
   return (
     <Panel title="Friends" wide>
       <SocialTabs current="friends" />
-      <p className="hint">Help a town once a day for coins (they get ⛽ too). 🎁 sends a daily gift.</p>
+      <p className="hint">Visit a town and tap {HELPS_PER_TOWN} of its shops each day for coins (they get ⛽ too). 🎁 sends a daily gift.</p>
       {!rows && <p className="hint">Loading...</p>}
       <div className="leaders">
         {rows?.map((l, i) => {
@@ -77,15 +79,14 @@ export function FriendsPanel() {
 
 export function VisitBanner() {
   const v = useGame((s) => s.visiting)
-  const helped = useGame((s) => (s.visiting ? s.helped[s.visiting.ownerId] === today() : false))
-  const help = useGame((s) => s.helpFriend)
   const visit = useGame((s) => s.visit)
   const racing = useGame((s) => s.panel === 'ghost')
+  const left = useHelp((h) => (v && h.owner === v.ownerId ? helpsLeft(h) : null))
+  const owner = v?.ownerId
+  useEffect(() => {
+    if (owner) void loadHelps(owner)
+  }, [owner])
   if (!v || racing) return null
-  const helpOut = () => {
-    help()
-    recordHelp(v.ownerId)
-  }
   return (
     <div className="visit-banner">
       <div className="visit-title">
@@ -96,7 +97,12 @@ export function VisitBanner() {
         <LikeButton owner={v.ownerId} />
         {signedInUser() && <GiftButton to={v.ownerId} />}
         <GhostButton town={v} />
-        <button className="buy small" disabled={helped} onClick={helpOut} title={`They get +${HELP_FUEL} fuel too`}>{helped ? 'Helped today ✔' : 'Help out'}</button>
+        {left !== null && (
+          <span className={`help-meter${left ? '' : ' full'}`} title={left ? 'Tap their shops to help' : 'All helped today'}>
+            {Array.from({ length: HELPS_PER_TOWN }, (_, i) => <i key={i} className={i < HELPS_PER_TOWN - left ? 'on' : ''} />)}
+            <b>{left ? `🤝 ${left}` : '🤝 ✔'}</b>
+          </span>
+        )}
         <button className="buy small alt" onClick={() => visit(null)}>🏠 Home</button>
       </div>
     </div>
