@@ -789,6 +789,10 @@ button.lvl-item:hover { border-color: var(--accent); transform: translateY(-2px)
 .race-full .shift-label.big { top: 34%; font-size: 40px; }
 .race-full .skill-flash { top: calc(118px + var(--sat)); }
 .rf-venue { position: absolute; top: calc(118px + var(--sat)); left: 0; right: 0; width: fit-content; margin: 0 auto; padding: 6px 16px; border-radius: 999px; background: rgba(27,31,36,.6); color: #fff; font: 18px var(--display); white-space: nowrap; pointer-events: none; animation: pop .25s ease-out; }
+.rf-venue small { display: block; font: 700 13px Nunito, system-ui, sans-serif; text-align: center; opacity: .9; margin-top: 2px; }
+/* Wheelspin on a slick strip: a small pulsing tag above the tach. */
+.rf-spin { position: absolute; left: calc(16px + var(--sal)); bottom: calc(160px + var(--sab)); padding: 4px 12px; border-radius: 999px; background: rgba(255,255,255,.85); color: #37474f; font: 15px var(--display); pointer-events: none; animation: spin-pulse .4s ease-in-out infinite alternate; }
+@keyframes spin-pulse { from { transform: translateX(-2px); } to { transform: translateX(2px); } }
 .rf-wait { position: absolute; top: 40%; left: 0; right: 0; padding: 0 16px; text-align: center; font: 22px var(--display); color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,.4); }
 .rf-wait-actions { display: flex; gap: 10px; justify-content: center; margin-top: 12px; text-shadow: none; }
 .rf-wait-actions button { font-family: inherit; }
