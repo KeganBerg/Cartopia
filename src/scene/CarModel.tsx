@@ -8,7 +8,7 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { wheelTex } from './textures'
 import { glowMats } from './dayNight'
-import { fittedMods, type Body, type ModSlot } from '../game/data'
+import { fittedMods, isBike, type Body, type ModSlot } from '../game/data'
 import { CarMods, RIM_LOOK } from './CarMods'
 
 type Shape = {
@@ -53,6 +53,18 @@ const SHAPES: Record<Body, Shape> = {
   coupe: { len: 1.26, wid: 0.72, body: 0.21, lift: 0.08, cabinLen: 0.5, cabinH: 0.2, cabinZ: -0.16, taper: 0.62, hood: 0.03, wheel: 0.16, drop: 0.03, nose: 0.06 },
   widebody: { len: 1.36, wid: 0.76, body: 0.26, lift: 0.08, cabinLen: 0.5, cabinH: 0.2, cabinZ: -0.17, taper: 0.7, hood: 0.05, wheel: 0.17, drop: 0.03, nose: 0.05, scoop: true, quad: true, flares: true, ducktail: true, lightbar: true },
   tank: { len: 1.44, wid: 0.84, body: 0.3, lift: 0.17, cabinLen: 0.48, cabinH: 0.19, cabinZ: -0.14, taper: 0.5, hood: 0, wheel: 0.19, drop: 0.02, nose: 0.14, tracks: true, armor: true },
+  // Motorcycles: only the size, wheel and ride height are used (see bikeGeo).
+  scooter: { len: 0.8, wid: 0.22, body: 0.16, lift: 0.1, cabinLen: 0, cabinH: 0, cabinZ: 0, taper: 1, hood: 0, wheel: 0.12, drop: 0, nose: 0 },
+  chopper: { len: 1.04, wid: 0.22, body: 0.16, lift: 0.12, cabinLen: 0, cabinH: 0, cabinZ: 0, taper: 1, hood: 0, wheel: 0.16, drop: 0, nose: 0 },
+  sportbike: { len: 0.94, wid: 0.22, body: 0.18, lift: 0.12, cabinLen: 0, cabinH: 0, cabinZ: 0, taper: 1, hood: 0, wheel: 0.16, drop: 0, nose: 0 },
+}
+
+// Motorcycles. head = steering head [y, z]; seat = seat top [y, z].
+type BikeBody = 'scooter' | 'chopper' | 'sportbike'
+const BIKE: Record<BikeBody, { wz: number; head: [number, number]; seat: [number, number]; bars: number; lean: number }> = {
+  scooter: { wz: 0.27, head: [0.5, 0.25], seat: [0.4, -0.1], bars: 0.07, lean: 0.05 },
+  chopper: { wz: 0.38, head: [0.5, 0.26], seat: [0.34, -0.14], bars: 0.2, lean: -0.08 },
+  sportbike: { wz: 0.31, head: [0.5, 0.22], seat: [0.44, -0.12], bars: -0.02, lean: 0.22 },
 }
 
 // A body this build doesn't know (another player's newer car) draws as a sedan.
@@ -118,7 +130,7 @@ function extrude(sh: ThreeShape, width: number, b: number) {
 export const carSize = (body: Body) => ({ len: shapeOf(body).len, wid: shapeOf(body).wid })
 
 // Wheel radius and the distance between front and rear axles, for steering and rolling.
-export const wheelRig = (body: Body): WheelRig => ({ steer: [], spin: [], radius: shapeOf(body).wheel, base: shapeOf(body).len * 0.66 })
+export const wheelRig = (body: Body): WheelRig => ({ steer: [], spin: [], radius: shapeOf(body).wheel, base: isBike(body) ? BIKE[body as BikeBody].wz * 2 : shapeOf(body).len * 0.66 })
 
 // Every part of a car that shares a look is merged into one mesh, so a car
 // costs about a dozen draws however much detail it has (town traffic can show
@@ -485,8 +497,15 @@ function wheelMaterial(rim?: string) {
 // Handles on a car's wheels so a driving car can steer the front pair and roll all four.
 export type WheelRig = { steer: (Group | null)[]; spin: (Group | null)[]; radius: number; base: number }
 
+type CarProps = { body: Body; color: string; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean; rig?: WheelRig; mods?: string[] | null; flames?: boolean }
+
+// Any vehicle: a motorcycle for bike bodies, otherwise a car. Faces +z.
+export function CarModel(props: CarProps) {
+  return isBike(props.body) ? <BikeModel {...props} /> : <CarBody {...props} />
+}
+
 // Toy-style car: bevelled extruded body and cabin so no edge is a hard box corner. Faces +z.
-export function CarModel({ body, color, highlight, stripe, beams, rusty, rig, mods, flames }: { body: Body; color: string; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean; rig?: WheelRig; mods?: string[] | null; flames?: boolean }) {
+function CarBody({ body, color, highlight, stripe, beams, rusty, rig, mods, flames }: { body: Body; color: string; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean; rig?: WheelRig; mods?: string[] | null; flames?: boolean }) {
   // Rusty finds come home stock.
   const fit = rusty ? {} : fittedMods(mods)
   const s = shapeOf(body)
@@ -525,6 +544,136 @@ export function CarModel({ body, color, highlight, stripe, beams, rusty, rig, mo
       {/* Chunky toy wheels with spoked rims. */}
       {[[-wx, wz], [wx, wz], [-wx, -wz], [wx, -wz]].map(([x, z], i) => (
         <group key={i} position={[x, s.wheel, z]} ref={rig && i < 2 ? (o) => void (rig.steer[i] = o) : undefined}>
+          <group ref={rig ? (o) => void (rig.spin[i] = o) : undefined}>
+            <mesh geometry={g.wheel} material={wheelMaterial(fit.rims)} />
+          </group>
+        </group>
+      ))}
+    </group>
+  )
+}
+
+// A box stretched from a to b (a strut, a limb, a fork leg).
+function bar(k: Kit, part: Part, a: V3, b: V3, t: number) {
+  const d = new Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2])
+  const q = new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), d.clone().normalize())
+  const e = new Euler().setFromQuaternion(q)
+  k.add(part, rbox(t, d.length() + t, t, t * 0.45), [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2], [e.x, e.y, e.z])
+}
+
+function bikeGeo(body: BikeBody, fit: Partial<Record<ModSlot, string>>): CarGeo {
+  const key = `${body}|${fit.exhaust ? 1 : 0}`
+  const hit = geoCache.get(key)
+  if (hit) return hit
+  const s = SHAPES[body]
+  const b = BIKE[body]
+  const k = new Kit()
+  const r = s.wheel
+  const [hy, hz] = b.head
+  const [sy, sz] = b.seat
+  // Fork legs from the front axle up to the steering head, with a fender over the tyre.
+  for (const x of [-0.045, 0.045]) bar(k, 'chrome', [x, r, b.wz], [x, hy, hz], 0.022)
+  k.add('paint', rbox(0.08, 0.025, r * 1.3, 0.012), [0, r * 2 + 0.03, b.wz], [-0.15, 0, 0])
+  // Headlight and handlebars.
+  k.add('black', cyl(0.05, 0.045, 0.05, 12), [0, hy - 0.02, hz + 0.05], [Math.PI / 2, 0, 0])
+  k.add('lamp', disc(0.042, 12), [0, hy - 0.02, hz + 0.077])
+  for (const sd of [-1, 1]) bar(k, 'black', [0, hy + 0.02, hz - 0.01], [sd * 0.19, hy + 0.04 + b.bars, hz - 0.05], 0.018)
+  for (const sd of [-1, 1]) k.add('black', cyl(0.014, 0.014, 0.05, 6), [sd * 0.2, hy + 0.04 + b.bars, hz - 0.05], [0, 0, Math.PI / 2])
+  // Frame from the head back to the rear axle, and the swingarm.
+  bar(k, 'black', [0, hy - 0.04, hz - 0.02], [0, sy - 0.08, sz - 0.1], 0.04)
+  for (const x of [-0.05, 0.05]) bar(k, 'black', [x, r, -b.wz], [x, r + 0.08, -0.04], 0.026)
+  // Engine between the wheels.
+  if (body === 'scooter') {
+    // Step-through: a floorboard, a leg shield up to the bars, and a round body over the rear wheel.
+    k.add('paint', rbox(0.2, 0.04, 0.28, 0.015), [0, r + 0.05, 0.02])
+    k.add('paint', rbox(0.24, hy - r - 0.04, 0.05, 0.02), [0, (hy + r) / 2, hz - 0.02], [-0.18, 0, 0])
+    k.add('paint', new SphereGeometry(1, 14, 10), [0, r + 0.15, -b.wz + 0.08], [0, 0, 0], [0.13, 0.14, 0.2])
+    k.add('dark', rbox(0.12, 0.1, 0.16, 0.03), [0.05, r + 0.03, -b.wz + 0.05])
+  } else {
+    k.add('chrome', rbox(0.14, 0.13, 0.17, 0.03), [0, r + 0.1, 0.02])
+    // V-twin cylinders on the cruiser, a sloped block on the sport bike.
+    if (body === 'chopper') for (const sd of [-1, 1]) k.add('chrome', cyl(0.045, 0.05, 0.14, 10), [0, r + 0.22, 0.02 + sd * 0.05], [sd * 0.45, 0, 0])
+    else k.add('dark', rbox(0.15, 0.1, 0.12, 0.03), [0, r + 0.2, 0.06], [0.3, 0, 0])
+    // Fuel tank between the head and the seat.
+    k.add('paint', rbox(0.16, 0.1, (hz - sz) * 0.62, 0.045), [0, (hy + sy) / 2 - 0.02, (hz + sz) / 2 + 0.02], [body === 'sportbike' ? 0.2 : 0.08, 0, 0])
+  }
+  // Seat, a rear fender with the tail light.
+  k.add('seat', rbox(0.15, 0.05, 0.26, 0.022), [0, sy, sz])
+  k.add('paint', rbox(0.1, 0.03, r * 1.5, 0.012), [0, r * 2 + 0.03, -b.wz + 0.02], [0.2, 0, 0])
+  k.add('tail', plane(0.07, 0.03), [0, r * 2 + 0.06, -b.wz - r * 0.7], [0, Math.PI, 0])
+  if (body === 'sportbike') {
+    // Full fairing round the head, a tinted screen, a belly pan and a raised tail.
+    k.add('paint', rbox(0.2, 0.2, 0.22, 0.06), [0, hy - 0.1, hz + 0.02], [0.35, 0, 0])
+    k.add('screen', box(0.15, 0.1, 0.01), [0, hy + 0.05, hz - 0.01], [-0.7, 0, 0])
+    k.add('paint', rbox(0.16, 0.08, 0.3, 0.03), [0, r + 0.02, 0.04], [-0.1, 0, 0])
+    k.add('paint', rbox(0.12, 0.08, 0.2, 0.03), [0, sy + 0.03, sz - 0.2], [-0.3, 0, 0])
+  }
+  if (body === 'chopper') {
+    // Sissy bar behind the seat and chrome crash bars by the engine.
+    bar(k, 'chrome', [0, sy, sz - 0.14], [0, sy + 0.2, sz - 0.18], 0.02)
+    k.add('seat', rbox(0.12, 0.1, 0.03, 0.015), [0, sy + 0.16, sz - 0.16])
+    for (const sd of [-1, 1]) k.add('chrome', new TorusGeometry(0.07, 0.01, 5, 10, Math.PI), [sd * 0.1, r + 0.12, 0.14], [0, Math.PI / 2, Math.PI / 2])
+  }
+  // Stock exhaust down the right side.
+  if (!fit.exhaust) {
+    bar(k, 'chrome', [0.08, r + 0.06, 0.06], [0.1, r + 0.03, -b.wz + 0.02], 0.03)
+    k.add('chrome', cyl(0.03, 0.03, 0.12, 10), [0.1, r + 0.04, -b.wz - 0.02], [Math.PI / 2 - 0.1, 0, 0])
+  }
+  // Rider: helmet in the bike's paint, dark jacket, legs to the pegs, hands on the grips.
+  const hip: V3 = [0, sy + 0.07, sz]
+  const neck: V3 = [0, sy + 0.32 - b.lean * 0.3, sz + 0.06 + b.lean * 0.5]
+  bar(k, 'black', hip, neck, 0.15)
+  k.add('paint', new SphereGeometry(0.075, 12, 10), [0, neck[1] + 0.09, neck[2] + 0.01])
+  k.add('glass', new SphereGeometry(0.068, 10, 6, -Math.PI / 2.6, Math.PI / 1.3, Math.PI / 3, Math.PI / 3.2), [0, neck[1] + 0.085, neck[2] + 0.02])
+  for (const sd of [-1, 1]) {
+    bar(k, 'black', [sd * 0.08, neck[1] - 0.03, neck[2]], [sd * 0.19, hy + 0.04 + b.bars, hz - 0.06], 0.05)
+    const knee: V3 = [sd * 0.1, sy + 0.04, sz + 0.2]
+    bar(k, 'dark', [sd * 0.06, hip[1], hip[2]], knee, 0.07)
+    bar(k, 'dark', knee, [sd * 0.1, r + 0.05, sz + (body === 'chopper' ? 0.36 : 0.12)], 0.06)
+  }
+
+  const wheel = new CylinderGeometry(r, r, 0.07, 18, 1)
+  const uv = wheel.getAttribute('uv')
+  const side = (18 + 1) * 2
+  for (let i = 0; i < uv.count; i++) uv.setX(i, i < side ? 0.5 + uv.getX(i) * 0.5 : uv.getX(i) * 0.5)
+  wheel.rotateZ(Math.PI / 2)
+  const out = { parts: k.build(), wheel }
+  geoCache.set(key, out)
+  return out
+}
+
+// Bikes take exhaust and rim mods only.
+function BikeModel({ body, color, highlight, beams, rusty, rig, mods, flames }: CarProps) {
+  const all = rusty ? {} : fittedMods(mods)
+  const fit = { exhaust: all.exhaust, rims: all.rims }
+  const bb = body as BikeBody
+  const g = bikeGeo(bb, fit)
+  const p = g.parts
+  const tint = useMemo(() => (rusty ? '#' + new Color(color).lerp(new Color('#8a5a3c'), 0.72).getHexString() : color), [color, rusty])
+  const dark = useMemo(() => '#' + new Color('#37474f').lerp(new Color(tint), 0.15).getHexString(), [tint])
+  const shared = (['black', 'chrome', 'glass', 'screen', 'seat', 'lamp', 'tail'] as const).filter((k) => p[k])
+  const r = SHAPES[bb].wheel
+  const wz = BIKE[bb].wz
+  return (
+    <group>
+      <mesh geometry={p.paint} castShadow>
+        <meshStandardMaterial color={tint} metalness={rusty ? 0.1 : 0.4} roughness={rusty ? 0.95 : 0.3} emissive={highlight ? '#ffffff' : '#000000'} emissiveIntensity={highlight ? 0.25 : 0} />
+      </mesh>
+      {p.dark && (
+        <mesh geometry={p.dark}>
+          <meshStandardMaterial color={dark} />
+        </mesh>
+      )}
+      {shared.map((k) => <mesh key={k} geometry={p[k]} material={MAT[k]} castShadow={k === 'black'} />)}
+      <CarMods body={body} fit={fit} tint={tint} metal={rusty ? 0.1 : 0.4} flames={flames} />
+      {beams && (
+        <mesh rotation-x={-Math.PI / 2} position={[0, 0.03, SHAPES[bb].len / 2 + 0.5]} renderOrder={2}>
+          <planeGeometry args={[0.5, 1.1]} />
+          <primitive object={glowMats.beam} attach="material" dispose={null} />
+        </mesh>
+      )}
+      {[wz, -wz].map((z, i) => (
+        <group key={i} position={[0, r, z]} ref={rig && i === 0 ? (o) => void (rig.steer[0] = o) : undefined}>
           <group ref={rig ? (o) => void (rig.spin[i] = o) : undefined}>
             <mesh geometry={g.wheel} material={wheelMaterial(fit.rims)} />
           </group>
