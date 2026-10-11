@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { Color, Matrix4, Object3D, Vector3 } from 'three'
 import type { InstancedMesh } from 'three'
-import { useGame } from '../game/store'
+import { useGame, type PlacedBuilding } from '../game/store'
 import { START_LAND, buildingDef } from '../game/data'
 import { buildWalkGraph, findPath, pedestrianCrossings, stepsFor, transit, sideOf, SIDES, type Pt, type Step, type WalkGraph, type WalkNode } from '../game/walkGraph'
 import { anchors } from './anchors'
@@ -187,11 +187,18 @@ function destinations(g: WalkGraph) {
 
 export function Townspeople() {
   const roadsList = useGame((s) => (s.visiting ?? s).roads)
-  const buildings = useGame((s) => (s.visiting ?? s).buildings)
+  // Only where buildings stand shapes the paths, so starting or collecting a
+  // job (which swaps the buildings array) doesn't rebuild the graph.
+  const footprint = useGame((s) => footprintOf((s.visiting ?? s).buildings))
   const land = useGame((s) => (s.visiting ? START_LAND : s.land))
   const visitKey = useGame((s) => s.visiting?.ownerId ?? 'home')
   const level = useGame((s) => (s.visiting ?? s).level)
-  const graph = useMemo(() => buildWalkGraph(new Set(roadsList), buildings, land), [roadsList, buildings, land])
+  const graph = useMemo(() => {
+    void footprint
+    const s = useGame.getState()
+    return buildWalkGraph(new Set(roadsList), (s.visiting ?? s).buildings, land)
+  }, [roadsList, footprint, land])
+  const planned = useRef<WalkGraph | null>(null)
   const places = useMemo(() => destinations(graph), [graph])
   const people = useRef<Person[]>([])
   const colorsDirty = useRef(true)
@@ -222,30 +229,40 @@ export function Townspeople() {
       for (let i = 0; i < 4; i++) wanted.push({ id: `${visitKey}:${fallback.uid}:${i}`, home: fallback })
     }
     const old = new Map(people.current.map((p) => [p.id, p]))
+    const moved = planned.current !== graph
+    planned.current = graph
     people.current = wanted.slice(0, MAX_PEOPLE).map(({ id, home }) => {
       const p = old.get(id) ?? person(id, home.uid, home.center)
-      if (p.state === 'walk') replan(p)
+      if (moved && p.state === 'walk') replan(p)
       return p
     })
     colorsDirty.current = true
-    for (const k of [...pedestrianCrossings.keys()]) pedestrianCrossings.delete(k)
+    // Recount who is on a crosswalk, so people who left town drop out but
+    // anyone mid-crossing stays in the road for cars to see.
+    pedestrianCrossings.clear()
+    for (const p of people.current) if (p.crossing) pedestrianCrossings.set(p.crossing, (pedestrianCrossings.get(p.crossing) ?? 0) + 1)
 
     // Re-route someone who was walking when the town changed: from wherever
     // they stand now to the same place, or home if that's gone.
     function replan(p: Person) {
-      leaveCrossing(p)
-      const start = nearestNode(graph, p.pos)
+      // Someone halfway across the road finishes crossing first.
+      const crossing = p.crossing ? p.steps[p.si] : undefined
+      const from = crossing ? crossing.p : p.pos
+      if (!crossing) leaveCrossing(p)
+      const start = nearestNode(graph, from)
       const goal = graph.byKey.get(p.dest?.key ?? '') ?? graph.byKey.get(`b${p.home}`)
       const route = start != null && goal != null ? findPath(graph, start, goal) : null
       if (!route) {
         // Nowhere to go: pop indoors at home.
+        leaveCrossing(p)
         p.state = 'inside'
         p.at = `b${p.home}`
         p.timer = rand(2, 8)
         return
       }
       if (graph.byKey.get(p.dest?.key ?? '') == null) p.dest = { kind: 'home', key: `b${p.home}`, def: 'house' }
-      p.steps = stepsFor(graph, route, p.pos)
+      p.steps = stepsFor(graph, route, from)
+      if (crossing) p.steps.unshift(crossing)
       p.si = 0
     }
   }, [graph, visitKey, level])
@@ -677,6 +694,10 @@ function carNear(at: Pt, r: number) {
 }
 
 // Closest sidewalk corner, lawn or decoration to a point, for re-planning.
+function footprintOf(buildings: PlacedBuilding[]) {
+  return buildings.map((b) => `${b.uid}:${b.def}:${b.x}:${b.z}:${b.rot ?? 0}`).join('|')
+}
+
 function nearestNode(g: WalkGraph, at: Pt) {
   let best: number | null = null
   let bestD = Infinity
