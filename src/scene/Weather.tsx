@@ -9,6 +9,7 @@ export { raceWeather } from '../game/weather'
 import { applyNight, dayPhase, nightAmount } from './dayNight'
 import { gloomOf, groundUniforms, hazeColor } from './weatherLook'
 import type { Look } from './look'
+import { isFree } from './freeCam'
 
 
 // Rain, snow, splashes, lightning and fog. Everything that falls is one
@@ -128,6 +129,16 @@ function frameFor(camera: Camera, out: Frame, race: boolean) {
     out.span = 22
     out.top = 7
     out.px = 0.006
+    return out
+  }
+  // Free view (perspective): a box on the ground ahead of the camera, sized to how far up it is.
+  if (isFree(camera)) {
+    const t = fwd.y < -0.05 ? Math.min(-camera.position.y / fwd.y, 45) : 30
+    out.center.copy(camera.position).addScaledVector(fwd, t).setY(0)
+    const d = camera.position.distanceTo(out.center)
+    out.span = Math.ceil(Math.min(120, Math.max(40, d * 1.2 + 20)) / 8) * 8
+    out.top = Math.max(22, camera.position.y + 6)
+    out.px = 0.02 + d * 0.0006
     return out
   }
   // Bird's-eye: centre on the ground point in the middle of the screen.
@@ -343,6 +354,8 @@ function TownFog() {
   }, [scene, fog])
   const frame = useMemo<Frame>(() => ({ center: new Vector3(), span: 60, top: 22, px: 0.03 }), [])
   useFrame(() => {
+    // The free view's far haze is set by Horizon instead.
+    if (isFree(camera)) return
     const w = weatherNow()
     const h = w.haze
     if (h < 0.01) {

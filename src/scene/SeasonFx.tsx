@@ -4,6 +4,7 @@ import { BufferAttribute, BufferGeometry, Color, DoubleSide, Object3D, Shape, Sh
 import { SEASON } from './season'
 import { dayPhase, nightAmount } from './dayNight'
 import { weatherNow } from '../game/weather'
+import { isFree } from './freeCam'
 
 type Fx = { colors: readonly string[]; fall: number; sway: number; size: number; shape: 'leaf' | 'petal' | 'flake' }
 const FX: Record<'fall' | 'winter' | 'spring', Fx> = {
@@ -96,17 +97,22 @@ function Leaves({ fx, count }: { fx: Fx; count: number }) {
     for (let i = 0; i < count; i++) m.setColorAt(i, c.set(fx.colors[i % fx.colors.length]).offsetHSL(0, 0, (fliers.seed[i] % 1) * 0.1 - 0.05))
     if (m.instanceColor) m.instanceColor.needsUpdate = true
   }, [count, fx, fliers])
-  useFrame(({ clock }, dt) => {
+  useFrame(({ clock, camera }, dt) => {
     const m = ref.current
     if (!m) return
     const t = clock.elapsedTime
     drift(fliers, fx, t, Math.min(dt, 0.1))
+    // Sized to read from the bird's-eye view; up close in the free view they'd be
+    // the size of a car, so they shrink there and step aside from the lens.
+    const free = isFree(camera)
+    const k = free ? 0.4 : 1
     for (let i = 0; i < count; i++) {
       const s = fliers.seed[i]
       o.position.set(fliers.x[i], fliers.y[i], fliers.z[i])
       // Each leaf spins at its own pace and rocks side to side as it falls.
       o.rotation.set(t * (1.1 + (s % 1.7)) + s, t * 0.7 + s * 2, Math.sin(t * 2.6 + s) * 0.9)
-      o.scale.setScalar(fx.size * (0.75 + (s % 0.5)))
+      const near = free && camera.position.distanceToSquared(o.position) < 16
+      o.scale.setScalar(near ? 0 : fx.size * k * (0.75 + (s % 0.5)))
       o.updateMatrix()
       m.setMatrixAt(i, o.matrix)
     }

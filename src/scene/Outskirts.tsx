@@ -12,6 +12,7 @@ import { PAL, SEASON } from './season'
 import { gravelTex, waterTex } from './textures'
 import { toWorld } from './grid'
 import { LAYER } from './layers'
+import { VIEW, isFree } from './freeCam'
 
 // Everything past the edge of the player's land: wild meadow on the plots they
 // could still buy (cleared the moment they buy one), a split-rail fence along
@@ -237,6 +238,11 @@ function Forest() {
   useFrame(({ camera, size, controls }) => {
     const g = ref.current
     if (!g) return
+    // The free view can look out to the horizon.
+    if (isFree(camera)) {
+      g.visible = true
+      return
+    }
     const t = (controls as unknown as { target?: Vector3 } | null)?.target ?? look.set(0, 0, 0)
     // Ground seen from the tilted camera stretches the screen's height.
     const reach = Math.hypot(size.width / 2, size.height / 2 / 0.6) / camera.zoom
@@ -528,7 +534,9 @@ function Fireflies({ small }: { small: boolean }) {
     if (!ref.current?.visible) return
     mat.uniforms.uTime.value = clock.elapsedTime
     // Points don't scale with an orthographic zoom on their own.
-    mat.uniforms.uScale.value = Math.min(14, Math.max(3, camera.zoom * 0.16)) * gl.getPixelRatio()
+    // (In the free view they shrink with distance instead.)
+    const zoom = isFree(camera) ? 900 / Math.max(10, camera.position.distanceTo(VIEW)) : camera.zoom
+    mat.uniforms.uScale.value = Math.min(14, Math.max(3, zoom * 0.16)) * gl.getPixelRatio()
   })
   return <points ref={ref} geometry={geo} material={mat} frustumCulled={false} raycast={() => null} />
 }

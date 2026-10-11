@@ -1,5 +1,6 @@
 import { Vector3 } from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
+import { VIEW, isFree } from './freeCam'
 
 // DOM bubbles (job timers, coins, flat tires) live outside the canvas and are
 // pinned to world positions here each frame. Cheaper and sturdier than one
@@ -16,6 +17,7 @@ const HOP = 64
 // Zoomed out past this share of the screen's default zoom, quiet bubbles (job timers, idle
 // "start" pills) fade away so the town reads at a glance. Ready coins and visitors stay.
 const FAR = 0.8
+const FREE_FAR = 70
 const quiet = (el: HTMLElement) => {
   const c = el.firstElementChild?.classList
   return !!c && (c.contains('badge-working') || c.contains('badge-idle'))
@@ -38,7 +40,8 @@ export function AnchorProjector() {
       hud = [...document.querySelectorAll(HUD)].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0 && r.height > 0)
     }
     // Same default zoom as ResponsiveZoom in World.tsx.
-    const far = camera.zoom < Math.min(38, Math.max(18, Math.sqrt(size.width * size.height) / 24)) * FAR
+    // The free view's camera is a perspective one: there, far means pulled well back.
+    const far = isFree(camera) ? camera.position.distanceTo(VIEW) > FREE_FAR : camera.zoom < Math.min(38, Math.max(18, Math.sqrt(size.width * size.height) / 24)) * FAR
     for (const [id, el] of anchorEls) {
       const p = anchors.get(id)
       if (!p) {

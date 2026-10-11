@@ -37,6 +37,14 @@ import { Ear } from './Ear'
 import { WorldFx, PopGroup, usePops } from './WorldFx'
 import { helpable } from '../game/help'
 import { helpBuilding } from '../lib/help'
+import { FREE, VIEW, isFree, useFreeCam } from './freeCam'
+import { FreeCam } from './FreeCam'
+
+// Every controls instance (a new one is made whenever the camera swaps) aims at
+// the same shared point, so the view stays put across the swap.
+const shareView = (c: { target: Vector3 } | null) => {
+  if (c) c.target = VIEW
+}
 
 // The countryside ground: wide enough to never show its edge, an odd number of
 // 16-unit repeats so its meadow texture lines up with the plots'.
@@ -441,6 +449,7 @@ function Interaction() {
   const placeRot = useGame((s) => s.placeRot)
   const selected = useGame((s) => s.selected)
   const drag = useDrag((g) => g.drag)
+  const free = useFreeCam((f) => f.on)
   const [hover, setHover] = useState<[number, number] | null>(null)
   const painting = useRef(false)
   // Whether the last press was a finger. Touch has no hover, so a tap previews instead of building.
@@ -617,11 +626,16 @@ function Interaction() {
       </mesh>
       {ghost}
       <MapControls
+        ref={shareView}
         makeDefault
         enabled={!(mode === 'road' || mode === 'bulldoze' || drag)}
-        enableRotate={false}
+        enableRotate={free}
         minZoom={12}
         maxZoom={90}
+        minDistance={free ? FREE.minDist : 0}
+        maxDistance={free ? FREE.maxDist : Infinity}
+        minPolarAngle={free ? FREE.minPolar : 0}
+        maxPolarAngle={free ? FREE.maxPolar : Math.PI}
         screenSpacePanning={false}
       />
     </>
@@ -633,6 +647,7 @@ function ResponsiveZoom() {
   const camera = useThree((s) => s.camera)
   const { width, height } = useThree((s) => s.size)
   useEffect(() => {
+    if (isFree(camera)) return
     camera.zoom = Math.min(38, Math.max(18, Math.sqrt(width * height) / 24))
     camera.updateProjectionMatrix()
   }, [camera, width, height])
@@ -667,6 +682,7 @@ export function World() {
   const land = useGame((s) => (s.visiting ? (s.visiting.land ?? START_LAND) : s.land))
   const mode = useGame((s) => s.mode)
   const popping = usePops((s) => Object.keys(s.pops).join())
+  const free = useFreeCam((f) => f.on)
   // Rebuild the merged town only when something's footprint changes, not on every job timer.
   const layout = useMemo(
     () => [buildings.map((b) => `${b.uid}:${b.def}:${b.x}:${b.z}:${b.rot}:${b.level ?? 1}:${b.merge ?? ''}`).join(), roadsList.join(), land.join(), popping].join('/'),
@@ -704,7 +720,8 @@ export function World() {
       <SeasonFx small={Math.min(window.innerWidth, window.innerHeight) < 700} />
       <Weather small={Math.min(window.innerWidth, window.innerHeight) < 700} />
       <SkyEnv />
-      <PostFx look={townLook} town tiltShift />
+      <FreeCam />
+      <PostFx look={townLook} town tiltShift={!free} />
     </>
   )
 }

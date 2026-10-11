@@ -724,14 +724,19 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .collect-badge { position: absolute; top: -4px; right: -4px; min-width: 20px; height: 20px; border-radius: 10px; background: #e53935; color: #fff; font: 12px var(--display); display: grid; place-items: center; border: 2px solid #fff; }
 /* Goals checklist docked straight above Collect All. */
 .goals-btn.goals-dock { position: absolute; z-index: 51; right: calc(26px + var(--sar)); bottom: calc(176px + var(--sab)); width: 60px; height: 60px; font-size: 26px; border-radius: 16px; }
+/* Free camera toggle, docked above Goals. Lit blue while the free view is on. */
+.goals-btn.cam-dock { position: absolute; z-index: 51; right: calc(26px + var(--sar)); bottom: calc(248px + var(--sab)); width: 60px; height: 60px; border-radius: 16px; }
+.goals-btn.cam-dock.on { background: linear-gradient(#6ab4ff 0 50%, #3a86ea 50%); color: #fff; }
 @media (max-width: 700px) {
   .goals-btn.goals-dock { width: 52px; height: 52px; right: calc(10px + var(--sar)); bottom: calc(140px + var(--sab)); border-radius: 14px; }
+  .goals-btn.cam-dock { width: 52px; height: 52px; right: calc(10px + var(--sar)); bottom: calc(202px + var(--sab)); border-radius: 14px; }
   .collect-all { width: 52px; height: 52px; right: calc(10px + var(--sar)); bottom: calc(76px + var(--sab)); }
   .collect-ico { font-size: 24px; }
 }
 /* Phones in landscape: a slim column centred over RACE, clear of the top-right icons. */
 @media (max-height: 500px) {
   .goals-btn.goals-dock { width: 44px; height: 44px; font-size: 20px; border-radius: 12px; right: calc(34px + var(--sar)); bottom: calc(164px + var(--sab)); }
+  .goals-btn.cam-dock { width: 44px; height: 44px; border-radius: 12px; right: calc(34px + var(--sar)); bottom: calc(216px + var(--sab)); }
   .collect-all { width: 48px; height: 48px; right: calc(32px + var(--sar)); bottom: calc(110px + var(--sab)); border-width: 2.5px; }
   .collect-all::before { inset: 4px; }
   .collect-ico { font-size: 22px; }
