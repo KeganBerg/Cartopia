@@ -4,7 +4,7 @@ import { BackSide, Color, Object3D, type PerspectiveCamera, type Group, type Ins
 import type { Body, Finish } from '../game/data'
 import { CarModel } from './CarModel'
 import { signTexture } from './signTexture'
-import { skyTex, asphaltTex, paverTex, glowTex, sandTex, grassTex } from './textures'
+import { skyTex, asphaltTex, paverTex, glowTex, sandTex, grassTex, beachSandTex, snowTex, concreteTex } from './textures'
 import { BuildingModel, LightPool } from './BuildingModel'
 import { glowMats, dayPhase, duskAmount, nightAmount } from './dayNight'
 import { lookFor } from './look'
@@ -342,6 +342,12 @@ export function RaceScene({ track, me, them, mine, theirs, venue }: Props) {
         <planeGeometry args={[80, len + 100]} />
         {venue.id === 'desert' ? (
           <meshStandardMaterial map={sandTex(10, (len + 100) / 8)} />
+        ) : venue.id === 'beach' ? (
+          <meshStandardMaterial map={beachSandTex(10, (len + 100) / 8)} />
+        ) : venue.id === 'snow' ? (
+          <meshStandardMaterial map={snowTex(10, (len + 100) / 8)} />
+        ) : venue.id === 'docks' ? (
+          <meshStandardMaterial map={concreteTex(16, (len + 100) / 5)} />
         ) : venue.id === 'farm' ? (
           <meshStandardMaterial map={grassTex(10, (len + 100) / 8)} />
         ) : (

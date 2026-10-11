@@ -5,7 +5,8 @@ import { BuildingModel } from './BuildingModel'
 import { glowMats } from './dayNight'
 import { Batch } from './Batch'
 import { PAL, SEASON } from './season'
-import { gravelTex, soilTex } from './textures'
+import { gravelTex, soilTex, waterTex, containerTex, shutterTex } from './textures'
+import { signTexture } from './signTexture'
 import { CarModel } from './CarModel'
 import { TILE, buildingDef } from '../game/data'
 import type { VenueId } from './venues'
@@ -132,6 +133,21 @@ function Poles({ len, x, wood = '#6d4c41' }: { len: number; x: number; wood?: st
 const SHORE = -(EDGE + 5.5) // beach waterline
 const QUAY = -(EDGE + 3) // dock edge
 
+// Open water with crests that drift slowly toward the shore.
+function Water({ x, z, w, d, id }: { x: number; z: number; w: number; d: number; id: string }) {
+  const map = useMemo(() => waterTex(id, w / 8, d / 8), [id, w, d])
+  useFrame((_, dt) => {
+    map.offset.x += dt * 0.012
+    map.offset.y += dt * 0.004
+  })
+  return (
+    <mesh rotation-x={-Math.PI / 2} position={[x, 0.015, z]}>
+      <planeGeometry args={[w, d]} />
+      <meshStandardMaterial map={map} roughness={0.25} metalness={0.05} />
+    </mesh>
+  )
+}
+
 function Beach({ len }: { len: number }) {
 
   const items = useMemo(() => {
@@ -144,13 +160,25 @@ function Beach({ len }: { len: number }) {
     const palms = Array.from({ length: Math.ceil((len + 50) / 4.2) }, (_, i) => ({ z: i * 4.2 - 9 + r() * 1.2, h: 1.9 + r() * 0.8, lean: (r() - 0.3) * 0.5 }))
     const boards = []
     for (let z = -6; z < len + 30; z += 7 + r() * 6) boards.push({ z, x: -(EDGE + 0.7 + r() * 2), c: Math.floor(r() * 4), ry: r() * 0.6 - 0.3 })
-    return { umbrellas, huts, boats, palms, boards }
+    const shops = [0.2, 0.5, 0.78].map((k) => len * k)
+    const clear = (z: number) => shops.every((sz) => Math.abs(z - sz) > 1.9)
+    const near = (n: number, from: number, to: number, side = -1) =>
+      Array.from({ length: n }, () => ({ x: side * (EDGE + from + r() * (to - from)), z: r() * (len + 60) - 14, s: 0.6 + r() * 0.8, ry: r() * 6 }))
+    return {
+      umbrellas, boats, boards, shops,
+      huts: huts.filter((h) => clear(h.z)),
+      palms: palms.filter((t) => clear(t.z)),
+      dune: near(260, 0.1, 1.4),
+      shells: near(220, 1, 5.2).map((p) => ({ ...p, y: 0.02 })),
+      balls: near(14, 1, 4.5).map((p) => ({ ...p, s: 1, y: 0.12 })),
+    }
   }, [len])
   const canopy = ['#e53935', '#fdd835', '#1e88e5', '#ff7043']
   const hut = ['#80deea', '#f8bbd0', '#fff59d', '#a5d6a7']
   return (
     <group>
-      <Flat x={SHORE - 45} z={len / 2} w={90} d={len + 220} c="#2f8fd6" />
+      <Water x={SHORE - 45} z={len / 2} w={90} d={len + 220} id="beach" />
+      <Flat x={SHORE + 0.8} z={len / 2} w={1.6} d={len + 220} c="#d8bd86" y={0.013} />
       {Array.from({ length: Math.ceil((len + 60) / 6) }, (_, i) => (
         <Flat key={i} x={SHORE + 0.15 + Math.sin(i * 1.7) * 0.25} z={i * 6 - 12} w={0.35} d={6.2} c="#eaf7ff" y={0.02} />
       ))}
@@ -167,6 +195,11 @@ function Beach({ len }: { len: number }) {
         return (
           <group key={k}>
             {[-0.35, 0.35].map((dx) => [-0.35, 0.35].map((dz) => <Box key={`${dx}${dz}`} p={[x + dx, 0.6, z + dz]} s={[0.07, 1.2, 0.07]} c="#eeeeee" />))}
+            {/* Ramp up to the platform, and a red rescue float. */}
+            <mesh position={[x + 0.95, 0.55, z]} rotation-z={0.6}><boxGeometry args={[1.5, 0.05, 0.4]} /><meshStandardMaterial color="#eeeeee" /></mesh>
+            <Box p={[x - 0.52, 1.45, z]} s={[0.04, 0.3, 0.12]} c="#ff7043" />
+            <Box p={[x, 2.05, z]} s={[0.03, 0.5, 0.03]} c="#eeeeee" />
+            <Box p={[x, 2.2, z + 0.15]} s={[0.02, 0.2, 0.3]} c="#fdd835" />
             <Box p={[x, 1.45, z]} s={[1.0, 0.6, 1.0]} c="#e53935" />
             <Box p={[x, 1.8, z]} s={[1.2, 0.08, 1.2]} c="#eeeeee" />
           </group>
@@ -184,6 +217,35 @@ function Beach({ len }: { len: number }) {
         </group>
       ))}
       {items.palms.map((t, i) => <Palm key={i} x={EDGE + 1.4} z={t.z} h={t.h} lean={t.lean} />)}
+      {/* Snack stands from town along the boardwalk. */}
+      <Lot def="icecream" side={1} z={items.shops[0]} back={1.2} />
+      <Lot def="tacos" side={1} z={items.shops[1]} back={1.2} />
+      <Lot def="coffee" side={1} z={items.shops[2]} back={1.2} />
+      <Scatter spots={items.dune} colors={['#9cae5a', '#b8b56a', '#8aa04e', '#c7bd7a']}>
+        <coneGeometry args={[0.05, 0.32, 3]} />
+      </Scatter>
+      <Scatter spots={items.shells} colors={['#ffffff', '#ffe0d6', '#f3e5c8', '#d7ccc8']}>
+        <dodecahedronGeometry args={[0.04, 0]} />
+      </Scatter>
+      <Scatter spots={items.balls} colors={['#e53935', '#fdd835', '#1e88e5', '#ffffff']}>
+        <sphereGeometry args={[0.12, 10, 8]} />
+      </Scatter>
+      {/* Sandcastles and a volleyball net. */}
+      {[0.3, 0.66].map((k) => (
+        <group key={k} position={[-(EDGE + 2.6), 0, len * k]}>
+          <Box p={[0, 0.12, 0]} s={[0.7, 0.24, 0.7]} c="#e3c891" />
+          {[-1, 1].map((dx) => [-1, 1].map((dz) => <Cyl key={`${dx}${dz}`} p={[dx * 0.32, 0.26, dz * 0.32]} r={0.09} h={0.36} c="#e3c891" seg={8} />))}
+          {[-1, 1].map((dx) => [-1, 1].map((dz) => <Cone key={`c${dx}${dz}`} p={[dx * 0.32, 0.52, dz * 0.32]} r={0.11} h={0.16} c="#d9bb7f" seg={8} />))}
+          <Box p={[0, 0.5, 0]} s={[0.3, 0.3, 0.3]} c="#e3c891" />
+          <Box p={[0, 0.8, 0]} s={[0.01, 0.3, 0.01]} c="#6d4c41" />
+          <Box p={[0, 0.92, 0.07]} s={[0.01, 0.08, 0.14]} c="#e53935" />
+        </group>
+      ))}
+      <group position={[-(EDGE + 3.4), 0, len * 0.4]}>
+        {[-1.6, 1.6].map((dz) => <Cyl key={dz} p={[0, 0.6, dz]} r={0.04} h={1.2} c="#eeeeee" seg={6} />)}
+        <Box p={[0, 1.0, 0]} s={[0.02, 0.4, 3.2]} c="#fafafa" />
+        <Box p={[0, 1.2, 0]} s={[0.03, 0.05, 3.2]} c="#1e88e5" />
+      </group>
       {items.boards.map((b, i) => (
         <mesh key={i} position={[b.x, 0.45, b.z]} rotation={[0, b.ry, 0.12]} scale={[0.2, 0.5, 0.05]}>
           <sphereGeometry args={[1, 8, 6]} />
@@ -327,7 +389,7 @@ function Lot({ def, side, z, back = 0.3 }: { def: string; side: -1 | 1; z: numbe
   )
 }
 
-type Spot = { x: number; z: number; s?: number; ry?: number; y?: number; sy?: number }
+type Spot = { x: number; z: number; s?: number; ry?: number; rx?: number; y?: number; sy?: number }
 
 // Lots of one small thing (grass, pebbles, corn) as a single instanced draw,
 // each copy tinted from a short list so the patch doesn't look stamped.
@@ -341,7 +403,7 @@ function Scatter({ spots, colors, y = 0, children }: { spots: Spot[]; colors: st
     spots.forEach((p, i) => {
       const k = p.s ?? 1
       o.position.set(p.x, (p.y ?? y) * k, p.z)
-      o.rotation.set(0, p.ry ?? 0, 0)
+      o.rotation.set(p.rx ?? 0, p.ry ?? 0, 0)
       o.scale.set(k, k * (p.sy ?? 1), k)
       o.updateMatrix()
       m.setMatrixAt(i, o.matrix)
@@ -390,35 +452,77 @@ function Snowfall() {
   )
 }
 
-// Snowbanks, a pine forest, log cabins, mountains behind, and falling snow.
+// Frostbite Pass: a dense instanced pine forest, lumpy snowbanks, snowy scrub
+// and rocks, a frozen lake, snowmen, log cabins with icicles, an A-frame ski
+// lodge with lit windows, a chairlift (chairs move, see SkiLift) and falling snow.
+const LIFT_X = -(EDGE + 13)
 function Snow({ len }: { len: number }) {
   // A frozen lake opens up on the left part way down the pass.
-  const lake = useMemo(() => ({ x: -(EDGE + 9), z: len * 0.45, w: 12, d: len * 0.3 }), [len])
-  const pines = useMemo(
-    () =>
-      along(len, (r) => 1.1 + r() * 1.6, 7)
-        .map(({ z, side, r }) => ({ z, x: side * (EDGE + 0.9 + r() ** 1.6 * 16), s: 0.8 + r() * 0.7 }))
-        .filter((t) => ((t.x - lake.x) / (lake.w / 2 + 0.6)) ** 2 + ((t.z - lake.z) / (lake.d / 2 + 0.6)) ** 2 > 1),
-    [len, lake],
-  )
+  const lake = useMemo(() => ({ x: -(EDGE + 7.5), z: len * 0.45, w: 9, d: len * 0.28 }), [len])
+  const geo = useMemo(() => {
+    const r = rand(7)
+    const out = (x: number, z: number) => ((x - lake.x) / (lake.w / 2 + 0.6)) ** 2 + ((z - lake.z) / (lake.d / 2 + 0.6)) ** 2 > 1
+    const lodge = (x: number, z: number) => !(x > EDGE + 2 && x < EDGE + 10 && Math.abs(z - len * 0.55) < 5)
+    const lift = (x: number) => Math.abs(x - LIFT_X) > 1.6
+    const pines: Spot[] = []
+    for (const side of [-1, 1]) {
+      for (let z = -14; z < len + 45; z += 0.55 + r() * 0.9) {
+        const x = side * (EDGE + 1.2 + r() ** 1.3 * 20)
+        if (out(x, z) && lodge(x, z) && lift(x)) pines.push({ x, z, s: 0.7 + r() * 0.9, ry: r() * 6 })
+      }
+    }
+    const near = (n: number, from: number, to: number) =>
+      Array.from({ length: n }, () => {
+        const side = r() < 0.5 ? -1 : 1
+        return { x: side * (EDGE + from + r() * (to - from)), z: r() * (len + 60) - 14, s: 0.6 + r() * 0.9, ry: r() * 6 }
+      }).filter((p) => out(p.x, p.z) && lodge(p.x, p.z))
+    const bank: Spot[] = []
+    for (const side of [-1, 1]) for (let z = -14; z < len + 45; z += 0.5) bank.push({ x: side * (ROAD + 0.4 + r() * 0.25), z, s: 0.8 + r() * 0.6, sy: 0.45, y: 0.05 })
+    return { pines, bank, scrub: near(180, 0.3, 6), rocks: near(70, 0.5, 9), saplings: near(160, 0.4, 4) }
+  }, [len, lake])
+  const greens = ['#1f5f3a', '#245f3f', '#2b6b45', '#1b5634']
   const snowmen = [0.12, 0.38, 0.7, 0.95].map((k, i) => ({ z: len * k, x: (i % 2 ? 1 : -1) * (EDGE + 1.1) }))
-  const cabins = useMemo(() => [0.2, 0.55, 0.85].map((k, i) => ({ z: len * k, side: (i % 2 ? 1 : -1) as -1 | 1 })), [len])
+  const cabins = [0.2, 0.85].map((k, i) => ({ z: len * k, side: (i % 2 ? 1 : -1) as -1 | 1 }))
+  const lodgeZ = len * 0.55
   return (
     <group>
-      {[-1, 1].map((sd) => (
-        <Box key={sd} p={[sd * (ROAD + 0.35), 0.1, len / 2 + 5]} s={[0.5, 0.2, len + 60]} c="#ffffff" />
-      ))}
-      {pines.map((t, i) => (
-        <group key={i} position={[t.x, 0, t.z]} scale={t.s}>
-          <Cyl p={[0, 0.2, 0]} r={0.07} h={0.4} c="#5d4037" seg={5} />
-          <Cone p={[0, 0.65, 0]} r={0.5} h={0.8} c="#1f5f3a" seg={7} />
-          <Cone p={[0, 1.1, 0]} r={0.38} h={0.7} c="#1f5f3a" seg={7} />
-          <Cone p={[0, 1.5, 0]} r={0.22} h={0.5} c="#ffffff" seg={7} />
+      <Scatter spots={geo.bank} colors={['#ffffff', '#f4f8fb', '#eaf0f5']}>
+        <sphereGeometry args={[0.32, 8, 6]} />
+      </Scatter>
+      {/* Pines: trunk, three tiers of branches and a cap of snow on each tier. */}
+      <Scatter spots={geo.pines} colors={['#5d4037', '#4e342e']} y={0.2}>
+        <cylinderGeometry args={[0.07, 0.09, 0.4, 5]} />
+      </Scatter>
+      {[[0.65, 0.52, 0.8], [1.1, 0.4, 0.7], [1.5, 0.26, 0.55]].map(([y, rr, h]) => (
+        <group key={y}>
+          <Scatter spots={geo.pines} colors={greens} y={y}>
+            <coneGeometry args={[rr, h, 7]} />
+          </Scatter>
+          <Scatter spots={geo.pines} colors={['#ffffff', '#f2f6f9']} y={y + h * 0.22}>
+            <coneGeometry args={[rr * 0.62, h * 0.5, 7]} />
+          </Scatter>
         </group>
       ))}
-      <mesh rotation-x={-Math.PI / 2} position={[lake.x, 0.02, lake.z]} scale={[lake.w / 2, lake.d / 2, 1]}>
-        <circleGeometry args={[1, 24]} />
-        <meshStandardMaterial color="#bfe0f2" roughness={0.15} metalness={0.1} />
+      <Scatter spots={geo.saplings} colors={greens} y={0.18}>
+        <coneGeometry args={[0.16, 0.38, 6]} />
+      </Scatter>
+      <Scatter spots={geo.scrub} colors={['#ffffff', '#eef3f7', '#dfe8ef']} y={0.08}>
+        <icosahedronGeometry args={[0.16, 0]} />
+      </Scatter>
+      <Scatter spots={geo.rocks} colors={['#78909c', '#8d9aa3', '#6b7b85']} y={0.12}>
+        <dodecahedronGeometry args={[0.28, 0]} />
+      </Scatter>
+      <Scatter spots={geo.rocks} colors={['#ffffff']} y={0.3} >
+        <sphereGeometry args={[0.24, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2]} />
+      </Scatter>
+      {/* Frozen lake with a ring of packed snow. */}
+      <mesh rotation-x={-Math.PI / 2} position={[lake.x, 0.018, lake.z]} scale={[lake.w / 2 + 0.4, lake.d / 2 + 0.4, 1]}>
+        <circleGeometry args={[1, 28]} />
+        <meshStandardMaterial color="#e3edf4" />
+      </mesh>
+      <mesh rotation-x={-Math.PI / 2} position={[lake.x, 0.022, lake.z]} scale={[lake.w / 2, lake.d / 2, 1]}>
+        <circleGeometry args={[1, 28]} />
+        <meshStandardMaterial color="#a9d4ee" roughness={0.08} metalness={0.15} />
       </mesh>
       {snowmen.map((m, i) => (
         <group key={i} position={[m.x, 0, m.z]}>
@@ -427,20 +531,111 @@ function Snow({ len }: { len: number }) {
           <mesh position={[0, 0.72, 0]}><sphereGeometry args={[0.11, 10, 7]} /><meshStandardMaterial color="#ffffff" flatShading /></mesh>
           <mesh position={[-Math.sign(m.x) * 0.1, 0.72, -0.07]} rotation={[-Math.PI / 2 + 0.3, 0, Math.sign(m.x) * 0.9]}><coneGeometry args={[0.025, 0.14, 5]} /><meshStandardMaterial color="#ff7043" flatShading /></mesh>
           <Box p={[0, 0.6, 0]} s={[0.36, 0.05, 0.05]} c="#c62828" />
+          <Cyl p={[0, 0.86, 0]} r={0.08} h={0.14} c="#212121" seg={8} />
+          <Cyl p={[0, 0.8, 0]} r={0.13} h={0.02} c="#212121" seg={8} />
+          {[-1, 1].map((sd) => <mesh key={sd} position={[sd * 0.2, 0.55, 0]} rotation-z={sd * -0.9}><cylinderGeometry args={[0.012, 0.012, 0.3, 4]} /><meshStandardMaterial color="#5d4037" /></mesh>)}
         </group>
       ))}
       {cabins.map((c, i) => {
         const x = c.side * (EDGE + 3.2)
+        const front = x - c.side * 1.11
         return (
           <group key={i}>
             <Box p={[x, 0.6, c.z]} s={[2.2, 1.2, 3]} c="#8d5a3b" />
+            {[0.25, 0.55, 0.85].map((y) => <Box key={y} p={[front, y, c.z]} s={[0.02, 0.04, 3.02]} c="#6d4426" />)}
             <Cone p={[x, 1.6, c.z]} r={2.3} h={0.9} c="#ffffff" seg={4} ry={Math.PI / 4} />
-            <Box p={[x - c.side * 1.11, 0.45, c.z]} s={[0.02, 0.5, 0.5]} c="#ffd54f" />
-            <Box p={[x + 0.5, 1.7, c.z + 0.6]} s={[0.3, 0.8, 0.3]} c="#6d4c41" />
+            <mesh position={[front - c.side * 0.01, 0.6, c.z - 0.6]} rotation-y={c.side > 0 ? -Math.PI / 2 : Math.PI / 2}>
+              <planeGeometry args={[0.5, 0.4]} />
+              <primitive object={glowMats.window} attach="material" dispose={null} />
+            </mesh>
+            <Box p={[front, 0.45, c.z + 0.5]} s={[0.03, 0.8, 0.5]} c="#4e2e1a" />
+            <Box p={[x + 0.5, 1.75, c.z + 0.6]} s={[0.3, 0.9, 0.3]} c="#6d4c41" />
+            {Array.from({ length: 9 }, (_, k) => (
+              <Cone key={k} p={[front - c.side * 0.1, 1.12, c.z - 1.4 + k * 0.35]} r={0.03} h={0.12 + (k % 3) * 0.05} c="#e1f1fb" seg={4} />
+            ))}
           </group>
         )
       })}
+      {/* A-frame ski lodge with a glass front, deck and chimney. */}
+      <group position={[EDGE + 5.4, 0, lodgeZ]}>
+        <Box p={[0, 0.25, 0]} s={[4.4, 0.5, 5]} c="#6d4c41" />
+        <group position-y={0.5} scale={[1, 1.5, 1]}>
+          <mesh rotation-z={Math.PI / 4}>
+            <boxGeometry args={[3, 3, 4.6]} />
+            <meshStandardMaterial color="#8d5a3b" flatShading />
+          </mesh>
+        </group>
+        {[-1, 1].map((sd) => (
+          <mesh key={sd} position={[sd * 1.08, 2.15, 0]} rotation-z={-sd * 0.98}>
+            <boxGeometry args={[3.85, 0.14, 5]} />
+            <meshStandardMaterial color="#ffffff" flatShading />
+          </mesh>
+        ))}
+        <mesh position={[-2.0, 1.3, 0]} rotation-y={-Math.PI / 2}>
+          <planeGeometry args={[1.5, 1.4]} />
+          <primitive object={glowMats.window} attach="material" dispose={null} />
+        </mesh>
+        <Box p={[-2.5, 0.55, 0]} s={[0.8, 0.08, 4]} c="#8d6e63" />
+        {[-1.9, 1.9].map((dz) => <Box key={dz} p={[-2.85, 0.75, dz]} s={[0.05, 0.4, 0.05]} c="#6d4c41" />)}
+        <Box p={[-2.85, 0.9, 0]} s={[0.04, 0.04, 3.9]} c="#6d4c41" />
+        <Box p={[0.6, 3.1, 1.4]} s={[0.4, 1.4, 0.4]} c="#78909c" />
+        {/* Skis and poles leaning on the deck. */}
+        {[0, 1, 2].map((k) => (
+          <mesh key={k} position={[-2.9, 0.75, -1.2 + k * 0.25]} rotation-z={0.2}>
+            <boxGeometry args={[0.03, 1.2, 0.07]} />
+            <meshStandardMaterial color={['#e53935', '#1e88e5', '#fdd835'][k]} />
+          </mesh>
+        ))}
+      </group>
+      {/* Chairlift towers and cable up the slope; the chairs move. */}
+      {Array.from({ length: 9 }, (_, k) => {
+        const z = -6 + k * ((len + 40) / 8)
+        return (
+          <group key={k} position={[LIFT_X, 0, z]}>
+            <Box p={[0, 2.1, 0]} s={[0.18, 4.2, 0.18]} c="#607d8b" />
+            <Box p={[0, 4.2, 0]} s={[1.6, 0.12, 0.12]} c="#607d8b" />
+          </group>
+        )
+      })}
+      {[-0.7, 0.7].map((dx) => (
+        <mesh key={dx} position={[LIFT_X + dx, 4.12, len / 2 + 14]}>
+          <boxGeometry args={[0.02, 0.02, len + 52]} />
+          <meshBasicMaterial color="#263238" />
+        </mesh>
+      ))}
     </group>
+  )
+}
+
+// Chairs riding the lift, up one side and down the other. Three instanced
+// parts (hanger, seat, back) keep all the chairs to three draws.
+function SkiLift({ len }: { len: number }) {
+  const parts = [useRef<InstancedMesh>(null), useRef<InstancedMesh>(null), useRef<InstancedMesh>(null)]
+  const N = 16
+  const span = len + 52
+  const tmp = useMemo(() => new Object3D(), [])
+  const offsets: V3[] = [[0, 0.3, 0], [0, 0, 0], [0, 0.14, -0.14]]
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+    for (let i = 0; i < N; i++) {
+      const up = i % 2 === 0
+      const k = (((i / N) * span + t * 1.2 * (up ? 1 : -1)) % span + span) % span
+      parts.forEach((ref, j) => {
+        const m = ref.current
+        if (!m) return
+        tmp.position.set(LIFT_X + (up ? -0.7 : 0.7) + offsets[j][0], 3.6 + offsets[j][1], k - 12 + offsets[j][2] * (up ? 1 : -1))
+        tmp.updateMatrix()
+        m.setMatrixAt(i, tmp.matrix)
+      })
+    }
+    parts.forEach((ref) => { if (ref.current) ref.current.instanceMatrix.needsUpdate = true })
+  })
+  return (
+    <>
+      <instancedMesh ref={parts[0]} args={[undefined, undefined, N]} frustumCulled={false}><boxGeometry args={[0.02, 0.6, 0.02]} /><meshStandardMaterial color="#263238" /></instancedMesh>
+      <instancedMesh ref={parts[1]} args={[undefined, undefined, N]} frustumCulled={false}><boxGeometry args={[0.5, 0.06, 0.3]} /><meshStandardMaterial color="#c62828" /></instancedMesh>
+      <instancedMesh ref={parts[2]} args={[undefined, undefined, N]} frustumCulled={false}><boxGeometry args={[0.5, 0.26, 0.04]} /><meshStandardMaterial color="#c62828" /></instancedMesh>
+    </>
   )
 }
 
@@ -498,7 +693,7 @@ function Farm({ len }: { len: number }) {
         </Scatter>
       )}
       {/* Grass along the fences and across the pasture, flowers in spring and summer. */}
-      <Scatter spots={geo.grass} colors={PAL.bare ? ['#e8eef2', '#d7dee3'] : [...PAL.leaves.slice(0, 1), '#5a9a3a', '#6fae46', '#4e8a33']}>
+      <Scatter spots={geo.grass} colors={PAL.bare ? ['#e8eef2', '#d7dee3'] : SEASON === 'fall' ? ['#8c9a43', '#a3a050', '#7d8a3a', '#b5a55a'] : ['#7cc04e', '#5a9a3a', '#6fae46', '#4e8a33']}>
         <coneGeometry args={[0.06, 0.28, 3]} />
       </Scatter>
       {SEASON !== 'winter' && SEASON !== 'fall' && (
@@ -614,8 +809,15 @@ function Farm({ len }: { len: number }) {
 }
 
 // A quay: water, cranes and ships on the left, stacked containers on the right.
+const SHED_SIGNS = ['PIER 7', 'COLD STORE', 'DOCK 3', 'FREIGHT', 'PIER 9']
+
 function Docks({ len }: { len: number }) {
   const quay = QUAY
+  const yard = useMemo(() => {
+    const r = rand(73)
+    const pick = (n: number) => Array.from({ length: n }, () => ({ x: -(EDGE + 0.5 + r() * 1.6), z: r() * (len + 50) - 12, ry: r() * 6 })).filter((p) => [0.12, 0.5, 0.88, 0.22, 0.62].every((k) => Math.abs(p.z - len * k) > 2))
+    return { barrels: pick(70), crates: pick(60), pallets: pick(40) }
+  }, [len])
   const box = ['#c62828', '#1565c0', '#2e7d32', '#ef6c00', '#00838f', '#6d4c41']
   const stacks = useMemo(() => {
     const r = rand(61)
@@ -636,7 +838,7 @@ function Docks({ len }: { len: number }) {
   }, [len])
   return (
     <group>
-      <Flat x={quay - 45} z={len / 2} w={90} d={len + 220} c="#1d5f8a" />
+      <Water x={quay - 45} z={len / 2} w={90} d={len + 220} id="docks" />
       <Box p={[quay + 0.15, 0.1, len / 2 + 10]} s={[0.3, 0.2, len + 80]} c="#eceff1" />
       {Array.from({ length: Math.ceil((len + 50) / 4) }, (_, i) => <Cyl key={i} p={[quay + 0.45, 0.15, i * 4 - 10]} r={0.1} h={0.3} c="#263238" />)}
       {[0.12, 0.5, 0.88].map((k) => {
@@ -675,11 +877,48 @@ function Docks({ len }: { len: number }) {
         </mesh>
         <Cone p={[0, 8.85, 0]} r={0.6} h={0.6} c="#263238" seg={10} />
       </group>
-      {stacks.map((s, i) => <Box key={i} p={[s.x, s.y, s.z]} s={[1.0, 1.05, 2.4]} c={box[s.c]} />)}
+      {/* Containers in corrugated steel, with door bars on the ends. */}
+      {stacks.map((s, i) => (
+        <group key={i}>
+          <mesh position={[s.x, s.y, s.z]} scale={[1.0, 1.05, 2.4]}>
+            <boxGeometry />
+            <meshStandardMaterial map={containerTex()} color={box[s.c]} />
+          </mesh>
+          {i % 2 === 0 && [-0.25, 0.25].map((dx) => <Box key={dx} p={[s.x + dx, s.y, s.z - 1.21]} s={[0.03, 0.95, 0.02]} c="#9e9e9e" />)}
+        </group>
+      ))}
       {sheds.map((s, i) => (
         <group key={i}>
           <Box p={[EDGE + 9, s.h / 2, s.z + s.w / 2]} s={[6, s.h, s.w - 0.6]} c="#90a4ae" />
-          <Box p={[EDGE + 5.99, s.h * 0.4, s.z + s.w / 2]} s={[0.02, s.h * 0.7, s.w * 0.5]} c="#607d8b" />
+          <Box p={[EDGE + 9, s.h + 0.15, s.z + s.w / 2]} s={[6.2, 0.3, s.w - 0.4]} c="#607d8b" />
+          <mesh position={[EDGE + 5.98, s.h * 0.35, s.z + s.w / 2]} rotation-y={-Math.PI / 2}>
+            <planeGeometry args={[s.w * 0.45, s.h * 0.62]} />
+            <meshStandardMaterial map={shutterTex()} color="#cfd8dc" />
+          </mesh>
+          <mesh position={[EDGE + 5.97, s.h * 0.85, s.z + s.w / 2]} rotation-y={-Math.PI / 2}>
+            <planeGeometry args={[s.w * 0.6, 0.55]} />
+            <meshBasicMaterial map={signTexture(SHED_SIGNS[i % SHED_SIGNS.length], '#1565c0', '#ffffff')} toneMapped={false} />
+          </mesh>
+        </group>
+      ))}
+      {/* Barrels, pallets and crates along the quay, and a forklift. */}
+      <Scatter spots={yard.barrels} colors={['#c62828', '#1565c0', '#2e7d32', '#fbc02d']} y={0.22}>
+        <cylinderGeometry args={[0.16, 0.16, 0.44, 10]} />
+      </Scatter>
+      <Scatter spots={yard.crates} colors={['#a1795a', '#8d6e63', '#b08968']} y={0.22}>
+        <boxGeometry args={[0.44, 0.44, 0.44]} />
+      </Scatter>
+      <Scatter spots={yard.pallets} colors={['#bfa27a', '#a98d66']} y={0.05}>
+        <boxGeometry args={[0.6, 0.1, 0.6]} />
+      </Scatter>
+      {[0.22, 0.62].map((k) => (
+        <group key={k} position={[quay + 1.3, 0, len * k]} rotation-y={0.4}>
+          <Box p={[0, 0.3, 0]} s={[0.55, 0.35, 0.8]} c="#fbc02d" />
+          <Box p={[0, 0.62, 0.1]} s={[0.5, 0.04, 0.5]} c="#212121" />
+          {[-0.22, 0.22].map((dx) => <Box key={dx} p={[dx, 0.45, -0.2]} s={[0.03, 0.3, 0.03]} c="#212121" />)}
+          <Box p={[0, 0.65, -0.45]} s={[0.4, 1.1, 0.05]} c="#424242" />
+          {[-0.17, 0.17].map((dx) => <Box key={dx} p={[dx, 0.08, -0.75]} s={[0.07, 0.03, 0.6]} c="#9e9e9e" />)}
+          {[-1, 1].map((sd) => [-0.25, 0.25].map((dz) => <Cyl key={`${sd}${dz}`} p={[sd * 0.3, 0.12, dz]} r={0.12} h={0.1} c="#212121" seg={10} rot={[0, 0, Math.PI / 2]} />))}
         </group>
       ))}
     </group>
@@ -829,6 +1068,7 @@ export function VenueBackdrop({ id, len }: { id: VenueId; len: number }) {
       {id === 'docks' && <><Sparkles edge={QUAY} /><Gulls x={-(EDGE + 9)} /></>}
       {id === 'desert' && <Tumbleweeds />}
       {id === 'farm' && <Windmill x={EDGE + 13} z={len * 0.8} />}
+      {id === 'snow' && <SkiLift len={len} />}
     </>
   )
 }

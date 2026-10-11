@@ -9,7 +9,8 @@ import { Canvas } from '@react-three/fiber'
 import { NeutralToneMapping } from 'three'
 import { RaceScene } from '../scene/RaceScene'
 import { pickVenue, venue as venueById } from '../scene/venues'
-import { sfx, engineRpm, stopEngine } from '../lib/sound'
+import { sfx } from '../lib/sound'
+import { raceAudio, type RaceAudio } from '../lib/engineAudio'
 import { useLive, challenge, cancelChallenge, refreshPresence, raceChannel, endLiveRace, answer, pruneInvites, mute, unmute, setClosed, INVITE_MS, type LiveRace } from '../lib/live'
 import { displayName } from '../lib/names'
 import { joinRefereed, reportFinish, serverPi, type Verdict } from '../lib/referee'
@@ -110,6 +111,7 @@ export function RacePanel() {
   const campaignResult = useGame((s) => s.campaignResult)
 
   const livePlayers = useLive((l) => l.players)
+  const liveSignedIn = useLive((l) => l.signedIn)
   const outgoing = useLive((l) => l.outgoing)
   const mutedIds = useLive((l) => l.muted)
   const cooldownTo = useLive((l) => l.cooldownTo)
@@ -202,7 +204,8 @@ export function RacePanel() {
       {supabase && (
         <>
           <h3>Live now <small>(players online this minute, no fuel needed)</small></h3>
-          {livePlayers.length === 0 && <p className="hint">Nobody else is online right now. Open Cartopia in another browser or ask a friend to join!</p>}
+          {!liveSignedIn ? <p className="hint">Sign in from the Menu to race other players live.</p>
+            : livePlayers.length === 0 && <p className="hint">Nobody else is online right now. Open Cartopia in another browser or ask a friend to join!</p>}
           <div className="rivals">
             {livePlayers.filter((p) => !mutedIds[p.id]).map((p) => (
               <div key={p.id} className="rival">
@@ -514,10 +517,24 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
   // Campaign rivals shift sloppier early on: from 0.64-0.78 (good, sometimes early) up to 0.8-0.92 (perfect).
   const cleanness = shownRival.shift ?? 1
   const skill = useMemo(() => Array.from({ length: 4 }, () => 0.64 + 0.16 * cleanness + Math.random() * (0.14 - 0.02 * cleanness)), [cleanness])
+  // Engine, tyre and crowd sounds for this race. A live rival's revs aren't sent,
+  // so a stand-in racer with their PI drives their engine sound.
+  const sound = useRef<RaceAudio | null>(null)
+  const ghost = useRef(fresh())
+  useEffect(() => {
+    sound.current = raceAudio({ model: car.model, mods: car.mods }, { model: CARS.find((c) => c.name === shownRival.carName)?.id, body: shownRival.body, mods: shownRival.mods })
+    return () => sound.current?.close()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (countdown === 99) return
-    if (countdown >= 0 && countdown <= 3) sfx.countdown(countdown === 0)
+    if (countdown >= 0 && countdown <= 3) {
+      if (countdown === 3) sound.current?.screech()
+      sfx.countdown(countdown === 0)
+      sound.current?.countdown(countdown === 0)
+      if (countdown === 0) sound.current?.launch(Math.min(1, myPi / 200), Math.min(1, rivalRef.current.pi / 200))
+    }
     if (countdown <= 0) return
     const id = setTimeout(() => setCountdown((c) => c - 1), 700)
     return () => clearTimeout(id)
@@ -527,47 +544,58 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
     if (!live) return
     let started = false
     let answeredReady = false
+    let disposed = false
+    let ch: ReturnType<typeof raceChannel> = null
+    let ping: ReturnType<typeof setInterval> | undefined
     const go = () => {
       if (started) return
       started = true
       setCountdown(3)
     }
-    const ch = raceChannel(live.raceId, {
-      onPos: (p) => {
-        const last = samples.current[samples.current.length - 1]
-        if (!last || p.t > last.t) samples.current.push(p)
-      },
-      onFinish: (ft) => {
-        them.current.finished = ft
-      },
-      onGo: go,
-      onLeave: () => {
-        if (started) return
-        useGame.getState().toast(`${live.opponent.town} called off the race`)
-        onExit()
-      },
-      onReady: () => {
-        if (live.host) {
-          ch?.send({ type: 'broadcast', event: 'go', payload: {} })
-          go()
-        } else if (!answeredReady) {
-          answeredReady = true
-          ch?.send({ type: 'broadcast', event: 'ready', payload: {} })
-        }
-      },
-    })
-    channel.current = ch
     const uid = live.opponent.uid
+    // The race channel is private to the two racers on the server's copy of the race, so join that first.
     joined.current = joinRefereed(live.raceId, uid)
     joined.current.then((ok) => {
-      if (!ok) refereed.current = 'no'
+      if (disposed) return
+      if (!ok) {
+        refereed.current = 'no'
+        useGame.getState().toast("Couldn't start the live race on the server. Try again in a moment.")
+        onExit()
+        return
+      }
+      ch = raceChannel(live.raceId, {
+        onPos: (p) => {
+          const last = samples.current[samples.current.length - 1]
+          if (!last || p.t > last.t) samples.current.push(p)
+        },
+        onFinish: (ft) => {
+          them.current.finished = ft
+        },
+        onGo: go,
+        onLeave: () => {
+          if (started) return
+          useGame.getState().toast(`${live.opponent.town} called off the race`)
+          onExit()
+        },
+        onReady: () => {
+          if (live.host) {
+            ch?.send({ type: 'broadcast', event: 'go', payload: {} })
+            go()
+          } else if (!answeredReady) {
+            answeredReady = true
+            ch?.send({ type: 'broadcast', event: 'ready', payload: {} })
+          }
+        },
+      })
+      channel.current = ch
+      // Keep pinging until the race starts in case the first message was missed.
+      ping = setInterval(() => {
+        if (!started) ch?.send({ type: 'broadcast', event: 'ready', payload: {} })
+      }, 1000)
     })
     if (uid) serverPi(uid).then((p) => p !== null && setServerRivalPi(p)).catch(() => {})
-    // Keep pinging until the race starts in case the first message was missed.
-    const ping = setInterval(() => {
-      if (!started) ch?.send({ type: 'broadcast', event: 'ready', payload: {} })
-    }, 1000)
     return () => {
+      disposed = true
       clearInterval(ping)
       // Leaving before the start tells the other player instead of leaving them waiting.
       if (!started) ch?.send({ type: 'broadcast', event: 'leave', payload: {} })
@@ -590,7 +618,6 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
     let myFinishSentAt: number | null = null
     const signal = { cancelled: false }
     const applyVerdict = (v: Verdict | null, myTime: number) => {
-      stopEngine()
       if (!v || v.void) {
         sfx.lose()
         setResult({
@@ -602,6 +629,7 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
       if (Number.isFinite(v.theirTime)) them.current.finished = v.theirTime
       if (v.won) sfx.win()
       else sfx.lose()
+      sound.current?.finish(v.won)
       const note = v.forfeit
         ? v.won
           ? `${rivalRef.current.town} dropped out before finishing.`
@@ -662,18 +690,27 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
           th.quality = smoothShift(theirSkill) && q.label === 'Good' ? 1.08 : q.q
           th.gear++
           th.rpm = 0.35
+          sound.current?.shift('them', th.gear, Math.min(1, rivalRef.current.pi / 200))
         }
         step(th, rivalRef.current.pi, dt, t.current, theirBoost * skillDrag(sk, th, t.current))
       }
       force((n) => n + 1)
-      if (me.current.finished === null) engineRpm(me.current.rpm, me.current.gear)
-      else stopEngine()
+      if (live) {
+        const g = ghost.current
+        if (g.gear < 3 && g.rpm >= 0.85) {
+          g.gear++
+          g.rpm = 0.35
+          sound.current?.shift('them', g.gear, Math.min(1, rivalRef.current.pi / 200))
+        }
+        step(g, rivalRef.current.pi, dt, t.current)
+        sound.current?.frame(me.current, { rpm: g.rpm, gear: g.gear, dist: th.dist, finished: th.finished })
+      } else sound.current?.frame(me.current, th)
       if (live && !wasDone && me.current.finished !== null) settle(me.current.finished)
       if (refereed.current === 'no' && me.current.finished !== null && th.finished !== null) {
         const won = me.current.finished < th.finished || (me.current.finished === th.finished && (!live || live.host))
-        stopEngine()
         if (won) sfx.win()
         else sfx.lose()
+        sound.current?.finish(won)
         const stars = finishCb.current ? finishCb.current(won, me.current.finished, th.finished) : finishRace(won, reward(rivalRef.current))
         setResult({ won, myTime: me.current.finished, theirTime: th.finished, stars: typeof stars === 'number' ? stars : undefined })
         return
@@ -684,7 +721,6 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
     return () => {
       signal.cancelled = true
       cancelAnimationFrame(raf)
-      stopEngine()
     }
   }, [countdown, result, myPi, skill, finishRace, live, def, theirSkill])
 
@@ -696,6 +732,7 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
     sfx.shift(s.q >= 1)
     r.quality = s.q
     r.gear++
+    sound.current?.shift('me', r.gear, Math.min(1, myPi / 200))
     r.rpm = 0.35
     setLabel(s.label)
     setTimeout(() => setLabel(''), 700)
