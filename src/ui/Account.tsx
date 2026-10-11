@@ -40,7 +40,7 @@ export function AccountPanel() {
     if (!supabase) return
     setMsg('...')
     const { error, data } = signUp
-      ? await supabase.auth.signUp({ email, password })
+      ? await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } })
       : await supabase.auth.signInWithPassword({ email, password })
     if (error) return setMsg(friendlyAuthError(error.message, signUp))
     setMsg(signUp && !data.session ? 'Check your email to confirm your account, then sign in.' : 'Signed in. Your town now saves to the cloud.')
