@@ -4,12 +4,14 @@ import { PerspectiveCamera, Spherical, Vector3, type OrthographicCamera } from '
 import { useGame } from '../game/store'
 import { FREE, VIEW, setFreeCam, useFreeCam } from './freeCam'
 import { Horizon } from './Horizon'
+import { heightAt } from './horizonLand'
 
 // How far from the middle of town the free view may wander.
 const ROAM = 150
 // The opening move: the camera swoops down from the bird's-eye angle to a lower
-// one that shows the skyline, over this many seconds.
-const SWOOP = 1.1
+// one that shows the skyline, swinging half way round so the building fronts the
+// bird's-eye view hides come into sight, over this many seconds.
+const SWOOP = 1.9
 const SWOOP_TILT = 1.26 // polar angle it ends at (0 straight down, π/2 level)
 const SWOOP_IN = 0.72 // and how much closer it comes
 
@@ -98,6 +100,7 @@ function Rig() {
       const de = ease(s.t) - e0
       sph.setFromVector3(off.copy(c.position).sub(VIEW))
       sph.phi = Math.min(FREE.maxPolar, sph.phi + s.tilt * de)
+      sph.theta += Math.PI * de
       sph.radius *= 1 + (s.scale - 1) * de
       c.position.copy(VIEW).add(off.setFromSpherical(sph))
       c.lookAt(VIEW)
@@ -134,6 +137,12 @@ function Rig() {
     VIEW.z = Math.max(-ROAM, Math.min(ROAM, VIEW.z))
     VIEW.y = 0
     if (!before.equals(VIEW)) c.position.add(off.subVectors(VIEW, before))
+    // Never sink into the ground or the hills past town.
+    const floor = Math.max(0, heightAt(c.position.x, c.position.z)) + 1.2
+    if (c.position.y < floor) {
+      c.position.y = floor
+      c.lookAt(VIEW)
+    }
   })
   return null
 }
@@ -150,6 +159,8 @@ function useKeys() {
       return !!t && (t.isContentEditable || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')
     }
     const down = (e: KeyboardEvent) => {
+      // Escape goes back to the bird's-eye view.
+      if (e.code === 'Escape' && !typing(e) && !useGame.getState().panel) return setFreeCam(false)
       if (!FLY_KEYS.has(e.code) || typing(e) || e.metaKey || e.altKey || useGame.getState().panel) return
       held.add(e.code)
       // Space would otherwise press whichever button has focus, or scroll; Ctrl+S, Ctrl+D

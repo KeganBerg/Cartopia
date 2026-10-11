@@ -646,8 +646,11 @@ function Interaction() {
 function ResponsiveZoom() {
   const camera = useThree((s) => s.camera)
   const { width, height } = useThree((s) => s.size)
+  // Only when the screen changes size: coming back from the free view keeps the player's zoom.
+  const last = useRef('')
   useEffect(() => {
-    if (isFree(camera)) return
+    if (isFree(camera) || last.current === `${width}x${height}`) return
+    last.current = `${width}x${height}`
     camera.zoom = Math.min(38, Math.max(18, Math.sqrt(width * height) / 24))
     camera.updateProjectionMatrix()
   }, [camera, width, height])
@@ -716,7 +719,8 @@ export function World() {
       <TownCars />
       <Townspeople />
       <WorldFx small={Math.min(window.innerWidth, window.innerHeight) < 700} />
-      <Clouds />
+      {/* The free view's sky draws its own clouds; these puffs hang at camera height there. */}
+      {!free && <Clouds />}
       <SeasonFx small={Math.min(window.innerWidth, window.innerHeight) < 700} />
       <Weather small={Math.min(window.innerWidth, window.innerHeight) < 700} />
       <SkyEnv />
