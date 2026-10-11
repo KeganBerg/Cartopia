@@ -117,6 +117,10 @@ export function LightPool({ r, x = 0, z = 0, y = 0.075 }: { r: number; x?: numbe
   )
 }
 
+// Clan-colored parts stay out of the Batch merge: the color can arrive after
+// the town is merged, and a merged copy would keep the old one.
+const LIVE = { noBatch: true }
+
 // The Crew House flies a flag in the player's clan color.
 function CrewFlag({ x, z }: { x: number; z: number }) {
   const color = useGame((s) => s.clanBadge?.color ?? '#ff7043')
@@ -124,7 +128,7 @@ function CrewFlag({ x, z }: { x: number; z: number }) {
     <group position={[x, 0, z]}>
       <mesh position={[0, 0.8, 0]} castShadow><cylinderGeometry args={[0.025, 0.03, 1.6, 8]} /><meshStandardMaterial color="#cfd8dc" metalness={0.6} roughness={0.4} /></mesh>
       <mesh position={[0, 1.62, 0]}><sphereGeometry args={[0.05, 8, 8]} /><meshStandardMaterial color="#ffd54f" /></mesh>
-      <mesh position={[0.24, 1.38, 0]} castShadow><boxGeometry args={[0.46, 0.3, 0.02]} /><meshStandardMaterial color={color} /></mesh>
+      <mesh position={[0.24, 1.38, 0]} castShadow userData={LIVE}><boxGeometry args={[0.46, 0.3, 0.02]} /><meshStandardMaterial color={color} /></mesh>
       <mesh position={[0.24, 1.38, 0.012]}><circleGeometry args={[0.08, 16]} /><meshStandardMaterial color="#fffde7" /></mesh>
     </group>
   )
@@ -165,7 +169,7 @@ function CrewHouse({ m, ghost, sign, bulb, win }: { m: ReturnType<typeof useMat>
           {m('#90a4ae')}
         </mesh>
       ))}
-      <mesh position={[hx, 0.44, len / 2 - 0.08]}>
+      <mesh userData={LIVE} position={[hx, 0.44, len / 2 - 0.08]}>
         <planeGeometry args={[0.95, 0.09]} />
         <meshStandardMaterial color={ghost ? '#66bb6a' : clan} />
       </mesh>
@@ -177,7 +181,7 @@ function CrewHouse({ m, ghost, sign, bulb, win }: { m: ReturnType<typeof useMat>
         </mesh>
       ))}
       {/* Clan banner hanging down the arch. */}
-      <mesh position={[hx, 0.86, len / 2 - 0.08]}>
+      <mesh userData={LIVE} position={[hx, 0.86, len / 2 - 0.08]}>
         <planeGeometry args={[0.36, 0.22]} />
         <meshStandardMaterial color={ghost ? '#66bb6a' : clan} />
       </mesh>
@@ -208,7 +212,7 @@ function CrewHouse({ m, ghost, sign, bulb, win }: { m: ReturnType<typeof useMat>
       {sign && (
         <group position={[hx, 1.22, len / 2 - 0.15]}>
           {[-0.5, 0.5].map((x) => <mesh key={x} position={[x, -0.18, -0.02]}><boxGeometry args={[0.04, 0.36, 0.04]} />{m('#37474f')}</mesh>)}
-          <mesh position={[0, 0, -0.03]}><boxGeometry args={[1.28, 0.36, 0.05]} /><meshStandardMaterial color={ghost ? '#66bb6a' : clan} /></mesh>
+          <mesh userData={LIVE} position={[0, 0, -0.03]}><boxGeometry args={[1.28, 0.36, 0.05]} /><meshStandardMaterial color={ghost ? '#66bb6a' : clan} /></mesh>
           <Sign text="CREW HOUSE" w={1.2} y={0} z={0} bg="#263238" fg="#ffffff" />
         </group>
       )}
