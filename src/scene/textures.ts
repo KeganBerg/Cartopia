@@ -318,6 +318,21 @@ export const windowGlowTex = () =>
     }
   })
 
+// The same panes in plain white, for windows lit in any colour (the club's LEDs).
+export const ledPaneTex = () =>
+  make('ledPane', 128, (g, s) => {
+    g.fillStyle = '#000000'
+    g.fillRect(0, 0, s, s)
+    const pw = s / 3
+    for (let i = 0; i < 3; i++) {
+      const grd = g.createLinearGradient(0, 6, 0, s - 6)
+      grd.addColorStop(0, '#ffffff')
+      grd.addColorStop(1, '#b0b0b0')
+      g.fillStyle = grd
+      g.fillRect(i * pw + 6, 6, pw - 12, s - 12)
+    }
+  })
+
 // Soft round light pool, drawn additively under lamps and headlights.
 export const glowTex = () =>
   make('glow', 64, (g, s) => {
