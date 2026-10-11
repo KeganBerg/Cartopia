@@ -6,7 +6,11 @@ import { CarModel } from './CarModel'
 import { signTexture } from './signTexture'
 import { skyTex, asphaltTex, paverTex, glowTex } from './textures'
 import { BuildingModel, LightPool } from './BuildingModel'
-import { glowMats, dayPhase, nightAmount } from './dayNight'
+import { glowMats, dayPhase, duskAmount, nightAmount } from './dayNight'
+import { lookFor } from './look'
+import { PostFx } from './PostFx'
+import { SkyEnv } from './SkyEnv'
+import { holdTown } from './renderGate'
 import { PAL } from './season'
 import { LAYER, decal } from './layers'
 import { holdPageTint } from './pageTint'
@@ -162,6 +166,10 @@ export function RaceScene({ track, me, them, mine, theirs }: Props) {
   const len = track * SCALE
   const slots = useStreet(len)
   const night = useMemo(() => nightAmount(dayPhase()), [])
+  // Same lights and colour grade as the town at this time of day.
+  const look = useMemo(() => lookFor(night, duskAmount(dayPhase())), [night])
+  // The town behind the race is hidden, so stop drawing it while racing.
+  useEffect(() => holdTown(), [])
   const asphalt = useMemo(() => {
     const t = asphaltTex().clone()
     t.repeat.set(1.6, (len + 40) / 2)
@@ -173,7 +181,8 @@ export function RaceScene({ track, me, them, mine, theirs }: Props) {
   const sky = tint('#3d9bff', '#0f1730')
   useEffect(() => holdPageTint(sky), [sky])
 
-  useFrame(() => {
+  useFrame(({ scene }) => {
+    scene.environmentIntensity = look.env
     const mz = (me.current?.dist ?? 0) * SCALE
     const tz = (them.current?.dist ?? 0) * SCALE
     meRef.current?.position.set(LANE, 0, mz)
@@ -194,8 +203,10 @@ export function RaceScene({ track, me, them, mine, theirs }: Props) {
       <fog attach="fog" args={[tint('#d9f2ff', '#1d2740'), 25, 60]} />
       <color attach="background" args={[tint('#3d9bff', '#0f1730')]} />
       <SkyDome tint={tint('#ffffff', '#2a3560')} />
-      <hemisphereLight args={[tint('#ffffff', '#6274b8'), PAL.ground, 0.85 - night * 0.4]} />
-      <directionalLight position={[5, 10, 2]} intensity={1.5 - night * 1.1} color={tint(PAL.sun, '#9fb4ff')} />
+      <hemisphereLight args={[look.sky, look.ground, look.hemiIntensity * 1.15]} />
+      <directionalLight position={[5, 10, 2]} intensity={look.sunIntensity * 0.85} color={look.sun} />
+      <SkyEnv />
+      <PostFx look={look} />
       {/* Ground, sidewalks and the street itself. */}
       <mesh rotation-x={-Math.PI / 2} position={[0, LAYER.outer, len / 2]}>
         <planeGeometry args={[80, len + 100]} />

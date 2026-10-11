@@ -8,6 +8,9 @@ import { BuildingModel } from './BuildingModel'
 import { rotatePlacement, setGhostTurn } from '../game/placement'
 import { Clouds } from './Clouds'
 import { DayNight } from './DayNight'
+import { PostFx } from './PostFx'
+import { SkyEnv } from './SkyEnv'
+import { townLook } from './look'
 import { PAL } from './season'
 import { SeasonFx } from './SeasonFx'
 import { glowMats } from './dayNight'
@@ -406,6 +409,8 @@ export function World() {
       <TownCars />
       <Clouds />
       <SeasonFx small={Math.min(window.innerWidth, window.innerHeight) < 700} />
+      <SkyEnv />
+      <PostFx look={townLook} town tiltShift />
     </>
   )
 }
