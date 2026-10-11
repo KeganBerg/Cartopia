@@ -8,7 +8,7 @@ import { supabase } from '../lib/supabase'
 import { Panel, SheetTabs } from './Menus'
 import { Canvas } from '@react-three/fiber'
 import { NeutralToneMapping } from 'three'
-import { RaceScene, startLights } from '../scene/RaceScene'
+import { RaceScene, startLights, finishView } from '../scene/RaceScene'
 import { pickVenue, venue as venueById } from '../scene/venues'
 import { sfx } from '../lib/sound'
 import { raceAudio, type RaceAudio } from '../lib/engineAudio'
@@ -778,11 +778,16 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   const [label, setLabel] = useState('')
   const labelTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const [result, setResult] = useState<null | { won: boolean; myTime: number; theirTime: number; note?: string; counted?: boolean; stars?: number }>(null)
-  // The result card waits a moment so both cars can be seen rolling through the finish.
+  // The result card waits a moment so both cars can be seen rolling through the finish,
+  // and for a slow-motion finish to play out (never more than a few seconds).
   const [cardUp, setCardUp] = useState(false)
   useEffect(() => {
     if (!result) return
-    const id = setTimeout(() => setCardUp(true), 1400)
+    const until = performance_now() + 5000
+    let id = setTimeout(function wait() {
+      if (finishView.busy && performance_now() < until) id = setTimeout(wait, 100)
+      else setCardUp(true)
+    }, 1400)
     return () => clearTimeout(id)
   }, [result])
   // Live races between signed-in players: 'yes' once the server is refereeing, 'no' to decide here.
@@ -790,10 +795,10 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   const joined = useRef<Promise<boolean> | null>(null)
   const [checking, setChecking] = useState(false)
   const finishRace = useGame((s) => s.finishRace)
-  const flash = (text: string) => {
+  const flash = (text: string, ms = 800) => {
     setLabel(text)
     clearTimeout(labelTimer.current)
-    labelTimer.current = setTimeout(() => setLabel(''), 800)
+    labelTimer.current = setTimeout(() => setLabel(''), ms)
   }
   // Off the line: reaction is seconds after GO, or negative for a jump start.
   const callLaunch = (reaction: number) => {
@@ -1071,7 +1076,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   return (
     <div className="race-full">
       <Canvas className="rf-canvas" camera={{ position: [0.4, 2.2, -4], fov: 55, near: 0.3, far: 150 }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
-        <RaceScene track={TRACK} me={me} them={them} mine={{ body: def.body, model: car.model, color: car.color, finish: car.finish, mods: car.mods }} theirs={{ body: rival.body, color: rival.color, mods: rival.mods }} venue={venue} weather={weather} night={night} />
+        <RaceScene track={TRACK} me={me} them={them} mine={{ body: def.body, model: car.model, color: car.color, finish: car.finish, mods: car.mods }} theirs={{ body: rival.body, color: rival.color, mods: rival.mods }} venue={venue} weather={weather} night={night} onPhoto={() => flash('PHOTO FINISH!', 2200)} />
       </Canvas>
       <div className="rf-top">
         <h2>{title ?? `Drag Race vs ${rival.town}`}</h2>

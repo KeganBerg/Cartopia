@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { BackSide, Color, IcosahedronGeometry, MeshBasicMaterial, MeshStandardMaterial, Object3D, type PerspectiveCamera, type Group, type InstancedMesh, type Mesh } from 'three'
 import type { Body, Finish } from '../game/data'
-import { CarModel } from './CarModel'
+import { CarModel, carSize } from './CarModel'
 import { signTexture } from './signTexture'
 import { skyTex, asphaltTex, paverTex, glowTex, sandTex, grassTex, beachSandTex, snowTex, concreteTex } from './textures'
 import { BuildingModel, LightPool } from './BuildingModel'
@@ -28,9 +28,25 @@ import type { Weather as WeatherState } from '../game/weather'
 
 export type RacerView = { dist: number }
 const SCALE = 0.25 // metres of race distance per world unit
-// How far past the finish line a car can roll while it brakes (the street runs on a little further).
-const RUN_OUT = 90
+// How far past the finish line (race metres) a car has to coast and brake to a stop.
+const RUN_OUT = 150
+// The road carries on this far (world units) past the finish, so its end is always lost in the
+// haze instead of dropping off into nothing. The scenery stops a bit sooner (each venue dresses
+// ~45 units past the length it's given), where the fog has nearly swallowed it anyway.
+const TAIL = 120
+const DRESS = 70
 const LANE = 0.75
+
+// The finish plays back from a short history of where the race put each car, so it
+// can run in slow motion (and from a trackside camera when it's close) while the race
+// clock, the shifts and the reported times carry on untouched.
+const PHOTO_GAP = 0.15 // seconds between the cars at the line that counts as a photo finish
+const SLOW = 0.3 // playback speed as the winner crosses
+const PHOTO_SLOW = 0.15 // ...and in a photo finish
+// Visual race clock (slows with the replay), for the crowd and the flag.
+const vclock = { t: 0 }
+// True while the finish is still playing back, so the result card waits for it.
+export const finishView = { busy: false }
 
 type Props = {
   track: number
@@ -42,6 +58,7 @@ type Props = {
   weatherSeed?: string // a live race's id, so both racers get the same weather
   weather?: WeatherState // the race's weather, already rolled (wins over weatherSeed)
   night?: boolean // race under the floodlights whatever the clock says (Pro Tour midnight legs)
+  onPhoto?: () => void // a photo finish is about to play
 }
 
 export function SkyDome({ tint = '#ffffff' }: { tint?: string }) {
@@ -97,7 +114,9 @@ function Spectators({ len, cold }: { len: number; cold: boolean }) {
     for (let i = 0; i < 90; i++) {
       const side = i % 2 ? 1 : -1
       // Crowds bunch up at the start and the finish.
-      const z = i < 60 ? -3 + (i / 60) * 18 : len - 8 + ((i - 60) / 30) * 12
+      let z = i < 60 ? -3 + (i / 60) * 18 : len - 8 + ((i - 60) / 30) * 12
+      // Keep clear of the photo-finish camera on the line.
+      if (side > 0 && z > len - 1.5 && z < len + 3.5) z -= 5
       // Face the street, give or take a little.
       const h = (side > 0 ? -Math.PI / 2 : Math.PI / 2) + (((i * 29) % 7) - 3) * 0.08
       out.push({ x: side * (ROAD + 0.3 + ((i * 37) % 7) / 10), z: z + ((i * 13) % 5) / 5, h, phase: i * 1.7, cheer: (i * 7) % 3 !== 0, c: i * 2654435761 })
@@ -120,8 +139,8 @@ function Spectators({ len, cold }: { len: number; cold: boolean }) {
     for (const m of [torso, head, hair, legs, arms]) if (m.current?.instanceColor) m.current.instanceColor.needsUpdate = true
   }, [fans, cold])
   const tmp = useMemo(() => new Object3D(), [])
-  useFrame(({ clock }) => {
-    const t = clock.elapsedTime
+  useFrame(() => {
+    const t = vclock.t
     fans.forEach((f, i) => {
       const hop = f.cheer ? Math.max(0, Math.sin(t * 6 + f.phase)) * 0.09 : 0
       const hip = FAN_LEG + hop
@@ -194,10 +213,13 @@ function Banner({ z, text, bg }: { z: number; text: string; bg: string }) {
           <meshStandardMaterial color="#eceff1" />
         </mesh>
       ))}
-      <mesh position={[0, 3.05, 0]} rotation-y={Math.PI}>
-        <planeGeometry args={[ROAD * 2 + 0.5, 0.55]} />
-        <meshBasicMaterial map={signTexture(text, bg, '#ffffff')} toneMapped={false} side={2} />
-      </mesh>
+      {/* Printed on both faces, so it reads the right way round from the photo-finish camera too. */}
+      {[Math.PI, 0].map((ry) => (
+        <mesh key={ry} position={[0, 3.05, ry ? -0.005 : 0.005]} rotation-y={ry}>
+          <planeGeometry args={[ROAD * 2 + 0.5, 0.55]} />
+          <meshBasicMaterial map={signTexture(text, bg, '#ffffff')} toneMapped={false} />
+        </mesh>
+      ))}
     </group>
   )
 }
@@ -258,9 +280,9 @@ function LaunchSmoke({ me, them, len }: { me: RefObject<RacerView>; them: RefObj
     if (startLights.n === 0 && acc.current > 0.06) {
       acc.current = 0
       for (const [r, x] of [[me, LANE], [them, -LANE]] as const) {
-        const z = (r.current?.dist ?? 0) * SCALE
+        const z = (r.current?.dist ?? 0) * SCALE - 0.9
         // Burnout for the first few car lengths, then it clears.
-        if (z > 0.05 && z < Math.min(3.5, len) && list.length < SMOKE_MAX - 1) {
+        if (z > -0.85 && z < Math.min(2.6, len) && list.length < SMOKE_MAX - 1) {
           for (const w of [-0.32, 0.32]) {
             list.push({ x: x + w + (Math.random() - 0.5) * 0.1, y: 0.15, z: z - 0.75, vx: w * 1.2 + (Math.random() - 0.5) * 0.6, vy: 0.4 + Math.random() * 0.5, vz: -0.6 - Math.random() * 0.8, age: 0, life: 0.6 + Math.random() * 0.4 })
           }
@@ -293,12 +315,12 @@ function LaunchSmoke({ me, them, len }: { me: RefObject<RacerView>; them: RefObj
 function FinishFlag({ len, me, them }: { len: number; me: RefObject<RacerView>; them: RefObject<RacerView> }) {
   const flag = useRef<Group>(null)
   const tex = useMemo(() => signTexture('▚▚▚', '#ffffff', '#111111'), [])
-  useFrame(({ clock }) => {
+  useFrame(() => {
     const g = flag.current
     if (!g) return
     // A lazy wave while they race, wild once someone crosses the line.
     const done = Math.max(me.current?.dist ?? 0, them.current?.dist ?? 0) * SCALE >= len
-    const t = clock.elapsedTime
+    const t = vclock.t
     g.rotation.z = done ? Math.sin(t * 9) * 0.9 : Math.sin(t * 2.2) * 0.25 + 0.2
   })
   return (
@@ -316,6 +338,9 @@ function FinishFlag({ len, me, them }: { len: number; me: RefObject<RacerView>; 
     </group>
   )
 }
+
+// Nothing tall on the kerb right in front of the photo-finish camera.
+const shotClear = (z: number, side: number, len: number) => side > 0 && z > len - 2 && z < len + 4.5
 
 function Lamp({ z, side, pole = '#37474f' }: { z: number; side: 1 | -1; pole?: string }) {
   return (
@@ -339,18 +364,20 @@ function Lamp({ z, side, pole = '#37474f' }: { z: number; side: 1 | -1; pole?: s
 
 // Street furniture: crowd barriers at the start and finish, bunting across the
 // street, hydrants and bins on the sidewalks, manholes, and a start light tree.
-function StreetDressing({ len, city }: { len: number; city: boolean }) {
+function StreetDressing({ len, far, city }: { len: number; far: number; city: boolean }) {
   const barriers: number[] = []
   for (let z = -4; z < 14; z += 1) barriers.push(z)
   for (let z = len - 9; z < len + 5; z += 1) barriers.push(z)
+  // A gap on the right at the line for the photo-finish camera.
+  const gap = (z: number, sd: number) => sd > 0 && z > len - 1.6
   const bunting: number[] = []
   for (let z = 12; z < len - 4; z += 22) bunting.push(z)
   const flags = ['#e53935', '#fdd835', '#1e88e5', '#43a047', '#fafafa']
   const furniture: number[] = []
-  if (city) for (let z = 2; z < len + 20; z += 7) furniture.push(z)
+  if (city) for (let z = 2; z < far + 20; z += 7) furniture.push(z)
   return (
     <group>
-      {barriers.map((z) => [-1, 1].map((sd) => (
+      {barriers.map((z) => [-1, 1].map((sd) => gap(z, sd) ? null : (
         <group key={`${z}${sd}`} position={[sd * (ROAD + 0.1), 0.08, z + 0.5]}>
           {[0.18, 0.42].map((y) => (
             <mesh key={y} position={[0, y, 0]}><boxGeometry args={[0.04, 0.07, 0.94]} /><meshStandardMaterial color={(Math.round(z) + (y > 0.3 ? 1 : 0)) % 2 ? '#e53935' : '#fafafa'} /></mesh>
@@ -393,6 +420,12 @@ function StreetDressing({ len, city }: { len: number; city: boolean }) {
           <Manhole key={z} x={-sd * LANE} z={z} />
         )
       })}
+      {/* The photo-finish camera on its tripod, across from the line camera. */}
+      <group position={[-(ROAD + 0.6), 0, len + 1.3]} rotation-y={2.3}>
+        {[0, 2.1, 4.2].map((a) => <mesh key={a} position={[Math.sin(a) * 0.12, 0.3, Math.cos(a) * 0.12]} rotation={[Math.cos(a) * 0.35, 0, -Math.sin(a) * 0.35]}><cylinderGeometry args={[0.012, 0.015, 0.62, 5]} /><meshStandardMaterial color="#263238" /></mesh>)}
+        <mesh position={[0, 0.66, 0]}><boxGeometry args={[0.16, 0.13, 0.22]} /><meshStandardMaterial color="#212121" /></mesh>
+        <mesh position={[0, 0.66, 0.14]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.045, 0.05, 0.08, 10]} /><meshStandardMaterial color="#37474f" metalness={0.6} roughness={0.3} /></mesh>
+      </group>
       {/* Start light tree beside the line. */}
       <group position={[-(ROAD + 0.45), 0, -0.4]}>
         <mesh position={[0, 0.8, 0]}><cylinderGeometry args={[0.05, 0.06, 1.6, 6]} /><meshStandardMaterial color="#37474f" /></mesh>
@@ -407,13 +440,16 @@ function StreetDressing({ len, city }: { len: number; city: boolean }) {
 
 // The drag strip, seen from a chase camera. On Main Street it's lined with the
 // player's own town; the other venues bring their own scenery.
-export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, weather: given, night: midnight }: Props) {
+export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, weather: given, night: midnight, onPhoto }: Props) {
   const city = venue.id === 'main'
   const meRef = useRef<Group>(null)
   const themRef = useRef<Group>(null)
   const { camera, size } = useThree()
   const len = track * SCALE
-  const slots = useStreet(len)
+  // Where the road and the scenery run out: far past where the cars stop, deep in the haze.
+  const far = len + TAIL
+  const dress = len + DRESS
+  const slots = useStreet(dress)
   const night = useMemo(() => (midnight ? 1 : nightAmount(dayPhase())), [midnight])
   // The venue's weather for this race (see raceWeather).
   // The race screen passes the one it races on, so the grip matches the sky.
@@ -425,10 +461,10 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
   useEffect(() => holdTown(), [])
   const asphalt = useMemo(() => {
     const t = asphaltTex().clone()
-    t.repeat.set(1.6, (len + 40) / 2)
+    t.repeat.set(1.6, (far + 50) / 2)
     t.needsUpdate = true
     return t
-  }, [len])
+  }, [far])
   // Goes glossy in the rain and slushy in snow, like the town's roads.
   const road = useMemo(() => wetRoad(asphalt, venue.road ?? '#ffffff'), [asphalt, venue.road])
   useEffect(() => () => road.dispose(), [road])
@@ -439,38 +475,129 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
   const sky = tint(overcast(venue.sky), '#0f1730')
   useEffect(() => holdPageTint(sky), [sky])
   // Full screen on a phone is tall and narrow: widen the view so the street still fills it.
+  const fov = useMemo(() => {
+    const aspect = size.width / size.height
+    return aspect < 1 ? Math.min(72, 55 / Math.max(aspect, 0.45) ** 0.35) : 55
+  }, [size])
   useEffect(() => {
     const cam = camera as PerspectiveCamera
-    const aspect = size.width / size.height
-    cam.fov = aspect < 1 ? Math.min(72, 55 / Math.max(aspect, 0.45) ** 0.35) : 55
+    cam.fov = fov
     cam.updateProjectionMatrix()
-  }, [camera, size])
+  }, [camera, fov])
+  useEffect(() => () => void (finishView.busy = false), [])
+  // Each car is drawn with its nose on its race position, so whoever is ahead at the line looks it.
+  const noses = [carSize(mine.body).len * 0.7, carSize(theirs.body).len * 0.7]
 
-  // Past the line each car keeps rolling and brakes to a stop, instead of freezing on it.
-  const runs = useRef([{ z: 0, v: 0, last: 0 }, { z: 0, v: 0, last: 0 }])
+  // Past the line each car lifts, coasts a moment, then brakes to a stop well before the
+  // road runs out, nose dipping as the brakes bite. Distances are race metres.
+  const runs = useRef([0, 1].map(() => ({ z: 0, v: 0, last: 0, past: 0, dip: 0, cross: -1 })))
+  // The finish replay (see PHOTO_GAP): the race's own positions, stamped on the race's frame clock,
+  // played back on a visual clock that can run slower than it.
+  const fx = useRef({ st: 0, vt: 0, hist: [] as { t: number; d: [number, number] }[], phase: 'race' as 'race' | 'slow' | 'after', photo: false, rate: 1, target: 1, side: false, since: 0 })
   useFrame(({ scene }, delta) => {
     scene.environmentIntensity = look.env
     const dt = Math.min(delta, 0.1)
-    const [mz, tz] = [me.current?.dist ?? 0, them.current?.dist ?? 0].map((d, i) => {
+    const f = fx.current
+    f.st += dt
+    f.hist.push({ t: f.st, d: [me.current?.dist ?? 0, them.current?.dist ?? 0] })
+    f.rate += (f.target - f.rate) * Math.min(1, dt * 12)
+    const vdt = dt * f.rate
+    f.vt = Math.min(f.st, f.vt + vdt)
+    vclock.t += vdt
+    // Where the race had each car at the visual clock's time.
+    const h = f.hist
+    while (h.length > 2 && h[1].t <= f.vt) h.shift()
+    const a = h[0]
+    const b = h[1] ?? a
+    const k = b.t > a.t ? Math.max(0, Math.min(1, (f.vt - a.t) / (b.t - a.t))) : 1
+    const shown = [0, 1].map((i) => a.d[i] + (b.d[i] - a.d[i]) * k)
+    const [mz, tz] = shown.map((d, i) => {
       const r = runs.current[i]
       if (d < track) {
         // Speed as the race draws it, so live rivals (who only send positions) roll on too.
-        if (dt > 0) r.v += ((d - r.last) / dt - r.v) * Math.min(1, dt * 8)
+        if (vdt > 0) r.v += ((d - r.last) / vdt - r.v) * Math.min(1, vdt * 8)
         r.z = d
       } else {
-        if (r.z < track) r.z = track
-        r.v = Math.max(0, r.v - (6 + r.v * 0.35) * dt)
-        r.z = Math.min(track + RUN_OUT, r.z + r.v * dt)
+        if (r.cross < 0) {
+          r.cross = f.vt
+          r.z = Math.max(r.z, track)
+        }
+        r.past += vdt
+        // Lift and coast, then brake just hard enough to stop short of the end of the run-out.
+        const left = Math.max(1, track + RUN_OUT * 0.92 - r.z)
+        const brake = r.past < 0.35 ? 2.5 : Math.min(r.v * r.v / (2 * left), 14) * Math.min(1, (r.past - 0.35) / 0.4) + 1.5
+        r.v = Math.max(0, r.v - brake * vdt)
+        r.z = Math.min(track + RUN_OUT, r.z + r.v * vdt)
+        // The nose dips under braking and settles back as the car stops.
+        r.dip += ((r.v > 0.5 ? Math.min(1, brake / 12) : 0) - r.dip) * Math.min(1, vdt * 6)
       }
       r.last = d
-      return r.z * SCALE
+      return r.z * SCALE - noses[i]
     })
+    const cars = [meRef.current, themRef.current]
+    cars.forEach((g, i) => g?.rotation.set(runs.current[i].dip * 0.035, 0, 0))
     meRef.current?.position.set(LANE, 0, mz)
     themRef.current?.position.set(-LANE, 0, tz)
+
+    // The finish: slow motion as the leader reaches the line, from the trackside camera when it's close.
+    const [ra, rb] = runs.current
+    if (f.phase === 'race') {
+      const eta = (r: typeof ra, d: number) => (d >= track ? 0 : r.v > 1 ? (track - d) / r.v : Infinity)
+      const ta = eta(ra, shown[0])
+      const tb = eta(rb, shown[1])
+      if (Math.min(ta, tb) < 0.16) {
+        f.phase = 'slow'
+        f.photo = Math.abs(ta - tb) < PHOTO_GAP
+        f.target = f.photo ? PHOTO_SLOW : SLOW
+        f.side = f.photo
+        f.since = f.vt
+        finishView.busy = true
+        if (f.photo) onPhoto?.()
+      }
+    } else if (f.phase === 'slow') {
+      const first = Math.min(...[ra.cross, rb.cross].filter((c) => c >= 0))
+      const both = ra.cross >= 0 && rb.cross >= 0
+      // A normal finish slows just as the winner crosses; a photo finish holds until both are over.
+      const done = f.photo ? (both && f.vt - Math.max(ra.cross, rb.cross) > 0.12) || f.vt - f.since > 1 : Number.isFinite(first) && f.vt - first > 0.2
+      if (done) {
+        f.phase = 'after'
+        f.target = 1
+        f.since = f.vt
+      }
+    } else {
+      // Both cars are over the line, so nothing left in the history needs showing: drop the lag.
+      const settled = ra.cross >= 0 && rb.cross >= 0
+      if (settled) f.vt = f.st
+      // Otherwise the trailing car catches up at a little over real time.
+      else f.target = f.st - f.vt > 0.03 ? 1.35 : 1
+      // The trackside shot holds while the cars run out of frame, then cuts back to the chase.
+      if (f.side && f.vt - f.since > 0.7) f.side = false
+      if (!f.side && f.rate > 0.97 && f.st - f.vt < 0.03) finishView.busy = false
+    }
+
+    const cam = camera as PerspectiveCamera
+    const tall = size.height > size.width
+    if (f.side) {
+      // Low on the kerb just past the line, looking back across it as the noses arrive.
+      if (cam.fov !== (tall ? fov : 34)) {
+        cam.fov = tall ? fov : 34
+        cam.updateProjectionMatrix()
+      }
+      // A tall phone screen stands back a little and looks down more, so the cars fill it rather than the sky.
+      if (tall) cam.position.set(ROAD + 0.5, 1.15, len + 3.9)
+      else cam.position.set(ROAD + 0.55, 0.7, len + 2.6)
+      cam.lookAt(-0.3, tall ? 0.05 : 0.3, len - 0.5)
+      return
+    }
+    if (cam.fov !== fov) {
+      cam.fov = fov
+      cam.updateProjectionMatrix()
+      // Cut straight back behind the cars rather than swooping through the barriers.
+      cam.position.set(tall ? 0 : LANE * 0.5, tall ? 2.7 : 2.2, mz - (tall ? 5.2 : 4.2))
+    }
     const lead = Math.max(mz, tz)
     const target = Math.min(mz, len + RUN_OUT * SCALE)
     // Tall phone screens get a higher, further-back chase view.
-    const tall = size.height > size.width
     camera.position.lerp({ x: tall ? 0 : LANE * 0.5, y: tall ? 2.7 : 2.2, z: target - (tall ? 5.2 : 4.2) } as never, 0.15)
     camera.lookAt(tall ? 0 : LANE * 0.3, 0.3, Math.min(target + 3 + (lead - target) * 0.3, len + RUN_OUT * SCALE + 4))
   })
@@ -486,18 +613,18 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
       <PostFx look={look} />
       <RaceWeather w={weather} look={look} night={night} />
       {/* Ground, sidewalks and the street itself. */}
-      <mesh rotation-x={-Math.PI / 2} position={[0, LAYER.outer, len / 2]}>
-        <planeGeometry args={[80, len + 100]} />
+      <mesh rotation-x={-Math.PI / 2} position={[0, LAYER.outer, far / 2]}>
+        <planeGeometry args={[300, far + 140]} />
         {venue.id === 'desert' ? (
-          <meshStandardMaterial map={sandTex(10, (len + 100) / 8)} />
+          <meshStandardMaterial map={sandTex(38, (far + 140) / 8)} />
         ) : venue.id === 'beach' ? (
-          <meshStandardMaterial map={beachSandTex(10, (len + 100) / 8)} />
+          <meshStandardMaterial map={beachSandTex(38, (far + 140) / 8)} />
         ) : venue.id === 'snow' ? (
-          <meshStandardMaterial map={snowTex(10, (len + 100) / 8)} />
+          <meshStandardMaterial map={snowTex(38, (far + 140) / 8)} />
         ) : venue.id === 'docks' ? (
-          <meshStandardMaterial map={concreteTex(16, (len + 100) / 5)} />
+          <meshStandardMaterial map={concreteTex(60, (far + 140) / 5)} />
         ) : venue.id === 'farm' ? (
-          <meshStandardMaterial map={grassTex(10, (len + 100) / 8)} />
+          <meshStandardMaterial map={grassTex(38, (far + 140) / 8)} />
         ) : (
           <meshStandardMaterial color={venue.ground ?? PAL.ground} />
         )}
@@ -505,30 +632,30 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
       {/* The street is static, so it's merged into a few draws like the town. */}
       <Batch version={city ? slots : venue.id}>
         {[-1, 1].map((sd) => (
-          <mesh key={sd} position={[sd * (ROAD + WALK / 2), 0.04, len / 2 + 5]}>
-            <boxGeometry args={[WALK, 0.08, len + 50]} />
-            {venue.shoulder ? <meshStandardMaterial color={venue.shoulder} /> : <meshStandardMaterial map={paverTex(0.5, (len + 50) / 2)} />}
+          <mesh key={sd} position={[sd * (ROAD + WALK / 2), 0.04, far / 2 + 5]}>
+            <boxGeometry args={[WALK, 0.08, far + 50]} />
+            {venue.shoulder ? <meshStandardMaterial color={venue.shoulder} /> : <meshStandardMaterial map={paverTex(0.5, (far + 50) / 2)} />}
           </mesh>
         ))}
-        <mesh rotation-x={-Math.PI / 2} position={[0, LAYER.land, len / 2 + 5]}>
-          <planeGeometry args={[ROAD * 2, len + 50]} />
+        <mesh rotation-x={-Math.PI / 2} position={[0, LAYER.land, far / 2 + 5]}>
+          <planeGeometry args={[ROAD * 2, far + 50]} />
           <primitive object={road} attach="material" dispose={null} />
         </mesh>
         {/* Centre line dashes and edge lines. */}
-        {Array.from({ length: Math.ceil((len + 30) / 2) }, (_, i) => (
+        {Array.from({ length: Math.ceil((far + 30) / 2) }, (_, i) => (
           <mesh key={i} rotation-x={-Math.PI / 2} position={[0, LAYER.grid, i * 2 - 8]}>
             <planeGeometry args={[0.06, 1]} />
             <meshBasicMaterial color="#fafafa" {...decal()} />
           </mesh>
         ))}
         {[-1, 1].map((sd) => (
-          <mesh key={sd} rotation-x={-Math.PI / 2} position={[sd * (ROAD - 0.08), LAYER.grid, len / 2 + 5]}>
-            <planeGeometry args={[0.07, len + 50]} />
+          <mesh key={sd} rotation-x={-Math.PI / 2} position={[sd * (ROAD - 0.08), LAYER.grid, far / 2 + 5]}>
+            <planeGeometry args={[0.07, far + 50]} />
             <meshBasicMaterial color="#ffd54f" {...decal()} />
           </mesh>
         ))}
         {/* Start grid line and chequered finish. */}
-        <mesh rotation-x={-Math.PI / 2} position={[0, LAYER.lot, -0.6]}>
+        <mesh rotation-x={-Math.PI / 2} position={[0, LAYER.lot, 0.1]}>
           <planeGeometry args={[ROAD * 2, 0.15]} />
           <meshBasicMaterial color="#fafafa" {...decal(2)} />
         </mesh>
@@ -554,22 +681,22 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
               <group position={[sl.side * (ROAD + WALK + 0.9), 0, d.w + 0.7]}>
                 <BuildingModel def={buildingDef(i % 3 ? 'tree' : 'palm')} />
               </group>
-              {i % 2 === 0 && <Lamp z={d.w + 0.7} side={sl.side} />}
+              {i % 2 === 0 && !shotClear(sl.z + d.w + 0.7, sl.side, len) && <Lamp z={d.w + 0.7} side={sl.side} />}
             </group>
           )
         }) : (
           <>
-            <VenueScenery id={venue.id} len={len} />
-            {Array.from({ length: Math.ceil((len + 40) / 9) }, (_, i) => <Lamp key={i} z={i * 9 - 6} side={i % 2 ? 1 : -1} pole={venue.pole} />)}
+            <VenueScenery id={venue.id} len={dress} />
+            {Array.from({ length: Math.ceil((far + 40) / 9) }, (_, i) => shotClear(i * 9 - 6, i % 2 ? 1 : -1, len) ? null : <Lamp key={i} z={i * 9 - 6} side={i % 2 ? 1 : -1} pole={venue.pole} />)}
           </>
         )}
-        <StreetDressing len={len} city={city} />
+        <StreetDressing len={len} far={far} city={city} />
       </Batch>
       <Spectators len={len} cold={venue.id === 'snow' || SEASON === 'winter'} />
       <StartLights />
       <LaunchSmoke me={me} them={them} len={len} />
       <FinishFlag len={len} me={me} them={them} />
-      {city ? <Skyline len={len} edge={ROAD + WALK + 4.2} night={night} /> : <VenueBackdrop id={venue.id} len={len} />}
+      {city ? <Skyline len={dress} edge={ROAD + WALK + 4.2} night={night} /> : <VenueBackdrop id={venue.id} len={dress} />}
       {/* Soft shadows under the racers. */}
       {[meRef, themRef].map((r, i) => (
         <group key={i} ref={r} scale={1.4}>
