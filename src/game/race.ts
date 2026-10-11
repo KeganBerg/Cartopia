@@ -155,3 +155,22 @@ export function raceFloor(piVal: number) {
   floors.set(piVal, floor)
   return floor
 }
+
+// One clean pull, as the garage dyno runs it: every shift perfect at 85%, no skill.
+// Calls `each` with the racer after every step, and returns the finish time.
+export const DYNO_DT = 1 / 120
+export function dynoPull(piVal: number, each?: (r: Racer, t: number) => void) {
+  const r = freshRacer()
+  let t = 0
+  while (r.finished === null && t < 120) {
+    t += DYNO_DT
+    if (r.gear < 3 && r.rpm >= 0.85) {
+      r.quality = 1.08
+      r.gear++
+      r.rpm = 0.35
+    }
+    stepRacer(r, piVal, DYNO_DT, t)
+    each?.(r, t)
+  }
+  return Math.round((r.finished ?? t) * 100) / 100
+}

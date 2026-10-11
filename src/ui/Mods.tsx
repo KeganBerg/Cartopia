@@ -9,9 +9,6 @@ export function withMod(mods: string[] | undefined, tryId: string | null) {
   return [...(mods ?? []).filter((id) => modDef(id)?.slot !== m.slot), m.id]
 }
 
-// Tires stay off the shelf until races feel the weather (the race screen wiring follows).
-const SHOP_SLOTS = MOD_SLOTS.filter((s) => s.id !== 'tires')
-
 const STAT_NAME = { power: 'Power', grip: 'Grip', weight: 'Weight' } as const
 
 const TREAD_NAME = { wet: '🌧️ Rain', snow: '❄️ Snow', dust: '🏜️ Sand' } as const
@@ -30,13 +27,23 @@ function price(m: ModDef, coins = m.coins) {
   return `$${coins.toLocaleString()}${m.parts ? ` + ${m.parts}⚙` : ''}`
 }
 
+// The slot the next Mods tab opens on (a daily deal sends you to its part's slot).
+let nextModSlot: ModSlot = 'spoiler'
+export function openModSlot(slot: ModSlot) {
+  nextModSlot = slot
+}
+
 // Mod shop for one car: pick a slot, tap a part to try it on the preview, then fit it.
 export function ModShop({ car, trying, setTrying }: { car: OwnedCar; trying: string | null; setTrying: (id: string | null) => void }) {
   const level = useGame((s) => s.level)
   const modCar = useGame((s) => s.modCar)
   const deals = useGame((s) => s.deals)
   const def = carDef(car.model)
-  const [slot, setSlot] = useState<ModSlot>('spoiler')
+  const [slot, setSlot] = useState<ModSlot>(() => {
+    const s = nextModSlot
+    nextModSlot = 'spoiler'
+    return s
+  })
   const fit = fittedMods(car.mods, def.body)
   const owned = ownedMods(car)
   const basePi = performance(def, car.upgrades, car.mods)
@@ -44,7 +51,7 @@ export function ModShop({ car, trying, setTrying }: { car: OwnedCar; trying: str
   return (
     <div className="mods">
       <div className="mod-tabs" role="tablist">
-        {SHOP_SLOTS.map((s) => (
+        {MOD_SLOTS.map((s) => (
           <button
             key={s.id}
             role="tab"
@@ -86,7 +93,7 @@ export function ModShop({ car, trying, setTrying }: { car: OwnedCar; trying: str
                 <button
                   className={m.bucks ? 'buy small premium' : 'buy small'}
                   onClick={(e) => { e.stopPropagation(); if (modCar(car.uid, m.id)) setTrying(null) }}
-                >{deal.deal && <span className="deal-tag">DEAL</span>}Buy · {deal.deal && <s>{price(m)}</s>} {price(m, deal.coins)}</button>
+                >{deal.deal && <span className="deal-tag">DEAL</span>}Buy · {price(m, deal.coins)}</button>
               )}
             </div>
           )

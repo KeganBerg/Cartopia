@@ -1,9 +1,10 @@
 import { Icon } from './Icon'
 import { useGame, dealUsed, openDeals, today } from '../game/store'
-import { DEAL_SLOTS, buildingDef, carDef, dealOffer, dealsFor, msToNextDay, type DealDef } from '../game/data'
+import { DEAL_SLOTS, buildingDef, carDef, dealOffer, dealsFor, modDef, msToNextDay, type DealDef } from '../game/data'
 import { useNow } from '../scene/useNow'
 import { BuildingThumb, CarThumb } from '../scene/BuildingPreview'
 import { Panel, openGarageTab } from './Menus'
+import { openModSlot } from './Mods'
 
 const left = (ms: number) => {
   const m = Math.max(1, Math.ceil(ms / 60000))
@@ -53,6 +54,8 @@ function DealCard({ deal, slot }: { deal: DealDef; slot: string }) {
       return s.setMode('place', deal.item ?? null)
     }
     if (!s.cars.length) return s.toast('Get a car first')
+    const slot = deal.kind === 'mod' ? modDef(deal.item ?? '')?.slot : undefined
+    if (slot) openModSlot(slot)
     openGarageTab(deal.kind === 'mod' ? 'mods' : 'paint')
     s.toast(deal.kind === 'mod' ? `Pick a car, then the ${o.name} is on sale in Mods` : `Pick a car, then ${o.name} is on sale in Paint`)
   }

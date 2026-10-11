@@ -15,7 +15,9 @@ import { raceAudio, type RaceAudio } from '../lib/engineAudio'
 import { useLive, challenge, cancelChallenge, refreshPresence, raceChannel, endLiveRace, answer, pruneInvites, mute, unmute, setClosed, INVITE_MS, type LiveRace } from '../lib/live'
 import { displayName } from '../lib/names'
 import { joinRefereed, reportFinish, serverPi, type Verdict } from '../lib/referee'
-import { ghostDist, TRIAL_FUEL } from '../game/trial'
+import { ghostDist, trialWeek, TRIAL_FUEL } from '../game/trial'
+import { raceWeather } from '../game/weather'
+import { carGrip, conditions, conditionsNote, gripMul, spinning } from '../game/grip'
 import { TrialTab, TrialResult, beginTrialRun, type TrialRun } from './TimeTrial'
 import { claim as claimVisitor, leave as leaveVisitor, setRacing, type Visitor } from '../lib/visitors'
 import { RivalCard, RivalResult, type RivalMatch, type RivalBonus } from './Rivals'
@@ -611,6 +613,15 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   const theirSkill = live || trial ? undefined : rival.skill
   // Somewhere different each race; both sides of a live race get the same place.
   const [venue] = useState(() => (venueId ? venueById(venueId) : pickVenue(live?.raceId)))
+  // The sky over the strip, rolled once: a live race from its id (both racers match), the weekly
+  // time trial from its week (everyone races the same conditions), anything else from the town.
+  const [weather] = useState(() => raceWeather(venue.id, live?.raceId ?? (trial ? `trial-${trialWeek()}` : undefined)))
+  // What the weather and venue do to each car's grip (see grip.ts). AI rivals race on stock tires.
+  const grip = useMemo(() => conditions(weather.kind, venue.id, carGrip(def, car.upgrades, car.mods), car.mods), [weather, venue, def, car.upgrades, car.mods])
+  const theirGrip = useMemo(() => conditions(weather.kind, venue.id, CARS.find((c) => c.name === shownRival.carName)?.grip ?? 50), [weather, venue, shownRival.carName])
+  const gripNote = conditionsNote(grip)
+  const spinShown = useRef(false)
+  const [spin, setSpin] = useState(false)
   const theirActive = useRef(false)
   const [theirShown, setTheirShown] = useState(false)
   const t = useRef(0)
@@ -809,8 +820,10 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       const theirDrag = skillDrag(theirSkill, me.current, t.current)
       const theirOn = theirBoost !== 1 || theirDrag !== 1
       if (theirOn !== theirActive.current) { theirActive.current = theirOn; setTheirShown(theirOn) }
-      const myMul = (live ? mine : skillBoost(sk, me.current, th0)) * theirDrag
+      const myMul = (live ? mine : skillBoost(sk, me.current, th0)) * theirDrag * gripMul(grip, me.current.gear, me.current.rpm, t.current)
       step(me.current, myPi, dt, t.current, myMul)
+      const spinNow = me.current.launched && me.current.finished === null && spinning(grip, me.current.gear, me.current.rpm, t.current)
+      if (spinNow !== spinShown.current) { spinShown.current = spinNow; setSpin(spinNow) }
       const th = them.current
       if (live) {
         if (now - lastSent > 100) {
@@ -830,13 +843,13 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       } else {
         if (!th.launched && t.current >= theirReaction) launchRacer(th, theirReaction)
         if (th.launched && th.gear < 3 && th.rpm >= skill[th.gear]) {
-          const q = shiftQuality(th.rpm)
+          const q = shiftQuality(th.rpm, theirGrip.lo, theirGrip.hi)
           shiftRacer(th, smoothShift(theirSkill) && q.label === 'Good' ? 1.08 : q.q)
           sound.current?.shift('them', th.gear, Math.min(1, rivalRef.current.pi / 200))
         }
         if (th.gear >= AI_BOOST_GEAR) fireBoost(th)
         if (th.burning !== theirBoosting.current) { theirBoosting.current = th.burning; setTheirBoost(th.burning) }
-        step(th, rivalRef.current.pi, dt, t.current, theirBoost * skillDrag(sk, th, t.current))
+        step(th, rivalRef.current.pi, dt, t.current, theirBoost * skillDrag(sk, th, t.current) * gripMul(theirGrip, th.gear, th.rpm, t.current))
       }
       force((n) => n + 1)
       if (live) {
@@ -867,7 +880,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       signal.cancelled = true
       cancelAnimationFrame(raf)
     }
-  }, [countdown, result, myPi, skill, finishRace, live, def, theirSkill, trial, theirReaction])
+  }, [countdown, result, myPi, skill, finishRace, live, def, theirSkill, trial, theirReaction, grip, theirGrip])
 
   // The big button: launch on GO, then shift up.
   const press = () => {
@@ -881,7 +894,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       return
     }
     if (r.gear >= 3) return
-    let s = shiftQuality(r.rpm)
+    let s = shiftQuality(r.rpm, grip.lo, grip.hi)
     if (smoothShift(def.skill) && s.label === 'Good') s = { q: 1.08, label: 'SMOOTH!' }
     sfx.shift(s.q >= 1)
     shiftRacer(r, s.q)
@@ -914,7 +927,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   return (
     <div className="race-full">
       <Canvas className="rf-canvas" camera={{ position: [0.4, 2.2, -4], fov: 55, near: 0.3, far: 150 }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
-        <RaceScene track={TRACK} me={me} them={them} mine={{ body: def.body, model: car.model, color: car.color, finish: car.finish, mods: car.mods }} theirs={{ body: rival.body, color: rival.color, mods: rival.mods }} venue={venue} weatherSeed={live?.raceId} />
+        <RaceScene track={TRACK} me={me} them={them} mine={{ body: def.body, model: car.model, color: car.color, finish: car.finish, mods: car.mods }} theirs={{ body: rival.body, color: rival.color, mods: rival.mods }} venue={venue} weather={weather} />
       </Canvas>
       <div className="rf-top">
         <h2>{title ?? `Drag Race vs ${rival.town}`}</h2>
@@ -932,7 +945,8 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
           </div>
         ))}
       </div>
-      {countdown > 0 && !result && <div className="rf-venue">{venue.icon} {venue.name}</div>}
+      {countdown > 0 && !result && <div className={`rf-venue v-${venue.id}`}><span className="rf-venue-ico">{venue.icon}</span><span className="rf-venue-txt"><small>{gripNote ?? 'Race venue'}</small><b>{venue.name}</b></span></div>}
+      {spin && !label && !result && <div className="rf-spin">💨 Wheelspin</div>}
       {countdown > 0 && countdown !== 99 && <div className="countdown big" key={countdown}>{countdown}</div>}
       {countdown === 0 && !me.current.launched && !result && <div className="countdown big go">GO!</div>}
       {me.current.burning && !result && <div className="rf-boost-fx" />}
@@ -956,7 +970,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
         <div className="rf-bottom">
           <svg viewBox="0 0 120 120" className="tach">
             <circle cx="60" cy="60" r="56" fill="#1b1f24" fillOpacity="0.85" stroke="#cfd8dc" strokeWidth="3" />
-            <path d={arcPath(60, 60, 46, -210 + 0.78 * 240, -210 + 0.93 * 240)} stroke="#76ff03" strokeWidth="10" fill="none" />
+            <path d={arcPath(60, 60, 46, -210 + grip.lo * 240, -210 + grip.hi * 240)} stroke="#76ff03" strokeWidth="10" fill="none" />
             <path d={arcPath(60, 60, 46, -210 + 0.95 * 240, 30)} stroke="#ff1744" strokeWidth="10" fill="none" />
             <line x1="60" y1="60" x2={60 + 44 * Math.cos((rpmAngle * Math.PI) / 180)} y2={60 + 44 * Math.sin((rpmAngle * Math.PI) / 180)} stroke="#ff9100" strokeWidth="4" strokeLinecap="round" />
             <circle cx="60" cy="60" r="6" fill="#eceff1" />

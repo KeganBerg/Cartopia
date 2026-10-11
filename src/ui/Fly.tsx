@@ -162,7 +162,7 @@ export function FlyLayer() {
 
 // A counter that rolls up to its new value instead of jumping, timed to land
 // with the flying coins. Spending drops straight away.
-export function Roll({ value }: { value: number }) {
+export function Roll({ value, format = (v: number) => v.toLocaleString() }: { value: number; format?: (v: number) => string }) {
   const [shown, setShown] = useState(value)
   const cur = useRef(value)
   useEffect(() => {
@@ -185,5 +185,5 @@ export function Roll({ value }: { value: number }) {
     raf = requestAnimationFrame(step)
     return () => cancelAnimationFrame(raf)
   }, [value])
-  return <>{shown.toLocaleString()}</>
+  return <>{format(shown)}</>
 }

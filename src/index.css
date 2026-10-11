@@ -434,13 +434,17 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
   .hud-strip .speedo-level { top: 32px; width: 50px; font-size: 13px; line-height: 1; }
   .hud-strip .speedo-xp { display: none; }
   .hud-strip .speedo-menu { width: 18px; height: 18px; font-size: 10px; top: -4px; right: -19px; border-width: 1.5px; }
-  .hud-chips { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; min-width: 0; }
+  .hud-chips { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; min-width: 164px; }
   .chip-stat { display: flex; align-items: center; gap: 4px; min-width: 0; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.25); border-radius: 12px; padding: 1px 6px 1px 2px; color: #fff; font: 13px var(--display); white-space: nowrap; overflow: hidden; }
   .chip-stat .ico { width: 18px; height: 18px; font-size: 10px; border-width: 1.5px; }
-  .chip-fuel-bar { position: relative; flex: 1; height: 14px; border-radius: 7px; background: #11151a; overflow: hidden; min-width: 40px; }
-  .chip-fuel-bar i { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(#ffee58, #f9a825); }
-  .chip-fuel-bar b { position: absolute; inset: 0; display: grid; place-items: center; font: 10px var(--display); font-weight: normal; color: #fff; text-shadow: 0 1px 1px #000; }
+  .chip-fuel-bar { position: relative; flex: 1 1 0; width: 0; min-width: 0; height: 14px; border-radius: 7px; background: #11151a; overflow: hidden; }
+  .chip-fuel { padding-right: 4px; }
+  .chip-fuel-bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: inherit; background: linear-gradient(#ffee58, #f9a825); }
+  .chip-fuel-bar b { position: absolute; inset: 0; display: grid; place-items: center; white-space: nowrap; letter-spacing: -.02em; font: 10px var(--display); font-weight: normal; color: #fff; text-shadow: 0 1px 1px #000; }
   .hud-actions { display: flex; gap: 4px; flex: none; }
+  /* Four or more tiles stack two-high so the money chips keep their room. */
+  .hud-actions:has(> :nth-child(4)) { display: grid; grid-auto-flow: column; grid-template-rows: 28px 28px; }
+  .hud-mobile .hud-actions:has(> :nth-child(4)) > * { width: 28px; height: 28px; font-size: 14px; border-radius: 8px; }
   .hud-actions .goals-btn, .hud-actions .challenge-bell { width: 36px; height: 36px; font-size: 17px; border-width: 2px; border-radius: 10px; box-shadow: none; }
   .hud-actions .bell-count { top: -6px; right: -6px; }
   .hud-town { display: flex; justify-content: center; align-items: center; gap: 8px; margin: 5px auto 0; width: max-content; max-width: 100%; background: rgba(27,31,36,.7); color: #fff; font: 13px var(--display); border-radius: 12px; padding: 2px 10px; pointer-events: auto; }
@@ -789,6 +793,9 @@ button.lvl-item:hover { border-color: var(--accent); transform: translateY(-2px)
 .race-full .shift-label.big { top: 34%; font-size: 40px; }
 .race-full .skill-flash { top: calc(118px + var(--sat)); }
 .rf-venue { position: absolute; top: calc(118px + var(--sat)); left: 0; right: 0; width: fit-content; margin: 0 auto; padding: 6px 16px; border-radius: 999px; background: rgba(27,31,36,.6); color: #fff; font: 18px var(--display); white-space: nowrap; pointer-events: none; animation: pop .25s ease-out; }
+/* Wheelspin on a slick strip: a small pulsing tag above the tach. */
+.rf-spin { position: absolute; left: calc(16px + var(--sal)); bottom: calc(160px + var(--sab)); padding: 4px 12px; border-radius: 999px; background: rgba(255,255,255,.85); color: #37474f; font: 15px var(--display); pointer-events: none; animation: spin-pulse .4s ease-in-out infinite alternate; }
+@keyframes spin-pulse { from { transform: translateX(-2px); } to { transform: translateX(2px); } }
 .rf-wait { position: absolute; top: 40%; left: 0; right: 0; padding: 0 16px; text-align: center; font: 22px var(--display); color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,.4); }
 .rf-wait-actions { display: flex; gap: 10px; justify-content: center; margin-top: 12px; text-shadow: none; }
 .rf-wait-actions button { font-family: inherit; }
@@ -1367,6 +1374,34 @@ button.book-car { font: inherit; color: inherit; }
 .taunt-sent { color: #2e7d32; font-weight: 800; }
 .taunt-quote { font-weight: 800; color: #5e35b1; }
 .visit-banner .row { flex-wrap: wrap; justify-content: center; }
+
+/* Garage dyno: drawn over the car preview after an upgrade. Tap anywhere to close. */
+.dyno { position: absolute; inset: 0; display: block; width: 100%; padding: 0; border: 0; background: linear-gradient(180deg, rgba(38,50,56,.0) 55%, rgba(38,50,56,.28)); cursor: pointer; font: inherit; color: #263238; text-align: left; animation: dyno-in .25s ease-out; }
+@keyframes dyno-in { from { opacity: 0; } }
+.dyno-tag { position: absolute; top: 6px; left: 6px; font: 12px var(--display); letter-spacing: 2px; color: #fff; background: #263238; border-radius: 6px; padding: 2px 7px; box-shadow: 0 2px 0 rgba(0,0,0,.25); }
+.dyno-skip { position: absolute; bottom: 6px; right: 6px; font-size: 11px; font-weight: 800; color: #fff; background: rgba(38,50,56,.6); border-radius: 999px; padding: 2px 9px; }
+.dyno.done .dyno-skip { opacity: .7; }
+.dyno-gauge { position: absolute; left: 6px; bottom: 6px; width: 72px; height: 72px; filter: drop-shadow(0 2px 2px rgba(0,0,0,.3)); }
+.dg-face { fill: #263238; stroke: #eceff1; stroke-width: 3; }
+.dg-arc { fill: none; stroke: #78909c; stroke-width: 4; }
+.dg-red { fill: none; stroke: #ef5350; stroke-width: 5; }
+.dg-tick { stroke: #eceff1; stroke-width: 2.5; stroke-linecap: round; }
+.dg-gear { fill: #ffca28; font: 16px var(--display); text-anchor: middle; }
+.dg-needle { fill: #ff7043; }
+.dg-hub { fill: #eceff1; }
+.dyno-read { position: absolute; top: 6px; right: 6px; display: grid; gap: 2px; min-width: 128px; padding: 5px 8px; background: rgba(255,255,255,.92); border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,.18); }
+.dr-row { display: grid; grid-template-columns: 44px auto 1fr; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
+.dr-row small { font-size: 10px; font-weight: 800; text-transform: uppercase; color: #78909c; }
+.dr-row b { font: 15px var(--display); }
+.dr-row i { font-style: normal; font-size: 11px; font-weight: 800; color: #607d8b; text-align: right; }
+.dr-row.old b { color: #90a4ae; }
+.dr-row.new b { color: #1b5e20; }
+.dr-gain { justify-self: end; font-size: 12px; font-weight: 900; color: #fff; background: #43a047; border-radius: 999px; padding: 1px 8px; opacity: 0; transform: scale(.6); transition: opacity .2s, transform .3s cubic-bezier(.3,1.6,.5,1); }
+.dr-gain.show { opacity: 1; transform: none; }
+@media (max-width: 560px) {
+  .dyno-gauge { width: 58px; height: 58px; }
+  .dyno-read { min-width: 116px; padding: 4px 7px; }
+  .dr-row b { font-size: 13px; }
 /* ---- Animations: coins flying to the HUD, badge pops, panel close, chest burst ---- */
 .fly-layer { position: fixed; inset: 0; z-index: 400; pointer-events: none; overflow: hidden; }
 .fly { position: absolute; left: 0; top: 0; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; display: grid; place-items: center; font: 13px var(--display); will-change: transform; }
