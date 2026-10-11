@@ -44,6 +44,21 @@ function JobBadge({ b, now }: { b: PlacedBuilding; now: number }) {
   )
 }
 
+// The Crew House shows your clan tag, or invites you to find one.
+function CrewBadge({ b }: { b: PlacedBuilding }) {
+  const tap = useGame((s) => s.tapBuilding)
+  const clan = useGame((s) => s.clanBadge)
+  const [cx, cz] = centerOf(b.def, b.x, b.z)
+  anchors.set(b.uid, new Vector3(cx, 2.6, cz))
+  return (
+    <div className="anchor" ref={anchorRef(b.uid)}>
+      <button className="badge badge-crew" style={clan ? { background: clan.color } : undefined} onClick={() => tap(b.uid)} title="Crew House">
+        {clan ? `${clan.emblem} ${clan.tag}` : '🛡️ Find a crew'}
+      </button>
+    </div>
+  )
+}
+
 // Rusty's shows what the restore bay is up to.
 function RescueBadge({ b, now }: { b: PlacedBuilding; now: number }) {
   const tap = useGame((s) => s.tapBuilding)
@@ -111,6 +126,9 @@ export function Badges() {
       ))}
       {buildings.filter((b) => b.def === 'rescue').map((b) => (
         <RescueBadge key={b.uid} b={b} now={now} />
+      ))}
+      {buildings.filter((b) => b.def === 'crew').map((b) => (
+        <CrewBadge key={b.uid} b={b} />
       ))}
       {cars.filter((c) => c.flat || c.lowFuel).map((c) => (
         <div key={c.uid} className="anchor" ref={anchorRef(`car:${c.uid}`)}>

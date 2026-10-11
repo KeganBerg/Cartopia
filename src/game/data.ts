@@ -39,6 +39,8 @@ export const BUILDINGS: BuildingDef[] = [
   // Rusty rescues and restores cars: the first thing a new town builds, and
   // the Showroom stays locked until it exists.
   { id: 'rescue', name: "Rusty's Rescue", kind: 'business', w: 2, h: 1, price: 1000, unlockLevel: 1, unique: true, color: '#a1887f', roof: '#c62828', sign: "RUSTY'S" },
+  // Crew House: the town's clubhouse, opens the Crew window.
+  { id: 'crew', name: 'Crew House', kind: 'business', w: 2, h: 1, price: 2500, unlockLevel: 2, unique: true, color: '#455a64', roof: '#ff7043', sign: 'CREW HOUSE' },
   { id: 'gas', name: 'Gas Station', kind: 'gas', w: 2, h: 1, price: 1500, unlockLevel: 1, fuelCap: 10, color: '#ffca28', roof: '#e53935', sign: 'GAS' },
   { id: 'pizza', name: 'Pizza Place', kind: 'business', w: 1, h: 1, price: 400, unlockLevel: 1, jobSeconds: 30, fuelCost: 1, payout: 60, xp: 5, color: '#c0504d', roof: '#f5f5f5', sign: 'PIZZA' },
   { id: 'donut', name: 'Donut Shop', kind: 'business', w: 1, h: 1, price: 900, unlockLevel: 2, jobSeconds: 90, fuelCost: 2, payout: 160, xp: 12, color: '#f48fb1', roof: '#fff8e1', sign: 'DONUTS', prop: 'donut' },
@@ -343,3 +345,17 @@ export const PAINTS: { color: string; name: string; bucks?: number }[] = [
 export const STRIPES = [null, '#fafafa', '#212121', '#e53935', '#fdd835', '#1e88e5']
 export const PAINT_COST = 150
 export const STRIPE_COST = 100
+
+// Garage power: the combined PI of a player's five best cars.
+export const POWER_CARS = 5
+export const garagePower = (cars: { model: string; upgrades: Record<UpgradeSlot, number> }[]) =>
+  cars
+    .map((c) => performance(carDef(c.model), c.upgrades))
+    .sort((a, b) => b - a)
+    .slice(0, POWER_CARS)
+    .reduce((a, b) => a + b, 0)
+
+export const CLAN_COST = 2000
+export const CLAN_CAP = 20
+export const CLAN_EMBLEMS = ['🏁', '🔥', '⚡', '🦅', '🐺', '💀', '👑', '🚀', '🐉', '⭐', '🏎️', '🛞']
+export const CLAN_COLORS = ['#ff7043', '#e53935', '#8e24aa', '#1e88e5', '#00897b', '#43a047', '#fdd835', '#546e7a']

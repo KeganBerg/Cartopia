@@ -1,14 +1,17 @@
 import { useEffect } from 'react'
 import { Canvas } from '@react-three/fiber'
+import { NeutralToneMapping } from 'three'
 import { World } from './scene/World'
 import { Hud } from './ui/Hud'
-import { ThumbBaker } from './scene/BuildingPreview'
+import { ThumbRenderer } from './scene/BuildingPreview'
 import { BottomBar, ShopPanel, ShowroomPanel, GaragePanel, Toasts } from './ui/Menus'
 import { RacePanel, LiveRaceOverlay, InvitesPanel, PrizePopup } from './ui/Race'
 import { joinLobby, useLive } from './lib/live'
 import { FriendsPanel, VisitBanner } from './ui/Friends'
+import { LeadersPanel, ClanPanel } from './ui/Social'
 import { Tutorial } from './ui/Tutorial'
 import { Badges } from './ui/Badges'
+import { ThoughtBubble } from './ui/Thought'
 import { NeedPanel } from './ui/Need'
 import { UpgradePanel } from './ui/Upgrade'
 import { RescuePanel } from './ui/Rescue'
@@ -18,6 +21,7 @@ import { AccountPanel } from './ui/Account'
 import { GoalsPanel, DailyPanel, FlatPanel } from './ui/Goals'
 import { useGame, today } from './game/store'
 import { startCloudSync } from './lib/cloud'
+import { useTownPaused } from './scene/renderGate'
 
 // Phones get a lighter renderer: lower pixel ratio keeps iOS from dropping the WebGL context.
 const SMALL = typeof window !== 'undefined' && Math.min(window.innerWidth, window.innerHeight) < 700
@@ -26,6 +30,7 @@ export default function App() {
   const panel = useGame((s) => s.panel)
   const liveRace = useLive((l) => l.race)
   const tick = useGame((s) => s.tick)
+  const townPaused = useTownPaused()
 
   useEffect(() => {
     startCloudSync()
@@ -38,7 +43,8 @@ export default function App() {
 
   return (
     <>
-      <Canvas shadows orthographic camera={{ position: [30, 32, 30], zoom: 36, near: 0.1, far: 500 }} dpr={SMALL ? [1, 1.5] : [1, 2]}
+      {/* Camera sits well back with a tight near/far range so depth stays precise and flat layers never flicker. */}
+      <Canvas shadows orthographic camera={{ position: [75, 80, 75], zoom: 36, near: 1, far: 320 }} dpr={SMALL ? [1, 1.5] : [1, 2]} gl={{ toneMapping: NeutralToneMapping }} frameloop={townPaused ? 'never' : 'always'}
         onCreated={({ gl }) => {
           // Let the browser restore the 3D view after it drops the context, instead of leaving it blank.
           gl.domElement.addEventListener('webglcontextlost', (e) => e.preventDefault())
@@ -48,7 +54,8 @@ export default function App() {
         <World />
       </Canvas>
       <Badges />
-      <ThumbBaker />
+      <ThoughtBubble />
+      <ThumbRenderer />
       <Hud />
       <BottomBar />
       {panel === 'shop' && <ShopPanel />}
@@ -58,6 +65,8 @@ export default function App() {
       {liveRace && <LiveRaceOverlay />}
       {panel === 'invites' && <InvitesPanel />}
       {panel === 'friends' && <FriendsPanel />}
+      {panel === 'leaders' && <LeadersPanel />}
+      {panel === 'clan' && <ClanPanel />}
       {panel === 'need' && <NeedPanel />}
       {panel === 'upgrade' && <UpgradePanel />}
       {panel === 'rescue' && <RescuePanel />}

@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Color, DoubleSide, ExtrudeGeometry, Shape as ThreeShape } from 'three'
+import { Color, DoubleSide, ExtrudeGeometry, Shape as ThreeShape, type Group } from 'three'
 import { RoundedBox } from '@react-three/drei'
 import { rimTex } from './textures'
 import { glowMats } from './dayNight'
@@ -97,6 +97,12 @@ function extrude(sh: ThreeShape, width: number, b: number) {
   return g
 }
 
+// Footprint of a body (before any scaling), for keeping town cars apart.
+export const carSize = (body: Body) => ({ len: SHAPES[body].len, wid: SHAPES[body].wid })
+
+// Wheel radius and the distance between front and rear axles, for steering and rolling.
+export const wheelRig = (body: Body): WheelRig => ({ steer: [], spin: [], radius: SHAPES[body].wheel, base: SHAPES[body].len * 0.66 })
+
 const geoCache = new Map<Body, { body: ExtrudeGeometry; glass: ExtrudeGeometry | null; roof: ExtrudeGeometry | null; hood: number; deck: number; roofY: number; roofLen: number; roofZ: number }>()
 
 function carGeo(body: Body) {
@@ -133,7 +139,10 @@ function carGeo(body: Body) {
 }
 
 // Toy-style car: bevelled extruded body and cabin so no edge is a hard box corner. Faces +z.
-export function CarModel({ body, color, highlight, stripe, beams, rusty }: { body: Body; color: string; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean }) {
+// Handles on a car's wheels so a driving car can steer the front pair and roll all four.
+export type WheelRig = { steer: (Group | null)[]; spin: (Group | null)[]; radius: number; base: number }
+
+export function CarModel({ body, color, highlight, stripe, beams, rusty, rig }: { body: Body; color: string; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean; rig?: WheelRig }) {
   const s = SHAPES[body]
   const g = carGeo(body)
   // Rusty finds keep a hint of their paint under brown, matte rust.
@@ -352,7 +361,8 @@ export function CarModel({ body, color, highlight, stripe, beams, rusty }: { bod
       )}
       {/* Chunky toy wheels with spoked rims. */}
       {[[-wx, wz], [wx, wz], [-wx, -wz], [wx, -wz]].map(([x, z], i) => (
-        <group key={i} position={[x, s.wheel, z]}>
+        <group key={i} position={[x, s.wheel, z]} ref={rig && i < 2 ? (g) => void (rig.steer[i] = g) : undefined}>
+          <group ref={rig ? (g) => void (rig.spin[i] = g) : undefined}>
           <mesh rotation-z={Math.PI / 2} castShadow>
             <cylinderGeometry args={[s.wheel, s.wheel, 0.14, 16]} />
             <meshStandardMaterial color="#1a1a1a" roughness={0.9} />
@@ -361,6 +371,7 @@ export function CarModel({ body, color, highlight, stripe, beams, rusty }: { bod
             <circleGeometry args={[s.wheel * 0.92, 16]} />
             <meshStandardMaterial map={rimTex()} metalness={0.5} roughness={0.3} side={DoubleSide} />
           </mesh>
+          </group>
         </group>
       ))}
     </group>

@@ -54,7 +54,7 @@ export type Mode = 'play' | 'place' | 'move' | 'road' | 'bulldoze' | 'expand'
 export type Resource = 'coins' | 'parts' | 'fuel' | 'bucks' | 'level'
 export type Need = { res: Resource; missing: number; what?: string }
 
-export type Panel = null | 'need' | 'shop' | 'garage' | 'showroom' | 'race' | 'account' | 'goals' | 'daily' | 'flat' | 'friends' | 'rescue' | 'bank' | 'invites' | 'upgrade'
+export type Panel = null | 'need' | 'shop' | 'garage' | 'showroom' | 'race' | 'account' | 'goals' | 'daily' | 'flat' | 'friends' | 'rescue' | 'bank' | 'invites' | 'leaders' | 'clan' | 'upgrade'
 
 // A read-only copy of another player's town while visiting it.
 export type VisitedTown = { ownerId: string; townName: string; level: number; trophies: number; roads: string[]; buildings: PlacedBuilding[]; cars: OwnedCar[] }
@@ -81,6 +81,8 @@ type UiState = {
   upgrading: string | null
   // A Grand Prix mystery box waiting to be opened.
   gpPrize: { series: string; model: string; color: string } | null
+  // The signed-in player's clan, shown on the Crew House.
+  clanBadge: { tag: string; emblem: string; color: string } | null
   // Level-up splash: the levels just reached and the rewards they paid.
   levelUp: { from: number; to: number; coins: number; bucks: number } | null
 }
@@ -315,6 +317,7 @@ export const useGame = create<GameState>()(
       need: null,
       search: null,
       highlight: null,
+      clanBadge: null,
       shopFocus: null,
       upgrading: null,
       gpPrize: null,
@@ -433,6 +436,7 @@ export const useGame = create<GameState>()(
         if (d.kind === 'showroom') return s.openPanel('showroom')
         if (d.kind === 'garage') return s.openPanel('garage')
         if (b.def === 'rescue') return s.openPanel('rescue')
+        if (b.def === 'crew') return s.openPanel('clan')
         if (d.kind === 'obstacle') {
           const now = Date.now()
           if (b.jobEndsAt === null) {

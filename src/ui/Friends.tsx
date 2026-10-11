@@ -3,6 +3,7 @@ import { useGame, today } from '../game/store'
 import { fetchLeaderboard, fetchTown, demoLeaders, type Leader } from '../lib/friends'
 import { supabase } from '../lib/supabase'
 import { Panel } from './Menus'
+import { SocialTabs } from './Social'
 
 export function FriendsPanel() {
   // Neighbours show right away; real players merge in when the query returns.
@@ -36,7 +37,8 @@ export function FriendsPanel() {
   }
 
   return (
-    <Panel title="Friends & Leaderboard" wide>
+    <Panel title="Friends" wide>
+      <SocialTabs current="friends" />
       <p className="hint">Visit other towns and help out once a day for coins. Ranked by trophies.</p>
       {!rows && <p className="hint">Loading...</p>}
       <div className="leaders">
