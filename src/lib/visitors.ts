@@ -57,14 +57,18 @@ function bestPi() {
   return Math.max(10, ...cars.map((c) => performance(carDef(c.model), c.upgrades, c.mods)))
 }
 
-// The look of a visitor: a racer a touch quicker than your best car, a camper full of tourists,
+// A street racer's PI against your best car: most are within 5% either way, one in five is
+// 5-10% quicker.
+export const visitorPiFactor = (r = Math.random(), r2 = Math.random()) => (r < 0.2 ? 1.05 + r2 * 0.05 : 0.95 + r2 * 0.1)
+
+// The look of a visitor: a racer close to your best car, a camper full of tourists,
 // a mysterious black supercar.
 function dress(id: string, kind: VisitorKind, prize: { coins: number; xp: number; parts: number; bucks: number }, expiresAt: number, server: boolean): Visitor {
   let model = 'camper'
   let color = pick(['#ffe082', '#80deea', '#f8bbd0', '#c5e1a5'])
   let pi = 0
   if (kind === 'racer') {
-    pi = Math.round(bestPi() * (1 + Math.random() * 0.12))
+    pi = Math.round(bestPi() * visitorPiFactor())
     const car = [...CARS].filter((c) => !c.bucks).sort((a, b) => Math.abs(performance(a, zero) - pi) - Math.abs(performance(b, zero) - pi))[0]
     model = car.id
     color = pick(car.colors)

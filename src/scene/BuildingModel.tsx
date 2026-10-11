@@ -263,7 +263,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
       </group>
     )
 
-  if (NEW_MODELS.has(def.id)) return <NewBuildingModel def={def} ghost={ghost} m={m} win={win} bulb={bulb} level={lvl} />
+  if (NEW_MODELS.has(def.id)) return <NewBuildingModel def={def} ghost={ghost} valid={valid} m={m} win={win} bulb={bulb} level={lvl} />
   if (OFFICE_MODELS.has(def.id)) return <OfficeModel def={def} ghost={ghost} m={m} bulb={bulb} level={lvl} />
 
   switch (def.id) {

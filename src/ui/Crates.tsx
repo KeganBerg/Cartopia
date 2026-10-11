@@ -17,15 +17,6 @@ const price = (c: CrateDef, level: number) => {
   return p.coins ? <><CoinIcon size={16} />{compact(p.coins)}</> : <><BuckIcon size={16} />{p.bucks}</>
 }
 
-// HUD button into the Crate Depot.
-export function CratesButton() {
-  return (
-    <button className="goals-btn crates-btn" onClick={() => useGame.getState().openPanel('crates')} title="Crates" aria-label="Crates">
-      <Icon name="crate" />
-    </button>
-  )
-}
-
 // A little crate drawn in CSS for the picker, in the crate's own colours.
 function CrateIcon({ c }: { c: CrateDef }) {
   return (
