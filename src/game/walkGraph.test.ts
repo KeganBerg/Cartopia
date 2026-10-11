@@ -75,6 +75,12 @@ describe('walking network', () => {
     expect(steps.some((s) => s.cross)).toBe(true)
   })
 
+  it("doesn't stroll through a covered lot from a newer build", () => {
+    const g2 = buildWalkGraph(roads, [...buildings, b('crewhouse', 10, 15)], START_LAND)
+    expect(g2.byKey.has('t10,15')).toBe(false)
+    expect(g.byKey.has('t10,15')).toBe(true)
+  })
+
   it('reaches every house from every other house', () => {
     const houses = buildings.filter((o) => o.def === 'house')
     for (const a of houses) for (const c of houses) if (a !== c) expect(findPath(g, g.buildingNode.get(a.uid)!, g.buildingNode.get(c.uid)!)).not.toBeNull()

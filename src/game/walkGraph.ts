@@ -1,5 +1,6 @@
 import { buildingDef, PLOT } from './data'
 import { toWorld } from '../scene/grid'
+import { turnOf } from './placement'
 
 // The walking network for townspeople. Pedestrians keep to the sidewalks that
 // line every road, cross only on the zebra crossings painted next to
@@ -27,30 +28,6 @@ const lotSize = (def: string, rot?: number): Tile => {
 }
 // World position of the north-west corner of a tile.
 const corner = (i: number, j: number): Pt => toWorld(i - 0.5, j - 0.5)
-
-// The quarter turn a building faces: the player's choice, or the road beside it.
-// Mirrors World's turnOf so doors line up with what's drawn.
-export function doorTurn(b: WalkBuilding, roads: Set<string>) {
-  if (b.rot != null) return b.rot
-  const d = buildingDef(b.def)
-  if (d.kind === 'decor' || d.kind === 'obstacle') return 0
-  const edge = (dir: 'S' | 'E' | 'N' | 'W') => {
-    for (let i = 0; i < Math.max(d.w, d.h); i++) {
-      const t =
-        dir === 'S' ? [b.x + i, b.z + d.h] : dir === 'N' ? [b.x + i, b.z - 1]
-        : dir === 'E' ? [b.x + d.w, b.z + i] : [b.x - 1, b.z + i]
-      const inRange = dir === 'S' || dir === 'N' ? i < d.w : i < d.h
-      if (inRange && roads.has(key(t[0], t[1]))) return true
-    }
-    return false
-  }
-  const square = d.w === d.h
-  if (edge('S')) return 0
-  if (square && edge('E')) return 1
-  if (edge('N')) return 2
-  if (square && edge('W')) return 3
-  return 0
-}
 
 // A crosswalk being walked across. Cars can look these up to yield.
 export type Crossing = { id: string; mid: Pt }
@@ -159,7 +136,8 @@ export function buildWalkGraph(roads: Set<string>, buildings: WalkBuilding[], la
   // Small decorations are strolled around; everything else is solid.
   const strollable = (b: WalkBuilding) => {
     const d = buildingDef(b.def)
-    return d.kind === 'decor' && d.w === 1 && d.h === 1
+    // A covered "coming soon" lot from a newer build is solid, whatever its size turns out to be.
+    return d.kind === 'decor' && d.w === 1 && d.h === 1 && !d.parked
   }
   const walkTile = (x: number, z: number): number | null => {
     if (isRoad(x, z) || !owns(land, x, z)) return null
@@ -167,7 +145,7 @@ export function buildWalkGraph(roads: Set<string>, buildings: WalkBuilding[], la
     if (b && !strollable(b)) return null
     return add(`t${x},${z}`, {
       kind: 't', tile: [x, z], center: toWorld(x, z),
-      decor: b ? b.def : null, turn: b ? doorTurn(b, roads) : 0, uid: b ? b.uid : null,
+      decor: b ? b.def : null, turn: b ? turnOf(b, roads) : 0, uid: b ? b.uid : null,
     })
   }
 
@@ -205,7 +183,7 @@ export function buildWalkGraph(roads: Set<string>, buildings: WalkBuilding[], la
     const [cx, cz] = toWorld(b.x + (w - 1) / 2, b.z + (h - 1) / 2)
     const node = add(`b${b.uid}`, { kind: 'b', uid: b.uid, def: b.def, center: [cx, cz] })
     buildingNode.set(b.uid, node)
-    const front = doorTurn(b, roads)
+    const front = turnOf(b, roads)
     const order = [front, ...[0, 1, 2, 3].filter((s) => s !== front)]
     for (const s of order) {
       const [dx, dz] = SIDES[s]
