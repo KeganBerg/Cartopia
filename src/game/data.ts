@@ -350,8 +350,8 @@ export const RESCUE_SPOTS: RescueSpot[] = [
     { model: 'charger', rarity: 'scarce' }, { model: 'lemans', rarity: 'rare' }, { model: 'gtr', rarity: 'rare' }, { model: 'speedster', rarity: 'rare' },
   ] },
   { id: 'track', name: 'Old Race Track', icon: '🏁', unlockLevel: 10, cost: 15000, cars: [
-    { model: 'rally', rarity: 'common' }, { model: 'vette', rarity: 'common' }, { model: 'charger', rarity: 'scarce' },
-    { model: 'lemans', rarity: 'scarce' }, { model: 'gullwing', rarity: 'rare' }, { model: 'hyper', rarity: 'rare' },
+    { model: 'vette', rarity: 'common' }, { model: 'lemans', rarity: 'common' }, { model: 'charger', rarity: 'scarce' },
+    { model: 'gullwing', rarity: 'scarce' }, { model: 'gtr', rarity: 'rare' }, { model: 'hyper', rarity: 'rare' },
   ] },
 ]
 export const RESCUE_PINS = 8
