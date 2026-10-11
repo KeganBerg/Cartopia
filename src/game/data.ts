@@ -37,6 +37,8 @@ export type BuildingDef = {
   nightOnly?: boolean
   // Stand-in for a building this build doesn't know (see buildingDef).
   parked?: boolean
+  // Sold only while this event runs (see EVENTS). Ones already placed stay.
+  event?: EventId
 }
 
 export const BUILDINGS: BuildingDef[] = [
@@ -100,7 +102,38 @@ export const BUILDINGS: BuildingDef[] = [
   { id: 'playground', name: 'Playground', kind: 'decor', w: 2, h: 2, price: 1800, unlockLevel: 5, color: '#ef9a9a', roof: '#1e88e5' },
   { id: 'gazebo', name: 'Gazebo', kind: 'decor', w: 1, h: 1, price: 1200, unlockLevel: 6, color: '#fafafa', roof: '#2e7d32' },
   { id: 'clocktower', name: 'Clock Tower', kind: 'decor', w: 1, h: 1, price: 3500, unlockLevel: 8, color: '#b0796b', roof: '#37474f' },
+  // Spooky Season decorations: in the Shop only during the event.
+  { id: 'pumpkins', name: 'Pumpkin Patch', kind: 'decor', w: 1, h: 1, price: 250, unlockLevel: 1, color: '#ef6c00', roof: '#5d4037', event: 'spooky' },
+  { id: 'scarecrow', name: 'Scarecrow', kind: 'decor', w: 1, h: 1, price: 450, unlockLevel: 1, color: '#c8a165', roof: '#6d4c41', event: 'spooky' },
+  { id: 'graves', name: 'Spooky Graveyard', kind: 'decor', w: 1, h: 1, price: 700, unlockLevel: 2, color: '#9e9e9e', roof: '#424242', event: 'spooky' },
+  { id: 'deadtree', name: 'Haunted Tree', kind: 'decor', w: 1, h: 1, price: 1200, unlockLevel: 3, color: '#4e342e', roof: '#ff9800', event: 'spooky' },
 ]
+
+// Limited-time events, by East Coast calendar date (from inclusive, to exclusive, as MM-DD).
+// ?event=<id> switches one on for testing.
+export type EventId = 'spooky'
+export type GameEvent = { id: EventId; name: string; icon: string; from: string; to: string }
+export const EVENTS: GameEvent[] = [{ id: 'spooky', name: 'Spooky Season', icon: '🎃', from: '10-01', to: '11-01' }]
+function eastCoastDay(now: number) {
+  try {
+    const p = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', month: '2-digit', day: '2-digit' }).formatToParts(new Date(now))
+    return `${p.find((x) => x.type === 'month')!.value}-${p.find((x) => x.type === 'day')!.value}`
+  } catch {
+    return new Date(now).toISOString().slice(5, 10)
+  }
+}
+export function activeEvent(now = Date.now()): GameEvent | null {
+  const pin = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('event') : null
+  if (pin) return EVENTS.find((e) => e.id === pin) ?? null
+  const day = eastCoastDay(now)
+  return EVENTS.find((e) => day >= e.from && day < e.to) ?? null
+}
+// Midnight on the East Coast when the event ends, roughly (good enough for a countdown).
+export function eventEndsAt(e: GameEvent, now = Date.now()) {
+  const year = new Date(now).getUTCFullYear()
+  const [m, d] = e.to.split('-').map(Number)
+  return Date.UTC(year, m - 1, d, 4)
+}
 
 // Land is bought in 8x8 plots. The starting lot is the 3x3 plots covering
 // tiles 0-23; towns can grow two plots out on every side.
@@ -316,6 +349,8 @@ export const RESCUE_SPOTS: RescueSpot[] = [
   ] },
 ]
 export const RESCUE_PINS = 8
+// The chance each pin hides a car (every search has at least one).
+export const RESCUE_CAR_CHANCE = 0.1
 export const STORAGE_MAX = 6
 export const restoreCost = (car: CarDef) => Math.max(200, Math.round((car.price + (car.bucks ?? 0) * 1000) * 0.25 / 10) * 10)
 export const rushBucks = (msLeft: number) => Math.max(1, Math.ceil(msLeft / 1800000))
@@ -563,7 +598,7 @@ export type CounterKey =
   | 'races' | 'campaignWins' | 'painted' | 'modsBought' | 'serviced'
 // Read off the town itself, so towns that did these before the goal existed still get credit.
 // owns: has a `def` building; bldgLevel: highest building level; stars/chapters: campaign; power: garage power.
-export type DerivedKey = 'rusty' | 'level' | 'carsOwned' | 'drivers' | 'plots' | 'bldgLevel' | 'stars' | 'chapters' | 'power' | 'owns'
+export type DerivedKey = 'spooky' | 'rusty' | 'level' | 'carsOwned' | 'drivers' | 'plots' | 'bldgLevel' | 'stars' | 'chapters' | 'power' | 'owns'
 export type StatKey = CounterKey | DerivedKey
 export const COUNTERS: CounterKey[] = [
   'jobs', 'carsBought', 'upgrades', 'racesWon', 'built', 'roads', 'coinsEarned', 'flatsFixed', 'rescued', 'searches', 'gpWins',
@@ -571,7 +606,8 @@ export const COUNTERS: CounterKey[] = [
 ]
 
 // level: the goal stays hidden until then. def: the building an `owns` goal asks for.
-export type GoalDef = { id: string; icon: string; text: string; stat: StatKey; target: number; coins: number; xp: number; bucks?: number; level?: number; def?: string }
+// event: an event goal, shown in its own section while the event runs instead of in the story chain.
+export type GoalDef = { id: string; icon: string; text: string; stat: StatKey; target: number; coins: number; xp: number; bucks?: number; level?: number; def?: string; event?: EventId }
 
 // The story goals, played in order; the first three unclaimed goals the player's level allows are active at once.
 // Each new feature gets a goal near where it unlocks, so the list doubles as the game's guided tour.
@@ -635,6 +671,11 @@ export const GOALS: GoalDef[] = [
   { id: 'q36', icon: '💰', text: 'Earn 250,000 coins', stat: 'coinsEarned', target: 250000, coins: 30000, xp: 1000, bucks: 3 },
   { id: 'q37', icon: '🅿', text: 'Own 20 cars', stat: 'carsOwned', target: 20, coins: 30000, xp: 1000, bucks: 3 },
   { id: 'q38', icon: '⭐', text: 'Reach level 20', stat: 'level', target: 20, coins: 50000, xp: 0, bucks: 5 },
+  // Spooky Season.
+  { id: 'sp1', icon: '🎃', text: 'Place a Pumpkin Patch', stat: 'owns', def: 'pumpkins', target: 1, coins: 300, xp: 25, event: 'spooky' },
+  { id: 'sp2', icon: '👻', text: 'Place 4 spooky decorations', stat: 'spooky', target: 4, coins: 1000, xp: 60, bucks: 1, event: 'spooky' },
+  { id: 'sp3', icon: '🌳', text: 'Grow a Haunted Tree', stat: 'owns', def: 'deadtree', target: 1, coins: 1500, xp: 80, event: 'spooky', level: 3 },
+  { id: 'sp4', icon: '🦇', text: 'Place 10 spooky decorations', stat: 'spooky', target: 10, coins: 3000, xp: 150, bucks: 3, event: 'spooky' },
 ]
 
 // Daily and weekly tasks: three each, drawn per UTC day or ISO week from the pools below,
@@ -781,7 +822,7 @@ export const CLAN_EMBLEMS = ['🏁', '🔥', '⚡', '🦅', '🐺', '💀', '�
 export const CLAN_COLORS = ['#ff7043', '#e53935', '#8e24aa', '#1e88e5', '#00897b', '#43a047', '#fdd835', '#546e7a']
 
 // Crew weekly goal. The server counts the points from each save and checks the target
-// (supabase/migrations/0022_crew_weekly_goal.sql, crew_goal_rules()); these copies are for display.
+// (supabase/migrations/0026_crew_weekly_goal.sql, crew_goal_rules()); these copies are for display.
 export const CREW_POINTS = { job: 1, race: 3 }
 // What a crew chest pays. The server guard reads this from econ_catalog().crew.
 export const CREW_CHEST: ChestPay = { coins: 1500, coinsPerLevel: 300, xp: 0, xpPerLevel: 0, parts: 25, bucks: 5, fuel: 0 }

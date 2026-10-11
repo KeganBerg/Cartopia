@@ -237,6 +237,11 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .rank { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font: 15px var(--display); background: #eceff1; }
 .rank.r1 { background: #ffd54f; } .rank.r2 { background: #e0e0e0; } .rank.r3 { background: #ffab91; }
 .leader-trophies { font: 15px var(--display); }
+.leader-acts { display: flex; gap: 6px; align-items: center; justify-content: flex-end; }
+.gift-pick { display: inline-flex; gap: 4px; }
+.gift-btn { min-width: 40px; padding-left: 8px; padding-right: 8px; white-space: nowrap; }
+.gift-list { max-height: min(52vh, 420px); overflow-y: auto; }
+.gift-note .price { white-space: nowrap; }
 .visit-banner { position: absolute; z-index: 60; left: 50%; transform: translateX(-50%); bottom: calc(12px + var(--sab)); background: var(--panel); border: 3px solid #fff; border-radius: 16px; padding: 8px 12px; box-shadow: 0 4px 0 rgba(0,0,0,.3); display: flex; gap: 14px; align-items: center; max-width: calc(100vw - 20px); }
 .visit-title { display: flex; flex-direction: column; font-size: 15px; }
 .visit-title b { font: 18px var(--display); }
@@ -494,7 +499,8 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
   .source { grid-template-columns: 28px 1fr; }
   .source .buy { grid-column: 2; justify-self: start; }
   .rusty-lock .buy { grid-column: 1 / -1; }
-  .leader .buy { grid-column: 1 / -1; }
+  .leader .leader-acts { grid-column: 1 / -1; }
+  .leader-acts > .buy:last-child { flex: 1; }
   .visit-banner { flex-direction: column; gap: 6px; text-align: center; left: 6px; right: 6px; transform: none; }
   .tutorial { bottom: calc(76px + var(--sab)); }
   .tutorial p { font-size: 14px; }
@@ -1167,3 +1173,13 @@ button.book-car { font: inherit; color: inherit; }
 .crew-mini-main b { font-weight: normal; }
 .crew-mini .crew-bar { flex: none; height: 8px; }
 .crew-mini small { font: 12px var(--display); color: #78909c; }
+/* Limited-time event items and goals */
+.ribbon.spooky { background: linear-gradient(90deg, #ef6c00, #6a1b9a); }
+.goal-head.event span { color: #ef6c00; font-weight: 700; }
+.menu-sound small { font-weight: 400; color: #78909c; }
+/* Merged buildings: block size on the job badge, and the Merge tool's buttons. */
+.badge-merge { position: absolute; top: -9px; left: -9px; height: 18px; line-height: 15px; font-size: 11px; background: #5e35b1; color: #fff; border: 2px solid #fff; border-radius: 9px; padding: 0 4px; }
+.badge-merge-go { background: #7e57c2; color: #fff; border-color: #fff; font-size: 15px; text-shadow: 0 1px 1px rgba(0,0,0,.35); animation: badge-bob 1.6s ease-in-out infinite; }
+.badge-split { background: #fff; color: #4527a0; border-color: #b39ddb; font-size: 13px; }
+@keyframes badge-bob { 50% { transform: translateY(-3px); } }
+.badge-merge-go.pair { background: #9575cd; font-size: 13px; }
