@@ -164,12 +164,14 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
     // ---- Driving Academy: an office, a carport of learner cars and a cone course ----
     case 'academy': {
       const h = 1.15 + lift
-      // Learners slalom east past the cones, swing round the far end, cruise back
-      // along the outer lane and round again. The two lanes sit far enough apart
-      // that cars passing each other on them never touch.
+      // Learners weave east along the near lane, swing round the far end and
+      // cruise back along the outer lane. The course keeps clear of the strip
+      // along the front where townspeople come and go at the doors, and of the
+      // office, signs and parking box; the two lanes sit far enough apart that
+      // passing cars never touch (checked frame by frame against car boxes).
       const weave = smoothLoop([
-        [-1.2, 0.63], [-0.8, 0.5], [-0.4, 0.68], [0, 0.86], [0.4, 0.68], [0.8, 0.5], [1.2, 0.63], [1.55, 0.88],
-        [1.62, 1.12], [1.5, 1.42], [1.15, 1.58], [0, 1.6], [-1.15, 1.58], [-1.5, 1.42], [-1.62, 1.12], [-1.55, 0.88],
+        [-1, 0.43], [-0.8, 0.36], [-0.4, 0.43], [0, 0.5], [0.4, 0.43], [0.8, 0.36], [1, 0.43], [1.27, 0.54],
+        [1.39, 0.81], [1.27, 1.09], [1, 1.2], [0, 1.2], [-1, 1.2], [-1.27, 1.09], [-1.39, 0.81], [-1.27, 0.54],
       ])
       return (
         <group>
@@ -178,16 +180,16 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
           <Paint m={m} at={[0, 0.062, 1.9]} s={[3.8, 0.04]} />
           <Paint m={m} at={[0, 0.062, -0.3]} s={[3.8, 0.04]} />
           {[-1, 1].map((sd) => <Paint key={sd} m={m} at={[sd * 1.9, 0.062, 0.8]} s={[0.04, 2.2]} />)}
-          <Paint m={m} at={[0, 0.062, 0.68]} s={[2.6, 0.02]} c={YELLOW} />
-          {/* Each cone sits on the far side of the line from where the learners pass it. */}
-          {([[-0.8, 0.86], [0, 0.5], [0.8, 0.86]] as const).map(([x, z]) => <Cone key={x} m={m} at={[x, 0.06, z]} />)}
+          {/* Cones on the island between the two lanes. */}
+          <Paint m={m} at={[0, 0.062, 0.82]} s={[2.0, 0.02]} c={YELLOW} />
+          {[-0.8, 0.8].map((x) => <Cone key={x} m={m} at={[x, 0.06, 0.82]} />)}
           {[-0.25, 0, 0.25, 0.5].map((x) => <Paint key={x} m={m} at={[x - 1.0, 0.063, 0.0]} s={[0.12, 0.42]} />)}
           <Paint m={m} at={[-0.4, 0.063, -0.08]} s={[0.06, 0.4]} />
           {/* Parallel parking box with cones at its corners. */}
           <Paint m={m} at={[0.85, 0.063, 0.02]} s={[1.0, 0.03]} c={YELLOW} />
           <Paint m={m} at={[0.85, 0.063, -0.22]} s={[1.0, 0.03]} c={YELLOW} />
-          <Cone m={m} at={[0.33, 0.06, -0.1]} />
-          <Cone m={m} at={[1.37, 0.06, -0.1]} />
+          <Cone m={m} at={[0.33, 0.06, -0.15]} />
+          <Cone m={m} at={[1.37, 0.06, -0.15]} />
           {/* Skid pad from level 4: a wet-look circle with a painted ring. */}
           {lvl >= 4 && (
             <group>
@@ -196,11 +198,11 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
             </group>
           )}
           {/* Stop sign and a little set of training lights at the stop line. */}
-          <group position={[-0.32, 0.06, 0.25]}>
+          <group position={[-0.05, 0.06, -0.25]}>
             <Cyl m={m} at={[0, 0.35, 0]} r={0.015} h={0.7} c="#9e9e9e" seg={6} />
             <mesh position={[0, 0.72, 0.02]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.1, 0.1, 0.015, 8]} />{m('#d32f2f')}</mesh>
           </group>
-          <group position={[-1.7, 0.06, 0.25]}>
+          <group position={[-1.85, 0.06, -0.15]}>
             <Cyl m={m} at={[0, 0.4, 0]} r={0.02} h={0.8} c="#37474f" seg={6} />
             <Box m={m} at={[0, 0.88, 0]} s={[0.12, 0.3, 0.1]} c="#212121" />
             {[['#e53935', 0.97], [YELLOW, 0.88], ['#43a047', 0.79]].map(([c, y]) => (
