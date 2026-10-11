@@ -5,6 +5,7 @@ import { World } from './scene/World'
 import { Hud } from './ui/Hud'
 import { FlyLayer } from './ui/Fly'
 import { ThumbRenderer } from './scene/BuildingPreview'
+import { StageCanvas } from './scene/Stage'
 import { BottomBar, ShopPanel, ShowroomPanel, GaragePanel, Toasts } from './ui/Menus'
 import { RacePanel, LiveRaceOverlay, InvitesPanel, PrizePopup, CampaignPrizePopup, TourPrizePopup } from './ui/Race'
 import { joinLobby, useLive } from './lib/live'
@@ -83,6 +84,7 @@ export default function App() {
       <VisitorBadges />
       <ThoughtBubble />
       <ThumbRenderer />
+      <StageCanvas />
       <Hud />
       <BottomBar />
       {panel === 'shop' && <ShopPanel />}

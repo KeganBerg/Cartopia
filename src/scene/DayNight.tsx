@@ -1,6 +1,6 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Color, type DirectionalLight, type HemisphereLight } from 'three'
+import { Color, Vector3, type DirectionalLight, type HemisphereLight } from 'three'
 import { PAL } from './season'
 import { setPageTint } from './pageTint'
 import { applyNight, dayPhase, duskAmount, nightAmount } from './dayNight'
@@ -13,6 +13,7 @@ const BG_NIGHT = new Color('#1b1d38')
 const BG_DUSK = new Color('#7a6a52')
 const page = new Color()
 const haze = new Color()
+const STEP = 4
 
 // Sun, sky light and background that follow the shared day/night clock.
 // Colours come from the shared look (look.ts), which also drives the grade.
@@ -20,14 +21,29 @@ export function DayNight({ small }: { small: boolean }) {
   const sun = useRef<DirectionalLight>(null)
   const hemi = useRef<HemisphereLight>(null)
   const last = useRef(-1)
-  useFrame(({ scene }) => {
+  const dir = useRef(new Vector3())
+  const at = useRef(new Vector3())
+  useFrame(({ scene, controls }) => {
+    // The shadow box (60 units across) follows the view, so a big town keeps its shadows
+    // at the edges and the shadow pass skips the parts of town that are off screen.
+    // It moves in whole steps so shadow edges don't crawl while panning.
+    const view = (controls as { target?: Vector3 } | null)?.target
+    let moved = false
+    if (view) {
+      const x = Math.round(view.x / STEP) * STEP
+      const z = Math.round(view.z / STEP) * STEP
+      if (x !== at.current.x || z !== at.current.z) {
+        at.current.set(x, 0, z)
+        moved = true
+      }
+    }
     const phase = dayPhase()
     const n = nightAmount(phase)
     const dusk = duskAmount(phase)
     const w = weatherNow()
     // Nothing visible changes between frames most of the time.
     const key = Math.round(phase * 2000) + (fxState.on ? 0 : 1e4) + Math.round(w.cloud * 200) * 1e5 + Math.round(w.haze * 200) * 1e8 + Math.round(w.flash * 100) * 1e11
-    if (key === last.current) return
+    if (key === last.current && !moved) return
     last.current = key
     applyNight(n, gloomOf(w))
     const look = weatherLook(lookFor(n, dusk, townLook), w)
@@ -35,7 +51,10 @@ export function DayNight({ small }: { small: boolean }) {
     if (sun.current) {
       sun.current.color.copy(look.sun)
       sun.current.intensity = look.sunIntensity
-      lightDir(phase, n, sun.current.position).multiplyScalar(50)
+      lightDir(phase, n, dir.current)
+      sun.current.position.copy(dir.current).multiplyScalar(50).add(at.current)
+      sun.current.target.position.copy(at.current)
+      sun.current.target.updateMatrixWorld()
     }
     if (hemi.current) {
       hemi.current.color.copy(look.sky)
