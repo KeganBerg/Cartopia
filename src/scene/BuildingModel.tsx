@@ -91,6 +91,21 @@ export function BuildingModel({ def, ghost, valid }: Props) {
   const win = ghost ? m('#ffffff', windowTex()) : <primitive object={glowMats.window} attach="material" dispose={null} />
   const bulb = ghost ? m('#fff8e1') : <primitive object={glowMats.bulb} attach="material" dispose={null} />
 
+  // A building from a newer version of the game: a tarp-covered crate and a cone.
+  if (def.parked)
+    return (
+      <group>
+        <mesh position={[0, 0.35, 0]} castShadow receiveShadow>
+          <boxGeometry args={[W * 0.6, 0.7, D * 0.6]} />
+          {m(def.roof)}
+        </mesh>
+        <mesh position={[0.62, 0.22, 0.62]} castShadow>
+          <coneGeometry args={[0.16, 0.44, 12]} />
+          {m(def.color)}
+        </mesh>
+      </group>
+    )
+
   switch (def.id) {
     case 'bush':
       return (

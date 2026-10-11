@@ -456,57 +456,61 @@ function DragRace({ car, rival, onExit, live, prize, onFinish, title }: { car: O
   })
 
   const rpmAngle = -210 + Math.min(1.05, me.current.rpm) * 240
+  const close = live ? onExit : () => useGame.getState().openPanel(null)
+  // One full-screen view: the street fills the screen and the controls float over it.
   return (
-    <Panel title={title ?? `Drag Race vs ${rival.town}`} wide onClose={live ? onExit : undefined}>
-      <div className="race-layout">
-      <div className="race-3d">
-        <Canvas camera={{ position: [0.4, 2.2, -4], fov: 55, near: 0.3, far: 300 }} dpr={[1, 1.5]}>
-          <RaceScene track={TRACK} me={me} them={them} mine={{ body: def.body, color: car.color }} theirs={{ body: rival.body, color: rival.color }} />
-        </Canvas>
-        {countdown > 0 && <div className="countdown big">{countdown}</div>}
-        {label && <div className="shift-label big">{label}</div>}
-        {def.skill && skillShown && !result && <div className="skill-flash">{SKILLS[def.skill].icon} {SKILLS[def.skill].name}!</div>}
+    <div className="race-full">
+      <Canvas className="rf-canvas" camera={{ position: [0.4, 2.2, -4], fov: 55, near: 0.3, far: 300 }} dpr={[1, 1.5]}>
+        <RaceScene track={TRACK} me={me} them={them} mine={{ body: def.body, color: car.color }} theirs={{ body: rival.body, color: rival.color }} />
+      </Canvas>
+      <div className="rf-top">
+        <h2>{title ?? `Drag Race vs ${rival.town}`}</h2>
+        <button className="close" onClick={close} aria-label="Leave race">✕</button>
       </div>
-      <div className="strip mini">
+      <div className="rf-lanes">
         {[
           { name: `You · ${def.name}`, color: car.color, r: me.current },
           { name: `${rival.town} · ${rival.carName}`, color: rival.color, r: them.current },
         ].map((lane) => (
-          <div key={lane.name} className="lane">
+          <div key={lane.name} className="rf-lane">
             <span className="lane-name">{lane.name}</span>
-            <div className="lane-car" style={{ left: `calc(${Math.min(1, lane.r.dist / TRACK) * 92}% )`, background: lane.color }} />
+            <div className="lane-car" style={{ left: `${Math.min(1, lane.r.dist / TRACK) * 90}%`, background: lane.color }} />
             <div className="finish" />
           </div>
         ))}
       </div>
-      <div className="race-controls">
-        <svg viewBox="0 0 120 120" width="150" height="150" className="tach">
-          <circle cx="60" cy="60" r="56" fill="#1b1f24" stroke="#cfd8dc" strokeWidth="3" />
-          <path d={arcPath(60, 60, 46, -210 + 0.78 * 240, -210 + 0.93 * 240)} stroke="#76ff03" strokeWidth="10" fill="none" />
-          <path d={arcPath(60, 60, 46, -210 + 0.95 * 240, 30)} stroke="#ff1744" strokeWidth="10" fill="none" />
-          <line x1="60" y1="60" x2={60 + 44 * Math.cos((rpmAngle * Math.PI) / 180)} y2={60 + 44 * Math.sin((rpmAngle * Math.PI) / 180)} stroke="#ff9100" strokeWidth="4" strokeLinecap="round" />
-          <circle cx="60" cy="60" r="6" fill="#eceff1" />
-          <text x="60" y="92" textAnchor="middle" fill="#fff" fontSize="14" fontWeight="900">GEAR {me.current.gear + 1}</text>
-        </svg>
-        <div className="race-side">
-          <div className="speed">{Math.round(me.current.speed * 0.9)} km/h</div>
-          {countdown === 99 && <div className="hint">Waiting for {rival.town} to join...</div>}
-          {!result ? (
+      {countdown > 0 && countdown !== 99 && <div className="countdown big">{countdown}</div>}
+      {countdown === 99 && <div className="rf-wait">Waiting for {rival.town} to join...</div>}
+      {label && <div className="shift-label big">{label}</div>}
+      {def.skill && skillShown && !result && <div className="skill-flash">{SKILLS[def.skill].icon} {SKILLS[def.skill].name}!</div>}
+      {result ? (
+        <div className="rf-result-wrap">
+          <div className={result.won ? 'rf-result result win' : 'rf-result result lose'}>
+            <h3>{result.won ? 'YOU WIN!' : 'You lost'}</h3>
+            <p>{result.myTime.toFixed(2)}s vs {Number.isFinite(result.theirTime) ? `${result.theirTime.toFixed(2)}s` : 'did not finish'}</p>
+            <p>{result.won ? `+$${payout} · +1 🏆 · +30 XP` : `+$${Math.round(payout * 0.1)} · +8 XP`}</p>
+            <button className="buy" onClick={onExit}>Back</button>
+          </div>
+        </div>
+      ) : (
+        <div className="rf-bottom">
+          <svg viewBox="0 0 120 120" className="tach">
+            <circle cx="60" cy="60" r="56" fill="#1b1f24" fillOpacity="0.85" stroke="#cfd8dc" strokeWidth="3" />
+            <path d={arcPath(60, 60, 46, -210 + 0.78 * 240, -210 + 0.93 * 240)} stroke="#76ff03" strokeWidth="10" fill="none" />
+            <path d={arcPath(60, 60, 46, -210 + 0.95 * 240, 30)} stroke="#ff1744" strokeWidth="10" fill="none" />
+            <line x1="60" y1="60" x2={60 + 44 * Math.cos((rpmAngle * Math.PI) / 180)} y2={60 + 44 * Math.sin((rpmAngle * Math.PI) / 180)} stroke="#ff9100" strokeWidth="4" strokeLinecap="round" />
+            <circle cx="60" cy="60" r="6" fill="#eceff1" />
+            <text x="60" y="92" textAnchor="middle" fill="#fff" fontSize="14" fontWeight="900">GEAR {me.current.gear + 1}</text>
+          </svg>
+          <div className="rf-side">
+            <div className="rf-speed">{Math.round(me.current.speed * 0.9)}<small> km/h</small></div>
             <button className="big-btn shift-btn" onPointerDown={shift} disabled={countdown > 0 || me.current.gear >= 3}>
               SHIFT ▲
             </button>
-          ) : (
-            <div className={result.won ? 'result win' : 'result lose'}>
-              <h3>{result.won ? 'YOU WIN!' : 'You lost'}</h3>
-              <p>{result.myTime.toFixed(2)}s vs {Number.isFinite(result.theirTime) ? `${result.theirTime.toFixed(2)}s` : 'did not finish'}</p>
-              <p>{result.won ? `+$${payout} · +1 🏆 · +30 XP` : `+$${Math.round(payout * 0.1)} · +8 XP`}</p>
-              <button className="buy" onClick={onExit}>Back</button>
-            </div>
-          )}
+          </div>
         </div>
-      </div>
-      </div>
-    </Panel>
+      )}
+    </div>
   )
 }
 
