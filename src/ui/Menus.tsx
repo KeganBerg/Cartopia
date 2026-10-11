@@ -110,8 +110,8 @@ function price(def: { price: number; bucks?: number }) {
 
 const SHOP_GROUPS: { title: string; filter: (b: BuildingDef) => boolean }[] = [
   { title: 'Cars and parts makers', filter: (b) => b.id === 'rescue' || b.kind === 'parts' },
-  { title: 'Businesses', filter: (b) => b.kind === 'business' && b.id !== 'rescue' && b.id !== 'crew' },
-  { title: 'Services and clubs', filter: (b) => b.kind === 'gas' || b.id === 'crew' },
+  { title: 'Businesses', filter: (b) => b.kind === 'business' && b.id !== 'rescue' && b.id !== 'crew' && !b.service },
+  { title: 'Services and clubs', filter: (b) => b.kind === 'gas' || b.id === 'crew' || !!b.service },
   { title: 'Homes and decor', filter: (b) => b.kind === 'house' || b.kind === 'decor' },
 ]
 
