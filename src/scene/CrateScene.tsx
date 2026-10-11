@@ -14,8 +14,9 @@ import { LAYER, decal } from './layers'
 import { concreteTex, corrugatedTex, glowTex, shutterTex } from './textures'
 import { signTexture } from './signTexture'
 import { ToolChest, TyreStack, useFitCamera } from './ArcadeScenery'
-import { SKINNED_SLOTS, carDef, fittedMods, modDef, modFits, type Body, type Finish, type SkinnedSlot } from '../game/data'
-import { dropTier, type CrateDef, type CrateDrop } from '../game/crates'
+import { tickSkins, withSkin } from './skins'
+import { SKINNED_SLOTS, carDef, fittedMods, modDef, modFits, modSkinNumber, skinNumber, type Body, type Finish, type SkinnedSlot } from '../game/data'
+import { dropTier, type CrateDef, type CrateDrop, type CrateId } from '../game/crates'
 import { bumpSound, crashSound, dingSound } from '../lib/arcadeSound'
 import { sfx } from '../lib/sound'
 
@@ -175,16 +176,27 @@ function Panel({ wood, frame, crystal }: { wood: MeshStandardMaterial; frame: Me
   )
 }
 
+// Each crate's boards wear one of the car skins, livelier the rarer the crate: Street the
+// pulsing Hexcore honeycomb, Garage Overclock's racing circuits, Gold the glinting Gold Leaf
+// flakes and Diamond the Prismatic holo foil. Drawn in the crate's own space (see withSkin).
+const CRATE_SKIN: Record<CrateId, number> = {
+  street: skinNumber('hexcore'), garage: skinNumber('overclock'), gold: modSkinNumber('goldleaf'), diamond: skinNumber('prismatic'),
+}
+const SKIN_SCALE = 0.5
+
 function CrateModel({ def, glow, parts }: { def: CrateDef; glow: string; parts: React.RefObject<CrateParts> }) {
   const crystal = def.id === 'diamond'
   const gold = def.id === 'gold'
+  // Where the crate is, so its pattern rides along with it as it drops, hops and sways.
+  const origin = useMemo(() => ({ value: new Vector3() }), [])
   const mats = useMemo(() => {
     const map = plankTex()
-    const wood = crystal
-      ? new MeshStandardMaterial({ color: def.look.wood, emissive: new Color(def.look.wood), emissiveIntensity: 0.35, transparent: true, opacity: 0.55, roughness: 0.05, metalness: 0.2, depthWrite: false })
-      : new MeshStandardMaterial({ map, color: def.look.wood, roughness: gold ? 0.35 : 0.85, metalness: gold ? 0.55 : 0 })
+    const n = CRATE_SKIN[def.id]
+    const wood = new MeshStandardMaterial({ map: crystal ? null : map, color: def.look.wood, roughness: crystal ? 0.15 : gold ? 0.35 : 0.7, metalness: crystal ? 0.35 : gold ? 0.55 : 0.05 })
+    wood.onBeforeCompile = (sh) => withSkin(sh, String(n), false, { origin, scale: SKIN_SCALE })
+    wood.customProgramCacheKey = () => `crate-skin-${n}`
     const frame = crystal
-      ? new MeshStandardMaterial({ color: '#eceff1', metalness: 1, roughness: 0.18 })
+      ? new MeshStandardMaterial({ color: '#f5f7fa', metalness: 0.55, roughness: 0.28, emissive: '#cfd8dc', emissiveIntensity: 0.25 })
       : new MeshStandardMaterial({ map, color: new Color(def.look.wood).multiplyScalar(gold ? 0.8 : 0.72), roughness: 0.8, metalness: gold ? 0.5 : 0 })
     const band = new MeshStandardMaterial({ color: def.look.band, metalness: gold || crystal ? 1 : 0.75, roughness: gold ? 0.22 : 0.4 })
     const bolt = new MeshStandardMaterial({ color: gold ? '#ffe082' : '#b0bec5', metalness: 1, roughness: 0.3 })
@@ -192,8 +204,12 @@ function CrateModel({ def, glow, parts }: { def: CrateDef; glow: string; parts: 
     return { wood, frame, band, bolt, core }
   }, [def, glow, crystal, gold])
   useEffect(() => () => Object.values(mats).forEach((m) => m.dispose()), [mats])
-  const label = useMemo(() => labelTex(def.name, def.id === 'garage' ? '#f5f5f5' : '#3e2723'), [def])
   const p = parts.current
+  useFrame(() => {
+    tickSkins()
+    p.root?.getWorldPosition(origin.value)
+  })
+  const label = useMemo(() => labelTex(def.name, def.id === 'garage' ? '#f5f5f5' : '#3e2723'), [def])
   // Panels: front (+z), back, left, right; each hinged at its bottom outside edge.
   const sides: { pos: [number, number, number]; ry: number }[] = [
     { pos: [0, 0, S / 2], ry: 0 }, { pos: [0, 0, -S / 2], ry: Math.PI }, { pos: [-S / 2, 0, 0], ry: -Math.PI / 2 }, { pos: [S / 2, 0, 0], ry: Math.PI / 2 },
