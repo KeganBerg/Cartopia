@@ -3,8 +3,9 @@
 // green at four-ways), pulls up at businesses, and swings round cars stopped
 // at the curb. Plain TypeScript so it can be tested without a renderer.
 import { dirAt, pointAt, type Curve, type V2 } from './curves'
+import { lightAt, type Light } from './layout'
 import {
-  D, LANE, buildNet, conflicts, exits, lightFor, opp, priority, right, roadCurve, route, tkey,
+  D, LANE, buildNet, conflicts, exits, opp, priority, right, roadCurve, route, tkey,
   type Building, type Net, type Node, type Stop, type TurnOf,
 } from './net'
 
@@ -67,6 +68,7 @@ export type Agent = {
   queuedAt: number // last time it was held waiting its turn at a forecourt
   show: number // 0..1 faded in, for arriving and the rare car that has to give up
   leaving: boolean
+  pull: number | null // broken down on the verge: odometer reading where it pulled over
 }
 
 const ACCEL = 1.6
@@ -82,6 +84,9 @@ const PASS_V = 1.5
 // Our directions (east, west, south, north) as walkGraph's crosswalk sides (south, east, north, west).
 const SIDE = [1, 3, 0, 2]
 const STOP_LINE = 0.6 // how far short of an intersection cars wait
+const PULL = 0.9 // how far a broken-down car pulls over onto the verge, clear of its lane
+const PULL_RAMP = 1.4 // distance over which it eases off the road (and back on)
+const PULL_FLAT = 0.9 // either side of the spot, where it is all the way over
 const JAMMED = 45 // seconds stuck before a car gives up
 
 // A short oriented box: centre, heading, half length and half width.
@@ -143,6 +148,7 @@ export class Traffic {
       a.parkedAt = null
       this.truncate(a, leg.node ? a.ci : this.lotEnd(a))
       for (const l of a.legs) if (l.stopKind && l.stopKind !== 'stall') this.clearStop(l)
+      if (!a.legs.some((l) => l.stopKind === 'stall')) a.pull = null
       if (leg.node && leg.granted) this.net.nodes.get(leg.node)!.occ.set(a.uid, { inDir: leg.inDir, outDir: leg.outDir })
     }
     this.syncCars()
@@ -216,7 +222,7 @@ export class Traffic {
     const out = new Set<string>()
     for (const a of this.agents.values()) {
       const l = a.parkedAt
-      if (a.stalled && l?.node) out.add(`${l.node}|${l.inDir}`)
+      if (a.stalled && a.pull === null && l?.node) out.add(`${l.node}|${l.inDir}`)
     }
     return out
   }
@@ -242,7 +248,7 @@ export class Traffic {
         stalled: false, parked: 0, parkedAt: null, wait: 0,
         plan: [], trip: null, nextVisit: 10 + rand() * 40,
         tow: 0, truck: 0, ot: null, rerouteAt: 0, pend: null, approach: null, arrived: null, boxes: [], claim: [], gapTo: null, gap: Infinity,
-        show: 0, leaving: false, queuedAt: -1,
+        show: 0, leaving: false, queuedAt: -1, pull: null,
       }
       this.agents.set(a.uid, a)
       this.extend(a)
@@ -261,6 +267,8 @@ export class Traffic {
     }
     // Fixed: drop any breakdown stop still ahead and drive off once clear.
     if (a.parked > 0 && a.parkedAt?.stopKind === 'stall') a.parked = 0.6
+    // Fixed before it got to the verge: stay on the road.
+    else a.pull = null
     for (const l of a.legs) if (l.stopKind === 'stall') this.clearStop(l)
   }
 
@@ -407,7 +415,8 @@ export class Traffic {
     const n = this.net.nodes.get(last.node)!
     const nk = tkey(n.x + D[last.outDir][0], n.z + D[last.outDir][1])
     if (!this.net.nodes.has(nk)) return false
-    const outs = route(this.net, nk, last.outDir, stop.tile, stop.heading, this.stalledLanes())
+    const stalls = this.stalledLanes()
+    const outs = route(this.net, nk, last.outDir, stop.tile, stop.heading, stalls, stalls)
     if (!outs) return false
     this.truncate(a, keep)
     for (let i = a.ci + 1; i < a.legs.length; i++) {
@@ -455,12 +464,19 @@ export class Traffic {
 
   // Sideways offset while overtaking: out into the other lane, past, and back.
   private swing(a: Agent, o: number) {
+    let off = 0
+    // Pulled over onto the verge: ease off the road up to the spot, and back on after.
+    if (a.pull !== null) {
+      // All the way over along the whole car, then a gentle ramp either side.
+      const d = Math.abs(o - a.pull) - PULL_FLAT
+      off += PULL * (1 - smooth(d / PULL_RAMP))
+    }
     const ot = a.ot
-    if (!ot) return 0
+    if (!ot) return off
     const full = -2 * LANE
-    if (o < ot.start) return 0
-    if (o < ot.merge) return full * smooth((o - ot.start) / SWING)
-    return full * (1 - smooth((o - ot.merge) / SWING))
+    if (o < ot.start) return off
+    if (o < ot.merge) return off + full * smooth((o - ot.start) / SWING)
+    return off + full * (1 - smooth((o - ot.merge) / SWING))
   }
 
   private front(a: Agent) {
@@ -583,7 +599,7 @@ export class Traffic {
       // Can't plan a way there from here yet (mid-junction, say): try again next frame.
       if (!stop || this.startTrip(a, stop, trip)) this.trips.delete(a.uid)
     }
-    if (a.tow === 1 && this.roomAhead(a, a.len / 2 + TRUCK.gap + TRUCK.len + 0.1)) a.tow = 2
+    if (a.tow === 1 && this.roomAhead(a, a.len / 2 + TRUCK.gap + TRUCK.len + 0.1) && (a.pull === null || this.laneClear(a))) a.tow = 2
     if (a.tow === 2) a.truck = Math.min(1, a.truck + dt * 2.5)
     if (a.tow === 3) {
       a.truck = Math.max(0, a.truck - dt * 2)
@@ -591,6 +607,11 @@ export class Traffic {
     }
 
     // Broken down: pull over on the next straight stretch and wait to be fixed.
+    // Someone else broke down right where it meant to pull over: find another spot.
+    if (a.stalled && !a.parked) {
+      const mine = a.legs.find((l) => l.stopKind === 'stall')
+      if (mine && this.nearStall(mine.node, this.stallSpots(a, true))) this.clearStop(mine)
+    }
     if (a.stalled && !a.legs.some((l) => l.stopKind === 'stall')) this.planStall(a)
 
     // Now and then, drop in at a business.
@@ -604,6 +625,27 @@ export class Traffic {
       }
     }
     this.extend(a)
+  }
+
+  // Tiles where other broken-down cars have stopped (`parkedOnly`) or mean to.
+  private stallSpots(a: Agent, parkedOnly = false) {
+    const out: string[] = []
+    for (const o of this.agents.values()) {
+      if (o === a || !o.stalled) continue
+      if (parkedOnly) {
+        if (o.parked && o.parkedAt?.node) out.push(o.parkedAt.node)
+      } else for (const l of o.legs) if (l.stopKind === 'stall' && l.node) out.push(l.node)
+    }
+    return out
+  }
+
+  private nearStall(tile: string | null, spots: string[]) {
+    if (!tile) return false
+    const [x, z] = tile.split(',').map(Number)
+    return spots.some((k) => {
+      const [sx, sz] = k.split(',').map(Number)
+      return Math.abs(sx - x) + Math.abs(sz - z) <= 2
+    })
   }
 
   private planStall(a: Agent) {
@@ -621,10 +663,46 @@ export class Traffic {
     }
     // Not down a dead end, where everyone would have to squeeze past it twice.
     const open = (i: number) => !this.net.nodes.get(a.legs[i].node ?? '')?.spur
-    // Limp on to a spot others can pass; settle for any straight once it has gone far enough.
+    // Enough plain road past it for a car to pull out, get by and back in before
+    // the next junction (two more tiles), so it never bottles up a street.
+    // The queue that forms behind it while it's passed mustn't reach back into a junction either.
+    const roomy = (i: number) => {
+      const ahead = [i + 1, i + 2].every((j) => {
+        const l = a.legs[j]
+        return !!l?.node && !l.junction && l.turn !== 2 && !l.stopKind
+      })
+      const n = this.net.nodes.get(a.legs[i].node ?? '')
+      if (!ahead || !n) return false
+      const [bx, bz] = D[opp(a.legs[i].inDir)]
+      return [1, 2].every((m) => {
+        const b = this.net.nodes.get(tkey(n.x + bx * m, n.z + bz * m))
+        return !!b && !b.junction
+      })
+    }
+    // Limp on to a spot others can pass; settle for less only once it has gone a long way.
     const since = a.odo - (this.limp.get(a.uid) ?? (this.limp.set(a.uid, a.odo), a.odo))
-    const tests = [(i: number) => good(i) && open(i), (i: number) => fallback(i) && open(i), good, fallback]
-    for (const test of since > 40 ? tests : since > 25 ? tests.slice(0, 2) : tests.slice(0, 1)) {
+    // Well clear of other broken-down cars, so no stretch needs two cars passed at once.
+    const spots = this.stallSpots(a)
+    const apart = (i: number) => !this.nearStall(a.legs[i].node, spots)
+    // Best of all: straight road with open ground beside it to pull right off onto.
+    const verge = (i: number) => {
+      const l = a.legs[i]
+      const n = this.net.nodes.get(l.node ?? '')
+      const prev = a.legs[i - 1]
+      const next = a.legs[i + 1]
+      if (!n || n.junction || l.turn || !prev?.node || !next?.node || prev.junction || next.junction) return false
+      const [dx, dz] = D[l.inDir]
+      return this.net.verge.has(tkey(n.x - dz, n.z + dx)) && !this.nearStall(n.key, spots)
+    }
+    const tests = [
+      verge,
+      (i: number) => good(i) && open(i) && roomy(i) && apart(i),
+      (i: number) => fallback(i) && open(i) && roomy(i) && apart(i),
+      (i: number) => fallback(i) && roomy(i) && apart(i),
+      good,
+      fallback,
+    ]
+    for (const test of since > 120 ? tests : since > 60 ? tests.slice(0, 4) : since > 25 ? tests.slice(0, 3) : tests.slice(0, 2)) {
       for (let i = a.ci; i < a.legs.length - 1; i++) {
         const l = a.legs[i]
         const at = l.c.len / 2
@@ -633,6 +711,11 @@ export class Traffic {
         l.stopS = at
         l.stopFor = Infinity
         l.stopKind = 'stall'
+        if (test === verge) {
+          let dist = at - a.s
+          for (let j = a.ci; j < i; j++) dist += a.legs[j].c.len
+          a.pull = a.odo + dist
+        } else a.pull = null
         a.trip = null
         a.plan = []
         // Nothing past the stop: give back any junction it had a turn for.
@@ -641,6 +724,19 @@ export class Traffic {
         return
       }
     }
+  }
+
+  // No one coming along the lane beside a car pulled over on the verge.
+  private laneClear(a: Agent) {
+    const [rx, rz] = right([a.hx, a.hz])
+    const lx = a.x - rx * PULL, lz = a.z - rz * PULL
+    for (const o of this.agents.values()) {
+      if (o === a || o.hx * a.hx + o.hz * a.hz < 0.3) continue
+      const dx = o.x - lx, dz = o.z - lz
+      const along = dx * a.hx + dz * a.hz
+      if (Math.abs(dx * a.hz - dz * a.hx) < 0.7 && along > -4 && along < 2) return false
+    }
+    return true
   }
 
   // Is the lane clear for `dist` ahead of the car's nose?
@@ -673,7 +769,7 @@ export class Traffic {
       return node.degree < 2 || this.clearToTurn(a, leg)
     }
     if (node.signal && obey) {
-      const light = lightFor(node, leg.inDir, this.t)
+      const light = this.lightOf(node.cluster, leg.inDir)
       if (light === 'red') return false
       if (light === 'yellow' && (!first || dist > (a.v * a.v) / (2 * BRAKE) + 0.15)) return false
     }
@@ -700,7 +796,8 @@ export class Traffic {
       // Not if they are queued behind someone, cannot get out the other side,
       // or are sat at a red light.
       if ((y.gapTo && y.gap < ap.dist) || !this.exitRoom(y, ap.chain[ap.chain.length - 1])) continue
-      if (node.signal && lightFor(node, w.inDir, this.t) !== 'green') continue
+      // (Its light is the one where it drives into the intersection, not this tile's.)
+      if (node.signal && this.lightOf(node.cluster, ap.chain[0].inDir) !== 'green') continue
       if (y.arrived !== null && a.arrived !== null) {
         if (y.arrived < a.arrived || (y.arrived === a.arrived && y.uid < a.uid)) return false
       } else if (y.arrived === null && ap.dist < 2.6 && y.v > 0.5 && a.wait < 5 && this.lane(node, w) > mine) {
@@ -709,6 +806,12 @@ export class Traffic {
       }
     }
     return true
+  }
+
+  // The light shown to traffic heading `heading` into intersection `cluster`.
+  lightOf(cluster: number, heading: number): Light {
+    const c = this.net.layout.clusters[cluster]
+    return c?.signal ? lightAt(c.offset, heading, this.t, c.clear) : 'green'
   }
 
   // Waiting its turn for the pumps, or queued behind a car that is: not a jam.
@@ -737,11 +840,12 @@ export class Traffic {
   private bayBusy(a: Agent, tile: string, lotDir: number, curves: Curve[]) {
     for (const o of this.agents.values()) {
       if (o === a) continue
-      // Turning in, or anywhere on the forecourt (tail included).
+      // Turning in, or on the forecourt.
       for (let i = Math.max(0, o.ci - 1); i < o.legs.length; i++) {
         const l = o.legs[i]
         if (l.granted && l.node === tile && l.outDir === lotDir) return true
-        if (i <= o.ci && !l.node && curves.includes(l.c)) return true
+        // (Once its nose is back out on the road, the next car may start in behind it.)
+        if (i === o.ci && !l.node && curves.includes(l.c)) return true
       }
     }
     return false
@@ -794,6 +898,8 @@ export class Traffic {
       const targeted = [...this.agents.values()].some((o) => o.ot?.target === a.uid)
       if (a.tow === 2 && a.parkedAt?.stopKind === 'tow') a.tow = 3
       if (done && a.tow !== 1 && a.tow !== 3) a.parked -= dt
+      // Off on the verge: only ease back onto the road with a gap in the traffic.
+      if (a.pull !== null && a.parked <= 0 && !this.laneClear(a)) a.parked = 0.05
       if (a.parked <= 0 && targeted) a.parked = 0.2
       if (a.parked <= 0) {
         const k = a.parkedAt?.stopKind
@@ -844,6 +950,18 @@ export class Traffic {
           a.s += Math.max(0, gap)
           return
         }
+        break
+      }
+      ahead += l.c.len
+    }
+
+    // Someone turning round on a tile ahead swings into our lane there: wait short of it.
+    ahead = leg.c.len - a.s - fr
+    for (let i = a.ci + 1; i < a.legs.length && ahead < look + 1.5; i++) {
+      const l = a.legs[i]
+      const n = l.node && !l.junction ? this.net.nodes.get(l.node) : null
+      if (n && [...n.occ].some(([u, m]) => u !== a.uid && m.inDir === opp(m.outDir) && m.outDir === l.inDir)) {
+        cap(ahead - 0.1)
         break
       }
       ahead += l.c.len
@@ -929,6 +1047,7 @@ export class Traffic {
     a.s += move
     a.odo += move
     if (a.ot && a.odo > a.ot.merge + SWING) a.ot = null
+    if (a.pull !== null && a.odo > a.pull + PULL_FLAT + PULL_RAMP) a.pull = null
 
     while (a.s > a.legs[a.ci].c.len && a.ci < a.legs.length - 1) {
       a.s -= a.legs[a.ci].c.len
@@ -974,6 +1093,11 @@ export class Traffic {
     while (!now && keep < a.legs.length - 1 && a.legs[keep + 1].granted) keep++
     // Never strand a car on a forecourt: keep its way back onto the road.
     keep = Math.min(a.legs.length - 1, Math.max(keep, this.lotEnd(a)))
+    // Stuck behind a breakdown with no turning before it: nothing to gain,
+    // and a new route would only tell it to turn round somewhere past the blockage.
+    const kl = a.legs[keep]
+    const kn = kl.node && this.net.nodes.get(kl.node)
+    if (now && kn && blocked.has(`${tkey(kn.x + D[kl.outDir][0], kn.z + D[kl.outDir][1])}|${kl.outDir}`)) return
     if (a.legs.slice(keep + 1).some((l) => l.stopKind)) {
       // Heading for a stop: find another route there.
       const trip = a.trip
@@ -982,7 +1106,8 @@ export class Traffic {
       const n = last.node && this.net.nodes.get(last.node)
       if (!n) return
       const nk = tkey(n.x + D[last.outDir][0], n.z + D[last.outDir][1])
-      const outs = route(this.net, nk, last.outDir, trip.stop.tile, trip.stop.heading, new Set([...this.stalledLanes(), ...blocked]))
+      const stalls = this.stalledLanes()
+      const outs = route(this.net, nk, last.outDir, trip.stop.tile, trip.stop.heading, new Set([...stalls, ...blocked]), stalls)
       if (!outs) return
       this.truncate(a, keep)
       a.plan = [...outs, { at: trip.stop.bay ? 'bay' : 'curb', kind: trip.kind }]
@@ -1019,16 +1144,18 @@ export class Traffic {
   // Pull round a car parked at the curb when the other lane is clear and the road
   // runs straight long enough to get past and back in.
   private tryOvertake(a: Agent, p: Agent) {
-    if (a.tow || a.stalled) return
+    // A car limping on a flat still gets round one parked in its way.
+    if (a.tow) return
     const pass = a.gap + p.len + a.len + 0.25
     const need = pass + SWING + a.len / 2
-    // Plain road the whole way: gentle bends are fine, junctions and stops are not.
+    // Straight road the whole way: no junctions, no corners (it would meet whoever is
+    // coming round them head on), and no stops.
     let ahead = -a.s
     for (let i = a.ci; i < a.legs.length; i++) {
       const l = a.legs[i]
       if (ahead > need) break
       // Never swing out past a car parked where this one means to stop.
-      if (!l.node || l.junction || l.turn === 2 || (l.stopKind && !(i === a.ci && (l.stopS ?? 0) < a.s))) return
+      if (!l.node || l.junction || l.turn || (l.stopKind && !(i === a.ci && (l.stopS ?? 0) < a.s))) return
       ahead += l.c.len
     }
     if (ahead < need) return

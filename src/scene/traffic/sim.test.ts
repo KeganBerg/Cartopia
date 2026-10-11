@@ -169,6 +169,78 @@ describe('town traffic', () => {
     expect(movedAfter).toBeGreaterThan(0)
   })
 
+  // The starter town with its businesses, as most players have it.
+  const starter = () => {
+    const roads: string[] = []
+    for (let i = 4; i <= 19; i++) roads.push(`${i},4`, `${i},19`, `4,${i}`, `19,${i}`, `${i},11`)
+    const blds = [['gas', 6, 3], ['pizza', 10, 3], ['pizza', 12, 3], ['rescue', 14, 3], ['pizza', 17, 10], ['showroom', 9, 9], ['garage', 13, 9]]
+    return { roads: [...new Set(roads)], buildings: blds.map(([def, x, z]) => ({ uid: `${def}${x}`, def: def as string, x: x as number, z: z as number, rot: 0 })) }
+  }
+  // Share of time moving cars spend stopped, the biggest knot of stopped cars, and give-ups.
+  const crowding = (t: Traffic, seconds: number, every?: (t: Traffic, at: number) => void) => {
+    let still = 0, all = 0, knot = 0
+    run(t, seconds, (tr, at) => {
+      every?.(tr, at)
+      if (at < 10) return
+      const live = [...tr.agents.values()].filter((a) => !a.parked && !a.stalled && !a.tow)
+      const stopped = live.filter((a) => a.v < 0.05)
+      all += live.length
+      still += stopped.length
+      const seen = new Set<string>()
+      for (const a of stopped) {
+        if (seen.has(a.uid)) continue
+        let size = 0
+        const q = [a]
+        seen.add(a.uid)
+        while (q.length) {
+          const c = q.pop()!
+          size++
+          for (const o of stopped) {
+            if (seen.has(o.uid) || Math.hypot(o.x - c.x, o.z - c.z) >= 2.2) continue
+            seen.add(o.uid)
+            q.push(o)
+          }
+        }
+        knot = Math.max(knot, size)
+      }
+    })
+    return { still: still / all, knot }
+  }
+
+  it('broken-down cars pull onto the verge and traffic keeps flowing', () => {
+    seedRandom(11)
+    const t = new Traffic()
+    const { roads, buildings } = starter()
+    t.setTown(roads, buildings, turnOf)
+    t.setCars(cars(18, 4), 18)
+    const bumps = new Set<string>()
+    const c = crowding(t, 240, (tr) => {
+      for (const o of overlaps(tr)) bumps.add(o)
+    })
+    const parked = [...t.agents.values()].filter((a) => a.stalled && a.parked)
+    expect(parked.length).toBe(4)
+    // All four off the road, out of everyone's way.
+    for (const a of parked) expect(a.pull).not.toBeNull()
+    expect([...bumps]).toEqual([])
+    expect(t.respawns).toBe(0)
+    expect(c.still).toBeLessThan(0.08)
+    expect(c.knot).toBeLessThanOrEqual(4)
+  })
+
+  it('a busy starter town with a run on the gas station does not bunch up', () => {
+    seedRandom(11)
+    const t = new Traffic()
+    const { roads, buildings } = starter()
+    t.setTown(roads, buildings, turnOf)
+    t.setCars(cars(24), 24)
+    const c = crowding(t, 240, (tr, at) => {
+      if (at === 20) for (const a of [...tr.agents.values()].slice(0, 8)) tr.requestTrip(a.uid, 'gas')
+    })
+    expect(t.respawns).toBe(0)
+    expect(c.still).toBeLessThan(0.1)
+    expect(c.knot).toBeLessThanOrEqual(6)
+  })
+
   it('tows a car to Rusty\'s curb', () => {
     seedRandom(9)
     const t = new Traffic()
