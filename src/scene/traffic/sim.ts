@@ -60,6 +60,7 @@ export type Agent = {
   ot: null | { target: string; start: number; merge: number }
   approach: null | { dist: number; chain: Leg[] } // junction tiles it is waiting to cross, nose distance to the first
   arrived: number | null // when it pulled up asking to cross, for first come first served
+  halt: number | null // when it came to a stop at a stop sign
   boxes: Box[] // the body, as short boxes laid along its path this frame
   claim: Box[] // lane an overtaking car has claimed ahead of it
   rerouteAt: number
@@ -157,6 +158,7 @@ export class Traffic {
       a.pend = null
       a.approach = null
       a.arrived = null
+      a.halt = null
       a.gapTo = null
       a.parked = 0
       a.parkedAt = null
@@ -262,7 +264,7 @@ export class Traffic {
         x: p[0], z: p[1], yaw: 0, hx: 0, hz: 1,
         stalled: false, parked: 0, parkedAt: null, wait: 0,
         plan: [], trip: null, nextVisit: 10 + rand() * 40,
-        tow: 0, truck: 0, ot: null, rerouteAt: 0, pend: null, approach: null, arrived: null, boxes: [], claim: [], gapTo: null, gap: Infinity,
+        tow: 0, truck: 0, ot: null, rerouteAt: 0, pend: null, approach: null, arrived: null, halt: null, boxes: [], claim: [], gapTo: null, gap: Infinity,
         show: 0, leaving: false, queuedAt: -1, pull: null,
       }
       this.agents.set(a.uid, a)
@@ -1018,22 +1020,27 @@ export class Traffic {
           chain.push(a.legs[j])
         }
         a.approach = { dist: ahead, chain }
+        const prev = a.legs[i - 1]
+        const line = l.junction && prev.node && !this.net.nodes.get(prev.node)!.junction ? STOP_LINE : 0
+        // A stop sign: come to a full stop at the line before taking a turn.
+        const sign = this.net.stopSigns.has(`${l.node}>${l.inDir}`)
+        if (sign && a.v < 0.15 && ahead - line < 0.4) a.halt ??= this.t
+        const halted = !sign || (a.halt !== null && this.t - a.halt > 0.5)
         // Only ask when close enough to commit; until then just be ready to stop.
-        const asking = ahead < (a.v * a.v) / (2 * BRAKE) + 0.7
+        const asking = ahead < (a.v * a.v) / (2 * BRAKE) + 0.7 && (!sign || a.halt !== null)
         if (asking) a.arrived ??= this.t
         // Through a cluster of junction tiles, only the first light counts.
         const lit = chain.findIndex((c) => this.net.nodes.get(c.node!)!.signal)
-        const ok = asking && chain.every((c, k) => this.canEnter(a, c, ahead, k === 0, k === lit)) && this.exitRoom(a, chain[chain.length - 1]) && !this.zebraBusy(a.legs[i - 1], chain)
+        const ok = asking && halted && chain.every((c, k) => this.canEnter(a, c, ahead, k === 0, k === lit)) && this.exitRoom(a, chain[chain.length - 1]) && !this.zebraBusy(a.legs[i - 1], chain)
         if (ok) {
           a.arrived = null
+          a.halt = null
           for (const c of chain) {
             c.granted = true
             this.net.nodes.get(c.node!)!.occ.set(a.uid, { inDir: c.inDir, outDir: c.outDir })
           }
         } else {
           // Wait at the stop line, short of the zebra crossing.
-          const prev = a.legs[i - 1]
-          const line = l.junction && prev.node && !this.net.nodes.get(prev.node)!.junction ? STOP_LINE : 0
           cap(ahead - 0.05 - line)
           // Stuck behind cars that are waiting on each other: try another way through.
           if (asking && a.wait > 4 && this.t > a.rerouteAt) this.reroute(a, chain)
@@ -1043,7 +1050,10 @@ export class Traffic {
       ahead += l.c.len
     }
 
-    if (!a.approach) a.arrived = null
+    if (!a.approach) {
+      a.arrived = null
+      a.halt = null
+    }
 
     // Whatever is in the way along the path ahead.
     a.gapTo = null
