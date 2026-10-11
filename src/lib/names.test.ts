@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { displayName, isCleanName } from './names'
+import { readFileSync } from 'node:fs'
+import { ALLOWED, ANYWHERE, WHOLE_WORD, displayName, isCleanName } from './names'
 
 describe('isCleanName', () => {
   it('blocks slurs, including spaced and leetspeak spellings', () => {
@@ -18,5 +19,14 @@ describe('displayName', () => {
   it('replaces a blocked name with a neutral one', () => {
     expect(displayName('Niggapolis', '8a1e7edb-cb66-437e-b1be-d3768917fda2')).toBe('Town #FDA2')
     expect(displayName('Ram Ranch', 'x')).toBe('Ram Ranch')
+  })
+})
+
+describe('database name filter', () => {
+  it('uses the same word lists as the game', () => {
+    const sql = readFileSync(new URL('../../supabase/migrations/0015_security_hardening.sql', import.meta.url), 'utf8')
+    const block = sql.split('-- names:begin')[1].split('-- names:end')[0]
+    const lists = [...block.matchAll(/array\[([^\]]*)\]/g)].map((m) => [...m[1].matchAll(/'([^']*)'/g)].map((w) => w[1]))
+    expect(lists).toEqual([ALLOWED, ANYWHERE, WHOLE_WORD])
   })
 })

@@ -1,5 +1,5 @@
 import { PAL, SEASON } from './season'
-import { CanvasTexture, RepeatWrapping, SRGBColorSpace, type Texture } from 'three'
+import { CanvasTexture, Color, RepeatWrapping, SRGBColorSpace, type Texture } from 'three'
 
 // Hand-drawn canvas textures, generated once and shared. Small sizes keep
 // them cheap on phones; repeat settings tile them across bigger surfaces.
@@ -49,14 +49,42 @@ function speckle(g: CanvasRenderingContext2D, s: number, r: () => number, colors
   }
 }
 
+// Grass: soft light and dark patches so the lawn isn't one flat colour, short
+// blades, the odd clover clump, then the season's flowers, leaves or sparkle.
+// One image spans four tiles; blobs wrap round the edges so the seams vanish.
 export const grassTex = (rx = 1, ry = rx) =>
-  rep(make(`grass|${SEASON}`, 128, (g, s, r) => {
+  rep(make(`grass2|${SEASON}`, 256, (g, s, r) => {
     g.fillStyle = PAL.grass
     g.fillRect(0, 0, s, s)
-    speckle(g, s, r, PAL.grassSpeckle, 900, 3)
+    const wrapped = (x: number, y: number, draw: (x: number, y: number) => void) => {
+      for (const ox of [-s, 0, s]) for (const oy of [-s, 0, s]) draw(x + ox, y + oy)
+    }
+    const shades = [-0.1, 0.08, -0.06, 0.1].map((l) => `#${new Color(PAL.grass).offsetHSL(0, 0, l).getHexString()}`)
+    for (let i = 0; i < 18; i++) {
+      const x = r() * s, y = r() * s, rad = 18 + r() * 40, squash = 0.6 + r() * 0.4, turn = r() * 3
+      g.globalAlpha = 0.5
+      g.fillStyle = shades[i % shades.length]
+      wrapped(x, y, (cx, cy) => { g.beginPath(); g.ellipse(cx, cy, rad, rad * squash, turn, 0, Math.PI * 2); g.fill() })
+    }
+    g.globalAlpha = 1
+    speckle(g, s, r, PAL.grassSpeckle, 2400, 3)
+    // Blades: short slanted strokes, darker at the root side.
+    g.lineWidth = 1
+    for (let i = 0; i < 1600; i++) {
+      const x = r() * s, y = r() * s, len = 3 + r() * 4, lean = (r() - 0.5) * 3
+      g.strokeStyle = PAL.grassSpeckle[Math.floor(r() * PAL.grassSpeckle.length)]
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x + lean, y - len); g.stroke()
+    }
+    if (SEASON !== 'winter') {
+      g.fillStyle = PAL.grassSpeckle[2]
+      for (let i = 0; i < 10; i++) {
+        const x = r() * s, y = r() * s
+        for (let k = 0; k < 5; k++) wrapped(x + (r() - 0.5) * 8, y + (r() - 0.5) * 8, (cx, cy) => { g.beginPath(); g.arc(cx, cy, 2.2, 0, Math.PI * 2); g.fill() })
+      }
+    }
     // Flowers in spring, fallen leaves in fall, sparkle on the snow.
-    speckle(g, s, r, PAL.grassDots, PAL.dots, 2)
-  }), `grass|${SEASON}`, rx, ry)
+    speckle(g, s, r, PAL.grassDots, PAL.dots * 4, 2)
+  }), `grass2|${SEASON}`, rx, ry)
 
 // Light concrete pavers for sidewalks and building lots.
 export const paverTex = (rx = 1, ry = rx) =>
@@ -165,25 +193,49 @@ export const windowTex = () =>
     }
   })
 
-// Car rim with spokes, used on the outside face of each wheel.
-export const rimTex = () =>
-  make('rim', 64, (g, s) => {
-    const c = s / 2
-    g.fillStyle = '#1b1b1b'
-    g.fillRect(0, 0, s, s)
-    g.fillStyle = '#e8eaed'
-    g.beginPath(); g.arc(c, c, s * 0.42, 0, Math.PI * 2); g.fill()
-    g.fillStyle = '#9aa0a6'
-    g.beginPath(); g.arc(c, c, s * 0.36, 0, Math.PI * 2); g.fill()
-    g.strokeStyle = '#f5f6f7'
-    g.lineWidth = 5
-    for (let i = 0; i < 5; i++) {
-      const a = (i / 5) * Math.PI * 2
-      g.beginPath(); g.moveTo(c, c); g.lineTo(c + Math.cos(a) * s * 0.36, c + Math.sin(a) * s * 0.36); g.stroke()
-    }
-    g.fillStyle = '#5f6368'
-    g.beginPath(); g.arc(c, c, s * 0.08, 0, Math.PI * 2); g.fill()
-  })
+// Car wheel atlas: the spoked rim on the left half (mapped onto the wheel's
+// faces) and the tyre's tread on the right half (wrapped round its edge), so a
+// whole wheel draws with one material.
+let wheelAtlas: CanvasTexture | null = null
+export function wheelTex() {
+  if (wheelAtlas) return wheelAtlas
+  const c = document.createElement('canvas')
+  c.width = 128
+  c.height = 64
+  const g = c.getContext('2d')!
+  const s = 64
+  const m = s / 2
+  g.fillStyle = '#1b1b1b'
+  g.fillRect(0, 0, 128, 64)
+  // Sidewall ring, then the rim, its dish and five spokes.
+  g.fillStyle = '#262626'
+  g.beginPath(); g.arc(m, m, s * 0.48, 0, Math.PI * 2); g.fill()
+  g.fillStyle = '#e8eaed'
+  g.beginPath(); g.arc(m, m, s * 0.4, 0, Math.PI * 2); g.fill()
+  g.fillStyle = '#80868b'
+  g.beginPath(); g.arc(m, m, s * 0.34, 0, Math.PI * 2); g.fill()
+  g.strokeStyle = '#f5f6f7'
+  g.lineCap = 'round'
+  g.lineWidth = 6
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2 - Math.PI / 2
+    g.beginPath(); g.moveTo(m, m); g.lineTo(m + Math.cos(a) * s * 0.35, m + Math.sin(a) * s * 0.35); g.stroke()
+  }
+  g.fillStyle = '#bdc1c6'
+  g.beginPath(); g.arc(m, m, s * 0.12, 0, Math.PI * 2); g.fill()
+  g.fillStyle = '#5f6368'
+  g.beginPath(); g.arc(m, m, s * 0.06, 0, Math.PI * 2); g.fill()
+  // Chunky tread blocks round the tyre.
+  g.fillStyle = '#2e2e2e'
+  for (let x = 64; x < 128; x += 4) {
+    g.fillRect(x, 6, 2, 22)
+    g.fillRect(x + 2, 36, 2, 22)
+  }
+  wheelAtlas = new CanvasTexture(c)
+  wheelAtlas.colorSpace = SRGBColorSpace
+  wheelAtlas.anisotropy = 4
+  return wheelAtlas
+}
 
 // Sky: blue gradient with soft cartoon clouds. Used as a dome in races and
 // as the backdrop around the town.
@@ -301,4 +353,320 @@ export const towerGlowTex = () =>
         g.fillStyle = r() < 0.7 ? '#ffd88a' : '#cfe8ff'
         g.fillRect(x * 16 + 3, y * 8 + 2, 10, 5)
       }
+  })
+
+// Cast-iron manhole cover: a pale rim round a diamond-tread lid with two
+// lifting holes. Drawn to fill the square so a circleGeometry shows the lid.
+export const manholeTex = () =>
+  make('manhole', 64, (g, s) => {
+    const m = s / 2
+    g.fillStyle = '#6f777c'
+    g.fillRect(0, 0, s, s)
+    g.fillStyle = '#a7afb4'
+    g.beginPath(); g.arc(m, m, m, 0, Math.PI * 2); g.fill()
+    g.fillStyle = '#7f888d'
+    g.beginPath(); g.arc(m, m, m * 0.8, 0, Math.PI * 2); g.fill()
+    g.save()
+    g.beginPath(); g.arc(m, m, m * 0.8, 0, Math.PI * 2); g.clip()
+    g.strokeStyle = '#9ba4a9'
+    g.lineWidth = 2
+    for (let i = -s; i < s * 2; i += 8) {
+      g.beginPath(); g.moveTo(i, 0); g.lineTo(i + s, s); g.stroke()
+      g.beginPath(); g.moveTo(i, s); g.lineTo(i + s, 0); g.stroke()
+    }
+    g.restore()
+    g.fillStyle = '#4b5257'
+    for (const dx of [-0.42, 0.42]) {
+      g.beginPath(); g.ellipse(m + dx * m, m, 3, 2, 0, 0, Math.PI * 2); g.fill()
+    }
+  })
+
+// Gutter drain grate: a steel frame with slots running across it.
+export const drainTex = () =>
+  make('drain', 32, (g, s) => {
+    g.fillStyle = '#9aa2a7'
+    g.fillRect(0, 0, s, s)
+    g.fillStyle = '#3d4348'
+    for (let y = 4; y < s - 4; y += 6) g.fillRect(5, y, s - 10, 3)
+  })
+
+// Desert sand: warm base, wind ripples, darker grit and the odd pebble.
+export const sandTex = (rx = 1, ry = rx) =>
+  rep(make('sand', 256, (g, s, r) => {
+    g.fillStyle = '#d9a46c'
+    g.fillRect(0, 0, s, s)
+    for (let i = 0; i < 14; i++) {
+      g.globalAlpha = 0.35
+      g.fillStyle = i % 2 ? '#e3b47e' : '#c99258'
+      g.beginPath()
+      g.ellipse(r() * s, r() * s, 30 + r() * 50, 14 + r() * 24, r() * 3, 0, Math.PI * 2)
+      g.fill()
+    }
+    g.globalAlpha = 0.4
+    g.strokeStyle = '#c48b52'
+    g.lineWidth = 2
+    for (let y = 6; y < s; y += 11) {
+      g.beginPath()
+      for (let x = 0; x <= s; x += 8) g.lineTo(x, y + Math.sin(x * 0.05 + y) * 3)
+      g.stroke()
+    }
+    g.globalAlpha = 1
+    speckle(g, s, r, ['#b97d45', '#e8bf8c', '#a86d3a', '#f0cc9c'], 2600, 2)
+    speckle(g, s, r, ['#8d5a35', '#9e9e9e', '#7b4a2a'], 60, 4)
+  }), 'sand', rx, ry)
+
+// Ploughed soil between crop rows.
+export const soilTex = (rx = 1, ry = rx) =>
+  rep(make('soil', 128, (g, s, r) => {
+    g.fillStyle = '#6d4c41'
+    g.fillRect(0, 0, s, s)
+    for (let x = 0; x < s; x += 16) {
+      g.fillStyle = '#5a3d33'
+      g.fillRect(x, 0, 6, s)
+      g.fillStyle = '#7d5a4c'
+      g.fillRect(x + 8, 0, 3, s)
+    }
+    speckle(g, s, r, ['#4e342e', '#8d6e63', '#5d4037'], 900, 2)
+  }), 'soil', rx, ry)
+
+// Nightclub dance floor: a grid of coloured tiles. `lit` is the glow (an
+// emissive map); unlit is the same floor dimmed for daytime.
+export const danceFloorTex = (lit: boolean, rx = 1, ry = rx) =>
+  rep(make(`dance|${lit}`, 128, (g, s) => {
+    const colors = ['#ff2bd6', '#00e5ff', '#ffea00', '#7c4dff', '#76ff03', '#ff6d00']
+    const n = 4
+    const t = s / n
+    g.fillStyle = '#0d0618'
+    g.fillRect(0, 0, s, s)
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        g.globalAlpha = lit ? 1 : 0.32
+        g.fillStyle = colors[(i * 3 + j * 2) % colors.length]
+        g.fillRect(i * t + 2, j * t + 2, t - 4, t - 4)
+      }
+    }
+    g.globalAlpha = 1
+  }), `dance|${lit}`, rx, ry)
+
+// Pale beach sand with soft wind ripples.
+export const beachSandTex = (rx = 1, ry = rx) =>
+  rep(make('beachsand', 256, (g, s, r) => {
+    g.fillStyle = '#f1dcae'
+    g.fillRect(0, 0, s, s)
+    for (let i = 0; i < 12; i++) {
+      g.globalAlpha = 0.3
+      g.fillStyle = i % 2 ? '#f7e7c3' : '#e3c891'
+      g.beginPath()
+      g.ellipse(r() * s, r() * s, 30 + r() * 50, 14 + r() * 24, r() * 3, 0, Math.PI * 2)
+      g.fill()
+    }
+    g.globalAlpha = 0.25
+    g.strokeStyle = '#d9bd86'
+    g.lineWidth = 2
+    for (let y = 8; y < s; y += 14) {
+      g.beginPath()
+      for (let x = 0; x <= s; x += 8) g.lineTo(x, y + Math.sin(x * 0.04 + y) * 3)
+      g.stroke()
+    }
+    g.globalAlpha = 1
+    speckle(g, s, r, ['#e0c58f', '#fbefd2', '#d4b67c', '#ffffff'], 2200, 2)
+  }), 'beachsand', rx, ry)
+
+// Packed snow: blue-grey drifts and sparkle.
+export const snowTex = (rx = 1, ry = rx) =>
+  rep(make('snowfield', 256, (g, s, r) => {
+    g.fillStyle = '#f4f7fa'
+    g.fillRect(0, 0, s, s)
+    for (let i = 0; i < 16; i++) {
+      g.globalAlpha = 0.35
+      g.fillStyle = i % 2 ? '#e3ebf2' : '#ffffff'
+      g.beginPath()
+      g.ellipse(r() * s, r() * s, 30 + r() * 60, 12 + r() * 26, r() * 3, 0, Math.PI * 2)
+      g.fill()
+    }
+    g.globalAlpha = 1
+    speckle(g, s, r, ['#dde6ee', '#ffffff', '#cfdbe6'], 1800, 2)
+    speckle(g, s, r, ['#b0c4d6'], 120, 1)
+  }), 'snowfield', rx, ry)
+
+// Dock concrete: slabs with joints, oil spots and tyre scuffs.
+export const concreteTex = (rx = 1, ry = rx) =>
+  rep(make('concrete', 256, (g, s, r) => {
+    g.fillStyle = '#a3aaaf'
+    g.fillRect(0, 0, s, s)
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
+      const v = 0.94 + r() * 0.08
+      g.fillStyle = `rgba(${Math.round(163 * v)},${Math.round(170 * v)},${Math.round(175 * v)},1)`
+      g.fillRect(i * 64 + 1, j * 64 + 1, 62, 62)
+    }
+    speckle(g, s, r, ['#979ea3', '#b0b6ba', '#8f969b'], 2200, 2)
+    for (let i = 0; i < 6; i++) {
+      g.globalAlpha = 0.25
+      g.fillStyle = '#4a4f53'
+      g.beginPath()
+      g.ellipse(r() * s, r() * s, 6 + r() * 12, 4 + r() * 8, r() * 3, 0, Math.PI * 2)
+      g.fill()
+    }
+    g.globalAlpha = 1
+    g.strokeStyle = '#7d8489'
+    g.lineWidth = 2
+    for (let i = 0; i <= 4; i++) {
+      g.beginPath(); g.moveTo(0, i * 64); g.lineTo(s, i * 64); g.stroke()
+      g.beginPath(); g.moveTo(i * 64, 0); g.lineTo(i * 64, s); g.stroke()
+    }
+  }), 'concrete', rx, ry)
+
+// Open water: deep blue with lighter wave crests. Scroll its offset to animate.
+export const waterTex = (key: string, rx = 1, ry = rx) =>
+  rep(make('water', 256, (g, s, r) => {
+    g.fillStyle = '#2b86c9'
+    g.fillRect(0, 0, s, s)
+    for (let i = 0; i < 10; i++) {
+      g.globalAlpha = 0.3
+      g.fillStyle = i % 2 ? '#3a9bdc' : '#1f74b3'
+      g.beginPath()
+      g.ellipse(r() * s, r() * s, 40 + r() * 50, 18 + r() * 20, 0, 0, Math.PI * 2)
+      g.fill()
+    }
+    g.globalAlpha = 0.55
+    g.strokeStyle = '#9fd4f5'
+    g.lineWidth = 2
+    for (let i = 0; i < 70; i++) {
+      const x = r() * s, y = r() * s, w = 8 + r() * 18
+      g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + w / 2, y - 3, x + w, y); g.stroke()
+    }
+    g.globalAlpha = 1
+  }), `water|${key}`, rx, ry)
+
+// Corrugated steel for shipping containers, tinted by the material colour.
+export const containerTex = () =>
+  make('container', 64, (g, s) => {
+    g.fillStyle = '#ffffff'
+    g.fillRect(0, 0, s, s)
+    for (let x = 0; x < s; x += 6) {
+      g.fillStyle = '#c9c9c9'
+      g.fillRect(x, 0, 2, s)
+      g.fillStyle = '#e6e6e6'
+      g.fillRect(x + 2, 0, 1, s)
+    }
+    g.fillStyle = '#9e9e9e'
+    g.fillRect(0, 0, s, 3)
+    g.fillRect(0, s - 3, s, 3)
+  })
+
+// Corrugated sheet metal, tinted by the material colour: ribs run across the
+// image (`across`) or down it, tiled `rx` by `ry`. Rust streaks bleed from the seams.
+export const corrugatedTex = (rx = 1, ry = rx, across = false) =>
+  rep(make(across ? 'corrugated-x' : 'corrugated', 64, (g, s, r) => {
+    g.fillStyle = '#ffffff'
+    g.fillRect(0, 0, s, s)
+    for (let k = 0; k < s; k += 8) {
+      g.fillStyle = '#c4c4c4'
+      if (across) g.fillRect(0, k, s, 3)
+      else g.fillRect(k, 0, 3, s)
+      g.fillStyle = '#ececec'
+      if (across) g.fillRect(0, k + 3, s, 1)
+      else g.fillRect(k + 3, 0, 1, s)
+    }
+    g.globalAlpha = 0.28
+    g.fillStyle = '#6d3a1c'
+    for (let i = 0; i < 5; i++) {
+      const a = r() * s
+      const len = 10 + r() * 26
+      if (across) g.fillRect(r() * s, a, len, 2 + r() * 3)
+      else g.fillRect(a, r() * s, 2 + r() * 3, len)
+    }
+    g.globalAlpha = 1
+  }), across ? 'corrugated-x' : 'corrugated', rx, ry)
+
+// Wild meadow for unbought land and the countryside: the season's rougher,
+// darker grass with long tangled blades, clumps and bare earth showing through.
+// One image spans eight tiles; blobs wrap so the seams vanish.
+export const meadowTex = (rx = 1, ry = rx) =>
+  rep(make(`meadow|${SEASON}`, 256, (g, s, r) => {
+    g.fillStyle = PAL.ground
+    g.fillRect(0, 0, s, s)
+    const wrapped = (x: number, y: number, draw: (x: number, y: number) => void) => {
+      for (const ox of [-s, 0, s]) for (const oy of [-s, 0, s]) draw(x + ox, y + oy)
+    }
+    const shades = [-0.09, 0.07, -0.05, 0.09, -0.12].map((l) => `#${new Color(PAL.ground).offsetHSL(0.01 * (r() - 0.5), 0, l).getHexString()}`)
+    for (let i = 0; i < 26; i++) {
+      const x = r() * s, y = r() * s, rad = 14 + r() * 46, squash = 0.5 + r() * 0.5, turn = r() * 3
+      g.globalAlpha = 0.45
+      g.fillStyle = shades[i % shades.length]
+      wrapped(x, y, (cx, cy) => { g.beginPath(); g.ellipse(cx, cy, rad, rad * squash, turn, 0, Math.PI * 2); g.fill() })
+    }
+    // Bare earth (or ice under the snow) in a few worn spots.
+    g.globalAlpha = 0.35
+    g.fillStyle = SEASON === 'winter' ? '#c9d6e0' : '#8a7a52'
+    for (let i = 0; i < 5; i++) {
+      const x = r() * s, y = r() * s, rad = 5 + r() * 9
+      wrapped(x, y, (cx, cy) => { g.beginPath(); g.ellipse(cx, cy, rad, rad * 0.7, r() * 3, 0, Math.PI * 2); g.fill() })
+    }
+    g.globalAlpha = 1
+    const blades = [...PAL.grassSpeckle, `#${new Color(PAL.ground).offsetHSL(0, 0, -0.14).getHexString()}`]
+    speckle(g, s, r, blades, 1800, 3)
+    g.lineWidth = 1.2
+    for (let i = 0; i < 2600; i++) {
+      const x = r() * s, y = r() * s, len = 4 + r() * 7, lean = (r() - 0.5) * 5
+      g.strokeStyle = blades[Math.floor(r() * blades.length)]
+      g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + lean * 0.3, y - len * 0.6, x + lean, y - len); g.stroke()
+    }
+    speckle(g, s, r, PAL.grassDots, PAL.dots * 3, 2)
+  }), `meadow|${SEASON}`, rx, ry)
+
+// Road wear, four cells side by side, each drawn on transparent: hairline
+// cracks, a darker tar patch with sealed seams, an oil stain, and grime that
+// collects along the kerb. Lay them as decals over the asphalt.
+export const roadWearTex = () =>
+  make('roadwear', 256, (g, s, r) => {
+    g.clearRect(0, 0, s, s)
+    const c = s / 4
+    // Cracks: branching dark lines.
+    g.strokeStyle = 'rgba(45,48,52,0.85)'
+    g.lineCap = 'round'
+    const crack = (x: number, y: number, a: number, len: number, w: number, depth: number) => {
+      let px = x, py = y
+      for (let i = 0; i < len; i++) {
+        a += (r() - 0.5) * 0.9
+        const nx = px + Math.cos(a) * 4, ny = py + Math.sin(a) * 4
+        g.lineWidth = w * (1 - i / len) + 0.5
+        g.beginPath(); g.moveTo(px, py); g.lineTo(nx, ny); g.stroke()
+        if (depth > 0 && r() < 0.18) crack(nx, ny, a + (r() < 0.5 ? 1 : -1) * (0.6 + r() * 0.6), len * 0.45, w * 0.6, depth - 1)
+        px = Math.min(c - 4, Math.max(4, nx)); py = Math.min(s - 4, Math.max(4, ny))
+      }
+    }
+    for (let k = 0; k < 3; k++) crack(c / 2 + (r() - 0.5) * 20, 10 + k * 80, Math.PI / 2 + (r() - 0.5) * 0.6, 18, 2.2, 2)
+    // Patch: a darker, smoother rectangle with a black sealed edge.
+    g.fillStyle = 'rgba(70,74,80,0.3)'
+    g.fillRect(c + 10, 30, c - 20, s - 60)
+    for (let i = 0; i < 300; i++) {
+      g.fillStyle = r() < 0.5 ? 'rgba(60,63,68,0.35)' : 'rgba(120,124,130,0.3)'
+      g.fillRect(c + 10 + r() * (c - 22), 30 + r() * (s - 62), 2, 2)
+    }
+    g.strokeStyle = 'rgba(30,32,35,0.55)'
+    g.lineWidth = 2
+    g.strokeRect(c + 10, 30, c - 20, s - 60)
+    // Oil stain: soft dark blob with a faint rainbow-free sheen ring.
+    const grad = g.createRadialGradient(c * 2.5, s / 2, 2, c * 2.5, s / 2, c * 0.45)
+    grad.addColorStop(0, 'rgba(25,25,28,0.7)')
+    grad.addColorStop(0.6, 'rgba(35,35,40,0.35)')
+    grad.addColorStop(1, 'rgba(40,40,45,0)')
+    g.fillStyle = grad
+    g.beginPath(); g.ellipse(c * 2.5, s / 2, c * 0.45, c * 0.8, 0, 0, Math.PI * 2); g.fill()
+    for (let i = 0; i < 6; i++) {
+      g.fillStyle = 'rgba(25,25,28,0.45)'
+      g.beginPath(); g.arc(c * 2.5 + (r() - 0.5) * c * 0.7, s / 2 + (r() - 0.5) * c * 1.4, 2 + r() * 5, 0, Math.PI * 2); g.fill()
+    }
+    // Kerb grime: dark at the kerb (left edge of the cell), fading towards the lane.
+    const k = g.createLinearGradient(c * 3, 0, c * 4, 0)
+    k.addColorStop(0, 'rgba(60,58,52,0.75)')
+    k.addColorStop(0.35, 'rgba(70,68,62,0.3)')
+    k.addColorStop(1, 'rgba(80,80,80,0)')
+    g.fillStyle = k
+    g.fillRect(c * 3, 0, c, s)
+    for (let i = 0; i < 120; i++) {
+      g.fillStyle = `rgba(${r() < 0.5 ? '90,80,60' : '50,50,50'},${0.3 + r() * 0.4})`
+      g.fillRect(c * 3 + r() * r() * c * 0.6, r() * s, 1.5 + r() * 2, 1.5 + r() * 2)
+    }
   })

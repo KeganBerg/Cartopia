@@ -2,6 +2,7 @@ import { supabase } from './supabase'
 import { demoLeaders } from './friends'
 import { useGame } from '../game/store'
 import { displayName, isCleanName } from './names'
+import { CLAN_EMBLEMS } from '../game/data'
 
 export type Metric = 'power' | 'race_wins' | 'trophies' | 'level'
 export type Period = 'all' | 'week'
@@ -85,6 +86,8 @@ type ClanRow = {
 }
 
 const cleanTag = (t: string) => (isCleanName(t) ? t : '??')
+// The game only offers these emblems; anything else was typed in through the API.
+const cleanEmblem = (e: string) => (CLAN_EMBLEMS.includes(e) ? e : CLAN_EMBLEMS[0])
 
 const toRow = (r: PlayerRow): BoardRow => ({
   ownerId: r.owner_id,
@@ -94,14 +97,14 @@ const toRow = (r: PlayerRow): BoardRow => ({
   raceWins: r.race_wins,
   power: r.power,
   week: { power: r.week_power, race_wins: r.week_race_wins, trophies: r.week_trophies, level: r.week_levels },
-  clan: r.clan_id ? { id: r.clan_id, tag: cleanTag(r.clan_tag!), emblem: r.clan_emblem!, color: r.clan_color! } : null,
+  clan: r.clan_id ? { id: r.clan_id, tag: cleanTag(r.clan_tag!), emblem: cleanEmblem(r.clan_emblem!), color: r.clan_color! } : null,
 })
 
 const toClan = (r: ClanRow): Clan => ({
   id: r.id,
   name: displayName(r.name, r.id, 'crew'),
   tag: cleanTag(r.tag),
-  emblem: r.emblem,
+  emblem: cleanEmblem(r.emblem),
   color: r.color,
   description: isCleanName(r.description) ? r.description : '',
   leaderId: r.leader_id,
@@ -200,3 +203,26 @@ export const leaveClan = () => rpc('leave_clan')
 export const kickMember = (id: string) => rpc('kick_clan_member', { p_member: id })
 export const updateClan = (a: { description: string; emblem: string; color: string; minLevel: number }) =>
   rpc('update_clan', { p_description: a.description, p_emblem: a.emblem, p_color: a.color, p_min_level: a.minLevel })
+
+// Crew weekly goal (supabase/migrations/0027_crew_weekly_goal.sql). Weeks are named by their Monday (UTC).
+export type CrewWeek = {
+  week: string
+  target: number
+  points: number
+  reached: boolean
+  mine: number
+  opened: boolean
+  members: { id: string; points: number; jobs: number; races: number }[]
+}
+export type CrewGoal = { rules: { minPoints: number; memberCap: number }; chests: number; payable: boolean; current: CrewWeek | null; last: CrewWeek | null }
+
+export async function fetchCrewGoal(): Promise<CrewGoal | null> {
+  if (!supabase) return null
+  return rpc<CrewGoal | null>('crew_goal')
+}
+
+// Chests the player can open right now: this week's once the crew hits its goal, and last week's if missed.
+export const chestsReady = (g: CrewGoal | null) =>
+  !g || !g.payable ? 0 : [g.current, g.last].filter((w) => w && w.reached && !w.opened && w.mine >= g.rules.minPoints).length
+
+export const openCrewChestOn = (week: string) => rpc<number>('open_crew_chest', { p_week: week })

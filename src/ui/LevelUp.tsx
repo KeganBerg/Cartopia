@@ -16,22 +16,22 @@ type Unlock = {
 function unlocksBetween(from: number, to: number, rusty: boolean, focus: ReturnType<typeof useGame.getState>['focusShop']) {
   const inRange = (l: number) => l > from && l <= to
   const items: Unlock[] = [
-    ...BUILDINGS.filter((b) => b.unlockLevel < 99 && inRange(b.unlockLevel)).map((b): Unlock => ({
+    ...BUILDINGS.filter((b) => b.unlockLevel < 99 && !b.event && inRange(b.unlockLevel)).map((b): Unlock => ({
       key: `b-${b.id}`,
       name: b.name,
       level: b.unlockLevel,
       tag: b.kind === 'decor' || b.kind === 'house' ? 'Decor' : 'Building',
-      price: b.bucks ? `B ${b.bucks}` : `$ ${b.price.toLocaleString()}`,
+      price: b.bucks ? `💎 ${b.bucks}` : `$ ${b.price.toLocaleString()}`,
       art: <BuildingThumb def={b} />,
       go: () => focus('shop', b.id),
     })),
-    ...CARS.filter((c) => !c.rescueOnly && inRange(c.unlockLevel)).map((c): Unlock => ({
+    ...CARS.filter((c) => !c.rescueOnly && !c.season && inRange(c.unlockLevel)).map((c): Unlock => ({
       key: `c-${c.id}`,
       name: c.name,
       level: c.unlockLevel,
       tag: 'Car',
-      price: c.bucks ? `B ${c.bucks}` : `$ ${c.price.toLocaleString()}`,
-      art: <CarThumb color={c.colors[0]} body={c.body} />,
+      price: c.bucks ? `💎 ${c.bucks}` : `$ ${c.price.toLocaleString()}`,
+      art: <CarThumb color={c.colors[0]} body={c.body} model={c.id} />,
       go: () => focus('showroom', c.id),
     })),
     ...RESCUE_SPOTS.filter((r) => inRange(r.unlockLevel)).map((r): Unlock => ({
@@ -58,7 +58,7 @@ function unlocksBetween(from: number, to: number, rusty: boolean, focus: ReturnT
 
 // The next level that unlocks anything, so a quiet level-up still has something to aim for.
 function nextUnlock(level: number) {
-  const levels = [...BUILDINGS.filter((b) => b.unlockLevel < 99), ...CARS.filter((c) => !c.rescueOnly), ...RESCUE_SPOTS, ...GP_SERIES]
+  const levels = [...BUILDINGS.filter((b) => b.unlockLevel < 99 && !b.event), ...CARS.filter((c) => !c.rescueOnly && !c.season), ...RESCUE_SPOTS, ...GP_SERIES]
     .map((x) => x.unlockLevel)
     .filter((l) => l > level)
   return levels.length ? Math.min(...levels) : null
@@ -105,7 +105,7 @@ function Splash({ from, to, coins, bucks }: { from: number; to: number; coins: n
         <p className="lvl-sub">You're now level {to}</p>
         <div className="lvl-rewards">
           {coins > 0 && <span className="lvl-chip"><span className="ico coin-ico">$</span>+{coins.toLocaleString()}</span>}
-          {bucks > 0 && <span className="lvl-chip"><span className="ico buck-ico">B</span>+{bucks}</span>}
+          {bucks > 0 && <span className="lvl-chip"><span className="ico buck-ico">💎</span>+{bucks}</span>}
           {fuel > 0 && <span className="lvl-chip">⛽ +{fuel} max fuel</span>}
           <span className="lvl-chip">⛽ Tank filled</span>
         </div>

@@ -1,9 +1,16 @@
 import { useGame, fuelCap } from '../game/store'
 import { xpToNext, FUEL_REGEN_SECONDS } from '../game/data'
 import { useNow } from '../scene/useNow'
-import { GoalsButton } from './Goals'
+import { GoalTracker } from './Goals'
+import { SeasonButton } from './Season'
 import { MuteButton } from './MuteButton'
+import { DealsButton } from './Deals'
+import { CratesButton } from './Crates'
 import { ChallengeBell } from './Race'
+import { GiftBell } from './Gifts'
+import { Icon, CoinIcon, BuckIcon, PartsIcon, FuelIcon } from './Icon'
+import { Roll } from './Fly'
+import { compact } from './format'
 
 const n = (v: number) => v.toLocaleString()
 
@@ -32,11 +39,11 @@ function Speedometer({ level, xp, onClick }: { level: number; xp: number; onClic
           y2={44 + 28 * Math.sin((angle * Math.PI) / 180)}
           stroke="#ff1744" strokeWidth="3" strokeLinecap="round"
         />
-        <circle cx="44" cy="44" r="5" fill="#eceff1" />
+        <circle cx="44" cy="44" r="4" fill="#eceff1" />
       </svg>
       <div className="speedo-level">{level}</div>
       <div className="speedo-xp">{n(xp)} XP</div>
-      <span className="speedo-menu" aria-hidden>☰</span>
+      <span className="speedo-menu" aria-hidden><Icon name="menu" size={14} /></span>
     </button>
   )
 }
@@ -51,54 +58,64 @@ export function Hud() {
       <div className="hud-left">
         <Speedometer level={s.level} xp={s.xp} onClick={() => s.openPanel('account')} />
         <div className="pills">
-          <button className="pill" onClick={() => s.showNeed('coins', 0)}><span className="ico coin-ico">$</span>{n(s.coins)}<span className="plus">+</span></button>
-          <button className="pill" onClick={() => s.openPanel('bank')}><span className="ico buck-ico">B</span>{n(s.bucks)}<span className="plus">+</span></button>
-          <button className="pill" onClick={() => s.showNeed('parts', 0)}><span className="ico parts-ico">⚙</span>{n(s.parts)}<span className="plus">+</span></button>
+          <button className="pill" onClick={() => s.showNeed('coins', 0)}><span className="ico cur-ico" data-fly="coins"><CoinIcon /></span><Roll value={s.coins} format={compact} /><span className="plus"><Icon name="plus" size={12} /></span></button>
+          <button className="pill" onClick={() => s.openPanel('bank')}><span className="ico cur-ico" data-fly="bucks"><BuckIcon /></span>{compact(s.bucks)}<span className="plus"><Icon name="plus" size={12} /></span></button>
+          <button className="pill" onClick={() => s.showNeed('parts', 0)}><span className="ico cur-ico" data-fly="parts"><PartsIcon /></span><Roll value={s.parts} format={compact} /><span className="plus"><Icon name="plus" size={12} /></span></button>
         </div>
       </div>
       <div className="hud-center">
         <div className="town-name">{s.visiting?.townName ?? s.townName}</div>
-        {!s.visiting && <button className="my-cars" onClick={() => s.openPanel('garage')}>🚗 <span className="my-cars-label">MY CARS:</span> {s.cars.length}</button>}
+        {!s.visiting && <button className="my-cars" onClick={() => s.openPanel('garage')}><Icon name="car" size={18} /> <span className="my-cars-label">MY CARS:</span> {s.cars.length}</button>}
+        <GoalTracker />
       </div>
       <div className="hud-right">
         <button className="fuel" onClick={() => s.showNeed('fuel', 0)}>
           <div className="fuel-bar">
             <div style={{ width: `${Math.min(100, (s.fuel / cap) * 100)}%` }} />
-            <span>{s.fuel}/{cap}</span>
+            <span>{compact(s.fuel)}/{compact(cap)}</span>
           </div>
-          <span className="ico fuel-ico">⛽</span>
+          <span className="ico cur-ico"><FuelIcon /></span>
         </button>
         <div className="fuel-sub">{nextIn === null ? 'Fuel full' : `+1 fuel in ${nextIn}s`}</div>
         <div className="hud-right-row">
-          <button className="pill trophies" title="Leaderboards" onClick={() => s.openPanel('leaders')}>🏆 {s.trophies}</button>
-          <GoalsButton />
+          <button className="pill trophies" title="Leaderboards" onClick={() => s.openPanel('leaders')}><Icon name="trophy" size={16} /> {compact(s.trophies)}</button>
+          <SeasonButton />
+          <DealsButton />
+          <CratesButton />
           <MuteButton />
         </div>
-        <ChallengeBell />
+        <div className="hud-right-row">
+          <ChallengeBell />
+          <GiftBell />
+        </div>
       </div>
       {/* Phones: one compact strip across the top, town label under it. */}
       <div className="hud-mobile">
         <div className="hud-strip">
           <Speedometer level={s.level} xp={s.xp} onClick={() => s.openPanel('account')} />
           <div className="hud-chips">
-            <button className="chip-stat" onClick={() => s.showNeed('coins', 0)}><span className="ico coin-ico">$</span>{n(s.coins)}</button>
-            <button className="chip-stat" onClick={() => s.openPanel('bank')}><span className="ico buck-ico">B</span>{n(s.bucks)}</button>
-            <button className="chip-stat" onClick={() => s.showNeed('parts', 0)}><span className="ico parts-ico">⚙</span>{n(s.parts)}</button>
+            <button className="chip-stat" onClick={() => s.showNeed('coins', 0)}><span className="ico cur-ico" data-fly="coins"><CoinIcon /></span><Roll value={s.coins} format={compact} /></button>
+            <button className="chip-stat" onClick={() => s.openPanel('bank')}><span className="ico cur-ico" data-fly="bucks"><BuckIcon /></span>{compact(s.bucks)}</button>
+            <button className="chip-stat" onClick={() => s.showNeed('parts', 0)}><span className="ico cur-ico" data-fly="parts"><PartsIcon /></span><Roll value={s.parts} format={compact} /></button>
             <button className="chip-stat chip-fuel" onClick={() => s.showNeed('fuel', 0)}>
-              <span className="ico fuel-ico">⛽</span>
-              <span className="chip-fuel-bar"><i style={{ width: `${Math.min(100, (s.fuel / cap) * 100)}%` }} /><b>{s.fuel}/{cap}</b></span>
+              <span className="ico cur-ico"><FuelIcon /></span>
+              <span className="chip-fuel-bar"><i style={{ width: s.fuel > 0 ? `max(4px, ${Math.min(100, (s.fuel / cap) * 100)}%)` : 0 }} /><b>{compact(s.fuel)}/{compact(cap)}</b></span>
             </button>
           </div>
           <div className="hud-actions">
-            <GoalsButton />
-            <ChallengeBell />
+            <SeasonButton />
+            <DealsButton />
+            <CratesButton />
+              <ChallengeBell />
+            <GiftBell />
           </div>
         </div>
         <div className="hud-town">
           <span className="hud-town-name">{s.visiting?.townName ?? s.townName}</span>
-          {!s.visiting && <button onClick={() => s.openPanel('garage')}>🚗 {s.cars.length}</button>}
-          <button onClick={() => s.openPanel('leaders')}>🏆 {s.trophies}</button>
+          {!s.visiting && <button onClick={() => s.openPanel('garage')}><Icon name="car" size={15} /> {s.cars.length}</button>}
+          <button onClick={() => s.openPanel('leaders')}><Icon name="trophy" size={16} /> {compact(s.trophies)}</button>
         </div>
+        <GoalTracker />
       </div>
     </>
   )

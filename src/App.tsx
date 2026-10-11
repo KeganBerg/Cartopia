@@ -3,12 +3,14 @@ import { Canvas } from '@react-three/fiber'
 import { NeutralToneMapping } from 'three'
 import { World } from './scene/World'
 import { Hud } from './ui/Hud'
+import { FlyLayer } from './ui/Fly'
 import { ThumbRenderer } from './scene/BuildingPreview'
 import { BottomBar, ShopPanel, ShowroomPanel, GaragePanel, Toasts } from './ui/Menus'
-import { RacePanel, LiveRaceOverlay, InvitesPanel, PrizePopup } from './ui/Race'
+import { RacePanel, LiveRaceOverlay, InvitesPanel, PrizePopup, CampaignPrizePopup, TourPrizePopup } from './ui/Race'
 import { joinLobby, useLive } from './lib/live'
 import { FriendsPanel, VisitBanner } from './ui/Friends'
 import { LeadersPanel, ClanPanel } from './ui/Social'
+import { MeetPanel } from './ui/Meet'
 import { Tutorial } from './ui/Tutorial'
 import { Badges } from './ui/Badges'
 import { ThoughtBubble } from './ui/Thought'
@@ -16,12 +18,27 @@ import { NeedPanel } from './ui/Need'
 import { UpgradePanel } from './ui/Upgrade'
 import { RescuePanel } from './ui/Rescue'
 import { BankPanel } from './ui/Bank'
+import { DealsPanel } from './ui/Deals'
+import { CratesPanel } from './ui/Crates'
 import { LevelUpSplash } from './ui/LevelUp'
 import { AccountPanel } from './ui/Account'
+import { AlertsCard } from './ui/Alerts'
+import { WelcomeBack } from './ui/WelcomeBack'
+import { GiftWatcher, GiftsPanel } from './ui/Gifts'
+import { GhostRacePanel, TauntWatcher, TauntsPanel } from './ui/GhostRace'
 import { GoalsPanel, DailyPanel, FlatPanel } from './ui/Goals'
+import { SeasonPanel } from './ui/Season'
+import { ArcadePanel } from './ui/Arcade'
 import { useGame, today } from './game/store'
 import { startCloudSync } from './lib/cloud'
+import './lib/rescue'
+import './lib/crates'
+import { startAmbience } from './lib/ambience'
 import { useTownPaused } from './scene/renderGate'
+import { useCrewGoalWatcher } from './ui/CrewGoal'
+import { VisitorBadges, StreetRaceCard } from './ui/Visitors'
+import { visitorTick, forceVisitor } from './lib/visitors'
+import type { VisitorKind } from './game/data'
 
 // Phones get a lighter renderer: lower pixel ratio keeps iOS from dropping the WebGL context.
 const SMALL = typeof window !== 'undefined' && Math.min(window.innerWidth, window.innerHeight) < 700
@@ -31,13 +48,22 @@ export default function App() {
   const liveRace = useLive((l) => l.race)
   const tick = useGame((s) => s.tick)
   const townPaused = useTownPaused()
+  useCrewGoalWatcher()
 
   useEffect(() => {
     startCloudSync()
+    startAmbience()
     joinLobby()
     tick(Date.now())
-    if (useGame.getState().lastDaily !== today()) setTimeout(() => useGame.getState().openPanel('daily'), 800)
-    const id = setInterval(() => tick(Date.now()), 1000)
+    // Checked again when it fires: a cloud save may have loaded since, already claimed today.
+    setTimeout(() => { const s = useGame.getState(); if (s.lastDaily !== today() && !s.panel) s.openPanel('daily') }, 800)
+    // ?visitor=racer|tourist|mystery|barn brings a guest's visitor right away (for testing).
+    const forced = new URLSearchParams(location.search).get('visitor') as VisitorKind | null
+    if (forced) setTimeout(() => forceVisitor(forced), 2500)
+    const id = setInterval(() => {
+      tick(Date.now())
+      visitorTick()
+    }, 1000)
     return () => clearInterval(id)
   }, [tick])
 
@@ -54,6 +80,7 @@ export default function App() {
         <World />
       </Canvas>
       <Badges />
+      <VisitorBadges />
       <ThoughtBubble />
       <ThumbRenderer />
       <Hud />
@@ -67,19 +94,35 @@ export default function App() {
       {panel === 'friends' && <FriendsPanel />}
       {panel === 'leaders' && <LeadersPanel />}
       {panel === 'clan' && <ClanPanel />}
+      {panel === 'meet' && <MeetPanel />}
       {panel === 'need' && <NeedPanel />}
       {panel === 'upgrade' && <UpgradePanel />}
       {panel === 'rescue' && <RescuePanel />}
       {panel === 'bank' && <BankPanel />}
+      {panel === 'deals' && <DealsPanel />}
+      {panel === 'crates' && <CratesPanel />}
       <VisitBanner />
       <Tutorial />
+      <AlertsCard />
       {panel === 'account' && <AccountPanel />}
       {panel === 'goals' && <GoalsPanel />}
+      {panel === 'season' && <SeasonPanel />}
       {panel === 'daily' && <DailyPanel />}
       {panel === 'flat' && <FlatPanel />}
+      <WelcomeBack />
+      <GiftWatcher />
+      {panel === 'gifts' && <GiftsPanel />}
+      <StreetRaceCard />
+      <TauntWatcher />
+      {panel === 'taunts' && <TauntsPanel />}
+      {panel === 'ghost' && <GhostRacePanel />}
+      {panel === 'arcade' && <ArcadePanel />}
       <PrizePopup />
+      <CampaignPrizePopup />
+      <TourPrizePopup />
       <LevelUpSplash />
       <Toasts />
+      <FlyLayer />
     </>
   )
 }

@@ -3,7 +3,11 @@ import type { Texture } from 'three'
 import { levelLift, type BuildingDef } from '../game/data'
 import { signTexture } from './signTexture'
 import { CarModel } from './CarModel'
-import { glowMats } from './dayNight'
+import { Upright } from './mergeScale'
+import { glowMats, onNight } from './dayNight'
+import { ClubLife } from './ClubLife'
+import { CLUB } from './clubLayout'
+import { MeshBasicMaterial, MeshStandardMaterial, Color } from 'three'
 import { PAL, SEASON } from './season'
 import { LAYER, decal } from './layers'
 import { brickTex, sidingTex, gravelTex, awningTex, paverTex, shutterTex, shingleTex, checkerTex } from './textures'
@@ -19,8 +23,9 @@ type Mat = (color: string, map?: Texture) => ReactNode
 export type NewModelProps = { def: BuildingDef; ghost?: boolean; valid?: boolean; m: Mat; win: ReactNode; bulb: ReactNode; level?: number }
 
 export const NEW_MODELS = new Set([
-  'coffee', 'tacos', 'lube', 'arcade', 'bodyshop', 'market', 'firehouse', 'police', 'parkade',
+  'coffee', 'tacos', 'lube', 'arcade', 'bodyshop', 'market', 'firehouse', 'police', 'parkade', 'club',
   'pine', 'hedge', 'fence', 'picnic', 'busstop', 'hotdog', 'flagpole', 'arch', 'playground', 'gazebo', 'clocktower',
+  'pumpkins', 'scarecrow', 'graves', 'deadtree',
 ])
 
 const GOLD = '#ffc107'
@@ -244,12 +249,38 @@ function Parasol({ m, at, c }: { m: Mat; at: V3; c: string }) {
 // A simple car shape for the parking garage decks: far fewer meshes than CarModel.
 function BlockCar({ m, at, c, rot = 0 }: { m: Mat; at: V3; c: string; rot?: number }) {
   return (
-    <group position={at} rotation-y={rot}>
-      <Box m={m} at={[0, 0.1, 0]} s={[0.36, 0.13, 0.66]} c={c} />
-      <Box m={m} at={[0, 0.21, -0.04]} s={[0.3, 0.1, 0.34]} c="#b3e5fc" />
+    <group position={at}>
+      <Upright>
+        <group rotation-y={rot}>
+          <Box m={m} at={[0, 0.1, 0]} s={[0.36, 0.13, 0.66]} c={c} />
+          <Box m={m} at={[0, 0.21, -0.04]} s={[0.3, 0.1, 0.34]} c="#b3e5fc" />
+        </group>
+      </Upright>
     </group>
   )
 }
+
+
+// Nightclub signs: dim by day and lit after dusk; the CLOSED plaque only shows by day.
+// Built on first use (the textures need a canvas) and kept by identity so Batch
+// merges them without baking in the glow.
+let clubSigns: { name: MeshStandardMaterial; closed: MeshBasicMaterial } | null = null
+function clubSignMats() {
+  if (clubSigns) return clubSigns
+  const tex = signTexture('NEON OWL', '#12061f', '#ff4fd8')
+  const name = new MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: new Color('#ffffff'), emissiveIntensity: 0.15, toneMapped: false })
+  const closed = new MeshBasicMaterial({ map: signTexture('CLOSED', '#fafafa', '#c62828'), toneMapped: false })
+  name.userData.live = closed.userData.live = true
+  const signs = { name, closed }
+  onNight((n) => {
+    signs.name.emissiveIntensity = 0.15 + n * 1.1
+    signs.closed.visible = n < 0.5
+  })
+  clubSigns = signs
+  return signs
+}
+
+type GlowKey = 'neonPink' | 'neonCyan' | 'neonViolet' | 'danceFloor'
 
 export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }: NewModelProps) {
   const lvl = Math.min(10, Math.max(1, Math.floor(level) || 1))
@@ -411,8 +442,12 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           <Box m={m} at={[0, 0.03, 0.68]} s={[3.6, 0.05, 0.62]} c="#ffffff" t={paverTex(4, 1)} shadow={false} />
           {/* A freshly painted car rolling out of the bay. */}
           {!ghost && (
-            <group position={[-0.05, 0.05, 0.62]} rotation-y={Math.PI / 2}>
-              <CarModel body="coupe" color="#ff6d00" />
+            <group position={[-0.05, 0.05, 0.62]}>
+              <Upright>
+                <group rotation-y={Math.PI / 2}>
+                  <CarModel body="coupe" color="#ff6d00" />
+                </group>
+              </Upright>
             </group>
           )}
           {/* Giant spray can on the roof. */}
@@ -526,11 +561,15 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           ))}
           {/* A patrol car parked out front, light bar on the roof. */}
           {!ghost && (
-            <group position={[-1.25, 0.05, 0.72]} rotation-y={Math.PI / 2}>
-              <CarModel body="sedan" color="#fafafa" stripe="#1a237e" />
-              <Box m={m} at={[-0.08, 0.6, -0.02]} s={[0.1, 0.05, 0.34]} c="#e0e0e0" />
-              <Box m={m} at={[-0.08, 0.64, 0.09]} s={[0.1, 0.05, 0.12]} c="#e53935" />
-              <Box m={m} at={[-0.08, 0.64, -0.13]} s={[0.1, 0.05, 0.12]} c="#1e88e5" />
+            <group position={[-1.25, 0.05, 0.72]}>
+              <Upright>
+                <group rotation-y={Math.PI / 2}>
+                  <CarModel body="sedan" color="#fafafa" stripe="#1a237e" />
+                  <Box m={m} at={[-0.08, 0.6, -0.02]} s={[0.1, 0.05, 0.34]} c="#e0e0e0" />
+                  <Box m={m} at={[-0.08, 0.64, 0.09]} s={[0.1, 0.05, 0.12]} c="#e53935" />
+                  <Box m={m} at={[-0.08, 0.64, -0.13]} s={[0.1, 0.05, 0.12]} c="#1e88e5" />
+                </group>
+              </Upright>
             </group>
           )}
           {!ghost && <Flag at={[1.4, 0, 0.75]} color="#1565c0" tall={1.6} star={lvl >= 10} />}
@@ -538,6 +577,125 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           {trim && lvl >= 9 && <Box m={m} at={[0, 1.06, 0.86]} s={[1.12, 0.03, 0.03]} c={GOLD} />}
         </ShellBuilding>
       )
+    case 'club': {
+      const h = 1.3 + lift
+      const w = 3.4
+      const d = 1.3
+      const z0 = -0.29
+      const zf = z0 + d / 2
+      const glow = (k: GlowKey, c: string) => (ghost ? m(c) : <primitive object={glowMats[k]} attach="material" dispose={null} />)
+      const tube = (k: GlowKey, at: V3, sz: V3) => (
+        <mesh key={at.join()} position={at}>
+          <boxGeometry args={sz} />
+          {glow(k, '#ff2bd6')}
+        </mesh>
+      )
+      const signs = ghost ? null : clubSignMats()
+      const floor = { y: h + 0.15, z: z0 + 0.06, w: w - 0.5, d: d - 0.36 }
+      const posts = Array.from({ length: 6 }, (_, i) => CLUB.ropeFrom + ((CLUB.ropeTo - CLUB.ropeFrom) * i) / 5)
+      return (
+        <ShellBuilding {...shell} w={w} d={d} h0={1.3} z0={z0} wall="#3a2160" roof="#d500f9" shopfront={null}>
+          {/* Entrance: a black door under a neon-edged canopy, red carpet to the street. */}
+          <Box m={m} at={[CLUB.doorX, 0.38, zf + 0.012]} s={[0.5, 0.76, 0.02]} c="#ffc107" shadow={false} />
+          <mesh position={[CLUB.doorX, 0.36, zf + 0.024]}>
+            <planeGeometry args={[0.42, 0.7]} />
+            {m('#120818')}
+          </mesh>
+          {signs && (
+            <mesh position={[CLUB.doorX, 0.46, zf + 0.03]}>
+              <planeGeometry args={[0.36, 0.09]} />
+              <primitive object={signs.closed} attach="material" dispose={null} />
+            </mesh>
+          )}
+          <Box m={m} at={[CLUB.doorX, 0.84, zf + 0.24]} s={[0.66, 0.05, 0.48]} c="#120818" />
+          {tube('neonViolet', [CLUB.doorX, 0.84, zf + 0.485], [0.66, 0.03, 0.03])}
+          {[-0.3, 0.3].map((x) => <Cyl key={x} m={m} at={[CLUB.doorX + x, 0.42, zf + 0.44]} r={0.018} h={0.84} c="#ffc107" seg={6} />)}
+          <Box m={m} at={[CLUB.doorX, 0.012, (zf + 0.99) / 2]} s={[0.4, 0.016, 0.99 - zf]} c="#c62828" shadow={false} />
+          {/* Velvet rope for the line, gold posts and red rope. */}
+          {posts.map((x) => (
+            <group key={x} position={[x, 0, CLUB.ropeZ]}>
+              <Cyl m={m} at={[0, 0.15, 0]} r={0.018} h={0.3} c="#ffc107" seg={6} />
+              <Cyl m={m} at={[0, 0.01, 0]} r={0.05} h={0.02} c="#ffc107" seg={8} />
+              <mesh position={[0, 0.31, 0]}><sphereGeometry args={[0.028, 8, 6]} />{m('#ffc107')}</mesh>
+            </group>
+          ))}
+          {posts.slice(1).map((x, i) => (
+            <Box key={x} m={m} at={[(x + posts[i]) / 2, 0.25, CLUB.ropeZ]} s={[x - posts[i] - 0.03, 0.022, 0.022]} c="#b71c1c" shadow={false} />
+          ))}
+          {/* Club lights through the front window. */}
+          <Box m={m} at={[0.5, 0.55, zf + 0.006]} s={[1.96, 0.46, 0.012]} c="#120818" shadow={false} />
+          <mesh position={[0.5, 0.55, zf + 0.014]}>
+            <planeGeometry args={[1.9, 0.4]} />
+            {glow('danceFloor', '#7c4dff')}
+          </mesh>
+          {/* The name in lights over the door, with a neon owl beside it. */}
+          {signs && (
+            <group position={[0.35, 1.04, zf + 0.03]}>
+              <Box m={m} at={[0, 0, -0.012]} s={[1.68, 0.44, 0.03]} c="#12061f" shadow={false} />
+              <mesh position-z={0.006}>
+                <planeGeometry args={[1.6, 0.4]} />
+                <primitive object={signs.name} attach="material" dispose={null} />
+              </mesh>
+            </group>
+          )}
+          <group position={[-1.32, 1.06, zf + 0.04]}>
+            {[-0.1, 0.1].map((x) => (
+              <mesh key={x} position={[x, 0.04, 0]}>
+                <torusGeometry args={[0.075, 0.016, 6, 14]} />
+                {glow('neonCyan', '#00e5ff')}
+              </mesh>
+            ))}
+            <mesh position={[0, -0.07, 0]} rotation-x={Math.PI / 2}>
+              <coneGeometry args={[0.035, 0.08, 4]} />
+              {glow('neonPink', '#ff2bd6')}
+            </mesh>
+          </group>
+          {/* Neon edges: corners and a band under the roof. */}
+          {[-1, 1].map((sd) => tube('neonPink', [sd * (w / 2 + 0.005), h / 2, zf + 0.01], [0.035, h - 0.08, 0.035]))}
+          {tube('neonCyan', [0, h - 0.17, zf + 0.02], [w, 0.035, 0.03])}
+          {tube('neonViolet', [0.5, 0.33, zf + 0.02], [1.96, 0.03, 0.03])}
+          {/* Rooftop dance floor with a DJ booth, speakers, a mirror ball and a glowing rail. */}
+          <mesh position={[0, floor.y, floor.z]} rotation-x={-Math.PI / 2}>
+            <planeGeometry args={[floor.w, floor.d]} />
+            {glow('danceFloor', '#7c4dff')}
+          </mesh>
+          {[-1, 1].map((sd) => tube('neonCyan', [0, h + 0.36, z0 + sd * (d / 2 - 0.05)], [w - 0.1, 0.03, 0.03]))}
+          {[-1, 1].map((sd) => tube('neonCyan', [sd * (w / 2 - 0.05), h + 0.36, z0], [0.03, 0.03, d - 0.1]))}
+          {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => (
+            <Box key={`${sx}${sz}`} m={m} at={[sx * (w / 2 - 0.05), h + 0.25, z0 + sz * (d / 2 - 0.05)]} s={[0.04, 0.24, 0.04]} c="#120818" shadow={false} />
+          )))}
+          <group position={[0, h + 0.14, z0 - d / 2 + 0.2]}>
+            <Box m={m} at={[0, 0.14, 0]} s={[0.7, 0.28, 0.22]} c="#212121" />
+            {tube('neonPink', [0, 0.2, 0.115], [0.66, 0.03, 0.01])}
+            {[-0.62, 0.62].map((x) => (
+              <group key={x}>
+                <Box m={m} at={[x, 0.22, 0]} s={[0.26, 0.44, 0.22]} c="#151515" />
+                <Cyl m={m} at={[x, 0.27, 0.115]} r={0.07} h={0.01} c="#424242" seg={10} rot={[Math.PI / 2, 0, 0]} />
+                <Cyl m={m} at={[x, 0.11, 0.115]} r={0.045} h={0.01} c="#424242" seg={10} rot={[Math.PI / 2, 0, 0]} />
+              </group>
+            ))}
+          </group>
+          <group position={[1.35, h + 0.14, z0 - d / 2 + 0.15]}>
+            <Cyl m={m} at={[0, 0.45, 0]} r={0.02} h={0.9} c="#9e9e9e" seg={6} />
+            <Box m={m} at={[-0.2, 0.89, 0.12]} rot={[0, 0.5, 0]} s={[0.5, 0.02, 0.02]} c="#9e9e9e" shadow={false} />
+            <mesh position={[-0.42, 0.74, 0.25]} castShadow>
+              <icosahedronGeometry args={[0.12, 1]} />
+              <meshStandardMaterial color="#eceff1" metalness={0.9} roughness={0.15} flatShading />
+            </mesh>
+          </group>
+          {/* Searchlight lamps behind the club. */}
+          {[-1, 1].map((sd) => (
+            <group key={sd} position={[sd * 1.78, 0, -0.8]}>
+              <Cyl m={m} at={[0, 0.08, 0]} r={0.12} r2={0.14} h={0.16} c="#37474f" seg={10} />
+              <Cyl m={m} at={[0, 0.2, 0]} r={0.09} h={0.08} c="#eceff1" seg={10} />
+            </group>
+          ))}
+          {!ghost && <Pool r={0.8} x={CLUB.doorX} z={0.8} />}
+          {!ghost && <Pool r={0.9} x={0.75} z={0.85} />}
+          {!ghost && <ClubLife lvl={lvl} floorY={floor.y} floorZ={floor.z} floorW={floor.w} floorD={floor.d} />}
+        </ShellBuilding>
+      )
+    }
     case 'parkade': {
       // A concrete deck for every two levels, cars parked on each.
       const decks = 2 + Math.floor((lvl - 1) / 2)
@@ -606,6 +764,134 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
       )
     }
 
+    // ---- Spooky Season decorations ----
+    case 'pumpkins': {
+      const pumpkins: [number, number, number][] = [[-0.45, -0.35, 0.34], [0.4, -0.45, 0.26], [0.5, 0.35, 0.3], [-0.5, 0.45, 0.22], [0.02, 0.05, 0.42]]
+      return (
+        <group>
+          <Box m={m} at={[0, 0.03, 0]} s={[1.75, 0.06, 1.75]} c="#5d4037" shadow={false} />
+          {/* Vines across the patch. */}
+          {[[-0.2, -0.4, 0.5], [0.3, 0.1, -0.7], [-0.3, 0.3, 1.1]].map(([x, z, r], i) => (
+            <Box key={i} m={m} at={[x, 0.08, z]} rot={[0, r, 0]} s={[1.0, 0.03, 0.05]} c="#558b2f" shadow={false} />
+          ))}
+          {pumpkins.map(([x, z, r], i) => (
+            <group key={i} position={[x, r * 0.72, z]}>
+              <mesh scale={[1, 0.72, 1]} castShadow><sphereGeometry args={[r, 12, 8]} />{m(i % 2 ? '#fb8c00' : '#ef6c00')}</mesh>
+              <Cyl m={m} at={[0, r * 0.78, 0]} r={r * 0.12} r2={r * 0.16} h={r * 0.4} c="#33691e" seg={5} />
+            </group>
+          ))}
+          {/* The big one is carved: its face glows after dark. */}
+          <group position={[0.02, 0.42 * 0.72, 0.05 + 0.4]}>
+            {[-0.13, 0.13].map((x) => (
+              <mesh key={x} position={[x, 0.07, 0.004]} rotation-z={Math.PI}><circleGeometry args={[0.07, 3]} />{bulb}</mesh>
+            ))}
+            <mesh position={[0, -0.09, 0.004]} scale={[1, 0.45, 1]}><circleGeometry args={[0.17, 7, Math.PI, Math.PI]} />{bulb}</mesh>
+          </group>
+          {trim && <Box m={m} at={[0.75, 0.2, -0.75]} s={[0.36, 0.26, 0.26]} c="#e0c068" />}
+        </group>
+      )
+    }
+    case 'scarecrow':
+      return (
+        <group>
+          <Cyl m={m} at={[0, 0.85, 0]} r={0.05} h={1.7} c="#6d4c41" seg={6} />
+          <Box m={m} at={[0, 1.2, 0]} s={[1.2, 0.07, 0.07]} c="#6d4c41" />
+          {/* Plaid shirt, overalls and straw. */}
+          <Box m={m} at={[0, 1.08, 0]} s={[0.46, 0.42, 0.24]} c="#c62828" />
+          <Box m={m} at={[0, 0.8, 0]} s={[0.4, 0.26, 0.22]} c="#3f51b5" />
+          {[-1, 1].map((sd) => (
+            <group key={sd}>
+              <Box m={m} at={[sd * 0.4, 1.2, 0]} s={[0.36, 0.14, 0.16]} c="#c62828" />
+              <mesh position={[sd * 0.62, 1.2, 0]} rotation-z={sd * -Math.PI / 2}><coneGeometry args={[0.07, 0.16, 6]} />{m('#fdd835')}</mesh>
+              <mesh position={[sd * 0.1, 0.6, 0]} rotation-z={Math.PI}><coneGeometry args={[0.07, 0.2, 6]} />{m('#fdd835')}</mesh>
+            </group>
+          ))}
+          <mesh position={[0, 1.45, 0]} castShadow><sphereGeometry args={[0.17, 10, 8]} />{m('#d7b98a')}</mesh>
+          {[-0.06, 0.06].map((x) => <Box key={x} m={m} at={[x, 1.48, 0.16]} s={[0.04, 0.04, 0.02]} c="#212121" shadow={false} />)}
+          <Box m={m} at={[0, 1.4, 0.165]} s={[0.12, 0.02, 0.02]} c="#212121" shadow={false} />
+          <Cyl m={m} at={[0, 1.58, 0]} r={0.3} h={0.03} c="#6d4c41" seg={12} />
+          <mesh position={[0, 1.74, 0]} castShadow><coneGeometry args={[0.16, 0.32, 10]} />{m('#6d4c41')}</mesh>
+          {/* A crow on the arm, and a hay bale at his feet. */}
+          <group position={[0.5, 1.3, 0]}>
+            <mesh scale={[1.4, 1, 1]}><sphereGeometry args={[0.06, 8, 6]} />{m('#212121')}</mesh>
+            <mesh position={[0.1, 0.04, 0]} rotation-z={-Math.PI / 2}><coneGeometry args={[0.025, 0.06, 4]} />{m('#ffb300')}</mesh>
+          </group>
+          {trim && <Box m={m} at={[-0.5, 0.17, 0.45]} s={[0.55, 0.34, 0.34]} c="#e0c068" />}
+          {trim && (
+            <group position={[0.45, 0.16, 0.5]}>
+              <mesh scale={[1, 0.72, 1]} castShadow><sphereGeometry args={[0.2, 10, 8]} />{m('#ef6c00')}</mesh>
+            </group>
+          )}
+        </group>
+      )
+    case 'graves': {
+      const stones: [number, number, number, number][] = [[-0.5, -0.3, 0.55, 0.1], [0.05, -0.45, 0.7, -0.08], [0.55, -0.2, 0.5, 0.15]]
+      return (
+        <group>
+          <Box m={m} at={[0, 0.03, 0]} s={[1.8, 0.06, 1.8]} c="#4e5b31" shadow={false} />
+          {stones.map(([x, z, h, tilt], i) => (
+            <group key={i} position={[x, 0, z]} rotation={[0, 0, tilt]}>
+              <Box m={m} at={[0, h / 2, 0]} s={[0.36, h, 0.1]} c="#9e9e9e" />
+              <mesh position={[0, h, 0]} rotation-x={Math.PI / 2} castShadow><cylinderGeometry args={[0.18, 0.18, 0.1, 12, 1, false, -Math.PI / 2, Math.PI]} />{m('#9e9e9e')}</mesh>
+              <Box m={m} at={[0, h * 0.65, 0.052]} s={[0.18, 0.03, 0.01]} c="#616161" shadow={false} />
+              <Box m={m} at={[0, 0.07, 0.3]} s={[0.34, 0.06, 0.4]} c="#5d4037" shadow={false} />
+            </group>
+          ))}
+          {/* A stone cross, an iron fence along the front and a lantern that lights at night. */}
+          <group position={[-0.55, 0, 0.4]}>
+            <Box m={m} at={[0, 0.4, 0]} s={[0.08, 0.8, 0.08]} c="#bdbdbd" />
+            <Box m={m} at={[0, 0.58, 0]} s={[0.36, 0.08, 0.08]} c="#bdbdbd" />
+          </group>
+          {trim && Array.from({ length: 9 }, (_, i) => (
+            <Box key={i} m={m} at={[-0.8 + i * 0.2, 0.22, 0.85]} s={[0.03, 0.44, 0.03]} c="#263238" shadow={false} />
+          ))}
+          {trim && <Box m={m} at={[0, 0.38, 0.85]} s={[1.65, 0.03, 0.03]} c="#263238" shadow={false} />}
+          <group position={[0.55, 0, 0.45]}>
+            <Cyl m={m} at={[0, 0.35, 0]} r={0.025} h={0.7} c="#263238" seg={6} />
+            <mesh position={[0, 0.76, 0]}><boxGeometry args={[0.13, 0.16, 0.13]} />{bulb}</mesh>
+            <mesh position={[0, 0.88, 0]}><coneGeometry args={[0.11, 0.1, 4]} />{m('#263238')}</mesh>
+          </group>
+        </group>
+      )
+    }
+    case 'deadtree': {
+      // Bare, twisted branches with lanterns hanging off them.
+      const branches: [number, number, number, number, number][] = [
+        [0.28, 1.55, 0, 0.9, 0.55], [-0.3, 1.45, 0.1, -0.85, 0.5], [0.05, 1.8, -0.2, 0.25, 0.45], [-0.12, 1.25, -0.25, -0.5, 0.4],
+      ]
+      return (
+        <group>
+          <Cyl m={m} at={[0, 0.55, 0]} r={0.1} r2={0.2} h={1.1} c="#3e2723" seg={7} />
+          <Cyl m={m} at={[0.06, 1.3, 0]} r={0.07} r2={0.1} h={0.6} c="#3e2723" seg={7} rot={[0, 0, -0.15]} />
+          {branches.map(([x, y, z, rz, len], i) => (
+            <group key={i}>
+              <Cyl m={m} at={[x, y, z]} r={0.025} r2={0.05} h={len} c="#3e2723" seg={5} rot={[0, 0, rz]} />
+              <Cyl m={m} at={[x * 1.6, y + 0.18, z]} r={0.012} r2={0.025} h={0.25} c="#3e2723" seg={4} rot={[0, 0, -rz * 0.6]} />
+            </group>
+          ))}
+          {[[0.55, 1.45, 0.05], [-0.55, 1.36, 0.12], [0.12, 1.75, -0.3]].map(([x, y, z], i) => (
+            <group key={i} position={[x, y, z]}>
+              <Cyl m={m} at={[0, 0.1, 0]} r={0.006} h={0.2} c="#212121" seg={4} />
+              <mesh position={[0, -0.04, 0]}><sphereGeometry args={[0.07, 8, 6]} />{bulb}</mesh>
+            </group>
+          ))}
+          {/* Roots, and a bat resting on the top branch. */}
+          {[0, 1, 2, 3].map((i) => (
+            <Cyl key={i} m={m} at={[Math.sin(i * 1.7) * 0.22, 0.06, Math.cos(i * 1.7) * 0.22]} r={0.03} r2={0.06} h={0.35} c="#3e2723" seg={5} rot={[Math.cos(i * 1.7) * 1.2, 0, -Math.sin(i * 1.7) * 1.2]} />
+          ))}
+          <group position={[0.15, 2.08, -0.2]}>
+            <mesh><sphereGeometry args={[0.05, 6, 5]} />{m('#212121')}</mesh>
+            {[-1, 1].map((sd) => <Box key={sd} m={m} at={[sd * 0.09, 0.01, 0]} rot={[0, 0, sd * 0.4]} s={[0.12, 0.015, 0.07]} c="#212121" shadow={false} />)}
+          </group>
+          {trim && (
+            <group position={[-0.45, 0.13, 0.45]}>
+              <mesh scale={[1, 0.72, 1]} castShadow><sphereGeometry args={[0.18, 10, 8]} />{m('#ef6c00')}</mesh>
+            </group>
+          )}
+        </group>
+      )
+    }
+
     // ---- Decorations ----
     case 'pine':
       // Evergreen: stays green all year and catches snow in winter.
@@ -631,22 +917,64 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
     case 'hedge':
       return (
         <group>
-          {/* Boxwood stays green through the fall. */}
-          <Box m={m} at={[0, 0.32, 0]} s={[1.9, 0.6, 0.62]} c="#2e7d32" />
-          <Box m={m} at={[0, 0.64, 0]} s={[1.84, 0.06, 0.56]} c={SNOW ? '#ffffff' : '#388e3c'} shadow={false} />
+          {/* Boxwood stays green through the fall: a stone kerb, a clipped body
+              and leafy clumps along the top. */}
+          <Box m={m} at={[0, 0.04, 0]} s={[1.98, 0.08, 0.7]} c="#9e9e9e" />
+          <Box m={m} at={[0, 0.36, 0]} s={[1.86, 0.56, 0.58]} c="#2e7d32" />
+          {[-0.72, -0.24, 0.24, 0.72].map((x, i) => (
+            <mesh key={x} position={[x, 0.62, (i % 2) * 0.04 - 0.02]} scale={[1.25, 0.6, 1]} castShadow>
+              <icosahedronGeometry args={[0.25, 0]} />
+              {m(SNOW ? '#ffffff' : i % 2 ? '#388e3c' : '#43a047')}
+            </mesh>
+          ))}
+          {(SEASON === 'spring' || SEASON === 'summer') && [-0.8, -0.45, -0.1, 0.3, 0.65].map((x, i) => (
+            <mesh key={x} position={[x, 0.13, 0.32]}>
+              <sphereGeometry args={[0.04, 6, 4]} />
+              {m(['#f06292', '#fff176', '#ffffff'][i % 3])}
+            </mesh>
+          ))}
         </group>
       )
     case 'fence':
       // Runs along the lot's front edge; turn it to fence another side.
       return (
         <group position={[0, 0, 0.85]}>
-          {Array.from({ length: 9 }, (_, i) => -0.92 + i * 0.23).map((x) => (
+          {/* Pickets either side of a little gate, square posts with caps at the ends. */}
+          {[-0.85, -0.66, -0.47, -0.28, 0.28, 0.47, 0.66, 0.85].map((x) => (
             <group key={x}>
               <Box m={m} at={[x, 0.2, 0]} s={[0.07, 0.4, 0.03]} c="#fafafa" />
               <mesh position={[x, 0.42, 0]} rotation-y={Math.PI / 4}><coneGeometry args={[0.05, 0.06, 4]} />{m('#fafafa')}</mesh>
             </group>
           ))}
-          {[0.12, 0.3].map((y) => <Box key={y} m={m} at={[0, y, -0.025]} s={[1.98, 0.04, 0.02]} c="#fafafa" />)}
+          {[-1, 1].map((sd) => (
+            <group key={sd}>
+              {[-0.97, -0.18].map((x) => (
+                <group key={x}>
+                  <Box m={m} at={[sd * -x, 0.24, -0.01]} s={[0.09, 0.48, 0.09]} c="#f5f5f5" />
+                  <Box m={m} at={[sd * -x, 0.5, -0.01]} s={[0.12, 0.04, 0.12]} c="#e0e0e0" />
+                </group>
+              ))}
+              {[0.12, 0.3].map((y) => <Box key={y} m={m} at={[sd * 0.575, y, -0.025]} s={[0.76, 0.04, 0.02]} c="#fafafa" />)}
+            </group>
+          ))}
+          {/* The gate: three pickets on a Z brace, with black hinges and latch. */}
+          {[-0.09, 0, 0.09].map((x) => <Box key={x} m={m} at={[x, 0.19, 0.01]} s={[0.07, 0.34, 0.025]} c="#fafafa" />)}
+          {[0.1, 0.28].map((y) => <Box key={y} m={m} at={[0, y, -0.012]} s={[0.26, 0.04, 0.02]} c="#eeeeee" />)}
+          <Box m={m} at={[0, 0.19, -0.012]} s={[0.035, 0.24, 0.02]} c="#eeeeee" rot={[0, 0, -0.85]} />
+          {[0.1, 0.28].map((y) => <Box key={y} m={m} at={[-0.13, y, 0.03]} s={[0.06, 0.02, 0.012]} c="#37474f" shadow={false} />)}
+          <Box m={m} at={[0.13, 0.2, 0.03]} s={[0.025, 0.04, 0.02]} c="#37474f" shadow={false} />
+          {/* A flower bed along the inside. */}
+          {!SNOW && (
+            <group>
+              <Box m={m} at={[0, 0.02, -0.2]} s={[1.9, 0.04, 0.22]} c="#5d4037" shadow={false} />
+              {[-0.8, -0.6, -0.4, 0.4, 0.6, 0.8].map((x, i) => (
+                <mesh key={x} position={[x, 0.09, -0.2]}>
+                  <icosahedronGeometry args={[0.07, 0]} />
+                  {m(SEASON === 'fall' ? ['#ff8f00', '#c62828', '#fbc02d'][i % 3] : ['#ec407a', '#ffee58', '#ab47bc'][i % 3])}
+                </mesh>
+              ))}
+            </group>
+          )}
         </group>
       )
     case 'picnic':

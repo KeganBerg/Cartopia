@@ -15,6 +15,13 @@ export function holdTown(): () => void {
   }
 }
 
+// For non-React listeners (the town's ambient sounds go quiet during a race).
+export const townHeld = () => holds > 0
+export function onTownHold(l: () => void) {
+  listeners.add(l)
+  return () => listeners.delete(l)
+}
+
 export function useTownPaused(): boolean {
   return useSyncExternalStore(
     (l) => {

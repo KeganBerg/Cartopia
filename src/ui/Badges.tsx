@@ -1,26 +1,40 @@
 import { Vector3 } from 'three'
-import { useState } from 'react'
+import { useMemo, useState, type CSSProperties } from 'react'
 import { useGame, buyablePlots, type PlacedBuilding } from '../game/store'
-import { buildingDef, buildingLevel, jobLevel, carDef, levelLift, plotPrice, START_LAND, upgradeJobSeconds } from '../game/data'
+import { buildingDef, buildingLevel, jobLevel, carDef, loves, levelLift, plotPrice, START_LAND, upgradeJobSeconds, isOpen } from '../game/data'
+import { msUntilNight } from '../game/clock'
 import { anchors, anchorRef } from '../scene/anchors'
-import { centerOf, plotCenter } from '../scene/World'
+import { centerOf, groupCenter, plotCenter } from '../scene/World'
+import { mergeGroups, mergeCandidates, type MergeGroup } from '../game/merge'
 import { useNow } from '../scene/useNow'
 
 function fmt(sec: number) {
   if (sec >= 60) return `${Math.floor(sec / 60)}m ${String(sec % 60).padStart(2, '0')}s`
   return `${sec}s`
 }
+// Phones show only the biggest unit, next to a progress ring.
+const short = (sec: number) => (sec >= 3600 ? `${Math.floor(sec / 3600)}h` : sec >= 60 ? `${Math.ceil(sec / 60)}m` : `${sec}s`)
 
-function JobBadge({ b, now }: { b: PlacedBuilding; now: number }) {
+// Badge height over a merged block: as tall as its model grows (see groupScale).
+const lift = (g: MergeGroup) => (g.cols === g.rows ? g.cols : 1.5)
+
+// `g` and `members` are the whole block for a merged business: one badge for all of it.
+function JobBadge({ b, now, g, members = [b] }: { b: PlacedBuilding; now: number; g?: MergeGroup; members?: PlacedBuilding[] }) {
   const d = buildingDef(b.def)
   const tap = useGame((s) => s.tapBuilding)
   const lit = useGame((s) => !!s.highlight?.includes(b.def))
-  const [cx, cz] = centerOf(b.def, b.x, b.z, b.rot)
+  // A driver at work: a heart when it loves the place, a wrench when it needs fixing.
+  const driver = useGame((s) => (b.car ? s.cars.find((c) => c.uid === b.car) : undefined))
+  const n = members.length
+  const k = g ? lift(g) : 1
+  const [cx, cz] = g ? groupCenter(g) : centerOf(b.def, b.x, b.z, b.rot)
   const lvl = buildingLevel(b)
-  anchors.set(b.uid, new Vector3(cx, (d.w > 1 ? 2.6 : 2.2) + levelLift(lvl), cz))
-  const ready = b.jobEndsAt !== null && now >= b.jobEndsAt
-  const working = b.jobEndsAt !== null && !ready
-  const left = working ? Math.ceil((b.jobEndsAt! - now) / 1000) : 0
+  anchors.set(b.uid, new Vector3(cx, ((d.w > 1 ? 2.6 : 2.2) + levelLift(lvl)) * k, cz))
+  const ready = members.some((o) => o.jobEndsAt !== null && now >= o.jobEndsAt)
+  const idle = members.filter((o) => o.jobEndsAt === null).length
+  const working = !ready && !idle
+  const end = Math.max(...members.map((o) => o.jobEndsAt ?? 0))
+  const left = working ? Math.ceil((end - now) / 1000) : 0
   const pct = working ? Math.max(0, 1 - left / upgradeJobSeconds(d, jobLevel(b))) : 0
   return (
     <div className="anchor" ref={anchorRef(b.uid)}>
@@ -29,18 +43,60 @@ function JobBadge({ b, now }: { b: PlacedBuilding; now: number }) {
           <span className="coin">{d.kind === 'obstacle' ? '✔' : '$'}</span>
         ) : working ? (
           <>
-            <span className="clock">⏱</span>
+            <span className="clock" style={{ '--p': `${pct * 360}deg` } as CSSProperties}>⏱</span>
             <span className="bar"><span style={{ width: `${pct * 100}%` }} /></span>
             <span className="time">{fmt(left)}</span>
+            <span className="time-short">{short(left)}</span>
           </>
+        ) : !isOpen(d, now) ? (
+          <span className="start">🌙 {fmt(Math.max(1, Math.ceil(msUntilNight(now) / 1000)))}</span>
         ) : d.kind === 'obstacle' ? (
           <span className="start">🪓 ${d.price.toLocaleString()}</span>
         ) : (
-          <span className="start">⛽ {d.fuelCost}</span>
+          <span className="start">⛽ {(d.fuelCost ?? 0) * idle}</span>
         )}
+        {n > 1 && <span className="badge-merge">×{n}</span>}
         {lvl > 1 && <span className="badge-lvl">{lvl}</span>}
+        {driver && <span className={`badge-driver${driver.flat || driver.lowFuel ? ' off' : ''}`}>{driver.flat || driver.lowFuel ? '🔧' : loves(carDef(driver.model), d.id) ? '❤️' : '🚗'}</span>}
       </button>
     </div>
+  )
+}
+
+// Merge tool: a puzzle piece over every square of four matching buildings, and
+// scissors over every merged one.
+function MergeBadges() {
+  const buildings = useGame((s) => s.buildings)
+  const merge = useGame((s) => s.mergeBlock)
+  const split = useGame((s) => s.splitBlock)
+  const rotate = useGame((s) => s.rotateBlock)
+  const { merges, candidates } = useMemo(() => {
+    const merges = mergeGroups(buildings)
+    return { merges, candidates: mergeCandidates(buildings, merges) }
+  }, [buildings])
+  const pin = (id: string, g: MergeGroup, y: number) => {
+    const [cx, cz] = groupCenter(g)
+    anchors.set(id, new Vector3(cx, y, cz))
+    return anchorRef(id)
+  }
+  return (
+    <>
+      {candidates.map((c) => (
+        <div key={`m:${c.anchor.uid}:${c.code}`} className="anchor" ref={pin(`m:${c.anchor.uid}:${c.code}`, c, 1.2 * lift(c))}>
+          <button className={`badge badge-merge-go${c.members.length === 2 ? ' pair' : ''}`} onClick={() => merge(c.anchor.uid, c.code)} title={`Merge ${c.members.length} ${buildingDef(c.anchor.def).name}`}>
+            🧩 Merge ×{c.members.length}
+          </button>
+        </div>
+      ))}
+      {[...merges.groups.values()].map((g) => (
+        <div key={`s:${g.anchor.uid}`} className="anchor" ref={pin(`s:${g.anchor.uid}`, g, 0.6 * lift(g))}>
+          <span className="merge-tools">
+            <button className="badge badge-split" onClick={() => rotate(g.anchor.uid)} title="Turn it">🔄</button>
+            <button className="badge badge-split" onClick={() => split(g.anchor.uid)} title="Split it back up">✂️ Split</button>
+          </span>
+        </div>
+      ))}
+    </>
   )
 }
 
@@ -55,6 +111,21 @@ function CrewBadge({ b }: { b: PlacedBuilding }) {
       <button className="badge badge-crew" style={clan ? { background: clan.color } : undefined} onClick={() => tap(b.uid)} title="Crew House">
         {clan ? `${clan.emblem} ${clan.tag}` : '🛡️ Find a crew'}
       </button>
+    </div>
+  )
+}
+
+// The arcade games live in the Pixel Palace: a joystick over each one you own opens them.
+// A merged block gets one, over its middle, like its job badge.
+function ArcadeBadge({ b, g }: { b: PlacedBuilding; g?: MergeGroup }) {
+  const open = useGame((s) => s.openPanel)
+  const k = g ? lift(g) : 1
+  const [cx, cz] = g ? groupCenter(g) : centerOf(b.def, b.x, b.z, b.rot)
+  const id = `arc:${b.uid}`
+  anchors.set(id, new Vector3(cx, (3.3 + levelLift(buildingLevel(b))) * k, cz))
+  return (
+    <div className="anchor" ref={anchorRef(id)}>
+      <button className="badge badge-arcade" onClick={() => open('arcade')} title="Arcade games" aria-label="Arcade games">🕹️</button>
     </div>
   )
 }
@@ -116,13 +187,21 @@ export function Badges() {
   const visiting = useGame((s) => !!s.visiting)
   const openPanel = useGame((s) => s.openPanel)
   const selectCar = useGame((s) => s.selectCar)
+  const mergeKey = buildings.map((b) => `${b.uid}:${b.x}:${b.z}:${b.rot ?? ''}:${b.level ?? 1}:${b.merge ?? ''}`).join()
+  const merges = useMemo(() => mergeGroups(buildings), [mergeKey]) // eslint-disable-line react-hooks/exhaustive-deps
   if (visiting) return null
   if (mode === 'expand') return <div className="badges"><ExpandBadges /></div>
+  if (mode === 'merge') return <div className="badges"><MergeBadges /></div>
   if (mode !== 'play') return null
   return (
     <div className="badges">
-      {buildings.filter((b) => buildingDef(b.def).jobSeconds).map((b) => (
-        <JobBadge key={b.uid} b={b} now={now} />
+      {buildings.filter((b) => buildingDef(b.def).jobSeconds && (!merges.owner.has(b.uid) || merges.groups.has(b.uid))).map((b) => {
+        // Members come from the live list so their timers stay current.
+        const g = merges.groups.get(b.uid)
+        return <JobBadge key={b.uid} b={b} now={now} g={g} members={g ? buildings.filter((o) => merges.owner.get(o.uid) === b.uid) : undefined} />
+      })}
+      {buildings.filter((b) => b.def === 'arcade' && (!merges.owner.has(b.uid) || merges.groups.has(b.uid))).map((b) => (
+        <ArcadeBadge key={`arc:${b.uid}`} b={b} g={merges.groups.get(b.uid)} />
       ))}
       {buildings.filter((b) => b.def === 'rescue').map((b) => (
         <RescueBadge key={b.uid} b={b} now={now} />

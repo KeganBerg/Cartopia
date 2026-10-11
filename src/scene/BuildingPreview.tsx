@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { PerspectiveCamera, type Group, type Mesh } from 'three'
-import { TILE, type Body, type BuildingDef } from '../game/data'
+import { PerspectiveCamera, Vector3, type Group, type Mesh } from 'three'
+import type { Body, BuildingDef, Finish } from '../game/data'
 import { BuildingModel } from './BuildingModel'
 import { CarModel } from './CarModel'
 import { SEASON } from './season'
+import { frame, seat, type Bounds } from './fit'
 
 // Shop, showroom and garage thumbnails are live 3D renders, drawn every display
 // frame. One hidden WebGL canvas renders every on-screen model into a shared
@@ -15,29 +16,20 @@ const SPIN_MS = 8000
 const DPR = typeof window === 'undefined' ? 1 : Math.min(window.devicePixelRatio || 1, 1.5)
 const still = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
 
-type Item = {
-  key: string
-  // Camera distance and the height it looks at; the shadow's radius.
-  dist: number
-  look: number
-  shadow: number
-  model: () => ReactNode
+// Each model is measured once it's mounted and the camera is fitted to it, so
+// tall towers, wide lots and long trucks all fill their box whole.
+type Item = { key: string; model: () => ReactNode }
+
+function buildingItem(def: BuildingDef, level?: number): Item {
+  return { key: `b|${def.id}|${level ?? 1}|${SEASON}`, model: () => <BuildingModel def={def} level={level} /> }
 }
 
-function buildingItem(def: BuildingDef): Item {
-  const size = Math.max(def.w, def.h) * TILE
-  return { key: `b|${def.id}|${SEASON}`, dist: 2 + size * 1.2, look: 0.7 + size * 0.1, shadow: size * 0.5, model: () => <BuildingModel def={def} /> }
-}
-
-type CarLook = { body: Body; color: string; stripe?: string | null; rusty?: boolean; mods?: string[] | null }
+type CarLook = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; stripe?: string | null; rusty?: boolean; mods?: string[] | null }
 
 function carItem(c: CarLook): Item {
   return {
-    key: `c|${c.body}|${c.color}|${c.stripe ?? ''}|${c.rusty ? 1 : 0}|${c.rusty ? '' : (c.mods ?? []).join(',')}`,
-    dist: 2.55,
-    look: 0.4,
-    shadow: 0.65,
-    model: () => <group scale={1.25}><CarModel body={c.body} color={c.color} stripe={c.stripe} rusty={c.rusty} mods={c.mods} /></group>,
+    key: `c|${c.body}|${c.model ?? ''}|${c.color}|${c.finish ?? ''}|${c.skin ?? ''}|${c.stripe ?? ''}|${c.rusty ? 1 : 0}|${c.rusty ? '' : (c.mods ?? []).join(',')}`,
+    model: () => <CarModel body={c.body} model={c.model} color={c.color} finish={c.finish} skin={c.skin} stripe={c.stripe} rusty={c.rusty} mods={c.mods} />,
   }
 }
 
@@ -112,10 +104,16 @@ function attach(item: Item, canvas: HTMLCanvasElement) {
 
 // The atlas grows to fit whatever is on screen and never shrinks; rows wrap at this width.
 const MAX_W = 2048
+// The view comes from above and to the side, as in town; the model bobs between these heights.
+const VIEW = new Vector3(1, 0.8, 1)
+const LO = 0.19
+const HI = 0.31
 
 function Renderer() {
   const { gl, scene } = useThree()
   const groups = useRef(new Map<string, Group>())
+  // Each model's size, measured the first time it's drawn.
+  const sizes = useRef(new WeakMap<Group, Bounds>())
   const shadow = useRef<Mesh>(null)
   const cam = useRef(new PerspectiveCamera(30, 1, 0.5, 40))
   useSyncExternalStore(subscribe, () => version)
@@ -161,22 +159,24 @@ function Renderer() {
     const ah = src.height
 
     const turn = still ? 0.12 : (performance.now() % SPIN_MS) / SPIN_MS
-    const lift = 0.25 + Math.sin(turn * Math.PI * 4) * 0.06
+    const lift = (LO + HI) / 2 + Math.sin(turn * Math.PI * 4) * ((HI - LO) / 2)
     for (const g of groups.current.values()) g.visible = false
     gl.setScissorTest(true)
     gl.setClearColor(0x000000, 0)
     for (const [key, n] of need) {
       const g = groups.current.get(key)!
-      const { item } = models.get(key)!
+      let b = sizes.current.get(g)
+      if (!b) {
+        b = seat(g.children[0], g)
+        sizes.current.set(g, b)
+      }
       g.visible = true
       g.rotation.y = turn * Math.PI * 2
       g.position.y = lift
-      shadow.current?.scale.setScalar(item.shadow * (1 - lift * 0.5))
+      shadow.current?.scale.setScalar(b.r * 0.8 * (1 - lift * 0.5))
       const c = cam.current
       c.aspect = n.w / n.h
-      c.updateProjectionMatrix()
-      c.position.set(item.dist, item.dist * 0.8, item.dist)
-      c.lookAt(0, item.look, 0)
+      frame(c, b, VIEW, { lo: LO, hi: HI, floor: b.r * 0.8 })
       // WebGL counts rows from the bottom; the atlas is laid out from the top.
       gl.setViewport(n.x, ah - n.y - n.h, n.w, n.h)
       gl.setScissor(n.x, ah - n.y - n.h, n.w, n.h)
@@ -213,7 +213,7 @@ function Renderer() {
             else groups.current.delete(item.key)
           }}
         >
-          {item.model()}
+          <group>{item.model()}</group>
         </group>
       ))}
     </>
@@ -274,8 +274,8 @@ function Thumb({ item, size }: { item: Item; size?: Size }) {
 }
 
 // A building or decoration floating and turning, exactly as it looks in town.
-export function BuildingThumb({ def }: { def: BuildingDef }) {
-  return <Thumb item={buildingItem(def)} />
+export function BuildingThumb({ def, level }: { def: BuildingDef; level?: number }) {
+  return <Thumb item={buildingItem(def, level)} />
 }
 
 // A car floating and turning. Rusty finds show the real model in dull, rusted paint.

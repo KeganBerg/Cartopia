@@ -6,7 +6,7 @@ import { displayName } from './names'
 export type Leader = { ownerId: string; townName: string; level: number; trophies: number; carName: string | null; demo?: boolean }
 
 // Pre-built neighbours so the Friends list is never empty.
-const DEMO: { id: string; name: string; level: number; trophies: number; seed: number }[] = [
+export const DEMO: { id: string; name: string; level: number; trophies: number; seed: number }[] = [
   { id: 'demo-rusty', name: 'Rustbelt Row', level: 8, trophies: 42, seed: 3 },
   { id: 'demo-gear', name: 'Gearville', level: 5, trophies: 17, seed: 7 },
   { id: 'demo-nitro', name: 'Nitro Bay', level: 12, trophies: 88, seed: 11 },
@@ -17,7 +17,7 @@ function rng(seed: number) {
   return () => ((x = (x * 9301 + 49297) % 233280) / 233280)
 }
 
-function demoTown(d: (typeof DEMO)[number]): VisitedTown {
+export function demoTown(d: (typeof DEMO)[number]): VisitedTown {
   const r = rng(d.seed)
   const roads = new Set<string>()
   for (let i = 2; i <= 21; i++) {
@@ -75,5 +75,5 @@ export async function fetchTown(ownerId: string): Promise<VisitedTown | null> {
   const { data } = await supabase.from('game_saves').select('state').eq('owner_id', ownerId).maybeSingle()
   const s = data?.state as SaveState | undefined
   if (!s) return null
-  return { ownerId, townName: displayName(s.townName, ownerId), level: s.level, trophies: s.trophies, roads: s.roads, buildings: s.buildings, cars: s.cars }
+  return { ownerId, townName: displayName(s.townName, ownerId), level: s.level, trophies: s.trophies, roads: s.roads, buildings: s.buildings, cars: s.cars, land: s.land, showcase: s.showcase }
 }

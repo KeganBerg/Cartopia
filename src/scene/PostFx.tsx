@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { PerformanceMonitor } from '@react-three/drei'
-import { Bloom, EffectComposer, TiltShift, ToneMapping } from '@react-three/postprocessing'
-import { BlendFunction, Effect, KernelSize, ToneMappingMode, type BloomEffect } from 'postprocessing'
+import { Bloom, EffectComposer, ToneMapping } from '@react-three/postprocessing'
+import { BlendFunction, Effect, KernelSize, TiltShiftEffect, ToneMappingMode, type BloomEffect } from 'postprocessing'
 import { Uniform, Vector3 } from 'three'
 import { fxState, type Look } from './look'
 
@@ -67,6 +67,29 @@ class GradeEffect extends Effect {
   }
 }
 
+// postprocessing's tilt-shift swaps to its blurred copy with a hard step() at the
+// edge of the focus band, which shows as a straight line across the town. Fade
+// between the sharp and blurred frames over the feather instead.
+const TILT_FRAG = /* glsl */ `
+uniform mediump sampler2D map;
+uniform vec2 maskParams;
+uniform float fade;
+varying vec2 vUv2;
+
+void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor) {
+  float mask = smoothstep(maskParams.x - fade, maskParams.x, vUv2.y) - smoothstep(maskParams.y, maskParams.y + fade, vUv2.y);
+  outputColor = mix(texture2D(map, uv), inputColor, mask);
+}
+`
+
+class SoftTiltShift extends TiltShiftEffect {
+  constructor(focusArea: number, feather: number) {
+    super({ blendFunction: BlendFunction.NORMAL, focusArea, feather, kernelSize: KernelSize.VERY_SMALL, resolutionScale: 0.5 })
+    this.uniforms.set('fade', new Uniform(feather))
+    this.setFragmentShader(TILT_FRAG)
+  }
+}
+
 // How much post-processing a device gets.
 // high: full bloom and 4x anti-aliasing (desktops, laptops, tablets).
 // low: lighter bloom and 2x anti-aliasing (phones).
@@ -106,9 +129,11 @@ export function PostFx({ look, town, tiltShift }: { look: Look; town?: boolean; 
     return () => clearTimeout(id)
   }, [])
   const grade = useMemo(() => new GradeEffect(), [])
+  const tilt = useMemo(() => new SoftTiltShift(0.72, 0.28), [])
   const bloom = useRef<BloomEffect>(null)
 
   useEffect(() => () => grade.dispose(), [grade])
+  useEffect(() => () => tilt.dispose(), [tilt])
   useEffect(() => {
     if (town) fxState.on = tier !== 'off'
   }, [town, tier])
@@ -139,8 +164,9 @@ export function PostFx({ look, town, tiltShift }: { look: Look; town?: boolean; 
       {armed && !pinned && <PerformanceMonitor bounds={() => [40, 120]} flipflops={3} onDecline={stepDown} />}
       {tier !== 'off' && (
         <EffectComposer multisampling={tier === 'high' ? 4 : 2} enableNormalPass={false}>
+          {/* Tilt-shift blurs the raw frame, so it goes before bloom; after it, the blurred bands lost their glow. */}
+          {tiltShift ? <primitive object={tilt} /> : <></>}
           <Bloom ref={bloom} mipmapBlur levels={tier === 'high' ? 7 : 5} radius={0.75} luminanceThreshold={1} luminanceSmoothing={0.25} intensity={0.3} />
-          {tiltShift ? <TiltShift blendFunction={BlendFunction.NORMAL} focusArea={0.72} feather={0.28} kernelSize={KernelSize.VERY_SMALL} resolutionScale={0.5} /> : <></>}
           <ToneMapping mode={ToneMappingMode.NEUTRAL} />
           <primitive object={grade} />
         </EffectComposer>

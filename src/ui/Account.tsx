@@ -2,10 +2,15 @@ import { useEffect, useMemo, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { useGame } from '../game/store'
-import { Panel } from './Menus'
-import { MuteButton } from './MuteButton'
+import { Panel, SheetTabs } from './Menus'
+import { AmbienceControl, MuteButton } from './MuteButton'
+import { AlertsMenu } from './Alerts'
 import { localBackup, restoreLocalBackup } from '../lib/cloud'
 import { isCleanName, NAME_REJECTED } from '../lib/names'
+
+type MenuTab = 'town' | 'account' | 'help'
+const MENU_TABS = [{ id: 'town', label: '🏠 Town' }, { id: 'account', label: '👤 Account' }, { id: 'help', label: '❓ How to play' }] as const
+let lastTab: MenuTab = 'town'
 
 export function AccountPanel() {
   const townName = useGame((s) => s.townName)
@@ -15,6 +20,7 @@ export function AccountPanel() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [msg, setMsg] = useState('')
+  const [tab, setTab] = useState<MenuTab>(lastTab)
   const [name, setName] = useState(townName)
   // Follow the town when sign-in swaps in the cloud save while this menu is open.
   useEffect(() => setName(townName), [townName])
@@ -41,14 +47,19 @@ export function AccountPanel() {
 
   return (
     <Panel title="Menu">
-      <button className="buy bank-menu-btn" onClick={() => openPanel('bank')}>🏦 Bank · get bucks</button>
+      <SheetTabs items={MENU_TABS} value={tab} onChange={(t) => { lastTab = t; setTab(t) }} />
+      {tab === 'town' && <>
+      <button className="buy bank-menu-btn" onClick={() => openPanel('bank')}>🏦 Bank · get gems</button>
       <div className="menu-sound"><span>Sound</span><MuteButton /></div>
+      <AmbienceControl />
+      <AlertsMenu />
       <h3>Town name</h3>
       <div className="row">
         <input value={name} maxLength={24} onChange={(e) => setName(e.target.value)} />
         <button className="buy small" onClick={() => (isCleanName(name) ? rename(name) : useGame.getState().toast(NAME_REJECTED))}>Save</button>
       </div>
-      <h3>Account</h3>
+      </>}
+      {tab === 'account' && <>
       {!supabase ? (
         <p className="hint">Offline mode: progress saves in this browser only.</p>
       ) : user ? (
@@ -74,8 +85,8 @@ export function AccountPanel() {
         </>
       )}
       {msg && <p className="hint">{msg}</p>}
-      <h3>How to play</h3>
-      <ul className="howto">
+      </>}
+      {tab === 'help' && <ul className="howto">
         <li>Tap a business to send a car on a job. It costs fuel; fuel refills 1 per minute.</li>
         <li>When the coin bubble pops up, tap it to collect coins and XP.</li>
         <li>Buy cars in the Showroom. Every car you own drives around your roads.</li>
@@ -84,7 +95,7 @@ export function AccountPanel() {
         <li>Short on anything? Tap the coins, parts or fuel counters at the top to see how to get more.</li>
         <li>Race rivals for coins and trophies. Shift in the green zone.</li>
         <li>Level up to unlock new businesses and cars. Gas Stations raise your fuel cap.</li>
-      </ul>
+      </ul>}
     </Panel>
   )
 }
@@ -102,3 +113,4 @@ function friendlyAuthError(message: string, signUp: boolean): string {
   if (m.includes('email')) return 'Please enter a valid email address.'
   return message
 }
+

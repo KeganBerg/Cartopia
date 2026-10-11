@@ -8,8 +8,9 @@ import {
   createClan, joinClan, leaveClan, kickMember, updateClan,
   type BoardRow, type Clan, type ClanBadge, type Metric, type MyClan, type Period,
 } from '../lib/clans'
-import { Panel } from './Menus'
+import { Panel, SheetTabs } from './Menus'
 import { isCleanName, NAME_REJECTED } from '../lib/names'
+import { CrewGoalCard, useCrewGoal } from './CrewGoal'
 
 const n = (v: number) => v.toLocaleString()
 
@@ -27,18 +28,14 @@ export function useUserId() {
 // Friends, Leaderboards and Crew share one window with tabs across the top.
 export function SocialTabs({ current }: { current: PanelId }) {
   const openPanel = useGame((s) => s.openPanel)
-  const tabs: { id: PanelId; label: string }[] = [
+  const chests = useCrewGoal((g) => g.ready)
+  const tabs: { id: PanelId; label: React.ReactNode }[] = [
     { id: 'friends', label: '👫 Friends' },
     { id: 'leaders', label: '🏅 Leaderboards' },
-    { id: 'clan', label: '🛡️ Crew' },
+    { id: 'clan', label: <>🛡️ Crew{chests > 0 && <span className="tab-dot">{chests}</span>}</> },
+    { id: 'meet', label: '🚗 Meet' },
   ]
-  return (
-    <div className="tabs social-tabs">
-      {tabs.map((t) => (
-        <button key={t.id} className={t.id === current ? 'tab sel' : 'tab'} onClick={() => openPanel(t.id)}>{t.label}</button>
-      ))}
-    </div>
-  )
+  return <SheetTabs items={tabs as { id: Exclude<PanelId, null>; label: React.ReactNode }[]} value={current ?? 'friends'} onChange={(id) => openPanel(id)} />
 }
 
 export function ClanTag({ clan, small }: { clan: ClanBadge | null; small?: boolean }) {
@@ -64,9 +61,10 @@ function weekResetsIn() {
   return h > 24 ? `${Math.floor(h / 24)}d ${h % 24}h` : `${h}h`
 }
 
-function MetricPicker({ metric, setMetric, period, setPeriod }: { metric: Metric; setMetric: (m: Metric) => void; period: Period; setPeriod: (p: Period) => void }) {
+function MetricPicker({ metric, setMetric, period, setPeriod, children }: { metric: Metric; setMetric: (m: Metric) => void; period: Period; setPeriod: (p: Period) => void; children?: React.ReactNode }) {
   return (
     <div className="board-controls">
+      {children}
       <div className="seg metrics">
         {METRICS.map((m) => (
           <button key={m.id} className={m.id === metric ? 'sel' : ''} onClick={() => setMetric(m.id)}>
@@ -145,11 +143,12 @@ export function LeadersPanel() {
   return (
     <Panel title="Leaderboards" wide>
       <SocialTabs current="leaders" />
-      <div className="seg scope">
-        <button className={scope === 'players' ? 'sel' : ''} onClick={() => setScope('players')}>Players</button>
-        <button className={scope === 'clans' ? 'sel' : ''} onClick={() => setScope('clans')}>Crews</button>
-      </div>
-      <MetricPicker metric={metric} setMetric={setMetric} period={period} setPeriod={setPeriod} />
+      <MetricPicker metric={metric} setMetric={setMetric} period={period} setPeriod={setPeriod}>
+        <div className="seg scope">
+          <button className={scope === 'players' ? 'sel' : ''} onClick={() => setScope('players')}>Players</button>
+          <button className={scope === 'clans' ? 'sel' : ''} onClick={() => setScope('clans')}>Crews</button>
+        </div>
+      </MetricPicker>
       <p className="hint board-hint">
         {metric === 'power' && 'Power is the combined PI of your 5 best cars. Upgrade in the Garage to climb. '}
         {metric === 'race_wins' && 'Every drag race and Grand Prix win counts. '}
@@ -237,7 +236,7 @@ export function ClanPanel() {
           <span className="big-emblem">🛡️</span>
           <div>
             <b>Team up in a crew</b>
-            <p>Join up to {CLAN_CAP} drivers, pool your power, wins and trophies, and climb the crew leaderboards together.</p>
+            <p>Join up to {CLAN_CAP} drivers, hit a weekly goal together for a crew chest, and climb the crew leaderboards.</p>
             <button className="buy" onClick={() => openPanel('account')}>Sign in to join</button>
           </div>
         </div>
@@ -314,6 +313,7 @@ function ClanHome({ data, uid, onChange }: { data: MyClan; uid: string; onChange
           <small>{clan.members}/{clan.memberCap} members{clan.minLevel > 1 ? ` · level ${clan.minLevel}+ to join` : ''}{rank ? ` · #${rank} by power` : ''}</small>
         </div>
       </div>
+      <CrewGoalCard members={members} uid={uid} />
       <div className="clan-stats">
         {METRICS.map((m) => (
           <div key={m.id} className="clan-stat">
@@ -445,7 +445,9 @@ function ClanBrowser({ onJoined }: { onJoined: () => void }) {
     setBusy(true)
     try {
       await createClan({ ...form, tag, name: form.name.trim() })
-      useGame.setState((s) => ({ coins: s.coins - CLAN_COST, updatedAt: Date.now() }))
+      // A cloud sync can swap the town in while the crew is being made, so charge
+      // the balance as it is now and never take it below zero.
+      useGame.setState((s) => ({ coins: Math.max(0, s.coins - CLAN_COST), updatedAt: Date.now() }))
       toast(`${form.name.trim()} is open for members!`)
       onJoined()
     } catch (e) {

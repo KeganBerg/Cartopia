@@ -2,9 +2,15 @@ import { TILE, levelLift, type BuildingDef } from '../game/data'
 import { useGame } from '../game/store'
 import { signTexture } from './signTexture'
 import { CarModel } from './CarModel'
+import { Upright } from './mergeScale'
+import { ObstacleDetail, BenchDetail, BillboardDetail, DriveInDetail, FlowerDetail, FountainDetail, GarageDetail, HouseDetail, LampDetail, PondDetail, ShopDetail, SpeedwayDetail, StatueDetail, TreeDetail } from './BuildingDetail'
 import { NEW_MODELS, NewBuildingModel } from './NewBuildings'
+import { HouseLevels } from './HouseLevels'
+import { RustysYard } from './RustysYard'
 import type { Texture } from 'three'
 import { glowMats } from './dayNight'
+import { tickMovie } from './movie'
+import { useFrame } from '@react-three/fiber'
 import { PAL, SEASON } from './season'
 import { LAYER, decal } from './layers'
 import { brickTex, sidingTex, shingleTex, gravelTex, awningTex, windowTex, paverTex, shutterTex, pumpTex } from './textures'
@@ -111,6 +117,10 @@ export function LightPool({ r, x = 0, z = 0, y = 0.075 }: { r: number; x?: numbe
   )
 }
 
+// Clan-colored parts stay out of the Batch merge: the color can arrive after
+// the town is merged, and a merged copy would keep the old one.
+const LIVE = { noBatch: true }
+
 // The Crew House flies a flag in the player's clan color.
 function CrewFlag({ x, z }: { x: number; z: number }) {
   const color = useGame((s) => s.clanBadge?.color ?? '#ff7043')
@@ -118,7 +128,7 @@ function CrewFlag({ x, z }: { x: number; z: number }) {
     <group position={[x, 0, z]}>
       <mesh position={[0, 0.8, 0]} castShadow><cylinderGeometry args={[0.025, 0.03, 1.6, 8]} /><meshStandardMaterial color="#cfd8dc" metalness={0.6} roughness={0.4} /></mesh>
       <mesh position={[0, 1.62, 0]}><sphereGeometry args={[0.05, 8, 8]} /><meshStandardMaterial color="#ffd54f" /></mesh>
-      <mesh position={[0.24, 1.38, 0]} castShadow><boxGeometry args={[0.46, 0.3, 0.02]} /><meshStandardMaterial color={color} /></mesh>
+      <mesh position={[0.24, 1.38, 0]} castShadow userData={LIVE}><boxGeometry args={[0.46, 0.3, 0.02]} /><meshStandardMaterial color={color} /></mesh>
       <mesh position={[0.24, 1.38, 0.012]}><circleGeometry args={[0.08, 16]} /><meshStandardMaterial color="#fffde7" /></mesh>
     </group>
   )
@@ -159,7 +169,7 @@ function CrewHouse({ m, ghost, sign, bulb, win }: { m: ReturnType<typeof useMat>
           {m('#90a4ae')}
         </mesh>
       ))}
-      <mesh position={[hx, 0.44, len / 2 - 0.08]}>
+      <mesh userData={LIVE} position={[hx, 0.44, len / 2 - 0.08]}>
         <planeGeometry args={[0.95, 0.09]} />
         <meshStandardMaterial color={ghost ? '#66bb6a' : clan} />
       </mesh>
@@ -171,7 +181,7 @@ function CrewHouse({ m, ghost, sign, bulb, win }: { m: ReturnType<typeof useMat>
         </mesh>
       ))}
       {/* Clan banner hanging down the arch. */}
-      <mesh position={[hx, 0.86, len / 2 - 0.08]}>
+      <mesh userData={LIVE} position={[hx, 0.86, len / 2 - 0.08]}>
         <planeGeometry args={[0.36, 0.22]} />
         <meshStandardMaterial color={ghost ? '#66bb6a' : clan} />
       </mesh>
@@ -202,12 +212,18 @@ function CrewHouse({ m, ghost, sign, bulb, win }: { m: ReturnType<typeof useMat>
       {sign && (
         <group position={[hx, 1.22, len / 2 - 0.15]}>
           {[-0.5, 0.5].map((x) => <mesh key={x} position={[x, -0.18, -0.02]}><boxGeometry args={[0.04, 0.36, 0.04]} />{m('#37474f')}</mesh>)}
-          <mesh position={[0, 0, -0.03]}><boxGeometry args={[1.28, 0.36, 0.05]} /><meshStandardMaterial color={ghost ? '#66bb6a' : clan} /></mesh>
+          <mesh userData={LIVE} position={[0, 0, -0.03]}><boxGeometry args={[1.28, 0.36, 0.05]} /><meshStandardMaterial color={ghost ? '#66bb6a' : clan} /></mesh>
           <Sign text="CREW HOUSE" w={1.2} y={0} z={0} bg="#263238" fg="#ffffff" />
         </group>
       )}
     </group>
   )
+}
+
+// Advances the shared Drive-In film; many screens still redraw it once a frame.
+function MovieReel() {
+  useFrame(() => tickMovie())
+  return null
 }
 
 function Sign({ text, w, y, z, bg, fg }: { text: string; w: number; y: number; z: number; bg?: string; fg?: string }) {
@@ -258,6 +274,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
               {m(PAL.bush[i % 2])}
             </mesh>
           ))}
+          {!ghost && <ObstacleDetail id={def.id} />}
         </group>
       )
     case 'rock':
@@ -271,6 +288,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             <dodecahedronGeometry args={[0.3, 0]} />
             {m(def.roof)}
           </mesh>
+          {!ghost && <ObstacleDetail id={def.id} />}
         </group>
       )
     case 'cactus':
@@ -292,6 +310,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             <cylinderGeometry args={[0.55, 0.6, 0.12, 14]} />
             {m('#d7b77b')}
           </mesh>
+          {!ghost && <ObstacleDetail id={def.id} />}
         </group>
       )
     case 'tree': {
@@ -340,6 +359,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
               <meshStandardMaterial color={g ?? PAL.leaves[i]} transparent={ghost} opacity={ghost ? 0.55 : 1} flatShading />
             </mesh>
           ))}
+          {!ghost && <TreeDetail />}
         </group>
       )
     }
@@ -393,6 +413,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             {m('#b3e5fc')}
           </mesh>
           {!ghost && <LightPool r={1.1} />}
+          {!ghost && <FountainDetail stone={def.color} />}
         </group>
       )
     case 'flowers':
@@ -402,6 +423,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
           {[[-0.4, -0.4], [0, -0.35], [0.4, -0.4], [-0.35, 0], [0.05, 0.05], [0.4, 0], [-0.4, 0.4], [0, 0.4], [0.4, 0.38]].map(([x, z], i) => (
             <mesh key={i} position={[x, 0.26, z]}><sphereGeometry args={[0.13, 8, 6]} />{m(['#e91e63', '#ffeb3b', '#ab47bc', '#ff7043'][i % 4])}</mesh>
           ))}
+          {!ghost && <FlowerDetail />}
         </group>
       )
     case 'lamp':
@@ -411,6 +433,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
           <mesh position={[0.2, 1.78, 0]}><boxGeometry args={[0.45, 0.05, 0.08]} />{m(def.color)}</mesh>
           <mesh position={[0.38, 1.72, 0]}><sphereGeometry args={[0.1, 10, 8]} />{bulb}</mesh>
           {!ghost && <LightPool r={0.9} x={0.38} />}
+          {!ghost && <LampDetail iron={def.color} />}
         </group>
       )
     case 'bench':
@@ -419,6 +442,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
           <mesh position={[0, 0.3, 0]} castShadow><boxGeometry args={[1, 0.06, 0.32]} />{m(def.color)}</mesh>
           <mesh position={[0, 0.5, -0.15]} castShadow><boxGeometry args={[1, 0.3, 0.05]} />{m(def.color)}</mesh>
           {[-0.42, 0.42].map((x) => <mesh key={x} position={[x, 0.15, 0]}><boxGeometry args={[0.06, 0.3, 0.3]} />{m(def.roof)}</mesh>)}
+          {!ghost && <BenchDetail wood={def.color} iron={def.roof} />}
         </group>
       )
     case 'billboard':
@@ -436,15 +460,21 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             <mesh key={x} position={[x, 1.2, 0.3]} rotation-x={-0.6}><boxGeometry args={[0.12, 0.08, 0.12]} />{bulb}</mesh>
           ))}
           {!ghost && <LightPool r={0.8} z={0.5} />}
+          {!ghost && <BillboardDetail />}
         </group>
       )
     case 'statue':
       return (
         <group>
           <mesh position={[0, 0.35, 0]} castShadow><boxGeometry args={[1, 0.7, 1]} />{m(def.roof)}</mesh>
-          <group position={[0, 0.7, 0]} rotation-y={0.6} scale={1.2}>
-            {ghost ? <mesh position-y={0.25}><boxGeometry args={[0.7, 0.4, 1.2]} />{m(def.color)}</mesh> : <CarModel body="super" color={def.color} />}
+          <group position={[0, 0.7, 0]}>
+            <Upright>
+              <group rotation-y={0.6} scale={1.2}>
+                {ghost ? <mesh position-y={0.25}><boxGeometry args={[0.7, 0.4, 1.2]} />{m(def.color)}</mesh> : <CarModel body="super" color={def.color} />}
+              </group>
+            </Upright>
           </group>
+          {!ghost && <StatueDetail stone={def.roof} />}
         </group>
       )
     case 'pond':
@@ -462,6 +492,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
           {[[1.4, 1.2], [-1.3, 1.3], [1.3, -1.3]].map(([x, z], i) => (
             <mesh key={i} position={[x, 0.3, z]} castShadow><sphereGeometry args={[0.3, 10, 8]} />{m('#388e3c')}</mesh>
           ))}
+          {!ghost && <PondDetail />}
         </group>
       )
     case 'stadium': {
@@ -518,11 +549,13 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             const a = Math.PI * 0.15 + Math.PI * 1.1 * t
             return <Flag key={t} x={Math.sin(a) * 1.95} y={sh + 0.1} z={Math.cos(a) * 1.95} color={def.roof} star={lvl >= 10} />
           })}
+          {!ghost && <SpeedwayDetail sh={sh} roof={def.roof} />}
           {sign && <Sign text="SPEEDWAY" w={2} y={1.25 + lift * 0.5} z={0} bg="#c62828" fg="#ffffff" />}
         </group>
       )
     }
     case 'house':
+      if (lvl > 1) return <HouseLevels def={def} level={lvl} ghost={ghost} m={m} win={win} bulb={bulb} />
       return (
         <group>
           <mesh position={[0, 0.5, 0]} castShadow receiveShadow>
@@ -571,6 +604,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
                 <mesh position={[0, 0.2, 0]}><boxGeometry args={[0.03, 0.4, 0.03]} />{m('#5d4037')}</mesh>
                 <mesh position={[0, 0.42, 0]}><boxGeometry args={[0.1, 0.08, 0.16]} />{m('#1e88e5')}</mesh>
               </group>
+              <HouseDetail />
             </>
           )}
         </group>
@@ -692,6 +726,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
               {m('#263238')}
             </mesh>
           ))}
+          {!ghost && <GarageDetail W={W} D={D} />}
           {sign && <Sign text="MY GARAGE" w={2.2} y={1.42} z={0.33} bg="#263238" fg="#ffca28" />}
         </group>
       )
@@ -812,6 +847,8 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
         </group>
       )
     }
+    case 'rescue':
+      return <RustysYard m={m} ghost={ghost} sign={!!sign} bulb={bulb} win={win} lvl={lvl} lift={lift} />
     case 'crew':
       return <CrewHouse m={m} ghost={ghost} sign={!!sign} bulb={bulb} win={win} />
     case 'cinema': {
@@ -821,7 +858,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
         <group>
           <mesh position={[0, 1.4 + sl, -1.5]} castShadow>
             <boxGeometry args={[3, 1.8, 0.15]} />
-            {m('#fafafa')}
+            {m('#37474f')}
           </mesh>
           {[-1.2, 1.2].map((x) => (
             <mesh key={x} position={[x, 0.6 + sl / 2, -1.55]} castShadow>
@@ -839,21 +876,20 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             <boxGeometry args={[3.6, 0.05, 3]} />
             {m('#757575')}
           </mesh>
-          <mesh position={[1.2, 0.5, 1.3]} castShadow>
-            <boxGeometry args={[0.8, 1, 0.8]} />
-            {m('#e53935')}
-          </mesh>
-          {/* Speaker posts in the lot and a projector beam on the screen. */}
-          {!ghost && [[-0.9, -0.2], [0, -0.2], [0.9, -0.2], [-0.9, 0.9], [0, 0.9]].map(([x, z], i) => (
-            <group key={i} position={[x, 0, z]}>
-              <mesh position={[0, 0.25, 0]}><cylinderGeometry args={[0.025, 0.025, 0.5, 6]} />{m('#78909c')}</mesh>
-              <mesh position={[0, 0.5, 0]}><boxGeometry args={[0.12, 0.08, 0.06]} />{m('#37474f')}</mesh>
-            </group>
-          ))}
+          {ghost ? (
+            <mesh position={[1.2, 0.5, 1.3]}>
+              <boxGeometry args={[0.8, 1, 0.8]} />
+              {m('#e53935')}
+            </mesh>
+          ) : (
+            <DriveInDetail />
+          )}
+          {/* The film: one shared animated texture, kept out of Batch by its live material. */}
           {!ghost && (
             <mesh position={[0, 1.4 + sl, -1.42]}>
-              <planeGeometry args={[2.8, 1.6]} />
+              <planeGeometry args={[2.8, 1.575]} />
               <primitive object={glowMats.screen} attach="material" dispose={null} />
+              <MovieReel />
             </mesh>
           )}
           {!ghost && <LightPool r={1.2} x={1.2} z={1.3} />}
@@ -865,7 +901,15 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
           )}
           {trim && lvl >= 5 && <Lights from={[-1.5, 2.42 + sl, -1.4]} to={[1.5, 2.42 + sl, -1.4]} n={14} />}
           {trim && lvl >= 8 && [-1.45, 1.45].map((x) => <Flag key={x} x={x} y={2.37 + sl} z={-1.5} color="#e53935" star={lvl >= 10} />)}
-          {sign && <Sign text="DRIVE-IN" w={2.4} y={1.6 + sl} z={-1.41} bg="#fafafa" fg="#3e2723" />}
+          {sign && (
+            <group>
+              <mesh position={[0, 2.7 + sl, -1.47]} castShadow>
+                <boxGeometry args={[2.05, 0.6, 0.06]} />
+                {m(def.roof)}
+              </mesh>
+              <Sign text="DRIVE-IN" w={1.9} y={2.7 + sl} z={-1.435} bg="#fafafa" fg="#3e2723" />
+            </group>
+          )}
         </group>
       )
     }
@@ -1002,6 +1046,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
               <meshStandardMaterial color={GOLD} metalness={0.6} roughness={0.3} />
             </mesh>
           )}
+          {!ghost && <ShopDetail W={W} D={D} h={h} F={F} roof={def.roof} rows={rows} cols={cols} awning={m('#ffffff', awningTex(def.roof === '#f5f5f5' || def.roof === '#fff8e1' ? def.color : def.roof))} mullions={def.id !== 'motel' && def.id !== 'carwash'} />}
           {/* Planters by the door. */}
           {!ghost && [-1, 1].map((sd) => (
             <group key={sd} position={[sd * (W * 0.41 - 0.12), 0, F + 0.15]}>
@@ -1032,15 +1077,6 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
               <meshStandardMaterial color={x < 0 ? '#29b6f6' : '#ffca28'} roughness={1} />
             </mesh>
           ))}
-          {def.id === 'rescue' && !ghost && (
-            <group position={[W * 0.44, 0, D * 0.3]}>
-              {/* Scrap pile: a rusty shell and some old tyres. */}
-              <mesh position={[0, 0.14, 0.15]} rotation-y={0.4} castShadow><boxGeometry args={[0.32, 0.22, 0.55]} />{m('#a1663a')}</mesh>
-              {[0, 1].map((i) => (
-                <mesh key={i} position={[0.05, 0.06 + i * 0.12, -0.3]} rotation-x={Math.PI / 2}><torusGeometry args={[0.12, 0.05, 8, 14]} />{m('#3e2723')}</mesh>
-              ))}
-            </group>
-          )}
           {def.prop && <RoofProp prop={def.prop} y={h + 0.13} />}
           {def.id === 'motel' && [-1.2, -0.6, 0.6, 1.2].map((x) => (
             <mesh key={x} position={[x, 0.32, F + 0.012]}>

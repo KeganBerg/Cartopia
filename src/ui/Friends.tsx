@@ -4,6 +4,11 @@ import { fetchLeaderboard, fetchTown, demoLeaders, type Leader } from '../lib/fr
 import { supabase } from '../lib/supabase'
 import { Panel } from './Menus'
 import { SocialTabs } from './Social'
+import { GiftButton } from './Gifts'
+import { recordHelp, refreshGifts, HELP_FUEL } from '../lib/gifts'
+import { signedInUser } from '../lib/cloud'
+import { LikeButton } from './Meet'
+import { GhostButton } from './GhostRace'
 
 export function FriendsPanel() {
   // Neighbours show right away; real players merge in when the query returns.
@@ -19,6 +24,7 @@ export function FriendsPanel() {
   useEffect(() => {
     fetchLeaderboard().then(setLeaders).catch(() => {})
     supabase?.auth.getUser().then(({ data }) => setMe(data.user?.id ?? null))
+    refreshGifts().catch(() => {})
   }, [])
 
   // Put the local player on the board even when not signed in.
@@ -39,7 +45,7 @@ export function FriendsPanel() {
   return (
     <Panel title="Friends" wide>
       <SocialTabs current="friends" />
-      <p className="hint">Visit other towns and help out once a day for coins. Ranked by trophies.</p>
+      <p className="hint">Help a town once a day for coins (they get ⛽ too). 🎁 sends a daily gift.</p>
       {!rows && <p className="hint">Loading...</p>}
       <div className="leaders">
         {rows?.map((l, i) => {
@@ -53,9 +59,12 @@ export function FriendsPanel() {
               </div>
               <span className="leader-trophies">🏆 {l.trophies}</span>
               {!mine && (
-                <button className="buy small" onClick={() => go(l.ownerId)}>
-                  {helped[l.ownerId] === today() ? 'Visit' : 'Visit & help'}
-                </button>
+                <div className="leader-acts">
+                  {me && <GiftButton to={l.ownerId} />}
+                  <button className="buy small" onClick={() => go(l.ownerId)}>
+                    {helped[l.ownerId] === today() ? 'Visit' : 'Visit & help'}
+                  </button>
+                </div>
               )}
             </div>
           )
@@ -71,7 +80,12 @@ export function VisitBanner() {
   const helped = useGame((s) => (s.visiting ? s.helped[s.visiting.ownerId] === today() : false))
   const help = useGame((s) => s.helpFriend)
   const visit = useGame((s) => s.visit)
-  if (!v) return null
+  const racing = useGame((s) => s.panel === 'ghost')
+  if (!v || racing) return null
+  const helpOut = () => {
+    help()
+    recordHelp(v.ownerId)
+  }
   return (
     <div className="visit-banner">
       <div className="visit-title">
@@ -79,7 +93,10 @@ export function VisitBanner() {
         <small>Lvl {v.level} · 🏆 {v.trophies} · {v.cars.length} cars</small>
       </div>
       <div className="row">
-        <button className="buy small" disabled={helped} onClick={help}>{helped ? 'Helped today ✔' : 'Help out'}</button>
+        <LikeButton owner={v.ownerId} />
+        {signedInUser() && <GiftButton to={v.ownerId} />}
+        <GhostButton town={v} />
+        <button className="buy small" disabled={helped} onClick={helpOut} title={`They get +${HELP_FUEL} fuel too`}>{helped ? 'Helped today ✔' : 'Help out'}</button>
         <button className="buy small alt" onClick={() => visit(null)}>🏠 Home</button>
       </div>
     </div>
