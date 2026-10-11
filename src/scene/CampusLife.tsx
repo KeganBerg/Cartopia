@@ -150,6 +150,7 @@ export function LearnerCar({ i, at, rot = 0, rig, body: tilt }: { i: number; at?
 const CRUISE = 0.4
 const BRAKE_FOR = 0.25
 const LOOK = 0.55 // how far ahead a learner looks for the next bend
+const MAX_LOCK = 0.26 // front wheel steering limit, radians
 
 // Learner cars driving the course on a smooth line: they ease off before each
 // bend, steer the front wheels into it, lean a little and roll out again. Every
@@ -179,8 +180,10 @@ export function StudentCars({ n, drive }: { n: number; drive: Drive }) {
       g.position.set(pose.x, 0.06, pose.z)
       g.rotation.y = pose.yaw
       // Front wheels turn to the bend's angle for this wheelbase, smoothed like hands on a wheel.
+      // Kept to a modest lock: the close-up model's brake discs are part of the body and
+      // don't turn, so a full lock would push them out through the tyres.
       const rig = rigs[i]
-      const want = Math.max(-0.55, Math.min(0.55, Math.atan(pose.curv * rig.base * k)))
+      const want = Math.max(-MAX_LOCK, Math.min(MAX_LOCK, Math.atan(pose.curv * rig.base * k)))
       st.steer += (want - st.steer) * Math.min(1, dt * 6)
       for (const w of rig.steer) if (w) w.rotation.y = st.steer
       const roll = (st.v * dt) / (rig.radius * k)

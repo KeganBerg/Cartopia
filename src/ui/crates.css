@@ -73,3 +73,8 @@
 @media (prefers-reduced-motion: reduce) {
   .crate-tab.sel .crate-ico, .crate-skip, .crate-prize { animation: none; }
 }
+/* Already yours: it pays coins instead. */
+.crate-car.owned, .crate-skin.owned { position: relative; }
+.crate-car.owned > *, .crate-skin.owned > * { opacity: .45; }
+.crate-car.owned::after, .crate-skin.owned::after { content: '🪙'; position: absolute; top: -4px; right: -4px; font-size: 11px; }
+.odd.mod.spent { filter: saturate(.35); }

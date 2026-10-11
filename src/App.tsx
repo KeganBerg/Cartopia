@@ -46,6 +46,7 @@ import { VisitorBadges, StreetRaceCard } from './ui/Visitors'
 import { visitorTick, forceVisitor } from './lib/visitors'
 import type { VisitorKind } from './game/data'
 import { hideSplash, splashProgress } from './lib/splash'
+import { rememberSplashCar } from './lib/splashCar'
 
 // Phones get a lighter renderer: lower pixel ratio keeps iOS from dropping the WebGL context.
 const SMALL = typeof window !== 'undefined' && Math.min(window.innerWidth, window.innerHeight) < 700
@@ -69,6 +70,7 @@ export default function App() {
     tick(Date.now())
     // The loading screen leaves after the town's first frames; this is the fallback if they never come.
     const splashFallback = setTimeout(hideSplash, 15000)
+    const stopSplashCar = rememberSplashCar()
     // Checked again when it fires: a cloud save may have loaded since, already claimed today.
     setTimeout(() => { const s = useGame.getState(); if (s.lastDaily !== today() && !s.panel) s.openPanel('daily') }, 800)
     // ?visitor=racer|tourist|mystery|barn brings a guest's visitor right away (for testing).
@@ -81,6 +83,7 @@ export default function App() {
     return () => {
       clearInterval(id)
       clearTimeout(splashFallback)
+      stopSplashCar()
     }
   }, [tick])
 
