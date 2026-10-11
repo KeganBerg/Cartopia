@@ -1,6 +1,10 @@
 // Tiny synthesized sound effects, so the game ships no audio files.
+// Everything audible shares one AudioContext and goes through one master
+// output, so the Sound toggle silences it all. Other audio (the town ambience,
+// race engines) gets both from audioContext() and audioOut().
 
 let ctx: AudioContext | null = null
+let master: GainNode | null = null
 let muted = (() => {
   try {
     return localStorage.getItem('cartopia-muted') === '1'
@@ -16,6 +20,8 @@ function audio() {
   if (!ctx) {
     try {
       ctx = new AudioContext()
+      master = ctx.createGain()
+      master.connect(ctx.destination)
     } catch {
       return null
     }
@@ -24,6 +30,9 @@ function audio() {
   return ctx
 }
 
+// The shared context and master output for other synthesised audio; null while muted.
+export const audioContext = () => audio()
+export const audioOut = (): AudioNode | null => (audio() ? master : null)
 export const isMuted = () => muted
 export function setMuted(m: boolean) {
   muted = m
@@ -52,7 +61,7 @@ function tone(freq: number, start: number, dur: number, type: OscillatorType = '
   g.gain.setValueAtTime(0.0001, t)
   g.gain.exponentialRampToValueAtTime(vol, t + 0.01)
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
-  o.connect(g).connect(a.destination)
+  o.connect(g).connect(master!)
   o.start(t)
   o.stop(t + dur + 0.02)
 }
@@ -90,7 +99,7 @@ export function engineRpm(rpm: number, gear: number) {
     f.type = 'lowpass'
     f.frequency.value = 900
     g.gain.value = 0.05
-    o.connect(f).connect(g).connect(a.destination)
+    o.connect(f).connect(g).connect(master!)
     o.start()
     engine = { o, g }
   }
