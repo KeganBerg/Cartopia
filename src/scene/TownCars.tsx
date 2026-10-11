@@ -9,7 +9,7 @@ import { tripRequests, visitRequests } from '../game/trips'
 import { pedestrianCrossings } from '../game/walkGraph'
 import { turnOf } from '../game/placement'
 import { toWorld, DIRS } from './grid'
-import { CarModel, carSize, wheelRig } from './CarModel'
+import { CarModel, carSize, wheelRig, type WheelRig } from './CarModel'
 import { liveTraffic as sim } from './traffic/live'
 import { layoutRoads, type Light } from './traffic/layout'
 
@@ -18,17 +18,20 @@ const SCALE = 1.1
 const MAX_VISIBLE = 30
 
 // Tow truck facing +z, drawn at its own spot on the road just ahead of the towed car.
-function TowTruck() {
+// `crane` leaves off the fixed boom for scenes that animate their own.
+export function TowTruck({ rig, crane }: { rig?: WheelRig; crane?: boolean }) {
   return (
     <group>
       <group scale={SCALE}>
-        <CarModel body="truck" color="#ff8f00" beams />
+        <CarModel body="truck" color="#ff8f00" beams rig={rig} />
       </group>
       {/* Boom and hook reaching back to the towed car. */}
-      <mesh position={[0, 0.7, -0.75]} rotation-x={0.5}>
-        <boxGeometry args={[0.07, 0.07, 0.7]} />
-        <meshStandardMaterial color="#37474f" />
-      </mesh>
+      {!crane && (
+        <mesh position={[0, 0.7, -0.75]} rotation-x={0.5}>
+          <boxGeometry args={[0.07, 0.07, 0.7]} />
+          <meshStandardMaterial color="#37474f" />
+        </mesh>
+      )}
       <mesh position={[0, 0.95, -0.15]}>
         <boxGeometry args={[0.44, 0.07, 0.18]} />
         <meshStandardMaterial color="#ffca28" emissive="#ffb300" emissiveIntensity={0.6} />

@@ -156,9 +156,9 @@ export function ClubLife({ lvl, floorY, floorZ, floorW, floorD }: Props) {
           <meshStandardMaterial />
         </instancedMesh>
       </group>
-      {/* Searchlights behind the club, sweeping the sky. */}
+      {/* Searchlights behind the club, sweeping the sky (left out of preview framing). */}
       {[-1, 1].map((sd, k) => (
-        <group key={sd} position={[sd * 1.78, 0.2, -0.8]}>
+        <group key={sd} position={[sd * 1.78, 0.2, -0.8]} userData={{ noFit: true }}>
           <group
             ref={(el) => {
               if (el) beams.current[k] = el
