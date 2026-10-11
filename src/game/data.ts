@@ -158,6 +158,7 @@ export const buildingUpgradeXp = (level: number) => 10 + level * 5
 export const levelLift = (level = 1) => 0.26 * (Math.min(MAX_BUILDING_LEVEL, Math.max(1, level)) - 1)
 
 export type Body = 'compact' | 'sedan' | 'sports' | 'muscle' | 'truck' | 'super' | 'bubble' | 'wagon' | 'wedge' | 'roadster' | 'rally' | 'classic' | 'offroad' | 'coupe' | 'widebody' | 'tank' | 'scooter' | 'chopper' | 'sportbike'
+  | 'hatch' | 'van' | 'suv' | 'ev' | 'luxury' | 'formula'
 // Two-wheelers: drawn as motorcycles with a rider, and only take exhaust and rim mods.
 export const BIKES: Body[] = ['scooter', 'chopper', 'sportbike']
 export const isBike = (body: Body) => BIKES.includes(body)
@@ -243,6 +244,15 @@ export const CARS: CarDef[] = [
   { id: 'zippy', name: 'Kipper Zip 50', body: 'scooter', price: 1800, unlockLevel: 2, power: 14, grip: 30, weight: 8, skill: 'slipstream', likes: ['pizza', 'coffee', 'icecream'], colors: ['#4dd0e1', '#fdd835', '#f48fb1'] },
   { id: 'baron', name: 'Liberty Road Baron', body: 'chopper', price: 8500, unlockLevel: 5, power: 46, grip: 36, weight: 30, skill: 'nitro', likes: ['diner', 'burger', 'bowling'], colors: ['#212121', '#b71c1c', '#1565c0'] },
   { id: 'shinden', name: 'Kazumi Shinden RR', body: 'sportbike', price: 30000, unlockLevel: 9, power: 80, grip: 60, weight: 14, skill: 'launch', likes: ['tuner', 'stadium', 'arcade'], colors: ['#1565c0', '#eceff1', '#76ff03'] },
+  { id: 'camper', name: 'Lakeside Sunrise Camper', body: 'van', price: 2400, unlockLevel: 2, power: 20, grip: 28, weight: 64, skill: 'slipstream', likes: ['icecream', 'tacos', 'motel'], colors: ['#ff8a65', '#4db6ac', '#fff59d'] },
+  { id: 'hotshot', name: 'Kazumi Hot Shot RS', body: 'hatch', price: 3800, unlockLevel: 3, power: 36, grip: 50, weight: 26, skill: 'launch', likes: ['arcade', 'tuner', 'coffee'], colors: ['#eceff1', '#d32f2f', '#1e88e5'] },
+  { id: 'ridgeback', name: 'Kodiak Ridgeback 4x4', body: 'suv', price: 6000, unlockLevel: 4, power: 44, grip: 46, weight: 62, skill: 'torque', likes: ['tires', 'parts', 'firehouse'], colors: ['#ff6f00', '#33691e', '#eceff1'] },
+  { id: 'kitsune', name: 'Kazumi Kitsune Drift', body: 'coupe', price: 8000, unlockLevel: 5, power: 48, grip: 58, weight: 30, skill: 'smooth', likes: ['tuner', 'arcade', 'bodyshop'], colors: ['#fafafa', '#212121', '#ff4081'] },
+  { id: 'current', name: 'Sparkline Current', body: 'ev', price: 15000, unlockLevel: 6, power: 72, grip: 52, weight: 50, skill: 'launch', likes: ['coffee', 'market', 'parkade'], colors: ['#eceff1', '#b71c1c', '#263238'] },
+  { id: 'salon', name: 'Regent Grand Salon', body: 'luxury', price: 0, bucks: 25, unlockLevel: 6, power: 64, grip: 50, weight: 70, skill: 'slipstream', likes: ['motel', 'cinema', 'market'], colors: ['#1a1a2e', '#eceff1', '#6d1b1b'] },
+  { id: 'stomper', name: 'Ironside Dune Stomper', body: 'truck', price: 16000, unlockLevel: 7, power: 66, grip: 44, weight: 72, skill: 'torque', likes: ['tires', 'stadium', 'lube'], colors: ['#424242', '#1565c0', '#ff6d00'] },
+  { id: 'monoposto', name: 'Veloce Monoposto 1', body: 'formula', price: 75000, unlockLevel: 11, power: 90, grip: 90, weight: 20, skill: 'smooth', likes: ['stadium', 'tuner', 'parkade'], colors: ['#d50000', '#eceff1', '#00897b'] },
+  { id: 'zenith', name: 'Aether Zenith R', body: 'super', price: 120000, unlockLevel: 14, legendary: true, power: 100, grip: 96, weight: 26, skill: 'nitro', likes: ['stadium', 'parkade', 'police'], colors: ['#212121', '#1e88e5', '#ff6d00'] },
   { id: 'lambo', name: 'Veloce Corrida V12', body: 'wedge', price: 0, bucks: 40, unlockLevel: 5, power: 86, grip: 70, weight: 34, skill: 'oil', likes: ['cinema', 'club', 'parkade'], colors: ['#fdd835', '#d50000', '#fafafa'] },
   { id: 'hyper', name: 'Veloce Hyperion', body: 'super', price: 60000, unlockLevel: 12, power: 98, grip: 86, weight: 32, skill: 'nitro', likes: ['stadium', 'tuner', 'parkade'], colors: ['#1a237e', '#212121', '#d50000'] },
   { id: 'bug', name: 'Bumble Bubble', body: 'bubble', price: 1200, unlockLevel: 1, rescueOnly: true, power: 14, grip: 28, weight: 28, skill: 'freeze', likes: ['icecream', 'donut', 'coffee'], colors: ['#80cbc4', '#ffcc80', '#ef9a9a'] },
@@ -253,6 +263,7 @@ export const CARS: CarDef[] = [
   { id: 'bandit', name: 'Night Bandit', body: 'muscle', price: 8000, unlockLevel: 1, rescueOnly: true, power: 56, grip: 38, weight: 54, skill: 'nitro', likes: ['club', 'burger', 'bodyshop'], colors: ['#212121', '#ffd54f', '#b71c1c'] },
   { id: 'lemans', name: 'Liberty Endurance GT', body: 'super', price: 16000, unlockLevel: 1, rescueOnly: true, power: 72, grip: 62, weight: 32, skill: 'smooth', likes: ['stadium', 'parts', 'police'], colors: ['#1565c0', '#fafafa', '#c62828'] },
   { id: 'gullwing', name: 'Silver Wing 300', body: 'coupe', price: 30000, unlockLevel: 1, rescueOnly: true, power: 64, grip: 58, weight: 36, skill: 'oil', likes: ['motel', 'bowling', 'parkade'], colors: ['#cfd8dc', '#b71c1c', '#263238'] },
+  { id: 'speedster', name: 'Fairhaven Speedster', body: 'roadster', price: 12000, unlockLevel: 1, rescueOnly: true, power: 58, grip: 46, weight: 26, skill: 'nitro', likes: ['cinema', 'diner', 'stadium'], colors: ['#1565c0', '#eceff1', '#b71c1c'] },
 ]
 
 // Rusty's Rescue: pay to search a location, tap the pins to send the tow
@@ -280,7 +291,7 @@ export const RESCUE_SPOTS: RescueSpot[] = [
   ] },
   { id: 'desert', name: 'Desert', icon: '🌵', unlockLevel: 7, cost: 7000, cars: [
     { model: 'buggy', rarity: 'common' }, { model: 'hauler', rarity: 'common' }, { model: 'bandit', rarity: 'scarce' },
-    { model: 'charger', rarity: 'scarce' }, { model: 'lemans', rarity: 'rare' }, { model: 'gtr', rarity: 'rare' },
+    { model: 'charger', rarity: 'scarce' }, { model: 'lemans', rarity: 'rare' }, { model: 'gtr', rarity: 'rare' }, { model: 'speedster', rarity: 'rare' },
   ] },
   { id: 'track', name: 'Old Race Track', icon: '🏁', unlockLevel: 10, cost: 15000, cars: [
     { model: 'rally', rarity: 'common' }, { model: 'vette', rarity: 'common' }, { model: 'charger', rarity: 'scarce' },
@@ -350,8 +361,8 @@ export const MOD_SLOTS: { id: ModSlot; name: string; icon: string; stat: string 
   { id: 'rims', name: 'Rims', icon: '🛞', stat: 'Lighter wheels' },
 ]
 
-// Bikes have nowhere to bolt a spoiler, body kit or hood.
-export const modSlotsFor = (body: Body) => (isBike(body) ? MOD_SLOTS.filter((m) => m.id === 'exhaust' || m.id === 'rims') : MOD_SLOTS)
+// Bikes and the open-wheel racer have nowhere to bolt a spoiler, body kit or hood.
+export const modSlotsFor = (body: Body) => (isBike(body) || body === 'formula' ? MOD_SLOTS.filter((m) => m.id === 'exhaust' || m.id === 'rims') : MOD_SLOTS)
 
 export type ModDef = {
   id: string
@@ -497,7 +508,10 @@ export const CAR_SETS: CarSet[] = [
   { id: 'classics', name: "Rusty's Classics", icon: '🔧', cars: ['bug', 'woodie', 'hauler', 'cruiser', 'buggy'], coins: 5000, bucks: 5, trophies: 15, xp: 150 },
   { id: 'muscle', name: 'Muscle Row', icon: '💪', cars: ['stallion', 'charger', 'hellcat', 'bandit'], coins: 8000, bucks: 5, trophies: 15, xp: 200 },
   { id: 'track', name: 'Track Legends', icon: '🏁', cars: ['rally', 'vette', 'gtr', 'lemans', 'gullwing'], coins: 15000, bucks: 8, trophies: 25, xp: 300 },
-  { id: 'dream', name: 'Dream Garage', icon: '💎', cars: ['lambo', 'hyper', 'tomahawk'], coins: 30000, bucks: 15, trophies: 40, xp: 500 },
+  { id: 'roadtrip', name: 'Road Trip', icon: '🏕', cars: ['camper', 'ridgeback', 'stomper'], coins: 6000, bucks: 4, trophies: 12, xp: 160 },
+  { id: 'tuners', name: 'Tuner Alley', icon: '🌀', cars: ['hotshot', 'kitsune', 'current'], coins: 7000, bucks: 4, trophies: 12, xp: 180 },
+  { id: 'grandtour', name: 'Grand Tour', icon: '🎩', cars: ['salon', 'speedster', 'monoposto'], coins: 20000, bucks: 10, trophies: 30, xp: 350 },
+  { id: 'dream', name: 'Dream Garage', icon: '💎', cars: ['lambo', 'hyper', 'tomahawk', 'zenith'], coins: 30000, bucks: 15, trophies: 40, xp: 500 },
 ]
 export const setOwned = (set: CarSet, cars: { model: string }[]) => set.cars.filter((m) => cars.some((c) => c.model === m)).length
 export const setComplete = (set: CarSet, cars: { model: string }[]) => setOwned(set, cars) === set.cars.length
