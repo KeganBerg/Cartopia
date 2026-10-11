@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { Box3, Vector3, type Group } from 'three'
+import type { Group } from 'three'
 import { useGame } from '../game/store'
 import {
   buildingDef, buildingLevel, upgradable, upgradePayout, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap,
@@ -9,6 +9,7 @@ import {
 import { workingDriver, type PlacedBuilding } from '../game/store'
 import { CarThumb } from '../scene/BuildingPreview'
 import { BuildingModel } from '../scene/BuildingModel'
+import { seat } from '../scene/fit'
 import { Panel } from './Menus'
 
 const n = (v: number) => v.toLocaleString()
@@ -24,22 +25,7 @@ function Spinner({ def, level }: { def: BuildingDef; level: number }) {
   const ref = useRef<Group>(null)
   const inner = useRef<Group>(null)
   useLayoutEffect(() => {
-    const g = inner.current
-    const spin = ref.current
-    if (!g || !spin) return
-    // Measure unrotated and unscaled, so the last level's fit doesn't leak in.
-    const turn = spin.rotation.y
-    spin.rotation.y = 0
-    g.scale.setScalar(1)
-    g.position.set(0, 0, 0)
-    spin.updateMatrixWorld(true)
-    const box = new Box3().setFromObject(g)
-    spin.rotation.y = turn
-    const size = box.getSize(new Vector3())
-    const center = box.getCenter(new Vector3())
-    const k = Math.min(FIT_H / size.y, FIT_W / Math.hypot(size.x, size.z))
-    g.scale.setScalar(k)
-    g.position.set(-center.x * k, -box.min.y * k, -center.z * k)
+    if (inner.current && ref.current) seat(inner.current, ref.current, (b) => Math.min(FIT_H / b.h, FIT_W / (b.r * 2)))
   }, [def, level])
   useFrame((_, dt) => {
     if (ref.current) ref.current.rotation.y += dt * 0.5
