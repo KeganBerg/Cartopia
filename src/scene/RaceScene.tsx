@@ -28,6 +28,8 @@ import type { Weather as WeatherState } from '../game/weather'
 
 export type RacerView = { dist: number }
 const SCALE = 0.25 // metres of race distance per world unit
+// How far past the finish line a car can roll while it brakes (the street runs on a little further).
+const RUN_OUT = 90
 const LANE = 0.75
 
 type Props = {
@@ -328,18 +330,33 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
     cam.updateProjectionMatrix()
   }, [camera, size])
 
-  useFrame(({ scene }) => {
+  // Past the line each car keeps rolling and brakes to a stop, instead of freezing on it.
+  const runs = useRef([{ z: 0, v: 0, last: 0 }, { z: 0, v: 0, last: 0 }])
+  useFrame(({ scene }, delta) => {
     scene.environmentIntensity = look.env
-    const mz = (me.current?.dist ?? 0) * SCALE
-    const tz = (them.current?.dist ?? 0) * SCALE
+    const dt = Math.min(delta, 0.1)
+    const [mz, tz] = [me.current?.dist ?? 0, them.current?.dist ?? 0].map((d, i) => {
+      const r = runs.current[i]
+      if (d < track) {
+        // Speed as the race draws it, so live rivals (who only send positions) roll on too.
+        if (dt > 0) r.v += ((d - r.last) / dt - r.v) * Math.min(1, dt * 8)
+        r.z = d
+      } else {
+        if (r.z < track) r.z = track
+        r.v = Math.max(0, r.v - (6 + r.v * 0.35) * dt)
+        r.z = Math.min(track + RUN_OUT, r.z + r.v * dt)
+      }
+      r.last = d
+      return r.z * SCALE
+    })
     meRef.current?.position.set(LANE, 0, mz)
     themRef.current?.position.set(-LANE, 0, tz)
     const lead = Math.max(mz, tz)
-    const target = Math.min(mz, len)
+    const target = Math.min(mz, len + RUN_OUT * SCALE)
     // Tall phone screens get a higher, further-back chase view.
     const tall = size.height > size.width
     camera.position.lerp({ x: tall ? 0 : LANE * 0.5, y: tall ? 2.7 : 2.2, z: target - (tall ? 5.2 : 4.2) } as never, 0.15)
-    camera.lookAt(tall ? 0 : LANE * 0.3, 0.3, Math.min(target + 3 + (lead - target) * 0.3, len + 4))
+    camera.lookAt(tall ? 0 : LANE * 0.3, 0.3, Math.min(target + 3 + (lead - target) * 0.3, len + RUN_OUT * SCALE + 4))
   })
 
   return (
