@@ -316,3 +316,38 @@ export const towerGlowTex = () =>
         g.fillRect(x * 16 + 3, y * 8 + 2, 10, 5)
       }
   })
+
+// Cast-iron manhole cover: a pale rim round a diamond-tread lid with two
+// lifting holes. Drawn to fill the square so a circleGeometry shows the lid.
+export const manholeTex = () =>
+  make('manhole', 64, (g, s) => {
+    const m = s / 2
+    g.fillStyle = '#6f777c'
+    g.fillRect(0, 0, s, s)
+    g.fillStyle = '#a7afb4'
+    g.beginPath(); g.arc(m, m, m, 0, Math.PI * 2); g.fill()
+    g.fillStyle = '#7f888d'
+    g.beginPath(); g.arc(m, m, m * 0.8, 0, Math.PI * 2); g.fill()
+    g.save()
+    g.beginPath(); g.arc(m, m, m * 0.8, 0, Math.PI * 2); g.clip()
+    g.strokeStyle = '#9ba4a9'
+    g.lineWidth = 2
+    for (let i = -s; i < s * 2; i += 8) {
+      g.beginPath(); g.moveTo(i, 0); g.lineTo(i + s, s); g.stroke()
+      g.beginPath(); g.moveTo(i, s); g.lineTo(i + s, 0); g.stroke()
+    }
+    g.restore()
+    g.fillStyle = '#4b5257'
+    for (const dx of [-0.42, 0.42]) {
+      g.beginPath(); g.ellipse(m + dx * m, m, 3, 2, 0, 0, Math.PI * 2); g.fill()
+    }
+  })
+
+// Gutter drain grate: a steel frame with slots running across it.
+export const drainTex = () =>
+  make('drain', 32, (g, s) => {
+    g.fillStyle = '#9aa2a7'
+    g.fillRect(0, 0, s, s)
+    g.fillStyle = '#3d4348'
+    for (let y = 4; y < s - 4; y += 6) g.fillRect(5, y, s - 10, 3)
+  })
