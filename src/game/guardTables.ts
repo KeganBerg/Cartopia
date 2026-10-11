@@ -1,6 +1,6 @@
 // Tables the server's save guard uses to check restores and Grand Prix wins
 // (supabase/migrations/0016_econ_restore_gp.sql, 0022_rescue_rolls.sql). guardTables.test.ts keeps them in step.
-import { GP_ROUNDS, GP_SERIES, RARITY, RESCUE_CAR_CHANCE, RESCUE_PINS, RESCUE_SPOTS, type Rarity } from './data'
+import { BARN_PER_DAY, BARN_RARITY, GP_ROUNDS, GP_SERIES, RARITY, RESCUE_CAR_CHANCE, RESCUE_PINS, RESCUE_SPOTS, VISITORS, VISIT_GAP_MIN, VISITS_PER_DAY, type Rarity } from './data'
 import { AI_BOOST_GEAR, MAX_RACE_PI, aiReaction, fireBoost, freshRacer, launchRacer, raceFloor, shiftRacer, stepRacer } from './race'
 
 // Pins in one search, and the chance each one hides a car.
@@ -68,4 +68,15 @@ export function gpBeatTable(): number[] {
     const k = floors.findIndex((f) => f < slowest)
     return k < 0 ? MAX_RACE_PI + 1 : k + 1
   })
+}
+
+// Surprise visitors as the server rolls them (visitor_next() in 0032_town_visitors.sql).
+export function visitorTable() {
+  return {
+    kinds: Object.fromEntries(Object.entries(VISITORS).map(([k, v]) => [k, { weight: v.weight, minutes: v.minutes, ...v.pay }])),
+    gap: VISIT_GAP_MIN,
+    perDay: VISITS_PER_DAY,
+    barn: BARN_RARITY,
+    barnPerDay: BARN_PER_DAY,
+  }
 }
