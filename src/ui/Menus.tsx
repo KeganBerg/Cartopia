@@ -22,6 +22,7 @@ import { useChat } from '../lib/chat'
 import { useRivalWaiting } from './Rivals'
 import { ShowcaseToggle } from './Meet'
 import { tutTarget, type TutTarget } from './Tutorial'
+import { setFreeCam, useFreeCam } from '../scene/freeCam'
 
 // Phones and tablets: no hover, so placing takes a preview tap first.
 const TOUCH = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
@@ -50,9 +51,35 @@ export function BottomBar() {
         <button className="icon-btn" onClick={() => setMode('road')}><span className="i i-edit"><Icon name="cone" /></span>EDIT</button>
         <button className={`big-btn race-btn${pulse('race')}`} onClick={() => openPanel('race')}><span className="i"><Icon name="flag" />{rival && <span className="btn-dot" title="Your rival is in town">!</span>}</span>RACE</button>
       </div>
+      <FreeCamButton />
       <GoalsButton />
       <CollectAllButton />
     </>
+  )
+}
+
+// The first couple of times, a one-line toast says how to steer.
+function toggleFreeCam(on: boolean) {
+  setFreeCam(on)
+  if (!on) return
+  try {
+    const seen = Number(localStorage.getItem('cartopia-freecam-tips')) || 0
+    if (seen >= 2) return
+    localStorage.setItem('cartopia-freecam-tips', String(seen + 1))
+  } catch {
+    // No storage: show it every time.
+  }
+  useGame.getState().toast(TOUCH ? 'Pinch to zoom · two fingers to turn and tilt' : 'WASD to fly · Space up, Shift down · Ctrl for speed')
+}
+
+// Switches the town between the bird's-eye view and the free camera.
+function FreeCamButton() {
+  const on = useFreeCam((f) => f.on)
+  const label = on ? "Back to bird's-eye view" : 'Free camera'
+  return (
+    <button className={`goals-btn cam-dock${on ? ' on' : ''}`} onClick={() => toggleFreeCam(!on)} title={label} aria-label={label} aria-pressed={on}>
+      <Icon name={on ? 'birdseye' : 'orbit'} />
+    </button>
   )
 }
 

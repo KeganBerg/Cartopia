@@ -4,6 +4,7 @@ import { BufferAttribute, BufferGeometry, Color, DoubleSide, InstancedBufferAttr
 import { SEASON } from './season'
 import { dayPhase, nightAmount } from './dayNight'
 import { weatherNow } from '../game/weather'
+import { isFree } from './freeCam'
 
 type Fx = { colors: readonly string[]; fall: number; sway: number; size: number; shape: 'leaf' | 'petal' | 'flake' }
 export const FX: Record<'fall' | 'winter' | 'spring', Fx> = {
@@ -130,12 +131,16 @@ function Leaves({ fx, count }: { fx: Fx; count: number }) {
     for (let i = 0; i < count; i++) m.setColorAt(i, c.set(fx.colors[i % fx.colors.length]).offsetHSL(0, 0, (fliers.seed[i] % 1) * 0.1 - 0.05))
     if (m.instanceColor) m.instanceColor.needsUpdate = true
   }, [count, fx, fliers])
-  useFrame(({ clock }, dt) => {
+  useFrame(({ clock, camera }, dt) => {
     const m = ref.current
     if (!m) return
     const t = clock.elapsedTime
     drift(fliers, fx, t, Math.min(dt, 0.1), true)
     const a = fade.array as Float32Array
+    // Sized to read from the bird's-eye view; up close in the free view they'd be
+    // the size of a car, so they shrink there and step aside from the lens.
+    const free = isFree(camera)
+    const k = free ? 0.4 : 1
     for (let i = 0; i < count; i++) {
       const s = fliers.seed[i]
       const landed = fliers.land[i]
@@ -149,7 +154,8 @@ function Leaves({ fx, count }: { fx: Fx; count: number }) {
         o.rotation.set(-Math.PI / 2, 0, s * 7)
         a[i] = 1 - Math.min(1, Math.max(0, (t - landed - REST_S) / FADE_S))
       }
-      o.scale.setScalar(fx.size * (0.75 + (s % 0.5)))
+      const near = free && camera.position.distanceToSquared(o.position) < 16
+      o.scale.setScalar(near ? 0 : fx.size * k * (0.75 + (s % 0.5)))
       o.updateMatrix()
       m.setMatrixAt(i, o.matrix)
     }
