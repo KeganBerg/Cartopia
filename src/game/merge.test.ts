@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
-import { mergeGroups, mergeCandidates, applyMerge, applySplit, groupTurn } from './merge'
+import { mergeGroups, mergeCandidates, applyMerge, applySplit, groupTurn, groupScale } from './merge'
 import { useGame, type PlacedBuilding } from './store'
 import { buildingDef, buildingUpgradeCost, upgradePayout } from './data'
 
@@ -19,14 +19,14 @@ describe('merging buildings', () => {
     const town = square('pizza', 2, 2, 2)
     const c = mergeCandidates(town)
     expect(c).toHaveLength(1)
-    expect(c[0]).toMatchObject({ size: 2, x: 2, z: 2, w: 2, h: 2 })
+    expect(c[0]).toMatchObject({ code: 2, x: 2, z: 2, w: 2, h: 2 })
   })
 
   it('needs the same building at the same level', () => {
     const town = square('pizza', 2, 2, 2)
     town[3] = { ...town[3], level: 2 }
-    expect(mergeCandidates(town)).toHaveLength(0)
-    expect(mergeCandidates([...square('pizza', 0, 0, 2).slice(0, 3), b('donut', 1, 1)])).toHaveLength(0)
+    expect(mergeCandidates(town).filter((c) => c.code === 2)).toHaveLength(0)
+    expect(mergeCandidates([...square('pizza', 0, 0, 2).slice(0, 3), b('donut', 1, 1)]).filter((c) => c.code === 2)).toHaveLength(0)
   })
 
   it('works for wide lots too', () => {
@@ -39,17 +39,17 @@ describe('merging buildings', () => {
     let town = square('house', 0, 0, 4)
     // Four overlapping-free 2x2 merges first.
     for (const [x, z] of [[0, 0], [2, 0], [0, 2], [2, 2]]) {
-      const c = mergeCandidates(town).find((o) => o.x === x && o.z === z && o.size === 2)!
+      const c = mergeCandidates(town).find((o) => o.x === x && o.z === z && o.code === 2)!
       town = applyMerge(town, c)
     }
     let m = mergeGroups(town)
     expect(m.groups.size).toBe(4)
-    const big = mergeCandidates(town, m).filter((c) => c.size === 4)
+    const big = mergeCandidates(town, m).filter((c) => c.code === 4)
     expect(big).toHaveLength(1)
     town = applyMerge(town, big[0])
     m = mergeGroups(town)
     expect(m.groups.size).toBe(1)
-    expect([...m.groups.values()][0]).toMatchObject({ size: 4, w: 4, h: 4 })
+    expect([...m.groups.values()][0]).toMatchObject({ code: 4, w: 4, h: 4 })
     expect(m.owner.size).toBe(16)
     // Every building is still in the save.
     expect(town).toHaveLength(16)
@@ -69,6 +69,34 @@ describe('merging buildings', () => {
     expect(mergeGroups(town).groups.size).toBe(0)
     // Unknown buildings never merge.
     expect(mergeCandidates(square('not-a-building', 0, 0, 2))).toHaveLength(0)
+  })
+
+  it('merges two side by side, and two pairs into a square', () => {
+    let town = [b('pizza', 0, 0), b('pizza', 1, 0), b('pizza', 5, 0), b('pizza', 5, 1)]
+    const c = mergeCandidates(town)
+    expect(c.map((o) => [o.code, o.w, o.h])).toEqual([[21, 2, 1], [12, 1, 2]])
+    town = applyMerge(town, c[0])
+    expect(mergeGroups(town).groups.size).toBe(1)
+    // A 2x2 offers only the square merge, not its pairs.
+    let sq = square('pizza', 0, 0, 2)
+    expect(mergeCandidates(sq).map((o) => o.code)).toEqual([2])
+    // Two pairs inside a square can still become the square.
+    sq = applyMerge(applyMerge(sq, { ...mergeCandidates([sq[0], sq[1]])[0] }), mergeCandidates([sq[2], sq[3]])[0])
+    expect(mergeGroups(sq).groups.size).toBe(2)
+    const up = mergeCandidates(sq).find((o) => o.code === 2)!
+    sq = applyMerge(sq, up)
+    const m = mergeGroups(sq)
+    expect([...m.groups.values()].map((g) => g.code)).toEqual([2])
+    expect(m.owner.size).toBe(4)
+  })
+
+  it('stretches a pair along its length', () => {
+    const [g] = mergeCandidates([b('pizza', 0, 0), b('pizza', 1, 0)])
+    expect(groupTurn(g, new Set())).toBe(0)
+    expect(groupScale(g, 0)).toEqual([2, 1.5, 1])
+    const [t] = mergeCandidates([b('pizza', 0, 0), b('pizza', 0, 1)])
+    expect(groupTurn(t, new Set(['1,1']))).toBe(1)
+    expect(groupScale(t, 1)).toEqual([2, 1.5, 1])
   })
 
   it('faces the merged building at a road along its edge', () => {

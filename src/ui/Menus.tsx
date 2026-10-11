@@ -53,7 +53,7 @@ function EditBar() {
   const canMerge = useGame((s) => (s.mode === 'merge' ? mergeCandidates(s.buildings).length > 0 || s.buildings.some((b) => b.merge) : true))
   const hint =
     mode === 'expand' ? 'Tap a For Sale sign to buy the land next to your town'
-    : mode === 'merge' ? (canMerge ? 'Tap 🧩 to merge 4 matching buildings into one big one' : 'Put 4 matching buildings (same level) in a square to merge them')
+    : mode === 'merge' ? (canMerge ? 'Tap 🧩 to merge matching buildings into one big one' : 'Put 2 or 4 matching buildings (same level) side by side to merge them')
     : mode === 'road' ? 'Click or drag to lay road (10 coins per tile)'
     : mode === 'bulldoze' ? 'Click or drag to remove (buildings refund half)'
     : mode === 'move' && again && selected ? 'Built! Rotate or drag it to adjust it'
