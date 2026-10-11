@@ -199,7 +199,8 @@ type Actions = {
   // Adds a mod skin to the garage (crates and other prizes). False when it was already unlocked.
   grantModSkin: (id: string) => boolean
   visit: (town: VisitedTown | null) => void
-  helpFriend: () => void
+  // Every business in this town has had today's help (the Friends list shows it).
+  markHelped: (ownerId: string) => void
   // Put a car on show at the Car Meet, or take it off.
   toggleShowcase: (uid: string) => void
   setTutorial: (step: number) => void
@@ -1383,15 +1384,10 @@ export const useGame = create<GameState>()(
         set({ showcase: togglePick(s.showcase ?? [], cuid), updatedAt: Date.now() })
       },
 
-      helpFriend: () => {
+      markHelped: (ownerId) => {
         const s = get()
-        const v = s.visiting
-        if (!v) return
-        if (s.helped[v.ownerId] === today()) return s.toast('You already helped this town today')
-        const coins = 100 + v.level * 20
-        sfx.coin()
-        s.toast(`You helped ${v.townName}! +${coins} coins, +10 XP`)
-        set(withXp(s, 10, { coins: s.coins + coins, helped: { ...s.helped, [v.ownerId]: today() }, updatedAt: Date.now() }))
+        if (s.helped[ownerId] === today()) return
+        set({ helped: { ...s.helped, [ownerId]: today() }, updatedAt: Date.now() })
       },
 
       setTutorial: (tutorial) => set({ tutorial, updatedAt: Date.now() }),
