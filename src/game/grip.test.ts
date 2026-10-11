@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { CLEAR, conditions, conditionsNote, gripMul, surfaceOf, type Conditions } from './grip'
-import { freshRacer, perfectRun, raceFloor, shiftQuality, stepRacer, type Racer } from './race'
+import { TOP_GEAR, freshRacer, perfectRun, raceFloor, shiftQuality, stepRacer, type Racer } from './race'
 import { WEATHER_KINDS } from './weather'
 import { VENUES } from '../scene/venues'
 import { MODS } from './data'
@@ -12,7 +12,7 @@ function run(pi: number, c: Conditions, at = 0.855) {
   let t = 0
   while (r.finished === null && t < 120) {
     t += dt
-    if (r.gear < 3 && r.rpm >= at) {
+    if (r.gear < TOP_GEAR && r.rpm >= at) {
       r.quality = shiftQuality(r.rpm, c.lo, c.hi).q
       r.gear++
       r.rpm = 0.35

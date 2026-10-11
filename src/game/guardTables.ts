@@ -1,7 +1,7 @@
 // Tables the server's save guard uses to check restores and Grand Prix wins
 // (supabase/migrations/0016_econ_restore_gp.sql, 0022_rescue_rolls.sql). guardTables.test.ts keeps them in step.
 import { BARN_PER_DAY, BARN_RARITY, GP_ROUNDS, GP_SERIES, RARITY, RESCUE_CAR_CHANCE, RESCUE_PINS, RESCUE_SPOTS, VISITORS, VISIT_GAP_MIN, VISITS_PER_DAY, type Rarity } from './data'
-import { AI_BOOST_GEAR, MAX_RACE_PI, aiReaction, fireBoost, freshRacer, launchRacer, raceFloor, shiftRacer, stepRacer } from './race'
+import { AI_BOOST_GEAR, MAX_RACE_PI, OIL_SECONDS, TOP_GEAR, aiReaction, fireBoost, freshRacer, launchRacer, raceFloor, shiftRacer, stepRacer } from './race'
 
 // Pins in one search, and the chance each one hides a car.
 export const rescueRoll = () => ({ pins: RESCUE_PINS, car: RESCUE_CAR_CHANCE })
@@ -38,7 +38,7 @@ export const GP_RIVAL_MAX = 400
 // can (aiReaction), shift perfectly (somewhere between 0.80 and 0.92 rpm) and fire their boost on
 // reaching AI_BOOST_GEAR, and the player's oil or freeze skill can slow them. Plus 3% for frame timing.
 export function gpRivalSlowest(pi: number) {
-  const drags: ((r: { gear: number }, t: number) => number)[] = [() => 1, (_, t) => (t < 2.5 ? 0.9 : 1), (r) => (r.gear === 1 ? 0.9 : 1)]
+  const drags: ((r: { gear: number }, t: number) => number)[] = [() => 1, (_, t) => (t < OIL_SECONDS ? 0.9 : 1), (r) => (r.gear === 1 ? 0.9 : 1)]
   let worst = 0
   for (const drag of drags) {
     for (let at = 0.8; at <= 0.92 + 1e-9; at += 0.01) {
@@ -49,7 +49,7 @@ export function gpRivalSlowest(pi: number) {
       while (r.finished === null && t < 120) {
         t += dt
         if (!r.launched && t >= reaction) launchRacer(r, reaction)
-        if (r.launched && r.gear < 3 && r.rpm >= at) shiftRacer(r, 1.08)
+        if (r.launched && r.gear < TOP_GEAR && r.rpm >= at) shiftRacer(r, 1.08)
         if (r.gear >= AI_BOOST_GEAR) fireBoost(r)
         stepRacer(r, pi, dt, t, drag(r, t))
       }

@@ -60,3 +60,76 @@ export const routeMove = (route: (f: number) => XZ, lap: number, spread = 0.02):
   return [x + Math.sin(i * 4.7) * spread, z + Math.cos(i * 3.1) * spread]
 }
 
+
+// A closed drive through `pts`, rounded into a smooth curve (centripetal Catmull-Rom)
+// so a car following it steers through bends instead of pivoting on the spot.
+// Sampled once into an arc-length table: `at(d)` is the point `d` along the
+// curve (wraps), its heading, and how sharply it bends there (radians per unit).
+export type Drive = { len: number; at: (d: number, out?: DrivePose) => DrivePose; bend: (d0: number, d1: number) => number }
+export type DrivePose = { x: number; z: number; yaw: number; curv: number }
+
+export function smoothLoop(pts: XZ[], per = 20): Drive {
+  const n = pts.length
+  const P = (i: number) => pts[((i % n) + n) % n]
+  const xs: number[] = [], zs: number[] = []
+  for (let i = 0; i < n; i++) {
+    const p0 = P(i - 1), p1 = P(i), p2 = P(i + 1), p3 = P(i + 2)
+    const t = (a: XZ, b: XZ) => Math.sqrt(Math.hypot(b[0] - a[0], b[1] - a[1])) || 1e-4
+    const t1 = t(p0, p1), t2 = t1 + t(p1, p2), t3 = t2 + t(p2, p3)
+    for (let s = 0; s < per; s++) {
+      const u = t1 + ((t2 - t1) * s) / per
+      const lerp = (a: XZ, b: XZ, ta: number, tb: number): XZ => {
+        const k = (u - ta) / (tb - ta)
+        return [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k]
+      }
+      const a1 = lerp(p0, p1, 0, t1), a2 = lerp(p1, p2, t1, t2), a3 = lerp(p2, p3, t2, t3)
+      const b1 = lerp(a1, a2, 0, t2), b2 = lerp(a2, a3, t1, t3)
+      const c = lerp(b1, b2, t1, t2)
+      xs.push(c[0])
+      zs.push(c[1])
+    }
+  }
+  const m = xs.length
+  const cum = [0], yaw: number[] = [], curv: number[] = []
+  for (let i = 0; i < m; i++) {
+    const j = (i + 1) % m
+    cum.push(cum[i] + Math.hypot(xs[j] - xs[i], zs[j] - zs[i]))
+    yaw.push(Math.atan2(xs[j] - xs[i], zs[j] - zs[i]))
+  }
+  const len = cum[m]
+  const index = (d: number) => {
+    d = ((d % len) + len) % len
+    let lo = 0, hi = m - 1
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1
+      if (cum[mid] <= d) lo = mid
+      else hi = mid - 1
+    }
+    return { i: lo, k: (d - cum[lo]) / Math.max(1e-4, cum[lo + 1] - cum[lo]) }
+  }
+  // Bend measured as the turn in heading across a short stretch, so uneven
+  // sample spacing doesn't spike it.
+  const W = 0.12
+  for (let i = 0; i < m; i++) {
+    const a = yaw[index(cum[i] - W / 2).i], b = yaw[index(cum[i] + W / 2).i]
+    curv.push(Math.atan2(Math.sin(b - a), Math.cos(b - a)) / W)
+  }
+  const at = (d: number, out: DrivePose = { x: 0, z: 0, yaw: 0, curv: 0 }) => {
+    const { i, k } = index(d)
+    const j = (i + 1) % m
+    out.x = xs[i] + (xs[j] - xs[i]) * k
+    out.z = zs[i] + (zs[j] - zs[i]) * k
+    // Heading eased between samples so it turns continuously.
+    const dy = Math.atan2(Math.sin(yaw[j] - yaw[i]), Math.cos(yaw[j] - yaw[i]))
+    out.yaw = yaw[i] + dy * k
+    out.curv = curv[i] + (curv[j] - curv[i]) * k
+    return out
+  }
+  // Sharpest bend between d0 and d1: how hard the car will have to steer soon.
+  const bend = (d0: number, d1: number) => {
+    let most = 0
+    for (let d = d0; d <= d1; d += 0.05) most = Math.max(most, Math.abs(curv[index(d).i]))
+    return most
+  }
+  return { len, at, bend }
+}

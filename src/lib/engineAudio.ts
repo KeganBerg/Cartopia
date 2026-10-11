@@ -726,9 +726,15 @@ export class RaceAudio {
   countdown(go: boolean) {
     if (!this.ensure()) return
     if (!go) {
-      this.me!.rev(0.45 + Math.random() * 0.25)
+      // Your own engine revs with the pedal (see rev()).
       setTimeout(() => this.them?.rev(0.4 + Math.random() * 0.3), 120 + Math.random() * 200)
     }
+  }
+
+  // Your engine on the line, revving with the pedal.
+  rev(rpm: number) {
+    if (!this.ensure()) return
+    this.me!.drive(rpm, 0, rpm > 0.3 ? 1 : 0.2)
   }
 
   launch(myPower: number, theirPower: number) {
