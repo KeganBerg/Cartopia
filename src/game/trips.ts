@@ -7,3 +7,10 @@ export const tripRequests = new Map<string, TripKind>()
 export function requestTrip(uid: string, kind: TripKind) {
   tripRequests.set(uid, kind)
 }
+
+// A driver heading to the business it works for (car uid -> building uid).
+export const visitRequests = new Map<string, string>()
+
+export function requestVisit(uid: string, building: string) {
+  visitRequests.set(uid, building)
+}

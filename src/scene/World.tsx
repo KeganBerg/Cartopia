@@ -35,7 +35,7 @@ const ALL = (PLOT_MAX - PLOT_MIN + 1) * PLOT * TILE
 export const plotCenter = (px: number, pz: number) => toWorld(px * PLOT + (PLOT - 1) / 2, pz * PLOT + (PLOT - 1) / 2)
 
 function Land() {
-  const land = useGame((s) => (s.visiting ? START_LAND : s.land))
+  const land = useGame((s) => (s.visiting ? (s.visiting.land ?? START_LAND) : s.land))
   const mode = useGame((s) => s.mode)
   const forSale = useMemo(() => (mode === 'expand' ? buyablePlots(land) : []), [land, mode])
   return (
@@ -605,7 +605,7 @@ export function World() {
   const buildings = useGame((s) => (s.visiting ?? s).buildings)
   const roadsList = useGame((s) => (s.visiting ?? s).roads)
   const roads = useMemo(() => new Set(roadsList), [roadsList])
-  const land = useGame((s) => (s.visiting ? START_LAND : s.land))
+  const land = useGame((s) => (s.visiting ? (s.visiting.land ?? START_LAND) : s.land))
   const mode = useGame((s) => s.mode)
   // Rebuild the merged town only when something's footprint changes, not on every job timer.
   const layout = useMemo(
