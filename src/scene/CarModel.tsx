@@ -44,7 +44,7 @@ type Shape = {
   frontbar?: boolean // one light strip across the nose instead of a grille
   ornament?: boolean // tall chrome grille with a hood ornament
   bus?: boolean // window posts down the sides, rub rails, stop arm and roof warning lamps
-  plates?: boolean // angular armour plates over each wheel, a wedge nose and a rear spotlight mast, no windshield
+  plates?: boolean // armoured scout: wheels clear of the hull under faceted fenders, a raked prow, a roll hoop and a rear turret, no windshield
   dog?: boolean // shaggy fur tufts, floppy ears, eyes, nose, tongue and a tail
   track?: number // wheel distance from the centre line, when the wheels stand clear of the body
   drop: number // how far the hood sits below the rear deck
@@ -74,7 +74,7 @@ const SHAPES: Record<Body, Shape> = {
   ev: { len: 1.26, wid: 0.72, body: 0.21, lift: 0.08, cabinLen: 0.74, cabinH: 0.22, cabinZ: -0.08, taper: 0.6, hood: 0, wheel: 0.16, drop: 0.03, nose: 0.07, lightbar: true, frontbar: true },
   luxury: { len: 1.5, wid: 0.74, body: 0.28, lift: 0.1, cabinLen: 0.62, cabinH: 0.25, cabinZ: -0.18, taper: 0.84, hood: 0, wheel: 0.17, drop: 0.02, nose: 0.02, ornament: true },
   bus: { len: 1.8, wid: 0.8, body: 0.34, lift: 0.14, cabinLen: 1.46, cabinH: 0.32, cabinZ: -0.13, taper: 0.99, hood: 0, wheel: 0.18, drop: 0.1, nose: 0.06, bus: true },
-  tusker: { len: 1.36, wid: 0.84, body: 0.18, lift: 0.22, cabinLen: 0.44, cabinH: 0.2, cabinZ: -0.02, taper: 1, hood: 0, wheel: 0.22, drop: 0.02, nose: 0.1, open: true, plates: true },
+  tusker: { len: 1.42, wid: 0.6, body: 0.2, lift: 0.2, cabinLen: 0.44, cabinH: 0.2, cabinZ: -0.02, taper: 1, hood: 0, wheel: 0.22, drop: 0.02, nose: 0.1, open: true, plates: true, track: 0.42 },
   dogvan: { len: 1.3, wid: 0.74, body: 0.28, lift: 0.12, cabinLen: 1.0, cabinH: 0.33, cabinZ: -0.1, taper: 0.97, hood: 0, wheel: 0.15, drop: 0.02, nose: 0.03, dog: true },
   // Open-wheel racer: drawn by formulaGeo; wid is the full width over the wheels.
   formula: { len: 1.4, wid: 0.84, body: 0.12, lift: 0.05, cabinLen: 0.3, cabinH: 0.1, cabinZ: -0.1, taper: 1, hood: 0, wheel: 0.15, drop: 0, nose: 0.06, track: 0.33 },
@@ -200,7 +200,9 @@ const SLEEK: Body[] = ['super', 'wedge', 'bubble', 'ev']
 const ROUND_LAMPS: Body[] = ['bubble', 'classic', 'offroad', 'compact', 'truck', 'van', 'suv', 'bus', 'dogvan', 'tusker']
 const BIG_GRILLE: Body[] = ['muscle', 'truck', 'classic', 'wagon', 'luxury', 'bus']
 const LOW: Body[] = ['sports', 'super', 'wedge', 'coupe', 'hatch']
-const RUGGED: Body[] = ['truck', 'offroad', 'rally', 'suv', 'tusker']
+const RUGGED: Body[] = ['truck', 'offroad', 'rally', 'suv']
+const VINTAGE: Body[] = ['classic', 'wagon', 'bubble', 'luxury', 'van', 'dogvan', 'bus']
+const FOUR_DOOR: Body[] = ['sedan', 'wagon', 'suv', 'luxury', 'ev', 'van', 'dogvan']
 
 // Where bolt-on mods attach, fitted to each body's size and shape: wheel spots, the sides and
 // ends of the body, where a spoiler mounts (the trunk, or the roof when the cabin runs to the
@@ -236,7 +238,7 @@ export function carFrame(body: Body): ModFrame {
   const roofMount = !s.open && s.cabinZ - s.cabinLen / 2 < -s.len / 2 + 0.16
   const c = cabinProfile(s, p.deck - 0.01, 0.025)
   return {
-    body, len: s.len, wid: s.wid, lift: s.lift, wheel: s.wheel, wz: s.len * 0.33, wx: s.wid / 2 - 0.02,
+    body, len: s.len, wid: s.wid, lift: s.lift, wheel: s.wheel, wz: s.len * 0.33, wx: s.track ?? s.wid / 2 - 0.02,
     bodyW: s.wid, side: s.tracks ? s.wid / 2 + 0.08 : s.wid / 2, front: s.len / 2, rear: -s.len / 2, pipeY: s.lift + 0.06,
     deck: roofMount ? c.roof : p.deck, deckZ: roofMount ? c.roofR + 0.05 : -s.len / 2 + 0.08, deckW: roofMount ? s.wid * 0.84 : s.wid,
     hoodTop: p.hood + s.hood, hoodZ: (cowl + s.len / 2 - s.len * 0.1) / 2, hs: Math.min(1.15, s.wid / 0.7),
@@ -437,6 +439,11 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
       k.add('seat', rbox(s.wid * 0.14, 0.07, 0.05, 0.02), [sd * s.wid * 0.2, base[1] + 0.27, base[2] - 0.1])
     }
     k.add('black', rbox(s.wid * 0.78, 0.06, 0.08, 0.02), [0, top + 0.03, s.cabinZ + s.cabinLen * 0.38])
+    // Two round gauges and a row of switches on the dash.
+    for (const gx of [-0.06, 0.06]) {
+      k.add('chrome', new TorusGeometry(0.022, 0.004, 3, 12), [-s.wid * 0.2 + gx * 0.5, top + 0.064, s.cabinZ + s.cabinLen * 0.38 - 0.03], [-0.6, 0, 0])
+      k.add('lamp', disc(0.018, 10), [-s.wid * 0.2 + gx * 0.5, top + 0.064, s.cabinZ + s.cabinLen * 0.38 - 0.031], [-0.6 + Math.PI, 0, Math.PI])
+    }
     k.add('black', new TorusGeometry(0.055, 0.012, 5, 14), [-s.wid * 0.2, top + 0.11, s.cabinZ + s.cabinLen * 0.28], [-0.9, 0, 0])
     if (s.rollbar) {
       k.add('chrome', new TorusGeometry(s.wid * 0.3, 0.025, 6, 16, Math.PI), [0, top + 0.1, s.cabinZ - 0.18])
@@ -464,9 +471,14 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
     const ph = roofY - top
     for (const sd of [-1, 1]) {
       // Door pillar between the side windows, and black window trim along the belt line.
-      k.add('paint', box(0.012, ph, 0.035), [sd * s.wid * 0.405, (top + roofY) / 2, roofZ - roofLen * 0.05])
+      k.add(VINTAGE.includes(body) ? 'paint' : 'black', box(0.012, ph, 0.035), [sd * s.wid * 0.405, (top + roofY) / 2, roofZ - roofLen * 0.05])
       k.add('black', box(0.012, 0.02, s.cabinLen * 0.86), [sd * s.wid * 0.402, top + 0.008, s.cabinZ])
+      // Drip rail along the edge of the roof.
+      k.add(VINTAGE.includes(body) ? 'chrome' : 'black', box(0.008, 0.008, roofLen * 0.96), [sd * s.wid * 0.416, roofY - 0.006, roofZ])
     }
+    // Cowl panel with vent slots across the base of the windshield.
+    k.add('black', box(s.wid * 0.74, 0.008, 0.04), [0, top + 0.003, c.front + 0.012])
+    for (let i = -4; i <= 4; i++) k.add('dark', box(0.012, 0.009, 0.026), [i * s.wid * 0.07, top + 0.004, c.front + 0.012])
     // Wipers resting at the base of the windshield.
     for (const x of [-0.12, 0.08]) k.add('black', box(0.16, 0.008, 0.012), [x * s.wid * 1.6, top + 0.01, c.front - 0.03], [0, 0.25, 0])
     // Third brake light on the rear edge of the roof.
@@ -554,17 +566,80 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
   }
   if (s.bus) for (const y of [0.35, 0.75]) for (const sd of [-1, 1]) k.add('black', box(0.012, 0.02, s.len * 0.9), [sd * (s.wid / 2 + 0.004), s.lift + s.body * y, 0])
   if (s.plates) {
-    // Angular plates over each wheel, a wedge nose, and a spotlight on a mast at the back.
+    // Armoured scout: wheels standing clear of a narrow hull on exposed arms, a faceted
+    // fender over each wheel, a raked armoured prow, a roll hoop behind the seats and a
+    // three-barrel turret on a post at the back.
+    const tx = s.track!
+    const r = s.wheel
+    const fy = r * 2 + 0.05
     for (const zz of [wz, -wz]) for (const sd of [-1, 1]) {
-      k.add('paint', rbox(0.2, 0.035, s.wheel * 2.4, 0.012), [sd * (s.wid / 2 - 0.03), s.wheel * 2 + 0.03, zz], [zz > 0 ? 0.18 : -0.1, 0, sd * -0.15])
-      k.add('paint', box(0.025, 0.09, s.wheel * 1.6), [sd * (s.wid / 2 + 0.06), s.wheel * 1.75, zz])
+      const fx = sd * tx
+      const fwd = zz > 0
+      // Fender: a flat top over the tyre with sloped ends, the long slope facing out from the car's middle.
+      const [lf, lr] = fwd ? [0.26, 0.12] : [0.12, 0.2]
+      k.add('paint', rbox(0.24, 0.03, r * 1.1, 0.01), [fx, fy, zz])
+      k.add('paint', rbox(0.24, 0.03, lf, 0.01), [fx, fy - Math.sin(0.55) * lf / 2, zz + r * 0.55 + (Math.cos(0.55) * lf) / 2 - 0.01], [0.55, 0, 0])
+      k.add('paint', rbox(0.24, 0.03, lr, 0.01), [fx, fy - Math.sin(0.55) * lr / 2, zz - r * 0.55 - (Math.cos(0.55) * lr) / 2 + 0.01], [-0.55, 0, 0])
+      // Outer skirt leaning in at the top, and the inner wall back to the hull.
+      k.add('paint', rbox(0.025, 0.1, r * 1.5, 0.008), [fx + sd * 0.115, fy - 0.06, zz], [0, 0, sd * 0.3])
+      k.add('dark', box(0.02, fy - top + 0.02, r * 1.6), [sd * (s.wid / 2 + 0.01), (fy + top) / 2 - 0.01, zz])
+      // Rivets along the fender top.
+      for (const u of [-0.35, 0, 0.35]) k.add('chrome', disc(0.009, 6), [fx + sd * 0.08, fy + 0.016, zz + u * r], [-Math.PI / 2, 0, 0])
+      // Suspension: two arms out to the hub and a coil-over shock.
+      for (const dy of [-0.04, 0.04]) bar(k, 'black', [sd * (s.wid / 2 - 0.01), r + dy, zz], [sd * (tx - 0.09), r + dy * 0.6, zz], 0.022)
+      bar(k, 'chrome', [sd * (tx - 0.09), r + 0.03, zz - 0.02], [sd * (s.wid / 2 - 0.02), top + 0.02, zz - 0.05], 0.022)
+      if (fwd) {
+        // Twin headlights set into the front slope of each front fender.
+        for (const lx of [-0.05, 0.05]) {
+          const p: V3 = [fx + lx, fy - Math.sin(0.55) * lf * 0.55 + 0.018, zz + r * 0.55 + Math.cos(0.55) * lf * 0.55]
+          k.add('black', cyl(0.032, 0.032, 0.04, 12), p, [Math.PI / 2, 0, 0])
+          k.add('lamp', disc(0.026, 12), [p[0], p[1], p[2] + 0.021])
+          k.add('chrome', new TorusGeometry(0.029, 0.004, 3, 12), [p[0], p[1], p[2] + 0.021])
+        }
+      } else {
+        k.add('tail', plane(0.07, 0.022), [fx, fy - Math.sin(0.55) * lr * 0.5 + 0.017, zz - r * 0.55 - Math.cos(0.55) * lr * 0.5 - 0.004], [0.55, Math.PI, 0])
+      }
     }
-    k.add('paint', box(s.wid * 0.55, 0.05, 0.32), [0, top + 0.01, front - 0.14], [0.35, 0, 0])
-    k.add('black', box(s.wid * 0.5, 0.03, 0.05), [0, s.lift + 0.05, front + 0.01])
+    // Prow: a raked armour face with a slotted grille, a sloped hood with a ridge, and a heavy bumper with a winch.
+    k.add('paint', rbox(s.wid * 0.9, 0.2, 0.07, 0.015), [0, s.lift + 0.13, front - 0.01], [-0.32, 0, 0])
+    k.add('dark', plane(s.wid * 0.6, 0.12), [0, s.lift + 0.14, front + 0.032], [-0.32, 0, 0])
+    for (let i = -3; i <= 3; i++) k.add('black', plane(0.02, 0.1), [i * 0.045, s.lift + 0.14, front + 0.034], [-0.32, 0, 0])
+    k.add('paint', rbox(s.wid * 0.94, 0.04, 0.42, 0.012), [0, top + 0.03, front - 0.25], [0.2, 0, 0])
+    k.add('paint', rbox(0.09, 0.035, 0.36, 0.012), [0, top + 0.06, front - 0.27], [0.2, 0, 0])
+    for (const sd of [-1, 1]) k.add('black', box(0.08, 0.006, 0.12), [sd * 0.13, top + 0.05, front - 0.22], [0.2, 0, 0])
+    k.add('black', rbox(s.wid * 1.1, 0.06, 0.07, 0.02), [0, s.lift + 0.02, front + 0.05])
+    k.add('black', cyl(0.035, 0.035, 0.16, 10), [0, s.lift + 0.06, front + 0.07], [0, 0, Math.PI / 2])
+    k.add('chrome', cyl(0.037, 0.037, 0.05, 10), [0, s.lift + 0.06, front + 0.07], [0, 0, Math.PI / 2])
+    for (const sd of [-1, 1]) {
+      k.add('chrome', new TorusGeometry(0.022, 0.008, 5, 10), [sd * s.wid * 0.42, s.lift + 0.0, front + 0.085], [0, Math.PI / 2, 0])
+      k.add('amber', plane(0.04, 0.02), [sd * s.wid * 0.5, s.lift + 0.03, front + 0.086])
+    }
+    // Faceted hull: sloped armour along each side between the wheels, and a dark V under it.
+    for (const sd of [-1, 1]) {
+      k.add('paint', rbox(0.1, 0.025, wz * 2 - r * 2.2, 0.008), [sd * (s.wid / 2 - 0.02), top - 0.02, 0], [0, 0, sd * -0.6])
+      k.add('dark', rbox(0.025, 0.08, wz * 2 - r * 2.4, 0.008), [sd * (s.wid / 2 - 0.05), s.lift + 0.02, 0], [0, 0, sd * 0.5])
+    }
+    // Roll hoop behind the seats, braced back to the rear deck.
+    const hz = s.cabinZ - 0.17
+    k.add('black', new TorusGeometry(s.wid * 0.36, 0.02, 6, 16, Math.PI), [0, top, hz])
+    for (const sd of [-1, 1]) bar(k, 'black', [sd * s.wid * 0.3, top + s.wid * 0.2, hz], [sd * s.wid * 0.36, top + 0.01, hz - 0.22], 0.02)
     if (!fit.spoiler) {
-      k.add('black', cyl(0.025, 0.03, 0.32, 8), [0, top + 0.16, -s.len / 2 + 0.2])
-      k.add('black', cyl(0.05, 0.05, 0.08, 10), [0, top + 0.34, -s.len / 2 + 0.2], [Math.PI / 2, 0, 0])
-      k.add('lamp', disc(0.042, 12), [0, top + 0.34, -s.len / 2 + 0.241])
+      // Turret: a post with a ring, the gun body with a three-barrel spinner, a shield and grips.
+      const tz = -front + 0.3
+      const gy = top + 0.34
+      k.add('black', cyl(0.045, 0.07, gy - top - 0.04, 10), [0, top + (gy - top - 0.04) / 2, tz])
+      k.add('dark', cyl(0.1, 0.1, 0.03, 16), [0, gy - 0.07, tz])
+      k.add('dark', rbox(0.13, 0.1, 0.22, 0.03), [0, gy, tz + 0.02])
+      k.add('black', cyl(0.05, 0.05, 0.07, 12), [0, gy, tz + 0.16], [Math.PI / 2, 0, 0])
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI * 2 + Math.PI / 2
+        k.add('black', cyl(0.012, 0.012, 0.34, 8), [Math.cos(a) * 0.024, gy + Math.sin(a) * 0.024, tz + 0.36], [Math.PI / 2, 0, 0])
+      }
+      for (const z of [0.3, 0.52]) k.add('chrome', new TorusGeometry(0.038, 0.007, 4, 12), [0, gy, tz + z])
+      k.add('paint', rbox(0.3, 0.15, 0.018, 0.006), [0, gy + 0.05, tz + 0.13], [-0.15, 0, 0])
+      k.add('black', plane(0.08, 0.012), [0, gy + 0.08, tz + 0.142], [-0.15, 0, 0])
+      for (const sd of [-1, 1]) bar(k, 'black', [sd * 0.05, gy - 0.02, tz - 0.09], [sd * 0.07, gy + 0.02, tz - 0.16], 0.016)
+      k.add('dark', rbox(0.07, 0.08, 0.12, 0.01), [0.1, gy - 0.02, tz + 0.02])
     }
   }
   if (s.dog) {
@@ -640,68 +715,71 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
     if (roofLen > 0) k.add('stripe', box(0.07, 0.006, roofLen * 0.95), [x, roofY + 0.003, roofZ])
   }
 
-  // Bumpers, with a black lower lip and a lower air intake on the front.
-  k.add('chrome', rbox(s.wid * 0.96, bumperH, 0.06, 0.024), [0, bumperY, front - 0.005])
   k.add('chrome', rbox(s.wid * 0.96, 0.07, 0.06, 0.028), [0, s.lift + 0.07, -front + 0.005])
-  if (!fit.kit) k.add('black', box(s.wid * 0.8, 0.02, 0.05), [0, s.lift + 0.03, front - 0.02])
-  // Front: headlights in dark housings either side of a grille (or a low intake on sleek cars), turn signals and a plate.
+  // The armoured scout has its own nose (see the plates section above).
   const roundLamps = ROUND_LAMPS.includes(body)
   const bigGrille = BIG_GRILLE.includes(body)
   const sleek = SLEEK.includes(body)
-  for (const sd of [-1, 1]) {
-    const x = sd * s.wid * 0.3
-    if (s.quad) {
-      // Two round lamps each side in a black bezel; the inner left one is an air intake.
-      onNose('black', rbox(0.17, 0.07, 0.01, 0.01), x, lightY, 0.002)
-      for (const lx of [0.37, 0.23]) {
-        const intake = sd < 0 && lx === 0.23
-        onNose(intake ? 'black' : 'lamp', disc(0.028, 14), sd * s.wid * lx, lightY, 0.008)
-        onNose(intake ? 'chrome' : 'chrome', new TorusGeometry(0.031, 0.005, 4, 16), sd * s.wid * lx, lightY, 0.009)
-        if (!intake) onNose('chrome', disc(0.009, 8), sd * s.wid * lx, lightY, 0.01)
-      }
-    } else if (roundLamps) {
-      // Sealed-beam lamp: black bucket, chrome ring, lens and a bulb shield in the middle.
-      onNose('black', disc(0.058, 18), x, lightY, 0.002)
-      onNose('lamp', disc(0.046, 18), x, lightY, 0.004)
-      onNose('chrome', new TorusGeometry(0.049, 0.006, 4, 20), x, lightY, 0.006)
-      onNose('chrome', disc(0.014, 10), x, lightY, 0.007)
-      for (const a of [-0.5, 0.5]) onNose('chrome', plane(0.002, 0.07), x, lightY, 0.0055, a)
-    } else if (sleek) {
-      // Slim slanted LED strip with a row of projector dots under it.
-      onNose('black', plane(0.17, 0.042), x, lightY, 0.002, sd * 0.16)
-      onNose('lamp', plane(0.16, 0.009), x, lightY + 0.013, 0.004, sd * 0.16)
-      for (const i of [0, 1, 2]) onNose('lamp', disc(0.009, 8), x - sd * (0.045 - i * 0.04), lightY - 0.006 + sd * (0.045 - i * 0.04) * 0.16, 0.004)
-    } else {
-      // Housing with a chrome reflector, twin projector lenses and a light strip along the top.
-      onNose('black', plane(0.16, 0.055), x, lightY, 0.002, sd * 0.12)
-      onNose('glass', plane(0.144, 0.042), x, lightY, 0.003, sd * 0.12)
-      for (const lx of [-0.035, 0.035]) {
-        const px = x + lx * sd
-        onNose('black', disc(0.019, 12), px, lightY - 0.004 + lx * sd * 0.12, 0.004)
-        onNose('lamp', disc(0.014, 12), px, lightY - 0.004 + lx * sd * 0.12, 0.005)
-      }
-      onNose('lamp', plane(0.13, 0.008), x, lightY + 0.017, 0.005, sd * 0.12)
-    }
-    // Amber turn signal at the outer corner, and a side marker behind it.
-    onNose('amber', plane(0.045, 0.022), sd * s.wid * 0.43, lightY - 0.04, 0.004)
-    k.add('amber', plane(0.04, 0.018), [sd * (s.wid / 2 + 0.004), lightY - 0.02, front - 0.09], [0, (sd * Math.PI) / 2, 0])
-    // Fog lamps low on the bumper of off-roaders and rally cars.
-    if (RUGGED.includes(body)) k.add('lamp', disc(0.025, 10), [sd * s.wid * 0.3, s.lift + 0.07, front + 0.026])
-  }
-  if (!sleek) {
-    // Grille: a surround with a mesh of slats and bars behind it.
-    const gw = s.wid * (bigGrille ? 0.42 : 0.3)
-    const gh = bigGrille ? 0.075 : 0.05
-    const gy = Math.max(bumperY + bumperH / 2 + gh / 2 - 0.005, lightY - 0.005)
-    onNose('dark', plane(gw * 0.94, gh * 0.86), 0, gy, 0.003)
-    const rim = bigGrille ? 'chrome' : 'black'
+  if (!s.plates) {
+    // Bumpers, with a black lower lip and a lower air intake on the front.
+    k.add('chrome', rbox(s.wid * 0.96, bumperH, 0.06, 0.024), [0, bumperY, front - 0.005])
+    if (!fit.kit) k.add('black', box(s.wid * 0.8, 0.02, 0.05), [0, s.lift + 0.03, front - 0.02])
+    // Front: headlights in dark housings either side of a grille (or a low intake on sleek cars), turn signals and a plate.
     for (const sd of [-1, 1]) {
-      onNose(rim, box(gw, 0.008, 0.008), 0, gy + (sd * gh) / 2, 0.004)
-      onNose(rim, box(0.008, gh, 0.008), (sd * gw) / 2, gy, 0.004)
+      const x = sd * s.wid * 0.3
+      if (s.quad) {
+        // Two round lamps each side in a black bezel; the inner left one is an air intake.
+        onNose('black', rbox(0.17, 0.07, 0.01, 0.01), x, lightY, 0.002)
+        for (const lx of [0.37, 0.23]) {
+          const intake = sd < 0 && lx === 0.23
+          onNose(intake ? 'black' : 'lamp', disc(0.028, 14), sd * s.wid * lx, lightY, 0.008)
+          onNose(intake ? 'chrome' : 'chrome', new TorusGeometry(0.031, 0.005, 4, 16), sd * s.wid * lx, lightY, 0.009)
+          if (!intake) onNose('chrome', disc(0.009, 8), sd * s.wid * lx, lightY, 0.01)
+        }
+      } else if (roundLamps) {
+        // Sealed-beam lamp: black bucket, chrome ring, lens and a bulb shield in the middle.
+        onNose('black', disc(0.058, 18), x, lightY, 0.002)
+        onNose('lamp', disc(0.046, 18), x, lightY, 0.004)
+        onNose('chrome', new TorusGeometry(0.049, 0.006, 4, 20), x, lightY, 0.006)
+        onNose('chrome', disc(0.014, 10), x, lightY, 0.007)
+        for (const a of [-0.5, 0.5]) onNose('chrome', plane(0.002, 0.07), x, lightY, 0.0055, a)
+      } else if (sleek) {
+        // Slim slanted LED strip with a row of projector dots under it.
+        onNose('black', plane(0.17, 0.042), x, lightY, 0.002, sd * 0.16)
+        onNose('lamp', plane(0.16, 0.009), x, lightY + 0.013, 0.004, sd * 0.16)
+        for (const i of [0, 1, 2]) onNose('lamp', disc(0.009, 8), x - sd * (0.045 - i * 0.04), lightY - 0.006 + sd * (0.045 - i * 0.04) * 0.16, 0.004)
+      } else {
+        // Housing with a chrome reflector, twin projector lenses and a light strip along the top.
+        onNose('black', plane(0.16, 0.055), x, lightY, 0.002, sd * 0.12)
+        onNose('glass', plane(0.144, 0.042), x, lightY, 0.003, sd * 0.12)
+        for (const lx of [-0.035, 0.035]) {
+          const px = x + lx * sd
+          onNose('black', disc(0.019, 12), px, lightY - 0.004 + lx * sd * 0.12, 0.004)
+          onNose('lamp', disc(0.014, 12), px, lightY - 0.004 + lx * sd * 0.12, 0.005)
+        }
+        onNose('lamp', plane(0.13, 0.008), x, lightY + 0.017, 0.005, sd * 0.12)
+      }
+      // Amber turn signal at the outer corner, and a side marker behind it.
+      onNose('amber', plane(0.045, 0.022), sd * s.wid * 0.43, lightY - 0.04, 0.004)
+      k.add('amber', plane(0.04, 0.018), [sd * (s.wid / 2 + 0.004), lightY - 0.02, front - 0.09], [0, (sd * Math.PI) / 2, 0])
+      // Fog lamps low on the bumper of off-roaders and rally cars.
+      if (RUGGED.includes(body)) k.add('lamp', disc(0.025, 10), [sd * s.wid * 0.3, s.lift + 0.07, front + 0.026])
     }
-    const n = bigGrille ? 4 : 3
-    for (let i = 0; i < n; i++) onNose(bigGrille ? 'chrome' : 'black', box(gw * 0.9, 0.005, 0.006), 0, gy - gh / 2 + (gh * (i + 1)) / (n + 1), 0.005)
-    for (let i = 1; i < 6; i++) onNose('black', box(0.004, gh * 0.8, 0.005), (i / 6 - 0.5) * gw * 0.9, gy, 0.004)
+    if (!sleek) {
+      // Grille: a surround with a mesh of slats and bars behind it.
+      const gw = s.wid * (bigGrille ? 0.42 : 0.3)
+      const gh = bigGrille ? 0.075 : 0.05
+      const gy = Math.max(bumperY + bumperH / 2 + gh / 2 - 0.005, lightY - 0.005)
+      onNose('dark', plane(gw * 0.94, gh * 0.86), 0, gy, 0.003)
+      const rim = bigGrille ? 'chrome' : 'black'
+      for (const sd of [-1, 1]) {
+        onNose(rim, box(gw, 0.008, 0.008), 0, gy + (sd * gh) / 2, 0.004)
+        onNose(rim, box(0.008, gh, 0.008), (sd * gw) / 2, gy, 0.004)
+      }
+      const n = bigGrille ? 4 : 3
+      for (let i = 0; i < n; i++) onNose(bigGrille ? 'chrome' : 'black', box(gw * 0.9, 0.005, 0.006), 0, gy - gh / 2 + (gh * (i + 1)) / (n + 1), 0.005)
+      for (let i = 1; i < 6; i++) onNose('black', box(0.004, gh * 0.8, 0.005), (i / 6 - 0.5) * gw * 0.9, gy, 0.004)
+    }
   }
   if (sleek && body !== 'bubble') {
     // Wide intake cut into the bumper, with a splitter bar across it.
@@ -710,7 +788,7 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
     // Side air intakes ahead of the rear wheels.
     for (const sd of [-1, 1]) k.add('black', plane(0.14, 0.05), [sd * (s.wid / 2 + 0.004), s.lift + s.body * 0.55, -wz + s.wheel * 1.3], [0, (sd * Math.PI) / 2, 0])
   }
-  k.add('lamp', plane(0.11, 0.04), [0, plateY, front + 0.032])
+  if (!s.plates) k.add('lamp', plane(0.11, 0.04), [0, plateY, front + 0.032])
   // Rear: wide tail lights with reversing lamps, a plate, and exhausts.
   const ty = s.lift + (top - s.lift) * 0.68
   if (s.lightbar) {
@@ -738,7 +816,12 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
   for (const sd of pipes) {
     k.add('chrome', cyl(0.024, 0.024, 0.08, 10), [sd * s.wid * 0.3, s.lift + 0.035, -front - 0.02], [Math.PI / 2, 0, 0])
     k.add('black', disc(0.016, 10), [sd * s.wid * 0.3, s.lift + 0.035, -front - 0.061], [0, Math.PI, 0])
+    k.add('chrome', new TorusGeometry(0.024, 0.004, 4, 12), [sd * s.wid * 0.3, s.lift + 0.035, -front - 0.06])
   }
+  // Red reflectors on the rear bumper corners, and black frames round both plates.
+  for (const sd of [-1, 1]) k.add('tail', plane(0.035, 0.012), [sd * s.wid * 0.42, s.lift + 0.075, -front - 0.026], [0, Math.PI, 0])
+  k.add('black', plane(0.124, 0.054), [0, s.lift + 0.13, -s.len / 2 - 0.034], [0, Math.PI, 0])
+  if (!s.plates) k.add('black', plane(0.124, 0.052), [0, plateY, front + 0.031])
   // Low cars get a black diffuser under the rear bumper.
   if (LOW.includes(body) && !fit.kit) {
     k.add('black', box(s.wid * 0.7, 0.03, 0.06), [0, s.lift + 0.02, -front + 0.02])
@@ -758,6 +841,22 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
       k.add('black', box(0.03, 0.012, 0.012), [sd * (s.wid * 0.4 - 0.005), top + 0.035, cowl - 0.04])
       k.add('glass', plane(0.045, 0.028), [sd * (s.wid * 0.4 + 0.03), top + 0.05, cowl - 0.056], [0, Math.PI, 0])
     }
+  }
+  if (closed && FOUR_DOOR.includes(body)) for (const sd of [-1, 1]) k.add('chrome', box(0.01, 0.012, 0.05), [sd * (s.wid / 2 + 0.004), top - 0.05, s.cabinZ + s.cabinLen * 0.5 - 0.06])
+  // Panel lines: the hood's edges and front, and the trunk lid on cars with a trunk.
+  const hoodLen = hoodFront - cowl
+  if (!s.plates && !s.dog && !s.armor && hoodLen > 0.12) {
+    for (const sd of [-1, 1]) k.add('dark', box(0.005, 0.003, hoodLen), [sd * s.wid * 0.4, hoodY + 0.002, (hoodFront + cowl) / 2])
+    k.add('dark', box(s.wid * 0.8, 0.003, 0.005), [0, hoodY + 0.002, hoodFront - 0.005])
+  }
+  const deckLen = s.cabinZ - s.cabinLen / 2 - (-front + 0.04)
+  if (!s.open && !s.round && !s.bed && !s.tracks && deckLen > 0.16) {
+    for (const sd of [-1, 1]) k.add('dark', box(0.005, 0.003, deckLen), [sd * s.wid * 0.38, top + 0.002, -front + 0.04 + deckLen / 2])
+    k.add('dark', box(s.wid * 0.76, 0.003, 0.005), [0, top + 0.002, -front + 0.04 + deckLen])
+  }
+  // Wheel arch lips: a thin dark band round each opening on road cars.
+  if (!s.plates && !s.tracks && !s.flares && !RUGGED.includes(body) && !s.open) {
+    for (const z of [wz, -wz]) for (const sd of [-1, 1]) k.add('dark', new TorusGeometry(s.wheel * 1.2, 0.008, 3, 14, Math.PI), [sd * (s.wid / 2 + 0.004), s.wheel, z], [0, (sd * Math.PI) / 2, 0], [1, 1, 0.6])
   }
   if (!s.tracks) brakes(k, s.track ?? s.wid / 2 - 0.02, wz, s.wheel, 0.14)
   // This model's own trim (see carTrim.ts).
