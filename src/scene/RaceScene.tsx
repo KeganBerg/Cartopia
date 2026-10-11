@@ -26,7 +26,8 @@ import { RaceWeather, raceWeather } from './Weather'
 import { gloomOf, weatherLook, wetRoad } from './weatherLook'
 import type { Weather as WeatherState } from '../game/weather'
 
-export type RacerView = { dist: number }
+// burning: the boost is firing (the chase camera punches in).
+export type RacerView = { dist: number; burning?: boolean }
 const SCALE = 0.25 // metres of race distance per world unit
 // How far past the finish line (race metres) a car has to coast and brake to a stop.
 const RUN_OUT = 150
@@ -493,7 +494,7 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
   const runs = useRef([0, 1].map(() => ({ z: 0, v: 0, last: 0, past: 0, dip: 0, cross: -1 })))
   // The finish replay (see PHOTO_GAP): the race's own positions, stamped on the race's frame clock,
   // played back on a visual clock that can run slower than it.
-  const fx = useRef({ st: 0, vt: 0, hist: [] as { t: number; d: [number, number] }[], phase: 'race' as 'race' | 'slow' | 'after', photo: false, rate: 1, target: 1, side: false, since: 0 })
+  const fx = useRef({ st: 0, vt: 0, hist: [] as { t: number; d: [number, number] }[], phase: 'race' as 'race' | 'slow' | 'after', photo: false, rate: 1, target: 1, side: false, since: 0, cut: false, shake: 0 })
   useFrame(({ scene }, delta) => {
     scene.environmentIntensity = look.env
     const dt = Math.min(delta, 0.1)
@@ -578,6 +579,7 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
     const cam = camera as PerspectiveCamera
     const tall = size.height > size.width
     if (f.side) {
+      f.cut = true
       // Low on the kerb just past the line, looking back across it as the noses arrive.
       if (cam.fov !== (tall ? fov : 34)) {
         cam.fov = tall ? fov : 34
@@ -589,17 +591,25 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
       cam.lookAt(-0.3, tall ? 0.05 : 0.3, len - 0.5)
       return
     }
-    if (cam.fov !== fov) {
-      cam.fov = fov
-      cam.updateProjectionMatrix()
+    // Speed widens the view a little, and the boost punches it wider still, so going fast feels fast.
+    const pace = Math.min(1, ra.v / 160)
+    const boosting = !!me.current?.burning && ra.cross < 0
+    const want = fov + 7 * pace + (boosting ? 6 : 0)
+    if (f.cut) {
+      f.cut = false
+      cam.fov = want
       // Cut straight back behind the cars rather than swooping through the barriers.
       cam.position.set(tall ? 0 : LANE * 0.5, tall ? 2.7 : 2.2, mz - (tall ? 5.2 : 4.2))
-    }
+    } else cam.fov += (want - cam.fov) * Math.min(1, dt * (boosting ? 8 : 3))
+    cam.updateProjectionMatrix()
     const lead = Math.max(mz, tz)
     const target = Math.min(mz, len + RUN_OUT * SCALE)
     // Tall phone screens get a higher, further-back chase view.
     camera.position.lerp({ x: tall ? 0 : LANE * 0.5, y: tall ? 2.7 : 2.2, z: target - (tall ? 5.2 : 4.2) } as never, 0.15)
     camera.lookAt(tall ? 0 : LANE * 0.3, 0.3, Math.min(target + 3 + (lead - target) * 0.3, len + RUN_OUT * SCALE + 4))
+    // A faint road buzz at speed, stronger under boost; gone once the cars are over the line.
+    f.shake += ((ra.cross < 0 ? pace * 0.012 + (boosting ? 0.02 : 0) : 0) - f.shake) * Math.min(1, dt * 6)
+    if (f.shake > 0.0005) camera.position.y += Math.sin(f.st * 53) * f.shake + Math.sin(f.st * 31) * f.shake * 0.6
   })
 
   return (
