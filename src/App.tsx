@@ -22,6 +22,7 @@ import { WelcomeBack } from './ui/WelcomeBack'
 import { GoalsPanel, DailyPanel, FlatPanel } from './ui/Goals'
 import { useGame, today } from './game/store'
 import { startCloudSync } from './lib/cloud'
+import './lib/rescue'
 import { startAmbience } from './lib/ambience'
 import { useTownPaused } from './scene/renderGate'
 

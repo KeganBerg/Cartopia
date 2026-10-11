@@ -1,7 +1,8 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { GP_ROUNDS, GP_SERIES, gpRivalPi } from './data'
-import { gpBeatTable, gpRivalSlowest, gpSeries, restoreMinutes } from './guardTables'
+import { gpBeatTable, gpRivalSlowest, gpSeries, rarities, rescueRoll, rescueSpots, restoreMinutes } from './guardTables'
+import { rollSearch } from './store'
 import { raceFloor } from './race'
 
 const dir = new URL('../../supabase/migrations/', import.meta.url)
@@ -16,6 +17,22 @@ describe('restore and Grand Prix checks', () => {
   // When one of these fails, regenerate the table in a new migration.
   it('has the restore times the game uses', () => {
     expect(newest('$restoremin$')).toEqual(restoreMinutes())
+  })
+
+  it("rolls Rusty's searches like the game", () => {
+    expect(newest('$spots$')).toEqual(rescueSpots())
+    expect(newest('$rarity$')).toEqual(rarities())
+    expect(newest('$roll$')).toEqual(rescueRoll())
+  })
+
+  it("puts the server's finds on their pins and no other cars", () => {
+    const finds = [{ i: 2, uid: 'rabc', model: 'vette', rarity: 'rare' as const }]
+    for (let n = 0; n < 50; n++) {
+      const q = rollSearch('downtown', finds)
+      expect(q.pins.filter((p) => p.kind === 'car')).toEqual([{ kind: 'car', model: 'vette', rarity: 'rare', uid: 'rabc' }])
+      expect(q.pins[2].kind).toBe('car')
+      expect(q.flatAt).not.toBe(2)
+    }
   })
 
   it('has the Grand Prix rivals the game uses', () => {
