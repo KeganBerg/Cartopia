@@ -13,6 +13,9 @@ const SWOOP = 1.1
 const SWOOP_TILT = 1.26 // polar angle it ends at (0 straight down, π/2 level)
 const SWOOP_IN = 0.72 // and how much closer it comes
 
+const fwdV = new Vector3()
+const rightV = new Vector3()
+const move = new Vector3()
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2)
 const fovFor = (w: number, h: number) => (w < h ? FREE.fovTall : FREE.fovWide)
 
@@ -81,6 +84,7 @@ function Rig() {
   }, [size])
 
   useTwist()
+  const keys = useKeys()
 
   // Runs after the controls have moved the camera this frame.
   useFrame((_, delta) => {
@@ -98,6 +102,30 @@ function Rig() {
       c.position.copy(VIEW).add(off.setFromSpherical(sph))
       c.lookAt(VIEW)
     }
+    // Keyboard flying (PC): WASD or arrows glide over the ground the way the camera
+    // faces, Space rises and Shift sinks. Faster the further out the camera is.
+    const k = keys.current
+    if (k.size) {
+      const dt = Math.min(delta, 0.1)
+      const speed = (12 + c.position.distanceTo(VIEW) * 0.9) * dt
+      c.getWorldDirection(fwdV).setY(0).normalize()
+      rightV.crossVectors(fwdV, UP)
+      move.set(0, 0, 0)
+      if (k.has('KeyW') || k.has('ArrowUp')) move.add(fwdV)
+      if (k.has('KeyS') || k.has('ArrowDown')) move.sub(fwdV)
+      if (k.has('KeyD') || k.has('ArrowRight')) move.add(rightV)
+      if (k.has('KeyA') || k.has('ArrowLeft')) move.sub(rightV)
+      if (move.lengthSq() > 0) {
+        move.normalize().multiplyScalar(speed)
+        VIEW.add(move)
+        c.position.add(move)
+      }
+      const lift = (k.has('Space') ? 1 : 0) - (k.has('ShiftLeft') || k.has('ShiftRight') ? 1 : 0)
+      if (lift) {
+        c.position.y = Math.max(1, c.position.y + lift * speed * 0.7)
+        c.lookAt(VIEW)
+      }
+    }
     // Keep the view over the town and its fields.
     before.copy(VIEW)
     VIEW.x = Math.max(-ROAM, Math.min(ROAM, VIEW.x))
@@ -108,6 +136,39 @@ function Rig() {
   return null
 }
 
+
+// Keys held down for flying, ignored while typing (chat, names) or with a panel open.
+const FLY_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'ShiftLeft', 'ShiftRight'])
+function useKeys() {
+  const keys = useRef(new Set<string>())
+  useEffect(() => {
+    const held = keys.current
+    const typing = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null
+      return !!t && (t.isContentEditable || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')
+    }
+    const down = (e: KeyboardEvent) => {
+      if (!FLY_KEYS.has(e.code) || typing(e) || e.ctrlKey || e.metaKey || e.altKey || useGame.getState().panel) return
+      held.add(e.code)
+      // Space would otherwise press whichever button has focus, or scroll.
+      if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault()
+    }
+    const up = (e: KeyboardEvent) => held.delete(e.code)
+    const clear = () => held.clear()
+    window.addEventListener('keydown', down)
+    window.addEventListener('keyup', up)
+    window.addEventListener('blur', clear)
+    // Opening a panel or chat mid-flight stops the camera.
+    const unsub = useGame.subscribe((g) => g.panel && clear())
+    return () => {
+      window.removeEventListener('keydown', down)
+      window.removeEventListener('keyup', up)
+      window.removeEventListener('blur', clear)
+      unsub()
+    }
+  }, [])
+  return keys
+}
 
 // Twisting two fingers turns the view round, like a map app. (Dragging two
 // fingers tilts and turns, and pinching zooms; the controls do those.)
