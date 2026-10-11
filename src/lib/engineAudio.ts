@@ -4,6 +4,7 @@
 // and the crowd at the finish.
 
 import { audioContext, audioOut, onStopEngine, onMuteChange, isMuted } from './sound'
+import { loadEngineWorklet, engineWorkletReady, type PulseConfig } from './engineWorklet'
 import { CARS, carDef, type Body, type CarDef } from '../game/data'
 
 export type EngineProfile = {
@@ -220,6 +221,29 @@ export function eagleScreech(a: AudioContext, out: AudioNode, at = a.currentTime
   cry(at + 0.35, 1.6, 2850, 0.16)
 }
 
+// How a profile's cylinders fire: uneven gaps and strengths give V8 burble and V-twin
+// potato-potato; pricier engines fire more evenly and ring a longer exhaust.
+function pulseConfig(prof: EngineProfile, q: number): PulseConfig {
+  const group = prof.lump > 0.05 ? Math.max(2, Math.round(1 / prof.lumpRatio)) : 4
+  const intervals: number[] = []
+  const weights: number[] = []
+  for (let i = 0; i < group; i++) {
+    const swing = group % 2 === 0 ? (i % 2 === 0 ? -1 : 1) : i === 0 ? -2 : 1
+    intervals.push(1 + prof.lump * 0.16 * swing)
+    const r = Math.abs(Math.sin((i + 1) * 12.9898) * 43758.5453) % 1
+    weights.push(1 - (0.05 + prof.lump * 0.35) * r)
+  }
+  return {
+    intervals,
+    weights,
+    jitter: 0.05 + (1 - q) * 0.08 + prof.grit * 0.06,
+    width: Math.min(0.5, Math.max(0.16, 0.44 - prof.bright * 0.1 - prof.clatter * 0.1)),
+    rough: 0.12 + prof.grit * 0.3 + (1 - q) * 0.12,
+    pipe: Math.min(0.025, 1 / Math.max(40, prof.reso)),
+    feedback: 0.22 + q * 0.14,
+  }
+}
+
 type Mode = 'idle' | 'race' | 'coast'
 
 // One running engine.
@@ -233,6 +257,7 @@ export class EngineVoice {
   private layer: OscillatorNode | null = null
   private sub: OscillatorNode
   private lope: OscillatorNode
+  private pulse: AudioWorkletNode | null = null
   private tick: OscillatorNode
   private whistle: OscillatorNode
   private whineOsc: OscillatorNode
@@ -325,13 +350,28 @@ export class EngineVoice {
       this.layer.connect(lg).connect(mix)
     }
 
-    // Lope: amplitude wobble at a fraction of the firing rate (cross-plane V8, V-twin, boxer).
+    // Real combustion pulses when the audio thread can run them (electric motors keep
+    // their tonal whine). Otherwise a tone with a lope wobble stands in.
+    if (!prof.electric && engineWorkletReady(a)) {
+      try {
+        this.pulse = new AudioWorkletNode(a, 'engine-pulse', { numberOfInputs: 0, outputChannelCount: [1], processorOptions: pulseConfig(prof, q) })
+      } catch {
+        this.pulse = null
+      }
+    }
     const am = a.createGain()
-    am.gain.value = 1 - prof.lump * 0.45
     const lopeDepth = a.createGain()
-    lopeDepth.gain.value = prof.lump * 0.45
+    if (this.pulse) {
+      am.gain.value = 1
+      lopeDepth.gain.value = 0
+      this.pulse.connect(am)
+    } else {
+      // Lope: amplitude wobble at a fraction of the firing rate (cross-plane V8, V-twin, boxer).
+      am.gain.value = 1 - prof.lump * 0.45
+      lopeDepth.gain.value = prof.lump * 0.45
+      mix.connect(am)
+    }
     this.lope.connect(lopeDepth).connect(am.gain)
-    mix.connect(am)
 
     const shaper = a.createWaveShaper()
     shaper.curve = drive(prof.grit)
@@ -472,7 +512,11 @@ export class EngineVoice {
         /* already stopped */
       }
     })
-    setTimeout(() => this.pan.disconnect(), (fade + 0.3) * 1000)
+    setTimeout(() => {
+      this.pan.disconnect()
+      this.pulse?.port.postMessage('stop')
+      this.pulse?.disconnect()
+    }, (fade + 0.3) * 1000)
   }
 
   private pops(at: number, spread: number, count: number) {
@@ -515,6 +559,10 @@ export class EngineVoice {
     const fire = prof.electric ? 60 + 900 * r : (realRpm / 60) * prof.ppr * wob
     const tc = now ? 0 : 0.02
     const set = (pp: AudioParam, v: number) => (now ? pp.setValueAtTime(v, t) : pp.setTargetAtTime(v, t, tc))
+    if (this.pulse) {
+      set(this.pulse.parameters.get('freq')!, fire)
+      set(this.pulse.parameters.get('throttle')!, thr)
+    }
     set(this.main.frequency, fire)
     if (this.layer) set(this.layer.frequency, fire)
     set(this.sub.frequency, fire / 2)
@@ -617,6 +665,9 @@ export class RaceAudio {
   private offMute: () => void
   private closed = false
   private bus: AudioNode | null = null
+  private trim: AudioNode | null = null
+  private loading: Promise<void> | null = null
+  private loaded = false
 
   private mine: { model: string; mods?: string[] }
   private theirs: { model?: string; body: Body; mods?: string[] }
@@ -627,6 +678,16 @@ export class RaceAudio {
     this.offMute = onMuteChange(() => {
       if (isMuted()) this.silence()
     })
+    this.warm()
+  }
+
+  // Start loading the pulse engine as the race screen opens, so it's ready for the countdown.
+  private warm() {
+    const a = audioContext()
+    if (!a || this.loading) return
+    this.loading = loadEngineWorklet(a).then(() => {
+      this.loaded = true
+    })
   }
 
   private ensure() {
@@ -634,15 +695,21 @@ export class RaceAudio {
     const a = audioContext()
     const dest = audioOut()
     if (!a || !dest) return false
+    this.warm()
+    if (!this.loaded) return false
     // A limiter keeps two roaring engines and a crowd from clipping on phone speakers.
     const out = a.createDynamicsCompressor()
-    out.threshold.value = -14
-    out.knee.value = 8
-    out.ratio.value = 8
+    out.threshold.value = -20
+    out.knee.value = 6
+    out.ratio.value = 12
     out.attack.value = 0.004
     out.release.value = 0.2
-    out.connect(dest)
+    // Races sit a little above the town ambience, not at full blast on headphones.
+    const trim = a.createGain()
+    trim.gain.value = 0.28
+    out.connect(trim).connect(dest)
     this.bus = out
+    this.trim = trim
     // Your car sits in the left lane on screen, the rival on the right.
     this.me = new EngineVoice(a, out, { model: this.mine.model, mods: this.mine.mods, pan: -0.2 })
     this.them = new EngineVoice(a, out, { model: this.theirs.model, body: this.theirs.body, mods: this.theirs.mods, pan: 0.6, level: 0.5 })
@@ -714,8 +781,12 @@ export class RaceAudio {
 
   private dropBus(after: number) {
     const b = this.bus
-    this.bus = null
-    if (b) setTimeout(() => b.disconnect(), after * 1000 + 300)
+    const tr = this.trim
+    this.bus = this.trim = null
+    if (b) setTimeout(() => {
+      b.disconnect()
+      tr?.disconnect()
+    }, after * 1000 + 300)
   }
 
   close() {
