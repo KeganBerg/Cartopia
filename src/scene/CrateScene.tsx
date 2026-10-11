@@ -880,7 +880,8 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
         beam.current.scale.set(1, Math.min(1, after * 4), 1)
         ;(beam.current.material as MeshBasicMaterial).opacity = Math.max(0.12, 0.7 * (1 - after * 0.6))
       }
-      // The prize rises out of the box and turns slowly.
+      // The prize rises out of the box and turns slowly; a coin prize spins as it rises,
+      // then stops facing the camera.
       const g = prize.current
       if (g) {
         const r = Math.min(1, Math.max(0, (after - RISE) / 0.9))
@@ -888,7 +889,7 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
         g.visible = r > 0
         g.position.y = LIFT + 0.2 + ease * 0.5
         g.scale.setScalar(Math.max(0.01, ease))
-        g.rotation.y = -0.6 + after * 0.55
+        g.rotation.y = coins && !showCar ? Math.pow(1 - r, 3) * Math.PI * 4 : -0.6 + after * 0.55
       }
       if (!s.revealed && after > SETTLE - CHARGE) {
         s.revealed = true
