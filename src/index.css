@@ -1056,3 +1056,40 @@ button.lvl-item:hover { border-color: var(--accent); transform: translateY(-2px)
 .fin-opt.sel { border-color: var(--blue); box-shadow: 0 0 0 2px var(--blue) inset; }
 .fin-opt.locked { opacity: .55; }
 .finish-chip { width: 34px; height: 22px; border-radius: 8px; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+
+/* Collection book: sets of car tiles, silhouettes for missing cars. */
+.book { display: flex; flex-direction: column; gap: 8px; }
+.book-progress { display: flex; align-items: center; gap: 10px; font: 16px var(--display); }
+.book-progress small { font: 13px var(--display); color: #607d8b; white-space: nowrap; }
+.book-bar { flex: 1; height: 10px; border-radius: 6px; background: var(--seg); overflow: hidden; }
+.book-bar i { display: block; height: 100%; background: linear-gradient(90deg, #ffb300, #ff7043); border-radius: 6px; transition: width .4s; }
+.book-set { background: #fff; border: 1.5px solid #dfe5ea; border-radius: 12px; padding: 6px 8px 8px; }
+.book-set.ready { border-color: #ffb300; box-shadow: 0 0 0 3px #ffe082; }
+.book-set.done { background: #f1f8e9; border-color: #c5e1a5; }
+.book-set header { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.book-icon { font-size: 20px; }
+.book-name { font: 16px var(--display); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.book-name small { color: #78909c; font-size: 13px; }
+.book-reward { display: flex; gap: 6px; font: 13px var(--display); color: #546e7a; white-space: nowrap; }
+.book-reward .bk { color: #2e7d32; }
+.book-set.done .book-reward { opacity: .5; text-decoration: line-through; }
+.book-claimed { font: 18px var(--display); color: #2e7d32; }
+.book-claim { animation: bob .9s ease-in-out infinite; }
+.book-cars { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; }
+.book-car { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 2px; border-radius: 10px; background: #f7f9fb; border: 1px solid #eceff1; text-align: center; min-width: 0; }
+.book-car .thumb3d.sm { --tw: 80px; --th: 62px; }
+button.book-car { font: inherit; color: inherit; }
+.book-car.missing .thumb3d { background: #eceff1; }
+.book-car.missing .thumb-view { filter: brightness(0); opacity: .28; }
+.book-car-name { font: 12px/1.15 var(--display); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.book-car.missing .book-car-name { color: #90a4ae; }
+.book-src { font-size: 10.5px; font-weight: 800; color: var(--blue); line-height: 1.1; }
+.tab-dot, .btn-dot { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; margin-left: 5px; border-radius: 9px; background: #e53935; color: #fff; font: 12px/1 var(--display); vertical-align: middle; }
+.icon-btn .i { position: relative; }
+.btn-dot { position: absolute; top: -4px; right: -6px; margin: 0; border: 2px solid #fff; }
+@media (max-width: 600px) {
+  .book-cars { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .book-car .thumb3d.sm { --tw: 72px; --th: 56px; }
+  .book-reward { gap: 4px; font-size: 12px; }
+  .book-name { font-size: 15px; }
+}

@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useGame, hasRusty } from '../game/store'
-import { garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, carDef, performance, upgradeCost, buildingDef, upgradable, loves, type BuildingDef } from '../game/data'
+import { garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, carDef, performance, upgradeCost, buildingDef, upgradable, loves, readySets, type BuildingDef } from '../game/data'
 import { CarInspect, CarPreview } from '../scene/CarPreview'
 import { CollectAllButton } from './CollectAll'
 import { rotateCurrent } from '../game/placement'
 import { BuildingThumb, CarThumb } from '../scene/BuildingPreview'
 import { ShopUpgrades } from './Upgrade'
 import { ModShop, withMod } from './Mods'
+import { CollectionBook, useFindCar } from './Collection'
 import { PaintShop, jobOf } from './Paint'
 import type { PaintJob } from '../game/data'
 
@@ -18,13 +19,14 @@ export function BottomBar() {
   const setMode = useGame((s) => s.setMode)
   const mode = useGame((s) => s.mode)
   const visiting = useGame((s) => !!s.visiting)
+  const setsReady = useGame((s) => readySets(s).length)
   if (visiting) return null
   if (mode !== 'play') return <EditBar />
   return (
     <>
       <div className="bottom-bar">
         <button className="icon-btn" onClick={() => openPanel('shop')}><span className="i">🏪</span>SHOP</button>
-        <button className="icon-btn" onClick={() => openPanel('showroom')}><span className="i">🚘</span>SHOWROOM</button>
+        <button className="icon-btn" onClick={() => openPanel('showroom')}><span className="i">🚘{setsReady > 0 && <span className="btn-dot">{setsReady}</span>}</span>SHOWROOM</button>
         <button className="icon-btn" onClick={() => openPanel('garage')}><span className="i">🔧</span>GARAGE</button>
         <button className="icon-btn" onClick={() => openPanel('friends')}><span className="i">👫</span>FRIENDS</button>
         <button className="icon-btn" onClick={() => setMode('road')}><span className="i">🚧</span>EDIT</button>
@@ -207,6 +209,9 @@ export function ShopPanel() {
   )
 }
 
+// The Showroom reopens on the tab it was left on.
+let lastShowroomTab: 'shop' | 'book' = 'shop'
+
 export function ShowroomPanel() {
   const level = useGame((s) => s.level)
   const buyCar = useGame((s) => s.buyCar)
@@ -216,8 +221,26 @@ export function ShowroomPanel() {
   const [inspect, setInspect] = useState<string | null>(null)
   const { body, focus } = useShopFocus()
   const look = inspect ? carDef(inspect) : null
+  const [tab, setTab] = useState<'shop' | 'book'>(() => lastShowroomTab)
+  const pickTab = (t: 'shop' | 'book') => {
+    lastShowroomTab = t
+    setTab(t)
+  }
+  const ready = useGame((s) => readySets(s).length)
+  const owned = useGame((s) => CARS.filter((c) => s.cars.some((o) => o.model === c.id)).length)
+  const find = useFindCar((model) => {
+    pickTab('shop')
+    useGame.setState({ shopFocus: model })
+  })
+  const tabs = [
+    { id: 'shop' as const, label: '🚘 For sale' },
+    { id: 'book' as const, label: <>📖 Collection {owned}/{CARS.length}{ready > 0 && <span className="tab-dot">{ready}</span>}</> },
+  ]
   return (
     <Panel title="Showroom" wide>
+      <SheetTabs items={tabs} value={tab} onChange={pickTab} />
+      {tab === 'book' && <CollectionBook onFind={find} />}
+      {tab === 'shop' && <>
       {!rusty && (
         <div className="rusty-lock">
           <span className="rusty-icon">🔧</span>
@@ -257,6 +280,7 @@ export function ShowroomPanel() {
           )
         })}
       </div>
+      </>}
       {look && <CarInspect title={look.name} body={look.body} color={colorFor[look.id] ?? look.colors[0]} onClose={() => setInspect(null)} />}
     </Panel>
   )

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildingDef, carDef, knownBuilding, BUILDINGS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost, jobLevel, performance, fittedMods, modStats, modCost, MODS, MOD_SLOTS, ownedMods, CARS, takesDriver, loves, driverPayout, skillBoost, skillDrag, liveSkillBoost, SKILLS , CAMPAIGN, CAMPAIGN_RACES, campaignRivalPi, campaignReward, campaignShift, campaignStars } from './data'
+import { buildingDef, carDef, knownBuilding, BUILDINGS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost, jobLevel, performance, fittedMods, modStats, modCost, MODS, MOD_SLOTS, ownedMods, CARS, takesDriver, loves, driverPayout, skillBoost, skillDrag, liveSkillBoost, SKILLS , CAMPAIGN, CAMPAIGN_RACES, campaignRivalPi, campaignReward, campaignShift, campaignStars, CAR_SETS, carSource, readySets } from './data'
 import { MAX_RACE_PI } from './race'
 import { VENUES } from '../scene/venues'
 
@@ -189,5 +189,26 @@ describe('campaign ladder', () => {
     expect(campaignStars(9.9, 10)).toBe(1)
     expect(campaignStars(9.65, 10)).toBe(2)
     expect(campaignStars(9.3, 10)).toBe(3)
+  })
+})
+
+describe('collection book', () => {
+  it('puts every car in exactly one set', () => {
+    const all = CAR_SETS.flatMap((s) => s.cars)
+    expect([...all].sort()).toEqual(CARS.map((c) => c.id).sort())
+  })
+
+  it('says where to find each car', () => {
+    expect(carSource(carDef('bug')).text).toBe("Rusty's · Suburbs")
+    expect(carSource(carDef('lambo')).text).toBe('Showroom · B40')
+    expect(carSource(carDef('vette')).text).toBe('Showroom · Lv 6')
+  })
+
+  it('lists a set as ready once every car in it is owned and unclaimed', () => {
+    const daily = CAR_SETS.find((s) => s.id === 'daily')!
+    const cars = daily.cars.map((model) => ({ model }))
+    expect(readySets({ cars: cars.slice(1), claimedSets: [] })).toEqual([])
+    expect(readySets({ cars, claimedSets: [] })).toEqual([daily])
+    expect(readySets({ cars, claimedSets: ['daily'] })).toEqual([])
   })
 })

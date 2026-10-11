@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
   PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS,
-  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, DAILY_BONUS, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modSlotsFor, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef,
+  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, CAR_SETS, setComplete, type Rarity, GOALS, DAILY_BONUS, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modSlotsFor, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef,
 } from './data'
 import { sfx } from '../lib/sound'
 import { msUntilNight } from './clock'
@@ -51,6 +51,8 @@ export type SaveState = {
   gp: Record<string, { round: number; clears: number }>
   // Campaign races won, by race id, with the best stars earned (1-3).
   campaign: Record<string, number>
+  // Collection book sets whose one-time reward has been claimed.
+  claimedSets: string[]
   land: string[]
   updatedAt: number
 }
@@ -119,6 +121,7 @@ type Actions = {
   finishRace: (won: boolean, reward: number) => void
   renameTown: (name: string) => void
   claimGoal: (id: string) => void
+  claimSet: (id: string) => void
   claimDaily: () => void
   fixFlat: (uid: string, tow: boolean) => void
   serviceCar: (uid: string, how: 'tires' | 'gas' | 'can') => void
@@ -253,6 +256,7 @@ export function starterTown(): SaveState {
     restoring: null,
     gp: {},
     campaign: {},
+    claimedSets: [],
     land: [...START_LAND],
     updatedAt: now,
   }
@@ -802,6 +806,22 @@ export const useGame = create<GameState>()(
         }))
       },
 
+      claimSet: (id) => {
+        const s = get()
+        const set_ = CAR_SETS.find((o) => o.id === id)
+        if (!set_ || s.claimedSets.includes(id) || !setComplete(set_, s.cars)) return
+        setTimeout(sfx.levelUp, 200)
+        s.toast(`${set_.icon} ${set_.name} complete! +${set_.coins.toLocaleString()} coins, +${set_.bucks} bucks, +${set_.trophies} 🏆`)
+        set(withXp(s, set_.xp, {
+          coins: s.coins + set_.coins,
+          bucks: s.bucks + set_.bucks,
+          trophies: s.trophies + set_.trophies,
+          claimedSets: [...s.claimedSets, id],
+          stats: { ...s.stats, coinsEarned: (s.stats.coinsEarned ?? 0) + set_.coins },
+          updatedAt: Date.now(),
+        }))
+      },
+
       claimDaily: () => {
         const s = get()
         const t = today()
@@ -1231,14 +1251,14 @@ export const useGame = create<GameState>()(
 )
 
 export function saveOf(s: GameState): SaveState {
-  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, land, updatedAt } = s
-  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, land, updatedAt }
+  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, land, updatedAt } = s
+  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, land, updatedAt }
 }
 
 // Fields added after launch, so older saves load with sensible values.
-function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'gp' | 'campaign' | 'land'> {
+function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'gp' | 'campaign' | 'claimedSets' | 'land'> {
   // Saves from before the tutorial existed skip it.
-  return { stats: emptyStats(), claimedGoals: [], lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, gp: {}, campaign: {}, land: [...START_LAND] }
+  return { stats: emptyStats(), claimedGoals: [], lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, gp: {}, campaign: {}, claimedSets: [], land: [...START_LAND] }
 }
 
 
