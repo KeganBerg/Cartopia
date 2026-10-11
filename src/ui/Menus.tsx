@@ -66,16 +66,16 @@ function EditBar() {
     <div className="edit-bar">
       <div className="edit-hint">{hint}</div>
       <div className="edit-tools">
-        <button className={mode === 'road' ? 'tool active' : 'tool'} onClick={() => setMode('road')}>🛣️ Road</button>
-        <button className={mode === 'bulldoze' ? 'tool active' : 'tool'} onClick={() => setMode('bulldoze')}>🚜 Bulldoze</button>
-        <button className={mode === 'move' ? 'tool active' : 'tool'} onClick={() => setMode('move')}>✋ Move</button>
-        <button className={mode === 'expand' ? 'tool active' : 'tool'} onClick={() => setMode('expand')}>🗺 Land</button>
-        <button className={mode === 'merge' ? 'tool active' : 'tool'} onClick={() => setMode('merge')}>🧩 Merge</button>
-        {((mode === 'place' && placing) || (mode === 'move' && selected)) && <button className="tool" onClick={rotateCurrent} title="Rotate (R)">🔄 Rotate</button>}
-        {mode === 'move' && selected && canUpgrade && <button className="tool" onClick={() => openUpgrade(selected)}>⬆ Upgrade</button>}
-        {mode === 'move' && again && <button className="tool" onClick={() => setMode('place', again)}>➕ Build another</button>}
-        <button className="tool" onClick={() => openPanel('shop')}>🏪 Shop</button>
-        <button className="tool done" onClick={() => setMode('play')}>✔ Done</button>
+        <button className={mode === 'road' ? 'tool active' : 'tool'} onClick={() => setMode('road')}><Icon name="road" size={18} />Road</button>
+        <button className={mode === 'bulldoze' ? 'tool active' : 'tool'} onClick={() => setMode('bulldoze')}><Icon name="bulldoze" size={18} />Bulldoze</button>
+        <button className={mode === 'move' ? 'tool active' : 'tool'} onClick={() => setMode('move')}><Icon name="move" size={18} />Move</button>
+        <button className={mode === 'expand' ? 'tool active' : 'tool'} onClick={() => setMode('expand')}><Icon name="land" size={18} />Land</button>
+        <button className={mode === 'merge' ? 'tool active' : 'tool'} onClick={() => setMode('merge')}><Icon name="merge" size={18} />Merge</button>
+        {((mode === 'place' && placing) || (mode === 'move' && selected)) && <button className="tool" onClick={rotateCurrent} title="Rotate (R)"><Icon name="rotate" size={18} />Rotate</button>}
+        {mode === 'move' && selected && canUpgrade && <button className="tool" onClick={() => openUpgrade(selected)}><Icon name="up" size={18} />Upgrade</button>}
+        {mode === 'move' && again && <button className="tool" onClick={() => setMode('place', again)}><Icon name="plus" size={18} />Build another</button>}
+        <button className="tool" onClick={() => openPanel('shop')}><Icon name="shop" size={18} />Shop</button>
+        <button className="tool done" onClick={() => setMode('play')}><Icon name="check" size={18} />Done</button>
       </div>
     </div>
   )
@@ -174,7 +174,7 @@ export function ShopPanel() {
     return () => cancelAnimationFrame(raf)
   }, [focus])
   const ev = activeEvent()
-  const tabs: { id: ShopTab; label: React.ReactNode }[] = [...SHOP_GROUPS.filter((g) => g.id !== 'event' || ev), ...(canUpgrade ? [{ id: 'upgrades' as const, label: '⬆ Upgrades' }] : [])]
+  const tabs: { id: ShopTab; label: React.ReactNode }[] = [...SHOP_GROUPS.filter((g) => g.id !== 'event' || ev), ...(canUpgrade ? [{ id: 'upgrades' as const, label: '<Icon name="up" size={18} />Upgrades' }] : [])]
   const group = SHOP_GROUPS.find((g) => g.id === tab)
   return (
     <Panel title="Shop" wide>
