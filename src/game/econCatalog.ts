@@ -32,7 +32,7 @@ function upgrades(d: BuildingDef) {
 // economy.test.ts fails when data.ts changes without the SQL copy.
 export function econCatalog() {
   const cars = Object.fromEntries(
-    CARS.map((c) => [c.id, { name: c.name, body: c.body, price: c.price, bucks: c.bucks ?? 0, power: c.power, grip: c.grip, weight: c.weight }]),
+    CARS.map((c) => [c.id, { name: c.name, body: c.body, price: c.price, bucks: c.bucks ?? 0, power: c.power, grip: c.grip, weight: c.weight, unlock: c.season ? 0 : c.unlockLevel }]),
   )
   const buildings = Object.fromEntries(
     BUILDINGS.map((b) => [b.id, { price: b.price, obstacle: b.kind === 'obstacle', fuelCap: b.fuelCap ?? 0, ...(upgradable(b) ? { up: upgrades(b) } : {}) }]),

@@ -15,7 +15,8 @@ import { tickSkins, withSkin } from './skins'
 import { CarMods, RIM_LOOK, carbon, chrome as modChrome, glass as modGlass, modGeo, modIds } from './CarMods'
 import { carBody, wheelPool, type WheelSlot } from './carBatch'
 import { bake, finishOf, type Finish as Look } from './bake'
-import { trimBike, trimCar } from './carTrim'
+import { carStyle, hasTrim, trimBike, trimCar, type CarStyle } from './carTrim'
+import { brakeGeo, wheelGeo, type RimStyle } from './carWheels'
 
 type Shape = {
   len: number; wid: number
@@ -118,7 +119,7 @@ function bodyProfile(s: Shape, b: number) {
   sh.quadraticCurveTo(-L, deck, -L, deck - r)
   sh.lineTo(-L, bot + r)
   sh.quadraticCurveTo(-L, bot, -L + r, bot)
-  return { sh, hood: hood + b, deck: deck + b }
+  return { sh, hood: hood + b, deck: deck + b, nose, hoodRaw: hood, L }
 }
 
 // Greenhouse profile: raked windshield, roof and rear window with soft corners.
@@ -161,7 +162,9 @@ export const wheelRig = (body: Body): WheelRig => ({ steer: [], spin: [], radius
 // Every part of a car that shares a look is merged into one mesh, so a car
 // costs about a dozen draws however much detail it has (town traffic can show
 // thirty at once, and phones pay for every draw).
-export type Part = 'paint' | 'dark' | 'black' | 'chrome' | 'glass' | 'screen' | 'seat' | 'wood' | 'lamp' | 'tail' | 'amber' | 'stripe'
+// 'cabin' (seats), 'dash' (dark trim inside, brake rotors), 'display' (the dash screen) and 'caliper' are only drawn
+// on cars shown whole: town traffic has solid glass and pooled wheels that hide them.
+export type Part = 'paint' | 'dark' | 'black' | 'chrome' | 'glass' | 'screen' | 'seat' | 'wood' | 'lamp' | 'tail' | 'amber' | 'stripe' | 'cabin' | 'dash' | 'caliper' | 'display'
 type V3 = [number, number, number]
 
 export class Kit {
@@ -188,6 +191,8 @@ export class Kit {
 
 const box = (w: number, h: number, d: number) => new BoxGeometry(w, h, d)
 const rbox = (w: number, h: number, d: number, r: number) => new RoundedBoxGeometry(w, h, d, 2, Math.min(r, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001))
+// One bevel segment: for small parts seen through glass.
+const rbox1 = (w: number, h: number, d: number, r: number) => new RoundedBoxGeometry(w, h, d, 1, Math.min(r, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001))
 const plane = (w: number, h: number) => new PlaneGeometry(w, h)
 const disc = (r: number, seg = 16) => new CircleGeometry(r, seg)
 const cyl = (rt: number, rb: number, h: number, seg = 10) => new CylinderGeometry(rt, rb, h, seg)
@@ -277,6 +282,7 @@ function formulaGeo(key: string, fit: Partial<Record<ModSlot, string>>): CarGeo 
     k.add('black', box(len, 0.012, 0.02), [sd * (0.12 + len / 2), y, z])
   }
   k.add('tail', plane(0.06, 0.03), [0, 0.2, -s.len / 2 + 0.05], [0, Math.PI, 0])
+  brakes(k, tx, wz, s.wheel, 0.16)
   if (!fit.exhaust) k.add('chrome', cyl(0.025, 0.025, 0.08, 10), [0, 0.24, -s.len / 2 + 0.1], [Math.PI / 2 - 0.2, 0, 0])
   // Racing stripes along the nose and engine cover.
   for (const x of [-0.03, 0.03]) {
@@ -291,6 +297,66 @@ function formulaGeo(key: string, fit: Partial<Record<ModSlot, string>>): CarGeo 
   const out = { parts: k.build(), wheel }
   geoCache.set(key, out)
   return out
+}
+
+// A bucket seat: cushion, a raked back and a headrest, seen through the glass.
+function seat(k: Kit, x: number, y: number, z: number, w: number, back: number) {
+  k.add('cabin', rbox1(w, 0.045, 0.11, 0.018), [x, y + 0.025, z + 0.045])
+  k.add('cabin', rbox1(w, back, 0.04, 0.016), [x, y + back / 2 + 0.03, z - 0.02], [-0.18, 0, 0])
+  // Side bolsters on the back, a shade darker.
+  for (const sd of [-1, 1]) k.add('dash', rbox1(0.016, back * 0.8, 0.045, 0.007), [x + sd * (w / 2 - 0.006), y + back * 0.45 + 0.03, z - 0.015], [-0.18, 0, 0])
+  k.add('cabin', rbox1(w * 0.58, 0.04, 0.03, 0.012), [x, y + back + 0.06, z - 0.035], [-0.18, 0, 0])
+}
+
+// Steering wheel on its column, tilted toward the driver.
+function steering(k: Kit, x: number, y: number, z: number) {
+  k.add('dash', new TorusGeometry(0.038, 0.008, 5, 16), [x, y, z], [-0.5, 0, 0])
+  k.add('dash', box(0.07, 0.008, 0.008), [x, y, z], [-0.5, 0, 0])
+  k.add('dash', cyl(0.01, 0.012, 0.08, 6), [x, y - 0.02, z + 0.04], [1.0, 0, 0])
+}
+
+// What shows through the windows of a closed car: a dash with a gauge hood and a
+// screen, the wheel, front seats with a console between them, rear seats when the
+// cabin is long enough (rows of them in vans and buses), and a mirror at the top of
+// the windshield. Everything is kept behind the raked glass.
+function cabinInside(k: Kit, s: Shape, top: number, c: { front: number; rear: number; roofF: number; roofR: number; roof: number }) {
+  const base = top - 0.01
+  const slope = (c.front - c.roofF) / Math.max(0.05, c.roof - base)
+  const back = (c.roofR - c.rear) / Math.max(0.05, c.roof - base)
+  // Furthest forward (and back) anything at height y can sit and stay inside the glass.
+  const fwd = (y: number) => c.front - 0.03 - (y - base) * slope
+  const aft = (y: number) => c.rear + 0.03 + (y - base) * back
+  const wi = s.wid * 0.8 - 0.06
+  const dy = top + 0.035
+  k.add('dash', rbox1(wi, 0.05, 0.09, 0.02), [0, dy, fwd(dy + 0.025) - 0.045])
+  const dx = s.wid * 0.19
+  // Gauge hood in front of the driver, and a lit screen in the middle of the dash.
+  k.add('dash', rbox1(0.1, 0.03, 0.05, 0.012), [dx, dy + 0.035, fwd(dy + 0.05) - 0.06])
+  k.add('display', plane(0.06, 0.035), [0, dy + 0.02, fwd(dy + 0.04) - 0.095], [-0.4, 0, 0])
+  const wy = top + 0.075
+  steering(k, dx, wy, fwd(wy + 0.03) - 0.1)
+  const hb = Math.max(0.06, Math.min(0.15, s.cabinH * 0.85 - 0.075))
+  const sw = Math.min(0.15, s.wid * 0.25)
+  const zs = Math.max(aft(top + hb) + 0.03, Math.min(fwd(top) - 0.28, c.front - s.cabinLen * 0.5))
+  for (const sd of [-1, 1]) seat(k, sd * dx, base, zs, sw, hb)
+  k.add('dash', rbox1(0.06, 0.05, 0.2, 0.015), [0, base + 0.03, zs + 0.1])
+  // Rear rows, as many as fit behind the front seats.
+  for (let z = zs - 0.22; aft(top + hb) + 0.02 < z; z -= 0.22) {
+    k.add('cabin', rbox1(wi * 0.9, 0.045, 0.11, 0.018), [0, base + 0.025, z + 0.045])
+    k.add('cabin', rbox1(wi * 0.9, hb * 0.85, 0.04, 0.016), [0, base + hb * 0.42 + 0.03, z - 0.02], [-0.15, 0, 0])
+    for (const sd of [-1, 1]) k.add('cabin', rbox1(sw * 0.5, 0.035, 0.03, 0.01), [sd * dx, base + hb * 0.85 + 0.05, z - 0.03])
+  }
+  const my = c.roof - 0.035
+  k.add('dash', rbox1(0.055, 0.02, 0.012, 0.006), [0, my, fwd(my) - 0.02])
+}
+
+// Brake rotors and calipers behind each wheel's spokes.
+function brakes(k: Kit, wx: number, wz: number, r: number, w: number) {
+  for (const z of [wz, -wz]) for (const sd of [-1, 1]) {
+    const b = brakeGeo(r, w, sd)
+    k.add('dash', b.rotor, [sd * wx, r, z])
+    k.add('caliper', b.caliper, [sd * wx, r, z])
+  }
 }
 
 // Stock parts that a fitted mod replaces are left out of the merged body.
@@ -309,7 +375,29 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
   const cowl = s.cabinZ + s.cabinLen / 2
   const hoodFront = s.len / 2 - s.len * 0.1
   const front = s.len / 2
-  const lightY = s.lift + (Math.max(s.lift + 0.1, hoodY - s.nose) - s.lift) * 0.7
+  const low = LOW.includes(body) || SLEEK.includes(body)
+  // Front bumper: slimmer and lower on low cars so the headlights clear it.
+  const bumperH = low ? 0.05 : 0.07
+  const bumperY = s.lift + (low ? 0.055 : 0.07)
+  const plateY = low ? bumperY + 0.005 : s.lift + 0.12
+  const lightY = Math.min(lower.hoodRaw - 0.012, Math.max(bumperY + bumperH / 2 + 0.03, s.lift + (Math.max(s.lift + 0.1, hoodY - s.nose) - s.lift) * 0.7))
+  // Where a flat part at height y sits on the nose, and how far it tips back: the
+  // front face is upright up to the nose line, then curves back into the hood.
+  const noseAt = (y: number): [number, number, number] => {
+    const n = lower.nose
+    const h = lower.hoodRaw
+    if (y <= n || h - n < 0.005) return [front, y, 0]
+    const t = 1 - Math.sqrt(1 - Math.min(1, (y - n) / (h - n)))
+    const nz = 2 * (1 - t) * (h - n)
+    const ny = 2 * t * s.len * 0.12
+    const l = Math.hypot(nz, ny) || 1
+    return [lower.L - t * t * s.len * 0.12 + (b * nz) / l, y + (b * ny) / l, -Math.atan2(ny, nz)]
+  }
+  // Adds a part flat on the nose at (x, y), lifted `out` off the surface, turned rz in its own plane.
+  const onNose = (part: Part, geo: BufferGeometry, x: number, y: number, out = 0.004, rz = 0) => {
+    const [nz, ny, rx] = noseAt(y)
+    k.add(part, geo, [x, ny - Math.sin(rx) * out, nz + Math.cos(rx) * out], [rx, 0, rz])
+  }
   const closed = !s.open && !s.round
   let roofY = top
   let roofLen = 0
@@ -334,6 +422,10 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
     // Chrome strip round the dome's base and a little rear engine grille.
     k.add('chrome', new TorusGeometry(1, 0.03, 4, 24), [0, top - 0.015, s.cabinZ], [Math.PI / 2, 0, 0], [sc[0] * 1.01, sc[2] * 1.01, 1])
     for (const y of [0, 0.03, 0.06]) k.add('black', box(0.2, 0.012, 0.01), [0, top - 0.09 + y, -front - 0.002])
+    // Two little seats, a dash and a wheel under the dome.
+    for (const sd of [-1, 1]) seat(k, sd * s.wid * 0.17, top - 0.02, s.cabinZ - 0.04, s.wid * 0.22, 0.12)
+    k.add('dash', rbox(s.wid * 0.6, 0.05, 0.06, 0.02), [0, top + 0.03, s.cabinZ + s.cabinLen * 0.3])
+    steering(k, s.wid * 0.17, top + 0.08, s.cabinZ + s.cabinLen * 0.22)
   } else if (s.open) {
     // Open top: raked windshield in a frame, seats with headrests, a dash and a wheel.
     const base: V3 = [0, top, s.cabinZ]
@@ -357,6 +449,7 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
     const cb = 0.025
     const c = cabinProfile(s, lower.deck - 0.01, cb)
     k.add('glass', extrude(c.sh, s.wid * 0.8, cb))
+    cabinInside(k, s, top, c)
     // Painted roof panel sitting on the glass, slightly wider so it reads as a roof line.
     const rs = new ThreeShape()
     const t = 0.03
@@ -498,7 +591,7 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
     k.add('chrome', box(0.012, 0.05, 0.03), [0, hoodY + 0.025, front - 0.04], [-0.4, 0, 0])
     for (const sd of [-1, 1]) k.add('chrome', box(0.008, 0.014, s.len * 0.7), [sd * (s.wid / 2 + 0.004), s.lift + s.body * 0.7, 0])
   }
-  if (s.frontbar) k.add('lamp', plane(s.wid * 0.82, 0.014), [0, lightY + 0.03, front + 0.006])
+  if (s.frontbar) onNose('lamp', plane(s.wid * 0.82, 0.014), 0, lightY + 0.03, 0.006)
   if (s.ducktail && !fit.spoiler) k.add('paint', box(s.wid * 0.84, 0.03, 0.1), [0, top + 0.015, -s.len / 2 + 0.07], [0.35, 0, 0])
   if (s.flares && !fit.kit) {
     for (const sd of [-1, 1]) {
@@ -548,11 +641,11 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
     if (roofLen > 0) k.add('stripe', box(0.07, 0.006, roofLen * 0.95), [x, roofY + 0.003, roofZ])
   }
 
-  // Bumpers, with a black lower lip on the front.
-  for (const sd of [1, -1]) k.add('chrome', rbox(s.wid * 0.96, 0.07, 0.06, 0.028), [0, s.lift + 0.07, sd * (s.len / 2 - 0.005)])
-  if (!fit.kit) k.add('black', box(s.wid * 0.8, 0.02, 0.05), [0, s.lift + 0.03, s.len / 2 - 0.02])
-  // Front: headlights in dark bezels either side of a grille (or a low intake on sleek cars), turn signals and a plate.
-  const z = front + 0.004
+  // Bumpers, with a black lower lip and a lower air intake on the front.
+  k.add('chrome', rbox(s.wid * 0.96, bumperH, 0.06, 0.024), [0, bumperY, front - 0.005])
+  k.add('chrome', rbox(s.wid * 0.96, 0.07, 0.06, 0.028), [0, s.lift + 0.07, -front + 0.005])
+  if (!fit.kit) k.add('black', box(s.wid * 0.8, 0.02, 0.05), [0, s.lift + 0.03, front - 0.02])
+  // Front: headlights in dark housings either side of a grille (or a low intake on sleek cars), turn signals and a plate.
   const roundLamps = ROUND_LAMPS.includes(body)
   const bigGrille = BIG_GRILLE.includes(body)
   const sleek = SLEEK.includes(body)
@@ -560,40 +653,65 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
     const x = sd * s.wid * 0.3
     if (s.quad) {
       // Two round lamps each side in a black bezel; the inner left one is an air intake.
-      k.add('black', rbox(0.17, 0.07, 0.01, 0.01), [sd * s.wid * 0.3, lightY, z - 0.002])
+      onNose('black', rbox(0.17, 0.07, 0.01, 0.01), x, lightY, 0.002)
       for (const lx of [0.37, 0.23]) {
         const intake = sd < 0 && lx === 0.23
-        k.add(intake ? 'black' : 'lamp', disc(0.028, 14), [sd * s.wid * lx, lightY, z + 0.004])
-        k.add(intake ? 'chrome' : 'lamp', new TorusGeometry(0.031, 0.004, 4, 16), [sd * s.wid * lx, lightY, z + 0.005])
+        onNose(intake ? 'black' : 'lamp', disc(0.028, 14), sd * s.wid * lx, lightY, 0.008)
+        onNose(intake ? 'chrome' : 'chrome', new TorusGeometry(0.031, 0.005, 4, 16), sd * s.wid * lx, lightY, 0.009)
+        if (!intake) onNose('chrome', disc(0.009, 8), sd * s.wid * lx, lightY, 0.01)
       }
     } else if (roundLamps) {
-      k.add('black', disc(0.056, 16), [x, lightY, z - 0.002])
-      k.add('lamp', disc(0.045, 16), [x, lightY, z])
+      // Sealed-beam lamp: black bucket, chrome ring, lens and a bulb shield in the middle.
+      onNose('black', disc(0.058, 18), x, lightY, 0.002)
+      onNose('lamp', disc(0.046, 18), x, lightY, 0.004)
+      onNose('chrome', new TorusGeometry(0.049, 0.006, 4, 20), x, lightY, 0.006)
+      onNose('chrome', disc(0.014, 10), x, lightY, 0.007)
+      for (const a of [-0.5, 0.5]) onNose('chrome', plane(0.002, 0.07), x, lightY, 0.0055, a)
+    } else if (sleek) {
+      // Slim slanted LED strip with a row of projector dots under it.
+      onNose('black', plane(0.17, 0.042), x, lightY, 0.002, sd * 0.16)
+      onNose('lamp', plane(0.16, 0.009), x, lightY + 0.013, 0.004, sd * 0.16)
+      for (const i of [0, 1, 2]) onNose('lamp', disc(0.009, 8), x - sd * (0.045 - i * 0.04), lightY - 0.006 + sd * (0.045 - i * 0.04) * 0.16, 0.004)
     } else {
-      k.add('black', plane(0.16, 0.055), [x, lightY, z - 0.002], [0, 0, sd * 0.12])
-      k.add('lamp', plane(0.14, 0.04), [x, lightY, z], [0, 0, sd * 0.12])
+      // Housing with a chrome reflector, twin projector lenses and a light strip along the top.
+      onNose('black', plane(0.16, 0.055), x, lightY, 0.002, sd * 0.12)
+      onNose('glass', plane(0.144, 0.042), x, lightY, 0.003, sd * 0.12)
+      for (const lx of [-0.035, 0.035]) {
+        const px = x + lx * sd
+        onNose('black', disc(0.019, 12), px, lightY - 0.004 + lx * sd * 0.12, 0.004)
+        onNose('lamp', disc(0.014, 12), px, lightY - 0.004 + lx * sd * 0.12, 0.005)
+      }
+      onNose('lamp', plane(0.13, 0.008), x, lightY + 0.017, 0.005, sd * 0.12)
     }
     // Amber turn signal at the outer corner, and a side marker behind it.
-    k.add('amber', plane(0.045, 0.022), [sd * s.wid * 0.43, lightY - 0.045, z])
+    onNose('amber', plane(0.045, 0.022), sd * s.wid * 0.43, lightY - 0.04, 0.004)
     k.add('amber', plane(0.04, 0.018), [sd * (s.wid / 2 + 0.004), lightY - 0.02, front - 0.09], [0, (sd * Math.PI) / 2, 0])
     // Fog lamps low on the bumper of off-roaders and rally cars.
     if (RUGGED.includes(body)) k.add('lamp', disc(0.025, 10), [sd * s.wid * 0.3, s.lift + 0.07, front + 0.026])
   }
   if (!sleek) {
-    k.add(bigGrille ? 'chrome' : 'black', rbox(s.wid * (bigGrille ? 0.42 : 0.3), bigGrille ? 0.07 : 0.045, 0.01, 0.004), [0, lightY - 0.005, z])
-    // Grille slats.
-    const n = bigGrille ? 3 : 2
-    for (let i = 0; i < n; i++) {
-      const gh = bigGrille ? 0.07 : 0.045
-      k.add(bigGrille ? 'black' : 'dark', box(s.wid * (bigGrille ? 0.38 : 0.27), 0.006, 0.006), [0, lightY - 0.005 - gh / 2 + (gh * (i + 1)) / (n + 1), z + 0.005])
+    // Grille: a surround with a mesh of slats and bars behind it.
+    const gw = s.wid * (bigGrille ? 0.42 : 0.3)
+    const gh = bigGrille ? 0.075 : 0.05
+    const gy = Math.max(bumperY + bumperH / 2 + gh / 2 - 0.005, lightY - 0.005)
+    onNose('dark', plane(gw * 0.94, gh * 0.86), 0, gy, 0.003)
+    const rim = bigGrille ? 'chrome' : 'black'
+    for (const sd of [-1, 1]) {
+      onNose(rim, box(gw, 0.008, 0.008), 0, gy + (sd * gh) / 2, 0.004)
+      onNose(rim, box(0.008, gh, 0.008), (sd * gw) / 2, gy, 0.004)
     }
+    const n = bigGrille ? 4 : 3
+    for (let i = 0; i < n; i++) onNose(bigGrille ? 'chrome' : 'black', box(gw * 0.9, 0.005, 0.006), 0, gy - gh / 2 + (gh * (i + 1)) / (n + 1), 0.005)
+    for (let i = 1; i < 6; i++) onNose('black', box(0.004, gh * 0.8, 0.005), (i / 6 - 0.5) * gw * 0.9, gy, 0.004)
   }
   if (sleek && body !== 'bubble') {
-    k.add('black', plane(s.wid * 0.6, 0.035), [0, s.lift + 0.12, z])
+    // Wide intake cut into the bumper, with a splitter bar across it.
+    k.add('black', plane(s.wid * 0.6, bumperH * 0.7), [0, bumperY, front + 0.0255])
+    k.add('dark', box(s.wid * 0.58, 0.006, 0.006), [0, bumperY, front + 0.027])
     // Side air intakes ahead of the rear wheels.
     for (const sd of [-1, 1]) k.add('black', plane(0.14, 0.05), [sd * (s.wid / 2 + 0.004), s.lift + s.body * 0.55, -wz + s.wheel * 1.3], [0, (sd * Math.PI) / 2, 0])
   }
-  k.add('lamp', plane(0.11, 0.04), [0, s.lift + 0.12, s.len / 2 + 0.035])
+  k.add('lamp', plane(0.11, 0.04), [0, plateY, front + 0.032])
   // Rear: wide tail lights with reversing lamps, a plate, and exhausts.
   const ty = s.lift + (top - s.lift) * 0.68
   if (s.lightbar) {
@@ -601,15 +719,23 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
     k.add('black', plane(s.wid * 0.9, 0.06), [0, ty, -front - 0.002], [0, Math.PI, 0])
     k.add('tail', plane(s.wid * 0.86, 0.04), [0, ty, -front - 0.004], [0, Math.PI, 0])
     k.add('dark', plane(0.1, 0.044), [0, ty, -front - 0.006], [0, Math.PI, 0])
+    // LED segments: thin dark breaks along the bar, and reversing lamps at each end.
+    for (let i = 1; i < 10; i++) if (Math.abs(i - 5) > 1) k.add('black', plane(0.003, 0.04), [(i / 10 - 0.5) * s.wid * 0.86, ty, -front - 0.005], [0, Math.PI, 0])
+    for (const sd of [-1, 1]) k.add('lamp', plane(0.035, 0.012), [sd * s.wid * 0.36, ty - 0.012, -front - 0.006], [0, Math.PI, 0])
   } else {
     for (const sd of [-1, 1]) {
-      k.add('black', plane(0.17, 0.06), [sd * s.wid * 0.3, ty, -front - 0.002], [0, Math.PI, 0])
-      k.add('tail', plane(0.15, 0.045), [sd * s.wid * 0.3, ty, -front - 0.004], [0, Math.PI, 0])
+      // Tail light cluster: a red lens with a brighter inner ring, an amber indicator and a reversing lamp.
+      const x = sd * s.wid * 0.3
+      k.add('black', plane(0.17, 0.06), [x, ty, -front - 0.002], [0, Math.PI, 0])
+      k.add('tail', plane(0.15, 0.045), [x, ty, -front - 0.004], [0, Math.PI, 0])
+      k.add('dark', plane(0.15, 0.004), [x, ty + 0.006, -front - 0.005], [0, Math.PI, 0])
+      k.add('lamp', new TorusGeometry(0.012, 0.003, 3, 12), [x + sd * 0.045, ty - 0.006, -front - 0.006], [0, Math.PI, 0])
+      k.add('amber', plane(0.035, 0.012), [x - sd * 0.045, ty - 0.012, -front - 0.006], [0, Math.PI, 0])
       k.add('lamp', plane(0.03, 0.03), [sd * s.wid * 0.19, ty, -front - 0.005], [0, Math.PI, 0])
     }
   }
   k.add('lamp', plane(0.11, 0.045), [0, s.lift + 0.13, -s.len / 2 - 0.035], [0, Math.PI, 0])
-  const pipes = fit.exhaust ? [] : LOW.includes(body) || body === 'muscle' || body === 'widebody' ? [-1, 1] : body === 'offroad' || body === 'ev' ? [] : [-1]
+  const pipes = fit.exhaust || hasTrim(model, 'centerExhaust') ? [] : LOW.includes(body) || body === 'muscle' || body === 'widebody' ? [-1, 1] : body === 'offroad' || body === 'ev' ? [] : [-1]
   for (const sd of pipes) {
     k.add('chrome', cyl(0.024, 0.024, 0.08, 10), [sd * s.wid * 0.3, s.lift + 0.035, -front - 0.02], [Math.PI / 2, 0, 0])
     k.add('black', disc(0.016, 10), [sd * s.wid * 0.3, s.lift + 0.035, -front - 0.061], [0, Math.PI, 0])
@@ -634,10 +760,11 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
       k.add('glass', plane(0.045, 0.028), [sd * (s.wid * 0.4 + 0.03), top + 0.05, cowl - 0.056], [0, Math.PI, 0])
     }
   }
+  if (!s.tracks) brakes(k, s.track ?? s.wid / 2 - 0.02, wz, s.wheel, 0.14)
   // This model's own trim (see carTrim.ts).
   trimCar(k, model, {
     len: s.len, wid: s.wid, lift: s.lift, body: s.body, wheel: s.wheel, cabinZ: s.cabinZ, cabinLen: s.cabinLen,
-    top, hoodY, bulge: s.hood * 2 > 0 ? s.hood : 0, hoodFront, cowl, front, wz, lightY, ty, roofY, roofLen, roofZ, closed,
+    top, hoodY, bulge: s.hood * 2 > 0 ? s.hood : 0, hoodFront, cowl, front, wz, lightY, plateY, nose: noseAt, exhaust: !!fit.exhaust, ty, roofY, roofLen, roofZ, closed,
   })
 
   // Wheel: one mesh per wheel. The tread and the spoked rim share one texture,
@@ -664,6 +791,20 @@ const MAT = {
   lamp: new MeshBasicMaterial({ color: '#fffde7' }),
   tail: new MeshBasicMaterial({ color: '#ff1744' }),
   amber: new MeshBasicMaterial({ color: '#ffa000' }),
+  dash: new MeshStandardMaterial({ color: '#26282b', roughness: 0.7, metalness: 0.2 }),
+  rubber: new MeshStandardMaterial({ color: '#1c1c1e', roughness: 0.92 }),
+  display: new MeshBasicMaterial({ color: '#7fd0ff' }),
+}
+// Tinted glass you can see the cabin through, for cars shown whole. Town traffic
+// bakes MAT.glass solid instead.
+const seeGlass = new MeshStandardMaterial({ color: '#3d6a8c', metalness: 0.6, roughness: 0.04, transparent: true, opacity: 0.55, depthWrite: false })
+// One material per seat, caliper or rim colour in use.
+const tinted = new Map<string, MeshStandardMaterial>()
+function matOf(key: string, color: string, metal: number, rough: number) {
+  const k = `${key}|${color}|${metal}|${rough}`
+  let m = tinted.get(k)
+  if (!m) tinted.set(k, (m = new MeshStandardMaterial({ color, metalness: metal, roughness: rough })))
+  return m
 }
 // Wheel materials: stock, and one per rim finish from the Rims mod.
 const wheelMats = new Map<string, MeshStandardMaterial>()
@@ -673,6 +814,29 @@ function wheelMaterial(rim?: string) {
   let m = wheelMats.get(key)
   if (!m) wheelMats.set(key, (m = new MeshStandardMaterial({ map: wheelTex(), color: look?.[0] ?? '#ffffff', metalness: look?.[1] ?? 0.35, roughness: look?.[2] ?? 0.6 })))
   return m
+}
+
+// A rims mod swaps the stock rim for its own style and finish.
+const RIM_STYLE: Record<string, RimStyle> = { chrome: 'deep', goldmesh: 'mesh', forged: 'split' }
+
+// Close-up wheels: a tyre and a 3D rim each, steering and rolling with the rig.
+function Wheels({ at, r, w, rig, rims, rusty, look }: { at: number[][]; r: number; w: number; rig?: WheelRig; rims?: string; rusty?: boolean; look: CarStyle }) {
+  const mod = rims ? RIM_LOOK[rims] : undefined
+  const style = (rims && RIM_STYLE[rims]) || look.rim
+  const geo = wheelGeo(style, r, w, look.ww && !mod)
+  const rim = rusty ? matOf('rim', '#7a5a44', 0.2, 0.9) : mod ? matOf('rim', mod[0], Math.max(0.6, mod[1] + 0.4), mod[2]) : matOf('rim', look.rimColor ?? '#d5d9de', 0.75, 0.28)
+  return (
+    <>
+      {at.map(([x, z], i) => (
+        <group key={i} position={[x, r, z]} ref={rig && i < 2 ? (o) => void (rig.steer[i] = o) : undefined}>
+          <group ref={rig ? (o) => void (rig.spin[i] = o) : undefined}>
+            <mesh geometry={geo.tire} material={MAT.rubber} castShadow />
+            <mesh geometry={geo.rims[x < 0 ? 0 : 1]} material={rim} />
+          </group>
+        </group>
+      ))}
+    </>
+  )
 }
 
 // Handles on a car's wheels so a driving car can steer the front pair and roll all four.
@@ -771,7 +935,8 @@ function CarBody({ body, model, color, finish, skin, highlight, stripe, beams, r
   const dark = useMemo(() => '#' + new Color(tint).multiplyScalar(0.6).getHexString(), [tint])
   const wz = s.len * 0.33
   const wx = s.track ?? s.wid / 2 - 0.02
-  const shared = (['black', 'chrome', 'glass', 'screen', 'seat', 'wood', 'lamp', 'tail', 'amber'] as const).filter((k) => p[k])
+  const shared = (['black', 'chrome', 'screen', 'seat', 'wood', 'lamp', 'tail', 'amber', 'dash', 'display'] as const).filter((k) => p[k])
+  const look = carStyle(model)
   const beam = beams && (
     <mesh rotation-x={-Math.PI / 2} position={[0, 0.03, s.len / 2 + 0.55]} renderOrder={2}>
       <planeGeometry args={[s.wid * 1.5, 1.3]} />
@@ -806,18 +971,14 @@ function CarBody({ body, model, color, finish, skin, highlight, stripe, beams, r
           <meshStandardMaterial color={stripe} />
         </mesh>
       )}
-      {shared.map((k) => <mesh key={k} geometry={p[k]} material={MAT[k]} castShadow={k === 'glass'} />)}
+      {shared.map((k) => <mesh key={k} geometry={p[k]} material={MAT[k]} />)}
+      {p.glass && <mesh geometry={p.glass} material={seeGlass} castShadow />}
+      {p.cabin && <mesh geometry={p.cabin} material={matOf('seat', look.seat ?? '#2b2b2b', 0, 0.75)} />}
+      {p.caliper && <mesh geometry={p.caliper} material={matOf('cal', look.caliper ?? '#4a4d52', look.caliper ? 0.2 : 0.5, 0.45)} />}
       <CarMods body={body} fit={fit} tint={tint} metal={rusty ? 0.1 : 0.4} flames={flames} />
       {/* Headlight beams on the road, visible after dark. */}
       {beam}
-      {/* Chunky toy wheels with spoked rims. */}
-      {[[-wx, wz], [wx, wz], [-wx, -wz], [wx, -wz]].map(([x, z], i) => (
-        <group key={i} position={[x, s.wheel, z]} ref={rig && i < 2 ? (o) => void (rig.steer[i] = o) : undefined}>
-          <group ref={rig ? (o) => void (rig.spin[i] = o) : undefined}>
-            <mesh geometry={g.wheel} material={wheelMaterial(fit.rims)} />
-          </group>
-        </group>
-      ))}
+      <Wheels at={[[-wx, wz], [wx, wz], [-wx, -wz], [wx, -wz]]} r={s.wheel} w={s.track ? 0.16 : 0.14} rig={rig} rims={fit.rims} rusty={rusty} look={look} />
     </group>
   )
 }
@@ -925,6 +1086,11 @@ function BikeModel({ body, model, color, finish, skin, highlight, beams, rusty, 
   const shared = (['black', 'chrome', 'glass', 'screen', 'seat', 'lamp', 'tail'] as const).filter((k) => p[k])
   const r = SHAPES[bb].wheel
   const wz = BIKE[bb].wz
+  // Close-up wheels: wire spokes on the cruiser, split spokes on the sport bike, pressed steel on the scooter.
+  const bikeStyle: RimStyle = (fit.rims && RIM_STYLE[fit.rims]) || (bb === 'chopper' ? 'wire' : bb === 'sportbike' ? 'split' : 'steel')
+  const bw = wheelGeo(bikeStyle, r, 0.07)
+  const rimLook = fit.rims ? RIM_LOOK[fit.rims] : undefined
+  const bikeRim = rusty ? matOf('rim', '#7a5a44', 0.2, 0.9) : rimLook ? matOf('rim', rimLook[0], Math.max(0.6, rimLook[1] + 0.4), rimLook[2]) : matOf('rim', bb === 'sportbike' ? '#2b2b2b' : '#d5d9de', 0.75, 0.28)
   const beam = beams && (
     <mesh rotation-x={-Math.PI / 2} position={[0, 0.03, SHAPES[bb].len / 2 + 0.5]} renderOrder={2}>
       <planeGeometry args={[0.5, 1.1]} />
@@ -960,7 +1126,8 @@ function BikeModel({ body, model, color, finish, skin, highlight, beams, rusty, 
       {[wz, -wz].map((z, i) => (
         <group key={i} position={[0, r, z]} ref={rig && i === 0 ? (o) => void (rig.steer[0] = o) : undefined}>
           <group ref={rig ? (o) => void (rig.spin[i] = o) : undefined}>
-            <mesh geometry={g.wheel} material={wheelMaterial(fit.rims)} />
+            <mesh geometry={bw.tire} material={MAT.rubber} castShadow />
+            {bw.rims.map((g, j) => <mesh key={j} geometry={g} material={bikeRim} />)}
           </group>
         </group>
       ))}
