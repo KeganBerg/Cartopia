@@ -190,7 +190,7 @@ export function Townspeople() {
   // Only where buildings stand shapes the paths, so starting or collecting a
   // job (which swaps the buildings array) doesn't rebuild the graph.
   const footprint = useGame((s) => footprintOf((s.visiting ?? s).buildings))
-  const land = useGame((s) => (s.visiting ? START_LAND : s.land))
+  const land = useGame((s) => (s.visiting ? (s.visiting.land ?? START_LAND) : s.land))
   const visitKey = useGame((s) => s.visiting?.ownerId ?? 'home')
   const level = useGame((s) => (s.visiting ?? s).level)
   const graph = useMemo(() => {

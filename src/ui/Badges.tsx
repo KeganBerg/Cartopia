@@ -1,7 +1,7 @@
 import { Vector3 } from 'three'
 import { useState } from 'react'
 import { useGame, buyablePlots, type PlacedBuilding } from '../game/store'
-import { buildingDef, buildingLevel, jobLevel, carDef, levelLift, plotPrice, START_LAND, upgradeJobSeconds } from '../game/data'
+import { buildingDef, buildingLevel, jobLevel, carDef, loves, levelLift, plotPrice, START_LAND, upgradeJobSeconds } from '../game/data'
 import { anchors, anchorRef } from '../scene/anchors'
 import { centerOf, plotCenter } from '../scene/World'
 import { useNow } from '../scene/useNow'
@@ -15,6 +15,8 @@ function JobBadge({ b, now }: { b: PlacedBuilding; now: number }) {
   const d = buildingDef(b.def)
   const tap = useGame((s) => s.tapBuilding)
   const lit = useGame((s) => !!s.highlight?.includes(b.def))
+  // A driver at work: a heart when it loves the place, a wrench when it needs fixing.
+  const driver = useGame((s) => (b.car ? s.cars.find((c) => c.uid === b.car) : undefined))
   const [cx, cz] = centerOf(b.def, b.x, b.z, b.rot)
   const lvl = buildingLevel(b)
   anchors.set(b.uid, new Vector3(cx, (d.w > 1 ? 2.6 : 2.2) + levelLift(lvl), cz))
@@ -39,6 +41,7 @@ function JobBadge({ b, now }: { b: PlacedBuilding; now: number }) {
           <span className="start">⛽ {d.fuelCost}</span>
         )}
         {lvl > 1 && <span className="badge-lvl">{lvl}</span>}
+        {driver && <span className={`badge-driver${driver.flat || driver.lowFuel ? ' off' : ''}`}>{driver.flat || driver.lowFuel ? '🔧' : loves(carDef(driver.model), d.id) ? '❤️' : '🚗'}</span>}
       </button>
     </div>
   )
