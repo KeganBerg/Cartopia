@@ -9,7 +9,8 @@ import { TILE, PLOT, PLOT_MIN, PLOT_MAX, START_LAND, buildingDef, buildingLevel 
 import { BuildingModel } from './BuildingModel'
 import { rotateCurrent, setGhostTurn, turnOf } from '../game/placement'
 import { mergeGroups, groupOf, groupTurn, groupScale, type MergeGroup } from '../game/merge'
-import { MergeScale } from './mergeScale'
+import { KeepShapes, MergeScale } from './mergeScale'
+import { propLimit } from './keepShape'
 import { sfx } from '../lib/sound'
 import { Clouds } from './Clouds'
 import { DayNight } from './DayNight'
@@ -231,7 +232,9 @@ function Building({ b, roads, group }: { b: PlacedBuilding; roads: Set<string>; 
       <group scale={[sx, sy, sz]}>
         <MergeScale.Provider value={group ? [sx, sy, sz] : ONE}>
           <PopGroup uid={b.uid}>
-            <BuildingModel def={d} level={buildingLevel(b)} />
+            <KeepShapes limit={propLimit(d.w * TILE, d.h * TILE)}>
+              <BuildingModel def={d} level={buildingLevel(b)} />
+            </KeepShapes>
           </PopGroup>
         </MergeScale.Provider>
       </group>
