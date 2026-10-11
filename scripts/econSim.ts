@@ -9,7 +9,7 @@
 // goals that need them are claimed on a timer as a stand-in.
 import {
   BUILDINGS, GOALS, CARS, DAILY_BONUS, QUEST_PAY, payAt, xpToNext, baseFuelCap, buildingUpgradeCost, upgradePayout, upgradeXp,
-  upgradeJobSeconds, upgradeFuelCap, upgradePartsPayout, buildingUpgradeXp, MAX_BUILDING_LEVEL, type BuildingDef,
+  upgradeJobSeconds, upgradeFuelCap, BUCKS_PACKS, refillBucks, upgradePartsPayout, buildingUpgradeXp, MAX_BUILDING_LEVEL, type BuildingDef,
 } from '../src/game/data'
 
 const CHECK = Number(process.env.CHECK ?? 60)
@@ -19,6 +19,10 @@ const DAYS = Number(process.env.DAYS ?? 60)
 type B = { d: BuildingDef; level: number; endsAt: number | null; pay: number; xp: number }
 // The starting town (public.econ_starter on the server).
 let coins = 2500, xp = 0, level = 1, fuel = 25, parts = 10, bucks = 10
+// SPEND20=1: the player buys the $19.99 Vault of Bucks on day one and spends every buck on refills.
+const SPEND20 = !!process.env.SPEND20
+const vault = BUCKS_PACKS.find((p) => p.id === 'vault')!
+if (SPEND20) { bucks += vault.bucks + vault.bonus; coins += vault.coins ?? 0; parts += vault.parts ?? 0 }
 let earned = 0, jobs = 0, built = 0, upgrades = 0
 const town: B[] = []
 const claimed = new Set<string>()
@@ -37,7 +41,7 @@ function addXp(n: number) {
     bucks++
     coins += level * 100
     fuel = Math.max(fuel, cap())
-    for (const m of [3, 5, 8, 10, 12, 15, 20]) if (level === m) out[`L${m}`] = `day ${(t / 1440 + 1).toFixed(1)}`
+    for (const m of [3, 5, 8, 10, 12, 15, 20, 26, 30, 36, 40]) if (level === m) out[`L${m}`] = `day ${(t / 1440 + 1).toFixed(1)}`
   }
 }
 function earn(n: number) { coins += n; earned += n }
@@ -62,9 +66,7 @@ function incomePerCheck(list: { d: BuildingDef; level: number }[], f: number) {
   return inc
 }
 
-function checkIn() {
-  // Collect.
-  for (const b of town) if (b.endsAt !== null && t * 60 >= b.endsAt) { earn(b.pay); addXp(b.xp); b.endsAt = null; jobs++ }
+function startJobs() {
   // Start jobs, best coins per fuel first.
   for (const b of jobsFor().sort((a, b) => perFuel(b.d, b.level) - perFuel(a.d, a.level))) {
     if (b.endsAt === null && fuel >= b.d.fuelCost!) {
@@ -74,6 +76,17 @@ function checkIn() {
       parts += upgradePartsPayout(b.d, b.level)
       b.xp = upgradeXp(b.d, b.level)
     }
+  }
+}
+
+function checkIn() {
+  // Collect.
+  for (const b of town) if (b.endsAt !== null && t * 60 >= b.endsAt) { earn(b.pay); addXp(b.xp); b.endsAt = null; jobs++ }
+  startJobs()
+  // Out of fuel with idle shops: a paying player fills up with bucks and keeps going.
+  const idle = jobsFor().filter((b) => b.endsAt === null)
+  if (SPEND20 && idle.length && fuel < Math.min(...idle.map((b) => b.d.fuelCost!)) && bucks >= refillBucks(cap() - fuel)) {
+    bucks -= refillBucks(cap() - fuel); fuel = cap(); startJobs()
   }
   // Goals: tracked ones when met, untracked ones (races, campaign, cars...) 45 play-minutes after they open.
   const active = GOALS.filter((g) => !g.event && !claimed.has(g.id) && level >= (g.level ?? 1)).slice(0, 3)
@@ -143,10 +156,12 @@ for (t = 0; t < DAYS * 1440; t += CHECK) {
   playMin += CHECK
   checkIn()
 }
+const topCar = CARS.filter((c) => !c.rescueOnly && !c.season).sort((a, b) => b.unlockLevel - a.unlockLevel)[0]
 const newestCar = (l: number) => CARS.filter((c) => !c.bucks && !c.rescueOnly && !c.season && c.unlockLevel <= l).sort((a, b) => b.price - a.price)[0]
 console.log(JSON.stringify({
   reached: out,
   finalLevel: level, coins: Math.round(coins), earned: Math.round(earned), bucks, buildings: town.length,
   coinsPerPlayHour: hourly,
+  topCar: `${topCar.name} unlocks at level ${topCar.unlockLevel}: ${out[`L${topCar.unlockLevel}`] ?? 'not reached'}`,
   newestCarAtL5: newestCar(5).name + ' ' + newestCar(5).price,
 }, null, 1))

@@ -228,8 +228,8 @@ describe('collection book', () => {
 
   it('says where to find each car', () => {
     expect(carSource(carDef('bug')).text).toBe("Rusty's · Suburbs")
-    expect(carSource(carDef('lambo')).text).toBe('Showroom · B75')
-    expect(carSource(carDef('vette')).text).toBe('Showroom · Lv 6')
+    expect(carSource(carDef('lambo')).text).toBe('Showroom · B90')
+    expect(carSource(carDef('vette')).text).toBe('Showroom · Lv 15')
   })
 
   it('lists a set as ready once every car in it is owned and unclaimed', () => {
