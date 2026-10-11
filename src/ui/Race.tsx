@@ -4,7 +4,7 @@ import { CARS, SKILLS, carDef, performance, RACE_FUEL, GP_SERIES, GP_ROUNDS, gpR
 import { TRACK, freshRacer, stepRacer, shiftQuality } from '../game/race'
 import { CarThumb } from '../scene/BuildingPreview'
 import { supabase } from '../lib/supabase'
-import { Panel } from './Menus'
+import { Panel, SheetTabs } from './Menus'
 import { Canvas } from '@react-three/fiber'
 import { NeutralToneMapping } from 'three'
 import { RaceScene } from '../scene/RaceScene'
@@ -84,6 +84,7 @@ export function RacePanel() {
   const [race, setRace] = useState<Rival | null>(null)
   const [gpRace, setGpRace] = useState<{ series: GpSeries; rival: Rival; prize: number } | null>(null)
   const [tab, setTab] = useState<'quick' | 'gp'>('quick')
+  const [pickCar, setPickCar] = useState(false)
   const gpResult = useGame((s) => s.gpResult)
 
   const livePlayers = useLive((l) => l.players)
@@ -125,20 +126,30 @@ export function RacePanel() {
 
   return (
     <Panel title="Drag Race" wide>
-      <h3>Your car</h3>
-      <div className="race-cars">
-        {cars.map((c) => (
-          <button key={c.uid} className={c.uid === car?.uid ? 'chip sel' : 'chip'} onClick={() => setCarId(c.uid)}>
-            <CarThumb size="xs" color={c.color} body={carDef(c.model).body} stripe={c.stripe} mods={c.mods} /> {carDef(c.model).name} · PI {pi(c)}{carDef(c.model).skill ? ` ${SKILLS[carDef(c.model).skill!].icon}` : ''}
-          </button>
-        ))}
-      </div>
-      {car && carDef(car.model).skill && <p className="hint">{SKILLS[carDef(car.model).skill!].icon} <b>{SKILLS[carDef(car.model).skill!].name}:</b> {SKILLS[carDef(car.model).skill!].text}</p>}
-      <div className="tabs">
-        <button className={tab === 'quick' ? 'tab sel' : 'tab'} onClick={() => setTab('quick')}>🏁 Quick race</button>
-        <button className={tab === 'gp' ? 'tab sel' : 'tab'} onClick={() => setTab('gp')}>🏆 Grand Prix</button>
-        <button className="tab" onClick={() => useGame.getState().openPanel('leaders')}>🏅 Top racers</button>
-      </div>
+      <SheetTabs
+        items={[{ id: 'quick', label: '🏁 Quick race' }, { id: 'gp', label: '🏆 Grand Prix' }, { id: 'top', label: '🏅 Top racers' }] as const}
+        value={tab}
+        onChange={(t) => (t === 'top' ? useGame.getState().openPanel('leaders') : setTab(t))}
+      />
+      {car && (pickCar ? (
+        <div className="race-cars">
+          {cars.map((c) => (
+            <button key={c.uid} className={c.uid === car.uid ? 'chip sel' : 'chip'} onClick={() => { setCarId(c.uid); setPickCar(false) }}>
+              <CarThumb size="xs" color={c.color} body={carDef(c.model).body} stripe={c.stripe} mods={c.mods} /> {carDef(c.model).name} · PI {pi(c)}{carDef(c.model).skill ? ` ${SKILLS[carDef(c.model).skill!].icon}` : ''}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <button className="race-car-pick" onClick={() => setPickCar(true)} disabled={cars.length < 2}>
+          <CarThumb size="sm" color={car.color} body={carDef(car.model).body} stripe={car.stripe} mods={car.mods} />
+          <span>
+            <small>Racing with</small>
+            <b>{carDef(car.model).name} · PI {pi(car)}</b>
+            {carDef(car.model).skill && <small>{SKILLS[carDef(car.model).skill!].icon} {SKILLS[carDef(car.model).skill!].name}: {SKILLS[carDef(car.model).skill!].text}</small>}
+          </span>
+          {cars.length > 1 && <span className="chev">Change ›</span>}
+        </button>
+      ))}
       {tab === 'gp' ? (
         <GrandPrix onRace={(series, rival, prize) => {
           if (waiting()) return
