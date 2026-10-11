@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGame, spendFuel, type OwnedCar } from '../game/store'
-import { CARS, SKILLS, carDef, performance, RACE_FUEL, GP_SERIES, GP_ROUNDS, gpRivalPi, gpReward, type Body, type GpSeries } from '../game/data'
+import { CARS, SKILLS, carDef, performance, RACE_FUEL, GP_SERIES, GP_ROUNDS, gpRivalPi, gpReward, skillBoost, skillDrag, liveSkillBoost, smoothShift, type Body, type GpSeries, type SkillId } from '../game/data'
 import { TRACK, freshRacer, stepRacer, shiftQuality } from '../game/race'
 import { CarThumb } from '../scene/BuildingPreview'
 import { supabase } from '../lib/supabase'
@@ -13,7 +13,8 @@ import { useLive, challenge, refreshPresence, raceChannel, endLiveRace, answer, 
 import { displayName } from '../lib/names'
 import { joinRefereed, reportFinish, serverPi, type Verdict } from '../lib/referee'
 
-type Rival = { id: string; town: string; level: number; carName: string; color: string; pi: number; online: boolean; body: Body; mods?: string[] }
+// skill: the rival car's race skill. AI rivals use it; live players use theirs on their own device.
+type Rival = { id: string; town: string; level: number; carName: string; color: string; pi: number; online: boolean; body: Body; mods?: string[]; skill?: SkillId }
 
 const TOWNS = ['Transamsylvania', 'Gearville', 'Piston Peak', 'Nitro Bay', 'Chrome City', 'Rustbelt Row', 'Turbo Falls', 'Muffler Hills']
 const zero = { engine: 0, turbo: 0, tires: 0, weight: 0 }
@@ -29,7 +30,7 @@ function carNear(target: number) {
 function gpRival(series: GpSeries, round: number, clears: number): Rival {
   const target = gpRivalPi(series, round, clears)
   const car = carNear(target)
-  return { id: `gp-${series.id}-${round}`, town: series.rivals[round], level: series.unlockLevel + round, carName: car.name, color: car.colors[round % car.colors.length], pi: target, online: false, body: car.body }
+  return { id: `gp-${series.id}-${round}`, town: series.rivals[round], level: series.unlockLevel + round, carName: car.name, color: car.colors[round % car.colors.length], pi: target, online: false, body: car.body, skill: car.skill }
 }
 
 function makeRivals(myPi: number, level: number): Rival[] {
@@ -46,6 +47,7 @@ function makeRivals(myPi: number, level: number): Rival[] {
       pi: target,
       online: false,
       body: car.body,
+      skill: car.skill,
     }
   })
 }
@@ -70,6 +72,7 @@ async function fetchOnlineRivals(): Promise<Rival[]> {
       online: true,
       body: (r.best_car.body ?? 'sedan') as Body,
       mods: Array.isArray(r.best_car.mods) ? r.best_car.mods : undefined,
+      skill: CARS.find((c) => c.name === r.best_car.name)?.skill,
     }))
 }
 
@@ -173,7 +176,7 @@ export function RacePanel() {
             <i style={{ background: r.color }} />
             <div>
               <b>{r.town}</b> {r.online && <span className="tag">PLAYER</span>}
-              <div className="card-stat">Lvl {r.level} · {r.carName} · PI {r.pi}</div>
+              <div className="card-stat">Lvl {r.level} · {r.carName} · PI {r.pi}{r.skill && <RivalSkill skill={r.skill} />}</div>
             </div>
             <button className="buy small" onClick={() => start(r)}>Race · win ${reward(r)}</button>
           </div>
@@ -183,6 +186,10 @@ export function RacePanel() {
       <p className="hint">Shift when the needle hits the green zone. Space bar works too.</p>
     </Panel>
   )
+}
+
+function RivalSkill({ skill }: { skill: SkillId }) {
+  return <span className="rival-skill" title={`${SKILLS[skill].name}: ${SKILLS[skill].text}`}> · {SKILLS[skill].icon} {SKILLS[skill].name}</span>
 }
 
 function GrandPrix({ onRace }: { onRace: (s: GpSeries, r: Rival, prize: number) => void }) {
@@ -223,7 +230,7 @@ function GrandPrix({ onRace }: { onRace: (s: GpSeries, r: Rival, prize: number) 
                 </div>
               ) : (
                 <div className="gp-next">
-                  <span>Race {prog.round + 1}: <b>{rival.town}</b> · {rival.carName} · PI {rival.pi}</span>
+                  <span>Race {prog.round + 1}: <b>{rival.town}</b> · {rival.carName} · PI {rival.pi}{rival.skill && <RivalSkill skill={rival.skill} />}</span>
                   <button className="buy small" onClick={() => onRace(s, rival, prize)}>Race · win ${prize}</button>
                 </div>
               )}
@@ -305,6 +312,10 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
   const def = carDef(car.model)
   const skillActive = useRef(false)
   const [skillShown, setSkillShown] = useState(false)
+  // The AI rival's skill, flashed while it is working (live rivals use theirs on their own device).
+  const theirSkill = live ? undefined : rival.skill
+  const theirActive = useRef(false)
+  const [theirShown, setTheirShown] = useState(false)
   const t = useRef(0)
   const [, force] = useState(0)
   // Live races wait for both players before counting down.
@@ -423,14 +434,16 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
       const wasDone = me.current.finished !== null
       const sk = def.skill
       const th0 = them.current
-      let myMul = 1
-      let skillOn = false
-      if (sk === 'launch' && me.current.gear === 0) { myMul = 1.2; skillOn = true }
-      else if (sk === 'nitro' && me.current.gear === 3) { myMul = 1.15; skillOn = true }
-      else if (sk === 'slipstream' && me.current.dist < th0.dist && me.current.dist > 0) { myMul = 1.08; skillOn = true }
-      // In a live race the rival runs on their own device, so Oil Slick boosts us instead.
-      else if (sk === 'oil' && live && t.current < 2.5) { myMul = 1.1; skillOn = true }
+      // In a live race the rival runs on their own device, so slow-downs boost us instead.
+      const mine = live ? liveSkillBoost(sk, me.current, th0, t.current) : skillBoost(sk, me.current, th0) * skillDrag(sk, th0, t.current)
+      const skillOn = mine !== 1
       if (skillOn !== skillActive.current) { skillActive.current = skillOn; setSkillShown(skillOn) }
+      // What the AI rival's skill does to its car and to ours this frame.
+      const theirBoost = skillBoost(theirSkill, th0, me.current)
+      const theirDrag = skillDrag(theirSkill, me.current, t.current)
+      const theirOn = theirBoost !== 1 || theirDrag !== 1
+      if (theirOn !== theirActive.current) { theirActive.current = theirOn; setTheirShown(theirOn) }
+      const myMul = (live ? mine : skillBoost(sk, me.current, th0)) * theirDrag
       step(me.current, myPi, dt, t.current, myMul)
       const th = them.current
       if (live) {
@@ -447,11 +460,12 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
         if (myFinishSentAt !== null && th.finished === null && now - myFinishSentAt > 15000) th.finished = Infinity
       } else {
         if (th.gear < 3 && th.rpm >= skill[th.gear]) {
-          th.quality = shiftQuality(th.rpm).q
+          const q = shiftQuality(th.rpm)
+          th.quality = smoothShift(theirSkill) && q.label === 'Good' ? 1.08 : q.q
           th.gear++
           th.rpm = 0.35
         }
-        step(th, rivalRef.current.pi, dt, t.current, def.skill === 'oil' && t.current < 2.5 ? 0.9 : 1)
+        step(th, rivalRef.current.pi, dt, t.current, theirBoost * skillDrag(sk, th, t.current))
       }
       force((n) => n + 1)
       if (me.current.finished === null) engineRpm(me.current.rpm, me.current.gear)
@@ -475,13 +489,13 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
       cancelAnimationFrame(raf)
       stopEngine()
     }
-  }, [countdown, result, myPi, skill, finishRace, live, def])
+  }, [countdown, result, myPi, skill, finishRace, live, def, theirSkill])
 
   const shift = () => {
     const r = me.current
     if (countdown > 0 || r.gear >= 3 || r.finished !== null) return
     let s = shiftQuality(r.rpm)
-    if (def.skill === 'smooth' && s.label === 'Good') s = { q: 1.08, label: 'SMOOTH!' }
+    if (smoothShift(def.skill) && s.label === 'Good') s = { q: 1.08, label: 'SMOOTH!' }
     sfx.shift(s.q >= 1)
     r.quality = s.q
     r.gear++
@@ -530,6 +544,7 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
       {checking && !result && <div className="rf-wait">Checking the result with the race server...</div>}
       {label && <div className="shift-label big">{label}</div>}
       {def.skill && skillShown && !result && <div className="skill-flash">{SKILLS[def.skill].icon} {SKILLS[def.skill].name}!</div>}
+      {theirSkill && theirShown && !result && <div className="skill-flash theirs">{rival.town}: {SKILLS[theirSkill].icon} {SKILLS[theirSkill].name}!</div>}
       {result ? (
         <RaceResult won={result.won} myTime={result.myTime} theirTime={result.theirTime} cash={result.counted === false ? 0 : result.won ? payout : Math.round(payout * 0.1)} xp={result.counted === false ? 0 : result.won ? 30 : 8} rival={rival.town} note={result.note} noContest={result.counted === false} onExit={onExit} />
       ) : (

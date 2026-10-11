@@ -37,6 +37,9 @@ const SKILL_BOOST: Record<string, (r: Racer, t: number) => number> = {
   nitro: (r) => (r.gear === 3 ? 1.15 : 1),
   slipstream: () => 1.08,
   oil: (_, t) => (t < 2.5 ? 1.1 : 1),
+  // Never the fastest, so they leave the floors as they were.
+  torque: (r) => (r.gear <= 1 ? 1.1 : 1),
+  freeze: (r) => (r.gear === 1 ? 1.1 : 1),
 }
 export function raceFloor(piVal: number) {
   let best = Infinity
