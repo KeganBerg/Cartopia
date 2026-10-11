@@ -24,6 +24,7 @@ import { VenueScenery, VenueBackdrop, ROAD, WALK } from './RaceVenues'
 import type { Venue } from './venues'
 import { RaceWeather, raceWeather } from './Weather'
 import { gloomOf, weatherLook, wetRoad } from './weatherLook'
+import type { Weather as WeatherState } from '../game/weather'
 
 export type RacerView = { dist: number }
 const SCALE = 0.25 // metres of race distance per world unit
@@ -37,6 +38,7 @@ type Props = {
   theirs: { body: Body; model?: string; color: string; mods?: string[] }
   venue: Venue
   weatherSeed?: string // a live race's id, so both racers get the same weather
+  weather?: WeatherState // the race's weather, already rolled (wins over weatherSeed)
 }
 
 export function SkyDome({ tint = '#ffffff' }: { tint?: string }) {
@@ -287,7 +289,7 @@ function StreetDressing({ len, city }: { len: number; city: boolean }) {
 
 // The drag strip, seen from a chase camera. On Main Street it's lined with the
 // player's own town; the other venues bring their own scenery.
-export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed }: Props) {
+export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, weather: given }: Props) {
   const city = venue.id === 'main'
   const meRef = useRef<Group>(null)
   const themRef = useRef<Group>(null)
@@ -296,7 +298,8 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed }:
   const slots = useStreet(len)
   const night = useMemo(() => nightAmount(dayPhase()), [])
   // The venue's weather for this race (see raceWeather).
-  const weather = useMemo(() => raceWeather(venue.id, weatherSeed), [venue.id, weatherSeed])
+  // The race screen passes the one it races on, so the grip matches the sky.
+  const weather = useMemo(() => given ?? raceWeather(venue.id, weatherSeed), [given, venue.id, weatherSeed])
   const beams = night > 0.3 || gloomOf(weather) > 0.5
   // Same lights and colour grade as the town at this time of day.
   const look = useMemo(() => weatherLook(lookFor(night, duskAmount(dayPhase())), weather), [night, weather])

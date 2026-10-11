@@ -20,10 +20,11 @@ export function stepRacer(r: Racer, piVal: number, dt: number, t: number, mul = 
   if (r.dist >= TRACK) r.finished = t
 }
 
-export function shiftQuality(rpm: number) {
-  if (rpm >= 0.78 && rpm <= 0.93) return { q: 1.08, label: 'PERFECT!' }
-  if (rpm >= 0.65 && rpm < 0.78) return { q: 0.95, label: 'Good' }
-  if (rpm > 0.93) return { q: 0.85, label: 'Late' }
+// lo..hi is the perfect window; rain and snow narrow it (see grip.ts).
+export function shiftQuality(rpm: number, lo = 0.78, hi = 0.93) {
+  if (rpm >= lo && rpm <= hi) return { q: 1.08, label: 'PERFECT!' }
+  if (rpm >= 0.65 && rpm < lo) return { q: 0.95, label: 'Good' }
+  if (rpm > hi) return { q: 0.85, label: 'Late' }
   return { q: 0.75, label: 'Early' }
 }
 
