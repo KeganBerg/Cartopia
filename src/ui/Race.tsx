@@ -5,6 +5,7 @@ import { CarThumb } from '../scene/BuildingPreview'
 import { supabase } from '../lib/supabase'
 import { Panel } from './Menus'
 import { Canvas } from '@react-three/fiber'
+import { NeutralToneMapping } from 'three'
 import { RaceScene } from '../scene/RaceScene'
 import { sfx, engineRpm, stopEngine } from '../lib/sound'
 import { useLive, challenge, refreshPresence, raceChannel, endLiveRace, answer, pruneInvites, mute, unmute, setClosed, INVITE_MS, type LiveRace } from '../lib/live'
@@ -462,7 +463,7 @@ function DragRace({ car, rival, onExit, live, prize, onFinish, title }: { car: O
   // One full-screen view: the street fills the screen and the controls float over it.
   return (
     <div className="race-full">
-      <Canvas className="rf-canvas" camera={{ position: [0.4, 2.2, -4], fov: 55, near: 0.3, far: 150 }} dpr={[1, 1.5]}>
+      <Canvas className="rf-canvas" camera={{ position: [0.4, 2.2, -4], fov: 55, near: 0.3, far: 150 }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
         <RaceScene track={TRACK} me={me} them={them} mine={{ body: def.body, color: car.color }} theirs={{ body: rival.body, color: rival.color }} />
       </Canvas>
       <div className="rf-top">
