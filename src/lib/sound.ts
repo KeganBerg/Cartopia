@@ -24,6 +24,7 @@ let volume = (() => {
 })()
 
 const listeners = new Set<() => void>()
+const hidden = () => typeof document !== 'undefined' && document.hidden
 
 function audio() {
   if (muted) return null
@@ -37,9 +38,26 @@ function audio() {
       return null
     }
   }
-  if (ctx.state === 'suspended') ctx.resume()
+  // 'interrupted' (iOS after a call or Siri) needs a resume too, not just 'suspended';
+  // a hidden tab stays paused until it's shown again.
+  if (ctx.state !== 'running' && !hidden()) ctx.resume().catch(() => {})
   return ctx
 }
+
+// Mute and hidden tabs act on the master output at once, so nothing already
+// playing (a race engine whose frames stopped, a dyno pull, a sound effect)
+// keeps going: a hidden tab fades out and then pauses the whole context.
+let pausing: ReturnType<typeof setTimeout> | null = null
+function gate() {
+  if (!ctx || !master) return
+  const quiet = muted || hidden()
+  master.gain.setTargetAtTime(quiet ? 0 : volume, ctx.currentTime, 0.03)
+  if (pausing) clearTimeout(pausing)
+  pausing = null
+  if (hidden()) pausing = setTimeout(() => hidden() && ctx?.suspend().catch(() => {}), 200)
+  else if (!muted && ctx.state !== 'running') ctx.resume().catch(() => {})
+}
+if (typeof document !== 'undefined') document.addEventListener('visibilitychange', gate)
 
 // The shared context and master output for other synthesised audio; null while muted.
 export const audioContext = () => audio()
@@ -55,7 +73,10 @@ if (typeof window !== 'undefined') {
     /* not supported */
   }
   const events = ['pointerdown', 'touchend', 'keydown']
+  // Kept for the whole session: iOS pauses audio again after a call, Siri or
+  // the app going to the background, and only a tap brings it back.
   const unlock = () => {
+    if (ctx?.state === 'running') return
     const a = audio()
     if (!a) return
     // A silent blip inside the gesture is what actually unlocks iOS.
@@ -63,7 +84,6 @@ if (typeof window !== 'undefined') {
     src.buffer = a.createBuffer(1, 1, 22050)
     src.connect(a.destination)
     src.start()
-    if (a.state === 'running') events.forEach((e) => window.removeEventListener(e, unlock, true))
   }
   events.forEach((e) => window.addEventListener(e, unlock, true))
 }
@@ -77,6 +97,7 @@ export function setMuted(m: boolean) {
     /* storage unavailable */
   }
   if (m) stopEngine()
+  gate()
   listeners.forEach((l) => l())
 }
 export const getVolume = () => volume
@@ -87,7 +108,7 @@ export function setVolume(v: number) {
   } catch {
     /* storage unavailable */
   }
-  if (ctx && master) master.gain.setTargetAtTime(volume, ctx.currentTime, 0.05)
+  if (ctx && master && !muted && !hidden()) master.gain.setTargetAtTime(volume, ctx.currentTime, 0.05)
   listeners.forEach((l) => l())
 }
 export function onMuteChange(l: () => void) {
