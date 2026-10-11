@@ -6,6 +6,7 @@ import { anchors } from './anchors'
 import { useGame, type OwnedCar } from '../game/store'
 import { TILE, carDef, performance } from '../game/data'
 import { tripRequests } from '../game/trips'
+import { pedestrianCrossings } from '../game/walkGraph'
 import { turnOf } from '../game/placement'
 import { toWorld, DIRS } from './grid'
 import { CarModel, carSize, wheelRig } from './CarModel'
@@ -186,6 +187,8 @@ export function TownCars() {
   const town = useMemo(() => ({ roads, buildings }), [townKey]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     sim.setTown(town.roads, town.buildings, turnOf)
+    // Stop for people on the zebra crossings.
+    sim.walkers = pedestrianCrossings
   }, [town])
 
   // Which cars are out and how they drive.

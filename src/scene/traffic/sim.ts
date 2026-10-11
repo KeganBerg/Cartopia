@@ -64,6 +64,7 @@ export type Agent = {
   pend: null | { target: string; need: number } // waiting to overtake: asks oncoming cars to hold back
   gapTo: string | null // whatever it is following
   gap: number
+  queuedAt: number // last time it was held waiting its turn at a forecourt
   show: number // 0..1 faded in, for arriving and the rare car that has to give up
   leaving: boolean
 }
@@ -78,6 +79,8 @@ const LOT_V = 1.0
 const SWING = 1.0 // distance over which an overtaking car changes lane
 const TRUCK = { len: 1.52, gap: 0.12 }
 const PASS_V = 1.5
+// Our directions (east, west, south, north) as walkGraph's crosswalk sides (south, east, north, west).
+const SIDE = [1, 3, 0, 2]
 const STOP_LINE = 0.6 // how far short of an intersection cars wait
 const JAMMED = 45 // seconds stuck before a car gives up
 
@@ -112,6 +115,9 @@ export class Traffic {
   agents = new Map<string, Agent>()
   t = 0
   respawns = 0 // cars that sat jammed so long they faded out and came back elsewhere
+  // People on each zebra crossing, keyed "x,z:side" (the road tile it's painted
+  // on and the side facing the intersection, in walkGraph SIDES order).
+  walkers: ReadonlyMap<string, number> = new Map()
   private specs = new Map<string, CarSpec>()
   private trips = new Map<string, TripKind>()
   private ways = new Map<string, { outs: number[]; to: string; heading: number }[]>()
@@ -236,7 +242,7 @@ export class Traffic {
         stalled: false, parked: 0, parkedAt: null, wait: 0,
         plan: [], trip: null, nextVisit: 10 + rand() * 40,
         tow: 0, truck: 0, ot: null, rerouteAt: 0, pend: null, approach: null, arrived: null, boxes: [], claim: [], gapTo: null, gap: Infinity,
-        show: 0, leaving: false,
+        show: 0, leaving: false, queuedAt: -1,
       }
       this.agents.set(a.uid, a)
       this.extend(a)
@@ -554,7 +560,7 @@ export class Traffic {
     for (const a of agents) this.drive(a, dt)
     for (const a of agents) {
       // Last resort for a hopeless jam: fade out and pop up somewhere quieter.
-      if (!a.leaving && !a.parked && !a.stalled && !a.tow && a.wait > JAMMED) a.leaving = true
+      if (!a.leaving && !a.parked && !a.stalled && !a.tow && a.wait > JAMMED && !this.queuing(a)) a.leaving = true
       a.show = a.leaving ? Math.max(0, a.show - dt * 2) : Math.min(1, a.show + dt * 2)
       if (a.leaving && !a.show) {
         const spec = this.specs.get(a.uid)
@@ -568,14 +574,14 @@ export class Traffic {
   private think(a: Agent, dt: number) {
     // A service trip was just paid for.
     const trip = this.trips.get(a.uid)
-    if (trip) {
-      this.trips.delete(a.uid)
+    if (trip && !a.parked) {
       const stop = this.stopFor(trip)
-      if (trip === 'tow') {
+      if (trip === 'tow' && !a.tow) {
         a.tow = 1
         a.truck = 0
       }
-      if (stop) this.startTrip(a, stop, trip)
+      // Can't plan a way there from here yet (mid-junction, say): try again next frame.
+      if (!stop || this.startTrip(a, stop, trip)) this.trips.delete(a.uid)
     }
     if (a.tow === 1 && this.roomAhead(a, a.len / 2 + TRUCK.gap + TRUCK.len + 0.1)) a.tow = 2
     if (a.tow === 2) a.truck = Math.min(1, a.truck + dt * 2.5)
@@ -659,12 +665,25 @@ export class Traffic {
     if (!node.junction) {
       // Turning round: one car at a time, and mid-road only with nothing coming.
       if ([...node.occ.keys()].some((u) => u !== a.uid)) return false
+      // Turning round to pull into a busy forecourt: wait in lane rather than mid-turn.
+      if (this.bayAhead(a, leg)) {
+        a.queuedAt = this.t
+        return false
+      }
       return node.degree < 2 || this.clearToTurn(a, leg)
     }
     if (node.signal && obey) {
       const light = lightFor(node, leg.inDir, this.t)
       if (light === 'red') return false
       if (light === 'yellow' && (!first || dist > (a.v * a.v) / (2 * BRAKE) + 0.15)) return false
+    }
+    // One car at a time on a forecourt: wait on the road until it's free.
+    if (node.lots[leg.outDir]) {
+      const bay = this.net.stops.find((st) => st.bay && st.tile === node.key)?.bay
+      if (bay && this.bayBusy(a, node.key, leg.outDir, bay.legs)) {
+        a.queuedAt = this.t
+        return false
+      }
     }
     for (const [uid, m] of node.occ) {
       if (uid === a.uid || (m.inDir === leg.inDir && m.outDir !== opp(m.inDir) && leg.outDir !== opp(leg.inDir))) continue
@@ -692,8 +711,57 @@ export class Traffic {
     return true
   }
 
+  // Waiting its turn for the pumps, or queued behind a car that is: not a jam.
+  private queuing(a: Agent) {
+    let o: Agent | undefined = a
+    for (let n = 0; o && n < 8; n++) {
+      if (this.t - o.queuedAt < 0.5) return true
+      o = o.gapTo ? this.agents.get(o.gapTo) : undefined
+    }
+    return false
+  }
+
+  // Is the forecourt this car turns into a couple of tiles after `leg` taken?
+  private bayAhead(a: Agent, leg: Leg) {
+    const i = a.legs.indexOf(leg)
+    for (let j = i + 1; j >= 1 && j < a.legs.length && j <= i + 3; j++) {
+      const l = a.legs[j]
+      const n = l.node && this.net.nodes.get(l.node)
+      if (!n || !n.lots[l.outDir]) continue
+      const bay = this.net.stops.find((st) => st.bay && st.tile === n.key)?.bay
+      return !!bay && this.bayBusy(a, n.key, l.outDir, bay.legs)
+    }
+    return false
+  }
+
+  private bayBusy(a: Agent, tile: string, lotDir: number, curves: Curve[]) {
+    for (const o of this.agents.values()) {
+      if (o === a) continue
+      // Turning in, or anywhere on the forecourt (tail included).
+      for (let i = Math.max(0, o.ci - 1); i < o.legs.length; i++) {
+        const l = o.legs[i]
+        if (l.granted && l.node === tile && l.outDir === lotDir) return true
+        if (i <= o.ci && !l.node && curves.includes(l.c)) return true
+      }
+    }
+    return false
+  }
+
   private lane(node: Node, leg: Leg) {
     return priority(node, leg.inDir)
+  }
+
+  // Someone on the zebra crossing this car would drive over going into the
+  // intersection (painted on the tile it comes from) or out of it (on the tile it leaves by).
+  private zebraBusy(prev: Leg | undefined, chain: Leg[]) {
+    if (!this.walkers.size) return false
+    const first = chain[0]
+    const last = chain[chain.length - 1]
+    if (!first.junction) return false
+    if (prev?.node && this.walkers.get(`${prev.node}:${SIDE[first.inDir]}`)) return true
+    const n = this.net.nodes.get(last.node!)!
+    const out = tkey(n.x + D[last.outDir][0], n.z + D[last.outDir][1])
+    return !!this.walkers.get(`${out}:${SIDE[opp(last.outDir)]}`)
   }
 
   // Room to clear the junction: don't pull in if the lane beyond is backed up.
@@ -706,7 +774,9 @@ export class Traffic {
       if (o === a) continue
       const l = o.legs[o.ci]
       if (l.node !== nk) continue
-      if (l.inDir === leg.outDir && o.s - o.len / 2 < need && o.v < 0.6) return false
+      // (A car finishing a turn round is already back in the other lane.)
+      const turnedRound = l.turn === 2 && o.s > l.c.len * 0.6
+      if (l.inDir === leg.outDir && !turnedRound && o.s - o.len / 2 < need && o.v < 0.6) return false
       // Someone overtaking towards us in that lane.
       if (o.ot && l.inDir === opp(leg.outDir)) return false
     }
@@ -789,14 +859,20 @@ export class Traffic {
       const l = a.legs[i]
       if (this.held(l) && !l.granted) {
         const chain: Leg[] = []
-        for (let j = i; j < a.legs.length && this.held(a.legs[j]); j++) chain.push(a.legs[j])
+        // A turn round mid-road is asked for on its own; anything else runs
+        // through every junction tile (and dead end) in a row.
+        const midRoad = (m: Leg) => !m.junction && this.net.nodes.get(m.node!)!.degree >= 2
+        for (let j = i; j < a.legs.length && this.held(a.legs[j]); j++) {
+          if (j > i && (midRoad(a.legs[j]) || midRoad(a.legs[i]))) break
+          chain.push(a.legs[j])
+        }
         a.approach = { dist: ahead, chain }
         // Only ask when close enough to commit; until then just be ready to stop.
         const asking = ahead < (a.v * a.v) / (2 * BRAKE) + 0.7
         if (asking) a.arrived ??= this.t
         // Through a cluster of junction tiles, only the first light counts.
         const lit = chain.findIndex((c) => this.net.nodes.get(c.node!)!.signal)
-        const ok = asking && chain.every((c, k) => this.canEnter(a, c, ahead, k === 0, k === lit)) && this.exitRoom(a, chain[chain.length - 1])
+        const ok = asking && chain.every((c, k) => this.canEnter(a, c, ahead, k === 0, k === lit)) && this.exitRoom(a, chain[chain.length - 1]) && !this.zebraBusy(a.legs[i - 1], chain)
         if (ok) {
           a.arrived = null
           for (const c of chain) {
@@ -896,6 +972,8 @@ export class Traffic {
     if (en) blocked.add(`${tkey(en.x + D[end.outDir][0], en.z + D[end.outDir][1])}|${end.outDir}`)
     let keep = a.ci
     while (!now && keep < a.legs.length - 1 && a.legs[keep + 1].granted) keep++
+    // Never strand a car on a forecourt: keep its way back onto the road.
+    keep = Math.min(a.legs.length - 1, Math.max(keep, this.lotEnd(a)))
     if (a.legs.slice(keep + 1).some((l) => l.stopKind)) {
       // Heading for a stop: find another route there.
       const trip = a.trip
@@ -949,7 +1027,8 @@ export class Traffic {
     for (let i = a.ci; i < a.legs.length; i++) {
       const l = a.legs[i]
       if (ahead > need) break
-      if (!l.node || l.junction || l.turn === 2 || (l.stopKind && i !== a.ci)) return
+      // Never swing out past a car parked where this one means to stop.
+      if (!l.node || l.junction || l.turn === 2 || (l.stopKind && !(i === a.ci && (l.stopS ?? 0) < a.s))) return
       ahead += l.c.len
     }
     if (ahead < need) return
