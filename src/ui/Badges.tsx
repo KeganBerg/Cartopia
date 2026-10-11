@@ -1,6 +1,6 @@
 import { Vector3 } from 'three'
 import { useMemo, useState, type CSSProperties } from 'react'
-import { useGame, buyablePlots, type PlacedBuilding } from '../game/store'
+import { useGame, buyablePlots, today, type PlacedBuilding } from '../game/store'
 import { buildingDef, buildingLevel, jobLevel, carDef, loves, levelLift, plotPrice, START_LAND, upgradeJobSeconds, isOpen } from '../game/data'
 import { msUntilNight } from '../game/clock'
 import { anchors, anchorRef } from '../scene/anchors'
@@ -8,6 +8,8 @@ import { centerOf, groupCenter, plotCenter } from '../scene/World'
 import { mergeGroups, mergeCandidates, type MergeGroup } from '../game/merge'
 import { useNow } from '../scene/useNow'
 import { tutTarget } from './Tutorial'
+import { helpable, helpAct, askingForHelp } from '../game/help'
+import { useHelp, helpsLeft, helpBuilding } from '../lib/help'
 
 function fmt(sec: number) {
   if (sec >= 60) return `${Math.floor(sec / 60)}m ${String(sec % 60).padStart(2, '0')}s`
@@ -179,6 +181,48 @@ function ExpandBadges() {
   )
 }
 
+// In a friend's town: a small action bubble over each business you can still help today,
+// and a tick over the ones you have.
+function HelpBadges() {
+  const town = useGame((s) => s.visiting)
+  const h = useHelp()
+  const buildings = town?.buildings
+  const owner = town?.ownerId ?? ''
+  const day = today()
+  const merges = useMemo(() => mergeGroups(buildings ?? []), [buildings])
+  const asking = useMemo(
+    () => new Set(askingForHelp((buildings ?? []).filter((b) => helpable(buildingDef(b.def)) && (!merges.owner.has(b.uid) || merges.groups.has(b.uid))), owner, day).map((b) => b.uid)),
+    [buildings, merges, owner, day],
+  )
+  if (!town || !buildings || h.owner !== town.ownerId) return null
+  const left = helpsLeft(h)
+  return (
+    <div className="badges">
+      {buildings.filter((b) => asking.has(b.uid) || h.done.includes(b.uid)).map((b) => {
+        const done = h.done.includes(b.uid)
+        if (!done && !left) return null
+        const d = buildingDef(b.def)
+        const g = merges.groups.get(b.uid)
+        const k = g ? lift(g) : 1
+        const [cx, cz] = g ? groupCenter(g) : centerOf(b.def, b.x, b.z, b.rot)
+        anchors.set(b.uid, new Vector3(cx, ((d.w > 1 ? 2.6 : 2.2) + levelLift(buildingLevel(b))) * k, cz))
+        const act = helpAct(b.def)
+        return (
+          <div key={b.uid} className="anchor" ref={anchorRef(b.uid)}>
+            {done ? (
+              <span className="badge badge-helped" title={`Helped ${d.name}`}>✔</span>
+            ) : (
+              <button className={`badge badge-help${h.busy === b.uid ? ' busy' : ''}`} title={`Help at ${d.name}`} onClick={(e) => helpBuilding(b.uid, e.currentTarget)}>
+                <span className="help-icon">{act.icon}</span>
+              </button>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // Bubbles over businesses and broken-down cars, pinned to the 3D scene.
 export function Badges() {
   const now = useNow()
@@ -190,7 +234,7 @@ export function Badges() {
   const selectCar = useGame((s) => s.selectCar)
   const mergeKey = buildings.map((b) => `${b.uid}:${b.x}:${b.z}:${b.rot ?? ''}:${b.level ?? 1}:${b.merge ?? ''}`).join()
   const merges = useMemo(() => mergeGroups(buildings), [mergeKey]) // eslint-disable-line react-hooks/exhaustive-deps
-  if (visiting) return null
+  if (visiting) return <HelpBadges />
   if (mode === 'expand') return <div className="badges"><ExpandBadges /></div>
   if (mode === 'merge') return <div className="badges"><MergeBadges /></div>
   if (mode !== 'play') return null

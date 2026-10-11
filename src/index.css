@@ -1702,3 +1702,21 @@ button.book-car { font: inherit; color: inherit; }
 .car-tags .loves-tag, .car-tags .driver-row { width: auto; display: inline-block; font-size: 12px; padding: 3px 10px; border-radius: 999px; background: #fce4ec; border: 0; }
 .car-tags .skill-tag { font-size: 12px; }
 .car-tags .showcase-toggle { margin-left: auto; font-size: 12px; }
+
+/* Helping a friend's town: a round action bubble over each shop, a tick once helped, and pips on the visit banner. */
+.badge-help { width: 34px; height: 34px; padding: 0; justify-content: center; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #f1fff4, #b9f6ca); animation: badge-in .5s cubic-bezier(.2,1.7,.4,1) both, help-nod 1.6s ease-in-out .5s infinite; }
+.badge-help .help-icon { font-size: 18px; line-height: 1; }
+.badge-help.busy { animation: none; opacity: .6; }
+.badge-helped { width: 22px; height: 22px; padding: 0; justify-content: center; border-radius: 50%; background: #2e7d32; color: #fff; font-size: 12px; opacity: .85; }
+@keyframes help-nod { 0%, 70%, 100% { transform: rotate(0); } 78% { transform: rotate(-12deg) scale(1.08); } 86% { transform: rotate(10deg) scale(1.08); } }
+.help-meter { display: inline-flex; align-items: center; gap: 3px; padding: 3px 8px; border-radius: 12px; background: #e8f5e9; border: 2px solid #a5d6a7; }
+.help-meter i { width: 8px; height: 8px; border-radius: 50%; background: #c8e6c9; box-shadow: inset 0 1px 1px rgba(0,0,0,.2); }
+.help-meter i.on { background: #43a047; }
+.help-meter b { margin-left: 4px; font: 14px var(--display); color: #1b5e20; }
+.help-meter.full { background: #c8e6c9; }
+@media (max-width: 600px) {
+  .badge-help { width: 28px; height: 28px; }
+  .badge-help .help-icon { font-size: 15px; }
+  .badge-helped { width: 18px; height: 18px; font-size: 10px; }
+}
+@media (prefers-reduced-motion: reduce) { .badge-help { animation: none; } }
