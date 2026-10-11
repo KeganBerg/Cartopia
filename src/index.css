@@ -730,6 +730,7 @@ button.lvl-item:hover { border-color: var(--accent); transform: translateY(-2px)
 .race-full .countdown.big { font-size: 120px; }
 .race-full .shift-label.big { top: 34%; font-size: 40px; }
 .race-full .skill-flash { top: calc(118px + var(--sat)); }
+.rf-venue { position: absolute; top: calc(118px + var(--sat)); left: 0; right: 0; width: fit-content; margin: 0 auto; padding: 6px 16px; border-radius: 999px; background: rgba(27,31,36,.6); color: #fff; font: 18px var(--display); white-space: nowrap; pointer-events: none; animation: pop .25s ease-out; }
 .rf-wait { position: absolute; top: 40%; left: 0; right: 0; text-align: center; font: 22px var(--display); color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,.4); }
 .rf-bottom { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: 40px calc(16px + var(--sar)) calc(16px + var(--sab)) calc(16px + var(--sal)); background: linear-gradient(transparent, rgba(10,20,40,.5)); pointer-events: none; }
 .rf-bottom > * { pointer-events: auto; }
@@ -756,6 +757,7 @@ button.lvl-item:hover { border-color: var(--accent); transform: translateY(-2px)
   .rf-speed { font-size: 28px; }
   .race-full .shift-btn { font-size: 22px; padding: 14px 24px; }
   .race-full .countdown.big { font-size: 80px; }
+  .rf-venue { top: calc(96px + var(--sat)); font-size: 15px; }
 }
 @media (min-width: 900px) { .rf-lane { height: 30px; } .rf-lane .lane-name { font-size: 12px; } .rf-top h2 { font-size: 24px; } }
 

@@ -19,6 +19,8 @@ import { Skyline } from './Skyline'
 import { Batch } from './Batch'
 import { Manhole } from './BuildingDetail'
 import { BUILDINGS, TILE, buildingDef } from '../game/data'
+import { VenueScenery, VenueBackdrop, ROAD, WALK } from './RaceVenues'
+import type { Venue } from './venues'
 
 export type RacerView = { dist: number }
 const SCALE = 0.25 // metres of race distance per world unit
@@ -30,6 +32,7 @@ type Props = {
   them: RefObject<RacerView>
   mine: { body: Body; color: string; mods?: string[] }
   theirs: { body: Body; color: string; mods?: string[] }
+  venue: Venue
 }
 
 function SkyDome({ tint = '#ffffff' }: { tint?: string }) {
@@ -43,8 +46,6 @@ function SkyDome({ tint = '#ffffff' }: { tint?: string }) {
   )
 }
 
-const ROAD = 1.6 // half width of the street
-const WALK = 1.0 // sidewalk width
 const FALLBACK = ['pizza', 'donut', 'burger', 'diner', 'house', 'motel', 'carwash', 'tires', 'gas', 'bowling', 'icecream', 'house']
 const SHOPS = new Set(['business', 'gas', 'parts', 'tires', 'house'])
 
@@ -162,7 +163,7 @@ function Lamp({ z, side }: { z: number; side: 1 | -1 }) {
 
 // Street furniture: crowd barriers at the start and finish, bunting across the
 // street, hydrants and bins on the sidewalks, manholes, and a start light tree.
-function StreetDressing({ len }: { len: number }) {
+function StreetDressing({ len, city }: { len: number; city: boolean }) {
   const barriers: number[] = []
   for (let z = -4; z < 14; z += 1) barriers.push(z)
   for (let z = len - 9; z < len + 5; z += 1) barriers.push(z)
@@ -170,7 +171,7 @@ function StreetDressing({ len }: { len: number }) {
   for (let z = 12; z < len - 4; z += 22) bunting.push(z)
   const flags = ['#e53935', '#fdd835', '#1e88e5', '#43a047', '#fafafa']
   const furniture: number[] = []
-  for (let z = 2; z < len + 20; z += 7) furniture.push(z)
+  if (city) for (let z = 2; z < len + 20; z += 7) furniture.push(z)
   return (
     <group>
       {barriers.map((z) => [-1, 1].map((sd) => (
@@ -228,8 +229,10 @@ function StreetDressing({ len }: { len: number }) {
   )
 }
 
-// Main street drag race, lined with the player's own town, seen from a chase camera.
-export function RaceScene({ track, me, them, mine, theirs }: Props) {
+// The drag strip, seen from a chase camera. On Main Street it's lined with the
+// player's own town; the other venues bring their own scenery.
+export function RaceScene({ track, me, them, mine, theirs, venue }: Props) {
+  const city = venue.id === 'main'
   const meRef = useRef<Group>(null)
   const themRef = useRef<Group>(null)
   const { camera, size } = useThree()
@@ -248,7 +251,7 @@ export function RaceScene({ track, me, them, mine, theirs }: Props) {
   }, [len])
   const tint = (day: string, dark: string) => '#' + new Color(day).lerp(new Color(dark), night).getHexString()
   // Phone status bar and toolbar take the sky colour while racing.
-  const sky = tint('#3d9bff', '#0f1730')
+  const sky = tint(venue.sky, '#0f1730')
   useEffect(() => holdPageTint(sky), [sky])
   // Full screen on a phone is tall and narrow: widen the view so the street still fills it.
   useEffect(() => {
@@ -274,8 +277,8 @@ export function RaceScene({ track, me, them, mine, theirs }: Props) {
 
   return (
     <>
-      <fog attach="fog" args={[tint('#d9f2ff', '#1d2740'), 28, 105]} />
-      <color attach="background" args={[tint('#3d9bff', '#0f1730')]} />
+      <fog attach="fog" args={[tint(venue.fog, '#1d2740'), venue.fogNear, venue.fogFar]} />
+      <color attach="background" args={[sky]} />
       <SkyDome tint={tint('#ffffff', '#2a3560')} />
       <hemisphereLight args={[look.sky, look.ground, look.hemiIntensity * 1.15]} />
       <directionalLight position={[5, 10, 2]} intensity={look.sunIntensity * 0.85} color={look.sun} />
@@ -284,14 +287,14 @@ export function RaceScene({ track, me, them, mine, theirs }: Props) {
       {/* Ground, sidewalks and the street itself. */}
       <mesh rotation-x={-Math.PI / 2} position={[0, LAYER.outer, len / 2]}>
         <planeGeometry args={[80, len + 100]} />
-        <meshStandardMaterial color={PAL.ground} />
+        <meshStandardMaterial color={venue.ground ?? PAL.ground} />
       </mesh>
       {/* The street is static, so it's merged into a few draws like the town. */}
-      <Batch version={slots}>
+      <Batch version={city ? slots : venue.id}>
         {[-1, 1].map((sd) => (
           <mesh key={sd} position={[sd * (ROAD + WALK / 2), 0.04, len / 2 + 5]}>
             <boxGeometry args={[WALK, 0.08, len + 50]} />
-            <meshStandardMaterial map={paverTex(0.5, (len + 50) / 2)} />
+            {venue.shoulder ? <meshStandardMaterial color={venue.shoulder} /> : <meshStandardMaterial map={paverTex(0.5, (len + 50) / 2)} />}
           </mesh>
         ))}
         <mesh rotation-x={-Math.PI / 2} position={[0, LAYER.land, len / 2 + 5]}>
@@ -323,7 +326,7 @@ export function RaceScene({ track, me, them, mine, theirs }: Props) {
         <Banner z={-0.8} text="START" bg="#2e7d32" />
         <Banner z={len} text="FINISH" bg="#c62828" />
         {/* Shops facing the street, with trees in the gaps and lamps on the kerb. */}
-        {slots.map((sl, i) => {
+        {city ? slots.map((sl, i) => {
           const d = buildingDef(sl.def)
           const depth = d.h * TILE
           return (
@@ -341,11 +344,16 @@ export function RaceScene({ track, me, them, mine, theirs }: Props) {
               {i % 2 === 0 && <Lamp z={d.w + 0.7} side={sl.side} />}
             </group>
           )
-        })}
-        <StreetDressing len={len} />
+        }) : (
+          <>
+            <VenueScenery id={venue.id} len={len} />
+            {Array.from({ length: Math.ceil((len + 40) / 9) }, (_, i) => <Lamp key={i} z={i * 9 - 6} side={i % 2 ? 1 : -1} />)}
+          </>
+        )}
+        <StreetDressing len={len} city={city} />
       </Batch>
       <Spectators len={len} />
-      <Skyline len={len} edge={ROAD + WALK + 4.2} night={night} />
+      {city ? <Skyline len={len} edge={ROAD + WALK + 4.2} night={night} /> : <VenueBackdrop id={venue.id} />}
       {/* Soft shadows under the racers. */}
       {[meRef, themRef].map((r, i) => (
         <group key={i} ref={r} scale={1.4}>
