@@ -112,7 +112,8 @@ export function Crowd({ n, move, hours = 'always', kids, uniform }: CrowdProps) 
 // ---- Learner cars ----
 
 // The academy's own learner cars: full car models at town traffic size, each in a
-// school colour with a STUDENT DRIVER topper on the roof.
+// school colour with a STUDENT DRIVER topper on the roof. Driving ones (with a
+// wheel `rig`) light the road ahead after dark, like town traffic.
 const CAR_COLORS = ['#e53935', '#1e88e5', '#fdd835', '#43a047']
 const LEARNERS: { body: Body; model: string }[] = [
   { body: 'compact', model: 'pip' },
@@ -130,7 +131,7 @@ export function LearnerCar({ i, at, rot = 0, rig, body: tilt }: { i: number; at?
   return (
     <group position={at} rotation-y={rot}>
       <group scale={k} ref={tilt}>
-        <CarModel body={body} model={model} color={CAR_COLORS[i % CAR_COLORS.length]} rig={rig} />
+        <CarModel body={body} model={model} color={CAR_COLORS[i % CAR_COLORS.length]} rig={rig} beams={!!rig} />
         {/* STUDENT DRIVER topper on two little feet. */}
         <mesh position={[0, roof + 0.05, -0.04]}>
           <boxGeometry args={[0.26, 0.08, 0.07]} />
