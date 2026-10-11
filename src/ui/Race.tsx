@@ -2,7 +2,7 @@ import { Icon } from './Icon'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useGame, spendFuel, type OwnedCar } from '../game/store'
 import { CARS, SKILLS, carDef, performance, RACE_FUEL, GP_SERIES, GP_ROUNDS, gpRivalPi, gpReward, CAMPAIGN, CAMPAIGN_RACES, campaignRaceId, campaignRivalPi, campaignShift, campaignRivalSkills, campaignReward, campaignCleared, type CampaignChapter, skillBoost, skillDrag, liveSkillBoost, smoothShift, type Body, type GpSeries, type SkillId } from '../game/data'
-import { TRACK, freshRacer, stepRacer, shiftQuality } from '../game/race'
+import { TRACK, freshRacer, stepRacer, shiftQuality, launchRacer, shiftRacer, fireBoost, aiReaction, AI_BOOST_GEAR, AUTO_LAUNCH, JUMP_START_DELAY } from '../game/race'
 import { CarThumb } from '../scene/BuildingPreview'
 import { supabase } from '../lib/supabase'
 import { Panel, SheetTabs } from './Menus'
@@ -562,8 +562,11 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   const finishCb = useRef(onFinish)
   finishCb.current = onFinish
   const myPi = pi(car)
-  const me = useRef(fresh())
-  const them = useRef(fresh())
+  // Both cars wait on the line for their driver; the player launches on GO with the big button.
+  const me = useRef(fresh(false))
+  const them = useRef(fresh(!!(live || trial)))
+  // Pressed before GO: launched at GO with wheelspin.
+  const jumped = useRef(false)
   const samples = useRef<Sample[]>([])
   const def = carDef(car.model)
   const skillActive = useRef(false)
@@ -582,16 +585,32 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   const [slow, setSlow] = useState(false)
   const channel = useRef<ReturnType<typeof raceChannel>>(null)
   const [label, setLabel] = useState('')
+  const labelTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const [result, setResult] = useState<null | { won: boolean; myTime: number; theirTime: number; note?: string; counted?: boolean; stars?: number }>(null)
   // Live races between signed-in players: 'yes' once the server is refereeing, 'no' to decide here.
   const refereed = useRef<'pending' | 'yes' | 'no'>(live ? 'pending' : 'no')
   const joined = useRef<Promise<boolean> | null>(null)
   const [checking, setChecking] = useState(false)
   const finishRace = useGame((s) => s.finishRace)
+  const flash = (text: string) => {
+    setLabel(text)
+    clearTimeout(labelTimer.current)
+    labelTimer.current = setTimeout(() => setLabel(''), 800)
+  }
+  // Off the line: reaction is seconds after GO, or negative for a jump start.
+  const callLaunch = (reaction: number) => {
+    const call = launchRacer(me.current, reaction)
+    sfx.shift(reaction >= 0 && reaction <= 0.25)
+    if (reaction >= 0) flash(call)
+  }
   // The rival's shifting skill for each gear.
   // Campaign rivals shift sloppier early on: from 0.64-0.78 (good, sometimes early) up to 0.8-0.92 (perfect).
   const cleanness = shownRival.shift ?? 1
   const skill = useMemo(() => Array.from({ length: 4 }, () => 0.64 + 0.16 * cleanness + Math.random() * (0.14 - 0.02 * cleanness)), [cleanness])
+  // How long the AI rival takes to react to GO: clean drivers are quicker off the line.
+  const theirReaction = useMemo(() => aiReaction(cleanness, Math.random()), [cleanness])
+  const theirBoosting = useRef(false)
+  const [theirBoost, setTheirBoost] = useState(false)
   // Engine, tyre and crowd sounds for this race. A live rival's revs aren't sent,
   // so a stand-in racer with their PI drives their engine sound.
   const sound = useRef<RaceAudio | null>(null)
@@ -733,6 +752,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       last = now
       t.current += dt
       const wasDone = me.current.finished !== null
+      if (!me.current.launched && t.current >= (jumped.current ? JUMP_START_DELAY : AUTO_LAUNCH)) callLaunch(jumped.current ? -1 : t.current)
       const sk = def.skill
       const th0 = them.current
       // In a live race the rival runs on their own device, so slow-downs boost us instead.
@@ -763,13 +783,14 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
         th.dist = ghostDist(t.current, trial.target)
         if (th.finished === null && t.current >= trial.target) th.finished = trial.target
       } else {
-        if (th.gear < 3 && th.rpm >= skill[th.gear]) {
+        if (!th.launched && t.current >= theirReaction) launchRacer(th, theirReaction)
+        if (th.launched && th.gear < 3 && th.rpm >= skill[th.gear]) {
           const q = shiftQuality(th.rpm)
-          th.quality = smoothShift(theirSkill) && q.label === 'Good' ? 1.08 : q.q
-          th.gear++
-          th.rpm = 0.35
+          shiftRacer(th, smoothShift(theirSkill) && q.label === 'Good' ? 1.08 : q.q)
           sound.current?.shift('them', th.gear, Math.min(1, rivalRef.current.pi / 200))
         }
+        if (th.gear >= AI_BOOST_GEAR) fireBoost(th)
+        if (th.burning !== theirBoosting.current) { theirBoosting.current = th.burning; setTheirBoost(th.burning) }
         step(th, rivalRef.current.pi, dt, t.current, theirBoost * skillDrag(sk, th, t.current))
       }
       force((n) => n + 1)
@@ -801,27 +822,41 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       signal.cancelled = true
       cancelAnimationFrame(raf)
     }
-  }, [countdown, result, myPi, skill, finishRace, live, def, theirSkill, trial])
+  }, [countdown, result, myPi, skill, finishRace, live, def, theirSkill, trial, theirReaction])
 
-  const shift = () => {
+  // The big button: launch on GO, then shift up.
+  const press = () => {
     const r = me.current
-    if (countdown > 0 || r.gear >= 3 || r.finished !== null) return
+    if (countdown === 99 || result || r.finished !== null) return
+    if (!r.launched) {
+      if (countdown > 0) {
+        if (!jumped.current) flash('JUMP START!')
+        jumped.current = true
+      } else if (!jumped.current) callLaunch(t.current)
+      return
+    }
+    if (r.gear >= 3) return
     let s = shiftQuality(r.rpm)
     if (smoothShift(def.skill) && s.label === 'Good') s = { q: 1.08, label: 'SMOOTH!' }
     sfx.shift(s.q >= 1)
-    r.quality = s.q
-    r.gear++
+    shiftRacer(r, s.q)
     sound.current?.shift('me', r.gear, Math.min(1, myPi / 200))
-    r.rpm = 0.35
-    setLabel(s.label)
-    setTimeout(() => setLabel(''), 700)
+    flash(r.streak >= 2 ? `${s.label.replace('!', '')} x${r.streak}!` : s.label)
+  }
+  const boost = () => {
+    if (countdown > 0 || result || !fireBoost(me.current)) return
+    sfx.boost()
+    flash('BOOST!')
   }
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.code === 'Space') {
         e.preventDefault()
-        shift()
+        press()
+      } else if (e.code === 'KeyB' || e.code === 'ArrowUp') {
+        e.preventDefault()
+        boost()
       }
     }
     window.addEventListener('keydown', onKey)
@@ -854,6 +889,8 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       </div>
       {countdown > 0 && !result && <div className="rf-venue">{venue.icon} {venue.name}</div>}
       {countdown > 0 && countdown !== 99 && <div className="countdown big">{countdown}</div>}
+      {countdown === 0 && !me.current.launched && !result && <div className="countdown big go">GO!</div>}
+      {me.current.burning && !result && <div className="rf-boost-fx" />}
       {countdown === 99 && (
         <div className="rf-wait">
           {slow ? `No answer from ${rival.town} yet. Cancel the race?` : `Waiting for ${rival.town} to join...`}
@@ -867,6 +904,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       {label && <div className="shift-label big">{label}</div>}
       {def.skill && skillShown && !result && <div className="skill-flash">{SKILLS[def.skill].icon} {SKILLS[def.skill].name}!</div>}
       {theirSkill && theirShown && !result && <div className="skill-flash theirs">{rival.town}: {SKILLS[theirSkill].icon} {SKILLS[theirSkill].name}!</div>}
+      {theirBoost && !theirShown && !result && <div className="skill-flash theirs">{rival.town}: 🔥 Boost!</div>}
       {result && resultView ? resultView(result) : result ? (
         <RaceResult won={result.won} myTime={result.myTime} theirTime={result.theirTime} cash={result.counted === false ? 0 : result.won ? payout : Math.round(payout * 0.1)} xp={result.counted === false ? 0 : result.won ? 30 : 8} rival={rival.town} note={result.note} noContest={result.counted === false} stars={result.stars} onExit={onExit} />
       ) : (
@@ -881,9 +919,12 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
           </svg>
           <div className="rf-side">
             <div className="rf-speed">{Math.round(me.current.speed * 0.9)}<small> km/h</small></div>
-            <button className="big-btn shift-btn" onPointerDown={shift} disabled={countdown > 0 || me.current.gear >= 3}>
-              SHIFT ▲
-            </button>
+            <div className="rf-buttons">
+              <BoostButton r={me.current} onFire={boost} ready={countdown === 0} />
+              <button className={me.current.launched ? 'big-btn shift-btn' : 'big-btn shift-btn launch'} onPointerDown={press} disabled={countdown === 99 || (me.current.launched && me.current.gear >= 3)}>
+                {me.current.launched ? 'SHIFT ▲' : 'GO ▶'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -891,6 +932,24 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   )
 }
 
+
+// The boost tank as a ring that fills with clean driving; tap it once to fire.
+function BoostButton({ r, onFire, ready }: { r: { boost: number; burning: boolean; boostUsed: boolean; launched: boolean }; onFire: () => void; ready: boolean }) {
+  const spent = r.boostUsed && !r.burning
+  const fill = Math.round(r.boost * 100)
+  return (
+    <button
+      className={`boost-btn${r.burning ? ' burning' : ''}${!spent && fill >= 99 ? ' full' : ''}`}
+      style={{ ['--fill' as string]: `${fill}%` }}
+      onPointerDown={onFire}
+      disabled={!ready || spent || !r.launched || r.boost <= 0}
+      aria-label={`Boost, ${fill}% full`}
+    >
+      <span>🔥</span>
+      <small>{spent ? 'USED' : 'BOOST'}</small>
+    </button>
+  )
+}
 
 // Counts a number up from zero once it appears.
 function useCountUp(target: number, delay: number, ms = 900) {

@@ -1,7 +1,7 @@
 // Tables the server's save guard uses to check restores and Grand Prix wins
 // (supabase/migrations/0016_econ_restore_gp.sql, 0022_rescue_rolls.sql). guardTables.test.ts keeps them in step.
 import { BARN_PER_DAY, BARN_RARITY, GP_ROUNDS, GP_SERIES, RARITY, RESCUE_CAR_CHANCE, RESCUE_PINS, RESCUE_SPOTS, VISITORS, VISIT_GAP_MIN, VISITS_PER_DAY, type Rarity } from './data'
-import { MAX_RACE_PI, freshRacer, raceFloor, stepRacer } from './race'
+import { AI_BOOST_GEAR, MAX_RACE_PI, aiReaction, fireBoost, freshRacer, launchRacer, raceFloor, shiftRacer, stepRacer } from './race'
 
 // Pins in one search, and the chance each one hides a car.
 export const rescueRoll = () => ({ pins: RESCUE_PINS, car: RESCUE_CAR_CHANCE })
@@ -34,23 +34,23 @@ export function gpSeries(): Record<string, { last: number }> {
 
 export const GP_RIVAL_MAX = 400
 
-// The slowest a Grand Prix rival with this PI finishes: rivals shift perfectly (somewhere between
-// 0.80 and 0.92 rpm), and the player's oil or freeze skill can slow them. Plus 3% for frame timing.
+// The slowest a Grand Prix rival with this PI finishes: rivals react as slowly as a clean driver
+// can (aiReaction), shift perfectly (somewhere between 0.80 and 0.92 rpm) and fire their boost on
+// reaching AI_BOOST_GEAR, and the player's oil or freeze skill can slow them. Plus 3% for frame timing.
 export function gpRivalSlowest(pi: number) {
   const drags: ((r: { gear: number }, t: number) => number)[] = [() => 1, (_, t) => (t < 2.5 ? 0.9 : 1), (r) => (r.gear === 1 ? 0.9 : 1)]
   let worst = 0
   for (const drag of drags) {
     for (let at = 0.8; at <= 0.92 + 1e-9; at += 0.01) {
-      const r = freshRacer()
+      const r = freshRacer(false)
       const dt = 1 / 240
+      const reaction = aiReaction(1, 1)
       let t = 0
       while (r.finished === null && t < 120) {
         t += dt
-        if (r.gear < 3 && r.rpm >= at) {
-          r.quality = 1.08
-          r.gear++
-          r.rpm = 0.35
-        }
+        if (!r.launched && t >= reaction) launchRacer(r, reaction)
+        if (r.launched && r.gear < 3 && r.rpm >= at) shiftRacer(r, 1.08)
+        if (r.gear >= AI_BOOST_GEAR) fireBoost(r)
         stepRacer(r, pi, dt, t, drag(r, t))
       }
       worst = Math.max(worst, r.finished ?? 120)
