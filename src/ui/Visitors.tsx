@@ -31,7 +31,7 @@ export function VisitorBadges() {
     : '📞 Barn tip!'
   return (
     <div className="badges">
-      <div className="anchor" ref={anchorRef(id)}>
+      <div className="anchor" data-clamp ref={anchorRef(id)}>
         <button className={`badge badge-visitor badge-visitor-${v.kind}`} disabled={busy} onClick={tapVisitor}>{label}</button>
       </div>
     </div>

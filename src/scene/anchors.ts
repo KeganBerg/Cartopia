@@ -20,9 +20,17 @@ export function AnchorProjector() {
         continue
       }
       v.copy(p).project(camera)
-      const x = ((v.x + 1) / 2) * size.width
-      const y = ((1 - v.y) / 2) * size.height
+      let x = ((v.x + 1) / 2) * size.width
+      let y = ((1 - v.y) / 2) * size.height
       el.style.visibility = v.z > 1 ? 'hidden' : 'visible'
+      // data-clamp: keep it on screen, pinned to the nearest edge (for things worth chasing).
+      if (el.dataset.clamp !== undefined) {
+        const cx = Math.min(Math.max(x, 60), size.width - 60)
+        const cy = Math.min(Math.max(y, 210), size.height - 110)
+        el.classList.toggle('edge', cx !== x || cy !== y)
+        x = cx
+        y = cy
+      }
       el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`
     }
   })

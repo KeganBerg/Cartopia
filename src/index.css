@@ -1263,6 +1263,9 @@ button.book-car { font: inherit; color: inherit; }
 .badge-visitor-tourist { background: radial-gradient(#fff8e1, #ffecb3); color: var(--ink); }
 .badge-visitor-mystery { background: linear-gradient(#5e35b1, #311b92); color: #fff; animation: badgepulse .6s ease-in-out infinite; }
 .badge-visitor-barn { background: #fff3e0; color: #5d4037; }
+/* Off screen: pinned to the edge, smaller and without its pointer. */
+.anchor.edge .badge-visitor { transform: scale(.85); opacity: .92; }
+.anchor.edge .badge-visitor::after { display: none; }
 .street-card { display: flex; align-items: center; gap: 12px; }
 .street-card > div { display: flex; flex-direction: column; gap: 2px; }
 .street-prize { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 12px 0; font-weight: 700; }
