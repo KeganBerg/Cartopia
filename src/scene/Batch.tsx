@@ -60,8 +60,9 @@ export function Batch({ version, off, children }: { version: unknown; off?: bool
       const mesh = o as Mesh
       if (!mesh.isMesh || (mesh as { isInstancedMesh?: boolean }).isInstancedMesh || !mesh.visible || mesh.userData.noBatch) return
       if (Array.isArray(mesh.material) || mesh.morphTargetInfluences) return
-      // Something hidden higher up isn't drawn, so it mustn't be drawn merged either.
-      for (let p = mesh.parent; p && p !== r; p = p.parent) if (!p.visible) return
+      // Something hidden higher up isn't drawn, so it mustn't be drawn merged either;
+      // a group marked noBatch (a building mid-bounce) keeps everything under it live.
+      for (let p = mesh.parent; p && p !== r; p = p.parent) if (!p.visible || p.userData.noBatch) return
       const g = mesh.geometry
       const names = ATTRS.filter((n) => g.getAttribute(n))
       if (!names.includes('position')) return

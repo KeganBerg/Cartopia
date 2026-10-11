@@ -7,6 +7,7 @@ import { MuteButton } from './MuteButton'
 import { DealsButton } from './Deals'
 import { ChallengeBell } from './Race'
 import { GiftBell } from './Gifts'
+import { Roll } from './Fly'
 
 const n = (v: number) => v.toLocaleString()
 
@@ -54,9 +55,9 @@ export function Hud() {
       <div className="hud-left">
         <Speedometer level={s.level} xp={s.xp} onClick={() => s.openPanel('account')} />
         <div className="pills">
-          <button className="pill" onClick={() => s.showNeed('coins', 0)}><span className="ico coin-ico">$</span>{n(s.coins)}<span className="plus">+</span></button>
+          <button className="pill" onClick={() => s.showNeed('coins', 0)}><span className="ico coin-ico">$</span><Roll value={s.coins} /><span className="plus">+</span></button>
           <button className="pill" onClick={() => s.openPanel('bank')}><span className="ico buck-ico">B</span>{n(s.bucks)}<span className="plus">+</span></button>
-          <button className="pill" onClick={() => s.showNeed('parts', 0)}><span className="ico parts-ico">⚙</span>{n(s.parts)}<span className="plus">+</span></button>
+          <button className="pill" onClick={() => s.showNeed('parts', 0)}><span className="ico parts-ico">⚙</span><Roll value={s.parts} /><span className="plus">+</span></button>
         </div>
       </div>
       <div className="hud-center">
@@ -90,9 +91,9 @@ export function Hud() {
         <div className="hud-strip">
           <Speedometer level={s.level} xp={s.xp} onClick={() => s.openPanel('account')} />
           <div className="hud-chips">
-            <button className="chip-stat" onClick={() => s.showNeed('coins', 0)}><span className="ico coin-ico">$</span>{n(s.coins)}</button>
+            <button className="chip-stat" onClick={() => s.showNeed('coins', 0)}><span className="ico coin-ico">$</span><Roll value={s.coins} /></button>
             <button className="chip-stat" onClick={() => s.openPanel('bank')}><span className="ico buck-ico">B</span>{n(s.bucks)}</button>
-            <button className="chip-stat" onClick={() => s.showNeed('parts', 0)}><span className="ico parts-ico">⚙</span>{n(s.parts)}</button>
+            <button className="chip-stat" onClick={() => s.showNeed('parts', 0)}><span className="ico parts-ico">⚙</span><Roll value={s.parts} /></button>
             <button className="chip-stat chip-fuel" onClick={() => s.showNeed('fuel', 0)}>
               <span className="ico fuel-ico">⛽</span>
               <span className="chip-fuel-bar"><i style={{ width: `${Math.min(100, (s.fuel / cap) * 100)}%` }} /><b>{s.fuel}/{cap}</b></span>

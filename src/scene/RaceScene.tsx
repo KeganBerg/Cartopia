@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { BackSide, Color, Object3D, type PerspectiveCamera, type Group, type InstancedMesh, type Mesh } from 'three'
+import { BackSide, Color, IcosahedronGeometry, MeshBasicMaterial, MeshStandardMaterial, Object3D, type PerspectiveCamera, type Group, type InstancedMesh, type Mesh } from 'three'
 import type { Body, Finish } from '../game/data'
 import { CarModel } from './CarModel'
 import { signTexture } from './signTexture'
@@ -193,6 +193,121 @@ function Banner({ z, text, bg }: { z: number; text: string; bg: string }) {
         <planeGeometry args={[ROAD * 2 + 0.5, 0.55]} />
         <meshBasicMaterial map={signTexture(text, bg, '#ffffff')} toneMapped={false} side={2} />
       </mesh>
+    </group>
+  )
+}
+
+// The countdown, shared with the race overlay: 3, 2, 1, then 0 for GO (99 before it starts).
+export const startLights = { n: 99 }
+const LIT = ['#ff1744', '#ff1744', '#ffab00']
+const OFF = new Color('#3a1010')
+
+// A light bar hanging under the START banner: reds come on with the countdown, all green on GO.
+function StartLights() {
+  const lamps = useMemo(() => Array.from({ length: 3 }, () => new MeshBasicMaterial({ color: OFF, toneMapped: false })), [])
+  const lit = useMemo(() => LIT.map((c) => new Color(c)), [])
+  const go = useMemo(() => new Color('#00e676'), [])
+  useEffect(() => () => lamps.forEach((m) => m.dispose()), [lamps])
+  useFrame(() => {
+    const n = startLights.n
+    lamps.forEach((m, i) => {
+      if (n === 0) m.color.copy(go)
+      else if (n <= 3 && i < 4 - n) m.color.copy(lit[i])
+      else m.color.copy(OFF)
+    })
+  })
+  return (
+    <group position={[0, 2.5, -0.85]}>
+      <mesh position={[0, 0.32, 0]}>
+        <boxGeometry args={[0.05, 0.3, 0.05]} />
+        <meshStandardMaterial color="#263238" />
+      </mesh>
+      <mesh>
+        <boxGeometry args={[1.25, 0.36, 0.14]} />
+        <meshStandardMaterial color="#212121" />
+      </mesh>
+      {lamps.map((m, i) => (
+        <mesh key={i} position={[(1 - i) * 0.38, 0, -0.08]} rotation-y={Math.PI} material={m}>
+          <circleGeometry args={[0.13, 18]} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+// Tyre smoke off the line, and a flag waving at the finish.
+const smokeGeo = new IcosahedronGeometry(0.5, 1)
+const smokeMat = new MeshStandardMaterial({ color: '#eceff1', roughness: 1, flatShading: true, emissive: '#555555' })
+type Puff = { x: number; y: number; z: number; vx: number; vy: number; vz: number; age: number; life: number }
+const SMOKE_MAX = 90
+const pt = new Object3D()
+
+function LaunchSmoke({ me, them, len }: { me: RefObject<RacerView>; them: RefObject<RacerView>; len: number }) {
+  const mesh = useRef<InstancedMesh>(null)
+  const puffs = useRef<Puff[]>([])
+  const acc = useRef(0)
+  useFrame((_, raw) => {
+    const dt = Math.min(0.05, raw)
+    const list = puffs.current
+    acc.current += dt
+    if (startLights.n === 0 && acc.current > 0.06) {
+      acc.current = 0
+      for (const [r, x] of [[me, LANE], [them, -LANE]] as const) {
+        const z = (r.current?.dist ?? 0) * SCALE
+        // Burnout for the first few car lengths, then it clears.
+        if (z > 0.05 && z < Math.min(3.5, len) && list.length < SMOKE_MAX - 1) {
+          for (const w of [-0.32, 0.32]) {
+            list.push({ x: x + w + (Math.random() - 0.5) * 0.1, y: 0.15, z: z - 0.75, vx: w * 1.2 + (Math.random() - 0.5) * 0.6, vy: 0.4 + Math.random() * 0.5, vz: -0.6 - Math.random() * 0.8, age: 0, life: 0.6 + Math.random() * 0.4 })
+          }
+        }
+      }
+    }
+    const m = mesh.current
+    if (!m) return
+    let n = 0
+    for (const p of list) {
+      p.age += dt
+      if (p.age >= p.life) continue
+      p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt
+      p.vx *= 0.97; p.vz *= 0.95
+      const t = p.age / p.life
+      pt.position.set(p.x, p.y, p.z)
+      pt.scale.setScalar(Math.max(0.001, (0.15 + t * 0.45) * (1 - t * t)))
+      pt.updateMatrix()
+      m.setMatrixAt(n, pt.matrix)
+      list[n++] = p
+    }
+    list.length = n
+    m.count = n
+    m.visible = n > 0
+    m.instanceMatrix.needsUpdate = true
+  })
+  return <instancedMesh ref={mesh} args={[smokeGeo, smokeMat, SMOKE_MAX]} frustumCulled={false} visible={false} />
+}
+
+function FinishFlag({ len, me, them }: { len: number; me: RefObject<RacerView>; them: RefObject<RacerView> }) {
+  const flag = useRef<Group>(null)
+  const tex = useMemo(() => signTexture('▚▚▚', '#ffffff', '#111111'), [])
+  useFrame(({ clock }) => {
+    const g = flag.current
+    if (!g) return
+    // A lazy wave while they race, wild once someone crosses the line.
+    const done = Math.max(me.current?.dist ?? 0, them.current?.dist ?? 0) * SCALE >= len
+    const t = clock.elapsedTime
+    g.rotation.z = done ? Math.sin(t * 9) * 0.9 : Math.sin(t * 2.2) * 0.25 + 0.2
+  })
+  return (
+    <group position={[-(ROAD + WALK * 0.55), 1.1, len - 0.4]}>
+      <group ref={flag}>
+        <mesh position={[0, 0.55, 0]}>
+          <cylinderGeometry args={[0.025, 0.025, 1.1, 6]} />
+          <meshStandardMaterial color="#cfd8dc" />
+        </mesh>
+        <mesh position={[0.3, 0.9, 0]} rotation-y={Math.PI}>
+          <planeGeometry args={[0.6, 0.4]} />
+          <meshBasicMaterial map={tex} side={2} />
+        </mesh>
+      </group>
     </group>
   )
 }
@@ -430,6 +545,9 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed }:
         <StreetDressing len={len} city={city} />
       </Batch>
       <Spectators len={len} cold={venue.id === 'snow' || SEASON === 'winter'} />
+      <StartLights />
+      <LaunchSmoke me={me} them={them} len={len} />
+      <FinishFlag len={len} me={me} them={them} />
       {city ? <Skyline len={len} edge={ROAD + WALK + 4.2} night={night} /> : <VenueBackdrop id={venue.id} len={len} />}
       {/* Soft shadows under the racers. */}
       {[meRef, themRef].map((r, i) => (

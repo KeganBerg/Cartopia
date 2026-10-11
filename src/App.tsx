@@ -3,6 +3,7 @@ import { Canvas } from '@react-three/fiber'
 import { NeutralToneMapping } from 'three'
 import { World } from './scene/World'
 import { Hud } from './ui/Hud'
+import { FlyLayer } from './ui/Fly'
 import { ThumbRenderer } from './scene/BuildingPreview'
 import { BottomBar, ShopPanel, ShowroomPanel, GaragePanel, Toasts } from './ui/Menus'
 import { RacePanel, LiveRaceOverlay, InvitesPanel, PrizePopup, CampaignPrizePopup } from './ui/Race'
@@ -98,6 +99,7 @@ export default function App() {
       <CampaignPrizePopup />
       <LevelUpSplash />
       <Toasts />
+      <FlyLayer />
     </>
   )
 }

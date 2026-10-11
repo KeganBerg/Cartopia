@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabase'
 import { Panel, SheetTabs } from './Menus'
 import { Canvas } from '@react-three/fiber'
 import { NeutralToneMapping } from 'three'
-import { RaceScene } from '../scene/RaceScene'
+import { RaceScene, startLights } from '../scene/RaceScene'
 import { pickVenue, venue as venueById } from '../scene/venues'
 import { sfx } from '../lib/sound'
 import { raceAudio, type RaceAudio } from '../lib/engineAudio'
@@ -564,7 +564,9 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  useEffect(() => () => void (startLights.n = 99), [])
   useEffect(() => {
+    startLights.n = countdown
     if (countdown === 99) return
     if (countdown >= 0 && countdown <= 3) {
       if (countdown === 3) sound.current?.screech()
@@ -815,7 +817,8 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
         ))}
       </div>
       {countdown > 0 && !result && <div className="rf-venue">{venue.icon} {venue.name}</div>}
-      {countdown > 0 && countdown !== 99 && <div className="countdown big">{countdown}</div>}
+      {countdown > 0 && countdown !== 99 && <div className="countdown big" key={countdown}>{countdown}</div>}
+      {countdown === 0 && !result && <div className="countdown big go">GO!</div>}
       {countdown === 99 && (
         <div className="rf-wait">
           {slow ? `No answer from ${rival.town} yet. Cancel the race?` : `Waiting for ${rival.town} to join...`}

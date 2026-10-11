@@ -1,6 +1,7 @@
 import { mergeCandidates } from '../game/merge'
 import { useEffect, useRef, useState } from 'react'
 import { useGame, hasRusty, buildPrice } from '../game/store'
+import { reducedMotion } from '../game/fx'
 import { activeEvent, garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, carDef, performance, upgradeCost, buildingDef, upgradable, loves, readySets, type BuildingDef } from '../game/data'
 import { CarInspect, CarPreview } from '../scene/CarPreview'
 import { CollectAllButton } from './CollectAll'
@@ -82,9 +83,20 @@ function EditBar() {
 
 export function Panel({ title, children, wide, onClose }: { title: string; children: React.ReactNode; wide?: boolean; onClose?: () => void }) {
   const openPanel = useGame((s) => s.openPanel)
-  const close = (_: null) => (onClose ? onClose() : openPanel(null))
+  // Slides away before it unmounts; the timer dies with the panel, so a panel
+  // swapped in meanwhile is never closed by it.
+  const [closing, setClosing] = useState(false)
+  const timer = useRef(0)
+  useEffect(() => () => clearTimeout(timer.current), [])
+  const close = (_: null) => {
+    const done = () => (onClose ? onClose() : openPanel(null))
+    if (reducedMotion()) return done()
+    if (closing) return
+    setClosing(true)
+    timer.current = window.setTimeout(done, 170)
+  }
   return (
-    <div className="overlay" onClick={() => close(null)}>
+    <div className={closing ? 'overlay closing' : 'overlay'} onClick={() => close(null)}>
       <div className={wide ? 'panel wide' : 'panel'} onClick={(e) => e.stopPropagation()}>
         <div className="panel-head">
           <h2>{title}</h2>
@@ -380,7 +392,10 @@ export function GaragePanel() {
                 <CarInspect title={def.name} {...look!} onClose={() => setInspect(false)} />
               </>
             ) : (
-              <CarPreview {...look!} onExpand={() => setInspect(true)} />
+              <div className="preview-wrap">
+                <CarPreview {...look!} onExpand={() => setInspect(true)} />
+                {tab === 'paint' && <div className="paint-sweep" key={`${look!.color}|${look!.finish}|${look!.stripe}`} aria-hidden />}
+              </div>
             )}
             <h3>{def.name}{car.plate && <span className="mini-plate">{car.plate}</span>}</h3>
             <div className="pi">Performance Index <b>{performance(def, car.upgrades, car.mods)}</b></div>
