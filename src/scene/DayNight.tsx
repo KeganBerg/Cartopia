@@ -4,18 +4,15 @@ import { Color, type DirectionalLight, type HemisphereLight } from 'three'
 import { PAL } from './season'
 import { setPageTint } from './pageTint'
 import { applyNight, dayPhase, duskAmount, nightAmount } from './dayNight'
+import { fxState, gradeColor, lightDir, lookFor, townLook } from './look'
 
-const SUN = new Color(PAL.sun)
-const DUSK = new Color('#ffa463')
-const MOON = new Color('#9fb4ff')
-const SKY_DAY = new Color('#ffffff')
-const SKY_NIGHT = new Color('#6274b8')
-const GROUND_DAY = new Color('#6b8e4e')
-const GROUND_NIGHT = new Color('#1f2a44')
 const BG_DAY = new Color(PAL.ground)
-const BG_NIGHT = new Color('#1b2f2a')
+const BG_NIGHT = new Color('#16233a')
+const BG_DUSK = new Color('#7a6a52')
+const page = new Color()
 
 // Sun, sky light and background that follow the shared day/night clock.
+// Colours come from the shared look (look.ts), which also drives the grade.
 export function DayNight({ small }: { small: boolean }) {
   const sun = useRef<DirectionalLight>(null)
   const hemi = useRef<HemisphereLight>(null)
@@ -25,33 +22,38 @@ export function DayNight({ small }: { small: boolean }) {
     const n = nightAmount(phase)
     const dusk = duskAmount(phase)
     // Nothing visible changes between frames most of the time.
-    const key = Math.round(n * 400) + Math.round(dusk * 400) * 1000
+    const key = Math.round(phase * 2000) + (fxState.on ? 0 : 1e4)
     if (key === last.current) return
     last.current = key
     applyNight(n)
+    const look = lookFor(n, dusk, townLook)
+    scene.environmentIntensity = look.env
     if (sun.current) {
-      sun.current.color.copy(SUN).lerp(MOON, n).lerp(DUSK, dusk * 0.8)
-      sun.current.intensity = 1.6 - n * 1.15
+      sun.current.color.copy(look.sun)
+      sun.current.intensity = look.sunIntensity
+      lightDir(phase, n, sun.current.position).multiplyScalar(50)
     }
     if (hemi.current) {
-      hemi.current.color.copy(SKY_DAY).lerp(SKY_NIGHT, n).lerp(DUSK, dusk * 0.3)
-      hemi.current.groundColor.copy(GROUND_DAY).lerp(GROUND_NIGHT, n)
-      hemi.current.intensity = 0.7 - n * 0.15
+      hemi.current.color.copy(look.sky)
+      hemi.current.groundColor.copy(look.ground)
+      hemi.current.intensity = look.hemiIntensity
     }
     if (scene.background instanceof Color) {
-      scene.background.copy(BG_DAY).lerp(BG_NIGHT, n)
-      setPageTint(scene.background)
+      scene.background.copy(BG_DAY).lerp(BG_NIGHT, n).lerp(BG_DUSK, dusk * 0.25)
+      // The phone status bar sits at the top edge, so match the graded colour there.
+      page.copy(scene.background)
+      setPageTint(fxState.on ? gradeColor(page, look.grade) : page)
     }
   })
   return (
     <>
       <color attach="background" args={[PAL.ground]} />
-      <hemisphereLight ref={hemi} args={['#ffffff', '#6b8e4e', 0.7]} />
+      <hemisphereLight ref={hemi} args={['#cfe6ff', '#7a9a55', 0.75]} />
       <directionalLight
         ref={sun}
         castShadow
         position={[25, 40, 15]}
-        intensity={1.6}
+        intensity={1.85}
         shadow-mapSize={small ? [1024, 1024] : [2048, 2048]}
         shadow-bias={-0.0004}
         shadow-normalBias={0.02}
