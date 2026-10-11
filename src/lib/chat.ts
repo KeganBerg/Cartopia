@@ -3,7 +3,8 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import { useGame } from '../game/store'
 import { CLAN_EMBLEMS } from '../game/data'
-import { displayName, isCleanChat, isCleanName } from './names'
+import { isCleanChat, isCleanName } from './names'
+import { loadUsernames, playerName } from './profiles'
 import type { ClanBadge } from './clans'
 
 // Global chat and crew chat (supabase/migrations/0048_chat.sql). Messages are sent through
@@ -42,9 +43,9 @@ export const useChat = create<ChatState>(() => ({
 export const MAX_CHAT = 200
 const KEEP = 80
 
-// The one place chat decides a sender's name. The server sends the town name (public.chat_name);
-// the word filter still runs here in case the lists drift. Switch both to usernames when they land.
-export const senderName = (m: Pick<ChatMsg, 'name' | 'owner'>) => displayName(m.name, m.owner)
+// The one place chat decides a sender's name: "@username" once they've picked one, else the
+// (filtered) town name the server sent (public.chat_name).
+export const senderName = (m: Pick<ChatMsg, 'name' | 'owner'>) => playerName(m.owner, m.name)
 
 // Rows come from the server, but keep only well-formed ones and run the filters again.
 type Row = { id: number; owner: string; name: string; level: number; body: string; at: string; tag?: string | null; emblem?: string | null; color?: string | null }
@@ -64,6 +65,7 @@ const roomKey = (room: Room) => (room === 'global' ? 'global' : useChat.getState
 
 // count: whether new messages add to the unread count (not for a room's first history load).
 function add(room: Room, list: ChatMsg[]) {
+  loadUsernames(list.map((m) => m.owner))
   useChat.setState((s) => {
     const byId = new Map(s.msgs[room].map((m) => [m.id, m]))
     const count = s.msgs[room].length > 0

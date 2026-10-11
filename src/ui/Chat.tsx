@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useGame } from '../game/store'
 import { supabase } from '../lib/supabase'
 import { MAX_CHAT, firstRoom, sendChat, senderName, setMuted, useChat, viewRoom, type ChatMsg, type Room } from '../lib/chat'
+import { useNames } from '../lib/profiles'
 import { Panel } from './Menus'
 import { ClanTag, SocialTabs, useVisit } from './Social'
 import './chat.css'
@@ -70,6 +71,8 @@ function ChatRoom({ room }: { room: Room }) {
   const uid = useChat((c) => c.uid)
   const msgs = useChat((c) => c.msgs[room])
   const muted = useChat((c) => c.muted)
+  // Re-render when senders' usernames arrive.
+  useNames((n) => n.byId)
   const toast = useGame((s) => s.toast)
   const go = useVisit()
   const [text, setText] = useState('')
