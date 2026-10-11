@@ -11,12 +11,23 @@ const v = new Vector3()
 
 type Placed = { el: HTMLElement; x: number; y: number; w: number; h: number; fixed: boolean }
 const placed: Placed[] = []
+// Furthest a bubble may be nudged from its building, in px.
+const HOP = 64
+// Zoomed out past this share of the screen's default zoom, quiet bubbles (job timers, idle
+// "start" pills) fade away so the town reads at a glance. Ready coins and visitors stay.
+const FAR = 0.8
+const quiet = (el: HTMLElement) => {
+  const c = el.firstElementChild?.classList
+  return !!c && (c.contains('badge-working') || c.contains('badge-idle'))
+}
 
 export function AnchorProjector() {
   const camera = useThree((s) => s.camera)
   const size = useThree((s) => s.size)
   useFrame(() => {
     placed.length = 0
+    // Same default zoom as ResponsiveZoom in World.tsx.
+    const far = camera.zoom < Math.min(38, Math.max(18, Math.sqrt(size.width * size.height) / 24)) * FAR
     for (const [id, el] of anchorEls) {
       const p = anchors.get(id)
       if (!p) {
@@ -40,23 +51,50 @@ export function AnchorProjector() {
         x = cx
         y = cy
       }
+      const hide = far && !clamp && quiet(el)
+      el.classList.toggle('far', hide)
+      if (hide) {
+        el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`
+        continue
+      }
       placed.push({ el, x, y, w: el.offsetWidth, h: el.offsetHeight, fixed: clamp })
     }
-    // Bubbles on neighbouring buildings would pile on top of each other: the one nearest the
-    // bottom of the screen keeps its spot and the others stack upward above it.
+    // Bubbles on neighbouring buildings would pile on top of each other. Bubbles nearest the
+    // bottom of the screen keep their spot; each later one moves to the closest free spot beside,
+    // above or below the ones already placed, but only a short hop so it still reads as its
+    // building's, and never up under the HUD.
     placed.sort((a, b) => b.y - a.y)
+    const top = Math.min(200, size.height / 3)
+    const free = (a: Placed, x: number, y: number, upto: number) => {
+      if (x - a.w / 2 < 2 || x + a.w / 2 > size.width - 2 || y - a.h < top) return false
+      for (let j = 0; j < upto; j++) {
+        const b = placed[j]
+        if (Math.abs(x - b.x) < (a.w + b.w) / 2 && y > b.y - b.h && y - a.h < b.y) return false
+      }
+      return true
+    }
     for (let i = 0; i < placed.length; i++) {
       const a = placed[i]
       // Keep plain bubbles fully on screen sideways too.
       if (!a.fixed) a.x = Math.min(Math.max(a.x, a.w / 2 + 4), size.width - a.w / 2 - 4)
-      for (let moved = true, n = 0; moved && n < 8; n++) {
-        moved = false
+      if (!a.fixed && !free(a, a.x, a.y, i)) {
+        let best: [number, number] | null = null
+        let bestD = HOP * HOP
         for (let j = 0; j < i; j++) {
           const b = placed[j]
-          if (a.fixed || Math.abs(a.x - b.x) >= (a.w + b.w) / 2 || a.y <= b.y - b.h || a.y - a.h >= b.y) continue
-          a.y = b.y - b.h - 2
-          moved = true
+          const spots: [number, number][] = [
+            [a.x, b.y - b.h - 2], [a.x, b.y + a.h + 2],
+            [b.x - (a.w + b.w) / 2 - 2, a.y], [b.x + (a.w + b.w) / 2 + 2, a.y],
+          ]
+          for (const [x, y] of spots) {
+            const d = (x - a.x) ** 2 + (y - a.y) ** 2
+            if (d < bestD && free(a, x, y, i)) {
+              best = [x, y]
+              bestD = d
+            }
+          }
         }
+        if (best) [a.x, a.y] = best
       }
       a.el.style.transform = `translate(${a.x.toFixed(1)}px, ${a.y.toFixed(1)}px) translate(-50%, -100%)`
     }

@@ -14,10 +14,11 @@ import { useNow } from '../scene/useNow'
 import { Icon } from './Icon'
 import { CrewGoalMini } from './CrewGoal'
 
+// Sits in its own dock above Collect All, next to the Race button, so it's always in thumb reach.
 export function GoalsButton() {
   const ready = useGame(claimable)
   return (
-    <button className="goals-btn" onClick={() => useGame.getState().openPanel('goals')} title="Goals">
+    <button className="goals-btn goals-dock" onClick={() => useGame.getState().openPanel('goals')} title="Goals">
       <Icon name="goals" />{ready > 0 && <span className="goal-badge">{ready}</span>}
     </button>
   )
