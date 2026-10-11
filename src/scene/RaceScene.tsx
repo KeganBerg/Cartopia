@@ -4,7 +4,7 @@ import { BackSide, Color, Object3D, type PerspectiveCamera, type Group, type Ins
 import type { Body, Finish } from '../game/data'
 import { CarModel } from './CarModel'
 import { signTexture } from './signTexture'
-import { skyTex, asphaltTex, paverTex, glowTex } from './textures'
+import { skyTex, asphaltTex, paverTex, glowTex, sandTex, grassTex } from './textures'
 import { BuildingModel, LightPool } from './BuildingModel'
 import { glowMats, dayPhase, duskAmount, nightAmount } from './dayNight'
 import { lookFor } from './look'
@@ -340,7 +340,13 @@ export function RaceScene({ track, me, them, mine, theirs, venue }: Props) {
       {/* Ground, sidewalks and the street itself. */}
       <mesh rotation-x={-Math.PI / 2} position={[0, LAYER.outer, len / 2]}>
         <planeGeometry args={[80, len + 100]} />
-        <meshStandardMaterial color={venue.ground ?? PAL.ground} />
+        {venue.id === 'desert' ? (
+          <meshStandardMaterial map={sandTex(10, (len + 100) / 8)} />
+        ) : venue.id === 'farm' ? (
+          <meshStandardMaterial map={grassTex(10, (len + 100) / 8)} />
+        ) : (
+          <meshStandardMaterial color={venue.ground ?? PAL.ground} />
+        )}
       </mesh>
       {/* The street is static, so it's merged into a few draws like the town. */}
       <Batch version={city ? slots : venue.id}>
