@@ -372,7 +372,7 @@ function Drum({ m, at, c, tipped }: { m: Mat; at: V3; c: string; tipped?: boolea
 
 // The crane: tracked base, cab and boom swing between the stacks and the
 // crusher, an electromagnet dangling a flattened car.
-function Crane({ m, at }: { m: Mat; at: V3 }) {
+export function Crane({ m, at }: { m: Mat; at: V3 }) {
   const top = useRef<Group>(null)
   const hook = useRef<Group>(null)
   useFrame(({ clock }) => {
@@ -416,7 +416,7 @@ function Crane({ m, at }: { m: Mat; at: V3 }) {
 }
 
 // Car crusher: a frame with a press that slams down on a car and lifts again.
-function Crusher({ m, at, bulb }: { m: Mat; at: V3; bulb: ReactNode }) {
+export function Crusher({ m, at, bulb }: { m: Mat; at: V3; bulb: ReactNode }) {
   const press = useRef<Group>(null)
   const car = useRef<Group>(null)
   useFrame(({ clock }) => {
