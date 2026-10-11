@@ -315,6 +315,28 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .gp-rounds i { font: 14px var(--display); font-style: normal; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: #eceff1; color: #78909c; border: 2px solid #cfd8dc; }
 .gp-rounds i.won { background: var(--green); color: #fff; border-color: #2e7d32; }
 .gp-rounds i.next { background: #fff3e0; color: #e65100; border-color: var(--accent); animation: badgepulse 1.2s ease-in-out infinite; }
+.camp-head { display: flex; align-items: center; gap: 10px; background: none; border: none; padding: 0; text-align: left; color: inherit; font: inherit; cursor: pointer; width: 100%; }
+.camp-head:disabled { cursor: default; }
+.camp-num { font: 18px var(--display); width: 34px; height: 34px; flex: none; border-radius: 10px; display: grid; place-items: center; background: var(--accent); color: #fff; }
+.camp-card.locked .camp-num { background: #b0bec5; }
+.camp-title { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.camp-title b { font-size: 17px; }
+.camp-title small { color: #607d8b; font-size: 12px; }
+.camp-stars { font: 14px var(--display); white-space: nowrap; color: #f57f17; }
+.camp-card.open { border-color: var(--accent); }
+.camp-bonus { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.camp-bonus .got { color: #2e7d32; }
+.camp-bonus .ico, .camp-prize .ico { display: inline-grid; width: 15px; height: 15px; font-size: 10px; vertical-align: -2px; border-width: 1px; }
+.camp-show { justify-self: start; }
+.camp-races .rival.boss { border-color: #ffb300; background: #fff8e1; }
+.camp-races .rival.locked { opacity: .6; }
+.boss-tag { background: #d84315; }
+.stars { color: #cfd8dc; letter-spacing: 1px; white-space: nowrap; }
+.stars i { font-style: normal; }
+.stars i.on { color: #ffb300; text-shadow: 0 1px 0 #e65100; }
+.stars.big { display: block; font-size: 34px; margin: 2px 0 4px; animation: pop .5s ease-out both; animation-delay: .4s; }
+.camp-prize { display: flex; justify-content: center; gap: 14px; font: 20px var(--display); flex-wrap: wrap; }
+.camp-prize .ico { width: 22px; height: 22px; font-size: 13px; vertical-align: -3px; }
 .gp-next, .gp-short { display: flex; align-items: center; gap: 8px; justify-content: space-between; flex-wrap: wrap; font-size: 14px; }
 .prize-overlay { z-index: 160; align-items: center !important; place-items: center !important; padding: 16px !important; animation: fadein .3s ease-out 1.2s both; }
 @keyframes fadein { from { opacity: 0; visibility: hidden; } to { opacity: 1; visibility: visible; } }
