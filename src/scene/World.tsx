@@ -101,8 +101,9 @@ const groundTile = (e: ThreeEvent<PointerEvent>) => {
 }
 
 // Pick a building up. Letting go drops it there if it fits, or snaps it back.
-// `quick` is a long press from normal play, which goes back to play once dropped.
-function startDrag(b: PlacedBuilding, tile: [number, number], pointerId: number, quick = false) {
+// It stays picked in move mode, so the edit bar (Rotate, Upgrade, Done) is
+// still there after the mouse button or finger lifts.
+function startDrag(b: PlacedBuilding, tile: [number, number], pointerId: number) {
   useGame.getState().select(b.uid)
   useDrag.setState({ drag: { uid: b.uid, x: b.x, z: b.z, gx: tile[0] - b.x, gz: tile[1] - b.z } })
   const end = (e: PointerEvent) => {
@@ -112,7 +113,6 @@ function startDrag(b: PlacedBuilding, tile: [number, number], pointerId: number,
     window.removeEventListener('pointercancel', end)
     const d = useDrag.getState().drag
     useDrag.setState({ drag: null })
-    if (quick) useGame.getState().setMode('play')
     if (!d || e.type === 'pointercancel' || (d.x === b.x && d.z === b.z)) return
     if (useGame.getState().moveBuilding(d.uid, d.x, d.z)) sfx.click()
     else sfx.error()
@@ -159,7 +159,7 @@ function holdToMove(b: PlacedBuilding, e: ThreeEvent<PointerEvent>) {
     navigator.vibrate?.(15)
     sfx.click()
     useGame.setState({ mode: 'move', placing: null })
-    startDrag(b, tile, pointerId, true)
+    startDrag(b, tile, pointerId)
   }, HOLD_MS)
   // Raw updates aren't held back to the next frame, so a swipe cancels the hold even on a slow phone.
   window.addEventListener('pointermove', watch.move)
