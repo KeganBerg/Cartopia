@@ -6,6 +6,8 @@ import { ObstacleDetail, BenchDetail, BillboardDetail, DriveInDetail, FlowerDeta
 import { NEW_MODELS, NewBuildingModel } from './NewBuildings'
 import type { Texture } from 'three'
 import { glowMats } from './dayNight'
+import { tickMovie } from './movie'
+import { useFrame } from '@react-three/fiber'
 import { PAL, SEASON } from './season'
 import { LAYER, decal } from './layers'
 import { brickTex, sidingTex, shingleTex, gravelTex, awningTex, windowTex, paverTex, shutterTex, pumpTex } from './textures'
@@ -209,6 +211,12 @@ function CrewHouse({ m, ghost, sign, bulb, win }: { m: ReturnType<typeof useMat>
       )}
     </group>
   )
+}
+
+// Advances the shared Drive-In film; many screens still redraw it once a frame.
+function MovieReel() {
+  useFrame(() => tickMovie())
+  return null
 }
 
 function Sign({ text, w, y, z, bg, fg }: { text: string; w: number; y: number; z: number; bg?: string; fg?: string }) {
@@ -836,7 +844,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
         <group>
           <mesh position={[0, 1.4 + sl, -1.5]} castShadow>
             <boxGeometry args={[3, 1.8, 0.15]} />
-            {m('#fafafa')}
+            {m('#37474f')}
           </mesh>
           {[-1.2, 1.2].map((x) => (
             <mesh key={x} position={[x, 0.6 + sl / 2, -1.55]} castShadow>
@@ -869,10 +877,12 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
               <mesh position={[0, 0.5, 0]}><boxGeometry args={[0.12, 0.08, 0.06]} />{m('#37474f')}</mesh>
             </group>
           ))}
+          {/* The film: one shared animated texture, kept out of Batch by its live material. */}
           {!ghost && (
             <mesh position={[0, 1.4 + sl, -1.42]}>
-              <planeGeometry args={[2.8, 1.6]} />
+              <planeGeometry args={[2.8, 1.575]} />
               <primitive object={glowMats.screen} attach="material" dispose={null} />
+              <MovieReel />
             </mesh>
           )}
           {!ghost && <LightPool r={1.2} x={1.2} z={1.3} />}
@@ -884,7 +894,15 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
           )}
           {trim && lvl >= 5 && <Lights from={[-1.5, 2.42 + sl, -1.4]} to={[1.5, 2.42 + sl, -1.4]} n={14} />}
           {trim && lvl >= 8 && [-1.45, 1.45].map((x) => <Flag key={x} x={x} y={2.37 + sl} z={-1.5} color="#e53935" star={lvl >= 10} />)}
-          {sign && <Sign text="DRIVE-IN" w={2.4} y={1.6 + sl} z={-1.41} bg="#fafafa" fg="#3e2723" />}
+          {sign && (
+            <group>
+              <mesh position={[0, 2.7 + sl, -1.47]} castShadow>
+                <boxGeometry args={[2.05, 0.6, 0.06]} />
+                {m(def.roof)}
+              </mesh>
+              <Sign text="DRIVE-IN" w={1.9} y={2.7 + sl} z={-1.435} bg="#fafafa" fg="#3e2723" />
+            </group>
+          )}
         </group>
       )
     }

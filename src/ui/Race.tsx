@@ -8,8 +8,9 @@ import { Panel, SheetTabs } from './Menus'
 import { Canvas } from '@react-three/fiber'
 import { NeutralToneMapping } from 'three'
 import { RaceScene } from '../scene/RaceScene'
+import { pickVenue } from '../scene/venues'
 import { sfx, engineRpm, stopEngine } from '../lib/sound'
-import { useLive, challenge, refreshPresence, raceChannel, endLiveRace, answer, pruneInvites, mute, unmute, setClosed, INVITE_MS, type LiveRace } from '../lib/live'
+import { useLive, challenge, cancelChallenge, refreshPresence, raceChannel, endLiveRace, answer, pruneInvites, mute, unmute, setClosed, INVITE_MS, type LiveRace } from '../lib/live'
 import { displayName } from '../lib/names'
 import { joinRefereed, reportFinish, serverPi, type Verdict } from '../lib/referee'
 
@@ -76,6 +77,9 @@ async function fetchOnlineRivals(): Promise<Rival[]> {
       skill: CARS.find((c) => c.name === r.best_car.name)?.skill,
     }))
 }
+
+// How long a live race waits for the other player before offering to call it off.
+const JOIN_PATIENCE_MS = 30000
 
 export function RacePanel() {
   const cars = useGame((s) => s.cars)
@@ -194,9 +198,15 @@ export function RacePanel() {
                   <b>{p.town}</b> <span className="tag live">LIVE</span>
                   <div className="card-stat">Lvl {p.level} · {p.carName} · PI {p.pi}</div>
                 </div>
-                <button className="buy small alt" disabled={!!outgoing || p.closed || (cooldownTo[p.id] ?? 0) > Date.now()} onClick={() => challenge(p.id)}>
-                  {p.closed ? 'Not taking races' : outgoing?.to === p.id ? 'Waiting...' : (cooldownTo[p.id] ?? 0) > Date.now() ? 'Try again soon' : `Challenge · win $${liveReward(p.pi)}`}
-                </button>
+                {outgoing?.to === p.id ? (
+                  <button className="buy small alt" onClick={cancelChallenge} title="Waiting for an answer. Tap to call it off.">
+                    Waiting... Cancel
+                  </button>
+                ) : (
+                  <button className="buy small alt" disabled={!!outgoing || p.closed || (cooldownTo[p.id] ?? 0) > Date.now()} onClick={() => challenge(p.id)}>
+                    {p.closed ? 'Not taking races' : (cooldownTo[p.id] ?? 0) > Date.now() ? 'Try again soon' : `Challenge · win $${liveReward(p.pi)}`}
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -465,12 +475,16 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
   const [skillShown, setSkillShown] = useState(false)
   // The AI rival's skill, flashed while it is working (live rivals use theirs on their own device).
   const theirSkill = live ? undefined : rival.skill
+  // Somewhere different each race; both sides of a live race get the same place.
+  const [venue] = useState(() => pickVenue(live?.raceId))
   const theirActive = useRef(false)
   const [theirShown, setTheirShown] = useState(false)
   const t = useRef(0)
   const [, force] = useState(0)
   // Live races wait for both players before counting down.
   const [countdown, setCountdown] = useState(live ? 99 : 3)
+  // Set once the rival has taken too long to join, to offer calling the race off.
+  const [slow, setSlow] = useState(false)
   const channel = useRef<ReturnType<typeof raceChannel>>(null)
   const [label, setLabel] = useState('')
   const [result, setResult] = useState<null | { won: boolean; myTime: number; theirTime: number; note?: string; counted?: boolean; stars?: number }>(null)
@@ -510,6 +524,11 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
         them.current.finished = ft
       },
       onGo: go,
+      onLeave: () => {
+        if (started) return
+        useGame.getState().toast(`${live.opponent.town} called off the race`)
+        onExit()
+      },
       onReady: () => {
         if (live.host) {
           ch?.send({ type: 'broadcast', event: 'go', payload: {} })
@@ -533,9 +552,18 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
     }, 1000)
     return () => {
       clearInterval(ping)
+      // Leaving before the start tells the other player instead of leaving them waiting.
+      if (!started) ch?.send({ type: 'broadcast', event: 'leave', payload: {} })
       if (ch && supabase) supabase.removeChannel(ch)
     }
   }, [live])
+
+  // Nobody has joined after a while: ask whether to keep waiting.
+  useEffect(() => {
+    if (countdown !== 99 || slow) return
+    const id = setTimeout(() => setSlow(true), JOIN_PATIENCE_MS)
+    return () => clearTimeout(id)
+  }, [countdown, slow])
 
   useEffect(() => {
     if (countdown > 0 || result) return
@@ -673,7 +701,7 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
   return (
     <div className="race-full">
       <Canvas className="rf-canvas" camera={{ position: [0.4, 2.2, -4], fov: 55, near: 0.3, far: 150 }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
-        <RaceScene track={TRACK} me={me} them={them} mine={{ body: def.body, color: car.color, mods: car.mods }} theirs={{ body: rival.body, color: rival.color, mods: rival.mods }} />
+        <RaceScene track={TRACK} me={me} them={them} mine={{ body: def.body, color: car.color, mods: car.mods }} theirs={{ body: rival.body, color: rival.color, mods: rival.mods }} venue={venue} />
       </Canvas>
       <div className="rf-top">
         <h2>{title ?? `Drag Race vs ${rival.town}`}</h2>
@@ -691,8 +719,17 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
           </div>
         ))}
       </div>
+      {countdown > 0 && !result && <div className="rf-venue">{venue.icon} {venue.name}</div>}
       {countdown > 0 && countdown !== 99 && <div className="countdown big">{countdown}</div>}
-      {countdown === 99 && <div className="rf-wait">Waiting for {rival.town} to join...</div>}
+      {countdown === 99 && (
+        <div className="rf-wait">
+          {slow ? `No answer from ${rival.town} yet. Cancel the race?` : `Waiting for ${rival.town} to join...`}
+          <div className="rf-wait-actions">
+            {slow && <button className="buy small alt" onClick={() => setSlow(false)}>Keep waiting</button>}
+            <button className="buy small" onClick={onExit}>Cancel race</button>
+          </div>
+        </div>
+      )}
       {checking && !result && <div className="rf-wait">Checking the result with the race server...</div>}
       {label && <div className="shift-label big">{label}</div>}
       {def.skill && skillShown && !result && <div className="skill-flash">{SKILLS[def.skill].icon} {SKILLS[def.skill].name}!</div>}

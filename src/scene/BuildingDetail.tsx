@@ -3,6 +3,7 @@ import { glowMats } from './dayNight'
 import { PAL } from './season'
 import { CarModel } from './CarModel'
 import { decal, LAYER } from './layers'
+import { manholeTex } from './textures'
 
 // Small dressing that makes buildings and props read as lived-in: trims,
 // pipes, bins, curbs and so on. Everything here is static and reuses the
@@ -340,8 +341,8 @@ export function GarageDetail({ W, D }: { W: number; D: number }) {
 export function Manhole({ x, z }: { x: number; z: number }) {
   return (
     <mesh position={[x, LAYER.paint, z]} rotation-x={-Math.PI / 2}>
-      <circleGeometry args={[0.16, 14]} />
-      <meshStandardMaterial color="#3a3f44" {...decal()} />
+      <circleGeometry args={[0.17, 18]} />
+      <meshStandardMaterial map={manholeTex()} {...decal()} />
     </mesh>
   )
 }

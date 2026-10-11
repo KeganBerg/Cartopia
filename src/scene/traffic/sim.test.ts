@@ -227,6 +227,32 @@ describe('town traffic', () => {
     expect(c.knot).toBeLessThanOrEqual(4)
   })
 
+  it('side roads at a T have stop signs, and cars stop at them before pulling out', () => {
+    seedRandom(4)
+    const t = new Traffic()
+    const { roads, buildings } = starter()
+    t.setTown(roads, buildings, turnOf)
+    // The middle street meets the ring road in a T at each end: the side road stops.
+    expect([...t.net.stopSigns].sort()).toEqual(['19,11>0', '4,11>1'])
+    for (const c of t.net.layout.clusters) expect(c.signal).toBe(false)
+    t.setCars(cars(18), 18)
+    const seen = new WeakSet<object>()
+    const speeds: number[] = []
+    const c = crowding(t, 240, (tr) => {
+      for (const a of tr.agents.values()) {
+        const l = a.legs[a.ci + 1]
+        if (l?.granted && !seen.has(l) && tr.net.stopSigns.has(`${l.node}>${l.inDir}`)) {
+          seen.add(l)
+          speeds.push(a.v)
+        }
+      }
+    })
+    expect(speeds.length).toBeGreaterThan(10)
+    for (const v of speeds) expect(v).toBeLessThan(0.2)
+    expect(t.respawns).toBe(0)
+    expect(c.still).toBeLessThan(0.1)
+  })
+
   it('a busy starter town with a run on the gas station does not bunch up', () => {
     seedRandom(11)
     const t = new Traffic()

@@ -115,11 +115,11 @@ const ORDER: Light[] = ['red', 'yellow', 'green']
 // its arm reaching over the lane and its lamps facing the waiting cars.
 function TrafficSignals({ roads }: { roads: string[] }) {
   const signals = useMemo(() => {
-    const out: { key: string; x: number; z: number; yaw: number; cluster: number; heading: number }[] = []
+    const out: { key: string; x: number; z: number; yaw: number; cluster: number; heading: number; stop: boolean }[] = []
     const { tiles, clusters } = layoutRoads(roads)
     for (const c of clusters) {
-      if (!c.signal) continue
       for (const e of c.entries) {
+        if (!c.signal && !e.stop) continue
         const from = tiles.get(e.from)!
         const [cx, cz] = toWorld(from.x, from.z)
         const [dx, dz] = DIRS[e.heading]
@@ -132,7 +132,7 @@ function TrafficSignals({ roads }: { roads: string[] }) {
           z: cz + dz * along + rz * side,
           // Local +z faces back down the road at the cars.
           yaw: Math.atan2(-dx, -dz),
-          cluster: c.id, heading: e.heading,
+          cluster: c.id, heading: e.heading, stop: !c.signal,
         })
       }
     }
@@ -141,6 +141,7 @@ function TrafficSignals({ roads }: { roads: string[] }) {
   const lamps = useRef<(Mesh | null)[]>([])
   useFrame(() => {
     signals.forEach((s, i) => {
+      if (s.stop) return
       const now = sim.lightOf(s.cluster, s.heading)
       ORDER.forEach((l, k) => {
         for (const m of [lamps.current[i * 6 + k * 2], lamps.current[i * 6 + k * 2 + 1]]) if (m) m.material = now === l ? lit[l] : dark
@@ -149,7 +150,27 @@ function TrafficSignals({ roads }: { roads: string[] }) {
   })
   return (
     <>
-      {signals.map((s, i) => (
+      {signals.map((s, i) => s.stop ? (
+        // A stop sign on a side road with no lights.
+        <group key={s.key} position={[s.x, 0, s.z]} rotation-y={s.yaw}>
+          <mesh position-y={0.6} castShadow>
+            <cylinderGeometry args={[0.03, 0.03, 1.2, 6]} />
+            <meshStandardMaterial color="#9e9e9e" />
+          </mesh>
+          <mesh position={[0, 1.15, 0.03]} rotation={[Math.PI / 2, Math.PI / 8, 0]} castShadow>
+            <cylinderGeometry args={[0.24, 0.24, 0.02, 8]} />
+            <meshStandardMaterial color="#fafafa" />
+          </mesh>
+          <mesh position={[0, 1.15, 0.042]} rotation={[Math.PI / 2, Math.PI / 8, 0]}>
+            <cylinderGeometry args={[0.215, 0.215, 0.01, 8]} />
+            <meshStandardMaterial color="#c62828" />
+          </mesh>
+          <mesh position={[0, 1.15, 0.05]}>
+            <planeGeometry args={[0.24, 0.06]} />
+            <meshBasicMaterial color="#fafafa" />
+          </mesh>
+        </group>
+      ) : (
         <group key={s.key} position={[s.x, 0, s.z]} rotation-y={s.yaw}>
           <mesh position-y={0.75} castShadow>
             <cylinderGeometry args={[0.03, 0.04, 1.5, 6]} />
