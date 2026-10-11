@@ -28,6 +28,17 @@ export const GROWTH: Record<string, [string, string]> = {
   hospital: ['Medical Center', 'Medical Tower'],
   hq: ['HQ Campus', 'Twin Towers'],
   glasstower: ['Sky Garden Tower', 'Twisting Supertall'],
+  // Grand forms for places that wouldn't make sense as towers.
+  tacos: ['Taqueria', 'Cantina'],
+  firehouse: ['Fire Station & Drill Tower', 'Fire HQ'],
+  stadium: ['Grand Speedway', 'Speedway Arena'],
+  gas: ['Service Plaza', 'Travel Center'],
+  cinema: ['Drive-In Deluxe', 'Mega Drive-In'],
+  tires: ['Tire Center', 'Giant Tire Auto Mall'],
+  lube: ['Lube Center', 'Oil Can Auto Mall'],
+  carwash: ['Wash Center', 'Bubble Car Spa'],
+  parts: ['Parts Center', 'Parts Superstore'],
+  bodyshop: ['Paint Center', 'Custom Paint Studio'],
 }
 
 export const grows = (id: string) => id in GROWTH

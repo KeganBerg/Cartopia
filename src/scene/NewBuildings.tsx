@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { Texture } from 'three'
 import { levelLift, type BuildingDef } from '../game/data'
+import { growthStage } from '../game/growth'
 import { signTexture } from './signTexture'
 import { CarModel } from './CarModel'
 import { Upright } from './mergeScale'
@@ -312,6 +313,76 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
     }
     case 'tacos': {
       const sh = 1.5 + lift
+      const st = growthStage(lvl)
+      if (st > 1) {
+        // The truck settles down: an adobe taqueria (level 4), then a two-storey
+        // cantina with a roof terrace under the giant taco (level 7).
+        const H = st === 3 ? 1.75 : 1.05
+        const taco = (
+          <group>
+            <mesh rotation={[0, 0, Math.PI / 2]} castShadow>
+              <cylinderGeometry args={[0.28, 0.28, 0.22, 16, 1, false, 0, Math.PI]} />
+              {m('#ffca28')}
+            </mesh>
+            <Box m={m} at={[0, 0.03, 0]} s={[0.16, 0.06, 0.5]} c="#66bb6a" shadow={false} />
+            {[-0.12, 0.05, 0.18].map((z) => <mesh key={z} position={[0, 0.07, z]}><sphereGeometry args={[0.05, 6, 5]} />{m('#e53935')}</mesh>)}
+          </group>
+        )
+        return (
+          <group>
+            <Box m={m} at={[0, 0.025, 0]} s={[1.92, 0.05, 1.92]} c="#ffffff" t={paverTex(2, 2)} shadow={false} />
+            <Box m={m} at={[0, H / 2, -0.4]} s={[1.6, H, 1.0]} c="#ffcc80" />
+            {/* Stepped terracotta parapet and a tiled ledge over the door. */}
+            <Box m={m} at={[0, H + 0.05, -0.4]} s={[1.66, 0.1, 1.06]} c="#d84315" />
+            <Box m={m} at={[0, H + 0.17, 0.1]} s={[0.6, 0.18, 0.06]} c="#d84315" />
+            <Box m={m} at={[0, H + 0.3, 0.1]} s={[0.26, 0.1, 0.06]} c="#d84315" />
+            {/* Arched windows and a door, an awning in the truck's colours. */}
+            {[-0.5, 0.5].map((x) => (
+              <group key={x}>
+                <mesh position={[x, 0.42, 0.105]}><planeGeometry args={[0.32, 0.36]} />{win}</mesh>
+                <mesh position={[x, 0.6, 0.106]}><circleGeometry args={[0.16, 12, 0, Math.PI]} />{win}</mesh>
+                <Box m={m} at={[x, 0.22, 0.12]} s={[0.38, 0.04, 0.05]} c="#5d4037" shadow={false} />
+              </group>
+            ))}
+            <mesh position={[0, 0.33, 0.106]}><planeGeometry args={[0.32, 0.62]} />{m('#5d4037')}</mesh>
+            <Box m={m} at={[0, 0.8, 0.3]} rot={[0.5, 0, 0]} s={[1.5, 0.03, 0.42]} c="#ffffff" t={awningTex('#ff7043', '#ffd54f')} />
+            {st === 3 && (
+              <group>
+                {/* Upstairs: a band of arched windows and a balcony. */}
+                {[-0.5, 0, 0.5].map((x) => (
+                  <group key={x}>
+                    <mesh position={[x, 1.32, 0.105]}><planeGeometry args={[0.26, 0.3]} />{win}</mesh>
+                    <mesh position={[x, 1.47, 0.106]}><circleGeometry args={[0.13, 12, 0, Math.PI]} />{win}</mesh>
+                  </group>
+                ))}
+                <Box m={m} at={[0, 1.08, 0.22]} s={[1.5, 0.04, 0.24]} c="#5d4037" />
+                <Box m={m} at={[0, 1.16, 0.335]} s={[1.5, 0.12, 0.015]} c="#3e2723" shadow={false} />
+              </group>
+            )}
+            {!ghost && (
+              <group>
+                <group position={[0, H + 0.12, 0.1]}>
+                  <Box m={m} at={[0, 0, -0.03]} s={[0.98, 0.29, 0.05]} c="#ff7043" shadow={false} />
+                  <Sign text={st === 3 ? 'CANTINA' : 'TAQUERIA'} w={0.9} at={[0, 0, 0]} bg="#ffd54f" fg="#bf360c" />
+                </group>
+                {/* Roof: chairs and parasols round the giant taco on a plinth. */}
+                <Cyl m={m} at={[0.35, H + 0.16, -0.6]} r={0.3} h={0.12} c="#d84315" seg={12} />
+                <group position={[0.35, H + 0.5, -0.6]} scale={st === 3 ? 1.5 : 1.15}>{taco}</group>
+                {st === 3 && <Parasol m={m} at={[-0.45, H + 0.1, -0.5]} c="#43a047" />}
+                {/* Patio with tables, papel picado and string lights. */}
+                {[-0.55, 0.55].map((x, i) => <Parasol key={x} m={m} at={[x, 0, 0.62]} c={i ? '#43a047' : '#ff7043'} />)}
+                {[-0.88, 0.88].map((x) => <Cyl key={x} m={m} at={[x, 0.6, 0.88]} r={0.02} h={1.2} c="#6d4c41" seg={6} />)}
+                <Bulbs from={[-0.88, 1.15, 0.88]} to={[0.88, 1.15, 0.88]} n={9} />
+                {[-0.6, -0.3, 0, 0.3, 0.6].map((x, i) => (
+                  <Box key={x} m={m} at={[x, 1.02 - Math.sin(((x + 0.88) / 1.76) * Math.PI) * 0.04, 0.88]} s={[0.12, 0.1, 0.01]} c={['#e91e63', '#ffeb3b', '#00bcd4', '#8bc34a', '#ff9800'][i]} shadow={false} />
+                ))}
+                {lvl >= 8 && <Flag at={[-0.7, H + 0.1, -0.8]} color="#43a047" star={lvl >= 10} />}
+                <Pool r={0.8} z={0.55} />
+              </group>
+            )}
+          </group>
+        )
+      }
       return (
         <group>
           <Box m={m} at={[0, 0.025, 0]} s={[1.92, 0.05, 1.92]} c="#ffffff" t={paverTex(2, 2)} shadow={false} />
@@ -495,9 +566,12 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
     }
     case 'firehouse': {
       const h = 1.5 + lift
-      const th = h + 0.9
+      // Grown: the hose tower becomes a drill tower (level 4), then Fire HQ
+      // adds a dispatch floor and the ladder truck raised to the tower (7).
+      const st = growthStage(lvl)
+      const th = h + (st === 3 ? 2.6 : st === 2 ? 1.7 : 0.9)
       return (
-        <ShellBuilding {...shell} w={3.5} d={1.4} h0={1.5} z0={-0.25} wall="#c62828" roof="#37474f" sign="FIRE STATION" signBg="#fafafa" signFg="#c62828" shopfront={null}>
+        <ShellBuilding {...shell} w={3.5} d={1.4} h0={1.5} z0={-0.25} wall="#c62828" roof="#37474f" sign={st === 3 ? undefined : 'FIRE STATION'} signBg="#fafafa" signFg="#c62828" shopfront={null}>
           {/* Two tall engine bays with white trim. */}
           {[-0.9, 0.3].map((x) => (
             <group key={x}>
@@ -542,6 +616,66 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           )}
           {!ghost && <Pool r={0.9} x={-0.3} z={0.8} />}
           {trim && lvl >= 5 && <Bulbs from={[1.05, th + 0.02, -0.24]} to={[1.65, th + 0.02, -0.24]} n={5} />}
+          {st > 1 && (
+            <group>
+              {/* Drill tower: a balcony with railings and a lit window on every floor above the roof. */}
+              {Array.from({ length: Math.floor((th - h) / 0.45) }, (_, i) => h + 0.3 + i * 0.45).map((y) => (
+                <group key={y}>
+                  <Box m={m} at={[1.35, y, -0.17]} s={[0.56, 0.03, 0.16]} c="#37474f" shadow={false} />
+                  <Box m={m} at={[1.35, y + 0.08, -0.095]} s={[0.56, 0.14, 0.012]} c="#eceff1" shadow={false} />
+                  <mesh position={[1.35, y + 0.17, -0.244]}><planeGeometry args={[0.22, 0.24]} />{win}</mesh>
+                </group>
+              ))}
+              {!ghost && <Box m={m} at={[1.66, (th - 0.6) / 2 + 0.3, -0.55]} s={[0.02, th - 0.6, 0.12]} c="#cfd8dc" shadow={false} />}
+              {!ghost && (
+                <group position={[1.35, th + 0.5, -0.55]}>
+                  <Box m={m} at={[0, 0.12, 0]} s={[0.14, 0.1, 0.14]} c="#eceff1" />
+                  <mesh position={[0, 0.22, 0]}><sphereGeometry args={[0.06, 8, 6]} /><primitive object={glowMats.taillight} attach="material" dispose={null} /></mesh>
+                </group>
+              )}
+            </group>
+          )}
+          {st === 3 && (
+            <group>
+              {/* Dispatch floor: a glass band on the roof with the HQ name. */}
+              <Box m={m} at={[-0.4, h + 0.32, -0.3]} s={[2.4, 0.5, 1.0]} c="#37474f" />
+              <mesh position={[-0.4, h + 0.32, 0.205]}><planeGeometry args={[2.3, 0.34]} />{win}</mesh>
+              <Box m={m} at={[-0.4, h + 0.6, -0.3]} s={[2.46, 0.06, 1.06]} c="#c62828" />
+              {!ghost && (
+                <group position={[-0.4, h + 0.88, 0.1]}>
+                  <Box m={m} at={[0, 0, -0.03]} s={[1.38, 0.39, 0.05]} c="#c62828" shadow={false} />
+                  <Sign text="FIRE HQ" w={1.3} at={[0, 0, 0]} bg="#fafafa" fg="#c62828" />
+                </group>
+              )}
+              {/* Siren mast and the ladder truck by the tower, its ladder up to the top balcony. */}
+              {!ghost && <Cyl m={m} at={[-1.4, h + 0.95, -0.55]} r={0.02} h={0.7} c="#b0bec5" seg={6} />}
+              {!ghost && <Cyl m={m} at={[-1.4, h + 1.35, -0.55]} r={0.07} r2={0.05} h={0.1} c="#fdd835" seg={8} />}
+              {!ghost && (
+                <group position={[0.3, 0, 0.5]}>
+                  <Box m={m} at={[0, 0.34, 0]} s={[0.6, 0.42, 0.95]} c="#d32f2f" />
+                  <Box m={m} at={[0, 0.42, 0.42]} s={[0.56, 0.2, 0.14]} c="#b3e5fc" />
+                  {[[-0.3, 0.3], [0.3, 0.3], [-0.3, -0.3], [0.3, -0.3]].map(([x, z]) => (
+                    <Cyl key={`${x}${z}`} m={m} at={[x, 0.13, z]} r={0.12} h={0.07} c="#212121" seg={10} rot={[0, 0, Math.PI / 2]} />
+                  ))}
+                  {(() => {
+                    // From the turntable on the truck to the tower's top balcony.
+                    const from: V3 = [0, 0.6, -0.2]
+                    const to: V3 = [1.05, th - 0.15, -0.75]
+                    const dx = to[0] - from[0], dy = to[1] - from[1], dz = to[2] - from[2]
+                    const len = Math.hypot(dx, dy, dz)
+                    return (
+                      <group position={[(from[0] + to[0]) / 2, (from[1] + to[1]) / 2, (from[2] + to[2]) / 2]} rotation={[0, Math.atan2(dx, dz), 0]}>
+                        <group rotation-x={-Math.atan2(dy, Math.hypot(dx, dz)) + Math.PI / 2}>
+                          {[-0.06, 0.06].map((x) => <Box key={x} m={m} at={[x, 0, 0]} s={[0.025, len, 0.025]} c="#eceff1" shadow={false} />)}
+                          {Array.from({ length: Math.floor(len / 0.18) }, (_, i) => <Box key={i} m={m} at={[0, -len / 2 + 0.09 + i * 0.18, 0]} s={[0.12, 0.015, 0.015]} c="#eceff1" shadow={false} />)}
+                        </group>
+                      </group>
+                    )
+                  })()}
+                </group>
+              )}
+            </group>
+          )}
         </ShellBuilding>
       )
     }

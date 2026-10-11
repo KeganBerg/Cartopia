@@ -8,7 +8,7 @@ import { CarModel } from './CarModel'
 import { Upright } from './mergeScale'
 import { glowMats } from './dayNight'
 import { PAL, SEASON } from './season'
-import { concreteTex, helipadTex, sidingTex } from './textures'
+import { concreteTex, helipadTex, sidingTex, shutterTex, gravelTex } from './textures'
 import { Storefront, BrickFloors, StoneShaft, GlassDrum, RibbonDrum, WaterTank, GiantProp, Beacon, type Kit, type Giant } from './GrowthKit'
 
 // The grown forms of shops and services (names in src/game/growth.ts). Level
@@ -619,13 +619,141 @@ function PoliceModel({ def, ghost, m, win, bulb, level }: Props) {
   )
 }
 
-export const GROWTH_MODELS = new Set([...Object.keys(FOOD), 'diner', 'bowling', 'motel', 'market', 'arcade', 'tuner', 'police'])
+// ---- Car shops: a service center (level 4), then the same with a showroom floor
+// and a giant roadside landmark on the roof (level 7) ----
+
+type Auto = { wall: string; trim: string; sign: string; signFg: string; board: string }
+const AUTO: Record<string, Auto> = {
+  tires: { wall: '#455a64', trim: '#eceff1', sign: 'TIRES', signFg: '#212121', board: '#ffca28' },
+  lube: { wall: '#eceff1', trim: '#ffb300', sign: 'LUBE & GO', signFg: '#e65100', board: '#ffb300' },
+  carwash: { wall: '#4fc3f7', trim: '#e1f5fe', sign: 'CAR WASH', signFg: '#0277bd', board: '#e1f5fe' },
+  parts: { wall: '#1565c0', trim: '#bbdefb', sign: 'PARTS', signFg: '#1565c0', board: '#bbdefb' },
+  bodyshop: { wall: '#90a4ae', trim: '#263238', sign: 'PAINT & BODY', signFg: '#263238', board: '#ff7043' },
+}
+
+function Landmark({ m, id, at, s }: { m: Mat; id: string; at: V3; s: number }) {
+  return (
+    <group position={at} scale={s}>
+      {id === 'tires' && (
+        <group position={[0, 0.62, 0]}>
+          <mesh castShadow><torusGeometry args={[0.42, 0.2, 12, 24]} />{m('#212121')}</mesh>
+          {Array.from({ length: 12 }, (_, i) => {
+            const a = (i / 12) * Math.PI * 2
+            return <Box key={i} m={m} at={[Math.cos(a) * 0.42, Math.sin(a) * 0.42, 0.19]} rot={[0, 0, a]} s={[0.06, 0.16, 0.03]} c="#37474f" shadow={false} />
+          })}
+          <Cyl m={m} at={[0, 0, 0]} r={0.26} h={0.16} c="#cfd8dc" seg={16} rot={[Math.PI / 2, 0, 0]} />
+          <Cyl m={m} at={[0, 0, 0.09]} r={0.08} h={0.04} c="#ffca28" seg={10} rot={[Math.PI / 2, 0, 0]} />
+        </group>
+      )}
+      {id === 'lube' && (
+        <group>
+          <Cyl m={m} at={[0, 0.45, 0]} r={0.3} h={0.8} c="#ffb300" seg={16} />
+          <Cyl m={m} at={[0, 0.45, 0]} r={0.305} h={0.22} c="#e65100" seg={16} />
+          <Cyl m={m} at={[0, 0.88, 0]} r={0.12} r2={0.3} h={0.1} c="#ffb300" seg={16} />
+          <Cyl m={m} at={[0.18, 1.0, 0]} r={0.035} h={0.4} c="#9e9e9e" seg={8} rot={[0, 0, -0.9]} />
+          <mesh position={[0.36, 0.86, 0]}><sphereGeometry args={[0.05, 8, 6]} />{m('#5d4037')}</mesh>
+        </group>
+      )}
+      {id === 'carwash' && (
+        <group>
+          {[-0.3, 0.3].map((x, i) => (
+            <group key={x}>
+              <Cyl m={m} at={[x, 0.5, 0]} r={0.2} h={0.9} c={i ? '#ffca28' : '#ec407a'} seg={12} />
+              <Cyl m={m} at={[x, 1.0, 0]} r={0.04} h={0.12} c="#90a4ae" seg={6} />
+            </group>
+          ))}
+          <Box m={m} at={[0, 1.08, 0]} s={[0.8, 0.06, 0.08]} c="#90a4ae" />
+          {[[0.0, 1.3, 0.1, 0.14], [-0.25, 1.45, -0.05, 0.1], [0.22, 1.5, 0.05, 0.12], [0.05, 1.7, 0, 0.08]].map(([x, y, z, r]) => (
+            <mesh key={`${x}${y}`} position={[x, y, z]}><sphereGeometry args={[r, 10, 8]} /><meshStandardMaterial color="#e1f5fe" roughness={0.1} metalness={0.3} /></mesh>
+          ))}
+        </group>
+      )}
+      {id === 'parts' && (
+        <group position={[0, 0.7, 0]} rotation-z={0.6}>
+          {/* A giant wrench. */}
+          <Box m={m} at={[0, 0, 0]} s={[0.14, 1.1, 0.06]} c="#b0bec5" />
+          <mesh position={[0, 0.62, 0]} castShadow><torusGeometry args={[0.16, 0.06, 6, 12, Math.PI * 1.4]} />{m('#b0bec5')}</mesh>
+          <mesh position={[0, -0.62, 0]} castShadow><torusGeometry args={[0.13, 0.05, 6, 16]} />{m('#b0bec5')}</mesh>
+        </group>
+      )}
+      {id === 'bodyshop' && (
+        <group rotation-z={-0.25}>
+          {/* A giant spray can mid-spray. */}
+          <Cyl m={m} at={[0, 0.5, 0]} r={0.22} h={0.85} c="#ff7043" seg={14} />
+          <Cyl m={m} at={[0, 0.5, 0]} r={0.225} h={0.2} c="#fafafa" seg={14} />
+          <mesh position={[0, 0.98, 0]}><sphereGeometry args={[0.22, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />{m('#cfd8dc')}</mesh>
+          <Box m={m} at={[0, 1.22, 0]} s={[0.08, 0.1, 0.08]} c="#263238" />
+          {[[0.18, 1.3], [0.32, 1.38], [0.46, 1.48]].map(([x, y], i) => <mesh key={x} position={[x, y, 0]}><sphereGeometry args={[0.05 + i * 0.03, 8, 6]} />{m(['#ff7043', '#ab47bc', '#29b6f6'][i])}</mesh>)}
+        </group>
+      )}
+    </group>
+  )
+}
+
+function AutoModel({ def, ghost, m, win, bulb, level }: Props) {
+  const a = AUTO[def.id]
+  const st = growthStage(level)
+  const wide = def.w > 1
+  const W = wide ? 3.5 : 1.7
+  const D = 1.3
+  const z0 = -0.3
+  const zf = z0 + D / 2
+  const h = 1.1
+  const up = st === 3 ? 0.62 : 0
+  const bays = wide ? [-1.15, -0.25, 0.65] : [-0.35, 0.4]
+  const bw = wide ? 0.78 : 0.62
+  return (
+    <group>
+      <Box m={m} at={[0, 0.025, 0.1]} s={[W + 0.3, 0.05, 1.9]} c="#9e9e9e" t={concreteTex(2, 1)} shadow={false} />
+      <Box m={m} at={[0, h / 2, z0]} s={[W, h, D]} c={a.wall} t={concreteTex(Math.max(1, Math.round(W)), 1)} />
+      {/* Roll-up bay doors, the middle one open with a car on the lift. */}
+      {bays.map((x, i) => (
+        <group key={x}>
+          <Box m={m} at={[x, 0.42, zf + 0.012]} s={[bw + 0.08, 0.86, 0.025]} c={a.trim} shadow={false} />
+          <mesh position={[x, 0.4, zf + 0.027]}>
+            <planeGeometry args={[bw, 0.78]} />
+            {i === 1 ? m('#263238') : m('#ffffff', shutterTex())}
+          </mesh>
+          <mesh position={[x, 0.88, zf + 0.04]}><boxGeometry args={[0.12, 0.05, 0.06]} />{bulb}</mesh>
+        </group>
+      ))}
+      {!ghost && <BlockCar m={m} at={[bays[1], 0.15, zf - 0.3]} c={CAR_COLS[def.id.length % CAR_COLS.length]} rot={0} />}
+      {/* Office corner and roof edge. */}
+      {wide && <mesh position={[1.45, 0.45, zf + 0.006]}><planeGeometry args={[0.4, 0.5]} />{win}</mesh>}
+      <Box m={m} at={[0, h + 0.04, z0]} s={[W + 0.08, 0.08, D + 0.08]} c={a.trim} />
+      <mesh position={[0, h + 0.081, z0]} rotation-x={-Math.PI / 2}><planeGeometry args={[W, D]} />{m('#cfd8dc', gravelTex(Math.max(1, Math.round(W)), 1))}</mesh>
+      {st === 3 && (
+        // Showroom floor: a glass band set back on the roof.
+        <GlassBlock m={m} ghost={ghost} x={0} z={z0 - 0.1} y0={h + 0.08} w={W - 0.3} d={D - 0.4} h={up - 0.08} tint="#cfd8dc" frame={a.trim} />
+      )}
+      <RoofSign m={m} text={a.sign} w={wide ? 1.7 : 1.2} at={[wide ? -0.6 : 0, h + up + 0.08, zf - 0.15]} bg="#fffde7" fg={a.signFg} board={a.board} ghost={ghost} />
+      <Landmark m={m} id={def.id} at={[wide ? 1.05 : 0.45, h + up + 0.08, z0 - 0.2]} s={st === 3 ? 1.5 : 0.8} />
+      {/* Forecourt: cones, a tyre stack or oil drums by the door. */}
+      {!ghost && (
+        <group>
+          {[-1, 1].map((sd) => (
+            <group key={sd} position={[sd * (W / 2 - 0.1), 0, zf + 0.3]}>
+              <mesh position={[0, 0.1, 0]} castShadow><coneGeometry args={[0.06, 0.2, 8]} />{m('#ff6d00')}</mesh>
+            </group>
+          ))}
+          {def.id === 'tires' && [0, 1, 2, 3].map((i) => <mesh key={i} position={[-W / 2 + 0.25, 0.08 + i * 0.12, zf + 0.25]} rotation-x={Math.PI / 2} castShadow><torusGeometry args={[0.13, 0.06, 8, 14]} />{m('#212121')}</mesh>)}
+          {def.id === 'lube' && [0, 1].map((i) => <Cyl key={i} m={m} at={[W / 2 - 0.3 - i * 0.22, 0.16, zf + 0.25]} r={0.1} h={0.3} c={i ? '#1565c0' : '#ffb300'} seg={10} />)}
+          {st === 3 && <Flag at={[-W / 2 + 0.1, h + up + 0.08, z0 - 0.5]} color={a.board} star={level >= 10} />}
+          <Pool r={0.9} z={zf + 0.4} />
+        </group>
+      )}
+    </group>
+  )
+}
+
+export const GROWTH_MODELS = new Set([...Object.keys(FOOD), ...Object.keys(AUTO), 'diner', 'bowling', 'motel', 'market', 'arcade', 'tuner', 'police'])
 
 // The grown form of a business at level 4+, or null for its own model.
 export function GrowthModel(props: Props) {
   if (props.level < 4) return null
   const id = props.def.id
   if (FOOD[id]) return <FoodModel {...props} />
+  if (AUTO[id]) return <AutoModel {...props} />
   switch (id) {
     case 'diner': return <DinerModel {...props} />
     case 'bowling': return <BowlingModel {...props} />
