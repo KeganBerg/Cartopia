@@ -1,3 +1,4 @@
+import { Icon } from './Icon'
 import { useGame, dealUsed, openDeals, today } from '../game/store'
 import { DEAL_SLOTS, buildingDef, carDef, dealOffer, dealsFor, msToNextDay, type DealDef } from '../game/data'
 import { useNow } from '../scene/useNow'
@@ -17,7 +18,7 @@ export function DealsButton() {
   const open = useGame(openDeals)
   return (
     <button className="goals-btn deals-btn" onClick={() => useGame.getState().openPanel('deals')} title="Daily deals" aria-label="Daily deals">
-      🏷️{open > 0 && <span className="goal-badge deal-badge">{open}</span>}
+      <Icon name="tag" />{open > 0 && <span className="goal-badge deal-badge">{open}</span>}
     </button>
   )
 }

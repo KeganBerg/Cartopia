@@ -11,6 +11,7 @@ import { ModShop, withMod } from './Mods'
 import { CollectionBook, useFindCar } from './Collection'
 import { PaintShop, jobOf } from './Paint'
 import type { PaintJob } from '../game/data'
+import { Icon } from './Icon'
 import { useCrewGoal } from './CrewGoal'
 
 // Phones and tablets: no hover, so placing takes a preview tap first.
@@ -28,12 +29,12 @@ export function BottomBar() {
   return (
     <>
       <div className="bottom-bar">
-        <button className="icon-btn" onClick={() => openPanel('shop')}><span className="i">🏪</span>SHOP</button>
-        <button className="icon-btn" onClick={() => openPanel('showroom')}><span className="i">🚘{setsReady > 0 && <span className="btn-dot">{setsReady}</span>}</span>SHOWROOM</button>
-        <button className="icon-btn" onClick={() => openPanel('garage')}><span className="i">🔧</span>GARAGE</button>
-        <button className="icon-btn" onClick={() => openPanel('friends')}><span className="i">👫{crewChests > 0 && <span className="btn-dot">{crewChests}</span>}</span>FRIENDS</button>
-        <button className="icon-btn" onClick={() => setMode('road')}><span className="i">🚧</span>EDIT</button>
-        <button className="big-btn race-btn" onClick={() => openPanel('race')}><span className="i">🏆</span>RACE</button>
+        <button className="icon-btn" onClick={() => openPanel('shop')}><span className="i i-shop"><Icon name="shop" /></span>SHOP</button>
+        <button className="icon-btn" onClick={() => openPanel('showroom')}><span className="i i-showroom"><Icon name="car" />{setsReady > 0 && <span className="btn-dot">{setsReady}</span>}</span>SHOWROOM</button>
+        <button className="icon-btn" onClick={() => openPanel('garage')}><span className="i i-garage"><Icon name="wrench" /></span>GARAGE</button>
+        <button className="icon-btn" onClick={() => openPanel('friends')}><span className="i i-friends"><Icon name="friends" />{crewChests > 0 && <span className="btn-dot">{crewChests}</span>}</span>FRIENDS</button>
+        <button className="icon-btn" onClick={() => setMode('road')}><span className="i i-edit"><Icon name="cone" /></span>EDIT</button>
+        <button className="big-btn race-btn" onClick={() => openPanel('race')}><span className="i"><Icon name="flag" /></span>RACE</button>
       </div>
       <CollectAllButton />
     </>
@@ -88,7 +89,7 @@ export function Panel({ title, children, wide, onClose }: { title: string; child
       <div className={wide ? 'panel wide' : 'panel'} onClick={(e) => e.stopPropagation()}>
         <div className="panel-head">
           <h2>{title}</h2>
-          <button className="close" onClick={() => close(null)}>✕</button>
+          <button className="close" aria-label="Close" onClick={() => close(null)}><Icon name="close" size={16} /></button>
         </div>
         <div className="panel-body">{children}</div>
       </div>

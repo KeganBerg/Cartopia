@@ -1,3 +1,4 @@
+import { Icon } from './Icon'
 import { useEffect, useState } from 'react'
 import { isMuted, setMuted, onMuteChange } from '../lib/sound'
 import { ambienceSettings, onAmbienceChange, setAmbience } from '../lib/ambience'
@@ -12,7 +13,7 @@ export function MuteButton() {
   }, [])
   return (
     <button className="goals-btn" title={muted ? 'Sound off' : 'Sound on'} onClick={() => setMuted(!muted)}>
-      {muted ? '🔇' : '🔊'}
+      <Icon name={muted ? 'soundOff' : 'soundOn'} />
     </button>
   )
 }

@@ -1,3 +1,4 @@
+import { Icon } from './Icon'
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { useGame, lastCollectAll, collectAllListeners, COLLECT_ALL_MS } from '../game/store'
 import { buildingDef, isOpen } from '../game/data'
@@ -29,7 +30,7 @@ export function CollectAllButton() {
       aria-label="Collect and fuel everything"
       style={{ ['--pct' as string]: `${pct}%` }}
     >
-      <span className="collect-ico">⚡</span>
+      <span className="collect-ico"><Icon name="bolt" size={30} /></span>
       {left ? <span className="collect-time">{Math.ceil(left / 1000)}s</span> : ready > 0 && <span className="collect-badge">{ready}</span>}
     </button>
   )
