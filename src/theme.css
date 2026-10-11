@@ -1,0 +1,136 @@
+/* SVG icons in the HUD and nav (see src/ui/Icon.tsx). */
+.gi { display: block; flex: none; }
+.cur { display: block; flex: none; filter: drop-shadow(0 1px 0 rgba(0,0,0,.25)); }
+.ico.cur-ico { background: none; border: none; padding: 0; }
+.ico.cur-ico .cur { width: 100%; height: 100%; }
+.plus .gi { width: 70%; height: 70%; margin: auto; }
+.plus { display: grid; place-items: center; }
+.speedo .speedo-menu .gi { width: 60%; height: 60%; }
+.my-cars, .trophies, .hud-town button { display: inline-flex; align-items: center; gap: 5px; }
+.close { display: grid; place-items: center; padding: 0; }
+.goals-btn, .challenge-bell { display: grid; place-items: center; padding: 0; color: #37474f; }
+.goals-btn .gi, .challenge-bell .gi { width: 56%; height: 56%; }
+.icon-btn .i .gi { width: 58%; height: 58%; }
+.race-btn .i .gi { width: 30px; height: 30px; }
+.collect-ico { color: #7a4a00; }
+.collect-ico .gi { filter: drop-shadow(0 1px 0 rgba(255,255,255,.6)); }
+
+/* Glossy cartoon theme: dark outlines, bevelled buttons, colour-coded nav.
+   Scoped under :root so it outranks the base rules in index.css. */
+html {
+  --ink: #1b2a4a;
+  --line: #14213d;
+  --sheet: #e8f1fc;
+  --seg: #d3e2f5;
+  --blue: #2f7ff0;
+  --accent: #ff9f1a;
+}
+:root .pill, :root .my-cars, :root .goal-tracker {
+  background: linear-gradient(#34507f, #1f3358); border: 2.5px solid var(--line); box-shadow: inset 0 2px 0 rgba(255,255,255,.22), 0 3px 0 rgba(0,0,0,.35); color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,.45);
+}
+:root .pill { padding-left: 2px; }
+:root .plus { width: 18px; height: 18px; border-radius: 6px; background: linear-gradient(#7ee05a, #2fa52f); border: 2px solid var(--line); margin-left: 4px; box-shadow: inset 0 1.5px 0 rgba(255,255,255,.45); }
+:root .town-name { -webkit-text-stroke: 1.5px var(--line); text-shadow: 0 4px 0 var(--line); }
+:root .speedo svg circle:first-child { stroke: var(--line); }
+:root .speedo-xp { background: linear-gradient(#34507f, #1f3358); border-color: var(--line); }
+:root .speedo-menu { background: linear-gradient(#ffd43b, #ff9f1a); border: 2.5px solid var(--line); color: var(--line); box-shadow: inset 0 2px 0 rgba(255,255,255,.5), 0 2px 0 rgba(0,0,0,.35); }
+:root .fuel-bar { background: #1f3358; border: 2.5px solid var(--line); box-shadow: 0 3px 0 rgba(0,0,0,.35); }
+:root .fuel-bar div { background: linear-gradient(#ffe066 0 45%, #ffb703 55%); }
+:root .fuel-bar span, :root .fuel-sub { text-shadow: 0 2px 0 var(--line); }
+:root .goals-btn, :root .challenge-bell {
+  background: linear-gradient(#ffffff 0 50%, #e3ecf7 50%); border: 2.5px solid var(--line); border-radius: 12px; color: #2f6fd6; box-shadow: 0 3px 0 rgba(0,0,0,.35);
+}
+:root .icon-btn { color: #fff; text-shadow: 0 2px 0 var(--line), 0 0 2px var(--line); letter-spacing: .3px; }
+:root .icon-btn .i {
+  border-radius: 16px; border: 3px solid var(--line); color: #fff; position: relative; overflow: visible;
+  box-shadow: inset 0 -5px 0 rgba(0,0,0,.18), inset 0 3px 0 rgba(255,255,255,.4), 0 4px 0 rgba(0,0,0,.35);
+}
+:root .icon-btn .i .gi { filter: drop-shadow(0 2px 0 rgba(0,0,0,.3)); }
+:root .i-shop { background: linear-gradient(#ffb547, #f07b0e); }
+:root .i-showroom { background: linear-gradient(#ff6b6b, #d6283b); }
+:root .i-garage { background: linear-gradient(#5aa9ff, #2263d6); }
+:root .i-friends { background: linear-gradient(#b48cff, #7444d9); }
+:root .i-edit { background: linear-gradient(#ffd84a, #f0a400); }
+:root .icon-btn:active .i { transform: translateY(3px); box-shadow: inset 0 -3px 0 rgba(0,0,0,.18), 0 1px 0 rgba(0,0,0,.35); }
+:root .race-btn {
+  background: linear-gradient(#8ef05c, #2fae35); border: 3px solid var(--line); border-radius: 18px; color: #fff; text-shadow: 0 2px 0 var(--line);
+  box-shadow: inset 0 -6px 0 rgba(0,0,0,.18), inset 0 3px 0 rgba(255,255,255,.45), 0 5px 0 rgba(0,0,0,.35); padding: 8px 20px; font-size: 20px;
+}
+:root .race-btn .gi { filter: drop-shadow(0 2px 0 rgba(0,0,0,.3)); }
+:root .collect-all { border: 3px solid var(--line); box-shadow: 0 4px 0 rgba(0,0,0,.35); }
+:root .collect-all::before { background: radial-gradient(circle at 40% 30%, #fff3b0, #ffc21a 60%, #f39b00); }
+:root .hud-strip { background: linear-gradient(#2a4370, #1c2e52); border: 2.5px solid var(--line); box-shadow: inset 0 2px 0 rgba(255,255,255,.18), 0 4px 0 rgba(0,0,0,.3); }
+:root .chip-stat { background: rgba(0,0,0,.25); border: 1.5px solid rgba(0,0,0,.35); box-shadow: inset 0 -1px 0 rgba(255,255,255,.1); text-shadow: 0 1px 0 rgba(0,0,0,.5); }
+:root .hud-town { background: linear-gradient(#34507f, #1f3358); border: 2px solid var(--line); text-shadow: 0 1px 0 rgba(0,0,0,.5); }
+
+:root .overlay { background: rgba(10,22,48,.55); }
+:root .panel { border: 4px solid var(--line); border-radius: 24px; box-shadow: 0 8px 0 rgba(0,0,0,.35), 0 20px 40px rgba(0,0,0,.3); background: var(--sheet); }
+:root .panel-head {
+  background: linear-gradient(#5aa9ff, #2263d6); border-bottom: 3px solid var(--line); padding: 8px 10px 8px 18px;
+  box-shadow: inset 0 3px 0 rgba(255,255,255,.35), inset 0 -4px 0 rgba(0,0,0,.15);
+}
+:root .panel-head h2 { font-size: 24px; letter-spacing: .4px; text-shadow: 0 3px 0 var(--line); -webkit-text-stroke: 1px var(--line); }
+:root .close {
+  width: 36px; height: 36px; border-radius: 12px; background: linear-gradient(#ff6b6b, #d6283b); border: 3px solid var(--line);
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.4), 0 3px 0 rgba(0,0,0,.35);
+}
+:root .close .gi { filter: drop-shadow(0 1.5px 0 rgba(0,0,0,.35)); }
+:root .sheet-tabs { background: var(--sheet); border-bottom: 2px solid #c6d7ee; gap: 6px; }
+:root .sheet-tabs button { background: #fff; color: #4a6283; border: 2px solid #b9cde8; border-radius: 12px; box-shadow: 0 2px 0 #b9cde8; }
+:root .sheet-tabs button.sel { background: linear-gradient(#ffd84a, #ffa41a); color: var(--line); border-color: var(--line); box-shadow: inset 0 2px 0 rgba(255,255,255,.5), 0 3px 0 rgba(0,0,0,.3); }
+:root .tabs { background: #d3e2f5; }
+:root .card { border: 2px solid #c6d7ee; border-radius: 16px; box-shadow: 0 3px 0 #c6d7ee; }
+:root button.card:hover:not(:disabled) { border-color: #2f7ff0; box-shadow: 0 3px 0 #2f7ff0; }
+:root .cards.rows .card { border-width: 2px; border-radius: 14px; }
+:root .cards.rows .card > .price {
+  background: linear-gradient(#8ef05c, #2fae35); color: #fff; border: 2px solid #1d6b22; border-radius: 12px; text-shadow: 0 1.5px 0 rgba(0,0,0,.35);
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.4), 0 2px 0 rgba(0,0,0,.2);
+}
+:root .cards.rows .card > .price.bucks { background: linear-gradient(#5aa9ff, #2263d6); border-color: #123d8a; }
+:root .cards.rows .card.broke > .price { background: linear-gradient(#ff8a8a, #d6283b); border-color: #8a1020; }
+:root .buy { background: linear-gradient(#8ef05c, #2fae35); border: 2.5px solid #1d6b22; border-radius: 14px; text-shadow: 0 2px 0 rgba(0,0,0,.3); box-shadow: inset 0 2px 0 rgba(255,255,255,.4), inset 0 -3px 0 rgba(0,0,0,.12), 0 3px 0 rgba(0,0,0,.3); }
+:root .buy.alt { background: linear-gradient(#5aa9ff, #2263d6); border-color: #123d8a; }
+:root .garage-item, :root .garage-detail, :root .goal, :root .day { border-color: #c6d7ee; box-shadow: 0 2px 0 #c6d7ee; }
+:root .garage-item.sel { border-color: #2f7ff0; background: #eaf3ff; box-shadow: 0 2px 0 #2f7ff0; }
+:root .toast { background: linear-gradient(#34507f, #1f3358); border: 2.5px solid var(--line); box-shadow: 0 3px 0 rgba(0,0,0,.35); }
+@media (max-width: 600px) {
+  :root .icon-btn .i { width: 44px; height: 44px; border-radius: 13px; border-width: 2.5px; }
+  :root .race-btn { padding: 5px 12px; font-size: 14px; border-width: 2.5px; }
+  :root .race-btn .gi { width: 24px; height: 24px; }
+  :root .panel { border-width: 4px 0 0; border-radius: 22px 22px 0 0; }
+  :root .goals-btn, :root .challenge-bell { box-shadow: 0 2px 0 rgba(0,0,0,.35); }
+}
+
+
+/* Floating bars and pop-ups */
+:root .edit-bar, :root .visit-banner, :root .challenge-pop { background: var(--sheet); border: 3px solid var(--line); border-radius: 18px; box-shadow: 0 5px 0 rgba(0,0,0,.3); }
+:root .tool { border: 2px solid #b9cde8; border-radius: 12px; box-shadow: 0 2px 0 #b9cde8; color: var(--ink); }
+:root .tool.active { background: linear-gradient(#ffd84a, #ffa41a); border-color: var(--line); box-shadow: inset 0 2px 0 rgba(255,255,255,.5), 0 2px 0 rgba(0,0,0,.3); }
+:root .tool.done { background: linear-gradient(#8ef05c, #2fae35); border-color: #1d6b22; color: #fff; text-shadow: 0 1.5px 0 rgba(0,0,0,.3); box-shadow: inset 0 2px 0 rgba(255,255,255,.4), 0 2px 0 rgba(0,0,0,.3); }
+:root .tutorial { background: linear-gradient(#2a4370, #1c2e52); border: 3px solid var(--line); box-shadow: inset 0 2px 0 rgba(255,255,255,.15), 0 5px 0 rgba(0,0,0,.3); }
+:root .badge { border-color: var(--line); border-width: 2.5px; box-shadow: 0 3px 0 rgba(0,0,0,.3); }
+:root .badge::after { border-top-color: var(--line); }
+:root .tab.sel { box-shadow: 0 2px 0 #b9cde8; color: var(--ink); }
+:root .source, :root .leader, :root .rival { border-color: #c6d7ee; box-shadow: 0 2px 0 #c6d7ee; }
+:root .leader.mine { border-color: var(--accent); box-shadow: 0 2px 0 var(--accent); }
+:root .sell { border-radius: 12px; }
+
+/* Currency badges used by feature screens ($, B, gear, fuel letters): draw the same icons as the HUD. */
+:root .coin-ico:not(.cur-ico), :root .buck-ico:not(.cur-ico), :root .parts-ico:not(.cur-ico), :root .fuel-ico:not(.cur-ico) { border: none; border-radius: 0; color: transparent; text-shadow: none; overflow: hidden; filter: drop-shadow(0 1px 0 rgba(0,0,0,.25)); }
+:root .coin-ico:not(.cur-ico) { background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20width%3D%2224%22%20height%3D%2224%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212.8%22%20r%3D%2210.5%22%20fill%3D%22%23b86e00%22%3E%3C%2Fcircle%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2211.6%22%20r%3D%2210.5%22%20fill%3D%22%23ffc533%22%3E%3C%2Fcircle%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2211.6%22%20r%3D%227.6%22%20fill%3D%22%23ffd95c%22%20stroke%3D%22%23e8a20c%22%20stroke-width%3D%221.4%22%3E%3C%2Fcircle%3E%3Cpath%20d%3D%22M12.9%206.8v1a3%203%200%200%201%202.3%201.6l-1.5.8a1.6%201.6%200%200%200-1.6-.9c-.8%200-1.3.4-1.3.9%200%20.6.6.8%201.7%201.1%201.7.4%203%201%203%202.7%200%201.3-1%202.3-2.6%202.5v1h-1.6v-1a3.2%203.2%200%200%201-2.6-1.8l1.5-.8a1.8%201.8%200%200%200%201.8%201.1c.9%200%201.4-.4%201.4-1s-.6-.8-1.8-1.1c-1.5-.4-2.8-1-2.8-2.6%200-1.2.9-2.2%202.4-2.5v-1Z%22%20fill%3D%22%23a35f00%22%3E%3C%2Fpath%3E%3C%2Fsvg%3E") center / contain no-repeat !important; }
+:root .buck-ico:not(.cur-ico) { background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20width%3D%2224%22%20height%3D%2224%22%3E%3Cpath%20d%3D%22M7%203.5h10l5%206.2L12%2021.8%202%209.7Z%22%20fill%3D%22%230d5fb3%22%20transform%3D%22translate(0%201)%22%3E%3C%2Fpath%3E%3Cpath%20d%3D%22M7%203.5h10l5%206.2L12%2021.8%202%209.7Z%22%20fill%3D%22%2335a8ff%22%3E%3C%2Fpath%3E%3Cpath%20d%3D%22M7%203.5h10l5%206.2H2Z%22%20fill%3D%22%238fd3ff%22%3E%3C%2Fpath%3E%3Cpath%20d%3D%22m7%203.5%202.5%206.2L12%203.5l2.5%206.2L17%203.5M2%209.7h20M9.5%209.7%2012%2021.8l2.5-12.1%22%20fill%3D%22none%22%20stroke%3D%22%231676d2%22%20stroke-width%3D%22.9%22%20stroke-linejoin%3D%22round%22%3E%3C%2Fpath%3E%3Cpath%20d%3D%22M8%205h2.3l-1.4%203.4L7%206.3Z%22%20fill%3D%22%23fff%22%20opacity%3D%22.8%22%3E%3C%2Fpath%3E%3C%2Fsvg%3E") center / contain no-repeat !important; }
+:root .parts-ico:not(.cur-ico) { background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20width%3D%2224%22%20height%3D%2224%22%3E%3Cg%20transform%3D%22translate(0%201)%22%20fill%3D%22%234a5560%22%3E%3Crect%20x%3D%2210%22%20y%3D%221%22%20width%3D%224%22%20height%3D%225%22%20rx%3D%221%22%20transform%3D%22rotate(0%2012%2012)%22%3E%3C%2Frect%3E%3Crect%20x%3D%2210%22%20y%3D%221%22%20width%3D%224%22%20height%3D%225%22%20rx%3D%221%22%20transform%3D%22rotate(45%2012%2012)%22%3E%3C%2Frect%3E%3Crect%20x%3D%2210%22%20y%3D%221%22%20width%3D%224%22%20height%3D%225%22%20rx%3D%221%22%20transform%3D%22rotate(90%2012%2012)%22%3E%3C%2Frect%3E%3Crect%20x%3D%2210%22%20y%3D%221%22%20width%3D%224%22%20height%3D%225%22%20rx%3D%221%22%20transform%3D%22rotate(135%2012%2012)%22%3E%3C%2Frect%3E%3Crect%20x%3D%2210%22%20y%3D%221%22%20width%3D%224%22%20height%3D%225%22%20rx%3D%221%22%20transform%3D%22rotate(180%2012%2012)%22%3E%3C%2Frect%3E%3Crect%20x%3D%2210%22%20y%3D%221%22%20width%3D%224%22%20height%3D%225%22%20rx%3D%221%22%20transform%3D%22rotate(225%2012%2012)%22%3E%3C%2Frect%3E%3Crect%20x%3D%2210%22%20y%3D%221%22%20width%3D%224%22%20height%3D%225%22%20rx%3D%221%22%20transform%3D%22rotate(270%2012%2012)%22%3E%3C%2Frect%3E%3Crect%20x%3D%2210%22%20y%3D%221%22%20width%3D%224%22%20height%3D%225%22%20rx%3D%221%22%20transform%3D%22rotate(315%2012%2012)%22%3E%3C%2Frect%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%227.5%22%3E%3C%2Fcircle%3E%3C%2Fg%3E%3Cg%20fill%3D%22%23a9b6c2%22%3E%3Crect%20x%3D%2210%22%20y%3D%221%22%20width%3D%224%22%20height%3D%225%22%20rx%3D%221%22%20transform%3D%22rotate(0%2012%2012)%22%3E%3C%2Frect%3E%3Crect%20x%3D%2210%22%20y%3D%221%22%20width%3D%224%22%20height%3D%225%22%20rx%3D%221%22%20transform%3D%22rotate(45%2012%2012)%22%3E%3C%2Frect%3E%3Crect%20x%3D%2210%22%20y%3D%221%22%20width%3D%224%22%20height%3D%225%22%20rx%3D%221%22%20transform%3D%22rotate(90%2012%2012)%22%3E%3C%2Frect%3E%3Crect%20x%3D%2210%22%20y%3D%221%22%20width%3D%224%22%20height%3D%225%22%20rx%3D%221%22%20transform%3D%22rotate(135%2012%2012)%22%3E%3C%2Frect%3E%3Crect%20x%3D%2210%22%20y%3D%221%22%20width%3D%224%22%20height%3D%225%22%20rx%3D%221%22%20transform%3D%22rotate(180%2012%2012)%22%3E%3C%2Frect%3E%3Crect%20x%3D%2210%22%20y%3D%221%22%20width%3D%224%22%20height%3D%225%22%20rx%3D%221%22%20transform%3D%22rotate(225%2012%2012)%22%3E%3C%2Frect%3E%3Crect%20x%3D%2210%22%20y%3D%221%22%20width%3D%224%22%20height%3D%225%22%20rx%3D%221%22%20transform%3D%22rotate(270%2012%2012)%22%3E%3C%2Frect%3E%3Crect%20x%3D%2210%22%20y%3D%221%22%20width%3D%224%22%20height%3D%225%22%20rx%3D%221%22%20transform%3D%22rotate(315%2012%2012)%22%3E%3C%2Frect%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%227.5%22%3E%3C%2Fcircle%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%225.6%22%20fill%3D%22%23cfd8e0%22%3E%3C%2Fcircle%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%222.8%22%20fill%3D%22%234a5560%22%3E%3C%2Fcircle%3E%3C%2Fsvg%3E") center / contain no-repeat !important; }
+:root .fuel-ico:not(.cur-ico) { background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20width%3D%2224%22%20height%3D%2224%22%3E%3Cpath%20d%3D%22M7%202.5h5l1.5%201.5H18a2%202%200%200%201%202%202V20a2%202%200%200%201-2%202H6a2%202%200%200%201-2-2V8.5Z%22%20fill%3D%22%239b1c1c%22%20transform%3D%22translate(0%201)%22%3E%3C%2Fpath%3E%3Cpath%20d%3D%22M7%202.5h5l1.5%201.5H18a2%202%200%200%201%202%202V20a2%202%200%200%201-2%202H6a2%202%200%200%201-2-2V8.5Z%22%20fill%3D%22%23f04438%22%3E%3C%2Fpath%3E%3Cpath%20d%3D%22M8.5%201.5h4v3h-4Z%22%20fill%3D%22%233a4148%22%3E%3C%2Fpath%3E%3Cpath%20d%3D%22M12%209.5c1.8%202.4%203%204%203%205.6a3%203%200%200%201-6%200c0-1.6%201.2-3.2%203-5.6Z%22%20fill%3D%22%23fff%22%3E%3C%2Fpath%3E%3Cpath%20d%3D%22M6%209.2%208.6%206.5H17%22%20stroke%3D%22%23fff%22%20stroke-opacity%3D%22.45%22%20stroke-width%3D%221.2%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%3E%3C%2Fpath%3E%3C%2Fsvg%3E") center / contain no-repeat !important; }
+
+/* Edit tools: icon + label */
+:root .tool { display: inline-flex; align-items: center; gap: 5px; }
+:root .tool .gi { color: #2f6fd6; }
+:root .tool.active .gi { color: var(--line); }
+:root .tool.done .gi { color: #fff; filter: drop-shadow(0 1.5px 0 rgba(0,0,0,.3)); }
+
+/* Level up and welcome back cards */
+:root .lvl { border: 4px solid var(--line); box-shadow: inset 0 0 0 4px #ffca28, 0 8px 0 rgba(0,0,0,.35), 0 20px 50px rgba(0,0,0,.4); }
+:root .lvl-badge { border: 5px solid #ffca28; box-shadow: 0 0 0 4px var(--line), 0 7px 0 rgba(0,0,0,.35); }
+:root .lvl-title { color: #ff8a00; -webkit-text-stroke: 1.5px var(--line); text-shadow: 0 4px 0 var(--line); }
+:root .lvl-chip { background: linear-gradient(#34507f, #1f3358); border: 2px solid var(--line); box-shadow: inset 0 1.5px 0 rgba(255,255,255,.2), 0 2px 0 rgba(0,0,0,.3); text-shadow: 0 1.5px 0 rgba(0,0,0,.4); }
+:root .rusty-lock { border: 2.5px solid var(--accent); box-shadow: 0 3px 0 #f0a400; }

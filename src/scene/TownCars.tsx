@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { BoxGeometry, BufferGeometry, CylinderGeometry, Euler, Matrix4, MeshBasicMaterial, MeshStandardMaterial, PlaneGeometry, SphereGeometry, Vector3 } from 'three'
+import { BoxGeometry, BufferGeometry, CylinderGeometry, Euler, Matrix4, MeshBasicMaterial, MeshStandardMaterial, OctahedronGeometry, PlaneGeometry, Quaternion, SphereGeometry, Vector3 } from 'three'
 import type { Group, InstancedMesh } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { anchors } from './anchors'
@@ -8,6 +8,7 @@ import { useGame, type OwnedCar } from '../game/store'
 import { TILE, carDef, performance } from '../game/data'
 import { tripRequests, visitRequests } from '../game/trips'
 import { pedestrianCrossings } from '../game/walkGraph'
+import { showcaseOf } from '../game/meet'
 import { turnOf } from '../game/placement'
 import { toWorld, DIRS } from './grid'
 import { CarModel, carSize, wheelRig, type WheelRig } from './CarModel'
@@ -245,11 +246,43 @@ function TrafficSignals({ roads }: { roads: string[] }) {
   )
 }
 
+const starGeo = new OctahedronGeometry(0.26, 0)
+const starMat = new MeshStandardMaterial({ color: '#ffca28', emissive: '#ffb300', emissiveIntensity: 1.2, metalness: 0.3, roughness: 0.35 })
+const starAt = new Matrix4()
+const starTurn = new Euler()
+const starQuat = new Quaternion()
+const starPos = new Vector3()
+const starScale = new Vector3()
+
+// A spinning gold gem over each car on show, all in one draw.
+function ShowcaseStars({ uids }: { uids: string[] }) {
+  const ref = useRef<InstancedMesh>(null)
+  useFrame(({ clock }) => {
+    const m = ref.current
+    if (!m) return
+    const t = clock.elapsedTime
+    uids.forEach((uid, i) => {
+      const a = sim.agents.get(uid)
+      if (!a || a.show < 0.5) return m.setMatrixAt(i, hidden)
+      starTurn.set(0, t * 2 + i, 0)
+      starPos.set(a.x, 1.6 + Math.sin(t * 3 + i) * 0.08, a.z)
+      starScale.set(1, 1.5, 1).multiplyScalar(a.show)
+      m.setMatrixAt(i, starAt.compose(starPos, starQuat.setFromEuler(starTurn), starScale))
+    })
+    m.instanceMatrix.needsUpdate = true
+  })
+  if (!uids.length) return null
+  return <instancedMesh key={uids.length} ref={ref} args={[starGeo, starMat, uids.length]} frustumCulled={false} />
+}
+
 export function TownCars() {
   const roads = useGame((s) => (s.visiting ?? s).roads)
   const cars = useGame((s) => (s.visiting ?? s).cars)
   const buildings = useGame((s) => (s.visiting ?? s).buildings)
   const visitKey = useGame((s) => s.visiting?.ownerId ?? 'home')
+  const picks = useGame((s) => (s.visiting ?? s).showcase)
+  // The cars on show always get a spot on the road.
+  const stars = useMemo(() => showcaseOf(cars, picks).map((c) => c.uid), [cars, picks])
 
   // Rebuild the road network only when roads or buildings move, not on every save.
   const townKey = JSON.stringify([visitKey, roads, buildings.map((b) => [b.uid, b.def, b.x, b.z, b.rot ?? null])])
@@ -263,7 +296,7 @@ export function TownCars() {
   // Which cars are out and how they drive.
   const max = Math.min(MAX_VISIBLE, Math.max(3, Math.floor(roads.length * 0.5)))
   const specs = useMemo(
-    () => cars.map((c) => {
+    () => [...cars].sort((a, b) => Number(stars.includes(b.uid)) - Number(stars.includes(a.uid))).map((c) => {
       const def = carDef(c.model)
       const size = carSize(def.body)
       return {
@@ -274,7 +307,7 @@ export function TownCars() {
         stalled: !!(c.flat || c.lowFuel),
       }
     }),
-    [cars],
+    [cars, stars],
   )
   useEffect(() => {
     sim.setCars(specs, max)
@@ -311,9 +344,10 @@ export function TownCars() {
   }, -1)
 
   const shown = useMemo(() => {
-    const out = [...cars].sort((a, b) => Number(!!(b.flat || b.lowFuel)) - Number(!!(a.flat || a.lowFuel)))
+    const rank = (c: OwnedCar) => (c.flat || c.lowFuel ? 2 : stars.includes(c.uid) ? 1 : 0)
+    const out = [...cars].sort((a, b) => rank(b) - rank(a))
     return out.slice(0, max)
-  }, [cars, max])
+  }, [cars, max, stars])
 
   if (!roads.length) return null
   return (
@@ -325,6 +359,7 @@ export function TownCars() {
       {shown.map((car) => (
         <TownCar key={`${visitKey}-${car.uid}`} car={car} />
       ))}
+      <ShowcaseStars uids={stars} />
     </>
   )
 }

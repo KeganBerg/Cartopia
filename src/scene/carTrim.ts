@@ -32,6 +32,7 @@ type Feature =
   | 'louvers' | 'deckLouvers' | 'sharkFin' | 'tailBand' | 'rearRack' | 'continental' | 'spare' | 'stowage' | 'towHitch' | 'whip'
   | 'sideExhaust' | 'sideStripe' | 'chromeBelt' | 'fenderVents' | 'eyebrows' | 'roundel'
   | 'splitter' | 'canards' | 'bullBar' | 'overriders' | 'snorkel' | 'toolbox' | 'crates' | 'humps'
+  | 'stopArm' | 'roofHatches' | 'schoolSign' | 'crossingArm' | 'busMirrors' | 'bone'
 
 // What each car gets on top of its body's own detail. Ids not in this build
 // (another thread's newer cars) are simply skipped.
@@ -67,6 +68,10 @@ const TRIMS: Record<string, Feature[]> = {
   stomper: ['lightBar', 'bullBar', 'snorkel', 'crates'],
   zenith: ['sharkFin', 'canards', 'deckLouvers', 'splitter'],
   speedster: ['humps', 'roundel', 'rearRack'],
+  schoolbus: ['stopArm', 'roofHatches', 'schoolSign', 'crossingArm', 'busMirrors'],
+  tusker: ['stowage', 'towHitch', 'whip'],
+  shaggy: ['roofRack', 'bone', 'towHitch'],
+  nightfall: ['splitter', 'canards', 'deckLouvers', 'fenderVents'],
 }
 
 const box = (w: number, h: number, d: number) => new BoxGeometry(w, h, d)
@@ -310,6 +315,53 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
     case 'humps':
       for (const sd of SIDES) k.add('paint', new SphereGeometry(1, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), [sd * wid * 0.2, top, t.cabinZ - t.cabinLen * 0.5 - 0.1], [0, 0, 0], [wid * 0.12, 0.08, 0.22])
       return
+    case 'stopArm': {
+      // A red stop sign with a white rim, folded flat against the driver's side.
+      const p: V3 = [wid / 2 + 0.012, lift + t.body * 0.75, front - 0.42]
+      k.add('black', box(0.012, 0.02, 0.07), [p[0] - 0.004, p[1], p[2] + 0.06])
+      k.add('lamp', disc(0.068, 8), p, [Math.PI / 8, Math.PI / 2, 0])
+      k.add('tail', disc(0.058, 8), [p[0] + 0.002, p[1], p[2]], [Math.PI / 8, Math.PI / 2, 0])
+      k.add('lamp', box(0.002, 0.008, 0.06), [p[0] + 0.004, p[1], p[2]])
+      return
+    }
+    case 'roofHatches':
+      if (!roof) return
+      for (const u of [0.24, -0.24]) {
+        k.add('black', box(wid * 0.34, 0.014, 0.2), [0, roofY + 0.006, roofZ + u * roofLen])
+        k.add('dark', box(wid * 0.3, 0.018, 0.17), [0, roofY + 0.008, roofZ + u * roofLen])
+      }
+      return
+    case 'schoolSign': {
+      // An amber name board over the windscreen with dark letters.
+      if (!roof) return
+      const z = t.cabinZ + t.cabinLen / 2 + 0.012
+      const y = roofY - 0.04
+      k.add('black', plane(wid * 0.56, 0.05), [0, y, z])
+      k.add('amber', plane(wid * 0.52, 0.036), [0, y, z + 0.001])
+      for (let i = 0; i < 6; i++) k.add('black', plane(0.024, 0.022), [(i - 2.5) * wid * 0.075, y, z + 0.002])
+      return
+    }
+    case 'crossingArm':
+      // The swing-out crossing gate, folded along the front bumper.
+      k.add('amber', box(wid * 0.42, 0.014, 0.014), [-wid * 0.18, lift + 0.07, front + 0.05])
+      k.add('black', box(0.03, 0.03, 0.03), [-wid * 0.41, lift + 0.07, front + 0.04])
+      return
+    case 'busMirrors':
+      // Crossover mirrors on stalks at the front corners.
+      for (const sd of SIDES) {
+        bar(k, 'black', [sd * wid * 0.42, t.lightY + 0.04, front - 0.04], [sd * (wid / 2 + 0.05), t.lightY + 0.14, front + 0.05], 0.012)
+        k.add('black', new SphereGeometry(0.034, 10, 8), [sd * (wid / 2 + 0.05), t.lightY + 0.17, front + 0.05], [0, 0, 0], [1, 0.8, 0.5])
+      }
+      return
+    case 'bone': {
+      // A big chew bone strapped to the roof rack.
+      if (!roof) return
+      const y = roofY + 0.075
+      k.add('lamp', cyl(0.022, 0.022, roofLen * 0.5, 8), [0, y, roofZ], [Math.PI / 2, 0, 0])
+      for (const z of [-1, 1]) for (const sd of SIDES) k.add('lamp', new SphereGeometry(0.034, 10, 8), [sd * 0.03, y, roofZ + z * roofLen * 0.26])
+      k.add('black', box(0.06, 0.008, 0.012), [0, y + 0.022, roofZ])
+      return
+    }
   }
 }
 

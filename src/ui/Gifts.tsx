@@ -1,3 +1,4 @@
+import { Icon } from './Icon'
 import { useEffect, useState } from 'react'
 import { useGame, hasRusty } from '../game/store'
 import { supabase } from '../lib/supabase'
@@ -52,7 +53,7 @@ export function GiftBell() {
   if (!count || visiting) return null
   return (
     <button className="challenge-bell gift-bell has" onClick={() => openPanel('gifts')} title="Friends helped you">
-      🎁<span className="bell-count">{count}</span>
+      <Icon name="gift" /><span className="bell-count">{count}</span>
     </button>
   )
 }
