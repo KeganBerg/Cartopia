@@ -243,3 +243,8 @@ div.rm-node { cursor: default; }
   .rm-hub { min-height: 0; }
   .rm-hub .rm-gp .rm-meta + .rm-meta { display: none; }
 }
+
+/* The race-car bar on top of the challenges inbox: its car list opens downward. */
+.invites-car { margin-bottom: 10px; }
+.invites-car .rm-bar { border: 3px solid var(--line, #14213d); border-radius: 16px; padding: 6px 10px; }
+.invites-car .rm-picker { bottom: auto; top: calc(100% + 6px); }

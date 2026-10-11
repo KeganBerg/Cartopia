@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { NeutralToneMapping } from 'three'
 import { useGame, type OwnedCar } from '../game/store'
+import { bestCar, raceCarOf } from '../game/raceCar'
 import { carDef } from '../game/data'
 import {
   ARCADE_FUEL, CHASE_HEARTS, PARK_LOTS, PARK_MAX_BUMPS, chaseReward, chaseScore, loadBests, lotOpen, parkReward, parkStars, saveBests,
@@ -19,9 +20,9 @@ type Playing = { game: 'chase' } | { game: 'park'; lot: number } | { game: 'star
 
 export function ArcadePanel() {
   const cars = useGame((s) => s.cars)
-  const best = useMemo(() => [...cars].sort((a, b) => pi(b) - pi(a))[0], [cars])
-  const [carId, setCarId] = useState(best?.uid)
-  const car = cars.find((c) => c.uid === carId) ?? best
+  // Starts on your race car; picking another here only lasts for this visit.
+  const [carId, setCarId] = useState(() => raceCarOf(cars, useGame.getState().raceCar)?.uid)
+  const car = cars.find((c) => c.uid === carId) ?? bestCar(cars)
   const [playing, setPlaying] = useState<Playing | null>(null)
   const [lots, setLots] = useState(false)
   const [bests, setBests] = useState(loadBests)

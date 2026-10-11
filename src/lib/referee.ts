@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { SERVER_CAR_COLUMNS, serverCar } from './serverCar'
 import { flushSave, signedInUser } from './cloud'
 
 // Live races between two signed-in players are decided by the server
@@ -27,12 +28,11 @@ export async function joinRefereed(raceId: string, opponentUid: string | null | 
   return false
 }
 
-// The opponent's car as the server sees it (its PI is checked by the economy guard).
+// The opponent's race car as the server sees it (its PI is checked by the economy guard).
 export async function serverPi(uid: string): Promise<number | null> {
   if (!supabase) return null
-  const { data } = await supabase.from('game_saves').select('best_car').eq('owner_id', uid).maybeSingle()
-  const pi = (data?.best_car as { pi?: number } | null)?.pi
-  return typeof pi === 'number' ? pi : null
+  const { data } = await supabase.from('game_saves').select(SERVER_CAR_COLUMNS).eq('owner_id', uid).maybeSingle()
+  return data ? serverCar(data)?.pi ?? null : null
 }
 
 const toVerdict = (v: View): Verdict => ({
