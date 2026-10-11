@@ -30,9 +30,14 @@
 .crate-odds .odd small { font-size: 10px; opacity: .8; }
 .odd.coins { background: linear-gradient(#f9a825, #c17900); }
 .odd.mod { background: linear-gradient(#9575cd, #5e35b1); }
+.odd.skin { background: linear-gradient(#ec407a, #ad1457); cursor: pointer; }
 .odd.car { background: linear-gradient(#ff9800, #e65100); cursor: pointer; }
 .crate-cars { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin-top: 5px; max-height: 128px; overflow-y: auto; }
 .crate-car { display: flex; flex-direction: column; align-items: center; background: rgba(255,255,255,.08); border-radius: 8px; padding: 2px 3px 1px; }
+.crate-skin { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 3px; border-radius: 8px; background: rgba(255,255,255,.08); }
+.crate-skin i { position: relative; width: 30px; height: 30px; border-radius: 8px; border: 2px solid var(--tier); box-shadow: 0 0 6px var(--tier); }
+.crate-skin i em { position: absolute; right: -5px; bottom: -5px; font-size: 11px; font-style: normal; }
+.crate-skin small { font: 11px var(--display); color: #e1bee7; }
 .crate-car small { font: 11px var(--display); color: #ffe0b2; }
 .crate-none { font: 13px var(--display); color: #cfd8dc; padding: 6px; }
 
@@ -47,6 +52,7 @@
 /* The prize card under the reveal, edged in the prize's glow. */
 .crate-prize { position: absolute; left: 50%; bottom: calc(12px + var(--sab)); transform: translateX(-50%); width: min(520px, calc(100vw - 16px - var(--sal) - var(--sar))); display: grid; grid-template-columns: auto 1fr; grid-template-areas: 'icon text' 'act act'; gap: 6px 10px; align-items: center; padding: 10px 12px; background: rgba(20,14,32,.9); border: 3px solid var(--glow); border-radius: 18px; box-shadow: 0 0 24px var(--glow), 0 4px 0 rgba(0,0,0,.4); animation: prize-in .45s cubic-bezier(.2,1.4,.4,1) both; }
 .cp-icon { grid-area: icon; font-size: 34px; line-height: 1; filter: drop-shadow(0 0 8px var(--glow)); }
+.cp-swatch { display: block; width: 38px; height: 38px; border-radius: 10px; border: 2px solid #fff; box-shadow: 0 0 12px var(--glow); }
 .cp-text { grid-area: text; display: flex; flex-direction: column; min-width: 0; }
 .cp-text small { font: 13px var(--display); color: var(--glow); text-transform: uppercase; letter-spacing: .5px; }
 .cp-text b { font: 22px var(--display); font-weight: normal; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
