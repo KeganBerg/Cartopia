@@ -1,4 +1,4 @@
--- Refresh the server price list from src/game/data.ts (on top of 0016; every other key is unchanged).
+-- Refresh the server price list from src/game/data.ts (on top of 0018; every other key is unchanged).
 -- Adds ten cars: camper, hotshot, ridgeback, kitsune, current, salon (25 bucks), stomper,
 -- monoposto, zenith and speedster (Rusty's Desert search), three new collection sets
 -- (roadtrip, tuners, grandtour) and the Aether Zenith R in the Dream Garage set.
