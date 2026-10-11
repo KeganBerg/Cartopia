@@ -2,8 +2,8 @@
 // synthesised: warm electric piano, airy "aah" choirs and string pads, a round
 // bass, vibraphone and flute leads over a laid-back beat, in a big soft room.
 // Like a game soundtrack it shuffles: one song, a quiet spell with just the
-// town, then a different one. Days and nights, and each season, have their
-// own songs. Each song always has the same tune, so players get to know them.
+// town, then a different one. Every season has its own three day songs and
+// three night songs, picked at random, and a reload opens on a fresh one. Each song always has the same tune, so players get to know them.
 // It sits under the town sounds, stops for races and arcade games, and gives
 // way to the nightclub's beat when the club is on screen.
 import { audioContext, audioOut, isMuted, onMuteChange } from './sound'
@@ -20,7 +20,7 @@ type Chord = [string, ...string[]]
 export type Song = {
   name: string
   when: 'day' | 'night'
-  seasons?: Season[] // missing: any season
+  seasons: Season[]
   bpm: number
   chords: Chord[] // one per bar, looping
   scale: string[] // the notes the tune is made of
@@ -37,23 +37,23 @@ export type Song = {
 const day = 'day' as const
 const night = 'night' as const
 export const SONGS: Song[] = [
-  { name: 'Sunny Side Street', when: day, seasons: ['spring', 'summer'], bpm: 88, lead: 'vibes', bass: 'bounce', air: 'choir', arp: 'keys', groove: 'chill', swing: 0.12,
+  { name: 'Sunny Side Street', when: day, seasons: ['spring'], bpm: 88, lead: 'vibes', bass: 'bounce', air: 'choir', arp: 'keys', groove: 'chill', swing: 0.12,
     chords: [['G2', 'B3', 'D4', 'F#4', 'A4'], ['E2', 'G3', 'B3', 'D4', 'F#4'], ['C3', 'E3', 'G3', 'B3', 'D4'], ['D2', 'F#3', 'A3', 'B3', 'E4']],
     scale: ['D4', 'E4', 'G4', 'A4', 'B4', 'D5', 'E5', 'G5', 'A5'] },
   { name: 'Lemonade Stand', when: day, seasons: ['summer'], bpm: 92, lead: 'flute', bass: 'bounce', air: 'pad', arp: 'none', groove: 'chill', comp: true, swing: 0.14,
     chords: [['F2', 'A3', 'C4', 'E4', 'G4'], ['D2', 'F3', 'A3', 'C4', 'E4'], ['G2', 'Bb3', 'D4', 'F4', 'A4'], ['C3', 'E3', 'Bb3', 'D4', 'G4']],
     scale: ['C4', 'D4', 'F4', 'G4', 'A4', 'C5', 'D5', 'F5', 'G5'] },
-  { name: 'Paper Route', when: day, bpm: 90, lead: 'vibes', bass: 'root', air: 'choir', arp: 'keys', groove: 'brush',
+  { name: 'Paper Route', when: day, seasons: ['spring'], bpm: 90, lead: 'vibes', bass: 'root', air: 'choir', arp: 'keys', groove: 'brush',
     chords: [['C3', 'E3', 'G3', 'B3', 'E4'], ['A2', 'E3', 'G3', 'C4', 'E4'], ['F2', 'A3', 'C4', 'E4'], ['G2', 'F3', 'A3', 'B3', 'E4'],
       ['C3', 'E3', 'G3', 'B3', 'E4'], ['E2', 'D3', 'G3', 'B3', 'E4'], ['F2', 'A3', 'C4', 'E4'], ['G2', 'F3', 'B3', 'D4', 'G4']],
     scale: ['C5', 'D5', 'E5', 'G5', 'A5', 'C6', 'D6'] },
-  { name: 'Garage Sale', when: day, bpm: 86, lead: 'flute', bass: 'walk', air: 'pad', arp: 'none', groove: 'chill', comp: true, swing: 0.16,
+  { name: 'Garage Sale', when: day, seasons: ['summer'], bpm: 86, lead: 'flute', bass: 'walk', air: 'pad', arp: 'none', groove: 'chill', comp: true, swing: 0.16,
     chords: [['D2', 'F#3', 'A3', 'C#4', 'E4'], ['C3', 'E3', 'G3', 'B3', 'D4'], ['G2', 'F#3', 'B3', 'D4'], ['D2', 'F#3', 'A3', 'C#4', 'E4']],
     scale: ['D4', 'E4', 'F#4', 'A4', 'B4', 'D5', 'E5', 'F#5'] },
-  { name: 'Picnic Hill', when: day, seasons: ['spring', 'summer'], bpm: 84, lead: 'flute', bass: 'bounce', air: 'choir', arp: 'keys', groove: 'chill', swing: 0.1,
+  { name: 'Picnic Hill', when: day, seasons: ['spring'], bpm: 84, lead: 'flute', bass: 'bounce', air: 'choir', arp: 'keys', groove: 'chill', swing: 0.1,
     chords: [['A2', 'C#4', 'E4', 'G#4', 'B4'], ['F#2', 'A3', 'C#4', 'E4'], ['D3', 'F#3', 'A3', 'C#4', 'E4'], ['E2', 'G#3', 'B3', 'C#4', 'E4']],
     scale: ['E4', 'F#4', 'A4', 'B4', 'C#5', 'E5', 'F#5', 'A5'] },
-  { name: 'Rainy Window', when: day, bpm: 72, lead: 'epiano', bass: 'root', air: 'pad', arp: 'keys', groove: 'brush',
+  { name: 'Rainy Window', when: day, seasons: ['fall'], bpm: 72, lead: 'epiano', bass: 'root', air: 'pad', arp: 'keys', groove: 'brush',
     chords: [['E2', 'G3', 'B3', 'D4', 'F#4'], ['C3', 'E3', 'G3', 'B3'], ['A2', 'C4', 'E4', 'G4', 'B4'], ['B2', 'A3', 'E4', 'F#4']],
     scale: ['E4', 'G4', 'A4', 'B4', 'D5', 'E5', 'G5'] },
   { name: 'Maple Drive', when: day, seasons: ['fall'], bpm: 80, lead: 'epiano', bass: 'bounce', air: 'choir', arp: 'keys', groove: 'chill', comp: true, swing: 0.12,
@@ -68,19 +68,49 @@ export const SONGS: Song[] = [
   { name: 'Cocoa Break', when: day, seasons: ['winter'], bpm: 80, lead: 'flute', bass: 'walk', air: 'pad', arp: 'none', groove: 'brush', comp: true, swing: 0.14,
     chords: [['F2', 'A3', 'C4', 'E4', 'G4'], ['A2', 'G3', 'C4', 'E4'], ['Bb2', 'A3', 'D4', 'F4'], ['C3', 'E3', 'A3', 'D4']],
     scale: ['C4', 'D4', 'F4', 'G4', 'A4', 'C5', 'D5', 'F5'] },
-  { name: 'Streetlights', when: night, bpm: 66, lead: 'epiano', bass: 'root', air: 'choir', arp: 'keys', groove: 'brush',
+  { name: 'Streetlights', when: night, seasons: ['summer'], bpm: 66, lead: 'epiano', bass: 'root', air: 'choir', arp: 'keys', groove: 'brush',
     chords: [['F2', 'A3', 'C4', 'E4'], ['E2', 'G3', 'B3', 'D4'], ['D2', 'F3', 'A3', 'C4'], ['C3', 'E3', 'G3', 'B3'],
       ['F2', 'A3', 'C4', 'E4'], ['E2', 'G3', 'B3', 'D4'], ['D2', 'F3', 'C4', 'E4'], ['G2', 'B3', 'D4', 'E4']],
     scale: ['C4', 'D4', 'E4', 'G4', 'A4', 'C5', 'D5', 'E5'] },
-  { name: 'Night Shift', when: night, bpm: 74, lead: 'flute', bass: 'walk', air: 'pad', arp: 'none', groove: 'chill', comp: true, swing: 0.14,
+  { name: 'Night Shift', when: night, seasons: ['fall'], bpm: 74, lead: 'flute', bass: 'walk', air: 'pad', arp: 'none', groove: 'chill', comp: true, swing: 0.14,
     chords: [['A2', 'C4', 'E4', 'G4', 'B4'], ['D2', 'F3', 'A3', 'C4', 'E4'], ['G2', 'B3', 'E4', 'F4', 'A4'], ['C3', 'E3', 'G3', 'B3', 'D4']],
     scale: ['A3', 'C4', 'D4', 'E4', 'G4', 'A4', 'C5', 'D5', 'E5'] },
-  { name: 'Porch Light', when: night, bpm: 62, lead: 'vibes', bass: 'root', air: 'choir', arp: 'keys', groove: 'none',
+  { name: 'Porch Light', when: night, seasons: ['spring'], bpm: 62, lead: 'vibes', bass: 'root', air: 'choir', arp: 'keys', groove: 'none',
     chords: [['Bb2', 'D4', 'F4', 'A4'], ['G2', 'Bb3', 'D4', 'F4'], ['Eb3', 'G3', 'Bb3', 'D4'], ['F2', 'A3', 'C4', 'D4']],
     scale: ['Bb4', 'C5', 'D5', 'F5', 'G5', 'Bb5', 'C6'] },
-  { name: 'Moon Garage', when: night, bpm: 70, lead: 'epiano', bass: 'bounce', air: 'choir', arp: 'keys', groove: 'chill', swing: 0.12,
+  { name: 'Moon Garage', when: night, seasons: ['summer'], bpm: 70, lead: 'epiano', bass: 'bounce', air: 'choir', arp: 'keys', groove: 'chill', swing: 0.12,
     chords: [['E2', 'G3', 'B3', 'D4', 'F#4'], ['A2', 'G3', 'C#4', 'F#4'], ['G2', 'B3', 'D4', 'F#4'], ['F#2', 'A3', 'C#4', 'E4']],
     scale: ['E4', 'F#4', 'A4', 'B4', 'D5', 'E5', 'F#5'] },
+  { name: 'Pool Party', when: day, seasons: ['summer'], bpm: 94, lead: 'vibes', bass: 'bounce', air: 'pad', arp: 'keys', groove: 'chill', swing: 0.12,
+    chords: [['Bb2', 'D4', 'F4', 'A4'], ['C3', 'Eb3', 'G3', 'Bb3', 'D4'], ['D3', 'F3', 'A3', 'C4'], ['Eb3', 'G3', 'Bb3', 'D4', 'F4']],
+    scale: ['F4', 'G4', 'Bb4', 'C5', 'D5', 'F5', 'G5'] },
+  { name: 'Snow Day', when: day, seasons: ['winter'], bpm: 76, lead: 'flute', bass: 'root', air: 'choir', arp: 'keys', groove: 'brush',
+    chords: [['D3', 'F#3', 'A3', 'C#4', 'E4'], ['B2', 'D4', 'F#4', 'A4'], ['G2', 'B3', 'D4', 'F#4'], ['A2', 'C#4', 'E4', 'F#4']],
+    scale: ['A4', 'B4', 'D5', 'E5', 'F#5', 'A5', 'B5'] },
+  { name: 'Peeper Pond', when: night, seasons: ['spring'], bpm: 68, lead: 'vibes', bass: 'bounce', air: 'choir', arp: 'keys', groove: 'brush',
+    chords: [['G2', 'B3', 'D4', 'F#4'], ['A2', 'G3', 'C4', 'E4'], ['B2', 'A3', 'D4', 'F#4'], ['C3', 'E3', 'G3', 'B3', 'D4']],
+    scale: ['D4', 'E4', 'G4', 'A4', 'B4', 'D5', 'E5'] },
+  { name: 'April Rain', when: night, seasons: ['spring'], bpm: 64, lead: 'epiano', bass: 'root', air: 'pad', arp: 'keys', groove: 'none',
+    chords: [['Eb3', 'G3', 'Bb3', 'D4'], ['C3', 'Eb3', 'G3', 'Bb3', 'D4'], ['Ab2', 'C4', 'Eb4', 'G4'], ['Bb2', 'D4', 'F4', 'G4']],
+    scale: ['Bb3', 'C4', 'Eb4', 'F4', 'G4', 'Bb4', 'C5', 'Eb5'] },
+  { name: 'Fireflies', when: night, seasons: ['summer'], bpm: 72, lead: 'flute', bass: 'bounce', air: 'choir', arp: 'keys', groove: 'chill', swing: 0.12,
+    chords: [['A2', 'C4', 'E4', 'G4', 'B4'], ['D2', 'F#3', 'C4', 'E4'], ['G2', 'B3', 'D4', 'F#4'], ['C3', 'E3', 'G3', 'B3']],
+    scale: ['E4', 'G4', 'A4', 'B4', 'D5', 'E5', 'G5'] },
+  { name: 'Harvest Moon', when: night, seasons: ['fall'], bpm: 66, lead: 'epiano', bass: 'walk', air: 'choir', arp: 'none', groove: 'brush', comp: true, swing: 0.14,
+    chords: [['D2', 'F3', 'A3', 'C4', 'E4'], ['Bb2', 'D4', 'F4', 'A4'], ['G2', 'Bb3', 'D4', 'F4', 'A4'], ['A2', 'G3', 'D4', 'E4']],
+    scale: ['A3', 'C4', 'D4', 'F4', 'G4', 'A4', 'C5', 'D5'] },
+  { name: 'Hayride Home', when: night, seasons: ['fall'], bpm: 70, lead: 'vibes', bass: 'bounce', air: 'pad', arp: 'keys', groove: 'chill', swing: 0.1,
+    chords: [['F#2', 'A3', 'C#4', 'E4'], ['D3', 'F#3', 'A3', 'C#4'], ['B2', 'A3', 'D4', 'F#4'], ['E2', 'G#3', 'C#4', 'E4']],
+    scale: ['E4', 'F#4', 'A4', 'B4', 'C#5', 'E5', 'F#5'] },
+  { name: 'Silent Lot', when: night, seasons: ['winter'], bpm: 60, lead: 'vibes', bass: 'root', air: 'choir', arp: 'keys', groove: 'none',
+    chords: [['C3', 'E3', 'G3', 'B3', 'D4'], ['A2', 'C4', 'E4', 'G4', 'B4'], ['F2', 'A3', 'C4', 'E4'], ['G2', 'C4', 'D4', 'G4']],
+    scale: ['E4', 'G4', 'A4', 'C5', 'D5', 'E5', 'G5'] },
+  { name: 'Frosted Glass', when: night, seasons: ['winter'], bpm: 64, lead: 'flute', bass: 'root', air: 'pad', arp: 'keys', groove: 'brush',
+    chords: [['E2', 'G3', 'B3', 'D4', 'F#4'], ['C3', 'E3', 'G3', 'B3'], ['G2', 'B3', 'D4', 'F#4'], ['D2', 'A3', 'D4', 'E4']],
+    scale: ['B3', 'D4', 'E4', 'G4', 'A4', 'B4', 'D5'] },
+  { name: 'Fireside', when: night, seasons: ['winter'], bpm: 68, lead: 'epiano', bass: 'walk', air: 'pad', arp: 'none', groove: 'brush', comp: true, swing: 0.14,
+    chords: [['F2', 'A3', 'C4', 'E4', 'G4'], ['D2', 'F3', 'A3', 'C4', 'E4'], ['G2', 'Bb3', 'D4', 'F4', 'A4'], ['C3', 'E3', 'Bb3', 'D4', 'A4']],
+    scale: ['C4', 'D4', 'F4', 'G4', 'A4', 'C5', 'D5'] },
 ]
 
 // The note's name without its octave, to match melody notes to chords.
@@ -137,11 +167,17 @@ export function phrase(song: Pick<Song, 'scale'>, chords: [Chord, Chord], random
   })
 }
 
-// The songs that suit now, leaving out the last few played if there are others.
+// The songs for this season and time of day, leaving out the last few played
+// if there are others.
 export function songsFor(isNight: boolean, season: Season, recent: string[] = []) {
-  const fit = SONGS.filter((s) => s.when === (isNight ? 'night' : 'day') && (!s.seasons || s.seasons.includes(season)))
-  const fresh = fit.filter((s) => !recent.includes(s.name))
-  return fresh.length ? fresh : fit
+  const fit = SONGS.filter((s) => s.when === (isNight ? 'night' : 'day') && s.seasons.includes(season))
+  // Forget the oldest plays first until something is left, so the song just
+  // played never comes straight back.
+  for (let k = 0; k < recent.length; k++) {
+    const fresh = fit.filter((s) => !recent.slice(k).includes(s.name))
+    if (fresh.length) return fresh
+  }
+  return fit
 }
 
 // A song: an intro, the tune, the tune again, a quieter break, and the tune
@@ -150,8 +186,17 @@ const BARS = 40
 const VERSES = [[8, 16], [16, 24], [32, 40]]
 const inVerse = (bar: number) => VERSES.some(([a, b]) => bar >= a && bar < b)
 
-// Remembered across players so a race or a menu doesn't bring the same song back.
-const recent: string[] = []
+// The last few songs played, kept across reloads so a fresh visit opens on a
+// different song (and a race or a menu doesn't bring the same one back).
+const RECENT_KEY = 'cartopia-music-recent'
+const recent: string[] = (() => {
+  try {
+    const v = JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]')
+    return Array.isArray(v) ? v.filter((x) => typeof x === 'string').slice(-3) : []
+  } catch {
+    return []
+  }
+})()
 let playing: Song | null = null
 const nowListeners = new Set<() => void>()
 export const nowPlaying = () => playing?.name ?? null
@@ -239,6 +284,11 @@ export class TownMusic {
     const song = SONGS.find((s) => s.name === pinned) ?? choices[Math.floor(Math.random() * choices.length)]
     recent.push(song.name)
     if (recent.length > 3) recent.shift()
+    try {
+      localStorage.setItem(RECENT_KEY, JSON.stringify(recent))
+    } catch {
+      /* storage unavailable */
+    }
     this.song = song
     this.pos = 0
     this.next = at
