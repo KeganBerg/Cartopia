@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { Box3, Sphere, type Group } from 'three'
 import { useGame } from '../game/store'
@@ -21,7 +21,7 @@ function Spinner({ def, level }: { def: BuildingDef; level: number }) {
     if (!g) return
     g.scale.setScalar(1)
     const sphere = new Box3().setFromObject(g).getBoundingSphere(new Sphere())
-    const k = 1.25 / sphere.radius
+    const k = 1.45 / sphere.radius
     g.scale.setScalar(k)
     g.position.set(-sphere.center.x * k, -sphere.center.y * k + 0.55, -sphere.center.z * k)
   }, [def, level])
@@ -124,11 +124,17 @@ export function ShopUpgrades() {
   const coins = useGame((s) => s.coins)
   const parts = useGame((s) => s.parts)
   const openUpgrade = useGame((s) => s.openUpgrade)
+  const [all, setAll] = useState(false)
   const order = (id: string) => BUILDINGS.findIndex((d) => d.id === id)
-  const mine = buildings
+  // Cheapest next upgrade first; maxed-out buildings last.
+  const costOf = (b: (typeof buildings)[number]) =>
+    buildingLevel(b) >= MAX_BUILDING_LEVEL ? Infinity : buildingUpgradeCost(buildingDef(b.def), buildingLevel(b)).coins
+  const sorted = buildings
     .filter((b) => upgradable(buildingDef(b.def)))
-    .sort((a, b) => buildingLevel(a) - buildingLevel(b) || order(a.def) - order(b.def))
-  if (!mine.length) return null
+    .sort((a, b) => costOf(a) - costOf(b) || order(a.def) - order(b.def))
+  if (!sorted.length) return null
+  const FEW = 4
+  const mine = all ? sorted : sorted.slice(0, FEW)
   return (
     <section>
       <h3>Upgrade your buildings <small>Taller, fancier, more coins, faster jobs</small></h3>
@@ -148,6 +154,9 @@ export function ShopUpgrades() {
           )
         })}
       </div>
+      {sorted.length > FEW && (
+        <button className="upgrade-more" onClick={() => setAll(!all)}>{all ? 'Show fewer' : `Show all ${sorted.length}`}</button>
+      )}
     </section>
   )
 }

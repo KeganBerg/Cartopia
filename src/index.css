@@ -737,3 +737,4 @@ button.lvl-item:hover { border-color: var(--accent); transform: translateY(-2px)
   .upgrade { gap: 6px; }
   .upgrade-stats td { padding: 3px 10px; }
 }
+.upgrade-more { display: block; margin: 0 auto 6px; background: none; border: none; font: 14px var(--display); color: var(--blue, #1e88e5); text-decoration: underline; }
