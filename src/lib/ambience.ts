@@ -90,12 +90,16 @@ function noiseBuffer(ctx: BaseAudioContext, seconds: number, brown: boolean) {
 }
 
 type Voice = { o: OscillatorNode; g: GainNode; next: number }
-// An open nightclub in town: where it is on screen (-1 left .. 1 right).
-export type Club = { pan: number }
-// Where a point in the town sits left to right on screen, -1..1 (set by the scene).
+// An open nightclub in town: where it is on screen (-1 left .. 1 right), and
+// how close it sounds (1 on screen, quieter the further off screen it is).
+export type Club = { pan: number; near?: number }
+// Where a point in the town sits left to right on screen, -1..1, and how close
+// it sounds, 0..1 (both set by the scene).
 let ear = (x: number, z: number) => Math.max(-1, Math.min(1, (x - z) / 40))
-export function setEar(f: (x: number, z: number) => number) {
+let earNear = (_x: number, _z: number) => 1
+export function setEar(f: (x: number, z: number) => number, near?: (x: number, z: number) => number) {
   ear = f
+  if (near) earNear = near
 }
 // A bird singing from one spot, repeating its song now and then like a real one.
 type Singer = { kind: Species; pan: number; dist: number; next: number }
@@ -420,7 +424,7 @@ export class Soundscape {
     if (chance(0.035 * m.crows, dt)) this.crow(at)
     if (chance(0.022 * m.owls, dt)) this.owl(at)
 
-    this.clubMusic(t, club, m.nightlife)
+    this.clubMusic(t, club)
   }
 
   // Night music: house thumping through the walls of your own nightclub while
@@ -428,16 +432,18 @@ export class Soundscape {
   // different groove (clubGrooves.ts): deep, piano, garage, acid or disco
   // house. Every so often someone opens the door and the music spills out
   // bright for a moment.
-  private clubMusic(t: number, club: Club | boolean | null, nightlife: number) {
-    const near = club ? 1 : 0
-    const level = near ? 0.62 : nightlife * 0.3
-    if (near && t > this.doorUntil + 4 && Math.random() < 0.025) this.doorUntil = t + rand(1.8, 3)
-    const door = near && t < this.doorUntil ? 1 : 0
+  private clubMusic(t: number, club: Club | boolean | null) {
+    // Only a town with its own nightclub hears it, louder the closer it is.
+    const near = !club ? 0 : typeof club === 'object' ? (club.near ?? 1) : 1
+    const level = 0.62 * near
+    if (near > 0.6 && t > this.doorUntil + 4 && Math.random() < 0.025) this.doorUntil = t + rand(1.8, 3)
+    const door = near > 0.6 && t < this.doorUntil ? 1 : 0
     this.music.gain.setTargetAtTime(level * (1 + door * 0.25), t, door ? 0.15 : 2)
-    this.wall.frequency.setTargetAtTime(door ? 1600 : near ? 700 : 260, t, door ? 0.15 : 1)
-    this.keys.frequency.setTargetAtTime(door ? 3200 : near ? 1100 : 420, t, door ? 0.15 : 1)
-    this.hats.gain.setTargetAtTime(door ? 0.5 : near ? 0.14 : 0, t, door ? 0.15 : 1)
-    this.gritTone.frequency.setTargetAtTime(near ? 1100 : 650, t, 1)
+    // Further off, the walls and distance soak up more of the top end.
+    this.wall.frequency.setTargetAtTime(door ? 1600 : 260 + 440 * near, t, door ? 0.15 : 1)
+    this.keys.frequency.setTargetAtTime(door ? 3200 : 420 + 680 * near, t, door ? 0.15 : 1)
+    this.hats.gain.setTargetAtTime(door ? 0.5 : 0.14 * near * near, t, door ? 0.15 : 1)
+    this.gritTone.frequency.setTargetAtTime(650 + 450 * near, t, 1)
     if (this.musicPan) this.musicPan.pan.setTargetAtTime(typeof club === 'object' && club ? club.pan * 0.8 : 0.4, t, 0.5)
     if (level < 0.01) {
       this.beatAt = 0
@@ -865,7 +871,7 @@ function clubOpen(): Club | null {
   const c = buildings.find((b) => b.def === 'club')
   if (!c) return null
   const [x, z] = toWorld(c.x, c.z)
-  return { pan: ear(x, z) }
+  return { pan: ear(x, z), near: earNear(x, z) }
 }
 
 // Drivers stuck behind someone lose patience and honk: behind a car pulled up
