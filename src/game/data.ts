@@ -921,6 +921,8 @@ export const SKINS: SkinDef[] = [
     swatch: 'linear-gradient(135deg, #ff5f6d, #ffc371, #f9f871, #67f3a4, #4facfe, #b06ab3, #ff5f6d)' },
   { id: 'horizon', n: 9, name: 'Event Horizon', tier: 'legendary', blurb: 'A turning spiral of fire and violet', unlock: { bucks: 60 },
     swatch: 'radial-gradient(circle, #000 0 18%, #ff7a1a 24%, #9c3dff 38%, #12051f 60%)' },
+  { id: 'coldsnap', n: 10, name: 'Cold Snap', tier: 'legendary', blurb: 'Black ice shards with frost in the seams', unlock: { bucks: 50 },
+    swatch: 'linear-gradient(115deg, #05080d 30%, #cfeaf7 31% 32%, #0b141e 33% 58%, #8fdcff 59% 60%, #070b11 61%), linear-gradient(20deg, transparent 45%, #e6f6ff 46% 47%, transparent 48%) #05080d' },
 ]
 export const skinDef = (id?: string | null) => (id ? SKINS.find((s) => s.id === id) : undefined)
 // The shader number for a car's skin, 0 for none (or one this version doesn't know).

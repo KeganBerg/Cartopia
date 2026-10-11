@@ -226,6 +226,30 @@ void skinShade(int id, vec3 p, vec3 n, vec3 v, float t, inout vec3 col, inout ve
     }
     glow += skStars(skAt(p, n, v, 0.15), 22.0, t, 0.7) * 0.6;
     glow += vec3(0.55, 0.3, 1.0) * rim * 0.18;
+  } else if (id == 10) {
+    // Cold Snap: black glassy ice. Faceted shards on top, each catching the light at
+    // its own tilt, frost-white seams between them, frozen crystals and glints deeper
+    // down, and a cold blue glow coming up through the seams.
+    const vec3 ice = vec3(0.55, 0.9, 1.0);
+    col = mix(col, vec3(0.006, 0.01, 0.018), 0.97);
+    vec2 sh = skVor(uv0 * 5.5);
+    float facet = skH(vec2(sh.y * 91.0, 3.1));
+    float tilt = pow(clamp(facing * (0.6 + 0.8 * facet) - 0.25, 0.0, 1.0), 3.0);
+    col += vec3(0.025, 0.05, 0.08) * tilt + vec3(0.006, 0.01, 0.018) * facet;
+    float seam = smoothstep(0.022, 0.0, sh.x);
+    col = mix(col, vec3(0.6, 0.85, 0.97), seam * 0.75);
+    glow += ice * seam * 0.12;
+    vec2 sd = skVor(skAt(p, n, v, 0.035) * 5.5);
+    glow += ice * smoothstep(0.12, 0.0, sd.x) * (0.18 + 0.12 * sin(t * 0.8 + sd.y * 20.0));
+    vec2 cr = skVor(skAt(p, n, v, 0.07) * 13.0);
+    float frost = smoothstep(0.06, 0.0, cr.x) * skFbm(skAt(p, n, v, 0.07) * 3.0 + 2.0);
+    glow += ice * frost * 0.3;
+    vec2 gs = skAt(p, n, v, 0.02) * 40.0;
+    float gh = skH(floor(gs));
+    float glint = pow(max(0.0, sin(t * 1.7 + gh * 80.0 + facing * 12.0)), 30.0) * step(0.8, gh);
+    glow += vec3(0.9, 0.97, 1.0) * glint * smoothstep(0.3, 0.0, length(fract(gs) - 0.5)) * 1.6;
+    glow += ice * rim * 0.14;
+    rough = 0.22;
   }
 }
 `
