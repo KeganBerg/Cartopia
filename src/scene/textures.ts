@@ -1,5 +1,5 @@
 import { PAL, SEASON } from './season'
-import { CanvasTexture, RepeatWrapping, SRGBColorSpace, type Texture } from 'three'
+import { CanvasTexture, Color, RepeatWrapping, SRGBColorSpace, type Texture } from 'three'
 
 // Hand-drawn canvas textures, generated once and shared. Small sizes keep
 // them cheap on phones; repeat settings tile them across bigger surfaces.
@@ -49,14 +49,42 @@ function speckle(g: CanvasRenderingContext2D, s: number, r: () => number, colors
   }
 }
 
+// Grass: soft light and dark patches so the lawn isn't one flat colour, short
+// blades, the odd clover clump, then the season's flowers, leaves or sparkle.
+// One image spans four tiles; blobs wrap round the edges so the seams vanish.
 export const grassTex = (rx = 1, ry = rx) =>
-  rep(make(`grass|${SEASON}`, 128, (g, s, r) => {
+  rep(make(`grass2|${SEASON}`, 256, (g, s, r) => {
     g.fillStyle = PAL.grass
     g.fillRect(0, 0, s, s)
-    speckle(g, s, r, PAL.grassSpeckle, 900, 3)
+    const wrapped = (x: number, y: number, draw: (x: number, y: number) => void) => {
+      for (const ox of [-s, 0, s]) for (const oy of [-s, 0, s]) draw(x + ox, y + oy)
+    }
+    const shades = [-0.1, 0.08, -0.06, 0.1].map((l) => `#${new Color(PAL.grass).offsetHSL(0, 0, l).getHexString()}`)
+    for (let i = 0; i < 18; i++) {
+      const x = r() * s, y = r() * s, rad = 18 + r() * 40, squash = 0.6 + r() * 0.4, turn = r() * 3
+      g.globalAlpha = 0.5
+      g.fillStyle = shades[i % shades.length]
+      wrapped(x, y, (cx, cy) => { g.beginPath(); g.ellipse(cx, cy, rad, rad * squash, turn, 0, Math.PI * 2); g.fill() })
+    }
+    g.globalAlpha = 1
+    speckle(g, s, r, PAL.grassSpeckle, 2400, 3)
+    // Blades: short slanted strokes, darker at the root side.
+    g.lineWidth = 1
+    for (let i = 0; i < 1600; i++) {
+      const x = r() * s, y = r() * s, len = 3 + r() * 4, lean = (r() - 0.5) * 3
+      g.strokeStyle = PAL.grassSpeckle[Math.floor(r() * PAL.grassSpeckle.length)]
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x + lean, y - len); g.stroke()
+    }
+    if (SEASON !== 'winter') {
+      g.fillStyle = PAL.grassSpeckle[2]
+      for (let i = 0; i < 10; i++) {
+        const x = r() * s, y = r() * s
+        for (let k = 0; k < 5; k++) wrapped(x + (r() - 0.5) * 8, y + (r() - 0.5) * 8, (cx, cy) => { g.beginPath(); g.arc(cx, cy, 2.2, 0, Math.PI * 2); g.fill() })
+      }
+    }
     // Flowers in spring, fallen leaves in fall, sparkle on the snow.
-    speckle(g, s, r, PAL.grassDots, PAL.dots, 2)
-  }), `grass|${SEASON}`, rx, ry)
+    speckle(g, s, r, PAL.grassDots, PAL.dots * 4, 2)
+  }), `grass2|${SEASON}`, rx, ry)
 
 // Light concrete pavers for sidewalks and building lots.
 export const paverTex = (rx = 1, ry = rx) =>

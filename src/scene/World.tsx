@@ -22,6 +22,7 @@ import { TownCars } from './TownCars'
 import { Townspeople } from './Townspeople'
 import { Batch } from './Batch'
 import { Manhole } from './BuildingDetail'
+import { GrassTufts } from './Tufts'
 import { toWorld, toTile, DIRS } from './grid'
 import { grassTex, paverTex, asphaltTex, drainTex } from './textures'
 import { layoutRoads } from './traffic/layout'
@@ -47,7 +48,7 @@ function Land() {
           <group key={k} position={[cx, 0, cz]}>
             <mesh rotation-x={-Math.PI / 2} position-y={LAYER.land} receiveShadow>
               <planeGeometry args={[PLOT * TILE, PLOT * TILE]} />
-              <meshStandardMaterial map={grassTex(PLOT / 2)} />
+              <meshStandardMaterial map={grassTex(PLOT / 4)} />
             </mesh>
             {mode !== 'play' && mode !== 'expand' && <gridHelper args={[PLOT * TILE, PLOT, '#4f8f2f', '#5f9f3f']} position-y={LAYER.grid} />}
           </group>
@@ -628,6 +629,7 @@ export function World() {
       {/* Pieces move while building or dragging, so merging waits for plain play. */}
       <Batch version={layout} off={mode !== 'play'}>
         <Land />
+        <GrassTufts land={land} roads={roadsList} buildings={buildings} />
         <Roads />
         {buildings.map((b) => (
           <Building key={b.uid} b={b} roads={roads} />
