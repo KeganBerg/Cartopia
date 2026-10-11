@@ -197,6 +197,42 @@ describe('moving between devices', () => {
 })
 
 describe('server economy checks', () => {
+  it("gives a new account its own starter town in a browser holding another player's town", async () => {
+    let shared = await openGame({})
+    shared = await signIn(shared, 'kegan')
+    await play(shared, { level: 5, townName: 'Kegan Town' })
+
+    // Kegan signs out and a friend makes a brand-new account in the same browser.
+    let friend = await openGame(shared.snapshot())
+    friend = await signIn(friend, 'friend')
+    expect(db.get('friend')!.state.townName).toBe('My Town')
+    expect(db.get('friend')!.state.level).toBe(1)
+    expect(friend.useGame.getState().townName).toBe('My Town')
+    expect(db.get('kegan')!.state.townName).toBe('Kegan Town')
+  })
+
+  it("never offers to restore another player's town", async () => {
+    let shared = await openGame({})
+    shared = await signIn(shared, 'kegan')
+    await play(shared, { level: 5, townName: 'Kegan Town' })
+    db.set('nate', { owner_id: 'nate', level: 2, state: { level: 2, townName: 'Nate Town', updatedAt: 1 }, updated_at: '2026-10-10T00:00:00+00:00' })
+
+    let nate = await openGame(shared.snapshot())
+    nate = await signIn(nate, 'nate')
+    const { localBackup } = await import('./cloud')
+    expect(nate.useGame.getState().townName).toBe('Nate Town')
+    expect(localBackup()).toBeNull()
+  })
+
+  it('still offers a guest town back after signing in to an account that has a save', async () => {
+    let laptop = await openGame({})
+    await play(laptop, { level: 4, townName: 'Guest Town' })
+    db.set('nate', { owner_id: 'nate', level: 2, state: { level: 2, townName: 'Nate Town', updatedAt: 1 }, updated_at: '2026-10-10T00:00:00+00:00' })
+    laptop = await signIn(laptop, 'nate')
+    const { localBackup } = await import('./cloud')
+    expect(localBackup()?.townName).toBe('Guest Town')
+  })
+
   it('plays on from the server copy when the server trims a save', async () => {
     let phone = await openGame({})
     phone = await signIn(phone, 'kegan')

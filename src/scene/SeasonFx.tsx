@@ -128,7 +128,7 @@ function Snow({ fx, count }: { fx: Fx; count: number }) {
     drift(fliers, fx, clock.elapsedTime, Math.min(dt, 0.1))
     const p = geo.attributes.position as BufferAttribute
     const a = p.array as Float32Array
-    for (let i = 0; i < count; i++) a.set([fliers.x[i], fliers.y[i], fliers.z[i]], i * 3)
+    for (let i = 0; i < count; i++) { a[i * 3] = fliers.x[i]; a[i * 3 + 1] = fliers.y[i]; a[i * 3 + 2] = fliers.z[i] }
     p.needsUpdate = true
   })
   return (

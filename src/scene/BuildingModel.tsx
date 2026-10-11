@@ -2,6 +2,7 @@ import { TILE, levelLift, type BuildingDef } from '../game/data'
 import { useGame } from '../game/store'
 import { signTexture } from './signTexture'
 import { CarModel } from './CarModel'
+import { NEW_MODELS, NewBuildingModel } from './NewBuildings'
 import type { Texture } from 'three'
 import { glowMats } from './dayNight'
 import { PAL, SEASON } from './season'
@@ -244,6 +245,8 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
         </mesh>
       </group>
     )
+
+  if (NEW_MODELS.has(def.id)) return <NewBuildingModel def={def} ghost={ghost} m={m} win={win} bulb={bulb} level={lvl} />
 
   switch (def.id) {
     case 'bush':
