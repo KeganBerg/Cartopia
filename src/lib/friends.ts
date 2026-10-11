@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import type { SaveState, VisitedTown, PlacedBuilding, OwnedCar } from '../game/store'
 import { CARS } from '../game/data'
+import { displayName } from './names'
 
 export type Leader = { ownerId: string; townName: string; level: number; trophies: number; carName: string | null; demo?: boolean }
 
@@ -58,7 +59,7 @@ export async function fetchLeaderboard(): Promise<Leader[]> {
       .limit(50)
     real = (data ?? []).map((r) => ({
       ownerId: r.owner_id,
-      townName: r.town_name,
+      townName: displayName(r.town_name, r.owner_id),
       level: r.level,
       trophies: Number(r.trophies ?? 0),
       carName: (r.best_car as { name?: string } | null)?.name ?? null,
@@ -74,5 +75,5 @@ export async function fetchTown(ownerId: string): Promise<VisitedTown | null> {
   const { data } = await supabase.from('game_saves').select('state').eq('owner_id', ownerId).maybeSingle()
   const s = data?.state as SaveState | undefined
   if (!s) return null
-  return { ownerId, townName: s.townName, level: s.level, trophies: s.trophies, roads: s.roads, buildings: s.buildings, cars: s.cars }
+  return { ownerId, townName: displayName(s.townName, ownerId), level: s.level, trophies: s.trophies, roads: s.roads, buildings: s.buildings, cars: s.cars }
 }
