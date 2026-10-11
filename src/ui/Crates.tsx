@@ -3,7 +3,8 @@ import { Canvas } from '@react-three/fiber'
 import { NeutralToneMapping } from 'three'
 import { useGame, openCrate } from '../game/store'
 import { carDef, modDef } from '../game/data'
-import { CRATES, carOdds, crateCost, crateDef, crateOddsShown, dropTier, type CrateDef, type CrateId, type CrateOpen } from '../game/crates'
+import { CRATES, carOdds, crateCost, crateDef, crateOddsShown, dropTier, skinOdds, skinOf, type CrateDef, type CrateId, type CrateOpen } from '../game/crates'
+import { SKIN_TIERS } from '../game/data'
 import { CrateScene, TIER_GLOW, prizeLook, type CratePhase } from '../scene/CrateScene'
 import { CarThumb } from '../scene/BuildingPreview'
 import { BuckIcon, CoinIcon, Icon } from './Icon'
@@ -17,15 +18,6 @@ const price = (c: CrateDef, level: number) => {
   return p.coins ? <><CoinIcon size={16} />{compact(p.coins)}</> : <><BuckIcon size={16} />{p.bucks}</>
 }
 
-// HUD button into the Crate Depot.
-export function CratesButton() {
-  return (
-    <button className="goals-btn crates-btn" onClick={() => useGame.getState().openPanel('crates')} title="Crates" aria-label="Crates">
-      <Icon name="crate" />
-    </button>
-  )
-}
-
 // A little crate drawn in CSS for the picker, in the crate's own colours.
 function CrateIcon({ c }: { c: CrateDef }) {
   return (
@@ -35,29 +27,43 @@ function CrateIcon({ c }: { c: CrateDef }) {
   )
 }
 
-// The odds a crate shows: coins, parts and cars, and on a tap the cars it can hold.
+// The odds a crate shows: coins, parts, cars and skins, and on a tap the cars or skins it can hold.
 function Odds({ c, level }: { c: CrateDef; level: number }) {
-  const [cars, setCars] = useState(false)
+  const [open, setOpen] = useState<'car' | 'skin' | null>(null)
   const o = crateOddsShown(c)
   const list = useMemo(() => carOdds(c, level).sort((a, b) => b.p - a.p), [c, level])
+  const skins = useMemo(() => skinOdds(c).sort((a, b) => b.p - a.p), [c])
+  const pct = (p: number) => p.toFixed(p < 1 ? 1 : 0)
+  const toggle = (k: 'car' | 'skin') => setOpen(open === k ? null : k)
   return (
     <div className="crate-odds">
       <div className="crate-odds-row">
         <span className="odd coins" style={{ flex: o.coins }}><b>🪙</b>{o.coins}%</span>
         <span className="odd mod" style={{ flex: o.mod }}><b>🔧</b>{o.mod}%</span>
-        <button className="odd car" style={{ flex: Math.max(o.car, 14) }} onClick={() => setCars(!cars)} aria-expanded={cars}><b>🚗</b>{o.car}%<small>{cars ? '▴' : '▾'}</small></button>
+        <button className="odd car" style={{ flex: Math.max(o.car, 14) }} onClick={() => toggle('car')} aria-expanded={open === 'car'}><b>🚗</b>{o.car}%<small>{open === 'car' ? '▴' : '▾'}</small></button>
+        {o.skin > 0 && <button className="odd skin" style={{ flex: Math.max(o.skin, 14) }} onClick={() => toggle('skin')} aria-expanded={open === 'skin'}><b>✨</b>{o.skin}%<small>{open === 'skin' ? '▴' : '▾'}</small></button>}
       </div>
-      {cars && (
+      {open === 'car' && (
         <div className="crate-cars">
           {list.length ? list.map((x) => {
             const d = carDef(x.model)
             return (
               <span key={x.model} className="crate-car" title={d.name}>
                 <CarThumb size="xs" body={d.body} model={d.id} color={d.colors[0]} />
-                <small>{(x.p * o.car).toFixed(x.p * o.car < 1 ? 1 : 0)}%</small>
+                <small>{pct(x.p * o.car)}%</small>
               </span>
             )
           }) : <span className="crate-none">No cars at your level yet</span>}
+        </div>
+      )}
+      {open === 'skin' && (
+        <div className="crate-cars">
+          {skins.map((x) => (
+            <span key={(x.part ? 'p:' : 'b:') + x.id} className="crate-skin" title={`${x.def.name}${x.part ? ' (part skin)' : ''}`} style={{ '--tier': SKIN_TIERS[x.def.tier].color } as React.CSSProperties}>
+              <i style={{ background: x.def.swatch }}>{x.part && <em>🔧</em>}</i>
+              <small>{pct(x.p * o.skin)}%</small>
+            </span>
+          ))}
         </div>
       )}
     </div>
@@ -81,6 +87,16 @@ function Prize({ open, onAgain, onDone, again }: { open: CrateOpen; onAgain: () 
     icon = '🔁'
     title = `+${d.coins.toLocaleString()} coins`
     sub = `${carDef(d.model).name} · already yours`
+  } else if (d.kind === 'skin' || d.kind === 'skindupe') {
+    const def = skinOf(d.skin, d.part)
+    icon = <span className="cp-swatch" style={{ background: def?.swatch }} />
+    if (d.kind === 'skindupe') {
+      title = `+${d.coins.toLocaleString()} coins`
+      sub = `${def?.name ?? 'Skin'} · already yours`
+    } else {
+      title = def?.name ?? 'Skin'
+      sub = `${def ? SKIN_TIERS[def.tier].name : 'New'} ${d.part ? 'part skin' : 'skin'}!`
+    }
   } else if (d.kind === 'car') {
     icon = '🚗'
     title = carDef(d.model).name
@@ -97,6 +113,7 @@ function Prize({ open, onAgain, onDone, again }: { open: CrateOpen; onAgain: () 
       <div className="cp-text"><small>{sub}</small><b>{title}</b></div>
       <div className="cp-actions">
         {d.kind === 'mod' && !fitted && <button className="buy small" onClick={() => { if (modCar(d.car, d.mod)) setFitted(true) }}>Fit it</button>}
+        {d.kind === 'skin' && <button className="buy small alt" onClick={() => { onDone(); openGarageTab(d.part ? 'mods' : 'paint'); useGame.getState().openPanel('garage') }}>Use it</button>}
         {d.kind === 'car' && <button className="buy small alt" onClick={() => { onDone(); openGarageTab('tune'); useGame.getState().openPanel('garage') }}>Garage</button>}
         <button className="buy small" onClick={onAgain}>{again}</button>
         <button className="sell small" onClick={onDone}>Done</button>

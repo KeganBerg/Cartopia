@@ -33,6 +33,8 @@ export type BuildingDef = {
   prop?: 'donut' | 'burger' | 'cone' | 'tire' | 'pin' | 'popcorn'
   // Listed under Services in the Shop (fire and police stations).
   service?: boolean
+  // A small decoration townspeople can't stroll across (it fills its tile edge to edge).
+  solid?: boolean
   // Only open at night (the nightclub): jobs can only start after dark.
   nightOnly?: boolean
   // Stand-in for a building this build doesn't know (see buildingDef).
@@ -76,6 +78,20 @@ export const BUILDINGS: BuildingDef[] = [
   // Only open after dark: neon on at dusk, a line at the door and a rooftop dance floor.
   { id: 'club', name: 'Neon Owl Nightclub', kind: 'business', nightOnly: true, w: 2, h: 1, price: 8800, unlockLevel: 6, jobSeconds: 300, fuelCost: 4, payout: 750, xp: 60, color: '#1a1035', roof: '#d500f9', sign: 'NEON OWL' },
   { id: 'parts', name: 'Parts Depot', kind: 'parts', w: 2, h: 1, price: 8000, unlockLevel: 5, jobSeconds: 480, fuelCost: 4, payout: 160, partsPayout: 15, xp: 45, color: '#1565c0', roof: '#bbdefb', sign: 'PARTS' },
+  // Offices, heli pad and hospital: the big-town end of the ladder, from a
+  // low-rise business park at 10 up to a glass tower in the 30s.
+  { id: 'offices', name: 'Business Park', kind: 'business', w: 2, h: 1, price: 16500, unlockLevel: 10, jobSeconds: 900, fuelCost: 6, payout: 1500, xp: 100, color: '#d7ccc8', roof: '#455a64', sign: 'BUSINESS PARK' },
+  { id: 'hospital', name: 'Mercy General Hospital', kind: 'business', service: true, w: 2, h: 2, price: 48000, unlockLevel: 18, jobSeconds: 1800, fuelCost: 10, payout: 4000, xp: 280, color: '#eceff1', roof: '#c62828', sign: 'HOSPITAL' },
+  { id: 'hq', name: 'Corporate HQ', kind: 'business', w: 2, h: 1, price: 82000, unlockLevel: 24, jobSeconds: 2700, fuelCost: 12, payout: 6250, xp: 440, color: '#90a4ae', roof: '#1e3a5f', sign: 'APEXCORP' },
+  { id: 'helipad', name: 'Skyhook Heliport', kind: 'business', w: 2, h: 2, price: 115000, unlockLevel: 28, jobSeconds: 3000, fuelCost: 14, payout: 7850, xp: 520, color: '#cfd8dc', roof: '#ff6f00', sign: 'HELIPORT' },
+  { id: 'glasstower', name: 'Glass Tower', kind: 'business', w: 2, h: 2, price: 185000, unlockLevel: 32, jobSeconds: 3600, fuelCost: 16, payout: 9600, xp: 700, color: '#80cbc4', roof: '#263238', sign: 'HORIZON' },
+  // Schools, university and driving academy: big late-game jobs that keep the
+  // long climb to level 40 stocked. The academy's students earn less but learn
+  // fast (more XP per fuel); the university is one campus per town.
+  { id: 'academy', name: 'Driving Academy', kind: 'business', w: 2, h: 2, price: 16000, unlockLevel: 9, jobSeconds: 900, fuelCost: 6, payout: 1380, xp: 140, color: '#eceff1', roof: '#ff6f00', sign: 'DRIVING ACADEMY' },
+  { id: 'school', name: 'Elementary School', kind: 'business', w: 2, h: 2, price: 48000, unlockLevel: 17, jobSeconds: 2100, fuelCost: 10, payout: 4300, xp: 300, color: '#c1694f', roof: '#1565c0', sign: 'ELEMENTARY' },
+  { id: 'highschool', name: 'High School', kind: 'business', w: 3, h: 2, price: 110000, unlockLevel: 25, jobSeconds: 2700, fuelCost: 13, payout: 7400, xp: 430, color: '#a1887f', roof: '#2e7d32', sign: 'HIGH SCHOOL' },
+  { id: 'university', name: 'Ridgemont University', kind: 'business', w: 3, h: 3, price: 240000, unlockLevel: 32, unique: true, jobSeconds: 3600, fuelCost: 16, payout: 11000, xp: 560, color: '#d7ccc8', roof: '#6a1b9a', sign: 'RIDGEMONT UNIVERSITY' },
 
   // Obstacles on newly bought land: pay to clear, wait, then tap to remove.
   { id: 'bush', name: 'Bushes', kind: 'obstacle', w: 1, h: 1, price: 150, unlockLevel: 99, jobSeconds: 30, xp: 5, color: '#558b2f', roof: '#33691e' },
@@ -92,13 +108,13 @@ export const BUILDINGS: BuildingDef[] = [
   { id: 'statue', name: 'Golden Car Statue', kind: 'decor', w: 1, h: 1, price: 0, bucks: 3, unlockLevel: 5, color: '#ffd700', roof: '#9e9e9e' },
   { id: 'pond', name: 'Duck Pond', kind: 'decor', w: 2, h: 2, price: 1500, unlockLevel: 4, color: '#4fc3f7', roof: '#81c784' },
   { id: 'pine', name: 'Pine Tree', kind: 'decor', w: 1, h: 1, price: 60, unlockLevel: 1, color: '#2e7d32', roof: '#6d4c41' },
-  { id: 'hedge', name: 'Hedge', kind: 'decor', w: 1, h: 1, price: 40, unlockLevel: 1, color: '#33691e', roof: '#558b2f' },
-  { id: 'fence', name: 'Picket Fence', kind: 'decor', w: 1, h: 1, price: 30, unlockLevel: 1, color: '#fafafa', roof: '#eceff1' },
+  { id: 'hedge', name: 'Hedge', kind: 'decor', solid: true, w: 1, h: 1, price: 40, unlockLevel: 1, color: '#33691e', roof: '#558b2f' },
+  { id: 'fence', name: 'Picket Fence', kind: 'decor', solid: true, w: 1, h: 1, price: 30, unlockLevel: 1, color: '#fafafa', roof: '#eceff1' },
   { id: 'picnic', name: 'Picnic Table', kind: 'decor', w: 1, h: 1, price: 90, unlockLevel: 2, color: '#a1887f', roof: '#e53935' },
   { id: 'busstop', name: 'Bus Stop', kind: 'decor', w: 1, h: 1, price: 200, unlockLevel: 2, color: '#90caf9', roof: '#37474f' },
   { id: 'hotdog', name: 'Hot Dog Cart', kind: 'decor', w: 1, h: 1, price: 350, unlockLevel: 3, color: '#eceff1', roof: '#fdd835' },
   { id: 'flagpole', name: 'Flag Pole', kind: 'decor', w: 1, h: 1, price: 300, unlockLevel: 3, color: '#2e7d32', roof: '#eceff1' },
-  { id: 'arch', name: 'Finish Line Arch', kind: 'decor', w: 1, h: 1, price: 0, bucks: 2, unlockLevel: 4, color: '#212121', roof: '#e53935' },
+  { id: 'arch', name: 'Finish Line Arch', kind: 'decor', solid: true, w: 1, h: 1, price: 0, bucks: 2, unlockLevel: 4, color: '#212121', roof: '#e53935' },
   { id: 'playground', name: 'Playground', kind: 'decor', w: 2, h: 2, price: 1800, unlockLevel: 5, color: '#ef9a9a', roof: '#1e88e5' },
   { id: 'gazebo', name: 'Gazebo', kind: 'decor', w: 1, h: 1, price: 1200, unlockLevel: 6, color: '#fafafa', roof: '#2e7d32' },
   { id: 'clocktower', name: 'Clock Tower', kind: 'decor', w: 1, h: 1, price: 3500, unlockLevel: 8, color: '#b0796b', roof: '#37474f' },
@@ -282,16 +298,16 @@ export type CarDef = {
 // a misspelling of one. Ids stay fixed so existing saves keep working.
 // Stats follow each real car's relative performance.
 export const CARS: CarDef[] = [
-  { id: 'pip', name: 'Kipper Pocket', body: 'compact', price: 800, unlockLevel: 1, power: 18, grip: 36, weight: 24, skill: 'launch', likes: ['pizza', 'donut', 'market'], colors: ['#c62828', '#1b5e20', '#fafafa'] },
-  { id: 'civic', name: 'Kazumi Commuter', body: 'sedan', price: 1500, unlockLevel: 1, power: 24, grip: 34, weight: 36, skill: 'slipstream', likes: ['pizza', 'diner', 'coffee'], colors: ['#1e88e5', '#eeeeee', '#424242'] },
+  { id: 'pip', name: 'Kipper Pocket', body: 'compact', price: 800, unlockLevel: 1, power: 18, grip: 36, weight: 24, skill: 'launch', likes: ['pizza', 'academy', 'market'], colors: ['#c62828', '#1b5e20', '#fafafa'] },
+  { id: 'civic', name: 'Kazumi Commuter', body: 'sedan', price: 1500, unlockLevel: 1, power: 24, grip: 34, weight: 36, skill: 'slipstream', likes: ['pizza', 'diner', 'offices'], colors: ['#1e88e5', '#eeeeee', '#424242'] },
   { id: 'trail', name: 'Ironside Workhorse', body: 'truck', price: 3500, unlockLevel: 3, power: 38, grip: 26, weight: 74, skill: 'torque', likes: ['tires', 'parts', 'lube'], colors: ['#0d47a1', '#c62828', '#eceff1'] },
   { id: 'miata', name: 'Kazumi Zephyr', body: 'roadster', price: 7000, unlockLevel: 5, power: 32, grip: 54, weight: 22, skill: 'smooth', likes: ['icecream', 'cinema', 'arcade'], colors: ['#d32f2f', '#1e88e5', '#fafafa'] },
   { id: 'stallion', name: "Liberty Bore Horse '68", body: 'muscle', price: 14000, unlockLevel: 7, power: 52, grip: 34, weight: 54, skill: 'nitro', likes: ['burger', 'stadium', 'firehouse'], colors: ['#1b5e20', '#ff6f00', '#212121'] },
   { id: 'rally', name: 'Kodiak Gravel Rex', body: 'rally', price: 26000, unlockLevel: 10, power: 52, grip: 64, weight: 40, skill: 'smooth', likes: ['tires', 'tuner', 'bodyshop'], colors: ['#0d47a1', '#fafafa', '#ffd600'] },
   { id: 'vette', name: 'Liberty Sidewinder', body: 'sports', price: 55000, unlockLevel: 15, power: 66, grip: 54, weight: 38, skill: 'slipstream', likes: ['motel', 'stadium', 'police'], colors: ['#b71c1c', '#bdbdbd', '#ffd600'] },
-  { id: 'charger', name: 'Liberty Brawler', body: 'muscle', price: 42000, unlockLevel: 13, power: 70, grip: 40, weight: 60, skill: 'nitro', likes: ['burger', 'tuner', 'lube'], colors: ['#212121', '#ff5722', '#6a1b9a'] },
+  { id: 'charger', name: 'Liberty Brawler', body: 'muscle', price: 42000, unlockLevel: 13, power: 70, grip: 40, weight: 60, skill: 'nitro', likes: ['burger', 'highschool', 'lube'], colors: ['#212121', '#ff5722', '#6a1b9a'] },
   { id: 'hellcat', name: 'Liberty Hellhound 707', body: 'widebody', price: 80000, unlockLevel: 18, power: 80, grip: 46, weight: 62, skill: 'launch', likes: ['tuner', 'stadium', 'bodyshop'], colors: ['#c62828', '#7b1fa2', '#9ccc65'] },
-  { id: 'gtr', name: 'Kazumi Ronin GT', body: 'coupe', price: 115000, unlockLevel: 22, power: 78, grip: 70, weight: 46, skill: 'smooth', likes: ['tuner', 'bowling', 'arcade'], colors: ['#eceff1', '#263238', '#ff6d00'] },
+  { id: 'gtr', name: 'Kazumi Ronin GT', body: 'coupe', price: 115000, unlockLevel: 22, power: 78, grip: 70, weight: 46, skill: 'smooth', likes: ['tuner', 'hq', 'arcade'], colors: ['#eceff1', '#263238', '#ff6d00'] },
   { id: 'tomahawk', name: 'Ironside Tomahawk', body: 'tank', price: 420000, unlockLevel: 36, legendary: true, power: 100, grip: 94, weight: 60, skill: 'launch', likes: ['stadium', 'police', 'firehouse'], colors: ['#556b2f', '#37474f', '#c9a227'] },
   { id: 'zippy', name: 'Kipper Zip 50', body: 'scooter', price: 2100, unlockLevel: 2, power: 14, grip: 30, weight: 8, skill: 'slipstream', likes: ['pizza', 'coffee', 'icecream'], colors: ['#4dd0e1', '#fdd835', '#f48fb1'] },
   { id: 'baron', name: 'Liberty Road Baron', body: 'chopper', price: 16000, unlockLevel: 7, power: 46, grip: 36, weight: 30, skill: 'nitro', likes: ['diner', 'burger', 'bowling'], colors: ['#212121', '#b71c1c', '#1565c0'] },
@@ -300,18 +316,18 @@ export const CARS: CarDef[] = [
   { id: 'hotshot', name: 'Kazumi Hot Shot RS', body: 'hatch', price: 7000, unlockLevel: 5, power: 36, grip: 50, weight: 26, skill: 'launch', likes: ['arcade', 'tuner', 'coffee'], colors: ['#eceff1', '#d32f2f', '#1e88e5'] },
   { id: 'ridgeback', name: 'Kodiak Ridgeback 4x4', body: 'suv', price: 10000, unlockLevel: 6, power: 44, grip: 46, weight: 62, skill: 'torque', likes: ['tires', 'parts', 'firehouse'], colors: ['#ff6f00', '#33691e', '#eceff1'] },
   { id: 'kitsune', name: 'Kazumi Kitsune Drift', body: 'coupe', price: 20000, unlockLevel: 9, power: 48, grip: 58, weight: 30, skill: 'smooth', likes: ['tuner', 'arcade', 'bodyshop'], colors: ['#fafafa', '#212121', '#ff4081'] },
-  { id: 'current', name: 'Sparkline Current', body: 'ev', price: 62000, unlockLevel: 16, power: 72, grip: 52, weight: 50, skill: 'launch', likes: ['coffee', 'market', 'parkade'], colors: ['#eceff1', '#b71c1c', '#263238'] },
-  { id: 'salon', name: 'Regent Grand Salon', body: 'luxury', price: 0, bucks: 45, unlockLevel: 11, power: 64, grip: 50, weight: 70, skill: 'slipstream', likes: ['motel', 'cinema', 'market'], colors: ['#1a1a2e', '#eceff1', '#6d1b1b'] },
+  { id: 'current', name: 'Sparkline Current', body: 'ev', price: 62000, unlockLevel: 16, power: 72, grip: 52, weight: 50, skill: 'launch', likes: ['university', 'market', 'parkade'], colors: ['#eceff1', '#b71c1c', '#263238'] },
+  { id: 'salon', name: 'Regent Grand Salon', body: 'luxury', price: 0, bucks: 45, unlockLevel: 11, power: 64, grip: 50, weight: 70, skill: 'slipstream', likes: ['motel', 'hq', 'market'], colors: ['#1a1a2e', '#eceff1', '#6d1b1b'] },
   { id: 'stomper', name: 'Ironside Dune Stomper', body: 'truck', price: 36000, unlockLevel: 12, power: 66, grip: 44, weight: 72, skill: 'torque', likes: ['tires', 'stadium', 'lube'], colors: ['#424242', '#1565c0', '#ff6d00'] },
   { id: 'monoposto', name: 'Veloce Monoposto 1', body: 'formula', price: 220000, unlockLevel: 30, power: 90, grip: 90, weight: 20, skill: 'smooth', likes: ['stadium', 'tuner', 'parkade'], colors: ['#d50000', '#eceff1', '#00897b'] },
-  { id: 'zenith', name: 'Aether Zenith R', body: 'super', price: 550000, unlockLevel: 40, legendary: true, power: 100, grip: 96, weight: 26, skill: 'nitro', likes: ['stadium', 'parkade', 'police'], colors: ['#212121', '#1e88e5', '#ff6d00'] },
-  { id: 'schoolbus', name: 'Ironside Scholar 72', body: 'bus', price: 6500, unlockLevel: 4, power: 30, grip: 26, weight: 90, skill: 'slipstream', likes: ['diner', 'arcade', 'icecream'], colors: ['#fbc02d', '#ff8f00', '#eceff1'] },
+  { id: 'zenith', name: 'Aether Zenith R', body: 'super', price: 550000, unlockLevel: 40, legendary: true, power: 100, grip: 96, weight: 26, skill: 'nitro', likes: ['stadium', 'glasstower', 'police'], colors: ['#212121', '#1e88e5', '#ff6d00'] },
+  { id: 'schoolbus', name: 'Ironside Scholar 72', body: 'bus', price: 6500, unlockLevel: 4, power: 30, grip: 26, weight: 90, skill: 'slipstream', likes: ['diner', 'arcade', 'school'], colors: ['#fbc02d', '#ff8f00', '#eceff1'] },
   { id: 'shaggy', name: 'Lakeside Shaggy Hound', body: 'dogvan', price: 8000, unlockLevel: 5, power: 26, grip: 30, weight: 66, skill: 'oil', likes: ['burger', 'donut', 'icecream'], colors: ['#d7ccc8', '#a1887f', '#9e9e9e'] },
-  { id: 'tusker', name: 'Kodiak Tusker Scout', body: 'tusker', price: 95000, unlockLevel: 20, power: 70, grip: 72, weight: 58, skill: 'torque', likes: ['police', 'firehouse', 'tires'], colors: ['#6b7a3a', '#c2a36b', '#eceff1'] },
+  { id: 'tusker', name: 'Kodiak Tusker Scout', body: 'tusker', price: 95000, unlockLevel: 20, power: 70, grip: 72, weight: 58, skill: 'torque', likes: ['police', 'helipad', 'tires'], colors: ['#6b7a3a', '#c2a36b', '#eceff1'] },
   { id: 'lambo', name: 'Veloce Corrida V12', body: 'wedge', price: 0, bucks: 90, unlockLevel: 26, power: 86, grip: 70, weight: 34, skill: 'oil', likes: ['cinema', 'club', 'parkade'], colors: ['#fdd835', '#d50000', '#fafafa'] },
   { id: 'hyper', name: 'Veloce Hyperion', body: 'super', price: 300000, unlockLevel: 33, power: 98, grip: 86, weight: 32, skill: 'nitro', likes: ['stadium', 'tuner', 'parkade'], colors: ['#1a237e', '#212121', '#d50000'] },
   { id: 'bug', name: 'Bumble Bubble', body: 'bubble', price: 1200, unlockLevel: 1, rescueOnly: true, power: 14, grip: 28, weight: 28, skill: 'freeze', likes: ['icecream', 'donut', 'coffee'], colors: ['#80cbc4', '#ffcc80', '#ef9a9a'] },
-  { id: 'woodie', name: 'Lakeside Woodie Wagon', body: 'wagon', price: 2200, unlockLevel: 1, rescueOnly: true, power: 22, grip: 28, weight: 56, skill: 'slipstream', likes: ['diner', 'carwash', 'market'], colors: ['#fafafa', '#fff59d', '#4db6ac'] },
+  { id: 'woodie', name: 'Lakeside Woodie Wagon', body: 'wagon', price: 2200, unlockLevel: 1, rescueOnly: true, power: 22, grip: 28, weight: 56, skill: 'slipstream', likes: ['diner', 'hospital', 'market'], colors: ['#fafafa', '#fff59d', '#4db6ac'] },
   { id: 'hauler', name: 'Old Faithful Hauler', body: 'truck', price: 3000, unlockLevel: 1, rescueOnly: true, power: 26, grip: 26, weight: 70, skill: 'torque', likes: ['parts', 'carwash', 'tacos'], colors: ['#558b2f', '#e65100', '#1565c0'] },
   { id: 'cruiser', name: "Sunset Cruiser '57", body: 'classic', price: 5000, unlockLevel: 1, rescueOnly: true, power: 38, grip: 34, weight: 58, skill: 'freeze', likes: ['cinema', 'diner', 'firehouse'], colors: ['#4dd0e1', '#f06292', '#fafafa'] },
   { id: 'buggy', name: 'Dune Skipper Buggy', body: 'offroad', price: 6000, unlockLevel: 1, rescueOnly: true, power: 34, grip: 56, weight: 18, skill: 'launch', likes: ['icecream', 'tires', 'tacos'], colors: ['#ff9800', '#cddc39', '#29b6f6'] },
@@ -911,25 +927,45 @@ export const SKINS: SkinDef[] = [
     swatch: 'linear-gradient(90deg, transparent 45%, #39ff88 45% 55%, transparent 55%), linear-gradient(0deg, transparent 70%, #39ff88 70% 78%, transparent 78%), #0c2416' },
   { id: 'static', n: 8, name: 'Static', tier: 'rare', blurb: 'Pixels blinking under the coat', unlock: { bucks: 15 },
     swatch: 'conic-gradient(#ff29b3 0 25%, #101018 0 50%, #19f2ff 0 75%, #ffe633 0) 0 0 / 10px 10px' },
+  { id: 'contour', n: 16, name: 'Contour', tier: 'rare', blurb: 'Glowing map lines over hidden hills', unlock: { set: 'roadtrip' },
+    swatch: 'repeating-radial-gradient(circle at 35% 60%, #062022 0 5px, #ffb347 6px 7px, #062022 8px 12px, #1abc9c 13px 14px)' },
+  { id: 'cascade', n: 17, name: 'Cascade', tier: 'rare', blurb: 'Amber code raining down the panels', unlock: { level: 15 },
+    swatch: 'repeating-linear-gradient(90deg, transparent 0 3px, #120800 3px 6px), linear-gradient(180deg, #120800, #ff8c1a 70%, #ffe7b3)' },
+  { id: 'ghostcamo', n: 19, name: 'Ghost Camo', tier: 'rare', blurb: 'Pixel camo that shifts colour as it turns', unlock: { set: 'heavy' },
+    swatch: 'conic-gradient(#1b4d3e 0 25%, #2fd3a0 0 50%, #0b1f2a 0 75%, #7a5cff 0) 0 0 / 9px 9px' },
   { id: 'deepspace', n: 3, name: 'Deep Space', tier: 'epic', blurb: 'Stars and nebula at every depth', unlock: { season: 10 },
     swatch: 'radial-gradient(circle at 30% 30%, #fff 0 4%, transparent 5%), radial-gradient(circle at 70% 60%, #cde 0 3%, transparent 4%), radial-gradient(circle at 60% 30%, #7a2aa8, transparent 60%), #05061a' },
   { id: 'faultline', n: 5, name: 'Fault Line', tier: 'epic', blurb: 'Lava glowing through cracked plates', unlock: { set: 'muscle' },
     swatch: 'linear-gradient(120deg, #241612 40%, #ff6a00 42%, #ffd54f 44%, #241612 46%), linear-gradient(30deg, #2e1d17 60%, #ff3d00 61%, #2e1d17 63%)' },
   { id: 'aurora', n: 6, name: 'Aurora', tier: 'epic', blurb: 'Northern lights swaying deep inside', unlock: { bucks: 30 },
     swatch: 'linear-gradient(170deg, transparent 20%, #3dff9e 40%, transparent 55%, #b24dff 75%, transparent 90%), #051226' },
+  { id: 'thunderhead', n: 15, name: 'Thunderhead', tier: 'epic', blurb: 'Storm clouds with lightning inside', unlock: { crate: true },
+    swatch: 'linear-gradient(100deg, transparent 46%, #e8f1ff 47% 49%, transparent 50%), radial-gradient(circle at 50% 40%, #5a6380, #121626 70%)' },
+  { id: 'biolume', n: 18, name: 'Biolume', tier: 'epic', blurb: 'Glowing jellies drifting in the deep', unlock: { crate: true },
+    swatch: 'radial-gradient(circle at 35% 40%, #ff4fc4 0 12%, transparent 22%), radial-gradient(circle at 70% 70%, #8c4dff 0 8%, transparent 16%), radial-gradient(circle at 65% 25%, #33ffd6 0 3%, transparent 4%), #00101c' },
+  { id: 'nightdrive', n: 22, name: 'Night Drive', tier: 'epic', blurb: 'Striped sunset under a neon grid', unlock: { bucks: 35 },
+    swatch: 'repeating-linear-gradient(0deg, transparent 0 7px, #ff36d8 7px 8px), radial-gradient(circle at 50% 60%, #ffd84d 0 22%, #ff3d8b 30%, #2a0040 60%)' },
+  { id: 'petalstorm', n: 23, name: 'Petal Storm', tier: 'epic', blurb: 'Blossom petals tumbling at dusk', unlock: { crate: true },
+    swatch: 'radial-gradient(ellipse 18% 10% at 30% 35%, #ffc1d6 90%, transparent), radial-gradient(ellipse 14% 8% at 70% 65%, #fff0f5 90%, transparent), linear-gradient(180deg, #2a1240, #b0607a)' },
   { id: 'prismatic', n: 4, name: 'Prismatic', tier: 'legendary', blurb: 'Holo foil that shifts as you turn', unlock: { season: 20 },
     swatch: 'linear-gradient(135deg, #ff5f6d, #ffc371, #f9f871, #67f3a4, #4facfe, #b06ab3, #ff5f6d)' },
   { id: 'horizon', n: 9, name: 'Event Horizon', tier: 'legendary', blurb: 'A turning spiral of fire and violet', unlock: { bucks: 60 },
     swatch: 'radial-gradient(circle, #000 0 18%, #ff7a1a 24%, #9c3dff 38%, #12051f 60%)' },
-  { id: 'coldsnap', n: 10, name: 'Cold Snap', tier: 'legendary', blurb: 'Black ice shards with frost in the seams', unlock: { bucks: 50 },
-    swatch: 'linear-gradient(115deg, #05080d 30%, #cfeaf7 31% 32%, #0b141e 33% 58%, #8fdcff 59% 60%, #070b11 61%), linear-gradient(20deg, transparent 45%, #e6f6ff 46% 47%, transparent 48%) #05080d' },
+  { id: 'coldsnap', n: 10, name: 'Cold Snap', tier: 'legendary', blurb: 'Shattered ice in white and teal', unlock: { bucks: 50 },
+    swatch: 'linear-gradient(115deg, #d9eef0 0 28%, #0d2a33 29% 30%, #7fc3cb 31% 52%, #0d2a33 53% 54%, #3f8e99 55% 74%, #0d2a33 75% 76%, #eef8f9 77%)' },
+  { id: 'quicksilver', n: 20, name: 'Quicksilver', tier: 'legendary', blurb: 'Liquid chrome with rippling drops', unlock: { bucks: 70 },
+    swatch: 'radial-gradient(circle at 50% 50%, #fff 0 6%, #8a93a0 10%, #f2f4f7 16%, #6b7380 24%, #e6e9ee 34%, #4a515c 60%)' },
+  { id: 'wyrmscale', n: 21, name: 'Wyrmscale', tier: 'legendary', blurb: 'Dragon scales with embers in the seams', unlock: { crate: true },
+    swatch: 'radial-gradient(circle at 50% 0, #e6b830 0 30%, #0f5a33 55%, #ff5a00 58% 62%, transparent 63%) 0 0 / 12px 10px, #071a10' },
+  { id: 'kaleido', n: 24, name: 'Kaleido', tier: 'legendary', blurb: 'Stained glass turning in a kaleidoscope', unlock: { crate: true },
+    swatch: 'conic-gradient(#ff4d6d, #ffb703, #3ddc97, #4cc9f0, #7b2cbf, #ff4d6d)' },
 ]
 export const skinDef = (id?: string | null) => (id ? SKINS.find((s) => s.id === id) : undefined)
 // The shader number for a car's skin, 0 for none (or one this version doesn't know).
 export const skinNumber = (id?: string | null) => skinDef(id)?.n ?? 0
 // Every skin the player can put on a car right now.
-export function ownedSkins(s: { level: number; claimedSets?: string[]; skins?: string[] }) {
-  return SKINS.filter((d) => {
+export function ownedSkins(s: { level: number; claimedSets?: string[]; skins?: string[] }, pool = SKINS) {
+  return pool.filter((d) => {
     const u = d.unlock
     if (s.skins?.includes(d.id)) return true
     if ('level' in u) return s.level >= u.level
@@ -939,6 +975,52 @@ export function ownedSkins(s: { level: number; claimedSets?: string[]; skins?: s
 }
 // Season track tiers (1-based) that give a skin on top of their usual prize.
 export const seasonSkin = (tier: number) => SKINS.find((d) => 'season' in d.unlock && d.unlock.season === tier)
+
+// ---- Mod skins ----
+// A second pool, for bolt-on parts: each fitted spoiler, exhaust, body kit and hood
+// can wear its own skin, separate from the body's, so effects mix and match. Unlocked
+// once for the garage like body skins; saves keep bought and won ones in `modSkins`
+// and each car's choices in `modSkin` (by slot).
+export type SkinnedSlot = 'spoiler' | 'exhaust' | 'kit' | 'hood'
+export const SKINNED_SLOTS: SkinnedSlot[] = ['spoiler', 'exhaust', 'kit', 'hood']
+export const MOD_SKINS: SkinDef[] = [
+  { id: 'ember', n: 11, name: 'Ember', tier: 'rare', blurb: 'Flames rolling back off the part', unlock: { level: 5 },
+    swatch: 'linear-gradient(0deg, #2a0700, #ff3d00 40%, #ffb300 70%, #fff3b0)' },
+  { id: 'hexplate', n: 1, name: 'Hex Plate', tier: 'rare', blurb: 'Glowing honeycomb armour', unlock: { level: 7 },
+    swatch: 'conic-gradient(from 30deg, #0b2a36, #19e3ff 10%, #0b2a36 20%, #0b2a36 50%, #19e3ff 60%, #0b2a36 70%)' },
+  { id: 'neonpulse', n: 12, name: 'Neon Pulse', tier: 'rare', blurb: 'Neon bands sweeping front to back', unlock: { set: 'tuners' },
+    swatch: 'repeating-linear-gradient(90deg, #12001f 0 6px, #ff2bd6 7px 9px, #12001f 10px 14px, #2be8ff 15px 16px)' },
+  { id: 'tracer', n: 25, name: 'Tracer', tier: 'rare', blurb: 'Light streaks racing back off the part', unlock: { level: 12 },
+    swatch: 'linear-gradient(90deg, transparent 20%, #ff2a10 60%, #fff3d6 70%, transparent 71%) 0 3px / 100% 8px, #08080c' },
+  { id: 'checkered', n: 27, name: 'Checkered', tier: 'rare', blurb: 'A chequered flag rippling in the wind', unlock: { set: 'track' },
+    swatch: 'conic-gradient(#f2f2f2 0 25%, #111 0 50%, #f2f2f2 0 75%, #111 0) 0 0 / 10px 10px' },
+  { id: 'goldleaf', n: 14, name: 'Gold Leaf', tier: 'epic', blurb: 'Gold flakes glinting at every depth', unlock: { bucks: 20 },
+    swatch: 'radial-gradient(circle at 30% 30%, #fff8d0 0 6%, transparent 7%), radial-gradient(circle at 65% 60%, #fff 0 4%, transparent 5%), linear-gradient(135deg, #8a5a00, #ffd34d 50%, #a06a00)' },
+  { id: 'carbonprism', n: 13, name: 'Carbon Prism', tier: 'epic', blurb: 'Carbon weave over a rainbow sheen', unlock: { season: 15 },
+    swatch: 'repeating-linear-gradient(45deg, rgba(0,0,0,.75) 0 3px, transparent 3px 6px), linear-gradient(135deg, #ff5f6d, #f9f871, #67f3a4, #4facfe, #b06ab3)' },
+  { id: 'starlight', n: 3, name: 'Starlight', tier: 'epic', blurb: 'A pocket of deep space', unlock: { crate: true },
+    swatch: 'radial-gradient(circle at 30% 30%, #fff 0 4%, transparent 5%), radial-gradient(circle at 70% 60%, #cde 0 3%, transparent 4%), #05061a' },
+  { id: 'toxic', n: 26, name: 'Toxic', tier: 'epic', blurb: 'Bubbling green sludge', unlock: { crate: true },
+    swatch: 'radial-gradient(circle at 30% 40%, transparent 0 12%, #c6ff4d 14% 17%, transparent 18%), radial-gradient(circle at 70% 65%, #b2ff3d, #2f7a00 60%, #0d2600)' },
+  { id: 'stormcell', n: 15, name: 'Storm Cell', tier: 'epic', blurb: 'A pocket of lightning', unlock: { crate: true },
+    swatch: 'linear-gradient(100deg, transparent 46%, #e8f1ff 47% 49%, transparent 50%), radial-gradient(circle at 50% 40%, #5a6380, #121626 70%)' },
+  { id: 'biobloom', n: 18, name: 'Biobloom', tier: 'epic', blurb: 'Deep-sea glow to match Biolume', unlock: { crate: true },
+    swatch: 'radial-gradient(circle at 35% 40%, #ff4fc4 0 12%, transparent 22%), radial-gradient(circle at 65% 25%, #33ffd6 0 3%, transparent 4%), #00101c' },
+  { id: 'holofoil', n: 4, name: 'Holo Foil', tier: 'legendary', blurb: 'Rainbow foil that rolls as you turn', unlock: { bucks: 35 },
+    swatch: 'linear-gradient(135deg, #ff5f6d, #ffc371, #f9f871, #67f3a4, #4facfe, #b06ab3)' },
+  { id: 'rime', n: 10, name: 'Rime', tier: 'legendary', blurb: 'Shattered ice to match Cold Snap', unlock: { bucks: 40 },
+    swatch: 'linear-gradient(115deg, #d9eef0 0 28%, #0d2a33 29% 30%, #7fc3cb 31% 52%, #0d2a33 53% 54%, #3f8e99 55% 74%, #0d2a33 75% 76%, #eef8f9 77%)' },
+  { id: 'mercury', n: 20, name: 'Mercury', tier: 'legendary', blurb: 'Liquid chrome to match Quicksilver', unlock: { bucks: 45 },
+    swatch: 'radial-gradient(circle at 50% 50%, #fff 0 6%, #8a93a0 10%, #f2f4f7 16%, #6b7380 24%, #e6e9ee 34%, #4a515c 60%)' },
+  { id: 'dragonhide', n: 21, name: 'Dragonhide', tier: 'legendary', blurb: 'Ember-seamed scales to match Wyrmscale', unlock: { crate: true },
+    swatch: 'radial-gradient(circle at 50% 0, #e6b830 0 30%, #0f5a33 55%, #ff5a00 58% 62%, transparent 63%) 0 0 / 12px 10px, #071a10' },
+]
+export const modSkinDef = (id?: string | null) => (id ? MOD_SKINS.find((s) => s.id === id) : undefined)
+export const modSkinNumber = (id?: string | null) => modSkinDef(id)?.n ?? 0
+// Every mod skin the player can put on a part right now.
+export const ownedModSkins = (s: { level: number; claimedSets?: string[]; modSkins?: string[] }) =>
+  ownedSkins({ level: s.level, claimedSets: s.claimedSets, skins: s.modSkins }, MOD_SKINS)
+export const seasonModSkin = (tier: number) => MOD_SKINS.find((d) => 'season' in d.unlock && d.unlock.season === tier)
 
 // Garage power: the combined PI of a player's five best cars.
 export const POWER_CARS = 5

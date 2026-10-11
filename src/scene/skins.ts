@@ -59,6 +59,20 @@ vec2 skVor(vec2 p) {
   }
   return vec2(sqrt(d2) - sqrt(d1), id);
 }
+// Like skVor, plus the cell's own point: border distance, id, point.
+vec4 skVorP(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  float d1 = 8.0, d2 = 8.0, id = 0.0;
+  vec2 pt = vec2(0.0);
+  for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+    vec2 g = vec2(float(x), float(y));
+    vec2 o = skH2(i + g);
+    vec2 r = g + o - f;
+    float d = dot(r, r);
+    if (d < d1) { d2 = d1; d1 = d; id = skH(i + g); pt = i + g + o; } else if (d < d2) d2 = d;
+  }
+  return vec4(sqrt(d2) - sqrt(d1), id, pt);
+}
 // A field of stars: round points in some cells, each twinkling on its own beat.
 vec3 skStars(vec2 uv, float scale, float t, float keep) {
   vec2 c = floor(uv * scale);
@@ -227,29 +241,381 @@ void skinShade(int id, vec3 p, vec3 n, vec3 v, float t, inout vec3 col, inout ve
     glow += skStars(skAt(p, n, v, 0.15), 22.0, t, 0.7) * 0.6;
     glow += vec3(0.55, 0.3, 1.0) * rim * 0.18;
   } else if (id == 10) {
-    // Cold Snap: black glassy ice. Faceted shards on top, each catching the light at
-    // its own tilt, frost-white seams between them, frozen crystals and glints deeper
-    // down, and a cold blue glow coming up through the seams.
-    const vec3 ice = vec3(0.55, 0.9, 1.0);
-    col = mix(col, vec3(0.006, 0.01, 0.018), 0.97);
-    vec2 sh = skVor(uv0 * 5.5);
-    float facet = skH(vec2(sh.y * 91.0, 3.1));
-    float tilt = pow(clamp(facing * (0.6 + 0.8 * facet) - 0.25, 0.0, 1.0), 3.0);
-    col += vec3(0.025, 0.05, 0.08) * tilt + vec3(0.006, 0.01, 0.018) * facet;
-    float seam = smoothstep(0.022, 0.0, sh.x);
-    col = mix(col, vec3(0.6, 0.85, 0.97), seam * 0.75);
-    glow += ice * seam * 0.12;
-    vec2 sd = skVor(skAt(p, n, v, 0.035) * 5.5);
-    glow += ice * smoothstep(0.12, 0.0, sd.x) * (0.18 + 0.12 * sin(t * 0.8 + sd.y * 20.0));
-    vec2 cr = skVor(skAt(p, n, v, 0.07) * 13.0);
-    float frost = smoothstep(0.06, 0.0, cr.x) * skFbm(skAt(p, n, v, 0.07) * 3.0 + 2.0);
-    glow += ice * frost * 0.3;
+    // Cold Snap: shattered ice. Long angular shards in white, pale ice and teal, each
+    // split once more by a crack and tilted its own way so it brightens or dims as
+    // the view turns; darker teal breaks between them, and a deeper layer of teal
+    // shards that slides beneath the top one.
+    const mat2 rotA = mat2(0.8, 0.6, -0.6, 0.8);
+    const mat2 rotB = mat2(0.34, -0.94, 0.94, 0.34);
+    vec2 su = (rotA * uv0) * vec2(4.6, 10.5);
+    vec4 sh = skVorP(su);
+    float a = sh.y * 6.2831853;
+    vec2 dir = vec2(cos(a), sin(a));
+    float cut = dot(su - sh.zw, dir);
+    float sub = step(0.0, cut);
+    float fid = fract(sh.y * 7.31 + sub * 0.37);
+    // White ice at the front fading to teal at the back, shard by shard.
+    float along = smoothstep(-0.2, 0.5, p.z + (fid - 0.5) * 0.25);
+    vec3 teal = fid < 0.2 ? vec3(0.36, 0.86, 0.9) : fid < 0.48 ? vec3(0.16, 0.7, 0.78) : fid < 0.74 ? vec3(0.06, 0.52, 0.6) : fid < 0.9 ? vec3(0.03, 0.34, 0.42) : vec3(0.02, 0.14, 0.2);
+    vec3 white = fid < 0.35 ? vec3(0.96, 0.98, 0.99) : fid < 0.62 ? vec3(0.86, 0.91, 0.93) : fid < 0.82 ? vec3(0.7, 0.79, 0.83) : fid < 0.93 ? vec3(0.45, 0.56, 0.62) : vec3(0.2, 0.3, 0.38);
+    vec3 shade = mix(teal, white, along);
+    float tiltF = 0.7 + 0.4 * sin(facing * (3.0 + 4.0 * fid) + fid * 30.0);
+    float grad = 0.85 + 0.2 * dot(su - sh.zw, vec2(dir.y, -dir.x));
+    vec3 top = shade * tiltF * grad;
+    vec4 dp = skVorP((rotB * skAt(p, n, v, 0.05)) * vec2(2.4, 6.0) + 4.0);
+    vec3 deep = mix(vec3(0.08, 0.3, 0.38), vec3(0.45, 0.78, 0.84), fract(dp.y * 5.3)) * (0.7 + 0.3 * smoothstep(0.0, 0.04, dp.x));
+    float clear = (fid > 0.2 && fid < 0.74 ? 0.3 : 0.08) * (1.0 - 0.7 * along);
+    col = mix(top, deep, clear);
+    float crack = smoothstep(0.035, 0.0, abs(cut)) * 0.85;
+    float seam = smoothstep(0.05, 0.0, sh.x);
+    col = mix(col, mix(vec3(0.05, 0.17, 0.22), vec3(0.32, 0.4, 0.46), along), max(seam, crack) * 0.9);
+    col = mix(col, vec3(1.0), smoothstep(0.012, 0.0, abs(sh.x - 0.045)) * 0.5);
     vec2 gs = skAt(p, n, v, 0.02) * 40.0;
     float gh = skH(floor(gs));
-    float glint = pow(max(0.0, sin(t * 1.7 + gh * 80.0 + facing * 12.0)), 30.0) * step(0.8, gh);
-    glow += vec3(0.9, 0.97, 1.0) * glint * smoothstep(0.3, 0.0, length(fract(gs) - 0.5)) * 1.6;
-    glow += ice * rim * 0.14;
+    float glint = pow(max(0.0, sin(t * 1.7 + gh * 80.0 + facing * 12.0)), 30.0) * step(0.85, gh);
+    glow += vec3(0.9, 0.97, 1.0) * glint * smoothstep(0.3, 0.0, length(fract(gs) - 0.5)) * 1.2;
+    glow += vec3(0.55, 0.85, 1.0) * rim * 0.06;
+    rough = 0.2;
+  } else if (id == 11) {
+    // Ember (mod skin): flames streaming back along the part, a hot layer deep down
+    // and a thinner, faster one near the top.
+    col = mix(col, vec3(0.04, 0.012, 0.005), 0.85);
+    for (int i = 0; i < 2; i++) {
+      float fi = float(i);
+      vec3 q = p + v * ((0.07 - 0.045 * fi) / max(-dot(v, n), 0.3));
+      vec2 u = vec2(q.x * 6.0 + fi * 3.0, q.y * 9.0 + q.z * 9.0 + t * (1.4 + 0.8 * fi));
+      float f = skFbm(u) * (0.75 + 0.5 * skNoise(u * 0.5 + 7.0));
+      float hot = smoothstep(0.45, 0.85, f);
+      vec3 c = mix(vec3(0.9, 0.1, 0.0), vec3(1.0, 0.75, 0.2), hot);
+      glow += c * smoothstep(0.35, 0.7, f) * (i == 0 ? 0.55 : 0.75);
+      col = mix(col, c * 0.4, smoothstep(0.4, 0.8, f) * 0.5);
+    }
+  } else if (id == 12) {
+    // Neon Pulse (mod skin): bright bands racing front to back, magenta deep and cyan
+    // shallow, so they split apart at an angle; a fine grid on the surface.
+    col *= 0.35;
+    vec3 qd = p + v * (0.05 / max(-dot(v, n), 0.3));
+    vec3 qs = p + v * (0.015 / max(-dot(v, n), 0.3));
+    float bd = pow(0.5 + 0.5 * sin(qd.z * 30.0 + t * 5.0), 10.0);
+    float bs = pow(0.5 + 0.5 * sin(qs.z * 30.0 + t * 5.0 - 0.6), 14.0);
+    glow += vec3(1.0, 0.17, 0.84) * bd * 0.8 + vec3(0.17, 0.91, 1.0) * bs * 0.9;
+    vec2 gl = abs(fract(uv0 * 28.0) - 0.5);
+    col += vec3(0.25, 0.1, 0.35) * smoothstep(0.46, 0.5, max(gl.x, gl.y));
+    rough = min(rough, 0.25);
+  } else if (id == 13) {
+    // Carbon Prism (mod skin): a carbon twill on top with gaps that show a rainbow
+    // sheen deeper down, its colours rolling with the viewing angle.
+    vec2 w = uv0 * 34.0;
+    vec2 wc = floor(w);
+    float dir = mod(wc.x + wc.y, 2.0);
+    float thread = 0.5 + 0.5 * sin((dir > 0.5 ? w.x : w.y) * 6.2831853);
+    float weave = mix(0.025, 0.09, thread * (0.6 + 0.4 * facing));
+    vec2 ud = skAt(p, n, v, 0.04);
+    vec3 holo = skHue(fract(dot(ud, vec2(0.7, 0.7)) * 2.5 + facing * 1.8 + t * 0.05)) * 0.8 + 0.1;
+    float gap = smoothstep(0.35, 0.05, thread);
+    col = mix(vec3(weave), holo * 0.55, gap * 0.6);
+    glow += holo * (gap * 0.25 + rim * 0.2);
+    rough = 0.3;
+  } else if (id == 14) {
+    // Gold Leaf (mod skin): warm gold with flakes at three depths that wink as the
+    // car moves.
+    col = mix(col, vec3(0.85, 0.6, 0.18), 0.85);
+    for (int i = 0; i < 3; i++) {
+      float fi = float(i);
+      vec2 g = skAt(p, n, v, 0.01 + 0.03 * fi) * (55.0 - 12.0 * fi);
+      vec2 c = floor(g);
+      vec2 h = skH2(c + fi * 13.0);
+      float flake = smoothstep(0.32, 0.12, length(fract(g) - 0.5 - (h - 0.5) * 0.4));
+      float wink = pow(max(0.0, sin(h.x * 60.0 + facing * (8.0 + 6.0 * h.y) + t * (0.6 + h.y))), 12.0);
+      glow += vec3(1.0, 0.85, 0.45) * flake * wink * (0.9 - 0.25 * fi);
+      col += vec3(0.12, 0.08, 0.02) * flake * h.y;
+    }
+    rough = 0.25;
+  } else if (id == 15) {
+    // Thunderhead: storm clouds rolling deep in the paint, lit from inside when
+    // lightning forks through a nearer layer, each patch striking on its own beat.
+    float cl = skFbm(skAt(p, n, v, 0.12) * 3.2 + vec2(t * 0.06, t * 0.02));
+    float cl2 = skFbm(skAt(p, n, v, 0.05) * 5.0 - vec2(t * 0.09, 0.0) + 3.0);
+    col = mix(vec3(0.01, 0.012, 0.03), vec3(0.24, 0.27, 0.38), smoothstep(0.35, 0.75, cl));
+    col = mix(col, vec3(0.36, 0.4, 0.5), smoothstep(0.55, 0.85, cl2) * 0.45);
+    vec2 ub = skAt(p, n, v, 0.08) * vec2(2.4, 1.7);
+    vec2 bc = floor(ub), bf = fract(ub);
+    float bh = skH(bc);
+    float rate = 0.16 + bh * 0.14;
+    float beat = fract(t * rate + bh * 7.0);
+    float si = floor(t * rate + bh * 7.0);
+    float strike = step(beat, 0.14) * (0.55 + 0.45 * step(0.5, fract(beat * 60.0)));
+    float sd = skH(bc + si * 0.71);
+    float x = 0.5 + (skNoise(vec2(bf.y * 5.0, sd * 50.0)) - 0.5) * 0.45 + (skNoise(vec2(bf.y * 19.0, sd * 90.0)) - 0.5) * 0.12;
+    float fx = x + (bf.y - 0.55) * (sd > 0.5 ? 0.9 : -0.9) + (skNoise(vec2(bf.y * 23.0, sd * 30.0)) - 0.5) * 0.08;
+    float span = smoothstep(0.04, 0.12, bf.y) * smoothstep(0.98, 0.85, bf.y);
+    float bolt = smoothstep(0.028, 0.0, abs(bf.x - x)) * span;
+    bolt = max(bolt, smoothstep(0.016, 0.0, abs(bf.x - fx)) * step(bf.y, 0.55) * smoothstep(0.1, 0.25, bf.y) * 0.8);
+    float halo = smoothstep(0.2, 0.0, abs(bf.x - x)) * span;
+    vec3 flash = vec3(0.7, 0.82, 1.0);
+    // Between strikes the last bolt still smoulders faintly in the cloud.
+    glow += flash * (bolt * (0.3 + 1.9 * strike) + halo * 0.25 * strike);
+    glow += vec3(0.45, 0.55, 1.0) * bolt * 0.15;
+    col += vec3(0.35, 0.4, 0.55) * strike * smoothstep(0.75, 0.0, length(bf - 0.5)) * cl;
+    glow += flash * rim * 0.08;
+  } else if (id == 16) {
+    // Contour: a topographic map, its height lines glowing teal deep down and amber
+    // near the top so they slide apart as the car turns; a scan line climbs the hills.
+    col = mix(col, vec3(0.02, 0.05, 0.055), 0.82);
+    for (int i = 0; i < 2; i++) {
+      float fi = float(i);
+      vec2 u = skAt(p, n, v, i == 0 ? 0.08 : 0.02);
+      float h = skFbm(u * 1.7 + vec2(4.0, 1.0));
+      float c = h * 16.0;
+      float dl = abs(fract(c) - 0.5);
+      float major = step(mod(floor(c + 0.5), 5.0), 0.5);
+      float line = smoothstep(0.39 - major * 0.05, 0.47, dl);
+      float scan = pow(1.0 - abs(fract(h * 1.4 - t * 0.07) - 0.5) * 2.0, 18.0);
+      vec3 c3 = i == 0 ? vec3(0.1, 0.75, 0.65) : vec3(1.0, 0.7, 0.28);
+      glow += c3 * line * ((i == 0 ? 0.22 : 0.35) + major * 0.25 + scan * 1.2);
+      col = mix(col, c3 * 0.35, line * (0.25 + fi * 0.2));
+      col += c3 * scan * 0.04;
+    }
+  } else if (id == 17) {
+    // Cascade: amber code falling down the panels in columns, a dim layer deep in the
+    // paint and a bright one near the top, each glyph flickering as it changes.
+    col = mix(col, vec3(0.03, 0.015, 0.0), 0.88);
+    for (int i = 0; i < 2; i++) {
+      float fi = float(i);
+      float sc = i == 0 ? 26.0 : 16.0;
+      vec2 g = skAt(p, n, v, i == 0 ? 0.07 : 0.02) * sc + fi * 11.0;
+      float colm = floor(g.x);
+      float ch = skH(vec2(colm, fi));
+      float y = g.y + t * (3.0 + ch * 5.0);
+      float trail = fract(y / (10.0 + ch * 12.0) + ch);
+      float cy = floor(y);
+      vec2 f = vec2(fract(g.x), fract(y));
+      vec2 sub = floor(f * vec2(3.0, 5.0));
+      float bit = step(0.45, skH(vec2(colm, cy) + sub * 0.17 + floor(t * 3.0 + ch * 9.0) * 0.031 * step(0.9, skH(vec2(cy, colm)))));
+      float inGlyph = step(0.15, f.x) * step(f.x, 0.85) * step(0.1, f.y) * step(f.y, 0.9);
+      float on = step(0.25, ch) * bit * inGlyph * pow(trail, 2.5);
+      vec3 amber = mix(vec3(1.0, 0.45, 0.05), vec3(1.0, 0.92, 0.7), step(0.96, trail));
+      glow += amber * on * (i == 0 ? 0.45 : 0.9);
+      col += amber * on * 0.12;
+    }
+    col *= 0.9 + 0.1 * sin(uv0.y * 160.0);
+  } else if (id == 18) {
+    // Biolume: the deep sea. Glowing jellies drift up through the dark, plankton
+    // sparks sit nearer the top and faint caustics ripple over the surface.
+    col = mix(col, vec3(0.0, 0.02, 0.05), 0.9);
+    vec2 uj = skAt(p, n, v, 0.13) * 4.0 - vec2(0.0, t * 0.12);
+    vec2 jc = floor(uj);
+    vec2 jh = skH2(jc);
+    vec2 jf = fract(uj) - 0.5 - (jh - 0.5) * 0.5;
+    float jr = length(jf * vec2(1.0, 1.3));
+    float jon = step(0.2, jh.x);
+    float pulse = 0.55 + 0.45 * sin(t * (1.2 + jh.y) + jh.x * 40.0);
+    vec3 jcol = mix(vec3(1.0, 0.25, 0.75), vec3(0.55, 0.3, 1.0), jh.y);
+    glow += jcol * jon * (smoothstep(0.36, 0.0, jr) * 0.7 + smoothstep(0.2, 0.15, jr) * smoothstep(0.08, 0.17, jr) * 0.9) * pulse;
+    float tent = smoothstep(0.03, 0.0, abs(sin(jf.x * 25.0 + jf.y * 6.0 + t * 2.0)) * 0.1) * step(0.0, -jf.y) * smoothstep(0.45, 0.1, length(jf));
+    glow += jcol * jon * tent * 0.3 * pulse;
+    vec2 up = skAt(p, n, v, 0.05) + vec2(sin(t * 0.3) * 0.02, -t * 0.03);
+    glow += skStars(up, 24.0, t * 1.5, 0.55) * vec3(0.2, 1.0, 0.85) * 0.9;
+    vec2 cs = skVor(uv0 * 5.0 + vec2(t * 0.15, t * 0.1));
+    vec2 cs2 = skVor(uv0 * 7.0 - vec2(t * 0.11, 0.0) + 3.0);
+    float caus = smoothstep(0.05, 0.0, cs.x) * 0.6 + smoothstep(0.04, 0.0, cs2.x) * 0.4;
+    glow += vec3(0.25, 0.7, 0.9) * caus * 0.06;
+  } else if (id == 19) {
+    // Ghost Camo: blocky digital camo whose colours slide round the wheel as the car
+    // turns, with a deeper layer showing through its darkest blocks and a cloak
+    // shimmer sweeping across.
+    vec2 qb = floor(uv0 * 34.0) / 34.0;
+    float lv = skNoise(qb * 4.0) * 0.6 + skNoise(qb * 9.0 + 5.0) * 0.4;
+    float band = floor(lv * 4.0) / 3.0;
+    float hue = 0.42 + facing * 0.45 + t * 0.015;
+    vec3 top = band < 0.4 ? skHue(fract(hue)) * 0.06 + 0.02 : band < 0.7 ? skHue(fract(hue + 0.06)) * 0.3 + 0.03 : skHue(fract(hue + 0.13)) * 0.6 + 0.08;
+    vec2 qd = floor(skAt(p, n, v, 0.06) * 22.0) / 22.0;
+    float ld = skNoise(qd * 5.0 + 9.0);
+    vec3 deep = skHue(fract(hue + 0.5)) * (0.15 + 0.45 * step(0.5, ld));
+    col = band < 0.2 ? mix(top, deep, 0.75) : top;
+    float sweep = pow(1.0 - abs(fract(dot(uv0, vec2(0.35, 1.0)) * 0.6 - t * 0.12) - 0.5) * 2.0, 10.0);
+    vec2 bf = abs(fract(uv0 * 34.0) - 0.5);
+    float edge = smoothstep(0.4, 0.5, max(bf.x, bf.y));
+    glow += skHue(fract(hue + 0.25)) * sweep * (0.15 + edge * 0.6);
+    rough = 0.45;
+  } else if (id == 20) {
+    // Quicksilver: liquid chrome with drops landing on it, rings spreading out, and
+    // an oil-slick sheen deeper down that shows at glancing angles.
+    vec2 u = skAt(p, n, v, 0.015) * 3.0;
+    float h = 0.0;
+    for (int i = 0; i < 3; i++) {
+      float fi = float(i);
+      float per = 2.6 + fi * 0.9;
+      float k = floor(t / per + fi * 0.37);
+      float age = fract(t / per + fi * 0.37);
+      vec2 cell = floor(u + fi * 0.5);
+      vec2 c = cell + skH2(cell + k * 1.3 + fi);
+      float r = length(u + fi * 0.5 - c);
+      h += sin(r * 30.0 - age * 20.0) * exp(-r * 5.0) * (1.0 - age) * smoothstep(age * 1.2 + 0.15, age * 1.2 - 0.05, r) * 0.6;
+    }
+    // Chrome: the reflected ray's height picks dark ground or bright sky, the
+    // horizon between them bent by slow liquid swells and the ripples.
+    vec3 rf = reflect(v, n);
+    float swell = skFbm(uv0 * 2.2 + vec2(t * 0.05, -t * 0.04)) - 0.5;
+    float hy = rf.y * 0.45 + swell * 1.3 + h * 0.4 + 0.18 * sin(dot(uv0, vec2(1.0, 3.0)) * 4.0 + t * 0.3);
+    vec3 skyc = mix(vec3(0.48, 0.52, 0.6), vec3(1.0), smoothstep(0.05, 0.7, hy));
+    vec3 gnd = mix(vec3(0.03, 0.035, 0.045), vec3(0.22, 0.23, 0.26), smoothstep(-0.6, -0.05, hy));
+    col = mix(gnd, skyc, smoothstep(-0.03, 0.03, hy));
+    col += vec3(1.0) * smoothstep(0.02, 0.0, abs(hy - 0.0)) * 0.4;
+    vec3 film = skHue(fract(dot(skAt(p, n, v, 0.06), vec2(0.8, 0.6)) * 1.8 + facing * 2.2 + t * 0.03));
+    col = mix(col, col * (0.6 + film * 0.8), rim * 0.8);
+    glow += vec3(0.9, 0.95, 1.0) * pow(max(h, 0.0), 3.0) * 0.6;
+    rough = 0.04;
+  } else if (id == 21) {
+    // Wyrmscale: overlapping dragon scales that shift from emerald to gold as the
+    // light catches each one, with embers glowing in the seams deeper down.
+    vec2 s = uv0 * vec2(14.0, 18.0);
+    float fl = floor(s.y);
+    float o0 = mod(fl, 2.0) * 0.5;
+    vec2 c = vec2(floor(s.x - o0) + 0.5 + o0, fl);
+    float d = length((s - c) * vec2(1.0, 1.15));
+    if (d > 0.72) {
+      float o1 = mod(fl + 1.0, 2.0) * 0.5;
+      c = vec2(floor(s.x - o1) + 0.5 + o1, fl + 1.0);
+      d = length((s - c) * vec2(1.0, 1.15));
+    }
+    float edge = 0.72 - d;
+    float sid = skH(c);
+    float dome = smoothstep(0.72, 0.05, d);
+    float irid = 0.5 + 0.5 * sin(facing * 6.0 + sid * 9.0 + (s.y - c.y) * 3.0);
+    vec3 sc = mix(vec3(0.0, 0.16, 0.08), vec3(0.08, 0.62, 0.36), irid);
+    sc = mix(sc, vec3(0.9, 0.62, 0.1), smoothstep(0.85, 1.0, irid) * 0.7);
+    col = sc * (0.2 + 0.85 * dome) * smoothstep(0.0, 0.07, edge);
+    col += vec3(0.9, 0.7, 0.2) * smoothstep(0.05, 0.0, abs(edge - 0.08)) * 0.35;
+    float heat = skFbm(skAt(p, n, v, 0.05) * 5.0 + vec2(0.0, t * 0.4));
+    vec3 ember = mix(vec3(1.0, 0.18, 0.0), vec3(1.0, 0.65, 0.15), heat);
+    glow += ember * smoothstep(0.08, 0.0, edge) * (0.25 + 0.9 * smoothstep(0.35, 0.75, heat));
+    float glint = pow(max(0.0, sin(facing * 14.0 + sid * 60.0 + t * 0.8)), 20.0);
+    glow += vec3(1.0, 0.9, 0.55) * glint * dome * 0.35;
     rough = 0.22;
+  } else if (id == 22) {
+    // Night Drive: a striped sunset sun low in a violet sky deep in the paint, a
+    // neon grid scrolling over the top of it.
+    vec2 ud = skAt(p, n, v, 0.1);
+    float gy = fract(ud.y * 1.3 + 0.35);
+    vec3 sky = mix(vec3(0.04, 0.0, 0.1), vec3(0.85, 0.12, 0.5), smoothstep(0.1, 0.9, gy));
+    sky = mix(sky, vec3(1.0, 0.55, 0.2), smoothstep(0.75, 1.0, gy));
+    float sx = ud.x * 1.3;
+    vec2 q = vec2(sx - floor(sx + 0.5), (gy - 0.62) * 1.0);
+    float r = length(q);
+    float cut = q.y < 0.0 ? step(0.5 + q.y * 1.5, fract(q.y * 16.0 - t * 0.4)) : 1.0;
+    float sun = smoothstep(0.24, 0.23, r) * cut;
+    vec3 sunc = mix(vec3(1.0, 0.25, 0.55), vec3(1.0, 0.9, 0.35), smoothstep(-0.2, 0.2, q.y));
+    col = mix(sky * 0.45, sunc * 0.7, sun);
+    glow += sunc * sun * 0.55 + sky * 0.08;
+    vec2 g = uv0 * 12.0 + vec2(t * 1.6, 0.0);
+    vec2 gl = abs(fract(g) - 0.5);
+    float grid = max(smoothstep(0.44, 0.49, gl.x), smoothstep(0.44, 0.49, gl.y));
+    vec3 gc = mix(vec3(1.0, 0.2, 0.85), vec3(0.2, 0.9, 1.0), 0.5 + 0.5 * sin(t * 0.5 + uv0.x * 2.0));
+    glow += gc * grid * 0.75;
+    col = mix(col, gc * 0.4, grid * 0.5);
+    rough = min(rough, 0.25);
+  } else if (id == 23) {
+    // Petal Storm: blossom petals tumbling past at three depths over a dusk sky,
+    // the far ones dim and soft, the near ones bright.
+    vec2 ug = skAt(p, n, v, 0.14);
+    col = mix(vec3(0.12, 0.05, 0.2), vec3(0.75, 0.38, 0.5), smoothstep(-0.1, 0.5, ug.y + 0.12 * sin(ug.x * 2.0)));
+    col *= 0.6;
+    for (int i = 0; i < 3; i++) {
+      float fi = float(i);
+      float sc = 9.0 - fi * 2.0;
+      vec2 u = skAt(p, n, v, 0.1 - 0.04 * fi) * sc + vec2(t * (0.45 + 0.2 * fi), -t * (0.3 + 0.15 * fi)) + fi * 7.3;
+      vec2 c = floor(u);
+      vec2 h = skH2(c + fi * 3.1);
+      vec2 f = fract(u) - 0.5 - (h - 0.5) * 0.4;
+      float a = t * (0.8 + h.y * 1.5) + h.x * 30.0;
+      f = mat2(cos(a), sin(a), -sin(a), cos(a)) * f;
+      float flip = 0.45 + 0.55 * abs(sin(t * (1.0 + h.x) + h.y * 20.0));
+      vec2 pf = vec2(f.x / flip, f.y);
+      float pd = length(pf * vec2(1.0, 1.9)) + 0.06 * smoothstep(0.0, 0.1, pf.x) * (1.0 - smoothstep(0.0, 0.05, abs(pf.y)));
+      float soft = 0.05 - fi * 0.015;
+      float petal = smoothstep(0.17 + soft, 0.17 - soft, pd) * step(0.45, h.x);
+      vec3 pc = mix(vec3(1.0, 0.55, 0.7), vec3(1.0, 0.92, 0.95), smoothstep(0.1, -0.1, pf.x));
+      col = mix(col, pc * (0.55 + 0.2 * fi), petal * (0.45 + 0.25 * fi));
+      glow += pc * petal * (0.08 + 0.1 * fi);
+    }
+  } else if (id == 24) {
+    // Kaleido: stained glass turning in a kaleidoscope, lead lines on the surface
+    // and a second wheel deeper down spinning the other way through the clear panes.
+    vec3 res = vec3(0.0);
+    for (int i = 0; i < 2; i++) {
+      float fi = float(i);
+      vec2 u = skAt(p, n, v, i == 0 ? 0.07 : 0.0) * 1.5;
+      vec2 q = u - floor(u + 0.5);
+      float r = length(q);
+      float a = atan(q.y, q.x) + t * (i == 0 ? -0.12 : 0.18);
+      float seg = 6.2831853 / 8.0;
+      a = abs(mod(a, seg) - seg * 0.5);
+      vec2 k = vec2(cos(a), sin(a)) * r * 6.0;
+      vec2 vv = skVor(k + fi * 5.0);
+      vec3 glass = skHue(fract(vv.y * 0.8 + r * 0.6 + fi * 0.3 + t * 0.02));
+      glass *= glass * 0.9;
+      float lead = smoothstep(0.05, 0.1, vv.x);
+      if (i == 0) res = glass * (0.3 + 0.7 * lead);
+      else {
+        float clear = step(0.75, fract(vv.y * 3.7));
+        vec3 pane = mix(glass, res, clear * 0.8);
+        col = pane * lead * 0.6;
+        glow += pane * lead * (0.22 + 0.35 * facing * facing);
+        col += vec3(0.02) * (1.0 - lead);
+      }
+    }
+    rough = 0.15;
+  } else if (id == 25) {
+    // Tracer (mod skin): long-exposure light streaks racing back along the part,
+    // white-hot heads fading to red tails, one layer deep and one shallow.
+    col = mix(col, vec3(0.02, 0.02, 0.03), 0.85);
+    for (int i = 0; i < 2; i++) {
+      float fi = float(i);
+      vec3 q = p + v * ((0.05 - 0.035 * fi) / max(-dot(v, n), 0.3));
+      float lane = (q.y + q.x * 0.6) * (40.0 - fi * 12.0);
+      float li = floor(lane);
+      float lh = skH(vec2(li, fi));
+      float thin = smoothstep(0.35, 0.05, abs(fract(lane) - 0.5));
+      float run = fract(q.z * (1.2 + lh) + t * (0.6 + lh * 1.4) + lh * 9.0);
+      float streak = pow(run, 3.0) * step(0.4, lh);
+      vec3 c = mix(vec3(1.0, 0.1, 0.05), vec3(1.0, 0.95, 0.8), smoothstep(0.8, 1.0, run));
+      glow += c * streak * thin * (0.7 + 0.4 * fi);
+    }
+    rough = 0.3;
+  } else if (id == 26) {
+    // Toxic (mod skin): glowing green sludge churning deep down, bubbles rising
+    // through it and popping at the surface.
+    vec2 ug = skAt(p, n, v, 0.06);
+    float slime = skFbm(ug * 6.0 + vec2(t * 0.15, -t * 0.4));
+    vec3 goo = mix(vec3(0.05, 0.25, 0.0), vec3(0.6, 1.0, 0.1), smoothstep(0.35, 0.8, slime));
+    col = goo * 0.45;
+    glow += goo * smoothstep(0.5, 0.85, slime) * 0.55;
+    vec2 ub = skAt(p, n, v, 0.025) * 14.0 + vec2(0.0, -t * 1.2);
+    vec2 bc = floor(ub);
+    vec2 bh = skH2(bc);
+    vec2 bf = fract(ub) - 0.5 - (bh - 0.5) * 0.4;
+    float br = 0.12 + bh.y * 0.15;
+    float life = fract(t * 0.5 + bh.x * 5.0);
+    br *= smoothstep(0.0, 0.3, life) * step(life, 0.92);
+    float bd = length(bf);
+    float ring = smoothstep(br, br - 0.04, bd) * smoothstep(br - 0.1, br - 0.04, bd) * step(0.4, bh.x);
+    glow += vec3(0.75, 1.0, 0.35) * ring * 0.8;
+    col = mix(col, vec3(0.7, 1.0, 0.5), smoothstep(0.04, 0.0, length(bf + br * 0.4)) * step(0.4, bh.x) * step(0.05, br));
+    rough = 0.12;
+  } else if (id == 27) {
+    // Checkered (mod skin): a chequered flag rippling in the wind, a faint red glow
+    // of a second flag showing through its black squares from underneath.
+    vec2 u = uv0 * 13.0;
+    float wv = sin(u.x * 0.55 + u.y * 0.25 - t * 4.0);
+    vec2 uf = u + vec2(0.0, wv * 0.35);
+    float chk = mod(floor(uf.x) + floor(uf.y), 2.0);
+    float shade = 0.72 + 0.28 * cos(u.x * 0.55 + u.y * 0.25 - t * 4.0);
+    vec2 ud = skAt(p, n, v, 0.04) * 13.0 + vec2(t * 0.5, 0.0);
+    float chd = mod(floor(ud.x) + floor(ud.y), 2.0);
+    col = mix(vec3(0.03), vec3(0.95), chk) * shade;
+    glow += vec3(1.0, 0.15, 0.1) * (1.0 - chk) * chd * 0.04 * shade;
+    rough = 0.35;
   }
 }
 `

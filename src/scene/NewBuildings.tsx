@@ -10,7 +10,7 @@ import { CLUB } from './clubLayout'
 import { MeshBasicMaterial, MeshStandardMaterial, Color } from 'three'
 import { PAL, SEASON } from './season'
 import { LAYER, decal } from './layers'
-import { brickTex, sidingTex, gravelTex, awningTex, paverTex, shutterTex, shingleTex } from './textures'
+import { brickTex, sidingTex, gravelTex, awningTex, paverTex, shutterTex, shingleTex, checkerTex } from './textures'
 
 // Models for the second wave of shop items: businesses and services (coffee,
 // tacos, oil change, arcade, body shop, market, fire and police stations,
@@ -18,9 +18,9 @@ import { brickTex, sidingTex, gravelTex, awningTex, paverTex, shutterTex, shingl
 // colours shared across the town, so Batch merges them into a few draws.
 // Lots face +z (the front door side), like the rest of the town.
 
-type V3 = [number, number, number]
-type Mat = (color: string, map?: Texture) => ReactNode
-export type NewModelProps = { def: BuildingDef; ghost?: boolean; m: Mat; win: ReactNode; bulb: ReactNode; level?: number }
+export type V3 = [number, number, number]
+export type Mat = (color: string, map?: Texture) => ReactNode
+export type NewModelProps = { def: BuildingDef; ghost?: boolean; valid?: boolean; m: Mat; win: ReactNode; bulb: ReactNode; level?: number }
 
 export const NEW_MODELS = new Set([
   'coffee', 'tacos', 'lube', 'arcade', 'bodyshop', 'market', 'firehouse', 'police', 'parkade', 'club',
@@ -28,10 +28,10 @@ export const NEW_MODELS = new Set([
   'pumpkins', 'scarecrow', 'graves', 'deadtree',
 ])
 
-const GOLD = '#ffc107'
-const SNOW = SEASON === 'winter'
+export const GOLD = '#ffc107'
+export const SNOW = SEASON === 'winter'
 
-function Box({ m, at, s, c, t, rot, shadow = true }: { m: Mat; at: V3; s: V3; c: string; t?: Texture; rot?: V3; shadow?: boolean }) {
+export function Box({ m, at, s, c, t, rot, shadow = true }: { m: Mat; at: V3; s: V3; c: string; t?: Texture; rot?: V3; shadow?: boolean }) {
   return (
     <mesh position={at} rotation={rot} castShadow={shadow} receiveShadow>
       <boxGeometry args={s} />
@@ -40,7 +40,7 @@ function Box({ m, at, s, c, t, rot, shadow = true }: { m: Mat; at: V3; s: V3; c:
   )
 }
 
-function Cyl({ m, at, r, r2 = r, h, c, seg = 12, rot }: { m: Mat; at: V3; r: number; r2?: number; h: number; c: string; seg?: number; rot?: V3 }) {
+export function Cyl({ m, at, r, r2 = r, h, c, seg = 12, rot }: { m: Mat; at: V3; r: number; r2?: number; h: number; c: string; seg?: number; rot?: V3 }) {
   return (
     <mesh position={at} rotation={rot} castShadow>
       <cylinderGeometry args={[r, r2, h, seg]} />
@@ -49,7 +49,7 @@ function Cyl({ m, at, r, r2 = r, h, c, seg = 12, rot }: { m: Mat; at: V3; r: num
   )
 }
 
-function Sign({ text, w, at, bg, fg }: { text: string; w: number; at: V3; bg: string; fg: string }) {
+export function Sign({ text, w, at, bg, fg }: { text: string; w: number; at: V3; bg: string; fg: string }) {
   return (
     <mesh position={at}>
       <planeGeometry args={[w, w / 4]} />
@@ -58,7 +58,7 @@ function Sign({ text, w, at, bg, fg }: { text: string; w: number; at: V3; bg: st
   )
 }
 
-function Pool({ r, x = 0, z = 0 }: { r: number; x?: number; z?: number }) {
+export function Pool({ r, x = 0, z = 0 }: { r: number; x?: number; z?: number }) {
   return (
     <mesh rotation-x={-Math.PI / 2} position={[x, 0.075, z]} renderOrder={2}>
       <planeGeometry args={[r * 2, r * 2]} />
@@ -68,7 +68,7 @@ function Pool({ r, x = 0, z = 0 }: { r: number; x?: number; z?: number }) {
 }
 
 // Neon tubes stay lit day and night; one material per colour keeps them mergeable.
-function Neon({ at, s, c }: { at: V3; s: V3; c: string }) {
+export function Neon({ at, s, c }: { at: V3; s: V3; c: string }) {
   return (
     <mesh position={at}>
       <boxGeometry args={s} />
@@ -77,7 +77,7 @@ function Neon({ at, s, c }: { at: V3; s: V3; c: string }) {
   )
 }
 
-function Bulbs({ from, to, n }: { from: V3; to: V3; n: number }) {
+export function Bulbs({ from, to, n }: { from: V3; to: V3; n: number }) {
   return (
     <group>
       {Array.from({ length: n }, (_, i) => {
@@ -93,7 +93,7 @@ function Bulbs({ from, to, n }: { from: V3; to: V3; n: number }) {
   )
 }
 
-function Flag({ at, color, star, tall = 0.9 }: { at: V3; color: string; star?: boolean; tall?: number }) {
+export function Flag({ at, color, star, tall = 0.9 }: { at: V3; color: string; star?: boolean; tall?: number }) {
   return (
     <group position={at}>
       <mesh position={[0, tall / 2, 0]} castShadow><cylinderGeometry args={[0.02, 0.025, tall, 6]} /><meshStandardMaterial color="#eceff1" metalness={0.4} /></mesh>
@@ -109,7 +109,7 @@ function Flag({ at, color, star, tall = 0.9 }: { at: V3; color: string; star?: b
 
 // Upgrade trimmings shared by every new business, in the same order as the
 // original buildings: cornice (3), roof bulbs (5), flag (8), gold trim (9), star (10).
-function Trims({ m, lvl, w, d, h, z0, flag }: { m: Mat; lvl: number; w: number; d: number; h: number; z0: number; flag: string }) {
+export function Trims({ m, lvl, w, d, h, z0, flag }: { m: Mat; lvl: number; w: number; d: number; h: number; z0: number; flag: string }) {
   const zf = z0 + d / 2
   return (
     <group>
@@ -145,12 +145,14 @@ type Shell = {
   signFg?: string
   // Ground floor: a shop window, door and awning, or nothing (the model draws its own).
   shopfront?: string | null
+  // How much of the usual upgrade height it gains (low-rise lots like the schools grow slower).
+  grow?: number
   children?: ReactNode
 }
 
 // A flat-roofed building that grows a floor of windows every other upgrade level.
-function ShellBuilding({ m, win, bulb, ghost, lvl, w, d, h0, z0 = -0.15, x0 = 0, wall, tex = 'brick', roof, sign, signBg = '#fffde7', signFg = '#c62828', shopfront, children }: Shell) {
-  const h = h0 + levelLift(lvl)
+export function ShellBuilding({ m, win, bulb, ghost, lvl, w, d, h0, z0 = -0.15, x0 = 0, wall, tex = 'brick', roof, sign, signBg = '#fffde7', signFg = '#c62828', shopfront, grow = 1, children }: Shell) {
+  const h = h0 + levelLift(lvl) * grow
   const zf = z0 + d / 2
   const rx = Math.max(1, Math.round(w * 0.6))
   const wallTex = tex === 'brick' ? brickTex(rx, Math.max(1, Math.round(h))) : sidingTex(rx, Math.max(1, Math.round(h * 1.5)))
@@ -232,7 +234,7 @@ function Wheel({ m, at }: { m: Mat; at: V3 }) {
 }
 
 // Patio table under a parasol.
-function Parasol({ m, at, c }: { m: Mat; at: V3; c: string }) {
+export function Parasol({ m, at, c }: { m: Mat; at: V3; c: string }) {
   return (
     <group position={at}>
       <Cyl m={m} at={[0, 0.2, 0]} r={0.16} h={0.03} c="#fafafa" seg={10} />
@@ -247,7 +249,7 @@ function Parasol({ m, at, c }: { m: Mat; at: V3; c: string }) {
 }
 
 // A simple car shape for the parking garage decks: far fewer meshes than CarModel.
-function BlockCar({ m, at, c, rot = 0 }: { m: Mat; at: V3; c: string; rot?: number }) {
+export function BlockCar({ m, at, c, rot = 0 }: { m: Mat; at: V3; c: string; rot?: number }) {
   return (
     <group position={at}>
       <Upright>
@@ -282,7 +284,7 @@ function clubSignMats() {
 
 type GlowKey = 'neonPink' | 'neonCyan' | 'neonViolet' | 'danceFloor'
 
-export function NewBuildingModel({ def, ghost, m, win, bulb, level = 1 }: NewModelProps) {
+export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }: NewModelProps) {
   const lvl = Math.min(10, Math.max(1, Math.floor(level) || 1))
   const lift = levelLift(lvl)
   const trim = !ghost
@@ -348,7 +350,7 @@ export function NewBuildingModel({ def, ghost, m, win, bulb, level = 1 }: NewMod
           )}
           {/* Pole sign that grows taller with each level. */}
           {!ghost && (
-            <group position={[-0.78, 0, -0.78]}>
+            <group position={[-0.6, 0, -0.78]}>
               <Cyl m={m} at={[0, sh / 2, 0]} r={0.035} h={sh} c="#90a4ae" seg={6} />
               <Box m={m} at={[0, sh + 0.12, 0]} s={[0.66, 0.24, 0.05]} c={lvl >= 9 ? GOLD : '#ff7043'} />
               <Sign text="TACOS" w={0.6} at={[0, sh + 0.12, 0.03]} bg="#ffd54f" fg="#bf360c" />
@@ -902,7 +904,7 @@ export function NewBuildingModel({ def, ghost, m, win, bulb, level = 1 }: NewMod
             <group key={i}>
               <mesh position={[0, y, 0]} castShadow>
                 <coneGeometry args={[r, h, 8]} />
-                <meshStandardMaterial color={ghost ? '#66bb6a' : ['#1b5e20', '#2e7d32', '#388e3c'][i]} transparent={ghost} opacity={ghost ? 0.55 : 1} flatShading />
+                <meshStandardMaterial color={ghost ? (valid ? '#66bb6a' : '#ef5350') : ['#1b5e20', '#2e7d32', '#388e3c'][i]} transparent={ghost} opacity={ghost ? 0.55 : 1} flatShading />
               </mesh>
               {SNOW && !ghost && (
                 <mesh position={[0, y + h * 0.22, 0]}>
@@ -1007,7 +1009,7 @@ export function NewBuildingModel({ def, ghost, m, win, bulb, level = 1 }: NewMod
           {[-0.45, 0.45].map((x) => <Box key={x} m={m} at={[x, 0.14, -0.26]} s={[0.05, 0.28, 0.18]} c="#37474f" />)}
           <mesh position={[0, 1.22, -0.18]} rotation-x={Math.PI / 2}><planeGeometry args={[1.2, 0.4]} />{bulb}</mesh>
           {!ghost && (
-            <group position={[0.85, 0, 0.35]}>
+            <group position={[0.6, 0, 0.55]}>
               <Cyl m={m} at={[0, 0.75, 0]} r={0.03} h={1.5} c="#90a4ae" seg={6} />
               <mesh position={[0, 1.45, 0]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.18, 0.18, 0.03, 16]} />{m('#1e88e5')}</mesh>
               <mesh position={[0, 1.45, 0.017]}>
@@ -1045,7 +1047,7 @@ export function NewBuildingModel({ def, ghost, m, win, bulb, level = 1 }: NewMod
         <group>
           <Cyl m={m} at={[0, 0.1, 0]} r={0.36} r2={0.42} h={0.2} c="#cfd8dc" seg={12} />
           <Cyl m={m} at={[0, 1.4, 0]} r={0.025} r2={0.04} h={2.6} c="#eceff1" seg={8} />
-          <mesh position={[0, 2.72, 0]}><sphereGeometry args={[0.06, 8, 6]} /><meshStandardMaterial color={GOLD} metalness={0.6} roughness={0.3} /></mesh>
+          <mesh position={[0, 2.72, 0]}><sphereGeometry args={[0.06, 8, 6]} />{ghost ? m(GOLD) : <meshStandardMaterial color={GOLD} metalness={0.6} roughness={0.3} />}</mesh>
           {/* Town flag: green and white with a gold car. */}
           <group position={[0.36, 2.35, 0]}>
             <Box m={m} at={[0, 0.12, 0]} s={[0.66, 0.22, 0.015]} c="#2e7d32" />
@@ -1072,7 +1074,7 @@ export function NewBuildingModel({ def, ghost, m, win, bulb, level = 1 }: NewMod
           {!ghost && [-1, 1].map((sd) => (
             <mesh key={sd} position={[0, 1.85, sd * 0.081]} rotation-y={sd < 0 ? Math.PI : 0}>
               <planeGeometry args={[1.9, 0.3]} />
-              <meshBasicMaterial map={signTexture('▚▚▚▚▚▚', '#ffffff', '#111111')} toneMapped={false} />
+              <meshBasicMaterial map={checkerTex(3)} toneMapped={false} />
             </mesh>
           ))}
           {[-0.5, -0.25, 0, 0.25, 0.5].map((x) => (
@@ -1138,10 +1140,10 @@ export function NewBuildingModel({ def, ghost, m, win, bulb, level = 1 }: NewMod
             <Box key={a} m={m} at={[Math.sin(a) * 0.72, 0.75, Math.cos(a) * 0.72]} s={[0.07, 1.2, 0.07]} c="#fafafa" />
           ))}
           {/* Railings on every side but the front. */}
-          {posts.slice(1).map((a, i) => {
+          {posts.map((a, i) => {
             const b = a + Math.PI / 3
             const mid = (a + b) / 2
-            if (i === 4) return null
+            if (i === 5) return null
             return <Box key={a} m={m} at={[Math.sin(mid) * 0.62, 0.42, Math.cos(mid) * 0.62]} rot={[0, mid, 0]} s={[0.7, 0.05, 0.04]} c="#fafafa" />
           })}
           <mesh position={[0, 1.42, 0]} rotation-y={Math.PI / 6}><cylinderGeometry args={[0.92, 0.92, 0.1, 6]} />{m('#fafafa')}</mesh>

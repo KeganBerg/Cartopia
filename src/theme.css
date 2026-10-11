@@ -47,6 +47,7 @@ html {
 }
 :root .icon-btn .i .gi { filter: drop-shadow(0 2px 0 rgba(0,0,0,.3)); }
 :root .i-shop { background: linear-gradient(#ffb547, #f07b0e); }
+:root .i-crates { background: linear-gradient(#4fd1c5, #1b8f86); }
 :root .i-showroom { background: linear-gradient(#ff6b6b, #d6283b); }
 :root .i-garage { background: linear-gradient(#5aa9ff, #2263d6); }
 :root .i-friends { background: linear-gradient(#b48cff, #7444d9); }

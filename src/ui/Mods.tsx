@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useGame, modPrice, type OwnedCar } from '../game/store'
-import { MODS, MOD_SLOTS, carDef, modFits, fittedMods, modDef, ownedMods, performance, type ModDef, type ModSlot } from '../game/data'
+import { ModSkinPicker } from './Skins'
+import { MODS, MOD_SLOTS, SKINNED_SLOTS, type SkinnedSlot, carDef, modFits, fittedMods, modDef, ownedMods, performance, type ModDef, type ModSlot } from '../game/data'
 
 // The car's mods with `tryId` swapped into its slot, for previewing before buying.
 export function withMod(mods: string[] | undefined, tryId: string | null) {
@@ -34,7 +35,11 @@ export function openModSlot(slot: ModSlot) {
 }
 
 // Mod shop for one car: pick a slot, tap a part to try it on the preview, then fit it.
-export function ModShop({ car, trying, setTrying }: { car: OwnedCar; trying: string | null; setTrying: (id: string | null) => void }) {
+// skinTry: a mod skin being tried on a slot's part (skin null: trying none).
+export function ModShop({ car, trying, setTrying, skinTry, setSkinTry }: {
+  car: OwnedCar; trying: string | null; setTrying: (id: string | null) => void
+  skinTry: { slot: SkinnedSlot; skin: string | null } | null; setSkinTry: (t: { slot: SkinnedSlot; skin: string | null } | null) => void
+}) {
   const level = useGame((s) => s.level)
   const modCar = useGame((s) => s.modCar)
   const deals = useGame((s) => s.deals)
@@ -57,7 +62,7 @@ export function ModShop({ car, trying, setTrying }: { car: OwnedCar; trying: str
             role="tab"
             aria-selected={s.id === slot}
             className={s.id === slot ? 'mod-tab sel' : 'mod-tab'}
-            onClick={() => { setSlot(s.id); setTrying(null) }}
+            onClick={() => { setSlot(s.id); setTrying(null); setSkinTry(null) }}
           >
             <span className="mod-tab-icon">{s.icon}</span>
             <span>{s.name}</span>
@@ -65,7 +70,7 @@ export function ModShop({ car, trying, setTrying }: { car: OwnedCar; trying: str
           </button>
         ))}
       </div>
-      <p className="mod-hint">{info.stat}. Tap a part to try it on.</p>
+      <p className="mod-hint">{info.stat}</p>
       <div className="mod-list">
         {MODS.filter((m) => m.slot === slot && modFits(m, def.body)).map((m) => {
           const fitted = fit[slot] === m.id
@@ -99,7 +104,10 @@ export function ModShop({ car, trying, setTrying }: { car: OwnedCar; trying: str
           )
         })}
       </div>
-      <p className="mod-hint small">Parts you buy stay with this car, so you can swap back for free.</p>
+      {SKINNED_SLOTS.includes(slot as SkinnedSlot) && (fit[slot] ? (
+        <ModSkinPicker car={car} slot={slot as SkinnedSlot} trying={skinTry?.slot === slot ? skinTry.skin : undefined}
+          setTrying={(skin) => setSkinTry(skin === undefined ? null : { slot: slot as SkinnedSlot, skin })} />
+      ) : <p className="mod-hint small">🎨 Fit a {info.name.toLowerCase()} part to give it a mod skin.</p>)}
     </div>
   )
 }

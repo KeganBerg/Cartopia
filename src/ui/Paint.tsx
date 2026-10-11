@@ -33,17 +33,13 @@ export function PaintShop({ car, job, setJob }: { car: OwnedCar; job: PaintJob; 
   const price = [cost.coins && `$${cost.coins.toLocaleString()}`, cost.bucks && `💎 ${cost.bucks}`].filter(Boolean).join(' + ') || 'Free'
   return (
     <div className="paint-shop">
-      <div className={changed ? 'try-bar on' : 'try-bar'}>
-        {changed ? (
-          <>
-            <span className="try-what">Trying <b>{label}</b></span>
-            <button className="try-cancel" onClick={() => setJob(null)}>Undo</button>
-            <button className={cost.bucks ? 'buy small premium' : 'buy small'} onClick={() => { if (paintCar(car.uid, job)) setJob(null) }}>{cost.deal && <span className="deal-tag">DEAL</span>}Buy · {cost.deal && <s>${full.coins.toLocaleString()}</s>} {price}</button>
-          </>
-        ) : (
-          <span className="try-what">Tap a finish, colour or stripe to try it on. Pay only when you like it.</span>
-        )}
-      </div>
+      {changed && (
+        <div className="try-bar on">
+          <span className="try-what">Trying <b>{label}</b></span>
+          <button className="try-cancel" onClick={() => setJob(null)}>Undo</button>
+          <button className={cost.bucks ? 'buy small premium' : 'buy small'} onClick={() => { if (paintCar(car.uid, job)) setJob(null) }}>{cost.deal && <span className="deal-tag">DEAL</span>}Buy · {cost.deal && <s>${full.coins.toLocaleString()}</s>} {price}</button>
+        </div>
+      )}
       <h4>Finish</h4>
       <div className="finishes">
         {FINISHES.map((f) => {
