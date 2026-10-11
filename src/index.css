@@ -297,6 +297,7 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .goal:not(.done) .goal-main { cursor: pointer; }
 .crash-screen { z-index: 300; place-items: center !important; align-items: center !important; padding: 16px !important; }
 .crash-detail { font-size: 11px; word-break: break-word; margin-top: 10px; }
+.thought { font-size: 13px; max-width: 230px; white-space: normal; text-align: left; line-height: 1.25; padding: 5px 10px; }
 .badge-crew { background: #455a64; color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,.4); }
 .badge-rescue { background: #fff3e0; color: #5d4037; }
 

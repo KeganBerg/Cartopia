@@ -646,33 +646,34 @@ export function BuildingModel({ def, ghost, valid }: Props) {
             <boxGeometry args={[W * 0.96, 0.05, D * 0.94]} />
             {m('#ffffff', paverTex(4, 2))}
           </mesh>
-          {[[-1.3, -0.5], [0.7, -0.5], [-1.3, 0.5], [0.7, 0.5]].map(([x, z], i) => (
+          {/* Canopy over the pumps at the back, leaving the front clear for
+              cars to swing in from the road, pull up and drive out. */}
+          {[[-0.85, -0.45], [0.85, -0.45], [-0.85, -0.9], [0.85, -0.9]].map(([x, z], i) => (
             <mesh key={i} position={[x, 0.75, z]} castShadow>
               <boxGeometry args={[0.12, 1.4, 0.12]} />
               {m('#eeeeee')}
             </mesh>
           ))}
-          {/* Canopy with a red band and a lit underside. */}
-          <mesh position={[-0.3, 1.5, 0]} castShadow>
-            <boxGeometry args={[2.6, 0.22, 1.6]} />
+          <mesh position={[0, 1.5, -0.2]} castShadow>
+            <boxGeometry args={[2.2, 0.22, 1.5]} />
             {m('#fafafa')}
           </mesh>
-          <mesh position={[-0.3, 1.5, 0]}>
-            <boxGeometry args={[2.64, 0.1, 1.64]} />
+          <mesh position={[0, 1.5, -0.2]}>
+            <boxGeometry args={[2.24, 0.1, 1.54]} />
             {m(def.roof)}
           </mesh>
-          <mesh position={[-0.3, 1.375, 0]} rotation-x={Math.PI / 2}>
-            <planeGeometry args={[2.4, 1.4]} />
+          <mesh position={[0, 1.375, -0.2]} rotation-x={Math.PI / 2}>
+            <planeGeometry args={[2.0, 1.3]} />
             {bulb}
           </mesh>
-          {!ghost && <LightPool r={1.3} x={-0.3} />}
-          {/* Pump island with two pumps. */}
-          <mesh position={[-0.3, 0.1, 0]} receiveShadow>
-            <boxGeometry args={[1.8, 0.1, 0.4]} />
+          {!ghost && <LightPool r={1.2} z={0} />}
+          {/* Pump island with two pumps facing the forecourt. */}
+          <mesh position={[0, 0.1, -0.45]} receiveShadow>
+            <boxGeometry args={[1.5, 0.1, 0.36]} />
             {m('#ffca28')}
           </mesh>
-          {[-0.85, 0.25].map((x) => (
-            <group key={x} position={[x, 0, 0]}>
+          {[-0.4, 0.4].map((x) => (
+            <group key={x} position={[x, 0, -0.45]}>
               <mesh position={[0, 0.48, 0]} castShadow>
                 <boxGeometry args={[0.34, 0.66, 0.26]} />
                 {m('#fafafa')}
@@ -685,26 +686,26 @@ export function BuildingModel({ def, ghost, valid }: Props) {
               ))}
             </group>
           ))}
-          {/* Little shop with a striped awning. */}
-          <mesh position={[1.45, 0.55, -0.1]} castShadow receiveShadow>
-            <boxGeometry args={[0.95, 1.1, 1.5]} />
+          {/* Little shop tucked in the back corner, with a striped awning. */}
+          <mesh position={[1.53, 0.55, -0.65]} castShadow receiveShadow>
+            <boxGeometry args={[0.75, 1.1, 0.6]} />
             {m(def.color, brickTex(1, 1.2))}
           </mesh>
-          <mesh position={[1.45, 1.14, -0.1]} castShadow>
-            <boxGeometry args={[1.02, 0.1, 1.58]} />
+          <mesh position={[1.53, 1.14, -0.65]} castShadow>
+            <boxGeometry args={[0.82, 0.1, 0.68]} />
             {m(def.roof)}
           </mesh>
-          <mesh position={[0.965, 0.45, -0.1]} rotation-y={-Math.PI / 2}>
-            <planeGeometry args={[1.2, 0.55]} />
+          <mesh position={[1.53, 0.45, -0.34]}>
+            <planeGeometry args={[0.6, 0.5]} />
             {win}
           </mesh>
-          <mesh position={[0.9, 0.85, -0.1]} rotation-z={0.5} rotation-y={-Math.PI / 2}>
-            <planeGeometry args={[1.35, 0.3]} />
+          <mesh position={[1.53, 0.84, -0.27]} rotation-x={-0.5}>
+            <planeGeometry args={[0.72, 0.28]} />
             {m('#ffffff', awningTex(def.roof))}
           </mesh>
           {/* Price sign on a pole. */}
           {!ghost && (
-            <group position={[-1.8, 0, 0.75]}>
+            <group position={[-1.75, 0, -0.7]}>
               <mesh position={[0, 0.8, 0]} castShadow>
                 <cylinderGeometry args={[0.04, 0.04, 1.6]} />
                 {m('#90a4ae')}
@@ -719,7 +720,7 @@ export function BuildingModel({ def, ghost, valid }: Props) {
               </mesh>
             </group>
           )}
-          {sign && <Sign text="GAS" w={1.2} y={1.5} z={0.83} bg={def.roof} fg="#ffffff" />}
+          {sign && <Sign text="GAS" w={1.2} y={1.5} z={0.58} bg={def.roof} fg="#ffffff" />}
         </group>
       )
     case 'crew':
