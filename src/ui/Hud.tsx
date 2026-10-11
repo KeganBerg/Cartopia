@@ -5,6 +5,7 @@ import { GoalsButton, GoalTracker } from './Goals'
 import { MuteButton } from './MuteButton'
 import { ChallengeBell } from './Race'
 import { GiftBell } from './Gifts'
+import { Icon, CoinIcon, BuckIcon, PartsIcon, FuelIcon } from './Icon'
 
 const n = (v: number) => v.toLocaleString()
 
@@ -37,7 +38,7 @@ function Speedometer({ level, xp, onClick }: { level: number; xp: number; onClic
       </svg>
       <div className="speedo-level">{level}</div>
       <div className="speedo-xp">{n(xp)} XP</div>
-      <span className="speedo-menu" aria-hidden>☰</span>
+      <span className="speedo-menu" aria-hidden><Icon name="menu" size={14} /></span>
     </button>
   )
 }
@@ -52,14 +53,14 @@ export function Hud() {
       <div className="hud-left">
         <Speedometer level={s.level} xp={s.xp} onClick={() => s.openPanel('account')} />
         <div className="pills">
-          <button className="pill" onClick={() => s.showNeed('coins', 0)}><span className="ico coin-ico">$</span>{n(s.coins)}<span className="plus">+</span></button>
-          <button className="pill" onClick={() => s.openPanel('bank')}><span className="ico buck-ico">B</span>{n(s.bucks)}<span className="plus">+</span></button>
-          <button className="pill" onClick={() => s.showNeed('parts', 0)}><span className="ico parts-ico">⚙</span>{n(s.parts)}<span className="plus">+</span></button>
+          <button className="pill" onClick={() => s.showNeed('coins', 0)}><span className="ico cur-ico"><CoinIcon /></span>{n(s.coins)}<span className="plus"><Icon name="plus" size={12} /></span></button>
+          <button className="pill" onClick={() => s.openPanel('bank')}><span className="ico cur-ico"><BuckIcon /></span>{n(s.bucks)}<span className="plus"><Icon name="plus" size={12} /></span></button>
+          <button className="pill" onClick={() => s.showNeed('parts', 0)}><span className="ico cur-ico"><PartsIcon /></span>{n(s.parts)}<span className="plus"><Icon name="plus" size={12} /></span></button>
         </div>
       </div>
       <div className="hud-center">
         <div className="town-name">{s.visiting?.townName ?? s.townName}</div>
-        {!s.visiting && <button className="my-cars" onClick={() => s.openPanel('garage')}>🚗 <span className="my-cars-label">MY CARS:</span> {s.cars.length}</button>}
+        {!s.visiting && <button className="my-cars" onClick={() => s.openPanel('garage')}><Icon name="car" size={18} /> <span className="my-cars-label">MY CARS:</span> {s.cars.length}</button>}
         <GoalTracker />
       </div>
       <div className="hud-right">
@@ -68,11 +69,11 @@ export function Hud() {
             <div style={{ width: `${Math.min(100, (s.fuel / cap) * 100)}%` }} />
             <span>{s.fuel}/{cap}</span>
           </div>
-          <span className="ico fuel-ico">⛽</span>
+          <span className="ico cur-ico"><FuelIcon /></span>
         </button>
         <div className="fuel-sub">{nextIn === null ? 'Fuel full' : `+1 fuel in ${nextIn}s`}</div>
         <div className="hud-right-row">
-          <button className="pill trophies" title="Leaderboards" onClick={() => s.openPanel('leaders')}>🏆 {s.trophies}</button>
+          <button className="pill trophies" title="Leaderboards" onClick={() => s.openPanel('leaders')}><Icon name="trophy" size={16} /> {s.trophies}</button>
           <GoalsButton />
           <MuteButton />
         </div>
@@ -86,11 +87,11 @@ export function Hud() {
         <div className="hud-strip">
           <Speedometer level={s.level} xp={s.xp} onClick={() => s.openPanel('account')} />
           <div className="hud-chips">
-            <button className="chip-stat" onClick={() => s.showNeed('coins', 0)}><span className="ico coin-ico">$</span>{n(s.coins)}</button>
-            <button className="chip-stat" onClick={() => s.openPanel('bank')}><span className="ico buck-ico">B</span>{n(s.bucks)}</button>
-            <button className="chip-stat" onClick={() => s.showNeed('parts', 0)}><span className="ico parts-ico">⚙</span>{n(s.parts)}</button>
+            <button className="chip-stat" onClick={() => s.showNeed('coins', 0)}><span className="ico cur-ico"><CoinIcon /></span>{n(s.coins)}</button>
+            <button className="chip-stat" onClick={() => s.openPanel('bank')}><span className="ico cur-ico"><BuckIcon /></span>{n(s.bucks)}</button>
+            <button className="chip-stat" onClick={() => s.showNeed('parts', 0)}><span className="ico cur-ico"><PartsIcon /></span>{n(s.parts)}</button>
             <button className="chip-stat chip-fuel" onClick={() => s.showNeed('fuel', 0)}>
-              <span className="ico fuel-ico">⛽</span>
+              <span className="ico cur-ico"><FuelIcon /></span>
               <span className="chip-fuel-bar"><i style={{ width: `${Math.min(100, (s.fuel / cap) * 100)}%` }} /><b>{s.fuel}/{cap}</b></span>
             </button>
           </div>
@@ -102,8 +103,8 @@ export function Hud() {
         </div>
         <div className="hud-town">
           <span className="hud-town-name">{s.visiting?.townName ?? s.townName}</span>
-          {!s.visiting && <button onClick={() => s.openPanel('garage')}>🚗 {s.cars.length}</button>}
-          <button onClick={() => s.openPanel('leaders')}>🏆 {s.trophies}</button>
+          {!s.visiting && <button onClick={() => s.openPanel('garage')}><Icon name="car" size={15} /> {s.cars.length}</button>}
+          <button onClick={() => s.openPanel('leaders')}><Icon name="trophy" size={16} /> {s.trophies}</button>
         </div>
         <GoalTracker />
       </div>
