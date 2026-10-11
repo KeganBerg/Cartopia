@@ -8,7 +8,7 @@ import { CarModel, carFrame } from './CarModel'
 import { frame, seat, type Bounds } from './fit'
 import { SkyEnv } from './SkyEnv'
 
-type Look = { body: Body; model?: string; color: string; finish?: Finish | null; stripe?: string | null; mods?: string[] | null }
+type Look = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; stripe?: string | null; mods?: string[] | null }
 
 // How big the car's bounding sphere is made, so long trucks and tiny bubble cars both fill the view.
 const FIT = 1.05

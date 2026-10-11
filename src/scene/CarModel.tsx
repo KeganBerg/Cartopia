@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react'
-import { useThree } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { chromeEnv } from './chromeEnv'
 import {
   BoxGeometry, BufferGeometry, CircleGeometry, Color, CylinderGeometry, DoubleSide, Euler, ExtrudeGeometry, Matrix4,
@@ -10,7 +10,8 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { wheelTex } from './textures'
 import { glowMats } from './dayNight'
-import { FINISH_LOOK, fittedMods, isBike, type Body, type Finish, type ModSlot } from '../game/data'
+import { FINISH_LOOK, fittedMods, isBike, skinNumber, type Body, type Finish, type ModSlot } from '../game/data'
+import { tickSkins, withSkin } from './skins'
 import { CarMods, RIM_LOOK, carbon, chrome as modChrome, glass as modGlass, modGeo, modIds } from './CarMods'
 import { carBody, wheelPool, type WheelSlot } from './carBatch'
 import { bake, finishOf, type Finish as Look } from './bake'
@@ -844,7 +845,8 @@ export type WheelRig = { steer: (Group | null)[]; spin: (Group | null)[]; radius
 
 // lean: draw the body as one merged mesh and the wheels from the shared pool (town
 // traffic). Needs `rig`, whose owner places the wheels each frame; no exhaust flames.
-type CarProps = { body: Body; model?: string; color: string; finish?: Finish | null; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean; rig?: WheelRig; mods?: string[] | null; flames?: boolean; lean?: boolean }
+// skin: a skin id (game/data.ts SKINS) drawn into the paint.
+type CarProps = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean; rig?: WheelRig; mods?: string[] | null; flames?: boolean; lean?: boolean }
 
 // A lean car: every part baked into two meshes (the parts that cast a shadow and the
 // rest) with the finish it would otherwise be drawn with, except the see-through screen;
@@ -902,25 +904,29 @@ export function CarModel(props: CarProps) {
   return isBike(props.body) ? <BikeModel {...props} /> : <CarBody {...props} />
 }
 
-// The body paint: glossy, matte or chrome. Rust is always flat.
-function PaintMaterial({ color, finish, rusty, highlight }: { color: string; finish?: Finish | null; rusty?: boolean; highlight?: boolean }) {
+// The body paint: glossy, matte or chrome, with a skin (by number) drawn into it. Rust is always flat.
+function PaintMaterial({ color, finish, rusty, highlight, skin = 0 }: { color: string; finish?: Finish | null; rusty?: boolean; highlight?: boolean; skin?: number }) {
   const [metal, rough, lift] = rusty ? [0.1, 0.95, 0] : FINISH_LOOK[finish ?? 'gloss'] ?? FINISH_LOOK.gloss
   const tint = useMemo(() => (lift ? '#' + new Color(color).lerp(new Color('#ffffff'), lift).getHexString() : color), [color, lift])
   const gl = useThree((s) => s.gl)
   const env = !rusty && finish === 'chrome' ? chromeEnv(gl) : null
-  return <meshStandardMaterial key={env ? 'chrome' : 'paint'} color={tint} metalness={metal} roughness={rough} envMap={env} envMapIntensity={env ? 1.3 : 1} emissive={highlight ? '#ffffff' : '#000000'} emissiveIntensity={highlight ? 0.25 : 0} />
+  const skinHook = useMemo(() => (skin ? { onBeforeCompile: (sh: Parameters<typeof withSkin>[0]) => withSkin(sh, String(skin)), customProgramCacheKey: () => `skin-${skin}` } : {}), [skin])
+  return <meshStandardMaterial key={`${env ? 'chrome' : 'paint'}-${skin}`} {...skinHook} color={tint} metalness={metal} roughness={rough} envMap={env} envMapIntensity={env ? 1.3 : 1} emissive={highlight ? '#ffffff' : '#000000'} emissiveIntensity={highlight ? 0.25 : 0} />
 }
 
 // The same paint as PaintMaterial, for baking (any finish but chrome).
-function paintLook(color: string, finish?: Finish | null, rusty?: boolean): Look {
+// A chrome car with a skin bakes as chrome-like metal, without its studio reflections.
+function paintLook(color: string, finish?: Finish | null, rusty?: boolean, skin = 0): Look {
   const [metal, rough, lift] = rusty ? [0.1, 0.95, 0] : FINISH_LOOK[finish ?? 'gloss'] ?? FINISH_LOOK.gloss
-  return { color: lift ? '#' + new Color(color).lerp(new Color('#ffffff'), lift).getHexString() : color, metal, rough, glow: true }
+  return { color: lift ? '#' + new Color(color).lerp(new Color('#ffffff'), lift).getHexString() : color, metal: Math.min(metal, 0.75), rough: Math.max(rough, skin ? 0.2 : 0), glow: true, skin }
 }
 
 // Toy-style car: bevelled extruded body and cabin so no edge is a hard box corner. Faces +z.
-function CarBody({ body, model, color, finish, highlight, stripe, beams, rusty, rig, mods, flames, lean }: CarProps) {
+function CarBody({ body, model, color, finish, skin, highlight, stripe, beams, rusty, rig, mods, flames, lean }: CarProps) {
   // Rusty finds come home stock.
   const fit = rusty ? {} : fittedMods(mods, body)
+  const sk = rusty ? 0 : skinNumber(skin)
+  useFrame(() => void (sk && tickSkins()))
   const s = shapeOf(body)
   const g = carGeo(body, fit, model)
   const p = g.parts
@@ -938,9 +944,9 @@ function CarBody({ body, model, color, finish, highlight, stripe, beams, rusty, 
     </mesh>
   )
   if (lean && rig) {
-    const chromed = !rusty && finish === 'chrome'
+    const chromed = !rusty && finish === 'chrome' && !sk
     const looks: Partial<Record<Part, Look>> = {
-      ...(chromed ? {} : { paint: paintLook(tint, finish, rusty) }), dark: { color: dark }, ...(stripe ? { stripe: { color: stripe } } : {}),
+      ...(chromed ? {} : { paint: paintLook(tint, finish, rusty, sk) }), dark: { color: dark }, ...(stripe ? { stripe: { color: stripe } } : {}),
       black: finishOf(MAT.black), chrome: finishOf(MAT.chrome), glass: finishOf(MAT.glass), seat: finishOf(MAT.seat), wood: finishOf(MAT.wood),
       lamp: finishOf(MAT.lamp), tail: finishOf(MAT.tail), amber: finishOf(MAT.amber),
     }
@@ -953,7 +959,7 @@ function CarBody({ body, model, color, finish, highlight, stripe, beams, rusty, 
   return (
     <group>
       <mesh geometry={p.paint} castShadow>
-        <PaintMaterial color={tint} finish={finish} rusty={rusty} highlight={highlight} />
+        <PaintMaterial color={tint} finish={finish} rusty={rusty} highlight={highlight} skin={sk} />
       </mesh>
       {p.dark && (
         <mesh geometry={p.dark}>
@@ -1068,8 +1074,10 @@ function bikeGeo(body: BikeBody, fit: Partial<Record<ModSlot, string>>, model?: 
 }
 
 // Bikes take every mod slot, with bike-sized parts.
-function BikeModel({ body, model, color, finish, highlight, beams, rusty, rig, mods, flames, lean }: CarProps) {
+function BikeModel({ body, model, color, finish, skin, highlight, beams, rusty, rig, mods, flames, lean }: CarProps) {
   const fit = rusty ? {} : fittedMods(mods, body)
+  const sk = rusty ? 0 : skinNumber(skin)
+  useFrame(() => void (sk && tickSkins()))
   const bb = body as BikeBody
   const g = bikeGeo(bb, fit, model)
   const p = g.parts
@@ -1090,9 +1098,9 @@ function BikeModel({ body, model, color, finish, highlight, beams, rusty, rig, m
     </mesh>
   )
   if (lean && rig) {
-    const chromed = !rusty && finish === 'chrome'
+    const chromed = !rusty && finish === 'chrome' && !sk
     const looks: Partial<Record<Part, Look>> = {
-      ...(chromed ? {} : { paint: paintLook(tint, finish, rusty) }), dark: { color: dark },
+      ...(chromed ? {} : { paint: paintLook(tint, finish, rusty, sk) }), dark: { color: dark },
       black: finishOf(MAT.black), chrome: finishOf(MAT.chrome), glass: finishOf(MAT.glass), seat: finishOf(MAT.seat),
       lamp: finishOf(MAT.lamp), tail: finishOf(MAT.tail),
     }
@@ -1105,7 +1113,7 @@ function BikeModel({ body, model, color, finish, highlight, beams, rusty, rig, m
   return (
     <group>
       <mesh geometry={p.paint} castShadow>
-        <PaintMaterial color={tint} finish={finish} rusty={rusty} highlight={highlight} />
+        <PaintMaterial color={tint} finish={finish} rusty={rusty} highlight={highlight} skin={sk} />
       </mesh>
       {p.dark && (
         <mesh geometry={p.dark}>
