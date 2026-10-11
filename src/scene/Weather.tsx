@@ -384,24 +384,25 @@ export function Weather({ small }: { small: boolean }) {
 }
 
 // The weather during a race. `look` is the race's lighting, for lightning flashes.
-export function RaceWeather({ w, look }: { w: WeatherState; look: Look }) {
+// `night` is the race's darkness (a midnight race forces it; otherwise the clock's).
+export function RaceWeather({ w, look, night: dark }: { w: WeatherState; look: Look; night?: number }) {
+  const nightOf = () => dark ?? nightAmount(dayPhase())
   const scene = useThree((s) => s.scene)
   const camera = useThree((s) => s.camera)
   const base = useRef<{ near: number; far: number; color: Color; exposure: number } | null>(null)
   // Street lamps and headlights come on in a race-day storm, and go back to the
   // town's weather afterwards.
   useEffect(() => {
-    const night = nightAmount(dayPhase())
-    applyNight(night, gloomOf(w))
+    applyNight(nightOf(), gloomOf(w))
     return () => applyNight(nightAmount(dayPhase()), gloomOf(weatherNow()))
-  }, [w])
+  }, [w, dark])
   useEffect(() => {
     const f = scene.fog
     if (f instanceof Fog) {
       base.current = { near: f.near, far: f.far, color: f.color.clone(), exposure: look.grade.exposure }
       f.near *= 1 - 0.65 * w.haze
       f.far *= 1 - 0.6 * w.haze
-      f.color.lerp(hazeColor(new Color(), w, nightAmount(dayPhase())), Math.min(1, w.haze + w.cloud * 0.5))
+      f.color.lerp(hazeColor(new Color(), w, nightOf()), Math.min(1, w.haze + w.cloud * 0.5))
     }
     return () => {
       const b = base.current
@@ -411,7 +412,7 @@ export function RaceWeather({ w, look }: { w: WeatherState; look: Look }) {
   const get = useMemo(() => () => w, [w])
   // A grey (or sandy) veil over the venue's blue sky when it's overcast.
   const veil = useMemo(() => {
-    const night = nightAmount(dayPhase())
+    const night = nightOf()
     const c = new Color(w.dust > 0 ? '#cfa877' : w.haze > w.cloud ? '#c9d1da' : '#87909b').lerp(new Color('#1c2438'), night * 0.8)
     return new MeshBasicMaterial({ color: c, transparent: true, opacity: Math.min(0.88, w.cloud * 0.8 + w.haze * 0.45 + w.dust * 0.45), side: BackSide, fog: false, depthWrite: false })
   }, [w])

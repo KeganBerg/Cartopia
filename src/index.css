@@ -410,6 +410,15 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .camp-who b { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .camp-who small { font-size: 12px; color: #607d8b; font-weight: 700; }
 .camp-race .buy { min-width: 84px; white-space: nowrap; }
+.camp-locked-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+/* Pro Tour: the campaign's look, with midnight legs in deep blue under a starry banner. */
+.tour .camp-node.locked { opacity: .75; }
+.tour .camp-node.night { background: linear-gradient(#232a55, #141833); border-color: #3949ab; color: #fff; }
+.tour .camp-node.night small { color: #ffd54f; }
+.tour .camp-node.night.sel { border-color: #ffd54f; box-shadow: 0 3px 0 #ffd54f; }
+.camp-chapter.night .camp-banner { background: radial-gradient(1.5px 1.5px at 18% 30%, #fff 60%, transparent), radial-gradient(1px 1px at 42% 70%, #fff 60%, transparent), radial-gradient(1.5px 1.5px at 66% 22%, #fff 60%, transparent), radial-gradient(1px 1px at 84% 64%, #fff 60%, transparent), linear-gradient(120deg, #0d1240, #283593 60%, #4a148c); }
+.camp-chapter.night .camp-rewards > span { background: rgba(255,213,79,.25); }
+.tour-beat { font: 13px var(--display); color: #2e7d32; min-width: 84px; text-align: center; }
 .trial { display: grid; gap: 10px; }
 .trial-me { display: flex; align-items: center; gap: 12px; padding: 10px 12px; }
 .trial-best { display: flex; flex-direction: column; line-height: 1.1; }
