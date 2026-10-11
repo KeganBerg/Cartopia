@@ -5,6 +5,9 @@ import './theme.css'
 import App from './App.tsx'
 import { ErrorBoundary } from './ErrorBoundary'
 import { initPush } from './lib/push'
+import { splashProgress } from './lib/splash'
+
+splashProgress(0.7)
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
