@@ -31,16 +31,24 @@ describe('town music', () => {
     expect(phrase(s, c, seeded(s.name))).toEqual(phrase(s, c, seeded(s.name)))
     expect(phrase(s, c, seeded(s.name))).not.toEqual(phrase(s, c, seeded(SONGS[1].name)))
   })
-  it('has several songs for every season, day and night', () => {
-    for (const season of ['winter', 'spring', 'summer', 'fall'] as const) {
-      expect(songsFor(false, season).length).toBeGreaterThanOrEqual(4)
-      expect(songsFor(true, season).length).toBeGreaterThanOrEqual(4)
-    }
+  it('gives every season its own three day songs and three night songs', () => {
+    const seen = new Set<string>()
+    for (const season of ['winter', 'spring', 'summer', 'fall'] as const)
+      for (const night of [false, true]) {
+        const songs = songsFor(night, season)
+        expect(songs.length).toBeGreaterThanOrEqual(3)
+        for (const s of songs) {
+          expect(seen.has(s.name), s.name).toBe(false)
+          seen.add(s.name)
+        }
+      }
     expect(new Set(SONGS.map((s) => s.name)).size).toBe(SONGS.length)
   })
   it("doesn't bring back a song it just played", () => {
     const night = songsFor(true, 'summer').map((s) => s.name)
-    const left = songsFor(true, 'summer', night.slice(0, 3)).map((s) => s.name)
-    expect(left).toEqual(night.slice(3))
+    const left = songsFor(true, 'summer', night.slice(0, 2)).map((s) => s.name)
+    expect(left).toEqual(night.slice(2))
+    // All three just played: only the oldest can come back.
+    expect(songsFor(true, 'summer', night).map((s) => s.name)).toEqual([night[0]])
   })
 })
