@@ -9,6 +9,7 @@ import { NeutralToneMapping } from 'three'
 import { RaceScene } from '../scene/RaceScene'
 import { sfx, engineRpm, stopEngine } from '../lib/sound'
 import { useLive, challenge, refreshPresence, raceChannel, endLiveRace, answer, pruneInvites, mute, unmute, setClosed, INVITE_MS, type LiveRace } from '../lib/live'
+import { displayName } from '../lib/names'
 
 type Rival = { id: string; town: string; level: number; carName: string; color: string; pi: number; online: boolean; body: Body }
 
@@ -61,7 +62,7 @@ async function fetchOnlineRivals(): Promise<Rival[]> {
     .filter((r) => r.best_car)
     .map((r) => ({
       id: r.owner_id,
-      town: r.town_name,
+      town: displayName(r.town_name, r.owner_id),
       level: r.level,
       carName: r.best_car.name,
       color: r.best_car.color,
@@ -127,6 +128,7 @@ export function RacePanel() {
       <div className="tabs">
         <button className={tab === 'quick' ? 'tab sel' : 'tab'} onClick={() => setTab('quick')}>🏁 Quick race</button>
         <button className={tab === 'gp' ? 'tab sel' : 'tab'} onClick={() => setTab('gp')}>🏆 Grand Prix</button>
+        <button className="tab" onClick={() => useGame.getState().openPanel('leaders')}>🏅 Top racers</button>
       </div>
       {tab === 'gp' ? (
         <GrandPrix onRace={(series, rival, prize) => {
@@ -457,60 +459,116 @@ function DragRace({ car, rival, onExit, live, prize, onFinish, title }: { car: O
   })
 
   const rpmAngle = -210 + Math.min(1.05, me.current.rpm) * 240
+  const close = live ? onExit : () => useGame.getState().openPanel(null)
+  // One full-screen view: the street fills the screen and the controls float over it.
   return (
-    <Panel title={title ?? `Drag Race vs ${rival.town}`} wide onClose={live ? onExit : undefined}>
-      <div className="race-layout">
-      <div className="race-3d">
-        <Canvas camera={{ position: [0.4, 2.2, -4], fov: 55, near: 0.3, far: 150 }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
-          <RaceScene track={TRACK} me={me} them={them} mine={{ body: def.body, color: car.color }} theirs={{ body: rival.body, color: rival.color }} />
-        </Canvas>
-        {countdown > 0 && <div className="countdown big">{countdown}</div>}
-        {label && <div className="shift-label big">{label}</div>}
-        {def.skill && skillShown && !result && <div className="skill-flash">{SKILLS[def.skill].icon} {SKILLS[def.skill].name}!</div>}
+    <div className="race-full">
+      <Canvas className="rf-canvas" camera={{ position: [0.4, 2.2, -4], fov: 55, near: 0.3, far: 150 }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
+        <RaceScene track={TRACK} me={me} them={them} mine={{ body: def.body, color: car.color }} theirs={{ body: rival.body, color: rival.color }} />
+      </Canvas>
+      <div className="rf-top">
+        <h2>{title ?? `Drag Race vs ${rival.town}`}</h2>
+        <button className="close" onClick={close} aria-label="Leave race">✕</button>
       </div>
-      <div className="strip mini">
+      <div className="rf-lanes">
         {[
           { name: `You · ${def.name}`, color: car.color, r: me.current },
           { name: `${rival.town} · ${rival.carName}`, color: rival.color, r: them.current },
         ].map((lane) => (
-          <div key={lane.name} className="lane">
+          <div key={lane.name} className="rf-lane">
             <span className="lane-name">{lane.name}</span>
-            <div className="lane-car" style={{ left: `calc(${Math.min(1, lane.r.dist / TRACK) * 92}% )`, background: lane.color }} />
+            <div className="lane-car" style={{ left: `${Math.min(1, lane.r.dist / TRACK) * 90}%`, background: lane.color }} />
             <div className="finish" />
           </div>
         ))}
       </div>
-      <div className="race-controls">
-        <svg viewBox="0 0 120 120" width="150" height="150" className="tach">
-          <circle cx="60" cy="60" r="56" fill="#1b1f24" stroke="#cfd8dc" strokeWidth="3" />
-          <path d={arcPath(60, 60, 46, -210 + 0.78 * 240, -210 + 0.93 * 240)} stroke="#76ff03" strokeWidth="10" fill="none" />
-          <path d={arcPath(60, 60, 46, -210 + 0.95 * 240, 30)} stroke="#ff1744" strokeWidth="10" fill="none" />
-          <line x1="60" y1="60" x2={60 + 44 * Math.cos((rpmAngle * Math.PI) / 180)} y2={60 + 44 * Math.sin((rpmAngle * Math.PI) / 180)} stroke="#ff9100" strokeWidth="4" strokeLinecap="round" />
-          <circle cx="60" cy="60" r="6" fill="#eceff1" />
-          <text x="60" y="92" textAnchor="middle" fill="#fff" fontSize="14" fontWeight="900">GEAR {me.current.gear + 1}</text>
-        </svg>
-        <div className="race-side">
-          <div className="speed">{Math.round(me.current.speed * 0.9)} km/h</div>
-          {countdown === 99 && <div className="hint">Waiting for {rival.town} to join...</div>}
-          {!result ? (
+      {countdown > 0 && countdown !== 99 && <div className="countdown big">{countdown}</div>}
+      {countdown === 99 && <div className="rf-wait">Waiting for {rival.town} to join...</div>}
+      {label && <div className="shift-label big">{label}</div>}
+      {def.skill && skillShown && !result && <div className="skill-flash">{SKILLS[def.skill].icon} {SKILLS[def.skill].name}!</div>}
+      {result ? (
+        <RaceResult won={result.won} myTime={result.myTime} theirTime={result.theirTime} cash={result.won ? payout : Math.round(payout * 0.1)} xp={result.won ? 30 : 8} rival={rival.town} onExit={onExit} />
+      ) : (
+        <div className="rf-bottom">
+          <svg viewBox="0 0 120 120" className="tach">
+            <circle cx="60" cy="60" r="56" fill="#1b1f24" fillOpacity="0.85" stroke="#cfd8dc" strokeWidth="3" />
+            <path d={arcPath(60, 60, 46, -210 + 0.78 * 240, -210 + 0.93 * 240)} stroke="#76ff03" strokeWidth="10" fill="none" />
+            <path d={arcPath(60, 60, 46, -210 + 0.95 * 240, 30)} stroke="#ff1744" strokeWidth="10" fill="none" />
+            <line x1="60" y1="60" x2={60 + 44 * Math.cos((rpmAngle * Math.PI) / 180)} y2={60 + 44 * Math.sin((rpmAngle * Math.PI) / 180)} stroke="#ff9100" strokeWidth="4" strokeLinecap="round" />
+            <circle cx="60" cy="60" r="6" fill="#eceff1" />
+            <text x="60" y="92" textAnchor="middle" fill="#fff" fontSize="14" fontWeight="900">GEAR {me.current.gear + 1}</text>
+          </svg>
+          <div className="rf-side">
+            <div className="rf-speed">{Math.round(me.current.speed * 0.9)}<small> km/h</small></div>
             <button className="big-btn shift-btn" onPointerDown={shift} disabled={countdown > 0 || me.current.gear >= 3}>
               SHIFT ▲
             </button>
-          ) : (
-            <div className={result.won ? 'result win' : 'result lose'}>
-              <h3>{result.won ? 'YOU WIN!' : 'You lost'}</h3>
-              <p>{result.myTime.toFixed(2)}s vs {Number.isFinite(result.theirTime) ? `${result.theirTime.toFixed(2)}s` : 'did not finish'}</p>
-              <p>{result.won ? `+$${payout} · +1 🏆 · +30 XP` : `+$${Math.round(payout * 0.1)} · +8 XP`}</p>
-              <button className="buy" onClick={onExit}>Back</button>
-            </div>
-          )}
+          </div>
         </div>
-      </div>
-      </div>
-    </Panel>
+      )}
+    </div>
   )
 }
 
+
+// Counts a number up from zero once it appears.
+function useCountUp(target: number, delay: number, ms = 900) {
+  const [v, setV] = useState(0)
+  useEffect(() => {
+    let raf = 0
+    const t0 = performance_now() + delay
+    const tick = () => {
+      const k = Math.min(1, Math.max(0, (performance_now() - t0) / ms))
+      setV(Math.round(target * (1 - (1 - k) ** 3)))
+      if (k < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [target, delay, ms])
+  return v
+}
+
+const CONFETTI = ['#ffd54f', '#ef5350', '#42a5f5', '#66bb6a', '#ab47bc', '#ff7043', '#ffffff']
+
+function RaceResult({ won, myTime, theirTime, cash, xp, rival, onExit }: { won: boolean; myTime: number; theirTime: number; cash: number; xp: number; rival: string; onExit: () => void }) {
+  const money = useCountUp(cash, 700)
+  const exp = useCountUp(xp, 900)
+  const margin = Number.isFinite(theirTime) ? Math.abs(theirTime - myTime) : null
+  const pieces = useMemo(() => Array.from({ length: won ? 60 : 0 }, (_, i) => ({
+    left: (i * 37) % 100,
+    delay: ((i * 53) % 100) / 60,
+    dur: 2.4 + ((i * 29) % 10) / 6,
+    color: CONFETTI[i % CONFETTI.length],
+    drift: ((i * 71) % 60) - 30,
+    round: i % 3 === 0,
+  })), [won])
+  return (
+    <div className={won ? 'rr win' : 'rr lose'}>
+      {won && <div className="rr-rays" />}
+      {pieces.map((c, i) => (
+        <i key={i} className={c.round ? 'rr-bit round' : 'rr-bit'} style={{ left: `${c.left}%`, background: c.color, animationDelay: `${c.delay}s`, animationDuration: `${c.dur}s`, ['--drift' as string]: `${c.drift}vw` }} />
+      ))}
+      <div className="rr-card">
+        <div className="rr-icon">{won ? '🏆' : '🏁'}</div>
+        <h3 className="rr-title">{won ? 'YOU WIN!' : 'SO CLOSE!'}</h3>
+        <p className="rr-sub">
+          {won ? `You beat ${rival}` : `${rival} took it`}
+          {margin !== null ? ` by ${margin.toFixed(2)}s` : ''}
+        </p>
+        <div className="rr-times">
+          <span className={won ? 'best' : ''}><small>You</small>{myTime.toFixed(2)}s</span>
+          <span className={won ? '' : 'best'}><small>{rival}</small>{Number.isFinite(theirTime) ? `${theirTime.toFixed(2)}s` : 'DNF'}</span>
+        </div>
+        <div className="rr-loot">
+          <span style={{ animationDelay: '.6s' }}>💵 +${money.toLocaleString()}</span>
+          {won && <span style={{ animationDelay: '.8s' }}>🏆 +1</span>}
+          <span style={{ animationDelay: won ? '1s' : '.8s' }}>⭐ +{exp} XP</span>
+        </div>
+        <button className="buy rr-go" onClick={onExit}>{won ? 'Collect' : 'Back'}</button>
+      </div>
+    </div>
+  )
+}
 
 function arcPath(cx: number, cy: number, r: number, a0: number, a1: number) {
   const p = (a: number) => [cx + r * Math.cos((a * Math.PI) / 180), cy + r * Math.sin((a * Math.PI) / 180)]
@@ -526,7 +584,7 @@ export function LiveRaceOverlay() {
   const best = useMemo(() => [...cars].sort((a, b) => pi(b) - pi(a))[0], [cars])
   if (!race || !best) return null
   const o = race.opponent
-  const rival: Rival = { id: `live:${o.id}`, town: o.town, level: o.level, carName: o.carName, color: o.color, pi: o.pi, online: true, body: o.body }
+  const rival: Rival = { id: `live:${o.id}`, town: displayName(o.town, o.id), level: o.level, carName: o.carName, color: o.color, pi: o.pi, online: true, body: o.body }
   return <DragRace key={race.raceId} car={best} rival={rival} live={race} onExit={endLiveRace} />
 }
 

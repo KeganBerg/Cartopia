@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useGame, hasRusty } from '../game/store'
-import { BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, PAINTS, STRIPES, PAINT_COST, STRIPE_COST, carDef, performance, upgradeCost, type BuildingDef } from '../game/data'
+import { garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, PAINTS, STRIPES, PAINT_COST, STRIPE_COST, carDef, performance, upgradeCost, type BuildingDef } from '../game/data'
 import { CarPreview } from '../scene/CarPreview'
 import { CollectAllButton } from './CollectAll'
-import { rotatePlacement } from '../game/placement'
-import { preloadBuildings, BuildingThumb, CarThumb } from '../scene/BuildingPreview'
+import { rotateCurrent } from '../game/placement'
+import { BuildingThumb, CarThumb } from '../scene/BuildingPreview'
+
+// Phones and tablets: no hover, so placing takes a preview tap first.
+const TOUCH = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
 
 export function BottomBar() {
   const openPanel = useGame((s) => s.openPanel)
@@ -16,7 +19,6 @@ export function BottomBar() {
   return (
     <>
       <div className="bottom-bar">
-        <button className="big-btn menu-btn" onClick={() => openPanel('account')}><span>CARTOPIA</span>MENU</button>
         <button className="icon-btn" onClick={() => openPanel('shop')}><span className="i">🏪</span>SHOP</button>
         <button className="icon-btn" onClick={() => openPanel('showroom')}><span className="i">🚘</span>SHOWROOM</button>
         <button className="icon-btn" onClick={() => openPanel('garage')}><span className="i">🔧</span>GARAGE</button>
@@ -32,21 +34,27 @@ export function BottomBar() {
 function EditBar() {
   const mode = useGame((s) => s.mode)
   const placing = useGame((s) => s.placing)
+  const selected = useGame((s) => s.selected)
+  const again = useGame((s) => s.again)
   const setMode = useGame((s) => s.setMode)
   const openPanel = useGame((s) => s.openPanel)
   const hint =
     mode === 'expand' ? 'Tap a For Sale sign to buy the land next to your town'
     : mode === 'road' ? 'Click or drag to lay road (10 coins per tile)'
     : mode === 'bulldoze' ? 'Click or drag to remove (buildings refund half)'
-    : `Click to place ${placing ? BUILDINGS.find((b) => b.id === placing)?.name : ''}. Rotate turns it.`
+    : mode === 'move' && again && selected ? 'Built! Rotate or drag it to adjust it'
+    : mode === 'move' ? (selected ? 'Drag it to move it, or Rotate to turn it' : 'Drag a building to move it, or tap one to rotate it')
+    : `${TOUCH ? 'Tap a spot to preview' : 'Click to place'} ${placing ? BUILDINGS.find((b) => b.id === placing)?.name : ''}${TOUCH ? ', tap it again to build' : ''}. Rotate turns it.`
   return (
     <div className="edit-bar">
       <div className="edit-hint">{hint}</div>
       <div className="edit-tools">
         <button className={mode === 'road' ? 'tool active' : 'tool'} onClick={() => setMode('road')}>🛣️ Road</button>
         <button className={mode === 'bulldoze' ? 'tool active' : 'tool'} onClick={() => setMode('bulldoze')}>🚜 Bulldoze</button>
+        <button className={mode === 'move' ? 'tool active' : 'tool'} onClick={() => setMode('move')}>✋ Move</button>
         <button className={mode === 'expand' ? 'tool active' : 'tool'} onClick={() => setMode('expand')}>🗺 Land</button>
-        {mode === 'place' && placing && <button className="tool" onClick={rotatePlacement} title="Rotate (R)">🔄 Rotate</button>}
+        {((mode === 'place' && placing) || (mode === 'move' && selected)) && <button className="tool" onClick={rotateCurrent} title="Rotate (R)">🔄 Rotate</button>}
+        {mode === 'move' && again && <button className="tool" onClick={() => setMode('place', again)}>➕ Build another</button>}
         <button className="tool" onClick={() => openPanel('shop')}>🏪 Shop</button>
         <button className="tool done" onClick={() => setMode('play')}>✔ Done</button>
       </div>
@@ -95,8 +103,8 @@ function price(def: { price: number; bucks?: number }) {
 
 const SHOP_GROUPS: { title: string; filter: (b: BuildingDef) => boolean }[] = [
   { title: 'Cars and parts makers', filter: (b) => b.id === 'rescue' || b.kind === 'parts' },
-  { title: 'Businesses', filter: (b) => b.kind === 'business' && b.id !== 'rescue' },
-  { title: 'Services', filter: (b) => b.kind === 'gas' },
+  { title: 'Businesses', filter: (b) => b.kind === 'business' && b.id !== 'rescue' && b.id !== 'crew' },
+  { title: 'Services and clubs', filter: (b) => b.kind === 'gas' || b.id === 'crew' },
   { title: 'Homes and decor', filter: (b) => b.kind === 'house' || b.kind === 'decor' },
 ]
 
@@ -109,7 +117,6 @@ export function ShopPanel() {
   const focus = useGame((s) => s.shopFocus)
   const focusRef = useRef<HTMLButtonElement>(null)
   const rusty = hasRusty({ buildings })
-  useEffect(preloadBuildings, [])
   // A "Build" hint elsewhere opened the Shop: bring that building into view.
   useEffect(() => {
     focusRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
@@ -143,6 +150,7 @@ export function ShopPanel() {
                     </div>
                   )}
                   {b.id === 'rescue' && <div className="card-stat">Search for old cars and restore them</div>}
+                  {b.id === 'crew' && <div className="card-stat">Your crew's clubhouse: roster, rank and crew boards</div>}
                   {b.fuelCap && <div className="card-stat">+{b.fuelCap} max fuel</div>}
                   {owned ? <span className="price">✔ Built</span> : locked ? <span className="price">🔒 Level {b.unlockLevel}</span> : price(b)}
                 </button>
@@ -220,7 +228,7 @@ export function GaragePanel() {
   const car = cars.find((c) => c.uid === selected) ?? cars[0]
   const def = car && carDef(car.model)
   return (
-    <Panel title={`My Garage · ${cars.length} cars`} wide>
+    <Panel title={`My Garage · ${cars.length} cars · ⚡${garagePower(cars)}`} wide>
       <div className="garage">
         <div className="garage-list">
           {cars.map((c) => {

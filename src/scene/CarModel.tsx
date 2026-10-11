@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Color, DoubleSide, ExtrudeGeometry, Shape as ThreeShape } from 'three'
+import { Color, DoubleSide, ExtrudeGeometry, Shape as ThreeShape, type Group } from 'three'
 import { RoundedBox } from '@react-three/drei'
 import { rimTex } from './textures'
 import { glowMats } from './dayNight'
@@ -97,6 +97,12 @@ function extrude(sh: ThreeShape, width: number, b: number) {
   return g
 }
 
+// Footprint of a body (before any scaling), for keeping town cars apart.
+export const carSize = (body: Body) => ({ len: SHAPES[body].len, wid: SHAPES[body].wid })
+
+// Wheel radius and the distance between front and rear axles, for steering and rolling.
+export const wheelRig = (body: Body): WheelRig => ({ steer: [], spin: [], radius: SHAPES[body].wheel, base: SHAPES[body].len * 0.66 })
+
 const geoCache = new Map<Body, { body: ExtrudeGeometry; glass: ExtrudeGeometry | null; roof: ExtrudeGeometry | null; hood: number; deck: number; roofY: number; roofLen: number; roofZ: number }>()
 
 function carGeo(body: Body) {
@@ -133,7 +139,10 @@ function carGeo(body: Body) {
 }
 
 // Toy-style car: bevelled extruded body and cabin so no edge is a hard box corner. Faces +z.
-export function CarModel({ body, color, highlight, stripe, beams, rusty }: { body: Body; color: string; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean }) {
+// Handles on a car's wheels so a driving car can steer the front pair and roll all four.
+export type WheelRig = { steer: (Group | null)[]; spin: (Group | null)[]; radius: number; base: number }
+
+export function CarModel({ body, color, highlight, stripe, beams, rusty, rig }: { body: Body; color: string; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean; rig?: WheelRig }) {
   const s = SHAPES[body]
   const g = carGeo(body)
   // Rusty finds keep a hint of their paint under brown, matte rust.
@@ -290,17 +299,57 @@ export function CarModel({ body, color, highlight, stripe, beams, rusty }: { bod
           <meshStandardMaterial color="#cfd8dc" metalness={0.7} roughness={0.25} />
         </RoundedBox>
       ))}
-      {/* Lights. */}
+      {/* Front: headlights either side of a grille (or a low intake on sleek cars), and a number plate. */}
+      {(() => {
+        const z = s.len / 2 + 0.004
+        const roundLamps = s.round || body === 'classic' || body === 'offroad' || body === 'compact' || body === 'truck'
+        const bigGrille = body === 'muscle' || body === 'truck' || body === 'classic' || body === 'wagon'
+        const sleek = body === 'super' || body === 'wedge' || body === 'bubble'
+        return (
+          <group>
+            {[-1, 1].map((sd) => (
+              <group key={sd} position={[sd * s.wid * 0.3, lightY, z]}>
+                {roundLamps ? (
+                  <mesh><circleGeometry args={[0.045, 16]} /><meshBasicMaterial color="#fffde7" /></mesh>
+                ) : (
+                  <mesh rotation-z={sd * 0.12}><planeGeometry args={[0.14, 0.04]} /><meshBasicMaterial color="#fffde7" /></mesh>
+                )}
+              </group>
+            ))}
+            {!sleek && (
+              <RoundedBox args={[s.wid * (bigGrille ? 0.42 : 0.3), bigGrille ? 0.07 : 0.045, 0.01]} radius={0.004} smoothness={1} position={[0, lightY - 0.005, z]}>
+                <meshStandardMaterial color={bigGrille ? '#b0bec5' : '#1c1c1c'} metalness={bigGrille ? 0.7 : 0.2} roughness={0.4} />
+              </RoundedBox>
+            )}
+            {sleek && body !== 'bubble' && (
+              <mesh position={[0, s.lift + 0.12, z]}><planeGeometry args={[s.wid * 0.6, 0.035]} /><meshBasicMaterial color="#141414" /></mesh>
+            )}
+            <mesh position={[0, s.lift + 0.12, s.len / 2 + 0.035]}><planeGeometry args={[0.11, 0.04]} /><meshBasicMaterial color="#fafafa" /></mesh>
+          </group>
+        )
+      })()}
+      {/* Rear: wide tail lights and a number plate. */}
       {[-1, 1].map((sd) => (
-        <group key={sd}>
-          <mesh position={[sd * s.wid * 0.3, lightY, s.len / 2 + 0.003]}>
-            <circleGeometry args={[0.045, 14]} />
-            <meshBasicMaterial color="#fffde7" />
+        <mesh key={`t${sd}`} position={[sd * s.wid * 0.3, s.lift + (top - s.lift) * 0.68, -s.len / 2 - 0.004]} rotation-y={Math.PI}>
+          <planeGeometry args={[0.15, 0.045]} />
+          <meshBasicMaterial color="#ff1744" />
+        </mesh>
+      ))}
+      <mesh position={[0, s.lift + 0.13, -s.len / 2 - 0.035]} rotation-y={Math.PI}><planeGeometry args={[0.11, 0.045]} /><meshBasicMaterial color="#fafafa" /></mesh>
+      {/* Door seams, handles and mirrors on closed cars. */}
+      {!s.open && !s.round && [-1, 1].map((sd) => (
+        <group key={`d${sd}`}>
+          <mesh position={[sd * (s.wid / 2 + 0.003), (s.lift + 0.07 + top) / 2, s.cabinZ + s.cabinLen * 0.08]} rotation-y={sd * Math.PI / 2}>
+            <planeGeometry args={[0.008, top - s.lift - 0.11]} />
+            <meshBasicMaterial color={dark} />
           </mesh>
-          <mesh position={[sd * s.wid * 0.32, s.lift + s.body * 0.6, -s.len / 2 - 0.002]} rotation-y={Math.PI}>
-            <planeGeometry args={[0.13, 0.06]} />
-            <meshBasicMaterial color="#ff1744" />
+          <mesh position={[sd * (s.wid / 2 + 0.004), top - 0.05, s.cabinZ + s.cabinLen * 0.08 - 0.06]} rotation-y={sd * Math.PI / 2}>
+            <planeGeometry args={[0.05, 0.012]} />
+            <meshBasicMaterial color="#cfd8dc" />
           </mesh>
+          <RoundedBox args={[0.06, 0.04, 0.03]} radius={0.012} smoothness={1} position={[sd * (s.wid * 0.4 + 0.03), top + 0.05, cowl - 0.04]}>
+            {paint}
+          </RoundedBox>
         </group>
       ))}
       {/* Headlight beams on the road, visible after dark. */}
@@ -312,7 +361,8 @@ export function CarModel({ body, color, highlight, stripe, beams, rusty }: { bod
       )}
       {/* Chunky toy wheels with spoked rims. */}
       {[[-wx, wz], [wx, wz], [-wx, -wz], [wx, -wz]].map(([x, z], i) => (
-        <group key={i} position={[x, s.wheel, z]}>
+        <group key={i} position={[x, s.wheel, z]} ref={rig && i < 2 ? (g) => void (rig.steer[i] = g) : undefined}>
+          <group ref={rig ? (g) => void (rig.spin[i] = g) : undefined}>
           <mesh rotation-z={Math.PI / 2} castShadow>
             <cylinderGeometry args={[s.wheel, s.wheel, 0.14, 16]} />
             <meshStandardMaterial color="#1a1a1a" roughness={0.9} />
@@ -321,6 +371,7 @@ export function CarModel({ body, color, highlight, stripe, beams, rusty }: { bod
             <circleGeometry args={[s.wheel * 0.92, 16]} />
             <meshStandardMaterial map={rimTex()} metalness={0.5} roughness={0.3} side={DoubleSide} />
           </mesh>
+          </group>
         </group>
       ))}
     </group>
