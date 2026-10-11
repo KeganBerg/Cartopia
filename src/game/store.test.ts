@@ -151,3 +151,19 @@ describe('story goals', () => {
     expect(goalDone(useGame.getState(), club)).toBe(true)
   })
 })
+
+describe('collection sets', () => {
+  const g = () => useGame.getState()
+  const car = (model: string) => ({ uid: model, model, color: '#fff', upgrades: { engine: 0, turbo: 0, tires: 0, weight: 0 } })
+
+  it('pays a full set once and ignores an incomplete one', () => {
+    useGame.setState({ level: 20, xp: 0, coins: 0, bucks: 0, trophies: 0, claimedSets: [], levelUp: null, cars: ['pip', 'civic', 'trail', 'miata'].map(car) })
+    g().claimSet('bikes')
+    expect(g().coins).toBe(0)
+    g().claimSet('daily')
+    expect(g().claimedSets).toEqual(['daily'])
+    expect([g().coins, g().bucks, g().trophies, g().xp]).toEqual([1500, 2, 5, 60])
+    g().claimSet('daily')
+    expect(g().coins).toBe(1500)
+  })
+})
