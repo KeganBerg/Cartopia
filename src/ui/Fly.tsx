@@ -6,7 +6,7 @@ import { anchorEls } from '../scene/anchors'
 // Plain DOM driven by the Web Animations API: nothing re-renders while they fly.
 
 type Res = 'coins' | 'parts' | 'xp' | 'bucks'
-const TARGET: Record<Res, string> = { coins: '.coin-ico', parts: '.parts-ico', xp: '.speedo', bucks: '.buck-ico' }
+const TARGET: Record<Res, string> = { coins: '[data-fly=coins]', parts: '[data-fly=parts]', xp: '.speedo', bucks: '[data-fly=bucks]' }
 const FACE: Record<Res, string> = { coins: '$', parts: '⚙', xp: '★', bucks: 'B' }
 // When the coins land, so counters can wait for them before rolling up.
 export const FLIGHT_MS = 900

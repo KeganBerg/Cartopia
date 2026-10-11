@@ -24,9 +24,12 @@ import { VenueScenery, VenueBackdrop, ROAD, WALK } from './RaceVenues'
 import type { Venue } from './venues'
 import { RaceWeather, raceWeather } from './Weather'
 import { gloomOf, weatherLook, wetRoad } from './weatherLook'
+import type { Weather as WeatherState } from '../game/weather'
 
 export type RacerView = { dist: number }
 const SCALE = 0.25 // metres of race distance per world unit
+// How far past the finish line a car can roll while it brakes (the street runs on a little further).
+const RUN_OUT = 90
 const LANE = 0.75
 
 type Props = {
@@ -37,6 +40,7 @@ type Props = {
   theirs: { body: Body; model?: string; color: string; mods?: string[] }
   venue: Venue
   weatherSeed?: string // a live race's id, so both racers get the same weather
+  weather?: WeatherState // the race's weather, already rolled (wins over weatherSeed)
 }
 
 export function SkyDome({ tint = '#ffffff' }: { tint?: string }) {
@@ -402,7 +406,7 @@ function StreetDressing({ len, city }: { len: number; city: boolean }) {
 
 // The drag strip, seen from a chase camera. On Main Street it's lined with the
 // player's own town; the other venues bring their own scenery.
-export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed }: Props) {
+export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, weather: given }: Props) {
   const city = venue.id === 'main'
   const meRef = useRef<Group>(null)
   const themRef = useRef<Group>(null)
@@ -411,7 +415,8 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed }:
   const slots = useStreet(len)
   const night = useMemo(() => nightAmount(dayPhase()), [])
   // The venue's weather for this race (see raceWeather).
-  const weather = useMemo(() => raceWeather(venue.id, weatherSeed), [venue.id, weatherSeed])
+  // The race screen passes the one it races on, so the grip matches the sky.
+  const weather = useMemo(() => given ?? raceWeather(venue.id, weatherSeed), [given, venue.id, weatherSeed])
   const beams = night > 0.3 || gloomOf(weather) > 0.5
   // Same lights and colour grade as the town at this time of day.
   const look = useMemo(() => weatherLook(lookFor(night, duskAmount(dayPhase())), weather), [night, weather])
@@ -440,18 +445,33 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed }:
     cam.updateProjectionMatrix()
   }, [camera, size])
 
-  useFrame(({ scene }) => {
+  // Past the line each car keeps rolling and brakes to a stop, instead of freezing on it.
+  const runs = useRef([{ z: 0, v: 0, last: 0 }, { z: 0, v: 0, last: 0 }])
+  useFrame(({ scene }, delta) => {
     scene.environmentIntensity = look.env
-    const mz = (me.current?.dist ?? 0) * SCALE
-    const tz = (them.current?.dist ?? 0) * SCALE
+    const dt = Math.min(delta, 0.1)
+    const [mz, tz] = [me.current?.dist ?? 0, them.current?.dist ?? 0].map((d, i) => {
+      const r = runs.current[i]
+      if (d < track) {
+        // Speed as the race draws it, so live rivals (who only send positions) roll on too.
+        if (dt > 0) r.v += ((d - r.last) / dt - r.v) * Math.min(1, dt * 8)
+        r.z = d
+      } else {
+        if (r.z < track) r.z = track
+        r.v = Math.max(0, r.v - (6 + r.v * 0.35) * dt)
+        r.z = Math.min(track + RUN_OUT, r.z + r.v * dt)
+      }
+      r.last = d
+      return r.z * SCALE
+    })
     meRef.current?.position.set(LANE, 0, mz)
     themRef.current?.position.set(-LANE, 0, tz)
     const lead = Math.max(mz, tz)
-    const target = Math.min(mz, len)
+    const target = Math.min(mz, len + RUN_OUT * SCALE)
     // Tall phone screens get a higher, further-back chase view.
     const tall = size.height > size.width
     camera.position.lerp({ x: tall ? 0 : LANE * 0.5, y: tall ? 2.7 : 2.2, z: target - (tall ? 5.2 : 4.2) } as never, 0.15)
-    camera.lookAt(tall ? 0 : LANE * 0.3, 0.3, Math.min(target + 3 + (lead - target) * 0.3, len + 4))
+    camera.lookAt(tall ? 0 : LANE * 0.3, 0.3, Math.min(target + 3 + (lead - target) * 0.3, len + RUN_OUT * SCALE + 4))
   })
 
   return (

@@ -12,7 +12,10 @@ import { ModShop, withMod } from './Mods'
 import { CollectionBook, useFindCar } from './Collection'
 import { PaintShop, jobOf } from './Paint'
 import type { PaintJob } from '../game/data'
+import { Icon } from './Icon'
 import { useCrewGoal } from './CrewGoal'
+import { useRivalWaiting } from './Rivals'
+import { ShowcaseToggle } from './Meet'
 
 // Phones and tablets: no hover, so placing takes a preview tap first.
 const TOUCH = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
@@ -24,17 +27,18 @@ export function BottomBar() {
   const visiting = useGame((s) => !!s.visiting)
   const setsReady = useGame((s) => readySets(s).length)
   const crewChests = useCrewGoal((g) => g.ready)
+  const rival = useRivalWaiting()
   if (visiting) return null
   if (mode !== 'play') return <EditBar />
   return (
     <>
       <div className="bottom-bar">
-        <button className="icon-btn" onClick={() => openPanel('shop')}><span className="i">🏪</span>SHOP</button>
-        <button className="icon-btn" onClick={() => openPanel('showroom')}><span className="i">🚘{setsReady > 0 && <span className="btn-dot">{setsReady}</span>}</span>SHOWROOM</button>
-        <button className="icon-btn" onClick={() => openPanel('garage')}><span className="i">🔧</span>GARAGE</button>
-        <button className="icon-btn" onClick={() => openPanel('friends')}><span className="i">👫{crewChests > 0 && <span className="btn-dot">{crewChests}</span>}</span>FRIENDS</button>
-        <button className="icon-btn" onClick={() => setMode('road')}><span className="i">🚧</span>EDIT</button>
-        <button className="big-btn race-btn" onClick={() => openPanel('race')}><span className="i">🏆</span>RACE</button>
+        <button className="icon-btn" onClick={() => openPanel('shop')}><span className="i i-shop"><Icon name="shop" /></span>SHOP</button>
+        <button className="icon-btn" onClick={() => openPanel('showroom')}><span className="i i-showroom"><Icon name="car" />{setsReady > 0 && <span className="btn-dot">{setsReady}</span>}</span>SHOWROOM</button>
+        <button className="icon-btn" onClick={() => openPanel('garage')}><span className="i i-garage"><Icon name="wrench" /></span>GARAGE</button>
+        <button className="icon-btn" onClick={() => openPanel('friends')}><span className="i i-friends"><Icon name="friends" />{crewChests > 0 && <span className="btn-dot">{crewChests}</span>}</span>FRIENDS</button>
+        <button className="icon-btn" onClick={() => setMode('road')}><span className="i i-edit"><Icon name="cone" /></span>EDIT</button>
+        <button className="big-btn race-btn" onClick={() => openPanel('race')}><span className="i"><Icon name="flag" />{rival && <span className="btn-dot" title="Your rival is in town">!</span>}</span>RACE</button>
       </div>
       <CollectAllButton />
     </>
@@ -66,16 +70,16 @@ function EditBar() {
     <div className="edit-bar">
       <div className="edit-hint">{hint}</div>
       <div className="edit-tools">
-        <button className={mode === 'road' ? 'tool active' : 'tool'} onClick={() => setMode('road')}>🛣️ Road</button>
-        <button className={mode === 'bulldoze' ? 'tool active' : 'tool'} onClick={() => setMode('bulldoze')}>🚜 Bulldoze</button>
-        <button className={mode === 'move' ? 'tool active' : 'tool'} onClick={() => setMode('move')}>✋ Move</button>
-        <button className={mode === 'expand' ? 'tool active' : 'tool'} onClick={() => setMode('expand')}>🗺 Land</button>
-        <button className={mode === 'merge' ? 'tool active' : 'tool'} onClick={() => setMode('merge')}>🧩 Merge</button>
-        {((mode === 'place' && placing) || (mode === 'move' && selected)) && <button className="tool" onClick={rotateCurrent} title="Rotate (R)">🔄 Rotate</button>}
-        {mode === 'move' && selected && canUpgrade && <button className="tool" onClick={() => openUpgrade(selected)}>⬆ Upgrade</button>}
-        {mode === 'move' && again && <button className="tool" onClick={() => setMode('place', again)}>➕ Build another</button>}
-        <button className="tool" onClick={() => openPanel('shop')}>🏪 Shop</button>
-        <button className="tool done" onClick={() => setMode('play')}>✔ Done</button>
+        <button className={mode === 'road' ? 'tool active' : 'tool'} onClick={() => setMode('road')}><Icon name="road" size={18} />Road</button>
+        <button className={mode === 'bulldoze' ? 'tool active' : 'tool'} onClick={() => setMode('bulldoze')}><Icon name="bulldoze" size={18} />Bulldoze</button>
+        <button className={mode === 'move' ? 'tool active' : 'tool'} onClick={() => setMode('move')}><Icon name="move" size={18} />Move</button>
+        <button className={mode === 'expand' ? 'tool active' : 'tool'} onClick={() => setMode('expand')}><Icon name="land" size={18} />Land</button>
+        <button className={mode === 'merge' ? 'tool active' : 'tool'} onClick={() => setMode('merge')}><Icon name="merge" size={18} />Merge</button>
+        {((mode === 'place' && placing) || (mode === 'move' && selected)) && <button className="tool" onClick={rotateCurrent} title="Rotate (R)"><Icon name="rotate" size={18} />Rotate</button>}
+        {mode === 'move' && selected && canUpgrade && <button className="tool" onClick={() => openUpgrade(selected)}><Icon name="up" size={18} />Upgrade</button>}
+        {mode === 'move' && again && <button className="tool" onClick={() => setMode('place', again)}><Icon name="plus" size={18} />Build another</button>}
+        <button className="tool" onClick={() => openPanel('shop')}><Icon name="shop" size={18} />Shop</button>
+        <button className="tool done" onClick={() => setMode('play')}><Icon name="check" size={18} />Done</button>
       </div>
     </div>
   )
@@ -100,7 +104,7 @@ export function Panel({ title, children, wide, onClose }: { title: string; child
       <div className={wide ? 'panel wide' : 'panel'} onClick={(e) => e.stopPropagation()}>
         <div className="panel-head">
           <h2>{title}</h2>
-          <button className="close" onClick={() => close(null)}>✕</button>
+          <button className="close" aria-label="Close" onClick={() => close(null)}><Icon name="close" size={16} /></button>
         </div>
         <div className="panel-body">{children}</div>
       </div>
@@ -185,7 +189,7 @@ export function ShopPanel() {
     return () => cancelAnimationFrame(raf)
   }, [focus])
   const ev = activeEvent()
-  const tabs: { id: ShopTab; label: React.ReactNode }[] = [...SHOP_GROUPS.filter((g) => g.id !== 'event' || ev), ...(canUpgrade ? [{ id: 'upgrades' as const, label: '⬆ Upgrades' }] : [])]
+  const tabs: { id: ShopTab; label: React.ReactNode }[] = [...SHOP_GROUPS.filter((g) => g.id !== 'event' || ev), ...(canUpgrade ? [{ id: 'upgrades' as const, label: '<Icon name="up" size={18} />Upgrades' }] : [])]
   const group = SHOP_GROUPS.find((g) => g.id === tab)
   return (
     <Panel title="Shop" wide>
@@ -398,7 +402,7 @@ export function GaragePanel() {
               </div>
             )}
             <h3>{def.name}{car.plate && <span className="mini-plate">{car.plate}</span>}</h3>
-            <div className="pi">Performance Index <b>{performance(def, car.upgrades, car.mods)}</b></div>
+            <div className="pi">Performance Index <b>{performance(def, car.upgrades, car.mods)}</b> <ShowcaseToggle car={car.uid} /></div>
             {def.skill && <div className="skill-row"><SkillTag model={car.model} /> <small>{SKILLS[def.skill].text}</small></div>}
             <DriverRow car={car.uid} model={car.model} />
             <div className="garage-tabs" role="tablist">

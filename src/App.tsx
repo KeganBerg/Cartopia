@@ -10,6 +10,7 @@ import { RacePanel, LiveRaceOverlay, InvitesPanel, PrizePopup, CampaignPrizePopu
 import { joinLobby, useLive } from './lib/live'
 import { FriendsPanel, VisitBanner } from './ui/Friends'
 import { LeadersPanel, ClanPanel } from './ui/Social'
+import { MeetPanel } from './ui/Meet'
 import { Tutorial } from './ui/Tutorial'
 import { Badges } from './ui/Badges'
 import { ThoughtBubble } from './ui/Thought'
@@ -23,6 +24,7 @@ import { AccountPanel } from './ui/Account'
 import { AlertsCard } from './ui/Alerts'
 import { WelcomeBack } from './ui/WelcomeBack'
 import { GiftWatcher, GiftsPanel } from './ui/Gifts'
+import { GhostRacePanel, TauntWatcher, TauntsPanel } from './ui/GhostRace'
 import { GoalsPanel, DailyPanel, FlatPanel } from './ui/Goals'
 import { SeasonPanel } from './ui/Season'
 import { useGame, today } from './game/store'
@@ -31,6 +33,9 @@ import './lib/rescue'
 import { startAmbience } from './lib/ambience'
 import { useTownPaused } from './scene/renderGate'
 import { useCrewGoalWatcher } from './ui/CrewGoal'
+import { VisitorBadges, StreetRaceCard } from './ui/Visitors'
+import { visitorTick, forceVisitor } from './lib/visitors'
+import type { VisitorKind } from './game/data'
 
 // Phones get a lighter renderer: lower pixel ratio keeps iOS from dropping the WebGL context.
 const SMALL = typeof window !== 'undefined' && Math.min(window.innerWidth, window.innerHeight) < 700
@@ -49,7 +54,13 @@ export default function App() {
     tick(Date.now())
     // Checked again when it fires: a cloud save may have loaded since, already claimed today.
     setTimeout(() => { const s = useGame.getState(); if (s.lastDaily !== today() && !s.panel) s.openPanel('daily') }, 800)
-    const id = setInterval(() => tick(Date.now()), 1000)
+    // ?visitor=racer|tourist|mystery|barn brings a guest's visitor right away (for testing).
+    const forced = new URLSearchParams(location.search).get('visitor') as VisitorKind | null
+    if (forced) setTimeout(() => forceVisitor(forced), 2500)
+    const id = setInterval(() => {
+      tick(Date.now())
+      visitorTick()
+    }, 1000)
     return () => clearInterval(id)
   }, [tick])
 
@@ -66,6 +77,7 @@ export default function App() {
         <World />
       </Canvas>
       <Badges />
+      <VisitorBadges />
       <ThoughtBubble />
       <ThumbRenderer />
       <Hud />
@@ -79,6 +91,7 @@ export default function App() {
       {panel === 'friends' && <FriendsPanel />}
       {panel === 'leaders' && <LeadersPanel />}
       {panel === 'clan' && <ClanPanel />}
+      {panel === 'meet' && <MeetPanel />}
       {panel === 'need' && <NeedPanel />}
       {panel === 'upgrade' && <UpgradePanel />}
       {panel === 'rescue' && <RescuePanel />}
@@ -95,6 +108,10 @@ export default function App() {
       <WelcomeBack />
       <GiftWatcher />
       {panel === 'gifts' && <GiftsPanel />}
+      <StreetRaceCard />
+      <TauntWatcher />
+      {panel === 'taunts' && <TauntsPanel />}
+      {panel === 'ghost' && <GhostRacePanel />}
       <PrizePopup />
       <CampaignPrizePopup />
       <LevelUpSplash />

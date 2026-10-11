@@ -3,6 +3,7 @@ import {
   upgradeFuelCap, upgradeJobSeconds, FAVORITE_BONUS, DEAL_SLOTS, dealSave, QUEST_PAY, CREW_CHEST, TASKS_PER_PERIOD, upgradePartsPayout, upgradePayout, upgradeXp, type BuildingDef,
   SEASON_START, SEASON_DAYS, STARS_PER_TIER, SEASON_STARS, SEASON_TIERS, SEASON_CAR_BUCKS, seasonCars,
 } from './data'
+import { RIVALS } from './rivals'
 
 const LEVELS = Array.from({ length: MAX_BUILDING_LEVEL }, (_, i) => i + 1)
 const cents = (n: number) => Math.round(n * 100) / 100
@@ -76,6 +77,8 @@ export function econCatalog() {
   }
   // Crew chests: paid once per chest the server recorded in public.crew_chests.
   const crew = { chest: CREW_CHEST }
+  // Town rivals: each pays its one-time bonus when first beaten three times, from its unlock level.
+  const rivals = Object.fromEntries(RIVALS.map((r) => [r.id, { unlock: r.unlockLevel, coins: r.coins, bucks: r.bucks, trophies: r.trophies }]))
   // A driver adds at most this share to a business's coins (see driverPayout).
-  return { cars, buildings, goals, gp, rescue, upgradeXpTo, mods, driverBonus: FAVORITE_BONUS, campaign, sets, quests, season, deals, crew }
+  return { cars, buildings, goals, gp, rescue, upgradeXpTo, mods, driverBonus: FAVORITE_BONUS, campaign, sets, quests, season, deals, crew, rivals }
 }

@@ -1,3 +1,4 @@
+import { Icon } from './Icon'
 import { useGame, currentSeason, tierReady, seasonClaimable } from '../game/store'
 import { SEASON_TIERS, STARS_PER_TIER, SEASON_CAR_BUCKS, seasonOf, seasonEndsAt, carDef, type SeasonPrize } from '../game/data'
 import { Panel } from './Menus'
@@ -8,7 +9,7 @@ export function SeasonButton() {
   const ready = useGame(seasonClaimable)
   return (
     <button className="goals-btn" onClick={() => useGame.getState().openPanel('season')} title="Season">
-      ⭐{ready > 0 && <span className="goal-badge">{ready}</span>}
+      <Icon name="star" />{ready > 0 && <span className="goal-badge">{ready}</span>}
     </button>
   )
 }
