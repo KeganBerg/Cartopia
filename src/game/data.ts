@@ -29,6 +29,8 @@ export type BuildingDef = {
   // Only one per town.
   unique?: boolean
   prop?: 'donut' | 'burger' | 'cone' | 'tire' | 'pin' | 'popcorn'
+  // Stand-in for a building this build doesn't know (see buildingDef).
+  parked?: boolean
 }
 
 export const BUILDINGS: BuildingDef[] = [
@@ -76,7 +78,21 @@ export const PLOT_MAX = 4
 export const START_LAND = [0, 1, 2].flatMap((x) => [0, 1, 2].map((z) => `${x},${z}`))
 export const plotPrice = (bought: number) => Math.round((5000 * Math.pow(1.45, bought)) / 500) * 500
 
-export const buildingDef = (id: string) => BUILDINGS.find((b) => b.id === id)!
+// A save can hold a building this build doesn't know yet, e.g. one placed on a
+// preview site of an unmerged feature (both share the same cloud saves). It gets
+// a harmless stand-in: no jobs, no fuel, can't be sold, drawn as a covered lot.
+// The save keeps the real id, so it comes back once that building ships.
+const parkedDefs = new Map<string, BuildingDef>()
+function parkedDef(id: string): BuildingDef {
+  let d = parkedDefs.get(id)
+  if (!d) {
+    d = { id, name: 'Coming Soon', kind: 'decor', w: 1, h: 1, price: 0, unlockLevel: 99, color: '#ffb300', roof: '#455a64', parked: true }
+    parkedDefs.set(id, d)
+  }
+  return d
+}
+export const knownBuilding = (id: string) => BUILDINGS.some((b) => b.id === id)
+export const buildingDef = (id: string): BuildingDef => BUILDINGS.find((b) => b.id === id) ?? parkedDef(id)
 
 export type Body = 'compact' | 'sedan' | 'sports' | 'muscle' | 'truck' | 'super' | 'bubble' | 'wagon' | 'wedge' | 'roadster' | 'rally' | 'classic' | 'offroad' | 'coupe'
 
@@ -105,6 +121,8 @@ export type CarDef = {
   grip: number
   weight: number
   colors: string[]
+  // Stand-in for a car this build doesn't know (see carDef).
+  parked?: boolean
 }
 
 // Parodies of real cars: the shapes and stats nod to the real thing, but the
@@ -170,7 +188,18 @@ export const STORAGE_MAX = 6
 export const restoreCost = (car: CarDef) => Math.max(200, Math.round((car.price + (car.bucks ?? 0) * 1000) * 0.25 / 10) * 10)
 export const rushBucks = (msLeft: number) => Math.max(1, Math.ceil(msLeft / 1800000))
 
-export const carDef = (id: string) => CARS.find((c) => c.id === id)!
+// Same idea as buildingDef: a car from a newer build drives as the starter car
+// under a placeholder name, can't be sold or scrapped, and keeps its real id.
+const parkedCars = new Map<string, CarDef>()
+function parkedCar(id: string): CarDef {
+  let c = parkedCars.get(id)
+  if (!c) {
+    c = { ...CARS[0], id, name: 'Coming Soon', price: 0, bucks: undefined, skill: undefined, parked: true }
+    parkedCars.set(id, c)
+  }
+  return c
+}
+export const carDef = (id: string): CarDef => CARS.find((c) => c.id === id) ?? parkedCar(id)
 
 export type UpgradeSlot = 'engine' | 'turbo' | 'tires' | 'weight'
 export const UPGRADE_SLOTS: { id: UpgradeSlot; name: string }[] = [
