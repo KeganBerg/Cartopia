@@ -1257,6 +1257,35 @@ button.book-car { font: inherit; color: inherit; }
 .alerts-x { width: 30px; height: 30px; flex: none; border: none; border-radius: 50%; background: #eceff1; font-weight: 800; color: #546e7a; }
 @media (max-width: 600px) { .alerts-card { bottom: calc(78px + var(--sab)); font-size: 13px; } }
 
+/* Town rival */
+.race-btn .i { position: relative; }
+.rv-card { --rv: #ff7043; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; margin: 4px 0 10px; padding: 8px 10px; border-radius: 14px; background: linear-gradient(100deg, color-mix(in srgb, var(--rv) 22%, #fff), #fff 70%); border: 2px solid color-mix(in srgb, var(--rv) 60%, #fff); }
+.rv-card.rv-idle { filter: saturate(.5); }
+.rv-card.rv-done { display: flex; gap: 8px; font: 16px var(--display); background: #fff8e1; border-color: #ffd54f; }
+.rv-card.rv-done small { font: 800 12px Nunito, sans-serif; color: #78909c; }
+.rv-face { display: grid; place-items: center; width: 46px; height: 46px; font-size: 30px; border-radius: 50%; background: var(--rv); box-shadow: 0 3px 0 rgba(0,0,0,.2); }
+.rv-body { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.rv-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.rv-head b { font: 16px var(--display); }
+.rv-pips { display: inline-flex; gap: 3px; }
+.rv-pips i { width: 9px; height: 9px; border-radius: 50%; background: #cfd8dc; }
+.rv-pips i.on { background: #43a047; }
+.rv-bonus { margin-left: auto; font: 12px var(--display); color: #6d4c41; background: #fff3e0; border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
+.rv-bonus .ico { display: inline-grid; width: 14px; height: 14px; font-size: 9px; vertical-align: -2px; border-width: 1px; }
+.rv-bubble { position: relative; align-self: flex-start; max-width: 100%; background: #fff; border: 2px solid #37474f; border-radius: 12px; padding: 3px 9px; font-weight: 800; font-size: 13px; color: #263238; }
+.rv-bubble.big { align-self: center; margin: 8px auto 4px; font-size: 15px; }
+.rv-car { display: flex; align-items: center; gap: 5px; font-weight: 700; color: #607d8b; font-size: 12px; }
+.rv-card .buy small { display: block; font-size: 10px; opacity: .85; }
+.rv-result .rv-bet-q { font-weight: 800; color: #6a1b9a; margin: -4px 0 10px; }
+.rv-row { justify-content: center; gap: 8px; flex-wrap: wrap; }
+.rv-bet { background: linear-gradient(#ab47bc, #6a1b9a); }
+@media (max-width: 520px) {
+  .rv-card { grid-template-columns: auto 1fr; }
+  .rv-card > .buy { grid-column: 1 / -1; }
+  .rv-bonus { margin-left: 0; }
+}
+.rv-tag { background: var(--rv); color: #fff; }
+.rv-result .rr-loot span .ico { padding: 0; border: none; width: 18px; height: 18px; display: inline-block; vertical-align: -3px; animation: none; }
 /* Race launch and boost. */
 .race-full .countdown.big.go { color: #76ff03; text-shadow: 0 4px 0 #1b5e20; animation: pop .15s ease-out; }
 .rf-buttons { display: flex; align-items: center; gap: 12px; }
