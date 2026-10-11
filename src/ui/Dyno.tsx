@@ -30,6 +30,7 @@ function dynoEngine(model: string, mods?: string[]) {
       voice = new EngineVoice(a, trim, { model, mods })
     }).catch(() => {})
   }
+  let off = () => {}
   const stop = (fade: number) => {
     if (done) return
     done = true
@@ -38,7 +39,7 @@ function dynoEngine(model: string, mods?: string[]) {
     const t = trim
     setTimeout(() => t?.disconnect(), fade * 1000 + 400)
   }
-  const off = onMuteChange(() => { if (isMuted()) stop(0.1) })
+  off = onMuteChange(() => { if (isMuted()) stop(0.1) })
   return {
     drive: (rpm: number, gear: number) => voice?.drive(rpm, gear),
     shift: () => voice?.shift(),
