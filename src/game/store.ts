@@ -435,7 +435,7 @@ export function liveDeal(s: Pick<SaveState, 'deals' | 'level'>, kind: DealKind, 
 }
 export const openDeals = (s: Pick<SaveState, 'deals' | 'level'>) =>
   dealsFor(today()).filter((d) => !dealUsed(s, d.id) && s.level >= dealOffer(d).unlockLevel).length
-const useDeal = (s: Pick<SaveState, 'deals'>, d: DealDef | null) =>
+const spendDeal = (s: Pick<SaveState, 'deals'>, d: DealDef | null) =>
   d ? { deals: { day: today(), used: [...(s.deals?.day === today() ? s.deals.used : []), d.id] } } : {}
 // What placing a building costs today, after any deal on it.
 export function buildPrice(s: Pick<SaveState, 'deals' | 'level'>, def: string) {
@@ -560,7 +560,7 @@ export const useGame = create<GameState>()(
         set(withXp(s, Math.max(1, Math.round(d.price / 100)), {
           coins: s.coins - cost.coins,
           bucks: s.bucks - cost.bucks,
-          ...useDeal(s, cost.deal),
+          ...spendDeal(s, cost.deal),
           buildings: [...s.buildings, { uid: uid(), def, x, z, jobEndsAt: null, ...(rot == null ? {} : { rot }) }],
           stats: bump(s, 'built'),
           updatedAt: Date.now(),
@@ -1079,7 +1079,7 @@ export const useGame = create<GameState>()(
         const patch = {
           coins: s.coins - coins,
           bucks: s.bucks - bucks,
-          ...useDeal(s, deal),
+          ...spendDeal(s, deal),
           cars: s.cars.map((c) => (c.uid === cuid ? { ...c, color: job.color, finish: job.finish === 'gloss' ? undefined : job.finish, stripe: job.stripe } : c)),
           stats: bump(s, 'painted'),
           updatedAt: Date.now(),
@@ -1132,7 +1132,7 @@ export const useGame = create<GameState>()(
           coins: s.coins - cost.coins,
           parts: s.parts - cost.parts,
           bucks: s.bucks - cost.bucks,
-          ...useDeal(s, cost.deal),
+          ...spendDeal(s, cost.deal),
           cars: s.cars.map((c) => (c.uid === cuid ? { ...c, mods: [...others, modId], ownedMods: [...owned, modId] } : c)),
           stats: bump(s, 'modsBought'),
           ...addXp(s, modXp(modId)),
@@ -1258,7 +1258,7 @@ export const useGame = create<GameState>()(
           coins: s.coins - o.now.coins,
           bucks: s.bucks - o.now.bucks,
           ...(d.kind === 'parts' ? { parts: s.parts + (d.n ?? 0) } : { fuel: fuelCap(s), fuelUpdatedAt: Date.now() }),
-          ...useDeal(s, d),
+          ...spendDeal(s, d),
           updatedAt: Date.now(),
         })
         s.toast(d.kind === 'parts' ? `+${d.n} parts!` : 'Tank filled!')
