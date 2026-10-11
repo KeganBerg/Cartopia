@@ -145,12 +145,14 @@ type Shell = {
   signFg?: string
   // Ground floor: a shop window, door and awning, or nothing (the model draws its own).
   shopfront?: string | null
+  // How much of the usual upgrade height it gains (low-rise lots like the schools grow slower).
+  grow?: number
   children?: ReactNode
 }
 
 // A flat-roofed building that grows a floor of windows every other upgrade level.
-export function ShellBuilding({ m, win, bulb, ghost, lvl, w, d, h0, z0 = -0.15, x0 = 0, wall, tex = 'brick', roof, sign, signBg = '#fffde7', signFg = '#c62828', shopfront, children }: Shell) {
-  const h = h0 + levelLift(lvl)
+export function ShellBuilding({ m, win, bulb, ghost, lvl, w, d, h0, z0 = -0.15, x0 = 0, wall, tex = 'brick', roof, sign, signBg = '#fffde7', signFg = '#c62828', shopfront, grow = 1, children }: Shell) {
+  const h = h0 + levelLift(lvl) * grow
   const zf = z0 + d / 2
   const rx = Math.max(1, Math.round(w * 0.6))
   const wallTex = tex === 'brick' ? brickTex(rx, Math.max(1, Math.round(h))) : sidingTex(rx, Math.max(1, Math.round(h * 1.5)))

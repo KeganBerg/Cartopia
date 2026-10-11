@@ -18,6 +18,7 @@ export const CAMPUS_MODELS = new Set(['academy', 'school', 'highschool', 'univer
 
 type Props = { def: BuildingDef; ghost?: boolean; m: Mat; win: ReactNode; bulb: ReactNode; level?: number }
 
+const GROW = 0.5
 const PAINT = '#fafafa'
 const YELLOW = '#fdd835'
 const BUS = '#f9a825'
@@ -154,8 +155,9 @@ function Portico({ m, x, z, w, h, n, c = '#fafafa' }: { m: Mat; x: number; z: nu
 
 export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
   const lvl = Math.min(10, Math.max(1, Math.floor(level) || 1))
-  const lift = levelLift(lvl)
-  const shell = { m, win, bulb, ghost, lvl }
+  // Schools spread out more than up: half the usual upgrade height.
+  const lift = levelLift(lvl) * GROW
+  const shell = { m, win, bulb, ghost, lvl, grow: GROW }
   const live = !ghost
 
   switch (def.id) {
