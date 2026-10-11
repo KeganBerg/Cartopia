@@ -51,13 +51,18 @@ export function AnchorProjector() {
       v.copy(p).project(camera)
       let x = ((v.x + 1) / 2) * size.width
       let y = ((1 - v.y) / 2) * size.height
-      if (v.z > 1) {
-        el.style.visibility = 'hidden'
-        continue
-      }
-      el.style.visibility = 'visible'
       // data-clamp: keep it on screen, pinned to the nearest edge (for things worth chasing).
       const clamp = el.dataset.clamp !== undefined
+      if (v.z > 1) {
+        // Behind the free camera. A pinned bubble flips to the edge it's really past.
+        if (!clamp) {
+          el.style.visibility = 'hidden'
+          continue
+        }
+        x = size.width - x
+        y = size.height * 2
+      }
+      el.style.visibility = 'visible'
       if (clamp) {
         const cx = Math.min(Math.max(x, 60), size.width - 60)
         const cy = Math.min(Math.max(y, 210), size.height - 110)

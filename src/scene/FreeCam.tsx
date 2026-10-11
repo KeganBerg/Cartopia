@@ -71,6 +71,12 @@ function Rig() {
       // Back to bird's-eye over the spot the free view ended up on.
       ortho.position.copy(VIEW).add(offset)
       ortho.lookAt(VIEW)
+      // The screen may have turned or resized meanwhile, and only the live camera follows that.
+      const now = get().size
+      ortho.left = -now.width / 2
+      ortho.right = now.width / 2
+      ortho.top = now.height / 2
+      ortho.bottom = -now.height / 2
       ortho.updateProjectionMatrix()
       set({ camera: ortho })
       cam.current = null

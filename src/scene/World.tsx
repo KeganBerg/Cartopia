@@ -660,10 +660,14 @@ function ResponsiveZoom() {
 // Pull the camera back while buying land so the For Sale signs are in view.
 function ExpandZoom() {
   const camera = useThree((s) => s.camera)
+  const get = useThree((s) => s.get)
   const controls = useThree((s) => s.controls) as { target: { set: (x: number, y: number, z: number) => void }; update: () => void } | null
   const mode = useGame((s) => s.mode)
   const saved = useRef<number | null>(null)
   useEffect(() => {
+    // Read the live camera: leaving the free view for land mode swaps it back in this same commit.
+    const camera = get().camera
+    if (isFree(camera)) return
     if (mode === 'expand' && saved.current === null) {
       saved.current = camera.zoom
       camera.zoom = Math.max(12, camera.zoom * 0.5)
@@ -674,7 +678,7 @@ function ExpandZoom() {
       camera.updateProjectionMatrix()
     }
     controls?.update()
-  }, [mode, camera, controls])
+  }, [mode, camera, controls, get])
   return null
 }
 

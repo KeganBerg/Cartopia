@@ -9,9 +9,15 @@ const v = new Vector3()
 export function Ear() {
   const camera = useThree((s) => s.camera)
   useEffect(() => {
+    // A spot behind the free camera projects mirrored, so it counts as off to the side.
+    const behind = (x: number, z: number) => v.set(x, 0, z).applyMatrix4(camera.matrixWorldInverse).z > 0
     setEar(
-      (x, z) => Math.max(-1, Math.min(1, v.set(x, 0, z).project(camera).x)),
       (x, z) => {
+        if (behind(x, z)) return Math.sign(v.x) * 0.8
+        return Math.max(-1, Math.min(1, v.set(x, 0, z).project(camera).x))
+      },
+      (x, z) => {
+        if (behind(x, z)) return 0.4
         v.set(x, 0, z).project(camera)
         const off = Math.max(Math.abs(v.x), Math.abs(v.y))
         return off <= 1 ? 1 : Math.max(0.3, 1 - (off - 1) * 0.5)
