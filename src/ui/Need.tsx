@@ -1,5 +1,5 @@
 import { useGame, fuelCap } from '../game/store'
-import { buildingDef, isOpen, xpToNext, FUEL_REGEN_SECONDS, RACE_FUEL, REFILL_BUCKS, type BuildingDef } from '../game/data'
+import { buildingDef, isOpen, xpToNext, FUEL_REGEN_SECONDS, RACE_FUEL, refillBucks, type BuildingDef } from '../game/data'
 import { useNow } from '../scene/useNow'
 import { Panel } from './Menus'
 
@@ -58,8 +58,9 @@ export function NeedPanel() {
     const cap = fuelCap(s)
     const next = s.fuel >= cap ? null : Math.max(0, FUEL_REGEN_SECONDS - Math.floor((now - s.fuelUpdatedAt) / 1000))
     summary = need.missing ? `You need ${need.missing} more fuel${need.what ? ` for ${need.what}` : ''}. You have ${s.fuel}/${cap}.` : `You have ${s.fuel}/${cap} fuel.`
+    const refill = refillBucks(cap - s.fuel)
     sources = [
-      { icon: '⛽', title: `Fill up with bucks · B ${REFILL_BUCKS}`, detail: s.fuel >= cap ? 'Your tank is full.' : `Fill your tank to ${cap} right now. You have ${s.bucks} bucks.`, action: { label: `Fill up · B ${REFILL_BUCKS}`, run: s.refillFuel, disabled: s.fuel >= cap } },
+      { icon: '⛽', title: `Fill up with bucks · B ${refill}`, detail: s.fuel >= cap ? 'Your tank is full.' : `Fill your tank to ${cap} right now. You have ${s.bucks} bucks.`, action: { label: `Fill up · B ${refill}`, run: s.refillFuel, disabled: s.fuel >= cap } },
       { icon: '⏱', title: 'Wait for a refill', detail: next === null ? 'Your tank is full.' : `Fuel refills 1 every minute. Next one in ${next}s.` },
       { icon: '⛽', title: 'Build a Gas Station', detail: `Each one adds +10 to your max fuel. You have ${owned('gas')}.`, action: build('gas') },
       ...(owned('house') ? [{ icon: '🏡', title: 'Upgrade your homes', detail: 'Every home level adds +1 to your max fuel. Find them under Upgrades in the Shop.', action: { label: 'Upgrades', run: () => s.openShop('upgrades') } }] : []),
