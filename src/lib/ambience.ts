@@ -128,6 +128,8 @@ export class Soundscape {
   private murmur: GainNode
   private music: GainNode
   private wall: BiquadFilterNode
+  private thump: GainNode
+  private gritTone: BiquadFilterNode
   private musicPan: StereoPannerNode | null
   private beat = 0
   private vowels: BiquadFilterNode[]
@@ -181,6 +183,18 @@ export class Soundscape {
     this.wall = this.filter('lowpass', 400, this.music)
     if (this.musicPan) this.music.connect(this.musicPan).connect(this.out)
     else this.music.connect(this.out)
+    // Phone speakers can't play deep bass, so the kick and bassline also go
+    // through a little overdrive whose upper-bass harmonics they can play.
+    this.thump = ctx.createGain()
+    this.thump.connect(this.wall)
+    const drive = ctx.createWaveShaper()
+    const curve = new Float32Array(1024)
+    for (let i = 0; i < curve.length; i++) curve[i] = Math.tanh(((i / (curve.length - 1)) * 2 - 1) * 5)
+    drive.curve = curve
+    this.gritTone = this.filter('lowpass', 900, this.music)
+    const grit = ctx.createGain()
+    grit.gain.value = 0.5
+    this.thump.connect(drive).connect(this.filter('highpass', 160)).connect(grit).connect(this.gritTone)
     const echo = ctx.createGain()
     echo.gain.value = 0.3
     this.music.connect(echo).connect(this.room)
@@ -400,9 +414,10 @@ export class Soundscape {
   // own nightclub while it's open, or faintly from somewhere across town.
   private clubMusic(t: number, club: Club | boolean | null, nightlife: number) {
     const near = club ? 1 : 0
-    const level = near ? 0.55 : nightlife * 0.18
+    const level = near ? 0.8 : nightlife * 0.3
     this.music.gain.setTargetAtTime(level, t, 2)
-    this.wall.frequency.setTargetAtTime(near ? 600 : 220, t, 1)
+    this.wall.frequency.setTargetAtTime(near ? 700 : 260, t, 1)
+    this.gritTone.frequency.setTargetAtTime(near ? 1100 : 650, t, 1)
     if (this.musicPan) this.musicPan.pan.setTargetAtTime(typeof club === 'object' && club ? club.pan * 0.8 : 0.4, t, 0.5)
     if (level < 0.01) {
       this.beatAt = 0
@@ -416,17 +431,17 @@ export class Soundscape {
       const b = this.beatAt
       const k = this.beat % 16
       if (k % 4 === 0) {
-        this.blip(b, 0.25, 0.6, null, (o) => {
-          o.frequency.setValueAtTime(110, b)
-          o.frequency.exponentialRampToValueAtTime(45, b + 0.1)
-        }, () => this.wall)
+        this.blip(b, 0.28, 0.7, null, (o) => {
+          o.frequency.setValueAtTime(150, b)
+          o.frequency.exponentialRampToValueAtTime(48, b + 0.1)
+        }, () => this.thump)
       }
       if (k % 4 === 2) {
         const f = roots[Math.floor(this.beat / 16) % 4]
         this.blip(b, sixteenth * 1.8, 0.16, null, (o) => {
           o.type = 'sawtooth'
           o.frequency.value = f * (this.beat % 32 === 30 ? 2 : 1)
-        }, () => this.wall)
+        }, () => this.thump)
       }
       if (near && (k === 4 || k === 12)) this.noiseHit(b, 0.09, 0.12, this.filter('bandpass', 1300, this.wall, 1.2))
       this.beat++
