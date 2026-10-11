@@ -5,6 +5,7 @@ import { useGame } from '../game/store'
 import { Panel } from './Menus'
 import { MuteButton } from './MuteButton'
 import { localBackup, restoreLocalBackup } from '../lib/cloud'
+import { isCleanName, NAME_REJECTED } from '../lib/names'
 
 export function AccountPanel() {
   const townName = useGame((s) => s.townName)
@@ -45,7 +46,7 @@ export function AccountPanel() {
       <h3>Town name</h3>
       <div className="row">
         <input value={name} maxLength={24} onChange={(e) => setName(e.target.value)} />
-        <button className="buy small" onClick={() => rename(name)}>Save</button>
+        <button className="buy small" onClick={() => (isCleanName(name) ? rename(name) : useGame.getState().toast(NAME_REJECTED))}>Save</button>
       </div>
       <h3>Account</h3>
       {!supabase ? (

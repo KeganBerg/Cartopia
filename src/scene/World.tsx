@@ -2,10 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { MapControls } from '@react-three/drei'
 import { AnchorProjector } from './anchors'
 import { useThree, type ThreeEvent } from '@react-three/fiber'
-import { useGame, canPlace, buyablePlots, lotSize, type PlacedBuilding } from '../game/store'
+import { Plane, Vector3 } from 'three'
+import { create } from 'zustand'
+import { useGame, canPlace, buyablePlots, lotSize, movable, type PlacedBuilding } from '../game/store'
 import { GRID, TILE, PLOT, PLOT_MIN, PLOT_MAX, START_LAND, buildingDef } from '../game/data'
 import { BuildingModel } from './BuildingModel'
-import { rotatePlacement, setGhostTurn } from '../game/placement'
+import { rotateCurrent, setGhostTurn, turnOf } from '../game/placement'
+import { sfx } from '../lib/sound'
 import { Clouds } from './Clouds'
 import { DayNight } from './DayNight'
 import { PAL } from './season'
@@ -13,6 +16,7 @@ import { SeasonFx } from './SeasonFx'
 import { glowMats } from './dayNight'
 import { LightPool } from './BuildingModel'
 import { TownCars } from './TownCars'
+import { Batch } from './Batch'
 import { toWorld, toTile, DIRS } from './grid'
 import { grassTex, paverTex, asphaltTex } from './textures'
 import { LAYER, decal } from './layers'
@@ -61,52 +65,125 @@ export function centerOf(def: string, x: number, z: number, rot?: number): [numb
   return toWorld(x + (w - 1) / 2, z + (h - 1) / 2)
 }
 
+// A building being dragged in move mode: where it would land, and which of its
+// tiles the pointer is holding.
+type Drag = { uid: string; x: number; z: number; gx: number; gz: number }
+const useDrag = create<{ drag: Drag | null }>(() => ({ drag: null }))
 
+const GROUND = new Plane(new Vector3(0, 1, 0), 0)
+const hit = new Vector3()
+// Tile under the pointer at ground level, even when the pointer is on a rooftop.
+const groundTile = (e: ThreeEvent<PointerEvent>) => {
+  const p = e.ray.intersectPlane(GROUND, hit)
+  return p ? toTile(p.x, p.z) : toTile(e.point.x, e.point.z)
+}
 
-// Quarter turns that point a building's front at an adjacent road. Non-square lots can only flip.
-function roadTurn(b: Pick<PlacedBuilding, 'def' | 'x' | 'z'>, roads: Set<string>) {
-  const d = buildingDef(b.def)
-  const edge = (dir: 'S' | 'E' | 'N' | 'W') => {
-    for (let i = 0; i < Math.max(d.w, d.h); i++) {
-      const t =
-        dir === 'S' ? [b.x + i, b.z + d.h] : dir === 'N' ? [b.x + i, b.z - 1]
-        : dir === 'E' ? [b.x + d.w, b.z + i] : [b.x - 1, b.z + i]
-      const inRange = dir === 'S' || dir === 'N' ? i < d.w : i < d.h
-      if (inRange && roads.has(`${t[0]},${t[1]}`)) return true
-    }
-    return false
+// Pick a building up. Letting go drops it there if it fits, or snaps it back.
+// `quick` is a long press from normal play, which goes back to play once dropped.
+function startDrag(b: PlacedBuilding, tile: [number, number], pointerId: number, quick = false) {
+  useGame.getState().select(b.uid)
+  useDrag.setState({ drag: { uid: b.uid, x: b.x, z: b.z, gx: tile[0] - b.x, gz: tile[1] - b.z } })
+  const end = (e: PointerEvent) => {
+    // A second finger tapping Rotate mustn't drop the building.
+    if (e.pointerId !== pointerId) return
+    window.removeEventListener('pointerup', end)
+    window.removeEventListener('pointercancel', end)
+    const d = useDrag.getState().drag
+    useDrag.setState({ drag: null })
+    if (quick) useGame.getState().setMode('play')
+    if (!d || e.type === 'pointercancel' || (d.x === b.x && d.z === b.z)) return
+    if (useGame.getState().moveBuilding(d.uid, d.x, d.z)) sfx.click()
+    else sfx.error()
   }
-  const square = d.w === d.h
-  if (edge('S')) return 0
-  if (square && edge('E')) return 1
-  if (edge('N')) return 2
-  if (square && edge('W')) return 3
-  return 0
+  window.addEventListener('pointerup', end)
+  window.addEventListener('pointercancel', end)
 }
 
-// The player's chosen turn, or else face the road. Decorations face south unless turned.
-function turnOf(b: Pick<PlacedBuilding, 'def' | 'x' | 'z' | 'rot'>, roads: Set<string>) {
-  if (b.rot != null) return b.rot
-  const kind = buildingDef(b.def).kind
-  return kind === 'decor' || kind === 'obstacle' ? 0 : roadTurn(b, roads)
-}
+// Holding a building in normal play picks it up. Moving the finger first pans the map instead.
+const HOLD_MS = 450
+const HOLD_SLOP = 10
+// Set when a hold lifted a building, so letting go doesn't also count as a tap on it.
+let held = false
 
+// The press being watched; a building made of several meshes reports one press per mesh.
+let holdPress: PointerEvent | null = null
+
+function holdToMove(b: PlacedBuilding, e: ThreeEvent<PointerEvent>) {
+  if (holdPress === e.nativeEvent) return
+  holdPress = e.nativeEvent
+  const tile = groundTile(e)
+  const { pointerId, clientX, clientY } = e.nativeEvent
+  const watch = {
+    timer: 0,
+    stop() {
+      clearTimeout(watch.timer)
+      window.removeEventListener('pointermove', watch.move)
+      window.removeEventListener('pointerrawupdate' as 'pointermove', watch.move)
+      window.removeEventListener('pointerup', watch.up)
+      window.removeEventListener('pointercancel', watch.up)
+    },
+    move(m: PointerEvent) {
+      if (m.pointerId === pointerId && Math.hypot(m.clientX - clientX, m.clientY - clientY) > HOLD_SLOP) watch.stop()
+    },
+    up(u: PointerEvent) {
+      if (u.pointerId === pointerId) watch.stop()
+    },
+  }
+  watch.timer = window.setTimeout(() => {
+    watch.stop()
+    const s = useGame.getState()
+    if (s.mode !== 'play' || s.panel || s.visiting) return
+    held = true
+    navigator.vibrate?.(15)
+    sfx.click()
+    useGame.setState({ mode: 'move', placing: null })
+    startDrag(b, tile, pointerId, true)
+  }, HOLD_MS)
+  // Raw updates aren't held back to the next frame, so a swipe cancels the hold even on a slow phone.
+  window.addEventListener('pointermove', watch.move)
+  window.addEventListener('pointerrawupdate' as 'pointermove', watch.move)
+  window.addEventListener('pointerup', watch.up)
+  window.addEventListener('pointercancel', watch.up)
+}
 
 function Building({ b, roads }: { b: PlacedBuilding; roads: Set<string> }) {
   const d = buildingDef(b.def)
   const [cx, cz] = centerOf(b.def, b.x, b.z, b.rot)
+  // Hidden while dragged away; the ghost shows where it would land.
+  const away = useDrag((g) => g.drag?.uid === b.uid && (g.drag.x !== b.x || g.drag.z !== b.z))
+  if (away) return null
   return (
     <group
       position={[cx, 0, cz]}
       rotation-y={(turnOf(b, roads) * Math.PI) / 2}
+      onPointerDown={(e) => {
+        const s = useGame.getState()
+        if (s.visiting || e.button !== 0) return
+        if (s.mode === 'play') {
+          held = false
+          if (movable(b.def)) holdToMove(b, e)
+          return
+        }
+        if (s.mode !== 'move') return
+        e.stopPropagation()
+        if (!movable(b.def)) return s.toast(`Tap the ${d.name.toLowerCase()} in play mode to clear it`)
+        startDrag(b, groundTile(e), e.pointerId)
+      }}
       onClick={(e) => {
         const s = useGame.getState()
+        // In move mode the tap already picked it up; don't let it fall through and deselect.
+        if (s.mode === 'move' || held) {
+          held = false
+          return e.stopPropagation()
+        }
         if (s.mode !== 'play' || s.visiting || e.delta > 6) return
         e.stopPropagation()
         s.tapBuilding(b.uid)
       }}
       onPointerOver={() => {
-        if (useGame.getState().mode === 'play' && d.kind !== 'decor' && d.kind !== 'house') document.body.style.cursor = 'pointer'
+        const mode = useGame.getState().mode
+        if (mode === 'move' && movable(b.def)) document.body.style.cursor = 'grab'
+        else if (mode === 'play' && d.kind !== 'decor' && d.kind !== 'house') document.body.style.cursor = 'pointer'
       }}
       onPointerOut={() => (document.body.style.cursor = '')}
     >
@@ -239,32 +316,61 @@ function Interaction() {
   const mode = useGame((s) => s.mode)
   const placing = useGame((s) => s.placing)
   const placeRot = useGame((s) => s.placeRot)
+  const selected = useGame((s) => s.selected)
+  const drag = useDrag((g) => g.drag)
   const [hover, setHover] = useState<[number, number] | null>(null)
   const painting = useRef(false)
+  // Whether the last press was a finger. Touch has no hover, so a tap previews instead of building.
+  const touch = useRef(false)
+  const controls = useThree((s) => s.controls) as { target: Vector3 } | null
   const roads = useGame((s) => s.roads)
   const buildings = useGame((s) => s.buildings)
   const land = useGame((s) => s.land)
   const roadSet = useMemo(() => new Set(roads), [roads])
 
-  // R turns the building being placed on desktop.
+  // R turns the building being placed or moved on desktop.
   useEffect(() => {
-    if (mode !== 'place') return
+    if (mode !== 'place' && mode !== 'move') return
     const onKey = (e: KeyboardEvent) => {
-      if ((e.key === 'r' || e.key === 'R') && !(e.target instanceof HTMLInputElement)) rotatePlacement()
+      if ((e.key === 'r' || e.key === 'R') && !(e.target instanceof HTMLInputElement)) rotateCurrent()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [mode])
 
+  // Show the ghost mid-screen as soon as placing starts, so Rotate visibly turns it
+  // even before the pointer reaches the town (and on phones, which never hover).
+  useEffect(() => {
+    if (mode !== 'place' || !placing || !controls) return
+    setHover(toTile(controls.target.x, controls.target.z))
+  }, [mode, placing, controls])
+
   const tileOf = (e: ThreeEvent<PointerEvent | MouseEvent>) => toTile(e.point.x, e.point.z)
 
   const onMove = (e: ThreeEvent<PointerEvent>) => {
     const t = tileOf(e)
+    if (drag) {
+      const x = t[0] - drag.gx
+      const z = t[1] - drag.gz
+      if (x !== drag.x || z !== drag.z) useDrag.setState({ drag: { ...drag, x, z } })
+      return
+    }
+    // A finger dragging across the town is panning; leave the ghost where it was.
+    if (mode === 'place' && e.pointerType === 'touch') return
     if (!hover || hover[0] !== t[0] || hover[1] !== t[1]) setHover(t)
     if (painting.current && mode === 'road') useGame.getState().paintRoad(...t)
     if (painting.current && mode === 'bulldoze') useGame.getState().bulldoze(...t)
   }
   const onDown = (e: ThreeEvent<PointerEvent>) => {
+    touch.current = e.pointerType === 'touch'
+    if (mode === 'move' && selected && e.button === 0) {
+      // Grabbing the ground inside the picked building's lot drags it too.
+      const b = buildings.find((o) => o.uid === selected)
+      const t = tileOf(e)
+      const [w, h] = b ? lotSize(b.def, b.rot) : [0, 0]
+      if (b && t[0] >= b.x && t[0] < b.x + w && t[1] >= b.z && t[1] < b.z + h) startDrag(b, t, e.pointerId)
+      return
+    }
     if (mode !== 'road' && mode !== 'bulldoze') return
     if (e.button !== 0) return
     painting.current = true
@@ -274,16 +380,27 @@ function Interaction() {
   }
   const onUp = () => (painting.current = false)
   const onClick = (e: ThreeEvent<MouseEvent>) => {
+    // Tapping open ground lets go of the picked building.
+    if (mode === 'move' && e.delta <= 6 && !drag) return useGame.getState().select(null)
     if (mode !== 'place' || !placing || e.delta > 6) return
-    const [x, z] = tileOf(e)
+    let [x, z] = tileOf(e)
     const d = buildingDef(placing)
     const [w, h] = lotSize(placing, placeRot ?? undefined)
+    if (touch.current) {
+      // Phones: the first tap moves the ghost there; tapping the ghost builds it.
+      const gx = hover ? hover[0] - Math.floor((w - 1) / 2) : NaN
+      const gz = hover ? hover[1] - Math.floor((h - 1) / 2) : NaN
+      if (!(x >= gx && x < gx + w && z >= gz && z < gz + h)) return setHover([x, z])
+      ;[x, z] = hover!
+    }
     // Hover tile is the footprint's centre; convert to its top-left corner.
     const ox = x - Math.floor((w - 1) / 2)
     const oz = z - Math.floor((h - 1) / 2)
     if (useGame.getState().placeBuilding(placing, ox, oz, placeRot ?? undefined)) {
+      // Keep the new building picked so Rotate (and dragging) can still adjust it.
       const s = useGame.getState()
-      if (s.coins < d.price) s.setMode('play')
+      const built = s.buildings[s.buildings.length - 1]
+      useGame.setState({ mode: 'move', placing: null, selected: built.uid, again: s.coins >= d.price && !d.unique ? placing : null })
     }
   }
 
@@ -309,6 +426,32 @@ function Interaction() {
         </group>
       </group>
     )
+  } else if (mode === 'move' && selected) {
+    const b = buildings.find((o) => o.uid === selected)
+    if (b) {
+      const d = buildingDef(b.def)
+      const [w, h] = lotSize(b.def, b.rot)
+      const x = drag?.uid === b.uid ? drag.x : b.x
+      const z = drag?.uid === b.uid ? drag.z : b.z
+      const moved = x !== b.x || z !== b.z
+      const valid = !moved || canPlace({ roads, buildings, land }, b.def, x, z, b.rot, b.uid)
+      const [cx, cz] = centerOf(b.def, x, z, b.rot)
+      // Buildings that face the nearest road keep doing so at the new spot.
+      const turn = turnOf({ def: b.def, x, z, rot: b.rot }, roadSet)
+      ghost = (
+        <group position={[cx, 0.02, cz]}>
+          <mesh rotation-x={-Math.PI / 2} position-y={0.03}>
+            <planeGeometry args={[w * TILE, h * TILE]} />
+            <meshBasicMaterial color={!moved ? '#ffd54f' : valid ? '#66bb6a' : '#ef5350'} transparent opacity={0.45} />
+          </mesh>
+          {moved && (
+            <group rotation-y={(turn * Math.PI) / 2}>
+              <BuildingModel def={d} ghost valid={valid} />
+            </group>
+          )}
+        </group>
+      )
+    }
   } else if (hover && (mode === 'road' || mode === 'bulldoze')) {
     const [wx, wz] = toWorld(...hover)
     ghost = (
@@ -330,7 +473,8 @@ function Interaction() {
         onPointerUp={onUp}
         onPointerLeave={() => {
           painting.current = false
-          setHover(null)
+          // Keep the ghost while the mouse visits the Rotate button.
+          if (mode !== 'place') setHover(null)
         }}
         onClick={onClick}
       >
@@ -340,7 +484,7 @@ function Interaction() {
       {ghost}
       <MapControls
         makeDefault
-        enabled={!(mode === 'road' || mode === 'bulldoze')}
+        enabled={!(mode === 'road' || mode === 'bulldoze' || drag)}
         enableRotate={false}
         minZoom={12}
         maxZoom={90}
@@ -386,6 +530,13 @@ export function World() {
   const buildings = useGame((s) => (s.visiting ?? s).buildings)
   const roadsList = useGame((s) => (s.visiting ?? s).roads)
   const roads = useMemo(() => new Set(roadsList), [roadsList])
+  const land = useGame((s) => (s.visiting ? START_LAND : s.land))
+  const mode = useGame((s) => s.mode)
+  // Rebuild the merged town only when something's footprint changes, not on every job timer.
+  const layout = useMemo(
+    () => [buildings.map((b) => `${b.uid}:${b.def}:${b.x}:${b.z}:${b.rot}`).join(), roadsList.join(), land.join()].join('/'),
+    [buildings, roadsList, land],
+  )
   return (
     <>
       <DayNight small={Math.min(window.innerWidth, window.innerHeight) < 700} />
@@ -397,11 +548,14 @@ export function World() {
       <ResponsiveZoom />
       <ExpandZoom />
       <Interaction />
-      <Land />
-      <Roads />
-      {buildings.map((b) => (
-        <Building key={b.uid} b={b} roads={roads} />
-      ))}
+      {/* Pieces move while building or dragging, so merging waits for plain play. */}
+      <Batch version={layout} off={mode !== 'play'}>
+        <Land />
+        <Roads />
+        {buildings.map((b) => (
+          <Building key={b.uid} b={b} roads={roads} />
+        ))}
+      </Batch>
       <AnchorProjector />
       <TownCars />
       <Clouds />

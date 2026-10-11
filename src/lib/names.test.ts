@@ -1,0 +1,22 @@
+import { describe, expect, it } from 'vitest'
+import { displayName, isCleanName } from './names'
+
+describe('isCleanName', () => {
+  it('blocks slurs, including spaced and leetspeak spellings', () => {
+    for (const n of ['Niggapolis', 'n i g g a town', 'N1gg@ville', 'Faggot Falls', 'Shit Creek', 'FUK U', 'Big Ass Town']) {
+      expect(isCleanName(n), n).toBe(false)
+    }
+  })
+  it('allows ordinary names, even ones containing a blocked piece', () => {
+    for (const n of ['Ram Ranch', 'Polio Folio', 'Peacock Point', 'Raccoon City', 'Spice Market', 'Classic Motors', 'Scunthorpe', 'Torpedo Bay', 'Cucumber Lane', 'Midnight Racers']) {
+      expect(isCleanName(n), n).toBe(true)
+    }
+  })
+})
+
+describe('displayName', () => {
+  it('replaces a blocked name with a neutral one', () => {
+    expect(displayName('Niggapolis', '8a1e7edb-cb66-437e-b1be-d3768917fda2')).toBe('Town #FDA2')
+    expect(displayName('Ram Ranch', 'x')).toBe('Ram Ranch')
+  })
+})

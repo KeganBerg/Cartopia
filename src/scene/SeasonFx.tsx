@@ -2,6 +2,7 @@ import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { BufferAttribute, BufferGeometry, type Points } from 'three'
 import { SEASON } from './season'
+import { dayPhase, nightAmount } from './dayNight'
 
 const FX = {
   fall: { colors: ['#e65100', '#ff8f00', '#c62828', '#fbc02d'], fall: 1.2, sway: 1.2, size: 6 },
@@ -11,9 +12,16 @@ const FX = {
 
 const SPAN = 56
 const TOP = 22
+const PARKED = -100 // below the ground, out of sight
+const isNight = () => nightAmount(dayPhase()) > 0.5
+// In the morning a parked flake rejoins after about this many seconds on average,
+// so the sky fills from the top gradually rather than all at once.
+const REJOIN_S = 6
 
 // Falling leaves in fall, snow in winter and blossom petals in spring.
-// One Points object, so it costs a single draw call.
+// One Points object, so it costs a single draw call. Only during the day: at
+// dusk nothing new spawns and the last ones land, and in the morning they
+// start again from the top.
 export function SeasonFx({ small }: { small: boolean }) {
   const fx = SEASON === 'summer' ? null : FX[SEASON]
   const count = small ? 160 : 320
@@ -23,9 +31,10 @@ export function SeasonFx({ small }: { small: boolean }) {
     const col = new Float32Array(count * 3)
     const seeds = new Float32Array(count)
     const c = { r: 0, g: 0, b: 0 }
+    const night = isNight()
     for (let i = 0; i < count; i++) {
       pos[i * 3] = (Math.random() - 0.5) * SPAN
-      pos[i * 3 + 1] = Math.random() * TOP
+      pos[i * 3 + 1] = night ? PARKED : Math.random() * TOP
       pos[i * 3 + 2] = (Math.random() - 0.5) * SPAN
       seeds[i] = Math.random() * 100
       const hex = fx ? fx.colors[i % fx.colors.length] : '#ffffff'
@@ -45,12 +54,19 @@ export function SeasonFx({ small }: { small: boolean }) {
     const t = clock.elapsedTime
     const p = geo.attributes.position as BufferAttribute
     const a = p.array as Float32Array
+    const night = isNight()
     for (let i = 0; i < count; i++) {
       const s = seeds[i]
+      if (a[i * 3 + 1] === PARKED) {
+        if (night || Math.random() > step / REJOIN_S) continue
+        a[i * 3] = (Math.random() - 0.5) * SPAN
+        a[i * 3 + 1] = TOP
+        a[i * 3 + 2] = (Math.random() - 0.5) * SPAN
+      }
       a[i * 3] += Math.sin(t * 0.8 + s) * fx.sway * step
       a[i * 3 + 1] -= fx.fall * (0.7 + (s % 1) * 0.6) * step
       a[i * 3 + 2] += Math.cos(t * 0.6 + s) * fx.sway * 0.5 * step
-      if (a[i * 3 + 1] < 0) a[i * 3 + 1] += TOP
+      if (a[i * 3 + 1] < 0) a[i * 3 + 1] = night ? PARKED : a[i * 3 + 1] + TOP
     }
     p.needsUpdate = true
   })

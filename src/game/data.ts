@@ -29,6 +29,8 @@ export type BuildingDef = {
   // Only one per town.
   unique?: boolean
   prop?: 'donut' | 'burger' | 'cone' | 'tire' | 'pin' | 'popcorn'
+  // Stand-in for a building this build doesn't know (see buildingDef).
+  parked?: boolean
 }
 
 export const BUILDINGS: BuildingDef[] = [
@@ -37,6 +39,8 @@ export const BUILDINGS: BuildingDef[] = [
   // Rusty rescues and restores cars: the first thing a new town builds, and
   // the Showroom stays locked until it exists.
   { id: 'rescue', name: "Rusty's Rescue", kind: 'business', w: 2, h: 1, price: 1000, unlockLevel: 1, unique: true, color: '#a1887f', roof: '#c62828', sign: "RUSTY'S" },
+  // Crew House: the town's clubhouse, opens the Crew window.
+  { id: 'crew', name: 'Crew House', kind: 'business', w: 2, h: 1, price: 2500, unlockLevel: 2, unique: true, color: '#455a64', roof: '#ff7043', sign: 'CREW HOUSE' },
   { id: 'gas', name: 'Gas Station', kind: 'gas', w: 2, h: 1, price: 1500, unlockLevel: 1, fuelCap: 10, color: '#ffca28', roof: '#e53935', sign: 'GAS' },
   { id: 'pizza', name: 'Pizza Place', kind: 'business', w: 1, h: 1, price: 400, unlockLevel: 1, jobSeconds: 30, fuelCost: 1, payout: 60, xp: 5, color: '#c0504d', roof: '#f5f5f5', sign: 'PIZZA' },
   { id: 'donut', name: 'Donut Shop', kind: 'business', w: 1, h: 1, price: 900, unlockLevel: 2, jobSeconds: 90, fuelCost: 2, payout: 160, xp: 12, color: '#f48fb1', roof: '#fff8e1', sign: 'DONUTS', prop: 'donut' },
@@ -76,7 +80,21 @@ export const PLOT_MAX = 4
 export const START_LAND = [0, 1, 2].flatMap((x) => [0, 1, 2].map((z) => `${x},${z}`))
 export const plotPrice = (bought: number) => Math.round((5000 * Math.pow(1.45, bought)) / 500) * 500
 
-export const buildingDef = (id: string) => BUILDINGS.find((b) => b.id === id)!
+// A save can hold a building this build doesn't know yet, e.g. one placed on a
+// preview site of an unmerged feature (both share the same cloud saves). It gets
+// a harmless stand-in: no jobs, no fuel, can't be sold, drawn as a covered lot.
+// The save keeps the real id, so it comes back once that building ships.
+const parkedDefs = new Map<string, BuildingDef>()
+function parkedDef(id: string): BuildingDef {
+  let d = parkedDefs.get(id)
+  if (!d) {
+    d = { id, name: 'Coming Soon', kind: 'decor', w: 1, h: 1, price: 0, unlockLevel: 99, color: '#ffb300', roof: '#455a64', parked: true }
+    parkedDefs.set(id, d)
+  }
+  return d
+}
+export const knownBuilding = (id: string) => BUILDINGS.some((b) => b.id === id)
+export const buildingDef = (id: string): BuildingDef => BUILDINGS.find((b) => b.id === id) ?? parkedDef(id)
 
 export type Body = 'compact' | 'sedan' | 'sports' | 'muscle' | 'truck' | 'super' | 'bubble' | 'wagon' | 'wedge' | 'roadster' | 'rally' | 'classic' | 'offroad' | 'coupe'
 
@@ -105,6 +123,8 @@ export type CarDef = {
   grip: number
   weight: number
   colors: string[]
+  // Stand-in for a car this build doesn't know (see carDef).
+  parked?: boolean
 }
 
 // Parodies of real cars: the shapes and stats nod to the real thing, but the
@@ -170,7 +190,18 @@ export const STORAGE_MAX = 6
 export const restoreCost = (car: CarDef) => Math.max(200, Math.round((car.price + (car.bucks ?? 0) * 1000) * 0.25 / 10) * 10)
 export const rushBucks = (msLeft: number) => Math.max(1, Math.ceil(msLeft / 1800000))
 
-export const carDef = (id: string) => CARS.find((c) => c.id === id)!
+// Same idea as buildingDef: a car from a newer build drives as the starter car
+// under a placeholder name, can't be sold or scrapped, and keeps its real id.
+const parkedCars = new Map<string, CarDef>()
+function parkedCar(id: string): CarDef {
+  let c = parkedCars.get(id)
+  if (!c) {
+    c = { ...CARS[0], id, name: 'Coming Soon', price: 0, bucks: undefined, skill: undefined, parked: true }
+    parkedCars.set(id, c)
+  }
+  return c
+}
+export const carDef = (id: string): CarDef => CARS.find((c) => c.id === id) ?? parkedCar(id)
 
 export type UpgradeSlot = 'engine' | 'turbo' | 'tires' | 'weight'
 export const UPGRADE_SLOTS: { id: UpgradeSlot; name: string }[] = [
@@ -286,3 +317,17 @@ export const PAINTS: { color: string; name: string; bucks?: number }[] = [
 export const STRIPES = [null, '#fafafa', '#212121', '#e53935', '#fdd835', '#1e88e5']
 export const PAINT_COST = 150
 export const STRIPE_COST = 100
+
+// Garage power: the combined PI of a player's five best cars.
+export const POWER_CARS = 5
+export const garagePower = (cars: { model: string; upgrades: Record<UpgradeSlot, number> }[]) =>
+  cars
+    .map((c) => performance(carDef(c.model), c.upgrades))
+    .sort((a, b) => b - a)
+    .slice(0, POWER_CARS)
+    .reduce((a, b) => a + b, 0)
+
+export const CLAN_COST = 2000
+export const CLAN_CAP = 20
+export const CLAN_EMBLEMS = ['🏁', '🔥', '⚡', '🦅', '🐺', '💀', '👑', '🚀', '🐉', '⭐', '🏎️', '🛞']
+export const CLAN_COLORS = ['#ff7043', '#e53935', '#8e24aa', '#1e88e5', '#00897b', '#43a047', '#fdd835', '#546e7a']
