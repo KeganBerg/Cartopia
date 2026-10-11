@@ -1,8 +1,7 @@
 // Scheduled every minute (netlify.toml): sends the push alerts that are due.
-// Needs Netlify env vars SUPABASE_SERVICE_ROLE_KEY and VAPID_PRIVATE_KEY (both secret);
-// does nothing until they are set.
+// Needs Netlify env vars VITE_VAPID_PUBLIC_KEY, plus SUPABASE_SERVICE_ROLE_KEY and
+// VAPID_PRIVATE_KEY (both secret); does nothing until they are set.
 import webpush from 'web-push'
-import { VAPID_PUBLIC_KEY } from '../../src/lib/vapid'
 
 type Due = { kind: string; title: string; body: string; endpoint: string; p256dh: string; auth: string }
 
@@ -10,7 +9,8 @@ export default async () => {
   const url = process.env.VITE_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   const vapid = process.env.VAPID_PRIVATE_KEY
-  if (!url || !key || !vapid) return new Response('push not configured', { status: 200 })
+  const vapidPublic = process.env.VITE_VAPID_PUBLIC_KEY
+  if (!url || !key || !vapid || !vapidPublic) return new Response('push not configured', { status: 200 })
   // New-style secret keys (sb_secret_...) go in apikey only; legacy service_role JWTs also as a bearer token.
   const headers: Record<string, string> = { apikey: key, 'Content-Type': 'application/json' }
   if (key.startsWith('eyJ')) headers.Authorization = `Bearer ${key}`
@@ -20,7 +20,7 @@ export default async () => {
   const due = (await res.json()) as Due[]
   if (!due.length) return new Response('nothing due')
 
-  webpush.setVapidDetails('https://cartopia2026.netlify.app', VAPID_PUBLIC_KEY, vapid)
+  webpush.setVapidDetails('https://cartopia2026.netlify.app', vapidPublic, vapid)
   const gone: string[] = []
   let sent = 0
   await Promise.all(due.map(async (d) => {

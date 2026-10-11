@@ -113,3 +113,4 @@ function friendlyAuthError(message: string, signUp: boolean): string {
   if (m.includes('email')) return 'Please enter a valid email address.'
   return message
 }
+

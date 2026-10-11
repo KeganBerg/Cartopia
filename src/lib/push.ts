@@ -5,7 +5,6 @@
 // without push) fall back to timers, which only fire while the tab stays open.
 import { create } from 'zustand'
 import { supabase } from './supabase'
-import { VAPID_PUBLIC_KEY } from './vapid'
 import { useGame, fuelCap, type GameState } from '../game/store'
 import { buildingDef, FUEL_REGEN_SECONDS } from '../game/data'
 
@@ -39,7 +38,9 @@ export function alertsFor(s: Pick<GameState, 'buildings' | 'restoring' | 'fuel' 
 
 const hasWindow = typeof window !== 'undefined'
 export const notifySupported = () => hasWindow && 'Notification' in window
-const pushSupported = () => hasWindow && 'serviceWorker' in navigator && 'PushManager' in window && notifySupported()
+// Public half of the push key pair, from the Netlify env var of the same name.
+const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY
+const pushSupported = () => !!VAPID_PUBLIC_KEY && hasWindow && 'serviceWorker' in navigator && 'PushManager' in window && notifySupported()
 export const isStandalone = () =>
   hasWindow && (window.matchMedia?.('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true)
 // iPhones and iPads only allow alerts from a game added to the Home Screen.
@@ -68,7 +69,8 @@ const write = (k: string, v: string) => {
     localStorage.setItem(k, v)
   } catch { /* private mode: the setting just won't stick */ }
 }
-const wantsOn = () => notifySupported() && Notification.permission === 'granted' && read(KEY) === '1'
+// cartopia-notify: the in-tab-only switch this replaced; players who turned it on stay on.
+const wantsOn = () => notifySupported() && Notification.permission === 'granted' && (read(KEY) ?? read('cartopia-notify')) === '1'
 
 // ---- Server side: this device's subscription and the pending alerts ----
 
@@ -92,7 +94,7 @@ async function saveSubscription() {
   const reg = await registration()
   if (!reg) return
   let sub = await reg.pushManager.getSubscription()
-  sub ??= await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(VAPID_PUBLIC_KEY) })
+  sub ??= await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(VAPID_PUBLIC_KEY!) })
   const j = sub.toJSON()
   const { error } = await supabase.rpc('push_subscribe', { p_endpoint: j.endpoint, p_p256dh: j.keys?.p256dh, p_auth: j.keys?.auth })
   if (!error) synced = userId

@@ -24,6 +24,7 @@ export type NewModelProps = { def: BuildingDef; ghost?: boolean; m: Mat; win: Re
 export const NEW_MODELS = new Set([
   'coffee', 'tacos', 'lube', 'arcade', 'bodyshop', 'market', 'firehouse', 'police', 'parkade', 'club',
   'pine', 'hedge', 'fence', 'picnic', 'busstop', 'hotdog', 'flagpole', 'arch', 'playground', 'gazebo', 'clocktower',
+  'pumpkins', 'scarecrow', 'graves', 'deadtree',
 ])
 
 const GOLD = '#ffc107'
@@ -746,6 +747,134 @@ export function NewBuildingModel({ def, ghost, m, win, bulb, level = 1 }: NewMod
           {trim && lvl >= 5 && <Bulbs from={[-1.72, top + 0.24, 1.6]} to={[1.72, top + 0.24, 1.6]} n={13} />}
           {trim && lvl >= 8 && <Flag at={[-1.4, top + 0.2, -1.5]} color="#1565c0" star={lvl >= 10} />}
           {!ghost && <Pool r={1.4} z={0.6} />}
+        </group>
+      )
+    }
+
+    // ---- Spooky Season decorations ----
+    case 'pumpkins': {
+      const pumpkins: [number, number, number][] = [[-0.45, -0.35, 0.34], [0.4, -0.45, 0.26], [0.5, 0.35, 0.3], [-0.5, 0.45, 0.22], [0.02, 0.05, 0.42]]
+      return (
+        <group>
+          <Box m={m} at={[0, 0.03, 0]} s={[1.75, 0.06, 1.75]} c="#5d4037" shadow={false} />
+          {/* Vines across the patch. */}
+          {[[-0.2, -0.4, 0.5], [0.3, 0.1, -0.7], [-0.3, 0.3, 1.1]].map(([x, z, r], i) => (
+            <Box key={i} m={m} at={[x, 0.08, z]} rot={[0, r, 0]} s={[1.0, 0.03, 0.05]} c="#558b2f" shadow={false} />
+          ))}
+          {pumpkins.map(([x, z, r], i) => (
+            <group key={i} position={[x, r * 0.72, z]}>
+              <mesh scale={[1, 0.72, 1]} castShadow><sphereGeometry args={[r, 12, 8]} />{m(i % 2 ? '#fb8c00' : '#ef6c00')}</mesh>
+              <Cyl m={m} at={[0, r * 0.78, 0]} r={r * 0.12} r2={r * 0.16} h={r * 0.4} c="#33691e" seg={5} />
+            </group>
+          ))}
+          {/* The big one is carved: its face glows after dark. */}
+          <group position={[0.02, 0.42 * 0.72, 0.05 + 0.4]}>
+            {[-0.13, 0.13].map((x) => (
+              <mesh key={x} position={[x, 0.07, 0.004]} rotation-z={Math.PI}><circleGeometry args={[0.07, 3]} />{bulb}</mesh>
+            ))}
+            <mesh position={[0, -0.09, 0.004]} scale={[1, 0.45, 1]}><circleGeometry args={[0.17, 7, Math.PI, Math.PI]} />{bulb}</mesh>
+          </group>
+          {trim && <Box m={m} at={[0.75, 0.2, -0.75]} s={[0.36, 0.26, 0.26]} c="#e0c068" />}
+        </group>
+      )
+    }
+    case 'scarecrow':
+      return (
+        <group>
+          <Cyl m={m} at={[0, 0.85, 0]} r={0.05} h={1.7} c="#6d4c41" seg={6} />
+          <Box m={m} at={[0, 1.2, 0]} s={[1.2, 0.07, 0.07]} c="#6d4c41" />
+          {/* Plaid shirt, overalls and straw. */}
+          <Box m={m} at={[0, 1.08, 0]} s={[0.46, 0.42, 0.24]} c="#c62828" />
+          <Box m={m} at={[0, 0.8, 0]} s={[0.4, 0.26, 0.22]} c="#3f51b5" />
+          {[-1, 1].map((sd) => (
+            <group key={sd}>
+              <Box m={m} at={[sd * 0.4, 1.2, 0]} s={[0.36, 0.14, 0.16]} c="#c62828" />
+              <mesh position={[sd * 0.62, 1.2, 0]} rotation-z={sd * -Math.PI / 2}><coneGeometry args={[0.07, 0.16, 6]} />{m('#fdd835')}</mesh>
+              <mesh position={[sd * 0.1, 0.6, 0]} rotation-z={Math.PI}><coneGeometry args={[0.07, 0.2, 6]} />{m('#fdd835')}</mesh>
+            </group>
+          ))}
+          <mesh position={[0, 1.45, 0]} castShadow><sphereGeometry args={[0.17, 10, 8]} />{m('#d7b98a')}</mesh>
+          {[-0.06, 0.06].map((x) => <Box key={x} m={m} at={[x, 1.48, 0.16]} s={[0.04, 0.04, 0.02]} c="#212121" shadow={false} />)}
+          <Box m={m} at={[0, 1.4, 0.165]} s={[0.12, 0.02, 0.02]} c="#212121" shadow={false} />
+          <Cyl m={m} at={[0, 1.58, 0]} r={0.3} h={0.03} c="#6d4c41" seg={12} />
+          <mesh position={[0, 1.74, 0]} castShadow><coneGeometry args={[0.16, 0.32, 10]} />{m('#6d4c41')}</mesh>
+          {/* A crow on the arm, and a hay bale at his feet. */}
+          <group position={[0.5, 1.3, 0]}>
+            <mesh scale={[1.4, 1, 1]}><sphereGeometry args={[0.06, 8, 6]} />{m('#212121')}</mesh>
+            <mesh position={[0.1, 0.04, 0]} rotation-z={-Math.PI / 2}><coneGeometry args={[0.025, 0.06, 4]} />{m('#ffb300')}</mesh>
+          </group>
+          {trim && <Box m={m} at={[-0.5, 0.17, 0.45]} s={[0.55, 0.34, 0.34]} c="#e0c068" />}
+          {trim && (
+            <group position={[0.45, 0.16, 0.5]}>
+              <mesh scale={[1, 0.72, 1]} castShadow><sphereGeometry args={[0.2, 10, 8]} />{m('#ef6c00')}</mesh>
+            </group>
+          )}
+        </group>
+      )
+    case 'graves': {
+      const stones: [number, number, number, number][] = [[-0.5, -0.3, 0.55, 0.1], [0.05, -0.45, 0.7, -0.08], [0.55, -0.2, 0.5, 0.15]]
+      return (
+        <group>
+          <Box m={m} at={[0, 0.03, 0]} s={[1.8, 0.06, 1.8]} c="#4e5b31" shadow={false} />
+          {stones.map(([x, z, h, tilt], i) => (
+            <group key={i} position={[x, 0, z]} rotation={[0, 0, tilt]}>
+              <Box m={m} at={[0, h / 2, 0]} s={[0.36, h, 0.1]} c="#9e9e9e" />
+              <mesh position={[0, h, 0]} rotation-x={Math.PI / 2} castShadow><cylinderGeometry args={[0.18, 0.18, 0.1, 12, 1, false, -Math.PI / 2, Math.PI]} />{m('#9e9e9e')}</mesh>
+              <Box m={m} at={[0, h * 0.65, 0.052]} s={[0.18, 0.03, 0.01]} c="#616161" shadow={false} />
+              <Box m={m} at={[0, 0.07, 0.3]} s={[0.34, 0.06, 0.4]} c="#5d4037" shadow={false} />
+            </group>
+          ))}
+          {/* A stone cross, an iron fence along the front and a lantern that lights at night. */}
+          <group position={[-0.55, 0, 0.4]}>
+            <Box m={m} at={[0, 0.4, 0]} s={[0.08, 0.8, 0.08]} c="#bdbdbd" />
+            <Box m={m} at={[0, 0.58, 0]} s={[0.36, 0.08, 0.08]} c="#bdbdbd" />
+          </group>
+          {trim && Array.from({ length: 9 }, (_, i) => (
+            <Box key={i} m={m} at={[-0.8 + i * 0.2, 0.22, 0.85]} s={[0.03, 0.44, 0.03]} c="#263238" shadow={false} />
+          ))}
+          {trim && <Box m={m} at={[0, 0.38, 0.85]} s={[1.65, 0.03, 0.03]} c="#263238" shadow={false} />}
+          <group position={[0.55, 0, 0.45]}>
+            <Cyl m={m} at={[0, 0.35, 0]} r={0.025} h={0.7} c="#263238" seg={6} />
+            <mesh position={[0, 0.76, 0]}><boxGeometry args={[0.13, 0.16, 0.13]} />{bulb}</mesh>
+            <mesh position={[0, 0.88, 0]}><coneGeometry args={[0.11, 0.1, 4]} />{m('#263238')}</mesh>
+          </group>
+        </group>
+      )
+    }
+    case 'deadtree': {
+      // Bare, twisted branches with lanterns hanging off them.
+      const branches: [number, number, number, number, number][] = [
+        [0.28, 1.55, 0, 0.9, 0.55], [-0.3, 1.45, 0.1, -0.85, 0.5], [0.05, 1.8, -0.2, 0.25, 0.45], [-0.12, 1.25, -0.25, -0.5, 0.4],
+      ]
+      return (
+        <group>
+          <Cyl m={m} at={[0, 0.55, 0]} r={0.1} r2={0.2} h={1.1} c="#3e2723" seg={7} />
+          <Cyl m={m} at={[0.06, 1.3, 0]} r={0.07} r2={0.1} h={0.6} c="#3e2723" seg={7} rot={[0, 0, -0.15]} />
+          {branches.map(([x, y, z, rz, len], i) => (
+            <group key={i}>
+              <Cyl m={m} at={[x, y, z]} r={0.025} r2={0.05} h={len} c="#3e2723" seg={5} rot={[0, 0, rz]} />
+              <Cyl m={m} at={[x * 1.6, y + 0.18, z]} r={0.012} r2={0.025} h={0.25} c="#3e2723" seg={4} rot={[0, 0, -rz * 0.6]} />
+            </group>
+          ))}
+          {[[0.55, 1.45, 0.05], [-0.55, 1.36, 0.12], [0.12, 1.75, -0.3]].map(([x, y, z], i) => (
+            <group key={i} position={[x, y, z]}>
+              <Cyl m={m} at={[0, 0.1, 0]} r={0.006} h={0.2} c="#212121" seg={4} />
+              <mesh position={[0, -0.04, 0]}><sphereGeometry args={[0.07, 8, 6]} />{bulb}</mesh>
+            </group>
+          ))}
+          {/* Roots, and a bat resting on the top branch. */}
+          {[0, 1, 2, 3].map((i) => (
+            <Cyl key={i} m={m} at={[Math.sin(i * 1.7) * 0.22, 0.06, Math.cos(i * 1.7) * 0.22]} r={0.03} r2={0.06} h={0.35} c="#3e2723" seg={5} rot={[Math.cos(i * 1.7) * 1.2, 0, -Math.sin(i * 1.7) * 1.2]} />
+          ))}
+          <group position={[0.15, 2.08, -0.2]}>
+            <mesh><sphereGeometry args={[0.05, 6, 5]} />{m('#212121')}</mesh>
+            {[-1, 1].map((sd) => <Box key={sd} m={m} at={[sd * 0.09, 0.01, 0]} rot={[0, 0, sd * 0.4]} s={[0.12, 0.015, 0.07]} c="#212121" shadow={false} />)}
+          </group>
+          {trim && (
+            <group position={[-0.45, 0.13, 0.45]}>
+              <mesh scale={[1, 0.72, 1]} castShadow><sphereGeometry args={[0.18, 10, 8]} />{m('#ef6c00')}</mesh>
+            </group>
+          )}
         </group>
       )
     }

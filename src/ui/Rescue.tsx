@@ -43,7 +43,7 @@ function RestoreBay({ onCollect }: { onCollect: () => void }) {
   const pct = done ? 100 : 100 - (left / (r.minutes * 60000)) * 100
   return (
     <div className={done ? 'bay done' : 'bay'}>
-      <CarThumb size="sm" color={d.colors[0]} body={d.body} rusty={!done} />
+      <CarThumb size="sm" color={d.colors[0]} body={d.body} model={d.id} rusty={!done} />
       <div className="bay-info">
         <b>{d.name}</b> <RarityTag r={r.rarity} />
         {done ? (
@@ -74,7 +74,7 @@ function Storage() {
         const d = carDef(c.model)
         return (
           <div key={c.uid} className="card junk-card">
-            <CarThumb color={d.colors[0]} body={d.body} rusty />
+            <CarThumb color={d.colors[0]} body={d.body} model={d.id} rusty />
             <div className="card-name">{d.name}</div>
             <div className="card-stat"><RarityTag r={c.rarity} /> PI {performance(d, { engine: 0, turbo: 0, tires: 0, weight: 0 })}{d.rescueOnly ? ' · Classic' : ''}</div>
             <SkillTag model={c.model} />
@@ -166,7 +166,7 @@ function SearchScreen() {
       {!started && !busy && !auto && <div className="rs-coach">👆 Tap a glowing spot</div>}
       {pop && popLabel && (
         <div key={found!.n} className={pop.kind === 'car' ? `rs-found car rr-${pop.rarity}` : 'rs-found'}>
-          {pop.kind === 'car' ? <CarThumb size="xs" body={carDef(pop.model).body} color={carDef(pop.model).colors[0]} rusty /> : <span className="rs-found-icon">{popLabel.icon}</span>}
+          {pop.kind === 'car' ? <CarThumb size="xs" body={carDef(pop.model).body} model={pop.model} color={carDef(pop.model).colors[0]} rusty /> : <span className="rs-found-icon">{popLabel.icon}</span>}
           <b>{popLabel.text}</b>
           {pop.kind === 'car' && <RarityTag r={pop.rarity} />}
         </div>
@@ -212,7 +212,7 @@ function PlateScreen({ onDone }: { onDone: () => void }) {
   const d = carDef(r.model)
   return (
     <div className="plate-screen">
-      <CarPreview body={d.body} color={d.colors[0]} />
+      <CarPreview body={d.body} model={d.id} color={d.colors[0]} />
       <h3>{d.name} <RarityTag r={r.rarity} /></h3>
       <p className="hint">Name your car on its license plate. You can't change it later.</p>
       <input className="plate-input" value={plate} maxLength={7} placeholder="RUSTY1" onChange={(e) => setPlate(e.target.value.toUpperCase().replace(/[^A-Z0-9 ]/g, ''))} autoFocus />

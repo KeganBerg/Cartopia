@@ -1,7 +1,10 @@
 // Tables the server's save guard uses to check restores and Grand Prix wins
-// (supabase/migrations/0016_econ_restore_gp.sql). guardTables.test.ts keeps them in step.
-import { GP_ROUNDS, GP_SERIES, RARITY, RESCUE_SPOTS } from './data'
+// (supabase/migrations/0016_econ_restore_gp.sql, 0022_rescue_rolls.sql). guardTables.test.ts keeps them in step.
+import { GP_ROUNDS, GP_SERIES, RARITY, RESCUE_CAR_CHANCE, RESCUE_PINS, RESCUE_SPOTS, type Rarity } from './data'
 import { MAX_RACE_PI, freshRacer, raceFloor, stepRacer } from './race'
+
+// Pins in one search, and the chance each one hides a car.
+export const rescueRoll = () => ({ pins: RESCUE_PINS, car: RESCUE_CAR_CHANCE })
 
 // The shortest restore time for each car: the rarity it has at the spot where it's commonest.
 export function restoreMinutes(): Record<string, number> {
@@ -10,6 +13,15 @@ export function restoreMinutes(): Record<string, number> {
     for (const c of spot.cars) out[c.model] = Math.min(out[c.model] ?? Infinity, RARITY[c.rarity].minutes)
   }
   return out
+}
+
+// Rusty's search spots as the server rolls them (rescue_roll()): the level each opens at, and its
+// cars with their rarities. Plus each rarity's weight in a roll and its restore minutes.
+export function rescueSpots(): Record<string, { unlock: number; cars: [string, Rarity][] }> {
+  return Object.fromEntries(RESCUE_SPOTS.map((s) => [s.id, { unlock: s.unlockLevel, cars: s.cars.map((c): [string, Rarity] => [c.model, c.rarity]) }]))
+}
+export function rarities(): Record<Rarity, { weight: number; minutes: number }> {
+  return Object.fromEntries(Object.entries(RARITY).map(([k, r]) => [k, { weight: r.weight, minutes: r.minutes }])) as Record<Rarity, { weight: number; minutes: number }>
 }
 
 // Each series' hardest rival is the last round's: (basePi + 5 steps), plus 8% per earlier clear.
