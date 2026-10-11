@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, type ReactNode } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Color, CylinderGeometry, MeshStandardMaterial, type Group, type Object3D, type Texture } from 'three'
+import { AdditiveBlending, Color, ConeGeometry, CylinderGeometry, IcosahedronGeometry, InstancedMesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, type Group, type Mesh, type Texture } from 'three'
 import { Box, Cyl, Pool, type Mat, type V3 } from './NewBuildings'
 import { Bench, GlassBlock, Lamp, PadLights, Planter, glassMat } from './OfficeBuildings'
 import { CarModel } from './CarModel'
@@ -230,9 +230,25 @@ function flight(c: number, pad: V3, out: { x: number; y: number; z: number; bank
   }
 }
 
+// Jet fire and the smoke it leaves: shared by every tower, one instanced draw for all the puffs.
+const flameGeo = new ConeGeometry(0.06, 0.32, 8, 1, true).rotateX(Math.PI).translate(0, -0.16, 0)
+const coreGeo = new ConeGeometry(0.035, 0.18, 8, 1, true).rotateX(Math.PI).translate(0, -0.09, 0)
+const flameMat = new MeshBasicMaterial({ color: '#ff7a1a', transparent: true, opacity: 0.85, blending: AdditiveBlending, depthWrite: false, toneMapped: false })
+const flameCore = new MeshBasicMaterial({ color: '#fff3b0', transparent: true, opacity: 0.95, blending: AdditiveBlending, depthWrite: false, toneMapped: false })
+const puffGeo = new IcosahedronGeometry(0.1, 0)
+const puffMat = new MeshStandardMaterial({ color: '#eef0f2', transparent: true, opacity: 0.72, depthWrite: false, flatShading: true })
+const PUFFS = 36
+const PUFF_LIFE = 1.8
+const JETS: [number, number][] = [[-0.2, 0.27], [0.2, 0.27], [-0.2, -0.27], [0.2, -0.27]]
+const dummy = new Object3D()
+
 function Skyhopper({ pad }: { pad: V3 }) {
   const craft = useRef<Group>(null)
   const jets = useRef<Group>(null)
+  const flames = useRef<(Mesh | null)[]>([])
+  const smoke = useRef<InstancedMesh>(null)
+  const puffs = useRef(Array.from({ length: PUFFS }, () => ({ x: 0, y: 0, z: 0, born: -99 })))
+  const emit = useRef({ next: 0, i: 0 })
   const at = useRef({ x: 0, y: 0, z: 0, bank: 0 })
   const next = useRef({ x: 0, y: 0, z: 0, bank: 0 })
   useLayoutEffect(() => {
@@ -251,22 +267,61 @@ function Skyhopper({ pad }: { pad: V3 }) {
     const vz = q.z - p.z
     // Point along the way it's flying; parked, it keeps facing the way it landed.
     if (vx * vx + vz * vz > 1e-6) g.rotation.set(0, Math.atan2(vx, vz), -p.bank, 'YXZ')
-    if (jets.current) jets.current.visible = p.y > 0.01
+    const flying = p.y > 0.01
+    if (jets.current) jets.current.visible = flying
+    const t = clock.elapsedTime
+    // Flickering jet flames, longer while climbing away from the pad.
+    flames.current.forEach((f, i) => {
+      if (!f) return
+      const k = 0.75 + 0.25 * Math.sin(t * 31 + i * 1.7) + 0.15 * Math.sin(t * 53 + i)
+      f.scale.set(1, k * (p.y < HOP * 1.2 ? 1.25 : 1), 1)
+    })
+    // Smoke: a puff off the jets every few frames, drifting, swelling and fading out.
+    const e = emit.current
+    if (flying && t >= e.next) {
+      e.next = t + 0.07
+      const pf = puffs.current[e.i]
+      e.i = (e.i + 1) % PUFFS
+      pf.x = p.x + (Math.random() - 0.5) * 0.12
+      pf.y = p.y - 0.12
+      pf.z = p.z + (Math.random() - 0.5) * 0.12
+      pf.born = t
+    }
+    const sm = smoke.current
+    if (!sm) return
+    puffs.current.forEach((pf, i) => {
+      const age = (t - pf.born) / PUFF_LIFE
+      const live = age >= 0 && age < 1
+      const sc = live ? (0.5 + age * 2.2) * Math.sin(Math.PI * Math.min(1, age * 1.15)) : 0
+      dummy.position.set(pf.x, pf.y - age * 0.25 + age * age * 0.4, pf.z)
+      dummy.rotation.set(i, age * 1.5, i * 0.7)
+      dummy.scale.setScalar(Math.max(sc, 0.0001))
+      dummy.updateMatrix()
+      sm.setMatrixAt(i, dummy.matrix)
+    })
+    sm.instanceMatrix.needsUpdate = true
   })
   return (
-    <group ref={craft} userData={{ noBatch: true }}>
+    <group userData={{ noBatch: true }}>
+    <instancedMesh ref={smoke} args={[puffGeo, puffMat, PUFFS]} frustumCulled={false} raycast={NO_RAY} />
+    <group ref={craft}>
       <group scale={0.72}>
         <CarModel body="wedge" color="#eceff1" stripe="#00bcd4" />
       </group>
-      {/* Hover jets: four cyan glows under the car, lit while it flies. */}
+      {/* Hover jets: four cyan glows under the car, each blowing a cone of fire while it flies. */}
       <group ref={jets} visible={false}>
-        {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => (
-          <mesh key={`${sx}${sz}`} position={[sx * 0.2, 0.03, sz * 0.27]} rotation-x={Math.PI / 2}>
-            <circleGeometry args={[0.07, 12]} />
-            {coreEl()}
-          </mesh>
-        )))}
+        {JETS.map(([x, z], i) => (
+          <group key={i} position={[x, 0.03, z]}>
+            <mesh rotation-x={Math.PI / 2}>
+              <circleGeometry args={[0.07, 12]} />
+              {coreEl()}
+            </mesh>
+            <mesh ref={(m) => void (flames.current[i] = m)} geometry={flameGeo} material={flameMat} raycast={NO_RAY} />
+            <mesh geometry={coreGeo} material={flameCore} raycast={NO_RAY} />
+          </group>
+        ))}
       </group>
+    </group>
     </group>
   )
 }
