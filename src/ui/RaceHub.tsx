@@ -1,0 +1,160 @@
+import { useState } from 'react'
+import { useGame, type OwnedCar } from '../game/store'
+import { CAMPAIGN, CAMPAIGN_RACES, GP_ROUNDS, GP_SERIES, RACE_FUEL, SKILLS, campaignCleared, campaignRaceId, campaignReward, carDef, msToNextWeek, performance } from '../game/data'
+import { TOUR_RACES, tourLeg, tourLegOf, tourPrize, tourRivalName } from '../game/tour'
+import { shortLeft, trialVenue, trialWeek } from '../game/trial'
+import { localBest } from '../lib/trialServer'
+import { useLive } from '../lib/live'
+import { supabase } from '../lib/supabase'
+import { venue as venueById } from '../scene/venues'
+import { CarThumb } from '../scene/BuildingPreview'
+import { RivalTile, type RivalMatch } from './Rivals'
+import { artClass, artStyle } from './venueArt'
+
+// The Race menu's front page: every race mode as a tile on one screen, each
+// showing its next race, so nothing needs scrolling to find.
+
+export type HubTab = 'quick' | 'campaign' | 'tour' | 'gp' | 'trial'
+
+const money = (n: number) => (n >= 10000 ? `$${Math.round(n / 1000)}k` : `$${n.toLocaleString()}`)
+
+// The chapter the campaign should open on (the first open, uncleared one) and its next race (-1: none left).
+export function campaignFocus(done: Record<string, number>, level: number) {
+  const opened = (ci: number) => level >= CAMPAIGN[ci].unlockLevel && (ci === 0 || campaignCleared(done, CAMPAIGN[ci - 1]))
+  const first = CAMPAIGN.findIndex((ch, ci) => opened(ci) && !campaignCleared(done, ch))
+  const ci = first === -1 ? CAMPAIGN.reduce((n, _, i) => (opened(i) ? i : n), 0) : first
+  const next = first === -1 ? -1 : Array.from({ length: CAMPAIGN_RACES }, (_, i) => done[campaignRaceId(CAMPAIGN[ci], i)] ?? 0).findIndex((n) => n === 0)
+  return { ci, next, opened }
+}
+
+export function Pips({ n, of, dark }: { n: number; of: number; dark?: boolean }) {
+  return <span className={dark ? 'rm-pips dark' : 'rm-pips'} aria-label={`${n} of ${of}`}>{Array.from({ length: of }, (_, i) => <i key={i} className={i < n ? 'on' : ''} />)}</span>
+}
+
+export function RaceHub({ onOpen, onCampaign, onTour, onRival }: { onOpen: (t: HubTab) => void; onCampaign: (ci: number, race: number) => void; onTour: () => void; onRival: (m: RivalMatch) => void }) {
+  const level = useGame((s) => s.level)
+  const done = useGame((s) => s.campaign)
+  const won = useGame((s) => s.tour ?? 0)
+  const gp = useGame((s) => s.gp)
+  const carCount = useGame((s) => s.cars.length)
+  const openPanel = useGame((s) => s.openPanel)
+  const live = useLive((l) => l.players.length)
+  const signedIn = useLive((l) => l.signedIn)
+
+  const { ci, next } = campaignFocus(done, level)
+  const ch = CAMPAIGN[ci]
+  const stars = Object.values(done).reduce((a, n) => a + n, 0)
+  const maxStars = CAMPAIGN.length * CAMPAIGN_RACES * 3
+
+  const tourOpen = campaignCleared(done, CAMPAIGN[0])
+  const leg = tourLeg(tourLegOf(won))
+  const tv = venueById(leg.venue)
+
+  // The Grand Prix series most worth showing: one under way, else the first that can be entered.
+  const series = GP_SERIES.find((s) => (gp[s.id]?.round ?? 0) > 0 && level >= s.unlockLevel)
+    ?? GP_SERIES.find((s) => level >= s.unlockLevel && carCount >= s.minCars) ?? GP_SERIES[0]
+  const round = gp[series.id]?.round ?? 0
+
+  const week = trialWeek()
+  const trial = trialVenue(week)
+  const best = localBest(week)
+
+  // A tile opens its mode; its button (where it has one) starts the next race straight away.
+  const tile = (tab: HubTab) => ({ role: 'button', tabIndex: 0, onClick: () => onOpen(tab), onKeyDown: (e: React.KeyboardEvent) => (e.key === 'Enter' || e.key === ' ') && onOpen(tab) })
+  const stop = (fn: () => void) => (e: React.MouseEvent) => { e.stopPropagation(); fn() }
+
+  return (
+    <div className="rm-hub">
+      <div className={`rm-tile rm-camp rm-photo${artClass(ch.venue)}`} style={artStyle(ch.venue)} {...tile('campaign')}>
+        <span className="rm-tag">CAMPAIGN</span>
+        <b className="rm-ttl">{ch.name}</b>
+        <span className="rm-meta">Chapter {ci + 1} of {CAMPAIGN.length} · ⭐ {stars}/{maxStars}</span>
+        <span className="rm-progress"><i style={{ width: `${(stars / maxStars) * 100}%` }} /></span>
+        {next >= 0 && (
+          <span className="rm-cta"><span>{ch.rivals[next]}</span><button className="buy small" onClick={stop(() => onCampaign(ci, next))}>{money(campaignReward(ch, next, true))}</button></span>
+        )}
+      </div>
+
+      <div className={`rm-tile rm-tour rm-photo${artClass(leg.venue, leg.night)}${tourOpen ? '' : ' rm-locked'}`} style={artStyle(leg.venue, leg.night)} {...tile('tour')}>
+        <span className="rm-tag">PRO TOUR</span>
+        <b className="rm-ttl">{leg.night ? `${tv.name} at Midnight` : `${tv.name} ${leg.name}`}</b>
+        {tourOpen ? (
+          <>
+            <span className="rm-meta">Leg {leg.index + 1}{leg.night ? ' · 🌙' : ''} <Pips n={won % TOUR_RACES} of={TOUR_RACES} /></span>
+            <span className="rm-cta"><span>{tourRivalName(won)}</span><button className="buy small" onClick={stop(onTour)}>{money(tourPrize(won))}</button></span>
+          </>
+        ) : <span className="rm-meta">🔒 Clear Back Streets to open</span>}
+      </div>
+
+      <RivalTile onRace={onRival} />
+
+      <div className={`rm-tile rm-gp rm-photo${level < series.unlockLevel ? ' rm-locked' : ''}`} style={artStyle('main')} {...tile('gp')}>
+        <span className="rm-tag">GRAND PRIX</span>
+        <b className="rm-ttl">{series.name}</b>
+        <span className="rm-meta"><Rounds round={round} /></span>
+        <span className="rm-meta">🎁 Mystery car at race {GP_ROUNDS}</span>
+      </div>
+
+      <div className={`rm-tile rm-trial rm-photo${artClass(trial.id)}`} style={artStyle(trial.id)} {...tile('trial')}>
+        <span className="rm-tag">TIME TRIAL</span>
+        <b className="rm-ttl">{trial.name}</b>
+        <span className="rm-meta">⏱️ {best !== null ? `${best.toFixed(3)}s` : 'No time yet'}</span>
+        <span className="rm-meta">⏳ {shortLeft(msToNextWeek())} left</span>
+      </div>
+
+      <div className="rm-minis">
+        <button className="rm-mini" onClick={() => onOpen('quick')}><span className="rm-mi">🏁</span><span><b>Quick race</b><small>Pick a rival</small></span></button>
+        {supabase && (
+          <button className="rm-mini" onClick={() => onOpen('quick')}>
+            {live > 0 && <span className="rm-dot">{live}</span>}
+            <span className="rm-mi">🟢</span><span><b>Live</b><small>{!signedIn ? 'Sign in' : live > 0 ? `${live} online` : 'Nobody on'}</small></span>
+          </button>
+        )}
+        <button className="rm-mini" onClick={() => openPanel('friends')}><span className="rm-mi">👻</span><span><b>Ghosts</b><small>Friends</small></span></button>
+        <button className="rm-mini" onClick={() => openPanel('leaders')}><span className="rm-mi">🏅</span><span><b>Top racers</b><small>Leaders</small></span></button>
+      </div>
+    </div>
+  )
+}
+
+export function Rounds({ round }: { round: number }) {
+  return (
+    <span className="rm-rounds" aria-label={`Race ${round + 1} of ${GP_ROUNDS}`}>
+      {Array.from({ length: GP_ROUNDS }, (_, i) => <i key={i} className={i < round ? 'won' : i === round ? 'next' : ''}>{i < round ? '✔' : i + 1}</i>)}
+    </span>
+  )
+}
+
+// The bar along the bottom of every Race menu screen: the car you race with
+// (tap to swap) and, where the screen has one, the button for its next race.
+export function RaceBar({ cars, car, onPick, go, note }: { cars: OwnedCar[]; car: OwnedCar | undefined; onPick: (uid: string) => void; go?: { label: string; onClick: () => void } | null; note?: string }) {
+  const [open, setOpen] = useState(false)
+  if (!car) return null
+  const d = carDef(car.model)
+  const pi = (c: OwnedCar) => performance(carDef(c.model), c.upgrades, c.mods)
+  const skill = d.skill ? SKILLS[d.skill] : null
+  return (
+    <div className="rm-bar">
+      {open && (
+        <div className="rm-picker" role="listbox" aria-label="Pick a car">
+          {[...cars].sort((a, b) => pi(b) - pi(a)).map((c) => (
+            <button key={c.uid} role="option" aria-selected={c.uid === car.uid} className={c.uid === car.uid ? 'chip sel' : 'chip'} onClick={() => { onPick(c.uid); setOpen(false) }}>
+              <CarThumb size="xs" color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} body={carDef(c.model).body} model={c.model} stripe={c.stripe} mods={c.mods} />
+              <span>{carDef(c.model).name}</span><span className="rm-pi">PI {pi(c)}</span>{carDef(c.model).skill ? ` ${SKILLS[carDef(c.model).skill!].icon}` : ''}
+            </button>
+          ))}
+        </div>
+      )}
+      <button className="rm-car" onClick={() => setOpen((o) => !o)} disabled={cars.length < 2} aria-expanded={open}>
+        <CarThumb size="xs" color={car.color} finish={car.finish} skin={car.skin} modSkin={car.modSkin} body={d.body} model={car.model} stripe={car.stripe} mods={car.mods} />
+        <span className="rm-car-txt">
+          <b>{d.name}</b>
+          <small><span className="rm-pi">PI {pi(car)}</span>{skill && <> {skill.icon} {skill.name}</>}</small>
+        </span>
+        {cars.length > 1 && <span className="rm-chev" aria-hidden>{open ? '▴' : '▾'}</span>}
+      </button>
+      {go ? <button className="buy rm-race" onClick={go.onClick}>🏁 {go.label}<small>⛽{RACE_FUEL}</small></button>
+        : note ? <span className="rm-note">{note}</span> : null}
+    </div>
+  )
+}
