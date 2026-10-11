@@ -75,7 +75,7 @@ export type Mode = 'play' | 'place' | 'move' | 'road' | 'bulldoze' | 'expand' | 
 export type Resource = 'coins' | 'parts' | 'fuel' | 'bucks' | 'level'
 export type Need = { res: Resource; missing: number; what?: string }
 
-export type Panel = null | 'need' | 'shop' | 'garage' | 'showroom' | 'race' | 'account' | 'goals' | 'daily' | 'flat' | 'friends' | 'rescue' | 'bank' | 'invites' | 'leaders' | 'clan' | 'upgrade' | 'welcome'
+export type Panel = null | 'need' | 'shop' | 'garage' | 'showroom' | 'race' | 'account' | 'goals' | 'daily' | 'flat' | 'friends' | 'rescue' | 'bank' | 'invites' | 'leaders' | 'clan' | 'upgrade' | 'welcome' | 'gifts'
 
 // A read-only copy of another player's town while visiting it.
 export type VisitedTown = { ownerId: string; townName: string; level: number; trophies: number; roads: string[]; buildings: PlacedBuilding[]; cars: OwnedCar[]; land?: string[] }
@@ -147,6 +147,8 @@ type Actions = {
   visit: (town: VisitedTown | null) => void
   helpFriend: () => void
   setTutorial: (step: number) => void
+  // Fuel and parts friends left for you (already checked and claimed server-side).
+  receiveGifts: (fuel: number, parts: number) => void
   // Fit a mod (replacing whatever is in its slot; buys it first if this car doesn't own it), or take it off with remove.
   modCar: (uid: string, modId: string, remove?: boolean) => boolean
   loadSave: (s: SaveState) => void
@@ -1110,6 +1112,13 @@ export const useGame = create<GameState>()(
       },
 
       setTutorial: (tutorial) => set({ tutorial, updatedAt: Date.now() }),
+
+      receiveGifts: (fuel, parts) => {
+        const s = get()
+        sfx.coin()
+        s.toast(`Collected${fuel ? ` +${fuel} ⛽` : ''}${parts ? ` +${parts} ⚙` : ''} from friends`)
+        set({ fuel: s.fuel + fuel, parts: s.parts + parts, updatedAt: Date.now() })
+      },
 
       // Colour, finish and stripes in one paint job, tried on in the garage first.
       paintCar: (cuid, job) => {
