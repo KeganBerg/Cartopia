@@ -13,6 +13,7 @@ import { Tutorial } from './ui/Tutorial'
 import { Badges } from './ui/Badges'
 import { ThoughtBubble } from './ui/Thought'
 import { NeedPanel } from './ui/Need'
+import { UpgradePanel } from './ui/Upgrade'
 import { RescuePanel } from './ui/Rescue'
 import { BankPanel } from './ui/Bank'
 import { LevelUpSplash } from './ui/LevelUp'
@@ -67,6 +68,7 @@ export default function App() {
       {panel === 'leaders' && <LeadersPanel />}
       {panel === 'clan' && <ClanPanel />}
       {panel === 'need' && <NeedPanel />}
+      {panel === 'upgrade' && <UpgradePanel />}
       {panel === 'rescue' && <RescuePanel />}
       {panel === 'bank' && <BankPanel />}
       <VisitBanner />
