@@ -28,17 +28,14 @@ export function useUserId() {
   return uid
 }
 
-// Friends, Leaderboards and Crew share one window with tabs across the top.
+// Friends, Leaderboards, Crew and Meet share one window with tabs across the top.
 export function SocialTabs({ current }: { current: PanelId }) {
   const openPanel = useGame((s) => s.openPanel)
   const chests = useCrewGoal((g) => g.ready) + useCrewBattle((b) => b.ready)
-  const crewChat = useChat((c) => c.unread.crew)
-  const globalChat = useChat((c) => c.unread.global > 0)
   const tabs: { id: PanelId; label: React.ReactNode }[] = [
     { id: 'friends', label: '👫 Friends' },
     { id: 'leaders', label: '🏅 Leaderboards' },
     { id: 'clan', label: <>🛡️ Crew{chests > 0 && <span className="tab-dot">{chests}</span>}</> },
-    { id: 'chat', label: <>💬 Chat{crewChat > 0 ? <span className="tab-dot">{crewChat > 9 ? '9+' : crewChat}</span> : globalChat && <i className="chat-new" />}</> },
     { id: 'meet', label: '🚗 Meet' },
   ]
   return <SheetTabs items={tabs as { id: Exclude<PanelId, null>; label: React.ReactNode }[]} value={current ?? 'friends'} onChange={(id) => openPanel(id)} />

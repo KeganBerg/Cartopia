@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { MAX_CHAT, firstRoom, sendChat, senderName, setMuted, useChat, viewRoom, type ChatMsg, type Room } from '../lib/chat'
 import { useNames } from '../lib/profiles'
 import { Panel } from './Menus'
-import { ClanTag, SocialTabs, useVisit } from './Social'
+import { ClanTag, useVisit } from './Social'
 import './chat.css'
 
 const ago = (at: number) => {
@@ -30,7 +30,6 @@ export function ChatPanel() {
 
   return (
     <Panel title="Chat" wide className="chat-panel">
-      <SocialTabs current="chat" />
       {!supabase && !uid ? (
         <p className="hint">Chat needs an internet connection.</p>
       ) : !uid ? (
