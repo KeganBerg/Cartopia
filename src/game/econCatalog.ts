@@ -1,5 +1,5 @@
 import {
-  BUILDINGS, CARS, GOALS, GP_SERIES, MAX_BUILDING_LEVEL, MODS, RESCUE_SPOTS, modXp, buildingUpgradeCost, buildingUpgradeXp, upgradable,
+  BUILDINGS, CAMPAIGN, CAMPAIGN_RACES, CARS, GOALS, GP_SERIES, campaignRaceId, MAX_BUILDING_LEVEL, MODS, RESCUE_SPOTS, modXp, buildingUpgradeCost, buildingUpgradeXp, upgradable,
   upgradeFuelCap, upgradeJobSeconds, FAVORITE_BONUS, upgradePartsPayout, upgradePayout, upgradeXp, type BuildingDef,
 } from './data'
 
@@ -52,6 +52,11 @@ export function econCatalog() {
   const mods = Object.fromEntries(
     MODS.map((m) => [m.id, { slot: m.slot, coins: m.coins, parts: m.parts, bucks: m.bucks, power: m.power, grip: m.grip, weight: m.weight, xp: modXp(m.id) }]),
   )
+  // Campaign chapters: the one-time bonuses for clearing one and for three stars on all its races.
+  const campaign = Object.fromEntries(CAMPAIGN.map((c) => [c.id, {
+    unlock: c.unlockLevel, races: Array.from({ length: CAMPAIGN_RACES }, (_, i) => campaignRaceId(c, i)),
+    coins: c.coins, bucks: c.bucks, trophies: c.trophies, starBucks: c.starBucks,
+  }]))
   // A driver adds at most this share to a business's coins (see driverPayout).
-  return { cars, buildings, goals, gp, rescue, upgradeXpTo, mods, driverBonus: FAVORITE_BONUS }
+  return { cars, buildings, goals, gp, rescue, upgradeXpTo, mods, driverBonus: FAVORITE_BONUS, campaign }
 }

@@ -11,6 +11,8 @@ import { useThought } from '../game/thoughts'
 import { SEASON } from './season'
 import { SHIRTS, PANTS, SKIN, HAIR, BEANIES } from './people'
 import { dayPhase, nightAmount } from './dayNight'
+import { isNight } from '../game/clock'
+import { CLUB } from './clubLayout'
 
 // Townspeople: little figures like the race crowd who live in the houses and
 // walk the sidewalks to grab a pizza, browse the showroom, sit on a park bench
@@ -18,6 +20,8 @@ import { dayPhase, nightAmount } from './dayNight'
 // of instanced meshes and the count is capped, so phones stay smooth.
 // Some go jogging or walk the dog, the town gets busier as you level up, and
 // tapping someone shows a thought bubble with what they're up to.
+// After dark many head out to the nightclub instead, line up along its velvet
+// rope and wait for the bouncer to let them in.
 
 const SMALL = typeof window !== 'undefined' && Math.min(window.innerWidth, window.innerHeight) < 700
 const MAX_PEOPLE = SMALL ? 16 : 36
@@ -95,7 +99,7 @@ const BIG_PARKS = new Set(['pond', 'playground'])
 // Seats: benches and the bus stop face out the front; at a picnic table people face the table.
 const SEATS: Record<string, 'out' | 'in'> = { bench: 'out', busstop: 'out', picnic: 'in' }
 
-type Kind = 'shop' | 'browse' | 'friend' | 'park' | 'home' | 'jog'
+type Kind = 'shop' | 'browse' | 'friend' | 'park' | 'home' | 'jog' | 'club' | 'door'
 type Dest = { kind: Kind; key: string; def: string }
 type Person = {
   id: string
@@ -111,7 +115,8 @@ type Person = {
   face: number | null // heading to turn to while lingering
   speed: number
   stride: number
-  state: 'inside' | 'walk' | 'linger'
+  state: 'inside' | 'walk' | 'linger' | 'queue'
+  queue: string | null // the club whose line they're standing in
   sit: boolean
   timer: number
   waited: number
@@ -143,7 +148,7 @@ function person(id: string, home: string, pos: Pt): Person {
     home, at: `b${home}`, pos: [...pos], heading: 0, face: null,
     speed: type === 'jogger' ? rand(1.5, 1.8) : rand(0.65, 0.9), stride: rand(0, 6),
     state: 'inside', sit: false, timer: rand(0.5, 10), waited: 0,
-    steps: [], si: 0, crossing: null, dest: null, outings: 0, item: null,
+    steps: [], si: 0, crossing: null, dest: null, outings: 0, item: null, queue: null,
     colors: {
       shirt: SHIRTS[h % SHIRTS.length], pants: PANTS[(h >> 3) % PANTS.length],
       skin: SKIN[(h >> 6) % SKIN.length], hair: (SEASON === 'winter' ? BEANIES : HAIR)[(h >> 9) % 5],
@@ -153,7 +158,8 @@ function person(id: string, home: string, pos: Pt): Person {
 }
 
 type Places = ReturnType<typeof destinations>
-type Ctx = { graph: WalkGraph; places: Places; dirty: { current: boolean } }
+type Club = { dest: Dest; center: Pt; turn: number }
+type Ctx = { graph: WalkGraph; places: Places; dirty: { current: boolean }; queues: Map<string, Person[]>; gates: Map<string, number> }
 
 // Places worth walking to, sorted by what kind of outing they make.
 function destinations(g: WalkGraph) {
@@ -161,13 +167,15 @@ function destinations(g: WalkGraph) {
   const browse: Dest[] = []
   const parks: Dest[] = []
   const houses: Dest[] = []
+  const clubs: Club[] = []
   // Street corners, for joggers to run to.
   const corners: Dest[] = [...g.byKey.keys()].filter((k) => k[0] === 'v').map((key) => ({ kind: 'jog', key, def: '' }))
   for (const n of g.nodes) {
     if (n.kind === 'b') {
       const kind = buildingDef(n.def).kind
       const d = (k: Kind): Dest => ({ kind: k, key: `b${n.uid}`, def: n.def })
-      if (kind === 'business' || kind === 'gas' || kind === 'parts') {
+      if (buildingDef(n.def).nightOnly) clubs.push({ dest: d('club'), center: n.center, turn: n.turn })
+      else if (kind === 'business' || kind === 'gas' || kind === 'parts') {
         // Food is the big draw, so it goes in twice.
         shops.push(d('shop'))
         if (ITEMS[n.def] && n.def !== 'motel') shops.push(d('shop'))
@@ -178,7 +186,7 @@ function destinations(g: WalkGraph) {
       parks.push({ kind: 'park', key: `t${n.tile[0]},${n.tile[1]}`, def: n.decor })
     }
   }
-  return { shops, browse, parks, houses, corners }
+  return { shops, browse, parks, houses, corners, clubs }
 }
 
 export function Townspeople() {
@@ -198,6 +206,8 @@ export function Townspeople() {
   const places = useMemo(() => destinations(graph), [graph])
   const people = useRef<Person[]>([])
   const colorsDirty = useRef(true)
+  const queues = useRef(new Map<string, Person[]>())
+  const gates = useRef(new Map<string, number>())
 
   const torso = useRef<InstancedMesh>(null)
   const head = useRef<InstancedMesh>(null)
@@ -233,6 +243,9 @@ export function Townspeople() {
       return p
     })
     colorsDirty.current = true
+    // Anyone who left town drops out of the club line.
+    const here = new Set(people.current)
+    for (const [k, q] of queues.current) queues.current.set(k, q.filter((p) => here.has(p)))
     // Recount who is on a crosswalk, so people who left town drop out but
     // anyone mid-crossing stays in the road for cars to see.
     pedestrianCrossings.clear()
@@ -285,7 +298,7 @@ export function Townspeople() {
     const dt = Math.min(rawDt, 0.1)
     const list = people.current
     const night = nightAmount(dayPhase()) > 0.5
-    const ctx: Ctx = { graph, places, dirty: colorsDirty }
+    const ctx: Ctx = { graph, places, dirty: colorsDirty, queues: queues.current, gates: gates.current }
     const t = torso.current
     const hd = head.current
     const hr = hair.current
@@ -311,6 +324,7 @@ export function Townspeople() {
       for (const m of [t, hd, hr, lg, it, db, dh]) if (m.instanceColor) m.instanceColor.needsUpdate = true
     }
 
+    bouncers(ctx, dt)
     list.forEach((p, i) => {
       update(ctx, p, dt, night)
       draw(p, i)
@@ -327,7 +341,7 @@ export function Townspeople() {
         lg!.setMatrixAt(i * 2 + 1, hidden)
         return
       }
-      const moving = p.state === 'walk' && p.waited === 0
+      const moving = (p.state === 'walk' && p.waited === 0) || (p.state === 'queue' && p.face === null)
       const jog = p.type === 'jogger'
       const swing = moving ? Math.sin(p.stride) * (jog ? 0.85 : 0.55) : 0
       const bob = moving ? Math.abs(Math.cos(p.stride)) * (jog ? 0.05 : 0.025) : 0
@@ -431,6 +445,7 @@ export function Townspeople() {
 }
 
 function update(ctx: Ctx, p: Person, dt: number, night: boolean) {
+  if (p.state === 'queue') return inLine(ctx, p, dt)
   if (p.state === 'inside' || p.state === 'linger') {
     if (p.face != null) turnTo(p, p.face, dt)
     if (p.state === 'linger') walkDog(p, dt)
@@ -501,12 +516,15 @@ function setOff(ctx: Ctx, p: Person, night: boolean) {
   p.sit = false
   p.face = null
   const atHome = p.at === `b${p.home}`
-  if (atHome && night && Math.random() < 0.85) {
+  // After dark the nightclub is the place to be (not for joggers or dog walkers).
+  const clubs = night && p.type === 'walker' ? ctx.places.clubs.filter((c) => c.dest.key !== p.at) : []
+  const club = clubs.length && Math.random() < (atHome ? 0.6 : 0.4) ? pick(clubs).dest : null
+  if (atHome && night && !club && Math.random() < 0.85) {
     p.timer = rand(20, 45) // most people stay in after dark
     return
   }
-  let dest: Dest | null = null
-  if (!atHome && (p.outings >= 3 || Math.random() < 0.4 || night)) dest = { kind: 'home', key: `b${p.home}`, def: 'house' }
+  let dest: Dest | null = club
+  if (!dest && !atHome && (p.outings >= 3 || Math.random() < 0.4 || night)) dest = { kind: 'home', key: `b${p.home}`, def: 'house' }
   const start = g.byKey.get(p.at) ?? nearestNode(g, p.pos)
   for (let tries = 0; tries < 4; tries++) {
     const d = dest ?? outing(ctx, p)
@@ -607,6 +625,21 @@ function arrive(ctx: Ctx, p: Person, night: boolean) {
     p.timer = rand(0.2, 0.8)
     return
   }
+  if (d.kind === 'club') {
+    const q = ctx.queues.get(d.key) ?? []
+    if (!isNight() || q.length >= CLUB.queueMax || !clubAt(ctx, d.key)) {
+      // Closed, or the line's too long: hang about a moment, then move on.
+      p.state = 'linger'
+      p.timer = rand(1, 3)
+      return
+    }
+    q.push(p)
+    ctx.queues.set(d.key, q)
+    p.state = 'queue'
+    p.queue = d.key
+    p.face = null
+    return
+  }
   if (d.kind === 'park') {
     p.state = 'linger'
     const [lo, hi] = LINGER[d.def] ?? [3, 8]
@@ -630,6 +663,8 @@ function arrive(ctx: Ctx, p: Person, night: boolean) {
     p.item = null
     p.outings = 0
     p.timer = night ? rand(40, 90) : rand(12, 35)
+  } else if (d.kind === 'door') {
+    p.timer = rand(35, 80) // dancing the night away
   } else {
     p.timer = d.kind === 'shop' ? rand(5, 12) : rand(6, 14)
     if (d.kind === 'shop' && ITEMS[d.def]) p.item = d.def
@@ -663,8 +698,85 @@ function thought(p: Person): string {
   else if (d?.kind === 'shop') idea = SHOP_THOUGHTS[d.def] ?? ['🛍️', 'running an errand']
   else if (d?.kind === 'browse') idea = d.def === 'garage' ? ['🔧', 'peeking into your garage'] : ['🚗', 'looking at cars in the showroom']
   else if (d?.kind === 'friend') idea = ['👋', 'visiting a neighbour']
+  else if (d?.kind === 'club') idea = p.state === 'queue' ? ['🎟️', 'waiting in line for the club'] : ['🪩', 'heading out dancing']
+  else if (d?.kind === 'door') idea = ['🕺', 'getting into the club']
   else if (d?.kind === 'park') idea = (p.state === 'linger' ? PARK_AT : PARK_GO)[d.def] ?? ['🌳', 'enjoying the park']
   return `${idea[0]} ${who} ${idea[1]}`
+}
+
+// The club a key names, if it still stands.
+function clubAt(ctx: Ctx, key: string) {
+  return ctx.places.clubs.find((c) => c.dest.key === key)
+}
+
+// A point in front of the club, from its own coordinates (see clubLayout) to the town's.
+function clubPoint(c: Club, lx: number, lz: number): Pt {
+  const a = (c.turn * Math.PI) / 2
+  const cos = Math.cos(a)
+  const sin = Math.sin(a)
+  return [c.center[0] + lx * cos + lz * sin, c.center[1] - lx * sin + lz * cos]
+}
+
+// Each club's bouncer lets the front of the line in every few seconds, and
+// sends everyone home when the club closes at dawn.
+function bouncers(ctx: Ctx, dt: number) {
+  const open = isNight()
+  for (const [key, q] of ctx.queues) {
+    const c = clubAt(ctx, key)
+    if (!c || !open) {
+      for (const p of q) {
+        p.queue = null
+        p.state = 'linger'
+        p.face = null
+        p.timer = rand(0.3, 2)
+      }
+      ctx.queues.delete(key)
+      continue
+    }
+    const left = (ctx.gates.get(key) ?? rand(6, 10)) - dt
+    ctx.gates.set(key, left)
+    const first = q[0]
+    // Only once they've made it to the front of the rope.
+    if (left > 0 || !first || first.face === null) continue
+    q.shift()
+    first.queue = null
+    first.face = null
+    first.dest = { kind: 'door', key, def: c.dest.def }
+    first.steps = [{ p: clubPoint(c, CLUB.doorX, CLUB.queueZ) }, { p: clubPoint(c, CLUB.doorX, CLUB.doorZ) }]
+    first.si = 0
+    first.state = 'walk'
+    ctx.gates.set(key, rand(8, 15))
+  }
+}
+
+// Shuffle up to your place in line, then wait facing the door.
+function inLine(ctx: Ctx, p: Person, dt: number) {
+  const c = p.queue ? clubAt(ctx, p.queue) : undefined
+  const q = p.queue ? ctx.queues.get(p.queue) : undefined
+  const i = q ? q.indexOf(p) : -1
+  if (!c || i < 0) {
+    p.queue = null
+    p.state = 'linger'
+    p.timer = rand(0.3, 1.5)
+    return
+  }
+  const spot = clubPoint(c, CLUB.queueX + i * CLUB.gap, CLUB.queueZ)
+  const dx = spot[0] - p.pos[0]
+  const dz = spot[1] - p.pos[1]
+  const len = Math.hypot(dx, dz)
+  const move = p.speed * 0.8 * dt
+  if (len > 0.02) {
+    p.face = null
+    const k = Math.min(1, move / len)
+    p.pos[0] += dx * k
+    p.pos[1] += dz * k
+    turnTo(p, Math.atan2(dx, dz), dt)
+    p.stride += dt * p.speed * 14
+    return
+  }
+  const a = (c.turn * Math.PI) / 2
+  p.face = Math.atan2(-Math.cos(a), Math.sin(a))
+  turnTo(p, p.face, dt)
 }
 
 function leaveCrossing(p: Person) {

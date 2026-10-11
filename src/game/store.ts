@@ -2,9 +2,10 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
   PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS,
-  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, type Rarity, GOALS, DAILY_BONUS, PAINTS, PAINT_COST, STRIPE_COST, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modSlotsFor, ownedMods, driverPayout, takesDriver, loves, type CarDef,
+  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, DAILY_BONUS, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modSlotsFor, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef,
 } from './data'
 import { sfx } from '../lib/sound'
+import { msUntilNight } from './clock'
 import { requestTrip, requestVisit } from './trips'
 
 // rot: quarter turns the player chose (0 faces south). Unset means face the nearest road.
@@ -12,7 +13,7 @@ import { requestTrip, requestVisit } from './trips'
 // jobLevel: the level the running job started at, so an upgrade mid-job only pays from the next job.
 // car: uid of the owned car assigned to drive for this business (see DRIVER_BONUS).
 export type PlacedBuilding = { uid: string; def: string; x: number; z: number; jobEndsAt: number | null; rot?: number; level?: number; jobLevel?: number; car?: string }
-export type OwnedCar = { uid: string; model: string; color: string; upgrades: Record<UpgradeSlot, number>; flat?: boolean; lowFuel?: boolean; stripe?: string | null; plate?: string; mods?: string[]; ownedMods?: string[] }
+export type OwnedCar = { uid: string; model: string; color: string; upgrades: Record<UpgradeSlot, number>; flat?: boolean; lowFuel?: boolean; stripe?: string | null; finish?: Finish; plate?: string; mods?: string[]; ownedMods?: string[] }
 // A rusty find waiting in Rusty's storage, and the one car in the restore bay.
 export type JunkCar = { uid: string; model: string; rarity: Rarity }
 export type Restoring = JunkCar & { endsAt: number; minutes: number }
@@ -48,6 +49,8 @@ export type SaveState = {
   junkyard: JunkCar[]
   restoring: Restoring | null
   gp: Record<string, { round: number; clears: number }>
+  // Campaign races won, by race id, with the best stars earned (1-3).
+  campaign: Record<string, number>
   land: string[]
   updatedAt: number
 }
@@ -83,6 +86,8 @@ type UiState = {
   upgrading: string | null
   // A Grand Prix mystery box waiting to be opened.
   gpPrize: { series: string; model: string; color: string } | null
+  // A campaign chapter just cleared (or perfected), with what it paid.
+  campaignPrize: { chapter: string; coins: number; bucks: number; trophies: number; cleared: boolean; perfect: boolean } | null
   // The signed-in player's clan, shown on the Crew House.
   clanBadge: { tag: string; emblem: string; color: string } | null
   // Level-up splash: the levels just reached and the rewards they paid.
@@ -117,11 +122,10 @@ type Actions = {
   claimDaily: () => void
   fixFlat: (uid: string, tow: boolean) => void
   serviceCar: (uid: string, how: 'tires' | 'gas' | 'can') => void
-  paintCar: (uid: string, color: string) => void
+  paintCar: (uid: string, job: PaintJob) => boolean
   visit: (town: VisitedTown | null) => void
   helpFriend: () => void
   setTutorial: (step: number) => void
-  stripeCar: (uid: string, stripe: string | null) => void
   // Fit a mod (replacing whatever is in its slot; buys it first if this car doesn't own it), or take it off with remove.
   modCar: (uid: string, modId: string, remove?: boolean) => boolean
   loadSave: (s: SaveState) => void
@@ -129,6 +133,9 @@ type Actions = {
   refillFuel: () => void
   buyPlot: (px: number, pz: number) => void
   gpResult: (series: string, won: boolean) => void
+  // Records a campaign race; returns the stars earned (0 for a loss).
+  campaignResult: (chapter: string, race: number, myTime: number, theirTime: number) => number
+  closeCampaignPrize: () => void
   closePrize: () => void
   closeLevelUp: () => void
   focusShop: (panel: 'shop' | 'showroom' | 'rescue' | 'race', id: string | null) => void
@@ -245,6 +252,7 @@ export function starterTown(): SaveState {
     junkyard: [],
     restoring: null,
     gp: {},
+    campaign: {},
     land: [...START_LAND],
     updatedAt: now,
   }
@@ -376,6 +384,7 @@ export const useGame = create<GameState>()(
       shopFocus: null,
       upgrading: null,
       gpPrize: null,
+      campaignPrize: null,
       levelUp: null,
 
       // Building, roads and land edit your own town, which isn't on screen while visiting.
@@ -515,6 +524,7 @@ export const useGame = create<GameState>()(
         const secs = upgradeJobSeconds(d, lvl)
         if (b.jobEndsAt !== null && now < b.jobEndsAt) return s.openUpgrade(buid)
         if (b.jobEndsAt === null) {
+          if (!isOpen(d, now)) return s.toast(`The ${d.name} only opens at night. Doors open in ${Math.max(1, Math.ceil(msUntilNight(now) / 60000))} min.`)
           if (s.fuel < d.fuelCost!) {
             return s.showNeed('fuel', d.fuelCost! - s.fuel, `a ${d.name} job`)
           }
@@ -651,7 +661,7 @@ export const useGame = create<GameState>()(
         const cap = fuelCap(s)
         buildings = buildings.map((b) => {
           const d = buildingDef(b.def)
-          if (!d.jobSeconds || d.kind === 'obstacle' || b.jobEndsAt !== null || fuel < (d.fuelCost ?? 0)) return b
+          if (!d.jobSeconds || d.kind === 'obstacle' || b.jobEndsAt !== null || !isOpen(d, now) || fuel < (d.fuelCost ?? 0)) return b
           fuel -= d.fuelCost ?? 0
           started++
           return { ...b, jobEndsAt: now + upgradeJobSeconds(d, buildingLevel(b)) * 1000, jobLevel: buildingLevel(b) }
@@ -682,7 +692,7 @@ export const useGame = create<GameState>()(
           cleared && `cleared ${cleared}`,
         ].filter(Boolean) as string[]
         s.toast(`${bits.join(', ').replace(/^./, (c) => c.toUpperCase())}${earned ? `. +${earned} coins` : ''}${parts > s.parts ? `, +${parts - s.parts} parts` : ''}`)
-        if (!started && buildings.some((b) => buildingDef(b.def).jobSeconds && buildingDef(b.def).kind !== 'obstacle' && b.jobEndsAt === null)) {
+        if (!started && buildings.some((b) => buildingDef(b.def).jobSeconds && buildingDef(b.def).kind !== 'obstacle' && isOpen(buildingDef(b.def), now) && b.jobEndsAt === null)) {
           setTimeout(() => get().toast('Out of fuel for the rest. It refills over time.'), 900)
         }
         set(withXp(s, xp, {
@@ -888,32 +898,33 @@ export const useGame = create<GameState>()(
 
       setTutorial: (tutorial) => set({ tutorial, updatedAt: Date.now() }),
 
-      paintCar: (cuid, color) => {
+      // Colour, finish and stripes in one paint job, tried on in the garage first.
+      paintCar: (cuid, job) => {
         const s = get()
         const car = s.cars.find((c) => c.uid === cuid)
-        const paint = PAINTS.find((p) => p.color === color)
-        if (!car || !paint || car.color === color) return
-        const bucks = paint.bucks ?? 0
-        const coins = bucks ? 0 : PAINT_COST
-        if (s.coins < coins) return s.showNeed('coins', coins - s.coins, 'a paint job')
-        if (s.bucks < bucks) return s.showNeed('bucks', bucks - s.bucks, `${paint.name} paint`)
-        set(withXp(s, 5, {
+        const paint = PAINTS.find((p) => p.color === job.color)
+        const fin = FINISHES.find((f) => f.id === job.finish)
+        // A car can keep a factory colour that isn't on the paint chart.
+        if (!car || (!paint && job.color !== car.color) || !fin || !STRIPES.includes(job.stripe)) return false
+        if (s.level < fin.unlockLevel && fin.id !== (car.finish ?? 'gloss')) {
+          s.toast(`${fin.name} unlocks at level ${fin.unlockLevel}`)
+          return false
+        }
+        const { coins, bucks } = paintJobCost(car, job)
+        const recolour = job.color !== car.color || job.finish !== (car.finish ?? 'gloss')
+        if (!recolour && job.stripe === (car.stripe ?? null)) return false
+        if (s.coins < coins) { s.showNeed('coins', coins - s.coins, 'a paint job'); return false }
+        if (s.bucks < bucks) { s.showNeed('bucks', bucks - s.bucks, `${paint?.name ?? 'Custom'} paint`); return false }
+        const patch = {
           coins: s.coins - coins,
           bucks: s.bucks - bucks,
-          cars: s.cars.map((c) => (c.uid === cuid ? { ...c, color } : c)),
+          cars: s.cars.map((c) => (c.uid === cuid ? { ...c, color: job.color, finish: job.finish === 'gloss' ? undefined : job.finish, stripe: job.stripe } : c)),
           updatedAt: Date.now(),
-        }))
+        }
+        set(recolour ? withXp(s, 5, patch) : patch)
         sfx.buy()
-        s.toast(`Painted ${paint.name}!`)
-      },
-
-      stripeCar: (cuid, stripe) => {
-        const s = get()
-        const car = s.cars.find((c) => c.uid === cuid)
-        if (!car || (car.stripe ?? null) === stripe) return
-        const cost = stripe ? STRIPE_COST : 0
-        if (s.coins < cost) return s.showNeed('coins', cost - s.coins, 'racing stripes')
-        set({ coins: s.coins - cost, cars: s.cars.map((c) => (c.uid === cuid ? { ...c, stripe } : c)), updatedAt: Date.now() })
+        s.toast(recolour ? (paint ? `Painted ${fin.id === 'gloss' ? '' : fin.name + ' '}${paint.name}!` : `${fin.name} finish on!`) : job.stripe ? 'Stripes on!' : 'Stripes off')
+        return true
       },
 
       modCar: (cuid, modId, remove) => {
@@ -991,6 +1002,40 @@ export const useGame = create<GameState>()(
         }))
       },
 
+      campaignResult: (chapterId, i, myTime, theirTime) => {
+        const s = get()
+        const ch = CAMPAIGN.find((o) => o.id === chapterId)
+        if (!ch) return 0
+        const id = campaignRaceId(ch, i)
+        const before = s.campaign[id] ?? 0
+        const stars = campaignStars(myTime, theirTime)
+        s.finishRace(stars > 0, campaignReward(ch, i, before === 0))
+        if (stars <= before) return stars
+        const campaign = { ...s.campaign, [id]: stars }
+        // One-time bonuses: clearing the chapter, and three stars on all of it.
+        const cleared = !campaignCleared(s.campaign, ch) && campaignCleared(campaign, ch)
+        const perfect = !campaignPerfect(s.campaign, ch) && campaignPerfect(campaign, ch)
+        if (!cleared && !perfect) {
+          set({ campaign, updatedAt: Date.now() })
+          return stars
+        }
+        const coins = cleared ? ch.coins : 0
+        const bucks = (cleared ? ch.bucks : 0) + (perfect ? ch.starBucks : 0)
+        const trophies = cleared ? ch.trophies : 0
+        setTimeout(sfx.levelUp, 200)
+        set((g) => ({
+          campaign,
+          coins: g.coins + coins,
+          bucks: g.bucks + bucks,
+          trophies: g.trophies + trophies,
+          stats: { ...g.stats, coinsEarned: (g.stats.coinsEarned ?? 0) + coins },
+          campaignPrize: { chapter: ch.id, coins, bucks, trophies, cleared, perfect },
+          updatedAt: Date.now(),
+        }))
+        return stars
+      },
+
+      closeCampaignPrize: () => set({ campaignPrize: null }),
       closePrize: () => set({ gpPrize: null }),
       closeLevelUp: () => set({ levelUp: null }),
       focusShop: (panel, shopFocus) => set({ levelUp: null, panel, shopFocus, mode: 'play', placing: null, selected: null }),
@@ -1186,14 +1231,14 @@ export const useGame = create<GameState>()(
 )
 
 export function saveOf(s: GameState): SaveState {
-  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, land, updatedAt } = s
-  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, land, updatedAt }
+  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, land, updatedAt } = s
+  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, land, updatedAt }
 }
 
 // Fields added after launch, so older saves load with sensible values.
-function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'gp' | 'land'> {
+function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'gp' | 'campaign' | 'land'> {
   // Saves from before the tutorial existed skip it.
-  return { stats: emptyStats(), claimedGoals: [], lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, gp: {}, land: [...START_LAND] }
+  return { stats: emptyStats(), claimedGoals: [], lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, gp: {}, campaign: {}, land: [...START_LAND] }
 }
 
 

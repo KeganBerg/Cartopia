@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGame, spendFuel, type OwnedCar } from '../game/store'
-import { CARS, SKILLS, carDef, performance, RACE_FUEL, GP_SERIES, GP_ROUNDS, gpRivalPi, gpReward, skillBoost, skillDrag, liveSkillBoost, smoothShift, type Body, type GpSeries, type SkillId } from '../game/data'
+import { CARS, SKILLS, carDef, performance, RACE_FUEL, GP_SERIES, GP_ROUNDS, gpRivalPi, gpReward, CAMPAIGN, CAMPAIGN_RACES, campaignRaceId, campaignRivalPi, campaignShift, campaignRivalSkills, campaignReward, campaignCleared, type CampaignChapter, skillBoost, skillDrag, liveSkillBoost, smoothShift, type Body, type GpSeries, type SkillId } from '../game/data'
 import { TRACK, freshRacer, stepRacer, shiftQuality } from '../game/race'
 import { CarThumb } from '../scene/BuildingPreview'
 import { supabase } from '../lib/supabase'
@@ -8,14 +8,15 @@ import { Panel, SheetTabs } from './Menus'
 import { Canvas } from '@react-three/fiber'
 import { NeutralToneMapping } from 'three'
 import { RaceScene } from '../scene/RaceScene'
-import { pickVenue } from '../scene/venues'
+import { pickVenue, venue as venueById } from '../scene/venues'
 import { sfx, engineRpm, stopEngine } from '../lib/sound'
 import { useLive, challenge, cancelChallenge, refreshPresence, raceChannel, endLiveRace, answer, pruneInvites, mute, unmute, setClosed, INVITE_MS, type LiveRace } from '../lib/live'
 import { displayName } from '../lib/names'
 import { joinRefereed, reportFinish, serverPi, type Verdict } from '../lib/referee'
 
 // skill: the rival car's race skill. AI rivals use it; live players use theirs on their own device.
-type Rival = { id: string; town: string; level: number; carName: string; color: string; pi: number; online: boolean; body: Body; mods?: string[]; skill?: SkillId }
+// shift: how cleanly an AI rival shifts, 0 (sloppy) to 1 (always perfect, the default).
+type Rival = { id: string; town: string; level: number; carName: string; color: string; pi: number; online: boolean; body: Body; mods?: string[]; skill?: SkillId; shift?: number; boss?: boolean }
 
 const TOWNS = ['Transamsylvania', 'Gearville', 'Piston Peak', 'Nitro Bay', 'Chrome City', 'Rustbelt Row', 'Turbo Falls', 'Muffler Hills']
 const zero = { engine: 0, turbo: 0, tires: 0, weight: 0 }
@@ -90,9 +91,11 @@ export function RacePanel() {
   const [online, setOnline] = useState<Rival[]>([])
   const [race, setRace] = useState<Rival | null>(null)
   const [gpRace, setGpRace] = useState<{ series: GpSeries; rival: Rival; prize: number } | null>(null)
-  const [tab, setTab] = useState<'quick' | 'gp'>('quick')
+  const [cRace, setCRace] = useState<{ chapter: CampaignChapter; race: number; rival: Rival; prize: number } | null>(null)
+  const [tab, setTab] = useState<'quick' | 'campaign' | 'gp'>('quick')
   const [pickCar, setPickCar] = useState(false)
   const gpResult = useGame((s) => s.gpResult)
+  const campaignResult = useGame((s) => s.campaignResult)
 
   const livePlayers = useLive((l) => l.players)
   const outgoing = useLive((l) => l.outgoing)
@@ -118,6 +121,20 @@ export function RacePanel() {
     )
   }
 
+  if (cRace && car) {
+    return (
+      <DragRace
+        car={car}
+        rival={cRace.rival}
+        prize={cRace.prize}
+        venueId={cRace.chapter.venue}
+        title={`${cRace.chapter.name} · ${cRace.race === CAMPAIGN_RACES - 1 ? 'Boss race' : `Race ${cRace.race + 1} of ${CAMPAIGN_RACES}`}`}
+        onFinish={(_, myTime, theirTime) => campaignResult(cRace.chapter.id, cRace.race, myTime, theirTime)}
+        onExit={() => { setCRace(null); setTab('campaign') }}
+      />
+    )
+  }
+
   // An accepted live challenge takes over the screen, so don't start a race that it would cut short.
   const waiting = () => {
     if (!useLive.getState().outgoing) return false
@@ -134,7 +151,7 @@ export function RacePanel() {
   return (
     <Panel title="Drag Race" wide>
       <SheetTabs
-        items={[{ id: 'quick', label: '🏁 Quick race' }, { id: 'gp', label: '🏆 Grand Prix' }, { id: 'top', label: '🏅 Top racers' }] as const}
+        items={[{ id: 'quick', label: '🏁 Quick race' }, { id: 'campaign', label: '🗺️ Campaign' }, { id: 'gp', label: '🏆 Grand Prix' }, { id: 'top', label: '🏅 Top racers' }] as const}
         value={tab}
         onChange={(t) => (t === 'top' ? useGame.getState().openPanel('leaders') : setTab(t))}
       />
@@ -142,13 +159,13 @@ export function RacePanel() {
         <div className="race-cars">
           {cars.map((c) => (
             <button key={c.uid} className={c.uid === car.uid ? 'chip sel' : 'chip'} onClick={() => { setCarId(c.uid); setPickCar(false) }}>
-              <CarThumb size="xs" color={c.color} body={carDef(c.model).body} stripe={c.stripe} mods={c.mods} /> {carDef(c.model).name} · PI {pi(c)}{carDef(c.model).skill ? ` ${SKILLS[carDef(c.model).skill!].icon}` : ''}
+              <CarThumb size="xs" color={c.color} finish={c.finish} body={carDef(c.model).body} stripe={c.stripe} mods={c.mods} /> {carDef(c.model).name} · PI {pi(c)}{carDef(c.model).skill ? ` ${SKILLS[carDef(c.model).skill!].icon}` : ''}
             </button>
           ))}
         </div>
       ) : (
         <button className="race-car-pick" onClick={() => setPickCar(true)} disabled={cars.length < 2}>
-          <CarThumb size="sm" color={car.color} body={carDef(car.model).body} stripe={car.stripe} mods={car.mods} />
+          <CarThumb size="sm" color={car.color} finish={car.finish} body={carDef(car.model).body} stripe={car.stripe} mods={car.mods} />
           <span>
             <small>Racing with</small>
             <b>{carDef(car.model).name} · PI {pi(car)}</b>
@@ -157,7 +174,13 @@ export function RacePanel() {
           {cars.length > 1 && <span className="chev">Change ›</span>}
         </button>
       ))}
-      {tab === 'gp' ? (
+      {tab === 'campaign' ? (
+        <Campaign onRace={(chapter, race, rival, prize) => {
+          if (waiting()) return
+          if (!spendFuel(RACE_FUEL)) return useGame.getState().showNeed('fuel', RACE_FUEL - useGame.getState().fuel, 'a campaign race')
+          setCRace({ chapter, race, rival, prize })
+        }} />
+      ) : tab === 'gp' ? (
         <GrandPrix onRace={(series, rival, prize) => {
           if (waiting()) return
           if (!spendFuel(RACE_FUEL)) return useGame.getState().showNeed('fuel', RACE_FUEL - useGame.getState().fuel, 'a Grand Prix race')
@@ -263,6 +286,128 @@ function GrandPrix({ onRace }: { onRace: (s: GpSeries, r: Rival, prize: number) 
   )
 }
 
+function campaignRival(ch: CampaignChapter, chIndex: number, i: number): Rival {
+  const target = campaignRivalPi(ch, i)
+  const car = carNear(target)
+  return {
+    id: `camp-${ch.id}-${i}`, town: ch.rivals[i], level: ch.unlockLevel + i * 2, carName: car.name, color: car.colors[(chIndex + i) % car.colors.length],
+    pi: target, online: false, body: car.body, skill: campaignRivalSkills(chIndex, i) ? car.skill : undefined, shift: campaignShift(chIndex, i), boss: i === CAMPAIGN_RACES - 1,
+  }
+}
+
+function Stars({ n, big }: { n: number; big?: boolean }) {
+  return <span className={big ? 'stars big' : 'stars'} aria-label={`${n} of 3 stars`}>{[0, 1, 2].map((i) => <i key={i} className={i < n ? 'on' : ''}>★</i>)}</span>
+}
+
+function Campaign({ onRace }: { onRace: (ch: CampaignChapter, race: number, r: Rival, prize: number) => void }) {
+  const level = useGame((s) => s.level)
+  const done = useGame((s) => s.campaign)
+  const showNeed = useGame((s) => s.showNeed)
+  const opened = (ci: number) => level >= CAMPAIGN[ci].unlockLevel && (ci === 0 || campaignCleared(done, CAMPAIGN[ci - 1]))
+  const firstOpen = CAMPAIGN.findIndex((ch, ci) => opened(ci) && !campaignCleared(done, ch))
+  const [sel, setSel] = useState(firstOpen === -1 ? CAMPAIGN.reduce((n, _, ci) => (opened(ci) ? ci : n), 0) : firstOpen)
+  const total = Object.values(done).reduce((a, n) => a + n, 0)
+  const max = CAMPAIGN.length * CAMPAIGN_RACES * 3
+  const starsOf = (ch: CampaignChapter) => Array.from({ length: CAMPAIGN_RACES }, (_, i) => done[campaignRaceId(ch, i)] ?? 0)
+  const ch = CAMPAIGN[sel]
+  const stars = starsOf(ch)
+  const v = venueById(ch.venue)
+  const cleared = campaignCleared(done, ch)
+  const perfect = stars.every((n) => n >= 3)
+  return (
+    <div className="camp">
+      <div className="camp-progress" title="Campaign stars">
+        <span>⭐ {total}/{max}</span>
+        <i style={{ width: `${(total / max) * 100}%` }} />
+      </div>
+      <div className="camp-map" role="tablist">
+        {CAMPAIGN.map((c, ci) => {
+          const open = opened(ci)
+          const n = starsOf(c).reduce((a, x) => a + x, 0)
+          return (
+            <button key={c.id} role="tab" aria-selected={ci === sel} aria-label={c.name}
+              className={`camp-node${ci === sel ? ' sel' : ''}${open ? '' : ' locked'}${campaignCleared(done, c) ? ' done' : ''}`}
+              onClick={() => setSel(ci)}>
+              <span className="camp-node-ico">{open ? venueById(c.venue).icon : '🔒'}</span>
+              <b>{ci + 1}</b>
+              <small>{open ? `★${n}` : `Lv${c.unlockLevel}`}</small>
+            </button>
+          )
+        })}
+      </div>
+      <div className={`camp-chapter venue-${ch.venue}`}>
+        <div className="camp-banner">
+          <span className="camp-banner-ico">{v.icon}</span>
+          <div>
+            <b>{ch.name}</b>
+            <small>{v.name}</small>
+          </div>
+          <div className="camp-rewards">
+            <span className={cleared ? 'got' : ''} title="Clear bonus (once)">{cleared ? '✔' : '🏁'} ${ch.coins >= 1000 ? `${ch.coins / 1000}k` : ch.coins} <span className="ico buck-ico">B</span>{ch.bucks} 🏆{ch.trophies}</span>
+            <span className={perfect ? 'got' : ''} title="Three stars on every race (once)">{perfect ? '✔' : '★★★'} <span className="ico buck-ico">B</span>{ch.starBucks}</span>
+          </div>
+        </div>
+        {!opened(sel) ? (
+          <div className="camp-locked">
+            {level < ch.unlockLevel
+              ? <button className="buy small alt" onClick={() => showNeed('level', ch.unlockLevel, ch.name)}>🔒 Opens at level {ch.unlockLevel}</button>
+              : <span>🔒 Beat {CAMPAIGN[sel - 1].rivals[CAMPAIGN_RACES - 1]} to open</span>}
+          </div>
+        ) : (
+          <div className="camp-races">
+            {stars.map((n, i) => {
+              const r = campaignRival(ch, sel, i)
+              const prize = campaignReward(ch, i, n === 0)
+              const can = i === 0 || stars[i - 1] > 0
+              const next = can && n === 0
+              return (
+                <div key={i} className={`camp-race${r.boss ? ' boss' : ''}${can ? '' : ' locked'}${next ? ' next' : ''}`}>
+                  <span className="camp-step">{r.boss ? '👑' : i + 1}</span>
+                  <CarThumb size="xs" color={r.color} body={r.body} />
+                  <div className="camp-who">
+                    <b>{r.town}</b>
+                    <small>{n > 0 && <Stars n={n} />} PI {r.pi}{r.skill && <span className="rival-skill" title={`${SKILLS[r.skill].name}: ${SKILLS[r.skill].text}`}> {SKILLS[r.skill].icon}</span>}</small>
+                  </div>
+                  <button className={`buy small${n > 0 ? ' alt' : ''}`} disabled={!can} onClick={() => onRace(ch, i, r, prize)}>
+                    {!can ? '🔒' : `${n > 0 ? '↻' : '🏁'} $${prize.toLocaleString()}`}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export function CampaignPrizePopup() {
+  const prize = useGame((s) => s.campaignPrize)
+  const close = useGame((s) => s.closeCampaignPrize)
+  if (!prize) return null
+  const ch = CAMPAIGN.find((c) => c.id === prize.chapter)
+  if (!ch) return null
+  const next = CAMPAIGN[CAMPAIGN.indexOf(ch) + 1]
+  return (
+    <div className="overlay prize-overlay">
+      <div className="prize">
+        <h2>{prize.cleared ? `${ch.name} cleared!` : `${ch.name}: all three stars!`}</h2>
+        <div className="mystery-box" aria-hidden>{prize.cleared ? '🏁' : '🌟'}</div>
+        <p className="camp-prize">
+          {prize.coins > 0 && <span>💵 +${prize.coins.toLocaleString()}</span>}
+          {prize.bucks > 0 && <span><span className="ico buck-ico">B</span> +{prize.bucks}</span>}
+          {prize.trophies > 0 && <span>🏆 +{prize.trophies}</span>}
+        </p>
+        {prize.cleared && prize.perfect && <p>Plus the three-star bonus. Flawless!</p>}
+        {prize.cleared && <p>{next ? `Next up: ${next.name}${next.unlockLevel > useGame.getState().level ? ` (opens at level ${next.unlockLevel})` : ''}.` : "You've beaten the whole campaign. Go back for three stars everywhere!"}</p>}
+        <div className="row">
+          <button className="buy" onClick={close}>Awesome!</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function PrizePopup() {
   const prize = useGame((s) => s.gpPrize)
   const close = useGame((s) => s.closePrize)
@@ -317,7 +462,7 @@ function sampleAt(samples: Sample[], t: number, finished: number | null) {
 const fresh = freshRacer
 const step = stepRacer
 
-function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title }: { car: OwnedCar; rival: Rival; onExit: () => void; live?: LiveRace; prize?: number; onFinish?: (won: boolean) => void; title?: string }) {
+function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title, venueId }: { car: OwnedCar; rival: Rival; onExit: () => void; live?: LiveRace; prize?: number; onFinish?: (won: boolean, myTime: number, theirTime: number) => number | void; title?: string; venueId?: string }) {
   // A signed-in live rival's PI comes from the server, not from their browser.
   const [serverRivalPi, setServerRivalPi] = useState<number | null>(null)
   const rival = useMemo(() => (serverRivalPi === null ? shownRival : { ...shownRival, pi: serverRivalPi }), [shownRival, serverRivalPi])
@@ -336,7 +481,7 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
   // The AI rival's skill, flashed while it is working (live rivals use theirs on their own device).
   const theirSkill = live ? undefined : rival.skill
   // Somewhere different each race; both sides of a live race get the same place.
-  const [venue] = useState(() => pickVenue(live?.raceId))
+  const [venue] = useState(() => (venueId ? venueById(venueId) : pickVenue(live?.raceId)))
   const theirActive = useRef(false)
   const [theirShown, setTheirShown] = useState(false)
   const t = useRef(0)
@@ -347,14 +492,16 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
   const [slow, setSlow] = useState(false)
   const channel = useRef<ReturnType<typeof raceChannel>>(null)
   const [label, setLabel] = useState('')
-  const [result, setResult] = useState<null | { won: boolean; myTime: number; theirTime: number; note?: string; counted?: boolean }>(null)
+  const [result, setResult] = useState<null | { won: boolean; myTime: number; theirTime: number; note?: string; counted?: boolean; stars?: number }>(null)
   // Live races between signed-in players: 'yes' once the server is refereeing, 'no' to decide here.
   const refereed = useRef<'pending' | 'yes' | 'no'>(live ? 'pending' : 'no')
   const joined = useRef<Promise<boolean> | null>(null)
   const [checking, setChecking] = useState(false)
   const finishRace = useGame((s) => s.finishRace)
   // The rival's shifting skill for each gear.
-  const skill = useMemo(() => Array.from({ length: 4 }, () => 0.8 + Math.random() * 0.12), [])
+  // Campaign rivals shift sloppier early on: from 0.64-0.78 (good, sometimes early) up to 0.8-0.92 (perfect).
+  const cleanness = shownRival.shift ?? 1
+  const skill = useMemo(() => Array.from({ length: 4 }, () => 0.64 + 0.16 * cleanness + Math.random() * (0.14 - 0.02 * cleanness)), [cleanness])
 
   useEffect(() => {
     if (countdown === 99) return
@@ -515,9 +662,8 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
         stopEngine()
         if (won) sfx.win()
         else sfx.lose()
-        setResult({ won, myTime: me.current.finished, theirTime: th.finished })
-        if (finishCb.current) finishCb.current(won)
-        else finishRace(won, reward(rivalRef.current))
+        const stars = finishCb.current ? finishCb.current(won, me.current.finished, th.finished) : finishRace(won, reward(rivalRef.current))
+        setResult({ won, myTime: me.current.finished, theirTime: th.finished, stars: typeof stars === 'number' ? stars : undefined })
         return
       }
       raf = requestAnimationFrame(loop)
@@ -560,7 +706,7 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
   return (
     <div className="race-full">
       <Canvas className="rf-canvas" camera={{ position: [0.4, 2.2, -4], fov: 55, near: 0.3, far: 150 }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
-        <RaceScene track={TRACK} me={me} them={them} mine={{ body: def.body, color: car.color, mods: car.mods }} theirs={{ body: rival.body, color: rival.color, mods: rival.mods }} venue={venue} />
+        <RaceScene track={TRACK} me={me} them={them} mine={{ body: def.body, color: car.color, finish: car.finish, mods: car.mods }} theirs={{ body: rival.body, color: rival.color, mods: rival.mods }} venue={venue} />
       </Canvas>
       <div className="rf-top">
         <h2>{title ?? `Drag Race vs ${rival.town}`}</h2>
@@ -594,7 +740,7 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
       {def.skill && skillShown && !result && <div className="skill-flash">{SKILLS[def.skill].icon} {SKILLS[def.skill].name}!</div>}
       {theirSkill && theirShown && !result && <div className="skill-flash theirs">{rival.town}: {SKILLS[theirSkill].icon} {SKILLS[theirSkill].name}!</div>}
       {result ? (
-        <RaceResult won={result.won} myTime={result.myTime} theirTime={result.theirTime} cash={result.counted === false ? 0 : result.won ? payout : Math.round(payout * 0.1)} xp={result.counted === false ? 0 : result.won ? 30 : 8} rival={rival.town} note={result.note} noContest={result.counted === false} onExit={onExit} />
+        <RaceResult won={result.won} myTime={result.myTime} theirTime={result.theirTime} cash={result.counted === false ? 0 : result.won ? payout : Math.round(payout * 0.1)} xp={result.counted === false ? 0 : result.won ? 30 : 8} rival={rival.town} note={result.note} noContest={result.counted === false} stars={result.stars} onExit={onExit} />
       ) : (
         <div className="rf-bottom">
           <svg viewBox="0 0 120 120" className="tach">
@@ -637,7 +783,7 @@ function useCountUp(target: number, delay: number, ms = 900) {
 
 const CONFETTI = ['#ffd54f', '#ef5350', '#42a5f5', '#66bb6a', '#ab47bc', '#ff7043', '#ffffff']
 
-function RaceResult({ won, myTime, theirTime, cash, xp, rival, note, noContest, onExit }: { won: boolean; myTime: number; theirTime: number; cash: number; xp: number; rival: string; note?: string; noContest?: boolean; onExit: () => void }) {
+function RaceResult({ won, myTime, theirTime, cash, xp, rival, note, noContest, stars, onExit }: { won: boolean; myTime: number; theirTime: number; cash: number; xp: number; rival: string; note?: string; noContest?: boolean; stars?: number; onExit: () => void }) {
   const money = useCountUp(cash, 700)
   const exp = useCountUp(xp, 900)
   const margin = Number.isFinite(theirTime) ? Math.abs(theirTime - myTime) : null
@@ -664,6 +810,7 @@ function RaceResult({ won, myTime, theirTime, cash, xp, rival, note, noContest, 
             {margin !== null ? ` by ${margin.toFixed(2)}s` : ''}
           </p>
         )}
+        {won && stars !== undefined && <Stars n={stars} big />}
         {note && <p className="rr-note">{note}</p>}
         <div className="rr-times">
           <span className={won ? 'best' : ''}><small>You</small>{myTime.toFixed(2)}s</span>

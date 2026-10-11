@@ -47,7 +47,7 @@ type Edge = { to: number; cost: number; pts: Pt[]; cross?: Crossing }
 export type WalkNode =
   | { kind: 'v'; pos: Pt } // a sidewalk corner
   | { kind: 't'; tile: Tile; center: Pt; decor: string | null; turn: number; uid: string | null } // lawn or small decoration
-  | { kind: 'b'; uid: string; def: string; center: Pt } // a building's doors
+  | { kind: 'b'; uid: string; def: string; center: Pt; turn: number } // a building's doors (turn: the side it faces)
 
 export type WalkGraph = {
   nodes: WalkNode[]
@@ -190,9 +190,9 @@ export function buildWalkGraph(roads: Set<string>, buildings: WalkBuilding[], la
     if (d.kind === 'obstacle' || strollable(b)) continue
     const [w, h] = lotSize(b.def, b.rot)
     const [cx, cz] = toWorld(b.x + (w - 1) / 2, b.z + (h - 1) / 2)
-    const node = add(`b${b.uid}`, { kind: 'b', uid: b.uid, def: b.def, center: [cx, cz] })
-    buildingNode.set(b.uid, node)
     const front = turnOf(b, roads)
+    const node = add(`b${b.uid}`, { kind: 'b', uid: b.uid, def: b.def, center: [cx, cz], turn: front })
+    buildingNode.set(b.uid, node)
     const order = [front, ...[0, 1, 2, 3].filter((s) => s !== front)]
     for (const s of order) {
       const [dx, dz] = SIDES[s]

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import { useGame, readyRewards } from './store'
-import { carDef, upgradeCost, xpToNext } from './data'
+import { CAMPAIGN, CAMPAIGN_RACES, campaignReward, carDef, upgradeCost, xpToNext } from './data'
 
 describe('level-up bonuses', () => {
   it('add on top of a race reward instead of replacing it', () => {
@@ -65,5 +65,37 @@ describe('welcome back report', () => {
     expect(s.coins).toBe(r.coins)
     expect(s.parts).toBe(r.parts)
     expect(s.buildings.find((o) => o.uid === 'd')?.jobEndsAt).toBe(later)
+  })
+})
+
+describe('campaign', () => {
+  const g = () => useGame.getState()
+  const start = () => useGame.setState({ level: 20, xp: 0, coins: 0, bucks: 0, trophies: 0, campaign: {}, campaignPrize: null, levelUp: null })
+
+  it('pays the full reward for a first win and less for a replay', () => {
+    start()
+    const first = campaignReward(CAMPAIGN[0], 0, true)
+    expect(g().campaignResult('c1', 0, 9, 9.2)).toBe(1)
+    expect(g().coins).toBe(first)
+    expect(g().campaign['c1-0']).toBe(1)
+    g().campaignResult('c1', 0, 9, 10)
+    expect(g().coins).toBe(first + campaignReward(CAMPAIGN[0], 0, false))
+    expect(g().campaign['c1-0']).toBe(3)
+    // A loss never takes stars away.
+    expect(g().campaignResult('c1', 0, 10, 9)).toBe(0)
+    expect(g().campaign['c1-0']).toBe(3)
+  })
+
+  it('pays the chapter bonus once, and the star bonus once', () => {
+    start()
+    for (let i = 0; i < CAMPAIGN_RACES; i++) g().campaignResult('c1', i, 9, 9.1)
+    const ch = CAMPAIGN[0]
+    expect(g().bucks).toBe(ch.bucks)
+    expect(g().campaignPrize).toMatchObject({ chapter: 'c1', cleared: true, perfect: false, coins: ch.coins })
+    g().campaignResult('c1', 0, 9, 9.1)
+    expect(g().bucks).toBe(ch.bucks)
+    for (let i = 0; i < CAMPAIGN_RACES; i++) g().campaignResult('c1', i, 9, 10)
+    expect(g().bucks).toBe(ch.bucks + ch.starBucks)
+    expect(g().campaignPrize).toMatchObject({ cleared: false, perfect: true, coins: 0 })
   })
 })
