@@ -13,6 +13,7 @@ import { toWorld } from '../scene/grid'
 import { pickSpecies, sing, type Species } from './birdsong'
 import { onThunder, weatherNow } from '../game/weather'
 import { GROOVES, grooveFor, type Tone } from './clubGrooves'
+import { clubHit } from './clubBeat'
 
 // How much of each layer plays, 0 to 1, for how dark it is and the season.
 export type Mix = {
@@ -150,6 +151,8 @@ export class Soundscape {
   private playing = -1
   // Pins the club to one groove (for rendering clips); null follows the night.
   groove: number | null = null
+  // Told of every kick and bass note as it's scheduled (t in the audio clock), for the club's lights.
+  onHit: ((t: number, kick: boolean) => void) | null = null
   private vowels: BiquadFilterNode[]
   private howl: GainNode
   private howlTone: BiquadFilterNode
@@ -474,6 +477,7 @@ export class Soundscape {
       // Sweeping grooves open the chord filter over eight bars and close it again.
       const sweep = g.sweep ? 0.35 + 0.65 * (0.5 - 0.5 * Math.cos((((n % 8) * 16 + k) / 128) * Math.PI * 2)) : 1
       if (k % 4 === 0) {
+        this.onHit?.(b, true)
         this.blip(b, 0.32, 0.7 * g.gain, null, (o) => {
           o.frequency.setValueAtTime(160, b)
           o.frequency.exponentialRampToValueAtTime(46, b + 0.12)
@@ -481,6 +485,7 @@ export class Soundscape {
       }
       const note = g.bass[k]
       if (note) {
+        if (k % 4) this.onHit?.(b, false)
         const f = chord.root * note
         const last = k === 14 && note >= 2
         this.blip(b, sixteenth * (last ? 1.2 : g.bassLen), (last ? 0.11 : 0.16) * g.gain, null, (o) => {
@@ -871,7 +876,7 @@ let quietSince = 0
 
 const target = () => (settings.on && !isMuted() && !townHeld() && !document.hidden ? settings.volume : 0)
 
-function clubOpen(): Club | null {
+export function clubOpen(): Club | null {
   if (!isNight()) return null
   const s = useGame.getState()
   const buildings = s.visiting ? s.visiting.buildings : s.buildings
@@ -925,7 +930,12 @@ function tick() {
   const v = target()
   const t = ctx.currentTime
   if (v > 0) {
-    if (!scape) scape = new Soundscape(ctx, audioOut() ?? ctx.destination)
+    if (!scape) {
+      const c = ctx
+      scape = new Soundscape(c, audioOut() ?? c.destination)
+      // Hits land on the page's clock when they'll actually be heard.
+      scape.onHit = (at, kick) => clubHit(performance.now() + (at - c.currentTime + (c.outputLatency || c.baseLatency || 0)) * 1000, kick)
+    }
     quietSince = 0
     scape.level(v, t)
     scape.step(t + 0.05, nightAmount(dayPhase()), SEASON, clubOpen(), weatherNow())

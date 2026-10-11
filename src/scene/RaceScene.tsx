@@ -42,7 +42,9 @@ const LANE = 0.75
 // can run in slow motion (and from a trackside camera when it's close) while the race
 // clock, the shifts and the reported times carry on untouched.
 const PHOTO_GAP = 0.15 // seconds between the cars at the line that counts as a photo finish
-const SLOW = 0.3 // playback speed as the winner crosses
+// Gap at the line (seconds) under which the finish plays in slow motion at all.
+const CLOSE_GAP = 0.4
+const SLOW = 0.3 // playback speed as the winner crosses a close finish
 const PHOTO_SLOW = 0.15 // ...and in a photo finish
 // Visual race clock (slows with the replay), for the crowd and the flag.
 const vclock = { t: 0 }
@@ -236,7 +238,11 @@ function StartLights() {
   const lit = useMemo(() => LIT.map((c) => new Color(c)), [])
   const go = useMemo(() => new Color('#00e676'), [])
   useEffect(() => () => lamps.forEach((m) => m.dispose()), [lamps])
-  useFrame(() => {
+  const group = useRef<Group>(null)
+  useFrame(({ camera }) => {
+    // The chase camera rides at the bar's height: drop the bar just before the camera reaches
+    // it, so it never sweeps through the frame as big blurred lamps.
+    if (group.current) group.current.visible = camera.position.z < -0.85 - 1.6 || camera.position.y < 2 || camera.position.y > 3.6
     const n = startLights.n
     lamps.forEach((m, i) => {
       if (n === 0) m.color.copy(go)
@@ -245,7 +251,7 @@ function StartLights() {
     })
   })
   return (
-    <group position={[0, 2.5, -0.85]}>
+    <group ref={group} position={[0, 2.5, -0.85]}>
       <mesh position={[0, 0.32, 0]}>
         <boxGeometry args={[0.05, 0.3, 0.05]} />
         <meshStandardMaterial color="#263238" />
@@ -540,13 +546,17 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
     meRef.current?.position.set(LANE, 0, mz)
     themRef.current?.position.set(-LANE, 0, tz)
 
-    // The finish: slow motion as the leader reaches the line, from the trackside camera when it's close.
+    // The finish: slow motion as the leader reaches the line when it's close, from the trackside camera when it's very close.
     const [ra, rb] = runs.current
     if (f.phase === 'race') {
       const eta = (r: typeof ra, d: number) => (d >= track ? 0 : r.v > 1 ? (track - d) / r.v : Infinity)
       const ta = eta(ra, shown[0])
       const tb = eta(rb, shown[1])
-      if (Math.min(ta, tb) < 0.16) {
+      // A clear win just rolls through at full speed; only a close one gets the slow-motion replay.
+      if (Math.min(ta, tb) < 0.16 && !(Math.abs(ta - tb) < CLOSE_GAP)) {
+        f.phase = 'after'
+        f.since = f.vt
+      } else if (Math.min(ta, tb) < 0.16) {
         f.phase = 'slow'
         f.photo = Math.abs(ta - tb) < PHOTO_GAP
         f.target = f.photo ? PHOTO_SLOW : SLOW

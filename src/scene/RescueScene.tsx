@@ -1,21 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { AdditiveBlending, BufferAttribute, BufferGeometry, Object3D, type Group, type InstancedMesh, type Mesh, type MeshBasicMaterial, type MeshStandardMaterial, type PerspectiveCamera } from 'three'
+import { AdditiveBlending, BufferAttribute, BufferGeometry, Object3D, type Group, type InstancedMesh, type Mesh, type MeshBasicMaterial, type MeshStandardMaterial, type PerspectiveCamera, type Texture } from 'three'
 import type { Loot, Search } from '../game/store'
 import { carDef, type Rarity } from '../game/data'
-import { CarModel, wheelRig } from './CarModel'
+import { CarModel, carSize, wheelRig } from './CarModel'
 import { TowTruck } from './TownCars'
 import { Batch } from './Batch'
 import { LotScenery } from './RescueLots'
+import { RescueYard, rustySpot, type YardLook } from './RescueYard'
+import { CarShadow, Crowd, useArcadeLook } from './ArcadeScenery'
+import { RaceWeather } from './Weather'
 import { PostFx } from './PostFx'
 import { SkyEnv } from './SkyEnv'
 import { holdTown } from './renderGate'
 import { holdPageTint } from './pageTint'
-import { dayPhase, duskAmount, nightAmount } from './dayNight'
-import { lookFor } from './look'
-import { PAL } from './season'
 import { LAYER } from './layers'
-import { glowTex } from './textures'
+import { beamTex, concreteTex, dirtTex, glowTex, grassTex, sandTex, trackTex } from './textures'
 
 // Rusty's search, played out in 3D: a dirt loop with the search spots around
 // it, each a tarp-covered heap under a glowing beacon. Tap one and the tow
@@ -23,14 +23,23 @@ import { glowTex } from './textures'
 // The rolls, costs and rewards all stay in the store; the scene only decides
 // when to call `onArrive` (the store's revealPin).
 
-type Theme = { ground: string; road: string; pad: string; tarp: string[]; sky: string; edge?: string }
+// `ground` is what lies beyond the lot; `road` tints the worn track round the
+// loop, `pad` the dirt under each spot, `yard` the lot itself and its fence.
+type Theme = { ground: 'grass' | 'sand' | 'concrete'; tint: string; road: string; pad: string; tarp: string[]; sky: string; edge?: string; yard: YardLook }
 
+const FENCE = ['#e07b45', '#5fa8a0', '#efe2c8', '#c0533e', '#b0bec5']
 const THEMES: Record<string, Theme> = {
-  suburbs: { ground: PAL.ground, road: '#62676c', pad: '#a08f78', tarp: ['#3f6fa8', '#6b7d4a', '#8a6d4b'], sky: '#d9f2ff' },
-  farm: { ground: PAL.ground, road: '#a7845c', pad: '#b39270', tarp: ['#6b7d4a', '#8a6d4b', '#3f6fa8'], sky: '#e2f4ff' },
-  downtown: { ground: '#8f969c', road: '#4b5056', pad: '#a7adb2', tarp: ['#3f6fa8', '#455a64', '#8a6d4b'], sky: '#d0dce5' },
-  desert: { ground: '#d9a066', road: '#b98552', pad: '#c99566', tarp: ['#8a6d4b', '#6b7d4a', '#a1887f'], sky: '#f2dcc2' },
-  track: { ground: PAL.ground, road: '#55595e', pad: '#8a8f94', tarp: ['#3f6fa8', '#b71c1c', '#455a64'], sky: '#d9f2ff', edge: '#fafafa' },
+  suburbs: { ground: 'grass', tint: '#ffffff', road: '#8a755f', pad: '#a58b70', tarp: ['#3f6fa8', '#6b7d4a', '#8a6d4b'], sky: '#d9f2ff', yard: { dirt: '#bba68c', pad: '#a58b70', fence: FENCE } },
+  farm: { ground: 'grass', tint: '#ffffff', road: '#9a7b58', pad: '#ad8e68', tarp: ['#6b7d4a', '#8a6d4b', '#3f6fa8'], sky: '#e2f4ff', yard: { dirt: '#c6ab84', pad: '#ad8e68', fence: ['#c0533e', '#efe2c8', '#e07b45', '#8d9b7a'], flavour: 'hay' } },
+  downtown: { ground: 'concrete', tint: '#c4c9cd', road: '#6f757b', pad: '#9aa0a5', tarp: ['#3f6fa8', '#455a64', '#8a6d4b'], sky: '#d0dce5', yard: { dirt: '#a9adb0', pad: '#9aa0a5', fence: ['#b0bec5', '#5fa8a0', '#efe2c8', '#e07b45'] } },
+  desert: { ground: 'sand', tint: '#ffffff', road: '#b0835a', pad: '#c99566', tarp: ['#8a6d4b', '#6b7d4a', '#a1887f'], sky: '#f2dcc2', yard: { dirt: '#e2b98c', pad: '#c99566', fence: ['#e07b45', '#efe2c8', '#c0533e', '#b0bec5'], flavour: 'desert' } },
+  track: { ground: 'grass', tint: '#ffffff', road: '#62676c', pad: '#9a9fa4', tarp: ['#3f6fa8', '#b71c1c', '#455a64'], sky: '#d9f2ff', edge: '#fafafa', yard: { dirt: '#b7ab9a', pad: '#9a9fa4', fence: FENCE, flavour: 'track' } },
+}
+
+function groundTex(kind: Theme['ground']): Texture {
+  if (kind === 'sand') return sandTex(28, 28)
+  if (kind === 'concrete') return concreteTex(44, 44)
+  return grassTex(55, 55)
 }
 
 export const RARITY_GLOW: Record<Rarity, string> = { common: '#cfd8dc', scarce: '#42a5f5', rare: '#ffb300' }
@@ -105,6 +114,17 @@ function ribbon(L: Layout, off: number, half: number, y: number) {
   g.setAttribute('normal', new BufferAttribute(nor, 3))
   g.setAttribute('uv', new BufferAttribute(uv, 2))
   g.setIndex(idx)
+  return g
+}
+
+// A straight strip along +z from z0 to z1, its texture running lengthwise
+// like the loop's (u along, v across).
+function straight(z0: number, z1: number, half: number, y: number) {
+  const g = new BufferGeometry()
+  g.setAttribute('position', new BufferAttribute(new Float32Array([-half, y, z0, half, y, z0, -half, y, z1, half, y, z1]), 3))
+  g.setAttribute('normal', new BufferAttribute(new Float32Array([0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0]), 3))
+  g.setAttribute('uv', new BufferAttribute(new Float32Array([z0 / 2, 1, z0 / 2, 0, z1 / 2, 1, z1 / 2, 0]), 2))
+  g.setIndex([0, 2, 1, 1, 2, 3])
   return g
 }
 
@@ -267,6 +287,95 @@ function SmallLoot({ kind }: { kind: Loot['kind'] }) {
   )
 }
 
+// Three tarp shapes, picked by the spot's number: a car cover, a lumpy heap
+// and a draped stack of crates. Ropes, sandbags and a loose flapping corner.
+function Tarp({ kind, color }: { kind: number; color: string }) {
+  const mat = <meshStandardMaterial color={color} roughness={0.9} flatShading />
+  const rope = <meshStandardMaterial color="#e3c98f" />
+  // Merged, so each tarp costs a couple of draws however many pieces it has.
+  return (
+    <Batch version={`${kind}${color}`}>
+      {kind === 0 && (
+        <>
+          <mesh position-y={0.2} scale={[0.82, 0.4, 1.5]}>
+            <boxGeometry args={[1, 1, 1]} />
+            {mat}
+          </mesh>
+          <mesh position={[0, 0.38, -0.08]} scale={[0.4, 0.26, 0.55]}>
+            <sphereGeometry args={[1, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2]} />
+            {mat}
+          </mesh>
+          {/* The cover's hem flaring out at the bottom. */}
+          <mesh position-y={0.04} scale={[0.92, 0.08, 1.6]}>
+            <boxGeometry args={[1, 1, 1]} />
+            {mat}
+          </mesh>
+          {[-0.45, 0.42].map((z) => (
+            <mesh key={z} position={[0, 0.405, z]}>
+              <boxGeometry args={[0.86, 0.025, 0.04]} />
+              {rope}
+            </mesh>
+          ))}
+        </>
+      )}
+      {kind === 1 && (
+        <>
+          <mesh position-y={0.05} scale={[0.72, 0.46, 1.05]}>
+            <sphereGeometry args={[1, 9, 6, 0, Math.PI * 2, 0, Math.PI / 2]} />
+            {mat}
+          </mesh>
+          <mesh position={[0.04, 0.32, -0.12]} scale={[0.5, 0.32, 0.52]} rotation-y={0.2}>
+            <sphereGeometry args={[1, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2]} />
+            {mat}
+          </mesh>
+          <mesh position={[-0.28, 0.12, 0.42]} rotation={[0.3, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.07, 0.07, 0.26, 8]} />
+            <meshStandardMaterial color="#6d4c41" />
+          </mesh>
+          {[-0.42, 0.38].map((z) => (
+            <mesh key={z} position={[0, 0.06, z]} rotation-y={Math.PI / 2} scale={[1, z < 0 ? 0.62 : 0.78, 1]}>
+              <torusGeometry args={[0.68 - Math.abs(z) * 0.25, 0.022, 4, 14, Math.PI]} />
+              {rope}
+            </mesh>
+          ))}
+        </>
+      )}
+      {kind === 2 && (
+        <>
+          <mesh position-y={0.26} rotation-y={0.12} scale={[1.0, 0.52, 0.95]}>
+            <boxGeometry args={[1, 1, 1]} />
+            {mat}
+          </mesh>
+          <mesh position={[0.14, 0.64, -0.08]} rotation-y={-0.2} scale={[0.55, 0.3, 0.55]}>
+            <boxGeometry args={[1, 1, 1]} />
+            {mat}
+          </mesh>
+          {/* A crate corner showing under the hem. */}
+          <mesh position={[-0.44, 0.1, 0.42]}>
+            <boxGeometry args={[0.2, 0.2, 0.2]} />
+            <meshStandardMaterial color="#a1887f" />
+          </mesh>
+          <mesh position={[0.02, 0.26, 0]} rotation-y={0.12}>
+            <boxGeometry args={[1.04, 0.025, 0.04]} />
+            {rope}
+          </mesh>
+        </>
+      )}
+      {/* A loose corner and sandbags holding the others down. */}
+      <mesh position={[0.6, 0.06, 0.7]} rotation={[-1.2, 0.5, 0]}>
+        <planeGeometry args={[0.32, 0.26]} />
+        <meshStandardMaterial color={color} roughness={0.9} side={2} />
+      </mesh>
+      {[[-0.6, -0.7], [0.55, -0.72], [-0.6, 0.66]].map(([x, z], j) => (
+        <mesh key={j} position={[x, 0.07, z]} rotation={[Math.PI / 2, 0, j]}>
+          <capsuleGeometry args={[0.06, 0.12, 2, 6]} />
+          <meshStandardMaterial color="#c9b07a" />
+        </mesh>
+      ))}
+    </Batch>
+  )
+}
+
 const backOut = (t: number) => 1 + 2.4 * (t - 1) ** 3 + 1.4 * (t - 1) ** 2
 const clamp01 = (t: number) => Math.min(1, Math.max(0, t))
 
@@ -304,7 +413,7 @@ function SearchSpot({ i, at: p, loot, open, gone, tarp, pad, speed, onPick, onFo
     const fade = t < 0 ? 1 : clamp01(1 - t / 0.3)
     const pulse = 0.5 + Math.sin(now * 3.2 + i) * 0.5
     if (ring.current) ring.current.opacity = fade * (0.45 + pulse * 0.45)
-    if (column.current) column.current.opacity = fade * (0.12 + pulse * 0.1)
+    if (column.current) column.current.opacity = fade * (0.3 + pulse * 0.2)
     if (beacon.current) {
       beacon.current.visible = fade > 0.01
       beacon.current.children[2]?.position.set(0, 1.75 + Math.abs(Math.sin(now * 2.4 + i)) * 0.3, 0)
@@ -372,31 +481,10 @@ function SearchSpot({ i, at: p, loot, open, gone, tarp, pad, speed, onPick, onFo
       </mesh>
       {stage !== 'open' && (
         <group ref={tarpRef}>
-          {/* A lumpy tarp over who-knows-what, tied down with rope. */}
+          {/* A tarp over who-knows-what, tied down with rope. Its shape says
+              nothing about what's under it. */}
           <group rotation-y={p.yaw}>
-            <mesh position-y={0.05} scale={[0.72, 0.42, 1.05]}>
-              <sphereGeometry args={[1, 9, 6, 0, Math.PI * 2, 0, Math.PI / 2]} />
-              <meshStandardMaterial color={tarp} roughness={0.9} flatShading />
-            </mesh>
-            <mesh position={[0.04, 0.3, -0.12]} scale={[0.5, 0.3, 0.52]} rotation-y={0.2}>
-              <sphereGeometry args={[1, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2]} />
-              <meshStandardMaterial color={tarp} roughness={0.9} flatShading />
-            </mesh>
-            {[-0.42, 0.38].map((z) => (
-              <mesh key={z} position={[0, 0.06, z]} rotation-y={Math.PI / 2} scale={[1, z < 0 ? 0.62 : 0.78, 1]}>
-                <torusGeometry args={[0.68 - Math.abs(z) * 0.25, 0.022, 4, 14, Math.PI]} />
-                <meshStandardMaterial color="#e3c98f" />
-              </mesh>
-            ))}
-            {/* Corner of the tarp flapping loose, and a brick holding the other. */}
-            <mesh position={[0.62, 0.05, 0.62]} rotation={[-1.2, 0.5, 0]}>
-              <planeGeometry args={[0.32, 0.26]} />
-              <meshStandardMaterial color={tarp} roughness={0.9} side={2} />
-            </mesh>
-            <mesh position={[-0.66, 0.07, -0.58]}>
-              <boxGeometry args={[0.18, 0.1, 0.1]} />
-              <meshStandardMaterial color="#a1553a" />
-            </mesh>
+            <Tarp kind={i % 3} color={tarp} />
           </group>
         </group>
       )}
@@ -406,9 +494,9 @@ function SearchSpot({ i, at: p, loot, open, gone, tarp, pad, speed, onPick, onFo
             <ringGeometry args={[1.0, 1.22, 36]} />
             <meshBasicMaterial ref={ring} color="#ffd54f" transparent depthWrite={false} blending={AdditiveBlending} toneMapped={false} />
           </mesh>
-          <mesh position-y={1.3} raycast={() => null}>
-            <cylinderGeometry args={[0.55, 0.9, 2.6, 20, 1, true]} />
-            <meshBasicMaterial ref={column} color="#ffe082" transparent depthWrite={false} blending={AdditiveBlending} side={2} toneMapped={false} />
+          <mesh position-y={1.5} raycast={() => null}>
+            <cylinderGeometry args={[0.5, 0.95, 3, 20, 1, true]} />
+            <meshBasicMaterial ref={column} map={beamTex()} color="#ffe082" transparent depthWrite={false} blending={AdditiveBlending} side={2} toneMapped={false} />
           </mesh>
           <group>
             <mesh rotation-x={Math.PI} raycast={() => null}>
@@ -445,7 +533,7 @@ function SearchSpot({ i, at: p, loot, open, gone, tarp, pad, speed, onPick, onFo
           </group>
           <mesh position-y={2.4} visible={false} raycast={() => null}>
             <cylinderGeometry args={[0.32, 0.6, 4.8, 16, 1, true]} />
-            <meshBasicMaterial ref={beam} map={glowTex()} color={glow} transparent opacity={0} depthWrite={false} blending={AdditiveBlending} side={2} toneMapped={false} />
+            <meshBasicMaterial ref={beam} map={beamTex()} color={glow} transparent opacity={0} depthWrite={false} blending={AdditiveBlending} side={2} toneMapped={false} />
           </mesh>
           {stage === 'opening' && <Puffs color={pad} />}
           {stage === 'opening' && <Sparkles delay={0.3 / speed} color={car ? RARITY_GLOW[loot.rarity] : '#ffe082'} count={car ? (loot.rarity === 'rare' ? 28 : 18) : 10} />}
@@ -501,8 +589,9 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
   const tall = size.height > size.width * 1.05
   const L = useMemo(() => makeLayout(tall, search.pins.length), [tall, search.pins.length])
   const theme = THEMES[search.spot] ?? THEMES.suburbs
-  const night = useMemo(() => nightAmount(dayPhase()), [])
-  const look = useMemo(() => lookFor(night, duskAmount(dayPhase())), [night])
+  // The town's own time of day and weather, graded like the race venues.
+  const town = useArcadeLook()
+  const { night, look } = town
   const sky = useMemo(() => {
     const day = theme.sky
     const n = Math.min(1, night)
@@ -533,7 +622,12 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
   const seen = useRef<number[]>(search.revealed.map((r) => (r ? -1e9 : 0)))
   // Where the truck has been, so towed cars can follow its exact path.
   const trail = useRef<{ x: number; z: number; yaw: number }[]>([])
-  const boom = useRef<Mesh>(null)
+  const boom = useRef<Group>(null)
+  const boomBase = useRef<Mesh>(null)
+  const boomExt = useRef<Mesh>(null)
+  const ram = useRef<Mesh>(null)
+  const pulley = useRef<Mesh>(null)
+  const straps = useRef<(Mesh | null)[]>([])
   const cable = useRef<Mesh>(null)
   const hook = useRef<Group>(null)
   const carried = useRef<Group>(null)
@@ -840,11 +934,31 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
     const hy = tip[1] - Math.sqrt(Math.max(0.0001, pose.drop * pose.drop - sw.x * sw.x - sw.z * sw.z))
     const bm = boom.current
     if (bm) {
-      const len = Math.max(0.05, pose.len)
-      bm.position.set(px + Math.sin(pose.a) * len * 0.5, py + len * TILT * 0.5, pz + Math.cos(pose.a) * len * 0.5)
+      // Boom: a heavy base section with a lighter one telescoping out of it,
+      // a pulley at the tip and a hydraulic ram pushing it up from the post.
+      const len = Math.hypot(Math.max(0.05, pose.len), pose.len * TILT)
+      bm.position.set(px, py, pz)
       bm.rotation.set(-Math.atan(TILT), pose.a, 0, 'YXZ')
-      bm.scale.set(1, 1, Math.hypot(len, len * TILT))
       bm.visible = s.mode !== 'gone'
+      const base = Math.min(len, 0.55 * TS)
+      boomBase.current?.position.set(0, 0, base / 2 - 0.06)
+      boomBase.current?.scale.set(1, 1, base + 0.12)
+      const ext = Math.max(0.01, len - base * 0.8)
+      boomExt.current?.position.set(0, 0, base * 0.8 + ext / 2)
+      boomExt.current?.scale.set(1, 1, ext)
+      pulley.current?.position.set(0, -0.02, len)
+      const r = ram.current
+      if (r) {
+        const al = Math.atan(TILT)
+        const d = 0.32 * TS
+        const fy = -d * Math.cos(al)
+        const fz = -d * Math.sin(al)
+        const ty = -0.05
+        const tz = Math.min(len, 0.42 * TS)
+        r.position.set(0, (fy + ty) / 2, (fz + tz) / 2)
+        r.rotation.set(Math.atan2(tz - fz, ty - fy), 0, 0)
+        r.scale.set(1, Math.hypot(tz - fz, ty - fy), 1)
+      }
     }
     const cb = cable.current
     if (cb) {
@@ -870,12 +984,26 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
       cg.scale.setScalar(carriedScale)
     }
     // Towed cars follow the truck's trail, the first one with its nose on the hook.
-    cars.forEach((_, n) => {
+    cars.forEach((ci, n) => {
       const c = towed.current[n]
       if (!c) return
       const b = behind(TOW_FIRST + n * TOW_GAP)
       c.position.set(b.x, n === 0 ? 0.1 : 0, b.z)
       c.rotation.set(n === 0 ? -0.12 : 0, b.yaw, 0, 'YXZ')
+      // A tow strap from this car's nose to the back of the one in front.
+      const st = straps.current[n]
+      if (!st) return
+      st.visible = n > 0
+      if (!n) return
+      const loot = sq.pins[ci]
+      const prev = sq.pins[cars[n - 1]]
+      const half = (l: Loot) => (l.kind === 'car' ? carSize(carDef(l.model).body).len / 2 : 0.6)
+      const a = behind(TOW_FIRST + (n - 1) * TOW_GAP + half(prev) - 0.05)
+      const f = behind(TOW_FIRST + n * TOW_GAP - half(loot) + 0.05)
+      const len = Math.max(0.02, Math.hypot(a.x - f.x, a.z - f.z))
+      st.position.set((a.x + f.x) / 2, 0.2, (a.z + f.z) / 2)
+      st.rotation.set(0, Math.atan2(a.x - f.x, a.z - f.z), 0)
+      st.scale.set(1, 1, len)
     })
 
     // The truck rocks back as it pulls away and dips its nose when it brakes.
@@ -935,11 +1063,20 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
   })
 
   const road = useMemo(() => ribbon(L, 0, HALF, LAYER.lot), [L])
+  const entry = useMemo(() => straight(L.rz - 0.2, L.rz + 32, HALF, LAYER.lot), [L])
+  // A berm of loose dirt pushed up along both sides of the track.
+  const berms = useMemo(() => [ribbon(L, HALF + 0.12, 0.14, LAYER.lot - 0.01), ribbon(L, -HALF - 0.12, 0.14, LAYER.lot - 0.01)], [L])
   const edges = useMemo(() => (theme.edge ? [ribbon(L, HALF - 0.08, 0.04, LAYER.paint), ribbon(L, -HALF + 0.08, 0.04, LAYER.paint)] : []), [L, theme.edge])
   useEffect(() => () => {
     road.dispose()
+    entry.dispose()
+    berms.forEach((g) => g.dispose())
     edges.forEach((g) => g.dispose())
-  }, [road, edges])
+  }, [road, entry, berms, edges])
+  const rusty = useMemo(() => {
+    const at = rustySpot(L)
+    return at ? [{ x: at.x, z: at.z, h: 0, shirt: '#ff8f00' }] : []
+  }, [L])
 
   return (
     <>
@@ -949,46 +1086,51 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
       <directionalLight position={[6, 12, 4]} intensity={look.sunIntensity * 0.9} color={look.sun} />
       <SkyEnv />
       <PostFx look={look} tiltShift />
+      <RaceWeather w={town.weather} look={look} />
       <mesh rotation-x={-Math.PI / 2} position-y={LAYER.outer} raycast={() => null}>
         <planeGeometry args={[220, 220]} />
-        <meshStandardMaterial color={theme.ground} />
+        <meshStandardMaterial color={theme.tint} map={groundTex(theme.ground)} />
       </mesh>
       {/* Everything that never moves, merged into a few draws. */}
       <Batch version={`${search.spot}${tall}`}>
         <mesh geometry={road}>
-          <meshStandardMaterial color={theme.road} />
+          <meshStandardMaterial color={theme.road} map={trackTex()} />
         </mesh>
+        {berms.map((g, i) => (
+          <mesh key={i} geometry={g}>
+            <meshStandardMaterial color={theme.yard.dirt} map={dirtTex(4, 1)} />
+          </mesh>
+        ))}
         {edges.map((g, i) => (
           <mesh key={i} geometry={g}>
             <meshBasicMaterial color={theme.edge} />
           </mesh>
         ))}
         {/* The way in, from Rusty's. */}
-        <mesh rotation-x={-Math.PI / 2} position={[0, LAYER.lot, L.rz + 16]}>
-          <planeGeometry args={[HALF * 2, 32]} />
-          <meshStandardMaterial color={theme.road} />
+        <mesh geometry={entry}>
+          <meshStandardMaterial color={theme.road} map={trackTex()} />
         </mesh>
         {L.spots.map((p, i) => (
           <group key={i}>
+            {/* A worn dirt pad with a darker rim of churned-up ground, and the track out to it. */}
+            <mesh rotation-x={-Math.PI / 2} position={[p.x, LAYER.land - 0.008, p.z]}>
+              <circleGeometry args={[1.42, 24]} />
+              <meshStandardMaterial color={theme.pad} map={dirtTex(0.7, 0.7)} />
+            </mesh>
             <mesh rotation-x={-Math.PI / 2} position={[p.x, LAYER.land, p.z]}>
-              <circleGeometry args={[1.35, 20]} />
-              <meshStandardMaterial color={theme.pad} />
+              <circleGeometry args={[1.25, 24]} />
+              <meshStandardMaterial color={theme.yard.dirt} map={dirtTex(0.6, 0.6)} />
             </mesh>
-            <mesh rotation-x={-Math.PI / 2} rotation-z={-p.yaw} position={[(p.x + p.rx) / 2, LAYER.land, (p.z + p.rz) / 2]}>
-              <planeGeometry args={[0.9, Math.hypot(p.x - p.rx, p.z - p.rz)]} />
-              <meshStandardMaterial color={theme.pad} />
+            <mesh rotation-x={-Math.PI / 2} rotation-z={-p.yaw} position={[(p.x + p.rx) / 2, LAYER.land - 0.004, (p.z + p.rz) / 2]}>
+              <planeGeometry args={[0.95, Math.hypot(p.x - p.rx, p.z - p.rz)]} />
+              <meshStandardMaterial color={theme.pad} map={dirtTex(0.4, 0.8)} />
             </mesh>
-            {/* Old tyres lying about. */}
-            {[0, 1].map((k) => (
-              <mesh key={k} rotation-x={-Math.PI / 2} position={[p.x + Math.cos(p.yaw + 1.6 + k * 0.5) * 1.15, 0.07, p.z - Math.sin(p.yaw + 1.6 + k * 0.5) * 1.15]}>
-                <torusGeometry args={[0.15, 0.07, 6, 12]} />
-                <meshStandardMaterial color="#263238" />
-              </mesh>
-            ))}
           </group>
         ))}
+        <RescueYard L={L} spots={L.spots} look={theme.yard} />
         <LotScenery theme={search.spot} L={L} />
       </Batch>
+      <Crowd people={rusty} />
       {L.spots.map((p, i) => (
         <SearchSpot key={i} i={i} at={p} loot={search.pins[i]} open={search.revealed[i]} gone={holding === i || taken.includes(i)} tarp={theme.tarp[i % theme.tarp.length]} pad={theme.pad} speed={speed} onPick={pick} onFound={onFound} />
       ))}
@@ -1039,18 +1181,37 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
         <icosahedronGeometry args={[0.22, 0]} />
         <meshStandardMaterial color={theme.pad} transparent opacity={0.6} depthWrite={false} flatShading />
       </instancedMesh>
-      <mesh ref={boom} raycast={() => null}>
-        <boxGeometry args={[0.1, 0.1, 1]} />
-        <meshStandardMaterial color="#ffb300" />
-      </mesh>
+      <group ref={boom}>
+        <mesh ref={boomBase} raycast={() => null}>
+          <boxGeometry args={[0.13, 0.13, 1]} />
+          <meshStandardMaterial color="#ffb300" />
+        </mesh>
+        <mesh ref={boomExt} raycast={() => null}>
+          <boxGeometry args={[0.085, 0.085, 1]} />
+          <meshStandardMaterial color="#ffd54f" metalness={0.3} roughness={0.5} />
+        </mesh>
+        <mesh ref={pulley} rotation-z={Math.PI / 2} raycast={() => null}>
+          <cylinderGeometry args={[0.07, 0.07, 0.06, 12]} />
+          <meshStandardMaterial color="#37474f" metalness={0.5} roughness={0.4} />
+        </mesh>
+        <mesh ref={ram} raycast={() => null}>
+          <cylinderGeometry args={[0.03, 0.03, 1, 8]} />
+          <meshStandardMaterial color="#cfd8dc" metalness={0.7} roughness={0.25} />
+        </mesh>
+      </group>
       <mesh ref={cable} raycast={() => null}>
         <boxGeometry args={[0.02, 1, 0.02]} />
         <meshStandardMaterial color="#212121" />
       </mesh>
       <group ref={hook}>
-        <mesh position-y={-0.02} raycast={() => null}>
-          <boxGeometry args={[0.1, 0.06, 0.06]} />
-          <meshStandardMaterial color="#37474f" />
+        {/* Hook block: a weighted housing with a hazard stripe, then the hook. */}
+        <mesh position-y={0.02} raycast={() => null}>
+          <boxGeometry args={[0.12, 0.1, 0.07]} />
+          <meshStandardMaterial color="#ffb300" />
+        </mesh>
+        <mesh position-y={-0.04} raycast={() => null}>
+          <boxGeometry args={[0.1, 0.03, 0.06]} />
+          <meshStandardMaterial color="#263238" />
         </mesh>
         <mesh position-y={-0.11} rotation-y={Math.PI / 2} raycast={() => null}>
           <torusGeometry args={[0.08, 0.026, 6, 12, Math.PI * 1.4]} />
@@ -1065,8 +1226,15 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
       {taken
         .filter((i) => search.pins[i].kind === 'car')
         .map((i, n) => (
-          <group key={i} ref={(o) => void (towed.current[n] = o)}>
-            <LootModel loot={search.pins[i]} />
+          <group key={i}>
+            <group ref={(o) => void (towed.current[n] = o)}>
+              <LootModel loot={search.pins[i]} />
+              <CarShadow len={1.3} wid={0.75} />
+            </group>
+            <mesh ref={(o) => void (straps.current[n] = o)} visible={false} raycast={() => null}>
+              <boxGeometry args={[0.05, 0.025, 1]} />
+              <meshStandardMaterial color="#ffb300" />
+            </mesh>
           </group>
         ))}
     </>

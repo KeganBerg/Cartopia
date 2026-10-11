@@ -2,14 +2,38 @@
 // (supabase/migrations/0009_live_race_referee.sql, public.race_floor()).
 
 export const TRACK = 400
-export const GEAR_POWER = [1, 0.85, 0.72, 0.6]
+
+// A six-speed box: revs follow road speed, so each gear runs longer than the one before and the
+// shifting lasts most of the race. RATIO is the share of the car's top speed each gear reaches
+// at the redline (rpm 1). Speeds are metres per second.
+export const RATIO = [0.22, 0.38, 0.55, 0.73, 0.9, 1]
+export const TOP_GEAR = RATIO.length - 1
+// The car's top speed and its pull, from PI.
+export const topSpeed = (pi: number) => 70 + pi * 0.3
+const pull = (pi: number) => 5.4 + pi * 0.048
+// Torque across the rev range (0-1), peaking near the redline.
+const torque = (rpm: number) => 0.62 + 0.55 * rpm - 0.25 * rpm * rpm
+// Lower gears multiply the engine's pull.
+const GEAR_PULL = RATIO.map((k) => (1 / k) ** 0.55)
+// Revs at a standstill: the needle never drops below this.
+export const IDLE = 0.25
+// The perfect band narrows gear by gear (as a share of the band from grip.ts), so a slower
+// needle in a tall gear still gives about the same fraction of a second to hit it.
+export const BAND = [1, 0.55, 0.32, 0.22, 0.16]
+export function shiftBand(gear: number, lo = 0.78, hi = 0.93) {
+  return { lo: hi - (hi - lo) * BAND[Math.min(gear, BAND.length - 1)], hi }
+}
+// Holding the pedal before GO revs the engine; where the needle sits at GO sets the launch.
+export const LAUNCH_BAND = { lo: 0.55, hi: 0.75 }
+export const REV_UP = 1.5
+export const REV_DOWN = 1.2
 
 // Boost: how hard it pushes in each gear (it only spins the tires in first), and how long a full tank lasts.
-export const BOOST_MUL = [0.85, 1.1, 1.25, 1.35]
-export const BOOST_SECONDS = 1.6
-// What a launch fills the tank with by reaction time (seconds after GO), and what each shift adds.
+export const BOOST_MUL = [0.85, 1.05, 1.15, 1.25, 1.3, 1.35]
+export const BOOST_SECONDS = 2.2
+// What a launch fills the tank with, and what each shift adds.
 export const LAUNCH_FILL = { perfect: 0.34, good: 0.15 }
-export const SHIFT_FILL = { perfect: 0.22, good: 0.1 }
+export const SHIFT_FILL = { perfect: 0.2, good: 0.08 }
 // Pressing before GO is a jump start: off the line this many seconds after GO, with wheelspin
 // through first gear and nothing in the boost tank.
 export const JUMP_START_DELAY = 0.6
@@ -24,14 +48,15 @@ export type Racer = {
   gear: number; rpm: number; speed: number; dist: number; quality: number; finished: number | null
   launched: boolean; boost: number; burning: boolean; boostUsed: boolean; streak: number
 }
-export const freshRacer = (launched = true): Racer => ({ gear: 0, rpm: 0, speed: 0, dist: 0, quality: 1, finished: null, launched, boost: launched ? LAUNCH_FILL.perfect : 0, burning: false, boostUsed: false, streak: 0 })
+export const freshRacer = (launched = true): Racer => ({ gear: 0, rpm: IDLE, speed: 0, dist: 0, quality: 1, finished: null, launched, boost: launched ? LAUNCH_FILL.perfect : 0, burning: false, boostUsed: false, streak: 0 })
 
 export function stepRacer(r: Racer, piVal: number, dt: number, t: number, mul = 1, track = TRACK) {
   if (r.finished !== null || !r.launched) return
-  const climb = (1.25 - r.gear * 0.16) * (0.85 + piVal / 300)
-  // Top gear just holds near the redline; lower gears bounce off the limiter.
-  r.rpm = Math.min(r.gear === 3 ? 0.95 : 1.05, r.rpm + climb * dt)
-  const overRev = r.rpm >= 1
+  const vTop = topSpeed(piVal)
+  const rev = Math.max(IDLE, r.speed / (vTop * RATIO[r.gear]))
+  r.rpm = Math.min(1.05, rev)
+  // Lower gears bounce off the limiter; top gear just stops pulling there.
+  const limiter = rev >= 1 ? (r.gear === TOP_GEAR ? 0 : 0.15) : 1
   if (r.burning) {
     mul *= BOOST_MUL[r.gear]
     r.boost -= dt / BOOST_SECONDS
@@ -40,9 +65,10 @@ export function stepRacer(r: Racer, piVal: number, dt: number, t: number, mul = 
       r.burning = false
     }
   }
-  const accel = (piVal / 100) * 70 * GEAR_POWER[r.gear] * r.quality * (overRev ? 0.25 : 1) * (0.4 + r.rpm * 0.6)
-  r.speed += accel * mul * dt
-  r.speed *= 1 - 0.04 * dt
+  const p = pull(piVal)
+  const drive = p * GEAR_PULL[r.gear] * torque(Math.min(1, rev)) * r.quality * limiter * mul
+  const drag = 0.9 * p * (r.speed / vTop) ** 2
+  r.speed = Math.max(0, r.speed + (drive - drag) * dt)
   r.dist += r.speed * dt
   if (r.dist >= track) r.finished = t
 }
@@ -50,9 +76,9 @@ export function stepRacer(r: Racer, piVal: number, dt: number, t: number, mul = 
 // lo..hi is the perfect window; rain and snow narrow it (see grip.ts).
 export function shiftQuality(rpm: number, lo = 0.78, hi = 0.93) {
   if (rpm >= lo && rpm <= hi) return { q: 1.08, label: 'PERFECT!' }
-  if (rpm >= 0.65 && rpm < lo) return { q: 0.95, label: 'Good' }
-  if (rpm > hi) return { q: 0.85, label: 'Late' }
-  return { q: 0.75, label: 'Early' }
+  if (rpm >= 0.65 && rpm < lo) return { q: 0.97, label: 'Good' }
+  if (rpm > hi) return { q: 0.88, label: 'Late' }
+  return { q: 0.8, label: 'Early' }
 }
 
 // Off the line `reaction` seconds after GO (negative: a jump start, which the caller holds until
@@ -76,11 +102,31 @@ export function launchRacer(r: Racer, reaction: number) {
   return 'Slow launch'
 }
 
-// Up a gear with shift quality q (1.08 perfect, 0.95 good). Clean shifts fill the boost tank.
+// Off the line at GO with the revs at `rpm`: in the launch band is a perfect launch, too few revs
+// bog the car down and too many spin the tires. Returns the call to show.
+export function revLaunch(r: Racer, rpm: number) {
+  r.launched = true
+  const { lo, hi } = LAUNCH_BAND
+  if (rpm >= lo && rpm <= hi) {
+    r.boost = LAUNCH_FILL.perfect
+    return 'PERFECT LAUNCH!'
+  }
+  if (rpm >= lo - 0.15 && rpm <= hi + 0.12) {
+    r.quality = 0.95
+    r.boost = LAUNCH_FILL.good
+    return 'Good launch'
+  }
+  r.quality = rpm > hi ? 0.82 : 0.86
+  r.boost = 0
+  return rpm > hi ? 'WHEELSPIN!' : 'Bogged down'
+}
+
+// Up a gear with shift quality q (1.08 perfect, 0.97 good). Clean shifts fill the boost tank.
 export function shiftRacer(r: Racer, q: number) {
+  if (r.gear >= TOP_GEAR) return
   r.quality = q
   r.gear++
-  r.rpm = 0.35
+  r.rpm = Math.max(IDLE, r.rpm * RATIO[r.gear - 1] / RATIO[r.gear])
   r.streak = q >= 1 ? r.streak + 1 : 0
   r.boost = Math.min(1, r.boost + (q >= 1 ? SHIFT_FILL.perfect : q >= 0.95 ? SHIFT_FILL.good : 0))
 }
@@ -96,19 +142,24 @@ export function fireBoost(r: Racer) {
 // AI rivals: reaction off the line by how cleanly they shift (0 sloppy to 1 clean; roll is 0-1
 // random), and they fire their boost as they reach this gear.
 export const aiReaction = (cleanness: number, roll: number) => 0.12 + (1 - cleanness) * 0.3 + roll * 0.12
-export const AI_BOOST_GEAR = 2
+export const AI_BOOST_GEAR = 3
+// Nitro Burst works in the top two gears; Oil Slick for the first few seconds.
+export const NITRO_GEAR = TOP_GEAR - 1
+export const OIL_SECONDS = 4
 
 // The fastest a car with this PI can finish: a perfect launch the instant the lights go green,
 // every shift perfect at the best shift point, the boost fired at the best moment, with whichever
 // skill helps most (see the race screen for how each one applies), less 2.5% for uneven frame
 // timing. The referee raises any faster reported time to this.
 export const MAX_RACE_PI = 250
+// The race screen steps the race at this fixed rate whatever the frame rate.
+export const RACE_DT = 1 / 240
 // No skill at all is left out: Slipstream pushes at least as hard everywhere.
 const SKILL_BOOST: Record<string, (r: Racer, t: number) => number> = {
   launch: (r) => (r.gear === 0 ? 1.2 : 1),
-  nitro: (r) => (r.gear === 3 ? 1.15 : 1),
+  nitro: (r) => (r.gear >= NITRO_GEAR ? 1.15 : 1),
   slipstream: () => 1.08,
-  oil: (_, t) => (t < 2.5 ? 1.1 : 1),
+  oil: (_, t) => (t < OIL_SECONDS ? 1.1 : 1),
   torque: (r) => (r.gear <= 1 ? 1.1 : 1),
   freeze: (r) => (r.gear === 1 ? 1.1 : 1),
 }
@@ -121,7 +172,7 @@ export function perfectRun(piVal: number, skill: (r: Racer, t: number) => number
   let lastShift = 0
   while (r.finished === null && t < 120) {
     t += dt
-    if (r.gear < 3 && r.rpm >= at) {
+    if (r.gear < TOP_GEAR && r.rpm >= at) {
       shiftRacer(r, 1.08)
       lastShift = t
     }
@@ -156,7 +207,7 @@ export function raceFloor(piVal: number) {
   return floor
 }
 
-// One clean pull, as the garage dyno runs it: every shift perfect at 85%, no skill.
+// One clean pull, as the garage dyno runs it: every shift perfect at 90%, no skill.
 // Calls `each` with the racer after every step, and returns the finish time.
 export const DYNO_DT = 1 / 120
 export function dynoPull(piVal: number, each?: (r: Racer, t: number) => void) {
@@ -164,11 +215,7 @@ export function dynoPull(piVal: number, each?: (r: Racer, t: number) => void) {
   let t = 0
   while (r.finished === null && t < 120) {
     t += DYNO_DT
-    if (r.gear < 3 && r.rpm >= 0.85) {
-      r.quality = 1.08
-      r.gear++
-      r.rpm = 0.35
-    }
+    if (r.gear < TOP_GEAR && r.rpm >= 0.9) shiftRacer(r, 1.08)
     stepRacer(r, piVal, DYNO_DT, t)
     each?.(r, t)
   }

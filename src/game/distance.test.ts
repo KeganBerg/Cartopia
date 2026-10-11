@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { CARS, GP_ROUNDS } from './data'
-import { AI_BOOST_GEAR, aiReaction, freshRacer, fireBoost, launchRacer, shiftRacer, stepRacer, type Racer } from './race'
+import { TOP_GEAR, NITRO_GEAR, OIL_SECONDS, AI_BOOST_GEAR, aiReaction, freshRacer, fireBoost, launchRacer, shiftRacer, stepRacer, type Racer } from './race'
 import { gpBeatTable } from './guardTables'
 import { DIST, RACE_DISTS, buildOf, character, characterMul, gpDist, tourDist, type RaceDist } from './distance'
 
@@ -11,7 +11,7 @@ function run(pi: number, c: number, d: RaceDist) {
   const dt = 1 / 120
   while (r.finished === null && t < 100) {
     t += dt
-    if (r.gear < 3 && r.rpm >= 0.9) shiftRacer(r, 1.08)
+    if (r.gear < TOP_GEAR && r.rpm >= 0.9) shiftRacer(r, 1.08)
     if (r.gear >= AI_BOOST_GEAR) fireBoost(r)
     stepRacer(r, pi, dt, t, characterMul(c, r.gear, r.dist), DIST[d].m)
   }
@@ -57,14 +57,14 @@ describe('race distances', () => {
 // longer race a lower-PI car has less of a chance against a rival, so the table never turns away
 // a real win: for each rival, the lowest PI that can beat it over a mile is at least the table's.
 describe('the Grand Prix check over a mile', () => {
-  const SKILL: ((r: Racer, t: number) => number)[] = [() => 1, (r) => (r.gear === 0 ? 1.2 : 1), (r) => (r.gear === 3 ? 1.15 : 1), () => 1.08, (_, t) => (t < 2.5 ? 1.1 : 1), (r) => (r.gear <= 1 ? 1.1 : 1), (r) => (r.gear === 1 ? 1.1 : 1)]
+  const SKILL: ((r: Racer, t: number) => number)[] = [() => 1, (r) => (r.gear === 0 ? 1.2 : 1), (r) => (r.gear >= NITRO_GEAR ? 1.15 : 1), () => 1.08, (_, t) => (t < OIL_SECONDS ? 1.1 : 1), (r) => (r.gear <= 1 ? 1.1 : 1), (r) => (r.gear === 1 ? 1.1 : 1)]
   const L = DIST.mile.m
   const best = (pi: number) => {
     let b = Infinity
     for (const sk of SKILL) for (const at of [0.9, 0.93]) for (let f = 0; f < 4; f += 0.25) {
       const r = freshRacer()
       let t = 0
-      while (r.finished === null && t < 100) { t += 1 / 120; if (r.gear < 3 && r.rpm >= at) shiftRacer(r, 1.08); if (t >= f) fireBoost(r); stepRacer(r, pi, 1 / 120, t, sk(r, t), L) }
+      while (r.finished === null && t < 100) { t += 1 / 120; if (r.gear < TOP_GEAR && r.rpm >= at) shiftRacer(r, 1.08); if (t >= f) fireBoost(r); stepRacer(r, pi, 1 / 120, t, sk(r, t), L) }
       b = Math.min(b, r.finished!)
     }
     return b * 0.975
@@ -75,7 +75,7 @@ describe('the Grand Prix check over a mile', () => {
       const r = freshRacer(false)
       const re = aiReaction(1, 1)
       let t = 0
-      while (r.finished === null && t < 100) { t += 1 / 120; if (!r.launched && t >= re) launchRacer(r, re); if (r.launched && r.gear < 3 && r.rpm >= at) shiftRacer(r, 1.08); if (r.gear >= AI_BOOST_GEAR) fireBoost(r); stepRacer(r, pi, 1 / 120, t, drag(r, t), L) }
+      while (r.finished === null && t < 100) { t += 1 / 120; if (!r.launched && t >= re) launchRacer(r, re); if (r.launched && r.gear < TOP_GEAR && r.rpm >= at) shiftRacer(r, 1.08); if (r.gear >= AI_BOOST_GEAR) fireBoost(r); stepRacer(r, pi, 1 / 120, t, drag(r, t), L) }
       w = Math.max(w, r.finished!)
     }
     return w * 1.03

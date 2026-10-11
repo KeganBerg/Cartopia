@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useGame, spendFuel, type OwnedCar } from '../game/store'
 import { bestCar, raceCarOf } from '../game/raceCar'
 import { CARS, SKILLS, carDef, performance, RACE_FUEL, GP_SERIES, GP_ROUNDS, gpRivalPi, gpReward, CAMPAIGN, CAMPAIGN_RACES, campaignRaceId, campaignRivalPi, campaignShift, campaignRivalSkills, campaignReward, campaignCleared, type CampaignChapter, skillBoost, skillDrag, liveSkillBoost, smoothShift, type Body, type GpSeries, type SkillId } from '../game/data'
-import { TRACK, freshRacer, stepRacer, shiftQuality, launchRacer, shiftRacer, fireBoost, aiReaction, AI_BOOST_GEAR, AUTO_LAUNCH, JUMP_START_DELAY } from '../game/race'
+import { TRACK, freshRacer, stepRacer, shiftQuality, shiftBand, launchRacer, revLaunch, shiftRacer, fireBoost, aiReaction, AI_BOOST_GEAR, TOP_GEAR, LAUNCH_BAND, IDLE, REV_UP, REV_DOWN, RACE_DT } from '../game/race'
 import { CarThumb } from '../scene/BuildingPreview'
 import { supabase } from '../lib/supabase'
 import { Panel } from './Menus'
@@ -897,7 +897,7 @@ const step = stepRacer
 type Result = { won: boolean; myTime: number; theirTime: number }
 type NextRace = { label: string; go: () => void }
 // How the run went, for the result card: reaction off the line (null for a jump start), clean shifts, top speed.
-type RunStats = { reaction: number | null; perfect: number; shifts: number; top: number }
+type RunStats = { launch: string; perfect: number; shifts: number; top: number }
 // dist: a Grand Prix or Pro Tour distance (game/distance.ts); the car's build counts in these.
 // next: the result card's button for the next race in this series (or a retry), when there is one.
 export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title, venueId, trial, resultView, night, weatherSeed, sky, next, dist }: { car: OwnedCar; rival: Rival; onExit: () => void; next?: NextRace | null; live?: LiveRace; prize?: number; onFinish?: (won: boolean, myTime: number, theirTime: number) => number | void; title?: string; venueId?: string; trial?: { target: number }; resultView?: (r: Result) => ReactNode; night?: boolean; weatherSeed?: string; sky?: WeatherKind; dist?: RaceDist }) {
@@ -910,11 +910,12 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   const finishCb = useRef(onFinish)
   finishCb.current = onFinish
   const myPi = pi(car)
-  // Both cars wait on the line for their driver; the player launches on GO with the big button.
+  // Both cars wait on the line; the player holds the pedal through the countdown to rev, and the
+  // car launches at GO on whatever revs it has.
   const me = useRef(fresh(false))
   const them = useRef(fresh(!!(live || trial)))
-  // Pressed before GO: launched at GO with wheelspin.
-  const jumped = useRef(false)
+  // The pedal is held down (pointer or Space) before GO.
+  const pedal = useRef(false)
   const samples = useRef<Sample[]>([])
   const def = carDef(car.model)
   const track = dist ? DIST[dist].m : TRACK
@@ -965,23 +966,27 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   const joined = useRef<Promise<boolean> | null>(null)
   const [checking, setChecking] = useState(false)
   const finishRace = useGame((s) => s.finishRace)
-  const stats = useRef<RunStats>({ reaction: null, perfect: 0, shifts: 0, top: 0 })
+  const stats = useRef<RunStats>({ launch: '', perfect: 0, shifts: 0, top: 0 })
   const flash = (text: string, ms = 800) => {
     setLabel(text)
     clearTimeout(labelTimer.current)
     labelTimer.current = setTimeout(() => setLabel(''), ms)
   }
-  // Off the line: reaction is seconds after GO, or negative for a jump start.
-  const callLaunch = (reaction: number) => {
-    const call = launchRacer(me.current, reaction)
-    stats.current.reaction = reaction >= 0 ? reaction : null
-    sfx.shift(reaction >= 0 && reaction <= 0.25)
-    if (reaction >= 0) flash(call)
+  // Off the line at GO, on the revs the driver is holding.
+  const callLaunch = () => {
+    const call = revLaunch(me.current, me.current.rpm)
+    pedal.current = false
+    stats.current.launch = call
+    sfx.shift(call.startsWith('PERFECT'))
+    flash(call, 1000)
   }
-  // The rival's shifting skill for each gear.
-  // Campaign rivals shift sloppier early on: from 0.64-0.78 (good, sometimes early) up to 0.8-0.92 (perfect).
+  // The rival's shift point in each gear: a clean driver shifts inside the perfect band, a sloppy
+  // one (campaign rivals early on) too early.
   const cleanness = shownRival.shift ?? 1
-  const skill = useMemo(() => Array.from({ length: 4 }, () => 0.64 + 0.16 * cleanness + Math.random() * (0.14 - 0.02 * cleanness)), [cleanness])
+  const skill = useMemo(() => Array.from({ length: TOP_GEAR }, (_, g) => {
+    const b = shiftBand(g, theirGrip.lo, theirGrip.hi)
+    return b.lo + (b.hi - b.lo) * (0.25 + 0.6 * Math.random()) - (1 - cleanness) * (0.06 + 0.1 * Math.random())
+  }), [cleanness, theirGrip])
   // How long the AI rival takes to react to GO: clean drivers are quicker off the line.
   const theirReaction = useMemo(() => aiReaction(cleanness, Math.random()), [cleanness])
   const theirBoosting = useRef(false)
@@ -1128,13 +1133,10 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       cancelAnimationFrame(raf)
       applyVerdict(v, myTime)
     }
-    const loop = () => {
-      const now = performance_now()
-      const dt = Math.min(0.1, (now - last) / 1000)
-      last = now
+    // The race runs on a fixed clock (RACE_DT steps), so a 30 fps phone and a 120 Hz screen race the same car.
+    let acc = 0
+    const tick = (dt: number) => {
       t.current += dt
-      const wasDone = me.current.finished !== null
-      if (!me.current.launched && t.current >= (jumped.current ? JUMP_START_DELAY : AUTO_LAUNCH)) callLaunch(jumped.current ? -1 : t.current)
       const sk = def.skill
       const th0 = them.current
       // In a live race the rival runs on their own device, so slow-downs boost us instead.
@@ -1149,8 +1151,40 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       const myMul = (live ? mine : skillBoost(sk, me.current, th0)) * theirDrag * gripMul(grip, me.current.gear, me.current.rpm, t.current)
       step(me.current, myPi, dt, t.current, build === null ? myMul : myMul * characterMul(build, me.current.gear, me.current.dist), track)
       stats.current.top = Math.max(stats.current.top, me.current.speed)
-      const spinNow = me.current.launched && me.current.finished === null && spinning(grip, me.current.gear, me.current.rpm, t.current)
+      const spinNow = me.current.launched && me.current.finished === null && (spinning(grip, me.current.gear, me.current.rpm, t.current) || (me.current.gear === 0 && me.current.quality < 0.84))
       if (spinNow !== spinShown.current) { spinShown.current = spinNow; setSpin(spinNow) }
+      const th = them.current
+      if (live) {
+        th.dist = sampleAt(samples.current, t.current, Number.isFinite(th.finished) ? th.finished : null)
+        const g = ghost.current
+        if (g.gear < TOP_GEAR && g.rpm >= 0.9) {
+          shiftRacer(g, 1.08)
+          sound.current?.shift('them', g.gear, Math.min(1, rivalRef.current.pi / 200))
+        }
+        step(g, rivalRef.current.pi, dt, t.current)
+      } else if (trial) {
+        th.dist = ghostDist(t.current, trial.target)
+        if (th.finished === null && t.current >= trial.target) th.finished = trial.target
+      } else {
+        if (!th.launched && t.current >= theirReaction) launchRacer(th, theirReaction)
+        if (th.launched && th.gear < TOP_GEAR && th.rpm >= skill[th.gear]) {
+          const band = shiftBand(th.gear, theirGrip.lo, theirGrip.hi)
+          const q = shiftQuality(th.rpm, band.lo, band.hi)
+          shiftRacer(th, smoothShift(theirSkill) && q.label === 'Good' ? 1.08 : q.q)
+          sound.current?.shift('them', th.gear, Math.min(1, rivalRef.current.pi / 200))
+        }
+        if (th.gear >= AI_BOOST_GEAR) fireBoost(th)
+        step(th, rivalRef.current.pi, dt, t.current, theirBoost * skillDrag(sk, th, t.current) * gripMul(theirGrip, th.gear, th.rpm, t.current), track)
+      }
+    }
+    const loop = () => {
+      const now = performance_now()
+      acc += Math.min(0.1, (now - last) / 1000)
+      last = now
+      const wasDone = me.current.finished !== null
+      // Off the line at GO, on whatever revs the driver is holding.
+      if (!me.current.launched) callLaunch()
+      for (; acc >= RACE_DT; acc -= RACE_DT) tick(RACE_DT)
       const th = them.current
       if (live) {
         if (now - lastSent > 100) {
@@ -1161,34 +1195,12 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
           myFinishSentAt = now
           channel.current?.send({ type: 'broadcast', event: 'finish', payload: { t: me.current.finished } })
         }
-        th.dist = sampleAt(samples.current, t.current, Number.isFinite(th.finished) ? th.finished : null)
         // Opponent vanished: the race is yours after a grace period.
         if (myFinishSentAt !== null && th.finished === null && now - myFinishSentAt > 15000) th.finished = Infinity
-      } else if (trial) {
-        th.dist = ghostDist(t.current, trial.target)
-        if (th.finished === null && t.current >= trial.target) th.finished = trial.target
-      } else {
-        if (!th.launched && t.current >= theirReaction) launchRacer(th, theirReaction)
-        if (th.launched && th.gear < 3 && th.rpm >= skill[th.gear]) {
-          const q = shiftQuality(th.rpm, theirGrip.lo, theirGrip.hi)
-          shiftRacer(th, smoothShift(theirSkill) && q.label === 'Good' ? 1.08 : q.q)
-          sound.current?.shift('them', th.gear, Math.min(1, rivalRef.current.pi / 200))
-        }
-        if (th.gear >= AI_BOOST_GEAR) fireBoost(th)
-        if (th.burning !== theirBoosting.current) { theirBoosting.current = th.burning; setTheirBoost(th.burning) }
-        step(th, rivalRef.current.pi, dt, t.current, theirBoost * skillDrag(sk, th, t.current) * gripMul(theirGrip, th.gear, th.rpm, t.current), track)
-      }
+      } else if (th.burning !== theirBoosting.current) { theirBoosting.current = th.burning; setTheirBoost(th.burning) }
       force((n) => n + 1)
-      if (live) {
-        const g = ghost.current
-        if (g.gear < 3 && g.rpm >= 0.85) {
-          g.gear++
-          g.rpm = 0.35
-          sound.current?.shift('them', g.gear, Math.min(1, rivalRef.current.pi / 200))
-        }
-        step(g, rivalRef.current.pi, dt, t.current)
-        sound.current?.frame(me.current, { rpm: g.rpm, gear: g.gear, dist: th.dist, finished: th.finished })
-      } else sound.current?.frame(me.current, th)
+      const g = ghost.current
+      sound.current?.frame(me.current, live ? { rpm: g.rpm, gear: g.gear, dist: th.dist, finished: th.finished } : th)
       if (live && !wasDone && me.current.finished !== null) settle(me.current.finished)
       if (refereed.current === 'no' && me.current.finished !== null && (th.finished !== null || trial)) {
         const theirTime = trial ? trial.target : th.finished!
@@ -1209,19 +1221,38 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
     }
   }, [countdown, result, myPi, skill, finishRace, live, def, theirSkill, trial, theirReaction, grip, theirGrip, build, track])
 
-  // The big button: launch on GO, then shift up.
+  // Revving on the line: the needle climbs while the pedal is held and falls when it's let go.
+  useEffect(() => {
+    if (countdown === 99 || countdown < 0 || result) return
+    let raf = 0
+    let last = performance_now()
+    const rev = () => {
+      const now = performance_now()
+      const dt = Math.min(0.1, (now - last) / 1000)
+      last = now
+      const r = me.current
+      if (r.launched) return
+      r.rpm = Math.max(IDLE, Math.min(1.02, r.rpm + (pedal.current ? REV_UP : -REV_DOWN) * dt))
+      sound.current?.rev(r.rpm)
+      force((n) => n + 1)
+      raf = requestAnimationFrame(rev)
+    }
+    raf = requestAnimationFrame(rev)
+    return () => cancelAnimationFrame(raf)
+  }, [countdown, result])
+  const release = () => void (pedal.current = false)
+
+  // The big button: hold it to rev on the line, then tap it to shift up.
   const press = () => {
     const r = me.current
     if (countdown === 99 || result || r.finished !== null) return
     if (!r.launched) {
-      if (countdown > 0) {
-        if (!jumped.current) flash('JUMP START!')
-        jumped.current = true
-      } else if (!jumped.current) callLaunch(t.current)
+      pedal.current = true
       return
     }
-    if (r.gear >= 3) return
-    let s = shiftQuality(r.rpm, grip.lo, grip.hi)
+    if (r.gear >= TOP_GEAR) return
+    const band = shiftBand(r.gear, grip.lo, grip.hi)
+    let s = shiftQuality(r.rpm, band.lo, band.hi)
     if (smoothShift(def.skill) && s.label === 'Good') s = { q: 1.08, label: 'SMOOTH!' }
     sfx.shift(s.q >= 1)
     shiftRacer(r, s.q)
@@ -1248,8 +1279,13 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
         boost()
       }
     }
+    const onUp = (e: KeyboardEvent) => e.code === 'Space' && release()
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keyup', onUp)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('keyup', onUp)
+    }
   })
 
   // The race screen redraws every frame (dials, lanes); the 3D scene only changes with
@@ -1266,7 +1302,10 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   const rpmAngle = -210 + Math.min(1.05, me.current.rpm) * 240
   // The shift light: green while the needle is in the perfect band, red once it's past.
   const rpm = me.current.rpm
-  const light = !me.current.launched || me.current.gear >= 3 || me.current.finished !== null ? '' : rpm >= grip.lo && rpm <= grip.hi ? ' now' : rpm > grip.hi ? ' late' : rpm >= grip.lo - 0.12 ? ' soon' : ''
+  // On the line it shows the launch band instead, and lights green while the revs sit in it.
+  const onLine = !me.current.launched
+  const band = onLine ? LAUNCH_BAND : shiftBand(me.current.gear, grip.lo, grip.hi)
+  const light = me.current.finished !== null || (!onLine && me.current.gear >= TOP_GEAR) || (onLine && countdown === 99) ? '' : rpm >= band.lo && rpm <= band.hi ? ' now' : rpm > band.hi ? ' late' : rpm >= band.lo - 0.12 && !onLine ? ' soon' : ''
   const close = live ? onExit : () => useGame.getState().openPanel(null)
   // One full-screen view: the street fills the screen and the controls float over it.
   return (
@@ -1276,7 +1315,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
         <h2>{title ?? `Drag Race vs ${rival.town}`}</h2>
         <button className="close" onClick={close} aria-label="Leave race">✕</button>
       </div>
-      <div className="rf-lanes">
+      {countdown <= 0 && t.current > 0.8 && <div className="rf-lanes">
         {[
           { name: `You · ${def.name}`, color: car.color, r: me.current },
           { name: `${rival.town} · ${rival.carName}`, color: rival.color, r: them.current },
@@ -1287,11 +1326,12 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
             <div className="finish" />
           </div>
         ))}
-      </div>
+      </div>}
       {countdown > 0 && !result && <div className={`rf-venue v-${venue.id}`}><span className="rf-venue-ico">{venue.icon}</span><span className="rf-venue-txt"><small>{gripNote ?? (dist ? `${DIST[dist].label} race` : 'Race venue')}</small><b>{venue.name}</b></span></div>}
       {spin && !label && !result && <div className="rf-spin">💨 Wheelspin</div>}
       {countdown > 0 && countdown !== 99 && <div className="countdown big" key={countdown}>{countdown}</div>}
-      {countdown === 0 && !me.current.launched && !result && <div className="countdown big go">GO!</div>}
+      {countdown === 0 && t.current < 0.5 && !label && !result && <div className="countdown big go">GO!</div>}
+      {onLine && countdown > 0 && countdown !== 99 && !result && <div className="rf-hold">{pedal.current ? (light === ' now' ? 'Hold it there!' : light === ' late' ? 'Too many revs!' : 'Revving...') : 'Hold the pedal: revs in the green'}</div>}
       {me.current.burning && !result && <div className="rf-boost-fx" />}
       {countdown === 99 && (
         <div className="rf-wait">
@@ -1313,18 +1353,18 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
         <div className="rf-bottom">
           <svg viewBox="0 0 120 120" className={`tach${light}`}>
             <circle cx="60" cy="60" r="56" fill="#1b1f24" fillOpacity="0.85" stroke="#cfd8dc" strokeWidth="3" />
-            <path d={arcPath(60, 60, 46, -210 + grip.lo * 240, -210 + grip.hi * 240)} stroke="#76ff03" strokeWidth="10" fill="none" />
+            <path d={arcPath(60, 60, 46, -210 + band.lo * 240, -210 + band.hi * 240)} stroke={onLine ? '#ffd54f' : '#76ff03'} strokeWidth="10" fill="none" />
             <path d={arcPath(60, 60, 46, -210 + 0.95 * 240, 30)} stroke="#ff1744" strokeWidth="10" fill="none" />
             <line x1="60" y1="60" x2={60 + 44 * Math.cos((rpmAngle * Math.PI) / 180)} y2={60 + 44 * Math.sin((rpmAngle * Math.PI) / 180)} stroke="#ff9100" strokeWidth="4" strokeLinecap="round" />
             <circle cx="60" cy="60" r="6" fill="#eceff1" />
             <text x="60" y="92" textAnchor="middle" fill="#fff" fontSize="14" fontWeight="900">GEAR {me.current.gear + 1}</text>
           </svg>
           <div className="rf-side">
-            <div className="rf-speed">{Math.round(me.current.speed * 0.9)}<small> km/h</small></div>
+            <div className="rf-speed">{Math.round(me.current.speed * 3.6)}<small> km/h</small></div>
             <div className="rf-buttons">
               <BoostButton r={me.current} onFire={boost} ready={countdown === 0} />
-              <button className={me.current.launched ? `big-btn shift-btn${light}` : 'big-btn shift-btn launch'} onPointerDown={press} disabled={countdown === 99 || (me.current.launched && me.current.gear >= 3)}>
-                {me.current.launched ? 'SHIFT ▲' : 'GO ▶'}
+              <button className={me.current.launched ? `big-btn shift-btn${light}` : `big-btn shift-btn launch${light}`} onPointerDown={press} onPointerUp={release} onPointerLeave={release} onPointerCancel={release} onContextMenu={(e) => e.preventDefault()} disabled={countdown === 99 || (me.current.launched && me.current.gear >= TOP_GEAR)}>
+                {me.current.launched ? 'SHIFT ▲' : 'HOLD ▶'}
               </button>
             </div>
           </div>
@@ -1392,7 +1432,7 @@ function RaceResult({ won, myTime, theirTime, cash, xp, rival, note, noContest, 
       ))}
       <div className="rr-card">
         <div className="rr-icon">{won ? '🏆' : '🏁'}</div>
-        <h3 className="rr-title">{noContest ? 'NO RESULT' : won ? 'YOU WIN!' : 'SO CLOSE!'}</h3>
+        <h3 className="rr-title">{noContest ? 'NO RESULT' : won ? 'YOU WIN!' : margin !== null && margin < 0.3 ? 'SO CLOSE!' : 'OUTRUN!'}</h3>
         {!noContest && (
           <p className="rr-sub">
             {won ? `You beat ${rival}` : `${rival} took it`}
@@ -1407,9 +1447,9 @@ function RaceResult({ won, myTime, theirTime, cash, xp, rival, note, noContest, 
         </div>
         {stats && !noContest && (
           <div className="rr-stats">
-            <span className={stats.reaction !== null && stats.reaction <= 0.25 ? 'good' : stats.reaction === null ? 'bad' : ''}><small>Launch</small>{stats.reaction === null ? 'Jump' : `${stats.reaction.toFixed(2)}s`}</span>
-            <span className={stats.shifts > 0 && stats.perfect === stats.shifts ? 'good' : ''}><small>Perfect</small>{stats.perfect}/3</span>
-            <span><small>Top speed</small>{Math.round(stats.top * 0.9)}<i> km/h</i></span>
+            <span className={stats.launch.startsWith('PERFECT') ? 'good' : stats.launch.startsWith('Good') ? '' : 'bad'}><small>Launch</small>{stats.launch.startsWith('PERFECT') ? 'Perfect' : stats.launch.startsWith('Good') ? 'Good' : stats.launch.startsWith('WHEEL') ? 'Spin' : 'Bogged'}</span>
+            <span className={stats.shifts > 0 && stats.perfect === stats.shifts ? 'good' : ''}><small>Perfect</small>{stats.perfect}/{Math.max(stats.shifts, 1)}</span>
+            <span><small>Top speed</small>{Math.round(stats.top * 3.6)}<i> km/h</i></span>
           </div>
         )}
         <div className="rr-loot">

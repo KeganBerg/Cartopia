@@ -2,6 +2,7 @@
 
 import { growthName } from './growth'
 import { isNight } from './clock'
+import { NITRO_GEAR, OIL_SECONDS } from './race'
 
 export const GRID = 24
 export const TILE = 2
@@ -244,10 +245,10 @@ export const isBike = (body: Body) => BIKES.includes(body)
 export type SkillId = 'launch' | 'nitro' | 'slipstream' | 'smooth' | 'oil' | 'torque' | 'freeze'
 export const SKILLS: Record<SkillId, { name: string; icon: string; text: string }> = {
   launch: { name: 'Hole Shot', icon: '🚀', text: '20% faster off the line in first gear' },
-  nitro: { name: 'Nitro Burst', icon: '🔥', text: '15% more power in top gear' },
+  nitro: { name: 'Nitro Burst', icon: '🔥', text: '15% more power in the top two gears' },
   slipstream: { name: 'Slipstream', icon: '💨', text: '8% more speed while chasing the leader' },
   smooth: { name: 'Smooth Shifter', icon: '🎯', text: 'Good shifts count as perfect' },
-  oil: { name: 'Oil Slick', icon: '🛢', text: 'Rivals lose 10% grip for the first 2.5 seconds' },
+  oil: { name: 'Oil Slick', icon: '🛢', text: 'Rivals lose 10% grip for the first 4 seconds' },
   torque: { name: 'Low-End Torque', icon: '🐂', text: '10% more power in first and second gear' },
   freeze: { name: 'Brain Freeze', icon: '🍦', text: 'Rivals are 10% slower in second gear' },
 }
@@ -258,21 +259,21 @@ export type SkillRacer = { gear: number; dist: number }
 // Boost to the skill owner's own car right now.
 export function skillBoost(sk: SkillId | undefined, me: SkillRacer, them: SkillRacer): number {
   if (sk === 'launch' && me.gear === 0) return 1.2
-  if (sk === 'nitro' && me.gear === 3) return 1.15
+  if (sk === 'nitro' && me.gear >= NITRO_GEAR) return 1.15
   if (sk === 'slipstream' && me.dist > 0 && me.dist < them.dist) return 1.08
   if (sk === 'torque' && me.gear <= 1) return 1.1
   return 1
 }
 // Slow-down the skill puts on the other car (t: seconds since the start).
 export function skillDrag(sk: SkillId | undefined, them: SkillRacer, t: number): number {
-  if (sk === 'oil' && t < 2.5) return 0.9
+  if (sk === 'oil' && t < OIL_SECONDS) return 0.9
   if (sk === 'freeze' && them.gear === 1) return 0.9
   return 1
 }
 // In a live race the other car runs on its owner's device, so slow-downs boost
 // our own car by the same amount in the same window instead.
 export function liveSkillBoost(sk: SkillId | undefined, me: SkillRacer, them: SkillRacer, t: number): number {
-  if (sk === 'oil') return t < 2.5 ? 1.1 : 1
+  if (sk === 'oil') return t < OIL_SECONDS ? 1.1 : 1
   if (sk === 'freeze') return me.gear === 1 ? 1.1 : 1
   return skillBoost(sk, me, them)
 }
@@ -609,7 +610,8 @@ export const CAMPAIGN: CampaignChapter[] = [
 export const campaignRaceId = (ch: CampaignChapter, i: number) => `${ch.id}-${i}`
 export const campaignRivalPi = (ch: CampaignChapter, i: number) => Math.round(ch.pi[0] + ((ch.pi[1] - ch.pi[0]) * i) / (CAMPAIGN_RACES - 1))
 // How cleanly a rival shifts, 0 (early, sloppy) to 1 (every shift perfect), across the whole campaign.
-export const campaignShift = (chIndex: number, i: number) => Math.min(1, (chIndex + i / (CAMPAIGN_RACES - 1)) / (CAMPAIGN.length - 1))
+// Even the first rival shifts decently, so race 1 can't be won with eyes closed.
+export const campaignShift = (chIndex: number, i: number) => Math.min(1, 0.35 + 0.65 * (chIndex + i / (CAMPAIGN_RACES - 1)) / (CAMPAIGN.length - 1))
 // Rivals use their car's skill from the third chapter on; bosses always do.
 export const campaignRivalSkills = (chIndex: number, i: number) => chIndex >= 2 || i === CAMPAIGN_RACES - 1
 // The first win of each race pays the most; replays pay about a quick race.

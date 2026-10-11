@@ -162,7 +162,8 @@ describe('race skills', () => {
   it('boosts the owner where each skill says', () => {
     expect(skillBoost('launch', r(0), r(0))).toBe(1.2)
     expect(skillBoost('launch', r(1), r(0))).toBe(1)
-    expect(skillBoost('nitro', r(3), r(0))).toBe(1.15)
+    expect(skillBoost('nitro', r(4), r(0))).toBe(1.15)
+    expect(skillBoost('nitro', r(3), r(0))).toBe(1)
     expect(skillBoost('slipstream', r(2, 5), r(2, 9))).toBe(1.08)
     expect(skillBoost('slipstream', r(2, 9), r(2, 5))).toBe(1)
     expect(skillBoost('torque', r(1), r(1))).toBe(1.1)
@@ -171,7 +172,8 @@ describe('race skills', () => {
   })
   it('slows the other car with Oil Slick and Brain Freeze', () => {
     expect(skillDrag('oil', r(0), 1)).toBe(0.9)
-    expect(skillDrag('oil', r(0), 3)).toBe(1)
+    expect(skillDrag('oil', r(0), 3)).toBe(0.9)
+    expect(skillDrag('oil', r(0), 4.5)).toBe(1)
     expect(skillDrag('freeze', r(1), 5)).toBe(0.9)
     expect(skillDrag('freeze', r(2), 5)).toBe(1)
     expect(skillDrag('launch', r(0), 0)).toBe(1)

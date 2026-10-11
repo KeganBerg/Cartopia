@@ -19,7 +19,7 @@ function fmt(sec: number) {
 const short = (sec: number) => (sec >= 3600 ? `${Math.floor(sec / 3600)}h` : sec >= 60 ? `${Math.ceil(sec / 60)}m` : `${sec}s`)
 
 // Badge height over a merged block: as tall as its model grows (see groupScale).
-const lift = (g: MergeGroup) => (g.cols === g.rows ? g.cols : 1.5)
+const lift = (g: MergeGroup) => (g.cols === g.rows ? g.cols : 1)
 
 // `g` and `members` are the whole block for a merged business: one badge for all of it.
 function JobBadge({ b, now, g, members = [b] }: { b: PlacedBuilding; now: number; g?: MergeGroup; members?: PlacedBuilding[] }) {

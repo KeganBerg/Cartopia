@@ -3,6 +3,7 @@ import { CylinderGeometry } from 'three'
 import { Box, Cyl, Sign, Pool, Bulbs, Parasol, GOLD, type Mat, type V3 } from './NewBuildings'
 import { Glass, glassMat, Planter } from './OfficeBuildings'
 import { glowMats } from './dayNight'
+import { Facade, Upright, useBays } from './mergeScale'
 import { PAL, SEASON } from './season'
 import { awningTex, brickTex, concreteTex, gravelTex } from './textures'
 
@@ -19,35 +20,46 @@ export const ROOFTOP = SNOW ? '#f4f8fb' : '#cfd8dc'
 
 // A ground-floor shop: display windows either side of the door, an awning, the
 // name on a board over it, lamps, planters and the lights' glow on the pavement.
+// Evenly spaced bay centres across a face `len` long: one every `pitch`, the
+// outer ones `fill` of the way to the ends.
+function spread(len: number, pitch: number, fill: number) {
+  const n = Math.max(2, Math.round(len / pitch))
+  return Array.from({ length: n }, (_, i) => ((i + 0.5) / n - 0.5) * len * fill)
+}
+
 export function Storefront({ k, w, d, z0 = 0, h = 0.95, wall, tex, trim = '#fafafa', awning, sign, signBg = '#fffde7', signFg = '#c62828', board, cafe }: {
   k: Kit; w: number; d: number; z0?: number; h?: number; wall: string; tex?: 'brick' | 'stone' | 'plain'; trim?: string; awning: string
   sign?: string; signBg?: string; signFg?: string; board?: string; cafe?: string
 }) {
   const { m, win, bulb, ghost } = k
   const zf = z0 + d / 2
-  const gw = (w - 0.7) / 2 - 0.06
+  // A merged pair's shopfront is twice as long: wider display windows, more mullions.
+  const [bx] = useBays()
+  const gw = (w * bx - 0.7) / 2 - 0.06
   const t = tex === 'brick' ? brickTex(Math.max(1, Math.round(w * 0.6)), 1) : tex === 'stone' ? concreteTex(Math.max(1, Math.round(w)), 1) : undefined
   const sw = Math.min(w * 0.62, 1.7)
   return (
     <group>
       <Box m={m} at={[0, h / 2, z0]} s={[w, h, d]} c={wall} t={t} />
       {/* Display windows with mullions, on a kick plate. */}
-      {[-1, 1].map((sd) => {
-        const x = sd * (0.35 + 0.06 + gw / 2)
-        const n = Math.max(1, Math.round(gw / 0.42))
-        return (
-          <group key={sd}>
-            <mesh position={[x, 0.42, zf + 0.006]}>
-              <planeGeometry args={[gw, 0.5]} />
-              {win}
-            </mesh>
-            {Array.from({ length: n + 1 }, (_, i) => (
-              <Box key={i} m={m} at={[x - gw / 2 + (gw * i) / n, 0.42, zf + 0.018]} s={[0.03, 0.54, 0.025]} c={trim} shadow={false} />
-            ))}
-            <Box m={m} at={[x, 0.68, zf + 0.018]} s={[gw + 0.03, 0.03, 0.025]} c={trim} shadow={false} />
-          </group>
-        )
-      })}
+      <Facade at={[0, 0, zf]} len={w}>
+        {() => [-1, 1].map((sd) => {
+          const x = sd * (0.35 + 0.06 + gw / 2)
+          const n = Math.max(1, Math.round(gw / 0.42))
+          return (
+            <group key={sd}>
+              <mesh position={[x, 0.42, 0.006]}>
+                <planeGeometry args={[gw, 0.5]} />
+                {win}
+              </mesh>
+              {Array.from({ length: n + 1 }, (_, i) => (
+                <Box key={i} m={m} at={[x - gw / 2 + (gw * i) / n, 0.42, 0.018]} s={[0.03, 0.54, 0.025]} c={trim} shadow={false} />
+              ))}
+              <Box m={m} at={[x, 0.68, 0.018]} s={[gw + 0.03, 0.03, 0.025]} c={trim} shadow={false} />
+            </group>
+          )
+        })}
+      </Facade>
       <Box m={m} at={[0, 0.08, zf + 0.015]} s={[w + 0.01, 0.16, 0.03]} c={trim} shadow={false} />
       {/* Door, frame and step. */}
       <Box m={m} at={[0, 0.34, zf + 0.02]} s={[0.52, 0.7, 0.02]} c={trim} shadow={false} />
@@ -96,40 +108,43 @@ export function BrickFloors({ k, w, d, z0 = 0, y0, floors, fh = 0.44, wall, trim
   const zf = z0 + d / 2
   const zb = z0 - d / 2
   const nf = Math.max(2, Math.round(w / 0.5))
-  const ns = Math.max(2, Math.round(d / 0.55))
   const fx = Array.from({ length: nf }, (_, i) => ((i + 0.5) / nf - 0.5) * w * 0.86)
-  const sx = Array.from({ length: ns }, (_, i) => ((i + 0.5) / ns - 0.5) * d * 0.8)
   const ys = Array.from({ length: floors }, (_, i) => y0 + i * fh + fh * 0.52)
   const t = tex === 'brick' ? brickTex(Math.max(1, Math.round(w * 0.6)), Math.max(1, Math.round(H))) : tex === 'stone' ? concreteTex(Math.max(1, Math.round(w)), Math.max(1, Math.round(H))) : undefined
   const ex = w / 2 + 0.1
   return (
     <group>
       <Box m={m} at={[0, y0 + H / 2, z0]} s={[w, H, d]} c={wall} t={t} />
-      {ys.map((y) => (
-        <group key={y}>
-          {fx.map((x) => (
-            <group key={x}>
-              <mesh position={[x, y, zf + 0.006]}>
-                <planeGeometry args={[0.26, 0.3]} />
-                {win}
-              </mesh>
-              <Box m={m} at={[x, y - 0.17, zf + 0.03]} s={[0.33, 0.03, 0.06]} c={trim} shadow={false} />
-              <Box m={m} at={[x, y + 0.175, zf + 0.012]} s={[0.31, 0.045, 0.025]} c={trim} shadow={false} />
-            </group>
-          ))}
-          {fx.map((x) => (
-            <mesh key={`b${x}`} position={[x, y, zb - 0.006]} rotation-y={Math.PI}>
+      {/* Sash windows on all four faces; a merged pair's longer faces get more (Facade). */}
+      <Facade at={[0, 0, zf]} len={w}>
+        {(L) => spread(L, 0.5, 0.86).map((x) => ys.map((y) => (
+          <group key={`${x}${y}`}>
+            <mesh position={[x, y, 0.006]}>
               <planeGeometry args={[0.26, 0.3]} />
               {win}
             </mesh>
-          ))}
-          {[-1, 1].flatMap((sd) => sx.map((z) => (
-            <mesh key={`${sd}${z}`} position={[sd * (w / 2 + 0.006), y, z0 + z]} rotation-y={(sd * Math.PI) / 2}>
+            <Box m={m} at={[x, y - 0.17, 0.03]} s={[0.33, 0.03, 0.06]} c={trim} shadow={false} />
+            <Box m={m} at={[x, y + 0.175, 0.012]} s={[0.31, 0.045, 0.025]} c={trim} shadow={false} />
+          </group>
+        )))}
+      </Facade>
+      <Facade at={[0, 0, zb - 0.006]} ry={Math.PI} len={w}>
+        {(L) => spread(L, 0.5, 0.86).map((x) => ys.map((y) => (
+          <mesh key={`${x}${y}`} position={[x, y, 0]}>
+            <planeGeometry args={[0.26, 0.3]} />
+            {win}
+          </mesh>
+        )))}
+      </Facade>
+      {[-1, 1].map((sd) => (
+        <Facade key={sd} at={[sd * (w / 2 + 0.006), 0, z0]} ry={(sd * Math.PI) / 2} len={d}>
+          {(L) => spread(L, 0.55, 0.8).map((x) => ys.map((y) => (
+            <mesh key={`${x}${y}`} position={[x, y, 0]}>
               <planeGeometry args={[0.26, 0.3]} />
               {win}
             </mesh>
           )))}
-        </group>
+        </Facade>
       ))}
       {/* A stone band over the shop and a cornice on brackets at the top. */}
       <Box m={m} at={[0, y0 + 0.02, z0]} s={[w + 0.04, 0.05, d + 0.04]} c={trim} shadow={false} />
@@ -196,20 +211,24 @@ export function StoneShaft({ k, x = 0, z = 0, y0, w, d, h, stone, tint, pier, ba
   return (
     <group position={[x, 0, z]}>
       <Box m={m} at={[0, y0 + h / 2, 0]} s={[w - 0.02, h, d - 0.02]} c={stone} t={concreteTex(Math.max(1, Math.round(w)), Math.max(1, Math.round(h)))} />
-      {faces.map(([fx, fz, ry, len]) => {
-        const n = Math.max(2, Math.round((bays * len) / w))
-        const bw = (len - 0.12) / n
-        return (
-          <group key={ry} position={[fx, 0, fz]} rotation-y={ry}>
-            {Array.from({ length: n }, (_, i) => (
-              <Glass key={i} m={m} ghost={ghost} at={[-len / 2 + 0.06 + bw * (i + 0.5), y0 + h / 2, 0.004]} w={bw - 0.08} h={h - 0.1} tint={tint} />
-            ))}
-            {Array.from({ length: n + 1 }, (_, i) => (
-              <Box key={`p${i}`} m={m} at={[-len / 2 + 0.06 + bw * i, y0 + h / 2, 0.025]} s={[0.07, h, 0.05]} c={pier} shadow={false} />
-            ))}
-          </group>
-        )
-      })}
+      {faces.map(([fx, fz, ry, len]) => (
+        <Facade key={ry} at={[fx, 0, fz]} ry={ry} len={len}>
+          {(L) => {
+            const n = Math.max(2, Math.round((bays * L) / w))
+            const bw = (L - 0.12) / n
+            return (
+              <group>
+                {Array.from({ length: n }, (_, i) => (
+                  <Glass key={i} m={m} ghost={ghost} at={[-L / 2 + 0.06 + bw * (i + 0.5), y0 + h / 2, 0.004]} w={bw - 0.08} h={h - 0.1} tint={tint} />
+                ))}
+                {Array.from({ length: n + 1 }, (_, i) => (
+                  <Box key={`p${i}`} m={m} at={[-L / 2 + 0.06 + bw * i, y0 + h / 2, 0.025]} s={[0.07, h, 0.05]} c={pier} shadow={false} />
+                ))}
+              </group>
+            )
+          }}
+        </Facade>
+      ))}
       <Box m={m} at={[0, y0 + h + 0.04, 0]} s={[w + 0.08, 0.08, d + 0.08]} c={pier} />
     </group>
   )
@@ -317,11 +336,14 @@ export type Giant = 'donut' | 'burger' | 'cone' | 'pizza' | 'mug' | 'pin' | 'app
 export function GiantProp({ m, kind, at, s = 1, plinth = '#eceff1' }: { m: Mat; kind: Giant; at: V3; s?: number; plinth?: string }) {
   return (
     <group position={at}>
-      <Cyl m={m} at={[0, 0.06, 0]} r={0.36 * s} r2={0.4 * s} h={0.12} c={plinth} seg={16} />
-      <Bulbs from={[-0.36 * s, 0.13, 0.36 * s]} to={[0.36 * s, 0.13, 0.36 * s]} n={6} />
-      <group position={[0, 0.12, 0]} scale={s}>
-        <GiantShape m={m} kind={kind} />
-      </group>
+      {/* Bigger than a prop, but a giant donut must stay round on a merged pair. */}
+      <Upright>
+        <Cyl m={m} at={[0, 0.06, 0]} r={0.36 * s} r2={0.4 * s} h={0.12} c={plinth} seg={16} />
+        <Bulbs from={[-0.36 * s, 0.13, 0.36 * s]} to={[0.36 * s, 0.13, 0.36 * s]} n={6} />
+        <group position={[0, 0.12, 0]} scale={s}>
+          <GiantShape m={m} kind={kind} />
+        </group>
+      </Upright>
     </group>
   )
 }
