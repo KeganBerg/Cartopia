@@ -77,20 +77,71 @@ const groundTile = (e: ThreeEvent<PointerEvent>) => {
 }
 
 // Pick a building up. Letting go drops it there if it fits, or snaps it back.
-function startDrag(b: PlacedBuilding, tile: [number, number]) {
+// `quick` is a long press from normal play, which goes back to play once dropped.
+function startDrag(b: PlacedBuilding, tile: [number, number], pointerId: number, quick = false) {
   useGame.getState().select(b.uid)
   useDrag.setState({ drag: { uid: b.uid, x: b.x, z: b.z, gx: tile[0] - b.x, gz: tile[1] - b.z } })
   const end = (e: PointerEvent) => {
+    // A second finger tapping Rotate mustn't drop the building.
+    if (e.pointerId !== pointerId) return
     window.removeEventListener('pointerup', end)
     window.removeEventListener('pointercancel', end)
     const d = useDrag.getState().drag
     useDrag.setState({ drag: null })
+    if (quick) useGame.getState().setMode('play')
     if (!d || e.type === 'pointercancel' || (d.x === b.x && d.z === b.z)) return
     if (useGame.getState().moveBuilding(d.uid, d.x, d.z)) sfx.click()
     else sfx.error()
   }
   window.addEventListener('pointerup', end)
   window.addEventListener('pointercancel', end)
+}
+
+// Holding a building in normal play picks it up. Moving the finger first pans the map instead.
+const HOLD_MS = 450
+const HOLD_SLOP = 10
+// Set when a hold lifted a building, so letting go doesn't also count as a tap on it.
+let held = false
+
+// The press being watched; a building made of several meshes reports one press per mesh.
+let holdPress: PointerEvent | null = null
+
+function holdToMove(b: PlacedBuilding, e: ThreeEvent<PointerEvent>) {
+  if (holdPress === e.nativeEvent) return
+  holdPress = e.nativeEvent
+  const tile = groundTile(e)
+  const { pointerId, clientX, clientY } = e.nativeEvent
+  const watch = {
+    timer: 0,
+    stop() {
+      clearTimeout(watch.timer)
+      window.removeEventListener('pointermove', watch.move)
+      window.removeEventListener('pointerrawupdate' as 'pointermove', watch.move)
+      window.removeEventListener('pointerup', watch.up)
+      window.removeEventListener('pointercancel', watch.up)
+    },
+    move(m: PointerEvent) {
+      if (m.pointerId === pointerId && Math.hypot(m.clientX - clientX, m.clientY - clientY) > HOLD_SLOP) watch.stop()
+    },
+    up(u: PointerEvent) {
+      if (u.pointerId === pointerId) watch.stop()
+    },
+  }
+  watch.timer = window.setTimeout(() => {
+    watch.stop()
+    const s = useGame.getState()
+    if (s.mode !== 'play' || s.panel || s.visiting) return
+    held = true
+    navigator.vibrate?.(15)
+    sfx.click()
+    useGame.setState({ mode: 'move', placing: null })
+    startDrag(b, tile, pointerId, true)
+  }, HOLD_MS)
+  // Raw updates aren't held back to the next frame, so a swipe cancels the hold even on a slow phone.
+  window.addEventListener('pointermove', watch.move)
+  window.addEventListener('pointerrawupdate' as 'pointermove', watch.move)
+  window.addEventListener('pointerup', watch.up)
+  window.addEventListener('pointercancel', watch.up)
 }
 
 function Building({ b, roads }: { b: PlacedBuilding; roads: Set<string> }) {
@@ -105,15 +156,24 @@ function Building({ b, roads }: { b: PlacedBuilding; roads: Set<string> }) {
       rotation-y={(turnOf(b, roads) * Math.PI) / 2}
       onPointerDown={(e) => {
         const s = useGame.getState()
-        if (s.mode !== 'move' || s.visiting || e.button !== 0) return
+        if (s.visiting || e.button !== 0) return
+        if (s.mode === 'play') {
+          held = false
+          if (movable(b.def)) holdToMove(b, e)
+          return
+        }
+        if (s.mode !== 'move') return
         e.stopPropagation()
         if (!movable(b.def)) return s.toast(`Tap the ${d.name.toLowerCase()} in play mode to clear it`)
-        startDrag(b, groundTile(e))
+        startDrag(b, groundTile(e), e.pointerId)
       }}
       onClick={(e) => {
         const s = useGame.getState()
         // In move mode the tap already picked it up; don't let it fall through and deselect.
-        if (s.mode === 'move') return e.stopPropagation()
+        if (s.mode === 'move' || held) {
+          held = false
+          return e.stopPropagation()
+        }
         if (s.mode !== 'play' || s.visiting || e.delta > 6) return
         e.stopPropagation()
         s.tapBuilding(b.uid)
@@ -305,7 +365,7 @@ function Interaction() {
       const b = buildings.find((o) => o.uid === selected)
       const t = tileOf(e)
       const [w, h] = b ? lotSize(b.def, b.rot) : [0, 0]
-      if (b && t[0] >= b.x && t[0] < b.x + w && t[1] >= b.z && t[1] < b.z + h) startDrag(b, t)
+      if (b && t[0] >= b.x && t[0] < b.x + w && t[1] >= b.z && t[1] < b.z + h) startDrag(b, t, e.pointerId)
       return
     }
     if (mode !== 'road' && mode !== 'bulldoze') return
