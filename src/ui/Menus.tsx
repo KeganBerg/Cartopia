@@ -1,6 +1,6 @@
 import { groupOf, mergeCandidates } from '../game/merge'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useGame, hasRusty, buildPrice } from '../game/store'
+import { useGame, hasRusty, buildPrice, type OwnedCar } from '../game/store'
 import { reducedMotion } from '../game/fx'
 import { activeEvent, garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, carDef, performance, upgradeCost, buildingDef, upgradable, loves, readySets, type BuildingDef } from '../game/data'
 import { CarInspect, CarPreview, type DynoFeed } from '../scene/CarPreview'
@@ -14,7 +14,7 @@ import { ModShop, withMod } from './Mods'
 import { CollectionBook, useFindCar } from './Collection'
 import { PaintShop, jobOf } from './Paint'
 import { SkinPicker } from './Skins'
-import type { PaintJob } from '../game/data'
+import type { PaintJob, SkinnedSlot } from '../game/data'
 import { Icon } from './Icon'
 import { useCrewGoal } from './CrewGoal'
 import { useRivalWaiting } from './Rivals'
@@ -349,6 +349,14 @@ function DriverRow({ car, model }: { car: string; model: string }) {
   return <div className="driver-row idle"><LovesTag model={model} /><small>Tap a busy business to put this car to work there.</small></div>
 }
 
+// A car's mod skins with one slot changed (null takes that slot's skin off).
+const withSlot = (m: OwnedCar['modSkin'], slot: SkinnedSlot, skin: string | null) => {
+  const next = { ...m }
+  if (skin) next[slot] = skin
+  else delete next[slot]
+  return next
+}
+
 type GarageTab = 'tune' | 'mods' | 'paint'
 let nextGarageTab: GarageTab = 'tune'
 // Opens the Garage on a given tab (goals use it for paint and mods).
@@ -380,7 +388,11 @@ export function GaragePanel() {
   // A skin being tried on (null: trying no skin), cleared when another car is picked.
   const [skinning, setSkinning] = useState<{ car: string; skin: string | null } | null>(null)
   const trySkin = skinning && skinning.car === car?.uid && tab === 'paint' ? skinning.skin : undefined
-  const look = car && def && { body: def.body, model: def.id, ...(tryJob ?? jobOf(car)), skin: trySkin === undefined ? car.skin : trySkin, mods: withMod(car.mods, tryMod) }
+  // A mod skin being tried on one slot's part, cleared when another car is picked.
+  const [modSkinning, setModSkinning] = useState<{ car: string; slot: SkinnedSlot; skin: string | null } | null>(null)
+  const tryModSkin = modSkinning && modSkinning.car === car?.uid && tab === 'mods' ? modSkinning : null
+  const modSkin = car && tryModSkin ? withSlot(car.modSkin, tryModSkin.slot, tryModSkin.skin) : car?.modSkin
+  const look = car && def && { body: def.body, model: def.id, ...(tryJob ?? jobOf(car)), skin: trySkin === undefined ? car.skin : trySkin, modSkin, mods: withMod(car.mods, tryMod) }
   // After an upgrade or a part goes on, the car does a dyno pull showing the old and new time.
   const pi = car && def ? performance(def, car.upgrades, car.mods) : 0
   const [dyno, setDyno] = useState<DynoRun | null>(null)
@@ -404,7 +416,7 @@ export function GaragePanel() {
             const d = carDef(c.model)
             return (
               <button key={c.uid} className={c.uid === car?.uid ? 'garage-item sel' : 'garage-item'} onClick={() => select(c.uid)}>
-                <CarThumb size="sm" color={c.color} finish={c.finish} skin={c.skin} body={d.body} model={d.id} stripe={c.stripe} mods={c.mods} />
+                <CarThumb size="sm" color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} body={d.body} model={d.id} stripe={c.stripe} mods={c.mods} />
                 <span>{d.name}{c.plate && <span className="mini-plate">{c.plate}</span>}</span>
                 <small>PI {performance(d, c.upgrades, c.mods)}</small>
               </button>
@@ -435,7 +447,7 @@ export function GaragePanel() {
                 <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'sel' : ''} onClick={() => setTab(id)}>{label}</button>
               ))}
             </div>
-            {tab === 'mods' && <ModShop car={car} trying={tryMod} setTrying={(id) => setTrying(id ? { car: car.uid, mod: id } : null)} />}
+            {tab === 'mods' && <ModShop car={car} trying={tryMod} setTrying={(id) => setTrying(id ? { car: car.uid, mod: id } : null)} skinTry={tryModSkin} setSkinTry={(t) => setModSkinning(t ? { car: car.uid, ...t } : null)} />}
             {tab === 'tune' && UPGRADE_SLOTS.map((u) => {
               const lvl = car.upgrades[u.id]
               const cost = upgradeCost(def, lvl)
