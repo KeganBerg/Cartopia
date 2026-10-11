@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { CLEAR, conditions, conditionsNote, gripMul, surfaceOf, type Conditions } from './grip'
-import { freshRacer, raceFloor, shiftQuality, stepRacer } from './race'
+import { freshRacer, perfectRun, raceFloor, shiftQuality, stepRacer, type Racer } from './race'
 import { WEATHER_KINDS } from './weather'
 import { VENUES } from '../scene/venues'
 import { MODS } from './data'
@@ -37,6 +37,24 @@ describe('race grip', () => {
           expect(time).toBeGreaterThanOrEqual(floor)
         }
         expect(run(pi, c)).toBeGreaterThanOrEqual(dry - 1e-9)
+      }
+    }
+  })
+
+  it('stays above the floor with a perfect launch and the boost fired at any moment', () => {
+    for (const pi of [40, 110]) {
+      const floor = raceFloor(pi)
+      for (const [k, v] of [['storm', 'main'], ['blizzard', 'snow'], ['dust', 'desert'], ['clear', 'snow']] as const) {
+        const c = conditions(k, v, 100)
+        for (const at of [c.lo, (c.lo + c.hi) / 2, c.hi]) {
+          for (const skill of [(r: Racer) => (r.gear === 0 ? 1.2 : 1), () => 1.08]) {
+            for (let fireAt = 0; fireAt <= 4; fireAt += 0.25) {
+              const slick = perfectRun(pi, (r, t) => skill(r) * gripMul(c, r.gear, r.rpm, t), at, fireAt).time
+              expect(slick).toBeGreaterThanOrEqual(perfectRun(pi, skill, at, fireAt).time - 1e-9)
+              expect(slick).toBeGreaterThanOrEqual(floor)
+            }
+          }
+        }
       }
     }
   })
