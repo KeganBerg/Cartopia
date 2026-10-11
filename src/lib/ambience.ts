@@ -871,7 +871,7 @@ let quietSince = 0
 
 const target = () => (settings.on && !isMuted() && !townHeld() && !document.hidden ? settings.volume : 0)
 
-function clubOpen(): Club | null {
+export function clubOpen(): Club | null {
   if (!isNight()) return null
   const s = useGame.getState()
   const buildings = s.visiting ? s.visiting.buildings : s.buildings
