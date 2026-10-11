@@ -31,6 +31,7 @@ import { Weather } from './Weather'
 import { layoutRoads } from './traffic/layout'
 import { LAYER, decal } from './layers'
 import { Ear } from './Ear'
+import { WorldFx, PopGroup, usePops } from './WorldFx'
 
 const SIZE = GRID * TILE
 // Everything a town could ever own, centred on the origin like the start lot.
@@ -213,7 +214,9 @@ function Building({ b, roads, group }: { b: PlacedBuilding; roads: Set<string>; 
         </mesh>
       )}
       <group scale={[sx, sy, sz]}>
-        <BuildingModel def={d} level={buildingLevel(b)} />
+        <PopGroup uid={b.uid}>
+          <BuildingModel def={d} level={buildingLevel(b)} />
+        </PopGroup>
       </group>
     </group>
   )
@@ -627,10 +630,11 @@ export function World() {
   const roads = useMemo(() => new Set(roadsList), [roadsList])
   const land = useGame((s) => (s.visiting ? (s.visiting.land ?? START_LAND) : s.land))
   const mode = useGame((s) => s.mode)
+  const popping = usePops((s) => Object.keys(s.pops).join())
   // Rebuild the merged town only when something's footprint changes, not on every job timer.
   const layout = useMemo(
-    () => [buildings.map((b) => `${b.uid}:${b.def}:${b.x}:${b.z}:${b.rot}:${b.level ?? 1}:${b.merge ?? ''}`).join(), roadsList.join(), land.join()].join('/'),
-    [buildings, roadsList, land],
+    () => [buildings.map((b) => `${b.uid}:${b.def}:${b.x}:${b.z}:${b.rot}:${b.level ?? 1}:${b.merge ?? ''}`).join(), roadsList.join(), land.join(), popping].join('/'),
+    [buildings, roadsList, land, popping],
   )
   const merges = useMemo(() => mergeGroups(buildings), [layout]) // eslint-disable-line react-hooks/exhaustive-deps
   return (
@@ -657,6 +661,7 @@ export function World() {
       <Ear />
       <TownCars />
       <Townspeople />
+      <WorldFx small={Math.min(window.innerWidth, window.innerHeight) < 700} />
       <Clouds />
       <SeasonFx small={Math.min(window.innerWidth, window.innerHeight) < 700} />
       <Weather small={Math.min(window.innerWidth, window.innerHeight) < 700} />

@@ -8,7 +8,7 @@ import { supabase } from '../lib/supabase'
 import { Panel, SheetTabs } from './Menus'
 import { Canvas } from '@react-three/fiber'
 import { NeutralToneMapping } from 'three'
-import { RaceScene } from '../scene/RaceScene'
+import { RaceScene, startLights } from '../scene/RaceScene'
 import { pickVenue, venue as venueById } from '../scene/venues'
 import { sfx } from '../lib/sound'
 import { raceAudio, type RaceAudio } from '../lib/engineAudio'
@@ -675,7 +675,9 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  useEffect(() => () => void (startLights.n = 99), [])
   useEffect(() => {
+    startLights.n = countdown
     if (countdown === 99) return
     if (countdown >= 0 && countdown <= 3) {
       if (countdown === 3) sound.current?.screech()
@@ -945,7 +947,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       </div>
       {countdown > 0 && !result && <div className={`rf-venue v-${venue.id}`}><span className="rf-venue-ico">{venue.icon}</span><span className="rf-venue-txt"><small>{gripNote ?? 'Race venue'}</small><b>{venue.name}</b></span></div>}
       {spin && !label && !result && <div className="rf-spin">💨 Wheelspin</div>}
-      {countdown > 0 && countdown !== 99 && <div className="countdown big">{countdown}</div>}
+      {countdown > 0 && countdown !== 99 && <div className="countdown big" key={countdown}>{countdown}</div>}
       {countdown === 0 && !me.current.launched && !result && <div className="countdown big go">GO!</div>}
       {me.current.burning && !result && <div className="rf-boost-fx" />}
       {countdown === 99 && (

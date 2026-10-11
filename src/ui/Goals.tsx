@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { flyFrom, openChestFx, type Amounts } from './Fly'
 import {
   useGame, activeGoals, eventGoals, goalOpen, goalDone, statValue, today, claimable, taskDef, taskText, taskProgress, periodSlots, periodDone, chestOpened,
   type Period, type GameState,
@@ -117,8 +118,8 @@ function Reward({ coins, xp, bucks, parts, stars }: { coins: number; xp?: number
   )
 }
 
-function Row({ icon, text, have, target, done, claimed, onGo, onClaim, children }: {
-  icon: string; text: string; have: number; target: number; done: boolean; claimed?: boolean; onGo: () => void; onClaim: () => void; children: React.ReactNode
+function Row({ icon, text, have, target, done, claimed, onGo, onClaim, pay, children }: {
+  icon: string; text: string; have: number; target: number; done: boolean; claimed?: boolean; onGo: () => void; onClaim: () => void; pay?: Amounts; children: React.ReactNode
 }) {
   return (
     <div className={claimed ? 'goal claimed' : done ? 'goal done' : 'goal'}>
@@ -134,7 +135,7 @@ function Row({ icon, text, have, target, done, claimed, onGo, onClaim, children 
       {claimed
         ? <span className="goal-check">✔</span>
         : done
-          ? <button className="buy small" onClick={onClaim}>Collect</button>
+          ? <button className="buy small" onClick={(e) => { if (pay) flyFrom(e.currentTarget, pay); onClaim() }}>Collect</button>
           : <button className="buy small alt" onClick={onGo}>Go ›</button>}
     </div>
   )
@@ -156,7 +157,7 @@ function StoryGoals() {
       <div className="goals">
         {goals.map((g: GoalDef) => (
           <Row key={g.id} icon={g.icon} text={g.text} have={statValue(s, g.stat, g.def)} target={g.target} done={goalDone(s, g)}
-            onGo={() => goTo(g.stat, g.def)} onClaim={() => s.claimGoal(g.id)}>
+            onGo={() => goTo(g.stat, g.def)} onClaim={() => s.claimGoal(g.id)} pay={{ coins: g.coins, xp: g.xp, bucks: g.bucks }}>
             <Reward coins={g.coins} xp={g.xp} bucks={g.bucks} />
           </Row>
         ))}
@@ -187,7 +188,7 @@ function Tasks({ period }: { period: Period }) {
           return (
             <Row key={t.id} icon={d.icon} text={taskText(period, t)} have={taskProgress(s, period, t)} target={t.n}
               done={taskProgress(s, period, t) >= t.n} claimed={done.includes(t.id)}
-              onGo={() => goTo(d.stat)} onClaim={() => s.claimTask(period, t.id)}>
+              onGo={() => goTo(d.stat)} onClaim={() => s.claimTask(period, t.id)} pay={{ coins: pay.coins, xp: pay.xp }}>
               <Reward coins={pay.coins} xp={pay.xp} stars={period === 'daily' ? SEASON_STARS.dailyTask : SEASON_STARS.weeklyTask} />
             </Row>
           )
@@ -200,7 +201,7 @@ function Tasks({ period }: { period: Period }) {
           <div className="chest-pips">{Array.from({ length: TASKS_PER_PERIOD }, (_, i) => <i key={i} className={i < done.length ? 'on' : ''} />)}</div>
           <Reward coins={chestPay.coins} bucks={chest.bucks} parts={chest.parts} stars={period === 'daily' ? SEASON_STARS.dailyChest : SEASON_STARS.weeklyChest} />
         </div>
-        {opened ? <span className="goal-check">✔</span> : <button className="buy small" disabled={!ready} onClick={() => s.claimChest(period)}>{ready ? 'Open' : '🔒'}</button>}
+        {opened ? <span className="goal-check">✔</span> : <button className="buy small" disabled={!ready} onClick={(e) => { openChestFx(e.currentTarget, { coins: chestPay.coins, parts: chest.parts, bucks: chest.bucks, xp: chestPay.xp }); s.claimChest(period) }}>{ready ? 'Open' : '🔒'}</button>}
       </div>
       {period === 'weekly' && <CrewGoalMini />}
     </>
@@ -226,7 +227,7 @@ function EventGoals() {
           return (
             <Row key={g.id} icon={g.icon} text={locked ? `${g.text} (level ${g.level})` : g.text} have={statValue(s, g.stat, g.def)} target={g.target}
               done={!locked && goalDone(s, g)} claimed={claimed}
-              onGo={() => goTo(g.stat, g.def)} onClaim={() => s.claimGoal(g.id)}>
+              onGo={() => goTo(g.stat, g.def)} onClaim={() => s.claimGoal(g.id)} pay={{ coins: g.coins, xp: g.xp, bucks: g.bucks }}>
               <Reward coins={g.coins} xp={g.xp} bucks={g.bucks} />
             </Row>
           )
