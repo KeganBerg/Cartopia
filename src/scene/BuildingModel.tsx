@@ -2,6 +2,7 @@ import { TILE, levelLift, type BuildingDef } from '../game/data'
 import { useGame } from '../game/store'
 import { signTexture } from './signTexture'
 import { CarModel } from './CarModel'
+import { Upright } from './mergeScale'
 import { ObstacleDetail, BenchDetail, BillboardDetail, DriveInDetail, FlowerDetail, FountainDetail, GarageDetail, HouseDetail, LampDetail, PondDetail, ShopDetail, SpeedwayDetail, StatueDetail, TreeDetail } from './BuildingDetail'
 import { NEW_MODELS, NewBuildingModel } from './NewBuildings'
 import { HouseLevels } from './HouseLevels'
@@ -462,8 +463,12 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
       return (
         <group>
           <mesh position={[0, 0.35, 0]} castShadow><boxGeometry args={[1, 0.7, 1]} />{m(def.roof)}</mesh>
-          <group position={[0, 0.7, 0]} rotation-y={0.6} scale={1.2}>
-            {ghost ? <mesh position-y={0.25}><boxGeometry args={[0.7, 0.4, 1.2]} />{m(def.color)}</mesh> : <CarModel body="super" color={def.color} />}
+          <group position={[0, 0.7, 0]}>
+            <Upright>
+              <group rotation-y={0.6} scale={1.2}>
+                {ghost ? <mesh position-y={0.25}><boxGeometry args={[0.7, 0.4, 1.2]} />{m(def.color)}</mesh> : <CarModel body="super" color={def.color} />}
+              </group>
+            </Upright>
           </group>
           {!ghost && <StatueDetail stone={def.roof} />}
         </group>
@@ -875,13 +880,6 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
           ) : (
             <DriveInDetail />
           )}
-          {/* Speaker posts in the lot and a projector beam on the screen. */}
-          {!ghost && [[-0.9, -0.2], [0, -0.2], [0.9, -0.2], [-0.9, 0.9], [0, 0.9]].map(([x, z], i) => (
-            <group key={i} position={[x, 0, z]}>
-              <mesh position={[0, 0.25, 0]}><cylinderGeometry args={[0.025, 0.025, 0.5, 6]} />{m('#78909c')}</mesh>
-              <mesh position={[0, 0.5, 0]}><boxGeometry args={[0.12, 0.08, 0.06]} />{m('#37474f')}</mesh>
-            </group>
-          ))}
           {/* The film: one shared animated texture, kept out of Batch by its live material. */}
           {!ghost && (
             <mesh position={[0, 1.4 + sl, -1.42]}>

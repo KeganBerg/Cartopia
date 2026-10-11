@@ -3,6 +3,7 @@ import type { Texture } from 'three'
 import { levelLift, type BuildingDef } from '../game/data'
 import { signTexture } from './signTexture'
 import { CarModel } from './CarModel'
+import { Upright } from './mergeScale'
 import { glowMats, onNight } from './dayNight'
 import { ClubLife } from './ClubLife'
 import { CLUB } from './clubLayout'
@@ -248,9 +249,13 @@ function Parasol({ m, at, c }: { m: Mat; at: V3; c: string }) {
 // A simple car shape for the parking garage decks: far fewer meshes than CarModel.
 function BlockCar({ m, at, c, rot = 0 }: { m: Mat; at: V3; c: string; rot?: number }) {
   return (
-    <group position={at} rotation-y={rot}>
-      <Box m={m} at={[0, 0.1, 0]} s={[0.36, 0.13, 0.66]} c={c} />
-      <Box m={m} at={[0, 0.21, -0.04]} s={[0.3, 0.1, 0.34]} c="#b3e5fc" />
+    <group position={at}>
+      <Upright>
+        <group rotation-y={rot}>
+          <Box m={m} at={[0, 0.1, 0]} s={[0.36, 0.13, 0.66]} c={c} />
+          <Box m={m} at={[0, 0.21, -0.04]} s={[0.3, 0.1, 0.34]} c="#b3e5fc" />
+        </group>
+      </Upright>
     </group>
   )
 }
@@ -437,8 +442,12 @@ export function NewBuildingModel({ def, ghost, m, win, bulb, level = 1 }: NewMod
           <Box m={m} at={[0, 0.03, 0.68]} s={[3.6, 0.05, 0.62]} c="#ffffff" t={paverTex(4, 1)} shadow={false} />
           {/* A freshly painted car rolling out of the bay. */}
           {!ghost && (
-            <group position={[-0.05, 0.05, 0.62]} rotation-y={Math.PI / 2}>
-              <CarModel body="coupe" color="#ff6d00" />
+            <group position={[-0.05, 0.05, 0.62]}>
+              <Upright>
+                <group rotation-y={Math.PI / 2}>
+                  <CarModel body="coupe" color="#ff6d00" />
+                </group>
+              </Upright>
             </group>
           )}
           {/* Giant spray can on the roof. */}
@@ -552,11 +561,15 @@ export function NewBuildingModel({ def, ghost, m, win, bulb, level = 1 }: NewMod
           ))}
           {/* A patrol car parked out front, light bar on the roof. */}
           {!ghost && (
-            <group position={[-1.25, 0.05, 0.72]} rotation-y={Math.PI / 2}>
-              <CarModel body="sedan" color="#fafafa" stripe="#1a237e" />
-              <Box m={m} at={[-0.08, 0.6, -0.02]} s={[0.1, 0.05, 0.34]} c="#e0e0e0" />
-              <Box m={m} at={[-0.08, 0.64, 0.09]} s={[0.1, 0.05, 0.12]} c="#e53935" />
-              <Box m={m} at={[-0.08, 0.64, -0.13]} s={[0.1, 0.05, 0.12]} c="#1e88e5" />
+            <group position={[-1.25, 0.05, 0.72]}>
+              <Upright>
+                <group rotation-y={Math.PI / 2}>
+                  <CarModel body="sedan" color="#fafafa" stripe="#1a237e" />
+                  <Box m={m} at={[-0.08, 0.6, -0.02]} s={[0.1, 0.05, 0.34]} c="#e0e0e0" />
+                  <Box m={m} at={[-0.08, 0.64, 0.09]} s={[0.1, 0.05, 0.12]} c="#e53935" />
+                  <Box m={m} at={[-0.08, 0.64, -0.13]} s={[0.1, 0.05, 0.12]} c="#1e88e5" />
+                </group>
+              </Upright>
             </group>
           )}
           {!ghost && <Flag at={[1.4, 0, 0.75]} color="#1565c0" tall={1.6} star={lvl >= 10} />}
