@@ -109,12 +109,33 @@ function price(def: { price: number; bucks?: number }) {
   return <span className="price">$ {def.price.toLocaleString()}</span>
 }
 
-const SHOP_GROUPS: { title: string; filter: (b: BuildingDef) => boolean }[] = [
-  { title: 'Cars and parts makers', filter: (b) => b.id === 'rescue' || b.kind === 'parts' },
-  { title: 'Businesses', filter: (b) => b.kind === 'business' && b.id !== 'rescue' && b.id !== 'crew' && !b.service },
-  { title: 'Services and clubs', filter: (b) => b.kind === 'gas' || b.id === 'crew' || !!b.service },
-  { title: 'Homes and decor', filter: (b) => b.kind === 'house' || b.kind === 'decor' },
+// Tabs across the top of a menu, sticky while its body scrolls.
+export function SheetTabs<T extends string>({ items, value, onChange }: { items: readonly { id: T; label: React.ReactNode }[]; value: T; onChange: (id: T) => void }) {
+  return (
+    <div className="sheet-tabs" role="tablist">
+      {items.map((t) => (
+        <button key={t.id} role="tab" aria-selected={t.id === value} className={t.id === value ? 'sel' : ''} onClick={() => onChange(t.id)}>{t.label}</button>
+      ))}
+    </div>
+  )
+}
+
+type ShopTab = 'cars' | 'business' | 'services' | 'homes' | 'upgrades'
+const SHOP_GROUPS: { id: Exclude<ShopTab, 'upgrades'>; label: string; filter: (b: BuildingDef) => boolean }[] = [
+  { id: 'cars', label: '🔧 Cars & parts', filter: (b) => b.id === 'rescue' || b.kind === 'parts' },
+  { id: 'business', label: '🍕 Businesses', filter: (b) => b.kind === 'business' && b.id !== 'rescue' && b.id !== 'crew' && !b.service },
+  { id: 'services', label: '⛽ Services', filter: (b) => b.kind === 'gas' || b.id === 'crew' || !!b.service },
+  { id: 'homes', label: '🏡 Homes', filter: (b) => b.kind === 'house' || b.kind === 'decor' },
 ]
+// The Shop reopens on the tab it was left on.
+let lastShopTab: ShopTab = 'cars'
+// Which tab a focus request (a building id, or 'upgrades') should open.
+function shopTabFor(focus: string | null): ShopTab | null {
+  if (!focus) return null
+  if (focus === 'upgrades') return 'upgrades'
+  const def = BUILDINGS.find((b) => b.id === focus)
+  return (def && SHOP_GROUPS.find((g) => g.filter(def))?.id) || null
+}
 
 export function ShopPanel() {
   const level = useGame((s) => s.level)
@@ -125,18 +146,28 @@ export function ShopPanel() {
   const focus = useGame((s) => s.shopFocus)
   const focusRef = useRef<HTMLButtonElement>(null)
   const rusty = hasRusty({ buildings })
-  // A "Build" hint elsewhere opened the Shop: bring that building into view.
+  const canUpgrade = buildings.some((b) => upgradable(buildingDef(b.def)))
+  const [tab, setTabState] = useState<ShopTab>(() => shopTabFor(focus) ?? (!rusty ? 'cars' : lastShopTab === 'upgrades' && !canUpgrade ? 'cars' : lastShopTab))
+  const setTab = (t: ShopTab) => {
+    lastShopTab = t
+    setTabState(t)
+  }
+  // A "Build" hint elsewhere opened the Shop: switch to that building's tab and bring it into view.
   useEffect(() => {
-    focusRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    const t = shopTabFor(focus)
+    if (t) setTabState(t)
+    const raf = requestAnimationFrame(() => focusRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' }))
+    return () => cancelAnimationFrame(raf)
   }, [focus])
+  const tabs: { id: ShopTab; label: React.ReactNode }[] = [...SHOP_GROUPS, ...(canUpgrade ? [{ id: 'upgrades' as const, label: '⬆ Upgrades' }] : [])]
+  const group = SHOP_GROUPS.find((g) => g.id === tab)
   return (
     <Panel title="Shop" wide>
-      <ShopUpgrades />
-      {SHOP_GROUPS.map((g) => (
-        <section key={g.title}>
-          <h3>{g.title}</h3>
-          <div className="cards">
-            {BUILDINGS.filter((b) => b.unlockLevel < 99 && g.filter(b)).sort((a, b) => Number(b.id === 'rescue') - Number(a.id === 'rescue')).map((b) => {
+      <SheetTabs items={tabs} value={tab} onChange={setTab} />
+      {tab === 'upgrades' && <ShopUpgrades />}
+      {group && (
+          <div className="cards rows">
+            {BUILDINGS.filter((b) => b.unlockLevel < 99 && group.filter(b)).sort((a, b) => Number(b.id === 'rescue') - Number(a.id === 'rescue')).map((b) => {
               const locked = level < b.unlockLevel
               const broke = coins < b.price
               const owned = !!b.unique && buildings.some((o) => o.def === b.id)
@@ -152,22 +183,23 @@ export function ShopPanel() {
                 >
                   {highlight && <span className="ribbon">START HERE</span>}
                   <BuildingThumb def={b} />
-                  <div className="card-name">{b.name}</div>
-                  {b.jobSeconds && (
-                    <div className="card-stat">
-                      ${b.payout}{b.partsPayout ? ` +${b.partsPayout}⚙` : ''} every {b.jobSeconds >= 60 ? `${b.jobSeconds / 60}m` : `${b.jobSeconds}s`} · ⛽{b.fuelCost}
-                    </div>
-                  )}
-                  {b.id === 'rescue' && <div className="card-stat">Search for old cars and restore them</div>}
-                  {b.id === 'crew' && <div className="card-stat">Your crew's clubhouse: roster, rank and crew boards</div>}
-                  {b.fuelCap && <div className="card-stat">+{b.fuelCap} max fuel</div>}
+                  <div className="card-text">
+                    <div className="card-name">{b.name}</div>
+                    {b.jobSeconds && (
+                      <div className="card-stat">
+                        ${b.payout}{b.partsPayout ? ` +${b.partsPayout}⚙` : ''} every {b.jobSeconds >= 60 ? `${b.jobSeconds / 60}m` : `${b.jobSeconds}s`} · ⛽{b.fuelCost}
+                      </div>
+                    )}
+                    {b.id === 'rescue' && <div className="card-stat">Search for old cars and restore them</div>}
+                    {b.id === 'crew' && <div className="card-stat">Your crew's clubhouse: roster, rank and crew boards</div>}
+                    {b.fuelCap && <div className="card-stat">+{b.fuelCap} max fuel</div>}
+                  </div>
                   {owned ? <span className="price">✔ Built</span> : locked ? <span className="price">🔒 Level {b.unlockLevel}</span> : price(b)}
                 </button>
               )
             })}
           </div>
-        </section>
-      ))}
+      )}
     </Panel>
   )
 }
