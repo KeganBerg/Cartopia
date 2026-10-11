@@ -98,7 +98,7 @@ export function Hud() {
             <button className="chip-stat" onClick={() => s.showNeed('parts', 0)}><span className="ico cur-ico" data-fly="parts"><PartsIcon /></span><Roll value={s.parts} format={compact} /></button>
             <button className="chip-stat chip-fuel" onClick={() => s.showNeed('fuel', 0)}>
               <span className="ico cur-ico"><FuelIcon /></span>
-              <span className="chip-fuel-bar"><i style={{ width: `${Math.min(100, (s.fuel / cap) * 100)}%` }} /><b>{compact(s.fuel)}/{compact(cap)}</b></span>
+              <span className="chip-fuel-bar"><i style={{ width: s.fuel > 0 ? `max(14px, ${Math.min(100, (s.fuel / cap) * 100)}%)` : 0 }} /><b>{compact(s.fuel)}/{compact(cap)}</b></span>
             </button>
           </div>
           <div className="hud-actions">

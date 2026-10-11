@@ -602,6 +602,9 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
   .toast { font-size: 13px; text-align: center; padding: 6px 12px; }
   .challenge-pop { top: calc(126px + var(--sat)); left: 8px; right: 8px; max-width: none; }
   .badge { font-size: 12px; padding: 2px 6px; border-width: 2px; }
+  /* Job timers: progress becomes a thin line along the bubble's bottom so the bubble is half as wide. */
+  .badge-working { padding-bottom: 5px; }
+  .badge-working .bar { position: absolute; left: 7px; right: 7px; bottom: 2px; width: auto; height: 3px; border-radius: 2px; }
   .coin { width: 28px; height: 28px; font-size: 18px; }
 }
 
