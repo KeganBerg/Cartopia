@@ -8,6 +8,7 @@ import { skyTex, asphaltTex, paverTex, glowTex } from './textures'
 import { BuildingModel, LightPool } from './BuildingModel'
 import { glowMats, dayPhase, nightAmount } from './dayNight'
 import { PAL } from './season'
+import { LAYER, decal } from './layers'
 import { holdPageTint } from './pageTint'
 import { useGame } from '../game/store'
 import { Skyline } from './Skyline'
@@ -148,7 +149,7 @@ function Lamp({ z, side }: { z: number; side: 1 | -1 }) {
         <boxGeometry args={[0.16, 0.07, 0.22]} />
         <primitive object={glowMats.bulb} attach="material" dispose={null} />
       </mesh>
-      <LightPool r={1} z={0.6} y={0.05} />
+      <LightPool r={1} z={0.6} y={0.09} />
     </group>
   )
 }
@@ -189,8 +190,8 @@ export function RaceScene({ track, me, them, mine, theirs }: Props) {
     const target = Math.min(mz, len)
     // Tall phone screens get a higher, further-back chase view.
     const tall = size.height > size.width
-    camera.position.lerp({ x: LANE * 0.5, y: tall ? 2.7 : 2.2, z: target - (tall ? 5.2 : 4.2) } as never, 0.15)
-    camera.lookAt(LANE * 0.3, 0.3, Math.min(target + 3 + (lead - target) * 0.3, len + 4))
+    camera.position.lerp({ x: tall ? 0 : LANE * 0.5, y: tall ? 2.7 : 2.2, z: target - (tall ? 5.2 : 4.2) } as never, 0.15)
+    camera.lookAt(tall ? 0 : LANE * 0.3, 0.3, Math.min(target + 3 + (lead - target) * 0.3, len + 4))
     // Only draw the stretch of street near the camera.
     const cz = camera.position.z
     scenery.current.forEach((g) => {
@@ -206,7 +207,7 @@ export function RaceScene({ track, me, them, mine, theirs }: Props) {
       <hemisphereLight args={[tint('#ffffff', '#6274b8'), PAL.ground, 0.85 - night * 0.4]} />
       <directionalLight position={[5, 10, 2]} intensity={1.5 - night * 1.1} color={tint(PAL.sun, '#9fb4ff')} />
       {/* Ground, sidewalks and the street itself. */}
-      <mesh rotation-x={-Math.PI / 2} position={[0, -0.02, len / 2]}>
+      <mesh rotation-x={-Math.PI / 2} position={[0, LAYER.outer, len / 2]}>
         <planeGeometry args={[80, len + 100]} />
         <meshStandardMaterial color={PAL.ground} />
       </mesh>
@@ -216,31 +217,31 @@ export function RaceScene({ track, me, them, mine, theirs }: Props) {
           <meshStandardMaterial map={paverTex(0.5, (len + 50) / 2)} />
         </mesh>
       ))}
-      <mesh rotation-x={-Math.PI / 2} position={[0, 0.01, len / 2 + 5]}>
+      <mesh rotation-x={-Math.PI / 2} position={[0, LAYER.land, len / 2 + 5]}>
         <planeGeometry args={[ROAD * 2, len + 50]} />
         <meshStandardMaterial map={asphalt} />
       </mesh>
       {/* Centre line dashes and edge lines. */}
       {Array.from({ length: Math.ceil((len + 30) / 2) }, (_, i) => (
-        <mesh key={i} rotation-x={-Math.PI / 2} position={[0, 0.03, i * 2 - 8]}>
+        <mesh key={i} rotation-x={-Math.PI / 2} position={[0, LAYER.grid, i * 2 - 8]}>
           <planeGeometry args={[0.06, 1]} />
-          <meshBasicMaterial color="#fafafa" />
+          <meshBasicMaterial color="#fafafa" {...decal()} />
         </mesh>
       ))}
       {[-1, 1].map((sd) => (
-        <mesh key={sd} rotation-x={-Math.PI / 2} position={[sd * (ROAD - 0.08), 0.03, len / 2 + 5]}>
+        <mesh key={sd} rotation-x={-Math.PI / 2} position={[sd * (ROAD - 0.08), LAYER.grid, len / 2 + 5]}>
           <planeGeometry args={[0.07, len + 50]} />
-          <meshBasicMaterial color="#ffd54f" />
+          <meshBasicMaterial color="#ffd54f" {...decal()} />
         </mesh>
       ))}
       {/* Start grid line and chequered finish. */}
-      <mesh rotation-x={-Math.PI / 2} position={[0, 0.04, -0.6]}>
+      <mesh rotation-x={-Math.PI / 2} position={[0, LAYER.lot, -0.6]}>
         <planeGeometry args={[ROAD * 2, 0.15]} />
-        <meshBasicMaterial color="#fafafa" />
+        <meshBasicMaterial color="#fafafa" {...decal(2)} />
       </mesh>
-      <mesh rotation-x={-Math.PI / 2} position={[0, 0.04, len]}>
+      <mesh rotation-x={-Math.PI / 2} position={[0, LAYER.lot, len]}>
         <planeGeometry args={[ROAD * 2, 0.5]} />
-        <meshBasicMaterial map={signTexture('▚▚▚▚▚▚▚▚', '#ffffff', '#111111')} />
+        <meshBasicMaterial map={signTexture('▚▚▚▚▚▚▚▚', '#ffffff', '#111111')} {...decal(2)} />
       </mesh>
       <Banner z={-0.8} text="START" bg="#2e7d32" />
       <Banner z={len} text="FINISH" bg="#c62828" />
@@ -253,7 +254,7 @@ export function RaceScene({ track, me, them, mine, theirs }: Props) {
         return (
           <group key={i} ref={(g) => { scenery.current[i] = g }} position={[0, 0, sl.z]}>
             <group position={[sl.side * (ROAD + WALK + depth / 2 + 0.1), 0, 0]} rotation-y={sl.side < 0 ? Math.PI / 2 : -Math.PI / 2}>
-              <mesh rotation-x={-Math.PI / 2} position-y={0.012}>
+              <mesh rotation-x={-Math.PI / 2} position-y={LAYER.lot}>
                 <planeGeometry args={[d.w * TILE - 0.1, depth - 0.1]} />
                 <meshStandardMaterial map={paverTex(d.w, d.h)} />
               </mesh>
@@ -269,9 +270,9 @@ export function RaceScene({ track, me, them, mine, theirs }: Props) {
       {/* Soft shadows under the racers. */}
       {[meRef, themRef].map((r, i) => (
         <group key={i} ref={r} scale={1.4}>
-          <mesh rotation-x={-Math.PI / 2} position-y={0.05}>
+          <mesh rotation-x={-Math.PI / 2} position-y={LAYER.paint}>
             <planeGeometry args={[0.9, 1.5]} />
-            <meshBasicMaterial map={glowTex()} color="#000000" transparent opacity={0.35} depthWrite={false} />
+            <meshBasicMaterial map={glowTex()} color="#000000" transparent opacity={0.35} depthWrite={false} {...decal(3)} />
           </mesh>
           {i === 0 ? <CarModel body={mine.body} color={mine.color} beams={night > 0.3} /> : <CarModel body={theirs.body} color={theirs.color} beams={night > 0.3} />}
         </group>
