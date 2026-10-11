@@ -12,6 +12,7 @@ import { RaceScene, startLights, finishView } from '../scene/RaceScene'
 import { pickVenue, venue as venueById } from '../scene/venues'
 import { sfx } from '../lib/sound'
 import { raceAudio, type RaceAudio } from '../lib/engineAudio'
+import { PlayerName } from './Username'
 import { useLive, challenge, cancelChallenge, refreshPresence, raceChannel, endLiveRace, answer, pruneInvites, mute, unmute, setClosed, INVITE_MS, type LiveRace } from '../lib/live'
 import { displayName } from '../lib/names'
 import { joinRefereed, reportFinish, serverPi, type Verdict } from '../lib/referee'
@@ -390,7 +391,7 @@ export function RacePanel() {
               <div key={p.id} className="rival">
                 <i style={{ background: p.color }} />
                 <div>
-                  <b>{p.town}</b> <span className="tag live">LIVE</span>
+                  <b><PlayerName id={p.uid} town={p.town} /></b> <span className="tag live">LIVE</span>
                   <div className="card-stat">Lvl {p.level} · {p.carName} · PI {p.pi}</div>
                 </div>
                 {outgoing?.to === p.id ? (
@@ -1406,7 +1407,7 @@ export function InvitesPanel() {
             <div key={i.raceId} className="rival invite">
               <i style={{ background: i.from.color }} />
               <div>
-                <b>{i.from.town}</b> <span className="tag live">LIVE</span>
+                <b><PlayerName id={i.from.uid} town={i.from.town} /></b> <span className="tag live">LIVE</span>
                 <div className="card-stat">Lvl {i.from.level} · {i.from.carName} · PI {i.from.pi} · {Math.max(0, Math.ceil((INVITE_MS - (Date.now() - i.at)) / 1000))}s left</div>
               </div>
               <div className="invite-actions">
