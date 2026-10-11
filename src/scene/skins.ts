@@ -1,4 +1,4 @@
-import type { WebGLProgramParametersWithUniforms } from 'three'
+import type { Vector3, WebGLProgramParametersWithUniforms } from 'three'
 
 // Car skins: animated patterns that sit at depth inside the paint, like a holo
 // decal under a clear coat. Each layer is drawn as if it lay a little way under
@@ -838,13 +838,27 @@ vSkN = normal;
 // The model's rotation undone (uniform scale only shrinks it, and it's normalised later).
 vSkV = transpose(mat3(modelMatrix)) * ((modelMatrix * vec4(position, 1.0)).xyz - cameraPosition);`
 
+// The same in world space, around a moving origin and scaled: for something built from many
+// small parts (a crate's boards) that should share one pattern instead of each repeating it.
+const VERTEX_WORLD = /* glsl */ `
+vec4 skW = modelMatrix * vec4(position, 1.0);
+vSkP = (skW.xyz - uSkO) * uSkK;
+vSkN = mat3(modelMatrix) * normal;
+vSkV = skW.xyz - cameraPosition;`
+export type SkinSpace = { origin: { value: Vector3 }; scale: number }
+
 // Adds skins to a standard material's shader. `id` is a GLSL int expression: a
 // constant for one car's own paint, or the baked per-vertex number for town cars.
-export function withSkin(sh: WebGLProgramParametersWithUniforms, id: string, attr = false) {
+// `space` draws it in world space instead of the mesh's own (see VERTEX_WORLD).
+export function withSkin(sh: WebGLProgramParametersWithUniforms, id: string, attr = false, space?: SkinSpace) {
   sh.uniforms.uSkinT = skinClock
+  if (space) {
+    sh.uniforms.uSkO = space.origin
+    sh.uniforms.uSkK = { value: space.scale }
+  }
   sh.vertexShader = sh.vertexShader
-    .replace('#include <common>', `#include <common>\n${VARYINGS}${attr ? '\nattribute float skin;\nflat varying float vSkin;' : ''}`)
-    .replace('#include <begin_vertex>', `#include <begin_vertex>\n${VERTEX}${attr ? '\nvSkin = skin;' : ''}`)
+    .replace('#include <common>', `#include <common>\n${VARYINGS}${space ? '\nuniform vec3 uSkO;\nuniform float uSkK;' : ''}${attr ? '\nattribute float skin;\nflat varying float vSkin;' : ''}`)
+    .replace('#include <begin_vertex>', `#include <begin_vertex>\n${space ? VERTEX_WORLD : VERTEX}${attr ? '\nvSkin = skin;' : ''}`)
   sh.fragmentShader = sh.fragmentShader
     .replace('#include <common>', `#include <common>\n${VARYINGS}${attr ? '\nflat varying float vSkin;' : ''}\n${GLSL}`)
     .replace('#include <normal_fragment_begin>', /* glsl */ `vec3 skGlow = vec3(0.0);
