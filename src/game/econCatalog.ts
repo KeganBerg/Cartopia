@@ -1,6 +1,6 @@
 import {
   BUILDINGS, CAMPAIGN, CAR_SETS, CAMPAIGN_RACES, CARS, GOALS, GP_SERIES, campaignRaceId, MAX_BUILDING_LEVEL, MODS, RESCUE_SPOTS, modXp, buildingUpgradeCost, buildingUpgradeXp, upgradable,
-  upgradeFuelCap, upgradeJobSeconds, FAVORITE_BONUS, QUEST_PAY, TASKS_PER_PERIOD, upgradePartsPayout, upgradePayout, upgradeXp, type BuildingDef,
+  upgradeFuelCap, upgradeJobSeconds, FAVORITE_BONUS, DEAL_SLOTS, dealSave, QUEST_PAY, TASKS_PER_PERIOD, upgradePartsPayout, upgradePayout, upgradeXp, type BuildingDef,
 } from './data'
 
 const LEVELS = Array.from({ length: MAX_BUILDING_LEVEL }, (_, i) => i + 1)
@@ -61,6 +61,13 @@ export function econCatalog() {
   const sets = Object.fromEntries(CAR_SETS.map((c) => [c.id, { cars: c.cars, coins: c.coins, bucks: c.bucks, trophies: c.trophies, xp: c.xp }]))
   // Daily and weekly tasks: at most `count` task rewards and one chest per UTC day / ISO week.
   const quests = Object.fromEntries((['daily', 'weekly'] as const).map((p) => [p, { count: TASKS_PER_PERIOD, ...QUEST_PAY[p] }]))
+  // Daily deals: slot i on UTC day n (days since 1970-01-01) is slots[i][(n * step[i] + i) % length].
+  // `save` is how much town worth each deal adds beyond what the player paid.
+  const deals = {
+    slots: DEAL_SLOTS.map((s) => s.deals.map((d) => d.id)),
+    step: DEAL_SLOTS.map((s) => s.step),
+    save: Object.fromEntries(DEAL_SLOTS.flatMap((s) => s.deals).map((d) => [d.id, dealSave(d)])),
+  }
   // A driver adds at most this share to a business's coins (see driverPayout).
-  return { cars, buildings, goals, gp, rescue, upgradeXpTo, mods, driverBonus: FAVORITE_BONUS, campaign, sets, quests }
+  return { cars, buildings, goals, gp, rescue, upgradeXpTo, mods, driverBonus: FAVORITE_BONUS, campaign, sets, quests, deals }
 }

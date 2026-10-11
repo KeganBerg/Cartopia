@@ -16,6 +16,7 @@ import { NeedPanel } from './ui/Need'
 import { UpgradePanel } from './ui/Upgrade'
 import { RescuePanel } from './ui/Rescue'
 import { BankPanel } from './ui/Bank'
+import { DealsPanel } from './ui/Deals'
 import { LevelUpSplash } from './ui/LevelUp'
 import { AccountPanel } from './ui/Account'
 import { WelcomeBack } from './ui/WelcomeBack'
@@ -75,6 +76,7 @@ export default function App() {
       {panel === 'upgrade' && <UpgradePanel />}
       {panel === 'rescue' && <RescuePanel />}
       {panel === 'bank' && <BankPanel />}
+      {panel === 'deals' && <DealsPanel />}
       <VisitBanner />
       <Tutorial />
       {panel === 'account' && <AccountPanel />}

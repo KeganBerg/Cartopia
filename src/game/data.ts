@@ -779,3 +779,76 @@ export const CLAN_COST = 2000
 export const CLAN_CAP = 20
 export const CLAN_EMBLEMS = ['🏁', '🔥', '⚡', '🦅', '🐺', '💀', '👑', '🚀', '🐉', '⭐', '🏎️', '🛞']
 export const CLAN_COLORS = ['#ff7043', '#e53935', '#8e24aa', '#1e88e5', '#00897b', '#43a047', '#fdd835', '#546e7a']
+
+// Daily deals: three discounted items a day, the same for everyone, each usable once.
+// Each slot rotates through its own list by UTC day number: list[(day * step + slot) % length].
+// The server guard rebuilds the same three from econ_catalog().deals, so keep the formula simple.
+export type DealKind = 'parts' | 'fuel' | 'decor' | 'mod' | 'paint'
+export type DealDef = { id: string; kind: DealKind; item?: string; n?: number; off: number }
+export const DEAL_SLOTS: { name: string; step: number; deals: DealDef[] }[] = [
+  {
+    name: 'Supplies', step: 3, deals: [
+      { id: 'parts10', kind: 'parts', n: 10, off: 0.4 },
+      { id: 'fuel', kind: 'fuel', off: 0.67 },
+      { id: 'parts25', kind: 'parts', n: 25, off: 0.4 },
+      { id: 'parts50', kind: 'parts', n: 50, off: 0.4 },
+    ],
+  },
+  {
+    name: 'Car shop', step: 5, deals: [
+      ...(['chrome', 'twintips', 'vented', 'ducktail', 'streetkit'] as const).map((m) => ({ id: `mod-${m}`, kind: 'mod' as const, item: m, off: 0.4 })),
+      { id: 'paint-matte', kind: 'paint', item: 'matte', off: 0.5 },
+      ...(['goldmesh', 'ramscoop', 'sidepipes', 'gtwing', 'widebody', 'blower', 'forged'] as const).map((m) => ({ id: `mod-${m}`, kind: 'mod' as const, item: m, off: 0.3 })),
+      { id: 'paint-chrome', kind: 'paint', item: 'chrome', off: 0.4 },
+    ],
+  },
+  {
+    name: 'Town', step: 3, deals: (['fountain', 'pond', 'playground', 'gazebo', 'clocktower', 'billboard', 'hotdog', 'statue'] as const)
+      .map((b) => ({ id: `decor-${b}`, kind: 'decor' as const, item: b, off: 0.4 })),
+  },
+]
+export const DEALS: DealDef[] = DEAL_SLOTS.flatMap((s) => s.deals)
+export const dealDef = (id: string) => DEALS.find((d) => d.id === id)
+export const dayNumber = (day: string) => Math.floor(Date.parse(`${day}T00:00:00Z`) / 86400000)
+export const dealsFor = (day: string): DealDef[] => {
+  const n = dayNumber(day)
+  return DEAL_SLOTS.map((s, i) => s.deals[(((n * s.step + i) % s.deals.length) + s.deals.length) % s.deals.length])
+}
+
+const off10 = (n: number, off: number) => Math.round((n * (1 - off)) / 10) * 10
+export type DealOffer = { name: string; icon: string; unlockLevel: number; was: { coins: number; bucks: number }; now: { coins: number; bucks: number }; parts: number }
+// What a deal sells and for how much. `parts` is the parts price of a mod (never discounted).
+export function dealOffer(d: DealDef): DealOffer {
+  switch (d.kind) {
+    case 'parts': {
+      const n = d.n ?? 0
+      return { name: `${n} Parts`, icon: '⚙', unlockLevel: 1, was: { coins: n * 50, bucks: 0 }, now: { coins: off10(n * 50, d.off), bucks: 0 }, parts: 0 }
+    }
+    case 'fuel':
+      return { name: 'Full tank', icon: '⛽', unlockLevel: 1, was: { coins: 0, bucks: REFILL_BUCKS }, now: { coins: 0, bucks: Math.max(1, Math.round(REFILL_BUCKS * (1 - d.off))) }, parts: 0 }
+    case 'decor': {
+      const b = buildingDef(d.item ?? '')
+      return {
+        name: b.name, icon: '🌳', unlockLevel: b.unlockLevel,
+        was: { coins: b.price, bucks: b.bucks ?? 0 },
+        now: { coins: off10(b.price, d.off), bucks: b.bucks ? Math.max(1, Math.round(b.bucks * (1 - d.off))) : 0 },
+        parts: 0,
+      }
+    }
+    case 'mod': {
+      const m = modDef(d.item ?? '')
+      return { name: m?.name ?? 'Mod', icon: '🪽', unlockLevel: m?.unlockLevel ?? 1, was: { coins: m?.coins ?? 0, bucks: 0 }, now: { coins: off10(m?.coins ?? 0, d.off), bucks: 0 }, parts: m?.parts ?? 0 }
+    }
+    case 'paint': {
+      const f = finishDef(d.item as Finish)
+      return { name: `${f.name} paint`, icon: '🎨', unlockLevel: f.unlockLevel, was: { coins: f.coins, bucks: 0 }, now: { coins: off10(f.coins, d.off), bucks: 0 }, parts: 0 }
+    }
+  }
+}
+// How much town worth a deal adds beyond what was paid, for the server guard. Fuel and
+// paint aren't part of town worth, so they need no allowance.
+export const dealSave = (d: DealDef) => {
+  if (d.kind === 'fuel' || d.kind === 'paint') return 0
+  const o = dealOffer(d)
+  return o.was.coins - o.now.coins
+}

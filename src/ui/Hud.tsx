@@ -3,6 +3,7 @@ import { xpToNext, FUEL_REGEN_SECONDS } from '../game/data'
 import { useNow } from '../scene/useNow'
 import { GoalsButton, GoalTracker } from './Goals'
 import { MuteButton } from './MuteButton'
+import { DealsButton } from './Deals'
 import { ChallengeBell } from './Race'
 
 const n = (v: number) => v.toLocaleString()
@@ -72,6 +73,7 @@ export function Hud() {
         <div className="fuel-sub">{nextIn === null ? 'Fuel full' : `+1 fuel in ${nextIn}s`}</div>
         <div className="hud-right-row">
           <button className="pill trophies" title="Leaderboards" onClick={() => s.openPanel('leaders')}>🏆 {s.trophies}</button>
+          <DealsButton />
           <GoalsButton />
           <MuteButton />
         </div>
@@ -91,6 +93,7 @@ export function Hud() {
             </button>
           </div>
           <div className="hud-actions">
+            <DealsButton />
             <GoalsButton />
             <ChallengeBell />
           </div>

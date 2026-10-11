@@ -1135,3 +1135,31 @@ button.book-car { font: inherit; color: inherit; }
 .gt-bar i { display: block; height: 100%; background: #76ff03; }
 @media (max-height: 500px) { .hud-center .goal-tracker { display: none; } }
 @media (max-width: 600px) { .goal-tracker { margin-top: 4px; font-size: 12px; padding: 2px 8px 2px 3px; } }
+
+/* Daily deals: three cards side by side, even on phones. */
+.deals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.deal { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; background: #fff; border: 2px solid #ffcc80; border-radius: 14px; padding: 18px 6px 8px; text-align: center; min-width: 0; }
+.deal.used { opacity: .6; border-color: #e0e0e0; }
+.deal.locked { filter: grayscale(.6); }
+.deal-slot { position: absolute; top: 4px; left: 6px; font: 10px var(--display); color: #8d6e63; text-transform: uppercase; }
+.deal-off { position: absolute; top: -9px; right: -6px; background: #e53935; color: #fff; font: 13px var(--display); padding: 2px 7px; border-radius: 10px; transform: rotate(6deg); box-shadow: 0 2px 0 rgba(0,0,0,.25); }
+.deal-art { width: 100%; height: 72px; display: grid; place-items: center; overflow: hidden; }
+.deal-art canvas, .deal-art img { max-height: 72px; }
+.deal-icon { font-size: 40px; }
+.deal-name { font: 13px var(--display); line-height: 1.1; overflow-wrap: anywhere; }
+.deal-cost { font-size: 12px; font-weight: 800; }
+.deal-cost s, .price s, .buy s, .fin-opt s { color: #9e9e9e; font-weight: 700; margin-right: 2px; }
+.deal-cost b, .deal-price { color: #2e7d32; }
+.deal .buy, .deal .price { width: 100%; }
+.deals-foot { text-align: center; margin: 10px 0 0; font-weight: 800; color: #546e7a; font-size: 13px; }
+.deal-badge { background: #e53935; }
+.deal-tag { background: #e53935; color: #fff; font: 10px var(--display); border-radius: 6px; padding: 1px 5px; margin-right: 5px; }
+.ribbon.deal, .cards.rows .ribbon.deal { background: #e53935; left: auto; right: 8px; }
+@media (max-width: 520px) {
+  .deals { gap: 6px; }
+  .deal { padding: 16px 4px 6px; }
+  .deal-art { height: 56px; }
+  .deal-name { font-size: 11px; }
+  .deal-cost { font-size: 10px; }
+  .deal-off { font-size: 11px; padding: 1px 5px; }
+}

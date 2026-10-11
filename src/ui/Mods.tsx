@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useGame, type OwnedCar } from '../game/store'
+import { useGame, modPrice, type OwnedCar } from '../game/store'
 import { MODS, carDef, modSlotsFor, fittedMods, modDef, ownedMods, performance, type ModDef, type ModSlot } from '../game/data'
 
 // The car's mods with `tryId` swapped into its slot, for previewing before buying.
@@ -18,15 +18,16 @@ function statLine(m: ModDef) {
     .join(' · ')
 }
 
-function price(m: ModDef) {
+function price(m: ModDef, coins = m.coins) {
   if (m.bucks) return `B ${m.bucks}`
-  return `$${m.coins.toLocaleString()}${m.parts ? ` + ${m.parts}⚙` : ''}`
+  return `$${coins.toLocaleString()}${m.parts ? ` + ${m.parts}⚙` : ''}`
 }
 
 // Mod shop for one car: pick a slot, tap a part to try it on the preview, then fit it.
 export function ModShop({ car, trying, setTrying }: { car: OwnedCar; trying: string | null; setTrying: (id: string | null) => void }) {
   const level = useGame((s) => s.level)
   const modCar = useGame((s) => s.modCar)
+  const deals = useGame((s) => s.deals)
   const def = carDef(car.model)
   const slots = modSlotsFor(def.body)
   const [pick, setSlot] = useState<ModSlot>('spoiler')
@@ -60,6 +61,7 @@ export function ModShop({ car, trying, setTrying }: { car: OwnedCar; trying: str
           const locked = !have && level < m.unlockLevel
           const pi = performance(def, car.upgrades, withMod(car.mods, m.id))
           const gain = pi - basePi
+          const deal = modPrice({ deals, level }, m.id)
           return (
             <div
               key={m.id}
@@ -79,7 +81,7 @@ export function ModShop({ car, trying, setTrying }: { car: OwnedCar; trying: str
                 <button
                   className={m.bucks ? 'buy small premium' : 'buy small'}
                   onClick={(e) => { e.stopPropagation(); if (modCar(car.uid, m.id)) setTrying(null) }}
-                >Buy · {price(m)}</button>
+                >{deal.deal && <span className="deal-tag">DEAL</span>}Buy · {deal.deal && <s>{price(m)}</s>} {price(m, deal.coins)}</button>
               )}
             </div>
           )

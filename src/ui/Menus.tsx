@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useGame, hasRusty } from '../game/store'
+import { useGame, hasRusty, buildPrice } from '../game/store'
 import { garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, carDef, performance, upgradeCost, buildingDef, upgradable, loves, readySets, type BuildingDef } from '../game/data'
 import { CarInspect, CarPreview } from '../scene/CarPreview'
 import { CollectAllButton } from './CollectAll'
@@ -108,9 +108,9 @@ function useShopFocus() {
   return { body, focus }
 }
 
-function price(def: { price: number; bucks?: number }) {
-  if (def.bucks) return <span className="price bucks">B {def.bucks}</span>
-  return <span className="price">$ {def.price.toLocaleString()}</span>
+function price(def: { price: number; bucks?: number }, sale?: { coins: number; bucks: number } | null) {
+  if (def.bucks) return <span className="price bucks">{sale && <s>B {def.bucks}</s>} B {sale ? sale.bucks : def.bucks}</span>
+  return <span className="price">{sale && <s>$ {def.price.toLocaleString()}</s>} $ {(sale ? sale.coins : def.price).toLocaleString()}</span>
 }
 
 // Tabs across the top of a menu, sticky while its body scrolls.
@@ -148,6 +148,7 @@ export function ShopPanel() {
   const buildings = useGame((s) => s.buildings)
   const showNeed = useGame((s) => s.showNeed)
   const focus = useGame((s) => s.shopFocus)
+  const deals = useGame((s) => s.deals)
   const focusRef = useRef<HTMLButtonElement>(null)
   const rusty = hasRusty({ buildings })
   const canUpgrade = buildings.some((b) => upgradable(buildingDef(b.def)))
@@ -173,7 +174,8 @@ export function ShopPanel() {
           <div className="cards rows">
             {BUILDINGS.filter((b) => b.unlockLevel < 99 && group.filter(b)).sort((a, b) => Number(b.id === 'rescue') - Number(a.id === 'rescue')).map((b) => {
               const locked = level < b.unlockLevel
-              const broke = coins < b.price
+              const sale = buildPrice({ deals, level }, b.id)
+              const broke = coins < sale.coins
               const owned = !!b.unique && buildings.some((o) => o.def === b.id)
               const highlight = b.id === 'rescue' && !rusty
               const focused = b.id === focus
@@ -183,9 +185,10 @@ export function ShopPanel() {
                   ref={focused ? focusRef : undefined}
                   className={`card ${locked ? 'locked' : ''} ${broke && !locked ? 'broke' : ''} ${highlight ? 'start-here' : ''} ${focused ? 'focus' : ''}`}
                   disabled={owned}
-                  onClick={() => (locked ? showNeed('level', b.unlockLevel, b.name) : broke ? showNeed('coins', b.price - coins, b.name) : setMode('place', b.id))}
+                  onClick={() => (locked ? showNeed('level', b.unlockLevel, b.name) : broke ? showNeed('coins', sale.coins - coins, b.name) : setMode('place', b.id))}
                 >
                   {highlight && <span className="ribbon">START HERE</span>}
+                  {sale.deal && !locked && <span className="ribbon deal">DEAL</span>}
                   <BuildingThumb def={b} />
                   <div className="card-text">
                     <div className="card-name">{b.name}</div>
@@ -199,7 +202,7 @@ export function ShopPanel() {
                     {b.id === 'crew' && <div className="card-stat">Your crew's clubhouse: roster, rank and crew boards</div>}
                     {b.fuelCap && <div className="card-stat">+{b.fuelCap} max fuel</div>}
                   </div>
-                  {owned ? <span className="price">✔ Built</span> : locked ? <span className="price">🔒 Level {b.unlockLevel}</span> : price(b)}
+                  {owned ? <span className="price">✔ Built</span> : locked ? <span className="price">🔒 Level {b.unlockLevel}</span> : price(b, sale.deal && sale)}
                 </button>
               )
             })}
