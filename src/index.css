@@ -968,11 +968,30 @@ button.lvl-item:hover { border-color: var(--accent); transform: translateY(-2px)
 .rr-loot span { font: 18px var(--display); background: #fff8e1; border: 2px solid #ffd54f; color: #8d5a00; border-radius: 14px; padding: 4px 10px; animation: rr-pop .4s cubic-bezier(.2,1.8,.4,1) both; }
 @keyframes rr-pop { from { transform: scale(0); opacity: 0; } }
 .rr-go { min-width: 160px; font-size: 20px; animation: rr-pop .4s ease-out 1.2s both; }
+.rr-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: -4px 0 12px; }
+.rr-stats span { display: flex; flex-direction: column; border-radius: 10px; padding: 4px 2px; background: #f5f7f8; font: 16px var(--display); color: #455a64; animation: rr-pop .35s ease-out .4s both; }
+.rr-stats span.good { background: #e8f5e9; color: #2e7d32; }
+.rr-stats span.bad { background: #ffebee; color: #c62828; }
+.rr-stats small { font: 800 10px Nunito, sans-serif; color: #90a4ae; text-transform: uppercase; letter-spacing: .04em; }
+.rr-stats i { font-style: normal; font-size: 11px; }
+.rr-row { display: flex; gap: 8px; justify-content: center; }
+.rr-row .rr-go { min-width: 0; flex: 1.6; white-space: nowrap; }
+.rr-row .rr-back { flex: 1; font-size: 18px; animation: rr-pop .4s ease-out 1.2s both; }
+/* The shift light: the tach rim and the SHIFT button glow as the needle nears and enters the perfect band. */
+.rf-bottom .tach circle:first-child { transition: stroke .06s; }
+.rf-bottom .tach.soon circle:first-child { stroke: #ffd54f; }
+.rf-bottom .tach.now circle:first-child { stroke: #76ff03; stroke-width: 6; }
+.rf-bottom .tach.now { filter: drop-shadow(0 0 10px rgba(118,255,3,.85)) drop-shadow(0 3px 4px rgba(0,0,0,.35)); }
+.rf-bottom .tach.late circle:first-child { stroke: #ff1744; stroke-width: 5; }
+.race-full .shift-btn.now { background: linear-gradient(#76ff03, #2e7d32); box-shadow: 0 4px 0 rgba(0,0,0,.35), 0 0 22px rgba(118,255,3,.8); }
+.race-full .shift-btn.late { background: linear-gradient(#ff5252, #8e0000); }
 @media (max-height: 500px) {
   .rr-icon { font-size: 40px; margin-top: -34px; }
   .rr-title { font-size: 32px; }
   .rr-card { padding: 10px 20px 12px; }
   .rr-times, .rr-loot { margin-bottom: 8px; }
+  .rr-stats { margin-bottom: 8px; }
+  .rr-stats span { font-size: 14px; padding: 2px; }
 }
 @media (prefers-reduced-motion: reduce) { .rr-bit, .rr-rays { display: none; } .rr-icon { animation: none; } }
 
