@@ -374,7 +374,7 @@ export function PitScene({ me, input, running, onHud, onEnd }: {
       <group ref={car} rotation-y={Math.PI / 2}>
         <CarShadow len={LEN} wid={f.wid * sc} />
         <group scale={sc}>
-          <CarModel body={me.body} model={me.model} color={me.color} finish={me.finish} mods={me.mods} beams={view.beams} />
+          <CarModel body={me.body} model={me.model} color={me.color} finish={me.finish} skin={me.skin} mods={me.mods} beams={view.beams} />
         </group>
       </group>
       {/* Tap targets beside each wheel, and the new tyre waiting by each wheel man. */}

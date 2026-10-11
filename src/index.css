@@ -201,7 +201,7 @@ button.card:hover:not(:disabled) { border-color: var(--accent); }
 /* Bubbles pinned over the 3D scene. */
 .badges { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 10; }
 .anchor { position: absolute; left: 0; top: 0; visibility: hidden; pointer-events: auto; padding-bottom: 9px; will-change: transform; transition: opacity .25s; }
-.anchor.far { opacity: 0; pointer-events: none; }
+.anchor.far, .anchor.under { opacity: 0; pointer-events: none; }
 
 /* Rusty's Rescue gate */
 .card { position: relative; }
@@ -356,6 +356,8 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .thought { font-size: 13px; max-width: 230px; white-space: normal; text-align: left; line-height: 1.25; padding: 5px 10px; }
 .badge-crew { background: #455a64; color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,.4); }
 .badge-rescue { background: #fff3e0; color: #5d4037; }
+.badge-arcade { background: linear-gradient(160deg, #7e57c2, #ec407a); font-size: 20px; padding: 1px 6px; animation: arc-bob 2.4s ease-in-out infinite; }
+@keyframes arc-bob { 50% { translate: 0 -3px; } }
 
 /* Grand Prix */
 .gp-list { display: grid; gap: 10px; }
@@ -705,6 +707,23 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
   .goals-btn.goals-dock { width: 52px; height: 52px; right: calc(10px + var(--sar)); bottom: calc(140px + var(--sab)); border-radius: 14px; }
   .collect-all { width: 52px; height: 52px; right: calc(10px + var(--sar)); bottom: calc(76px + var(--sab)); }
   .collect-ico { font-size: 24px; }
+}
+/* Phones in landscape: a slim column centred over RACE, clear of the top-right icons. */
+@media (max-height: 500px) {
+  .goals-btn.goals-dock { width: 44px; height: 44px; font-size: 20px; border-radius: 12px; right: calc(34px + var(--sar)); bottom: calc(164px + var(--sab)); }
+  .collect-all { width: 48px; height: 48px; right: calc(32px + var(--sar)); bottom: calc(110px + var(--sab)); border-width: 2.5px; }
+  .collect-all::before { inset: 4px; }
+  .collect-ico { font-size: 22px; }
+  .collect-time { font-size: 10px; bottom: -7px; }
+  .collect-all.has-work { animation-name: collect-pulse-sm; }
+  @keyframes collect-pulse-sm { 50% { box-shadow: 0 4px 0 rgba(0,0,0,.3), 0 0 0 4px rgba(255, 213, 79, .45); } }
+  /* Race and gift bells join the icon row instead of a second row under it. */
+  .hud-right { display: grid; grid-template-columns: auto auto; justify-items: end; column-gap: 6px; }
+  .hud-right > .fuel, .hud-right > .fuel-sub { grid-column: 1 / -1; }
+  .hud-right > .hud-right-row:nth-last-child(2) { grid-column: 2; grid-row: 3; }
+  .hud-right > .hud-right-row:last-child { grid-column: 1; grid-row: 3; }
+  .hud-right-row { gap: 4px; }
+  .hud-right-row .challenge-bell, .hud-right-row > button:not(.pill) { width: 34px; height: 34px; font-size: 16px; border-width: 2px; border-radius: 10px; }
 }
 /* Leaderboards and clans */
 .crew-nudge { display: flex; gap: 10px; align-items: center; background: #eceff1; border: 2px dashed #90a4ae; border-radius: 12px; padding: 8px 10px; margin-bottom: 10px; }
@@ -1172,6 +1191,25 @@ button.lvl-item:hover { border-color: var(--accent); transform: translateY(-2px)
 .fin-opt.locked { opacity: .55; }
 .finish-chip { width: 34px; height: 22px; border-radius: 8px; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
 
+/* Skins: one scrolling row of animated chips edged in their tier colour, try-on bar under it. */
+.garage-detail { min-width: 0; }
+.skin-row { display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 6px; scroll-snap-type: x proximity; scrollbar-width: thin; }
+.skin-opt { flex: none; width: 76px; scroll-snap-align: start; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px; border-radius: 12px; border: 1.5px solid #dfe5ea; border-bottom: 3px solid var(--tier, #cfd8dc); background: #fff; font: 13px var(--display); color: #37474f; }
+.skin-opt b { font-weight: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.skin-opt small { font: 700 11px Nunito, sans-serif; color: #607d8b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.skin-opt.sel { border-color: var(--blue); box-shadow: 0 0 0 2px var(--blue) inset; }
+.skin-opt.locked .skin-chip { filter: saturate(.35) brightness(.8); }
+.skin-chip { position: relative; width: 40px; height: 40px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35), 0 0 0 1.5px var(--tier, transparent); overflow: hidden; background-size: cover; }
+.skin-chip::after { content: ''; position: absolute; inset: -50%; background: linear-gradient(115deg, transparent 40%, rgba(255,255,255,.55) 50%, transparent 60%); animation: skin-shine 2.6s ease-in-out infinite; }
+.skin-chip.none { display: grid; place-items: center; background: var(--seg); color: #90a4ae; font-size: 18px; }
+.skin-chip.none::after { display: none; }
+@keyframes skin-shine { 0%, 35% { transform: translateX(-60%); } 75%, 100% { transform: translateX(60%); } }
+.skin-try .skin-tier { font: 800 11px Nunito, sans-serif; text-transform: uppercase; letter-spacing: .04em; }
+.skin-blurb { color: #607d8b; }
+@media (max-width: 520px) { .skin-blurb { display: none; } }
+.skin-how { flex: none; font: 800 12px Nunito, sans-serif; color: #607d8b; }
+@media (prefers-reduced-motion: reduce) { .skin-chip::after { animation: none; display: none; } }
+
 /* Collection book: sets of car tiles, silhouettes for missing cars. */
 .book { display: flex; flex-direction: column; gap: 8px; }
 .book-progress { display: flex; align-items: center; gap: 10px; font: 16px var(--display); }
@@ -1304,6 +1342,7 @@ button.book-car { font: inherit; color: inherit; }
 .tier small { color: #90a4ae; font-size: 11px; }
 .tier .tier-prize { display: flex; align-items: center; gap: 2px; white-space: nowrap; }
 .tier .tier-prize .ico { transform: scale(.8); }
+.tier .tier-skin { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid #fff; box-shadow: 0 0 0 1px #c77dff, 0 1px 2px rgba(0,0,0,.3); margin-right: 2px; }
 .tier em { font-style: normal; font-size: 11px; color: #2e7d32; }
 .tier:disabled { opacity: 1; }
 .tier.ready { border-color: #43a047; background: #e8f5e9; box-shadow: 0 0 0 2px #a5d6a7; animation: pulse 1.6s infinite; }
@@ -1621,5 +1660,5 @@ button.book-car { font: inherit; color: inherit; }
 .chest.ready .chest-icon { animation: boxwiggle 1.2s ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
-  .overlay:has(> .panel), .overlay > .panel, .overlay.closing, .overlay.closing > .panel, .paint-sweep::before, .chest.ready .chest-icon { animation: none; }
+  .overlay:has(> .panel), .overlay > .panel, .overlay.closing, .overlay.closing > .panel, .paint-sweep::before, .chest.ready .chest-icon, .badge-arcade { animation: none; }
 }
