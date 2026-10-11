@@ -1768,3 +1768,6 @@ button.book-car { font: inherit; color: inherit; }
   .fr-incoming .leader-acts > .buy:last-child { flex: 0 0 auto; padding-left: 14px; padding-right: 14px; }
 }
 .visit-user { font-weight: 800; color: #607d8b; }
+
+/* The CARS window's four tabs fit a small phone without their emoji. */
+@media (max-width: 400px) { .tab-emo { display: none; } }

@@ -44,9 +44,7 @@ export function BottomBar() {
     <>
       <div className="bottom-bar">
         <button className={`icon-btn${pulse('shop')}`} onClick={() => openPanel('shop')}><span className="i i-shop"><Icon name="shop" /></span>SHOP</button>
-        <button className="icon-btn crates-btn" onClick={() => openPanel('crates')}><span className="i i-crates"><Icon name="crate" /></span>CRATES</button>
-        <button className="icon-btn" onClick={() => openPanel('showroom')}><span className="i i-showroom"><Icon name="car" />{setsReady > 0 && <span className="btn-dot">{setsReady}</span>}</span>SHOWROOM</button>
-        <button className="icon-btn" onClick={() => openPanel('garage')}><span className="i i-garage"><Icon name="wrench" /></span>GARAGE</button>
+        <button className="icon-btn" onClick={() => openCars(setsReady > 0)}><span className="i i-showroom"><Icon name="car" />{setsReady > 0 && <span className="btn-dot">{setsReady}</span>}</span>CARS</button>
         <button className="icon-btn" onClick={() => openPanel('friends')}><span className="i i-friends"><Icon name="friends" />{crewChests > 0 && <span className="btn-dot">{crewChests}</span>}</span>FRIENDS</button>
         <button className="icon-btn" onClick={() => openPanel('chat')}><span className="i i-chat"><Icon name="chat" />{crewChat > 0 ? <span className="btn-dot">{crewChat > 9 ? '9+' : crewChat}</span> : globalChat && <span className="btn-dot new" />}</span>CHAT</button>
         <button className="icon-btn" onClick={() => setMode('road')}><span className="i i-edit"><Icon name="cone" /></span>EDIT</button>
@@ -259,6 +257,35 @@ export function ShopPanel() {
 
 // The Showroom reopens on the tab it was left on.
 let lastShowroomTab: 'shop' | 'book' = 'shop'
+// The CARS button reopens whichever of the Garage and Showroom was used last.
+let lastCars: 'garage' | 'showroom' = 'garage'
+
+// Opens the cars window; a ready collection set jumps straight to the Collection tab.
+function openCars(setsReady: boolean) {
+  if (setsReady) lastShowroomTab = 'book'
+  useGame.getState().openPanel(setsReady ? 'showroom' : lastCars)
+}
+
+type CarsTab = 'garage' | 'shop' | 'book' | 'crates'
+
+// My Garage, the Showroom and the Crate Depot share one row of tabs, opened from the CARS button.
+function CarsTabs({ current, onShowroom }: { current: CarsTab; onShowroom?: (t: 'shop' | 'book') => void }) {
+  const openPanel = useGame((s) => s.openPanel)
+  const ready = useGame((s) => readySets(s).length)
+  const tabs: { id: CarsTab; label: React.ReactNode }[] = [
+    { id: 'garage', label: <><span className="tab-emo">🔧 </span>My Cars</> },
+    { id: 'shop', label: <><span className="tab-emo">🚘 </span>For Sale</> },
+    { id: 'book', label: <><span className="tab-emo">📖 </span>Collection{ready > 0 && <span className="tab-dot">{ready}</span>}</> },
+    { id: 'crates', label: <><span className="tab-emo">📦 </span>Crates</> },
+  ]
+  const pick = (t: CarsTab) => {
+    if (t === 'garage' || t === 'crates') return openPanel(t)
+    if (onShowroom) return onShowroom(t)
+    lastShowroomTab = t
+    openPanel('showroom')
+  }
+  return <SheetTabs items={tabs} value={current} onChange={pick} />
+}
 
 export function ShowroomPanel() {
   const level = useGame((s) => s.level)
@@ -270,23 +297,18 @@ export function ShowroomPanel() {
   const { body, focus } = useShopFocus()
   const look = inspect ? carDef(inspect) : null
   const [tab, setTab] = useState<'shop' | 'book'>(() => lastShowroomTab)
+  useEffect(() => { lastCars = 'showroom' }, [])
   const pickTab = (t: 'shop' | 'book') => {
     lastShowroomTab = t
     setTab(t)
   }
-  const ready = useGame((s) => readySets(s).length)
-  const owned = useGame((s) => CARS.filter((c) => s.cars.some((o) => o.model === c.id)).length)
   const find = useFindCar((model) => {
     pickTab('shop')
     useGame.setState({ shopFocus: model })
   })
-  const tabs = [
-    { id: 'shop' as const, label: '🚘 For sale' },
-    { id: 'book' as const, label: <>📖 Collection {owned}/{CARS.length}{ready > 0 && <span className="tab-dot">{ready}</span>}</> },
-  ]
   return (
     <Panel title="Showroom" wide>
-      <SheetTabs items={tabs} value={tab} onChange={pickTab} />
+      <CarsTabs current={tab} onShowroom={pickTab} />
       {tab === 'book' && <CollectionBook onFind={find} />}
       {tab === 'shop' && <>
       {!rusty && (
@@ -398,6 +420,7 @@ export function GaragePanel() {
   const sell = useGame((s) => s.sellCar)
   const car = cars.find((c) => c.uid === selected) ?? cars[0]
   const def = car && carDef(car.model)
+  useEffect(() => { lastCars = 'garage' }, [])
   const [tab, setTab] = useState<GarageTab>(() => {
     const t = nextGarageTab
     nextGarageTab = 'tune'
@@ -438,6 +461,7 @@ export function GaragePanel() {
   }, [car?.uid, pi])
   return (
     <Panel title={`My Garage · ${cars.length} cars · ⚡${garagePower(cars)}`} wide>
+      <CarsTabs current="garage" />
       <div className={picking ? 'garage picking' : 'garage'}>
         <div className="garage-list">
           {cars.map((c) => {
