@@ -41,6 +41,7 @@ type Props = {
   venue: Venue
   weatherSeed?: string // a live race's id, so both racers get the same weather
   weather?: WeatherState // the race's weather, already rolled (wins over weatherSeed)
+  night?: boolean // race under the floodlights whatever the clock says (Pro Tour midnight legs)
 }
 
 export function SkyDome({ tint = '#ffffff' }: { tint?: string }) {
@@ -406,20 +407,20 @@ function StreetDressing({ len, city }: { len: number; city: boolean }) {
 
 // The drag strip, seen from a chase camera. On Main Street it's lined with the
 // player's own town; the other venues bring their own scenery.
-export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, weather: given }: Props) {
+export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, weather: given, night: midnight }: Props) {
   const city = venue.id === 'main'
   const meRef = useRef<Group>(null)
   const themRef = useRef<Group>(null)
   const { camera, size } = useThree()
   const len = track * SCALE
   const slots = useStreet(len)
-  const night = useMemo(() => nightAmount(dayPhase()), [])
+  const night = useMemo(() => (midnight ? 1 : nightAmount(dayPhase())), [midnight])
   // The venue's weather for this race (see raceWeather).
   // The race screen passes the one it races on, so the grip matches the sky.
   const weather = useMemo(() => given ?? raceWeather(venue.id, weatherSeed), [given, venue.id, weatherSeed])
   const beams = night > 0.3 || gloomOf(weather) > 0.5
   // Same lights and colour grade as the town at this time of day.
-  const look = useMemo(() => weatherLook(lookFor(night, duskAmount(dayPhase())), weather), [night, weather])
+  const look = useMemo(() => weatherLook(lookFor(night, midnight ? 0 : duskAmount(dayPhase())), weather), [night, midnight, weather])
   // The race fills the screen, so stop drawing the town underneath while racing.
   useEffect(() => holdTown(), [])
   const asphalt = useMemo(() => {
@@ -483,7 +484,7 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
       <directionalLight position={[5, 10, 2]} intensity={look.sunIntensity * 0.85} color={look.sun} />
       <SkyEnv />
       <PostFx look={look} />
-      <RaceWeather w={weather} look={look} />
+      <RaceWeather w={weather} look={look} night={night} />
       {/* Ground, sidewalks and the street itself. */}
       <mesh rotation-x={-Math.PI / 2} position={[0, LAYER.outer, len / 2]}>
         <planeGeometry args={[80, len + 100]} />

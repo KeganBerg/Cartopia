@@ -21,6 +21,8 @@ import { carGrip, conditions, conditionsNote, gripMul, spinning } from '../game/
 import { TrialTab, TrialResult, beginTrialRun, type TrialRun } from './TimeTrial'
 import { claim as claimVisitor, leave as leaveVisitor, setRacing, type Visitor } from '../lib/visitors'
 import { RivalCard, RivalResult, type RivalMatch, type RivalBonus } from './Rivals'
+import { TOUR_RACES, tourLeg, tourLegOf, tourIsBoss, tourRivalPi, tourShift, tourSkills, tourRivalName, tourPrize, tourLegBonus } from '../game/tour'
+import type { WeatherKind } from '../game/weather'
 
 // skill: the rival car's race skill. AI rivals use it; live players use theirs on their own device.
 // shift: how cleanly an AI rival shifts, 0 (sloppy) to 1 (always perfect, the default).
@@ -89,7 +91,7 @@ async function fetchOnlineRivals(): Promise<Rival[]> {
 // How long a live race waits for the other player before offering to call it off.
 const JOIN_PATIENCE_MS = 30000
 
-type RaceTab = 'quick' | 'campaign' | 'gp' | 'trial'
+type RaceTab = 'quick' | 'campaign' | 'tour' | 'gp' | 'trial'
 let nextRaceTab: RaceTab = 'quick'
 // A street racer visiting town (src/lib/visitors.ts): the race opens straight away, at no fuel.
 let nextStreet: Visitor | null = null
@@ -115,6 +117,7 @@ export function RacePanel() {
   const [race, setRace] = useState<Rival | null>(null)
   const [gpRace, setGpRace] = useState<{ series: GpSeries; rival: Rival; prize: number } | null>(null)
   const [cRace, setCRace] = useState<{ chapter: CampaignChapter; race: number; rival: Rival; prize: number } | null>(null)
+  const [tRace, setTRace] = useState<{ race: number; rival: Rival; prize: number } | null>(null)
   const [tab, setTab] = useState<RaceTab>(() => {
     const t = nextRaceTab
     nextRaceTab = 'quick'
@@ -133,6 +136,7 @@ export function RacePanel() {
   const rvBonus = useRef<RivalBonus>(null)
   const gpResult = useGame((s) => s.gpResult)
   const campaignResult = useGame((s) => s.campaignResult)
+  const tourResult = useGame((s) => s.tourResult)
 
   const livePlayers = useLive((l) => l.players)
   const liveSignedIn = useLive((l) => l.signedIn)
@@ -256,6 +260,24 @@ export function RacePanel() {
     )
   }
 
+  if (tRace && car) {
+    const leg = tourLeg(tourLegOf(tRace.race))
+    const step = tRace.race % TOUR_RACES
+    return (
+      <DragRace
+        car={car}
+        rival={tRace.rival}
+        prize={tRace.prize}
+        venueId={leg.venue}
+        night={leg.night}
+        weatherSeed={`tour-${tRace.race}`}
+        title={`${leg.night ? '🌙' : '🌍'} Pro Tour · Leg ${leg.index + 1} · ${tourIsBoss(tRace.race) ? 'Boss race' : `Race ${step + 1} of ${TOUR_RACES}`}`}
+        onFinish={(won) => tourResult(won)}
+        onExit={() => { setTRace(null); setTab('tour') }}
+      />
+    )
+  }
+
   function startRival(match: RivalMatch, n = 0) {
     if (waiting()) return
     if (!spendFuel(RACE_FUEL)) return useGame.getState().showNeed('fuel', RACE_FUEL - useGame.getState().fuel, 'a rival race')
@@ -272,7 +294,7 @@ export function RacePanel() {
   return (
     <Panel title="Drag Race" wide>
       <SheetTabs
-        items={[{ id: 'quick', label: '🏁 Quick race' }, { id: 'campaign', label: '🗺️ Campaign' }, { id: 'gp', label: '🏆 Grand Prix' }, { id: 'trial', label: '⏱️ Time trial' }, { id: 'arcade', label: '🕹️ Arcade' }, { id: 'top', label: '🏅 Top racers' }] as const}
+        items={[{ id: 'quick', label: '🏁 Quick race' }, { id: 'campaign', label: '🗺️ Campaign' }, { id: 'tour', label: '🌍 Pro Tour' }, { id: 'gp', label: '🏆 Grand Prix' }, { id: 'trial', label: '⏱️ Time trial' }, { id: 'arcade', label: '🕹️ Arcade' }, { id: 'top', label: '🏅 Top racers' }] as const}
         value={tab}
         onChange={(t) => (t === 'top' ? useGame.getState().openPanel('leaders') : t === 'arcade' ? useGame.getState().openPanel('arcade') : setTab(t))}
       />
@@ -296,11 +318,19 @@ export function RacePanel() {
         </button>
       ))}
       {tab === 'campaign' ? (
-        <Campaign onRace={(chapter, race, rival, prize) => {
+        <Campaign onTour={() => setTab('tour')} onRace={(chapter, race, rival, prize) => {
           if (waiting()) return
           if (!spendFuel(RACE_FUEL)) return useGame.getState().showNeed('fuel', RACE_FUEL - useGame.getState().fuel, 'a campaign race')
           setCRace({ chapter, race, rival, prize })
         }} />
+      ) : tab === 'tour' ? (
+        <Tour
+          onCampaign={() => setTab('campaign')}
+          onRace={(race, rival, prize) => {
+            if (waiting()) return
+            if (!spendFuel(RACE_FUEL)) return useGame.getState().showNeed('fuel', RACE_FUEL - useGame.getState().fuel, 'a Pro Tour race')
+            setTRace({ race, rival, prize })
+          }} />
       ) : tab === 'trial' ? (
         car && <TrialTab myPi={pi(car)} onRun={startTrial} />
       ) : tab === 'gp' ? (
@@ -424,7 +454,7 @@ function Stars({ n, big }: { n: number; big?: boolean }) {
   return <span className={big ? 'stars big' : 'stars'} aria-label={`${n} of 3 stars`}>{[0, 1, 2].map((i) => <i key={i} className={i < n ? 'on' : ''}>★</i>)}</span>
 }
 
-function Campaign({ onRace }: { onRace: (ch: CampaignChapter, race: number, r: Rival, prize: number) => void }) {
+function Campaign({ onRace, onTour }: { onRace: (ch: CampaignChapter, race: number, r: Rival, prize: number) => void; onTour: () => void }) {
   const level = useGame((s) => s.level)
   const done = useGame((s) => s.campaign)
   const showNeed = useGame((s) => s.showNeed)
@@ -475,7 +505,10 @@ function Campaign({ onRace }: { onRace: (ch: CampaignChapter, race: number, r: R
         {!opened(sel) ? (
           <div className="camp-locked">
             {level < ch.unlockLevel
-              ? <button className="buy small alt" onClick={() => showNeed('level', ch.unlockLevel, ch.name)}>🔒 Opens at level {ch.unlockLevel}</button>
+              ? <div className="camp-locked-row">
+                  <button className="buy small alt" onClick={() => showNeed('level', ch.unlockLevel, ch.name)}>🔒 Opens at level {ch.unlockLevel}</button>
+                  {campaignCleared(done, CAMPAIGN[0]) && <button className="buy small" onClick={onTour}>🌍 Race the Pro Tour</button>}
+                </div>
               : <span>🔒 Beat {CAMPAIGN[sel - 1].rivals[CAMPAIGN_RACES - 1]} to open</span>}
           </div>
         ) : (
@@ -506,6 +539,116 @@ function Campaign({ onRace }: { onRace: (ch: CampaignChapter, race: number, r: R
   )
 }
 
+function tourRival(race: number): Rival {
+  const target = tourRivalPi(race)
+  const car = carNear(target)
+  const leg = tourLegOf(race)
+  return {
+    id: `tour-${race}`, town: tourRivalName(race), level: Math.min(99, 3 + leg * 2 + (race % TOUR_RACES)), carName: car.name, color: car.colors[race % car.colors.length],
+    pi: target, online: false, body: car.body, skill: tourSkills(race) ? car.skill : undefined, shift: tourShift(race), boss: tourIsBoss(race),
+  }
+}
+
+const SKY_ICON: Record<WeatherKind, string> = { clear: '☀️', rain: '🌧️', storm: '⛈️', drizzle: '🌦️', fog: '🌫️', wind: '💨', snow: '🌨️', blizzard: '❄️', dust: '🌪️' }
+
+// Pro Tour (game/tour.ts): the endless ladder. Shows the leg being raced, the legs
+// either side of it on a strip, and the five races of the current leg.
+function Tour({ onRace, onCampaign }: { onRace: (race: number, r: Rival, prize: number) => void; onCampaign: () => void }) {
+  const done = useGame((s) => s.campaign)
+  const won = useGame((s) => s.tour ?? 0)
+  const open = campaignCleared(done, CAMPAIGN[0])
+  const cur = tourLegOf(won)
+  const leg = tourLeg(cur)
+  const v = venueById(leg.venue)
+  const first = cur * TOUR_RACES
+  // The next race's sky, rolled from its number so it matches the race itself.
+  const sky = useMemo(() => raceWeather(leg.venue, `tour-${won}`).kind, [leg.venue, won])
+  const strip = Array.from({ length: 6 }, (_, i) => Math.max(0, cur - 2) + i)
+  return (
+    <div className="camp tour">
+      <div className="camp-progress" title="Pro Tour races won">
+        <span>🌍 {won.toLocaleString()} tour wins · Leg {cur + 1}</span>
+        <i style={{ width: `${((won - first) / TOUR_RACES) * 100}%` }} />
+      </div>
+      <div className="camp-map">
+        {strip.map((k) => {
+          const l = tourLeg(k)
+          return (
+            <div key={k} className={`camp-node${k === cur ? ' sel' : ''}${k < cur ? ' done' : ''}${k > cur ? ' locked' : ''}${l.night ? ' night' : ''}`}>
+              <span className="camp-node-ico">{k < cur ? '✔' : venueById(l.venue).icon}</span>
+              <b>{k + 1}</b>
+              <small>{l.night ? '🌙' : 'PI'} {tourRivalPi(k * TOUR_RACES + TOUR_RACES - 1)}</small>
+            </div>
+          )
+        })}
+      </div>
+      <div className={`camp-chapter venue-${leg.venue}${leg.night ? ' night' : ''}`}>
+        <div className="camp-banner">
+          <span className="camp-banner-ico">{v.icon}</span>
+          <div>
+            <b>{leg.night ? `${v.name} at Midnight` : `${v.name} ${leg.name}`}</b>
+            <small>Leg {cur + 1} · {leg.night ? '🌙 Under the lights' : 'Daytime'} · {SKY_ICON[sky]}</small>
+          </div>
+          <div className="camp-rewards">
+            <span title="Beat the boss for this bonus">👑 ${tourLegBonus(cur).toLocaleString()}</span>
+          </div>
+        </div>
+        {!open ? (
+          <div className="camp-locked">
+            <button className="buy small alt" onClick={onCampaign}>🔒 Clear Back Streets to open</button>
+          </div>
+        ) : (
+          <div className="camp-races">
+            {Array.from({ length: TOUR_RACES }, (_, i) => {
+              const race = first + i
+              const r = tourRival(race)
+              const beat = race < won
+              const next = race === won
+              const prize = tourPrize(race)
+              return (
+                <div key={race} className={`camp-race${r.boss ? ' boss' : ''}${!beat && !next ? ' locked' : ''}${next ? ' next' : ''}`}>
+                  <span className="camp-step">{beat ? '✔' : r.boss ? '👑' : i + 1}</span>
+                  <CarThumb size="xs" color={r.color} body={r.body} />
+                  <div className="camp-who">
+                    <b>{r.town}</b>
+                    <small>PI {r.pi}{r.skill && <span className="rival-skill" title={`${SKILLS[r.skill].name}: ${SKILLS[r.skill].text}`}> {SKILLS[r.skill].icon}</span>}</small>
+                  </div>
+                  {beat ? <span className="tour-beat">Beaten</span> : (
+                    <button className="buy small" disabled={!next} onClick={() => onRace(race, r, prize)}>
+                      {next ? `🏁 $${prize.toLocaleString()}` : '🔒'}
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export function TourPrizePopup() {
+  const prize = useGame((s) => s.tourPrize)
+  const close = useGame((s) => s.closeTourPrize)
+  if (!prize) return null
+  const next = tourLeg(prize.leg + 1)
+  const nv = venueById(next.venue)
+  return (
+    <div className="overlay prize-overlay">
+      <div className="prize">
+        <h2>Leg {prize.leg + 1} cleared!</h2>
+        <div className="mystery-box" aria-hidden>👑</div>
+        <p className="camp-prize"><span>💵 +${prize.coins.toLocaleString()}</span></p>
+        <p>Next up: {nv.icon} {next.night ? `${nv.name} at Midnight 🌙` : `${nv.name} ${next.name}`}</p>
+        <div className="row">
+          <button className="buy" onClick={close}>Keep going!</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function CampaignPrizePopup() {
   const prize = useGame((s) => s.campaignPrize)
   const close = useGame((s) => s.closeCampaignPrize)
@@ -524,7 +667,7 @@ export function CampaignPrizePopup() {
           {prize.trophies > 0 && <span>🏆 +{prize.trophies}</span>}
         </p>
         {prize.cleared && prize.perfect && <p>Plus the three-star bonus. Flawless!</p>}
-        {prize.cleared && <p>{next ? `Next up: ${next.name}${next.unlockLevel > useGame.getState().level ? ` (opens at level ${next.unlockLevel})` : ''}.` : "You've beaten the whole campaign. Go back for three stars everywhere!"}</p>}
+        {prize.cleared && <p>{next ? `Next up: ${next.name}${next.unlockLevel > useGame.getState().level ? ` (opens at level ${next.unlockLevel}). The Pro Tour has races until then` : ''}.` : "You've beaten the whole campaign. The Pro Tour never ends!"}</p>}
         <div className="row">
           <button className="buy" onClick={close}>Awesome!</button>
         </div>
@@ -590,7 +733,7 @@ const step = stepRacer
 // trial: a solo run against a ghost that finishes in `target` seconds; the run ends when you cross the line.
 // resultView: replaces the usual result card.
 type Result = { won: boolean; myTime: number; theirTime: number }
-export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title, venueId, trial, resultView }: { car: OwnedCar; rival: Rival; onExit: () => void; live?: LiveRace; prize?: number; onFinish?: (won: boolean, myTime: number, theirTime: number) => number | void; title?: string; venueId?: string; trial?: { target: number }; resultView?: (r: Result) => ReactNode }) {
+export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title, venueId, trial, resultView, night, weatherSeed }: { car: OwnedCar; rival: Rival; onExit: () => void; live?: LiveRace; prize?: number; onFinish?: (won: boolean, myTime: number, theirTime: number) => number | void; title?: string; venueId?: string; trial?: { target: number }; resultView?: (r: Result) => ReactNode; night?: boolean; weatherSeed?: string }) {
   // A signed-in live rival's PI comes from the server, not from their browser.
   const [serverRivalPi, setServerRivalPi] = useState<number | null>(null)
   const rival = useMemo(() => (serverRivalPi === null ? shownRival : { ...shownRival, pi: serverRivalPi }), [shownRival, serverRivalPi])
@@ -614,8 +757,9 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   // Somewhere different each race; both sides of a live race get the same place.
   const [venue] = useState(() => (venueId ? venueById(venueId) : pickVenue(live?.raceId)))
   // The sky over the strip, rolled once: a live race from its id (both racers match), the weekly
-  // time trial from its week (everyone races the same conditions), anything else from the town.
-  const [weather] = useState(() => raceWeather(venue.id, live?.raceId ?? (trial ? `trial-${trialWeek()}` : undefined)))
+  // time trial from its week (everyone races the same conditions), a Pro Tour race from its number
+  // (so the card can show it), anything else from the town.
+  const [weather] = useState(() => raceWeather(venue.id, live?.raceId ?? (trial ? `trial-${trialWeek()}` : weatherSeed)))
   // What the weather and venue do to each car's grip (see grip.ts). AI rivals race on stock tires.
   const grip = useMemo(() => conditions(weather.kind, venue.id, carGrip(def, car.upgrades, car.mods), car.mods), [weather, venue, def, car.upgrades, car.mods])
   const theirGrip = useMemo(() => conditions(weather.kind, venue.id, CARS.find((c) => c.name === shownRival.carName)?.grip ?? 50), [weather, venue, shownRival.carName])
@@ -927,7 +1071,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   return (
     <div className="race-full">
       <Canvas className="rf-canvas" camera={{ position: [0.4, 2.2, -4], fov: 55, near: 0.3, far: 150 }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
-        <RaceScene track={TRACK} me={me} them={them} mine={{ body: def.body, model: car.model, color: car.color, finish: car.finish, mods: car.mods }} theirs={{ body: rival.body, color: rival.color, mods: rival.mods }} venue={venue} weather={weather} />
+        <RaceScene track={TRACK} me={me} them={them} mine={{ body: def.body, model: car.model, color: car.color, finish: car.finish, mods: car.mods }} theirs={{ body: rival.body, color: rival.color, mods: rival.mods }} venue={venue} weather={weather} night={night} />
       </Canvas>
       <div className="rf-top">
         <h2>{title ?? `Drag Race vs ${rival.town}`}</h2>
