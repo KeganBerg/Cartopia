@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useGame, hasRusty } from '../game/store'
-import { garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, PAINTS, STRIPES, PAINT_COST, STRIPE_COST, carDef, performance, upgradeCost, buildingDef, upgradable, loves, readySets, type BuildingDef } from '../game/data'
+import { garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, carDef, performance, upgradeCost, buildingDef, upgradable, loves, readySets, type BuildingDef } from '../game/data'
 import { CarInspect, CarPreview } from '../scene/CarPreview'
 import { CollectAllButton } from './CollectAll'
 import { rotateCurrent } from '../game/placement'
@@ -8,6 +8,8 @@ import { BuildingThumb, CarThumb } from '../scene/BuildingPreview'
 import { ShopUpgrades } from './Upgrade'
 import { ModShop, withMod } from './Mods'
 import { CollectionBook, useFindCar } from './Collection'
+import { PaintShop, jobOf } from './Paint'
+import type { PaintJob } from '../game/data'
 
 // Phones and tablets: no hover, so placing takes a preview tap first.
 const TOUCH = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
@@ -319,8 +321,6 @@ export function GaragePanel() {
   const select = useGame((s) => s.selectCar)
   const upgrade = useGame((s) => s.upgradeCar)
   const sell = useGame((s) => s.sellCar)
-  const paint = useGame((s) => s.paintCar)
-  const stripeCar = useGame((s) => s.stripeCar)
   const car = cars.find((c) => c.uid === selected) ?? cars[0]
   const def = car && carDef(car.model)
   const [tab, setTab] = useState<'tune' | 'mods' | 'paint'>('tune')
@@ -328,6 +328,10 @@ export function GaragePanel() {
   const [trying, setTrying] = useState<{ car: string; mod: string } | null>(null)
   const tryMod = trying && trying.car === car?.uid && tab === 'mods' ? trying.mod : null
   const [inspect, setInspect] = useState(false)
+  // A paint job being tried on, cleared when another car is picked.
+  const [painting, setPainting] = useState<{ car: string; job: PaintJob } | null>(null)
+  const tryJob = painting && painting.car === car?.uid && tab === 'paint' ? painting.job : null
+  const look = car && def && { body: def.body, ...(tryJob ?? jobOf(car)), mods: withMod(car.mods, tryMod) }
   return (
     <Panel title={`My Garage · ${cars.length} cars · ⚡${garagePower(cars)}`} wide>
       <div className="garage">
@@ -336,7 +340,7 @@ export function GaragePanel() {
             const d = carDef(c.model)
             return (
               <button key={c.uid} className={c.uid === car?.uid ? 'garage-item sel' : 'garage-item'} onClick={() => select(c.uid)}>
-                <CarThumb size="sm" color={c.color} body={d.body} stripe={c.stripe} mods={c.mods} />
+                <CarThumb size="sm" color={c.color} finish={c.finish} body={d.body} stripe={c.stripe} mods={c.mods} />
                 <span>{d.name}{c.plate && <span className="mini-plate">{c.plate}</span>}</span>
                 <small>PI {performance(d, c.upgrades, c.mods)}</small>
               </button>
@@ -348,10 +352,10 @@ export function GaragePanel() {
             {inspect ? (
               <>
                 <div className="car-preview" />
-                <CarInspect title={def.name} body={def.body} color={car.color} stripe={car.stripe} mods={withMod(car.mods, tryMod)} onClose={() => setInspect(false)} />
+                <CarInspect title={def.name} {...look!} onClose={() => setInspect(false)} />
               </>
             ) : (
-              <CarPreview body={def.body} color={car.color} stripe={car.stripe} mods={withMod(car.mods, tryMod)} onExpand={() => setInspect(true)} />
+              <CarPreview {...look!} onExpand={() => setInspect(true)} />
             )}
             <h3>{def.name}{car.plate && <span className="mini-plate">{car.plate}</span>}</h3>
             <div className="pi">Performance Index <b>{performance(def, car.upgrades, car.mods)}</b></div>
@@ -378,32 +382,7 @@ export function GaragePanel() {
                 </div>
               )
             })}
-            {tab === 'paint' && <>
-            <h4>Paint shop <small>${PAINT_COST} · neon and gold B1</small></h4>
-            <div className="paints">
-              {PAINTS.map((p) => (
-                <button
-                  key={p.color}
-                  title={`${p.name}${p.bucks ? ' (1 buck)' : ''}`}
-                  className={p.color === car.color ? 'dot big sel' : p.bucks ? 'dot big premium' : 'dot big'}
-                  style={{ background: p.color }}
-                  onClick={() => paint(car.uid, p.color)}
-                />
-              ))}
-            </div>
-            <h4>Racing stripes <small>${STRIPE_COST}</small></h4>
-            <div className="paints">
-              {STRIPES.map((st) => (
-                <button
-                  key={st ?? 'none'}
-                  title={st ? 'Stripe' : 'No stripe'}
-                  className={(car.stripe ?? null) === st ? 'dot big sel' : 'dot big'}
-                  style={{ background: st ? `linear-gradient(90deg, ${car.color} 0 35%, ${st} 35% 45%, ${car.color} 45% 55%, ${st} 55% 65%, ${car.color} 65%)` : car.color }}
-                  onClick={() => stripeCar(car.uid, st)}
-                >{st ? '' : '∅'}</button>
-              ))}
-            </div>
-            </>}
+            {tab === 'paint' && <PaintShop car={car} job={tryJob ?? jobOf(car)} setJob={(job) => setPainting(job ? { car: car.uid, job } : null)} />}
             <button className="sell" onClick={() => sell(car.uid)}>Sell for ${Math.floor(def.price * 0.5).toLocaleString()}</button>
           </div>
         )}
