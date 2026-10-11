@@ -135,17 +135,6 @@ html {
 :root .lvl-chip { background: linear-gradient(#34507f, #1f3358); border: 2px solid var(--line); box-shadow: inset 0 1.5px 0 rgba(255,255,255,.2), 0 2px 0 rgba(0,0,0,.3); text-shadow: 0 1.5px 0 rgba(0,0,0,.4); }
 :root .rusty-lock { border: 2.5px solid var(--accent); box-shadow: 0 3px 0 #f0a400; }
 
-/* Segmented tabs (Rusty's Rescue): same chunky look as .sheet-tabs */
-:root .tabs { background: none; padding: 0; gap: 6px; }
-:root .tab { background: #fff; color: #4a6283; border: 2px solid #b9cde8; border-radius: 12px; box-shadow: 0 2px 0 #b9cde8; }
-:root .tab.sel { background: linear-gradient(#ffd84a, #ffa41a); color: var(--line); border-color: var(--line); box-shadow: inset 0 2px 0 rgba(255,255,255,.5), 0 3px 0 rgba(0,0,0,.3); }
-
-/* Prices on grid cards read as buttons too */
-:root .spot-card > .price { background: linear-gradient(#8ef05c, #2fae35); color: #fff; border: 2px solid #1d6b22; border-radius: 12px; padding: 3px 12px; text-shadow: 0 1.5px 0 rgba(0,0,0,.35); box-shadow: inset 0 2px 0 rgba(255,255,255,.4), 0 2px 0 rgba(0,0,0,.2); }
-:root .spot-card.broke > .price { background: linear-gradient(#ff8a8a, #d6283b); border-color: #8a1020; color: #fff; }
-:root .bay { border-color: #b9cde8; background: #fff; }
-:root .bay.done { border-color: #2fae35; background: #effbe9; }
-
 /* Daily bonus days */
 :root .day.today { background: linear-gradient(#fff3b0, #ffd84a); border-color: var(--line); box-shadow: 0 3px 0 rgba(0,0,0,.3); }
 
