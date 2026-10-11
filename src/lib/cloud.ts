@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import { refreshClanBadge } from './clans'
-import { useGame, saveOf, type SaveState } from '../game/store'
+import { useGame, saveOf, starterTown, type SaveState } from '../game/store'
 import { carDef, performance, garagePower } from '../game/data'
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
@@ -29,9 +29,9 @@ function writeOwner(uid: string) {
   }
 }
 
-function backupLocal(s: SaveState) {
+function backupLocal(s: SaveState, owner: string | null) {
   try {
-    localStorage.setItem(BACKUP_KEY, JSON.stringify({ at: Date.now(), owner: readOwner(), save: s }))
+    localStorage.setItem(BACKUP_KEY, JSON.stringify({ at: Date.now(), owner, save: s }))
   } catch {
     // Best effort only.
   }
@@ -151,19 +151,30 @@ async function syncOnSignIn(uid: string) {
   }
   const cloud = data?.state as SaveState | undefined
   const local = saveOf(useGame.getState())
-  const localIsTheirs = readOwner() === uid
+  const owner = readOwner()
+  const localIsTheirs = owner === uid
+  // A guest town (no owner) can move into a brand-new account; another account's town never can.
+  const localMayMove = owner === null || localIsTheirs
   const keepLocal =
-    !cloud ||
-    (localIsTheirs && local.updatedAt > cloud.updatedAt && progressScore(local) >= progressScore(cloud))
+    (!cloud && localMayMove) ||
+    (!!cloud && localIsTheirs && local.updatedAt > cloud.updatedAt && progressScore(local) >= progressScore(cloud))
   userId = uid
   cloudAt = data?.updated_at ?? null
   writeOwner(uid)
   // This browser already shows the cloud town, e.g. right after the reload below.
   if (cloud && localIsTheirs && local.updatedAt === cloud.updatedAt) return
+  if (!cloud && !localMayMove) {
+    // New account in a browser holding someone else's town: give it its own starter town.
+    const fresh = starterTown()
+    const { data: made, error: insertError } = await supabase.from('game_saves').insert(rowOf(uid, fresh)).select('updated_at')
+    if (userId !== uid) return
+    if (insertError || !made?.length) return pullNewer(uid, true)
+    return loadCloud(fresh, made[0].updated_at, 'Started a new town for this account')
+  }
   if (keepLocal) {
     await pushSave()
   } else {
-    if (!localIsTheirs || progressScore(local) > progressScore(cloud!)) backupLocal(local)
+    if (!localIsTheirs || progressScore(local) > progressScore(cloud!)) backupLocal(local, owner)
     loadCloud(cloud!, data!.updated_at, 'Loaded your town from the cloud')
   }
 }
@@ -216,8 +227,10 @@ export function startCloudSync() {
 export function localBackup(): SaveState | null {
   try {
     const raw = localStorage.getItem(BACKUP_KEY)
-    const save = raw ? (JSON.parse(raw).save as SaveState) : null
-    return save && progressScore(save) > progressScore(saveOf(useGame.getState())) ? save : null
+    const backup = raw ? (JSON.parse(raw) as { owner: string | null; save: SaveState }) : null
+    // Only offer back a guest town or one this account already owned, never another player's.
+    if (!backup || (backup.owner !== null && backup.owner !== readOwner())) return null
+    return progressScore(backup.save) > progressScore(saveOf(useGame.getState())) ? backup.save : null
   } catch {
     return null
   }

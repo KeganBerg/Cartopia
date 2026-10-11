@@ -197,7 +197,7 @@ export function canPlace(s: Pick<SaveState, 'roads' | 'buildings' | 'land'>, def
 // Obstacles get cleared, not moved.
 export const movable = (def: string) => buildingDef(def).kind !== 'obstacle'
 
-function starterTown(): SaveState {
+export function starterTown(): SaveState {
   const roads: string[] = []
   // A loop road with a cross street, like a fresh Car Town Streets lot.
   for (let i = 4; i <= 19; i++) {
