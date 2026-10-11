@@ -471,6 +471,16 @@ export class Traffic {
     a.yaw = Math.atan2(q.h[0], q.h[1])
   }
 
+  // Front wheel angle for a car with axles `base` apart, from how sharply its path bends here.
+  steerOf(a: Agent, base: number) {
+    const f = this.sample(a, 0.3)
+    const b = this.sample(a, -0.3)
+    if (!f || !b) return 0
+    let d = Math.atan2(f.h[0], f.h[1]) - Math.atan2(b.h[0], b.h[1])
+    d = Math.atan2(Math.sin(d), Math.cos(d))
+    return Math.max(-0.55, Math.min(0.55, Math.atan((base * d) / 0.6)))
+  }
+
   // Where the tow truck sits: on the path just ahead of the towed car.
   truckPose(a: Agent) {
     if (!a.tow || a.tow === 1) return null

@@ -8,7 +8,7 @@ import { TILE, carDef, performance } from '../game/data'
 import { tripRequests } from '../game/trips'
 import { turnOf } from '../game/placement'
 import { toWorld, DIRS } from './grid'
-import { CarModel, carSize } from './CarModel'
+import { CarModel, carSize, wheelRig } from './CarModel'
 import { liveTraffic as sim } from './traffic/live'
 import { layoutRoads, lightAt, type Light } from './traffic/layout'
 
@@ -41,10 +41,11 @@ function TownCar({ car }: { car: OwnedCar }) {
   const body = useRef<Group>(null)
   const truck = useRef<Group>(null)
   const def = carDef(car.model)
+  const rig = useMemo(() => wheelRig(def.body), [def.body])
   const selected = useGame((s) => s.selectedCar === car.uid)
   useEffect(() => () => void anchors.delete(`car:${car.uid}`), [car.uid])
 
-  useFrame(() => {
+  useFrame((_, dt) => {
     const g = ref.current
     const a = sim.agents.get(car.uid)
     if (!g) return
@@ -57,6 +58,11 @@ function TownCar({ car }: { car: OwnedCar }) {
     // Broken down: slumped on a flat. Being towed: front wheels lifted.
     g.rotation.z = a.stalled && !a.tow ? 0.06 : 0
     if (body.current) body.current.rotation.x = a.tow >= 2 ? -0.1 * a.truck : 0
+    // Front wheels steer into the bend; all four roll with the road.
+    const steer = a.v > 0.01 || a.parked ? sim.steerOf(a, rig.base * SCALE) : null
+    for (const w of rig.steer) if (w && steer !== null) w.rotation.y += (steer - w.rotation.y) * Math.min(1, Math.min(dt, 0.1) * 10)
+    const roll = (a.v * Math.min(dt, 0.1)) / (rig.radius * SCALE)
+    for (const w of rig.spin) if (w) w.rotation.x = (w.rotation.x + roll) % (Math.PI * 2)
     const tp = sim.truckPose(a)
     const t = truck.current
     if (t && tp) {
@@ -83,7 +89,7 @@ function TownCar({ car }: { car: OwnedCar }) {
         }}
       >
         <group ref={body} scale={SCALE}>
-          <CarModel body={def.body} color={car.color} highlight={selected} stripe={car.stripe} beams />
+          <CarModel body={def.body} color={car.color} highlight={selected} stripe={car.stripe} beams rig={rig} />
         </group>
       </group>
       <group ref={truck} visible={false}>
