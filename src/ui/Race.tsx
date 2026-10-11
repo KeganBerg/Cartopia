@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGame, spendFuel, type OwnedCar } from '../game/store'
 import { CARS, SKILLS, carDef, performance, RACE_FUEL, GP_SERIES, GP_ROUNDS, gpRivalPi, gpReward, type Body, type GpSeries } from '../game/data'
+import { TRACK, freshRacer, stepRacer, shiftQuality } from '../game/race'
 import { CarThumb } from '../scene/BuildingPreview'
 import { supabase } from '../lib/supabase'
 import { Panel } from './Menus'
@@ -10,12 +11,11 @@ import { RaceScene } from '../scene/RaceScene'
 import { sfx, engineRpm, stopEngine } from '../lib/sound'
 import { useLive, challenge, refreshPresence, raceChannel, endLiveRace, answer, pruneInvites, mute, unmute, setClosed, INVITE_MS, type LiveRace } from '../lib/live'
 import { displayName } from '../lib/names'
+import { joinRefereed, reportFinish, serverPi, type Verdict } from '../lib/referee'
 
 type Rival = { id: string; town: string; level: number; carName: string; color: string; pi: number; online: boolean; body: Body }
 
 const TOWNS = ['Transamsylvania', 'Gearville', 'Piston Peak', 'Nitro Bay', 'Chrome City', 'Rustbelt Row', 'Turbo Falls', 'Muffler Hills']
-const TRACK = 400
-const GEAR_POWER = [1, 0.85, 0.72, 0.6]
 const zero = { engine: 0, turbo: 0, tires: 0, weight: 0 }
 const pi = (c: OwnedCar) => performance(carDef(c.model), c.upgrades)
 const liveReward = (oppPi: number) => 300 + oppPi * 8
@@ -268,7 +268,6 @@ export function PrizePopup() {
 }
 
 
-type Racer = { gear: number; rpm: number; speed: number; dist: number; quality: number; finished: number | null }
 // A live opponent is replayed on our own race clock from the samples they
 // send, so the strip and the result both compare the same race times.
 type Sample = { dist: number; t: number; speed: number }
@@ -286,30 +285,16 @@ function sampleAt(samples: Sample[], t: number, finished: number | null) {
   return a.dist + (b.dist - a.dist) * Math.max(0, Math.min(1, f))
 }
 
-const fresh = (): Racer => ({ gear: 0, rpm: 0, speed: 0, dist: 0, quality: 1, finished: null })
+const fresh = freshRacer
+const step = stepRacer
 
-function step(r: Racer, piVal: number, dt: number, t: number, mul = 1) {
-  if (r.finished !== null) return
-  const climb = (1.25 - r.gear * 0.16) * (0.85 + piVal / 300)
-  // Top gear just holds near the redline; lower gears bounce off the limiter.
-  r.rpm = Math.min(r.gear === 3 ? 0.95 : 1.05, r.rpm + climb * dt)
-  const overRev = r.rpm >= 1
-  const accel = (piVal / 100) * 70 * GEAR_POWER[r.gear] * r.quality * (overRev ? 0.25 : 1) * (0.4 + r.rpm * 0.6)
-  r.speed += accel * mul * dt
-  r.speed *= 1 - 0.04 * dt
-  r.dist += r.speed * dt
-  if (r.dist >= TRACK) r.finished = t
-}
-
-function shiftQuality(rpm: number) {
-  if (rpm >= 0.78 && rpm <= 0.93) return { q: 1.08, label: 'PERFECT!' }
-  if (rpm >= 0.65 && rpm < 0.78) return { q: 0.95, label: 'Good' }
-  if (rpm > 0.93) return { q: 0.85, label: 'Late' }
-  return { q: 0.75, label: 'Early' }
-}
-
-function DragRace({ car, rival, onExit, live, prize, onFinish, title }: { car: OwnedCar; rival: Rival; onExit: () => void; live?: LiveRace; prize?: number; onFinish?: (won: boolean) => void; title?: string }) {
+function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title }: { car: OwnedCar; rival: Rival; onExit: () => void; live?: LiveRace; prize?: number; onFinish?: (won: boolean) => void; title?: string }) {
+  // A signed-in live rival's PI comes from the server, not from their browser.
+  const [serverRivalPi, setServerRivalPi] = useState<number | null>(null)
+  const rival = useMemo(() => (serverRivalPi === null ? shownRival : { ...shownRival, pi: serverRivalPi }), [shownRival, serverRivalPi])
   const payout = prize ?? reward(rival)
+  const rivalRef = useRef(rival)
+  rivalRef.current = rival
   const finishCb = useRef(onFinish)
   finishCb.current = onFinish
   const myPi = pi(car)
@@ -325,7 +310,11 @@ function DragRace({ car, rival, onExit, live, prize, onFinish, title }: { car: O
   const [countdown, setCountdown] = useState(live ? 99 : 3)
   const channel = useRef<ReturnType<typeof raceChannel>>(null)
   const [label, setLabel] = useState('')
-  const [result, setResult] = useState<null | { won: boolean; myTime: number; theirTime: number }>(null)
+  const [result, setResult] = useState<null | { won: boolean; myTime: number; theirTime: number; note?: string; counted?: boolean }>(null)
+  // Live races between signed-in players: 'yes' once the server is refereeing, 'no' to decide here.
+  const refereed = useRef<'pending' | 'yes' | 'no'>(live ? 'pending' : 'no')
+  const joined = useRef<Promise<boolean> | null>(null)
+  const [checking, setChecking] = useState(false)
   const finishRace = useGame((s) => s.finishRace)
   // The rival's shifting skill for each gear.
   const skill = useMemo(() => Array.from({ length: 4 }, () => 0.8 + Math.random() * 0.12), [])
@@ -367,6 +356,12 @@ function DragRace({ car, rival, onExit, live, prize, onFinish, title }: { car: O
       },
     })
     channel.current = ch
+    const uid = live.opponent.uid
+    joined.current = joinRefereed(live.raceId, uid)
+    joined.current.then((ok) => {
+      if (!ok) refereed.current = 'no'
+    })
+    if (uid) serverPi(uid).then((p) => p !== null && setServerRivalPi(p)).catch(() => {})
     // Keep pinging until the race starts in case the first message was missed.
     const ping = setInterval(() => {
       if (!started) ch?.send({ type: 'broadcast', event: 'ready', payload: {} })
@@ -383,6 +378,42 @@ function DragRace({ car, rival, onExit, live, prize, onFinish, title }: { car: O
     let last = performance_now()
     let lastSent = 0
     let myFinishSentAt: number | null = null
+    const signal = { cancelled: false }
+    const applyVerdict = (v: Verdict | null, myTime: number) => {
+      stopEngine()
+      if (!v || v.void) {
+        sfx.lose()
+        setResult({
+          won: false, myTime, theirTime: Infinity, counted: false,
+          note: v ? `${rivalRef.current.town} never joined the race on the server, so it didn't count.` : "Couldn't reach the race server, so this race didn't count. Check your connection.",
+        })
+        return
+      }
+      if (Number.isFinite(v.theirTime)) them.current.finished = v.theirTime
+      if (v.won) sfx.win()
+      else sfx.lose()
+      const note = v.forfeit
+        ? v.won
+          ? `${rivalRef.current.town} dropped out before finishing.`
+          : 'Your connection dropped before your time reached the server, so this one went to your rival.'
+        : undefined
+      setResult({ won: v.won, myTime: Number.isFinite(v.myTime) ? v.myTime : myTime, theirTime: v.theirTime, note })
+      finishRace(v.won, reward(rivalRef.current))
+    }
+    // Live: the server's verdict replaces the local call when both players are signed in.
+    const settle = async (myTime: number) => {
+      if (!(await joined.current)) {
+        refereed.current = 'no'
+        return
+      }
+      refereed.current = 'yes'
+      setChecking(true)
+      const v = await reportFinish(live!.raceId, myTime, signal)
+      if (signal.cancelled) return
+      setChecking(false)
+      cancelAnimationFrame(raf)
+      applyVerdict(v, myTime)
+    }
     const loop = () => {
       const now = performance_now()
       const dt = Math.min(0.1, (now - last) / 1000)
@@ -419,29 +450,31 @@ function DragRace({ car, rival, onExit, live, prize, onFinish, title }: { car: O
           th.gear++
           th.rpm = 0.35
         }
-        step(th, rival.pi, dt, t.current, def.skill === 'oil' && t.current < 2.5 ? 0.9 : 1)
+        step(th, rivalRef.current.pi, dt, t.current, def.skill === 'oil' && t.current < 2.5 ? 0.9 : 1)
       }
       force((n) => n + 1)
       if (me.current.finished === null) engineRpm(me.current.rpm, me.current.gear)
       else stopEngine()
-      if (me.current.finished !== null && th.finished !== null) {
+      if (live && !wasDone && me.current.finished !== null) settle(me.current.finished)
+      if (refereed.current === 'no' && me.current.finished !== null && th.finished !== null) {
         const won = me.current.finished < th.finished || (me.current.finished === th.finished && (!live || live.host))
         stopEngine()
         if (won) sfx.win()
         else sfx.lose()
         setResult({ won, myTime: me.current.finished, theirTime: th.finished })
         if (finishCb.current) finishCb.current(won)
-        else finishRace(won, reward(rival))
+        else finishRace(won, reward(rivalRef.current))
         return
       }
       raf = requestAnimationFrame(loop)
     }
     raf = requestAnimationFrame(loop)
     return () => {
+      signal.cancelled = true
       cancelAnimationFrame(raf)
       stopEngine()
     }
-  }, [countdown, result, myPi, rival, skill, finishRace, live, def])
+  }, [countdown, result, myPi, skill, finishRace, live, def])
 
   const shift = () => {
     const r = me.current
@@ -493,10 +526,11 @@ function DragRace({ car, rival, onExit, live, prize, onFinish, title }: { car: O
       </div>
       {countdown > 0 && countdown !== 99 && <div className="countdown big">{countdown}</div>}
       {countdown === 99 && <div className="rf-wait">Waiting for {rival.town} to join...</div>}
+      {checking && !result && <div className="rf-wait">Checking the result with the race server...</div>}
       {label && <div className="shift-label big">{label}</div>}
       {def.skill && skillShown && !result && <div className="skill-flash">{SKILLS[def.skill].icon} {SKILLS[def.skill].name}!</div>}
       {result ? (
-        <RaceResult won={result.won} myTime={result.myTime} theirTime={result.theirTime} cash={result.won ? payout : Math.round(payout * 0.1)} xp={result.won ? 30 : 8} rival={rival.town} onExit={onExit} />
+        <RaceResult won={result.won} myTime={result.myTime} theirTime={result.theirTime} cash={result.counted === false ? 0 : result.won ? payout : Math.round(payout * 0.1)} xp={result.counted === false ? 0 : result.won ? 30 : 8} rival={rival.town} note={result.note} noContest={result.counted === false} onExit={onExit} />
       ) : (
         <div className="rf-bottom">
           <svg viewBox="0 0 120 120" className="tach">
@@ -539,7 +573,7 @@ function useCountUp(target: number, delay: number, ms = 900) {
 
 const CONFETTI = ['#ffd54f', '#ef5350', '#42a5f5', '#66bb6a', '#ab47bc', '#ff7043', '#ffffff']
 
-function RaceResult({ won, myTime, theirTime, cash, xp, rival, onExit }: { won: boolean; myTime: number; theirTime: number; cash: number; xp: number; rival: string; onExit: () => void }) {
+function RaceResult({ won, myTime, theirTime, cash, xp, rival, note, noContest, onExit }: { won: boolean; myTime: number; theirTime: number; cash: number; xp: number; rival: string; note?: string; noContest?: boolean; onExit: () => void }) {
   const money = useCountUp(cash, 700)
   const exp = useCountUp(xp, 900)
   const margin = Number.isFinite(theirTime) ? Math.abs(theirTime - myTime) : null
@@ -559,11 +593,14 @@ function RaceResult({ won, myTime, theirTime, cash, xp, rival, onExit }: { won: 
       ))}
       <div className="rr-card">
         <div className="rr-icon">{won ? '🏆' : '🏁'}</div>
-        <h3 className="rr-title">{won ? 'YOU WIN!' : 'SO CLOSE!'}</h3>
-        <p className="rr-sub">
-          {won ? `You beat ${rival}` : `${rival} took it`}
-          {margin !== null ? ` by ${margin.toFixed(2)}s` : ''}
-        </p>
+        <h3 className="rr-title">{noContest ? 'NO RESULT' : won ? 'YOU WIN!' : 'SO CLOSE!'}</h3>
+        {!noContest && (
+          <p className="rr-sub">
+            {won ? `You beat ${rival}` : `${rival} took it`}
+            {margin !== null ? ` by ${margin.toFixed(2)}s` : ''}
+          </p>
+        )}
+        {note && <p className="rr-note">{note}</p>}
         <div className="rr-times">
           <span className={won ? 'best' : ''}><small>You</small>{myTime.toFixed(2)}s</span>
           <span className={won ? '' : 'best'}><small>{rival}</small>{Number.isFinite(theirTime) ? `${theirTime.toFixed(2)}s` : 'DNF'}</span>
