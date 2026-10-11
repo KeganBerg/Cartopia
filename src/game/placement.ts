@@ -1,4 +1,4 @@
-import { useGame, type PlacedBuilding } from './store'
+import { useGame, canPlace, lotSize, type PlacedBuilding } from './store'
 import { buildingDef } from './data'
 
 // The turn the placement ghost currently shows, so Rotate turns from what the player sees.
@@ -16,7 +16,7 @@ export function rotatePlacement() {
 }
 
 // Quarter turns that point a building's front at an adjacent road. Non-square lots can only flip.
-function roadTurn(b: Pick<PlacedBuilding, 'def' | 'x' | 'z'>, roads: Set<string>) {
+export function roadTurn(b: Pick<PlacedBuilding, 'def' | 'x' | 'z'>, roads: Set<string>) {
   const d = buildingDef(b.def)
   const edge = (dir: 'S' | 'E' | 'N' | 'W') => {
     for (let i = 0; i < Math.max(d.w, d.h); i++) {
@@ -41,4 +41,34 @@ export function turnOf(b: Pick<PlacedBuilding, 'def' | 'x' | 'z' | 'rot'>, roads
   if (b.rot != null) return b.rot
   const kind = buildingDef(b.def).kind
   return kind === 'decor' || kind === 'obstacle' ? 0 : roadTurn(b, roads)
+}
+
+// Turns the building picked in move mode a quarter turn in place, keeping it
+// centred on the same spot. Its roads and driveway turn with it, and town cars
+// park at whichever side turnOf says is the front.
+export function rotateSelected() {
+  const s = useGame.getState()
+  const b = s.buildings.find((o) => o.uid === s.selected)
+  if (s.mode !== 'move' || !b) return
+  const from = turnOf(b, new Set(s.roads))
+  const to = (from + 1) % 4
+  const [w, h] = lotSize(b.def, from)
+  const [w2, h2] = lotSize(b.def, to)
+  const x = b.x + (w - w2) / 2
+  const z = b.z + (h - h2) / 2
+  // A 2x1 lot has no exact middle once turned. Round one way going sideways and
+  // back the other way coming home, so turning all the way round lands where it began.
+  const near = to % 2 ? Math.floor : Math.ceil
+  const far = to % 2 ? Math.ceil : Math.floor
+  const spots: [number, number][] = [[near(x), near(z)], [far(x), near(z)], [near(x), far(z)], [far(x), far(z)]]
+  const spot = spots.find(([sx, sz]) => canPlace(s, b.def, sx, sz, to, b.uid))
+  if (!spot || !s.moveBuilding(b.uid, spot[0], spot[1], to)) {
+    s.toast('No room to turn it here. Drag it somewhere roomier first.')
+  }
+}
+
+// R on desktop turns whatever is being placed or moved.
+export function rotateCurrent() {
+  if (useGame.getState().mode === 'move') rotateSelected()
+  else rotatePlacement()
 }
