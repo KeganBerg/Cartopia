@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildingDef, carDef, knownBuilding, BUILDINGS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost, jobLevel, performance, fittedMods, modStats, modCost, MODS, MOD_SLOTS, ownedMods, CARS, takesDriver, loves, driverPayout } from './data'
+import { buildingDef, carDef, knownBuilding, BUILDINGS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost, jobLevel, performance, fittedMods, modStats, modCost, MODS, MOD_SLOTS, ownedMods, CARS, takesDriver, loves, driverPayout, skillBoost, skillDrag, liveSkillBoost, SKILLS } from './data'
 
 describe('unknown ids from newer builds', () => {
   it('gives an unknown building a harmless stand-in instead of crashing', () => {
@@ -123,6 +123,32 @@ describe('car mods', () => {
       expect(new Set(MODS.map((x) => x.id)).size).toBe(MODS.length)
       expect(m.bucks > 0).toBe(m.coins === 0 && m.parts === 0)
     }
+  })
+})
+
+describe('race skills', () => {
+  const r = (gear: number, dist = 10) => ({ gear, dist })
+  it('boosts the owner where each skill says', () => {
+    expect(skillBoost('launch', r(0), r(0))).toBe(1.2)
+    expect(skillBoost('launch', r(1), r(0))).toBe(1)
+    expect(skillBoost('nitro', r(3), r(0))).toBe(1.15)
+    expect(skillBoost('slipstream', r(2, 5), r(2, 9))).toBe(1.08)
+    expect(skillBoost('slipstream', r(2, 9), r(2, 5))).toBe(1)
+    expect(skillBoost('torque', r(1), r(1))).toBe(1.1)
+    expect(skillBoost('torque', r(2), r(1))).toBe(1)
+    expect(skillBoost(undefined, r(0), r(0))).toBe(1)
+  })
+  it('slows the other car with Oil Slick and Brain Freeze', () => {
+    expect(skillDrag('oil', r(0), 1)).toBe(0.9)
+    expect(skillDrag('oil', r(0), 3)).toBe(1)
+    expect(skillDrag('freeze', r(1), 5)).toBe(0.9)
+    expect(skillDrag('freeze', r(2), 5)).toBe(1)
+    expect(skillDrag('launch', r(0), 0)).toBe(1)
+    expect(liveSkillBoost('freeze', r(1), r(1), 5)).toBe(1.1)
+    expect(liveSkillBoost('oil', r(2), r(1), 1)).toBe(1.1)
+  })
+  it('gives every skill to at least one car', () => {
+    for (const id of Object.keys(SKILLS)) expect(CARS.some((c) => c.skill === id), id).toBe(true)
   })
 })
 

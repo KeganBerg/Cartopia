@@ -156,14 +156,43 @@ export type Body = 'compact' | 'sedan' | 'sports' | 'muscle' | 'truck' | 'super'
 export const BIKES: Body[] = ['scooter', 'chopper', 'sportbike']
 export const isBike = (body: Body) => BIKES.includes(body)
 
-export type SkillId = 'launch' | 'nitro' | 'slipstream' | 'smooth' | 'oil'
+export type SkillId = 'launch' | 'nitro' | 'slipstream' | 'smooth' | 'oil' | 'torque' | 'freeze'
 export const SKILLS: Record<SkillId, { name: string; icon: string; text: string }> = {
   launch: { name: 'Hole Shot', icon: '🚀', text: '20% faster off the line in first gear' },
   nitro: { name: 'Nitro Burst', icon: '🔥', text: '15% more power in top gear' },
   slipstream: { name: 'Slipstream', icon: '💨', text: '8% more speed while chasing the leader' },
   smooth: { name: 'Smooth Shifter', icon: '🎯', text: 'Good shifts count as perfect' },
   oil: { name: 'Oil Slick', icon: '🛢', text: 'Rivals lose 10% grip for the first 2.5 seconds' },
+  torque: { name: 'Low-End Torque', icon: '🐂', text: '10% more power in first and second gear' },
+  freeze: { name: 'Brain Freeze', icon: '🍦', text: 'Rivals are 10% slower in second gear' },
 }
+
+// What a skill does in a drag race, as speed multipliers. Rivals use their car's
+// skill too. `me` is the racer with the skill, `them` the other one.
+export type SkillRacer = { gear: number; dist: number }
+// Boost to the skill owner's own car right now.
+export function skillBoost(sk: SkillId | undefined, me: SkillRacer, them: SkillRacer): number {
+  if (sk === 'launch' && me.gear === 0) return 1.2
+  if (sk === 'nitro' && me.gear === 3) return 1.15
+  if (sk === 'slipstream' && me.dist > 0 && me.dist < them.dist) return 1.08
+  if (sk === 'torque' && me.gear <= 1) return 1.1
+  return 1
+}
+// Slow-down the skill puts on the other car (t: seconds since the start).
+export function skillDrag(sk: SkillId | undefined, them: SkillRacer, t: number): number {
+  if (sk === 'oil' && t < 2.5) return 0.9
+  if (sk === 'freeze' && them.gear === 1) return 0.9
+  return 1
+}
+// In a live race the other car runs on its owner's device, so slow-downs boost
+// our own car by the same amount in the same window instead.
+export function liveSkillBoost(sk: SkillId | undefined, me: SkillRacer, them: SkillRacer, t: number): number {
+  if (sk === 'oil') return t < 2.5 ? 1.1 : 1
+  if (sk === 'freeze') return me.gear === 1 ? 1.1 : 1
+  return skillBoost(sk, me, them)
+}
+// A shift the driver timed "Good" counts as perfect with Smooth Shifter.
+export const smoothShift = (sk: SkillId | undefined) => sk === 'smooth'
 
 export type CarDef = {
   id: string
@@ -196,7 +225,7 @@ export type CarDef = {
 export const CARS: CarDef[] = [
   { id: 'pip', name: 'Kipper Pocket', body: 'compact', price: 800, unlockLevel: 1, power: 18, grip: 36, weight: 24, skill: 'launch', likes: ['pizza', 'donut', 'market'], colors: ['#c62828', '#1b5e20', '#fafafa'] },
   { id: 'civic', name: 'Kazumi Commuter', body: 'sedan', price: 1500, unlockLevel: 1, power: 24, grip: 34, weight: 36, skill: 'slipstream', likes: ['pizza', 'diner', 'coffee'], colors: ['#1e88e5', '#eeeeee', '#424242'] },
-  { id: 'trail', name: 'Ironside Workhorse', body: 'truck', price: 2600, unlockLevel: 2, power: 38, grip: 26, weight: 74, skill: 'launch', likes: ['tires', 'parts', 'lube'], colors: ['#0d47a1', '#c62828', '#eceff1'] },
+  { id: 'trail', name: 'Ironside Workhorse', body: 'truck', price: 2600, unlockLevel: 2, power: 38, grip: 26, weight: 74, skill: 'torque', likes: ['tires', 'parts', 'lube'], colors: ['#0d47a1', '#c62828', '#eceff1'] },
   { id: 'miata', name: 'Kazumi Zephyr', body: 'roadster', price: 4200, unlockLevel: 3, power: 32, grip: 54, weight: 22, skill: 'smooth', likes: ['icecream', 'cinema', 'arcade'], colors: ['#d32f2f', '#1e88e5', '#fafafa'] },
   { id: 'stallion', name: "Liberty Bore Horse '68", body: 'muscle', price: 7000, unlockLevel: 4, power: 52, grip: 34, weight: 54, skill: 'nitro', likes: ['burger', 'stadium', 'firehouse'], colors: ['#1b5e20', '#ff6f00', '#212121'] },
   { id: 'rally', name: 'Kodiak Gravel Rex', body: 'rally', price: 9500, unlockLevel: 5, power: 52, grip: 64, weight: 40, skill: 'smooth', likes: ['tires', 'tuner', 'bodyshop'], colors: ['#0d47a1', '#fafafa', '#ffd600'] },
@@ -210,10 +239,10 @@ export const CARS: CarDef[] = [
   { id: 'shinden', name: 'Kazumi Shinden RR', body: 'sportbike', price: 30000, unlockLevel: 9, power: 80, grip: 60, weight: 14, skill: 'launch', likes: ['tuner', 'stadium', 'arcade'], colors: ['#1565c0', '#eceff1', '#76ff03'] },
   { id: 'lambo', name: 'Veloce Corrida V12', body: 'wedge', price: 0, bucks: 40, unlockLevel: 5, power: 86, grip: 70, weight: 34, skill: 'oil', likes: ['cinema', 'carwash', 'parkade'], colors: ['#fdd835', '#d50000', '#fafafa'] },
   { id: 'hyper', name: 'Veloce Hyperion', body: 'super', price: 60000, unlockLevel: 12, power: 98, grip: 86, weight: 32, skill: 'nitro', likes: ['stadium', 'tuner', 'parkade'], colors: ['#1a237e', '#212121', '#d50000'] },
-  { id: 'bug', name: 'Bumble Bubble', body: 'bubble', price: 1200, unlockLevel: 1, rescueOnly: true, power: 14, grip: 28, weight: 28, skill: 'launch', likes: ['icecream', 'donut', 'coffee'], colors: ['#80cbc4', '#ffcc80', '#ef9a9a'] },
+  { id: 'bug', name: 'Bumble Bubble', body: 'bubble', price: 1200, unlockLevel: 1, rescueOnly: true, power: 14, grip: 28, weight: 28, skill: 'freeze', likes: ['icecream', 'donut', 'coffee'], colors: ['#80cbc4', '#ffcc80', '#ef9a9a'] },
   { id: 'woodie', name: 'Lakeside Woodie Wagon', body: 'wagon', price: 2200, unlockLevel: 1, rescueOnly: true, power: 22, grip: 28, weight: 56, skill: 'slipstream', likes: ['diner', 'carwash', 'market'], colors: ['#fafafa', '#fff59d', '#4db6ac'] },
-  { id: 'hauler', name: 'Old Faithful Hauler', body: 'truck', price: 3000, unlockLevel: 1, rescueOnly: true, power: 26, grip: 26, weight: 70, skill: 'launch', likes: ['parts', 'carwash', 'tacos'], colors: ['#558b2f', '#e65100', '#1565c0'] },
-  { id: 'cruiser', name: "Sunset Cruiser '57", body: 'classic', price: 5000, unlockLevel: 1, rescueOnly: true, power: 38, grip: 34, weight: 58, skill: 'slipstream', likes: ['cinema', 'diner', 'firehouse'], colors: ['#4dd0e1', '#f06292', '#fafafa'] },
+  { id: 'hauler', name: 'Old Faithful Hauler', body: 'truck', price: 3000, unlockLevel: 1, rescueOnly: true, power: 26, grip: 26, weight: 70, skill: 'torque', likes: ['parts', 'carwash', 'tacos'], colors: ['#558b2f', '#e65100', '#1565c0'] },
+  { id: 'cruiser', name: "Sunset Cruiser '57", body: 'classic', price: 5000, unlockLevel: 1, rescueOnly: true, power: 38, grip: 34, weight: 58, skill: 'freeze', likes: ['cinema', 'diner', 'firehouse'], colors: ['#4dd0e1', '#f06292', '#fafafa'] },
   { id: 'buggy', name: 'Dune Skipper Buggy', body: 'offroad', price: 6000, unlockLevel: 1, rescueOnly: true, power: 34, grip: 56, weight: 18, skill: 'launch', likes: ['icecream', 'tires', 'tacos'], colors: ['#ff9800', '#cddc39', '#29b6f6'] },
   { id: 'bandit', name: 'Night Bandit', body: 'muscle', price: 8000, unlockLevel: 1, rescueOnly: true, power: 56, grip: 38, weight: 54, skill: 'nitro', likes: ['bowling', 'burger', 'bodyshop'], colors: ['#212121', '#ffd54f', '#b71c1c'] },
   { id: 'lemans', name: 'Liberty Endurance GT', body: 'super', price: 16000, unlockLevel: 1, rescueOnly: true, power: 72, grip: 62, weight: 32, skill: 'smooth', likes: ['stadium', 'parts', 'police'], colors: ['#1565c0', '#fafafa', '#c62828'] },
