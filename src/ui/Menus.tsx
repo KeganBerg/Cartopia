@@ -19,7 +19,6 @@ export function BottomBar() {
   return (
     <>
       <div className="bottom-bar">
-        <button className="big-btn menu-btn" onClick={() => openPanel('account')}><span>CARTOPIA</span>MENU</button>
         <button className="icon-btn" onClick={() => openPanel('shop')}><span className="i">🏪</span>SHOP</button>
         <button className="icon-btn" onClick={() => openPanel('showroom')}><span className="i">🚘</span>SHOWROOM</button>
         <button className="icon-btn" onClick={() => openPanel('garage')}><span className="i">🔧</span>GARAGE</button>

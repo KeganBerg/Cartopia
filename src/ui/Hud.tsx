@@ -7,7 +7,8 @@ import { ChallengeBell } from './Race'
 
 const n = (v: number) => v.toLocaleString()
 
-function Speedometer({ level, xp }: { level: number; xp: number }) {
+// The level gauge doubles as the Menu button.
+function Speedometer({ level, xp, onClick }: { level: number; xp: number; onClick: () => void }) {
   const need = xpToNext(level)
   const pct = Math.min(1, xp / need)
   // Needle sweeps 240 degrees, from -210 to 30.
@@ -20,7 +21,7 @@ function Speedometer({ level, xp }: { level: number; xp: number }) {
     return `M ${x0} ${y0} A ${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1} ${y1}`
   }
   return (
-    <div className="speedo" title={`${n(xp)} / ${n(need)} XP to level ${level + 1}`}>
+    <button className="speedo" onClick={onClick} aria-label="Menu" title={`Menu · ${n(xp)} / ${n(need)} XP to level ${level + 1}`}>
       <svg viewBox="0 0 88 88" width="88" height="88">
         <circle cx="44" cy="44" r="42" fill="#1b1f24" stroke="#cfd8dc" strokeWidth="3" />
         <path d={arc(-210, 30)} stroke="#37474f" strokeWidth="7" fill="none" strokeLinecap="round" />
@@ -35,7 +36,8 @@ function Speedometer({ level, xp }: { level: number; xp: number }) {
       </svg>
       <div className="speedo-level">{level}</div>
       <div className="speedo-xp">{n(xp)} XP</div>
-    </div>
+      <span className="speedo-menu" aria-hidden>☰</span>
+    </button>
   )
 }
 
@@ -47,7 +49,7 @@ export function Hud() {
   return (
     <>
       <div className="hud-left">
-        <Speedometer level={s.level} xp={s.xp} />
+        <Speedometer level={s.level} xp={s.xp} onClick={() => s.openPanel('account')} />
         <div className="pills">
           <button className="pill" onClick={() => s.showNeed('coins', 0)}><span className="ico coin-ico">$</span>{n(s.coins)}<span className="plus">+</span></button>
           <button className="pill" onClick={() => s.openPanel('bank')}><span className="ico buck-ico">B</span>{n(s.bucks)}<span className="plus">+</span></button>
@@ -77,7 +79,7 @@ export function Hud() {
       {/* Phones: one compact strip across the top, town label under it. */}
       <div className="hud-mobile">
         <div className="hud-strip">
-          <Speedometer level={s.level} xp={s.xp} />
+          <Speedometer level={s.level} xp={s.xp} onClick={() => s.openPanel('account')} />
           <div className="hud-chips">
             <button className="chip-stat" onClick={() => s.showNeed('coins', 0)}><span className="ico coin-ico">$</span>{n(s.coins)}</button>
             <button className="chip-stat" onClick={() => s.openPanel('bank')}><span className="ico buck-ico">B</span>{n(s.bucks)}</button>
