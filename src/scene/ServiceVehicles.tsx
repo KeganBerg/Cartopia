@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { createContext, useContext, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { BoxGeometry, BufferGeometry, CircleGeometry, Color, CylinderGeometry, DoubleSide, Matrix4, MeshBasicMaterial, MeshStandardMaterial, Quaternion, SphereGeometry, Euler, Vector3 } from 'three'
 import type { Group, Mesh } from 'three'
@@ -119,10 +119,15 @@ const HOVER = 1.1
 const smooth = (x: number) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x))
 const span = (t: number, [a, b]: readonly [number, number]) => smooth((t - a) / (b - a))
 
+// Shop previews ground every helicopter, so a model never flies out of its card.
+export const Grounded = createContext(false)
+
 // One helicopter, parked facing +x at the origin of its pad. `fly`: does laps of
 // town (radius and height in world units); off, it sits with the rotor still
 // (shop previews and spares in the hangar). `seed` staggers helicopters.
-export function Helicopter({ look, fly, seed = 0, radius = 7, height = 5.5, ghost }: { look: HeliLook; fly?: boolean; seed?: number; radius?: number; height?: number; ghost?: boolean }) {
+export function Helicopter({ look, fly: wantsFly, seed = 0, radius = 7, height = 5.5, ghost }: { look: HeliLook; fly?: boolean; seed?: number; radius?: number; height?: number; ghost?: boolean }) {
+  const grounded = useContext(Grounded)
+  const fly = wantsFly && !grounded
   const body = useMemo(() => heliBody(look), [look])
   const craft = useRef<Group>(null)
   const rotor = useRef<Mesh>(null)

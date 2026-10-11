@@ -35,7 +35,7 @@ function glassMat(tint: string) {
   g = new MeshStandardMaterial({ color: tint, map: curtainTex(), emissiveMap: curtainGlowTex(), emissive: new Color('#ffffff'), emissiveIntensity: 0, metalness: 0.15, roughness: 0.22 })
   g.userData.live = true
   const mat = g
-  onNight((n) => (mat.emissiveIntensity = n * 0.95))
+  onNight((n) => (mat.emissiveIntensity = n * 0.7))
   glassMats.set(tint, g)
   return g
 }
@@ -549,13 +549,13 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
           {/* Windsock, fuel bowser and a perimeter fence along the back. */}
           {!ghost && (
             <group>
-              <group position={[-1.7, 0, 1.6]}>
+              <group position={[-1.85, 0, -0.3]}>
                 <Cyl m={m} at={[0, 0.55, 0]} r={0.02} h={1.1} c="#eceff1" seg={6} />
                 {[0, 1, 2, 3].map((i) => (
                   <Cyl key={i} m={m} at={[0.08 + i * 0.1, 1.04 - i * 0.025, 0]} r={0.075 - i * 0.012} r2={0.065 - i * 0.012} h={0.1} c={i % 2 ? '#fafafa' : '#ff6f00'} seg={10} rot={[0, 0, Math.PI / 2 + 0.25]} />
                 ))}
               </group>
-              <group position={[-0.45, 0.05, 1.45]} rotation-y={0.3}>
+              <group position={[-0.25, 0.05, 1.68]} rotation-y={1.3}>
                 <Box m={m} at={[0, 0.2, -0.15]} s={[0.36, 0.26, 0.5]} c="#eceff1" />
                 <Cyl m={m} at={[0, 0.25, -0.17]} r={0.13} h={0.46} c="#c62828" seg={12} rot={[Math.PI / 2, 0, 0]} />
                 <Box m={m} at={[0, 0.22, 0.2]} s={[0.36, 0.3, 0.22]} c="#c62828" />
@@ -564,13 +564,13 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
               </group>
               {[-1.9, -0.95, 0, 0.95, 1.9].map((x) => <Box key={x} m={m} at={[x, 0.25, -1.92]} s={[0.04, 0.5, 0.04]} c="#78909c" shadow={false} />)}
               {[0.15, 0.42].map((y) => <Box key={y} m={m} at={[0, y, -1.92]} s={[3.8, 0.02, 0.02]} c="#90a4ae" shadow={false} />)}
-              <Lamp m={m} bulb={bulb} at={[-1.75, 0.05, 0.3]} />
+              <Lamp m={m} bulb={bulb} at={[-1.85, 0.05, 1.85]} />
               <Pool r={1.3} x={pad[0]} z={pad[2]} />
             </group>
           )}
           {/* A second pad from level 5 with another helicopter, flying too from level 8. */}
           {trim && lvl >= 5 && (
-            <group position={[-1.1, 0, 0.55]}>
+            <group position={[-1.25, 0, 0.95]}>
               <Cyl m={m} at={[0, 0.06, 0]} r={0.65} h={0.04} c="#78909c" seg={20} />
               <mesh position={[0, 0.081, 0]} rotation-x={-Math.PI / 2}><circleGeometry args={[0.62, 20]} />{m('#ffffff', helipadTex('#fafafa', '#ffca28'))}</mesh>
               <group position={[0, 0.08, 0]} scale={0.55}>

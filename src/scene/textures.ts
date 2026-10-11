@@ -686,14 +686,14 @@ export const curtainTex = (rx = 1, ry = rx) =>
     for (let y = 0; y < 4; y++) g.fillRect(0, y * 32 + 24, s, 1)
   }), 'curtain', rx, ry)
 
-// Matching night glow: most offices lit warm or cool white, a few dark.
+// Matching night glow: about half the offices lit, warm or cool white.
 export const curtainGlowTex = (rx = 1, ry = rx) =>
   rep(make('curtainGlow', 128, (g, s, r) => {
     g.fillStyle = '#000000'
     g.fillRect(0, 0, s, s)
     for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) {
-      if (r() < 0.3) continue
-      g.fillStyle = r() < 0.55 ? '#ffe2a8' : '#d6ecff'
+      if (r() < 0.5) continue
+      g.fillStyle = r() < 0.55 ? '#ffd892' : '#c4e0f7'
       g.fillRect(x * 32 + 3, y * 32 + 3, 26, 20)
     }
   }), 'curtainGlow', rx, ry)
