@@ -30,3 +30,13 @@ describe('ambientMix', () => {
       }
   })
 })
+
+describe('pickSpecies', () => {
+  it('picks only birds that are around that season', async () => {
+    const { pickSpecies } = await import('./birdsong')
+    for (let r = 0; r < 1; r += 0.01) {
+      expect(pickSpecies('winter', r)).not.toBe('robin')
+      expect(pickSpecies('summer', r)).not.toBe('blueJay')
+    }
+  })
+})
