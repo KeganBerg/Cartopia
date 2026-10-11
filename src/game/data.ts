@@ -921,15 +921,15 @@ export const SKINS: SkinDef[] = [
     swatch: 'linear-gradient(135deg, #ff5f6d, #ffc371, #f9f871, #67f3a4, #4facfe, #b06ab3, #ff5f6d)' },
   { id: 'horizon', n: 9, name: 'Event Horizon', tier: 'legendary', blurb: 'A turning spiral of fire and violet', unlock: { bucks: 60 },
     swatch: 'radial-gradient(circle, #000 0 18%, #ff7a1a 24%, #9c3dff 38%, #12051f 60%)' },
-  { id: 'coldsnap', n: 10, name: 'Cold Snap', tier: 'legendary', blurb: 'Black ice shards with frost in the seams', unlock: { bucks: 50 },
-    swatch: 'linear-gradient(115deg, #05080d 30%, #cfeaf7 31% 32%, #0b141e 33% 58%, #8fdcff 59% 60%, #070b11 61%), linear-gradient(20deg, transparent 45%, #e6f6ff 46% 47%, transparent 48%) #05080d' },
+  { id: 'coldsnap', n: 10, name: 'Cold Snap', tier: 'legendary', blurb: 'Shattered ice in white and teal', unlock: { bucks: 50 },
+    swatch: 'linear-gradient(115deg, #d9eef0 0 28%, #0d2a33 29% 30%, #7fc3cb 31% 52%, #0d2a33 53% 54%, #3f8e99 55% 74%, #0d2a33 75% 76%, #eef8f9 77%)' },
 ]
 export const skinDef = (id?: string | null) => (id ? SKINS.find((s) => s.id === id) : undefined)
 // The shader number for a car's skin, 0 for none (or one this version doesn't know).
 export const skinNumber = (id?: string | null) => skinDef(id)?.n ?? 0
 // Every skin the player can put on a car right now.
-export function ownedSkins(s: { level: number; claimedSets?: string[]; skins?: string[] }) {
-  return SKINS.filter((d) => {
+export function ownedSkins(s: { level: number; claimedSets?: string[]; skins?: string[] }, pool = SKINS) {
+  return pool.filter((d) => {
     const u = d.unlock
     if (s.skins?.includes(d.id)) return true
     if ('level' in u) return s.level >= u.level
@@ -939,6 +939,38 @@ export function ownedSkins(s: { level: number; claimedSets?: string[]; skins?: s
 }
 // Season track tiers (1-based) that give a skin on top of their usual prize.
 export const seasonSkin = (tier: number) => SKINS.find((d) => 'season' in d.unlock && d.unlock.season === tier)
+
+// ---- Mod skins ----
+// A second pool, for bolt-on parts: each fitted spoiler, exhaust, body kit and hood
+// can wear its own skin, separate from the body's, so effects mix and match. Unlocked
+// once for the garage like body skins; saves keep bought and won ones in `modSkins`
+// and each car's choices in `modSkin` (by slot).
+export type SkinnedSlot = 'spoiler' | 'exhaust' | 'kit' | 'hood'
+export const SKINNED_SLOTS: SkinnedSlot[] = ['spoiler', 'exhaust', 'kit', 'hood']
+export const MOD_SKINS: SkinDef[] = [
+  { id: 'ember', n: 11, name: 'Ember', tier: 'rare', blurb: 'Flames rolling back off the part', unlock: { level: 5 },
+    swatch: 'linear-gradient(0deg, #2a0700, #ff3d00 40%, #ffb300 70%, #fff3b0)' },
+  { id: 'hexplate', n: 1, name: 'Hex Plate', tier: 'rare', blurb: 'Glowing honeycomb armour', unlock: { level: 7 },
+    swatch: 'conic-gradient(from 30deg, #0b2a36, #19e3ff 10%, #0b2a36 20%, #0b2a36 50%, #19e3ff 60%, #0b2a36 70%)' },
+  { id: 'neonpulse', n: 12, name: 'Neon Pulse', tier: 'rare', blurb: 'Neon bands sweeping front to back', unlock: { set: 'tuners' },
+    swatch: 'repeating-linear-gradient(90deg, #12001f 0 6px, #ff2bd6 7px 9px, #12001f 10px 14px, #2be8ff 15px 16px)' },
+  { id: 'goldleaf', n: 14, name: 'Gold Leaf', tier: 'epic', blurb: 'Gold flakes glinting at every depth', unlock: { bucks: 20 },
+    swatch: 'radial-gradient(circle at 30% 30%, #fff8d0 0 6%, transparent 7%), radial-gradient(circle at 65% 60%, #fff 0 4%, transparent 5%), linear-gradient(135deg, #8a5a00, #ffd34d 50%, #a06a00)' },
+  { id: 'carbonprism', n: 13, name: 'Carbon Prism', tier: 'epic', blurb: 'Carbon weave over a rainbow sheen', unlock: { season: 15 },
+    swatch: 'repeating-linear-gradient(45deg, rgba(0,0,0,.75) 0 3px, transparent 3px 6px), linear-gradient(135deg, #ff5f6d, #f9f871, #67f3a4, #4facfe, #b06ab3)' },
+  { id: 'starlight', n: 3, name: 'Starlight', tier: 'epic', blurb: 'A pocket of deep space', unlock: { crate: true },
+    swatch: 'radial-gradient(circle at 30% 30%, #fff 0 4%, transparent 5%), radial-gradient(circle at 70% 60%, #cde 0 3%, transparent 4%), #05061a' },
+  { id: 'holofoil', n: 4, name: 'Holo Foil', tier: 'legendary', blurb: 'Rainbow foil that rolls as you turn', unlock: { bucks: 35 },
+    swatch: 'linear-gradient(135deg, #ff5f6d, #ffc371, #f9f871, #67f3a4, #4facfe, #b06ab3)' },
+  { id: 'rime', n: 10, name: 'Rime', tier: 'legendary', blurb: 'Shattered ice to match Cold Snap', unlock: { bucks: 40 },
+    swatch: 'linear-gradient(115deg, #d9eef0 0 28%, #0d2a33 29% 30%, #7fc3cb 31% 52%, #0d2a33 53% 54%, #3f8e99 55% 74%, #0d2a33 75% 76%, #eef8f9 77%)' },
+]
+export const modSkinDef = (id?: string | null) => (id ? MOD_SKINS.find((s) => s.id === id) : undefined)
+export const modSkinNumber = (id?: string | null) => modSkinDef(id)?.n ?? 0
+// Every mod skin the player can put on a part right now.
+export const ownedModSkins = (s: { level: number; claimedSets?: string[]; modSkins?: string[] }) =>
+  ownedSkins({ level: s.level, claimedSets: s.claimedSets, skins: s.modSkins }, MOD_SKINS)
+export const seasonModSkin = (tier: number) => MOD_SKINS.find((d) => 'season' in d.unlock && d.unlock.season === tier)
 
 // Garage power: the combined PI of a player's five best cars.
 export const POWER_CARS = 5
