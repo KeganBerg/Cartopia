@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { AdditiveBlending, BufferAttribute, BufferGeometry, Object3D, type Group, type InstancedMesh, type MeshBasicMaterial, type MeshStandardMaterial, type PerspectiveCamera } from 'three'
+import { AdditiveBlending, BufferAttribute, BufferGeometry, Object3D, type Group, type InstancedMesh, type Mesh, type MeshBasicMaterial, type MeshStandardMaterial, type PerspectiveCamera } from 'three'
 import type { Loot, Search } from '../game/store'
 import { buildingDef, carDef, type Rarity } from '../game/data'
 import { CarModel, wheelRig } from './CarModel'
@@ -295,6 +295,10 @@ function Scenery({ theme, L }: { theme: string; L: Layout }) {
 
 // ---- Effects ----
 
+// Dev builds only: `?slowmo=8` runs the search at an eighth of the speed, for screenshots.
+const SLOW = import.meta.env.DEV && typeof location !== 'undefined' ? Number(new URLSearchParams(location.search).get('slowmo')) || 1 : 1
+
+
 const tmp = new Object3D()
 
 // A burst of dust (or, with `loop`, a steady trickle of smoke).
@@ -308,7 +312,7 @@ function Puffs({ color, count = 12, loop, dur = 1.1, spread = 1.5, y = 0.15 }: {
     const m = ref.current
     if (!m) return
     if (t0.current < 0) t0.current = clock.elapsedTime
-    const age = clock.elapsedTime - t0.current
+    const age = (clock.elapsedTime - t0.current) / SLOW
     if (!loop && age > dur) return setDone(true)
     seeds.forEach((p, i) => {
       const t = loop ? ((age / dur + p.off) % 1) : age / dur
@@ -417,9 +421,9 @@ function SmallLoot({ kind }: { kind: Loot['kind'] }) {
 const backOut = (t: number) => 1 + 2.4 * (t - 1) ** 3 + 1.4 * (t - 1) ** 2
 const clamp01 = (t: number) => Math.min(1, Math.max(0, t))
 
-type SpotProps = { i: number; at: SpotAt; loot: Loot; open: boolean; tarp: string; pad: string; speed: number; onPick: (i: number) => void; onFound: (i: number) => void }
+type SpotProps = { i: number; at: SpotAt; loot: Loot; open: boolean; gone: boolean; tarp: string; pad: string; speed: number; onPick: (i: number) => void; onFound: (i: number) => void }
 
-function SearchSpot({ i, at: p, loot, open, tarp, pad, speed, onPick, onFound }: SpotProps) {
+function SearchSpot({ i, at: p, loot, open, gone, tarp, pad, speed, onPick, onFound }: SpotProps) {
   // Already open when the scene came up (the panel was reopened): no show.
   const born = useRef(open)
   const t0 = useRef(-1)
@@ -436,7 +440,7 @@ function SearchSpot({ i, at: p, loot, open, tarp, pad, speed, onPick, onFound }:
   const glow = car ? RARITY_GLOW[loot.rarity] : '#ffe082'
 
   useFrame(({ clock }) => {
-    const now = clock.elapsedTime
+    const now = clock.elapsedTime / SLOW
     if (stage === 'opening' && t0.current < 0) t0.current = now
     const t = stage === 'opening' ? (now - t0.current) * speed : stage === 'open' ? 9 : -1
     // Beacon: a pulsing ring and a soft light column while unopened, fading out as it opens.
@@ -465,7 +469,7 @@ function SearchSpot({ i, at: p, loot, open, tarp, pad, speed, onPick, onFound }:
     const it = item.current
     if (it) {
       const k = t < 0 ? 0 : clamp01((t - 0.25) / 0.55)
-      it.visible = k > 0
+      it.visible = k > 0 && !gone
       const e = backOut(k)
       if (car) {
         it.position.y = -0.5 + e * 0.5
@@ -476,7 +480,7 @@ function SearchSpot({ i, at: p, loot, open, tarp, pad, speed, onPick, onFound }:
         it.rotation.y = now * 1.4 + i
       }
     }
-    if (flash.current) flash.current.opacity = t < 0.25 ? 0 : car ? 0.25 + 0.6 * clamp01(1 - (t - 0.25) / 1.2) : 0.35 * clamp01(1 - (t - 0.25) / 1.2)
+    if (flash.current) flash.current.opacity = t < 0.25 || gone ? 0 : car ? 0.25 + 0.6 * clamp01(1 - (t - 0.25) / 1.2) : 0.35 * clamp01(1 - (t - 0.25) / 1.2)
     if (stage === 'opening' && t > 0.6 && !told.current) {
       told.current = true
       onFound(i)
@@ -536,7 +540,7 @@ function SearchSpot({ i, at: p, loot, open, tarp, pad, speed, onPick, onFound }:
             <circleGeometry args={[car ? 1.5 : 0.9, 24]} />
             <meshBasicMaterial ref={flash} map={glowTex()} color={glow} transparent opacity={0} depthWrite={false} blending={AdditiveBlending} toneMapped={false} />
           </mesh>
-          {car && (
+          {car && !gone && (
             <mesh rotation-x={-Math.PI / 2} position-y={0.07} raycast={() => null}>
               <ringGeometry args={[1.12, 1.3, 36]} />
               <meshBasicMaterial color={glow} toneMapped={false} />
@@ -559,6 +563,28 @@ function SearchSpot({ i, at: p, loot, open, tarp, pad, speed, onPick, onFound }:
 }
 
 // ---- The scene ----
+
+// The crane on the back of the tow truck, in truck-local units.
+const PIVOT_Y = 1.05
+const PIVOT_Z = -0.62
+const TILT = 0.22 // boom rise per unit of reach
+const STEP = 0.05 // trail sample spacing
+const TOW_GAP = 1.5 // spacing of towed cars
+const BED_SCALE = 0.5
+
+type Pose = { a: number; len: number; drop: number }
+
+const lerpAngle = (a: number, b: number, t: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t
+const mix = (p: Pose, q: Pose, t: number): Pose => ({ a: lerpAngle(p.a, q.a, t), len: p.len + (q.len - p.len) * t, drop: p.drop + (q.drop - p.drop) * t })
+const tipOf = (px: number, py: number, pz: number, p: Pose): [number, number, number] => [px + Math.sin(p.a) * p.len, py + p.len * TILT, pz + Math.cos(p.a) * p.len]
+
+// Where the n-th small find sits in the truck bed (truck-local).
+const bedSlot = (n: number): [number, number, number] => [n % 2 ? 0.17 : -0.17, 0.66 + Math.floor(n / 4) * 0.2, -0.28 - (Math.floor(n / 2) % 2) * 0.26]
+
+function LootModel({ loot }: { loot: Loot }) {
+  if (loot.kind === 'car') return <CarModel body={carDef(loot.model).body} color={carDef(loot.model).colors[0]} rusty />
+  return <SmallLoot kind={loot.kind} />
+}
 
 type Props = {
   search: Search
@@ -599,7 +625,22 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
   // Truck state lives in refs and moves every frame.
   const truck = useRef<Group>(null)
   const rig = useMemo(() => wheelRig('truck'), [])
-  const st = useRef({ mode: 'intro' as Mode, s: 0, v: 0, spur: 9, yaw: Math.PI, goal: null as number | null, busyUntil: 0, focus: -1, focusAt: -99, dir: 1 })
+  const st = useRef({ mode: 'intro' as Mode, s: 0, v: 0, trip: 9, spur: 9, yaw: Math.PI, goal: null as number | null, busyUntil: 0, focus: -1, focusAt: -99, parked: -1 })
+  // Finds already hauled aboard: small ones ride in the bed, cars are towed
+  // in a line behind. Anything found before the scene came up starts aboard.
+  const [taken, setTaken] = useState<number[]>(() => search.pins.flatMap((l, i) => (search.revealed[i] && l.kind !== 'nothing' ? [i] : [])))
+  const [holding, setHolding] = useState<number | null>(null)
+  const takenRef = useRef(taken)
+  takenRef.current = taken
+  const grab = useRef<{ i: number; t0: number; held: boolean } | null>(null)
+  const seen = useRef<number[]>(search.revealed.map((r) => (r ? -1e9 : 0)))
+  // Where the truck has been, so towed cars can follow its exact path.
+  const trail = useRef<{ x: number; z: number; yaw: number }[]>([])
+  const boom = useRef<Mesh>(null)
+  const cable = useRef<Mesh>(null)
+  const hook = useRef<Group>(null)
+  const carried = useRef<Group>(null)
+  const towed = useRef<(Group | null)[]>([])
   const q = useRef(search)
   q.current = search
   const opts = useRef({ fast, auto, leaving, onArrive, onLeft, onBusy })
@@ -638,11 +679,18 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
   }, [camera, tall, size])
   const view = useRef({ x: 0, z: 0, d: 0 })
 
+  // The truck is parked at a find it hasn't hooked yet.
+  const pending = () => {
+    const s = st.current
+    const sq = q.current
+    return s.parked >= 0 && sq.revealed[s.parked] && sq.pins[s.parked].kind !== 'nothing' && !takenRef.current.includes(s.parked)
+  }
+
   const pick = (i: number) => {
     const s = st.current
     const sq = q.current
     if (sq.flat || sq.revealed[i] || s.goal !== null || s.mode === 'leave' || s.mode === 'gone' || s.mode === 'drive') return
-    if (performance.now() / 1000 < s.busyUntil) return
+    if (performance.now() / 1000 / SLOW < s.busyUntil || grab.current || pending()) return
     s.goal = i
     if (s.mode === 'idle') s.mode = 'drive'
   }
@@ -654,33 +702,37 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
 
   useFrame(({ clock, scene }, rawDt) => {
     scene.environmentIntensity = look.env
-    const dt = Math.min(rawDt, 0.1)
-    const now = clock.elapsedTime
-    const wall = performance.now() / 1000
+    const dt = Math.min(rawDt, 0.1) / SLOW
+    const now = clock.elapsedTime / SLOW
+    const wall = performance.now() / 1000 / SLOW
     const s = st.current
     const o = opts.current
     const sq = q.current
     const k = o.fast ? 2.6 : 1
-    const vmax = 9 * k
-    const acc = 9 * k
 
-    // Drives toward a distance around the loop the short way; true on arrival.
+    // Drives forward round the loop to a distance; true on arrival. Long trips
+    // go faster so no trip drags on.
     const driveTo = (target: number) => {
-      let delta = (((target - s.s) % L.len) + L.len) % L.len
-      if (delta > L.len / 2) delta -= L.len
-      const remaining = Math.abs(delta)
+      const remaining = (((target - s.s) % L.len) + L.len) % L.len
       if (remaining < 0.01) {
         s.s = target
         s.v = 0
         return true
       }
-      s.dir = Math.sign(delta)
-      s.v = Math.min(vmax, s.v + acc * dt, Math.sqrt(2 * acc * remaining) + 0.4)
-      s.s += s.dir * Math.min(remaining, s.v * dt)
+      if (s.v === 0) s.trip = Math.max(9, remaining / 1.8) * k
+      const acc = s.trip * 1.3
+      s.v = Math.min(s.trip, s.v + acc * dt, Math.sqrt(2 * acc * remaining) + 0.4)
+      s.s += Math.min(remaining, s.v * dt)
       return false
     }
 
-    if (o.leaving && s.mode !== 'leave' && s.mode !== 'gone' && !sq.flat) {
+    sq.revealed.forEach((r, i) => {
+      if (r && !seen.current[i]) seen.current[i] = now
+    })
+    const cars = takenRef.current.filter((i) => sq.pins[i].kind === 'car')
+    const smalls = takenRef.current.filter((i) => sq.pins[i].kind !== 'car')
+
+    if (o.leaving && s.mode !== 'leave' && s.mode !== 'gone' && !sq.flat && !grab.current && !pending()) {
       s.mode = 'leave'
       s.goal = null
     }
@@ -693,14 +745,15 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
         s.mode = s.goal !== null ? 'drive' : 'idle'
       }
     } else if (s.mode === 'idle') {
-      if (o.auto && !sq.flat && wall >= s.busyUntil) {
-        // Nearest unchecked spot, either way round.
+      // A fresh find: once it has risen into view, swing the hook out for it.
+      if (!grab.current && pending() && (now - seen.current[s.parked]) * k > 1.0) grab.current = { i: s.parked, t0: now, held: false }
+      if (o.auto && !sq.flat && wall >= s.busyUntil && !grab.current && !pending()) {
+        // Next unchecked spot ahead.
         let best = -1
         let bestD = Infinity
         sq.revealed.forEach((r, i) => {
           if (r) return
-          let d = Math.abs((((L.spots[i].s - s.s) % L.len) + L.len) % L.len)
-          d = Math.min(d, L.len - d)
+          const d = (((L.spots[i].s - s.s) % L.len) + L.len) % L.len
           if (d < bestD) {
             bestD = d
             best = i
@@ -712,27 +765,29 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
         }
       }
     } else if (s.mode === 'drive' && s.goal !== null) {
+      s.parked = -1
       if (driveTo(L.spots[s.goal].s)) {
         const i = s.goal
         s.goal = null
         s.mode = 'idle'
+        s.parked = i
         s.focus = i
         s.focusAt = now
         s.busyUntil = wall + 1.0 / k
         o.onArrive(i)
       }
     } else if (s.mode === 'leave') {
-      if (s.spur > 0 || driveTo(0)) {
-        s.dir = 1
+      s.parked = -1
+      if (s.spur > 0 || driveTo(Math.ceil(s.s / L.len - 0.001) * L.len)) {
         s.v = Math.min(9 * k, s.v + 8 * k * dt)
         s.spur += s.v * dt
-        if (s.spur > 10) {
+        if (s.spur > 10 + cars.length * 1.7) {
           s.mode = 'gone'
           o.onLeft()
         }
       }
     }
-    const busy = s.mode === 'drive' || s.mode === 'intro' || wall < s.busyUntil
+    const busy = s.mode === 'drive' || s.mode === 'intro' || wall < s.busyUntil || !!grab.current || pending()
     if (busy !== busyShown.current) {
       busyShown.current = busy
       o.onBusy(busy)
@@ -750,7 +805,7 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
       const p = at(L, s.s)
       x = p.x
       z = p.z
-      yaw = Math.atan2(p.tx * s.dir, p.tz * s.dir)
+      yaw = Math.atan2(p.tx, p.tz)
     }
     let dy = yaw - s.yaw
     dy = Math.atan2(Math.sin(dy), Math.cos(dy))
@@ -764,9 +819,122 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
     const roll = (s.v * dt) / (rig.radius * 1.1)
     for (const w of rig.spin) if (w) w.rotation.x = (w.rotation.x + roll) % (Math.PI * 2)
 
+    // Trail of where the truck has been. Seeded with the road it came in on.
+    const tr = trail.current
+    if (!tr.length) for (let j = 160; j > 0; j--) tr.push({ x, z: z + j * STEP, yaw: s.yaw })
+    const last = tr[tr.length - 1]
+    if (Math.hypot(x - last.x, z - last.z) >= STEP) {
+      tr.push({ x, z, yaw: s.yaw })
+      if (tr.length > 1200) tr.splice(0, tr.length - 1200)
+    }
+    const behind = (d: number) => tr[Math.max(0, tr.length - 1 - Math.round(d / STEP))]
+
+    // Truck-local point to world.
+    const cos = Math.cos(s.yaw)
+    const sin = Math.sin(s.yaw)
+    const local = (lx: number, ly: number, lz: number): [number, number, number] => [x + lx * cos + lz * sin, ly, z - lx * sin + lz * cos]
+
+    // The crane: a post at the back of the bed with a boom that swings
+    // round, lowers its hook onto a find and lifts it aboard.
+    const [px, py, pz] = local(0, PIVOT_Y, PIVOT_Z)
+    const rest: Pose = cars.length ? { a: s.yaw + Math.PI, len: 0.75, drop: 0.5 } : { a: s.yaw + Math.PI, len: 0.5, drop: 0.22 }
+    let pose = rest
+    const g = grab.current
+    let carriedAt: [number, number, number] | null = null
+    let carriedYaw = 0
+    let carriedScale = 1
+    if (g) {
+      const sp = L.spots[g.i]
+      const loot = sq.pins[g.i]
+      const isCar = loot.kind === 'car'
+      const u = (now - g.t0) * k
+      const reach = Math.hypot(sp.x - px, sp.z - pz)
+      const ta = Math.atan2(sp.x - px, sp.z - pz)
+      const hang = isCar ? 0.7 : 0.3
+      const itemTop = isCar ? 0.72 : 0.9
+      const tipY = py + reach * TILT
+      const over: Pose = { a: ta, len: reach, drop: 0.3 }
+      const down: Pose = { a: ta, len: reach, drop: tipY - itemTop }
+      const lifted: Pose = { a: ta, len: reach, drop: Math.max(0.3, tipY - itemTop - 0.6) }
+      // Small finds go into the bed; cars swing round behind to be towed.
+      const slot = bedSlot(smalls.length)
+      const bedReach = slot[2] - PIVOT_Z
+      const dest: Pose = isCar ? { a: s.yaw + Math.PI, len: 0.75, drop: 0.5 } : { a: s.yaw, len: bedReach, drop: PIVOT_Y + bedReach * TILT - slot[1] - hang * BED_SCALE }
+      const e = (v: number) => v * v * (3 - 2 * v)
+      if (u < 0.45) pose = mix(rest, over, e(u / 0.45))
+      else if (u < 0.7) pose = mix(over, down, e((u - 0.45) / 0.25))
+      else if (u < 1.15) pose = mix(down, lifted, e((u - 0.7) / 0.45))
+      else pose = mix(lifted, dest, e(clamp01((u - 1.15) / 0.5)))
+      if (u >= 0.7 && !g.held) {
+        g.held = true
+        setHolding(g.i)
+      }
+      if (g.held) {
+        const tip = tipOf(px, py, pz, pose)
+        let at3: [number, number, number] = [tip[0], tip[1] - pose.drop - hang, tip[2]]
+        const back = clamp01((u - 1.15) / 0.5)
+        carriedYaw = sp.yaw
+        if (isCar) {
+          // Ease into its place in the tow line.
+          const b = behind(TOW_GAP + cars.length * TOW_GAP)
+          const w = e(back)
+          at3 = [at3[0] + (b.x - at3[0]) * w, at3[1] + (0.1 - at3[1]) * w, at3[2] + (b.z - at3[2]) * w]
+          carriedYaw = lerpAngle(sp.yaw, b.yaw, w)
+        } else {
+          // Shrink to fit and settle into its spot in the bed.
+          const w = e(back)
+          const b = local(...slot)
+          at3 = [at3[0] + (b[0] - at3[0]) * w * w, at3[1] + (b[1] - at3[1]) * w * w, at3[2] + (b[2] - at3[2]) * w * w]
+          carriedScale = 1.4 + (BED_SCALE - 1.4) * w
+          carriedYaw = lerpAngle(sp.yaw, s.yaw, w)
+        }
+        carriedAt = at3
+      }
+      if (u >= 1.7) {
+        grab.current = null
+        setHolding(null)
+        setTaken((tk) => [...tk, g.i])
+      }
+    }
+    const tip = tipOf(px, py, pz, pose)
+    const bm = boom.current
+    if (bm) {
+      const len = Math.max(0.05, pose.len)
+      bm.position.set(px + Math.sin(pose.a) * len * 0.5, py + len * TILT * 0.5, pz + Math.cos(pose.a) * len * 0.5)
+      bm.rotation.set(-Math.atan(TILT), pose.a, 0, 'YXZ')
+      bm.scale.set(1, 1, Math.hypot(len, len * TILT))
+      bm.visible = s.mode !== 'gone'
+    }
+    const cb = cable.current
+    if (cb) {
+      cb.position.set(tip[0], tip[1] - pose.drop / 2, tip[2])
+      cb.scale.set(1, Math.max(0.01, pose.drop), 1)
+      cb.visible = s.mode !== 'gone'
+    }
+    const hk = hook.current
+    if (hk) {
+      hk.position.set(tip[0], tip[1] - pose.drop, tip[2])
+      hk.rotation.y = pose.a
+      hk.visible = s.mode !== 'gone'
+    }
+    const cg = carried.current
+    if (cg && carriedAt) {
+      cg.position.set(...carriedAt)
+      cg.rotation.y = carriedYaw
+      cg.scale.setScalar(carriedScale)
+    }
+    // Towed cars follow the truck's trail, the first one with its nose on the hook.
+    cars.forEach((_, n) => {
+      const c = towed.current[n]
+      if (!c) return
+      const b = behind(TOW_GAP + n * TOW_GAP)
+      c.position.set(b.x, n === 0 ? 0.1 : 0, b.z)
+      c.rotation.set(n === 0 ? -0.12 : 0, b.yaw, 0, 'YXZ')
+    })
+
     // Camera: frames the whole lot, drifts a little toward the truck, and
     // leans in while a find is being revealed.
-    const reveal = s.focus >= 0 && ((now - s.focusAt) * k < 1.8 || sq.flat)
+    const reveal = s.focus >= 0 && ((now - s.focusAt) * k < 1.8 || sq.flat || !!g)
     const f = reveal ? L.spots[s.focus] : null
     const lean = s.spur > 0 ? 0 : 0.18
     const gx = f ? f.x * 0.45 : x * lean
@@ -838,10 +1006,22 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
         <Scenery theme={search.spot} L={L} />
       </Batch>
       {L.spots.map((p, i) => (
-        <SearchSpot key={i} i={i} at={p} loot={search.pins[i]} open={search.revealed[i]} tarp={theme.tarp[i % theme.tarp.length]} pad={theme.pad} speed={speed} onPick={pick} onFound={onFound} />
+        <SearchSpot key={i} i={i} at={p} loot={search.pins[i]} open={search.revealed[i]} gone={holding === i || taken.includes(i)} tarp={theme.tarp[i % theme.tarp.length]} pad={theme.pad} speed={speed} onPick={pick} onFound={onFound} />
       ))}
       <group ref={truck}>
-        <TowTruck rig={rig} />
+        <TowTruck rig={rig} crane />
+        {/* Crane post, and the small finds riding in the bed. */}
+        <mesh position={[0, (PIVOT_Y + 0.5) / 2, PIVOT_Z]}>
+          <boxGeometry args={[0.1, PIVOT_Y - 0.5, 0.1]} />
+          <meshStandardMaterial color="#37474f" />
+        </mesh>
+        {taken
+          .filter((i) => search.pins[i].kind !== 'car')
+          .map((i, n) => (
+            <group key={i} position={bedSlot(n)} scale={BED_SCALE}>
+              <SmallLoot kind={search.pins[i].kind} />
+            </group>
+          ))}
         <mesh rotation-x={-Math.PI / 2} position-y={LAYER.paint} raycast={() => null}>
           <planeGeometry args={[1.3, 2.1]} />
           <meshBasicMaterial map={glowTex()} color="#000000" transparent opacity={0.35} depthWrite={false} />
@@ -852,6 +1032,32 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
           </group>
         )}
       </group>
+      <mesh ref={boom} raycast={() => null}>
+        <boxGeometry args={[0.08, 0.08, 1]} />
+        <meshStandardMaterial color="#37474f" />
+      </mesh>
+      <mesh ref={cable} raycast={() => null}>
+        <boxGeometry args={[0.02, 1, 0.02]} />
+        <meshStandardMaterial color="#212121" />
+      </mesh>
+      <group ref={hook}>
+        <mesh position-y={-0.08} rotation-y={Math.PI / 2} raycast={() => null}>
+          <torusGeometry args={[0.07, 0.022, 6, 12, Math.PI * 1.4]} />
+          <meshStandardMaterial color="#ffca28" metalness={0.6} roughness={0.3} />
+        </mesh>
+      </group>
+      {holding !== null && (
+        <group ref={carried}>
+          <LootModel loot={search.pins[holding]} />
+        </group>
+      )}
+      {taken
+        .filter((i) => search.pins[i].kind === 'car')
+        .map((i, n) => (
+          <group key={i} ref={(o) => void (towed.current[n] = o)}>
+            <LootModel loot={search.pins[i]} />
+          </group>
+        ))}
     </>
   )
 }
