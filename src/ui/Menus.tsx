@@ -13,6 +13,7 @@ import { PaintShop, jobOf } from './Paint'
 import type { PaintJob } from '../game/data'
 import { Icon } from './Icon'
 import { useCrewGoal } from './CrewGoal'
+import { useRivalWaiting } from './Rivals'
 
 // Phones and tablets: no hover, so placing takes a preview tap first.
 const TOUCH = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
@@ -24,6 +25,7 @@ export function BottomBar() {
   const visiting = useGame((s) => !!s.visiting)
   const setsReady = useGame((s) => readySets(s).length)
   const crewChests = useCrewGoal((g) => g.ready)
+  const rival = useRivalWaiting()
   if (visiting) return null
   if (mode !== 'play') return <EditBar />
   return (
@@ -34,7 +36,7 @@ export function BottomBar() {
         <button className="icon-btn" onClick={() => openPanel('garage')}><span className="i i-garage"><Icon name="wrench" /></span>GARAGE</button>
         <button className="icon-btn" onClick={() => openPanel('friends')}><span className="i i-friends"><Icon name="friends" />{crewChests > 0 && <span className="btn-dot">{crewChests}</span>}</span>FRIENDS</button>
         <button className="icon-btn" onClick={() => setMode('road')}><span className="i i-edit"><Icon name="cone" /></span>EDIT</button>
-        <button className="big-btn race-btn" onClick={() => openPanel('race')}><span className="i"><Icon name="flag" /></span>RACE</button>
+        <button className="big-btn race-btn" onClick={() => openPanel('race')}><span className="i"><Icon name="flag" />{rival && <span className="btn-dot" title="Your rival is in town">!</span>}</span>RACE</button>
       </div>
       <CollectAllButton />
     </>
