@@ -14,6 +14,8 @@ import { CrewGoalCard, useCrewGoal } from './CrewGoal'
 import { openChat, refreshChatRooms, useChat } from '../lib/chat'
 import { CrewBattleCard } from './CrewBattle'
 import { demoBattle, useCrewBattle } from '../lib/battles'
+import { PlayerName } from './Username'
+import { playerName } from '../lib/profiles'
 
 const n = (v: number) => v.toLocaleString()
 
@@ -174,7 +176,7 @@ export function LeadersPanel() {
               <div key={l.ownerId} className={l.mine ? 'leader board-row mine' : 'leader board-row'}>
                 <span className={`rank r${i + 1}`}>{i + 1}</span>
                 <div className="leader-main">
-                  <b>{l.townName}{l.mine ? ' (you)' : ''}</b>
+                  <b><PlayerName id={l.demo ? null : l.ownerId === 'me' ? uid : l.ownerId} town={l.townName} />{l.mine ? ' (you)' : ''}</b>
                   <div className="card-stat">
                     <ClanTag clan={l.clan} small /> Lvl {l.level}{l.demo ? ' · neighbour' : ''}
                   </div>
@@ -347,12 +349,12 @@ function ClanHome({ data, uid, onChange }: { data: MyClan; uid: string; onChange
             <div key={m.ownerId} className={me ? 'leader member-row mine' : 'leader member-row'}>
               <span className="rank">{m.role === 'leader' ? '👑' : m.level}</span>
               <div className="leader-main">
-                <b>{m.townName}{me ? ' (you)' : ''}</b>
+                <b><PlayerName id={m.ownerId} town={m.townName} />{me ? ' (you)' : ''}</b>
                 <div className="card-stat">Lvl {m.level} · ⚡ {n(m.power)} · 🏁 {n(m.raceWins)} · 🏆 {n(m.trophies)}</div>
               </div>
               {!me ? <button className="buy small" onClick={() => go(m.ownerId)}>Visit</button> : <span />}
               {role === 'leader' && !me ? (
-                <button className="sell small" disabled={busy} onClick={() => act(() => kickMember(m.ownerId), `${m.townName} was removed`)}>Remove</button>
+                <button className="sell small" disabled={busy} onClick={() => act(() => kickMember(m.ownerId), `${playerName(m.ownerId, m.townName)} was removed`)}>Remove</button>
               ) : <span />}
             </div>
           )

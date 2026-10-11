@@ -13,6 +13,7 @@ import { useNow } from '../scene/useNow'
 import { Icon } from './Icon'
 import { compact } from './format'
 import './crew-battle.css'
+import { PlayerName } from './Username'
 
 // Crew battles: a strip in the Crew window and the full-screen showdown, where the two crews' cars
 // face off at the start line of the week's venue with the live score and both rosters docked below.
@@ -120,7 +121,7 @@ function Roster({ s, side, me, online }: { s: BattleSide; side: 'us' | 'them'; m
         return (
           <div key={m.id} className={`cb-row${m.id === me ? ' me' : ''}`}>
             <i style={{ width: `${(m.points / top) * 100}%` }} />
-            <em>{i === 0 && m.points > 0 ? '👑 ' : ''}{m.id === me ? 'You' : m.name}</em>
+            <em>{i === 0 && m.points > 0 ? '👑 ' : ''}{m.id === me ? 'You' : <PlayerName id={m.id} town={m.name} />}</em>
             {live && (
               <button className="cb-duel" disabled={!!outgoing || (cooldownTo[live] ?? 0) > Date.now()} onClick={() => void challenge(live)} title={`Race ${m.name} live for +${BATTLE_RULES.h2h}`}>⚔️</button>
             )}
