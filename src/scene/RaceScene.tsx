@@ -16,6 +16,8 @@ import { LAYER, decal } from './layers'
 import { holdPageTint } from './pageTint'
 import { useGame } from '../game/store'
 import { Skyline } from './Skyline'
+import { Batch } from './Batch'
+import { Manhole } from './BuildingDetail'
 import { BUILDINGS, TILE, buildingDef } from '../game/data'
 
 export type RacerView = { dist: number }
@@ -158,11 +160,78 @@ function Lamp({ z, side }: { z: number; side: 1 | -1 }) {
   )
 }
 
+// Street furniture: crowd barriers at the start and finish, bunting across the
+// street, hydrants and bins on the sidewalks, manholes, and a start light tree.
+function StreetDressing({ len }: { len: number }) {
+  const barriers: number[] = []
+  for (let z = -4; z < 14; z += 1) barriers.push(z)
+  for (let z = len - 9; z < len + 5; z += 1) barriers.push(z)
+  const bunting: number[] = []
+  for (let z = 12; z < len - 4; z += 22) bunting.push(z)
+  const flags = ['#e53935', '#fdd835', '#1e88e5', '#43a047', '#fafafa']
+  const furniture: number[] = []
+  for (let z = 2; z < len + 20; z += 7) furniture.push(z)
+  return (
+    <group>
+      {barriers.map((z) => [-1, 1].map((sd) => (
+        <group key={`${z}${sd}`} position={[sd * (ROAD + 0.1), 0.08, z + 0.5]}>
+          {[0.18, 0.42].map((y) => (
+            <mesh key={y} position={[0, y, 0]}><boxGeometry args={[0.04, 0.07, 0.94]} /><meshStandardMaterial color={(Math.round(z) + (y > 0.3 ? 1 : 0)) % 2 ? '#e53935' : '#fafafa'} /></mesh>
+          ))}
+          {[-0.42, 0.42].map((dz) => <mesh key={dz} position={[0, 0.24, dz]}><boxGeometry args={[0.04, 0.48, 0.04]} /><meshStandardMaterial color="#90a4ae" /></mesh>)}
+        </group>
+      )))}
+      {bunting.map((z) => (
+        <group key={z} position={[0, 0, z]}>
+          {Array.from({ length: 13 }, (_, i) => {
+            const t = i / 12
+            const x = -ROAD - 0.6 + t * (ROAD + 0.6) * 2
+            const y = 3.1 - Math.sin(t * Math.PI) * 0.45
+            return (
+              <mesh key={i} position={[x, y - 0.12, 0]} rotation-z={Math.PI}>
+                <coneGeometry args={[0.12, 0.24, 3]} />
+                <meshStandardMaterial color={flags[i % flags.length]} flatShading />
+              </mesh>
+            )
+          })}
+          {[-1, 1].map((sd) => (
+            <mesh key={sd} position={[sd * (ROAD + 0.6), 1.6, 0]}><cylinderGeometry args={[0.04, 0.05, 3.2, 6]} /><meshStandardMaterial color="#37474f" /></mesh>
+          ))}
+        </group>
+      ))}
+      {furniture.map((z, i) => {
+        const sd = i % 2 ? 1 : -1
+        const x = sd * (ROAD + WALK - 0.2)
+        return i % 3 === 0 ? (
+          <group key={z} position={[x, 0.08, z]}>
+            <mesh position={[0, 0.12, 0]}><cylinderGeometry args={[0.06, 0.07, 0.24, 8]} /><meshStandardMaterial color="#e53935" /></mesh>
+            <mesh position={[0, 0.26, 0]}><sphereGeometry args={[0.065, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2]} /><meshStandardMaterial color="#e53935" /></mesh>
+          </group>
+        ) : i % 3 === 1 ? (
+          <group key={z} position={[x, 0.08, z]}>
+            <mesh position={[0, 0.16, 0]}><cylinderGeometry args={[0.1, 0.09, 0.32, 10]} /><meshStandardMaterial color="#37474f" /></mesh>
+            <mesh position={[0, 0.33, 0]}><cylinderGeometry args={[0.11, 0.11, 0.03, 10]} /><meshStandardMaterial color="#546e7a" /></mesh>
+          </group>
+        ) : (
+          <Manhole key={z} x={-sd * LANE} z={z} />
+        )
+      })}
+      {/* Start light tree beside the line. */}
+      <group position={[-(ROAD + 0.45), 0, -0.4]}>
+        <mesh position={[0, 0.8, 0]}><cylinderGeometry args={[0.05, 0.06, 1.6, 6]} /><meshStandardMaterial color="#37474f" /></mesh>
+        <mesh position={[0, 1.75, 0]}><boxGeometry args={[0.22, 0.62, 0.16]} /><meshStandardMaterial color="#212121" /></mesh>
+        {['#f44336', '#ffb300', '#4caf50'].map((col, i) => (
+          <mesh key={col} position={[0, 1.95 - i * 0.2, 0.081]}><circleGeometry args={[0.07, 12]} /><meshBasicMaterial color={col} toneMapped={false} /></mesh>
+        ))}
+      </group>
+    </group>
+  )
+}
+
 // Main street drag race, lined with the player's own town, seen from a chase camera.
 export function RaceScene({ track, me, them, mine, theirs }: Props) {
   const meRef = useRef<Group>(null)
   const themRef = useRef<Group>(null)
-  const scenery = useRef<(Group | null)[]>([])
   const { camera, size } = useThree()
   const len = track * SCALE
   const slots = useStreet(len)
@@ -201,11 +270,6 @@ export function RaceScene({ track, me, them, mine, theirs }: Props) {
     const tall = size.height > size.width
     camera.position.lerp({ x: tall ? 0 : LANE * 0.5, y: tall ? 2.7 : 2.2, z: target - (tall ? 5.2 : 4.2) } as never, 0.15)
     camera.lookAt(tall ? 0 : LANE * 0.3, 0.3, Math.min(target + 3 + (lead - target) * 0.3, len + 4))
-    // Only draw the stretch of street near the camera.
-    const cz = camera.position.z
-    scenery.current.forEach((g) => {
-      if (g) g.visible = g.position.z > cz - 6 && g.position.z < cz + 48
-    })
   })
 
   return (
@@ -222,62 +286,66 @@ export function RaceScene({ track, me, them, mine, theirs }: Props) {
         <planeGeometry args={[80, len + 100]} />
         <meshStandardMaterial color={PAL.ground} />
       </mesh>
-      {[-1, 1].map((sd) => (
-        <mesh key={sd} position={[sd * (ROAD + WALK / 2), 0.04, len / 2 + 5]}>
-          <boxGeometry args={[WALK, 0.08, len + 50]} />
-          <meshStandardMaterial map={paverTex(0.5, (len + 50) / 2)} />
+      {/* The street is static, so it's merged into a few draws like the town. */}
+      <Batch version={slots}>
+        {[-1, 1].map((sd) => (
+          <mesh key={sd} position={[sd * (ROAD + WALK / 2), 0.04, len / 2 + 5]}>
+            <boxGeometry args={[WALK, 0.08, len + 50]} />
+            <meshStandardMaterial map={paverTex(0.5, (len + 50) / 2)} />
+          </mesh>
+        ))}
+        <mesh rotation-x={-Math.PI / 2} position={[0, LAYER.land, len / 2 + 5]}>
+          <planeGeometry args={[ROAD * 2, len + 50]} />
+          <meshStandardMaterial map={asphalt} />
         </mesh>
-      ))}
-      <mesh rotation-x={-Math.PI / 2} position={[0, LAYER.land, len / 2 + 5]}>
-        <planeGeometry args={[ROAD * 2, len + 50]} />
-        <meshStandardMaterial map={asphalt} />
-      </mesh>
-      {/* Centre line dashes and edge lines. */}
-      {Array.from({ length: Math.ceil((len + 30) / 2) }, (_, i) => (
-        <mesh key={i} rotation-x={-Math.PI / 2} position={[0, LAYER.grid, i * 2 - 8]}>
-          <planeGeometry args={[0.06, 1]} />
-          <meshBasicMaterial color="#fafafa" {...decal()} />
+        {/* Centre line dashes and edge lines. */}
+        {Array.from({ length: Math.ceil((len + 30) / 2) }, (_, i) => (
+          <mesh key={i} rotation-x={-Math.PI / 2} position={[0, LAYER.grid, i * 2 - 8]}>
+            <planeGeometry args={[0.06, 1]} />
+            <meshBasicMaterial color="#fafafa" {...decal()} />
+          </mesh>
+        ))}
+        {[-1, 1].map((sd) => (
+          <mesh key={sd} rotation-x={-Math.PI / 2} position={[sd * (ROAD - 0.08), LAYER.grid, len / 2 + 5]}>
+            <planeGeometry args={[0.07, len + 50]} />
+            <meshBasicMaterial color="#ffd54f" {...decal()} />
+          </mesh>
+        ))}
+        {/* Start grid line and chequered finish. */}
+        <mesh rotation-x={-Math.PI / 2} position={[0, LAYER.lot, -0.6]}>
+          <planeGeometry args={[ROAD * 2, 0.15]} />
+          <meshBasicMaterial color="#fafafa" {...decal(2)} />
         </mesh>
-      ))}
-      {[-1, 1].map((sd) => (
-        <mesh key={sd} rotation-x={-Math.PI / 2} position={[sd * (ROAD - 0.08), LAYER.grid, len / 2 + 5]}>
-          <planeGeometry args={[0.07, len + 50]} />
-          <meshBasicMaterial color="#ffd54f" {...decal()} />
+        <mesh rotation-x={-Math.PI / 2} position={[0, LAYER.lot, len]}>
+          <planeGeometry args={[ROAD * 2, 0.5]} />
+          <meshBasicMaterial map={signTexture('▚▚▚▚▚▚▚▚', '#ffffff', '#111111')} {...decal(2)} />
         </mesh>
-      ))}
-      {/* Start grid line and chequered finish. */}
-      <mesh rotation-x={-Math.PI / 2} position={[0, LAYER.lot, -0.6]}>
-        <planeGeometry args={[ROAD * 2, 0.15]} />
-        <meshBasicMaterial color="#fafafa" {...decal(2)} />
-      </mesh>
-      <mesh rotation-x={-Math.PI / 2} position={[0, LAYER.lot, len]}>
-        <planeGeometry args={[ROAD * 2, 0.5]} />
-        <meshBasicMaterial map={signTexture('▚▚▚▚▚▚▚▚', '#ffffff', '#111111')} {...decal(2)} />
-      </mesh>
-      <Banner z={-0.8} text="START" bg="#2e7d32" />
-      <Banner z={len} text="FINISH" bg="#c62828" />
+        <Banner z={-0.8} text="START" bg="#2e7d32" />
+        <Banner z={len} text="FINISH" bg="#c62828" />
+        {/* Shops facing the street, with trees in the gaps and lamps on the kerb. */}
+        {slots.map((sl, i) => {
+          const d = buildingDef(sl.def)
+          const depth = d.h * TILE
+          return (
+            <group key={i} position={[0, 0, sl.z]}>
+              <group position={[sl.side * (ROAD + WALK + depth / 2 + 0.1), 0, 0]} rotation-y={sl.side < 0 ? Math.PI / 2 : -Math.PI / 2}>
+                <mesh rotation-x={-Math.PI / 2} position-y={LAYER.lot}>
+                  <planeGeometry args={[d.w * TILE - 0.1, depth - 0.1]} />
+                  <meshStandardMaterial map={paverTex(d.w, d.h)} />
+                </mesh>
+                <BuildingModel def={d} />
+              </group>
+              <group position={[sl.side * (ROAD + WALK + 0.9), 0, d.w + 0.7]}>
+                <BuildingModel def={buildingDef(i % 3 ? 'tree' : 'palm')} />
+              </group>
+              {i % 2 === 0 && <Lamp z={d.w + 0.7} side={sl.side} />}
+            </group>
+          )
+        })}
+        <StreetDressing len={len} />
+      </Batch>
       <Spectators len={len} />
       <Skyline len={len} edge={ROAD + WALK + 4.2} night={night} />
-      {/* Shops facing the street, with trees in the gaps and lamps on the kerb. */}
-      {slots.map((sl, i) => {
-        const d = buildingDef(sl.def)
-        const depth = d.h * TILE
-        return (
-          <group key={i} ref={(g) => { scenery.current[i] = g }} position={[0, 0, sl.z]}>
-            <group position={[sl.side * (ROAD + WALK + depth / 2 + 0.1), 0, 0]} rotation-y={sl.side < 0 ? Math.PI / 2 : -Math.PI / 2}>
-              <mesh rotation-x={-Math.PI / 2} position-y={LAYER.lot}>
-                <planeGeometry args={[d.w * TILE - 0.1, depth - 0.1]} />
-                <meshStandardMaterial map={paverTex(d.w, d.h)} />
-              </mesh>
-              <BuildingModel def={d} />
-            </group>
-            <group position={[sl.side * (ROAD + WALK + 0.9), 0, d.w + 0.7]}>
-              <BuildingModel def={buildingDef(i % 3 ? 'tree' : 'palm')} />
-            </group>
-            {i % 2 === 0 && <Lamp z={d.w + 0.7} side={sl.side} />}
-          </group>
-        )
-      })}
       {/* Soft shadows under the racers. */}
       {[meRef, themRef].map((r, i) => (
         <group key={i} ref={r} scale={1.4}>

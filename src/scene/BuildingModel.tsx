@@ -2,6 +2,7 @@ import { TILE, levelLift, type BuildingDef } from '../game/data'
 import { useGame } from '../game/store'
 import { signTexture } from './signTexture'
 import { CarModel } from './CarModel'
+import { ObstacleDetail, BenchDetail, BillboardDetail, DriveInDetail, FlowerDetail, FountainDetail, GarageDetail, HouseDetail, LampDetail, PondDetail, ShopDetail, SpeedwayDetail, StatueDetail, TreeDetail } from './BuildingDetail'
 import type { Texture } from 'three'
 import { glowMats } from './dayNight'
 import { PAL, SEASON } from './season'
@@ -255,6 +256,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
               {m(PAL.bush[i % 2])}
             </mesh>
           ))}
+          {!ghost && <ObstacleDetail id={def.id} />}
         </group>
       )
     case 'rock':
@@ -268,6 +270,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             <dodecahedronGeometry args={[0.3, 0]} />
             {m(def.roof)}
           </mesh>
+          {!ghost && <ObstacleDetail id={def.id} />}
         </group>
       )
     case 'cactus':
@@ -289,6 +292,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             <cylinderGeometry args={[0.55, 0.6, 0.12, 14]} />
             {m('#d7b77b')}
           </mesh>
+          {!ghost && <ObstacleDetail id={def.id} />}
         </group>
       )
     case 'tree': {
@@ -337,6 +341,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
               <meshStandardMaterial color={g ?? PAL.leaves[i]} transparent={ghost} opacity={ghost ? 0.55 : 1} flatShading />
             </mesh>
           ))}
+          {!ghost && <TreeDetail />}
         </group>
       )
     }
@@ -390,6 +395,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             {m('#b3e5fc')}
           </mesh>
           {!ghost && <LightPool r={1.1} />}
+          {!ghost && <FountainDetail stone={def.color} />}
         </group>
       )
     case 'flowers':
@@ -399,6 +405,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
           {[[-0.4, -0.4], [0, -0.35], [0.4, -0.4], [-0.35, 0], [0.05, 0.05], [0.4, 0], [-0.4, 0.4], [0, 0.4], [0.4, 0.38]].map(([x, z], i) => (
             <mesh key={i} position={[x, 0.26, z]}><sphereGeometry args={[0.13, 8, 6]} />{m(['#e91e63', '#ffeb3b', '#ab47bc', '#ff7043'][i % 4])}</mesh>
           ))}
+          {!ghost && <FlowerDetail />}
         </group>
       )
     case 'lamp':
@@ -408,6 +415,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
           <mesh position={[0.2, 1.78, 0]}><boxGeometry args={[0.45, 0.05, 0.08]} />{m(def.color)}</mesh>
           <mesh position={[0.38, 1.72, 0]}><sphereGeometry args={[0.1, 10, 8]} />{bulb}</mesh>
           {!ghost && <LightPool r={0.9} x={0.38} />}
+          {!ghost && <LampDetail iron={def.color} />}
         </group>
       )
     case 'bench':
@@ -416,6 +424,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
           <mesh position={[0, 0.3, 0]} castShadow><boxGeometry args={[1, 0.06, 0.32]} />{m(def.color)}</mesh>
           <mesh position={[0, 0.5, -0.15]} castShadow><boxGeometry args={[1, 0.3, 0.05]} />{m(def.color)}</mesh>
           {[-0.42, 0.42].map((x) => <mesh key={x} position={[x, 0.15, 0]}><boxGeometry args={[0.06, 0.3, 0.3]} />{m(def.roof)}</mesh>)}
+          {!ghost && <BenchDetail wood={def.color} iron={def.roof} />}
         </group>
       )
     case 'billboard':
@@ -433,6 +442,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             <mesh key={x} position={[x, 1.2, 0.3]} rotation-x={-0.6}><boxGeometry args={[0.12, 0.08, 0.12]} />{bulb}</mesh>
           ))}
           {!ghost && <LightPool r={0.8} z={0.5} />}
+          {!ghost && <BillboardDetail />}
         </group>
       )
     case 'statue':
@@ -442,6 +452,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
           <group position={[0, 0.7, 0]} rotation-y={0.6} scale={1.2}>
             {ghost ? <mesh position-y={0.25}><boxGeometry args={[0.7, 0.4, 1.2]} />{m(def.color)}</mesh> : <CarModel body="super" color={def.color} />}
           </group>
+          {!ghost && <StatueDetail stone={def.roof} />}
         </group>
       )
     case 'pond':
@@ -459,6 +470,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
           {[[1.4, 1.2], [-1.3, 1.3], [1.3, -1.3]].map(([x, z], i) => (
             <mesh key={i} position={[x, 0.3, z]} castShadow><sphereGeometry args={[0.3, 10, 8]} />{m('#388e3c')}</mesh>
           ))}
+          {!ghost && <PondDetail />}
         </group>
       )
     case 'stadium': {
@@ -515,6 +527,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             const a = Math.PI * 0.15 + Math.PI * 1.1 * t
             return <Flag key={t} x={Math.sin(a) * 1.95} y={sh + 0.1} z={Math.cos(a) * 1.95} color={def.roof} star={lvl >= 10} />
           })}
+          {!ghost && <SpeedwayDetail sh={sh} roof={def.roof} />}
           {sign && <Sign text="SPEEDWAY" w={2} y={1.25 + lift * 0.5} z={0} bg="#c62828" fg="#ffffff" />}
         </group>
       )
@@ -568,6 +581,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
                 <mesh position={[0, 0.2, 0]}><boxGeometry args={[0.03, 0.4, 0.03]} />{m('#5d4037')}</mesh>
                 <mesh position={[0, 0.42, 0]}><boxGeometry args={[0.1, 0.08, 0.16]} />{m('#1e88e5')}</mesh>
               </group>
+              <HouseDetail />
             </>
           )}
         </group>
@@ -689,6 +703,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
               {m('#263238')}
             </mesh>
           ))}
+          {!ghost && <GarageDetail W={W} D={D} />}
           {sign && <Sign text="MY GARAGE" w={2.2} y={1.42} z={0.33} bg="#263238" fg="#ffca28" />}
         </group>
       )
@@ -836,10 +851,14 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             <boxGeometry args={[3.6, 0.05, 3]} />
             {m('#757575')}
           </mesh>
-          <mesh position={[1.2, 0.5, 1.3]} castShadow>
-            <boxGeometry args={[0.8, 1, 0.8]} />
-            {m('#e53935')}
-          </mesh>
+          {ghost ? (
+            <mesh position={[1.2, 0.5, 1.3]}>
+              <boxGeometry args={[0.8, 1, 0.8]} />
+              {m('#e53935')}
+            </mesh>
+          ) : (
+            <DriveInDetail />
+          )}
           {/* Speaker posts in the lot and a projector beam on the screen. */}
           {!ghost && [[-0.9, -0.2], [0, -0.2], [0.9, -0.2], [-0.9, 0.9], [0, 0.9]].map(([x, z], i) => (
             <group key={i} position={[x, 0, z]}>
@@ -999,6 +1018,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
               <meshStandardMaterial color={GOLD} metalness={0.6} roughness={0.3} />
             </mesh>
           )}
+          {!ghost && <ShopDetail W={W} D={D} h={h} F={F} roof={def.roof} rows={rows} cols={cols} awning={m('#ffffff', awningTex(def.roof === '#f5f5f5' || def.roof === '#fff8e1' ? def.color : def.roof))} mullions={def.id !== 'motel' && def.id !== 'carwash'} />}
           {/* Planters by the door. */}
           {!ghost && [-1, 1].map((sd) => (
             <group key={sd} position={[sd * (W * 0.41 - 0.12), 0, F + 0.15]}>
