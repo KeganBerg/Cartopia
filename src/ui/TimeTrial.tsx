@@ -118,7 +118,8 @@ export function beginTrialRun() {
 
 // The end-of-run card: the time, whether it's a new best, and where it put you.
 export function TrialResult({ myTime, target, ghost, onAgain, onExit }: { myTime: number; target: number; ghost: string; onAgain: () => void; onExit: () => void }) {
-  const before = localBest()
+  // This device's best before this run, read once (the run is saved as the new best below).
+  const [before] = useState(() => localBest())
   const [posted, setPosted] = useState<Board | null | 'local' | 'pending'>('pending')
   useEffect(() => {
     saveLocalBest(myTime)
@@ -138,13 +139,13 @@ export function TrialResult({ myTime, target, ghost, onAgain, onExit }: { myTime
       <div className="rr-card">
         <div className="rr-icon">⏱️</div>
         <h3 className="rr-title trial-time">{(board?.kept ?? myTime).toFixed(3)}s</h3>
-        <p className="rr-sub">{best ? 'NEW BEST!' : beat ? `Beat ${ghost}!` : `${ghost}: ${target.toFixed(3)}s`}</p>
+        <p className="rr-sub">{best ? 'NEW BEST!' : beat ? `You beat ${ghost.toLowerCase()}!` : `${ghost}: ${target.toFixed(3)}s`}</p>
         <div className="rr-loot">
           {posted === 'pending' && <span>Posting...</span>}
           {board?.me && <span>{place(board.me.place)} of {board.total} this week</span>}
           {posted === 'local' && <span>{signedInUser() ? "Couldn't post this run" : 'Sign in to post times'}</span>}
         </div>
-        <div className="row">
+        <div className="row trial-row">
           <button className="buy alt rr-go" onClick={onExit}>Board</button>
           <button className="buy rr-go" onClick={onAgain}>↻ Again · ⛽{TRIAL_FUEL}</button>
         </div>

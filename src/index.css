@@ -357,6 +357,8 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .trial-prize .ico { display: inline-grid; width: 16px; height: 16px; font-size: 10px; vertical-align: -3px; border-width: 1px; }
 .trial-soon { font: 14px var(--display); color: #8d6e63; white-space: nowrap; }
 .rr-title.trial-time { font-size: 40px; }
+.trial-row { justify-content: center; }
+.trial-row .rr-go { min-width: 0; flex: 1; font-size: 18px; white-space: nowrap; }
 .stars { color: #cfd8dc; letter-spacing: 1px; white-space: nowrap; }
 .stars i { font-style: normal; }
 .stars i.on { color: #ffb300; text-shadow: 0 1px 0 #e65100; }
