@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 type Row = { owner_id: string; state: { level: number; townName: string; updatedAt: number }; updated_at: string; level: number }
 let db: Map<string, Row>
 let serverWrites: number
+// Stands in for the server's economy guard: trims a save and says what it changed.
+let serverTrim: ((s: Row['state']) => object | null) | null
 
 function stamp(iso: string) {
   // Postgres hands timestamps back in its own format, not the one we sent.
@@ -33,16 +35,18 @@ function fakeClient(signedInAs?: string) {
         }
         if (op === 'insert') {
           if (db.has(payload.owner_id)) return { data: null, error: { code: '23505', message: 'duplicate' } }
+          const corrections = serverTrim?.(payload.state) ?? null
           db.set(payload.owner_id, { ...payload, updated_at: stamp(payload.updated_at) })
           serverWrites++
-          return { data: [{ updated_at: db.get(payload.owner_id)!.updated_at }], error: null }
+          return { data: [{ updated_at: db.get(payload.owner_id)!.updated_at, corrections }], error: null }
         }
         const row = db.get(filters.owner_id)
         if (!row || (filters.updated_at && row.updated_at !== filters.updated_at)) return { data: [], error: null }
         if (payload.state.level < row.state.level) return { data: null, error: { code: '23514', message: 'refusing level drop' } }
+        const corrections = serverTrim?.(payload.state) ?? null
         db.set(row.owner_id, { ...payload, updated_at: stamp(payload.updated_at) })
         serverWrites++
-        return { data: [{ updated_at: db.get(row.owner_id)!.updated_at }], error: null }
+        return { data: [{ updated_at: db.get(row.owner_id)!.updated_at, corrections }], error: null }
       }
       const q = {
         select: () => q,
@@ -103,6 +107,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date('2026-10-10T12:00:00Z'))
   db = new Map()
   serverWrites = 0
+  serverTrim = null
 })
 
 afterEach(() => {
@@ -188,5 +193,28 @@ describe('moving between devices', () => {
     sameBrowser = await signIn(sameBrowser, 'nate')
     expect(db.get('nate')!.state.townName).toBe('Nate Town')
     expect(sameBrowser.useGame.getState().townName).toBe('Nate Town')
+  })
+})
+
+describe('server economy checks', () => {
+  it('plays on from the server copy when the server trims a save', async () => {
+    let phone = await openGame({})
+    phone = await signIn(phone, 'kegan')
+    await play(phone, { level: 4, townName: 'Phone Town' })
+
+    // A level jump the server can't verify gets cut back to what it allows.
+    serverTrim = (s) => (s.level > 5 ? ((s.level = 5), { xp: { sent: 99, kept: 5 } }) : null)
+    await play(phone, { level: 60, townName: 'Phone Town' })
+    expect(db.get('kegan')!.state.level).toBe(5)
+    expect(phone.reloads).toBe(1)
+    phone = await boot(phone.snapshot(), 'kegan')
+    expect(phone.reloads).toBe(0)
+    expect(phone.useGame.getState().level).toBe(5)
+
+    // Normal play after that saves as usual.
+    const writes = serverWrites
+    await play(phone, { level: 5, townName: 'Still Phone Town' })
+    expect(serverWrites).toBe(writes + 1)
+    expect(phone.reloads).toBe(0)
   })
 })
