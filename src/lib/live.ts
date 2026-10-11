@@ -66,6 +66,8 @@ export const useLive = create<LiveState>(() => ({
 }))
 
 let lobby: RealtimeChannel | null = null
+// Challenges we sent, so a late accept of one we already dropped can be told it expired.
+const sentIds = new Set<string>()
 
 function myCard(): LivePlayer {
   const s = useGame.getState()
@@ -93,9 +95,28 @@ export function joinLobby() {
       useLive.setState({ invites: [...l.invites.filter((i) => i.from.id !== from.id), { raceId: payload.raceId, from, at: Date.now() }] })
       if (fresh) useGame.getState().toast(`${from.town} challenged you to a race! Tap 🏁 to answer.`)
     })
+    .on('broadcast', { event: 'cancel' }, ({ payload }) => {
+      const l = useLive.getState()
+      const inv = l.invites.find((i) => i.raceId === payload.raceId)
+      if (payload.to !== myId || !inv) return
+      useLive.setState({ invites: l.invites.filter((i) => i.raceId !== payload.raceId) })
+      useGame.getState().toast(`${inv.from.town} called off their challenge`)
+    })
+    .on('broadcast', { event: 'expired' }, ({ payload }) => {
+      const race = useLive.getState().race
+      if (payload.to !== myId || !race || race.raceId !== payload.raceId || race.host) return
+      useLive.setState({ race: null })
+      useGame.getState().toast(`${race.opponent.town}'s challenge had already expired`)
+    })
     .on('broadcast', { event: 'answer' }, ({ payload }) => {
       const out = useLive.getState().outgoing
-      if (!out || payload.raceId !== out.raceId) return
+      if (!out || payload.raceId !== out.raceId) {
+        // They accepted after we cancelled or gave up: let them know instead of leaving them waiting.
+        if (payload.accept && sentIds.has(payload.raceId)) {
+          lobby?.send({ type: 'broadcast', event: 'expired', payload: { raceId: payload.raceId, to: payload.from.id } })
+        }
+        return
+      }
       useLive.setState({ outgoing: null })
       if (!payload.accept) {
         useLive.setState((l) => ({ cooldownTo: { ...l.cooldownTo, [out.to]: Date.now() + COOLDOWN_MS } }))
@@ -122,6 +143,7 @@ export function challenge(to: string) {
   const l = useLive.getState()
   if (l.outgoing || (l.cooldownTo[to] ?? 0) > Date.now()) return
   const raceId = crypto.randomUUID()
+  sentIds.add(raceId)
   useLive.setState({ outgoing: { raceId, to } })
   lobby?.send({ type: 'broadcast', event: 'challenge', payload: { to, raceId, from: myCard() } })
   // Give up if nobody answers.
@@ -131,6 +153,15 @@ export function challenge(to: string) {
       useGame.getState().toast('No answer to your challenge')
     }
   }, INVITE_MS)
+}
+
+// Call off our challenge before it's answered. The other player's invite disappears.
+export function cancelChallenge() {
+  const out = useLive.getState().outgoing
+  if (!out) return
+  lobby?.send({ type: 'broadcast', event: 'cancel', payload: { raceId: out.raceId, to: out.to } })
+  useLive.setState({ outgoing: null })
+  useGame.getState().toast('Challenge cancelled')
 }
 
 export function answer(raceId: string, accept: boolean) {
@@ -181,14 +212,15 @@ export function endLiveRace() {
   useLive.setState({ race: null })
 }
 
-// Per-race channel: opponent's distance and finish time, plus the start signal.
-export function raceChannel(raceId: string, handlers: { onPos: (p: { dist: number; t: number; speed: number }) => void; onFinish: (t: number) => void; onGo: () => void; onReady: () => void }) {
+// Per-race channel: opponent's distance and finish time, the start signal, and leaving before the start.
+export function raceChannel(raceId: string, handlers: { onPos: (p: { dist: number; t: number; speed: number }) => void; onFinish: (t: number) => void; onGo: () => void; onReady: () => void; onLeave: () => void }) {
   if (!supabase) return null
   const ch = supabase.channel(`race-${raceId}`, { config: { broadcast: { self: false } } })
   ch.on('broadcast', { event: 'pos' }, ({ payload }) => handlers.onPos({ dist: payload.dist, t: payload.t ?? 0, speed: payload.speed ?? 0 }))
     .on('broadcast', { event: 'finish' }, ({ payload }) => handlers.onFinish(payload.t))
     .on('broadcast', { event: 'go' }, () => handlers.onGo())
     .on('broadcast', { event: 'ready' }, () => handlers.onReady())
+    .on('broadcast', { event: 'leave' }, () => handlers.onLeave())
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') ch.send({ type: 'broadcast', event: 'ready', payload: {} })
     })
