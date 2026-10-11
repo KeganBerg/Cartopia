@@ -315,22 +315,49 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .gp-rounds i { font: 14px var(--display); font-style: normal; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: #eceff1; color: #78909c; border: 2px solid #cfd8dc; }
 .gp-rounds i.won { background: var(--green); color: #fff; border-color: #2e7d32; }
 .gp-rounds i.next { background: #fff3e0; color: #e65100; border-color: var(--accent); animation: badgepulse 1.2s ease-in-out infinite; }
-.camp-head { display: flex; align-items: center; gap: 10px; background: none; border: none; padding: 0; text-align: left; color: inherit; font: inherit; cursor: pointer; width: 100%; }
-.camp-head:disabled { cursor: default; }
-.camp-num { font: 18px var(--display); width: 34px; height: 34px; flex: none; border-radius: 10px; display: grid; place-items: center; background: var(--accent); color: #fff; }
-.camp-card.locked .camp-num { background: #b0bec5; }
-.camp-title { display: flex; flex-direction: column; min-width: 0; flex: 1; }
-.camp-title b { font-size: 17px; }
-.camp-title small { color: #607d8b; font-size: 12px; }
-.camp-stars { font: 14px var(--display); white-space: nowrap; color: #f57f17; }
-.camp-card.open { border-color: var(--accent); }
-.camp-bonus { display: flex; flex-wrap: wrap; gap: 4px 14px; }
-.camp-bonus .got { color: #2e7d32; }
-.camp-bonus .ico, .camp-prize .ico { display: inline-grid; width: 15px; height: 15px; font-size: 10px; vertical-align: -2px; border-width: 1px; }
-.camp-show { justify-self: start; }
-.camp-races .rival.boss { border-color: #ffb300; background: #fff8e1; }
-.camp-races .rival.locked { opacity: .6; }
-.boss-tag { background: #d84315; }
+.camp { display: grid; gap: 10px; }
+.camp-progress { position: relative; height: 22px; border-radius: 11px; background: #eceff1; overflow: hidden; }
+.camp-progress i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #ffca28, #ff9800); border-radius: 11px; }
+.camp-progress span { position: relative; z-index: 1; display: block; text-align: center; font: 13px/22px var(--display); color: #4e342e; }
+.camp-map { display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 6px; scrollbar-width: none; }
+.camp-map::-webkit-scrollbar { display: none; }
+.camp-node { flex: 1 0 64px; display: grid; justify-items: center; gap: 1px; padding: 6px 4px; border-radius: 14px; border: 2px solid #e0e0e0; background: #fff; color: inherit; font: inherit; cursor: pointer; position: relative; }
+.camp-node-ico { font-size: 24px; line-height: 1; }
+.camp-node b { font: 13px var(--display); }
+.camp-node small { font-size: 11px; font-weight: 800; color: #f57f17; }
+.camp-node.done { border-color: #a5d6a7; background: #f1f8e9; }
+.camp-node.locked { background: #f5f5f5; }
+.camp-node.locked small { color: #90a4ae; }
+.camp-node.sel { border-color: var(--accent); box-shadow: 0 3px 0 var(--accent); transform: translateY(-1px); }
+.camp-chapter { border-radius: 16px; overflow: hidden; border: 2px solid #e0e0e0; background: #fff; }
+.camp-banner { display: flex; align-items: center; gap: 10px; padding: 10px 12px; color: #fff; background: linear-gradient(120deg, #1e88e5, #3949ab); text-shadow: 0 1px 2px rgba(0,0,0,.35); flex-wrap: wrap; }
+.venue-docks .camp-banner { background: linear-gradient(120deg, #455a64, #1565c0); }
+.venue-desert .camp-banner { background: linear-gradient(120deg, #e65100, #bf360c); }
+.venue-snow .camp-banner { background: linear-gradient(120deg, #4fc3f7, #5c6bc0); }
+.venue-beach .camp-banner { background: linear-gradient(120deg, #ffa726, #ec407a); }
+.venue-farm .camp-banner { background: linear-gradient(120deg, #7cb342, #8d6e63); }
+.camp-banner-ico { font-size: 34px; line-height: 1; }
+.camp-banner > div:nth-child(2) { display: flex; flex-direction: column; flex: 1; min-width: 120px; }
+.camp-banner b { font: 20px var(--display); }
+.camp-banner small { font-size: 12px; opacity: .9; font-weight: 700; }
+.camp-rewards { display: flex; gap: 6px; flex-wrap: wrap; }
+.camp-rewards > span { background: rgba(0,0,0,.25); border-radius: 999px; padding: 3px 9px; font: 13px var(--display); white-space: nowrap; }
+.camp-rewards > span.got { background: rgba(46,125,50,.85); }
+.camp-rewards .ico, .camp-prize .ico { display: inline-grid; width: 16px; height: 16px; font-size: 10px; vertical-align: -3px; border-width: 1px; text-shadow: none; }
+.camp-locked { padding: 18px; text-align: center; font-weight: 800; color: #607d8b; }
+.camp-races { display: grid; }
+.camp-race { display: grid; grid-template-columns: 26px 44px 1fr auto; align-items: center; gap: 8px; padding: 6px 10px; border-top: 1px solid #eceff1; }
+.camp-race:first-child { border-top: none; }
+.camp-race.next { background: #fff8e1; }
+.camp-race.boss { background: linear-gradient(90deg, #fff3e0, #fff); }
+.camp-race.locked { opacity: .5; }
+.camp-race.locked .thumb3d { filter: grayscale(1); }
+.camp-step { font: 13px var(--display); width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: #eceff1; color: #607d8b; }
+.camp-race.next .camp-step { background: var(--accent); color: #fff; }
+.camp-who { display: flex; flex-direction: column; min-width: 0; }
+.camp-who b { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.camp-who small { font-size: 12px; color: #607d8b; font-weight: 700; }
+.camp-race .buy { min-width: 84px; white-space: nowrap; }
 .stars { color: #cfd8dc; letter-spacing: 1px; white-space: nowrap; }
 .stars i { font-style: normal; }
 .stars i.on { color: #ffb300; text-shadow: 0 1px 0 #e65100; }

@@ -303,77 +303,81 @@ function Campaign({ onRace }: { onRace: (ch: CampaignChapter, race: number, r: R
   const level = useGame((s) => s.level)
   const done = useGame((s) => s.campaign)
   const showNeed = useGame((s) => s.showNeed)
-  const reachable = CAMPAIGN.findIndex((ch, i) => level < ch.unlockLevel || (i > 0 && !campaignCleared(done, CAMPAIGN[i - 1])))
-  const lastOpen = reachable === -1 ? CAMPAIGN.length - 1 : Math.max(0, reachable - 1)
-  const current = CAMPAIGN.findIndex((ch, i) => i <= lastOpen && !campaignCleared(done, ch))
-  const [openId, setOpenId] = useState(CAMPAIGN[current === -1 ? lastOpen : current].id)
+  const opened = (ci: number) => level >= CAMPAIGN[ci].unlockLevel && (ci === 0 || campaignCleared(done, CAMPAIGN[ci - 1]))
+  const firstOpen = CAMPAIGN.findIndex((ch, ci) => opened(ci) && !campaignCleared(done, ch))
+  const [sel, setSel] = useState(firstOpen === -1 ? CAMPAIGN.reduce((n, _, ci) => (opened(ci) ? ci : n), 0) : firstOpen)
   const total = Object.values(done).reduce((a, n) => a + n, 0)
+  const max = CAMPAIGN.length * CAMPAIGN_RACES * 3
+  const starsOf = (ch: CampaignChapter) => Array.from({ length: CAMPAIGN_RACES }, (_, i) => done[campaignRaceId(ch, i)] ?? 0)
+  const ch = CAMPAIGN[sel]
+  const stars = starsOf(ch)
+  const v = venueById(ch.venue)
+  const cleared = campaignCleared(done, ch)
+  const perfect = stars.every((n) => n >= 3)
   return (
-    <>
-      <p className="hint">Beat each rival to unlock the next. Every chapter ends with a boss and pays a big bonus the first time you clear it. Win by a wide margin for more stars: three stars on every race in a chapter pays extra bucks. <b>⭐ {total} / {CAMPAIGN.length * CAMPAIGN_RACES * 3}</b></p>
-      <div className="gp-list">
-        {CAMPAIGN.map((ch, ci) => {
-          const prevCleared = ci === 0 || campaignCleared(done, CAMPAIGN[ci - 1])
-          const lockedLevel = level < ch.unlockLevel
-          const locked = lockedLevel || !prevCleared
-          const open = openId === ch.id && !locked
-          const cleared = campaignCleared(done, ch)
-          const stars = Array.from({ length: CAMPAIGN_RACES }, (_, i) => done[campaignRaceId(ch, i)] ?? 0)
-          const perfect = stars.every((n) => n >= 3)
+    <div className="camp">
+      <div className="camp-progress" title="Campaign stars">
+        <span>⭐ {total}/{max}</span>
+        <i style={{ width: `${(total / max) * 100}%` }} />
+      </div>
+      <div className="camp-map" role="tablist">
+        {CAMPAIGN.map((c, ci) => {
+          const open = opened(ci)
+          const n = starsOf(c).reduce((a, x) => a + x, 0)
           return (
-            <div key={ch.id} className={`gp-card camp-card${locked ? ' locked' : ''}${open ? ' open' : ''}`}>
-              <button className="camp-head" onClick={() => !locked && setOpenId(open ? '' : ch.id)} disabled={locked}>
-                <span className="camp-num">{ci + 1}</span>
-                <span className="camp-title">
-                  <b>{ch.name}</b>
-                  <small>{venueById(ch.venue).icon} {venueById(ch.venue).name} · {ch.blurb}</small>
-                </span>
-                {cleared && <span className="tag">Cleared</span>}
-                <span className="camp-stars">⭐ {stars.reduce((a, n) => a + n, 0)}/{CAMPAIGN_RACES * 3}</span>
-              </button>
-              <div className="gp-rounds">
-                {stars.map((n, i) => (
-                  <i key={i} className={n > 0 ? 'won' : !locked && (i === 0 || stars[i - 1] > 0) ? 'next' : ''}>{n > 0 ? '✔' : i === CAMPAIGN_RACES - 1 ? '👑' : i + 1}</i>
-                ))}
-              </div>
-              <div className="card-stat camp-bonus">
-                <span className={cleared ? 'got' : ''}>{cleared ? '✔ ' : ''}Clear bonus: ${ch.coins.toLocaleString()} · <span className="ico buck-ico">B</span>{ch.bucks} · 🏆{ch.trophies}</span>
-                <span className={perfect ? 'got' : ''}>{perfect ? '✔ ' : ''}All ★★★: <span className="ico buck-ico">B</span>{ch.starBucks}</span>
-              </div>
-              {lockedLevel ? (
-                <button className="price locked-btn" onClick={() => showNeed('level', ch.unlockLevel, ch.name)}>🔒 Level {ch.unlockLevel}</button>
-              ) : !prevCleared ? (
-                <div className="card-stat">🔒 Beat {CAMPAIGN[ci - 1].rivals[CAMPAIGN_RACES - 1]} in {CAMPAIGN[ci - 1].name} to unlock</div>
-              ) : open ? (
-                <div className="rivals camp-races">
-                  {stars.map((n, i) => {
-                    const r = campaignRival(ch, ci, i)
-                    const prize = campaignReward(ch, i, n === 0)
-                    const can = i === 0 || stars[i - 1] > 0
-                    return (
-                      <div key={i} className={`rival${r.boss ? ' boss' : ''}${can ? '' : ' locked'}`}>
-                        <i style={{ background: r.color }} />
-                        <div>
-                          <b>{r.town}</b> {r.boss && <span className="tag boss-tag">BOSS</span>} {n > 0 && <Stars n={n} />}
-                          <div className="card-stat">{r.carName} · PI {r.pi}{r.skill && <RivalSkill skill={r.skill} />}</div>
-                        </div>
-                        {can ? (
-                          <button className="buy small" onClick={() => onRace(ch, i, r, prize)}>{n > 0 ? 'Replay' : 'Race'} · win ${prize.toLocaleString()}</button>
-                        ) : (
-                          <button className="buy small" disabled>🔒 Beat {ch.rivals[i - 1].split(' ')[0]}</button>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              ) : (
-                <button className="buy small alt camp-show" onClick={() => setOpenId(ch.id)}>Show races ›</button>
-              )}
-            </div>
+            <button key={c.id} role="tab" aria-selected={ci === sel} aria-label={c.name}
+              className={`camp-node${ci === sel ? ' sel' : ''}${open ? '' : ' locked'}${campaignCleared(done, c) ? ' done' : ''}`}
+              onClick={() => setSel(ci)}>
+              <span className="camp-node-ico">{open ? venueById(c.venue).icon : '🔒'}</span>
+              <b>{ci + 1}</b>
+              <small>{open ? `★${n}` : `Lv${c.unlockLevel}`}</small>
+            </button>
           )
         })}
       </div>
-    </>
+      <div className={`camp-chapter venue-${ch.venue}`}>
+        <div className="camp-banner">
+          <span className="camp-banner-ico">{v.icon}</span>
+          <div>
+            <b>{ch.name}</b>
+            <small>{v.name}</small>
+          </div>
+          <div className="camp-rewards">
+            <span className={cleared ? 'got' : ''} title="Clear bonus (once)">{cleared ? '✔' : '🏁'} ${ch.coins >= 1000 ? `${ch.coins / 1000}k` : ch.coins} <span className="ico buck-ico">B</span>{ch.bucks} 🏆{ch.trophies}</span>
+            <span className={perfect ? 'got' : ''} title="Three stars on every race (once)">{perfect ? '✔' : '★★★'} <span className="ico buck-ico">B</span>{ch.starBucks}</span>
+          </div>
+        </div>
+        {!opened(sel) ? (
+          <div className="camp-locked">
+            {level < ch.unlockLevel
+              ? <button className="buy small alt" onClick={() => showNeed('level', ch.unlockLevel, ch.name)}>🔒 Opens at level {ch.unlockLevel}</button>
+              : <span>🔒 Beat {CAMPAIGN[sel - 1].rivals[CAMPAIGN_RACES - 1]} to open</span>}
+          </div>
+        ) : (
+          <div className="camp-races">
+            {stars.map((n, i) => {
+              const r = campaignRival(ch, sel, i)
+              const prize = campaignReward(ch, i, n === 0)
+              const can = i === 0 || stars[i - 1] > 0
+              const next = can && n === 0
+              return (
+                <div key={i} className={`camp-race${r.boss ? ' boss' : ''}${can ? '' : ' locked'}${next ? ' next' : ''}`}>
+                  <span className="camp-step">{r.boss ? '👑' : i + 1}</span>
+                  <CarThumb size="xs" color={r.color} body={r.body} />
+                  <div className="camp-who">
+                    <b>{r.town}</b>
+                    <small>{n > 0 && <Stars n={n} />} PI {r.pi}{r.skill && <span className="rival-skill" title={`${SKILLS[r.skill].name}: ${SKILLS[r.skill].text}`}> {SKILLS[r.skill].icon}</span>}</small>
+                  </div>
+                  <button className={`buy small${n > 0 ? ' alt' : ''}`} disabled={!can} onClick={() => onRace(ch, i, r, prize)}>
+                    {!can ? '🔒' : `${n > 0 ? '↻' : '🏁'} $${prize.toLocaleString()}`}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
 
