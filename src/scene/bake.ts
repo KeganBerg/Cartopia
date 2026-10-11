@@ -1,21 +1,24 @@
-import { BufferAttribute, BufferGeometry, Color, DoubleSide, FrontSide, Material, MeshBasicMaterial, MeshStandardMaterial, type Matrix4 } from 'three'
+import { BufferAttribute, BufferGeometry, Color, DoubleSide, FrontSide, Material, MeshBasicMaterial, MeshStandardMaterial, type Matrix3, type Matrix4, type Texture } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
 // Baking: many parts that differ only in plain material settings (colour,
 // roughness, metalness, glow) become one mesh with those settings stored per
 // vertex, drawn with one shared material (bakedMaterial). One draw instead of one
 // per look. Used for town cars (carBatch.ts) and the static town (Batch.tsx).
+// Textured parts bake too, one mesh per image: each part's texture repeat and
+// offset are moved into its UVs, so tiled copies of one image share a draw.
 
 // How one part looks, matching the material it would otherwise be drawn with.
 // glow: lights up when its car is picked (the paint's highlight).
-export type Finish = { color: Color | string; metal?: number; rough?: number; unlit?: boolean; emissive?: Color; glow?: boolean; double?: boolean }
+// uv: the part's texture transform (repeat, offset), baked into its UVs.
+export type Finish = { color: Color | string; metal?: number; rough?: number; unlit?: boolean; emissive?: Color; glow?: boolean; double?: boolean; uv?: Matrix3 }
 
 const tmp = new Color()
 
 // Merge parts (each optionally moved by a matrix) into one indexed geometry carrying
 // `color` (linear RGB, as a material's colour is), `emissive` (colour times intensity)
-// and `look` (metalness, roughness, unlit, glow).
-export function bake(parts: [BufferGeometry, Finish, Matrix4?][]) {
+// and `look` (metalness, roughness, unlit, glow). `uvs` keeps texture coordinates.
+export function bake(parts: [BufferGeometry, Finish, Matrix4?][], uvs = false) {
   const list = parts.map(([geo, f, m]) => {
     const pos = geo.getAttribute('position')
     const n = pos.count
@@ -23,6 +26,11 @@ export function bake(parts: [BufferGeometry, Finish, Matrix4?][]) {
     g.setAttribute('position', pos.clone())
     g.setAttribute('normal', geo.getAttribute('normal').clone())
     g.setIndex(geo.index ? geo.index.clone() : new BufferAttribute(Uint32Array.from({ length: n }, (_, i) => i), 1))
+    if (uvs) {
+      const uv = geo.getAttribute('uv').clone()
+      if (f.uv) uv.applyMatrix3(f.uv)
+      g.setAttribute('uv', uv)
+    }
     if (m) g.applyMatrix4(m)
     // Double-sided parts get a reversed copy of every triangle with the normals flipped,
     // so one front-sided material draws (and shadows) both faces.
@@ -84,8 +92,8 @@ function withBackFaces(g: BufferGeometry) {
 // vertices. Unlit parts come out as their flat colour, exactly like
 // MeshBasicMaterial. `picked` lights up the glow parts like the emissive highlight
 // on a picked car's paint.
-export function bakedMaterial(picked = false) {
-  const m = new MeshStandardMaterial({ vertexColors: true, metalness: 1, roughness: 1 })
+export function bakedMaterial(picked = false, map: Texture | null = null) {
+  const m = new MeshStandardMaterial({ vertexColors: true, metalness: 1, roughness: 1, map })
   m.onBeforeCompile = (sh) => {
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec4 look;\nattribute vec3 emissive;\nflat varying vec4 vLook;\nflat varying vec3 vEmissive;')
@@ -105,14 +113,46 @@ const emissiveOf = (m: MeshStandardMaterial) => (m.emissiveIntensity && (m.emiss
 
 // The finish a shared material gives a part.
 export function finishOf(m: MeshStandardMaterial | MeshBasicMaterial): Finish {
-  if (m instanceof MeshBasicMaterial) return { color: m.color, unlit: true, double: m.side === DoubleSide }
-  return { color: m.color, metal: m.metalness, rough: m.roughness, emissive: emissiveOf(m), double: m.side === DoubleSide }
+  const uv = m.map ? uvOf(m.map) : undefined
+  if (m instanceof MeshBasicMaterial) return { color: m.color, unlit: true, double: m.side === DoubleSide, uv }
+  return { color: m.color, metal: m.metalness, rough: m.roughness, emissive: emissiveOf(m), double: m.side === DoubleSide, uv }
+}
+
+function uvOf(t: Texture) {
+  if (t.matrixAutoUpdate) t.updateMatrix()
+  return t.matrix.clone()
+}
+
+// Everything about a texture except its repeat and offset: textures with the same
+// key can share one draw once those are baked into the UVs.
+export function textureKey(t: Texture) {
+  return [t.source.uuid, t.wrapS, t.wrapT, t.magFilter, t.minFilter, t.anisotropy, t.colorSpace, t.flipY, t.generateMipmaps, t.premultiplyAlpha, t.format, t.type, t.channel].join('|')
+}
+
+// One material per texture image (and settings) for baked textured parts, the
+// texture itself left untransformed since the UVs carry each part's repeat.
+const mapMats = new Map<string, MeshStandardMaterial>()
+export function bakedMapMaterial(t: Texture) {
+  const k = textureKey(t)
+  let m = mapMats.get(k)
+  if (!m) {
+    const plain = t.clone()
+    plain.repeat.set(1, 1)
+    plain.offset.set(0, 0)
+    plain.rotation = 0
+    plain.center.set(0, 0)
+    plain.matrixAutoUpdate = true
+    plain.updateMatrix()
+    mapMats.set(k, (m = bakedMaterial(false, plain)))
+  }
+  return m
 }
 
 // Can a mesh with this material be baked without changing how it looks? Only when
-// everything but the settings a Finish carries is left at its default: no textures,
-// not see-through, no custom shader, and so on.
-const plain = new WeakMap<Material, boolean>()
+// everything but the settings a Finish carries is left at its default: at most a
+// colour map, not see-through, no custom shader, and so on. 'map' means it has a
+// colour map (bake it with others of the same textureKey), 'plain' that it has none.
+const plain = new WeakMap<Material, false | 'plain' | 'map'>()
 const SKIP = new Set(['uuid', 'id', 'name', 'version', 'userData', 'type'])
 function settings(m: Material) {
   const parts: string[] = []
@@ -126,10 +166,11 @@ function settings(m: Material) {
 }
 const DEFAULTS = { std: settings(new MeshStandardMaterial()), basic: settings(new MeshBasicMaterial()) }
 
-export function bakeable(m: Material) {
+export function bakeable(m: Material): false | 'plain' | 'map' {
   let ok = plain.get(m)
   if (ok !== undefined) return ok
   ok = false
+  let same = false
   // Exactly these classes: subclasses (physical, toon...) draw differently.
   const kind: unknown = m.constructor
   // A custom shader hook isn't copied by clone(), so look for it on the original.
@@ -138,13 +179,17 @@ export function bakeable(m: Material) {
     const c = m.clone() as MeshStandardMaterial | MeshBasicMaterial
     c.color.set(0xffffff)
     c.side = m.side === DoubleSide ? FrontSide : m.side
+    const map = c.map
+    c.map = null
     if (c instanceof MeshStandardMaterial) {
       c.emissive.set(0)
       c.emissiveIntensity = 1
       c.roughness = 1
       c.metalness = 0
-      ok = settings(c) === DEFAULTS.std
-    } else ok = settings(c) === DEFAULTS.basic
+      same = settings(c) === DEFAULTS.std
+    } else same = settings(c) === DEFAULTS.basic
+    // A colour map read through the plain UV channel.
+    if (same) ok = !map ? 'plain' : map.channel === 0 && map.isTexture && map.source ? 'map' : false
   }
   plain.set(m, ok)
   return ok
