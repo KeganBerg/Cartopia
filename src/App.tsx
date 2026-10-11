@@ -10,6 +10,7 @@ import { FriendsPanel, VisitBanner } from './ui/Friends'
 import { LeadersPanel, ClanPanel } from './ui/Social'
 import { Tutorial } from './ui/Tutorial'
 import { Badges } from './ui/Badges'
+import { ThoughtBubble } from './ui/Thought'
 import { NeedPanel } from './ui/Need'
 import { RescuePanel } from './ui/Rescue'
 import { BankPanel } from './ui/Bank'
@@ -49,6 +50,7 @@ export default function App() {
         <World />
       </Canvas>
       <Badges />
+      <ThoughtBubble />
       <ThumbRenderer />
       <Hud />
       <BottomBar />
