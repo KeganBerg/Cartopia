@@ -904,22 +904,64 @@ export function NewBuildingModel({ def, ghost, m, win, bulb, level = 1 }: NewMod
     case 'hedge':
       return (
         <group>
-          {/* Boxwood stays green through the fall. */}
-          <Box m={m} at={[0, 0.32, 0]} s={[1.9, 0.6, 0.62]} c="#2e7d32" />
-          <Box m={m} at={[0, 0.64, 0]} s={[1.84, 0.06, 0.56]} c={SNOW ? '#ffffff' : '#388e3c'} shadow={false} />
+          {/* Boxwood stays green through the fall: a stone kerb, a clipped body
+              and leafy clumps along the top. */}
+          <Box m={m} at={[0, 0.04, 0]} s={[1.98, 0.08, 0.7]} c="#9e9e9e" />
+          <Box m={m} at={[0, 0.36, 0]} s={[1.86, 0.56, 0.58]} c="#2e7d32" />
+          {[-0.72, -0.24, 0.24, 0.72].map((x, i) => (
+            <mesh key={x} position={[x, 0.62, (i % 2) * 0.04 - 0.02]} scale={[1.25, 0.6, 1]} castShadow>
+              <icosahedronGeometry args={[0.25, 0]} />
+              {m(SNOW ? '#ffffff' : i % 2 ? '#388e3c' : '#43a047')}
+            </mesh>
+          ))}
+          {(SEASON === 'spring' || SEASON === 'summer') && [-0.8, -0.45, -0.1, 0.3, 0.65].map((x, i) => (
+            <mesh key={x} position={[x, 0.13, 0.32]}>
+              <sphereGeometry args={[0.04, 6, 4]} />
+              {m(['#f06292', '#fff176', '#ffffff'][i % 3])}
+            </mesh>
+          ))}
         </group>
       )
     case 'fence':
       // Runs along the lot's front edge; turn it to fence another side.
       return (
         <group position={[0, 0, 0.85]}>
-          {Array.from({ length: 9 }, (_, i) => -0.92 + i * 0.23).map((x) => (
+          {/* Pickets either side of a little gate, square posts with caps at the ends. */}
+          {[-0.85, -0.66, -0.47, -0.28, 0.28, 0.47, 0.66, 0.85].map((x) => (
             <group key={x}>
               <Box m={m} at={[x, 0.2, 0]} s={[0.07, 0.4, 0.03]} c="#fafafa" />
               <mesh position={[x, 0.42, 0]} rotation-y={Math.PI / 4}><coneGeometry args={[0.05, 0.06, 4]} />{m('#fafafa')}</mesh>
             </group>
           ))}
-          {[0.12, 0.3].map((y) => <Box key={y} m={m} at={[0, y, -0.025]} s={[1.98, 0.04, 0.02]} c="#fafafa" />)}
+          {[-1, 1].map((sd) => (
+            <group key={sd}>
+              {[-0.97, -0.18].map((x) => (
+                <group key={x}>
+                  <Box m={m} at={[sd * -x, 0.24, -0.01]} s={[0.09, 0.48, 0.09]} c="#f5f5f5" />
+                  <Box m={m} at={[sd * -x, 0.5, -0.01]} s={[0.12, 0.04, 0.12]} c="#e0e0e0" />
+                </group>
+              ))}
+              {[0.12, 0.3].map((y) => <Box key={y} m={m} at={[sd * 0.575, y, -0.025]} s={[0.76, 0.04, 0.02]} c="#fafafa" />)}
+            </group>
+          ))}
+          {/* The gate: three pickets on a Z brace, with black hinges and latch. */}
+          {[-0.09, 0, 0.09].map((x) => <Box key={x} m={m} at={[x, 0.19, 0.01]} s={[0.07, 0.34, 0.025]} c="#fafafa" />)}
+          {[0.1, 0.28].map((y) => <Box key={y} m={m} at={[0, y, -0.012]} s={[0.26, 0.04, 0.02]} c="#eeeeee" />)}
+          <Box m={m} at={[0, 0.19, -0.012]} s={[0.035, 0.24, 0.02]} c="#eeeeee" rot={[0, 0, -0.85]} />
+          {[0.1, 0.28].map((y) => <Box key={y} m={m} at={[-0.13, y, 0.03]} s={[0.06, 0.02, 0.012]} c="#37474f" shadow={false} />)}
+          <Box m={m} at={[0.13, 0.2, 0.03]} s={[0.025, 0.04, 0.02]} c="#37474f" shadow={false} />
+          {/* A flower bed along the inside. */}
+          {!SNOW && (
+            <group>
+              <Box m={m} at={[0, 0.02, -0.2]} s={[1.9, 0.04, 0.22]} c="#5d4037" shadow={false} />
+              {[-0.8, -0.6, -0.4, 0.4, 0.6, 0.8].map((x, i) => (
+                <mesh key={x} position={[x, 0.09, -0.2]}>
+                  <icosahedronGeometry args={[0.07, 0]} />
+                  {m(SEASON === 'fall' ? ['#ff8f00', '#c62828', '#fbc02d'][i % 3] : ['#ec407a', '#ffee58', '#ab47bc'][i % 3])}
+                </mesh>
+              ))}
+            </group>
+          )}
         </group>
       )
     case 'picnic':

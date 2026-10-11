@@ -1257,6 +1257,117 @@ button.book-car { font: inherit; color: inherit; }
 .alerts-x { width: 30px; height: 30px; flex: none; border: none; border-radius: 50%; background: #eceff1; font-weight: 800; color: #546e7a; }
 @media (max-width: 600px) { .alerts-card { bottom: calc(78px + var(--sab)); font-size: 13px; } }
 
+/* Surprise visitors: the bubble over a visitor's car (or Rusty's, for a barn tip) and the street racer's card. */
+.badge-visitor { animation: bob 0.9s ease-in-out infinite; font-size: 15px; z-index: 4; }
+.badge-visitor-racer { background: linear-gradient(#ff7043, #d84315); color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,.4); }
+.badge-visitor-tourist { background: radial-gradient(#fff8e1, #ffecb3); color: var(--ink); }
+.badge-visitor-mystery { background: linear-gradient(#5e35b1, #311b92); color: #fff; animation: badgepulse .6s ease-in-out infinite; }
+.badge-visitor-barn { background: #fff3e0; color: #5d4037; }
+/* Off screen: pinned to the edge, smaller and without its pointer. */
+.anchor.edge .badge-visitor { transform: scale(.85); opacity: .92; }
+.anchor.edge .badge-visitor::after { display: none; }
+.street-card { display: flex; align-items: center; gap: 12px; }
+.street-card > div { display: flex; flex-direction: column; gap: 2px; }
+.street-prize { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 12px 0; font-weight: 700; }
+.street-prize .chip { padding: 2px 8px; }
+.street-prize .chip.free { border-color: #a5d6a7; background: #e8f5e9; }
+.street-actions { display: flex; gap: 10px; }
+.street-actions .buy { flex: 1; }
+.street-actions .ghost { background: none; border: 2px solid #cfd8dc; border-radius: 12px; padding: 6px 12px; font-weight: 800; color: var(--ink); }
+/* Town rival */
+.race-btn .i { position: relative; }
+.rv-card { --rv: #ff7043; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; margin: 4px 0 10px; padding: 8px 10px; border-radius: 14px; background: linear-gradient(100deg, color-mix(in srgb, var(--rv) 22%, #fff), #fff 70%); border: 2px solid color-mix(in srgb, var(--rv) 60%, #fff); }
+.rv-card.rv-idle { filter: saturate(.5); }
+.rv-card.rv-done { display: flex; gap: 8px; font: 16px var(--display); background: #fff8e1; border-color: #ffd54f; }
+.rv-card.rv-done small { font: 800 12px Nunito, sans-serif; color: #78909c; }
+.rv-face { display: grid; place-items: center; width: 46px; height: 46px; font-size: 30px; border-radius: 50%; background: var(--rv); box-shadow: 0 3px 0 rgba(0,0,0,.2); }
+.rv-body { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.rv-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.rv-head b { font: 16px var(--display); }
+.rv-pips { display: inline-flex; gap: 3px; }
+.rv-pips i { width: 9px; height: 9px; border-radius: 50%; background: #cfd8dc; }
+.rv-pips i.on { background: #43a047; }
+.rv-bonus { margin-left: auto; font: 12px var(--display); color: #6d4c41; background: #fff3e0; border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
+.rv-bonus .ico { display: inline-grid; width: 14px; height: 14px; font-size: 9px; vertical-align: -2px; border-width: 1px; }
+.rv-bubble { position: relative; align-self: flex-start; max-width: 100%; background: #fff; border: 2px solid #37474f; border-radius: 12px; padding: 3px 9px; font-weight: 800; font-size: 13px; color: #263238; }
+.rv-bubble.big { align-self: center; margin: 8px auto 4px; font-size: 15px; }
+.rv-car { display: flex; align-items: center; gap: 5px; font-weight: 700; color: #607d8b; font-size: 12px; }
+.rv-card .buy small { display: block; font-size: 10px; opacity: .85; }
+.rv-result .rv-bet-q { font-weight: 800; color: #6a1b9a; margin: -4px 0 10px; }
+.rv-row { justify-content: center; gap: 8px; flex-wrap: wrap; }
+.rv-bet { background: linear-gradient(#ab47bc, #6a1b9a); }
+@media (max-width: 520px) {
+  .rv-card { grid-template-columns: auto 1fr; }
+  .rv-card > .buy { grid-column: 1 / -1; }
+  .rv-bonus { margin-left: 0; }
+}
+.rv-tag { background: var(--rv); color: #fff; }
+.rv-result .rr-loot span .ico { padding: 0; border: none; width: 18px; height: 18px; display: inline-block; vertical-align: -3px; animation: none; }
+/* Race launch and boost. */
+.race-full .countdown.big.go { color: #76ff03; text-shadow: 0 4px 0 #1b5e20; animation: pop .15s ease-out; }
+.rf-buttons { display: flex; align-items: center; gap: 12px; }
+.race-full .shift-btn.launch { background: linear-gradient(#76ff03, #2e7d32); }
+.boost-btn { position: relative; width: 84px; height: 84px; flex: none; border-radius: 50%; border: 3px solid #fff; padding: 0; display: grid; place-content: center; color: #fff; font-family: var(--display); cursor: pointer;
+  background: radial-gradient(circle, #263238 0 56%, transparent 57%), conic-gradient(#ff9100 0 var(--fill), rgba(255,255,255,.18) var(--fill) 100%); box-shadow: 0 4px 0 rgba(0,0,0,.35); }
+.boost-btn span { font-size: 28px; line-height: 1; }
+.boost-btn small { font-size: 12px; letter-spacing: .5px; }
+.boost-btn:disabled { opacity: .55; cursor: default; }
+.boost-btn.full:not(:disabled) { animation: boost-ready .7s ease-in-out infinite; }
+.boost-btn.burning { opacity: 1; animation: none; box-shadow: 0 0 0 5px rgba(255,145,0,.6), 0 0 26px 8px rgba(255,109,0,.7); }
+@keyframes boost-ready { 50% { transform: scale(1.08); box-shadow: 0 4px 0 rgba(0,0,0,.35), 0 0 0 6px rgba(255,145,0,.45); } }
+/* Speed streaks round the edges of the screen while the boost burns. */
+.rf-boost-fx { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: screen;
+  background: repeating-conic-gradient(from 0deg at 50% 55%, rgba(255,214,140,.32) 0 1.2deg, transparent 1.2deg 7deg);
+  -webkit-mask: radial-gradient(ellipse at 50% 55%, transparent 38%, #000 75%); mask: radial-gradient(ellipse at 50% 55%, transparent 38%, #000 75%);
+  animation: boost-streak .12s linear infinite; }
+@keyframes boost-streak { 50% { transform: scale(1.04); opacity: .8; } }
+@media (prefers-reduced-motion: reduce) { .rf-boost-fx { animation: none; } .boost-btn.full:not(:disabled) { animation: none; } }
+@media (max-height: 500px) { .boost-btn { width: 64px; height: 64px; } .boost-btn span { font-size: 22px; } .boost-btn small { font-size: 10px; } }
+@media (max-width: 420px) { .boost-btn { width: 70px; height: 70px; } .rf-buttons { gap: 8px; } }
+
+/* Car Meet (src/ui/Meet.tsx) */
+.meet-mine { background: #fff8e1; border: 2px solid #ffca28; border-radius: 12px; padding: 8px 10px; margin-bottom: 8px; }
+.meet-head { display: flex; align-items: center; gap: 8px; }
+.meet-head b { font: 16px var(--display); flex: 1; }
+.meet-likes { font-weight: 800; color: #c62828; }
+.meet-lot { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 6px; padding: 6px; border-radius: 10px;
+  background: repeating-linear-gradient(90deg, #455a64 0 calc(33.33% - 2px), #fff 0 33.33%); }
+.meet-spot { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+.meet-spot .thumb3d { background: radial-gradient(ellipse at 50% 70%, #78909c 0 35%, #455a64 75%); height: 84px; }
+.meet-spot small { color: #fff; font-weight: 800; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.meet-pick { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+.meet-chip { position: relative; flex: none; padding: 2px; border: 2px solid #e0e0e0; border-radius: 10px; background: #fff; cursor: pointer; }
+.meet-chip.on { border-color: #ffb300; background: #fff3e0; }
+.meet-chip span { position: absolute; top: 0; right: 3px; font-size: 14px; }
+.meet-list { display: flex; flex-direction: column; gap: 6px; }
+.meet-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; background: #fff; border: 2px solid #e0e0e0; border-radius: 12px; padding: 6px 10px; }
+.meet-who { min-width: 0; }
+.meet-who b { overflow-wrap: anywhere; }
+.meet-cars { display: flex; gap: 2px; }
+.meet-like { min-width: 52px; }
+.showcase-toggle { border: 2px solid #ffca28; background: #fff; border-radius: 999px; padding: 2px 10px; font-weight: 800; cursor: pointer; }
+.showcase-toggle.on { background: #ffca28; }
+@media (max-width: 560px) {
+  .meet-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .meet-cars { grid-column: 1 / -1; grid-row: 2; justify-content: flex-start; }
+  .meet-row .leader-acts { grid-row: 1; grid-column: 2; }
+}
+.meet-spot.empty { justify-content: center; min-height: 100px; border: 2px dashed #90a4ae; border-radius: 10px; background: none; color: #cfd8dc; font-size: 28px; cursor: pointer; }
+/* Friend ghost races */
+.ghost-btn { background: #7e57c2; }
+.ghost-times { display: flex; gap: 8px; justify-content: center; margin: 2px 0 10px; }
+.ghost-times span { flex: 1; display: flex; flex-direction: column; background: #eceff1; border-radius: 12px; padding: 4px 8px; }
+.ghost-times span.win { background: #e8f5e9; box-shadow: inset 0 0 0 2px #66bb6a; }
+.ghost-times small { color: #607d8b; font-weight: 800; font-size: 12px; }
+.ghost-times b { font: 20px var(--display); }
+.taunt-pick { margin-bottom: 12px; }
+.taunt-pick > small { display: block; color: #607d8b; font-weight: 800; margin-bottom: 4px; }
+.taunt-pick > div { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
+.taunt-pick .chip { font-size: 13px; padding: 4px 9px; }
+.taunt-sent { color: #2e7d32; font-weight: 800; }
+.taunt-quote { font-weight: 800; color: #5e35b1; }
+.visit-banner .row { flex-wrap: wrap; justify-content: center; }
+
 /* Garage dyno: drawn over the car preview after an upgrade. Tap anywhere to close. */
 .dyno { position: absolute; inset: 0; display: block; width: 100%; padding: 0; border: 0; background: linear-gradient(180deg, rgba(38,50,56,.0) 55%, rgba(38,50,56,.28)); cursor: pointer; font: inherit; color: #263238; text-align: left; animation: dyno-in .25s ease-out; }
 @keyframes dyno-in { from { opacity: 0; } }

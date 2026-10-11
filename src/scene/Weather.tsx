@@ -4,14 +4,12 @@ import {
   BackSide, BufferAttribute, BufferGeometry, Color, Fog, InstancedBufferAttribute, InstancedBufferGeometry, Mesh, MeshBasicMaterial,
   OrthographicCamera, ShaderMaterial, Vector2, Vector3, type Camera,
 } from 'three'
-import { FEEL, seedRoll, strike, weatherNow, type Weather as WeatherState, type WeatherKind } from '../game/weather'
-import { SEASON } from './season'
+import { strike, weatherNow, type Weather as WeatherState } from '../game/weather'
+export { raceWeather } from '../game/weather'
 import { applyNight, dayPhase, nightAmount } from './dayNight'
 import { gloomOf, groundUniforms, hazeColor } from './weatherLook'
 import type { Look } from './look'
-import type { VenueId } from './venues'
 
-const PINNED = typeof location !== 'undefined' && new URLSearchParams(location.search).has('weather')
 
 // Rain, snow, splashes, lightning and fog. Everything that falls is one
 // instanced quad per drop, moved entirely on the GPU from a time uniform, so a
@@ -383,47 +381,6 @@ export function Weather({ small }: { small: boolean }) {
       <Lightning race={false} get={get} />
     </>
   )
-}
-
-// Every venue has its own skies: drizzle and fog on the docks, dust storms in
-// the canyon, blizzards up the pass. A live race rolls its weather from the race
-// id, so both racers see the same sky. Otherwise bad weather in town carries
-// over to the race (adjusted for the venue), and a clear day rolls the venue's own.
-const VENUE_SKIES: Record<VenueId, [WeatherKind, number][]> = {
-  main: [['clear', 45], ['rain', 20], ['storm', 12], ['drizzle', 10], ['fog', 13]],
-  beach: [['clear', 45], ['rain', 15], ['storm', 15], ['fog', 15], ['wind', 10]],
-  desert: [['clear', 45], ['dust', 35], ['wind', 20]],
-  snow: [['clear', 35], ['snow', 40], ['blizzard', 25]],
-  farm: [['clear', 45], ['rain', 18], ['storm', 14], ['fog', 13], ['drizzle', 10]],
-  docks: [['clear', 40], ['fog', 25], ['drizzle', 15], ['rain', 10], ['storm', 10]],
-}
-const AS_SNOW: Partial<Record<WeatherKind, WeatherKind>> = { rain: 'snow', drizzle: 'snow', storm: 'blizzard' }
-const IN_DESERT: Partial<Record<WeatherKind, WeatherKind>> = { rain: 'dust', drizzle: 'clear', storm: 'dust', snow: 'wind', blizzard: 'dust', fog: 'clear' }
-
-function rollVenue(venue: VenueId, roll: number): WeatherKind {
-  const odds = VENUE_SKIES[venue]
-  let r = roll * odds.reduce((s, [, w]) => s + w, 0)
-  for (const [k, w] of odds) if ((r -= w) < 0) return k
-  return 'clear'
-}
-
-export function raceWeather(venue: VenueId, seed?: string): WeatherState {
-  let kind: WeatherKind
-  const town = weatherNow()
-  if (PINNED) kind = town.kind
-  else if (seed) kind = rollVenue(venue, seedRoll(seed))
-  else kind = town.kind !== 'clear' && town.strength > 0.3 ? town.kind : rollVenue(venue, Math.random())
-  if (venue === 'snow') kind = AS_SNOW[kind] ?? kind
-  else if (venue === 'desert') kind = IN_DESERT[kind] ?? kind
-  // Winter rain falls as snow everywhere but the desert.
-  else if (SEASON === 'winter') kind = AS_SNOW[kind] ?? kind
-  const f = FEEL[kind]
-  return {
-    kind, strength: 1, flash: 0,
-    rain: f.rain, snow: f.snow, cloud: f.cloud, haze: f.haze, wind: f.wind, dust: f.dust,
-    wet: f.rain > 0 ? 1 : 0,
-    cover: f.snow > 0 ? 0.85 : venue === 'snow' || venue === 'desert' ? 0 : town.cover,
-  }
 }
 
 // The weather during a race. `look` is the race's lighting, for lightning flashes.

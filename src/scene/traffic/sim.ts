@@ -213,8 +213,11 @@ export class Traffic {
   }
 
   private syncCars() {
-    for (const uid of [...this.agents.keys()]) {
-      if (!this.specs.has(uid)) this.remove(this.agents.get(uid)!)
+    for (const [uid, a] of [...this.agents]) {
+      if (this.specs.has(uid)) continue
+      // A visitor leaving town fades out where it is (step() removes it); anything else just goes.
+      if (uid.startsWith('visitor:') && a.show > 0) a.leaving = true
+      else this.remove(a)
     }
     for (const spec of this.specs.values()) {
       const a = this.agents.get(spec.uid)
