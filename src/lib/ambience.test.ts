@@ -40,3 +40,19 @@ describe('pickSpecies', () => {
     }
   })
 })
+
+describe('weatherMix', () => {
+  it('sends birds and yard work indoors in rain and snow, and adds wind', async () => {
+    const { weatherMix } = await import('./ambience')
+    const day = ambientMix(0, 'summer')
+    const storm = weatherMix(day, { rain: 1, snow: 0, wind: 0.7, wet: 1 })
+    expect(storm.birds).toBeLessThan(day.birds * 0.2)
+    expect(storm.yard).toBe(0)
+    expect(storm.cicadas).toBe(0)
+    expect(storm.wind).toBeGreaterThan(day.wind)
+    const snow = weatherMix(ambientMix(0, 'winter'), { rain: 0, snow: 1, wind: 1, wet: 0 })
+    expect(snow.traffic).toBeLessThan(ambientMix(0, 'winter').traffic)
+    expect(snow.leaves).toBe(0)
+    for (const v of Object.values(storm)) expect(v).toBeLessThanOrEqual(1)
+  })
+})
