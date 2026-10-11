@@ -201,3 +201,45 @@ div.rm-node { cursor: default; }
 @media (max-width: 600px), (max-height: 500px) {
   .rm-box .thumb3d.sm { --tw: 66px; --th: 52px; }
 }
+
+/* Tablets in portrait: the panel is tall and narrow, so use the phone hub layout. */
+@media (min-width: 601px) and (max-width: 1000px) and (orientation: portrait) {
+  .rm-hub { grid-template-columns: 1fr 1fr; grid-template-rows: 1.5fr 1fr 1fr auto; grid-template-areas: "camp tour" "rival rival" "gp trial" "minis minis"; }
+  .rm-gp-grid { grid-template-columns: 1fr 1fr; }
+}
+
+/* Small phones (iPhone SE and smaller): tighter tiles so the hub still fits. */
+@media (max-width: 600px) {
+  .rm-hub { min-height: 0; }
+  .rm-box small { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+}
+@media (max-width: 600px) and (max-height: 700px) {
+  .rm-hub { gap: 8px; grid-template-rows: 1.4fr .9fr 1fr auto; }
+  .rm-tile { padding: 6px 7px; gap: 2px; }
+  .rm-tile .rm-ttl { font-size: 16px; }
+  .rm-tile .rm-meta { font-size: 11px; }
+  .rm-tile .rm-progress { display: none; }
+  .rm-cta { padding: 2px 2px 2px 6px; }
+  .rm-cta > span { font-size: 12px; }
+  .rm-cta .buy { padding: 2px 8px; font-size: 13px; }
+  .rm-face { width: 44px; height: 44px; font-size: 24px; }
+  .rm-rival .rm-ttl { font-size: 16px; }
+  .rm-bub { -webkit-line-clamp: 1; font-size: 11px; }
+  .rm-go { font-size: 16px; padding: 4px 10px; }
+  .rm-mini { flex-direction: row; gap: 5px; padding: 6px 4px; justify-content: center; }
+  .rm-mini small { display: none; }
+  .rm-mi { font-size: 18px; }
+  .rm-mini b { font-size: 12px; }
+  .rm-nodes { margin-bottom: -2px; }
+  .rm-banner { min-height: 96px; padding: 8px 10px; }
+  .rm-row { min-height: 46px; padding: 3px 8px; }
+  .rm-gpc-top { padding: 7px 8px; gap: 3px; }
+  .rm-gpc-body { padding: 6px 8px 8px; gap: 4px; }
+  .rm-box small { -webkit-line-clamp: 1; }
+  .rm-gpc .rm-rounds { gap: 2px; } .rm-gpc .rm-rounds i { width: 16px; height: 16px; font-size: 9px; }
+  .rm-cup { font-size: 20px; top: 4px; right: 5px; }
+}
+@media (max-height: 500px) {
+  .rm-hub { min-height: 0; }
+  .rm-hub .rm-gp .rm-meta + .rm-meta { display: none; }
+}
