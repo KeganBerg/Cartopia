@@ -70,7 +70,7 @@ export function ModShop({ car, trying, setTrying, skinTry, setSkinTry }: {
           </button>
         ))}
       </div>
-      <p className="mod-hint">{info.stat}. Tap a part to try it on.</p>
+      <p className="mod-hint">{info.stat}</p>
       <div className="mod-list">
         {MODS.filter((m) => m.slot === slot && modFits(m, def.body)).map((m) => {
           const fitted = fit[slot] === m.id
@@ -108,7 +108,6 @@ export function ModShop({ car, trying, setTrying, skinTry, setSkinTry }: {
         <ModSkinPicker car={car} slot={slot as SkinnedSlot} trying={skinTry?.slot === slot ? skinTry.skin : undefined}
           setTrying={(skin) => setSkinTry(skin === undefined ? null : { slot: slot as SkinnedSlot, skin })} />
       ) : <p className="mod-hint small">🎨 Fit a {info.name.toLowerCase()} part to give it a mod skin.</p>)}
-      <p className="mod-hint small">Parts you buy stay with this car, so you can swap back for free.</p>
     </div>
   )
 }

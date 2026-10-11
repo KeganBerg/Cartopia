@@ -573,10 +573,13 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
   .card { padding: 6px; }
   .card-name { font-size: 15px; }
   .garage { grid-template-columns: 1fr; gap: 10px; }
-  .garage-list { flex-direction: row; overflow-x: auto; max-height: none; padding-bottom: 4px; }
-  .garage-item { grid-template-columns: 48px auto; min-width: 150px; }
-  .garage-item small { grid-column: 2; }
-  .garage-item .car-swatch { width: 48px; grid-row: span 2; }
+  /* Phones: no side-scrolling strip. The car switcher steps through cars and opens a grid of all of them. */
+  .garage-list { display: none; }
+  .garage.picking .garage-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; max-height: 46vh; overflow-y: auto; }
+  .garage.picking .garage-item { grid-template-columns: 1fr; justify-items: center; text-align: center; padding: 4px; font-size: 12px; line-height: 1.15; }
+  .garage.picking .garage-item small { font-size: 11px; }
+  .garage.picking .garage-item .car-swatch { width: 64px; height: 34px; }
+  .garage-name { display: none; }
   .car-preview { height: 150px; }
   .upgrade-row { gap: 6px; font-size: 14px; }
   .pips i { width: 9px; height: 14px; }
@@ -1008,7 +1011,7 @@ button.lvl-item:hover { border-color: var(--accent); transform: translateY(-2px)
 .garage-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; background: #eceff1; border-radius: 12px; padding: 4px; margin: 10px 0 6px; }
 .garage-tabs button { border: 0; background: transparent; border-radius: 9px; padding: 8px 4px; font: 14px var(--display); color: #546e7a; cursor: pointer; }
 .garage-tabs button.sel { background: #fff; color: #263238; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15); }
-.mod-tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.mod-tabs { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; }
 .mod-tab { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; border: 2px solid #e0e0e0; background: #fafafa; border-radius: 10px; padding: 6px 2px; font: 800 11px Nunito, sans-serif; color: #455a64; cursor: pointer; }
 .mod-tab-icon { font-size: 20px; line-height: 1; }
 .mod-tab.sel { border-color: var(--accent); background: #fff8e1; color: #263238; }
@@ -1191,15 +1194,17 @@ button.lvl-item:hover { border-color: var(--accent); transform: translateY(-2px)
 .fin-opt.locked { opacity: .55; }
 .finish-chip { width: 34px; height: 22px; border-radius: 8px; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
 
-/* Skins: one scrolling row of animated chips edged in their tier colour, try-on bar under it. */
+/* Skins: a wrapping grid of animated chips edged in their tier colour, try-on bar under it. */
 .garage-detail { min-width: 0; }
-.skin-row { display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 6px; scroll-snap-type: x proximity; scrollbar-width: thin; }
-.skin-opt { flex: none; width: 76px; scroll-snap-align: start; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px; border-radius: 12px; border: 1.5px solid #dfe5ea; border-bottom: 3px solid var(--tier, #cfd8dc); background: #fff; font: 13px var(--display); color: #37474f; }
+.skin-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 6px; padding: 2px 0 4px; }
+.skin-opt { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 2px 4px; border-radius: 12px; border: 1.5px solid #dfe5ea; border-bottom: 3px solid var(--tier, #cfd8dc); background: #fff; font: 11px var(--display); color: #37474f; cursor: pointer; }
+.skin-opt { position: relative; }
+.skin-lock { position: absolute; top: 4px; right: 4px; font-size: 11px; line-height: 1; }
 .skin-opt b { font-weight: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .skin-opt small { font: 700 11px Nunito, sans-serif; color: #607d8b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .skin-opt.sel { border-color: var(--blue); box-shadow: 0 0 0 2px var(--blue) inset; }
 .skin-opt.locked .skin-chip { filter: saturate(.35) brightness(.8); }
-.skin-chip { position: relative; width: 40px; height: 40px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35), 0 0 0 1.5px var(--tier, transparent); overflow: hidden; background-size: cover; }
+.skin-chip { position: relative; width: 36px; height: 36px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35), 0 0 0 1.5px var(--tier, transparent); overflow: hidden; background-size: cover; }
 .skin-chip::after { content: ''; position: absolute; inset: -50%; background: linear-gradient(115deg, transparent 40%, rgba(255,255,255,.55) 50%, transparent 60%); animation: skin-shine 2.6s ease-in-out infinite; }
 .skin-chip.none { display: grid; place-items: center; background: var(--seg); color: #90a4ae; font-size: 18px; }
 .skin-chip.none::after { display: none; }
@@ -1663,3 +1668,19 @@ button.book-car { font: inherit; color: inherit; }
   .overlay:has(> .panel), .overlay > .panel, .overlay.closing, .overlay.closing > .panel, .paint-sweep::before, .chest.ready .chest-icon, .badge-arcade { animation: none; }
 }
 .merge-tools { display: inline-flex; gap: 6px; }
+
+/* Garage header: a car switcher on phones, then one wrapping row of small tags. */
+.car-switch { display: grid; grid-template-columns: 40px 1fr 40px; gap: 6px; margin-bottom: 8px; }
+.car-switch button { border: 0; border-radius: 10px; background: var(--seg); font: 22px var(--display); color: #37474f; cursor: pointer; min-height: 40px; }
+.car-switch button:disabled { opacity: .35; }
+.car-switch .car-switch-name { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 2px 6px; min-width: 0; }
+.car-switch-name b { font: 16px var(--display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.car-switch-name small { font: 800 11px Nunito, sans-serif; color: #607d8b; }
+@media (min-width: 601px) { .car-switch { display: none; } }
+.car-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 2px; }
+.car-tags > * { margin: 0; }
+.pi-badge { font: 800 12px Nunito, sans-serif; color: #546e7a; background: var(--seg); border-radius: 999px; padding: 2px 10px; }
+.pi-badge b { font: 16px var(--display); color: var(--blue); }
+.car-tags .loves-tag, .car-tags .driver-row { width: auto; display: inline-block; font-size: 12px; padding: 3px 10px; border-radius: 999px; background: #fce4ec; border: 0; }
+.car-tags .skill-tag { font-size: 12px; }
+.car-tags .showcase-toggle { margin-left: auto; font-size: 12px; }
