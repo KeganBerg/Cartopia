@@ -70,7 +70,7 @@ export function gpBeatTable(): number[] {
   })
 }
 
-// Surprise visitors as the server rolls them (visitor_next() in 0030_town_visitors.sql).
+// Surprise visitors as the server rolls them (visitor_next() in 0032_town_visitors.sql).
 export function visitorTable() {
   return {
     kinds: Object.fromEntries(Object.entries(VISITORS).map(([k, v]) => [k, { weight: v.weight, minutes: v.minutes, ...v.pay }])),

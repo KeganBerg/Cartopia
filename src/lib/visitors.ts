@@ -7,7 +7,7 @@ import { CARS, RESCUE_SPOTS, STORAGE_MAX, VISITORS, VISIT_GAP_MIN, BARN_RARITY, 
 
 // Surprise visitors in town: every few minutes someone turns up (see VISITORS in data.ts).
 // Signed-in players get theirs from the server (visitor_next() and visitor_claim() in
-// supabase/migrations/0030_town_visitors.sql), which fixes the prize so the save guard can pay it.
+// supabase/migrations/0032_town_visitors.sql), which fixes the prize so the save guard can pay it.
 // Guests roll here; their towns aren't saved to the cloud.
 
 export type Visitor = {

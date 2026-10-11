@@ -972,7 +972,7 @@ export const CREW_POINTS = { job: 1, race: 3 }
 export const CREW_CHEST: ChestPay = { coins: 1500, coinsPerLevel: 300, xp: 0, xpPerLevel: 0, parts: 25, bucks: 5, fuel: 0 }
 
 // Surprise visitors in town (src/lib/visitors.ts). For signed-in players the server picks who comes
-// and fixes the prize (supabase/migrations/0030_town_visitors.sql, visitor_next()); guests roll here.
+// and fixes the prize (supabase/migrations/0032_town_visitors.sql, visitor_next()); guests roll here.
 //   racer: a street racer to beat (the bonus on top of the race's own prize, paid only on a win)
 //   tourist: tips you for the photo op
 //   mystery: a mystery car drives by; tap it before it leaves
