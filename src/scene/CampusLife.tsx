@@ -4,6 +4,10 @@ import { Color, Object3D } from 'three'
 import type { Group, InstancedMesh } from 'three'
 import { dayPhase, isNight, nightAmount } from '../game/clock'
 import { SHIRTS, PANTS, SKIN, HAIR } from './people'
+import { CarModel } from './CarModel'
+import { bodyScale } from './townCarSize'
+import { signTexture } from './signTexture'
+import type { Body } from '../game/data'
 
 // The moving parts of the schools and the driving academy: kids at recess,
 // runners on the high school track, students crossing the quad and learner
@@ -107,11 +111,42 @@ export function Crowd({ n, move, hours = 'always', kids, uniform }: CrowdProps) 
 
 // ---- Learner cars ----
 
+// The academy's own learner cars: full car models at town traffic size, each in a
+// school colour with a STUDENT DRIVER topper on the roof.
 const CAR_COLORS = ['#e53935', '#1e88e5', '#fdd835', '#43a047']
+const LEARNERS: { body: Body; model: string }[] = [
+  { body: 'compact', model: 'pip' },
+  { body: 'hatch', model: 'hotshot' },
+  { body: 'sedan', model: 'civic' },
+]
+
+// Roof height of each learner body (CarModel's lift + body + cabin).
+const SHAPE_TOP: Record<string, number> = { compact: 0.65, hatch: 0.59, sedan: 0.59 }
+
+export function LearnerCar({ i, at, rot = 0 }: { i: number; at?: [number, number, number]; rot?: number }) {
+  const { body, model } = LEARNERS[i % LEARNERS.length]
+  const k = bodyScale(body)
+  const roof = SHAPE_TOP[body] ?? 0.6
+  return (
+    <group position={at} rotation-y={rot}>
+      <group scale={k}>
+        <CarModel body={body} model={model} color={CAR_COLORS[i % CAR_COLORS.length]} />
+        {/* STUDENT DRIVER topper on two little feet. */}
+        <mesh position={[0, roof + 0.05, -0.04]}>
+          <boxGeometry args={[0.26, 0.08, 0.07]} />
+          <meshStandardMaterial color="#ffeb3b" emissive="#ffc400" emissiveIntensity={0.35} />
+        </mesh>
+        <mesh position={[0, roof + 0.05, -0.004]}>
+          <planeGeometry args={[0.24, 0.06]} />
+          <meshBasicMaterial map={signTexture('STUDENT', '#ffeb3b', '#212121')} toneMapped={false} />
+        </mesh>
+      </group>
+    </group>
+  )
+}
 
 // Learner cars weaving through the course: each follows `route` a little
-// behind the last, nose pointed where it is going. A roof topper marks them
-// as student drivers, and they drive slowly (they are learning).
+// behind the last, nose pointed where it is going. They drive slowly (they are learning).
 export function StudentCars({ n, route, lap }: { n: number; route: (f: number) => XZ; lap: number }) {
   const cars = useRef<(Group | null)[]>([])
   useFrame(({ clock }) => {
@@ -123,7 +158,7 @@ export function StudentCars({ n, route, lap }: { n: number; route: (f: number) =
       const f = time / lap + Math.sin(time * 0.6 + i) * 0.012 + i / n
       const [x, z] = route(f)
       const [x2, z2] = route(f + 0.004)
-      g.position.set(x, 0, z)
+      g.position.set(x, 0.06, z)
       g.rotation.y = Math.atan2(x2 - x, z2 - z)
     }
   })
@@ -131,26 +166,7 @@ export function StudentCars({ n, route, lap }: { n: number; route: (f: number) =
     <group userData={{ noBatch: true }}>
       {Array.from({ length: n }, (_, i) => (
         <group key={i} ref={(el) => { cars.current[i] = el }}>
-          <mesh position={[0, 0.14, 0]} castShadow>
-            <boxGeometry args={[0.36, 0.14, 0.7]} />
-            <meshStandardMaterial color={CAR_COLORS[i % CAR_COLORS.length]} roughness={0.35} metalness={0.2} />
-          </mesh>
-          <mesh position={[0, 0.27, -0.05]} castShadow>
-            <boxGeometry args={[0.3, 0.12, 0.36]} />
-            <meshStandardMaterial color="#b3e5fc" roughness={0.15} metalness={0.4} />
-          </mesh>
-          {/* STUDENT DRIVER topper. */}
-          <mesh position={[0, 0.37, -0.05]}>
-            <boxGeometry args={[0.22, 0.07, 0.06]} />
-            <meshStandardMaterial color="#ffeb3b" emissive="#ffc400" emissiveIntensity={0.35} />
-          </mesh>
-          {/* One axle per end: its ends are the wheels. */}
-          {[0.22, -0.22].map((z) => (
-            <mesh key={z} position={[0, 0.07, z]} rotation-z={Math.PI / 2}>
-              <cylinderGeometry args={[0.07, 0.07, 0.4, 10]} />
-              <meshStandardMaterial color="#212121" />
-            </mesh>
-          ))}
+          <LearnerCar i={i} />
         </group>
       ))}
     </group>

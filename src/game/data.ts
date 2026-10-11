@@ -1,5 +1,6 @@
 // Static game data: buildings, cars and the progression curve.
 
+import { growthName } from './growth'
 import { isNight } from './clock'
 
 export const GRID = 24
@@ -227,9 +228,9 @@ const HOME_NAMES: Record<HomeStage, string> = { house: 'House', apartments: 'Apa
 const TRAILER_NAMES: Record<HomeStage, string> = { house: 'Trailer Home', apartments: 'Double-Wide', tower: 'Trailer Court' }
 const RESIDENTS = [2, 3, 4, 6, 8, 10, 13, 16, 20, 24]
 export const houseResidents = (level: number) => RESIDENTS[Math.min(MAX_BUILDING_LEVEL, Math.max(1, level)) - 1]
-// What a building is called at a level (only homes change name).
+// What a building is called at a level: homes and growing businesses (game/growth.ts) change name.
 export const levelName = (d: BuildingDef, level: number) =>
-  d.kind !== 'house' ? d.name : (d.id === 'trailer' ? TRAILER_NAMES : HOME_NAMES)[homeStage(level)]
+  d.kind !== 'house' ? growthName(d.id, d.name, level) : (d.id === 'trailer' ? TRAILER_NAMES : HOME_NAMES)[homeStage(level)]
 export const buildingUpgradeXp = (level: number) => 10 + level * 5
 // Extra model height an upgraded building gains, on the same lot.
 export const levelLift = (level = 1) => 0.26 * (Math.min(MAX_BUILDING_LEVEL, Math.max(1, level)) - 1)
@@ -546,12 +547,18 @@ export const modXp = (id: string) => 10 + (modDef(id)?.unlockLevel ?? 0) * 3
 
 // Performance index: what races are decided on (plus the driver's shifting).
 export const performance = (car: CarDef, up: Record<UpgradeSlot, number>, mods?: string[] | null) => {
+  const { power, grip, weight } = carStats(car, up, mods)
+  return Math.round(power * 0.6 + grip * 0.3 + (100 - weight) * 0.1)
+}
+// Power, grip and weight with upgrades and fitted mods.
+export function carStats(car: CarDef, up: Record<UpgradeSlot, number>, mods?: string[] | null) {
   const m = Object.values(fittedMods(mods, car.body)).map(modStats)
   const sum = (k: 'power' | 'grip' | 'weight') => m.reduce((a, x) => a + x[k], 0)
-  const power = car.power + up.engine * 4 + up.turbo * 3 + sum('power')
-  const grip = car.grip + up.tires * 4 + sum('grip')
-  const weight = Math.max(5, car.weight - up.weight * 4 + sum('weight'))
-  return Math.round(power * 0.6 + grip * 0.3 + (100 - weight) * 0.1)
+  return {
+    power: car.power + up.engine * 4 + up.turbo * 3 + sum('power'),
+    grip: car.grip + up.tires * 4 + sum('grip'),
+    weight: Math.max(5, car.weight - up.weight * 4 + sum('weight')),
+  }
 }
 
 // XP needed to go from `level` to `level + 1`.

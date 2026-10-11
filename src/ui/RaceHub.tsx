@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useGame, type OwnedCar } from '../game/store'
-import { CAMPAIGN, CAMPAIGN_RACES, GP_ROUNDS, GP_SERIES, RACE_FUEL, SKILLS, campaignCleared, campaignRaceId, campaignReward, carDef, msToNextWeek, performance, skinDef } from '../game/data'
+import { CAMPAIGN, CAMPAIGN_RACES, GP_ROUNDS, GP_SERIES, RACE_FUEL, SKILLS, campaignCleared, campaignRaceId, campaignReward, carDef, carStats, msToNextWeek, performance, skinDef } from '../game/data'
+import { BUILDS, DIST, buildOf, character, fit, tourDist, type RaceDist } from '../game/distance'
 import { EVENT_RACES, eventFor, eventPrize, eventProgress } from '../game/events'
 import { TOUR_RACES, tourLeg, tourLegOf, tourPrize, tourRivalName } from '../game/tour'
 import { shortLeft, trialVenue, trialWeek } from '../game/trial'
@@ -10,7 +11,7 @@ import { supabase } from '../lib/supabase'
 import { venue as venueById } from '../scene/venues'
 import { CarThumb } from '../scene/BuildingPreview'
 import { RivalTile, type RivalMatch } from './Rivals'
-import { artClass, artStyle } from './venueArt'
+import { artStyle } from './venueArt'
 
 // The Race menu's front page: every race mode as a tile on one screen, each
 // showing its next race, so nothing needs scrolling to find.
@@ -75,7 +76,7 @@ export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival }: { onOp
 
   return (
     <div className="rm-hub">
-      <div className={`rm-tile rm-camp rm-photo${artClass(ch.venue)}`} style={artStyle(ch.venue)} {...tile('campaign')}>
+      <div className="rm-tile rm-camp rm-photo" style={artStyle('camp', ch.venue)} {...tile('campaign')}>
         <span className="rm-tag">CAMPAIGN</span>
         <b className="rm-ttl">{ch.name}</b>
         <span className="rm-meta">Chapter {ci + 1} of {CAMPAIGN.length} · ⭐ {stars}/{maxStars}</span>
@@ -85,12 +86,12 @@ export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival }: { onOp
         )}
       </div>
 
-      <div className={`rm-tile rm-tour rm-photo${artClass(leg.venue, leg.night)}${tourOpen ? '' : ' rm-locked'}`} style={artStyle(leg.venue, leg.night)} {...tile('tour')}>
+      <div className={`rm-tile rm-tour rm-photo${tourOpen ? '' : ' rm-locked'}`} style={artStyle('tour', leg.venue, leg.night)} {...tile('tour')}>
         <span className="rm-tag">PRO TOUR</span>
         <b className="rm-ttl">{leg.night ? `${tv.name} at Midnight` : `${tv.name} ${leg.name}`}</b>
         {tourOpen ? (
           <>
-            <span className="rm-meta">Leg {leg.index + 1}{leg.night ? ' · 🌙' : ''} <Pips n={won % TOUR_RACES} of={TOUR_RACES} /></span>
+            <span className="rm-meta">Leg {leg.index + 1}{leg.night ? ' · 🌙' : ''} · {DIST[tourDist(won)].label} <Pips n={won % TOUR_RACES} of={TOUR_RACES} /></span>
             <span className="rm-cta"><span>{tourRivalName(won)}</span><button className="buy small" onClick={stop(onTour)}>{money(tourPrize(won))}</button></span>
           </>
         ) : <span className="rm-meta">🔒 Clear Back Streets to open</span>}
@@ -98,7 +99,7 @@ export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival }: { onOp
 
       <RivalTile onRace={onRival} />
 
-      <div className={`rm-tile rm-ev rm-photo${artClass(ev.venue, ev.night)}`} style={{ ...artStyle(ev.venue, ev.night), '--ev': ev.color } as React.CSSProperties} {...tile('event')}>
+      <div className={`rm-tile rm-ev rm-photo`} style={{ ...artStyle('tour', ev.venue, ev.night), '--ev': ev.color } as React.CSSProperties} {...tile('event')}>
         {evCar && (
           <span className="rm-ev-car" aria-hidden>
             <CarThumb size="xs" color={evCar.color} finish={evCar.finish} skin={ev.skin} body={carDef(evCar.model).body} model={evCar.model} stripe={evCar.stripe} mods={evCar.mods} />
@@ -114,14 +115,14 @@ export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival }: { onOp
           : <span className="rm-ev-done">✔ Cleared</span>}
       </div>
 
-      <div className={`rm-tile rm-gp rm-photo${level < series.unlockLevel ? ' rm-locked' : ''}`} style={artStyle('main')} {...tile('gp')}>
+      <div className={`rm-tile rm-gp rm-photo${level < series.unlockLevel ? ' rm-locked' : ''}`} style={artStyle('gp')} {...tile('gp')}>
         <span className="rm-tag">GRAND PRIX</span>
         <b className="rm-ttl">{series.name}</b>
         <span className="rm-meta"><Rounds round={round} /></span>
         <span className="rm-meta">🎁 Mystery car at race {GP_ROUNDS}</span>
       </div>
 
-      <div className={`rm-tile rm-trial rm-photo${artClass(trial.id)}`} style={artStyle(trial.id)} {...tile('trial')}>
+      <div className="rm-tile rm-trial rm-photo" style={artStyle('trial', trial.id)} {...tile('trial')}>
         <span className="rm-tag">TIME TRIAL</span>
         <b className="rm-ttl">{trial.name}</b>
         <span className="rm-meta">⏱️ {best !== null ? `${best.toFixed(3)}s` : 'No time yet'}</span>
@@ -153,20 +154,29 @@ export function Rounds({ round }: { round: number }) {
 
 // The bar along the bottom of every Race menu screen: the car you race with
 // (tap to swap) and, where the screen has one, the button for its next race.
-export function RaceBar({ cars, car, onPick, go, note }: { cars: OwnedCar[]; car: OwnedCar | undefined; onPick: (uid: string) => void; go?: { label: string; onClick: () => void } | null; note?: string }) {
+// dist: the next race's distance, to show how each car's build suits it; null on a screen
+// whose races vary (builds shown without a verdict); left out where builds don't count.
+export function RaceBar({ cars, car, onPick, go, note, dist }: { cars: OwnedCar[]; car: OwnedCar | undefined; onPick: (uid: string) => void; go?: { label: string; onClick: () => void } | null; note?: string; dist?: RaceDist | null }) {
   const [open, setOpen] = useState(false)
   if (!car) return null
   const d = carDef(car.model)
   const pi = (c: OwnedCar) => performance(carDef(c.model), c.upgrades, c.mods)
   const skill = d.skill ? SKILLS[d.skill] : null
+  // The build tag, with a tick or a cross for how it suits the next race's distance.
+  const tag = (c: OwnedCar) => {
+    if (dist === undefined) return null
+    const b = buildOf(character(carStats(carDef(c.model), c.upgrades, c.mods)))
+    const f = dist ? fit(b, dist) : null
+    return <span className={`rm-build${f ? ` ${f}` : ''}`} title={`${BUILDS[b].name}: ${BUILDS[b].text}`}>{BUILDS[b].icon}{f === 'good' ? '✓' : f === 'bad' ? '✗' : ''}</span>
+  }
   return (
     <div className="rm-bar">
       {open && (
-        <div className="rm-picker" role="listbox" aria-label="Pick a car">
+        <div className="rm-picker" role="listbox" aria-label="Pick the car you race with">
           {[...cars].sort((a, b) => pi(b) - pi(a)).map((c) => (
             <button key={c.uid} role="option" aria-selected={c.uid === car.uid} className={c.uid === car.uid ? 'chip sel' : 'chip'} onClick={() => { onPick(c.uid); setOpen(false) }}>
               <CarThumb size="xs" color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} body={carDef(c.model).body} model={c.model} stripe={c.stripe} mods={c.mods} />
-              <span>{carDef(c.model).name}</span><span className="rm-pi">PI {pi(c)}</span>{carDef(c.model).skill ? ` ${SKILLS[carDef(c.model).skill!].icon}` : ''}
+              <span>{carDef(c.model).name}</span><span className="rm-pi">PI {pi(c)}</span>{carDef(c.model).skill ? ` ${SKILLS[carDef(c.model).skill!].icon}` : ''}{tag(c)}
             </button>
           ))}
         </div>
@@ -174,10 +184,11 @@ export function RaceBar({ cars, car, onPick, go, note }: { cars: OwnedCar[]; car
       <button className="rm-car" onClick={() => setOpen((o) => !o)} disabled={cars.length < 2} aria-expanded={open}>
         <CarThumb size="xs" color={car.color} finish={car.finish} skin={car.skin} modSkin={car.modSkin} body={d.body} model={car.model} stripe={car.stripe} mods={car.mods} />
         <span className="rm-car-txt">
+          <small className="rm-car-lbl">🏁 Racing with</small>
           <b>{d.name}</b>
-          <small><span className="rm-pi">PI {pi(car)}</span>{skill && <> {skill.icon} {skill.name}</>}</small>
+          <small><span className="rm-pi">PI {pi(car)}</span>{skill && <> {skill.icon} {skill.name}</>}{tag(car)}</small>
         </span>
-        {cars.length > 1 && <span className="rm-chev" aria-hidden>{open ? '▴' : '▾'}</span>}
+        {cars.length > 1 && <span className="rm-swap" aria-hidden>{open ? 'Done' : 'Change'}</span>}
       </button>
       {go ? <button className="buy rm-race" onClick={go.onClick}>🏁 {go.label}<small>⛽{RACE_FUEL}</small></button>
         : note ? <span className="rm-note">{note}</span> : null}

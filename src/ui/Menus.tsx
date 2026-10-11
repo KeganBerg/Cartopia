@@ -1,6 +1,7 @@
 import { groupOf, mergeCandidates } from '../game/merge'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGame, hasRusty, buildPrice, type OwnedCar } from '../game/store'
+import { raceCarOf } from '../game/raceCar'
 import { reducedMotion } from '../game/fx'
 import { activeEvent, garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, carDef, performance, upgradeCost, buildingDef, upgradable, loves, readySets, type BuildingDef } from '../game/data'
 import { CarInspect, CarPreview, type DynoFeed } from '../scene/CarPreview'
@@ -17,8 +18,10 @@ import { SkinPicker } from './Skins'
 import type { PaintJob, SkinnedSlot } from '../game/data'
 import { Icon } from './Icon'
 import { useCrewGoal } from './CrewGoal'
+import { useChat } from '../lib/chat'
 import { useRivalWaiting } from './Rivals'
 import { ShowcaseToggle } from './Meet'
+import { tutTarget, type TutTarget } from './Tutorial'
 
 // Phones and tablets: no hover, so placing takes a preview tap first.
 const TOUCH = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
@@ -30,19 +33,22 @@ export function BottomBar() {
   const visiting = useGame((s) => !!s.visiting)
   const setsReady = useGame((s) => readySets(s).length)
   const crewChests = useCrewGoal((g) => g.ready)
+  const crewChat = useChat((c) => c.unread.crew)
+  const globalChat = useChat((c) => c.unread.global > 0)
   const rival = useRivalWaiting()
+  const tut = useGame(tutTarget)
+  const pulse = (t: TutTarget) => (tut === t ? ' tut-pulse' : '')
   if (visiting) return null
   if (mode !== 'play') return <EditBar />
   return (
     <>
       <div className="bottom-bar">
-        <button className="icon-btn" onClick={() => openPanel('shop')}><span className="i i-shop"><Icon name="shop" /></span>SHOP</button>
-        <button className="icon-btn crates-btn" onClick={() => openPanel('crates')}><span className="i i-crates"><Icon name="crate" /></span>CRATES</button>
-        <button className="icon-btn" onClick={() => openPanel('showroom')}><span className="i i-showroom"><Icon name="car" />{setsReady > 0 && <span className="btn-dot">{setsReady}</span>}</span>SHOWROOM</button>
-        <button className="icon-btn" onClick={() => openPanel('garage')}><span className="i i-garage"><Icon name="wrench" /></span>GARAGE</button>
+        <button className={`icon-btn${pulse('shop')}`} onClick={() => openPanel('shop')}><span className="i i-shop"><Icon name="shop" /></span>SHOP</button>
+        <button className="icon-btn" onClick={() => openCars(setsReady > 0)}><span className="i i-showroom"><Icon name="car" />{setsReady > 0 && <span className="btn-dot">{setsReady}</span>}</span>CARS</button>
         <button className="icon-btn" onClick={() => openPanel('friends')}><span className="i i-friends"><Icon name="friends" />{crewChests > 0 && <span className="btn-dot">{crewChests}</span>}</span>FRIENDS</button>
+        <button className="icon-btn" onClick={() => openPanel('chat')}><span className="i i-chat"><Icon name="chat" />{crewChat > 0 ? <span className="btn-dot">{crewChat > 9 ? '9+' : crewChat}</span> : globalChat && <span className="btn-dot new" />}</span>CHAT</button>
         <button className="icon-btn" onClick={() => setMode('road')}><span className="i i-edit"><Icon name="cone" /></span>EDIT</button>
-        <button className="big-btn race-btn" onClick={() => openPanel('race')}><span className="i"><Icon name="flag" />{rival && <span className="btn-dot" title="Your rival is in town">!</span>}</span>RACE</button>
+        <button className={`big-btn race-btn${pulse('race')}`} onClick={() => openPanel('race')}><span className="i"><Icon name="flag" />{rival && <span className="btn-dot" title="Your rival is in town">!</span>}</span>RACE</button>
       </div>
       <GoalsButton />
       <CollectAllButton />
@@ -62,6 +68,7 @@ function EditBar() {
     const b = s.selected ? s.buildings.find((o) => o.uid === s.selected) : undefined
     return !!b && upgradable(buildingDef(b.def))
   })
+  const tutDone = useGame((s) => tutTarget(s) === 'done')
   const pickedMerged = useGame((s) => !!s.selected && !!groupOf(s.buildings, s.selected))
   const canMerge = useGame((s) => (s.mode === 'merge' ? mergeCandidates(s.buildings).length > 0 || s.buildings.some((b) => b.merge) : true))
   const hint =
@@ -85,7 +92,7 @@ function EditBar() {
         {mode === 'move' && selected && canUpgrade && <button className="tool" onClick={() => openUpgrade(selected)}><Icon name="up" size={22} /><span>Upgrade</span></button>}
         {mode === 'move' && again && <button className="tool" onClick={() => setMode('place', again)}><Icon name="plus" size={22} /><span>Again</span></button>}
         <button className="tool" onClick={() => openPanel('shop')}><Icon name="shop" size={22} /><span>Shop</span></button>
-        <button className="tool done" onClick={() => setMode('play')}><Icon name="check" size={22} /><span>Done</span></button>
+        <button className={tutDone ? 'tool done tut-pulse' : 'tool done'} onClick={() => setMode('play')}><Icon name="check" size={22} /><span>Done</span></button>
       </div>
     </div>
   )
@@ -199,7 +206,7 @@ export function ShopPanel() {
     return () => cancelAnimationFrame(raf)
   }, [focus])
   const ev = activeEvent()
-  const tabs: { id: ShopTab; label: React.ReactNode }[] = [...SHOP_GROUPS.filter((g) => g.id !== 'event' || ev), ...(canUpgrade ? [{ id: 'upgrades' as const, label: '<Icon name="up" size={18} />Upgrades' }] : [])]
+  const tabs: { id: ShopTab; label: React.ReactNode }[] = [...SHOP_GROUPS.filter((g) => g.id !== 'event' || ev), ...(canUpgrade ? [{ id: 'upgrades' as const, label: '⬆️ Upgrades' }] : [])]
   const group = SHOP_GROUPS.find((g) => g.id === tab)
   return (
     <Panel title="Shop" wide>
@@ -250,6 +257,35 @@ export function ShopPanel() {
 
 // The Showroom reopens on the tab it was left on.
 let lastShowroomTab: 'shop' | 'book' = 'shop'
+// The CARS button reopens whichever of the Garage and Showroom was used last.
+let lastCars: 'garage' | 'showroom' = 'garage'
+
+// Opens the cars window; a ready collection set jumps straight to the Collection tab.
+function openCars(setsReady: boolean) {
+  if (setsReady) lastShowroomTab = 'book'
+  useGame.getState().openPanel(setsReady ? 'showroom' : lastCars)
+}
+
+type CarsTab = 'garage' | 'shop' | 'book' | 'crates'
+
+// My Garage, the Showroom and the Crate Depot share one row of tabs, opened from the CARS button.
+function CarsTabs({ current, onShowroom }: { current: CarsTab; onShowroom?: (t: 'shop' | 'book') => void }) {
+  const openPanel = useGame((s) => s.openPanel)
+  const ready = useGame((s) => readySets(s).length)
+  const tabs: { id: CarsTab; label: React.ReactNode }[] = [
+    { id: 'garage', label: <><span className="tab-emo">🔧 </span>My Cars</> },
+    { id: 'shop', label: <><span className="tab-emo">🚘 </span>For Sale</> },
+    { id: 'book', label: <><span className="tab-emo">📖 </span>Collection{ready > 0 && <span className="tab-dot">{ready}</span>}</> },
+    { id: 'crates', label: <><span className="tab-emo">📦 </span>Crates</> },
+  ]
+  const pick = (t: CarsTab) => {
+    if (t === 'garage' || t === 'crates') return openPanel(t)
+    if (onShowroom) return onShowroom(t)
+    lastShowroomTab = t
+    openPanel('showroom')
+  }
+  return <SheetTabs items={tabs} value={current} onChange={pick} />
+}
 
 export function ShowroomPanel() {
   const level = useGame((s) => s.level)
@@ -261,23 +297,18 @@ export function ShowroomPanel() {
   const { body, focus } = useShopFocus()
   const look = inspect ? carDef(inspect) : null
   const [tab, setTab] = useState<'shop' | 'book'>(() => lastShowroomTab)
+  useEffect(() => { lastCars = 'showroom' }, [])
   const pickTab = (t: 'shop' | 'book') => {
     lastShowroomTab = t
     setTab(t)
   }
-  const ready = useGame((s) => readySets(s).length)
-  const owned = useGame((s) => CARS.filter((c) => s.cars.some((o) => o.model === c.id)).length)
   const find = useFindCar((model) => {
     pickTab('shop')
     useGame.setState({ shopFocus: model })
   })
-  const tabs = [
-    { id: 'shop' as const, label: '🚘 For sale' },
-    { id: 'book' as const, label: <>📖 Collection {owned}/{CARS.length}{ready > 0 && <span className="tab-dot">{ready}</span>}</> },
-  ]
   return (
     <Panel title="Showroom" wide>
-      <SheetTabs items={tabs} value={tab} onChange={pickTab} />
+      <CarsTabs current={tab} onShowroom={pickTab} />
       {tab === 'book' && <CollectionBook onFind={find} />}
       {tab === 'shop' && <>
       {!rusty && (
@@ -370,6 +401,17 @@ export function openGarageTab(tab: GarageTab) {
   useGame.getState().openPanel('garage')
 }
 
+// Makes this the car every race uses (the Race menu's car bar picks it too).
+function RaceCarToggle({ car }: { car: string }) {
+  const on = useGame((s) => raceCarOf(s.cars, s.raceCar)?.uid === car)
+  const pick = useGame((s) => s.setRaceCar)
+  return (
+    <button className={on ? 'showcase-toggle race-toggle on' : 'showcase-toggle race-toggle'} onClick={() => pick(car)} disabled={on} title="The car you race with, in every race and live challenge">
+      {on ? '🏁 Racing' : '🏁 Race with'}
+    </button>
+  )
+}
+
 export function GaragePanel() {
   const cars = useGame((s) => s.cars)
   const selected = useGame((s) => s.selectedCar)
@@ -378,6 +420,7 @@ export function GaragePanel() {
   const sell = useGame((s) => s.sellCar)
   const car = cars.find((c) => c.uid === selected) ?? cars[0]
   const def = car && carDef(car.model)
+  useEffect(() => { lastCars = 'garage' }, [])
   const [tab, setTab] = useState<GarageTab>(() => {
     const t = nextGarageTab
     nextGarageTab = 'tune'
@@ -418,6 +461,7 @@ export function GaragePanel() {
   }, [car?.uid, pi])
   return (
     <Panel title={`My Garage · ${cars.length} cars · ⚡${garagePower(cars)}`} wide>
+      <CarsTabs current="garage" />
       <div className={picking ? 'garage picking' : 'garage'}>
         <div className="garage-list">
           {cars.map((c) => {
@@ -460,6 +504,7 @@ export function GaragePanel() {
               <SkillTag model={car.model} />
               <DriverRow car={car.uid} model={car.model} />
               <ShowcaseToggle car={car.uid} />
+              <RaceCarToggle car={car.uid} />
             </div>
             <div className="garage-tabs" role="tablist">
               {([['tune', '🔧 Upgrades'], ['mods', '🪽 Mods'], ['paint', '🎨 Paint']] as const).map(([id, label]) => (

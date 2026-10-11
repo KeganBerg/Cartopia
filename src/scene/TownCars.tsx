@@ -11,7 +11,8 @@ import { pedestrianCrossings } from '../game/walkGraph'
 import { showcaseOf } from '../game/meet'
 import { turnOf } from '../game/placement'
 import { toWorld, DIRS } from './grid'
-import { CarModel, carSize, wheelRig, type WheelRig } from './CarModel'
+import { CarModel, wheelRig, type WheelRig } from './CarModel'
+import { bodyScale, townScale, townSize } from './townCarSize'
 import { wheelPool } from './carBatch'
 import { liveTraffic as sim } from './traffic/live'
 import { layoutRoads, type Light } from './traffic/layout'
@@ -28,8 +29,9 @@ const visitorCar = (v: Visitor): OwnedCar => ({
   stripe: v.kind === 'racer' ? '#fafafa' : null,
 })
 
-// Town cars are drawn a little smaller than in the garage so two fit side by side.
-const SCALE = 1.1
+// Garage scale, which TowTruck is drawn at on its own (the rescue scene). In town
+// every car is drawn at its lane-fitting size (townCarSize.ts).
+const GARAGE = 1.1
 const MAX_VISIBLE = 30
 // Cars under this PI are the town's beaters, at home in the trailer homes.
 const LOW_PI = 40
@@ -39,7 +41,7 @@ const LOW_PI = 40
 export function TowTruck({ rig, crane }: { rig?: WheelRig; crane?: boolean }) {
   return (
     <group>
-      <group scale={SCALE}>
+      <group scale={GARAGE}>
         <CarModel body="truck" color="#ff8f00" beams rig={rig} />
       </group>
       {/* Boom and hook reaching back to the towed car. */}
@@ -64,6 +66,7 @@ function TownCar({ car, onTap }: { car: OwnedCar; onTap?: () => void }) {
   const truck = useRef<Group>(null)
   const def = carDef(car.model)
   const rig = useMemo(() => wheelRig(def.body), [def.body])
+  const k = bodyScale(def.body)
   const selected = useGame((s) => s.selectedCar === car.uid)
   useEffect(() => () => void anchors.delete(`car:${car.uid}`), [car.uid])
 
@@ -85,9 +88,9 @@ function TownCar({ car, onTap }: { car: OwnedCar; onTap?: () => void }) {
     g.rotation.z = a.stalled && !a.tow ? 0.06 : 0
     if (body.current) body.current.rotation.x = a.tow >= 2 ? -0.1 * a.truck : 0
     // Front wheels steer into the bend; all four roll with the road.
-    const steer = a.v > 0.01 || a.parked ? sim.steerOf(a, rig.base * SCALE) : null
+    const steer = a.v > 0.01 || a.parked ? sim.steerOf(a, rig.base * k) : null
     for (const w of rig.steer) if (w && steer !== null) w.rotation.y += (steer - w.rotation.y) * Math.min(1, Math.min(dt, 0.1) * 10)
-    const roll = (a.v * Math.min(dt, 0.1)) / (rig.radius * SCALE)
+    const roll = (a.v * Math.min(dt, 0.1)) / (rig.radius * k)
     for (const w of rig.spin) if (w) w.rotation.x = (w.rotation.x + roll) % (Math.PI * 2)
     rig.slots?.forEach((w, i) => w && wheelPool.place(w, rig.spin[i]))
     const tp = sim.truckPose(a)
@@ -116,12 +119,14 @@ function TownCar({ car, onTap }: { car: OwnedCar; onTap?: () => void }) {
           s.openPanel(car.flat || car.lowFuel ? 'flat' : 'garage')
         }}
       >
-        <group ref={body} scale={SCALE}>
+        <group ref={body} scale={k}>
           <CarModel body={def.body} model={def.id} color={car.color} finish={car.finish} skin={car.skin} modSkin={car.modSkin} highlight={selected} stripe={car.stripe} mods={car.mods} beams rig={rig} lean />
         </group>
       </group>
       <group ref={truck} visible={false}>
-        <TowTruck />
+        <group scale={bodyScale('truck') / GARAGE}>
+          <TowTruck />
+        </group>
       </group>
     </>
   )
@@ -223,7 +228,9 @@ function TrafficSignals({ roads }: { roads: string[] }) {
     }
     return out
   }, [lights])
-  // One instanced mesh per lamp look (unlit, red, yellow, green); each lamp shows in exactly one.
+  // One instanced mesh per lamp look (unlit, red, yellow, green). Each lamp sits in exactly
+  // one of them, packed at the front so the meshes only draw the lamps they show (count),
+  // not every lamp in town four times over.
   const lamps = useRef<(InstancedMesh | null)[]>([])
   // Which look each lamp is showing now (-1 before the first frame).
   const shown = useMemo(() => new Int8Array(spots.length).fill(-1), [spots])
@@ -239,11 +246,17 @@ function TrafficSignals({ roads }: { roads: string[] }) {
           if (shown[j] === look) continue
           shown[j] = look
           changed = true
-          meshes.forEach((m, n) => m?.setMatrixAt(j, n === look ? spots[j] : hidden))
         }
       }
     })
-    if (changed) for (const m of meshes) if (m) m.instanceMatrix.needsUpdate = true
+    if (!changed) return
+    meshes.forEach((m, n) => {
+      if (!m) return
+      let c = 0
+      for (let j = 0; j < spots.length; j++) if (shown[j] === n) m.setMatrixAt(c++, spots[j])
+      m.count = c
+      m.instanceMatrix.needsUpdate = true
+    })
   })
 
   return (
@@ -317,11 +330,9 @@ export function TownCars() {
     const slow = new Set([...cars].sort((a, b) => pis.get(a.uid)! - pis.get(b.uid)!).slice(0, Math.ceil(cars.length / 3)).map((c) => c.uid))
     return [...cars].sort((a, b) => Number(stars.includes(b.uid)) - Number(stars.includes(a.uid))).map((c) => {
       const def = carDef(c.model)
-      const size = carSize(def.body)
       return {
         uid: c.uid,
-        len: size.len * SCALE,
-        wid: size.wid * SCALE,
+        ...townSize(def.body),
         cruise: 1.1 + pis.get(c.uid)! / 45,
         stalled: !!(c.flat || c.lowFuel),
         low: pis.get(c.uid)! < LOW_PI || slow.has(c.uid),
@@ -336,16 +347,15 @@ export function TownCars() {
   // Each hospital (up to two) runs an ambulance round town on top of the usual cap.
   const hospitals = useMemo(() => buildings.filter((b) => b.def === 'hospital').slice(0, 2).map((b) => b.uid), [townKey]) // eslint-disable-line react-hooks/exhaustive-deps
   const ambulances = useMemo(
-    () => hospitals.map((h) => ({ uid: `ambulance:${h}`, len: AMBULANCE.len * SCALE, wid: AMBULANCE.wid * SCALE, cruise: 2.2, stalled: false })),
+    () => hospitals.map((h) => ({ uid: `ambulance:${h}`, len: AMBULANCE.len * townScale(AMBULANCE.wid), wid: AMBULANCE.wid * townScale(AMBULANCE.wid), cruise: 2.2, stalled: false })),
     [hospitals],
   )
   useEffect(() => {
     const all = [...ambulances, ...specs]
     const cap = max + ambulances.length
     if (!guest || guestGone) return sim.setCars(all, cap)
-    const size = carSize(carDef(guest.model).body)
     const kind = visitor!.kind
-    const spec = { uid: guest.uid, len: size.len * SCALE, wid: size.wid * SCALE, cruise: kind === 'racer' ? 2.6 : kind === 'mystery' ? 2.2 : 1.4, stalled: false }
+    const spec = { uid: guest.uid, ...townSize(carDef(guest.model).body), cruise: kind === 'racer' ? 2.6 : kind === 'mystery' ? 2.2 : 1.4, stalled: false }
     sim.setCars([spec, ...all], cap + 1)
   }, [specs, ambulances, max, town, guest, guestGone]) // eslint-disable-line react-hooks/exhaustive-deps
   const homesKey = buildings.map((b) => (b.car ? `${b.car}>${b.uid}` : '')).join()
@@ -396,7 +406,7 @@ export function TownCars() {
         <TownCar key={`${visitKey}-${car.uid}`} car={car} />
       ))}
       {guest && <TownCar key={guest.uid} car={guest} onTap={tapVisitor} />}
-      {hospitals.map((h) => <TownAmbulance key={`${visitKey}-${h}`} uid={`ambulance:${h}`} home={h} scale={SCALE} />)}
+      {hospitals.map((h) => <TownAmbulance key={`${visitKey}-${h}`} uid={`ambulance:${h}`} home={h} scale={townScale(AMBULANCE.wid)} />)}
       <ShowcaseStars uids={stars} />
     </>
   )

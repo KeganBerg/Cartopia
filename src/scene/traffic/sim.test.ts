@@ -17,8 +17,8 @@ function grid(n: number, step: number, at = 2) {
 function cars(n: number, stalled = 0): CarSpec[] {
   return Array.from({ length: n }, (_, i) => ({
     uid: `c${String(i).padStart(2, '0')}`,
-    len: [1.34, 1.05, 1.52, 1.63][i % 4],
-    wid: [0.73, 0.7, 0.81, 0.86][i % 4],
+    len: [0.98, 0.76, 1.0, 1.22][i % 4],
+    wid: [0.53, 0.51, 0.54, 0.54][i % 4],
     cruise: 1.6 + (i % 5) * 0.4,
     stalled: i < stalled,
   }))

@@ -639,8 +639,8 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
           <meshStandardMaterial color={venue.ground ?? PAL.ground} />
         )}
       </mesh>
-      {/* The street is static, so it's merged into a few draws like the town. */}
-      <Batch version={city ? slots : venue.id}>
+      {/* The street is static, so it's merged into a few draws like the town, in stretches so the camera skips what it has passed. */}
+      <Batch version={city ? slots : venue.id} cell={24}>
         {[-1, 1].map((sd) => (
           <mesh key={sd} position={[sd * (ROAD + WALK / 2), 0.04, far / 2 + 5]}>
             <boxGeometry args={[WALK, 0.08, far + 50]} />

@@ -248,10 +248,20 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .visit-title { display: flex; flex-direction: column; font-size: 15px; }
 .visit-title b { font: 18px var(--display); }
 .visit-title small { color: #607d8b; font-weight: 800; }
-.tutorial { position: absolute; z-index: 70; left: 50%; transform: translateX(-50%); bottom: calc(96px + var(--sab)); width: min(420px, calc(100vw - 20px)); background: #263238; color: #fff; border: 3px solid #fff; border-radius: 16px; padding: 10px 14px; box-shadow: 0 6px 0 rgba(0,0,0,.3); animation: pop .25s ease-out; }
-.tutorial p { margin: 4px 0 8px; font-weight: 800; line-height: 1.35; }
-.tut-step { font: 12px var(--display); color: #ffca28; }
-.tut-skip { background: none; border: none; color: #b0bec5; font-weight: 800; text-decoration: underline; }
+.tutorial { position: absolute; z-index: 70; left: 50%; transform: translateX(-50%); bottom: calc(96px + var(--sab)); width: min(440px, calc(100vw - 20px)); display: flex; align-items: center; gap: 10px; background: #263238; color: #fff; border: 3px solid #fff; border-radius: 16px; padding: 8px 10px; box-shadow: 0 6px 0 rgba(0,0,0,.3); animation: tutIn .3s ease-out; }
+@keyframes tutIn { from { transform: translateX(-50%) scale(.85); opacity: 0; } }
+.tut-icon { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(#ffe082, #ffb300); box-shadow: inset 0 2px 0 rgba(255,255,255,.5), 0 2px 0 rgba(0,0,0,.3); font-size: 22px; }
+.tut-body { flex: 1; min-width: 0; }
+.tutorial p { margin: 0 0 5px; font-weight: 800; line-height: 1.3; }
+.tut-dots { display: flex; gap: 4px; }
+.tut-dots i { width: 6px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.3); }
+.tut-dots i.on { background: #ffca28; }
+.tut-dots i.cur { width: 16px; background: #ffca28; }
+.tut-actions { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.tut-skip { background: none; border: none; padding: 2px 4px; color: #b0bec5; font-weight: 800; font-size: 12px; text-decoration: underline; }
+/* Whatever the tutorial is pointing at: a gold ring that breathes. */
+.tut-pulse:not(.icon-btn), .icon-btn.tut-pulse .i { animation: tutPulse 1.1s ease-in-out infinite; }
+@keyframes tutPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,202,40,.95); transform: scale(1); } 50% { box-shadow: 0 0 0 8px rgba(255,202,40,0); transform: scale(1.08); } }
 
 /* Phones in portrait. */
 /* Rusty's Rescue */
@@ -606,8 +616,11 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
   .leader .leader-acts { grid-column: 1 / -1; }
   .leader-acts > .buy:last-child { flex: 1; }
   .visit-banner { flex-direction: column; gap: 6px; text-align: center; left: 6px; right: 6px; transform: none; }
-  .tutorial { bottom: calc(76px + var(--sab)); }
-  .tutorial p { font-size: 14px; }
+  .tutorial { bottom: calc(76px + var(--sab)); padding: 6px 8px; gap: 8px; }
+  /* Toasts step up over the tutorial card instead of covering it. */
+  body:has(.tutorial) .toasts { bottom: calc(146px + var(--sab)); }
+  .tutorial p { font-size: 13px; margin-bottom: 4px; }
+  .tut-icon { width: 34px; height: 34px; font-size: 18px; }
   .rival .buy { grid-column: 1 / -1; }
 
   .race-3d { height: 30dvh; min-height: 170px; }
@@ -1708,6 +1721,9 @@ button.book-car { font: inherit; color: inherit; }
 .car-tags .loves-tag, .car-tags .driver-row { width: auto; display: inline-block; font-size: 12px; padding: 3px 10px; border-radius: 999px; background: #fce4ec; border: 0; }
 .car-tags .skill-tag { font-size: 12px; }
 .car-tags .showcase-toggle { margin-left: auto; font-size: 12px; }
+.car-tags .race-toggle { margin-left: 0; border-color: #43a047; }
+.race-toggle.on { background: #c8e6c9; }
+.race-toggle:disabled { cursor: default; opacity: 1; color: inherit; }
 
 /* Helping a friend's town: a round action bubble over each shop, a tick once helped, and pips on the visit banner. */
 .badge-help { width: 34px; height: 34px; padding: 0; justify-content: center; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #f1fff4, #b9f6ca); animation: badge-in .5s cubic-bezier(.2,1.7,.4,1) both, help-nod 1.6s ease-in-out .5s infinite; }
@@ -1726,3 +1742,51 @@ button.book-car { font: inherit; color: inherit; }
   .badge-helped { width: 18px; height: 18px; font-size: 10px; }
 }
 @media (prefers-reduced-motion: reduce) { .badge-help { animation: none; } }
+
+/* Friends list and usernames */
+.fr-signin, .fr-claim { display: flex; gap: 10px; align-items: center; background: #fff; border: 2px solid #e0e0e0; border-radius: 14px; padding: 10px 12px; margin: 6px 0 8px; }
+.fr-signin > span { font-size: 28px; }
+.fr-signin > div { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.fr-signin small { color: #607d8b; font-weight: 700; }
+.fr-claim { flex-direction: column; align-items: stretch; gap: 6px; border-color: var(--accent); background: #fff8ef; }
+.fr-add { display: flex; gap: 8px; align-items: center; margin: 4px 0 6px; }
+.fr-add input { flex: 1; margin: 0; min-width: 0; }
+.fr-h { display: flex; align-items: center; gap: 6px; margin: 12px 0 6px; }
+.fr-h small { font-weight: 800; font-size: 12px; color: #78909c; }
+.fr-empty { margin: 0; font-size: 14px; }
+.fr-row { grid-template-columns: 36px 1fr auto; }
+.fr-row.fr-on { border-color: #81c784; }
+.fr-incoming { border-color: var(--accent); background: #fff8ef; }
+.fr-av { position: relative; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; color: #fff; font: 17px var(--display); text-shadow: 0 1px 0 rgba(0,0,0,.25); }
+.fr-av.on::after { content: ''; position: absolute; right: -1px; bottom: -1px; width: 11px; height: 11px; border-radius: 50%; background: #43a047; border: 2px solid #fff; }
+.fr-online { color: #2e7d32; font-weight: 800; }
+.fr-online em { font-style: normal; color: #607d8b; font-weight: 700; }
+.fr-seen { color: #90a4ae; }
+.fr-more { background: none; border: none; font-size: 20px; line-height: 1; padding: 2px 4px; color: #90a4ae; cursor: pointer; }
+.fr-sent { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
+.fr-sent small { font-weight: 800; color: #78909c; }
+.fr-chip { display: inline-flex; align-items: center; gap: 4px; background: #eceff1; border-radius: 999px; padding: 3px 4px 3px 10px; font-weight: 800; font-size: 13px; }
+.fr-chip button { background: #cfd8dc; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 11px; padding: 0; cursor: pointer; }
+.uname-form { display: flex; flex-direction: column; gap: 4px; }
+.uname-input { display: flex; align-items: center; gap: 6px; }
+.uname-input > span { font: 20px var(--display); color: #78909c; }
+.uname-input input { flex: 1; margin: 0; min-width: 0; }
+.uname-note { font-weight: 800; color: #e53935; font-size: 13px; }
+.uname-note.ok { color: #2e7d32; }
+.uname-show { align-items: center; gap: 10px; }
+.uname-show b { font: 18px var(--display); }
+.uname-prompt { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+.uname-prompt .uname-form { align-self: stretch; }
+.uname-badge { font-size: 44px; }
+.uname-prompt p { margin: 0; }
+@media (max-width: 600px) {
+  .fr-row { grid-template-columns: 32px 1fr; }
+  .fr-row .leader-acts { grid-column: 1 / -1; }
+  .fr-av { width: 30px; height: 30px; font-size: 15px; }
+  .fr-incoming .leader-acts > .buy:first-child { flex: 1; }
+  .fr-incoming .leader-acts > .buy:last-child { flex: 0 0 auto; padding-left: 14px; padding-right: 14px; }
+}
+.visit-user { font-weight: 800; color: #607d8b; }
+
+/* The CARS window's four tabs fit a small phone without their emoji. */
+@media (max-width: 400px) { .tab-emo { display: none; } }

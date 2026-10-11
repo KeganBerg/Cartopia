@@ -1,0 +1,151 @@
+import { Box3, BoxGeometry, Matrix3, Matrix4, Object3D, type InstancedMesh, type Mesh } from 'three'
+
+// The maths behind merged blocks keeping their props in shape: see THE RULE
+// in mergeScale.tsx.
+
+export const uniform = ([x, y, z]: readonly number[]) => x === y && y === z
+
+// Anything this wide or deeper (in the model's own units) is architecture.
+// A car is ~0.7, a school bus ~1.4, a one-tile building ~1.9.
+export function propLimit(w: number, d: number) {
+  return Math.min(1.45, 0.42 * Math.min(w, d))
+}
+// Anything lower than this is a ground mark (paint, a pad, a pond) and may stretch.
+export const FLAT = 0.03
+
+const m4 = new Matrix4()
+const inv = new Matrix4()
+const p3 = new Matrix3()
+const pInv = new Matrix3()
+const c3 = new Matrix3()
+const own = new Matrix3()
+
+type Shape = { root: Object3D; scale: readonly number[]; k: number }
+
+// What's being kept, by object (not in userData: models share userData objects).
+const kept = new WeakMap<Object3D, Shape>()
+const rawSet = new WeakMap<InstancedMesh, InstancedMesh['setMatrixAt']>()
+export const isKept = (o: Object3D) => kept.has(o)
+
+// The linear fix for something whose parent sits at `parent` inside the block:
+// the stretch S is undone and a uniform k put back, in the parent's own axes,
+// so it works under any turn: C = P^-1 (k S^-1) P.
+function fixFor(parent: Object3D, s: Shape, out: Matrix3) {
+  inv.copy(s.root.matrixWorld).invert()
+  m4.multiplyMatrices(inv, parent.matrixWorld)
+  p3.setFromMatrix4(m4)
+  if (Math.abs(p3.determinant()) < 1e-9) return false
+  pInv.copy(p3).invert()
+  const [sx, sy, sz] = s.scale
+  const e = out.copy(pInv).elements
+  // out = P^-1 * D, D = diag(k/sx, k/sy, k/sz): scale P^-1's columns.
+  for (let r = 0; r < 3; r++) {
+    e[r] *= s.k / sx
+    e[3 + r] *= s.k / sy
+    e[6 + r] *= s.k / sz
+  }
+  out.multiply(p3)
+  return true
+}
+
+function applyLinear(target: Matrix4, fix: Matrix3) {
+  own.setFromMatrix4(target)
+  own.premultiply(fix)
+  const t = target.elements
+  const o = own.elements
+  t[0] = o[0]; t[1] = o[1]; t[2] = o[2]
+  t[4] = o[3]; t[5] = o[4]; t[6] = o[5]
+  t[8] = o[6]; t[9] = o[7]; t[10] = o[8]
+}
+
+// Something already kept upright higher up is in true shape; don't fix it twice.
+function underKept(o: Object3D, root: Object3D) {
+  for (let p = o.parent; p && p !== root; p = p.parent) if (kept.has(p)) return true
+  return false
+}
+
+// Keeps `o` in true shape every frame, wherever it moves or turns.
+export function keepShape(o: Object3D, root: Object3D, scale: readonly number[], k = Math.min(scale[0], scale[2])) {
+  const shape: Shape = { root, scale, k }
+  const had = kept.get(o)
+  if (had) return void Object.assign(had, shape)
+  kept.set(o, shape)
+  o.updateMatrix = function () {
+    Object3D.prototype.updateMatrix.call(this)
+    const s = kept.get(this)
+    if (!s || !this.parent || uniform(s.scale) || underKept(this, s.root)) return
+    if (fixFor(this.parent, s, c3)) applyLinear(this.matrix, c3)
+  }
+  o.matrixAutoUpdate = true
+  o.updateMatrix()
+}
+
+export function releaseShape(o: Object3D) {
+  if (!kept.delete(o)) return
+  if ((o as InstancedMesh).isInstancedMesh) return
+  delete (o as { updateMatrix?: unknown }).updateMatrix
+  o.updateMatrix()
+}
+
+// Crowds are instanced: each person part is fixed as it's placed.
+export function keepInstances(mesh: InstancedMesh, root: Object3D, scale: readonly number[]) {
+  const shape: Shape = { root, scale, k: Math.min(scale[0], scale[2]) }
+  const had = kept.get(mesh)
+  if (had) return void Object.assign(had, shape)
+  kept.set(mesh, shape)
+  // Kept across re-scans so a fix is never wrapped round another one.
+  const set: InstancedMesh['setMatrixAt'] = rawSet.get(mesh) ?? mesh.setMatrixAt.bind(mesh)
+  rawSet.set(mesh, set)
+  const tmp = new Matrix4()
+  const fix = new Matrix3()
+  const fixed = (i: number, m: Matrix4) => {
+    const s = kept.get(mesh)
+    if (!s || uniform(s.scale) || underKept(mesh, s.root)) return set(i, m)
+    if (!fixFor(mesh, s, fix)) return set(i, m)
+    tmp.copy(m)
+    applyLinear(tmp, fix)
+    return set(i, tmp)
+  }
+  mesh.setMatrixAt = fixed
+  // Fix what's already placed (crowds that only place people once).
+  const m = new Matrix4()
+  for (let i = 0; i < mesh.count; i++) {
+    mesh.getMatrixAt(i, m)
+    fixed(i, m)
+  }
+  mesh.instanceMatrix.needsUpdate = true
+}
+
+const box = new Box3()
+
+// Finds the props under `root` (see THE RULE above) and keeps them upright.
+export function keepProps(root: Object3D, scale: readonly number[], limit: number) {
+  root.updateWorldMatrix(true, true)
+  const back = new Matrix4().copy(root.matrixWorld).invert()
+  const visit = (o: Object3D) => {
+    for (const c of o.children) {
+      if (kept.has(c)) continue
+      if ((c as InstancedMesh).isInstancedMesh) {
+        keepInstances(c as InstancedMesh, root, scale)
+        continue
+      }
+      if (c.userData.stretch) {
+        visit(c)
+        continue
+      }
+      box.setFromObject(c).applyMatrix4(back)
+      if (box.isEmpty()) {
+        visit(c)
+        continue
+      }
+      const small = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) <= limit && box.max.y - box.min.y >= FLAT
+      const leaf = (c as Mesh).isMesh && c.children.length === 0
+      // A model that's one prop as a whole (a tree, a lamp, a statue) grows
+      // evenly with the pair's height instead, so a merged pair still reads bigger.
+      if (small && (!leaf || !((c as Mesh).geometry instanceof BoxGeometry))) keepShape(c, root, scale, o === root ? scale[1] : undefined)
+      else visit(c)
+    }
+  }
+  visit(root)
+}
+

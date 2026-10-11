@@ -26,6 +26,8 @@ export function signTexture(text: string, bg = '#ffffff', fg = '#c62828') {
   const t = new CanvasTexture(c)
   t.colorSpace = SRGBColorSpace
   t.anisotropy = 4
+  // Lettering: mergeShape.test checks it never stretches.
+  t.userData.text = true
   cache.set(k, t)
   return t
 }

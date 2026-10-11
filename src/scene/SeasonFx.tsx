@@ -146,5 +146,8 @@ export function SeasonFx({ small }: { small: boolean }) {
   if (SEASON === 'summer') return null
   const fx = FX[SEASON]
   if (fx.shape === 'flake') return <Snow fx={fx} count={small ? 160 : 320} />
+  // Fall leaves are bigger and bolder than petals, so far fewer of them keep the
+  // roads, cars and people readable.
+  if (SEASON === 'fall') return <Leaves fx={fx} count={small ? 35 : 60} />
   return <Leaves fx={fx} count={small ? 150 : 280} />
 }

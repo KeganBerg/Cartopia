@@ -7,6 +7,7 @@ import { anchors, anchorRef } from '../scene/anchors'
 import { centerOf, groupCenter, plotCenter } from '../scene/World'
 import { mergeGroups, mergeCandidates, type MergeGroup } from '../game/merge'
 import { useNow } from '../scene/useNow'
+import { tutTarget } from './Tutorial'
 import { helpable, helpAct, askingForHelp } from '../game/help'
 import { useHelp, helpsLeft, helpBuilding } from '../lib/help'
 
@@ -24,7 +25,7 @@ const lift = (g: MergeGroup) => (g.cols === g.rows ? g.cols : 1.5)
 function JobBadge({ b, now, g, members = [b] }: { b: PlacedBuilding; now: number; g?: MergeGroup; members?: PlacedBuilding[] }) {
   const d = buildingDef(b.def)
   const tap = useGame((s) => s.tapBuilding)
-  const lit = useGame((s) => !!s.highlight?.includes(b.def))
+  const lit = useGame((s) => !!s.highlight?.includes(b.def) || (b.def === 'pizza' && tutTarget(s) === 'pizza'))
   // A driver at work: a heart when it loves the place, a wrench when it needs fixing.
   const driver = useGame((s) => (b.car ? s.cars.find((c) => c.uid === b.car) : undefined))
   const n = members.length
@@ -136,7 +137,7 @@ function ArcadeBadge({ b, g }: { b: PlacedBuilding; g?: MergeGroup }) {
 function RescueBadge({ b, now }: { b: PlacedBuilding; now: number }) {
   const tap = useGame((s) => s.tapBuilding)
   const r = useGame((s) => s.restoring)
-  const lit = useGame((s) => !!s.highlight?.includes('rescue'))
+  const lit = useGame((s) => !!s.highlight?.includes('rescue') || tutTarget(s) === 'rescue')
   const [cx, cz] = centerOf(b.def, b.x, b.z, b.rot)
   anchors.set(b.uid, new Vector3(cx, 2.6, cz))
   const ready = r && now >= r.endsAt
