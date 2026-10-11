@@ -216,7 +216,6 @@ export function ShopUpgrades() {
   const coins = useGame((s) => s.coins)
   const parts = useGame((s) => s.parts)
   const openUpgrade = useGame((s) => s.openUpgrade)
-  const [all, setAll] = useState(false)
   const order = (id: string) => BUILDINGS.findIndex((d) => d.id === id)
   // Cheapest next upgrade first; maxed-out buildings last.
   const costOf = (b: (typeof buildings)[number]) =>
@@ -225,13 +224,11 @@ export function ShopUpgrades() {
     .filter((b) => upgradable(buildingDef(b.def)))
     .sort((a, b) => costOf(a) - costOf(b) || order(a.def) - order(b.def))
   if (!sorted.length) return null
-  const FEW = 4
-  const mine = all ? sorted : sorted.slice(0, FEW)
   return (
     <section>
-      <h3>Upgrade your buildings <small>Taller, fancier, more coins, faster jobs</small></h3>
+      <p className="hint">Upgraded buildings grow taller and fancier, pay more coins and finish jobs sooner. Cheapest first.</p>
       <div className="upgrade-list">
-        {mine.map((b) => {
+        {sorted.map((b) => {
           const d = buildingDef(b.def)
           const lvl = buildingLevel(b)
           const max = lvl >= MAX_BUILDING_LEVEL
@@ -246,9 +243,6 @@ export function ShopUpgrades() {
           )
         })}
       </div>
-      {sorted.length > FEW && (
-        <button className="upgrade-more" onClick={() => setAll(!all)}>{all ? 'Show fewer' : `Show all ${sorted.length}`}</button>
-      )}
     </section>
   )
 }
