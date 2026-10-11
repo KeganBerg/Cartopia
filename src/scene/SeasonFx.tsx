@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { BufferAttribute, BufferGeometry, Color, DoubleSide, Object3D, Shape, ShapeGeometry, type InstancedMesh } from 'three'
+import { BufferAttribute, BufferGeometry, Color, DoubleSide, InstancedBufferAttribute, MeshLambertMaterial, Object3D, Shape, ShapeGeometry, type InstancedMesh } from 'three'
 import { SEASON } from './season'
 import { dayPhase, nightAmount } from './dayNight'
 import { weatherNow } from '../game/weather'
 
 type Fx = { colors: readonly string[]; fall: number; sway: number; size: number; shape: 'leaf' | 'petal' | 'flake' }
-const FX: Record<'fall' | 'winter' | 'spring', Fx> = {
+export const FX: Record<'fall' | 'winter' | 'spring', Fx> = {
   fall: { colors: ['#ff7a1a', '#ffa726', '#e53935', '#ffd54f', '#d2691e'], fall: 1.1, sway: 1.2, size: 0.6, shape: 'leaf' },
   winter: { colors: ['#ffffff', '#f1f5ff'], fall: 1.6, sway: 0.5, size: 4, shape: 'flake' },
   spring: { colors: ['#f8bbd0', '#ffffff', '#f48fb1'], fall: 0.8, sway: 1.4, size: 0.4, shape: 'petal' },
@@ -20,16 +20,22 @@ const isNight = () => nightAmount(dayPhase()) > 0.5 || weatherNow().rain > 0.15
 // In the morning a parked flake rejoins after about this many seconds on average,
 // so the sky fills from the top gradually rather than all at once.
 const REJOIN_S = 6
+// Leaves and petals settle on the ground, lie still for a while, then fade away.
+export const REST_S = 5
+export const FADE_S = 3
+const GROUND_Y = 0.06
+export const AIRBORNE = -1
 
 // A shared breeze: a steady drift plus slow gusts, so everything leans the same way.
 // Windy weather and blizzards blow it much harder.
 const wind = (t: number) => (0.6 + Math.sin(t * 0.23) * 0.5 + Math.max(0, Math.sin(t * 0.61)) * 0.9) * (1 + weatherNow().wind * 3)
 
-type Flier = { x: Float32Array; y: Float32Array; z: Float32Array; seed: Float32Array }
+// `land` is when each one touched down (AIRBORNE while it is still in the air).
+type Flier = { x: Float32Array; y: Float32Array; z: Float32Array; seed: Float32Array; land: Float32Array }
 
-function makeFliers(count: number): Flier {
+export function makeFliers(count: number): Flier {
   const night = isNight()
-  const f = { x: new Float32Array(count), y: new Float32Array(count), z: new Float32Array(count), seed: new Float32Array(count) }
+  const f = { x: new Float32Array(count), y: new Float32Array(count), z: new Float32Array(count), seed: new Float32Array(count), land: new Float32Array(count).fill(AIRBORNE) }
   for (let i = 0; i < count; i++) {
     f.x[i] = (Math.random() - 0.5) * SPAN
     f.y[i] = night ? PARKED : Math.random() * TOP
@@ -41,11 +47,18 @@ function makeFliers(count: number): Flier {
 
 // Drift every flier one step. Only during the day: at dusk nothing new spawns
 // and the last ones land, and in the morning they start again from the top.
-function drift(f: Flier, fx: Fx, t: number, step: number) {
+// With `settle`, fliers that reach the ground lie there for REST_S, fade out
+// over FADE_S and only then take off again from the top; snow just loops.
+export function drift(f: Flier, fx: Fx, t: number, step: number, settle = false) {
   const night = isNight()
   const w = wind(t)
   for (let i = 0; i < f.y.length; i++) {
     const s = f.seed[i]
+    if (f.land[i] !== AIRBORNE) {
+      if (t - f.land[i] < REST_S + FADE_S) continue
+      f.land[i] = AIRBORNE
+      f.y[i] = PARKED
+    }
     if (f.y[i] === PARKED) {
       if (night || Math.random() > step / REJOIN_S) continue
       f.x[i] = (Math.random() - 0.5) * SPAN
@@ -58,7 +71,10 @@ function drift(f: Flier, fx: Fx, t: number, step: number) {
     // Blown off one side: come back in on the other.
     if (f.x[i] > SPAN / 2) f.x[i] -= SPAN
     if (f.z[i] > SPAN / 2) f.z[i] -= SPAN
-    if (f.y[i] < 0) f.y[i] = night ? PARKED : f.y[i] + TOP
+    if (f.y[i] < GROUND_Y && settle) {
+      f.y[i] = GROUND_Y
+      f.land[i] = t
+    } else if (f.y[i] < 0) f.y[i] = night ? PARKED : f.y[i] + TOP
   }
 }
 
@@ -89,6 +105,24 @@ function Leaves({ fx, count }: { fx: Fx; count: number }) {
   const fliers = useMemo(() => makeFliers(count), [count])
   const geo = useMemo(() => leafShape(fx.shape === 'petal' ? 'petal' : 'leaf'), [fx])
   const o = useMemo(() => new Object3D(), [])
+  // Per-leaf opacity, so landed leaves can fade out inside the one draw call.
+  const fade = useMemo(() => new InstancedBufferAttribute(new Float32Array(count).fill(1), 1), [count])
+  const mat = useMemo(() => {
+    const m = new MeshLambertMaterial({ side: DoubleSide, transparent: true })
+    m.onBeforeCompile = (sh) => {
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nattribute float aFade;\nvarying float vFade;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFade = aFade;')
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying float vFade;')
+        .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.a *= vFade;')
+    }
+    m.customProgramCacheKey = () => 'season-leaf-fade'
+    return m
+  }, [])
+  useEffect(() => {
+    geo.setAttribute('aFade', fade)
+  }, [geo, fade])
   useEffect(() => {
     const m = ref.current
     if (!m) return
@@ -100,22 +134,30 @@ function Leaves({ fx, count }: { fx: Fx; count: number }) {
     const m = ref.current
     if (!m) return
     const t = clock.elapsedTime
-    drift(fliers, fx, t, Math.min(dt, 0.1))
+    drift(fliers, fx, t, Math.min(dt, 0.1), true)
+    const a = fade.array as Float32Array
     for (let i = 0; i < count; i++) {
       const s = fliers.seed[i]
+      const landed = fliers.land[i]
       o.position.set(fliers.x[i], fliers.y[i], fliers.z[i])
-      // Each leaf spins at its own pace and rocks side to side as it falls.
-      o.rotation.set(t * (1.1 + (s % 1.7)) + s, t * 0.7 + s * 2, Math.sin(t * 2.6 + s) * 0.9)
+      if (landed === AIRBORNE) {
+        // Each leaf spins at its own pace and rocks side to side as it falls.
+        o.rotation.set(t * (1.1 + (s % 1.7)) + s, t * 0.7 + s * 2, Math.sin(t * 2.6 + s) * 0.9)
+        a[i] = 1
+      } else {
+        // On the ground: flat, at a random heading, then fading to nothing.
+        o.rotation.set(-Math.PI / 2, 0, s * 7)
+        a[i] = 1 - Math.min(1, Math.max(0, (t - landed - REST_S) / FADE_S))
+      }
       o.scale.setScalar(fx.size * (0.75 + (s % 0.5)))
       o.updateMatrix()
       m.setMatrixAt(i, o.matrix)
     }
     m.instanceMatrix.needsUpdate = true
+    fade.needsUpdate = true
   })
   return (
-    <instancedMesh ref={ref} args={[geo, undefined, count]} raycast={() => null} frustumCulled={false}>
-      <meshLambertMaterial side={DoubleSide} />
-    </instancedMesh>
+    <instancedMesh ref={ref} args={[geo, mat, count]} raycast={() => null} frustumCulled={false} />
   )
 }
 
