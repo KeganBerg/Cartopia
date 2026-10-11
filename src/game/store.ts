@@ -2,15 +2,16 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
   PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS,
-  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, upgradePayout, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, type Rarity, GOALS, DAILY_BONUS, PAINTS, PAINT_COST, STRIPE_COST, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey,
+  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePayout, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, type Rarity, GOALS, DAILY_BONUS, PAINTS, PAINT_COST, STRIPE_COST, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp,
 } from './data'
 import { sfx } from '../lib/sound'
 import { requestTrip } from './trips'
 
 // rot: quarter turns the player chose (0 faces south). Unset means face the nearest road.
 // level: upgrade level 1-10 (see MAX_BUILDING_LEVEL); unset means 1.
-export type PlacedBuilding = { uid: string; def: string; x: number; z: number; jobEndsAt: number | null; rot?: number; level?: number }
-export type OwnedCar = { uid: string; model: string; color: string; upgrades: Record<UpgradeSlot, number>; flat?: boolean; lowFuel?: boolean; stripe?: string | null; plate?: string }
+// jobLevel: the level the running job started at, so an upgrade mid-job only pays from the next job.
+export type PlacedBuilding = { uid: string; def: string; x: number; z: number; jobEndsAt: number | null; rot?: number; level?: number; jobLevel?: number }
+export type OwnedCar = { uid: string; model: string; color: string; upgrades: Record<UpgradeSlot, number>; flat?: boolean; lowFuel?: boolean; stripe?: string | null; plate?: string; mods?: string[] }
 // A rusty find waiting in Rusty's storage, and the one car in the restore bay.
 export type JunkCar = { uid: string; model: string; rarity: Rarity }
 export type Restoring = JunkCar & { endsAt: number; minutes: number }
@@ -118,6 +119,8 @@ type Actions = {
   helpFriend: () => void
   setTutorial: (step: number) => void
   stripeCar: (uid: string, stripe: string | null) => void
+  // Fit a mod (replacing whatever is in its slot), or pass a slot name's mod with remove to take it off.
+  modCar: (uid: string, modId: string, remove?: boolean) => boolean
   loadSave: (s: SaveState) => void
   showMe: (defs: string[], text: string) => void
   refillFuel: () => void
@@ -197,7 +200,7 @@ export function canPlace(s: Pick<SaveState, 'roads' | 'buildings' | 'land'>, def
 // Obstacles get cleared, not moved.
 export const movable = (def: string) => buildingDef(def).kind !== 'obstacle'
 
-function starterTown(): SaveState {
+export function starterTown(): SaveState {
   const roads: string[] = []
   // A loop road with a cross street, like a fresh Car Town Streets lot.
   for (let i = 4; i <= 19; i++) {
@@ -462,6 +465,7 @@ export const useGame = create<GameState>()(
         if (!d.jobSeconds) return upgradable(d) ? s.openUpgrade(buid) : undefined
         const now = Date.now()
         const lvl = buildingLevel(b)
+        const jobLvl = jobLevel(b)
         const secs = upgradeJobSeconds(d, lvl)
         if (b.jobEndsAt !== null && now < b.jobEndsAt) return s.openUpgrade(buid)
         if (b.jobEndsAt === null) {
@@ -474,13 +478,13 @@ export const useGame = create<GameState>()(
             fuel: s.fuel - d.fuelCost!,
             // Restart the regen clock if we were sitting at the cap.
             fuelUpdatedAt: s.fuel >= cap ? now : s.fuelUpdatedAt,
-            buildings: s.buildings.map((o) => (o.uid === buid ? { ...o, jobEndsAt: now + secs * 1000 } : o)),
+            buildings: s.buildings.map((o) => (o.uid === buid ? { ...o, jobEndsAt: now + secs * 1000, jobLevel: lvl } : o)),
             updatedAt: now,
           })
         } else {
-          const pay = upgradePayout(d, lvl)
-          const parts = upgradePartsPayout(d, lvl)
-          const xp = upgradeXp(d, lvl)
+          const pay = upgradePayout(d, jobLvl)
+          const parts = upgradePartsPayout(d, jobLvl)
+          const xp = upgradeXp(d, jobLvl)
           sfx.coin()
           s.toast(`+${pay} coins${parts ? `, +${parts} parts` : ''}, +${xp} XP`)
           // Sometimes a car out on the job comes back with a flat.
@@ -498,7 +502,7 @@ export const useGame = create<GameState>()(
             parts: s.parts + parts,
             cars,
             stats: { ...bump(s, 'jobs'), coinsEarned: (s.stats.coinsEarned ?? 0) + pay },
-            buildings: s.buildings.map((o) => (o.uid === buid ? { ...o, jobEndsAt: null } : o)),
+            buildings: s.buildings.map((o) => (o.uid === buid ? { ...o, jobEndsAt: null, jobLevel: undefined } : o)),
             updatedAt: now,
           }))
         }
@@ -534,6 +538,7 @@ export const useGame = create<GameState>()(
           coins: s.coins - cost.coins,
           parts: s.parts - cost.parts,
           buildings: s.buildings.map((o) => (o.uid === buid ? { ...o, level: lvl + 1 } : o)),
+          stats: bump(s, 'upgrades'),
           updatedAt: Date.now(),
         }))
         return true
@@ -564,13 +569,13 @@ export const useGame = create<GameState>()(
             cleared++
             return b
           }
-          const lvl = buildingLevel(b)
+          const lvl = jobLevel(b)
           coins += upgradePayout(d, lvl)
           earned += upgradePayout(d, lvl)
           parts += upgradePartsPayout(d, lvl)
           xp += upgradeXp(d, lvl)
           collected++
-          return { ...b, jobEndsAt: null }
+          return { ...b, jobEndsAt: null, jobLevel: undefined }
         }).filter((b) => !removed.has(b.uid))
         const cap = fuelCap(s)
         buildings = buildings.map((b) => {
@@ -578,7 +583,7 @@ export const useGame = create<GameState>()(
           if (!d.jobSeconds || d.kind === 'obstacle' || b.jobEndsAt !== null || fuel < (d.fuelCost ?? 0)) return b
           fuel -= d.fuelCost ?? 0
           started++
-          return { ...b, jobEndsAt: now + upgradeJobSeconds(d, buildingLevel(b)) * 1000 }
+          return { ...b, jobEndsAt: now + upgradeJobSeconds(d, buildingLevel(b)) * 1000, jobLevel: buildingLevel(b) }
         })
         // Cars out of gas fill up at your Gas Station, if you have one.
         let cars = s.cars
@@ -837,6 +842,46 @@ export const useGame = create<GameState>()(
         const cost = stripe ? STRIPE_COST : 0
         if (s.coins < cost) return s.showNeed('coins', cost - s.coins, 'racing stripes')
         set({ coins: s.coins - cost, cars: s.cars.map((c) => (c.uid === cuid ? { ...c, stripe } : c)), updatedAt: Date.now() })
+      },
+
+      modCar: (cuid, modId, remove) => {
+        const s = get()
+        const car = s.cars.find((c) => c.uid === cuid)
+        const m = modDef(modId)
+        if (!car || !m) return false
+        const others = (car.mods ?? []).filter((id) => modDef(id)?.slot !== m.slot)
+        if (remove) {
+          set({ cars: s.cars.map((c) => (c.uid === cuid ? { ...c, mods: others } : c)), updatedAt: Date.now() })
+          return true
+        }
+        if ((car.mods ?? []).includes(modId)) return false
+        if (s.level < m.unlockLevel) {
+          s.showNeed('level', m.unlockLevel, m.name)
+          return false
+        }
+        if (s.bucks < m.bucks) {
+          s.showNeed('bucks', m.bucks - s.bucks, `the ${m.name}`)
+          return false
+        }
+        if (s.parts < m.parts) {
+          s.showNeed('parts', m.parts - s.parts, `the ${m.name}`)
+          return false
+        }
+        if (s.coins < m.coins) {
+          s.showNeed('coins', m.coins - s.coins, `the ${m.name}`)
+          return false
+        }
+        sfx.buy()
+        set({
+          coins: s.coins - m.coins,
+          parts: s.parts - m.parts,
+          bucks: s.bucks - m.bucks,
+          cars: s.cars.map((c) => (c.uid === cuid ? { ...c, mods: [...others, modId] } : c)),
+          ...addXp(s, modXp(modId)),
+          updatedAt: Date.now(),
+        })
+        s.toast(`${m.name} fitted!`)
+        return true
       },
 
       loadSave: (save) => set({ ...starterDefaults(), ...save }),

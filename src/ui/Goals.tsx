@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useGame, activeGoals, goalDone, statValue, today } from '../game/store'
-import { DAILY_BONUS, buildingDef, carDef, type StatKey, flatFixCost, servicePay, gasCanCost } from '../game/data'
+import { DAILY_BONUS, buildingDef, buildingLevel, upgradable, MAX_BUILDING_LEVEL, carDef, type StatKey, flatFixCost, servicePay, gasCanCost } from '../game/data'
 import { Panel } from './Menus'
 
 export function GoalsButton() {
@@ -41,7 +41,8 @@ function goTo(stat: StatKey): void {
     case 'gpWins':
       return s.openPanel('race')
     case 'upgrades':
-      return s.openPanel('garage')
+      // Building upgrades count too; the Shop lists them when there's one to do.
+      return s.openPanel(s.buildings.some((b) => upgradable(buildingDef(b.def)) && buildingLevel(b) < MAX_BUILDING_LEVEL) ? 'shop' : 'garage')
     case 'built':
       return s.openPanel('shop')
     case 'flatsFixed': {

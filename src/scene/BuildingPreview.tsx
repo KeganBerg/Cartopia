@@ -1,4 +1,4 @@
-import { useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { PerspectiveCamera, type Group, type Mesh } from 'three'
 import { TILE, type Body, type BuildingDef } from '../game/data'
@@ -29,15 +29,15 @@ function buildingItem(def: BuildingDef): Item {
   return { key: `b|${def.id}|${SEASON}`, dist: 2 + size * 1.2, look: 0.7 + size * 0.1, shadow: size * 0.5, model: () => <BuildingModel def={def} /> }
 }
 
-type CarLook = { body: Body; color: string; stripe?: string | null; rusty?: boolean }
+type CarLook = { body: Body; color: string; stripe?: string | null; rusty?: boolean; mods?: string[] | null }
 
 function carItem(c: CarLook): Item {
   return {
-    key: `c|${c.body}|${c.color}|${c.stripe ?? ''}|${c.rusty ? 1 : 0}`,
+    key: `c|${c.body}|${c.color}|${c.stripe ?? ''}|${c.rusty ? 1 : 0}|${c.rusty ? '' : (c.mods ?? []).join(',')}`,
     dist: 2.55,
     look: 0.4,
     shadow: 0.65,
-    model: () => <group scale={1.25}><CarModel body={c.body} color={c.color} stripe={c.stripe} rusty={c.rusty} /></group>,
+    model: () => <group scale={1.25}><CarModel body={c.body} color={c.color} stripe={c.stripe} rusty={c.rusty} mods={c.mods} /></group>,
   }
 }
 
@@ -45,6 +45,9 @@ function carItem(c: CarLook): Item {
 type Slot = { key: string; canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D | null; seen: boolean }
 const slots = new Set<Slot>()
 const models = new Map<string, { item: Item; uses: number }>()
+// Models stay mounted after their thumbnail goes, so reopening the Shop reuses
+// compiled shaders and geometry; past this many unused ones, the oldest go.
+const KEEP_IDLE = 80
 const listeners = new Set<() => void>()
 const subscribe = (fn: () => void) => (listeners.add(fn), () => listeners.delete(fn))
 let version = 0
@@ -100,7 +103,9 @@ function attach(item: Item, canvas: HTMLCanvasElement) {
     watcher?.unobserve(canvas)
     sizer?.unobserve(canvas)
     const n = models.get(item.key)
-    if (n && --n.uses <= 0) models.delete(item.key)
+    if (n) n.uses--
+    const idle = [...models].filter(([, v]) => v.uses <= 0)
+    for (const [k] of idle.slice(0, Math.max(0, idle.length - KEEP_IDLE))) models.delete(k)
     changed()
   }
 }
@@ -215,12 +220,34 @@ function Renderer() {
   )
 }
 
-// One hidden canvas for the whole app. It exists only while a thumbnail is mounted.
+// One hidden canvas for the whole app. It's created the first time a thumbnail
+// shows and then kept, so opening the Shop again doesn't build a fresh WebGL
+// context (phones cap how many they allow). It only animates while a thumbnail
+// is on the page.
+let started = false
 export function ThumbRenderer() {
-  const busy = useSyncExternalStore(subscribe, () => models.size > 0)
-  if (!busy) return null
+  const used = useSyncExternalStore(subscribe, () => (started ||= models.size > 0))
+  const active = useSyncExternalStore(subscribe, () => slots.size > 0)
+  // Bumped to rebuild the canvas when the phone drops its context and doesn't give it back.
+  const [gen, setGen] = useState(0)
+  if (!used) return null
   return (
-    <Canvas className="preview-renderer" dpr={1} gl={{ alpha: true, antialias: true }} style={{ width: 1, height: 1 }}>
+    <Canvas
+      key={gen}
+      className="preview-renderer"
+      dpr={1}
+      frameloop={active ? 'always' : 'never'}
+      gl={{ alpha: true, antialias: true }}
+      style={{ width: 1, height: 1 }}
+      onCreated={({ gl }) => {
+        let t = 0
+        // three keeps the canvas restorable; if the browser never restores it, start over.
+        gl.domElement.addEventListener('webglcontextlost', () => {
+          t = window.setTimeout(() => setGen((g) => g + 1), 2000)
+        })
+        gl.domElement.addEventListener('webglcontextrestored', () => clearTimeout(t))
+      }}
+    >
       <Renderer />
     </Canvas>
   )
@@ -231,7 +258,9 @@ type Size = 'xs' | 'sm' | 'lg'
 function Thumb({ item, size }: { item: Item; size?: Size }) {
   const ref = useRef<HTMLCanvasElement>(null)
   const latest = useRef(item)
-  latest.current = item
+  useEffect(() => {
+    latest.current = item
+  })
   const key = item.key
   useEffect(() => {
     const canvas = ref.current
