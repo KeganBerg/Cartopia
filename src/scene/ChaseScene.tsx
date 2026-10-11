@@ -1,12 +1,14 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { CanvasTexture, Color, Group, InstancedMesh, Mesh, MeshStandardMaterial, Object3D, PerspectiveCamera, RepeatWrapping, SRGBColorSpace } from 'three'
+import { Box3, Color, Group, InstancedMesh, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, PerspectiveCamera } from 'three'
 import { CarModel, carFrame } from './CarModel'
-import { SkyDome } from './RaceScene'
-import { SkyEnv } from './SkyEnv'
 import { holdTown } from './renderGate'
+import { Batch } from './Batch'
+import { signTexture } from './signTexture'
+import { glowTex } from './textures'
+import { ArcadeSky, CarShadow, StreetStretch, useArcadeLook, useTownPool } from './ArcadeScenery'
 import { CHASE_HEARTS, CHASE_LANES, chaseRow, chaseSpeed } from '../game/arcade'
-import type { Body, Finish } from '../game/data'
+import { CARS, isBike, type Body, type Finish } from '../game/data'
 import { sfx } from '../lib/sound'
 import { crashSound, sirenSound } from '../lib/arcadeSound'
 
@@ -17,42 +19,78 @@ export type ChaseHud = { dist: number; coins: number; hearts: number; speed: num
 
 const LEN = 1.6 // every car is drawn at this length
 const SPAWN_Z = -80
-const ROAD_W = 6.4
-const TRAFFIC: { body: Body; color: string }[] = [
-  { body: 'sedan', color: '#90a4ae' }, { body: 'compact', color: '#ffb74d' }, { body: 'van', color: '#e0e0e0' },
-  { body: 'suv', color: '#4e6e8e' }, { body: 'truck', color: '#a1887f' }, { body: 'hatch', color: '#ef5350' },
-  { body: 'wagon', color: '#81c784' }, { body: 'classic', color: '#4dd0e1' }, { body: 'sedan', color: '#fff176' },
-  { body: 'compact', color: '#ba68c8' },
-]
+const HALF = 3.2 // half the road's width
+const STRETCH = 44 // one repeating stretch of street
+const STRETCHES = 3
 const COINS = 24
+const PUFFS = 14
+const SMOKE = new Color('#eceff1')
+const GOLD = new Color('#ffe082')
 
+// Everyday cars from the showroom for the traffic, never the exotic ones.
+const TRAFFIC_BODIES: Body[] = ['sedan', 'compact', 'van', 'suv', 'truck', 'hatch', 'wagon', 'classic', 'ev', 'luxury', 'bubble', 'dogvan']
+function pickTraffic(n: number) {
+  const pool = CARS.filter((c) => !c.parked && !isBike(c.body) && TRAFFIC_BODIES.includes(c.body))
+  return Array.from({ length: n }, (_, i) => {
+    const c = pool[(i * 7 + 3) % pool.length]
+    return { body: c.body, model: c.id, color: c.colors[i % c.colors.length] }
+  })
+}
 const fit = (body: Body) => LEN / carFrame(body).len
 
-// Rows of windows for the roadside blocks, tinted by each block's colour.
-let windows: CanvasTexture | null = null
-function windowTex() {
-  if (windows) return windows
-  const c = document.createElement('canvas')
-  c.width = c.height = 64
-  const g = c.getContext('2d')!
-  g.fillStyle = '#ffffff'
-  g.fillRect(0, 0, 64, 64)
-  g.fillStyle = '#5d7590'
-  for (let y = 0; y < 2; y++) for (let x = 0; x < 2; x++) g.fillRect(8 + x * 32, 10 + y * 32, 16, 14)
-  windows = new CanvasTexture(c)
-  windows.wrapS = windows.wrapT = RepeatWrapping
-  windows.repeat.set(2, 2)
-  windows.colorSpace = SRGBColorSpace
-  return windows
-}
-
 type Slot = { on: boolean; lane: number; z: number; hit: number }
+
+// A cruiser: the town's sedan in black and white, with a light bar, push bar and door lettering.
+function Cruiser({ beams, red, blue }: { beams: boolean; red: React.Ref<Mesh>; blue: React.Ref<Mesh> }) {
+  const car = useRef<Group>(null)
+  const kit = useRef<Group>(null)
+  const f = carFrame('sedan')
+  const s = fit('sedan')
+  // Sit the light bar on the roof, wherever the roof ends up for this body.
+  useLayoutEffect(() => {
+    if (!car.current || !kit.current) return
+    kit.current.position.y = new Box3().setFromObject(car.current).max.y
+  }, [])
+  const door = signTexture('POLICE', '#1b1f24', '#ffffff')
+  const w = (f.wid * s) / 2
+  return (
+    <group>
+      <group ref={car} scale={s}>
+        <CarModel body="sedan" color="#f5f5f5" beams={beams} />
+      </group>
+      {/* Black doors with lettering on both sides. */}
+      {[-1, 1].map((sd) => (
+        <mesh key={sd} position={[sd * (w + 0.006), 0.36, -0.05]} rotation-y={(sd * Math.PI) / 2}>
+          <planeGeometry args={[0.72, 0.2]} />
+          <meshStandardMaterial map={door} />
+        </mesh>
+      ))}
+      <mesh position={[0, 0.22, (f.len * s) / 2 + 0.06]}>
+        <boxGeometry args={[0.6, 0.16, 0.06]} />
+        <meshStandardMaterial color="#212121" metalness={0.4} roughness={0.5} />
+      </mesh>
+      <group ref={kit}>
+        <mesh position={[0, 0.02, 0]}><boxGeometry args={[0.62, 0.04, 0.16]} /><meshStandardMaterial color="#cfd8dc" metalness={0.7} roughness={0.3} /></mesh>
+        <mesh ref={red} position={[-0.16, 0.07, 0]}>
+          <boxGeometry args={[0.28, 0.07, 0.13]} />
+          <meshStandardMaterial color="#ff1744" emissive="#ff1744" emissiveIntensity={2} />
+        </mesh>
+        <mesh ref={blue} position={[0.16, 0.07, 0]}>
+          <boxGeometry args={[0.28, 0.07, 0.13]} />
+          <meshStandardMaterial color="#2979ff" emissive="#2979ff" emissiveIntensity={2} />
+        </mesh>
+      </group>
+    </group>
+  )
+}
 
 export function ChaseScene({ me, input, running, onHud, onBusted }: {
   me: ChaseCar; input: ChaseInput; running: boolean
   onHud: (h: ChaseHud) => void; onBusted: (dist: number, coins: number) => void
 }) {
   useEffect(() => holdTown(), [])
+  const view = useArcadeLook()
+  const pool = useTownPool()
   const camera = useThree((s) => s.camera) as PerspectiveCamera
   const size = useThree((s) => s.size)
   useLayoutEffect(() => {
@@ -61,44 +99,44 @@ export function ChaseScene({ me, input, running, onHud, onBusted }: {
     camera.updateProjectionMatrix()
   }, [camera, size])
 
+  const traffic = useMemo(() => pickTraffic(10), [])
   const player = useRef<Group>(null)
   const cop = useRef<Group>(null)
   const red = useRef<Mesh>(null)
   const blue = useRef<Mesh>(null)
+  const glow = useRef<Mesh>(null)
   const cars = useRef<(Group | null)[]>([])
   const coinMesh = useRef<InstancedMesh>(null)
-  const dashes = useRef<InstancedMesh>(null)
-  const props = useRef<InstancedMesh>(null)
-  const blocks = useRef<InstancedMesh>(null)
+  const rimMesh = useRef<InstancedMesh>(null)
+  const puffMesh = useRef<InstancedMesh>(null)
+  const stretches = useRef<(Group | null)[]>([])
 
   const st = useRef({
     t: 0, dist: 0, got: 0, hearts: CHASE_HEARTS, lane: 1, x: 0, safe: 0, rowIn: 0.8, shake: 0, over: false, overAt: 0,
     hudAt: 0, copZ: 6, road: 0, seed: Math.floor(Math.random() * 1e9),
-    cars: TRAFFIC.map((): Slot => ({ on: false, lane: 0, z: 0, hit: 0 })),
+    cars: traffic.map((): Slot => ({ on: false, lane: 0, z: 0, hit: 0 })),
     bags: Array.from({ length: COINS }, () => ({ on: false, lane: 0, z: 0 })),
+    // Smoke from crashes and sparkles from grabbed coins.
+    puffs: Array.from({ length: PUFFS }, () => ({ x: 0, y: 0, z: 0, vx: 0, vy: 0, age: 1, life: 1, gold: false })),
   })
   const rand = useMemo(() => {
     let s = st.current.seed
     return () => ((s = (s * 16807) % 2147483647) / 2147483647)
   }, [])
-
-  // Roadside: trees, lamp posts and building blocks, recycled as they pass.
-  const side = useMemo(() => {
-    const trees = Array.from({ length: 28 }, (_, i) => ({ z: -i * 3.2, x: (i % 2 ? 1 : -1) * (ROAD_W / 2 + 1.6 + (i % 3) * 0.5), s: 0.8 + (i % 4) * 0.15 }))
-    const houses = Array.from({ length: 20 }, (_, i) => ({ z: -i * 4.6, x: (i % 2 ? 1 : -1) * (ROAD_W / 2 + 5.2), w: 3 + (i % 3), h: 2 + ((i * 7) % 5) * 0.7 }))
-    return { trees, houses }
-  }, [])
   const dummy = useMemo(() => new Object3D(), [])
-  const houseColors = ['#ffcc80', '#90caf9', '#ef9a9a', '#c5e1a5', '#fff59d', '#b39ddb', '#80cbc4', '#ffab91']
-  useLayoutEffect(() => {
-    const c = new Color()
-    side.houses.forEach((_, i) => blocks.current?.setColorAt(i, c.set(houseColors[i % houseColors.length])))
-    if (blocks.current?.instanceColor) blocks.current.instanceColor.needsUpdate = true
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (running) sirenSound(2)
   }, [running])
+
+  const puff = (x: number, z: number, n: number, gold: boolean) => {
+    const s = st.current
+    for (let k = 0; k < n; k++) {
+      const p = s.puffs.find((o) => o.age >= o.life)
+      if (!p) return
+      Object.assign(p, { x: x + (rand() - 0.5) * 0.6, y: 0.3 + rand() * 0.3, z: z + (rand() - 0.5) * 0.6, vx: (rand() - 0.5) * 2.5, vy: 1 + rand() * 1.5, age: 0, life: 0.5 + rand() * 0.4, gold })
+    }
+  }
 
   useFrame((state, rawDt) => {
     const s = st.current
@@ -165,6 +203,7 @@ export function ChaseScene({ me, input, running, onHud, onBusted }: {
           s.safe = 1.4
           s.shake = 0.5
           crashSound()
+          puff(s.x, -0.6, 8, false)
           if (s.hearts <= 0) {
             s.over = true
             s.overAt = state.clock.elapsedTime
@@ -174,13 +213,14 @@ export function ChaseScene({ me, input, running, onHud, onBusted }: {
       }
       if (g) {
         g.visible = true
-        if (!c.hit) g.position.set(CHASE_LANES[c.lane], 0, c.z)
-        else g.position.z = c.z
-        if (!c.hit) g.rotation.y = Math.PI
+        if (!c.hit) {
+          g.position.set(CHASE_LANES[c.lane], 0, c.z)
+          g.rotation.y = Math.PI
+        } else g.position.z = c.z
       }
     })
 
-    // Coins spin in place on the road.
+    // Coins bob and spin above the road.
     let collected = false
     s.bags.forEach((c, i) => {
       if (c.on) {
@@ -190,51 +230,49 @@ export function ChaseScene({ me, input, running, onHud, onBusted }: {
           c.on = false
           s.got++
           collected = true
+          puff(CHASE_LANES[c.lane], c.z, 3, true)
         }
       }
-      dummy.position.set(CHASE_LANES[c.lane], c.on ? 0.45 : -10, c.z)
+      dummy.position.set(CHASE_LANES[c.lane], c.on ? 0.5 + Math.sin(state.clock.elapsedTime * 3 + i) * 0.06 : -10, c.z)
       dummy.rotation.set(Math.PI / 2, 0, state.clock.elapsedTime * 4 + i)
       dummy.scale.setScalar(1)
       dummy.updateMatrix()
       coinMesh.current?.setMatrixAt(i, dummy.matrix)
+      rimMesh.current?.setMatrixAt(i, dummy.matrix)
     })
     if (coinMesh.current) coinMesh.current.instanceMatrix.needsUpdate = true
+    if (rimMesh.current) rimMesh.current.instanceMatrix.needsUpdate = true
     if (collected) sfx.coin()
 
-    // The road and roadside scroll at your full speed.
-    s.road += move
-    const scroll = (z: number, span: number) => ((((z + s.road) % span) + span) % span) - span + 12
-    if (dashes.current) {
-      for (let i = 0; i < 40; i++) {
-        const z = scroll(-i * 4, 160)
-        dummy.position.set(i % 2 ? CHASE_LANES[0] / 2 + CHASE_LANES[1] / 2 : CHASE_LANES[1] / 2 + CHASE_LANES[2] / 2, 0.012, z)
-        dummy.rotation.set(-Math.PI / 2, 0, 0)
-        dummy.scale.setScalar(1)
-        dummy.updateMatrix()
-        dashes.current.setMatrixAt(i, dummy.matrix)
+    // Puffs drift up: smoke swells, sparkles shrink away.
+    s.puffs.forEach((p, i) => {
+      p.age += dt
+      const live = p.age < p.life
+      if (live) {
+        p.x += p.vx * dt
+        p.y += p.vy * dt
+        p.z += close
       }
-      dashes.current.instanceMatrix.needsUpdate = true
+      const k = live ? p.age / p.life : 1
+      dummy.position.set(p.x, live ? p.y : -10, p.z)
+      dummy.rotation.set(0, 0, 0)
+      dummy.scale.setScalar(live ? (p.gold ? 0.18 * (1 - k) : 0.25 + k * 0.5) : 0.001)
+      dummy.updateMatrix()
+      puffMesh.current?.setMatrixAt(i, dummy.matrix)
+      puffMesh.current?.setColorAt(i, p.gold ? GOLD : SMOKE)
+    })
+    if (puffMesh.current) {
+      puffMesh.current.instanceMatrix.needsUpdate = true
+      if (puffMesh.current.instanceColor) puffMesh.current.instanceColor.needsUpdate = true
     }
-    if (props.current) {
-      side.trees.forEach((t, i) => {
-        dummy.position.set(t.x, 0, scroll(t.z, 28 * 3.2))
-        dummy.rotation.set(0, 0, 0)
-        dummy.scale.setScalar(t.s)
-        dummy.updateMatrix()
-        props.current!.setMatrixAt(i, dummy.matrix)
-      })
-      props.current.instanceMatrix.needsUpdate = true
-    }
-    if (blocks.current) {
-      side.houses.forEach((h, i) => {
-        dummy.position.set(h.x, h.h / 2, scroll(h.z, 20 * 4.6))
-        dummy.rotation.set(0, 0, 0)
-        dummy.scale.set(h.w, h.h, 3.6)
-        dummy.updateMatrix()
-        blocks.current!.setMatrixAt(i, dummy.matrix)
-      })
-      blocks.current.instanceMatrix.needsUpdate = true
-    }
+
+    // The street stretches leapfrog past at your full speed.
+    s.road += move
+    stretches.current.forEach((g, i) => {
+      if (!g) return
+      const span = STRETCH * STRETCHES
+      g.position.z = ((((i * STRETCH + s.road) % span) + span) % span) - span + STRETCH + 14
+    })
 
     // You: lean into lane changes, blink while you're safe after a crash.
     s.safe = Math.max(0, s.safe - dt)
@@ -255,6 +293,7 @@ export function ChaseScene({ me, input, running, onHud, onBusted }: {
     const flash = Math.floor(state.clock.elapsedTime * 6) % 2 === 0
     if (red.current) (red.current.material as MeshStandardMaterial).emissiveIntensity = flash ? 3 : 0.2
     if (blue.current) (blue.current.material as MeshStandardMaterial).emissiveIntensity = flash ? 0.2 : 3
+    if (glow.current) (glow.current.material as MeshBasicMaterial).color.set(flash ? '#ff1744' : '#2979ff')
 
     // Chase camera with a little shake on a crash.
     s.shake = Math.max(0, s.shake - dt)
@@ -274,74 +313,56 @@ export function ChaseScene({ me, input, running, onHud, onBusted }: {
 
   return (
     <>
-      <color attach="background" args={['#8fd3ff']} />
-      <fog attach="fog" args={['#bfe6ff', 30, 80]} />
-      <SkyDome />
-      <hemisphereLight args={['#ffffff', '#6a8f4e', 1.2]} />
-      <directionalLight position={[4, 10, 3]} intensity={1.6} />
-      <SkyEnv />
-      {/* Ground, road and sidewalks. */}
-      <mesh rotation-x={-Math.PI / 2} position={[0, -0.02, -40]}>
-        <planeGeometry args={[80, 140]} />
-        <meshStandardMaterial color="#7cb85a" />
+      <ArcadeSky view={view} near={30} far={95} />
+      {/* Grass far out under everything. */}
+      <mesh rotation-x={-Math.PI / 2} position={[0, -0.06, -40]}>
+        <planeGeometry args={[160, 200]} />
+        <meshStandardMaterial color="#6fae4f" />
       </mesh>
-      <mesh rotation-x={-Math.PI / 2} position={[0, 0, -40]}>
-        <planeGeometry args={[ROAD_W, 140]} />
-        <meshStandardMaterial color="#4a4f57" roughness={0.9} />
-      </mesh>
-      {[-1, 1].map((sd) => (
-        <mesh key={sd} position={[sd * (ROAD_W / 2 + 0.5), 0.06, -40]}>
-          <boxGeometry args={[1, 0.12, 140]} />
-          <meshStandardMaterial color="#cfd2d6" />
-        </mesh>
+      {Array.from({ length: STRETCHES }, (_, i) => (
+        <group key={i} ref={(g) => void (stretches.current[i] = g)}>
+          <Batch version={pool.join()}>
+            <StreetStretch len={STRETCH} half={HALF} lanes={[(CHASE_LANES[0] + CHASE_LANES[1]) / 2, (CHASE_LANES[1] + CHASE_LANES[2]) / 2]} seed={i + 1} pool={pool} />
+          </Batch>
+        </group>
       ))}
-      <instancedMesh ref={dashes} args={[undefined, undefined, 40]} frustumCulled={false}>
-        <planeGeometry args={[0.14, 1.6]} />
-        <meshStandardMaterial color="#ffffff" />
-      </instancedMesh>
-      <instancedMesh ref={props} args={[undefined, undefined, side.trees.length]} frustumCulled={false}>
-        <coneGeometry args={[0.7, 2.2, 7]} />
-        <meshStandardMaterial color="#3f8f3a" flatShading />
-      </instancedMesh>
-      <instancedMesh ref={blocks} args={[undefined, undefined, side.houses.length]} frustumCulled={false}>
-        <boxGeometry args={[1, 1, 1]} />
-        <meshStandardMaterial color="#ffffff" map={windowTex()} />
-      </instancedMesh>
+
       <instancedMesh ref={coinMesh} args={[undefined, undefined, COINS]} frustumCulled={false}>
-        <cylinderGeometry args={[0.3, 0.3, 0.08, 16]} />
-        <meshStandardMaterial color="#ffd54f" metalness={0.7} roughness={0.3} emissive="#ffb300" emissiveIntensity={0.6} />
+        <cylinderGeometry args={[0.26, 0.26, 0.09, 20]} />
+        <meshStandardMaterial color="#ffd54f" metalness={0.75} roughness={0.25} emissive="#ffb300" emissiveIntensity={0.55} />
+      </instancedMesh>
+      <instancedMesh ref={rimMesh} args={[undefined, undefined, COINS]} frustumCulled={false}>
+        <torusGeometry args={[0.27, 0.035, 6, 20]} />
+        <meshStandardMaterial color="#f9a825" metalness={0.8} roughness={0.3} emissive="#e65100" emissiveIntensity={0.25} />
+      </instancedMesh>
+      <instancedMesh ref={puffMesh} args={[undefined, undefined, PUFFS]} frustumCulled={false}>
+        <icosahedronGeometry args={[1, 1]} />
+        <meshStandardMaterial color="#ffffff" transparent opacity={0.8} flatShading depthWrite={false} />
       </instancedMesh>
 
       <group ref={player} rotation-y={Math.PI}>
+        <CarShadow len={LEN} />
         <group scale={fit(me.body)}>
-          <CarModel body={me.body} model={me.model} color={me.color} finish={me.finish} mods={me.mods} />
+          <CarModel body={me.body} model={me.model} color={me.color} finish={me.finish} mods={me.mods} beams={view.beams} flames />
         </group>
       </group>
 
-      {TRAFFIC.map((t, i) => (
+      {traffic.map((t, i) => (
         <group key={i} ref={(g) => void (cars.current[i] = g)} visible={false}>
+          <CarShadow len={LEN} />
           <group scale={fit(t.body)}>
-            <CarModel body={t.body} color={t.color} />
+            <CarModel body={t.body} model={t.model} color={t.color} beams={view.beams} />
           </group>
         </group>
       ))}
 
       <group ref={cop} position={[0, 0, 6]} rotation-y={Math.PI}>
-        <group scale={fit('sedan')}>
-          <CarModel body="sedan" color="#f5f5f5" />
-        </group>
-        {/* Black doors and a light bar make it read as a cruiser. */}
-        <mesh position={[0, 0.34, 0]}>
-          <boxGeometry args={[0.86, 0.2, 0.7]} />
-          <meshStandardMaterial color="#1b1f24" />
-        </mesh>
-        <mesh ref={red} position={[-0.17, 0.84, 0]}>
-          <boxGeometry args={[0.3, 0.1, 0.16]} />
-          <meshStandardMaterial color="#ff1744" emissive="#ff1744" emissiveIntensity={2} />
-        </mesh>
-        <mesh ref={blue} position={[0.17, 0.84, 0]}>
-          <boxGeometry args={[0.3, 0.1, 0.16]} />
-          <meshStandardMaterial color="#2979ff" emissive="#2979ff" emissiveIntensity={2} />
+        <CarShadow len={LEN} />
+        <Cruiser beams={view.beams} red={red} blue={blue} />
+        {/* The light bar's glow on the road. */}
+        <mesh ref={glow} rotation-x={-Math.PI / 2} position={[0, 0.05, 0]}>
+          <planeGeometry args={[2.2, 2.8]} />
+          <meshBasicMaterial map={glowTex()} color="#ff1744" transparent opacity={0.35 + view.night * 0.4} depthWrite={false} toneMapped={false} />
         </mesh>
       </group>
     </>
