@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
   PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS,
-  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, DAILY_BONUS, PAINTS, PAINT_COST, STRIPE_COST, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modSlotsFor, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef,
+  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, DAILY_BONUS, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modSlotsFor, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef,
 } from './data'
 import { sfx } from '../lib/sound'
 import { msUntilNight } from './clock'
@@ -13,7 +13,7 @@ import { requestTrip, requestVisit } from './trips'
 // jobLevel: the level the running job started at, so an upgrade mid-job only pays from the next job.
 // car: uid of the owned car assigned to drive for this business (see DRIVER_BONUS).
 export type PlacedBuilding = { uid: string; def: string; x: number; z: number; jobEndsAt: number | null; rot?: number; level?: number; jobLevel?: number; car?: string }
-export type OwnedCar = { uid: string; model: string; color: string; upgrades: Record<UpgradeSlot, number>; flat?: boolean; lowFuel?: boolean; stripe?: string | null; plate?: string; mods?: string[]; ownedMods?: string[] }
+export type OwnedCar = { uid: string; model: string; color: string; upgrades: Record<UpgradeSlot, number>; flat?: boolean; lowFuel?: boolean; stripe?: string | null; finish?: Finish; plate?: string; mods?: string[]; ownedMods?: string[] }
 // A rusty find waiting in Rusty's storage, and the one car in the restore bay.
 export type JunkCar = { uid: string; model: string; rarity: Rarity }
 export type Restoring = JunkCar & { endsAt: number; minutes: number }
@@ -122,11 +122,10 @@ type Actions = {
   claimDaily: () => void
   fixFlat: (uid: string, tow: boolean) => void
   serviceCar: (uid: string, how: 'tires' | 'gas' | 'can') => void
-  paintCar: (uid: string, color: string) => void
+  paintCar: (uid: string, job: PaintJob) => boolean
   visit: (town: VisitedTown | null) => void
   helpFriend: () => void
   setTutorial: (step: number) => void
-  stripeCar: (uid: string, stripe: string | null) => void
   // Fit a mod (replacing whatever is in its slot; buys it first if this car doesn't own it), or take it off with remove.
   modCar: (uid: string, modId: string, remove?: boolean) => boolean
   loadSave: (s: SaveState) => void
@@ -899,32 +898,33 @@ export const useGame = create<GameState>()(
 
       setTutorial: (tutorial) => set({ tutorial, updatedAt: Date.now() }),
 
-      paintCar: (cuid, color) => {
+      // Colour, finish and stripes in one paint job, tried on in the garage first.
+      paintCar: (cuid, job) => {
         const s = get()
         const car = s.cars.find((c) => c.uid === cuid)
-        const paint = PAINTS.find((p) => p.color === color)
-        if (!car || !paint || car.color === color) return
-        const bucks = paint.bucks ?? 0
-        const coins = bucks ? 0 : PAINT_COST
-        if (s.coins < coins) return s.showNeed('coins', coins - s.coins, 'a paint job')
-        if (s.bucks < bucks) return s.showNeed('bucks', bucks - s.bucks, `${paint.name} paint`)
-        set(withXp(s, 5, {
+        const paint = PAINTS.find((p) => p.color === job.color)
+        const fin = FINISHES.find((f) => f.id === job.finish)
+        // A car can keep a factory colour that isn't on the paint chart.
+        if (!car || (!paint && job.color !== car.color) || !fin || !STRIPES.includes(job.stripe)) return false
+        if (s.level < fin.unlockLevel && fin.id !== (car.finish ?? 'gloss')) {
+          s.toast(`${fin.name} unlocks at level ${fin.unlockLevel}`)
+          return false
+        }
+        const { coins, bucks } = paintJobCost(car, job)
+        const recolour = job.color !== car.color || job.finish !== (car.finish ?? 'gloss')
+        if (!recolour && job.stripe === (car.stripe ?? null)) return false
+        if (s.coins < coins) { s.showNeed('coins', coins - s.coins, 'a paint job'); return false }
+        if (s.bucks < bucks) { s.showNeed('bucks', bucks - s.bucks, `${paint?.name ?? 'Custom'} paint`); return false }
+        const patch = {
           coins: s.coins - coins,
           bucks: s.bucks - bucks,
-          cars: s.cars.map((c) => (c.uid === cuid ? { ...c, color } : c)),
+          cars: s.cars.map((c) => (c.uid === cuid ? { ...c, color: job.color, finish: job.finish === 'gloss' ? undefined : job.finish, stripe: job.stripe } : c)),
           updatedAt: Date.now(),
-        }))
+        }
+        set(recolour ? withXp(s, 5, patch) : patch)
         sfx.buy()
-        s.toast(`Painted ${paint.name}!`)
-      },
-
-      stripeCar: (cuid, stripe) => {
-        const s = get()
-        const car = s.cars.find((c) => c.uid === cuid)
-        if (!car || (car.stripe ?? null) === stripe) return
-        const cost = stripe ? STRIPE_COST : 0
-        if (s.coins < cost) return s.showNeed('coins', cost - s.coins, 'racing stripes')
-        set({ coins: s.coins - cost, cars: s.cars.map((c) => (c.uid === cuid ? { ...c, stripe } : c)), updatedAt: Date.now() })
+        s.toast(recolour ? (paint ? `Painted ${fin.id === 'gloss' ? '' : fin.name + ' '}${paint.name}!` : `${fin.name} finish on!`) : job.stripe ? 'Stripes on!' : 'Stripes off')
+        return true
       },
 
       modCar: (cuid, modId, remove) => {
