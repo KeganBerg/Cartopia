@@ -5,6 +5,7 @@ import { GoalTracker } from './Goals'
 import { SeasonButton } from './Season'
 import { MuteButton } from './MuteButton'
 import { DealsButton } from './Deals'
+import { CratesButton } from './Crates'
 import { ChallengeBell } from './Race'
 import { GiftBell } from './Gifts'
 import { Icon, CoinIcon, BuckIcon, PartsIcon, FuelIcon } from './Icon'
@@ -80,6 +81,7 @@ export function Hud() {
           <button className="pill trophies" title="Leaderboards" onClick={() => s.openPanel('leaders')}><Icon name="trophy" size={16} /> {compact(s.trophies)}</button>
           <SeasonButton />
           <DealsButton />
+          <CratesButton />
           <MuteButton />
         </div>
         <div className="hud-right-row">
@@ -103,6 +105,7 @@ export function Hud() {
           <div className="hud-actions">
             <SeasonButton />
             <DealsButton />
+            <CratesButton />
               <ChallengeBell />
             <GiftBell />
           </div>

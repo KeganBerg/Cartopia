@@ -445,7 +445,9 @@ function ClanBrowser({ onJoined }: { onJoined: () => void }) {
     setBusy(true)
     try {
       await createClan({ ...form, tag, name: form.name.trim() })
-      useGame.setState((s) => ({ coins: s.coins - CLAN_COST, updatedAt: Date.now() }))
+      // A cloud sync can swap the town in while the crew is being made, so charge
+      // the balance as it is now and never take it below zero.
+      useGame.setState((s) => ({ coins: Math.max(0, s.coins - CLAN_COST), updatedAt: Date.now() }))
       toast(`${form.name.trim()} is open for members!`)
       onJoined()
     } catch (e) {
