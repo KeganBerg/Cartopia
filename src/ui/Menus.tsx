@@ -134,7 +134,7 @@ function useShopFocus() {
 }
 
 function price(def: { price: number; bucks?: number }, sale?: { coins: number; bucks: number } | null) {
-  if (def.bucks) return <span className="price bucks">{sale && <s>B {def.bucks}</s>} B {sale ? sale.bucks : def.bucks}</span>
+  if (def.bucks) return <span className="price bucks">{sale && <s>💎 {def.bucks}</s>} 💎 {sale ? sale.bucks : def.bucks}</span>
   return <span className="price">{sale && <s>$ {def.price.toLocaleString()}</s>} $ {(sale ? sale.coins : def.price).toLocaleString()}</span>
 }
 

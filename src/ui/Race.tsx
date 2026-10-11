@@ -498,8 +498,8 @@ function Campaign({ onRace, onTour }: { onRace: (ch: CampaignChapter, race: numb
             <small>{v.name}</small>
           </div>
           <div className="camp-rewards">
-            <span className={cleared ? 'got' : ''} title="Clear bonus (once)">{cleared ? '✔' : '🏁'} ${ch.coins >= 1000 ? `${ch.coins / 1000}k` : ch.coins} <span className="ico buck-ico">B</span>{ch.bucks} 🏆{ch.trophies}</span>
-            <span className={perfect ? 'got' : ''} title="Three stars on every race (once)">{perfect ? '✔' : '★★★'} <span className="ico buck-ico">B</span>{ch.starBucks}</span>
+            <span className={cleared ? 'got' : ''} title="Clear bonus (once)">{cleared ? '✔' : '🏁'} ${ch.coins >= 1000 ? `${ch.coins / 1000}k` : ch.coins} <span className="ico buck-ico">💎</span>{ch.bucks} 🏆{ch.trophies}</span>
+            <span className={perfect ? 'got' : ''} title="Three stars on every race (once)">{perfect ? '✔' : '★★★'} <span className="ico buck-ico">💎</span>{ch.starBucks}</span>
           </div>
         </div>
         {!opened(sel) ? (
@@ -663,7 +663,7 @@ export function CampaignPrizePopup() {
         <div className="mystery-box" aria-hidden>{prize.cleared ? '🏁' : '🌟'}</div>
         <p className="camp-prize">
           {prize.coins > 0 && <span>💵 +${prize.coins.toLocaleString()}</span>}
-          {prize.bucks > 0 && <span><span className="ico buck-ico">B</span> +{prize.bucks}</span>}
+          {prize.bucks > 0 && <span><span className="ico buck-ico">💎</span> +{prize.bucks}</span>}
           {prize.trophies > 0 && <span>🏆 +{prize.trophies}</span>}
         </p>
         {prize.cleared && prize.perfect && <p>Plus the three-star bonus. Flawless!</p>}

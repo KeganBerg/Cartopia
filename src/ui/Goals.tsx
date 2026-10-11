@@ -111,7 +111,7 @@ function Reward({ coins, xp, bucks, parts, stars }: { coins: number; xp?: number
   return (
     <span className="goal-pay">
       <i className="coin-ico ico">$</i>{n(coins)}
-      {!!bucks && <><i className="buck-ico ico">B</i>{bucks}</>}
+      {!!bucks && <><i className="buck-ico ico">💎</i>{bucks}</>}
       {!!parts && <><i className="parts-ico ico">⚙</i>{parts}</>}
       {!!xp && <b>+{n(xp)} XP</b>}
       {!!stars && <b className="star-pay">+{stars} ⭐</b>}
@@ -313,7 +313,7 @@ export function DailyPanel() {
             <b>${r.coins}</b>
             {r.fuel && <small>+{r.fuel} ⛽</small>}
             {r.parts && <small>+{r.parts} ⚙</small>}
-            {r.bucks && <small>+B{r.bucks}</small>}
+            {r.bucks && <small>+💎{r.bucks}</small>}
           </div>
         ))}
       </div>

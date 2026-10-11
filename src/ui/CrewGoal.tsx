@@ -53,7 +53,7 @@ function Pay() {
   return (
     <span className="goal-pay">
       <i className="coin-ico ico">$</i>{n(pay.coins)}
-      <i className="buck-ico ico">B</i>{CREW_CHEST.bucks}
+      <i className="buck-ico ico">💎</i>{CREW_CHEST.bucks}
       <i className="parts-ico ico">⚙</i>{CREW_CHEST.parts}
     </span>
   )

@@ -3,8 +3,8 @@ import { buildingDef, isOpen, xpToNext, FUEL_REGEN_SECONDS, RACE_FUEL, refillBuc
 import { useNow } from '../scene/useNow'
 import { Panel } from './Menus'
 
-const LABEL = { coins: 'coins', parts: 'parts', fuel: 'fuel', bucks: 'bucks', level: 'a higher level' } as const
-const ICON = { coins: '$', parts: '⚙', fuel: '⛽', bucks: 'B', level: '⭐' } as const
+const LABEL = { coins: 'coins', parts: 'parts', fuel: 'fuel', bucks: 'gems', level: 'a higher level' } as const
+const ICON = { coins: '$', parts: '⚙', fuel: '⛽', bucks: '💎', level: '⭐' } as const
 
 type Source = { icon: string; title: string; detail: string; action?: { label: string; run: () => void; disabled?: boolean } }
 
@@ -40,7 +40,7 @@ export function NeedPanel() {
       ...(upgradableOwned ? [{ icon: '⬆', title: 'Upgrade your businesses', detail: 'Upgraded businesses pay more coins per job and finish sooner. Find them under Upgrades in the Shop.', action: { label: 'Upgrades', run: () => s.openShop('upgrades') } }] : []),
       { icon: '🔍', title: "Search at Rusty's", detail: 'Searches can turn up coin stashes along with cars.', action: owned('rescue') ? { label: "Rusty's", run: () => s.openPanel('rescue') } : build('rescue') },
       { icon: '🏆', title: 'Win drag races', detail: `Each race costs ${RACE_FUEL} fuel and pays a few hundred coins.`, action: { label: 'Race', run: () => s.openPanel('race') } },
-      { icon: '📋', title: 'Finish goals', detail: 'Goals pay coins, XP and sometimes bucks.', action: { label: 'Goals', run: () => s.openPanel('goals') } },
+      { icon: '📋', title: 'Finish goals', detail: 'Goals pay coins, XP and sometimes gems.', action: { label: 'Goals', run: () => s.openPanel('goals') } },
       { icon: '👫', title: 'Help other towns', detail: 'Visit a town once a day and tap Help out.', action: { label: 'Friends', run: () => s.openPanel('friends') } },
       { icon: '📅', title: 'Daily bonus', detail: 'Come back every day for up to $1,200.' },
     ]
@@ -60,7 +60,7 @@ export function NeedPanel() {
     summary = need.missing ? `You need ${need.missing} more fuel${need.what ? ` for ${need.what}` : ''}. You have ${s.fuel}/${cap}.` : `You have ${s.fuel}/${cap} fuel.`
     const refill = refillBucks(cap - s.fuel)
     sources = [
-      { icon: '⛽', title: `Fill up with bucks · B ${refill}`, detail: s.fuel >= cap ? 'Your tank is full.' : `Fill your tank to ${cap} right now. You have ${s.bucks} bucks.`, action: { label: `Fill up · B ${refill}`, run: s.refillFuel, disabled: s.fuel >= cap } },
+      { icon: '⛽', title: `Fill up with gems · 💎 ${refill}`, detail: s.fuel >= cap ? 'Your tank is full.' : `Fill your tank to ${cap} right now. You have ${s.bucks} gems.`, action: { label: `Fill up · 💎 ${refill}`, run: s.refillFuel, disabled: s.fuel >= cap } },
       { icon: '⏱', title: 'Wait for a refill', detail: next === null ? 'Your tank is full.' : `Fuel refills 1 every minute. Next one in ${next}s.` },
       { icon: '⛽', title: 'Build a Gas Station', detail: `Each one adds +10 to your max fuel. You have ${owned('gas')}.`, action: build('gas') },
       ...(owned('house') ? [{ icon: '🏡', title: 'Upgrade your homes', detail: 'Every home level adds +1 to your max fuel. Find them under Upgrades in the Shop.', action: { label: 'Upgrades', run: () => s.openShop('upgrades') } }] : []),
@@ -68,12 +68,12 @@ export function NeedPanel() {
       { icon: '📅', title: 'Daily bonus day 3', detail: '+5 fuel on the third day of your streak.' },
     ]
   } else if (need.res === 'bucks') {
-    summary = need.missing ? `You need ${need.missing} more bucks${need.what ? ` for ${need.what}` : ''}.` : `You have ${s.bucks} bucks.`
+    summary = need.missing ? `You need ${need.missing} more gems${need.what ? ` for ${need.what}` : ''}.` : `You have ${s.bucks} gems.`
     sources = [
-      { icon: '🏦', title: 'Visit the Bank', detail: 'Buy bucks in packs. Bigger packs come with bonus bucks, coins and parts.', action: { label: 'Bank', run: () => s.openPanel('bank') } },
-      { icon: '⭐', title: 'Level up', detail: 'Every new level gives +1 buck.' },
-      { icon: '📋', title: 'Finish goals', detail: 'Bigger goals pay bucks.', action: { label: 'Goals', run: () => s.openPanel('goals') } },
-      { icon: '📅', title: 'Daily bonus day 5', detail: '+1 buck on the fifth day of your streak.' },
+      { icon: '🏦', title: 'Visit the Bank', detail: 'Buy gems in packs. Bigger packs come with bonus gems, coins and parts.', action: { label: 'Bank', run: () => s.openPanel('bank') } },
+      { icon: '⭐', title: 'Level up', detail: 'Every new level gives +1 gem.' },
+      { icon: '📋', title: 'Finish goals', detail: 'Bigger goals pay gems.', action: { label: 'Goals', run: () => s.openPanel('goals') } },
+      { icon: '📅', title: 'Daily bonus day 5', detail: '+1 gem on the fifth day of your streak.' },
     ]
   } else {
     const toGo = xpToNext(s.level) - s.xp

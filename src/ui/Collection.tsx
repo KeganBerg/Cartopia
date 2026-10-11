@@ -34,7 +34,7 @@ function SetRow({ set, onFind }: { set: CarSet; onFind: (model: string) => void 
         <span className="book-icon">{set.icon}</span>
         <span className="book-name">{set.name} <small>{have}/{set.cars.length}</small></span>
         <span className="book-reward" title="Set reward">
-          <span>💰{set.coins.toLocaleString()}</span><span className="bk">B{set.bucks}</span><span>🏆{set.trophies}</span>
+          <span>💰{set.coins.toLocaleString()}</span><span className="bk">💎{set.bucks}</span><span>🏆{set.trophies}</span>
         </span>
         {done ? <span className="book-claimed">✔</span> : ready ? <button className="buy small book-claim" onClick={() => claim(set.id)}>Claim!</button> : null}
       </header>
