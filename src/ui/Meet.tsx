@@ -11,7 +11,7 @@ import { SocialTabs } from './Social'
 
 const Thumb = ({ car, size }: { car: OwnedCar; size?: 'sm' }) => {
   const d = carDef(car.model)
-  return <CarThumb size={size} color={car.color} finish={car.finish} body={d.body} model={d.id} stripe={car.stripe} mods={car.mods} />
+  return <CarThumb size={size} color={car.color} finish={car.finish} skin={car.skin} body={d.body} model={d.id} stripe={car.stripe} mods={car.mods} />
 }
 
 // A heart with the like count. Your own display just shows the count.

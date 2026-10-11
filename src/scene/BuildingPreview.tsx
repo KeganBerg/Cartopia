@@ -24,12 +24,12 @@ function buildingItem(def: BuildingDef, level?: number): Item {
   return { key: `b|${def.id}|${level ?? 1}|${SEASON}`, model: () => <BuildingModel def={def} level={level} /> }
 }
 
-type CarLook = { body: Body; model?: string; color: string; finish?: Finish | null; stripe?: string | null; rusty?: boolean; mods?: string[] | null }
+type CarLook = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; stripe?: string | null; rusty?: boolean; mods?: string[] | null }
 
 function carItem(c: CarLook): Item {
   return {
-    key: `c|${c.body}|${c.model ?? ''}|${c.color}|${c.finish ?? ''}|${c.stripe ?? ''}|${c.rusty ? 1 : 0}|${c.rusty ? '' : (c.mods ?? []).join(',')}`,
-    model: () => <CarModel body={c.body} model={c.model} color={c.color} finish={c.finish} stripe={c.stripe} rusty={c.rusty} mods={c.mods} />,
+    key: `c|${c.body}|${c.model ?? ''}|${c.color}|${c.finish ?? ''}|${c.skin ?? ''}|${c.stripe ?? ''}|${c.rusty ? 1 : 0}|${c.rusty ? '' : (c.mods ?? []).join(',')}`,
+    model: () => <CarModel body={c.body} model={c.model} color={c.color} finish={c.finish} skin={c.skin} stripe={c.stripe} rusty={c.rusty} mods={c.mods} />,
   }
 }
 

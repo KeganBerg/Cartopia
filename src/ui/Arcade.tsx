@@ -43,7 +43,7 @@ export function ArcadePanel() {
         <div className="arc-cars">
           {cars.slice().sort((a, b) => pi(b) - pi(a)).slice(0, 12).map((c) => (
             <button key={c.uid} className={c.uid === car.uid ? 'arc-car sel' : 'arc-car'} onClick={() => setCarId(c.uid)} title={carDef(c.model).name}>
-              <CarThumb size="xs" color={c.color} finish={c.finish} body={carDef(c.model).body} model={c.model} stripe={c.stripe} mods={c.mods} />
+              <CarThumb size="xs" color={c.color} finish={c.finish} skin={c.skin} body={carDef(c.model).body} model={c.model} stripe={c.stripe} mods={c.mods} />
             </button>
           ))}
         </div>

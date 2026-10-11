@@ -1,6 +1,7 @@
 import { BufferAttribute, BufferGeometry, Color, DoubleSide, FrontSide, Material, MeshBasicMaterial, MeshStandardMaterial, type Matrix3, type Matrix4, type Texture } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { weatherBaked } from './weatherLook'
+import { withSkin } from './skins'
 
 // Baking: many parts that differ only in plain material settings (colour,
 // roughness, metalness, glow) become one mesh with those settings stored per
@@ -12,14 +13,17 @@ import { weatherBaked } from './weatherLook'
 // How one part looks, matching the material it would otherwise be drawn with.
 // glow: lights up when its car is picked (the paint's highlight).
 // uv: the part's texture transform (repeat, offset), baked into its UVs.
-export type Finish = { color: Color | string; metal?: number; rough?: number; unlit?: boolean; emissive?: Color; glow?: boolean; double?: boolean; uv?: Matrix3 }
+// skin: a car skin's number (scene/skins.ts); only town cars bake skins.
+export type Finish = { color: Color | string; metal?: number; rough?: number; unlit?: boolean; emissive?: Color; glow?: boolean; double?: boolean; uv?: Matrix3; skin?: number }
 
 const tmp = new Color()
 
 // Merge parts (each optionally moved by a matrix) into one indexed geometry carrying
 // `color` (linear RGB, as a material's colour is), `emissive` (colour times intensity)
 // and `look` (metalness, roughness, unlit, glow). `uvs` keeps texture coordinates.
+// When any part sets a skin (0 for none), every part gets a `skin` number.
 export function bake(parts: [BufferGeometry, Finish, Matrix4?][], uvs = false) {
+  const skinned = parts.some(([, f]) => f.skin !== undefined)
   const list = parts.map(([geo, f, m]) => {
     const pos = geo.getAttribute('position')
     const n = pos.count
@@ -59,6 +63,7 @@ export function bake(parts: [BufferGeometry, Finish, Matrix4?][], uvs = false) {
     g.setAttribute('color', new BufferAttribute(color, 3))
     g.setAttribute('emissive', new BufferAttribute(emissive, 3))
     g.setAttribute('look', new BufferAttribute(look, 4))
+    if (skinned) g.setAttribute('skin', new BufferAttribute(new Float32Array(n * both).fill(f.skin ?? 0), 1))
     return g
   })
   const out = mergeGeometries(list)!
@@ -92,8 +97,8 @@ function withBackFaces(g: BufferGeometry) {
 // A standard material whose colour, glow, metalness and roughness come from the
 // vertices. Unlit parts come out as their flat colour, exactly like
 // MeshBasicMaterial. `picked` lights up the glow parts like the emissive highlight
-// on a picked car's paint.
-export function bakedMaterial(picked = false, map: Texture | null = null) {
+// on a picked car's paint. `skins`: draws car skins on parts baked with one (town cars).
+export function bakedMaterial(picked = false, map: Texture | null = null, skins = false) {
   const m = new MeshStandardMaterial({ vertexColors: true, metalness: 1, roughness: 1, map })
   m.onBeforeCompile = (sh) => {
     sh.vertexShader = sh.vertexShader
@@ -107,8 +112,9 @@ export function bakedMaterial(picked = false, map: Texture | null = null) {
       .replace('#include <opaque_fragment>', 'outgoingLight = mix(outgoingLight, diffuseColor.rgb, vLook.z);\n#include <opaque_fragment>')
     // Rain sheen and settled snow on whatever faces the sky.
     weatherBaked(sh)
+    if (skins) withSkin(sh, 'int(vSkin + 0.5)', true)
   }
-  m.customProgramCacheKey = () => (picked ? 'baked-picked' : 'baked')
+  m.customProgramCacheKey = () => (picked ? 'baked-picked' : 'baked') + (skins ? '-skins' : '')
   return m
 }
 
