@@ -1,22 +1,15 @@
-// Shots of each race venue (taken in the race scene), used as art on the Race
-// menu's tiles and banners. Venues without a night shot get a night tint in CSS.
-import main from '../assets/venues/main.jpg'
-import docks from '../assets/venues/docks.jpg'
-import desert from '../assets/venues/desert.jpg'
-import snow from '../assets/venues/snow.jpg'
-import beach from '../assets/venues/beach.jpg'
-import farm from '../assets/venues/farm.jpg'
-import snowNight from '../assets/venues/snow-night.jpg'
-import beachNight from '../assets/venues/beach-night.jpg'
+// Hero pictures for the Race menu's tiles and banners: one shot per mode, rendered
+// from the race scene at each venue (scripts/hero renders them again).
+// Campaign: the face-off under the start lights. Pro Tour: both noses on the finish
+// line, day or midnight. Grand Prix: the podium. Time Trial: a lone run past the split board.
+const ART = import.meta.glob<string>('../assets/race-menu/*.webp', { eager: true, import: 'default' })
 
-const DAY: Record<string, string> = { main, docks, desert, snow, beach, farm }
-const NIGHT: Record<string, string> = { snow: snowNight, beach: beachNight }
+export type ArtMode = 'camp' | 'tour' | 'gp' | 'trial'
 
-// The picture, and whether CSS should darken it for a night race.
-export function venueArt(id: string, night = false): { src: string; tint: boolean } {
-  if (night && NIGHT[id]) return { src: NIGHT[id], tint: false }
-  return { src: DAY[id] ?? main, tint: night }
+export function heroArt(mode: ArtMode, venue = 'main', night = false): string {
+  const at = (name: string) => ART[`../assets/race-menu/${name}.webp`]
+  if (mode === 'gp') return at('gp-main')
+  return at(`${mode}-${venue}${mode === 'tour' && night ? '-night' : ''}`) ?? at(`${mode}-main`)
 }
 
-export const artStyle = (id: string, night = false) => ({ backgroundImage: `url(${venueArt(id, night).src})` })
-export const artClass = (id: string, night = false) => (venueArt(id, night).tint ? ' rm-night' : '')
+export const artStyle = (mode: ArtMode, venue?: string, night = false) => ({ backgroundImage: `url(${heroArt(mode, venue, night)})` })

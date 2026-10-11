@@ -20,9 +20,9 @@ import { raceWeather } from '../game/weather'
 import { carGrip, conditions, conditionsNote, gripMul, spinning } from '../game/grip'
 import { TrialTab, TrialResult, beginTrialRun, type TrialRun } from './TimeTrial'
 import { claim as claimVisitor, leave as leaveVisitor, setRacing, type Visitor } from '../lib/visitors'
-import { RivalCard, RivalResult, type RivalMatch, type RivalBonus } from './Rivals'
+import { RivalResult, type RivalMatch, type RivalBonus } from './Rivals'
 import { RaceBar, RaceHub, Rounds, campaignFocus, type HubTab } from './RaceHub'
-import { artClass, artStyle } from './venueArt'
+import { artStyle } from './venueArt'
 import './race-menu.css'
 import { TOUR_RACES, tourLeg, tourLegOf, tourIsBoss, tourRivalPi, tourShift, tourSkills, tourRivalName, tourPrize, tourLegBonus } from '../game/tour'
 import type { WeatherKind } from '../game/weather'
@@ -381,58 +381,49 @@ export function RacePanel() {
           car && <TrialTab myPi={pi(car)} onRun={startTrial} />
         ) : tab === 'gp' ? (
           <GrandPrix onRace={startGp} />
-        ) : <>
-      <RivalCard onRace={(m) => startRival(m)} />
-      {supabase && (
-        <>
-          <h3>Live now <small>(players online this minute, no fuel needed)</small></h3>
-          {!liveSignedIn ? <p className="hint">Sign in from the Menu to race other players live.</p>
-            : livePlayers.length === 0 && <p className="hint">Nobody else is online right now. Open Cartopia in another browser or ask a friend to join!</p>}
-          <div className="rivals">
-            {livePlayers.filter((p) => !mutedIds[p.id]).map((p) => (
-              <div key={p.id} className="rival">
-                <i style={{ background: p.color }} />
-                <div>
-                  <b><PlayerName id={p.uid} town={p.town} /></b> <span className="tag live">LIVE</span>
-                  <div className="card-stat">Lvl {p.level} · {p.carName} · PI {p.pi}</div>
+        ) : (
+          <div className="rm-q-grid">
+            {supabase && !liveSignedIn && (
+              <button className="rm-qc rm-qc-live rm-qc-signin" onClick={() => useGame.getState().openPanel('account')}>
+                <span className="rm-qc-top"><span className="rm-mi">🟢</span><span className="tag live">LIVE</span></span>
+                <span className="rm-qc-body"><b>Race players live</b><span className="buy small alt">Sign in</span></span>
+              </button>
+            )}
+            {supabase && livePlayers.filter((p) => !mutedIds[p.id]).map((p) => {
+              const wait = (cooldownTo[p.id] ?? 0) > Date.now()
+              return (
+                <div key={p.id} className="rm-qc rm-qc-live" style={{ ['--qc' as string]: p.color }}>
+                  <span className="rm-qc-top"><CarThumb size="sm" color={p.color} body={p.body} mods={p.mods} /><span className="tag live">LIVE</span></span>
+                  <span className="rm-qc-body">
+                    <b><PlayerName id={p.uid} town={p.town} /></b>
+                    <span className="rm-qc-chips"><span>Lv {p.level}</span><span className="rm-pi">PI {p.pi}</span></span>
+                    {outgoing?.to === p.id ? (
+                      <button className="buy small alt" onClick={cancelChallenge} title="Waiting for an answer. Tap to call it off.">⏳ Cancel</button>
+                    ) : (
+                      <button className="buy small alt" disabled={!!outgoing || p.closed || wait} onClick={() => void challenge(p.id)}>
+                        {p.closed ? '🚫 Busy' : wait ? '⏱ Soon' : `⚔️ $${liveReward(p.pi)}`}
+                      </button>
+                    )}
+                  </span>
                 </div>
-                {outgoing?.to === p.id ? (
-                  <button className="buy small alt" onClick={cancelChallenge} title="Waiting for an answer. Tap to call it off.">
-                    Waiting... Cancel
-                  </button>
-                ) : (
-                  <button className="buy small alt" disabled={!!outgoing || p.closed || (cooldownTo[p.id] ?? 0) > Date.now()} onClick={() => void challenge(p.id)}>
-                    {p.closed ? 'Not taking races' : (cooldownTo[p.id] ?? 0) > Date.now() ? 'Try again soon' : `Challenge · win $${liveReward(p.pi)}`}
-                  </button>
-                )}
+              )
+            })}
+            {[...online, ...rivals].map((r) => (
+              <div key={r.id} className="rm-qc" style={{ ['--qc' as string]: r.color }}>
+                <span className="rm-qc-top"><CarThumb size="sm" color={r.color} body={r.body} mods={r.mods} />{r.online && <span className="tag">PLAYER</span>}</span>
+                <span className="rm-qc-body">
+                  <b>{r.town}</b>
+                  <span className="rm-qc-chips"><span>Lv {r.level}</span><span className="rm-pi">PI {r.pi}</span>{r.skill && <span title={`${SKILLS[r.skill].name}: ${SKILLS[r.skill].text}`}>{SKILLS[r.skill].icon}</span>}</span>
+                  <button className="buy small" onClick={() => start(r)}>🏁 ${reward(r)} <small>⛽{RACE_FUEL}</small></button>
+                </span>
               </div>
             ))}
           </div>
-        </>
-      )}
-      <h3>Pick a rival <small>(costs ⛽{RACE_FUEL})</small></h3>
-      <div className="rivals">
-        {[...online, ...rivals].map((r) => (
-          <div key={r.id} className="rival">
-            <i style={{ background: r.color }} />
-            <div>
-              <b>{r.town}</b> {r.online && <span className="tag">PLAYER</span>}
-              <div className="card-stat">Lvl {r.level} · {r.carName} · PI {r.pi}{r.skill && <RivalSkill skill={r.skill} />}</div>
-            </div>
-            <button className="buy small" onClick={() => start(r)}>Race · win ${reward(r)}</button>
-          </div>
-        ))}
-      </div>
-      <p className="hint">Shift when the needle hits the green zone. Space bar works too.</p>
-      </>}
+        )}
       </div>
       <RaceBar cars={cars} car={car} onPick={setCarId} go={go} note={tab === 'gp' ? 'Races every round' : tab === 'event' ? 'Back next week' : undefined} />
     </Panel>
   )
-}
-
-function RivalSkill({ skill }: { skill: SkillId }) {
-  return <span className="rival-skill" title={`${SKILLS[skill].name}: ${SKILLS[skill].text}`}> · {SKILLS[skill].icon} {SKILLS[skill].name}</span>
 }
 
 const GP_CUP = ['🥉', '🏆', '🏆', '👑']
@@ -522,7 +513,7 @@ function Campaign({ sel, setSel, onRace, onTour }: { sel: number; setSel: (ci: n
             )
           })}
         </div>
-        <div className={`rm-banner rm-photo${artClass(ch.venue)}`} style={artStyle(ch.venue)}>
+        <div className="rm-banner rm-photo" style={artStyle('camp', ch.venue)}>
           <span className="rm-eyebrow">Chapter {sel + 1} · {v.name}</span>
           <b className="rm-ttl">{ch.name}</b>
           <span className="rm-chips">
@@ -608,7 +599,7 @@ function Tour({ onRace, onCampaign }: { onRace: () => void; onCampaign: () => vo
             )
           })}
         </div>
-        <div className={`rm-banner rm-photo${artClass(leg.venue, leg.night)}`} style={artStyle(leg.venue, leg.night)}>
+        <div className="rm-banner rm-photo" style={artStyle('tour', leg.venue, leg.night)}>
           <span className="rm-eyebrow">Leg {cur + 1} · {leg.night ? '🌙 Under the lights' : 'Daytime'} · {SKY_ICON[sky]}</span>
           <b className="rm-ttl">{leg.night ? `${v.name} at Midnight` : `${v.name} ${leg.name}`}</b>
           <span className="rm-chips">
@@ -677,7 +668,7 @@ function WeeklyEvent({ base, car, onRace }: { base: number; car: OwnedCar | unde
   return (
     <div className="rm-split rm-event" style={{ '--ev': e.color } as React.CSSProperties}>
       <div className="rm-left">
-        <div className={`rm-banner rm-photo${artClass(e.venue, e.night)}`} style={artStyle(e.venue, e.night)}>
+        <div className="rm-banner rm-photo" style={artStyle('tour', e.venue, e.night)}>
           <span className="rm-eyebrow">{v.icon} {v.name} · {e.night ? '🌙 Night' : 'Day'} · {SKY_ICON[e.sky]}</span>
           <b className="rm-ttl">{e.name}</b>
           <span className="rm-ev-blurb">{e.blurb}</span>

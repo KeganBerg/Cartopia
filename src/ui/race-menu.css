@@ -8,8 +8,23 @@
 .race-panel .panel-body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0; overflow: hidden; }
 .rm-head-chip { background: rgba(10,30,70,.35); border: 2px solid rgba(20,33,61,.55); color: #fff; border-radius: 999px; padding: 2px 10px; font: 900 13px Nunito, sans-serif; white-space: nowrap; text-shadow: 0 1px 0 rgba(0,0,0,.4); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .rm-screen { flex: 1; min-height: 0; overflow: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
-.rm-s-quick, .rm-s-trial { display: block; }
-.rm-s-quick > * + *, .rm-s-trial > * + * { margin-top: 10px; }
+.rm-s-trial { display: block; }
+.rm-s-trial > * + * { margin-top: 10px; }
+.rm-s-quick { display: block; }
+
+/* ---------- quick race: one card per rival ---------- */
+.rm-q-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.rm-qc { --qc: #5aa9ff; border: 3px solid var(--line, #14213d); border-radius: 18px; background: #fff; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 0 rgba(0,0,0,.3); min-width: 0; padding: 0; font: inherit; text-align: left; color: inherit; }
+.rm-qc-top { position: relative; height: 74px; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 50% 120%, rgba(255,255,255,.85), rgba(255,255,255,0) 60%), linear-gradient(135deg, color-mix(in srgb, var(--qc) 55%, #fff), color-mix(in srgb, var(--qc) 80%, #14213d)); box-shadow: inset 0 3px 0 rgba(255,255,255,.3); }
+.rm-qc-top .tag { position: absolute; top: 6px; right: 6px; }
+.rm-qc-top .rm-mi { font-size: 34px; }
+.rm-qc-live .rm-qc-top { background: linear-gradient(135deg, #7ee05a, #2f9e35); }
+.rm-qc-body { flex: 1; padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 6px; }
+.rm-qc-body b { font: 900 15px Nunito, sans-serif; color: var(--ink, #1b2a4a); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rm-qc-chips { display: flex; gap: 5px; align-items: center; font-size: 12px; font-weight: 800; color: #4a6283; }
+.rm-qc-body .buy { margin-top: auto; width: 100%; }
+.rm-qc-body .buy small { opacity: .85; font-size: 11px; }
+.rm-qc-signin { cursor: pointer; }
 
 /* ---------- shared ---------- */
 .rm-ttl { font: 22px var(--display); line-height: 1.05; color: #fff; text-shadow: 0 2px 0 var(--line, #14213d); -webkit-text-stroke: .8px var(--line, #14213d); letter-spacing: .3px; }
@@ -28,7 +43,6 @@
 /* venue picture with a dark fade for text */
 .rm-photo { position: relative; background-color: #3d6fb3; background-size: cover; background-position: center; color: #fff; isolation: isolate; }
 .rm-photo::before { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(10,20,45,.12), rgba(10,20,45,0) 35%, rgba(10,20,45,.85)); }
-.rm-photo.rm-night::before { background: linear-gradient(180deg, rgba(8,12,50,.6), rgba(8,12,50,.45) 40%, rgba(8,12,40,.9)); }
 
 /* ---------- hub ---------- */
 .rm-hub { flex: 1; min-height: 360px; display: grid; gap: 12px; grid-template-columns: 1.25fr 1.25fr 1fr 1fr; grid-template-rows: 1fr 1fr auto; grid-template-areas: "camp tour rival rival" "camp tour gp trial" "minis minis minis minis"; }
@@ -199,6 +213,10 @@ div.rm-node { cursor: default; }
 .rm-box .thumb3d.sm { --tw: 120px; --th: 94px; }
 .rm-rival .rm-ttl { flex-wrap: wrap; row-gap: 2px; }
 @media (max-width: 600px), (max-height: 500px) {
+  .rm-q-grid { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 8px; }
+  .rm-qc-top { height: 58px; }
+  .rm-qc-body { padding: 6px 8px 8px; gap: 4px; }
+  .rm-qc-body b { font-size: 14px; }
   .rm-box .thumb3d.sm { --tw: 66px; --th: 52px; }
 }
 
