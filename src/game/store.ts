@@ -5,6 +5,7 @@ import {
   upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, refillBucks, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, activeEvent, DAILY_BONUS, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modFits, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, CREW_CHEST, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower, seasonNumber, seasonOf, SEASON_STARS, SEASON_TIERS, STARS_PER_TIER, SEASON_CAR_BUCKS, dealsFor, dealOffer, type DealDef, type DealKind,
 } from './data'
 import { sfx } from '../lib/sound'
+import { fx } from './fx'
 import { msUntilNight } from './clock'
 import { requestTrip, requestVisit } from './trips'
 import { trialPrize } from './trial'
@@ -515,6 +516,7 @@ function tapMerged(s: GameState, set: (p: Partial<GameState>) => void, uids: str
     }
     const done = new Set(ready.map((o) => o.uid))
     sfx.coin()
+    fx({ kind: 'collect', uids: [members[0].uid, ...uids], coins: pay, parts, xp })
     s.toast(`+${pay.toLocaleString()} coins${parts ? `, +${parts} parts` : ''}, +${xp} XP`)
     return set(withXp(s, xp, {
       coins: s.coins + pay,
@@ -687,11 +689,13 @@ export const useGame = create<GameState>()(
         }
         if (def === 'rescue') setTimeout(() => get().toast("Rusty's is open! Tap his shop to search for cars. The Showroom is unlocked too."), 400)
         sfx.click()
+        const nid = uid()
+        fx({ kind: 'built', uid: nid })
         set(withXp(s, Math.max(1, Math.round(d.price / 100)), {
           coins: s.coins - cost.coins,
           bucks: s.bucks - cost.bucks,
           ...spendDeal(s, cost.deal),
-          buildings: [...s.buildings, { uid: uid(), def, x, z, jobEndsAt: null, ...(rot == null ? {} : { rot }) }],
+          buildings: [...s.buildings, { uid: nid, def, x, z, jobEndsAt: null, ...(rot == null ? {} : { rot }) }],
           stats: bump(s, 'built'),
           updatedAt: Date.now(),
         }))
@@ -780,6 +784,8 @@ export const useGame = create<GameState>()(
           }
           if (now < b.jobEndsAt) return
           sfx.coin()
+          fx({ kind: 'cleared', uid: buid })
+          fx({ kind: 'collect', uids: [buid], coins: 0, parts: 0, xp: d.xp ?? 0 })
           s.toast(`Cleared! +${d.xp} XP`)
           return set(withXp(s, d.xp!, { buildings: s.buildings.filter((o) => o.uid !== buid), updatedAt: now }))
         }
@@ -816,6 +822,7 @@ export const useGame = create<GameState>()(
           const parts = upgradePartsPayout(d, jobLvl)
           const xp = upgradeXp(d, jobLvl)
           sfx.coin()
+          fx({ kind: 'collect', uids: [buid], coins: pay, parts, xp })
           s.toast(`+${pay} coins${parts ? `, +${parts} parts` : ''}, +${xp} XP`)
           // Sometimes a car out on the job comes back with a flat.
           let cars = s.cars
@@ -866,6 +873,7 @@ export const useGame = create<GameState>()(
           return false
         }
         sfx.buy()
+        fx({ kind: 'upgraded', uids: [...ids] })
         s.toast(`${d.name} is now level ${lvl + 1}!`)
         set(withXp(s, buildingUpgradeXp(lvl) * ids.size, {
           coins: s.coins - cost.coins,
@@ -912,11 +920,13 @@ export const useGame = create<GameState>()(
         let cleared = 0
         let earned = 0
         const removed = new Set<string>()
+        const paid: string[] = []
         let buildings = s.buildings.map((b) => {
           const d = buildingDef(b.def)
           if (!d.jobSeconds || b.jobEndsAt === null || now < b.jobEndsAt) return b
           if (d.kind === 'obstacle') {
             removed.add(b.uid)
+            paid.push(b.uid)
             xp += d.xp ?? 0
             cleared++
             return b
@@ -927,6 +937,7 @@ export const useGame = create<GameState>()(
           earned += pay
           parts += upgradePartsPayout(d, lvl)
           xp += upgradeXp(d, lvl)
+          paid.push(b.uid)
           collected++
           return { ...b, jobEndsAt: null, jobLevel: undefined }
         }).filter((b) => !removed.has(b.uid))
@@ -957,6 +968,8 @@ export const useGame = create<GameState>()(
         setLastCollectAll(now)
         if (collected || filled) sfx.coin()
         else sfx.start()
+        for (const u of removed) fx({ kind: 'cleared', uid: u })
+        if (paid.length || earned) fx({ kind: 'collect', uids: paid, coins: earned, parts: parts - s.parts, xp })
         const bits = [
           collected && `collected ${collected} job${collected > 1 ? 's' : ''}`,
           started && `started ${started}`,

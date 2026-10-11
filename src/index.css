@@ -1402,4 +1402,54 @@ button.book-car { font: inherit; color: inherit; }
   .dyno-gauge { width: 58px; height: 58px; }
   .dyno-read { min-width: 116px; padding: 4px 7px; }
   .dr-row b { font-size: 13px; }
+/* ---- Animations: coins flying to the HUD, badge pops, panel close, chest burst ---- */
+.fly-layer { position: fixed; inset: 0; z-index: 400; pointer-events: none; overflow: hidden; }
+.fly { position: absolute; left: 0; top: 0; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; display: grid; place-items: center; font: 13px var(--display); will-change: transform; }
+.fly-coins { background: radial-gradient(#ffe082, #f9a825); color: #8d5a00; border: 2px solid #fff3c4; box-shadow: 0 2px 0 rgba(0,0,0,.25); }
+.fly-parts { background: radial-gradient(#bcaaa4, #6d4c41); color: #fff; border: 2px solid #efebe9; }
+.fly-xp { background: radial-gradient(#b9f6ca, #2e7d32); color: #fff; border: 2px solid #e8f5e9; font-size: 12px; }
+.fly-label { position: absolute; left: 0; top: 0; font: 22px var(--display); color: #fff; white-space: nowrap; -webkit-text-stroke: 1.5px #8d5a00; text-shadow: 0 3px 0 #8d5a00, 0 0 10px rgba(255,213,79,.8); will-change: transform; }
+@media (max-width: 600px) { .fly-label { font-size: 18px; } }
+
+/* A finished job's coin pops up, then bobs and spins now and then. */
+.badge-ready { animation: badge-in .5s cubic-bezier(.2,1.7,.4,1) both, bob .9s ease-in-out .5s infinite; }
+.badge-ready .coin { animation: coin-spin 2.6s ease-in-out .6s infinite; }
+@keyframes badge-in { 0% { transform: scale(0) translateY(10px); } 60% { transform: scale(1.25) translateY(-6px); } 100% { transform: scale(1); } }
+@keyframes coin-spin { 0%, 70% { transform: rotateY(0); } 85% { transform: rotateY(180deg); } 100% { transform: rotateY(360deg); } }
+@media (prefers-reduced-motion: reduce) { .badge-ready, .badge-ready .coin { animation: none; } }
+
+/* Race countdown: each number punches in. */
+.countdown.big { animation: count-punch .6s cubic-bezier(.2,1.6,.4,1) both; }
+@keyframes count-punch { 0% { transform: scale(2.2); opacity: 0; } 35% { transform: scale(.92); opacity: 1; } 60% { transform: scale(1.05); } 100% { transform: scale(1); opacity: .95; } }
+@media (prefers-reduced-motion: reduce) { .countdown.big { animation: none; } }
+
+/* Panels rise in and drop away (phones: the sheet slides up from the bottom). */
+.overlay:has(> .panel) { animation: ov-in .2s ease-out both; }
+.overlay > .panel { animation: panel-in .28s cubic-bezier(.2,1.25,.4,1) both; }
+.overlay.closing { animation: ov-out .17s ease-in both; pointer-events: none; }
+.overlay.closing > .panel { animation: panel-out .17s ease-in both; }
+@keyframes ov-in { from { opacity: 0; } }
+@keyframes ov-out { to { opacity: 0; } }
+@keyframes panel-in { from { transform: translateY(24px) scale(.94); opacity: 0; } }
+@keyframes panel-out { to { transform: translateY(18px) scale(.95); opacity: 0; } }
+@media (max-width: 600px) {
+  .overlay > .panel { animation: sheet-in .3s cubic-bezier(.2,1,.3,1) both; }
+  .overlay.closing > .panel { animation: sheet-out .17s ease-in both; }
+  @keyframes sheet-in { from { transform: translateY(100%); } }
+  @keyframes sheet-out { to { transform: translateY(100%); } }
+}
+
+/* Garage paint: a shine sweeps across the car whenever the colour changes. */
+.preview-wrap { position: relative; }
+.paint-sweep { position: absolute; inset: 0 0 6px; border-radius: 12px; pointer-events: none; overflow: hidden; }
+.paint-sweep::before { content: ''; position: absolute; top: -20%; bottom: -20%; width: 45%; left: -60%; transform: skewX(-20deg);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.75) 45%, rgba(255,255,255,.95) 50%, rgba(255,255,255,.75) 55%, transparent);
+  animation: paint-sweep .7s ease-out both; }
+@keyframes paint-sweep { to { left: 120%; } }
+
+/* A full chest wiggles until it's opened. */
+.chest.ready .chest-icon { animation: boxwiggle 1.2s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay:has(> .panel), .overlay > .panel, .overlay.closing, .overlay.closing > .panel, .paint-sweep::before, .chest.ready .chest-icon { animation: none; }
 }
