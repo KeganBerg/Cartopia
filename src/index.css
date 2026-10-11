@@ -262,6 +262,7 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .rarity-common { background: #78909c; }
 .rarity-scarce { background: #1e88e5; }
 .rarity-rare { background: linear-gradient(90deg, #8e24aa, #ff6d00); }
+.rarity-legendary { background: linear-gradient(90deg, #b8860b, #ffd54f, #b8860b); color: #3e2723; box-shadow: 0 0 6px rgba(255, 213, 79, .8); }
 .junk-card { background: #faf6f3; }
 .scrap { font: 12px var(--display); background: none; border: none; color: #8d6e63; text-decoration: underline; padding: 2px; }
 .spot-card .spot-icon { font-size: 34px; line-height: 1.1; }
@@ -729,7 +730,10 @@ button.lvl-item:hover { border-color: var(--accent); transform: translateY(-2px)
 .race-full .countdown.big { font-size: 120px; }
 .race-full .shift-label.big { top: 34%; font-size: 40px; }
 .race-full .skill-flash { top: calc(118px + var(--sat)); }
-.rf-wait { position: absolute; top: 40%; left: 0; right: 0; text-align: center; font: 22px var(--display); color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,.4); }
+.rf-venue { position: absolute; top: calc(118px + var(--sat)); left: 0; right: 0; width: fit-content; margin: 0 auto; padding: 6px 16px; border-radius: 999px; background: rgba(27,31,36,.6); color: #fff; font: 18px var(--display); white-space: nowrap; pointer-events: none; animation: pop .25s ease-out; }
+.rf-wait { position: absolute; top: 40%; left: 0; right: 0; padding: 0 16px; text-align: center; font: 22px var(--display); color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,.4); }
+.rf-wait-actions { display: flex; gap: 10px; justify-content: center; margin-top: 12px; text-shadow: none; }
+.rf-wait-actions button { font-family: inherit; }
 .rf-bottom { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: 40px calc(16px + var(--sar)) calc(16px + var(--sab)) calc(16px + var(--sal)); background: linear-gradient(transparent, rgba(10,20,40,.5)); pointer-events: none; }
 .rf-bottom > * { pointer-events: auto; }
 .rf-bottom .tach { width: 132px; height: 132px; flex: none; filter: drop-shadow(0 3px 4px rgba(0,0,0,.35)); }
@@ -755,6 +759,7 @@ button.lvl-item:hover { border-color: var(--accent); transform: translateY(-2px)
   .rf-speed { font-size: 28px; }
   .race-full .shift-btn { font-size: 22px; padding: 14px 24px; }
   .race-full .countdown.big { font-size: 80px; }
+  .rf-venue { top: calc(96px + var(--sat)); font-size: 15px; }
 }
 @media (min-width: 900px) { .rf-lane { height: 30px; } .rf-lane .lane-name { font-size: 12px; } .rf-top h2 { font-size: 24px; } }
 
@@ -944,3 +949,30 @@ button.lvl-item:hover { border-color: var(--accent); transform: translateY(-2px)
 .rival-skill { color: #6a1b9a; font-weight: 800; white-space: nowrap; }
 .skill-flash.theirs { background: rgba(183,28,28,.88); }
 .race-full .skill-flash.theirs { top: calc(158px + var(--sat)); }
+
+/* Welcome back */
+.welcome-sub { margin: 0 0 10px; }
+.welcome-rewards { justify-content: center; margin-bottom: 12px; animation: none; }
+.welcome-list { grid-template-columns: 1fr; }
+.welcome-list .card { min-height: 52px; }
+.welcome-ico { width: 76px; flex: none; display: grid; place-items: center; font-size: 30px; }
+.welcome-actions { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 12px; text-align: center; }
+.welcome-actions .hint { margin: 0; font-size: 13px; }
+.welcome-collect { font-size: 20px; padding: 8px 32px; }
+
+/* Interactive car preview: drag to orbit, pinch/scroll to zoom, two fingers or right-drag to pan. */
+.car-preview { position: relative; touch-action: none; user-select: none; -webkit-user-select: none; }
+.car-preview canvas { cursor: grab; }
+.car-preview canvas:active { cursor: grabbing; }
+.cp-tools { position: absolute; top: 6px; right: 6px; display: flex; gap: 6px; }
+.cp-btn { width: 34px; height: 34px; border-radius: 50%; border: 2px solid #fff; background: rgba(38, 50, 56, .72); color: #fff; font-size: 17px; font-weight: 900; line-height: 1; display: grid; place-items: center; padding: 0; box-shadow: 0 2px 0 rgba(0,0,0,.25); }
+.cp-hint { position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%); max-width: calc(100% - 16px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; font-size: 11px; font-weight: 800; color: #455a64; background: rgba(255,255,255,.8); border-radius: 999px; padding: 2px 9px; }
+.car-inspect { position: fixed; inset: 0; z-index: 190; display: flex; flex-direction: column; background: linear-gradient(#dfe7ec, #fff); padding: var(--sat) var(--sar) var(--sab) var(--sal); animation: fadein .2s ease-out; }
+.ci-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; background: linear-gradient(#5c9ded, #1e5fbf); color: #fff; padding: 6px 10px 6px 16px; }
+.ci-head h2 { margin: 0; font: 20px var(--display); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 2px 0 rgba(0,0,0,.3); }
+.car-inspect .ci-view { flex: 1; height: auto !important; border-radius: 0; margin: 0; background: none; }
+.car-inspect .cp-tools { top: 10px; right: 10px; }
+.car-inspect .cp-btn { width: 42px; height: 42px; font-size: 20px; }
+.car-inspect .cp-hint { bottom: 14px; font-size: 13px; padding: 4px 12px; }
+.thumb-look { position: relative; display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
+.look-badge { position: absolute; right: 4px; bottom: 4px; width: 26px; height: 26px; border-radius: 50%; background: rgba(255,255,255,.9); box-shadow: 0 1px 3px rgba(0,0,0,.25); display: grid; place-items: center; font-size: 13px; pointer-events: none; }

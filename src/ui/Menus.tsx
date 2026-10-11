@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useGame, hasRusty } from '../game/store'
 import { garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, PAINTS, STRIPES, PAINT_COST, STRIPE_COST, carDef, performance, upgradeCost, buildingDef, upgradable, loves, type BuildingDef } from '../game/data'
-import { CarPreview } from '../scene/CarPreview'
+import { CarInspect, CarPreview } from '../scene/CarPreview'
 import { CollectAllButton } from './CollectAll'
 import { rotateCurrent } from '../game/placement'
 import { BuildingThumb, CarThumb } from '../scene/BuildingPreview'
@@ -211,7 +211,9 @@ export function ShowroomPanel() {
   const rusty = useGame((s) => hasRusty(s))
   const openShop = useGame((s) => s.openShop)
   const [colorFor, setColorFor] = useState<Record<string, string>>({})
+  const [inspect, setInspect] = useState<string | null>(null)
   const { body, focus } = useShopFocus()
+  const look = inspect ? carDef(inspect) : null
   return (
     <Panel title="Showroom" wide>
       {!rusty && (
@@ -231,8 +233,11 @@ export function ShowroomPanel() {
           const pi = performance(c, { engine: 0, turbo: 0, tires: 0, weight: 0 })
           return (
             <div key={c.id} data-id={c.id} className={`card car-card ${locked ? 'locked' : ''} ${focus === c.id ? 'focus' : ''}`}>
-              <CarThumb color={color} body={c.body} />
-              <div className="card-name">{c.name}</div>
+              <button className="thumb-look" aria-label={`Take a closer look at the ${c.name}`} onClick={() => setInspect(c.id)}>
+                <CarThumb color={color} body={c.body} />
+                <span className="look-badge">🔍</span>
+              </button>
+              <div className="card-name">{c.name}{c.legendary && <> <span className="rarity rarity-legendary">Legendary</span></>}</div>
               <div className="card-stat">PI {pi} · {c.body}</div>
               <SkillTag model={c.id} />
               <LovesTag model={c.id} />
@@ -250,6 +255,7 @@ export function ShowroomPanel() {
           )
         })}
       </div>
+      {look && <CarInspect title={look.name} body={look.body} color={colorFor[look.id] ?? look.colors[0]} onClose={() => setInspect(null)} />}
     </Panel>
   )
 }
@@ -297,6 +303,7 @@ export function GaragePanel() {
   // A mod being tried on in the preview, cleared when another car is picked.
   const [trying, setTrying] = useState<{ car: string; mod: string } | null>(null)
   const tryMod = trying && trying.car === car?.uid && tab === 'mods' ? trying.mod : null
+  const [inspect, setInspect] = useState(false)
   return (
     <Panel title={`My Garage · ${cars.length} cars · ⚡${garagePower(cars)}`} wide>
       <div className="garage">
@@ -314,7 +321,14 @@ export function GaragePanel() {
         </div>
         {car && def && (
           <div className="garage-detail">
-            <CarPreview body={def.body} color={car.color} stripe={car.stripe} mods={withMod(car.mods, tryMod)} />
+            {inspect ? (
+              <>
+                <div className="car-preview" />
+                <CarInspect title={def.name} body={def.body} color={car.color} stripe={car.stripe} mods={withMod(car.mods, tryMod)} onClose={() => setInspect(false)} />
+              </>
+            ) : (
+              <CarPreview body={def.body} color={car.color} stripe={car.stripe} mods={withMod(car.mods, tryMod)} onExpand={() => setInspect(true)} />
+            )}
             <h3>{def.name}{car.plate && <span className="mini-plate">{car.plate}</span>}</h3>
             <div className="pi">Performance Index <b>{performance(def, car.upgrades, car.mods)}</b></div>
             {def.skill && <div className="skill-row"><SkillTag model={car.model} /> <small>{SKILLS[def.skill].text}</small></div>}

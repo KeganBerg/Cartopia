@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useGame, type OwnedCar } from '../game/store'
-import { MODS, MOD_SLOTS, carDef, fittedMods, modDef, ownedMods, performance, type ModDef, type ModSlot } from '../game/data'
+import { MODS, carDef, modSlotsFor, fittedMods, modDef, ownedMods, performance, type ModDef, type ModSlot } from '../game/data'
 
 // The car's mods with `tryId` swapped into its slot, for previewing before buying.
 export function withMod(mods: string[] | undefined, tryId: string | null) {
@@ -27,16 +27,18 @@ function price(m: ModDef) {
 export function ModShop({ car, trying, setTrying }: { car: OwnedCar; trying: string | null; setTrying: (id: string | null) => void }) {
   const level = useGame((s) => s.level)
   const modCar = useGame((s) => s.modCar)
-  const [slot, setSlot] = useState<ModSlot>('spoiler')
   const def = carDef(car.model)
+  const slots = modSlotsFor(def.body)
+  const [pick, setSlot] = useState<ModSlot>('spoiler')
+  const slot = slots.some((s) => s.id === pick) ? pick : slots[0].id
   const fit = fittedMods(car.mods)
   const owned = ownedMods(car)
   const basePi = performance(def, car.upgrades, car.mods)
-  const info = MOD_SLOTS.find((s) => s.id === slot)!
+  const info = slots.find((s) => s.id === slot)!
   return (
     <div className="mods">
       <div className="mod-tabs" role="tablist">
-        {MOD_SLOTS.map((s) => (
+        {slots.map((s) => (
           <button
             key={s.id}
             role="tab"

@@ -59,6 +59,7 @@ export type Net = {
   layout: RoadLayout
   nodes: Map<string, Node>
   stops: Stop[]
+  stopSigns: Set<string> // `${tile}>${heading}`: a stop sign before driving into that junction tile that way
   verge: Set<string> // open ground beside the road (no road, no building) a broken-down car can pull onto
   curves: Map<string, Curve>
 }
@@ -138,7 +139,8 @@ export function buildNet(roadList: string[], buildings: Building[], turnOf: Turn
       occ: new Map(),
     })
   }
-  const net: Net = { layout, nodes, stops: [], curves: new Map(), verge: new Set() }
+  const stopSigns = new Set(layout.clusters.flatMap((c) => c.entries.filter((e) => e.stop).map((e) => `${e.tile}>${e.heading}`)))
+  const net: Net = { layout, nodes, stops: [], curves: new Map(), stopSigns, verge: new Set() }
   const built = new Set<string>()
   for (const b of buildings) {
     const d = buildingDef(b.def)

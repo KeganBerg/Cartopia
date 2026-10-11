@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
   PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS,
-  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, type Rarity, GOALS, DAILY_BONUS, PAINTS, PAINT_COST, STRIPE_COST, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef,
+  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, type Rarity, GOALS, DAILY_BONUS, PAINTS, PAINT_COST, STRIPE_COST, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modSlotsFor, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef,
 } from './data'
 import { sfx } from '../lib/sound'
 import { msUntilNight } from './clock'
@@ -57,7 +57,7 @@ export type Mode = 'play' | 'place' | 'move' | 'road' | 'bulldoze' | 'expand'
 export type Resource = 'coins' | 'parts' | 'fuel' | 'bucks' | 'level'
 export type Need = { res: Resource; missing: number; what?: string }
 
-export type Panel = null | 'need' | 'shop' | 'garage' | 'showroom' | 'race' | 'account' | 'goals' | 'daily' | 'flat' | 'friends' | 'rescue' | 'bank' | 'invites' | 'leaders' | 'clan' | 'upgrade'
+export type Panel = null | 'need' | 'shop' | 'garage' | 'showroom' | 'race' | 'account' | 'goals' | 'daily' | 'flat' | 'friends' | 'rescue' | 'bank' | 'invites' | 'leaders' | 'clan' | 'upgrade' | 'welcome'
 
 // A read-only copy of another player's town while visiting it.
 export type VisitedTown = { ownerId: string; townName: string; level: number; trophies: number; roads: string[]; buildings: PlacedBuilding[]; cars: OwnedCar[]; land?: string[] }
@@ -142,7 +142,8 @@ type Actions = {
   rushRestore: () => void
   collectRestored: (plate: string) => void
   scrapCar: (uid: string) => void
-  collectAll: () => void
+  // force skips the once-a-minute wait (the welcome back screen uses it).
+  collectAll: (force?: boolean) => void
 }
 
 export type GameState = SaveState & UiState & Actions
@@ -259,6 +260,40 @@ export function workingDriver(s: Pick<SaveState, 'cars'>, b: PlacedBuilding): Ca
 }
 
 const bump = (s: SaveState, key: StatKey, by = 1) => ({ ...s.stats, [key]: (s.stats[key] ?? 0) + by })
+
+// What a Collect All would pay right now: finished jobs, cleared obstacles
+// and (with a Gas Station) cars out of gas. Mirrors collectAll's payouts.
+export type ReadyReport = { jobs: { def: string; n: number; coins: number }[]; coins: number; parts: number; xp: number; collected: number; cleared: number; filled: number }
+export function readyRewards(s: Pick<SaveState, 'buildings' | 'cars' | 'level'>, now: number): ReadyReport {
+  const r: ReadyReport = { jobs: [], coins: 0, parts: 0, xp: 0, collected: 0, cleared: 0, filled: 0 }
+  const byDef = new Map<string, { def: string; n: number; coins: number }>()
+  for (const b of s.buildings) {
+    const d = buildingDef(b.def)
+    if (!d.jobSeconds || b.jobEndsAt === null || now < b.jobEndsAt) continue
+    if (d.kind === 'obstacle') {
+      r.xp += d.xp ?? 0
+      r.cleared++
+      continue
+    }
+    const lvl = jobLevel(b)
+    const pay = driverPayout(d, lvl, workingDriver(s, b))
+    r.coins += pay
+    r.parts += upgradePartsPayout(d, lvl)
+    r.xp += upgradeXp(d, lvl)
+    r.collected++
+    const row = byDef.get(d.id) ?? { def: d.id, n: 0, coins: 0 }
+    row.n++
+    row.coins += pay
+    byDef.set(d.id, row)
+  }
+  if (s.buildings.some((b) => b.def === 'gas')) {
+    r.filled = s.cars.filter((c) => c.lowFuel).length
+    r.coins += r.filled * servicePay(s.level, 'gas')
+    r.xp += r.filled * 8
+  }
+  r.jobs = [...byDef.values()].sort((a, b) => b.coins - a.coins)
+  return r
+}
 
 export const hasRusty = (s: Pick<SaveState, 'buildings'>) => s.buildings.some((b) => b.def === 'rescue')
 
@@ -583,11 +618,11 @@ export const useGame = create<GameState>()(
 
       // One tap: collect every finished job and cleared obstacle, restart
       // every idle business while fuel lasts, and fill up cars out of gas.
-      collectAll: () => {
+      collectAll: (force) => {
         const s = get()
         const now = Date.now()
         const left = COLLECT_ALL_MS - (now - lastCollectAll())
-        if (left > 0) return s.toast(`Ready again in ${Math.ceil(left / 1000)}s`)
+        if (left > 0 && !force) return s.toast(`Ready again in ${Math.ceil(left / 1000)}s`)
         let coins = s.coins
         let parts = s.parts
         let fuel = s.fuel
@@ -888,6 +923,7 @@ export const useGame = create<GameState>()(
         const car = s.cars.find((c) => c.uid === cuid)
         const m = modDef(modId)
         if (!car || !m) return false
+        if (!remove && !modSlotsFor(carDef(car.model).body).some((x) => x.id === m.slot)) return false
         const others = (car.mods ?? []).filter((id) => modDef(id)?.slot !== m.slot)
         if (remove) {
           // Taken-off parts stay owned.

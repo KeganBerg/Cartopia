@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
-import { useGame } from './store'
+import { useGame, readyRewards } from './store'
 import { carDef, upgradeCost, xpToNext } from './data'
 
 describe('level-up bonuses', () => {
@@ -43,5 +43,27 @@ describe('car mods', () => {
     expect(g().modCar('m1', 'ducktail', true)).toBe(true)
     expect(g().cars[0].mods).toEqual([])
     expect(g().cars[0].ownedMods).toEqual(['ducktail', 'gtwing'])
+  })
+})
+
+describe('welcome back report', () => {
+  it('previews exactly what Collect All pays', () => {
+    const past = Date.now() - 1000
+    const later = Date.now() + 600_000
+    const b = (uid: string, def: string, jobEndsAt: number | null, level?: number) => ({ uid, def, x: 0, z: 0, jobEndsAt, level })
+    useGame.setState({
+      level: 5, xp: 0, coins: 0, parts: 0, fuel: 0, levelUp: null,
+      cars: [{ uid: 'g1', model: 'pip', color: '#fff', upgrades: { engine: 0, turbo: 0, tires: 0, weight: 0 }, lowFuel: true }],
+      buildings: [b('r', 'rescue', null), b('g', 'gas', null), b('p1', 'pizza', past), b('p2', 'pizza', past, 3), b('t', 'tires', past), b('d', 'diner', later)],
+    })
+    const r = readyRewards(useGame.getState(), Date.now())
+    expect(r.collected).toBe(3)
+    expect(r.filled).toBe(1)
+    expect(r.jobs.map((j) => [j.def, j.n])).toEqual(expect.arrayContaining([['pizza', 2], ['tires', 1]]))
+    useGame.getState().collectAll(true)
+    const s = useGame.getState()
+    expect(s.coins).toBe(r.coins)
+    expect(s.parts).toBe(r.parts)
+    expect(s.buildings.find((o) => o.uid === 'd')?.jobEndsAt).toBe(later)
   })
 })
