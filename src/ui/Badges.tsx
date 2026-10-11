@@ -69,6 +69,7 @@ function MergeBadges() {
   const buildings = useGame((s) => s.buildings)
   const merge = useGame((s) => s.mergeBlock)
   const split = useGame((s) => s.splitBlock)
+  const rotate = useGame((s) => s.rotateBlock)
   const { merges, candidates } = useMemo(() => {
     const merges = mergeGroups(buildings)
     return { merges, candidates: mergeCandidates(buildings, merges) }
@@ -89,7 +90,10 @@ function MergeBadges() {
       ))}
       {[...merges.groups.values()].map((g) => (
         <div key={`s:${g.anchor.uid}`} className="anchor" ref={pin(`s:${g.anchor.uid}`, g, 0.6 * lift(g))}>
-          <button className="badge badge-split" onClick={() => split(g.anchor.uid)} title="Split it back up">✂️ Split</button>
+          <span className="merge-tools">
+            <button className="badge badge-split" onClick={() => rotate(g.anchor.uid)} title="Turn it">🔄</button>
+            <button className="badge badge-split" onClick={() => split(g.anchor.uid)} title="Split it back up">✂️ Split</button>
+          </span>
         </div>
       ))}
     </>

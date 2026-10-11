@@ -8,7 +8,7 @@ import { useGame, canPlace, buyablePlots, lotSize, movable, type PlacedBuilding 
 import { TILE, PLOT, PLOT_MIN, PLOT_MAX, START_LAND, buildingDef, buildingLevel } from '../game/data'
 import { BuildingModel } from './BuildingModel'
 import { rotateCurrent, setGhostTurn, turnOf } from '../game/placement'
-import { mergeGroups, groupTurn, groupScale, type MergeGroup } from '../game/merge'
+import { mergeGroups, groupOf, groupTurn, groupScale, type MergeGroup } from '../game/merge'
 import { MergeScale } from './mergeScale'
 import { sfx } from '../lib/sound'
 import { Clouds } from './Clouds'
@@ -192,7 +192,8 @@ function Building({ b, roads, group }: { b: PlacedBuilding; roads: Set<string>; 
         if (s.mode !== 'move') return
         e.stopPropagation()
         if (!movable(b.def)) return s.toast(`Tap the ${d.name.toLowerCase()} in play mode to clear it`)
-        if (group) return s.toast(`Split the merged ${d.name} first to move it (Merge tool)`)
+        // A merged block can be picked to turn it, but only moves once split.
+        if (group) return s.select(b.uid)
         startDrag(b, groundTile(e), e.pointerId)
       }}
       onClick={(e) => {
@@ -438,6 +439,7 @@ function Interaction() {
   const buildings = useGame((s) => s.buildings)
   const land = useGame((s) => s.land)
   const roadSet = useMemo(() => new Set(roads), [roads])
+  const pickedBlock = useMemo(() => (mode === 'move' && selected ? groupOf(buildings, selected) : undefined), [mode, selected, buildings])
 
   // R turns the building being placed or moved on desktop.
   useEffect(() => {
@@ -479,6 +481,7 @@ function Interaction() {
       const b = buildings.find((o) => o.uid === selected)
       const t = tileOf(e)
       const [w, h] = b ? lotSize(b.def, b.rot) : [0, 0]
+      if (pickedBlock) return
       if (b && t[0] >= b.x && t[0] < b.x + w && t[1] >= b.z && t[1] < b.z + h) startDrag(b, t, e.pointerId)
       return
     }
@@ -536,6 +539,15 @@ function Interaction() {
           <BuildingModel def={d} ghost valid={valid} />
         </group>
       </group>
+    )
+  } else if (pickedBlock) {
+    // A picked merged block: highlight its whole footprint.
+    const [cx, cz] = groupCenter(pickedBlock)
+    ghost = (
+      <mesh rotation-x={-Math.PI / 2} position={[cx, 0.05, cz]}>
+        <planeGeometry args={[pickedBlock.w * TILE, pickedBlock.h * TILE]} />
+        <meshBasicMaterial color="#ffd54f" transparent opacity={0.45} />
+      </mesh>
     )
   } else if (mode === 'move' && selected) {
     const b = buildings.find((o) => o.uid === selected)

@@ -1,4 +1,4 @@
-import { mergeCandidates } from '../game/merge'
+import { groupOf, mergeCandidates } from '../game/merge'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGame, hasRusty, buildPrice } from '../game/store'
 import { reducedMotion } from '../game/fx'
@@ -61,6 +61,7 @@ function EditBar() {
     const b = s.selected ? s.buildings.find((o) => o.uid === s.selected) : undefined
     return !!b && upgradable(buildingDef(b.def))
   })
+  const pickedMerged = useGame((s) => !!s.selected && !!groupOf(s.buildings, s.selected))
   const canMerge = useGame((s) => (s.mode === 'merge' ? mergeCandidates(s.buildings).length > 0 || s.buildings.some((b) => b.merge) : true))
   const hint =
     mode === 'expand' ? 'Tap a For Sale sign to buy land'
@@ -68,7 +69,7 @@ function EditBar() {
     : mode === 'road' ? 'Drag to lay road · $10 a tile'
     : mode === 'bulldoze' ? 'Drag to remove · buildings refund half'
     : mode === 'move' && again && selected ? 'Built! Drag or rotate it'
-    : mode === 'move' ? (selected ? 'Drag to move, or rotate it' : 'Drag a building, or tap one to pick it')
+    : mode === 'move' ? (selected ? (pickedMerged ? 'Rotate turns the whole block. Split it to move it' : 'Drag to move, or rotate it') : 'Drag a building, or tap one to pick it')
     : `${TOUCH ? 'Tap to preview, tap again to build' : 'Click to place'} ${placing ? BUILDINGS.find((b) => b.id === placing)?.name : ''}`
   return (
     <div className="edit-bar">
