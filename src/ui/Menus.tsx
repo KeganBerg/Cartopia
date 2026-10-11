@@ -346,7 +346,7 @@ function DriverRow({ car, model }: { car: string; model: string }) {
       </button>
     )
   }
-  return <div className="driver-row idle"><LovesTag model={model} /><small>Tap a busy business to put this car to work there.</small></div>
+  return <LovesTag model={model} />
 }
 
 // A car's mod skins with one slot changed (null takes that slot's skin off).
@@ -382,6 +382,9 @@ export function GaragePanel() {
   const [trying, setTrying] = useState<{ car: string; mod: string } | null>(null)
   const tryMod = trying && trying.car === car?.uid && tab === 'mods' ? trying.mod : null
   const [inspect, setInspect] = useState(false)
+  const [picking, setPicking] = useState(false)
+  const idx = Math.max(0, cars.findIndex((c) => c.uid === car?.uid))
+  const step = (d: number) => select(cars[(idx + d + cars.length) % cars.length].uid)
   // A paint job being tried on, cleared when another car is picked.
   const [painting, setPainting] = useState<{ car: string; job: PaintJob } | null>(null)
   const tryJob = painting && painting.car === car?.uid && tab === 'paint' ? painting.job : null
@@ -410,12 +413,12 @@ export function GaragePanel() {
   }, [car?.uid, pi])
   return (
     <Panel title={`My Garage · ${cars.length} cars · ⚡${garagePower(cars)}`} wide>
-      <div className="garage">
+      <div className={picking ? 'garage picking' : 'garage'}>
         <div className="garage-list">
           {cars.map((c) => {
             const d = carDef(c.model)
             return (
-              <button key={c.uid} className={c.uid === car?.uid ? 'garage-item sel' : 'garage-item'} onClick={() => select(c.uid)}>
+              <button key={c.uid} className={c.uid === car?.uid ? 'garage-item sel' : 'garage-item'} onClick={() => { select(c.uid); setPicking(false) }}>
                 <CarThumb size="sm" color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} body={d.body} model={d.id} stripe={c.stripe} mods={c.mods} />
                 <span>{d.name}{c.plate && <span className="mini-plate">{c.plate}</span>}</span>
                 <small>PI {performance(d, c.upgrades, c.mods)}</small>
@@ -425,6 +428,14 @@ export function GaragePanel() {
         </div>
         {car && def && (
           <div className="garage-detail" onClickCapture={() => { tapped.current = Date.now() }}>
+            {/* Phones: step through cars here, or open the grid of all of them. */}
+            <div className="car-switch">
+              <button aria-label="Previous car" onClick={() => step(-1)} disabled={cars.length < 2}>‹</button>
+              <button className="car-switch-name" onClick={() => setPicking((p) => !p)} aria-expanded={picking}>
+                <b>{def.name}</b><small>{idx + 1}/{cars.length} {picking ? '▴' : '▾'}</small>
+              </button>
+              <button aria-label="Next car" onClick={() => step(1)} disabled={cars.length < 2}>›</button>
+            </div>
             {inspect ? (
               <>
                 <div className="car-preview" />
@@ -438,10 +449,13 @@ export function GaragePanel() {
                 {tab === 'paint' && <div className="paint-sweep" key={`${look!.color}|${look!.finish}|${look!.stripe}|${look!.skin ?? ''}`} aria-hidden />}
               </div>
             )}
-            <h3>{def.name}{car.plate && <span className="mini-plate">{car.plate}</span>}</h3>
-            <div className="pi">Performance Index <b>{performance(def, car.upgrades, car.mods)}</b> <ShowcaseToggle car={car.uid} /></div>
-            {def.skill && <div className="skill-row"><SkillTag model={car.model} /> <small>{SKILLS[def.skill].text}</small></div>}
-            <DriverRow car={car.uid} model={car.model} />
+            <h3 className="garage-name">{def.name}{car.plate && <span className="mini-plate">{car.plate}</span>}</h3>
+            <div className="car-tags">
+              <span className="pi-badge">PI <b>{pi}</b></span>
+              <SkillTag model={car.model} />
+              <DriverRow car={car.uid} model={car.model} />
+              <ShowcaseToggle car={car.uid} />
+            </div>
             <div className="garage-tabs" role="tablist">
               {([['tune', '🔧 Upgrades'], ['mods', '🪽 Mods'], ['paint', '🎨 Paint']] as const).map(([id, label]) => (
                 <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'sel' : ''} onClick={() => setTab(id)}>{label}</button>

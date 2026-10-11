@@ -13,7 +13,7 @@ export function skinSource(d: SkinDef) {
 
 type Trying = string | null | undefined
 
-// A row of skin chips with a try-on bar: tapping one tries it on in the preview
+// A wrapping grid of skin chips with a try-on bar: tapping one tries it on in the preview
 // (undefined: not trying; null: trying none). Owned skins go on free, gem skins are
 // bought from the bar. Shared by body skins and mod skins.
 function SkinChooser({ title, defs, owned, now, trying, setTrying, apply }: {
@@ -33,7 +33,6 @@ function SkinChooser({ title, defs, owned, now, trying, setTrying, apply }: {
         <button className={`skin-opt${pick === null ? ' sel' : ''}`} onClick={() => setTrying(now === null ? undefined : null)}>
           <i className="skin-chip none">∅</i>
           <b>None</b>
-          <small>{now === null ? 'On' : 'Plain'}</small>
         </button>
         {defs.map((s) => {
           const has = owned.includes(s.id)
@@ -46,8 +45,8 @@ function SkinChooser({ title, defs, owned, now, trying, setTrying, apply }: {
               onClick={() => setTrying(s.id === now ? undefined : s.id)}
             >
               <i className="skin-chip" style={{ background: s.swatch }} />
+              {!has && <span className="skin-lock">🔒</span>}
               <b>{s.name}</b>
-              <small>{now === s.id ? 'On' : has ? SKIN_TIERS[s.tier].name : skinSource(s)}</small>
             </button>
           )
         })}
@@ -79,7 +78,7 @@ export function SkinPicker({ car, trying, setTrying }: { car: OwnedCar; trying: 
   const skinCar = useGame((s) => s.skinCar)
   const owned = ownedSkins({ level, claimedSets, skins })
   return (
-    <SkinChooser title={<>Skins <small>{owned.length}/{SKINS.length} unlocked · free on any car</small></>} defs={SKINS} owned={owned}
+    <SkinChooser title={<>Skins <small>{owned.length}/{SKINS.length}</small></>} defs={SKINS} owned={owned}
       now={car.skin ?? null} trying={trying} setTrying={setTrying} apply={(id) => skinCar(car.uid, id)} />
   )
 }
@@ -92,7 +91,7 @@ export function ModSkinPicker({ car, slot, trying, setTrying }: { car: OwnedCar;
   const skinMod = useGame((s) => s.skinMod)
   const owned = ownedModSkins({ level, claimedSets, modSkins })
   return (
-    <SkinChooser title={<>Mod skin <small>{owned.length}/{MOD_SKINS.length} unlocked · mix and match per part</small></>} defs={MOD_SKINS} owned={owned}
+    <SkinChooser title={<>Mod skin <small>{owned.length}/{MOD_SKINS.length}</small></>} defs={MOD_SKINS} owned={owned}
       now={car.modSkin?.[slot] ?? null} trying={trying} setTrying={setTrying} apply={(id) => skinMod(car.uid, slot, id)} />
   )
 }
