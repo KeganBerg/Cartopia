@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import {
-  useGame, activeGoals, goalDone, statValue, today, claimable, taskDef, taskText, taskProgress, periodSlots, periodDone, chestOpened,
+  useGame, activeGoals, eventGoals, goalOpen, goalDone, statValue, today, claimable, taskDef, taskText, taskProgress, periodSlots, periodDone, chestOpened,
   type Period, type GameState,
 } from '../game/store'
 import {
   DAILY_BONUS, GOALS, QUEST_PAY, TASKS_PER_PERIOD, payAt, msToNextDay, msToNextWeek, buildingDef, buildingLevel, upgradable, MAX_BUILDING_LEVEL,
-  carDef, takesDriver, plotPrice, START_LAND, type StatKey, type GoalDef, flatFixCost, servicePay, gasCanCost,
+  carDef, takesDriver, activeEvent, eventEndsAt, plotPrice, START_LAND, type StatKey, type GoalDef, flatFixCost, servicePay, gasCanCost,
 } from '../game/data'
 import { Panel, SheetTabs, openGarageTab } from './Menus'
 import { openRaceTab } from './Race'
@@ -33,6 +33,8 @@ function goTo(stat: StatKey, def?: string): void {
       if (s.coins < price) return s.showNeed('coins', price - s.coins, "Rusty's Rescue")
       return s.openShop('rescue')
     }
+    case 'spooky':
+      return s.openShop('pumpkins')
     case 'owns': {
       const d = buildingDef(def ?? '')
       if (s.coins < d.price) return s.showNeed('coins', d.price - s.coins, d.name)
@@ -201,19 +203,51 @@ function Tasks({ period }: { period: Period }) {
   )
 }
 
-type GoalsTab = 'story' | Period
+// Limited-time goals for the running event, with a countdown to its end.
+function EventGoals() {
+  const s = useGame()
+  const now = useNow()
+  const e = activeEvent(now)
+  if (!e) return <p className="hint">No event is running right now.</p>
+  const goals = eventGoals(now)
+  return (
+    <>
+      <div className="goal-head event">
+        <span>{e.icon} {e.name} ends in {left(eventEndsAt(e, now) - now)}</span>
+      </div>
+      <div className="goals">
+        {goals.map((g: GoalDef) => {
+          const claimed = s.claimedGoals.includes(g.id)
+          const locked = s.level < (g.level ?? 1)
+          return (
+            <Row key={g.id} icon={g.icon} text={locked ? `${g.text} (level ${g.level})` : g.text} have={statValue(s, g.stat, g.def)} target={g.target}
+              done={!locked && goalDone(s, g)} claimed={claimed}
+              onGo={() => goTo(g.stat, g.def)} onClaim={() => s.claimGoal(g.id)}>
+              <Reward coins={g.coins} xp={g.xp} bucks={g.bucks} />
+            </Row>
+          )
+        })}
+      </div>
+    </>
+  )
+}
+
+type GoalsTab = 'story' | 'event' | Period
 let lastGoalsTab: GoalsTab | null = null
 
 export function GoalsPanel() {
   const s = useGame()
   // Opens on the first tab with something to collect, else where it was left.
+  const ev = activeEvent()
+  const eventDot = eventGoals().filter((g) => goalOpen(s, g) && goalDone(s, g)).length
   const [tab, setTabState] = useState<GoalsTab>(() => {
     const has = (p: Period) => periodSlots(s.quests, p).some((t) => !periodDone(s.quests, p).includes(t.id) && taskProgress(s, p, t) >= t.n)
       || (periodDone(s.quests, p).length >= TASKS_PER_PERIOD && !chestOpened(s.quests, p))
     if (activeGoals(s).some((g) => goalDone(s, g))) return 'story'
+    if (eventDot) return 'event'
     if (has('daily')) return 'daily'
     if (has('weekly')) return 'weekly'
-    return lastGoalsTab ?? 'story'
+    return lastGoalsTab === 'event' && !ev ? 'story' : lastGoalsTab ?? 'story'
   })
   const setTab = (t: GoalsTab) => { lastGoalsTab = t; setTabState(t) }
   const dot = (p: Period) => {
@@ -228,8 +262,9 @@ export function GoalsPanel() {
         { id: 'story', label: <>📋 Goals{storyDot ? <span className="tab-dot">{storyDot}</span> : null}</> },
         { id: 'daily', label: <>☀️ Daily{dot('daily')}</> },
         { id: 'weekly', label: <>📅 Weekly{dot('weekly')}</> },
-      ] as const} />
-      {tab === 'story' ? <StoryGoals /> : <Tasks key={tab} period={tab} />}
+        ...(ev ? [{ id: 'event' as const, label: <>{ev.icon} Event{eventDot ? <span className="tab-dot">{eventDot}</span> : null}</> }] : []),
+      ]} />
+      {tab === 'story' ? <StoryGoals /> : tab === 'event' ? <EventGoals /> : <Tasks key={tab} period={tab} />}
     </Panel>
   )
 }

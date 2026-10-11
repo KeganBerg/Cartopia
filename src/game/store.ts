@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
   PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS,
-  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, DAILY_BONUS, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modSlotsFor, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower,
+  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, activeEvent, DAILY_BONUS, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modSlotsFor, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower,
 } from './data'
 import { sfx } from '../lib/sound'
 import { msUntilNight } from './clock'
@@ -344,13 +344,21 @@ type StatSource = Pick<SaveState, 'stats' | 'buildings' | 'level' | 'cars' | 'la
 
 // Story goals showing now: the first three unclaimed ones the player's level allows.
 export function activeGoals(s: Pick<SaveState, 'claimedGoals' | 'level'>) {
-  return GOALS.filter((g) => !s.claimedGoals.includes(g.id) && s.level >= (g.level ?? 1)).slice(0, 3)
+  return GOALS.filter((g) => !g.event && !s.claimedGoals.includes(g.id) && s.level >= (g.level ?? 1)).slice(0, 3)
 }
+// The running event's goals, claimed ones included (shown ticked).
+export function eventGoals(now = Date.now()) {
+  const e = activeEvent(now)
+  return e ? GOALS.filter((g) => g.event === e.id) : []
+}
+export const goalOpen = (s: Pick<SaveState, 'claimedGoals' | 'level'>, g: GoalDef) =>
+  !s.claimedGoals.includes(g.id) && s.level >= (g.level ?? 1) && (g.event ? activeEvent()?.id === g.event : true)
 export function statValue(s: StatSource, key: StatKey, def?: string): number {
   switch (key) {
     // Rusty's Rescue counts from the buildings so older towns that already have one get credit.
     case 'rusty': return s.buildings.some((b) => b.def === 'rescue') ? 1 : 0
     case 'owns': return s.buildings.some((b) => b.def === def) ? 1 : 0
+    case 'spooky': return s.buildings.filter((b) => buildingDef(b.def).event === 'spooky').length
     case 'level': return s.level
     case 'carsOwned': return s.cars.length
     case 'drivers': return s.buildings.filter((b) => b.car && s.cars.some((c) => c.uid === b.car)).length
@@ -397,7 +405,7 @@ export function rolledQuests(s: Pick<SaveState, 'quests' | 'stats' | 'level' | '
 
 // Everything ready to collect: finished story goals, tasks and chests.
 export function claimable(s: GameState) {
-  const goals = activeGoals(s).filter((g) => goalDone(s, g)).length
+  const goals = [...activeGoals(s), ...eventGoals()].filter((g) => goalOpen(s, g) && goalDone(s, g)).length
   let tasks = 0
   for (const p of ['daily', 'weekly'] as const) {
     const done = periodDone(s.quests, p)
@@ -571,6 +579,10 @@ export const useGame = create<GameState>()(
         const d = buildingDef(def)
         if (!canPlace(s, def, x, z, rot)) {
           sfx.error()
+          return false
+        }
+        if (d.event && activeEvent()?.id !== d.event) {
+          s.toast(`The ${d.name} comes back next event`)
           return false
         }
         if (d.unique && s.buildings.some((o) => o.def === def)) {
@@ -962,7 +974,7 @@ export const useGame = create<GameState>()(
       claimGoal: (id) => {
         const s = get()
         const g = GOALS.find((o) => o.id === id)
-        if (!g || s.claimedGoals.includes(id) || !goalDone(s, g) || s.level < (g.level ?? 1)) return
+        if (!g || !goalOpen(s, g) || !goalDone(s, g)) return
         sfx.coin()
         s.toast(`Goal complete! +${g.coins} coins${g.bucks ? `, +${g.bucks} bucks` : ''}, +${g.xp} XP`)
         set(withXp(s, g.xp, {
