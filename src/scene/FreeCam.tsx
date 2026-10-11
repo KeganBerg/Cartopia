@@ -103,11 +103,13 @@ function Rig() {
       c.lookAt(VIEW)
     }
     // Keyboard flying (PC): WASD or arrows glide over the ground the way the camera
-    // faces, Space rises and Shift sinks. Faster the further out the camera is.
+    // faces, Space rises and Shift sinks, Ctrl goes three times as fast. Faster the
+    // further out the camera is.
     const k = keys.current
     if (k.size) {
       const dt = Math.min(delta, 0.1)
-      const speed = (12 + c.position.distanceTo(VIEW) * 0.9) * dt
+      const boost = k.has('ControlLeft') || k.has('ControlRight') ? 3 : 1
+      const speed = (12 + c.position.distanceTo(VIEW) * 0.9) * dt * boost
       c.getWorldDirection(fwdV).setY(0).normalize()
       rightV.crossVectors(fwdV, UP)
       move.set(0, 0, 0)
@@ -138,7 +140,7 @@ function Rig() {
 
 
 // Keys held down for flying, ignored while typing (chat, names) or with a panel open.
-const FLY_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'ShiftLeft', 'ShiftRight'])
+const FLY_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight'])
 function useKeys() {
   const keys = useRef(new Set<string>())
   useEffect(() => {
@@ -148,13 +150,22 @@ function useKeys() {
       return !!t && (t.isContentEditable || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')
     }
     const down = (e: KeyboardEvent) => {
-      if (!FLY_KEYS.has(e.code) || typing(e) || e.ctrlKey || e.metaKey || e.altKey || useGame.getState().panel) return
+      if (!FLY_KEYS.has(e.code) || typing(e) || e.metaKey || e.altKey || useGame.getState().panel) return
       held.add(e.code)
-      // Space would otherwise press whichever button has focus, or scroll.
-      if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault()
+      // Space would otherwise press whichever button has focus, or scroll; Ctrl+S, Ctrl+D
+      // and Ctrl+A would save, bookmark or select the page.
+      if (e.code === 'Space' || e.code.startsWith('Arrow') || e.ctrlKey) e.preventDefault()
     }
     const up = (e: KeyboardEvent) => held.delete(e.code)
     const clear = () => held.clear()
+    // Ctrl+W closes the tab before the page ever sees it, so while Ctrl is held for
+    // a speed boost the browser asks before leaving instead.
+    const leaving = (e: BeforeUnloadEvent) => {
+      if (!held.has('ControlLeft') && !held.has('ControlRight')) return
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', leaving)
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
     window.addEventListener('blur', clear)
@@ -164,6 +175,7 @@ function useKeys() {
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
       window.removeEventListener('blur', clear)
+      window.removeEventListener('beforeunload', leaving)
       unsub()
     }
   }, [])

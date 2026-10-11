@@ -69,7 +69,7 @@ function toggleFreeCam(on: boolean) {
   } catch {
     // No storage: show it every time.
   }
-  useGame.getState().toast(TOUCH ? 'Pinch to zoom · two fingers to turn and tilt' : 'WASD to fly · Space up, Shift down · right-drag to turn')
+  useGame.getState().toast(TOUCH ? 'Pinch to zoom · two fingers to turn and tilt' : 'WASD to fly · Space up, Shift down · Ctrl for speed')
 }
 
 // Switches the town between the bird's-eye view and the free camera.
