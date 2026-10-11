@@ -5,6 +5,7 @@ import ReactThreeTestRenderer from '@react-three/test-renderer'
 import { Box3, BoxGeometry, CircleGeometry, CylinderGeometry, Matrix3, Mesh, Object3D, PlaneGeometry, Vector3, type Material } from 'three'
 import { BUILDINGS, TILE } from '../game/data'
 import { BuildingModel } from './BuildingModel'
+import { VanguardTower } from './Landmark'
 import { LAYER } from './layers'
 
 // No flicker (Z-fighting): two flat faces that face the same way, overlap and
@@ -130,8 +131,8 @@ function fights(all: Face[], solids: Map<Object3D, Box3>) {
   return bad
 }
 
-async function scan(def: (typeof BUILDINGS)[number], level: number) {
-  const r = await ReactThreeTestRenderer.create(<BuildingModel def={def} level={level} />)
+async function scan(def: (typeof BUILDINGS)[number], level: number, model = <BuildingModel def={def} level={level} />, lot = [def.w, def.h]) {
+  const r = await ReactThreeTestRenderer.create(model)
   await ReactThreeTestRenderer.act(async () => r.advanceFrames(2, 1 / 60))
   const scene = r.scene.instance as Object3D
   scene.updateMatrixWorld(true)
@@ -146,7 +147,7 @@ async function scan(def: (typeof BUILDINGS)[number], level: number) {
   })
   // The lot paving the town lays under every building (World.tsx).
   if (def.kind !== 'decor' && def.kind !== 'obstacle') {
-    const hw = (def.w * TILE - 0.1) / 2, hd = (def.h * TILE - 0.1) / 2
+    const hw = (lot[0] * TILE - 0.1) / 2, hd = (lot[1] * TILE - 0.1) / 2
     list.push({ axis: 1, sign: 1, at: LAYER.lot, lo: [-hw, -hd], hi: [hw, hd], who: 'lot paving', off: false, mesh: null, look: 'lot', glass: false })
   }
   const bad = fights(list, solids)
@@ -162,4 +163,11 @@ describe('no flickering flat faces', () => {
       expect([...bad]).toEqual([])
     })
   }
+})
+
+// The landmark four max-level houses merge into, on its 2x2 lot.
+describe('no flickering flat faces on landmarks', () => {
+  it('vanguard tower', async () => {
+    expect(await scan(BUILDINGS.find((d) => d.id === 'house')!, 10, <VanguardTower />, [2, 2])).toEqual([])
+  })
 })

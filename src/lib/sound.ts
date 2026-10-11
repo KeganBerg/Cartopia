@@ -2,7 +2,7 @@
 // Everything audible shares one AudioContext and goes through one master
 // output, so the Sound toggle silences it all. Other audio (the town ambience,
 // race engines) gets both from audioContext() and audioOut().
-import { choir, glock, hz, marimba, pluck, softKick, vibes, woodblock } from './instruments'
+import { choir, glock, hz, marimba, pluck, shaker, softKick, vibes, woodblock } from './instruments'
 
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
@@ -177,6 +177,32 @@ export const sfx = {
     pluck(d, t + 0.44, hz('C3'), 0.12)
   }),
   lose: () => play(arp(['A3', 'F3', 'D3'], 0.2, pluck, 0.3)),
+  // A flying car's engine catching then cutting: a soft thump with a puff of exhaust.
+  putt: () => play((d, t) => {
+    softKick(d, t, 0.16)
+    shaker(d, t + 0.01, 0.03, 0.12, 900)
+  }),
+  // Hover jets lighting up: a low rush of air that swells and fades.
+  jet: () => play((d, t) => {
+    const len = 1.4
+    const buf = d.ctx.createBuffer(1, Math.floor(d.ctx.sampleRate * len), d.ctx.sampleRate)
+    const data = buf.getChannelData(0)
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1
+    const src = d.ctx.createBufferSource()
+    src.buffer = buf
+    const lp = d.ctx.createBiquadFilter()
+    lp.type = 'lowpass'
+    lp.frequency.setValueAtTime(300, t)
+    lp.frequency.exponentialRampToValueAtTime(1400, t + 0.5)
+    lp.frequency.exponentialRampToValueAtTime(500, t + len)
+    const g = d.ctx.createGain()
+    g.gain.setValueAtTime(0.0001, t)
+    g.gain.exponentialRampToValueAtTime(0.12, t + 0.25)
+    g.gain.exponentialRampToValueAtTime(0.0001, t + len)
+    src.connect(lp).connect(g).connect(d.out)
+    src.start(t)
+    src.stop(t + len)
+  }),
   // Boost: a rising rush of filtered noise.
   boost: () => play((d, t) => {
     const len = 0.7
