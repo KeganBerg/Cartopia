@@ -7,7 +7,7 @@ import {
   buildingUpgradeCost, MAX_BUILDING_LEVEL, houseResidents, levelName, buildingUpgradeXp, BUILDINGS, CARS, takesDriver, loves, driverPayout, carDef, type BuildingDef,
 } from '../game/data'
 import { workingDriver, type PlacedBuilding } from '../game/store'
-import { groupOf, mergeGroups } from '../game/merge'
+import { groupOf, isLandmark, LANDMARK_NAME, mergeGroups } from '../game/merge'
 import { CarThumb } from '../scene/BuildingPreview'
 import { BuildingModel } from '../scene/BuildingModel'
 import { frame, seat } from '../scene/fit'
@@ -183,7 +183,8 @@ export function UpgradePanel() {
     rows.push({ label: 'Residents', now: `${houseResidents(lvl) * k}`, next: `${houseResidents(next) * k}` })
     rows.push({ label: 'Upgrade XP', now: '', next: `+${buildingUpgradeXp(lvl) * k}` })
   }
-  const name = levelName(d, lvl) + (k > 1 ? ` ×${k}` : '')
+  const block = groupOf(s.buildings, b.uid)
+  const name = block && isLandmark(block) ? LANDMARK_NAME : levelName(d, lvl) + (k > 1 ? ` ×${k}` : '')
 
   return (
     <Panel title={`${name} · Level ${lvl}`} onClose={close}>
