@@ -1,5 +1,6 @@
 import { useGame, canPlace, lotSize, type PlacedBuilding } from './store'
 import { buildingDef } from './data'
+import { groupOf } from './merge'
 
 // The turn the placement ghost currently shows, so Rotate turns from what the player sees.
 let ghostTurn = 0
@@ -50,6 +51,8 @@ export function rotateSelected() {
   const s = useGame.getState()
   const b = s.buildings.find((o) => o.uid === s.selected)
   if (s.mode !== 'move' || !b) return
+  // A merged block turns as one building.
+  if (groupOf(s.buildings, b.uid)) return void s.rotateBlock(b.uid)
   const from = turnOf(b, new Set(s.roads))
   const to = (from + 1) % 4
   const [w, h] = lotSize(b.def, from)

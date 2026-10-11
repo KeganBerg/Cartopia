@@ -1623,3 +1623,4 @@ button.book-car { font: inherit; color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   .overlay:has(> .panel), .overlay > .panel, .overlay.closing, .overlay.closing > .panel, .paint-sweep::before, .chest.ready .chest-icon { animation: none; }
 }
+.merge-tools { display: inline-flex; gap: 6px; }

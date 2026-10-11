@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
-import { mergeGroups, mergeCandidates, applyMerge, applySplit, groupTurn, groupScale } from './merge'
+import { mergeGroups, mergeCandidates, applyMerge, applySplit, groupTurn, groupScale, rotateGroup } from './merge'
 import { useGame, type PlacedBuilding } from './store'
 import { buildingDef, buildingUpgradeCost, upgradePayout } from './data'
 
@@ -147,5 +147,65 @@ describe('merged buildings in the store', () => {
     expect(g().buildings).toHaveLength(4)
     g().splitBlock(town[3].uid)
     expect(g().buildings.some((o) => o.merge)).toBe(false)
+  })
+})
+
+describe('turning merged blocks', () => {
+  const all = () => true
+  const one = (town: PlacedBuilding[]) => [...mergeGroups(town).groups.values()][0]
+
+  it('turns a square block of square lots in place, all the way round', () => {
+    const blk = square('pizza', 2, 2, 2)
+    let town = applyMerge(blk, mergeCandidates(blk)[0])
+    const start = town.map((o) => [o.x, o.z])
+    for (let t = 1; t <= 4; t++) {
+      const g = one(town)
+      town = rotateGroup(town, g, groupTurn(g, new Set()), all)!
+      expect(groupTurn(one(town), new Set())).toBe(t % 4)
+    }
+    expect(town.map((o) => [o.x, o.z])).toEqual(start)
+  })
+
+  it('turns a pair from along x to along z and back, keeping each building', () => {
+    const pair = [b('pizza', 5, 5, { jobEndsAt: 123, car: 'c1' }), b('pizza', 6, 5)]
+    let town = applyMerge(pair, mergeCandidates(pair)[0])
+    let g = one(town)
+    town = rotateGroup(town, g, groupTurn(g, new Set()), all)!
+    g = one(town)
+    expect(g).toMatchObject({ code: 12, w: 1, h: 2 })
+    expect(groupTurn(g, new Set())).toBe(1)
+    expect(town.find((o) => o.car === 'c1')).toMatchObject({ jobEndsAt: 123 })
+    // Round trip lands where it began.
+    for (let i = 0; i < 3; i++) town = rotateGroup(town, one(town), groupTurn(one(town), new Set()), all)!
+    expect(one(town)).toMatchObject({ code: 21, x: 5, z: 5 })
+  })
+
+  it('swaps width and depth for wide lots and still validates', () => {
+    const blk = square('diner', 0, 0, 2)
+    let town = applyMerge(blk, mergeCandidates(blk)[0])
+    town = rotateGroup(town, one(town), groupTurn(one(town), new Set()), all)!
+    const g = one(town)
+    expect(g).toMatchObject({ code: 2, w: 2, h: 4 })
+    expect(town.every((o) => o.rot === 1)).toBe(true)
+  })
+
+  it('refuses when the turned block would not fit', () => {
+    const pair = [b('pizza', 5, 5), b('pizza', 6, 5)]
+    const town = applyMerge(pair, mergeCandidates(pair)[0])
+    const g = one(town)
+    expect(rotateGroup(town, g, 0, (x, z) => z === 5)).toBeNull()
+  })
+})
+
+describe('turning a merged block in the store', () => {
+  it('turns it in place on owned land and keeps it merged after a reload', () => {
+    const pair = [b('pizza', 5, 5), b('pizza', 6, 5)]
+    useGame.setState({ buildings: applyMerge(pair, mergeCandidates(pair)[0]), roads: [], visiting: null })
+    expect(useGame.getState().rotateBlock(pair[1].uid)).toBe(true)
+    const saved = JSON.parse(JSON.stringify(useGame.getState().buildings)) as PlacedBuilding[]
+    expect([...mergeGroups(saved).groups.values()][0]).toMatchObject({ code: 12 })
+    // Blocked by a house where the turned pair would go.
+    useGame.setState({ buildings: [...applyMerge(pair, mergeCandidates(pair)[0]), b('house', 5, 6), b('house', 6, 6), b('house', 5, 4), b('house', 6, 4)] })
+    expect(useGame.getState().rotateBlock(pair[0].uid)).toBe(false)
   })
 })

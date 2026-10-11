@@ -137,7 +137,7 @@ export function mergeCandidates(buildings: PlacedBuilding[], merges = mergeGroup
 // Saves with the block merged (anchor flagged, the rest cleared).
 export function applyMerge(buildings: PlacedBuilding[], c: MergeGroup): PlacedBuilding[] {
   const ids = new Set(c.members.map((o) => o.uid))
-  return buildings.map((b) => (b.uid === c.anchor.uid ? { ...b, merge: c.code } : ids.has(b.uid) ? unflag(b) : b))
+  return buildings.map((b) => (b.uid === c.anchor.uid ? { ...unflag(b), merge: c.code } : ids.has(b.uid) ? unflag(b) : b))
 }
 
 // Saves with the block split one step: a 4x4 back into four 2x2s, a 2x2 or a pair back into loose buildings.
@@ -152,12 +152,55 @@ export function applySplit(buildings: PlacedBuilding[], g: MergeGroup): PlacedBu
 }
 
 function unflag(b: PlacedBuilding): PlacedBuilding {
-  if (b.merge == null) return b
-  const { merge: _, ...rest } = b
+  if (b.merge == null && b.mturn == null) return b
+  const { merge: _, mturn: __, ...rest } = b
   return rest
 }
 
-// Which way the big building faces: towards a road along the block's edge.
+// Saves with the block turned a quarter clockwise in place, or null when the
+// turned block doesn't fit. A square block of square lots only changes which
+// way it faces. Anything else swaps its width and depth: the buildings are laid
+// out again across the new footprint (centred on the old one, as a single
+// building turns), each keeping its own job, level and driver.
+// `free` says whether a tile can take part of the turned block.
+export function rotateGroup(buildings: PlacedBuilding[], g: MergeGroup, turn: number, free: (x: number, z: number) => boolean): PlacedBuilding[] | null {
+  const d = buildingDef(g.anchor.def)
+  const to = (turn + 1) % 4
+  const square = d.w === d.h
+  if (square && g.cols === g.rows) return buildings.map((b) => (b.uid === g.anchor.uid ? { ...b, mturn: to } : b))
+  const cols = g.rows
+  const rows = g.cols
+  const code = cols === rows ? g.code : cols > rows ? 21 : 12
+  const [mw, mh] = square || to % 2 === 0 ? [d.w, d.h] : [d.h, d.w]
+  const W = mw * cols
+  const H = mh * rows
+  const x = g.x + (g.w - W) / 2
+  const z = g.z + (g.h - H) / 2
+  // No exact middle when the sizes differ by an odd number of tiles. Round one
+  // way going sideways and back the other way coming home, so four turns land
+  // where they began.
+  const near = to % 2 ? Math.floor : Math.ceil
+  const far = to % 2 ? Math.ceil : Math.floor
+  const spots: [number, number][] = [[near(x), near(z)], [far(x), near(z)], [near(x), far(z)], [far(x), far(z)]]
+  const fits = ([sx, sz]: [number, number]) => {
+    for (let i = 0; i < W; i++) for (let j = 0; j < H; j++) if (!free(sx + i, sz + j)) return false
+    return true
+  }
+  const spot = spots.find(fits)
+  if (!spot) return null
+  // The anchor stays the top-left building, so the block still reads as merged.
+  const order = [g.anchor, ...g.members.filter((o) => o.uid !== g.anchor.uid)]
+  const at = new Map(order.map((o, k) => [o.uid, [spot[0] + (k % cols) * mw, spot[1] + Math.floor(k / cols) * mh]]))
+  return buildings.map((b) => {
+    const p = at.get(b.uid)
+    if (!p) return b
+    const moved = { ...unflag(b), x: p[0], z: p[1], ...(square ? {} : { rot: to }) }
+    return b.uid === g.anchor.uid ? { ...moved, merge: code, mturn: to } : moved
+  })
+}
+
+// Which way the big building faces: the player's turn (`mturn` on the anchor)
+// if it suits the block's shape, else towards a road along the block's edge.
 // Lots that aren't square keep their orientation and can only flip.
 export function groupTurn(g: MergeGroup, roads: Set<string>) {
   const d = buildingDef(g.anchor.def)
@@ -174,6 +217,8 @@ export function groupTurn(g: MergeGroup, roads: Set<string>) {
   const p = (g.anchor.rot ?? 0) % 2
   // A pair of square lots stands lengthways along the pair.
   const order = d.w !== d.h ? [p, p + 2] : g.cols === g.rows ? [0, 1, 2, 3] : g.cols > g.rows ? [0, 2] : [1, 3]
+  const chosen = g.anchor.mturn
+  if (chosen != null && order.includes(chosen)) return chosen
   return order.find(touches) ?? order[0]
 }
 

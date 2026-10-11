@@ -11,15 +11,15 @@ import { requestTrip, requestVisit } from './trips'
 import { trialPrize } from './trial'
 import { RIVALS, RIVAL_VISITS, RIVAL_BACK_MS, type RivalProgress } from './rivals'
 import { tourIsBoss, tourLegBonus, tourLegOf, tourPrize } from './tour'
-import { groupOf, mergeCandidates, applyMerge, applySplit } from './merge'
+import { groupOf, groupTurn, mergeCandidates, applyMerge, applySplit, rotateGroup } from './merge'
 import { togglePick } from './meet'
 
 // rot: quarter turns the player chose (0 faces south). Unset means face the nearest road.
 // level: upgrade level 1-10 (see MAX_BUILDING_LEVEL); unset means 1.
 // jobLevel: the level the running job started at, so an upgrade mid-job only pays from the next job.
 // car: uid of the owned car assigned to drive for this business (see DRIVER_BONUS).
-// merge: set on the top-left building of a merged 2x2 or 4x4 block (see merge.ts).
-export type PlacedBuilding = { uid: string; def: string; x: number; z: number; jobEndsAt: number | null; rot?: number; level?: number; jobLevel?: number; car?: string; merge?: number }
+// merge: set on the top-left building of a merged block (see merge.ts); mturn: the turn the player gave that block.
+export type PlacedBuilding = { uid: string; def: string; x: number; z: number; jobEndsAt: number | null; rot?: number; level?: number; jobLevel?: number; car?: string; merge?: number; mturn?: number }
 export type OwnedCar = { uid: string; model: string; color: string; upgrades: Record<UpgradeSlot, number>; flat?: boolean; lowFuel?: boolean; stripe?: string | null; finish?: Finish; plate?: string; mods?: string[]; ownedMods?: string[] }
 // A rusty find waiting in Rusty's storage, and the one car in the restore bay.
 export type JunkCar = { uid: string; model: string; rarity: Rarity }
@@ -152,6 +152,7 @@ type Actions = {
   bulldoze: (x: number, z: number) => void
   mergeBlock: (anchor: string, size: number) => void
   splitBlock: (uid: string) => void
+  rotateBlock: (uid: string) => boolean
   tapBuilding: (uid: string) => void
   openUpgrade: (uid: string) => void
   upgradeBuilding: (uid: string) => boolean
@@ -776,6 +777,28 @@ export const useGame = create<GameState>()(
         if (!g) return
         sfx.click()
         set({ buildings: applySplit(s.buildings, g), updatedAt: Date.now() })
+      },
+
+      // Turns a merged block a quarter clockwise as one building.
+      rotateBlock: (uid) => {
+        const s = get()
+        const g = groupOf(s.buildings, uid)
+        if (!g) return false
+        const ids = new Set(g.members.map((o) => o.uid))
+        const occ = occupancy(s)
+        const free = (x: number, z: number) => {
+          const o = occ.get(key(x, z))
+          return owns(s.land, x, z) && (!o || ids.has(o))
+        }
+        const buildings = rotateGroup(s.buildings, g, groupTurn(g, new Set(s.roads)), free)
+        if (!buildings) {
+          sfx.error()
+          s.toast('No room to turn it here. Clear some space around it first.')
+          return false
+        }
+        sfx.click()
+        set({ buildings, updatedAt: Date.now() })
+        return true
       },
 
       tapBuilding: (buid) => {
