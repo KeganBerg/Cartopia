@@ -12,6 +12,7 @@ import type { Agent } from '../scene/traffic/sim'
 import { toWorld } from '../scene/grid'
 import { pickSpecies, sing, type Species } from './birdsong'
 import { onThunder, weatherNow } from '../game/weather'
+import { GROOVES, grooveFor, type Tone } from './clubGrooves'
 
 // How much of each layer plays, 0 to 1, for how dark it is and the season.
 export type Mix = {
@@ -89,24 +90,16 @@ function noiseBuffer(ctx: BaseAudioContext, seconds: number, brown: boolean) {
 }
 
 type Voice = { o: OscillatorNode; g: GainNode; next: number }
-// The club's four-bar deep house loop: Am9, Fmaj9, Cmaj9, G6/9. Bass notes
-// are multiples of each bar's root, by sixteenth (0 = rest); stabs are the
-// sixteenths each bar's chord is hit on.
-const HOUSE_LOOP = [
-  { root: 55, notes: [220, 261.63, 329.63, 392, 493.88] },
-  { root: 43.65, notes: [174.61, 220, 261.63, 329.63, 392] },
-  { root: 65.41, notes: [164.81, 196, 246.94, 293.66, 392] },
-  { root: 49, notes: [196, 246.94, 293.66, 329.63, 440] },
-]
-const HOUSE_BASS = [0, 0, 1, 0, 0, 0, 1, 1.5, 0, 0, 1, 0, 0, 0, 2, 1]
-const HOUSE_STABS = [[3, 6, 10], [3, 6, 10, 13], [3, 6, 10], [3, 6, 14]]
-
-// An open nightclub in town: where it is on screen (-1 left .. 1 right).
-export type Club = { pan: number }
-// Where a point in the town sits left to right on screen, -1..1 (set by the scene).
+// An open nightclub in town: where it is on screen (-1 left .. 1 right), and
+// how close it sounds (1 on screen, quieter the further off screen it is).
+export type Club = { pan: number; near?: number }
+// Where a point in the town sits left to right on screen, -1..1, and how close
+// it sounds, 0..1 (both set by the scene).
 let ear = (x: number, z: number) => Math.max(-1, Math.min(1, (x - z) / 40))
-export function setEar(f: (x: number, z: number) => number) {
+let earNear = (_x: number, _z: number) => 1
+export function setEar(f: (x: number, z: number) => number, near?: (x: number, z: number) => number) {
   ear = f
+  if (near) earNear = near
 }
 // A bird singing from one spot, repeating its song now and then like a real one.
 type Singer = { kind: Species; pan: number; dist: number; next: number }
@@ -147,6 +140,9 @@ export class Soundscape {
   private hats: GainNode
   private doorUntil = 0
   private beat = 0
+  private playing = -1
+  // Pins the club to one groove (for rendering clips); null follows the night.
+  groove: number | null = null
   private vowels: BiquadFilterNode[]
   private howl: GainNode
   private howlTone: BiquadFilterNode
@@ -428,80 +424,132 @@ export class Soundscape {
     if (chance(0.035 * m.crows, dt)) this.crow(at)
     if (chance(0.022 * m.owls, dt)) this.owl(at)
 
-    this.clubMusic(t, club, m.nightlife)
+    this.clubMusic(t, club)
   }
 
-  // Night music: a deep house groove thumping through the walls of your own
-  // nightclub while it's open, or faintly from somewhere across town. Four on
-  // the floor, claps on two and four, open hats on the off-beat, a shuffled
-  // bassline and minor-ninth organ stabs over a four-bar loop. Every so often
-  // someone opens the door and the music spills out bright for a moment.
-  private clubMusic(t: number, club: Club | boolean | null, nightlife: number) {
-    const near = club ? 1 : 0
-    const level = near ? 0.62 : nightlife * 0.3
-    if (near && t > this.doorUntil + 4 && Math.random() < 0.025) this.doorUntil = t + rand(1.8, 3)
-    const door = near && t < this.doorUntil ? 1 : 0
+  // Night music: house thumping through the walls of your own nightclub while
+  // it's open, or faintly from somewhere across town. Each night plays a
+  // different groove (clubGrooves.ts): deep, piano, garage, acid or disco
+  // house. Every so often someone opens the door and the music spills out
+  // bright for a moment.
+  private clubMusic(t: number, club: Club | boolean | null) {
+    // Only a town with its own nightclub hears it, louder the closer it is.
+    const near = !club ? 0 : typeof club === 'object' ? (club.near ?? 1) : 1
+    const level = 0.62 * near
+    if (near > 0.6 && t > this.doorUntil + 4 && Math.random() < 0.025) this.doorUntil = t + rand(1.8, 3)
+    const door = near > 0.6 && t < this.doorUntil ? 1 : 0
     this.music.gain.setTargetAtTime(level * (1 + door * 0.25), t, door ? 0.15 : 2)
-    this.wall.frequency.setTargetAtTime(door ? 1600 : near ? 700 : 260, t, door ? 0.15 : 1)
-    this.keys.frequency.setTargetAtTime(door ? 3200 : near ? 1100 : 420, t, door ? 0.15 : 1)
-    this.hats.gain.setTargetAtTime(door ? 0.5 : near ? 0.14 : 0, t, door ? 0.15 : 1)
-    this.gritTone.frequency.setTargetAtTime(near ? 1100 : 650, t, 1)
+    // Further off, the walls and distance soak up more of the top end.
+    this.wall.frequency.setTargetAtTime(door ? 1600 : 260 + 440 * near, t, door ? 0.15 : 1)
+    this.keys.frequency.setTargetAtTime(door ? 3200 : 420 + 680 * near, t, door ? 0.15 : 1)
+    this.hats.gain.setTargetAtTime(door ? 0.5 : 0.14 * near * near, t, door ? 0.15 : 1)
+    this.gritTone.frequency.setTargetAtTime(650 + 450 * near, t, 1)
     if (this.musicPan) this.musicPan.pan.setTargetAtTime(typeof club === 'object' && club ? club.pan * 0.8 : 0.4, t, 0.5)
     if (level < 0.01) {
       this.beatAt = 0
       return
     }
-    const sixteenth = 60 / 124 / 4
+    const gi = this.groove ?? grooveFor()
+    if (gi !== this.playing) {
+      this.playing = gi
+      this.beat = 0
+    }
+    const g = GROOVES[gi]
+    const sixteenth = 60 / g.bpm / 4
     if (this.beatAt < t) this.beatAt = t + 0.1
     while (this.beatAt < t + 0.5) {
-      // A light shuffle: the in-between sixteenths land a touch late.
-      const b = this.beatAt + (this.beat % 2 ? sixteenth * 0.14 : 0)
+      // A shuffle: the in-between sixteenths land a touch late.
+      const b = this.beatAt + (this.beat % 2 ? sixteenth * g.swing : 0)
       const k = this.beat % 16
-      const bar = Math.floor(this.beat / 16) % 4
-      const chord = HOUSE_LOOP[bar]
+      const n = Math.floor(this.beat / 16)
+      const bar = n % g.loop.length
+      const chord = g.loop[bar]
+      // Sweeping grooves open the chord filter over eight bars and close it again.
+      const sweep = g.sweep ? 0.35 + 0.65 * (0.5 - 0.5 * Math.cos((((n % 8) * 16 + k) / 128) * Math.PI * 2)) : 1
       if (k % 4 === 0) {
-        this.blip(b, 0.32, 0.7, null, (o) => {
+        this.blip(b, 0.32, 0.7 * g.gain, null, (o) => {
           o.frequency.setValueAtTime(160, b)
           o.frequency.exponentialRampToValueAtTime(46, b + 0.12)
         }, () => this.thump)
       }
-      const note = HOUSE_BASS[k]
+      const note = g.bass[k]
       if (note) {
         const f = chord.root * note
-        this.blip(b, sixteenth * (k === 14 ? 1.2 : 1.7), k === 14 ? 0.11 : 0.16, null, (o) => {
+        const last = k === 14 && note >= 2
+        this.blip(b, sixteenth * (last ? 1.2 : g.bassLen), (last ? 0.11 : 0.16) * g.gain, null, (o) => {
           o.type = 'sawtooth'
           o.frequency.value = f
         }, () => this.thump)
       }
-      if (HOUSE_STABS[bar].includes(k)) this.stab(b, chord.notes, k === 14 && bar === 3 ? sixteenth * 5 : sixteenth * 1.6)
+      const hits = g.stabs[bar % g.stabs.length]
+      if (hits.includes(k)) {
+        const long = bar === g.loop.length - 1 && k === hits[hits.length - 1] && g.tone !== 'chop'
+        this.stab(b, chord.notes, sixteenth * (long ? 4 : g.stabLen), g.tone, g.gain, sweep)
+      }
+      const step = g.acid?.notes[k]
+      if (g.acid && step !== null && step !== undefined) this.acid(b, chord.root * 2 * 2 ** (step / 12), sixteenth, g.acid.accents.includes(k), sweep, g.gain)
       if (near) {
-        if (k === 4 || k === 12) this.clap(b)
-        if (k % 4 === 2) this.noiseHit(b, 0.16, 0.09, this.filter('highpass', 7000, this.hats))
-        else if (k % 2) this.noiseHit(b, 0.03, 0.035, this.filter('highpass', 9000, this.hats))
+        if (g.claps.includes(k)) this.clap(b)
+        if (g.openHats.includes(k)) this.noiseHit(b, 0.16, 0.09, this.filter('highpass', 7000, this.hats))
+        else if (g.closedHats === 'all' ? k % 4 !== 0 : k % 2) this.noiseHit(b, 0.03, k % 2 ? 0.035 : 0.025, this.filter('highpass', 9000, this.hats))
       }
       this.beat++
       this.beatAt += sixteenth
     }
   }
 
-  // An organ chord stab: a few soft detuned saws per note, short and plucky.
-  private stab(t: number, notes: number[], dur: number) {
+  // A chord stab. Organ: soft detuned saws, short and plucky. Piano: bright
+  // struck tones that ring out. Chop: a tight funky hit through a filter that
+  // the groove sweeps open and shut.
+  private stab(t: number, notes: number[], dur: number, tone: Tone, gain: number, sweep: number) {
     const g = this.ctx.createGain()
+    let dest: AudioNode = this.keys
+    if (sweep < 1) dest = this.filter('lowpass', 300 + 2600 * sweep * sweep, this.keys, tone === 'chop' ? 3 : 1)
+    g.connect(dest)
+    const peak = (tone === 'piano' ? 0.06 : tone === 'chop' ? 0.06 : 0.05) * gain
+    const ring = tone === 'piano' ? 0.5 : tone === 'chop' ? 0.04 : 0.12
     g.gain.setValueAtTime(0.0001, t)
-    g.gain.exponentialRampToValueAtTime(0.05, t + 0.008)
-    g.gain.exponentialRampToValueAtTime(0.022, t + dur * 0.5)
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.12)
-    g.connect(this.keys)
+    g.gain.exponentialRampToValueAtTime(peak, t + (tone === 'piano' ? 0.004 : 0.008))
+    g.gain.exponentialRampToValueAtTime(peak * (tone === 'piano' ? 0.3 : 0.44), t + dur * 0.5)
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur + ring)
     for (const f of notes) {
-      for (const d of [0.996, 1.004]) {
+      const parts: [OscillatorType, number, number][] =
+        tone === 'piano' ? [['triangle', f, 1], ['sine', f * 2, 0.35], ['sine', f * 3, 0.12]] : [['sawtooth', f * 0.996, 1], ['sawtooth', f * 1.004, 1]]
+      for (const [type, hz, amp] of parts) {
         const o = this.ctx.createOscillator()
-        o.type = 'sawtooth'
-        o.frequency.value = f * d
-        o.connect(g)
+        o.type = type
+        o.frequency.value = hz
+        if (amp === 1) o.connect(g)
+        else {
+          const a = this.ctx.createGain()
+          a.gain.value = amp
+          o.connect(a).connect(g)
+        }
         o.start(t)
-        o.stop(t + dur + 0.15)
+        o.stop(t + dur + ring + 0.05)
       }
     }
+  }
+
+  // One note of an acid bassline: a saw through a resonant filter that snaps
+  // shut, brighter and louder on accented steps.
+  private acid(t: number, f: number, sixteenth: number, accent: boolean, sweep: number, gain: number) {
+    const o = this.ctx.createOscillator()
+    o.type = 'sawtooth'
+    o.frequency.value = f
+    const lp = this.filter('lowpass', 200, undefined, 12)
+    const top = 250 + 1500 * sweep * (accent ? 1.5 : 1)
+    lp.frequency.setValueAtTime(top, t)
+    lp.frequency.exponentialRampToValueAtTime(180, t + sixteenth * 1.4)
+    const g = this.ctx.createGain()
+    const peak = (accent ? 0.075 : 0.045) * gain
+    g.gain.setValueAtTime(0.0001, t)
+    g.gain.exponentialRampToValueAtTime(peak, t + 0.005)
+    g.gain.setValueAtTime(peak, t + sixteenth * 0.8)
+    g.gain.exponentialRampToValueAtTime(0.0001, t + sixteenth * 1.1)
+    o.connect(lp).connect(g).connect(this.keys)
+    o.start(t)
+    o.stop(t + sixteenth * 1.2)
   }
 
   // A hand clap: three quick slaps of noise and a short room tail.
@@ -823,7 +871,7 @@ function clubOpen(): Club | null {
   const c = buildings.find((b) => b.def === 'club')
   if (!c) return null
   const [x, z] = toWorld(c.x, c.z)
-  return { pan: ear(x, z) }
+  return { pan: ear(x, z), near: earNear(x, z) }
 }
 
 // Drivers stuck behind someone lose patience and honk: behind a car pulled up
