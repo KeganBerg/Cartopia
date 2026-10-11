@@ -3,7 +3,7 @@
 // cars can visit, worked out from each building's front door.
 import { GRID, TILE, buildingDef } from '../../game/data'
 import { add, bend, cubic, line, pointAt, type Curve, type V2 } from './curves'
-import { layoutRoads, lightAt, type Light, type RoadLayout } from './layout'
+import { layoutRoads, type RoadLayout } from './layout'
 
 export type { Light } from './layout'
 
@@ -59,6 +59,7 @@ export type Net = {
   layout: RoadLayout
   nodes: Map<string, Node>
   stops: Stop[]
+  verge: Set<string> // open ground beside the road (no road, no building) a broken-down car can pull onto
   curves: Map<string, Curve>
 }
 
@@ -114,11 +115,6 @@ const conflictTable: boolean[] = (() => {
 
 export const conflicts = (ai: number, ao: number, bi: number, bo: number) => conflictTable[((ai << 2) | ao) * 16 + ((bi << 2) | bo)]
 
-// Light shown to cars heading `inDir` onto this junction tile.
-export function lightFor(node: Node, inDir: number, t: number): Light {
-  return lightAt(node.offset, inDir, t, node.clear)
-}
-
 // Right of way for cars entering heading `inDir`: through roads beat side roads,
 // and anything on the road beats a car pulling out of a driveway.
 export function priority(node: Node, inDir: number) {
@@ -142,7 +138,21 @@ export function buildNet(roadList: string[], buildings: Building[], turnOf: Turn
       occ: new Map(),
     })
   }
-  const net: Net = { layout, nodes, stops: [], curves: new Map() }
+  const net: Net = { layout, nodes, stops: [], curves: new Map(), verge: new Set() }
+  const built = new Set<string>()
+  for (const b of buildings) {
+    const d = buildingDef(b.def)
+    if (!d) continue
+    const [w, h] = turnOf(b, roads) % 2 ? [d.h, d.w] : [d.w, d.h]
+    for (let x = 0; x < w; x++) for (let z = 0; z < h; z++) built.add(tkey(b.x + x, b.z + z))
+  }
+  for (const t of layout.tiles.values()) {
+    for (const [dx, dz] of D) {
+      const x = t.x + dx, z = t.z + dz
+      const k = tkey(x, z)
+      if (x >= 0 && z >= 0 && x < GRID && z < GRID && !roads.has(k) && !built.has(k)) net.verge.add(k)
+    }
+  }
   // How deep each junction sits inside a block of junction tiles (wide roads, plazas).
   const queue = [...nodes.values()].filter((n) => !n.junction)
   for (const n of nodes.values()) if (n.junction) n.depth = Infinity
@@ -262,14 +272,15 @@ function gasBay(net: Net, b: Building, turn: number, w: number, h: number, front
 // `goal` heading `gh`: no U-turns except at dead ends, unless there is no other
 // way (a ring road), when a car may turn round on a quiet stretch of road.
 // Returns the direction to leave each tile on the way, not including the goal tile.
-export function route(net: Net, start: string, h: number, goal: string, gh: number, avoid?: Set<string>): number[] | null {
-  return search(net, start, h, goal, gh, avoid, false) ?? search(net, start, h, goal, gh, avoid, true)
+// `stalls`: lanes with a broken-down car in them, not to turn round just after.
+export function route(net: Net, start: string, h: number, goal: string, gh: number, avoid?: Set<string>, stalls?: Set<string>): number[] | null {
+  return search(net, start, h, goal, gh, avoid, false) ?? search(net, start, h, goal, gh, avoid, true, stalls)
 }
 
 // A plain two-way stretch of road a car can turn round on.
 export const uTurnOk = (n: Node) => !n.junction && n.degree === 2 && n.oneWay < 0 && n.lots.every((l) => !l)
 
-function search(net: Net, start: string, h: number, goal: string, gh: number, avoid: Set<string> | undefined, turnRound: boolean) {
+function search(net: Net, start: string, h: number, goal: string, gh: number, avoid: Set<string> | undefined, turnRound: boolean, stalls?: Set<string>) {
   const sk = `${start}|${h}`
   const gk = `${goal}|${gh}`
   const prev = new Map<string, [string, number] | null>([[sk, null]])
@@ -285,7 +296,13 @@ function search(net: Net, start: string, h: number, goal: string, gh: number, av
     const node = net.nodes.get(k)
     if (!node) continue
     const outs = exits(node, Number(hs))
-    if (turnRound && uTurnOk(node) && k !== start) outs.push(opp(Number(hs)))
+    // Turn round only on open road: not on the first tile, nor just past a broken-down
+    // car, where the car would have to get past it first.
+    const justPast = () => {
+      for (let at: string | undefined = cur, n = 0; at && n < 3; at = prev.get(at)?.[0], n++) if (stalls?.has(at)) return true
+      return false
+    }
+    if (turnRound && uTurnOk(node) && k !== start && !justPast()) outs.push(opp(Number(hs)))
     for (const o of outs) {
       const nk = `${tkey(node.x + D[o][0], node.z + D[o][1])}|${o}`
       if (prev.has(nk) || (avoid?.has(nk) && nk !== gk)) continue
