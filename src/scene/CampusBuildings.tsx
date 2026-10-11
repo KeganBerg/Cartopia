@@ -6,7 +6,7 @@ import { PAL } from './season'
 import { asphaltTex, brickTex, grassTex, paverTex, sidingTex, shingleTex } from './textures'
 import { Box, Cyl, Sign, Pool, Bulbs, Flag, ShellBuilding, BlockCar, GOLD, SNOW, type Mat, type V3 } from './NewBuildings'
 import { Crowd, LearnerCar, StudentCars } from './CampusLife'
-import { loop, track, playMove, routeMove } from './campusPaths'
+import { loop, smoothLoop, track, playMove, routeMove } from './campusPaths'
 
 // Schools, the university and the driving academy: the big late-game lots.
 // Static pieces share the town's colours so Batch merges them; the people and
@@ -164,9 +164,11 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
     // ---- Driving Academy: an office, a carport of learner cars and a cone course ----
     case 'academy': {
       const h = 1.15 + lift
-      const weave = loop([
-        [-1.35, 0.7], [-1.2, 0.86], [-0.9, 1.04], [-0.6, 0.7], [-0.3, 0.36], [0, 0.7], [0.3, 1.04], [0.6, 0.7], [0.9, 0.36], [1.2, 0.6],
-        [1.35, 0.84], [1.42, 1.15], [1.25, 1.42], [0.9, 1.5], [-0.9, 1.5], [-1.25, 1.42], [-1.42, 1.15], [-1.4, 0.86],
+      // Learners slalom east past the cones, swing round the far end, cruise back
+      // along the outer lane and round again: wide enough bends to steer through.
+      const weave = smoothLoop([
+        [-1.35, 0.62], [-0.9, 0.51], [-0.45, 0.75], [0, 0.99], [0.45, 0.75], [0.9, 0.51], [1.3, 0.62], [1.55, 0.85],
+        [1.6, 1.15], [1.45, 1.42], [1.1, 1.52], [0, 1.52], [-1.1, 1.52], [-1.45, 1.42], [-1.6, 1.15], [-1.55, 0.82],
       ])
       return (
         <group>
@@ -175,8 +177,8 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
           <Paint m={m} at={[0, 0.062, 1.9]} s={[3.8, 0.04]} />
           <Paint m={m} at={[0, 0.062, -0.3]} s={[3.8, 0.04]} />
           {[-1, 1].map((sd) => <Paint key={sd} m={m} at={[sd * 1.9, 0.062, 0.8]} s={[0.04, 2.2]} />)}
-          <Paint m={m} at={[0, 0.062, 0.7]} s={[2.6, 0.02]} c={YELLOW} />
-          {[-0.9, -0.3, 0.3, 0.9].map((x) => <Cone key={x} m={m} at={[x, 0.06, 0.7]} />)}
+          <Paint m={m} at={[0, 0.062, 0.75]} s={[2.6, 0.02]} c={YELLOW} />
+          {[-0.9, 0, 0.9].map((x) => <Cone key={x} m={m} at={[x, 0.06, 0.75]} />)}
           {[-0.25, 0, 0.25, 0.5].map((x) => <Paint key={x} m={m} at={[x - 1.0, 0.063, 0.0]} s={[0.12, 0.42]} />)}
           <Paint m={m} at={[-0.4, 0.063, -0.08]} s={[0.06, 0.4]} />
           {/* Parallel parking box with cones at its corners. */}
@@ -223,7 +225,7 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
           {live && <Tree m={m} at={[-1.75, 0.06, -0.55]} s={0.7} />}
           {live && <Lamp m={m} bulb={bulb} ghost={ghost} at={[1.85, 0.06, 0.2]} />}
           {live && <Lamp m={m} bulb={bulb} ghost={ghost} at={[-1.85, 0.06, 1.85]} />}
-          {live && <StudentCars n={lvl >= 7 ? 3 : 2} route={weave} lap={26} />}
+          {live && <StudentCars n={lvl >= 7 ? 3 : 2} drive={weave} />}
           {live && <Crowd n={2} move={(i, t) => [-0.6 + i * 0.3 + Math.sin(t * 0.3 + i) * 0.1, -0.45 + Math.cos(t * 0.25 + i) * 0.05]} hours="campus" />}
         </group>
       )
