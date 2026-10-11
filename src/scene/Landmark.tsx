@@ -6,7 +6,10 @@ import { Bench, GlassBlock, Lamp, PadLights, Planter, glassMat } from './OfficeB
 import { CarModel } from './CarModel'
 import { Upright } from './mergeScale'
 import { glowMats, onNight } from './dayNight'
-import { concreteTex, helipadTex, paverTex } from './textures'
+import { concreteTex, curtainGlowTex, curtainTex, helipadTex, paverTex } from './textures'
+import { RAINBOW } from './clubLeds'
+import { clubPulse } from '../lib/clubBeat'
+import { dayPhase, isNight, nightAmount } from '../game/clock'
 import { PAL } from './season'
 import { useGame } from '../game/store'
 import { sfx } from '../lib/sound'
@@ -30,6 +33,8 @@ const BASE = 0.8 // top of the lobby podium
 const DECK = 9.3 // underside line of the deck at the tower
 const DECK_TOP = 9.85
 const PEAK = 14.9 // top of the fin
+// The penthouse suite's three floors, deck to roof.
+const SUITE: [number, number][] = [[DECK_TOP, 11.2], [11.2, 12.55], [12.55, 13.9]]
 
 const mat: Mat = (color: string, map?: Texture) => <meshStandardMaterial color={color} map={map ?? null} />
 const bulb = <primitive object={glowMats.bulb} attach="material" dispose={null} />
@@ -46,6 +51,26 @@ function coreMat() {
   return c
 }
 const coreEl = () => <primitive object={coreMat()} attach="material" dispose={null} />
+
+// The penthouse suite dances with the nightclub at night: each floor's lit
+// panes take a colour of the club's rainbow, a step apart, moving on and
+// flashing with every bass note (clubBeat.ts; a soft beat when the music's off).
+// Glass by day like the rest of the tower.
+const suiteMats = SUITE.map(() => {
+  const m = new MeshStandardMaterial({ color: TINT, map: curtainTex(), emissiveMap: curtainGlowTex(), emissive: new Color('#000000'), emissiveIntensity: 1, metalness: 0.15, roughness: 0.22 })
+  m.userData.live = true
+  return m
+})
+const suiteTint = new Color()
+function SuiteLights() {
+  useFrame(() => {
+    const p = clubPulse()
+    const lit = isNight() ? nightAmount(dayPhase()) : 0
+    const glow = lit * (0.8 + 1.6 * p.flash)
+    suiteMats.forEach((m, i) => m.emissive.copy(suiteTint.set(RAINBOW[(i * 2 + p.step) % RAINBOW.length])).multiplyScalar(glow))
+  })
+  return null
+}
 
 // ---- Shapes (front elevation, x across, y up), extruded front to back ----
 
@@ -108,7 +133,12 @@ const GEO = (() => {
   deck.lineTo(-1.1, DECK_TOP)
   deck.closePath()
   const roof = quad(ROOF[0], ROOF[1], ROOF[2])
-  const pent = new Shape([new Vector2(-1.05, DECK_TOP), new Vector2(0.85, DECK_TOP), ...roof, new Vector2(-1.05, 13.9)])
+  // The penthouse suite: three floors, each cut from the outline under the curving roof.
+  const right = (y: number) => (y <= ROOF[0].y ? 0.85 : roof.reduce((best, p) => (Math.abs(p.y - y) < Math.abs(best.y - y) ? p : best)).x)
+  const suite = SUITE.map(([y0, y1]) => {
+    const edge = roof.filter((p) => p.y > y0 && p.y < y1)
+    return new Shape([new Vector2(-1.05, y0), new Vector2(right(y0), y0), ...edge, new Vector2(right(y1), y1), new Vector2(-1.05, y1)])
+  })
   // The fin: a white band along the roof that rises into a peak over the left wall.
   const finLine = [...quad(new Vector2(1.08, 11.15), new Vector2(0.15, 13.25), new Vector2(-0.82, 14.05)), new Vector2(-1.0, PEAK - 0.2), new Vector2(-1.05, PEAK)]
   const fin = band(finLine, -0.22)
@@ -118,7 +148,7 @@ const GEO = (() => {
   return {
     body: extrude(body, D, true),
     deck: extrude(deck, 1.9),
-    pent: extrude(pent, D - 0.2, true),
+    suite: suite.map((f) => extrude(f, D - 0.2, true)),
     fin: extrude(fin, D - 0.1),
     clad: extrude(clad, 0.14),
     arch: extrude(band(archLine, 0.17), 0.08),
@@ -168,7 +198,8 @@ export function VanguardTower() {
         <mesh geometry={GEO.deck} castShadow receiveShadow>{mat(FRAME)}</mesh>
         <mesh position={[0.5, DECK_TOP - 0.06, 0.96]}><boxGeometry args={[3.2, 0.025, 0.02]} />{bulb}</mesh>
         {/* Penthouse glass, then the roof fin rising to the peak, lit along its edge. */}
-        <mesh geometry={GEO.pent} castShadow><primitive object={glassMat(TINT)} attach="material" dispose={null} /></mesh>
+        {GEO.suite.map((g, i) => <mesh key={i} geometry={g} castShadow><primitive object={suiteMats[i]} attach="material" dispose={null} /></mesh>)}
+        <SuiteLights />
         <mesh geometry={GEO.fin} castShadow>{mat(FRAME)}</mesh>
         <group position-z={(D - 0.1) / 2}><mesh geometry={GEO.finLed}>{bulb}</mesh></group>
         {/* Mast and warning light on the peak. */}
