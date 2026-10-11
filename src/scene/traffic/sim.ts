@@ -17,6 +17,7 @@ export type CarSpec = {
   wid: number
   cruise: number // top speed, world units per second
   stalled: boolean // flat tire or out of gas: pull over and wait
+  favors?: string[] // building types it drops in at most (school buses: the schools)
 }
 
 type Leg = {
@@ -725,7 +726,10 @@ export class Traffic {
         const busy = new Set([...this.agents.values()].map((o) => o.trip?.stop.uid))
         const free = this.net.stops.filter((s) => !busy.has(s.uid))
         const home = free.find((s) => s.uid === this.homes.get(a.uid))
+        const fav = this.specs.get(a.uid)?.favors
+        const liked = fav ? free.filter((s) => fav.includes(s.def)) : []
         if (home && rand() < 0.6) this.startTrip(a, home, 'visit')
+        else if (liked.length && rand() < 0.7) this.startTrip(a, liked[Math.floor(rand() * liked.length)], 'visit')
         else if (free.length) this.startTrip(a, free[Math.floor(rand() * free.length)], 'visit')
       }
     }

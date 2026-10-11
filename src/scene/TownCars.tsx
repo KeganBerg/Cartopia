@@ -17,6 +17,9 @@ import { liveTraffic as sim } from './traffic/live'
 import { layoutRoads, type Light } from './traffic/layout'
 import { useVisitors, tapVisitor, type Visitor } from '../lib/visitors'
 
+// Buses run the school routes: they drop in at schools more than anywhere else.
+const SCHOOLS = ['school', 'highschool', 'university']
+
 const visitKeyIsAway = (key: string) => key !== 'home'
 // A visitor's car as a town car (its uid starts "visitor:", which the traffic sim fades out on leaving).
 const visitorCar = (v: Visitor): OwnedCar => ({
@@ -315,6 +318,7 @@ export function TownCars() {
         wid: size.wid * SCALE,
         cruise: 1.1 + performance(def, c.upgrades, c.mods) / 45,
         stalled: !!(c.flat || c.lowFuel),
+        favors: def.body === 'bus' ? SCHOOLS : undefined,
       }
     }),
     [cars, stars],

@@ -76,6 +76,13 @@ export const BUILDINGS: BuildingDef[] = [
   // Only open after dark: neon on at dusk, a line at the door and a rooftop dance floor.
   { id: 'club', name: 'Neon Owl Nightclub', kind: 'business', nightOnly: true, w: 2, h: 1, price: 8800, unlockLevel: 6, jobSeconds: 300, fuelCost: 4, payout: 750, xp: 60, color: '#1a1035', roof: '#d500f9', sign: 'NEON OWL' },
   { id: 'parts', name: 'Parts Depot', kind: 'parts', w: 2, h: 1, price: 8000, unlockLevel: 5, jobSeconds: 480, fuelCost: 4, payout: 160, partsPayout: 15, xp: 45, color: '#1565c0', roof: '#bbdefb', sign: 'PARTS' },
+  // Schools, university and driving academy: big late-game jobs that keep the
+  // long climb to level 40 stocked. The academy's students earn less but learn
+  // fast (more XP per fuel); the university is one campus per town.
+  { id: 'academy', name: 'Driving Academy', kind: 'business', w: 2, h: 2, price: 16000, unlockLevel: 9, jobSeconds: 900, fuelCost: 6, payout: 1380, xp: 140, color: '#eceff1', roof: '#ff6f00', sign: 'DRIVING ACADEMY' },
+  { id: 'school', name: 'Elementary School', kind: 'business', w: 2, h: 2, price: 48000, unlockLevel: 17, jobSeconds: 2100, fuelCost: 10, payout: 4300, xp: 300, color: '#c1694f', roof: '#1565c0', sign: 'ELEMENTARY' },
+  { id: 'highschool', name: 'High School', kind: 'business', w: 3, h: 2, price: 110000, unlockLevel: 25, jobSeconds: 2700, fuelCost: 13, payout: 7400, xp: 430, color: '#a1887f', roof: '#2e7d32', sign: 'HIGH SCHOOL' },
+  { id: 'university', name: 'Ridgemont University', kind: 'business', w: 3, h: 3, price: 240000, unlockLevel: 32, unique: true, jobSeconds: 3600, fuelCost: 16, payout: 11000, xp: 560, color: '#d7ccc8', roof: '#6a1b9a', sign: 'RIDGEMONT UNIVERSITY' },
 
   // Obstacles on newly bought land: pay to clear, wait, then tap to remove.
   { id: 'bush', name: 'Bushes', kind: 'obstacle', w: 1, h: 1, price: 150, unlockLevel: 99, jobSeconds: 30, xp: 5, color: '#558b2f', roof: '#33691e' },
@@ -282,14 +289,14 @@ export type CarDef = {
 // a misspelling of one. Ids stay fixed so existing saves keep working.
 // Stats follow each real car's relative performance.
 export const CARS: CarDef[] = [
-  { id: 'pip', name: 'Kipper Pocket', body: 'compact', price: 800, unlockLevel: 1, power: 18, grip: 36, weight: 24, skill: 'launch', likes: ['pizza', 'donut', 'market'], colors: ['#c62828', '#1b5e20', '#fafafa'] },
+  { id: 'pip', name: 'Kipper Pocket', body: 'compact', price: 800, unlockLevel: 1, power: 18, grip: 36, weight: 24, skill: 'launch', likes: ['pizza', 'academy', 'market'], colors: ['#c62828', '#1b5e20', '#fafafa'] },
   { id: 'civic', name: 'Kazumi Commuter', body: 'sedan', price: 1500, unlockLevel: 1, power: 24, grip: 34, weight: 36, skill: 'slipstream', likes: ['pizza', 'diner', 'coffee'], colors: ['#1e88e5', '#eeeeee', '#424242'] },
   { id: 'trail', name: 'Ironside Workhorse', body: 'truck', price: 3500, unlockLevel: 3, power: 38, grip: 26, weight: 74, skill: 'torque', likes: ['tires', 'parts', 'lube'], colors: ['#0d47a1', '#c62828', '#eceff1'] },
   { id: 'miata', name: 'Kazumi Zephyr', body: 'roadster', price: 7000, unlockLevel: 5, power: 32, grip: 54, weight: 22, skill: 'smooth', likes: ['icecream', 'cinema', 'arcade'], colors: ['#d32f2f', '#1e88e5', '#fafafa'] },
   { id: 'stallion', name: "Liberty Bore Horse '68", body: 'muscle', price: 14000, unlockLevel: 7, power: 52, grip: 34, weight: 54, skill: 'nitro', likes: ['burger', 'stadium', 'firehouse'], colors: ['#1b5e20', '#ff6f00', '#212121'] },
   { id: 'rally', name: 'Kodiak Gravel Rex', body: 'rally', price: 26000, unlockLevel: 10, power: 52, grip: 64, weight: 40, skill: 'smooth', likes: ['tires', 'tuner', 'bodyshop'], colors: ['#0d47a1', '#fafafa', '#ffd600'] },
   { id: 'vette', name: 'Liberty Sidewinder', body: 'sports', price: 55000, unlockLevel: 15, power: 66, grip: 54, weight: 38, skill: 'slipstream', likes: ['motel', 'stadium', 'police'], colors: ['#b71c1c', '#bdbdbd', '#ffd600'] },
-  { id: 'charger', name: 'Liberty Brawler', body: 'muscle', price: 42000, unlockLevel: 13, power: 70, grip: 40, weight: 60, skill: 'nitro', likes: ['burger', 'tuner', 'lube'], colors: ['#212121', '#ff5722', '#6a1b9a'] },
+  { id: 'charger', name: 'Liberty Brawler', body: 'muscle', price: 42000, unlockLevel: 13, power: 70, grip: 40, weight: 60, skill: 'nitro', likes: ['burger', 'highschool', 'lube'], colors: ['#212121', '#ff5722', '#6a1b9a'] },
   { id: 'hellcat', name: 'Liberty Hellhound 707', body: 'widebody', price: 80000, unlockLevel: 18, power: 80, grip: 46, weight: 62, skill: 'launch', likes: ['tuner', 'stadium', 'bodyshop'], colors: ['#c62828', '#7b1fa2', '#9ccc65'] },
   { id: 'gtr', name: 'Kazumi Ronin GT', body: 'coupe', price: 115000, unlockLevel: 22, power: 78, grip: 70, weight: 46, skill: 'smooth', likes: ['tuner', 'bowling', 'arcade'], colors: ['#eceff1', '#263238', '#ff6d00'] },
   { id: 'tomahawk', name: 'Ironside Tomahawk', body: 'tank', price: 420000, unlockLevel: 36, legendary: true, power: 100, grip: 94, weight: 60, skill: 'launch', likes: ['stadium', 'police', 'firehouse'], colors: ['#556b2f', '#37474f', '#c9a227'] },
@@ -301,11 +308,11 @@ export const CARS: CarDef[] = [
   { id: 'ridgeback', name: 'Kodiak Ridgeback 4x4', body: 'suv', price: 10000, unlockLevel: 6, power: 44, grip: 46, weight: 62, skill: 'torque', likes: ['tires', 'parts', 'firehouse'], colors: ['#ff6f00', '#33691e', '#eceff1'] },
   { id: 'kitsune', name: 'Kazumi Kitsune Drift', body: 'coupe', price: 20000, unlockLevel: 9, power: 48, grip: 58, weight: 30, skill: 'smooth', likes: ['tuner', 'arcade', 'bodyshop'], colors: ['#fafafa', '#212121', '#ff4081'] },
   { id: 'current', name: 'Sparkline Current', body: 'ev', price: 62000, unlockLevel: 16, power: 72, grip: 52, weight: 50, skill: 'launch', likes: ['coffee', 'market', 'parkade'], colors: ['#eceff1', '#b71c1c', '#263238'] },
-  { id: 'salon', name: 'Regent Grand Salon', body: 'luxury', price: 0, bucks: 45, unlockLevel: 11, power: 64, grip: 50, weight: 70, skill: 'slipstream', likes: ['motel', 'cinema', 'market'], colors: ['#1a1a2e', '#eceff1', '#6d1b1b'] },
+  { id: 'salon', name: 'Regent Grand Salon', body: 'luxury', price: 0, bucks: 45, unlockLevel: 11, power: 64, grip: 50, weight: 70, skill: 'slipstream', likes: ['motel', 'university', 'market'], colors: ['#1a1a2e', '#eceff1', '#6d1b1b'] },
   { id: 'stomper', name: 'Ironside Dune Stomper', body: 'truck', price: 36000, unlockLevel: 12, power: 66, grip: 44, weight: 72, skill: 'torque', likes: ['tires', 'stadium', 'lube'], colors: ['#424242', '#1565c0', '#ff6d00'] },
   { id: 'monoposto', name: 'Veloce Monoposto 1', body: 'formula', price: 220000, unlockLevel: 30, power: 90, grip: 90, weight: 20, skill: 'smooth', likes: ['stadium', 'tuner', 'parkade'], colors: ['#d50000', '#eceff1', '#00897b'] },
   { id: 'zenith', name: 'Aether Zenith R', body: 'super', price: 550000, unlockLevel: 40, legendary: true, power: 100, grip: 96, weight: 26, skill: 'nitro', likes: ['stadium', 'parkade', 'police'], colors: ['#212121', '#1e88e5', '#ff6d00'] },
-  { id: 'schoolbus', name: 'Ironside Scholar 72', body: 'bus', price: 6500, unlockLevel: 4, power: 30, grip: 26, weight: 90, skill: 'slipstream', likes: ['diner', 'arcade', 'icecream'], colors: ['#fbc02d', '#ff8f00', '#eceff1'] },
+  { id: 'schoolbus', name: 'Ironside Scholar 72', body: 'bus', price: 6500, unlockLevel: 4, power: 30, grip: 26, weight: 90, skill: 'slipstream', likes: ['diner', 'arcade', 'school'], colors: ['#fbc02d', '#ff8f00', '#eceff1'] },
   { id: 'shaggy', name: 'Lakeside Shaggy Hound', body: 'dogvan', price: 8000, unlockLevel: 5, power: 26, grip: 30, weight: 66, skill: 'oil', likes: ['burger', 'donut', 'icecream'], colors: ['#d7ccc8', '#a1887f', '#9e9e9e'] },
   { id: 'tusker', name: 'Kodiak Tusker Scout', body: 'tusker', price: 95000, unlockLevel: 20, power: 70, grip: 72, weight: 58, skill: 'torque', likes: ['police', 'firehouse', 'tires'], colors: ['#6b7a3a', '#c2a36b', '#eceff1'] },
   { id: 'lambo', name: 'Veloce Corrida V12', body: 'wedge', price: 0, bucks: 90, unlockLevel: 26, power: 86, grip: 70, weight: 34, skill: 'oil', likes: ['cinema', 'club', 'parkade'], colors: ['#fdd835', '#d50000', '#fafafa'] },

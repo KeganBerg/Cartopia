@@ -18,8 +18,8 @@ import { brickTex, sidingTex, gravelTex, awningTex, paverTex, shutterTex, shingl
 // colours shared across the town, so Batch merges them into a few draws.
 // Lots face +z (the front door side), like the rest of the town.
 
-type V3 = [number, number, number]
-type Mat = (color: string, map?: Texture) => ReactNode
+export type V3 = [number, number, number]
+export type Mat = (color: string, map?: Texture) => ReactNode
 export type NewModelProps = { def: BuildingDef; ghost?: boolean; m: Mat; win: ReactNode; bulb: ReactNode; level?: number }
 
 export const NEW_MODELS = new Set([
@@ -28,10 +28,10 @@ export const NEW_MODELS = new Set([
   'pumpkins', 'scarecrow', 'graves', 'deadtree',
 ])
 
-const GOLD = '#ffc107'
-const SNOW = SEASON === 'winter'
+export const GOLD = '#ffc107'
+export const SNOW = SEASON === 'winter'
 
-function Box({ m, at, s, c, t, rot, shadow = true }: { m: Mat; at: V3; s: V3; c: string; t?: Texture; rot?: V3; shadow?: boolean }) {
+export function Box({ m, at, s, c, t, rot, shadow = true }: { m: Mat; at: V3; s: V3; c: string; t?: Texture; rot?: V3; shadow?: boolean }) {
   return (
     <mesh position={at} rotation={rot} castShadow={shadow} receiveShadow>
       <boxGeometry args={s} />
@@ -40,7 +40,7 @@ function Box({ m, at, s, c, t, rot, shadow = true }: { m: Mat; at: V3; s: V3; c:
   )
 }
 
-function Cyl({ m, at, r, r2 = r, h, c, seg = 12, rot }: { m: Mat; at: V3; r: number; r2?: number; h: number; c: string; seg?: number; rot?: V3 }) {
+export function Cyl({ m, at, r, r2 = r, h, c, seg = 12, rot }: { m: Mat; at: V3; r: number; r2?: number; h: number; c: string; seg?: number; rot?: V3 }) {
   return (
     <mesh position={at} rotation={rot} castShadow>
       <cylinderGeometry args={[r, r2, h, seg]} />
@@ -49,7 +49,7 @@ function Cyl({ m, at, r, r2 = r, h, c, seg = 12, rot }: { m: Mat; at: V3; r: num
   )
 }
 
-function Sign({ text, w, at, bg, fg }: { text: string; w: number; at: V3; bg: string; fg: string }) {
+export function Sign({ text, w, at, bg, fg }: { text: string; w: number; at: V3; bg: string; fg: string }) {
   return (
     <mesh position={at}>
       <planeGeometry args={[w, w / 4]} />
@@ -58,7 +58,7 @@ function Sign({ text, w, at, bg, fg }: { text: string; w: number; at: V3; bg: st
   )
 }
 
-function Pool({ r, x = 0, z = 0 }: { r: number; x?: number; z?: number }) {
+export function Pool({ r, x = 0, z = 0 }: { r: number; x?: number; z?: number }) {
   return (
     <mesh rotation-x={-Math.PI / 2} position={[x, 0.075, z]} renderOrder={2}>
       <planeGeometry args={[r * 2, r * 2]} />
@@ -77,7 +77,7 @@ function Neon({ at, s, c }: { at: V3; s: V3; c: string }) {
   )
 }
 
-function Bulbs({ from, to, n }: { from: V3; to: V3; n: number }) {
+export function Bulbs({ from, to, n }: { from: V3; to: V3; n: number }) {
   return (
     <group>
       {Array.from({ length: n }, (_, i) => {
@@ -93,7 +93,7 @@ function Bulbs({ from, to, n }: { from: V3; to: V3; n: number }) {
   )
 }
 
-function Flag({ at, color, star, tall = 0.9 }: { at: V3; color: string; star?: boolean; tall?: number }) {
+export function Flag({ at, color, star, tall = 0.9 }: { at: V3; color: string; star?: boolean; tall?: number }) {
   return (
     <group position={at}>
       <mesh position={[0, tall / 2, 0]} castShadow><cylinderGeometry args={[0.02, 0.025, tall, 6]} /><meshStandardMaterial color="#eceff1" metalness={0.4} /></mesh>
@@ -109,7 +109,7 @@ function Flag({ at, color, star, tall = 0.9 }: { at: V3; color: string; star?: b
 
 // Upgrade trimmings shared by every new business, in the same order as the
 // original buildings: cornice (3), roof bulbs (5), flag (8), gold trim (9), star (10).
-function Trims({ m, lvl, w, d, h, z0, flag }: { m: Mat; lvl: number; w: number; d: number; h: number; z0: number; flag: string }) {
+export function Trims({ m, lvl, w, d, h, z0, flag }: { m: Mat; lvl: number; w: number; d: number; h: number; z0: number; flag: string }) {
   const zf = z0 + d / 2
   return (
     <group>
@@ -149,7 +149,7 @@ type Shell = {
 }
 
 // A flat-roofed building that grows a floor of windows every other upgrade level.
-function ShellBuilding({ m, win, bulb, ghost, lvl, w, d, h0, z0 = -0.15, x0 = 0, wall, tex = 'brick', roof, sign, signBg = '#fffde7', signFg = '#c62828', shopfront, children }: Shell) {
+export function ShellBuilding({ m, win, bulb, ghost, lvl, w, d, h0, z0 = -0.15, x0 = 0, wall, tex = 'brick', roof, sign, signBg = '#fffde7', signFg = '#c62828', shopfront, children }: Shell) {
   const h = h0 + levelLift(lvl)
   const zf = z0 + d / 2
   const rx = Math.max(1, Math.round(w * 0.6))
@@ -247,7 +247,7 @@ function Parasol({ m, at, c }: { m: Mat; at: V3; c: string }) {
 }
 
 // A simple car shape for the parking garage decks: far fewer meshes than CarModel.
-function BlockCar({ m, at, c, rot = 0 }: { m: Mat; at: V3; c: string; rot?: number }) {
+export function BlockCar({ m, at, c, rot = 0 }: { m: Mat; at: V3; c: string; rot?: number }) {
   return (
     <group position={at}>
       <Upright>

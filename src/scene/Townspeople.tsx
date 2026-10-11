@@ -66,6 +66,8 @@ const SHOP_THOUGHTS: Record<string, [string, string]> = {
   coffee: ['☕', 'grabbing a coffee'], tacos: ['🌮', 'getting tacos'], lube: ['🛢', 'booking an oil change'], arcade: ['🕹️', 'chasing a high score'],
   bodyshop: ['🎨', 'picking a new paint colour'], market: ['🛒', 'doing the grocery run'], firehouse: ['🚒', 'visiting the firefighters'],
   police: ['👮', 'dropping by the police station'], parkade: ['🅿️', 'fetching the car from the garage'],
+  academy: ['🚗', 'off to a driving lesson'], school: ['🎒', 'picking the kids up from school'], highschool: ['🏈', 'going to the big game'],
+  university: ['🎓', 'heading to a lecture'],
 }
 const PARK_GO: Record<string, [string, string]> = {
   bench: ['🪑', 'heading for a bench'], fountain: ['⛲', 'going to see the fountain'], pond: ['🦆', 'going to see the ducks'],
