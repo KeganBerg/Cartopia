@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
-import { Canvas } from '@react-three/fiber'
+import { useEffect, useRef } from 'react'
+import { Canvas, useFrame } from '@react-three/fiber'
 import { NeutralToneMapping } from 'three'
 import { World } from './scene/World'
 import { Hud } from './ui/Hud'
@@ -45,6 +45,7 @@ import { BattlePanel, useCrewBattleWatcher } from './ui/CrewBattle'
 import { VisitorBadges, StreetRaceCard } from './ui/Visitors'
 import { visitorTick, forceVisitor } from './lib/visitors'
 import type { VisitorKind } from './game/data'
+import { hideSplash, splashProgress } from './lib/splash'
 
 // Phones get a lighter renderer: lower pixel ratio keeps iOS from dropping the WebGL context.
 const SMALL = typeof window !== 'undefined' && Math.min(window.innerWidth, window.innerHeight) < 700
@@ -66,6 +67,8 @@ export default function App() {
     if (new URLSearchParams(location.search).has('chatdemo')) chatDemo()
     else startChat()
     tick(Date.now())
+    // The loading screen leaves after the town's first frames; this is the fallback if they never come.
+    const splashFallback = setTimeout(hideSplash, 15000)
     // Checked again when it fires: a cloud save may have loaded since, already claimed today.
     setTimeout(() => { const s = useGame.getState(); if (s.lastDaily !== today() && !s.panel) s.openPanel('daily') }, 800)
     // ?visitor=racer|tourist|mystery|barn brings a guest's visitor right away (for testing).
@@ -75,7 +78,10 @@ export default function App() {
       tick(Date.now())
       visitorTick()
     }, 1000)
-    return () => clearInterval(id)
+    return () => {
+      clearInterval(id)
+      clearTimeout(splashFallback)
+    }
   }, [tick])
 
   return (
@@ -83,12 +89,14 @@ export default function App() {
       {/* Camera sits well back with a tight near/far range so depth stays precise and flat layers never flicker. */}
       <Canvas shadows orthographic camera={{ position: [75, 80, 75], zoom: 36, near: 1, far: 320 }} dpr={SMALL ? [1, 1.5] : [1, 2]} gl={{ toneMapping: NeutralToneMapping }} frameloop={townPaused ? 'never' : 'always'}
         onCreated={({ gl }) => {
+          splashProgress(0.9)
           // Let the browser restore the 3D view after it drops the context, instead of leaving it blank.
           gl.domElement.addEventListener('webglcontextlost', (e) => e.preventDefault())
           gl.domElement.addEventListener('webglcontextrestored', () => location.reload())
         }}
       >
         <World />
+        <SplashHandoff />
       </Canvas>
       <Badges />
       <VisitorBadges />
@@ -141,4 +149,14 @@ export default function App() {
       <FlyLayer />
     </>
   )
+}
+
+// Fades out the loading screen once the town has drawn a few frames, so the
+// first-frame shader compile happens behind it instead of as a frozen town.
+function SplashHandoff() {
+  const frames = useRef(0)
+  useFrame(() => {
+    if (++frames.current === 3) hideSplash()
+  })
+  return null
 }
