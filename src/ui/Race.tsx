@@ -8,6 +8,7 @@ import { Canvas } from '@react-three/fiber'
 import { RaceScene } from '../scene/RaceScene'
 import { sfx, engineRpm, stopEngine } from '../lib/sound'
 import { useLive, challenge, refreshPresence, raceChannel, endLiveRace, answer, pruneInvites, mute, unmute, setClosed, INVITE_MS, type LiveRace } from '../lib/live'
+import { displayName } from '../lib/names'
 
 type Rival = { id: string; town: string; level: number; carName: string; color: string; pi: number; online: boolean; body: Body }
 
@@ -60,7 +61,7 @@ async function fetchOnlineRivals(): Promise<Rival[]> {
     .filter((r) => r.best_car)
     .map((r) => ({
       id: r.owner_id,
-      town: r.town_name,
+      town: displayName(r.town_name, r.owner_id),
       level: r.level,
       carName: r.best_car.name,
       color: r.best_car.color,
@@ -126,6 +127,7 @@ export function RacePanel() {
       <div className="tabs">
         <button className={tab === 'quick' ? 'tab sel' : 'tab'} onClick={() => setTab('quick')}>🏁 Quick race</button>
         <button className={tab === 'gp' ? 'tab sel' : 'tab'} onClick={() => setTab('gp')}>🏆 Grand Prix</button>
+        <button className="tab" onClick={() => useGame.getState().openPanel('leaders')}>🏅 Top racers</button>
       </div>
       {tab === 'gp' ? (
         <GrandPrix onRace={(series, rival, prize) => {
@@ -460,7 +462,7 @@ function DragRace({ car, rival, onExit, live, prize, onFinish, title }: { car: O
   // One full-screen view: the street fills the screen and the controls float over it.
   return (
     <div className="race-full">
-      <Canvas className="rf-canvas" camera={{ position: [0.4, 2.2, -4], fov: 55, near: 0.3, far: 300 }} dpr={[1, 1.5]}>
+      <Canvas className="rf-canvas" camera={{ position: [0.4, 2.2, -4], fov: 55, near: 0.3, far: 150 }} dpr={[1, 1.5]}>
         <RaceScene track={TRACK} me={me} them={them} mine={{ body: def.body, color: car.color }} theirs={{ body: rival.body, color: rival.color }} />
       </Canvas>
       <div className="rf-top">
@@ -581,7 +583,7 @@ export function LiveRaceOverlay() {
   const best = useMemo(() => [...cars].sort((a, b) => pi(b) - pi(a))[0], [cars])
   if (!race || !best) return null
   const o = race.opponent
-  const rival: Rival = { id: `live:${o.id}`, town: o.town, level: o.level, carName: o.carName, color: o.color, pi: o.pi, online: true, body: o.body }
+  const rival: Rival = { id: `live:${o.id}`, town: displayName(o.town, o.id), level: o.level, carName: o.carName, color: o.color, pi: o.pi, online: true, body: o.body }
   return <DragRace key={race.raceId} car={best} rival={rival} live={race} onExit={endLiveRace} />
 }
 

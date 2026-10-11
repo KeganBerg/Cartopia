@@ -19,7 +19,9 @@ input { font: inherit; padding: 8px 10px; border-radius: 10px; border: 2px solid
 
 /* HUD */
 .hud-left { position: absolute; z-index: 50; top: calc(10px + var(--sat)); left: calc(10px + var(--sal)); display: flex; gap: 6px; align-items: flex-start; }
-.speedo { position: relative; width: 88px; height: 100px; filter: drop-shadow(0 3px 3px rgba(0,0,0,.35)); }
+.speedo { position: relative; width: 88px; height: 100px; padding: 0; border: none; background: none; cursor: pointer; filter: drop-shadow(0 3px 3px rgba(0,0,0,.35)); transition: transform .1s; -webkit-tap-highlight-color: transparent; }
+.speedo:active { transform: scale(.92); }
+.speedo-menu { position: absolute; top: -2px; right: -4px; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; line-height: 1; color: #fff; background: linear-gradient(#5c9ded, #1e5fbf); border: 2px solid #fff; box-shadow: 0 2px 0 rgba(0,0,0,.3); }
 .speedo-level { position: absolute; top: 50px; left: 0; width: 88px; text-align: center; font: 22px var(--display); color: #fff; }
 .speedo-xp { position: absolute; top: 84px; left: 4px; width: 80px; text-align: center; font: 12px var(--display); background: #1b1f24; color: #fff; border-radius: 6px; border: 2px solid #cfd8dc; }
 .pills { display: flex; flex-direction: column; gap: 5px; margin-top: 4px; }
@@ -295,6 +297,8 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .goal:not(.done) .goal-main { cursor: pointer; }
 .crash-screen { z-index: 300; place-items: center !important; align-items: center !important; padding: 16px !important; }
 .crash-detail { font-size: 11px; word-break: break-word; margin-top: 10px; }
+.thought { font-size: 13px; max-width: 230px; white-space: normal; text-align: left; line-height: 1.25; padding: 5px 10px; }
+.badge-crew { background: #455a64; color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,.4); }
 .badge-rescue { background: #fff3e0; color: #5d4037; }
 
 /* Grand Prix */
@@ -367,6 +371,7 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
   .hud-strip .speedo svg { width: 50px; height: 50px; }
   .hud-strip .speedo-level { top: 24px; width: 50px; font-size: 15px; }
   .hud-strip .speedo-xp { display: none; }
+  .hud-strip .speedo-menu { width: 18px; height: 18px; font-size: 10px; top: -3px; right: -5px; border-width: 1.5px; }
   .hud-chips { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; min-width: 0; }
   .chip-stat { display: flex; align-items: center; gap: 4px; min-width: 0; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.25); border-radius: 12px; padding: 1px 6px 1px 2px; color: #fff; font: 13px var(--display); white-space: nowrap; overflow: hidden; }
   .chip-stat .ico { width: 18px; height: 18px; font-size: 10px; border-width: 1.5px; }
@@ -525,14 +530,14 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
   .toast { font-size: 13px; }
 }
 
-/* Shop 3D previews: one canvas over the scrolling list draws every thumbnail. */
+/* 3D thumbnails: one hidden WebGL canvas renders them all onto per-card 2D canvases. */
 .panel { position: relative; }
-.preview-baker { position: fixed !important; left: -10000px; top: 0; pointer-events: none; }
+.preview-renderer { position: fixed !important; left: -10000px; top: 0; pointer-events: none; }
 .thumb3d { --tw: 132px; --th: 104px; width: 100%; height: var(--th); border-radius: 10px; overflow: hidden; display: flex; justify-content: center; background: radial-gradient(ellipse at 50% 70%, #ffffff 0 35%, #e3f2fd 75%); }
 .thumb3d.sm { --tw: 66px; --th: 52px; width: var(--tw); flex: none; border-radius: 8px; }
 .thumb3d.xs { --tw: 44px; --th: 35px; width: var(--tw); flex: none; border-radius: 6px; background: none; }
 .thumb3d.lg { --tw: 198px; --th: 156px; }
-.thumb-strip { width: var(--tw); height: var(--th); flex: none; display: block; }
+.thumb-view { width: var(--tw); height: var(--th); flex: none; display: block; }
 .card.locked .thumb3d { filter: grayscale(1); }
 
 /* Collect and fuel all: round button above the Race button with a recharge ring. */
@@ -549,6 +554,88 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 @media (max-width: 700px) {
   .collect-all { width: 52px; height: 52px; right: calc(10px + var(--sar)); bottom: calc(76px + var(--sab)); }
   .collect-ico { font-size: 24px; }
+}
+/* Leaderboards and clans */
+.crew-nudge { display: flex; gap: 10px; align-items: center; background: #eceff1; border: 2px dashed #90a4ae; border-radius: 12px; padding: 8px 10px; margin-bottom: 10px; }
+.crew-nudge > span { font-size: 26px; }
+.crew-nudge > div { flex: 1; display: flex; flex-direction: column; }
+.crew-nudge small { color: #546e7a; font-weight: 800; }
+.social-tabs { margin-top: 0; }
+.social-tabs .tab { font-size: 14px; padding: 6px 4px; white-space: nowrap; }
+.seg { display: flex; background: #eceff1; border-radius: 12px; padding: 3px; gap: 3px; }
+.seg button { flex: 1; border: none; background: none; border-radius: 9px; padding: 6px 8px; font: 14px var(--display); color: #546e7a; white-space: nowrap; }
+.seg button.sel { background: #fff; color: var(--ink); box-shadow: 0 1px 0 rgba(0,0,0,.15); }
+.seg.scope { margin-bottom: 8px; }
+.seg-ico { margin-right: 4px; }
+.board-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+.board-controls .metrics { flex: 3 1 320px; }
+.board-controls .periods { flex: 1 1 180px; }
+.board-hint { margin: 8px 0; }
+.board-row { grid-template-columns: 34px 1fr auto 64px; }
+.board-value { font: 17px var(--display); white-space: nowrap; }
+.empty-board { text-align: center; padding: 18px 8px; color: #546e7a; font-weight: 800; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.my-rank { text-align: center; font-weight: 800; margin: 10px 0 0; }
+.link { background: none; border: none; padding: 0; color: var(--blue); font: inherit; font-weight: 800; text-decoration: underline; }
+.clan-tag { display: inline-block; font: 13px var(--display); color: #fff; border-radius: 6px; padding: 1px 6px; text-shadow: 0 1px 1px rgba(0,0,0,.35); vertical-align: 2px; }
+.clan-tag.small { font-size: 11px; padding: 0 5px; vertical-align: 1px; }
+.clan-emblem { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 7px; font-size: 14px; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.15); vertical-align: -5px; }
+.clan-emblem.big { width: 42px; height: 42px; font-size: 24px; border-radius: 12px; }
+.big-emblem { display: grid; place-items: center; width: 64px; height: 64px; flex: none; font-size: 38px; border-radius: 18px; border: 3px solid #fff; background: #90a4ae; box-shadow: 0 3px 0 rgba(0,0,0,.2); }
+.clan-signin { display: flex; gap: 14px; align-items: center; background: #fff; border: 2px solid #e0e0e0; border-radius: 14px; padding: 12px; }
+.clan-signin p { margin: 4px 0 10px; }
+.clan-banner { display: flex; gap: 14px; align-items: center; padding: 12px; border-radius: 16px; color: #fff; background: linear-gradient(135deg, var(--clan), #263238); border: 3px solid #fff; box-shadow: 0 4px 0 rgba(0,0,0,.2); }
+.clan-banner .big-emblem { background: rgba(255,255,255,.2); }
+.clan-banner h3 { margin: 0; font-size: 24px; text-shadow: 0 2px 0 rgba(0,0,0,.3); }
+.clan-banner h3 .clan-tag { background: rgba(0,0,0,.35); }
+.clan-banner p { margin: 4px 0; font-weight: 800; }
+.clan-banner small { font-weight: 800; opacity: .9; }
+.clan-banner-main { min-width: 0; }
+.clan-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 10px 0; }
+.clan-stat { background: #fff; border: 2px solid #e0e0e0; border-radius: 12px; padding: 8px 4px; text-align: center; display: flex; flex-direction: column; align-items: center; }
+.clan-stat > span { font-size: 20px; }
+.clan-stat b { font: 20px var(--display); }
+.clan-stat small { color: #607d8b; font-weight: 800; }
+.clan-stat em { font: normal 12px var(--display); color: var(--green); }
+.member-row { grid-template-columns: 34px 1fr auto auto; }
+.member-row .rank { font-size: 14px; }
+.sell.small { margin-top: 0; font-size: 13px; padding: 4px 8px; }
+.clan-actions { display: flex; gap: 8px; align-items: center; justify-content: flex-end; flex-wrap: wrap; margin-top: 12px; }
+.clan-actions .sell { margin-top: 0; }
+.confirm { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-weight: 800; justify-content: flex-end; }
+.clan-form { display: flex; flex-direction: column; gap: 6px; background: #fff; border: 2px solid #e0e0e0; border-radius: 14px; padding: 12px; margin: 8px 0; }
+.clan-form h3 { margin-top: 0; }
+.clan-form label { font-weight: 800; font-size: 14px; color: #455a64; }
+.clan-form input[type=number] { width: 90px; display: block; }
+.clan-preview { display: flex; gap: 12px; align-items: center; font: 20px var(--display); }
+.clan-preview .clan-tag { font-size: 15px; }
+.emblem-picker { display: flex; flex-direction: column; gap: 8px; }
+.emblems { display: flex; flex-wrap: wrap; gap: 6px; }
+.emblem { width: 40px; height: 40px; border-radius: 11px; border: 2px solid #fff; box-shadow: 0 0 0 1px #90a4ae; font-size: 22px; padding: 0; }
+.emblem.sel { box-shadow: 0 0 0 3px var(--accent); }
+.clan-browser-head { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.clan-search { flex: 1; margin: 0; }
+.clan-row { grid-template-columns: 42px 1fr auto; }
+.clan-motto { font-size: 13px; color: #607d8b; font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.leader-main { min-width: 0; }
+.leader-main b { overflow-wrap: anywhere; }
+button.pill.trophies { cursor: pointer; }
+.hud-town button { font: inherit; color: inherit; background: none; border: none; padding: 0; }
+@media (max-width: 600px) {
+  .social-tabs .tab { font-size: 12px; padding: 6px 2px; }
+  .seg button { font-size: 12px; padding: 6px 3px; }
+  .seg-ico { margin-right: 2px; }
+  .board-controls .metrics, .board-controls .periods { flex-basis: 100%; }
+  .board-row { grid-template-columns: 26px 1fr auto auto; gap: 6px; padding: 6px 8px; }
+  .board-row .buy, .member-row .buy, .clan-row .buy { grid-column: auto; }
+  .board-row .buy.small, .member-row .buy.small, .member-row .sell.small { font-size: 12px; padding: 4px 7px; }
+  .board-value { font-size: 15px; }
+  .rank { width: 26px; height: 26px; font-size: 13px; }
+  .clan-stats { grid-template-columns: repeat(2, 1fr); }
+  .clan-banner { padding: 10px; gap: 10px; }
+  .clan-banner h3 { font-size: 19px; }
+  .big-emblem { width: 52px; height: 52px; font-size: 30px; }
+  .member-row { grid-template-columns: 26px 1fr auto auto; gap: 6px; padding: 6px 8px; }
+  .clan-browser-head .buy { font-size: 14px; padding: 6px 8px; white-space: nowrap; }
 }
 
 /* Level-up splash */

@@ -16,9 +16,12 @@ import { SeasonFx } from './SeasonFx'
 import { glowMats } from './dayNight'
 import { LightPool } from './BuildingModel'
 import { TownCars } from './TownCars'
+import { Townspeople } from './Townspeople'
+import { Batch } from './Batch'
 import { toWorld, toTile, DIRS } from './grid'
 import { grassTex, paverTex, asphaltTex } from './textures'
 import { layoutRoads } from './traffic/layout'
+import { LAYER, decal } from './layers'
 
 const SIZE = GRID * TILE
 // Everything a town could ever own, centred on the origin like the start lot.
@@ -38,20 +41,20 @@ function Land() {
         const [cx, cz] = plotCenter(px, pz)
         return (
           <group key={k} position={[cx, 0, cz]}>
-            <mesh rotation-x={-Math.PI / 2} position-y={0.001} receiveShadow>
+            <mesh rotation-x={-Math.PI / 2} position-y={LAYER.land} receiveShadow>
               <planeGeometry args={[PLOT * TILE, PLOT * TILE]} />
               <meshStandardMaterial map={grassTex(PLOT / 2)} />
             </mesh>
-            {mode !== 'play' && mode !== 'expand' && <gridHelper args={[PLOT * TILE, PLOT, '#4f8f2f', '#5f9f3f']} position-y={0.005} />}
+            {mode !== 'play' && mode !== 'expand' && <gridHelper args={[PLOT * TILE, PLOT, '#4f8f2f', '#5f9f3f']} position-y={LAYER.grid} />}
           </group>
         )
       })}
       {forSale.map(([px, pz]) => {
         const [cx, cz] = plotCenter(px, pz)
         return (
-          <mesh key={`${px},${pz}`} rotation-x={-Math.PI / 2} position={[cx, 0.004, cz]}>
+          <mesh key={`${px},${pz}`} rotation-x={-Math.PI / 2} position={[cx, LAYER.grid, cz]}>
             <planeGeometry args={[PLOT * TILE - 0.6, PLOT * TILE - 0.6]} />
-            <meshBasicMaterial color="#ffd54f" transparent opacity={0.35} />
+            <meshBasicMaterial color="#ffd54f" transparent opacity={0.35} depthWrite={false} {...decal()} />
           </mesh>
         )
       })}
@@ -78,20 +81,71 @@ const groundTile = (e: ThreeEvent<PointerEvent>) => {
 }
 
 // Pick a building up. Letting go drops it there if it fits, or snaps it back.
-function startDrag(b: PlacedBuilding, tile: [number, number]) {
+// `quick` is a long press from normal play, which goes back to play once dropped.
+function startDrag(b: PlacedBuilding, tile: [number, number], pointerId: number, quick = false) {
   useGame.getState().select(b.uid)
   useDrag.setState({ drag: { uid: b.uid, x: b.x, z: b.z, gx: tile[0] - b.x, gz: tile[1] - b.z } })
   const end = (e: PointerEvent) => {
+    // A second finger tapping Rotate mustn't drop the building.
+    if (e.pointerId !== pointerId) return
     window.removeEventListener('pointerup', end)
     window.removeEventListener('pointercancel', end)
     const d = useDrag.getState().drag
     useDrag.setState({ drag: null })
+    if (quick) useGame.getState().setMode('play')
     if (!d || e.type === 'pointercancel' || (d.x === b.x && d.z === b.z)) return
     if (useGame.getState().moveBuilding(d.uid, d.x, d.z)) sfx.click()
     else sfx.error()
   }
   window.addEventListener('pointerup', end)
   window.addEventListener('pointercancel', end)
+}
+
+// Holding a building in normal play picks it up. Moving the finger first pans the map instead.
+const HOLD_MS = 450
+const HOLD_SLOP = 10
+// Set when a hold lifted a building, so letting go doesn't also count as a tap on it.
+let held = false
+
+// The press being watched; a building made of several meshes reports one press per mesh.
+let holdPress: PointerEvent | null = null
+
+function holdToMove(b: PlacedBuilding, e: ThreeEvent<PointerEvent>) {
+  if (holdPress === e.nativeEvent) return
+  holdPress = e.nativeEvent
+  const tile = groundTile(e)
+  const { pointerId, clientX, clientY } = e.nativeEvent
+  const watch = {
+    timer: 0,
+    stop() {
+      clearTimeout(watch.timer)
+      window.removeEventListener('pointermove', watch.move)
+      window.removeEventListener('pointerrawupdate' as 'pointermove', watch.move)
+      window.removeEventListener('pointerup', watch.up)
+      window.removeEventListener('pointercancel', watch.up)
+    },
+    move(m: PointerEvent) {
+      if (m.pointerId === pointerId && Math.hypot(m.clientX - clientX, m.clientY - clientY) > HOLD_SLOP) watch.stop()
+    },
+    up(u: PointerEvent) {
+      if (u.pointerId === pointerId) watch.stop()
+    },
+  }
+  watch.timer = window.setTimeout(() => {
+    watch.stop()
+    const s = useGame.getState()
+    if (s.mode !== 'play' || s.panel || s.visiting) return
+    held = true
+    navigator.vibrate?.(15)
+    sfx.click()
+    useGame.setState({ mode: 'move', placing: null })
+    startDrag(b, tile, pointerId, true)
+  }, HOLD_MS)
+  // Raw updates aren't held back to the next frame, so a swipe cancels the hold even on a slow phone.
+  window.addEventListener('pointermove', watch.move)
+  window.addEventListener('pointerrawupdate' as 'pointermove', watch.move)
+  window.addEventListener('pointerup', watch.up)
+  window.addEventListener('pointercancel', watch.up)
 }
 
 function Building({ b, roads }: { b: PlacedBuilding; roads: Set<string> }) {
@@ -106,15 +160,24 @@ function Building({ b, roads }: { b: PlacedBuilding; roads: Set<string> }) {
       rotation-y={(turnOf(b, roads) * Math.PI) / 2}
       onPointerDown={(e) => {
         const s = useGame.getState()
-        if (s.mode !== 'move' || s.visiting || e.button !== 0) return
+        if (s.visiting || e.button !== 0) return
+        if (s.mode === 'play') {
+          held = false
+          if (movable(b.def)) holdToMove(b, e)
+          return
+        }
+        if (s.mode !== 'move') return
         e.stopPropagation()
         if (!movable(b.def)) return s.toast(`Tap the ${d.name.toLowerCase()} in play mode to clear it`)
-        startDrag(b, groundTile(e))
+        startDrag(b, groundTile(e), e.pointerId)
       }}
       onClick={(e) => {
         const s = useGame.getState()
         // In move mode the tap already picked it up; don't let it fall through and deselect.
-        if (s.mode === 'move') return e.stopPropagation()
+        if (s.mode === 'move' || held) {
+          held = false
+          return e.stopPropagation()
+        }
         if (s.mode !== 'play' || s.visiting || e.delta > 6) return
         e.stopPropagation()
         s.tapBuilding(b.uid)
@@ -127,7 +190,7 @@ function Building({ b, roads }: { b: PlacedBuilding; roads: Set<string> }) {
       onPointerOut={() => (document.body.style.cursor = '')}
     >
       {d.kind !== 'decor' && d.kind !== 'obstacle' && (
-        <mesh rotation-x={-Math.PI / 2} position-y={0.012} receiveShadow>
+        <mesh rotation-x={-Math.PI / 2} position-y={LAYER.lot} receiveShadow>
           <planeGeometry args={[d.w * TILE - 0.1, d.h * TILE - 0.1]} />
           <meshStandardMaterial map={paverTex(d.w, d.h)} />
         </mesh>
@@ -162,9 +225,9 @@ function Crosswalk({ side }: { side: 'e' | 'w' | 's' | 'n' }) {
   return (
     <group>
       {[-0.45, -0.15, 0.15, 0.45].map((o) => (
-        <mesh key={o} rotation-x={-Math.PI / 2} position={across ? [off, 0.021, o] : [o, 0.021, off]}>
+        <mesh key={o} rotation-x={-Math.PI / 2} position={across ? [off, LAYER.paint, o] : [o, LAYER.paint, off]}>
           <planeGeometry args={across ? [0.34, 0.16] : [0.16, 0.34]} />
-          <meshBasicMaterial color="#f5f5f5" />
+          <meshBasicMaterial color="#f5f5f5" {...decal()} />
         </mesh>
       ))}
     </group>
@@ -191,7 +254,8 @@ function StreetLamp({ side }: { side: 'e' | 'w' | 's' | 'n' }) {
           <primitive object={glowMats.bulb} attach="material" dispose={null} />
         </mesh>
       </group>
-      <LightPool r={0.95} x={0.55} z={half - 0.5} />
+      {/* Above the kerb so the glow spills over the sidewalk too. */}
+      <LightPool r={0.95} x={0.55} z={half - 0.5} y={0.09} />
     </group>
   )
 }
@@ -202,9 +266,9 @@ function Dashes({ alongX }: { alongX: boolean }) {
   return (
     <>
       {[-0.5, 0.5].map((o) => (
-        <mesh key={o} rotation-x={-Math.PI / 2} position={alongX ? [o, 0.02, 0] : [0, 0.02, o]}>
+        <mesh key={o} rotation-x={-Math.PI / 2} position={alongX ? [o, LAYER.paint, 0] : [0, LAYER.paint, o]}>
           <planeGeometry args={alongX ? [0.45, 0.07] : [0.07, 0.45]} />
-          <meshBasicMaterial color="#fafafa" />
+          <meshBasicMaterial color="#fafafa" {...decal()} />
         </mesh>
       ))}
     </>
@@ -218,9 +282,9 @@ function Median({ side }: { side: number }) {
   return (
     <>
       {[-0.07, 0.07].map((o) => (
-        <mesh key={o} rotation-x={-Math.PI / 2} position={alongX ? [0, 0.02, edge + o] : [edge + o, 0.02, 0]}>
+        <mesh key={o} rotation-x={-Math.PI / 2} position={alongX ? [0, LAYER.paint, edge + o] : [edge + o, LAYER.paint, 0]}>
           <planeGeometry args={alongX ? [TILE, 0.06] : [0.06, TILE]} />
-          <meshBasicMaterial color="#ffca28" />
+          <meshBasicMaterial color="#ffca28" {...decal()} />
         </mesh>
       ))}
     </>
@@ -235,9 +299,9 @@ function StopLine({ side }: { side: number }) {
   const at = TILE / 2 - 0.58
   const lane = 0.45
   return (
-    <mesh rotation-x={-Math.PI / 2} position={[dx * at + rx * lane, 0.02, dz * at + rz * lane]}>
+    <mesh rotation-x={-Math.PI / 2} position={[dx * at + rx * lane, LAYER.paint, dz * at + rz * lane]}>
       <planeGeometry args={dx ? [0.08, 0.8] : [0.8, 0.08]} />
-      <meshBasicMaterial color="#fafafa" />
+      <meshBasicMaterial color="#fafafa" {...decal()} />
     </mesh>
   )
 }
@@ -269,7 +333,7 @@ function Roads() {
         const outer = avenue ? SIDES[mate ^ 1] : null
         return (
           <group key={k} position={[wx, 0, wz]}>
-            <mesh rotation-x={-Math.PI / 2} position-y={0.01} receiveShadow>
+            <mesh rotation-x={-Math.PI / 2} position-y={LAYER.lot} receiveShadow>
               <planeGeometry args={[TILE, TILE]} />
               <meshStandardMaterial map={asphalt} />
             </mesh>
@@ -347,7 +411,7 @@ function Interaction() {
       const b = buildings.find((o) => o.uid === selected)
       const t = tileOf(e)
       const [w, h] = b ? lotSize(b.def, b.rot) : [0, 0]
-      if (b && t[0] >= b.x && t[0] < b.x + w && t[1] >= b.z && t[1] < b.z + h) startDrag(b, t)
+      if (b && t[0] >= b.x && t[0] < b.x + w && t[1] >= b.z && t[1] < b.z + h) startDrag(b, t, e.pointerId)
       return
     }
     if (mode !== 'road' && mode !== 'bulldoze') return
@@ -445,6 +509,7 @@ function Interaction() {
     <>
       <mesh
         rotation-x={-Math.PI / 2}
+        position-y={LAYER.base}
         receiveShadow
         onPointerMove={onMove}
         onPointerDown={onDown}
@@ -508,24 +573,35 @@ export function World() {
   const buildings = useGame((s) => (s.visiting ?? s).buildings)
   const roadsList = useGame((s) => (s.visiting ?? s).roads)
   const roads = useMemo(() => new Set(roadsList), [roadsList])
+  const land = useGame((s) => (s.visiting ? START_LAND : s.land))
+  const mode = useGame((s) => s.mode)
+  // Rebuild the merged town only when something's footprint changes, not on every job timer.
+  const layout = useMemo(
+    () => [buildings.map((b) => `${b.uid}:${b.def}:${b.x}:${b.z}:${b.rot}`).join(), roadsList.join(), land.join()].join('/'),
+    [buildings, roadsList, land],
+  )
   return (
     <>
       <DayNight small={Math.min(window.innerWidth, window.innerHeight) < 700} />
       {/* Grass beyond the buildable lot. */}
-      <mesh rotation-x={-Math.PI / 2} position-y={-0.02}>
+      <mesh rotation-x={-Math.PI / 2} position-y={LAYER.outer}>
         <planeGeometry args={[SIZE * 8, SIZE * 8]} />
         <meshStandardMaterial color={PAL.ground} />
       </mesh>
       <ResponsiveZoom />
       <ExpandZoom />
       <Interaction />
-      <Land />
-      <Roads />
-      {buildings.map((b) => (
-        <Building key={b.uid} b={b} roads={roads} />
-      ))}
+      {/* Pieces move while building or dragging, so merging waits for plain play. */}
+      <Batch version={layout} off={mode !== 'play'}>
+        <Land />
+        <Roads />
+        {buildings.map((b) => (
+          <Building key={b.uid} b={b} roads={roads} />
+        ))}
+      </Batch>
       <AnchorProjector />
       <TownCars />
+      <Townspeople />
       <Clouds />
       <SeasonFx small={Math.min(window.innerWidth, window.innerHeight) < 700} />
     </>
