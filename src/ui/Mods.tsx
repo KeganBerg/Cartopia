@@ -11,7 +11,11 @@ export function withMod(mods: string[] | undefined, tryId: string | null) {
 
 const STAT_NAME = { power: 'Power', grip: 'Grip', weight: 'Weight' } as const
 
+const TREAD_NAME = { wet: '🌧️ Rain', snow: '❄️ Snow', dust: '🏜️ Sand' } as const
+
 function statLine(m: ModDef) {
+  // Tires add no PI; they hold the strip in bad weather.
+  if (m.tread) return (Object.keys(TREAD_NAME) as (keyof typeof TREAD_NAME)[]).filter((k) => m.tread![k]).map((k) => `${TREAD_NAME[k]}${m.tread![k]! < 1 ? ` ${Math.round(m.tread![k]! * 100)}%` : ''}`).join(' · ')
   return (['power', 'grip', 'weight'] as const)
     .filter((k) => m[k])
     .map((k) => `${m[k] > 0 ? '+' : ''}${m[k]} ${STAT_NAME[k]}`)
