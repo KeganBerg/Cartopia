@@ -1,6 +1,7 @@
 import { buildingDef, PLOT } from './data'
 import { toWorld } from '../scene/grid'
 import { turnOf } from './placement'
+import { layoutRoads } from '../scene/traffic/layout'
 
 // The walking network for townspeople. Pedestrians keep to the sidewalks that
 // line every road, cross only on the zebra crossings painted next to
@@ -20,6 +21,9 @@ const ZEBRA = 0.32 // crosswalk stripes sit this far in from the intersection
 const LAWN = 2.5
 const TILE_COST = 2 * LAWN
 
+// SIDES index -> grid DIRS index (east, west, south, north).
+const SIDE_TO_DIR = [2, 0, 3, 1]
+
 const key = (x: number, z: number) => `${x},${z}`
 const owns = (land: string[], x: number, z: number) => land.includes(key(Math.floor(x / PLOT), Math.floor(z / PLOT)))
 const lotSize = (def: string, rot?: number): Tile => {
@@ -30,7 +34,9 @@ const lotSize = (def: string, rot?: number): Tile => {
 const corner = (i: number, j: number): Pt => toWorld(i - 0.5, j - 0.5)
 
 // A crosswalk being walked across. Cars can look these up to yield.
-export type Crossing = { id: string; mid: Pt }
+// `tile` and `dir` (grid DIRS order: east, west, south, north) name it the way
+// the traffic sim's crossingSignal does.
+export type Crossing = { id: string; mid: Pt; tile: string; dir: number }
 
 // How many people are on each crosswalk right now, keyed by crosswalk id
 // ("x,z:side": the road tile it's painted on and the side facing the
@@ -99,11 +105,12 @@ export function buildWalkGraph(roads: Set<string>, buildings: WalkBuilding[], la
   }
   const dist = (a: Pt, b: Pt) => Math.hypot(a[0] - b[0], a[1] - b[1])
 
-  // Sidewalks and crosswalks.
-  const degree = (x: number, z: number) => SIDES.filter(([dx, dz]) => isRoad(x + dx, z + dz)).length
+  // Sidewalks and crosswalks. Zebra crossings are painted where the road layout
+  // (shared with the road renderer and traffic) says a road meets an intersection.
+  const layout = layoutRoads(roads)
+  const junction = (x: number, z: number) => !!layout.tiles.get(key(x, z))?.junction
   for (const k of roads) {
     const [x, z] = k.split(',').map(Number)
-    const count = degree(x, z)
     SIDES.forEach(([dx, dz], s) => {
       const [ca, cb] = sideCorners(x, z, s)
       if (!isRoad(x + dx, z + dz)) {
@@ -112,7 +119,7 @@ export function buildWalkGraph(roads: Set<string>, buildings: WalkBuilding[], la
         const na = nodes[a] as { pos: Pt }
         const nb = nodes[b] as { pos: Pt }
         link(a, b, dist(na.pos, nb.pos), [])
-      } else if (count < 3 && degree(x + dx, z + dz) >= 3) {
+      } else if (!junction(x, z) && junction(x + dx, z + dz)) {
         // Zebra crossing on this tile, just before the intersection.
         const a = vertex(...ca)
         const b = vertex(...cb)
@@ -122,7 +129,9 @@ export function buildWalkGraph(roads: Set<string>, buildings: WalkBuilding[], la
         const uz = Math.sign(bz - az)
         const p1: Pt = [ax + ux * SIDEWALK - dx * ZEBRA, az + uz * SIDEWALK - dz * ZEBRA]
         const p2: Pt = [bx - ux * SIDEWALK - dx * ZEBRA, bz - uz * SIDEWALK - dz * ZEBRA]
-        link(a, b, dist(p1, p2) + 1.5, [p1, p2], { id: `${k}:${s}`, mid: [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2] })
+        link(a, b, dist(p1, p2) + 1.5, [p1, p2], {
+          id: `${k}:${s}`, mid: [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2], tile: k, dir: SIDE_TO_DIR[s],
+        })
       }
     })
   }
