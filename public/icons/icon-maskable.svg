@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4fc3f7"/><stop offset="1" stop-color="#1e5fbf"/></linearGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff5a4e"/><stop offset="1" stop-color="#c62828"/></linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#sky)"/>
+  <circle cx="400" cy="120" r="54" fill="#ffd54f"/>
+  <path d="M0 330 Q120 260 256 300 T512 290 V512 H0Z" fill="#66bb6a"/>
+  <rect y="372" width="512" height="140" fill="#455a64"/>
+  <g fill="#fff">
+    <rect x="20" y="436" width="70" height="12" rx="6"/><rect x="150" y="436" width="70" height="12" rx="6"/>
+    <rect x="280" y="436" width="70" height="12" rx="6"/><rect x="410" y="436" width="70" height="12" rx="6"/>
+  </g>
+  <g transform="translate(256 320) scale(.78)">
+    <ellipse cx="0" cy="66" rx="190" ry="18" fill="#000" opacity=".25"/>
+    <path d="M-185 40 Q-190 -10 -150 -18 L-95 -26 Q-60 -95 10 -98 Q85 -100 120 -30 L160 -22 Q195 -14 192 30 L190 46 Q188 58 175 58 L-172 58 Q-186 58 -185 40Z" fill="url(#body)" stroke="#7f1010" stroke-width="8" stroke-linejoin="round"/>
+    <path d="M-70 -28 Q-45 -80 0 -82 L0 -28Z" fill="#b3e5fc" stroke="#7f1010" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M16 -82 Q70 -82 98 -28 L16 -28Z" fill="#b3e5fc" stroke="#7f1010" stroke-width="6" stroke-linejoin="round"/>
+    <rect x="160" y="-8" width="26" height="16" rx="6" fill="#fff59d"/>
+    <rect x="-186" y="-4" width="16" height="14" rx="5" fill="#ffab91"/>
+    <rect x="-40" y="0" width="80" height="10" rx="5" fill="#ffcdd2" opacity=".7"/>
+    <g><circle cx="-105" cy="58" r="42" fill="#212121"/><circle cx="-105" cy="58" r="20" fill="#cfd8dc"/></g>
+    <g><circle cx="105" cy="58" r="42" fill="#212121"/><circle cx="105" cy="58" r="20" fill="#cfd8dc"/></g>
+  </g>
+</svg>

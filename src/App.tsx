@@ -18,6 +18,7 @@ import { RescuePanel } from './ui/Rescue'
 import { BankPanel } from './ui/Bank'
 import { LevelUpSplash } from './ui/LevelUp'
 import { AccountPanel } from './ui/Account'
+import { AlertsCard } from './ui/Alerts'
 import { WelcomeBack } from './ui/WelcomeBack'
 import { GiftWatcher, GiftsPanel } from './ui/Gifts'
 import { GoalsPanel, DailyPanel, FlatPanel } from './ui/Goals'
@@ -79,6 +80,7 @@ export default function App() {
       {panel === 'bank' && <BankPanel />}
       <VisitBanner />
       <Tutorial />
+      <AlertsCard />
       {panel === 'account' && <AccountPanel />}
       {panel === 'goals' && <GoalsPanel />}
       {panel === 'daily' && <DailyPanel />}
