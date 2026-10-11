@@ -27,6 +27,7 @@ import { GiftWatcher, GiftsPanel } from './ui/Gifts'
 import { GhostRacePanel, TauntWatcher, TauntsPanel } from './ui/GhostRace'
 import { GoalsPanel, DailyPanel, FlatPanel } from './ui/Goals'
 import { SeasonPanel } from './ui/Season'
+import { ArcadePanel } from './ui/Arcade'
 import { useGame, today } from './game/store'
 import { startCloudSync } from './lib/cloud'
 import './lib/rescue'
@@ -112,6 +113,7 @@ export default function App() {
       <TauntWatcher />
       {panel === 'taunts' && <TauntsPanel />}
       {panel === 'ghost' && <GhostRacePanel />}
+      {panel === 'arcade' && <ArcadePanel />}
       <PrizePopup />
       <CampaignPrizePopup />
       <LevelUpSplash />

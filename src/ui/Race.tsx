@@ -272,9 +272,9 @@ export function RacePanel() {
   return (
     <Panel title="Drag Race" wide>
       <SheetTabs
-        items={[{ id: 'quick', label: '🏁 Quick race' }, { id: 'campaign', label: '🗺️ Campaign' }, { id: 'gp', label: '🏆 Grand Prix' }, { id: 'trial', label: '⏱️ Time trial' }, { id: 'top', label: '🏅 Top racers' }] as const}
+        items={[{ id: 'quick', label: '🏁 Quick race' }, { id: 'campaign', label: '🗺️ Campaign' }, { id: 'gp', label: '🏆 Grand Prix' }, { id: 'trial', label: '⏱️ Time trial' }, { id: 'arcade', label: '🕹️ Arcade' }, { id: 'top', label: '🏅 Top racers' }] as const}
         value={tab}
-        onChange={(t) => (t === 'top' ? useGame.getState().openPanel('leaders') : setTab(t))}
+        onChange={(t) => (t === 'top' ? useGame.getState().openPanel('leaders') : t === 'arcade' ? useGame.getState().openPanel('arcade') : setTab(t))}
       />
       {car && (pickCar ? (
         <div className="race-cars">
