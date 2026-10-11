@@ -37,7 +37,7 @@ export const RIVALS: RivalDef[] = [
     },
   },
   {
-    id: 'polly', name: 'Polly Pistonbroke', icon: '💅', color: '#ec407a', unlockLevel: 4, pi: [36, 44], coins: 2500, bucks: 1, trophies: 3,
+    id: 'polly', name: 'Polly Pistonbroke', icon: '💅', color: '#ec407a', unlockLevel: 5, pi: [36, 44], coins: 2500, bucks: 1, trophies: 3,
     lines: {
       intro: 'I\'ve seen faster lawn mowers in this town.',
       back: ['I polished every bolt. Twice.', 'Custom exhaust. Try to keep up.'],
@@ -50,7 +50,7 @@ export const RIVALS: RivalDef[] = [
     },
   },
   {
-    id: 'duke', name: 'Duke Dragsworth', icon: '🎩', color: '#7e57c2', unlockLevel: 6, pi: [48, 58], coins: 4000, bucks: 2, trophies: 4,
+    id: 'duke', name: 'Duke Dragsworth', icon: '🎩', color: '#7e57c2', unlockLevel: 9, pi: [48, 58], coins: 4000, bucks: 2, trophies: 4,
     lines: {
       intro: 'A town this small needs a proper champion. Me.',
       back: ['My butler tuned the gearbox.', 'I bought a faster engine. And a faster butler.'],
@@ -63,7 +63,7 @@ export const RIVALS: RivalDef[] = [
     },
   },
   {
-    id: 'roxy', name: 'Roxy Revs', icon: '🔥', color: '#ef5350', unlockLevel: 9, pi: [64, 76], coins: 6500, bucks: 2, trophies: 5,
+    id: 'roxy', name: 'Roxy Revs', icon: '🔥', color: '#ef5350', unlockLevel: 14, pi: [64, 76], coins: 6500, bucks: 2, trophies: 5,
     lines: {
       intro: 'Heard you\'re fast. I\'m faster.',
       back: ['New tires. Still hot.', 'Full nitro. No more games.'],
@@ -76,7 +76,7 @@ export const RIVALS: RivalDef[] = [
     },
   },
   {
-    id: 'clutchula', name: 'Count Clutchula', icon: '🧛', color: '#5c6bc0', unlockLevel: 12, pi: [84, 96], coins: 10000, bucks: 3, trophies: 6,
+    id: 'clutchula', name: 'Count Clutchula', icon: '🧛', color: '#5c6bc0', unlockLevel: 20, pi: [84, 96], coins: 10000, bucks: 3, trophies: 6,
     lines: {
       intro: 'I have come from Transamsylvania to drain your trophies.',
       back: ['I rested in my garage. I am refreshed.', 'A full moon tonight. I am at full power.'],
@@ -89,7 +89,7 @@ export const RIVALS: RivalDef[] = [
     },
   },
   {
-    id: 'nova', name: 'Nova Nightshift', icon: '🌙', color: '#26c6da', unlockLevel: 15, pi: [104, 118], coins: 15000, bucks: 3, trophies: 8,
+    id: 'nova', name: 'Nova Nightshift', icon: '🌙', color: '#26c6da', unlockLevel: 27, pi: [104, 118], coins: 15000, bucks: 3, trophies: 8,
     lines: {
       intro: 'Every town has a fastest racer. Not yours.',
       back: ['I rebuilt the engine overnight.', 'This is my best car. Ready?'],
