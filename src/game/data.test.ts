@@ -68,7 +68,8 @@ describe('building upgrades', () => {
   it('grows houses into apartments at 4 and a tower at 7', () => {
     const house = buildingDef('house')
     expect([1, 3, 4, 6, 7, 10].map((l) => levelName(house, l))).toEqual(['House', 'House', 'Apartments', 'Apartments', 'Sky Tower', 'Sky Tower'])
-    expect(levelName(buildingDef('pizza'), 8)).toBe(buildingDef('pizza').name)
+    expect([3, 4, 8].map((l) => levelName(buildingDef('pizza'), l))).toEqual([buildingDef('pizza').name, 'Pizza Walk-Up', 'Pizza Tower'])
+    expect(levelName(buildingDef('gas'), 8)).toBe(buildingDef('gas').name)
     expect(houseResidents(1)).toBe(2)
     expect(buildingUpgradeCost(house, 1)).toEqual({ coins: 300, parts: 0 })
     expect([1, 2, 10].map((l) => upgradeFuelCap(house, l))).toEqual([0, 1, 9])

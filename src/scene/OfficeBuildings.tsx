@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Color, MeshStandardMaterial, PlaneGeometry } from 'three'
 import { levelLift, type BuildingDef } from '../game/data'
+import { growthStage, midFloors, towerFloors } from '../game/growth'
 import { Box, Cyl, Sign, Pool, Bulbs, Flag, Trims, type Mat, type V3 } from './NewBuildings'
 import { CarModel } from './CarModel'
 import { Upright } from './mergeScale'
@@ -29,7 +30,7 @@ const ROOF = SNOW ? '#f4f8fb' : '#cfd8dc'
 // One material per tint, kept by identity so Batch merges every pane of that
 // tint into one draw. Lit offices fade in with the night.
 const glassMats = new Map<string, MeshStandardMaterial>()
-function glassMat(tint: string) {
+export function glassMat(tint: string) {
   let g = glassMats.get(tint)
   if (g) return g
   g = new MeshStandardMaterial({ color: tint, map: curtainTex(), emissiveMap: curtainGlowTex(), emissive: new Color('#ffffff'), emissiveIntensity: 0, metalness: 0.15, roughness: 0.22 })
@@ -53,7 +54,7 @@ function paneGeo(w: number, h: number) {
   return g
 }
 
-function Glass({ m, ghost, at, w, h, ry = 0, tint }: { m: Mat; ghost?: boolean; at: V3; w: number; h: number; ry?: number; tint: string }) {
+export function Glass({ m, ghost, at, w, h, ry = 0, tint }: { m: Mat; ghost?: boolean; at: V3; w: number; h: number; ry?: number; tint: string }) {
   return (
     <mesh position={at} rotation-y={ry} geometry={paneGeo(w, h)}>
       {ghost ? m(tint) : <primitive object={glassMat(tint)} attach="material" dispose={null} />}
@@ -62,7 +63,7 @@ function Glass({ m, ghost, at, w, h, ry = 0, tint }: { m: Mat; ghost?: boolean; 
 }
 
 // A glass box: four curtain walls round a core, a roof slab, and slim corner fins.
-function GlassBlock({ m, ghost, x, z, y0 = 0, w, d, h, tint, frame, roof = ROOF }: { m: Mat; ghost?: boolean; x: number; z: number; y0?: number; w: number; d: number; h: number; tint: string; frame: string; roof?: string }) {
+export function GlassBlock({ m, ghost, x, z, y0 = 0, w, d, h, tint, frame, roof = ROOF }: { m: Mat; ghost?: boolean; x: number; z: number; y0?: number; w: number; d: number; h: number; tint: string; frame: string; roof?: string }) {
   const y = y0 + h / 2
   return (
     <group>
@@ -84,7 +85,7 @@ function GlassBlock({ m, ghost, x, z, y0 = 0, w, d, h, tint, frame, roof = ROOF 
 }
 
 // Rooftop plant: air handlers with fans, a vent stack and a hatch.
-function RoofPlant({ m, at, big }: { m: Mat; at: V3; big?: boolean }) {
+export function RoofPlant({ m, at, big }: { m: Mat; at: V3; big?: boolean }) {
   const k = big ? 1.3 : 1
   return (
     <group position={at}>
@@ -96,7 +97,7 @@ function RoofPlant({ m, at, big }: { m: Mat; at: V3; big?: boolean }) {
   )
 }
 
-function Planter({ m, at, big }: { m: Mat; at: V3; big?: boolean }) {
+export function Planter({ m, at, big }: { m: Mat; at: V3; big?: boolean }) {
   const r = big ? 0.2 : 0.15
   return (
     <group position={at}>
@@ -113,7 +114,7 @@ function Planter({ m, at, big }: { m: Mat; at: V3; big?: boolean }) {
   )
 }
 
-function Bench({ m, at, ry = 0 }: { m: Mat; at: V3; ry?: number }) {
+export function Bench({ m, at, ry = 0 }: { m: Mat; at: V3; ry?: number }) {
   return (
     <group position={at} rotation-y={ry}>
       <Box m={m} at={[0, 0.12, 0]} s={[0.36, 0.035, 0.1]} c="#8d6e63" />
@@ -123,7 +124,7 @@ function Bench({ m, at, ry = 0 }: { m: Mat; at: V3; ry?: number }) {
   )
 }
 
-function Lamp({ m, bulb, at }: { m: Mat; bulb: ReactNode; at: V3 }) {
+export function Lamp({ m, bulb, at }: { m: Mat; bulb: ReactNode; at: V3 }) {
   return (
     <group position={at}>
       <Cyl m={m} at={[0, 0.4, 0]} r={0.018} h={0.8} c="#37474f" seg={6} />
@@ -133,10 +134,32 @@ function Lamp({ m, bulb, at }: { m: Mat; bulb: ReactNode; at: V3 }) {
   )
 }
 
+// A tall block in stone with recessed glass bays between piers (the grown
+// hospital's tower).
+function StoneShaftLite({ m, ghost, x, z, y0, w, d, h }: { m: Mat; ghost?: boolean; x: number; z: number; y0: number; w: number; d: number; h: number }) {
+  const faces: [number, number, number, number][] = [[0, d / 2, 0, w], [0, -d / 2, Math.PI, w], [w / 2, 0, Math.PI / 2, d], [-w / 2, 0, -Math.PI / 2, d]]
+  return (
+    <group position={[x, 0, z]}>
+      <Box m={m} at={[0, y0 + h / 2, 0]} s={[w - 0.02, h, d - 0.02]} c="#f7f7f7" />
+      {faces.map(([fx, fz, ry, len]) => {
+        const n = Math.max(2, Math.round(len / 0.5))
+        const bw = (len - 0.1) / n
+        return (
+          <group key={ry} position={[fx, 0, fz]} rotation-y={ry}>
+            {Array.from({ length: n }, (_, i) => <Glass key={i} m={m} ghost={ghost} at={[-len / 2 + 0.05 + bw * (i + 0.5), y0 + h / 2 - 0.1, 0.004]} w={bw - 0.1} h={h - 0.4} tint="#80cbc4" />)}
+            {Array.from({ length: n + 1 }, (_, i) => <Box key={`p${i}`} m={m} at={[-len / 2 + 0.05 + bw * i, y0 + h / 2, 0.025]} s={[0.08, h, 0.05]} c="#ffffff" shadow={false} />)}
+          </group>
+        )
+      })}
+      <Box m={m} at={[0, y0 + h + 0.05, 0]} s={[w + 0.08, 0.1, d + 0.08]} c="#cfd8dc" />
+    </group>
+  )
+}
+
 // Signs that glow after dark (the HQ crown, HOSPITAL, EMERGENCY): kept by
 // identity, brightened by the night.
 const litSigns = new Map<string, MeshStandardMaterial>()
-function litSign(text: string, bg: string, fg: string, day = 0.15) {
+export function litSign(text: string, bg: string, fg: string, day = 0.15) {
   const k = `${text}|${bg}|${fg}`
   let s = litSigns.get(k)
   if (s) return s
@@ -148,7 +171,7 @@ function litSign(text: string, bg: string, fg: string, day = 0.15) {
   litSigns.set(k, s)
   return s
 }
-function LitSign({ text, w, at, bg, fg, ghost, m }: { text: string; w: number; at: V3; bg: string; fg: string; ghost?: boolean; m: Mat }) {
+export function LitSign({ text, w, at, bg, fg, ghost, m }: { text: string; w: number; at: V3; bg: string; fg: string; ghost?: boolean; m: Mat }) {
   return (
     <mesh position={at}>
       <planeGeometry args={[w, w / 4]} />
@@ -159,7 +182,7 @@ function LitSign({ text, w, at, bg, fg, ghost, m }: { text: string; w: number; a
 
 // The hospital's red cross: glows softly by day and bright at night.
 let crossMat: MeshStandardMaterial | null = null
-function redCross() {
+export function redCross() {
   if (crossMat) return crossMat
   const c = new MeshStandardMaterial({ color: '#d32f2f', emissive: new Color('#ff1744'), emissiveIntensity: 0.15 })
   c.userData.live = true
@@ -170,7 +193,7 @@ function redCross() {
 
 // Runway-style edge lights: amber around pads, blue along taxiways. Unlit
 // colours by day; the amber ones share the street-lamp bulb's night glow.
-function PadLights({ bulb, r, n, y = 0.06, x = 0, z = 0 }: { bulb: ReactNode; r: number; n: number; y?: number; x?: number; z?: number }) {
+export function PadLights({ bulb, r, n, y = 0.06, x = 0, z = 0 }: { bulb: ReactNode; r: number; n: number; y?: number; x?: number; z?: number }) {
   return (
     <group>
       {Array.from({ length: n }, (_, i) => {
@@ -190,11 +213,14 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
   const lvl = Math.min(10, Math.max(1, Math.floor(level) || 1))
   const lift = levelLift(lvl)
   const trim = !ghost
+  // Level 4 and 7 rebuild these into bigger forms (names in game/growth.ts).
+  const st = growthStage(lvl)
 
   switch (def.id) {
     // ---- Business Park: a two-storey office with ribbon windows and a glass atrium ----
     case 'offices': {
-      const h = 1.2 + lift
+      // Grown, the two-storey block is the podium for glass floors or a tower.
+      const h = st > 1 ? 1.2 : 1.2 + lift
       const w = 2.75
       const d = 1.3
       const x0 = -0.5
@@ -245,24 +271,57 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
               <Pool r={0.5} x={0.05} z={0.95} />
             </group>
           )}
-          {/* Rooftop plant; solar panels from level 4 and a roof garden from 7. */}
-          <RoofPlant m={m} at={[x0 + 0.85, h + 0.1, z0 - 0.15]} />
-          {trim && lvl >= 4 && [-1.45, -1.0, -0.55].map((x) => (
-            <Box key={x} m={m} at={[x, h + 0.2, z0 + 0.1]} rot={[-0.5, 0, 0]} s={[0.38, 0.02, 0.5]} c="#1a237e" />
-          ))}
-          {trim && lvl >= 7 && (
+          {st === 1 && (
             <group>
-              <Box m={m} at={[x0 + 0.85, h + 0.13, z0 + 0.38]} s={[0.9, 0.06, 0.4]} c={PAL.grass} />
-              {[0.55, 0.85, 1.15].map((x) => <mesh key={x} position={[x0 + x, h + 0.24, z0 + 0.38]}><icosahedronGeometry args={[0.09, 0]} /><meshStandardMaterial color={PAL.leaves[1]} flatShading /></mesh>)}
+              {/* Rooftop plant and solar panels. */}
+              <RoofPlant m={m} at={[x0 + 0.85, h + 0.1, z0 - 0.15]} />
+              {!ghost && <Trims m={m} lvl={lvl} w={w} d={d} h={h} z0={z0} flag="#455a64" />}
+              {!ghost && (
+                <group position={[x0 - 0.3, h + 0.36, zf - 0.06]}>
+                  <Box m={m} at={[0, 0, -0.03]} s={[1.36, 0.4, 0.05]} c="#455a64" shadow={false} />
+                  <Sign text="BUSINESS PARK" w={1.28} at={[0, 0, 0]} bg="#fafafa" fg="#37474f" />
+                </group>
+              )}
             </group>
           )}
-          {!ghost && <Trims m={m} lvl={lvl} w={w} d={d} h={h} z0={z0} flag="#455a64" />}
-          {!ghost && (
-            <group position={[x0 - 0.3, h + 0.36, zf - 0.06]}>
-              <Box m={m} at={[0, 0, -0.03]} s={[1.36, 0.4, 0.05]} c="#455a64" shadow={false} />
-              <Sign text="BUSINESS PARK" w={1.28} at={[0, 0, 0]} bg="#fafafa" fg="#37474f" />
-            </group>
-          )}
+          {st === 2 && (() => {
+            // Office Block: glass floors on the stone podium, the top floor set
+            // back behind a roof terrace.
+            const uh = (midFloors(lvl) + 1) * 0.3
+            const y = h + 0.1
+            return (
+              <group>
+                <GlassBlock m={m} ghost={ghost} x={x0} z={z0} y0={y} w={w} d={d} h={uh} tint="#90caf9" frame="#455a64" />
+                {!ghost && [-1.1, -0.55, 0, 0.55, 1.1].map((x) => <Box key={x} m={m} at={[x0 + x, y + uh / 2, zf + 0.03]} s={[0.04, uh, 0.05]} c="#eceff1" shadow={false} />)}
+                <GlassBlock m={m} ghost={ghost} x={x0 - 0.3} z={z0 - 0.2} y0={y + uh + 0.08} w={1.9} d={0.85} h={0.6} tint="#90caf9" frame="#455a64" />
+                <Box m={m} at={[x0 + 1.0, y + uh + 0.13, z0 + 0.2]} s={[0.7, 0.06, 0.8]} c={PAL.grass} />
+                {!ghost && [0.75, 1.2].map((x) => <Planter key={x} m={m} at={[x0 + x, y + uh + 0.12, z0 + 0.3]} />)}
+                {!ghost && <LitSign text="BUSINESS PARK" w={1.3} at={[x0 - 0.3, y + uh + 0.38, z0 - 0.2 + 0.43]} bg="#37474f" fg="#ffffff" m={m} />}
+                <RoofPlant m={m} at={[x0 - 0.6, y + uh + 0.76, z0 - 0.3]} />
+                {!ghost && lvl >= 5 && <Bulbs from={[x0 - w / 2, y + uh + 0.17, zf + 0.06]} to={[x0 + w / 2, y + uh + 0.17, zf + 0.06]} n={13} />}
+              </group>
+            )
+          })()}
+          {st === 3 && (() => {
+            // Business Tower: a glass tower with aluminium fins and a stepped crown.
+            const th = towerFloors(lvl) * 0.3
+            const y = h + 0.1
+            const tx = x0 + 0.05
+            const tz = z0 - 0.1
+            return (
+              <group>
+                <GlassBlock m={m} ghost={ghost} x={tx} z={tz} y0={y} w={2.1} d={1.05} h={th} tint="#90caf9" frame="#455a64" />
+                {!ghost && [-0.8, -0.4, 0, 0.4, 0.8].map((x) => <Box key={x} m={m} at={[tx + x, y + th / 2, tz + 0.555]} s={[0.03, th, 0.06]} c="#cfd8dc" shadow={false} />)}
+                <GlassBlock m={m} ghost={ghost} x={tx} z={tz} y0={y + th + 0.08} w={1.5} d={0.75} h={0.5} tint="#90caf9" frame="#455a64" />
+                {!ghost && <LitSign text="BUSINESS PARK" w={1.2} at={[tx, y + th + 0.33, tz + 0.38]} bg="#37474f" fg="#ffffff" m={m} />}
+                <Box m={m} at={[tx, y + th + 0.66, tz]} s={[0.9, 0.08, 0.45]} c={lvl >= 10 ? GOLD : '#455a64'} />
+                <Cyl m={m} at={[tx + 0.3, y + th + 1.0, tz]} r={0.015} r2={0.03} h={0.62} c="#cfd8dc" seg={6} />
+                <mesh position={[tx + 0.3, y + th + 1.33, tz]}><sphereGeometry args={[0.04, 8, 6]} /><primitive object={glowMats.taillight} attach="material" dispose={null} /></mesh>
+                {!ghost && lvl >= 8 && <Flag at={[tx - 0.5, y + th + 0.7, tz]} color="#455a64" star={lvl >= 10} />}
+                {!ghost && [-1.5, -0.9].map((x) => <Planter key={x} m={m} at={[x, h + 0.12, z0 + 0.35]} />)}
+              </group>
+            )
+          })()}
         </group>
       )
     }
@@ -289,23 +348,68 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
           <mesh position={[0.2, 0.672, 1.04]}><boxGeometry args={[1.24, 0.015, 0.02]} />{bulb}</mesh>
           <mesh position={[0.2, 0.3, 0.55]}><cylinderGeometry args={[0.22, 0.22, 0.58, 16, 1, true]} />{ghost ? m('#90a4ae') : <primitive object={glassMat('#cfd8dc')} attach="material" dispose={null} />}</mesh>
           <Cyl m={m} at={[0.2, 0.6, 0.55]} r={0.24} h={0.04} c="#263238" seg={16} />
-          {/* The tower: dark glass between slim aluminium fins. */}
-          <GlassBlock m={m} ghost={ghost} x={tx} z={tz} y0={ph} w={tw} d={td} h={th} tint="#a9c4de" frame="#263238" />
-          {!ghost && Array.from({ length: 7 }, (_, i) => tx - tw / 2 + 0.25 + i * 0.25).map((x) => (
-            <Box key={x} m={m} at={[x, ph + th / 2, tz + td / 2 + 0.03]} s={[0.025, th, 0.06]} c="#b0bec5" shadow={false} />
-          ))}
-          {!ghost && [-1, 1].flatMap((sd) => [-0.25, 0.1].map((z) => (
-            <Box key={`${sd}${z}`} m={m} at={[tx + sd * (tw / 2 + 0.03), ph + th / 2, tz + z]} s={[0.06, th, 0.025]} c="#b0bec5" shadow={false} />
-          )))}
-          {/* Crown: a stepped glass top with the company name lit after dark. */}
-          <GlassBlock m={m} ghost={ghost} x={tx} z={tz - 0.05} y0={top + 0.08} w={1.5} d={0.8} h={0.42} tint="#a9c4de" frame="#263238" />
-          <LitSign text="APEXCORP" w={1.3} at={[tx, top + 0.29, tz + 0.354]} bg="#0d1b2a" fg="#4fc3f7" ghost={ghost} m={m} />
-          <Cyl m={m} at={[tx + 0.5, top + 0.88, tz - 0.2]} r={0.015} h={0.75} c="#90a4ae" seg={6} />
-          <mesh position={[tx + 0.5, top + 1.27, tz - 0.2]}><sphereGeometry args={[0.035, 8, 6]} /><primitive object={glowMats.taillight} attach="material" dispose={null} /></mesh>
-          <RoofPlant m={m} at={[tx - 0.4, top + 0.5, tz - 0.1]} />
-          {trim && lvl >= 5 && <Bulbs from={[tx - tw / 2, top + 0.02, tz + td / 2 + 0.05]} to={[tx + tw / 2, top + 0.02, tz + td / 2 + 0.05]} n={11} />}
-          {trim && lvl >= 9 && <Box m={m} at={[tx, top + 0.53, tz + 0.36]} s={[1.56, 0.05, 0.03]} c={GOLD} />}
-          {trim && lvl >= 8 && <Flag at={[tx - 0.55, top + 0.5, tz - 0.3]} color="#1e3a5f" star={lvl >= 10} />}
+          {st < 3 ? (
+            <group>
+              {/* The tower: dark glass between slim aluminium fins. */}
+              <GlassBlock m={m} ghost={ghost} x={tx} z={tz} y0={ph} w={tw} d={td} h={th} tint="#a9c4de" frame="#263238" />
+              {!ghost && Array.from({ length: 7 }, (_, i) => tx - tw / 2 + 0.25 + i * 0.25).map((x) => (
+                <Box key={x} m={m} at={[x, ph + th / 2, tz + td / 2 + 0.03]} s={[0.025, th, 0.06]} c="#b0bec5" shadow={false} />
+              ))}
+              {!ghost && [-1, 1].flatMap((sd) => [-0.25, 0.1].map((z) => (
+                <Box key={`${sd}${z}`} m={m} at={[tx + sd * (tw / 2 + 0.03), ph + th / 2, tz + z]} s={[0.06, th, 0.025]} c="#b0bec5" shadow={false} />
+              )))}
+              {/* Crown: a stepped glass top with the company name lit after dark. */}
+              <GlassBlock m={m} ghost={ghost} x={tx} z={tz - 0.05} y0={top + 0.08} w={1.5} d={0.8} h={0.42} tint="#a9c4de" frame="#263238" />
+              <LitSign text="APEXCORP" w={1.3} at={[tx, top + 0.29, tz + 0.354]} bg="#0d1b2a" fg="#4fc3f7" ghost={ghost} m={m} />
+              {st === 1 ? (
+                <group>
+                  <Cyl m={m} at={[tx + 0.5, top + 0.88, tz - 0.2]} r={0.015} h={0.75} c="#90a4ae" seg={6} />
+                  <mesh position={[tx + 0.5, top + 1.27, tz - 0.2]}><sphereGeometry args={[0.035, 8, 6]} /><primitive object={glowMats.taillight} attach="material" dispose={null} /></mesh>
+                  <RoofPlant m={m} at={[tx - 0.4, top + 0.5, tz - 0.1]} />
+                </group>
+              ) : (
+                <group position={[tx, top + 0.5, tz - 0.05]}>
+                  {/* HQ Campus: an executive helipad over the crown, and a mast. */}
+                  <Box m={m} at={[0, 0.05, 0]} s={[1.2, 0.1, 0.9]} c="#78909c" />
+                  <mesh position={[0, 0.101, 0]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.84, 0.84]} />{m('#ffffff', helipadTex('#4fc3f7', '#fafafa'))}</mesh>
+                  {!ghost && <PadLights bulb={bulb} r={0.45} n={8} y={0.12} />}
+                  {[-0.45, 0.45].map((x) => <Box key={x} m={m} at={[x, -0.2, 0.3]} rot={[0, 0, x > 0 ? -0.6 : 0.6]} s={[0.04, 0.5, 0.04]} c="#263238" shadow={false} />)}
+                  <Cyl m={m} at={[0.55, 0.55, -0.35]} r={0.015} r2={0.03} h={1.0} c="#90a4ae" seg={6} />
+                  <mesh position={[0.55, 1.07, -0.35]}><sphereGeometry args={[0.035, 8, 6]} /><primitive object={glowMats.taillight} attach="material" dispose={null} /></mesh>
+                </group>
+              )}
+              {trim && lvl >= 5 && <Bulbs from={[tx - tw / 2, top + 0.02, tz + td / 2 + 0.05]} to={[tx + tw / 2, top + 0.02, tz + td / 2 + 0.05]} n={11} />}
+              {trim && lvl >= 8 && <Flag at={[tx - 0.55, top + 0.5, tz - 0.3]} color="#1e3a5f" star={lvl >= 10} />}
+            </group>
+          ) : (() => {
+            // Twin Towers: two glass towers on the podium joined by a sky bridge.
+            const t2 = towerFloors(lvl) * 0.34
+            const bridge = ph + t2 * 0.62
+            return (
+              <group>
+                {/* Set on a diagonal so both read from the town camera. */}
+                {([[-1.0, -0.2], [1.05, -0.55]] as const).map(([x, z], i) => {
+                  const th2 = t2 - i * 0.34
+                  return (
+                    <group key={x}>
+                      <GlassBlock m={m} ghost={ghost} x={x} z={z} y0={ph} w={1.1} d={0.85} h={th2} tint="#a9c4de" frame="#263238" />
+                      {!ghost && [-0.33, -0.11, 0.11, 0.33].map((fx) => <Box key={fx} m={m} at={[x + fx, ph + th2 / 2, z + 0.455]} s={[0.025, th2, 0.06]} c="#b0bec5" shadow={false} />)}
+                      <GlassBlock m={m} ghost={ghost} x={x} z={z - 0.02} y0={ph + th2 + 0.08} w={0.78} d={0.6} h={0.36} tint="#a9c4de" frame="#263238" />
+                      <Cyl m={m} at={[x, ph + th2 + 0.95, z - 0.02]} r={0.02} r2={0.06} h={1.0} c={lvl >= 10 ? GOLD : '#cfd8dc'} seg={8} />
+                      <mesh position={[x, ph + th2 + 1.48, z - 0.02]}><sphereGeometry args={[0.04, 8, 6]} /><primitive object={glowMats.taillight} attach="material" dispose={null} /></mesh>
+                      {trim && <Bulbs from={[x - 0.55, ph + th2 + 0.02, z + 0.47]} to={[x + 0.55, ph + th2 + 0.02, z + 0.47]} n={7} />}
+                    </group>
+                  )
+                })}
+                <group position={[0.02, bridge, -0.38]} rotation-y={Math.atan2(0.35, 2.05)}>
+                  <GlassBlock m={m} ghost={ghost} x={0} z={0} y0={0} w={1.0} d={0.36} h={0.24} tint="#cfd8dc" frame="#263238" />
+                  {[-0.3, 0.3].map((x) => <Box key={x} m={m} at={[x, -0.2, 0]} rot={[0, 0, x < 0 ? 0.7 : -0.7]} s={[0.04, 0.45, 0.04]} c="#263238" shadow={false} />)}
+                </group>
+                <LitSign text="APEXCORP" w={0.7} at={[-1.0, ph + t2 + 0.26, -0.2 + 0.285]} bg="#0d1b2a" fg="#4fc3f7" ghost={ghost} m={m} />
+                {trim && lvl >= 8 && <Flag at={[0.4, ph + 0.05, -0.75]} color="#1e3a5f" star={lvl >= 10} />}
+              </group>
+            )
+          })()}
           {/* Plaza: three flags, a fountain and the boss's car at the kerb. */}
           {!ghost && (
             <group>
@@ -334,9 +438,16 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
 
     // ---- Glass Tower: a teal skyscraper with setbacks, a spire and a plaza ----
     case 'glasstower': {
-      const H = 3.4 + lift * 1.3
       const tz = -0.55
       const lob = 0.75
+      // Level 7-10: two-floor slabs, each turned a little more, 6 to 13 of them.
+      const segs = Math.round(towerFloors(lvl) / 1.45)
+      const twist = (4 * Math.PI) / 180
+      const H = st === 3 ? lob + 0.08 + segs * 0.6 : 3.4 + lift * 1.3
+      const turn = st === 3 ? (segs - 1) * twist : 0
+      // Level 4-6: an open sky garden splits the shaft.
+      const g1 = lob + 0.08 + (H - lob) * 0.52
+      const crown = (kids: ReactNode) => (turn ? <group position={[0, 0, tz]} rotation-y={turn}><group position={[0, 0, -tz]}>{kids}</group></group> : kids)
       return (
         <group>
           <Box m={m} at={[0, 0.025, 0]} s={[3.9, 0.05, 3.9]} c="#ffffff" t={paverTex(4, 4)} shadow={false} />
@@ -345,8 +456,26 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
           <Box m={m} at={[0, lob + 0.04, tz + 1.3]} s={[1.4, 0.06, 0.5]} c="#263238" />
           <mesh position={[0, lob + 0.01, tz + 1.54]}><boxGeometry args={[1.36, 0.015, 0.02]} />{bulb}</mesh>
           <mesh position={[0, 0.3, tz + 1.156]}><planeGeometry args={[0.6, 0.56]} />{m('#1c2a33')}</mesh>
-          {/* Shaft, upper setback and crown band. */}
-          <GlassBlock m={m} ghost={ghost} x={0} z={tz} y0={lob + 0.08} w={2.1} d={1.9} h={H - lob} tint="#7fd1c7" frame="#eceff1" />
+          {/* Shaft (whole, split by a sky garden, or twisting), upper setback and crown band. */}
+          {st === 1 && <GlassBlock m={m} ghost={ghost} x={0} z={tz} y0={lob + 0.08} w={2.1} d={1.9} h={H - lob} tint="#7fd1c7" frame="#eceff1" />}
+          {st === 2 && (
+            <group>
+              <GlassBlock m={m} ghost={ghost} x={0} z={tz} y0={lob + 0.08} w={2.1} d={1.9} h={g1 - lob - 0.08} tint="#7fd1c7" frame="#eceff1" />
+              <Box m={m} at={[0, g1 + 0.25, tz]} s={[1.3, 0.5, 1.1]} c="#37474f" />
+              <Box m={m} at={[0, g1 + 0.12, tz]} s={[2.0, 0.06, 1.8]} c={PAL.grass} />
+              {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => <Box key={`${sx}${sz}`} m={m} at={[sx * 1.0, g1 + 0.3, tz + sz * 0.9]} s={[0.08, 0.5, 0.08]} c="#eceff1" />))}
+              {!ghost && [[-0.75, 0.6], [0.75, 0.6], [-0.75, -0.6], [0.75, -0.6], [0, 0.72]].map(([x, z]) => <Planter key={`${x}${z}`} m={m} at={[x, g1 + 0.12, tz + z]} />)}
+              <GlassBlock m={m} ghost={ghost} x={0} z={tz} y0={g1 + 0.5} w={2.1} d={1.9} h={H - g1 - 0.5} tint="#7fd1c7" frame="#eceff1" />
+            </group>
+          )}
+          {st === 3 && Array.from({ length: segs }, (_, i) => (
+            <group key={i} position={[0, 0, tz]} rotation-y={i * twist}>
+              <GlassBlock m={m} ghost={ghost} x={0} z={0} y0={lob + 0.08 + i * 0.6} w={2.1} d={1.9} h={0.56} tint="#7fd1c7" frame="#eceff1" roof="#eceff1" />
+            </group>
+          ))}
+          {!ghost && <LitSign text="HORIZON" w={1.0} at={[0, lob + 0.17, tz + 1.552]} bg="#004d40" fg="#e0f2f1" m={m} />}
+          {crown(
+            <group>
           <GlassBlock m={m} ghost={ghost} x={0} z={tz} y0={H + 0.16} w={1.5} d={1.3} h={0.7} tint="#7fd1c7" frame="#eceff1" />
           <mesh position={[0, H + 0.2, tz + 0.96]}><boxGeometry args={[2.1, 0.03, 0.02]} />{bulb}</mesh>
           <mesh position={[0, H + 0.2, tz - 0.96]}><boxGeometry args={[2.1, 0.03, 0.02]} />{bulb}</mesh>
@@ -354,10 +483,9 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
           <Box m={m} at={[0, H + 0.98, tz]} s={[0.7, 0.16, 0.6]} c="#eceff1" />
           <Cyl m={m} at={[0, H + 1.5, tz]} r={0.02} r2={0.07} h={0.9} c="#eceff1" seg={8} />
           <mesh position={[0, H + 1.97, tz]}><sphereGeometry args={[0.045, 8, 6]} /><primitive object={glowMats.taillight} attach="material" dispose={null} /></mesh>
-          {!ghost && <LitSign text="HORIZON" w={1.0} at={[0, lob + 0.17, tz + 1.552]} bg="#004d40" fg="#e0f2f1" m={m} />}
           {!ghost && <LitSign text="HORIZON" w={1.2} at={[0, H + 0.55, tz + 0.656]} bg="#004d40" fg="#a7ffeb" m={m} />}
           {/* Window-cleaning cradle from level 6, roof garden from 4. */}
-          {trim && lvl >= 6 && (
+          {trim && lvl >= 6 && st < 3 && (
             <group position={[0.55, H * 0.62, tz + 0.99]}>
               <Box m={m} at={[0, 0, 0.05]} s={[0.5, 0.1, 0.12]} c="#fdd835" />
               {[-0.22, 0.22].map((x) => <Cyl key={x} m={m} at={[x, (H * 0.38 + 0.2) / 2, 0.04]} r={0.004} h={H * 0.38 + 0.2} c="#424242" seg={4} />)}
@@ -365,6 +493,8 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
           )}
           {trim && lvl >= 4 && [-0.45, 0.45].map((x) => <Planter key={x} m={m} at={[x, H + 0.86, tz + 0.4]} />)}
           {!ghost && <Trims m={m} lvl={lvl} w={1.5} d={1.3} h={H + 0.86} z0={tz} flag="#004d40" />}
+            </group>,
+          )}
           {/* Plaza: reflecting pool, a sculpture, planters, benches and a taxi waiting. */}
           {!ghost && (
             <group>
@@ -398,7 +528,14 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
 
     // ---- Hospital: wards, an emergency wing with an ambulance bay, and a rooftop pad ----
     case 'hospital': {
-      const h = 1.65 + lift
+      // Grown, the ward block stops at three floors and a ward tower rises
+      // behind it (level 4-6), then a medical tower with the pad on top (7-10).
+      const h = 1.65 + (st > 1 ? levelLift(3) : lift)
+      const wardFl = midFloors(lvl) + 1
+      const tth = st === 2 ? wardFl * 0.42 : st === 3 ? towerFloors(lvl) * 0.32 : 0
+      const tx = st === 3 ? 0.55 : 0.9
+      const tw = st === 3 ? 2.1 : 1.5
+      const padAt: V3 = st === 3 ? [tx, h + tth + 0.12, -1.05] : [-0.75, h + 0.1, -1.0]
       const w = 3.5
       const d = 1.7
       const z0 = -1.0
@@ -451,7 +588,7 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
           )}
           <Box m={m} at={[1.2, 0.055, zf + 1.4]} s={[1.3, 0.012, 1.0]} c="#78909c" shadow={false} />
           {/* Rooftop helipad with edge lights, and the air ambulance on it. */}
-          <group position={[-0.75, h + 0.1, z0]}>
+          <group position={padAt}>
             <Box m={m} at={[0, 0.06, 0]} s={[1.6, 0.12, 1.5]} c="#9e9e9e" />
             <mesh position={[0, 0.121, 0]} rotation-x={-Math.PI / 2}>
               <planeGeometry args={[1.5, 1.5]} />
@@ -464,8 +601,48 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
               </group>
             )}
           </group>
-          <RoofPlant m={m} at={[0.85, h + 0.1, z0 - 0.2]} big />
-          <Box m={m} at={[1.4, h + 0.3, z0 + 0.35]} s={[0.4, 0.4, 0.35]} c="#eceff1" />
+          {st === 1 && <RoofPlant m={m} at={[0.85, h + 0.1, z0 - 0.2]} big />}
+          {st === 1 && <Box m={m} at={[1.4, h + 0.3, z0 + 0.35]} s={[0.4, 0.4, 0.35]} c="#eceff1" />}
+          {st === 2 && (
+            <group>
+              {/* Ward tower: white, a glass band on every floor, the cross on top. */}
+              <Box m={m} at={[tx, h + tth / 2, -1.05]} s={[tw, tth, 1.3]} c="#f7f7f7" />
+              {Array.from({ length: wardFl }, (_, i) => h + i * 0.42 + 0.22).map((y) => (
+                <group key={y}>
+                  <Glass m={m} ghost={ghost} at={[tx, y, -1.05 + 0.654]} w={tw - 0.16} h={0.22} tint="#80cbc4" />
+                  <Glass m={m} ghost={ghost} at={[tx + tw / 2 + 0.004, y, -1.05]} w={1.14} h={0.22} ry={Math.PI / 2} tint="#80cbc4" />
+                  <Glass m={m} ghost={ghost} at={[tx - tw / 2 - 0.004, y, -1.05]} w={1.14} h={0.22} ry={-Math.PI / 2} tint="#80cbc4" />
+                </group>
+              ))}
+              <Box m={m} at={[tx, h + tth + 0.05, -1.05]} s={[tw + 0.06, 0.1, 1.36]} c="#cfd8dc" />
+              <Box m={m} at={[tx, h + tth - 0.06, -1.05 + 0.66]} s={[tw + 0.01, 0.08, 0.02]} c="#d32f2f" shadow={false} />
+              <RoofPlant m={m} at={[tx + 0.2, h + tth + 0.1, -1.25]} />
+              <group position={[tx - 0.35, h + tth + 0.42, -1.05 + 0.4]}>
+                {[[0.34, 0.11], [0.11, 0.34]].map(([sx, sy]) => (
+                  <mesh key={sx}><boxGeometry args={[sx, sy, 0.05]} />{ghost ? m('#d32f2f') : <primitive object={redCross()} attach="material" dispose={null} />}</mesh>
+                ))}
+                <Box m={m} at={[0, -0.25, -0.02]} s={[0.04, 0.3, 0.04]} c="#90a4ae" shadow={false} />
+              </group>
+            </group>
+          )}
+          {st === 3 && (
+            <group>
+              {/* Medical tower: white stone and sea-green glass, a red band and cross at the top. */}
+              <StoneShaftLite m={m} ghost={ghost} x={tx} z={-1.05} y0={h} w={tw} d={1.35} h={tth} />
+              <Box m={m} at={[tx, h + tth - 0.12, -1.05 + 0.7]} s={[tw + 0.02, 0.1, 0.02]} c="#d32f2f" shadow={false} />
+              <group position={[tx + 0.65, h + tth - 0.55, -1.05 + 0.72]}>
+                <Box m={m} at={[0, 0, -0.01]} s={[0.5, 0.5, 0.02]} c="#fafafa" shadow={false} />
+                {[[0.36, 0.12], [0.12, 0.36]].map(([sx, sy]) => (
+                  <mesh key={sx}><boxGeometry args={[sx, sy, 0.03]} />{ghost ? m('#d32f2f') : <primitive object={redCross()} attach="material" dispose={null} />}</mesh>
+                ))}
+              </group>
+              {!ghost && <LitSign text="MERCY" w={0.8} at={[tx - 0.45, h + tth - 0.55, -1.05 + 0.72]} bg="#fafafa" fg="#c62828" m={m} />}
+              {/* The old pad's roof becomes a garden for the patients. */}
+              <Box m={m} at={[-1.05, h + 0.13, -1.0]} s={[1.2, 0.06, 1.3]} c={PAL.grass} />
+              {!ghost && [[-1.4, -0.6], [-0.7, -1.4], [-1.4, -1.4]].map(([x, z]) => <Planter key={`${x}${z}`} m={m} at={[x, h + 0.14, z]} />)}
+              {!ghost && <Bench m={m} at={[-1.0, h + 0.14, -0.6]} ry={Math.PI} />}
+            </group>
+          )}
           {!ghost && <Trims m={m} lvl={lvl} w={w} d={d} h={h + 0.05} z0={z0} flag="#d32f2f" />}
           {/* Grounds: benches, planters, lamps and a wheelchair ramp to the doors. */}
           {!ghost && (
