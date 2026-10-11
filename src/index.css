@@ -1790,3 +1790,9 @@ button.book-car { font: inherit; color: inherit; }
 
 /* The CARS window's four tabs fit a small phone without their emoji. */
 @media (max-width: 400px) { .tab-emo { display: none; } }
+/* Town news waits while a race fills the screen. */
+body:has(.race-full) .toasts { display: none; }
+.rf-hold { position: absolute; left: 0; right: 0; bottom: calc(200px + var(--sab)); width: fit-content; margin: 0 auto; padding: 6px 16px; border-radius: 999px; background: rgba(27,31,36,.7); color: #ffd54f; font: 18px var(--display); pointer-events: none; white-space: nowrap; }
+@media (max-height: 500px) { .rf-hold { bottom: calc(130px + var(--sab)); font-size: 15px; } }
+.race-full .shift-btn.launch.now { box-shadow: 0 4px 0 rgba(0,0,0,.35), 0 0 22px rgba(118,255,3,.8); }
+.race-full .shift-btn.launch.late { background: linear-gradient(#ff5252, #8e0000); }

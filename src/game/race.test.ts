@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { JUMP_START_DELAY, MAX_RACE_PI, dynoPull, fireBoost, freshRacer, launchRacer, raceFloor, shiftRacer, stepRacer } from './race'
+import { TOP_GEAR, JUMP_START_DELAY, MAX_RACE_PI, dynoPull, fireBoost, freshRacer, launchRacer, raceFloor, shiftRacer, stepRacer } from './race'
 
 const dir = new URL('../../supabase/migrations/', import.meta.url)
 // The newest migration that sets public.race_floor().
@@ -20,7 +20,7 @@ describe('live race referee', () => {
         let t = 0
         while (r.finished === null) {
           t += dt
-          if (r.gear < 3 && r.rpm >= 0.8) {
+          if (r.gear < TOP_GEAR && r.rpm >= 0.8) {
             r.quality = 1.08
             r.gear++
             r.rpm = 0.35
@@ -41,7 +41,7 @@ describe('live race referee', () => {
         while (r.finished === null) {
           t += dt
           if (!r.launched) launchRacer(r, 0)
-          if (r.gear < 3 && r.rpm >= 0.92) shiftRacer(r, 1.08)
+          if (r.gear < TOP_GEAR && r.rpm >= 0.92) shiftRacer(r, 1.08)
           if (t >= fireAt) fireBoost(r)
           stepRacer(r, pi, dt, t, r.gear === 0 ? 1.2 : 1)
         }
@@ -59,7 +59,7 @@ describe('launch and boost', () => {
     while (r.finished === null && t < 60) {
       t += dt
       if (!r.launched && t >= (launchAt < 0 ? JUMP_START_DELAY : launchAt)) launchRacer(r, launchAt)
-      if (r.launched && r.gear < 3 && r.rpm >= shiftAt) shiftRacer(r, shiftAt >= 0.78 && shiftAt <= 0.93 ? 1.08 : 0.75)
+      if (r.launched && r.gear < TOP_GEAR && r.rpm >= shiftAt) shiftRacer(r, shiftAt >= 0.78 && shiftAt <= 0.93 ? 1.08 : 0.75)
       if (fire(r, t)) fireBoost(r)
       stepRacer(r, 60, dt, t)
     }
@@ -76,9 +76,9 @@ describe('launch and boost', () => {
   it('fills the tank from a clean launch and clean shifts, and fires once', () => {
     const r = freshRacer(false)
     launchRacer(r, 0.1)
-    for (let i = 0; i < 3; i++) shiftRacer(r, 1.08)
+    for (let i = 0; i < 4; i++) shiftRacer(r, 1.08)
     expect(r.boost).toBeCloseTo(1)
-    expect(r.streak).toBe(3)
+    expect(r.streak).toBe(4)
     expect(fireBoost(r)).toBe(true)
     expect(fireBoost(r)).toBe(false)
     const sloppy = freshRacer(false)
@@ -101,7 +101,7 @@ describe('launch and boost', () => {
     while (r.finished === null) {
       t += dt
       if (!r.launched && t >= 0.6) launchRacer(r, 0.6)
-      if (r.launched && r.gear < 3 && r.rpm >= 0.7) shiftRacer(r, 0.95)
+      if (r.launched && r.gear < TOP_GEAR && r.rpm >= 0.7) shiftRacer(r, 0.95)
       stepRacer(r, 68, dt, t)
     }
     expect(clean).toBeLessThan(r.finished!)
