@@ -170,6 +170,8 @@ export type CarDef = {
   rescueOnly?: boolean
   // Race perk, like the original's car special skills.
   skill?: SkillId
+  // Businesses this car loves working at (building ids): it earns them a bigger bonus.
+  likes: string[]
   // Base performance stats out of 100.
   power: number
   grip: number
@@ -184,25 +186,25 @@ export type CarDef = {
 // a misspelling of one. Ids stay fixed so existing saves keep working.
 // Stats follow each real car's relative performance.
 export const CARS: CarDef[] = [
-  { id: 'pip', name: 'Kipper Pocket', body: 'compact', price: 800, unlockLevel: 1, power: 18, grip: 36, weight: 24, skill: 'launch', colors: ['#c62828', '#1b5e20', '#fafafa'] },
-  { id: 'civic', name: 'Kazumi Commuter', body: 'sedan', price: 1500, unlockLevel: 1, power: 24, grip: 34, weight: 36, skill: 'slipstream', colors: ['#1e88e5', '#eeeeee', '#424242'] },
-  { id: 'trail', name: 'Ironside Workhorse', body: 'truck', price: 2600, unlockLevel: 2, power: 38, grip: 26, weight: 74, skill: 'launch', colors: ['#0d47a1', '#c62828', '#eceff1'] },
-  { id: 'miata', name: 'Kazumi Zephyr', body: 'roadster', price: 4200, unlockLevel: 3, power: 32, grip: 54, weight: 22, skill: 'smooth', colors: ['#d32f2f', '#1e88e5', '#fafafa'] },
-  { id: 'stallion', name: "Liberty Bore Horse '68", body: 'muscle', price: 7000, unlockLevel: 4, power: 52, grip: 34, weight: 54, skill: 'nitro', colors: ['#1b5e20', '#ff6f00', '#212121'] },
-  { id: 'rally', name: 'Kodiak Gravel Rex', body: 'rally', price: 9500, unlockLevel: 5, power: 52, grip: 64, weight: 40, skill: 'smooth', colors: ['#0d47a1', '#fafafa', '#ffd600'] },
-  { id: 'vette', name: 'Liberty Sidewinder', body: 'sports', price: 14000, unlockLevel: 6, power: 66, grip: 54, weight: 38, skill: 'slipstream', colors: ['#b71c1c', '#bdbdbd', '#ffd600'] },
-  { id: 'charger', name: 'Liberty Brawler', body: 'muscle', price: 18000, unlockLevel: 7, power: 70, grip: 40, weight: 60, skill: 'nitro', colors: ['#212121', '#ff5722', '#6a1b9a'] },
-  { id: 'gtr', name: 'Kazumi Ronin GT', body: 'coupe', price: 26000, unlockLevel: 9, power: 78, grip: 70, weight: 46, skill: 'smooth', colors: ['#eceff1', '#263238', '#ff6d00'] },
-  { id: 'lambo', name: 'Veloce Corrida V12', body: 'wedge', price: 0, bucks: 40, unlockLevel: 5, power: 86, grip: 70, weight: 34, skill: 'oil', colors: ['#fdd835', '#d50000', '#fafafa'] },
-  { id: 'hyper', name: 'Veloce Hyperion', body: 'super', price: 60000, unlockLevel: 12, power: 98, grip: 86, weight: 32, skill: 'nitro', colors: ['#1a237e', '#212121', '#d50000'] },
-  { id: 'bug', name: 'Bumble Bubble', body: 'bubble', price: 1200, unlockLevel: 1, rescueOnly: true, power: 14, grip: 28, weight: 28, skill: 'launch', colors: ['#80cbc4', '#ffcc80', '#ef9a9a'] },
-  { id: 'woodie', name: 'Lakeside Woodie Wagon', body: 'wagon', price: 2200, unlockLevel: 1, rescueOnly: true, power: 22, grip: 28, weight: 56, skill: 'slipstream', colors: ['#fafafa', '#fff59d', '#4db6ac'] },
-  { id: 'hauler', name: 'Old Faithful Hauler', body: 'truck', price: 3000, unlockLevel: 1, rescueOnly: true, power: 26, grip: 26, weight: 70, skill: 'launch', colors: ['#558b2f', '#e65100', '#1565c0'] },
-  { id: 'cruiser', name: "Sunset Cruiser '57", body: 'classic', price: 5000, unlockLevel: 1, rescueOnly: true, power: 38, grip: 34, weight: 58, skill: 'slipstream', colors: ['#4dd0e1', '#f06292', '#fafafa'] },
-  { id: 'buggy', name: 'Dune Skipper Buggy', body: 'offroad', price: 6000, unlockLevel: 1, rescueOnly: true, power: 34, grip: 56, weight: 18, skill: 'launch', colors: ['#ff9800', '#cddc39', '#29b6f6'] },
-  { id: 'bandit', name: 'Night Bandit', body: 'muscle', price: 8000, unlockLevel: 1, rescueOnly: true, power: 56, grip: 38, weight: 54, skill: 'nitro', colors: ['#212121', '#ffd54f', '#b71c1c'] },
-  { id: 'lemans', name: 'Liberty Endurance GT', body: 'super', price: 16000, unlockLevel: 1, rescueOnly: true, power: 72, grip: 62, weight: 32, skill: 'smooth', colors: ['#1565c0', '#fafafa', '#c62828'] },
-  { id: 'gullwing', name: 'Silver Wing 300', body: 'coupe', price: 30000, unlockLevel: 1, rescueOnly: true, power: 64, grip: 58, weight: 36, skill: 'oil', colors: ['#cfd8dc', '#b71c1c', '#263238'] },
+  { id: 'pip', name: 'Kipper Pocket', body: 'compact', price: 800, unlockLevel: 1, power: 18, grip: 36, weight: 24, skill: 'launch', likes: ['pizza', 'donut'], colors: ['#c62828', '#1b5e20', '#fafafa'] },
+  { id: 'civic', name: 'Kazumi Commuter', body: 'sedan', price: 1500, unlockLevel: 1, power: 24, grip: 34, weight: 36, skill: 'slipstream', likes: ['pizza', 'diner'], colors: ['#1e88e5', '#eeeeee', '#424242'] },
+  { id: 'trail', name: 'Ironside Workhorse', body: 'truck', price: 2600, unlockLevel: 2, power: 38, grip: 26, weight: 74, skill: 'launch', likes: ['tires', 'parts'], colors: ['#0d47a1', '#c62828', '#eceff1'] },
+  { id: 'miata', name: 'Kazumi Zephyr', body: 'roadster', price: 4200, unlockLevel: 3, power: 32, grip: 54, weight: 22, skill: 'smooth', likes: ['icecream', 'cinema'], colors: ['#d32f2f', '#1e88e5', '#fafafa'] },
+  { id: 'stallion', name: "Liberty Bore Horse '68", body: 'muscle', price: 7000, unlockLevel: 4, power: 52, grip: 34, weight: 54, skill: 'nitro', likes: ['burger', 'stadium'], colors: ['#1b5e20', '#ff6f00', '#212121'] },
+  { id: 'rally', name: 'Kodiak Gravel Rex', body: 'rally', price: 9500, unlockLevel: 5, power: 52, grip: 64, weight: 40, skill: 'smooth', likes: ['tires', 'tuner'], colors: ['#0d47a1', '#fafafa', '#ffd600'] },
+  { id: 'vette', name: 'Liberty Sidewinder', body: 'sports', price: 14000, unlockLevel: 6, power: 66, grip: 54, weight: 38, skill: 'slipstream', likes: ['motel', 'stadium'], colors: ['#b71c1c', '#bdbdbd', '#ffd600'] },
+  { id: 'charger', name: 'Liberty Brawler', body: 'muscle', price: 18000, unlockLevel: 7, power: 70, grip: 40, weight: 60, skill: 'nitro', likes: ['burger', 'tuner'], colors: ['#212121', '#ff5722', '#6a1b9a'] },
+  { id: 'gtr', name: 'Kazumi Ronin GT', body: 'coupe', price: 26000, unlockLevel: 9, power: 78, grip: 70, weight: 46, skill: 'smooth', likes: ['tuner', 'bowling'], colors: ['#eceff1', '#263238', '#ff6d00'] },
+  { id: 'lambo', name: 'Veloce Corrida V12', body: 'wedge', price: 0, bucks: 40, unlockLevel: 5, power: 86, grip: 70, weight: 34, skill: 'oil', likes: ['cinema', 'carwash'], colors: ['#fdd835', '#d50000', '#fafafa'] },
+  { id: 'hyper', name: 'Veloce Hyperion', body: 'super', price: 60000, unlockLevel: 12, power: 98, grip: 86, weight: 32, skill: 'nitro', likes: ['stadium', 'tuner'], colors: ['#1a237e', '#212121', '#d50000'] },
+  { id: 'bug', name: 'Bumble Bubble', body: 'bubble', price: 1200, unlockLevel: 1, rescueOnly: true, power: 14, grip: 28, weight: 28, skill: 'launch', likes: ['icecream', 'donut'], colors: ['#80cbc4', '#ffcc80', '#ef9a9a'] },
+  { id: 'woodie', name: 'Lakeside Woodie Wagon', body: 'wagon', price: 2200, unlockLevel: 1, rescueOnly: true, power: 22, grip: 28, weight: 56, skill: 'slipstream', likes: ['diner', 'carwash'], colors: ['#fafafa', '#fff59d', '#4db6ac'] },
+  { id: 'hauler', name: 'Old Faithful Hauler', body: 'truck', price: 3000, unlockLevel: 1, rescueOnly: true, power: 26, grip: 26, weight: 70, skill: 'launch', likes: ['parts', 'carwash'], colors: ['#558b2f', '#e65100', '#1565c0'] },
+  { id: 'cruiser', name: "Sunset Cruiser '57", body: 'classic', price: 5000, unlockLevel: 1, rescueOnly: true, power: 38, grip: 34, weight: 58, skill: 'slipstream', likes: ['cinema', 'diner'], colors: ['#4dd0e1', '#f06292', '#fafafa'] },
+  { id: 'buggy', name: 'Dune Skipper Buggy', body: 'offroad', price: 6000, unlockLevel: 1, rescueOnly: true, power: 34, grip: 56, weight: 18, skill: 'launch', likes: ['icecream', 'tires'], colors: ['#ff9800', '#cddc39', '#29b6f6'] },
+  { id: 'bandit', name: 'Night Bandit', body: 'muscle', price: 8000, unlockLevel: 1, rescueOnly: true, power: 56, grip: 38, weight: 54, skill: 'nitro', likes: ['bowling', 'burger'], colors: ['#212121', '#ffd54f', '#b71c1c'] },
+  { id: 'lemans', name: 'Liberty Endurance GT', body: 'super', price: 16000, unlockLevel: 1, rescueOnly: true, power: 72, grip: 62, weight: 32, skill: 'smooth', likes: ['stadium', 'parts'], colors: ['#1565c0', '#fafafa', '#c62828'] },
+  { id: 'gullwing', name: 'Silver Wing 300', body: 'coupe', price: 30000, unlockLevel: 1, rescueOnly: true, power: 64, grip: 58, weight: 36, skill: 'oil', likes: ['motel', 'bowling'], colors: ['#cfd8dc', '#b71c1c', '#263238'] },
 ]
 
 // Rusty's Rescue: pay to search a location, tap the pins to send the tow
@@ -248,12 +250,25 @@ const parkedCars = new Map<string, CarDef>()
 function parkedCar(id: string): CarDef {
   let c = parkedCars.get(id)
   if (!c) {
-    c = { ...CARS[0], id, name: 'Coming Soon', price: 0, bucks: undefined, skill: undefined, parked: true }
+    c = { ...CARS[0], id, name: 'Coming Soon', price: 0, bucks: undefined, skill: undefined, likes: [], parked: true }
     parkedCars.set(id, c)
   }
   return c
 }
 export const carDef = (id: string): CarDef => CARS.find((c) => c.id === id) ?? parkedCar(id)
+
+// Drivers: each business can have one of your cars assigned to it, and a car
+// works at one business at a time. A driver adds 10% to the coins every job pays,
+// or 25% at a business it loves. A car with a flat or out of gas earns nothing
+// extra until it's fixed. Saves keep the car's uid as `car` on the placed building.
+export const DRIVER_BONUS = 0.1
+export const FAVORITE_BONUS = 0.25
+export const takesDriver = (d: BuildingDef) => !d.parked && !!d.jobSeconds && d.kind !== 'obstacle'
+export const loves = (car: CarDef, buildingId: string) => car.likes.includes(buildingId)
+export const driverBonus = (car: CarDef, buildingId: string) => (loves(car, buildingId) ? FAVORITE_BONUS : DRIVER_BONUS)
+// Coins a job pays with this driver (null: no working driver).
+export const driverPayout = (d: BuildingDef, level: number, car: CarDef | null) =>
+  Math.round(upgradePayout(d, level) * (1 + (car ? driverBonus(car, d.id) : 0)))
 
 export type UpgradeSlot = 'engine' | 'turbo' | 'tires' | 'weight'
 export const UPGRADE_SLOTS: { id: UpgradeSlot; name: string }[] = [
@@ -269,11 +284,81 @@ export const upgradeCost = (car: CarDef, level: number) => ({
   parts: 2 + level * 3,
 })
 
+// Car mods: bolt-on parts you can see on the car (in town, in races and in
+// every preview), one per slot. Unlike Garage upgrades, which tune what's under
+// the skin in five steps, a mod is a single visible part with a fixed price and
+// a small stat bump, and the same mod costs the same on any car. Saves list the
+// fitted mod ids as `mods` on each car (missing means none). Swapping a slot
+// replaces the old part. Ids stay fixed so saves keep working.
+export type ModSlot = 'spoiler' | 'exhaust' | 'kit' | 'hood' | 'rims'
+export const MOD_SLOTS: { id: ModSlot; name: string; icon: string; stat: string }[] = [
+  { id: 'spoiler', name: 'Spoilers', icon: '🪽', stat: 'Downforce for more grip' },
+  { id: 'exhaust', name: 'Exhausts', icon: '💨', stat: 'Freer flow for more power' },
+  { id: 'kit', name: 'Body Kits', icon: '🏎', stat: 'Lighter panels and better grip' },
+  { id: 'hood', name: 'Hoods', icon: '🔥', stat: 'More air for more power' },
+  { id: 'rims', name: 'Rims', icon: '🛞', stat: 'Lighter wheels' },
+]
+
+export type ModDef = {
+  id: string
+  slot: ModSlot
+  name: string
+  unlockLevel: number
+  coins: number
+  parts: number
+  bucks: number
+  // Stat changes, on the same scale as CarDef stats (weight goes down).
+  power: number
+  grip: number
+  weight: number
+}
+
+export const MODS: ModDef[] = [
+  { id: 'ducktail', slot: 'spoiler', name: 'Ducktail Lip', unlockLevel: 2, coins: 1200, parts: 0, bucks: 0, power: 0, grip: 2, weight: 0 },
+  { id: 'gtwing', slot: 'spoiler', name: 'GT Wing', unlockLevel: 5, coins: 4000, parts: 10, bucks: 0, power: 0, grip: 4, weight: 0 },
+  { id: 'attackwing', slot: 'spoiler', name: 'Time Attack Wing', unlockLevel: 8, coins: 0, parts: 0, bucks: 12, power: 0, grip: 6, weight: 0 },
+  { id: 'twintips', slot: 'exhaust', name: 'Twin Tips', unlockLevel: 2, coins: 1000, parts: 0, bucks: 0, power: 2, grip: 0, weight: 0 },
+  { id: 'sidepipes', slot: 'exhaust', name: 'Side Pipes', unlockLevel: 4, coins: 3500, parts: 8, bucks: 0, power: 4, grip: 0, weight: 0 },
+  { id: 'flamepipes', slot: 'exhaust', name: 'Flame Throwers', unlockLevel: 8, coins: 0, parts: 0, bucks: 10, power: 6, grip: 0, weight: 0 },
+  { id: 'streetkit', slot: 'kit', name: 'Street Kit', unlockLevel: 3, coins: 1500, parts: 0, bucks: 0, power: 0, grip: 1, weight: -2 },
+  { id: 'widebody', slot: 'kit', name: 'Widebody', unlockLevel: 6, coins: 6000, parts: 15, bucks: 0, power: 0, grip: 3, weight: -3 },
+  { id: 'carbonkit', slot: 'kit', name: 'Carbon Race Kit', unlockLevel: 10, coins: 0, parts: 0, bucks: 15, power: 0, grip: 3, weight: -6 },
+  { id: 'vented', slot: 'hood', name: 'Vented Hood', unlockLevel: 2, coins: 800, parts: 0, bucks: 0, power: 1, grip: 0, weight: -1 },
+  { id: 'ramscoop', slot: 'hood', name: 'Ram Scoop', unlockLevel: 4, coins: 3000, parts: 6, bucks: 0, power: 3, grip: 0, weight: 0 },
+  { id: 'blower', slot: 'hood', name: 'Supercharger', unlockLevel: 7, coins: 8000, parts: 20, bucks: 0, power: 5, grip: 0, weight: 0 },
+  { id: 'chrome', slot: 'rims', name: 'Chrome Spokes', unlockLevel: 1, coins: 600, parts: 0, bucks: 0, power: 0, grip: 0, weight: -1 },
+  { id: 'goldmesh', slot: 'rims', name: 'Gold Mesh', unlockLevel: 4, coins: 2500, parts: 5, bucks: 0, power: 0, grip: 1, weight: -2 },
+  { id: 'forged', slot: 'rims', name: 'Forged Black', unlockLevel: 7, coins: 7000, parts: 12, bucks: 0, power: 0, grip: 2, weight: -3 },
+]
+
+// Unknown ids (a mod from a newer build) give nothing and draw nothing.
+export const modDef = (id: string): ModDef | undefined => MODS.find((m) => m.id === id)
+export const modStats = (id: string) => {
+  const m = modDef(id)
+  return { power: m?.power ?? 0, grip: m?.grip ?? 0, weight: m?.weight ?? 0 }
+}
+export const modCost = (id: string) => {
+  const m = modDef(id)
+  return { coins: m?.coins ?? 0, parts: m?.parts ?? 0, bucks: m?.bucks ?? 0 }
+}
+// The fitted mod in each slot (the first known one wins if a save lists two).
+export const fittedMods = (mods?: string[] | null): Partial<Record<ModSlot, string>> => {
+  const out: Partial<Record<ModSlot, string>> = {}
+  for (const id of Array.isArray(mods) ? mods : []) {
+    const m = modDef(id)
+    if (m && !out[m.slot]) out[m.slot] = id
+  }
+  return out
+}
+export const modXp = (id: string) => 10 + (modDef(id)?.unlockLevel ?? 0) * 3
+
 // Performance index: what races are decided on (plus the driver's shifting).
-export const performance = (car: CarDef, up: Record<UpgradeSlot, number>) => {
-  const power = car.power + up.engine * 4 + up.turbo * 3
-  const grip = car.grip + up.tires * 4
-  const weight = Math.max(5, car.weight - up.weight * 4)
+export const performance = (car: CarDef, up: Record<UpgradeSlot, number>, mods?: string[] | null) => {
+  const m = Object.values(fittedMods(mods)).map(modStats)
+  const sum = (k: 'power' | 'grip' | 'weight') => m.reduce((a, x) => a + x[k], 0)
+  const power = car.power + up.engine * 4 + up.turbo * 3 + sum('power')
+  const grip = car.grip + up.tires * 4 + sum('grip')
+  const weight = Math.max(5, car.weight - up.weight * 4 + sum('weight'))
   return Math.round(power * 0.6 + grip * 0.3 + (100 - weight) * 0.1)
 }
 
@@ -372,9 +457,9 @@ export const STRIPE_COST = 100
 
 // Garage power: the combined PI of a player's five best cars.
 export const POWER_CARS = 5
-export const garagePower = (cars: { model: string; upgrades: Record<UpgradeSlot, number> }[]) =>
+export const garagePower = (cars: { model: string; upgrades: Record<UpgradeSlot, number>; mods?: string[] }[]) =>
   cars
-    .map((c) => performance(carDef(c.model), c.upgrades))
+    .map((c) => performance(carDef(c.model), c.upgrades, c.mods))
     .sort((a, b) => b - a)
     .slice(0, POWER_CARS)
     .reduce((a, b) => a + b, 0)
