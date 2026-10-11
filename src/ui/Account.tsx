@@ -7,6 +7,7 @@ import { AmbienceControl, MuteButton } from './MuteButton'
 import { AlertsMenu } from './Alerts'
 import { localBackup, restoreLocalBackup } from '../lib/cloud'
 import { isCleanName, NAME_REJECTED } from '../lib/names'
+import { UsernameRow } from './Username'
 
 type MenuTab = 'town' | 'account' | 'help'
 const MENU_TABS = [{ id: 'town', label: '🏠 Town' }, { id: 'account', label: '👤 Account' }, { id: 'help', label: '❓ How to play' }] as const
@@ -65,6 +66,7 @@ export function AccountPanel() {
       ) : user ? (
         <>
           <p>Signed in as <b>{user.email}</b>. Your town saves to the cloud and other players can race your best car.</p>
+          <UsernameRow />
           {backup && (
             <>
               <p className="hint">This device has an older town that is further along: {backup.townName}, level {backup.level}, {backup.cars.length} cars.</p>
