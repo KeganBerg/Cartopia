@@ -247,7 +247,7 @@ div.rm-node { cursor: default; }
 /* ---------- weekly event (game/events.ts) ---------- */
 .rm-hub { grid-template-rows: 1fr 1fr 1fr auto; grid-template-areas: "camp tour rival rival" "camp tour ev ev" "camp tour gp trial" "minis minis minis minis"; }
 .rm-ev { grid-area: ev; flex-direction: row; align-items: center; gap: 10px; }
-.rm-ev .rm-tag { background: var(--ev, #ff4fd8); }
+.rm-ev .rm-tag { background: var(--ev, #ff4fd8); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .rm-ev .rm-ttl { margin-top: 2px; font-size: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rm-ev::before { background: linear-gradient(90deg, rgba(10,20,45,.78), rgba(10,20,45,.35) 60%, rgba(10,20,45,.6)) !important; }
 .rm-ev.rm-night::before { background: linear-gradient(90deg, rgba(8,10,45,.88), rgba(8,10,45,.6) 60%, rgba(8,10,45,.78)) !important; }
@@ -271,7 +271,7 @@ div.rm-node { cursor: default; }
 .rm-ev-ptxt b { font: 22px var(--display); line-height: 1.05; }
 .rm-ev-ptxt > span { display: flex; align-items: center; gap: 5px; font: 800 12px Nunito, sans-serif; }
 .rm-ev-ptxt .skin-chip { width: 18px; height: 18px; border-width: 1.5px; }
-.rm-ev-ptxt em { font-style: normal; font-weight: 900; text-shadow: 0 0 1px rgba(0,0,0,.6); }
+.rm-ev-ptxt em { font-style: normal; font-weight: 900; color: #14213d; border: 1.5px solid #14213d; border-radius: 6px; padding: 0 6px; font-size: 11px; letter-spacing: .3px; }
 .ev-prize .thumb3d { margin: 6px auto; }
 
 @media (max-width: 600px) {
@@ -292,6 +292,13 @@ div.rm-node { cursor: default; }
   .rm-ev-blurb { display: none; }
 }
 @media (max-height: 500px) {
+  .rm-hub { grid-template-rows: 1fr 1fr auto; grid-template-areas: "camp tour ev ev" "camp tour rival rival" "gp trial minis minis"; }
+  .rm-hub .rm-gp, .rm-hub .rm-trial { min-height: 58px; }
+  .rm-hub .rm-gp .rm-meta, .rm-hub .rm-trial .rm-meta { display: none; }
+  .rm-hub .rm-minis { gap: 6px; }
+  .rm-hub .rm-mini { flex-direction: column; gap: 0; padding: 4px 2px; justify-content: center; text-align: center; }
+  .rm-hub .rm-mini > span:last-child { align-items: center; }
+  .rm-hub .rm-mini small { display: none; }
   .rm-ev-car { width: 40px; height: 40px; border-width: 2px; }
   .rm-ev .rm-ttl { font-size: 16px; }
   .rm-ev-blurb { display: none; }
@@ -300,3 +307,5 @@ div.rm-node { cursor: default; }
   .rm-ev-prize .thumb3d.sm { --tw: 76px; --th: 50px; }
   .rm-ev-ptxt b { font-size: 17px; }
 }
+.rm-event .rm-rows { flex: 1; }
+.rm-event .rm-rows > .rm-row { flex: 1; }

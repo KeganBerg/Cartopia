@@ -85,7 +85,8 @@ vec3 skStars(vec2 uv, float scale, float t, float keep) {
 }
 
 // Weekly event skins' helpers.
-// Water caustics: bright wavy lines of sunlight focused by ripples (Shallows).
+// Water caustics: bright wavy lines of sunlight focused by ripples (Shallows). Wants p far
+// from the origin (around -250), where the lines come out thin.
 float skCaustic(vec2 p, float t) {
   vec2 i = p;
   float c = 1.0;
@@ -651,7 +652,7 @@ void skinShade(int id, vec3 p, vec3 n, vec3 v, float t, inout vec3 col, inout ve
     // Hoarfrost (Whiteout Sprint): frost ferns creeping over the surface and melting
     // back, feathered crystal edges catching the light, snow drifting deep below.
     vec2 ud = skAt(p, n, v, 0.1);
-    col = mix(vec3(0.05, 0.12, 0.24), vec3(0.32, 0.55, 0.78), skFbm(ud * 2.5 + vec2(0.0, t * 0.03)));
+    col = mix(vec3(0.02, 0.07, 0.16), vec3(0.12, 0.38, 0.6), skFbm(ud * 3.5 + vec2(0.0, t * 0.03)));
     for (int i = 0; i < 2; i++) {
       float fi = float(i);
       vec2 u = skAt(p, n, v, 0.09 - fi * 0.045) * (9.0 - fi * 3.5) + vec2(sin(t * 0.3 + fi) * 0.4, t * (0.35 + fi * 0.25));
@@ -662,48 +663,47 @@ void skinShade(int id, vec3 p, vec3 n, vec3 v, float t, inout vec3 col, inout ve
       col = mix(col, vec3(0.9, 0.96, 1.0), flake * (0.5 + 0.3 * fi));
       glow += vec3(0.7, 0.85, 1.0) * flake * 0.12;
     }
-    float grow = skFbm(uv0 * 2.2 + 3.0) + 0.12 * sin(t * 0.25);
-    float cover = smoothstep(0.42, 0.55, grow);
-    vec4 vp = skVorP(uv0 * 7.0);
-    vec2 q = uv0 * 7.0 - vp.zw;
+    float grow = skFbm(uv0 * 3.0 + 3.0) + 0.1 * sin(t * 0.25);
+    float cover = smoothstep(0.45, 0.56, grow);
+    vec4 vp = skVorP(uv0 * 11.0);
+    vec2 q = uv0 * 11.0 - vp.zw;
     float a = atan(q.y, q.x);
     float spoke = abs(sin(a * 3.0 + vp.y * 6.0));
     float rq = length(q);
     float fern = smoothstep(0.12, 0.0, spoke * rq) * smoothstep(0.75, 0.1, rq);
     float barbs = smoothstep(0.55, 0.95, sin(rq * 38.0 - a * 2.0)) * smoothstep(0.35, 0.0, spoke * rq) * smoothstep(0.7, 0.15, rq);
-    float edges = smoothstep(0.06, 0.0, skVor(uv0 * 19.0 + 2.0).x);
+    float edges = smoothstep(0.06, 0.0, skVor(uv0 * 28.0 + 2.0).x);
     float frost = clamp(fern + barbs * 0.6 + edges * 0.35, 0.0, 1.0) * cover;
     col = mix(col, vec3(0.88, 0.95, 1.0), frost * 0.85);
-    col = mix(col, vec3(0.75, 0.88, 0.98), cover * 0.18);
     float glint = pow(max(0.0, sin(facing * 18.0 + vp.y * 50.0 + t * 0.6)), 24.0);
     glow += vec3(0.8, 0.95, 1.0) * (frost * (0.06 + glint * 0.5) + rim * 0.15);
-    rough = mix(0.08, 0.5, frost);
+    rough = mix(0.25, 0.55, frost);
   } else if (id == 29) {
     // Harvest Moon (Harvest Moon Run): a giant orange moon low in a plum sky deep in
     // the paint, wheat swaying in silhouette in front of it, fireflies near the top.
-    vec2 ud = skAt(p, n, v, 0.12);
-    float gy = fract(ud.y * 1.1 + 0.3);
-    float sx = ud.x * 1.1;
+    vec2 ud = skAt(p, n, v, 0.12) * 2.6;
+    float gy = fract(ud.y + 0.3);
+    float sx = ud.x;
     vec3 sky = mix(vec3(0.03, 0.02, 0.1), vec3(0.32, 0.12, 0.28), smoothstep(0.95, 0.2, gy));
     sky = mix(sky, vec3(0.75, 0.32, 0.12), smoothstep(0.45, 0.2, gy) * 0.6);
     vec2 mq = vec2(sx - floor(sx + 0.5), gy - 0.52);
     float mr = length(mq);
-    float moon = smoothstep(0.27, 0.26, mr);
-    float mare = skFbm(mq * 9.0 + floor(sx + 0.5) * 3.0);
+    float moon = smoothstep(0.2, 0.19, mr);
+    float mare = skFbm(mq * 12.0 + floor(sx + 0.5) * 3.0);
     vec3 mc = mix(vec3(1.0, 0.62, 0.22), vec3(1.0, 0.86, 0.5), smoothstep(0.3, -0.25, mq.y)) * (0.82 + 0.25 * smoothstep(0.65, 0.4, mare));
     col = mix(sky * 0.5, mc * 0.8, moon);
-    glow += mc * moon * 0.55 + vec3(1.0, 0.5, 0.2) * smoothstep(0.5, 0.26, mr) * (1.0 - moon) * 0.18;
-    vec2 uw = skAt(p, n, v, 0.05);
-    float wy = fract(uw.y * 1.1 + 0.3);
-    float wx = uw.x * 30.0;
+    glow += mc * moon * 0.4 + vec3(1.0, 0.45, 0.15) * smoothstep(0.38, 0.19, mr) * (1.0 - moon) * 0.25;
+    vec2 uw = skAt(p, n, v, 0.05) * 2.6;
+    float wy = fract(uw.y + 0.3);
+    float wx = uw.x * 14.0;
     float stalk = floor(wx);
     float sh = skH(vec2(stalk, 3.0));
     float sway = sin(t * 1.3 + stalk * 0.4) * 0.25 * smoothstep(0.0, 0.4, wy);
-    float top = 0.24 + sh * 0.14;
+    float top = 0.3 + sh * 0.16;
     float lx = fract(wx + sway * min(wy / top, 1.0)) - 0.5;
     float stem = smoothstep(0.12, 0.05, abs(lx)) * step(wy, top);
     float head = smoothstep(1.0, 0.7, length(vec2(lx / 0.2, (wy - top) / 0.06)));
-    float field = max(stem, head) + smoothstep(0.1, 0.06, wy);
+    float field = max(stem, head) + smoothstep(0.16, 0.1, wy);
     col = mix(col, vec3(0.05, 0.025, 0.01), clamp(field, 0.0, 1.0));
     vec2 uf = skAt(p, n, v, 0.02) * 8.0 + vec2(sin(t * 0.4) * 0.6, t * 0.15);
     vec2 fc = floor(uf);
@@ -717,8 +717,8 @@ void skinShade(int id, vec3 p, vec3 n, vec3 v, float t, inout vec3 col, inout ve
     // Beacon (Foghorn Classic): a lighthouse beam sweeping round through night fog
     // deep in the paint, lighting the fog it passes and glinting off the swell below.
     vec2 ud = skAt(p, n, v, 0.11);
-    vec2 cell = floor(ud * 0.9 + 0.5);
-    vec2 q = ud * 0.9 - cell;
+    vec2 cell = floor(ud * 1.8 + 0.5);
+    vec2 q = ud * 1.8 - cell;
     float fog = skFbm(ud * 3.0 + vec2(t * 0.08, 0.0));
     col = mix(vec3(0.02, 0.04, 0.08), vec3(0.12, 0.16, 0.22), fog);
     vec2 lp = q - vec2(-0.25, 0.05);
@@ -727,11 +727,11 @@ void skinShade(int id, vec3 p, vec3 n, vec3 v, float t, inout vec3 col, inout ve
     float da = abs(mod(ang - sweep + 3.14159, 6.28318) - 3.14159);
     float da2 = abs(mod(ang - sweep, 6.28318) - 3.14159);
     float dist = length(lp);
-    float beam = (smoothstep(0.22, 0.0, da) + smoothstep(0.22, 0.0, da2) * 0.6) * exp(-dist * 1.6);
+    float beam = (smoothstep(0.16, 0.0, da) + smoothstep(0.16, 0.0, da2) * 0.5) * exp(-dist * 1.1);
     float lit = beam * (0.45 + 0.9 * fog);
     vec3 warm = vec3(1.0, 0.93, 0.7);
     col += warm * lit * 0.35;
-    glow += warm * lit * 0.5;
+    glow += warm * lit * 1.1;
     float lamp = smoothstep(0.05, 0.0, dist);
     glow += warm * lamp * (1.3 + 0.5 * pow(max(0.0, cos(da)), 40.0));
     float tower = step(abs(lp.x), 0.02 + max(0.0, -lp.y) * 0.08) * step(lp.y, -0.02) * step(-0.22, lp.y);
@@ -742,7 +742,7 @@ void skinShade(int id, vec3 p, vec3 n, vec3 v, float t, inout vec3 col, inout ve
     col = mix(col, vec3(0.01, 0.03, 0.05), sea * 0.8);
     glow += warm * crest * (0.08 + smoothstep(0.6, 0.0, abs(q.x + 0.25 - cos(sweep) * 0.5)) * 0.6);
     vec2 uw = skAt(p, n, v, 0.03) * 2.0 + vec2(t * 0.15, 0.0);
-    col = mix(col, vec3(0.5, 0.56, 0.62), smoothstep(0.55, 0.8, skFbm(uw)) * 0.25);
+    col = mix(col, vec3(0.3, 0.36, 0.42), smoothstep(0.55, 0.8, skFbm(uw)) * 0.2);
     rough = 0.25;
   } else if (id == 31) {
     // Rain Glass (Neon Downpour): a blur of neon city lights deep down, seen through
@@ -780,43 +780,43 @@ void skinShade(int id, vec3 p, vec3 n, vec3 v, float t, inout vec3 col, inout ve
     // sunlight focused into dancing caustic lines on it, glints on the surface.
     vec2 us = skAt(p, n, v, 0.12);
     float rip = sin(us.x * 26.0 + skFbm(us * 3.0) * 6.0 + us.y * 6.0);
-    vec3 sand = mix(vec3(0.72, 0.6, 0.38), vec3(0.93, 0.84, 0.62), 0.5 + 0.5 * rip);
-    float cau = skCaustic(us * 4.0 + 20.0, t * 0.6);
-    float cau2 = skCaustic(us * 4.0 + 20.3, t * 0.6);
+    vec3 sand = mix(vec3(0.55, 0.45, 0.28), vec3(0.85, 0.74, 0.52), 0.5 + 0.5 * rip);
+    float cau = skCaustic(us * 4.0 - 250.0, t * 0.6);
+    float cau2 = skCaustic(us * 4.0 - 249.97, t * 0.6);
     vec3 lightc = vec3(cau2, cau, cau * 0.85);
-    vec3 water = vec3(0.04, 0.52, 0.56);
-    col = mix(sand, water, 0.6) * 0.7 + lightc * 0.2;
-    glow += lightc * vec3(0.5, 0.75, 0.7) * 0.25;
+    vec3 water = vec3(0.0, 0.5, 0.58);
+    col = mix(sand, water, 0.7) * 0.55 + lightc * vec3(0.6, 0.9, 0.8) * 0.45;
+    glow += lightc * vec3(0.5, 0.95, 0.85) * 0.5;
     vec2 ui = skAt(p, n, v, 0.05) * 5.0 + vec2(t * 0.25, t * 0.1);
     float weed = smoothstep(0.62, 0.7, skFbm(ui)) * 0.25;
     col = mix(col, vec3(0.02, 0.25, 0.3), weed);
     float swell = skFbm(uv0 * 5.0 + vec2(t * 0.2, -t * 0.15));
-    col = mix(col, vec3(0.75, 0.95, 1.0), rim * 0.5);
+    col = mix(col, vec3(0.2, 0.75, 0.85), rim * 0.35);
     float spark = pow(max(0.0, sin(swell * 40.0 + t * 2.0)), 30.0) * smoothstep(0.5, 0.7, swell);
     glow += vec3(1.0, 0.95, 0.8) * spark * 0.8;
-    rough = 0.06;
+    rough = 0.22;
   } else if (id == 33) {
     // Mirage (Mirage Mile): three ranges of dunes at different depths under a
     // white-hot sun, heat haze bending them, sand grains blowing over the surface.
     vec2 ud = skAt(p, n, v, 0.14);
     float shimmer = sin(ud.y * 40.0 - t * 3.0) * 0.012 + sin(ud.y * 23.0 + t * 2.1) * 0.008;
-    float gy = fract(ud.y * 1.2 + 0.25);
-    float sx = ud.x * 1.2;
-    vec3 sky = mix(vec3(0.98, 0.55, 0.22), vec3(1.0, 0.88, 0.62), smoothstep(0.95, 0.35, gy));
+    float gy = fract(ud.y * 2.4 + 0.25);
+    float sx = ud.x * 2.4;
+    vec3 sky = mix(vec3(0.85, 0.28, 0.1), vec3(1.0, 0.72, 0.38), smoothstep(0.95, 0.35, gy));
     vec2 sq = vec2(sx - floor(sx + 0.5) + shimmer, gy - 0.72);
     float sun = smoothstep(0.1, 0.09, length(sq));
-    col = sky * 0.6 + vec3(1.0, 0.97, 0.85) * sun * 0.4;
+    col = sky * 0.5 + vec3(1.0, 0.97, 0.85) * sun * 0.4;
     glow += vec3(1.0, 0.95, 0.75) * (sun * 0.9 + smoothstep(0.3, 0.1, length(sq)) * 0.2);
     for (int i = 0; i < 3; i++) {
       float fi = float(i);
       vec2 u = skAt(p, n, v, 0.11 - fi * 0.04);
-      float y = fract(u.y * 1.2 + 0.25);
-      float x = u.x * (1.6 + fi * 0.6) + fi * 3.0 + shimmer * (3.0 - fi) * 8.0;
+      float y = fract(u.y * 2.4 + 0.25);
+      float x = u.x * (3.2 + fi * 1.2) + fi * 3.0 + shimmer * (3.0 - fi) * 8.0;
       float ridge = 0.48 - fi * 0.13 + 0.07 * sin(x * 3.0) + 0.05 * sin(x * 7.3 + fi) + 0.03 * skNoise(vec2(x * 4.0, fi));
       float below = smoothstep(ridge + 0.006, ridge - 0.006, y);
       float lit = 0.5 + 0.5 * cos(x * 3.0 + 0.8);
-      vec3 dune = mix(vec3(0.62, 0.24, 0.1), vec3(0.98, 0.62, 0.3), lit) * (0.55 + 0.18 * fi);
-      dune = mix(dune, sky * 0.6, 0.35 - fi * 0.12);
+      vec3 dune = mix(vec3(0.3, 0.06, 0.03), vec3(0.88, 0.36, 0.1), lit) * (0.5 + 0.2 * fi);
+      dune = mix(dune, sky * 0.5, 0.28 - fi * 0.1);
       col = mix(col, dune, below);
       glow += vec3(1.0, 0.7, 0.35) * below * smoothstep(0.02, 0.0, ridge - y) * 0.15;
     }
@@ -824,7 +824,7 @@ void skinShade(int id, vec3 p, vec3 n, vec3 v, float t, inout vec3 col, inout ve
     vec2 gc = floor(ug);
     float gh = skH(gc);
     float streak = smoothstep(0.4, 0.0, abs(fract(ug.y) - 0.5)) * step(0.82, gh) * pow(fract(ug.x + gh * 5.0), 6.0);
-    col = mix(col, vec3(1.0, 0.85, 0.6), streak * 0.5);
+    col = mix(col, vec3(1.0, 0.8, 0.5), streak * 0.35);
     rough = 0.35;
   }
 }

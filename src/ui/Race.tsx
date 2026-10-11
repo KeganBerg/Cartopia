@@ -360,7 +360,7 @@ export function RacePanel() {
   const chip = tab === 'campaign' ? `⭐ ${stars}/${CAMPAIGN.length * CAMPAIGN_RACES * 3}`
     : tab === 'tour' ? `🌍 ${tourWon.toLocaleString()} wins`
     : tab === 'gp' ? '🏆 Win 6 in a row'
-    : tab === 'event' ? `⏳ ${shortLeft(msToNextWeek())} left`
+    : tab === 'event' ? `⏳ ${shortLeft(msToNextWeek())}`
     : null
 
   return (
@@ -675,7 +675,7 @@ function WeeklyEvent({ base, car, onRace }: { base: number; car: OwnedCar | unde
     <div className="rm-split rm-event" style={{ '--ev': e.color } as React.CSSProperties}>
       <div className="rm-left">
         <div className={`rm-banner rm-photo${artClass(e.venue, e.night)}`} style={artStyle(e.venue, e.night)}>
-          <span className="rm-eyebrow">{v.icon} {v.name} · {e.night ? '🌙 Night' : 'Day'} · {SKY_ICON[e.sky]} · ⏳ {shortLeft(msToNextWeek())}</span>
+          <span className="rm-eyebrow">{v.icon} {v.name} · {e.night ? '🌙 Night' : 'Day'} · {SKY_ICON[e.sky]}</span>
           <b className="rm-ttl">{e.name}</b>
           <span className="rm-ev-blurb">{e.blurb}</span>
           <span className="rm-chips">
@@ -688,7 +688,7 @@ function WeeklyEvent({ base, car, onRace }: { base: number; car: OwnedCar | unde
           <span className="rm-ev-ptxt">
             <small>{won >= EVENT_RACES ? 'WON' : has ? 'ALREADY YOURS' : 'EXCLUSIVE PRIZE'}</small>
             <b>{skin.name}</b>
-            <span><i className="skin-chip" style={{ background: skin.swatch }} /> <em style={{ color: SKIN_TIERS[skin.tier].color }}>{SKIN_TIERS[skin.tier].name}</em> skin</span>
+            <span><i className="skin-chip" style={{ background: skin.swatch }} /> <em style={{ background: SKIN_TIERS[skin.tier].color }}>{SKIN_TIERS[skin.tier].name}</em> skin</span>
             <small>{won >= EVENT_RACES ? 'Fit it in the Paint Shop' : has ? `Win again for $${(eventBonus(base) * 2).toLocaleString()}` : `Beat the boss · +$${eventBonus(base).toLocaleString()}`}</small>
           </span>
         </div>
