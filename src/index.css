@@ -1491,6 +1491,38 @@ button.book-car { font: inherit; color: inherit; }
   .arc-count { font-size: 72px; }
 }
 
+/* Arcade, second wave: Pit Stop, Car Wash, Delivery Dash, Stunt Ramp. */
+.arc-games { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 560px) { .arc-games { grid-template-columns: 1fr 1fr; } }
+.arc-tile.pit { background: linear-gradient(160deg, #c62828, #37474f); }
+.arc-tile.wash { background: linear-gradient(160deg, #29b6f6, #3949ab); }
+.arc-tile.delivery { background: linear-gradient(160deg, #fb8c00, #c62828); }
+.arc-tile.stunt { background: linear-gradient(160deg, #6a1b9a, #ef6c00); }
+.arc-scrub { position: absolute; inset: 0; touch-action: none; user-select: none; -webkit-user-select: none; }
+.arc-sponge { position: absolute; font-size: 44px; transform: translate(-50%, -60%) rotate(-15deg); pointer-events: none; filter: drop-shadow(0 3px 2px rgba(0,0,0,.35)); }
+.arc-time.low { background: rgba(198,40,40,.85) !important; }
+.arc-fuelrig { position: absolute; right: calc(16px + var(--sar)); bottom: calc(16px + var(--sab)); display: flex; align-items: flex-end; gap: 10px; }
+.arc-fuelrig .arc-tip { position: absolute; right: 0; bottom: calc(100% + 8px); left: auto; width: max-content; }
+.arc-gauge { position: relative; width: 26px; height: 150px; border-radius: 13px; border: 3px solid #fff; background: rgba(27,31,36,.65); overflow: hidden; box-shadow: 0 4px 0 rgba(0,0,0,.3); }
+.arc-gauge i { position: absolute; left: 0; right: 0; bottom: 0; }
+.arc-gauge .band { background: rgba(0,230,118,.55); border-top: 2px solid #b9f6ca; border-bottom: 2px solid #b9f6ca; }
+.arc-gauge .fill { background: linear-gradient(0deg, #ff6f00, #ffd54f); opacity: .85; }
+.arc-btn.big { width: 96px; height: 96px; font-size: 36px; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; }
+.arc-btn.big small { font-size: 13px; margin-top: 4px; }
+.arc-power { position: absolute; left: 0; right: 0; bottom: calc(70px + var(--sab)); display: flex; justify-content: center; pointer-events: none; }
+.arc-power .arc-tip { bottom: -44px; }
+.arc-meter { width: min(320px, 70vw); height: 24px; border-radius: 12px; border: 3px solid #fff; background: linear-gradient(90deg, #e53935, #fdd835 60%, #00e676 88%, #e53935); overflow: hidden; position: relative; box-shadow: 0 4px 0 rgba(0,0,0,.3); }
+.arc-meter i { position: absolute; top: 0; bottom: 0; left: 0; border-right: 5px solid #1b1f24; background: rgba(27,31,36,.35); }
+.arc-callout { position: absolute; top: 30%; left: 0; right: 0; text-align: center; font: 56px var(--display); color: #ffd54f; text-shadow: 0 4px 0 rgba(0,0,0,.4); pointer-events: none; animation: pop .3s ease-out; display: flex; flex-direction: column; align-items: center; }
+.arc-callout small { font-size: 26px; color: #fff; }
+.arc-callout.bad { color: #ff8a80; }
+@media (max-height: 500px) {
+  .arc-gauge { height: 110px; }
+  .arc-btn.big { width: 76px; height: 76px; font-size: 28px; }
+  .arc-power { bottom: calc(52px + var(--sab)); }
+  .arc-callout { font-size: 40px; }
+}
+
 /* Garage dyno: drawn over the car preview after an upgrade. Tap anywhere to close. */
 .dyno { position: absolute; inset: 0; display: block; width: 100%; padding: 0; border: 0; background: linear-gradient(180deg, rgba(38,50,56,.0) 55%, rgba(38,50,56,.28)); cursor: pointer; font: inherit; color: #263238; text-align: left; animation: dyno-in .25s ease-out; }
 @keyframes dyno-in { from { opacity: 0; } }

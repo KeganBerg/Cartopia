@@ -1,5 +1,7 @@
-import { useEffect, useMemo } from 'react'
-import { Color } from 'three'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { useFrame, useThree } from '@react-three/fiber'
+import { Color, Object3D, Vector3, type InstancedMesh, type PerspectiveCamera } from 'three'
+import { SHIRTS, PANTS, SKIN, HAIR } from './people'
 import { BuildingModel, LightPool } from './BuildingModel'
 import { Manhole } from './BuildingDetail'
 import { SkyDome } from './RaceScene'
@@ -10,7 +12,7 @@ import { gloomOf, weatherLook } from './weatherLook'
 import { lookFor } from './look'
 import { glowMats, dayPhase, duskAmount, nightAmount } from './dayNight'
 import { holdPageTint } from './pageTint'
-import { asphaltTex, drainTex, glowTex, paverTex, towerTex } from './textures'
+import { asphaltTex, concreteTex, drainTex, glowTex, paverTex, towerTex } from './textures'
 import { LAYER, decal } from './layers'
 import { useGame } from '../game/store'
 import { BUILDINGS, TILE, buildingDef } from '../game/data'
@@ -265,6 +267,166 @@ export function StreetStretch({ len, half, walk = 1.6, lanes, seed, pool }: { le
       <group position={[half + walk * 0.5, 0.12, -len * 0.62]} rotation-y={-Math.PI / 2} scale={K * 0.8}>
         <BuildingModel def={buildingDef('bench')} />
       </group>
+    </group>
+  )
+}
+
+// People, built like the race crowd (body, head, hair, legs, arms) and instanced.
+// Each stands at x/z facing h; cheering ones hop with their arms up, the rest wave now and then.
+// `shirt` forces one colour (a pit crew in team kit).
+export type Person = { x: number; z: number; h: number; y?: number; cheer?: boolean; shirt?: string }
+const FAN = 1.3
+const FAN_LEG = 0.24
+export function Crowd({ people, scale = 1 }: { people: Person[]; scale?: number }) {
+  const torso = useRef<InstancedMesh>(null)
+  const head = useRef<InstancedMesh>(null)
+  const hair = useRef<InstancedMesh>(null)
+  const legs = useRef<InstancedMesh>(null)
+  const arms = useRef<InstancedMesh>(null)
+  useEffect(() => {
+    const c = new Color()
+    people.forEach((p, i) => {
+      const k = (i * 2654435761) >>> 0
+      const shirt = p.shirt ?? SHIRTS[k % SHIRTS.length]
+      torso.current?.setColorAt(i, c.set(shirt))
+      head.current?.setColorAt(i, c.set(SKIN[(k >> 6) % SKIN.length]))
+      hair.current?.setColorAt(i, c.set(HAIR[(k >> 9) % HAIR.length]))
+      legs.current?.setColorAt(i * 2, c.set(p.shirt ? '#263238' : PANTS[(k >> 3) % PANTS.length]))
+      legs.current?.setColorAt(i * 2 + 1, c)
+      arms.current?.setColorAt(i * 2, c.set(shirt))
+      arms.current?.setColorAt(i * 2 + 1, c)
+    })
+    for (const m of [torso, head, hair, legs, arms]) if (m.current?.instanceColor) m.current.instanceColor.needsUpdate = true
+  }, [people])
+  const tmp = useMemo(() => new Object3D(), [])
+  const S = FAN * scale
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+    people.forEach((f, i) => {
+      const phase = i * 1.7
+      const hop = f.cheer ? Math.max(0, Math.sin(t * 6 + phase)) * 0.09 : 0
+      const hip = FAN_LEG + hop + (f.y ?? 0) / S
+      const sin = Math.sin(f.h), cos = Math.cos(f.h)
+      const x = f.x / S, z = f.z / S
+      const put = (m: InstancedMesh | null, at: number, px: number, py: number, pz: number, rz = 0, rx = 0, sy = 1) => {
+        if (!m) return
+        tmp.position.set(px, py, pz)
+        tmp.rotation.set(rx, f.h, rz)
+        tmp.scale.set(1, sy, 1)
+        tmp.updateMatrix()
+        m.setMatrixAt(at, tmp.matrix)
+      }
+      put(torso.current, i, x, hip + 0.15, z)
+      put(head.current, i, x, hip + 0.36, z)
+      put(hair.current, i, x - sin * 0.02, hip + 0.385, z - cos * 0.02, 0, 0, 0.8)
+      for (const side of [-1, 1]) {
+        const lx = side * 0.045
+        put(legs.current, i * 2 + (side > 0 ? 1 : 0), x + cos * lx, hip - FAN_LEG * 0.5, z - sin * lx, 0, hop * side * 2)
+      }
+      const wave = Math.sin(t * (f.cheer ? 6 : 2) + phase)
+      for (const side of [-1, 1]) {
+        const a = f.cheer ? 2.5 + wave * 0.35 * side : 0.15 + (side > 0 ? Math.max(0, wave) * 2.2 : 0)
+        const lx = side * (0.11 + Math.sin(a) * 0.085)
+        put(arms.current, i * 2 + (side > 0 ? 1 : 0), x + cos * lx, hip + 0.25 - Math.cos(a) * 0.085, z - sin * lx, side * a)
+      }
+    })
+    for (const m of [torso, head, hair, legs, arms]) if (m.current) m.current.instanceMatrix.needsUpdate = true
+  })
+  const n = people.length
+  return (
+    <group scale={S}>
+      <instancedMesh ref={torso} args={[undefined, undefined, n]} frustumCulled={false}><capsuleGeometry args={[0.085, 0.16, 3, 8]} /><meshStandardMaterial /></instancedMesh>
+      <instancedMesh ref={head} args={[undefined, undefined, n]} frustumCulled={false}><sphereGeometry args={[0.08, 10, 8]} /><meshStandardMaterial /></instancedMesh>
+      <instancedMesh ref={hair} args={[undefined, undefined, n]} frustumCulled={false}><sphereGeometry args={[0.085, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2]} /><meshStandardMaterial /></instancedMesh>
+      <instancedMesh ref={legs} args={[undefined, undefined, n * 2]} frustumCulled={false}><boxGeometry args={[0.06, FAN_LEG, 0.07]} /><meshStandardMaterial /></instancedMesh>
+      <instancedMesh ref={arms} args={[undefined, undefined, n * 2]} frustumCulled={false}><boxGeometry args={[0.045, 0.17, 0.05]} /><meshStandardMaterial /></instancedMesh>
+    </group>
+  )
+}
+
+// Rows of stepped seating with fans, facing h (0 = facing +z), centred at x/z.
+export function Grandstand({ x, z, h, width, rows = 4, roof = '#c62828' }: { x: number; z: number; h: number; width: number; rows?: number; roof?: string }) {
+  const people = useMemo(() => {
+    const out: Person[] = []
+    for (let r = 0; r < rows; r++) for (let i = 0; i < Math.floor(width / 0.55); i++) {
+      if ((i * 7 + r * 3) % 5 === 0) continue
+      const lx = -width / 2 + 0.3 + i * 0.55 + (r % 2) * 0.2
+      const lz = -r * 0.7
+      out.push({ x: x + lx * Math.cos(h) + lz * Math.sin(h), z: z - lx * Math.sin(h) + lz * Math.cos(h), h, y: 0.35 + r * 0.4, cheer: (i + r) % 3 !== 0 })
+    }
+    return out
+  }, [x, z, h, width, rows])
+  return (
+    <>
+      <group position={[x, 0, z]} rotation-y={h}>
+        {Array.from({ length: rows }, (_, r) => (
+          <mesh key={r} position={[0, 0.17 + r * 0.2, -r * 0.7]}>
+            <boxGeometry args={[width, 0.35 + r * 0.4, 0.7]} />
+            <meshStandardMaterial map={concreteTex(width / 2, 0.5)} color={r % 2 ? '#cfd8dc' : '#b0bec5'} />
+          </mesh>
+        ))}
+        {/* A cantilever roof over the back rows. */}
+        {[-1, 1].map((sd) => (
+          <mesh key={sd} position={[sd * (width / 2 - 0.1), 1.6 + rows * 0.2, -rows * 0.7 + 0.3]}>
+            <boxGeometry args={[0.12, 3.2 + rows * 0.4, 0.12]} />
+            <meshStandardMaterial color="#455a64" />
+          </mesh>
+        ))}
+        <mesh position={[0, 3.2 + rows * 0.4, -rows * 0.35]} rotation-x={0.12}>
+          <boxGeometry args={[width + 0.4, 0.1, rows * 0.7 + 0.6]} />
+          <meshStandardMaterial color={roof} />
+        </mesh>
+      </group>
+      <Crowd people={people} />
+    </>
+  )
+}
+
+// Points the camera at `target` from direction `dir`, backed off just far enough that a
+// box halfW wide and halfH tall around the target fits, on a phone or a wide screen.
+export function useFitCamera(dir: [number, number, number], target: [number, number, number], halfW: number, halfH: number) {
+  const camera = useThree((s) => s.camera) as PerspectiveCamera
+  const size = useThree((s) => s.size)
+  useLayoutEffect(() => {
+    const t = Math.tan(((camera.fov / 2) * Math.PI) / 180)
+    const dist = Math.max(halfH / t, halfW / (t * (size.width / size.height)))
+    const at = new Vector3(...target)
+    camera.up.set(0, 1, 0)
+    camera.position.copy(at).add(new Vector3(...dir).normalize().multiplyScalar(dist))
+    camera.lookAt(at)
+    camera.updateProjectionMatrix()
+  }, [camera, size, dir[0], dir[1], dir[2], target[0], target[1], target[2], halfW, halfH]) // eslint-disable-line react-hooks/exhaustive-deps
+}
+
+// A racing tyre: black rubber with a coloured compound band, standing up (or lying flat).
+export function Tyre({ x, z, y = 0, r = 0.3, w = 0.24, flat, band = '#e53935', ry = 0 }: { x: number; z: number; y?: number; r?: number; w?: number; flat?: boolean; band?: string; ry?: number }) {
+  return (
+    <group position={[x, y + (flat ? w / 2 : r), z]} rotation={flat ? [0, ry, 0] : [0, ry, Math.PI / 2]}>
+      <mesh><cylinderGeometry args={[r, r, w, 18]} /><meshStandardMaterial color="#1c1c1c" roughness={0.9} /></mesh>
+      {[-1, 1].map((sd) => (
+        <mesh key={sd} position-y={(sd * w) / 2 + sd * 0.002} rotation-x={(sd * Math.PI) / 2}><ringGeometry args={[r * 0.72, r * 0.8, 18]} /><meshBasicMaterial color={band} side={2} /></mesh>
+      ))}
+      <mesh><cylinderGeometry args={[r * 0.55, r * 0.55, w + 0.01, 12]} /><meshStandardMaterial color="#9e9e9e" metalness={0.6} roughness={0.35} /></mesh>
+    </group>
+  )
+}
+
+// A stack of spare tyres.
+export function TyreStack({ x, z, n = 4, band }: { x: number; z: number; n?: number; band?: string }) {
+  return (
+    <>
+      {Array.from({ length: n }, (_, i) => <Tyre key={i} x={x} z={z} y={i * 0.235} w={0.22} flat band={band} ry={i * 0.7} />)}
+    </>
+  )
+}
+
+// A rolling red tool chest.
+export function ToolChest({ x, z, ry = 0, color = '#c62828' }: { x: number; z: number; ry?: number; color?: string }) {
+  return (
+    <group position={[x, 0, z]} rotation-y={ry}>
+      <mesh position-y={0.5}><boxGeometry args={[0.9, 0.85, 0.45]} /><meshStandardMaterial color={color} metalness={0.3} roughness={0.4} /></mesh>
+      {[0.25, 0.42, 0.59, 0.76].map((y) => <mesh key={y} position={[0, y, 0.228]}><boxGeometry args={[0.8, 0.02, 0.01]} /><meshStandardMaterial color="#cfd8dc" metalness={0.8} roughness={0.3} /></mesh>)}
+      {[-0.38, 0.38].map((dx) => [-0.17, 0.17].map((dz) => <mesh key={`${dx}${dz}`} position={[dx, 0.04, dz]}><sphereGeometry args={[0.04, 6, 4]} /><meshStandardMaterial color="#212121" /></mesh>))}
     </group>
   )
 }
