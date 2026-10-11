@@ -85,12 +85,13 @@ export function carOdds(c: CrateDef, level: number): { model: string; p: number 
 }
 
 // Skins a crate can hold: every body skin (SKINS) and part skin (MOD_SKINS) of its tiers, so a new
-// skin joins the crates as soon as it's added there. Rarer tiers are less likely.
+// skin joins the crates as soon as it's added there. Rarer tiers are less likely. Weekly event
+// skins (game/events.ts) are the exception: they're only won by clearing their event.
 export const SKIN_WEIGHT: Record<SkinTier, number> = { rare: 6, epic: 3, legendary: 1 }
 export type CrateSkin = { id: string; part: boolean; def: SkinDef }
 export function crateSkins(c: CrateDef): CrateSkin[] {
   const all = [...SKINS.map((def) => ({ id: def.id, part: false, def })), ...MOD_SKINS.map((def) => ({ id: def.id, part: true, def }))]
-  return all.filter((x) => c.skins.includes(x.def.tier))
+  return all.filter((x) => c.skins.includes(x.def.tier) && !('event' in x.def.unlock))
 }
 export function skinOdds(c: CrateDef): (CrateSkin & { p: number })[] {
   const list = crateSkins(c)
@@ -204,6 +205,9 @@ export function crateOddsShown(c: CrateDef) {
   return { coins: pc(o.coins + o.jackpot), mod: pc(o.mod), car: pc(o.car), skin: pc(o.skin) }
 }
 
+// Weekly event skins never go in crates.
+const inCrates = (d: SkinDef) => !('event' in d.unlock)
+
 // The tables crate_open() rolls from, as embedded in the server's SQL.
 export function crateTables() {
   return {
@@ -214,8 +218,8 @@ export function crateTables() {
     // Body skins by id, part skins by id: tier, and the level or collection set that also unlocks one.
     skinWeight: SKIN_WEIGHT,
     skinDupe: SKIN_DUPE,
-    skins: Object.fromEntries(SKINS.map((d) => [d.id, skinRow(d)])),
-    modSkins: Object.fromEntries(MOD_SKINS.map((d) => [d.id, skinRow(d)])),
+    skins: Object.fromEntries(SKINS.filter(inCrates).map((d) => [d.id, skinRow(d)])),
+    modSkins: Object.fromEntries(MOD_SKINS.filter(inCrates).map((d) => [d.id, skinRow(d)])),
     gem: GEM_COINS,
     // Every car's body (parts are rolled for any car you own); `pool` marks the ones a crate can hold.
     cars: Object.fromEntries(CARS.map((car) => [car.id, {

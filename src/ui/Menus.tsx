@@ -20,6 +20,7 @@ import { useCrewGoal } from './CrewGoal'
 import { useChat } from '../lib/chat'
 import { useRivalWaiting } from './Rivals'
 import { ShowcaseToggle } from './Meet'
+import { tutTarget, type TutTarget } from './Tutorial'
 
 // Phones and tablets: no hover, so placing takes a preview tap first.
 const TOUCH = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
@@ -33,18 +34,20 @@ export function BottomBar() {
   const crewChests = useCrewGoal((g) => g.ready)
   const crewChat = useChat((c) => c.unread.crew)
   const rival = useRivalWaiting()
+  const tut = useGame(tutTarget)
+  const pulse = (t: TutTarget) => (tut === t ? ' tut-pulse' : '')
   if (visiting) return null
   if (mode !== 'play') return <EditBar />
   return (
     <>
       <div className="bottom-bar">
-        <button className="icon-btn" onClick={() => openPanel('shop')}><span className="i i-shop"><Icon name="shop" /></span>SHOP</button>
+        <button className={`icon-btn${pulse('shop')}`} onClick={() => openPanel('shop')}><span className="i i-shop"><Icon name="shop" /></span>SHOP</button>
         <button className="icon-btn crates-btn" onClick={() => openPanel('crates')}><span className="i i-crates"><Icon name="crate" /></span>CRATES</button>
         <button className="icon-btn" onClick={() => openPanel('showroom')}><span className="i i-showroom"><Icon name="car" />{setsReady > 0 && <span className="btn-dot">{setsReady}</span>}</span>SHOWROOM</button>
         <button className="icon-btn" onClick={() => openPanel('garage')}><span className="i i-garage"><Icon name="wrench" /></span>GARAGE</button>
         <button className="icon-btn" onClick={() => openPanel(crewChests === 0 && crewChat > 0 ? 'chat' : 'friends')}><span className="i i-friends"><Icon name="friends" />{crewChests > 0 ? <span className="btn-dot">{crewChests}</span> : crewChat > 0 && <span className="btn-dot">{crewChat > 9 ? '9+' : crewChat}</span>}</span>FRIENDS</button>
         <button className="icon-btn" onClick={() => setMode('road')}><span className="i i-edit"><Icon name="cone" /></span>EDIT</button>
-        <button className="big-btn race-btn" onClick={() => openPanel('race')}><span className="i"><Icon name="flag" />{rival && <span className="btn-dot" title="Your rival is in town">!</span>}</span>RACE</button>
+        <button className={`big-btn race-btn${pulse('race')}`} onClick={() => openPanel('race')}><span className="i"><Icon name="flag" />{rival && <span className="btn-dot" title="Your rival is in town">!</span>}</span>RACE</button>
       </div>
       <GoalsButton />
       <CollectAllButton />
@@ -64,6 +67,7 @@ function EditBar() {
     const b = s.selected ? s.buildings.find((o) => o.uid === s.selected) : undefined
     return !!b && upgradable(buildingDef(b.def))
   })
+  const tutDone = useGame((s) => tutTarget(s) === 'done')
   const pickedMerged = useGame((s) => !!s.selected && !!groupOf(s.buildings, s.selected))
   const canMerge = useGame((s) => (s.mode === 'merge' ? mergeCandidates(s.buildings).length > 0 || s.buildings.some((b) => b.merge) : true))
   const hint =
@@ -87,7 +91,7 @@ function EditBar() {
         {mode === 'move' && selected && canUpgrade && <button className="tool" onClick={() => openUpgrade(selected)}><Icon name="up" size={22} /><span>Upgrade</span></button>}
         {mode === 'move' && again && <button className="tool" onClick={() => setMode('place', again)}><Icon name="plus" size={22} /><span>Again</span></button>}
         <button className="tool" onClick={() => openPanel('shop')}><Icon name="shop" size={22} /><span>Shop</span></button>
-        <button className="tool done" onClick={() => setMode('play')}><Icon name="check" size={22} /><span>Done</span></button>
+        <button className={tutDone ? 'tool done tut-pulse' : 'tool done'} onClick={() => setMode('play')}><Icon name="check" size={22} /><span>Done</span></button>
       </div>
     </div>
   )
@@ -201,7 +205,7 @@ export function ShopPanel() {
     return () => cancelAnimationFrame(raf)
   }, [focus])
   const ev = activeEvent()
-  const tabs: { id: ShopTab; label: React.ReactNode }[] = [...SHOP_GROUPS.filter((g) => g.id !== 'event' || ev), ...(canUpgrade ? [{ id: 'upgrades' as const, label: '<Icon name="up" size={18} />Upgrades' }] : [])]
+  const tabs: { id: ShopTab; label: React.ReactNode }[] = [...SHOP_GROUPS.filter((g) => g.id !== 'event' || ev), ...(canUpgrade ? [{ id: 'upgrades' as const, label: '⬆️ Upgrades' }] : [])]
   const group = SHOP_GROUPS.find((g) => g.id === tab)
   return (
     <Panel title="Shop" wide>

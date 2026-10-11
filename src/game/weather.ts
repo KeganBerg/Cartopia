@@ -187,13 +187,16 @@ function rollVenue(venue: VenueId, roll: number): WeatherKind {
   return 'clear'
 }
 
-export function raceWeather(venue: VenueId, seed?: string): Weather {
+// `force`: a sky the race always has (weekly events), kept as it is at every venue.
+export function raceWeather(venue: VenueId, seed?: string, force?: WeatherKind): Weather {
   let kind: WeatherKind
   const town = weatherNow()
   if (PIN) kind = town.kind
+  else if (force) kind = force
   else if (seed) kind = rollVenue(venue, seedRoll(seed))
   else kind = town.kind !== 'clear' && town.strength > 0.3 ? town.kind : rollVenue(venue, Math.random())
-  if (venue === 'snow') kind = AS_SNOW[kind] ?? kind
+  if (force && !PIN) kind = force
+  else if (venue === 'snow') kind = AS_SNOW[kind] ?? kind
   else if (venue === 'desert') kind = IN_DESERT[kind] ?? kind
   // Winter rain falls as snow everywhere but the desert.
   else if (SEASON === 'winter') kind = AS_SNOW[kind] ?? kind

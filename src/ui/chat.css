@@ -1,5 +1,5 @@
 /* Global and crew chat (src/ui/Chat.tsx). The log fills the window; the box stays at the bottom. */
-.chat-panel .panel-body { display: flex; flex-direction: column; overflow: hidden; }
+.chat-panel .panel-body { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .chat { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
 .chat-rooms { flex: none; }
 .chat-rooms button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
