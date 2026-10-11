@@ -97,6 +97,9 @@ function extrude(sh: ThreeShape, width: number, b: number) {
   return g
 }
 
+// Footprint of a body (before any scaling), for keeping town cars apart.
+export const carSize = (body: Body) => ({ len: SHAPES[body].len, wid: SHAPES[body].wid })
+
 const geoCache = new Map<Body, { body: ExtrudeGeometry; glass: ExtrudeGeometry | null; roof: ExtrudeGeometry | null; hood: number; deck: number; roofY: number; roofLen: number; roofZ: number }>()
 
 function carGeo(body: Body) {

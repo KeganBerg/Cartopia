@@ -78,6 +78,7 @@ const LOT_V = 1.0
 const SWING = 1.0 // distance over which an overtaking car changes lane
 const TRUCK = { len: 1.52, gap: 0.12 }
 const PASS_V = 1.5
+const STOP_LINE = 0.6 // how far short of an intersection cars wait
 const JAMMED = 45 // seconds stuck before a car gives up
 
 // A short oriented box: centre, heading, half length and half width.
@@ -107,7 +108,7 @@ export function seedRandom(seed: number) {
 }
 
 export class Traffic {
-  net: Net = { nodes: new Map(), stops: [], curves: new Map() }
+  net: Net = buildNet([], [], () => 0)
   agents = new Map<string, Agent>()
   t = 0
   respawns = 0 // cars that sat jammed so long they faded out and came back elsewhere
@@ -793,7 +794,10 @@ export class Traffic {
             this.net.nodes.get(c.node!)!.occ.set(a.uid, { inDir: c.inDir, outDir: c.outDir })
           }
         } else {
-          cap(ahead - 0.05)
+          // Wait at the stop line, short of the zebra crossing.
+          const prev = a.legs[i - 1]
+          const line = l.junction && prev.node && !this.net.nodes.get(prev.node)!.junction ? STOP_LINE : 0
+          cap(ahead - 0.05 - line)
           // Stuck behind cars that are waiting on each other: try another way through.
           if (asking && a.wait > 4 && this.t > a.rerouteAt) this.reroute(a, chain)
           break

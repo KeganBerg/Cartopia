@@ -5,7 +5,7 @@ import { useThree, type ThreeEvent } from '@react-three/fiber'
 import { useGame, canPlace, buyablePlots, lotSize, type PlacedBuilding } from '../game/store'
 import { GRID, TILE, PLOT, PLOT_MIN, PLOT_MAX, START_LAND, buildingDef } from '../game/data'
 import { BuildingModel } from './BuildingModel'
-import { rotatePlacement, setGhostTurn } from '../game/placement'
+import { rotatePlacement, setGhostTurn, turnOf } from '../game/placement'
 import { Clouds } from './Clouds'
 import { DayNight } from './DayNight'
 import { PAL } from './season'
@@ -15,6 +15,7 @@ import { LightPool } from './BuildingModel'
 import { TownCars } from './TownCars'
 import { toWorld, toTile, DIRS } from './grid'
 import { grassTex, paverTex, asphaltTex } from './textures'
+import { layoutRoads } from './traffic/layout'
 
 const SIZE = GRID * TILE
 // Everything a town could ever own, centred on the origin like the start lot.
@@ -60,35 +61,6 @@ export function centerOf(def: string, x: number, z: number, rot?: number): [numb
   return toWorld(x + (w - 1) / 2, z + (h - 1) / 2)
 }
 
-
-
-// Quarter turns that point a building's front at an adjacent road. Non-square lots can only flip.
-function roadTurn(b: Pick<PlacedBuilding, 'def' | 'x' | 'z'>, roads: Set<string>) {
-  const d = buildingDef(b.def)
-  const edge = (dir: 'S' | 'E' | 'N' | 'W') => {
-    for (let i = 0; i < Math.max(d.w, d.h); i++) {
-      const t =
-        dir === 'S' ? [b.x + i, b.z + d.h] : dir === 'N' ? [b.x + i, b.z - 1]
-        : dir === 'E' ? [b.x + d.w, b.z + i] : [b.x - 1, b.z + i]
-      const inRange = dir === 'S' || dir === 'N' ? i < d.w : i < d.h
-      if (inRange && roads.has(`${t[0]},${t[1]}`)) return true
-    }
-    return false
-  }
-  const square = d.w === d.h
-  if (edge('S')) return 0
-  if (square && edge('E')) return 1
-  if (edge('N')) return 2
-  if (square && edge('W')) return 3
-  return 0
-}
-
-// The player's chosen turn, or else face the road. Decorations face south unless turned.
-function turnOf(b: Pick<PlacedBuilding, 'def' | 'x' | 'z' | 'rot'>, roads: Set<string>) {
-  if (b.rot != null) return b.rot
-  const kind = buildingDef(b.def).kind
-  return kind === 'decor' || kind === 'obstacle' ? 0 : roadTurn(b, roads)
-}
 
 
 function Building({ b, roads }: { b: PlacedBuilding; roads: Set<string> }) {
@@ -179,53 +151,94 @@ function StreetLamp({ side }: { side: 'e' | 'w' | 's' | 'n' }) {
   )
 }
 
+// Lane paint along a tile: dashes down the middle, as on any two-way road and
+// between the two lanes of each side of an avenue.
+function Dashes({ alongX }: { alongX: boolean }) {
+  return (
+    <>
+      {[-0.5, 0.5].map((o) => (
+        <mesh key={o} rotation-x={-Math.PI / 2} position={alongX ? [o, 0.02, 0] : [0, 0.02, o]}>
+          <planeGeometry args={alongX ? [0.45, 0.07] : [0.07, 0.45]} />
+          <meshBasicMaterial color="#fafafa" />
+        </mesh>
+      ))}
+    </>
+  )
+}
+
+// Double yellow line down the middle of an avenue, on the edge facing `side`.
+function Median({ side }: { side: number }) {
+  const alongX = side >= 2
+  const edge = (side === 0 || side === 2 ? 1 : -1) * (TILE / 2)
+  return (
+    <>
+      {[-0.07, 0.07].map((o) => (
+        <mesh key={o} rotation-x={-Math.PI / 2} position={alongX ? [0, 0.02, edge + o] : [edge + o, 0.02, 0]}>
+          <planeGeometry args={alongX ? [TILE, 0.06] : [0.06, TILE]} />
+          <meshBasicMaterial color="#ffca28" />
+        </mesh>
+      ))}
+    </>
+  )
+}
+
+// Stop line across the lane heading into an intersection on side `side`.
+function StopLine({ side }: { side: number }) {
+  const [dx, dz] = DIRS[side]
+  // The lane on the right of traffic heading that way.
+  const [rx, rz] = [-dz, dx]
+  const at = TILE / 2 - 0.58
+  const lane = 0.45
+  return (
+    <mesh rotation-x={-Math.PI / 2} position={[dx * at + rx * lane, 0.02, dz * at + rz * lane]}>
+      <planeGeometry args={dx ? [0.08, 0.8] : [0.8, 0.08]} />
+      <meshBasicMaterial color="#fafafa" />
+    </mesh>
+  )
+}
+
+const SIDES = ['e', 'w', 's', 'n'] as const
+
 function Roads() {
   const roadsList = useGame((s) => (s.visiting ?? s).roads)
   const tiles = useMemo(() => {
-    const set = new Set(roadsList)
-    const degree = (x: number, z: number) => DIRS.filter(([dx, dz]) => set.has(`${x + dx},${z + dz}`)).length
-    return roadsList.map((k) => {
-      const [x, z] = k.split(',').map(Number)
-      const n = DIRS.map(([dx, dz]) => set.has(`${x + dx},${z + dz}`))
-      // Which neighbours are intersections, for crosswalks.
-      const xing = DIRS.map(([dx, dz], i) => n[i] && degree(x + dx, z + dz) >= 3)
-      return { k, x, z, n, xing }
+    const { tiles: all } = layoutRoads(roadsList)
+    return [...all.values()].map((t) => {
+      const near = DIRS.map(([dx, dz]) => all.get(`${t.x + dx},${t.z + dz}`))
+      // Zebra crossings where a road meets an intersection.
+      const xing = near.map((n) => !t.junction && !!n?.junction)
+      return { ...t, xing }
     })
   }, [roadsList])
   const asphalt = asphaltTex()
 
   return (
     <group>
-      {tiles.map(({ k, x, z, n, xing }) => {
+      {tiles.map(({ key: k, x, z, arms, junction, oneWay, mate, xing }) => {
         const [wx, wz] = toWorld(x, z)
-        const [e, w, s, nn] = n
-        const count = n.filter(Boolean).length
-        const straightX = (e || w) && !s && !nn
-        const straightZ = (s || nn) && !e && !w
+        const [e, w, s, nn] = arms
+        const straightX = !junction && (e || w) && !s && !nn
+        const straightZ = !junction && (s || nn) && !e && !w
+        const avenue = oneWay >= 0
+        // Lamps go on the outside edge of an avenue.
+        const outer = avenue ? SIDES[mate ^ 1] : null
         return (
           <group key={k} position={[wx, 0, wz]}>
             <mesh rotation-x={-Math.PI / 2} position-y={0.01} receiveShadow>
               <planeGeometry args={[TILE, TILE]} />
               <meshStandardMaterial map={asphalt} />
             </mesh>
-            {!e && <Sidewalk side="e" />}
-            {!w && <Sidewalk side="w" />}
-            {!s && <Sidewalk side="s" />}
-            {!nn && <Sidewalk side="n" />}
-            {count < 3 && xing[0] && <Crosswalk side="e" />}
-            {count < 3 && xing[1] && <Crosswalk side="w" />}
-            {count < 3 && xing[2] && <Crosswalk side="s" />}
-            {count < 3 && xing[3] && <Crosswalk side="n" />}
+            {SIDES.map((sd, i) => !arms[i] && <Sidewalk key={sd} side={sd} />)}
+            {SIDES.map((sd, i) => xing[i] && <Crosswalk key={sd} side={sd} />)}
+            {xing.map((on, i) => on && (oneWay < 0 || oneWay === i) && <StopLine key={i} side={i} />)}
             {/* Street lamps every few tiles along straight roads, alternating sides. */}
-            {(straightX || straightZ) && (x * 7 + z * 5) % 3 === 0 && (
+            {(straightX || straightZ) && !xing.some(Boolean) && (x * 7 + z * 5) % 3 === 0 && (
               <StreetLamp side={straightX ? ((x + z) % 2 ? 's' : 'n') : ((x + z) % 2 ? 'e' : 'w')} />
             )}
-            {straightX && [-0.5, 0.5].map((o) => (
-              <mesh key={o} rotation-x={-Math.PI / 2} position={[o, 0.02, 0]}><planeGeometry args={[0.45, 0.07]} /><meshBasicMaterial color="#fafafa" /></mesh>
-            ))}
-            {straightZ && [-0.5, 0.5].map((o) => (
-              <mesh key={o} rotation-x={-Math.PI / 2} position={[0, 0.02, o]}><planeGeometry args={[0.07, 0.45]} /><meshBasicMaterial color="#fafafa" /></mesh>
-            ))}
+            {avenue && outer && !xing.some(Boolean) && (x * 7 + z * 5) % 3 === 0 && <StreetLamp side={outer} />}
+            {(straightX || straightZ) && <Dashes alongX={straightX} />}
+            {avenue && <Dashes alongX={oneWay < 2} />}
+            {avenue && (mate === 0 || mate === 2) && <Median side={mate} />}
           </group>
         )
       })}
