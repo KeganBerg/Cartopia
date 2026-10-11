@@ -17,6 +17,7 @@ import { displayName } from '../lib/names'
 import { joinRefereed, reportFinish, serverPi, type Verdict } from '../lib/referee'
 import { ghostDist, TRIAL_FUEL } from '../game/trial'
 import { TrialTab, TrialResult, beginTrialRun, type TrialRun } from './TimeTrial'
+import { claim as claimVisitor, leave as leaveVisitor, setRacing, type Visitor } from '../lib/visitors'
 
 // skill: the rival car's race skill. AI rivals use it; live players use theirs on their own device.
 // shift: how cleanly an AI rival shifts, 0 (sloppy) to 1 (always perfect, the default).
@@ -87,6 +88,13 @@ const JOIN_PATIENCE_MS = 30000
 
 type RaceTab = 'quick' | 'campaign' | 'gp' | 'trial'
 let nextRaceTab: RaceTab = 'quick'
+// A street racer visiting town (src/lib/visitors.ts): the race opens straight away, at no fuel.
+let nextStreet: Visitor | null = null
+export function openStreetRace(v: Visitor) {
+  nextStreet = v
+  nextRaceTab = 'quick'
+  useGame.getState().openPanel('race')
+}
 // Opens the Race menu on a given tab (goals use it to send players to the campaign or Grand Prix).
 export function openRaceTab(tab: RaceTab) {
   nextRaceTab = tab
@@ -110,6 +118,12 @@ export function RacePanel() {
     return t
   })
   const [pickCar, setPickCar] = useState(false)
+  const [street, setStreet] = useState<Visitor | null>(() => {
+    const v = nextStreet
+    nextStreet = null
+    if (v) setRacing(true)
+    return v
+  })
   const [trial, setTrial] = useState<(TrialRun & { n: number }) | null>(null)
   const gpResult = useGame((s) => s.gpResult)
   const campaignResult = useGame((s) => s.campaignResult)
@@ -119,6 +133,9 @@ export function RacePanel() {
   const outgoing = useLive((l) => l.outgoing)
   const mutedIds = useLive((l) => l.muted)
   const cooldownTo = useLive((l) => l.cooldownTo)
+
+  // Closing the race menu ends a street race too.
+  useEffect(() => () => setRacing(false), [])
 
   useEffect(() => {
     fetchOnlineRivals().then(setOnline)
@@ -140,6 +157,26 @@ export function RacePanel() {
   }
 
   if (race && car) return <DragRace car={car} rival={race} onExit={() => setRace(null)} />
+  if (street && car) {
+    const rival: Rival = { id: `street-${street.id}`, town: street.name, level, carName: carDef(street.model).name, color: street.color, pi: street.pi, online: false, body: street.body, skill: carDef(street.model).skill }
+    return (
+      <DragRace
+        car={car}
+        rival={rival}
+        title="🏁 Street challenge"
+        onFinish={(won) => {
+          useGame.getState().finishRace(won, reward(rival))
+          setRacing(false)
+          if (won) void claimVisitor()
+          else {
+            useGame.getState().toast(`${street.name.split(' from ')[0]} smoked you and drove off laughing.`)
+            leaveVisitor()
+          }
+        }}
+        onExit={() => { setRacing(false); setStreet(null); useGame.getState().openPanel(null) }}
+      />
+    )
+  }
   if (gpRace && car) {
     return (
       <DragRace

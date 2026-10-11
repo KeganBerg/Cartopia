@@ -970,3 +970,32 @@ export const dealSave = (d: DealDef) => {
 export const CREW_POINTS = { job: 1, race: 3 }
 // What a crew chest pays. The server guard reads this from econ_catalog().crew.
 export const CREW_CHEST: ChestPay = { coins: 1500, coinsPerLevel: 300, xp: 0, xpPerLevel: 0, parts: 25, bucks: 5, fuel: 0 }
+
+// Surprise visitors in town (src/lib/visitors.ts). For signed-in players the server picks who comes
+// and fixes the prize (supabase/migrations/0030_town_visitors.sql, visitor_next()); guests roll here.
+//   racer: a street racer to beat (the bonus on top of the race's own prize, paid only on a win)
+//   tourist: tips you for the photo op
+//   mystery: a mystery car drives by; tap it before it leaves
+//   barn: Rusty hears of a barn find and tows the car home to storage (needs Rusty's Rescue)
+export type VisitorKind = 'racer' | 'tourist' | 'mystery' | 'barn'
+export type VisitorPay = { coins: number; coinsPerLevel: number; xp: number; xpPerLevel: number; parts: number; bucksChance: number }
+export const VISITORS: Record<VisitorKind, { weight: number; minutes: number; pay: VisitorPay }> = {
+  racer: { weight: 30, minutes: 5, pay: { coins: 100, coinsPerLevel: 25, xp: 0, xpPerLevel: 0, parts: 3, bucksChance: 0.05 } },
+  tourist: { weight: 35, minutes: 5, pay: { coins: 50, coinsPerLevel: 10, xp: 5, xpPerLevel: 1, parts: 0, bucksChance: 0 } },
+  mystery: { weight: 25, minutes: 0.5, pay: { coins: 100, coinsPerLevel: 20, xp: 10, xpPerLevel: 2, parts: 2, bucksChance: 0.1 } },
+  barn: { weight: 10, minutes: 10, pay: { coins: 0, coinsPerLevel: 0, xp: 0, xpPerLevel: 0, parts: 0, bucksChance: 0 } },
+}
+// Minutes between visitors, and the most a player gets in a UTC day.
+export const VISIT_GAP_MIN = 4
+export const VISITS_PER_DAY = 30
+// A barn find's rarity odds (better than a search), from the cars at the spots the player has opened.
+export const BARN_RARITY: Record<Rarity, number> = { common: 30, scarce: 50, rare: 20 }
+export const visitorPrize = (kind: VisitorKind, level: number, roll = Math.random()) => {
+  const p = VISITORS[kind].pay
+  return {
+    coins: Math.round(p.coins + p.coinsPerLevel * level),
+    xp: Math.round(p.xp + p.xpPerLevel * level),
+    parts: p.parts,
+    bucks: roll < p.bucksChance ? 1 : 0,
+  }
+}

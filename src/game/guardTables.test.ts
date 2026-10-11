@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { GP_ROUNDS, GP_SERIES, gpRivalPi } from './data'
-import { gpBeatTable, gpRivalSlowest, gpSeries, rarities, rescueRoll, rescueSpots, restoreMinutes, spotCosts } from './guardTables'
+import { gpBeatTable, gpRivalSlowest, gpSeries, rarities, rescueRoll, rescueSpots, restoreMinutes, spotCosts, visitorTable } from './guardTables'
 import { rollSearch } from './store'
 import { raceFloor } from './race'
 
@@ -24,6 +24,11 @@ describe('restore and Grand Prix checks', () => {
     expect(newest('$rarity$')).toEqual(rarities())
     expect(newest('$roll$')).toEqual(rescueRoll())
     expect(newest('$spotcost$')).toEqual(spotCosts())
+  })
+
+  it('rolls town visitors and barn finds like the game', () => {
+    expect(newest('$visitors$')).toEqual(visitorTable())
+    expect(newest('$barnspots$')).toEqual(rescueSpots())
   })
 
   it("puts the server's finds on their pins and no other cars", () => {
