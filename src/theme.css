@@ -144,3 +144,48 @@ html {
 :root .rf-result { border: 4px solid var(--line); border-radius: 22px; box-shadow: 0 8px 0 rgba(0,0,0,.35), 0 20px 40px rgba(0,0,0,.3); }
 :root .shift-btn { background: linear-gradient(#ff6b6b, #d6283b); border: 3px solid var(--line); color: #fff; text-shadow: 0 2px 0 var(--line); box-shadow: inset 0 -6px 0 rgba(0,0,0,.18), inset 0 3px 0 rgba(255,255,255,.4), 0 5px 0 rgba(0,0,0,.35); }
 :root .shift-btn:active { transform: translateY(3px); box-shadow: inset 0 -3px 0 rgba(0,0,0,.18), 0 2px 0 rgba(0,0,0,.35); }
+
+/* Build toolbar: one slim dock of icon tiles; the hint floats above it as a pill. */
+:root .edit-bar { display: flex; flex-direction: column; align-items: center; gap: 8px; background: none; border: none; box-shadow: none; padding: 0; max-width: calc(100vw - 16px); }
+:root .edit-hint { order: -1; margin: 0; max-width: 100%; padding: 5px 14px; border-radius: 999px; font: 14px var(--display); color: #fff; background: linear-gradient(#34507f, #1f3358); border: 2.5px solid var(--line); box-shadow: 0 3px 0 rgba(0,0,0,.35); text-shadow: 0 1.5px 0 rgba(0,0,0,.4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:root .edit-tools { flex-wrap: nowrap; gap: 4px; padding: 5px; background: var(--sheet); border: 3px solid var(--line); border-radius: 20px; box-shadow: 0 5px 0 rgba(0,0,0,.3); max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+:root .edit-tools::-webkit-scrollbar { display: none; }
+:root .tool { flex-direction: column; justify-content: center; gap: 2px; min-width: 58px; height: 54px; padding: 4px 6px; font: 11px/1 var(--display); letter-spacing: .2px; border: 2px solid transparent; border-radius: 14px; background: transparent; box-shadow: none; color: #4a6283; white-space: nowrap; }
+:root .tool .gi { width: 24px; height: 24px; color: #2f6fd6; }
+:root .tool:hover { background: #fff; }
+:root .tool.active { background: linear-gradient(#ffd84a, #ffa41a); border-color: var(--line); color: var(--line); box-shadow: inset 0 2px 0 rgba(255,255,255,.5), 0 2px 0 rgba(0,0,0,.3); }
+:root .tool.active .gi { color: var(--line); }
+:root .tool.done { margin-left: 4px; background: linear-gradient(#8ef05c, #2fae35); border-color: #1d6b22; color: #fff; text-shadow: 0 1.5px 0 rgba(0,0,0,.3); box-shadow: inset 0 2px 0 rgba(255,255,255,.4), 0 2px 0 rgba(0,0,0,.3); }
+:root .tool.done .gi { color: #fff; filter: drop-shadow(0 1.5px 0 rgba(0,0,0,.3)); }
+@media (max-width: 600px) {
+  :root .edit-bar { left: calc(6px + var(--sal)); right: calc(6px + var(--sar)); transform: none; max-width: none; bottom: calc(6px + var(--sab)); }
+  :root .edit-tools { width: 100%; padding: 4px; gap: 2px; border-radius: 18px; }
+  :root .tool { flex: 1 0 auto; min-width: 46px; height: 50px; padding: 3px 4px; font-size: 10px; }
+  :root .tool .gi { width: 22px; height: 22px; }
+  :root .edit-hint { font-size: 12px; padding: 4px 12px; }
+}
+@media (max-height: 500px) { :root .tool { height: 44px; } :root .tool .gi { width: 20px; height: 20px; } }
+
+/* Race venue banner: a title card that slides in during the countdown */
+:root .rf-venue { display: flex; align-items: center; gap: 10px; padding: 6px 18px 6px 6px; border-radius: 18px; --vc: #2263d6; background: linear-gradient(#34507f, #1f3358); border: 3px solid var(--line); box-shadow: inset 0 2px 0 rgba(255,255,255,.18), 0 4px 0 rgba(0,0,0,.35); animation: venue-in .5s cubic-bezier(.2, 1.4, .4, 1) both; }
+:root .rf-venue-ico { width: 44px; height: 44px; flex: none; display: grid; place-items: center; font-size: 26px; border-radius: 13px; background: linear-gradient(color-mix(in srgb, var(--vc) 70%, #fff), var(--vc)); border: 2.5px solid var(--line); box-shadow: inset 0 2px 0 rgba(255,255,255,.35); }
+:root .rf-venue-txt { display: flex; flex-direction: column; line-height: 1.05; text-align: left; }
+:root .rf-venue-txt small { font: 11px var(--display); letter-spacing: 1px; text-transform: uppercase; color: #ffd84a; }
+:root .rf-venue-txt b { font: 22px var(--display); font-weight: normal; color: #fff; text-shadow: 0 2px 0 var(--line); }
+:root .rf-venue.v-main { --vc: #5aa9ff; }
+:root .rf-venue.v-beach { --vc: #ffb547; }
+:root .rf-venue.v-desert { --vc: #e8743b; }
+:root .rf-venue.v-snow { --vc: #9fd8ff; }
+:root .rf-venue.v-farm { --vc: #8ed14a; }
+:root .rf-venue.v-docks { --vc: #3fb5b0; }
+@keyframes venue-in { from { transform: translateY(-14px) scale(.85); opacity: 0; } }
+@media (max-width: 600px) { :root .rf-venue-ico { width: 36px; height: 36px; font-size: 21px; } :root .rf-venue-txt b { font-size: 18px; } }
+@media (prefers-reduced-motion: reduce) { :root .rf-venue { animation: none; } }
+
+/* Race: GO!, boost button, skill flashes */
+:root .race-full .countdown.big { -webkit-text-stroke: 3px var(--line); text-shadow: 0 6px 0 var(--line); color: #ffd84a; }
+:root .race-full .countdown.big.go { color: #8ef05c; text-shadow: 0 6px 0 var(--line); }
+:root .boost-btn { border: 3px solid var(--line); box-shadow: 0 0 0 3px #fff inset, 0 4px 0 rgba(0,0,0,.35); text-shadow: 0 2px 0 var(--line); }
+:root .boost-btn small { color: #ffd84a; }
+:root .skill-flash { border: 2.5px solid var(--line); border-radius: 14px; box-shadow: 0 3px 0 rgba(0,0,0,.35); text-shadow: 0 1.5px 0 rgba(0,0,0,.4); }
+:root .skill-flash.theirs { background: linear-gradient(#ff6b6b, #d6283b); }
