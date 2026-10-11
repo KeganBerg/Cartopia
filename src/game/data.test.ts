@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildingDef, carDef, knownBuilding, BUILDINGS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost, jobLevel } from './data'
+import { buildingDef, carDef, knownBuilding, BUILDINGS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost, jobLevel, performance, fittedMods, modStats, modCost, MODS, MOD_SLOTS } from './data'
 
 describe('unknown ids from newer builds', () => {
   it('gives an unknown building a harmless stand-in instead of crashing', () => {
@@ -65,5 +65,40 @@ describe('jobs locked to the level they started at', () => {
     expect(jobLevel({ level: 3 })).toBe(3)
     expect(jobLevel({ level: 4, jobLevel: 3 })).toBe(3)
     expect(jobLevel({ level: 2, jobLevel: 9 })).toBe(2)
+  })
+})
+
+describe('car mods', () => {
+  const none = { engine: 0, turbo: 0, tires: 0, weight: 0 }
+
+  it('adds fitted mod stats to the performance index', () => {
+    const pip = carDef('pip')
+    const base = performance(pip, none)
+    expect(performance(pip, none, [])).toBe(base)
+    expect(performance(pip, none, ['flamepipes'])).toBe(Math.round((pip.power + 6) * 0.6 + pip.grip * 0.3 + (100 - pip.weight) * 0.1))
+    expect(performance(pip, none, MODS.map((m) => m.id))).toBeGreaterThan(base)
+  })
+
+  it('counts one mod per slot and ignores unknown ids', () => {
+    expect(fittedMods(['ducktail', 'gtwing', 'future-mod', 'chrome'])).toEqual({ spoiler: 'ducktail', rims: 'chrome' })
+    expect(fittedMods(undefined)).toEqual({})
+    expect(modStats('future-mod')).toEqual({ power: 0, grip: 0, weight: 0 })
+    expect(modCost('future-mod')).toEqual({ coins: 0, parts: 0, bucks: 0 })
+  })
+
+  it('stays smaller than maxed Garage upgrades', () => {
+    const car = carDef('civic')
+    const best = MOD_SLOTS.map((s) => MODS.filter((m) => m.slot === s.id).at(-1)!.id)
+    const modGain = performance(car, none, best) - performance(car, none)
+    const upGain = performance(car, { engine: 5, turbo: 5, tires: 5, weight: 5 }) - performance(car, none)
+    expect(modGain).toBeGreaterThan(5)
+    expect(modGain).toBeLessThan(upGain / 2)
+  })
+
+  it('prices every mod in coins or bucks, never both', () => {
+    for (const m of MODS) {
+      expect(new Set(MODS.map((x) => x.id)).size).toBe(MODS.length)
+      expect(m.bucks > 0).toBe(m.coins === 0 && m.parts === 0)
+    }
   })
 })

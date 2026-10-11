@@ -29,15 +29,15 @@ function buildingItem(def: BuildingDef): Item {
   return { key: `b|${def.id}|${SEASON}`, dist: 2 + size * 1.2, look: 0.7 + size * 0.1, shadow: size * 0.5, model: () => <BuildingModel def={def} /> }
 }
 
-type CarLook = { body: Body; color: string; stripe?: string | null; rusty?: boolean }
+type CarLook = { body: Body; color: string; stripe?: string | null; rusty?: boolean; mods?: string[] | null }
 
 function carItem(c: CarLook): Item {
   return {
-    key: `c|${c.body}|${c.color}|${c.stripe ?? ''}|${c.rusty ? 1 : 0}`,
+    key: `c|${c.body}|${c.color}|${c.stripe ?? ''}|${c.rusty ? 1 : 0}|${c.rusty ? '' : (c.mods ?? []).join(',')}`,
     dist: 2.55,
     look: 0.4,
     shadow: 0.65,
-    model: () => <group scale={1.25}><CarModel body={c.body} color={c.color} stripe={c.stripe} rusty={c.rusty} /></group>,
+    model: () => <group scale={1.25}><CarModel body={c.body} color={c.color} stripe={c.stripe} rusty={c.rusty} mods={c.mods} /></group>,
   }
 }
 

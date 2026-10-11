@@ -43,11 +43,11 @@ export function progressScore(s: Pick<SaveState, 'level' | 'xp' | 'cars' | 'buil
 }
 
 function bestCar(s: SaveState) {
-  let best: { name: string; color: string; pi: number; body: string } | null = null
+  let best: { name: string; color: string; pi: number; body: string; mods?: string[] } | null = null
   for (const c of s.cars) {
     const d = carDef(c.model)
-    const p = performance(d, c.upgrades)
-    if (!best || p > best.pi) best = { name: d.name, color: c.color, pi: p, body: d.body }
+    const p = performance(d, c.upgrades, c.mods)
+    if (!best || p > best.pi) best = { name: d.name, color: c.color, pi: p, body: d.body, ...(c.mods?.length ? { mods: c.mods } : {}) }
   }
   return best
 }
