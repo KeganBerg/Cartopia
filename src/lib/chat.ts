@@ -149,6 +149,8 @@ export function startChat() {
     const { viewing } = useChat.getState()
     if (viewing && !live[viewing] && !document.hidden) void loadRecent(viewing)
   }, 15000)
+  // Realtime only checks crew membership on join, so notice a kick or a crew change and rejoin.
+  setInterval(() => { if (!document.hidden) void refreshChatRooms() }, 120000)
 }
 
 let pickedRoom: Room | null = null
