@@ -356,6 +356,8 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .thought { font-size: 13px; max-width: 230px; white-space: normal; text-align: left; line-height: 1.25; padding: 5px 10px; }
 .badge-crew { background: #455a64; color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,.4); }
 .badge-rescue { background: #fff3e0; color: #5d4037; }
+.badge-arcade { background: linear-gradient(160deg, #7e57c2, #ec407a); font-size: 20px; padding: 1px 6px; animation: arc-bob 2.4s ease-in-out infinite; }
+@keyframes arc-bob { 50% { translate: 0 -3px; } }
 
 /* Grand Prix */
 .gp-list { display: grid; gap: 10px; }
@@ -1621,5 +1623,5 @@ button.book-car { font: inherit; color: inherit; }
 .chest.ready .chest-icon { animation: boxwiggle 1.2s ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
-  .overlay:has(> .panel), .overlay > .panel, .overlay.closing, .overlay.closing > .panel, .paint-sweep::before, .chest.ready .chest-icon { animation: none; }
+  .overlay:has(> .panel), .overlay > .panel, .overlay.closing, .overlay.closing > .panel, .paint-sweep::before, .chest.ready .chest-icon, .badge-arcade { animation: none; }
 }
