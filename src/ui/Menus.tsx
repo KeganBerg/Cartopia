@@ -34,6 +34,7 @@ export function BottomBar() {
   const setsReady = useGame((s) => readySets(s).length)
   const crewChests = useCrewGoal((g) => g.ready)
   const crewChat = useChat((c) => c.unread.crew)
+  const globalChat = useChat((c) => c.unread.global > 0)
   const rival = useRivalWaiting()
   const tut = useGame(tutTarget)
   const pulse = (t: TutTarget) => (tut === t ? ' tut-pulse' : '')
@@ -46,7 +47,8 @@ export function BottomBar() {
         <button className="icon-btn crates-btn" onClick={() => openPanel('crates')}><span className="i i-crates"><Icon name="crate" /></span>CRATES</button>
         <button className="icon-btn" onClick={() => openPanel('showroom')}><span className="i i-showroom"><Icon name="car" />{setsReady > 0 && <span className="btn-dot">{setsReady}</span>}</span>SHOWROOM</button>
         <button className="icon-btn" onClick={() => openPanel('garage')}><span className="i i-garage"><Icon name="wrench" /></span>GARAGE</button>
-        <button className="icon-btn" onClick={() => openPanel(crewChests === 0 && crewChat > 0 ? 'chat' : 'friends')}><span className="i i-friends"><Icon name="friends" />{crewChests > 0 ? <span className="btn-dot">{crewChests}</span> : crewChat > 0 && <span className="btn-dot">{crewChat > 9 ? '9+' : crewChat}</span>}</span>FRIENDS</button>
+        <button className="icon-btn" onClick={() => openPanel('friends')}><span className="i i-friends"><Icon name="friends" />{crewChests > 0 && <span className="btn-dot">{crewChests}</span>}</span>FRIENDS</button>
+        <button className="icon-btn" onClick={() => openPanel('chat')}><span className="i i-chat"><Icon name="chat" />{crewChat > 0 ? <span className="btn-dot">{crewChat > 9 ? '9+' : crewChat}</span> : globalChat && <span className="btn-dot new" />}</span>CHAT</button>
         <button className="icon-btn" onClick={() => setMode('road')}><span className="i i-edit"><Icon name="cone" /></span>EDIT</button>
         <button className={`big-btn race-btn${pulse('race')}`} onClick={() => openPanel('race')}><span className="i"><Icon name="flag" />{rival && <span className="btn-dot" title="Your rival is in town">!</span>}</span>RACE</button>
       </div>
