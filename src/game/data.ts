@@ -126,13 +126,14 @@ function parkedDef(id: string): BuildingDef {
 export const knownBuilding = (id: string) => BUILDINGS.some((b) => b.id === id)
 export const buildingDef = (id: string): BuildingDef => BUILDINGS.find((b) => b.id === id) ?? parkedDef(id)
 
-// Building upgrades: businesses, parts makers and gas stations go from level 1
-// to 10. Each level pays more per job and finishes jobs sooner (a gas station
-// holds more fuel instead). Saves keep the level as `level` on the placed
+// Building upgrades: businesses, parts makers, gas stations and houses go from
+// level 1 to 10. Each level pays more per job and finishes jobs sooner (a gas
+// station holds more fuel, a house grows into apartments and then a tower and
+// fits more residents). Saves keep the level as `level` on the placed
 // building; a missing level is level 1.
 export const MAX_BUILDING_LEVEL = 10
 export const upgradable = (d: BuildingDef) =>
-  !d.parked && ((!!d.jobSeconds && d.kind !== 'obstacle') || !!d.fuelCap)
+  !d.parked && ((!!d.jobSeconds && d.kind !== 'obstacle') || !!d.fuelCap || d.kind === 'house')
 export const buildingLevel = (b: { level?: number }) =>
   Math.min(MAX_BUILDING_LEVEL, Math.max(1, Math.floor(Number(b.level) || 1)))
 // The level a running job pays at: locked when it started (older saves: the current level).
@@ -145,14 +146,30 @@ export const upgradePartsPayout = (d: BuildingDef, level: number) => Math.round(
 export const upgradeXp = (d: BuildingDef, level: number) => Math.round((d.xp ?? 0) * (1 + 0.1 * (level - 1)))
 export const upgradeJobSeconds = (d: BuildingDef, level: number) =>
   d.jobSeconds ? Math.max(10, Math.round((d.jobSeconds * Math.pow(0.92, level - 1)) / 5) * 5) : 0
-export const upgradeFuelCap = (d: BuildingDef, level: number) => (d.fuelCap ? d.fuelCap + 2 * (level - 1) : 0)
+// Max fuel a building adds: a gas station's tank grows 2 a level; every house
+// level above 1 adds 1 (residents chip in with their own gas cans).
+export const upgradeFuelCap = (d: BuildingDef, level: number) =>
+  d.fuelCap ? d.fuelCap + 2 * (level - 1) : d.kind === 'house' ? level - 1 : 0
 
 // Cost to go from `level` to `level + 1`: 60% of the build price, 40% more each
-// level, plus parts from level 4 up.
+// level, plus parts from level 4 up. Houses are cheap to build but end up as
+// skyscrapers, so theirs start at $300 and grow 55% a level.
 export const buildingUpgradeCost = (d: BuildingDef, level: number) => ({
-  coins: Math.max(100, Math.round((d.price * 0.6 * Math.pow(1.4, level - 1)) / 50) * 50),
+  coins: d.kind === 'house'
+    ? Math.round((300 * Math.pow(1.55, level - 1)) / 50) * 50
+    : Math.max(100, Math.round((d.price * 0.6 * Math.pow(1.4, level - 1)) / 50) * 50),
   parts: level >= 4 ? (level - 2) * 2 : 0,
 })
+
+// Houses: a nicer house at levels 1-3, an apartment block at 4-6 and an
+// apartment tower at 7-10, with more residents walking the streets each level.
+export type HomeStage = 'house' | 'apartments' | 'tower'
+export const homeStage = (level: number): HomeStage => (level >= 7 ? 'tower' : level >= 4 ? 'apartments' : 'house')
+const HOME_NAMES: Record<HomeStage, string> = { house: 'House', apartments: 'Apartments', tower: 'Sky Tower' }
+const RESIDENTS = [2, 3, 4, 6, 8, 10, 13, 16, 20, 24]
+export const houseResidents = (level: number) => RESIDENTS[Math.min(MAX_BUILDING_LEVEL, Math.max(1, level)) - 1]
+// What a building is called at a level (only houses change name).
+export const levelName = (d: BuildingDef, level: number) => (d.kind === 'house' ? HOME_NAMES[homeStage(level)] : d.name)
 export const buildingUpgradeXp = (level: number) => 10 + level * 5
 // Extra model height an upgraded building gains, on the same lot.
 export const levelLift = (level = 1) => 0.26 * (Math.min(MAX_BUILDING_LEVEL, Math.max(1, level)) - 1)

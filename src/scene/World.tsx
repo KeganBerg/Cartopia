@@ -190,7 +190,7 @@ function Building({ b, roads }: { b: PlacedBuilding; roads: Set<string> }) {
       onPointerOver={() => {
         const mode = useGame.getState().mode
         if (mode === 'move' && movable(b.def)) document.body.style.cursor = 'grab'
-        else if (mode === 'play' && d.kind !== 'decor' && d.kind !== 'house') document.body.style.cursor = 'pointer'
+        else if (mode === 'play' && d.kind !== 'decor') document.body.style.cursor = 'pointer'
       }}
       onPointerOut={() => (document.body.style.cursor = '')}
     >
