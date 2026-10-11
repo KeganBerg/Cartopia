@@ -10,6 +10,8 @@ export type Venue = {
   icon: string
   ground?: string // land colour; missing = the season's grass
   shoulder?: string // strip beside the road; missing = sidewalk pavers
+  road?: string // tint on the asphalt (dusty, salty, slushy)
+  pole?: string // street lamp colour
   sky: string // daytime sky
   fog: string // daytime haze
   fogNear: number
@@ -18,11 +20,11 @@ export type Venue = {
 
 export const VENUES: Venue[] = [
   { id: 'main', name: 'Main Street', icon: '🏙️', sky: '#3d9bff', fog: '#d9f2ff', fogNear: 28, fogFar: 105 },
-  { id: 'beach', name: 'Sunset Boardwalk', icon: '🏖️', ground: '#ecd9a6', shoulder: '#a1795a', sky: '#2fa8ff', fog: '#e4f6ff', fogNear: 30, fogFar: 110 },
-  { id: 'desert', name: 'Red Rock Canyon', icon: '🏜️', ground: '#d9a066', shoulder: '#c08350', sky: '#4aa3e8', fog: '#f2dcc2', fogNear: 26, fogFar: 110 },
-  { id: 'snow', name: 'Frostbite Pass', icon: '🏔️', ground: '#eef3f7', shoulder: '#dde6ee', sky: '#8fbde6', fog: '#e6edf4', fogNear: 18, fogFar: 85 },
-  { id: 'farm', name: 'Harvest Backroad', icon: '🌾', shoulder: '#a08a70', sky: '#55aaf5', fog: '#e2f4ff', fogNear: 30, fogFar: 110 },
-  { id: 'docks', name: 'Harbor Docks', icon: '⚓', ground: '#9aa3a9', shoulder: '#b3babf', sky: '#5b9bd5', fog: '#d0dce5', fogNear: 24, fogFar: 100 },
+  { id: 'beach', name: 'Sunset Boardwalk', icon: '🏖️', ground: '#ecd9a6', shoulder: '#a1795a', road: '#f4ece0', pole: '#eceff1', sky: '#2fa8ff', fog: '#e4f6ff', fogNear: 30, fogFar: 110 },
+  { id: 'desert', name: 'Red Rock Canyon', icon: '🏜️', ground: '#d9a066', shoulder: '#c08350', road: '#f0d9bf', pole: '#6d4c41', sky: '#4aa3e8', fog: '#f2dcc2', fogNear: 26, fogFar: 110 },
+  { id: 'snow', name: 'Frostbite Pass', icon: '🏔️', ground: '#eef3f7', shoulder: '#dde6ee', road: '#e4ecf4', pole: '#5d4037', sky: '#8fbde6', fog: '#e6edf4', fogNear: 18, fogFar: 85 },
+  { id: 'farm', name: 'Harvest Backroad', icon: '🌾', shoulder: '#a08a70', pole: '#6d4c41', sky: '#55aaf5', fog: '#e2f4ff', fogNear: 30, fogFar: 110 },
+  { id: 'docks', name: 'Harbor Docks', icon: '⚓', ground: '#9aa3a9', shoulder: '#b3babf', pole: '#fbc02d', sky: '#5b9bd5', fog: '#d0dce5', fogNear: 24, fogFar: 100 },
 ]
 
 export const venue = (id: string) => VENUES.find((v) => v.id === id) ?? VENUES[0]
