@@ -1401,7 +1401,7 @@ export function InvitesPanel() {
   }
   return (
     <Panel title="Race challenges">
-      {invites.length > 0 && <div className="invites-car"><RaceBar cars={cars} car={car} onPick={setRaceCar} note="Your race car" /></div>}
+      {invites.length > 0 && <div className="invites-car"><RaceBar cars={cars} car={car} onPick={setRaceCar} /></div>}
       <label className="toggle-row">
         <input type="checkbox" checked={closed} onChange={(e) => setClosed(e.target.checked)} />
         <span>Don't accept challenges <small>Other players will see you're not taking races.</small></span>
