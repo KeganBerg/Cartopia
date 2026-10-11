@@ -6,6 +6,7 @@ import { useGame } from '../game/store'
 import { START_LAND, buildingDef } from '../game/data'
 import { buildWalkGraph, findPath, pedestrianCrossings, stepsFor, transit, sideOf, SIDES, type Pt, type Step, type WalkGraph, type WalkNode } from '../game/walkGraph'
 import { anchors } from './anchors'
+import { liveTraffic, crossingSignal } from './traffic/live'
 import { useThought } from '../game/thoughts'
 import { SEASON } from './season'
 import { dayPhase, nightAmount } from './dayNight'
@@ -56,7 +57,7 @@ const SHOP_THOUGHTS: Record<string, [string, string]> = {
   icecream: ['🍦', 'getting ice cream'], diner: ['🥞', 'heading to the diner'], gas: ['🥤', 'grabbing a cold drink'],
   cinema: ['🍿', 'catching a movie'], bowling: ['🎳', 'going bowling'], motel: ['🧳', 'checking in at the motel'],
   carwash: ['🧽', 'checking out the car wash'], rescue: ['🔧', "dropping by Rusty's"], tires: ['🛞', 'asking about tires'],
-  parts: ['🔩', 'picking up parts'], tuner: ['🔩', 'browsing the tuner shop'], stadium: ['🏁', 'going to the speedway'],
+  parts: ['🔩', 'picking up parts'], crew: ['🤝', 'hanging out at the Crew House'], tuner: ['🔩', 'browsing the tuner shop'], stadium: ['🏁', 'going to the speedway'],
 }
 const PARK_GO: Record<string, [string, string]> = {
   bench: ['🪑', 'heading for a bench'], fountain: ['⛲', 'going to see the fountain'], pond: ['🦆', 'going to see the ducks'],
@@ -405,8 +406,11 @@ function update(ctx: Ctx, p: Person, dt: number, night: boolean) {
   const step = p.steps[p.si]
   if (!step) return arrive(ctx, p, night)
   if (step.cross && p.crossing !== step.cross.id) {
-    // Look both ways: wait at the curb while a car is close to the crossing.
-    if (p.waited < 6 && carNear(step.cross.mid, 1.7)) {
+    // At lights, wait for the walk signal (and still mind cars turning across);
+    // elsewhere look both ways and wait while a car is close to the crossing.
+    const signal = crossingSignal(step.cross.tile, step.cross.dir)
+    const hold = signal === 'wait' ? p.waited < 30 : carNear(step.cross.mid, signal === 'walk' ? 1.1 : 1.7) && p.waited < 8
+    if (hold) {
       p.waited += dt
       turnTo(p, Math.atan2(step.p[0] - p.pos[0], step.p[1] - p.pos[1]), dt)
       walkDog(p, dt)
@@ -633,10 +637,10 @@ function turnTo(p: Person, target: number, dt: number) {
   p.heading += diff * Math.min(1, dt * 10)
 }
 
-// Town cars publish where they are for their DOM bubbles; reuse that to spot traffic.
+// Any car from the shared traffic sim within `r` of a point.
 function carNear(at: Pt, r: number) {
-  for (const [k, v] of anchors) {
-    if (k.startsWith('car:') && Math.hypot(v.x - at[0], v.z - at[1]) < r) return true
+  for (const a of liveTraffic.agents.values()) {
+    if (Math.hypot(a.x - at[0], a.z - at[1]) < r) return true
   }
   return false
 }
