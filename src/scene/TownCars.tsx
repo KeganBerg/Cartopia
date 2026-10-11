@@ -52,7 +52,10 @@ function TownCar({ car }: { car: OwnedCar }) {
     if (!g) return
     g.visible = !!a
     if (truck.current) truck.current.visible = false
-    if (!a) return
+    if (!a) {
+      anchors.delete(`car:${car.uid}`)
+      return
+    }
     g.position.set(a.x, 0.02, a.z)
     g.rotation.y = a.yaw
     g.scale.setScalar(Math.max(0.001, a.show))

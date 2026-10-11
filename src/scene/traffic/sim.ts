@@ -29,6 +29,7 @@ type Leg = {
   stopS?: number // pull up here (arc length) ...
   stopFor?: number // ... for this long
   stopKind?: 'curb' | 'pump' | 'stall' | 'tow'
+  lot?: string // on a forecourt: the road tile its driveway turns in from
   granted: boolean
 }
 
@@ -137,8 +138,14 @@ export class Traffic {
     // Keep cars where they are when their road still exists; replan what comes next.
     for (const a of [...this.agents.values()]) {
       const leg = a.legs[a.ci]
-      const still = leg.node ? this.legValid(leg) : this.lotValid(a)
+      // Turning in to (or on) a forecourt: keep its way through and back out onto the road.
+      const inLot = !leg.node || (a.ci + 1 < a.legs.length && !a.legs[a.ci + 1].node)
+      const keep = inLot ? this.lotEnd(a, a.ci + (leg.node ? 1 : 0)) : a.ci
+      const still = keep < a.legs.length && this.legValid(a.legs[keep]) && (!leg.node || this.legValid(leg))
+      // A paid-for trip (gas, tires, a tow) still has to happen, by the new roads.
+      if (a.trip && a.trip.kind !== 'visit' && !this.trips.has(a.uid)) this.trips.set(a.uid, a.trip.kind)
       if (!still) {
+        // Can't stay where it is: it comes back somewhere on the new roads.
         this.agents.delete(a.uid)
         continue
       }
@@ -147,9 +154,13 @@ export class Traffic {
       a.trip = null
       a.plan = []
       a.ot = null
+      a.pend = null
+      a.approach = null
+      a.arrived = null
+      a.gapTo = null
       a.parked = 0
       a.parkedAt = null
-      this.truncate(a, leg.node ? a.ci : this.lotEnd(a))
+      this.truncate(a, keep)
       for (const l of a.legs) if (l.stopKind && l.stopKind !== 'stall') this.clearStop(l)
       if (!a.legs.some((l) => l.stopKind === 'stall')) a.pull = null
       if (leg.node && leg.granted) this.net.nodes.get(leg.node)!.occ.set(a.uid, { inDir: leg.inDir, outDir: leg.outDir })
@@ -194,6 +205,7 @@ export class Traffic {
   private remove(a: Agent) {
     for (const n of this.net.nodes.values()) n.occ.delete(a.uid)
     this.agents.delete(a.uid)
+    this.limp.delete(a.uid)
   }
 
   private legValid(l: Leg) {
@@ -203,14 +215,9 @@ export class Traffic {
     return (n.arms[back] || n.lots[back]) && (n.drive[l.outDir] || n.lots[l.outDir]) && !(l.outDir === back && n.degree > 1)
   }
 
-  private lotValid(a: Agent) {
-    const end = this.lotEnd(a)
-    return end < a.legs.length && this.legValid(a.legs[end])
-  }
-
-  // Index of the first road leg at or after the current one.
-  private lotEnd(a: Agent) {
-    let i = a.ci
+  // Index of the first road leg at or after the current one (or `from`).
+  private lotEnd(a: Agent, from = a.ci) {
+    let i = from
     while (i < a.legs.length && !a.legs[i].node) i++
     return i
   }
@@ -322,7 +329,7 @@ export class Traffic {
       if (bay) {
         a.legs.push(this.makeLeg(node, inDir, bay.lotDir))
         bay.legs.forEach((c, i) => {
-          const leg: Leg = { c, node: null, inDir: -1, outDir: -1, junction: false, turn: i === bay.stopLeg ? 0 : 1, granted: false }
+          const leg: Leg = { c, node: null, inDir: -1, outDir: -1, junction: false, turn: i === bay.stopLeg ? 0 : 1, granted: false, lot: node.key }
           if (i === bay.stopLeg) {
             leg.stopS = c.len / 2
             leg.stopFor = 3.5
@@ -588,10 +595,18 @@ export class Traffic {
       a.show = a.leaving ? Math.max(0, a.show - dt * 2) : Math.min(1, a.show + dt * 2)
       if (a.leaving && !a.show) {
         const spec = this.specs.get(a.uid)
+        if (a.trip && a.trip.kind !== 'visit' && !this.trips.has(a.uid)) this.trips.set(a.uid, a.trip.kind)
         this.remove(a)
         this.respawns++
         if (spec) this.spawn(spec)
       }
+    }
+    // Now and then: bring back any car that found nowhere clear to appear, and
+    // forget requests for cars that aren't out any more.
+    if (Math.floor(this.t) !== Math.floor(this.t - dt)) {
+      for (const spec of this.specs.values()) if (!this.agents.has(spec.uid)) this.spawn(spec)
+      for (const uid of [...this.trips.keys()]) if (!this.specs.has(uid)) this.trips.delete(uid)
+      for (const uid of [...this.visits.keys()]) if (!this.specs.has(uid)) this.visits.delete(uid)
     }
   }
 
@@ -613,6 +628,8 @@ export class Traffic {
       if (!stop || this.startTrip(a, stop, 'visit')) this.visits.delete(a.uid)
     }
     if (a.tow === 1 && this.roomAhead(a, a.len / 2 + TRUCK.gap + TRUCK.len + 0.1) && (a.pull === null || this.laneClear(a))) a.tow = 2
+    // Nowhere left to tow it to (the town changed under it): unhook.
+    if (a.tow && a.tow !== 3 && !a.trip && !this.trips.has(a.uid) && !a.parked) a.tow = 3
     if (a.tow === 2) a.truck = Math.min(1, a.truck + dt * 2.5)
     if (a.tow === 3) {
       a.truck = Math.max(0, a.truck - dt * 2)
@@ -791,7 +808,7 @@ export class Traffic {
     // One car at a time on a forecourt: wait on the road until it's free.
     if (node.lots[leg.outDir]) {
       const bay = this.net.stops.find((st) => st.bay && st.tile === node.key)?.bay
-      if (bay && this.bayBusy(a, node.key, leg.outDir, bay.legs)) {
+      if (bay && this.bayBusy(a, node.key, leg.outDir)) {
         a.queuedAt = this.t
         return false
       }
@@ -847,12 +864,12 @@ export class Traffic {
       const n = l.node && this.net.nodes.get(l.node)
       if (!n || !n.lots[l.outDir]) continue
       const bay = this.net.stops.find((st) => st.bay && st.tile === n.key)?.bay
-      return !!bay && this.bayBusy(a, n.key, l.outDir, bay.legs)
+      return !!bay && this.bayBusy(a, n.key, l.outDir)
     }
     return false
   }
 
-  private bayBusy(a: Agent, tile: string, lotDir: number, curves: Curve[]) {
+  private bayBusy(a: Agent, tile: string, lotDir: number) {
     for (const o of this.agents.values()) {
       if (o === a) continue
       // Turning in, or on the forecourt.
@@ -860,7 +877,7 @@ export class Traffic {
         const l = o.legs[i]
         if (l.granted && l.node === tile && l.outDir === lotDir) return true
         // (Once its nose is back out on the road, the next car may start in behind it.)
-        if (i === o.ci && !l.node && curves.includes(l.c)) return true
+        if (i === o.ci && !l.node && l.lot === tile) return true
       }
     }
     return false
@@ -885,7 +902,8 @@ export class Traffic {
 
   // Room to clear the junction: don't pull in if the lane beyond is backed up.
   private exitRoom(a: Agent, leg: Leg) {
-    const n = this.net.nodes.get(leg.node!)!
+    const n = this.net.nodes.get(leg.node ?? '')
+    if (!n) return true
     const nk = tkey(n.x + D[leg.outDir][0], n.z + D[leg.outDir][1])
     if (!this.net.nodes.has(nk)) return true
     const need = a.len + 0.35

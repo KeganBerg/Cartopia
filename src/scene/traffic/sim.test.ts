@@ -241,6 +241,46 @@ describe('town traffic', () => {
     expect(c.knot).toBeLessThanOrEqual(6)
   })
 
+  it('building something mid gas trip or mid tow never strands a car', () => {
+    seedRandom(8)
+    const t = new Traffic()
+    const roads = grid(2, 8)
+    const gas = { uid: 'g', def: 'gas', x: 5, z: 1, rot: 0 }
+    const rescue = { uid: 'r', def: 'rescue', x: 5, z: 11, rot: 2 }
+    t.setTown(roads, [gas, rescue], turnOf)
+    t.setCars(cars(4), 4)
+    t.requestTrip('c00', 'gas')
+    t.requestTrip('c01', 'tow')
+    // Build a house the moment c00 starts turning in to the pumps.
+    let rebuilt = false
+    let pumped = 0
+    let towedHome = false
+    run(t, 150, (tr) => {
+      const a = tr.agents.get('c00')!
+      const l = a.legs[a.ci]
+      if (!rebuilt && l.node && tr.net.nodes.get(l.node)!.lots[l.outDir] && l.granted) {
+        rebuilt = true
+        tr.setTown(roads, [gas, rescue, { uid: 'h', def: 'house', x: 14, z: 14 }], turnOf)
+      }
+      for (const o of tr.agents.values()) if (o.parked > 0 && o.parkedAt?.stopKind === 'pump') pumped++
+      const b = tr.agents.get('c01')
+      if (b?.parked && b.parkedAt?.stopKind === 'tow') towedHome = true
+    })
+    expect(rebuilt).toBe(true)
+    // The forecourt doesn't stay blocked: another car can still fill up afterwards.
+    pumped = 0
+    t.requestTrip('c02', 'gas')
+    run(t, 90, (tr) => {
+      const a = tr.agents.get('c02')
+      if (a?.parked && a.parkedAt?.stopKind === 'pump') pumped++
+    })
+    expect(pumped).toBeGreaterThan(0)
+    expect(towedHome).toBe(true)
+    expect(t.agents.get('c01')!.tow).toBe(0)
+    expect(t.agents.size).toBe(4)
+    for (const a of t.agents.values()) expect(a.wait).toBeLessThan(46)
+  })
+
   it('tows a car to Rusty\'s curb', () => {
     seedRandom(9)
     const t = new Traffic()
