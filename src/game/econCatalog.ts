@@ -33,7 +33,8 @@ export function econCatalog() {
     CARS.map((c) => [c.id, { name: c.name, body: c.body, price: c.price, bucks: c.bucks ?? 0, power: c.power, grip: c.grip, weight: c.weight }]),
   )
   const buildings = Object.fromEntries(
-    BUILDINGS.map((b) => [b.id, { price: b.price, obstacle: b.kind === 'obstacle', fuelCap: b.fuelCap ?? 0, ...(upgradable(b) ? { up: upgrades(b) } : {}) }]),
+    // Stuck items cost and pay nothing; the guard already treats unknown ids as free obstacles.
+    BUILDINGS.filter((b) => !b.stuck).map((b) => [b.id, { price: b.price, obstacle: b.kind === 'obstacle', fuelCap: b.fuelCap ?? 0, ...(upgradable(b) ? { up: upgrades(b) } : {}) }]),
   )
   const goals = Object.fromEntries(GOALS.map((g) => [g.id, { coins: g.coins, xp: g.xp, bucks: g.bucks ?? 0 }]))
   const gp = Object.fromEntries(

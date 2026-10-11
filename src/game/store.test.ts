@@ -167,3 +167,34 @@ describe('collection sets', () => {
     expect(g().coins).toBe(1500)
   })
 })
+
+describe('poop bushes', () => {
+  const poop = { uid: 'p1', def: 'poop', x: 2, z: 2, jobEndsAt: null }
+  const town = () => useGame.setState({ mode: 'play', coins: 5000, bucks: 10, level: 5, roads: [], land: ['0,0'], buildings: [{ ...poop }], toasts: [] })
+  const g = () => useGame.getState()
+
+  it("can't be bulldozed, cleared or moved", () => {
+    town()
+    g().bulldoze(2, 2)
+    g().tapBuilding('p1')
+    expect(g().moveBuilding('p1', 3, 3)).toBe(false)
+    expect(g().buildings).toEqual([poop])
+    expect(g().coins).toBe(5000)
+    expect(g().toasts.at(-1)?.text).toBe("This one's not going anywhere")
+  })
+
+  it('blocks roads but is squashed for good by a building placed on it', () => {
+    town()
+    g().paintRoad(2, 2)
+    expect(g().roads).toEqual([])
+    expect(g().placeBuilding('carwash', 1, 2)).toBe(true)
+    expect(g().buildings.map((b) => b.def)).toEqual(['carwash'])
+  })
+
+  it('is squashed by a building moved onto it', () => {
+    town()
+    useGame.setState({ buildings: [{ ...poop }, { uid: 'h1', def: 'house', x: 5, z: 5, jobEndsAt: null }] })
+    expect(g().moveBuilding('h1', 2, 2)).toBe(true)
+    expect(g().buildings).toEqual([{ uid: 'h1', def: 'house', x: 2, z: 2, jobEndsAt: null }])
+  })
+})

@@ -258,6 +258,37 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
   if (NEW_MODELS.has(def.id)) return <NewBuildingModel def={def} ghost={ghost} m={m} win={win} bulb={bulb} level={lvl} />
 
   switch (def.id) {
+    // A brown swirl, like the emoji: three squashed blobs and a curl on top, with a face
+    // turned toward the camera (which looks in from +x, +z).
+    case 'poop':
+      return (
+        <group>
+          {[[0.62, 0.55, 0.3], [0.47, 0.6, 0.66], [0.32, 0.65, 0.95]].map(([r, sy, y], i) => (
+            <mesh key={i} position={[0, y, 0]} scale={[1, sy, 1]} castShadow>
+              <sphereGeometry args={[r, 18, 12]} />
+              {m(i % 2 ? def.roof : def.color)}
+            </mesh>
+          ))}
+          <mesh position={[0, 1.2, 0]} rotation-z={0.35} castShadow>
+            <coneGeometry args={[0.16, 0.36, 12]} />
+            {m(def.color)}
+          </mesh>
+          {!ghost && (
+            <group rotation-y={Math.PI / 4}>
+              {[-0.15, 0.15].map((x) => (
+                <group key={x}>
+                  <mesh position={[x, 0.74, 0.39]}><sphereGeometry args={[0.11, 12, 10]} />{m('#ffffff')}</mesh>
+                  <mesh position={[x, 0.75, 0.49]}><sphereGeometry args={[0.05, 10, 8]} />{m('#1b1b1b')}</mesh>
+                </group>
+              ))}
+              <mesh position={[0, 0.48, 0.6]} rotation-z={Math.PI}>
+                <torusGeometry args={[0.14, 0.035, 8, 16, Math.PI]} />
+                {m('#1b1b1b')}
+              </mesh>
+            </group>
+          )}
+        </group>
+      )
     case 'bush':
       return (
         <group>

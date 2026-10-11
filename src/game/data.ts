@@ -37,6 +37,8 @@ export type BuildingDef = {
   nightOnly?: boolean
   // Stand-in for a building this build doesn't know (see buildingDef).
   parked?: boolean
+  // Can't be cleared, moved or bulldozed. Building over it squashes it for good.
+  stuck?: boolean
 }
 
 export const BUILDINGS: BuildingDef[] = [
@@ -79,6 +81,8 @@ export const BUILDINGS: BuildingDef[] = [
   { id: 'bush', name: 'Bushes', kind: 'obstacle', w: 1, h: 1, price: 150, unlockLevel: 99, jobSeconds: 30, xp: 5, color: '#558b2f', roof: '#33691e' },
   { id: 'rock', name: 'Boulder', kind: 'obstacle', w: 1, h: 1, price: 400, unlockLevel: 99, jobSeconds: 120, xp: 12, color: '#9e9e9e', roof: '#757575' },
   { id: 'cactus', name: 'Cactus', kind: 'obstacle', w: 1, h: 1, price: 1500, unlockLevel: 99, jobSeconds: 600, xp: 40, color: '#43a047', roof: '#2e7d32' },
+  // Only ever planted by the server (an admin SQL file), never sold or scattered.
+  { id: 'poop', name: 'Poop Bush', kind: 'obstacle', w: 1, h: 1, price: 0, unlockLevel: 99, stuck: true, color: '#7b4a2a', roof: '#5d3a1f' },
   { id: 'house', name: 'House', kind: 'house', w: 1, h: 1, price: 250, unlockLevel: 1, color: '#fff3e0', roof: '#6d4c41' },
   { id: 'tree', name: 'Oak Tree', kind: 'decor', w: 1, h: 1, price: 50, unlockLevel: 1, color: '#43a047', roof: '#2e7d32' },
   { id: 'palm', name: 'Palm Tree', kind: 'decor', w: 1, h: 1, price: 120, unlockLevel: 2, color: '#66bb6a', roof: '#8d6e63' },
@@ -123,6 +127,7 @@ function parkedDef(id: string): BuildingDef {
   }
   return d
 }
+export const STUCK_TOAST = "This one's not going anywhere"
 export const knownBuilding = (id: string) => BUILDINGS.some((b) => b.id === id)
 export const buildingDef = (id: string): BuildingDef => BUILDINGS.find((b) => b.id === id) ?? parkedDef(id)
 
@@ -221,6 +226,8 @@ export type CarDef = {
   colors: string[]
   // Stand-in for a car this build doesn't know (see carDef).
   parked?: boolean
+  // Can't be cleared, moved or bulldozed. Building over it squashes it for good.
+  stuck?: boolean
   // Top-tier showroom car, flagged Legendary in the shop.
   legendary?: boolean
 }

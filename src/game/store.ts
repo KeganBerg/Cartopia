@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
   PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS,
-  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, DAILY_BONUS, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modSlotsFor, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower,
+  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, DAILY_BONUS, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modSlotsFor, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower, STUCK_TOAST,
 } from './data'
 import { sfx } from '../lib/sound'
 import { msUntilNight } from './clock'
@@ -220,9 +220,23 @@ export function buyablePlots(land: string[]) {
   return out
 }
 
+export const isStuck = (def: string) => !!buildingDef(def).stuck
+
+// Stuck items (poop bushes) don't block a building: it squashes them instead (see squash).
 export function canPlace(s: Pick<SaveState, 'roads' | 'buildings' | 'land'>, def: string, x: number, z: number, rot?: number, ignore?: string) {
   const occ = occupancy(s, ignore)
-  return footprint(def, x, z, rot).every(([tx, tz]) => owns(s.land, tx, tz) && !occ.has(key(tx, tz)))
+  const stuck = new Set(s.buildings.filter((b) => isStuck(b.def)).map((b) => b.uid))
+  return footprint(def, x, z, rot).every(([tx, tz]) => {
+    const what = occ.get(key(tx, tz))
+    return owns(s.land, tx, tz) && (!what || stuck.has(what))
+  })
+}
+
+// The buildings left once a building lands on its lot: stuck items under it are gone for good.
+// The server allows this and nothing else to remove them (econ_private.econ_stuck).
+export function squash(buildings: PlacedBuilding[], def: string, x: number, z: number, rot?: number) {
+  const under = new Set(footprint(def, x, z, rot).map(([tx, tz]) => key(tx, tz)))
+  return buildings.filter((b) => !(isStuck(b.def) && under.has(key(b.x, b.z))))
 }
 
 // Obstacles get cleared, not moved.
@@ -521,10 +535,12 @@ export const useGame = create<GameState>()(
         }
         if (def === 'rescue') setTimeout(() => get().toast("Rusty's is open! Tap his shop to search for cars. The Showroom is unlocked too."), 400)
         sfx.click()
+        const kept = squash(s.buildings, def, x, z, rot)
+        if (kept.length < s.buildings.length) setTimeout(() => get().toast('Squashed! That poop bush is gone for good.'), 300)
         set(withXp(s, Math.max(1, Math.round(d.price / 100)), {
           coins: s.coins - d.price,
           bucks: s.bucks - (d.bucks ?? 0),
-          buildings: [...s.buildings, { uid: uid(), def, x, z, jobEndsAt: null, ...(rot == null ? {} : { rot }) }],
+          buildings: [...kept, { uid: uid(), def, x, z, jobEndsAt: null, ...(rot == null ? {} : { rot }) }],
           stats: bump(s, 'built'),
           updatedAt: Date.now(),
         }))
@@ -540,8 +556,10 @@ export const useGame = create<GameState>()(
         const turn = rot ?? b.rot
         if (!canPlace(s, b.def, x, z, turn, buid)) return false
         if (b.x === x && b.z === z && b.rot === turn) return true
+        const kept = squash(s.buildings, b.def, x, z, turn)
+        if (kept.length < s.buildings.length) setTimeout(() => get().toast('Squashed! That poop bush is gone for good.'), 300)
         set({
-          buildings: s.buildings.map((o) => (o.uid === buid ? { ...o, x, z, ...(turn == null ? {} : { rot: turn }) } : o)),
+          buildings: kept.map((o) => (o.uid === buid ? { ...o, x, z, ...(turn == null ? {} : { rot: turn }) } : o)),
           updatedAt: Date.now(),
         })
         return true
@@ -565,6 +583,7 @@ export const useGame = create<GameState>()(
         const d = buildingDef(b.def)
         if (d.kind === 'showroom' || d.kind === 'garage') return s.toast(`${d.name} can't be removed`)
         if (d.parked) return s.toast('This one is coming in a future update, so it stays put')
+        if (d.stuck) return s.toast(STUCK_TOAST)
         if (d.kind === 'obstacle') return s.toast(`Tap the ${d.name.toLowerCase()} in play mode to clear it`)
         // Upgrades would be lost, and a drag can sweep over a building by accident.
         if (buildingLevel(b) > 1) return s.toast(`Your ${d.name} is upgraded, so it can't be bulldozed. Use Move to put it somewhere else.`)
@@ -584,6 +603,7 @@ export const useGame = create<GameState>()(
         if (d.kind === 'garage') return s.openPanel('garage')
         if (b.def === 'rescue') return s.openPanel('rescue')
         if (b.def === 'crew') return s.openPanel('clan')
+        if (d.stuck) return s.toast(STUCK_TOAST)
         if (d.kind === 'obstacle') {
           const now = Date.now()
           if (b.jobEndsAt === null) {
