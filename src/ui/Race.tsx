@@ -1315,7 +1315,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
         <h2>{title ?? `Drag Race vs ${rival.town}`}</h2>
         <button className="close" onClick={close} aria-label="Leave race">✕</button>
       </div>
-      {countdown <= 0 && <div className="rf-lanes">
+      {countdown <= 0 && t.current > 0.8 && <div className="rf-lanes">
         {[
           { name: `You · ${def.name}`, color: car.color, r: me.current },
           { name: `${rival.town} · ${rival.carName}`, color: rival.color, r: them.current },
@@ -1330,7 +1330,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       {countdown > 0 && !result && <div className={`rf-venue v-${venue.id}`}><span className="rf-venue-ico">{venue.icon}</span><span className="rf-venue-txt"><small>{gripNote ?? (dist ? `${DIST[dist].label} race` : 'Race venue')}</small><b>{venue.name}</b></span></div>}
       {spin && !label && !result && <div className="rf-spin">💨 Wheelspin</div>}
       {countdown > 0 && countdown !== 99 && <div className="countdown big" key={countdown}>{countdown}</div>}
-      {countdown === 0 && t.current < 0.5 && !result && <div className="countdown big go">GO!</div>}
+      {countdown === 0 && t.current < 0.5 && !label && !result && <div className="countdown big go">GO!</div>}
       {onLine && countdown > 0 && countdown !== 99 && !result && <div className="rf-hold">{pedal.current ? (light === ' now' ? 'Hold it there!' : light === ' late' ? 'Too many revs!' : 'Revving...') : 'Hold the pedal: revs in the green'}</div>}
       {me.current.burning && !result && <div className="rf-boost-fx" />}
       {countdown === 99 && (
