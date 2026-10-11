@@ -109,7 +109,15 @@ export function RacePanel() {
     )
   }
 
+  // An accepted live challenge takes over the screen, so don't start a race that it would cut short.
+  const waiting = () => {
+    if (!useLive.getState().outgoing) return false
+    useGame.getState().toast('Waiting for your live challenge to be answered')
+    return true
+  }
+
   const start = (r: Rival) => {
+    if (waiting()) return
     if (!spendFuel(RACE_FUEL)) return useGame.getState().showNeed('fuel', RACE_FUEL - useGame.getState().fuel, 'a race')
     setRace(r)
   }
@@ -132,6 +140,7 @@ export function RacePanel() {
       </div>
       {tab === 'gp' ? (
         <GrandPrix onRace={(series, rival, prize) => {
+          if (waiting()) return
           if (!spendFuel(RACE_FUEL)) return useGame.getState().showNeed('fuel', RACE_FUEL - useGame.getState().fuel, 'a Grand Prix race')
           setGpRace({ series, rival, prize })
         }} />
