@@ -48,7 +48,7 @@ function JobBadge({ b, now }: { b: PlacedBuilding; now: number }) {
 function CrewBadge({ b }: { b: PlacedBuilding }) {
   const tap = useGame((s) => s.tapBuilding)
   const clan = useGame((s) => s.clanBadge)
-  const [cx, cz] = centerOf(b.def, b.x, b.z)
+  const [cx, cz] = centerOf(b.def, b.x, b.z, b.rot)
   anchors.set(b.uid, new Vector3(cx, 2.6, cz))
   return (
     <div className="anchor" ref={anchorRef(b.uid)}>
