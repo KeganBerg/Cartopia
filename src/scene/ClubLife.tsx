@@ -32,9 +32,9 @@ if (typeof document !== 'undefined') {
   beamMat.alphaMap = new CanvasTexture(c)
 }
 
-type Props = { lvl: number; floorY: number; floorZ: number; floorW: number; floorD: number }
+type Props = { lvl: number; roofY: number; roofZ: number; floorY: number; floorZ: number; floorW: number; floorD: number }
 
-export function ClubLife({ lvl, floorY, floorZ, floorW, floorD }: Props) {
+export function ClubLife({ lvl, roofY, roofZ, floorY, floorZ, floorW, floorD }: Props) {
   // More dancers as the club levels up: 5 at level 1, 10 at level 10.
   const dancers = 5 + Math.floor(lvl / 2)
   const n = dancers + 1 // the last figure is the bouncer
@@ -80,8 +80,11 @@ export function ClubLife({ lvl, floorY, floorZ, floorW, floorD }: Props) {
       if (!b) continue
       b.visible = night > 0.05
       const k = b.userData.k as number
-      b.rotation.z = Math.sin(clock.elapsedTime * 0.5 + k * 2.2) * 0.45
-      b.rotation.x = Math.cos(clock.elapsedTime * 0.37 + k) * 0.3 - 0.1
+      const sd = k === 0 ? -1 : 1
+      // Sweep up and away from the club (out to the side and back), never
+      // down across the roof.
+      b.rotation.z = -sd * (0.3 + Math.sin(clock.elapsedTime * 0.5 + k * 2.2) * 0.25)
+      b.rotation.x = -0.1 + Math.cos(clock.elapsedTime * 0.37 + k) * 0.15
     }
     beamMat.opacity = night * 0.3
     const count = open ? n : 0
@@ -156,9 +159,9 @@ export function ClubLife({ lvl, floorY, floorZ, floorW, floorD }: Props) {
           <meshStandardMaterial />
         </instancedMesh>
       </group>
-      {/* Searchlights behind the club, sweeping the sky (left out of preview framing). */}
+      {/* Searchlights on the roof, sweeping the sky (left out of preview framing). */}
       {[-1, 1].map((sd, k) => (
-        <group key={sd} position={[sd * 1.78, 0.2, -0.8]} userData={{ noFit: true }}>
+        <group key={sd} position={[sd * CLUB.lampX, roofY + 0.24, roofZ + CLUB.lampZ]} userData={{ noFit: true }}>
           <group
             ref={(el) => {
               if (el) beams.current[k] = el

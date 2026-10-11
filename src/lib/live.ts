@@ -7,6 +7,7 @@ import { displayName, isCleanName } from './names'
 import { joinRefereed } from './referee'
 import { SERVER_CAR_COLUMNS, serverCar } from './serverCar'
 import { raceCarOf } from '../game/raceCar'
+import { loadUsernames, playerName } from './profiles'
 
 // Live drag racing over Supabase Realtime. A shared lobby channel carries
 // presence and challenges; each race gets its own channel for positions.
@@ -116,6 +117,7 @@ async function lookUp(players: Pick<LivePlayer, 'uid' | 'car'>[]) {
     return age > 60000 || (!!p.car && !!k?.card && k.card.car !== p.car && age > 4000)
   }).map((p) => p.uid).filter((u): u is string => !!u))]
   if (!stale.length || !supabase) return
+  loadUsernames(stale)
   const { data, error } = await supabase.from('game_saves').select(`owner_id, town_name, level, ${SERVER_CAR_COLUMNS}`).in('owner_id', stale)
   if (error) return
   const at = Date.now()
@@ -196,7 +198,7 @@ async function openLobby(uid: string) {
       // One pending challenge per sender: a repeat just replaces the old one.
       const fresh = !l.invites.some((i) => i.from.id === from.id)
       useLive.setState({ invites: [...l.invites.filter((i) => i.from.id !== from.id), { raceId: payload.raceId, from, at: Date.now() }] })
-      if (fresh) useGame.getState().toast(`${from.town} challenged you to a race! Tap 🏁 to answer.`)
+      if (fresh) useGame.getState().toast(`${playerName(from.uid, from.town)} challenged you to a race! Tap 🏁 to answer.`)
     })
     .on('broadcast', { event: 'cancel' }, ({ payload }) => {
       const l = useLive.getState()
