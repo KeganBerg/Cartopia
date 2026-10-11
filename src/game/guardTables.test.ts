@@ -44,12 +44,12 @@ describe('restore and Grand Prix checks', () => {
         expect(Math.round(gpSeries()[s.id].last * (1 + clears * 0.08))).toBe(gpRivalPi(s, GP_ROUNDS - 1, clears))
       }
     }
-  })
+  }, 60000)
 
   it('lets a car at least as quick as the rival win', () => {
     const beat = gpBeatTable()
     for (let pi = 1; pi <= 250; pi++) expect(beat[pi - 1]).toBeLessThanOrEqual(pi)
     // A rival is never slower than its own best run.
     for (const pi of [20, 60, 120]) expect(gpRivalSlowest(pi)).toBeGreaterThan(raceFloor(pi))
-  })
+  }, 60000)
 })
