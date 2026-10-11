@@ -1,4 +1,4 @@
-import { Box3, Vector3, type Object3D, type PerspectiveCamera } from 'three'
+import { Box3, Vector3, type Mesh, type Object3D, type PerspectiveCamera } from 'three'
 
 // How much room a model takes on a turntable: the radius it sweeps as it
 // spins, and its height.
@@ -16,7 +16,11 @@ export function seat(model: Object3D, turntable: Object3D, scale?: (b: Bounds) =
   model.scale.setScalar(1)
   model.position.set(0, 0, 0)
   turntable.updateMatrixWorld(true)
-  const box = new Box3().setFromObject(model)
+  // Effects that reach far beyond the model (searchlight beams) opt out with userData.noFit.
+  const box = new Box3()
+  model.traverse((o) => {
+    if ((o as Mesh).isMesh && !hasNoFit(o, model)) box.expandByObject(o, false)
+  })
   turntable.rotation.y = turn
   turntable.position.copy(at)
   if (box.isEmpty()) return { r: 0, h: 0 }
@@ -27,6 +31,11 @@ export function seat(model: Object3D, turntable: Object3D, scale?: (b: Bounds) =
   model.scale.setScalar(k)
   model.position.set(-center.x * k, -box.min.y * k, -center.z * k)
   return { r: b.r * k, h: b.h * k }
+}
+
+function hasNoFit(o: Object3D, root: Object3D) {
+  for (let p: Object3D | null = o; p && p !== root.parent; p = p.parent) if (p.userData.noFit) return true
+  return false
 }
 
 const RING = 16
