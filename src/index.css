@@ -827,6 +827,36 @@ button.lvl-item:hover { border-color: var(--accent); transform: translateY(-2px)
 }
 .upgrade-more { display: block; margin: 0 auto 6px; background: none; border: none; font: 14px var(--display); color: var(--blue, #1e88e5); text-decoration: underline; }
 
+/* Garage tabs and the mod shop. */
+.garage-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; background: #eceff1; border-radius: 12px; padding: 4px; margin: 10px 0 6px; }
+.garage-tabs button { border: 0; background: transparent; border-radius: 9px; padding: 8px 4px; font: 14px var(--display); color: #546e7a; cursor: pointer; }
+.garage-tabs button.sel { background: #fff; color: #263238; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15); }
+.mod-tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.mod-tab { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; border: 2px solid #e0e0e0; background: #fafafa; border-radius: 10px; padding: 6px 2px; font: 800 11px Nunito, sans-serif; color: #455a64; cursor: pointer; }
+.mod-tab-icon { font-size: 20px; line-height: 1; }
+.mod-tab.sel { border-color: var(--accent); background: #fff8e1; color: #263238; }
+.mod-dot { position: absolute; top: 4px; right: 5px; width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+.mod-hint { margin: 8px 2px 6px; font-size: 13px; color: #607d8b; }
+.mod-hint.small { font-size: 12px; margin-top: 6px; }
+.mod-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.mod-card { display: flex; flex-direction: column; gap: 3px; border: 2px solid #e0e0e0; border-radius: 12px; padding: 8px; background: #fff; cursor: pointer; min-width: 0; }
+.mod-card.trying { border-color: #42a5f5; background: #e3f2fd; }
+.mod-card.fitted { border-color: var(--green); background: #f1f8e9; }
+.mod-card.locked { opacity: 0.75; }
+.mod-name { font: 15px var(--display); color: #263238; }
+.mod-stats { font: 800 12px Nunito, sans-serif; color: #2e7d32; }
+.mod-pi { font-size: 12px; color: #607d8b; flex: 1; }
+.mod-pi b { color: #2e7d32; }
+.mod-card button { margin-top: 4px; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mod-remove { border: 0; border-radius: 9px; padding: 6px 4px; background: #c5e1a5; color: #33691e; font: 800 12px Nunito, sans-serif; cursor: pointer; }
+.buy.premium { background: linear-gradient(#ab47bc, #7b1fa2); }
+@media (max-width: 520px) {
+  .mod-list { grid-template-columns: 1fr; }
+  .mod-card { display: grid; grid-template-columns: 1fr auto; column-gap: 8px; }
+  .mod-card .mod-name, .mod-card .mod-stats, .mod-card .mod-pi { grid-column: 1; }
+  .mod-card button { grid-column: 2; grid-row: 1 / span 3; align-self: center; width: auto; min-width: 104px; margin: 0; }
+  .mod-tab span:not(.mod-tab-icon) { font-size: 10px; }
+}
 /* Drivers: a car assigned to a business */
 .badge-driver { position: absolute; top: -9px; left: -9px; width: 20px; height: 20px; line-height: 16px; text-align: center; font-size: 11px; background: #fff; border: 2px solid #ec407a; border-radius: 10px; }
 .badge-driver.off { border-color: #ff9800; }

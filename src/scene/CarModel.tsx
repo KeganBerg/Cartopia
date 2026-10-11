@@ -3,7 +3,8 @@ import { Color, DoubleSide, ExtrudeGeometry, Shape as ThreeShape, type Group } f
 import { RoundedBox } from '@react-three/drei'
 import { rimTex } from './textures'
 import { glowMats } from './dayNight'
-import type { Body } from '../game/data'
+import { fittedMods, type Body } from '../game/data'
+import { CarMods, RIM_LOOK } from './CarMods'
 
 type Shape = {
   len: number; wid: number
@@ -138,11 +139,25 @@ function carGeo(body: Body) {
   return out
 }
 
+// Where bolt-on mods attach: body size, deck and hood heights, wheel spots.
+export function carFrame(body: Body) {
+  const s = SHAPES[body]
+  const g = carGeo(body)
+  const cowl = Math.min(s.cabinZ + s.cabinLen / 2, s.len / 2 - s.len * 0.2)
+  return {
+    len: s.len, wid: s.wid, lift: s.lift, wheel: s.wheel, wz: s.len * 0.33,
+    deck: g.deck, hoodTop: g.hood + s.hood, hoodZ: (cowl + s.len / 2 - s.len * 0.1) / 2,
+  }
+}
+
 // Toy-style car: bevelled extruded body and cabin so no edge is a hard box corner. Faces +z.
 // Handles on a car's wheels so a driving car can steer the front pair and roll all four.
 export type WheelRig = { steer: (Group | null)[]; spin: (Group | null)[]; radius: number; base: number }
 
-export function CarModel({ body, color, highlight, stripe, beams, rusty, rig }: { body: Body; color: string; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean; rig?: WheelRig }) {
+export function CarModel({ body, color, highlight, stripe, beams, rusty, rig, mods, flames }: { body: Body; color: string; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean; rig?: WheelRig; mods?: string[] | null; flames?: boolean }) {
+  // Rusty finds come home stock.
+  const fit = rusty ? {} : fittedMods(mods)
+  const rim = fit.rims ? RIM_LOOK[fit.rims] : undefined
   const s = SHAPES[body]
   const g = carGeo(body)
   // Rusty finds keep a hint of their paint under brown, matte rust.
@@ -226,7 +241,7 @@ export function CarModel({ body, color, highlight, stripe, beams, rusty, rig }: 
           {paint}
         </mesh>
       ))}
-      {s.wing && (
+      {s.wing && !fit.spoiler && (
         <group position={[0, top, -s.len / 2 + 0.08]}>
           {[-1, 1].map((sd) => (
             <mesh key={sd} position={[sd * s.wid * 0.3, 0.1, 0]}>
@@ -245,7 +260,7 @@ export function CarModel({ body, color, highlight, stripe, beams, rusty, rig }: 
           {paint}
         </RoundedBox>
       )}
-      {s.scoop && (
+      {s.scoop && !fit.hood && (
         <RoundedBox args={[0.16, 0.07, 0.16]} radius={0.025} smoothness={2} position={[0, g.hood + s.hood + 0.02, s.len * 0.27]}>
           <meshStandardMaterial color="#212121" />
         </RoundedBox>
@@ -256,7 +271,7 @@ export function CarModel({ body, color, highlight, stripe, beams, rusty, rig }: 
           <meshStandardMaterial color="#2b2b2b" />
         </mesh>
       )}
-      {s.spoiler && (
+      {s.spoiler && !fit.spoiler && (
         <group position={[0, top, -s.len / 2 + 0.07]}>
           {[-1, 1].map((sd) => (
             <mesh key={sd} position={[sd * s.wid * 0.32, 0.06, 0]}>
@@ -293,6 +308,7 @@ export function CarModel({ body, color, highlight, stripe, beams, rusty, rig }: 
           ))}
         </>
       )}
+      <CarMods body={body} fit={fit} tint={tint} metal={rusty ? 0.1 : 0.4} flames={flames} />
       {/* Bumpers. */}
       {[1, -1].map((sd) => (
         <RoundedBox key={sd} args={[s.wid * 0.96, 0.07, 0.06]} radius={0.028} smoothness={2} position={[0, s.lift + 0.07, sd * (s.len / 2 - 0.005)]}>
@@ -369,7 +385,7 @@ export function CarModel({ body, color, highlight, stripe, beams, rusty, rig }: 
           </mesh>
           <mesh position={[x > 0 ? 0.071 : -0.071, 0, 0]} rotation-y={x > 0 ? Math.PI / 2 : -Math.PI / 2}>
             <circleGeometry args={[s.wheel * 0.92, 16]} />
-            <meshStandardMaterial map={rimTex()} metalness={0.5} roughness={0.3} side={DoubleSide} />
+            <meshStandardMaterial map={rimTex()} color={rim?.[0] ?? '#ffffff'} metalness={rim?.[1] ?? 0.5} roughness={rim?.[2] ?? 0.3} side={DoubleSide} />
           </mesh>
           </group>
         </group>

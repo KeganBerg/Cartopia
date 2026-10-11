@@ -6,6 +6,7 @@ import { CollectAllButton } from './CollectAll'
 import { rotateCurrent } from '../game/placement'
 import { BuildingThumb, CarThumb } from '../scene/BuildingPreview'
 import { ShopUpgrades } from './Upgrade'
+import { ModShop, withMod } from './Mods'
 
 // Phones and tablets: no hover, so placing takes a preview tap first.
 const TOUCH = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
@@ -259,6 +260,10 @@ export function GaragePanel() {
   const stripeCar = useGame((s) => s.stripeCar)
   const car = cars.find((c) => c.uid === selected) ?? cars[0]
   const def = car && carDef(car.model)
+  const [tab, setTab] = useState<'tune' | 'mods' | 'paint'>('tune')
+  // A mod being tried on in the preview, cleared when another car is picked.
+  const [trying, setTrying] = useState<{ car: string; mod: string } | null>(null)
+  const tryMod = trying && trying.car === car?.uid && tab === 'mods' ? trying.mod : null
   return (
     <Panel title={`My Garage · ${cars.length} cars · ⚡${garagePower(cars)}`} wide>
       <div className="garage">
@@ -267,21 +272,27 @@ export function GaragePanel() {
             const d = carDef(c.model)
             return (
               <button key={c.uid} className={c.uid === car?.uid ? 'garage-item sel' : 'garage-item'} onClick={() => select(c.uid)}>
-                <CarThumb size="sm" color={c.color} body={d.body} stripe={c.stripe} />
+                <CarThumb size="sm" color={c.color} body={d.body} stripe={c.stripe} mods={c.mods} />
                 <span>{d.name}{c.plate && <span className="mini-plate">{c.plate}</span>}</span>
-                <small>PI {performance(d, c.upgrades)}</small>
+                <small>PI {performance(d, c.upgrades, c.mods)}</small>
               </button>
             )
           })}
         </div>
         {car && def && (
           <div className="garage-detail">
-            <CarPreview body={def.body} color={car.color} stripe={car.stripe} />
+            <CarPreview body={def.body} color={car.color} stripe={car.stripe} mods={withMod(car.mods, tryMod)} />
             <h3>{def.name}{car.plate && <span className="mini-plate">{car.plate}</span>}</h3>
-            <div className="pi">Performance Index <b>{performance(def, car.upgrades)}</b></div>
+            <div className="pi">Performance Index <b>{performance(def, car.upgrades, car.mods)}</b></div>
             {def.skill && <div className="skill-row"><SkillTag model={car.model} /> <small>{SKILLS[def.skill].text}</small></div>}
             <DriverRow car={car.uid} model={car.model} />
-            {UPGRADE_SLOTS.map((u) => {
+            <div className="garage-tabs" role="tablist">
+              {([['tune', '🔧 Upgrades'], ['mods', '🪽 Mods'], ['paint', '🎨 Paint']] as const).map(([id, label]) => (
+                <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'sel' : ''} onClick={() => setTab(id)}>{label}</button>
+              ))}
+            </div>
+            {tab === 'mods' && <ModShop car={car} trying={tryMod} setTrying={(id) => setTrying(id ? { car: car.uid, mod: id } : null)} />}
+            {tab === 'tune' && UPGRADE_SLOTS.map((u) => {
               const lvl = car.upgrades[u.id]
               const cost = upgradeCost(def, lvl)
               return (
@@ -296,6 +307,7 @@ export function GaragePanel() {
                 </div>
               )
             })}
+            {tab === 'paint' && <>
             <h4>Paint shop <small>${PAINT_COST} · neon and gold B1</small></h4>
             <div className="paints">
               {PAINTS.map((p) => (
@@ -320,6 +332,7 @@ export function GaragePanel() {
                 >{st ? '' : '∅'}</button>
               ))}
             </div>
+            </>}
             <button className="sell" onClick={() => sell(car.uid)}>Sell for ${Math.floor(def.price * 0.5).toLocaleString()}</button>
           </div>
         )}

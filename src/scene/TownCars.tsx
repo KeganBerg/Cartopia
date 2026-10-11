@@ -90,7 +90,7 @@ function TownCar({ car }: { car: OwnedCar }) {
         }}
       >
         <group ref={body} scale={SCALE}>
-          <CarModel body={def.body} color={car.color} highlight={selected} stripe={car.stripe} beams rig={rig} />
+          <CarModel body={def.body} color={car.color} highlight={selected} stripe={car.stripe} mods={car.mods} beams rig={rig} />
         </group>
       </group>
       <group ref={truck} visible={false}>
@@ -201,7 +201,7 @@ export function TownCars() {
         uid: c.uid,
         len: size.len * SCALE,
         wid: size.wid * SCALE,
-        cruise: 1.1 + performance(def, c.upgrades) / 45,
+        cruise: 1.1 + performance(def, c.upgrades, c.mods) / 45,
         stalled: !!(c.flat || c.lowFuel),
       }
     }),
