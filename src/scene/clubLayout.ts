@@ -11,4 +11,6 @@ export const CLUB = {
   queueX: -0.5, // first in line, then one step of `gap` further from the door each
   gap: 0.3,
   queueMax: 8,
+  lampX: 1.45, // searchlights on the roof's back corners: ±lampX, and lampZ from the building's middle
+  lampZ: -0.43,
 }

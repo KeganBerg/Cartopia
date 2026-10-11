@@ -77,7 +77,8 @@ describe('crates', () => {
 
   it('holds every body and part skin in some crate, and pays coins for ones you have', () => {
     const anywhere = new Set(CRATES.flatMap((c) => crateSkins(c).map((x) => (x.part ? 'p:' : 'b:') + x.id)))
-    for (const d of SKINS) expect(anywhere).toContain('b:' + d.id)
+    // Weekly event skins are only won in their event.
+    for (const d of SKINS) expect(anywhere.has('b:' + d.id), d.id).toBe(!('event' in d.unlock))
     for (const d of MOD_SKINS) expect(anywhere).toContain('p:' + d.id)
     for (const c of CRATES) {
       const odds = skinOdds(c)

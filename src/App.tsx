@@ -6,7 +6,7 @@ import { Hud } from './ui/Hud'
 import { FlyLayer } from './ui/Fly'
 import { ThumbRenderer } from './scene/BuildingPreview'
 import { BottomBar, ShopPanel, ShowroomPanel, GaragePanel, Toasts } from './ui/Menus'
-import { RacePanel, LiveRaceOverlay, InvitesPanel, PrizePopup, CampaignPrizePopup, TourPrizePopup } from './ui/Race'
+import { RacePanel, LiveRaceOverlay, InvitesPanel, PrizePopup, CampaignPrizePopup, TourPrizePopup, EventPrizePopup } from './ui/Race'
 import { joinLobby, useLive } from './lib/live'
 import { FriendsPanel, VisitBanner } from './ui/Friends'
 import { LeadersPanel, ClanPanel } from './ui/Social'
@@ -37,6 +37,7 @@ import './lib/crates'
 import { startAmbience } from './lib/ambience'
 import { useTownPaused } from './scene/renderGate'
 import { useCrewGoalWatcher } from './ui/CrewGoal'
+import { BattlePanel, useCrewBattleWatcher } from './ui/CrewBattle'
 import { VisitorBadges, StreetRaceCard } from './ui/Visitors'
 import { visitorTick, forceVisitor } from './lib/visitors'
 import type { VisitorKind } from './game/data'
@@ -50,6 +51,7 @@ export default function App() {
   const tick = useGame((s) => s.tick)
   const townPaused = useTownPaused()
   useCrewGoalWatcher()
+  useCrewBattleWatcher()
 
   useEffect(() => {
     startCloudSync()
@@ -102,6 +104,7 @@ export default function App() {
       {panel === 'bank' && <BankPanel />}
       {panel === 'deals' && <DealsPanel />}
       {panel === 'crates' && <CratesPanel />}
+      {panel === 'battle' && <BattlePanel />}
       <VisitBanner />
       <Tutorial />
       <AlertsCard />
@@ -122,6 +125,7 @@ export default function App() {
       <PrizePopup />
       <CampaignPrizePopup />
       <TourPrizePopup />
+      <EventPrizePopup />
       <LevelUpSplash />
       <Toasts />
       <FlyLayer />
