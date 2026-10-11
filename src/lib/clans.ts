@@ -204,7 +204,7 @@ export const kickMember = (id: string) => rpc('kick_clan_member', { p_member: id
 export const updateClan = (a: { description: string; emblem: string; color: string; minLevel: number }) =>
   rpc('update_clan', { p_description: a.description, p_emblem: a.emblem, p_color: a.color, p_min_level: a.minLevel })
 
-// Crew weekly goal (supabase/migrations/0022_crew_weekly_goal.sql). Weeks are named by their Monday (UTC).
+// Crew weekly goal (supabase/migrations/0026_crew_weekly_goal.sql). Weeks are named by their Monday (UTC).
 export type CrewWeek = {
   week: string
   target: number
