@@ -42,7 +42,7 @@ export const PALETTES: Record<Season, Palette> = {
     ground: '#5aa83a', leaves: ['#4caf50', '#5cb85c', '#43a047', '#66c266', '#4caf50'], bush: ['#43a047', '#66bb6a'], fronds: ['#4caf50', '#43a047'], sun: '#ffffff', bare: false,
   },
   fall: {
-    grass: '#a9b552', grassSpeckle: ['#9faa48', '#b5bf5d', '#97a142', '#c2c46a'], grassDots: ['#e65100', '#ff8f00', '#c62828', '#fbc02d'], dots: 70,
+    grass: '#a9b552', grassSpeckle: ['#9faa48', '#b5bf5d', '#97a142', '#c2c46a'], grassDots: ['#e65100', '#ff8f00', '#c62828', '#fbc02d'], dots: 35,
     ground: '#8c9a43', leaves: ['#ef6c00', '#fbc02d', '#d84315', '#ff8f00', '#c62828'], bush: ['#d84315', '#f9a825'], fronds: ['#9e9d24', '#827717'], sun: '#ffe2b8', bare: false,
   },
   winter: {
