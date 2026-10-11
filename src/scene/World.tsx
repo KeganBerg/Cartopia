@@ -30,6 +30,7 @@ import { roadMat } from './weatherLook'
 import { Weather } from './Weather'
 import { layoutRoads } from './traffic/layout'
 import { LAYER, decal } from './layers'
+import { Ear } from './Ear'
 
 const SIZE = GRID * TILE
 // Everything a town could ever own, centred on the origin like the start lot.
@@ -653,6 +654,7 @@ export function World() {
         )}
       </Batch>
       <AnchorProjector />
+      <Ear />
       <TownCars />
       <Townspeople />
       <Clouds />
