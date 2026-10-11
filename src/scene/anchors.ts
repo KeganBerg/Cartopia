@@ -13,12 +13,21 @@ type Placed = { el: HTMLElement; x: number; y: number; w: number; h: number; fix
 const placed: Placed[] = []
 // Furthest a bubble may be nudged from its building, in px.
 const HOP = 64
+// Zoomed out past this share of the screen's default zoom, quiet bubbles (job timers, idle
+// "start" pills) fade away so the town reads at a glance. Ready coins and visitors stay.
+const FAR = 0.8
+const quiet = (el: HTMLElement) => {
+  const c = el.firstElementChild?.classList
+  return !!c && (c.contains('badge-working') || c.contains('badge-idle'))
+}
 
 export function AnchorProjector() {
   const camera = useThree((s) => s.camera)
   const size = useThree((s) => s.size)
   useFrame(() => {
     placed.length = 0
+    // Same default zoom as ResponsiveZoom in World.tsx.
+    const far = camera.zoom < Math.min(38, Math.max(18, Math.sqrt(size.width * size.height) / 24)) * FAR
     for (const [id, el] of anchorEls) {
       const p = anchors.get(id)
       if (!p) {
@@ -41,6 +50,12 @@ export function AnchorProjector() {
         el.classList.toggle('edge', cx !== x || cy !== y)
         x = cx
         y = cy
+      }
+      const hide = far && !clamp && quiet(el)
+      el.classList.toggle('far', hide)
+      if (hide) {
+        el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`
+        continue
       }
       placed.push({ el, x, y, w: el.offsetWidth, h: el.offsetHeight, fixed: clamp })
     }
