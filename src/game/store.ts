@@ -88,7 +88,7 @@ export type Mode = 'play' | 'place' | 'move' | 'road' | 'bulldoze' | 'expand' | 
 export type Resource = 'coins' | 'parts' | 'fuel' | 'bucks' | 'level'
 export type Need = { res: Resource; missing: number; what?: string }
 
-export type Panel = null | 'need' | 'shop' | 'garage' | 'showroom' | 'race' | 'account' | 'goals' | 'daily' | 'flat' | 'friends' | 'rescue' | 'bank' | 'invites' | 'leaders' | 'clan' | 'upgrade' | 'welcome' | 'gifts' | 'season' | 'deals' | 'ghost' | 'taunts' | 'meet'
+export type Panel = null | 'need' | 'shop' | 'garage' | 'showroom' | 'race' | 'account' | 'goals' | 'daily' | 'flat' | 'friends' | 'rescue' | 'bank' | 'invites' | 'leaders' | 'clan' | 'upgrade' | 'welcome' | 'gifts' | 'season' | 'deals' | 'ghost' | 'taunts' | 'meet' | 'arcade'
 
 // A read-only copy of another player's town while visiting it.
 export type VisitedTown = { ownerId: string; townName: string; level: number; trophies: number; roads: string[]; buildings: PlacedBuilding[]; cars: OwnedCar[]; land?: string[]; showcase?: string[] }
@@ -148,6 +148,8 @@ type Actions = {
   upgradeCar: (uid: string, slot: UpgradeSlot) => boolean
   sellCar: (uid: string) => void
   finishRace: (won: boolean, reward: number) => void
+  // Arcade mini games pay a little coin and XP (see game/arcade.ts).
+  finishArcade: (coins: number, xp: number) => void
   renameTown: (name: string) => void
   claimGoal: (id: string) => void
   claimTask: (period: Period, id: string) => void
@@ -1040,6 +1042,15 @@ export const useGame = create<GameState>()(
           trophies: s.trophies + (won ? 1 : 0),
           racesWon: s.racesWon + (won ? 1 : 0),
           stats: { ...bump(s, 'racesWon', won ? 1 : 0), races: (s.stats.races ?? 0) + 1, coinsEarned: (s.stats.coinsEarned ?? 0) + (won ? reward : Math.round(reward * 0.1)) },
+          updatedAt: Date.now(),
+        }))
+      },
+
+      finishArcade: (coins, xp) => {
+        const s = get()
+        set(withXp(s, xp, {
+          coins: s.coins + coins,
+          stats: { ...s.stats, coinsEarned: (s.stats.coinsEarned ?? 0) + coins },
           updatedAt: Date.now(),
         }))
       },
