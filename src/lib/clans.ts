@@ -2,6 +2,7 @@ import { supabase } from './supabase'
 import { demoLeaders } from './friends'
 import { useGame } from '../game/store'
 import { displayName, isCleanName } from './names'
+import { CLAN_EMBLEMS } from '../game/data'
 
 export type Metric = 'power' | 'race_wins' | 'trophies' | 'level'
 export type Period = 'all' | 'week'
@@ -85,6 +86,8 @@ type ClanRow = {
 }
 
 const cleanTag = (t: string) => (isCleanName(t) ? t : '??')
+// The game only offers these emblems; anything else was typed in through the API.
+const cleanEmblem = (e: string) => (CLAN_EMBLEMS.includes(e) ? e : CLAN_EMBLEMS[0])
 
 const toRow = (r: PlayerRow): BoardRow => ({
   ownerId: r.owner_id,
@@ -94,14 +97,14 @@ const toRow = (r: PlayerRow): BoardRow => ({
   raceWins: r.race_wins,
   power: r.power,
   week: { power: r.week_power, race_wins: r.week_race_wins, trophies: r.week_trophies, level: r.week_levels },
-  clan: r.clan_id ? { id: r.clan_id, tag: cleanTag(r.clan_tag!), emblem: r.clan_emblem!, color: r.clan_color! } : null,
+  clan: r.clan_id ? { id: r.clan_id, tag: cleanTag(r.clan_tag!), emblem: cleanEmblem(r.clan_emblem!), color: r.clan_color! } : null,
 })
 
 const toClan = (r: ClanRow): Clan => ({
   id: r.id,
   name: displayName(r.name, r.id, 'crew'),
   tag: cleanTag(r.tag),
-  emblem: r.emblem,
+  emblem: cleanEmblem(r.emblem),
   color: r.color,
   description: isCleanName(r.description) ? r.description : '',
   leaderId: r.leader_id,
