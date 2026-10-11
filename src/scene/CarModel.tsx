@@ -10,9 +10,9 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { wheelTex } from './textures'
 import { glowMats } from './dayNight'
-import { FINISH_LOOK, fittedMods, isBike, skinNumber, type Body, type Finish, type ModSlot } from '../game/data'
+import { FINISH_LOOK, SKINNED_SLOTS, fittedMods, isBike, modSkinNumber, skinNumber, type Body, type Finish, type ModSlot, type SkinnedSlot } from '../game/data'
 import { tickSkins, withSkin } from './skins'
-import { CarMods, RIM_LOOK, carbon, chrome as modChrome, glass as modGlass, modGeo, modIds } from './CarMods'
+import { CarMods, RIM_LOOK, carbon, chrome as modChrome, glass as modGlass, modGeo, modIds, splitSkinned } from './CarMods'
 import { carBody, wheelPool, type WheelSlot } from './carBatch'
 import { bake, finishOf, type Finish as Look } from './bake'
 import { carStyle, hasTrim, trimBike, trimCar, type CarStyle } from './carTrim'
@@ -1020,7 +1020,8 @@ export type WheelRig = { steer: (Group | null)[]; spin: (Group | null)[]; radius
 // lean: draw the body as one merged mesh and the wheels from the shared pool (town
 // traffic). Needs `rig`, whose owner places the wheels each frame; no exhaust flames.
 // skin: a skin id (game/data.ts SKINS) drawn into the paint.
-type CarProps = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean; rig?: WheelRig; mods?: string[] | null; flames?: boolean; lean?: boolean }
+// modSkin: a mod skin id (game/data.ts MOD_SKINS) for the part in each slot.
+type CarProps = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean; rig?: WheelRig; mods?: string[] | null; flames?: boolean; lean?: boolean }
 
 // A lean car: every part baked into two meshes (the parts that cast a shadow and the
 // rest) with the finish it would otherwise be drawn with, except the see-through screen;
@@ -1028,21 +1029,27 @@ type CarProps = { body: Body; model?: string; color: string; finish?: Finish | n
 // `extra` is drawn as is (chrome paint, which mirrors its own studio and can't be baked).
 function LeanCar({ parts, looks, casters, mods, modPaint, highlight, wheels, radius, width, rims, rig, beams, extra }: {
   parts: Partial<Record<Part, BufferGeometry>>; looks: Partial<Record<Part, Look>>; casters: Part[]
-  mods: { body: Body; ids: string[] }; modPaint: Look; highlight?: boolean
+  mods: { body: Body; ids: string[]; skins?: Partial<Record<SkinnedSlot, number>> }; modPaint: Look; highlight?: boolean
   wheels: V3[]; radius: number; width: number; rims?: string; rig: WheelRig; beams: React.ReactNode; extra?: React.ReactNode
 }) {
-  const key = (Object.keys(looks) as Part[]).map((k) => `${k}:${parts[k]?.uuid ?? 0}:${JSON.stringify(looks[k])}`).join() + mods.ids.join() + JSON.stringify(modPaint)
+  const key = (Object.keys(looks) as Part[]).map((k) => `${k}:${parts[k]?.uuid ?? 0}:${JSON.stringify(looks[k])}`).join() + mods.ids.join() + JSON.stringify(mods.skins ?? {}) + JSON.stringify(modPaint)
   const geo = useMemo(() => {
     const shade: [BufferGeometry, Look][] = []
     const rest: [BufferGeometry, Look][] = []
     for (const k of Object.keys(looks) as Part[]) if (parts[k] && looks[k]) (casters.includes(k) ? shade : rest).push([parts[k]!, looks[k]!])
     // Mod paint and carbon cast shadows; mod chrome doesn't.
-    const m = mods.ids.length ? modGeo(mods.body, mods.ids) : {}
-    if (m.paint) shade.push([m.paint, modPaint])
-    if (m.carbon) shade.push([m.carbon, finishOf(carbon)])
-    if (m.chrome) rest.push([m.chrome, finishOf(modChrome)])
-    // Glass mod parts (bike screens, bubbles) bake solid in town traffic.
-    if (m.glass) rest.push([m.glass, finishOf(modGlass)])
+    // Parts wearing a mod skin bake on their own with its number; the rest share 0.
+    const { skinned, plain } = splitSkinned(mods.ids, mods.skins)
+    const groups: [string[], number][] = [[plain, 0], ...skinned.map(([id, n]): [string[], number] => [[id], n])]
+    for (const [ids, skin] of groups) {
+      if (!ids.length) continue
+      const m = modGeo(mods.body, ids)
+      if (m.paint) shade.push([m.paint, { ...modPaint, skin }])
+      if (m.carbon) shade.push([m.carbon, { ...finishOf(carbon), skin }])
+      if (m.chrome) rest.push([m.chrome, { ...finishOf(modChrome), skin }])
+      // Glass mod parts (bike screens, bubbles) bake solid in town traffic.
+      if (m.glass) rest.push([m.glass, finishOf(modGlass)])
+    }
     return { shade: shade.length ? bake(shade) : null, rest: rest.length ? bake(rest) : null }
   }, [key]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => {
@@ -1078,6 +1085,16 @@ export function CarModel(props: CarProps) {
   return isBike(props.body) ? <BikeModel {...props} /> : <CarBody {...props} />
 }
 
+// Mod skin numbers by slot, or undefined when no part wears one.
+function modSkinNumbers(modSkin?: Partial<Record<SkinnedSlot, string>> | null) {
+  const out: Partial<Record<SkinnedSlot, number>> = {}
+  for (const sl of SKINNED_SLOTS) {
+    const n = modSkinNumber(modSkin?.[sl])
+    if (n) out[sl] = n
+  }
+  return Object.keys(out).length ? out : undefined
+}
+
 // The body paint: glossy, matte or chrome, with a skin (by number) drawn into it. Rust is always flat.
 function PaintMaterial({ color, finish, rusty, highlight, skin = 0 }: { color: string; finish?: Finish | null; rusty?: boolean; highlight?: boolean; skin?: number }) {
   const [metal, rough, lift] = rusty ? [0.1, 0.95, 0] : FINISH_LOOK[finish ?? 'gloss'] ?? FINISH_LOOK.gloss
@@ -1096,11 +1113,12 @@ function paintLook(color: string, finish?: Finish | null, rusty?: boolean, skin 
 }
 
 // Toy-style car: bevelled extruded body and cabin so no edge is a hard box corner. Faces +z.
-function CarBody({ body, model, color, finish, skin, highlight, stripe, beams, rusty, rig, mods, flames, lean }: CarProps) {
+function CarBody({ body, model, color, finish, skin, modSkin, highlight, stripe, beams, rusty, rig, mods, flames, lean }: CarProps) {
   // Rusty finds come home stock.
   const fit = rusty ? {} : fittedMods(mods, body)
   const sk = rusty ? 0 : skinNumber(skin)
-  useFrame(() => void (sk && tickSkins()))
+  const msk = useMemo(() => (rusty ? undefined : modSkinNumbers(modSkin)), [rusty, modSkin])
+  useFrame(() => void ((sk || msk) && tickSkins()))
   const s = shapeOf(body)
   const g = carGeo(body, fit, model)
   const p = g.parts
@@ -1125,7 +1143,7 @@ function CarBody({ body, model, color, finish, skin, highlight, stripe, beams, r
       lamp: finishOf(MAT.lamp), tail: finishOf(MAT.tail), amber: finishOf(MAT.amber),
     }
     return (
-      <LeanCar parts={p} looks={looks} casters={['paint', 'glass']} mods={{ body, ids: modIds(fit) }} modPaint={{ color: tint, metal: rusty ? 0.1 : 0.4, rough: 0.3 }} highlight={highlight}
+      <LeanCar parts={p} looks={looks} casters={['paint', 'glass']} mods={{ body, ids: modIds(fit), skins: msk }} modPaint={{ color: tint, metal: rusty ? 0.1 : 0.4, rough: 0.3 }} highlight={highlight}
         wheels={[[-wx, s.wheel, wz], [wx, s.wheel, wz], [-wx, s.wheel, -wz], [wx, s.wheel, -wz]]} radius={s.wheel} width={0.14} rims={fit.rims} rig={rig} beams={beam}
         extra={chromed && <mesh geometry={p.paint} castShadow><PaintMaterial color={tint} finish={finish} highlight={highlight} /></mesh>} />
     )
@@ -1149,7 +1167,7 @@ function CarBody({ body, model, color, finish, skin, highlight, stripe, beams, r
       {p.glass && <mesh geometry={p.glass} material={seeGlass} castShadow />}
       {p.cabin && <mesh geometry={p.cabin} material={matOf('seat', look.seat ?? '#2b2b2b', 0, 0.75)} />}
       {p.caliper && <mesh geometry={p.caliper} material={matOf('cal', look.caliper ?? '#4a4d52', look.caliper ? 0.2 : 0.5, 0.45)} />}
-      <CarMods body={body} fit={fit} tint={tint} metal={rusty ? 0.1 : 0.4} flames={flames} />
+      <CarMods body={body} fit={fit} tint={tint} metal={rusty ? 0.1 : 0.4} flames={flames} skins={msk} />
       {/* Headlight beams on the road, visible after dark. */}
       {beam}
       <Wheels at={[[-wx, wz], [wx, wz], [-wx, -wz], [wx, -wz]]} r={s.wheel} w={s.track ? 0.16 : 0.14} rig={rig} rims={fit.rims} rusty={rusty} look={look} />
@@ -1248,10 +1266,11 @@ function bikeGeo(body: BikeBody, fit: Partial<Record<ModSlot, string>>, model?: 
 }
 
 // Bikes take every mod slot, with bike-sized parts.
-function BikeModel({ body, model, color, finish, skin, highlight, beams, rusty, rig, mods, flames, lean }: CarProps) {
+function BikeModel({ body, model, color, finish, skin, modSkin, highlight, beams, rusty, rig, mods, flames, lean }: CarProps) {
   const fit = rusty ? {} : fittedMods(mods, body)
   const sk = rusty ? 0 : skinNumber(skin)
-  useFrame(() => void (sk && tickSkins()))
+  const msk = useMemo(() => (rusty ? undefined : modSkinNumbers(modSkin)), [rusty, modSkin])
+  useFrame(() => void ((sk || msk) && tickSkins()))
   const bb = body as BikeBody
   const g = bikeGeo(bb, fit, model)
   const p = g.parts
@@ -1279,7 +1298,7 @@ function BikeModel({ body, model, color, finish, skin, highlight, beams, rusty, 
       lamp: finishOf(MAT.lamp), tail: finishOf(MAT.tail),
     }
     return (
-      <LeanCar parts={p} looks={looks} casters={['paint', 'black']} mods={{ body, ids: modIds(fit) }} modPaint={{ color: tint, metal: rusty ? 0.1 : 0.4, rough: 0.3 }} highlight={highlight}
+      <LeanCar parts={p} looks={looks} casters={['paint', 'black']} mods={{ body, ids: modIds(fit), skins: msk }} modPaint={{ color: tint, metal: rusty ? 0.1 : 0.4, rough: 0.3 }} highlight={highlight}
         wheels={[[0, r, wz], [0, r, -wz]]} radius={r} width={0.07} rims={fit.rims} rig={rig} beams={beam}
         extra={chromed && <mesh geometry={p.paint} castShadow><PaintMaterial color={tint} finish={finish} highlight={highlight} /></mesh>} />
     )
@@ -1295,7 +1314,7 @@ function BikeModel({ body, model, color, finish, skin, highlight, beams, rusty, 
         </mesh>
       )}
       {shared.map((k) => <mesh key={k} geometry={p[k]} material={MAT[k]} castShadow={k === 'black'} />)}
-      <CarMods body={body} fit={fit} tint={tint} metal={rusty ? 0.1 : 0.4} flames={flames} />
+      <CarMods body={body} fit={fit} tint={tint} metal={rusty ? 0.1 : 0.4} flames={flames} skins={msk} />
       {beam}
       {[wz, -wz].map((z, i) => (
         <group key={i} position={[0, r, z]} ref={rig && i === 0 ? (o) => void (rig.steer[0] = o) : undefined}>

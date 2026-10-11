@@ -1,8 +1,9 @@
-import { useRef } from 'react'
+import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { AdditiveBlending, BoxGeometry, BufferGeometry, ConeGeometry, CylinderGeometry, MeshBasicMaterial, MeshStandardMaterial, SphereGeometry, TorusGeometry, type Mesh } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import type { Body, ModSlot } from '../game/data'
+import { modDef, type Body, type ModSlot, type SkinnedSlot } from '../game/data'
+import { withSkin } from './skins'
 import { carFrame, type ModFrame } from './CarModel'
 
 // Bolt-on mod parts for a car. Every part of one material is merged into a
@@ -414,18 +415,56 @@ function Flames({ geometry }: { geometry: BufferGeometry }) {
 // The mod parts fitted, in a fixed slot order.
 export const modIds = (fit: Partial<Record<ModSlot, string>>) => (['spoiler', 'exhaust', 'kit', 'hood'] as ModSlot[]).map((s) => fit[s]).filter((id): id is string => !!id)
 
-export function CarMods({ body, fit, tint, metal, flames }: { body: Body; fit: Partial<Record<ModSlot, string>>; tint: string; metal: number; flames?: boolean }) {
-  const ids = modIds(fit)
-  if (!ids.length) return null
-  const g = modGeo(body, ids)
+// A mod part's material with a mod skin (by number) drawn into it.
+function SkinnedMat({ n, color, metal, rough }: { n: number; color: string; metal: number; rough: number }) {
+  const hook = useMemo(() => ({ onBeforeCompile: (sh: Parameters<typeof withSkin>[0]) => withSkin(sh, String(n)), customProgramCacheKey: () => `skin-${n}` }), [n])
+  return <meshStandardMaterial key={n} {...hook} color={color} metalness={metal} roughness={rough} />
+}
+
+// The parts wearing a mod skin, drawn one part at a time (paint, carbon and chrome
+// all take the skin; glass and flames don't).
+function SkinnedPart({ body, id, n, tint, metal }: { body: Body; id: string; n: number; tint: string; metal: number }) {
+  const g = modGeo(body, [id])
+  return (
+    <>
+      {g.paint && <mesh geometry={g.paint} castShadow><SkinnedMat n={n} color={tint} metal={metal} rough={0.3} /></mesh>}
+      {g.carbon && <mesh geometry={g.carbon} castShadow><SkinnedMat n={n} color={'#' + carbon.color.getHexString()} metal={carbon.metalness} rough={carbon.roughness} /></mesh>}
+      {g.chrome && <mesh geometry={g.chrome}><SkinnedMat n={n} color={'#' + chrome.color.getHexString()} metal={chrome.metalness} rough={chrome.roughness} /></mesh>}
+      {g.glass && <mesh geometry={g.glass} material={glass} renderOrder={2} />}
+    </>
+  )
+}
+
+// Mod part ids split into the ones wearing a mod skin (with its number) and the rest.
+export function splitSkinned(ids: string[], skins?: Partial<Record<SkinnedSlot, number>>) {
+  const skinned: [string, number][] = []
+  const plain: string[] = []
+  for (const id of ids) {
+    const n = skins?.[modDef(id)?.slot as SkinnedSlot] ?? 0
+    if (n) skinned.push([id, n])
+    else plain.push(id)
+  }
+  return { skinned, plain }
+}
+
+// skins: a mod skin number per slot. Skinned parts cost a few extra draws here; town
+// cars bake them instead (see LeanCar in CarModel.tsx).
+export function CarMods({ body, fit, tint, metal, flames, skins }: { body: Body; fit: Partial<Record<ModSlot, string>>; tint: string; metal: number; flames?: boolean; skins?: Partial<Record<SkinnedSlot, number>> }) {
+  const all = modIds(fit)
+  if (!all.length) return null
+  const { skinned, plain: ids } = splitSkinned(all, skins)
+  const g = ids.length ? modGeo(body, ids) : {}
+  // Flames come from the exhaust, skinned or not.
+  const fl = modGeo(body, all).flame
   return (
     <group>
+      {skinned.map(([id, n]) => <SkinnedPart key={id} body={body} id={id} n={n} tint={tint} metal={metal} />)}
       {g.paint && <mesh geometry={g.paint} castShadow><meshStandardMaterial color={tint} metalness={metal} roughness={0.3} /></mesh>}
       {g.carbon && <mesh geometry={g.carbon} material={carbon} castShadow />}
       {g.chrome && <mesh geometry={g.chrome} material={chrome} />}
       {g.glass && <mesh geometry={g.glass} material={glass} renderOrder={2} />}
-      {g.flame && flames && (
-        <group position-z={carFrame(body).rear - FLAME_Z}><Flames geometry={g.flame} /></group>
+      {fl && flames && (
+        <group position-z={carFrame(body).rear - FLAME_Z}><Flames geometry={fl} /></group>
       )}
     </group>
   )

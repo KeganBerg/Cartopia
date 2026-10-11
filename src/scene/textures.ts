@@ -261,6 +261,16 @@ export const skyTex = (rx = 1) =>
     }
   }), 'sky', rx, 1)
 
+// Chequered flag: black and white squares, two rows high.
+export const checkerTex = (rx = 1) =>
+  rep(make('checker', 64, (g, s) => {
+    g.fillStyle = '#ffffff'
+    g.fillRect(0, 0, s, s)
+    g.fillStyle = '#111111'
+    const q = s / 4
+    for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) if ((x + y) % 2) g.fillRect(x * q, y * q, q, q)
+  }), 'checker', rx, 1)
+
 // Roll-up garage door: ribbed slats with a handle bar.
 export const shutterTex = () =>
   make('shutter', 64, (g, s) => {
@@ -659,4 +669,75 @@ export const roadWearTex = () =>
       g.fillStyle = `rgba(${r() < 0.5 ? '90,80,60' : '50,50,50'},${0.3 + r() * 0.4})`
       g.fillRect(c * 3 + r() * r() * c * 0.6, r() * s, 1.5 + r() * 2, 1.5 + r() * 2)
     }
+  })
+
+// Curtain wall for office towers: tall glass panels between thin mullions, a
+// band of spandrel at each floor and a soft sky reflection running across.
+// Neutral, so the material colour tints the glass per building.
+export const curtainTex = (rx = 1, ry = rx) =>
+  rep(make('curtain', 128, (g, s, r) => {
+    const grd = g.createLinearGradient(0, 0, s, s)
+    grd.addColorStop(0, '#f2f7fa')
+    grd.addColorStop(0.45, '#b9c7d0')
+    grd.addColorStop(0.55, '#d8e2e8')
+    grd.addColorStop(1, '#8c9ba5')
+    g.fillStyle = grd
+    g.fillRect(0, 0, s, s)
+    // Each pane a touch lighter or darker, like tinted glass catching the sky.
+    for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) {
+      g.fillStyle = `rgba(${r() < 0.5 ? '255,255,255' : '40,60,80'},${0.05 + r() * 0.12})`
+      g.fillRect(x * 32 + 2, y * 32 + 2, 28, 22)
+    }
+    g.fillStyle = '#a3afb7'
+    for (let y = 0; y < 4; y++) g.fillRect(0, y * 32 + 24, s, 8)
+    g.fillStyle = '#7d8a93'
+    for (let x = 0; x < 4; x++) g.fillRect(x * 32, 0, 2, s)
+    g.fillStyle = 'rgba(255,255,255,.35)'
+    for (let y = 0; y < 4; y++) g.fillRect(0, y * 32 + 24, s, 1)
+  }), 'curtain', rx, ry)
+
+// Matching night glow: about half the offices lit, warm or cool white.
+export const curtainGlowTex = (rx = 1, ry = rx) =>
+  rep(make('curtainGlow', 128, (g, s, r) => {
+    g.fillStyle = '#000000'
+    g.fillRect(0, 0, s, s)
+    for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) {
+      if (r() < 0.5) continue
+      g.fillStyle = r() < 0.55 ? '#ffd892' : '#c4e0f7'
+      g.fillRect(x * 32 + 3, y * 32 + 3, 26, 20)
+    }
+  }), 'curtainGlow', rx, ry)
+
+// Landing pad: a painted circle with a big H on dark concrete. `ring` is the
+// circle's colour, `mark` the letter's (a hospital pad's H sits in a red cross).
+export const helipadTex = (ring: string, mark: string, cross = false) =>
+  make(`helipad|${ring}|${mark}|${cross}`, 256, (g, s, r) => {
+    g.fillStyle = '#6d7377'
+    g.fillRect(0, 0, s, s)
+    speckle(g, s, r, ['#646a6e', '#757b7f', '#5e6468'], 900, 2)
+    g.strokeStyle = ring
+    g.lineWidth = 14
+    g.beginPath()
+    g.arc(s / 2, s / 2, s * 0.42, 0, Math.PI * 2)
+    g.stroke()
+    // Touchdown marks round the ring.
+    g.fillStyle = '#fafafa'
+    for (let i = 0; i < 8; i++) {
+      const a = (i * Math.PI) / 4
+      g.save()
+      g.translate(s / 2 + Math.cos(a) * s * 0.47, s / 2 + Math.sin(a) * s * 0.47)
+      g.rotate(a)
+      g.fillRect(-4, -10, 8, 20)
+      g.restore()
+    }
+    if (cross) {
+      g.fillStyle = '#d32f2f'
+      g.fillRect(s * 0.38, s * 0.2, s * 0.24, s * 0.6)
+      g.fillRect(s * 0.2, s * 0.38, s * 0.6, s * 0.24)
+    }
+    g.fillStyle = mark
+    const u = s / 256
+    g.fillRect(88 * u, 76 * u, 22 * u, 104 * u)
+    g.fillRect(146 * u, 76 * u, 22 * u, 104 * u)
+    g.fillRect(88 * u, 117 * u, 80 * u, 22 * u)
   })

@@ -7,7 +7,7 @@ import { START_LAND, buildingDef, buildingLevel, houseResidents } from '../game/
 import { buildWalkGraph, findPath, pedestrianCrossings, stepsFor, transit, sideOf, SIDES, type Pt, type Step, type WalkGraph, type WalkNode } from '../game/walkGraph'
 import { anchors } from './anchors'
 import { liveTraffic, crossingSignal } from './traffic/live'
-import { useThought } from '../game/thoughts'
+import { useThought, placeChip } from '../game/thoughts'
 import { SEASON } from './season'
 import { SHIRTS, PANTS, SKIN, HAIR, BEANIES } from './people'
 import { dayPhase, nightAmount } from './dayNight'
@@ -54,6 +54,7 @@ const ITEMS: Record<string, { size: [number, number, number]; color: string; emo
   tacos: { size: [0.14, 0.05, 0.1], color: '#ffca28', emoji: '🌮', thing: 'tacos' },
   market: { size: [0.16, 0.14, 0.1], color: '#d7a86e', emoji: '🛒', thing: 'groceries' },
   hotdog: { size: [0.12, 0.04, 0.05], color: '#e0a052', emoji: '🌭', thing: 'a hot dog' },
+  offices: { size: [0.16, 0.12, 0.04], color: '#4e342e', emoji: '💼', thing: 'their briefcase' },
 }
 
 // Thought bubbles: what someone is off to do, and what they're doing when they get there.
@@ -67,13 +68,15 @@ const SHOP_THOUGHTS: Record<string, [string, string]> = {
   bodyshop: ['🎨', 'picking a new paint colour'], market: ['🛒', 'doing the grocery run'], firehouse: ['🚒', 'visiting the firefighters'],
   police: ['👮', 'dropping by the police station'], parkade: ['🅿️', 'fetching the car from the garage'],
   junkyard: ['🧲', 'digging for parts at the junkyard'],
+  offices: ['💼', 'heading in to the office'], hq: ['📊', 'off to a big meeting at HQ'], glasstower: ['🏙️', 'riding the lift up the Glass Tower'],
+  hospital: ['🏥', 'visiting a friend in hospital'], helipad: ['🚁', 'booking a helicopter tour'],
 }
 const PARK_GO: Record<string, [string, string]> = {
   bench: ['🪑', 'heading for a bench'], fountain: ['⛲', 'going to see the fountain'], pond: ['🦆', 'going to see the ducks'],
   flowers: ['🌷', 'going to smell the flowers'], tree: ['🌳', 'taking a walk in the park'], palm: ['🌴', 'taking a walk in the park'],
   statue: ['🏆', 'going to see the golden car'], pine: ['🌲', 'taking a walk in the park'], picnic: ['🧺', 'off for a picnic'],
   busstop: ['🚌', 'catching the bus'], hotdog: ['🌭', 'getting a hot dog'], flagpole: ['🚩', 'going to see the town flag'],
-  arch: ['🏁', 'taking a photo at the finish line'], playground: ['🛝', 'heading to the playground'], gazebo: ['🎶', 'going to the gazebo'],
+  playground: ['🛝', 'heading to the playground'], gazebo: ['🎶', 'going to the gazebo'],
   clocktower: ['🕰️', 'meeting a friend at the clock tower'],
   dogpark: ['🐕', 'taking the dog to the dog park'], skatepark: ['🛹', 'going skating'], koi: ['🐟', 'going to feed the koi'],
   garden: ['🌺', 'visiting the botanical garden'],
@@ -85,7 +88,7 @@ const PARK_AT: Record<string, [string, string]> = {
   flowers: ['🌷', 'smelling the flowers'], tree: ['🌳', 'enjoying the shade'], palm: ['🌴', 'enjoying the shade'],
   statue: ['🏆', 'admiring the golden car'], pine: ['🌲', 'enjoying the shade'], picnic: ['🧺', 'having a picnic'],
   busstop: ['🚌', 'waiting for the bus'], hotdog: ['🌭', 'eating a hot dog'], flagpole: ['🚩', 'saluting the town flag'],
-  arch: ['📸', 'posing under the finish line'], playground: ['🛝', 'playing on the swings'], gazebo: ['🎶', 'listening to the band'],
+  playground: ['🛝', 'playing on the swings'], gazebo: ['🎶', 'listening to the band'],
   clocktower: ['🕰️', 'waiting by the clock tower'],
   dogpark: ['🎾', 'playing fetch'], skatepark: ['🛹', 'watching the skaters'], koi: ['🐟', 'feeding the koi'],
   garden: ['🌺', 'admiring the orchids'],
@@ -96,7 +99,7 @@ const PARK_AT: Record<string, [string, string]> = {
 // Where to stand at each decoration, as a distance from its middle.
 const SPOT: Record<string, number> = {
   bench: 0.06, fountain: 0.98, flowers: 0.86, tree: 0.5, palm: 0.5, statue: 0.78, lamp: 0.45, billboard: 0.7,
-  pine: 0.7, picnic: 0.45, busstop: -0.22, hotdog: 0.5, flagpole: 0.6, arch: 0.4, gazebo: 0.25, clocktower: 0.8,
+  pine: 0.7, picnic: 0.45, busstop: -0.22, hotdog: 0.5, flagpole: 0.6, gazebo: 0.25, clocktower: 0.8,
   pumpkins: 0.6, scarecrow: 0.55, graves: 0.65, deadtree: 0.6,
 }
 // How long people linger, in seconds.
@@ -106,11 +109,14 @@ const LINGER: Record<string, [number, number]> = {
   dogpark: [10, 22], skatepark: [8, 18], koi: [8, 16], garden: [10, 20],
   pumpkins: [5, 12], graves: [4, 9],
 }
-const PARKS = new Set(['bench', 'fountain', 'flowers', 'tree', 'palm', 'statue', 'pond', 'pine', 'picnic', 'busstop', 'hotdog', 'flagpole', 'arch', 'gazebo', 'clocktower', 'pumpkins', 'scarecrow', 'graves', 'deadtree'])
+const PARKS = new Set(['bench', 'fountain', 'flowers', 'tree', 'palm', 'statue', 'pond', 'pine', 'picnic', 'busstop', 'hotdog', 'flagpole', 'gazebo', 'clocktower', 'pumpkins', 'scarecrow', 'graves', 'deadtree'])
 // Big decorations people walk up to, like the duck pond.
 const BIG_PARKS = new Set(['pond', 'playground', 'dogpark', 'skatepark', 'koi', 'garden'])
 // Seats: benches and the bus stop face out the front; at a picnic table people face the table.
 const SEATS: Record<string, 'out' | 'in'> = { bench: 'out', busstop: 'out', picnic: 'in' }
+// Walled on three sides: people go in and out through the open front only.
+const FRONT_DOOR = new Set(['busstop', 'gazebo'])
+const doorOf = (n: Extract<WalkNode, { kind: 't' }>): Pt => [n.center[0] + SIDES[n.turn][0] * 0.95, n.center[1] + SIDES[n.turn][1] * 0.95]
 
 type Kind = 'shop' | 'browse' | 'friend' | 'park' | 'home' | 'jog' | 'club' | 'door'
 type Dest = { kind: Kind; key: string; def: string }
@@ -313,7 +319,7 @@ export function Townspeople() {
     const p = people.current[e.instanceId]
     if (!p || p.state === 'inside') return
     e.stopPropagation()
-    useThought.setState({ id: p.id, text: thought(p), until: performance.now() + 6000 })
+    useThought.setState({ id: p.id, text: thought(p), ...where(p), until: performance.now() + 6000 })
   }
 
   useFrame((_, rawDt) => {
@@ -461,7 +467,7 @@ export function Townspeople() {
         <meshStandardMaterial />
       </instancedMesh>
       <instancedMesh ref={hits} args={[undefined, undefined, MAX_PEOPLE]} frustumCulled={false} onClick={onTap}>
-        <boxGeometry args={[0.45, 0.9, 0.45]} />
+        <boxGeometry args={SMALL ? [0.6, 1, 0.6] : [0.45, 0.9, 0.45]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} colorWrite={false} />
       </instancedMesh>
     </group>
@@ -560,7 +566,11 @@ function setOff(ctx: Ctx, p: Person, night: boolean) {
       continue
     }
     p.dest = d
-    p.steps = stepsFor(g, route, p.pos)
+    const here = g.nodes[start!]
+    if (here.kind === 't' && FRONT_DOOR.has(here.decor ?? '') && Math.hypot(p.pos[0] - here.center[0], p.pos[1] - here.center[1]) < 0.9) {
+      const door = doorOf(here)
+      p.steps = [{ p: door }, ...stepsFor(g, route, door)]
+    } else p.steps = stepsFor(g, route, p.pos)
     p.si = 0
     const last = g.nodes[goal!]
     if (last.kind === 't') settle(p, last)
@@ -621,13 +631,18 @@ function settle(p: Person, n: Extract<WalkNode, { kind: 't' }>) {
   const bench = seat === 'out'
   // Picnic benches run along the front and back of the table.
   const near = sideOf(c, entry)
-  const side = bench ? n.turn : seat === 'in' && (near - n.turn) % 2 !== 0 ? n.turn : near
+  const front = FRONT_DOOR.has(n.decor ?? '')
+  const side = bench || front ? n.turn : seat === 'in' && (near - n.turn) % 2 !== 0 ? n.turn : near
   const [dx, dz] = SIDES[side]
   const r = SPOT[n.decor ?? ''] ?? 0.8
   // Benches seat two: shuffle along the seat.
   const along = bench ? rand(-0.25, 0.25) : rand(-0.3, 0.3)
   const spot: Pt = [c[0] + dx * r + dz * along, c[1] + dz * r - dx * along]
-  for (const w of transit(n, entry, spot)) p.steps.push({ p: w })
+  if (front) {
+    const door = doorOf(n)
+    for (const w of transit(n, entry, door)) p.steps.push({ p: w })
+    p.steps.push({ p: door })
+  } else for (const w of transit(n, entry, spot)) p.steps.push({ p: w })
   p.steps.push({ p: spot })
 }
 
@@ -709,7 +724,18 @@ function followThought(list: Person[]) {
   }
   anchors.set('person', bubbleAt.set(p.pos[0], 1.2, p.pos[1]))
   const text = thought(p)
-  if (text !== th.text) useThought.setState({ text })
+  const w = where(p)
+  if (text !== th.text || w.where !== th.where || w.there !== th.there) useThought.setState({ text, ...w })
+}
+
+// The chip for where someone is headed ("☕ Coffee"), and whether they're there yet.
+function where(p: Person): { where: string; there: boolean } {
+  const d = p.dest
+  const there = p.state === 'linger' || p.state === 'queue'
+  if (!d || d.kind === 'jog') return { where: p.type === 'jogger' ? '🏃 Around the block' : '🚶 Around town', there: false }
+  if (d.kind === 'home') return { where: '🏠 Home', there }
+  if (d.kind === 'friend') return { where: "🏡 A neighbour's", there }
+  return { where: placeChip(d.def, (SHOP_THOUGHTS[d.def] ?? PARK_GO[d.def])?.[0]), there }
 }
 
 // One line for the thought bubble: who it is and what they're up to.

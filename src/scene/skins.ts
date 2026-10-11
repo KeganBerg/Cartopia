@@ -254,17 +254,21 @@ void skinShade(int id, vec3 p, vec3 n, vec3 v, float t, inout vec3 col, inout ve
     float cut = dot(su - sh.zw, dir);
     float sub = step(0.0, cut);
     float fid = fract(sh.y * 7.31 + sub * 0.37);
-    vec3 shade = fid < 0.2 ? vec3(0.85, 0.93, 0.95) : fid < 0.48 ? vec3(0.55, 0.8, 0.84) : fid < 0.74 ? vec3(0.24, 0.58, 0.64) : fid < 0.9 ? vec3(0.1, 0.34, 0.41) : vec3(0.05, 0.11, 0.19);
+    // White ice at the front fading to teal at the back, shard by shard.
+    float along = smoothstep(-0.2, 0.5, p.z + (fid - 0.5) * 0.25);
+    vec3 teal = fid < 0.2 ? vec3(0.36, 0.86, 0.9) : fid < 0.48 ? vec3(0.16, 0.7, 0.78) : fid < 0.74 ? vec3(0.06, 0.52, 0.6) : fid < 0.9 ? vec3(0.03, 0.34, 0.42) : vec3(0.02, 0.14, 0.2);
+    vec3 white = fid < 0.35 ? vec3(0.96, 0.98, 0.99) : fid < 0.62 ? vec3(0.86, 0.91, 0.93) : fid < 0.82 ? vec3(0.7, 0.79, 0.83) : fid < 0.93 ? vec3(0.45, 0.56, 0.62) : vec3(0.2, 0.3, 0.38);
+    vec3 shade = mix(teal, white, along);
     float tiltF = 0.7 + 0.4 * sin(facing * (3.0 + 4.0 * fid) + fid * 30.0);
     float grad = 0.85 + 0.2 * dot(su - sh.zw, vec2(dir.y, -dir.x));
     vec3 top = shade * tiltF * grad;
     vec4 dp = skVorP((rotB * skAt(p, n, v, 0.05)) * vec2(2.4, 6.0) + 4.0);
     vec3 deep = mix(vec3(0.08, 0.3, 0.38), vec3(0.45, 0.78, 0.84), fract(dp.y * 5.3)) * (0.7 + 0.3 * smoothstep(0.0, 0.04, dp.x));
-    float clear = fid > 0.2 && fid < 0.74 ? 0.3 : 0.08;
+    float clear = (fid > 0.2 && fid < 0.74 ? 0.3 : 0.08) * (1.0 - 0.7 * along);
     col = mix(top, deep, clear);
     float crack = smoothstep(0.035, 0.0, abs(cut)) * 0.85;
     float seam = smoothstep(0.05, 0.0, sh.x);
-    col = mix(col, vec3(0.05, 0.17, 0.22), max(seam, crack) * 0.9);
+    col = mix(col, mix(vec3(0.05, 0.17, 0.22), vec3(0.32, 0.4, 0.46), along), max(seam, crack) * 0.9);
     col = mix(col, vec3(1.0), smoothstep(0.012, 0.0, abs(sh.x - 0.045)) * 0.5);
     vec2 gs = skAt(p, n, v, 0.02) * 40.0;
     float gh = skH(floor(gs));
