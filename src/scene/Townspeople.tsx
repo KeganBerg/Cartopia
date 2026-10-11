@@ -14,6 +14,8 @@ import { dayPhase, nightAmount } from './dayNight'
 import { isNight } from '../game/clock'
 import { CLUB } from './clubLayout'
 
+const LEG_SIDES = [-1, 1]
+
 // Townspeople: little figures like the race crowd who live in the houses and
 // walk the sidewalks to grab a pizza, browse the showroom, sit on a park bench
 // or look at the fountain, then head home. Everything is drawn with a handful
@@ -324,6 +326,7 @@ export function Townspeople() {
       for (const m of [t, hd, hr, lg, it, db, dh]) if (m.instanceColor) m.instanceColor.needsUpdate = true
     }
 
+    const ones = [t, hd, hr, it, db, dh, hit]
     bouncers(ctx, dt)
     list.forEach((p, i) => {
       update(ctx, p, dt, night)
@@ -331,12 +334,13 @@ export function Townspeople() {
     })
     t.count = hd.count = hr.count = it.count = db.count = dh.count = hit.count = list.length
     lg.count = list.length * 2
-    for (const m of [t, hd, hr, lg, it, db, dh, hit]) m.instanceMatrix.needsUpdate = true
+    for (const m of ones) m.instanceMatrix.needsUpdate = true
+    lg.instanceMatrix.needsUpdate = true
     followThought(list)
 
     function draw(p: Person, i: number) {
       if (p.state === 'inside') {
-        for (const m of [t!, hd!, hr!, it!, db!, dh!, hit!]) m.setMatrixAt(i, hidden)
+        for (const m of ones) m.setMatrixAt(i, hidden)
         lg!.setMatrixAt(i * 2, hidden)
         lg!.setMatrixAt(i * 2 + 1, hidden)
         return
@@ -391,7 +395,7 @@ export function Townspeople() {
         dh!.setMatrixAt(i, hidden)
       }
       // Legs swing from the hips; sitting folds them forward.
-      for (const side of [-1, 1]) {
+      for (const side of LEG_SIDES) {
         const a = p.sit ? -Math.PI / 2 : swing * side
         const lx = side * 0.045
         // Leg hangs half its length below the hip, rotated by the swing.
