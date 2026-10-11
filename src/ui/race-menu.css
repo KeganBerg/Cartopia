@@ -334,3 +334,11 @@ div.rm-node { cursor: default; }
 .invites-car { margin-bottom: 10px; }
 .invites-car .rm-bar { flex-wrap: wrap; border: 3px solid var(--line, #14213d); border-radius: 16px; padding: 6px 10px; }
 .invites-car .rm-picker { position: static; order: 3; flex-basis: 100%; min-width: 0; max-height: 260px; overflow-x: hidden; box-shadow: none; }
+
+/* Race distances (game/distance.ts): a tag per race, and each car's build against the next distance. */
+.rm-dist { display: inline-block; font: 800 10px Nunito, sans-serif; letter-spacing: .02em; padding: 1px 6px; border-radius: 8px; color: #fff; background: #43a047; white-space: nowrap; vertical-align: 1px; }
+.rm-dist.d-half { background: #fb8c00; }
+.rm-dist.d-mile { background: #c62828; }
+.rm-build { margin-left: 4px; font-weight: 900; white-space: nowrap; }
+.rm-build.good { color: #2e7d32; }
+.rm-build.bad { color: #c62828; }

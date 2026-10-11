@@ -28,7 +28,8 @@ import './race-menu.css'
 import { TOUR_RACES, tourLeg, tourLegOf, tourIsBoss, tourRivalPi, tourShift, tourSkills, tourRivalName, tourPrize, tourLegBonus } from '../game/tour'
 import type { WeatherKind } from '../game/weather'
 import { WEEKLY_EVENTS, EVENT_RACES, eventBonus, eventFor, eventIsBoss, eventPrize, eventProgress, eventRivalPi, eventShift, nextEventWeek } from '../game/events'
-import { msToNextWeek, skinDef, SKIN_TIERS } from '../game/data'
+import { msToNextWeek, skinDef, SKIN_TIERS, carStats } from '../game/data'
+import { DIST, character, characterMul, gpDist, tourDist, type RaceDist } from '../game/distance'
 import { playerName } from '../lib/profiles'
 
 // skill: the rival car's race skill. AI rivals use it; live players use theirs on their own device.
@@ -206,12 +207,14 @@ export function RacePanel() {
     )
   }
   if (gpRace && car) {
+    const round = Number(gpRace.rival.id.split('-').pop())
     return (
       <DragRace
         car={car}
         rival={gpRace.rival}
         prize={gpRace.prize}
-        title={`${gpRace.series.name} · Race ${Number(gpRace.rival.id.split('-').pop()) + 1} of ${GP_ROUNDS}`}
+        dist={gpDist(round)}
+        title={`${gpRace.series.name} · Race ${round + 1} of ${GP_ROUNDS} · ${DIST[gpDist(round)].label}`}
         onFinish={(won) => gpResult(gpRace.series.id, won)}
         onExit={() => { setGpRace(null); setTab('gp') }}
       />
@@ -289,7 +292,8 @@ export function RacePanel() {
         venueId={leg.venue}
         night={leg.night}
         weatherSeed={`tour-${tRace.race}`}
-        title={`${leg.night ? '🌙' : '🌍'} Pro Tour · Leg ${leg.index + 1} · ${tourIsBoss(tRace.race) ? 'Boss race' : `Race ${step + 1} of ${TOUR_RACES}`}`}
+        dist={tourDist(tRace.race)}
+        title={`${leg.night ? '🌙' : '🌍'} Pro Tour · Leg ${leg.index + 1} · ${tourIsBoss(tRace.race) ? 'Boss race' : `Race ${step + 1} of ${TOUR_RACES}`} · ${DIST[tourDist(tRace.race)].label}`}
         onFinish={(won) => tourResult(won)}
         onExit={() => { setTRace(null); setTab('tour') }}
       />
@@ -424,12 +428,16 @@ export function RacePanel() {
           </div>
         )}
       </div>
-      <RaceBar cars={cars} car={car} onPick={setRaceCar} go={go} note={tab === 'gp' ? 'Races every round' : tab === 'event' ? 'Back next week' : undefined} />
+      <RaceBar cars={cars} car={car} onPick={setRaceCar} go={go} note={tab === 'gp' ? 'Races every round' : tab === 'event' ? 'Back next week' : undefined}
+        dist={tab === 'tour' ? tourDist(tourWon) : tab === 'gp' ? null : undefined} />
     </Panel>
   )
 }
 
 const GP_CUP = ['🥉', '🏆', '🏆', '👑']
+
+// A race's distance, as a small tag.
+const DistChip = ({ d }: { d: RaceDist }) => <span className={`rm-dist d-${d}`} title={`${DIST[d].label} race`}>{DIST[d].label}</span>
 
 function GrandPrix({ onRace }: { onRace: (s: GpSeries, r: Rival, prize: number) => void }) {
   const level = useGame((s) => s.level)
@@ -455,7 +463,7 @@ function GrandPrix({ onRace }: { onRace: (s: GpSeries, r: Rival, prize: number) 
               {prog.clears > 0 && <span className="rm-wchip">Won ×{prog.clears}</span>}
             </div>
             <div className="rm-gpc-body">
-              <span className="rm-next">Race {prog.round + 1}: <b>{rival.town}</b> · PI {rival.pi}{rival.skill && <span className="rival-skill" title={SKILLS[rival.skill].name}> {SKILLS[rival.skill].icon}</span>}</span>
+              <span className="rm-next"><DistChip d={gpDist(prog.round)} /> Race {prog.round + 1}: <b>{rival.town}</b> · PI {rival.pi}{rival.skill && <span className="rival-skill" title={SKILLS[rival.skill].name}> {SKILLS[rival.skill].icon}</span>}</span>
               <span className="rm-box" title={`Mystery box: ${s.box.map((m) => carDef(m).name).join(', ')}`}>
                 <CarThumb size="sm" color={box.colors[0]} body={box.body} model={box.id} />
                 <small>🎁 {box.name}{s.box.length > 1 ? ` +${s.box.length - 1}` : ''}</small>
@@ -629,7 +637,7 @@ function Tour({ onRace, onCampaign }: { onRace: () => void; onCampaign: () => vo
                   <CarThumb size="xs" color={r.color} body={r.body} />
                   <div className="rm-who">
                     <b>{r.town}</b>
-                    <small>PI {r.pi}{r.skill && <span className="rival-skill" title={`${SKILLS[r.skill].name}: ${SKILLS[r.skill].text}`}> {SKILLS[r.skill].icon}</span>}</small>
+                    <small><DistChip d={tourDist(race)} /> PI {r.pi}{r.skill && <span className="rival-skill" title={`${SKILLS[r.skill].name}: ${SKILLS[r.skill].text}`}> {SKILLS[r.skill].icon}</span>}</small>
                   </div>
                   {beat ? <span className="tour-beat">Beaten</span> : (
                     <button className="buy small" disabled={!next} onClick={onRace}>
@@ -849,7 +857,8 @@ const step = stepRacer
 // trial: a solo run against a ghost that finishes in `target` seconds; the run ends when you cross the line.
 // resultView: replaces the usual result card.
 type Result = { won: boolean; myTime: number; theirTime: number }
-export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title, venueId, trial, resultView, night, weatherSeed, sky }: { car: OwnedCar; rival: Rival; onExit: () => void; live?: LiveRace; prize?: number; onFinish?: (won: boolean, myTime: number, theirTime: number) => number | void; title?: string; venueId?: string; trial?: { target: number }; resultView?: (r: Result) => ReactNode; night?: boolean; weatherSeed?: string; sky?: WeatherKind }) {
+// dist: a Grand Prix or Pro Tour distance (game/distance.ts); the car's build counts in these.
+export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title, venueId, trial, resultView, night, weatherSeed, sky, dist }: { car: OwnedCar; rival: Rival; onExit: () => void; live?: LiveRace; prize?: number; onFinish?: (won: boolean, myTime: number, theirTime: number) => number | void; title?: string; venueId?: string; trial?: { target: number }; resultView?: (r: Result) => ReactNode; night?: boolean; weatherSeed?: string; sky?: WeatherKind; dist?: RaceDist }) {
   // A signed-in live rival's PI comes from the server, not from their browser.
   const [serverRivalPi, setServerRivalPi] = useState<number | null>(null)
   const rival = useMemo(() => (serverRivalPi === null ? shownRival : { ...shownRival, pi: serverRivalPi }), [shownRival, serverRivalPi])
@@ -866,6 +875,9 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   const jumped = useRef(false)
   const samples = useRef<Sample[]>([])
   const def = carDef(car.model)
+  const track = dist ? DIST[dist].m : TRACK
+  // The car's build (sprinter to long-hauler) only counts over a set distance; AI rivals have none.
+  const build = useMemo(() => (dist ? character(carStats(def, car.upgrades, car.mods)) : null), [dist, def, car.upgrades, car.mods])
   const skillActive = useRef(false)
   const [skillShown, setSkillShown] = useState(false)
   // The AI rival's skill, flashed while it is working (live rivals use theirs on their own device).
@@ -1091,7 +1103,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       const theirOn = theirBoost !== 1 || theirDrag !== 1
       if (theirOn !== theirActive.current) { theirActive.current = theirOn; setTheirShown(theirOn) }
       const myMul = (live ? mine : skillBoost(sk, me.current, th0)) * theirDrag * gripMul(grip, me.current.gear, me.current.rpm, t.current)
-      step(me.current, myPi, dt, t.current, myMul)
+      step(me.current, myPi, dt, t.current, build === null ? myMul : myMul * characterMul(build, me.current.gear, me.current.dist), track)
       const spinNow = me.current.launched && me.current.finished === null && spinning(grip, me.current.gear, me.current.rpm, t.current)
       if (spinNow !== spinShown.current) { spinShown.current = spinNow; setSpin(spinNow) }
       const th = them.current
@@ -1119,7 +1131,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
         }
         if (th.gear >= AI_BOOST_GEAR) fireBoost(th)
         if (th.burning !== theirBoosting.current) { theirBoosting.current = th.burning; setTheirBoost(th.burning) }
-        step(th, rivalRef.current.pi, dt, t.current, theirBoost * skillDrag(sk, th, t.current) * gripMul(theirGrip, th.gear, th.rpm, t.current))
+        step(th, rivalRef.current.pi, dt, t.current, theirBoost * skillDrag(sk, th, t.current) * gripMul(theirGrip, th.gear, th.rpm, t.current), track)
       }
       force((n) => n + 1)
       if (live) {
@@ -1150,7 +1162,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       signal.cancelled = true
       cancelAnimationFrame(raf)
     }
-  }, [countdown, result, myPi, skill, finishRace, live, def, theirSkill, trial, theirReaction, grip, theirGrip])
+  }, [countdown, result, myPi, skill, finishRace, live, def, theirSkill, trial, theirReaction, grip, theirGrip, build, track])
 
   // The big button: launch on GO, then shift up.
   const press = () => {
@@ -1197,8 +1209,8 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   const theirLook = useMemo(() => ({ body: rival.body, color: rival.color, mods: rival.mods }), [rival.body, rival.color, rival.mods])
   const photo = useRef(() => flash('PHOTO FINISH!', 2200))
   const scene = useMemo(
-    () => <RaceScene track={TRACK} me={me} them={them} mine={mineLook} theirs={theirLook} venue={venue} weather={weather} night={night} onPhoto={() => photo.current()} />,
-    [mineLook, theirLook, venue, weather, night],
+    () => <RaceScene track={track} me={me} them={them} mine={mineLook} theirs={theirLook} venue={venue} weather={weather} night={night} onPhoto={() => photo.current()} />,
+    [mineLook, theirLook, venue, weather, night, track],
   )
 
   const rpmAngle = -210 + Math.min(1.05, me.current.rpm) * 240
@@ -1218,12 +1230,12 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
         ].map((lane) => (
           <div key={lane.name} className="rf-lane">
             <span className="lane-name">{lane.name}</span>
-            <div className="lane-car" style={{ left: `${Math.min(1, lane.r.dist / TRACK) * 90}%`, background: lane.color }} />
+            <div className="lane-car" style={{ left: `${Math.min(1, lane.r.dist / track) * 90}%`, background: lane.color }} />
             <div className="finish" />
           </div>
         ))}
       </div>
-      {countdown > 0 && !result && <div className={`rf-venue v-${venue.id}`}><span className="rf-venue-ico">{venue.icon}</span><span className="rf-venue-txt"><small>{gripNote ?? 'Race venue'}</small><b>{venue.name}</b></span></div>}
+      {countdown > 0 && !result && <div className={`rf-venue v-${venue.id}`}><span className="rf-venue-ico">{venue.icon}</span><span className="rf-venue-txt"><small>{gripNote ?? (dist ? `${DIST[dist].label} race` : 'Race venue')}</small><b>{venue.name}</b></span></div>}
       {spin && !label && !result && <div className="rf-spin">💨 Wheelspin</div>}
       {countdown > 0 && countdown !== 99 && <div className="countdown big" key={countdown}>{countdown}</div>}
       {countdown === 0 && !me.current.launched && !result && <div className="countdown big go">GO!</div>}

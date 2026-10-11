@@ -547,12 +547,18 @@ export const modXp = (id: string) => 10 + (modDef(id)?.unlockLevel ?? 0) * 3
 
 // Performance index: what races are decided on (plus the driver's shifting).
 export const performance = (car: CarDef, up: Record<UpgradeSlot, number>, mods?: string[] | null) => {
+  const { power, grip, weight } = carStats(car, up, mods)
+  return Math.round(power * 0.6 + grip * 0.3 + (100 - weight) * 0.1)
+}
+// Power, grip and weight with upgrades and fitted mods.
+export function carStats(car: CarDef, up: Record<UpgradeSlot, number>, mods?: string[] | null) {
   const m = Object.values(fittedMods(mods, car.body)).map(modStats)
   const sum = (k: 'power' | 'grip' | 'weight') => m.reduce((a, x) => a + x[k], 0)
-  const power = car.power + up.engine * 4 + up.turbo * 3 + sum('power')
-  const grip = car.grip + up.tires * 4 + sum('grip')
-  const weight = Math.max(5, car.weight - up.weight * 4 + sum('weight'))
-  return Math.round(power * 0.6 + grip * 0.3 + (100 - weight) * 0.1)
+  return {
+    power: car.power + up.engine * 4 + up.turbo * 3 + sum('power'),
+    grip: car.grip + up.tires * 4 + sum('grip'),
+    weight: Math.max(5, car.weight - up.weight * 4 + sum('weight')),
+  }
 }
 
 // XP needed to go from `level` to `level + 1`.

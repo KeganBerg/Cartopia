@@ -26,7 +26,7 @@ export type Racer = {
 }
 export const freshRacer = (launched = true): Racer => ({ gear: 0, rpm: 0, speed: 0, dist: 0, quality: 1, finished: null, launched, boost: launched ? LAUNCH_FILL.perfect : 0, burning: false, boostUsed: false, streak: 0 })
 
-export function stepRacer(r: Racer, piVal: number, dt: number, t: number, mul = 1) {
+export function stepRacer(r: Racer, piVal: number, dt: number, t: number, mul = 1, track = TRACK) {
   if (r.finished !== null || !r.launched) return
   const climb = (1.25 - r.gear * 0.16) * (0.85 + piVal / 300)
   // Top gear just holds near the redline; lower gears bounce off the limiter.
@@ -44,7 +44,7 @@ export function stepRacer(r: Racer, piVal: number, dt: number, t: number, mul = 
   r.speed += accel * mul * dt
   r.speed *= 1 - 0.04 * dt
   r.dist += r.speed * dt
-  if (r.dist >= TRACK) r.finished = t
+  if (r.dist >= track) r.finished = t
 }
 
 // lo..hi is the perfect window; rain and snow narrow it (see grip.ts).
