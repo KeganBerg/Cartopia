@@ -102,9 +102,8 @@ html {
 :root .garage-item.sel { border-color: #2f7ff0; background: #eaf3ff; box-shadow: 0 2px 0 #2f7ff0; }
 :root .toast { background: linear-gradient(#34507f, #1f3358); border: 2.5px solid var(--line); box-shadow: 0 3px 0 rgba(0,0,0,.35); }
 @media (max-width: 600px) {
-  :root .icon-btn .i { width: 40px; height: 40px; border-radius: 12px; border-width: 2.5px; }
-  /* Seven tiles plus RACE: labels shrink so SHOWROOM doesn't run into its neighbours. */
-  :root .icon-btn { font-size: 8px; letter-spacing: 0; }
+  :root .icon-btn .i { width: 48px; height: 48px; border-radius: 14px; border-width: 2.5px; }
+  :root .icon-btn { font-size: 11px; }
   :root .race-btn { padding: 5px 12px; font-size: 14px; border-width: 2.5px; }
   :root .race-btn .gi { width: 24px; height: 24px; }
   :root .panel { border-width: 4px 0 0; border-radius: 22px 22px 0 0; }
