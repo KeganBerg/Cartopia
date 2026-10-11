@@ -8,6 +8,8 @@ import { NEW_MODELS, NewBuildingModel } from './NewBuildings'
 import { OFFICE_MODELS, OfficeModel } from './OfficeBuildings'
 import { CAMPUS_MODELS, CampusModel } from './CampusBuildings'
 import { HouseLevels } from './HouseLevels'
+import { TRAILER_JUNK, TrailerJunkModel } from './TrailerJunkyard'
+import { PARK_STYLES, ParkStyleModel } from './ParkStyles'
 import { RustysYard } from './RustysYard'
 import type { Texture } from 'three'
 import { glowMats } from './dayNight'
@@ -266,6 +268,8 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
 
   if (NEW_MODELS.has(def.id)) return <NewBuildingModel def={def} ghost={ghost} valid={valid} m={m} win={win} bulb={bulb} level={lvl} />
   if (OFFICE_MODELS.has(def.id)) return <OfficeModel def={def} ghost={ghost} m={m} bulb={bulb} level={lvl} />
+  if (TRAILER_JUNK.has(def.id)) return <TrailerJunkModel id={def.id} m={m} win={win} bulb={bulb} ghost={ghost} lvl={lvl} lift={lift} roof={def.roof} color={def.color} />
+  if (PARK_STYLES.has(def.id)) return <ParkStyleModel id={def.id} m={m} win={win} bulb={bulb} ghost={ghost} lvl={lvl} lift={lift} roof={def.roof} color={def.color} />
   if (CAMPUS_MODELS.has(def.id)) return <CampusModel def={def} ghost={ghost} m={m} win={win} bulb={bulb} level={lvl} />
 
   switch (def.id) {

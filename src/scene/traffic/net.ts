@@ -199,7 +199,8 @@ function curbOk(net: Net, k: string, heading: number) {
 
 function stopFor(net: Net, b: Building, roads: Set<string>, turnOf: TurnOf): Stop | null {
   const d = buildingDef(b.def)
-  if (!d || d.kind === 'decor' || d.kind === 'obstacle' || d.kind === 'house') return null
+  // Homes have no curb stop, except trailer homes, where the town's beaters park.
+  if (!d || d.kind === 'decor' || d.kind === 'obstacle' || (d.kind === 'house' && d.id !== 'trailer')) return null
   const turn = turnOf(b, roads)
   const [w, h] = turn % 2 ? [d.h, d.w] : [d.w, d.h]
   // Front door direction for each quarter turn: south, east, north, west.

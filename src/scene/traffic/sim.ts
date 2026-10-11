@@ -17,6 +17,7 @@ export type CarSpec = {
   wid: number
   cruise: number // top speed, world units per second
   stalled: boolean // flat tire or out of gas: pull over and wait
+  low?: boolean // a low-PI beater: it keeps heading home to the trailer homes
   favors?: string[] // building types it drops in at most (school buses: the schools)
 }
 
@@ -115,6 +116,13 @@ function apart(a: Box, b: Box, dx: number, dz: number, nx: number, nz: number) {
   return Math.abs(dx * nx + dz * nz) > ra + rb
 }
 
+// A steady small number for a car, so it picks the same trailer every time.
+const hashOf = (uid: string) => {
+  let h = 0
+  for (let i = 0; i < uid.length; i++) h = (h * 31 + uid.charCodeAt(i)) >>> 0
+  return h
+}
+
 const smooth = (t: number) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t))
 
 let rand = Math.random
@@ -139,6 +147,7 @@ export class Traffic {
   private specs = new Map<string, CarSpec>()
   private trips = new Map<string, TripKind>()
   private visits = new Map<string, string>()
+  private low = new Set<string>()
   private ways = new Map<string, { outs: number[]; to: string; heading: number }[]>()
   private limp = new Map<string, number>() // broken-down cars still looking for a spot, by odometer at breakdown
   // Each set of lights: which road has right of way (0 east-west, 1 north-south),
@@ -201,6 +210,7 @@ export class Traffic {
     this.specs = new Map()
     const sorted = [...cars].sort((a, b) => Number(b.stalled) - Number(a.stalled))
     for (const c of sorted.slice(0, max)) this.specs.set(c.uid, c)
+    this.low = new Set(cars.filter((c) => c.low).map((c) => c.uid))
     this.syncCars()
   }
 
@@ -352,7 +362,8 @@ export class Traffic {
         const leg = this.makeLeg(node, inDir, inDir)
         leg.stopS = leg.c.len / 2
         leg.stopKind = next.kind === 'tow' ? 'tow' : 'curb'
-        leg.stopFor = next.kind === 'visit' ? 3 + rand() * 3 : next.kind === 'tow' ? 2.5 : 4
+        // Home at the trailer park: it parks out front for a good while.
+        leg.stopFor = next.kind === 'visit' ? (a.trip?.stop.def === 'trailer' ? 12 + rand() * 10 : 3 + rand() * 3) : next.kind === 'tow' ? 2.5 : 4
         a.legs.push(leg)
         continue
       }
@@ -724,11 +735,18 @@ export class Traffic {
       if (a.nextVisit <= 0) {
         a.nextVisit = 25 + rand() * 45
         const busy = new Set([...this.agents.values()].map((o) => o.trip?.stop.uid))
-        const free = this.net.stops.filter((s) => !busy.has(s.uid))
+        // Only the town's low-PI cars live at the trailer homes; nobody else pulls up there.
+        const low = this.low.has(a.uid)
+        const free = this.net.stops.filter((s) => !busy.has(s.uid) && (low || s.def !== 'trailer'))
         const home = free.find((s) => s.uid === this.homes.get(a.uid))
+        const pads = low ? this.net.stops.filter((s) => s.def === 'trailer') : []
+        // Each beater has its own trailer it keeps coming back to, or any free one.
+        const mine = pads.length ? pads[hashOf(a.uid) % pads.length] : null
+        const pad = mine && !busy.has(mine.uid) ? mine : free.find((s) => s.def === 'trailer')
         const fav = this.specs.get(a.uid)?.favors
         const liked = fav ? free.filter((s) => fav.includes(s.def)) : []
         if (home && rand() < 0.6) this.startTrip(a, home, 'visit')
+        else if (pad && rand() < 0.8) this.startTrip(a, pad, 'visit')
         else if (liked.length && rand() < 0.7) this.startTrip(a, liked[Math.floor(rand() * liked.length)], 'visit')
         else if (free.length) this.startTrip(a, free[Math.floor(rand() * free.length)], 'visit')
       }
