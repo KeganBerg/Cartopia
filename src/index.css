@@ -429,12 +429,13 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
   .hud-mobile { display: block; position: absolute; z-index: 50; top: 0; left: 0; right: 0; padding: calc(6px + var(--sat)) calc(8px + var(--sar)) 0 calc(8px + var(--sal)); pointer-events: none; }
   .hud-mobile button { pointer-events: auto; }
   .hud-strip { display: flex; align-items: center; gap: 6px; background: linear-gradient(rgba(27,31,36,.82), rgba(27,31,36,.7)); border: 2px solid rgba(255,255,255,.75); border-radius: 18px; padding: 4px 6px; box-shadow: 0 3px 0 rgba(0,0,0,.25); pointer-events: auto; }
-  .hud-strip .speedo { width: 50px; height: 50px; flex: none; margin-right: 22px; filter: none; }
+  .hud-strip .speedo { width: 50px; height: 50px; flex: none; margin-right: 20px; filter: none; }
   .hud-strip .speedo svg { width: 50px; height: 50px; }
   .hud-strip .speedo-level { top: 32px; width: 50px; font-size: 13px; line-height: 1; }
   .hud-strip .speedo-xp { display: none; }
-  .hud-strip .speedo-menu { width: 18px; height: 18px; font-size: 10px; top: -4px; right: -19px; border-width: 1.5px; }
-  .hud-chips { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; min-width: 164px; }
+  /* Menu badge sits in the gap beside the gauge, centred on it, so it never straddles the rim. */
+  .hud-strip .speedo-menu { width: 18px; height: 18px; font-size: 10px; top: 16px; right: -20px; border-width: 1.5px; }
+  .hud-chips { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; min-width: 0; }
   .chip-stat { display: flex; align-items: center; gap: 4px; min-width: 0; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.25); border-radius: 12px; padding: 1px 6px 1px 2px; color: #fff; font: 13px var(--display); white-space: nowrap; overflow: hidden; }
   .chip-stat .ico { width: 18px; height: 18px; font-size: 10px; border-width: 1.5px; }
   .chip-fuel-bar { position: relative; flex: 1 1 0; width: 0; min-width: 0; height: 14px; border-radius: 7px; background: #11151a; overflow: hidden; }
@@ -443,10 +444,15 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
   .chip-fuel-bar b { position: absolute; inset: 0; display: grid; place-items: center; white-space: nowrap; letter-spacing: -.02em; font: 10px var(--display); font-weight: normal; color: #fff; text-shadow: 0 1px 1px #000; }
   .hud-actions { display: flex; gap: 4px; flex: none; }
   /* Four or more tiles stack two-high so the money chips keep their room. */
-  .hud-actions:has(> :nth-child(4)) { display: grid; grid-auto-flow: column; grid-template-rows: 28px 28px; }
-  .hud-mobile .hud-actions:has(> :nth-child(4)) > * { width: 28px; height: 28px; font-size: 14px; border-radius: 8px; }
+  .hud-actions:has(> :nth-child(4)) { display: grid; grid-auto-flow: column; grid-template-rows: 26px 26px; gap: 3px; }
+  .hud-mobile .hud-actions:has(> :nth-child(4)) > * { width: 26px; height: 26px; font-size: 13px; border-radius: 8px; }
   .hud-actions .goals-btn, .hud-actions .challenge-bell { width: 36px; height: 36px; font-size: 17px; border-width: 2px; border-radius: 10px; box-shadow: none; }
   .hud-actions .bell-count { top: -6px; right: -6px; }
+  /* Narrow phones (iPhone SE/mini): slimmer tiles so the strip never runs off the right edge. */
+  @media (max-width: 380px) {
+    .hud-actions { gap: 3px; }
+    .hud-actions .goals-btn, .hud-actions .challenge-bell { width: 33px; height: 33px; font-size: 16px; }
+  }
   .hud-town { display: flex; justify-content: center; align-items: center; gap: 8px; margin: 5px auto 0; width: max-content; max-width: 100%; background: rgba(27,31,36,.7); color: #fff; font: 13px var(--display); border-radius: 12px; padding: 2px 10px; pointer-events: auto; }
   .hud-town button { background: none; border: none; color: #fff; font: inherit; padding: 0; }
   .hud-town-name { max-width: 45vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
