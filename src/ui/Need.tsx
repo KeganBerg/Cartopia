@@ -1,5 +1,5 @@
 import { useGame, fuelCap } from '../game/store'
-import { buildingDef, xpToNext, FUEL_REGEN_SECONDS, RACE_FUEL, REFILL_BUCKS, type BuildingDef } from '../game/data'
+import { buildingDef, isOpen, xpToNext, FUEL_REGEN_SECONDS, RACE_FUEL, REFILL_BUCKS, type BuildingDef } from '../game/data'
 import { useNow } from '../scene/useNow'
 import { Panel } from './Menus'
 
@@ -22,7 +22,7 @@ export function NeedPanel() {
     return { label: `Build · $${d.price.toLocaleString()}`, run: () => s.openShop(id) }
   }
   const isJob = (def: string) => !!buildingDef(def).jobSeconds && buildingDef(def).kind !== 'obstacle'
-  const idle = s.buildings.filter((b) => isJob(b.def) && b.jobEndsAt === null).length
+  const idle = s.buildings.filter((b) => isJob(b.def) && b.jobEndsAt === null && isOpen(buildingDef(b.def), now)).length
   const ready = s.buildings.filter((b) => isJob(b.def) && b.jobEndsAt !== null && now >= b.jobEndsAt).length
   const jobDefs = [...new Set(s.buildings.filter((b) => isJob(b.def)).map((b) => b.def))]
   const showJobs = () => s.showMe(jobDefs, ready ? 'Tap the flashing $ bubbles to collect.' : 'Tap a flashing ⛽ bubble to start a job.')

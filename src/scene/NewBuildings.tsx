@@ -3,7 +3,10 @@ import type { Texture } from 'three'
 import { levelLift, type BuildingDef } from '../game/data'
 import { signTexture } from './signTexture'
 import { CarModel } from './CarModel'
-import { glowMats } from './dayNight'
+import { glowMats, onNight } from './dayNight'
+import { ClubLife } from './ClubLife'
+import { CLUB } from './clubLayout'
+import { MeshBasicMaterial, MeshStandardMaterial, Color } from 'three'
 import { PAL, SEASON } from './season'
 import { LAYER, decal } from './layers'
 import { brickTex, sidingTex, gravelTex, awningTex, paverTex, shutterTex, shingleTex } from './textures'
@@ -19,7 +22,7 @@ type Mat = (color: string, map?: Texture) => ReactNode
 export type NewModelProps = { def: BuildingDef; ghost?: boolean; m: Mat; win: ReactNode; bulb: ReactNode; level?: number }
 
 export const NEW_MODELS = new Set([
-  'coffee', 'tacos', 'lube', 'arcade', 'bodyshop', 'market', 'firehouse', 'police', 'parkade',
+  'coffee', 'tacos', 'lube', 'arcade', 'bodyshop', 'market', 'firehouse', 'police', 'parkade', 'club',
   'pine', 'hedge', 'fence', 'picnic', 'busstop', 'hotdog', 'flagpole', 'arch', 'playground', 'gazebo', 'clocktower',
 ])
 
@@ -250,6 +253,28 @@ function BlockCar({ m, at, c, rot = 0 }: { m: Mat; at: V3; c: string; rot?: numb
     </group>
   )
 }
+
+
+// Nightclub signs: dim by day and lit after dusk; the CLOSED plaque only shows by day.
+// Built on first use (the textures need a canvas) and kept by identity so Batch
+// merges them without baking in the glow.
+let clubSigns: { name: MeshStandardMaterial; closed: MeshBasicMaterial } | null = null
+function clubSignMats() {
+  if (clubSigns) return clubSigns
+  const tex = signTexture('NEON OWL', '#12061f', '#ff4fd8')
+  const name = new MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: new Color('#ffffff'), emissiveIntensity: 0.15, toneMapped: false })
+  const closed = new MeshBasicMaterial({ map: signTexture('CLOSED', '#fafafa', '#c62828'), toneMapped: false })
+  name.userData.live = closed.userData.live = true
+  const signs = { name, closed }
+  onNight((n) => {
+    signs.name.emissiveIntensity = 0.15 + n * 1.1
+    signs.closed.visible = n < 0.5
+  })
+  clubSigns = signs
+  return signs
+}
+
+type GlowKey = 'neonPink' | 'neonCyan' | 'neonViolet' | 'danceFloor'
 
 export function NewBuildingModel({ def, ghost, m, win, bulb, level = 1 }: NewModelProps) {
   const lvl = Math.min(10, Math.max(1, Math.floor(level) || 1))
@@ -538,6 +563,125 @@ export function NewBuildingModel({ def, ghost, m, win, bulb, level = 1 }: NewMod
           {trim && lvl >= 9 && <Box m={m} at={[0, 1.06, 0.86]} s={[1.12, 0.03, 0.03]} c={GOLD} />}
         </ShellBuilding>
       )
+    case 'club': {
+      const h = 1.3 + lift
+      const w = 3.4
+      const d = 1.3
+      const z0 = -0.29
+      const zf = z0 + d / 2
+      const glow = (k: GlowKey, c: string) => (ghost ? m(c) : <primitive object={glowMats[k]} attach="material" dispose={null} />)
+      const tube = (k: GlowKey, at: V3, sz: V3) => (
+        <mesh key={at.join()} position={at}>
+          <boxGeometry args={sz} />
+          {glow(k, '#ff2bd6')}
+        </mesh>
+      )
+      const signs = ghost ? null : clubSignMats()
+      const floor = { y: h + 0.15, z: z0 + 0.06, w: w - 0.5, d: d - 0.36 }
+      const posts = Array.from({ length: 6 }, (_, i) => CLUB.ropeFrom + ((CLUB.ropeTo - CLUB.ropeFrom) * i) / 5)
+      return (
+        <ShellBuilding {...shell} w={w} d={d} h0={1.3} z0={z0} wall="#3a2160" roof="#d500f9" shopfront={null}>
+          {/* Entrance: a black door under a neon-edged canopy, red carpet to the street. */}
+          <Box m={m} at={[CLUB.doorX, 0.38, zf + 0.012]} s={[0.5, 0.76, 0.02]} c="#ffc107" shadow={false} />
+          <mesh position={[CLUB.doorX, 0.36, zf + 0.024]}>
+            <planeGeometry args={[0.42, 0.7]} />
+            {m('#120818')}
+          </mesh>
+          {signs && (
+            <mesh position={[CLUB.doorX, 0.46, zf + 0.03]}>
+              <planeGeometry args={[0.36, 0.09]} />
+              <primitive object={signs.closed} attach="material" dispose={null} />
+            </mesh>
+          )}
+          <Box m={m} at={[CLUB.doorX, 0.84, zf + 0.24]} s={[0.66, 0.05, 0.48]} c="#120818" />
+          {tube('neonViolet', [CLUB.doorX, 0.84, zf + 0.485], [0.66, 0.03, 0.03])}
+          {[-0.3, 0.3].map((x) => <Cyl key={x} m={m} at={[CLUB.doorX + x, 0.42, zf + 0.44]} r={0.018} h={0.84} c="#ffc107" seg={6} />)}
+          <Box m={m} at={[CLUB.doorX, 0.012, (zf + 0.99) / 2]} s={[0.4, 0.016, 0.99 - zf]} c="#c62828" shadow={false} />
+          {/* Velvet rope for the line, gold posts and red rope. */}
+          {posts.map((x) => (
+            <group key={x} position={[x, 0, CLUB.ropeZ]}>
+              <Cyl m={m} at={[0, 0.15, 0]} r={0.018} h={0.3} c="#ffc107" seg={6} />
+              <Cyl m={m} at={[0, 0.01, 0]} r={0.05} h={0.02} c="#ffc107" seg={8} />
+              <mesh position={[0, 0.31, 0]}><sphereGeometry args={[0.028, 8, 6]} />{m('#ffc107')}</mesh>
+            </group>
+          ))}
+          {posts.slice(1).map((x, i) => (
+            <Box key={x} m={m} at={[(x + posts[i]) / 2, 0.25, CLUB.ropeZ]} s={[x - posts[i] - 0.03, 0.022, 0.022]} c="#b71c1c" shadow={false} />
+          ))}
+          {/* Club lights through the front window. */}
+          <Box m={m} at={[0.5, 0.55, zf + 0.006]} s={[1.96, 0.46, 0.012]} c="#120818" shadow={false} />
+          <mesh position={[0.5, 0.55, zf + 0.014]}>
+            <planeGeometry args={[1.9, 0.4]} />
+            {glow('danceFloor', '#7c4dff')}
+          </mesh>
+          {/* The name in lights over the door, with a neon owl beside it. */}
+          {signs && (
+            <group position={[0.35, 1.04, zf + 0.03]}>
+              <Box m={m} at={[0, 0, -0.012]} s={[1.68, 0.44, 0.03]} c="#12061f" shadow={false} />
+              <mesh position-z={0.006}>
+                <planeGeometry args={[1.6, 0.4]} />
+                <primitive object={signs.name} attach="material" dispose={null} />
+              </mesh>
+            </group>
+          )}
+          <group position={[-1.32, 1.06, zf + 0.04]}>
+            {[-0.1, 0.1].map((x) => (
+              <mesh key={x} position={[x, 0.04, 0]}>
+                <torusGeometry args={[0.075, 0.016, 6, 14]} />
+                {glow('neonCyan', '#00e5ff')}
+              </mesh>
+            ))}
+            <mesh position={[0, -0.07, 0]} rotation-x={Math.PI / 2}>
+              <coneGeometry args={[0.035, 0.08, 4]} />
+              {glow('neonPink', '#ff2bd6')}
+            </mesh>
+          </group>
+          {/* Neon edges: corners and a band under the roof. */}
+          {[-1, 1].map((sd) => tube('neonPink', [sd * (w / 2 + 0.005), h / 2, zf + 0.01], [0.035, h - 0.08, 0.035]))}
+          {tube('neonCyan', [0, h - 0.17, zf + 0.02], [w, 0.035, 0.03])}
+          {tube('neonViolet', [0.5, 0.33, zf + 0.02], [1.96, 0.03, 0.03])}
+          {/* Rooftop dance floor with a DJ booth, speakers, a mirror ball and a glowing rail. */}
+          <mesh position={[0, floor.y, floor.z]} rotation-x={-Math.PI / 2}>
+            <planeGeometry args={[floor.w, floor.d]} />
+            {glow('danceFloor', '#7c4dff')}
+          </mesh>
+          {[-1, 1].map((sd) => tube('neonCyan', [0, h + 0.36, z0 + sd * (d / 2 - 0.05)], [w - 0.1, 0.03, 0.03]))}
+          {[-1, 1].map((sd) => tube('neonCyan', [sd * (w / 2 - 0.05), h + 0.36, z0], [0.03, 0.03, d - 0.1]))}
+          {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => (
+            <Box key={`${sx}${sz}`} m={m} at={[sx * (w / 2 - 0.05), h + 0.25, z0 + sz * (d / 2 - 0.05)]} s={[0.04, 0.24, 0.04]} c="#120818" shadow={false} />
+          )))}
+          <group position={[0, h + 0.14, z0 - d / 2 + 0.2]}>
+            <Box m={m} at={[0, 0.14, 0]} s={[0.7, 0.28, 0.22]} c="#212121" />
+            {tube('neonPink', [0, 0.2, 0.115], [0.66, 0.03, 0.01])}
+            {[-0.62, 0.62].map((x) => (
+              <group key={x}>
+                <Box m={m} at={[x, 0.22, 0]} s={[0.26, 0.44, 0.22]} c="#151515" />
+                <Cyl m={m} at={[x, 0.27, 0.115]} r={0.07} h={0.01} c="#424242" seg={10} rot={[Math.PI / 2, 0, 0]} />
+                <Cyl m={m} at={[x, 0.11, 0.115]} r={0.045} h={0.01} c="#424242" seg={10} rot={[Math.PI / 2, 0, 0]} />
+              </group>
+            ))}
+          </group>
+          <group position={[1.35, h + 0.14, z0 - d / 2 + 0.15]}>
+            <Cyl m={m} at={[0, 0.45, 0]} r={0.02} h={0.9} c="#9e9e9e" seg={6} />
+            <Box m={m} at={[-0.2, 0.89, 0.12]} rot={[0, 0.5, 0]} s={[0.5, 0.02, 0.02]} c="#9e9e9e" shadow={false} />
+            <mesh position={[-0.42, 0.74, 0.25]} castShadow>
+              <icosahedronGeometry args={[0.12, 1]} />
+              <meshStandardMaterial color="#eceff1" metalness={0.9} roughness={0.15} flatShading />
+            </mesh>
+          </group>
+          {/* Searchlight lamps behind the club. */}
+          {[-1, 1].map((sd) => (
+            <group key={sd} position={[sd * 1.78, 0, -0.8]}>
+              <Cyl m={m} at={[0, 0.08, 0]} r={0.12} r2={0.14} h={0.16} c="#37474f" seg={10} />
+              <Cyl m={m} at={[0, 0.2, 0]} r={0.09} h={0.08} c="#eceff1" seg={10} />
+            </group>
+          ))}
+          {!ghost && <Pool r={0.8} x={CLUB.doorX} z={0.8} />}
+          {!ghost && <Pool r={0.9} x={0.75} z={0.85} />}
+          {!ghost && <ClubLife lvl={lvl} floorY={floor.y} floorZ={floor.z} floorW={floor.w} floorD={floor.d} />}
+        </ShellBuilding>
+      )
+    }
     case 'parkade': {
       // A concrete deck for every two levels, cars parked on each.
       const decks = 2 + Math.floor((lvl - 1) / 2)
