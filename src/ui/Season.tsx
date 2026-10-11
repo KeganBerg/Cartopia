@@ -1,6 +1,6 @@
 import { Icon } from './Icon'
 import { useGame, currentSeason, tierReady, seasonClaimable } from '../game/store'
-import { SEASON_TIERS, STARS_PER_TIER, SEASON_CAR_BUCKS, seasonOf, seasonEndsAt, carDef, seasonSkin, type SeasonPrize } from '../game/data'
+import { SEASON_TIERS, STARS_PER_TIER, SEASON_CAR_BUCKS, seasonOf, seasonEndsAt, carDef, seasonSkin, seasonModSkin, type SeasonPrize } from '../game/data'
 import { Panel } from './Menus'
 import { CarThumb } from '../scene/BuildingPreview'
 import { useNow } from '../scene/useNow'
@@ -22,7 +22,7 @@ const left = (ms: number) => {
 function Prize({ p, car, tier }: { p: SeasonPrize; car?: string; tier: number }) {
   if (p.car && car) return <span className="tier-prize">🚗</span>
   const bucks = p.bucks + (p.car ? SEASON_CAR_BUCKS : 0)
-  const skin = seasonSkin(tier)
+  const skin = seasonSkin(tier) ?? seasonModSkin(tier)
   return (
     <span className="tier-prize">
       {skin && <i className="tier-skin" style={{ background: skin.swatch }} title={`${skin.name} skin`} />}

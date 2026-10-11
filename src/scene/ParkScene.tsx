@@ -328,7 +328,7 @@ export function ParkScene({ lot, me, input, running, onHud, onEnd }: {
       <group ref={player} position={[lot.start.x, 0, lot.start.z]} rotation-y={lot.start.h}>
         <CarShadow len={PARK_LEN} wid={carW} />
         <group scale={scale}>
-          <CarModel body={me.body} model={me.model} color={me.color} finish={me.finish} skin={me.skin} mods={me.mods} beams={view.beams} />
+          <CarModel body={me.body} model={me.model} color={me.color} finish={me.finish} skin={me.skin} modSkin={me.modSkin} mods={me.mods} beams={view.beams} />
         </group>
       </group>
     </>

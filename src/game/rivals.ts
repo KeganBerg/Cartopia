@@ -116,8 +116,14 @@ export function currentRival(level: number, progress: Record<string, RivalProgre
 }
 
 // Each comeback is in a faster car, so beating a rival three times takes upgrades along the way.
-export const rivalPi = (def: RivalDef, visit: number) => Math.round(def.pi[0] + ((def.pi[1] - def.pi[0]) * visit) / (RIVAL_VISITS - 1))
+export const rivalLadderPi = (def: RivalDef, visit: number) => Math.round(def.pi[0] + ((def.pi[1] - def.pi[0]) * visit) / (RIVAL_VISITS - 1))
+// What they race against your best car (myPi): a touch slower on the first visit, level on the
+// second, a touch quicker as the boss, and never faster than their own ladder.
+export const RIVAL_PI_STEP = [0.96, 1, 1.04]
+export const rivalPi = (def: RivalDef, visit: number, myPi = Infinity) =>
+  Math.max(10, Math.min(rivalLadderPi(def, visit), Math.round(myPi * RIVAL_PI_STEP[visit])))
 // Shift cleanly from 0 (sloppy) to 1 (perfect); they practice between visits.
 export const rivalShift = (def: RivalDef, visit: number) => Math.min(1, 0.45 + RIVALS.indexOf(def) * 0.05 + visit * 0.15)
-// A rival race pays a bit more than a quick race. The rematch stakes the same again.
+// A rival race pays a bit more than a quick race (on their ladder PI, so a closer car doesn't pay
+// less). The rematch stakes the same again.
 export const rivalPrize = (pi: number) => Math.round((200 + pi * 8) / 10) * 10

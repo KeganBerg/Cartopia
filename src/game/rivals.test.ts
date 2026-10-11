@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
-import { RIVALS, RIVAL_VISITS, RIVAL_BACK_MS, currentRival, rivalPi, rivalShift } from './rivals'
+import { RIVALS, RIVAL_VISITS, RIVAL_BACK_MS, currentRival, rivalLadderPi, rivalPi, rivalShift } from './rivals'
+import { visitorPiFactor } from '../lib/visitors'
 import { CAMPAIGN, GP_SERIES } from './data'
 import { isCleanName } from '../lib/names'
 import { useGame } from './store'
@@ -25,6 +26,31 @@ describe('town rivals', () => {
       }
       expect(rivalShift(r, RIVAL_VISITS - 1)).toBeLessThanOrEqual(1)
       expect(rivalPi(r, RIVAL_VISITS - 1)).toBe(r.pi[1])
+    }
+  })
+
+  it('race a car within a few percent of yours, still getting quicker each visit', () => {
+    for (const r of RIVALS) {
+      for (const my of [20, 40, 60, 80, 100, 130]) {
+        for (let v = 0; v < RIVAL_VISITS; v++) {
+          const pi = rivalPi(r, v, my)
+          expect(pi).toBeLessThanOrEqual(rivalLadderPi(r, v))
+          if (pi < rivalLadderPi(r, v)) expect(Math.abs(pi - my)).toBeLessThanOrEqual(Math.ceil(my * 0.04))
+          if (v > 0) expect(pi).toBeGreaterThanOrEqual(rivalPi(r, v - 1, my))
+        }
+      }
+    }
+    expect(rivalPi(RIVALS[2], 0, 30)).toBe(29) // Duke used to bring 48 to a PI 30 car
+  })
+
+  it('send street racers within 5% of your best car, one in five up to 10% quicker', () => {
+    for (let i = 0; i <= 10; i++) {
+      const f = visitorPiFactor(0.5, i / 10)
+      expect(f).toBeGreaterThanOrEqual(0.95)
+      expect(f).toBeLessThanOrEqual(1.05)
+      const tough = visitorPiFactor(0.1, i / 10)
+      expect(tough).toBeGreaterThanOrEqual(1.05)
+      expect(tough).toBeLessThanOrEqual(1.1)
     }
   })
 
