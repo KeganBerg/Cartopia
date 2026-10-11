@@ -4,7 +4,7 @@ import { Color, Object3D } from 'three'
 import type { Group, InstancedMesh } from 'three'
 import { dayPhase, isNight, nightAmount } from '../game/clock'
 import { SHIRTS, PANTS, SKIN, HAIR } from './people'
-import { CarModel } from './CarModel'
+import { CarModel, wheelRig, type WheelRig } from './CarModel'
 import { bodyScale } from './townCarSize'
 import { signTexture } from './signTexture'
 import type { Body } from '../game/data'
@@ -14,7 +14,7 @@ import type { Body } from '../game/data'
 // cars weaving through the cones. Instanced meshes and noBatch groups, so
 // Batch leaves them alone and they can move; a handful of draws per building.
 
-import { type Mover, type XZ } from './campusPaths'
+import { type Drive, type DrivePose, type Mover } from './campusPaths'
 
 // When people are about: `school` only in daylight (kids go home at dusk),
 // `campus` all day with a few night owls, `always` round the clock.
@@ -112,7 +112,8 @@ export function Crowd({ n, move, hours = 'always', kids, uniform }: CrowdProps) 
 // ---- Learner cars ----
 
 // The academy's own learner cars: full car models at town traffic size, each in a
-// school colour with a STUDENT DRIVER topper on the roof.
+// school colour with a STUDENT DRIVER topper on the roof. Driving ones (with a
+// wheel `rig`) light the road ahead after dark, like town traffic.
 const CAR_COLORS = ['#e53935', '#1e88e5', '#fdd835', '#43a047']
 const LEARNERS: { body: Body; model: string }[] = [
   { body: 'compact', model: 'pip' },
@@ -123,14 +124,14 @@ const LEARNERS: { body: Body; model: string }[] = [
 // Roof height of each learner body (CarModel's lift + body + cabin).
 const SHAPE_TOP: Record<string, number> = { compact: 0.65, hatch: 0.59, sedan: 0.59 }
 
-export function LearnerCar({ i, at, rot = 0 }: { i: number; at?: [number, number, number]; rot?: number }) {
+export function LearnerCar({ i, at, rot = 0, rig, body: tilt }: { i: number; at?: [number, number, number]; rot?: number; rig?: WheelRig; body?: (g: Group | null) => void }) {
   const { body, model } = LEARNERS[i % LEARNERS.length]
   const k = bodyScale(body)
   const roof = SHAPE_TOP[body] ?? 0.6
   return (
     <group position={at} rotation-y={rot}>
-      <group scale={k}>
-        <CarModel body={body} model={model} color={CAR_COLORS[i % CAR_COLORS.length]} />
+      <group scale={k} ref={tilt}>
+        <CarModel body={body} model={model} color={CAR_COLORS[i % CAR_COLORS.length]} rig={rig} beams={!!rig} />
         {/* STUDENT DRIVER topper on two little feet. */}
         <mesh position={[0, roof + 0.05, -0.04]}>
           <boxGeometry args={[0.26, 0.08, 0.07]} />
@@ -145,28 +146,56 @@ export function LearnerCar({ i, at, rot = 0 }: { i: number; at?: [number, number
   )
 }
 
-// Learner cars weaving through the course: each follows `route` a little
-// behind the last, nose pointed where it is going. They drive slowly (they are learning).
-export function StudentCars({ n, route, lap }: { n: number; route: (f: number) => XZ; lap: number }) {
+// How the class drives: top speed on the straights, and how much a bend ahead slows them.
+const CRUISE = 0.4
+const BRAKE_FOR = 0.25
+const LOOK = 0.55 // how far ahead a learner looks for the next bend
+
+// Learner cars driving the course on a smooth line: they ease off before each
+// bend, steer the front wheels into it, lean a little and roll out again. Every
+// car follows the same speed for each spot on the course (times the class's
+// shared hesitation), so they keep their spacing and never run into each other.
+export function StudentCars({ n, drive }: { n: number; drive: Drive }) {
   const cars = useRef<(Group | null)[]>([])
-  useFrame(({ clock }) => {
+  const bodies = useRef<(Group | null)[]>([])
+  const rigs = useMemo(() => Array.from({ length: n }, (_, i) => wheelRig(LEARNERS[i % LEARNERS.length].body)), [n])
+  const state = useRef(Array.from({ length: n }, (_, i) => ({ d: (drive.len * i) / n, v: 0, steer: 0, lean: 0 })))
+  const pose = useMemo<DrivePose>(() => ({ x: 0, z: 0, yaw: 0, curv: 0 }), [])
+  useFrame(({ clock }, delta) => {
+    const dt = Math.min(delta, 0.1)
     const time = clock.elapsedTime
+    // The whole class hesitates now and then, as if the instructor called a stop.
+    const hesitate = 0.55 + 0.45 * Math.min(1, Math.max(0, 0.5 + Math.sin(time * 0.23) * 1.4))
     for (let i = 0; i < n; i++) {
       const g = cars.current[i]
+      const st = (state.current[i] ??= { d: (drive.len * i) / n, v: 0, steer: 0, lean: 0 })
       if (!g) continue
-      // A hesitant learner: speeds up and slows down, and the whole class stalls now and then.
-      const f = time / lap + Math.sin(time * 0.6 + i) * 0.012 + i / n
-      const [x, z] = route(f)
-      const [x2, z2] = route(f + 0.004)
-      g.position.set(x, 0.06, z)
-      g.rotation.y = Math.atan2(x2 - x, z2 - z)
+      const k = bodyScale(LEARNERS[i % LEARNERS.length].body)
+      const target = (CRUISE / (1 + BRAKE_FOR * drive.bend(st.d, st.d + LOOK))) * hesitate
+      // Gentle on the pedals: speed eases toward the target.
+      st.v += (target - st.v) * Math.min(1, dt * 1.8)
+      st.d += st.v * dt
+      drive.at(st.d, pose)
+      g.position.set(pose.x, 0.06, pose.z)
+      g.rotation.y = pose.yaw
+      // Front wheels turn to the bend's angle for this wheelbase, smoothed like hands on a wheel.
+      const rig = rigs[i]
+      const want = Math.max(-0.55, Math.min(0.55, Math.atan(pose.curv * rig.base * k)))
+      st.steer += (want - st.steer) * Math.min(1, dt * 6)
+      for (const w of rig.steer) if (w) w.rotation.y = st.steer
+      const roll = (st.v * dt) / (rig.radius * k)
+      for (const w of rig.spin) if (w) w.rotation.x = (w.rotation.x + roll) % (Math.PI * 2)
+      // Body leans out of the turn a touch.
+      st.lean += (-pose.curv * st.v * st.v * 0.35 - st.lean) * Math.min(1, dt * 4)
+      const b = bodies.current[i]
+      if (b) b.rotation.z = Math.max(-0.06, Math.min(0.06, st.lean))
     }
   })
   return (
     <group userData={{ noBatch: true }}>
       {Array.from({ length: n }, (_, i) => (
         <group key={i} ref={(el) => { cars.current[i] = el }}>
-          <LearnerCar i={i} />
+          <LearnerCar i={i} rig={rigs[i]} body={(el) => { bodies.current[i] = el }} />
         </group>
       ))}
     </group>
