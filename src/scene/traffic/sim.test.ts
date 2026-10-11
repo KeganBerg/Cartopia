@@ -110,6 +110,28 @@ describe('town traffic', () => {
     expect(t.agents.get(a.uid)!.parked).toBe(0)
   })
 
+  it('cars use the forecourt one at a time', () => {
+    seedRandom(8)
+    const t = new Traffic()
+    t.setTown(grid(2, 8), [{ uid: 'g', def: 'gas', x: 5, z: 1, rot: 0 }], turnOf)
+    const bay = t.net.stops[0].bay!
+    t.setCars(cars(4), 4)
+    for (const a of t.agents.values()) t.requestTrip(a.uid, 'gas')
+    const pumped = new Set<string>()
+    const bumps = new Set<string>()
+    let most = 0
+    run(t, 180, (tr) => {
+      const inBay = [...tr.agents.values()].filter((a) => a.legs.slice(a.ci).some((l) => !l.node && bay.legs.includes(l.c)) && !a.legs[a.ci].node)
+      most = Math.max(most, inBay.length)
+      for (const a of tr.agents.values()) if (a.parked > 0 && a.parkedAt?.stopKind === 'pump') pumped.add(a.uid)
+      for (const o of overlaps(tr)) bumps.add(o)
+    })
+    expect(t.respawns).toBe(0)
+    expect(most).toBe(1)
+    expect(pumped.size).toBe(4)
+    expect([...bumps]).toEqual([])
+  })
+
   it('tows a car to Rusty\'s curb', () => {
     seedRandom(9)
     const t = new Traffic()
