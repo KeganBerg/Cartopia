@@ -42,7 +42,7 @@ export function useArcadeLook() {
   return useMemo(() => {
     const night = nightAmount(dayPhase())
     const weather = weatherNow()
-    const look = weatherLook(lookFor(night, duskAmount(dayPhase())), weather)
+    const look = weatherLook(lookFor(night, duskAmount(dayPhase()), undefined, undefined, 'race'), weather)
     const tint = (day: string, dark: string) => '#' + new Color(day).lerp(new Color(dark), night).getHexString()
     const grey = Math.min(1, weather.cloud * 0.95 + weather.haze * 0.55)
     const sky = '#' + new Color(tint('#3d9bff', '#0f1730')).lerp(new Color(night > 0.5 ? '#1c2438' : '#8a939e'), grey * 0.7).getHexString()

@@ -43,31 +43,53 @@ function key(l: {
   }
 }
 
-// Bright toy-town midday: warm sun, cool sky fill so shadows read blue, punchy colour.
+// The town's look is cozy: a warm, low-contrast storybook light with soft
+// lilac shadows, a gentle glow on bright edges and honey-coloured lamps after
+// dark. Races and arcade games keep the punchier RACE_ keys further down.
+
+// Warm late-morning sun with a soft sky fill, so shadows read gentle rather than blue.
 const DAY = key({
+  sun: '#ffd9a2', sunIntensity: 1.8, sky: '#cfd2ea', ground: '#b09868', hemiIntensity: 0.74, env: 0.4,
+  grade: { exposure: 0.94, contrast: 1.01, saturation: 0.96, vibrance: 0.12, greens: 0.85, shadows: [0.024, 0.006, 0.026], highlights: [0.05, 0.022, -0.02], vignette: 0.28, bloom: 0.32, threshold: 0.95 },
+})
+
+// Golden hour: honey sun, rosy-violet shadows and soft glowing highlights.
+const DUSK = key({
+  sun: '#ff9a50', sunIntensity: 1.85, sky: '#b890c8', ground: '#74563e', hemiIntensity: 0.52, env: 0.3,
+  grade: { exposure: 0.97, contrast: 1.07, saturation: 1.08, vibrance: 0.18, greens: 0.45, shadows: [0.036, 0.0, 0.046], highlights: [0.1, 0.04, -0.045], vignette: 0.34, bloom: 0.85, threshold: 0.72 },
+})
+
+// Night: a soft indigo dark, not a cold blue one, so warm windows and lamps feel inviting.
+const NIGHT = key({
+  sun: '#a4a8f0', sunIntensity: 0.38, sky: '#5858b0', ground: '#221c2e', hemiIntensity: 0.5, env: 0.1,
+  grade: { exposure: 1.06, contrast: 1.08, saturation: 0.6, vibrance: 0.05, greens: 1.0, shadows: [-0.004, -0.01, 0.09], highlights: [0.09, 0.04, -0.03], vignette: 0.4, bloom: 1.9, threshold: 0.4 },
+})
+
+// Races and arcade games: bright toy-town midday with a cool sky fill so
+// shadows read blue, punchy colour, and a moonlit blue night.
+const RACE_DAY = key({
   sun: '#ffeccc', sunIntensity: 2.0, sky: '#a9d0ff', ground: '#7a9a55', hemiIntensity: 0.6, env: 0.45,
   grade: { exposure: 0.9, contrast: 1.1, saturation: 1.0, vibrance: 0.08, greens: 0.55, shadows: [-0.014, 0.0, 0.032], highlights: [0.012, 0.006, -0.006], vignette: 0.24, bloom: 0.18, threshold: 1.1 },
 })
-
-// Golden hour: low orange sun, violet shadows, glowing highlights.
-const DUSK = key({
+const RACE_DUSK = key({
   sun: '#ff8838', sunIntensity: 1.9, sky: '#b48ad0', ground: '#6b5040', hemiIntensity: 0.55, env: 0.3,
   grade: { exposure: 0.95, contrast: 1.12, saturation: 1.2, vibrance: 0.22, greens: 0.2, shadows: [0.03, -0.015, 0.06], highlights: [0.08, 0.03, -0.05], vignette: 0.36, bloom: 0.7, threshold: 0.8 },
 })
-
-// Night: moonlit blue world so warm windows, lamps and headlights pop and glow.
-const NIGHT = key({
+const RACE_NIGHT = key({
   sun: '#9db4ff', sunIntensity: 0.4, sky: '#5466b0', ground: '#141a2c', hemiIntensity: 0.45, env: 0.1,
   grade: { exposure: 1.05, contrast: 1.12, saturation: 0.62, vibrance: 0.04, greens: 0.9, shadows: [-0.02, -0.004, 0.085], highlights: [0.05, 0.022, -0.02], vignette: 0.45, bloom: 1.8, threshold: 0.4 },
 })
 
+export type LookStyle = 'town' | 'race'
+const KEYS: Record<LookStyle, [Look, Look, Look]> = { town: [DAY, DUSK, NIGHT], race: [RACE_DAY, RACE_DUSK, RACE_NIGHT] }
+
 // Seasonal nudges on top of the time of day.
 type Nudge = { sun: string; amount: number; saturation: number; shadows: [number, number, number]; highlights: [number, number, number] }
 const SEASON_NUDGE: Record<Season, Nudge> = {
-  spring: { sun: '#fff6f0', amount: 0.25, saturation: 0.02, shadows: [0.006, 0, 0.012], highlights: [0.012, 0.006, 0.008] }, // soft pastel
-  summer: { sun: '#fff3d6', amount: 0.2, saturation: 0.05, shadows: [-0.004, 0.004, 0.006], highlights: [0.01, 0.008, -0.01] }, // vivid
-  fall: { sun: '#ffd49a', amount: 0.4, saturation: 0.04, shadows: [0.006, -0.004, 0.012], highlights: [0.035, 0.014, -0.03] }, // golden
-  winter: { sun: '#e6efff', amount: 0.45, saturation: -0.1, shadows: [-0.008, 0.004, 0.03], highlights: [-0.006, 0.002, 0.012] }, // crisp and cool
+  spring: { sun: '#fff0e4', amount: 0.25, saturation: 0.02, shadows: [0.008, 0, 0.012], highlights: [0.012, 0.006, 0.006] }, // soft pastel
+  summer: { sun: '#ffeccc', amount: 0.2, saturation: 0.04, shadows: [0.002, 0.004, 0.004], highlights: [0.012, 0.008, -0.01] }, // warm and bright
+  fall: { sun: '#ffcf90', amount: 0.4, saturation: 0.05, shadows: [0.01, -0.002, 0.008], highlights: [0.04, 0.016, -0.03] }, // golden
+  winter: { sun: '#f2eeff', amount: 0.35, saturation: -0.06, shadows: [-0.004, 0.002, 0.024], highlights: [0.006, 0.004, 0.002] }, // crisp, sunlit snow stays warm
 }
 
 function blank(): Look {
@@ -103,15 +125,17 @@ const nudgeSun = new Color()
 const nudgeTint = new Color()
 
 // The look for a given darkness (0 day, 1 night) and sunset amount, written into `out`.
-export function lookFor(night: number, dusk: number, out: Look = blank(), season: Season = SEASON): Look {
-  lerpLook(out, DAY, NIGHT, night)
-  lerpLook(out, out, DUSK, dusk)
+// Races and arcade games pass 'race' for their punchier look.
+export function lookFor(night: number, dusk: number, out: Look = blank(), season: Season = SEASON, style: LookStyle = 'town'): Look {
+  const [day, duskKey, nightKey] = KEYS[style]
+  lerpLook(out, day, nightKey, night)
+  lerpLook(out, out, duskKey, dusk)
   const s = SEASON_NUDGE[season]
-  const day = 1 - night
-  out.sun.lerp(nudgeSun.set(s.sun), s.amount * day * (1 - dusk))
+  const lit = 1 - night
+  out.sun.lerp(nudgeSun.set(s.sun), s.amount * lit * (1 - dusk))
   out.grade.saturation += s.saturation
   out.grade.shadows.add(nudgeTint.setRGB(...s.shadows))
-  out.grade.highlights.add(nudgeTint.setRGB(...s.highlights).multiplyScalar(day))
+  out.grade.highlights.add(nudgeTint.setRGB(...s.highlights).multiplyScalar(lit))
   return out
 }
 

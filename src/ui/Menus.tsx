@@ -91,7 +91,9 @@ function EditBar() {
   )
 }
 
-export function Panel({ title, children, wide, onClose }: { title: string; children: React.ReactNode; wide?: boolean; onClose?: () => void }) {
+// onBack: shows a back button before the title (a sub-screen of the panel).
+// head: extra bits in the title bar, before the close button.
+export function Panel({ title, children, wide, onClose, onBack, head, className }: { title: string; children: React.ReactNode; wide?: boolean; onClose?: () => void; onBack?: () => void; head?: React.ReactNode; className?: string }) {
   const openPanel = useGame((s) => s.openPanel)
   // Slides away before it unmounts; the timer dies with the panel, so a panel
   // swapped in meanwhile is never closed by it.
@@ -107,9 +109,11 @@ export function Panel({ title, children, wide, onClose }: { title: string; child
   }
   return (
     <div className={closing ? 'overlay closing' : 'overlay'} onClick={() => close(null)}>
-      <div className={wide ? 'panel wide' : 'panel'} onClick={(e) => e.stopPropagation()}>
+      <div className={`${wide ? 'panel wide' : 'panel'}${className ? ` ${className}` : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="panel-head">
+          {onBack && <button className="panel-back" aria-label="Back" onClick={onBack}><Icon name="back" size={18} /></button>}
           <h2>{title}</h2>
+          {head}
           <button className="close" aria-label="Close" onClick={() => close(null)}><Icon name="close" size={16} /></button>
         </div>
         <div className="panel-body">{children}</div>

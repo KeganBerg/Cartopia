@@ -70,6 +70,8 @@ const SHOP_THOUGHTS: Record<string, [string, string]> = {
   junkyard: ['🧲', 'digging for parts at the junkyard'],
   offices: ['💼', 'heading in to the office'], hq: ['📊', 'off to a big meeting at HQ'], glasstower: ['🏙️', 'riding the lift up the Glass Tower'],
   hospital: ['🏥', 'visiting a friend in hospital'], helipad: ['🚁', 'booking a helicopter tour'],
+  academy: ['🚗', 'off to a driving lesson'], school: ['🎒', 'picking the kids up from school'], highschool: ['🏈', 'going to the big game'],
+  university: ['🎓', 'heading to a lecture'],
 }
 const PARK_GO: Record<string, [string, string]> = {
   bench: ['🪑', 'heading for a bench'], fountain: ['⛲', 'going to see the fountain'], pond: ['🦆', 'going to see the ducks'],

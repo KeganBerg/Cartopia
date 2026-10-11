@@ -13,7 +13,7 @@ export const groundUniforms = { uWet: { value: 0 }, uCover: { value: 0 } }
 const grey = new Color()
 const tmp = new Color()
 const flashSky = new Color('#dfe6ff')
-const cool = new Color(-0.01, 0, 0.018)
+const cool = new Color(-0.007, 0, 0.012)
 const dustSun = new Color('#ffb070')
 
 function desaturate(c: Color, amount: number) {
@@ -63,9 +63,9 @@ export function weatherLook(look: Look, w: Weather) {
 export const gloomOf = (w: Weather) => Math.min(1, Math.max(0, (w.cloud - 0.45) / 0.45) + w.haze * 0.5)
 
 // The haze colour that fog fades into: pale grey by day, whiter in snow, deep blue at night.
-const HAZE_DAY = new Color('#c4ccd6')
+const HAZE_DAY = new Color('#cacbd2')
 const HAZE_SNOW = new Color('#eef2f7')
-const HAZE_NIGHT = new Color('#1c2438')
+const HAZE_NIGHT = new Color('#201f3a')
 const HAZE_DUST = new Color('#d6b48c')
 export function hazeColor(out: Color, w: Weather, night: number) {
   return out.copy(HAZE_DAY).lerp(HAZE_SNOW, w.snow > 0 ? Math.min(1, w.snow * 1.5) : 0).lerp(HAZE_DUST, Math.min(1, w.dust * 1.2)).lerp(HAZE_NIGHT, night)

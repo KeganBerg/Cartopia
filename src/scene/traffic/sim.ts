@@ -18,6 +18,7 @@ export type CarSpec = {
   cruise: number // top speed, world units per second
   stalled: boolean // flat tire or out of gas: pull over and wait
   low?: boolean // a low-PI beater: it keeps heading home to the trailer homes
+  favors?: string[] // building types it drops in at most (school buses: the schools)
 }
 
 type Leg = {
@@ -742,8 +743,11 @@ export class Traffic {
         // Each beater has its own trailer it keeps coming back to, or any free one.
         const mine = pads.length ? pads[hashOf(a.uid) % pads.length] : null
         const pad = mine && !busy.has(mine.uid) ? mine : free.find((s) => s.def === 'trailer')
+        const fav = this.specs.get(a.uid)?.favors
+        const liked = fav ? free.filter((s) => fav.includes(s.def)) : []
         if (home && rand() < 0.6) this.startTrip(a, home, 'visit')
         else if (pad && rand() < 0.8) this.startTrip(a, pad, 'visit')
+        else if (liked.length && rand() < 0.7) this.startTrip(a, liked[Math.floor(rand() * liked.length)], 'visit')
         else if (free.length) this.startTrip(a, free[Math.floor(rand() * free.length)], 'visit')
       }
     }
