@@ -8,6 +8,7 @@ import { Panel, SheetTabs } from './Menus'
 import { Canvas } from '@react-three/fiber'
 import { NeutralToneMapping } from 'three'
 import { RaceScene } from '../scene/RaceScene'
+import { pickVenue } from '../scene/venues'
 import { sfx, engineRpm, stopEngine } from '../lib/sound'
 import { useLive, challenge, cancelChallenge, refreshPresence, raceChannel, endLiveRace, answer, pruneInvites, mute, unmute, setClosed, INVITE_MS, type LiveRace } from '../lib/live'
 import { displayName } from '../lib/names'
@@ -334,6 +335,8 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
   const [skillShown, setSkillShown] = useState(false)
   // The AI rival's skill, flashed while it is working (live rivals use theirs on their own device).
   const theirSkill = live ? undefined : rival.skill
+  // Somewhere different each race; both sides of a live race get the same place.
+  const [venue] = useState(() => pickVenue(live?.raceId))
   const theirActive = useRef(false)
   const [theirShown, setTheirShown] = useState(false)
   const t = useRef(0)
@@ -557,7 +560,7 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
   return (
     <div className="race-full">
       <Canvas className="rf-canvas" camera={{ position: [0.4, 2.2, -4], fov: 55, near: 0.3, far: 150 }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
-        <RaceScene track={TRACK} me={me} them={them} mine={{ body: def.body, color: car.color, mods: car.mods }} theirs={{ body: rival.body, color: rival.color, mods: rival.mods }} />
+        <RaceScene track={TRACK} me={me} them={them} mine={{ body: def.body, color: car.color, mods: car.mods }} theirs={{ body: rival.body, color: rival.color, mods: rival.mods }} venue={venue} />
       </Canvas>
       <div className="rf-top">
         <h2>{title ?? `Drag Race vs ${rival.town}`}</h2>
@@ -575,6 +578,7 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
           </div>
         ))}
       </div>
+      {countdown > 0 && !result && <div className="rf-venue">{venue.icon} {venue.name}</div>}
       {countdown > 0 && countdown !== 99 && <div className="countdown big">{countdown}</div>}
       {countdown === 99 && (
         <div className="rf-wait">
