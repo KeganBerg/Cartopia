@@ -456,7 +456,7 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
   const weather = useMemo(() => given ?? raceWeather(venue.id, weatherSeed), [given, venue.id, weatherSeed])
   const beams = night > 0.3 || gloomOf(weather) > 0.5
   // Same lights and colour grade as the town at this time of day.
-  const look = useMemo(() => weatherLook(lookFor(night, midnight ? 0 : duskAmount(dayPhase())), weather), [night, midnight, weather])
+  const look = useMemo(() => weatherLook(lookFor(night, midnight ? 0 : duskAmount(dayPhase()), undefined, undefined, 'race'), weather), [night, midnight, weather])
   // The race fills the screen, so stop drawing the town underneath while racing.
   useEffect(() => holdTown(), [])
   const asphalt = useMemo(() => {

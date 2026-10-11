@@ -9,7 +9,7 @@ import { weatherNow } from '../game/weather'
 import { gloomOf, hazeColor, weatherLook } from './weatherLook'
 
 const BG_DAY = new Color(PAL.ground)
-const BG_NIGHT = new Color('#16233a')
+const BG_NIGHT = new Color('#1b1d38')
 const BG_DUSK = new Color('#7a6a52')
 const page = new Color()
 const haze = new Color()
@@ -60,6 +60,8 @@ export function DayNight({ small }: { small: boolean }) {
         position={[25, 40, 15]}
         intensity={1.85}
         shadow-mapSize={small ? [1024, 1024] : [2048, 2048]}
+        // A wider filter softens shadow edges for free (same number of taps).
+        shadow-radius={small ? 2 : 3}
         shadow-bias={-0.0004}
         shadow-normalBias={0.02}
         shadow-camera-left={-30}

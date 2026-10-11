@@ -8,15 +8,15 @@ export { DAY_MS, dayPhase, nightAmount, duskAmount } from '../game/clock'
 // Shared materials whose glow follows the time of day. One instance each
 // keeps the per-frame update to a handful of objects.
 export const glowMats = {
-  window: new MeshStandardMaterial({ map: windowTex(), emissiveMap: windowGlowTex(), emissive: new Color('#ffd27a'), emissiveIntensity: 0 }),
-  bulb: new MeshStandardMaterial({ color: '#fff8e1', emissive: new Color('#ffcc66'), emissiveIntensity: 0.2 }),
+  window: new MeshStandardMaterial({ map: windowTex(), emissiveMap: windowGlowTex(), emissive: new Color('#ffc46a'), emissiveIntensity: 0 }),
+  bulb: new MeshStandardMaterial({ color: '#fff4dc', emissive: new Color('#ffbb55'), emissiveIntensity: 0.2 }),
   headlight: new MeshStandardMaterial({ color: '#fffde7', emissive: new Color('#fff3c4'), emissiveIntensity: 0.1 }),
   taillight: new MeshStandardMaterial({ color: '#d32f2f', emissive: new Color('#ff1744'), emissiveIntensity: 0 }),
   // The Drive-In's film plays unlit so it reads like a lit screen, a touch
   // dimmer by day when the sun washes it out.
   screen: new MeshBasicMaterial({ map: movieTex(), toneMapped: false }),
   // Glows lie flat on the ground, so they get a depth nudge to never flicker against it.
-  pool: new MeshBasicMaterial({ map: glowTex(), color: '#ffcf7a', transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false, toneMapped: false, ...decal() }),
+  pool: new MeshBasicMaterial({ map: glowTex(), color: '#ffc070', transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false, toneMapped: false, ...decal() }),
   beam: new MeshBasicMaterial({ map: glowTex(), color: '#fff2c0', transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false, toneMapped: false, ...decal() }),
   // Nightclub neon: dark tubes by day that light up after dusk.
   neonPink: neon('#ff2bd6'),
@@ -42,7 +42,8 @@ export function onNight(f: (n: number) => void) {
 // headlights on and street lamps come up, though windows and neon wait for night.
 export function applyNight(n: number, gloom = 0) {
   const lamps = Math.max(n, gloom * 0.8)
-  glowMats.window.emissiveIntensity = Math.max(n, gloom * 0.4) * 1.3
+  // Windows warm up a little in gloomy weather too, for a cosy lit-from-inside town.
+  glowMats.window.emissiveIntensity = Math.max(n, gloom * 0.55) * 1.45
   glowMats.bulb.emissiveIntensity = 0.2 + lamps * 2.2
   glowMats.headlight.emissiveIntensity = 0.1 + Math.max(n, gloom) * 2
   glowMats.taillight.emissiveIntensity = Math.max(n, gloom) * 1.2
