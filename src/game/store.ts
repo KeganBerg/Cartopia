@@ -2,9 +2,10 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
   PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS,
-  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, type Rarity, GOALS, DAILY_BONUS, PAINTS, PAINT_COST, STRIPE_COST, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, ownedMods, driverPayout, takesDriver, loves, type CarDef,
+  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, type Rarity, GOALS, DAILY_BONUS, PAINTS, PAINT_COST, STRIPE_COST, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef,
 } from './data'
 import { sfx } from '../lib/sound'
+import { msUntilNight } from './clock'
 import { requestTrip, requestVisit } from './trips'
 
 // rot: quarter turns the player chose (0 faces south). Unset means face the nearest road.
@@ -480,6 +481,7 @@ export const useGame = create<GameState>()(
         const secs = upgradeJobSeconds(d, lvl)
         if (b.jobEndsAt !== null && now < b.jobEndsAt) return s.openUpgrade(buid)
         if (b.jobEndsAt === null) {
+          if (!isOpen(d, now)) return s.toast(`The ${d.name} only opens at night. Doors open in ${Math.max(1, Math.ceil(msUntilNight(now) / 60000))} min.`)
           if (s.fuel < d.fuelCost!) {
             return s.showNeed('fuel', d.fuelCost! - s.fuel, `a ${d.name} job`)
           }
@@ -616,7 +618,7 @@ export const useGame = create<GameState>()(
         const cap = fuelCap(s)
         buildings = buildings.map((b) => {
           const d = buildingDef(b.def)
-          if (!d.jobSeconds || d.kind === 'obstacle' || b.jobEndsAt !== null || fuel < (d.fuelCost ?? 0)) return b
+          if (!d.jobSeconds || d.kind === 'obstacle' || b.jobEndsAt !== null || !isOpen(d, now) || fuel < (d.fuelCost ?? 0)) return b
           fuel -= d.fuelCost ?? 0
           started++
           return { ...b, jobEndsAt: now + upgradeJobSeconds(d, buildingLevel(b)) * 1000, jobLevel: buildingLevel(b) }
@@ -647,7 +649,7 @@ export const useGame = create<GameState>()(
           cleared && `cleared ${cleared}`,
         ].filter(Boolean) as string[]
         s.toast(`${bits.join(', ').replace(/^./, (c) => c.toUpperCase())}${earned ? `. +${earned} coins` : ''}${parts > s.parts ? `, +${parts - s.parts} parts` : ''}`)
-        if (!started && buildings.some((b) => buildingDef(b.def).jobSeconds && buildingDef(b.def).kind !== 'obstacle' && b.jobEndsAt === null)) {
+        if (!started && buildings.some((b) => buildingDef(b.def).jobSeconds && buildingDef(b.def).kind !== 'obstacle' && isOpen(buildingDef(b.def), now) && b.jobEndsAt === null)) {
           setTimeout(() => get().toast('Out of fuel for the rest. It refills over time.'), 900)
         }
         set(withXp(s, xp, {

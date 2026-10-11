@@ -1,34 +1,8 @@
 import { AdditiveBlending, Color, MeshBasicMaterial, MeshStandardMaterial } from 'three'
-import { glowTex, windowGlowTex, windowTex } from './textures'
+import { danceFloorTex, glowTex, windowGlowTex, windowTex } from './textures'
 import { decal } from './layers'
 
-// One in-game day lasts 20 real minutes, tied to the clock so every player
-// sees the same time of day. ?time=0..1 pins it (0.5 is midnight) for testing.
-export const DAY_MS = 20 * 60 * 1000
-const pinned = (() => {
-  if (typeof location === 'undefined') return null
-  const v = new URLSearchParams(location.search).get('time')
-  return v === null ? null : Number(v)
-})()
-
-// 0 = noon, 0.5 = midnight.
-export function dayPhase(now = Date.now()) {
-  return pinned ?? (now % DAY_MS) / DAY_MS
-}
-
-// How dark it is, 0 (day) to 1 (night), with gentle dusk and dawn ramps.
-export function nightAmount(phase: number) {
-  const d = Math.abs(phase - 0.5) // 0 at midnight, 0.5 at noon
-  if (d < 0.14) return 1
-  if (d > 0.26) return 0
-  return 1 - (d - 0.14) / 0.12
-}
-
-// How much of a sunset tint to add: peaks halfway through dusk and dawn.
-export function duskAmount(phase: number) {
-  const n = nightAmount(phase)
-  return Math.max(0, 1 - Math.abs(n - 0.35) / 0.35)
-}
+export { DAY_MS, dayPhase, nightAmount, duskAmount } from '../game/clock'
 
 // Shared materials whose glow follows the time of day. One instance each
 // keeps the per-frame update to a handful of objects.
@@ -41,6 +15,24 @@ export const glowMats = {
   // Glows lie flat on the ground, so they get a depth nudge to never flicker against it.
   pool: new MeshBasicMaterial({ map: glowTex(), color: '#ffcf7a', transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false, toneMapped: false, ...decal() }),
   beam: new MeshBasicMaterial({ map: glowTex(), color: '#fff2c0', transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false, toneMapped: false, ...decal() }),
+  // Nightclub neon: dark tubes by day that light up after dusk.
+  neonPink: neon('#ff2bd6'),
+  neonCyan: neon('#00e5ff'),
+  neonViolet: neon('#b04dff'),
+  danceFloor: new MeshStandardMaterial({ map: danceFloorTex(false, 2, 1), emissiveMap: danceFloorTex(true, 2, 1), emissive: new Color('#ffffff'), emissiveIntensity: 0, roughness: 0.35 }),
+}
+
+function neon(c: string) {
+  return new MeshStandardMaterial({ color: new Color(c).multiplyScalar(0.35), emissive: new Color(c), emissiveIntensity: 0.05, toneMapped: false })
+}
+
+// Other things that follow the night (signs drawn elsewhere register here and
+// are brought up to date straight away).
+const hooks = new Set<(n: number) => void>()
+let nightNow = 0
+export function onNight(f: (n: number) => void) {
+  hooks.add(f)
+  f(nightNow)
 }
 
 export function applyNight(n: number) {
@@ -52,4 +44,8 @@ export function applyNight(n: number) {
   glowMats.pool.opacity = n * 0.75
   glowMats.beam.opacity = n * 0.5
   for (const m of [glowMats.pool, glowMats.beam]) m.visible = n > 0.02
+  for (const m of [glowMats.neonPink, glowMats.neonCyan, glowMats.neonViolet]) m.emissiveIntensity = 0.05 + n * 1.5
+  glowMats.danceFloor.emissiveIntensity = n * 1.3
+  nightNow = n
+  for (const f of hooks) f(n)
 }

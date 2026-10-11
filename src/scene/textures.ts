@@ -316,3 +316,22 @@ export const towerGlowTex = () =>
         g.fillRect(x * 16 + 3, y * 8 + 2, 10, 5)
       }
   })
+
+// Nightclub dance floor: a grid of coloured tiles. `lit` is the glow (an
+// emissive map); unlit is the same floor dimmed for daytime.
+export const danceFloorTex = (lit: boolean, rx = 1, ry = rx) =>
+  rep(make(`dance|${lit}`, 128, (g, s) => {
+    const colors = ['#ff2bd6', '#00e5ff', '#ffea00', '#7c4dff', '#76ff03', '#ff6d00']
+    const n = 4
+    const t = s / n
+    g.fillStyle = '#0d0618'
+    g.fillRect(0, 0, s, s)
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        g.globalAlpha = lit ? 1 : 0.32
+        g.fillStyle = colors[(i * 3 + j * 2) % colors.length]
+        g.fillRect(i * t + 2, j * t + 2, t - 4, t - 4)
+      }
+    }
+    g.globalAlpha = 1
+  }), `dance|${lit}`, rx, ry)

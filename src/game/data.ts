@@ -1,5 +1,7 @@
 // Static game data: buildings, cars and the progression curve.
 
+import { isNight } from './clock'
+
 export const GRID = 24
 export const TILE = 2
 
@@ -31,6 +33,8 @@ export type BuildingDef = {
   prop?: 'donut' | 'burger' | 'cone' | 'tire' | 'pin' | 'popcorn'
   // Listed under Services in the Shop (fire and police stations).
   service?: boolean
+  // Only open at night (the nightclub): jobs can only start after dark.
+  nightOnly?: boolean
   // Stand-in for a building this build doesn't know (see buildingDef).
   parked?: boolean
 }
@@ -67,6 +71,8 @@ export const BUILDINGS: BuildingDef[] = [
   { id: 'firehouse', name: 'Fire Station', kind: 'business', service: true, w: 2, h: 1, price: 12000, unlockLevel: 9, jobSeconds: 1200, fuelCost: 7, payout: 3400, xp: 150, color: '#c62828', roof: '#37474f', sign: 'FIRE STATION' },
   { id: 'police', name: 'Police Station', kind: 'business', service: true, w: 2, h: 1, price: 16000, unlockLevel: 11, jobSeconds: 1500, fuelCost: 8, payout: 4500, xp: 200, color: '#cfd8dc', roof: '#1a237e', sign: 'POLICE' },
   { id: 'parkade', name: 'Parking Garage', kind: 'business', w: 2, h: 2, price: 30000, unlockLevel: 13, jobSeconds: 2400, fuelCost: 12, payout: 8800, xp: 380, color: '#bdbdbd', roof: '#1565c0', sign: 'PARKING' },
+  // Only open after dark: neon on at dusk, a line at the door and a rooftop dance floor.
+  { id: 'club', name: 'Neon Owl Nightclub', kind: 'business', nightOnly: true, w: 2, h: 1, price: 5000, unlockLevel: 6, jobSeconds: 300, fuelCost: 4, payout: 1000, xp: 60, color: '#1a1035', roof: '#d500f9', sign: 'NEON OWL' },
   { id: 'parts', name: 'Parts Depot', kind: 'parts', w: 2, h: 1, price: 5000, unlockLevel: 5, jobSeconds: 480, fuelCost: 4, payout: 200, partsPayout: 15, xp: 45, color: '#1565c0', roof: '#bbdefb', sign: 'PARTS' },
 
   // Obstacles on newly bought land: pay to clear, wait, then tap to remove.
@@ -227,14 +233,14 @@ export const CARS: CarDef[] = [
   { id: 'vette', name: 'Liberty Sidewinder', body: 'sports', price: 14000, unlockLevel: 6, power: 66, grip: 54, weight: 38, skill: 'slipstream', likes: ['motel', 'stadium', 'police'], colors: ['#b71c1c', '#bdbdbd', '#ffd600'] },
   { id: 'charger', name: 'Liberty Brawler', body: 'muscle', price: 18000, unlockLevel: 7, power: 70, grip: 40, weight: 60, skill: 'nitro', likes: ['burger', 'tuner', 'lube'], colors: ['#212121', '#ff5722', '#6a1b9a'] },
   { id: 'gtr', name: 'Kazumi Ronin GT', body: 'coupe', price: 26000, unlockLevel: 9, power: 78, grip: 70, weight: 46, skill: 'smooth', likes: ['tuner', 'bowling', 'arcade'], colors: ['#eceff1', '#263238', '#ff6d00'] },
-  { id: 'lambo', name: 'Veloce Corrida V12', body: 'wedge', price: 0, bucks: 40, unlockLevel: 5, power: 86, grip: 70, weight: 34, skill: 'oil', likes: ['cinema', 'carwash', 'parkade'], colors: ['#fdd835', '#d50000', '#fafafa'] },
+  { id: 'lambo', name: 'Veloce Corrida V12', body: 'wedge', price: 0, bucks: 40, unlockLevel: 5, power: 86, grip: 70, weight: 34, skill: 'oil', likes: ['cinema', 'club', 'parkade'], colors: ['#fdd835', '#d50000', '#fafafa'] },
   { id: 'hyper', name: 'Veloce Hyperion', body: 'super', price: 60000, unlockLevel: 12, power: 98, grip: 86, weight: 32, skill: 'nitro', likes: ['stadium', 'tuner', 'parkade'], colors: ['#1a237e', '#212121', '#d50000'] },
   { id: 'bug', name: 'Bumble Bubble', body: 'bubble', price: 1200, unlockLevel: 1, rescueOnly: true, power: 14, grip: 28, weight: 28, skill: 'freeze', likes: ['icecream', 'donut', 'coffee'], colors: ['#80cbc4', '#ffcc80', '#ef9a9a'] },
   { id: 'woodie', name: 'Lakeside Woodie Wagon', body: 'wagon', price: 2200, unlockLevel: 1, rescueOnly: true, power: 22, grip: 28, weight: 56, skill: 'slipstream', likes: ['diner', 'carwash', 'market'], colors: ['#fafafa', '#fff59d', '#4db6ac'] },
   { id: 'hauler', name: 'Old Faithful Hauler', body: 'truck', price: 3000, unlockLevel: 1, rescueOnly: true, power: 26, grip: 26, weight: 70, skill: 'torque', likes: ['parts', 'carwash', 'tacos'], colors: ['#558b2f', '#e65100', '#1565c0'] },
   { id: 'cruiser', name: "Sunset Cruiser '57", body: 'classic', price: 5000, unlockLevel: 1, rescueOnly: true, power: 38, grip: 34, weight: 58, skill: 'freeze', likes: ['cinema', 'diner', 'firehouse'], colors: ['#4dd0e1', '#f06292', '#fafafa'] },
   { id: 'buggy', name: 'Dune Skipper Buggy', body: 'offroad', price: 6000, unlockLevel: 1, rescueOnly: true, power: 34, grip: 56, weight: 18, skill: 'launch', likes: ['icecream', 'tires', 'tacos'], colors: ['#ff9800', '#cddc39', '#29b6f6'] },
-  { id: 'bandit', name: 'Night Bandit', body: 'muscle', price: 8000, unlockLevel: 1, rescueOnly: true, power: 56, grip: 38, weight: 54, skill: 'nitro', likes: ['bowling', 'burger', 'bodyshop'], colors: ['#212121', '#ffd54f', '#b71c1c'] },
+  { id: 'bandit', name: 'Night Bandit', body: 'muscle', price: 8000, unlockLevel: 1, rescueOnly: true, power: 56, grip: 38, weight: 54, skill: 'nitro', likes: ['club', 'burger', 'bodyshop'], colors: ['#212121', '#ffd54f', '#b71c1c'] },
   { id: 'lemans', name: 'Liberty Endurance GT', body: 'super', price: 16000, unlockLevel: 1, rescueOnly: true, power: 72, grip: 62, weight: 32, skill: 'smooth', likes: ['stadium', 'parts', 'police'], colors: ['#1565c0', '#fafafa', '#c62828'] },
   { id: 'gullwing', name: 'Silver Wing 300', body: 'coupe', price: 30000, unlockLevel: 1, rescueOnly: true, power: 64, grip: 58, weight: 36, skill: 'oil', likes: ['motel', 'bowling', 'parkade'], colors: ['#cfd8dc', '#b71c1c', '#263238'] },
 ]
@@ -295,6 +301,8 @@ export const carDef = (id: string): CarDef => CARS.find((c) => c.id === id) ?? p
 // extra until it's fixed. Saves keep the car's uid as `car` on the placed building.
 export const DRIVER_BONUS = 0.1
 export const FAVORITE_BONUS = 0.25
+// Whether a business takes jobs right now: night spots only open after dark.
+export const isOpen = (d: BuildingDef, now = Date.now()) => !d.nightOnly || isNight(now)
 export const takesDriver = (d: BuildingDef) => !d.parked && !!d.jobSeconds && d.kind !== 'obstacle'
 export const loves = (car: CarDef, buildingId: string) => car.likes.includes(buildingId)
 export const driverBonus = (car: CarDef, buildingId: string) => (loves(car, buildingId) ? FAVORITE_BONUS : DRIVER_BONUS)

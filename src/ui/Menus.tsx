@@ -190,6 +190,7 @@ export function ShopPanel() {
                         ${b.payout}{b.partsPayout ? ` +${b.partsPayout}⚙` : ''} every {b.jobSeconds >= 60 ? `${b.jobSeconds / 60}m` : `${b.jobSeconds}s`} · ⛽{b.fuelCost}
                       </div>
                     )}
+                    {b.nightOnly && <div className="card-stat">🌙 Open at night only</div>}
                     {b.id === 'rescue' && <div className="card-stat">Search for old cars and restore them</div>}
                     {b.id === 'crew' && <div className="card-stat">Your crew's clubhouse: roster, rank and crew boards</div>}
                     {b.fuelCap && <div className="card-stat">+{b.fuelCap} max fuel</div>}
