@@ -543,3 +543,28 @@ export const containerTex = () =>
     g.fillRect(0, 0, s, 3)
     g.fillRect(0, s - 3, s, 3)
   })
+
+// Corrugated sheet metal, tinted by the material colour: ribs run across the
+// image (`across`) or down it, tiled `rx` by `ry`. Rust streaks bleed from the seams.
+export const corrugatedTex = (rx = 1, ry = rx, across = false) =>
+  rep(make(across ? 'corrugated-x' : 'corrugated', 64, (g, s, r) => {
+    g.fillStyle = '#ffffff'
+    g.fillRect(0, 0, s, s)
+    for (let k = 0; k < s; k += 8) {
+      g.fillStyle = '#c4c4c4'
+      if (across) g.fillRect(0, k, s, 3)
+      else g.fillRect(k, 0, 3, s)
+      g.fillStyle = '#ececec'
+      if (across) g.fillRect(0, k + 3, s, 1)
+      else g.fillRect(k + 3, 0, 1, s)
+    }
+    g.globalAlpha = 0.28
+    g.fillStyle = '#6d3a1c'
+    for (let i = 0; i < 5; i++) {
+      const a = r() * s
+      const len = 10 + r() * 26
+      if (across) g.fillRect(r() * s, a, len, 2 + r() * 3)
+      else g.fillRect(a, r() * s, 2 + r() * 3, len)
+    }
+    g.globalAlpha = 1
+  }), across ? 'corrugated-x' : 'corrugated', rx, ry)
