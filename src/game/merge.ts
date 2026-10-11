@@ -8,7 +8,7 @@
 // position. A block that no longer lines up (moved on an older build, levels
 // differ) simply shows as separate buildings again.
 
-import { buildingDef, buildingLevel } from './data'
+import { buildingDef, buildingLevel, MAX_BUILDING_LEVEL } from './data'
 import type { PlacedBuilding } from './store'
 
 // Save value -> buildings across and down: 2 is a 2x2 square, 4 a 4x4, 21 two
@@ -231,3 +231,10 @@ export function groupScale(g: MergeGroup, turn: number): [number, number, number
   const alongX = g.cols > g.rows
   return alongX === (turn % 2 === 0) ? [2, 1.5, 1] : [1, 1.5, 2]
 }
+
+// Four level 10 houses merged into a square become a landmark skyscraper
+// (Vanguard Tower, src/scene/Landmark.tsx) instead of one scaled-up Sky Tower.
+// Four of those merged again make a giant one.
+export const LANDMARK_NAME = 'Vanguard Tower'
+export const isLandmark = (g: Pick<MergeGroup, 'anchor' | 'cols' | 'rows'>) =>
+  g.anchor.def === 'house' && buildingLevel(g.anchor) >= MAX_BUILDING_LEVEL && g.cols === g.rows

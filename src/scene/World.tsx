@@ -8,7 +8,8 @@ import { useGame, canPlace, buyablePlots, lotSize, movable, type PlacedBuilding 
 import { TILE, PLOT, PLOT_MIN, PLOT_MAX, START_LAND, buildingDef, buildingLevel } from '../game/data'
 import { BuildingModel } from './BuildingModel'
 import { rotateCurrent, setGhostTurn, turnOf } from '../game/placement'
-import { mergeGroups, groupOf, groupTurn, groupScale, type MergeGroup } from '../game/merge'
+import { mergeGroups, groupOf, groupTurn, groupScale, isLandmark, type MergeGroup } from '../game/merge'
+import { VanguardTower } from './Landmark'
 import { KeepShapes, MergeScale } from './mergeScale'
 import { propLimit } from './keepShape'
 import { sfx } from '../lib/sound'
@@ -177,6 +178,9 @@ function Building({ b, roads, group }: { b: PlacedBuilding; roads: Set<string>; 
   const [cx, cz] = group ? groupCenter(group) : centerOf(b.def, b.x, b.z, b.rot)
   const turn = group ? groupTurn(group, roads) : turnOf(b, roads)
   const [sx, sy, sz] = group ? groupScale(group, turn) : [1, 1, 1]
+  // Four max-level houses in a square are a landmark built for a 2x2 lot, not a scaled-up house.
+  const mark = group && isLandmark(group)
+  const k = mark ? group.cols / 2 : 1
   // Hidden while dragged away; the ghost shows where it would land.
   const away = useDrag((g) => g.drag?.uid === b.uid && (g.drag.x !== b.x || g.drag.z !== b.z))
   if (away) return null
@@ -229,11 +233,11 @@ function Building({ b, roads, group }: { b: PlacedBuilding; roads: Set<string>; 
           <meshStandardMaterial map={paverTex(d.w * sx, d.h * sz)} />
         </mesh>
       )}
-      <group scale={[sx, sy, sz]}>
-        <MergeScale.Provider value={group ? [sx, sy, sz] : ONE}>
+      <group scale={mark ? [k, k, k] : [sx, sy, sz]}>
+        <MergeScale.Provider value={mark ? [k, k, k] : group ? [sx, sy, sz] : ONE}>
           <PopGroup uid={b.uid}>
             <KeepShapes limit={propLimit(d.w * TILE, d.h * TILE)}>
-              <BuildingModel def={d} level={buildingLevel(b)} />
+              {mark ? <VanguardTower /> : <BuildingModel def={d} level={buildingLevel(b)} />}
             </KeepShapes>
           </PopGroup>
         </MergeScale.Provider>

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
-import { mergeGroups, mergeCandidates, applyMerge, applySplit, groupTurn, groupScale, rotateGroup } from './merge'
+import { mergeGroups, mergeCandidates, applyMerge, applySplit, groupTurn, groupScale, rotateGroup, isLandmark } from './merge'
 import { useGame, type PlacedBuilding } from './store'
 import { buildingDef, buildingUpgradeCost, upgradePayout } from './data'
 
@@ -207,5 +207,22 @@ describe('turning a merged block in the store', () => {
     // Blocked by a house where the turned pair would go.
     useGame.setState({ buildings: [...applyMerge(pair, mergeCandidates(pair)[0]), b('house', 5, 6), b('house', 6, 6), b('house', 5, 4), b('house', 6, 4)] })
     expect(useGame.getState().rotateBlock(pair[0].uid)).toBe(false)
+  })
+})
+
+describe('landmark', () => {
+  const block = (level: number, code = 2) => {
+    const hs = [b('house', 0, 0, { level, merge: code }), b('house', 1, 0, { level }), b('house', 0, 1, { level }), b('house', 1, 1, { level })]
+    return mergeGroups(hs).groups.get(hs[0].uid)!
+  }
+  it('four level 10 houses in a square are the Vanguard Tower', () => {
+    expect(isLandmark(block(10))).toBe(true)
+  })
+  it('lower houses, pairs and other buildings stay plain', () => {
+    expect(isLandmark(block(9))).toBe(false)
+    const pair = [b('house', 0, 0, { level: 10, merge: 21 }), b('house', 1, 0, { level: 10 })]
+    expect(isLandmark(mergeGroups(pair).groups.get(pair[0].uid)!)).toBe(false)
+    const shops = [b('pizza', 0, 0, { level: 10, merge: 2 }), b('pizza', 1, 0, { level: 10 }), b('pizza', 0, 1, { level: 10 }), b('pizza', 1, 1, { level: 10 })]
+    expect(isLandmark(mergeGroups(shops).groups.get(shops[0].uid)!)).toBe(false)
   })
 })
