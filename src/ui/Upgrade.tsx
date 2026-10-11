@@ -10,6 +10,7 @@ import { workingDriver, type PlacedBuilding } from '../game/store'
 import { groupOf, isLandmark, LANDMARK_NAME, mergeGroups } from '../game/merge'
 import { CarThumb } from '../scene/BuildingPreview'
 import { BuildingModel } from '../scene/BuildingModel'
+import { VanguardTower } from '../scene/Landmark'
 import { frame, seat } from '../scene/fit'
 import { Panel } from './Menus'
 
@@ -21,7 +22,7 @@ const time = (sec: number) => (sec >= 60 ? `${Math.floor(sec / 60)}m${sec % 60 ?
 // fills the frame, so a level 10 sky tower is as easy to see as a pizza shop.
 const VIEW = new Vector3(3.4, 2.6, 3.4)
 
-function Spinner({ def, level }: { def: BuildingDef; level: number }) {
+function Spinner({ def, level, landmark }: { def: BuildingDef; level: number; landmark?: boolean }) {
   const ref = useRef<Group>(null)
   const inner = useRef<Group>(null)
   const disc = useRef<Mesh>(null)
@@ -34,7 +35,7 @@ function Spinner({ def, level }: { def: BuildingDef; level: number }) {
     disc.current?.scale.setScalar(floor)
     camera.aspect = size.width / Math.max(1, size.height)
     frame(camera, b, VIEW, { floor, pad: 0.06 })
-  }, [def, level, camera, size])
+  }, [def, level, landmark, camera, size])
   useFrame((_, dt) => {
     if (ref.current) ref.current.rotation.y += dt * 0.5
   })
@@ -46,22 +47,23 @@ function Spinner({ def, level }: { def: BuildingDef; level: number }) {
       </mesh>
       <group ref={ref} rotation-y={-0.5}>
         <group ref={inner}>
-          <BuildingModel def={def} level={level} />
+          {landmark ? <VanguardTower /> : <BuildingModel def={def} level={level} />}
         </group>
       </group>
     </>
   )
 }
 
-function LevelPreview({ def, level }: { def: BuildingDef; level: number }) {
+// `landmark`: the block is (or this upgrade makes it) a Vanguard Tower, so show that instead of one house.
+function LevelPreview({ def, level, landmark }: { def: BuildingDef; level: number; landmark?: boolean }) {
   return (
     <div className="upgrade-preview">
       <Canvas camera={{ position: VIEW.toArray(), fov: 35 }} dpr={[1, 1.5]}>
         <hemisphereLight args={['#ffffff', '#90a4ae', 1]} />
         <directionalLight position={[3, 5, 2]} intensity={1.4} />
-        <Spinner def={def} level={level} />
+        <Spinner def={def} level={level} landmark={landmark} />
       </Canvas>
-      <span className="upgrade-tag">Level {level}{level > 1 ? ' look' : ''}</span>
+      <span className="upgrade-tag">{landmark ? LANDMARK_NAME : `Level ${level}${level > 1 ? ' look' : ''}`}</span>
     </div>
   )
 }
@@ -178,18 +180,21 @@ export function UpgradePanel() {
   if (upgradeFuelCap(d, next) > 0) rows.push({ label: 'Max fuel', now: `+${upgradeFuelCap(d, lvl) * k}`, next: `+${upgradeFuelCap(d, next) * k}` })
   // A business that rebuilds into its next form says what it becomes.
   if (d.kind !== 'house' && levelName(d, next) !== levelName(d, lvl)) rows.push({ label: 'Building', now: levelName(d, lvl), next: levelName(d, next) })
+  const block = groupOf(s.buildings, b.uid)
+  const landmark = !!block && isLandmark(block)
+  // A merged square of houses reaching level 10 becomes the Vanguard Tower.
+  const becomes = !!block && isLandmark({ ...block, anchor: { ...block.anchor, level: next } })
   if (d.kind === 'house') {
-    rows.push({ label: 'Building', now: levelName(d, lvl), next: levelName(d, next) })
+    rows.push({ label: 'Building', now: landmark ? LANDMARK_NAME : levelName(d, lvl), next: becomes ? LANDMARK_NAME : levelName(d, next) })
     rows.push({ label: 'Residents', now: `${houseResidents(lvl) * k}`, next: `${houseResidents(next) * k}` })
     rows.push({ label: 'Upgrade XP', now: '', next: `+${buildingUpgradeXp(lvl) * k}` })
   }
-  const block = groupOf(s.buildings, b.uid)
-  const name = block && isLandmark(block) ? LANDMARK_NAME : levelName(d, lvl) + (k > 1 ? ` ×${k}` : '')
+  const name = landmark ? LANDMARK_NAME : levelName(d, lvl) + (k > 1 ? ` ×${k}` : '')
 
   return (
     <Panel title={`${name} · Level ${lvl}`} onClose={close}>
       <div className="upgrade">
-        <LevelPreview def={d} level={next} />
+        <LevelPreview def={d} level={next} landmark={becomes} />
         <Pips level={lvl} />
         {max ? (
           <p className="upgrade-max">⭐ Max level! Your {name} is as fancy as it gets.</p>

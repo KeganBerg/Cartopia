@@ -12,7 +12,7 @@ import { danceFloorTex, ledPaneTex, windowTex } from './textures'
 // the same for any number of windows.
 
 export const LED_COUNT = 6
-const RAINBOW = ['#ff1744', '#ff9100', '#ffea00', '#00e676', '#00b0ff', '#d500f9']
+export const RAINBOW = ['#ff1744', '#ff9100', '#ffea00', '#00e676', '#00b0ff', '#d500f9']
 
 export const ledWindows = Array.from({ length: LED_COUNT }, () => {
   const m = new MeshStandardMaterial({ map: windowTex(), emissiveMap: ledPaneTex(), emissive: new Color('#000000'), emissiveIntensity: 1 })
