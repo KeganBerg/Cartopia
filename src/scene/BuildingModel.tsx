@@ -4,6 +4,7 @@ import { signTexture } from './signTexture'
 import { CarModel } from './CarModel'
 import { ObstacleDetail, BenchDetail, BillboardDetail, DriveInDetail, FlowerDetail, FountainDetail, GarageDetail, HouseDetail, LampDetail, PondDetail, ShopDetail, SpeedwayDetail, StatueDetail, TreeDetail } from './BuildingDetail'
 import { NEW_MODELS, NewBuildingModel } from './NewBuildings'
+import { HouseLevels } from './HouseLevels'
 import type { Texture } from 'three'
 import { glowMats } from './dayNight'
 import { tickMovie } from './movie'
@@ -575,6 +576,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
       )
     }
     case 'house':
+      if (lvl > 1) return <HouseLevels def={def} level={lvl} ghost={ghost} m={m} win={win} bulb={bulb} />
       return (
         <group>
           <mesh position={[0, 0.5, 0]} castShadow receiveShadow>
