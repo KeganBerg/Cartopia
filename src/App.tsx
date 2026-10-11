@@ -5,7 +5,7 @@ import { World } from './scene/World'
 import { Hud } from './ui/Hud'
 import { ThumbRenderer } from './scene/BuildingPreview'
 import { BottomBar, ShopPanel, ShowroomPanel, GaragePanel, Toasts } from './ui/Menus'
-import { RacePanel, LiveRaceOverlay, InvitesPanel, PrizePopup } from './ui/Race'
+import { RacePanel, LiveRaceOverlay, InvitesPanel, PrizePopup, CampaignPrizePopup } from './ui/Race'
 import { joinLobby, useLive } from './lib/live'
 import { FriendsPanel, VisitBanner } from './ui/Friends'
 import { LeadersPanel, ClanPanel } from './ui/Social'
@@ -81,6 +81,7 @@ export default function App() {
       {panel === 'flat' && <FlatPanel />}
       <WelcomeBack />
       <PrizePopup />
+      <CampaignPrizePopup />
       <LevelUpSplash />
       <Toasts />
     </>

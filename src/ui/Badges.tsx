@@ -1,7 +1,8 @@
 import { Vector3 } from 'three'
 import { useState } from 'react'
 import { useGame, buyablePlots, type PlacedBuilding } from '../game/store'
-import { buildingDef, buildingLevel, jobLevel, carDef, loves, levelLift, plotPrice, START_LAND, upgradeJobSeconds } from '../game/data'
+import { buildingDef, buildingLevel, jobLevel, carDef, loves, levelLift, plotPrice, START_LAND, upgradeJobSeconds, isOpen } from '../game/data'
+import { msUntilNight } from '../game/clock'
 import { anchors, anchorRef } from '../scene/anchors'
 import { centerOf, plotCenter } from '../scene/World'
 import { useNow } from '../scene/useNow'
@@ -35,6 +36,8 @@ function JobBadge({ b, now }: { b: PlacedBuilding; now: number }) {
             <span className="bar"><span style={{ width: `${pct * 100}%` }} /></span>
             <span className="time">{fmt(left)}</span>
           </>
+        ) : !isOpen(d, now) ? (
+          <span className="start">🌙 {fmt(Math.max(1, Math.ceil(msUntilNight(now) / 1000)))}</span>
         ) : d.kind === 'obstacle' ? (
           <span className="start">🪓 ${d.price.toLocaleString()}</span>
         ) : (
