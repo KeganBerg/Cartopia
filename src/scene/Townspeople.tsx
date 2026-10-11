@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { useFrame } from '@react-three/fiber'
-import { Color, Matrix4, Object3D } from 'three'
+import { useFrame, type ThreeEvent } from '@react-three/fiber'
+import { Color, Matrix4, Object3D, Vector3 } from 'three'
 import type { InstancedMesh } from 'three'
 import { useGame } from '../game/store'
 import { START_LAND, buildingDef } from '../game/data'
 import { buildWalkGraph, findPath, pedestrianCrossings, stepsFor, transit, sideOf, SIDES, type Pt, type Step, type WalkGraph, type WalkNode } from '../game/walkGraph'
 import { anchors } from './anchors'
+import { useThought } from '../game/thoughts'
 import { SEASON } from './season'
 import { dayPhase, nightAmount } from './dayNight'
 
@@ -13,11 +14,14 @@ import { dayPhase, nightAmount } from './dayNight'
 // walk the sidewalks to grab a pizza, browse the showroom, sit on a park bench
 // or look at the fountain, then head home. Everything is drawn with a handful
 // of instanced meshes and the count is capped, so phones stay smooth.
-
+// Some go jogging or walk the dog, the town gets busier as you level up, and
+// tapping someone shows a thought bubble with what they're up to.
 
 const SMALL = typeof window !== 'undefined' && Math.min(window.innerWidth, window.innerHeight) < 700
 const MAX_PEOPLE = SMALL ? 16 : 36
 const PER_HOUSE = 2
+// Extra residents as the town levels up: one more for every two levels.
+const extraPeople = (level: number) => Math.min(10, Math.floor(level / 2))
 const LEG = 0.24
 // Figures are modelled at race-crowd proportions and drawn a little bigger so they read from the town camera.
 const SCALE = 1.3
@@ -28,17 +32,41 @@ const SKIN = ['#f5d0b5', '#e0ac8a', '#c68863', '#8d5a3b', '#5c3a24', '#f1c27d']
 const HAIR = ['#3e2723', '#212121', '#6d4c41', '#fbc02d', '#bf360c', '#9e9e9e']
 const BEANIES = ['#d32f2f', '#1976d2', '#388e3c', '#fbc02d', '#7b1fa2']
 
-// What people carry out of each shop: size and colour of a little box in their hands.
-const ITEMS: Record<string, { size: [number, number, number]; color: string }> = {
-  pizza: { size: [0.22, 0.04, 0.22], color: '#fff3e0' }, // pizza box
-  donut: { size: [0.18, 0.07, 0.13], color: '#f8bbd0' }, // box of donuts
-  burger: { size: [0.12, 0.15, 0.08], color: '#c8a165' }, // paper bag
-  icecream: { size: [0.06, 0.15, 0.06], color: '#f48fb1' }, // cone
-  diner: { size: [0.15, 0.09, 0.11], color: '#eceff1' }, // takeout box
-  gas: { size: [0.06, 0.12, 0.06], color: '#29b6f6' }, // cold drink
-  cinema: { size: [0.09, 0.13, 0.09], color: '#e53935' }, // popcorn
-  bowling: { size: [0.11, 0.11, 0.11], color: '#6a1b9a' }, // bowling ball
-  motel: { size: [0.17, 0.13, 0.06], color: '#795548' }, // suitcase
+const NAMES = ['Alex', 'Sam', 'Jordan', 'Riley', 'Casey', 'Morgan', 'Taylor', 'Jamie', 'Quinn', 'Avery', 'Rowan', 'Skyler', 'Drew', 'Kai', 'Robin', 'Charlie', 'Frankie', 'Jesse', 'Remy', 'Sage']
+const DOGS = ['Biscuit', 'Rocket', 'Pepper', 'Daisy', 'Turbo', 'Maple', 'Nugget', 'Scout']
+const DOG_COATS = ['#8d6e63', '#f5f5f5', '#3e2723', '#d4a056', '#a1887f', '#212121']
+
+// What people carry out of each shop: size and colour of a little box in their
+// hands, and how a thought bubble describes taking it home.
+const ITEMS: Record<string, { size: [number, number, number]; color: string; emoji: string; thing: string }> = {
+  pizza: { size: [0.22, 0.04, 0.22], color: '#fff3e0', emoji: '🍕', thing: 'a pizza' },
+  donut: { size: [0.18, 0.07, 0.13], color: '#f8bbd0', emoji: '🍩', thing: 'a box of donuts' },
+  burger: { size: [0.12, 0.15, 0.08], color: '#c8a165', emoji: '🍔', thing: 'burgers' },
+  icecream: { size: [0.06, 0.15, 0.06], color: '#f48fb1', emoji: '🍦', thing: 'an ice cream' },
+  diner: { size: [0.15, 0.09, 0.11], color: '#eceff1', emoji: '🥡', thing: 'takeout' },
+  gas: { size: [0.06, 0.12, 0.06], color: '#29b6f6', emoji: '🥤', thing: 'a cold drink' },
+  cinema: { size: [0.09, 0.13, 0.09], color: '#e53935', emoji: '🍿', thing: 'leftover popcorn' },
+  bowling: { size: [0.11, 0.11, 0.11], color: '#6a1b9a', emoji: '🎳', thing: 'their bowling ball' },
+  motel: { size: [0.17, 0.13, 0.06], color: '#795548', emoji: '🧳', thing: 'their suitcase' },
+}
+
+// Thought bubbles: what someone is off to do, and what they're doing when they get there.
+const SHOP_THOUGHTS: Record<string, [string, string]> = {
+  pizza: ['🍕', 'grabbing a pizza'], donut: ['🍩', 'getting donuts'], burger: ['🍔', 'getting a burger'],
+  icecream: ['🍦', 'getting ice cream'], diner: ['🥞', 'heading to the diner'], gas: ['🥤', 'grabbing a cold drink'],
+  cinema: ['🍿', 'catching a movie'], bowling: ['🎳', 'going bowling'], motel: ['🧳', 'checking in at the motel'],
+  carwash: ['🧽', 'checking out the car wash'], rescue: ['🔧', "dropping by Rusty's"], tires: ['🛞', 'asking about tires'],
+  parts: ['🔩', 'picking up parts'], tuner: ['🔩', 'browsing the tuner shop'], stadium: ['🏁', 'going to the speedway'],
+}
+const PARK_GO: Record<string, [string, string]> = {
+  bench: ['🪑', 'heading for a bench'], fountain: ['⛲', 'going to see the fountain'], pond: ['🦆', 'going to see the ducks'],
+  flowers: ['🌷', 'going to smell the flowers'], tree: ['🌳', 'taking a walk in the park'], palm: ['🌴', 'taking a walk in the park'],
+  statue: ['🏆', 'going to see the golden car'],
+}
+const PARK_AT: Record<string, [string, string]> = {
+  bench: ['🪑', 'resting on the bench'], fountain: ['⛲', 'watching the fountain'], pond: ['🦆', 'watching the ducks'],
+  flowers: ['🌷', 'smelling the flowers'], tree: ['🌳', 'enjoying the shade'], palm: ['🌴', 'enjoying the shade'],
+  statue: ['🏆', 'admiring the golden car'],
 }
 
 // Where to stand at each decoration, as a distance from its middle.
@@ -47,10 +75,15 @@ const SPOT: Record<string, number> = { bench: 0.06, fountain: 0.98, flowers: 0.8
 const LINGER: Record<string, [number, number]> = { bench: [10, 24], fountain: [5, 12], statue: [4, 9], pond: [6, 14] }
 const PARKS = new Set(['bench', 'fountain', 'flowers', 'tree', 'palm', 'statue', 'pond'])
 
-type Kind = 'shop' | 'browse' | 'friend' | 'park' | 'home'
+type Kind = 'shop' | 'browse' | 'friend' | 'park' | 'home' | 'jog'
 type Dest = { kind: Kind; key: string; def: string }
 type Person = {
   id: string
+  type: 'walker' | 'jogger' | 'dog'
+  name: string
+  dogName: string
+  dogPos: Pt
+  dogHeading: number
   home: string // building uid
   at: string // graph node key where they last stopped
   pos: Pt
@@ -68,7 +101,7 @@ type Person = {
   dest: Dest | null
   outings: number // stops on this trip out
   item: string | null
-  colors: { shirt: string; pants: string; skin: string; hair: string }
+  colors: { shirt: string; pants: string; skin: string; hair: string; dog: string }
 }
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a)
@@ -82,14 +115,19 @@ const nodePos = (n: WalkNode): Pt => (n.kind === 'v' ? n.pos : n.center)
 
 function person(id: string, home: string, pos: Pt): Person {
   const h = hash(id)
+  // About one in six jogs and one in six walks a dog.
+  const type = h % 6 === 0 ? 'jogger' : h % 6 === 1 ? 'dog' : 'walker'
   return {
-    id, home, at: `b${home}`, pos: [...pos], heading: 0, face: null,
-    speed: rand(0.65, 0.9), stride: rand(0, 6),
+    id, type, name: NAMES[(h >> 4) % NAMES.length], dogName: DOGS[(h >> 7) % DOGS.length],
+    dogPos: [...pos], dogHeading: 0,
+    home, at: `b${home}`, pos: [...pos], heading: 0, face: null,
+    speed: type === 'jogger' ? rand(1.5, 1.8) : rand(0.65, 0.9), stride: rand(0, 6),
     state: 'inside', sit: false, timer: rand(0.5, 10), waited: 0,
     steps: [], si: 0, crossing: null, dest: null, outings: 0, item: null,
     colors: {
       shirt: SHIRTS[h % SHIRTS.length], pants: PANTS[(h >> 3) % PANTS.length],
       skin: SKIN[(h >> 6) % SKIN.length], hair: (SEASON === 'winter' ? BEANIES : HAIR)[(h >> 9) % 5],
+      dog: DOG_COATS[(h >> 11) % DOG_COATS.length],
     },
   }
 }
@@ -103,6 +141,8 @@ function destinations(g: WalkGraph) {
   const browse: Dest[] = []
   const parks: Dest[] = []
   const houses: Dest[] = []
+  // Street corners, for joggers to run to.
+  const corners: Dest[] = [...g.byKey.keys()].filter((k) => k[0] === 'v').map((key) => ({ kind: 'jog', key, def: '' }))
   for (const n of g.nodes) {
     if (n.kind === 'b') {
       const kind = buildingDef(n.def).kind
@@ -118,7 +158,7 @@ function destinations(g: WalkGraph) {
       parks.push({ kind: 'park', key: `t${n.tile[0]},${n.tile[1]}`, def: n.decor })
     }
   }
-  return { shops, browse, parks, houses }
+  return { shops, browse, parks, houses, corners }
 }
 
 export function Townspeople() {
@@ -126,6 +166,7 @@ export function Townspeople() {
   const buildings = useGame((s) => (s.visiting ?? s).buildings)
   const land = useGame((s) => (s.visiting ? START_LAND : s.land))
   const visitKey = useGame((s) => s.visiting?.ownerId ?? 'home')
+  const level = useGame((s) => (s.visiting ?? s).level)
   const graph = useMemo(() => buildWalkGraph(new Set(roadsList), buildings, land), [roadsList, buildings, land])
   const places = useMemo(() => destinations(graph), [graph])
   const people = useRef<Person[]>([])
@@ -136,8 +177,12 @@ export function Townspeople() {
   const hair = useRef<InstancedMesh>(null)
   const legs = useRef<InstancedMesh>(null)
   const items = useRef<InstancedMesh>(null)
+  const dogBody = useRef<InstancedMesh>(null)
+  const dogHead = useRef<InstancedMesh>(null)
+  const hits = useRef<InstancedMesh>(null)
 
-  // Two people per house (or a few visitors in a town with no houses yet).
+  // Two people per house plus a few more as the town levels up (or a few
+  // visitors in a town with no houses yet).
   // People who already exist keep walking; anyone mid-walk re-plans on the new streets.
   useEffect(() => {
     const homes = graph.nodes.filter((n): n is Extract<WalkNode, { kind: 'b' }> => n.kind === 'b' && buildingDef(n.def).kind === 'house')
@@ -145,6 +190,10 @@ export function Townspeople() {
     const wanted: { id: string; home: Extract<WalkNode, { kind: 'b' }> }[] = []
     if (homes.length) {
       for (let i = 0; i < PER_HOUSE; i++) for (const h of homes) wanted.push({ id: `${visitKey}:${h.uid}:${i}`, home: h })
+      for (let i = 0; i < extraPeople(level); i++) {
+        const h = homes[i % homes.length]
+        wanted.push({ id: `${visitKey}:${h.uid}:${PER_HOUSE + Math.floor(i / homes.length)}`, home: h })
+      }
     } else if (fallback) {
       for (let i = 0; i < 4; i++) wanted.push({ id: `${visitKey}:${fallback.uid}:${i}`, home: fallback })
     }
@@ -175,7 +224,7 @@ export function Townspeople() {
       p.steps = stepsFor(graph, route, p.pos)
       p.si = 0
     }
-  }, [graph, visitKey])
+  }, [graph, visitKey, level])
 
   const dummy = useMemo(() => {
     const o = new Object3D()
@@ -184,6 +233,16 @@ export function Townspeople() {
   }, [])
   const hidden = useMemo(() => new Matrix4().makeScale(0, 0, 0), [])
   const color = useMemo(() => new Color(), [])
+
+  // Tap someone to see what they're up to.
+  const onTap = (e: ThreeEvent<MouseEvent>) => {
+    const s = useGame.getState()
+    if (s.mode !== 'play' || e.delta > 6 || e.instanceId == null) return
+    const p = people.current[e.instanceId]
+    if (!p || p.state === 'inside') return
+    e.stopPropagation()
+    useThought.setState({ id: p.id, text: thought(p), until: performance.now() + 6000 })
+  }
 
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
@@ -195,7 +254,10 @@ export function Townspeople() {
     const hr = hair.current
     const lg = legs.current
     const it = items.current
-    if (!t || !hd || !hr || !lg || !it) return
+    const db = dogBody.current
+    const dh = dogHead.current
+    const hit = hits.current
+    if (!t || !hd || !hr || !lg || !it || !db || !dh || !hit) return
 
     if (colorsDirty.current) {
       colorsDirty.current = false
@@ -206,28 +268,32 @@ export function Townspeople() {
         lg.setColorAt(i * 2, color.set(p.colors.pants))
         lg.setColorAt(i * 2 + 1, color)
         it.setColorAt(i, color.set(p.item ? ITEMS[p.item].color : '#ffffff'))
+        db.setColorAt(i, color.set(p.colors.dog))
+        dh.setColorAt(i, color)
       })
-      for (const m of [t, hd, hr, lg, it]) if (m.instanceColor) m.instanceColor.needsUpdate = true
+      for (const m of [t, hd, hr, lg, it, db, dh]) if (m.instanceColor) m.instanceColor.needsUpdate = true
     }
 
     list.forEach((p, i) => {
       update(ctx, p, dt, night)
       draw(p, i)
     })
-    t.count = hd.count = hr.count = it.count = list.length
+    t.count = hd.count = hr.count = it.count = db.count = dh.count = hit.count = list.length
     lg.count = list.length * 2
-    for (const m of [t, hd, hr, lg, it]) m.instanceMatrix.needsUpdate = true
+    for (const m of [t, hd, hr, lg, it, db, dh, hit]) m.instanceMatrix.needsUpdate = true
+    followThought(list)
 
     function draw(p: Person, i: number) {
       if (p.state === 'inside') {
-        for (const m of [t!, hd!, hr!, it!]) m.setMatrixAt(i, hidden)
+        for (const m of [t!, hd!, hr!, it!, db!, dh!, hit!]) m.setMatrixAt(i, hidden)
         lg!.setMatrixAt(i * 2, hidden)
         lg!.setMatrixAt(i * 2 + 1, hidden)
         return
       }
       const moving = p.state === 'walk' && p.waited === 0
-      const swing = moving ? Math.sin(p.stride) * 0.55 : 0
-      const bob = moving ? Math.abs(Math.cos(p.stride)) * 0.025 : 0
+      const jog = p.type === 'jogger'
+      const swing = moving ? Math.sin(p.stride) * (jog ? 0.85 : 0.55) : 0
+      const bob = moving ? Math.abs(Math.cos(p.stride)) * (jog ? 0.05 : 0.025) : 0
       const hip = (p.sit ? 0.26 : LEG) + bob
       const h = p.heading
       const sin = Math.sin(h)
@@ -250,6 +316,29 @@ export function Townspeople() {
         const [sx, sy, sz] = ITEMS[p.item].size
         part(it!, 0.1, 0.13, sx, sy, sz)
       } else it!.setMatrixAt(i, hidden)
+      // An invisible, roomier box around each person makes them easy to tap on a phone.
+      dummy.position.set(x, 0.45, z)
+      dummy.rotation.set(0, h, 0)
+      dummy.scale.set(1, 1, 1)
+      dummy.updateMatrix()
+      hit!.setMatrixAt(i, dummy.matrix)
+      if (p.type === 'dog') {
+        const dx = p.dogPos[0] / SCALE
+        const dz = p.dogPos[1] / SCALE
+        const trot = moving ? Math.abs(Math.sin(p.stride * 1.6)) * 0.03 : 0
+        const ds = Math.sin(p.dogHeading)
+        const dc = Math.cos(p.dogHeading)
+        dummy.position.set(dx, 0.1 + trot, dz)
+        dummy.rotation.set(0, p.dogHeading, 0)
+        dummy.updateMatrix()
+        db!.setMatrixAt(i, dummy.matrix)
+        dummy.position.set(dx + ds * 0.12, 0.17 + trot, dz + dc * 0.12)
+        dummy.updateMatrix()
+        dh!.setMatrixAt(i, dummy.matrix)
+      } else {
+        db!.setMatrixAt(i, hidden)
+        dh!.setMatrixAt(i, hidden)
+      }
       // Legs swing from the hips; sitting folds them forward.
       for (const side of [-1, 1]) {
         const a = p.sit ? -Math.PI / 2 : swing * side
@@ -288,6 +377,18 @@ export function Townspeople() {
         <boxGeometry args={[1, 1, 1]} />
         <meshStandardMaterial />
       </instancedMesh>
+      <instancedMesh ref={dogBody} args={[undefined, undefined, MAX_PEOPLE]} frustumCulled={false}>
+        <boxGeometry args={[0.09, 0.08, 0.2]} />
+        <meshStandardMaterial />
+      </instancedMesh>
+      <instancedMesh ref={dogHead} args={[undefined, undefined, MAX_PEOPLE]} frustumCulled={false}>
+        <boxGeometry args={[0.08, 0.08, 0.09]} />
+        <meshStandardMaterial />
+      </instancedMesh>
+      <instancedMesh ref={hits} args={[undefined, undefined, MAX_PEOPLE]} frustumCulled={false} onClick={onTap}>
+        <boxGeometry args={[0.45, 0.9, 0.45]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} colorWrite={false} />
+      </instancedMesh>
     </group>
   )
 }
@@ -295,6 +396,7 @@ export function Townspeople() {
 function update(ctx: Ctx, p: Person, dt: number, night: boolean) {
   if (p.state === 'inside' || p.state === 'linger') {
     if (p.face != null) turnTo(p, p.face, dt)
+    if (p.state === 'linger') walkDog(p, dt)
     p.timer -= dt
     if (p.timer <= 0) setOff(ctx, p, night)
     return
@@ -307,6 +409,7 @@ function update(ctx: Ctx, p: Person, dt: number, night: boolean) {
     if (p.waited < 6 && carNear(step.cross.mid, 1.7)) {
       p.waited += dt
       turnTo(p, Math.atan2(step.p[0] - p.pos[0], step.p[1] - p.pos[1]), dt)
+      walkDog(p, dt)
       return
     }
     p.crossing = step.cross.id
@@ -327,7 +430,29 @@ function update(ctx: Ctx, p: Person, dt: number, night: boolean) {
     p.pos[1] += (dz / len) * move
     turnTo(p, Math.atan2(dx, dz), dt)
   }
-  p.stride += dt * p.speed * 14
+  p.stride += dt * p.speed * (p.type === 'jogger' ? 10 : 14)
+  walkDog(p, dt)
+}
+
+// The dog trots along at heel, a little behind and to the side, and sits beside its owner when they stop.
+function walkDog(p: Person, dt: number) {
+  if (p.type !== 'dog') return
+  const sin = Math.sin(p.heading)
+  const cos = Math.cos(p.heading)
+  const still = p.state === 'linger'
+  const back = still ? -0.1 : 0.4
+  const side = still ? 0.35 : 0.22
+  const tx = p.pos[0] - sin * back + cos * side
+  const tz = p.pos[1] - cos * back - sin * side
+  const dx = tx - p.dogPos[0]
+  const dz = tz - p.dogPos[1]
+  const k = Math.min(1, dt * 6)
+  p.dogPos[0] += dx * k
+  p.dogPos[1] += dz * k
+  const target = Math.hypot(dx, dz) > 0.03 ? Math.atan2(dx, dz) : p.heading
+  let diff = target - p.dogHeading
+  diff = Math.atan2(Math.sin(diff), Math.cos(diff))
+  p.dogHeading += diff * Math.min(1, dt * 8)
 }
 
 // Done with the current stop (or time to leave home): work out the next one.
@@ -365,6 +490,8 @@ function setOff(ctx: Ctx, p: Person, night: boolean) {
         p.heading = Math.atan2(first.p[0] - nodePos(g.nodes[start!])[0], first.p[1] - nodePos(g.nodes[start!])[1])
         p.si = 1
       }
+      p.dogPos = [...p.pos]
+      p.dogHeading = p.heading
     }
     p.state = 'walk'
     p.outings++
@@ -376,6 +503,24 @@ function setOff(ctx: Ctx, p: Person, night: boolean) {
 
 // Somewhere to go on an outing: food most often, then parks, the showroom or a neighbour.
 function outing(ctx: Ctx, p: Person): Dest | null {
+  // Joggers run to a far street corner and on to another.
+  if (p.type === 'jogger' && ctx.places.corners.length) {
+    let best: Dest | null = null
+    let bestD = -1
+    for (let i = 0; i < 4; i++) {
+      const c = pick(ctx.places.corners)
+      const n = ctx.graph.nodes[ctx.graph.byKey.get(c.key)!]
+      const [x, z] = nodePos(n)
+      const d = Math.hypot(x - p.pos[0], z - p.pos[1])
+      if (d > bestD) {
+        bestD = d
+        best = c
+      }
+    }
+    return best
+  }
+  // Dogs want the park.
+  if (p.type === 'dog' && ctx.places.parks.length && Math.random() < 0.7) return pick(ctx.places.parks)
   const r = Math.random()
   const order =
     r < 0.45 ? [ctx.places.shops, ctx.places.parks, ctx.places.browse]
@@ -413,6 +558,12 @@ function arrive(ctx: Ctx, p: Person, night: boolean) {
   }
   p.at = d.key
   const node = ctx.graph.nodes[ctx.graph.byKey.get(d.key) ?? -1]
+  if (d.kind === 'jog') {
+    // Catch a breath at the corner, then keep going.
+    p.state = 'linger'
+    p.timer = rand(0.2, 0.8)
+    return
+  }
   if (d.kind === 'park') {
     p.state = 'linger'
     const [lo, hi] = LINGER[d.def] ?? [3, 8]
@@ -436,6 +587,36 @@ function arrive(ctx: Ctx, p: Person, night: boolean) {
     if (d.kind === 'shop' && ITEMS[d.def]) p.item = d.def
   }
   ctx.dirty.current = true
+}
+
+// Keep the thought bubble over the person it belongs to, and let it fade after a few seconds.
+const bubbleAt = new Vector3()
+function followThought(list: Person[]) {
+  const th = useThought.getState()
+  if (!th.id) return
+  const p = list.find((o) => o.id === th.id)
+  if (!p || p.state === 'inside' || performance.now() > th.until) {
+    useThought.setState({ id: null })
+    anchors.delete('person')
+    return
+  }
+  anchors.set('person', bubbleAt.set(p.pos[0], 1.2, p.pos[1]))
+  const text = thought(p)
+  if (text !== th.text) useThought.setState({ text })
+}
+
+// One line for the thought bubble: who it is and what they're up to.
+function thought(p: Person): string {
+  const who = p.type === 'dog' ? `${p.name} and ${p.dogName} are` : `${p.name} is`
+  const d = p.dest
+  let idea: [string, string] = ['🚶', 'out for a walk']
+  if (p.type === 'jogger' && d?.kind !== 'home') idea = ['🏃', 'out for a run']
+  else if (d?.kind === 'home') idea = p.item ? [ITEMS[p.item].emoji, `taking ${ITEMS[p.item].thing} home`] : ['🏠', 'heading home']
+  else if (d?.kind === 'shop') idea = SHOP_THOUGHTS[d.def] ?? ['🛍️', 'running an errand']
+  else if (d?.kind === 'browse') idea = d.def === 'garage' ? ['🔧', 'peeking into your garage'] : ['🚗', 'looking at cars in the showroom']
+  else if (d?.kind === 'friend') idea = ['👋', 'visiting a neighbour']
+  else if (d?.kind === 'park') idea = (p.state === 'linger' ? PARK_AT : PARK_GO)[d.def] ?? ['🌳', 'enjoying the park']
+  return `${idea[0]} ${who} ${idea[1]}`
 }
 
 function leaveCrossing(p: Person) {
