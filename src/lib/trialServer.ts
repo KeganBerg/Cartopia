@@ -2,7 +2,7 @@ import { supabase } from './supabase'
 import { flushSave, signedInUser } from './cloud'
 import { trialWeek } from '../game/trial'
 
-// The weekly time trial board (supabase/migrations/0022_time_trials.sql). Signed-in players
+// The weekly time trial board (supabase/migrations/0026_time_trials.sql). Signed-in players
 // post times; everyone can look. Guests and offline players keep a best on this device only.
 
 export type BoardRow = { owner: string; town: string | null; t: number; pi: number; car: string | null; place: number }

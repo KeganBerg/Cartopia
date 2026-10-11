@@ -1,6 +1,6 @@
 // Weekly time trial: one venue a week, a solo run against a ghost, and a leaderboard that
 // resets every Monday 00:00 UTC. Times are kept by the server
-// (supabase/migrations/0022_time_trials.sql), which raises any time faster than the player's
+// (supabase/migrations/0026_time_trials.sql), which raises any time faster than the player's
 // best car allows to raceFloor(), the same floor the live race referee uses.
 import { TRACK } from './race'
 import { RACE_FUEL } from './data'

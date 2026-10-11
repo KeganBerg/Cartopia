@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { TRIAL_PRIZES, trialPrize, trialWeek, trialVenue, ghostDist, shortLeft } from './trial'
 import { TRACK } from './race'
 
-const sql = readFileSync(new URL('../../supabase/migrations/0022_time_trials.sql', import.meta.url), 'utf8')
+const sql = readFileSync(new URL('../../supabase/migrations/0026_time_trials.sql', import.meta.url), 'utf8')
 
 describe('weekly time trial', () => {
   it('has the same prizes as the server', () => {
