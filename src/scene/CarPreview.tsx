@@ -7,8 +7,9 @@ import { CarModel } from './CarModel'
 // How big the car's bounding sphere appears; the camera below fits this with room to spare.
 const FIT = 1.05
 
-function Spinner(props: { body: Body; color: string; stripe?: string | null }) {
+function Spinner(props: { body: Body; color: string; stripe?: string | null; mods?: string[] | null }) {
   const ref = useRef<Group>(null)
+  const modKey = (props.mods ?? []).join(',')
   const inner = useRef<Group>(null)
   // Scale every body to the same size on screen, so long trucks and tiny bubble cars both fit whole.
   useLayoutEffect(() => {
@@ -20,7 +21,7 @@ function Spinner(props: { body: Body; color: string; stripe?: string | null }) {
     const k = FIT / sphere.radius
     g.scale.setScalar(k)
     g.position.set(-sphere.center.x * k, 0, -sphere.center.z * k)
-  }, [props.body])
+  }, [props.body, modKey])
   useFrame((_, dt) => {
     if (ref.current) ref.current.rotation.y += dt * 0.6
   })
@@ -34,7 +35,7 @@ function Spinner(props: { body: Body; color: string; stripe?: string | null }) {
 }
 
 // Turntable view of a car, used in the garage and when a restored car rolls out.
-export function CarPreview(props: { body: Body; color: string; stripe?: string | null }) {
+export function CarPreview(props: { body: Body; color: string; stripe?: string | null; mods?: string[] | null }) {
   return (
     <div className="car-preview">
       <Canvas camera={{ position: [2.7, 1.9, 2.7], fov: 35 }} dpr={[1, 1.5]} onCreated={({ camera }) => camera.lookAt(0, 0.42, 0)}>

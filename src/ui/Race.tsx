@@ -11,13 +11,13 @@ import { sfx, engineRpm, stopEngine } from '../lib/sound'
 import { useLive, challenge, refreshPresence, raceChannel, endLiveRace, answer, pruneInvites, mute, unmute, setClosed, INVITE_MS, type LiveRace } from '../lib/live'
 import { displayName } from '../lib/names'
 
-type Rival = { id: string; town: string; level: number; carName: string; color: string; pi: number; online: boolean; body: Body }
+type Rival = { id: string; town: string; level: number; carName: string; color: string; pi: number; online: boolean; body: Body; mods?: string[] }
 
 const TOWNS = ['Transamsylvania', 'Gearville', 'Piston Peak', 'Nitro Bay', 'Chrome City', 'Rustbelt Row', 'Turbo Falls', 'Muffler Hills']
 const TRACK = 400
 const GEAR_POWER = [1, 0.85, 0.72, 0.6]
 const zero = { engine: 0, turbo: 0, tires: 0, weight: 0 }
-const pi = (c: OwnedCar) => performance(carDef(c.model), c.upgrades)
+const pi = (c: OwnedCar) => performance(carDef(c.model), c.upgrades, c.mods)
 const liveReward = (oppPi: number) => 300 + oppPi * 8
 const reward = (r: Rival) => (r.id.startsWith('live:') ? liveReward(r.pi) : 150 + r.pi * 6)
 const performance_now = () => window.performance.now()
@@ -69,6 +69,7 @@ async function fetchOnlineRivals(): Promise<Rival[]> {
       pi: r.best_car.pi,
       online: true,
       body: (r.best_car.body ?? 'sedan') as Body,
+      mods: Array.isArray(r.best_car.mods) ? r.best_car.mods : undefined,
     }))
 }
 
@@ -120,7 +121,7 @@ export function RacePanel() {
       <div className="race-cars">
         {cars.map((c) => (
           <button key={c.uid} className={c.uid === car?.uid ? 'chip sel' : 'chip'} onClick={() => setCarId(c.uid)}>
-            <CarThumb size="xs" color={c.color} body={carDef(c.model).body} stripe={c.stripe} /> {carDef(c.model).name} · PI {pi(c)}{carDef(c.model).skill ? ` ${SKILLS[carDef(c.model).skill!].icon}` : ''}
+            <CarThumb size="xs" color={c.color} body={carDef(c.model).body} stripe={c.stripe} mods={c.mods} /> {carDef(c.model).name} · PI {pi(c)}{carDef(c.model).skill ? ` ${SKILLS[carDef(c.model).skill!].icon}` : ''}
           </button>
         ))}
       </div>
@@ -464,7 +465,7 @@ function DragRace({ car, rival, onExit, live, prize, onFinish, title }: { car: O
   return (
     <div className="race-full">
       <Canvas className="rf-canvas" camera={{ position: [0.4, 2.2, -4], fov: 55, near: 0.3, far: 150 }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
-        <RaceScene track={TRACK} me={me} them={them} mine={{ body: def.body, color: car.color }} theirs={{ body: rival.body, color: rival.color }} />
+        <RaceScene track={TRACK} me={me} them={them} mine={{ body: def.body, color: car.color, mods: car.mods }} theirs={{ body: rival.body, color: rival.color, mods: rival.mods }} />
       </Canvas>
       <div className="rf-top">
         <h2>{title ?? `Drag Race vs ${rival.town}`}</h2>
@@ -584,7 +585,7 @@ export function LiveRaceOverlay() {
   const best = useMemo(() => [...cars].sort((a, b) => pi(b) - pi(a))[0], [cars])
   if (!race || !best) return null
   const o = race.opponent
-  const rival: Rival = { id: `live:${o.id}`, town: displayName(o.town, o.id), level: o.level, carName: o.carName, color: o.color, pi: o.pi, online: true, body: o.body }
+  const rival: Rival = { id: `live:${o.id}`, town: displayName(o.town, o.id), level: o.level, carName: o.carName, color: o.color, pi: o.pi, online: true, body: o.body, mods: o.mods }
   return <DragRace key={race.raceId} car={best} rival={rival} live={race} onExit={endLiveRace} />
 }
 
