@@ -408,6 +408,7 @@ export const useGame = create<GameState>()(
         const b = s.buildings.find((b) => b.uid === what)!
         const d = buildingDef(b.def)
         if (d.kind === 'showroom' || d.kind === 'garage') return s.toast(`${d.name} can't be removed`)
+        if (d.parked) return s.toast('This one is coming in a future update, so it stays put')
         if (d.kind === 'obstacle') return s.toast(`Tap the ${d.name.toLowerCase()} in play mode to clear it`)
         set({
           buildings: s.buildings.filter((o) => o.uid !== what),
@@ -623,6 +624,7 @@ export const useGame = create<GameState>()(
         if (s.cars.length <= 1) return s.toast('You need at least one car')
         const car = s.cars.find((c) => c.uid === cuid)
         if (!car) return
+        if (carDef(car.model).parked) return s.toast('This car is coming in a future update, so it stays in your garage')
         const value = Math.floor(carDef(car.model).price * 0.5)
         set({ cars: s.cars.filter((c) => c.uid !== cuid), coins: s.coins + value, selectedCar: null, updatedAt: Date.now() })
       },
@@ -946,6 +948,7 @@ export const useGame = create<GameState>()(
         const s = get()
         const car = s.junkyard.find((c) => c.uid === juid)
         if (!car) return
+        if (carDef(car.model).parked) return s.toast('This car is coming in a future update. Check back soon!')
         if (s.restoring) return s.toast('The restore bay is busy. Finish that car first.')
         const cost = restoreCost(carDef(car.model))
         if (s.coins < cost) return s.showNeed('coins', cost - s.coins, `restoring the ${carDef(car.model).name}`)
@@ -991,6 +994,7 @@ export const useGame = create<GameState>()(
         const s = get()
         const car = s.junkyard.find((c) => c.uid === juid)
         if (!car) return
+        if (carDef(car.model).parked) return s.toast('This car is coming in a future update, so it stays in storage')
         const n = RARITY[car.rarity].scrapParts
         sfx.coin()
         s.toast(`Scrapped the ${carDef(car.model).name} for ${n} parts`)
