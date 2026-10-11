@@ -188,7 +188,7 @@ function destinations(g: WalkGraph) {
 export function Townspeople() {
   const roadsList = useGame((s) => (s.visiting ?? s).roads)
   const buildings = useGame((s) => (s.visiting ?? s).buildings)
-  const land = useGame((s) => (s.visiting ? START_LAND : s.land))
+  const land = useGame((s) => (s.visiting ? (s.visiting.land ?? START_LAND) : s.land))
   const visitKey = useGame((s) => s.visiting?.ownerId ?? 'home')
   const level = useGame((s) => (s.visiting ?? s).level)
   const graph = useMemo(() => buildWalkGraph(new Set(roadsList), buildings, land), [roadsList, buildings, land])

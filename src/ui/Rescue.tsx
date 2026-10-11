@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useGame, hasRusty, cleanPlate, type Loot } from '../game/store'
+import { useGame, hasRusty, type Loot } from '../game/store'
 import { RESCUE_SPOTS, RARITY, STORAGE_MAX, carDef, performance, restoreCost, rushBucks, type Rarity } from '../game/data'
 import { useNow } from '../scene/useNow'
 import { CarPreview } from '../scene/CarPreview'
@@ -175,7 +175,7 @@ function PlateScreen({ onDone }: { onDone: () => void }) {
       <CarPreview body={d.body} color={d.colors[0]} />
       <h3>{d.name} <RarityTag r={r.rarity} /></h3>
       <p className="hint">Name your car on its license plate. You can't change it later.</p>
-      <input className="plate-input" value={plate} maxLength={7} placeholder="RUSTY1" onChange={(e) => setPlate(cleanPlate(e.target.value))} autoFocus />
+      <input className="plate-input" value={plate} maxLength={7} placeholder="RUSTY1" onChange={(e) => setPlate(e.target.value.toUpperCase().replace(/[^A-Z0-9 ]/g, ''))} autoFocus />
       <button className="buy" onClick={() => { const id = r.uid; collect(plate); onDone(); selectCar(id); openPanel('garage') }}>Add to my garage</button>
     </div>
   )

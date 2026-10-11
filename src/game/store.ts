@@ -57,7 +57,7 @@ export type Need = { res: Resource; missing: number; what?: string }
 export type Panel = null | 'need' | 'shop' | 'garage' | 'showroom' | 'race' | 'account' | 'goals' | 'daily' | 'flat' | 'friends' | 'rescue' | 'bank' | 'invites' | 'leaders' | 'clan' | 'upgrade'
 
 // A read-only copy of another player's town while visiting it.
-export type VisitedTown = { ownerId: string; townName: string; level: number; trophies: number; roads: string[]; buildings: PlacedBuilding[]; cars: OwnedCar[] }
+export type VisitedTown = { ownerId: string; townName: string; level: number; trophies: number; roads: string[]; buildings: PlacedBuilding[]; cars: OwnedCar[]; land?: string[] }
 
 type UiState = {
   mode: Mode
@@ -329,7 +329,11 @@ export const useGame = create<GameState>()(
       gpPrize: null,
       levelUp: null,
 
-      setMode: (mode, placing = null) => set((s) => ({ mode, placing, panel: null, selected: null, again: null, placeRot: placing && placing === s.placing ? s.placeRot : null })),
+      // Building, roads and land edit your own town, which isn't on screen while visiting.
+      setMode: (mode, placing = null) => {
+        if (mode !== 'play' && get().visiting) return get().toast('Head home to build in your own town')
+        set((s) => ({ mode, placing, panel: null, selected: null, again: null, placeRot: placing && placing === s.placing ? s.placeRot : null }))
+      },
       select: (selected) => set({ selected }),
       setPlaceRot: (placeRot) => set({ placeRot }),
       showNeed: (res, missing, what) => {
