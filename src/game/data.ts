@@ -102,6 +102,14 @@ export const BUILDINGS: BuildingDef[] = [
   { id: 'playground', name: 'Playground', kind: 'decor', w: 2, h: 2, price: 1800, unlockLevel: 5, color: '#ef9a9a', roof: '#1e88e5' },
   { id: 'gazebo', name: 'Gazebo', kind: 'decor', w: 1, h: 1, price: 1200, unlockLevel: 6, color: '#fafafa', roof: '#2e7d32' },
   { id: 'clocktower', name: 'Clock Tower', kind: 'decor', w: 1, h: 1, price: 3500, unlockLevel: 8, color: '#b0796b', roof: '#37474f' },
+  // Edge of town: trailer homes (a cheap home the town's beaters keep driving
+  // back to), a scrapyard that strips wrecks for parts, and bigger park styles.
+  { id: 'trailer', name: 'Trailer Home', kind: 'house', w: 1, h: 1, price: 200, unlockLevel: 2, color: '#e0f2f1', roof: '#b0bec5' },
+  { id: 'junkyard', name: 'Junkyard', kind: 'parts', w: 2, h: 2, price: 21000, unlockLevel: 9, jobSeconds: 900, fuelCost: 6, payout: 300, partsPayout: 32, xp: 105, color: '#8d6e63', roof: '#ffb300', sign: 'JUNKYARD' },
+  { id: 'dogpark', name: 'Dog Park', kind: 'decor', w: 2, h: 2, price: 1600, unlockLevel: 4, color: '#7cb342', roof: '#8d6e63' },
+  { id: 'skatepark', name: 'Skate Park', kind: 'decor', w: 2, h: 2, price: 2400, unlockLevel: 6, color: '#b0bec5', roof: '#ff7043' },
+  { id: 'koi', name: 'Koi Garden', kind: 'decor', w: 2, h: 2, price: 3000, unlockLevel: 7, color: '#4db6ac', roof: '#c62828' },
+  { id: 'garden', name: 'Botanical Garden', kind: 'decor', w: 2, h: 2, price: 4800, unlockLevel: 10, color: '#e8f5e9', roof: '#2e7d32' },
   // Spooky Season decorations: in the Shop only during the event.
   { id: 'pumpkins', name: 'Pumpkin Patch', kind: 'decor', w: 1, h: 1, price: 250, unlockLevel: 1, color: '#ef6c00', roof: '#5d4037', event: 'spooky' },
   { id: 'scarecrow', name: 'Scarecrow', kind: 'decor', w: 1, h: 1, price: 450, unlockLevel: 1, color: '#c8a165', roof: '#6d4c41', event: 'spooky' },
@@ -199,10 +207,13 @@ export const buildingUpgradeCost = (d: BuildingDef, level: number) => ({
 export type HomeStage = 'house' | 'apartments' | 'tower'
 export const homeStage = (level: number): HomeStage => (level >= 7 ? 'tower' : level >= 4 ? 'apartments' : 'house')
 const HOME_NAMES: Record<HomeStage, string> = { house: 'House', apartments: 'Apartments', tower: 'Sky Tower' }
+// Trailer homes stay low: a single-wide, then a double-wide with a deck, then a little trailer court.
+const TRAILER_NAMES: Record<HomeStage, string> = { house: 'Trailer Home', apartments: 'Double-Wide', tower: 'Trailer Court' }
 const RESIDENTS = [2, 3, 4, 6, 8, 10, 13, 16, 20, 24]
 export const houseResidents = (level: number) => RESIDENTS[Math.min(MAX_BUILDING_LEVEL, Math.max(1, level)) - 1]
-// What a building is called at a level (only houses change name).
-export const levelName = (d: BuildingDef, level: number) => (d.kind === 'house' ? HOME_NAMES[homeStage(level)] : d.name)
+// What a building is called at a level (only homes change name).
+export const levelName = (d: BuildingDef, level: number) =>
+  d.kind !== 'house' ? d.name : (d.id === 'trailer' ? TRAILER_NAMES : HOME_NAMES)[homeStage(level)]
 export const buildingUpgradeXp = (level: number) => 10 + level * 5
 // Extra model height an upgraded building gains, on the same lot.
 export const levelLift = (level = 1) => 0.26 * (Math.min(MAX_BUILDING_LEVEL, Math.max(1, level)) - 1)
@@ -312,7 +323,7 @@ export const CARS: CarDef[] = [
   { id: 'hyper', name: 'Veloce Hyperion', body: 'super', price: 300000, unlockLevel: 33, power: 98, grip: 86, weight: 32, skill: 'nitro', likes: ['stadium', 'tuner', 'parkade'], colors: ['#1a237e', '#212121', '#d50000'] },
   { id: 'bug', name: 'Bumble Bubble', body: 'bubble', price: 1200, unlockLevel: 1, rescueOnly: true, power: 14, grip: 28, weight: 28, skill: 'freeze', likes: ['icecream', 'donut', 'coffee'], colors: ['#80cbc4', '#ffcc80', '#ef9a9a'] },
   { id: 'woodie', name: 'Lakeside Woodie Wagon', body: 'wagon', price: 2200, unlockLevel: 1, rescueOnly: true, power: 22, grip: 28, weight: 56, skill: 'slipstream', likes: ['diner', 'carwash', 'market'], colors: ['#fafafa', '#fff59d', '#4db6ac'] },
-  { id: 'hauler', name: 'Old Faithful Hauler', body: 'truck', price: 3000, unlockLevel: 1, rescueOnly: true, power: 26, grip: 26, weight: 70, skill: 'torque', likes: ['parts', 'carwash', 'tacos'], colors: ['#558b2f', '#e65100', '#1565c0'] },
+  { id: 'hauler', name: 'Old Faithful Hauler', body: 'truck', price: 3000, unlockLevel: 1, rescueOnly: true, power: 26, grip: 26, weight: 70, skill: 'torque', likes: ['parts', 'junkyard', 'tacos'], colors: ['#558b2f', '#e65100', '#1565c0'] },
   { id: 'cruiser', name: "Sunset Cruiser '57", body: 'classic', price: 5000, unlockLevel: 1, rescueOnly: true, power: 38, grip: 34, weight: 58, skill: 'freeze', likes: ['cinema', 'diner', 'firehouse'], colors: ['#4dd0e1', '#f06292', '#fafafa'] },
   { id: 'buggy', name: 'Dune Skipper Buggy', body: 'offroad', price: 6000, unlockLevel: 1, rescueOnly: true, power: 34, grip: 56, weight: 18, skill: 'launch', likes: ['icecream', 'tires', 'tacos'], colors: ['#ff9800', '#cddc39', '#29b6f6'] },
   { id: 'bandit', name: 'Night Bandit', body: 'muscle', price: 8000, unlockLevel: 1, rescueOnly: true, power: 56, grip: 38, weight: 54, skill: 'nitro', likes: ['club', 'burger', 'bodyshop'], colors: ['#212121', '#ffd54f', '#b71c1c'] },

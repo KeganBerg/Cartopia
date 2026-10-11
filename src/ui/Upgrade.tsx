@@ -200,7 +200,9 @@ export function UpgradePanel() {
                 ))}
               </tbody>
             </table>
-            <p className="card-stat upgrade-note">{d.kind === 'house'
+            <p className="card-stat upgrade-note">{d.id === 'trailer'
+              ? 'Every level adds 1 max fuel and more residents. It becomes a double-wide at level 4 and a trailer court at level 7, on the same lot.'
+              : d.kind === 'house'
               ? 'Every level adds 1 max fuel and more residents. Homes grow into apartments at level 4 and a sky tower at level 7, on the same lot.'
               : 'Each level makes it taller and fancier on the same lot.'}</p>
             <button className={`buy upgrade-buy${shortCoins || shortParts ? ' short' : ''}`} onClick={() => s.upgradeBuilding(b.uid)}>

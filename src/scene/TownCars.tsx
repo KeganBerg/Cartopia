@@ -27,6 +27,8 @@ const visitorCar = (v: Visitor): OwnedCar => ({
 // Town cars are drawn a little smaller than in the garage so two fit side by side.
 const SCALE = 1.1
 const MAX_VISIBLE = 30
+// Cars under this PI are the town's beaters, at home in the trailer homes.
+const LOW_PI = 40
 
 // Tow truck facing +z, drawn at its own spot on the road just ahead of the towed car.
 // `crane` leaves off the fixed boom for scenes that animate their own.
@@ -305,20 +307,23 @@ export function TownCars() {
 
   // Which cars are out and how they drive.
   const max = Math.min(MAX_VISIBLE, Math.max(3, Math.floor(roads.length * 0.5)))
-  const specs = useMemo(
-    () => [...cars].sort((a, b) => Number(stars.includes(b.uid)) - Number(stars.includes(a.uid))).map((c) => {
+  const specs = useMemo(() => {
+    const pis = new Map(cars.map((c) => [c.uid, performance(carDef(c.model), c.upgrades, c.mods)]))
+    // Low-PI cars live at the trailer homes: anything under PI 40, and the slowest third of the town.
+    const slow = new Set([...cars].sort((a, b) => pis.get(a.uid)! - pis.get(b.uid)!).slice(0, Math.ceil(cars.length / 3)).map((c) => c.uid))
+    return [...cars].sort((a, b) => Number(stars.includes(b.uid)) - Number(stars.includes(a.uid))).map((c) => {
       const def = carDef(c.model)
       const size = carSize(def.body)
       return {
         uid: c.uid,
         len: size.len * SCALE,
         wid: size.wid * SCALE,
-        cruise: 1.1 + performance(def, c.upgrades, c.mods) / 45,
+        cruise: 1.1 + pis.get(c.uid)! / 45,
         stalled: !!(c.flat || c.lowFuel),
+        low: pis.get(c.uid)! < LOW_PI || slow.has(c.uid),
       }
-    }),
-    [cars, stars],
-  )
+    })
+  }, [cars, stars])
   // A visitor's car drives round town too (src/lib/visitors.ts), on top of the usual cap.
   const visitor = useVisitors((v) => (v.visitor && v.visitor.kind !== 'barn' && !visitKeyIsAway(visitKey) ? v.visitor : null))
   const guest = useMemo(() => (visitor ? visitorCar(visitor) : null), [visitor?.id]) // eslint-disable-line react-hooks/exhaustive-deps
