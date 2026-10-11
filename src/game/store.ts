@@ -516,7 +516,7 @@ export const useGame = create<GameState>()(
           s.toast(`Cleared! +${d.xp} XP`)
           return set(withXp(s, d.xp!, { buildings: s.buildings.filter((o) => o.uid !== buid), updatedAt: now }))
         }
-        // Gas stations have no jobs; a tap shows their upgrades.
+        // Gas stations and houses have no jobs; a tap shows their upgrades.
         if (!d.jobSeconds) return upgradable(d) ? s.openUpgrade(buid) : undefined
         const now = Date.now()
         const lvl = buildingLevel(b)

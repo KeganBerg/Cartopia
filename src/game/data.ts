@@ -146,7 +146,10 @@ export const upgradePartsPayout = (d: BuildingDef, level: number) => Math.round(
 export const upgradeXp = (d: BuildingDef, level: number) => Math.round((d.xp ?? 0) * (1 + 0.1 * (level - 1)))
 export const upgradeJobSeconds = (d: BuildingDef, level: number) =>
   d.jobSeconds ? Math.max(10, Math.round((d.jobSeconds * Math.pow(0.92, level - 1)) / 5) * 5) : 0
-export const upgradeFuelCap = (d: BuildingDef, level: number) => (d.fuelCap ? d.fuelCap + 2 * (level - 1) : 0)
+// Max fuel a building adds: a gas station's tank grows 2 a level; every house
+// level above 1 adds 1 (residents chip in with their own gas cans).
+export const upgradeFuelCap = (d: BuildingDef, level: number) =>
+  d.fuelCap ? d.fuelCap + 2 * (level - 1) : d.kind === 'house' ? level - 1 : 0
 
 // Cost to go from `level` to `level + 1`: 60% of the build price, 40% more each
 // level, plus parts from level 4 up. Houses are cheap to build but end up as

@@ -44,6 +44,7 @@ describe('building upgrades', () => {
           expect(upgradeJobSeconds(d, l + 1)).toBeLessThanOrEqual(upgradeJobSeconds(d, l))
         } else if (d.kind === 'house') {
           expect(houseResidents(l + 1)).toBeGreaterThan(houseResidents(l))
+          expect(upgradeFuelCap(d, l + 1)).toBe(upgradeFuelCap(d, l) + 1)
         } else {
           expect(upgradeFuelCap(d, l + 1)).toBeGreaterThan(upgradeFuelCap(d, l))
         }
@@ -70,6 +71,7 @@ describe('building upgrades', () => {
     expect(levelName(buildingDef('pizza'), 8)).toBe(buildingDef('pizza').name)
     expect(houseResidents(1)).toBe(2)
     expect(buildingUpgradeCost(house, 1)).toEqual({ coins: 300, parts: 0 })
+    expect([1, 2, 10].map((l) => upgradeFuelCap(house, l))).toEqual([0, 1, 9])
   })
 })
 

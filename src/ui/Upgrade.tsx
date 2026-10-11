@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
-import type { Group } from 'three'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { Vector3, type Group, type Mesh, type PerspectiveCamera } from 'three'
 import { useGame } from '../game/store'
 import {
   buildingDef, buildingLevel, upgradable, upgradePayout, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap,
@@ -9,46 +9,55 @@ import {
 import { workingDriver, type PlacedBuilding } from '../game/store'
 import { CarThumb } from '../scene/BuildingPreview'
 import { BuildingModel } from '../scene/BuildingModel'
-import { seat } from '../scene/fit'
+import { frame, seat } from '../scene/fit'
 import { Panel } from './Menus'
 
 const n = (v: number) => v.toLocaleString()
 const time = (sec: number) => (sec >= 60 ? `${Math.floor(sec / 60)}m${sec % 60 ? ` ${sec % 60}s` : ''}` : `${sec}s`)
 
-// Turntable of the building at a given level. Fits the model to the frame by
-// its own bounds: base on the floor, centred, and scaled down so even a
-// level 10 tower stays fully in view.
-const FIT_H = 1.9
-const FIT_W = 2.3
+// Turntable of the building at a given level. The model sits on the floor at
+// its natural size and the camera backs off until the whole thing, spinning,
+// fills the frame, so a level 10 sky tower is as easy to see as a pizza shop.
+const VIEW = new Vector3(3.4, 2.6, 3.4)
 
 function Spinner({ def, level }: { def: BuildingDef; level: number }) {
   const ref = useRef<Group>(null)
   const inner = useRef<Group>(null)
+  const disc = useRef<Mesh>(null)
+  const camera = useThree((t) => t.camera as PerspectiveCamera)
+  const size = useThree((t) => t.size)
   useLayoutEffect(() => {
-    if (inner.current && ref.current) seat(inner.current, ref.current, (b) => Math.min(FIT_H / b.h, FIT_W / (b.r * 2)))
-  }, [def, level])
+    if (!inner.current || !ref.current) return
+    const b = seat(inner.current, ref.current)
+    const floor = Math.max(b.r * 1.2, 0.8)
+    disc.current?.scale.setScalar(floor)
+    camera.aspect = size.width / Math.max(1, size.height)
+    frame(camera, b, VIEW, { floor, pad: 0.06 })
+  }, [def, level, camera, size])
   useFrame((_, dt) => {
     if (ref.current) ref.current.rotation.y += dt * 0.5
   })
   return (
-    <group ref={ref} rotation-y={-0.5}>
-      <group ref={inner}>
-        <BuildingModel def={def} level={level} />
+    <>
+      <mesh ref={disc} rotation-x={-Math.PI / 2} position-y={-0.02}>
+        <circleGeometry args={[1, 40]} />
+        <meshStandardMaterial color="#cfd8dc" />
+      </mesh>
+      <group ref={ref} rotation-y={-0.5}>
+        <group ref={inner}>
+          <BuildingModel def={def} level={level} />
+        </group>
       </group>
-    </group>
+    </>
   )
 }
 
 function LevelPreview({ def, level }: { def: BuildingDef; level: number }) {
   return (
     <div className="upgrade-preview">
-      <Canvas camera={{ position: [3.4, 2.6, 3.4], fov: 35 }} dpr={[1, 1.5]} onCreated={({ camera }) => camera.lookAt(0, FIT_H / 2, 0)}>
+      <Canvas camera={{ position: VIEW.toArray(), fov: 35 }} dpr={[1, 1.5]}>
         <hemisphereLight args={['#ffffff', '#90a4ae', 1]} />
         <directionalLight position={[3, 5, 2]} intensity={1.4} />
-        <mesh rotation-x={-Math.PI / 2} position-y={-0.02}>
-          <circleGeometry args={[1.5, 40]} />
-          <meshStandardMaterial color="#cfd8dc" />
-        </mesh>
         <Spinner def={def} level={level} />
       </Canvas>
       <span className="upgrade-tag">Level {level}{level > 1 ? ' look' : ''}</span>
@@ -160,7 +169,7 @@ export function UpgradePanel() {
     rows.push({ label: 'Job time', now: time(upgradeJobSeconds(d, lvl)), next: time(upgradeJobSeconds(d, next)) })
     rows.push({ label: 'XP per job', now: `${upgradeXp(d, lvl)}`, next: `${upgradeXp(d, next)}` })
   }
-  if (d.fuelCap) rows.push({ label: 'Max fuel', now: `+${upgradeFuelCap(d, lvl)}`, next: `+${upgradeFuelCap(d, next)}` })
+  if (upgradeFuelCap(d, next) > 0) rows.push({ label: 'Max fuel', now: `+${upgradeFuelCap(d, lvl)}`, next: `+${upgradeFuelCap(d, next)}` })
   if (d.kind === 'house') {
     rows.push({ label: 'Building', now: levelName(d, lvl), next: levelName(d, next) })
     rows.push({ label: 'Residents', now: `${houseResidents(lvl)}`, next: `${houseResidents(next)}` })
@@ -186,7 +195,7 @@ export function UpgradePanel() {
               </tbody>
             </table>
             <p className="card-stat upgrade-note">{d.kind === 'house'
-              ? 'Homes grow into apartments at level 4 and a sky tower at level 7, all on the same lot.'
+              ? 'Every level adds 1 max fuel and more residents. Homes grow into apartments at level 4 and a sky tower at level 7, on the same lot.'
               : 'Each level makes it taller and fancier on the same lot.'}</p>
             <button className={`buy upgrade-buy${shortCoins || shortParts ? ' short' : ''}`} onClick={() => s.upgradeBuilding(b.uid)}>
               ⬆ Upgrade · ${n(cost.coins)}{cost.parts ? ` · ⚙ ${cost.parts}` : ''}
@@ -220,7 +229,7 @@ export function ShopUpgrades() {
   if (!sorted.length) return null
   return (
     <section>
-      <p className="hint">Upgraded buildings grow taller and fancier. Businesses pay more and finish jobs sooner, and homes grow into apartments and sky towers. Cheapest first.</p>
+      <p className="hint">Upgraded buildings grow taller and fancier. Businesses pay more and finish jobs sooner, and homes add max fuel as they grow into apartments and sky towers. Cheapest first.</p>
       <div className="upgrade-list">
         {sorted.map((b) => {
           const d = buildingDef(b.def)
