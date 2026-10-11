@@ -4,7 +4,7 @@ import { signedInUser, flushSave } from './cloud'
 import { displayName } from './names'
 import { useGame } from '../game/store'
 
-// Amounts are fixed server-side in supabase/migrations/0022_friend_gifts.sql; these are for labels.
+// Amounts are fixed server-side in supabase/migrations/0025_friend_gifts.sql; these are for labels.
 export const HELP_FUEL = 10
 export const GIFTS = { fuel: { amount: 15, icon: '⛽', label: 'fuel' }, parts: { amount: 5, icon: '⚙', label: 'parts' } } as const
 export type GiftItem = keyof typeof GIFTS
