@@ -4,7 +4,7 @@ import type { Group } from 'three'
 import { useGame } from '../game/store'
 import {
   buildingDef, buildingLevel, upgradable, upgradePayout, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap,
-  buildingUpgradeCost, MAX_BUILDING_LEVEL, BUILDINGS, CARS, takesDriver, loves, driverPayout, carDef, type BuildingDef,
+  buildingUpgradeCost, MAX_BUILDING_LEVEL, houseResidents, levelName, buildingUpgradeXp, BUILDINGS, CARS, takesDriver, loves, driverPayout, carDef, type BuildingDef,
 } from '../game/data'
 import { workingDriver, type PlacedBuilding } from '../game/store'
 import { CarThumb } from '../scene/BuildingPreview'
@@ -161,14 +161,20 @@ export function UpgradePanel() {
     rows.push({ label: 'XP per job', now: `${upgradeXp(d, lvl)}`, next: `${upgradeXp(d, next)}` })
   }
   if (d.fuelCap) rows.push({ label: 'Max fuel', now: `+${upgradeFuelCap(d, lvl)}`, next: `+${upgradeFuelCap(d, next)}` })
+  if (d.kind === 'house') {
+    rows.push({ label: 'Building', now: levelName(d, lvl), next: levelName(d, next) })
+    rows.push({ label: 'Residents', now: `${houseResidents(lvl)}`, next: `${houseResidents(next)}` })
+    rows.push({ label: 'Upgrade XP', now: '', next: `+${buildingUpgradeXp(lvl)}` })
+  }
+  const name = levelName(d, lvl)
 
   return (
-    <Panel title={`${d.name} · Level ${lvl}`} onClose={close}>
+    <Panel title={`${name} · Level ${lvl}`} onClose={close}>
       <div className="upgrade">
         <LevelPreview def={d} level={next} />
         <Pips level={lvl} />
         {max ? (
-          <p className="upgrade-max">⭐ Max level! Your {d.name} is as fancy as it gets.</p>
+          <p className="upgrade-max">⭐ Max level! Your {name} is as fancy as it gets.</p>
         ) : (
           <>
             <table className="upgrade-stats">
@@ -179,12 +185,14 @@ export function UpgradePanel() {
                 ))}
               </tbody>
             </table>
-            <p className="card-stat upgrade-note">Each level makes it taller and fancier on the same lot.</p>
+            <p className="card-stat upgrade-note">{d.kind === 'house'
+              ? 'Homes grow into apartments at level 4 and a sky tower at level 7, all on the same lot.'
+              : 'Each level makes it taller and fancier on the same lot.'}</p>
             <button className={`buy upgrade-buy${shortCoins || shortParts ? ' short' : ''}`} onClick={() => s.upgradeBuilding(b.uid)}>
               ⬆ Upgrade · ${n(cost.coins)}{cost.parts ? ` · ⚙ ${cost.parts}` : ''}
             </button>
             {(shortCoins > 0 || shortParts > 0) && (
-              <button className="upgrade-short" onClick={() => (shortCoins ? s.showNeed('coins', shortCoins, `upgrading your ${d.name}`) : s.showNeed('parts', shortParts, `upgrading your ${d.name}`))}>
+              <button className="upgrade-short" onClick={() => (shortCoins ? s.showNeed('coins', shortCoins, `upgrading your ${name}`) : s.showNeed('parts', shortParts, `upgrading your ${name}`))}>
                 You need {shortCoins ? `$${n(shortCoins)} more` : ''}{shortCoins && shortParts ? ' and ' : ''}{shortParts ? `${shortParts} more parts` : ''}. How do I get more?
               </button>
             )}
@@ -212,7 +220,7 @@ export function ShopUpgrades() {
   if (!sorted.length) return null
   return (
     <section>
-      <p className="hint">Upgraded buildings grow taller and fancier, pay more coins and finish jobs sooner. Cheapest first.</p>
+      <p className="hint">Upgraded buildings grow taller and fancier. Businesses pay more and finish jobs sooner, and homes grow into apartments and sky towers. Cheapest first.</p>
       <div className="upgrade-list">
         {sorted.map((b) => {
           const d = buildingDef(b.def)
@@ -222,7 +230,7 @@ export function ShopUpgrades() {
           const afford = coins >= cost.coins && parts >= cost.parts
           return (
             <button key={b.uid} className={`upgrade-row${afford && !max ? ' ready' : ''}`} onClick={() => openUpgrade(b.uid)}>
-              <span className="upgrade-row-name">{d.name}</span>
+              <span className="upgrade-row-name">{levelName(d, lvl)}</span>
               <Pips level={lvl} />
               <span className="price">{max ? '⭐ Max' : `$${n(cost.coins)}${cost.parts ? ` ⚙${cost.parts}` : ''}`}</span>
             </button>
