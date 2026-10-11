@@ -75,5 +75,5 @@ export async function fetchTown(ownerId: string): Promise<VisitedTown | null> {
   const { data } = await supabase.from('game_saves').select('state').eq('owner_id', ownerId).maybeSingle()
   const s = data?.state as SaveState | undefined
   if (!s) return null
-  return { ownerId, townName: displayName(s.townName, ownerId), level: s.level, trophies: s.trophies, roads: s.roads, buildings: s.buildings, cars: s.cars }
+  return { ownerId, townName: displayName(s.townName, ownerId), level: s.level, trophies: s.trophies, roads: s.roads, buildings: s.buildings, cars: s.cars, land: s.land }
 }
