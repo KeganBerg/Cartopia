@@ -643,11 +643,11 @@ export const useGame = create<GameState>()(
 
       mergeBlock: (anchor, size) => {
         const s = get()
-        const c = mergeCandidates(s.buildings).find((o) => o.anchor.uid === anchor && o.size === size)
+        const c = mergeCandidates(s.buildings).find((o) => o.anchor.uid === anchor && o.code === size)
         if (!c) return
         sfx.buy()
         const d = buildingDef(c.anchor.def)
-        s.toast(size === 4 ? `Giant ${d.name}! 16 in one.` : `Merged 4 into one big ${d.name}!`)
+        s.toast(size === 4 ? `Giant ${d.name}! 16 in one.` : `Merged ${c.members.length} into one big ${d.name}!`)
         set({ buildings: applyMerge(s.buildings, c), updatedAt: Date.now() })
       },
 

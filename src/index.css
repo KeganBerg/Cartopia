@@ -1141,3 +1141,4 @@ button.book-car { font: inherit; color: inherit; }
 .badge-merge-go { background: #7e57c2; color: #fff; border-color: #fff; font-size: 15px; text-shadow: 0 1px 1px rgba(0,0,0,.35); animation: badge-bob 1.6s ease-in-out infinite; }
 .badge-split { background: #fff; color: #4527a0; border-color: #b39ddb; font-size: 13px; }
 @keyframes badge-bob { 50% { transform: translateY(-3px); } }
+.badge-merge-go.pair { background: #9575cd; font-size: 13px; }
