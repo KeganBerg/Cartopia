@@ -7,6 +7,7 @@ import {
 import { sfx } from '../lib/sound'
 import { msUntilNight } from './clock'
 import { requestTrip, requestVisit } from './trips'
+import { trialPrize } from './trial'
 
 // rot: quarter turns the player chose (0 faces south). Unset means face the nearest road.
 // level: upgrade level 1-10 (see MAX_BUILDING_LEVEL); unset means 1.
@@ -65,6 +66,8 @@ export type SaveState = {
   campaign: Record<string, number>
   // Collection book sets whose one-time reward has been claimed.
   claimedSets: string[]
+  // Weekly time trial prizes claimed, by week (its Monday, YYYY-MM-DD), with the place that paid.
+  trials: { claimed: Record<string, number> }
   land: string[]
   updatedAt: number
 }
@@ -153,6 +156,8 @@ type Actions = {
   // Records a campaign race; returns the stars earned (0 for a loss).
   campaignResult: (chapter: string, race: number, myTime: number, theirTime: number) => number
   closeCampaignPrize: () => void
+  // Pays a finished week's time trial prize (the place comes from the server's board).
+  claimTrialPrize: (week: string, place: number) => void
   closePrize: () => void
   closeLevelUp: () => void
   focusShop: (panel: 'shop' | 'showroom' | 'rescue' | 'race', id: string | null) => void
@@ -272,6 +277,7 @@ export function starterTown(): SaveState {
     gp: {},
     campaign: {},
     claimedSets: [],
+    trials: { claimed: {} },
     land: [...START_LAND],
     updatedAt: now,
   }
@@ -1163,6 +1169,21 @@ export const useGame = create<GameState>()(
       },
 
       closeCampaignPrize: () => set({ campaignPrize: null }),
+
+      claimTrialPrize: (week, place) => {
+        const s = get()
+        if (s.trials.claimed[week] !== undefined || !(place >= 1)) return
+        const p = trialPrize(place)
+        setTimeout(sfx.levelUp, 200)
+        set({
+          coins: s.coins + p.coins,
+          bucks: s.bucks + p.bucks,
+          trophies: s.trophies + p.trophies,
+          trials: { ...s.trials, claimed: { ...s.trials.claimed, [week]: place } },
+          stats: { ...s.stats, coinsEarned: (s.stats.coinsEarned ?? 0) + p.coins },
+          updatedAt: Date.now(),
+        })
+      },
       closePrize: () => set({ gpPrize: null }),
       closeLevelUp: () => set({ levelUp: null }),
       focusShop: (panel, shopFocus) => set({ levelUp: null, panel, shopFocus, mode: 'play', placing: null, selected: null }),
@@ -1358,14 +1379,14 @@ export const useGame = create<GameState>()(
 )
 
 export function saveOf(s: GameState): SaveState {
-  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, land, updatedAt } = s
-  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, land, updatedAt }
+  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, trials, land, updatedAt } = s
+  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, trials, land, updatedAt }
 }
 
 // Fields added after launch, so older saves load with sensible values.
-function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'quests' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'gp' | 'campaign' | 'claimedSets' | 'land'> {
+function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'quests' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'gp' | 'campaign' | 'claimedSets' | 'trials' | 'land'> {
   // Saves from before the tutorial existed skip it.
-  return { stats: emptyStats(), claimedGoals: [], quests: null, lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, gp: {}, campaign: {}, claimedSets: [], land: [...START_LAND] }
+  return { stats: emptyStats(), claimedGoals: [], quests: null, lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, gp: {}, campaign: {}, claimedSets: [], trials: { claimed: {} }, land: [...START_LAND] }
 }
 
 

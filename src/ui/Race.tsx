@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useGame, spendFuel, type OwnedCar } from '../game/store'
 import { CARS, SKILLS, carDef, performance, RACE_FUEL, GP_SERIES, GP_ROUNDS, gpRivalPi, gpReward, CAMPAIGN, CAMPAIGN_RACES, campaignRaceId, campaignRivalPi, campaignShift, campaignRivalSkills, campaignReward, campaignCleared, type CampaignChapter, skillBoost, skillDrag, liveSkillBoost, smoothShift, type Body, type GpSeries, type SkillId } from '../game/data'
 import { TRACK, freshRacer, stepRacer, shiftQuality } from '../game/race'
@@ -14,6 +14,8 @@ import { raceAudio, type RaceAudio } from '../lib/engineAudio'
 import { useLive, challenge, cancelChallenge, refreshPresence, raceChannel, endLiveRace, answer, pruneInvites, mute, unmute, setClosed, INVITE_MS, type LiveRace } from '../lib/live'
 import { displayName } from '../lib/names'
 import { joinRefereed, reportFinish, serverPi, type Verdict } from '../lib/referee'
+import { ghostDist, TRIAL_FUEL } from '../game/trial'
+import { TrialTab, TrialResult, beginTrialRun, type TrialRun } from './TimeTrial'
 
 // skill: the rival car's race skill. AI rivals use it; live players use theirs on their own device.
 // shift: how cleanly an AI rival shifts, 0 (sloppy) to 1 (always perfect, the default).
@@ -82,7 +84,7 @@ async function fetchOnlineRivals(): Promise<Rival[]> {
 // How long a live race waits for the other player before offering to call it off.
 const JOIN_PATIENCE_MS = 30000
 
-type RaceTab = 'quick' | 'campaign' | 'gp'
+type RaceTab = 'quick' | 'campaign' | 'gp' | 'trial'
 let nextRaceTab: RaceTab = 'quick'
 // Opens the Race menu on a given tab (goals use it to send players to the campaign or Grand Prix).
 export function openRaceTab(tab: RaceTab) {
@@ -107,6 +109,7 @@ export function RacePanel() {
     return t
   })
   const [pickCar, setPickCar] = useState(false)
+  const [trial, setTrial] = useState<(TrialRun & { n: number }) | null>(null)
   const gpResult = useGame((s) => s.gpResult)
   const campaignResult = useGame((s) => s.campaignResult)
 
@@ -121,6 +124,20 @@ export function RacePanel() {
     refreshPresence()
   }, [])
 
+  // An accepted live challenge takes over the screen, so don't start a race that it would cut short.
+  const waiting = () => {
+    if (!useLive.getState().outgoing) return false
+    useGame.getState().toast('Waiting for your live challenge to be answered')
+    return true
+  }
+
+  const startTrial = (run: TrialRun) => {
+    if (waiting()) return
+    if (!spendFuel(TRIAL_FUEL)) return useGame.getState().showNeed('fuel', TRIAL_FUEL - useGame.getState().fuel, 'a time trial run')
+    beginTrialRun()
+    setTrial((t) => ({ ...run, n: (t?.n ?? 0) + 1 }))
+  }
+
   if (race && car) return <DragRace car={car} rival={race} onExit={() => setRace(null)} />
   if (gpRace && car) {
     return (
@@ -131,6 +148,28 @@ export function RacePanel() {
         title={`${gpRace.series.name} · Race ${Number(gpRace.rival.id.split('-').pop()) + 1} of ${GP_ROUNDS}`}
         onFinish={(won) => gpResult(gpRace.series.id, won)}
         onExit={() => { setGpRace(null); setTab('gp') }}
+      />
+    )
+  }
+
+  if (trial && car) {
+    const d = carDef(car.model)
+    const again = (myTime: number) => {
+      // Chase the new best next time, if this run set one.
+      const next = myTime < trial.target || trial.ghost === 'Your best' ? { ...trial, target: Math.min(myTime, trial.target), ghost: 'Your best' } : trial
+      startTrial(next)
+    }
+    return (
+      <DragRace
+        key={trial.n}
+        car={car}
+        rival={{ id: 'trial', town: `👻 ${trial.ghost}`, level: 0, carName: d.name, color: '#eceff1', pi: pi(car), online: false, body: d.body }}
+        trial={{ target: trial.target }}
+        venueId={trial.venue}
+        title={`⏱️ Time trial · ${venueById(trial.venue).name}`}
+        onFinish={() => {}}
+        resultView={(r) => <TrialResult myTime={r.myTime} target={trial.target} ghost={trial.ghost} onAgain={() => again(r.myTime)} onExit={() => { setTrial(null); setTab('trial') }} />}
+        onExit={() => { setTrial(null); setTab('trial') }}
       />
     )
   }
@@ -149,13 +188,6 @@ export function RacePanel() {
     )
   }
 
-  // An accepted live challenge takes over the screen, so don't start a race that it would cut short.
-  const waiting = () => {
-    if (!useLive.getState().outgoing) return false
-    useGame.getState().toast('Waiting for your live challenge to be answered')
-    return true
-  }
-
   const start = (r: Rival) => {
     if (waiting()) return
     if (!spendFuel(RACE_FUEL)) return useGame.getState().showNeed('fuel', RACE_FUEL - useGame.getState().fuel, 'a race')
@@ -165,7 +197,7 @@ export function RacePanel() {
   return (
     <Panel title="Drag Race" wide>
       <SheetTabs
-        items={[{ id: 'quick', label: '🏁 Quick race' }, { id: 'campaign', label: '🗺️ Campaign' }, { id: 'gp', label: '🏆 Grand Prix' }, { id: 'top', label: '🏅 Top racers' }] as const}
+        items={[{ id: 'quick', label: '🏁 Quick race' }, { id: 'campaign', label: '🗺️ Campaign' }, { id: 'gp', label: '🏆 Grand Prix' }, { id: 'trial', label: '⏱️ Time trial' }, { id: 'top', label: '🏅 Top racers' }] as const}
         value={tab}
         onChange={(t) => (t === 'top' ? useGame.getState().openPanel('leaders') : setTab(t))}
       />
@@ -194,6 +226,8 @@ export function RacePanel() {
           if (!spendFuel(RACE_FUEL)) return useGame.getState().showNeed('fuel', RACE_FUEL - useGame.getState().fuel, 'a campaign race')
           setCRace({ chapter, race, rival, prize })
         }} />
+      ) : tab === 'trial' ? (
+        car && <TrialTab myPi={pi(car)} onRun={startTrial} />
       ) : tab === 'gp' ? (
         <GrandPrix onRace={(series, rival, prize) => {
           if (waiting()) return
@@ -477,7 +511,10 @@ function sampleAt(samples: Sample[], t: number, finished: number | null) {
 const fresh = freshRacer
 const step = stepRacer
 
-function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title, venueId }: { car: OwnedCar; rival: Rival; onExit: () => void; live?: LiveRace; prize?: number; onFinish?: (won: boolean, myTime: number, theirTime: number) => number | void; title?: string; venueId?: string }) {
+// trial: a solo run against a ghost that finishes in `target` seconds; the run ends when you cross the line.
+// resultView: replaces the usual result card.
+type Result = { won: boolean; myTime: number; theirTime: number }
+function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title, venueId, trial, resultView }: { car: OwnedCar; rival: Rival; onExit: () => void; live?: LiveRace; prize?: number; onFinish?: (won: boolean, myTime: number, theirTime: number) => number | void; title?: string; venueId?: string; trial?: { target: number }; resultView?: (r: Result) => ReactNode }) {
   // A signed-in live rival's PI comes from the server, not from their browser.
   const [serverRivalPi, setServerRivalPi] = useState<number | null>(null)
   const rival = useMemo(() => (serverRivalPi === null ? shownRival : { ...shownRival, pi: serverRivalPi }), [shownRival, serverRivalPi])
@@ -494,7 +531,7 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
   const skillActive = useRef(false)
   const [skillShown, setSkillShown] = useState(false)
   // The AI rival's skill, flashed while it is working (live rivals use theirs on their own device).
-  const theirSkill = live ? undefined : rival.skill
+  const theirSkill = live || trial ? undefined : rival.skill
   // Somewhere different each race; both sides of a live race get the same place.
   const [venue] = useState(() => (venueId ? venueById(venueId) : pickVenue(live?.raceId)))
   const theirActive = useRef(false)
@@ -684,6 +721,9 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
         th.dist = sampleAt(samples.current, t.current, Number.isFinite(th.finished) ? th.finished : null)
         // Opponent vanished: the race is yours after a grace period.
         if (myFinishSentAt !== null && th.finished === null && now - myFinishSentAt > 15000) th.finished = Infinity
+      } else if (trial) {
+        th.dist = ghostDist(t.current, trial.target)
+        if (th.finished === null && t.current >= trial.target) th.finished = trial.target
       } else {
         if (th.gear < 3 && th.rpm >= skill[th.gear]) {
           const q = shiftQuality(th.rpm)
@@ -706,13 +746,14 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
         sound.current?.frame(me.current, { rpm: g.rpm, gear: g.gear, dist: th.dist, finished: th.finished })
       } else sound.current?.frame(me.current, th)
       if (live && !wasDone && me.current.finished !== null) settle(me.current.finished)
-      if (refereed.current === 'no' && me.current.finished !== null && th.finished !== null) {
-        const won = me.current.finished < th.finished || (me.current.finished === th.finished && (!live || live.host))
+      if (refereed.current === 'no' && me.current.finished !== null && (th.finished !== null || trial)) {
+        const theirTime = trial ? trial.target : th.finished!
+        const won = me.current.finished < theirTime || (me.current.finished === theirTime && (!live || live.host))
         if (won) sfx.win()
         else sfx.lose()
         sound.current?.finish(won)
-        const stars = finishCb.current ? finishCb.current(won, me.current.finished, th.finished) : finishRace(won, reward(rivalRef.current))
-        setResult({ won, myTime: me.current.finished, theirTime: th.finished, stars: typeof stars === 'number' ? stars : undefined })
+        const stars = finishCb.current ? finishCb.current(won, me.current.finished, theirTime) : finishRace(won, reward(rivalRef.current))
+        setResult({ won, myTime: me.current.finished, theirTime, stars: typeof stars === 'number' ? stars : undefined })
         return
       }
       raf = requestAnimationFrame(loop)
@@ -722,7 +763,7 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
       signal.cancelled = true
       cancelAnimationFrame(raf)
     }
-  }, [countdown, result, myPi, skill, finishRace, live, def, theirSkill])
+  }, [countdown, result, myPi, skill, finishRace, live, def, theirSkill, trial])
 
   const shift = () => {
     const r = me.current
@@ -788,7 +829,7 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
       {label && <div className="shift-label big">{label}</div>}
       {def.skill && skillShown && !result && <div className="skill-flash">{SKILLS[def.skill].icon} {SKILLS[def.skill].name}!</div>}
       {theirSkill && theirShown && !result && <div className="skill-flash theirs">{rival.town}: {SKILLS[theirSkill].icon} {SKILLS[theirSkill].name}!</div>}
-      {result ? (
+      {result && resultView ? resultView(result) : result ? (
         <RaceResult won={result.won} myTime={result.myTime} theirTime={result.theirTime} cash={result.counted === false ? 0 : result.won ? payout : Math.round(payout * 0.1)} xp={result.counted === false ? 0 : result.won ? 30 : 8} rival={rival.town} note={result.note} noContest={result.counted === false} stars={result.stars} onExit={onExit} />
       ) : (
         <div className="rf-bottom">
