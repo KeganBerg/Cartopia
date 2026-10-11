@@ -380,6 +380,45 @@ export const drainTex = () =>
     for (let y = 4; y < s - 4; y += 6) g.fillRect(5, y, s - 10, 3)
   })
 
+// Desert sand: warm base, wind ripples, darker grit and the odd pebble.
+export const sandTex = (rx = 1, ry = rx) =>
+  rep(make('sand', 256, (g, s, r) => {
+    g.fillStyle = '#d9a46c'
+    g.fillRect(0, 0, s, s)
+    for (let i = 0; i < 14; i++) {
+      g.globalAlpha = 0.35
+      g.fillStyle = i % 2 ? '#e3b47e' : '#c99258'
+      g.beginPath()
+      g.ellipse(r() * s, r() * s, 30 + r() * 50, 14 + r() * 24, r() * 3, 0, Math.PI * 2)
+      g.fill()
+    }
+    g.globalAlpha = 0.4
+    g.strokeStyle = '#c48b52'
+    g.lineWidth = 2
+    for (let y = 6; y < s; y += 11) {
+      g.beginPath()
+      for (let x = 0; x <= s; x += 8) g.lineTo(x, y + Math.sin(x * 0.05 + y) * 3)
+      g.stroke()
+    }
+    g.globalAlpha = 1
+    speckle(g, s, r, ['#b97d45', '#e8bf8c', '#a86d3a', '#f0cc9c'], 2600, 2)
+    speckle(g, s, r, ['#8d5a35', '#9e9e9e', '#7b4a2a'], 60, 4)
+  }), 'sand', rx, ry)
+
+// Ploughed soil between crop rows.
+export const soilTex = (rx = 1, ry = rx) =>
+  rep(make('soil', 128, (g, s, r) => {
+    g.fillStyle = '#6d4c41'
+    g.fillRect(0, 0, s, s)
+    for (let x = 0; x < s; x += 16) {
+      g.fillStyle = '#5a3d33'
+      g.fillRect(x, 0, 6, s)
+      g.fillStyle = '#7d5a4c'
+      g.fillRect(x + 8, 0, 3, s)
+    }
+    speckle(g, s, r, ['#4e342e', '#8d6e63', '#5d4037'], 900, 2)
+  }), 'soil', rx, ry)
+
 // Nightclub dance floor: a grid of coloured tiles. `lit` is the glow (an
 // emissive map); unlit is the same floor dimmed for daytime.
 export const danceFloorTex = (lit: boolean, rx = 1, ry = rx) =>
