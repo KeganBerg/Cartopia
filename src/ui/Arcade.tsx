@@ -1,29 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { NeutralToneMapping } from 'three'
-import { useGame, spendFuel, type OwnedCar } from '../game/store'
-import { carDef, performance } from '../game/data'
+import { useGame, type OwnedCar } from '../game/store'
+import { carDef } from '../game/data'
 import {
   ARCADE_FUEL, CHASE_HEARTS, PARK_LOTS, PARK_MAX_BUMPS, chaseReward, chaseScore, loadBests, lotOpen, parkReward, parkStars, saveBests,
 } from '../game/arcade'
-import { ChaseScene, type ChaseCar, type ChaseHud, type ChaseInput } from '../scene/ChaseScene'
+import { ChaseScene, type ChaseHud, type ChaseInput } from '../scene/ChaseScene'
 import { ParkScene, type ParkEnd, type ParkHud, type ParkInput } from '../scene/ParkScene'
 import { CarThumb } from '../scene/BuildingPreview'
 import { Panel } from './Menus'
 import { sfx } from '../lib/sound'
+import { Countdown, Result, look, payFuel, pi } from './ArcadeBits'
+import { STAR_GAMES, StarGame } from './ArcadeMore'
+import { loadStars, type StarGameId } from '../game/arcadeMore'
 
-type Playing = { game: 'chase' } | { game: 'park'; lot: number }
-
-const pi = (c: OwnedCar) => performance(carDef(c.model), c.upgrades, c.mods)
-const look = (c: OwnedCar): ChaseCar => ({ body: carDef(c.model).body, model: c.model, color: c.color, finish: c.finish, mods: c.mods })
-
-// Every run costs a little fuel, like a race.
-function payFuel(what: string) {
-  if (spendFuel(ARCADE_FUEL)) return true
-  const s = useGame.getState()
-  s.showNeed('fuel', ARCADE_FUEL - s.fuel, what)
-  return false
-}
+type Playing = { game: 'chase' } | { game: 'park'; lot: number } | { game: 'star'; id: StarGameId }
 
 export function ArcadePanel() {
   const cars = useGame((s) => s.cars)
@@ -33,11 +25,13 @@ export function ArcadePanel() {
   const [playing, setPlaying] = useState<Playing | null>(null)
   const [lots, setLots] = useState(false)
   const [bests, setBests] = useState(loadBests)
+  const [starBests, setStarBests] = useState(loadStars)
   const stars = bests.park
   const totalStars = stars.reduce((a, b) => a + b, 0)
 
   if (playing && car) {
-    const exit = () => { setBests(loadBests()); setPlaying(null) }
+    const exit = () => { setBests(loadBests()); setStarBests(loadStars()); setPlaying(null) }
+    if (playing.game === 'star') return <StarGame id={playing.id} car={car} onExit={exit} />
     return playing.game === 'chase'
       ? <ChaseGame car={car} onExit={exit} />
       : <ParkGame car={car} lot={playing.lot} onExit={exit} onLot={(lot) => setPlaying({ game: 'park', lot })} />
@@ -88,37 +82,22 @@ export function ArcadePanel() {
             <span className="arc-best">★ {totalStars}/{PARK_LOTS.length * 3}</span>
             <button className="buy" disabled={!car} onClick={() => setLots(true)}>Pick a lot ›</button>
           </div>
+          {STAR_GAMES.map((g) => {
+            const b = starBests[g.id]
+            const best = b.best ? (g.id === 'pit' ? `⏱ ${b.best}s` : g.id === 'delivery' ? `🍕 ${b.best}` : g.id === 'stunt' ? `🔥 ${b.best.toLocaleString()}` : '') : ''
+            return (
+              <div key={g.id} className={`arc-tile ${g.id}`}>
+                <div className="arc-art">{g.art}</div>
+                <b>{g.name}</b>
+                <small>{g.tip}</small>
+                <span className="arc-best">{[1, 2, 3].map((n) => (n <= b.stars ? '★' : '☆')).join('')}{best && ` ${best}`}</span>
+                <button className="buy" disabled={!car} onClick={() => { if (payFuel(`a ${g.name} run`)) setPlaying({ game: 'star', id: g.id }) }}>Play · ⛽{ARCADE_FUEL}</button>
+              </div>
+            )
+          })}
         </div>
       )}
     </Panel>
-  )
-}
-
-function Countdown({ onGo }: { onGo: () => void }) {
-  const [n, setN] = useState(3)
-  useEffect(() => {
-    sfx.countdown(n === 0)
-    if (n === 0) {
-      onGo()
-      const id = setTimeout(() => setN(-1), 600)
-      return () => clearTimeout(id)
-    }
-    const id = setTimeout(() => setN(n - 1), 650)
-    return () => clearTimeout(id)
-  }, [n]) // eslint-disable-line react-hooks/exhaustive-deps
-  if (n < 0) return null
-  return <div key={n} className="arc-count">{n === 0 ? 'GO!' : n}</div>
-}
-
-function Result({ win, title, children, actions }: { win: boolean; title: string; children: React.ReactNode; actions: React.ReactNode }) {
-  return (
-    <div className={win ? 'rr win' : 'rr lose'}>
-      <div className="arc-result">
-        <h2>{title}</h2>
-        {children}
-        <div className="arc-actions">{actions}</div>
-      </div>
-    </div>
   )
 }
 
