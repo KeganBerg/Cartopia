@@ -266,27 +266,12 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .junk-card { background: #faf6f3; }
 .scrap { font: 12px var(--display); background: none; border: none; color: #8d6e63; text-decoration: underline; padding: 2px; }
 .spot-card .spot-icon { font-size: 34px; line-height: 1.1; }
-.search-map { position: relative; height: 300px; border-radius: 16px; border: 3px solid #fff; box-shadow: 0 3px 0 rgba(0,0,0,.2); overflow: hidden; margin: 8px 0; background: radial-gradient(circle at 30% 30%, #9ccc65, #689f38); }
-.map-farm { background: repeating-linear-gradient(35deg, #c5e1a5 0 26px, #dce775 26px 52px); }
-.map-downtown { background: repeating-linear-gradient(0deg, #b0bec5 0 2px, transparent 2px 40px), repeating-linear-gradient(90deg, #b0bec5 0 2px, #cfd8dc 2px 40px); }
-.map-desert { background: radial-gradient(circle at 70% 30%, #ffe0b2, #ffb74d); }
-.map-track { background: radial-gradient(ellipse at center, #81c784 0 40%, #757575 41% 55%, #66bb6a 56%); }
-.map-roads { position: absolute; inset: 0; width: 100%; height: 100%; }
-.map-roads path { fill: none; stroke: #fff8e1; stroke-dasharray: 3 2; opacity: .85; vector-effect: non-scaling-stroke; stroke-width: 6px; }
-.pin { position: absolute; transform: translate(-50%, -100%); font-size: 30px; background: none; border: none; padding: 0; filter: drop-shadow(0 2px 1px rgba(0,0,0,.35)); animation: pinbob 1.4s ease-in-out infinite; }
-.pin:disabled { opacity: 1; cursor: default; }
-.pin.open { animation: none; transform: translate(-50%, -50%); width: 44px; height: 44px; border-radius: 50%; background: #fff; border: 3px solid #ffca28; font-size: 22px; }
-.pin.open.pin-car { border-color: #8e24aa; box-shadow: 0 0 0 4px rgba(142,36,170,.25); }
-@keyframes pinbob { 50% { transform: translate(-50%, -112%); } }
-.truck { position: absolute; transform: translate(-50%, -50%) scaleX(-1); font-size: 34px; transition: left .7s ease-in-out, top .7s ease-in-out; pointer-events: none; filter: drop-shadow(0 2px 1px rgba(0,0,0,.35)); }
-.flat-pop { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(300px, 90%); background: var(--panel); border: 3px solid var(--accent); border-radius: 14px; padding: 12px; text-align: center; box-shadow: 0 6px 20px rgba(0,0,0,.35); }
+.flat-pop { width: min(300px, 90%); background: var(--panel); border: 3px solid var(--accent); border-radius: 14px; padding: 12px; text-align: center; box-shadow: 0 6px 20px rgba(0,0,0,.35); }
 .flat-pop p { margin: 4px 0 8px; font-size: 14px; }
 .flat-pop .row { justify-content: center; }
 .flat-pop .sell { margin-top: 0; }
-.haul { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; font-size: 14px; }
 .haul-item { display: inline-flex; align-items: center; gap: 4px; background: #fff; border: 2px solid #e0e0e0; border-radius: 10px; padding: 2px 8px; font-weight: 800; }
 .haul-item.car { border-color: #8e24aa; }
-.search > .buy { width: 100%; }
 .plate-screen { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; }
 .plate-screen .car-preview { width: 100%; }
 .plate-screen h3 { margin: 4px 0 0; }
@@ -497,7 +482,6 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
   .bay { grid-template-columns: 70px 1fr; }
   .bay .car-swatch { width: 70px; height: 35px; }
   .bay > .buy { grid-column: 1 / -1; }
-  .search-map { height: 260px; }
   .bank-packs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .pack-bucks { font-size: 24px; }
   .pack-art { font-size: 32px; }
@@ -1026,44 +1010,52 @@ button.lvl-item:hover { border-color: var(--accent); transform: translateY(-2px)
 .thumb-look { position: relative; display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
 .look-badge { position: absolute; right: 4px; bottom: 4px; width: 26px; height: 26px; border-radius: 50%; background: rgba(255,255,255,.9); box-shadow: 0 1px 3px rgba(0,0,0,.25); display: grid; place-items: center; font-size: 13px; pointer-events: none; }
 
-/* Goals sheet: story goals, daily and weekly tasks, chests. */
-.goal { grid-template-columns: auto 1fr auto; gap: 10px; padding: 6px 10px 6px 6px; border-width: 1.5px; }
-.goal.claimed { opacity: .55; }
-.goal-icon { width: 40px; height: 40px; display: grid; place-items: center; font-size: 22px; background: var(--sheet); border-radius: 10px; }
-.goal.done .goal-icon { background: #dcedc8; }
-.goal-main { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.goal-main > b { font-size: 15px; line-height: 1.15; }
-.goal-line { display: flex; align-items: center; gap: 6px; }
-.goal-line .bar { flex: 1; margin: 0; height: 8px; background: #e0e6ea; }
-.goal-head .bar { background: #dfe5ea; }
-.goal-line .bar span, .goal-head .bar span { background: var(--green); }
-.goal-line small { flex: none; font: 12px var(--display); color: #78909c; }
-.goal-pay { display: flex; align-items: center; gap: 4px; font: 13px var(--display); color: #455a64; }
-.goal-pay .ico { width: 16px; height: 16px; font-size: 10px; font-style: normal; }
-.goal-pay b { margin-left: 4px; color: #7e57c2; font-weight: normal; }
-.goal-check { color: var(--green); font: 20px var(--display); padding: 0 8px; }
-.goal-head { display: flex; align-items: center; gap: 10px; margin: 0 2px 8px; font: 14px var(--display); color: #546e7a; }
-.goal-head .bar { flex: 1; margin: 0; height: 8px; }
-.chest { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; margin-top: 10px; padding: 8px 10px 8px 6px; border-radius: 12px; border: 1.5px dashed #b0bec5; background: #fff; }
-.chest.ready { border: 2px solid #ffb300; background: #fff8e1; animation: chest-glow 1.4s ease-in-out infinite; }
-.chest.opened { opacity: .55; }
-.chest-icon { width: 40px; height: 40px; display: grid; place-items: center; font-size: 26px; }
-.chest-main { display: flex; flex-direction: column; gap: 3px; }
-.chest-pips { display: flex; gap: 4px; }
-.chest-pips i { width: 22px; height: 6px; border-radius: 3px; background: #cfd8dc; }
-.chest-pips i.on { background: #ffb300; }
-@keyframes chest-glow { 50% { box-shadow: 0 0 0 4px rgba(255,179,0,.25); } }
-.goal-badge { width: auto; min-width: 20px; padding: 0 4px; border-radius: 10px; background: #ff5252; }
+/* Rusty's search: a full-screen 3D lot with the controls floating over it. */
+.rescue-full { background: #9ccc65; }
+.rs-dots { position: absolute; top: calc(54px + var(--sat)); left: 0; right: 0; display: flex; justify-content: center; gap: 6px; pointer-events: none; }
+.rs-dot { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 14px; background: rgba(27,31,36,.45); border: 2px solid rgba(255,255,255,.75); box-shadow: inset 0 0 0 3px rgba(255,213,79,.55); }
+.rs-dot.open { background: #fff; border-color: #ffca28; box-shadow: 0 2px 0 rgba(0,0,0,.2); animation: pop .25s ease-out; }
+.rs-dot.car.rr-common { border-color: #78909c; }
+.rs-dot.car.rr-scarce { border-color: #1e88e5; }
+.rs-dot.car.rr-rare { border-color: #ff6d00; box-shadow: 0 0 8px rgba(255,179,0,.9); }
+.rs-coach { position: absolute; top: calc(96px + var(--sat)); left: 0; right: 0; width: fit-content; margin: 0 auto; padding: 6px 16px; border-radius: 999px; background: rgba(27,31,36,.6); color: #fff; font: 18px var(--display); pointer-events: none; animation: pop .25s ease-out, coach 1.6s ease-in-out .3s infinite; }
+@keyframes coach { 50% { transform: translateY(4px); } }
+.rs-found { position: absolute; top: calc(96px + var(--sat)); left: 0; right: 0; width: fit-content; max-width: calc(100% - 24px); margin: 0 auto; display: flex; align-items: center; gap: 8px; padding: 6px 16px 6px 8px; border-radius: 999px; background: var(--panel); border: 3px solid #ffca28; box-shadow: 0 4px 0 rgba(0,0,0,.25); font: 18px var(--display); pointer-events: none; animation: found 1.9s ease-out forwards; }
+.rs-found b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rs-found-icon { font-size: 26px; line-height: 1; }
+.rs-found.car { padding-left: 4px; }
+.rs-found.rr-scarce { border-color: #1e88e5; }
+.rs-found.rr-rare { border-color: #ff6d00; box-shadow: 0 4px 0 rgba(0,0,0,.25), 0 0 18px rgba(255,179,0,.9); }
+@keyframes found { 0% { transform: scale(.6); opacity: 0; } 12% { transform: scale(1.08); opacity: 1; } 20% { transform: scale(1); } 85% { opacity: 1; } 100% { opacity: 0; transform: translateY(-8px); } }
+.rs-flat-wrap { position: absolute; left: 0; right: 0; bottom: calc(120px + var(--sab)); display: flex; justify-content: center; padding: 0 12px; }
+.rs-flat { text-align: center; animation: pop .25s ease-out; }
+.rs-flat b { font: 22px var(--display); }
+.rs-flat .row { margin-top: 10px; }
+.rs-bottom { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; gap: 8px; padding: 30px calc(12px + var(--sar)) calc(12px + var(--sab)) calc(12px + var(--sal)); background: linear-gradient(transparent, rgba(10,20,40,.5)); pointer-events: none; }
+.rs-bottom > * { pointer-events: auto; }
+.rs-haul { display: flex; gap: 6px; align-items: center; overflow-x: auto; scrollbar-width: none; min-height: 34px; font-size: 14px; }
+.rs-haul::-webkit-scrollbar { display: none; }
+.rs-haul .haul-item { flex: none; }
+.rs-empty { color: #fff; font: 15px var(--display); text-shadow: 0 2px 0 rgba(0,0,0,.35); }
+.rs-actions { display: flex; gap: 8px; align-items: stretch; }
+.rs-actions .sell { margin-top: 0; }
+.rs-actions .rs-auto, .rs-actions .rs-home { flex: 1; font-size: 18px; padding: 10px 12px; white-space: nowrap; }
+.rs-actions .rs-home:disabled, .rs-actions .rs-auto:disabled { opacity: .55; }
+.rs-actions .rs-home.ready:not(:disabled) { animation: coach 1.2s ease-in-out infinite; box-shadow: 0 3px 0 rgba(0,0,0,.25), 0 0 14px rgba(102,187,106,.9); }
+@media (min-width: 700px) { .rs-bottom { align-items: center; } .rs-actions, .rs-haul { width: 100%; max-width: 560px; } }
 
-/* The next story goal, pinned under the HUD. */
-.goal-tracker { display: flex; align-items: center; gap: 6px; margin: 6px auto 0; max-width: min(320px, 80vw); padding: 3px 10px 3px 4px; border-radius: 14px; border: 1.5px solid rgba(255,255,255,.7); background: rgba(27,31,36,.78); color: #fff; font: 13px var(--display); pointer-events: auto; cursor: pointer; }
-.goal-tracker.done { background: rgba(46,125,50,.92); border-color: #c5e1a5; animation: chest-glow 1.4s ease-in-out infinite; }
-.gt-icon { width: 22px; height: 22px; display: grid; place-items: center; font-size: 14px; border-radius: 50%; background: rgba(255,255,255,.15); flex: none; }
-.gt-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.gt-bar { flex: none; width: 44px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.25); overflow: hidden; }
-.gt-bar i { display: block; height: 100%; background: #76ff03; }
-@media (max-height: 500px) { .hud-center .goal-tracker { display: none; } }
-@media (max-width: 600px) { .goal-tracker { margin-top: 4px; font-size: 12px; padding: 2px 8px 2px 3px; } }
+/* Paint shop: finishes, and the try-on bar that holds the Buy button. */
+.try-bar { display: flex; align-items: center; gap: 8px; min-height: 40px; margin: 8px 0 2px; padding: 6px 8px 6px 12px; border-radius: 12px; background: var(--seg); font-size: 13px; color: #546e7a; }
+.try-bar.on { position: sticky; top: 0; z-index: 2; background: #fff8e1; border: 1.5px solid #ffcc80; color: #37474f; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+.try-what { flex: 1; min-width: 0; }
+.try-bar .buy { flex: none; }
+.try-cancel { flex: none; border: none; background: none; color: #607d8b; font-weight: 800; text-decoration: underline; padding: 4px; }
+.finishes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.fin-opt { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px; border-radius: 12px; border: 1.5px solid #dfe5ea; background: #fff; font: 14px var(--display); color: #37474f; }
+.fin-opt small { font: 700 12px Nunito, sans-serif; color: #607d8b; }
+.fin-opt.sel { border-color: var(--blue); box-shadow: 0 0 0 2px var(--blue) inset; }
+.fin-opt.locked { opacity: .55; }
+.finish-chip { width: 34px; height: 22px; border-radius: 8px; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
 
 /* Collection book: sets of car tiles, silhouettes for missing cars. */
 .book { display: flex; flex-direction: column; gap: 8px; }
@@ -1102,15 +1094,41 @@ button.book-car { font: inherit; color: inherit; }
   .book-name { font-size: 15px; }
 }
 
-/* Paint shop: finishes, and the try-on bar that holds the Buy button. */
-.try-bar { display: flex; align-items: center; gap: 8px; min-height: 40px; margin: 8px 0 2px; padding: 6px 8px 6px 12px; border-radius: 12px; background: var(--seg); font-size: 13px; color: #546e7a; }
-.try-bar.on { position: sticky; top: 0; z-index: 2; background: #fff8e1; border: 1.5px solid #ffcc80; color: #37474f; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
-.try-what { flex: 1; min-width: 0; }
-.try-bar .buy { flex: none; }
-.try-cancel { flex: none; border: none; background: none; color: #607d8b; font-weight: 800; text-decoration: underline; padding: 4px; }
-.finishes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-.fin-opt { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px; border-radius: 12px; border: 1.5px solid #dfe5ea; background: #fff; font: 14px var(--display); color: #37474f; }
-.fin-opt small { font: 700 12px Nunito, sans-serif; color: #607d8b; }
-.fin-opt.sel { border-color: var(--blue); box-shadow: 0 0 0 2px var(--blue) inset; }
-.fin-opt.locked { opacity: .55; }
-.finish-chip { width: 34px; height: 22px; border-radius: 8px; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+/* Goals sheet: story goals, daily and weekly tasks, chests. */
+.goal { grid-template-columns: auto 1fr auto; gap: 10px; padding: 6px 10px 6px 6px; border-width: 1.5px; }
+.goal.claimed { opacity: .55; }
+.goal-icon { width: 40px; height: 40px; display: grid; place-items: center; font-size: 22px; background: var(--sheet); border-radius: 10px; }
+.goal.done .goal-icon { background: #dcedc8; }
+.goal-main { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.goal-main > b { font-size: 15px; line-height: 1.15; }
+.goal-line { display: flex; align-items: center; gap: 6px; }
+.goal-line .bar { flex: 1; margin: 0; height: 8px; background: #e0e6ea; }
+.goal-head .bar { background: #dfe5ea; }
+.goal-line .bar span, .goal-head .bar span { background: var(--green); }
+.goal-line small { flex: none; font: 12px var(--display); color: #78909c; }
+.goal-pay { display: flex; align-items: center; gap: 4px; font: 13px var(--display); color: #455a64; }
+.goal-pay .ico { width: 16px; height: 16px; font-size: 10px; font-style: normal; }
+.goal-pay b { margin-left: 4px; color: #7e57c2; font-weight: normal; }
+.goal-check { color: var(--green); font: 20px var(--display); padding: 0 8px; }
+.goal-head { display: flex; align-items: center; gap: 10px; margin: 0 2px 8px; font: 14px var(--display); color: #546e7a; }
+.goal-head .bar { flex: 1; margin: 0; height: 8px; }
+.chest { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; margin-top: 10px; padding: 8px 10px 8px 6px; border-radius: 12px; border: 1.5px dashed #b0bec5; background: #fff; }
+.chest.ready { border: 2px solid #ffb300; background: #fff8e1; animation: chest-glow 1.4s ease-in-out infinite; }
+.chest.opened { opacity: .55; }
+.chest-icon { width: 40px; height: 40px; display: grid; place-items: center; font-size: 26px; }
+.chest-main { display: flex; flex-direction: column; gap: 3px; }
+.chest-pips { display: flex; gap: 4px; }
+.chest-pips i { width: 22px; height: 6px; border-radius: 3px; background: #cfd8dc; }
+.chest-pips i.on { background: #ffb300; }
+@keyframes chest-glow { 50% { box-shadow: 0 0 0 4px rgba(255,179,0,.25); } }
+.goal-badge { width: auto; min-width: 20px; padding: 0 4px; border-radius: 10px; background: #ff5252; }
+
+/* The next story goal, pinned under the HUD. */
+.goal-tracker { display: flex; align-items: center; gap: 6px; margin: 6px auto 0; max-width: min(320px, 80vw); padding: 3px 10px 3px 4px; border-radius: 14px; border: 1.5px solid rgba(255,255,255,.7); background: rgba(27,31,36,.78); color: #fff; font: 13px var(--display); pointer-events: auto; cursor: pointer; }
+.goal-tracker.done { background: rgba(46,125,50,.92); border-color: #c5e1a5; animation: chest-glow 1.4s ease-in-out infinite; }
+.gt-icon { width: 22px; height: 22px; display: grid; place-items: center; font-size: 14px; border-radius: 50%; background: rgba(255,255,255,.15); flex: none; }
+.gt-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gt-bar { flex: none; width: 44px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.25); overflow: hidden; }
+.gt-bar i { display: block; height: 100%; background: #76ff03; }
+@media (max-height: 500px) { .hud-center .goal-tracker { display: none; } }
+@media (max-width: 600px) { .goal-tracker { margin-top: 4px; font-size: 12px; padding: 2px 8px 2px 3px; } }

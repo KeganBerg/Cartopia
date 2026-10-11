@@ -13,9 +13,9 @@ type Frame = ReturnType<typeof carFrame>
 type Kind = 'paint' | 'carbon' | 'chrome' | 'flame'
 type Parts = Record<Kind, BufferGeometry[]>
 
-const carbon = new MeshStandardMaterial({ color: '#1d1f22', metalness: 0.35, roughness: 0.45 })
+export const carbon = new MeshStandardMaterial({ color: '#1d1f22', metalness: 0.35, roughness: 0.45 })
 // Kept off full metal so it still reads as bright chrome in previews that have no reflections.
-const chrome = new MeshStandardMaterial({ color: '#f5f7f8', metalness: 0.6, roughness: 0.2 })
+export const chrome = new MeshStandardMaterial({ color: '#f5f7f8', metalness: 0.6, roughness: 0.2 })
 const flame = new MeshBasicMaterial({ color: '#ff8f00', transparent: true, opacity: 0.85, blending: AdditiveBlending, depthWrite: false })
 
 function box(w: number, h: number, d: number, x: number, y: number, z: number, rx = 0, ry = 0) {
@@ -133,7 +133,7 @@ const FLAME_Z = 0.09
 
 const cache = new Map<string, Partial<Record<Kind, BufferGeometry>>>()
 
-function modGeo(body: Body, ids: string[]) {
+export function modGeo(body: Body, ids: string[]) {
   const key = `${body}|${ids.join(',')}`
   const hit = cache.get(key)
   if (hit) return hit
@@ -162,8 +162,11 @@ function Flames({ geometry }: { geometry: BufferGeometry }) {
   return <mesh ref={ref} geometry={geometry} material={flame} renderOrder={3} />
 }
 
+// The mod parts fitted, in a fixed slot order.
+export const modIds = (fit: Partial<Record<ModSlot, string>>) => (['spoiler', 'exhaust', 'kit', 'hood'] as ModSlot[]).map((s) => fit[s]).filter((id): id is string => !!id)
+
 export function CarMods({ body, fit, tint, metal, flames }: { body: Body; fit: Partial<Record<ModSlot, string>>; tint: string; metal: number; flames?: boolean }) {
-  const ids = (['spoiler', 'exhaust', 'kit', 'hood'] as ModSlot[]).map((s) => fit[s]).filter((id): id is string => !!id)
+  const ids = modIds(fit)
   if (!ids.length) return null
   const g = modGeo(body, ids)
   return (
