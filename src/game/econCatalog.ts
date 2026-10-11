@@ -1,6 +1,6 @@
 import {
   BUILDINGS, CAMPAIGN, CAR_SETS, CAMPAIGN_RACES, CARS, GOALS, GP_SERIES, campaignRaceId, MAX_BUILDING_LEVEL, MODS, RESCUE_SPOTS, modXp, buildingUpgradeCost, buildingUpgradeXp, upgradable,
-  upgradeFuelCap, upgradeJobSeconds, FAVORITE_BONUS, QUEST_PAY, TASKS_PER_PERIOD, upgradePartsPayout, upgradePayout, upgradeXp, type BuildingDef,
+  upgradeFuelCap, upgradeJobSeconds, FAVORITE_BONUS, DEAL_SLOTS, dealSave, QUEST_PAY, TASKS_PER_PERIOD, upgradePartsPayout, upgradePayout, upgradeXp, type BuildingDef,
   SEASON_START, SEASON_DAYS, STARS_PER_TIER, SEASON_STARS, SEASON_TIERS, SEASON_CAR_BUCKS, seasonCars,
 } from './data'
 
@@ -51,7 +51,7 @@ export function econCatalog() {
     return before
   })
   const mods = Object.fromEntries(
-    MODS.map((m) => [m.id, { slot: m.slot, coins: m.coins, parts: m.parts, bucks: m.bucks, power: m.power, grip: m.grip, weight: m.weight, xp: modXp(m.id) }]),
+    MODS.map((m) => [m.id, { slot: m.slot, coins: m.coins, parts: m.parts, bucks: m.bucks, power: m.power, grip: m.grip, weight: m.weight, xp: modXp(m.id), ...(m.only ? { only: m.only } : {}), ...(m.notOn ? { notOn: m.notOn } : {}) }]),
   )
   // Campaign chapters: the one-time bonuses for clearing one and for three stars on all its races.
   const campaign = Object.fromEntries(CAMPAIGN.map((c) => [c.id, {
@@ -67,6 +67,13 @@ export function econCatalog() {
     start: new Date(SEASON_START).toISOString().slice(0, 10), days: SEASON_DAYS, perTier: STARS_PER_TIER, stars: SEASON_STARS,
     tiers: SEASON_TIERS.map((t) => ({ coins: t.coins, parts: t.parts, bucks: t.bucks, car: !!t.car })), carBucks: SEASON_CAR_BUCKS, cars: seasonCars(),
   }
+  // Daily deals: slot i on UTC day n (days since 1970-01-01) is slots[i][(n * step[i] + i) % length].
+  // `save` is how much town worth each deal adds beyond what the player paid.
+  const deals = {
+    slots: DEAL_SLOTS.map((s) => s.deals.map((d) => d.id)),
+    step: DEAL_SLOTS.map((s) => s.step),
+    save: Object.fromEntries(DEAL_SLOTS.flatMap((s) => s.deals).map((d) => [d.id, dealSave(d)])),
+  }
   // A driver adds at most this share to a business's coins (see driverPayout).
-  return { cars, buildings, goals, gp, rescue, upgradeXpTo, mods, driverBonus: FAVORITE_BONUS, campaign, sets, quests, season }
+  return { cars, buildings, goals, gp, rescue, upgradeXpTo, mods, driverBonus: FAVORITE_BONUS, campaign, sets, quests, season, deals }
 }

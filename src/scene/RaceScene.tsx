@@ -22,6 +22,8 @@ import { Manhole } from './BuildingDetail'
 import { BUILDINGS, TILE, buildingDef } from '../game/data'
 import { VenueScenery, VenueBackdrop, ROAD, WALK } from './RaceVenues'
 import type { Venue } from './venues'
+import { RaceWeather, raceWeather } from './Weather'
+import { gloomOf, weatherLook, wetRoad } from './weatherLook'
 
 export type RacerView = { dist: number }
 const SCALE = 0.25 // metres of race distance per world unit
@@ -292,8 +294,11 @@ export function RaceScene({ track, me, them, mine, theirs, venue }: Props) {
   const len = track * SCALE
   const slots = useStreet(len)
   const night = useMemo(() => nightAmount(dayPhase()), [])
+  // The town's weather when the race starts, suited to the venue.
+  const weather = useMemo(() => raceWeather(venue.id), [venue.id])
+  const beams = night > 0.3 || gloomOf(weather) > 0.5
   // Same lights and colour grade as the town at this time of day.
-  const look = useMemo(() => lookFor(night, duskAmount(dayPhase())), [night])
+  const look = useMemo(() => weatherLook(lookFor(night, duskAmount(dayPhase())), weather), [night, weather])
   // The race fills the screen, so stop drawing the town underneath while racing.
   useEffect(() => holdTown(), [])
   const asphalt = useMemo(() => {
@@ -302,9 +307,14 @@ export function RaceScene({ track, me, them, mine, theirs, venue }: Props) {
     t.needsUpdate = true
     return t
   }, [len])
+  // Goes glossy in the rain and slushy in snow, like the town's roads.
+  const road = useMemo(() => wetRoad(asphalt, venue.road ?? '#ffffff'), [asphalt, venue.road])
+  useEffect(() => () => road.dispose(), [road])
   const tint = (day: string, dark: string) => '#' + new Color(day).lerp(new Color(dark), night).getHexString()
+  // Grey skies when it's overcast.
+  const overcast = (c: string) => '#' + new Color(c).lerp(new Color('#7d8692'), Math.min(1, weather.cloud * 0.95)).getHexString()
   // Phone status bar and toolbar take the sky colour while racing.
-  const sky = tint(venue.sky, '#0f1730')
+  const sky = tint(overcast(venue.sky), '#0f1730')
   useEffect(() => holdPageTint(sky), [sky])
   // Full screen on a phone is tall and narrow: widen the view so the street still fills it.
   useEffect(() => {
@@ -332,11 +342,12 @@ export function RaceScene({ track, me, them, mine, theirs, venue }: Props) {
     <>
       <fog attach="fog" args={[tint(venue.fog, '#1d2740'), venue.fogNear, venue.fogFar]} />
       <color attach="background" args={[sky]} />
-      <SkyDome tint={tint('#ffffff', '#2a3560')} />
+      <SkyDome tint={tint(overcast('#ffffff'), '#2a3560')} />
       <hemisphereLight args={[look.sky, look.ground, look.hemiIntensity * 1.15]} />
       <directionalLight position={[5, 10, 2]} intensity={look.sunIntensity * 0.85} color={look.sun} />
       <SkyEnv />
       <PostFx look={look} />
+      <RaceWeather w={weather} look={look} />
       {/* Ground, sidewalks and the street itself. */}
       <mesh rotation-x={-Math.PI / 2} position={[0, LAYER.outer, len / 2]}>
         <planeGeometry args={[80, len + 100]} />
@@ -364,7 +375,7 @@ export function RaceScene({ track, me, them, mine, theirs, venue }: Props) {
         ))}
         <mesh rotation-x={-Math.PI / 2} position={[0, LAYER.land, len / 2 + 5]}>
           <planeGeometry args={[ROAD * 2, len + 50]} />
-          <meshStandardMaterial map={asphalt} color={venue.road ?? '#ffffff'} />
+          <primitive object={road} attach="material" dispose={null} />
         </mesh>
         {/* Centre line dashes and edge lines. */}
         {Array.from({ length: Math.ceil((len + 30) / 2) }, (_, i) => (
@@ -426,7 +437,7 @@ export function RaceScene({ track, me, them, mine, theirs, venue }: Props) {
             <planeGeometry args={[0.9, 1.5]} />
             <meshBasicMaterial map={glowTex()} color="#000000" transparent opacity={0.35} depthWrite={false} {...decal(3)} />
           </mesh>
-          {i === 0 ? <CarModel body={mine.body} model={mine.model} color={mine.color} finish={mine.finish} mods={mine.mods} flames beams={night > 0.3} /> : <CarModel body={theirs.body} model={theirs.model} color={theirs.color} mods={theirs.mods} flames beams={night > 0.3} />}
+          {i === 0 ? <CarModel body={mine.body} model={mine.model} color={mine.color} finish={mine.finish} mods={mine.mods} flames beams={beams} /> : <CarModel body={theirs.body} model={theirs.model} color={theirs.color} mods={theirs.mods} flames beams={beams} />}
         </group>
       ))}
     </>

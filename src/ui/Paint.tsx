@@ -1,5 +1,5 @@
-import { useGame, type OwnedCar } from '../game/store'
-import { FINISHES, PAINTS, STRIPES, finishDef, paintJobCost, type PaintJob } from '../game/data'
+import { useGame, liveDeal, paintPrice, type OwnedCar } from '../game/store'
+import { FINISHES, PAINTS, STRIPES, dealOffer, finishDef, paintJobCost, type PaintJob } from '../game/data'
 
 export const jobOf = (car: OwnedCar): PaintJob => ({ color: car.color, finish: car.finish ?? 'gloss', stripe: car.stripe ?? null })
 
@@ -16,9 +16,11 @@ const SHEEN = {
 export function PaintShop({ car, job, setJob }: { car: OwnedCar; job: PaintJob; setJob: (j: PaintJob | null) => void }) {
   const level = useGame((s) => s.level)
   const paintCar = useGame((s) => s.paintCar)
+  const deals = useGame((s) => s.deals)
   const now = jobOf(car)
   const changed = !same(job, now)
-  const cost = paintJobCost(car, job)
+  const cost = paintPrice({ deals, level }, car, job)
+  const full = paintJobCost(car, job)
   const pick = (p: Partial<PaintJob>) => {
     const next = { ...job, ...p }
     setJob(same(next, now) ? null : next)
@@ -36,7 +38,7 @@ export function PaintShop({ car, job, setJob }: { car: OwnedCar; job: PaintJob; 
           <>
             <span className="try-what">Trying <b>{label}</b></span>
             <button className="try-cancel" onClick={() => setJob(null)}>Undo</button>
-            <button className={cost.bucks ? 'buy small premium' : 'buy small'} onClick={() => { if (paintCar(car.uid, job)) setJob(null) }}>Buy · {price}</button>
+            <button className={cost.bucks ? 'buy small premium' : 'buy small'} onClick={() => { if (paintCar(car.uid, job)) setJob(null) }}>{cost.deal && <span className="deal-tag">DEAL</span>}Buy · {cost.deal && <s>${full.coins.toLocaleString()}</s>} {price}</button>
           </>
         ) : (
           <span className="try-what">Tap a finish, colour or stripe to try it on. Pay only when you like it.</span>
@@ -55,7 +57,7 @@ export function PaintShop({ car, job, setJob }: { car: OwnedCar; job: PaintJob; 
             >
               <i className="finish-chip" style={{ backgroundColor: job.color, backgroundImage: SHEEN[f.id] }} />
               <b>{f.name}</b>
-              <small>{locked ? `🔒 Level ${f.unlockLevel}` : now.finish === f.id ? 'Yours' : `$${f.coins.toLocaleString()}`}</small>
+              <small>{locked ? `🔒 Level ${f.unlockLevel}` : now.finish === f.id ? 'Yours' : <FinishPrice id={f.id} coins={f.coins} level={level} deals={deals} />}</small>
             </button>
           )
         })}
@@ -88,4 +90,11 @@ export function PaintShop({ car, job, setJob }: { car: OwnedCar; job: PaintJob; 
       </div>
     </div>
   )
+}
+
+// A finish's price, crossed out with today's deal price when it's on sale.
+function FinishPrice({ id, coins, level, deals }: { id: PaintJob['finish']; coins: number; level: number; deals: Parameters<typeof liveDeal>[0]['deals'] }) {
+  const deal = liveDeal({ deals, level }, 'paint', id)
+  if (!deal) return <>${coins.toLocaleString()}</>
+  return <><s>${coins.toLocaleString()}</s> <b className="deal-price">${dealOffer(deal).now.coins.toLocaleString()}</b></>
 }

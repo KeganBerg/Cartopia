@@ -8,7 +8,7 @@ import { useGame, canPlace, buyablePlots, lotSize, movable, type PlacedBuilding 
 import { GRID, TILE, PLOT, PLOT_MIN, PLOT_MAX, START_LAND, buildingDef, buildingLevel } from '../game/data'
 import { BuildingModel } from './BuildingModel'
 import { rotateCurrent, setGhostTurn, turnOf } from '../game/placement'
-import { mergeGroups, groupTurn, type MergeGroup } from '../game/merge'
+import { mergeGroups, groupTurn, groupScale, type MergeGroup } from '../game/merge'
 import { sfx } from '../lib/sound'
 import { Clouds } from './Clouds'
 import { DayNight } from './DayNight'
@@ -25,7 +25,9 @@ import { Batch } from './Batch'
 import { Manhole } from './BuildingDetail'
 import { GrassTufts } from './Tufts'
 import { toWorld, toTile, DIRS } from './grid'
-import { grassTex, paverTex, asphaltTex, drainTex } from './textures'
+import { grassTex, paverTex, drainTex } from './textures'
+import { roadMat } from './weatherLook'
+import { Weather } from './Weather'
 import { layoutRoads } from './traffic/layout'
 import { LAYER, decal } from './layers'
 
@@ -162,13 +164,15 @@ function holdToMove(b: PlacedBuilding, e: ThreeEvent<PointerEvent>) {
 function Building({ b, roads, group }: { b: PlacedBuilding; roads: Set<string>; group?: MergeGroup }) {
   const d = buildingDef(b.def)
   const [cx, cz] = group ? groupCenter(group) : centerOf(b.def, b.x, b.z, b.rot)
+  const turn = group ? groupTurn(group, roads) : turnOf(b, roads)
+  const [sx, sy, sz] = group ? groupScale(group, turn) : [1, 1, 1]
   // Hidden while dragged away; the ghost shows where it would land.
   const away = useDrag((g) => g.drag?.uid === b.uid && (g.drag.x !== b.x || g.drag.z !== b.z))
   if (away) return null
   return (
     <group
       position={[cx, 0, cz]}
-      rotation-y={((group ? groupTurn(group, roads) : turnOf(b, roads)) * Math.PI) / 2}
+      rotation-y={(turn * Math.PI) / 2}
       onPointerDown={(e) => {
         const s = useGame.getState()
         if (s.visiting || e.button !== 0) return
@@ -203,11 +207,11 @@ function Building({ b, roads, group }: { b: PlacedBuilding; roads: Set<string>; 
     >
       {d.kind !== 'decor' && d.kind !== 'obstacle' && (
         <mesh rotation-x={-Math.PI / 2} position-y={LAYER.lot} receiveShadow>
-          <planeGeometry args={[d.w * TILE * (group?.size ?? 1) - 0.1, d.h * TILE * (group?.size ?? 1) - 0.1]} />
-          <meshStandardMaterial map={paverTex(d.w * (group?.size ?? 1), d.h * (group?.size ?? 1))} />
+          <planeGeometry args={[d.w * TILE * sx - 0.1, d.h * TILE * sz - 0.1]} />
+          <meshStandardMaterial map={paverTex(d.w * sx, d.h * sz)} />
         </mesh>
       )}
-      <group scale={group?.size ?? 1}>
+      <group scale={[sx, sy, sz]}>
         <BuildingModel def={d} level={buildingLevel(b)} />
       </group>
     </group>
@@ -359,7 +363,8 @@ function Roads() {
       return { ...t, xing }
     })
   }, [roadsList])
-  const asphalt = asphaltTex()
+  // Shared so rain and snow can change every road at once (weatherLook.ts).
+  const asphalt = roadMat()
 
   return (
     <group>
@@ -376,7 +381,7 @@ function Roads() {
           <group key={k} position={[wx, 0, wz]}>
             <mesh rotation-x={-Math.PI / 2} position-y={LAYER.lot} receiveShadow>
               <planeGeometry args={[TILE, TILE]} />
-              <meshStandardMaterial map={asphalt} />
+              <primitive object={asphalt} attach="material" dispose={null} />
             </mesh>
             {/* Drains and manholes only on plain straight stretches, clear of crossings. */}
             {SIDES.map((sd, i) => !arms[i] && <Sidewalk key={sd} side={sd} drain={plain && (x * 2 + z + i) % 4 === 0} />)}
@@ -652,6 +657,7 @@ export function World() {
       <Townspeople />
       <Clouds />
       <SeasonFx small={Math.min(window.innerWidth, window.innerHeight) < 700} />
+      <Weather small={Math.min(window.innerWidth, window.innerHeight) < 700} />
       <SkyEnv />
       <PostFx look={townLook} town tiltShift />
     </>
