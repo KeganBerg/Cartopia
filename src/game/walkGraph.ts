@@ -146,7 +146,7 @@ export function buildWalkGraph(roads: Set<string>, buildings: WalkBuilding[], la
   const strollable = (b: WalkBuilding) => {
     const d = buildingDef(b.def)
     // A covered "coming soon" lot from a newer build is solid, whatever its size turns out to be.
-    return d.kind === 'decor' && d.w === 1 && d.h === 1 && !d.parked
+    return d.kind === 'decor' && d.w === 1 && d.h === 1 && !d.parked && !d.solid
   }
   const walkTile = (x: number, z: number): number | null => {
     if (isRoad(x, z) || !owns(land, x, z)) return null
@@ -187,7 +187,7 @@ export function buildWalkGraph(roads: Set<string>, buildings: WalkBuilding[], la
   // Doors: from the front of each building onto the sidewalk or lawn in front.
   for (const b of buildings) {
     const d = buildingDef(b.def)
-    if (d.kind === 'obstacle' || strollable(b)) continue
+    if (d.kind === 'obstacle' || d.solid || strollable(b)) continue
     const [w, h] = lotSize(b.def, b.rot)
     const [cx, cz] = toWorld(b.x + (w - 1) / 2, b.z + (h - 1) / 2)
     const node = add(`b${b.uid}`, { kind: 'b', uid: b.uid, def: b.def, center: [cx, cz] })

@@ -105,3 +105,15 @@ describe('walking network', () => {
     expect(layout.tiles.get('2,10')!.junction).toBe(true)
   })
 })
+
+describe('solid decorations', () => {
+  it('keeps walkers off hedges, fences and the finish arch, but not benches', () => {
+    const hedges = [b('hedge', 6, 13), b('fence', 7, 13), b('arch', 6, 14), b('bench', 7, 14)]
+    const g2 = buildWalkGraph(roads, [...buildings, ...hedges], START_LAND)
+    for (const o of hedges.slice(0, 3)) {
+      expect(g2.byKey.has(`t${o.x},${o.z}`)).toBe(false)
+      expect(g2.byKey.has(`b${o.uid}`)).toBe(false)
+    }
+    expect(g2.byKey.has('t7,14')).toBe(true)
+  })
+})

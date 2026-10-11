@@ -209,6 +209,16 @@ export const skyTex = (rx = 1) =>
     }
   }), 'sky', rx, 1)
 
+// Chequered flag: black and white squares, two rows high.
+export const checkerTex = (rx = 1) =>
+  rep(make('checker', 64, (g, s) => {
+    g.fillStyle = '#ffffff'
+    g.fillRect(0, 0, s, s)
+    g.fillStyle = '#111111'
+    const q = s / 4
+    for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) if ((x + y) % 2) g.fillRect(x * q, y * q, q, q)
+  }), 'checker', rx, 1)
+
 // Roll-up garage door: ribbed slats with a handle bar.
 export const shutterTex = () =>
   make('shutter', 64, (g, s) => {

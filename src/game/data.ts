@@ -31,6 +31,8 @@ export type BuildingDef = {
   prop?: 'donut' | 'burger' | 'cone' | 'tire' | 'pin' | 'popcorn'
   // Listed under Services in the Shop (fire and police stations).
   service?: boolean
+  // A small decoration townspeople can't stroll across (it fills its tile edge to edge).
+  solid?: boolean
   // Stand-in for a building this build doesn't know (see buildingDef).
   parked?: boolean
 }
@@ -84,13 +86,13 @@ export const BUILDINGS: BuildingDef[] = [
   { id: 'statue', name: 'Golden Car Statue', kind: 'decor', w: 1, h: 1, price: 0, bucks: 3, unlockLevel: 5, color: '#ffd700', roof: '#9e9e9e' },
   { id: 'pond', name: 'Duck Pond', kind: 'decor', w: 2, h: 2, price: 1500, unlockLevel: 4, color: '#4fc3f7', roof: '#81c784' },
   { id: 'pine', name: 'Pine Tree', kind: 'decor', w: 1, h: 1, price: 60, unlockLevel: 1, color: '#2e7d32', roof: '#6d4c41' },
-  { id: 'hedge', name: 'Hedge', kind: 'decor', w: 1, h: 1, price: 40, unlockLevel: 1, color: '#33691e', roof: '#558b2f' },
-  { id: 'fence', name: 'Picket Fence', kind: 'decor', w: 1, h: 1, price: 30, unlockLevel: 1, color: '#fafafa', roof: '#eceff1' },
+  { id: 'hedge', name: 'Hedge', kind: 'decor', solid: true, w: 1, h: 1, price: 40, unlockLevel: 1, color: '#33691e', roof: '#558b2f' },
+  { id: 'fence', name: 'Picket Fence', kind: 'decor', solid: true, w: 1, h: 1, price: 30, unlockLevel: 1, color: '#fafafa', roof: '#eceff1' },
   { id: 'picnic', name: 'Picnic Table', kind: 'decor', w: 1, h: 1, price: 90, unlockLevel: 2, color: '#a1887f', roof: '#e53935' },
   { id: 'busstop', name: 'Bus Stop', kind: 'decor', w: 1, h: 1, price: 200, unlockLevel: 2, color: '#90caf9', roof: '#37474f' },
   { id: 'hotdog', name: 'Hot Dog Cart', kind: 'decor', w: 1, h: 1, price: 350, unlockLevel: 3, color: '#eceff1', roof: '#fdd835' },
   { id: 'flagpole', name: 'Flag Pole', kind: 'decor', w: 1, h: 1, price: 300, unlockLevel: 3, color: '#2e7d32', roof: '#eceff1' },
-  { id: 'arch', name: 'Finish Line Arch', kind: 'decor', w: 1, h: 1, price: 0, bucks: 2, unlockLevel: 4, color: '#212121', roof: '#e53935' },
+  { id: 'arch', name: 'Finish Line Arch', kind: 'decor', solid: true, w: 1, h: 1, price: 0, bucks: 2, unlockLevel: 4, color: '#212121', roof: '#e53935' },
   { id: 'playground', name: 'Playground', kind: 'decor', w: 2, h: 2, price: 1800, unlockLevel: 5, color: '#ef9a9a', roof: '#1e88e5' },
   { id: 'gazebo', name: 'Gazebo', kind: 'decor', w: 1, h: 1, price: 1200, unlockLevel: 6, color: '#fafafa', roof: '#2e7d32' },
   { id: 'clocktower', name: 'Clock Tower', kind: 'decor', w: 1, h: 1, price: 3500, unlockLevel: 8, color: '#b0796b', roof: '#37474f' },

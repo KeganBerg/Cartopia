@@ -71,7 +71,7 @@ const PARK_GO: Record<string, [string, string]> = {
   flowers: ['🌷', 'going to smell the flowers'], tree: ['🌳', 'taking a walk in the park'], palm: ['🌴', 'taking a walk in the park'],
   statue: ['🏆', 'going to see the golden car'], pine: ['🌲', 'taking a walk in the park'], picnic: ['🧺', 'off for a picnic'],
   busstop: ['🚌', 'catching the bus'], hotdog: ['🌭', 'getting a hot dog'], flagpole: ['🚩', 'going to see the town flag'],
-  arch: ['🏁', 'taking a photo at the finish line'], playground: ['🛝', 'heading to the playground'], gazebo: ['🎶', 'going to the gazebo'],
+  playground: ['🛝', 'heading to the playground'], gazebo: ['🎶', 'going to the gazebo'],
   clocktower: ['🕰️', 'meeting a friend at the clock tower'],
 }
 const PARK_AT: Record<string, [string, string]> = {
@@ -79,25 +79,28 @@ const PARK_AT: Record<string, [string, string]> = {
   flowers: ['🌷', 'smelling the flowers'], tree: ['🌳', 'enjoying the shade'], palm: ['🌴', 'enjoying the shade'],
   statue: ['🏆', 'admiring the golden car'], pine: ['🌲', 'enjoying the shade'], picnic: ['🧺', 'having a picnic'],
   busstop: ['🚌', 'waiting for the bus'], hotdog: ['🌭', 'eating a hot dog'], flagpole: ['🚩', 'saluting the town flag'],
-  arch: ['📸', 'posing under the finish line'], playground: ['🛝', 'playing on the swings'], gazebo: ['🎶', 'listening to the band'],
+  playground: ['🛝', 'playing on the swings'], gazebo: ['🎶', 'listening to the band'],
   clocktower: ['🕰️', 'waiting by the clock tower'],
 }
 
 // Where to stand at each decoration, as a distance from its middle.
 const SPOT: Record<string, number> = {
   bench: 0.06, fountain: 0.98, flowers: 0.86, tree: 0.5, palm: 0.5, statue: 0.78, lamp: 0.45, billboard: 0.7,
-  pine: 0.7, picnic: 0.45, busstop: -0.22, hotdog: 0.5, flagpole: 0.6, arch: 0.4, gazebo: 0.25, clocktower: 0.8,
+  pine: 0.7, picnic: 0.45, busstop: -0.22, hotdog: 0.5, flagpole: 0.6, gazebo: 0.25, clocktower: 0.8,
 }
 // How long people linger, in seconds.
 const LINGER: Record<string, [number, number]> = {
   bench: [10, 24], fountain: [5, 12], statue: [4, 9], pond: [6, 14],
   picnic: [12, 26], busstop: [8, 18], hotdog: [4, 8], gazebo: [8, 18], playground: [10, 22], clocktower: [4, 9],
 }
-const PARKS = new Set(['bench', 'fountain', 'flowers', 'tree', 'palm', 'statue', 'pond', 'pine', 'picnic', 'busstop', 'hotdog', 'flagpole', 'arch', 'gazebo', 'clocktower'])
+const PARKS = new Set(['bench', 'fountain', 'flowers', 'tree', 'palm', 'statue', 'pond', 'pine', 'picnic', 'busstop', 'hotdog', 'flagpole', 'gazebo', 'clocktower'])
 // Big decorations people walk up to, like the duck pond.
 const BIG_PARKS = new Set(['pond', 'playground'])
 // Seats: benches and the bus stop face out the front; at a picnic table people face the table.
 const SEATS: Record<string, 'out' | 'in'> = { bench: 'out', busstop: 'out', picnic: 'in' }
+// Walled on three sides: people go in and out through the open front only.
+const FRONT_DOOR = new Set(['busstop', 'gazebo'])
+const doorOf = (n: Extract<WalkNode, { kind: 't' }>): Pt => [n.center[0] + SIDES[n.turn][0] * 0.95, n.center[1] + SIDES[n.turn][1] * 0.95]
 
 type Kind = 'shop' | 'browse' | 'friend' | 'park' | 'home' | 'jog'
 type Dest = { kind: Kind; key: string; def: string }
@@ -522,7 +525,11 @@ function setOff(ctx: Ctx, p: Person, night: boolean) {
       continue
     }
     p.dest = d
-    p.steps = stepsFor(g, route, p.pos)
+    const here = g.nodes[start!]
+    if (here.kind === 't' && FRONT_DOOR.has(here.decor ?? '') && Math.hypot(p.pos[0] - here.center[0], p.pos[1] - here.center[1]) < 0.9) {
+      const door = doorOf(here)
+      p.steps = [{ p: door }, ...stepsFor(g, route, door)]
+    } else p.steps = stepsFor(g, route, p.pos)
     p.si = 0
     const last = g.nodes[goal!]
     if (last.kind === 't') settle(p, last)
@@ -583,13 +590,18 @@ function settle(p: Person, n: Extract<WalkNode, { kind: 't' }>) {
   const bench = seat === 'out'
   // Picnic benches run along the front and back of the table.
   const near = sideOf(c, entry)
-  const side = bench ? n.turn : seat === 'in' && (near - n.turn) % 2 !== 0 ? n.turn : near
+  const front = FRONT_DOOR.has(n.decor ?? '')
+  const side = bench || front ? n.turn : seat === 'in' && (near - n.turn) % 2 !== 0 ? n.turn : near
   const [dx, dz] = SIDES[side]
   const r = SPOT[n.decor ?? ''] ?? 0.8
   // Benches seat two: shuffle along the seat.
   const along = bench ? rand(-0.25, 0.25) : rand(-0.3, 0.3)
   const spot: Pt = [c[0] + dx * r + dz * along, c[1] + dz * r - dx * along]
-  for (const w of transit(n, entry, spot)) p.steps.push({ p: w })
+  if (front) {
+    const door = doorOf(n)
+    for (const w of transit(n, entry, door)) p.steps.push({ p: w })
+    p.steps.push({ p: door })
+  } else for (const w of transit(n, entry, spot)) p.steps.push({ p: w })
   p.steps.push({ p: spot })
 }
 
