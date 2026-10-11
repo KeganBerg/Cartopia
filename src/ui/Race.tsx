@@ -173,13 +173,13 @@ export function RacePanel() {
         <div className="race-cars">
           {cars.map((c) => (
             <button key={c.uid} className={c.uid === car.uid ? 'chip sel' : 'chip'} onClick={() => { setCarId(c.uid); setPickCar(false) }}>
-              <CarThumb size="xs" color={c.color} finish={c.finish} body={carDef(c.model).body} stripe={c.stripe} mods={c.mods} /> {carDef(c.model).name} · PI {pi(c)}{carDef(c.model).skill ? ` ${SKILLS[carDef(c.model).skill!].icon}` : ''}
+              <CarThumb size="xs" color={c.color} finish={c.finish} body={carDef(c.model).body} model={c.model} stripe={c.stripe} mods={c.mods} /> {carDef(c.model).name} · PI {pi(c)}{carDef(c.model).skill ? ` ${SKILLS[carDef(c.model).skill!].icon}` : ''}
             </button>
           ))}
         </div>
       ) : (
         <button className="race-car-pick" onClick={() => setPickCar(true)} disabled={cars.length < 2}>
-          <CarThumb size="sm" color={car.color} finish={car.finish} body={carDef(car.model).body} stripe={car.stripe} mods={car.mods} />
+          <CarThumb size="sm" color={car.color} finish={car.finish} body={carDef(car.model).body} model={car.model} stripe={car.stripe} mods={car.mods} />
           <span>
             <small>Racing with</small>
             <b>{carDef(car.model).name} · PI {pi(car)}</b>
@@ -442,7 +442,7 @@ export function PrizePopup() {
           </>
         ) : (
           <>
-            <CarThumb size="lg" color={prize.color} body={def.body} />
+            <CarThumb size="lg" color={prize.color} body={def.body} model={def.id} />
             <h3>{def.name}</h3>
             <p>PI {performance(def, zero)} · +5 🏆. It's in your garage now.</p>
             <div className="row">
@@ -755,7 +755,7 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
   return (
     <div className="race-full">
       <Canvas className="rf-canvas" camera={{ position: [0.4, 2.2, -4], fov: 55, near: 0.3, far: 150 }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
-        <RaceScene track={TRACK} me={me} them={them} mine={{ body: def.body, color: car.color, finish: car.finish, mods: car.mods }} theirs={{ body: rival.body, color: rival.color, mods: rival.mods }} venue={venue} />
+        <RaceScene track={TRACK} me={me} them={them} mine={{ body: def.body, model: car.model, color: car.color, finish: car.finish, mods: car.mods }} theirs={{ body: rival.body, color: rival.color, mods: rival.mods }} venue={venue} />
       </Canvas>
       <div className="rf-top">
         <h2>{title ?? `Drag Race vs ${rival.town}`}</h2>
