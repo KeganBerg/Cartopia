@@ -142,7 +142,8 @@ div.rm-node { cursor: default; }
 .rm-car-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .rm-car-txt b { font: 15px var(--display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rm-car-txt small { font: 800 11.5px Nunito, sans-serif; color: #4a6283; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rm-chev { color: #2263d6; font-size: 14px; }
+.rm-car-txt .rm-car-lbl { font: 900 10px Nunito, sans-serif; letter-spacing: .6px; text-transform: uppercase; color: #2fae35; }
+.rm-swap { flex: none; font: 900 12px Nunito, sans-serif; color: #fff; background: #2263d6; border: 2px solid #0e1a33; border-radius: 999px; padding: 3px 10px; box-shadow: 0 2px 0 rgba(0,0,0,.25); }
 .rm-race { display: flex; align-items: center; gap: 6px; font-size: 20px; padding: 7px 16px; white-space: nowrap; }
 .rm-note { color: #cfe0ff; font: 800 12px Nunito, sans-serif; white-space: nowrap; }
 .rm-picker { position: absolute; left: 8px; right: 8px; bottom: calc(100% + 6px); max-height: min(50vh, 320px); overflow: auto; background: var(--sheet, #e8f1fc); border: 3px solid var(--line, #14213d); border-radius: 16px; padding: 8px; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; box-shadow: 0 6px 0 rgba(0,0,0,.3); z-index: 3; }
@@ -327,3 +328,9 @@ div.rm-node { cursor: default; }
 }
 .rm-event .rm-rows { flex: 1; }
 .rm-event .rm-rows > .rm-row { flex: 1; }
+
+/* The race-car bar on top of the challenges inbox: its car list opens below it, pushing the
+   challenges down instead of covering them. */
+.invites-car { margin-bottom: 10px; }
+.invites-car .rm-bar { flex-wrap: wrap; border: 3px solid var(--line, #14213d); border-radius: 16px; padding: 6px 10px; }
+.invites-car .rm-picker { position: static; order: 3; flex-basis: 100%; min-width: 0; max-height: 260px; overflow-x: hidden; box-shadow: none; }

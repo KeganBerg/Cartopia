@@ -98,6 +98,8 @@ export type SaveState = {
   event: EventProgress | null
   // Car uids on show at the Car Meet and cruising Main Street (see game/meet.ts).
   showcase: string[]
+  // The car picked for racing (game/raceCar.ts). Missing = the highest-PI car.
+  raceCar?: string | null
   // Skins bought or won (season track, crates). Level and set skins aren't listed; see ownedSkins().
   skins: string[]
   // Mod skins bought or won; level and set ones are worked out (ownedModSkins()).
@@ -203,6 +205,7 @@ type Actions = {
   markHelped: (ownerId: string) => void
   // Put a car on show at the Car Meet, or take it off.
   toggleShowcase: (uid: string) => void
+  setRaceCar: (uid: string) => void
   setTutorial: (step: number) => void
   // Fuel and parts friends left for you (already checked and claimed server-side).
   receiveGifts: (fuel: number, parts: number) => void
@@ -1384,6 +1387,12 @@ export const useGame = create<GameState>()(
         set({ showcase: togglePick(s.showcase ?? [], cuid), updatedAt: Date.now() })
       },
 
+      setRaceCar: (cuid) => {
+        const s = get()
+        if (s.raceCar === cuid || !s.cars.some((c) => c.uid === cuid)) return
+        set({ raceCar: cuid, updatedAt: Date.now() })
+      },
+
       markHelped: (ownerId) => {
         const s = get()
         if (s.helped[ownerId] === today()) return
@@ -1927,8 +1936,8 @@ export const useGame = create<GameState>()(
 )
 
 export function saveOf(s: GameState): SaveState {
-  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, season, deals, trials, rivals, tour, event, showcase, skins, modSkins, land, updatedAt } = s
-  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, season, deals, trials, rivals, tour, event, showcase, skins, modSkins, land, updatedAt }
+  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, season, deals, trials, rivals, tour, event, showcase, raceCar, skins, modSkins, land, updatedAt } = s
+  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, season, deals, trials, rivals, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, land, updatedAt }
 }
 
 // Fields added after launch, so older saves load with sensible values.

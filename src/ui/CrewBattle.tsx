@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { NeutralToneMapping } from 'three'
+import { raceCarOf } from '../game/raceCar'
 import { useGame, type OwnedCar } from '../game/store'
-import { CARS, CREW_CHEST, carDef, msToNextWeek, payAt, performance } from '../game/data'
+import { CARS, CREW_CHEST, carDef, msToNextWeek, payAt } from '../game/data'
 import { supabase } from '../lib/supabase'
 import { signedInUser } from '../lib/cloud'
 import { useLive, challenge } from '../lib/live'
@@ -19,7 +20,6 @@ import { PlayerName } from './Username'
 // face off at the start line of the week's venue with the live score and both rosters docked below.
 
 const n = (v: number) => v.toLocaleString()
-const pi = (c: OwnedCar) => performance(carDef(c.model), c.upgrades, c.mods)
 
 function left(ms: number) {
   const h = Math.max(1, Math.ceil(ms / 3600000))
@@ -191,7 +191,8 @@ export function BattlePanel() {
   const players = useLive((l) => l.players)
   const now = useNow()
   const close = () => openPanel('clan')
-  const car = useMemo(() => [...cars].sort((a, b) => pi(b) - pi(a))[0], [cars])
+  const raceCar = useGame((s) => s.raceCar)
+  const car = useMemo(() => raceCarOf(cars, raceCar), [cars, raceCar])
   const b = battle?.current ?? null
   const rival = useMemo(() => (car && b ? rivalCar(car, b.them.tag) : null), [car, b])
   // Rival crew members in the live lobby right now, by account: they can be challenged here.

@@ -1,6 +1,7 @@
 import { groupOf, mergeCandidates } from '../game/merge'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGame, hasRusty, buildPrice, type OwnedCar } from '../game/store'
+import { raceCarOf } from '../game/raceCar'
 import { reducedMotion } from '../game/fx'
 import { activeEvent, garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, carDef, performance, upgradeCost, buildingDef, upgradable, loves, readySets, type BuildingDef } from '../game/data'
 import { CarInspect, CarPreview, type DynoFeed } from '../scene/CarPreview'
@@ -376,6 +377,17 @@ export function openGarageTab(tab: GarageTab) {
   useGame.getState().openPanel('garage')
 }
 
+// Makes this the car every race uses (the Race menu's car bar picks it too).
+function RaceCarToggle({ car }: { car: string }) {
+  const on = useGame((s) => raceCarOf(s.cars, s.raceCar)?.uid === car)
+  const pick = useGame((s) => s.setRaceCar)
+  return (
+    <button className={on ? 'showcase-toggle race-toggle on' : 'showcase-toggle race-toggle'} onClick={() => pick(car)} disabled={on} title="The car you race with, in every race and live challenge">
+      {on ? '🏁 Racing' : '🏁 Race with'}
+    </button>
+  )
+}
+
 export function GaragePanel() {
   const cars = useGame((s) => s.cars)
   const selected = useGame((s) => s.selectedCar)
@@ -466,6 +478,7 @@ export function GaragePanel() {
               <SkillTag model={car.model} />
               <DriverRow car={car.uid} model={car.model} />
               <ShowcaseToggle car={car.uid} />
+              <RaceCarToggle car={car.uid} />
             </div>
             <div className="garage-tabs" role="tablist">
               {([['tune', '🔧 Upgrades'], ['mods', '🪽 Mods'], ['paint', '🎨 Paint']] as const).map(([id, label]) => (

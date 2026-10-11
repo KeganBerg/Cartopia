@@ -1,6 +1,7 @@
 import { Icon } from './Icon'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useGame, spendFuel, type OwnedCar } from '../game/store'
+import { bestCar, raceCarOf } from '../game/raceCar'
 import { CARS, SKILLS, carDef, performance, RACE_FUEL, GP_SERIES, GP_ROUNDS, gpRivalPi, gpReward, CAMPAIGN, CAMPAIGN_RACES, campaignRaceId, campaignRivalPi, campaignShift, campaignRivalSkills, campaignReward, campaignCleared, type CampaignChapter, skillBoost, skillDrag, liveSkillBoost, smoothShift, type Body, type GpSeries, type SkillId } from '../game/data'
 import { TRACK, freshRacer, stepRacer, shiftQuality, launchRacer, shiftRacer, fireBoost, aiReaction, AI_BOOST_GEAR, AUTO_LAUNCH, JUMP_START_DELAY } from '../game/race'
 import { CarThumb } from '../scene/BuildingPreview'
@@ -118,10 +119,11 @@ export function RacePanel() {
   useEffect(() => warmStage(), [])
   const cars = useGame((s) => s.cars)
   const level = useGame((s) => s.level)
-  const best = useMemo(() => [...cars].sort((a, b) => pi(b) - pi(a))[0], [cars])
-  const [carId, setCarId] = useState(best?.uid)
-  const car = cars.find((c) => c.uid === carId) ?? best
-  const [rivals] = useState(() => makeRivals(pi(best), level))
+  const best = useMemo(() => bestCar(cars), [cars])
+  const raceCar = useGame((s) => s.raceCar)
+  const setRaceCar = useGame((s) => s.setRaceCar)
+  const car = raceCarOf(cars, raceCar)
+  const [rivals] = useState(() => makeRivals(best ? pi(best) : 10, level))
   const [online, setOnline] = useState<Rival[]>([])
   const [race, setRace] = useState<Rival | null>(null)
   const [gpRace, setGpRace] = useState<{ series: GpSeries; rival: Rival; prize: number } | null>(null)
@@ -422,7 +424,7 @@ export function RacePanel() {
           </div>
         )}
       </div>
-      <RaceBar cars={cars} car={car} onPick={setCarId} go={go} note={tab === 'gp' ? 'Races every round' : tab === 'event' ? 'Back next week' : undefined} />
+      <RaceBar cars={cars} car={car} onPick={setRaceCar} go={go} note={tab === 'gp' ? 'Races every round' : tab === 'event' ? 'Back next week' : undefined} />
     </Panel>
   )
 }
@@ -1359,12 +1361,13 @@ function arcPath(cx: number, cy: number, r: number, a0: number, a1: number) {
 // A live race started from a challenge, shown wherever the player is.
 export function LiveRaceOverlay() {
   const race = useLive((l) => l.race)
-  const cars = useGame((s) => s.cars)
-  const best = useMemo(() => [...cars].sort((a, b) => pi(b) - pi(a))[0], [cars])
-  if (!race || !best) return null
+  const raceId = race?.raceId
+  // Picked as the race starts, so switching cars mid-race doesn't swap the car under you.
+  const car = useMemo(() => (raceId ? raceCarOf(useGame.getState().cars, useGame.getState().raceCar) : undefined), [raceId])
+  if (!race || !car) return null
   const o = race.opponent
   const rival: Rival = { id: `live:${o.id}`, town: playerName(o.uid, o.town), level: o.level, carName: o.carName, color: o.color, pi: o.pi, online: true, body: o.body, mods: o.mods }
-  return <DragRace key={race.raceId} car={best} rival={rival} live={race} onExit={endLiveRace} />
+  return <DragRace key={race.raceId} car={car} rival={rival} live={race} onExit={endLiveRace} />
 }
 
 // Challenges land in an inbox instead of popping up over the game.
@@ -1396,12 +1399,16 @@ export function InvitesPanel() {
     const id = setInterval(() => tick((n) => n + 1), 1000)
     return () => clearInterval(id)
   }, [])
+  const cars = useGame((s) => s.cars)
+  const car = raceCarOf(cars, useGame((s) => s.raceCar))
+  const setRaceCar = useGame((s) => s.setRaceCar)
   const accept = (raceId: string) => {
     answer(raceId, true)
     openPanel(null)
   }
   return (
     <Panel title="Race challenges">
+      {invites.length > 0 && <div className="invites-car"><RaceBar cars={cars} car={car} onPick={setRaceCar} /></div>}
       <label className="toggle-row">
         <input type="checkbox" checked={closed} onChange={(e) => setClosed(e.target.checked)} />
         <span>Don't accept challenges <small>Other players will see you're not taking races.</small></span>

@@ -1702,6 +1702,9 @@ button.book-car { font: inherit; color: inherit; }
 .car-tags .loves-tag, .car-tags .driver-row { width: auto; display: inline-block; font-size: 12px; padding: 3px 10px; border-radius: 999px; background: #fce4ec; border: 0; }
 .car-tags .skill-tag { font-size: 12px; }
 .car-tags .showcase-toggle { margin-left: auto; font-size: 12px; }
+.car-tags .race-toggle { margin-left: 0; border-color: #43a047; }
+.race-toggle.on { background: #c8e6c9; }
+.race-toggle:disabled { cursor: default; opacity: 1; color: inherit; }
 
 /* Helping a friend's town: a round action bubble over each shop, a tick once helped, and pips on the visit banner. */
 .badge-help { width: 34px; height: 34px; padding: 0; justify-content: center; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #f1fff4, #b9f6ca); animation: badge-in .5s cubic-bezier(.2,1.7,.4,1) both, help-nod 1.6s ease-in-out .5s infinite; }
