@@ -7,6 +7,7 @@ import { SocialTabs } from './Social'
 import { GiftButton } from './Gifts'
 import { recordHelp, refreshGifts, HELP_FUEL } from '../lib/gifts'
 import { signedInUser } from '../lib/cloud'
+import { LikeButton } from './Meet'
 import { GhostButton } from './GhostRace'
 
 export function FriendsPanel() {
@@ -92,6 +93,7 @@ export function VisitBanner() {
         <small>Lvl {v.level} · 🏆 {v.trophies} · {v.cars.length} cars</small>
       </div>
       <div className="row">
+        <LikeButton owner={v.ownerId} />
         {signedInUser() && <GiftButton to={v.ownerId} />}
         <GhostButton town={v} />
         <button className="buy small" disabled={helped} onClick={helpOut} title={`They get +${HELP_FUEL} fuel too`}>{helped ? 'Helped today ✔' : 'Help out'}</button>

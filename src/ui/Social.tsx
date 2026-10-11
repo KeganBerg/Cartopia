@@ -33,6 +33,7 @@ export function SocialTabs({ current }: { current: PanelId }) {
     { id: 'friends', label: '👫 Friends' },
     { id: 'leaders', label: '🏅 Leaderboards' },
     { id: 'clan', label: <>🛡️ Crew{chests > 0 && <span className="tab-dot">{chests}</span>}</> },
+    { id: 'meet', label: '🚗 Meet' },
   ]
   return <SheetTabs items={tabs as { id: Exclude<PanelId, null>; label: React.ReactNode }[]} value={current ?? 'friends'} onChange={(id) => openPanel(id)} />
 }
