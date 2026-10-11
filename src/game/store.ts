@@ -2,23 +2,25 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
   PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS,
-  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, DAILY_BONUS, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modSlotsFor, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower,
+  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, DAILY_BONUS, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modSlotsFor, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower,
 } from './data'
 import { sfx } from '../lib/sound'
 import { msUntilNight } from './clock'
 import { requestTrip, requestVisit } from './trips'
+import { groupOf, mergeCandidates, applyMerge, applySplit } from './merge'
 
 // rot: quarter turns the player chose (0 faces south). Unset means face the nearest road.
 // level: upgrade level 1-10 (see MAX_BUILDING_LEVEL); unset means 1.
 // jobLevel: the level the running job started at, so an upgrade mid-job only pays from the next job.
 // car: uid of the owned car assigned to drive for this business (see DRIVER_BONUS).
-export type PlacedBuilding = { uid: string; def: string; x: number; z: number; jobEndsAt: number | null; rot?: number; level?: number; jobLevel?: number; car?: string }
+// merge: set on the top-left building of a merged 2x2 or 4x4 block (see merge.ts).
+export type PlacedBuilding = { uid: string; def: string; x: number; z: number; jobEndsAt: number | null; rot?: number; level?: number; jobLevel?: number; car?: string; merge?: number }
 export type OwnedCar = { uid: string; model: string; color: string; upgrades: Record<UpgradeSlot, number>; flat?: boolean; lowFuel?: boolean; stripe?: string | null; finish?: Finish; plate?: string; mods?: string[]; ownedMods?: string[] }
 // A rusty find waiting in Rusty's storage, and the one car in the restore bay.
 export type JunkCar = { uid: string; model: string; rarity: Rarity }
 export type Restoring = JunkCar & { endsAt: number; minutes: number }
 export type Loot =
-  | { kind: 'car'; model: string; rarity: Rarity }
+  | { kind: 'car'; model: string; rarity: Rarity; uid?: string }
   | { kind: 'coins' | 'parts' | 'fuel'; n: number }
   | { kind: 'trophy' }
   | { kind: 'nothing' }
@@ -69,7 +71,7 @@ export type SaveState = {
   updatedAt: number
 }
 
-export type Mode = 'play' | 'place' | 'move' | 'road' | 'bulldoze' | 'expand'
+export type Mode = 'play' | 'place' | 'move' | 'road' | 'bulldoze' | 'expand' | 'merge'
 export type Resource = 'coins' | 'parts' | 'fuel' | 'bucks' | 'level'
 export type Need = { res: Resource; missing: number; what?: string }
 
@@ -122,6 +124,8 @@ type Actions = {
   moveBuilding: (uid: string, x: number, z: number, rot?: number) => boolean
   paintRoad: (x: number, z: number) => void
   bulldoze: (x: number, z: number) => void
+  mergeBlock: (anchor: string, size: number) => void
+  splitBlock: (uid: string) => void
   tapBuilding: (uid: string) => void
   openUpgrade: (uid: string) => void
   upgradeBuilding: (uid: string) => boolean
@@ -170,6 +174,17 @@ type Actions = {
 }
 
 export type GameState = SaveState & UiState & Actions
+
+// Cars a signed-in player's search finds come from the server (rescue_roll() in
+// supabase/migrations/0022_rescue_rolls.sql), which keeps them so the guard can tell real
+// finds from made-up ones. src/lib/rescue.ts plugs it in; null means roll here (guests, or a server
+// without it yet).
+export type ServerFind = { i: number; uid: string; model: string; rarity: Rarity }
+let rescueRoller: ((spot: string) => Promise<ServerFind[] | null>) | null = null
+let rolling = false
+export const setRescueRoller = (f: typeof rescueRoller) => {
+  rescueRoller = f
+}
 
 const key = (x: number, z: number) => `${x},${z}`
 let uidCounter = 0
@@ -417,6 +432,55 @@ function addXp(s: GameState, amount: number): Partial<GameState> {
 
 // Apply an action's changes, then its XP. Level-up bonuses add on top of the
 // action's own coins and bucks instead of replacing them.
+// A tap on a merged business works the whole block as one: collect every
+// finished job, otherwise start every idle one the fuel covers, otherwise
+// show its upgrades. Each building still runs and pays its own job.
+function tapMerged(s: GameState, set: (p: Partial<GameState>) => void, uids: string[]): void {
+  const now = Date.now()
+  const members = s.buildings.filter((o) => uids.includes(o.uid))
+  const d = buildingDef(members[0].def)
+  const ready = members.filter((o) => o.jobEndsAt !== null && now >= o.jobEndsAt)
+  if (ready.length) {
+    let pay = 0, parts = 0, xp = 0
+    for (const o of ready) {
+      pay += driverPayout(d, jobLevel(o), workingDriver(s, o))
+      parts += upgradePartsPayout(d, jobLevel(o))
+      xp += upgradeXp(d, jobLevel(o))
+    }
+    const done = new Set(ready.map((o) => o.uid))
+    sfx.coin()
+    s.toast(`+${pay.toLocaleString()} coins${parts ? `, +${parts} parts` : ''}, +${xp} XP`)
+    return set(withXp(s, xp, {
+      coins: s.coins + pay,
+      parts: s.parts + parts,
+      stats: { ...s.stats, jobs: (s.stats.jobs ?? 0) + ready.length, coinsEarned: (s.stats.coinsEarned ?? 0) + pay },
+      buildings: s.buildings.map((o) => (done.has(o.uid) ? { ...o, jobEndsAt: null, jobLevel: undefined } : o)),
+      updatedAt: now,
+    }))
+  }
+  const idle = members.filter((o) => o.jobEndsAt === null)
+  if (!idle.length) return s.openUpgrade(members[0].uid)
+  if (!isOpen(d, now)) return s.toast(`The ${d.name} only opens at night. Doors open in ${Math.max(1, Math.ceil(msUntilNight(now) / 60000))} min.`)
+  const cost = d.fuelCost ?? 0
+  const n = cost ? Math.min(idle.length, Math.floor(s.fuel / cost)) : idle.length
+  if (!n) return s.showNeed('fuel', cost * idle.length - s.fuel, `the merged ${d.name}`)
+  if (n < idle.length) s.toast(`Fuel for ${n} of ${idle.length} jobs. The rest start when you tap again.`)
+  sfx.start()
+  const go = new Set(idle.slice(0, n).map((o) => o.uid))
+  for (const o of idle.slice(0, n)) if (o.car) requestVisit(o.car, o.uid)
+  const cap = fuelCap(s)
+  set({
+    fuel: s.fuel - n * cost,
+    fuelUpdatedAt: s.fuel >= cap ? now : s.fuelUpdatedAt,
+    buildings: s.buildings.map((o) => {
+      if (!go.has(o.uid)) return o
+      const lvl = buildingLevel(o)
+      return { ...o, jobEndsAt: now + upgradeJobSeconds(d, lvl) * 1000, jobLevel: lvl }
+    }),
+    updatedAt: now,
+  })
+}
+
 function withXp(s: GameState, amount: number, patch: Partial<GameState>): Partial<GameState> {
   return { ...patch, ...addXp({ ...s, ...patch }, amount) }
 }
@@ -537,6 +601,7 @@ export const useGame = create<GameState>()(
         const s = get()
         const b = s.buildings.find((o) => o.uid === buid)
         if (!b || !movable(b.def)) return false
+        if (groupOf(s.buildings, buid)) return false
         const turn = rot ?? b.rot
         if (!canPlace(s, b.def, x, z, turn, buid)) return false
         if (b.x === x && b.z === z && b.rot === turn) return true
@@ -566,6 +631,7 @@ export const useGame = create<GameState>()(
         if (d.kind === 'showroom' || d.kind === 'garage') return s.toast(`${d.name} can't be removed`)
         if (d.parked) return s.toast('This one is coming in a future update, so it stays put')
         if (d.kind === 'obstacle') return s.toast(`Tap the ${d.name.toLowerCase()} in play mode to clear it`)
+        if (groupOf(s.buildings, b.uid)) return s.toast(`Split your merged ${d.name} first (Edit, then Merge)`)
         // Upgrades would be lost, and a drag can sweep over a building by accident.
         if (buildingLevel(b) > 1) return s.toast(`Your ${d.name} is upgraded, so it can't be bulldozed. Use Move to put it somewhere else.`)
         set({
@@ -573,6 +639,24 @@ export const useGame = create<GameState>()(
           coins: s.coins + Math.floor(d.price / 2),
           updatedAt: Date.now(),
         })
+      },
+
+      mergeBlock: (anchor, size) => {
+        const s = get()
+        const c = mergeCandidates(s.buildings).find((o) => o.anchor.uid === anchor && o.size === size)
+        if (!c) return
+        sfx.buy()
+        const d = buildingDef(c.anchor.def)
+        s.toast(size === 4 ? `Giant ${d.name}! 16 in one.` : `Merged 4 into one big ${d.name}!`)
+        set({ buildings: applyMerge(s.buildings, c), updatedAt: Date.now() })
+      },
+
+      splitBlock: (uid) => {
+        const s = get()
+        const g = groupOf(s.buildings, uid)
+        if (!g) return
+        sfx.click()
+        set({ buildings: applySplit(s.buildings, g), updatedAt: Date.now() })
       },
 
       tapBuilding: (buid) => {
@@ -596,8 +680,10 @@ export const useGame = create<GameState>()(
           s.toast(`Cleared! +${d.xp} XP`)
           return set(withXp(s, d.xp!, { buildings: s.buildings.filter((o) => o.uid !== buid), updatedAt: now }))
         }
-        // Gas stations have no jobs; a tap shows their upgrades.
+        // Gas stations and houses have no jobs; a tap shows their upgrades.
         if (!d.jobSeconds) return upgradable(d) ? s.openUpgrade(buid) : undefined
+        const merged = groupOf(s.buildings, buid)
+        if (merged) return tapMerged(s, set, merged.members.map((o) => o.uid))
         const now = Date.now()
         const lvl = buildingLevel(b)
         const jobLvl = jobLevel(b)
@@ -653,7 +739,7 @@ export const useGame = create<GameState>()(
         const s = get()
         const b = s.buildings.find((o) => o.uid === buid)
         if (!b || s.visiting || !upgradable(buildingDef(b.def))) return
-        set({ panel: 'upgrade', upgrading: buid })
+        set({ panel: 'upgrade', upgrading: groupOf(s.buildings, buid)?.anchor.uid ?? buid })
       },
 
       upgradeBuilding: (buid) => {
@@ -663,7 +749,10 @@ export const useGame = create<GameState>()(
         const d = buildingDef(b.def)
         const lvl = buildingLevel(b)
         if (!upgradable(d) || lvl >= MAX_BUILDING_LEVEL) return false
-        const cost = buildingUpgradeCost(d, lvl)
+        // A merged block upgrades all its buildings together, so they stay merged.
+        const ids = new Set(groupOf(s.buildings, buid)?.members.map((o) => o.uid) ?? [buid])
+        const one = buildingUpgradeCost(d, lvl)
+        const cost = { coins: one.coins * ids.size, parts: one.parts * ids.size }
         const what = `upgrading your ${d.name}`
         if (s.coins < cost.coins) {
           s.showNeed('coins', cost.coins - s.coins, what)
@@ -675,11 +764,11 @@ export const useGame = create<GameState>()(
         }
         sfx.buy()
         s.toast(`${d.name} is now level ${lvl + 1}!`)
-        set(withXp(s, buildingUpgradeXp(lvl), {
+        set(withXp(s, buildingUpgradeXp(lvl) * ids.size, {
           coins: s.coins - cost.coins,
           parts: s.parts - cost.parts,
-          buildings: s.buildings.map((o) => (o.uid === buid ? { ...o, level: lvl + 1 } : o)),
-          stats: bump(s, 'upgrades'),
+          buildings: s.buildings.map((o) => (ids.has(o.uid) ? { ...o, level: lvl + 1 } : o)),
+          stats: bump(s, 'upgrades', ids.size),
           updatedAt: Date.now(),
         }))
         return true
@@ -1218,13 +1307,25 @@ export const useGame = create<GameState>()(
         if (s.level < spot.unlockLevel) return s.showNeed('level', spot.unlockLevel, spot.name)
         if (s.junkyard.length >= STORAGE_MAX) return s.toast('Storage is full. Restore or scrap a car first.')
         if (s.coins < spot.cost) return s.showNeed('coins', spot.cost - s.coins, `a search in the ${spot.name}`)
-        sfx.start()
-        set({
-          coins: s.coins - spot.cost,
-          search: rollSearch(spotId),
-          stats: bump(s, 'searches'),
-          updatedAt: Date.now(),
-        })
+        const go = (finds: ServerFind[] | null) => {
+          const g = get()
+          if (g.search || g.coins < spot.cost) return
+          sfx.start()
+          set({
+            coins: g.coins - spot.cost,
+            search: rollSearch(spotId, finds),
+            stats: bump(g, 'searches'),
+            updatedAt: Date.now(),
+          })
+        }
+        if (!rescueRoller) return go(null)
+        if (rolling) return
+        rolling = true
+        rescueRoller(spotId)
+          .then(go, () => get().toast("Rusty's radio can't reach the yard. Check your connection and try again."))
+          .finally(() => {
+            rolling = false
+          })
       },
 
       revealPin: (i) => {
@@ -1274,7 +1375,7 @@ export const useGame = create<GameState>()(
           else if (l.kind === 'trophy') trophies += 1
           else if (l.kind === 'car') {
             if (junkyard.length < STORAGE_MAX) {
-              junkyard.push({ uid: uid(), model: l.model, rarity: l.rarity })
+              junkyard.push({ uid: l.uid ?? uid(), model: l.model, rarity: l.rarity })
               notes.push(carDef(l.model).name)
             } else {
               scrapped += RARITY[l.rarity].scrapParts
@@ -1385,18 +1486,20 @@ function rollCar(spotId: string): Loot {
 
 // Pre-rolls what every pin hides. Each search finds at least one car, and
 // about one in four gives the tow truck a flat partway through.
-function rollSearch(spotId: string): Search {
+export function rollSearch(spotId: string, finds: ServerFind[] | null = null): Search {
   const spot = RESCUE_SPOTS.find((o) => o.id === spotId)!
   const scale = spot.cost / 500
   const pins: Loot[] = Array.from({ length: RESCUE_PINS }, () => {
-    const r = Math.random()
-    if (r < 0.1) return rollCar(spotId)
+    // With server finds, every other pin hides something else.
+    const r = finds ? RESCUE_CAR_CHANCE + Math.random() * (1 - RESCUE_CAR_CHANCE) : Math.random()
+    if (r < RESCUE_CAR_CHANCE) return rollCar(spotId)
     if (r < 0.42) return { kind: 'coins', n: Math.round(range(4, 14) * 5 * scale) }
     if (r < 0.62) return { kind: 'parts', n: range(1, 3) + Math.floor(scale / 3) }
     if (r < 0.74) return { kind: 'fuel', n: range(1, 3) }
     if (r < 0.77) return { kind: 'trophy' }
     return { kind: 'nothing' }
   })
+  for (const f of finds ?? []) if (f.i >= 0 && f.i < RESCUE_PINS) pins[f.i] = { kind: 'car', model: f.model, rarity: f.rarity, uid: f.uid }
   if (!pins.some((p) => p.kind === 'car')) pins[Math.floor(Math.random() * RESCUE_PINS)] = rollCar(spotId)
   const flatAt = Math.random() < 0.25 ? pick(Array.from({ length: RESCUE_PINS }, (_, i) => i).filter((i) => pins[i].kind !== 'car')) : null
   return { spot: spotId, pins, revealed: pins.map(() => false), truckAt: null, flatAt: flatAt ?? null, flat: false }

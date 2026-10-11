@@ -437,3 +437,109 @@ export const danceFloorTex = (lit: boolean, rx = 1, ry = rx) =>
     }
     g.globalAlpha = 1
   }), `dance|${lit}`, rx, ry)
+
+// Pale beach sand with soft wind ripples.
+export const beachSandTex = (rx = 1, ry = rx) =>
+  rep(make('beachsand', 256, (g, s, r) => {
+    g.fillStyle = '#f1dcae'
+    g.fillRect(0, 0, s, s)
+    for (let i = 0; i < 12; i++) {
+      g.globalAlpha = 0.3
+      g.fillStyle = i % 2 ? '#f7e7c3' : '#e3c891'
+      g.beginPath()
+      g.ellipse(r() * s, r() * s, 30 + r() * 50, 14 + r() * 24, r() * 3, 0, Math.PI * 2)
+      g.fill()
+    }
+    g.globalAlpha = 0.25
+    g.strokeStyle = '#d9bd86'
+    g.lineWidth = 2
+    for (let y = 8; y < s; y += 14) {
+      g.beginPath()
+      for (let x = 0; x <= s; x += 8) g.lineTo(x, y + Math.sin(x * 0.04 + y) * 3)
+      g.stroke()
+    }
+    g.globalAlpha = 1
+    speckle(g, s, r, ['#e0c58f', '#fbefd2', '#d4b67c', '#ffffff'], 2200, 2)
+  }), 'beachsand', rx, ry)
+
+// Packed snow: blue-grey drifts and sparkle.
+export const snowTex = (rx = 1, ry = rx) =>
+  rep(make('snowfield', 256, (g, s, r) => {
+    g.fillStyle = '#f4f7fa'
+    g.fillRect(0, 0, s, s)
+    for (let i = 0; i < 16; i++) {
+      g.globalAlpha = 0.35
+      g.fillStyle = i % 2 ? '#e3ebf2' : '#ffffff'
+      g.beginPath()
+      g.ellipse(r() * s, r() * s, 30 + r() * 60, 12 + r() * 26, r() * 3, 0, Math.PI * 2)
+      g.fill()
+    }
+    g.globalAlpha = 1
+    speckle(g, s, r, ['#dde6ee', '#ffffff', '#cfdbe6'], 1800, 2)
+    speckle(g, s, r, ['#b0c4d6'], 120, 1)
+  }), 'snowfield', rx, ry)
+
+// Dock concrete: slabs with joints, oil spots and tyre scuffs.
+export const concreteTex = (rx = 1, ry = rx) =>
+  rep(make('concrete', 256, (g, s, r) => {
+    g.fillStyle = '#a3aaaf'
+    g.fillRect(0, 0, s, s)
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
+      const v = 0.94 + r() * 0.08
+      g.fillStyle = `rgba(${Math.round(163 * v)},${Math.round(170 * v)},${Math.round(175 * v)},1)`
+      g.fillRect(i * 64 + 1, j * 64 + 1, 62, 62)
+    }
+    speckle(g, s, r, ['#979ea3', '#b0b6ba', '#8f969b'], 2200, 2)
+    for (let i = 0; i < 6; i++) {
+      g.globalAlpha = 0.25
+      g.fillStyle = '#4a4f53'
+      g.beginPath()
+      g.ellipse(r() * s, r() * s, 6 + r() * 12, 4 + r() * 8, r() * 3, 0, Math.PI * 2)
+      g.fill()
+    }
+    g.globalAlpha = 1
+    g.strokeStyle = '#7d8489'
+    g.lineWidth = 2
+    for (let i = 0; i <= 4; i++) {
+      g.beginPath(); g.moveTo(0, i * 64); g.lineTo(s, i * 64); g.stroke()
+      g.beginPath(); g.moveTo(i * 64, 0); g.lineTo(i * 64, s); g.stroke()
+    }
+  }), 'concrete', rx, ry)
+
+// Open water: deep blue with lighter wave crests. Scroll its offset to animate.
+export const waterTex = (key: string, rx = 1, ry = rx) =>
+  rep(make('water', 256, (g, s, r) => {
+    g.fillStyle = '#2b86c9'
+    g.fillRect(0, 0, s, s)
+    for (let i = 0; i < 10; i++) {
+      g.globalAlpha = 0.3
+      g.fillStyle = i % 2 ? '#3a9bdc' : '#1f74b3'
+      g.beginPath()
+      g.ellipse(r() * s, r() * s, 40 + r() * 50, 18 + r() * 20, 0, 0, Math.PI * 2)
+      g.fill()
+    }
+    g.globalAlpha = 0.55
+    g.strokeStyle = '#9fd4f5'
+    g.lineWidth = 2
+    for (let i = 0; i < 70; i++) {
+      const x = r() * s, y = r() * s, w = 8 + r() * 18
+      g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + w / 2, y - 3, x + w, y); g.stroke()
+    }
+    g.globalAlpha = 1
+  }), `water|${key}`, rx, ry)
+
+// Corrugated steel for shipping containers, tinted by the material colour.
+export const containerTex = () =>
+  make('container', 64, (g, s) => {
+    g.fillStyle = '#ffffff'
+    g.fillRect(0, 0, s, s)
+    for (let x = 0; x < s; x += 6) {
+      g.fillStyle = '#c9c9c9'
+      g.fillRect(x, 0, 2, s)
+      g.fillStyle = '#e6e6e6'
+      g.fillRect(x + 2, 0, 1, s)
+    }
+    g.fillStyle = '#9e9e9e'
+    g.fillRect(0, 0, s, 3)
+    g.fillRect(0, s - 3, s, 3)
+  })

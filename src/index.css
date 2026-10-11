@@ -398,7 +398,10 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 
 /* Compact phone HUD (hidden on bigger screens) */
 .hud-mobile { display: none; }
-.menu-sound { display: flex; align-items: center; justify-content: space-between; background: #fff; border: 2px solid #e0e0e0; border-radius: 12px; padding: 6px 10px; margin-bottom: 8px; font-weight: 800; }
+.menu-sound { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #fff; border: 2px solid #e0e0e0; border-radius: 12px; padding: 6px 10px; margin-bottom: 8px; font-weight: 800; }
+
+.menu-sound .ambience-vol { flex: 1; min-width: 0; accent-color: var(--green); }
+.menu-sound .ambience-vol:disabled { opacity: .4; }
 
 @media (max-width: 600px) {
   .hud-left, .hud-center, .hud-right { display: none !important; }
@@ -1132,3 +1135,9 @@ button.book-car { font: inherit; color: inherit; }
 .gt-bar i { display: block; height: 100%; background: #76ff03; }
 @media (max-height: 500px) { .hud-center .goal-tracker { display: none; } }
 @media (max-width: 600px) { .goal-tracker { margin-top: 4px; font-size: 12px; padding: 2px 8px 2px 3px; } }
+
+/* Merged buildings: block size on the job badge, and the Merge tool's buttons. */
+.badge-merge { position: absolute; top: -9px; left: -9px; height: 18px; line-height: 15px; font-size: 11px; background: #5e35b1; color: #fff; border: 2px solid #fff; border-radius: 9px; padding: 0 4px; }
+.badge-merge-go { background: #7e57c2; color: #fff; border-color: #fff; font-size: 15px; text-shadow: 0 1px 1px rgba(0,0,0,.35); animation: badge-bob 1.6s ease-in-out infinite; }
+.badge-split { background: #fff; color: #4527a0; border-color: #b39ddb; font-size: 13px; }
+@keyframes badge-bob { 50% { transform: translateY(-3px); } }
