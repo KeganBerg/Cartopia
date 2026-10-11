@@ -750,7 +750,7 @@ function paintLook(color: string, finish?: Finish | null, rusty?: boolean): Look
 // Toy-style car: bevelled extruded body and cabin so no edge is a hard box corner. Faces +z.
 function CarBody({ body, color, finish, highlight, stripe, beams, rusty, rig, mods, flames, lean }: CarProps) {
   // Rusty finds come home stock.
-  const fit = rusty ? {} : fittedMods(mods)
+  const fit = rusty ? {} : fittedMods(mods, body)
   const s = shapeOf(body)
   const g = carGeo(body, fit)
   const p = g.parts
@@ -901,7 +901,7 @@ function bikeGeo(body: BikeBody, fit: Partial<Record<ModSlot, string>>): CarGeo 
 
 // Bikes take every mod slot, with bike-sized parts.
 function BikeModel({ body, color, finish, highlight, beams, rusty, rig, mods, flames, lean }: CarProps) {
-  const fit = rusty ? {} : fittedMods(mods)
+  const fit = rusty ? {} : fittedMods(mods, body)
   const bb = body as BikeBody
   const g = bikeGeo(bb, fit)
   const p = g.parts

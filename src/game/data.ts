@@ -438,12 +438,13 @@ export const modCost = (id: string) => {
   const m = modDef(id)
   return { coins: m?.coins ?? 0, parts: m?.parts ?? 0, bucks: m?.bucks ?? 0 }
 }
-// The fitted mod in each slot (the first known one wins if a save lists two).
-export const fittedMods = (mods?: string[] | null): Partial<Record<ModSlot, string>> => {
+// The fitted mod in each slot (the first known one wins if a save lists two). Given a body,
+// parts that don't fit it are skipped, as the server's econ_fitted_mods does.
+export const fittedMods = (mods?: string[] | null, body?: Body): Partial<Record<ModSlot, string>> => {
   const out: Partial<Record<ModSlot, string>> = {}
   for (const id of Array.isArray(mods) ? mods : []) {
     const m = modDef(id)
-    if (m && !out[m.slot]) out[m.slot] = id
+    if (m && !out[m.slot] && (!body || modFits(m, body))) out[m.slot] = id
   }
   return out
 }
@@ -455,7 +456,7 @@ export const modXp = (id: string) => 10 + (modDef(id)?.unlockLevel ?? 0) * 3
 
 // Performance index: what races are decided on (plus the driver's shifting).
 export const performance = (car: CarDef, up: Record<UpgradeSlot, number>, mods?: string[] | null) => {
-  const m = Object.values(fittedMods(mods)).map(modStats)
+  const m = Object.values(fittedMods(mods, car.body)).map(modStats)
   const sum = (k: 'power' | 'grip' | 'weight') => m.reduce((a, x) => a + x[k], 0)
   const power = car.power + up.engine * 4 + up.turbo * 3 + sum('power')
   const grip = car.grip + up.tires * 4 + sum('grip')

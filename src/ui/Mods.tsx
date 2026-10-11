@@ -29,7 +29,7 @@ export function ModShop({ car, trying, setTrying }: { car: OwnedCar; trying: str
   const modCar = useGame((s) => s.modCar)
   const def = carDef(car.model)
   const [slot, setSlot] = useState<ModSlot>('spoiler')
-  const fit = fittedMods(car.mods)
+  const fit = fittedMods(car.mods, def.body)
   const owned = ownedMods(car)
   const basePi = performance(def, car.upgrades, car.mods)
   const info = MOD_SLOTS.find((s) => s.id === slot)!

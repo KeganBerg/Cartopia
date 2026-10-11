@@ -129,6 +129,12 @@ describe('car mods', () => {
     }
   })
 
+  it('ignores parts that do not fit the body, like the server', () => {
+    const bike = carDef('shinden')
+    expect(fittedMods(['gtwing', 'tailfairing'], bike.body)).toEqual({ spoiler: 'tailfairing' })
+    expect(performance(bike, none, ['gtwing'])).toBe(performance(bike, none))
+  })
+
   it('prices every mod in coins or bucks, never both', () => {
     for (const m of MODS) {
       expect(new Set(MODS.map((x) => x.id)).size).toBe(MODS.length)
