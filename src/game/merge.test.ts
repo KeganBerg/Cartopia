@@ -193,7 +193,7 @@ describe('turning merged blocks', () => {
     const pair = [b('pizza', 5, 5), b('pizza', 6, 5)]
     const town = applyMerge(pair, mergeCandidates(pair)[0])
     const g = one(town)
-    expect(rotateGroup(town, g, 0, (x, z) => z === 5)).toBeNull()
+    expect(rotateGroup(town, g, 0, (_x, z) => z === 5)).toBeNull()
   })
 })
 
