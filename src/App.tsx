@@ -19,6 +19,7 @@ import { UpgradePanel } from './ui/Upgrade'
 import { RescuePanel } from './ui/Rescue'
 import { BankPanel } from './ui/Bank'
 import { DealsPanel } from './ui/Deals'
+import { CratesPanel } from './ui/Crates'
 import { LevelUpSplash } from './ui/LevelUp'
 import { AccountPanel } from './ui/Account'
 import { AlertsCard } from './ui/Alerts'
@@ -31,6 +32,7 @@ import { ArcadePanel } from './ui/Arcade'
 import { useGame, today } from './game/store'
 import { startCloudSync } from './lib/cloud'
 import './lib/rescue'
+import './lib/crates'
 import { startAmbience } from './lib/ambience'
 import { useTownPaused } from './scene/renderGate'
 import { useCrewGoalWatcher } from './ui/CrewGoal'
@@ -98,6 +100,7 @@ export default function App() {
       {panel === 'rescue' && <RescuePanel />}
       {panel === 'bank' && <BankPanel />}
       {panel === 'deals' && <DealsPanel />}
+      {panel === 'crates' && <CratesPanel />}
       <VisitBanner />
       <Tutorial />
       <AlertsCard />
