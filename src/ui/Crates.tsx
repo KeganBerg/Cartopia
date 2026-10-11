@@ -2,8 +2,8 @@ import { useMemo, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { NeutralToneMapping } from 'three'
 import { useGame, openCrate } from '../game/store'
-import { carDef, modDef } from '../game/data'
-import { CRATES, carOdds, crateCost, crateDef, crateOddsShown, dropTier, skinOdds, skinOf, type CrateDef, type CrateId, type CrateOpen } from '../game/crates'
+import { carDef, modDef, ownedModSkins, ownedSkins } from '../game/data'
+import { CRATES, carOdds, crateCost, crateDef, crateOddsShown, dropTier, modChoices, skinOdds, skinOf, type CrateDef, type CrateId, type CrateOpen } from '../game/crates'
 import { SKIN_TIERS } from '../game/data'
 import { CrateScene, TIER_GLOW, prizeLook, type CratePhase } from '../scene/CrateScene'
 import { CarThumb } from '../scene/BuildingPreview'
@@ -28,9 +28,21 @@ function CrateIcon({ c }: { c: CrateDef }) {
 }
 
 // The odds a crate shows: coins, parts, cars and skins, and on a tap the cars or skins it can hold.
+// Cars and skins you already have are dimmed with a coin, since they pay coins instead, and the
+// parts slice turns to coins once no part in it fits a car of yours.
 function Odds({ c, level }: { c: CrateDef; level: number }) {
   const [open, setOpen] = useState<'car' | 'skin' | null>(null)
   const o = crateOddsShown(c)
+  const cars = useGame((s) => s.cars)
+  const skinIds = useGame((s) => s.skins)
+  const modSkinIds = useGame((s) => s.modSkins)
+  const claimedSets = useGame((s) => s.claimedSets)
+  const have = useMemo(() => new Set(cars.map((x) => x.model)), [cars])
+  const haveSkin = useMemo(() => {
+    const st = { level, claimedSets, skins: skinIds, modSkins: modSkinIds }
+    return new Set([...ownedSkins(st).map((id) => 'b:' + id), ...ownedModSkins(st).map((id) => 'p:' + id)])
+  }, [level, claimedSets, skinIds, modSkinIds])
+  const noParts = useMemo(() => !modChoices(c, level, cars).length, [c, level, cars])
   const list = useMemo(() => carOdds(c, level).sort((a, b) => b.p - a.p), [c, level])
   const skins = useMemo(() => skinOdds(c).sort((a, b) => b.p - a.p), [c])
   const pct = (p: number) => p.toFixed(p < 1 ? 1 : 0)
@@ -39,7 +51,7 @@ function Odds({ c, level }: { c: CrateDef; level: number }) {
     <div className="crate-odds">
       <div className="crate-odds-row">
         <span className="odd coins" style={{ flex: o.coins }}><b>🪙</b>{o.coins}%</span>
-        <span className="odd mod" style={{ flex: o.mod }}><b>🔧</b>{o.mod}%</span>
+        <span className={`odd mod${noParts ? ' spent' : ''}`} style={{ flex: o.mod }} title={noParts ? 'No parts left to fit your cars: pays coins' : undefined}><b>{noParts ? '🔧🪙' : '🔧'}</b>{o.mod}%</span>
         <button className="odd car" style={{ flex: Math.max(o.car, 14) }} onClick={() => toggle('car')} aria-expanded={open === 'car'}><b>🚗</b>{o.car}%<small>{open === 'car' ? '▴' : '▾'}</small></button>
         {o.skin > 0 && <button className="odd skin" style={{ flex: Math.max(o.skin, 14) }} onClick={() => toggle('skin')} aria-expanded={open === 'skin'}><b>✨</b>{o.skin}%<small>{open === 'skin' ? '▴' : '▾'}</small></button>}
       </div>
@@ -48,7 +60,7 @@ function Odds({ c, level }: { c: CrateDef; level: number }) {
           {list.length ? list.map((x) => {
             const d = carDef(x.model)
             return (
-              <span key={x.model} className="crate-car" title={d.name}>
+              <span key={x.model} className={`crate-car${have.has(x.model) ? ' owned' : ''}`} title={have.has(x.model) ? `${d.name} (owned: pays coins)` : d.name}>
                 <CarThumb size="xs" body={d.body} model={d.id} color={d.colors[0]} />
                 <small>{pct(x.p * o.car)}%</small>
               </span>
@@ -59,7 +71,7 @@ function Odds({ c, level }: { c: CrateDef; level: number }) {
       {open === 'skin' && (
         <div className="crate-cars">
           {skins.map((x) => (
-            <span key={(x.part ? 'p:' : 'b:') + x.id} className="crate-skin" title={`${x.def.name}${x.part ? ' (part skin)' : ''}`} style={{ '--tier': SKIN_TIERS[x.def.tier].color } as React.CSSProperties}>
+            <span key={(x.part ? 'p:' : 'b:') + x.id} className={`crate-skin${haveSkin.has((x.part ? 'p:' : 'b:') + x.id) ? ' owned' : ''}`} title={`${x.def.name}${x.part ? ' (part skin)' : ''}${haveSkin.has((x.part ? 'p:' : 'b:') + x.id) ? ' (owned: pays coins)' : ''}`} style={{ '--tier': SKIN_TIERS[x.def.tier].color } as React.CSSProperties}>
               <i style={{ background: x.def.swatch }}>{x.part && <em>🔧</em>}</i>
               <small>{pct(x.p * o.skin)}%</small>
             </span>
