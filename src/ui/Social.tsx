@@ -8,7 +8,7 @@ import {
   createClan, joinClan, leaveClan, kickMember, updateClan,
   type BoardRow, type Clan, type ClanBadge, type Metric, type MyClan, type Period,
 } from '../lib/clans'
-import { Panel } from './Menus'
+import { Panel, SheetTabs } from './Menus'
 import { isCleanName, NAME_REJECTED } from '../lib/names'
 
 const n = (v: number) => v.toLocaleString()
@@ -32,13 +32,7 @@ export function SocialTabs({ current }: { current: PanelId }) {
     { id: 'leaders', label: '🏅 Leaderboards' },
     { id: 'clan', label: '🛡️ Crew' },
   ]
-  return (
-    <div className="tabs social-tabs">
-      {tabs.map((t) => (
-        <button key={t.id} className={t.id === current ? 'tab sel' : 'tab'} onClick={() => openPanel(t.id)}>{t.label}</button>
-      ))}
-    </div>
-  )
+  return <SheetTabs items={tabs as { id: Exclude<PanelId, null>; label: string }[]} value={current ?? 'friends'} onChange={(id) => openPanel(id)} />
 }
 
 export function ClanTag({ clan, small }: { clan: ClanBadge | null; small?: boolean }) {
@@ -64,9 +58,10 @@ function weekResetsIn() {
   return h > 24 ? `${Math.floor(h / 24)}d ${h % 24}h` : `${h}h`
 }
 
-function MetricPicker({ metric, setMetric, period, setPeriod }: { metric: Metric; setMetric: (m: Metric) => void; period: Period; setPeriod: (p: Period) => void }) {
+function MetricPicker({ metric, setMetric, period, setPeriod, children }: { metric: Metric; setMetric: (m: Metric) => void; period: Period; setPeriod: (p: Period) => void; children?: React.ReactNode }) {
   return (
     <div className="board-controls">
+      {children}
       <div className="seg metrics">
         {METRICS.map((m) => (
           <button key={m.id} className={m.id === metric ? 'sel' : ''} onClick={() => setMetric(m.id)}>
@@ -145,11 +140,12 @@ export function LeadersPanel() {
   return (
     <Panel title="Leaderboards" wide>
       <SocialTabs current="leaders" />
-      <div className="seg scope">
-        <button className={scope === 'players' ? 'sel' : ''} onClick={() => setScope('players')}>Players</button>
-        <button className={scope === 'clans' ? 'sel' : ''} onClick={() => setScope('clans')}>Crews</button>
-      </div>
-      <MetricPicker metric={metric} setMetric={setMetric} period={period} setPeriod={setPeriod} />
+      <MetricPicker metric={metric} setMetric={setMetric} period={period} setPeriod={setPeriod}>
+        <div className="seg scope">
+          <button className={scope === 'players' ? 'sel' : ''} onClick={() => setScope('players')}>Players</button>
+          <button className={scope === 'clans' ? 'sel' : ''} onClick={() => setScope('clans')}>Crews</button>
+        </div>
+      </MetricPicker>
       <p className="hint board-hint">
         {metric === 'power' && 'Power is the combined PI of your 5 best cars. Upgrade in the Garage to climb. '}
         {metric === 'race_wins' && 'Every drag race and Grand Prix win counts. '}

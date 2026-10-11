@@ -21,6 +21,7 @@ import { LightPool } from './BuildingModel'
 import { TownCars } from './TownCars'
 import { Townspeople } from './Townspeople'
 import { Batch } from './Batch'
+import { Manhole } from './BuildingDetail'
 import { toWorld, toTile, DIRS } from './grid'
 import { grassTex, paverTex, asphaltTex } from './textures'
 import { layoutRoads } from './traffic/layout'
@@ -204,7 +205,7 @@ function Building({ b, roads }: { b: PlacedBuilding; roads: Set<string> }) {
 }
 
 // Raised sidewalk strip along a road edge with no connecting road.
-function Sidewalk({ side }: { side: 'e' | 'w' | 's' | 'n' }) {
+function Sidewalk({ side, drain }: { side: 'e' | 'w' | 's' | 'n'; drain?: boolean }) {
   const half = TILE / 2
   const w = 0.4
   const along = side === 'e' || side === 'w'
@@ -212,10 +213,36 @@ function Sidewalk({ side }: { side: 'e' | 'w' | 's' | 'n' }) {
     side === 'e' ? [half - w / 2, 0.04, 0] : side === 'w' ? [-half + w / 2, 0.04, 0]
     : side === 's' ? [0, 0.04, half - w / 2] : [0, 0.04, -half + w / 2]
   return (
-    <mesh position={pos} receiveShadow>
-      <boxGeometry args={along ? [w, 0.08, TILE] : [TILE, 0.08, w]} />
-      <meshStandardMaterial map={along ? paverTex(0.5, 2) : paverTex(2, 0.5)} />
-    </mesh>
+    <group>
+      <mesh position={pos} receiveShadow>
+        <boxGeometry args={along ? [w, 0.08, TILE] : [TILE, 0.08, w]} />
+        <meshStandardMaterial map={along ? paverTex(0.5, 2) : paverTex(2, 0.5)} />
+      </mesh>
+      {/* Kerbstones along the road edge, and a drain grate in the gutter. */}
+      <mesh position={along ? [pos[0] - Math.sign(pos[0]) * (w / 2 - 0.03), 0.045, 0] : [0, 0.045, pos[2] - Math.sign(pos[2]) * (w / 2 - 0.03)]}>
+        <boxGeometry args={along ? [0.06, 0.09, TILE] : [TILE, 0.09, 0.06]} />
+        <meshStandardMaterial color="#cfd8dc" />
+      </mesh>
+      {drain && (
+        <mesh rotation-x={-Math.PI / 2} position={along ? [pos[0] - Math.sign(pos[0]) * (w / 2 + 0.05), LAYER.paint, 0.5] : [0.5, LAYER.paint, pos[2] - Math.sign(pos[2]) * (w / 2 + 0.05)]}>
+          <planeGeometry args={along ? [0.1, 0.26] : [0.26, 0.1]} />
+          <meshStandardMaterial color="#3a3f44" {...decal()} />
+        </mesh>
+      )}
+    </group>
+  )
+}
+
+// Fire hydrant on the sidewalk.
+function Hydrant({ side }: { side: 'e' | 'w' | 's' | 'n' }) {
+  const at = TILE / 2 - 0.2
+  const [x, z] = { e: [at, 0.6], w: [-at, -0.6], s: [-0.6, at], n: [0.6, -at] }[side]
+  return (
+    <group position={[x, 0.08, z]}>
+      <mesh position={[0, 0.12, 0]} castShadow><cylinderGeometry args={[0.06, 0.07, 0.24, 8]} /><meshStandardMaterial color="#e53935" /></mesh>
+      <mesh position={[0, 0.26, 0]}><sphereGeometry args={[0.065, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2]} /><meshStandardMaterial color="#e53935" /></mesh>
+      <mesh position={[0, 0.14, 0]} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.025, 0.025, 0.2, 6]} /><meshStandardMaterial color="#cfd8dc" /></mesh>
+    </group>
   )
 }
 
@@ -340,7 +367,9 @@ function Roads() {
               <planeGeometry args={[TILE, TILE]} />
               <meshStandardMaterial map={asphalt} />
             </mesh>
-            {SIDES.map((sd, i) => !arms[i] && <Sidewalk key={sd} side={sd} />)}
+            {SIDES.map((sd, i) => !arms[i] && <Sidewalk key={sd} side={sd} drain={(x * 2 + z + i) % 4 === 0} />)}
+            {(straightX || straightZ) && (x * 5 + z * 3) % 7 === 0 && <Hydrant side={straightX ? ((x + z) % 2 ? 'n' : 's') : ((x + z) % 2 ? 'w' : 'e')} />}
+            {(straightX || straightZ) && (x * 3 + z * 7) % 5 === 1 && <Manhole x={straightX ? 0.25 : 0.45} z={straightX ? 0.45 : 0.25} />}
             {SIDES.map((sd, i) => xing[i] && <Crosswalk key={sd} side={sd} />)}
             {xing.map((on, i) => on && (oneWay < 0 || oneWay === i) && <StopLine key={i} side={i} />)}
             {/* Street lamps every few tiles along straight roads, alternating sides. */}
