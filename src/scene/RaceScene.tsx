@@ -28,8 +28,8 @@ type Props = {
   track: number
   me: RefObject<RacerView>
   them: RefObject<RacerView>
-  mine: { body: Body; color: string }
-  theirs: { body: Body; color: string }
+  mine: { body: Body; color: string; mods?: string[] }
+  theirs: { body: Body; color: string; mods?: string[] }
 }
 
 function SkyDome({ tint = '#ffffff' }: { tint?: string }) {
@@ -353,7 +353,7 @@ export function RaceScene({ track, me, them, mine, theirs }: Props) {
             <planeGeometry args={[0.9, 1.5]} />
             <meshBasicMaterial map={glowTex()} color="#000000" transparent opacity={0.35} depthWrite={false} {...decal(3)} />
           </mesh>
-          {i === 0 ? <CarModel body={mine.body} color={mine.color} beams={night > 0.3} /> : <CarModel body={theirs.body} color={theirs.color} beams={night > 0.3} />}
+          {i === 0 ? <CarModel body={mine.body} color={mine.color} mods={mine.mods} flames beams={night > 0.3} /> : <CarModel body={theirs.body} color={theirs.color} mods={theirs.mods} flames beams={night > 0.3} />}
         </group>
       ))}
     </>

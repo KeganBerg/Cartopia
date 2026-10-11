@@ -8,7 +8,8 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { wheelTex } from './textures'
 import { glowMats } from './dayNight'
-import type { Body } from '../game/data'
+import { fittedMods, type Body, type ModSlot } from '../game/data'
+import { CarMods, RIM_LOOK } from './CarMods'
 
 type Shape = {
   len: number; wid: number
@@ -148,11 +149,24 @@ const BIG_GRILLE: Body[] = ['muscle', 'truck', 'classic', 'wagon']
 const LOW: Body[] = ['sports', 'super', 'wedge', 'coupe']
 const RUGGED: Body[] = ['truck', 'offroad', 'rally']
 
-type CarGeo = { parts: Partial<Record<Part, BufferGeometry>>; wheel: BufferGeometry }
-const geoCache = new Map<Body, CarGeo>()
+// Where bolt-on mods attach: body size, deck and hood heights, wheel spots.
+export function carFrame(body: Body) {
+  const s = SHAPES[body]
+  const p = bodyProfile(s, s.round ? Math.min(0.1, s.body * 0.4) : 0.035)
+  const cowl = Math.min(s.cabinZ + s.cabinLen / 2, s.len / 2 - s.len * 0.2)
+  return {
+    len: s.len, wid: s.wid, lift: s.lift, wheel: s.wheel, wz: s.len * 0.33,
+    deck: p.deck, hoodTop: p.hood + s.hood, hoodZ: (cowl + s.len / 2 - s.len * 0.1) / 2,
+  }
+}
 
-function carGeo(body: Body): CarGeo {
-  const hit = geoCache.get(body)
+type CarGeo = { parts: Partial<Record<Part, BufferGeometry>>; wheel: BufferGeometry }
+const geoCache = new Map<string, CarGeo>()
+
+// Stock parts that a fitted mod replaces are left out of the merged body.
+function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>): CarGeo {
+  const key = `${body}|${fit.spoiler ? 1 : 0}${fit.hood ? 1 : 0}${fit.exhaust ? 1 : 0}${fit.kit ? 1 : 0}`
+  const hit = geoCache.get(key)
   if (hit) return hit
   const s = SHAPES[body]
   const k = new Kit()
@@ -177,7 +191,7 @@ function carGeo(body: Body): CarGeo {
   for (const z of [wz, -wz]) for (const sd of [-1, 1]) {
     k.add('black', new CircleGeometry(s.wheel * 1.18, 18, 0, Math.PI), [sd * (s.wid / 2 + 0.003), s.wheel, z], [0, (sd * Math.PI) / 2, 0])
     // Rugged bodies get chunky black fender flares round the arches.
-    if (RUGGED.includes(body)) k.add('black', new TorusGeometry(s.wheel * 1.2, 0.03, 5, 14, Math.PI), [sd * (s.wid / 2 + 0.01), s.wheel, z], [0, (sd * Math.PI) / 2, 0], [1, 1, 1.6])
+    if (RUGGED.includes(body) && !fit.kit) k.add('black', new TorusGeometry(s.wheel * 1.2, 0.03, 5, 14, Math.PI), [sd * (s.wid / 2 + 0.01), s.wheel, z], [0, (sd * Math.PI) / 2, 0], [1, 1, 1.6])
   }
 
   if (s.round) {
@@ -262,13 +276,13 @@ function carGeo(body: Body): CarGeo {
     }
     k.add('chrome', new SphereGeometry(0.025, 8, 6), [0, hoodY + 0.02, hoodFront - 0.02], [0, 0, 0], [0.6, 1, 2])
   }
-  if (s.wing) {
+  if (s.wing && !fit.spoiler) {
     for (const sd of [-1, 1]) k.add('black', box(0.03, 0.2, 0.04), [sd * s.wid * 0.3, top + 0.1, -s.len / 2 + 0.08])
     k.add('paint', box(s.wid * 0.9, 0.03, 0.15), [0, top + 0.21, -s.len / 2 + 0.08])
     for (const sd of [-1, 1]) k.add('black', box(0.012, 0.08, 0.17), [sd * s.wid * 0.45, top + 0.2, -s.len / 2 + 0.08])
   }
   if (s.hood > 0) k.add('paint', rbox(s.wid * 0.5, s.hood * 2, s.len * 0.26, s.hood * 0.9), [0, hoodY, s.len * 0.3])
-  if (s.scoop) {
+  if (s.scoop && !fit.hood) {
     k.add('black', rbox(0.16, 0.07, 0.16, 0.025), [0, hoodY + s.hood + 0.02, s.len * 0.27])
     k.add('black', box(0.12, 0.03, 0.01), [0, hoodY + s.hood + 0.03, s.len * 0.27 + 0.082])
   }
@@ -278,7 +292,7 @@ function carGeo(body: Body): CarGeo {
     for (const sd of [-1, 1]) k.add('chrome', box(0.025, 0.02, s.len * 0.4), [sd * s.wid * 0.45, top + 0.01, -s.len * 0.27])
     k.add('chrome', box(0.12, 0.02, 0.01), [0, top - 0.05, -s.len / 2 - 0.004])
   }
-  if (s.spoiler) {
+  if (s.spoiler && !fit.spoiler) {
     for (const sd of [-1, 1]) k.add('black', box(0.03, 0.12, 0.04), [sd * s.wid * 0.32, top + 0.06, -s.len / 2 + 0.07])
     k.add(body === 'super' ? 'black' : 'paint', box(s.wid * 0.95, 0.03, 0.14), [0, top + 0.13, -s.len / 2 + 0.07])
   }
@@ -291,7 +305,7 @@ function carGeo(body: Body): CarGeo {
 
   // Bumpers, with a black lower lip on the front.
   for (const sd of [1, -1]) k.add('chrome', rbox(s.wid * 0.96, 0.07, 0.06, 0.028), [0, s.lift + 0.07, sd * (s.len / 2 - 0.005)])
-  k.add('black', box(s.wid * 0.8, 0.02, 0.05), [0, s.lift + 0.03, s.len / 2 - 0.02])
+  if (!fit.kit) k.add('black', box(s.wid * 0.8, 0.02, 0.05), [0, s.lift + 0.03, s.len / 2 - 0.02])
   // Front: headlights in dark bezels either side of a grille (or a low intake on sleek cars), turn signals and a plate.
   const z = front + 0.004
   const roundLamps = ROUND_LAMPS.includes(body)
@@ -335,18 +349,18 @@ function carGeo(body: Body): CarGeo {
     k.add('lamp', plane(0.03, 0.03), [sd * s.wid * 0.19, ty, -front - 0.005], [0, Math.PI, 0])
   }
   k.add('lamp', plane(0.11, 0.045), [0, s.lift + 0.13, -s.len / 2 - 0.035], [0, Math.PI, 0])
-  const pipes = LOW.includes(body) || body === 'muscle' ? [-1, 1] : body === 'offroad' ? [] : [-1]
+  const pipes = fit.exhaust ? [] : LOW.includes(body) || body === 'muscle' ? [-1, 1] : body === 'offroad' ? [] : [-1]
   for (const sd of pipes) {
     k.add('chrome', cyl(0.024, 0.024, 0.08, 10), [sd * s.wid * 0.3, s.lift + 0.035, -front - 0.02], [Math.PI / 2, 0, 0])
     k.add('black', disc(0.016, 10), [sd * s.wid * 0.3, s.lift + 0.035, -front - 0.061], [0, Math.PI, 0])
   }
   // Low cars get a black diffuser under the rear bumper.
-  if (LOW.includes(body)) {
+  if (LOW.includes(body) && !fit.kit) {
     k.add('black', box(s.wid * 0.7, 0.03, 0.06), [0, s.lift + 0.02, -front + 0.02])
     for (const x of [-0.15, 0, 0.15]) k.add('black', box(0.01, 0.04, 0.06), [x * s.wid, s.lift + 0.02, -front + 0.02])
   }
   // Mud flaps behind each wheel on rugged bodies.
-  if (RUGGED.includes(body)) for (const zz of [wz, -wz]) for (const sd of [-1, 1]) k.add('black', box(0.12, 0.1, 0.012), [sd * (s.wid / 2 - 0.07), s.lift + 0.02, zz - s.wheel * 1.15])
+  if (RUGGED.includes(body) && !fit.kit) for (const zz of [wz, -wz]) for (const sd of [-1, 1]) k.add('black', box(0.12, 0.1, 0.012), [sd * (s.wid / 2 - 0.07), s.lift + 0.02, zz - s.wheel * 1.15])
   // Fuel filler on the right rear quarter.
   if (!s.open) k.add('dark', disc(0.025, 12), [s.wid / 2 + 0.004, top - 0.06, -wz + 0.06], [0, Math.PI / 2, 0])
   // Door seams, handles and mirrors on closed cars.
@@ -370,7 +384,7 @@ function carGeo(body: Body): CarGeo {
   wheel.rotateZ(Math.PI / 2)
 
   const out = { parts: k.build(), wheel }
-  geoCache.set(body, out)
+  geoCache.set(key, out)
   return out
 }
 
@@ -386,16 +400,25 @@ const MAT = {
   tail: new MeshBasicMaterial({ color: '#ff1744' }),
   amber: new MeshBasicMaterial({ color: '#ffa000' }),
 }
-let wheelMat: MeshStandardMaterial | null = null
-const wheelMaterial = () => (wheelMat ??= new MeshStandardMaterial({ map: wheelTex(), metalness: 0.35, roughness: 0.6 }))
+// Wheel materials: stock, and one per rim finish from the Rims mod.
+const wheelMats = new Map<string, MeshStandardMaterial>()
+function wheelMaterial(rim?: string) {
+  const look = rim ? RIM_LOOK[rim] : undefined
+  const key = look ? rim! : ''
+  let m = wheelMats.get(key)
+  if (!m) wheelMats.set(key, (m = new MeshStandardMaterial({ map: wheelTex(), color: look?.[0] ?? '#ffffff', metalness: look?.[1] ?? 0.35, roughness: look?.[2] ?? 0.6 })))
+  return m
+}
 
 // Handles on a car's wheels so a driving car can steer the front pair and roll all four.
 export type WheelRig = { steer: (Group | null)[]; spin: (Group | null)[]; radius: number; base: number }
 
 // Toy-style car: bevelled extruded body and cabin so no edge is a hard box corner. Faces +z.
-export function CarModel({ body, color, highlight, stripe, beams, rusty, rig }: { body: Body; color: string; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean; rig?: WheelRig }) {
+export function CarModel({ body, color, highlight, stripe, beams, rusty, rig, mods, flames }: { body: Body; color: string; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean; rig?: WheelRig; mods?: string[] | null; flames?: boolean }) {
+  // Rusty finds come home stock.
+  const fit = rusty ? {} : fittedMods(mods)
   const s = SHAPES[body]
-  const g = carGeo(body)
+  const g = carGeo(body, fit)
   const p = g.parts
   // Rusty finds keep a hint of their paint under brown, matte rust.
   const tint = useMemo(() => (rusty ? '#' + new Color(color).lerp(new Color('#8a5a3c'), 0.72).getHexString() : color), [color, rusty])
@@ -419,6 +442,7 @@ export function CarModel({ body, color, highlight, stripe, beams, rusty, rig }: 
         </mesh>
       )}
       {shared.map((k) => <mesh key={k} geometry={p[k]} material={MAT[k]} castShadow={k === 'glass'} />)}
+      <CarMods body={body} fit={fit} tint={tint} metal={rusty ? 0.1 : 0.4} flames={flames} />
       {/* Headlight beams on the road, visible after dark. */}
       {beams && (
         <mesh rotation-x={-Math.PI / 2} position={[0, 0.03, s.len / 2 + 0.55]} renderOrder={2}>
@@ -430,7 +454,7 @@ export function CarModel({ body, color, highlight, stripe, beams, rusty, rig }: 
       {[[-wx, wz], [wx, wz], [-wx, -wz], [wx, -wz]].map(([x, z], i) => (
         <group key={i} position={[x, s.wheel, z]} ref={rig && i < 2 ? (o) => void (rig.steer[i] = o) : undefined}>
           <group ref={rig ? (o) => void (rig.spin[i] = o) : undefined}>
-            <mesh geometry={g.wheel} material={wheelMaterial()} />
+            <mesh geometry={g.wheel} material={wheelMaterial(fit.rims)} />
           </group>
         </group>
       ))}
