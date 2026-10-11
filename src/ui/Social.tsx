@@ -10,6 +10,7 @@ import {
 } from '../lib/clans'
 import { Panel, SheetTabs } from './Menus'
 import { isCleanName, NAME_REJECTED } from '../lib/names'
+import { CrewGoalCard, useCrewGoal } from './CrewGoal'
 
 const n = (v: number) => v.toLocaleString()
 
@@ -27,12 +28,13 @@ export function useUserId() {
 // Friends, Leaderboards and Crew share one window with tabs across the top.
 export function SocialTabs({ current }: { current: PanelId }) {
   const openPanel = useGame((s) => s.openPanel)
-  const tabs: { id: PanelId; label: string }[] = [
+  const chests = useCrewGoal((g) => g.ready)
+  const tabs: { id: PanelId; label: React.ReactNode }[] = [
     { id: 'friends', label: '👫 Friends' },
     { id: 'leaders', label: '🏅 Leaderboards' },
-    { id: 'clan', label: '🛡️ Crew' },
+    { id: 'clan', label: <>🛡️ Crew{chests > 0 && <span className="tab-dot">{chests}</span>}</> },
   ]
-  return <SheetTabs items={tabs as { id: Exclude<PanelId, null>; label: string }[]} value={current ?? 'friends'} onChange={(id) => openPanel(id)} />
+  return <SheetTabs items={tabs as { id: Exclude<PanelId, null>; label: React.ReactNode }[]} value={current ?? 'friends'} onChange={(id) => openPanel(id)} />
 }
 
 export function ClanTag({ clan, small }: { clan: ClanBadge | null; small?: boolean }) {
@@ -233,7 +235,7 @@ export function ClanPanel() {
           <span className="big-emblem">🛡️</span>
           <div>
             <b>Team up in a crew</b>
-            <p>Join up to {CLAN_CAP} drivers, pool your power, wins and trophies, and climb the crew leaderboards together.</p>
+            <p>Join up to {CLAN_CAP} drivers, hit a weekly goal together for a crew chest, and climb the crew leaderboards.</p>
             <button className="buy" onClick={() => openPanel('account')}>Sign in to join</button>
           </div>
         </div>
@@ -310,6 +312,7 @@ function ClanHome({ data, uid, onChange }: { data: MyClan; uid: string; onChange
           <small>{clan.members}/{clan.memberCap} members{clan.minLevel > 1 ? ` · level ${clan.minLevel}+ to join` : ''}{rank ? ` · #${rank} by power` : ''}</small>
         </div>
       </div>
+      <CrewGoalCard members={members} uid={uid} />
       <div className="clan-stats">
         {METRICS.map((m) => (
           <div key={m.id} className="clan-stat">

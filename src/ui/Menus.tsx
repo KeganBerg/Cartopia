@@ -11,6 +11,7 @@ import { ModShop, withMod } from './Mods'
 import { CollectionBook, useFindCar } from './Collection'
 import { PaintShop, jobOf } from './Paint'
 import type { PaintJob } from '../game/data'
+import { useCrewGoal } from './CrewGoal'
 
 // Phones and tablets: no hover, so placing takes a preview tap first.
 const TOUCH = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
@@ -21,6 +22,7 @@ export function BottomBar() {
   const mode = useGame((s) => s.mode)
   const visiting = useGame((s) => !!s.visiting)
   const setsReady = useGame((s) => readySets(s).length)
+  const crewChests = useCrewGoal((g) => g.ready)
   if (visiting) return null
   if (mode !== 'play') return <EditBar />
   return (
@@ -29,7 +31,7 @@ export function BottomBar() {
         <button className="icon-btn" onClick={() => openPanel('shop')}><span className="i">🏪</span>SHOP</button>
         <button className="icon-btn" onClick={() => openPanel('showroom')}><span className="i">🚘{setsReady > 0 && <span className="btn-dot">{setsReady}</span>}</span>SHOWROOM</button>
         <button className="icon-btn" onClick={() => openPanel('garage')}><span className="i">🔧</span>GARAGE</button>
-        <button className="icon-btn" onClick={() => openPanel('friends')}><span className="i">👫</span>FRIENDS</button>
+        <button className="icon-btn" onClick={() => openPanel('friends')}><span className="i">👫{crewChests > 0 && <span className="btn-dot">{crewChests}</span>}</span>FRIENDS</button>
         <button className="icon-btn" onClick={() => setMode('road')}><span className="i">🚧</span>EDIT</button>
         <button className="big-btn race-btn" onClick={() => openPanel('race')}><span className="i">🏆</span>RACE</button>
       </div>

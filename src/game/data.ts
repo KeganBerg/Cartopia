@@ -964,3 +964,9 @@ export const dealSave = (d: DealDef) => {
   const o = dealOffer(d)
   return o.was.coins - o.now.coins
 }
+
+// Crew weekly goal. The server counts the points from each save and checks the target
+// (supabase/migrations/0027_crew_weekly_goal.sql, crew_goal_rules()); these copies are for display.
+export const CREW_POINTS = { job: 1, race: 3 }
+// What a crew chest pays. The server guard reads this from econ_catalog().crew.
+export const CREW_CHEST: ChestPay = { coins: 1500, coinsPerLevel: 300, xp: 0, xpPerLevel: 0, parts: 25, bucks: 5, fuel: 0 }
