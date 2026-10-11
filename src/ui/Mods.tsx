@@ -70,7 +70,7 @@ export function ModShop({ car, trying, setTrying }: { car: OwnedCar; trying: str
               {fitted ? (
                 <button className="mod-remove" onClick={(e) => { e.stopPropagation(); modCar(car.uid, m.id, true) }}>✔ Fitted · Take off</button>
               ) : have ? (
-                <button className="buy small owned" onClick={(e) => { e.stopPropagation(); if (modCar(car.uid, m.id)) setTrying(null) }}>Owned · Fit free</button>
+                <button className="buy small owned" onClick={(e) => { e.stopPropagation(); if (modCar(car.uid, m.id)) setTrying(null) }}>Equip</button>
               ) : locked ? (
                 <button className="price locked-btn" onClick={(e) => { e.stopPropagation(); modCar(car.uid, m.id) }}>🔒 Level {m.unlockLevel}</button>
               ) : (
