@@ -325,11 +325,40 @@ export function PondDetail() {
   )
 }
 
-// Garage: roof vents and downspouts.
+// Garage: roof vents, skylights, an AC unit, a roof hatch and ladder, gutter and bay numbers, downspouts.
 export function GarageDetail({ W, D }: { W: number; D: number }) {
+  const front = D * 0.3 - 0.3
   return (
     <group>
       {[-1, 0, 1].map((i) => <Box key={i} p={[i * W * 0.28, 1.8, -0.3 - D * 0.1]} s={[0.28, 0.1, 0.22]} cast>{c('#cfd8dc')}</Box>)}
+      {/* Skylights over the bays. */}
+      {[-1, 0, 1].map((i) => (
+        <group key={i} position={[i * W * 0.28, 1.76, front - 0.35]}>
+          <Box p={[0, 0, 0]} s={[0.42, 0.04, 0.3]}>{c('#eceff1')}</Box>
+          <Box p={[0, 0.03, 0]} s={[0.36, 0.03, 0.24]}>{c('#81d4fa')}</Box>
+        </group>
+      ))}
+      {/* AC unit with a fan grille. */}
+      <group position={[-W * 0.3, 1.75, -0.3 - D * 0.22]}>
+        <Box p={[0, 0.13, 0]} s={[0.5, 0.26, 0.36]} cast>{c('#b0bec5')}</Box>
+        <mesh position={[0, 0.265, 0]} rotation-x={-Math.PI / 2}><circleGeometry args={[0.13, 12]} />{c('#37474f')}</mesh>
+        {[-0.06, 0, 0.06].map((x) => <Box key={x} p={[x, 0.27, 0]} s={[0.012, 0.01, 0.26]}>{c('#90a4ae')}</Box>)}
+      </group>
+      {/* Roof hatch, and a ladder up the side wall to it. */}
+      <Box p={[W * 0.3, 1.78, -0.3 - D * 0.22]} s={[0.3, 0.08, 0.3]} cast>{c('#78909c')}</Box>
+      <group position={[W * 0.45 + 0.03, 0, -0.3 - D * 0.15]}>
+        {[-0.1, 0.1].map((z) => <Box key={z} p={[0, 0.95, z]} s={[0.025, 1.9, 0.025]}>{c('#607d8b')}</Box>)}
+        {Array.from({ length: 8 }, (_, i) => <Box key={i} p={[0, 0.25 + i * 0.2, 0]} s={[0.02, 0.02, 0.2]}>{c('#607d8b')}</Box>)}
+      </group>
+      {/* Gutter along the front edge of the roof. */}
+      <Box p={[0, 1.61, D * 0.325 - 0.27]} s={[W * 0.93, 0.07, 0.06]}>{c('#90a4ae')}</Box>
+      {/* Bay numbers over the doors. */}
+      {[-1.1, 0, 1.1].map((x, i) => (
+        <group key={x} position={[x + 0.36, 1.25, front + 0.02]}>
+          <Box p={[0, 0, 0]} s={[0.12, 0.12, 0.01]}>{c('#fafafa')}</Box>
+          {Array.from({ length: i + 1 }, (_, j) => <Box key={j} p={[(j - i / 2) * 0.03, 0, 0.006]} s={[0.014, 0.08, 0.004]}>{c('#263238')}</Box>)}
+        </group>
+      ))}
       {[-1, 1].map((sd) => (
         <mesh key={sd} position={[sd * W * 0.44, 0.85, D * 0.3 - 0.27]}><cylinderGeometry args={[0.025, 0.025, 1.7, 6]} />{c('#90a4ae')}</mesh>
       ))}

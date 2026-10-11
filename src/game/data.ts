@@ -51,31 +51,31 @@ export const BUILDINGS: BuildingDef[] = [
   { id: 'crew', name: 'Crew House', kind: 'business', w: 2, h: 1, price: 2500, unlockLevel: 2, unique: true, color: '#455a64', roof: '#ff7043', sign: 'CREW HOUSE' },
   { id: 'gas', name: 'Gas Station', kind: 'gas', w: 2, h: 1, price: 1500, unlockLevel: 1, fuelCap: 10, color: '#ffca28', roof: '#e53935', sign: 'GAS' },
   { id: 'pizza', name: 'Pizza Place', kind: 'business', w: 1, h: 1, price: 400, unlockLevel: 1, jobSeconds: 30, fuelCost: 1, payout: 60, xp: 5, color: '#c0504d', roof: '#f5f5f5', sign: 'PIZZA' },
-  { id: 'donut', name: 'Donut Shop', kind: 'business', w: 1, h: 1, price: 900, unlockLevel: 2, jobSeconds: 90, fuelCost: 2, payout: 160, xp: 12, color: '#f48fb1', roof: '#fff8e1', sign: 'DONUTS', prop: 'donut' },
-  { id: 'burger', name: 'Burger Joint', kind: 'business', w: 1, h: 1, price: 1200, unlockLevel: 2, jobSeconds: 120, fuelCost: 2, payout: 210, xp: 15, color: '#ffb300', roof: '#d84315', sign: 'BURGERS', prop: 'burger' },
-  { id: 'icecream', name: 'Ice Cream Stand', kind: 'business', w: 1, h: 1, price: 1500, unlockLevel: 3, jobSeconds: 150, fuelCost: 2, payout: 260, xp: 18, color: '#b3e5fc', roof: '#f8bbd0', sign: 'ICE CREAM', prop: 'cone' },
-  { id: 'carwash', name: 'Car Wash', kind: 'business', w: 2, h: 1, price: 1800, unlockLevel: 3, jobSeconds: 180, fuelCost: 3, payout: 380, xp: 25, color: '#4fc3f7', roof: '#e1f5fe', sign: 'CAR WASH' },
-  { id: 'diner', name: 'Diner', kind: 'business', w: 2, h: 1, price: 3200, unlockLevel: 4, jobSeconds: 300, fuelCost: 4, payout: 700, xp: 40, color: '#90caf9', roof: '#ef5350', sign: 'DINER' },
-  { id: 'tires', name: 'Tire Shop', kind: 'parts', w: 1, h: 1, price: 2000, unlockLevel: 2, jobSeconds: 240, fuelCost: 3, payout: 100, partsPayout: 6, xp: 20, color: '#455a64', roof: '#263238', sign: 'TIRES', prop: 'tire' },
-  { id: 'bowling', name: 'Bowling Alley', kind: 'business', w: 2, h: 1, price: 4200, unlockLevel: 5, jobSeconds: 420, fuelCost: 4, payout: 950, xp: 55, color: '#7e57c2', roof: '#ede7f6', sign: 'BOWLING', prop: 'pin' },
-  { id: 'motel', name: 'Motel', kind: 'business', w: 2, h: 1, price: 5500, unlockLevel: 6, jobSeconds: 720, fuelCost: 5, payout: 1400, xp: 70, color: '#ffe0b2', roof: '#00897b', sign: 'MOTEL' },
-  { id: 'tuner', name: 'Tuner Shop', kind: 'parts', w: 2, h: 1, price: 8000, unlockLevel: 7, jobSeconds: 600, fuelCost: 5, payout: 400, partsPayout: 25, xp: 70, color: '#212121', roof: '#ff3d00', sign: 'TUNER' },
-  { id: 'stadium', name: 'Speedway', kind: 'business', w: 2, h: 2, price: 20000, unlockLevel: 10, jobSeconds: 1800, fuelCost: 10, payout: 6000, xp: 300, color: '#eceff1', roof: '#c62828', sign: 'SPEEDWAY' },
-  { id: 'cinema', name: 'Drive-In', kind: 'business', w: 2, h: 2, price: 6000, unlockLevel: 6, jobSeconds: 600, fuelCost: 6, payout: 1500, xp: 80, color: '#8d6e63', roof: '#3e2723', sign: 'DRIVE-IN', prop: 'popcorn' },
+  { id: 'donut', name: 'Donut Shop', kind: 'business', w: 1, h: 1, price: 1000, unlockLevel: 2, jobSeconds: 90, fuelCost: 2, payout: 150, xp: 12, color: '#f48fb1', roof: '#fff8e1', sign: 'DONUTS', prop: 'donut' },
+  { id: 'burger', name: 'Burger Joint', kind: 'business', w: 1, h: 1, price: 1400, unlockLevel: 2, jobSeconds: 120, fuelCost: 2, payout: 200, xp: 15, color: '#ffb300', roof: '#d84315', sign: 'BURGERS', prop: 'burger' },
+  { id: 'icecream', name: 'Ice Cream Stand', kind: 'business', w: 1, h: 1, price: 2000, unlockLevel: 3, jobSeconds: 150, fuelCost: 2, payout: 230, xp: 18, color: '#b3e5fc', roof: '#f8bbd0', sign: 'ICE CREAM', prop: 'cone' },
+  { id: 'carwash', name: 'Car Wash', kind: 'business', w: 2, h: 1, price: 2300, unlockLevel: 3, jobSeconds: 180, fuelCost: 3, payout: 340, xp: 25, color: '#4fc3f7', roof: '#e1f5fe', sign: 'CAR WASH' },
+  { id: 'diner', name: 'Diner', kind: 'business', w: 2, h: 1, price: 4600, unlockLevel: 4, jobSeconds: 300, fuelCost: 4, payout: 600, xp: 40, color: '#90caf9', roof: '#ef5350', sign: 'DINER' },
+  { id: 'tires', name: 'Tire Shop', kind: 'parts', w: 1, h: 1, price: 2300, unlockLevel: 2, jobSeconds: 240, fuelCost: 3, payout: 100, partsPayout: 6, xp: 20, color: '#455a64', roof: '#263238', sign: 'TIRES', prop: 'tire' },
+  { id: 'bowling', name: 'Bowling Alley', kind: 'business', w: 2, h: 1, price: 6700, unlockLevel: 5, jobSeconds: 420, fuelCost: 4, payout: 760, xp: 55, color: '#7e57c2', roof: '#ede7f6', sign: 'BOWLING', prop: 'pin' },
+  { id: 'motel', name: 'Motel', kind: 'business', w: 2, h: 1, price: 9600, unlockLevel: 6, jobSeconds: 720, fuelCost: 5, payout: 1050, xp: 70, color: '#ffe0b2', roof: '#00897b', sign: 'MOTEL' },
+  { id: 'tuner', name: 'Tuner Shop', kind: 'parts', w: 2, h: 1, price: 15200, unlockLevel: 7, jobSeconds: 600, fuelCost: 5, payout: 280, partsPayout: 25, xp: 70, color: '#212121', roof: '#ff3d00', sign: 'TUNER' },
+  { id: 'stadium', name: 'Speedway', kind: 'business', w: 2, h: 2, price: 40000, unlockLevel: 10, jobSeconds: 1800, fuelCost: 10, payout: 4200, xp: 300, color: '#eceff1', roof: '#c62828', sign: 'SPEEDWAY' },
+  { id: 'cinema', name: 'Drive-In', kind: 'business', w: 2, h: 2, price: 10500, unlockLevel: 6, jobSeconds: 600, fuelCost: 6, payout: 1120, xp: 80, color: '#8d6e63', roof: '#3e2723', sign: 'DRIVE-IN', prop: 'popcorn' },
   // Second wave: more food, car care and town services, filling the gaps
   // between the early shops and the Speedway and reaching past level 10.
-  { id: 'coffee', name: 'Coffee Corner', kind: 'business', w: 1, h: 1, price: 700, unlockLevel: 2, jobSeconds: 60, fuelCost: 1, payout: 110, xp: 8, color: '#8d6e63', roof: '#2e7d32', sign: 'COFFEE' },
-  { id: 'tacos', name: 'Taco Truck', kind: 'business', w: 1, h: 1, price: 1300, unlockLevel: 3, jobSeconds: 120, fuelCost: 2, payout: 230, xp: 16, color: '#fafafa', roof: '#ff7043', sign: 'TACOS' },
-  { id: 'lube', name: 'Lube & Go', kind: 'parts', w: 1, h: 1, price: 2600, unlockLevel: 4, jobSeconds: 300, fuelCost: 3, payout: 120, partsPayout: 8, xp: 25, color: '#eceff1', roof: '#ffb300', sign: 'LUBE & GO' },
-  { id: 'arcade', name: 'Pixel Palace Arcade', kind: 'business', w: 1, h: 1, price: 3600, unlockLevel: 5, jobSeconds: 360, fuelCost: 3, payout: 800, xp: 45, color: '#4527a0', roof: '#ec407a', sign: 'ARCADE' },
-  { id: 'bodyshop', name: 'Paint & Body Shop', kind: 'business', w: 2, h: 1, price: 6500, unlockLevel: 6, jobSeconds: 600, fuelCost: 5, payout: 1350, xp: 75, color: '#90a4ae', roof: '#263238', sign: 'PAINT & BODY' },
-  { id: 'market', name: 'Fresh Mart', kind: 'business', w: 2, h: 1, price: 9500, unlockLevel: 8, jobSeconds: 900, fuelCost: 6, payout: 2400, xp: 110, color: '#fff8e1', roof: '#2e7d32', sign: 'FRESH MART' },
-  { id: 'firehouse', name: 'Fire Station', kind: 'business', service: true, w: 2, h: 1, price: 12000, unlockLevel: 9, jobSeconds: 1200, fuelCost: 7, payout: 3400, xp: 150, color: '#c62828', roof: '#37474f', sign: 'FIRE STATION' },
-  { id: 'police', name: 'Police Station', kind: 'business', service: true, w: 2, h: 1, price: 16000, unlockLevel: 11, jobSeconds: 1500, fuelCost: 8, payout: 4500, xp: 200, color: '#cfd8dc', roof: '#1a237e', sign: 'POLICE' },
-  { id: 'parkade', name: 'Parking Garage', kind: 'business', w: 2, h: 2, price: 30000, unlockLevel: 13, jobSeconds: 2400, fuelCost: 12, payout: 8800, xp: 380, color: '#bdbdbd', roof: '#1565c0', sign: 'PARKING' },
+  { id: 'coffee', name: 'Coffee Corner', kind: 'business', w: 1, h: 1, price: 800, unlockLevel: 2, jobSeconds: 60, fuelCost: 1, payout: 100, xp: 8, color: '#8d6e63', roof: '#2e7d32', sign: 'COFFEE' },
+  { id: 'tacos', name: 'Taco Truck', kind: 'business', w: 1, h: 1, price: 1700, unlockLevel: 3, jobSeconds: 120, fuelCost: 2, payout: 210, xp: 16, color: '#fafafa', roof: '#ff7043', sign: 'TACOS' },
+  { id: 'lube', name: 'Lube & Go', kind: 'parts', w: 1, h: 1, price: 3800, unlockLevel: 4, jobSeconds: 300, fuelCost: 3, payout: 100, partsPayout: 8, xp: 25, color: '#eceff1', roof: '#ffb300', sign: 'LUBE & GO' },
+  { id: 'arcade', name: 'Pixel Palace Arcade', kind: 'business', w: 1, h: 1, price: 5800, unlockLevel: 5, jobSeconds: 360, fuelCost: 3, payout: 640, xp: 45, color: '#4527a0', roof: '#ec407a', sign: 'ARCADE' },
+  { id: 'bodyshop', name: 'Paint & Body Shop', kind: 'business', w: 2, h: 1, price: 11400, unlockLevel: 6, jobSeconds: 600, fuelCost: 5, payout: 1010, xp: 75, color: '#90a4ae', roof: '#263238', sign: 'PAINT & BODY' },
+  { id: 'market', name: 'Fresh Mart', kind: 'business', w: 2, h: 1, price: 19000, unlockLevel: 8, jobSeconds: 900, fuelCost: 6, payout: 1680, xp: 110, color: '#fff8e1', roof: '#2e7d32', sign: 'FRESH MART' },
+  { id: 'firehouse', name: 'Fire Station', kind: 'business', service: true, w: 2, h: 1, price: 24000, unlockLevel: 9, jobSeconds: 1200, fuelCost: 7, payout: 2380, xp: 150, color: '#c62828', roof: '#37474f', sign: 'FIRE STATION' },
+  { id: 'police', name: 'Police Station', kind: 'business', service: true, w: 2, h: 1, price: 32000, unlockLevel: 11, jobSeconds: 1500, fuelCost: 8, payout: 3150, xp: 200, color: '#cfd8dc', roof: '#1a237e', sign: 'POLICE' },
+  { id: 'parkade', name: 'Parking Garage', kind: 'business', w: 2, h: 2, price: 60000, unlockLevel: 13, jobSeconds: 2400, fuelCost: 12, payout: 6160, xp: 380, color: '#bdbdbd', roof: '#1565c0', sign: 'PARKING' },
   // Only open after dark: neon on at dusk, a line at the door and a rooftop dance floor.
-  { id: 'club', name: 'Neon Owl Nightclub', kind: 'business', nightOnly: true, w: 2, h: 1, price: 5000, unlockLevel: 6, jobSeconds: 300, fuelCost: 4, payout: 1000, xp: 60, color: '#1a1035', roof: '#d500f9', sign: 'NEON OWL' },
-  { id: 'parts', name: 'Parts Depot', kind: 'parts', w: 2, h: 1, price: 5000, unlockLevel: 5, jobSeconds: 480, fuelCost: 4, payout: 200, partsPayout: 15, xp: 45, color: '#1565c0', roof: '#bbdefb', sign: 'PARTS' },
+  { id: 'club', name: 'Neon Owl Nightclub', kind: 'business', nightOnly: true, w: 2, h: 1, price: 8800, unlockLevel: 6, jobSeconds: 300, fuelCost: 4, payout: 750, xp: 60, color: '#1a1035', roof: '#d500f9', sign: 'NEON OWL' },
+  { id: 'parts', name: 'Parts Depot', kind: 'parts', w: 2, h: 1, price: 8000, unlockLevel: 5, jobSeconds: 480, fuelCost: 4, payout: 160, partsPayout: 15, xp: 45, color: '#1565c0', roof: '#bbdefb', sign: 'PARTS' },
 
   // Obstacles on newly bought land: pay to clear, wait, then tap to remove.
   { id: 'bush', name: 'Bushes', kind: 'obstacle', w: 1, h: 1, price: 150, unlockLevel: 99, jobSeconds: 30, xp: 5, color: '#558b2f', roof: '#33691e' },
@@ -173,10 +173,10 @@ export const buildingLevel = (b: { level?: number }) =>
 export const jobLevel = (b: { level?: number; jobLevel?: number }) =>
   b.jobLevel == null ? buildingLevel(b) : buildingLevel({ level: Math.min(b.jobLevel, buildingLevel(b)) })
 
-// +15% coins and parts and +10% XP per level, 8% shorter jobs (rounded to 5s).
-export const upgradePayout = (d: BuildingDef, level: number) => Math.round((d.payout ?? 0) * (1 + 0.15 * (level - 1)))
-export const upgradePartsPayout = (d: BuildingDef, level: number) => Math.round((d.partsPayout ?? 0) * (1 + 0.15 * (level - 1)))
-export const upgradeXp = (d: BuildingDef, level: number) => Math.round((d.xp ?? 0) * (1 + 0.1 * (level - 1)))
+// +10% coins and parts and +5% XP per level, 8% shorter jobs (rounded to 5s).
+export const upgradePayout = (d: BuildingDef, level: number) => Math.round((d.payout ?? 0) * (1 + 0.1 * (level - 1)))
+export const upgradePartsPayout = (d: BuildingDef, level: number) => Math.round((d.partsPayout ?? 0) * (1 + 0.1 * (level - 1)))
+export const upgradeXp = (d: BuildingDef, level: number) => Math.round((d.xp ?? 0) * (1 + 0.05 * (level - 1)))
 export const upgradeJobSeconds = (d: BuildingDef, level: number) =>
   d.jobSeconds ? Math.max(10, Math.round((d.jobSeconds * Math.pow(0.92, level - 1)) / 5) * 5) : 0
 // Max fuel a building adds: a gas station's tank grows 2 a level; every house
@@ -184,13 +184,13 @@ export const upgradeJobSeconds = (d: BuildingDef, level: number) =>
 export const upgradeFuelCap = (d: BuildingDef, level: number) =>
   d.fuelCap ? d.fuelCap + 2 * (level - 1) : d.kind === 'house' ? level - 1 : 0
 
-// Cost to go from `level` to `level + 1`: 60% of the build price, 40% more each
+// Cost to go from `level` to `level + 1`: 75% of the build price, 50% more each
 // level, plus parts from level 4 up. Houses are cheap to build but end up as
 // skyscrapers, so theirs start at $300 and grow 55% a level.
 export const buildingUpgradeCost = (d: BuildingDef, level: number) => ({
   coins: d.kind === 'house'
     ? Math.round((300 * Math.pow(1.55, level - 1)) / 50) * 50
-    : Math.max(100, Math.round((d.price * 0.6 * Math.pow(1.4, level - 1)) / 50) * 50),
+    : Math.max(100, Math.round((d.price * 0.75 * Math.pow(1.5, level - 1)) / 50) * 50),
   parts: level >= 4 ? (level - 2) * 2 : 0,
 })
 
@@ -284,32 +284,32 @@ export type CarDef = {
 export const CARS: CarDef[] = [
   { id: 'pip', name: 'Kipper Pocket', body: 'compact', price: 800, unlockLevel: 1, power: 18, grip: 36, weight: 24, skill: 'launch', likes: ['pizza', 'donut', 'market'], colors: ['#c62828', '#1b5e20', '#fafafa'] },
   { id: 'civic', name: 'Kazumi Commuter', body: 'sedan', price: 1500, unlockLevel: 1, power: 24, grip: 34, weight: 36, skill: 'slipstream', likes: ['pizza', 'diner', 'coffee'], colors: ['#1e88e5', '#eeeeee', '#424242'] },
-  { id: 'trail', name: 'Ironside Workhorse', body: 'truck', price: 2600, unlockLevel: 2, power: 38, grip: 26, weight: 74, skill: 'torque', likes: ['tires', 'parts', 'lube'], colors: ['#0d47a1', '#c62828', '#eceff1'] },
-  { id: 'miata', name: 'Kazumi Zephyr', body: 'roadster', price: 4200, unlockLevel: 3, power: 32, grip: 54, weight: 22, skill: 'smooth', likes: ['icecream', 'cinema', 'arcade'], colors: ['#d32f2f', '#1e88e5', '#fafafa'] },
-  { id: 'stallion', name: "Liberty Bore Horse '68", body: 'muscle', price: 7000, unlockLevel: 4, power: 52, grip: 34, weight: 54, skill: 'nitro', likes: ['burger', 'stadium', 'firehouse'], colors: ['#1b5e20', '#ff6f00', '#212121'] },
-  { id: 'rally', name: 'Kodiak Gravel Rex', body: 'rally', price: 9500, unlockLevel: 5, power: 52, grip: 64, weight: 40, skill: 'smooth', likes: ['tires', 'tuner', 'bodyshop'], colors: ['#0d47a1', '#fafafa', '#ffd600'] },
-  { id: 'vette', name: 'Liberty Sidewinder', body: 'sports', price: 14000, unlockLevel: 6, power: 66, grip: 54, weight: 38, skill: 'slipstream', likes: ['motel', 'stadium', 'police'], colors: ['#b71c1c', '#bdbdbd', '#ffd600'] },
-  { id: 'charger', name: 'Liberty Brawler', body: 'muscle', price: 18000, unlockLevel: 7, power: 70, grip: 40, weight: 60, skill: 'nitro', likes: ['burger', 'tuner', 'lube'], colors: ['#212121', '#ff5722', '#6a1b9a'] },
-  { id: 'hellcat', name: 'Liberty Hellhound 707', body: 'widebody', price: 22000, unlockLevel: 8, power: 80, grip: 46, weight: 62, skill: 'launch', likes: ['tuner', 'stadium', 'bodyshop'], colors: ['#c62828', '#7b1fa2', '#9ccc65'] },
-  { id: 'gtr', name: 'Kazumi Ronin GT', body: 'coupe', price: 26000, unlockLevel: 9, power: 78, grip: 70, weight: 46, skill: 'smooth', likes: ['tuner', 'bowling', 'arcade'], colors: ['#eceff1', '#263238', '#ff6d00'] },
-  { id: 'tomahawk', name: 'Ironside Tomahawk', body: 'tank', price: 90000, unlockLevel: 10, legendary: true, power: 100, grip: 94, weight: 60, skill: 'launch', likes: ['stadium', 'police', 'firehouse'], colors: ['#556b2f', '#37474f', '#c9a227'] },
-  { id: 'zippy', name: 'Kipper Zip 50', body: 'scooter', price: 1800, unlockLevel: 2, power: 14, grip: 30, weight: 8, skill: 'slipstream', likes: ['pizza', 'coffee', 'icecream'], colors: ['#4dd0e1', '#fdd835', '#f48fb1'] },
-  { id: 'baron', name: 'Liberty Road Baron', body: 'chopper', price: 8500, unlockLevel: 5, power: 46, grip: 36, weight: 30, skill: 'nitro', likes: ['diner', 'burger', 'bowling'], colors: ['#212121', '#b71c1c', '#1565c0'] },
-  { id: 'shinden', name: 'Kazumi Shinden RR', body: 'sportbike', price: 30000, unlockLevel: 9, power: 80, grip: 60, weight: 14, skill: 'launch', likes: ['tuner', 'stadium', 'arcade'], colors: ['#1565c0', '#eceff1', '#76ff03'] },
-  { id: 'camper', name: 'Lakeside Sunrise Camper', body: 'van', price: 2400, unlockLevel: 2, power: 20, grip: 28, weight: 64, skill: 'slipstream', likes: ['icecream', 'tacos', 'motel'], colors: ['#ff8a65', '#4db6ac', '#fff59d'] },
-  { id: 'hotshot', name: 'Kazumi Hot Shot RS', body: 'hatch', price: 3800, unlockLevel: 3, power: 36, grip: 50, weight: 26, skill: 'launch', likes: ['arcade', 'tuner', 'coffee'], colors: ['#eceff1', '#d32f2f', '#1e88e5'] },
-  { id: 'ridgeback', name: 'Kodiak Ridgeback 4x4', body: 'suv', price: 6000, unlockLevel: 4, power: 44, grip: 46, weight: 62, skill: 'torque', likes: ['tires', 'parts', 'firehouse'], colors: ['#ff6f00', '#33691e', '#eceff1'] },
-  { id: 'kitsune', name: 'Kazumi Kitsune Drift', body: 'coupe', price: 8000, unlockLevel: 5, power: 48, grip: 58, weight: 30, skill: 'smooth', likes: ['tuner', 'arcade', 'bodyshop'], colors: ['#fafafa', '#212121', '#ff4081'] },
-  { id: 'current', name: 'Sparkline Current', body: 'ev', price: 15000, unlockLevel: 6, power: 72, grip: 52, weight: 50, skill: 'launch', likes: ['coffee', 'market', 'parkade'], colors: ['#eceff1', '#b71c1c', '#263238'] },
-  { id: 'salon', name: 'Regent Grand Salon', body: 'luxury', price: 0, bucks: 25, unlockLevel: 6, power: 64, grip: 50, weight: 70, skill: 'slipstream', likes: ['motel', 'cinema', 'market'], colors: ['#1a1a2e', '#eceff1', '#6d1b1b'] },
-  { id: 'stomper', name: 'Ironside Dune Stomper', body: 'truck', price: 16000, unlockLevel: 7, power: 66, grip: 44, weight: 72, skill: 'torque', likes: ['tires', 'stadium', 'lube'], colors: ['#424242', '#1565c0', '#ff6d00'] },
-  { id: 'monoposto', name: 'Veloce Monoposto 1', body: 'formula', price: 75000, unlockLevel: 11, power: 90, grip: 90, weight: 20, skill: 'smooth', likes: ['stadium', 'tuner', 'parkade'], colors: ['#d50000', '#eceff1', '#00897b'] },
-  { id: 'zenith', name: 'Aether Zenith R', body: 'super', price: 120000, unlockLevel: 14, legendary: true, power: 100, grip: 96, weight: 26, skill: 'nitro', likes: ['stadium', 'parkade', 'police'], colors: ['#212121', '#1e88e5', '#ff6d00'] },
-  { id: 'schoolbus', name: 'Ironside Scholar 72', body: 'bus', price: 5000, unlockLevel: 3, power: 30, grip: 26, weight: 90, skill: 'slipstream', likes: ['diner', 'arcade', 'icecream'], colors: ['#fbc02d', '#ff8f00', '#eceff1'] },
-  { id: 'shaggy', name: 'Lakeside Shaggy Hound', body: 'dogvan', price: 5500, unlockLevel: 4, power: 26, grip: 30, weight: 66, skill: 'oil', likes: ['burger', 'donut', 'icecream'], colors: ['#d7ccc8', '#a1887f', '#9e9e9e'] },
-  { id: 'tusker', name: 'Kodiak Tusker Scout', body: 'tusker', price: 34000, unlockLevel: 9, power: 70, grip: 72, weight: 58, skill: 'torque', likes: ['police', 'firehouse', 'tires'], colors: ['#6b7a3a', '#c2a36b', '#eceff1'] },
-  { id: 'lambo', name: 'Veloce Corrida V12', body: 'wedge', price: 0, bucks: 40, unlockLevel: 5, power: 86, grip: 70, weight: 34, skill: 'oil', likes: ['cinema', 'club', 'parkade'], colors: ['#fdd835', '#d50000', '#fafafa'] },
-  { id: 'hyper', name: 'Veloce Hyperion', body: 'super', price: 60000, unlockLevel: 12, power: 98, grip: 86, weight: 32, skill: 'nitro', likes: ['stadium', 'tuner', 'parkade'], colors: ['#1a237e', '#212121', '#d50000'] },
+  { id: 'trail', name: 'Ironside Workhorse', body: 'truck', price: 3000, unlockLevel: 2, power: 38, grip: 26, weight: 74, skill: 'torque', likes: ['tires', 'parts', 'lube'], colors: ['#0d47a1', '#c62828', '#eceff1'] },
+  { id: 'miata', name: 'Kazumi Zephyr', body: 'roadster', price: 5500, unlockLevel: 3, power: 32, grip: 54, weight: 22, skill: 'smooth', likes: ['icecream', 'cinema', 'arcade'], colors: ['#d32f2f', '#1e88e5', '#fafafa'] },
+  { id: 'stallion', name: "Liberty Bore Horse '68", body: 'muscle', price: 10200, unlockLevel: 4, power: 52, grip: 34, weight: 54, skill: 'nitro', likes: ['burger', 'stadium', 'firehouse'], colors: ['#1b5e20', '#ff6f00', '#212121'] },
+  { id: 'rally', name: 'Kodiak Gravel Rex', body: 'rally', price: 15200, unlockLevel: 5, power: 52, grip: 64, weight: 40, skill: 'smooth', likes: ['tires', 'tuner', 'bodyshop'], colors: ['#0d47a1', '#fafafa', '#ffd600'] },
+  { id: 'vette', name: 'Liberty Sidewinder', body: 'sports', price: 24500, unlockLevel: 6, power: 66, grip: 54, weight: 38, skill: 'slipstream', likes: ['motel', 'stadium', 'police'], colors: ['#b71c1c', '#bdbdbd', '#ffd600'] },
+  { id: 'charger', name: 'Liberty Brawler', body: 'muscle', price: 34200, unlockLevel: 7, power: 70, grip: 40, weight: 60, skill: 'nitro', likes: ['burger', 'tuner', 'lube'], colors: ['#212121', '#ff5722', '#6a1b9a'] },
+  { id: 'hellcat', name: 'Liberty Hellhound 707', body: 'widebody', price: 44000, unlockLevel: 8, power: 80, grip: 46, weight: 62, skill: 'launch', likes: ['tuner', 'stadium', 'bodyshop'], colors: ['#c62828', '#7b1fa2', '#9ccc65'] },
+  { id: 'gtr', name: 'Kazumi Ronin GT', body: 'coupe', price: 52000, unlockLevel: 9, power: 78, grip: 70, weight: 46, skill: 'smooth', likes: ['tuner', 'bowling', 'arcade'], colors: ['#eceff1', '#263238', '#ff6d00'] },
+  { id: 'tomahawk', name: 'Ironside Tomahawk', body: 'tank', price: 180000, unlockLevel: 10, legendary: true, power: 100, grip: 94, weight: 60, skill: 'launch', likes: ['stadium', 'police', 'firehouse'], colors: ['#556b2f', '#37474f', '#c9a227'] },
+  { id: 'zippy', name: 'Kipper Zip 50', body: 'scooter', price: 2100, unlockLevel: 2, power: 14, grip: 30, weight: 8, skill: 'slipstream', likes: ['pizza', 'coffee', 'icecream'], colors: ['#4dd0e1', '#fdd835', '#f48fb1'] },
+  { id: 'baron', name: 'Liberty Road Baron', body: 'chopper', price: 13600, unlockLevel: 5, power: 46, grip: 36, weight: 30, skill: 'nitro', likes: ['diner', 'burger', 'bowling'], colors: ['#212121', '#b71c1c', '#1565c0'] },
+  { id: 'shinden', name: 'Kazumi Shinden RR', body: 'sportbike', price: 60000, unlockLevel: 9, power: 80, grip: 60, weight: 14, skill: 'launch', likes: ['tuner', 'stadium', 'arcade'], colors: ['#1565c0', '#eceff1', '#76ff03'] },
+  { id: 'camper', name: 'Lakeside Sunrise Camper', body: 'van', price: 2800, unlockLevel: 2, power: 20, grip: 28, weight: 64, skill: 'slipstream', likes: ['icecream', 'tacos', 'motel'], colors: ['#ff8a65', '#4db6ac', '#fff59d'] },
+  { id: 'hotshot', name: 'Kazumi Hot Shot RS', body: 'hatch', price: 4900, unlockLevel: 3, power: 36, grip: 50, weight: 26, skill: 'launch', likes: ['arcade', 'tuner', 'coffee'], colors: ['#eceff1', '#d32f2f', '#1e88e5'] },
+  { id: 'ridgeback', name: 'Kodiak Ridgeback 4x4', body: 'suv', price: 8700, unlockLevel: 4, power: 44, grip: 46, weight: 62, skill: 'torque', likes: ['tires', 'parts', 'firehouse'], colors: ['#ff6f00', '#33691e', '#eceff1'] },
+  { id: 'kitsune', name: 'Kazumi Kitsune Drift', body: 'coupe', price: 12800, unlockLevel: 5, power: 48, grip: 58, weight: 30, skill: 'smooth', likes: ['tuner', 'arcade', 'bodyshop'], colors: ['#fafafa', '#212121', '#ff4081'] },
+  { id: 'current', name: 'Sparkline Current', body: 'ev', price: 26200, unlockLevel: 6, power: 72, grip: 52, weight: 50, skill: 'launch', likes: ['coffee', 'market', 'parkade'], colors: ['#eceff1', '#b71c1c', '#263238'] },
+  { id: 'salon', name: 'Regent Grand Salon', body: 'luxury', price: 0, bucks: 45, unlockLevel: 6, power: 64, grip: 50, weight: 70, skill: 'slipstream', likes: ['motel', 'cinema', 'market'], colors: ['#1a1a2e', '#eceff1', '#6d1b1b'] },
+  { id: 'stomper', name: 'Ironside Dune Stomper', body: 'truck', price: 30400, unlockLevel: 7, power: 66, grip: 44, weight: 72, skill: 'torque', likes: ['tires', 'stadium', 'lube'], colors: ['#424242', '#1565c0', '#ff6d00'] },
+  { id: 'monoposto', name: 'Veloce Monoposto 1', body: 'formula', price: 150000, unlockLevel: 11, power: 90, grip: 90, weight: 20, skill: 'smooth', likes: ['stadium', 'tuner', 'parkade'], colors: ['#d50000', '#eceff1', '#00897b'] },
+  { id: 'zenith', name: 'Aether Zenith R', body: 'super', price: 240000, unlockLevel: 14, legendary: true, power: 100, grip: 96, weight: 26, skill: 'nitro', likes: ['stadium', 'parkade', 'police'], colors: ['#212121', '#1e88e5', '#ff6d00'] },
+  { id: 'schoolbus', name: 'Ironside Scholar 72', body: 'bus', price: 6500, unlockLevel: 3, power: 30, grip: 26, weight: 90, skill: 'slipstream', likes: ['diner', 'arcade', 'icecream'], colors: ['#fbc02d', '#ff8f00', '#eceff1'] },
+  { id: 'shaggy', name: 'Lakeside Shaggy Hound', body: 'dogvan', price: 8000, unlockLevel: 4, power: 26, grip: 30, weight: 66, skill: 'oil', likes: ['burger', 'donut', 'icecream'], colors: ['#d7ccc8', '#a1887f', '#9e9e9e'] },
+  { id: 'tusker', name: 'Kodiak Tusker Scout', body: 'tusker', price: 68000, unlockLevel: 9, power: 70, grip: 72, weight: 58, skill: 'torque', likes: ['police', 'firehouse', 'tires'], colors: ['#6b7a3a', '#c2a36b', '#eceff1'] },
+  { id: 'lambo', name: 'Veloce Corrida V12', body: 'wedge', price: 0, bucks: 75, unlockLevel: 5, power: 86, grip: 70, weight: 34, skill: 'oil', likes: ['cinema', 'club', 'parkade'], colors: ['#fdd835', '#d50000', '#fafafa'] },
+  { id: 'hyper', name: 'Veloce Hyperion', body: 'super', price: 120000, unlockLevel: 12, power: 98, grip: 86, weight: 32, skill: 'nitro', likes: ['stadium', 'tuner', 'parkade'], colors: ['#1a237e', '#212121', '#d50000'] },
   { id: 'bug', name: 'Bumble Bubble', body: 'bubble', price: 1200, unlockLevel: 1, rescueOnly: true, power: 14, grip: 28, weight: 28, skill: 'freeze', likes: ['icecream', 'donut', 'coffee'], colors: ['#80cbc4', '#ffcc80', '#ef9a9a'] },
   { id: 'woodie', name: 'Lakeside Woodie Wagon', body: 'wagon', price: 2200, unlockLevel: 1, rescueOnly: true, power: 22, grip: 28, weight: 56, skill: 'slipstream', likes: ['diner', 'carwash', 'market'], colors: ['#fafafa', '#fff59d', '#4db6ac'] },
   { id: 'hauler', name: 'Old Faithful Hauler', body: 'truck', price: 3000, unlockLevel: 1, rescueOnly: true, power: 26, grip: 26, weight: 70, skill: 'torque', likes: ['parts', 'carwash', 'tacos'], colors: ['#558b2f', '#e65100', '#1565c0'] },
@@ -528,13 +528,14 @@ export const performance = (car: CarDef, up: Record<UpgradeSlot, number>, mods?:
 }
 
 // XP needed to go from `level` to `level + 1`.
-export const xpToNext = (level: number) => Math.round(80 * Math.pow(level, 1.6))
+export const xpToNext = (level: number) => Math.round(100 * Math.pow(level, 2.1))
 
 export const baseFuelCap = (level: number) => 15 + level * 2
 export const FUEL_REGEN_SECONDS = 60
 export const RACE_FUEL = 3
-// Bucks to fill the tank to the cap in one go.
+// Bucks to fill the tank to the cap in one go: at least 3, and 1 per 8 fuel it adds.
 export const REFILL_BUCKS = 3
+export const refillBucks = (fuelToAdd: number) => Math.max(REFILL_BUCKS, Math.ceil(fuelToAdd / 8))
 
 // Grand Prix: six races in a row against tougher and tougher rivals. Win
 // all six for a mystery box car. Each repeat of a series gets harder.
