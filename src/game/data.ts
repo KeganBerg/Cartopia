@@ -29,6 +29,8 @@ export type BuildingDef = {
   // Only one per town.
   unique?: boolean
   prop?: 'donut' | 'burger' | 'cone' | 'tire' | 'pin' | 'popcorn'
+  // Listed under Services in the Shop (fire and police stations).
+  service?: boolean
   // Stand-in for a building this build doesn't know (see buildingDef).
   parked?: boolean
 }
@@ -54,6 +56,17 @@ export const BUILDINGS: BuildingDef[] = [
   { id: 'tuner', name: 'Tuner Shop', kind: 'parts', w: 2, h: 1, price: 8000, unlockLevel: 7, jobSeconds: 600, fuelCost: 5, payout: 400, partsPayout: 25, xp: 70, color: '#212121', roof: '#ff3d00', sign: 'TUNER' },
   { id: 'stadium', name: 'Speedway', kind: 'business', w: 2, h: 2, price: 20000, unlockLevel: 10, jobSeconds: 1800, fuelCost: 10, payout: 6000, xp: 300, color: '#eceff1', roof: '#c62828', sign: 'SPEEDWAY' },
   { id: 'cinema', name: 'Drive-In', kind: 'business', w: 2, h: 2, price: 6000, unlockLevel: 6, jobSeconds: 600, fuelCost: 6, payout: 1500, xp: 80, color: '#8d6e63', roof: '#3e2723', sign: 'DRIVE-IN', prop: 'popcorn' },
+  // Second wave: more food, car care and town services, filling the gaps
+  // between the early shops and the Speedway and reaching past level 10.
+  { id: 'coffee', name: 'Coffee Corner', kind: 'business', w: 1, h: 1, price: 700, unlockLevel: 2, jobSeconds: 60, fuelCost: 1, payout: 110, xp: 8, color: '#8d6e63', roof: '#2e7d32', sign: 'COFFEE' },
+  { id: 'tacos', name: 'Taco Truck', kind: 'business', w: 1, h: 1, price: 1300, unlockLevel: 3, jobSeconds: 120, fuelCost: 2, payout: 230, xp: 16, color: '#fafafa', roof: '#ff7043', sign: 'TACOS' },
+  { id: 'lube', name: 'Lube & Go', kind: 'parts', w: 1, h: 1, price: 2600, unlockLevel: 4, jobSeconds: 300, fuelCost: 3, payout: 120, partsPayout: 8, xp: 25, color: '#eceff1', roof: '#ffb300', sign: 'LUBE & GO' },
+  { id: 'arcade', name: 'Pixel Palace Arcade', kind: 'business', w: 1, h: 1, price: 3600, unlockLevel: 5, jobSeconds: 360, fuelCost: 3, payout: 800, xp: 45, color: '#4527a0', roof: '#ec407a', sign: 'ARCADE' },
+  { id: 'bodyshop', name: 'Paint & Body Shop', kind: 'business', w: 2, h: 1, price: 6500, unlockLevel: 6, jobSeconds: 600, fuelCost: 5, payout: 1350, xp: 75, color: '#90a4ae', roof: '#263238', sign: 'PAINT & BODY' },
+  { id: 'market', name: 'Fresh Mart', kind: 'business', w: 2, h: 1, price: 9500, unlockLevel: 8, jobSeconds: 900, fuelCost: 6, payout: 2400, xp: 110, color: '#fff8e1', roof: '#2e7d32', sign: 'FRESH MART' },
+  { id: 'firehouse', name: 'Fire Station', kind: 'business', service: true, w: 2, h: 1, price: 12000, unlockLevel: 9, jobSeconds: 1200, fuelCost: 7, payout: 3400, xp: 150, color: '#c62828', roof: '#37474f', sign: 'FIRE STATION' },
+  { id: 'police', name: 'Police Station', kind: 'business', service: true, w: 2, h: 1, price: 16000, unlockLevel: 11, jobSeconds: 1500, fuelCost: 8, payout: 4500, xp: 200, color: '#cfd8dc', roof: '#1a237e', sign: 'POLICE' },
+  { id: 'parkade', name: 'Parking Garage', kind: 'business', w: 2, h: 2, price: 30000, unlockLevel: 13, jobSeconds: 2400, fuelCost: 12, payout: 8800, xp: 380, color: '#bdbdbd', roof: '#1565c0', sign: 'PARKING' },
   { id: 'parts', name: 'Parts Depot', kind: 'parts', w: 2, h: 1, price: 5000, unlockLevel: 5, jobSeconds: 480, fuelCost: 4, payout: 200, partsPayout: 15, xp: 45, color: '#1565c0', roof: '#bbdefb', sign: 'PARTS' },
 
   // Obstacles on newly bought land: pay to clear, wait, then tap to remove.
@@ -70,6 +83,17 @@ export const BUILDINGS: BuildingDef[] = [
   { id: 'billboard', name: 'Billboard', kind: 'decor', w: 1, h: 1, price: 600, unlockLevel: 3, color: '#eceff1', roof: '#1e88e5' },
   { id: 'statue', name: 'Golden Car Statue', kind: 'decor', w: 1, h: 1, price: 0, bucks: 3, unlockLevel: 5, color: '#ffd700', roof: '#9e9e9e' },
   { id: 'pond', name: 'Duck Pond', kind: 'decor', w: 2, h: 2, price: 1500, unlockLevel: 4, color: '#4fc3f7', roof: '#81c784' },
+  { id: 'pine', name: 'Pine Tree', kind: 'decor', w: 1, h: 1, price: 60, unlockLevel: 1, color: '#2e7d32', roof: '#6d4c41' },
+  { id: 'hedge', name: 'Hedge', kind: 'decor', w: 1, h: 1, price: 40, unlockLevel: 1, color: '#33691e', roof: '#558b2f' },
+  { id: 'fence', name: 'Picket Fence', kind: 'decor', w: 1, h: 1, price: 30, unlockLevel: 1, color: '#fafafa', roof: '#eceff1' },
+  { id: 'picnic', name: 'Picnic Table', kind: 'decor', w: 1, h: 1, price: 90, unlockLevel: 2, color: '#a1887f', roof: '#e53935' },
+  { id: 'busstop', name: 'Bus Stop', kind: 'decor', w: 1, h: 1, price: 200, unlockLevel: 2, color: '#90caf9', roof: '#37474f' },
+  { id: 'hotdog', name: 'Hot Dog Cart', kind: 'decor', w: 1, h: 1, price: 350, unlockLevel: 3, color: '#eceff1', roof: '#fdd835' },
+  { id: 'flagpole', name: 'Flag Pole', kind: 'decor', w: 1, h: 1, price: 300, unlockLevel: 3, color: '#2e7d32', roof: '#eceff1' },
+  { id: 'arch', name: 'Finish Line Arch', kind: 'decor', w: 1, h: 1, price: 0, bucks: 2, unlockLevel: 4, color: '#212121', roof: '#e53935' },
+  { id: 'playground', name: 'Playground', kind: 'decor', w: 2, h: 2, price: 1800, unlockLevel: 5, color: '#ef9a9a', roof: '#1e88e5' },
+  { id: 'gazebo', name: 'Gazebo', kind: 'decor', w: 1, h: 1, price: 1200, unlockLevel: 6, color: '#fafafa', roof: '#2e7d32' },
+  { id: 'clocktower', name: 'Clock Tower', kind: 'decor', w: 1, h: 1, price: 3500, unlockLevel: 8, color: '#b0796b', roof: '#37474f' },
 ]
 
 // Land is bought in 8x8 plots. The starting lot is the 3x3 plots covering
