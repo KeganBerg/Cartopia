@@ -207,6 +207,11 @@ function lizard(g: CanvasRenderingContext2D, t: number) {
   g.translate(shake, 0)
   const mx = 30 + ((t * 9) % 90)
   const my = 40 - stomp * 3
+  // Drawn at 1.6x around its feet so it towers over the city.
+  g.save()
+  g.translate(mx, 80)
+  g.scale(1.6, 1.6)
+  g.translate(-mx, -80)
   // Tail, body, head, spikes.
   g.fillStyle = '#43a047'
   g.beginPath()
@@ -240,6 +245,7 @@ function lizard(g: CanvasRenderingContext2D, t: number) {
       g.stroke()
     }
   }
+  g.restore()
   // City in front of its feet.
   for (let i = 0; i < 9; i++) {
     const h = 14 + hash(i + 9) * 16
@@ -264,10 +270,10 @@ function lizard(g: CanvasRenderingContext2D, t: number) {
 // ---- film dressing --------------------------------------------------------
 
 function leader(g: CanvasRenderingContext2D, t: number) {
-  rect(g, 0, 0, W, H, '#cfcfcf')
+  rect(g, 0, 0, W, H, '#a8a8a8')
   const n = 3 - Math.floor((t / LEADER) * 3)
   const sweep = ((t / LEADER) * 3) % 1
-  g.fillStyle = '#9e9e9e'
+  g.fillStyle = '#7a7a7a'
   g.beginPath()
   g.moveTo(W / 2, H / 2)
   g.arc(W / 2, H / 2, 70, -Math.PI / 2, -Math.PI / 2 + sweep * Math.PI * 2)

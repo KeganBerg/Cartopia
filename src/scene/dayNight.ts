@@ -51,7 +51,7 @@ export function applyNight(n: number) {
   glowMats.bulb.emissiveIntensity = 0.2 + n * 2.2
   glowMats.headlight.emissiveIntensity = 0.1 + n * 2
   glowMats.taillight.emissiveIntensity = n * 1.2
-  glowMats.screen.color.setScalar(0.7 + n * 0.3)
+  glowMats.screen.color.setScalar(0.72 + n * 0.16)
   glowMats.pool.opacity = n * 0.75
   glowMats.beam.opacity = n * 0.5
   for (const m of [glowMats.pool, glowMats.beam]) m.visible = n > 0.02
