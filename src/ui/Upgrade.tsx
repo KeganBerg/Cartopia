@@ -86,7 +86,7 @@ function Driver({ b, d }: { b: PlacedBuilding; d: BuildingDef }) {
       <div className="driver">
         <div className="driver-head">Driver</div>
         <div className="driver-car">
-          <CarThumb size="sm" color={car.color} body={cd.body} stripe={car.stripe} />
+          <CarThumb size="sm" color={car.color} finish={car.finish} body={cd.body} stripe={car.stripe} />
           <div>
             <b>{cd.name}</b>
             <div className={broken ? 'driver-bonus off' : 'driver-bonus'}>
@@ -121,7 +121,7 @@ function Driver({ b, d }: { b: PlacedBuilding; d: BuildingDef }) {
           const at = workplace(c.uid)
           return (
             <button key={c.uid} className={`driver-pick${fan ? ' fan' : ''}${c.uid === b.car ? ' sel' : ''}`} onClick={() => { assign(b.uid, c.uid); setPicking(false) }}>
-              <CarThumb size="xs" color={c.color} body={cd.body} stripe={c.stripe} />
+              <CarThumb size="xs" color={c.color} finish={c.finish} body={cd.body} stripe={c.stripe} />
               <span className="driver-pick-name">{cd.name}{(at || c.flat || c.lowFuel) && <small>{[at && `at ${buildingDef(at.def).name}`, c.flat && '🛞 flat tire', c.lowFuel && '⛽ out of gas'].filter(Boolean).join(' · ')}</small>}</span>
               <span className="driver-pick-bonus">{fan ? '❤️ +25%' : '+10%'}</span>
             </button>

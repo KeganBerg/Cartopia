@@ -2,8 +2,8 @@ import { create } from 'zustand'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import { useGame } from '../game/store'
-import { carDef, performance, type Body } from '../game/data'
-import { displayName } from './names'
+import { CARS, MODS, carDef, performance, type Body } from '../game/data'
+import { displayName, isCleanName } from './names'
 import { signedInUser } from './cloud'
 
 // Live drag racing over Supabase Realtime. A shared lobby channel carries
@@ -65,6 +65,32 @@ export const useLive = create<LiveState>(() => ({
   muted: load('cartopia-muted', {}), closed: load('cartopia-closed', false), cooldownFrom: {}, cooldownTo: {},
 }))
 
+// Lobby messages come straight from other browsers, so anyone can send anything: keep only
+// well-formed cards, with names through the word filter and the car drawn from known parts.
+const BODIES = new Set<string>(CARS.map((c) => c.body))
+const MOD_IDS = new Set(MODS.map((m) => m.id))
+const text = (v: unknown, max: number) => (typeof v === 'string' ? v.slice(0, max) : '')
+const num = (v: unknown, lo: number, hi: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(Math.max(v, lo), hi) : lo)
+export function cleanCard(p: unknown): LivePlayer | null {
+  if (!p || typeof p !== 'object') return null
+  const c = p as Record<string, unknown>
+  const id = text(c.id, 64)
+  if (!id) return null
+  const carName = text(c.carName, 40)
+  return {
+    id,
+    uid: typeof c.uid === 'string' && /^[0-9a-f-]{36}$/i.test(c.uid) ? c.uid : null,
+    town: displayName(text(c.town, 24) || 'Town', id),
+    level: Math.floor(num(c.level, 1, 200)),
+    carName: isCleanName(carName) && carName ? carName : 'Mystery Car',
+    color: typeof c.color === 'string' && /^#[0-9a-f]{6}$/i.test(c.color) ? c.color : '#888888',
+    body: (BODIES.has(c.body as string) ? c.body : 'sedan') as Body,
+    pi: Math.round(num(c.pi, 1, 250)),
+    mods: Array.isArray(c.mods) ? c.mods.filter((m): m is string => typeof m === 'string' && MOD_IDS.has(m)).slice(0, 8) : undefined,
+    closed: c.closed === true,
+  }
+}
+
 let lobby: RealtimeChannel | null = null
 // Challenges we sent, so a late accept of one we already dropped can be told it expired.
 const sentIds = new Set<string>()
@@ -82,13 +108,13 @@ export function joinLobby() {
   lobby
     .on('presence', { event: 'sync' }, () => {
       const state = lobby!.presenceState<LivePlayer>()
-      const players = Object.values(state).map((v) => v[0]).filter((p) => p && p.id !== myId)
+      const players = Object.values(state).map((v) => cleanCard(v[0])).filter((p): p is LivePlayer => !!p && p.id !== myId)
       useLive.setState({ players })
     })
     .on('broadcast', { event: 'challenge' }, ({ payload }) => {
       const l = useLive.getState()
-      const from = payload.from as LivePlayer
-      if (payload.to !== myId || l.race || l.closed || l.muted[from.id]) return
+      const from = cleanCard(payload.from)
+      if (!from || typeof payload.raceId !== 'string' || payload.to !== myId || l.race || l.closed || l.muted[from.id]) return
       if ((l.cooldownFrom[from.id] ?? 0) > Date.now()) return
       // One pending challenge per sender: a repeat just replaces the old one.
       const fresh = !l.invites.some((i) => i.from.id === from.id)
@@ -113,7 +139,7 @@ export function joinLobby() {
       if (!out || payload.raceId !== out.raceId) {
         // They accepted after we cancelled or gave up: let them know instead of leaving them waiting.
         if (payload.accept && sentIds.has(payload.raceId)) {
-          lobby?.send({ type: 'broadcast', event: 'expired', payload: { raceId: payload.raceId, to: payload.from.id } })
+          lobby?.send({ type: 'broadcast', event: 'expired', payload: { raceId: payload.raceId, to: cleanCard(payload.from)?.id } })
         }
         return
       }
@@ -122,7 +148,9 @@ export function joinLobby() {
         useLive.setState((l) => ({ cooldownTo: { ...l.cooldownTo, [out.to]: Date.now() + COOLDOWN_MS } }))
         return useGame.getState().toast('Challenge declined')
       }
-      useLive.setState({ race: { raceId: out.raceId, opponent: payload.from, host: true } })
+      const from = cleanCard(payload.from)
+      if (!from) return
+      useLive.setState({ race: { raceId: out.raceId, opponent: from, host: true } })
     })
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') lobby!.track(myCard())

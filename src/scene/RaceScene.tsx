@@ -1,17 +1,18 @@
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { BackSide, Color, Object3D, type PerspectiveCamera, type Group, type InstancedMesh, type Mesh } from 'three'
-import type { Body } from '../game/data'
+import type { Body, Finish } from '../game/data'
 import { CarModel } from './CarModel'
 import { signTexture } from './signTexture'
-import { skyTex, asphaltTex, paverTex, glowTex } from './textures'
+import { skyTex, asphaltTex, paverTex, glowTex, sandTex, grassTex } from './textures'
 import { BuildingModel, LightPool } from './BuildingModel'
 import { glowMats, dayPhase, duskAmount, nightAmount } from './dayNight'
 import { lookFor } from './look'
 import { PostFx } from './PostFx'
 import { SkyEnv } from './SkyEnv'
 import { holdTown } from './renderGate'
-import { PAL } from './season'
+import { PAL, SEASON } from './season'
+import { SHIRTS, PANTS, SKIN, HAIR, BEANIES } from './people'
 import { LAYER, decal } from './layers'
 import { holdPageTint } from './pageTint'
 import { useGame } from '../game/store'
@@ -30,7 +31,7 @@ type Props = {
   track: number
   me: RefObject<RacerView>
   them: RefObject<RacerView>
-  mine: { body: Body; color: string; mods?: string[] }
+  mine: { body: Body; color: string; finish?: Finish; mods?: string[] }
   theirs: { body: Body; color: string; mods?: string[] }
   venue: Venue
 }
@@ -72,55 +73,107 @@ function useStreet(len: number) {
   }, [buildings, len])
 }
 
-function Spectators({ len }: { len: number }) {
-  const ref = useRef<InstancedMesh>(null)
-  const heads = useRef<InstancedMesh>(null)
-  const spots = useMemo(() => {
-    const out: { x: number; z: number; phase: number }[] = []
+// The crowd, built like the townspeople (body, head, hair, legs) plus arms,
+// all instanced so 90 fans cost a handful of draws. About half cheer, hopping
+// with their arms in the air; the rest watch and wave now and then.
+const FAN = 1.3 // same scale as the townspeople
+const FAN_LEG = 0.24
+function Spectators({ len, cold }: { len: number; cold: boolean }) {
+  const torso = useRef<InstancedMesh>(null)
+  const head = useRef<InstancedMesh>(null)
+  const hair = useRef<InstancedMesh>(null)
+  const legs = useRef<InstancedMesh>(null)
+  const arms = useRef<InstancedMesh>(null)
+  const fans = useMemo(() => {
+    const out: { x: number; z: number; h: number; phase: number; cheer: boolean; c: number }[] = []
     for (let i = 0; i < 90; i++) {
       const side = i % 2 ? 1 : -1
       // Crowds bunch up at the start and the finish.
       const z = i < 60 ? -3 + (i / 60) * 18 : len - 8 + ((i - 60) / 30) * 12
-      out.push({ x: side * (ROAD + 0.3 + ((i * 37) % 7) / 10), z: z + ((i * 13) % 5) / 5, phase: i * 1.7 })
+      // Face the street, give or take a little.
+      const h = (side > 0 ? -Math.PI / 2 : Math.PI / 2) + (((i * 29) % 7) - 3) * 0.08
+      out.push({ x: side * (ROAD + 0.3 + ((i * 37) % 7) / 10), z: z + ((i * 13) % 5) / 5, h, phase: i * 1.7, cheer: (i * 7) % 3 !== 0, c: i * 2654435761 })
     }
     return out
   }, [len])
   useEffect(() => {
-    const m = ref.current
-    if (!m) return
     const c = new Color()
-    const colors = ['#e53935', '#1e88e5', '#fdd835', '#43a047', '#8e24aa', '#ff7043', '#fafafa', '#26c6da']
-    spots.forEach((_, i) => m.setColorAt(i, c.set(colors[i % colors.length])))
-    if (m.instanceColor) m.instanceColor.needsUpdate = true
-  }, [spots])
+    fans.forEach((f, i) => {
+      const k = f.c >>> 0
+      const shirt = SHIRTS[k % SHIRTS.length]
+      torso.current?.setColorAt(i, c.set(shirt))
+      head.current?.setColorAt(i, c.set(SKIN[(k >> 6) % SKIN.length]))
+      hair.current?.setColorAt(i, c.set((cold ? BEANIES : HAIR)[(k >> 9) % 5]))
+      legs.current?.setColorAt(i * 2, c.set(PANTS[(k >> 3) % PANTS.length]))
+      legs.current?.setColorAt(i * 2 + 1, c)
+      arms.current?.setColorAt(i * 2, c.set(shirt))
+      arms.current?.setColorAt(i * 2 + 1, c)
+    })
+    for (const m of [torso, head, hair, legs, arms]) if (m.current?.instanceColor) m.current.instanceColor.needsUpdate = true
+  }, [fans, cold])
   const tmp = useMemo(() => new Object3D(), [])
   useFrame(({ clock }) => {
-    const m = ref.current
-    if (!m) return
     const t = clock.elapsedTime
-    spots.forEach((p, i) => {
-      // Cheering: little hops.
-      tmp.position.set(p.x, 0.32 + Math.max(0, Math.sin(t * 6 + p.phase)) * 0.12, p.z)
-      tmp.updateMatrix()
-      m.setMatrixAt(i, tmp.matrix)
-      tmp.position.y += 0.3
-      tmp.updateMatrix()
-      heads.current?.setMatrixAt(i, tmp.matrix)
+    fans.forEach((f, i) => {
+      const hop = f.cheer ? Math.max(0, Math.sin(t * 6 + f.phase)) * 0.09 : 0
+      const hip = FAN_LEG + hop
+      const sin = Math.sin(f.h)
+      const cos = Math.cos(f.h)
+      const x = f.x / FAN
+      const z = f.z / FAN
+      const put = (m: InstancedMesh | null, at: number, px: number, py: number, pz: number, rz = 0, rx = 0, sy = 1, sxz = 1) => {
+        if (!m) return
+        tmp.position.set(px, py, pz)
+        tmp.rotation.set(rx, f.h, rz)
+        tmp.scale.set(sxz, sy, sxz)
+        tmp.updateMatrix()
+        m.setMatrixAt(at, tmp.matrix)
+      }
+      put(torso.current, i, x, hip + 0.15, z)
+      put(head.current, i, x, hip + 0.36, z)
+      if (cold) put(hair.current, i, x - sin * 0.005, hip + 0.4, z - cos * 0.005, 0, 0, 0.75, 1.05)
+      else put(hair.current, i, x - sin * 0.02, hip + 0.385, z - cos * 0.02, 0, 0, 0.8)
+      // Legs straight down, a little kick on each hop.
+      for (const side of [-1, 1]) {
+        const lx = side * 0.045
+        const a = hop * side * 2
+        put(legs.current, i * 2 + (side > 0 ? 1 : 0), x + cos * lx, hip - FAN_LEG * 0.5, z - sin * lx, 0, a)
+      }
+      // Arms swing out from the shoulders: up high when cheering, a lazy wave otherwise.
+      const wave = Math.sin(t * (f.cheer ? 6 : 2) + f.phase)
+      for (const side of [-1, 1]) {
+        const a = f.cheer ? 2.5 + wave * 0.35 * side : 0.15 + (side > 0 ? Math.max(0, wave) * 2.2 : 0)
+        const lx = side * (0.11 + Math.sin(a) * 0.085)
+        const ly = hip + 0.25 - Math.cos(a) * 0.085
+        put(arms.current, i * 2 + (side > 0 ? 1 : 0), x + cos * lx, ly, z - sin * lx, side * a)
+      }
     })
-    m.instanceMatrix.needsUpdate = true
-    if (heads.current) heads.current.instanceMatrix.needsUpdate = true
+    for (const m of [torso, head, hair, legs, arms]) if (m.current) m.current.instanceMatrix.needsUpdate = true
   })
+  const n = fans.length
   return (
-    <>
-      <instancedMesh ref={ref} args={[undefined, undefined, spots.length]} frustumCulled={false}>
-        <capsuleGeometry args={[0.11, 0.3, 3, 6]} />
+    <group scale={FAN}>
+      <instancedMesh ref={torso} args={[undefined, undefined, n]} frustumCulled={false}>
+        <capsuleGeometry args={[0.085, 0.16, 3, 8]} />
         <meshStandardMaterial />
       </instancedMesh>
-      <instancedMesh ref={heads} args={[undefined, undefined, spots.length]} frustumCulled={false}>
-        <sphereGeometry args={[0.09, 8, 6]} />
-        <meshStandardMaterial color="#f1c27d" />
+      <instancedMesh ref={head} args={[undefined, undefined, n]} frustumCulled={false}>
+        <sphereGeometry args={[0.08, 10, 8]} />
+        <meshStandardMaterial />
       </instancedMesh>
-    </>
+      <instancedMesh ref={hair} args={[undefined, undefined, n]} frustumCulled={false}>
+        <sphereGeometry args={[0.085, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <meshStandardMaterial />
+      </instancedMesh>
+      <instancedMesh ref={legs} args={[undefined, undefined, n * 2]} frustumCulled={false}>
+        <boxGeometry args={[0.06, FAN_LEG, 0.07]} />
+        <meshStandardMaterial />
+      </instancedMesh>
+      <instancedMesh ref={arms} args={[undefined, undefined, n * 2]} frustumCulled={false}>
+        <boxGeometry args={[0.045, 0.17, 0.05]} />
+        <meshStandardMaterial />
+      </instancedMesh>
+    </group>
   )
 }
 
@@ -141,16 +194,16 @@ function Banner({ z, text, bg }: { z: number; text: string; bg: string }) {
   )
 }
 
-function Lamp({ z, side }: { z: number; side: 1 | -1 }) {
+function Lamp({ z, side, pole = '#37474f' }: { z: number; side: 1 | -1; pole?: string }) {
   return (
     <group position={[side * (ROAD + 0.15), 0, z]} rotation-y={side > 0 ? -Math.PI / 2 : Math.PI / 2}>
       <mesh position={[0, 0.9, 0]}>
         <cylinderGeometry args={[0.04, 0.06, 1.8, 6]} />
-        <meshStandardMaterial color="#37474f" />
+        <meshStandardMaterial color={pole} />
       </mesh>
       <mesh position={[0, 1.78, 0.25]}>
         <boxGeometry args={[0.05, 0.04, 0.5]} />
-        <meshStandardMaterial color="#37474f" />
+        <meshStandardMaterial color={pole} />
       </mesh>
       <mesh position={[0, 1.72, 0.48]}>
         <boxGeometry args={[0.16, 0.07, 0.22]} />
@@ -287,7 +340,13 @@ export function RaceScene({ track, me, them, mine, theirs, venue }: Props) {
       {/* Ground, sidewalks and the street itself. */}
       <mesh rotation-x={-Math.PI / 2} position={[0, LAYER.outer, len / 2]}>
         <planeGeometry args={[80, len + 100]} />
-        <meshStandardMaterial color={venue.ground ?? PAL.ground} />
+        {venue.id === 'desert' ? (
+          <meshStandardMaterial map={sandTex(10, (len + 100) / 8)} />
+        ) : venue.id === 'farm' ? (
+          <meshStandardMaterial map={grassTex(10, (len + 100) / 8)} />
+        ) : (
+          <meshStandardMaterial color={venue.ground ?? PAL.ground} />
+        )}
       </mesh>
       {/* The street is static, so it's merged into a few draws like the town. */}
       <Batch version={city ? slots : venue.id}>
@@ -299,7 +358,7 @@ export function RaceScene({ track, me, them, mine, theirs, venue }: Props) {
         ))}
         <mesh rotation-x={-Math.PI / 2} position={[0, LAYER.land, len / 2 + 5]}>
           <planeGeometry args={[ROAD * 2, len + 50]} />
-          <meshStandardMaterial map={asphalt} />
+          <meshStandardMaterial map={asphalt} color={venue.road ?? '#ffffff'} />
         </mesh>
         {/* Centre line dashes and edge lines. */}
         {Array.from({ length: Math.ceil((len + 30) / 2) }, (_, i) => (
@@ -347,13 +406,13 @@ export function RaceScene({ track, me, them, mine, theirs, venue }: Props) {
         }) : (
           <>
             <VenueScenery id={venue.id} len={len} />
-            {Array.from({ length: Math.ceil((len + 40) / 9) }, (_, i) => <Lamp key={i} z={i * 9 - 6} side={i % 2 ? 1 : -1} />)}
+            {Array.from({ length: Math.ceil((len + 40) / 9) }, (_, i) => <Lamp key={i} z={i * 9 - 6} side={i % 2 ? 1 : -1} pole={venue.pole} />)}
           </>
         )}
         <StreetDressing len={len} city={city} />
       </Batch>
-      <Spectators len={len} />
-      {city ? <Skyline len={len} edge={ROAD + WALK + 4.2} night={night} /> : <VenueBackdrop id={venue.id} />}
+      <Spectators len={len} cold={venue.id === 'snow' || SEASON === 'winter'} />
+      {city ? <Skyline len={len} edge={ROAD + WALK + 4.2} night={night} /> : <VenueBackdrop id={venue.id} len={len} />}
       {/* Soft shadows under the racers. */}
       {[meRef, themRef].map((r, i) => (
         <group key={i} ref={r} scale={1.4}>
@@ -361,7 +420,7 @@ export function RaceScene({ track, me, them, mine, theirs, venue }: Props) {
             <planeGeometry args={[0.9, 1.5]} />
             <meshBasicMaterial map={glowTex()} color="#000000" transparent opacity={0.35} depthWrite={false} {...decal(3)} />
           </mesh>
-          {i === 0 ? <CarModel body={mine.body} color={mine.color} mods={mine.mods} flames beams={night > 0.3} /> : <CarModel body={theirs.body} color={theirs.color} mods={theirs.mods} flames beams={night > 0.3} />}
+          {i === 0 ? <CarModel body={mine.body} color={mine.color} finish={mine.finish} mods={mine.mods} flames beams={night > 0.3} /> : <CarModel body={theirs.body} color={theirs.color} mods={theirs.mods} flames beams={night > 0.3} />}
         </group>
       ))}
     </>

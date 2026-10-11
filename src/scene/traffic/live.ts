@@ -18,5 +18,8 @@ export function crossingSignal(tile: string, side: number): 'walk' | 'wait' | nu
   if (!c?.signal) return null
   // Cars turning in from the cross street still use the crossing, so keep an
   // eye on them even on 'walk'.
-  return liveTraffic.lightOf(c.id, side) === 'red' ? 'walk' : 'wait'
+  if (liveTraffic.lightOf(c.id, side) === 'red') return 'walk'
+  // Someone's waiting to cross: ask the lights to change.
+  liveTraffic.wantWalk(c.id, side)
+  return 'wait'
 }
