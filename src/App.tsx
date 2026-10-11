@@ -23,6 +23,7 @@ import { AccountPanel } from './ui/Account'
 import { AlertsCard } from './ui/Alerts'
 import { WelcomeBack } from './ui/WelcomeBack'
 import { GiftWatcher, GiftsPanel } from './ui/Gifts'
+import { GhostRacePanel, TauntWatcher, TauntsPanel } from './ui/GhostRace'
 import { GoalsPanel, DailyPanel, FlatPanel } from './ui/Goals'
 import { SeasonPanel } from './ui/Season'
 import { useGame, today } from './game/store'
@@ -96,6 +97,9 @@ export default function App() {
       <WelcomeBack />
       <GiftWatcher />
       {panel === 'gifts' && <GiftsPanel />}
+      <TauntWatcher />
+      {panel === 'taunts' && <TauntsPanel />}
+      {panel === 'ghost' && <GhostRacePanel />}
       <PrizePopup />
       <CampaignPrizePopup />
       <LevelUpSplash />
