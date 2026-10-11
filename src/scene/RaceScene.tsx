@@ -36,6 +36,7 @@ type Props = {
   mine: { body: Body; model?: string; color: string; finish?: Finish; mods?: string[] }
   theirs: { body: Body; model?: string; color: string; mods?: string[] }
   venue: Venue
+  weatherSeed?: string // a live race's id, so both racers get the same weather
 }
 
 export function SkyDome({ tint = '#ffffff' }: { tint?: string }) {
@@ -286,7 +287,7 @@ function StreetDressing({ len, city }: { len: number; city: boolean }) {
 
 // The drag strip, seen from a chase camera. On Main Street it's lined with the
 // player's own town; the other venues bring their own scenery.
-export function RaceScene({ track, me, them, mine, theirs, venue }: Props) {
+export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed }: Props) {
   const city = venue.id === 'main'
   const meRef = useRef<Group>(null)
   const themRef = useRef<Group>(null)
@@ -294,8 +295,8 @@ export function RaceScene({ track, me, them, mine, theirs, venue }: Props) {
   const len = track * SCALE
   const slots = useStreet(len)
   const night = useMemo(() => nightAmount(dayPhase()), [])
-  // The town's weather when the race starts, suited to the venue.
-  const weather = useMemo(() => raceWeather(venue.id), [venue.id])
+  // The venue's weather for this race (see raceWeather).
+  const weather = useMemo(() => raceWeather(venue.id, weatherSeed), [venue.id, weatherSeed])
   const beams = night > 0.3 || gloomOf(weather) > 0.5
   // Same lights and colour grade as the town at this time of day.
   const look = useMemo(() => weatherLook(lookFor(night, duskAmount(dayPhase())), weather), [night, weather])
@@ -312,7 +313,7 @@ export function RaceScene({ track, me, them, mine, theirs, venue }: Props) {
   useEffect(() => () => road.dispose(), [road])
   const tint = (day: string, dark: string) => '#' + new Color(day).lerp(new Color(dark), night).getHexString()
   // Grey skies when it's overcast.
-  const overcast = (c: string) => '#' + new Color(c).lerp(new Color('#7d8692'), Math.min(1, weather.cloud * 0.95)).getHexString()
+  const overcast = (c: string) => '#' + new Color(c).lerp(new Color(weather.dust > 0 ? '#c9a57a' : weather.haze > weather.cloud ? '#b9c2cc' : '#7d8692'), Math.min(1, weather.cloud * 0.95 + weather.haze * 0.55 + weather.dust * 0.3)).getHexString()
   // Phone status bar and toolbar take the sky colour while racing.
   const sky = tint(overcast(venue.sky), '#0f1730')
   useEffect(() => holdPageTint(sky), [sky])

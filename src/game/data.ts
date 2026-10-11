@@ -208,7 +208,7 @@ export const buildingUpgradeXp = (level: number) => 10 + level * 5
 export const levelLift = (level = 1) => 0.26 * (Math.min(MAX_BUILDING_LEVEL, Math.max(1, level)) - 1)
 
 export type Body = 'compact' | 'sedan' | 'sports' | 'muscle' | 'truck' | 'super' | 'bubble' | 'wagon' | 'wedge' | 'roadster' | 'rally' | 'classic' | 'offroad' | 'coupe' | 'widebody' | 'tank' | 'scooter' | 'chopper' | 'sportbike'
-  | 'hatch' | 'van' | 'suv' | 'ev' | 'luxury' | 'formula'
+  | 'hatch' | 'van' | 'suv' | 'ev' | 'luxury' | 'formula' | 'bus' | 'tusker' | 'dogvan'
 // Two-wheelers: drawn as motorcycles with a rider, and only take exhaust and rim mods.
 export const BIKES: Body[] = ['scooter', 'chopper', 'sportbike']
 export const isBike = (body: Body) => BIKES.includes(body)
@@ -260,6 +260,8 @@ export type CarDef = {
   unlockLevel: number
   // Classics that only turn up in Rusty's searches, never in the Showroom.
   rescueOnly?: boolean
+  // Season track prize: only ever given by that season's last tier (season number).
+  season?: number
   // Race perk, like the original's car special skills.
   skill?: SkillId
   // Businesses this car loves working at (building ids): it earns them a bigger bonus.
@@ -303,6 +305,9 @@ export const CARS: CarDef[] = [
   { id: 'stomper', name: 'Ironside Dune Stomper', body: 'truck', price: 16000, unlockLevel: 7, power: 66, grip: 44, weight: 72, skill: 'torque', likes: ['tires', 'stadium', 'lube'], colors: ['#424242', '#1565c0', '#ff6d00'] },
   { id: 'monoposto', name: 'Veloce Monoposto 1', body: 'formula', price: 75000, unlockLevel: 11, power: 90, grip: 90, weight: 20, skill: 'smooth', likes: ['stadium', 'tuner', 'parkade'], colors: ['#d50000', '#eceff1', '#00897b'] },
   { id: 'zenith', name: 'Aether Zenith R', body: 'super', price: 120000, unlockLevel: 14, legendary: true, power: 100, grip: 96, weight: 26, skill: 'nitro', likes: ['stadium', 'parkade', 'police'], colors: ['#212121', '#1e88e5', '#ff6d00'] },
+  { id: 'schoolbus', name: 'Ironside Scholar 72', body: 'bus', price: 5000, unlockLevel: 3, power: 30, grip: 26, weight: 90, skill: 'slipstream', likes: ['diner', 'arcade', 'icecream'], colors: ['#fbc02d', '#ff8f00', '#eceff1'] },
+  { id: 'shaggy', name: 'Lakeside Shaggy Hound', body: 'dogvan', price: 5500, unlockLevel: 4, power: 26, grip: 30, weight: 66, skill: 'oil', likes: ['burger', 'donut', 'icecream'], colors: ['#d7ccc8', '#a1887f', '#9e9e9e'] },
+  { id: 'tusker', name: 'Kodiak Tusker Scout', body: 'tusker', price: 34000, unlockLevel: 9, power: 70, grip: 72, weight: 58, skill: 'torque', likes: ['police', 'firehouse', 'tires'], colors: ['#6b7a3a', '#c2a36b', '#eceff1'] },
   { id: 'lambo', name: 'Veloce Corrida V12', body: 'wedge', price: 0, bucks: 40, unlockLevel: 5, power: 86, grip: 70, weight: 34, skill: 'oil', likes: ['cinema', 'club', 'parkade'], colors: ['#fdd835', '#d50000', '#fafafa'] },
   { id: 'hyper', name: 'Veloce Hyperion', body: 'super', price: 60000, unlockLevel: 12, power: 98, grip: 86, weight: 32, skill: 'nitro', likes: ['stadium', 'tuner', 'parkade'], colors: ['#1a237e', '#212121', '#d50000'] },
   { id: 'bug', name: 'Bumble Bubble', body: 'bubble', price: 1200, unlockLevel: 1, rescueOnly: true, power: 14, grip: 28, weight: 28, skill: 'freeze', likes: ['icecream', 'donut', 'coffee'], colors: ['#80cbc4', '#ffcc80', '#ef9a9a'] },
@@ -314,6 +319,7 @@ export const CARS: CarDef[] = [
   { id: 'lemans', name: 'Liberty Endurance GT', body: 'super', price: 16000, unlockLevel: 1, rescueOnly: true, power: 72, grip: 62, weight: 32, skill: 'smooth', likes: ['stadium', 'parts', 'police'], colors: ['#1565c0', '#fafafa', '#c62828'] },
   { id: 'gullwing', name: 'Silver Wing 300', body: 'coupe', price: 30000, unlockLevel: 1, rescueOnly: true, power: 64, grip: 58, weight: 36, skill: 'oil', likes: ['motel', 'bowling', 'parkade'], colors: ['#cfd8dc', '#b71c1c', '#263238'] },
   { id: 'speedster', name: 'Fairhaven Speedster', body: 'roadster', price: 12000, unlockLevel: 1, rescueOnly: true, power: 58, grip: 46, weight: 26, skill: 'nitro', likes: ['cinema', 'diner', 'stadium'], colors: ['#1565c0', '#eceff1', '#b71c1c'] },
+  { id: 'nightfall', name: 'Aether Nightfall', body: 'wedge', price: 24000, unlockLevel: 1, season: 1, power: 78, grip: 72, weight: 30, skill: 'slipstream', likes: ['club', 'cinema', 'arcade'], colors: ['#311b92', '#00e5ff', '#212121'] },
 ]
 
 // Rusty's Rescue: pay to search a location, tap the pins to send the tow
@@ -413,8 +419,9 @@ export const MOD_SLOTS: { id: ModSlot; name: string; icon: string; stat: string 
   { id: 'rims', name: 'Rims', icon: '🛞', stat: 'Lighter wheels' },
 ]
 
-// Bikes and the open-wheel racer have nowhere to bolt a spoiler, body kit or hood.
-export const modSlotsFor = (body: Body) => (isBike(body) || body === 'formula' ? MOD_SLOTS.filter((m) => m.id === 'exhaust' || m.id === 'rims') : MOD_SLOTS)
+// Whether a part can go on this body: special parts on their own bodies only, regular parts
+// everywhere except bodies they make no sense on.
+export const modFits = (m: ModDef, body: Body) => (m.only ? m.only.includes(body) : !m.notOn?.includes(body))
 
 export type ModDef = {
   id: string
@@ -428,23 +435,51 @@ export type ModDef = {
   power: number
   grip: number
   weight: number
+  // A special part made for these bodies only, or a regular part that makes no sense on these bodies.
+  only?: Body[]
+  notOn?: Body[]
 }
 
+// Bodies that swap regular spoilers, kits or hoods for parts of their own.
+const ODD: Body[] = ['bus', 'tank', 'dogvan', 'tusker', 'scooter', 'chopper', 'sportbike']
+const BIKE_BODIES: Body[] = ['scooter', 'chopper', 'sportbike']
 export const MODS: ModDef[] = [
-  { id: 'ducktail', slot: 'spoiler', name: 'Ducktail Lip', unlockLevel: 2, coins: 1200, parts: 0, bucks: 0, power: 0, grip: 2, weight: 0 },
-  { id: 'gtwing', slot: 'spoiler', name: 'GT Wing', unlockLevel: 5, coins: 4000, parts: 10, bucks: 0, power: 0, grip: 4, weight: 0 },
-  { id: 'attackwing', slot: 'spoiler', name: 'Time Attack Wing', unlockLevel: 8, coins: 0, parts: 0, bucks: 12, power: 0, grip: 6, weight: 0 },
+  { id: 'ducktail', slot: 'spoiler', notOn: ODD, name: 'Ducktail Lip', unlockLevel: 2, coins: 1200, parts: 0, bucks: 0, power: 0, grip: 2, weight: 0 },
+  { id: 'gtwing', slot: 'spoiler', notOn: ODD, name: 'GT Wing', unlockLevel: 5, coins: 4000, parts: 10, bucks: 0, power: 0, grip: 4, weight: 0 },
+  { id: 'attackwing', slot: 'spoiler', notOn: ODD, name: 'Time Attack Wing', unlockLevel: 8, coins: 0, parts: 0, bucks: 12, power: 0, grip: 6, weight: 0 },
   { id: 'twintips', slot: 'exhaust', name: 'Twin Tips', unlockLevel: 2, coins: 1000, parts: 0, bucks: 0, power: 2, grip: 0, weight: 0 },
   { id: 'sidepipes', slot: 'exhaust', name: 'Side Pipes', unlockLevel: 4, coins: 3500, parts: 8, bucks: 0, power: 4, grip: 0, weight: 0 },
   { id: 'flamepipes', slot: 'exhaust', name: 'Flame Throwers', unlockLevel: 8, coins: 0, parts: 0, bucks: 10, power: 6, grip: 0, weight: 0 },
-  { id: 'streetkit', slot: 'kit', name: 'Street Kit', unlockLevel: 3, coins: 1500, parts: 0, bucks: 0, power: 0, grip: 1, weight: -2 },
-  { id: 'widebody', slot: 'kit', name: 'Widebody', unlockLevel: 6, coins: 6000, parts: 15, bucks: 0, power: 0, grip: 3, weight: -3 },
-  { id: 'carbonkit', slot: 'kit', name: 'Carbon Race Kit', unlockLevel: 10, coins: 0, parts: 0, bucks: 15, power: 0, grip: 3, weight: -6 },
-  { id: 'vented', slot: 'hood', name: 'Vented Hood', unlockLevel: 2, coins: 800, parts: 0, bucks: 0, power: 1, grip: 0, weight: -1 },
-  { id: 'ramscoop', slot: 'hood', name: 'Ram Scoop', unlockLevel: 4, coins: 3000, parts: 6, bucks: 0, power: 3, grip: 0, weight: 0 },
-  { id: 'blower', slot: 'hood', name: 'Supercharger', unlockLevel: 7, coins: 8000, parts: 20, bucks: 0, power: 5, grip: 0, weight: 0 },
+  { id: 'streetkit', slot: 'kit', notOn: BIKE_BODIES, name: 'Street Kit', unlockLevel: 3, coins: 1500, parts: 0, bucks: 0, power: 0, grip: 1, weight: -2 },
+  { id: 'widebody', slot: 'kit', notOn: BIKE_BODIES, name: 'Widebody', unlockLevel: 6, coins: 6000, parts: 15, bucks: 0, power: 0, grip: 3, weight: -3 },
+  { id: 'carbonkit', slot: 'kit', notOn: BIKE_BODIES, name: 'Carbon Race Kit', unlockLevel: 10, coins: 0, parts: 0, bucks: 15, power: 0, grip: 3, weight: -6 },
+  { id: 'vented', slot: 'hood', notOn: [...BIKE_BODIES, 'formula'], name: 'Vented Hood', unlockLevel: 2, coins: 800, parts: 0, bucks: 0, power: 1, grip: 0, weight: -1 },
+  { id: 'ramscoop', slot: 'hood', notOn: [...BIKE_BODIES, 'formula'], name: 'Ram Scoop', unlockLevel: 4, coins: 3000, parts: 6, bucks: 0, power: 3, grip: 0, weight: 0 },
+  { id: 'blower', slot: 'hood', notOn: [...BIKE_BODIES, 'formula'], name: 'Supercharger', unlockLevel: 7, coins: 8000, parts: 20, bucks: 0, power: 5, grip: 0, weight: 0 },
   { id: 'chrome', slot: 'rims', name: 'Chrome Spokes', unlockLevel: 1, coins: 600, parts: 0, bucks: 0, power: 0, grip: 0, weight: -1 },
   { id: 'goldmesh', slot: 'rims', name: 'Gold Mesh', unlockLevel: 4, coins: 2500, parts: 5, bucks: 0, power: 0, grip: 1, weight: -2 },
+  // Special parts.
+  { id: 'luggage', slot: 'spoiler', only: ['bus'], name: 'Roof Luggage Rack', unlockLevel: 3, coins: 2500, parts: 0, bucks: 0, power: 0, grip: 2, weight: 1 },
+  { id: 'stacks', slot: 'exhaust', only: ['bus'], name: 'Big Rig Stacks', unlockLevel: 3, coins: 3000, parts: 5, bucks: 0, power: 3, grip: 0, weight: 0 },
+  { id: 'cowcatcher', slot: 'kit', only: ['bus'], name: 'Cow Catcher', unlockLevel: 4, coins: 3500, parts: 8, bucks: 0, power: 0, grip: 2, weight: 0 },
+  { id: 'disco', slot: 'hood', only: ['bus'], name: 'Disco Ball', unlockLevel: 5, coins: 0, parts: 0, bucks: 6, power: 2, grip: 0, weight: 0 },
+  { id: 'flag', slot: 'spoiler', only: ['tank'], name: 'Battle Standard', unlockLevel: 10, coins: 6000, parts: 10, bucks: 0, power: 0, grip: 3, weight: 0 },
+  { id: 'smoke', slot: 'exhaust', only: ['tank'], name: 'Smoke Screen Stacks', unlockLevel: 10, coins: 0, parts: 0, bucks: 8, power: 5, grip: 0, weight: 0 },
+  { id: 'reactive', slot: 'kit', only: ['tank'], name: 'Reactive Armour', unlockLevel: 10, coins: 9000, parts: 20, bucks: 0, power: 0, grip: 4, weight: 1 },
+  { id: 'watercannon', slot: 'hood', only: ['tank'], name: 'Water Cannon Turret', unlockLevel: 10, coins: 0, parts: 0, bucks: 12, power: 4, grip: 0, weight: 0 },
+  { id: 'bigtail', slot: 'spoiler', only: ['dogvan'], name: 'Wagging Tail XL', unlockLevel: 4, coins: 1500, parts: 0, bucks: 0, power: 0, grip: 2, weight: 0 },
+  { id: 'bubbles', slot: 'exhaust', only: ['dogvan'], name: 'Bubble Blower', unlockLevel: 4, coins: 0, parts: 0, bucks: 5, power: 2, grip: 0, weight: 0 },
+  { id: 'collar', slot: 'kit', only: ['dogvan'], name: 'Spiked Collar', unlockLevel: 4, coins: 2000, parts: 4, bucks: 0, power: 0, grip: 1, weight: -1 },
+  { id: 'bone', slot: 'hood', only: ['dogvan'], name: 'Bone Hood Ornament', unlockLevel: 4, coins: 1200, parts: 0, bucks: 0, power: 1, grip: 0, weight: 0 },
+  { id: 'radar', slot: 'spoiler', only: ['tusker'], name: 'Radar Dish', unlockLevel: 9, coins: 4500, parts: 10, bucks: 0, power: 0, grip: 3, weight: 0 },
+  { id: 'snorkel', slot: 'exhaust', only: ['tusker'], name: 'Snorkel', unlockLevel: 9, coins: 3000, parts: 6, bucks: 0, power: 3, grip: 0, weight: 0 },
+  { id: 'plating', slot: 'kit', only: ['tusker'], name: 'Armour Plating', unlockLevel: 9, coins: 7000, parts: 15, bucks: 0, power: 0, grip: 4, weight: 1 },
+  { id: 'lightbar', slot: 'hood', only: ['tusker'], name: 'Spotlight Rack', unlockLevel: 9, coins: 3500, parts: 6, bucks: 0, power: 2, grip: 0, weight: 0 },
+  { id: 'tailfairing', slot: 'spoiler', only: BIKE_BODIES, name: 'Tail Fairing', unlockLevel: 2, coins: 1500, parts: 0, bucks: 0, power: 0, grip: 2, weight: 0 },
+  { id: 'saddlebags', slot: 'kit', only: BIKE_BODIES, name: 'Saddlebags', unlockLevel: 2, coins: 1800, parts: 0, bucks: 0, power: 0, grip: 1, weight: -1 },
+  { id: 'windscreen', slot: 'hood', only: BIKE_BODIES, name: 'Touring Windscreen', unlockLevel: 2, coins: 1200, parts: 0, bucks: 0, power: 1, grip: 0, weight: 0 },
+  { id: 'campod', slot: 'hood', only: ['formula'], name: 'Onboard Camera', unlockLevel: 11, coins: 2000, parts: 4, bucks: 0, power: 1, grip: 0, weight: 0 },
+  { id: 'bargeboards', slot: 'kit', only: ['formula'], name: 'Bargeboards', unlockLevel: 11, coins: 0, parts: 0, bucks: 10, power: 0, grip: 3, weight: -3 },
   { id: 'forged', slot: 'rims', name: 'Forged Black', unlockLevel: 7, coins: 7000, parts: 12, bucks: 0, power: 0, grip: 2, weight: -3 },
 ]
 
@@ -458,12 +493,13 @@ export const modCost = (id: string) => {
   const m = modDef(id)
   return { coins: m?.coins ?? 0, parts: m?.parts ?? 0, bucks: m?.bucks ?? 0 }
 }
-// The fitted mod in each slot (the first known one wins if a save lists two).
-export const fittedMods = (mods?: string[] | null): Partial<Record<ModSlot, string>> => {
+// The fitted mod in each slot (the first known one wins if a save lists two). Given a body,
+// parts that don't fit it are skipped, as the server's econ_fitted_mods does.
+export const fittedMods = (mods?: string[] | null, body?: Body): Partial<Record<ModSlot, string>> => {
   const out: Partial<Record<ModSlot, string>> = {}
   for (const id of Array.isArray(mods) ? mods : []) {
     const m = modDef(id)
-    if (m && !out[m.slot]) out[m.slot] = id
+    if (m && !out[m.slot] && (!body || modFits(m, body))) out[m.slot] = id
   }
   return out
 }
@@ -475,7 +511,7 @@ export const modXp = (id: string) => 10 + (modDef(id)?.unlockLevel ?? 0) * 3
 
 // Performance index: what races are decided on (plus the driver's shifting).
 export const performance = (car: CarDef, up: Record<UpgradeSlot, number>, mods?: string[] | null) => {
-  const m = Object.values(fittedMods(mods)).map(modStats)
+  const m = Object.values(fittedMods(mods, car.body)).map(modStats)
   const sum = (k: 'power' | 'grip' | 'weight') => m.reduce((a, x) => a + x[k], 0)
   const power = car.power + up.engine * 4 + up.turbo * 3 + sum('power')
   const grip = car.grip + up.tires * 4 + sum('grip')
@@ -560,10 +596,13 @@ export const CAR_SETS: CarSet[] = [
   { id: 'classics', name: "Rusty's Classics", icon: '🔧', cars: ['bug', 'woodie', 'hauler', 'cruiser', 'buggy'], coins: 5000, bucks: 5, trophies: 15, xp: 150 },
   { id: 'muscle', name: 'Muscle Row', icon: '💪', cars: ['stallion', 'charger', 'hellcat', 'bandit'], coins: 8000, bucks: 5, trophies: 15, xp: 200 },
   { id: 'track', name: 'Track Legends', icon: '🏁', cars: ['rally', 'vette', 'gtr', 'lemans', 'gullwing'], coins: 15000, bucks: 8, trophies: 25, xp: 300 },
-  { id: 'roadtrip', name: 'Road Trip', icon: '🏕', cars: ['camper', 'ridgeback', 'stomper'], coins: 6000, bucks: 4, trophies: 12, xp: 160 },
+  { id: 'roadtrip', name: 'Road Trip', icon: '🏕', cars: ['camper', 'ridgeback', 'stomper', 'shaggy'], coins: 6000, bucks: 4, trophies: 12, xp: 160 },
   { id: 'tuners', name: 'Tuner Alley', icon: '🌀', cars: ['hotshot', 'kitsune', 'current'], coins: 7000, bucks: 4, trophies: 12, xp: 180 },
   { id: 'grandtour', name: 'Grand Tour', icon: '🎩', cars: ['salon', 'speedster', 'monoposto'], coins: 20000, bucks: 10, trophies: 30, xp: 350 },
+  { id: 'heavy', name: 'Heavy Duty', icon: '🚌', cars: ['schoolbus', 'tusker'], coins: 6000, bucks: 3, trophies: 10, xp: 150 },
   { id: 'dream', name: 'Dream Garage', icon: '💎', cars: ['lambo', 'hyper', 'tomahawk', 'zenith'], coins: 30000, bucks: 15, trophies: 40, xp: 500 },
+  // Season track prizes; each season adds its car here.
+  { id: 'seasons', name: 'Season Rides', icon: '🏁', cars: ['nightfall'], coins: 5000, bucks: 3, trophies: 10, xp: 150 },
 ]
 export const setOwned = (set: CarSet, cars: { model: string }[]) => set.cars.filter((m) => cars.some((c) => c.model === m)).length
 export const setComplete = (set: CarSet, cars: { model: string }[]) => setOwned(set, cars) === set.cars.length
@@ -572,6 +611,7 @@ export const readySets = (s: { cars: { model: string }[]; claimedSets?: string[]
   CAR_SETS.filter((set) => !(s.claimedSets ?? []).includes(set.id) && setComplete(set, s.cars))
 // Where to get a car: the Showroom (with its level or bucks price) or Rusty's searches.
 export function carSource(car: CarDef): { icon: string; text: string } {
+  if (car.season) return { icon: '🏁', text: `Season ${car.season} prize` }
   if (car.rescueOnly) {
     const spot = RESCUE_SPOTS.filter((sp) => sp.cars.some((c) => c.model === car.id)).sort((a, b) => a.unlockLevel - b.unlockLevel)[0]
     return { icon: '🔧', text: spot ? `Rusty's · ${spot.name}` : "Rusty's" }
@@ -735,6 +775,37 @@ export function weekKey(t = Date.now()) {
 export const msToNextDay = (t = Date.now()) => 86400000 - (t % 86400000)
 export const msToNextWeek = (t = Date.now()) => msToNextDay(t) + ((7 - ((new Date(t).getUTCDay() + 6) % 7) - 1) * 86400000)
 
+// ---- Season track ----
+// Six-week seasons, numbered from the first one. Stars come from daily and weekly task rewards, and
+// every STARS_PER_TIER stars unlock the next tier's prize. The last tier gives the season's own car.
+export const SEASON_START = Date.UTC(2026, 9, 5) // Monday 5 Oct 2026, 00:00 UTC
+export const SEASON_DAYS = 42
+export const STARS_PER_TIER = 8
+export const SEASON_STARS = { dailyTask: 1, dailyChest: 3, weeklyTask: 3, weeklyChest: 6 }
+export type SeasonDef = { n: number; name: string; icon: string; car?: string }
+const SEASON_NAMES: Omit<SeasonDef, 'n'>[] = [
+  { name: 'Midnight Run', icon: '🌙', car: 'nightfall' },
+]
+export const seasonNumber = (t = Date.now()) => Math.max(1, Math.floor((t - SEASON_START) / (SEASON_DAYS * 86400000)) + 1)
+export function seasonOf(n: number): SeasonDef {
+  const d = SEASON_NAMES[n - 1]
+  return d ? { n, ...d } : { n, name: `Season ${n}`, icon: '🏁' }
+}
+export const seasonEndsAt = (n: number) => SEASON_START + n * SEASON_DAYS * 86400000
+// The last tier of a season without its own car pays bucks instead.
+export const SEASON_CAR_BUCKS = 15
+export const seasonCars = () => Object.fromEntries(SEASON_NAMES.flatMap((d, i) => (d.car ? [[String(i + 1), d.car]] : [])))
+
+export type SeasonPrize = { coins: number; parts: number; bucks: number; car?: boolean }
+// 30 tiers: coins and parts most of the way, bucks every fifth tier, the car (or bucks) at the end.
+export const SEASON_TIERS: SeasonPrize[] = Array.from({ length: 30 }, (_, i): SeasonPrize => {
+  const t = i + 1
+  if (t === 30) return { coins: 0, parts: 0, bucks: 0, car: true }
+  if (t % 5 === 0) return { coins: 0, parts: 0, bucks: t / 5 + 1 }
+  if (t % 2 === 0) return { coins: 0, parts: 5 + Math.floor(t / 3) * 2, bucks: 0 }
+  return { coins: 500 + t * 150, parts: 0, bucks: 0 }
+})
+
 // Picks a period's tasks: a fixed shuffle per key, so every device draws the same three.
 export function drawTasks(pool: TaskDef[], key: string, level: number, owned: (def: string) => boolean) {
   let h = 2166136261
@@ -820,6 +891,79 @@ export const CLAN_COST = 2000
 export const CLAN_CAP = 20
 export const CLAN_EMBLEMS = ['🏁', '🔥', '⚡', '🦅', '🐺', '💀', '👑', '🚀', '🐉', '⭐', '🏎️', '🛞']
 export const CLAN_COLORS = ['#ff7043', '#e53935', '#8e24aa', '#1e88e5', '#00897b', '#43a047', '#fdd835', '#546e7a']
+
+// Daily deals: three discounted items a day, the same for everyone, each usable once.
+// Each slot rotates through its own list by UTC day number: list[(day * step + slot) % length].
+// The server guard rebuilds the same three from econ_catalog().deals, so keep the formula simple.
+export type DealKind = 'parts' | 'fuel' | 'decor' | 'mod' | 'paint'
+export type DealDef = { id: string; kind: DealKind; item?: string; n?: number; off: number }
+export const DEAL_SLOTS: { name: string; step: number; deals: DealDef[] }[] = [
+  {
+    name: 'Supplies', step: 3, deals: [
+      { id: 'parts10', kind: 'parts', n: 10, off: 0.4 },
+      { id: 'fuel', kind: 'fuel', off: 0.67 },
+      { id: 'parts25', kind: 'parts', n: 25, off: 0.4 },
+      { id: 'parts50', kind: 'parts', n: 50, off: 0.4 },
+    ],
+  },
+  {
+    name: 'Car shop', step: 5, deals: [
+      ...(['chrome', 'twintips', 'vented', 'ducktail', 'streetkit'] as const).map((m) => ({ id: `mod-${m}`, kind: 'mod' as const, item: m, off: 0.4 })),
+      { id: 'paint-matte', kind: 'paint', item: 'matte', off: 0.5 },
+      ...(['goldmesh', 'ramscoop', 'sidepipes', 'gtwing', 'widebody', 'blower', 'forged'] as const).map((m) => ({ id: `mod-${m}`, kind: 'mod' as const, item: m, off: 0.3 })),
+      { id: 'paint-chrome', kind: 'paint', item: 'chrome', off: 0.4 },
+    ],
+  },
+  {
+    name: 'Town', step: 3, deals: (['fountain', 'pond', 'playground', 'gazebo', 'clocktower', 'billboard', 'hotdog', 'statue'] as const)
+      .map((b) => ({ id: `decor-${b}`, kind: 'decor' as const, item: b, off: 0.4 })),
+  },
+]
+export const DEALS: DealDef[] = DEAL_SLOTS.flatMap((s) => s.deals)
+export const dealDef = (id: string) => DEALS.find((d) => d.id === id)
+export const dayNumber = (day: string) => Math.floor(Date.parse(`${day}T00:00:00Z`) / 86400000)
+export const dealsFor = (day: string): DealDef[] => {
+  const n = dayNumber(day)
+  return DEAL_SLOTS.map((s, i) => s.deals[(((n * s.step + i) % s.deals.length) + s.deals.length) % s.deals.length])
+}
+
+const off10 = (n: number, off: number) => Math.round((n * (1 - off)) / 10) * 10
+export type DealOffer = { name: string; icon: string; unlockLevel: number; was: { coins: number; bucks: number }; now: { coins: number; bucks: number }; parts: number }
+// What a deal sells and for how much. `parts` is the parts price of a mod (never discounted).
+export function dealOffer(d: DealDef): DealOffer {
+  switch (d.kind) {
+    case 'parts': {
+      const n = d.n ?? 0
+      return { name: `${n} Parts`, icon: '⚙', unlockLevel: 1, was: { coins: n * 50, bucks: 0 }, now: { coins: off10(n * 50, d.off), bucks: 0 }, parts: 0 }
+    }
+    case 'fuel':
+      return { name: 'Full tank', icon: '⛽', unlockLevel: 1, was: { coins: 0, bucks: REFILL_BUCKS }, now: { coins: 0, bucks: Math.max(1, Math.round(REFILL_BUCKS * (1 - d.off))) }, parts: 0 }
+    case 'decor': {
+      const b = buildingDef(d.item ?? '')
+      return {
+        name: b.name, icon: '🌳', unlockLevel: b.unlockLevel,
+        was: { coins: b.price, bucks: b.bucks ?? 0 },
+        now: { coins: off10(b.price, d.off), bucks: b.bucks ? Math.max(1, Math.round(b.bucks * (1 - d.off))) : 0 },
+        parts: 0,
+      }
+    }
+    case 'mod': {
+      const m = modDef(d.item ?? '')
+      return { name: m?.name ?? 'Mod', icon: '🪽', unlockLevel: m?.unlockLevel ?? 1, was: { coins: m?.coins ?? 0, bucks: 0 }, now: { coins: off10(m?.coins ?? 0, d.off), bucks: 0 }, parts: m?.parts ?? 0 }
+    }
+    case 'paint': {
+      const f = finishDef(d.item as Finish)
+      return { name: `${f.name} paint`, icon: '🎨', unlockLevel: f.unlockLevel, was: { coins: f.coins, bucks: 0 }, now: { coins: off10(f.coins, d.off), bucks: 0 }, parts: 0 }
+    }
+  }
+}
+// How much town worth a deal adds beyond what was paid, for the server guard. Fuel and
+// paint aren't part of town worth, so they need no allowance.
+export const dealSave = (d: DealDef) => {
+  if (d.kind === 'fuel' || d.kind === 'paint') return 0
+  const o = dealOffer(d)
+  return o.was.coins - o.now.coins
+}
 
 // Crew weekly goal. The server counts the points from each save and checks the target
 // (supabase/migrations/0027_crew_weekly_goal.sql, crew_goal_rules()); these copies are for display.

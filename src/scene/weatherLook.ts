@@ -14,6 +14,7 @@ const grey = new Color()
 const tmp = new Color()
 const flashSky = new Color('#dfe6ff')
 const cool = new Color(-0.01, 0, 0.018)
+const dustSun = new Color('#ffb070')
 
 function desaturate(c: Color, amount: number) {
   const l = c.r * 0.2126 + c.g * 0.7152 + c.b * 0.0722
@@ -39,6 +40,12 @@ export function weatherLook(look: Look, w: Weather) {
     g.bloom *= 1 + 0.3 * c // lamps and headlights glow in the gloom
   }
   if (w.haze > 0) look.grade.contrast -= 0.1 * w.haze
+  // A dust storm turns the light a hazy orange.
+  if (w.dust > 0) {
+    look.sun.lerp(dustSun, 0.5 * w.dust)
+    look.grade.highlights.add(tmp.setRGB(0.04, 0.015, -0.035).multiplyScalar(w.dust))
+    look.grade.shadows.add(tmp.setRGB(0.02, 0.008, -0.02).multiplyScalar(w.dust))
+  }
   // Snow on the ground lights everything from below, so snowy days stay bright.
   if (w.snow > 0) {
     look.hemiIntensity *= 1 + 0.3 * w.snow
@@ -59,8 +66,9 @@ export const gloomOf = (w: Weather) => Math.min(1, Math.max(0, (w.cloud - 0.45) 
 const HAZE_DAY = new Color('#c4ccd6')
 const HAZE_SNOW = new Color('#eef2f7')
 const HAZE_NIGHT = new Color('#1c2438')
+const HAZE_DUST = new Color('#d6b48c')
 export function hazeColor(out: Color, w: Weather, night: number) {
-  return out.copy(HAZE_DAY).lerp(HAZE_SNOW, w.snow > 0 ? Math.min(1, w.snow * 1.5) : 0).lerp(HAZE_NIGHT, night)
+  return out.copy(HAZE_DAY).lerp(HAZE_SNOW, w.snow > 0 ? Math.min(1, w.snow * 1.5) : 0).lerp(HAZE_DUST, Math.min(1, w.dust * 1.2)).lerp(HAZE_NIGHT, night)
 }
 
 // Shader bits shared by the ground materials.

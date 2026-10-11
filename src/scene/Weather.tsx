@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import {
-  BufferAttribute, BufferGeometry, Color, Fog, InstancedBufferAttribute, InstancedBufferGeometry, Mesh, MeshBasicMaterial,
+  BackSide, BufferAttribute, BufferGeometry, Color, Fog, InstancedBufferAttribute, InstancedBufferGeometry, Mesh, MeshBasicMaterial,
   OrthographicCamera, ShaderMaterial, Vector2, Vector3, type Camera,
 } from 'three'
-import { FEEL, strike, weatherNow, type Weather as WeatherState, type WeatherKind } from '../game/weather'
-import { dayPhase, nightAmount } from './dayNight'
-import { groundUniforms, hazeColor } from './weatherLook'
+import { FEEL, seedRoll, strike, weatherNow, type Weather as WeatherState, type WeatherKind } from '../game/weather'
+import { SEASON } from './season'
+import { applyNight, dayPhase, nightAmount } from './dayNight'
+import { gloomOf, groundUniforms, hazeColor } from './weatherLook'
 import type { Look } from './look'
 import type { VenueId } from './venues'
+
+const PINNED = typeof location !== 'undefined' && new URLSearchParams(location.search).has('weather')
 
 // Rain, snow, splashes, lightning and fog. Everything that falls is one
 // instanced quad per drop, moved entirely on the GPU from a time uniform, so a
@@ -144,6 +147,7 @@ function frameFor(camera: Camera, out: Frame, race: boolean) {
 
 const RAIN_DAY = new Color('#d6e2ee')
 const RAIN_NIGHT = new Color('#8c9ab5')
+const SNOW_NIGHT = new Color('#9fabc4')
 
 type Sizes = { rain: number; splash: number; snow: number }
 
@@ -214,7 +218,16 @@ function Precip({ sizes, race, get }: { sizes: Sizes; race: boolean; get: () => 
     s.uWidth.value = race ? 0.035 : 4.2 * frame.px
     s.uCenter.value.copy(frame.center)
     s.uWind.value.set(gust * 1.4, gust * 0.5)
-    snow.geo.instanceCount = Math.round(sizes.snow * Math.min(1, w.snow))
+    // Blowing sand rides the snow layer: tan grains racing sideways.
+    const sand = w.dust > w.snow
+    s.uColor.value.set(sand ? '#b48650' : '#ffffff').lerp(SNOW_NIGHT, sand ? 0 : night * 0.6)
+    s.uOpacity.value = sand ? 0.7 : 0.95
+    if (sand) {
+      s.uSpeed.value = race ? 1.2 : 1.5
+      s.uWind.value.set(gust * 2.4, gust * 0.8)
+      s.uWidth.value = race ? 0.04 : 3.4 * frame.px
+    }
+    snow.geo.instanceCount = Math.round(sizes.snow * Math.min(1, Math.max(w.snow, w.dust)))
 
     const p = splash.mat.uniforms
     p.uTime.value = t
@@ -238,6 +251,9 @@ function Precip({ sizes, race, get }: { sizes: Sizes; race: boolean; get: () => 
 // the whole scene, then thunder (for sound) a moment later.
 const SEGS = 22
 const flashCurve = (t: number) => (t < 0 ? 0 : t < 0.07 ? 1 : t < 0.13 ? 0.25 : t < 0.2 ? 0.85 : Math.max(0, 0.85 * (1 - (t - 0.2) / 0.45)))
+// Players who ask for less motion get one soft glow per strike instead of a flicker.
+const calm = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
+const softFlash = (t: number) => (t < 0 ? 0 : 0.3 * Math.max(0, 1 - Math.abs(t - 0.25) / 0.25))
 
 function Lightning({ race, get }: { race: boolean; get: () => WeatherState }) {
   const camera = useThree((s) => s.camera)
@@ -307,7 +323,7 @@ function Lightning({ race, get }: { race: boolean; get: () => WeatherState }) {
       const far = Math.random()
       strike(400 + far * 2200, 1 - far * 0.6)
     } else if (!stormy && s.next < t + 2) s.next = t + 2 + Math.random() * 4
-    const f = flashCurve(t - s.at)
+    const f = (calm ? softFlash : flashCurve)(t - s.at)
     w.flash = f
     const m = bolt.material as MeshBasicMaterial
     m.opacity = Math.min(1, f * 1.4)
@@ -369,27 +385,59 @@ export function Weather({ small }: { small: boolean }) {
   )
 }
 
-// A race picks up the town's weather when it starts, adjusted to the venue:
-// desert squalls blow dust instead of rain and the mountain pass gets snow.
+// Every venue has its own skies: drizzle and fog on the docks, dust storms in
+// the canyon, blizzards up the pass. A live race rolls its weather from the race
+// id, so both racers see the same sky. Otherwise bad weather in town carries
+// over to the race (adjusted for the venue), and a clear day rolls the venue's own.
+const VENUE_SKIES: Record<VenueId, [WeatherKind, number][]> = {
+  main: [['clear', 45], ['rain', 20], ['storm', 12], ['drizzle', 10], ['fog', 13]],
+  beach: [['clear', 45], ['rain', 15], ['storm', 15], ['fog', 15], ['wind', 10]],
+  desert: [['clear', 45], ['dust', 35], ['wind', 20]],
+  snow: [['clear', 35], ['snow', 40], ['blizzard', 25]],
+  farm: [['clear', 45], ['rain', 18], ['storm', 14], ['fog', 13], ['drizzle', 10]],
+  docks: [['clear', 40], ['fog', 25], ['drizzle', 15], ['rain', 10], ['storm', 10]],
+}
 const AS_SNOW: Partial<Record<WeatherKind, WeatherKind>> = { rain: 'snow', drizzle: 'snow', storm: 'blizzard' }
-const IN_DESERT: Partial<Record<WeatherKind, WeatherKind>> = { rain: 'wind', drizzle: 'clear', storm: 'wind', snow: 'wind', blizzard: 'wind', fog: 'clear' }
-export function raceWeather(venue: VenueId): WeatherState {
-  const now = weatherNow()
-  const kind = (venue === 'snow' ? AS_SNOW[now.kind] : venue === 'desert' ? IN_DESERT[now.kind] : undefined) ?? now.kind
+const IN_DESERT: Partial<Record<WeatherKind, WeatherKind>> = { rain: 'dust', drizzle: 'clear', storm: 'dust', snow: 'wind', blizzard: 'dust', fog: 'clear' }
+
+function rollVenue(venue: VenueId, roll: number): WeatherKind {
+  const odds = VENUE_SKIES[venue]
+  let r = roll * odds.reduce((s, [, w]) => s + w, 0)
+  for (const [k, w] of odds) if ((r -= w) < 0) return k
+  return 'clear'
+}
+
+export function raceWeather(venue: VenueId, seed?: string): WeatherState {
+  let kind: WeatherKind
+  const town = weatherNow()
+  if (PINNED) kind = town.kind
+  else if (seed) kind = rollVenue(venue, seedRoll(seed))
+  else kind = town.kind !== 'clear' && town.strength > 0.3 ? town.kind : rollVenue(venue, Math.random())
+  if (venue === 'snow') kind = AS_SNOW[kind] ?? kind
+  else if (venue === 'desert') kind = IN_DESERT[kind] ?? kind
+  // Winter rain falls as snow everywhere but the desert.
+  else if (SEASON === 'winter') kind = AS_SNOW[kind] ?? kind
   const f = FEEL[kind]
-  const s = now.strength
   return {
-    kind, strength: s, flash: 0,
-    rain: f.rain * s, snow: f.snow * s, cloud: f.cloud * s, haze: f.haze * s, wind: f.wind * s,
-    wet: venue === 'desert' ? 0 : venue === 'snow' ? 0 : Math.max(now.wet, f.rain > 0 ? s : 0),
-    cover: venue === 'snow' ? Math.max(now.cover, f.snow * s) : now.cover,
+    kind, strength: 1, flash: 0,
+    rain: f.rain, snow: f.snow, cloud: f.cloud, haze: f.haze, wind: f.wind, dust: f.dust,
+    wet: f.rain > 0 ? 1 : 0,
+    cover: f.snow > 0 ? 0.85 : venue === 'snow' || venue === 'desert' ? 0 : town.cover,
   }
 }
 
 // The weather during a race. `look` is the race's lighting, for lightning flashes.
 export function RaceWeather({ w, look }: { w: WeatherState; look: Look }) {
   const scene = useThree((s) => s.scene)
+  const camera = useThree((s) => s.camera)
   const base = useRef<{ near: number; far: number; color: Color; exposure: number } | null>(null)
+  // Street lamps and headlights come on in a race-day storm, and go back to the
+  // town's weather afterwards.
+  useEffect(() => {
+    const night = nightAmount(dayPhase())
+    applyNight(night, gloomOf(w))
+    return () => applyNight(nightAmount(dayPhase()), gloomOf(weatherNow()))
+  }, [w])
   useEffect(() => {
     const f = scene.fog
     if (f instanceof Fog) {
@@ -404,13 +452,27 @@ export function RaceWeather({ w, look }: { w: WeatherState; look: Look }) {
     }
   }, [scene, w, look])
   const get = useMemo(() => () => w, [w])
+  // A grey (or sandy) veil over the venue's blue sky when it's overcast.
+  const veil = useMemo(() => {
+    const night = nightAmount(dayPhase())
+    const c = new Color(w.dust > 0 ? '#cfa877' : w.haze > w.cloud ? '#c9d1da' : '#87909b').lerp(new Color('#1c2438'), night * 0.8)
+    return new MeshBasicMaterial({ color: c, transparent: true, opacity: Math.min(0.88, w.cloud * 0.8 + w.haze * 0.45 + w.dust * 0.45), side: BackSide, fog: false, depthWrite: false })
+  }, [w])
+  useEffect(() => () => veil.dispose(), [veil])
+  const dome = useRef<Mesh>(null)
   useFrame(() => {
+    dome.current?.position.set(camera.position.x, 0, camera.position.z)
     ground.uWet.value = w.wet
     ground.uCover.value = w.cover
     if (base.current) look.grade.exposure = base.current.exposure + 0.3 * w.flash
   })
   return (
     <>
+      {veil.opacity > 0.01 && (
+        <mesh ref={dome} material={veil} raycast={() => null} renderOrder={-1}>
+          <sphereGeometry args={[88, 24, 8, 0, Math.PI * 2, 0.9, Math.PI / 2 - 0.75]} />
+        </mesh>
+      )}
       <Precip sizes={SIZES.race} race get={get} />
       <Lightning race get={get} />
     </>

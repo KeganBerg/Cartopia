@@ -5,7 +5,7 @@ import {
 } from '../game/store'
 import {
   DAILY_BONUS, GOALS, QUEST_PAY, TASKS_PER_PERIOD, payAt, msToNextDay, msToNextWeek, buildingDef, buildingLevel, upgradable, MAX_BUILDING_LEVEL,
-  carDef, takesDriver, activeEvent, eventEndsAt, plotPrice, START_LAND, type StatKey, type GoalDef, flatFixCost, servicePay, gasCanCost,
+  carDef, takesDriver, SEASON_STARS, activeEvent, eventEndsAt, plotPrice, START_LAND, type StatKey, type GoalDef, flatFixCost, servicePay, gasCanCost,
 } from '../game/data'
 import { Panel, SheetTabs, openGarageTab } from './Menus'
 import { openRaceTab } from './Race'
@@ -104,13 +104,14 @@ const left = (ms: number) => {
   const m = Math.max(1, Math.ceil(ms / 60000))
   return m >= 1440 ? `${Math.floor(m / 1440)}d ${Math.floor((m % 1440) / 60)}h` : m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`
 }
-function Reward({ coins, xp, bucks, parts }: { coins: number; xp?: number; bucks?: number; parts?: number }) {
+function Reward({ coins, xp, bucks, parts, stars }: { coins: number; xp?: number; bucks?: number; parts?: number; stars?: number }) {
   return (
     <span className="goal-pay">
       <i className="coin-ico ico">$</i>{n(coins)}
       {!!bucks && <><i className="buck-ico ico">B</i>{bucks}</>}
       {!!parts && <><i className="parts-ico ico">⚙</i>{parts}</>}
       {!!xp && <b>+{n(xp)} XP</b>}
+      {!!stars && <b className="star-pay">+{stars} ⭐</b>}
     </span>
   )
 }
@@ -186,7 +187,7 @@ function Tasks({ period }: { period: Period }) {
             <Row key={t.id} icon={d.icon} text={taskText(period, t)} have={taskProgress(s, period, t)} target={t.n}
               done={taskProgress(s, period, t) >= t.n} claimed={done.includes(t.id)}
               onGo={() => goTo(d.stat)} onClaim={() => s.claimTask(period, t.id)}>
-              <Reward coins={pay.coins} xp={pay.xp} />
+              <Reward coins={pay.coins} xp={pay.xp} stars={period === 'daily' ? SEASON_STARS.dailyTask : SEASON_STARS.weeklyTask} />
             </Row>
           )
         })}
@@ -196,7 +197,7 @@ function Tasks({ period }: { period: Period }) {
         <div className="chest-main">
           <b>{period === 'daily' ? 'Daily chest' : 'Weekly chest'}</b>
           <div className="chest-pips">{Array.from({ length: TASKS_PER_PERIOD }, (_, i) => <i key={i} className={i < done.length ? 'on' : ''} />)}</div>
-          <Reward coins={chestPay.coins} bucks={chest.bucks} parts={chest.parts} />
+          <Reward coins={chestPay.coins} bucks={chest.bucks} parts={chest.parts} stars={period === 'daily' ? SEASON_STARS.dailyChest : SEASON_STARS.weeklyChest} />
         </div>
         {opened ? <span className="goal-check">✔</span> : <button className="buy small" disabled={!ready} onClick={() => s.claimChest(period)}>{ready ? 'Open' : '🔒'}</button>}
       </div>

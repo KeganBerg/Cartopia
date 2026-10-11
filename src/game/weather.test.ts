@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FEEL, SPELL_MS, spellKind, weatherNow, type WeatherKind } from './weather'
+import { FEEL, SPELL_MS, seedRoll, spellKind, weatherNow, type WeatherKind } from './weather'
 
 describe('weather', () => {
   it('rolls weather that suits the season, with clear spells most common', () => {
@@ -40,5 +40,14 @@ describe('weather', () => {
     expect(mid.strength).toBe(1)
     expect(mid.cloud).toBeCloseTo(FEEL[mid.kind].cloud)
     expect({ ...weatherNow(start + SPELL_MS / 2 + 500) }.kind).toBe(mid.kind)
+  })
+
+  it('rolls the same race weather from the same live race id', () => {
+    expect(seedRoll('race-abc')).toBe(seedRoll('race-abc'))
+    const rolls = Array.from({ length: 200 }, (_, i) => seedRoll(`race-${i}`))
+    expect(Math.min(...rolls)).toBeGreaterThanOrEqual(0)
+    expect(Math.max(...rolls)).toBeLessThan(1)
+    expect(rolls.filter((r) => r < 0.5).length).toBeGreaterThan(70)
+    expect(rolls.filter((r) => r < 0.5).length).toBeLessThan(130)
   })
 })
