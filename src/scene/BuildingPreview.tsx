@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { PerspectiveCamera, Vector3, type Group, type Mesh } from 'three'
 import type { Body, BuildingDef, Finish, SkinnedSlot } from '../game/data'
 import { BuildingModel } from './BuildingModel'
+import { Grounded } from './ServiceVehicles'
 import { CarModel } from './CarModel'
 import { SEASON } from './season'
 import { frame, seat, type Bounds } from './fit'
@@ -21,7 +22,7 @@ const still = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-
 type Item = { key: string; model: () => ReactNode }
 
 function buildingItem(def: BuildingDef, level?: number): Item {
-  return { key: `b|${def.id}|${level ?? 1}|${SEASON}`, model: () => <BuildingModel def={def} level={level} /> }
+  return { key: `b|${def.id}|${level ?? 1}|${SEASON}`, model: () => <Grounded.Provider value><BuildingModel def={def} level={level} /></Grounded.Provider> }
 }
 
 type CarLook = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; stripe?: string | null; rusty?: boolean; mods?: string[] | null }
