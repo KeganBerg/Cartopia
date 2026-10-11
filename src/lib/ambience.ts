@@ -8,6 +8,7 @@ import { SEASON, type Season } from '../scene/season'
 import { onTownHold, townHeld } from '../scene/renderGate'
 import { useGame } from '../game/store'
 import { pickSpecies, sing, type Species } from './birdsong'
+import { onThunder, weatherNow } from '../game/weather'
 
 // How much of each layer plays, 0 to 1, for how dark it is and the season.
 export type Mix = {
@@ -41,6 +42,27 @@ export function ambientMix(night: number, season: Season): Mix {
     owls: night * by({ winter: 0.7, spring: 0.4, summer: 0.4, fall: 0.7 }),
     yard: day * by({ winter: 0, spring: 0.6, summer: 1, fall: 0.25 }),
     dogs: day * 0.8 + night * 0.15,
+  }
+}
+
+// The parts of the weather the sounds follow (see src/game/weather.ts), all 0..1.
+export type Sky = { rain: number; snow: number; wind: number; wet: number }
+export const CALM: Sky = { rain: 0, snow: 0, wind: 0, wet: 0 }
+
+// Rain and snow send birds, bugs and people indoors.
+export function weatherMix(m: Mix, sky: Sky): Mix {
+  const wet = Math.max(sky.rain, sky.snow)
+  return {
+    ...m,
+    birds: m.birds * (1 - 0.85 * wet),
+    chatter: m.chatter * (1 - 0.6 * wet),
+    yard: m.yard * (1 - wet),
+    dogs: m.dogs * (1 - 0.5 * wet),
+    cicadas: m.cicadas * (1 - sky.rain),
+    crickets: m.crickets * (1 - 0.7 * sky.rain),
+    traffic: m.traffic * (1 - 0.4 * sky.snow),
+    leaves: Math.min(1, m.leaves + sky.wind * 0.5 * (m.leaves > 0 ? 1 : 0)),
+    wind: Math.min(1, m.wind + sky.wind),
   }
 }
 
@@ -91,6 +113,11 @@ export class Soundscape {
   private traffic: GainNode
   private trafficTone: BiquadFilterNode
   private wind: GainNode
+  private howl: GainNode
+  private howlTone: BiquadFilterNode
+  private rain: GainNode
+  private downpour: GainNode
+  private wet = 0
   private windTone: BiquadFilterNode
   private leaves: GainNode
   private cicada: GainNode
@@ -121,6 +148,15 @@ export class Soundscape {
     this.traffic = this.bed(this.brown, this.trafficTone)
     this.windTone = this.filter('lowpass', 400)
     this.wind = this.bed(this.brown, this.windTone)
+    // Strong wind whistles round corners: a narrow band that slides with the gusts.
+    this.howlTone = this.filter('bandpass', 600, undefined, 10)
+    this.howl = this.bed(this.white, this.howlTone)
+    // Rain: a bright hiss of drops, and a low roar when it pours.
+    this.rain = ctx.createGain()
+    const drops = this.filter('highpass', 900)
+    drops.connect(this.filter('lowpass', 7500, this.rain))
+    this.bed(this.white, drops, this.rain)
+    this.downpour = this.bed(this.brown, this.filter('lowpass', 600))
     this.leaves = ctx.createGain()
     const hiss = this.filter('highpass', 2800)
     hiss.connect(this.filter('lowpass', 7000, this.leaves))
@@ -239,11 +275,17 @@ export class Soundscape {
     this.out.gain.setTargetAtTime(v, t, fade)
   }
 
-  step(t: number, night: number, season: Season, club: boolean) {
+  step(t: number, night: number, season: Season, club: boolean, sky: Sky = CALM) {
     const dt = this.last < 0 ? 0.2 : Math.min(1, t - this.last)
     this.last = t
-    const m = ambientMix(night, season)
+    const m = weatherMix(ambientMix(night, season), sky)
     const fade = (g: GainNode, v: number) => g.gain.setTargetAtTime(v, t, 1.5)
+    this.wet = sky.wet
+
+    fade(this.rain, sky.rain * 0.05)
+    fade(this.downpour, sky.rain * sky.rain * 0.08)
+    // Water dripping off gutters and leaves after (and during) rain.
+    if (chance(sky.wet * 2.5, dt)) this.drip(t + rand(0, 0.2))
 
     fade(this.traffic, m.traffic * 0.09)
     fade(this.chorus, m.crickets * 0.07 + m.peepers * 0.02)
@@ -254,6 +296,8 @@ export class Soundscape {
       this.windTone.frequency.setTargetAtTime(300 + gust * 600, t, 1.2)
       if (gust > 0.75 && season !== 'summer') this.chimes(t + 0.5, m.wind)
       fade(this.wind, m.wind * (0.03 + gust * 0.08))
+      this.howlTone.frequency.setTargetAtTime(450 + gust * 500, t, 0.8)
+      fade(this.howl, sky.wind * sky.wind * gust * 0.05)
       fade(this.leaves, m.leaves * (0.004 + gust * gust * 0.03))
     }
     // Cicadas swell for a while, then rest.
@@ -367,8 +411,9 @@ export class Soundscape {
     hiss.buffer = this.white
     hiss.loop = true
     const hg = this.ctx.createGain()
-    hg.gain.value = scooter ? 0.004 : 0.012
-    hiss.connect(this.filter('bandpass', 1400, undefined, 0.6)).connect(hg).connect(g)
+    // Wet roads turn tyre noise into a long spray.
+    hg.gain.value = (scooter ? 0.004 : 0.012) * (1 + this.wet * 5)
+    hiss.connect(this.filter('bandpass', 1400 + this.wet * 1600, undefined, 0.6)).connect(hg).connect(g)
     hiss.start(t)
     hiss.stop(t + dur + 0.1)
 
@@ -544,6 +589,39 @@ export class Soundscape {
     }
   }
 
+  // A drop falling into a puddle or off a gutter.
+  private drip(t: number) {
+    const f = rand(1200, 2600)
+    this.blip(t, 0.06, rand(0.004, 0.012), rand(-0.9, 0.9), (o) => {
+      o.frequency.setValueAtTime(f, t)
+      o.frequency.exponentialRampToValueAtTime(f * 1.6, t + 0.05)
+    })
+  }
+
+  // Thunder: a crack when close, then a long rolling rumble.
+  thunder(t: number, loud: number) {
+    const near = loud > 0.6
+    const p = rand(-0.7, 0.7)
+    if (near) this.noiseHit(t, 0.35, 0.25 * loud, this.filter('highpass', 800, this.pan(p, 0.5)))
+    const dur = rand(3.5, 7)
+    const src = this.ctx.createBufferSource()
+    src.buffer = this.brown
+    src.loop = true
+    const g = this.ctx.createGain()
+    g.gain.setValueAtTime(0.0001, t)
+    // A few rolling swells, each fainter than the last.
+    let s = t
+    for (let i = 0; i < 4 && s < t + dur - 0.6; i++) {
+      g.gain.exponentialRampToValueAtTime((0.25 + 0.3 * loud) * (1 - i * 0.2), s + rand(0.08, near ? 0.15 : 0.5))
+      s += rand(0.6, 1.6)
+      g.gain.exponentialRampToValueAtTime(0.15 * (1 - i * 0.2), s)
+    }
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
+    src.connect(this.filter('lowpass', near ? 400 : 220)).connect(g).connect(this.pan(p, 0.5))
+    src.start(t, rand(0, 3))
+    src.stop(t + dur + 0.1)
+  }
+
   // Wind chimes on a porch, rung by a gust.
   private chimes(t: number, wind: number) {
     const scale = [1, 9 / 8, 5 / 4, 3 / 2, 5 / 3, 2]
@@ -630,7 +708,7 @@ function tick() {
     if (!scape) scape = new Soundscape(ctx, audioOut() ?? ctx.destination)
     quietSince = 0
     scape.level(v, t)
-    scape.step(t + 0.05, nightAmount(dayPhase()), SEASON, clubOpen())
+    scape.step(t + 0.05, nightAmount(dayPhase()), SEASON, clubOpen(), weatherNow())
   } else if (scape) {
     scape.level(0, t, 0.25)
     // Tear the graph down once it has faded, so nothing runs while silent.
@@ -666,4 +744,7 @@ export function startAmbience() {
   })
   onMuteChange(wake)
   onTownHold(wake)
+  onThunder((delay, loud) => {
+    if (ctx && scape && target() > 0) scape.thunder(ctx.currentTime + delay / 1000, loud)
+  })
 }
