@@ -71,6 +71,27 @@ export function pointAt(c: Curve, s: number): V2 {
   return bez(c.p, tAt(c, s))
 }
 
+// Point and unit direction at arc length s, written into `p` and `h` (no allocation;
+// same numbers as pointAt and dirAt).
+export function poseAt(c: Curve, s: number, p: V2, h: V2) {
+  const t = tAt(c, s)
+  const q = c.p
+  let u = 1 - t
+  let a = u * u * u, b = 3 * u * u * t, k = 3 * u * t * t, d = t * t * t
+  p[0] = a * q[0][0] + b * q[1][0] + k * q[2][0] + d * q[3][0]
+  p[1] = a * q[0][1] + b * q[1][1] + k * q[2][1] + d * q[3][1]
+  const td = Math.min(0.999, Math.max(0.001, t))
+  u = 1 - td
+  a = 3 * u * u
+  b = 6 * u * td
+  k = 3 * td * td
+  const dx = a * (q[1][0] - q[0][0]) + b * (q[2][0] - q[1][0]) + k * (q[3][0] - q[2][0])
+  const dz = a * (q[1][1] - q[0][1]) + b * (q[2][1] - q[1][1]) + k * (q[3][1] - q[2][1])
+  const l = Math.hypot(dx, dz) || 1
+  h[0] = dx / l
+  h[1] = dz / l
+}
+
 // Unit direction of travel at arc length s.
 export function dirAt(c: Curve, s: number): V2 {
   const d = deriv(c.p, Math.min(0.999, Math.max(0.001, tAt(c, s))))

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import {
   BoxGeometry, BufferGeometry, CircleGeometry, Color, CylinderGeometry, DoubleSide, Euler, ExtrudeGeometry, Matrix4,
   MeshBasicMaterial, MeshStandardMaterial, PlaneGeometry, Quaternion, Shape as ThreeShape, SphereGeometry, TorusGeometry, Vector3,
@@ -9,7 +9,9 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { wheelTex } from './textures'
 import { glowMats } from './dayNight'
 import { fittedMods, isBike, type Body, type ModSlot } from '../game/data'
-import { CarMods, RIM_LOOK } from './CarMods'
+import { CarMods, RIM_LOOK, carbon, chrome as modChrome, modGeo, modIds } from './CarMods'
+import { carBody, wheelPool, type WheelSlot } from './carBatch'
+import { bake, finishOf, type Finish } from './bake'
 
 type Shape = {
   len: number; wid: number
@@ -495,9 +497,59 @@ function wheelMaterial(rim?: string) {
 }
 
 // Handles on a car's wheels so a driving car can steer the front pair and roll all four.
-export type WheelRig = { steer: (Group | null)[]; spin: (Group | null)[]; radius: number; base: number }
+// `slots`: where a lean car's wheels are drawn in the shared wheel pool (see carBatch.ts).
+export type WheelRig = { steer: (Group | null)[]; spin: (Group | null)[]; radius: number; base: number; slots?: (WheelSlot | null)[] }
 
-type CarProps = { body: Body; color: string; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean; rig?: WheelRig; mods?: string[] | null; flames?: boolean }
+// lean: draw the body as one merged mesh and the wheels from the shared pool (town
+// traffic). Needs `rig`, whose owner places the wheels each frame; no exhaust flames.
+type CarProps = { body: Body; color: string; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean; rig?: WheelRig; mods?: string[] | null; flames?: boolean; lean?: boolean }
+
+// A lean car: every part baked into two meshes (the parts that cast a shadow and the
+// rest) with the finish it would otherwise be drawn with, except the see-through screen;
+// the wheels' groups stay for steering and rolling but are drawn from the shared wheel pool.
+function LeanCar({ parts, finish, casters, mods, paint, highlight, wheels, radius, width, rims, rig, beams }: {
+  parts: Partial<Record<Part, BufferGeometry>>; finish: Partial<Record<Part, Finish>>; casters: Part[]
+  mods: { body: Body; ids: string[] }; paint: Finish; highlight?: boolean
+  wheels: V3[]; radius: number; width: number; rims?: string; rig: WheelRig; beams: React.ReactNode
+}) {
+  const key = (Object.keys(finish) as Part[]).map((k) => `${k}:${parts[k] ? 1 : 0}:${JSON.stringify(finish[k])}`).join() + mods.ids.join()
+  const geo = useMemo(() => {
+    const shade: [BufferGeometry, Finish][] = []
+    const rest: [BufferGeometry, Finish][] = []
+    for (const k of Object.keys(finish) as Part[]) if (parts[k] && finish[k]) (casters.includes(k) ? shade : rest).push([parts[k]!, finish[k]!])
+    // Mod paint and carbon cast shadows; mod chrome doesn't.
+    const m = mods.ids.length ? modGeo(mods.body, mods.ids) : {}
+    if (m.paint) shade.push([m.paint, { ...paint, glow: false }])
+    if (m.carbon) shade.push([m.carbon, finishOf(carbon)])
+    if (m.chrome) rest.push([m.chrome, finishOf(modChrome)])
+    return { shade: shade.length ? bake(shade) : null, rest: rest.length ? bake(rest) : null }
+  }, [key]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => {
+    geo.shade?.dispose()
+    geo.rest?.dispose()
+  }, [geo])
+  useEffect(() => {
+    const mat = wheelMaterial(rims)
+    rig.slots = wheels.map(() => wheelPool.take(mat, radius, width))
+    return () => {
+      rig.slots?.forEach((w) => w && wheelPool.give(w))
+      rig.slots = undefined
+    }
+  }, [rig, rims, radius, width, wheels.length]) // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <group>
+      {geo.shade && <mesh geometry={geo.shade} material={highlight ? carBody.picked : carBody.plain} castShadow />}
+      {geo.rest && <mesh geometry={geo.rest} material={highlight ? carBody.picked : carBody.plain} />}
+      {parts.screen && <mesh geometry={parts.screen} material={MAT.screen} />}
+      {beams}
+      {wheels.map(([x, y, z], i) => (
+        <group key={i} position={[x, y, z]} ref={i < (wheels.length === 2 ? 1 : 2) ? (o) => void (rig.steer[i] = o) : undefined}>
+          <group ref={(o) => void (rig.spin[i] = o)} />
+        </group>
+      ))}
+    </group>
+  )
+}
 
 // Any vehicle: a motorcycle for bike bodies, otherwise a car. Faces +z.
 export function CarModel(props: CarProps) {
@@ -505,7 +557,7 @@ export function CarModel(props: CarProps) {
 }
 
 // Toy-style car: bevelled extruded body and cabin so no edge is a hard box corner. Faces +z.
-function CarBody({ body, color, highlight, stripe, beams, rusty, rig, mods, flames }: { body: Body; color: string; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean; rig?: WheelRig; mods?: string[] | null; flames?: boolean }) {
+function CarBody({ body, color, highlight, stripe, beams, rusty, rig, mods, flames, lean }: CarProps) {
   // Rusty finds come home stock.
   const fit = rusty ? {} : fittedMods(mods)
   const s = shapeOf(body)
@@ -517,6 +569,24 @@ function CarBody({ body, color, highlight, stripe, beams, rusty, rig, mods, flam
   const wz = s.len * 0.33
   const wx = s.wid / 2 - 0.02
   const shared = (['black', 'chrome', 'glass', 'screen', 'seat', 'wood', 'lamp', 'tail', 'amber'] as const).filter((k) => p[k])
+  const beam = beams && (
+    <mesh rotation-x={-Math.PI / 2} position={[0, 0.03, s.len / 2 + 0.55]} renderOrder={2}>
+      <planeGeometry args={[s.wid * 1.5, 1.3]} />
+      <primitive object={glowMats.beam} attach="material" dispose={null} />
+    </mesh>
+  )
+  if (lean && rig) {
+    const paint: Finish = { color: tint, metal: rusty ? 0.1 : 0.4, rough: rusty ? 0.95 : 0.3, glow: true }
+    const finish: Partial<Record<Part, Finish>> = {
+      paint, dark: { color: dark }, ...(stripe ? { stripe: { color: stripe } } : {}),
+      black: finishOf(MAT.black), chrome: finishOf(MAT.chrome), glass: finishOf(MAT.glass), seat: finishOf(MAT.seat), wood: finishOf(MAT.wood),
+      lamp: finishOf(MAT.lamp), tail: finishOf(MAT.tail), amber: finishOf(MAT.amber),
+    }
+    return (
+      <LeanCar parts={p} finish={finish} casters={['paint', 'glass']} mods={{ body, ids: modIds(fit) }} paint={paint} highlight={highlight}
+        wheels={[[-wx, s.wheel, wz], [wx, s.wheel, wz], [-wx, s.wheel, -wz], [wx, s.wheel, -wz]]} radius={s.wheel} width={0.14} rims={fit.rims} rig={rig} beams={beam} />
+    )
+  }
   return (
     <group>
       <mesh geometry={p.paint} castShadow>
@@ -535,12 +605,7 @@ function CarBody({ body, color, highlight, stripe, beams, rusty, rig, mods, flam
       {shared.map((k) => <mesh key={k} geometry={p[k]} material={MAT[k]} castShadow={k === 'glass'} />)}
       <CarMods body={body} fit={fit} tint={tint} metal={rusty ? 0.1 : 0.4} flames={flames} />
       {/* Headlight beams on the road, visible after dark. */}
-      {beams && (
-        <mesh rotation-x={-Math.PI / 2} position={[0, 0.03, s.len / 2 + 0.55]} renderOrder={2}>
-          <planeGeometry args={[s.wid * 1.5, 1.3]} />
-          <primitive object={glowMats.beam} attach="material" dispose={null} />
-        </mesh>
-      )}
+      {beam}
       {/* Chunky toy wheels with spoked rims. */}
       {[[-wx, wz], [wx, wz], [-wx, -wz], [wx, -wz]].map(([x, z], i) => (
         <group key={i} position={[x, s.wheel, z]} ref={rig && i < 2 ? (o) => void (rig.steer[i] = o) : undefined}>
@@ -643,7 +708,7 @@ function bikeGeo(body: BikeBody, fit: Partial<Record<ModSlot, string>>): CarGeo 
 }
 
 // Bikes take exhaust and rim mods only.
-function BikeModel({ body, color, highlight, beams, rusty, rig, mods, flames }: CarProps) {
+function BikeModel({ body, color, highlight, beams, rusty, rig, mods, flames, lean }: CarProps) {
   const all = rusty ? {} : fittedMods(mods)
   const fit = { exhaust: all.exhaust, rims: all.rims }
   const bb = body as BikeBody
@@ -654,6 +719,24 @@ function BikeModel({ body, color, highlight, beams, rusty, rig, mods, flames }: 
   const shared = (['black', 'chrome', 'glass', 'screen', 'seat', 'lamp', 'tail'] as const).filter((k) => p[k])
   const r = SHAPES[bb].wheel
   const wz = BIKE[bb].wz
+  const beam = beams && (
+    <mesh rotation-x={-Math.PI / 2} position={[0, 0.03, SHAPES[bb].len / 2 + 0.5]} renderOrder={2}>
+      <planeGeometry args={[0.5, 1.1]} />
+      <primitive object={glowMats.beam} attach="material" dispose={null} />
+    </mesh>
+  )
+  if (lean && rig) {
+    const paint: Finish = { color: tint, metal: rusty ? 0.1 : 0.4, rough: rusty ? 0.95 : 0.3, glow: true }
+    const finish: Partial<Record<Part, Finish>> = {
+      paint, dark: { color: dark },
+      black: finishOf(MAT.black), chrome: finishOf(MAT.chrome), glass: finishOf(MAT.glass), seat: finishOf(MAT.seat),
+      lamp: finishOf(MAT.lamp), tail: finishOf(MAT.tail),
+    }
+    return (
+      <LeanCar parts={p} finish={finish} casters={['paint', 'black']} mods={{ body, ids: modIds(fit) }} paint={paint} highlight={highlight}
+        wheels={[[0, r, wz], [0, r, -wz]]} radius={r} width={0.07} rims={fit.rims} rig={rig} beams={beam} />
+    )
+  }
   return (
     <group>
       <mesh geometry={p.paint} castShadow>
@@ -666,12 +749,7 @@ function BikeModel({ body, color, highlight, beams, rusty, rig, mods, flames }: 
       )}
       {shared.map((k) => <mesh key={k} geometry={p[k]} material={MAT[k]} castShadow={k === 'black'} />)}
       <CarMods body={body} fit={fit} tint={tint} metal={rusty ? 0.1 : 0.4} flames={flames} />
-      {beams && (
-        <mesh rotation-x={-Math.PI / 2} position={[0, 0.03, SHAPES[bb].len / 2 + 0.5]} renderOrder={2}>
-          <planeGeometry args={[0.5, 1.1]} />
-          <primitive object={glowMats.beam} attach="material" dispose={null} />
-        </mesh>
-      )}
+      {beam}
       {[wz, -wz].map((z, i) => (
         <group key={i} position={[0, r, z]} ref={rig && i === 0 ? (o) => void (rig.steer[0] = o) : undefined}>
           <group ref={rig ? (o) => void (rig.spin[i] = o) : undefined}>

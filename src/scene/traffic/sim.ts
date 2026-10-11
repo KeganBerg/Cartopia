@@ -2,7 +2,7 @@
 // its distance from whatever is ahead, takes turns at junctions (waiting for
 // green at four-ways), pulls up at businesses, and swings round cars stopped
 // at the curb. Plain TypeScript so it can be tested without a renderer.
-import { dirAt, pointAt, type Curve, type V2 } from './curves'
+import { pointAt, poseAt, type Curve, type V2 } from './curves'
 import { lightAt, type Light } from './layout'
 import {
   D, LANE, buildNet, conflicts, exits, opp, priority, right, roadCurve, route, tkey,
@@ -97,13 +97,14 @@ export type Box = { x: number; z: number; ux: number; uz: number; hl: number; hw
 export function overlap(a: Box, b: Box) {
   const dx = b.x - a.x, dz = b.z - a.z
   if (Math.abs(dx) + Math.abs(dz) > (a.hl + a.hw + b.hl + b.hw) * 1.5) return false
-  const axes: V2[] = [[a.ux, a.uz], [-a.uz, a.ux], [b.ux, b.uz], [-b.uz, b.ux]]
-  for (const [nx, nz] of axes) {
-    const ra = a.hl * Math.abs(a.ux * nx + a.uz * nz) + a.hw * Math.abs(-a.uz * nx + a.ux * nz)
-    const rb = b.hl * Math.abs(b.ux * nx + b.uz * nz) + b.hw * Math.abs(-b.uz * nx + b.ux * nz)
-    if (Math.abs(dx * nx + dz * nz) > ra + rb) return false
-  }
-  return true
+  // The four candidate separating axes, without allocating (this runs thousands of times a frame).
+  return !(apart(a, b, dx, dz, a.ux, a.uz) || apart(a, b, dx, dz, -a.uz, a.ux) || apart(a, b, dx, dz, b.ux, b.uz) || apart(a, b, dx, dz, -b.uz, b.ux))
+}
+
+function apart(a: Box, b: Box, dx: number, dz: number, nx: number, nz: number) {
+  const ra = a.hl * Math.abs(a.ux * nx + a.uz * nz) + a.hw * Math.abs(-a.uz * nx + a.ux * nz)
+  const rb = b.hl * Math.abs(b.ux * nx + b.uz * nz) + b.hw * Math.abs(-b.uz * nx + b.ux * nz)
+  return Math.abs(dx * nx + dz * nz) > ra + rb
 }
 
 const smooth = (t: number) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t))
@@ -456,6 +457,15 @@ export class Traffic {
   // Distance along the car's planned path to a point `d` ahead (negative: behind),
   // including any sideways swing while overtaking.
   sample(a: Agent, d: number): { p: V2; h: V2 } | null {
+    const q = this.at(a, d)
+    return q && { p: [q.p[0], q.p[1]], h: [q.h[0], q.h[1]] }
+  }
+
+  // Scratch pose that at() fills in; only valid until the next call.
+  private q = { p: [0, 0] as V2, h: [0, 0] as V2 }
+
+  // Same as sample(), but into the shared scratch pose, so hot loops don't allocate.
+  private at(a: Agent, d: number): { p: V2; h: V2 } | null {
     let i = a.ci
     let s = a.s + d
     while (s < 0 && i > 0) {
@@ -467,16 +477,20 @@ export class Traffic {
       i++
     }
     if (s > a.legs[i].c.len + 0.01) return null
-    const c = a.legs[i].c
-    const p = pointAt(c, s)
-    const h = dirAt(c, s)
+    const q = this.q
+    const p = q.p, h = q.h
+    poseAt(a.legs[i].c, s, p, h)
     const off = this.swing(a, a.odo + d)
-    if (!off) return { p, h }
-    const r = right(h)
+    if (!off) return q
+    const rx = -h[1], rz = h[0]
     const slope = (this.swing(a, a.odo + d + 0.05) - this.swing(a, a.odo + d - 0.05)) / 0.1
-    const hx = h[0] + r[0] * slope, hz = h[1] + r[1] * slope
+    const hx = h[0] + rx * slope, hz = h[1] + rz * slope
     const l = Math.hypot(hx, hz)
-    return { p: [p[0] + r[0] * off, p[1] + r[1] * off], h: [hx / l, hz / l] }
+    p[0] += rx * off
+    p[1] += rz * off
+    h[0] = hx / l
+    h[1] = hz / l
+    return q
   }
 
   // Sideways offset while overtaking: out into the other lane, past, and back.
@@ -501,7 +515,7 @@ export class Traffic {
   }
 
   private pose(a: Agent) {
-    const q = this.sample(a, 0)
+    const q = this.at(a, 0)
     if (!q) return
     a.x = q.p[0]
     a.z = q.p[1]
@@ -512,10 +526,12 @@ export class Traffic {
 
   // Front wheel angle for a car with axles `base` apart, from how sharply its path bends here.
   steerOf(a: Agent, base: number) {
-    const f = this.sample(a, 0.3)
-    const b = this.sample(a, -0.3)
-    if (!f || !b) return 0
-    let d = Math.atan2(f.h[0], f.h[1]) - Math.atan2(b.h[0], b.h[1])
+    const f = this.at(a, 0.3)
+    if (!f) return 0
+    const ahead = Math.atan2(f.h[0], f.h[1])
+    const b = this.at(a, -0.3)
+    if (!b) return 0
+    let d = ahead - Math.atan2(b.h[0], b.h[1])
     d = Math.atan2(Math.sin(d), Math.cos(d))
     return Math.max(-0.55, Math.min(0.55, Math.atan((base * d) / 0.6)))
   }
@@ -523,16 +539,26 @@ export class Traffic {
   // Where the tow truck sits: on the path just ahead of the towed car.
   truckPose(a: Agent) {
     if (!a.tow || a.tow === 1) return null
-    const q = this.sample(a, a.len / 2 + TRUCK.gap + TRUCK.len / 2)
+    const q = this.at(a, a.len / 2 + TRUCK.gap + TRUCK.len / 2)
     if (!q) return null
     return { x: q.p[0], z: q.p[1], yaw: Math.atan2(q.h[0], q.h[1]), scale: a.truck }
   }
 
   // Box covering the stretch of the car's path from d0 to d1 (relative to its centre).
   private slab(a: Agent, d0: number, d1: number, hw = a.wid / 2): Box | null {
-    const q = this.sample(a, (d0 + d1) / 2)
+    return this.slabInto({ x: 0, z: 0, ux: 0, uz: 0, hl: 0, hw: 0 }, a, d0, d1, hw)
+  }
+
+  private slabInto(out: Box, a: Agent, d0: number, d1: number, hw = a.wid / 2): Box | null {
+    const q = this.at(a, (d0 + d1) / 2)
     if (!q) return null
-    return { x: q.p[0], z: q.p[1], ux: q.h[0], uz: q.h[1], hl: (d1 - d0) / 2 + 0.02, hw }
+    out.x = q.p[0]
+    out.z = q.p[1]
+    out.ux = q.h[0]
+    out.uz = q.h[1]
+    out.hl = (d1 - d0) / 2 + 0.02
+    out.hw = hw
+    return out
   }
 
   private outline(a: Agent) {
@@ -540,16 +566,19 @@ export class Traffic {
     const fr = this.front(a)
     const n = Math.max(2, Math.ceil((back + fr) / 0.35))
     const step = (back + fr) / n
-    a.boxes = []
+    // Reuses last frame's boxes rather than allocating new ones.
+    const boxes = a.boxes
+    let k = 0
     for (let i = 0; i < n; i++) {
-      const b = this.slab(a, -back + step * i, -back + step * (i + 1))
-      if (b) a.boxes.push(b)
+      const b = this.slabInto(boxes[k] ?? { x: 0, z: 0, ux: 0, uz: 0, hl: 0, hw: 0 }, a, -back + step * i, -back + step * (i + 1))
+      if (b) boxes[k++] = b
     }
+    boxes.length = k
     a.claim = []
     if (a.pend) {
       // The oncoming lane it needs to get past.
       for (let d = fr; d < a.pend.need + 1.5; d += 0.4) {
-        const q = this.sample(a, d + 0.2)
+        const q = this.at(a, d + 0.2)
         if (!q) break
         const r = right(q.h)
         a.claim.push({ x: q.p[0] - r[0] * 2 * LANE, z: q.p[1] - r[1] * 2 * LANE, ux: q.h[0], uz: q.h[1], hl: 0.22, hw: a.wid / 2 })
@@ -564,20 +593,34 @@ export class Traffic {
     }
   }
 
+  // Someone other than `uid` turning round on a tile, swinging into the lane heading `inDir`.
+  private turningRound(occ: Map<string, { inDir: number; outDir: number }>, uid: string, inDir: number) {
+    for (const [u, m] of occ) if (u !== uid && m.inDir === opp(m.outDir) && m.outDir === inDir) return true
+    return false
+  }
+
+  // Reused by scan() every frame.
+  private probe: Box = { x: 0, z: 0, ux: 0, uz: 0, hl: 0, hw: 0 }
+  private inside: boolean[] = []
+  private near: Agent[] = []
+
   // First thing in the way within `look` of the car's nose, as [distance, car].
   private scan(a: Agent, look: number, others: Agent[]): [number, Agent] | null {
     const fr = this.front(a)
     // Already in someone's claimed stretch: carry on out of it rather than stop inside.
-    const inside = new Set(others.filter((o) => o.pend && o.claim.some((c) => a.boxes.some((b) => overlap(b, c)))).map((o) => o.uid))
+    const inside = this.inside
+    inside.length = 0
+    for (const o of others) inside.push(!!o.pend && o.claim.some((c) => a.boxes.some((b) => overlap(b, c))))
+    const probe = this.probe
     for (let d = 0; d <= look; d += 0.15) {
-      const probe = this.slab(a, fr + d - 0.15, fr + d)
-      if (!probe) return null
-      for (const o of others) {
+      if (!this.slabInto(probe, a, fr + d - 0.15, fr + d)) return null
+      for (let k = 0; k < others.length; k++) {
+        const o = others[k]
         if (a.ot && o.uid === a.ot.target) continue
         // An oncoming overtaker also claims the lane it needs to get back in.
         const opposite = a.hx * o.hx + a.hz * o.hz < -0.5
-        if (o.boxes.some((b) => overlap(probe, b))) return [d, o]
-        if (opposite && (o.ot || (o.pend && !inside.has(o.uid))) && o.claim.some((b) => overlap(probe, b))) return [d, o]
+        for (const b of o.boxes) if (overlap(probe, b)) return [d, o]
+        if (opposite && (o.ot || (o.pend && !inside[k]))) for (const b of o.claim) if (overlap(probe, b)) return [d, o]
       }
     }
     return null
@@ -995,7 +1038,7 @@ export class Traffic {
     for (let i = a.ci + 1; i < a.legs.length && ahead < look + 1.5; i++) {
       const l = a.legs[i]
       const n = l.node && !l.junction ? this.net.nodes.get(l.node) : null
-      if (n && [...n.occ].some(([u, m]) => u !== a.uid && m.inDir === opp(m.outDir) && m.outDir === l.inDir)) {
+      if (n && this.turningRound(n.occ, a.uid, l.inDir)) {
         cap(ahead - 0.1)
         break
       }
@@ -1059,7 +1102,9 @@ export class Traffic {
     a.gapTo = null
     a.gap = Infinity
     const near = look + fr + 2.5
-    const others = [...this.agents.values()].filter((o) => o !== a && Math.hypot(o.x - a.x, o.z - a.z) < near + o.len)
+    const others = this.near
+    others.length = 0
+    for (const o of this.agents.values()) if (o !== a && Math.hypot(o.x - a.x, o.z - a.z) < near + o.len) others.push(o)
     const hit = this.scan(a, look, others)
     if (hit) {
       a.gap = hit[0]
