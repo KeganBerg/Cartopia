@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { CARS, carDef, modDef, modFits } from './data'
-import { CRATES, carValue, crateCars, crateDef, crateTables, crateValue, modChoices, rollCrate, type CrateDrop } from './crates'
+import { CARS, MOD_SKINS, SKINS, carDef, modDef, modFits } from './data'
+import { CRATES, carValue, crateCars, crateDef, crateSkins, crateTables, crateValue, modChoices, rollCrate, skinOdds, type CrateDrop } from './crates'
 
 const dir = new URL('../../supabase/migrations/', import.meta.url)
 // The newest migration holding the crate tables.
@@ -58,6 +58,9 @@ describe('crates', () => {
         } else if (d.kind === 'dupe') {
           expect(garage.some((g) => g.model === d.model)).toBe(true)
           expect(d.coins).toBeGreaterThan(0)
+        } else if (d.kind === 'skin' || d.kind === 'skindupe') {
+          expect(crateSkins(c).some((x) => x.id === d.skin && x.part === d.part)).toBe(true)
+          if (d.kind === 'skindupe') expect(d.coins).toBeGreaterThan(0)
         } else {
           expect(d.coins).toBeGreaterThan(0)
         }
@@ -72,6 +75,23 @@ describe('crates', () => {
     for (let i = 0; i < 200; i++) expect(rollCrate(street, 5, [], rand).kind).not.toBe('mod')
   })
 
+  it('holds every body and part skin in some crate, and pays coins for ones you have', () => {
+    const anywhere = new Set(CRATES.flatMap((c) => crateSkins(c).map((x) => (x.part ? 'p:' : 'b:') + x.id)))
+    for (const d of SKINS) expect(anywhere).toContain('b:' + d.id)
+    for (const d of MOD_SKINS) expect(anywhere).toContain('p:' + d.id)
+    for (const c of CRATES) {
+      const odds = skinOdds(c)
+      if (odds.length) expect(odds.reduce((a, x) => a + x.p, 0)).toBeCloseTo(1)
+    }
+    const diamond = crateDef('diamond')!
+    const all = { skins: SKINS.map((d) => d.id), modSkins: MOD_SKINS.map((d) => d.id) }
+    const rand = seeded(11)
+    for (let i = 0; i < 300; i++) expect(rollCrate(diamond, 20, garage, rand, all).kind).not.toBe('skin')
+    let won = 0
+    for (let i = 0; i < 300; i++) if (rollCrate(diamond, 20, garage, rand).kind === 'skin') won++
+    expect(won).toBeGreaterThan(10)
+  })
+
   it('returns a bit less than a crate costs on average', () => {
     for (const c of CRATES) {
       for (const level of [Math.max(c.unlockLevel, 8), 20, 35]) {
@@ -83,7 +103,7 @@ describe('crates', () => {
           const d = rollCrate(c, level, garage, rand)
           if (d.kind === 'coins' || d.kind === 'dupe') total += d.coins
           // Parts are counted at about a crate's worth, cars at their price.
-          else if (d.kind === 'mod') total += v
+          else if (d.kind === 'mod' || d.kind === 'skin' || d.kind === 'skindupe') total += d.kind === 'skindupe' ? d.coins : v
           else total += carValue(CARS.find((x) => x.id === d.model)!, level)
         }
         const ev = total / n / v

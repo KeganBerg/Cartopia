@@ -14,7 +14,7 @@ import { LAYER, decal } from './layers'
 import { concreteTex, corrugatedTex, glowTex, shutterTex } from './textures'
 import { signTexture } from './signTexture'
 import { ToolChest, TyreStack, useFitCamera } from './ArcadeScenery'
-import { carDef, fittedMods, type Body, type Finish } from '../game/data'
+import { SKINNED_SLOTS, carDef, fittedMods, modDef, modFits, type Body, type Finish, type SkinnedSlot } from '../game/data'
 import { dropTier, type CrateDef, type CrateDrop } from '../game/crates'
 import { bumpSound, crashSound, dingSound } from '../lib/arcadeSound'
 import { sfx } from '../lib/sound'
@@ -519,13 +519,13 @@ function Dust() {
 // ---------------------------------------------------------------------------------------------
 // The prize
 
-type CarLook = { body: Body; model: string; color: string; finish?: Finish | null; stripe?: string | null; mods?: string[] | null }
+type CarLook = { body: Body; model: string; color: string; finish?: Finish | null; stripe?: string | null; mods?: string[] | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null }
 
 function PrizeCar({ look }: { look: CarLook }) {
   const sc = 2.3 / carSize(look.body).len
   return (
     <group scale={sc}>
-      <CarModel body={look.body} model={look.model} color={look.color} finish={look.finish} stripe={look.stripe} mods={look.mods} />
+      <CarModel body={look.body} model={look.model} color={look.color} finish={look.finish} stripe={look.stripe} mods={look.mods} skin={look.skin} modSkin={look.modSkin} />
     </group>
   )
 }
@@ -737,8 +737,8 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
   const burstAt = useRef<number | null>(null)
   const coinAt = useRef<number | null>(null)
   const st = useRef({ born: -1, openAt: -1, lid: { y: 0, vy: 0, x: 0, vx: 0, rx: 0, landed: false }, revealed: false, hops: 0, skipped: skip })
-  const coins = drop?.kind === 'coins' || drop?.kind === 'dupe'
-  const showCar = (drop?.kind === 'car' || drop?.kind === 'mod' || drop?.kind === 'dupe') && !!prizeCar
+  const coins = drop?.kind === 'coins' || drop?.kind === 'dupe' || drop?.kind === 'skindupe'
+  const showCar = (drop?.kind === 'car' || drop?.kind === 'mod' || drop?.kind === 'dupe' || drop?.kind === 'skin' || drop?.kind === 'skindupe') && !!prizeCar
 
   useFrame((state, rawDt) => {
     const s = st.current
@@ -885,6 +885,7 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
 // The car a prize shows: a new car in its colour, or your car wearing the part it won.
 export function prizeLook(drop: CrateDrop | null, cars: { uid: string; model: string; color: string; finish?: Finish; stripe?: string | null; mods?: string[] }[]): CarLook | null {
   if (!drop) return null
+  if (drop.kind === 'skin' || drop.kind === 'skindupe') return skinLook(drop.skin, drop.part, cars)
   if (drop.kind === 'car') return { body: carDef(drop.model).body, model: drop.model, color: drop.color }
   if (drop.kind === 'dupe') {
     const d = carDef(drop.model)
@@ -899,4 +900,19 @@ export function prizeLook(drop: CrateDrop | null, cars: { uid: string; model: st
     return { body: d.body, model: car.model, color: car.color, finish: car.finish, stripe: car.stripe, mods }
   }
   return null
+}
+
+// Parts put on a car to show off a part skin when it has none fitted.
+const SHOW_PARTS = ['gtwing', 'sidepipes', 'widebody', 'ramscoop', 'tailfairing', 'windscreen']
+// A skin prize: one of the player's cars wearing it (a part skin on every part it can take).
+function skinLook(id: string, part: boolean, cars: { model: string; color: string; finish?: Finish; stripe?: string | null; mods?: string[] }[]): CarLook {
+  const owned = cars.filter((c) => !carDef(c.model).parked)
+  const slotsOf = (body: Body, mods: string[]) => (Object.keys(fittedMods(mods, body)) as string[]).filter((sl): sl is SkinnedSlot => (SKINNED_SLOTS as string[]).includes(sl))
+  const car = (part ? owned.find((c) => slotsOf(carDef(c.model).body, c.mods ?? []).length) : undefined) ?? owned[0] ?? { model: 'civic', color: '#eceff1' }
+  const d = carDef(car.model)
+  let mods = car.mods ?? []
+  if (part && !slotsOf(d.body, mods).length) mods = SHOW_PARTS.filter((m) => modFits(modDef(m)!, d.body))
+  const look: CarLook = { body: d.body, model: car.model, color: car.color, finish: car.finish, stripe: car.stripe, mods: Object.values(fittedMods(mods, d.body)) }
+  if (!part) return { ...look, skin: id }
+  return { ...look, modSkin: Object.fromEntries(slotsOf(d.body, mods).map((sl) => [sl, id])) }
 }
