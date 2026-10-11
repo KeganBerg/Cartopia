@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react'
-import { Color, CylinderGeometry, MeshStandardMaterial, type Texture } from 'three'
+import { useLayoutEffect, useRef, type ReactNode } from 'react'
+import { useFrame } from '@react-three/fiber'
+import { Color, CylinderGeometry, MeshStandardMaterial, type Group, type Object3D, type Texture } from 'three'
 import { Box, Cyl, Pool, type Mat, type V3 } from './NewBuildings'
 import { Bench, GlassBlock, Lamp, PadLights, Planter, glassMat } from './OfficeBuildings'
 import { CarModel } from './CarModel'
@@ -158,6 +159,7 @@ export function VanguardTower() {
           {mat('#ffffff', helipadTex('#ffca28', '#6d7377'))}
         </mesh>
         <PadLights bulb={bulb} r={0.56} n={14} y={0.06} />
+        <group position-y={0.045}><Skyhopper pad={[padX, padY + 0.075, Z + 0.25]} /></group>
         <Cyl m={mat} at={[-0.12, -0.27, 0]} r={0.48} r2={0.08} h={0.46} c="#78909c" seg={16} />
         <Box m={mat} at={[-0.62, -0.34, 0]} s={[0.6, 0.06, 0.14]} c="#78909c" rot={[0, 0, 0.7]} />
       </group>
@@ -182,6 +184,88 @@ export function VanguardTower() {
             <CarModel body="super" color="#b71c1c" stripe="#ffc107" />
           </group>
         </Upright>
+      </group>
+    </group>
+  )
+}
+
+// ---- Skyhopper: the tower's flying car ----
+
+// Every CYCLE seconds it lifts off the pad, flies two laps round the tower
+// (climbing past the crown and back), then sets down on the pad again and rests.
+// It moves, so it stays out of the town's Batch, and it never catches taps.
+const CYCLE = 34
+const LIFT = 1.6 // seconds to rise off the pad
+const LAPS = 15 // seconds for both laps
+const LAND = 2.6 // seconds to settle back down
+const HOP = 0.7 // height of the hover above the pad
+const AXIS: [number, number] = [0.15, Z] // what it circles: the upper tower's middle
+const NO_RAY = () => null
+const ease = (u: number) => u * u * (3 - 2 * u)
+
+// Where the car is `c` seconds into its cycle, in the pad's frame (the pad centre is the origin).
+function flight(c: number, pad: V3, out: { x: number; y: number; z: number; bank: number }) {
+  const [px, , pz] = pad
+  const dx = px - AXIS[0]
+  const dz = pz - AXIS[1]
+  const r0 = Math.hypot(dx, dz)
+  const a0 = Math.atan2(dz, dx)
+  out.bank = 0
+  if (c < LIFT) {
+    out.x = 0; out.z = 0; out.y = HOP * ease(c / LIFT)
+  } else if (c < LIFT + LAPS) {
+    const u = (c - LIFT) / LAPS
+    const k = Math.sin(Math.PI * u)
+    // Swings out wide of the pad and the spine, two full turns, and back over the pad.
+    const a = a0 + 4 * Math.PI * ease(u)
+    const r = r0 + (3.1 - r0) * Math.min(1, k * 1.6)
+    out.x = AXIS[0] + r * Math.cos(a) - px
+    out.z = AXIS[1] + r * Math.sin(a) - pz
+    out.y = HOP + 3.2 * Math.pow(k, 0.8) + Math.sin(u * Math.PI * 6) * 0.15
+    out.bank = 0.45 * Math.min(1, k * 2)
+  } else if (c < LIFT + LAPS + LAND) {
+    out.x = 0; out.z = 0; out.y = HOP * (1 - ease((c - LIFT - LAPS) / LAND))
+  } else {
+    out.x = 0; out.z = 0; out.y = 0
+  }
+}
+
+function Skyhopper({ pad }: { pad: V3 }) {
+  const craft = useRef<Group>(null)
+  const jets = useRef<Group>(null)
+  const at = useRef({ x: 0, y: 0, z: 0, bank: 0 })
+  const next = useRef({ x: 0, y: 0, z: 0, bank: 0 })
+  useLayoutEffect(() => {
+    craft.current?.traverse((o: Object3D) => void (o.raycast = NO_RAY))
+  }, [])
+  useFrame(({ clock }) => {
+    const g = craft.current
+    if (!g) return
+    const c = clock.elapsedTime % CYCLE
+    flight(c, pad, at.current)
+    flight((c + 0.05) % CYCLE, pad, next.current)
+    const p = at.current
+    const q = next.current
+    g.position.set(p.x, p.y, p.z)
+    const vx = q.x - p.x
+    const vz = q.z - p.z
+    // Point along the way it's flying; parked, it keeps facing the way it landed.
+    if (vx * vx + vz * vz > 1e-6) g.rotation.set(0, Math.atan2(vx, vz), -p.bank, 'YXZ')
+    if (jets.current) jets.current.visible = p.y > 0.01
+  })
+  return (
+    <group ref={craft} userData={{ noBatch: true }}>
+      <group scale={0.72}>
+        <CarModel body="wedge" color="#eceff1" stripe="#00bcd4" />
+      </group>
+      {/* Hover jets: four cyan glows under the car, lit while it flies. */}
+      <group ref={jets} visible={false}>
+        {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => (
+          <mesh key={`${sx}${sz}`} position={[sx * 0.2, 0.03, sz * 0.27]} rotation-x={Math.PI / 2}>
+            <circleGeometry args={[0.07, 12]} />
+            {coreEl()}
+          </mesh>
+        )))}
       </group>
     </group>
   )
