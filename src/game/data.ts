@@ -443,6 +443,49 @@ export const GP_ROUNDS = 6
 export const gpRivalPi = (s: GpSeries, round: number, clears: number) => Math.round((s.basePi + round * s.step) * (1 + clears * 0.08))
 export const gpReward = (s: GpSeries, round: number) => s.prize + round * Math.round(s.prize / 4)
 
+// Campaign: a single-player ladder of chapters, five races each, the last
+// one a boss. Rivals get faster and shift cleaner the further you go, and
+// rewards climb with them. Clearing a chapter pays a one-time bonus, and
+// three stars on every race in it pays extra bucks.
+export type CampaignChapter = {
+  id: string; name: string; blurb: string; unlockLevel: number
+  venue: string // where its races run (scene/venues.ts)
+  pi: [number, number] // rival PI from the first race to the boss
+  rivals: string[] // the last one is the boss
+  coins: number; bucks: number; trophies: number; starBucks: number
+}
+export const CAMPAIGN_RACES = 5
+export const CAMPAIGN: CampaignChapter[] = [
+  { id: 'c1', name: 'Back Streets', blurb: 'Local kids with something to prove.', unlockLevel: 1, venue: 'main', pi: [22, 32], rivals: ['Scooter Steve', 'Bubblegum Bea', 'Hubcap Hal', 'Lil Lugnut', 'Big Mike'], coins: 1000, bucks: 1, trophies: 3, starBucks: 1 },
+  { id: 'c2', name: 'Harbor Run', blurb: 'Dockworkers race the night shift home.', unlockLevel: 3, venue: 'docks', pi: [32, 44], rivals: ['Salty Pete', 'Crane Carla', 'Rusty Anchor', 'Tugboat Ted', 'Captain Kidd'], coins: 2000, bucks: 1, trophies: 3, starBucks: 1 },
+  { id: 'c3', name: 'Desert Strip', blurb: 'Long straights, hot tarmac, no mercy.', unlockLevel: 5, venue: 'desert', pi: [44, 58], rivals: ['Dusty Dakota', 'Mirage Mo', 'Sidewinder Sal', 'Coyote Cass', 'The Scorpion'], coins: 3500, bucks: 2, trophies: 4, starBucks: 1 },
+  { id: 'c4', name: 'Mountain Pass', blurb: 'Thin air and thinner margins.', unlockLevel: 7, venue: 'snow', pi: [58, 72], rivals: ['Summit Sue', 'Avalanche Al', 'Ridge Runner', 'Peak Paulie', 'The Yeti'], coins: 5500, bucks: 2, trophies: 5, starBucks: 2 },
+  { id: 'c5', name: 'Sunset Boardwalk', blurb: 'Beach crowds, big money, bigger engines.', unlockLevel: 9, venue: 'beach', pi: [72, 88], rivals: ['Surfer Sid', 'Sandy Shores', 'Tidal Tom', 'Riptide Rita', 'Big Kahuna'], coins: 8000, bucks: 3, trophies: 6, starBucks: 2 },
+  { id: 'c6', name: 'Harvest Backroads', blurb: 'Farm-tough racers who never lift.', unlockLevel: 12, venue: 'farm', pi: [88, 104], rivals: ['Hayride Hank', 'Tractor Tina', 'Combine Carl', 'Silo Sam', 'The Scarecrow'], coins: 12000, bucks: 3, trophies: 8, starBucks: 2 },
+  { id: 'c7', name: 'Champions Speedway', blurb: 'The best drivers in the land. Only one leaves a legend.', unlockLevel: 15, venue: 'main', pi: [104, 124], rivals: ['Golden Gabe', 'Iron Ivy', 'Thunder Thea', 'Velvet Vince', 'The Champion'], coins: 20000, bucks: 5, trophies: 10, starBucks: 3 },
+]
+export const campaignRaceId = (ch: CampaignChapter, i: number) => `${ch.id}-${i}`
+export const campaignRivalPi = (ch: CampaignChapter, i: number) => Math.round(ch.pi[0] + ((ch.pi[1] - ch.pi[0]) * i) / (CAMPAIGN_RACES - 1))
+// How cleanly a rival shifts, 0 (early, sloppy) to 1 (every shift perfect), across the whole campaign.
+export const campaignShift = (chIndex: number, i: number) => Math.min(1, (chIndex + i / (CAMPAIGN_RACES - 1)) / (CAMPAIGN.length - 1))
+// Rivals use their car's skill from the third chapter on; bosses always do.
+export const campaignRivalSkills = (chIndex: number, i: number) => chIndex >= 2 || i === CAMPAIGN_RACES - 1
+// The first win of each race pays the most; replays pay about a quick race.
+export const campaignReward = (ch: CampaignChapter, i: number, first: boolean) => {
+  const full = 100 + campaignRivalPi(ch, i) * 10
+  return first ? full : Math.round((full * 0.6) / 10) * 10
+}
+// Stars for a win: one for winning, two for beating them by 3% of their time, three for 6%.
+export const campaignStars = (myTime: number, theirTime: number) => {
+  if (!(myTime < theirTime)) return 0
+  const lead = Number.isFinite(theirTime) ? (theirTime - myTime) / theirTime : 1
+  return lead >= 0.06 ? 3 : lead >= 0.03 ? 2 : 1
+}
+export const campaignCleared = (done: Record<string, number>, ch: CampaignChapter) =>
+  Array.from({ length: CAMPAIGN_RACES }, (_, i) => done[campaignRaceId(ch, i)] ?? 0).every((n) => n >= 1)
+export const campaignPerfect = (done: Record<string, number>, ch: CampaignChapter) =>
+  Array.from({ length: CAMPAIGN_RACES }, (_, i) => done[campaignRaceId(ch, i)] ?? 0).every((n) => n >= 3)
+
 // Bank packs. Bigger packs carry a bigger bonus on top of the base rate of
 // 5 bucks per dollar, plus extra coins and parts.
 export type BucksPack = { id: string; name: string; price: number; bucks: number; bonus: number; coins?: number; parts?: number; tag?: string; art: string }

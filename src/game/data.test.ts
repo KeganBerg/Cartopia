@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { buildingDef, carDef, knownBuilding, BUILDINGS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost, jobLevel, performance, fittedMods, modStats, modCost, MODS, MOD_SLOTS, ownedMods, CARS, takesDriver, loves, driverPayout, skillBoost, skillDrag, liveSkillBoost, SKILLS } from './data'
+import { buildingDef, carDef, knownBuilding, BUILDINGS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost, jobLevel, performance, fittedMods, modStats, modCost, MODS, MOD_SLOTS, ownedMods, CARS, takesDriver, loves, driverPayout, skillBoost, skillDrag, liveSkillBoost, SKILLS , CAMPAIGN, CAMPAIGN_RACES, campaignRivalPi, campaignReward, campaignShift, campaignStars } from './data'
+import { MAX_RACE_PI } from './race'
+import { VENUES } from '../scene/venues'
 
 describe('unknown ids from newer builds', () => {
   it('gives an unknown building a harmless stand-in instead of crashing', () => {
@@ -157,5 +159,35 @@ describe('owned mods', () => {
     expect(ownedMods({ mods: ['gtwing'] })).toEqual(['gtwing'])
     expect(ownedMods({ mods: ['gtwing'], ownedMods: ['ducktail', 'gtwing', 'future-mod'] })).toEqual(['ducktail', 'gtwing'])
     expect(ownedMods({})).toEqual([])
+  })
+})
+
+describe('campaign ladder', () => {
+  it('gets harder and pays more the further you go', () => {
+    let lastPi = 0, lastPay = 0, lastShift = -1
+    CAMPAIGN.forEach((ch, ci) => {
+      expect(ch.rivals).toHaveLength(CAMPAIGN_RACES)
+      expect(VENUES.map((v) => v.id)).toContain(ch.venue)
+      for (let i = 0; i < CAMPAIGN_RACES; i++) {
+        expect(campaignRivalPi(ch, i)).toBeGreaterThanOrEqual(lastPi)
+        expect(campaignReward(ch, i, true)).toBeGreaterThanOrEqual(lastPay)
+        expect(campaignShift(ci, i)).toBeGreaterThanOrEqual(lastShift)
+        lastPi = campaignRivalPi(ch, i)
+        lastPay = campaignReward(ch, i, true)
+        lastShift = campaignShift(ci, i)
+      }
+      if (ci > 0) {
+        expect(ch.coins).toBeGreaterThan(CAMPAIGN[ci - 1].coins)
+        expect(ch.unlockLevel).toBeGreaterThan(CAMPAIGN[ci - 1].unlockLevel)
+      }
+    })
+    expect(lastPi).toBeLessThanOrEqual(MAX_RACE_PI)
+  })
+
+  it('gives stars by winning margin', () => {
+    expect(campaignStars(10, 9)).toBe(0)
+    expect(campaignStars(9.9, 10)).toBe(1)
+    expect(campaignStars(9.65, 10)).toBe(2)
+    expect(campaignStars(9.3, 10)).toBe(3)
   })
 })

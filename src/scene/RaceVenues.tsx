@@ -1,7 +1,8 @@
 import { useMemo, useRef, type ReactNode } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { BufferAttribute, BufferGeometry, Color, type Group, type Points } from 'three'
+import { BufferAttribute, BufferGeometry, Color, Object3D, type Group, type InstancedMesh, type Points } from 'three'
 import { BuildingModel } from './BuildingModel'
+import { glowMats } from './dayNight'
 import { Batch } from './Batch'
 import { PAL } from './season'
 import { buildingDef } from '../game/data'
@@ -78,33 +79,78 @@ function along(len: number, step: (r: () => number) => number, seed: number, fro
   return out
 }
 
-function Palm({ x, z }: { x: number; z: number }) {
+// Beach palms stay tropical whatever the season back in town.
+function Palm({ x, z, h, lean }: { x: number; z: number; h: number; lean: number }) {
+  const top: V3 = [lean * h * 0.35, h, 0]
   return (
     <group position={[x, 0, z]}>
-      <BuildingModel def={buildingDef('palm')} />
+      {[0, 1, 2, 3].map((i) => {
+        const k = (i + 0.5) / 4
+        return <Cyl key={i} p={[lean * h * 0.35 * k * k, h * k, 0]} r={0.07 - i * 0.008} h={h / 4 + 0.05} c="#8d6e63" seg={6} rot={[0, 0, -lean * 0.5 * k]} />
+      })}
+      {[0, 1, 2, 3, 4, 5].map((i) => (
+        <group key={i} position={top} rotation-y={(i / 6) * Math.PI * 2 + lean}>
+          <mesh position={[0.42, -0.12, 0]} rotation-z={-0.45}>
+            <boxGeometry args={[0.9, 0.03, 0.24]} />
+            <meshStandardMaterial color={i % 2 ? '#43a047' : '#2e7d32'} flatShading />
+          </mesh>
+        </group>
+      ))}
+      <mesh position={[top[0], h - 0.08, 0.06]}>
+        <sphereGeometry args={[0.09, 6, 4]} />
+        <meshStandardMaterial color="#5d4037" flatShading />
+      </mesh>
+    </group>
+  )
+}
+
+// Wooden utility poles with sagging wires along one side of a country road.
+function Poles({ len, x, wood = '#6d4c41' }: { len: number; x: number; wood?: string }) {
+  const zs: number[] = []
+  for (let z = -10; z < len + 40; z += 8) zs.push(z)
+  return (
+    <group>
+      {zs.map((z) => (
+        <group key={z}>
+          <Cyl p={[x, 1.6, z]} r={0.06} h={3.2} c={wood} seg={6} />
+          <Box p={[x, 3.0, z]} s={[0.9, 0.07, 0.07]} c={wood} />
+        </group>
+      ))}
+      {[-0.38, 0.38].map((dx) => (
+        <mesh key={dx} position={[x + dx, 2.97, len / 2 + 15]}>
+          <boxGeometry args={[0.015, 0.015, len + 50]} />
+          <meshBasicMaterial color="#263238" />
+        </mesh>
+      ))}
     </group>
   )
 }
 
 // Ocean on the left, a boardwalk with beach huts and palms on the right.
+const SHORE = -(EDGE + 5.5) // beach waterline
+const QUAY = -(EDGE + 3) // dock edge
+
 function Beach({ len }: { len: number }) {
-  const shore = -(EDGE + 5.5)
+
   const items = useMemo(() => {
     const r = rand(5)
     const umbrellas = []
     for (let z = -10; z < len + 40; z += 2.6 + r() * 2.5) umbrellas.push({ z, x: -(EDGE + 0.9 + r() * 3.4), c: Math.floor(r() * 4) })
     const huts = []
     for (let z = -12; z < len + 40; z += 3.2 + r() * 1.4) huts.push({ z, c: Math.floor(r() * 4), w: 1.8 + r() * 0.6 })
-    const boats = Array.from({ length: 7 }, (_, i) => ({ x: shore - 10 - r() * 26, z: i * 22 - 5 + r() * 8 }))
-    return { umbrellas, huts, boats }
+    const boats = Array.from({ length: 7 }, (_, i) => ({ x: SHORE - 10 - r() * 26, z: i * 22 - 5 + r() * 8 }))
+    const palms = Array.from({ length: Math.ceil((len + 50) / 4.2) }, (_, i) => ({ z: i * 4.2 - 9 + r() * 1.2, h: 1.9 + r() * 0.8, lean: (r() - 0.3) * 0.5 }))
+    const boards = []
+    for (let z = -6; z < len + 30; z += 7 + r() * 6) boards.push({ z, x: -(EDGE + 0.7 + r() * 2), c: Math.floor(r() * 4), ry: r() * 0.6 - 0.3 })
+    return { umbrellas, huts, boats, palms, boards }
   }, [len])
   const canopy = ['#e53935', '#fdd835', '#1e88e5', '#ff7043']
   const hut = ['#80deea', '#f8bbd0', '#fff59d', '#a5d6a7']
   return (
     <group>
-      <Flat x={shore - 45} z={len / 2} w={90} d={len + 220} c="#2f8fd6" />
+      <Flat x={SHORE - 45} z={len / 2} w={90} d={len + 220} c="#2f8fd6" />
       {Array.from({ length: Math.ceil((len + 60) / 6) }, (_, i) => (
-        <Flat key={i} x={shore + 0.15 + Math.sin(i * 1.7) * 0.25} z={i * 6 - 12} w={0.35} d={6.2} c="#eaf7ff" y={0.02} />
+        <Flat key={i} x={SHORE + 0.15 + Math.sin(i * 1.7) * 0.25} z={i * 6 - 12} w={0.35} d={6.2} c="#eaf7ff" y={0.02} />
       ))}
       {items.umbrellas.map((u, i) => (
         <group key={i}>
@@ -124,14 +170,28 @@ function Beach({ len }: { len: number }) {
           </group>
         )
       })}
+      {/* Boardwalk rail between the road and the huts. */}
+      <Box p={[EDGE + 0.95, 0.55, len / 2 + 14]} s={[0.06, 0.06, len + 52]} c="#eeeeee" />
+      {Array.from({ length: Math.ceil((len + 52) / 1.5) }, (_, i) => <Box key={i} p={[EDGE + 0.95, 0.28, i * 1.5 - 12]} s={[0.05, 0.56, 0.05]} c="#eeeeee" />)}
       {items.huts.map((h, i) => (
         <group key={i}>
-          <Box p={[EDGE + 2.2, 0.55, h.z]} s={[1.6, 1.1, h.w]} c={hut[h.c]} />
-          <Box p={[EDGE + 1.4, 0.45, h.z]} s={[0.04, 0.6, h.w * 0.5]} c="#6d4c41" />
-          <Cone p={[EDGE + 2.2, 1.35, h.z]} r={Math.max(1.2, h.w) * 0.75} h={0.5} c="#eeeeee" seg={4} ry={Math.PI / 4} />
+          <Box p={[EDGE + 2.6, 0.5, h.z]} s={[1.4, 1.0, h.w]} c={hut[h.c]} />
+          <Box p={[EDGE + 1.89, 0.4, h.z]} s={[0.03, 0.6, h.w * 0.4]} c="#6d4c41" />
+          <Box p={[EDGE + 1.75, 1.0, h.z]} s={[0.4, 0.05, h.w * 0.9]} c={i % 2 ? '#ffffff' : canopy[h.c]} />
+          <Cone p={[EDGE + 2.6, 1.25, h.z]} r={h.w * 0.78} h={0.5} c="#ffffff" seg={4} ry={Math.PI / 4} />
         </group>
       ))}
-      {Array.from({ length: Math.ceil((len + 50) / 5) }, (_, i) => <Palm key={i} x={EDGE + 0.6} z={i * 5 - 9} />)}
+      {items.palms.map((t, i) => <Palm key={i} x={EDGE + 1.4} z={t.z} h={t.h} lean={t.lean} />)}
+      {items.boards.map((b, i) => (
+        <mesh key={i} position={[b.x, 0.45, b.z]} rotation={[0, b.ry, 0.12]} scale={[0.2, 0.5, 0.05]}>
+          <sphereGeometry args={[1, 8, 6]} />
+          <meshStandardMaterial color={canopy[b.c]} flatShading />
+        </mesh>
+      ))}
+      {/* A pier out into the sea. */}
+      <Box p={[SHORE - 6, 0.35, len * 0.45]} s={[12, 0.12, 1.4]} c="#a1795a" />
+      {Array.from({ length: 7 }, (_, i) => <Cyl key={i} p={[SHORE - i * 2, 0.15, len * 0.45 + (i % 2 ? 0.6 : -0.6)]} r={0.08} h={0.5} c="#6d4c41" seg={5} />)}
+      <Box p={[SHORE - 11.5, 0.9, len * 0.45]} s={[1.2, 1, 1.2]} c="#e53935" />
       {items.boats.map((b, i) => (
         <group key={i}>
           <Box p={[b.x, 0.15, b.z]} s={[0.9, 0.3, 2.4]} c="#eeeeee" />
@@ -172,6 +232,18 @@ function Desert({ len }: { len: number }) {
           )}
         </group>
       ))}
+      <Poles len={len} x={EDGE + 0.6} />
+      {/* An old water tower and a roadside diner sign. */}
+      <group position={[-(EDGE + 6), 0, len * 0.55]}>
+        {[-0.7, 0.7].map((dx) => [-0.7, 0.7].map((dz) => <Box key={`${dx}${dz}`} p={[dx, 1.6, dz]} s={[0.1, 3.2, 0.1]} c="#6d4c41" />))}
+        <Cyl p={[0, 3.8, 0]} r={1.1} h={1.4} c="#8d6e63" seg={10} />
+        <Cone p={[0, 4.8, 0]} r={1.2} h={0.6} c="#6d4c41" seg={10} />
+      </group>
+      <group position={[EDGE + 3.5, 0, len * 0.3]}>
+        {[-0.8, 0.8].map((dz) => <Box key={dz} p={[0, 1.2, dz]} s={[0.1, 2.4, 0.1]} c="#6d4c41" />)}
+        <Box p={[0, 2.3, 0]} s={[0.08, 1.0, 2.2]} c="#c62828" />
+        <Box p={[-0.05, 2.3, 0]} s={[0.02, 0.6, 1.8]} c="#fdd835" />
+      </group>
       {rocks.map((k, i) => (
         <mesh key={i} position={[k.x, k.s * 0.5, k.z]} scale={[k.s * 1.4, k.s, k.s * 1.2]}>
           <dodecahedronGeometry args={[1, 0]} />
@@ -215,7 +287,16 @@ function Snowfall() {
 
 // Snowbanks, a pine forest, log cabins, mountains behind, and falling snow.
 function Snow({ len }: { len: number }) {
-  const pines = useMemo(() => along(len, (r) => 1.1 + r() * 1.6, 7).map(({ z, side, r }) => ({ z, x: side * (EDGE + 0.9 + r() ** 1.6 * 16), s: 0.8 + r() * 0.7 })), [len])
+  // A frozen lake opens up on the left part way down the pass.
+  const lake = useMemo(() => ({ x: -(EDGE + 9), z: len * 0.45, w: 12, d: len * 0.3 }), [len])
+  const pines = useMemo(
+    () =>
+      along(len, (r) => 1.1 + r() * 1.6, 7)
+        .map(({ z, side, r }) => ({ z, x: side * (EDGE + 0.9 + r() ** 1.6 * 16), s: 0.8 + r() * 0.7 }))
+        .filter((t) => ((t.x - lake.x) / (lake.w / 2 + 0.6)) ** 2 + ((t.z - lake.z) / (lake.d / 2 + 0.6)) ** 2 > 1),
+    [len, lake],
+  )
+  const snowmen = [0.12, 0.38, 0.7, 0.95].map((k, i) => ({ z: len * k, x: (i % 2 ? 1 : -1) * (EDGE + 1.1) }))
   const cabins = useMemo(() => [0.2, 0.55, 0.85].map((k, i) => ({ z: len * k, side: (i % 2 ? 1 : -1) as -1 | 1 })), [len])
   return (
     <group>
@@ -228,6 +309,19 @@ function Snow({ len }: { len: number }) {
           <Cone p={[0, 0.65, 0]} r={0.5} h={0.8} c="#1f5f3a" seg={7} />
           <Cone p={[0, 1.1, 0]} r={0.38} h={0.7} c="#1f5f3a" seg={7} />
           <Cone p={[0, 1.5, 0]} r={0.22} h={0.5} c="#ffffff" seg={7} />
+        </group>
+      ))}
+      <mesh rotation-x={-Math.PI / 2} position={[lake.x, 0.02, lake.z]} scale={[lake.w / 2, lake.d / 2, 1]}>
+        <circleGeometry args={[1, 24]} />
+        <meshStandardMaterial color="#bfe0f2" roughness={0.15} metalness={0.1} />
+      </mesh>
+      {snowmen.map((m, i) => (
+        <group key={i} position={[m.x, 0, m.z]}>
+          <mesh position={[0, 0.2, 0]}><sphereGeometry args={[0.22, 10, 7]} /><meshStandardMaterial color="#ffffff" flatShading /></mesh>
+          <mesh position={[0, 0.5, 0]}><sphereGeometry args={[0.16, 10, 7]} /><meshStandardMaterial color="#ffffff" flatShading /></mesh>
+          <mesh position={[0, 0.72, 0]}><sphereGeometry args={[0.11, 10, 7]} /><meshStandardMaterial color="#ffffff" flatShading /></mesh>
+          <mesh position={[-Math.sign(m.x) * 0.1, 0.72, -0.07]} rotation={[-Math.PI / 2 + 0.3, 0, Math.sign(m.x) * 0.9]}><coneGeometry args={[0.025, 0.14, 5]} /><meshStandardMaterial color="#ff7043" flatShading /></mesh>
+          <Box p={[0, 0.6, 0]} s={[0.36, 0.05, 0.05]} c="#c62828" />
         </group>
       ))}
       {cabins.map((c, i) => {
@@ -258,6 +352,10 @@ function Farm({ len }: { len: number }) {
     for (let z = -8; z < len + 40; z += 2.5 + r() * 4) out.push({ z, x: EDGE + 1.6 + r() * 6, ry: r() * 3 })
     return out
   }, [len])
+  const cows = useMemo(() => {
+    const r = rand(43)
+    return Array.from({ length: 9 }, (_, i) => ({ z: (i / 8) * (len + 20) - 5 + r() * 4, x: EDGE + 2 + r() * 7, ry: r() * 6 }))
+  }, [len])
   const trees = useMemo(() => along(len, (r) => 7 + r() * 9, 47).map(({ z, side, r }) => ({ z, x: side * (EDGE + (side < 0 ? 13 : 10) + r() * 5) })), [len])
   return (
     <group>
@@ -287,6 +385,24 @@ function Farm({ len }: { len: number }) {
           </group>
         )
       })}
+      {cows.map((c, i) => (
+        <group key={i} position={[c.x, 0, c.z]} rotation-y={c.ry}>
+          <Box p={[0, 0.42, 0]} s={[0.36, 0.32, 0.7]} c="#fafafa" />
+          <Box p={[0.12, 0.47, 0.08]} s={[0.14, 0.2, 0.26]} c="#263238" />
+          <Box p={[0, 0.52, 0.42]} s={[0.22, 0.22, 0.22]} c="#fafafa" />
+          <Box p={[0, 0.46, 0.54]} s={[0.16, 0.1, 0.04]} c="#f8bbd0" />
+          {[-0.12, 0.12].map((dx) => [-0.25, 0.25].map((dz) => <Box key={`${dx}${dz}`} p={[dx, 0.13, dz]} s={[0.07, 0.26, 0.07]} c="#263238" />))}
+        </group>
+      ))}
+      {/* A scarecrow minding the crops. */}
+      <group position={[-(EDGE + 4.1), 0, len * 0.4]}>
+        <Box p={[0, 0.8, 0]} s={[0.06, 1.6, 0.06]} c={wood} />
+        <Box p={[0, 1.2, 0]} s={[0.9, 0.05, 0.05]} c={wood} />
+        <Box p={[0, 1.15, 0]} s={[0.4, 0.42, 0.18]} c="#1565c0" />
+        <mesh position={[0, 1.5, 0]}><sphereGeometry args={[0.13, 8, 6]} /><meshStandardMaterial color="#e0c068" flatShading /></mesh>
+        <Cone p={[0, 1.66, 0]} r={0.22} h={0.2} c="#6d4c41" seg={8} />
+      </group>
+      <Poles len={len} x={-(EDGE + 0.75)} />
       {bales.map((b, i) => <Cyl key={i} p={[b.x, 0.28, b.z]} r={0.28} h={0.5} c="#e0c068" seg={9} rot={[Math.PI / 2, b.ry, 0]} />)}
       {trees.map((t, i) => (
         <group key={i} position={[t.x, 0, t.z]}>
@@ -299,7 +415,7 @@ function Farm({ len }: { len: number }) {
 
 // A quay: water, cranes and ships on the left, stacked containers on the right.
 function Docks({ len }: { len: number }) {
-  const quay = -(EDGE + 3)
+  const quay = QUAY
   const box = ['#c62828', '#1565c0', '#2e7d32', '#ef6c00', '#00838f', '#6d4c41']
   const stacks = useMemo(() => {
     const r = rand(61)
@@ -347,6 +463,18 @@ function Docks({ len }: { len: number }) {
           </group>
         )
       })}
+      {Array.from({ length: Math.ceil((len + 50) / 4) }, (_, i) => <Cyl key={i} p={[quay - 0.02, 0.05, i * 4 - 8]} r={0.12} h={0.14} c="#212121" seg={8} rot={[0, 0, Math.PI / 2]} />)}
+      {/* Lighthouse at the end of the harbour wall. */}
+      <group position={[quay - 9, 0, len + 22]}>
+        <Cyl p={[0, 0.4, 0]} r={2} h={0.8} c="#9aa3a9" seg={10} />
+        {[0, 1, 2, 3].map((i) => <Cyl key={i} p={[0, 1.6 + i * 1.6, 0]} r={0.9 - i * 0.1} h={1.6} c={i % 2 ? '#ffffff' : '#c62828'} seg={10} />)}
+        <Cyl p={[0, 7.8, 0]} r={0.75} h={0.15} c="#263238" seg={10} />
+        <mesh position={[0, 8.2, 0]}>
+          <cylinderGeometry args={[0.45, 0.45, 0.7, 10]} />
+          <primitive object={glowMats.bulb} attach="material" dispose={null} />
+        </mesh>
+        <Cone p={[0, 8.85, 0]} r={0.6} h={0.6} c="#263238" seg={10} />
+      </group>
       {stacks.map((s, i) => <Box key={i} p={[s.x, s.y, s.z]} s={[1.0, 1.05, 2.4]} c={box[s.c]} />)}
       {sheds.map((s, i) => (
         <group key={i}>
@@ -364,9 +492,148 @@ function spread(n: number, seed: number) {
   return Array.from({ length: n }, (_, i) => ({ x: (i / (n - 1) - 0.5) * 130 + (r() - 0.5) * 8, z: 62 + r() * 14, a: r(), b: r() }))
 }
 
+// Glints on the water ahead of the camera.
+function Sparkles({ edge }: { edge: number }) {
+  const ref = useRef<InstancedMesh>(null)
+  const N = 70
+  const spots = useMemo(() => {
+    const r = rand(71)
+    return Array.from({ length: N }, () => ({ x: edge - 0.6 - r() ** 1.5 * 30, z: r() * 50 - 6, ph: r() * 6.3, w: 0.25 + r() * 0.5 }))
+  }, [edge])
+  const tmp = useMemo(() => new Object3D(), [])
+  useFrame(({ camera, clock }) => {
+    const m = ref.current
+    if (!m) return
+    const t = clock.elapsedTime
+    const cz = camera.position.z
+    spots.forEach((p, i) => {
+      // Each glint fades in and out on its own beat, and keeps pace with the camera.
+      const k = Math.max(0, Math.sin(t * 1.6 + p.ph))
+      const z = cz + ((p.z - cz * 0.15) % 50 + 50) % 50 - 4
+      tmp.position.set(p.x, 0.03, z)
+      tmp.scale.set(p.w * k, 1, 0.06 + 0.04 * k)
+      tmp.rotation.set(-Math.PI / 2, 0, 0)
+      tmp.updateMatrix()
+      m.setMatrixAt(i, tmp.matrix)
+    })
+    m.instanceMatrix.needsUpdate = true
+  })
+  return (
+    <instancedMesh ref={ref} args={[undefined, undefined, N]} frustumCulled={false} raycast={() => null}>
+      <planeGeometry />
+      <meshBasicMaterial color="#ffffff" transparent opacity={0.8} depthWrite={false} />
+    </instancedMesh>
+  )
+}
+
+// Gulls wheeling over the water.
+function Gulls({ x }: { x: number }) {
+  const refs = useRef<(Group | null)[]>([])
+  const birds = useMemo(() => Array.from({ length: 6 }, (_, i) => ({ r: 3 + (i % 3) * 1.5, y: 3.5 + (i % 2) * 1.2, ph: i * 1.1, z: 8 + i * 4 })), [])
+  useFrame(({ camera, clock }) => {
+    const t = clock.elapsedTime
+    birds.forEach((b, i) => {
+      const g = refs.current[i]
+      if (!g) return
+      const a = t * 0.5 + b.ph
+      g.position.set(x + Math.cos(a) * b.r, b.y + Math.sin(t * 2 + b.ph) * 0.15, camera.position.z + b.z + Math.sin(a) * b.r)
+      g.rotation.y = -a
+      const flap = Math.sin(t * 9 + b.ph) * 0.5
+      g.children[0].rotation.z = 0.3 + flap
+      g.children[1].rotation.z = -0.3 - flap
+    })
+  })
+  return (
+    <>
+      {birds.map((_, i) => (
+        <group key={i} ref={(g) => { refs.current[i] = g }}>
+          {[-1, 1].map((sd) => (
+            <mesh key={sd} position={[sd * 0.15, 0, 0]}>
+              <boxGeometry args={[0.3, 0.015, 0.08]} />
+              <meshStandardMaterial color="#fafafa" />
+            </mesh>
+          ))}
+        </group>
+      ))}
+    </>
+  )
+}
+
+// Tumbleweeds bowling across the desert ahead of the racers.
+function Tumbleweeds() {
+  const refs = useRef<(Group | null)[]>([])
+  const weeds = useMemo(() => [{ ph: 0, z: 14, s: 0.35 }, { ph: 5, z: 24, s: 0.28 }, { ph: 9, z: 34, s: 0.4 }], [])
+  useFrame(({ camera, clock }) => {
+    const t = clock.elapsedTime
+    weeds.forEach((w, i) => {
+      const g = refs.current[i]
+      if (!g) return
+      const k = ((t + w.ph) % 12) / 12
+      const x = 14 - k * 28
+      g.position.set(x, w.s + Math.abs(Math.sin(t * 4 + w.ph)) * 0.25, camera.position.z + w.z)
+      g.rotation.z = (x / w.s) * 0.9
+    })
+  })
+  return (
+    <>
+      {weeds.map((w, i) => (
+        <group key={i} ref={(g) => { refs.current[i] = g }} scale={w.s}>
+          <mesh>
+            <icosahedronGeometry args={[1, 1]} />
+            <meshStandardMaterial color="#b08b5a" wireframe />
+          </mesh>
+          <mesh scale={0.7}>
+            <icosahedronGeometry args={[1, 0]} />
+            <meshStandardMaterial color="#8d6e47" wireframe />
+          </mesh>
+        </group>
+      ))}
+    </>
+  )
+}
+
+// An old farm windmill, sails turning in the breeze.
+function Windmill({ x, z }: { x: number; z: number }) {
+  const sails = useRef<Group>(null)
+  useFrame((_, dt) => {
+    if (sails.current) sails.current.rotation.x += dt * 0.8
+  })
+  return (
+    <group position={[x, 0, z]}>
+      <Batch version={1}>
+        <Cyl p={[0, 2.2, 0]} r={0.9} h={4.4} c="#eceff1" seg={8} />
+        <Cone p={[0, 5, 0]} r={1.05} h={1.2} c="#5d4037" seg={8} />
+        <Box p={[-0.91, 0.5, 0]} s={[0.02, 1, 0.6]} c="#6d4c41" />
+      </Batch>
+      <group ref={sails} position={[-1.05, 4.3, 0]}>
+        {[0, 1, 2, 3].map((i) => (
+          <group key={i} rotation-x={(i * Math.PI) / 2}>
+            <mesh position={[0, 1.4, 0]}>
+              <boxGeometry args={[0.05, 2.6, 0.55]} />
+              <meshStandardMaterial color={i % 2 ? '#fafafa' : '#d7ccc8'} flatShading />
+            </mesh>
+          </group>
+        ))}
+      </group>
+    </group>
+  )
+}
+
 // What sits on the horizon, riding along with the camera. Lives outside the
 // street's <Batch> because it moves.
-export function VenueBackdrop({ id }: { id: VenueId }) {
+export function VenueBackdrop({ id, len }: { id: VenueId; len: number }) {
+  return (
+    <>
+      <Far id={id} />
+      {id === 'beach' && <><Sparkles edge={SHORE} /><Gulls x={-(EDGE + 12)} /></>}
+      {id === 'docks' && <><Sparkles edge={QUAY} /><Gulls x={-(EDGE + 9)} /></>}
+      {id === 'desert' && <Tumbleweeds />}
+      {id === 'farm' && <Windmill x={EDGE + 13} z={len * 0.8} />}
+    </>
+  )
+}
+
+function Far({ id }: { id: VenueId }) {
   const spots = useMemo(() => spread(id === 'desert' ? 16 : 13, id.length * 7), [id])
   const hill = '#' + new Color(PAL.ground).multiplyScalar(0.82).getHexString()
   if (id === 'desert')
