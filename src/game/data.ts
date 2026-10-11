@@ -526,34 +526,158 @@ export const BUCKS_PACKS: BucksPack[] = [
   { id: 'tanker', name: 'Golden Tanker', price: 99.99, bucks: 500, bonus: 250, coins: 60000, parts: 200, tag: 'Best value', art: '🏆' },
 ]
 
-export type StatKey = 'rusty' | 'jobs' | 'carsBought' | 'upgrades' | 'racesWon' | 'built' | 'roads' | 'coinsEarned' | 'flatsFixed' | 'rescued' | 'searches' | 'gpWins'
-
-export type GoalDef = { id: string; text: string; stat: StatKey; target: number; coins: number; xp: number; bucks?: number }
-
-// Played in order; the first three unclaimed goals are active at once.
-export const GOALS: GoalDef[] = [
-  { id: 'g0', text: "Build Rusty's Rescue", stat: 'rusty', target: 1, coins: 200, xp: 20 },
-  { id: 'r1', text: "Search for cars at Rusty's", stat: 'searches', target: 1, coins: 150, xp: 15 },
-  { id: 'r2', text: 'Restore a rescued car', stat: 'rescued', target: 1, coins: 300, xp: 25, bucks: 1 },
-  { id: 'g1', text: 'Collect from 3 businesses', stat: 'jobs', target: 3, coins: 150, xp: 15 },
-  { id: 'g2', text: 'Lay 5 road tiles', stat: 'roads', target: 5, coins: 100, xp: 10 },
-  { id: 'g3', text: 'Get a new car', stat: 'carsBought', target: 1, coins: 300, xp: 25 },
-  { id: 'g4', text: 'Win a drag race', stat: 'racesWon', target: 1, coins: 250, xp: 20 },
-  { id: 'g5', text: 'Upgrade a car part or a building', stat: 'upgrades', target: 1, coins: 200, xp: 20 },
-  { id: 'g6', text: 'Place 2 new buildings', stat: 'built', target: 2, coins: 300, xp: 25 },
-  { id: 'g7', text: 'Fix a flat tire', stat: 'flatsFixed', target: 1, coins: 150, xp: 15 },
-  { id: 'g8', text: 'Collect from 15 businesses', stat: 'jobs', target: 15, coins: 500, xp: 40, bucks: 1 },
-  { id: 'g9', text: 'Earn 5,000 coins', stat: 'coinsEarned', target: 5000, coins: 600, xp: 50 },
-  { id: 'g10', text: 'Win 5 drag races', stat: 'racesWon', target: 5, coins: 800, xp: 60, bucks: 1 },
-  { id: 'g11', text: 'Get 3 new cars', stat: 'carsBought', target: 3, coins: 1000, xp: 70 },
-  { id: 'r3', text: 'Restore 5 rescued cars', stat: 'rescued', target: 5, coins: 3000, xp: 200, bucks: 2 },
-  { id: 'gp1', text: 'Win a Grand Prix series', stat: 'gpWins', target: 1, coins: 2000, xp: 150, bucks: 2 },
-  { id: 'g12', text: 'Do 10 upgrades', stat: 'upgrades', target: 10, coins: 1200, xp: 80, bucks: 2 },
-  { id: 'g13', text: 'Place 10 new buildings', stat: 'built', target: 10, coins: 1500, xp: 100 },
-  { id: 'g14', text: 'Collect from 60 businesses', stat: 'jobs', target: 60, coins: 2500, xp: 150, bucks: 2 },
-  { id: 'g15', text: 'Earn 50,000 coins', stat: 'coinsEarned', target: 50000, coins: 5000, xp: 250, bucks: 3 },
-  { id: 'g16', text: 'Win 25 drag races', stat: 'racesWon', target: 25, coins: 5000, xp: 250, bucks: 3 },
+// Counted on the save as the player does things.
+export type CounterKey =
+  | 'jobs' | 'carsBought' | 'upgrades' | 'racesWon' | 'built' | 'roads' | 'coinsEarned' | 'flatsFixed' | 'rescued' | 'searches' | 'gpWins'
+  | 'races' | 'campaignWins' | 'painted' | 'modsBought' | 'serviced'
+// Read off the town itself, so towns that did these before the goal existed still get credit.
+// owns: has a `def` building; bldgLevel: highest building level; stars/chapters: campaign; power: garage power.
+export type DerivedKey = 'rusty' | 'level' | 'carsOwned' | 'drivers' | 'plots' | 'bldgLevel' | 'stars' | 'chapters' | 'power' | 'owns'
+export type StatKey = CounterKey | DerivedKey
+export const COUNTERS: CounterKey[] = [
+  'jobs', 'carsBought', 'upgrades', 'racesWon', 'built', 'roads', 'coinsEarned', 'flatsFixed', 'rescued', 'searches', 'gpWins',
+  'races', 'campaignWins', 'painted', 'modsBought', 'serviced',
 ]
+
+// level: the goal stays hidden until then. def: the building an `owns` goal asks for.
+export type GoalDef = { id: string; icon: string; text: string; stat: StatKey; target: number; coins: number; xp: number; bucks?: number; level?: number; def?: string }
+
+// The story goals, played in order; the first three unclaimed goals the player's level allows are active at once.
+// Each new feature gets a goal near where it unlocks, so the list doubles as the game's guided tour.
+export const GOALS: GoalDef[] = [
+  { id: 'g0', icon: '🔧', text: "Build Rusty's Rescue", stat: 'rusty', target: 1, coins: 200, xp: 20 },
+  { id: 'r1', icon: '🔍', text: "Search for cars at Rusty's", stat: 'searches', target: 1, coins: 150, xp: 15 },
+  { id: 'r2', icon: '🛠', text: 'Restore a rescued car', stat: 'rescued', target: 1, coins: 300, xp: 25, bucks: 1 },
+  { id: 'g1', icon: '🍕', text: 'Collect from 3 businesses', stat: 'jobs', target: 3, coins: 150, xp: 15 },
+  { id: 'g2', icon: '🛣', text: 'Lay 5 road tiles', stat: 'roads', target: 5, coins: 100, xp: 10 },
+  { id: 'g3', icon: '🚗', text: 'Get a new car', stat: 'carsBought', target: 1, coins: 300, xp: 25 },
+  { id: 'g4', icon: '🏁', text: 'Win a drag race', stat: 'racesWon', target: 1, coins: 250, xp: 20 },
+  { id: 'q1', icon: '🗺', text: 'Win a campaign race', stat: 'campaignWins', target: 1, coins: 250, xp: 20 },
+  { id: 'g5', icon: '⬆', text: 'Upgrade a car part or a building', stat: 'upgrades', target: 1, coins: 200, xp: 20 },
+  { id: 'q2', icon: '🎨', text: 'Paint a car', stat: 'painted', target: 1, coins: 200, xp: 15 },
+  { id: 'g6', icon: '🏗', text: 'Place 2 new buildings', stat: 'built', target: 2, coins: 300, xp: 25 },
+  { id: 'g7', icon: '🛞', text: 'Fix a flat tire', stat: 'flatsFixed', target: 1, coins: 150, xp: 15 },
+  { id: 'q3', icon: '🧑‍✈️', text: 'Give a business a driver', stat: 'drivers', target: 1, coins: 300, xp: 25 },
+  { id: 'g8', icon: '🍕', text: 'Collect from 15 businesses', stat: 'jobs', target: 15, coins: 500, xp: 40, bucks: 1 },
+  { id: 'q4', icon: '⭐', text: 'Reach level 3', stat: 'level', target: 3, coins: 400, xp: 0 },
+  { id: 'q5', icon: '🗺', text: 'Clear campaign chapter 1', stat: 'chapters', target: 1, coins: 600, xp: 50 },
+  { id: 'g9', icon: '💰', text: 'Earn 5,000 coins', stat: 'coinsEarned', target: 5000, coins: 600, xp: 50 },
+  { id: 'q6', icon: '🪽', text: 'Fit a car mod', stat: 'modsBought', target: 1, coins: 500, xp: 40, level: 2 },
+  { id: 'q7', icon: '🛞', text: 'Build a Tire Shop', stat: 'owns', def: 'tires', target: 1, coins: 500, xp: 40, level: 2 },
+  { id: 'q8', icon: '⛽', text: 'Service 3 stranded cars at your shops', stat: 'serviced', target: 3, coins: 500, xp: 40 },
+  { id: 'g10', icon: '🏁', text: 'Win 5 drag races', stat: 'racesWon', target: 5, coins: 800, xp: 60, bucks: 1 },
+  { id: 'q9', icon: '🌳', text: 'Buy more land', stat: 'plots', target: START_LAND.length + 1, coins: 800, xp: 60 },
+  { id: 'q10', icon: '🏢', text: 'Upgrade a building to level 3', stat: 'bldgLevel', target: 3, coins: 800, xp: 60 },
+  { id: 'g11', icon: '🚗', text: 'Get 3 new cars', stat: 'carsBought', target: 3, coins: 1000, xp: 70 },
+  { id: 'q11', icon: '🅿', text: 'Own 6 cars', stat: 'carsOwned', target: 6, coins: 1000, xp: 70 },
+  { id: 'q12', icon: '⭐', text: 'Reach level 5', stat: 'level', target: 5, coins: 1000, xp: 0, bucks: 1 },
+  { id: 'gp1', icon: '🏆', text: 'Win a Grand Prix series', stat: 'gpWins', target: 1, coins: 2000, xp: 150, bucks: 2, level: 2 },
+  { id: 'q13', icon: '✨', text: 'Earn 9 campaign stars', stat: 'stars', target: 9, coins: 1200, xp: 80 },
+  { id: 'r3', icon: '🛠', text: 'Restore 5 rescued cars', stat: 'rescued', target: 5, coins: 3000, xp: 200, bucks: 2 },
+  { id: 'q14', icon: '🧑‍✈️', text: 'Put 3 drivers to work', stat: 'drivers', target: 3, coins: 1500, xp: 100 },
+  { id: 'g12', icon: '⬆', text: 'Do 10 upgrades', stat: 'upgrades', target: 10, coins: 1200, xp: 80, bucks: 2 },
+  { id: 'q15', icon: '🦉', text: 'Build the Neon Owl Nightclub', stat: 'owns', def: 'club', target: 1, coins: 2000, xp: 120, level: 6 },
+  { id: 'q16', icon: '🎬', text: 'Build a Drive-In', stat: 'owns', def: 'cinema', target: 1, coins: 2000, xp: 120, level: 6 },
+  { id: 'q17', icon: '🗺', text: 'Clear campaign chapter 3', stat: 'chapters', target: 3, coins: 2500, xp: 150, bucks: 1 },
+  { id: 'g13', icon: '🏗', text: 'Place 10 new buildings', stat: 'built', target: 10, coins: 1500, xp: 100 },
+  { id: 'q18', icon: '🪽', text: 'Fit 5 car mods', stat: 'modsBought', target: 5, coins: 2500, xp: 150 },
+  { id: 'q19', icon: '💪', text: 'Reach 250 garage power', stat: 'power', target: 250, coins: 2500, xp: 150 },
+  { id: 'g14', icon: '🍕', text: 'Collect from 60 businesses', stat: 'jobs', target: 60, coins: 2500, xp: 150, bucks: 2 },
+  { id: 'q20', icon: '⭐', text: 'Reach level 8', stat: 'level', target: 8, coins: 3000, xp: 0, bucks: 1 },
+  { id: 'q21', icon: '🏢', text: 'Upgrade a building to level 5', stat: 'bldgLevel', target: 5, coins: 3000, xp: 200 },
+  { id: 'q22', icon: '🅿', text: 'Own 10 cars', stat: 'carsOwned', target: 10, coins: 3000, xp: 200 },
+  { id: 'g15', icon: '💰', text: 'Earn 50,000 coins', stat: 'coinsEarned', target: 50000, coins: 5000, xp: 250, bucks: 3 },
+  { id: 'g16', icon: '🏁', text: 'Win 25 drag races', stat: 'racesWon', target: 25, coins: 5000, xp: 250, bucks: 3 },
+  { id: 'q23', icon: '🗺', text: 'Clear campaign chapter 5', stat: 'chapters', target: 5, coins: 6000, xp: 300, bucks: 2 },
+  { id: 'q24', icon: '🏆', text: 'Win 3 Grand Prix series', stat: 'gpWins', target: 3, coins: 6000, xp: 300, bucks: 2, level: 5 },
+  { id: 'q25', icon: '⭐', text: 'Reach level 10', stat: 'level', target: 10, coins: 6000, xp: 0, bucks: 2 },
+  { id: 'q26', icon: '🏟', text: 'Build the Speedway', stat: 'owns', def: 'stadium', target: 1, coins: 8000, xp: 400, level: 10 },
+  { id: 'q27', icon: '✨', text: 'Earn 45 campaign stars', stat: 'stars', target: 45, coins: 8000, xp: 400, bucks: 2 },
+  { id: 'q28', icon: '🅿', text: 'Own 15 cars', stat: 'carsOwned', target: 15, coins: 8000, xp: 400 },
+  { id: 'q29', icon: '🍕', text: 'Collect from 250 businesses', stat: 'jobs', target: 250, coins: 10000, xp: 500, bucks: 2 },
+  { id: 'q30', icon: '🏢', text: 'Upgrade a building to level 10', stat: 'bldgLevel', target: 10, coins: 12000, xp: 600, bucks: 3 },
+  { id: 'q31', icon: '💪', text: 'Reach 450 garage power', stat: 'power', target: 450, coins: 12000, xp: 600, bucks: 2 },
+  { id: 'q32', icon: '🗺', text: 'Clear every campaign chapter', stat: 'chapters', target: 7, coins: 20000, xp: 800, bucks: 5 },
+  { id: 'q33', icon: '🏁', text: 'Win 100 drag races', stat: 'racesWon', target: 100, coins: 20000, xp: 800, bucks: 3 },
+  { id: 'q34', icon: '⭐', text: 'Reach level 15', stat: 'level', target: 15, coins: 20000, xp: 0, bucks: 3 },
+  { id: 'q35', icon: '✨', text: 'Earn all 105 campaign stars', stat: 'stars', target: 105, coins: 30000, xp: 1000, bucks: 5 },
+  { id: 'q36', icon: '💰', text: 'Earn 250,000 coins', stat: 'coinsEarned', target: 250000, coins: 30000, xp: 1000, bucks: 3 },
+  { id: 'q37', icon: '🅿', text: 'Own 20 cars', stat: 'carsOwned', target: 20, coins: 30000, xp: 1000, bucks: 3 },
+  { id: 'q38', icon: '⭐', text: 'Reach level 20', stat: 'level', target: 20, coins: 50000, xp: 0, bucks: 5 },
+]
+
+// Daily and weekly tasks: three each, drawn per UTC day or ISO week from the pools below,
+// with targets fixed when they're drawn. Every task in a period pays the same, scaled by level,
+// and finishing all three opens a chest. needs: a building the player must own; level: unlock level.
+export type TaskDef = { id: string; icon: string; stat: CounterKey; text: string; n: (level: number) => number; level?: number; needs?: string }
+const round = (n: number, to: number) => Math.max(to, Math.round(n / to) * to)
+export const DAILY_TASKS: TaskDef[] = [
+  { id: 'jobs', icon: '🍕', stat: 'jobs', text: 'Collect from # businesses', n: (l) => Math.min(8 + l * 2, 40) },
+  { id: 'coins', icon: '💰', stat: 'coinsEarned', text: 'Earn # coins', n: (l) => round(1500 + l * 700, 500) },
+  { id: 'races', icon: '🏁', stat: 'races', text: 'Race # times', n: () => 3 },
+  { id: 'wins', icon: '🏆', stat: 'racesWon', text: 'Win # races', n: () => 2 },
+  { id: 'campaign', icon: '🗺', stat: 'campaignWins', text: 'Win # campaign race', n: () => 1 },
+  { id: 'search', icon: '🔍', stat: 'searches', text: "Search # time at Rusty's", n: () => 1, needs: 'rescue' },
+  { id: 'upgrade', icon: '⬆', stat: 'upgrades', text: 'Do # upgrade', n: () => 1 },
+  { id: 'build', icon: '🏗', stat: 'built', text: 'Place # new building', n: () => 1 },
+  { id: 'service', icon: '⛽', stat: 'serviced', text: 'Service # stranded cars', n: () => 2, needs: 'gas' },
+  { id: 'paint', icon: '🎨', stat: 'painted', text: 'Paint # car', n: () => 1, level: 2 },
+]
+export const WEEKLY_TASKS: TaskDef[] = [
+  { id: 'jobs', icon: '🍕', stat: 'jobs', text: 'Collect from # businesses', n: (l) => Math.min(60 + l * 10, 250) },
+  { id: 'coins', icon: '💰', stat: 'coinsEarned', text: 'Earn # coins', n: (l) => round(12000 + l * 5000, 1000) },
+  { id: 'wins', icon: '🏆', stat: 'racesWon', text: 'Win # races', n: () => 15 },
+  { id: 'campaign', icon: '🗺', stat: 'campaignWins', text: 'Win # campaign races', n: () => 5 },
+  { id: 'search', icon: '🔍', stat: 'searches', text: "Search # times at Rusty's", n: () => 5, needs: 'rescue' },
+  { id: 'upgrade', icon: '⬆', stat: 'upgrades', text: 'Do # upgrades', n: () => 8 },
+  { id: 'build', icon: '🏗', stat: 'built', text: 'Place # new buildings', n: () => 5 },
+  { id: 'gp', icon: '🏆', stat: 'gpWins', text: 'Win # Grand Prix series', n: () => 1, level: 2 },
+  { id: 'mods', icon: '🪽', stat: 'modsBought', text: 'Fit # car mods', n: () => 2, level: 3 },
+]
+export const TASKS_PER_PERIOD = 3
+// What each task and each chest pays. The server guard reads these from econ_catalog().quests.
+export type TaskPay = { coins: number; coinsPerLevel: number; xp: number; xpPerLevel: number }
+export type ChestPay = TaskPay & { parts: number; bucks: number; fuel: number }
+export const QUEST_PAY: Record<'daily' | 'weekly', { task: TaskPay; chest: ChestPay }> = {
+  daily: {
+    task: { coins: 150, coinsPerLevel: 50, xp: 20, xpPerLevel: 5 },
+    chest: { coins: 300, coinsPerLevel: 100, xp: 0, xpPerLevel: 0, parts: 5, bucks: 0, fuel: 10 },
+  },
+  weekly: {
+    task: { coins: 500, coinsPerLevel: 150, xp: 100, xpPerLevel: 20 },
+    chest: { coins: 1000, coinsPerLevel: 250, xp: 0, xpPerLevel: 0, parts: 20, bucks: 3, fuel: 0 },
+  },
+}
+export const payAt = (p: TaskPay, level: number) => ({ coins: p.coins + p.coinsPerLevel * level, xp: p.xp + p.xpPerLevel * level })
+
+// UTC calendar keys: the day like 2026-10-11 and the ISO week like 2026-W41.
+export const dayKey = (t = Date.now()) => new Date(t).toISOString().slice(0, 10)
+export function weekKey(t = Date.now()) {
+  const d = new Date(t)
+  const day = (d.getUTCDay() + 6) % 7 // Monday 0
+  const thu = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - day + 3))
+  const week = Math.ceil(((thu.getTime() - Date.UTC(thu.getUTCFullYear(), 0, 1)) / 86400000 + 1) / 7)
+  return `${thu.getUTCFullYear()}-W${String(week).padStart(2, '0')}`
+}
+// Milliseconds until the next UTC midnight, and until the next Monday 00:00 UTC.
+export const msToNextDay = (t = Date.now()) => 86400000 - (t % 86400000)
+export const msToNextWeek = (t = Date.now()) => msToNextDay(t) + ((7 - ((new Date(t).getUTCDay() + 6) % 7) - 1) * 86400000)
+
+// Picks a period's tasks: a fixed shuffle per key, so every device draws the same three.
+export function drawTasks(pool: TaskDef[], key: string, level: number, owned: (def: string) => boolean) {
+  let h = 2166136261
+  for (const ch of key) h = Math.imul(h ^ ch.charCodeAt(0), 16777619)
+  const rand = () => {
+    h = Math.imul(h ^ (h >>> 15), 2246822507) ^ Math.imul(h ^ (h >>> 13), 3266489909)
+    return ((h ^= h >>> 16) >>> 0) / 4294967296
+  }
+  const ok = pool.filter((t) => level >= (t.level ?? 1) && (!t.needs || owned(t.needs)))
+  for (let i = ok.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1))
+    ;[ok[i], ok[j]] = [ok[j], ok[i]]
+  }
+  return ok.slice(0, TASKS_PER_PERIOD).map((t) => ({ id: t.id, n: t.n(level) }))
+}
 
 // Daily login bonus by streak day (repeats the last entry).
 export const DAILY_BONUS = [

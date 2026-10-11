@@ -1093,3 +1093,42 @@ button.book-car { font: inherit; color: inherit; }
   .book-reward { gap: 4px; font-size: 12px; }
   .book-name { font-size: 15px; }
 }
+
+/* Goals sheet: story goals, daily and weekly tasks, chests. */
+.goal { grid-template-columns: auto 1fr auto; gap: 10px; padding: 6px 10px 6px 6px; border-width: 1.5px; }
+.goal.claimed { opacity: .55; }
+.goal-icon { width: 40px; height: 40px; display: grid; place-items: center; font-size: 22px; background: var(--sheet); border-radius: 10px; }
+.goal.done .goal-icon { background: #dcedc8; }
+.goal-main { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.goal-main > b { font-size: 15px; line-height: 1.15; }
+.goal-line { display: flex; align-items: center; gap: 6px; }
+.goal-line .bar { flex: 1; margin: 0; height: 8px; background: #e0e6ea; }
+.goal-head .bar { background: #dfe5ea; }
+.goal-line .bar span, .goal-head .bar span { background: var(--green); }
+.goal-line small { flex: none; font: 12px var(--display); color: #78909c; }
+.goal-pay { display: flex; align-items: center; gap: 4px; font: 13px var(--display); color: #455a64; }
+.goal-pay .ico { width: 16px; height: 16px; font-size: 10px; font-style: normal; }
+.goal-pay b { margin-left: 4px; color: #7e57c2; font-weight: normal; }
+.goal-check { color: var(--green); font: 20px var(--display); padding: 0 8px; }
+.goal-head { display: flex; align-items: center; gap: 10px; margin: 0 2px 8px; font: 14px var(--display); color: #546e7a; }
+.goal-head .bar { flex: 1; margin: 0; height: 8px; }
+.chest { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; margin-top: 10px; padding: 8px 10px 8px 6px; border-radius: 12px; border: 1.5px dashed #b0bec5; background: #fff; }
+.chest.ready { border: 2px solid #ffb300; background: #fff8e1; animation: chest-glow 1.4s ease-in-out infinite; }
+.chest.opened { opacity: .55; }
+.chest-icon { width: 40px; height: 40px; display: grid; place-items: center; font-size: 26px; }
+.chest-main { display: flex; flex-direction: column; gap: 3px; }
+.chest-pips { display: flex; gap: 4px; }
+.chest-pips i { width: 22px; height: 6px; border-radius: 3px; background: #cfd8dc; }
+.chest-pips i.on { background: #ffb300; }
+@keyframes chest-glow { 50% { box-shadow: 0 0 0 4px rgba(255,179,0,.25); } }
+.goal-badge { width: auto; min-width: 20px; padding: 0 4px; border-radius: 10px; background: #ff5252; }
+
+/* The next story goal, pinned under the HUD. */
+.goal-tracker { display: flex; align-items: center; gap: 6px; margin: 6px auto 0; max-width: min(320px, 80vw); padding: 3px 10px 3px 4px; border-radius: 14px; border: 1.5px solid rgba(255,255,255,.7); background: rgba(27,31,36,.78); color: #fff; font: 13px var(--display); pointer-events: auto; cursor: pointer; }
+.goal-tracker.done { background: rgba(46,125,50,.92); border-color: #c5e1a5; animation: chest-glow 1.4s ease-in-out infinite; }
+.gt-icon { width: 22px; height: 22px; display: grid; place-items: center; font-size: 14px; border-radius: 50%; background: rgba(255,255,255,.15); flex: none; }
+.gt-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gt-bar { flex: none; width: 44px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.25); overflow: hidden; }
+.gt-bar i { display: block; height: 100%; background: #76ff03; }
+@media (max-height: 500px) { .hud-center .goal-tracker { display: none; } }
+@media (max-width: 600px) { .goal-tracker { margin-top: 4px; font-size: 12px; padding: 2px 8px 2px 3px; } }

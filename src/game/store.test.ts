@@ -100,6 +100,58 @@ describe('campaign', () => {
   })
 })
 
+describe('daily and weekly tasks', () => {
+  it('count from when the day began, pay once each, and open the chest after all three', async () => {
+    const { rolledQuests, taskProgress } = await import('./store')
+    const { QUEST_PAY, payAt, xpToNext: toNext } = await import('./data')
+    const g = () => useGame.getState()
+    useGame.setState({ level: 5, xp: 0, coins: 0, parts: 0, bucks: 0, fuel: 0, levelUp: null, quests: null, stats: { ...g().stats, jobs: 50, races: 7 } })
+    useGame.setState({ quests: rolledQuests(g()) })
+    const q = g().quests!
+    expect(q.daily).toHaveLength(3)
+    expect(q.dayBase.jobs).toBe(50)
+    // Finish every task by bumping each counter past its target.
+    const stats = { ...g().stats }
+    for (const t of q.daily) {
+      const stat = (await import('./store')).taskDef('daily', t.id)!.stat
+      stats[stat] = (q.dayBase[stat] ?? 0) + t.n
+    }
+    useGame.setState({ stats })
+    for (const t of q.daily) expect(taskProgress(g(), 'daily', t)).toBeGreaterThanOrEqual(t.n)
+    g().claimChest('daily')
+    expect(g().quests!.dayChest).toBe(false)
+    for (const t of q.daily) g().claimTask('daily', t.id)
+    g().claimTask('daily', q.daily[0].id)
+    const pay = payAt(QUEST_PAY.daily.task, 5)
+    expect(g().coins).toBe(pay.coins * 3)
+    expect(g().xp + (g().level > 5 ? toNext(5) : 0)).toBeGreaterThan(0)
+    g().claimChest('daily')
+    g().claimChest('daily')
+    expect(g().quests!.dayChest).toBe(true)
+    expect(g().parts).toBe(QUEST_PAY.daily.chest.parts)
+    expect(g().coins).toBe(pay.coins * 3 + payAt(QUEST_PAY.daily.chest, 5).coins)
+    // Same day: nothing rolls over.
+    expect(rolledQuests(g())).toBeNull()
+    // Next day: fresh daily tasks, the week carries on.
+    const next = rolledQuests(g(), Date.now() + 86400000)!
+    expect(next.dayDone).toEqual([])
+    expect(next.dayChest).toBe(false)
+  })
+})
+
+describe('story goals', () => {
+  it('credit things the town already has and wait for their level', async () => {
+    const { activeGoals, goalDone } = await import('./store')
+    const { GOALS } = await import('./data')
+    const club = GOALS.find((x) => x.def === 'club')!
+    useGame.setState({ level: 5, claimedGoals: GOALS.filter((x) => x.id !== club.id).map((x) => x.id) })
+    expect(activeGoals(useGame.getState())).toEqual([])
+    useGame.setState({ level: 6, buildings: [...useGame.getState().buildings, { uid: 'club1', def: 'club', x: 0, z: 0, jobEndsAt: null }] })
+    expect(activeGoals(useGame.getState()).map((x) => x.id)).toEqual([club.id])
+    expect(goalDone(useGame.getState(), club)).toBe(true)
+  })
+})
+
 describe('collection sets', () => {
   const g = () => useGame.getState()
   const car = (model: string) => ({ uid: model, model, color: '#fff', upgrades: { engine: 0, turbo: 0, tires: 0, weight: 0 } })

@@ -81,6 +81,14 @@ async function fetchOnlineRivals(): Promise<Rival[]> {
 // How long a live race waits for the other player before offering to call it off.
 const JOIN_PATIENCE_MS = 30000
 
+type RaceTab = 'quick' | 'campaign' | 'gp'
+let nextRaceTab: RaceTab = 'quick'
+// Opens the Race menu on a given tab (goals use it to send players to the campaign or Grand Prix).
+export function openRaceTab(tab: RaceTab) {
+  nextRaceTab = tab
+  useGame.getState().openPanel('race')
+}
+
 export function RacePanel() {
   const cars = useGame((s) => s.cars)
   const level = useGame((s) => s.level)
@@ -92,7 +100,11 @@ export function RacePanel() {
   const [race, setRace] = useState<Rival | null>(null)
   const [gpRace, setGpRace] = useState<{ series: GpSeries; rival: Rival; prize: number } | null>(null)
   const [cRace, setCRace] = useState<{ chapter: CampaignChapter; race: number; rival: Rival; prize: number } | null>(null)
-  const [tab, setTab] = useState<'quick' | 'campaign' | 'gp'>('quick')
+  const [tab, setTab] = useState<RaceTab>(() => {
+    const t = nextRaceTab
+    nextRaceTab = 'quick'
+    return t
+  })
   const [pickCar, setPickCar] = useState(false)
   const gpResult = useGame((s) => s.gpResult)
   const campaignResult = useGame((s) => s.campaignResult)
