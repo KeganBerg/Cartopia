@@ -201,7 +201,7 @@ button.card:hover:not(:disabled) { border-color: var(--accent); }
 /* Bubbles pinned over the 3D scene. */
 .badges { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 10; }
 .anchor { position: absolute; left: 0; top: 0; visibility: hidden; pointer-events: auto; padding-bottom: 9px; will-change: transform; transition: opacity .25s; }
-.anchor.far { opacity: 0; pointer-events: none; }
+.anchor.far, .anchor.under { opacity: 0; pointer-events: none; }
 
 /* Rusty's Rescue gate */
 .card { position: relative; }
@@ -705,6 +705,23 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
   .goals-btn.goals-dock { width: 52px; height: 52px; right: calc(10px + var(--sar)); bottom: calc(140px + var(--sab)); border-radius: 14px; }
   .collect-all { width: 52px; height: 52px; right: calc(10px + var(--sar)); bottom: calc(76px + var(--sab)); }
   .collect-ico { font-size: 24px; }
+}
+/* Phones in landscape: a slim column centred over RACE, clear of the top-right icons. */
+@media (max-height: 500px) {
+  .goals-btn.goals-dock { width: 44px; height: 44px; font-size: 20px; border-radius: 12px; right: calc(34px + var(--sar)); bottom: calc(164px + var(--sab)); }
+  .collect-all { width: 48px; height: 48px; right: calc(32px + var(--sar)); bottom: calc(110px + var(--sab)); border-width: 2.5px; }
+  .collect-all::before { inset: 4px; }
+  .collect-ico { font-size: 22px; }
+  .collect-time { font-size: 10px; bottom: -7px; }
+  .collect-all.has-work { animation-name: collect-pulse-sm; }
+  @keyframes collect-pulse-sm { 50% { box-shadow: 0 4px 0 rgba(0,0,0,.3), 0 0 0 4px rgba(255, 213, 79, .45); } }
+  /* Race and gift bells join the icon row instead of a second row under it. */
+  .hud-right { display: grid; grid-template-columns: auto auto; justify-items: end; column-gap: 6px; }
+  .hud-right > .fuel, .hud-right > .fuel-sub { grid-column: 1 / -1; }
+  .hud-right > .hud-right-row:nth-last-child(2) { grid-column: 2; grid-row: 3; }
+  .hud-right > .hud-right-row:last-child { grid-column: 1; grid-row: 3; }
+  .hud-right-row { gap: 4px; }
+  .hud-right-row .challenge-bell, .hud-right-row > button:not(.pill) { width: 34px; height: 34px; font-size: 16px; border-width: 2px; border-radius: 10px; }
 }
 /* Leaderboards and clans */
 .crew-nudge { display: flex; gap: 10px; align-items: center; background: #eceff1; border: 2px dashed #90a4ae; border-radius: 12px; padding: 8px 10px; margin-bottom: 10px; }
