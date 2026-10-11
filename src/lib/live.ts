@@ -4,12 +4,13 @@ import { supabase } from './supabase'
 import { useGame } from '../game/store'
 import { CARS, MODS, carDef, performance, type Body } from '../game/data'
 import { displayName, isCleanName } from './names'
-import { signedInUser } from './cloud'
 
 // Live drag racing over Supabase Realtime. A shared lobby channel carries
 // presence and challenges; each race gets its own channel for positions.
+// Both are private channels for signed-in players only (0020_private_realtime.sql):
+// the lobby is open to any signed-in player, a race channel only to its two racers.
 
-// uid: the signed-in account, which lets the server referee the race (guests have none).
+// uid: the signed-in account. Town, level and car shown to others come from its server save.
 export type LivePlayer = { id: string; uid?: string | null; town: string; level: number; carName: string; color: string; body: Body; pi: number; mods?: string[]; closed?: boolean }
 export type Invite = { raceId: string; from: LivePlayer; at: number }
 export type LiveRace = { raceId: string; opponent: LivePlayer; host: boolean }
@@ -27,6 +28,8 @@ type LiveState = {
   // target id -> time before which we can't challenge them again.
   cooldownFrom: Record<string, number>
   cooldownTo: Record<string, number>
+  // Signed in and in the lobby. Guests can't race live.
+  signedIn: boolean
 }
 
 // How long a challenge stays open, and the breather after one ends.
@@ -49,6 +52,9 @@ const save = (k: string, v: unknown) => {
   }
 }
 
+const LOBBY = 'lobby:v2'
+const raceTopic = (raceId: string) => `race:${raceId}`
+
 const myId = (() => {
   try {
     const k = 'cartopia-live-id'
@@ -62,7 +68,7 @@ const myId = (() => {
 
 export const useLive = create<LiveState>(() => ({
   me: myId, players: [], invites: [], outgoing: null, race: null,
-  muted: load('cartopia-muted', {}), closed: load('cartopia-closed', false), cooldownFrom: {}, cooldownTo: {},
+  muted: load('cartopia-muted', {}), closed: load('cartopia-closed', false), cooldownFrom: {}, cooldownTo: {}, signedIn: false,
 }))
 
 // Lobby messages come straight from other browsers, so anyone can send anything: keep only
@@ -91,7 +97,33 @@ export function cleanCard(p: unknown): LivePlayer | null {
   }
 }
 
+// What other players see of each account comes from its server save (town name, level and the
+// guard-checked best car), never from what a browser says about itself.
+type ServerCard = Pick<LivePlayer, 'town' | 'level' | 'carName' | 'color' | 'body' | 'pi' | 'mods'>
+const known = new Map<string, { at: number; card: ServerCard | null }>()
+async function lookUp(uids: string[]) {
+  const stale = [...new Set(uids)].filter((u) => Date.now() - (known.get(u)?.at ?? 0) > 60000)
+  if (!stale.length || !supabase) return
+  const { data, error } = await supabase.from('game_saves').select('owner_id, town_name, level, best_car').in('owner_id', stale)
+  if (error) return
+  const at = Date.now()
+  for (const u of stale) known.set(u, { at, card: null })
+  for (const r of data ?? []) {
+    const b = (r.best_car ?? {}) as Record<string, unknown>
+    if (!b.name) continue
+    known.set(r.owner_id, { at, card: { town: r.town_name, level: r.level, carName: b.name as string, color: b.color as string, body: b.body as Body, pi: b.pi as number, mods: b.mods as string[] } })
+  }
+}
+// A lobby card with the server's details, or null for anyone who isn't a known signed-in player.
+function verified(p: LivePlayer | null): LivePlayer | null {
+  const c = p?.uid ? known.get(p.uid)?.card : null
+  if (!p || !c) return null
+  return cleanCard({ ...p, ...c, town: displayName(c.town, p.uid!) })
+}
+
 let lobby: RealtimeChannel | null = null
+let authUid: string | null = null
+let watching = false
 // Challenges we sent, so a late accept of one we already dropped can be told it expired.
 const sentIds = new Set<string>()
 
@@ -99,22 +131,46 @@ function myCard(): LivePlayer {
   const s = useGame.getState()
   const best = [...s.cars].sort((a, b) => performance(carDef(b.model), b.upgrades, b.mods) - performance(carDef(a.model), a.upgrades, a.mods))[0]
   const d = carDef(best.model)
-  return { id: myId, uid: signedInUser(), town: displayName(s.townName, myId), level: s.level, carName: d.name, color: best.color, body: d.body, pi: performance(d, best.upgrades, best.mods), mods: best.mods, closed: useLive.getState().closed }
+  return { id: myId, uid: authUid, town: displayName(s.townName, myId), level: s.level, carName: d.name, color: best.color, body: d.body, pi: performance(d, best.upgrades, best.mods), mods: best.mods, closed: useLive.getState().closed }
 }
 
+// Joins the lobby whenever someone is signed in, and leaves it on sign-out.
 export function joinLobby() {
-  if (!supabase || lobby) return
-  lobby = supabase.channel('race-lobby', { config: { presence: { key: myId } } })
-  lobby
-    .on('presence', { event: 'sync' }, () => {
-      const state = lobby!.presenceState<LivePlayer>()
-      const players = Object.values(state).map((v) => cleanCard(v[0])).filter((p): p is LivePlayer => !!p && p.id !== myId)
-      useLive.setState({ players })
+  if (!supabase || watching) return
+  watching = true
+  supabase.auth.onAuthStateChange((_event, session) => {
+    const uid = session?.user.id ?? null
+    if (uid === authUid) return
+    authUid = uid
+    leaveLobby()
+    // Outside the callback: supabase-js shouldn't be called back into from inside it.
+    if (uid) setTimeout(() => void openLobby(uid), 0)
+  })
+}
+
+async function openLobby(uid: string) {
+  if (!supabase) return
+  await supabase.realtime.setAuth()
+  if (lobby || authUid !== uid) return
+  const ch = supabase.channel(LOBBY, { config: { private: true, presence: { key: myId } } })
+  lobby = ch
+  useLive.setState({ signedIn: true })
+  let syncs = 0
+  ch
+    .on('presence', { event: 'sync' }, async () => {
+      const n = ++syncs
+      const cards = Object.values(ch.presenceState<LivePlayer>()).map((v) => cleanCard(v[0])).filter((p): p is LivePlayer => !!p && p.id !== myId && p.uid !== authUid)
+      await lookUp(cards.map((p) => p.uid).filter((u): u is string => !!u))
+      if (n !== syncs || lobby !== ch) return
+      useLive.setState({ players: cards.map(verified).filter((p): p is LivePlayer => !!p) })
     })
-    .on('broadcast', { event: 'challenge' }, ({ payload }) => {
+    .on('broadcast', { event: 'challenge' }, async ({ payload }) => {
+      const raw = cleanCard(payload.from)
+      if (!raw?.uid || payload.to !== myId) return
+      await lookUp([raw.uid])
       const l = useLive.getState()
-      const from = cleanCard(payload.from)
-      if (!from || typeof payload.raceId !== 'string' || payload.to !== myId || l.race || l.closed || l.muted[from.id]) return
+      const from = verified(raw)
+      if (!from || typeof payload.raceId !== 'string' || l.race || l.closed || l.muted[from.id]) return
       if ((l.cooldownFrom[from.id] ?? 0) > Date.now()) return
       // One pending challenge per sender: a repeat just replaces the old one.
       const fresh = !l.invites.some((i) => i.from.id === from.id)
@@ -124,7 +180,7 @@ export function joinLobby() {
     .on('broadcast', { event: 'cancel' }, ({ payload }) => {
       const l = useLive.getState()
       const inv = l.invites.find((i) => i.raceId === payload.raceId)
-      if (payload.to !== myId || !inv) return
+      if (payload.to !== myId || !inv || payload.from !== inv.from.id) return
       useLive.setState({ invites: l.invites.filter((i) => i.raceId !== payload.raceId) })
       useGame.getState().toast(`${inv.from.town} called off their challenge`)
     })
@@ -134,33 +190,36 @@ export function joinLobby() {
       useLive.setState({ race: null })
       useGame.getState().toast(`${race.opponent.town}'s challenge had already expired`)
     })
-    .on('broadcast', { event: 'answer' }, ({ payload }) => {
+    .on('broadcast', { event: 'answer' }, async ({ payload }) => {
+      const raw = cleanCard(payload.from)
+      if (raw?.uid) await lookUp([raw.uid])
       const out = useLive.getState().outgoing
       if (!out || payload.raceId !== out.raceId) {
         // They accepted after we cancelled or gave up: let them know instead of leaving them waiting.
-        if (payload.accept && sentIds.has(payload.raceId)) {
-          lobby?.send({ type: 'broadcast', event: 'expired', payload: { raceId: payload.raceId, to: cleanCard(payload.from)?.id } })
+        if (payload.accept && sentIds.has(payload.raceId) && raw) {
+          lobby?.send({ type: 'broadcast', event: 'expired', payload: { raceId: payload.raceId, to: raw.id } })
         }
         return
       }
+      // Only the player we challenged can answer it.
+      const from = verified(raw)
+      if (!from || from.id !== out.to) return
       useLive.setState({ outgoing: null })
       if (!payload.accept) {
         useLive.setState((l) => ({ cooldownTo: { ...l.cooldownTo, [out.to]: Date.now() + COOLDOWN_MS } }))
         return useGame.getState().toast('Challenge declined')
       }
-      const from = cleanCard(payload.from)
-      if (!from) return
       useLive.setState({ race: { raceId: out.raceId, opponent: from, host: true } })
     })
     .subscribe((status) => {
-      if (status === 'SUBSCRIBED') lobby!.track(myCard())
+      if (status === 'SUBSCRIBED') ch.track(myCard())
     })
 }
 
 export function leaveLobby() {
   if (lobby && supabase) supabase.removeChannel(lobby)
   lobby = null
-  useLive.setState({ players: [] })
+  useLive.setState({ players: [], invites: [], outgoing: null, signedIn: false })
 }
 
 export function refreshPresence() {
@@ -187,7 +246,7 @@ export function challenge(to: string) {
 export function cancelChallenge() {
   const out = useLive.getState().outgoing
   if (!out) return
-  lobby?.send({ type: 'broadcast', event: 'cancel', payload: { raceId: out.raceId, to: out.to } })
+  lobby?.send({ type: 'broadcast', event: 'cancel', payload: { raceId: out.raceId, to: out.to, from: myId } })
   useLive.setState({ outgoing: null })
   useGame.getState().toast('Challenge cancelled')
 }
@@ -243,7 +302,7 @@ export function endLiveRace() {
 // Per-race channel: opponent's distance and finish time, the start signal, and leaving before the start.
 export function raceChannel(raceId: string, handlers: { onPos: (p: { dist: number; t: number; speed: number }) => void; onFinish: (t: number) => void; onGo: () => void; onReady: () => void; onLeave: () => void }) {
   if (!supabase) return null
-  const ch = supabase.channel(`race-${raceId}`, { config: { broadcast: { self: false } } })
+  const ch = supabase.channel(raceTopic(raceId), { config: { private: true, broadcast: { self: false } } })
   ch.on('broadcast', { event: 'pos' }, ({ payload }) => handlers.onPos({ dist: payload.dist, t: payload.t ?? 0, speed: payload.speed ?? 0 }))
     .on('broadcast', { event: 'finish' }, ({ payload }) => handlers.onFinish(payload.t))
     .on('broadcast', { event: 'go' }, () => handlers.onGo())

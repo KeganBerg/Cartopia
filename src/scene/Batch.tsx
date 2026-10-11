@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, type ReactNode } from 'react'
 import { BufferAttribute, BufferGeometry, Color, Group, Matrix4, Mesh, Texture, type Material } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { glowMats } from './dayNight'
-import { bake, bakeable, bakedMaterial, finishOf, type Finish } from './bake'
+import { bake, bakeable, bakedMapMaterial, bakedMaterial, finishOf, textureKey, type Finish } from './bake'
 
 // Every road tile, lawn and building is dozens of tiny meshes, and phones choke
 // on the per-object cost of drawing ~1000 of them each frame. Batch merges every
@@ -11,9 +11,10 @@ import { bake, bakeable, bakedMaterial, finishOf, type Finish } from './bake'
 // The originals stay in the scene, hidden, so taps still hit them; rebuilding
 // happens whenever `version` changes, and `off` restores the originals (for
 // modes where pieces move, like dragging a building).
-// Meshes whose material is plain (no texture, not see-through: see bake.ts) go
-// further: whatever their colour, they are baked into one mesh per shadow setup,
-// so dozens of distinct colours cost one draw.
+// Meshes whose material is plain (at most a colour map, not see-through: see
+// bake.ts) go further: whatever their colour, they are baked into one mesh per
+// shadow setup and texture image, so dozens of colours, and every tiling of one
+// image, cost one draw.
 
 // Materials that change over time (night glow) must be kept by identity.
 const live = new Set<Material>(Object.values(glowMats))
@@ -53,7 +54,7 @@ export function Batch({ version, off, children }: { version: unknown; off?: bool
     r.updateMatrixWorld(true)
     const inv = new Matrix4().copy(r.matrixWorld).invert()
     const sets = new Map<string, { mat: Material; cast: boolean; receive: boolean; order: number; names: string[]; parts: BufferGeometry[] }>()
-    const bakes = new Map<string, { cast: boolean; receive: boolean; order: number; parts: [BufferGeometry, Finish, Matrix4][] }>()
+    const bakes = new Map<string, { mat: Material; uvs: boolean; cast: boolean; receive: boolean; order: number; parts: [BufferGeometry, Finish, Matrix4][] }>()
     const hidden: Mesh[] = []
     r.traverse((o) => {
       const mesh = o as Mesh
@@ -65,10 +66,13 @@ export function Batch({ version, off, children }: { version: unknown; off?: bool
       const names = ATTRS.filter((n) => g.getAttribute(n))
       if (!names.includes('position')) return
       const mat = mesh.material
-      if (!live.has(mat) && !mat.userData.live && names.includes('normal') && bakeable(mat)) {
-        const key = `${mesh.castShadow}${mesh.receiveShadow}${mesh.renderOrder}`
+      const kind = !live.has(mat) && !mat.userData.live && names.includes('normal') && bakeable(mat)
+      const map = (mat as { map?: Texture | null }).map
+      if (kind === 'plain' || (kind === 'map' && map && names.includes('uv'))) {
+        const tex = kind === 'map' ? map! : null
+        const key = `${tex ? textureKey(tex) : ''}#${mesh.castShadow}${mesh.receiveShadow}${mesh.renderOrder}`
         let set = bakes.get(key)
-        if (!set) bakes.set(key, (set = { cast: mesh.castShadow, receive: mesh.receiveShadow, order: mesh.renderOrder, parts: [] }))
+        if (!set) bakes.set(key, (set = { mat: tex ? bakedMapMaterial(tex) : baked, uvs: !!tex, cast: mesh.castShadow, receive: mesh.receiveShadow, order: mesh.renderOrder, parts: [] }))
         set.parts.push([g, finishOf(mat as Parameters<typeof finishOf>[0]), new Matrix4().multiplyMatrices(inv, mesh.matrixWorld)])
         hidden.push(mesh)
         return
@@ -81,7 +85,7 @@ export function Batch({ version, off, children }: { version: unknown; off?: bool
     })
     const made: Mesh[] = []
     for (const set of bakes.values()) {
-      const m = new Mesh(bake(set.parts), baked)
+      const m = new Mesh(bake(set.parts, set.uvs), set.mat)
       m.castShadow = set.cast
       m.receiveShadow = set.receive
       m.renderOrder = set.order
