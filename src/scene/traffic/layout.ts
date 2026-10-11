@@ -24,7 +24,8 @@ export type RoadTile = {
   cluster: number // intersection this junction tile belongs to, else -1
 }
 
-export type Entry = { tile: string; from: string; heading: number } // a lane driving into an intersection
+// A lane driving into an intersection. `stop`: a stop sign (the side road of a T without lights).
+export type Entry = { tile: string; from: string; heading: number; stop?: boolean }
 
 export type Intersection = {
   id: number
@@ -139,6 +140,13 @@ export function layoutRoads(list: Iterable<string>): RoadLayout {
     // Lights where traffic comes in along both roads from at least four lanes.
     const axes = new Set(c.entries.map((e) => (e.heading < 2 ? 'x' : 'z')))
     c.signal = axes.size === 2 && c.entries.length >= 4
+    // No lights where a side road meets a through road: a stop sign on the side road.
+    if (!c.signal && axes.size === 2) {
+      const along = (e: Entry) => (e.heading < 2 ? 'x' : 'z')
+      const n = c.entries.filter((e) => along(e) === 'x').length
+      const minor = n * 2 < c.entries.length ? 'x' : n * 2 > c.entries.length ? 'z' : null
+      for (const e of c.entries) if (along(e) === minor) e.stop = true
+    }
     const xs = c.tiles.map((t) => tiles.get(t)!.x)
     const zs = c.tiles.map((t) => tiles.get(t)!.z)
     c.clear = clearTime(Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs)) + 1)

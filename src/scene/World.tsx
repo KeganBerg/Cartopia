@@ -376,6 +376,8 @@ function Roads() {
             {(straightX || straightZ) && !xing.some(Boolean) && (x * 7 + z * 5) % 3 === 0 && (
               <StreetLamp side={straightX ? ((x + z) % 2 ? 's' : 'n') : ((x + z) % 2 ? 'e' : 'w')} />
             )}
+            {/* A lamp lighting the corner where a side road meets the street. */}
+            {junction && arms.filter(Boolean).length === 3 && <StreetLamp side={SIDES[arms.indexOf(false)]} />}
             {avenue && outer && !xing.some(Boolean) && (x * 7 + z * 5) % 3 === 0 && <StreetLamp side={outer} />}
             {(straightX || straightZ) && <Dashes alongX={straightX} />}
             {avenue && <Dashes alongX={oneWay < 2} />}
