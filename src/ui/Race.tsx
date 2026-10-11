@@ -930,7 +930,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
           </div>
         ))}
       </div>
-      {countdown > 0 && !result && <div className="rf-venue">{venue.icon} {venue.name}</div>}
+      {countdown > 0 && !result && <div className={`rf-venue v-${venue.id}`}><span className="rf-venue-ico">{venue.icon}</span><span className="rf-venue-txt"><small>Race venue</small><b>{venue.name}</b></span></div>}
       {countdown > 0 && countdown !== 99 && <div className="countdown big">{countdown}</div>}
       {countdown === 0 && !me.current.launched && !result && <div className="countdown big go">GO!</div>}
       {me.current.burning && !result && <div className="rf-boost-fx" />}
