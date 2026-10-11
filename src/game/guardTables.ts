@@ -20,6 +20,9 @@ export function restoreMinutes(): Record<string, number> {
 export function rescueSpots(): Record<string, { unlock: number; cars: [string, Rarity][] }> {
   return Object.fromEntries(RESCUE_SPOTS.map((s) => [s.id, { unlock: s.unlockLevel, cars: s.cars.map((c): [string, Rarity] => [c.model, c.rarity]) }]))
 }
+// What a search at each spot costs; rescue_roll() splits it over the cars found, and a restore's
+// payout is checked against its share (0024_season_track.sql).
+export const spotCosts = (): Record<string, number> => Object.fromEntries(RESCUE_SPOTS.map((s) => [s.id, s.cost]))
 export function rarities(): Record<Rarity, { weight: number; minutes: number }> {
   return Object.fromEntries(Object.entries(RARITY).map(([k, r]) => [k, { weight: r.weight, minutes: r.minutes }])) as Record<Rarity, { weight: number; minutes: number }>
 }
