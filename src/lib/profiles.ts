@@ -3,7 +3,7 @@ import { create } from 'zustand'
 import { supabase } from './supabase'
 import { displayName, isCleanName } from './names'
 
-// Usernames: one per account, separate from the town name (supabase/migrations/0048_friends_usernames.sql).
+// Usernames: one per account, separate from the town name (supabase/migrations/0049_friends_usernames.sql).
 // Other players' names are fetched in batches and cached here.
 
 export const USERNAME_MIN = 3
@@ -50,13 +50,13 @@ export function loadUsernames(ids: (string | null | undefined)[]) {
     timer = null
     const at = Date.now()
     for (const id of batch) fetchedAt.set(id, at)
-    const { data, error } = await supabase!.from('player_profiles').select('owner_id, username').in('owner_id', batch)
+    const { data, error } = await supabase!.from('profiles').select('id, username').in('id', batch)
     if (error) {
       for (const id of batch) fetchedAt.delete(id)
       return
     }
     const found: Record<string, string | null> = Object.fromEntries(batch.map((id) => [id, null]))
-    for (const r of data ?? []) found[r.owner_id] = isCleanName(r.username) ? r.username : null
+    for (const r of data ?? []) found[r.id] = r.username && isCleanName(r.username) ? r.username : null
     useNames.setState((s) => ({ byId: { ...s.byId, ...found } }))
     if (queue.size) loadUsernames([])
   }, 30)
@@ -81,11 +81,11 @@ export function usePlayerName(id: string | null | undefined, townName: string): 
 // Loads (or clears, on sign-out) the signed-in player's own username.
 export async function loadMyProfile(uid: string | null) {
   if (!uid || !supabase) return useNames.setState({ mine: undefined })
-  const { data, error } = await supabase.from('player_profiles').select('username, changed_at').eq('owner_id', uid).maybeSingle()
+  const { data, error } = await supabase.from('profiles').select('username, username_changed_at').eq('id', uid).maybeSingle()
   if (error) return
   useNames.setState((s) => ({
-    mine: { uid, username: data?.username ?? null, changedAt: data?.changed_at ?? null },
-    byId: data ? { ...s.byId, [uid]: data.username } : s.byId,
+    mine: { uid, username: data?.username ?? null, changedAt: data?.username_changed_at ?? null },
+    byId: data?.username ? { ...s.byId, [uid]: data.username } : s.byId,
   }))
 }
 

@@ -1,5 +1,5 @@
 -- Usernames and a real friends list (src/lib/profiles.ts, src/lib/friendsList.ts, src/ui/Friends.tsx).
---   * player_profiles: one username per account, separate from the town name. 3 to 16 letters,
+--   * profiles.username: one username per account, separate from the town name. 3 to 16 letters,
 --     digits or _, unique ignoring case, through name_ok() like crew names. Set it once for free;
 --     after that it can change once every 30 days (changing only the capitals is always free).
 --     Everyone can read usernames; only set_username() writes them.
@@ -9,19 +9,24 @@
 --   * Limits: 100 friends, 30 requests waiting at once, 25 new requests a day.
 -- No catalog or guard change. Safe to run before the game update: nothing calls it yet.
 
-create table if not exists public.player_profiles (
-  owner_id uuid primary key references auth.users (id) on delete cascade,
-  username text not null check (username ~ '^[A-Za-z0-9_]{3,16}$'),
-  created_at timestamptz not null default now(),
-  changed_at timestamptz not null default now()
-);
-create unique index if not exists player_profiles_username_key on public.player_profiles (lower(username));
+-- The first schema's profiles table (0001_init.sql) already has a row per account (made by the
+-- on_auth_user_created trigger) and a username column nobody has used, so it holds usernames now.
+-- Existing rows are left as they are: the new check only applies to names set from here on.
+alter table public.profiles add column if not exists username_changed_at timestamptz;
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'profiles_username_format' and conrelid = 'public.profiles'::regclass) then
+    alter table public.profiles add constraint profiles_username_format check (username ~ '^[A-Za-z0-9_]{3,16}$') not valid;
+  end if;
+end $$;
+create unique index if not exists profiles_username_lower_key on public.profiles (lower(username));
 
-alter table public.player_profiles enable row level security;
-revoke all on public.player_profiles from anon, authenticated;
-grant select on public.player_profiles to anon, authenticated;
-drop policy if exists "usernames readable by all" on public.player_profiles;
-create policy "usernames readable by all" on public.player_profiles for select using (true);
+alter table public.profiles enable row level security;
+revoke insert, update, delete, truncate on public.profiles from anon, authenticated;
+grant select on public.profiles to anon, authenticated;
+drop policy if exists "own profile writable" on public.profiles;
+drop policy if exists "profiles readable by all" on public.profiles;
+create policy "profiles readable by all" on public.profiles for select using (true);
 
 -- Matches usernameProblem() in src/lib/profiles.ts (profiles.test.ts checks the lists agree).
 create or replace function public.username_ok(p_name text) returns boolean
@@ -39,27 +44,27 @@ language plpgsql security definer set search_path = '' as $$
 declare
   me uuid := auth.uid();
   n text := trim(coalesce(p_name, ''));
-  cur public.player_profiles;
+  cur public.profiles;
   days int;
 begin
   if me is null then return 'no'; end if;
   if not public.username_ok(n) then return 'bad'; end if;
-  select * into cur from public.player_profiles where owner_id = me;
-  if found then
+  select * into cur from public.profiles where id = me;
+  if found and cur.username is not null then
     if cur.username = n then return 'same'; end if;
-    if lower(cur.username) <> lower(n) and cur.changed_at > now() - interval '30 days' then
-      days := ceil(extract(epoch from (cur.changed_at + interval '30 days' - now())) / 86400);
+    if lower(cur.username) <> lower(n) and cur.username_changed_at > now() - interval '30 days' then
+      days := ceil(extract(epoch from (cur.username_changed_at + interval '30 days' - now())) / 86400);
       return 'wait:' || days;
     end if;
   end if;
-  if exists (select 1 from public.player_profiles where lower(username) = lower(n) and owner_id <> me) then
+  if exists (select 1 from public.profiles where lower(username) = lower(n) and id <> me) then
     return 'taken';
   end if;
   begin
-    insert into public.player_profiles (owner_id, username) values (me, n)
-    on conflict (owner_id) do update set username = excluded.username,
-      changed_at = case when lower(public.player_profiles.username) = lower(excluded.username)
-                        then public.player_profiles.changed_at else now() end;
+    insert into public.profiles (id, username, username_changed_at) values (me, n, now())
+    on conflict (id) do update set username = excluded.username,
+      username_changed_at = case when lower(public.profiles.username) = lower(excluded.username)
+                                 then public.profiles.username_changed_at else now() end;
   exception when unique_violation then
     return 'taken';
   end;
@@ -70,8 +75,8 @@ end $$;
 create or replace function public.username_free(p_name text) returns boolean
 language sql stable security definer set search_path = '' as $$
   select public.username_ok(trim(p_name)) and not exists (
-    select 1 from public.player_profiles
-    where lower(username) = lower(trim(p_name)) and owner_id is distinct from auth.uid());
+    select 1 from public.profiles
+    where lower(username) = lower(trim(p_name)) and id is distinct from auth.uid());
 $$;
 
 create table if not exists public.friendships (
@@ -102,7 +107,7 @@ declare
   f public.friendships;
 begin
   if me is null or p_to is null or p_to = me then return 'no'; end if;
-  if not exists (select 1 from public.player_profiles where owner_id = me) then return 'no_name'; end if;
+  if not exists (select 1 from public.profiles where id = me and username is not null) then return 'no_name'; end if;
   if not exists (select 1 from public.game_saves where owner_id = p_to) then return 'no'; end if;
   select * into f from public.friendships where a = lo and b = hi for update;
   if found then
@@ -132,7 +137,7 @@ language plpgsql security definer set search_path = '' as $$
 declare
   them uuid;
 begin
-  select owner_id into them from public.player_profiles where lower(username) = lower(trim(coalesce(p_username, '')));
+  select id into them from public.profiles where lower(username) = lower(trim(coalesce(p_username, '')));
   if them is null then return 'not_found'; end if;
   return public.friend_request(them);
 end $$;
@@ -180,7 +185,7 @@ language sql stable security definer set search_path = '' as $$
     coalesce(f.responded_at, f.created_at)
   from public.friendships f
   cross join lateral (select case when f.a = auth.uid() then f.b else f.a end as id) o
-  left join public.player_profiles p on p.owner_id = o.id
+  left join public.profiles p on p.id = o.id
   left join public.game_saves s on s.owner_id = o.id
   where (f.a = auth.uid() or f.b = auth.uid())
     and not (f.status = 'declined' and f.requester <> auth.uid())

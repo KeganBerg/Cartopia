@@ -4,7 +4,7 @@ import { displayName, isCleanName } from './names'
 import { useNames } from './profiles'
 import { useGame } from '../game/store'
 
-// Friends and friend requests (supabase/migrations/0048_friends_usernames.sql).
+// Friends and friend requests (supabase/migrations/0049_friends_usernames.sql).
 
 export type FriendStatus = 'friend' | 'incoming' | 'outgoing'
 export type Friend = {

@@ -15,7 +15,7 @@ describe('usernameProblem', () => {
 })
 
 describe('database username rules', () => {
-  const sql = readFileSync(new URL('../../supabase/migrations/0048_friends_usernames.sql', import.meta.url), 'utf8')
+  const sql = readFileSync(new URL('../../supabase/migrations/0049_friends_usernames.sql', import.meta.url), 'utf8')
   it('uses the same reserved list and length limits', () => {
     const block = sql.split('-- reserved:begin')[1].split('-- reserved:end')[0]
     expect([...block.matchAll(/'([^']*)'/g)].map((m) => m[1])).toEqual(RESERVED)
