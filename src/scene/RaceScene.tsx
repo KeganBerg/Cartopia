@@ -35,7 +35,7 @@ type Props = {
   venue: Venue
 }
 
-function SkyDome({ tint = '#ffffff' }: { tint?: string }) {
+export function SkyDome({ tint = '#ffffff' }: { tint?: string }) {
   const ref = useRef<Mesh>(null)
   useFrame(({ camera }) => ref.current?.position.set(camera.position.x, 0, camera.position.z))
   return (

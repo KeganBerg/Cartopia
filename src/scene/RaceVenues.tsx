@@ -16,13 +16,13 @@ export const WALK = 1.0 // shoulder / sidewalk width
 const EDGE = ROAD + WALK
 
 // Deterministic so a venue looks the same every race.
-function rand(seed: number) {
+export function rand(seed: number) {
   return () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646
 }
 
 type V3 = [number, number, number]
 
-function Box({ p, s, c, ry = 0 }: { p: V3; s: V3; c: string; ry?: number }) {
+export function Box({ p, s, c, ry = 0 }: { p: V3; s: V3; c: string; ry?: number }) {
   return (
     <mesh position={p} scale={s} rotation-y={ry}>
       <boxGeometry />
@@ -31,7 +31,7 @@ function Box({ p, s, c, ry = 0 }: { p: V3; s: V3; c: string; ry?: number }) {
   )
 }
 
-function Cyl({ p, r, h, c, seg = 8, rot }: { p: V3; r: number; h: number; c: string; seg?: number; rot?: V3 }) {
+export function Cyl({ p, r, h, c, seg = 8, rot }: { p: V3; r: number; h: number; c: string; seg?: number; rot?: V3 }) {
   return (
     <mesh position={p} rotation={rot}>
       <cylinderGeometry args={[r, r, h, seg]} />
@@ -40,7 +40,7 @@ function Cyl({ p, r, h, c, seg = 8, rot }: { p: V3; r: number; h: number; c: str
   )
 }
 
-function Cone({ p, r, h, c, seg = 8, ry = 0 }: { p: V3; r: number; h: number; c: string; seg?: number; ry?: number }) {
+export function Cone({ p, r, h, c, seg = 8, ry = 0 }: { p: V3; r: number; h: number; c: string; seg?: number; ry?: number }) {
   return (
     <mesh position={p} rotation-y={ry}>
       <coneGeometry args={[r, h, seg]} />
@@ -49,7 +49,7 @@ function Cone({ p, r, h, c, seg = 8, ry = 0 }: { p: V3; r: number; h: number; c:
   )
 }
 
-function Flat({ x, z, w, d, c, y = 0.015 }: { x: number; z: number; w: number; d: number; c: string; y?: number }) {
+export function Flat({ x, z, w, d, c, y = 0.015 }: { x: number; z: number; w: number; d: number; c: string; y?: number }) {
   return (
     <mesh rotation-x={-Math.PI / 2} position={[x, y, z]}>
       <planeGeometry args={[w, d]} />
