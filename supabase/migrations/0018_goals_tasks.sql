@@ -1,9 +1,9 @@
 -- More story goals, and daily and weekly tasks (src/game/data.ts: GOALS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY).
---   * Run after 0015 (collection book): this keeps its sets and claim checks.
+--   * Run after 0017 (collection book): this keeps its sets and claim checks.
 --   * econ_catalog() gains the new story goals (paid once each, like before) and `quests`: how many
 --     tasks a day or week pays, what each task and chest pays, and the per-level step. Everything else
---     is unchanged from 0015. Built by src/game/econCatalog.ts; economy.test.ts keeps it in step.
---   * econ_guard() is 0015's plus the task block: saves carry `quests` with the day (UTC date) and
+--     is unchanged from 0017. Built by src/game/econCatalog.ts; economy.test.ts keeps it in step.
+--   * econ_guard() is 0017's plus the task block: saves carry `quests` with the day (UTC date) and
 --     week (ISO week) and which tasks were collected, and the guard pays at most three tasks and one
 --     chest per period. Weekly chests pay bucks, so they count toward the bucks cap.
 create or replace function public.econ_catalog() returns jsonb
@@ -13,7 +13,7 @@ select $catalog${"cars":{"pip":{"name":"Kipper Pocket","body":"compact","price":
 -- catalog:end
 $$;
 
--- The guard from 0015, plus daily and weekly tasks.
+-- The guard from 0017 (collection book), plus daily and weekly tasks.
 create or replace function public.econ_guard() returns trigger
 language plpgsql set search_path = '' as $$
 declare

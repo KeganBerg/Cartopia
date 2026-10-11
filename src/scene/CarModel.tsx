@@ -1,4 +1,6 @@
 import { useMemo } from 'react'
+import { useThree } from '@react-three/fiber'
+import { chromeEnv } from './chromeEnv'
 import {
   BoxGeometry, BufferGeometry, CircleGeometry, Color, CylinderGeometry, DoubleSide, Euler, ExtrudeGeometry, Matrix4,
   MeshBasicMaterial, MeshStandardMaterial, PlaneGeometry, Quaternion, Shape as ThreeShape, SphereGeometry, TorusGeometry, Vector3,
@@ -8,7 +10,7 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { wheelTex } from './textures'
 import { glowMats } from './dayNight'
-import { fittedMods, isBike, type Body, type ModSlot } from '../game/data'
+import { FINISH_LOOK, fittedMods, isBike, type Body, type Finish, type ModSlot } from '../game/data'
 import { CarMods, RIM_LOOK } from './CarMods'
 
 type Shape = {
@@ -584,15 +586,24 @@ function wheelMaterial(rim?: string) {
 // Handles on a car's wheels so a driving car can steer the front pair and roll all four.
 export type WheelRig = { steer: (Group | null)[]; spin: (Group | null)[]; radius: number; base: number }
 
-type CarProps = { body: Body; color: string; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean; rig?: WheelRig; mods?: string[] | null; flames?: boolean }
+type CarProps = { body: Body; color: string; finish?: Finish | null; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean; rig?: WheelRig; mods?: string[] | null; flames?: boolean }
 
 // Any vehicle: a motorcycle for bike bodies, otherwise a car. Faces +z.
 export function CarModel(props: CarProps) {
   return isBike(props.body) ? <BikeModel {...props} /> : <CarBody {...props} />
 }
 
+// The body paint: glossy, matte or chrome. Rust is always flat.
+function PaintMaterial({ color, finish, rusty, highlight }: { color: string; finish?: Finish | null; rusty?: boolean; highlight?: boolean }) {
+  const [metal, rough, lift] = rusty ? [0.1, 0.95, 0] : FINISH_LOOK[finish ?? 'gloss'] ?? FINISH_LOOK.gloss
+  const tint = useMemo(() => (lift ? '#' + new Color(color).lerp(new Color('#ffffff'), lift).getHexString() : color), [color, lift])
+  const gl = useThree((s) => s.gl)
+  const env = !rusty && finish === 'chrome' ? chromeEnv(gl) : null
+  return <meshStandardMaterial key={env ? 'chrome' : 'paint'} color={tint} metalness={metal} roughness={rough} envMap={env} envMapIntensity={env ? 1.3 : 1} emissive={highlight ? '#ffffff' : '#000000'} emissiveIntensity={highlight ? 0.25 : 0} />
+}
+
 // Toy-style car: bevelled extruded body and cabin so no edge is a hard box corner. Faces +z.
-function CarBody({ body, color, highlight, stripe, beams, rusty, rig, mods, flames }: { body: Body; color: string; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean; rig?: WheelRig; mods?: string[] | null; flames?: boolean }) {
+function CarBody({ body, color, finish, highlight, stripe, beams, rusty, rig, mods, flames }: { body: Body; color: string; finish?: Finish | null; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean; rig?: WheelRig; mods?: string[] | null; flames?: boolean }) {
   // Rusty finds come home stock.
   const fit = rusty ? {} : fittedMods(mods)
   const s = shapeOf(body)
@@ -607,7 +618,7 @@ function CarBody({ body, color, highlight, stripe, beams, rusty, rig, mods, flam
   return (
     <group>
       <mesh geometry={p.paint} castShadow>
-        <meshStandardMaterial color={tint} metalness={rusty ? 0.1 : 0.4} roughness={rusty ? 0.95 : 0.3} emissive={highlight ? '#ffffff' : '#000000'} emissiveIntensity={highlight ? 0.25 : 0} />
+        <PaintMaterial color={tint} finish={finish} rusty={rusty} highlight={highlight} />
       </mesh>
       {p.dark && (
         <mesh geometry={p.dark}>
@@ -730,7 +741,7 @@ function bikeGeo(body: BikeBody, fit: Partial<Record<ModSlot, string>>): CarGeo 
 }
 
 // Bikes take exhaust and rim mods only.
-function BikeModel({ body, color, highlight, beams, rusty, rig, mods, flames }: CarProps) {
+function BikeModel({ body, color, finish, highlight, beams, rusty, rig, mods, flames }: CarProps) {
   const all = rusty ? {} : fittedMods(mods)
   const fit = { exhaust: all.exhaust, rims: all.rims }
   const bb = body as BikeBody
@@ -744,7 +755,7 @@ function BikeModel({ body, color, highlight, beams, rusty, rig, mods, flames }: 
   return (
     <group>
       <mesh geometry={p.paint} castShadow>
-        <meshStandardMaterial color={tint} metalness={rusty ? 0.1 : 0.4} roughness={rusty ? 0.95 : 0.3} emissive={highlight ? '#ffffff' : '#000000'} emissiveIntensity={highlight ? 0.25 : 0} />
+        <PaintMaterial color={tint} finish={finish} rusty={rusty} highlight={highlight} />
       </mesh>
       {p.dark && (
         <mesh geometry={p.dark}>

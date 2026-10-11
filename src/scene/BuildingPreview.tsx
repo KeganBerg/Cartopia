@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { PerspectiveCamera, Vector3, type Group, type Mesh } from 'three'
-import type { Body, BuildingDef } from '../game/data'
+import type { Body, BuildingDef, Finish } from '../game/data'
 import { BuildingModel } from './BuildingModel'
 import { CarModel } from './CarModel'
 import { SEASON } from './season'
@@ -24,12 +24,12 @@ function buildingItem(def: BuildingDef, level?: number): Item {
   return { key: `b|${def.id}|${level ?? 1}|${SEASON}`, model: () => <BuildingModel def={def} level={level} /> }
 }
 
-type CarLook = { body: Body; color: string; stripe?: string | null; rusty?: boolean; mods?: string[] | null }
+type CarLook = { body: Body; color: string; finish?: Finish | null; stripe?: string | null; rusty?: boolean; mods?: string[] | null }
 
 function carItem(c: CarLook): Item {
   return {
-    key: `c|${c.body}|${c.color}|${c.stripe ?? ''}|${c.rusty ? 1 : 0}|${c.rusty ? '' : (c.mods ?? []).join(',')}`,
-    model: () => <CarModel body={c.body} color={c.color} stripe={c.stripe} rusty={c.rusty} mods={c.mods} />,
+    key: `c|${c.body}|${c.color}|${c.finish ?? ''}|${c.stripe ?? ''}|${c.rusty ? 1 : 0}|${c.rusty ? '' : (c.mods ?? []).join(',')}`,
+    model: () => <CarModel body={c.body} color={c.color} finish={c.finish} stripe={c.stripe} rusty={c.rusty} mods={c.mods} />,
   }
 }
 
