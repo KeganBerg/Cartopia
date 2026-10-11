@@ -604,8 +604,8 @@ void skinShade(int id, vec3 p, vec3 n, vec3 v, float t, inout vec3 col, inout ve
     col = mix(col, vec3(0.7, 1.0, 0.5), smoothstep(0.04, 0.0, length(bf + br * 0.4)) * step(0.4, bh.x) * step(0.05, br));
     rough = 0.12;
   } else if (id == 27) {
-    // Checkered (mod skin): a chequered flag rippling in the wind, the red glow of a
-    // second flag showing through from underneath.
+    // Checkered (mod skin): a chequered flag rippling in the wind, a faint red glow
+    // of a second flag showing through its black squares from underneath.
     vec2 u = uv0 * 13.0;
     float wv = sin(u.x * 0.55 + u.y * 0.25 - t * 4.0);
     vec2 uf = u + vec2(0.0, wv * 0.35);
@@ -614,8 +614,7 @@ void skinShade(int id, vec3 p, vec3 n, vec3 v, float t, inout vec3 col, inout ve
     vec2 ud = skAt(p, n, v, 0.04) * 13.0 + vec2(t * 0.5, 0.0);
     float chd = mod(floor(ud.x) + floor(ud.y), 2.0);
     col = mix(vec3(0.03), vec3(0.95), chk) * shade;
-    col = mix(col, vec3(0.8, 0.05, 0.05), (1.0 - chk) * chd * 0.12);
-    glow += vec3(1.0, 0.15, 0.1) * (1.0 - chk) * chd * 0.12 * shade;
+    glow += vec3(1.0, 0.15, 0.1) * (1.0 - chk) * chd * 0.04 * shade;
     rough = 0.35;
   }
 }
