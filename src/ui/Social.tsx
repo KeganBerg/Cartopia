@@ -11,6 +11,7 @@ import {
 import { Panel, SheetTabs } from './Menus'
 import { isCleanName, NAME_REJECTED } from '../lib/names'
 import { CrewGoalCard, useCrewGoal } from './CrewGoal'
+import { openChat, refreshChatRooms, useChat } from '../lib/chat'
 import { CrewBattleCard } from './CrewBattle'
 import { demoBattle, useCrewBattle } from '../lib/battles'
 
@@ -31,10 +32,13 @@ export function useUserId() {
 export function SocialTabs({ current }: { current: PanelId }) {
   const openPanel = useGame((s) => s.openPanel)
   const chests = useCrewGoal((g) => g.ready) + useCrewBattle((b) => b.ready)
+  const crewChat = useChat((c) => c.unread.crew)
+  const globalChat = useChat((c) => c.unread.global > 0)
   const tabs: { id: PanelId; label: React.ReactNode }[] = [
     { id: 'friends', label: '👫 Friends' },
     { id: 'leaders', label: '🏅 Leaderboards' },
     { id: 'clan', label: <>🛡️ Crew{chests > 0 && <span className="tab-dot">{chests}</span>}</> },
+    { id: 'chat', label: <>💬 Chat{crewChat > 0 ? <span className="tab-dot">{crewChat > 9 ? '9+' : crewChat}</span> : globalChat && <i className="chat-new" />}</> },
     { id: 'meet', label: '🚗 Meet' },
   ]
   return <SheetTabs items={tabs as { id: Exclude<PanelId, null>; label: React.ReactNode }[]} value={current ?? 'friends'} onChange={(id) => openPanel(id)} />
@@ -45,7 +49,7 @@ export function ClanTag({ clan, small }: { clan: ClanBadge | null; small?: boole
   return <span className={small ? 'clan-tag small' : 'clan-tag'} style={{ background: clan.color }}>{clan.emblem} {clan.tag}</span>
 }
 
-function useVisit() {
+export function useVisit() {
   const visit = useGame((s) => s.visit)
   const toast = useGame((s) => s.toast)
   return async (id: string) => {
@@ -224,6 +228,7 @@ export function ClanPanel() {
     fetchMyClan(uid).then((m) => {
       setMine(m)
       useGame.setState({ clanBadge: m ? { tag: m.clan.tag, emblem: m.clan.emblem, color: m.clan.color } : null })
+      void refreshChatRooms()
     }).catch(() => setMine(null))
   }, [uid])
   useEffect(() => { if (uid !== undefined) reload() }, [uid, reload])
@@ -279,6 +284,7 @@ function CrewHouseNudge() {
 
 function ClanHome({ data, uid, onChange }: { data: MyClan; uid: string; onChange: () => void }) {
   const { clan, members, role } = data
+  const crewChat = useChat((c) => c.unread.crew)
   const toast = useGame((s) => s.toast)
   const go = useVisit()
   const [confirmLeave, setConfirmLeave] = useState(false)
@@ -316,6 +322,7 @@ function ClanHome({ data, uid, onChange }: { data: MyClan; uid: string; onChange
           {clan.description && <p>{clan.description}</p>}
           <small>{clan.members}/{clan.memberCap} members{clan.minLevel > 1 ? ` · level ${clan.minLevel}+ to join` : ''}{rank ? ` · #${rank} by power` : ''}</small>
         </div>
+        <button className="buy small alt clan-chat" onClick={() => openChat('crew')}>💬 Chat{crewChat > 0 && <span className="tab-dot">{crewChat > 9 ? '9+' : crewChat}</span>}</button>
       </div>
       <CrewBattleCard />
       <CrewGoalCard members={members} uid={uid} />
