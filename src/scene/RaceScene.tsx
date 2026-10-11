@@ -189,8 +189,8 @@ export function RaceScene({ track, me, them, mine, theirs }: Props) {
     const target = Math.min(mz, len)
     // Tall phone screens get a higher, further-back chase view.
     const tall = size.height > size.width
-    camera.position.lerp({ x: LANE * 0.5, y: tall ? 2.7 : 2.2, z: target - (tall ? 5.2 : 4.2) } as never, 0.15)
-    camera.lookAt(LANE * 0.3, 0.3, Math.min(target + 3 + (lead - target) * 0.3, len + 4))
+    camera.position.lerp({ x: tall ? 0 : LANE * 0.5, y: tall ? 2.7 : 2.2, z: target - (tall ? 5.2 : 4.2) } as never, 0.15)
+    camera.lookAt(tall ? 0 : LANE * 0.3, 0.3, Math.min(target + 3 + (lead - target) * 0.3, len + 4))
     // Only draw the stretch of street near the camera.
     const cz = camera.position.z
     scenery.current.forEach((g) => {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useGame, hasRusty } from '../game/store'
-import { BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, PAINTS, STRIPES, PAINT_COST, STRIPE_COST, carDef, performance, upgradeCost, type BuildingDef } from '../game/data'
+import { garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, PAINTS, STRIPES, PAINT_COST, STRIPE_COST, carDef, performance, upgradeCost, type BuildingDef } from '../game/data'
 import { CarPreview } from '../scene/CarPreview'
 import { CollectAllButton } from './CollectAll'
 import { rotateCurrent } from '../game/placement'
@@ -104,8 +104,8 @@ function price(def: { price: number; bucks?: number }) {
 
 const SHOP_GROUPS: { title: string; filter: (b: BuildingDef) => boolean }[] = [
   { title: 'Cars and parts makers', filter: (b) => b.id === 'rescue' || b.kind === 'parts' },
-  { title: 'Businesses', filter: (b) => b.kind === 'business' && b.id !== 'rescue' },
-  { title: 'Services', filter: (b) => b.kind === 'gas' },
+  { title: 'Businesses', filter: (b) => b.kind === 'business' && b.id !== 'rescue' && b.id !== 'crew' },
+  { title: 'Services and clubs', filter: (b) => b.kind === 'gas' || b.id === 'crew' },
   { title: 'Homes and decor', filter: (b) => b.kind === 'house' || b.kind === 'decor' },
 ]
 
@@ -151,6 +151,7 @@ export function ShopPanel() {
                     </div>
                   )}
                   {b.id === 'rescue' && <div className="card-stat">Search for old cars and restore them</div>}
+                  {b.id === 'crew' && <div className="card-stat">Your crew's clubhouse: roster, rank and crew boards</div>}
                   {b.fuelCap && <div className="card-stat">+{b.fuelCap} max fuel</div>}
                   {owned ? <span className="price">✔ Built</span> : locked ? <span className="price">🔒 Level {b.unlockLevel}</span> : price(b)}
                 </button>
@@ -228,7 +229,7 @@ export function GaragePanel() {
   const car = cars.find((c) => c.uid === selected) ?? cars[0]
   const def = car && carDef(car.model)
   return (
-    <Panel title={`My Garage · ${cars.length} cars`} wide>
+    <Panel title={`My Garage · ${cars.length} cars · ⚡${garagePower(cars)}`} wide>
       <div className="garage">
         <div className="garage-list">
           {cars.map((c) => {

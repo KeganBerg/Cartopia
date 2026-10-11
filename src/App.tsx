@@ -7,6 +7,7 @@ import { BottomBar, ShopPanel, ShowroomPanel, GaragePanel, Toasts } from './ui/M
 import { RacePanel, LiveRaceOverlay, InvitesPanel, PrizePopup } from './ui/Race'
 import { joinLobby, useLive } from './lib/live'
 import { FriendsPanel, VisitBanner } from './ui/Friends'
+import { LeadersPanel, ClanPanel } from './ui/Social'
 import { Tutorial } from './ui/Tutorial'
 import { Badges } from './ui/Badges'
 import { NeedPanel } from './ui/Need'
@@ -57,6 +58,8 @@ export default function App() {
       {liveRace && <LiveRaceOverlay />}
       {panel === 'invites' && <InvitesPanel />}
       {panel === 'friends' && <FriendsPanel />}
+      {panel === 'leaders' && <LeadersPanel />}
+      {panel === 'clan' && <ClanPanel />}
       {panel === 'need' && <NeedPanel />}
       {panel === 'rescue' && <RescuePanel />}
       {panel === 'bank' && <BankPanel />}
