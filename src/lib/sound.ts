@@ -13,6 +13,15 @@ let muted = (() => {
   }
 })()
 
+let volume = (() => {
+  try {
+    const v = localStorage.getItem('cartopia-volume')
+    return v !== null && Number.isFinite(Number(v)) ? Math.min(1, Math.max(0, Number(v))) : 0.8
+  } catch {
+    return 0.8
+  }
+})()
+
 const listeners = new Set<() => void>()
 
 function audio() {
@@ -21,6 +30,7 @@ function audio() {
     try {
       ctx = new AudioContext()
       master = ctx.createGain()
+      master.gain.value = volume
       master.connect(ctx.destination)
     } catch {
       return null
@@ -33,6 +43,30 @@ function audio() {
 // The shared context and master output for other synthesised audio; null while muted.
 export const audioContext = () => audio()
 export const audioOut = (): AudioNode | null => (audio() ? master : null)
+
+// iPhone: audio may only start inside a tap, and the ring/silent switch mutes
+// web audio unless the page asks for media playback.
+if (typeof window !== 'undefined') {
+  try {
+    const s = (navigator as Navigator & { audioSession?: { type: string } }).audioSession
+    if (s) s.type = 'playback'
+  } catch {
+    /* not supported */
+  }
+  const events = ['pointerdown', 'touchend', 'keydown']
+  const unlock = () => {
+    const a = audio()
+    if (!a) return
+    // A silent blip inside the gesture is what actually unlocks iOS.
+    const src = a.createBufferSource()
+    src.buffer = a.createBuffer(1, 1, 22050)
+    src.connect(a.destination)
+    src.start()
+    if (a.state === 'running') events.forEach((e) => window.removeEventListener(e, unlock, true))
+  }
+  events.forEach((e) => window.addEventListener(e, unlock, true))
+}
+
 export const isMuted = () => muted
 export function setMuted(m: boolean) {
   muted = m
@@ -42,6 +76,17 @@ export function setMuted(m: boolean) {
     /* storage unavailable */
   }
   if (m) stopEngine()
+  listeners.forEach((l) => l())
+}
+export const getVolume = () => volume
+export function setVolume(v: number) {
+  volume = Math.min(1, Math.max(0, v))
+  try {
+    localStorage.setItem('cartopia-volume', String(volume))
+  } catch {
+    /* storage unavailable */
+  }
+  if (ctx && master) master.gain.setTargetAtTime(volume, ctx.currentTime, 0.05)
   listeners.forEach((l) => l())
 }
 export function onMuteChange(l: () => void) {
@@ -80,37 +125,20 @@ export const sfx = {
     tone(392, 0, 0.35, 'square', 0.06)
     tone(494, 0, 0.35, 'square', 0.05)
   },
-  shift: (good: boolean) => tone(good ? 880 : 330, 0, 0.08, 'square', 0.08),
+  // A soft chime on a clean shift; the race engine plays the gear change itself.
+  shift: (good: boolean) => {
+    if (good) tone(1568, 0, 0.12, 'sine', 0.035)
+  },
   win: () => [523, 659, 784, 659, 1047].forEach((f, i) => tone(f, i * 0.12, 0.25, 'triangle', 0.13)),
   lose: () => [392, 330, 262].forEach((f, i) => tone(f, i * 0.16, 0.3, 'triangle', 0.1)),
   countdown: (go: boolean) => tone(go ? 880 : 440, 0, go ? 0.4 : 0.15, 'square', 0.08),
 }
 
-// Engine drone for races: a sawtooth whose pitch follows the rpm.
-let engine: { o: OscillatorNode; g: GainNode } | null = null
-export function engineRpm(rpm: number, gear: number) {
-  const a = audio()
-  if (!a) return
-  if (!engine) {
-    const o = a.createOscillator()
-    const g = a.createGain()
-    const f = a.createBiquadFilter()
-    o.type = 'sawtooth'
-    f.type = 'lowpass'
-    f.frequency.value = 900
-    g.gain.value = 0.05
-    o.connect(f).connect(g).connect(master!)
-    o.start()
-    engine = { o, g }
-  }
-  engine.o.frequency.setTargetAtTime(55 + rpm * (140 - gear * 12), a.currentTime, 0.03)
+// Race engines live in engineAudio.ts; muting silences them through this hook.
+let engineStop: (() => void) | null = null
+export function onStopEngine(f: () => void) {
+  engineStop = f
 }
 export function stopEngine() {
-  if (!engine) return
-  try {
-    engine.o.stop()
-  } catch {
-    /* already stopped */
-  }
-  engine = null
+  engineStop?.()
 }

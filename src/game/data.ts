@@ -323,6 +323,8 @@ export const RESCUE_SPOTS: RescueSpot[] = [
   ] },
 ]
 export const RESCUE_PINS = 8
+// The chance each pin hides a car (every search has at least one).
+export const RESCUE_CAR_CHANCE = 0.1
 export const STORAGE_MAX = 6
 export const restoreCost = (car: CarDef) => Math.max(200, Math.round((car.price + (car.bucks ?? 0) * 1000) * 0.25 / 10) * 10)
 export const rushBucks = (msLeft: number) => Math.max(1, Math.ceil(msLeft / 1800000))
