@@ -3,7 +3,7 @@
 // green at four-ways), pulls up at businesses, and swings round cars stopped
 // at the curb. Plain TypeScript so it can be tested without a renderer.
 import { dirAt, pointAt, type Curve, type V2 } from './curves'
-import { lightAt, type Light } from './layout'
+import { YELLOW, type Light } from './layout'
 import {
   D, LANE, buildNet, conflicts, exits, opp, priority, right, roadCurve, route, tkey,
   type Building, type Net, type Node, type Stop, type TurnOf,
@@ -90,6 +90,13 @@ const PULL = 0.9 // how far a broken-down car pulls over onto the verge, clear o
 const PULL_RAMP = 1.4 // distance over which it eases off the road (and back on)
 const PULL_FLAT = 0.9 // either side of the spot, where it is all the way over
 const JAMMED = 45 // seconds stuck before a car gives up
+// Traffic lights that answer to who's waiting. A green lasts at least MIN_GREEN,
+// changes early once its road goes quiet and someone waits across it, and at
+// most MAX_GREEN while cross traffic waits. With nobody waiting across, it stays.
+const MIN_GREEN = 4
+const MAX_GREEN = 12
+const SENSE = 7 // how far up the road the lights notice a car coming
+const REST_GREEN = 40 // change anyway now and then, in case someone wasn't noticed
 
 // A short oriented box: centre, heading, half length and half width.
 export type Box = { x: number; z: number; ux: number; uz: number; hl: number; hw: number }
@@ -132,9 +139,26 @@ export class Traffic {
   private visits = new Map<string, string>()
   private ways = new Map<string, { outs: number[]; to: string; heading: number }[]>()
   private limp = new Map<string, number>() // broken-down cars still looking for a spot, by odometer at breakdown
+  // Each set of lights: which road has right of way (0 east-west, 1 north-south),
+  // where it is in its change, and for how long.
+  private sigs = new Map<number, { axis: number; phase: 'green' | 'yellow' | 'clear'; t: number; clear: number }>()
+  private walkWait = new Map<string, number>() // "cluster:axis" -> last time someone on foot waited to cross that road
 
   setTown(roads: string[], buildings: Building[], turnOf: TurnOf) {
+    const was = new Map<string, { axis: number; phase: 'green' | 'yellow' | 'clear'; t: number; clear: number }>()
+    for (const [id, g] of this.sigs) {
+      const c = this.net.layout.clusters[id]
+      if (c) was.set(c.tiles[0], g)
+    }
     this.net = buildNet(roads, buildings, turnOf)
+    // Lights that are still there keep going as they were.
+    this.sigs = new Map()
+    this.walkWait = new Map()
+    for (const c of this.net.layout.clusters) {
+      if (!c.signal) continue
+      const g = was.get(c.tiles[0])
+      this.sigs.set(c.id, g ? { ...g, clear: c.clear } : { axis: Math.round(c.offset) % 2, phase: 'green', t: 0, clear: c.clear })
+    }
     this.ways = new Map()
     // Keep cars where they are when their road still exists; replan what comes next.
     for (const a of [...this.agents.values()]) {
@@ -589,6 +613,7 @@ export class Traffic {
     const agents = [...this.agents.values()]
     for (const a of agents) this.outline(a)
 
+    this.runLights(dt)
     for (const a of agents) this.think(a, dt)
     for (const a of agents) this.drive(a, dt)
     for (const a of agents) {
@@ -844,8 +869,61 @@ export class Traffic {
 
   // The light shown to traffic heading `heading` into intersection `cluster`.
   lightOf(cluster: number, heading: number): Light {
-    const c = this.net.layout.clusters[cluster]
-    return c?.signal ? lightAt(c.offset, heading, this.t, c.clear) : 'green'
+    const g = this.sigs.get(cluster)
+    if (!g) return 'green'
+    if ((heading < 2 ? 0 : 1) !== g.axis || g.phase === 'clear') return 'red'
+    return g.phase
+  }
+
+  // Someone on foot is waiting to cross the road whose traffic heads `heading` into `cluster`.
+  wantWalk(cluster: number, heading: number) {
+    this.walkWait.set(`${cluster}:${heading < 2 ? 0 : 1}`, this.t)
+  }
+
+  private runLights(dt: number) {
+    if (!this.sigs.size) return
+    // Who's waiting at a red, and who's still coming up to each light.
+    const waiting = new Set<string>()
+    const coming = new Set<string>()
+    for (const a of this.agents.values()) {
+      if (a.parked || a.stalled) continue
+      // The next junction along its way, if it's close (lights see cars coming
+      // from a few tiles off, so they can be green by the time they get there).
+      let d = a.legs[a.ci].c.len - a.s
+      for (let i = a.ci + 1; i < a.legs.length && d < SENSE; i++) {
+        const l = a.legs[i]
+        if (l.granted || !l.junction) {
+          d += l.c.len
+          continue
+        }
+        const n = this.net.nodes.get(l.node!)!
+        if (!n.signal) break
+        const k = `${n.cluster}:${l.inDir < 2 ? 0 : 1}`
+        if (a.v < 0.3 && d < 2) waiting.add(k)
+        else coming.add(k)
+        break
+      }
+    }
+    for (const [id, g] of this.sigs) {
+      g.t += dt
+      if (g.phase === 'green') {
+        const across = `${id}:${1 - g.axis}`
+        const asked = waiting.has(across) || coming.has(across) || this.t - (this.walkWait.get(`${id}:${g.axis}`) ?? -99) < 1
+        const mine = `${id}:${g.axis}`
+        const busy = coming.has(mine) || waiting.has(mine)
+        if ((asked && g.t >= MIN_GREEN && (!busy || g.t >= MAX_GREEN)) || (g.t >= REST_GREEN && !busy)) {
+          g.phase = 'yellow'
+          g.t = 0
+        }
+      } else if (g.phase === 'yellow' && g.t >= YELLOW) {
+        g.phase = 'clear'
+        g.t = 0
+      } else if (g.phase === 'clear' && g.t >= g.clear) {
+        g.phase = 'green'
+        g.axis = 1 - g.axis
+        g.t = 0
+      }
+    }
   }
 
   // Waiting its turn for the pumps, or queued behind a car that is: not a jam.
@@ -903,6 +981,31 @@ export class Traffic {
   }
 
   // Room to clear the junction: don't pull in if the lane beyond is backed up.
+  // Don't block the box: when the road out is too short to hold the car before
+  // the next junction, only go if that junction would let it through too. With
+  // no lights there, take it now as well, so no one can cut in and lock it up.
+  // Returns the junction turns to take along with this one, or null to wait.
+  private beyond(a: Agent, from: number): Leg[] | null {
+    let room = 0
+    let j = from
+    while (j < a.legs.length && !this.held(a.legs[j])) {
+      if (a.legs[j].stopS !== undefined) return []
+      room += a.legs[j].c.len
+      j++
+    }
+    if (j >= a.legs.length || room > a.len + GAP + STOP_LINE + 0.2) return []
+    const chain: Leg[] = []
+    for (let k = j; k < a.legs.length && this.held(a.legs[k]) && !a.legs[k].granted; k++) chain.push(a.legs[k])
+    for (const c of chain) {
+      const n = this.net.nodes.get(c.node!)!
+      for (const [uid, m] of n.occ) {
+        if (uid !== a.uid && (!n.junction || conflicts(c.inDir, c.outDir, m.inDir, m.outDir))) return null
+      }
+    }
+    if (chain.length && !this.exitRoom(a, chain[chain.length - 1])) return null
+    return chain.some((c) => this.net.nodes.get(c.node!)!.signal) ? [] : chain
+  }
+
   private exitRoom(a: Agent, leg: Leg) {
     const n = this.net.nodes.get(leg.node ?? '')
     if (!n) return true
@@ -1032,7 +1135,9 @@ export class Traffic {
         // Through a cluster of junction tiles, only the first light counts.
         const lit = chain.findIndex((c) => this.net.nodes.get(c.node!)!.signal)
         const ok = asking && halted && chain.every((c, k) => this.canEnter(a, c, ahead, k === 0, k === lit)) && this.exitRoom(a, chain[chain.length - 1]) && !this.zebraBusy(a.legs[i - 1], chain)
-        if (ok) {
+        const also = ok ? this.beyond(a, i + chain.length) : null
+        if (also) {
+          chain.push(...also)
           a.arrived = null
           a.halt = null
           for (const c of chain) {

@@ -373,6 +373,36 @@ describe('town traffic', () => {
     })
   }
 
+  it('lights change for whoever is waiting, and not for no one', () => {
+    seedRandom(2)
+    const t = new Traffic()
+    t.setTown(plazaTown(), [], turnOf)
+    const id = t.net.layout.clusters.find((c) => c.signal)!.id
+    const green = () => (t.lightOf(id, 0) === 'green' ? 0 : t.lightOf(id, 2) === 'green' ? 1 : -1)
+    // Empty town: whichever way is green stays green.
+    run(t, 2, () => {})
+    const axis = green()
+    expect(axis).toBeGreaterThanOrEqual(0)
+    run(t, 30, () => expect(green()).toBe(axis))
+    // Someone on foot waits to cross the green road: it changes for them.
+    let changed = -1
+    run(t, 10, (tr, at) => {
+      tr.wantWalk(id, axis === 0 ? 0 : 2)
+      if (changed < 0 && tr.lightOf(id, axis === 0 ? 0 : 2) === 'red') changed = at
+    })
+    expect(changed).toBeGreaterThan(0)
+    expect(changed).toBeLessThan(8)
+    // A lone car hardly ever sits at a red.
+    t.setCars(cars(1), 1)
+    let red = 0
+    run(t, 120, (tr) => {
+      const a = [...tr.agents.values()][0]
+      const n = a.approach && tr.net.nodes.get(a.approach.chain[0].node!)
+      if (n?.signal && a.v < 0.05 && tr.lightOf(n.cluster, a.approach!.chain[0].inDir) !== 'green') red += 0.1
+    })
+    expect(red).toBeLessThan(6)
+  })
+
   it('avenues are one-way each side and the 4x4 plaza is one intersection with lights', () => {
     const t = new Traffic()
     t.setTown(avenueTown(), [], turnOf)
