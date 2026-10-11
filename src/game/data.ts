@@ -205,6 +205,12 @@ export const upgradePartsPayout = (d: BuildingDef, level: number) => Math.round(
 export const upgradeXp = (d: BuildingDef, level: number) => Math.round((d.xp ?? 0) * (1 + 0.05 * (level - 1)))
 export const upgradeJobSeconds = (d: BuildingDef, level: number) =>
   d.jobSeconds ? Math.max(10, Math.round((d.jobSeconds * Math.pow(0.92, level - 1)) / 5) * 5) : 0
+// A brand new town's first few jobs finish in 10 seconds, so the first coins come fast.
+// Payouts don't change: the server guard banks coins over time, not per job.
+export const QUICK_JOBS = 6
+export const QUICK_JOB_SECONDS = 10
+export const jobSeconds = (d: BuildingDef, level: number, jobsDone: number) =>
+  jobsDone < QUICK_JOBS ? Math.min(QUICK_JOB_SECONDS, upgradeJobSeconds(d, level)) : upgradeJobSeconds(d, level)
 // Max fuel a building adds: a gas station's tank grows 2 a level; every house
 // level above 1 adds 1 (residents chip in with their own gas cans).
 export const upgradeFuelCap = (d: BuildingDef, level: number) =>
