@@ -580,7 +580,7 @@ export function World() {
   const mode = useGame((s) => s.mode)
   // Rebuild the merged town only when something's footprint changes, not on every job timer.
   const layout = useMemo(
-    () => [buildings.map((b) => `${b.uid}:${b.def}:${b.x}:${b.z}:${b.rot}`).join(), roadsList.join(), land.join()].join('/'),
+    () => [buildings.map((b) => `${b.uid}:${b.def}:${b.x}:${b.z}:${b.rot}:${b.level ?? 1}`).join(), roadsList.join(), land.join()].join('/'),
     [buildings, roadsList, land],
   )
   return (

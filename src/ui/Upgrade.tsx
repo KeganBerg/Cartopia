@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { Box3, Sphere, type Group } from 'three'
+import { Box3, Vector3, type Group } from 'three'
 import { useGame } from '../game/store'
 import {
   buildingDef, buildingLevel, upgradable, upgradePayout, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap,
@@ -14,18 +14,32 @@ import { Panel } from './Menus'
 const n = (v: number) => v.toLocaleString()
 const time = (sec: number) => (sec >= 60 ? `${Math.floor(sec / 60)}m${sec % 60 ? ` ${sec % 60}s` : ''}` : `${sec}s`)
 
-// Turntable of the building at a given level, scaled so the tallest level still fits.
+// Turntable of the building at a given level. Fits the model to the frame by
+// its own bounds: base on the floor, centred, and scaled down so even a
+// level 10 tower stays fully in view.
+const FIT_H = 1.9
+const FIT_W = 2.3
+
 function Spinner({ def, level }: { def: BuildingDef; level: number }) {
   const ref = useRef<Group>(null)
   const inner = useRef<Group>(null)
   useLayoutEffect(() => {
     const g = inner.current
-    if (!g) return
+    const spin = ref.current
+    if (!g || !spin) return
+    // Measure unrotated and unscaled, so the last level's fit doesn't leak in.
+    const turn = spin.rotation.y
+    spin.rotation.y = 0
     g.scale.setScalar(1)
-    const sphere = new Box3().setFromObject(g).getBoundingSphere(new Sphere())
-    const k = 1.45 / sphere.radius
+    g.position.set(0, 0, 0)
+    spin.updateMatrixWorld(true)
+    const box = new Box3().setFromObject(g)
+    spin.rotation.y = turn
+    const size = box.getSize(new Vector3())
+    const center = box.getCenter(new Vector3())
+    const k = Math.min(FIT_H / size.y, FIT_W / Math.hypot(size.x, size.z))
     g.scale.setScalar(k)
-    g.position.set(-sphere.center.x * k, -sphere.center.y * k + 0.55, -sphere.center.z * k)
+    g.position.set(-center.x * k, -box.min.y * k, -center.z * k)
   }, [def, level])
   useFrame((_, dt) => {
     if (ref.current) ref.current.rotation.y += dt * 0.5
@@ -42,11 +56,11 @@ function Spinner({ def, level }: { def: BuildingDef; level: number }) {
 function LevelPreview({ def, level }: { def: BuildingDef; level: number }) {
   return (
     <div className="upgrade-preview">
-      <Canvas camera={{ position: [3, 2.3, 3], fov: 35 }} dpr={[1, 1.5]} onCreated={({ camera }) => camera.lookAt(0, 0.55, 0)}>
+      <Canvas camera={{ position: [3.4, 2.6, 3.4], fov: 35 }} dpr={[1, 1.5]} onCreated={({ camera }) => camera.lookAt(0, FIT_H / 2, 0)}>
         <hemisphereLight args={['#ffffff', '#90a4ae', 1]} />
         <directionalLight position={[3, 5, 2]} intensity={1.4} />
         <mesh rotation-x={-Math.PI / 2} position-y={-0.02}>
-          <circleGeometry args={[1.6, 40]} />
+          <circleGeometry args={[1.5, 40]} />
           <meshStandardMaterial color="#cfd8dc" />
         </mesh>
         <Spinner def={def} level={level} />

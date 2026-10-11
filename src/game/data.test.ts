@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildingDef, carDef, knownBuilding, BUILDINGS, CARS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost, takesDriver, loves, driverPayout } from './data'
+import { buildingDef, carDef, knownBuilding, BUILDINGS, CARS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost, jobLevel, takesDriver, loves, driverPayout } from './data'
 
 describe('unknown ids from newer builds', () => {
   it('gives an unknown building a harmless stand-in instead of crashing', () => {
@@ -63,7 +63,7 @@ describe('building upgrades', () => {
 describe('drivers', () => {
   it('only loves businesses that take a driver, and every such business has fans', () => {
     for (const c of CARS) {
-      expect(c.likes.length, c.id).toBe(2)
+      expect(c.likes.length, c.id).toBe(3)
       for (const id of c.likes) expect(knownBuilding(id) && takesDriver(buildingDef(id)), `${c.id} -> ${id}`).toBe(true)
     }
     for (const d of BUILDINGS.filter(takesDriver)) {
@@ -80,5 +80,13 @@ describe('drivers', () => {
     expect(takesDriver(buildingDef('gas'))).toBe(false)
     expect(takesDriver(buildingDef('rock'))).toBe(false)
     expect(carDef('future-car').likes).toEqual([])
+  })
+})
+
+describe('jobs locked to the level they started at', () => {
+  it('pays the starting level after a mid-job upgrade', () => {
+    expect(jobLevel({ level: 3 })).toBe(3)
+    expect(jobLevel({ level: 4, jobLevel: 3 })).toBe(3)
+    expect(jobLevel({ level: 2, jobLevel: 9 })).toBe(2)
   })
 })

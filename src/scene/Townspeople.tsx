@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { Color, Matrix4, Object3D, Vector3 } from 'three'
 import type { InstancedMesh } from 'three'
-import { useGame } from '../game/store'
+import { useGame, type PlacedBuilding } from '../game/store'
 import { START_LAND, buildingDef } from '../game/data'
 import { buildWalkGraph, findPath, pedestrianCrossings, stepsFor, transit, sideOf, SIDES, type Pt, type Step, type WalkGraph, type WalkNode } from '../game/walkGraph'
 import { anchors } from './anchors'
@@ -49,6 +49,10 @@ const ITEMS: Record<string, { size: [number, number, number]; color: string; emo
   cinema: { size: [0.09, 0.13, 0.09], color: '#e53935', emoji: '🍿', thing: 'leftover popcorn' },
   bowling: { size: [0.11, 0.11, 0.11], color: '#6a1b9a', emoji: '🎳', thing: 'their bowling ball' },
   motel: { size: [0.17, 0.13, 0.06], color: '#795548', emoji: '🧳', thing: 'their suitcase' },
+  coffee: { size: [0.06, 0.1, 0.06], color: '#fafafa', emoji: '☕', thing: 'a coffee' },
+  tacos: { size: [0.14, 0.05, 0.1], color: '#ffca28', emoji: '🌮', thing: 'tacos' },
+  market: { size: [0.16, 0.14, 0.1], color: '#d7a86e', emoji: '🛒', thing: 'groceries' },
+  hotdog: { size: [0.12, 0.04, 0.05], color: '#e0a052', emoji: '🌭', thing: 'a hot dog' },
 }
 
 // Thought bubbles: what someone is off to do, and what they're doing when they get there.
@@ -58,23 +62,42 @@ const SHOP_THOUGHTS: Record<string, [string, string]> = {
   cinema: ['🍿', 'catching a movie'], bowling: ['🎳', 'going bowling'], motel: ['🧳', 'checking in at the motel'],
   carwash: ['🧽', 'checking out the car wash'], rescue: ['🔧', "dropping by Rusty's"], tires: ['🛞', 'asking about tires'],
   parts: ['🔩', 'picking up parts'], crew: ['🤝', 'hanging out at the Crew House'], tuner: ['🔩', 'browsing the tuner shop'], stadium: ['🏁', 'going to the speedway'],
+  coffee: ['☕', 'grabbing a coffee'], tacos: ['🌮', 'getting tacos'], lube: ['🛢', 'booking an oil change'], arcade: ['🕹️', 'chasing a high score'],
+  bodyshop: ['🎨', 'picking a new paint colour'], market: ['🛒', 'doing the grocery run'], firehouse: ['🚒', 'visiting the firefighters'],
+  police: ['👮', 'dropping by the police station'], parkade: ['🅿️', 'fetching the car from the garage'],
 }
 const PARK_GO: Record<string, [string, string]> = {
   bench: ['🪑', 'heading for a bench'], fountain: ['⛲', 'going to see the fountain'], pond: ['🦆', 'going to see the ducks'],
   flowers: ['🌷', 'going to smell the flowers'], tree: ['🌳', 'taking a walk in the park'], palm: ['🌴', 'taking a walk in the park'],
-  statue: ['🏆', 'going to see the golden car'],
+  statue: ['🏆', 'going to see the golden car'], pine: ['🌲', 'taking a walk in the park'], picnic: ['🧺', 'off for a picnic'],
+  busstop: ['🚌', 'catching the bus'], hotdog: ['🌭', 'getting a hot dog'], flagpole: ['🚩', 'going to see the town flag'],
+  arch: ['🏁', 'taking a photo at the finish line'], playground: ['🛝', 'heading to the playground'], gazebo: ['🎶', 'going to the gazebo'],
+  clocktower: ['🕰️', 'meeting a friend at the clock tower'],
 }
 const PARK_AT: Record<string, [string, string]> = {
   bench: ['🪑', 'resting on the bench'], fountain: ['⛲', 'watching the fountain'], pond: ['🦆', 'watching the ducks'],
   flowers: ['🌷', 'smelling the flowers'], tree: ['🌳', 'enjoying the shade'], palm: ['🌴', 'enjoying the shade'],
-  statue: ['🏆', 'admiring the golden car'],
+  statue: ['🏆', 'admiring the golden car'], pine: ['🌲', 'enjoying the shade'], picnic: ['🧺', 'having a picnic'],
+  busstop: ['🚌', 'waiting for the bus'], hotdog: ['🌭', 'eating a hot dog'], flagpole: ['🚩', 'saluting the town flag'],
+  arch: ['📸', 'posing under the finish line'], playground: ['🛝', 'playing on the swings'], gazebo: ['🎶', 'listening to the band'],
+  clocktower: ['🕰️', 'waiting by the clock tower'],
 }
 
 // Where to stand at each decoration, as a distance from its middle.
-const SPOT: Record<string, number> = { bench: 0.06, fountain: 0.98, flowers: 0.86, tree: 0.5, palm: 0.5, statue: 0.78, lamp: 0.45, billboard: 0.7 }
+const SPOT: Record<string, number> = {
+  bench: 0.06, fountain: 0.98, flowers: 0.86, tree: 0.5, palm: 0.5, statue: 0.78, lamp: 0.45, billboard: 0.7,
+  pine: 0.7, picnic: 0.45, busstop: -0.22, hotdog: 0.5, flagpole: 0.6, arch: 0.4, gazebo: 0.25, clocktower: 0.8,
+}
 // How long people linger, in seconds.
-const LINGER: Record<string, [number, number]> = { bench: [10, 24], fountain: [5, 12], statue: [4, 9], pond: [6, 14] }
-const PARKS = new Set(['bench', 'fountain', 'flowers', 'tree', 'palm', 'statue', 'pond'])
+const LINGER: Record<string, [number, number]> = {
+  bench: [10, 24], fountain: [5, 12], statue: [4, 9], pond: [6, 14],
+  picnic: [12, 26], busstop: [8, 18], hotdog: [4, 8], gazebo: [8, 18], playground: [10, 22], clocktower: [4, 9],
+}
+const PARKS = new Set(['bench', 'fountain', 'flowers', 'tree', 'palm', 'statue', 'pond', 'pine', 'picnic', 'busstop', 'hotdog', 'flagpole', 'arch', 'gazebo', 'clocktower'])
+// Big decorations people walk up to, like the duck pond.
+const BIG_PARKS = new Set(['pond', 'playground'])
+// Seats: benches and the bus stop face out the front; at a picnic table people face the table.
+const SEATS: Record<string, 'out' | 'in'> = { bench: 'out', busstop: 'out', picnic: 'in' }
 
 type Kind = 'shop' | 'browse' | 'friend' | 'park' | 'home' | 'jog'
 type Dest = { kind: Kind; key: string; def: string }
@@ -154,7 +177,7 @@ function destinations(g: WalkGraph) {
         if (ITEMS[n.def] && n.def !== 'motel') shops.push(d('shop'))
       } else if (kind === 'showroom' || kind === 'garage') browse.push(d('browse'))
       else if (kind === 'house') houses.push(d('friend'))
-      else if (n.def === 'pond') parks.push(d('park'), d('park'))
+      else if (BIG_PARKS.has(n.def)) parks.push(d('park'), d('park'))
     } else if (n.kind === 't' && n.decor && PARKS.has(n.decor)) {
       parks.push({ kind: 'park', key: `t${n.tile[0]},${n.tile[1]}`, def: n.decor })
     }
@@ -164,11 +187,18 @@ function destinations(g: WalkGraph) {
 
 export function Townspeople() {
   const roadsList = useGame((s) => (s.visiting ?? s).roads)
-  const buildings = useGame((s) => (s.visiting ?? s).buildings)
+  // Only where buildings stand shapes the paths, so starting or collecting a
+  // job (which swaps the buildings array) doesn't rebuild the graph.
+  const footprint = useGame((s) => footprintOf((s.visiting ?? s).buildings))
   const land = useGame((s) => (s.visiting ? START_LAND : s.land))
   const visitKey = useGame((s) => s.visiting?.ownerId ?? 'home')
   const level = useGame((s) => (s.visiting ?? s).level)
-  const graph = useMemo(() => buildWalkGraph(new Set(roadsList), buildings, land), [roadsList, buildings, land])
+  const graph = useMemo(() => {
+    void footprint
+    const s = useGame.getState()
+    return buildWalkGraph(new Set(roadsList), (s.visiting ?? s).buildings, land)
+  }, [roadsList, footprint, land])
+  const planned = useRef<WalkGraph | null>(null)
   const places = useMemo(() => destinations(graph), [graph])
   const people = useRef<Person[]>([])
   const colorsDirty = useRef(true)
@@ -199,30 +229,40 @@ export function Townspeople() {
       for (let i = 0; i < 4; i++) wanted.push({ id: `${visitKey}:${fallback.uid}:${i}`, home: fallback })
     }
     const old = new Map(people.current.map((p) => [p.id, p]))
+    const moved = planned.current !== graph
+    planned.current = graph
     people.current = wanted.slice(0, MAX_PEOPLE).map(({ id, home }) => {
       const p = old.get(id) ?? person(id, home.uid, home.center)
-      if (p.state === 'walk') replan(p)
+      if (moved && p.state === 'walk') replan(p)
       return p
     })
     colorsDirty.current = true
-    for (const k of [...pedestrianCrossings.keys()]) pedestrianCrossings.delete(k)
+    // Recount who is on a crosswalk, so people who left town drop out but
+    // anyone mid-crossing stays in the road for cars to see.
+    pedestrianCrossings.clear()
+    for (const p of people.current) if (p.crossing) pedestrianCrossings.set(p.crossing, (pedestrianCrossings.get(p.crossing) ?? 0) + 1)
 
     // Re-route someone who was walking when the town changed: from wherever
     // they stand now to the same place, or home if that's gone.
     function replan(p: Person) {
-      leaveCrossing(p)
-      const start = nearestNode(graph, p.pos)
+      // Someone halfway across the road finishes crossing first.
+      const crossing = p.crossing ? p.steps[p.si] : undefined
+      const from = crossing ? crossing.p : p.pos
+      if (!crossing) leaveCrossing(p)
+      const start = nearestNode(graph, from)
       const goal = graph.byKey.get(p.dest?.key ?? '') ?? graph.byKey.get(`b${p.home}`)
       const route = start != null && goal != null ? findPath(graph, start, goal) : null
       if (!route) {
         // Nowhere to go: pop indoors at home.
+        leaveCrossing(p)
         p.state = 'inside'
         p.at = `b${p.home}`
         p.timer = rand(2, 8)
         return
       }
       if (graph.byKey.get(p.dest?.key ?? '') == null) p.dest = { kind: 'home', key: `b${p.home}`, def: 'house' }
-      p.steps = stepsFor(graph, route, p.pos)
+      p.steps = stepsFor(graph, route, from)
+      if (crossing) p.steps.unshift(crossing)
       p.si = 0
     }
   }, [graph, visitKey, level])
@@ -539,8 +579,11 @@ function outing(ctx: Ctx, p: Person): Dest | null {
 function settle(p: Person, n: Extract<WalkNode, { kind: 't' }>) {
   const entry = p.steps.length ? p.steps[p.steps.length - 1].p : p.pos
   const c = n.center
-  const bench = n.decor === 'bench'
-  const side = bench ? n.turn : sideOf(c, entry)
+  const seat = SEATS[n.decor ?? '']
+  const bench = seat === 'out'
+  // Picnic benches run along the front and back of the table.
+  const near = sideOf(c, entry)
+  const side = bench ? n.turn : seat === 'in' && (near - n.turn) % 2 !== 0 ? n.turn : near
   const [dx, dz] = SIDES[side]
   const r = SPOT[n.decor ?? ''] ?? 0.8
   // Benches seat two: shuffle along the seat.
@@ -573,8 +616,13 @@ function arrive(ctx: Ctx, p: Person, night: boolean) {
     const [lo, hi] = LINGER[d.def] ?? [3, 8]
     p.timer = rand(lo, hi)
     if (node?.kind === 't') {
-      p.sit = d.def === 'bench'
-      p.face = p.sit ? Math.atan2(SIDES[node.turn][0], SIDES[node.turn][1]) : Math.atan2(node.center[0] - p.pos[0], node.center[1] - p.pos[1])
+      p.sit = !!SEATS[d.def]
+      p.face = SEATS[d.def] === 'out' ? Math.atan2(SIDES[node.turn][0], SIDES[node.turn][1]) : Math.atan2(node.center[0] - p.pos[0], node.center[1] - p.pos[1])
+      // A hot dog to go.
+      if (ITEMS[d.def]) {
+        p.item = d.def
+        ctx.dirty.current = true
+      }
     } else if (node?.kind === 'b') {
       // Watching the ducks.
       p.face = Math.atan2(node.center[0] - p.pos[0], node.center[1] - p.pos[1])
@@ -646,6 +694,10 @@ function carNear(at: Pt, r: number) {
 }
 
 // Closest sidewalk corner, lawn or decoration to a point, for re-planning.
+function footprintOf(buildings: PlacedBuilding[]) {
+  return buildings.map((b) => `${b.uid}:${b.def}:${b.x}:${b.z}:${b.rot ?? 0}`).join('|')
+}
+
 function nearestNode(g: WalkGraph, at: Pt) {
   let best: number | null = null
   let bestD = Infinity
