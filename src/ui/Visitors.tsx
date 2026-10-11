@@ -60,7 +60,7 @@ export function StreetRaceCard() {
         <span>Win: race prize +</span>
         {v.coins > 0 && <span className="chip">${v.coins.toLocaleString()}</span>}
         {v.parts > 0 && <span className="chip">⚙ {v.parts}</span>}
-        {v.bucks > 0 && <span className="chip">B{v.bucks}</span>}
+        {v.bucks > 0 && <span className="chip">💎{v.bucks}</span>}
         <span className="chip free">⛽ Free race</span>
       </div>
       <div className="street-actions">

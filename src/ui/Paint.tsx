@@ -30,7 +30,7 @@ export function PaintShop({ car, job, setJob }: { car: OwnedCar; job: PaintJob; 
     job.color !== now.color && (PAINTS.find((p) => p.color === job.color)?.name ?? 'New colour'),
     job.stripe !== now.stripe && (job.stripe ? 'stripes' : 'no stripes'),
   ].filter(Boolean).join(' · ')
-  const price = [cost.coins && `$${cost.coins.toLocaleString()}`, cost.bucks && `B ${cost.bucks}`].filter(Boolean).join(' + ') || 'Free'
+  const price = [cost.coins && `$${cost.coins.toLocaleString()}`, cost.bucks && `💎 ${cost.bucks}`].filter(Boolean).join(' + ') || 'Free'
   return (
     <div className="paint-shop">
       <div className={changed ? 'try-bar on' : 'try-bar'}>
@@ -67,7 +67,7 @@ export function PaintShop({ car, job, setJob }: { car: OwnedCar; job: PaintJob; 
         {PAINTS.map((p) => (
           <button
             key={p.color}
-            title={`${p.name}${p.bucks ? ' (1 buck)' : ''}`}
+            title={`${p.name}${p.bucks ? ' (1 gem)' : ''}`}
             aria-label={p.name}
             className={p.color === job.color ? 'dot big sel' : p.bucks ? 'dot big premium' : 'dot big'}
             style={{ backgroundColor: p.color, backgroundImage: SHEEN[job.finish] }}

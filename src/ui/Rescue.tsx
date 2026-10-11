@@ -70,7 +70,7 @@ function RestoreBay({ onCollect, onPick }: { onCollect: () => void; onPick: () =
       </div>
       {done
         ? <button className="buy bay-btn" onClick={onCollect}>Collect</button>
-        : <button className="buy alt small bay-btn" onClick={rush}>Finish · <span className="ico buck-ico rs-ico">B</span>{rushBucks(left)}</button>}
+        : <button className="buy alt small bay-btn" onClick={rush}>Finish · <span className="ico buck-ico rs-ico">💎</span>{rushBucks(left)}</button>}
     </div>
   )
 }
@@ -219,7 +219,7 @@ function SearchScreen() {
           <div className="flat-pop rs-flat">
             <b>🛞 Flat tire!</b>
             <div className="row">
-              <button className="buy" onClick={fix}>Fix · B 1{bucks < 1 ? ' (need 1)' : ''}</button>
+              <button className="buy" onClick={fix}>Fix · 💎 1{bucks < 1 ? ' (need 1)' : ''}</button>
               <button className="sell" onClick={abandon}>Go home</button>
             </div>
           </div>

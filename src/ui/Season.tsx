@@ -26,7 +26,7 @@ function Prize({ p, car }: { p: SeasonPrize; car?: string }) {
     <span className="tier-prize">
       {!!p.coins && <><i className="coin-ico ico">$</i>{p.coins >= 1000 ? `${(p.coins / 1000).toFixed(p.coins % 1000 ? 1 : 0)}k` : p.coins}</>}
       {!!p.parts && <><i className="parts-ico ico">⚙</i>{p.parts}</>}
-      {!!bucks && <><i className="buck-ico ico">B</i>{bucks}</>}
+      {!!bucks && <><i className="buck-ico ico">💎</i>{bucks}</>}
     </span>
   )
 }

@@ -21,7 +21,7 @@ function unlocksBetween(from: number, to: number, rusty: boolean, focus: ReturnT
       name: b.name,
       level: b.unlockLevel,
       tag: b.kind === 'decor' || b.kind === 'house' ? 'Decor' : 'Building',
-      price: b.bucks ? `B ${b.bucks}` : `$ ${b.price.toLocaleString()}`,
+      price: b.bucks ? `💎 ${b.bucks}` : `$ ${b.price.toLocaleString()}`,
       art: <BuildingThumb def={b} />,
       go: () => focus('shop', b.id),
     })),
@@ -30,7 +30,7 @@ function unlocksBetween(from: number, to: number, rusty: boolean, focus: ReturnT
       name: c.name,
       level: c.unlockLevel,
       tag: 'Car',
-      price: c.bucks ? `B ${c.bucks}` : `$ ${c.price.toLocaleString()}`,
+      price: c.bucks ? `💎 ${c.bucks}` : `$ ${c.price.toLocaleString()}`,
       art: <CarThumb color={c.colors[0]} body={c.body} model={c.id} />,
       go: () => focus('showroom', c.id),
     })),
@@ -105,7 +105,7 @@ function Splash({ from, to, coins, bucks }: { from: number; to: number; coins: n
         <p className="lvl-sub">You're now level {to}</p>
         <div className="lvl-rewards">
           {coins > 0 && <span className="lvl-chip"><span className="ico coin-ico">$</span>+{coins.toLocaleString()}</span>}
-          {bucks > 0 && <span className="lvl-chip"><span className="ico buck-ico">B</span>+{bucks}</span>}
+          {bucks > 0 && <span className="lvl-chip"><span className="ico buck-ico">💎</span>+{bucks}</span>}
           {fuel > 0 && <span className="lvl-chip">⛽ +{fuel} max fuel</span>}
           <span className="lvl-chip">⛽ Tank filled</span>
         </div>
