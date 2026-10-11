@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildingDef, carDef, knownBuilding, BUILDINGS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost, jobLevel, performance, fittedMods, modStats, modCost, MODS, MOD_SLOTS, CARS, takesDriver, loves, driverPayout } from './data'
+import { buildingDef, carDef, knownBuilding, BUILDINGS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost, jobLevel, performance, fittedMods, modStats, modCost, MODS, MOD_SLOTS, ownedMods, CARS, takesDriver, loves, driverPayout } from './data'
 
 describe('unknown ids from newer builds', () => {
   it('gives an unknown building a harmless stand-in instead of crashing', () => {
@@ -123,5 +123,13 @@ describe('car mods', () => {
       expect(new Set(MODS.map((x) => x.id)).size).toBe(MODS.length)
       expect(m.bucks > 0).toBe(m.coins === 0 && m.parts === 0)
     }
+  })
+})
+
+describe('owned mods', () => {
+  it('owns whatever is fitted, plus everything bought for the car', () => {
+    expect(ownedMods({ mods: ['gtwing'] })).toEqual(['gtwing'])
+    expect(ownedMods({ mods: ['gtwing'], ownedMods: ['ducktail', 'gtwing', 'future-mod'] })).toEqual(['ducktail', 'gtwing'])
+    expect(ownedMods({})).toEqual([])
   })
 })

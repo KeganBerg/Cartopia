@@ -291,8 +291,9 @@ export const upgradeCost = (car: CarDef, level: number) => ({
 // every preview), one per slot. Unlike Garage upgrades, which tune what's under
 // the skin in five steps, a mod is a single visible part with a fixed price and
 // a small stat bump, and the same mod costs the same on any car. Saves list the
-// fitted mod ids as `mods` on each car (missing means none). Swapping a slot
-// replaces the old part. Ids stay fixed so saves keep working.
+// fitted mod ids as `mods` on each car (missing means none) and every part
+// bought for that car as `ownedMods`, so a swapped-out part can go back on for
+// free. Ids stay fixed so saves keep working.
 export type ModSlot = 'spoiler' | 'exhaust' | 'kit' | 'hood' | 'rims'
 export const MOD_SLOTS: { id: ModSlot; name: string; icon: string; stat: string }[] = [
   { id: 'spoiler', name: 'Spoilers', icon: '🪽', stat: 'Downforce for more grip' },
@@ -353,6 +354,10 @@ export const fittedMods = (mods?: string[] | null): Partial<Record<ModSlot, stri
   }
   return out
 }
+// Every mod bought for a car: `ownedMods` plus whatever is fitted (older saves
+// only have `mods`). Known ids only, no repeats.
+export const ownedMods = (car: { mods?: string[] | null; ownedMods?: string[] | null }) =>
+  [...new Set([...(Array.isArray(car.ownedMods) ? car.ownedMods : []), ...(Array.isArray(car.mods) ? car.mods : [])])].filter((id) => !!modDef(id))
 export const modXp = (id: string) => 10 + (modDef(id)?.unlockLevel ?? 0) * 3
 
 // Performance index: what races are decided on (plus the driver's shifting).
