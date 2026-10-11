@@ -260,6 +260,8 @@ export type CarDef = {
   unlockLevel: number
   // Classics that only turn up in Rusty's searches, never in the Showroom.
   rescueOnly?: boolean
+  // Season track prize: only ever given by that season's last tier (season number).
+  season?: number
   // Race perk, like the original's car special skills.
   skill?: SkillId
   // Businesses this car loves working at (building ids): it earns them a bigger bonus.
@@ -314,6 +316,7 @@ export const CARS: CarDef[] = [
   { id: 'lemans', name: 'Liberty Endurance GT', body: 'super', price: 16000, unlockLevel: 1, rescueOnly: true, power: 72, grip: 62, weight: 32, skill: 'smooth', likes: ['stadium', 'parts', 'police'], colors: ['#1565c0', '#fafafa', '#c62828'] },
   { id: 'gullwing', name: 'Silver Wing 300', body: 'coupe', price: 30000, unlockLevel: 1, rescueOnly: true, power: 64, grip: 58, weight: 36, skill: 'oil', likes: ['motel', 'bowling', 'parkade'], colors: ['#cfd8dc', '#b71c1c', '#263238'] },
   { id: 'speedster', name: 'Fairhaven Speedster', body: 'roadster', price: 12000, unlockLevel: 1, rescueOnly: true, power: 58, grip: 46, weight: 26, skill: 'nitro', likes: ['cinema', 'diner', 'stadium'], colors: ['#1565c0', '#eceff1', '#b71c1c'] },
+  { id: 'nightfall', name: 'Aether Nightfall', body: 'wedge', price: 24000, unlockLevel: 1, season: 1, power: 78, grip: 72, weight: 30, skill: 'slipstream', likes: ['club', 'cinema', 'arcade'], colors: ['#311b92', '#00e5ff', '#212121'] },
 ]
 
 // Rusty's Rescue: pay to search a location, tap the pins to send the tow
@@ -564,6 +567,8 @@ export const CAR_SETS: CarSet[] = [
   { id: 'tuners', name: 'Tuner Alley', icon: '🌀', cars: ['hotshot', 'kitsune', 'current'], coins: 7000, bucks: 4, trophies: 12, xp: 180 },
   { id: 'grandtour', name: 'Grand Tour', icon: '🎩', cars: ['salon', 'speedster', 'monoposto'], coins: 20000, bucks: 10, trophies: 30, xp: 350 },
   { id: 'dream', name: 'Dream Garage', icon: '💎', cars: ['lambo', 'hyper', 'tomahawk', 'zenith'], coins: 30000, bucks: 15, trophies: 40, xp: 500 },
+  // Season track prizes; each season adds its car here.
+  { id: 'seasons', name: 'Season Rides', icon: '🏁', cars: ['nightfall'], coins: 5000, bucks: 3, trophies: 10, xp: 150 },
 ]
 export const setOwned = (set: CarSet, cars: { model: string }[]) => set.cars.filter((m) => cars.some((c) => c.model === m)).length
 export const setComplete = (set: CarSet, cars: { model: string }[]) => setOwned(set, cars) === set.cars.length
@@ -572,6 +577,7 @@ export const readySets = (s: { cars: { model: string }[]; claimedSets?: string[]
   CAR_SETS.filter((set) => !(s.claimedSets ?? []).includes(set.id) && setComplete(set, s.cars))
 // Where to get a car: the Showroom (with its level or bucks price) or Rusty's searches.
 export function carSource(car: CarDef): { icon: string; text: string } {
+  if (car.season) return { icon: '🏁', text: `Season ${car.season} prize` }
   if (car.rescueOnly) {
     const spot = RESCUE_SPOTS.filter((sp) => sp.cars.some((c) => c.model === car.id)).sort((a, b) => a.unlockLevel - b.unlockLevel)[0]
     return { icon: '🔧', text: spot ? `Rusty's · ${spot.name}` : "Rusty's" }
@@ -734,6 +740,37 @@ export function weekKey(t = Date.now()) {
 // Milliseconds until the next UTC midnight, and until the next Monday 00:00 UTC.
 export const msToNextDay = (t = Date.now()) => 86400000 - (t % 86400000)
 export const msToNextWeek = (t = Date.now()) => msToNextDay(t) + ((7 - ((new Date(t).getUTCDay() + 6) % 7) - 1) * 86400000)
+
+// ---- Season track ----
+// Six-week seasons, numbered from the first one. Stars come from daily and weekly task rewards, and
+// every STARS_PER_TIER stars unlock the next tier's prize. The last tier gives the season's own car.
+export const SEASON_START = Date.UTC(2026, 9, 5) // Monday 5 Oct 2026, 00:00 UTC
+export const SEASON_DAYS = 42
+export const STARS_PER_TIER = 8
+export const SEASON_STARS = { dailyTask: 1, dailyChest: 3, weeklyTask: 3, weeklyChest: 6 }
+export type SeasonDef = { n: number; name: string; icon: string; car?: string }
+const SEASON_NAMES: Omit<SeasonDef, 'n'>[] = [
+  { name: 'Midnight Run', icon: '🌙', car: 'nightfall' },
+]
+export const seasonNumber = (t = Date.now()) => Math.max(1, Math.floor((t - SEASON_START) / (SEASON_DAYS * 86400000)) + 1)
+export function seasonOf(n: number): SeasonDef {
+  const d = SEASON_NAMES[n - 1]
+  return d ? { n, ...d } : { n, name: `Season ${n}`, icon: '🏁' }
+}
+export const seasonEndsAt = (n: number) => SEASON_START + n * SEASON_DAYS * 86400000
+// The last tier of a season without its own car pays bucks instead.
+export const SEASON_CAR_BUCKS = 15
+export const seasonCars = () => Object.fromEntries(SEASON_NAMES.flatMap((d, i) => (d.car ? [[String(i + 1), d.car]] : [])))
+
+export type SeasonPrize = { coins: number; parts: number; bucks: number; car?: boolean }
+// 30 tiers: coins and parts most of the way, bucks every fifth tier, the car (or bucks) at the end.
+export const SEASON_TIERS: SeasonPrize[] = Array.from({ length: 30 }, (_, i): SeasonPrize => {
+  const t = i + 1
+  if (t === 30) return { coins: 0, parts: 0, bucks: 0, car: true }
+  if (t % 5 === 0) return { coins: 0, parts: 0, bucks: t / 5 + 1 }
+  if (t % 2 === 0) return { coins: 0, parts: 5 + Math.floor(t / 3) * 2, bucks: 0 }
+  return { coins: 500 + t * 150, parts: 0, bucks: 0 }
+})
 
 // Picks a period's tasks: a fixed shuffle per key, so every device draws the same three.
 export function drawTasks(pool: TaskDef[], key: string, level: number, owned: (def: string) => boolean) {

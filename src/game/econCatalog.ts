@@ -1,6 +1,7 @@
 import {
   BUILDINGS, CAMPAIGN, CAR_SETS, CAMPAIGN_RACES, CARS, GOALS, GP_SERIES, campaignRaceId, MAX_BUILDING_LEVEL, MODS, RESCUE_SPOTS, modXp, buildingUpgradeCost, buildingUpgradeXp, upgradable,
   upgradeFuelCap, upgradeJobSeconds, FAVORITE_BONUS, QUEST_PAY, TASKS_PER_PERIOD, upgradePartsPayout, upgradePayout, upgradeXp, type BuildingDef,
+  SEASON_START, SEASON_DAYS, STARS_PER_TIER, SEASON_STARS, SEASON_TIERS, SEASON_CAR_BUCKS, seasonCars,
 } from './data'
 
 const LEVELS = Array.from({ length: MAX_BUILDING_LEVEL }, (_, i) => i + 1)
@@ -61,6 +62,11 @@ export function econCatalog() {
   const sets = Object.fromEntries(CAR_SETS.map((c) => [c.id, { cars: c.cars, coins: c.coins, bucks: c.bucks, trophies: c.trophies, xp: c.xp }]))
   // Daily and weekly tasks: at most `count` task rewards and one chest per UTC day / ISO week.
   const quests = Object.fromEntries((['daily', 'weekly'] as const).map((p) => [p, { count: TASKS_PER_PERIOD, ...QUEST_PAY[p] }]))
+  // Season track: stars per task and chest, stars per tier, each tier's prize, and each season's car.
+  const season = {
+    start: new Date(SEASON_START).toISOString().slice(0, 10), days: SEASON_DAYS, perTier: STARS_PER_TIER, stars: SEASON_STARS,
+    tiers: SEASON_TIERS.map((t) => ({ coins: t.coins, parts: t.parts, bucks: t.bucks, car: !!t.car })), carBucks: SEASON_CAR_BUCKS, cars: seasonCars(),
+  }
   // A driver adds at most this share to a business's coins (see driverPayout).
-  return { cars, buildings, goals, gp, rescue, upgradeXpTo, mods, driverBonus: FAVORITE_BONUS, campaign, sets, quests }
+  return { cars, buildings, goals, gp, rescue, upgradeXpTo, mods, driverBonus: FAVORITE_BONUS, campaign, sets, quests, season }
 }

@@ -260,7 +260,7 @@ export function ShowroomPanel() {
         </div>
       )}
       <div ref={body} className={rusty ? 'cards' : 'cards dimmed'}>
-        {CARS.filter((c) => !c.rescueOnly).map((c) => {
+        {CARS.filter((c) => !c.rescueOnly && !c.season).map((c) => {
           const locked = level < c.unlockLevel
           const color = colorFor[c.id] ?? c.colors[0]
           const pi = performance(c, { engine: 0, turbo: 0, tires: 0, weight: 0 })

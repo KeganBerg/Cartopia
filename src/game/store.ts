@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
   PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS,
-  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, activeEvent, DAILY_BONUS, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modSlotsFor, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower,
+  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, REFILL_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, activeEvent, DAILY_BONUS, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modSlotsFor, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower, seasonNumber, seasonOf, SEASON_STARS, SEASON_TIERS, STARS_PER_TIER, SEASON_CAR_BUCKS,
 } from './data'
 import { sfx } from '../lib/sound'
 import { msUntilNight } from './clock'
@@ -67,15 +67,18 @@ export type SaveState = {
   campaign: Record<string, number>
   // Collection book sets whose one-time reward has been claimed.
   claimedSets: string[]
+  // Season track: the season number, stars earned in it, and tiers (0-based) collected.
+  season: SeasonProgress | null
   land: string[]
   updatedAt: number
 }
+export type SeasonProgress = { n: number; stars: number; claimed: number[] }
 
 export type Mode = 'play' | 'place' | 'move' | 'road' | 'bulldoze' | 'expand' | 'merge'
 export type Resource = 'coins' | 'parts' | 'fuel' | 'bucks' | 'level'
 export type Need = { res: Resource; missing: number; what?: string }
 
-export type Panel = null | 'need' | 'shop' | 'garage' | 'showroom' | 'race' | 'account' | 'goals' | 'daily' | 'flat' | 'friends' | 'rescue' | 'bank' | 'invites' | 'leaders' | 'clan' | 'upgrade' | 'welcome' | 'gifts'
+export type Panel = null | 'need' | 'shop' | 'garage' | 'showroom' | 'race' | 'account' | 'goals' | 'daily' | 'flat' | 'friends' | 'rescue' | 'bank' | 'invites' | 'leaders' | 'clan' | 'upgrade' | 'welcome' | 'gifts' | 'season'
 
 // A read-only copy of another player's town while visiting it.
 export type VisitedTown = { ownerId: string; townName: string; level: number; trophies: number; roads: string[]; buildings: PlacedBuilding[]; cars: OwnedCar[]; land?: string[] }
@@ -139,6 +142,7 @@ type Actions = {
   claimGoal: (id: string) => void
   claimTask: (period: Period, id: string) => void
   claimChest: (period: Period) => void
+  claimTier: (tier: number) => void
   claimSet: (id: string) => void
   claimDaily: () => void
   fixFlat: (uid: string, tow: boolean) => void
@@ -280,6 +284,7 @@ export function starterTown(): SaveState {
     stats: emptyStats(),
     claimedGoals: [],
     quests: null,
+    season: null,
     lastDaily: null,
     dailyStreak: 0,
     helped: {},
@@ -388,6 +393,21 @@ export const periodDone = (q: Quests | null, period: Period) => (period === 'dai
 export const chestOpened = (q: Quests | null, period: Period) => !!(period === 'daily' ? q?.dayChest : q?.weekChest)
 
 // Starts a new day or week of tasks when the calendar has moved on. Returns null when nothing changed.
+// This season's progress, starting fresh when a new season begins.
+export function currentSeason(s: Pick<SaveState, 'season'>, now = Date.now()): SeasonProgress {
+  const n = seasonNumber(now)
+  return s.season && s.season.n === n ? s.season : { n, stars: 0, claimed: [] }
+}
+export const tierReady = (p: SeasonProgress, tier: number) => !p.claimed.includes(tier) && p.stars >= (tier + 1) * STARS_PER_TIER
+export const seasonClaimable = (s: Pick<SaveState, 'season'>) => {
+  const p = currentSeason(s)
+  return SEASON_TIERS.filter((_, i) => tierReady(p, i)).length
+}
+const addStars = (s: Pick<SaveState, 'season'>, n: number): SeasonProgress => {
+  const p = currentSeason(s)
+  return { ...p, stars: p.stars + n }
+}
+
 export function rolledQuests(s: Pick<SaveState, 'quests' | 'stats' | 'level' | 'buildings'>, now = Date.now()): Quests | null {
   const day = dayKey(now)
   const week = weekKey(now)
@@ -893,6 +913,7 @@ export const useGame = create<GameState>()(
       buyCar: (model, color) => {
         const s = get()
         const c = carDef(model)
+        if (c.season || c.rescueOnly) return false
         if (s.level < c.unlockLevel) {
           s.showNeed('level', c.unlockLevel, c.name)
           return false
@@ -993,9 +1014,10 @@ export const useGame = create<GameState>()(
         if (!q || !slot || done.includes(id) || !taskDone(s, period, slot)) return
         const pay = payAt(QUEST_PAY[period].task, s.level)
         sfx.coin()
-        s.toast(`Task done! +${pay.coins.toLocaleString()} coins, +${pay.xp} XP`)
+        const stars = period === 'daily' ? SEASON_STARS.dailyTask : SEASON_STARS.weeklyTask
+        s.toast(`Task done! +${pay.coins.toLocaleString()} coins, +${pay.xp} XP, +${stars} ⭐`)
         const quests = period === 'daily' ? { ...q, dayDone: [...done, id] } : { ...q, weekDone: [...done, id] }
-        set(withXp(s, pay.xp, { coins: s.coins + pay.coins, quests, updatedAt: Date.now() }))
+        set(withXp(s, pay.xp, { coins: s.coins + pay.coins, quests, season: addStars(s, stars), updatedAt: Date.now() }))
       },
 
       claimChest: (period) => {
@@ -1005,12 +1027,32 @@ export const useGame = create<GameState>()(
         const c = QUEST_PAY[period].chest
         const pay = payAt(c, s.level)
         setTimeout(sfx.levelUp, 150)
-        s.toast(`Chest opened! +${pay.coins.toLocaleString()} coins, +${c.parts} parts${c.bucks ? `, +${c.bucks} bucks` : ''}${c.fuel ? `, +${c.fuel} fuel` : ''}`)
+        const stars = period === 'daily' ? SEASON_STARS.dailyChest : SEASON_STARS.weeklyChest
+        s.toast(`Chest opened! +${pay.coins.toLocaleString()} coins, +${c.parts} parts${c.bucks ? `, +${c.bucks} bucks` : ''}${c.fuel ? `, +${c.fuel} fuel` : ''}, +${stars} ⭐`)
         const quests = period === 'daily' ? { ...q, dayChest: true } : { ...q, weekChest: true }
         set(withXp(s, pay.xp, {
           coins: s.coins + pay.coins, parts: s.parts + c.parts, bucks: s.bucks + c.bucks, fuel: s.fuel + c.fuel,
-          quests, updatedAt: Date.now(),
+          quests, season: addStars(s, stars), updatedAt: Date.now(),
         }))
+      },
+
+      claimTier: (tier) => {
+        const s = get()
+        const p = currentSeason(s)
+        const prize = SEASON_TIERS[tier]
+        if (!prize || !tierReady(p, tier)) return
+        const season = { ...p, claimed: [...p.claimed, tier] }
+        const now = Date.now()
+        const car = prize.car ? seasonOf(p.n).car : undefined
+        setTimeout(sfx.levelUp, 150)
+        if (car) {
+          const d = carDef(car)
+          s.toast(`🏁 Season prize! The ${d.name} is yours.`)
+          return set({ season, cars: [...s.cars, { uid: uid(), model: car, color: d.colors[0], upgrades: noUpgrades() }], updatedAt: now })
+        }
+        const bucks = prize.bucks + (prize.car ? SEASON_CAR_BUCKS : 0)
+        s.toast(`Tier ${tier + 1}! ${[prize.coins && `+${prize.coins.toLocaleString()} coins`, prize.parts && `+${prize.parts} parts`, bucks && `+${bucks} bucks`].filter(Boolean).join(', ')}`)
+        set({ season, coins: s.coins + prize.coins, parts: s.parts + prize.parts, bucks: s.bucks + bucks, updatedAt: now })
       },
 
       claimSet: (id) => {
@@ -1480,14 +1522,14 @@ export const useGame = create<GameState>()(
 )
 
 export function saveOf(s: GameState): SaveState {
-  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, land, updatedAt } = s
-  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, land, updatedAt }
+  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, season, land, updatedAt } = s
+  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, season, land, updatedAt }
 }
 
 // Fields added after launch, so older saves load with sensible values.
-function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'quests' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'gp' | 'campaign' | 'claimedSets' | 'land'> {
+function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'quests' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'gp' | 'campaign' | 'claimedSets' | 'season' | 'land'> {
   // Saves from before the tutorial existed skip it.
-  return { stats: emptyStats(), claimedGoals: [], quests: null, lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, gp: {}, campaign: {}, claimedSets: [], land: [...START_LAND] }
+  return { stats: emptyStats(), claimedGoals: [], quests: null, lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, gp: {}, campaign: {}, claimedSets: [], season: null, land: [...START_LAND] }
 }
 
 

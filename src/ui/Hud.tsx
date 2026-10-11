@@ -2,6 +2,7 @@ import { useGame, fuelCap } from '../game/store'
 import { xpToNext, FUEL_REGEN_SECONDS } from '../game/data'
 import { useNow } from '../scene/useNow'
 import { GoalsButton, GoalTracker } from './Goals'
+import { SeasonButton } from './Season'
 import { MuteButton } from './MuteButton'
 import { ChallengeBell } from './Race'
 import { GiftBell } from './Gifts'
@@ -73,6 +74,7 @@ export function Hud() {
         <div className="fuel-sub">{nextIn === null ? 'Fuel full' : `+1 fuel in ${nextIn}s`}</div>
         <div className="hud-right-row">
           <button className="pill trophies" title="Leaderboards" onClick={() => s.openPanel('leaders')}>🏆 {s.trophies}</button>
+          <SeasonButton />
           <GoalsButton />
           <MuteButton />
         </div>
@@ -95,6 +97,7 @@ export function Hud() {
             </button>
           </div>
           <div className="hud-actions">
+            <SeasonButton />
             <GoalsButton />
             <ChallengeBell />
             <GiftBell />

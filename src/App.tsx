@@ -21,6 +21,7 @@ import { AccountPanel } from './ui/Account'
 import { WelcomeBack } from './ui/WelcomeBack'
 import { GiftWatcher, GiftsPanel } from './ui/Gifts'
 import { GoalsPanel, DailyPanel, FlatPanel } from './ui/Goals'
+import { SeasonPanel } from './ui/Season'
 import { useGame, today } from './game/store'
 import { startCloudSync } from './lib/cloud'
 import './lib/rescue'
@@ -81,6 +82,7 @@ export default function App() {
       <Tutorial />
       {panel === 'account' && <AccountPanel />}
       {panel === 'goals' && <GoalsPanel />}
+      {panel === 'season' && <SeasonPanel />}
       {panel === 'daily' && <DailyPanel />}
       {panel === 'flat' && <FlatPanel />}
       <WelcomeBack />
