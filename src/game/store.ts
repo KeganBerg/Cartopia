@@ -13,7 +13,7 @@ import { RIVALS, RIVAL_VISITS, RIVAL_BACK_MS, type RivalProgress } from './rival
 import { tourIsBoss, tourLegBonus, tourLegOf, tourPrize } from './tour'
 import { EVENT_RACES, eventBonus, eventFor, eventIsBoss, eventPrize, eventProgress, type EventProgress } from './events'
 import { trialWeek } from './trial'
-import { groupOf, groupTurn, mergeCandidates, applyMerge, applySplit, rotateGroup } from './merge'
+import { groupOf, groupTurn, mergeCandidates, applyMerge, applySplit, rotateGroup, isLandmark, LANDMARK_NAME } from './merge'
 import { togglePick } from './meet'
 import { crateCost, crateDef, rollCrate, type CrateId, type CrateOpen } from './crates'
 
@@ -814,7 +814,7 @@ export const useGame = create<GameState>()(
         if (!c) return
         sfx.buy()
         const d = buildingDef(c.anchor.def)
-        s.toast(size === 4 ? `Giant ${d.name}! 16 in one.` : `Merged ${c.members.length} into one big ${d.name}!`)
+        s.toast(isLandmark(c) && size === 2 ? `Four Sky Towers became the ${LANDMARK_NAME}!` : size === 4 ? `Giant ${isLandmark(c) ? LANDMARK_NAME : d.name}! 16 in one.` : `Merged ${c.members.length} into one big ${d.name}!`)
         set({ buildings: applyMerge(s.buildings, c), updatedAt: Date.now() })
       },
 
