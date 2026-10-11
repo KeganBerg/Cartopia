@@ -530,6 +530,7 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
   useEffect(() => {
     if (countdown === 99) return
     if (countdown >= 0 && countdown <= 3) {
+      if (countdown === 3) sound.current?.screech()
       sfx.countdown(countdown === 0)
       sound.current?.countdown(countdown === 0)
       if (countdown === 0) sound.current?.launch(Math.min(1, myPi / 200), Math.min(1, rivalRef.current.pi / 200))

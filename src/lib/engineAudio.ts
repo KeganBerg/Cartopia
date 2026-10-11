@@ -167,6 +167,53 @@ function blip(a: AudioContext, out: AudioNode, at: number, freq: number, dur: nu
   o.stop(at + dur + 0.02)
 }
 
+// A hawk's "kee-eeeer": a raspy cry that jumps up, then slides down and fades.
+// Synthesized (no recording): a buzzy tone with fast flutter, breath noise and an echo.
+export function eagleScreech(a: AudioContext, out: AudioNode, at = a.currentTime) {
+  const cry = (t0: number, dur: number, peak: number, vol: number) => {
+    const o = a.createOscillator()
+    o.type = 'sawtooth'
+    o.frequency.setValueAtTime(peak * 0.7, t0)
+    o.frequency.exponentialRampToValueAtTime(peak, t0 + 0.08)
+    o.frequency.setValueAtTime(peak, t0 + 0.2)
+    o.frequency.exponentialRampToValueAtTime(peak * 0.62, t0 + dur)
+    // Wobble in pitch, like a real bird's syrinx.
+    const vib = a.createOscillator()
+    vib.frequency.value = 23
+    const vd = a.createGain()
+    vd.gain.value = peak * 0.025
+    vib.connect(vd).connect(o.frequency)
+    // Rasp: fast amplitude flutter.
+    const flut = a.createOscillator()
+    flut.type = 'square'
+    flut.frequency.value = 90
+    const fd = a.createGain()
+    fd.gain.value = 0.35
+    const am = a.createGain()
+    am.gain.value = 0.65
+    flut.connect(fd).connect(am.gain)
+    const bp = a.createBiquadFilter()
+    bp.type = 'bandpass'
+    bp.frequency.setValueAtTime(peak * 1.1, t0)
+    bp.frequency.exponentialRampToValueAtTime(peak * 0.75, t0 + dur)
+    bp.Q.value = 2.5
+    const env = a.createGain()
+    env.gain.setValueAtTime(0.0001, t0)
+    env.gain.exponentialRampToValueAtTime(vol, t0 + 0.05)
+    env.gain.setValueAtTime(vol, t0 + dur * 0.45)
+    env.gain.exponentialRampToValueAtTime(0.0001, t0 + dur)
+    o.connect(am).connect(bp).connect(env).connect(out)
+    for (const x of [o, vib, flut]) {
+      x.start(t0)
+      x.stop(t0 + dur + 0.05)
+    }
+    burst(a, out, t0, dur * 0.9, vol * 0.5, 'bandpass', peak * 1.3, peak * 0.9, 3)
+  }
+  cry(at, 1.9, 2900, 0.7)
+  // The echo off the canyon walls.
+  cry(at + 0.35, 1.6, 2850, 0.16)
+}
+
 type Mode = 'idle' | 'race' | 'coast'
 
 // One running engine.
@@ -591,6 +638,12 @@ export class RaceAudio {
     this.them = new EngineVoice(a, out, { model: this.theirs.model, body: this.theirs.body, mods: this.theirs.mods, pan: 0.6, level: 0.5 })
     this.crowd = new Crowd(a, out)
     return true
+  }
+
+  // The Tomahawk announces itself at the start of every race, for both players.
+  screech() {
+    if (!this.ensure() || !this.bus) return
+    if (this.mine.model === 'tomahawk' || this.theirs.model === 'tomahawk') eagleScreech(this.bus.context as AudioContext, this.bus)
   }
 
   countdown(go: boolean) {
