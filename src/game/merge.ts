@@ -32,8 +32,15 @@ const lot = (b: PlacedBuilding): [number, number] => {
   return (b.rot ?? 0) % 2 ? [d.h, d.w] : [d.w, d.h]
 }
 
+// Decorations are single objects (a tree, a lamp, a bench): two of them make
+// no sense as one bigger thing, so they never merge. Only these area-like
+// ones do: parks and beds, which just grow into a bigger patch. A new decor
+// stays unmergeable unless it's added here.
+const MERGING_DECOR = new Set(['flowers', 'pumpkins', 'pond', 'playground', 'dogpark', 'skatepark', 'koi', 'garden'])
+
 export function mergeable(def: string) {
   const d = buildingDef(def)
+  if (d.kind === 'decor' && !MERGING_DECOR.has(d.id)) return false
   return !d.parked && !d.unique && d.kind !== 'obstacle' && d.kind !== 'showroom' && d.kind !== 'garage'
 }
 
@@ -223,11 +230,11 @@ export function groupTurn(g: MergeGroup, roads: Set<string>) {
 }
 
 // How much to grow one building's model to fill the block, in its own turned
-// frame. Squares grow evenly; a pair stretches along its length and stands a
-// bit taller.
+// frame. Squares grow evenly; a pair gets longer only, at the same height:
+// its walls repeat more bays rather than growing taller (see useBays).
 export function groupScale(g: MergeGroup, turn: number): [number, number, number] {
   if (g.cols === g.rows) return [g.cols, g.cols, g.cols]
   // The model's own x runs along world x when it faces north or south.
   const alongX = g.cols > g.rows
-  return alongX === (turn % 2 === 0) ? [2, 1.5, 1] : [1, 1.5, 2]
+  return alongX === (turn % 2 === 0) ? [2, 1, 1] : [1, 1, 2]
 }

@@ -1,19 +1,21 @@
-import { createContext, useContext, useLayoutEffect, useRef, type ReactNode, type RefObject } from 'react'
+import { createContext, useContext, useLayoutEffect, useRef, type ReactNode } from 'react'
 import { useFrame } from '@react-three/fiber'
 import type { Group, Object3D } from 'three'
 import { keepProps, keepShape, releaseShape, uniform } from './keepShape'
 
-// A merged block draws one building scaled up (see groupScale in game/merge.ts),
-// and a 1x2 pair stretches it 2x one way only. Walls and lots may stretch with
-// it, but cars, people and props must keep their real shape.
+// A merged block draws one building scaled up (see groupScale in game/merge.ts):
+// a 2x2 grows evenly, a 1x2 pair gets twice as long one way only. A pair must
+// look like one longer building, not the small one stretched:
 //
-// THE RULE: inside a stretched pair, every prop keeps its shape by default.
-// KeepShapes (wrapped round every building model in World) finds them itself:
-//  - any group whose footprint is prop-sized (see propLimit) and isn't flat,
-//  - any lone non-box mesh that size (posts, bulbs, bushes, sign faces),
-//  - every instanced mesh (crowds), one instance at a time.
-// A prop keeps its place in the stretched block, but not its stretch. A model
-// that is one prop as a whole (a tree, a lamp) grows evenly to the pair's height.
+// THE RULE, inside a pair (KeepShapes, wrapped round every model in World):
+//  - Props keep their shape: any prop-sized group or mesh (see propLimit) that
+//    isn't flat (cars, people, cones, windows, doors, sills, signs' letters),
+//    and every instanced crowd. They keep their place, not the stretch.
+//  - Walls, roofs and lots stretch, but their tiling textures (bricks, siding,
+//    window grids, awning stripes) repeat more instead of getting wider.
+//  - Things laid out in bays (rows of windows, columns) draw more of them
+//    along the longer side: lay them out in a <Facade> (or read useBays()).
+// Decorations that are one object (trees, lamps) don't merge at all (game/merge.ts).
 // Opt-outs and overrides:
 //  - <Stretch> marks a small piece that must stretch with the building
 //    (a fence run, a trim that has to meet the walls). Things inside still
@@ -24,7 +26,16 @@ import { keepProps, keepShape, releaseShape, uniform } from './keepShape'
 // anything round, lettered or instanced comes out stretched.
 export const MergeScale = createContext<[number, number, number]>([1, 1, 1])
 export const useMergeScale = () => useContext(MergeScale)
-const MergeRoot = createContext<RefObject<Object3D | null> | null>(null)
+
+// How many times over a model's facades should repeat along its own x and z:
+// [2, 1] or [1, 2] in a pair, [1, 1] otherwise. Anything laid out in bays
+// (windows, shopfronts, columns) uses it to draw more of them across the
+// longer side; KeepShapes keeps each one at its true size.
+export function useBays(): [number, number] {
+  const [sx, , sz] = useMergeScale()
+  const k = Math.min(sx, sz)
+  return [sx / k, sz / k]
+}
 
 function count(o: Object3D) {
   let n = 0
@@ -32,13 +43,22 @@ function count(o: Object3D) {
   return n
 }
 
+// The KeepShapes group above `o`. Found through the scene, not a React ref:
+// a parent's ref isn't set yet when its children's layout effects run, and
+// these must run before Batch bakes the town (also a layout effect, higher up).
+function rootOf(o: Object3D) {
+  for (let p = o.parent; p; p = p.parent) if (p.userData.mergeRoot) return p
+  return null
+}
+
 // Re-scans whenever something mounts or unmounts (a crowd at school hours, a
 // level's new trims), and drops the fixes once the block is no longer a pair.
-function Watch({ root, scale, limit }: { root: RefObject<Group | null>; scale: readonly number[]; limit: number }) {
+function Watch({ scale, limit }: { scale: readonly number[]; limit: number }) {
+  const marker = useRef<Group>(null)
   const seen = useRef(-1)
   const key = scale.join()
   useLayoutEffect(() => {
-    const r = root.current
+    const r = marker.current?.parent
     if (!r) return
     keepProps(r, scale, limit)
     seen.current = count(r)
@@ -47,26 +67,27 @@ function Watch({ root, scale, limit }: { root: RefObject<Group | null>; scale: r
       seen.current = -1
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [root, key, limit])
+  }, [key, limit])
   useFrame(() => {
-    const r = root.current
+    const r = marker.current?.parent
     if (!r) return
     const n = count(r)
     if (n === seen.current) return
     keepProps(r, scale, limit)
     seen.current = n
   })
-  return null
+  return <group ref={marker} />
 }
+
+const MERGE_ROOT = { mergeRoot: true }
 
 // Wraps a building model inside the block's scale group (see World).
 export function KeepShapes({ limit, children }: { limit: number; children: ReactNode }) {
   const scale = useMergeScale()
-  const root = useRef<Group>(null)
   return (
-    <group ref={root}>
-      <MergeRoot.Provider value={root}>{children}</MergeRoot.Provider>
-      {!uniform(scale) && <Watch root={root} scale={scale} limit={limit} />}
+    <group userData={MERGE_ROOT}>
+      {children}
+      {!uniform(scale) && <Watch scale={scale} limit={limit} />}
     </group>
   )
 }
@@ -82,18 +103,32 @@ export function Stretch({ children }: { children: ReactNode }) {
 // that scale instead. Works under any turn or movement.
 export function Upright({ children, size }: { children: ReactNode; size?: number }) {
   const scale = useMergeScale()
-  const root = useContext(MergeRoot)
   const g = useRef<Group>(null)
   const flat = uniform(scale)
   const key = scale.join()
   useLayoutEffect(() => {
     const o = g.current
-    const r = root?.current
+    const r = o && rootOf(o)
     if (!o || !r || flat) return
     keepShape(o, r, scale, size)
     return () => releaseShape(o)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [root, key, size, flat])
+  }, [key, size, flat])
   // Always a group, so the scene has the same shape merged or not.
   return <group ref={g} scale={flat && size != null ? size / scale[0] : 1}>{children}</group>
 }
+
+// One face of a building laid out in bays: `children` gets the face's length
+// as it is drawn (twice `len` along a pair) and lays its windows, piers or
+// mullions out across that, centred on 0, in true size. Place it at the face
+// (`at`, turned by `ry` so its x runs along the face, z out of it).
+export function Facade({ at, ry = 0, len, children }: { at: [number, number, number]; ry?: number; len: number; children: (L: number) => ReactNode }) {
+  const [bx, bz] = useBays()
+  const b = Math.abs(Math.sin(ry)) > 0.5 ? bz : bx
+  return (
+    <group position={at} rotation-y={ry}>
+      <Upright>{children(len * b)}</Upright>
+    </group>
+  )
+}
+
