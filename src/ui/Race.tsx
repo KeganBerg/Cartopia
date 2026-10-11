@@ -8,7 +8,7 @@ import { Panel, SheetTabs } from './Menus'
 import { Canvas } from '@react-three/fiber'
 import { NeutralToneMapping } from 'three'
 import { RaceScene } from '../scene/RaceScene'
-import { pickVenue } from '../scene/venues'
+import { pickVenue, venue as venueById } from '../scene/venues'
 import { sfx, engineRpm, stopEngine } from '../lib/sound'
 import { useLive, challenge, cancelChallenge, refreshPresence, raceChannel, endLiveRace, answer, pruneInvites, mute, unmute, setClosed, INVITE_MS, type LiveRace } from '../lib/live'
 import { displayName } from '../lib/names'
@@ -127,6 +127,7 @@ export function RacePanel() {
         car={car}
         rival={cRace.rival}
         prize={cRace.prize}
+        venueId={cRace.chapter.venue}
         title={`${cRace.chapter.name} · ${cRace.race === CAMPAIGN_RACES - 1 ? 'Boss race' : `Race ${cRace.race + 1} of ${CAMPAIGN_RACES}`}`}
         onFinish={(_, myTime, theirTime) => campaignResult(cRace.chapter.id, cRace.race, myTime, theirTime)}
         onExit={() => { setCRace(null); setTab('campaign') }}
@@ -325,7 +326,7 @@ function Campaign({ onRace }: { onRace: (ch: CampaignChapter, race: number, r: R
                 <span className="camp-num">{ci + 1}</span>
                 <span className="camp-title">
                   <b>{ch.name}</b>
-                  <small>{ch.blurb}</small>
+                  <small>{venueById(ch.venue).icon} {venueById(ch.venue).name} · {ch.blurb}</small>
                 </span>
                 {cleared && <span className="tag">Cleared</span>}
                 <span className="camp-stars">⭐ {stars.reduce((a, n) => a + n, 0)}/{CAMPAIGN_RACES * 3}</span>
@@ -457,7 +458,7 @@ function sampleAt(samples: Sample[], t: number, finished: number | null) {
 const fresh = freshRacer
 const step = stepRacer
 
-function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title }: { car: OwnedCar; rival: Rival; onExit: () => void; live?: LiveRace; prize?: number; onFinish?: (won: boolean, myTime: number, theirTime: number) => number | void; title?: string }) {
+function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title, venueId }: { car: OwnedCar; rival: Rival; onExit: () => void; live?: LiveRace; prize?: number; onFinish?: (won: boolean, myTime: number, theirTime: number) => number | void; title?: string; venueId?: string }) {
   // A signed-in live rival's PI comes from the server, not from their browser.
   const [serverRivalPi, setServerRivalPi] = useState<number | null>(null)
   const rival = useMemo(() => (serverRivalPi === null ? shownRival : { ...shownRival, pi: serverRivalPi }), [shownRival, serverRivalPi])
@@ -476,7 +477,7 @@ function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title
   // The AI rival's skill, flashed while it is working (live rivals use theirs on their own device).
   const theirSkill = live ? undefined : rival.skill
   // Somewhere different each race; both sides of a live race get the same place.
-  const [venue] = useState(() => pickVenue(live?.raceId))
+  const [venue] = useState(() => (venueId ? venueById(venueId) : pickVenue(live?.raceId)))
   const theirActive = useRef(false)
   const [theirShown, setTheirShown] = useState(false)
   const t = useRef(0)

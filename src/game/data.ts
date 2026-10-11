@@ -441,19 +441,20 @@ export const gpReward = (s: GpSeries, round: number) => s.prize + round * Math.r
 // three stars on every race in it pays extra bucks.
 export type CampaignChapter = {
   id: string; name: string; blurb: string; unlockLevel: number
+  venue: string // where its races run (scene/venues.ts)
   pi: [number, number] // rival PI from the first race to the boss
   rivals: string[] // the last one is the boss
   coins: number; bucks: number; trophies: number; starBucks: number
 }
 export const CAMPAIGN_RACES = 5
 export const CAMPAIGN: CampaignChapter[] = [
-  { id: 'c1', name: 'Back Streets', blurb: 'Local kids with something to prove.', unlockLevel: 1, pi: [22, 32], rivals: ['Scooter Steve', 'Bubblegum Bea', 'Hubcap Hal', 'Lil Lugnut', 'Big Mike'], coins: 1000, bucks: 1, trophies: 3, starBucks: 1 },
-  { id: 'c2', name: 'Harbor Run', blurb: 'Dockworkers race the night shift home.', unlockLevel: 3, pi: [32, 44], rivals: ['Salty Pete', 'Crane Carla', 'Rusty Anchor', 'Tugboat Ted', 'Captain Kidd'], coins: 2000, bucks: 1, trophies: 3, starBucks: 1 },
-  { id: 'c3', name: 'Desert Strip', blurb: 'Long straights, hot tarmac, no mercy.', unlockLevel: 5, pi: [44, 58], rivals: ['Dusty Dakota', 'Mirage Mo', 'Sidewinder Sal', 'Coyote Cass', 'The Scorpion'], coins: 3500, bucks: 2, trophies: 4, starBucks: 1 },
-  { id: 'c4', name: 'Mountain Pass', blurb: 'Thin air and thinner margins.', unlockLevel: 7, pi: [58, 72], rivals: ['Summit Sue', 'Avalanche Al', 'Ridge Runner', 'Peak Paulie', 'The Yeti'], coins: 5500, bucks: 2, trophies: 5, starBucks: 2 },
-  { id: 'c5', name: 'Neon City', blurb: 'Downtown after midnight. Bring nitro.', unlockLevel: 9, pi: [72, 88], rivals: ['Pixel Pia', 'Laser Lenny', 'Glowstick Gina', 'Voltage Vic', 'Neon Queen'], coins: 8000, bucks: 3, trophies: 6, starBucks: 2 },
-  { id: 'c6', name: 'Airfield', blurb: 'Racing jets down the runway.', unlockLevel: 12, pi: [88, 104], rivals: ['Wingman Will', 'Jetwash Jo', 'Afterburner Abe', 'Sonic Sasha', 'Top Ace'], coins: 12000, bucks: 3, trophies: 8, starBucks: 2 },
-  { id: 'c7', name: 'Champions Speedway', blurb: 'The best drivers in the land. Only one leaves a legend.', unlockLevel: 15, pi: [104, 124], rivals: ['Golden Gabe', 'Iron Ivy', 'Thunder Thea', 'Velvet Vince', 'The Champion'], coins: 20000, bucks: 5, trophies: 10, starBucks: 3 },
+  { id: 'c1', name: 'Back Streets', blurb: 'Local kids with something to prove.', unlockLevel: 1, venue: 'main', pi: [22, 32], rivals: ['Scooter Steve', 'Bubblegum Bea', 'Hubcap Hal', 'Lil Lugnut', 'Big Mike'], coins: 1000, bucks: 1, trophies: 3, starBucks: 1 },
+  { id: 'c2', name: 'Harbor Run', blurb: 'Dockworkers race the night shift home.', unlockLevel: 3, venue: 'docks', pi: [32, 44], rivals: ['Salty Pete', 'Crane Carla', 'Rusty Anchor', 'Tugboat Ted', 'Captain Kidd'], coins: 2000, bucks: 1, trophies: 3, starBucks: 1 },
+  { id: 'c3', name: 'Desert Strip', blurb: 'Long straights, hot tarmac, no mercy.', unlockLevel: 5, venue: 'desert', pi: [44, 58], rivals: ['Dusty Dakota', 'Mirage Mo', 'Sidewinder Sal', 'Coyote Cass', 'The Scorpion'], coins: 3500, bucks: 2, trophies: 4, starBucks: 1 },
+  { id: 'c4', name: 'Mountain Pass', blurb: 'Thin air and thinner margins.', unlockLevel: 7, venue: 'snow', pi: [58, 72], rivals: ['Summit Sue', 'Avalanche Al', 'Ridge Runner', 'Peak Paulie', 'The Yeti'], coins: 5500, bucks: 2, trophies: 5, starBucks: 2 },
+  { id: 'c5', name: 'Sunset Boardwalk', blurb: 'Beach crowds, big money, bigger engines.', unlockLevel: 9, venue: 'beach', pi: [72, 88], rivals: ['Surfer Sid', 'Sandy Shores', 'Tidal Tom', 'Riptide Rita', 'Big Kahuna'], coins: 8000, bucks: 3, trophies: 6, starBucks: 2 },
+  { id: 'c6', name: 'Harvest Backroads', blurb: 'Farm-tough racers who never lift.', unlockLevel: 12, venue: 'farm', pi: [88, 104], rivals: ['Hayride Hank', 'Tractor Tina', 'Combine Carl', 'Silo Sam', 'The Scarecrow'], coins: 12000, bucks: 3, trophies: 8, starBucks: 2 },
+  { id: 'c7', name: 'Champions Speedway', blurb: 'The best drivers in the land. Only one leaves a legend.', unlockLevel: 15, venue: 'main', pi: [104, 124], rivals: ['Golden Gabe', 'Iron Ivy', 'Thunder Thea', 'Velvet Vince', 'The Champion'], coins: 20000, bucks: 5, trophies: 10, starBucks: 3 },
 ]
 export const campaignRaceId = (ch: CampaignChapter, i: number) => `${ch.id}-${i}`
 export const campaignRivalPi = (ch: CampaignChapter, i: number) => Math.round(ch.pi[0] + ((ch.pi[1] - ch.pi[0]) * i) / (CAMPAIGN_RACES - 1))

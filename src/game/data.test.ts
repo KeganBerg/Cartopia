@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildingDef, carDef, knownBuilding, BUILDINGS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost, jobLevel, performance, fittedMods, modStats, modCost, MODS, MOD_SLOTS, ownedMods, CARS, takesDriver, loves, driverPayout, skillBoost, skillDrag, liveSkillBoost, SKILLS , CAMPAIGN, CAMPAIGN_RACES, campaignRivalPi, campaignReward, campaignShift, campaignStars } from './data'
 import { MAX_RACE_PI } from './race'
+import { VENUES } from '../scene/venues'
 
 describe('unknown ids from newer builds', () => {
   it('gives an unknown building a harmless stand-in instead of crashing', () => {
@@ -166,6 +167,7 @@ describe('campaign ladder', () => {
     let lastPi = 0, lastPay = 0, lastShift = -1
     CAMPAIGN.forEach((ch, ci) => {
       expect(ch.rivals).toHaveLength(CAMPAIGN_RACES)
+      expect(VENUES.map((v) => v.id)).toContain(ch.venue)
       for (let i = 0; i < CAMPAIGN_RACES; i++) {
         expect(campaignRivalPi(ch, i)).toBeGreaterThanOrEqual(lastPi)
         expect(campaignReward(ch, i, true)).toBeGreaterThanOrEqual(lastPay)
