@@ -1,5 +1,6 @@
 import { BufferAttribute, BufferGeometry, Color, DoubleSide, FrontSide, Material, MeshBasicMaterial, MeshStandardMaterial, type Matrix4 } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { weatherBaked } from './weatherLook'
 
 // Baking: many parts that differ only in plain material settings (colour,
 // roughness, metalness, glow) become one mesh with those settings stored per
@@ -96,6 +97,8 @@ export function bakedMaterial(picked = false) {
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = vLook.x;')
       .replace('#include <emissivemap_fragment>', `totalEmissiveRadiance += vEmissive${picked ? ' + vec3(0.25 * vLook.w)' : ''};`)
       .replace('#include <opaque_fragment>', 'outgoingLight = mix(outgoingLight, diffuseColor.rgb, vLook.z);\n#include <opaque_fragment>')
+    // Rain sheen and settled snow on whatever faces the sky.
+    weatherBaked(sh)
   }
   m.customProgramCacheKey = () => (picked ? 'baked-picked' : 'baked')
   return m

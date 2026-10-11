@@ -1,7 +1,8 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { MeshLambertMaterial, type Group } from 'three'
+import { Color, MeshLambertMaterial, type Group } from 'three'
 import { dayPhase, nightAmount } from './dayNight'
+import { weatherNow } from '../game/weather'
 
 const cloudMat = new MeshLambertMaterial({ color: '#ffffff', emissive: '#dfefff', emissiveIntensity: 0.35, transparent: true, opacity: 0.6, depthWrite: false, flatShading: true })
 
@@ -11,6 +12,9 @@ const SPAN = 70
 const PUFFS = [
   [0, 0, 0, 1.6], [1.5, -0.2, 0.3, 1.2], [-1.4, -0.3, -0.2, 1.1], [0.6, 0.5, -0.6, 1.0], [-0.5, 0.4, 0.7, 0.9],
 ] as const
+
+const WHITE = new Color('#ffffff')
+const STORM = new Color('#8a939e')
 
 export function Clouds() {
   const clouds = useMemo(
@@ -26,11 +30,15 @@ export function Clouds() {
   const refs = useRef<(Group | null)[]>([])
   useFrame((_, dt) => {
     const n = nightAmount(dayPhase())
-    cloudMat.opacity = 0.6 - n * 0.4
-    cloudMat.emissiveIntensity = 0.35 - n * 0.3
+    const w = weatherNow()
+    // Rain clouds thicken and darken; wind hurries them along.
+    cloudMat.color.copy(WHITE).lerp(STORM, w.cloud * (w.snow > 0 ? 0.4 : 1))
+    cloudMat.opacity = 0.6 - n * 0.4 + w.cloud * 0.1
+    cloudMat.emissiveIntensity = (0.35 - n * 0.3) * (1 - w.cloud * 0.8)
+    const speed = 1 + w.wind * 3
     refs.current.forEach((g, i) => {
       if (!g) return
-      g.position.x += clouds[i].v * Math.min(dt, 0.1)
+      g.position.x += clouds[i].v * speed * Math.min(dt, 0.1)
       if (g.position.x > SPAN / 2) g.position.x -= SPAN
     })
   })
