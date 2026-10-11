@@ -37,6 +37,7 @@ export function BottomBar() {
     <>
       <div className="bottom-bar">
         <button className="icon-btn" onClick={() => openPanel('shop')}><span className="i i-shop"><Icon name="shop" /></span>SHOP</button>
+        <button className="icon-btn crates-btn" onClick={() => openPanel('crates')}><span className="i i-crates"><Icon name="crate" /></span>CRATES</button>
         <button className="icon-btn" onClick={() => openPanel('showroom')}><span className="i i-showroom"><Icon name="car" />{setsReady > 0 && <span className="btn-dot">{setsReady}</span>}</span>SHOWROOM</button>
         <button className="icon-btn" onClick={() => openPanel('garage')}><span className="i i-garage"><Icon name="wrench" /></span>GARAGE</button>
         <button className="icon-btn" onClick={() => openPanel('friends')}><span className="i i-friends"><Icon name="friends" />{crewChests > 0 && <span className="btn-dot">{crewChests}</span>}</span>FRIENDS</button>
