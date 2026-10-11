@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useGame } from '../game/store'
 import { Panel, SheetTabs } from './Menus'
 import { AmbienceControl, MuteButton } from './MuteButton'
+import { AlertsMenu } from './Alerts'
 import { localBackup, restoreLocalBackup } from '../lib/cloud'
 import { isCleanName, NAME_REJECTED } from '../lib/names'
 
@@ -51,6 +52,7 @@ export function AccountPanel() {
       <button className="buy bank-menu-btn" onClick={() => openPanel('bank')}>🏦 Bank · get bucks</button>
       <div className="menu-sound"><span>Sound</span><MuteButton /></div>
       <AmbienceControl />
+      <AlertsMenu />
       <h3>Town name</h3>
       <div className="row">
         <input value={name} maxLength={24} onChange={(e) => setName(e.target.value)} />
