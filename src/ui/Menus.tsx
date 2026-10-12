@@ -18,6 +18,7 @@ import { SkinPicker } from './Skins'
 import type { PaintJob, SkinnedSlot } from '../game/data'
 import { Icon } from './Icon'
 import { useCrewGoal } from './CrewGoal'
+import { useCrewBattle } from '../lib/battles'
 import { useChat } from '../lib/chat'
 import { useRivalWaiting } from './Rivals'
 import { ShowcaseToggle } from './Meet'
@@ -34,7 +35,8 @@ export function BottomBar() {
   const mode = useGame((s) => s.mode)
   const visiting = useGame((s) => !!s.visiting)
   const setsReady = useGame((s) => readySets(s).length)
-  const crewChests = useCrewGoal((g) => g.ready)
+  // Same count as the Crew tab's dot, and the button opens that tab while a chest waits.
+  const crewChests = useCrewGoal((g) => g.ready) + useCrewBattle((b) => b.ready)
   const crewChat = useChat((c) => c.unread.crew)
   const globalChat = useChat((c) => c.unread.global > 0)
   const rival = useRivalWaiting()
@@ -48,7 +50,7 @@ export function BottomBar() {
       <div className="bottom-bar">
         <button className={`icon-btn${pulse('shop')}`} onClick={() => openPanel('shop')}><span className="i i-shop"><Icon name="shop" /></span>SHOP</button>
         <button className={`icon-btn${pulse('cars')}`} onClick={() => openCars(setsReady > 0)}><span className="i i-showroom"><Icon name="car" />{setsReady > 0 && <span className="btn-dot">{setsReady}</span>}</span>CARS</button>
-        <button className="icon-btn" onClick={() => openPanel('friends')}><span className="i i-friends"><Icon name="friends" />{crewChests > 0 && <span className="btn-dot">{crewChests}</span>}</span>FRIENDS</button>
+        <button className="icon-btn" onClick={() => openPanel(crewChests > 0 ? 'clan' : 'friends')}><span className="i i-friends"><Icon name="friends" />{crewChests > 0 && <span className="btn-dot">{crewChests}</span>}</span>FRIENDS</button>
         <button className="icon-btn" onClick={() => openPanel('chat')}><span className="i i-chat"><Icon name="chat" />{crewChat > 0 ? <span className="btn-dot">{crewChat > 9 ? '9+' : crewChat}</span> : globalChat && <span className="btn-dot new" />}</span>CHAT</button>
         <button className="icon-btn" onClick={() => setMode('road')}><span className="i i-edit"><Icon name="cone" /></span>EDIT</button>
         <button className={`big-btn race-btn${pulse('race')}`} onClick={() => openPanel('race')}><span className="i"><Icon name="flag" />{rival && <span className="btn-dot" title="Your rival is in town">!</span>}</span>RACE</button>
