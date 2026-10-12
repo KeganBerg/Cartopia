@@ -8,6 +8,8 @@ import { signTexture } from './signTexture'
 import { glowTex } from './textures'
 import { ArcadeSky, CarShadow, StreetStretch, useArcadeLook, useTownPool } from './ArcadeScenery'
 import { CHASE_HEARTS, CHASE_LANES, chaseRow, chaseSpeed } from '../game/arcade'
+import { boxPush, carBox, circlePush, type Footprint } from '../game/collide'
+import { Footprinted, frameFootprint, scaled } from './footprint'
 import { CARS, isBike, type Body, type Finish, type SkinnedSlot } from '../game/data'
 import { sfx } from '../lib/sound'
 import { crashSound, sirenSound } from '../lib/arcadeSound'
@@ -23,6 +25,7 @@ const HALF = 3.2 // half the road's width
 const STRETCH = 44 // one repeating stretch of street
 const STRETCHES = 3
 const COINS = 24
+const COIN_R = 0.3 // a coin and its rim
 const PUFFS = 14
 const SMOKE = new Color('#eceff1')
 const GOLD = new Color('#ffe082')
@@ -100,6 +103,9 @@ export function ChaseScene({ me, input, running, onHud, onBusted }: {
   }, [camera, size])
 
   const traffic = useMemo(() => pickTraffic(10), [])
+  // Each car's measured footprint, for the crash test.
+  const foot = useRef<Footprint>(scaled(frameFootprint(me.body), fit(me.body)))
+  const feet = useRef<Footprint[]>(traffic.map((t) => scaled(frameFootprint(t.body), fit(t.body))))
   const player = useRef<Group>(null)
   const cop = useRef<Group>(null)
   const red = useRef<Mesh>(null)
@@ -156,6 +162,7 @@ export function ChaseScene({ me, input, running, onHud, onBusted }: {
     const tx = CHASE_LANES[s.lane]
     const prevX = s.x
     s.x += (tx - s.x) * Math.min(1, dt * 12)
+    const lean = (s.x - prevX) / Math.max(dt, 1e-3)
 
     // A new row of traffic every so often, more often as the run goes on.
     if (go) {
@@ -179,7 +186,9 @@ export function ChaseScene({ me, input, running, onHud, onBusted }: {
 
     // Traffic drives the same way, slower than you, so it closes in at 70% of your speed.
     const close = move * 0.7
-    const near = (lane: number, z: number, w: number) => Math.abs(s.x - CHASE_LANES[lane]) < 0.95 && Math.abs(z) < w
+    // You and the traffic as the boxes you see: your car turned with its lean, theirs facing you.
+    const mine = carBox({ x: s.x, z: 0, h: Math.PI - lean * 0.03 }, foot.current)
+    const hitCar = (i: number, c: Slot) => boxPush(mine, carBox({ x: CHASE_LANES[c.lane], z: c.z, h: Math.PI }, feet.current[i])) !== null
     s.cars.forEach((c, i) => {
       const g = cars.current[i]
       if (!c.on) {
@@ -196,7 +205,7 @@ export function ChaseScene({ me, input, running, onHud, onBusted }: {
         }
       }
       if (c.z > 12) c.on = false
-      if (go && !c.hit && near(c.lane, c.z, LEN * 0.92)) {
+      if (go && !c.hit && hitCar(i, c)) {
         c.hit = 0.001
         if (s.safe <= 0) {
           s.hearts--
@@ -226,7 +235,7 @@ export function ChaseScene({ me, input, running, onHud, onBusted }: {
       if (c.on) {
         c.z += close
         if (c.z > 8) c.on = false
-        if (go && c.on && near(c.lane, c.z, 0.8)) {
+        if (go && c.on && circlePush(mine, { x: CHASE_LANES[c.lane], z: c.z, r: COIN_R }) !== null) {
           c.on = false
           s.got++
           collected = true
@@ -277,7 +286,6 @@ export function ChaseScene({ me, input, running, onHud, onBusted }: {
     // You: lean into lane changes, blink while you're safe after a crash.
     s.safe = Math.max(0, s.safe - dt)
     if (player.current) {
-      const lean = (s.x - prevX) / Math.max(dt, 1e-3)
       player.current.position.x = s.x
       player.current.rotation.y = Math.PI - lean * 0.03
       player.current.rotation.z = -lean * 0.012
@@ -342,17 +350,17 @@ export function ChaseScene({ me, input, running, onHud, onBusted }: {
 
       <group ref={player} rotation-y={Math.PI}>
         <CarShadow len={LEN} />
-        <group scale={fit(me.body)}>
+        <Footprinted id={`${me.body}:${me.model}:${me.mods?.join()}`} scale={fit(me.body)} onFoot={(f) => void (foot.current = f)}>
           <CarModel body={me.body} model={me.model} color={me.color} finish={me.finish} skin={me.skin} modSkin={me.modSkin} mods={me.mods} beams={view.beams} flames />
-        </group>
+        </Footprinted>
       </group>
 
       {traffic.map((t, i) => (
         <group key={i} ref={(g) => void (cars.current[i] = g)} visible={false}>
           <CarShadow len={LEN} />
-          <group scale={fit(t.body)}>
+          <Footprinted id={`${i}:${t.model}`} scale={fit(t.body)} onFoot={(f) => void (feet.current[i] = f)}>
             <CarModel body={t.body} model={t.model} color={t.color} beams={view.beams} />
-          </group>
+          </Footprinted>
         </group>
       ))}
 

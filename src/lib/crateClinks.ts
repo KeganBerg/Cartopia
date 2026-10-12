@@ -2,7 +2,7 @@
 // coins ring like small metal discs, gems tink like glass. Built from the glockenspiel and
 // shaker in instruments.ts, kept quiet and thinned out so a shower of 70 stays a patter.
 import { glock, shaker } from './instruments'
-import { audioContext, audioOut } from './sound'
+import { audioContext, sfxOut } from './sound'
 
 type Dest = { ctx: BaseAudioContext; out: AudioNode }
 
@@ -26,10 +26,11 @@ const GAP = 0.03
 let last = 0
 let recent = 0
 
-// One landing. `speed` is how hard it hit (m/s), which sets how loud the clink is.
-export function landClink(gem: boolean, speed: number) {
+// One landing. `speed` is how hard it hit (m/s), which sets how loud the clink is; `tune`,
+// when given, is the note the throw wants (a spiral climbs, a ring rings in fifths).
+export function landClink(gem: boolean, speed: number, tune?: number) {
   const ctx = audioContext()
-  const out = audioOut()
+  const out = sfxOut()
   if (!ctx || !out) return
   const now = ctx.currentTime
   if (now - last < GAP) return
@@ -38,7 +39,7 @@ export function landClink(gem: boolean, speed: number) {
   if (Math.random() < Math.min(0.6, (recent - 3) * 0.08)) return
   last = now
   const t = now + 0.005 + Math.random() * 0.012
-  const pitch = 0.88 + Math.random() * 0.26
+  const pitch = tune != null ? tune * (0.98 + Math.random() * 0.04) : 0.88 + Math.random() * 0.26
   const loud = Math.min(1, 0.45 + speed / 12)
   if (gem) gemTink({ ctx, out }, t, pitch, 0.011 * loud)
   else coinClink({ ctx, out }, t, pitch, 0.014 * loud)

@@ -68,3 +68,17 @@ export function startTechnoMusic() {
   onTechnoChange(wake)
   wake()
 }
+
+// A level-up's beat drop: five seconds of the Rave Mode drop on the sound
+// effects bus. Returns the milliseconds until the drop lands, or null when it
+// can't play (muted, a hidden tab, or Rave Mode already on).
+export function levelDrop(): number | null {
+  const c = audioContext()
+  if (!c || technoOn() || document.hidden) return null
+  const t = new TechnoTrack(c, audioOut() ?? c.destination)
+  const at = c.currentTime + 0.05
+  t.level(0.5, at, 0.005)
+  const drop = t.stinger(at)
+  setTimeout(() => t.stop(), 7000)
+  return (drop - c.currentTime) * 1000
+}

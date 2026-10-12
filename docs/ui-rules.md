@@ -11,4 +11,5 @@ Every screen, panel and popup follows these. `src/uiCopy.test.ts` enforces the c
 7. **Mobile first.** Check 390px wide phone and desktop. No overlapping containers, no oversized pills.
 8. **Real assets only.** Mockups and previews use in-game renders and screenshots, never hand-drawn sketches.
 
+Safety and legal copy (seizure warning, deleting an account, payments) stays in full.
 Help that truly needs words goes in a tooltip (`title=`) or the How-to-play page, not on the screen.

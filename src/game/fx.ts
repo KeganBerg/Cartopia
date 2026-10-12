@@ -2,6 +2,7 @@
 // scene and HUD play it: coins flying to the counter, a building dropping in.
 // Listeners run synchronously, so they can still measure a building's badge
 // before the state change re-renders it away.
+import { reduceMotionOn } from '../lib/prefs'
 
 export type FxEvent =
   | { kind: 'collect'; uids: string[]; coins: number; parts: number; xp: number }
@@ -29,4 +30,5 @@ export function fx(e: FxEvent): void {
   }
 }
 
-export const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+// The device's "reduce motion" setting, or the player's own choice in Settings.
+export const reducedMotion = reduceMotionOn

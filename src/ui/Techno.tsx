@@ -1,6 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { onTechnoChange, technoBeat, technoLeft, technoOn, technoToDrop } from '../game/techno'
+import { onTechnoChange, technoBeat, technoLeft, technoOn, technoToDrop, throwRave } from '../game/techno'
 import { reducedMotion } from '../game/fx'
+import { useCalmFlashing } from '../game/flashing'
 
 // Rave Mode in the HUD. While the event is on, the page gets the `techno`
 // class and a handful of CSS variables that follow the kick every frame (the
@@ -8,7 +9,9 @@ import { reducedMotion } from '../game/fx'
 // strobe, the nav tiles change colour on every beat, the screen edges glow and
 // lasers sweep over the town. Nothing here takes a tap: the light show sits
 // under the HUD and every control works as normal. Reduced motion keeps the
-// colours and drops the bouncing, shaking, lasers and flashes.
+// colours and drops the bouncing, shaking, lasers and flashes. Reduce flashing
+// (flashing.ts) goes further: the glow swells slowly instead of hitting on the
+// kick, and the colour moves on once a bar instead of every beat.
 //
 // Before the drop it builds up: everything starts soft and grows, the tag
 // counts down to the drop, the last five seconds count down big over the
@@ -20,13 +23,14 @@ const VARS = ['--tk', '--tk-m', '--tk-h', '--tk-side', '--tk-build', '--tk-drop'
 
 export function TechnoLayer() {
   const on = useTechno()
+  const soft = useCalmFlashing()
   // Seconds to the drop while counting down the last five (0 = none), and whether it has dropped.
   const [count, setCount] = useState(0)
   const [dropped, setDropped] = useState(false)
   useEffect(() => {
     if (!on) return
     const root = document.documentElement
-    const calm = reducedMotion()
+    const calm = soft || reducedMotion()
     root.classList.add('techno')
     root.classList.toggle('techno-calm', calm)
     let raf = 0
@@ -45,10 +49,12 @@ export function TechnoLayer() {
       if (c !== shown) setCount((shown = c))
       if ((toDrop === 0) !== down) setDropped((down = toDrop === 0))
       root.classList.toggle('techno-build', toDrop > 0)
-      set('--tk', (calm ? b.kick * 0.4 : b.kick).toFixed(2))
+      // Reduce flashing: a slow swell over two bars (well under 3 flashes a second).
+      const swell = 0.2 + 0.12 * Math.sin((b.n / 32) * Math.PI)
+      set('--tk', (soft ? swell : calm ? b.kick * 0.4 : b.kick).toFixed(2))
       set('--tk-m', (calm ? 0 : b.kick).toFixed(2))
-      // A new colour on every beat, going round the wheel.
-      set('--tk-h', String((((b.beat * 67) % 360) + 360) % 360))
+      // A new colour on every beat, going round the wheel (every bar with reduce flashing).
+      set('--tk-h', String((((soft ? b.bar * 67 : b.beat * 67) % 360) + 360) % 360))
       set('--tk-side', String(b.side))
       set('--tk-build', b.build.toFixed(2))
       set('--tk-drop', (calm ? 0 : b.drop).toFixed(2))
@@ -64,7 +70,7 @@ export function TechnoLayer() {
       root.classList.remove('techno', 'techno-calm', 'techno-build')
       for (const k of VARS) root.style.removeProperty(k)
     }
-  }, [on])
+  }, [on, soft])
   if (!on) return null
   return (
     <div className="techno-fx" aria-hidden>
@@ -106,5 +112,15 @@ export function TechnoTag({ short }: { short?: boolean }) {
       {!short && <span className="tk-name">RAVE MODE</span>}
       {clock && <span className="tk-left">{clock}</span>}
     </span>
+  )
+}
+
+// The Neon Owl's button: throws a Rave Mode party on this player's screen.
+export function RaveButton({ onStart }: { onStart: () => void }) {
+  const on = useTechno()
+  return (
+    <button className="buy rave-btn" disabled={on} onClick={() => { throwRave(); onStart() }}>
+      {on ? '🎧 Rave on!' : '🎧 Throw a rave'}
+    </button>
   )
 }

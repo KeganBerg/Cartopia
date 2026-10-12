@@ -6,7 +6,7 @@ import { signTexture } from './signTexture'
 import { signMat } from './closingTime'
 import { CarModel } from './CarModel'
 import { Upright, useBays, useMergeScale } from './mergeScale'
-import { ObstacleDetail, BillboardDetail, DriveInDetail, FountainDetail, GarageDetail, HouseDetail, PondDetail, ShopDetail, ShopLot, GasLot, GarageLot, CrewDeck, SpeedwayDetail, StatueDetail } from './BuildingDetail'
+import { ObstacleDetail, BillboardDetail, DriveInDetail, FountainDetail, GarageDetail, HouseDetail, PondDetail, ShopDetail, ShopLot, GasLot, GarageLot, CrewDeck, SpeedwayDetail, SpeedwayStands, StatueDetail } from './BuildingDetail'
 import { NEW_MODELS, NewBuildingModel } from './NewBuildings'
 import { PropMesh } from './propKit'
 import { DECOR_PROPS, benchBin } from './decorProps'
@@ -140,8 +140,9 @@ function SpeedwayGrown({ m, sh, roof, lvl, ghost }: { m: ReturnType<typeof useMa
         <cylinderGeometry args={[1.45, 2.02, 0.22, 48, 1, true, a0, arc]} />
         <meshStandardMaterial color="#eceff1" side={2} />
       </mesh>
-      <mesh position={[0, y + 0.115, 0]}>
-        <cylinderGeometry args={[2.03, 2.03, 0.04, 48, 1, true, a0, arc]} />
+      {/* Fascia round the canopy's outer rim. */}
+      <mesh position={[0, y - 0.09, 0]}>
+        <cylinderGeometry args={[2.025, 2.025, 0.06, 48, 1, true, a0, arc]} />
         <meshStandardMaterial color={lvl >= 10 ? GOLD : roof} metalness={lvl >= 10 ? 0.5 : 0} side={2} />
       </mesh>
       {Array.from({ length: posts }, (_, i) => {
@@ -386,7 +387,7 @@ function GasGrown({ m, lvl, cl, ghost, roof }: { m: ReturnType<typeof useMat>; l
           {[0.1, 0.45].map((z) => (
             <group key={z} position={[1.88, 0, z]}>
               <mesh position={[0, 0.3, 0]} castShadow><boxGeometry args={[0.12, 0.6, 0.18]} />{m('#eceff1')}</mesh>
-              <mesh position={[-0.061, 0.42, 0]} rotation-y={-Math.PI / 2}><planeGeometry args={[0.1, 0.1]} /><primitive object={glowMats.bulb} attach="material" dispose={null} /></mesh>
+              <mesh position={[-0.064, 0.42, 0]} rotation-y={-Math.PI / 2}><planeGeometry args={[0.1, 0.1]} /><primitive object={glowMats.bulb} attach="material" dispose={null} /></mesh>
               <mesh position={[0, 0.62, 0]}><boxGeometry args={[0.14, 0.04, 0.2]} />{m('#43a047')}</mesh>
             </group>
           ))}
@@ -845,13 +846,8 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
               <meshBasicMaterial map={signTexture('▚▚▚▚', '#ffffff', '#111111')} {...decal(2)} />
             </mesh>
           )}
-          {/* Crowd: coloured seat rows along the stands. */}
-          {!ghost && [0.3, 0.55, 0.8].map((y, i) => (
-            <mesh key={y} position={[0, (y * sh) / 0.9, 0]}>
-              <cylinderGeometry args={[1.9 - i * 0.02, 1.9 - i * 0.02, 0.06, 40, 1, true, Math.PI * 0.15, Math.PI * 1.1]} />
-              <meshStandardMaterial color={['#ffca28', '#42a5f5', '#ef5350'][i]} side={2} />
-            </mesh>
-          ))}
+          {/* Stepped seating tiers, one colour each, for the crowd to sit on. */}
+          {!ghost && <SpeedwayStands sh={sh} colors={['#ffca28', '#42a5f5', '#ef5350'].map((c) => <meshStandardMaterial key={c} color={c} side={2} />)} />}
           {/* Floodlight towers that light the track at night, on every corner
               but the one facing the camera so none stands in front of the sign.
               They rise over the roof once it closes into a ring. */}
@@ -1303,8 +1299,10 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             <boxGeometry args={[0.5, 0.68, 0.02]} />
             {m('#eceff1')}
           </mesh>
-          <mesh position={[0, 0.03, F + 0.12]} receiveShadow>
-            <boxGeometry args={[0.6, 0.06, 0.22]} />
+          {/* Tall enough to stand clear of the sidewalk pavers (0.08) the
+              shop front meets, so it reads as a step, not a slab under them. */}
+          <mesh position={[0, 0.05, F + 0.12]} castShadow receiveShadow>
+            <boxGeometry args={[0.6, 0.1, 0.22]} />
             {m('#cfd8dc')}
           </mesh>
           {[-0.36, 0.36].map((x) => (
@@ -1352,7 +1350,8 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
                 </mesh>
               ))}
               {[-1, 1].map((sd) => [-0.35, 0.25].map((z) => (
-                <mesh key={`${sd}${z}`} position={[sd * (W * 0.41 + 0.006), y, z - 0.1]} rotation-y={(sd * Math.PI) / 2}>
+                // A step out from the ground floor's side windows, which the lowest row can overlap.
+                <mesh key={`${sd}${z}`} position={[sd * (W * 0.41 + 0.012), y, z - 0.1]} rotation-y={(sd * Math.PI) / 2}>
                   <planeGeometry args={[0.36, 0.38]} />
                   {win}
                 </mesh>
@@ -1418,8 +1417,8 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             </mesh>
           ))}</group>}
           {def.id === 'carwash' && !ghost && [-0.45, 0.45].map((x) => (
-            <mesh key={x} position={[x, 0.6, F + 0.15]} castShadow>
-              <cylinderGeometry args={[0.13, 0.13, 0.9, 10]} />
+            <mesh key={x} position={[x, 0.525, F + 0.15]} castShadow>
+              <cylinderGeometry args={[0.13, 0.13, 1.05, 10]} />
               <meshStandardMaterial color={x < 0 ? '#29b6f6' : '#ffca28'} roughness={1} />
             </mesh>
           ))}
@@ -1432,13 +1431,13 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             </group>
           )}
           {def.id === 'motel' && [-1.2, -0.6, 0.6, 1.2].map((x) => (
-            <mesh key={x} position={[x, 0.32, F + 0.012]}>
+            <mesh key={x} position={[x, 0.32, F + 0.016]}>
               <planeGeometry args={[0.3, 0.55]} />
               {m('#00897b')}
             </mesh>
           ))}
           {def.id === 'carwash' && (
-            <mesh position={[0, 0.6, F + 0.012]}>
+            <mesh position={[0, 0.6, F + 0.016]}>
               <planeGeometry args={[1.4, 1]} />
               {m('#0277bd')}
             </mesh>

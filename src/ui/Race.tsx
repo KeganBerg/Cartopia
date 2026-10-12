@@ -25,11 +25,15 @@ import { RivalResult, type RivalMatch, type RivalBonus } from './Rivals'
 import { RaceBar, RaceHub, Rounds, campaignFocus, type HubTab } from './RaceHub'
 import { artStyle } from './venueArt'
 import './race-menu.css'
+import { KartGame, playerRacer, type KartRacer } from './Kart'
+import { gpField, gpTrack } from '../game/kart'
+import { gpClearPi } from '../game/gpBeat'
+import { look as kartLook } from './ArcadeBits'
 import { TOUR_RACES, tourLeg, tourLegOf, tourIsBoss, tourRivalPi, tourShift, tourSkills, tourRivalName, tourPrize, tourLegBonus } from '../game/tour'
 import type { WeatherKind } from '../game/weather'
 import { WEEKLY_EVENTS, EVENT_RACES, eventBonus, eventFor, eventIsBoss, eventPrize, eventProgress, eventRivalPi, eventShift, nextEventWeek } from '../game/events'
 import { msToNextWeek, skinDef, SKIN_TIERS, carStats } from '../game/data'
-import { DIST, character, characterMul, gpDist, tourDist, type RaceDist } from '../game/distance'
+import { DIST, character, characterMul, tourDist, type RaceDist } from '../game/distance'
 import { playerName } from '../lib/profiles'
 import { LoadingScene } from './Loading'
 
@@ -52,6 +56,21 @@ function gpRival(series: GpSeries, round: number, clears: number): Rival {
   const target = gpRivalPi(series, round, clears)
   const car = carNear(target)
   return { id: `gp-${series.id}-${round}`, town: series.rivals[round], level: series.unlockLevel + round, carName: car.name, color: car.colors[round % car.colors.length], pi: target, online: false, body: car.body, model: car.id, skill: car.skill }
+}
+
+// A Grand Prix race's grid: the round's named rival in their usual car and PI, the rest
+// of the series' cast a little slower, and the player (see game/kart.ts gpField).
+function gpKartField(series: GpSeries, round: number, rival: Rival, car: OwnedCar): KartRacer[] {
+  return gpField(series.rivals, round, rival.pi, { name: 'You', pi: pi(car) }).map((f, i) => {
+    if (!f.ai) return playerRacer(car)
+    const c = f.name === rival.town ? carDef(rival.model ?? '') : carNear(f.pi)
+    return { name: f.name, pi: f.pi, ai: true, skill: f.skill, look: kartLook({ uid: '', model: c.id, color: f.name === rival.town ? rival.color : c.colors[i % c.colors.length], upgrades: zero }) }
+  })
+}
+
+// The car PI the series' final race needs before the server will accept the clear (0 before the final).
+export function gpFinalNeed(series: GpSeries, clears: number, round: number) {
+  return round === GP_ROUNDS - 1 ? gpClearPi(gpRivalPi(series, GP_ROUNDS - 1, clears)) : 0
 }
 
 function makeRivals(myPi: number, level: number): Rival[] {
@@ -130,7 +149,7 @@ export function RacePanel() {
   const [rivals] = useState(() => makeRivals(best ? pi(best) : 10, level))
   const [online, setOnline] = useState<Rival[]>([])
   const [race, setRace] = useState<Rival | null>(null)
-  const [gpRace, setGpRace] = useState<{ series: GpSeries; rival: Rival; prize: number } | null>(null)
+  const [gpRace, setGpRace] = useState<{ series: GpSeries; rival: Rival; prize: number; field: KartRacer[] } | null>(null)
   const [cRace, setCRace] = useState<{ chapter: CampaignChapter; race: number; rival: Rival; prize: number } | null>(null)
   const [tRace, setTRace] = useState<{ race: number; rival: Rival; prize: number } | null>(null)
   const [eRace, setERace] = useState<{ race: number; rival: Rival; prize: number } | null>(null)
@@ -214,16 +233,18 @@ export function RacePanel() {
   }
   if (gpRace && car) {
     const round = Number(gpRace.rival.id.split('-').pop())
+    const { def, reverse } = gpTrack(round)
     return (
-      <DragRace
+      <KartGame
         key={seq}
         car={car}
-        rival={gpRace.rival}
+        track={def}
+        reverse={reverse}
+        field={gpRace.field}
         next={gpNext(gpRace.series)}
         prize={gpRace.prize}
-        dist={gpDist(round)}
-        title={`${gpRace.series.name} · Race ${round + 1} of ${GP_ROUNDS} · ${DIST[gpDist(round)].label}`}
-        onFinish={(won) => gpResult(gpRace.series.id, won)}
+        title={`${gpRace.series.name} · Race ${round + 1} of ${GP_ROUNDS} · ${def.name}${reverse ? ' (reverse)' : ''}`}
+        onFinish={(place) => gpResult(gpRace.series.id, place === 1)}
         onExit={() => { setGpRace(null); setTab('gp') }}
       />
     )
@@ -363,10 +384,13 @@ export function RacePanel() {
     setERace({ race: p.won, rival: eventRival(p.pi, p.won), prize: eventPrize(p.pi, p.won) })
   }
   function startGp(series: GpSeries, rival: Rival, prize: number) {
-    if (waiting()) return
+    if (waiting() || !car) return
+    const round = Number(rival.id.split('-').pop())
+    const need = gpFinalNeed(series, gpState[series.id]?.clears ?? 0, round)
+    if (need && (best ? pi(best) : 0) < need) return useGame.getState().toast(`The final needs a car with PI ${need} or more`)
     if (!spendFuel(RACE_FUEL)) return useGame.getState().showNeed('fuel', RACE_FUEL - useGame.getState().fuel, 'a Grand Prix race')
     setSeq((n) => n + 1)
-    setGpRace({ series, rival, prize })
+    setGpRace({ series, rival, prize, field: gpKartField(series, round, rival, car) })
   }
   // The result card's next race: the next one in the chapter after a win, or this one again.
   function campNextOf(ch: CampaignChapter, i: number): NextRace | null {
@@ -478,12 +502,20 @@ const GP_CUP = ['🥉', '🏆', '🏆', '👑']
 // A race's distance, as a small tag.
 const DistChip = ({ d }: { d: RaceDist }) => <span className={`rm-dist d-${d}`} title={`${DIST[d].label} race`}>{DIST[d].label}</span>
 
+// Which circuit a Grand Prix race runs on, as a small tag.
+function TrackChip({ round }: { round: number }) {
+  const { def, reverse } = gpTrack(round)
+  return <span className="rm-dist rm-track" title={`${def.name}${reverse ? ', the other way round' : ''}`}>{def.short}{reverse ? ' ↺' : ''}</span>
+}
+
 function GrandPrix({ onRace }: { onRace: (s: GpSeries, r: Rival, prize: number) => void }) {
   const level = useGame((s) => s.level)
   const carCount = useGame((s) => s.cars.length)
   const gp = useGame((s) => s.gp)
   const showNeed = useGame((s) => s.showNeed)
   const openPanel = useGame((s) => s.openPanel)
+  const cars = useGame((s) => s.cars)
+  const myBest = useMemo(() => { const b = bestCar(cars); return b ? pi(b) : 0 }, [cars])
   return (
     <div className="rm-gp-grid">
       {GP_SERIES.map((s, si) => {
@@ -492,6 +524,7 @@ function GrandPrix({ onRace }: { onRace: (s: GpSeries, r: Rival, prize: number) 
         const short = carCount < s.minCars
         const rival = gpRival(s, prog.round, prog.clears)
         const prize = gpReward(s, prog.round)
+        const need = gpFinalNeed(s, prog.clears, prog.round)
         const box = carDef(s.box[0])
         return (
           <div key={s.id} className={`rm-gpc rm-gp-${si}${locked ? ' locked' : ''}`}>
@@ -502,13 +535,15 @@ function GrandPrix({ onRace }: { onRace: (s: GpSeries, r: Rival, prize: number) 
               {prog.clears > 0 && <span className="rm-wchip">Won ×{prog.clears}</span>}
             </div>
             <div className="rm-gpc-body">
-              <span className="rm-next"><DistChip d={gpDist(prog.round)} /> Race {prog.round + 1}: <b>{rival.town}</b> · PI {rival.pi}{rival.skill && <span className="rival-skill" title={SKILLS[rival.skill].name}> {SKILLS[rival.skill].icon}</span>}</span>
+              <span className="rm-next"><TrackChip round={prog.round} /> Race {prog.round + 1}: <b>{rival.town}</b> · PI {rival.pi}</span>
               <span className="rm-box" title={`Mystery box: ${s.box.map((m) => carDef(m).name).join(', ')}`}>
                 <CarThumb size="sm" color={box.colors[0]} body={box.body} model={box.id} />
                 <small>🎁 {box.name}{s.box.length > 1 ? ` +${s.box.length - 1}` : ''}</small>
               </span>
               {locked ? (
                 <button className="buy small locked-btn" onClick={() => showNeed('level', s.unlockLevel, s.name)}>🔒 Level {s.unlockLevel}</button>
+              ) : need > myBest ? (
+                <button className="buy small locked-btn" onClick={() => openPanel('garage')}>🔒 Final needs PI {need}</button>
               ) : short ? (
                 <button className="buy small alt" onClick={() => openPanel('rescue')}>Need {s.minCars} cars ({carCount})</button>
               ) : (

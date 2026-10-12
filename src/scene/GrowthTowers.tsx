@@ -5,12 +5,19 @@ import { growthStage, midFloors, towerFloors } from '../game/growth'
 import { Box, Cyl, Sign, Pool, Neon, Bulbs, Flag, Parasol, BlockCar, GOLD, type Mat, type V3 } from './NewBuildings'
 import { Glass, GlassBlock, glassMat, LitSign, RoofPlant, PadLights } from './OfficeBuildings'
 import { CarModel } from './CarModel'
-import { Upright, useBays } from './mergeScale'
+import { Upright, useBays, useMergeScale } from './mergeScale'
+import { WashCenter } from './WashCenter'
+import { isMarketCenter } from '../game/marketCenter'
+import { isResort } from '../game/resortCenter'
+import { ResortCenter } from './ResortCenter'
+import { MarketCenter } from './MarketCenter'
+import { isWashCenter } from '../game/washCenter'
 import { ShopTower } from './ShopTower'
 import { glowMats } from './dayNight'
 import { concreteTex, helipadTex, shutterTex, gravelTex } from './textures'
 import { Storefront, BrickFloors, StoneShaft, GlassDrum, WaterTank, GiantProp, Beacon, type Kit, type Giant } from './GrowthKit'
 import { PEOPLE_SIZED } from './keepShape'
+import { LAYER } from './layers'
 
 // The grown forms of shops and services (names in src/game/growth.ts). Level
 // 4-6 rebuilds the business as a bigger building of its kind (a brick walk-up
@@ -224,6 +231,8 @@ function Balconies({ m, w, z, ys, c, rail }: { m: Mat; w: number; z: number; ys:
 }
 
 function MotelModel({ def, ghost, m, win, bulb, level }: Props) {
+  const scale = useMergeScale()
+  if (isResort(def.id, level, scale)) return <ResortCenter m={m} win={win} bulb={bulb} level={level} ghost={ghost} />
   const k: Kit = { m, win, bulb, ghost }
   const teal = def.roof
   if (growthStage(level) === 2) {
@@ -252,6 +261,8 @@ function MotelModel({ def, ghost, m, win, bulb, level }: Props) {
 // ---- Fresh Mart: a two-level plaza with roof parking, then a tower ----
 
 function MarketModel({ def, ghost, m, win, bulb, level }: Props) {
+  const scale = useMergeScale()
+  if (isMarketCenter(def.id, level, scale)) return <MarketCenter m={m} win={win} bulb={bulb} level={level} ghost={ghost} />
   const k: Kit = { m, win, bulb, ghost }
   const green = def.roof
   if (growthStage(level) === 2) {
@@ -305,8 +316,9 @@ function ArcadeModel({ def, ghost, m, win, bulb, level }: Props) {
             {Array.from({ length: 12 }, (_, i) => (
               <Neon key={i} at={[-0.4 + (i % 4) * 0.27, 1.25 + Math.floor(i / 4) * 0.22 * (fl / 3), 0.645]} s={[0.18, 0.12, 0.01]} c={neon[(i * 7) % 4]} />
             ))}
-            {[-1, 1].map((sd) => <Neon key={sd} at={[sd * 0.86, H / 2, 0.62]} s={[0.035, H, 0.035]} c={neon[sd < 0 ? 0 : 1]} />)}
-            <Neon at={[0, H, 0.62]} s={[1.72, 0.035, 0.035]} c="#76ff03" />
+            {/* Posts just past the bar's ends and a thinner bar, so no two neon faces share a plane. */}
+            {[-1, 1].map((sd) => <Neon key={sd} at={[sd * 0.866, H / 2, 0.626]} s={[0.035, H, 0.035]} c={neon[sd < 0 ? 0 : 1]} />)}
+            <Neon at={[0, H, 0.624]} s={[1.72, 0.035, 0.026]} c="#76ff03" />
           </group>
         )}
         <RoofSign m={m} text="ARCADE" w={1.2} at={[0, H + 0.08, 0.4]} bg="#1a1035" fg="#ff4fd8" board="#ec407a" ghost={ghost} />
@@ -338,7 +350,7 @@ function TunerModel({ def, ghost, m, win, bulb, level }: Props) {
           </group>
         ))}
         <Box m={m} at={[0, H + 0.04, -0.25]} s={[3.6, 0.08, 1.4]} c="#212121" />
-        {[-1.75, -0.58, 0.58, 1.75].flatMap((x) => [0.43, -0.93].map((z) => <Box key={`${x}${z}`} m={m} at={[x, H / 2, z]} s={[0.06, H, 0.06]} c="#212121" shadow={false} />))}
+        {[-1.756, -0.58, 0.58, 1.756].flatMap((x) => [0.43, -0.93].map((z) => <Box key={`${x}${z}`} m={m} at={[x, H / 2, z]} s={[0.06, H, 0.06]} c="#212121" shadow={false} />))}
         {/* Glass on the sides and back, the front left open to show the cars. */}
         <Glass m={m} ghost={ghost} at={[0, H / 2, -0.94]} w={3.5} h={H} ry={Math.PI} tint="#cfd8dc" />
         {[-1, 1].map((sd) => <Glass key={sd} m={m} ghost={ghost} at={[sd * 1.77, H / 2, -0.25]} w={1.3} h={H} ry={(sd * Math.PI) / 2} tint="#cfd8dc" />)}
@@ -407,9 +419,9 @@ function PoliceModel({ def, ghost, m, win, bulb, level }: Props) {
       {[0, 1, 2].map((i) => <Box key={i} m={m} at={[0, 0.03 + i * 0.05, z + 0.57 - i * 0.1]} s={[1.0, 0.06 + i * 0.05, 0.12]} c="#e0e0e0" shadow={false} />)}
       {!ghost && [-0.32, 0.32].map((x) => <mesh key={x} position={[x, 0.78, z + 0.08]}><sphereGeometry args={[0.07, 10, 8]} /><meshStandardMaterial color="#42a5f5" emissive="#1e88e5" emissiveIntensity={0.6} /></mesh>)}
       {!ghost && (
-        <group position={[-1.3, 0.05, z + 0.4]}>
+        <group position={[-1.3, LAYER.lot, z + 0.4]}>
           <Upright>
-            <group rotation-y={Math.PI / 2}>
+            <group rotation-y={Math.PI / 2} userData={PEOPLE_SIZED}>
               <CarModel body="sedan" color="#fafafa" stripe="#1a237e" />
               <Box m={m} at={[-0.08, 0.6, -0.02]} s={[0.1, 0.05, 0.34]} c="#e0e0e0" />
               <Box m={m} at={[-0.08, 0.64, 0.088]} s={[0.096, 0.05, 0.116]} c="#e53935" />
@@ -457,7 +469,7 @@ function PoliceModel({ def, ghost, m, win, bulb, level }: Props) {
       {/* Rooftop helipad and the comms mast. */}
       <group position={[0, y0 + h + 0.08, -0.45]}>
         <Box m={m} at={[0, 0.05, 0]} s={[1.0, 0.1, 0.95]} c="#78909c" />
-        <mesh position={[0, 0.101, 0]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.9, 0.9]} />{m('#ffffff', helipadTex('#fafafa', '#fafafa'))}</mesh>
+        <mesh position={[0, 0.104, 0]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.9, 0.9]} />{m('#ffffff', helipadTex('#fafafa', '#fafafa'))}</mesh>
         {!ghost && <PadLights bulb={bulb} r={0.48} n={8} y={0.12} />}
         <group position={[0.85, 0, 0.3]}>
           {[0, 1, 2].map((i) => <Box key={i} m={m} at={[0, 0.35 + i * 0.3, 0]} rot={[0, 0, i % 2 ? 0.4 : -0.4]} s={[0.02, 0.32, 0.02]} c="#b0bec5" shadow={false} />)}
@@ -548,6 +560,9 @@ function Landmark({ m, id, at, s }: { m: Mat; id: string; at: V3; s: number }) {
 }
 
 function AutoModel({ def, ghost, m, win, bulb, level }: Props) {
+  // A merged car wash's last form is a whole wash center, built for the block.
+  const scale = useMergeScale()
+  if (isWashCenter(def.id, level, scale)) return <WashCenter m={m} win={win} bulb={bulb} level={level} ghost={ghost} />
   const a = AUTO[def.id]
   const st = growthStage(level)
   const wide = def.w > 1
@@ -578,7 +593,7 @@ function AutoModel({ def, ghost, m, win, bulb, level }: Props) {
       {/* Office corner and roof edge. */}
       {wide && <mesh position={[1.45, 0.45, zf + 0.006]}><planeGeometry args={[0.4, 0.5]} />{win}</mesh>}
       <Box m={m} at={[0, h + 0.04, z0]} s={[W + 0.08, 0.08, D + 0.08]} c={a.trim} />
-      <mesh position={[0, h + 0.081, z0]} rotation-x={-Math.PI / 2}><planeGeometry args={[W, D]} />{m('#cfd8dc', gravelTex(Math.max(1, Math.round(W)), 1))}</mesh>
+      <mesh position={[0, h + 0.084, z0]} rotation-x={-Math.PI / 2}><planeGeometry args={[W, D]} />{m('#cfd8dc', gravelTex(Math.max(1, Math.round(W)), 1))}</mesh>
       {st === 3 && (
         // Showroom floor: a glass band set back on the roof.
         <GlassBlock m={m} ghost={ghost} x={0} z={z0 - 0.1} y0={h + 0.08} w={W - 0.3} d={D - 0.4} h={up - 0.08} tint="#cfd8dc" frame={a.trim} />

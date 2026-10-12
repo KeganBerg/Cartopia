@@ -241,7 +241,7 @@ export function VanguardTower({ uid }: { uid?: string } = {}) {
         {/* Landing pad on the deck's end, where the Skyhopper rests. */}
         <group position={[padX, padY, 0]}>
           <Cyl m={mat} at={[0, -0.02, 0]} r={0.47} h={0.04} c="#455a64" seg={28} />
-          <mesh position={[0, 0.0015, 0]} rotation-x={-Math.PI / 2}>
+          <mesh position={[0, 0.004, 0]} rotation-x={-Math.PI / 2}>
             <circleGeometry args={[0.43, 28]} />
             {mat('#ffffff', helipadTex('#ffca28', '#6d7377'))}
           </mesh>

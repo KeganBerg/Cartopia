@@ -290,6 +290,10 @@ body:has(.edit-bar) .tutorial { bottom: calc(150px + var(--sab)); }
 :root.techno-calm .tk-title { animation: none; opacity: 0; }
 :root.techno-calm .tk-eq i { animation: none; }
 
+/* The Neon Owl's "Throw a rave" button. */
+:root .buy.rave-btn { background: linear-gradient(100deg, #d500f9, #651fff 55%, #00b8d4); border-color: #3a0a6b; }
+:root .buy.rave-btn:disabled { opacity: .6; }
+
 /* Flat tire / out of gas: the stuck car instead of a sentence (docs/ui-rules.md). */
 :root .need-car { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; font: 18px var(--display); }
 :root .bank-uses { font-size: 20px; letter-spacing: 4px; }

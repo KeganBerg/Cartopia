@@ -1,11 +1,11 @@
 // Synthesized arcade sounds: a crash thump, a bumper tap and a short two-tone siren.
 import { glock, marimba, shaker, woodblock } from './instruments'
-import { audioContext, audioOut, knock } from './sound'
+import { audioContext, sfxOut, knock } from './sound'
 
 // The shared context, master output and a start time, or null while muted.
 function dest() {
   const ctx = audioContext()
-  const out = audioOut()
+  const out = sfxOut()
   return ctx && out ? { ctx, out, t: ctx.currentTime + 0.005 } : null
 }
 
@@ -20,7 +20,7 @@ function noise(ctx: BaseAudioContext, secs: number) {
 
 function thump(vol: number, cutoff: number, secs: number) {
   const ctx = audioContext()
-  const out = audioOut()
+  const out = sfxOut()
   if (!ctx || !out) return
   const t = ctx.currentTime + 0.005
   const n = noise(ctx, secs)
@@ -58,7 +58,7 @@ export const bumpSound = () => thump(0.16, 600, 0.22)
 // Wee-woo: a soft sine siren, quiet enough to sit under the music.
 export function sirenSound(cycles = 2) {
   const ctx = audioContext()
-  const out = audioOut()
+  const out = sfxOut()
   if (!ctx || !out) return
   const t = ctx.currentTime + 0.005
   const o = ctx.createOscillator()
@@ -77,7 +77,7 @@ export function sirenSound(cycles = 2) {
 // A short filtered noise burst: the base of a wrench rattle, a spray hiss or a scrub.
 function hiss(vol: number, type: BiquadFilterType, freq: number, secs: number, q = 1) {
   const ctx = audioContext()
-  const out = audioOut()
+  const out = sfxOut()
   if (!ctx || !out) return
   const t = ctx.currentTime + 0.005
   const n = noise(ctx, secs)
@@ -127,6 +127,16 @@ export const scrubSound = () => hiss(0.3, 'bandpass', 1500 + Math.random() * 900
 export const splashSound = () => hiss(0.22, 'bandpass', 1800, 0.5, 0.6)
 export const fuelSound = () => hiss(0.25, 'bandpass', 900, 0.25, 0.8)
 export const landSound = () => thump(0.17, 700, 0.4)
+// Brakes biting on the pit lane, and the air jacks letting the car down.
+export const squealSound = () => hiss(0.07, 'bandpass', 3300 + Math.random() * 400, 0.16, 9)
+export const airSound = () => hiss(0.18, 'highpass', 2400, 0.32, 0.7)
+// The wheel gun's short burst when it does a nut up.
+export function gunSound() {
+  const d = dest()
+  if (!d) return
+  for (let i = 0; i < 6; i++) shaker(d, d.t + i * 0.024, 0.065, 0.016, 2900)
+  knock(d, d.t + 0.15, 520, 0.05)
+}
 // Engine roar for a launch or take-off: a revving engine (two slightly detuned
 // voices that throb with the firing, its tone opening up as it climbs) over a rush of air.
 export function revSound(secs = 0.8) {

@@ -178,6 +178,8 @@ type Actions = {
   upgradeCar: (uid: string, slot: UpgradeSlot) => boolean
   sellCar: (uid: string) => void
   finishRace: (won: boolean, reward: number) => void
+  // A ghost race against a crewmate: no prize, but it counts as a race for the crew goal and battle.
+  crewRace: () => void
   // Arcade mini games pay a little coin and XP (see game/arcade.ts).
   finishArcade: (coins: number, xp: number) => void
   renameTown: (name: string) => void
@@ -543,7 +545,7 @@ function addXp(s: GameState, amount: number): Partial<GameState> {
   }
   if (!ups.length) return { xp }
   const fresh = { ...s, level }
-  setTimeout(sfx.levelUp, 250)
+  // The splash plays the level-up sound (a beat drop) when it opens.
   // Fold into a splash that's still open, so two quick level-ups show as one.
   const prev = s.levelUp
   const levelUp = {
@@ -1152,6 +1154,11 @@ export const useGame = create<GameState>()(
           stats: { ...bump(s, 'racesWon', won ? 1 : 0), races: (s.stats.races ?? 0) + 1, coinsEarned: (s.stats.coinsEarned ?? 0) + (won ? reward : Math.round(reward * 0.1)) },
           updatedAt: Date.now(),
         }))
+      },
+
+      crewRace: () => {
+        const s = get()
+        set({ stats: { ...s.stats, races: (s.stats.races ?? 0) + 1 }, updatedAt: Date.now() })
       },
 
       finishArcade: (coins, xp) => {

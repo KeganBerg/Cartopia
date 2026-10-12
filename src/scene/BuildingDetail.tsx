@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react'
+import { useMemo, type ReactNode } from 'react'
+import { Vector2 } from 'three'
 import { glowMats } from './dayNight'
 import { PAL } from './season'
 import { CarModel } from './CarModel'
@@ -77,16 +78,39 @@ export function ShopDetail({ W, D, h, F, roof, rows, cols, awning, mullions }: {
   )
 }
 
+// The Speedway's seating: three stepped tiers inside the stand wall, the
+// lowest nearest the track. Each runs from the track up its riser and out
+// along its tread to the next riser (the top one to the wall), so every tier
+// stands on the track and meets the next.
+const TIER_R = [1.7, 1.775, 1.845, 1.95]
+const TIER_A0 = Math.PI * 0.15, TIER_ARC = Math.PI * 1.1
+export const speedwayTiers = (sh: number) => [0.3, 0.55, 0.8].map((y, i) => ({ r0: TIER_R[i], r1: TIER_R[i + 1], h: (y * sh) / 0.9 + 0.03 }))
+
+export function SpeedwayStands({ sh, colors }: { sh: number; colors: ReactNode[] }) {
+  const tiers = useMemo(() => speedwayTiers(sh).map(({ r0, r1, h }) => [new Vector2(r0, 0.06), new Vector2(r0, h), new Vector2(r1, h)]), [sh])
+  return (
+    <group>
+      {tiers.map((pts, i) => (
+        <mesh key={i} castShadow receiveShadow>
+          <latheGeometry args={[pts, 40, TIER_A0, TIER_ARC]} />
+          {colors[i]}
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
 // Speedway: red and white curbs round the infield, a crowd in the stands and a
 // timing tower by the start line.
 export function SpeedwayDetail({ sh, roof }: { sh: number; roof: string }) {
   const kerbs = Array.from({ length: 28 }, (_, i) => (i / 28) * Math.PI * 2)
   const crowd: { p: V3; k: number }[] = []
-  ;[0.3, 0.55, 0.8].forEach((y, row) => {
+  // A fan in every seat along each tier's tread.
+  speedwayTiers(sh).forEach(({ r0, r1, h }, row) => {
     for (let i = 0; i < 26; i++) {
       const a = Math.PI * 0.17 + (Math.PI * 1.06 * (i + (row % 2) * 0.5)) / 26
-      const r = 1.84 - row * 0.02
-      crowd.push({ p: [Math.sin(a) * r, (y * sh) / 0.9 + 0.07, Math.cos(a) * r], k: (i * 7 + row * 3) % 4 })
+      const r = row === 2 ? r0 + 0.04 : (r0 + r1) / 2
+      crowd.push({ p: [Math.sin(a) * r, h + 0.04, Math.cos(a) * r], k: (i * 7 + row * 3) % 4 })
     }
   })
   const shirts = ['#ef5350', '#fafafa', '#42a5f5', '#ffca28']
@@ -482,7 +506,7 @@ function Scooter() {
       <Box p={[0, 0.2, -0.09]} s={[0.1, 0.13, 0.14]} cast>{c('#c62828')}</Box>
       <Box p={[0, 0.28, -0.07]} s={[0.09, 0.03, 0.16]}>{c('#212121')}</Box>
       <Box p={[0, 0.25, 0.15]} s={[0.04, 0.26, 0.04]} r={[-0.3, 0, 0]}>{c('#c62828')}</Box>
-      <Box p={[0, 0.38, 0.19]} s={[0.2, 0.025, 0.025]}>{c('#212121')}</Box>
+      <Box p={[0, 0.38, 0.19]} s={[0.2, 0.025, 0.03]}>{c('#212121')}</Box>
       <Box p={[0, 0.39, -0.12]} s={[0.17, 0.15, 0.15]} cast>{c('#fafafa')}</Box>
       <Box p={[0, 0.39, -0.12]} s={[0.175, 0.04, 0.155]}>{c('#c62828')}</Box>
     </group>
@@ -637,7 +661,7 @@ function OilCases() {
     <group>
       <group position={[-0.12, 0, 0]}>
         <Box p={[0, 0.03, 0]} s={[0.26, 0.06, 0.16]}>{c('#a1887f')}</Box>
-        {[[-0.06, 0.11], [0.06, 0.11], [0, 0.19]].map(([x, y], i) => <Box key={i} p={[x, y, 0]} s={[0.11, 0.08, 0.13]} cast>{c('#ffb300')}</Box>)}
+        {[[-0.06, 0.1], [0.06, 0.1], [0, 0.18]].map(([x, y], i) => <Box key={i} p={[x, y, 0]} s={[0.11, 0.08, 0.13]} cast>{c('#ffb300')}</Box>)}
       </group>
       <group position={[0.2, 0, 0]}>
         <mesh position={[0, 0.16, 0]} castShadow><cylinderGeometry args={[0.09, 0.09, 0.3, 12]} />{c('#37474f')}</mesh>
@@ -723,7 +747,7 @@ export function GarageLot({ front }: { front: number }) {
     <group position-y={0.055}>
       <group position={[-1.6, 0, front + 0.3]}>
         {[0, 1, 2].map((i) => (
-          <mesh key={i} position={[0, 0.06 + i * 0.1, 0]} rotation-x={Math.PI / 2} castShadow>
+          <mesh key={i} position={[0, 0.05 + i * 0.1, 0]} rotation-x={Math.PI / 2} castShadow>
             <torusGeometry args={[0.12, 0.05, 8, 14]} />
             {c('#212121')}
           </mesh>

@@ -15,6 +15,8 @@ const BASELINE: Record<string, number> = {
   'src/ui/Alerts.tsx': 1,
   'src/ui/Bank.tsx': 2,
   'src/ui/Chat.tsx': 1,
+  'src/ui/FlashWarning.tsx': 1, // seizure warning: safety copy stays in full
+  'src/ui/Settings.tsx': 1, // delete-account warning: safety copy stays in full
   'src/ui/Social.tsx': 3,
   'src/ui/Username.tsx': 2,
 }

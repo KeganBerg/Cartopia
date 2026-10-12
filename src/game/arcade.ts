@@ -3,6 +3,8 @@
 // the 3D scenes are scene/ChaseScene.tsx and scene/ParkScene.tsx.
 // Payouts are small coins and XP, like a quick race, so the server's usual earning limits cover them.
 
+import { boxPush, corners, hits, type Box, type Solid } from './collide'
+
 export type ArcadeId = 'chase' | 'park'
 export const ARCADE_FUEL = 2
 
@@ -35,14 +37,14 @@ export function chaseRow(rand: () => number, t: number): { cars: number[]; coins
 
 // ---------- Parking Pro ----------
 
-// Every car in the lot is drawn and checked at this length; width follows the body.
+// Every car in the lot fits in PARK_LEN by PARKED_W (scaled down evenly to fit) and is
+// checked at its own measured footprint, so what you see is what you hit.
 export const PARK_LEN = 1.7
 export const PARK_MAX_BUMPS = 3
-// Parked cars are all drawn and checked at this width.
 export const PARKED_W = 0.8
 
 export type Pose = { x: number; z: number; h: number } // h = 0 faces +z
-export type Box = { x: number; z: number; h: number; w: number; l: number }
+export type { Box }
 export type ParkLot = {
   name: string
   start: Pose
@@ -121,35 +123,13 @@ export const PARK_LOTS: ParkLot[] = [
   },
 ]
 
-export const CONE_R = 0.22
+// A cone stands on a square rubber base; that's what you see from above and what you hit.
+export const CONE_BASE = 0.4
+// The kerb round the lot, as four thick slabs just outside its edges.
+const KERB = 3
 
-// The four corners of a box, for drawing and for collisions.
-export function corners(b: Box): [number, number][] {
-  const c = Math.cos(b.h), s = Math.sin(b.h)
-  const hw = b.w / 2, hl = b.l / 2
-  return ([[-hw, -hl], [hw, -hl], [hw, hl], [-hw, hl]] as const).map(([x, z]) => [b.x + x * c + z * s, b.z - x * s + z * c])
-}
-
-// Separating-axis test for two boxes on the ground.
-export function boxesHit(a: Box, b: Box) {
-  const ca = corners(a), cb = corners(b)
-  for (const box of [a, b]) {
-    for (const [ax, az] of [[Math.cos(box.h), -Math.sin(box.h)], [Math.sin(box.h), Math.cos(box.h)]]) {
-      const pa = ca.map(([x, z]) => x * ax + z * az), pb = cb.map(([x, z]) => x * ax + z * az)
-      if (Math.max(...pa) < Math.min(...pb) || Math.max(...pb) < Math.min(...pa)) return false
-    }
-  }
-  return true
-}
-
-export function boxHitsCircle(b: Box, x: number, z: number, r: number) {
-  const c = Math.cos(b.h), s = Math.sin(b.h)
-  const dx = x - b.x, dz = z - b.z
-  // Into the box's own frame.
-  const lx = dx * c - dz * s, lz = dx * s + dz * c
-  const nx = Math.max(-b.w / 2, Math.min(b.w / 2, lx)), nz = Math.max(-b.l / 2, Math.min(b.l / 2, lz))
-  return (lx - nx) ** 2 + (lz - nz) ** 2 < r * r
-}
+export { corners }
+export const boxesHit = (a: Box, b: Box) => boxPush(a, b) !== null
 
 const inside = (b: Box, [x, z]: [number, number]) => {
   const c = Math.cos(b.h), s = Math.sin(b.h)
@@ -160,12 +140,22 @@ const inside = (b: Box, [x, z]: [number, number]) => {
 // Parked: every corner of the car sits inside the spot (either way round counts).
 export const parkedIn = (car: Box, spot: Box) => corners(car).every((p) => inside(spot, p))
 
-export function carHits(car: Box, lot: ParkLot): boolean {
-  for (const corner of corners(car)) if (Math.abs(corner[0]) > lot.w / 2 || Math.abs(corner[1]) > lot.l / 2) return true
-  if (lot.cars.some((p) => boxesHit(car, { ...p, w: PARKED_W, l: PARK_LEN }))) return true
-  if (lot.walls.some((w) => boxesHit(car, w))) return true
-  return lot.cones.some((c) => boxHitsCircle(car, c.x, c.z, CONE_R))
+// Everything solid in a lot, drawn size for drawn size: its kerbs, the walls with their
+// capstones, each parked car's own footprint (the scene measures them) and the cone bases.
+export function lotSolids(lot: ParkLot, parked: Box[] = lot.cars.map((p) => ({ ...p, w: PARKED_W, l: PARK_LEN }))): Solid[] {
+  const W = lot.w / 2, L = lot.l / 2
+  return [
+    { x: -W - KERB / 2, z: 0, h: 0, w: KERB, l: lot.l + KERB * 2 },
+    { x: W + KERB / 2, z: 0, h: 0, w: KERB, l: lot.l + KERB * 2 },
+    { x: 0, z: -L - KERB / 2, h: 0, w: lot.w + KERB * 2, l: KERB },
+    { x: 0, z: L + KERB / 2, h: 0, w: lot.w + KERB * 2, l: KERB },
+    ...lot.walls.map((w) => ({ ...w, w: w.w + 0.06, l: w.l + 0.06 })),
+    ...parked,
+    ...lot.cones.map((c) => ({ x: c.x, z: c.z, h: 0, w: CONE_BASE, l: CONE_BASE })),
+  ]
 }
+
+export const carHits = (car: Box, lot: ParkLot, parked?: Box[]) => lotSolids(lot, parked).some((s) => hits(car, s))
 
 // Bicycle steering: speed in units/s, steer in radians, wheelbase from the car length.
 export function drive(p: Pose, speed: number, steer: number, dt: number): Pose {
