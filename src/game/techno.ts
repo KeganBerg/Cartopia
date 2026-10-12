@@ -4,8 +4,8 @@
 //
 // Turning it on and off: startEvent('techno', { until }) / stopEvent('techno').
 // A live event row of kind 'techno' calls these when it starts and ends
-// (Kegan: `select public.live_event_start('techno', 15);` for 15 minutes);
-// ?event=techno pins it on for testing.
+// (Kegan: `select public.live_event_start('rave', 15);` for 15 minutes; it
+// shows as RAVE MODE, and 'techno' works too); ?event=rave pins it on for testing.
 //
 // The music runs on the shared wall clock: sixteenth number n plays at
 // n * 100 ms since 1970, so every player online hears the same bar, the same
@@ -115,7 +115,7 @@ export function technoBeat(now = Date.now()): TechnoBeat {
   return { n, beat, bar, section, kick, side: beat % 2 ? -1 : 1, build, drop }
 }
 
-registerLiveKind('techno', { start: (e) => startEvent('techno', { from: e.from, until: e.to }), stop: () => stopEvent('techno') })
+for (const kind of ['rave', 'techno']) registerLiveKind(kind, { start: (e) => startEvent('techno', { from: e.from, until: e.to }), stop: () => stopEvent('techno') })
 
-// ?event=techno turns it on for testing, with no end.
-if (typeof location !== 'undefined' && new URLSearchParams(location.search).get('event') === 'techno') startEvent('techno')
+// ?event=rave (or techno) turns it on for testing, with no end.
+if (typeof location !== 'undefined' && ['rave', 'techno'].includes(new URLSearchParams(location.search).get('event') ?? '')) startEvent('techno')

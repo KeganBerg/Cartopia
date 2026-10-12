@@ -61,7 +61,7 @@ export function TechnoLayer() {
       <div className="tk-strobe" />
       {/* Plays once as the event starts, then stays faded out. */}
       <div className="tk-title">
-        <b>TECHNO NIGHT</b>
+        <b>RAVE MODE</b>
         <span>150 BPM · EVERY TOWN</span>
       </div>
     </div>
@@ -81,9 +81,9 @@ export function TechnoTag({ short }: { short?: boolean }) {
   const left = technoLeft()
   const clock = left === null ? null : `${Math.floor(left / 60000)}:${String(Math.floor(left / 1000) % 60).padStart(2, '0')}`
   return (
-    <span className="tk-tag" title="Techno Night is on in every town">
+    <span className="tk-tag" title="Rave Mode is on in every town">
       <span className="tk-eq" aria-hidden><i /><i /><i /><i /></span>
-      {!short && <span className="tk-name">TECHNO NIGHT</span>}
+      {!short && <span className="tk-name">RAVE MODE</span>}
       {clock && <span className="tk-left">{clock}</span>}
     </span>
   )
