@@ -32,6 +32,7 @@ import { toWorld, toTile, DIRS } from './grid'
 import { grassTex, paverTex, meadowTex } from './textures'
 import { cloudyGround, roadMat } from './weatherLook'
 import { Weather } from './Weather'
+import { SkyExtras } from './SkyExtras'
 import { layoutRoads } from './traffic/layout'
 import { LAYER, decal } from './layers'
 import { Ear } from './Ear'
@@ -749,6 +750,7 @@ export const World = memo(function World() {
           <SeasonFx small={lite || small()} />
           <Weather small={lite || small()} />
           <Atmosphere />
+          <SkyExtras />
           <SkyEnv />
           <FreeCam />
         </>
