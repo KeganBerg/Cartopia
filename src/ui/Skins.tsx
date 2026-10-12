@@ -55,7 +55,7 @@ function SkinChooser({ title, defs, owned, now, trying, setTrying, apply }: {
       {changed && (
         <div className="try-bar on skin-try">
           <span className="try-what">
-            {d ? <><b>{d.name}</b> <span className="skin-tier" style={{ color: SKIN_TIERS[d.tier].color }}>{SKIN_TIERS[d.tier].name}</span><span className="skin-blurb"> · {d.blurb}</span></> : <>Back to plain</>}
+            {d ? <><b>{d.name}</b> <span className="skin-tier" style={{ color: SKIN_TIERS[d.tier].color }}>{SKIN_TIERS[d.tier].name}</span></> : <>Back to plain</>}
           </span>
           <button className="try-cancel" onClick={() => setTrying(undefined)}>Undo</button>
           {free ? (

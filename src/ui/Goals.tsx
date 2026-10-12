@@ -14,6 +14,7 @@ import { useNow } from '../scene/useNow'
 import { Icon } from './Icon'
 import { CrewGoalMini } from './CrewGoal'
 import { useTipTarget } from './Tips'
+import { CarThumb } from '../scene/BuildingPreview'
 
 // Sits in its own dock above Collect All, next to the Race button, so it's always in thumb reach.
 export function GoalsButton() {
@@ -156,7 +157,7 @@ function StoryGoals() {
         <span>Story {claimed}/{total}</span>
         <div className="bar"><span style={{ width: `${(claimed / total) * 100}%` }} /></div>
       </div>
-      {goals.length === 0 && <p className="hint">{next ? `More goals unlock at level ${next.level}.` : "You've finished every story goal. Daily and weekly tasks keep coming!"}</p>}
+      {goals.length === 0 && <p className="hint">{next ? `🔒 More at level ${next.level}` : '✔ Story complete'}</p>}
       <div className="goals">
         {goals.map((g: GoalDef) => (
           <Row key={g.id} icon={g.icon} text={g.text} have={statValue(s, g.stat, g.def)} target={g.target} done={goalDone(s, g)}
@@ -334,11 +335,11 @@ export function FlatPanel() {
   if (!car.flat) {
     return (
       <Panel title="Out of Gas!">
-        <p>Your <b>{d.name}</b> ran out of gas.</p>
+        <div className="need-car"><CarThumb size="sm" color={car.color} finish={car.finish} skin={car.skin} body={d.body} model={d.id} stripe={car.stripe} /><b>{d.name}</b></div>
         <div className="sources">
           <div className="source">
             <span className="source-icon">⛽</span>
-            <div><b>Fill up at your Gas Station</b><div className="card-stat">{owns('gas') ? `Your station earns $${servicePay(s.level, 'gas')} and 8 XP.` : 'Build a Gas Station to earn money from every fill-up.'}</div></div>
+            <div><b>Fill up at your Gas Station</b><div className="card-stat">{owns('gas') ? `+$${servicePay(s.level, 'gas')} · ⭐ 8 XP` : 'Earns on every fill-up'}</div></div>
             {owns('gas') ? <button className="buy small" onClick={() => s.serviceCar(car.uid, 'gas')}>Fill up · +${servicePay(s.level, 'gas')}</button> : <button className="buy small" onClick={() => s.openShop('gas')}>Build</button>}
           </div>
           <div className="source">
@@ -352,16 +353,16 @@ export function FlatPanel() {
   }
   return (
     <Panel title="Flat Tire!">
-      <p>Your <b>{d.name}</b> is stuck on the side of the road.</p>
+      <div className="need-car"><CarThumb size="sm" color={car.color} finish={car.finish} skin={car.skin} body={d.body} model={d.id} stripe={car.stripe} /><b>{d.name}</b></div>
       <div className="sources">
         <div className="source">
           <span className="source-icon">🛞</span>
-          <div><b>Send it to your Tire Shop</b><div className="card-stat">{owns('tires') ? `Your shop earns $${servicePay(s.level, 'tires')} and 12 XP.` : s.level < 2 ? 'Tire Shops unlock at level 2 and earn money from every flat.' : 'Build a Tire Shop to earn money from every flat.'}</div></div>
+          <div><b>Send it to your Tire Shop</b><div className="card-stat">{owns('tires') ? `+$${servicePay(s.level, 'tires')} · ⭐ 12 XP` : s.level < 2 ? '🔒 Level 2' : 'Earns on every flat'}</div></div>
           {owns('tires') ? <button className="buy small" onClick={() => s.serviceCar(car.uid, 'tires')}>Fix · +${servicePay(s.level, 'tires')}</button> : s.level >= 2 ? <button className="buy small" onClick={() => s.openShop('tires')}>Build</button> : null}
         </div>
         <div className="source">
           <span className="source-icon">🔧</span>
-          <div><b>Call Rusty's tow</b><div className="card-stat">{hasRusty ? 'Free, plus 15 XP.' : "Build Rusty's Rescue to tow cars for free."}</div></div>
+          <div><b>Call Rusty's tow</b><div className="card-stat">{hasRusty ? 'Free · ⭐ 15 XP' : "🔒 Needs Rusty's Rescue"}</div></div>
           <button className="buy small alt" onClick={() => s.fixFlat(car.uid, true)} disabled={!hasRusty}>Tow · free</button>
         </div>
         <div className="source">
