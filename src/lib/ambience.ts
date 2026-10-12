@@ -2,11 +2,12 @@
 // Web Audio so the game still ships no audio files. Days bring traffic,
 // distant chatter and birds (cicadas in summer, crows in winter); nights bring
 // crickets, spring peepers and owls, and a muffled beat from an open nightclub.
-import { audioContext, audioOut, isMuted, onMuteChange } from './sound'
+import { audioContext, audioOut, hornJingles, iceCreamJingle, isMuted, onMuteChange } from './sound'
 import { dayPhase, isNight, nightAmount } from '../game/clock'
 import { SEASON, type Season } from '../scene/season'
 import { onTownHold, townHeld } from '../scene/renderGate'
 import { useGame } from '../game/store'
+import { carDef, type Body } from '../game/data'
 import { liveTraffic } from '../scene/traffic/live'
 import type { Agent } from '../scene/traffic/sim'
 import { toWorld } from '../scene/grid'
@@ -648,6 +649,11 @@ export class Soundscape {
     }
   }
 
+  // The ice cream truck's horn: its jingle, from where it is.
+  jingle(t: number, pan: number) {
+    iceCreamJingle({ ctx: this.ctx, out: this.pan(pan, 0.25) }, t, 0.8)
+  }
+
   // A car driving past: road rumble, engine hum that drops in pitch as it
   // passes (Doppler) and tyre hiss, panning across. Some are trucks or scooters.
   private carPass(t: number) {
@@ -1005,8 +1011,17 @@ export class HonkWatch {
 }
 
 const watch = new HonkWatch()
+// What a town car is, by its traffic id (the town's own cars; guests honk a plain horn).
+function bodyOf(uid: string): Body | undefined {
+  const s = useGame.getState()
+  const car = (s.visiting ? s.visiting.cars : s.cars).find((c) => c.uid === uid)
+  return car ? carDef(car.model).body : undefined
+}
 function honks(s: Soundscape, t: number) {
-  for (const a of watch.check(liveTraffic.agents, t)) s.honk(t + rand(0, 0.2), ear(a.x, a.z), Math.min(1, Math.random() * 0.8 + (a.wait > 12 ? 0.4 : 0)))
+  for (const a of watch.check(liveTraffic.agents, t)) {
+    if (hornJingles(bodyOf(a.uid))) s.jingle(t + rand(0, 0.2), ear(a.x, a.z))
+    else s.honk(t + rand(0, 0.2), ear(a.x, a.z), Math.min(1, Math.random() * 0.8 + (a.wait > 12 ? 0.4 : 0)))
+  }
 }
 
 function tick() {

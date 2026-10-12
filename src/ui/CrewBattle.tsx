@@ -179,7 +179,7 @@ function LastBattle({ b, payable }: { b: Battle; payable: boolean }) {
 
 // A car for the rival crew: one near the player's own in class, picked by the crew so it stays put,
 // painted in the crew's colour. Bikes, buses and the like sit this one out.
-const SHOWDOWN = new Set(['scooter', 'chopper', 'sportbike', 'bus', 'dogvan', 'tank', 'van'])
+const SHOWDOWN = new Set(['scooter', 'chopper', 'sportbike', 'bus', 'dogvan', 'tank', 'van', 'icecream', 'parcel', 'monster'])
 function rivalCar(mine: OwnedCar, tag: string) {
   const price = carDef(mine.model).price || 20000
   const near = CARS.filter((c) => c.price > 0 && !c.rescueOnly && !c.season && !SHOWDOWN.has(c.body)).sort((a, b) => Math.abs(Math.log(a.price / price)) - Math.abs(Math.log(b.price / price))).slice(0, 5)

@@ -159,7 +159,7 @@ const HELLO: Record<VisitorKind, string> = {
 function arrived() {
   const v = useVisitors.getState().visitor
   if (!v) return
-  sfx.horn()
+  sfx.horn(v.body)
   useGame.getState().toast(HELLO[v.kind])
 }
 

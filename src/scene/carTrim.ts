@@ -617,6 +617,9 @@ const STYLES: Record<string, CarStyle> = {
   eclat: { rim: 'turbine', rimColor: '#c0c6cc', caliper: '#1565c0', seat: '#d7b98e' },
   orafo: { rim: 'mesh', rimColor: '#c9a227', caliper: '#212121', seat: '#8d4a2a' },
   fulmine: { rim: 'turbine', rimColor: '#1d1d1d', caliper: '#ffd600', seat: '#212121' },
+  scoops: { rim: 'steel', rimColor: '#f8bbd0', ww: true, seat: '#80cbc4' },
+  courier: { rim: 'steel', rimColor: '#3e2723', seat: '#4e342e' },
+  crusher: { rim: 'beadlock', rimColor: '#cfd8dc', caliper: '#ffd600', seat: '#212121' },
 }
 // A car this build doesn't know gets plain five-spokes.
 export const carStyle = (model?: string): CarStyle => (model && STYLES[model]) || { rim: 'five' }

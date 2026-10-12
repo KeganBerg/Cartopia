@@ -469,7 +469,8 @@ const CAR_SORTS: { id: CarSort; label: string }[] = [
   { id: 'pi', label: 'Top PI' }, { id: 'pi-low', label: 'Low PI' }, { id: 'name', label: 'A–Z' }, { id: 'new', label: 'Newest' },
 ]
 let garageView: { kind: string; sort: CarSort } = { kind: 'all', sort: 'pi' }
-const bodyLabel = (b: string) => (b === 'dogvan' ? 'Dog van' : b === 'ev' ? 'EV' : b === 'suv' ? 'SUV' : b[0].toUpperCase() + b.slice(1))
+const BODY_LABEL: Record<string, string> = { dogvan: 'Dog van', ev: 'EV', suv: 'SUV', icecream: 'Ice cream', parcel: 'Parcel van', monster: 'Monster truck' }
+const bodyLabel = (b: string) => BODY_LABEL[b] ?? b[0].toUpperCase() + b.slice(1)
 
 function useGarageList(cars: OwnedCar[]) {
   const [view, setViewState] = useState(garageView)

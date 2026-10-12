@@ -22,6 +22,7 @@ import { PEOPLE_SIZED } from './keepShape'
 import { EXOTIC } from './exoticCars'
 import { HatModel } from './CarHat'
 import type { HatFit } from '../game/hats'
+import { ODDBALL } from './oddballCars'
 
 type Shape = {
   len: number; wid: number
@@ -57,6 +58,7 @@ type Shape = {
   bubbles?: boolean // double-bubble roof: two raised ridges over the seats
   lmp?: boolean // endurance prototype: tall rounded wheel pods over all four tyres, louvred on top
   track?: number // wheel distance from the centre line, when the wheels stand clear of the body
+  tyre?: number // tyre width (default 0.14, or 0.16 on wheels standing clear of the body)
   drop: number // how far the hood sits below the rear deck
   nose: number // how far the nose falls away from the hood
 }
@@ -102,6 +104,13 @@ const SHAPES: Record<Body, Shape> = {
   horseshoe: { len: 1.4, wid: 0.82, body: 0.22, lift: 0.07, cabinLen: 0.62, cabinH: 0.17, cabinZ: -0.06, taper: 0.45, fastback: 0.7, hood: 0, wheel: 0.145, drop: 0.03, nose: 0.08 },
   teardrop: { len: 1.42, wid: 0.8, body: 0.21, lift: 0.07, cabinLen: 0.6, cabinH: 0.17, cabinZ: -0.08, taper: 0.4, fastback: 0.75, hood: 0, wheel: 0.145, drop: 0.03, nose: 0.1 },
   scissor: { len: 1.38, wid: 0.8, body: 0.2, lift: 0.06, cabinLen: 0.6, cabinH: 0.16, cabinZ: -0.06, taper: 0.4, fastback: 0.7, hood: 0, wheel: 0.14, drop: 0.03, nose: 0.1 },
+  // Oddballs: drawn by oddballCars.ts; these numbers place the wheels and the bolt-on mods.
+  // The ice cream truck and parcel van carry their tall box as a cabin to the back (mods go on the roof).
+  // The ice cream truck's wid takes in the awning over its serving window; its wheels sit under the 0.74 body.
+  icecream: { len: 1.42, wid: 0.8, track: 0.35, tyre: 0.14, body: 0.3, lift: 0.12, cabinLen: 1.16, cabinH: 0.46, cabinZ: -0.12, taper: 0.97, hood: 0, wheel: 0.15, drop: 0, nose: 0.02 },
+  parcel: { len: 1.36, wid: 0.72, body: 0.3, lift: 0.12, cabinLen: 1.1, cabinH: 0.49, cabinZ: -0.13, taper: 0.99, hood: 0, wheel: 0.15, drop: 0, nose: 0.02 },
+  // Monster truck: wid spans the huge tyres; the body rides above them (lift), the hood stands proud of the bed.
+  monster: { len: 1.4, wid: 1.04, body: 0.14, lift: 0.56, cabinLen: 0.38, cabinH: 0.3, cabinZ: 0.15, taper: 1, hood: 0, wheel: 0.27, drop: -0.12, nose: 0.02, bed: true, track: 0.4, tyre: 0.24 },
 }
 
 // Motorcycles. head = steering head [y, z]; seat = seat top [y, z].
@@ -185,6 +194,8 @@ export const wheelRig = (body: Body): WheelRig => ({ steer: [], spin: [], radius
 // 'cabin' (seats), 'dash' (dark trim inside, brake rotors), 'display' (the dash screen) and 'caliper' are only drawn
 // on cars shown whole: town traffic has solid glass and pooled wheels that hide them.
 export type Part = 'paint' | 'dark' | 'black' | 'chrome' | 'glass' | 'screen' | 'seat' | 'wood' | 'lamp' | 'tail' | 'amber' | 'stripe' | 'cabin' | 'dash' | 'caliper' | 'display'
+  // Fixed pastel colours for the oddballs' decorations (ice cream, cardboard).
+  | 'pink' | 'mint' | 'cream' | 'waffle'
 type V3 = [number, number, number]
 
 export class Kit {
@@ -460,11 +471,11 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
   if (hit) return hit
   if (body === 'formula') return formulaGeo(key, fit)
   const s = shapeOf(body)
-  const exotic = EXOTIC[body]
+  const exotic = EXOTIC[body] ?? ODDBALL[body]
   if (exotic) {
     const k = new Kit()
     exotic(k, fit, { seat, steering, brakes, bar })
-    const wheel = new CylinderGeometry(s.wheel, s.wheel, 0.14, 18, 1)
+    const wheel = new CylinderGeometry(s.wheel, s.wheel, s.tyre ?? 0.14, 18, 1)
     const uv = wheel.getAttribute('uv')
     for (let i = 0; i < uv.count; i++) uv.setX(i, i < 38 ? 0.5 + uv.getX(i) * 0.5 : uv.getX(i) * 0.5)
     wheel.rotateZ(Math.PI / 2)
@@ -1113,6 +1124,10 @@ const MAT = {
   dash: new MeshStandardMaterial({ color: '#26282b', roughness: 0.7, metalness: 0.2 }),
   rubber: new MeshStandardMaterial({ color: '#1c1c1e', roughness: 0.92 }),
   display: new MeshBasicMaterial({ color: '#7fd0ff' }),
+  pink: new MeshStandardMaterial({ color: '#f48fb1', roughness: 0.55 }),
+  mint: new MeshStandardMaterial({ color: '#80cbc4', roughness: 0.55 }),
+  cream: new MeshStandardMaterial({ color: '#fff3d6', roughness: 0.6 }),
+  waffle: new MeshStandardMaterial({ color: '#d39b55', roughness: 0.8 }),
 }
 // Tinted glass you can see the cabin through, for cars shown whole. Town traffic
 // bakes MAT.glass solid instead.
@@ -1290,7 +1305,7 @@ function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight,
   const dark = useMemo(() => '#' + new Color(tint).multiplyScalar(0.6).getHexString(), [tint])
   const wz = s.len * 0.33
   const wx = s.track ?? s.wid / 2 - 0.02
-  const shared = (['black', 'chrome', 'screen', 'seat', 'wood', 'lamp', 'tail', 'amber', 'dash', 'display'] as const).filter((k) => p[k])
+  const shared = (['black', 'chrome', 'screen', 'seat', 'wood', 'lamp', 'tail', 'amber', 'dash', 'display', 'pink', 'mint', 'cream', 'waffle'] as const).filter((k) => p[k])
   const look = carStyle(model)
   const beam = beams && (
     <mesh rotation-x={-Math.PI / 2} position={[0, 0.03, s.len / 2 + 0.55]} renderOrder={2}>
@@ -1309,10 +1324,11 @@ function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight,
       ...(own ? {} : { paint: paintLook(tint, finish, rusty, sk) }), dark: { color: dark }, ...(stripe ? { stripe: { color: stripe } } : {}),
       black: finishOf(MAT.black), chrome: finishOf(MAT.chrome), glass: finishOf(MAT.glass), seat: finishOf(MAT.seat), wood: finishOf(MAT.wood),
       lamp: finishOf(MAT.lamp), tail: finishOf(MAT.tail), amber: finishOf(MAT.amber),
+      pink: finishOf(MAT.pink), mint: finishOf(MAT.mint), cream: finishOf(MAT.cream), waffle: finishOf(MAT.waffle),
     }
     return (
       <LeanCar parts={p} looks={looks} casters={['paint', 'glass']} mods={{ body, ids: modIds(fit), skins: msk }} modPaint={{ color: tint, metal: rusty ? 0.1 : 0.4, rough: 0.3 }} highlight={highlight}
-        wheels={[[-wx, s.wheel, wz], [wx, s.wheel, wz], [-wx, s.wheel, -wz], [wx, s.wheel, -wz]]} radius={s.wheel} width={0.14} rims={fit.rims} rimColor={rimColor} rig={rig} beams={beam}
+        wheels={[[-wx, s.wheel, wz], [wx, s.wheel, wz], [-wx, s.wheel, -wz], [wx, s.wheel, -wz]]} radius={s.wheel} width={s.tyre ?? 0.14} rims={fit.rims} rimColor={rimColor} rig={rig} beams={beam}
         extra={<>{own && <mesh geometry={p.paint} castShadow><PaintMaterial color={tint} finish={finish} highlight={highlight} skin={chromed ? 0 : sk} panels={pan} zones={g.zones} /></mesh>}{topper}</>} />
     )
   }
@@ -1339,7 +1355,7 @@ function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight,
       {topper}
       {/* Headlight beams on the road, visible after dark. */}
       {beam}
-      <Wheels at={[[-wx, wz], [wx, wz], [-wx, -wz], [wx, -wz]]} r={s.wheel} w={s.track ? 0.16 : 0.14} rig={rig} rims={fit.rims} rimColor={rimColor} rusty={rusty} look={look} />
+      <Wheels at={[[-wx, wz], [wx, wz], [-wx, -wz], [wx, -wz]]} r={s.wheel} w={s.tyre ?? (s.track ? 0.16 : 0.14)} rig={rig} rims={fit.rims} rimColor={rimColor} rusty={rusty} look={look} />
     </group>
   )
 }
