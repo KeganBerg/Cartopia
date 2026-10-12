@@ -29,14 +29,14 @@ import { appendFileSync } from 'node:fs'
 // two boxes of different sizes doesn't line up, so they fight too.
 
 const LEVELS = [1, 4, 7, 10]
-// Every merged form: a pair either way (stretched) and a 2x2 block (scaled up
-// whole, people-sized props kept at true size). A 4x4 block only scales the
-// 2x2 one further apart.
-const MERGES: [number, number, number][] = [[1, 1, 1], [2, 1, 1], [1, 1, 2], [2, 2, 2]]
+// Every merged form: a pair either way (stretched) and 2x2 and 4x4 blocks
+// (scaled up whole, people-sized props kept at true size).
+const MERGES: [number, number, number][] = [[1, 1, 1], [2, 1, 1], [1, 1, 2], [2, 2, 2], [4, 4, 4]]
 // The depth buffer's step grows with distance: about z * z / (near * 2^24)
-// for the free camera (24-bit depth on phones), and two faces closer than a
-// couple of steps flicker. GAP keeps faces apart out to the free camera's
-// furthest zoom; the town camera is orthographic and far finer.
+// for the free camera (24-bit depth on phones), and two faces closer than
+// about a step flicker. GAP is at least that step at the free camera's
+// furthest zoom (0.0017 with near 1 and 170 away); the town camera is
+// orthographic and far finer.
 const STEP = (FREE.maxDist * FREE.maxDist) / (FREE.near * 2 ** 24)
 const GAP = Number(process.env.COPLANAR_GAP ?? Math.max(0.001, Math.ceil(STEP * 1000) / 1000))
 // Overlaps smaller than this (in square units) are seams, not visible fights.
@@ -105,12 +105,14 @@ function faces(o: Object3D): Face[] {
 }
 
 // A face pressed against or inside a solid box can't be seen (the back of a
-// sign on a wall, the bottom of a step), so it can't flicker.
+// sign on a wall, the bottom of a step), so it can't flicker. One lying on the
+// box's outside facing out (a mat on a step) is seen, and fights the box.
 function buried(f: Face, solids: Box3[]) {
   const [u, v] = [0, 1, 2].filter((k) => k !== f.axis)
   return solids.some((b) => {
     const mn = b.min.toArray(), mx = b.max.toArray()
-    return f.at > mn[f.axis] - GAP && f.at < mx[f.axis] + GAP && f.lo[0] > mn[u] - GAP && f.hi[0] < mx[u] + GAP && f.lo[1] > mn[v] - GAP && f.hi[1] < mx[v] + GAP
+    const out = f.sign > 0 ? f.at > mx[f.axis] - GAP : f.at < mn[f.axis] + GAP
+    return !out && f.at > mn[f.axis] - GAP && f.at < mx[f.axis] + GAP && f.lo[0] > mn[u] - GAP && f.hi[0] < mx[u] + GAP && f.lo[1] > mn[v] - GAP && f.hi[1] < mx[v] + GAP
   })
 }
 
@@ -135,7 +137,7 @@ function fights(all: Face[], solids: Map<Object3D, Box3>) {
     for (let j = i + 1; j < list.length; j++) {
       const a = list[i], b = list[j]
       if (a.mesh === b.mesh || a.axis !== b.axis || a.sign !== b.sign) continue
-      if (Math.abs(a.at - b.at) >= GAP) continue
+      if (Math.abs(a.at - b.at) >= GAP - 1e-6) continue
       if (a.off !== b.off || a.look === b.look || (a.glass && b.glass)) continue
       const w = Math.min(a.hi[0], b.hi[0]) - Math.max(a.lo[0], b.lo[0])
       const h = Math.min(a.hi[1], b.hi[1]) - Math.max(a.lo[1], b.lo[1])

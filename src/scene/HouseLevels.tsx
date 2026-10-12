@@ -153,7 +153,7 @@ function Apartments({ level, ghost, m, win, bulb }: Props) {
           {ups.flatMap((y) => [-0.5, 0.5].map((x) => (
             <group key={`${x}:${y}`} position={[x, y - FH * 0.42, D / 2 + 0.1]}>
               <mesh castShadow><boxGeometry args={[0.38, 0.03, 0.2]} />{m('#eceff1')}</mesh>
-              <mesh position={[0, 0.07, 0.1]}><boxGeometry args={[0.38, 0.12, 0.015]} />{m('#455a64')}</mesh>
+              <mesh position={[0, 0.07, 0.1]}><boxGeometry args={[0.372, 0.12, 0.015]} />{m('#455a64')}</mesh>
             </group>
           )))}
           <mesh position={[0, 0.03, D / 2 + 0.25]} receiveShadow><boxGeometry args={[0.5, 0.06, 0.4]} />{m('#bdbdbd')}</mesh>

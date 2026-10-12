@@ -383,7 +383,7 @@ function GasGrown({ m, lvl, cl, ghost, roof }: { m: ReturnType<typeof useMat>; l
           {[0.1, 0.45].map((z) => (
             <group key={z} position={[1.88, 0, z]}>
               <mesh position={[0, 0.3, 0]} castShadow><boxGeometry args={[0.12, 0.6, 0.18]} />{m('#eceff1')}</mesh>
-              <mesh position={[-0.061, 0.42, 0]} rotation-y={-Math.PI / 2}><planeGeometry args={[0.1, 0.1]} /><primitive object={glowMats.bulb} attach="material" dispose={null} /></mesh>
+              <mesh position={[-0.064, 0.42, 0]} rotation-y={-Math.PI / 2}><planeGeometry args={[0.1, 0.1]} /><primitive object={glowMats.bulb} attach="material" dispose={null} /></mesh>
               <mesh position={[0, 0.62, 0]}><boxGeometry args={[0.14, 0.04, 0.2]} />{m('#43a047')}</mesh>
             </group>
           ))}
@@ -1345,7 +1345,8 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
                 </mesh>
               ))}
               {[-1, 1].map((sd) => [-0.35, 0.25].map((z) => (
-                <mesh key={`${sd}${z}`} position={[sd * (W * 0.41 + 0.006), y, z - 0.1]} rotation-y={(sd * Math.PI) / 2}>
+                // A step out from the ground floor's side windows, which the lowest row can overlap.
+                <mesh key={`${sd}${z}`} position={[sd * (W * 0.41 + 0.012), y, z - 0.1]} rotation-y={(sd * Math.PI) / 2}>
                   <planeGeometry args={[0.36, 0.38]} />
                   {win}
                 </mesh>
