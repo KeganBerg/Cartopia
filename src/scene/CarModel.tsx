@@ -1131,8 +1131,10 @@ function LeanCar({ parts, looks, casters, mods, modPaint, highlight, wheels, rad
 }
 
 // Any vehicle: a motorcycle for bike bodies, otherwise a car. Faces +z.
+// Marked whole so a merged block keeps the car in shape as one piece (see keepProps).
+const WHOLE = { whole: true }
 export function CarModel(props: CarProps) {
-  return isBike(props.body) ? <BikeModel {...props} /> : <CarBody {...props} />
+  return <group userData={WHOLE}>{isBike(props.body) ? <BikeModel {...props} /> : <CarBody {...props} />}</group>
 }
 
 // Mod skin numbers by slot, or undefined when no part wears one.
