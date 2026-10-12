@@ -1035,18 +1035,15 @@ export function PrizePopup() {
         <h2>{series.name} champion!</h2>
         {!open ? (
           <>
-            <button className="mystery-box" onClick={() => { sfx.win(); setOpen(true) }}>🎁</button>
-            <p>Tap the mystery box to open it</p>
+            <button className="mystery-box" aria-label="Open the mystery box" onClick={() => { sfx.win(); setOpen(true) }}>🎁</button>
           </>
         ) : (
           <>
+            <button className="close prize-close" aria-label="Close" onClick={() => { close(); setOpen(false) }}>✕</button>
             <CarThumb size="lg" color={prize.color} body={def.body} model={def.id} />
             <h3>{def.name}</h3>
-            <p>PI {performance(def, zero)} · +5 🏆. It's in your garage now.</p>
-            <div className="row">
-              <button className="buy" onClick={() => { close(); setOpen(false); openPanel('garage') }}>See it</button>
-              <button className="buy alt" onClick={() => { close(); setOpen(false) }}>Nice!</button>
-            </div>
+            <div className="prize-stats"><span className="rm-pi">PI {performance(def, zero)}</span><span>+5 🏆</span></div>
+            <button className="buy prize-go" onClick={() => { close(); setOpen(false); openPanel('garage') }}>See it</button>
           </>
         )}
       </div>

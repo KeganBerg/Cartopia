@@ -39,7 +39,7 @@
 .rm-pips i { width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,.35); border: 1.5px solid rgba(20,33,61,.7); }
 .rm-pips i.on { background: #ffd84a; }
 .rm-rounds { display: inline-flex; gap: 4px; }
-.rm-rounds i { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font: 900 10px Nunito, sans-serif; font-style: normal; background: rgba(255,255,255,.3); border: 2px solid rgba(20,33,61,.55); color: #fff; text-shadow: none; }
+.rm-rounds i { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font: 13px var(--display); font-style: normal; background: rgba(255,255,255,.3); border: 2px solid rgba(20,33,61,.55); color: #fff; text-shadow: none; }
 .rm-rounds i.won { background: #ffd84a; color: #14213d; border-color: #14213d; }
 .rm-rounds i.next { background: #fff; color: #14213d; border-color: #14213d; }
 .rm-pi { background: #14213d; color: #ffd84a; border-radius: 6px; padding: 0 5px; font: 900 11px Nunito, sans-serif; white-space: nowrap; }
@@ -134,17 +134,17 @@ div.rm-node { cursor: default; }
 .rm-gpc-top { position: relative; padding: 10px; color: #fff; display: flex; flex-direction: column; gap: 5px; align-items: flex-start; box-shadow: inset 0 3px 0 rgba(255,255,255,.3); }
 .rm-gpc-top .rm-ttl { font-size: 19px; padding-right: 30px; }
 .rm-cup { position: absolute; right: 8px; top: 6px; font-size: 28px; filter: drop-shadow(0 2px 0 rgba(0,0,0,.35)); }
-.rm-wchip { background: rgba(10,20,45,.45); border-radius: 999px; padding: 1px 8px; font: 900 11px Nunito, sans-serif; }
+.rm-wchip { background: rgba(10,20,45,.45); border-radius: 999px; padding: 2px 10px; font: 14px var(--display); letter-spacing: .3px; }
 .rm-gp-0 .rm-gpc-top { background: linear-gradient(135deg, #7ee05a, #2f9e35); }
 .rm-gp-1 .rm-gpc-top { background: linear-gradient(135deg, #5aa9ff, #2263d6); }
 .rm-gp-2 .rm-gpc-top { background: linear-gradient(135deg, #b48cff, #6a3fd0); }
 .rm-gp-3 .rm-gpc-top { background: linear-gradient(135deg, #ffcf4a, #e07b00); }
-.rm-gpc-body { flex: 1; min-height: 0; padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; color: #4a6283; font-weight: 700; }
+.rm-gpc-body { flex: 1; min-height: 0; padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: #4a6283; font-weight: 800; }
 .rm-gpc-body b { color: var(--ink, #1b2a4a); }
 .rm-next { display: block; }
 .rm-box { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: #f2f6fc; border-radius: 12px; padding: 6px; text-align: center; }
-.rm-box small { font: 800 11.5px Nunito, sans-serif; }
-.rm-gpc-body .buy { margin-top: auto; width: 100%; }
+.rm-box small { font: 800 14px/1.2 Nunito, sans-serif; }
+.rm-gpc-body .buy { margin-top: auto; width: 100%; min-height: 44px; font-size: 18px; }
 
 /* ---------- bottom bar ---------- */
 .rm-bar { flex: none; position: relative; display: flex; align-items: center; gap: 10px; background: linear-gradient(#2a4370, #1c2e52); border-top: 3px solid var(--line, #14213d); padding: 8px 12px calc(8px + var(--sab, 0px)); }
@@ -184,7 +184,7 @@ div.rm-node { cursor: default; }
   .rm-row .buy { min-width: 76px; }
   .rm-gp-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
   .rm-gpc-top .rm-ttl { font-size: 17px; }
-  .rm-rounds i { width: 18px; height: 18px; }
+  .rm-rounds i { width: 22px; height: 22px; font-size: 12px; }
   .rm-race { font-size: 18px; padding: 6px 12px; }
   .rm-picker { grid-template-columns: 1fr; }
 }
@@ -267,7 +267,7 @@ div.rm-node { cursor: default; }
   .rm-gpc-top { padding: 7px 8px; gap: 3px; }
   .rm-gpc-body { padding: 6px 8px 8px; gap: 4px; }
   .rm-box small { -webkit-line-clamp: 1; }
-  .rm-gpc .rm-rounds { gap: 2px; } .rm-gpc .rm-rounds i { width: 16px; height: 16px; font-size: 9px; }
+  .rm-gpc .rm-rounds { gap: 3px; } .rm-gpc .rm-rounds i { width: 21px; height: 21px; font-size: 12px; }
   .rm-cup { font-size: 20px; top: 4px; right: 5px; }
 }
 @media (max-height: 500px) {
@@ -328,7 +328,7 @@ div.rm-node { cursor: default; }
 .invites-car .rm-picker { position: static; order: 3; flex-basis: 100%; min-width: 0; max-height: 260px; overflow-x: hidden; box-shadow: none; }
 
 /* Race distances (game/distance.ts): a tag per race, and each car's build against the next distance. */
-.rm-dist { display: inline-block; font: 800 10px Nunito, sans-serif; letter-spacing: .02em; padding: 1px 6px; border-radius: 8px; color: #fff; background: #43a047; white-space: nowrap; vertical-align: 1px; }
+.rm-dist { display: inline-block; font: 13px var(--display); letter-spacing: .3px; padding: 2px 8px; border-radius: 8px; color: #fff; background: #43a047; white-space: nowrap; vertical-align: 1px; }
 .rm-dist.d-half { background: #fb8c00; }
 .rm-dist.d-mile { background: #c62828; }
 .rm-build { margin-left: 4px; font-weight: 900; white-space: nowrap; }
@@ -431,7 +431,7 @@ div.rm-node { cursor: default; }
 .rm-hub .rm-tile .rm-meta { align-self: flex-start; max-width: 100%; font: 14px/1.1 var(--display); letter-spacing: .3px; color: #fff; text-shadow: 0 1px 0 rgba(0,0,0,.5); background: rgba(10,20,45,.62); border: 2px solid rgba(255,255,255,.2); border-radius: 10px; padding: 4px 9px; gap: 6px; }
 .rm-hub .rm-ev .rm-meta { gap: 8px; }
 .rm-hub .rm-pips i { width: 11px; height: 11px; border-width: 2px; }
-.rm-hub .rm-rounds i { width: 22px; height: 22px; font: 12px var(--display); }
+.rm-hub .rm-rounds i { width: 24px; height: 24px; font: 13px var(--display); }
 .rm-hub .rm-ev-skin { font: 13px var(--display); background: rgba(255,255,255,.14); }
 
 /* progress bar */
@@ -488,7 +488,7 @@ div.rm-node { cursor: default; }
   .rm-hub .rm-camp .rm-tag, .rm-hub .rm-tour .rm-tag, .rm-hub .rm-gp .rm-tag, .rm-hub .rm-trial .rm-tag { padding: 5px 9px 5px 11px; }
   .rm-hub .rm-tile .rm-meta { font-size: 12.5px; padding: 3px 7px; }
   .rm-hub .rm-rounds { gap: 3px; }
-  .rm-hub .rm-rounds i { width: 19px; height: 19px; font-size: 11px; }
+  .rm-hub .rm-rounds i { width: 21px; height: 21px; font-size: 12px; }
   .rm-hub .rm-cta { padding: 3px 3px 3px 8px; }
   .rm-hub .rm-cta > span { font-size: 15px; }
   .rm-hub .rm-cta .buy { font-size: 16px; padding: 3px 9px; }
@@ -639,4 +639,20 @@ div.rm-node { cursor: default; }
   .tt-check { padding: 4px 6px; }
   .tt-check b { font-size: 12.5px; }
   .tt-host .thumb3d.sm { --tw: 104px; --th: 66px; }
+}
+
+/* Grand Prix prize: the car, its name, two stat chips and one button (docs/ui-rules.md). */
+.prize { position: relative; }
+.prize h3 { font: 22px var(--display); margin: 4px 0; color: var(--ink, #1b2a4a); }
+.prize-close { position: absolute; top: 8px; right: 8px; width: 40px; height: 40px; }
+.prize-stats { display: flex; justify-content: center; gap: 8px; margin: 2px 0 12px; font: 17px var(--display); color: var(--ink, #1b2a4a); }
+.prize-stats .rm-pi { font: 16px var(--display); padding: 2px 8px; }
+.prize-go { min-height: 48px; min-width: 60%; font-size: 20px; }
+.prize h2 { padding: 0 34px; }
+/* GP cards: the cup stays in the title row so the bigger round dots never sit under it */
+.rm-gpc .rm-cup { font-size: 24px; top: 5px; right: 6px; }
+.rm-gpc-top .rm-ttl { padding-right: 30px; }
+@media (max-height: 500px) {
+  .rm-gpc .rm-cup { display: none; }
+  .rm-gpc-top .rm-ttl { padding-right: 0; }
 }

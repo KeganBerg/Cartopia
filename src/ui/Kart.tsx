@@ -3,7 +3,7 @@ import { Canvas } from '@react-three/fiber'
 import { NeutralToneMapping } from 'three'
 import type { OwnedCar } from '../game/store'
 import { carDef } from '../game/data'
-import { EMP_TIME, FLAT_TIME, ITEMS, KartRace, LAPS, SMOKE_TIME, TOW_TIME, buildTrack, type ItemId, type KartEvent, type TrackDef } from '../game/kart'
+import { EMP_TIME, FLAT_TIME, GHOST_TIME, ITEMS, KartRace, LAPS, ROCKET_TIME, SMOKE_TIME, SPLAT_TIME, TOW_TIME, buildTrack, type ItemId, type KartEvent, type TrackDef } from '../game/kart'
 import { KartScene, kartLights, type KartHud } from '../scene/KartScene'
 import type { ChaseCar } from '../scene/ChaseScene'
 import { CarThumb } from '../scene/BuildingPreview'
@@ -11,7 +11,7 @@ import { KeyHints, TouchDrive, newDriveInput, useDriveKeys, useTall, useTouchDev
 import { LoadingScene } from './Loading'
 import { look as lookOf, pi } from './ArcadeBits'
 import { sfx, audioContext, audioOut } from '../lib/sound'
-import { airSound, buzzSound, bumpSound, crashSound, dingSound, fuelSound, landSound } from '../lib/arcadeSound'
+import { airSound, buzzSound, bumpSound, crashSound, dingSound, fuelSound, landSound, revSound, splashSound } from '../lib/arcadeSound'
 import { EngineVoice } from '../lib/engineAudio'
 import './kart.css'
 
@@ -92,6 +92,8 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
     for (const e of es) {
       if (e.kart !== me) {
         if (e.kind === 'hit' && race.hornets.length === 0) bumpSound()
+        // A bomb going off nearby is heard by everyone close enough to see it.
+        if (e.kind === 'boom' && race.bombs.some((b) => b.boom && Math.hypot(b.x - race.karts[me].x, b.z - race.karts[me].z) < 40)) crashSound()
         continue
       }
       if (e.kind === 'wall' || e.kind === 'bump') bumpSound()
@@ -105,6 +107,10 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
       else if (e.kind === 'zap') buzzSound()
       else if (e.kind === 'tow') dingSound(2)
       else if (e.kind === 'block') dingSound(2.4)
+      else if (e.kind === 'ghost') { dingSound(0.7); airSound() }
+      else if (e.kind === 'rocket') { revSound(1.2); engine.current?.rev(1) }
+      else if (e.kind === 'splat') splashSound()
+      else if (e.kind === 'boom') crashSound()
       else if (e.kind === 'lap') { dingSound(1); setFlash(e.value === LAPS ? 'FINAL LAP!' : `LAP ${e.value}`) }
     }
   }
@@ -124,7 +130,8 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
 
   const item = hud?.item ? ITEMS[hud.item as ItemId] : null
   const dead = !!hud && hud.fx.emp > 0 // a static storm locks the item slot
-  const slot = item ? <Roulette key={hud!.item} icon={item.icon} /> : null
+  // A Nitro Triple shows how many cans are left.
+  const slot = item ? <span className="kt-item"><Roulette key={hud!.item} icon={item.icon} />{hud!.item === 'nitro3' && <b className="kt-uses">×{hud!.uses}</b>}</span> : null
   return (
     <div className={`race-full kt${tall ? ' tall' : ' wide'}${touch ? ' touch' : ''}${dead ? ' dead' : ''}`}>
       <Canvas className="rf-canvas" camera={{ fov: 60, near: 0.3, far: 420 }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
@@ -179,6 +186,9 @@ const FX: { key: keyof KartHud['fx']; icon: string; full: number; bad: boolean }
   { key: 'emp', icon: '⚡', full: EMP_TIME, bad: true },
   { key: 'tow', icon: '🧲', full: TOW_TIME, bad: false },
   { key: 'shield', icon: '🫧', full: 8, bad: false },
+  { key: 'splat', icon: '🎨', full: SPLAT_TIME, bad: true },
+  { key: 'ghost', icon: '👻', full: GHOST_TIME, bad: false },
+  { key: 'rocket', icon: '🚀', full: ROCKET_TIME, bad: false },
 ]
 function Effects({ fx }: { fx: KartHud['fx'] }) {
   const on = FX.filter((f) => fx[f.key] > 0)
@@ -186,6 +196,8 @@ function Effects({ fx }: { fx: KartHud['fx'] }) {
     <>
       {fx.smoke > 0 && <div className="kt-haze" style={{ opacity: Math.min(1, fx.smoke / SMOKE_TIME + 0.35) }} />}
       {fx.emp > 0 && <div className="kt-zap" />}
+      {fx.splat > 0 && <Splats fade={Math.min(1, fx.splat / SPLAT_TIME + 0.3)} />}
+      {fx.ghost > 0 && <div className="kt-ghost" />}
       {on.length > 0 && (
         <div className="kt-fx">
           {on.map((f) => (
@@ -194,6 +206,45 @@ function Effects({ fx }: { fx: KartHud['fx'] }) {
         </div>
       )}
     </>
+  )
+}
+
+// Paint across the screen: bumpy blobs with flung drops, mostly round the edges so the road
+// ahead still shows through the middle.
+function splatPath(r: number, seed: number) {
+  let s = seed
+  const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647)
+  const n = 16
+  const pts = Array.from({ length: n }, (_, i) => {
+    const a = (i / n) * Math.PI * 2
+    const k = r * (0.72 + rnd() * 0.32) * (i % 5 === 0 ? 1.35 : 1)
+    return [50 + Math.cos(a) * k, 50 + Math.sin(a) * k]
+  })
+  let d = `M${((pts[0][0] + pts[n - 1][0]) / 2).toFixed(1)},${((pts[0][1] + pts[n - 1][1]) / 2).toFixed(1)}`
+  for (let i = 0; i < n; i++) {
+    const p = pts[i], q = pts[(i + 1) % n]
+    d += `Q${p[0].toFixed(1)},${p[1].toFixed(1)} ${((p[0] + q[0]) / 2).toFixed(1)},${((p[1] + q[1]) / 2).toFixed(1)}`
+  }
+  const drops = Array.from({ length: 5 }, () => {
+    const a = rnd() * Math.PI * 2, dd = r * (1.4 + rnd() * 0.5)
+    return { x: 50 + Math.cos(a) * dd, y: 50 + Math.sin(a) * dd, r: r * (0.08 + rnd() * 0.12) }
+  })
+  return { d: d + 'Z', drops }
+}
+// Where each blob sits (share of the screen across and down), its size (share of the
+// screen's short side) and colour. Each keeps its shape whatever the screen's proportions.
+const SPLAT_BLOBS = ([[20, 32, 30, '#ff4081'], [78, 26, 34, '#00e5ff'], [58, 78, 24, '#ffea00'], [90, 68, 20, '#ff4081'], [8, 80, 22, '#00e5ff']] as const)
+  .map(([x, y, size, c], i) => ({ x, y, size, c, ...splatPath(24, 11 + i * 7) }))
+function Splats({ fade }: { fade: number }) {
+  return (
+    <div className="kt-splat" style={{ opacity: fade }} aria-hidden>
+      {SPLAT_BLOBS.map((b, i) => (
+        <svg key={i} viewBox="0 0 100 100" fill={b.c} style={{ left: `${b.x}%`, top: `${b.y}%`, width: `${b.size}vmin`, height: `${b.size}vmin` }}>
+          <path d={b.d} />
+          {b.drops.map((p, j) => <circle key={j} cx={p.x} cy={p.y} r={p.r} />)}
+        </svg>
+      ))}
+    </div>
   )
 }
 
