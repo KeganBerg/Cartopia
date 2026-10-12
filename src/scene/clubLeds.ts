@@ -5,7 +5,7 @@ import { nightAmount, dayPhase } from './dayNight'
 import { ledGridTex, ledPaneTex, windowTex } from './textures'
 
 // The nightclub's LED windows: every window shows the same colour of the
-// rainbow, and on every bass note they all move on to the next colour together
+// rainbow, and on every kick they all move on to the next colour together
 // and flash (clubBeat.ts). The big front window is a grid of LED cells in that
 // same colour. Dark by day and while closed. Two shared materials, kept out of
 // Batch by `live`, so the cost is the same for any number of windows.
