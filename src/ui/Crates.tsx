@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { StageSlot, useStageReady } from '../scene/Stage'
 import { useGame, openCrate } from '../game/store'
 import { MOD_SLOTS, SKINNED_SLOTS, carDef, fittedMods, modDef, ownedModSkins, ownedSkins, type ModDef } from '../game/data'
@@ -218,8 +218,12 @@ export function CratesPanel() {
       // Not remembered.
     }
   }
+  // The latest phase, for Again: its delayed go() comes from the render where the prize was still open.
+  const phaseNow = useRef(phase)
+  useEffect(() => { phaseNow.current = phase }, [phase])
   const go = async () => {
-    if (phase !== 'idle') return
+    if (phaseNow.current !== 'idle') return
+    phaseNow.current = 'wait'
     const before = useGame.getState().cars
     setPhase('wait')
     const got = await openCrate(pick)

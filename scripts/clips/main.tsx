@@ -19,7 +19,7 @@ import { TRACK, RACE_DT, TOP_GEAR, AI_BOOST_GEAR, freshRacer, stepRacer, shiftBa
 
 const q = new URLSearchParams(location.search)
 const ev = q.get('shot') === 'ev' ? WEEKLY_EVENTS.find((e) => e.id === q.get('event')) : undefined
-const shot = ev ? 'tour' : q.get('shot') ?? 'camp'
+const shot = ev ? 'ev' : q.get('shot') ?? 'camp'
 const v = venueById(ev?.venue ?? q.get('venue') ?? 'main')
 const night = ev ? ev.night : q.get('night') === '1'
 const sky = (ev?.sky ?? q.get('sky') ?? undefined) as WeatherKind | undefined
@@ -34,6 +34,8 @@ const CARS: Record<string, [Car, Car]> = {
   camp: [{ model: 'vette', color: '#e53935', finish: 'metallic' }, { model: 'charger', color: '#263238' }],
   tour: [{ model: 'gtr', color: '#eceff1', finish: 'pearl' }, { model: 'lambo', color: '#fdd835', finish: 'metallic' }],
   trial: [{ model: 'rally', color: '#1e88e5', finish: 'metallic' }, { model: 'rally', color: '#1e88e5' }],
+  // Weekly events get their own pair and shot, so the event card never plays the Pro Tour clip.
+  ev: [{ model: 'hellcat', color: '#7e57c2', finish: 'pearl' }, { model: 'kitsune', color: '#ff7043', finish: 'metallic' }],
 }
 
 // One race, run ahead of time at the race screen's own fixed step. Each driver launches,
@@ -109,6 +111,19 @@ const PLANS: Record<string, () => { plan: Plan; me: Trace; them: Trace | null }>
     // finish replay see the whole race.
     return { me: A, them, plan: { dur: 5.5, warm: A.finish - 3.2, start: -(A.finish - 3.2) } }
   },
+  // The launch seen from high on the roadside: both cars leave the line side by side and a
+  // drone shot rides along above them (the Pro Tour clip is the chase-cam run to the line).
+  ev: () => ({
+    me: A,
+    them: rivalFor(A, { pi: 60, launch: 0.12, late: 0.02 }, 0.1),
+    plan: {
+      dur: 5.5, warm: 0.4, start: 0.8,
+      cam: (t, mz, tz) => {
+        const c = (Math.max(0, mz) + Math.max(0, tz)) / 2
+        return { pos: [1.25, 2.1, c + 2.4 - t * 0.2], at: [0, 0.25, c - 0.3], fov: 50 }
+      },
+    },
+  }),
   // A lone car flat out, reeling in a low camera riding ahead of it.
   trial: () => ({
     me: A, them: null,

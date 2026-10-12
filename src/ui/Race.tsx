@@ -8,6 +8,7 @@ import { CarThumb } from '../scene/BuildingPreview'
 import { supabase } from '../lib/supabase'
 import { Panel } from './Menus'
 import { StageSlot, useStageReady, warmStage } from '../scene/Stage'
+import { pauseTownDraw } from '../scene/renderGate'
 import { RaceScene, startLights, finishView } from '../scene/RaceScene'
 import { pickVenue, venue as venueById } from '../scene/venues'
 import { sfx } from '../lib/sound'
@@ -43,7 +44,7 @@ import { msToNextWeek, skinDef, SKIN_TIERS, carStats } from '../game/data'
 import { DIST, character, characterMul, tourDist, type RaceDist } from '../game/distance'
 import { playerName } from '../lib/profiles'
 import { LoadingScene } from './Loading'
-import { settleWager, startWagers, wagersOn } from '../lib/wagers'
+import { settleWager, startWager, startWagers, voidWager, wagersOn } from '../lib/wagers'
 import { shortCoins, stakesFor } from '../game/wager'
 
 // skill: the rival car's race skill. AI rivals use it; live players use theirs on their own device.
@@ -149,8 +150,29 @@ export function openRaceTab(tab: RaceTab) {
 
 const RACE_CAM = { position: [0.4, 2.2, -4] as [number, number, number], fov: 55, near: 0.3, far: 150 }
 
+// Phones (portrait or on their side): the menu covers the town, so the town stops drawing
+// while it's open and the tile clips get the phone to themselves.
+const COVERS_TOWN = '(max-width: 600px), (max-height: 500px)'
+function usePauseTownUnderMenu() {
+  useEffect(() => {
+    const mq = window.matchMedia(COVERS_TOWN)
+    let release: (() => void) | undefined
+    const sync = () => {
+      release?.()
+      release = mq.matches ? pauseTownDraw() : undefined
+    }
+    sync()
+    mq.addEventListener('change', sync)
+    return () => {
+      mq.removeEventListener('change', sync)
+      release?.()
+    }
+  }, [])
+}
+
 export function RacePanel() {
   useEffect(() => warmStage(), [])
+  usePauseTownUnderMenu()
   const cars = useGame((s) => s.cars)
   const level = useGame((s) => s.level)
   const best = useMemo(() => bestCar(cars), [cars])
@@ -194,6 +216,14 @@ export function RacePanel() {
   // The town rival race; bet: the double-or-nothing rematch. n remounts the race for each run.
   const [rv, setRv] = useState<{ match: RivalMatch; bet: boolean; n: number } | null>(null)
   const rvBonus = useRef<RivalBonus>(null)
+  // A double-or-nothing stake that's on the line until its race finishes. Leaving
+  // early (the ✕ or closing the menu) counts as a loss, so a bet can't be dodged.
+  const betStake = useRef<number | null>(null)
+  const forfeitBet = () => {
+    if (betStake.current !== null) useGame.getState().rivalBet(false, betStake.current)
+    betStake.current = null
+  }
+  useEffect(() => forfeitBet, [])
   const gpResult = useGame((s) => s.gpResult)
   const campaignResult = useGame((s) => s.campaignResult)
   const tourResult = useGame((s) => s.tourResult)
@@ -308,16 +338,18 @@ export function RacePanel() {
         prize={match.prize}
         title={bet ? `🎲 Double or nothing · $${match.prize.toLocaleString()}` : `${match.def.icon} ${match.def.name} · Round ${match.visit + 1} of 3`}
         onFinish={(won) => {
-          if (bet) useGame.getState().rivalBet(won, match.prize)
-          else rvBonus.current = useGame.getState().rivalResult(match.def.id, won, match.prize)
+          if (bet) {
+            betStake.current = null
+            useGame.getState().rivalBet(won, match.prize)
+          } else rvBonus.current = useGame.getState().rivalResult(match.def.id, won, match.prize)
         }}
         resultView={(r) => (
           <RivalResult match={match} won={r.won} bet={bet} bonus={bet ? null : rvBonus.current} myTime={r.myTime} theirTime={r.theirTime}
-            onBet={() => setRv({ match, bet: true, n: rv.n + 1 })}
+            onBet={() => { betStake.current = match.prize; setRv({ match, bet: true, n: rv.n + 1 }) }}
             onRetry={() => startRival(match, rv.n + 1)}
             onExit={() => setRv(null)} />
         )}
-        onExit={() => setRv(null)}
+        onExit={() => { forfeitBet(); setRv(null) }}
       />
     )
   }
@@ -1247,6 +1279,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
     const go = () => {
       if (started) return
       started = true
+      if (live.stake) startWager(live.raceId)
       setCountdown(3)
     }
     const uid = live.opponent.uid
@@ -1296,6 +1329,8 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       clearInterval(ping)
       // Leaving before the start tells the other player instead of leaving them waiting.
       if (!started) ch?.send({ type: 'broadcast', event: 'leave', payload: {} })
+      // A bet on a race that never started is called off, so both stakes come straight back.
+      if (!started && live.stake) void voidWager(live.raceId)
       if (ch && supabase) supabase.removeChannel(ch)
     }
   }, [live])
@@ -1344,8 +1379,14 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       }
       refereed.current = 'yes'
       setChecking(true)
-      const v = await reportFinish(live!.raceId, myTime, signal)
-      if (signal.cancelled) return
+      // Like kart races, the server's call still pays (and settles a wager) if the
+      // player leaves while it's checking; only the result screen needs them here.
+      const v = await reportFinish(live!.raceId, myTime, { cancelled: false })
+      if (signal.cancelled) {
+        if (live?.stake) void settleWager(live.raceId)
+        if (v && !v.void) finishRace(v.won, reward(rivalRef.current))
+        return
+      }
       setChecking(false)
       cancelAnimationFrame(raf)
       applyVerdict(v, myTime)
