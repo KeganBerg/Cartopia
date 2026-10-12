@@ -37,7 +37,7 @@ import { WorldFx, PopGroup, usePops } from './WorldFx'
 import { helpable } from '../game/help'
 import { helpBuilding } from '../lib/help'
 import { hoursOf, seedOf } from '../game/hours'
-import { FREE, VIEW, isFree, useFreeCam } from './freeCam'
+import { VIEW, isFree, useFreeCam } from './freeCam'
 import { FreeCam } from './FreeCam'
 
 // Every controls instance (a new one is made whenever the camera swaps) aims at
@@ -594,14 +594,11 @@ function Interaction() {
       <MapControls
         ref={shareView}
         makeDefault
-        enabled={!(mode === 'road' || mode === 'bulldoze' || drag)}
-        enableRotate={free}
+        // The free view steers itself (FreeCam.tsx); these stay in charge of the bird's-eye view.
+        enabled={!(free || mode === 'road' || mode === 'bulldoze' || drag)}
+        enableRotate={false}
         minZoom={12}
         maxZoom={90}
-        minDistance={free ? FREE.minDist : 0}
-        maxDistance={free ? FREE.maxDist : Infinity}
-        minPolarAngle={free ? FREE.minPolar : 0}
-        maxPolarAngle={free ? FREE.maxPolar : Math.PI}
         screenSpacePanning={false}
       />
     </>
