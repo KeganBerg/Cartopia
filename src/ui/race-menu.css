@@ -664,3 +664,30 @@ div.rm-node { cursor: default; }
 .rm-qc-pick.on { border-color: #2f9e35; box-shadow: 0 0 0 3px #7ee05a, 0 4px 0 rgba(0,0,0,.3); }
 .rm-qc-pick:disabled { opacity: .5; cursor: default; }
 .rm-pick-tick { position: absolute; top: 6px; right: 6px; font-size: 24px; line-height: 1; }
+
+/* ---------- phone audit (2026-10-12): nothing on a hub tile is ever clipped ----------
+   Phones size each row to its tiles instead of squeezing them into fixed shares of the
+   screen; the hub scrolls in .rm-screen if it runs past the bottom. */
+.rm-paints { flex-wrap: nowrap; min-width: 0; }
+.rm-paints i { flex: 0 1 12px; min-width: 5px; height: auto; aspect-ratio: 1; }
+@media (max-width: 600px), (min-width: 601px) and (max-width: 1000px) and (orientation: portrait) {
+  .rm-hub { flex: none; grid-template-rows: auto; grid-auto-rows: auto; align-content: start; }
+  /* room for the corner tag so a two-line title never runs under it */
+  .rm-hub .rm-camp, .rm-hub .rm-tour { min-height: 190px; padding-top: 38px; }
+  .rm-hub .rm-gp, .rm-hub .rm-trial { min-height: 116px; padding-top: 34px; }
+  .rm-hub .rm-ev, .rm-hub .rm-rival { min-height: 96px; }
+  .rm-hub .rm-tile .rm-progress { display: block; }
+  /* the next rival's name: two short lines instead of "Blaze Bur..." */
+  .rm-hub .rm-cta > span { white-space: normal; font-size: 14px; line-height: 1.05; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+  .rm-hub .rm-tour .rm-meta { white-space: normal; }
+  .rm-hub .rm-bub { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; font-size: 13px; }
+  .rm-hub .rm-ev .rm-meta { display: flex; }
+  /* five mode buttons: icon over a label that may take two lines */
+  .rm-hub .rm-minis { gap: 6px; }
+  .rm-hub .rm-mini { flex-direction: column; justify-content: flex-start; gap: 3px; padding: 7px 2px 8px; min-height: 92px; text-align: center; }
+  .rm-hub .rm-mi { width: 38px; height: 38px; font-size: 20px; }
+  .rm-hub .rm-mini > span:last-child { align-items: center; min-width: 0; }
+  .rm-hub .rm-mini b { font-size: 14px; line-height: 1; white-space: normal; -webkit-text-stroke-width: 3px; }
+  .rm-hub .rm-mini small { display: none; }
+  .rm-hub .rm-mini.m-live small { display: block; font-size: 11.5px; }
+}
