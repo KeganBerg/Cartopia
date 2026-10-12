@@ -24,6 +24,11 @@ async function refresh() {
   apply((data as Row[]).map((r) => ({ id: r.id, kind: r.kind, payload: r.payload ?? {}, from: Date.parse(r.starts_at), to: Date.parse(r.ends_at) })))
 }
 
+// Pending start toasts, by event id, with the start time each was armed for.
+const timers = new Map<number, { timer: ReturnType<typeof setTimeout>; from: number }>()
+// setTimeout overflows past ~24.8 days and would fire at once; a later sync arms those.
+const MAX_DELAY = 2 ** 31 - 1
+
 function apply(list: LiveEvent[]) {
   // An event cut short drops out of the list; keep it a moment so the sky
   // eases back instead of snapping.
@@ -31,11 +36,18 @@ function apply(list: LiveEvent[]) {
   const ended = liveEvents().filter((e) => !list.some((x) => x.id === e.id) && e.from <= now && now < e.to).map((e) => ({ ...e, to: now }))
   setLiveEvents([...list, ...ended])
   syncHandlers()
+  // A deleted or moved event drops its pending toast; a moved one is re-armed below.
+  for (const [id, t] of timers) {
+    const e = list.find((x) => x.id === id)
+    if (!e || e.from !== t.from) {
+      clearTimeout(t.timer)
+      timers.delete(id)
+    }
+  }
   for (const e of list) announce(e)
 }
 
 // An event's optional `message` shows once as a toast when it starts.
-const timers = new Map<number, ReturnType<typeof setTimeout>>()
 function announce(e: LiveEvent) {
   const text = typeof e.payload.message === 'string' ? e.payload.message.slice(0, 120) : ''
   if (!text || timers.has(e.id) || seen().includes(e.id)) return
@@ -48,7 +60,9 @@ function announce(e: LiveEvent) {
       // Without storage it may show again on the next visit; harmless.
     }
   }
-  timers.set(e.id, setTimeout(show, Math.max(0, e.from - Date.now())))
+  const delay = Math.max(0, e.from - Date.now())
+  if (delay > MAX_DELAY) return
+  timers.set(e.id, { timer: setTimeout(show, delay), from: e.from })
 }
 
 function seen(): number[] {

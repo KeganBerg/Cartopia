@@ -1176,7 +1176,12 @@ export const useGame = create<GameState>()(
         if (carDef(car.model).parked) return s.toast('This car is coming in a future update, so it stays in your garage')
         const value = Math.floor(carDef(car.model).price * 0.5)
         const buildings = s.buildings.map((b) => (b.car === cuid ? { ...b, car: undefined } : b))
-        set({ cars: s.cars.filter((c) => c.uid !== cuid), buildings, coins: s.coins + value, selectedCar: null, updatedAt: Date.now() })
+        // A sold car leaves the meet display and stops being the race car too.
+        set({
+          cars: s.cars.filter((c) => c.uid !== cuid), buildings, coins: s.coins + value, selectedCar: null,
+          showcase: (s.showcase ?? []).filter((u) => u !== cuid), ...(s.raceCar === cuid ? { raceCar: null } : {}),
+          updatedAt: Date.now(),
+        })
       },
 
       finishRace: (won, reward) => {
