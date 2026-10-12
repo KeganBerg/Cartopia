@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { BackSide, Color, IcosahedronGeometry, MeshBasicMaterial, MeshStandardMaterial, Object3D, type PerspectiveCamera, type Group, type InstancedMesh, type Mesh } from 'three'
+import { BackSide, Color, IcosahedronGeometry, Vector3, MeshBasicMaterial, MeshStandardMaterial, Object3D, type PerspectiveCamera, type Group, type InstancedMesh, type Mesh } from 'three'
 import type { Body, Finish, Panels, SkinnedSlot } from '../game/data'
 import { CarModel, carSize } from './CarModel'
 import { signTexture } from './signTexture'
@@ -25,6 +25,8 @@ import type { Venue } from './venues'
 import { RaceWeather, raceWeather } from './Weather'
 import { gloomOf, weatherLook, wetRoad } from './weatherLook'
 import type { Weather as WeatherState } from '../game/weather'
+import { HERO_TIME, heroCam, heroShot, heroWanted, resetHero } from './heroShot'
+import { BoostTrail } from './boostTrail'
 
 // burning: the boost is firing (the chase camera punches in).
 export type RacerView = { dist: number; burning?: boolean }
@@ -491,7 +493,13 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
     cam.fov = fov
     cam.updateProjectionMatrix()
   }, [camera, fov])
-  useEffect(() => () => void (finishView.busy = false), [])
+  useEffect(() => {
+    resetHero()
+    return () => {
+      finishView.busy = false
+      resetHero()
+    }
+  }, [])
   // Each car is drawn with its nose on its race position, so whoever is ahead at the line looks it.
   const noses = [carSize(mine.body).len * 0.7, carSize(theirs.body).len * 0.7]
 
@@ -500,7 +508,13 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
   const runs = useRef([0, 1].map(() => ({ z: 0, v: 0, last: 0, past: 0, dip: 0, cross: -1 })))
   // The finish replay (see PHOTO_GAP): the race's own positions, stamped on the race's frame clock,
   // played back on a visual clock that can run slower than it.
-  const fx = useRef({ st: 0, vt: 0, hist: [] as { t: number; d: [number, number] }[], phase: 'race' as 'race' | 'slow' | 'after', photo: false, rate: 1, target: 1, side: false, since: 0, cut: false, shake: 0 })
+  // hero: seconds into the finish hero shot (heroShot.ts), -1 before it, -2 once it's over.
+  const fx = useRef({ st: 0, vt: 0, hist: [] as { t: number; d: [number, number] }[], phase: 'race' as 'race' | 'slow' | 'after', photo: false, rate: 1, target: 1, side: false, since: 0, cut: false, shake: 0, hero: -1 })
+  const heroPos = useMemo(() => new Vector3(), [])
+  const heroAt = useMemo(() => new Vector3(), [])
+  // A glowing ribbon on the road behind each car while its boost burns.
+  const trails = useMemo(() => [new BoostTrail(), new BoostTrail()], [])
+  useEffect(() => () => trails.forEach((t) => t.dispose()), [trails])
   useFrame(({ scene }, delta) => {
     scene.environmentIntensity = look.env
     const dt = Math.min(delta, 0.1)
@@ -545,6 +559,8 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
     cars.forEach((g, i) => g?.rotation.set(runs.current[i].dip * 0.035, 0, 0))
     meRef.current?.position.set(LANE, 0, mz)
     themRef.current?.position.set(-LANE, 0, tz)
+    trails[0].update(vdt, LANE, 0.16, mz - noses[0], 0, !!me.current?.burning && runs.current[0].cross < 0)
+    trails[1].update(vdt, -LANE, 0.16, tz - noses[1], 0, !!them.current?.burning && runs.current[1].cross < 0)
 
     // The finish: slow motion as the leader reaches the line when it's close, from the trackside camera when it's very close.
     const [ra, rb] = runs.current
@@ -583,11 +599,34 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
       else f.target = f.st - f.vt > 0.03 ? 1.35 : 1
       // The trackside shot holds while the cars run out of frame, then cuts back to the chase.
       if (f.side && f.vt - f.since > 0.7) f.side = false
-      if (!f.side && f.rate > 0.97 && f.st - f.vt < 0.03) finishView.busy = false
+      const caught = !f.side && f.rate > 0.97 && f.st - f.vt < 0.03
+      // Once any replay is done and the player's car is a moment past the line, its hero shot.
+      if (caught && f.hero === -1 && ra.cross >= 0 && f.vt - ra.cross > 0.35) {
+        f.hero = heroWanted() ? 0 : -2
+        heroShot.on = f.hero === 0
+      }
+      if (caught) finishView.busy = false
     }
 
     const cam = camera as PerspectiveCamera
     const tall = size.height > size.width
+    if (f.hero >= 0) {
+      f.hero += dt
+      if (heroShot.skip || f.hero >= HERO_TIME) {
+        // Over (or tapped past): the chase view glides back in from wherever the shot left off.
+        f.hero = -2
+        heroShot.on = false
+      } else {
+        const car = meRef.current!.position
+        // Round the inner flank, kept on the tarmac clear of the kerbside barriers.
+        heroCam(f.hero, car.x, 0, car.z, 0, noses[0] * 2 * (tall ? 1.25 : 1), -1, tall ? 2.5 : 2.3, heroPos, heroAt)
+        cam.fov = tall ? fov : 40
+        cam.updateProjectionMatrix()
+        cam.position.copy(heroPos)
+        cam.lookAt(heroAt)
+        return
+      }
+    }
     if (f.side) {
       f.cut = true
       // Low on the kerb just past the line, looking back across it as the noses arrive.
@@ -718,6 +757,7 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
       <LaunchSmoke me={me} them={them} len={len} />
       <FinishFlag len={len} me={me} them={them} />
       {city ? <Skyline len={dress} edge={ROAD + WALK + 4.2} night={night} /> : <VenueBackdrop id={venue.id} len={dress} />}
+      {trails.map((t, i) => <primitive key={i} object={t.mesh} dispose={null} />)}
       {/* Soft shadows under the racers. */}
       {[meRef, themRef].map((r, i) => (
         <group key={i} ref={r} scale={1.4}>

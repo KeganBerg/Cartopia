@@ -10,6 +10,7 @@ import { supabase } from '../lib/supabase'
 import { Panel } from './Menus'
 import { StageSlot, useStageReady, warmStage } from '../scene/Stage'
 import { RaceScene, startLights, finishView } from '../scene/RaceScene'
+import { heroShot } from '../scene/heroShot'
 import { pickVenue, venue as venueById } from '../scene/venues'
 import { sfx } from '../lib/sound'
 import { raceAudio, type RaceAudio } from '../lib/engineAudio'
@@ -1183,13 +1184,13 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   // Wager match: the server pays the winner both stakes, or refunds both if the race doesn't count.
   const stake = live?.stake ?? 0
   // The result card waits a moment so both cars can be seen rolling through the finish,
-  // and for a slow-motion finish to play out (never more than a few seconds).
+  // for a slow-motion finish to play out, then the player's hero shot (never more than a few seconds).
   const [cardUp, setCardUp] = useState(false)
   useEffect(() => {
     if (!result) return
     const until = performance_now() + 5000
     let id = setTimeout(function wait() {
-      if (finishView.busy && performance_now() < until) id = setTimeout(wait, 100)
+      if ((finishView.busy || heroShot.on) && performance_now() < until) id = setTimeout(wait, 100)
       else setCardUp(true)
     }, 1400)
     return () => clearTimeout(id)
@@ -1619,7 +1620,13 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       {def.skill && skillShown && !result && <div className="skill-flash">{SKILLS[def.skill].icon} {SKILLS[def.skill].name}!</div>}
       {theirSkill && theirShown && !result && <div className="skill-flash theirs">{rival.town}: {SKILLS[theirSkill].icon} {SKILLS[theirSkill].name}!</div>}
       {theirBoost && !theirShown && !result && <div className="skill-flash theirs">{rival.town}: 🔥 Boost!</div>}
-      {result && !cardUp ? null : result && resultView ? resultView(result) : result ? (
+      {result && !cardUp ? (
+        // A tap cuts the hero shot (a photo-finish replay still plays out first).
+        <button className="hero-skip" aria-label="Skip" onPointerDown={() => {
+          heroShot.skip = true
+          if (!finishView.busy) setCardUp(true)
+        }}><span>⏭</span></button>
+      ) : result && resultView ? resultView(result) : result ? (
         <RaceResult won={result.won} myTime={result.myTime} theirTime={result.theirTime} cash={result.counted === false ? 0 : result.won ? payout : Math.round(payout * (live ? LIVE_LOSS_SHARE : LOSS_SHARE))} xp={result.counted === false ? 0 : result.won ? 30 : 8} rival={rival.town} note={result.note} noContest={result.counted === false} stars={result.stars} stats={stats.current} next={next ?? undefined} onExit={onExit} bet={stake ? (result.counted === false ? 0 : result.won ? stake : -stake) : undefined} />
       ) : (
         <div className="rf-bottom">
