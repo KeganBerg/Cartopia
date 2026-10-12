@@ -134,6 +134,32 @@ function greenhouse(k: Kit, h: ExoticHelpers, glass: Loft, o: { roof: [number, n
   }
 }
 
+// Honeycomb mesh: rows of dark grey hexagons on a black panel w by h centred at (x, y),
+// on the front (dir 1) or the back (dir -1) face at z. The hexagons are interior trim
+// ('dash'), so town traffic shows the plain black panel and pays nothing for them.
+function honey(k: Kit, x: number, y: number, z: number, w: number, h: number, r: number, dir: 1 | -1) {
+  k.add('black', plane(w, h), [x, y, z + dir * 0.001], [0, dir < 0 ? Math.PI : 0, 0])
+  const dx = r * 1.8
+  const dy = r * 1.56
+  const rows = Math.max(1, Math.floor(h / dy))
+  const cols = Math.max(1, Math.floor(w / dx))
+  for (let j = 0; j < rows; j++) for (let i = 0; i < cols - (j % 2); i++) {
+    const cx = x - ((cols - 1) * dx) / 2 + i * dx + (j % 2 ? dx / 2 : 0)
+    const cy = y - ((rows - 1) * dy) / 2 + j * dy
+    k.add('dash', new CircleGeometry(r * 0.78, 6), [cx, cy, z + dir * 0.002], [0, dir < 0 ? Math.PI : 0, Math.PI / 6])
+  }
+}
+
+// A slatted vent lying on a surface: a black opening w wide and l long with n body-colour
+// louvres across it.
+function vent(S: Surface, x: number, z: number, w: number, l: number, n: number, turn = 0) {
+  S.top('black', poly([[-w / 2, -l / 2], [w / 2, -l / 2], [w / 2 * 0.86, l / 2], [-w / 2 * 0.86, l / 2]]), x, z, 0.002, turn)
+  for (let i = 0; i < n; i++) {
+    const t = (i + 0.5) / n - 0.5
+    S.top('dark', box(w * 0.9, 0.006, 0.006), x - Math.sin(turn) * t * l, z + Math.cos(turn) * t * l, 0.005, turn)
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Veloce Fulmine: a V12 wedge. One line from the nose over the roof to the tail,
 // hexagonal wheel arches, Y lamps, big side intakes, a louvred engine cover, a
@@ -194,6 +220,9 @@ export function fulmineGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
     const tri: [number, number][] = [[-0.13, -0.055], [0.12, -0.055], [0.12, 0.06]]
     S.wall('black', poly(tri.map(([x, y]) => [x * 1, y])), sd, -0.22, 0.175, 0.003)
     S.wall('dark', box(0.25, 0.008, 0.01), sd, -0.21, 0.152, 0.008, 0.38)
+    for (const dz of [-0.03, 0.03, 0.09]) S.wall('dark', box(0.006, 0.07, 0.008), sd, -0.22 + dz, 0.165 - dz * 0.2, 0.006)
+    // A crease low along the side between the wheels.
+    S.wall('dark', box(wz * 2 - r * 2.8, 0.005, 0.004), sd, 0, 0.115, 0.002)
     // Amber marker low on the front of the wall.
     S.wall('amber', plane(0.04, 0.014), sd, 0.6, 0.11, 0.004)
   }
@@ -202,7 +231,9 @@ export function fulmineGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
 
   // Nose: three black intakes across the front face, a splitter under it, and an angular
   // lamp each side with a Y of light inside.
-  k.add('black', plane(0.17, 0.03), [0, 0.098, front + 0.003])
+  honey(k, 0, 0.098, front + 0.002, 0.17, 0.03, 0.009, 1)
+  // Canards: two little black blades on each corner of the nose.
+  for (const sd of [-1, 1]) for (const [y, dz] of [[0.09, 0], [0.11, -0.025]]) k.add('black', box(0.07, 0.006, 0.04), [sd * 0.33, y, front - 0.06 + dz], [0, sd * 0.5, sd * -0.2])
   for (const sd of [-1, 1]) k.add('black', poly([[-0.07, -0.016], [0.06, -0.016], [0.08, 0.016], [-0.06, 0.016]].map(([x, y]) => [x * sd, y])), [sd * 0.17, 0.097, front + 0.003])
   if (!fit.kit) {
     k.add('black', box(0.6, 0.012, 0.07), [0, 0.07, front - 0.02])
@@ -218,6 +249,9 @@ export function fulmineGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
     S.top('lamp', box(0.07, 0.008, 0.004), x - sd * 0.025, z - 0.008, 0.004, -sd * 0.35)
     S.top('lamp', box(0.06, 0.008, 0.004), x + sd * 0.035, z, 0.004)
   }
+  // Two ducts on the roof, a fuel cap on the right haunch.
+  for (const sd of [-1, 1]) G.top('black', poly([[-0.012, -0.04], [0.012, -0.04], [0.02, 0.03], [-0.02, 0.03]]), sd * 0.07, -0.12, 0.012)
+  S.top('dark', new CircleGeometry(0.02, 6), 0.33, -0.44, 0.003)
   // Hood: two vents in the channel and a crease down the middle.
   for (const sd of [-1, 1]) S.top('black', poly([[-0.025, -0.04], [0.02, -0.04], [0.03, 0.04], [-0.02, 0.04]].map(([x, y]) => [-sd * x, y])), sd * 0.07, 0.47, 0.002)
   // Cowl: a black strip at the base of the windshield, and a wiper.
@@ -235,9 +269,9 @@ export function fulmineGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   // Tail: a black mesh panel across the back, a Y of red in each corner, twin hexagonal
   // pipes high in the middle, a plate and a finned diffuser.
   const tz = -front
-  k.add('black', plane(0.7, 0.12), [0, 0.17, tz - 0.003], [0, Math.PI, 0])
-  for (let i = -3; i <= 3; i++) if (i) k.add('dark', plane(0.006, 0.1), [i * 0.09, 0.17, tz - 0.005], [0, Math.PI, 0])
-  for (const y of [0.135, 0.205]) k.add('dark', plane(0.68, 0.006), [0, y, tz - 0.005], [0, Math.PI, 0])
+  honey(k, 0, 0.17, tz - 0.002, 0.7, 0.12, 0.016, -1)
+  // Body-colour frame round the mesh, split by a bar across the middle.
+  k.add('dark', box(0.7, 0.008, 0.006), [0, 0.2, tz - 0.006])
   for (const sd of [-1, 1]) {
     const x = sd * 0.29
     k.add('tail', box(0.1, 0.012, 0.004), [x + sd * 0.01, 0.255, tz - 0.004], [0, 0, sd * 0.35])
@@ -381,6 +415,11 @@ export function eclatGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   const roofTop = (z: number) => (z > -0.3 ? glass.near(z).pts[4][1] + 0.009 : S.y(0, z))
   spine(k, 'paint', 0.0, -0.66, roofTop, (z) => 0.01 + 0.012 * Math.sin(Math.min(1, (0.0 - z) / 0.66) * Math.PI), 0.012)
   spine(k, 'paint', front - 0.005, 0.36, (z) => S.y(0, z), (z) => 0.012 * Math.min(1, (z - 0.36) / 0.08), 0.03)
+  // Creases running back over the hood from each headlight to the windshield.
+  for (const sd of [-1, 1]) for (let z = 0.56; z > 0.33; z -= 0.035) S.top('dark', box(0.005, 0.036, 0.003), sd * (0.17 - (0.56 - z) * 0.12), z, 0.0015, sd * 0.12)
+  // Engine grille: a honeycomb panel on the rear deck behind the glass.
+  S.top('black', poly([[-0.17, -0.05], [0.17, -0.05], [0.15, 0.05], [-0.15, 0.05]]), 0, -0.57, 0.002)
+  for (const x of [-0.12, -0.06, 0, 0.06, 0.12]) for (const dz of [-0.025, 0.012]) S.top('dash', new CircleGeometry(0.014, 6), x + (dz > 0 ? 0.03 : 0), -0.57 + dz, 0.004)
   // Two roof intakes either side of the fin.
   for (const sd of [-1, 1]) G.top('black', poly(ellipse(0.025, 0.05, 12)), sd * 0.06, -0.33, 0.004)
 
@@ -421,6 +460,8 @@ export function eclatGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
     S.wall('black', poly(inside), sd, cz - 0.01, cy, 0.003)
     // Door seam ahead of the C, sill blade and a front marker.
     S.wall('dark', plane(0.006, 0.15), sd, 0.2, 0.17, 0.003, 0.25)
+    // Vent behind the front wheel: three black slots.
+    for (let i = 0; i < 3; i++) S.wall('black', box(0.05, 0.008, 0.002), sd, 0.29 - i * 0.004, 0.23 - i * 0.02, 0.003, -0.3)
     k.add('black', rbox(0.03, 0.035, wz * 2 - r * 2.6, 0.01), [sd * (S.side(0) - 0.005), 0.085, -0.01])
     S.wall('amber', plane(0.04, 0.014), sd, 0.6, 0.12, 0.004)
   }
@@ -430,8 +471,7 @@ export function eclatGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   const tz = -front
   k.add('black', plane(0.76, 0.04), [0, 0.262, tz - 0.003], [0, Math.PI, 0])
   k.add('tail', box(0.72, 0.014, 0.004), [0, 0.262, tz - 0.005])
-  k.add('dark', plane(0.7, 0.1), [0, 0.19, tz - 0.003], [0, Math.PI, 0])
-  for (const y of [0.165, 0.19, 0.215]) k.add('black', plane(0.7, 0.004), [0, y, tz - 0.005], [0, Math.PI, 0])
+  honey(k, 0, 0.19, tz - 0.002, 0.7, 0.1, 0.016, -1)
   for (const sd of [-1, 1]) k.add('lamp', plane(0.035, 0.012), [sd * 0.3, 0.23, tz - 0.006], [0, Math.PI, 0])
   if (!fit.exhaust) {
     k.add('black', rbox(0.15, 0.1, 0.03, 0.02), [0, 0.135, tz - 0.004])
@@ -501,11 +541,10 @@ export function orafoGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   greenhouse(k, h, glass, { roof: [0.04, -0.36], pillar: [0.3, 0.04], belt: [0.28, -0.46], mirror: [0.22, 0.27, 0.27] })
   roundArches(S, wz, r)
 
-  // Roof snorkel: a scoop on the roof with a black mouth, and a ridge running back from it.
+  // Roof snorkel: a scoop on the roof with a black mouth.
   const ry = glass.near(-0.12).pts[4][1]
   k.add('paint', rbox(0.11, 0.045, 0.17, 0.02), [0, ry + 0.02, -0.15])
   k.add('black', rbox(0.08, 0.026, 0.01, 0.006), [0, ry + 0.026, -0.064])
-  spine(k, 'paint', -0.23, -0.6, (z) => (z > -0.5 ? glass.near(z).pts[4][1] + 0.005 : S.y(0, z)), () => 0.014, 0.05)
 
   // Nose: an oval intake low in the middle with two small ones beside it, a splitter, and a
   // teardrop of black on each front fender holding three round lamps.
@@ -522,14 +561,20 @@ export function orafoGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
     }
   }
   // Two vents on the hood.
-  for (const sd of [-1, 1]) S.top('black', poly(ellipse(0.025, 0.045, 12)), sd * 0.07, 0.46, 0.002)
+  for (const sd of [-1, 1]) vent(S, sd * 0.075, 0.46, 0.06, 0.1, 4, sd * -0.15)
+  // Chrome bonnet pins, and an oval badge on the nose.
+  for (const sd of [-1, 1]) S.top('chrome', disc(0.008, 10), sd * 0.13, 0.6, 0.003)
+  S.top('chrome', poly(ellipse(0.022, 0.014, 14)), 0, 0.665, 0.003)
+  S.top('dash', poly(ellipse(0.016, 0.009, 14)), 0, 0.665, 0.004)
+  // Louvres across the rear deck.
+  for (let i = 0; i < 5; i++) S.top('black', box(0.26 - i * 0.02, 0.01, 0.004), 0, -0.56 - i * 0.022, 0.003)
 
   // Sides: a door seam, a sill blade, an intake on top of each rear haunch, a front marker.
   for (const sd of [-1, 1]) {
     S.wall('dark', plane(0.006, 0.14), sd, 0.19, 0.17, 0.003, 0.25)
     S.wall('dark', plane(0.006, 0.12), sd, -0.15, 0.165, 0.003, -0.15)
     k.add('black', rbox(0.03, 0.035, wz * 2 - r * 2.6, 0.01), [sd * (S.side(0) - 0.005), 0.085, -0.01])
-    S.top('black', poly(ellipse(0.03, 0.07, 14)), sd * 0.34, -0.3, 0.003)
+    vent(S, sd * 0.34, -0.3, 0.05, 0.13, 5)
     S.wall('black', poly(ellipse(0.07, 0.03, 14)), sd, -0.24, 0.18, 0.003)
     S.wall('amber', plane(0.04, 0.014), sd, 0.62, 0.11, 0.004)
   }
@@ -537,8 +582,7 @@ export function orafoGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   // Tail: two round lamps each side in black rings, four pipes in a chrome ring in the middle,
   // a mesh panel under them, a plate, a diffuser, and a flap at each corner of the ducktail.
   const tz = -front
-  k.add('dark', plane(0.6, 0.09), [0, 0.15, tz - 0.003], [0, Math.PI, 0])
-  for (const y of [0.125, 0.15, 0.175]) k.add('black', plane(0.6, 0.004), [0, y, tz - 0.005], [0, Math.PI, 0])
+  honey(k, 0, 0.15, tz - 0.002, 0.6, 0.09, 0.015, -1)
   for (const sd of [-1, 1]) for (const x of [0.2, 0.28]) {
     k.add('black', disc(0.03, 16), [sd * x, 0.245, tz - 0.003], [0, Math.PI, 0])
     k.add('tail', disc(0.023, 16), [sd * x, 0.245, tz - 0.005], [0, Math.PI, 0])

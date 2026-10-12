@@ -12,7 +12,7 @@ const models = (q.get('models') ?? 'lambo').split(',')
 const cols = +(q.get('cols') ?? models.length)
 
 const VIEWS: Record<string, [number, number, number]> = {
-  '34': [2.1, 1.25, 2.1], side: [3.0, 0.45, 0], front: [0.4, 0.7, 3], rear: [-0.6, 0.9, -3], top: [1.2, 3.2, 1.4], low: [2.2, 0.35, 1.4], r34: [-2.1, 1.1, -2.1],
+  '34': [2.1, 1.25, 2.1], c34: [1.3, 0.75, 1.5], cr34: [-1.3, 0.8, -1.5], side: [3.0, 0.45, 0], front: [0.4, 0.7, 3], rear: [-0.6, 0.9, -3], top: [1.2, 3.2, 1.4], low: [2.2, 0.35, 1.4], r34: [-2.1, 1.1, -2.1],
 }
 const views = (q.get('view') ?? '34').split(',')
 const colors = q.get('colors')?.split(',')
