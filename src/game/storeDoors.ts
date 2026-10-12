@@ -4,14 +4,16 @@ import type { PlacedBuilding } from './store'
 import { toWorld } from '../scene/grid'
 import { isTravelCenter, travelLayout } from './travelCenter'
 import { isMarketCenter, marketLayout } from './marketCenter'
+import { isResort, resortLayout } from './resortCenter'
 
 type Pt = [number, number]
 
-// The merged block forms with a big store people walk into, and where its
+// The merged block forms with a big store (or lobby) people walk into, and where its
 // doors are on the block's own frame (x along its front, +z towards the road).
 const STORES: Record<string, { is: (def: string, level: number, scale: readonly number[]) => boolean; door: (sx: number, sz: number) => { D: number; door: [number, number] } }> = {
   gas: { is: isTravelCenter, door: travelLayout },
   market: { is: isMarketCenter, door: marketLayout },
+  motel: { is: isResort, door: resortLayout },
 }
 export const STORE_DEFS = Object.keys(STORES)
 

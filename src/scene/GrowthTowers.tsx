@@ -8,6 +8,8 @@ import { CarModel } from './CarModel'
 import { Upright, useBays, useMergeScale } from './mergeScale'
 import { WashCenter } from './WashCenter'
 import { isMarketCenter } from '../game/marketCenter'
+import { isResort } from '../game/resortCenter'
+import { ResortCenter } from './ResortCenter'
 import { MarketCenter } from './MarketCenter'
 import { isWashCenter } from '../game/washCenter'
 import { ShopTower } from './ShopTower'
@@ -228,6 +230,8 @@ function Balconies({ m, w, z, ys, c, rail }: { m: Mat; w: number; z: number; ys:
 }
 
 function MotelModel({ def, ghost, m, win, bulb, level }: Props) {
+  const scale = useMergeScale()
+  if (isResort(def.id, level, scale)) return <ResortCenter m={m} win={win} bulb={bulb} level={level} ghost={ghost} />
   const k: Kit = { m, win, bulb, ghost }
   const teal = def.roof
   if (growthStage(level) === 2) {
