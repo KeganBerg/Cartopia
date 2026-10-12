@@ -944,16 +944,17 @@ export function CrateScene(props: StageProps & { run: number }) {
   useEffect(() => holdPageTint('#120c1c'), [])
   const size = useThree((s) => s.size)
   const camera = useThree((s) => s.camera)
-  // Wide screens dock the crate picker on the right, so the crate sits left of centre; tall
-  // ones dock it along the bottom, so the crate sits high.
-  const wide = size.width >= 900 && size.width > size.height * 1.25
+  // Wide screens, and phones held sideways, dock the crate picker on the right (crates.css), so
+  // the crate sits left of centre; tall ones dock it along the bottom, so the crate sits high.
+  const wide = size.width > size.height * 1.25 && (size.width >= 900 || size.height <= 500)
   useFitCamera([0, 0.42, 1], [0, 1.5, -0.6], wide ? 5 : 2.5, wide ? 3 : 2.9)
   // Where the camera sits before an opening pushes it in (useFitCamera has just placed it).
   const base = useRef(new Vector3())
   useLayoutEffect(() => {
     base.current.copy(camera.position)
     const cam = camera as PerspectiveCamera
-    if (wide) cam.setViewOffset(size.width, size.height, size.width * 0.13, 0, size.width, size.height)
+    // A sideways phone's picker takes a bigger share of the screen, so the crate moves further left.
+    if (wide) cam.setViewOffset(size.width, size.height, size.width * (size.height <= 500 ? 0.2 : 0.13), 0, size.width, size.height)
     else cam.setViewOffset(size.width, size.height, 0, size.height * 0.13, size.width, size.height)
     return () => cam.clearViewOffset()
   }, [camera, size, wide])
