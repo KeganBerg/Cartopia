@@ -5,7 +5,7 @@ import { signTexture } from './signTexture'
 import { signMat } from './closingTime'
 import { CarModel } from './CarModel'
 import { Upright, useBays, useMergeScale } from './mergeScale'
-import { ObstacleDetail, BillboardDetail, DriveInDetail, FountainDetail, GarageDetail, HouseDetail, PondDetail, ShopDetail, ShopLot, SpeedwayDetail, StatueDetail, TreeDetail } from './BuildingDetail'
+import { ObstacleDetail, BillboardDetail, DriveInDetail, FountainDetail, GarageDetail, HouseDetail, PondDetail, ShopDetail, ShopLot, SpeedwayDetail, StatueDetail } from './BuildingDetail'
 import { NEW_MODELS, NewBuildingModel } from './NewBuildings'
 import { PropMesh } from './propKit'
 import { DECOR_PROPS, benchBin } from './decorProps'
@@ -557,34 +557,17 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
       )
     case 'tree': {
       const g = ghost ? (valid ? '#66bb6a' : '#ef5350') : null
-      if (PAL.bare && !ghost) {
-        // Winter: bare branches with snow on the tips.
+      if (!ghost) {
+        // Winter adds a ring of snow under the bare branches.
         return (
           <group>
-            <mesh position={[0, 0.5, 0]} castShadow>
-              <cylinderGeometry args={[0.08, 0.16, 1, 7]} />
-              {m('#6d4c41')}
-            </mesh>
-            {[0, 1, 2, 3, 4].map((i) => {
-              const a = i * 1.26
-              const tilt = 0.6 + (i % 2) * 0.25
-              return (
-                <group key={i} position={[0, 0.75 + (i % 3) * 0.18, 0]} rotation={[0, a, tilt]}>
-                  <mesh position={[0, 0.3, 0]} castShadow>
-                    <cylinderGeometry args={[0.025, 0.05, 0.6, 5]} />
-                    {m('#6d4c41')}
-                  </mesh>
-                  <mesh position={[0, 0.62, 0]}>
-                    <icosahedronGeometry args={[0.09, 0]} />
-                    <meshStandardMaterial color="#ffffff" flatShading />
-                  </mesh>
-                </group>
-              )
-            })}
-            <mesh position={[0, LAYER.lot, 0]} rotation-x={-Math.PI / 2}>
-              <circleGeometry args={[0.55, 16]} />
-              <meshStandardMaterial color="#ffffff" {...decal()} />
-            </mesh>
+            <PropMesh parts={DECOR_PROPS.oak()} />
+            {PAL.bare && (
+              <mesh position={[0, LAYER.lot, 0]} rotation-x={-Math.PI / 2}>
+                <circleGeometry args={[0.55, 16]} />
+                <meshStandardMaterial color="#ffffff" {...decal()} />
+              </mesh>
+            )}
           </group>
         )
       }
@@ -601,12 +584,12 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
               <meshStandardMaterial color={g ?? PAL.leaves[i]} transparent={ghost} opacity={ghost ? 0.55 : 1} flatShading />
             </mesh>
           ))}
-          {!ghost && <TreeDetail />}
         </group>
       )
     }
     case 'palm':
       // Curved, banded trunk with drooping fronds and coconuts.
+      if (!ghost) return <PropMesh parts={DECOR_PROPS.palm()} />
       return (
         <group>
           {[0, 1, 2, 3, 4].map((i) => (

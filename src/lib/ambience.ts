@@ -190,8 +190,11 @@ export class Soundscape {
     // Beds: looping noise shaped into a steady layer, faded in and out by step().
     this.trafficTone = this.filter('lowpass', SEASON === 'winter' ? 170 : 300) // snow muffles the town
     this.traffic = this.bed(this.brown, this.trafficTone)
+    // Wind loses its sub-bass rumble: phones can't play it, and it only ate headroom.
+    this.wind = ctx.createGain()
     this.windTone = this.filter('lowpass', 400)
-    this.wind = this.bed(this.brown, this.windTone)
+    this.windTone.connect(this.filter('highpass', 110, this.wind))
+    this.bed(this.brown, this.windTone, this.wind)
     // People out and about: a soft hubbub of breath-like voices, too far off to
     // make out words, made from noise through moving vowel-like bands.
     this.murmur = ctx.createGain()
@@ -382,7 +385,7 @@ export class Soundscape {
       if (gust > 0.75 && season !== 'summer') this.chimes(t + 0.5, m.wind)
       fade(this.wind, m.wind * (0.03 + gust * 0.08))
       this.howlTone.frequency.setTargetAtTime(450 + gust * 500, t, 0.8)
-      fade(this.howl, sky.wind * sky.wind * gust * 0.05)
+      fade(this.howl, sky.wind * sky.wind * gust * 0.07)
       fade(this.leaves, m.leaves * (0.004 + gust * gust * 0.03))
     }
     // Cicadas swell for a while, then rest.
@@ -686,26 +689,43 @@ export class Soundscape {
     })
   }
 
-  // A dog a few yards away: one to three barks.
+  // A dog a few yards away: one to three barks. Each bark is a rough, breathy
+  // voice through the two resonances of a dog's mouth, not a bare buzz.
   private dog(t: number) {
     const p = rand(-0.9, 0.9)
     const dist = rand(0.3, 1)
     const big = Math.random() < 0.5
     const f = big ? rand(280, 360) : rand(500, 650)
     const dest = this.spot(p, dist)
+    const mouth = this.ctx.createGain()
+    mouth.gain.value = 0.35 * (1 - dist * 0.5)
+    for (const [ff, q, v] of big ? [[700, 3, 1], [1600, 4, 0.5]] : [[1200, 3, 1], [2600, 4, 0.45]]) {
+      const bp = this.filter('bandpass', ff, undefined, q)
+      const bg = this.ctx.createGain()
+      bg.gain.value = v
+      mouth.connect(bp).connect(bg).connect(dest)
+    }
     for (let i = Math.floor(rand(1, 4)); i > 0; i--) {
       const at = t
-      const tone = this.filter('bandpass', big ? 900 : 1500, dest, 2)
-      const g = this.ctx.createGain()
-      g.gain.value = 0.35 * (1 - dist * 0.5)
-      g.connect(tone)
-      this.blip(at, 0.14, 1, 0, (o) => {
+      const len = rand(0.11, 0.16)
+      // A growly flutter in the throat.
+      const rough = this.ctx.createGain()
+      rough.gain.value = 0.6
+      const lfo = this.ctx.createOscillator()
+      const depth = this.ctx.createGain()
+      lfo.frequency.value = rand(35, 55)
+      depth.gain.value = 0.4
+      lfo.connect(depth).connect(rough.gain)
+      rough.connect(mouth)
+      lfo.start(at)
+      lfo.stop(at + len + 0.05)
+      this.blip(at, len, 1, null, (o) => {
         o.type = 'sawtooth'
         o.frequency.setValueAtTime(f, at)
-        o.frequency.linearRampToValueAtTime(f * 1.25, at + 0.03)
-        o.frequency.exponentialRampToValueAtTime(f * 0.7, at + 0.14)
-      }, () => g)
-      this.noiseHit(at, 0.08, 0.05 * (1 - dist * 0.5), tone)
+        o.frequency.linearRampToValueAtTime(f * 1.3, at + 0.03)
+        o.frequency.exponentialRampToValueAtTime(f * 0.65, at + len)
+      }, () => rough)
+      this.noiseHit(at, len * 0.7, 0.12 * (1 - dist * 0.5), mouth)
       t += rand(0.3, 0.6)
     }
   }
@@ -821,11 +841,25 @@ export class Soundscape {
     }
   }
 
+  // A crow's "caw caw": a hoarse, raspy call with some breath in it.
   private crow(t: number) {
     const p = rand(-0.9, 0.9)
+    const dest = this.spot(p, rand(0.2, 0.9))
     for (let i = 0; i < Math.floor(rand(2, 4)); i++) {
-      const s = t + i * 0.5
-      this.blip(s, 0.28, 0.05, p, (o) => { o.type = 'sawtooth'; o.frequency.setValueAtTime(560, s); o.frequency.linearRampToValueAtTime(440, s + 0.28) }, (d) => this.filter('bandpass', 1150, d, 1.8))
+      const s = t + i * rand(0.42, 0.58)
+      const rasp = this.ctx.createGain()
+      rasp.gain.value = 0.55
+      const lfo = this.ctx.createOscillator()
+      const depth = this.ctx.createGain()
+      lfo.frequency.value = rand(70, 95)
+      depth.gain.value = 0.45
+      lfo.connect(depth).connect(rasp.gain)
+      lfo.start(s)
+      lfo.stop(s + 0.35)
+      const tone = this.filter('bandpass', 1250, dest, 1.6)
+      rasp.connect(tone)
+      this.blip(s, 0.28, 0.07, null, (o) => { o.type = 'sawtooth'; o.frequency.setValueAtTime(rand(540, 600), s); o.frequency.linearRampToValueAtTime(430, s + 0.28) }, () => rasp)
+      this.noiseHit(s, 0.22, 0.02, tone)
     }
   }
 

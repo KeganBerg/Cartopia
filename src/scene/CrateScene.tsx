@@ -17,8 +17,8 @@ import { ToolChest, TyreStack, useFitCamera } from './ArcadeScenery'
 import { tickSkins, withSkin } from './skins'
 import { MODS, SKINNED_SLOTS, carDef, fittedMods, modFits, modSkinNumber, skinNumber, type Body, type Finish, type SkinnedSlot } from '../game/data'
 import { dropTier, type CrateDef, type CrateDrop, type CrateId } from '../game/crates'
-import { bumpSound, crashSound, dingSound } from '../lib/arcadeSound'
-import { sfx } from '../lib/sound'
+import { bumpSound, crashSound } from '../lib/arcadeSound'
+import { crateSfx, sfx } from '../lib/sound'
 
 // The Crate Depot: a warehouse loading bay at night where crates are opened. The crate sits on a
 // hazard-striped lift under a work lamp, racking full of stock either side, a forklift parked up,
@@ -909,7 +909,10 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
     }
     let shake = 0
     let charge = 0
-    if (phase === 'open' && s.openAt < 0) s.openAt = now
+    if (phase === 'open' && s.openAt < 0) {
+      s.openAt = now
+      crateSfx.charge(CHARGE)
+    }
     if (skip !== s.skipped) {
       s.skipped = skip
       if (s.openAt > 0) s.openAt = Math.min(s.openAt, now - SETTLE)
@@ -987,10 +990,7 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
       }
       if (!s.revealed && after > SETTLE - CHARGE) {
         s.revealed = true
-        if (tier >= 3) sfx.levelUp()
-        else if (coins) sfx.coin()
-        else sfx.win()
-        if (tier >= 2) dingSound(1.3)
+        crateSfx.reveal(tier, coins)
         onReveal()
       }
       // Camera kick at the burst, then a slow push in.

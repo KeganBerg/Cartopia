@@ -1,4 +1,5 @@
 import { useGame, fuelCap } from '../game/store'
+import { UpdatePill } from './UpdatePill'
 import { xpToNext, FUEL_REGEN_SECONDS } from '../game/data'
 import { useNow } from '../scene/useNow'
 import { GoalTracker } from './Goals'
@@ -69,6 +70,7 @@ export function Hud() {
         <div className="town-name">{s.visiting?.townName ?? s.townName}</div>
         <TechnoTag />
         {!s.visiting && <button className="my-cars" onClick={() => s.openPanel('garage')}><Icon name="car" size={18} /> <span className="my-cars-label">MY CARS:</span> {s.cars.length}</button>}
+        <UpdatePill />
         <GoalTracker />
       </div>
       <div className="hud-right">
@@ -117,6 +119,7 @@ export function Hud() {
           <button onClick={() => s.openPanel('leaders')}><Icon name="trophy" size={16} /> {compact(s.trophies)}</button>
           <TechnoTag short />
         </div>
+        <UpdatePill />
         <GoalTracker />
       </div>
     </>

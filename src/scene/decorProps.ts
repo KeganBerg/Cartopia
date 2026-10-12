@@ -1,6 +1,6 @@
 import { PropKit, prop, type Look } from './propKit'
 import { STREET_PROPS } from './streetProps'
-import { SEASON } from './season'
+import { PAL, SEASON } from './season'
 
 // Park decor rebuilt for the free camera: cast-iron benches with slatted seats,
 // flower beds of real clumps of blooms, plank picnic tables on A-frames, a
@@ -138,6 +138,112 @@ export const DECOR_PROPS = {
     })
   }),
 
+  // Palm: a curved, ringed trunk, a crown of arching fronds with leaflets down
+  // both sides, and a cluster of coconuts.
+  palm: () => prop(`palm|${SEASON}`, (k) => {
+    const bark = ['#8d6e63', '#a1887f']
+    let x = 0
+    for (let i = 0; i < 9; i++) {
+      const y = 0.1 + i * 0.18
+      const nx = i * i * 0.0028
+      k.cyl(cast(L(bark[i % 2], 0.95)), 0.085 - i * 0.004, 0.1 - i * 0.004, 0.19, [nx, y, 0], [0, 0, -0.02 - i * 0.012], 8)
+      k.torus(L('#6d4c41', 0.95), 0.095 - i * 0.004, 0.012, [nx, y - 0.09, 0], [Math.PI / 2, 0, 0], Math.PI * 2, 8, 3)
+      x = nx
+    }
+    const top: [number, number, number] = [x + 0.03, 1.72, 0]
+    const leaf = PAL.fronds
+    for (let f = 0; f < 8; f++) {
+      const a = (f / 8) * Math.PI * 2 + 0.2
+      const ca = Math.cos(a), sa = Math.sin(a)
+      // The spine arches up and out, then droops.
+      const pts: [number, number, number][] = [0, 1, 2, 3, 4].map((j) => {
+        const t = j / 4
+        const r = 0.08 + t * 0.62
+        return [top[0] + ca * r, top[1] + 0.12 * Math.sin(t * Math.PI * 0.9) - t * t * 0.26, top[2] + sa * r]
+      })
+      for (let j = 0; j < 4; j++) {
+        const [x0, y0, z0] = pts[j]
+        const [x1, y1, z1] = pts[j + 1]
+        k.rod(L('#689f38', 0.9), pts[j], pts[j + 1], 0.012 - j * 0.002, 4)
+        // Leaflets feather out from the spine on both sides, angled forward and drooping.
+        const w = [0.2, 0.19, 0.15, 0.09][j]
+        for (const t of [0.25, 0.75]) {
+          const px = x0 + (x1 - x0) * t, py = y0 + (y1 - y0) * t, pz = z0 + (z1 - z0) * t
+          for (const s of [-1, 1]) {
+            const b2 = a + s * 1.0
+            const cb = Math.cos(b2), sb = Math.sin(b2)
+            const look = L(leaf[(f + j + (s > 0 ? 1 : 0)) % 2], 0.85)
+            k.box(cast(look), [w, 0.008, 0.085], [px + cb * w * 0.45, py - w * 0.17, pz + sb * w * 0.45], [0, -b2, -0.38])
+          }
+        }
+      }
+    }
+    for (let i = 0; i < 4; i++) k.sphere(L('#5d4037', 0.8), 0.06, [top[0] + Math.cos(i * 1.6) * 0.08, top[1] - 0.09, Math.sin(i * 1.6) * 0.08], [1, 1, 1], 7, 5)
+  }),
+
+  // Bus stop shelter: framed glass walls, a lit advert panel, a slatted bench
+  // and a timetable post, on a paved pad.
+  busstop: () => prop('busstop', (k) => {
+    const frame = L('#37474f', 0.45, 0.4)
+    const glass = L('#cfe7f3', 0.15, 0.1)
+    for (const [x, z] of [[-0.65, -0.42], [0.65, -0.42], [-0.65, 0.05], [0.65, 0.05]]) k.box(cast(frame), [0.05, 1.22, 0.05], [x, 0.66, z])
+    k.box(cast(glass), [1.26, 0.86, 0.02], [0, 0.62, -0.42])
+    for (const y of [0.18, 1.06]) k.box(frame, [1.3, 0.04, 0.04], [0, y, -0.42])
+    for (const x of [-0.65, 0.65]) {
+      k.box(cast(glass), [0.02, 0.86, 0.43], [x, 0.62, -0.185])
+      for (const y of [0.18, 1.06]) k.box(frame, [0.04, 0.04, 0.47], [x, y, -0.185])
+    }
+    // Roof: a canopy with a fascia and a drip edge.
+    k.box(cast(L('#455a64', 0.5, 0.3)), [1.48, 0.05, 0.64], [0, 1.29, -0.18])
+    k.box(L('#1e88e5', 0.5), [1.5, 0.07, 0.02], [0, 1.27, 0.14])
+    k.box(L('#cfd8dc', 0.5), [1.4, 0.015, 0.56], [0, 1.26, -0.18])
+    // Bench: slats on two brackets.
+    for (let i = 0; i < 3; i++) k.box(cast(L(i % 2 ? '#8d6e63' : '#7b5a48', 0.85)), [1.1, 0.022, 0.06], [0, 0.29, -0.33 + i * 0.07])
+    for (const x of [-0.45, 0.45]) {
+      k.box(frame, [0.04, 0.27, 0.04], [x, 0.14, -0.26])
+      k.box(frame, [0.04, 0.03, 0.2], [x, 0.27, -0.27])
+    }
+    // Advert panel frame on the right-hand wall (its picture glows, drawn by the model).
+    k.box(L('#263238', 0.5), [0.04, 0.66, 0.36], [0.68, 0.66, -0.2])
+    // Timetable on the sign post.
+    k.box(L('#eceff1', 0.5), [0.1, 0.16, 0.012], [0.6, 1.0, 0.565])
+    k.box(L('#263238', 0.5), [0.11, 0.17, 0.008], [0.6, 1.0, 0.556])
+    k.cyl(L('#90a4ae', 0.4, 0.5), 0.03, 0.03, 1.5, [0.6, 0.75, 0.55], undefined, 8)
+    k.cyl(L('#90a4ae', 0.4, 0.5), 0.05, 0.055, 0.03, [0.6, 0.065, 0.55], undefined, 8)
+  }),
+
+  // Hot dog cart: a steel cart on spoked wheels, a grill lid, condiments and a
+  // napkin box, a push handle and a stand leg.
+  hotdog: () => prop('hotdog', (k) => {
+    const steel = L('#cfd8dc', 0.3, 0.6)
+    k.box(cast(L('#eceff1', 0.4, 0.3)), [0.9, 0.42, 0.5], [0, 0.42, 0])
+    k.box(L('#e53935', 0.5), [0.86, 0.12, 0.006], [0, 0.42, 0.253])
+    k.box(L('#fdd835', 0.5), [0.86, 0.02, 0.006], [0, 0.35, 0.253])
+    k.box(cast(steel), [0.94, 0.04, 0.54], [0, 0.65, 0])
+    for (const x of [-0.3, 0, 0.3]) k.box(steel, [0.2, 0.004, 0.36], [x, 0.672, 0.02])
+    k.box(L('#9e9e9e', 0.3, 0.6), [0.38, 0.06, 0.3], [-0.2, 0.7, 0.02])
+    k.box(L('#bdbdbd', 0.3, 0.6), [0.35, 0.015, 0.27], [-0.2, 0.735, 0.02])
+    k.cyl(L('#fdd835', 0.4), 0.02, 0.022, 0.1, [0.18, 0.72, 0.15], undefined, 8)
+    k.cone(L('#fdd835', 0.4), 0.012, 0.03, [0.18, 0.785, 0.15], undefined, 6)
+    k.cyl(L('#e53935', 0.4), 0.02, 0.022, 0.1, [0.24, 0.72, 0.15], undefined, 8)
+    k.cone(L('#e53935', 0.4), 0.012, 0.03, [0.24, 0.785, 0.15], undefined, 6)
+    k.box(L('#9e9e9e', 0.4, 0.5), [0.08, 0.06, 0.06], [0.33, 0.7, 0.15])
+    k.box(L('#ffffff', 0.8), [0.06, 0.012, 0.04], [0.33, 0.736, 0.15])
+    for (const s of [-1, 1]) {
+      k.cyl(cast(L('#263238', 0.9)), 0.16, 0.16, 0.05, [-0.2, 0.17, s * 0.27], [Math.PI / 2, 0, 0], 16)
+      k.cyl(steel, 0.05, 0.05, 0.06, [-0.2, 0.17, s * 0.27], [Math.PI / 2, 0, 0], 8)
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI
+        k.rod(steel, [-0.2 + Math.cos(a) * 0.12, 0.17 + Math.sin(a) * 0.12, s * 0.295], [-0.2 - Math.cos(a) * 0.12, 0.17 - Math.sin(a) * 0.12, s * 0.295], 0.006, 4)
+      }
+    }
+    k.rod(steel, [0.45, 0.42, -0.2], [0.68, 0.5, -0.2], 0.015)
+    k.rod(steel, [0.45, 0.42, 0.2], [0.68, 0.5, 0.2], 0.015)
+    k.rod(L('#212121', 0.8), [0.68, 0.5, -0.22], [0.68, 0.5, 0.22], 0.02)
+    k.rod(steel, [0.35, 0.21, 0], [0.35, 0, 0], 0.02)
+    k.cyl(L('#424242', 0.9), 0.04, 0.04, 0.02, [0.35, 0.01, 0], undefined, 8)
+  }),
+
   // Victorian lantern post: footing, fluted base, ringed pole, scrolled arm and a
   // four-sided lantern hanging over the path (its glass glows at night).
   lamp: () => prop('decorLamp', (k) => {
@@ -192,6 +298,88 @@ export const DECOR_PROPS = {
         clump(k, Math.cos(a) * 0.52, Math.sin(a) * 0.52, 0, 0.09, pal[i % 3], 4, i)
       }
     }
+  }),
+  // Oak: a flared trunk with bark ridges that forks into limbs, under a
+  // lumpy canopy of leaf clumps in the season's colours. Winter shows the
+  // bare branches with snow on them.
+  oak: () => prop(`oak|${SEASON}`, (k) => {
+    const bark = cast(L('#6f4a30', 0.95))
+    const dark = L('#5a3b26', 0.95)
+    k.cyl(bark, 0.1, 0.16, 0.8, [0, 0.4, 0], undefined, 9)
+    for (let i = 0; i < 5; i++) {
+      const a = i * 1.26 + 0.3
+      const ca = Math.cos(a), sa = Math.sin(a)
+      // Root flare and a bark ridge up the trunk.
+      k.cone(dark, 0.06, 0.2, [ca * 0.15, 0.05, sa * 0.15], [sa * 1.05, 0, -ca * 1.05], 5)
+      k.rod(dark, [ca * 0.155, 0.04, sa * 0.155], [ca * 0.1, 0.72, sa * 0.1], 0.018, 4)
+    }
+    // Limbs fork from the top of the trunk.
+    const limbs: [number, number, number][] = [[0.42, 1.12, 0.1], [-0.38, 1.1, -0.12], [0.06, 1.4, -0.08], [-0.12, 1.05, 0.38], [0.2, 1.0, -0.36]]
+    for (const [x, y, z] of limbs) k.rod(bark, [0, 0.74, 0], [x, y, z], 0.05, 6)
+    if (PAL.bare) {
+      limbs.forEach(([x, y, z], i) => {
+        // Twigs off each limb, snow along the top.
+        for (const s of [-1, 1]) {
+          const tip: [number, number, number] = [x * 1.4 + s * z * 0.4, y + 0.3 + jit(i, s) * 0.1, z * 1.4 - s * x * 0.4]
+          k.rod(dark, [x, y, z], tip, 0.022, 4)
+          k.ico(L('#ffffff', 0.8), 0.05, [tip[0], tip[1] + 0.02, tip[2]], [1.3, 0.5, 1.3], 0)
+        }
+        k.ico(L('#ffffff', 0.8), 0.07, [x, y + 0.04, z], [1.4, 0.45, 1.4], 0)
+      })
+      return
+    }
+    const leaves = PAL.leaves
+    const blobs: [number, number, number, number][] = [
+      [0, 1.22, 0, 0.56], [0.36, 1.08, 0.12, 0.4], [-0.34, 1.06, -0.1, 0.42], [0.04, 1.58, -0.04, 0.4],
+      [-0.1, 1.08, 0.36, 0.38], [0.18, 1.02, -0.36, 0.36], [0.28, 1.42, 0.24, 0.3], [-0.3, 1.4, 0.16, 0.3], [-0.16, 1.44, -0.3, 0.3],
+    ]
+    blobs.forEach(([x, y, z, r], i) => {
+      const look = L(leaves[i % leaves.length], 0.85)
+      k.ico(r >= 0.36 ? cast(look) : look, r, [x, y, z], [1, 0.88, 1], 1)
+      // Small leaf tufts break up the outline of each clump.
+      for (let j = 0; j < 2; j++) {
+        const a = j * 2.1 + i
+        const d = r * 0.74
+        k.ico(L(leaves[(i + j + 1) % leaves.length], 0.85), r * 0.32, [x + Math.cos(a) * d, y + r * 0.25 + jit(i, j) * r * 0.4, z + Math.sin(a) * d], [1, 0.8, 1], 0)
+      }
+    })
+    if (SEASON === 'fall') {
+      // Fallen leaves round the trunk.
+      for (let i = 0; i < 12; i++) {
+        const a = i * 2.4, d = 0.28 + (i % 4) * 0.12
+        k.box(L(leaves[i % leaves.length], 0.9), [0.07, 0.008, 0.05], [Math.cos(a) * d, 0.012 + (i % 3) * 0.003, Math.sin(a) * d], [0, a, 0])
+      }
+    }
+  }),
+
+  // Gazebo trim: front steps, turned balusters under the rails, a seat
+  // round the inside, corner brackets under the roof ring and a spike finial.
+  gazeboTrim: () => prop('gazeboTrim', (k) => {
+    const white = L('#fafafa', 0.6)
+    k.box(cast(L('#c9bcb6', 0.9)), [0.52, 0.08, 0.2], [0, 0.04, 0.95])
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2 + Math.PI / 6
+      const b = a + Math.PI / 3
+      const p = [Math.sin(a) * 0.72, Math.cos(a) * 0.72], q = [Math.sin(b) * 0.72, Math.cos(b) * 0.72]
+      // Brackets from each post up to the roof ring.
+      const ci = [Math.sin(a) * 0.6, Math.cos(a) * 0.6]
+      k.rod(white, [p[0], 1.2, p[1]], [ci[0], 1.37, ci[1]], 0.014, 4)
+      k.box(white, [0.11, 0.05, 0.11], [p[0], 0.18, p[1]])
+      if (i === 5) continue
+      const mid = (a + b) / 2
+      for (let j = 1; j < 6; j++) {
+        const t = j / 6
+        const x = (p[0] + (q[0] - p[0]) * t) * 0.97, z = (p[1] + (q[1] - p[1]) * t) * 0.97
+        k.cyl(white, 0.012, 0.016, 0.22, [x, 0.29, z], undefined, 6)
+      }
+      k.box(white, [0.7, 0.03, 0.035], [Math.sin(mid) * 0.62, 0.19, Math.cos(mid) * 0.62], [0, mid, 0])
+      // A bench seat along the three back sides.
+      if (i === 1 || i === 2 || i === 3) {
+        k.box(cast(L('#8d6e63', 0.8)), [0.6, 0.03, 0.14], [Math.sin(mid) * 0.5, 0.36, Math.cos(mid) * 0.5], [0, mid, 0])
+        k.box(L('#795548', 0.8), [0.5, 0.18, 0.02], [Math.sin(mid) * 0.46, 0.26, Math.cos(mid) * 0.46], [0, mid, 0])
+      }
+    }
+    k.cone(L('#c9a227', 0.35, 0.6), 0.02, 0.16, [0, 2.24, 0], undefined, 6)
   }),
 }
 
