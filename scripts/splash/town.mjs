@@ -53,8 +53,9 @@ for (const season of ['spring', 'summer', 'fall', 'winter'])
     for (let i = 0; i < 3; i++) { await p.mouse.wheel(0, -120); await p.waitForTimeout(80) }
     await p.waitForTimeout(14000)
     const png = await p.screenshot({ timeout: 180000 })
-    // Re-encode as WebP in the page; Playwright only writes PNG and JPEG.
-    const data = await p.evaluate(async (src) => {
+    // Re-encode as WebP in a blank page; Playwright only writes PNG and JPEG.
+    const enc = await ctx.newPage()
+    const data = await enc.evaluate(async (src) => {
       const img = new Image()
       img.src = src
       await img.decode()

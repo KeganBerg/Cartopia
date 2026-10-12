@@ -1,5 +1,6 @@
 import { Vector3 } from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
+import { VIEW, isFree } from './freeCam'
 
 // DOM bubbles (job timers, coins, flat tires) live outside the canvas and are
 // pinned to world positions here each frame. Cheaper and sturdier than one
@@ -16,6 +17,7 @@ const HOP = 64
 // Zoomed out past this share of the screen's default zoom, quiet bubbles (job timers, idle
 // "start" pills) fade away so the town reads at a glance. Ready coins and visitors stay.
 const FAR = 0.8
+const FREE_FAR = 70
 const quiet = (el: HTMLElement) => {
   const c = el.firstElementChild?.classList
   return !!c && (c.contains('badge-working') || c.contains('badge-idle'))
@@ -38,7 +40,8 @@ export function AnchorProjector() {
       hud = [...document.querySelectorAll(HUD)].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0 && r.height > 0)
     }
     // Same default zoom as ResponsiveZoom in World.tsx.
-    const far = camera.zoom < Math.min(38, Math.max(18, Math.sqrt(size.width * size.height) / 24)) * FAR
+    // The free view's camera is a perspective one: there, far means pulled well back.
+    const far = isFree(camera) ? camera.position.distanceTo(VIEW) > FREE_FAR : camera.zoom < Math.min(38, Math.max(18, Math.sqrt(size.width * size.height) / 24)) * FAR
     for (const [id, el] of anchorEls) {
       const p = anchors.get(id)
       if (!p) {
@@ -48,13 +51,18 @@ export function AnchorProjector() {
       v.copy(p).project(camera)
       let x = ((v.x + 1) / 2) * size.width
       let y = ((1 - v.y) / 2) * size.height
-      if (v.z > 1) {
-        el.style.visibility = 'hidden'
-        continue
-      }
-      el.style.visibility = 'visible'
       // data-clamp: keep it on screen, pinned to the nearest edge (for things worth chasing).
       const clamp = el.dataset.clamp !== undefined
+      if (v.z > 1) {
+        // Behind the free camera. A pinned bubble flips to the edge it's really past.
+        if (!clamp) {
+          el.style.visibility = 'hidden'
+          continue
+        }
+        x = size.width - x
+        y = size.height * 2
+      }
+      el.style.visibility = 'visible'
       if (clamp) {
         const cx = Math.min(Math.max(x, 60), size.width - 60)
         const cy = Math.min(Math.max(y, 210), size.height - 110)

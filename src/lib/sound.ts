@@ -2,7 +2,7 @@
 // Everything audible shares one AudioContext and goes through one master
 // output, so the Sound toggle silences it all. Other audio (the town ambience,
 // race engines) gets both from audioContext() and audioOut().
-import { glock, hz, marimba, pluck, shaker, softKick, woodblock } from './instruments'
+import { choir, glock, hz, marimba, pluck, shaker, softKick, vibes, woodblock } from './instruments'
 
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
@@ -228,6 +228,113 @@ export const sfx = {
     if (!go) return woodblock(d, t, 900, 0.12)
     for (const n of ['C5', 'E5', 'G5']) glock(d, t, hz(n), 0.05, 1)
     marimba(d, t, hz('C4'), 0.12)
+  }),
+}
+
+// A burst of filtered noise swept from one pitch to another: tarps, whooshes.
+function whoosh(d: { ctx: BaseAudioContext; out: AudioNode }, t: number, len: number, from: number, to: number, vol: number) {
+  const buf = d.ctx.createBuffer(1, Math.floor(d.ctx.sampleRate * len), d.ctx.sampleRate)
+  const data = buf.getChannelData(0)
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1
+  const src = d.ctx.createBufferSource()
+  src.buffer = buf
+  const bp = d.ctx.createBiquadFilter()
+  bp.type = 'bandpass'
+  bp.Q.value = 0.9
+  bp.frequency.setValueAtTime(from, t)
+  bp.frequency.exponentialRampToValueAtTime(to, t + len)
+  const g = d.ctx.createGain()
+  g.gain.setValueAtTime(0.0001, t)
+  g.gain.exponentialRampToValueAtTime(vol, t + len * 0.25)
+  g.gain.exponentialRampToValueAtTime(0.0001, t + len)
+  src.connect(bp).connect(g).connect(d.out)
+  src.start(t)
+  src.stop(t + len)
+}
+
+type Tier = 'nothing' | 'small' | 'common' | 'scarce' | 'rare'
+
+// Rusty's Rescue: every beat of a search has its own sound, timed by the 3D scene.
+export const rescueSfx = {
+  // Tapping a spot: a cheery double toot from the tow truck.
+  go: () => play((d, t) => {
+    horn(d, t)
+    woodblock(d, t, 1500, 0.06)
+  }),
+  // The build-up under the tarp: a drumroll that speeds up and climbs, longer
+  // and higher the better the find.
+  rumble: (tier: Tier, len: number) => play((d, t) => {
+    const top = tier === 'rare' ? 2 : tier === 'scarce' ? 1.5 : 1.2
+    let at = 0
+    let n = 0
+    while (at < len) {
+      const k = at / len
+      woodblock(d, t + at, 700 * (1 + (top - 1) * k), 0.035 + k * 0.05)
+      at += 0.11 - k * 0.075
+      n++
+    }
+    if (tier === 'rare' || tier === 'scarce') whoosh(d, t, len, 200, 900, tier === 'rare' ? 0.05 : 0.03)
+  }),
+  // The tarp whipped off, then a chord that says how good the find is.
+  reveal: (tier: Tier) => play((d, t) => {
+    whoosh(d, t, 0.35, 1800, 500, 0.12)
+    const h = t + 0.12
+    if (tier === 'nothing') {
+      // A deflated "womp womp".
+      marimba(d, h, hz('D3'), 0.13, 0.4)
+      marimba(d, h + 0.22, hz('Db3'), 0.12, 0.7)
+      return
+    }
+    softKick(d, h, tier === 'small' ? 0.08 : 0.16)
+    if (tier === 'small') {
+      glock(d, h, hz('B5'), 0.06, 0.5)
+      glock(d, h + 0.07, hz('E6'), 0.07, 0.9)
+      return
+    }
+    if (tier === 'common') {
+      for (const n of ['C4', 'E4', 'G4']) marimba(d, h, hz(n), 0.1)
+      glock(d, h + 0.1, hz('C6'), 0.05, 1)
+      return
+    }
+    if (tier === 'scarce') {
+      arp(['D4', 'F#4', 'A4', 'D5', 'F#5'], 0.06, pluck, 0.12)(d, h)
+      vibes(d, h + 0.3, hz('A5'), 0.06)
+      glock(d, h + 0.3, hz('D6'), 0.06, 1.4)
+      return
+    }
+    // Rare: a big bright chord with a choir swell under it.
+    arp(['C4', 'E4', 'G4', 'C5', 'E5', 'G5', 'C6'], 0.05, pluck, 0.13)(d, h)
+    choir(d, h, [hz('C4'), hz('G4'), hz('E5')], 0.03, 2.2)
+    vibes(d, h + 0.36, hz('G5'), 0.07)
+    glock(d, h + 0.36, hz('C7'), 0.05, 1.8)
+    softKick(d, h + 0.36, 0.12)
+  }),
+  // The hook bites: a metal clunk.
+  clunk: () => play((d, t) => {
+    woodblock(d, t, 520, 0.1)
+    marimba(d, t, hz('A2'), 0.1, 0.2)
+  }),
+  // A find lands: a car settles onto the tow line, a small find drops in the bed.
+  land: (car: boolean) => play((d, t) => {
+    softKick(d, t, car ? 0.16 : 0.07)
+    if (car) marimba(d, t + 0.02, hz('G2'), 0.12, 0.3)
+    else woodblock(d, t, 1700, 0.05)
+  }),
+  // One tick of a count-up, climbing a little each step.
+  tick: (n: number) => play((d, t) => glock(d, t, hz('C6') * Math.pow(2, Math.min(n, 12) / 12), 0.025, 0.25)),
+  // Heading home: the horn and a short rising run.
+  home: () => play((d, t) => {
+    horn(d, t)
+    horn(d, t + 0.5)
+    arp(['G4', 'C5', 'E5'], 0.09, marimba, 0.1)(d, t + 0.2)
+  }),
+  // The haul card: a proper fanfare.
+  fanfare: (big: boolean) => play((d, t) => {
+    arp(['C4', 'E4', 'G4', 'C5'], 0.1, marimba, 0.13)(d, t)
+    arp(['E5', 'G5', 'C6'], 0.08, glock, 0.06)(d, t + 0.4)
+    pluck(d, t + 0.4, hz('C3'), 0.13)
+    softKick(d, t + 0.4, 0.14)
+    if (big) choir(d, t + 0.4, [hz('C4'), hz('G4'), hz('E5')], 0.025, 2)
   }),
 }
 

@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
   PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS,
-  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, refillBucks, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, activeEvent, DAILY_BONUS, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modFits, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, CREW_CHEST, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower, seasonNumber, seasonOf, SEASON_STARS, skinDef, ownedSkins, seasonSkin, modSkinDef, ownedModSkins, seasonModSkin, SKINNED_SLOTS, type SkinnedSlot, fittedMods, SEASON_TIERS, STARS_PER_TIER, SEASON_CAR_BUCKS, dealsFor, dealOffer, type DealDef, type DealKind,
+  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, jobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, refillBucks, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, activeEvent, DAILY_BONUS, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modFits, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, CREW_CHEST, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower, seasonNumber, seasonOf, SEASON_STARS, skinDef, ownedSkins, seasonSkin, modSkinDef, ownedModSkins, seasonModSkin, SKINNED_SLOTS, type SkinnedSlot, fittedMods, SEASON_TIERS, STARS_PER_TIER, SEASON_CAR_BUCKS, dealsFor, dealOffer, type DealDef, type DealKind,
 } from './data'
 import { sfx } from '../lib/sound'
 import { fx } from './fx'
@@ -601,7 +601,7 @@ function tapMerged(s: GameState, set: (p: Partial<GameState>) => void, uids: str
     buildings: s.buildings.map((o) => {
       if (!go.has(o.uid)) return o
       const lvl = buildingLevel(o)
-      return { ...o, jobEndsAt: now + upgradeJobSeconds(d, lvl) * 1000, jobLevel: lvl }
+      return { ...o, jobEndsAt: now + jobSeconds(d, lvl, s.stats.jobs ?? 0) * 1000, jobLevel: lvl }
     }),
     updatedAt: now,
   })
@@ -878,7 +878,7 @@ export const useGame = create<GameState>()(
         const now = Date.now()
         const lvl = buildingLevel(b)
         const jobLvl = jobLevel(b)
-        const secs = upgradeJobSeconds(d, lvl)
+        const secs = jobSeconds(d, lvl, s.stats.jobs ?? 0)
         if (b.jobEndsAt !== null && now < b.jobEndsAt) return s.openUpgrade(buid)
         if (b.jobEndsAt === null) {
           if (!isOpen(d, now)) return s.toast(`The ${d.name} only opens at night. Doors open in ${Math.max(1, Math.ceil(msUntilNight(now) / 60000))} min.`)
@@ -1029,7 +1029,7 @@ export const useGame = create<GameState>()(
           if (!d.jobSeconds || d.kind === 'obstacle' || b.jobEndsAt !== null || !isOpen(d, now) || fuel < (d.fuelCost ?? 0)) return b
           fuel -= d.fuelCost ?? 0
           started++
-          return { ...b, jobEndsAt: now + upgradeJobSeconds(d, buildingLevel(b)) * 1000, jobLevel: buildingLevel(b) }
+          return { ...b, jobEndsAt: now + jobSeconds(d, buildingLevel(b), s.stats.jobs ?? 0) * 1000, jobLevel: buildingLevel(b) }
         })
         // Cars out of gas fill up at your Gas Station, if you have one.
         let cars = s.cars
@@ -1813,10 +1813,7 @@ export const useGame = create<GameState>()(
           sfx.error()
           return set({ search: { ...q, truckAt: i, flat: true } })
         }
-        const loot = q.pins[i]
-        if (loot.kind === 'car') sfx.levelUp()
-        else if (loot.kind !== 'nothing') sfx.coin()
-        else sfx.click()
+        // The search scene plays the reveal's build-up and sting itself, in time with the tarp.
         set({ search: { ...q, truckAt: i, revealed: q.revealed.map((r, j) => r || j === i) } })
       },
 
@@ -1860,8 +1857,7 @@ export const useGame = create<GameState>()(
           }
         }
         parts += scrapped
-        sfx.coin()
-        s.toast(notes.length ? `Rusty towed home: ${notes.join(', ')}!` : 'Rusty hauled everything home.')
+        // Rusty's panel shows the haul card with its fanfare.
         if (scrapped) setTimeout(() => get().toast(`Storage was full, so extra finds were scrapped for ${scrapped} parts.`), 600)
         set(withXp(s, 10 + notes.length * 10, {
           coins, parts, fuel, trophies, junkyard,

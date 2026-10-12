@@ -34,6 +34,23 @@ const GLYPHS = {
   trophy: (
     <path fillRule="evenodd" d="M6 2.5h12V4h3a1 1 0 0 1 1 1v1.5a5 5 0 0 1-4.6 5 6 6 0 0 1-3.9 3.3V17H16a2 2 0 0 1 2 2v2.5H6V19a2 2 0 0 1 2-2h2.5v-2.2a6 6 0 0 1-3.9-3.3A5 5 0 0 1 2 6.5V5a1 1 0 0 1 1-1h3ZM4 6v.5a3 3 0 0 0 2.1 2.9A6 6 0 0 1 6 8.5V6Zm16 0h-2v2.5l-.1.9A3 3 0 0 0 20 6.5Z" />
   ),
+  // Free camera: a building with a path circling it.
+  orbit: (
+    <>
+      <path d="M12 5.5 16.2 8.8V15H7.8V8.8Z" />
+      <path d="M19.6 10.6c1.5.8 2.4 1.8 2.4 2.9 0 2.5-4.5 4.5-10 4.5S2 16 2 13.5c0-1.2 1.1-2.3 2.9-3.1" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M10.6 15.2 14.4 18l-3.8 2.8Z" />
+    </>
+  ),
+  // Back to the bird's-eye view: town blocks seen from above.
+  birdseye: (
+    <>
+      <path d="M12 2.5 16.5 7 12 11.5 7.5 7Z" />
+      <path d="M6.5 8 11 12.5 6.5 17 2 12.5Z" />
+      <path d="M17.5 8 22 12.5 17.5 17 13 12.5Z" />
+      <path d="M12 13.5 16.5 18 12 22.5 7.5 18Z" />
+    </>
+  ),
   goals: (
     <path fillRule="evenodd" d="M9 2h6a1 1 0 0 1 1 1v1h2.5A1.5 1.5 0 0 1 20 5.5v15a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 20.5v-15A1.5 1.5 0 0 1 5.5 4H8V3a1 1 0 0 1 1-1Zm1 2v1.5h4V4Zm5.8 6.2a1 1 0 0 0-1.5-1.3l-3.6 4.3-1.7-1.6a1 1 0 0 0-1.4 1.4l2.5 2.4a1 1 0 0 0 1.5-.1Zm-7.3 7.3a1 1 0 0 0 0 2h7a1 1 0 0 0 0-2Z" />
   ),

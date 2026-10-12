@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { AdditiveBlending, BufferAttribute, BufferGeometry, Object3D, type Group, type InstancedMesh, type Mesh, type MeshBasicMaterial, type MeshStandardMaterial, type PerspectiveCamera, type Texture } from 'three'
+import { AdditiveBlending, BufferAttribute, BufferGeometry, Color, Object3D, Vector3, type Group, type InstancedMesh, type Mesh, type MeshBasicMaterial, type MeshStandardMaterial, type PerspectiveCamera, type Texture } from 'three'
 import type { Loot, Search } from '../game/store'
 import { carDef, type Rarity } from '../game/data'
 import { CarModel, carSize, wheelRig } from './CarModel'
@@ -15,6 +15,8 @@ import { SkyEnv } from './SkyEnv'
 import { holdTown } from './renderGate'
 import { holdPageTint } from './pageTint'
 import { LAYER } from './layers'
+import { rescueSfx } from '../lib/sound'
+import { buzz } from '../lib/haptics'
 import { beamTex, concreteTex, dirtTex, glowTex, grassTex, sandTex, trackTex } from './textures'
 
 // Rusty's search, played out in 3D: a dirt loop with the search spots around
@@ -379,9 +381,25 @@ function Tarp({ kind, color }: { kind: number; color: string }) {
 const backOut = (t: number) => 1 + 2.4 * (t - 1) ** 3 + 1.4 * (t - 1) ** 2
 const clamp01 = (t: number) => Math.min(1, Math.max(0, t))
 
-type SpotProps = { i: number; at: SpotAt; loot: Loot; open: boolean; gone: boolean; tarp: string; pad: string; speed: number; onPick: (i: number) => void; onFound: (i: number) => void }
+// How good a find is, for the build-up, the sounds and the shake.
+export type Tier = 'nothing' | 'small' | Rarity
+export const tierOf = (l: Loot): Tier => (l.kind === 'car' ? l.rarity : l.kind === 'nothing' ? 'nothing' : 'small')
+// Seconds of drumroll under the tarp before it's yanked: the better the find, the longer the wait.
+const BUILD: Record<Tier, number> = { nothing: 0.3, small: 0.3, common: 0.5, scarce: 0.85, rare: 1.15 }
+// The beacon climbs this ladder of colours during the build-up.
+const LADDER: Record<Tier, string[]> = { nothing: ['#ffd54f'], small: ['#ffd54f'], common: ['#ffd54f', '#ffffff'], scarce: ['#ffd54f', '#42a5f5'], rare: ['#ffd54f', '#42a5f5', '#ff6d00'] }
+const SHAKE: Record<Tier, number> = { nothing: 0.02, small: 0.04, common: 0.08, scarce: 0.14, rare: 0.24 }
+const PUNCH: Record<Tier, number> = { nothing: 0.02, small: 0.04, common: 0.07, scarce: 0.1, rare: 0.14 }
+const BUZZ: Record<Tier, number | number[]> = { nothing: 8, small: 15, common: 25, scarce: [25, 40, 35], rare: [30, 40, 30, 40, 80] }
+// The find's place on screen (0-1 from the top left), for the HUD to fly it to the tray.
+export type ScreenAt = { x: number; y: number }
 
-function SearchSpot({ i, at: p, loot, open, gone, tarp, pad, speed, onPick, onFound }: SpotProps) {
+type SpotProps = { i: number; at: SpotAt; loot: Loot; open: boolean; gone: boolean; tarp: string; pad: string; speed: number; onPick: (i: number) => void; onFound: (i: number, at: ScreenAt) => void; onHit: (i: number, tier: Tier) => void }
+
+const ladderColor = new Color()
+
+function SearchSpot({ i, at: p, loot, open, gone, tarp, pad, speed, onPick, onFound, onHit }: SpotProps) {
+  const { camera } = useThree()
   // Already open when the scene came up (the panel was reopened): no show.
   const born = useRef(open)
   const t0 = useRef(-1)
@@ -393,6 +411,10 @@ function SearchSpot({ i, at: p, loot, open, gone, tarp, pad, speed, onPick, onFo
   const item = useRef<Group>(null)
   const flash = useRef<MeshBasicMaterial>(null)
   const beam = useRef<MeshBasicMaterial>(null)
+  const shock = useRef<Mesh>(null)
+  const shockMat = useRef<MeshBasicMaterial>(null)
+  const [hit, setHit] = useState(born.current)
+  const rumbled = useRef(born.current)
   // The tarp flies off away from the road.
   const away = useMemo(() => {
     const dx = p.x - p.rx
@@ -404,35 +426,72 @@ function SearchSpot({ i, at: p, loot, open, gone, tarp, pad, speed, onPick, onFo
   if (open && stage === 'shut') setStage('opening')
   const car = loot.kind === 'car'
   const glow = car ? RARITY_GLOW[loot.rarity] : '#ffe082'
+  const tier = tierOf(loot)
+  const pre = BUILD[tier]
 
   useFrame(({ clock }) => {
     const now = clock.elapsedTime / SLOW
     if (stage === 'opening' && t0.current < 0) t0.current = now
-    const t = stage === 'opening' ? (now - t0.current) * speed : stage === 'open' ? 9 : -1
-    // Beacon: a pulsing ring and a soft light column while unopened, fading out as it opens.
-    const fade = t < 0 ? 1 : clamp01(1 - t / 0.3)
-    const pulse = 0.5 + Math.sin(now * 3.2 + i) * 0.5
-    if (ring.current) ring.current.opacity = fade * (0.45 + pulse * 0.45)
-    if (column.current) column.current.opacity = fade * (0.3 + pulse * 0.2)
+    const raw = stage === 'opening' ? (now - t0.current) * speed : stage === 'open' ? 99 : -1
+    // The build-up runs first, then everything below times off the yank.
+    const t = raw < 0 ? -1 : raw - pre
+    const build = raw < 0 ? 0 : clamp01(raw / pre)
+    if (stage === 'opening' && !rumbled.current) {
+      rumbled.current = true
+      rescueSfx.rumble(tier, pre / speed)
+    }
+    if (stage === 'opening' && t >= 0.12 && !hit) {
+      setHit(true)
+      rescueSfx.reveal(tier)
+      buzz(BUZZ[tier])
+      onHit(i, tier)
+    }
+    // Beacon: a pulsing ring and a soft light column while unopened. During the
+    // build-up it pulses faster and climbs the rarity ladder, then fades as the tarp goes.
+    const fade = raw < 0 ? 1 : clamp01(1 - t / 0.3)
+    const rate = 3.2 + build * build * 22
+    const pulse = 0.5 + Math.sin(now * rate + i) * 0.5
+    const lad = LADDER[tier]
+    ladderColor.set(raw < 0 ? '#ffd54f' : lad[Math.min(lad.length - 1, Math.floor(build * lad.length * 0.999))])
+    if (ring.current) {
+      ring.current.opacity = fade * (0.45 + pulse * 0.45 + build * 0.3)
+      ring.current.color.copy(ladderColor)
+    }
+    if (column.current) {
+      column.current.opacity = fade * (0.3 + pulse * 0.2 + build * 0.35)
+      column.current.color.copy(ladderColor)
+    }
     if (beacon.current) {
       beacon.current.visible = fade > 0.01
-      beacon.current.children[2]?.position.set(0, 1.75 + Math.abs(Math.sin(now * 2.4 + i)) * 0.3, 0)
-      beacon.current.children[2]?.rotation.set(0, now * 1.6, 0)
-      beacon.current.scale.setScalar(1 + pulse * 0.04)
+      beacon.current.children[2]?.position.set(0, 1.75 + Math.abs(Math.sin(now * 2.4 + i)) * 0.3 + build * 0.5, 0)
+      beacon.current.children[2]?.rotation.set(0, now * (1.6 + build * 14), 0)
+      beacon.current.scale.setScalar(1 + pulse * 0.04 + build * 0.12)
     }
-    // Tarp: a shiver as the hook catches it, then it's whipped off away from
-    // the road, tumbling, and only shrinks away once it's well clear.
+    // Tarp: shivers and hops harder and harder through the build-up, then it's
+    // whipped off away from the road, tumbling, and only shrinks away once it's well clear.
     const g = tarpRef.current
     if (g) {
       g.visible = t < 0.9
-      if (t >= 0) {
+      if (raw >= 0 && t < 0) {
+        const a = 0.02 + build * build * 0.1
+        g.position.set(0, Math.abs(Math.sin(now * 23)) * a * 0.9, 0)
+        g.rotation.set(Math.sin(now * 71) * a, Math.sin(now * 37) * a * 0.5, Math.cos(now * 59) * a, 'YXZ')
+        g.scale.set(1 + build * 0.05, 1 - build * 0.06 + Math.sin(now * 31) * a * 0.3, 1 + build * 0.05)
+      } else if (t >= 0) {
         const shake = clamp01(t / 0.15)
-        const k = clamp01((t - 0.12) / 0.7)
-        const e = 1 - (1 - k) ** 2
-        g.position.set(away[0] * e * 2.4, Math.sin(k * Math.PI) * 1.3 + e * 0.4, away[1] * e * 2.4)
+        const k = clamp01((t - 0.12) / 0.55)
+        const e = 1 - (1 - k) ** 3
+        g.position.set(away[0] * e * 2.6, Math.sin(k * Math.PI) * 1.6 + e * 0.4, away[1] * e * 2.6)
         g.rotation.set(e * 2.6 * away[1] + Math.sin(t * 90) * 0.06 * (1 - k) * shake, e * 1.4, -e * 2.6 * away[0] + Math.sin(t * 70) * 0.05 * (1 - k) * shake, 'YXZ')
         g.scale.setScalar(Math.max(0.001, 1 - clamp01((k - 0.6) / 0.4)))
       }
+    }
+    // A ring of light rolls out across the ground as the tarp comes off.
+    if (shock.current && shockMat.current) {
+      const sk = t < 0.12 || born.current ? 1 : clamp01((t - 0.12) / 0.6)
+      shock.current.visible = sk < 1
+      shock.current.scale.setScalar(1 + sk * (tier === 'rare' ? 4 : tier === 'scarce' ? 3 : 2))
+      shockMat.current.opacity = (1 - sk) ** 2 * (car ? 0.9 : 0.5)
     }
     // A rarity beam shoots up as a car is uncovered.
     if (beam.current) {
@@ -458,7 +517,8 @@ function SearchSpot({ i, at: p, loot, open, gone, tarp, pad, speed, onPick, onFo
     if (flash.current) flash.current.opacity = t < 0.25 || gone ? 0 : car ? 0.25 + 0.6 * clamp01(1 - (t - 0.25) / 1.2) : 0.35 * clamp01(1 - (t - 0.25) / 1.2)
     if (stage === 'opening' && t > 0.6 && !told.current) {
       told.current = true
-      onFound(i)
+      const v = new Vector3(p.x, 0.6, p.z).project(camera)
+      onFound(i, { x: (v.x + 1) / 2, y: (1 - v.y) / 2 })
     }
     if (stage === 'opening' && t > 1.6) setStage('open')
   })
@@ -535,8 +595,12 @@ function SearchSpot({ i, at: p, loot, open, gone, tarp, pad, speed, onPick, onFo
             <cylinderGeometry args={[0.32, 0.6, 4.8, 16, 1, true]} />
             <meshBasicMaterial ref={beam} map={beamTex()} color={glow} transparent opacity={0} depthWrite={false} blending={AdditiveBlending} side={2} toneMapped={false} />
           </mesh>
-          {stage === 'opening' && <Puffs color={pad} />}
-          {stage === 'opening' && <Sparkles delay={0.3 / speed} color={car ? RARITY_GLOW[loot.rarity] : '#ffe082'} count={car ? (loot.rarity === 'rare' ? 28 : 18) : 10} />}
+          {stage === 'opening' && hit && <Puffs color={pad} count={car ? 16 : 12} />}
+          {stage === 'opening' && hit && <Sparkles delay={0.12 / speed} color={car ? RARITY_GLOW[loot.rarity] : '#ffe082'} count={car ? (loot.rarity === 'rare' ? 40 : loot.rarity === 'scarce' ? 26 : 16) : 10} />}
+          <mesh ref={shock} rotation-x={-Math.PI / 2} position-y={0.08} visible={false} raycast={() => null}>
+            <ringGeometry args={[0.9, 1.15, 40]} />
+            <meshBasicMaterial ref={shockMat} color={glow} transparent opacity={0} depthWrite={false} blending={AdditiveBlending} toneMapped={false} />
+          </mesh>
         </>
       )}
     </group>
@@ -577,7 +641,7 @@ type Props = {
   auto: boolean
   leaving: boolean
   onArrive: (i: number) => void
-  onFound: (i: number) => void
+  onFound: (i: number, at: ScreenAt) => void
   onLeft: () => void
   onBusy: (busy: boolean) => void
 }
@@ -645,6 +709,8 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
   opts.current = { fast, auto, leaving, onArrive, onLeft, onBusy }
   const busyShown = useRef(false)
   const speed = fast ? 2.4 : 1
+  // The camera's punch-in and shake when a tarp comes off.
+  const punch = useRef<{ at: number; tier: Tier } | null>(null)
 
   // Camera framing: back off until the whole loop and its spots fit on screen.
   const tilt = tall ? 1.08 : 0.92
@@ -691,6 +757,8 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
     if (performance.now() / 1000 / SLOW < s.busyUntil || grab.current || pending()) return
     s.goal = i
     if (s.mode === 'idle') s.mode = 'drive'
+    rescueSfx.go()
+    buzz(10)
   }
 
   // Dev builds only: lets screenshot scripts tap a spot.
@@ -712,12 +780,13 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
     // go faster so no trip drags on.
     const driveTo = (target: number) => {
       const remaining = (((target - s.s) % L.len) + L.len) % L.len
-      if (remaining < 0.01) {
+      // (Rounding can land a hair past the target, which reads as a whole lap to go.)
+      if (remaining < 0.01 || remaining > L.len - 0.01) {
         s.s = target
         s.v = 0
         return true
       }
-      if (s.v === 0) s.trip = Math.max(9, remaining / 1.8) * k
+      if (s.v === 0) s.trip = Math.max(11, remaining / 1.5) * k
       const acc = s.trip * 1.3
       s.v = Math.min(s.trip, s.v + acc * dt, Math.sqrt(2 * acc * remaining) + 0.4)
       s.s += Math.min(remaining, s.v * dt)
@@ -735,7 +804,7 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
       s.goal = null
     }
     if (s.mode === 'intro') {
-      s.v = 5 * k
+      s.v = 7 * k
       s.spur -= s.v * dt
       if (s.spur <= 0) {
         s.spur = 0
@@ -744,7 +813,7 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
       }
     } else if (s.mode === 'idle') {
       // A fresh find: once it has risen into view, swing the hook out for it.
-      if (!grab.current && pending() && (now - seen.current[s.parked]) * k > 1.0) grab.current = { i: s.parked, t0: now, held: false }
+      if (!grab.current && pending() && (now - seen.current[s.parked]) * k > BUILD[tierOf(sq.pins[s.parked])] + 0.85) grab.current = { i: s.parked, t0: now, held: false }
       if (o.auto && !sq.flat && wall >= s.busyUntil && !grab.current && !pending()) {
         // Next unchecked spot ahead.
         let best = -1
@@ -771,7 +840,7 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
         s.parked = i
         s.focus = i
         s.focusAt = now
-        s.busyUntil = wall + 1.0 / k
+        s.busyUntil = wall + (BUILD[tierOf(sq.pins[i])] + 0.9) / k
         o.onArrive(i)
       }
     } else if (s.mode === 'leave') {
@@ -853,7 +922,8 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
       const sp = L.spots[g.i]
       const loot = sq.pins[g.i]
       const isCar = loot.kind === 'car'
-      const u = (now - g.t0) * k
+      // A brisk swing: the hook doesn't dawdle.
+      const u = (now - g.t0) * k * 1.3
       const reach = Math.hypot(sp.x - px, sp.z - pz)
       const ta = Math.atan2(sp.x - px, sp.z - pz)
       const hang = isCar ? 0.7 : 0.3
@@ -875,6 +945,8 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
       if (u >= 0.7 && !g.held) {
         g.held = true
         setHolding(g.i)
+        rescueSfx.clunk()
+        buzz(12)
       }
       if (g.held) {
         const tip = tipOf(px, py, pz, pose)
@@ -898,6 +970,8 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
         carriedAt = at3
       }
       if (u >= 1.7) {
+        rescueSfx.land(isCar)
+        if (isCar) buzz(20)
         grab.current = null
         setHolding(null)
         setTaken((tk) => [...tk, g.i])
@@ -1040,7 +1114,7 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
 
     // Camera: frames the whole lot, drifts a little toward the truck, and
     // leans in while a find is being revealed.
-    const reveal = s.focus >= 0 && ((now - s.focusAt) * k < 1.8 || sq.flat || !!g)
+    const reveal = s.focus >= 0 && ((now - s.focusAt) * k < 1.8 + BUILD[tierOf(sq.pins[s.focus])] || sq.flat || !!g)
     const f = reveal ? L.spots[s.focus] : null
     const lean = s.spur > 0 ? 0 : 0.18
     const gx = f ? (f.x + x) * 0.32 : x * lean
@@ -1052,13 +1126,16 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
     v.x += (gx - v.x) * ease
     v.z += (gz - v.z) * ease
     v.d += (gd - v.d) * ease
-    // A thump when a rare car comes out from under the tarp.
-    const fl = f ? sq.pins[s.focus] : null
-    const since = (now - s.focusAt) * k - 0.35
-    const kick = fl?.kind === 'car' && fl.rarity !== 'common' && since > 0 && since < 0.45 ? (1 - since / 0.45) * (fl.rarity === 'rare' ? 0.16 : 0.08) : 0
+    // The tarp comes off: the camera punches in and shakes, harder the better the find.
+    const pu = punch.current
+    const since = pu ? wall - pu.at : 9
+    const amp = pu ? SHAKE[pu.tier] : 0
+    const kick = since < 0.6 ? amp * (1 - since / 0.6) ** 2 : 0
     const jx = kick ? Math.sin(now * 61) * kick : 0
     const jz = kick ? Math.cos(now * 53) * kick : 0
-    camera.position.set(v.x + jx, Math.sin(tilt) * v.d, v.z + Math.cos(tilt) * v.d + jz)
+    const dip = since < 0.07 ? since / 0.07 : Math.exp(-(since - 0.07) * 4)
+    const d = v.d * (1 - (pu ? PUNCH[pu.tier] : 0) * dip)
+    camera.position.set(v.x + jx, Math.sin(tilt) * d, v.z + Math.cos(tilt) * d + jz)
     camera.lookAt(v.x + jx, 0, v.z + jz)
   })
 
@@ -1132,7 +1209,7 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
       </Batch>
       <Crowd people={rusty} />
       {L.spots.map((p, i) => (
-        <SearchSpot key={i} i={i} at={p} loot={search.pins[i]} open={search.revealed[i]} gone={holding === i || taken.includes(i)} tarp={theme.tarp[i % theme.tarp.length]} pad={theme.pad} speed={speed} onPick={pick} onFound={onFound} />
+        <SearchSpot key={i} i={i} at={p} loot={search.pins[i]} open={search.revealed[i]} gone={holding === i || taken.includes(i)} tarp={theme.tarp[i % theme.tarp.length]} pad={theme.pad} speed={speed} onPick={pick} onFound={onFound} onHit={(_, tier) => (punch.current = { at: performance.now() / 1000 / SLOW, tier })} />
       ))}
       <group ref={truck}>
         <group scale={TS}>
