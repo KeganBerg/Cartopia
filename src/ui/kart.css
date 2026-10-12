@@ -69,3 +69,10 @@
   .kt-podium-card { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; width: min(640px, 94vw); align-items: center; }
   .kt-podium-card h2, .kt-podium-card .arc-actions, .kt-podium-card .arc-pay { grid-column: 1 / -1; }
 }
+/* Live kart races: waiting for the other player, and the server's verdict on the podium. */
+.kt-wait { position: absolute; top: 40%; left: 50%; transform: translateX(-50%); padding: 10px 20px; border-radius: 14px; background: rgba(10, 20, 40, .6); color: #fff; font: 700 16px var(--ui, system-ui); white-space: nowrap; z-index: 3; }
+.kt-verdict { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 0 0 10px; padding: 8px 12px; border-radius: 12px; font: 700 15px var(--ui, system-ui); }
+.kt-verdict.win { background: #fff8e1; color: #e65100; }
+.kt-verdict.lose { background: #eceff1; color: #455a64; }
+.kt-verdict.wait { background: #e3f2fd; color: #1565c0; justify-content: center; }
+@media (max-height: 460px) { .kt-podium-card .kt-verdict { grid-column: 1 / -1; } }
