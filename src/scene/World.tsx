@@ -41,6 +41,7 @@ import { helpBuilding } from '../lib/help'
 import { hoursOf, seedOf } from '../game/hours'
 import { VIEW, isFree, useFreeCam } from './freeCam'
 import { FreeCam } from './FreeCam'
+import { TutorialCamera } from './TutorialCamera'
 
 // Meadow ground that drifting cloud shadows pass over, one per tiling.
 const meadows = new Map<number, MeshStandardMaterial>()
@@ -669,6 +670,7 @@ export function World() {
       <Outskirts land={land} roads={roadsList} small={Math.min(window.innerWidth, window.innerHeight) < 700} />
       <ResponsiveZoom />
       <ExpandZoom />
+      <TutorialCamera />
       <Interaction />
       <Batch version={`${layout}|${picked ?? ''}`} off={batchOff(mode)} cell={24}>
         <Land />
