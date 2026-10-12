@@ -11,6 +11,7 @@
 // loading pill and sized to fit it) parked in front of a busy town
 // that slowly pans, in the real season and the game's 20-minute day/night clock
 // (src/game/clock.ts), or a live night/day event cached by src/game/liveEvents.ts.
+// When the game is ready the car drives off screen and the splash fades away.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 
@@ -56,6 +57,9 @@ left:-30%;width:160%;top:-24%;height:70%;--cx:50%;--cy:52%}
 #splash .car{position:absolute;left:50%;top:37%;width:calc(min(76vw,340px) * var(--k,1));transform:translateX(-50%);z-index:4;opacity:0;transition:opacity .35s ease}
 #splash .car.on{opacity:1;animation:sp-park .7s cubic-bezier(.2,1.3,.4,1) both}
 @keyframes sp-park{from{transform:translate(-20%,-14%) scale(.9)}}
+#splash .car.go{animation:sp-go .9s cubic-bezier(.5,0,.9,.6) forwards}
+#splash .car.go .body{animation:none}
+@keyframes sp-go{0%{transform:translateX(-50%)}18%{transform:translate(-44%,-3%) rotate(-1.5deg)}100%{transform:translate(calc(-50% - 95vmax),42vmax) rotate(2deg)}}
 #splash .car .body{position:relative;isolation:isolate;animation:sp-bob 1.6s ease-in-out infinite alternate}
 #splash .car img{display:block;width:100%;height:auto}
 #splash .paint{position:absolute;inset:0;mix-blend-mode:multiply;background:var(--paint,#d32f2f);-webkit-mask-size:100% 100%;mask-size:100% 100%}
@@ -78,7 +82,7 @@ left:-30%;width:160%;top:-24%;height:70%;--cx:50%;--cy:52%}
 }
 @media (min-aspect-ratio:1/1) and (max-height:520px){#splash .tag{display:none}#splash .ld{top:calc(15% + min(36vw,520px) * .32 + 12px)}#splash .car{--ldb:calc(15 * var(--vh) + min(36vw,520px) * .32 + 76px);--cmax:min(22vw,300px)}}
 @media (max-aspect-ratio:1/1) and (max-height:640px){#splash .tag{display:none}#splash .car{top:30%}}
-@media (prefers-reduced-motion:reduce){#splash *,#splash *::before{animation:none!important}}
+@media (prefers-reduced-motion:reduce){#splash *,#splash *::before{animation:none!important}#splash .car.go{opacity:0}}
 `
 
 // Picks the time of day, season and the player's car, eases the pill forward
@@ -106,7 +110,7 @@ var bar=el.querySelector('.ld .fill'),lab=el.querySelector('.ld b'),v=.06,cap=.6
 function draw(){bar.style.transform='scaleX('+v+')'}
 var tick=setInterval(function(){v+=(cap-v)*.04;draw()},120);
 var slow=setTimeout(function(){lab.textContent='Still loading\\u2026 tap to retry';el.querySelector('.ld').onclick=function(){location.reload()}},30000);
-window.cartopiaSplash={set:function(x){if(x>v)v=x;cap=Math.max(cap,Math.min(.97,x+.08));draw()},done:function(){if(end)return;end=1;clearInterval(tick);clearTimeout(slow);v=1;draw();lab.textContent='Let\\u2019s go!';setTimeout(function(){el.classList.add('out');setTimeout(function(){el.remove()},650)},300)}};
+window.cartopiaSplash={set:function(x){if(x>v)v=x;cap=Math.max(cap,Math.min(.97,x+.08));draw()},done:function(){if(end)return;end=1;clearInterval(tick);clearTimeout(slow);v=1;draw();lab.textContent='Let\\u2019s go!';setTimeout(function(){car.classList.add('go');setTimeout(function(){el.classList.add('out');setTimeout(function(){el.remove()},650)},750)},250)}};
 })()`
 
 const BODY = `<div id="splash">
