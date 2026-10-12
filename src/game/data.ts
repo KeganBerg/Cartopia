@@ -45,6 +45,16 @@ export type BuildingDef = {
   event?: EventId
 }
 
+// Buildings that open up a feature rather than just earning coins. The Shop lists them first
+// and one-time tips nudge new players toward them.
+export const FEATURES: Record<string, string> = {
+  rescue: 'find old cars and restore them',
+  tires: 'fixes flat tires around town',
+  gas: 'refuels stranded cars and holds more fuel',
+  crew: 'join a crew and race together',
+  arcade: 'mini-games with prizes',
+}
+
 export const BUILDINGS: BuildingDef[] = [
   { id: 'showroom', name: 'Showroom', kind: 'showroom', w: 2, h: 2, price: 0, unlockLevel: 99, color: '#cfd8dc', roof: '#eceff1', sign: 'SHOWROOM' },
   { id: 'garage', name: 'My Garage', kind: 'garage', w: 2, h: 2, price: 0, unlockLevel: 99, color: '#b0bec5', roof: '#78909c', sign: 'GARAGE' },

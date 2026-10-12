@@ -1473,6 +1473,8 @@ button.book-car { font: inherit; color: inherit; }
 .crew-mini .crew-bar { flex: none; height: 8px; }
 .crew-mini small { font: 12px var(--display); color: #78909c; }
 /* Limited-time event items and goals */
+.ribbon.feature { background: linear-gradient(90deg, #7c4dff, #00b0ff); }
+.feature-line { color: #5e35b1; font-weight: 800; }
 .ribbon.spooky { background: linear-gradient(90deg, #ef6c00, #6a1b9a); }
 .goal-head.event span { color: #ef6c00; font-weight: 700; }
 .menu-sound small { font-weight: 400; color: #78909c; }
