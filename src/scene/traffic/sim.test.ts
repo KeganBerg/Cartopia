@@ -227,6 +227,46 @@ describe('town traffic', () => {
     expect(c.knot).toBeLessThanOrEqual(4)
   })
 
+  it('a car that breaks down pulls over within a few tiles, not limping round town', () => {
+    const { roads, buildings } = starter()
+    for (const seed of [11, 12, 13]) {
+      seedRandom(seed)
+      const t = new Traffic()
+      t.setTown(roads, buildings, turnOf)
+      t.setCars(cars(18), 18)
+      run(t, 20, () => {})
+      // One after another, as they run dry or get a flat.
+      for (let k = 1; k <= 4; k++) {
+        t.setCars(cars(18, k), 18)
+        const a = t.agents.get(cars(18)[k - 1].uid)!
+        const from = a.odo
+        let drove = Infinity
+        run(t, 15, () => {
+          if (a.parked && drove === Infinity) drove = a.odo - from
+        })
+        expect(drove).toBeLessThan(6)
+      }
+    }
+  })
+
+  it('cars already broken down appear pulled over, not driving', () => {
+    seedRandom(11)
+    const t = new Traffic()
+    const { roads, buildings } = starter()
+    t.setTown(roads, buildings, turnOf)
+    t.setCars(cars(18, 4), 18)
+    const broken = [...t.agents.values()].filter((a) => a.stalled)
+    expect(broken.length).toBe(4)
+    for (const a of broken) expect(a.parked).toBeGreaterThan(0)
+    const odo = broken.map((a) => a.odo)
+    run(t, 30, () => {})
+    expect(broken.map((a) => a.odo)).toEqual(odo)
+    // Fixed: it drives off again.
+    t.setCars(cars(18), 18)
+    run(t, 10, () => {})
+    expect(broken.every((a) => a.odo > 0)).toBe(true)
+  })
+
   it('side roads at a T have stop signs, and cars stop at them before pulling out', () => {
     seedRandom(4)
     const t = new Traffic()
