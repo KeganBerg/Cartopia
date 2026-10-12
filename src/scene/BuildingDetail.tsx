@@ -447,3 +447,198 @@ export function ObstacleDetail({ id }: { id: string }) {
     )
   return null
 }
+
+const bulbMat = <primitive object={glowMats.bulb} attach="material" dispose={null} />
+
+// A chalkboard A-frame on the pavement out front.
+function Sandwich({ at, board }: { at: V3; board: string }) {
+  return (
+    <group position={at} rotation-y={-0.35}>
+      {[-1, 1].map((sd) => (
+        <group key={sd} position={[0, 0.13, sd * 0.035]} rotation-x={sd * 0.22}>
+          <Box p={[0, 0, 0]} s={[0.17, 0.26, 0.015]}>{c('#5d4037')}</Box>
+          <Box p={[0, 0.01, sd * 0.009]} s={[0.13, 0.19, 0.004]}>{c(board)}</Box>
+        </group>
+      ))}
+    </group>
+  )
+}
+
+// One wheel lying on its side for a little vehicle, turned to roll along z.
+const Wheel = ({ z, r = 0.07 }: { z: number; r?: number }) => (
+  <mesh position={[0, r, z]} rotation-z={Math.PI / 2} castShadow>
+    <cylinderGeometry args={[r, r, 0.04, 10]} />
+    {c('#212121')}
+  </mesh>
+)
+
+// The pizza place's delivery scooter, its hot box on the back.
+function Scooter() {
+  return (
+    <group rotation-y={Math.PI / 2}>
+      <Wheel z={-0.17} />
+      <Wheel z={0.17} />
+      <Box p={[0, 0.12, 0]} s={[0.08, 0.05, 0.3]}>{c('#c62828')}</Box>
+      <Box p={[0, 0.2, -0.09]} s={[0.1, 0.13, 0.14]} cast>{c('#c62828')}</Box>
+      <Box p={[0, 0.28, -0.07]} s={[0.09, 0.03, 0.16]}>{c('#212121')}</Box>
+      <Box p={[0, 0.25, 0.15]} s={[0.04, 0.26, 0.04]} r={[-0.3, 0, 0]}>{c('#c62828')}</Box>
+      <Box p={[0, 0.38, 0.19]} s={[0.2, 0.025, 0.025]}>{c('#212121')}</Box>
+      <Box p={[0, 0.39, -0.12]} s={[0.17, 0.15, 0.15]} cast>{c('#fafafa')}</Box>
+      <Box p={[0, 0.39, -0.12]} s={[0.175, 0.04, 0.155]}>{c('#c62828')}</Box>
+    </group>
+  )
+}
+
+// A drive-up menu board on two legs, lit for the evening.
+function MenuBoard() {
+  return (
+    <group>
+      {[-0.13, 0.13].map((x) => <Box key={x} p={[x, 0.2, 0]} s={[0.035, 0.4, 0.035]}>{c('#37474f')}</Box>)}
+      <Box p={[0, 0.46, 0]} s={[0.36, 0.26, 0.05]} cast>{c('#d84315')}</Box>
+      <Box p={[0, 0.46, 0.028]} s={[0.31, 0.2, 0.006]}>{bulbMat}</Box>
+      {[0.5, 0.44, 0.38].map((y) => <Box key={y} p={[-0.04, y, 0.033]} s={[0.18, 0.018, 0.004]}>{c('#3e2723')}</Box>)}
+    </group>
+  )
+}
+
+// A claw machine by the arcade's door: lit glass box over a pink cabinet.
+function ClawMachine() {
+  return (
+    <group>
+      <Box p={[0, 0.14, 0]} s={[0.22, 0.28, 0.22]} cast>{c('#ec407a')}</Box>
+      <Box p={[0, 0.39, 0]} s={[0.2, 0.22, 0.2]}>{c('#b3e5fc')}</Box>
+      {[[-0.05, 0.04], [0.04, -0.03], [0.05, 0.05], [-0.03, -0.05]].map(([x, z], i) => (
+        <mesh key={i} position={[x, 0.31, z]}><icosahedronGeometry args={[0.04, 0]} />{flat(['#ffeb3b', '#7e57c2', '#66bb6a', '#ff7043'][i])}</mesh>
+      ))}
+      <Box p={[0, 0.53, 0]} s={[0.23, 0.06, 0.23]}>{bulbMat}</Box>
+      <Box p={[0, 0.24, 0.115]} s={[0.12, 0.05, 0.02]}>{c('#212121')}</Box>
+    </group>
+  )
+}
+
+// A rack of house balls for the bowling alley, out by the side door.
+function BallRack() {
+  return (
+    <group>
+      {[-0.17, 0.17].map((x) => <Box key={x} p={[x, 0.12, 0]} s={[0.03, 0.24, 0.12]}>{c('#5e35b1')}</Box>)}
+      {[0.05, 0.2].map((y) => <Box key={y} p={[0, y, 0]} s={[0.31, 0.02, 0.12]}>{c('#ede7f6')}</Box>)}
+      {[-0.11, 0, 0.11].flatMap((x, i) => [0.05, 0.2].map((y, j) => (
+        <mesh key={`${x}${y}`} position={[x, y + 0.055, 0]} castShadow><sphereGeometry args={[0.045, 10, 8]} />{c(['#e53935', '#1e88e5', '#212121', '#43a047', '#fdd835', '#8e24aa'][i * 2 + j])}</mesh>
+      )))}
+    </group>
+  )
+}
+
+// A bistro table and two stools for the diner.
+function Bistro() {
+  return (
+    <group>
+      <mesh position={[0, 0.2, 0]}><cylinderGeometry args={[0.02, 0.05, 0.4, 8]} />{c('#b0bec5')}</mesh>
+      <mesh position={[0, 0.4, 0]} castShadow><cylinderGeometry args={[0.13, 0.13, 0.025, 14]} />{c('#ef5350')}</mesh>
+      {[-1, 1].map((sd) => (
+        <group key={sd} position={[sd * 0.2, 0, 0]}>
+          <mesh position={[0, 0.12, 0]}><cylinderGeometry args={[0.015, 0.04, 0.24, 6]} />{c('#b0bec5')}</mesh>
+          <mesh position={[0, 0.25, 0]} castShadow><cylinderGeometry args={[0.065, 0.065, 0.03, 12]} />{c('#ef5350')}</mesh>
+        </group>
+      ))}
+    </group>
+  )
+}
+
+// The motel's ice machine and a lit drinks machine by the rooms.
+function Machines() {
+  return (
+    <group>
+      <Box p={[-0.14, 0.26, 0]} s={[0.24, 0.52, 0.16]} cast>{c('#1565c0')}</Box>
+      <Box p={[-0.14, 0.32, 0.082]} s={[0.17, 0.3, 0.006]}>{bulbMat}</Box>
+      <Box p={[0.14, 0.2, 0]} s={[0.24, 0.4, 0.16]} cast>{c('#eceff1')}</Box>
+      <Box p={[0.14, 0.3, 0.082]} s={[0.17, 0.06, 0.006]}>{c('#29b6f6')}</Box>
+    </group>
+  )
+}
+
+// The tuner's rolling tool chest, a floor jack and a pair of cones.
+function Toolkit() {
+  return (
+    <group>
+      <Box p={[-0.2, 0.2, 0]} s={[0.26, 0.36, 0.14]} cast>{c('#d50000')}</Box>
+      {[0.1, 0.18, 0.26, 0.34].map((y) => <Box key={y} p={[-0.2, y, 0.072]} s={[0.18, 0.012, 0.006]}>{c('#eceff1')}</Box>)}
+      {[-0.3, -0.1].map((x) => <Box key={x} p={[x, 0.012, 0]} s={[0.03, 0.024, 0.1]}>{c('#212121')}</Box>)}
+      <Box p={[0.08, 0.03, 0]} s={[0.2, 0.05, 0.08]}>{c('#ff3d00')}</Box>
+      {[0.24, 0.36].map((x, i) => (
+        <group key={x} position={[x, 0, i ? 0.03 : -0.03]}>
+          <Box p={[0, 0.02, 0]} s={[0.1, 0.04, 0.1]}>{c('#ff6d00')}</Box>
+          <mesh position={[0, 0.125, 0]} castShadow><coneGeometry args={[0.04, 0.17, 8]} />{c('#ff6d00')}</mesh>
+          <mesh position={[0, 0.125, 0]}><cylinderGeometry args={[0.028, 0.034, 0.03, 8]} />{c('#fafafa')}</mesh>
+        </group>
+      ))}
+    </group>
+  )
+}
+
+// A display rack of new tyres standing on their treads.
+function TyreRack() {
+  return (
+    <group>
+      {[-0.06, 0.06].map((z) => <Box key={z} p={[0, 0.015, z]} s={[0.5, 0.03, 0.025]}>{c('#90a4ae')}</Box>)}
+      {[-0.16, 0, 0.16].map((x) => (
+        <mesh key={x} position={[x, 0.16, 0]} castShadow>
+          <torusGeometry args={[0.1, 0.045, 8, 16]} />
+          {c('#212121')}
+        </mesh>
+      ))}
+      {[-0.16, 0, 0.16].map((x) => (
+        <mesh key={x} position={[x, 0.16, 0]} rotation-x={Math.PI / 2}>
+          <cylinderGeometry args={[0.07, 0.07, 0.05, 10]} />
+          {c('#b0bec5')}
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+// The car wash's coin vacuum: a post, its hose looped over a hook.
+function Vacuum() {
+  return (
+    <group>
+      <Box p={[0, 0.03, 0]} s={[0.2, 0.06, 0.2]}>{c('#cfd8dc')}</Box>
+      <Box p={[0, 0.32, 0]} s={[0.13, 0.52, 0.13]} cast>{c('#ffca28')}</Box>
+      <Box p={[0, 0.6, 0]} s={[0.17, 0.05, 0.17]}>{c('#0277bd')}</Box>
+      <Box p={[0.068, 0.4, 0]} s={[0.006, 0.1, 0.08]}>{c('#0277bd')}</Box>
+      <mesh position={[0.1, 0.3, 0]} rotation-y={Math.PI / 2}><torusGeometry args={[0.1, 0.015, 6, 14, Math.PI * 1.4]} />{c('#37474f')}</mesh>
+    </group>
+  )
+}
+
+const SIDE_PROP: Record<string, () => ReactNode> = {
+  pizza: Scooter,
+  burger: MenuBoard,
+  arcade: ClawMachine,
+  bowling: BallRack,
+  diner: Bistro,
+  motel: Machines,
+  tuner: Toolkit,
+  tires: TyreRack,
+  carwash: Vacuum,
+}
+const BOARD = new Set(['pizza', 'burger', 'diner', 'arcade', 'bowling', 'donut', 'icecream'])
+
+// Lot dressing for a generic shop, one piece per thing so each keeps its shape
+// in a merged pair and stays its true size in a merged block: something that
+// says what the shop is, along the right-hand side the camera looks at, and a
+// chalkboard out front for the eateries.
+export function ShopLot({ id, W, F }: { id: string; W: number; F: number }) {
+  const Side = SIDE_PROP[id]
+  // Between the bin by the front corner and the gas meter at the back.
+  const x = W * 0.41 + (W > 2 ? 0.17 : 0.1)
+  return (
+    <group>
+      {Side && (
+        <group position={[x, 0, -0.05]} rotation-y={Math.PI / 2}>
+          <Side />
+        </group>
+      )}
+      {BOARD.has(id) && <Sandwich at={[W > 2 ? 0.62 : 0.42, 0, F + 0.3]} board={id === 'arcade' ? '#311b92' : '#263238'} />}
+    </group>
+  )
+}
