@@ -90,7 +90,7 @@ export function LiveKart({ live, car, onExit, deps = REAL }: { live: LiveRace; c
     deps.join(live.raceId, o.uid).then((ok) => {
       if (disposed) return
       if (!ok) {
-        useGame.getState().toast("Couldn't start the live race on the server. Try again in a moment.")
+        useGame.getState().toast("📡 Race didn't start · try again")
         onExit()
         return
       }
@@ -111,7 +111,9 @@ export function LiveKart({ live, car, onExit, deps = REAL }: { live: LiveRace; c
         if (s) setSetup(s)
       })
       c.on('ready', (p) => {
-        if (!live.host || started.current || (p as { seed?: unknown })?.seed !== setupRef.current?.seed) return
+        if (!live.host || (p as { seed?: unknown })?.seed !== setupRef.current?.seed) return
+        // Still hearing 'ready' after the start: every 'go' got lost, so say it again.
+        if (started.current) return cc.send('go', {})
         started.current = true
         for (let i = 0; i < 3; i++) setTimeout(() => cc.send('go', {}), i * 250)
         setGo(true)
@@ -136,17 +138,20 @@ export function LiveKart({ live, car, onExit, deps = REAL }: { live: LiveRace; c
     }
   }, [live, o, onExit, deps])
 
-  // Our finish time goes to the server, which waits for theirs and calls it.
-  const signal = useRef({ cancelled: false })
-  useEffect(() => () => { signal.current.cancelled = true }, [])
+  // Our finish time goes to the server, which waits for theirs and calls it. That carries on
+  // (and pays) even if the player leaves the podium first; only the podium update needs us here.
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
   const prize = liveKartPrize(o.pi)
   const onFinish = async (_place: number, time: number) => {
     setVerdict('checking')
-    const v = await deps.report(live.raceId, time, signal.current)
-    if (signal.current.cancelled) return
-    if (!v || v.void) return setVerdict('failed')
-    useGame.getState().finishRace(v.won, prize)
-    setVerdict(v)
+    const v = await deps.report(live.raceId, time, { cancelled: false })
+    if (v && !v.void) useGame.getState().finishRace(v.won, prize)
+    if (!mounted.current) return
+    setVerdict(!v || v.void ? 'failed' : v)
   }
 
   const who = playerName(o.uid, o.town)

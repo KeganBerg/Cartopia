@@ -42,7 +42,12 @@ function cleanSnap(raw: unknown, n: number): { id: number; v: number[] } | null 
   const id = raw[0]
   if (!Number.isInteger(id) || id < 0 || id >= n) return null
   const v = raw.slice(1).map((x, i) => {
-    const lim = LIMIT[F[i]]
+    const f = F[i]
+    // Indexes into the race stay whole numbers in range.
+    if (f === 'towTarget') return Number.isInteger(x) && x >= 0 && x < n ? x : -1
+    if (f === 'lap') return Math.max(0, Math.min(9, Math.round(x)))
+    if (f === 'idx') return Math.max(0, Math.round(x))
+    const lim = LIMIT[f]
     return lim === undefined ? x : Math.max(-lim, Math.min(lim, x))
   })
   return { id, v }
@@ -81,6 +86,7 @@ export class KartLink {
   private bufs: Snap[][]
   private off: number | null = null // their race clock minus ours, smoothed
   private heard = new Map<string, number>() // player id -> our race time when last heard
+  private picked: number[] // per kart: crates taken and not yet used, so a note can't conjure items
   private sentAt = -1
   gone = new Set<string>()
   onGone?: (player: string) => void
@@ -91,6 +97,7 @@ export class KartLink {
     this.owners = owners
     this.ch = ch
     this.bufs = race.karts.map(() => [])
+    this.picked = race.karts.map(() => 0)
     race.owned = (id) => this.drives(id)
     for (const p of new Set(owners)) if (p !== me) this.heard.set(p, 0)
     ch.on('snap', (p) => this.onSnap(p))
@@ -129,7 +136,14 @@ export class KartLink {
     for (const r of p.n.slice(0, 20)) {
       const n = cleanNote(r, this.race.karts.length)
       // Only a kart's own browser speaks for it.
-      if (n && (n.k === 'gone' || this.owners[n.kart] === p.from)) this.race.apply(n)
+      if (!n || (n.k !== 'gone' && this.owners[n.kart] !== p.from)) continue
+      // An item needs a crate behind it.
+      if (n.k === 'crate') this.picked[n.kart] = Math.min(2, this.picked[n.kart] + 1)
+      if (n.k === 'item') {
+        if (this.picked[n.kart] <= 0) continue
+        this.picked[n.kart]--
+      }
+      this.race.apply(n)
     }
   }
 

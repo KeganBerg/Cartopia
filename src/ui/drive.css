@@ -2,7 +2,7 @@
 .dc { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; pointer-events: none; user-select: none; -webkit-user-select: none; touch-action: none; }
 .dc * { touch-action: none; }
 .dc-steer { pointer-events: auto; position: relative; }
-.dc-steer.tall { height: 30vh; min-height: 150px; margin: 0 calc(8px + var(--sar, 0px)) 0 calc(8px + var(--sal, 0px)); }
+.dc-steer.tall { height: 30vh; min-height: 150px; margin: 0 calc(8px + var(--sar, 0px)) var(--sab, 0px) calc(8px + var(--sal, 0px)); }
 .dc-steer.wide { position: absolute; left: 0; bottom: 0; width: 46vw; height: 62vh; }
 .dc-hint { position: absolute; left: 50%; bottom: calc(26px + var(--sab, 0px)); transform: translateX(-50%); padding: 8px 16px; border-radius: 999px; background: rgba(10, 20, 40, .42); color: rgba(255, 255, 255, .9); font: 700 13px var(--ui, system-ui); white-space: nowrap; letter-spacing: .02em; }
 .dc-steer.wide .dc-hint { left: calc(110px + var(--sal, 0px)); bottom: calc(40px + var(--sab, 0px)); }
@@ -11,7 +11,7 @@
 .dc-knob { position: absolute; left: -30px; top: -30px; width: 60px; height: 60px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #cfd8dc 70%); box-shadow: 0 4px 10px rgba(0, 0, 0, .35); }
 .dc-knob.drift { background: radial-gradient(circle at 35% 30%, #fff, #ffab40 70%); box-shadow: 0 0 18px #ff9100; }
 .dc-btn { pointer-events: auto; border: 0; border-radius: 50%; display: grid; place-items: center; color: #fff; font: 800 15px var(--display, system-ui); letter-spacing: .03em; background: rgba(10, 20, 40, .5); border: 3px solid rgba(255, 255, 255, .7); box-shadow: 0 4px 0 rgba(0, 0, 0, .3); transition: transform .06s; }
-.dc-btn small { font-size: 11px; font-weight: 800; letter-spacing: .06em; }
+.dc-btn small { font-size: 13px; font-weight: 800; letter-spacing: .06em; }
 .dc-btn.on { transform: scale(.92); }
 .dc-drift { width: 96px; height: 96px; background: linear-gradient(#ffab40, #e65100); border-color: #fff3e0; font-size: 18px; }
 .dc-drift.on { box-shadow: 0 0 24px #ff9100; }

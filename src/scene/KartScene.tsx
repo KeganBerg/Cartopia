@@ -366,7 +366,7 @@ function Trackside({ t }: { t: Track }) {
     <group>
       {stands.map((s, i) => <Grandstand key={i} x={s.x} z={s.z} h={s.h} width={s.w} rows={5} roof={i % 2 ? '#1565c0' : '#c62828'} />)}
       <Crowd people={fans} />
-      <Batch version={t.n}>
+      <Batch version={t.n} cell={24}>
         {tyres.map((p, i) => <TyreStack key={i} x={p.x} z={p.z} n={3} band={i % 2 ? '#e53935' : '#fafafa'} />)}
         {marshals.map((m, i) => (
           <group key={i} position={[m.x, 0, m.z]} rotation-y={m.ry}>
@@ -417,7 +417,7 @@ function TownScenery({ t }: { t: Track }) {
   const tex = useMemo(() => { const c = towerTex().clone(); c.repeat.set(2, 4); c.needsUpdate = true; return c }, [])
   return (
     <group>
-      <Batch version={t.n + 1}>
+      <Batch version={t.n + 1} cell={24}>
         {shops.map((s, i) => <Building key={i} def={s.def} x={s.x} z={s.z} ry={s.ry} />)}
         {trees.map((p, i) => <Building key={i} def={p.def} x={p.x} z={p.z} ry={i} s={p.s} />)}
         {towers.map((b, i) => (
@@ -481,7 +481,7 @@ function DocksScenery({ t }: { t: Track }) {
   return (
     <group>
       <group position-y={-0.33}><Water x={0} z={0} w={500} d={500} id="kartdocks" color="#8fd0f5" rough={0.6} /></group>
-      <Batch version={t.n + 2}>
+      <Batch version={t.n + 2} cell={24}>
         {/* Concrete quay under the whole circuit, so the track sits on land with water round it. */}
         {quay.map((q, i) => <mesh key={i} position={[q.x, -0.22, q.z]}><boxGeometry args={[4.02, 0.44, 4.02]} /><meshStandardMaterial map={concreteTex(1, 1)} color="#b0b6ba" /></mesh>)}
         {stacks.map((s, i) => (
@@ -582,7 +582,7 @@ function DesertScenery({ t }: { t: Track }) {
   const stop = useMemo(() => along(200, 5, 1, 5, 89)[0], [along])
   return (
     <group>
-      <Batch version={t.n + 3}>
+      <Batch version={t.n + 3} cell={24}>
         <mesh rotation-x={-Math.PI / 2} position={[0, -0.01, 0]}><planeGeometry args={[460, 460]} /><meshStandardMaterial map={sandTex(60, 60)} color="#e7b98a" /></mesh>
         {mesas.map((m, i) => (
           <group key={i} position={[m.x, 0, m.z]} rotation-y={m.ry}>
@@ -867,7 +867,7 @@ export function KartScene({ race, looks, me, input, running, cam = (DEV?.get('ca
     }
     if (events.length) onEvents?.(events)
     const mine = race.karts[me]
-    if (DEV) (window as unknown as { kart: unknown }).kart = { race, camera }
+    if (DEV) (window as unknown as { kart: unknown }).kart = { race, camera, scene: state.scene, gl: state.gl }
     if (mine.done !== null && !s.finished) {
       s.finished = true
       onFinish()
