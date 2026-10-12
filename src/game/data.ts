@@ -592,8 +592,10 @@ export function carStats(car: CarDef, up: Record<UpgradeSlot, number>, mods?: st
   }
 }
 
-// XP needed to go from `level` to `level + 1`.
-export const xpToNext = (level: number) => Math.round(100 * Math.pow(level, 2.15))
+// XP needed to go from `level` to `level + 1`: rising gently, so each level is a bit more than the
+// last, then the same for every level past XP_FLAT_LEVEL so high levels never feel endless.
+export const XP_FLAT_LEVEL = 100
+export const xpToNext = (level: number) => Math.round(100 * Math.pow(Math.min(level, XP_FLAT_LEVEL), 2.15))
 
 export const baseFuelCap = (level: number) => 15 + level * 2
 export const FUEL_REGEN_SECONDS = 60
@@ -925,7 +927,7 @@ export const servicePay = (level: number, kind: 'tires' | 'gas') => (kind === 't
 export const gasCanCost = (level: number) => 30 + level * 15
 export const flatFixCost = (level: number) => 50 + level * 25
 
-export const PAINTS: { color: string; name: string; bucks?: number; earn?: 'road' | 'cup' }[] = [
+export const PAINTS: { color: string; name: string; bucks?: number; earn?: 'road' | 'first' }[] = [
   { color: '#e53935', name: 'Fire Red' }, { color: '#fb8c00', name: 'Sunset' }, { color: '#fdd835', name: 'Taxi' },
   { color: '#43a047', name: 'Racing Green' }, { color: '#00acc1', name: 'Lagoon' }, { color: '#1e88e5', name: 'Royal Blue' },
   { color: '#3949ab', name: 'Midnight' }, { color: '#8e24aa', name: 'Grape' }, { color: '#ec407a', name: 'Bubblegum' },
@@ -936,15 +938,15 @@ export const PAINTS: { color: string; name: string; bucks?: number; earn?: 'road
   { color: '#00796b', name: 'Deep Teal' },
   { color: '#ffd700', name: 'Gold Flake', bucks: 1 }, { color: '#76ff03', name: 'Neon Lime', bucks: 1 },
   { color: '#ff00e5', name: 'Hot Magenta', bucks: 1 }, { color: '#00e5ff', name: 'Ice Neon', bucks: 1 },
-  // Earned only: on the Trophy Road (game/trophyRoad.ts) or by winning a Class Cup (game/cups.ts).
+  // Earned only: on the Trophy Road (game/trophyRoad.ts) or by the first win in a car of a class (game/mastery.ts).
   { color: '#6fdcab', name: 'Mint', earn: 'road' }, { color: '#ffb38a', name: 'Peach', earn: 'road' },
   { color: '#2446c8', name: 'Cobalt', earn: 'road' }, { color: '#e0a899', name: 'Rose Gold', earn: 'road' },
   { color: '#f4e04d', name: 'Lemon', earn: 'road' }, { color: '#5b2a6e', name: 'Plum', earn: 'road' },
   { color: '#ff6f00', name: 'Tangerine', earn: 'road' }, { color: '#4a535c', name: 'Gunmetal', earn: 'road' },
   { color: '#9fd8cb', name: 'Sea Glass', earn: 'road' }, { color: '#d2042d', name: 'Cherry', earn: 'road' },
-  { color: '#a4e22b', name: 'Zest', earn: 'cup' }, { color: '#c1440e', name: 'Rust Orange', earn: 'cup' },
-  { color: '#0f7b5f', name: 'Paddock Green', earn: 'cup' }, { color: '#1a1446', name: 'Afterburner', earn: 'cup' },
-  { color: '#c8a165', name: 'Sandstorm', earn: 'cup' }, { color: '#ff4fa3', name: 'Bubblegum Pop', earn: 'cup' },
+  { color: '#a4e22b', name: 'Zest', earn: 'first' }, { color: '#c1440e', name: 'Rust Orange', earn: 'first' },
+  { color: '#0f7b5f', name: 'Paddock Green', earn: 'first' }, { color: '#1a1446', name: 'Afterburner', earn: 'first' },
+  { color: '#c8a165', name: 'Sandstorm', earn: 'first' }, { color: '#ff4fa3', name: 'Bubblegum Pop', earn: 'first' },
 ]
 // The colours every new town can paint with. The rest are won from paint rivals (game/paintRivals.ts).
 export const STARTER_PAINTS = ['#e53935', '#1e88e5', '#fafafa', '#212121']
@@ -955,23 +957,23 @@ export const PAINT_COST = 150
 export const STRIPE_COST = 100
 
 // How the paint catches the light. Glossy is the factory finish every car comes with.
-// Bronze, Silver and Gold are mastery finishes (game/mastery.ts): free, but only on a car
-// model whose mastery has reached that tier (`mastery`), never sold.
-export type Finish = 'gloss' | 'matte' | 'chrome' | 'bronze' | 'silver' | 'gold'
+// Gold, Diamond and Galaxy are class mastery finishes (game/mastery.ts): free, but only on a car
+// whose class has reached that tier (`mastery`: 1 Gold, 2 Diamond, 3 Galaxy), never sold.
+export type Finish = 'gloss' | 'matte' | 'chrome' | 'gold' | 'diamond' | 'galaxy'
 export const FINISHES: { id: Finish; name: string; coins: number; unlockLevel: number; blurb: string; mastery?: number }[] = [
   { id: 'gloss', name: 'Glossy', coins: 150, unlockLevel: 1, blurb: 'Factory shine' },
   { id: 'matte', name: 'Matte', coins: 400, unlockLevel: 1, blurb: 'Flat, no shine' },
   { id: 'chrome', name: 'Chrome', coins: 2500, unlockLevel: 8, blurb: 'Mirror metal in your colour' },
-  { id: 'bronze', name: 'Bronze', coins: 0, unlockLevel: 1, blurb: 'Bronze mastery in this car', mastery: 1 },
-  { id: 'silver', name: 'Silver', coins: 0, unlockLevel: 1, blurb: 'Silver mastery in this car', mastery: 2 },
-  { id: 'gold', name: 'Gold', coins: 0, unlockLevel: 1, blurb: 'Gold mastery in this car', mastery: 4 },
+  { id: 'gold', name: 'Gold', coins: 0, unlockLevel: 1, blurb: 'Gold: master 3 cars in this class', mastery: 1 },
+  { id: 'diamond', name: 'Diamond', coins: 0, unlockLevel: 1, blurb: 'Diamond: master 6 cars in this class', mastery: 2 },
+  { id: 'galaxy', name: 'Galaxy', coins: 0, unlockLevel: 1, blurb: 'Galaxy: Diamond in every class', mastery: 3 },
 ]
 export const finishDef = (id?: Finish | null) => FINISHES.find((f) => f.id === id) ?? FINISHES[0]
 // Material numbers for each finish: [metalness, roughness, how far the colour is lifted, and
 // towards what (white when left out)]. The mastery metals pull your colour towards their own.
 export const FINISH_LOOK: Record<Finish, [number, number, number, string?]> = {
   gloss: [0.4, 0.3, 0], matte: [0.05, 0.92, 0], chrome: [1, 0.12, 0.15],
-  bronze: [0.85, 0.3, 0.55, '#b0703a'], silver: [0.9, 0.24, 0.6, '#d9dee4'], gold: [0.95, 0.2, 0.62, '#ffc83d'],
+  gold: [0.95, 0.2, 0.62, '#ffc83d'], diamond: [0.7, 0.08, 0.6, '#e6f7ff'], galaxy: [0.85, 0.15, 0.6, '#3b1f8f'],
 }
 
 export type PaintJob = { color: string; finish: Finish; stripe: string | null }

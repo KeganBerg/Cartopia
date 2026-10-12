@@ -4,7 +4,8 @@ import { CARS, performance } from '../game/data'
 import { FIELD, KartRace, TRACKS, buildTrack } from '../game/kart'
 import { KartLink } from '../lib/kartNet'
 import { INVITE_MS, cleanCard, endParty, useLive, type LivePlayer, type LiveRace } from '../lib/live'
-import { PARTY_SHARE, joinParty, partyChannel, reportPartyFinish, type PartyVerdict } from '../lib/party'
+import { joinParty, partyChannel, reportPartyFinish, type PartyVerdict } from '../lib/party'
+import { placeShare } from '../game/boosts'
 import { playerName } from '../lib/profiles'
 import { signedInUser } from '../lib/cloud'
 import { CarThumb } from '../scene/BuildingPreview'
@@ -237,11 +238,11 @@ export function LiveKartParty({ live, car, onExit, deps = REAL }: { live: LiveRa
   }, [])
   const others = setup ? setup.cards.filter((c) => c.id !== me) : []
   const prize = liveKartPrize(others.length ? Math.round(others.reduce((a, c) => a + c.pi, 0) / others.length) : mine.pi)
-  const payOf = (place: number) => Math.round(prize * (PARTY_SHARE[place - 1] ?? 0.1))
+  const payOf = (place: number, of: number) => Math.round(prize * placeShare(place, of, true))
   const onFinish = async (_place: number, time: number) => {
     setVerdict('checking')
     const v = await deps.report(live.raceId, time)
-    if (v) useGame.getState().finishRace(v.place === 1, prize, { mode: 'kart', live: true, loss: payOf(v.place) })
+    if (v) useGame.getState().finishRace(v.place === 1, prize, { mode: 'kart', live: true, loss: payOf(v.place, v.of) })
     if (!mounted.current) return
     setVerdict(v ?? 'failed')
   }
@@ -252,7 +253,7 @@ export function LiveKartParty({ live, car, onExit, deps = REAL }: { live: LiveRa
     : verdict ? (
       <div className={`kt-verdict ${verdict.place === 1 ? 'win' : 'lose'}`}>
         <b>{verdict.place === 1 ? '🏆' : ''} {ORD(verdict.place)} / {verdict.of}</b>
-        <span>🪙 +${payOf(verdict.place).toLocaleString()}</span>
+        <span>🪙 +${payOf(verdict.place, verdict.of).toLocaleString()}</span>
       </div>
     ) : null
 

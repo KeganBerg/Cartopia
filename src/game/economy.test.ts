@@ -22,7 +22,8 @@ describe('server XP curve', () => {
     // different curve there would push levels back up (or down) on every save. Keep the two equal.
     const sql = readdirSync(dir).sort().map((f) => readFileSync(new URL(f, dir), 'utf8'))
       .filter((s) => s.includes('function public.econ_xp_to_next')).pop()!
-    const [, a, p] = /econ_xp_to_next[\s\S]*?round\(\s*([\d.]+)\s*\*\s*power\(l::numeric,\s*([\d.]+)\)\s*\)/.exec(sql)!
-    for (let l = 1; l <= 100; l++) expect(Math.round(Number(a) * Math.pow(l, Number(p))), `level ${l}`).toBe(xpToNext(l))
+    const [, a, cap, p] = /econ_xp_to_next[\s\S]*?round\(\s*([\d.]+)\s*\*\s*power\(least\(l,\s*(\d+)\)::numeric,\s*([\d.]+)\)\s*\)/.exec(sql)!
+    for (let l = 1; l <= 200; l++) expect(Math.round(Number(a) * Math.pow(Math.min(l, Number(cap)), Number(p))), `level ${l}`).toBe(xpToNext(l))
+    expect(xpToNext(150)).toBe(xpToNext(100))
   })
 })

@@ -57,6 +57,9 @@ export function tutTarget(s: Game): TutTarget | null {
 // Is the tutorial card on screen? Other hints stay quiet so one instruction shows at a time.
 export const tutorialShowing = (s: Game) => !!STEPS[s.tutorial] && !s.panel && !s.visiting
 
+// Skipping at or before this step keeps the free paint pick for the Paint Shop.
+const PICK_STEP = STEPS.findIndex((s) => s.pick)
+
 // The make-it-yours step offers the colours every new town has, for the body and the rims.
 const paintName = (c: string) => PAINTS.find((p) => p.color === c)?.name ?? c
 // What a Gas Station adds to the tank.
@@ -139,7 +142,7 @@ export function Tutorial() {
       <div className="tut-actions">
         {pick ? <button className="buy small" disabled={!paint || !rim} onClick={apply}>Done</button>
           : !cur.done && <button className="buy small" onClick={() => setStep(step + 1)}>Next</button>}
-        <button className="tut-skip" onClick={() => setStep(99)}>Skip</button>
+        <button className="tut-skip" onClick={() => useGame.getState().skipTutorial(PICK_STEP)}>Skip</button>
       </div>
     </div>
   )

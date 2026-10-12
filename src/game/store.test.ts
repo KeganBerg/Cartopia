@@ -92,7 +92,7 @@ describe('welcome back report', () => {
 
 describe('campaign', () => {
   const g = () => useGame.getState()
-  const start = () => useGame.setState({ level: 20, xp: 0, coins: 0, bucks: 0, trophies: 0, campaign: {}, campaignPrize: null, levelUp: null })
+  const start = () => useGame.setState((s) => ({ level: 20, xp: 0, coins: 0, bucks: 0, trophies: 0, campaign: {}, campaignPrize: null, levelUp: null, boosts: s.boosts && { ...s.boosts, streak: 0 } }))
 
   it('pays the full reward for a first win and less for a replay', () => {
     start()
@@ -100,6 +100,7 @@ describe('campaign', () => {
     expect(g().campaignResult('c1', 0, 9, 9.2)).toBe(1)
     expect(g().coins).toBe(first)
     expect(g().campaign['c1-0']).toBe(1)
+    useGame.setState((s) => ({ boosts: s.boosts && { ...s.boosts, streak: 0 } })) // no win-streak bonus on the payout checked
     g().campaignResult('c1', 0, 9, 10)
     expect(g().coins).toBe(first + campaignReward(CAMPAIGN[0], 0, false))
     expect(g().campaign['c1-0']).toBe(3)

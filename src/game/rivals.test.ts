@@ -74,6 +74,7 @@ describe('town rivals', () => {
     expect(g().rivals.vinnie.beaten).toBe(1)
     expect(g().rivals.vinnie.back).toBeGreaterThanOrEqual(t + RIVAL_BACK_MS)
     g().rivalResult('vinnie', true, 500)
+    useGame.setState((s) => ({ boosts: s.boosts && { ...s.boosts, streak: 0 } })) // no win-streak bonus on the payout checked
     const coins = g().coins
     expect(g().rivalResult('vinnie', true, 500)).toEqual({ coins: 1500, bucks: 1, trophies: 3 })
     expect(g().coins).toBe(coins + 500 + 1500)

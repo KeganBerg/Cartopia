@@ -1,46 +1,53 @@
 import { useGame } from '../game/store'
 import { PAINTS, patternDef } from '../game/data'
-import { ROAD, ROAD_STEP, roadPrize, roadReached, roadTrophies, type RoadPrize } from '../game/trophyRoad'
+import { MYSTERY_EVERY, ROAD_STEP, roadMystery, roadPay, roadReached, roadTrophies } from '../game/trophyRoad'
 
-// Trophy Road screen (game/trophyRoad.ts): a strip of stops, one per ROAD_STEP trophies,
-// each showing its prize. Claimed stops are ticked, reached ones glow, the rest are locked.
-// The bar's button claims every stop reached.
+// Trophy Road screen (game/trophyRoad.ts): a strip of stops, one per ROAD_STEP trophies, each
+// showing its coins and parts, and 🎁 on the mystery stops (the cosmetic it gave, once claimed).
+// Claimed stops are ticked, reached ones glow, the rest are locked. The bar's button claims
+// every stop reached.
 
-// Shows the stops up to a few past the last one reached, so the road always has a next goal.
-const shown = (reached: number) => Math.max(ROAD.length, reached + 4)
+const AHEAD = 12
+const BEHIND = 6
 
-function Prize({ p }: { p: RoadPrize }) {
-  if (p.paint) {
-    const name = PAINTS.find((x) => x.color === p.paint)?.name
-    return <span className="tr-prize" title={name}><i className="pr-swatch" style={{ background: p.paint }} /><small>{name}</small></span>
-  }
-  if (p.pattern) {
-    const pat = patternDef(p.pattern)
-    return <span className="tr-prize" title={pat?.name}><i className="tr-ico">🖌️</i><small>{pat?.name}</small></span>
-  }
-  return <span className="tr-prize"><i className="tr-ico">💰</i><small>${(p.coins ?? 0).toLocaleString()}{p.parts ? ` · ⚙${p.parts}` : ''}</small></span>
+// What a mystery stop gave: a colour swatch or a pattern name.
+function Item({ id }: { id: string }) {
+  const paint = PAINTS.find((p) => p.color === id)
+  if (paint) return <i className="pr-swatch tr-item" style={{ background: id }} title={paint.name} />
+  return <i className="tr-ico" title={patternDef(id)?.name}>🖌️</i>
 }
 
 export function TrophyRoad() {
   const trophies = useGame((s) => s.trophies)
   const claimed = useGame((s) => s.road ?? 0)
+  const items = useGame((s) => s.roadItems ?? [])
   const reached = roadReached(trophies)
   const toNext = roadTrophies(reached) - trophies
+  // The last few stops claimed and the next ones. Mystery stops claimed line up, in order, with the items they gave.
+  const from = Math.max(0, Math.min(claimed, reached) - BEHIND)
+  const stops = Array.from({ length: Math.max(reached, claimed) + AHEAD - from }, (_, k) => from + k)
+  const gave = (i: number) => (roadMystery(i) && i < claimed ? items[Math.floor(i / MYSTERY_EVERY)] : undefined)
   return (
     <div className="tr-road">
       <div className="tr-head">
         <b>🏆 {trophies.toLocaleString()}</b>
         <span className="rm-progress"><i style={{ width: `${((trophies % ROAD_STEP) / ROAD_STEP) * 100}%` }} /></span>
-        <small>{toNext} to the next stop</small>
+        <small>🏆 {toNext} ▸ 🎁</small>
       </div>
       <div className="tr-strip" role="list" aria-label="Trophy Road">
-        {Array.from({ length: shown(reached) }, (_, i) => {
+        {stops.map((i) => {
           const state = i < claimed ? 'got' : i < reached ? 'ready' : 'locked'
+          const pay = roadPay(i)
+          const box = roadMystery(i)
+          const won = gave(i)
           return (
-            <div key={i} role="listitem" className={`tr-stop ${state}`}>
+            <div key={i} role="listitem" className={`tr-stop ${state}${box ? ' mystery' : ''}`}>
               <b>🏆 {roadTrophies(i)}</b>
-              <Prize p={roadPrize(i)} />
-              <span className="tr-state" aria-hidden>{state === 'got' ? '✔' : state === 'ready' ? '🎁' : '🔒'}</span>
+              <span className="tr-prize">
+                {box && (won ? <Item id={won} /> : <i className="tr-ico">🎁</i>)}
+                <small>${pay.coins.toLocaleString()} · ⚙{pay.parts}</small>
+              </span>
+              <span className="tr-state" aria-hidden>{state === 'got' ? '✔' : state === 'ready' ? '✨' : '🔒'}</span>
             </div>
           )
         })}

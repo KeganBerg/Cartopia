@@ -183,6 +183,14 @@ export const GHOST_TIME = 3.5, SPLAT_TIME = 3.2, ROCKET_TIME = 3
 export const BOMB_R = 4.5 // blast radius
 const BOMB_FUSE = 0.8, BOMB_THROW = 20 // seconds in the air, track points ahead it lands
 
+// Catch-up for players at the back: the back half of the field gets a little extra top speed,
+// rising to CATCH_UP at the very back. Nothing ever targets the leader.
+export const CATCH_UP = 0.05
+export function catchUp(rank: number, field: number) {
+  const back = field > 1 ? rank / (field - 1) : 0
+  return back > 0.5 ? CATCH_UP * (back - 0.5) * 2 : 0
+}
+
 export type KartStats = { top: number; acc: number }
 // Performance from PI, flattening out at the top so a big PI edge is worth a few
 // percent of pace and driving well (drifts, boosts, items) still decides the race.
@@ -395,7 +403,7 @@ export class KartRace {
     let vl = k.vx * sx + k.vz * sz
     const vf0 = vf
     const rank = order.indexOf(k)
-    const band = k.ai ? 1 + Math.min(0.06, Math.max(-0.03, (rank - 2) * 0.015)) : 1
+    const band = k.ai ? 1 + Math.min(0.06, Math.max(-0.03, (rank - 2) * 0.015)) : 1 + catchUp(rank, order.length)
     // Static storm: the boost and any drift charge go dead for a moment.
     if (k.emp > 0) { k.boost = 0; k.charge = 0 }
     let top = k.stats.top * band * (k.offroad ? 0.55 : 1)

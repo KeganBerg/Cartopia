@@ -57,6 +57,7 @@ describe('Pro Tour', () => {
     for (let i = 0; i < TOUR_RACES - 1; i++) g().tourResult(true)
     expect(g().tour).toBe(TOUR_RACES - 1)
     expect(g().tourPrize).toBeNull()
+    useGame.setState((s) => ({ boosts: s.boosts && { ...s.boosts, streak: 0 } })) // no win-streak bonus on the payout checked
     const before = g().coins
     g().tourResult(true)
     expect(g().tour).toBe(TOUR_RACES)

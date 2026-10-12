@@ -6,7 +6,7 @@ import { openTunerTrial } from './TunerTrials'
 import { tunerTrial } from '../game/tuner'
 import { PAINTS, PANELS, PATTERNS, carDef, isBike, panelJobCost, tidyPanels, type PanelId, type Panels, type PatternDef } from '../game/data'
 import { MASTERY_TIERS, masteryTier } from '../game/mastery'
-import { roadOpen, roadPatternIndex, roadTrophies } from '../game/trophyRoad'
+import { roadOpen } from '../game/trophyRoad'
 
 const same = (a?: Panels | null, b?: Panels | null) => JSON.stringify(tidyPanels(a) ?? {}) === JSON.stringify(tidyPanels(b) ?? {})
 
@@ -112,13 +112,13 @@ export function CustomShop({ car, panels, setPanels }: { car: OwnedCar; panels: 
     setPanels(same(next, now) ? null : next ?? {})
   }
   // A locked colour can be tried on; the bar then points at the rival who has it.
-  const road = useGame((s) => s.road)
-  const cups = useGame((s) => s.cups)
+  const roadItems = useGame((s) => s.roadItems)
+  const mastery = useGame((s) => s.mastery)
   const tier = useGame((s) => masteryTier(s.mastery, car.model))
-  const open = (id: PanelId, c: string) => c === now?.[id]?.color || paintOpen({ rivalRow, oldPaints, road, cups }, c)
-  // A mastery pattern needs that tier in this car; a Trophy Road one, its stop claimed.
+  const open = (id: PanelId, c: string) => c === now?.[id]?.color || paintOpen({ rivalRow, oldPaints, roadItems, mastery }, c)
+  // A mastery pattern needs that step in this car; a Trophy Road one, won at a mystery stop.
   const earned = (id: PanelId, pt: PatternDef) => now?.[id]?.pattern === pt.id
-    || (pt.mastery ? tier >= pt.mastery : pt.road ? roadOpen(road, roadPatternIndex(pt.id)) : true)
+    || (pt.mastery ? tier >= pt.mastery : pt.road ? roadOpen(roadItems, pt.id) : true)
   // A pattern won in a Tuner Trial (game/tuner.ts) stays shut until that trial is won.
   const tuner = useGame((s) => s.tuner)
   const shut = (id: PanelId, pattern: string) => {
@@ -159,7 +159,7 @@ export function CustomShop({ car, panels, setPanels }: { car: OwnedCar; panels: 
             const id = pt?.id ?? null
             const on = (mine?.pattern ?? null) === id
             const had = now?.[info.id]?.pattern === id
-            const earn = pt && !earned(info.id, pt) ? (pt.mastery ? `🔒 ${MASTERY_TIERS[pt.mastery - 1].icon}` : `🔒 🏆 ${roadTrophies(roadPatternIndex(pt.id))}`) : null
+            const earn = pt && !earned(info.id, pt) ? (pt.mastery ? `🔒 ${MASTERY_TIERS[pt.mastery - 1].icon}` : '🔒 🛣️') : null
             const locked = (!!pt && level < pt.unlockLevel && !had) || !!earn
             const trial = pt ? shut(info.id, pt.id) : undefined
             return (

@@ -1,6 +1,6 @@
 import { useGame, liveDeal, paintPrice, type OwnedCar } from '../game/store'
 import { FINISHES, PAINTS, STRIPES, dealOffer, finishDef, paintJobCost, type Finish, type PaintJob } from '../game/data'
-import { MASTERY_TIERS, masteryTier } from '../game/mastery'
+import { CLASS_TIERS, carClassTier } from '../game/mastery'
 import { PAINTS_TO_COLLECT, earnHint, paintOpen, paintsOpen, rivalForPaint } from '../game/paintRivals'
 import { openPaintRival } from './PaintRivals'
 
@@ -13,9 +13,9 @@ const SHEEN = {
   gloss: 'radial-gradient(circle at 32% 28%, rgba(255,255,255,.75) 0 14%, transparent 34%)',
   matte: 'none',
   chrome: 'linear-gradient(135deg, rgba(255,255,255,.85) 0 18%, rgba(0,0,0,.25) 38%, rgba(255,255,255,.6) 55%, rgba(0,0,0,.3) 78%, rgba(255,255,255,.7))',
-  bronze: 'linear-gradient(135deg, rgba(255,214,170,.7) 0 18%, rgba(110,60,20,.55) 45%, rgba(255,214,170,.5) 70%, rgba(110,60,20,.5))',
-  silver: 'linear-gradient(135deg, rgba(255,255,255,.8) 0 18%, rgba(120,130,140,.55) 45%, rgba(255,255,255,.55) 70%, rgba(120,130,140,.5))',
   gold: 'linear-gradient(135deg, rgba(255,240,170,.8) 0 18%, rgba(170,120,10,.55) 45%, rgba(255,240,170,.55) 70%, rgba(170,120,10,.5))',
+  diamond: 'linear-gradient(135deg, rgba(255,255,255,.9) 0 15%, rgba(150,220,255,.5) 35%, rgba(255,255,255,.75) 50%, rgba(120,190,255,.5) 70%, rgba(255,255,255,.85))',
+  galaxy: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,.9) 0 3%, transparent 4%), radial-gradient(circle at 70% 60%, rgba(255,255,255,.8) 0 2%, transparent 3%), linear-gradient(135deg, rgba(60,20,140,.7), rgba(200,60,200,.45) 50%, rgba(20,30,110,.7))',
 } as const satisfies Record<Finish, string>
 
 // Paint shop for one car: tap a colour, finish or stripe to try it on the preview, then buy the lot.
@@ -25,15 +25,16 @@ export function PaintShop({ car, job, setJob }: { car: OwnedCar; job: PaintJob; 
   const deals = useGame((s) => s.deals)
   const rivalRow = useGame((s) => s.rivalRow)
   const oldPaints = useGame((s) => s.oldPaints)
-  const road = useGame((s) => s.road)
-  const cups = useGame((s) => s.cups)
-  const tier = useGame((s) => masteryTier(s.mastery, car.model))
+  const roadItems = useGame((s) => s.roadItems)
+  const mastery = useGame((s) => s.mastery)
+  const tier = carClassTier(mastery, car.model)
   const now = jobOf(car)
-  const open = (color: string) => color === now.color || paintOpen({ rivalRow, oldPaints, road, cups }, color)
+  const open = (color: string) => color === now.color || paintOpen({ rivalRow, oldPaints, roadItems, mastery }, color)
   // A locked colour can be tried on; the bar then points at the rival who has it.
   const lockedBy = open(job.color) ? null : rivalForPaint(job.color)
   const changed = !same(job, now)
-  const cost = paintPrice({ deals, level }, car, job)
+  const freePaint = useGame((s) => s.freePaint)
+  const cost = paintPrice({ deals, level, freePaint }, car, job)
   const full = paintJobCost(car, job)
   const pick = (p: Partial<PaintJob>) => {
     const next = { ...job, ...p }
@@ -54,14 +55,14 @@ export function PaintShop({ car, job, setJob }: { car: OwnedCar; job: PaintJob; 
           {lockedBy ? (
             <button className="buy small paint-rival-go" onClick={() => openPaintRival(lockedBy.id)} title={`Beat ${lockedBy.name} to unlock`}>🏁 {lockedBy.icon} {lockedBy.name.split(' ')[0]}</button>
           ) : (
-            <button className={cost.bucks ? 'buy small premium' : 'buy small'} onClick={() => { if (paintCar(car.uid, job)) setJob(null) }}>{cost.deal && <span className="deal-tag">DEAL</span>}Buy · {cost.deal && <s>${full.coins.toLocaleString()}</s>} {price}</button>
+            <button className={cost.bucks ? 'buy small premium' : 'buy small'} onClick={() => { if (paintCar(car.uid, job)) setJob(null) }}>{cost.deal && <span className="deal-tag">DEAL</span>}{cost.free && '🎁 '}Buy · {cost.deal && <s>${full.coins.toLocaleString()}</s>} {price}</button>
           )}
         </div>
       )}
       <h4>Finish</h4>
       <div className="finishes">
         {FINISHES.map((f) => {
-          const earn = f.mastery ? MASTERY_TIERS[f.mastery - 1] : undefined
+          const earn = f.mastery ? CLASS_TIERS[f.mastery - 1] : undefined
           const shut = !!earn && tier < f.mastery! && now.finish !== f.id
           const locked = (level < f.unlockLevel && now.finish !== f.id) || shut
           return (

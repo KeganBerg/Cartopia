@@ -4,7 +4,7 @@ import {
   PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS,
   upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, jobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, refillBucks, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, activeEvent, DAILY_BONUS, dailyDay, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modFits, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, CREW_CHEST, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower, seasonNumber, seasonOf, SEASON_STARS, skinDef, ownedSkins, seasonSkin, modSkinDef, ownedModSkins, seasonModSkin, SKINNED_SLOTS, type SkinnedSlot, fittedMods, SEASON_TIERS, STARS_PER_TIER, SEASON_CAR_BUCKS, dealsFor, dealOffer, type DealDef, type DealKind,
 } from './data'
-import { PANELS, PATTERNS, STARTER_PAINTS, isBike, panelJobCost, tidyPanels, type Panels } from './data'
+import { PAINT_COST, PANELS, PATTERNS, STARTER_PAINTS, isBike, panelJobCost, tidyPanels, type Panels } from './data'
 import { sfx } from '../lib/sound'
 import { fx } from './fx'
 import { opensLabel } from './clock'
@@ -19,11 +19,12 @@ import { trialWeek } from './trial'
 import { groupOf, groupTurn, mergeCandidates, applyMerge, applySplit, rotateGroup, isLandmark, LANDMARK_NAME } from './merge'
 import { togglePick } from './meet'
 import { crateCost, crateDef, pityHit, rollCrate, type CrateId, type CrateOpen } from './crates'
-import { LIVE_LOSS_SHARE, LOSS_SHARE, boostFor, boostLabel, emptyBoosts, welcomeBack, type BoostMode, type Boosts } from './boosts'
+import { LIVE_LOSS_SHARE, LOSS_SHARE, boostFor, placeShare, boostLabel, emptyBoosts, welcomeBack, type BoostMode, type Boosts } from './boosts'
 import { claim, type WagerEntry } from './wager'
-import { masteryTier, noteRace, type Mastery, type MasteryMode } from './mastery'
-import { roadOpen, roadPatternIndex, roadPrize, roadReached } from './trophyRoad'
-import { cupPrize, cupRace, cupWon } from './cups'
+import { carClassTier, classTier, classWon, galaxy, masteryTier, noteRace, type Mastery, type MasteryMode } from './mastery'
+import { roadClaim, roadOpen, roadReached } from './trophyRoad'
+import { cupCrateSource, cupPrize, cupRace } from './cups'
+import { CAR_CLASSES } from './classes'
 import type { CarClassId } from './classes'
 
 // rot: quarter turns the player chose (0 faces south). Unset means face the nearest road.
@@ -113,8 +114,13 @@ export type SaveState = {
   tuner?: Record<string, number>
   // Car mastery by car model (game/mastery.ts): race counts and tiers reached.
   mastery?: Record<string, Mastery>
-  // Trophy Road stops claimed (game/trophyRoad.ts).
+  // Trophy Road stops claimed, and the mystery cosmetics they gave, in order (game/trophyRoad.ts).
   road?: number
+  roadItems?: string[]
+  // Free crates waiting in the Crate Depot, by source (a Class Cup race: `cup:<id>`).
+  freeCrates?: string[]
+  // The tutorial was skipped before its free paint pick, so the next coin colour is free.
+  freePaint?: boolean
   // Class Cups (game/cups.ts): wins in each race.
   cups?: Record<string, number>
   // True for towns from before paint rivals, which keep every colour they could already buy.
@@ -177,10 +183,11 @@ type UiState = {
   paintPrize: string | null
   // A Tuner Trial just won for the first time: its id.
   tunerPrize: string | null
-  // A mastery tier just reached: the car model and the tier (1-4).
-  masteryPrize: { model: string; tier: number } | null
-  // A Class Cup just won in full: its class (its colour is now unlocked).
-  cupPrize: CarClassId | null
+  // Mastery news from a race: the car model and the step it just reached (0: none), class tiers
+  // just reached, Galaxy, and classes whose first-win colour just opened.
+  masteryPrize: { model: string; tier: number; classes: { cls: CarClassId; tier: number }[]; galaxy: boolean; first: CarClassId[] } | null
+  // A Class Cup race just won for the first time: its id (it gave a free crate).
+  cupPrize: string | null
   // The signed-in player's clan, shown on the Crew House.
   clanBadge: { tag: string; emblem: string; color: string } | null
   // Level-up splash: the levels just reached and the rewards they paid.
@@ -261,6 +268,8 @@ type Actions = {
   toggleShowcase: (uid: string) => void
   setRaceCar: (uid: string) => void
   setTutorial: (step: number) => void
+  // Ends the tutorial; skipping it before the paint pick keeps that free paint for later.
+  skipTutorial: (pickStep: number) => void
   // Fuel and parts friends left for you (already checked and claimed server-side).
   receiveGifts: (fuel: number, parts: number) => void
   // Fit a mod (replacing whatever is in its slot; buys it first if this car doesn't own it), or take it off with remove.
@@ -270,7 +279,8 @@ type Actions = {
   refillFuel: () => void
   buyDeal: (id: string) => boolean
   buyPlot: (px: number, pz: number) => void
-  gpResult: (series: string, won: boolean) => void
+  // A Grand Prix race finished: won, and the place out of how many karts (for what a loss pays).
+  gpResult: (series: string, won: boolean, place?: number, of?: number) => void
   // Records a campaign race; returns the stars earned (0 for a loss).
   campaignResult: (chapter: string, race: number, myTime: number, theirTime: number) => number
   closeCampaignPrize: () => void
@@ -333,7 +343,7 @@ export const setRescueRoller = (f: typeof rescueRoller) => {
 // supabase/migrations/0040_crates.sql); src/lib/crates.ts plugs it in. It returns the opens to add
 // (normally one; more when earlier ones never reached the save), or null to roll here (guests).
 // It throws 'soon' when the server can't open crates yet.
-let crateOpener: ((id: CrateId) => Promise<CrateOpen[] | null>) | null = null
+let crateOpener: ((id: CrateId, free?: string) => Promise<CrateOpen[] | null>) | null = null
 export const setCrateOpener = (f: typeof crateOpener) => {
   crateOpener = f
 }
@@ -706,13 +716,18 @@ export function modPrice(s: Pick<SaveState, 'deals' | 'level'>, modId: string) {
   const deal = liveDeal(s, 'mod', modId)
   return { coins: deal ? dealOffer(deal).now.coins : m?.coins ?? 0, parts: m?.parts ?? 0, bucks: m?.bucks ?? 0, deal }
 }
+// A colour change the skipped tutorial's free pick covers: any coin colour.
+const freeColour = (s: { freePaint?: boolean }, car: OwnedCar, job: PaintJob) =>
+  !!s.freePaint && job.color !== car.color && !PAINTS.find((p) => p.color === job.color)?.bucks
 // What a paint job costs today: a finish deal cuts the finish part of the bill.
-export function paintPrice(s: Pick<SaveState, 'deals' | 'level'>, car: OwnedCar, job: PaintJob) {
+export function paintPrice(s: Pick<SaveState, 'deals' | 'level'> & { freePaint?: boolean }, car: OwnedCar, job: PaintJob) {
   const cost = paintJobCost(car, job)
+  // A skipped tutorial leaves its free paint pick: one coin colour, once.
+  const free = freeColour(s, car, job) ? PAINT_COST : 0
   const deal = job.finish !== (car.finish ?? 'gloss') ? liveDeal(s, 'paint', job.finish) : null
-  if (!deal) return { ...cost, deal: null }
+  if (!deal) return { coins: cost.coins - free, bucks: cost.bucks, deal: null, free: free > 0 }
   const o = dealOffer(deal)
-  return { coins: cost.coins - (o.was.coins - o.now.coins), bucks: cost.bucks, deal }
+  return { coins: cost.coins - free - (o.was.coins - o.now.coins), bucks: cost.bucks, deal, free: free > 0 }
 }
 
 // Collect all can be used once a minute; the last use survives a reload.
@@ -1246,12 +1261,19 @@ export const useGame = create<GameState>()(
       masteryRace: (model, won, mode, upset) => {
         const s = get()
         const { next, reached } = noteRace(s.mastery?.[model], won, mode, upset)
+        const mastery = { ...s.mastery, [model]: next }
         const bucks = reached.reduce((a, t) => a + t.bucks, 0)
         const trophies = reached.reduce((a, t) => a + t.trophies, 0)
-        if (reached.length) setTimeout(sfx.levelUp, 300)
+        // What else this race opened: a class tier, Galaxy, or a class's first-win colour.
+        const classes = CAR_CLASSES.filter((c) => classTier(mastery, c.id) > classTier(s.mastery, c.id)).map((c) => ({ cls: c.id, tier: classTier(mastery, c.id) }))
+        const sky = galaxy(mastery) && !galaxy(s.mastery)
+        const first = CAR_CLASSES.filter((c) => classWon(mastery, c.id) && !classWon(s.mastery, c.id)).map((c) => c.id)
+        const news = reached.length > 0 || classes.length > 0 || sky || first.length > 0
+        if (news) setTimeout(sfx.levelUp, 300)
         set({
-          mastery: { ...s.mastery, [model]: next },
-          ...(reached.length ? { bucks: s.bucks + bucks, trophies: s.trophies + trophies, masteryPrize: { model, tier: next.tier } } : {}),
+          mastery,
+          ...(reached.length ? { bucks: s.bucks + bucks, trophies: s.trophies + trophies } : {}),
+          ...(news ? { masteryPrize: { model, tier: reached.length ? next.tier : 0, classes, galaxy: sky, first } } : {}),
           updatedAt: Date.now(),
         })
       },
@@ -1263,16 +1285,11 @@ export const useGame = create<GameState>()(
         const from = s.road ?? 0
         const to = roadReached(s.trophies)
         if (to <= from) return
-        let coins = 0
-        let parts = 0
-        for (let i = from; i < to; i++) {
-          const p = roadPrize(i)
-          coins += p.coins ?? 0
-          parts += p.parts ?? 0
-        }
+        const { coins, parts, items } = roadClaim(from, to, s.roadItems ?? [])
         sfx.levelUp()
         set({
           road: to,
+          roadItems: items,
           coins: s.coins + coins,
           parts: s.parts + parts,
           stats: { ...s.stats, coinsEarned: (s.stats.coinsEarned ?? 0) + coins },
@@ -1288,9 +1305,10 @@ export const useGame = create<GameState>()(
         s.finishRace(won, cupPrize(r, wins === 0))
         if (!won) return
         const cups = { ...s.cups, [id]: wins + 1 }
-        const full = !cupWon(s.cups, r.cls) && cupWon(cups, r.cls)
-        if (full) setTimeout(sfx.levelUp, 200)
-        set((g) => ({ cups, cupPrize: full ? r.cls : g.cupPrize, updatedAt: Date.now() }))
+        if (wins > 0) return set({ cups, updatedAt: Date.now() })
+        // The first win gives a free crate, opened from the Crate Depot.
+        setTimeout(sfx.levelUp, 200)
+        set((g) => ({ cups, freeCrates: [...(g.freeCrates ?? []), cupCrateSource(id)], cupPrize: id, updatedAt: Date.now() }))
       },
 
       closeCupPrize: () => set({ cupPrize: null }),
@@ -1565,6 +1583,7 @@ export const useGame = create<GameState>()(
       },
 
       setTutorial: (tutorial) => set({ tutorial, updatedAt: Date.now() }),
+      skipTutorial: (pickStep) => set((s) => ({ tutorial: 99, ...(s.tutorial <= pickStep ? { freePaint: true } : {}), updatedAt: Date.now() })),
 
       receiveGifts: (fuel, parts) => {
         const s = get()
@@ -1590,11 +1609,11 @@ export const useGame = create<GameState>()(
           s.toast(`${fin.name} unlocks at level ${fin.unlockLevel}`)
           return false
         }
-        if (fin.mastery && masteryTier(s.mastery, car.model) < fin.mastery && fin.id !== car.finish) {
-          s.toast(`Reach ${fin.name} mastery in this car to unlock it`)
+        if (fin.mastery && carClassTier(s.mastery, car.model) < fin.mastery && fin.id !== car.finish) {
+          s.toast(fin.blurb)
           return false
         }
-        const { coins, bucks, deal } = paintPrice(s, car, job)
+        const { coins, bucks, deal, free } = paintPrice(s, car, job)
         const recolour = job.color !== car.color || job.finish !== (car.finish ?? 'gloss')
         if (!recolour && job.stripe === (car.stripe ?? null)) return false
         if (s.coins < coins) { s.showNeed('coins', coins - s.coins, 'a paint job'); return false }
@@ -1603,6 +1622,7 @@ export const useGame = create<GameState>()(
           coins: s.coins - coins,
           bucks: s.bucks - bucks,
           ...spendDeal(s, deal),
+          ...(free ? { freePaint: false } : {}),
           cars: s.cars.map((c) => (c.uid === cuid ? { ...c, color: job.color, finish: job.finish === 'gloss' ? undefined : job.finish, stripe: job.stripe } : c)),
           stats: bump(s, 'painted'),
           updatedAt: Date.now(),
@@ -1641,8 +1661,8 @@ export const useGame = create<GameState>()(
             s.toast(`Reach ${pat.name} mastery in this car to unlock it`)
             return false
           }
-          if (pat?.road && !roadOpen(s.road, roadPatternIndex(pat.id)) && was?.[pn.id]?.pattern !== pat.id) {
-            s.toast(`Win ${pat.name} on the Trophy Road`)
+          if (pat?.road && !roadOpen(s.roadItems, pat.id) && was?.[pn.id]?.pattern !== pat.id) {
+            s.toast(`${pat.name}: Trophy Road mystery prize`)
             return false
           }
           if (pat && s.level < pat.unlockLevel && was?.[pn.id]?.pattern !== pat.id) {
@@ -1671,7 +1691,7 @@ export const useGame = create<GameState>()(
         const car = s.cars.find((c) => c.uid === cuid)
         if (!car || s.tutorial >= 99 || !STARTER_PAINTS.includes(color) || !STARTER_PAINTS.includes(rim)) return false
         const panels = tidyPanels({ ...car.panels, rims: { color: rim } })
-        set({ cars: s.cars.map((c) => (c.uid === cuid ? { ...c, color, panels } : c)), updatedAt: Date.now() })
+        set({ cars: s.cars.map((c) => (c.uid === cuid ? { ...c, color, panels } : c)), freePaint: false, updatedAt: Date.now() })
         sfx.buy()
         return true
       },
@@ -1783,13 +1803,13 @@ export const useGame = create<GameState>()(
 
       loadSave: (save) => set({ ...starterDefaults(), ...save, oldPaints: save.oldPaints ?? true }),
 
-      gpResult: (seriesId, won) => {
+      gpResult: (seriesId, won, place = won ? 1 : 2, of = 2) => {
         const s = get()
         const series = GP_SERIES.find((o) => o.id === seriesId)
         if (!series) return
         const cur = s.gp[seriesId] ?? { round: 0, clears: 0 }
         const reward = gpReward(series, cur.round)
-        s.finishRace(won, reward, { mode: 'kart' })
+        s.finishRace(won, reward, { mode: 'kart', loss: Math.round(reward * placeShare(place, of)) })
         if (!won) return
         const round = cur.round + 1
         if (round < GP_ROUNDS) return set({ gp: { ...s.gp, [seriesId]: { ...cur, round } } })
@@ -2196,8 +2216,8 @@ export const useGame = create<GameState>()(
 )
 
 export function saveOf(s: GameState): SaveState {
-  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, cratePity, boosts, wagers, season, deals, trials, rivals, rivalRow, tuner, mastery, road, cups, oldPaints, tour, event, showcase, raceCar, skins, modSkins, land, updatedAt } = s
-  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, cratePity: cratePity ?? {}, boosts: boosts ?? emptyBoosts(), ...(wagers ? { wagers } : {}), season, deals, trials, rivals, rivalRow, tuner: tuner ?? {}, mastery: mastery ?? {}, road: road ?? 0, cups: cups ?? {}, oldPaints: !!oldPaints, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, land, updatedAt }
+  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, cratePity, boosts, wagers, season, deals, trials, rivals, rivalRow, tuner, mastery, road, roadItems, freeCrates, cups, freePaint, oldPaints, tour, event, showcase, raceCar, skins, modSkins, land, updatedAt } = s
+  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, cratePity: cratePity ?? {}, boosts: boosts ?? emptyBoosts(), ...(wagers ? { wagers } : {}), season, deals, trials, rivals, rivalRow, tuner: tuner ?? {}, mastery: mastery ?? {}, road: road ?? 0, roadItems: roadItems ?? [], freeCrates: freeCrates ?? [], cups: cups ?? {}, ...(freePaint ? { freePaint } : {}), oldPaints: !!oldPaints, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, land, updatedAt }
 }
 
 // Fields added after launch, so older saves load with sensible values.
@@ -2251,16 +2271,18 @@ export const spendFuel = (amount: number) => {
 }
 
 // Opens a crate: checks the level and price, rolls it (on the server when signed in), adds it to
-// the town and returns what was opened for the reveal. Null when it couldn't be opened.
-export async function openCrate(id: CrateId): Promise<CrateOpen[] | null> {
+// the town and returns what was opened for the reveal. Null when it couldn't be opened. A free
+// crate (`free` is its source in freeCrates, see cups.ts) skips the level and price.
+export async function openCrate(id: CrateId, free?: string): Promise<CrateOpen[] | null> {
   const s = useGame.getState()
   const def = crateDef(id)
   if (!def) return null
-  if (s.level < def.unlockLevel) {
+  if (free && !s.freeCrates?.includes(free)) return null
+  const cost = free ? { coins: 0, bucks: 0 } : crateCost(def, s.level)
+  if (!free && s.level < def.unlockLevel) {
     s.showNeed('level', def.unlockLevel, def.name)
     return null
   }
-  const cost = crateCost(def, s.level)
   if (s.coins < cost.coins) {
     s.showNeed('coins', cost.coins - s.coins, def.name)
     return null
@@ -2269,15 +2291,19 @@ export async function openCrate(id: CrateId): Promise<CrateOpen[] | null> {
     s.showNeed('bucks', cost.bucks - s.bucks, def.name)
     return null
   }
+  const used = () => useGame.setState((g) => ({ freeCrates: (g.freeCrates ?? []).filter((x) => x !== free) }))
   let opens: CrateOpen[] | null = null
   try {
-    opens = crateOpener ? await crateOpener(id) : null
+    opens = crateOpener ? await crateOpener(id, free) : null
   } catch (e) {
     const msg = e instanceof Error ? e.message : ''
+    if (free && msg.includes('already opened')) used()
     useGame.getState().toast(msg === 'soon' ? 'Crates open for signed-in towns very soon!' : msg.includes('one crate') ? 'One crate at a time!' : "Couldn't open the crate. Try again.")
     return null
   }
   if (!opens) opens = [{ crate: id, cost, drop: rollCrate(def, s.level, s.cars, Math.random, { skins: ownedSkins(s), modSkins: ownedModSkins(s) }, s.cratePity?.[id] ?? 0) }]
   for (const o of opens) useGame.getState().applyCrate(o)
+  // The server may hand back earlier opens the save missed instead: the free crate is only used once one opened free.
+  if (free && opens.some((o) => o.crate === id && !o.cost.coins && !o.cost.bucks)) used()
   return opens
 }

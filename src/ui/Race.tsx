@@ -317,7 +317,7 @@ export function RacePanel() {
         next={gpNext(gpRace.series)}
         prize={gpRace.prize}
         title={`${GP_CUP[GP_SERIES.indexOf(gpRace.series)] ?? '🏆'} ${round + 1}/${GP_ROUNDS} · ${def.icon} ${def.short}${reverse ? ' ↺' : ''}`}
-        onFinish={(place) => gpResult(gpRace.series.id, place === 1)}
+        onFinish={(place) => gpResult(gpRace.series.id, place === 1, place, gpRace.field.length)}
         onExit={() => { setGpRace(null); setTab('gp') }}
       />
     )

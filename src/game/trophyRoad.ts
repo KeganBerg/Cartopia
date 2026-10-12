@@ -1,47 +1,51 @@
-// Trophy Road: every ROAD_STEP trophies is a stop with a prize that can't be bought: a paint
-// colour (data.ts PAINTS with earn 'road', for the body, a panel or the wheels), a pattern
-// (PATTERNS with road), or coins and parts every fourth stop. Past the last stop, every step
-// pays ROAD_AFTER. Trophies are never spent: the save keeps how many stops were claimed
-// (`road`). The server guard (econ_guard(), catalog key `road`) pays the same coins and parts
-// and won't let a claim run past the trophies.
-import { PAINTS } from './data'
+// Trophy Road: every ROAD_STEP trophies is a stop. Every stop pays coins and parts, rising for
+// the first ROAD_STOPS stops and then the same for ever. Every MYSTERY_EVERY-th stop also opens a
+// mystery cosmetic, like a loot crate: a random one, not yet won, from ROAD_POOL (colours from
+// data.ts PAINTS with earn 'road', for the body, a panel or the wheels, and patterns from PATTERNS
+// with road), none of which can be bought. Trophies are never spent: the save keeps how many stops
+// were claimed (`road`) and the cosmetics won, in order (`roadItems`). The server guard
+// (econ_guard(), catalog key `road`) pays the same coins and parts and won't let a claim run
+// past the trophies.
+import { PAINTS, PATTERNS } from './data'
 
 export const ROAD_STEP = 25
-export type RoadPrize = { paint?: string; pattern?: string; coins?: number; parts?: number }
+export const ROAD_STOPS = 20
+export const MYSTERY_EVERY = 3
 
-const roadPaint = (name: string) => {
-  const p = PAINTS.find((x) => x.name === name && x.earn === 'road')
-  if (!p) throw new Error(`no road paint ${name}`)
-  return p.color
+// Coins and parts at stop i (0-based: stop 0 is at ROAD_STEP trophies).
+export const roadPay = (i: number) => {
+  const n = Math.min(i, ROAD_STOPS)
+  return { coins: 2000 + 400 * n, parts: 5 + n }
 }
-
-export const ROAD: RoadPrize[] = [
-  { paint: roadPaint('Mint') },
-  { pattern: 'pinstripe' },
-  { paint: roadPaint('Peach') },
-  { coins: 10000, parts: 25 },
-  { paint: roadPaint('Cobalt') },
-  { paint: roadPaint('Rose Gold') },
-  { pattern: 'polka' },
-  { coins: 20000, parts: 50 },
-  { paint: roadPaint('Lemon') },
-  { paint: roadPaint('Plum') },
-  { paint: roadPaint('Tangerine') },
-  { coins: 30000, parts: 75 },
-  { paint: roadPaint('Gunmetal') },
-  { paint: roadPaint('Sea Glass') },
-  { paint: roadPaint('Cherry') },
-  { coins: 40000, parts: 100 },
-]
-export const ROAD_AFTER: RoadPrize = { coins: 5000, parts: 15 }
-
-// The prize at stop i (0-based: stop 0 is at ROAD_STEP trophies).
-export const roadPrize = (i: number): RoadPrize => ROAD[i] ?? ROAD_AFTER
+export const roadMystery = (i: number) => i % MYSTERY_EVERY === MYSTERY_EVERY - 1
 export const roadTrophies = (i: number) => (i + 1) * ROAD_STEP
 // How many stops these trophies reach.
 export const roadReached = (trophies: number) => Math.max(0, Math.floor(trophies / ROAD_STEP))
 
-// Is a paint or pattern from the road already won?
-export const roadPaintIndex = (color: string) => ROAD.findIndex((p) => p.paint === color)
-export const roadPatternIndex = (id: string) => ROAD.findIndex((p) => p.pattern === id)
-export const roadOpen = (claimed: number | undefined, i: number) => i >= 0 && (claimed ?? 0) > i
+// What the mystery stops can give: road colours (by colour) and road patterns (by id).
+export const ROAD_POOL: string[] = [...PAINTS.filter((p) => p.earn === 'road').map((p) => p.color), ...PATTERNS.filter((p) => p.road).map((p) => p.id)]
+
+// A random cosmetic not yet won, or null once the pool is all won.
+export function roadDraw(won: string[], rand: () => number = Math.random) {
+  const left = ROAD_POOL.filter((x) => !won.includes(x))
+  return left.length ? left[Math.floor(rand() * left.length)] : null
+}
+
+// Claims stops [from, to): the coins and parts, and the cosmetics drawn for the mystery stops.
+export function roadClaim(from: number, to: number, won: string[], rand: () => number = Math.random) {
+  let coins = 0
+  let parts = 0
+  const items = [...won]
+  for (let i = from; i < to; i++) {
+    const p = roadPay(i)
+    coins += p.coins
+    parts += p.parts
+    if (roadMystery(i)) {
+      const x = roadDraw(items, rand)
+      if (x) items.push(x)
+    }
+  }
+  return { coins, parts, items }
+}
+
+export const roadOpen = (won: string[] | undefined, id: string) => !!won?.includes(id)

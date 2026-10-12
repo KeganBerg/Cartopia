@@ -3,10 +3,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useGame } from './store'
 import { boostsSpent } from './boosts'
 import { CARS, PAINTS, PATTERNS } from './data'
-import { CAR_CLASSES, carsInClass, classOf } from './classes'
-import { MASTERY_TIERS, masteryMode, noteRace, tierReached, type Mastery } from './mastery'
-import { ROAD, ROAD_AFTER, ROAD_STEP, roadPrize, roadReached } from './trophyRoad'
-import { CUP_RACES, cupFits, cupPaint, cupPrize, cupRacesOf, cupWon } from './cups'
+import { CAR_CLASSES, carsInClass, classOf, classesOf, inClass } from './classes'
+import { CLASS_GOLD, MASTERY_TIERS, carClassTier, classTier, firstPaint, galaxy, masteryMode, noteRace, tierReached, type Mastery } from './mastery'
+import { MYSTERY_EVERY, ROAD_POOL, ROAD_STEP, ROAD_STOPS, roadClaim, roadPay, roadReached } from './trophyRoad'
+import { CUP_CRATE, CUP_RACES, cupCrateSource, cupFits, cupPrize, cupRacesOf, cupWon } from './cups'
 import { paintOpen } from './paintRivals'
 import { econCatalog } from './econCatalog'
 
@@ -28,6 +28,12 @@ describe('car classes', () => {
     expect(classOf('zenith').id).toBe('super')
     expect(classOf('trail').id).toBe('offroad')
     expect(classOf('schoolbus').id).toBe('oddball')
+  })
+  it('give some cars a second tag, never more than two', () => {
+    for (const c of CARS) expect(classesOf(c.id).length).toBeLessThanOrEqual(2)
+    expect(classesOf('tusker').map((c) => c.id)).toEqual(['oddball', 'offroad'])
+    expect(inClass('tusker', 'offroad')).toBe(true)
+    expect(carsInClass('offroad').map((c) => c.id)).toContain('tusker')
   })
 })
 
@@ -67,53 +73,97 @@ describe('mastery', () => {
     useGame.setState({ bucks: 0, trophies: 0, mastery: {}, masteryPrize: null })
     for (let i = 0; i < 10; i++) g().masteryRace('pip', false, 'drag', false)
     expect(g().bucks).toBe(MASTERY_TIERS[0].bucks)
-    expect(g().masteryPrize).toEqual({ model: 'pip', tier: 1 })
+    expect(g().masteryPrize).toEqual({ model: 'pip', tier: 1, classes: [], galaxy: false, first: [] })
     g().masteryRace('pip', false, 'drag', false)
     expect(g().bucks).toBe(MASTERY_TIERS[0].bucks)
     expect(g().mastery?.pip.races).toBe(11)
   })
-  it('opens its finishes and the Signature pattern on that model only', () => {
+  it('opens the Signature pattern on that model only', () => {
     useGame.setState({ level: 50, coins: 50000, bucks: 0, mastery: {}, oldPaints: true,
-      cars: [{ uid: 'm1', model: 'pip', color: '#e53935', upgrades: up() }, { uid: 'm2', model: 'civic', color: '#e53935', upgrades: up() }] })
-    const job = { color: '#e53935', finish: 'bronze' as const, stripe: null }
-    expect(g().paintCar('m1', job)).toBe(false)
-    useGame.setState({ mastery: { pip: { races: 10, wins: 0, modes: [], upsets: 0, tier: 1 } } })
-    expect(g().paintCar('m1', job)).toBe(true)
-    expect(g().paintCar('m2', job)).toBe(false)
+      cars: [{ uid: 'm1', model: 'pip', color: '#e53935', upgrades: up() }] })
     expect(g().paintPanels('m1', { body: { pattern: 'signature' } })).toBe(false)
     useGame.setState({ mastery: { pip: { races: 20, wins: 10, modes: ['drag', 'tour', 'event'], upsets: 0, tier: 3 } } })
     expect(g().paintPanels('m1', { body: { pattern: 'signature' } })).toBe(true)
   })
+  it('gives a first win in a class its colour, once', () => {
+    useGame.setState({ mastery: {}, masteryPrize: null, rivalRow: {}, oldPaints: false })
+    expect(paintOpen(g(), firstPaint('muscle'))).toBe(false)
+    g().masteryRace('stallion', false, 'drag', false)
+    expect(paintOpen(g(), firstPaint('muscle'))).toBe(false)
+    g().masteryRace('stallion', true, 'drag', false)
+    expect(g().masteryPrize?.first).toEqual(['muscle'])
+    expect(paintOpen(g(), firstPaint('muscle'))).toBe(true)
+    useGame.setState({ masteryPrize: null })
+    g().masteryRace('stallion', true, 'drag', false)
+    expect(g().masteryPrize).toBeNull()
+  })
+})
+
+describe('class mastery', () => {
+  const done: Mastery = { races: 20, wins: 20, modes: ['drag', 'tour', 'event'], upsets: 5, tier: MASTERY_TIERS.length }
+  const master = (ids: string[]) => Object.fromEntries(ids.map((id) => [id, done]))
+  it('Gold at three cars mastered, Diamond at six, Galaxy with Diamond everywhere', () => {
+    const compact = carsInClass('compact').map((c) => c.id)
+    expect(classTier(master(compact.slice(0, CLASS_GOLD - 1)), 'compact')).toBe(0)
+    expect(classTier(master(compact.slice(0, CLASS_GOLD)), 'compact')).toBe(1)
+    expect(classTier(master(compact.slice(0, 6)), 'compact')).toBe(2)
+    const all = master(CARS.filter((c) => !c.parked).map((c) => c.id))
+    expect(galaxy(all)).toBe(true)
+    expect(carClassTier(all, 'pip')).toBe(3)
+  })
+  it('opens Gold only on cars in that class', () => {
+    const compact = carsInClass('compact').map((c) => c.id).filter((id) => id !== 'pip')
+    useGame.setState({ level: 50, coins: 50000, bucks: 0, mastery: {}, oldPaints: true,
+      cars: [{ uid: 'm1', model: 'pip', color: '#e53935', upgrades: up() }, { uid: 'm2', model: 'stallion', color: '#e53935', upgrades: up() }] })
+    const job = { color: '#e53935', finish: 'gold' as const, stripe: null }
+    expect(g().paintCar('m1', job)).toBe(false)
+    useGame.setState({ mastery: master(compact.slice(0, CLASS_GOLD)) })
+    expect(g().paintCar('m1', job)).toBe(true)
+    expect(g().paintCar('m2', job)).toBe(false)
+    expect(g().paintCar('m1', { ...job, finish: 'diamond' })).toBe(false)
+  })
+  it('shows the class tier reached in the prize', () => {
+    const compact = carsInClass('compact').map((c) => c.id)
+    const almost = { ...done, upsets: 4, tier: 3 }
+    useGame.setState({ bucks: 0, mastery: { ...master(compact.slice(0, CLASS_GOLD - 1)), [compact[CLASS_GOLD - 1]]: almost }, masteryPrize: null })
+    g().masteryRace(compact[CLASS_GOLD - 1], true, 'drag', true)
+    expect(g().masteryPrize?.classes).toContainEqual({ cls: 'compact', tier: 1 })
+  })
 })
 
 describe('Trophy Road', () => {
-  it('has a stop every 25 trophies, each paint and pattern earned-only', () => {
+  it('has a stop every 25 trophies, paying more up to a cap', () => {
     expect(ROAD_STEP).toBe(25)
     expect(roadReached(24)).toBe(0)
     expect(roadReached(50)).toBe(2)
-    expect(roadPrize(ROAD.length + 3)).toEqual(ROAD_AFTER)
-    for (const p of ROAD) {
-      if (p.paint) expect(PAINTS.find((x) => x.color === p.paint)?.earn).toBe('road')
-      if (p.pattern) expect(PATTERNS.find((x) => x.id === p.pattern)?.road).toBe(true)
-    }
-    expect(PAINTS.filter((p) => p.earn === 'road').length).toBe(ROAD.filter((p) => p.paint).length)
+    expect(roadPay(1).coins).toBeGreaterThan(roadPay(0).coins)
+    expect(roadPay(ROAD_STOPS + 5)).toEqual(roadPay(ROAD_STOPS))
   })
-  it('claims every stop reached, once, and opens its colours', () => {
-    useGame.setState({ trophies: 110, road: 0, coins: 0, parts: 0, rivalRow: {}, oldPaints: false })
-    expect(paintOpen(g(), ROAD[0].paint!)).toBe(false)
+  it('draws mystery cosmetics only from earned-only ones, never twice', () => {
+    for (const id of ROAD_POOL) expect(PAINTS.find((x) => x.color === id)?.earn === 'road' || PATTERNS.find((x) => x.id === id)?.road, id).toBe(true)
+    const all = roadClaim(0, ROAD_POOL.length * MYSTERY_EVERY + 10, [])
+    expect(new Set(all.items).size).toBe(ROAD_POOL.length)
+    expect(all.items.length).toBe(ROAD_POOL.length)
+  })
+  it('claims every stop reached, once, and opens what the mystery stops gave', () => {
+    useGame.setState({ trophies: 110, road: 0, roadItems: [], coins: 0, parts: 0, rivalRow: {}, oldPaints: false })
     g().claimRoad()
     expect(g().road).toBe(4)
-    expect(g().coins).toBe(ROAD[3].coins)
-    expect(g().parts).toBe(ROAD[3].parts)
-    expect(paintOpen(g(), ROAD[0].paint!)).toBe(true)
-    expect(paintOpen(g(), ROAD[4].paint!)).toBe(false)
+    const pay = [0, 1, 2, 3].map(roadPay)
+    expect(g().coins).toBe(pay.reduce((a, p) => a + p.coins, 0))
+    expect(g().parts).toBe(pay.reduce((a, p) => a + p.parts, 0))
+    expect(g().roadItems?.length).toBe(1)
+    const won = g().roadItems![0]
+    if (PAINTS.some((p) => p.color === won)) expect(paintOpen(g(), won)).toBe(true)
+    const coins = g().coins
     g().claimRoad()
-    expect(g().coins).toBe(ROAD[3].coins)
+    expect(g().coins).toBe(coins)
   })
   it('matches the server catalog', () => {
     const c = econCatalog()
     expect(c.road.step).toBe(ROAD_STEP)
-    expect(c.road.stops.length).toBe(ROAD.length)
+    expect(c.road.stops.length).toBe(ROAD_STOPS)
+    expect(c.road.after).toEqual(roadPay(ROAD_STOPS))
     expect(c.mastery.tiers.map((t) => t.bucks)).toEqual(MASTERY_TIERS.map((t) => t.bucks))
   })
 })
@@ -123,29 +173,33 @@ describe('Class Cups', () => {
     for (const k of CAR_CLASSES) {
       const rs = cupRacesOf(k.id)
       expect(rs.length, k.id).toBe(3)
-      for (const r of rs) expect(classOf(r.car).id).toBe(k.id)
+      for (const r of rs) expect(inClass(r.car, k.id)).toBe(true)
       expect(rs[2].pi).toBeGreaterThan(rs[0].pi)
-      expect(PAINTS.find((p) => p.color === cupPaint(k.id))?.earn).toBe('cup')
     }
     expect(new Set(CUP_RACES.map((r) => r.id)).size).toBe(CUP_RACES.length)
   })
-  it('only take a car of the class', () => {
+  it('take a car with either class tag', () => {
     const r = cupRacesOf('muscle')[0]
     expect(cupFits(r, 'stallion')).toBe(true)
+    expect(cupFits(r, 'lemans')).toBe(true)
     expect(cupFits(r, 'pip')).toBe(false)
   })
-  it('pay double the first time and unlock the colour once all three are won', () => {
+  it('pay double the first time, with a free crate once per race', () => {
     vi.spyOn(Date, 'now').mockReturnValue(MONDAY)
-    useGame.setState({ coins: 0, cups: {}, cupPrize: null, levelUp: null, boosts: boostsSpent(MONDAY), rivalRow: {}, oldPaints: false })
+    useGame.setState({ coins: 0, cups: {}, freeCrates: [], cupPrize: null, levelUp: null, boosts: boostsSpent(MONDAY) })
     const [a, b, c] = cupRacesOf('compact')
     g().cupResult(a.id, true)
     expect(g().coins).toBe(cupPrize(a, true))
+    expect(g().cupPrize).toBe(a.id)
+    expect(g().freeCrates).toEqual([cupCrateSource(a.id)])
+    g().cupResult(a.id, true)
+    expect(g().freeCrates?.length).toBe(1)
+    g().cupResult(b.id, false)
+    expect(g().freeCrates?.length).toBe(1)
     g().cupResult(b.id, true)
-    expect(g().cupPrize).toBeNull()
-    expect(paintOpen(g(), cupPaint('compact'))).toBe(false)
     g().cupResult(c.id, true)
-    expect(g().cupPrize).toBe('compact')
+    expect(g().freeCrates?.length).toBe(3)
     expect(cupWon(g().cups, 'compact')).toBe(true)
-    expect(paintOpen(g(), cupPaint('compact'))).toBe(true)
+    expect(CUP_CRATE).toBe('garage')
   })
 })

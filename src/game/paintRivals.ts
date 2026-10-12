@@ -4,8 +4,8 @@
 // Shop. New towns start with only STARTER_PAINTS; towns from before the roster
 // keep every colour they already had (`oldPaints`).
 import { PAINTS, STARTER_PAINTS, LEGACY_PAINTS } from './data'
-import { roadOpen, roadPaintIndex, roadTrophies } from './trophyRoad'
-import { cupForPaint, cupWon } from './cups'
+import { roadOpen } from './trophyRoad'
+import { classWon, firstPaintClass, type Mastery } from './mastery'
 import type { RaceDist } from './distance'
 import type { VenueId } from '../scene/venues'
 
@@ -49,18 +49,18 @@ export const rowSkills = (r: PaintRival) => r.tier >= 3
 // What a race pays: a little more than a town rival at the same PI, plus a first-win bonus.
 export const rowPrize = (r: PaintRival, first: boolean) => Math.round(((260 + r.pi * 9) * (first ? 2 : 1)) / 10) * 10
 
-type PaintSave = { rivalRow?: Record<string, number>; oldPaints?: boolean; road?: number; cups?: Record<string, number> }
+type PaintSave = { rivalRow?: Record<string, number>; oldPaints?: boolean; road?: number; roadItems?: string[]; mastery?: Record<string, Mastery> }
 
 // Can this colour go on a car? Starter colours, gem colours (bought each time), colours
-// from beaten rivals, Trophy Road and Class Cup colours once won, and for older towns every
+// from beaten rivals, Trophy Road and first-win colours once won, and for older towns every
 // colour they had before the roster.
 export function paintOpen(s: PaintSave, color: string) {
   const p = PAINTS.find((x) => x.color === color)
   if (!p) return false
-  if (p.earn === 'road') return roadOpen(s.road, roadPaintIndex(color))
-  if (p.earn === 'cup') {
-    const c = cupForPaint(color)
-    return !!c && cupWon(s.cups, c.id)
+  if (p.earn === 'road') return roadOpen(s.roadItems, color)
+  if (p.earn === 'first') {
+    const c = firstPaintClass(color)
+    return !!c && classWon(s.mastery, c.id)
   }
   if (p.bucks || STARTER_PAINTS.includes(color)) return true
   if (s.oldPaints && LEGACY_PAINTS.includes(color)) return true
@@ -68,15 +68,14 @@ export function paintOpen(s: PaintSave, color: string) {
   return !!r && (s.rivalRow?.[r.id] ?? 0) > 0
 }
 
-// Where a Trophy Road or Class Cup colour is won.
+// Where a Trophy Road or first-win colour is won.
 export function earnHint(color: string) {
-  const i = roadPaintIndex(color)
-  if (i >= 0) return `Trophy Road at ${roadTrophies(i)} 🏆`
-  const c = cupForPaint(color)
-  return c ? `Win the ${c.name} Cup` : ''
+  if (PAINTS.find((p) => p.color === color)?.earn === 'road') return 'Trophy Road mystery prize'
+  const c = firstPaintClass(color)
+  return c ? `Win a race in a ${c.name} car` : ''
 }
 
-// The chart colours rivals and starters cover (Trophy Road and Class Cup colours are counted on their own screens).
+// The chart colours rivals and starters cover (Trophy Road and first-win colours aren't counted here).
 const ROSTER_PAINTS = PAINTS.filter((p) => !p.bucks && !p.earn)
 export const paintsOpen = (s: PaintSave) => ROSTER_PAINTS.filter((p) => paintOpen(s, p.color)).length
 export const PAINTS_TO_COLLECT = ROSTER_PAINTS.length

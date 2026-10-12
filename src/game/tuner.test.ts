@@ -54,6 +54,7 @@ describe('tunerResult', () => {
     expect(g().tuner).toEqual({ downforce: 1 })
     expect(g().tunerPrize).toBe('downforce')
     g().closeTunerPrize()
+    useGame.setState((s) => ({ boosts: s.boosts && { ...s.boosts, streak: 0 } })) // no win-streak bonus on the payout checked
     g().tunerResult(t.id, true)
     expect(g().coins).toBe(tunerPrize(t, true) + tunerPrize(t, false))
     expect(g().tunerPrize).toBeNull()

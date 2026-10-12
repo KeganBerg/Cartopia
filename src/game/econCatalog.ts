@@ -5,7 +5,7 @@ import {
 } from './data'
 import { RIVALS } from './rivals'
 import { MASTERY_TIERS } from './mastery'
-import { ROAD, ROAD_AFTER, ROAD_STEP } from './trophyRoad'
+import { ROAD_STEP, ROAD_STOPS, roadPay } from './trophyRoad'
 
 const LEVELS = Array.from({ length: MAX_BUILDING_LEVEL }, (_, i) => i + 1)
 const cents = (n: number) => Math.round(n * 100) / 100
@@ -86,6 +86,6 @@ export function econCatalog() {
   // (counted per model; the needs of earlier tiers carry on).
   const mastery = { tiers: MASTERY_TIERS.map((t) => ({ bucks: t.bucks, trophies: t.trophies, races: t.need.races ?? 0, wins: t.need.wins ?? 0, modes: t.need.modes ?? 0, upsets: t.need.upsets ?? 0 })) }
   // Trophy Road: a stop every `step` trophies; each stop's coins and parts, then `after` for every stop past the list.
-  const road = { step: ROAD_STEP, stops: ROAD.map((p) => ({ coins: p.coins ?? 0, parts: p.parts ?? 0 })), after: { coins: ROAD_AFTER.coins ?? 0, parts: ROAD_AFTER.parts ?? 0 } }
+  const road = { step: ROAD_STEP, stops: Array.from({ length: ROAD_STOPS }, (_, i) => roadPay(i)), after: roadPay(ROAD_STOPS) }
   return { cars, buildings, goals, gp, rescue, upgradeXpTo, mods, driverBonus: FAVORITE_BONUS, campaign, sets, quests, season, deals, crew, rivals, mastery, road }
 }

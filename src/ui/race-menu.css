@@ -713,6 +713,14 @@ div.rm-node { cursor: default; }
 .ms-tier.got i, .ms-tier.next i { filter: none; }
 .ms-medal { font-size: .9em; }
 .ms-prize .ms-ladder { width: min(360px, 100%); margin: 6px auto 0; }
+.ms-classes { flex: none; display: flex; gap: 6px; }
+.ms-class { flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 0; padding: 3px 2px; background: #fff; border: 2.5px solid #c6d7ee; border-radius: 12px; color: var(--ink, #1b2a4a); }
+.ms-class i { font-style: normal; font-size: 18px; line-height: 1.1; }
+.ms-class b { font: 900 11px Nunito, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.ms-class small { font: 800 11px Nunito, sans-serif; color: #4a6283; }
+.ms-class.got { border-color: #8fd694; background: #f2fff0; }
+.cup-crate { display: grid; place-items: center; font-size: 64px; line-height: 1; }
+.cup-crate.big { font-size: 96px; margin: 8px auto; }
 
 /* ---------- class cups (game/cups.ts) ---------- */
 .cup-classes { flex: none; display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }

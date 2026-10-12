@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BOMB_R, DRIFT_ORANGE, FIELD, GHOST_TIME, KartRace, LAPS, TRACKS, buildTrack, gpField, idleInput, itemOdds, kartStats, lateral, locate, type ItemId, type Kart } from './kart'
+import { BOMB_R, CATCH_UP, catchUp, DRIFT_ORANGE, FIELD, GHOST_TIME, KartRace, LAPS, TRACKS, buildTrack, gpField, idleInput, itemOdds, kartStats, lateral, locate, type ItemId, type Kart } from './kart'
 
 const ALL = TRACKS.flatMap((d) => [buildTrack(d, false), buildTrack(d, true)])
 
@@ -332,5 +332,16 @@ describe('kart items, second batch', () => {
     race.step(1 / 60, [], true)
     expect(b.spin).toBeGreaterThan(0)
     expect(a.spin).toBe(0)
+  })
+})
+
+describe('kart catch-up', () => {
+  it('gives the back half a small boost, most at the very back, none up front', () => {
+    expect(catchUp(0, 8)).toBe(0)
+    expect(catchUp(3, 8)).toBe(0)
+    expect(catchUp(5, 8)).toBeGreaterThan(0)
+    expect(catchUp(7, 8)).toBeCloseTo(CATCH_UP)
+    expect(catchUp(6, 8)).toBeLessThan(catchUp(7, 8))
+    expect(catchUp(0, 1)).toBe(0)
   })
 })
