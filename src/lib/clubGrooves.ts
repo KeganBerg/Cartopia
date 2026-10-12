@@ -1,7 +1,7 @@
 // The nightclub's house grooves. Each town night plays a different one, picked
 // from the shared town clock so every player hears the same set on the same
 // night, and a reload doesn't change it. ?groove=0..4 pins one for testing.
-import { DAY_MS } from '../game/clock'
+import { nightNumber } from '../game/clock'
 
 export type Tone = 'organ' | 'piano' | 'chop'
 export type Groove = {
@@ -141,10 +141,10 @@ const pinned = (() => {
   return v === null ? null : Number(v)
 })()
 
-// The groove for the night that's on at a given moment. Nights fall inside one
-// town day (phase 0.3 to 0.7), so the day number is the night number, and
-// stepping through the list means two nights in a row never repeat.
+// The groove for the night that's on at a given moment. The night number counts
+// up at noon, so a whole night keeps one groove, and stepping through the list
+// means two nights in a row never repeat.
 export function grooveFor(now = Date.now()): number {
   if (pinned !== null && GROOVES[pinned]) return pinned
-  return Math.floor(now / DAY_MS) % GROOVES.length
+  return nightNumber(now) % GROOVES.length
 }

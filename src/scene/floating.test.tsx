@@ -10,11 +10,12 @@ import { KeepShapes, MergeScale } from './mergeScale'
 import { limitFor } from './keepShape'
 import { describe, floating } from './floating'
 import { groupScale, mergeable, type MergeGroup } from '../game/merge'
-import { DAY_MS } from '../game/clock'
+import { sunDay } from '../game/sun'
 
 type Scale = [number, number, number]
 // Noon, then midnight: night spots (the club's dancers, lit signs) only show after dark.
-const NOON = 0, MIDNIGHT = DAY_MS / 2
+// A real noon and the midnight after it (the town clock follows local time).
+const NOON = sunDay(20_000).noon, MIDNIGHT = NOON + 12 * 3_600_000
 // How the town draws a merged pair (two side by side, facing south).
 const PAIR = groupScale({ cols: 2, rows: 1 } as MergeGroup, 0)
 // Every level on its own (trims come in one level at a time), and each growth
@@ -41,7 +42,7 @@ group('nothing floats', () => {
           </group>,
         )
         await ReactThreeTestRenderer.act(async () => r.advanceFrames(2, 1 / 60))
-        for (const p of floating(r.scene.instance as Object3D)) bad.add(`L${level}${scale.some((v) => v !== 1) ? ' pair' : ''}${time ? ' night' : ''}: ${describe(p)}`)
+        for (const p of floating(r.scene.instance as Object3D)) bad.add(`L${level}${scale.some((v) => v !== 1) ? ' pair' : ''}${time === MIDNIGHT ? ' night' : ''}: ${describe(p)}`)
         await r.unmount()
         vi.restoreAllMocks()
       }
@@ -58,7 +59,7 @@ group('nothing floats on landmarks', () => {
       vi.spyOn(Date, 'now').mockReturnValue(time)
       const r = await ReactThreeTestRenderer.create(<VanguardTower />)
       await ReactThreeTestRenderer.act(async () => r.advanceFrames(2, 1 / 60))
-      for (const p of floating(r.scene.instance as Object3D)) bad.add(`${time ? 'night' : 'day'}: ${describe(p)}`)
+      for (const p of floating(r.scene.instance as Object3D)) bad.add(`${time === MIDNIGHT ? 'night' : 'day'}: ${describe(p)}`)
       await r.unmount()
       vi.restoreAllMocks()
     }
