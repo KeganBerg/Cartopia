@@ -81,6 +81,9 @@ export function SettingsTab({ user }: { user: User | null }) {
       </Group>
       <Group icon="🔔" title="Notifications">
         <AlertsMenu />
+        <Row label="Mute taunts" sub="Ghost race taunts show as 👍">
+          <Switch label="Mute taunts" on={prefs.muteTaunts} onChange={(on) => setPrefs({ muteTaunts: on })} />
+        </Row>
         {user && <ChallengeSettings />}
       </Group>
     </>

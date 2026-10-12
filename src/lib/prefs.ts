@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 
 // Player settings that live on this device only (they never go into the save):
-// graphics quality, reduced motion and phone vibration. Sound volumes keep
+// graphics quality, reduced motion, phone vibration and muted ghost race taunts. Sound volumes keep
 // their own keys in sound.ts, townMusic.ts and ambience.ts.
 
 // auto: the game picks by device and steps down if it struggles.
@@ -13,10 +13,12 @@ export type Prefs = {
   // null follows the device's own "reduce motion" setting.
   reduceMotion: boolean | null
   vibration: boolean
+  // Received ghost race taunts show as a plain 👍.
+  muteTaunts: boolean
 }
 
 const KEY = 'cartopia-prefs'
-const DEFAULTS: Prefs = { graphics: 'auto', reduceMotion: null, vibration: true }
+const DEFAULTS: Prefs = { graphics: 'auto', reduceMotion: null, vibration: true, muteTaunts: false }
 
 export function parsePrefs(raw: string | null): Prefs {
   try {
@@ -25,6 +27,7 @@ export function parsePrefs(raw: string | null): Prefs {
       graphics: p.graphics === 'high' || p.graphics === 'saver' ? p.graphics : 'auto',
       reduceMotion: typeof p.reduceMotion === 'boolean' ? p.reduceMotion : null,
       vibration: p.vibration !== false,
+      muteTaunts: p.muteTaunts === true,
     }
   } catch {
     return { ...DEFAULTS }
