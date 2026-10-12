@@ -36,3 +36,40 @@ describe('land beyond the town', () => {
     for (let i = 0; i < n.count; i++) expect(n.getY(i)).toBeGreaterThan(0)
   })
 })
+
+describe('countryside layout', () => {
+  it('lays the railway on a level bed', async () => {
+    const { railHeight, railPoint } = await import('./horizonLand')
+    for (const s of [-800, -400, 0, 350, 800]) {
+      const [x, z] = railPoint(s)
+      expect(Math.abs(heightAt(x, z) - (railHeight(s) - 0.3))).toBeLessThan(0.5)
+    }
+  })
+
+  it('keeps fields off the roads and rail', async () => {
+    const { fieldAt, hwy, rail } = await import('./horizonLand')
+    let n = 0
+    for (let x = -700; x < 0; x += 9) {
+      for (let z = -700; z < 0; z += 9) {
+        if (!fieldAt(x, z)) continue
+        n++
+        expect(hwy(x, z).d).toBeGreaterThan(15)
+        expect(rail(x, z).d).toBeGreaterThan(11)
+      }
+    }
+    expect(n).toBeGreaterThan(500)
+  })
+
+  it('knows the height of the terrain mesh between its vertices', async () => {
+    const { groundAt } = await import('./horizonLand')
+    const g = buildTerrain()
+    const p = g.attributes.position
+    // Every triangle's centre sits exactly on the mesh.
+    for (let t = 0; t < p.count; t += 3 * 97) {
+      const x = (p.getX(t) + p.getX(t + 1) + p.getX(t + 2)) / 3
+      const y = (p.getY(t) + p.getY(t + 1) + p.getY(t + 2)) / 3
+      const z = (p.getZ(t) + p.getZ(t + 1) + p.getZ(t + 2)) / 3
+      expect(Math.abs(groundAt(x, z) - y)).toBeLessThan(0.01)
+    }
+  })
+})

@@ -162,11 +162,11 @@ function StoneShaftLite({ m, ghost, x, z, y0, w, d, h }: { m: Mat; ghost?: boole
 // Signs that glow after dark (the HQ crown, HOSPITAL, EMERGENCY): kept by
 // identity, brightened by the night.
 const litSigns = new Map<string, MeshStandardMaterial>()
-export function litSign(text: string, bg: string, fg: string, day = 0.15) {
-  const k = `${text}|${bg}|${fg}`
+export function litSign(text: string, bg: string, fg: string, day = 0.15, aspect = 4) {
+  const k = `${text}|${bg}|${fg}|${aspect}`
   let s = litSigns.get(k)
   if (s) return s
-  const tex = signTexture(text, bg, fg)
+  const tex = signTexture(text, bg, fg, aspect)
   s = new MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: new Color('#ffffff'), emissiveIntensity: day, toneMapped: false })
   s.userData.live = true
   const mat = s
@@ -174,11 +174,13 @@ export function litSign(text: string, bg: string, fg: string, day = 0.15) {
   litSigns.set(k, s)
   return s
 }
-export function LitSign({ text, w, at, bg, fg, ghost, m }: { text: string; w: number; at: V3; bg: string; fg: string; ghost?: boolean; m: Mat }) {
+// h sets a long, thin sign (a blade); the lettering is drawn for that shape.
+export function LitSign({ text, w, h = w / 4, at, bg, fg, ghost, m }: { text: string; w: number; h?: number; at: V3; bg: string; fg: string; ghost?: boolean; m: Mat }) {
+  const aspect = Math.round((w / h) * 4) / 4
   return (
     <mesh position={at}>
-      <planeGeometry args={[w, w / 4]} />
-      {ghost ? m(bg) : <primitive object={litSign(text, bg, fg)} attach="material" dispose={null} />}
+      <planeGeometry args={[w, h]} />
+      {ghost ? m(bg) : <primitive object={litSign(text, bg, fg, 0.15, aspect)} attach="material" dispose={null} />}
     </mesh>
   )
 }

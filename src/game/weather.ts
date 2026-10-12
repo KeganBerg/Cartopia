@@ -1,4 +1,4 @@
-import { DAY_MS } from './clock'
+import { naturalPhase } from './clock'
 import { SEASON, type Season } from '../scene/season'
 import type { VenueId } from '../scene/venues'
 
@@ -69,8 +69,8 @@ export function spellKind(index: number, season: Season = SEASON): WeatherKind {
   // Two big storms in a row feel endless: the second one calms to rain or snow.
   if ((kind === 'storm' || kind === 'blizzard') && spellKind(index - 1, season) === kind) kind = kind === 'storm' ? 'rain' : 'snow'
   if (kind === 'fog' && season === 'summer') {
-    // Morning: from just before dawn to mid-morning (0.5 is midnight, 0 noon).
-    const phase = (((index * SPELL_MS) % DAY_MS) + DAY_MS) % DAY_MS / DAY_MS
+    // Morning where the player is: from just before dawn to mid-morning (0.5 is midnight, 0 noon).
+    const phase = naturalPhase(index * SPELL_MS)
     if (phase < 0.68 || phase > 0.9) kind = 'clear'
   }
   return kind
