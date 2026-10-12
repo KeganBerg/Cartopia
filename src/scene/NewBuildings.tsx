@@ -1455,6 +1455,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           <mesh position={[0, 2.12, 0]}><sphereGeometry args={[0.07, 8, 6]} />{m(GOLD)}</mesh>
           <mesh position={[0, 1.36, 0]} rotation-x={Math.PI / 2}><circleGeometry args={[0.2, 10]} />{bulb}</mesh>
           {!ghost && <Pool r={0.9} />}
+          {!ghost && <PropMesh parts={DECOR_PROPS.gazeboTrim()} />}
         </group>
       )
     }
