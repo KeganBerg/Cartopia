@@ -1,4 +1,4 @@
--- Resto-mod pieces (2026-10-12, thread "Resto-mod cars from crate parts"): three secret cars
+-- 0065 Resto-mod pieces (2026-10-12, thread "Resto-mod cars from crate parts"): three secret cars
 -- (sprint Valtorre Sprint 65, revenant Liberty Revenant '69, pontone Corvara Pontone 58) that are
 -- never sold. Garage, Gold and Diamond crates drop one of four pieces of a car the level has
 -- unlocked and the player hasn't built; the fourth piece builds it. A piece already won pays
@@ -11,8 +11,11 @@
 --   * econ_catalog() rebuilt from econCatalog() (adds the three cars and the Resto Garage set).
 --   * crate_open() is 0062's with the crate tables regenerated from crateTables() and the piece
 --     slice added; econ_guard() is unchanged (0041).
--- Economy thread: please review, renumber if needed, and run it only AFTER the client with these
--- cars ships, and after 0062 (ORDER RULE: it writes new car ids).
+-- Run it only AFTER the client with these cars ships, and after 0062 (ORDER RULE: it writes new
+-- car ids). 0064's wheel reads this crate_open()'s table and still finds the street crate.
+-- Economy review: secret cars have no home crate, so the car slice never gives one; the only way to
+-- keep one is car_granted() on a server-built piece row. A reset (0063) deletes the pieces with the
+-- other crate opens.
 
 alter table public.crate_opens add column if not exists piece int;
 alter table public.crate_opens drop constraint if exists crate_opens_kind_check;
