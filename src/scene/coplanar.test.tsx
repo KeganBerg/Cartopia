@@ -1,25 +1,44 @@
 // @vitest-environment jsdom
 import './testCanvas'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import ReactThreeTestRenderer from '@react-three/test-renderer'
 import { Box3, BoxGeometry, CircleGeometry, CylinderGeometry, Matrix3, Mesh, Object3D, PlaneGeometry, Vector3, type Material } from 'three'
 import { BUILDINGS, TILE } from '../game/data'
+import { mergeable } from '../game/merge'
 import { BuildingModel } from './BuildingModel'
 import { VanguardTower } from './Landmark'
 import { LAYER } from './layers'
+import { applyNight } from './dayNight'
+import { KeepShapes, MergeScale } from './mergeScale'
+import { limitFor } from './keepShape'
+import { FREE } from './freeCam'
 import { appendFileSync } from 'node:fs'
 
 // No flicker (Z-fighting): two flat faces that face the same way, overlap and
 // sit at (almost) the same height or depth fight over the same pixels, which
 // shows as stripes on phones. That's a mat lying flush on the lot paving, a
 // sign glued to a wall at the wall's own depth, two pads with the same top.
-// This draws every building at each growth form, on the lot paving it sits on
-// in town, and lists every such pair. Fix one by lifting the top piece a clear
-// step (GAP or more), or give a flat decal `decal()` from layers.ts.
+// This draws every building at each growth form, alone and in every merged
+// form, at night, on the lot paving it sits on in town, and lists every such
+// pair. Fix one by lifting the top piece a clear step (GAP or more), or give a
+// flat decal `decal()` from layers.ts.
+//
+// THE RULE: two faces that look different and face the same way are GAP or
+// more apart, or one of them has polygonOffset (decal()). Faces that share a
+// picture count as different unless they are the same mesh: a texture laid on
+// two boxes of different sizes doesn't line up, so they fight too.
 
 const LEVELS = [1, 4, 7, 10]
-// Phones with a 16-bit depth buffer need about this much between two faces.
-const GAP = Number(process.env.COPLANAR_GAP ?? 0.001)
+// Every merged form: a pair either way (stretched) and a 2x2 block (scaled up
+// whole, people-sized props kept at true size). A 4x4 block only scales the
+// 2x2 one further apart.
+const MERGES: [number, number, number][] = [[1, 1, 1], [2, 1, 1], [1, 1, 2], [2, 2, 2]]
+// The depth buffer's step grows with distance: about z * z / (near * 2^24)
+// for the free camera (24-bit depth on phones), and two faces closer than a
+// couple of steps flicker. GAP keeps faces apart out to the free camera's
+// furthest zoom; the town camera is orthographic and far finer.
+const STEP = (FREE.maxDist * FREE.maxDist) / (FREE.near * 2 ** 24)
+const GAP = Number(process.env.COPLANAR_GAP ?? Math.max(0.001, Math.ceil(STEP * 1000) / 1000))
 // Overlaps smaller than this (in square units) are seams, not visible fights.
 const AREA = 0.0004
 
@@ -56,7 +75,7 @@ function faces(o: Object3D): Face[] {
   const off = offset(mesh.material)
   const mat = [mesh.material].flat()[0] as Material & { color?: { getHexString(): string }; map?: { uuid: string } | null; emissive?: { getHexString(): string } }
   // Two faces drawn the same (same colour, no picture) can't be told apart, so they can't flicker.
-  const look = mat.map ? mat.map.uuid : `${mat.type}${mat.color?.getHexString()}${mat.emissive?.getHexString() ?? ''}`
+  const look = mat.map ? `${mat.map.uuid}:${o.uuid}` : `${mat.type}${mat.color?.getHexString()}${mat.emissive?.getHexString() ?? ''}`
   // See-through glows that don't write depth just add up; they never fight each other.
   const glass = mat.transparent && !mat.depthWrite
   const out: Face[] = []
@@ -130,8 +149,14 @@ function fights(all: Face[], solids: Map<Object3D, Box3>) {
   return bad
 }
 
-async function scan(def: (typeof BUILDINGS)[number], level: number, model = <BuildingModel def={def} level={level} />, lot = [def.w, def.h]) {
-  const r = await ReactThreeTestRenderer.create(model)
+async function scan(def: (typeof BUILDINGS)[number], level: number, model = <BuildingModel def={def} level={level} />, lot = [def.w, def.h], scale: [number, number, number] = [1, 1, 1]) {
+  const r = await ReactThreeTestRenderer.create(
+    <group scale={scale}>
+      <MergeScale.Provider value={scale}>
+        <KeepShapes limit={limitFor(def)}>{model}</KeepShapes>
+      </MergeScale.Provider>
+    </group>,
+  )
   await ReactThreeTestRenderer.act(async () => r.advanceFrames(2, 1 / 60))
   const scene = r.scene.instance as Object3D
   scene.updateMatrixWorld(true)
@@ -146,7 +171,7 @@ async function scan(def: (typeof BUILDINGS)[number], level: number, model = <Bui
   })
   // The lot paving the town lays under every building (World.tsx).
   if (def.kind !== 'decor' && def.kind !== 'obstacle') {
-    const hw = (lot[0] * TILE - 0.1) / 2, hd = (lot[1] * TILE - 0.1) / 2
+    const hw = (lot[0] * scale[0] * TILE - 0.1) / 2, hd = (lot[1] * scale[2] * TILE - 0.1) / 2
     list.push({ axis: 1, sign: 1, at: LAYER.lot, lo: [-hw, -hd], hi: [hw, hd], who: 'lot paving', off: false, mesh: null, look: 'lot', glass: false })
   }
   const bad = fights(list, solids)
@@ -155,13 +180,21 @@ async function scan(def: (typeof BUILDINGS)[number], level: number, model = <Bui
 }
 
 describe('no flickering flat faces', () => {
+  // Night: lamps, pools and lit signs that only show after dark are drawn too.
+  beforeAll(() => applyNight(1))
+  it('keeps faces apart for the free camera out to its furthest zoom', () => {
+    expect(GAP).toBeGreaterThanOrEqual(STEP)
+  })
   for (const def of BUILDINGS.filter((d) => !d.parked)) {
     it(def.id, async () => {
       const bad = new Set<string>()
-      for (const level of LEVELS) for (const b of await scan(def, level)) bad.add(`L${level} ${b}`)
+      for (const sc of mergeable(def.id) ? MERGES : MERGES.slice(0, 1)) {
+        const tag = sc[0] === 1 && sc[2] === 1 ? '' : ` ${sc[0]}x${sc[2]}`
+        for (const level of LEVELS) for (const b of await scan(def, level, undefined, undefined, sc)) bad.add(`L${level}${tag} ${b}`)
+      }
       if (process.env.COPLANAR_OUT) appendFileSync(process.env.COPLANAR_OUT, [...bad].map((b) => `${def.id} ${b}\n`).join(''))
       expect([...bad]).toEqual([])
-    })
+    }, 120_000)
   }
 })
 

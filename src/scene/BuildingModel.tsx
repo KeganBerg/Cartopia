@@ -1425,13 +1425,13 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             </group>
           )}
           {def.id === 'motel' && [-1.2, -0.6, 0.6, 1.2].map((x) => (
-            <mesh key={x} position={[x, 0.32, F + 0.012]}>
+            <mesh key={x} position={[x, 0.32, F + 0.016]}>
               <planeGeometry args={[0.3, 0.55]} />
               {m('#00897b')}
             </mesh>
           ))}
           {def.id === 'carwash' && (
-            <mesh position={[0, 0.6, F + 0.012]}>
+            <mesh position={[0, 0.6, F + 0.016]}>
               <planeGeometry args={[1.4, 1]} />
               {m('#0277bd')}
             </mesh>

@@ -37,7 +37,7 @@ export function glassMat(tint: string) {
   g = new MeshStandardMaterial({ color: tint, map: curtainTex(), emissiveMap: curtainGlowTex(), emissive: new Color('#ffffff'), emissiveIntensity: 0, metalness: 0.15, roughness: 0.22 })
   g.userData.live = true
   // Four panes across and four floors per texture, emptied out one by one at night.
-  closingGlow(g, [4, 4], 'curtain')
+  closingGlow(g, [4, 4], 'curtain', 0.3)
   const mat = g
   onNight((n) => (mat.emissiveIntensity = n * 0.7))
   glassMats.set(tint, g)
@@ -76,7 +76,7 @@ export function GlassBlock({ m, ghost, x, z, y0 = 0, w, d, h, tint, frame, roof 
       <Glass m={m} ghost={ghost} at={[x + w / 2, y, z]} w={d} h={h} ry={Math.PI / 2} tint={tint} />
       <Glass m={m} ghost={ghost} at={[x - w / 2, y, z]} w={d} h={h} ry={-Math.PI / 2} tint={tint} />
       {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => (
-        <Box key={`${sx}${sz}`} m={m} at={[x + sx * (w / 2), y, z + sz * (d / 2)]} s={[0.05, h, 0.05]} c={frame} shadow={false} />
+        <Box key={`${sx}${sz}`} m={m} at={[x + sx * (w / 2 + 0.006), y, z + sz * (d / 2 + 0.006)]} s={[0.05, h, 0.05]} c={frame} shadow={false} />
       )))}
       <Box m={m} at={[x, y0 + h + 0.04, z]} s={[w + 0.06, 0.08, d + 0.06]} c={frame} />
       <mesh position={[x, y0 + h + 0.081, z]} rotation-x={-Math.PI / 2}>

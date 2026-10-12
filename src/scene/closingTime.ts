@@ -20,15 +20,20 @@ export const hoursUniforms = { uHour: { value: 12 }, uNight: { value: 0 } }
 const RULES = /* glsl */ `
 uniform float uHour;
 uniform float uNight;
-varying vec3 vHours;
+// Flat, never smoothed across the triangle: the seeds go through a hash that
+// turns the tiniest change into a different answer, and a smoothed value
+// wobbles in its last digits from pixel to pixel under the free camera's
+// perspective, which lit random pixels of a dark pane (white speckle).
+flat varying vec3 vHours;
 varying float vHoursY;
 float hoursHash(vec3 p) {
   p = fract(p * vec3(0.1031, 0.1030, 0.0973));
   p += dot(p, p.yxz + 33.33);
   return fract((p.x + p.y) * p.z);
 }
-// 1 while lit, 0 once closed. cell picks one pane within the mesh.
-float hoursLit(vec2 cell) {
+// 1 while lit, 0 once closed. cell picks one pane within the mesh, y is the
+// height of that pane's middle (so a pane never straddles two floors).
+float hoursLit(vec2 cell, float y) {
   float kind = floor(vHours.z + 0.5);
   if (kind < 0.5) return 1.0;
   float b = vHours.x;
@@ -40,7 +45,7 @@ float hoursLit(vec2 cell) {
   if (kind < 1.5) {
     // Offices: each floor heads home around its own time, then window by
     // window; a few work late, and a handful never switch off.
-    float fl = hoursHash(vec3(b * 131.0, floor(vHoursY / 0.3), 7.0));
+    float fl = hoursHash(vec3(b * 131.0, floor(y / 0.3), 7.0));
     float late = hoursHash(vec3(r * 313.0, b * 37.0, 3.0));
     off = 17.8 + fl * 2.4 + r * 1.6;
     if (late < 0.12) off = 23.5 + late * 35.0;
@@ -73,20 +78,23 @@ type Shader = { vertexShader: string; fragmentShader: string; uniforms: Record<s
 function vert(sh: Shader) {
   Object.assign(sh.uniforms, hoursUniforms)
   sh.vertexShader = sh.vertexShader
-    .replace('#include <common>', '#include <common>\nattribute vec3 aHours;\nvarying vec3 vHours;\nvarying float vHoursY;')
+    .replace('#include <common>', '#include <common>\nattribute vec3 aHours;\nflat varying vec3 vHours;\nvarying float vHoursY;')
     .replace('#include <project_vertex>', '#include <project_vertex>\nvHours = aHours;\nvHoursY = (modelMatrix * vec4(transformed, 1.0)).y;')
   sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n' + RULES)
 }
 
 // Lit windows: the emissive glow goes out pane by pane. `cells` is how many
-// panes the glow texture has across and up.
-export function closingGlow<M extends MeshStandardMaterial>(m: M, cells: [number, number], key: string) {
+// panes the glow texture has across and up; `row` is how tall one row of panes
+// is in the world, when the texture is laid on at a fixed size (0: unknown).
+export function closingGlow<M extends MeshStandardMaterial>(m: M, cells: [number, number], key: string, row = 0) {
   m.userData.hours = true
   m.onBeforeCompile = (sh) => {
     vert(sh)
     sh.fragmentShader = sh.fragmentShader.replace(
       '#include <emissivemap_fragment>',
-      `#include <emissivemap_fragment>\ntotalEmissiveRadiance *= hoursLit(floor(vEmissiveMapUv * vec2(${cells[0].toFixed(1)}, ${cells[1].toFixed(1)})));`,
+      `#include <emissivemap_fragment>
+vec2 hoursCell = vEmissiveMapUv * vec2(${cells[0].toFixed(1)}, ${cells[1].toFixed(1)});
+totalEmissiveRadiance *= hoursLit(floor(hoursCell), vHoursY - (fract(hoursCell.y) - 0.5) * ${row.toFixed(3)});`,
     )
   }
   m.customProgramCacheKey = () => `hours-${key}`
@@ -106,7 +114,7 @@ export function signMat(text: string, bg?: string, fg?: string) {
     vert(sh)
     sh.fragmentShader = '#define HOURS_SIGN\n' + sh.fragmentShader.replace(
       '#include <map_fragment>',
-      '#include <map_fragment>\ndiffuseColor.rgb *= 1.0 - (1.0 - hoursLit(vec2(0.0))) * 0.62 * uNight;',
+      '#include <map_fragment>\ndiffuseColor.rgb *= 1.0 - (1.0 - hoursLit(vec2(0.0), vHoursY)) * 0.62 * uNight;',
     )
   }
   s.customProgramCacheKey = () => 'hours-sign'

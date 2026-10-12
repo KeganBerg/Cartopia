@@ -500,7 +500,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           {/* Neon outlines that glow day and night. */}
           {!ghost && (
             <group>
-              <Neon at={[0, h - 0.04, 0.485]} s={[1.6, 0.04, 0.03]} c="#00e5ff" />
+              <Neon at={[0, h - 0.04, 0.485]} s={[1.58, 0.04, 0.022]} c="#00e5ff" />
               {[-0.79, 0.79].map((x) => <Neon key={x} at={[x, h / 2, 0.485]} s={[0.035, h - 0.1, 0.03]} c="#ff4fd8" />)}
               <Neon at={[0, 1.02, 0.49]} s={[1.3, 0.03, 0.03]} c="#76ff03" />
             </group>
@@ -624,7 +624,8 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           {/* A fire engine nosing out of the open bay. */}
           <Box m={m} at={[-0.9, 0.03, 0.7]} s={[1.1, 0.05, 0.6]} c="#ffffff" t={paverTex(1, 1)} shadow={false} />
           {!ghost && (
-            <group position={[-0.9, 0, 0.32]}>
+            // One piece, so a merged pair keeps its wheels on it.
+            <group position={[-0.9, 0, 0.32]} userData={{ whole: true }}>
               <Box m={m} at={[0, 0.42, 0]} s={[0.72, 0.5, 1.2]} c="#d32f2f" />
               <Box m={m} at={[0, 0.5, 0.52]} s={[0.66, 0.24, 0.18]} c="#b3e5fc" />
               <Box m={m} at={[0, 0.72, -0.1]} s={[0.5, 0.05, 1.05]} c="#cfd8dc" />
@@ -652,8 +653,8 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
               {Array.from({ length: Math.floor((th - h) / 0.45) }, (_, i) => h + 0.3 + i * 0.45).map((y) => (
                 <group key={y}>
                   <Box m={m} at={[1.35, y, -0.17]} s={[0.56, 0.03, 0.16]} c="#37474f" shadow={false} />
-                  <Box m={m} at={[1.35, y + 0.08, -0.095]} s={[0.56, 0.14, 0.012]} c="#eceff1" shadow={false} />
-                  <mesh position={[1.35, y + 0.17, -0.244]}><planeGeometry args={[0.22, 0.24]} />{win}</mesh>
+                  <Box m={m} at={[1.35, y + 0.08, -0.1]} s={[0.56, 0.14, 0.012]} c="#eceff1" shadow={false} />
+                  <mesh position={[1.35, y + 0.17, -0.238]}><planeGeometry args={[0.22, 0.24]} />{win}</mesh>
                 </group>
               ))}
               {!ghost && <Box m={m} at={[1.66, (th - 0.6) / 2 + 0.3, -0.55]} s={[0.02, th - 0.6, 0.12]} c="#cfd8dc" shadow={false} />}

@@ -305,8 +305,9 @@ function ArcadeModel({ def, ghost, m, win, bulb, level }: Props) {
             {Array.from({ length: 12 }, (_, i) => (
               <Neon key={i} at={[-0.4 + (i % 4) * 0.27, 1.25 + Math.floor(i / 4) * 0.22 * (fl / 3), 0.645]} s={[0.18, 0.12, 0.01]} c={neon[(i * 7) % 4]} />
             ))}
-            {[-1, 1].map((sd) => <Neon key={sd} at={[sd * 0.86, H / 2, 0.62]} s={[0.035, H, 0.035]} c={neon[sd < 0 ? 0 : 1]} />)}
-            <Neon at={[0, H, 0.62]} s={[1.72, 0.035, 0.035]} c="#76ff03" />
+            {/* Posts just past the bar's ends and a thinner bar, so no two neon faces share a plane. */}
+            {[-1, 1].map((sd) => <Neon key={sd} at={[sd * 0.866, H / 2, 0.62]} s={[0.035, H, 0.035]} c={neon[sd < 0 ? 0 : 1]} />)}
+            <Neon at={[0, H, 0.62]} s={[1.72, 0.035, 0.026]} c="#76ff03" />
           </group>
         )}
         <RoofSign m={m} text="ARCADE" w={1.2} at={[0, H + 0.08, 0.4]} bg="#1a1035" fg="#ff4fd8" board="#ec407a" ghost={ghost} />
