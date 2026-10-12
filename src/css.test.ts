@@ -23,9 +23,18 @@ function problems(css: string): string[] {
 }
 
 describe('stylesheets', () => {
-  for (const file of ['index.css', 'theme.css', 'ui/crates.css', 'ui/chat.css', 'ui/race-menu.css', 'ui/loading.css']) {
+  for (const file of ['index.css', 'theme.css', 'ui/crates.css', 'ui/chat.css', 'ui/race-menu.css', 'ui/loading.css', 'ui/goal.css']) {
     it(`${file} has balanced braces`, () => {
       expect(problems(readFileSync(new URL(`./${file}`, import.meta.url), 'utf8'))).toEqual([])
     })
   }
+})
+
+// The tutorial's goal screen reuses the word "goal", which is also every card
+// in the Goals panel. An unscoped .goal rule there pushed each card down 80px.
+describe('goal screen stylesheet', () => {
+  it('only styles the goal screen card, never the Goals panel cards', () => {
+    const css = readFileSync(new URL('./ui/goal.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+    expect(css.match(/(^|[\s,{}])\.goal(?![-\w])/gm) ?? []).toEqual([])
+  })
 })
