@@ -58,11 +58,21 @@ export function nextPhaseAt(phase: number, now = Date.now(), place: Place | null
   }
 }
 
+// A feature with its own night (Techno Night, techno.ts) pulls the town into
+// it: `force` says how far, 0 (the clock as it is) to 1 (midnight), so it can
+// ease in and out.
+let force: ((now: number) => number) | null = null
+export function forceNight(f: ((now: number) => number) | null) {
+  force = f
+}
+
 // 0 = noon, 0.5 = midnight.
 export function dayPhase(now = Date.now()) {
   if (pinned !== null) return pinned
   const natural = naturalPhase(now)
-  return forcedPhase(natural, now) ?? natural
+  const p = forcedPhase(natural, now) ?? natural
+  const w = force ? Math.min(1, Math.max(0, force(now))) : 0
+  return w > 0 ? p + (0.5 - p) * w : p
 }
 
 // Which night it is (counts up once a day, at noon), for things that change
@@ -70,9 +80,9 @@ export function dayPhase(now = Date.now()) {
 export const nightNumber = (now = Date.now()) => dayAt(now)
 
 // The hour on the town clock as hours from noon to the next noon (12..36,
-// midnight is 24): the device clock, or the pinned or forced time.
+// midnight is 24): the device clock, or the pinned or forced time (events, Techno Night).
 export function townHour(now = Date.now()) {
-  if (pinned !== null || forcedPhase(0, now) !== null) return clockHour(dayPhase(now))
+  if (pinned !== null || forcedPhase(0, now) !== null || (force && force(now) > 0)) return clockHour(dayPhase(now))
   const d = new Date(now)
   const h = d.getHours() + d.getMinutes() / 60
   return h < 12 ? h + 24 : h

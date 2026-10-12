@@ -51,7 +51,7 @@ left:-30%;width:160%;top:-24%;height:70%;--cx:50%;--cy:52%}
 @keyframes sp-spin{to{transform:rotate(1turn)}}
 #splash .wm{position:absolute;left:50%;top:calc(6% + env(safe-area-inset-top));width:min(80vw,560px);transform:translateX(-50%);filter:drop-shadow(0 6px 14px rgba(20,33,61,.3));z-index:5;animation:sp-in .7s cubic-bezier(.2,1.6,.4,1) both}
 @keyframes sp-in{from{transform:translateX(-50%) scale(.6);opacity:0}}
-#splash .tag{position:absolute;left:0;right:0;top:calc(6% + env(safe-area-inset-top) + min(80vw,560px) * .3);margin:0;text-align:center;font-size:clamp(15px,4.6vw,24px);line-height:1.25;letter-spacing:.3px;-webkit-text-stroke:4px ${N};paint-order:stroke fill;text-shadow:0 3px 0 ${N};z-index:5;animation:sp-up .6s .15s ease-out both}
+#splash .tag{position:absolute;left:0;right:0;background:none;padding:0;border-radius:0;font-family:inherit;top:calc(6% + env(safe-area-inset-top) + min(80vw,560px) * .3);margin:0;text-align:center;font-size:clamp(15px,4.6vw,24px);line-height:1.25;letter-spacing:.3px;-webkit-text-stroke:4px ${N};paint-order:stroke fill;text-shadow:0 3px 0 ${N};z-index:5;animation:sp-up .6s .15s ease-out both}
 @keyframes sp-up{from{transform:translateY(10px);opacity:0}}
 #splash .car{position:absolute;left:50%;top:37%;width:calc(min(76vw,340px) * var(--k,1));transform:translateX(-50%);z-index:4;opacity:0;transition:opacity .35s ease}
 #splash .car.on{opacity:1;animation:sp-park .7s cubic-bezier(.2,1.3,.4,1) both}

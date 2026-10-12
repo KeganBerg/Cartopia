@@ -220,3 +220,66 @@ body:has(.edit-bar) .tutorial { bottom: calc(150px + var(--sab)); }
   body:has(.edit-bar) .tutorial { bottom: calc(118px + var(--sab)); }
   body:has(.edit-bar):has(.tutorial) .toasts { bottom: calc(188px + var(--sab)); }
 }
+
+/* ---- Techno Night (live event). src/ui/Techno.tsx sets these on every frame:
+   --tk kick 0..1, --tk-h hue (new one each beat), --tk-side +-1 each beat,
+   --tk-m the same kick for movement (0 with reduced motion), --tk-build 0..1 through the breakdown, --tk-drop flash on the drop, --tk-sx/sy shake. */
+:root.techno { --tk: 0; --tk-m: 0; --tk-h: 0; --tk-side: 1; --tk-build: 0; --tk-drop: 0; --tk-sx: 0px; --tk-sy: 0px; --tk-c: hsl(var(--tk-h) 100% 60%); }
+/* Buttons bounce on the kick and rock side to side, neighbours the opposite way. */
+:root.techno .hud-left .pill, :root.techno .chip-stat, :root.techno .speedo, :root.techno .fuel, :root.techno .hud-right-row > *, :root.techno .hud-actions > *,
+:root.techno .bottom-bar .icon-btn, :root.techno .bottom-bar .big-btn, :root.techno .goals-btn, :root.techno .collect-all, :root.techno .my-cars, :root.techno .hud-town {
+  scale: calc(1 + var(--tk-m) * .07 + var(--tk-drop) * .12);
+  rotate: calc(var(--tk-m) * var(--tk-side) * 2.5deg);
+  translate: var(--tk-sx) var(--tk-sy);
+}
+:root.techno .hud-left .pill:nth-child(even), :root.techno .chip-stat:nth-child(even), :root.techno .bottom-bar > :nth-child(even), :root.techno .hud-right-row > :nth-child(even) {
+  rotate: calc(var(--tk-m) * var(--tk-side) * -2.5deg);
+}
+/* The coin, gem and parts counters strobe in the beat's colour. */
+:root.techno .hud-left .pill, :root.techno .chip-stat, :root.techno .fuel {
+  filter: brightness(calc(1 + var(--tk) * .45)) drop-shadow(0 0 calc(2px + var(--tk) * 10px) var(--tk-c));
+}
+:root.techno .hud-left .pill, :root.techno .chip-stat { text-shadow: 0 0 calc(var(--tk) * 9px) var(--tk-c), 0 2px 0 var(--line); }
+/* The nav tiles go round the colour wheel, a new colour on every beat. */
+:root.techno .bottom-bar .icon-btn .i, :root.techno .bottom-bar .big-btn, :root.techno .goals-btn, :root.techno .collect-all {
+  filter: hue-rotate(calc(var(--tk-h) * 1deg)) saturate(1.35) brightness(calc(1 + var(--tk) * .3)) drop-shadow(0 0 calc(var(--tk) * 12px) var(--tk-c));
+}
+:root.techno .speedo svg { filter: hue-rotate(calc(var(--tk-h) * 1deg)) drop-shadow(0 0 calc(var(--tk) * 10px) var(--tk-c)); }
+:root.techno .town-name { color: hsl(var(--tk-h) 100% 72%); text-shadow: 0 4px 0 var(--line), 0 0 calc(6px + var(--tk) * 16px) var(--tk-c); }
+:root.techno .panel-head { filter: hue-rotate(calc(var(--tk-h) * 1deg)); }
+:root.techno .badge { scale: calc(1 + var(--tk-m) * .08); }
+
+/* The light show: over the town, under the badges and every control, never takes a tap. */
+.techno-fx { position: fixed; inset: 0; z-index: 5; pointer-events: none; overflow: hidden; }
+.tk-glow { position: absolute; inset: 0; box-shadow: inset 0 0 calc(50px + var(--tk) * 90px) calc(var(--tk) * 14px) hsl(var(--tk-h) 100% 55% / calc(.25 + var(--tk) * .4 - var(--tk-build) * .2)); background: radial-gradient(ellipse at 50% 55%, transparent 55%, rgba(8, 0, 30, calc(.18 + var(--tk-build) * .35))); }
+.tk-lasers i { position: absolute; bottom: -10vh; width: 5px; height: 150vh; transform-origin: 50% 100%; mix-blend-mode: screen; opacity: calc(.18 + var(--tk) * .45);
+  background: linear-gradient(to top, transparent, hsl(var(--tk-h) 100% 65%) 30%, hsl(var(--tk-h) 100% 80% / .5) 70%, transparent); box-shadow: 0 0 14px 2px hsl(var(--tk-h) 100% 60% / .6);
+  animation: tk-sweep 3.2s ease-in-out infinite alternate; }
+.tk-lasers i:nth-child(1) { left: 6%; --a: -38deg; --b: 12deg; }
+.tk-lasers i:nth-child(2) { left: 8%; --a: -10deg; --b: 40deg; animation-delay: -1.6s; }
+.tk-lasers i:nth-child(3) { right: 8%; --a: 10deg; --b: -40deg; animation-delay: -.8s; }
+.tk-lasers i:nth-child(4) { right: 6%; --a: 38deg; --b: -12deg; animation-delay: -2.4s; }
+@keyframes tk-sweep { from { transform: rotate(var(--a)); } to { transform: rotate(var(--b)); } }
+.tk-strobe { position: absolute; inset: 0; background: #fff; opacity: calc(var(--tk-drop) * .32); mix-blend-mode: overlay; }
+.tk-title { position: absolute; left: 50%; top: 42%; translate: -50% -50%; text-align: center; white-space: nowrap; animation: tk-title 3.2s ease-out both; }
+.tk-title b { display: block; font: 64px/1 var(--display); letter-spacing: 3px; color: #fff; -webkit-text-stroke: 2px var(--line); text-shadow: 0 5px 0 var(--line), 0 0 30px var(--tk-c); scale: calc(1 + var(--tk-m) * .08); }
+.tk-title span { display: inline-block; margin-top: 8px; font: 15px var(--display); letter-spacing: 2px; color: #fff; background: rgba(10, 6, 30, .7); border: 2px solid var(--tk-c); border-radius: 10px; padding: 3px 12px; }
+@keyframes tk-title { 0% { opacity: 0; transform: scale(.6); } 12% { opacity: 1; transform: scale(1.06); } 20% { transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: scale(1.1); } }
+@media (max-width: 600px) { .tk-title b { font-size: 38px; } .tk-title span { font-size: 12px; } }
+
+/* The HUD tag: a little equaliser and the time left. */
+.tk-tag { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; padding: 2px 9px 2px 7px; border-radius: 10px; background: linear-gradient(#2a1150, #12082b); border: 2px solid var(--tk-c); color: #fff; font: 13px var(--display); letter-spacing: 1px; box-shadow: 0 0 calc(var(--tk) * 12px) var(--tk-c); pointer-events: none; }
+.hud-center .tk-tag { display: flex; width: max-content; margin: 0 auto 6px; }
+.hud-town .tk-tag { margin: 0; padding: 1px 6px; font-size: 12px; }
+.tk-left { color: hsl(var(--tk-h) 100% 75%); }
+.tk-eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 13px; }
+.tk-eq i { width: 3px; border-radius: 1px; background: var(--tk-c); height: calc(25% + var(--tk) * 75%); }
+.tk-eq i:nth-child(2) { height: calc(55% + var(--tk) * 45% * var(--tk-side)); }
+.tk-eq i:nth-child(3) { height: calc(40% + var(--tk) * 60%); animation: tk-eq .2s steps(2) infinite; }
+.tk-eq i:nth-child(4) { height: calc(70% - var(--tk) * 40%); }
+@keyframes tk-eq { 50% { height: 35%; } }
+
+/* Reduced motion: the colours stay, the movement, lasers and flashes go. */
+:root.techno-calm .tk-lasers, :root.techno-calm .tk-strobe { display: none; }
+:root.techno-calm .tk-title { animation: none; opacity: 0; }
+:root.techno-calm .tk-eq i { animation: none; }

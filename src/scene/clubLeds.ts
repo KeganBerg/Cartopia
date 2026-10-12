@@ -15,7 +15,8 @@ export const RAINBOW = ['#ff1744', '#ff9100', '#ffea00', '#00e676', '#00b0ff', '
 // The colour the club's windows show right now, and how brightly (0 by day,
 // about 0.75 at night between notes, up to about 2.3 on a kick). Anything that
 // lights up with the club (the Vanguard Tower's penthouse) reads it here so it
-// shows the exact same colour on the same beat.
+// shows the exact same colour on the same beat. Tag such a material
+// `userData.clubLed` so clubLeds.test.tsx checks it stays in step.
 export function clubLedColor(out = new Color(), now = performance.now()) {
   return out.set(RAINBOW[clubPulse(now).step % RAINBOW.length])
 }
@@ -26,9 +27,11 @@ export function clubLedGlow(now = performance.now()) {
 
 export const ledWindow = new MeshStandardMaterial({ map: windowTex(), emissiveMap: ledPaneTex(), emissive: new Color('#000000'), emissiveIntensity: 1 })
 ledWindow.userData.live = true
+ledWindow.userData.clubLed = true
 
 export const ledFront = new MeshStandardMaterial({ map: ledGridTex(false), emissiveMap: ledGridTex(true), emissive: new Color('#000000'), emissiveIntensity: 1, roughness: 0.35 })
 ledFront.userData.live = true
+ledFront.userData.clubLed = true
 
 const tmp = new Color()
 

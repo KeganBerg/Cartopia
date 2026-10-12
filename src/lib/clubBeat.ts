@@ -4,6 +4,7 @@
 // listening to the sound. With no music (muted, sound off, or too far from the
 // club to hear it) the lights keep a gentle pulse at the night's tempo instead.
 import { GROOVES, grooveFor } from './clubGrooves'
+import { technoBeat, technoOn } from '../game/techno'
 
 type Hit = { at: number; kick: boolean }
 const hits: Hit[] = []
@@ -31,6 +32,13 @@ export type ClubPulse = {
 }
 
 export function clubPulse(now = performance.now(), bpm = GROOVES[grooveFor()].bpm): ClubPulse {
+  // Techno Night: everything follows the event's kick, on the shared clock
+  // (so it keeps time while muted too), a new colour on every beat.
+  const wall = Date.now() - (performance.now() - now)
+  if (technoOn(wall)) {
+    const b = technoBeat(wall)
+    return { step: b.beat, flash: Math.max(b.kick, b.drop), live: true }
+  }
   hits.sort((a, b) => a.at - b.at)
   while (hits.length && hits[0].at <= now) {
     const h = hits.shift()!

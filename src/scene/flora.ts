@@ -113,7 +113,8 @@ export function rock() {
   })
 }
 
-// Grass clump: three thin blades fanning out, white so the instance tint colours it.
+// Grass clump seen from above: three thin blades fanning out, white so the
+// instance tint colours it.
 export function tuft() {
   return made((k) => {
     for (let b = 0; b < 3; b++) {
@@ -123,11 +124,37 @@ export function tuft() {
   })
 }
 
+// The same clump for the free camera's close-ups: six flat blades of mixed
+// height fanning out from the root (every other one a shade darker), thin so
+// they read as grass blades at street level, not spikes.
+export function blades() {
+  return made((k) => {
+    for (let b = 0; b < 6; b++) {
+      const a = (b / 6) * Math.PI * 2 + 0.4 + (b % 2) * 0.5
+      const h = [0.3, 0.22, 0.34, 0.18, 0.27, 0.24][b]
+      const lean = 0.25 + (b % 3) * 0.12
+      const r = 0.02 + (b % 2) * 0.025
+      k.add(cone3, b % 2 ? '#ffffff' : '#e3e8dc', Math.cos(a) * r, h * 0.45, Math.sin(a) * r, Math.PI / 2 - a, 0.028, h, 0.007, lean)
+    }
+  })
+}
+
 // A wildflower: a stalk and a white bloom the tint colours.
 export function flower() {
   return made((k) => {
     k.add(cone3, '#cfe8b0', 0, 0.09, 0, 0, 0.012, 0.18, 0.012)
     k.add(octa, '#ffffff', 0, 0.19, 0, 0, 0.045)
+  })
+}
+
+// The wildflower up close: a leafy stalk and four petals round a yellow eye.
+export function bloom() {
+  return made((k) => {
+    k.add(cone3, '#6f9a3f', 0, 0.09, 0, 0, 0.01, 0.18, 0.006)
+    k.add(cone3, '#7cb342', 0.02, 0.05, 0, 0.3, 0.03, 0.1, 0.006, 0, -0.7)
+    // Two crossed petal pairs (kept cheap: meadows hold hundreds of these).
+    for (const a of [0, Math.PI / 2]) k.add(octa, '#ffffff', 0, 0.185, 0, a, 0.055, 0.008, 0.022)
+    k.add(octa, '#f9c74f', 0, 0.19, 0, 0, 0.014, 0.01, 0.014)
   })
 }
 

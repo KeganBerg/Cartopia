@@ -1048,7 +1048,7 @@ export const useGame = create<GameState>()(
         }
         if (!collected && !started && !cleared && !filled) return s.toast('Nothing to collect or fuel right now')
         setLastCollectAll(now)
-        if (collected || filled) sfx.coin()
+        if (collected || filled) sfx.coins(collected + filled)
         else sfx.start()
         for (const u of removed) fx({ kind: 'cleared', uid: u })
         if (paid.length || earned) fx({ kind: 'collect', uids: paid, coins: earned, parts: parts - s.parts, xp })
