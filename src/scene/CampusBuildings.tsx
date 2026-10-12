@@ -95,7 +95,8 @@ function Cone({ m, at }: { m: Mat; at: V3 }) {
 function SchoolBus({ m, at, rot = 0 }: { m: Mat; at: V3; rot?: number }) {
   return (
     <group position={at}>
-      <Upright>
+      {/* Bus-sized however big the block it's parked in. */}
+      <Upright size={1}>
         <group rotation-y={rot}>
           <Box m={m} at={[0, 0.3, -0.06]} s={[0.44, 0.4, 1.12]} c={BUS} />
           <Box m={m} at={[0, 0.2, 0.58]} s={[0.42, 0.22, 0.2]} c={BUS} />

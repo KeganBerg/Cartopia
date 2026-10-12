@@ -16,12 +16,20 @@ import { keepProps, keepShape, releaseShape, uniform } from './keepShape'
 //  - Things laid out in bays (rows of windows, columns) draw more of them
 //    along the longer side: lay them out in a <Facade> (or read useBays()).
 // Decorations that are one object (trees, lamps) don't merge at all (game/merge.ts).
+// THE RULE, inside a 2x2 or 4x4 block (drawn 2x or 4x evenly): the building
+// grows, people don't. Anything person-sized (no taller than HUMAN) standing
+// free on the lot draws at true size, on the spot it stood on (keepPeople in
+// keepShape.ts). Mark things that must stay true size even when something
+// touches them with userData={PEOPLE_SIZED} (cars, parasols, tyre stacks) or
+// <Upright size={1}>. Lay out more of them in a bigger block rather than
+// letting one grow (GasPumps in BuildingModel.tsx). src/scene/humanScale.test.tsx
+// fails anything person-sized that grows in a block.
 // Opt-outs and overrides:
 //  - <Stretch> marks a small piece that must stretch with the building
 //    (a fence run, a trim that has to meet the walls). Things inside still
 //    get checked.
 //  - <Upright> forces a group to keep its shape whatever its size, and with
-//    `size` sets how big it draws in a uniform 2x2 block (the Drive-In's cars).
+//    `size` sets how big it draws in a 2x2 or 4x4 block (size={1}: true size).
 // src/scene/mergeShape.test.tsx renders every building as a pair and fails if
 // anything round, lettered or instanced comes out stretched.
 export const MergeScale = createContext<[number, number, number]>([1, 1, 1])
@@ -87,7 +95,7 @@ export function KeepShapes({ limit, children }: { limit: number; children: React
   return (
     <group userData={MERGE_ROOT}>
       {children}
-      {!uniform(scale) && <Watch scale={scale} limit={limit} />}
+      {(!uniform(scale) || scale[0] !== 1) && <Watch scale={scale} limit={limit} />}
     </group>
   )
 }

@@ -10,6 +10,7 @@ import { glowMats } from './dayNight'
 import { PAL, SEASON } from './season'
 import { concreteTex, helipadTex, sidingTex, shutterTex, gravelTex } from './textures'
 import { Storefront, BrickFloors, StoneShaft, GlassDrum, RibbonDrum, WaterTank, GiantProp, Beacon, type Kit, type Giant } from './GrowthKit'
+import { PEOPLE_SIZED } from './keepShape'
 
 // The grown forms of shops and services (names in src/game/growth.ts). Level
 // 4-6 rebuilds the business as a bigger building of its kind (a brick walk-up
@@ -769,8 +770,8 @@ function AutoModel({ def, ghost, m, win, bulb, level }: Props) {
               <mesh position={[0, 0.1, 0]} castShadow><coneGeometry args={[0.06, 0.2, 8]} />{m('#ff6d00')}</mesh>
             </group>
           ))}
-          {def.id === 'tires' && <group>{[0, 1, 2, 3].map((i) => <mesh key={i} position={[-W / 2 + 0.25, 0.08 + i * 0.12, zf + 0.25]} rotation-x={Math.PI / 2} castShadow><torusGeometry args={[0.13, 0.06, 8, 14]} />{m('#212121')}</mesh>)}</group>}
-          {def.id === 'lube' && [0, 1].map((i) => <Cyl key={i} m={m} at={[W / 2 - 0.3 - i * 0.22, 0.16, zf + 0.25]} r={0.1} h={0.3} c={i ? '#1565c0' : '#ffb300'} seg={10} />)}
+          {def.id === 'tires' && <group userData={PEOPLE_SIZED}>{[0, 1, 2, 3].map((i) => <mesh key={i} position={[-W / 2 + 0.25, 0.08 + i * 0.12, zf + 0.25]} rotation-x={Math.PI / 2} castShadow><torusGeometry args={[0.13, 0.06, 8, 14]} />{m('#212121')}</mesh>)}</group>}
+          {def.id === 'lube' && <group userData={PEOPLE_SIZED}>{[0, 1].map((i) => <Cyl key={i} m={m} at={[W / 2 - 0.3 - i * 0.22, 0.16, zf + 0.25]} r={0.1} h={0.3} c={i ? '#1565c0' : '#ffb300'} seg={10} />)}</group>}
           {st === 3 && <Flag at={[-W / 2 + 0.1, h + up + 0.08, z0 - 0.5]} color={a.board} star={level >= 10} />}
           <Pool r={0.9} z={zf + 0.4} />
         </group>
