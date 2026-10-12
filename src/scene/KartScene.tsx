@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { BufferAttribute, BufferGeometry, CanvasTexture, Color, DoubleSide, Group, InstancedMesh, Mesh, MeshStandardMaterial, Object3D, PerspectiveCamera, RepeatWrapping, SRGBColorSpace, Vector3, type Texture } from 'three'
 import { CarModel, carFrame, wheelRig, type WheelRig } from './CarModel'
@@ -7,9 +7,9 @@ import { Batch } from './Batch'
 import { holdTown } from './renderGate'
 import { ArcadeSky, CarShadow, Grandstand, Lamp, TyreStack, useArcadeLook, useTownPool, type Person, Crowd } from './ArcadeScenery'
 import { Box, Cone, Cyl, Palm, Scatter, Water, rand } from './RaceVenues'
-import { useSpots } from './kartSpots'
-import { CommonExtras, DesertExtras, DocksExtras, TownExtras } from './KartExtras'
-import { asphaltTex, checkerTex, concreteTex, containerTex, glowTex, grassTex, gravelTex, sandTex, shutterTex, towerTex } from './textures'
+import { local, nearZone, useFanZones, useSpots, ZONE_R } from './kartSpots'
+import { CommonExtras, DesertExtras, DocksExtras, SpectatorBoats, TownExtras, boatPeople, type BoatSpot } from './KartExtras'
+import { asphaltTex, checkerTex, concreteTex, containerTex, glowTex, grassTex, gravelTex, sandTex, towerTex } from './textures'
 import { signTexture } from './signTexture'
 import { glowMats } from './dayNight'
 import { decal } from './layers'
@@ -329,6 +329,7 @@ function Building({ def, x, z, ry, s = 1 }: { def: string; x: number; z: number;
 // Grandstands and a crowd along the start straight, tyre walls on the outside of tight bends.
 function Trackside({ t }: { t: Track }) {
   const { along, outside, clearOf } = useSpots(t)
+  const zones = useFanZones(t)
   const stands = useMemo(() => {
     const out: { x: number; z: number; h: number; w: number }[] = []
     for (const [i0, side] of [[(t.n - 22) % t.n, 1], [8, -1], [(t.n - 40) % t.n, -1]] as [number, -1 | 1][]) {
@@ -350,16 +351,16 @@ function Trackside({ t }: { t: Track }) {
     }
     return out.filter((p) => clearOf(p.x, p.z, t.wall + 0.2))
   }, [t, outside, clearOf])
-  const marshals = useMemo(() => along(38, 1.4, 1, 1, 91).concat(along(46, 1.4, -1, 1, 97)), [along])
+  const marshals = useMemo(() => along(38, 1.4, 1, 1, 91).concat(along(46, 1.4, -1, 1, 97)).filter((m) => !nearZone(zones, m.x, m.z)), [along, zones])
   const fans = useMemo(() => {
     const out: Person[] = []
     for (const p of along(9, 2.2, 1, 1.5, 41).concat(along(11, 2.2, -1, 1.5, 43))) {
-      if (p.r() < 0.45) continue
+      if (p.r() < 0.45 || nearZone(zones, p.x, p.z)) continue
       const n = 2 + Math.floor(p.r() * 4)
       for (let k = 0; k < n; k++) out.push({ x: p.x + (p.r() - 0.5) * 2.4, z: p.z + (p.r() - 0.5) * 2.4, h: p.ry + (p.r() - 0.5) * 0.6, cheer: p.r() < 0.5 })
     }
     return out
-  }, [along])
+  }, [along, zones])
   return (
     <group>
       {stands.map((s, i) => <Grandstand key={i} x={s.x} z={s.z} h={s.h} width={s.w} rows={5} roof={i % 2 ? '#1565c0' : '#c62828'} />)}
@@ -384,6 +385,7 @@ function Trackside({ t }: { t: Track }) {
 function TownScenery({ t }: { t: Track }) {
   const pool = useTownPool()
   const { along, clearOf } = useSpots(t)
+  const zones = useFanZones(t)
   const r = useMemo(() => rand(17), [])
   const shops = useMemo(() => {
     const out: { def: string; x: number; z: number; ry: number }[] = []
@@ -391,21 +393,21 @@ function TownScenery({ t }: { t: Track }) {
     for (const side of [1, -1] as const) for (const p of along(6.5, 4.6, side, 4.2, 5 + side)) {
       const def = pool[k++ % pool.length]
       const d = buildingDef(def)
-      if (d.w * TILE > 6 || d.h * TILE > 6) continue
+      if (d.w * TILE > 6 || d.h * TILE > 6 || nearZone(zones, p.x, p.z, ZONE_R + 2)) continue
       out.push({ def, x: p.x, z: p.z, ry: p.ry })
     }
     return out
-  }, [along, pool])
+  }, [along, pool, zones])
   const trees = useMemo(() => {
     const out: { x: number; z: number; def: string; s: number }[] = []
     for (let k = 0; k < 900 && out.length < 150; k++) {
       const x = (r() - 0.5) * 160, z = (r() - 0.5) * 150
-      if (!clearOf(x, z, t.wall + 2.5)) continue
+      if (!clearOf(x, z, t.wall + 2.5) || nearZone(zones, x, z)) continue
       if (shops.some((s) => (s.x - x) ** 2 + (s.z - z) ** 2 < 20)) continue
       out.push({ x, z, def: r() < 0.3 ? 'pine' : r() < 0.15 ? 'bush' : 'tree', s: 0.9 + r() * 0.5 })
     }
     return out
-  }, [r, clearOf, shops, t])
+  }, [r, clearOf, shops, t, zones])
   const props = useMemo(() => along(14, 0.9, 1, 0.6, 61).concat(along(14, 0.9, -1, 0.6, 67)), [along])
   const towers = useMemo(() => Array.from({ length: 28 }, (_, i) => {
     const a = (i / 28) * Math.PI * 2 + r() * 0.1, d = 105 + r() * 25
@@ -437,7 +439,7 @@ function DocksScenery({ t }: { t: Track }) {
   const colors = ['#c62828', '#1565c0', '#2e7d32', '#ef6c00', '#00838f', '#6d4c41']
   const stacks = useMemo(() => {
     const out: { x: number; z: number; y: number; ry: number; c: number }[] = []
-    for (const side of [1, -1] as const) for (const p of along(4.2, 2.6, side, 2.2, 31 + side, 2)) {
+    for (const side of [1, -1] as const) for (const p of along(4.2, 2.6, side, 2.2, 31 + side, 0.8)) {
       if (p.r() < 0.25) continue
       const n = 1 + Math.floor(p.r() * 3)
       for (let k = 0; k < n; k++) out.push({ x: p.x, z: p.z, y: 0.6 + k * 1.2, ry: p.ry + Math.PI / 2, c: Math.floor(p.r() * colors.length) })
@@ -445,13 +447,27 @@ function DocksScenery({ t }: { t: Track }) {
     return out
   }, [along, colors.length])
   const cranes = useMemo(() => along(70, 7, 1, 6, 37).concat(along(80, 7, -1, 6, 39)), [along])
-  const sheds = useMemo(() => along(30, 12, 1, 9, 43).concat(along(36, 12, -1, 9, 47)).filter((p) => p.r() < 0.7), [along])
+  // The start straight sits on a wide quay, so its grandstands and pit garages stand on land.
+  const startIdx = useMemo(() => Array.from({ length: t.n }, (_, i) => i).filter((i) => i < 14 || i > t.n - 46), [t])
+  const onStart = useCallback((x: number, z: number, d: number) => startIdx.some((i) => (t.x[i] - x) ** 2 + (t.z[i] - z) ** 2 < d * d), [startIdx, t])
+  // Spectator boats moored off the quay (never by the start straight or under a crane).
+  const boats = useMemo(() => {
+    const out: BoatSpot[] = []
+    for (const side of [1, -1] as const) for (const p of along(38, 8.6, side, 7, 43 + side)) {
+      const ends = [-6, 6].map((lx) => local(p, lx, 0))
+      if (!ends.every((e) => clearOf(e.x, e.z, t.wall + 6.4)) || onStart(p.x, p.z, t.wall + 16)) continue
+      if (cranes.some((c) => (c.x - p.x) ** 2 + (c.z - p.z) ** 2 < 13 * 13) || out.some((b) => (b.x - p.x) ** 2 + (b.z - p.z) ** 2 < 16 * 16)) continue
+      out.push({ x: p.x, z: p.z, ry: p.ry, k: out.length })
+    }
+    return out
+  }, [along, clearOf, onStart, cranes, t])
+  const boatFans = useMemo(() => boatPeople(boats), [boats])
   // Water fills the infield: wherever the grid says there's no track or quay.
   const quay = useMemo(() => {
     const out: { x: number; z: number }[] = []
-    for (let x = -90; x <= 90; x += 4) for (let z = -80; z <= 80; z += 4) if (!clearOf(x, z, t.wall + 3.5)) out.push({ x, z })
+    for (let x = -90; x <= 90; x += 4) for (let z = -80; z <= 80; z += 4) if (!clearOf(x, z, t.wall + 3.5) || onStart(x, z, t.wall + 9)) out.push({ x, z })
     return out
-  }, [clearOf, t])
+  }, [clearOf, onStart, t])
   const yard = useMemo(() => {
     const out = { barrels: [] as { x: number; z: number; ry: number }[], crates: [] as { x: number; z: number; ry: number }[] }
     for (let k = 0; k < 600; k++) {
@@ -475,6 +491,8 @@ function DocksScenery({ t }: { t: Track }) {
         ))}
         {cranes.map((c, i) => (
           <group key={i} position={[c.x, 0, c.z]} rotation-y={c.ry}>
+            {/* A concrete pier out to the crane's back legs. */}
+            <mesh position={[0, -0.22, 0.6]}><boxGeometry args={[4.6, 0.44, 6.4]} /><meshStandardMaterial map={concreteTex(1, 1.4)} color="#b0b6ba" /></mesh>
             {[-1.6, 1.6].map((dx) => [-1.6, 1.6].map((dz) => <Box key={`${dx}${dz}`} p={[dx, 4.5, dz]} s={[0.35, 9, 0.35]} c="#fbc02d" />))}
             <Box p={[0, 9, 0]} s={[3.6, 0.5, 3.6]} c="#fbc02d" />
             <Box p={[0, 9.8, 4]} s={[0.7, 0.6, 16]} c="#fbc02d" />
@@ -483,19 +501,13 @@ function DocksScenery({ t }: { t: Track }) {
             <Box p={[0, 5.3, 8]} s={[1.3, 0.3, 2.8]} c="#455a64" />
           </group>
         ))}
-        {sheds.map((s, i) => (
-          <group key={i} position={[s.x, 0, s.z]} rotation-y={s.ry}>
-            <Box p={[0, 2.2, -2]} s={[12, 4.4, 7]} c="#90a4ae" />
-            <Box p={[0, 4.55, -2]} s={[12.3, 0.3, 7.3]} c="#607d8b" />
-            <mesh position={[0, 1.5, 1.51]}><planeGeometry args={[4.5, 3]} /><meshStandardMaterial map={shutterTex()} color="#cfd8dc" /></mesh>
-            <mesh position={[0, 3.8, 1.52]}><planeGeometry args={[6, 0.8]} /><meshBasicMaterial map={signTexture(['PIER 7', 'COLD STORE', 'DOCK 3', 'FREIGHT'][i % 4], '#1565c0', '#ffffff', 7.5)} toneMapped={false} /></mesh>
-          </group>
-        ))}
       </Batch>
       <Scatter spots={yard.barrels} colors={['#c62828', '#1565c0', '#2e7d32', '#fbc02d']} y={0.22}><cylinderGeometry args={[0.2, 0.2, 0.5, 10]} /></Scatter>
       <Scatter spots={yard.crates} colors={['#a1795a', '#8d6e63', '#b08968']} y={0.25}><boxGeometry args={[0.5, 0.5, 0.5]} /></Scatter>
       <Lighthouse x={-20} z={10} />
       <Boats />
+      <SpectatorBoats boats={boats} />
+      <Crowd people={boatFans} />
     </group>
   )
 }
@@ -542,6 +554,7 @@ function Boats() {
 // Red rock canyon: banded mesas and spires round the outside, saguaros, scrub and a roadside stop.
 function DesertScenery({ t }: { t: Track }) {
   const { along, clearOf } = useSpots(t)
+  const zones = useFanZones(t)
   const r = useMemo(() => rand(53), [])
   const strata = ['#b5532f', '#c8693a', '#a84a2a', '#d4844e']
   const mesas = useMemo(() => {
@@ -549,22 +562,22 @@ function DesertScenery({ t }: { t: Track }) {
     for (let k = 0; k < 700 && out.length < 60; k++) {
       const x = (r() - 0.5) * 220, z = (r() - 0.5) * 200
       const w = 5 + r() * 9
-      if (!clearOf(x, z, t.wall + w * 0.8 + 3)) continue
+      if (!clearOf(x, z, t.wall + w * 0.8 + 3) || nearZone(zones, x, z, ZONE_R + w * 0.6)) continue
       if (out.some((m) => (m.x - x) ** 2 + (m.z - z) ** 2 < (w + m.w) ** 2 * 0.35)) continue
       out.push({ x, z, w, d: 4 + r() * 8, h: 3 + r() * 10, ry: r() * 3, spire: r() < 0.25 })
     }
     return out
-  }, [r, clearOf, t])
-  const saguaros = useMemo(() => along(5, 1.2, 1, 1, 71, 5).concat(along(5, 1.2, -1, 1, 73, 5)).map((p) => ({ ...p, h: 1.4 + p.r() * 1.2, arm: p.r() })), [along])
-  const small = useMemo(() => along(6, 0.5, 1, 0.3, 79, 2).concat(along(6, 0.5, -1, 0.3, 83, 2)).map((p) => ({ ...p, def: p.r() < 0.6 ? 'cactus' : 'rock' })), [along])
+  }, [r, clearOf, t, zones])
+  const saguaros = useMemo(() => along(5, 1.2, 1, 1, 71, 5).concat(along(5, 1.2, -1, 1, 73, 5)).map((p) => ({ ...p, h: 1.4 + p.r() * 1.2, arm: p.r() })).filter((p) => !nearZone(zones, p.x, p.z)), [along, zones])
+  const small = useMemo(() => along(6, 0.5, 1, 0.3, 79, 2).concat(along(6, 0.5, -1, 0.3, 83, 2)).map((p) => ({ ...p, def: p.r() < 0.6 ? 'cactus' : 'rock' })).filter((p) => !nearZone(zones, p.x, p.z, 7.5)), [along, zones])
   const scrub = useMemo(() => {
     const out: { x: number; z: number; s: number; ry: number }[] = []
     for (let k = 0; k < 3000 && out.length < 700; k++) {
       const x = (r() - 0.5) * 200, z = (r() - 0.5) * 180
-      if (clearOf(x, z, t.wall + 0.4)) out.push({ x, z, s: 0.6 + r() * 0.8, ry: r() * 6 })
+      if (clearOf(x, z, t.wall + 0.4) && !nearZone(zones, x, z, 7)) out.push({ x, z, s: 0.6 + r() * 0.8, ry: r() * 6 })
     }
     return out
-  }, [r, clearOf, t])
+  }, [r, clearOf, t, zones])
   const stop = useMemo(() => along(200, 5, 1, 5, 89)[0], [along])
   return (
     <group>
@@ -903,9 +916,11 @@ export function KartScene({ race, looks, me, input, running, cam = (DEV?.get('ca
     const fwd = tmpV.set(Math.sin(mine.h), 0, Math.cos(mine.h))
     const mv = Math.hypot(mine.vx, mine.vz)
     if (cam === 'sky') {
-      const a = Number(DEV?.get('ang') ?? 0)
-      camera.position.set(Math.sin(a) * 120, 95, -Math.cos(a) * 120)
-      camera.lookAt(0, 0, 0)
+      // Dev overview: ?ang turns round the middle, ?at=x,z&d=dist looks at one spot.
+      const a = Number(DEV?.get('ang') ?? 0), d = Number(DEV?.get('d') ?? 120)
+      const [ax, az] = (DEV?.get('at') ?? '0,0').split(',').map(Number)
+      camera.position.set(ax + Math.sin(a) * d, d * 0.79, az - Math.cos(a) * d)
+      camera.lookAt(ax, 0, az)
       camera.fov = 55
       camera.far = 600
       state.scene.fog = null
