@@ -7,6 +7,8 @@ import { Batch } from './Batch'
 import { holdTown } from './renderGate'
 import { ArcadeSky, CarShadow, Grandstand, Lamp, TyreStack, useArcadeLook, useTownPool, type Person, Crowd } from './ArcadeScenery'
 import { Box, Cone, Cyl, Palm, Scatter, Water, rand } from './RaceVenues'
+import { useSpots } from './kartSpots'
+import { CommonExtras, DesertExtras, DocksExtras, TownExtras } from './KartExtras'
 import { asphaltTex, checkerTex, concreteTex, containerTex, glowTex, grassTex, gravelTex, sandTex, shutterTex, towerTex } from './textures'
 import { signTexture } from './signTexture'
 import { glowMats } from './dayNight'
@@ -23,7 +25,7 @@ export type KartHud = {
   lap: number; place: number; item: string | null; speed: number; charge: number; boost: boolean; t: number; dots: { x: number; z: number; me: boolean }[]; wrong: boolean
   fx: { flat: number; smoke: number; emp: number; tow: number; shield: number } // seconds left on each effect on the player
 }
-export type KartCam = 'chase' | 'top'
+export type KartCam = 'chase' | 'top' | 'sky' // sky: a dev overview of the whole circuit
 
 // Dev only: ?autopilot drives the player's kart, ?warp=<s> skips ahead once the race starts (for screenshots).
 const DEV = import.meta.env.DEV && typeof location !== 'undefined' ? new URLSearchParams(location.search) : null
@@ -316,41 +318,6 @@ function StartLights({ w }: { w: number }) {
 
 // Spots beside the track: walking the centre line, `off` beyond the barrier on either side,
 // skipping any spot that would land within `clear` of another stretch of track.
-function useSpots(t: Track) {
-  return useMemo(() => {
-    const cell = 8
-    const grid = new Map<string, number[]>()
-    for (let i = 0; i < t.n; i++) {
-      const k = `${Math.floor(t.x[i] / cell)},${Math.floor(t.z[i] / cell)}`
-      const l = grid.get(k) ?? []
-      l.push(i)
-      grid.set(k, l)
-    }
-    const clearOf = (x: number, z: number, d: number) => {
-      const r = Math.ceil(d / cell)
-      const cx = Math.floor(x / cell), cz = Math.floor(z / cell)
-      for (let a = -r; a <= r; a++) for (let b = -r; b <= r; b++) for (const i of grid.get(`${cx + a},${cz + b}`) ?? []) if ((t.x[i] - x) ** 2 + (t.z[i] - z) ** 2 < d * d) return false
-      return true
-    }
-    const along = (step: number, off: number, side: -1 | 1, clear: number, seed: number, jitter = 0) => {
-      const r = rand(seed)
-      const out: { x: number; z: number; ry: number; i: number; r: () => number }[] = []
-      for (let s = r() * step; s < t.n; s += step * (0.75 + r() * 0.5)) {
-        const i = Math.floor(s)
-        const o = side * (t.wall + off + r() * jitter)
-        const x = t.x[i] + t.nx[i] * o, z = t.z[i] + t.nz[i] * o
-        if (!clearOf(x, z, t.wall + clear)) continue
-        // Facing back toward the track.
-        out.push({ x, z, ry: Math.atan2(-t.nx[i] * side, -t.nz[i] * side), i, r })
-      }
-      return out
-    }
-    // The bend's outside: + left when the track turns right.
-    const outside = (i: number) => (t.curve[i] < 0 ? 1 : -1) as -1 | 1
-    return { clearOf, along, outside }
-  }, [t])
-}
-
 function Building({ def, x, z, ry, s = 1 }: { def: string; x: number; z: number; ry: number; s?: number }) {
   return (
     <group position={[x, 0, z]} rotation-y={ry} scale={s}>
@@ -935,7 +902,14 @@ export function KartScene({ race, looks, me, input, running, cam = (DEV?.get('ca
     // Camera.
     const fwd = tmpV.set(Math.sin(mine.h), 0, Math.cos(mine.h))
     const mv = Math.hypot(mine.vx, mine.vz)
-    if (cam === 'top') {
+    if (cam === 'sky') {
+      const a = Number(DEV?.get('ang') ?? 0)
+      camera.position.set(Math.sin(a) * 120, 95, -Math.cos(a) * 120)
+      camera.lookAt(0, 0, 0)
+      camera.fov = 55
+      camera.far = 600
+      state.scene.fog = null
+    } else if (cam === 'top') {
       const want = new Vector3(mine.x, tall ? 30 : 24, mine.z - (tall ? 9 : 11))
       if (!s.init) s.camPos.copy(want)
       s.camPos.lerp(want, Math.min(1, dt * 4))
@@ -989,6 +963,10 @@ export function KartScene({ race, looks, me, input, running, cam = (DEV?.get('ca
       {t.def.theme === 'town' && <TownScenery t={t} />}
       {t.def.theme === 'docks' && <DocksScenery t={t} />}
       {t.def.theme === 'desert' && <DesertScenery t={t} />}
+      <CommonExtras t={t} />
+      {t.def.theme === 'town' && <TownExtras t={t} />}
+      {t.def.theme === 'docks' && <DocksExtras t={t} />}
+      {t.def.theme === 'desert' && <DesertExtras t={t} />}
       <Crates race={race} />
       <Hazards race={race} />
       <TowBeams race={race} />
