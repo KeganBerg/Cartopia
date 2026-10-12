@@ -14,6 +14,7 @@ import { pickSpecies, sing, type Species } from './birdsong'
 import { onThunder, weatherNow } from '../game/weather'
 import { GROOVES, grooveFor, type Tone } from './clubGrooves'
 import { clubHit } from './clubBeat'
+import { technoOn } from '../game/techno'
 
 // How much of each layer plays, 0 to 1, for how dark it is and the season.
 export type Mix = {
@@ -153,6 +154,8 @@ export class Soundscape {
   groove: number | null = null
   // Told of every kick and bass note as it's scheduled (t in the audio clock), for the club's lights.
   onHit: ((t: number, kick: boolean) => void) | null = null
+  // The Techno Night track is playing, so the club's own music stops.
+  techno = false
   private vowels: BiquadFilterNode[]
   private howl: GainNode
   private howlTone: BiquadFilterNode
@@ -444,7 +447,8 @@ export class Soundscape {
   // bright for a moment.
   private clubMusic(t: number, club: Club | boolean | null) {
     // Only a town with its own nightclub hears it, louder the closer it is.
-    const near = !club ? 0 : typeof club === 'object' ? (club.near ?? 1) : 1
+    // During Techno Night the event track takes over and the club falls quiet.
+    const near = !club || this.techno ? 0 : typeof club === 'object' ? (club.near ?? 1) : 1
     const level = 0.62 * near
     if (near > 0.6 && t > this.doorUntil + 4 && Math.random() < 0.025) this.doorUntil = t + rand(1.8, 3)
     const door = near > 0.6 && t < this.doorUntil ? 1 : 0
@@ -874,7 +878,8 @@ let scape: Soundscape | null = null
 let timer: ReturnType<typeof setInterval> | null = null
 let quietSince = 0
 
-const target = () => (settings.on && !isMuted() && !townHeld() && !document.hidden ? settings.volume : 0)
+// Techno Night turns the town down a little under the music.
+const target = () => (settings.on && !isMuted() && !townHeld() && !document.hidden ? settings.volume * (technoOn() ? 0.5 : 1) : 0)
 
 export function clubOpen(): Club | null {
   if (!isNight()) return null
@@ -938,6 +943,7 @@ function tick() {
     }
     quietSince = 0
     scape.level(v, t)
+    scape.techno = technoOn()
     scape.step(t + 0.05, nightAmount(dayPhase()), SEASON, clubOpen(), weatherNow())
     honks(scape, t + 0.05)
   } else if (scape) {

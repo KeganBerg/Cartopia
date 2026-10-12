@@ -11,11 +11,21 @@ const pinned = (() => {
   return v === null ? null : Number(v)
 })()
 
+// A feature with its own night (Techno Night, techno.ts) pulls the town into
+// it: `force` says how far, 0 (the clock as it is) to 1 (midnight), so it can
+// ease in and out.
+let force: ((now: number) => number) | null = null
+export function forceNight(f: ((now: number) => number) | null) {
+  force = f
+}
+
 // 0 = noon, 0.5 = midnight.
 export function dayPhase(now = Date.now()) {
   if (pinned !== null) return pinned
   const natural = (now % DAY_MS) / DAY_MS
-  return forcedPhase(natural, now) ?? natural
+  const p = forcedPhase(natural, now) ?? natural
+  const w = force ? Math.min(1, Math.max(0, force(now))) : 0
+  return w > 0 ? p + (0.5 - p) * w : p
 }
 
 // How dark it is, 0 (day) to 1 (night), with gentle dusk and dawn ramps.
