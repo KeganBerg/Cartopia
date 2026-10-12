@@ -19,11 +19,12 @@ import { roadReady } from './TrophyRoad'
 import { flairChip, flairNew } from './Flair'
 import { dailyBest } from './DailyRun'
 import { dailyDay } from '../game/daily'
+import { worldChip } from './WorldTour'
 
 // The Race menu's front page: every race mode as a tile on one screen, each
 // showing its next race, so nothing needs scrolling to find.
 
-export type HubTab = 'quick' | 'campaign' | 'tour' | 'gp' | 'trial' | 'event' | 'rivals' | 'tuner' | 'cups' | 'road' | 'flair' | 'daily'
+export type HubTab = 'quick' | 'campaign' | 'tour' | 'gp' | 'trial' | 'event' | 'rivals' | 'tuner' | 'cups' | 'road' | 'flair' | 'daily' | 'world'
 
 const money = (n: number) => (n >= 10000 ? `$${Math.round(n / 1000)}k` : `$${n.toLocaleString()}`)
 
@@ -53,6 +54,7 @@ export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival }: { onOp
   const roadDue = roadReady(trophies, useGame((s) => s.road))
   const daily = useGame((s) => s.daily)
   const dailyDue = daily?.day !== dailyDay()
+  const worldTour = useGame((s) => s.worldTour)
   const flairSave = { trophies, cups, stats: useGame((s) => s.stats), mastery: useGame((s) => s.mastery) }
   const flairDue = flairNew({ ...flairSave, flairSeen: useGame((s) => s.flairSeen) })
   const signedIn = useLive((l) => l.signedIn)
@@ -167,6 +169,9 @@ export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival }: { onOp
         <button className="rm-mini m-daily" onClick={() => onOpen('daily')}>
           {dailyDue && <span className="rm-dot">!</span>}
           <span className="rm-mi">📅</span><span><b>Daily Run</b><small>{dailyBest(daily, dailyDay())?.toFixed(2) ?? 'New today'}</small></span>
+        </button>
+        <button className="rm-mini m-world" onClick={() => onOpen('world')}>
+          <span className="rm-mi">🌍</span><span><b>World Tour</b><small>{worldChip(worldTour)}</small></span>
         </button>
         <button className="rm-mini m-flair" onClick={() => onOpen('flair')}>
           {flairDue > 0 && <span className="rm-dot">{flairDue}</span>}

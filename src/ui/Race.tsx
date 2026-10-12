@@ -62,6 +62,8 @@ import { Flair } from './Flair'
 import { RepChip } from './Reputation'
 import { DailyRunTab, DailyResult } from './DailyRun'
 import type { DailyRun } from '../game/daily'
+import { WorldTour, worldChip } from './WorldTour'
+import { WORLD_TOUR, worldCar, worldPrize, worldShift } from '../game/worldTour'
 import { CHALLENGER_BONUS, makeChallenger } from '../game/challenger'
 
 // skill: the rival car's race skill. AI rivals use it; live players use theirs on their own device.
@@ -236,6 +238,8 @@ export function RacePanel() {
   })
   const [trial, setTrial] = useState<(TrialRun & { n: number }) | null>(null)
   const [daily, setDaily] = useState<{ run: DailyRun; n: number } | null>(null)
+  const [wRace, setWRace] = useState<{ i: number; rival: Rival } | null>(null)
+  const worldTour = useGame((s) => s.worldTour)
   // The town rival race; bet: the double-or-nothing rematch. n remounts the race for each run.
   const [rv, setRv] = useState<{ match: RivalMatch; bet: boolean; n: number } | null>(null)
   const rvBonus = useRef<RivalBonus>(null)
@@ -439,6 +443,32 @@ export function RacePanel() {
     )
   }
 
+  if (wRace && car) {
+    const r = WORLD_TOUR[wRace.i]
+    const first = wRace.i === (worldTour ?? 0)
+    const next = (won: boolean): NextRace | null => {
+      const n = won ? wRace.i + 1 : wRace.i
+      if (n >= WORLD_TOUR.length) return null
+      return { label: won ? `▶ ${WORLD_TOUR[n].flag} ${WORLD_TOUR[n].country}` : '↻ Retry', go: () => { setWRace(null); startWorld(n) } }
+    }
+    return (
+      <DragRace
+        key={seq}
+        car={car}
+        rival={wRace.rival}
+        next={next}
+        prize={worldPrize(wRace.i, first)}
+        venueId={r.venue}
+        night={r.night}
+        weatherSeed={`world-${wRace.i}`}
+        dist={r.dist}
+        title={`🌍 ${r.flag} ${r.country} · ${wRace.i + 1} of ${WORLD_TOUR.length}`}
+        onFinish={(won) => useGame.getState().worldTourResult(wRace.i, won)}
+        onExit={() => { setWRace(null); setTab('world') }}
+      />
+    )
+  }
+
   if (pRace && car) {
     const won = (rivalRow[pRace.def.id] ?? 0) > 0
     return (
@@ -562,6 +592,12 @@ export function RacePanel() {
     setRowSel(id)
     setPRace({ def, rival: rowRival(def), prize: rowPrizeOf(def, useGame.getState().rivalRow) })
   }
+  function startWorld(i: number) {
+    if (i > (useGame.getState().worldTour ?? 0) || !WORLD_TOUR[i] || waiting()) return
+    if (!spendFuel(RACE_FUEL)) return useGame.getState().showNeed('fuel', RACE_FUEL - useGame.getState().fuel, 'a World Tour race')
+    setSeq((n) => n + 1)
+    setWRace({ i, rival: worldRival(i) })
+  }
   function startTuner(id: string) {
     const def = tunerTrial(id)
     if (!def || !car || waiting()) return
@@ -651,7 +687,7 @@ export function RacePanel() {
     : tab === 'road' && roadReady(trophies, roadClaimed) > 0 ? { label: `🎁 Claim ${roadReady(trophies, roadClaimed)}`, onClick: () => useGame.getState().claimRoad() }
     : null
   const stars = Object.values(done).reduce((a, n) => a + n, 0)
-  const TITLES: Record<RaceTab, string> = { hub: 'Race', quick: 'Quick Race', campaign: 'Campaign', tour: 'Pro Tour', gp: 'Grand Prix', trial: 'Time Trial', event: 'Weekly Event', rivals: 'Rivals', tuner: 'Tuner Trials', cups: 'Class Cups', road: 'Trophy Road', flair: 'Flair', daily: 'Daily Run' }
+  const TITLES: Record<RaceTab, string> = { hub: 'Race', quick: 'Quick Race', campaign: 'Campaign', tour: 'Pro Tour', gp: 'Grand Prix', trial: 'Time Trial', event: 'Weekly Event', rivals: 'Rivals', tuner: 'Tuner Trials', cups: 'Class Cups', road: 'Trophy Road', flair: 'Flair', daily: 'Daily Run', world: 'World Tour' }
   const chip = tab === 'campaign' ? `⭐ ${stars}/${CAMPAIGN.length * CAMPAIGN_RACES * 3}`
     : tab === 'tour' ? `🌍 ${tourWon.toLocaleString()} wins`
     : tab === 'gp' ? `🏁 ×${GP_ROUNDS} → 🎁`
@@ -659,6 +695,7 @@ export function RacePanel() {
     : tab === 'rivals' ? rowChip(rivalRow, oldPaints)
     : tab === 'tuner' ? trialChip(tuner)
     : tab === 'cups' ? cupChip(cups)
+    : tab === 'world' ? worldChip(worldTour)
     : tab === 'hub' ? <RepChip />
     : null
 
@@ -677,6 +714,8 @@ export function RacePanel() {
           <TrophyRoad />
         ) : tab === 'flair' ? (
           <Flair />
+        ) : tab === 'world' ? (
+          <WorldTour onRace={startWorld} />
         ) : tab === 'daily' ? (
           <DailyRunTab onRun={startDaily} />
         ) : tab === 'campaign' ? (
@@ -944,6 +983,16 @@ function rowRival(r: PaintRival): Rival {
   return {
     id: `row-${r.id}`, town: `${r.icon} ${r.name}`, level: r.tier * 8, carName: car.name, color: r.paint, pi: r.pi, online: false,
     body: car.body, model: car.id, skill: rowSkills(r) ? car.skill : undefined, shift: rowShift(r), boss: r.tier === 5,
+  }
+}
+
+// A World Tour racer in a random car near their PI (game/worldTour.ts).
+function worldRival(i: number): Rival {
+  const r = WORLD_TOUR[i]
+  const car = worldCar(i)
+  return {
+    id: `world-${i}`, town: `${r.flag} ${r.name}`, level: 5 + i * 5, carName: car.name, color: car.colors[Math.floor(Math.random() * car.colors.length)], pi: r.pi, online: false,
+    body: car.body, model: car.id, skill: i >= 3 ? car.skill : undefined, shift: worldShift(i), boss: i === WORLD_TOUR.length - 1,
   }
 }
 

@@ -27,9 +27,10 @@ export function PaintShop({ car, job, setJob }: { car: OwnedCar; job: PaintJob; 
   const oldPaints = useGame((s) => s.oldPaints)
   const roadItems = useGame((s) => s.roadItems)
   const mastery = useGame((s) => s.mastery)
+  const worldTour = useGame((s) => s.worldTour)
   const tier = carClassTier(mastery, car.model)
   const now = jobOf(car)
-  const open = (color: string) => color === now.color || paintOpen({ rivalRow, oldPaints, roadItems, mastery }, color)
+  const open = (color: string) => color === now.color || paintOpen({ rivalRow, oldPaints, roadItems, mastery, worldTour }, color)
   // A locked colour can be tried on; the bar then points at the rival who has it.
   const lockedBy = open(job.color) ? null : rivalForPaint(job.color)
   const changed = !same(job, now)

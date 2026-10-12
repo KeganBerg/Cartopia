@@ -927,7 +927,7 @@ export const servicePay = (level: number, kind: 'tires' | 'gas') => (kind === 't
 export const gasCanCost = (level: number) => 30 + level * 15
 export const flatFixCost = (level: number) => 50 + level * 25
 
-export const PAINTS: { color: string; name: string; bucks?: number; earn?: 'road' | 'first' }[] = [
+export const PAINTS: { color: string; name: string; bucks?: number; earn?: 'road' | 'first' | 'tour' }[] = [
   { color: '#e53935', name: 'Fire Red' }, { color: '#fb8c00', name: 'Sunset' }, { color: '#fdd835', name: 'Taxi' },
   { color: '#43a047', name: 'Racing Green' }, { color: '#00acc1', name: 'Lagoon' }, { color: '#1e88e5', name: 'Royal Blue' },
   { color: '#3949ab', name: 'Midnight' }, { color: '#8e24aa', name: 'Grape' }, { color: '#ec407a', name: 'Bubblegum' },
@@ -947,6 +947,8 @@ export const PAINTS: { color: string; name: string; bucks?: number; earn?: 'road
   { color: '#a4e22b', name: 'Zest', earn: 'first' }, { color: '#c1440e', name: 'Rust Orange', earn: 'first' },
   { color: '#0f7b5f', name: 'Paddock Green', earn: 'first' }, { color: '#1a1446', name: 'Afterburner', earn: 'first' },
   { color: '#c8a165', name: 'Sandstorm', earn: 'first' }, { color: '#ff4fa3', name: 'Bubblegum Pop', earn: 'first' },
+  // Won only by beating the whole World Tour (game/worldTour.ts).
+  { color: '#8fd8ff', name: 'Tour Blue', earn: 'tour' },
 ]
 // The colours every new town can paint with. The rest are won from paint rivals (game/paintRivals.ts).
 export const STARTER_PAINTS = ['#e53935', '#1e88e5', '#fafafa', '#212121']

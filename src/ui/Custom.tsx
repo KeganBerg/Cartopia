@@ -114,8 +114,9 @@ export function CustomShop({ car, panels, setPanels }: { car: OwnedCar; panels: 
   // A locked colour can be tried on; the bar then points at the rival who has it.
   const roadItems = useGame((s) => s.roadItems)
   const mastery = useGame((s) => s.mastery)
+  const worldTour = useGame((s) => s.worldTour)
   const tier = useGame((s) => masteryTier(s.mastery, car.model))
-  const open = (id: PanelId, c: string) => c === now?.[id]?.color || paintOpen({ rivalRow, oldPaints, roadItems, mastery }, c)
+  const open = (id: PanelId, c: string) => c === now?.[id]?.color || paintOpen({ rivalRow, oldPaints, roadItems, mastery, worldTour }, c)
   // A mastery pattern needs that step in this car; a Trophy Road one, won at a mystery stop.
   const earned = (id: PanelId, pt: PatternDef) => now?.[id]?.pattern === pt.id
     || (pt.mastery ? tier >= pt.mastery : pt.road ? roadOpen(roadItems, pt.id) : true)
