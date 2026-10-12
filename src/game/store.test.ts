@@ -13,6 +13,23 @@ describe('level-up bonuses', () => {
     expect(s.bucks).toBe(11)
   })
 
+  it('still charge for a mod that levels you up', () => {
+    const car = { uid: 'c2', model: 'pip', color: '#fff', upgrades: { engine: 0, turbo: 0, tires: 0, weight: 0 } }
+    useGame.setState({ level: 9, xp: xpToNext(9) - 1, coins: 10000, parts: 50, bucks: 10, levelUp: null, cars: [car], deals: { day: today(), used: DEALS.map((d) => d.id) } })
+    expect(useGame.getState().modCar('c2', 'gtwing')).toBe(true)
+    const s = useGame.getState()
+    expect(s.level).toBe(10)
+    expect(s.coins).toBe(10000 - 4000 + 1000)
+    expect(s.bucks).toBe(11)
+  })
+
+  it('never take away fuel already above the new tank size', () => {
+    useGame.setState({ level: 1, xp: xpToNext(1) - 1, coins: 1000, bucks: 10, fuel: 500, levelUp: null })
+    useGame.getState().finishRace(true, 0)
+    expect(useGame.getState().level).toBe(2)
+    expect(useGame.getState().fuel).toBe(500)
+  })
+
   it('still charge for a car upgrade that levels you up', () => {
     const car = { uid: 'c1', model: 'pip', color: '#fff', upgrades: { engine: 0, turbo: 0, tires: 0, weight: 0 } }
     useGame.setState({ level: 1, xp: xpToNext(1) - 1, coins: 2500, parts: 10, bucks: 10, levelUp: null, cars: [car] })
