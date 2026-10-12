@@ -20,7 +20,7 @@ import { LoadingScene } from './Loading'
 // fuel, the countdown, star pay and the result card.
 
 export const STAR_GAMES: { id: StarGameId; name: string; art: string; tip: string }[] = [
-  { id: 'pit', name: 'Pit Stop', art: '🔧🏎️', tip: 'Brake, swap, go' },
+  { id: 'pit', name: 'Pit Stop', art: '🔧🏎️', tip: 'Brake, remember, go' },
   { id: 'wash', name: 'Car Wash', art: '🧽🫧', tip: 'Scrub off the mud' },
   { id: 'delivery', name: 'Delivery Dash', art: '🍕🚗', tip: 'Beat the clock' },
   { id: 'stunt', name: 'Stunt Ramp', art: '🔥🚙', tip: 'Jump and flip' },
@@ -97,7 +97,7 @@ const pitLine = (e: PitEnd) =>
 
 function PitGame({ car, running, onDone }: GameProps) {
   const input = useRef<PitInput>({ pedal: false, presses: 0, taps: [], pads: [] }).current
-  const [hud, setHud] = useState<PitHud>({ phase: 'in', left: 4, time: 0, pop: null })
+  const [hud, setHud] = useState<PitHud>({ phase: 'in', left: 4, time: 0, pop: null, calling: false })
   const [pop, setPop] = useState<PitHud['pop']>(null)
   const onHud = (h: PitHud) => {
     setHud(h)
@@ -138,7 +138,7 @@ function PitGame({ car, running, onDone }: GameProps) {
         </div>
       )}
       {running && hud.phase === 'in' && <div className="arc-tip pit-tip">Stop on the white line</div>}
-      {running && hud.phase === 'wheels' && <div className="arc-tip pit-tip">Tap each ring when it's green</div>}
+      {running && hud.phase === 'wheels' && <div className="arc-tip pit-tip">{hud.calling ? '🧠 Remember the order!' : 'Wheels off in that order, on green'}</div>}
     </>
   )
 }
