@@ -147,6 +147,17 @@ function verified(p: LivePlayer | null): LivePlayer | null {
   return cleanCard({ ...p, ...c, town: displayName(c.town, p.uid!) })
 }
 
+// Lobby messages carry no proof of who sent them, but a real challenger claims the race (or
+// party) on the server before inviting anyone. A challenge only counts when that claim is theirs.
+export async function sentBy(raceId: string, fromUid: string, party: boolean): Promise<boolean> {
+  if (!supabase || raceId.length > 64) return false
+  const { data, error } = party
+    ? await supabase.from('kart_parties').select('host').eq('id', raceId).maybeSingle()
+    : await supabase.from('live_races').select('a').eq('id', raceId).maybeSingle()
+  if (error || !data) return false
+  return (party ? (data as { host: string }).host : (data as { a: string }).a) === fromUid
+}
+
 let lobby: RealtimeChannel | null = null
 let authUid: string | null = null
 let watching = false
@@ -215,15 +226,17 @@ async function openLobby(uid: string) {
       const raw = cleanCard(payload.from)
       if (!raw?.uid || payload.to !== myId) return
       await lookUp([raw])
-      const l = useLive.getState()
       const from = verified(raw)
-      if (!from || typeof payload.raceId !== 'string' || l.race || l.closed || l.muted[from.id]) return
+      if (!from || typeof payload.raceId !== 'string' || useLive.getState().muted[from.id]) return
+      const party = payload.mode === 'kart' && payload.party === true && !cleanStake(payload.stake) ? true : undefined
+      if (!(await sentBy(payload.raceId, from.uid!, !!party))) return
+      const l = useLive.getState()
+      if (l.race || l.closed || l.muted[from.id]) return
       if ((l.cooldownFrom[from.id] ?? 0) > Date.now()) return
       // One pending challenge per sender: a repeat just replaces the old one.
       const fresh = !l.invites.some((i) => i.from.id === from.id)
       const stake = cleanStake(payload.stake)
       const mode: LiveMode = payload.mode === 'kart' && !stake ? 'kart' : 'drag'
-      const party = mode === 'kart' && payload.party === true ? true : undefined
       useLive.setState({ invites: [...l.invites.filter((i) => i.from.id !== from.id), { raceId: payload.raceId, from, at: Date.now(), mode, stake, party }] })
       if (fresh) useGame.getState().toast(`${playerName(from.uid, from.town)} ${stake ? `bet 🪙${shortCoins(stake)} on a race` : party ? 'invited you to a kart party' : `challenged you to a ${mode === 'kart' ? 'kart race' : 'race'}`}! Tap 🏁`)
     })
