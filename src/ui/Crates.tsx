@@ -129,7 +129,7 @@ function Prize({ open, onAgain, onDone, again }: { open: CrateOpen; onAgain: () 
   } else if (d.kind === 'skin' || d.kind === 'skindupe') {
     const def = skinOf(d.skin, d.part)
     // Mod paints go on parts, car paints on the whole body: say which in the name.
-    const kind = d.part ? 'Mod paint' : 'Car paint'
+    const kind = d.part ? 'Mod Paint' : 'Car Paint'
     icon = <span className={`cp-swatch ${d.part ? 'mod' : 'car'}`} style={{ background: def?.swatch }}>{d.part ? '⚙️' : '🚗'}</span>
     if (d.kind === 'skindupe') {
       title = `+${d.coins.toLocaleString()} coins`
