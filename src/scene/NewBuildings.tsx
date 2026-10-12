@@ -17,6 +17,7 @@ import { PAL, SEASON } from './season'
 import { LAYER, decal } from './layers'
 import { Bulbs as EdgeBulbs } from './edgeKit'
 import { brickTex, sidingTex, gravelTex, awningTex, paverTex, shutterTex, shingleTex, checkerTex } from './textures'
+import { ShopLot } from './BuildingDetail'
 import { PEOPLE_SIZED } from './keepShape'
 
 // Models for the second wave of shop items: businesses and services (coffee,
@@ -507,6 +508,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
             <mesh position={[0, 0.56, 0]} castShadow><sphereGeometry args={[0.12, 12, 10]} />{m('#e53935')}</mesh>
             {[-0.13, 0.13].map((x) => <Cyl key={x} m={m} at={[x, 0.17, 0.1]} r={0.05} h={0.03} c={x < 0 ? '#ffeb3b' : '#00e5ff'} seg={10} />)}
           </group>
+          {!ghost && <ShopLot id="arcade" W={2} F={0.625} />}
         </ShellBuilding>
       )
     }

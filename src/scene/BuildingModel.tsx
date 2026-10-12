@@ -5,7 +5,7 @@ import { signTexture } from './signTexture'
 import { signMat } from './closingTime'
 import { CarModel } from './CarModel'
 import { Upright, useBays, useMergeScale } from './mergeScale'
-import { ObstacleDetail, BillboardDetail, DriveInDetail, FountainDetail, GarageDetail, HouseDetail, PondDetail, ShopDetail, SpeedwayDetail, StatueDetail } from './BuildingDetail'
+import { ObstacleDetail, BillboardDetail, DriveInDetail, FountainDetail, GarageDetail, HouseDetail, PondDetail, ShopDetail, ShopLot, SpeedwayDetail, StatueDetail } from './BuildingDetail'
 import { NEW_MODELS, NewBuildingModel } from './NewBuildings'
 import { PropMesh } from './propKit'
 import { DECOR_PROPS, benchBin } from './decorProps'
@@ -1304,6 +1304,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             </mesh>
           )}
           {!ghost && <ShopDetail W={W} D={D} h={h} F={F} roof={def.roof} rows={rows} cols={cols} awning={m('#ffffff', awningTex(def.roof === '#f5f5f5' || def.roof === '#fff8e1' ? def.color : def.roof))} mullions={def.id !== 'motel' && def.id !== 'carwash'} />}
+          {!ghost && <ShopLot id={def.id} W={W} F={F} />}
           {/* Planters by the door. */}
           {!ghost && [-1, 1].map((sd) => (
             <group key={sd} position={[sd * (W * 0.41 - 0.12), 0, F + 0.15]}>
