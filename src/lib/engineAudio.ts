@@ -296,8 +296,9 @@ export class EngineVoice {
   private cutUntil = 0
   private revUntil = 0
   private gear = 0
-  // Settled at top speed in top gear: the engine eases back to a steady cruise.
-  private cruise = 0
+  // How hard top gear is pulling, 0-1, smoothed.
+  private strain = 0
+  private topSince = -1
   private lastShift = -1
   private timer: ReturnType<typeof setInterval>
   private dead = false
@@ -595,16 +596,20 @@ export class EngineVoice {
     const a = this.a
     const t = a.currentTime
     const prof = this.prof
-    // At top speed the revs sit just under the redline rather than dithering on it.
-    const r = Math.min(this.gear >= TOP_GEAR && this.mode === 'race' && !prof.electric ? 0.98 : 1.05, Math.max(0, this.rpm))
+    // Top gear is tall: it drops the revs well below the redline and they climb
+    // slowly the whole way down a long straight, so the car always sounds like
+    // it's straining for more speed instead of droning flat at the limiter.
+    const top = this.mode === 'race' && !prof.electric && this.gear >= TOP_GEAR
+    // How far into top gear's pull the car is (0 just shifted, 1 flat out).
+    const strain = top ? Math.min(1, Math.max(0, (this.rpm - 0.8) / 0.2)) : 0
+    this.strain += (strain - this.strain) * (now ? 1 : 0.1)
+    // Even once the speed has topped out, the note keeps creeping up for a while.
+    if (!top) this.topSince = -1
+    else if (this.topSince < 0) this.topSince = t
+    const creep = top ? 1 - Math.exp(-(t - this.topSince) / 10) : 0
+    const r = top ? 0.64 + 0.22 * Math.sqrt(this.strain) + 0.1 * creep : Math.min(1.05, Math.max(0, this.rpm))
     let thr = this.throttle
     if (t < this.cutUntil) thr = 0
-    // Top gear doesn't bounce off a limiter (the sim just stops pulling there):
-    // at top speed the engine settles into a steady, slightly eased-off cruise
-    // instead of chopping for the rest of a long race.
-    const top = this.mode === 'race' && !prof.electric && this.gear >= TOP_GEAR
-    this.cruise += ((top && this.rpm >= 0.96 ? 1 : 0) - this.cruise) * (now ? 1 : 0.04)
-    thr *= 1 - 0.4 * this.cruise
     // A lower gear left too long bounces off the limiter, a stutter about 9 times a second.
     if (this.mode === 'race' && !prof.electric && !top && this.rpm >= 0.995 && Math.floor(t * 18) % 2 === 0) thr = Math.min(thr, 0.35)
     const realRpm = prof.electric ? 600 + 14000 * r : prof.idle + (prof.redline - prof.idle) * r
@@ -626,15 +631,18 @@ export class EngineVoice {
     set(this.lp.frequency, Math.min(4200, (200 + fire * (2 + 2.5 * thr) + r * 1400 * thr) * prof.bright))
     set(this.engGain.gain, (0.32 + 0.4 * r) * load)
     set(this.nf.frequency, Math.min(1800, 200 + fire * 2))
-    set(this.noiseGain.gain, prof.noise * (0.015 + 0.08 * r * thr))
+    // Hard-worked top gear: less hiss and rasp, more tone, so the strain reads as a rising howl.
+    set(this.noiseGain.gain, prof.noise * (0.015 + 0.08 * r * thr) * (top ? 0.5 : 1))
     set(this.tickGain.gain, prof.clatter * (0.02 + 0.03 * (1 - r)) * (0.5 + 0.5 * load))
     // Boost builds with revs under load and bleeds off when lifting.
-    this.boost += ((thr > 0.5 ? r : 0) - this.boost) * (thr > 0.5 ? 0.08 : 0.3)
+    this.boost += ((thr > 0.5 ? (top ? 0.75 + 0.25 * this.strain : r) : 0) - this.boost) * (thr > 0.5 ? 0.08 : 0.3)
     set(this.whistle.frequency, 1800 + this.boost * 5200)
     set(this.whistleGain.gain, prof.turbo * this.boost * this.boost * 0.035)
     set(this.whineOsc.frequency, (realRpm / 60) * 9)
-    set(this.whineGain.gain, prof.whine * (0.008 + 0.04 * r * load))
-    if (!now && this.mode !== 'idle') set(this.out.gain, prof.vol * this.level)
+    // Gearbox whine rises with road speed in top gear, on every car.
+    set(this.whineGain.gain, prof.whine * (0.008 + 0.04 * r * load) + (top ? 0.014 * this.strain * load : 0))
+    // And it swells a little as it digs in.
+    if (!now && this.mode !== 'idle') set(this.out.gain, prof.vol * this.level * (1 + 0.25 * this.strain))
     else if (!now) set(this.out.gain, prof.vol * this.level * 0.85)
   }
 }
