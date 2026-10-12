@@ -1668,6 +1668,10 @@ button.book-car { font: inherit; color: inherit; }
 .taunt-sent { color: #2e7d32; font-weight: 800; }
 .taunt-quote { font-weight: 800; color: #5e35b1; }
 .visit-banner .row { flex-wrap: wrap; justify-content: center; }
+/* Free camera on the visit banner: an icon-only pill that turns blue while it's on. */
+.visit-cam { display: inline-grid; place-items: center; padding-left: 10px; padding-right: 10px; }
+.visit-cam svg { width: 20px; height: 20px; }
+.visit-cam.on { background: linear-gradient(#6ab4ff 0 50%, #3a86ea 50%); color: #fff; }
 
 /* Arcade: the menu tiles, then the full-screen mini games. */
 .arc-cars { display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 8px; }
