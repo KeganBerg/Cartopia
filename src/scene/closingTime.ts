@@ -1,5 +1,6 @@
 import { Float32BufferAttribute, Matrix4, MeshBasicMaterial, Vector3, type BufferGeometry, type Material, type MeshStandardMaterial, type Object3D } from 'three'
 import { seedOf } from '../game/hours'
+import { addFog } from './heightFog'
 import { signTexture } from './signTexture'
 
 // Closing time: windows and signs that go dark at night as people head home
@@ -89,6 +90,7 @@ function vert(sh: Shader) {
 export function closingGlow<M extends MeshStandardMaterial>(m: M, cells: [number, number], key: string, row = 0) {
   m.userData.hours = true
   m.onBeforeCompile = (sh) => {
+    addFog(sh)
     vert(sh)
     sh.fragmentShader = sh.fragmentShader.replace(
       '#include <emissivemap_fragment>',
@@ -111,6 +113,7 @@ export function signMat(text: string, bg?: string, fg?: string) {
   s = new MeshBasicMaterial({ map: signTexture(text, bg, fg), toneMapped: false })
   s.userData.hours = s.userData.live = true
   s.onBeforeCompile = (sh) => {
+    addFog(sh)
     vert(sh)
     sh.fragmentShader = '#define HOURS_SIGN\n' + sh.fragmentShader.replace(
       '#include <map_fragment>',
