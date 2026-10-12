@@ -1,5 +1,6 @@
--- Reset account (Menu > Account > Reset account). Unnumbered: the economy thread numbers it.
--- Run BEFORE the client that calls it ships; until then the button says reset isn't switched on.
+-- 0063 Reset account (2026-10-12, thread "Reset account", PR #368): Menu > Account > Reset account.
+-- Adds an RPC the client calls, so run it BEFORE the client ships; until then the button says reset
+-- isn't switched on. Standalone: econ_guard() is untouched.
 --
 -- One function a signed-in player calls on themselves. It wipes game progress back to a new
 -- player's start but keeps the login, the player name (profiles.username), friends and chat.
@@ -16,6 +17,26 @@
 --   * Refuses while a coin wager is held (stake taken, race not settled): settling it later would
 --     pay into the new town. Wagers only offered are dropped.
 -- economy_flags is an audit log and stays.
+--
+-- Economy review: the fresh starter town goes in as an INSERT, and econ_guard gives a first save an
+-- hour of guest play plus the account's age (up to a day) as allowance. For a reset that allowance
+-- would be a whole day's coins and XP on an old account, so the account's age now counts from its
+-- last reset (econ_private.account_resets, read by econ_account_age()). Everything a reset clears
+-- lived in the old save, so nothing earned before a reset can be carried past it.
+
+create table if not exists econ_private.account_resets (
+  owner_id uuid primary key references auth.users on delete cascade,
+  at timestamptz not null default now()
+);
+revoke all on econ_private.account_resets from public, anon, authenticated;
+
+-- Seconds since the account was made, or since its last reset (0002, now reset-aware).
+create or replace function econ_private.econ_account_age(uid uuid) returns numeric
+language sql stable security definer set search_path = '' as $$
+  select coalesce(extract(epoch from now() - (
+    select greatest(u.created_at, (select r.at from econ_private.account_resets r where r.owner_id = u.id))
+    from auth.users u where u.id = uid and uid = auth.uid())), 0)
+$$;
 
 create or replace function public.reset_my_account()
 returns void language plpgsql security definer set search_path = '' as $$
@@ -46,6 +67,9 @@ begin
   delete from public.battle_points where owner_id = me;
   delete from public.battle_bank where owner_id = me;
   delete from public.car_meet_likes where owner = me;
+  -- The fresh town's first save gets a new player's allowance, not the account's age.
+  insert into econ_private.account_resets (owner_id, at) values (me, now())
+    on conflict (owner_id) do update set at = excluded.at;
 end $$;
 
 revoke all on function public.reset_my_account() from public, anon;
