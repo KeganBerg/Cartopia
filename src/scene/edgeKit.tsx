@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react'
-import type { Texture } from 'three'
+import { Quaternion, Vector3, type Texture } from 'three'
 import { glowMats } from './dayNight'
 import { signMat } from './closingTime'
 import { decal } from './layers'
+import { Stretch } from './mergeScale'
 
 // Small shared pieces for the edge-of-town models (trailer homes, junkyard,
 // park styles). Plain static meshes, so Batch bakes them into a few draws.
@@ -12,10 +13,13 @@ export type Mat = (color: string, map?: Texture) => ReactNode
 export type EdgeProps = { m: Mat; win: ReactNode; bulb: ReactNode; ghost?: boolean; lvl: number; lift: number; roof: string; color: string }
 
 export const GOLD = '#ffc107'
+// Marks a piece that stretches with a merged pair (see Stretch in mergeScale).
+const STRETCH = { stretch: true }
 
-export function Box({ m, at, s, c, t, rot, shadow = true }: { m: Mat; at: V3; s: V3; c: string; t?: Texture; rot?: V3; shadow?: boolean }) {
+// `stretch`: a small board or rail that must stretch with a merged pair (see Stretch).
+export function Box({ m, at, s, c, t, rot, shadow = true, stretch }: { m: Mat; at: V3; s: V3; c: string; t?: Texture; rot?: V3; shadow?: boolean; stretch?: boolean }) {
   return (
-    <mesh position={at} rotation={rot} castShadow={shadow} receiveShadow>
+    <mesh position={at} rotation={rot} castShadow={shadow} receiveShadow {...(stretch && { userData: STRETCH })}>
       <boxGeometry args={s} />
       {m(c, t)}
     </mesh>
@@ -72,19 +76,43 @@ export function Patch({ at, r, c, sx = 1, opacity }: { at: V3; r: number; c: str
   )
 }
 
-export function Bulbs({ from, to, n, sag = 0.04 }: { from: V3; to: V3; n: number; sag?: number }) {
+// A string of bulbs on a dark wire, lit at night. The wire runs bulb to bulb,
+// sagging between the ends; `posts` stands each end on a little post that tall,
+// for strings strung above a roof or a lot instead of along a wall or eave.
+const WIRE = '#263238'
+const UP = new Vector3(0, 1, 0)
+export function Bulbs({ from, to, n, sag = 0.04, r = 0.03, posts = 0 }: { from: V3; to: V3; n: number; sag?: number; r?: number; posts?: number }) {
+  const at = Array.from({ length: n }, (_, i) => {
+    const t = n > 1 ? i / (n - 1) : 0.5
+    return new Vector3(from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t - Math.sin(t * Math.PI) * sag, from[2] + (to[2] - from[2]) * t)
+  })
+  // The string as a whole stretches with a merged building, so it stays
+  // strung between what holds it up; each bulb on it keeps its round shape.
   return (
-    <group>
-      {Array.from({ length: n }, (_, i) => {
-        const t = n > 1 ? i / (n - 1) : 0.5
+    <Stretch>
+      {at.map((p, i) => (
+        <mesh key={i} position={p}>
+          <sphereGeometry args={[r, 6, 5]} />
+          <primitive object={glowMats.bulb} attach="material" dispose={null} />
+        </mesh>
+      ))}
+      {at.slice(1).map((p, i) => {
+        const q = at[i]
+        const len = p.distanceTo(q)
         return (
-          <mesh key={i} position={[from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t - Math.sin(t * Math.PI) * sag, from[2] + (to[2] - from[2]) * t]}>
-            <sphereGeometry args={[0.03, 6, 5]} />
-            <primitive object={glowMats.bulb} attach="material" dispose={null} />
+          <mesh key={`w${i}`} userData={STRETCH} position={p.clone().add(q).multiplyScalar(0.5)} quaternion={new Quaternion().setFromUnitVectors(UP, p.clone().sub(q).normalize())}>
+            <cylinderGeometry args={[0.006, 0.006, len, 4, 1, true]} />
+            <meshStandardMaterial color={WIRE} roughness={0.8} />
           </mesh>
         )
       })}
-    </group>
+      {posts > 0 && [from, to].map((p, i) => (
+        <mesh key={`p${i}`} userData={STRETCH} position={[p[0], p[1] - posts / 2 + r, p[2]]}>
+          <cylinderGeometry args={[0.012, 0.016, posts + r, 5]} />
+          <meshStandardMaterial color={WIRE} roughness={0.6} metalness={0.3} />
+        </mesh>
+      ))}
+    </Stretch>
   )
 }
 
@@ -121,6 +149,7 @@ export function Bench({ m, at, rot = 0 }: { m: Mat; at: V3; rot?: number }) {
       {[-0.05, 0.05].map((z) => <Box key={z} m={m} at={[0, 0.17, z]} s={[0.56, 0.025, 0.06]} c="#8d6e63" />)}
       <Box m={m} at={[0, 0.3, -0.09]} s={[0.56, 0.1, 0.025]} c="#8d6e63" rot={[-0.15, 0, 0]} />
       {[-0.24, 0.24].map((x) => <Box key={x} m={m} at={[x, 0.09, -0.01]} s={[0.04, 0.18, 0.2]} c="#37474f" />)}
+      {[-0.24, 0.24].map((x) => <Box key={`b${x}`} m={m} at={[x, 0.26, -0.1]} s={[0.035, 0.2, 0.025]} c="#37474f" rot={[-0.15, 0, 0]} />)}
     </group>
   )
 }

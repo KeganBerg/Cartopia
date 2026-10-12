@@ -101,7 +101,9 @@ export function Stretch({ children }: { children: ReactNode }) {
 // smaller ground scale: a 2x2 block's display car stays 2x like the rest of
 // the building, a pair's stays normal size instead of stretched. `size` sets
 // that scale instead. Works under any turn or movement.
-export function Upright({ children, size }: { children: ReactNode; size?: number }) {
+// `tall` grows it evenly to the pair's height instead (a mast or tower that
+// something stretched is strung from).
+export function Upright({ children, size, tall }: { children: ReactNode; size?: number; tall?: boolean }) {
   const scale = useMergeScale()
   const g = useRef<Group>(null)
   const flat = uniform(scale)
@@ -110,12 +112,14 @@ export function Upright({ children, size }: { children: ReactNode; size?: number
     const o = g.current
     const r = o && rootOf(o)
     if (!o || !r || flat) return
-    keepShape(o, r, scale, size)
+    keepShape(o, r, scale, tall ? scale[1] : size)
     return () => releaseShape(o)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, size, flat])
+  }, [key, size, flat, tall])
   // Always a group, so the scene has the same shape merged or not.
-  return <group ref={g} scale={flat && size != null ? size / scale[0] : 1}>{children}</group>
+  // Marked too, so KeepShapes keeps it when it mounts before the block's root
+  // is there to hand to keepShape above.
+  return <group ref={g} userData={{ upright: true, size, tall }} scale={flat && size != null ? size / scale[0] : 1}>{children}</group>
 }
 
 // One face of a building laid out in bays: `children` gets the face's length

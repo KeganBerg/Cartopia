@@ -143,8 +143,8 @@ export function DriveInDetail() {
           {[0, 1, 2, 3, 4, 5].map((i) => {
             const a = (i / 6) * Math.PI * 2
             return (
-              <mesh key={i} position={[Math.sin(a) * 0.207, 0.25, Math.cos(a) * 0.207]} rotation={[0, a, 0]}>
-                <boxGeometry args={[0.07, 0.5, 0.02]} />
+              <mesh key={i} position={[Math.sin(a) * 0.207, 0.245, Math.cos(a) * 0.207]} rotation={[0, a, 0]}>
+                <boxGeometry args={[0.07, 0.49, 0.02]} />
                 {c('#e53935')}
               </mesh>
             )
@@ -278,20 +278,25 @@ export function TreeDetail() {
 }
 
 // Fountain: an upper bowl, arcs of water and a stone rim.
+// Spill arc segments from the fountain bowl's rim: [z0, y0, z1, y1].
+const SPILL = [[0.36, 0.93, 0.47, 0.75], [0.47, 0.75, 0.55, 0.52], [0.55, 0.52, 0.59, 0.32]]
+
 export function FountainDetail({ stone }: { stone: string }) {
   return (
     <group>
       <mesh position={[0, 0.92, 0]} castShadow><cylinderGeometry args={[0.38, 0.2, 0.12, 20]} />{c(stone)}</mesh>
       <mesh position={[0, 0.985, 0]}><cylinderGeometry args={[0.32, 0.32, 0.02, 20]} />{c('#b3e5fc')}</mesh>
-      {Array.from({ length: 8 }, (_, i) => {
-        const a = (i / 8) * Math.PI * 2
-        return [0.45, 0.6].map((r, j) => (
-          <mesh key={`${i}${j}`} position={[Math.sin(a) * r, 0.62 - j * 0.22, Math.cos(a) * r]}>
-            <sphereGeometry args={[0.04 - j * 0.008, 6, 5]} />
-            {c('#b3e5fc')}
-          </mesh>
-        ))
-      })}
+      {/* Water spilling over the bowl's rim in arcs down to the pool. */}
+      {Array.from({ length: 8 }, (_, i) => (
+        <group key={i} rotation-y={(i / 8) * Math.PI * 2}>
+          {SPILL.map(([z0, y0, z1, y1], j) => (
+            <mesh key={j} position={[0, (y0 + y1) / 2, (z0 + z1) / 2]} rotation-x={Math.atan2(z0 - z1, y0 - y1)}>
+              <cylinderGeometry args={[0.022 - j * 0.004, 0.026 - j * 0.004, Math.hypot(z1 - z0, y1 - y0) + 0.02, 6]} />
+              {c('#b3e5fc')}
+            </mesh>
+          ))}
+        </group>
+      ))}
       {Array.from({ length: 12 }, (_, i) => {
         const a = (i / 12) * Math.PI * 2
         return (
@@ -354,6 +359,7 @@ export function BillboardDetail() {
     <group>
       <Box p={[0, 1.27, 0.15]} s={[1.8, 0.03, 0.22]}>{c('#78909c')}</Box>
       <Box p={[0, 1.4, 0.25]} s={[1.8, 0.02, 0.02]}>{c('#78909c')}</Box>
+      {[-0.88, -0.3, 0.3, 0.88].map((x) => <Box key={x} p={[x, 1.335, 0.25]} s={[0.02, 0.13, 0.02]}>{c('#78909c')}</Box>)}
       {[-0.07, 0.07].map((x) => <Box key={x} p={[-0.5 + x, 0.64, 0.12]} s={[0.02, 1.28, 0.02]}>{c('#78909c')}</Box>)}
       {[0.2, 0.4, 0.6, 0.8, 1.0, 1.2].map((y) => <Box key={y} p={[-0.5, y, 0.12]} s={[0.14, 0.02, 0.02]}>{c('#78909c')}</Box>)}
     </group>

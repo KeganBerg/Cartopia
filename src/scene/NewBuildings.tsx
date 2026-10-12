@@ -13,6 +13,7 @@ import { LED_COUNT, ledFront, ledWindows } from './clubLeds'
 import { MeshBasicMaterial, MeshStandardMaterial, Color } from 'three'
 import { PAL, SEASON } from './season'
 import { LAYER, decal } from './layers'
+import { Bulbs as EdgeBulbs } from './edgeKit'
 import { brickTex, sidingTex, gravelTex, awningTex, paverTex, shutterTex, shingleTex, checkerTex } from './textures'
 
 // Models for the second wave of shop items: businesses and services (coffee,
@@ -80,20 +81,8 @@ export function Neon({ at, s, c }: { at: V3; s: V3; c: string }) {
   )
 }
 
-export function Bulbs({ from, to, n }: { from: V3; to: V3; n: number }) {
-  return (
-    <group>
-      {Array.from({ length: n }, (_, i) => {
-        const t = n > 1 ? i / (n - 1) : 0.5
-        return (
-          <mesh key={i} position={[from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t - Math.sin(t * Math.PI) * 0.04, from[2] + (to[2] - from[2]) * t]}>
-            <sphereGeometry args={[0.035, 6, 5]} />
-            <primitive object={glowMats.bulb} attach="material" dispose={null} />
-          </mesh>
-        )
-      })}
-    </group>
-  )
+export function Bulbs(props: { from: V3; to: V3; n: number; sag?: number; posts?: number }) {
+  return <EdgeBulbs r={0.035} {...props} />
 }
 
 export function Flag({ at, color, star, tall = 0.9 }: { at: V3; color: string; star?: boolean; tall?: number }) {
@@ -117,8 +106,8 @@ export function Trims({ m, lvl, w, d, h, z0, flag }: { m: Mat; lvl: number; w: n
   return (
     <group>
       {lvl >= 3 && <Box m={m} at={[0, h - 0.06, z0]} s={[w + 0.04, 0.07, d + 0.04]} c="#fafafa" />}
-      {lvl >= 5 && <Bulbs from={[-w / 2 - 0.02, h + 0.17, zf + 0.06]} to={[w / 2 + 0.02, h + 0.17, zf + 0.06]} n={w > 2 ? 13 : 7} />}
-      {lvl >= 8 && <Flag at={[-w * 0.38, h + 0.13, z0 - d * 0.3]} color={flag} star={lvl >= 10} />}
+      {lvl >= 5 && <Bulbs from={[-w / 2 + 0.02, h + 0.17, zf + 0.02]} to={[w / 2 - 0.02, h + 0.17, zf + 0.02]} n={w > 2 ? 13 : 7} posts={0.19} />}
+      {lvl >= 8 && <Flag at={[-w * 0.38, h - 0.02, z0 - d * 0.3]} color={flag} star={lvl >= 10} tall={1.05} />}
       {lvl >= 9 && (
         <mesh position={[0, h + 0.1, zf + 0.045]}>
           <boxGeometry args={[w + 0.07, 0.05, 0.03]} />
@@ -231,6 +220,8 @@ export function ShellBuilding({ m, win, bulb, ghost, lvl, w, d, h0, z0 = -0.15, 
       {!ghost && <Trims m={m} lvl={lvl} w={w} d={d} h={h} z0={z0} flag={roof} />}
       {!ghost && sign && (
         <group position={[0, h + 0.38, zf - 0.08]}>
+          {/* Steel legs bolt the sign board down to the roof. */}
+          {[-1, 1].map((sd) => <Box key={sd} m={m} at={[(sd * sw) / 2.8, -0.12, -0.08]} s={[0.04, 0.26, 0.04]} c="#455a64" shadow={false} />)}
           <Box m={m} at={[0, 0, -0.03]} s={[sw + 0.08, sw / 4 + 0.08, 0.05]} c={roof} shadow={false} />
           <Sign text={sign} w={sw} at={[0, 0, 0]} bg={signBg} fg={signFg} />
         </group>
@@ -265,8 +256,15 @@ export function BlockCar({ m, at, c, rot = 0 }: { m: Mat; at: V3; c: string; rot
     <group position={at}>
       <Upright>
         <group rotation-y={rot}>
-          <Box m={m} at={[0, 0.1, 0]} s={[0.36, 0.13, 0.66]} c={c} />
-          <Box m={m} at={[0, 0.21, -0.04]} s={[0.3, 0.1, 0.34]} c="#b3e5fc" />
+          {/* Body on four wheels, so it sits on the deck or lot it's parked on. */}
+          <Box m={m} at={[0, 0.115, 0]} s={[0.36, 0.13, 0.66]} c={c} />
+          <Box m={m} at={[0, 0.225, -0.04]} s={[0.3, 0.1, 0.34]} c="#b3e5fc" />
+          {[[-0.17, 0.2], [0.17, 0.2], [-0.17, -0.2], [0.17, -0.2]].map(([x, z]) => (
+            <mesh key={`${x}${z}`} position={[x, 0.05, z]} rotation-z={Math.PI / 2}>
+              <cylinderGeometry args={[0.05, 0.05, 0.05, 10]} />
+              {m('#212121')}
+            </mesh>
+          ))}
         </group>
       </Upright>
     </group>
@@ -317,7 +315,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
             <Cyl m={m} at={[0, 0.46, 0]} r={0.22} h={0.01} c="#5d4037" seg={16} />
             <mesh position={[0.24, 0.27, 0]} castShadow><torusGeometry args={[0.1, 0.03, 6, 12]} />{m('#fafafa')}</mesh>
             {!ghost && [0, 1, 2].map((i) => (
-              <mesh key={i} position={[Math.sin(i * 2) * 0.05, 0.6 + i * 0.13, 0]}><sphereGeometry args={[0.06 + i * 0.015, 8, 6]} />{m('#eceff1')}</mesh>
+              <mesh key={i} position={[Math.sin(i * 2) * 0.04, 0.5 + i * 0.105, 0]}><sphereGeometry args={[0.06 + i * 0.015, 8, 6]} />{m('#eceff1')}</mesh>
             ))}
           </group>
           {!ghost && [-0.62, 0.62].map((x) => <Parasol key={x} m={m} at={[x, 0, 0.75]} c="#2e7d32" />)}
@@ -374,21 +372,27 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
             )}
             {!ghost && (
               <group>
-                <group position={[0, H + 0.12, 0.1]}>
+                {/* Mounted on the face of the stepped parapet, clear of its steps. */}
+                <group position={[0, H + 0.12, 0.19]}>
                   <Box m={m} at={[0, 0, -0.03]} s={[0.98, 0.29, 0.05]} c="#ff7043" shadow={false} />
                   <Sign text={st === 3 ? 'CANTINA' : 'TAQUERIA'} w={0.9} at={[0, 0, 0]} bg="#ffd54f" fg="#bf360c" />
                 </group>
                 {/* Roof: chairs and parasols round the giant taco on a plinth. */}
-                <Cyl m={m} at={[0.35, H + 0.16, -0.6]} r={0.3} h={0.12} c="#d84315" seg={12} />
-                <group position={[0.35, H + 0.5, -0.6]} scale={st === 3 ? 1.5 : 1.15}>{taco}</group>
+                <group position={[0.35, H + 0.1, -0.6]}>
+                  <Cyl m={m} at={[0, 0.06, 0]} r={0.3} h={0.12} c="#d84315" seg={12} />
+                  <group position-y={0.09} scale={st === 3 ? 1.5 : 1.15}>{taco}</group>
+                </group>
                 {st === 3 && <Parasol m={m} at={[-0.45, H + 0.1, -0.5]} c="#43a047" />}
                 {/* Patio with tables, papel picado and string lights. */}
                 {[-0.55, 0.55].map((x, i) => <Parasol key={x} m={m} at={[x, 0, 0.62]} c={i ? '#43a047' : '#ff7043'} />)}
-                {[-0.88, 0.88].map((x) => <Cyl key={x} m={m} at={[x, 0.6, 0.88]} r={0.02} h={1.2} c="#6d4c41" seg={6} />)}
-                <Bulbs from={[-0.88, 1.15, 0.88]} to={[0.88, 1.15, 0.88]} n={9} />
-                {[-0.6, -0.3, 0, 0.3, 0.6].map((x, i) => (
-                  <Box key={x} m={m} at={[x, 1.02 - Math.sin(((x + 0.88) / 1.76) * Math.PI) * 0.04, 0.88]} s={[0.12, 0.1, 0.01]} c={['#e91e63', '#ffeb3b', '#00bcd4', '#8bc34a', '#ff9800'][i]} shadow={false} />
-                ))}
+                {/* One piece, so merged the poles, lights and flags stay strung together. */}
+                <Upright>
+                  {[-0.88, 0.88].map((x) => <Cyl key={x} m={m} at={[x, 0.6, 0.88]} r={0.02} h={1.2} c="#6d4c41" seg={6} />)}
+                  <Bulbs from={[-0.88, 1.15, 0.88]} to={[0.88, 1.15, 0.88]} n={9} />
+                  {[-0.6, -0.3, 0, 0.3, 0.6].map((x, i) => (
+                    <Box key={x} m={m} at={[x, 1.095 - Math.sin(((x + 0.88) / 1.76) * Math.PI) * 0.04, 0.88]} s={[0.12, 0.1, 0.01]} c={['#e91e63', '#ffeb3b', '#00bcd4', '#8bc34a', '#ff9800'][i]} shadow={false} />
+                  ))}
+                </Upright>
                 {lvl >= 8 && <Flag at={[-0.7, H + 0.1, -0.8]} color="#43a047" star={lvl >= 10} />}
                 <Pool r={0.8} z={0.55} />
               </group>
@@ -401,6 +405,8 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           <Box m={m} at={[0, 0.025, 0]} s={[1.92, 0.05, 1.92]} c="#ffffff" t={paverTex(2, 2)} shadow={false} />
           {/* The truck: box body, cab, serving hatch facing the street. */}
           <group position={[0.05, 0, -0.25]}>
+          {/* A vehicle: merged, it stays truck-shaped on its wheels. */}
+          <Upright>
             <Box m={m} at={[-0.15, 0.6, 0]} s={[1.15, 0.78, 0.78]} c="#fafafa" />
             <Box m={m} at={[0.62, 0.44, 0]} s={[0.42, 0.46, 0.76]} c="#ff7043" />
             <Box m={m} at={[0.62, 0.78, 0]} s={[0.38, 0.24, 0.72]} c="#b3e5fc" />
@@ -409,11 +415,11 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
               <planeGeometry args={[0.8, 0.32]} />
               {m('#3e2723')}
             </mesh>
-            <Box m={m} at={[-0.15, 0.88, 0.5]} rot={[0.6, 0, 0]} s={[0.86, 0.03, 0.3]} c="#ffffff" t={awningTex('#ff7043', '#ffd54f')} />
+            <Box m={m} at={[-0.15, 0.8, 0.5]} rot={[0.6, 0, 0]} s={[0.86, 0.03, 0.3]} c="#ffffff" t={awningTex('#ff7043', '#ffd54f')} />
             <Box m={m} at={[-0.15, 0.48, 0.44]} s={[0.84, 0.04, 0.1]} c="#bdbdbd" />
             {[[-0.55, 0.38], [0.6, 0.38], [-0.55, -0.38], [0.6, -0.38]].map(([x, z]) => <Wheel key={`${x}${z}`} m={m} at={[x, 0.12, z]} />)}
             {/* Giant taco on the roof. */}
-            <group position={[-0.2, 1.05, 0]}>
+            <group position={[-0.2, 0.995, 0]}>
               <mesh rotation={[0, 0, Math.PI / 2]} castShadow>
                 <cylinderGeometry args={[0.28, 0.28, 0.22, 16, 1, false, 0, Math.PI]} />
                 {m('#ffca28')}
@@ -422,15 +428,16 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
               {[-0.12, 0.05, 0.18].map((z) => <mesh key={z} position={[0, 0.07, z]}><sphereGeometry args={[0.05, 6, 5]} />{m('#e53935')}</mesh>)}
             </group>
             {!ghost && <Sign text="TACOS" w={0.7} at={[-0.15, 0.95 + 0.04, 0.395]} bg="#ffd54f" fg="#bf360c" />}
+          </Upright>
           </group>
           {/* Patio: one table to start, a second and string lights as it levels up. */}
           {!ghost && <Parasol m={m} at={[-0.55, 0, 0.62]} c="#ff7043" />}
           {trim && lvl >= 3 && <Parasol m={m} at={[0.55, 0, 0.62]} c="#43a047" />}
           {trim && lvl >= 5 && (
-            <group>
+            <Upright>
               {[-0.88, 0.88].map((x) => <Cyl key={x} m={m} at={[x, 0.6, 0.85]} r={0.02} h={1.2} c="#6d4c41" seg={6} />)}
               <Bulbs from={[-0.88, 1.15, 0.85]} to={[0.88, 1.15, 0.85]} n={9} />
-            </group>
+            </Upright>
           )}
           {/* Pole sign that grows taller with each level. */}
           {!ghost && (
@@ -519,8 +526,8 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           </mesh>
           <mesh position={[1.1, 0.25, 0.358]}><planeGeometry args={[0.3, 0.46]} />{m('#37474f')}</mesh>
           {/* Paint splats down the side wall. */}
-          {!ghost && [[-1.5, 1.05, '#e53935', 0.16], [-1.3, 0.85, '#1e88e5', 0.12], [-1.62, 0.72, '#fdd835', 0.1], [1.45, 1.1, '#43a047', 0.13]].map(([x, y, c, r]) => (
-            <mesh key={c as string} position={[x as number, y as number, 0.358]}>
+          {!ghost && [[-1.5, 1.05, '#e53935', 0.16], [-1.3, 0.85, '#1e88e5', 0.12], [-1.62, 0.72, '#fdd835', 0.1], [1.45, 1.1, '#43a047', 0.13]].map(([x, y, c, r], i) => (
+            <mesh key={c as string} position={[x as number, y as number, 0.358 + i * 0.002]}>
               <circleGeometry args={[r as number, 10]} />
               {m(c as string)}
             </mesh>
@@ -565,7 +572,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           {!ghost && [0, 1, 2].map((i) => (
             <group key={i} position={[0.75 + i * 0.12, 0, 0.82]}>
               <Box m={m} at={[0, 0.17, 0]} s={[0.1, 0.14, 0.24]} c="#b0bec5" />
-              <Box m={m} at={[0, 0.06, 0.06]} s={[0.08, 0.02, 0.2]} c="#e53935" shadow={false} />
+              <Box m={m} at={[0, 0.065, 0.02]} s={[0.08, 0.07, 0.2]} c="#e53935" shadow={false} />
             </group>
           ))}
           {/* Giant apple on the roof. */}
@@ -641,7 +648,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
               ))}
               {!ghost && <Box m={m} at={[1.66, (th - 0.6) / 2 + 0.3, -0.55]} s={[0.02, th - 0.6, 0.12]} c="#cfd8dc" shadow={false} />}
               {!ghost && (
-                <group position={[1.35, th + 0.5, -0.55]}>
+                <group position={[1.35, th + 0.37, -0.55]}>
                   <Box m={m} at={[0, 0.12, 0]} s={[0.14, 0.1, 0.14]} c="#eceff1" />
                   <mesh position={[0, 0.22, 0]}><sphereGeometry args={[0.06, 8, 6]} /><primitive object={glowMats.taillight} attach="material" dispose={null} /></mesh>
                 </group>
@@ -661,8 +668,12 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
                 </group>
               )}
               {/* Siren mast and the ladder truck by the tower, its ladder up to the top balcony. */}
-              {!ghost && <Cyl m={m} at={[-1.4, h + 0.95, -0.55]} r={0.02} h={0.7} c="#b0bec5" seg={6} />}
-              {!ghost && <Cyl m={m} at={[-1.4, h + 1.35, -0.55]} r={0.07} r2={0.05} h={0.1} c="#fdd835" seg={8} />}
+              {!ghost && (
+                <group position={[-1.4, h + 0.6, -0.55]}>
+                  <Cyl m={m} at={[0, 0.35, 0]} r={0.02} h={0.7} c="#b0bec5" seg={6} />
+                  <Cyl m={m} at={[0, 0.75, 0]} r={0.07} r2={0.05} h={0.1} c="#fdd835" seg={8} />
+                </group>
+              )}
               {!ghost && (
                 <group position={[0.3, 0, 0.5]}>
                   <Box m={m} at={[0, 0.34, 0]} s={[0.6, 0.42, 0.95]} c="#d32f2f" />
@@ -715,8 +726,8 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
                 <group rotation-y={Math.PI / 2}>
                   <CarModel body="sedan" color="#fafafa" stripe="#1a237e" />
                   <Box m={m} at={[-0.08, 0.6, -0.02]} s={[0.1, 0.05, 0.34]} c="#e0e0e0" />
-                  <Box m={m} at={[-0.08, 0.64, 0.09]} s={[0.1, 0.05, 0.12]} c="#e53935" />
-                  <Box m={m} at={[-0.08, 0.64, -0.13]} s={[0.1, 0.05, 0.12]} c="#1e88e5" />
+                  <Box m={m} at={[-0.08, 0.64, 0.088]} s={[0.096, 0.05, 0.116]} c="#e53935" />
+                  <Box m={m} at={[-0.08, 0.64, -0.128]} s={[0.096, 0.05, 0.116]} c="#1e88e5" />
                 </group>
               </Upright>
             </group>
@@ -976,7 +987,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           {[[-1.65, 1.45], [1.65, 1.45], [-1.65, -1.65], [1.65, -1.65], [0, 1.45], [0, -1.65]].map(([x, z]) => (
             <Box key={`${x}${z}`} m={m} at={[x, top / 2, z]} s={[0.14, top, 0.14]} c="#9e9e9e" />
           ))}
-          <Box m={m} at={[1.45, (top + 0.6) / 2, -1.5]} s={[0.55, top + 0.6, 0.5]} c="#9e9e9e" />
+          <Box m={m} at={[1.45, (top + 0.6) / 2, -1.495]} s={[0.55, top + 0.6, 0.49]} c="#9e9e9e" />
           <mesh position={[1.45, top + 0.1, -1.245]}><planeGeometry args={[0.3, 0.4]} />{win}</mesh>
           {/* Ramp up the right side. */}
           <mesh position={[1.2, DH / 2 + 0.05, 0.3]} rotation-x={-0.32} castShadow receiveShadow>
@@ -998,7 +1009,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
               <Box m={m} at={[0, top + 0.6, 0.06]} s={[0.5, 0.5, 0.06]} c={lvl >= 9 ? GOLD : '#1565c0'} />
               <mesh position={[0, top + 0.6, 0.095]}>
                 <planeGeometry args={[0.44, 0.44]} />
-                <meshBasicMaterial map={signTexture('P', '#1565c0', '#ffffff')} toneMapped={false} />
+                <meshBasicMaterial map={signTexture('P', '#1565c0', '#ffffff', 1)} toneMapped={false} />
               </mesh>
             </group>
           )}
@@ -1009,7 +1020,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
             </group>
           )}
           {trim && lvl >= 5 && <Bulbs from={[-1.72, top + 0.24, 1.6]} to={[1.72, top + 0.24, 1.6]} n={13} />}
-          {trim && lvl >= 8 && <Flag at={[-1.4, top + 0.2, -1.5]} color="#1565c0" star={lvl >= 10} />}
+          {trim && lvl >= 8 && <Flag at={[-1.4, top + 0.05, -1.5]} color="#1565c0" star={lvl >= 10} />}
           {!ghost && <Pool r={1.4} z={0.6} />}
         </group>
       )
@@ -1108,7 +1119,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
     case 'deadtree': {
       // Bare, twisted branches with lanterns hanging off them.
       const branches: [number, number, number, number, number][] = [
-        [0.28, 1.55, 0, 0.9, 0.55], [-0.3, 1.45, 0.1, -0.85, 0.5], [0.05, 1.8, -0.2, 0.25, 0.45], [-0.12, 1.25, -0.25, -0.5, 0.4],
+        [0.28, 1.55, 0, 0.9, 0.55], [-0.3, 1.45, 0.1, -0.85, 0.5], [0.05, 1.8, -0.06, 0.25, 0.45], [-0.12, 1.25, -0.25, -0.5, 0.4],
       ]
       return (
         <group>
@@ -1120,7 +1131,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
               <Cyl m={m} at={[x * 1.6, y + 0.18, z]} r={0.012} r2={0.025} h={0.25} c="#3e2723" seg={4} rot={[0, 0, -rz * 0.6]} />
             </group>
           ))}
-          {[[0.55, 1.45, 0.05], [-0.55, 1.36, 0.12], [0.12, 1.75, -0.3]].map(([x, y, z], i) => (
+          {[[0.55, 1.45, 0.05], [-0.55, 1.36, 0.12], [0.1, 1.72, -0.06]].map(([x, y, z], i) => (
             <group key={i} position={[x, y, z]}>
               <Cyl m={m} at={[0, 0.1, 0]} r={0.006} h={0.2} c="#212121" seg={4} />
               <mesh position={[0, -0.04, 0]}><sphereGeometry args={[0.07, 8, 6]} />{bulb}</mesh>
@@ -1130,7 +1141,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           {[0, 1, 2, 3].map((i) => (
             <Cyl key={i} m={m} at={[Math.sin(i * 1.7) * 0.22, 0.06, Math.cos(i * 1.7) * 0.22]} r={0.03} r2={0.06} h={0.35} c="#3e2723" seg={5} rot={[Math.cos(i * 1.7) * 1.2, 0, -Math.sin(i * 1.7) * 1.2]} />
           ))}
-          <group position={[0.15, 2.08, -0.2]}>
+          <group position={[0.0, 2.07, -0.06]}>
             <mesh><sphereGeometry args={[0.05, 6, 5]} />{m('#212121')}</mesh>
             {[-1, 1].map((sd) => <Box key={sd} m={m} at={[sd * 0.09, 0.01, 0]} rot={[0, 0, sd * 0.4]} s={[0.12, 0.015, 0.07]} c="#212121" shadow={false} />)}
           </group>
@@ -1212,8 +1223,8 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           {[-0.09, 0, 0.09].map((x) => <Box key={x} m={m} at={[x, 0.19, 0.01]} s={[0.07, 0.34, 0.025]} c="#fafafa" />)}
           {[0.1, 0.28].map((y) => <Box key={y} m={m} at={[0, y, -0.012]} s={[0.26, 0.04, 0.02]} c="#eeeeee" />)}
           <Box m={m} at={[0, 0.19, -0.012]} s={[0.035, 0.24, 0.02]} c="#eeeeee" rot={[0, 0, -0.85]} />
-          {[0.1, 0.28].map((y) => <Box key={y} m={m} at={[-0.13, y, 0.03]} s={[0.06, 0.02, 0.012]} c="#37474f" shadow={false} />)}
-          <Box m={m} at={[0.13, 0.2, 0.03]} s={[0.025, 0.04, 0.02]} c="#37474f" shadow={false} />
+          {[0.1, 0.28].map((y) => <Box key={y} m={m} at={[-0.13, y, 0.036]} s={[0.06, 0.02, 0.012]} c="#37474f" shadow={false} />)}
+          <Box m={m} at={[0.13, 0.2, 0.036]} s={[0.025, 0.04, 0.02]} c="#37474f" shadow={false} />
           {/* A flower bed along the inside. */}
           {!SNOW && (
             <group>
@@ -1261,7 +1272,8 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
             <group position={[0.6, 0, 0.55]}>
               <Cyl m={m} at={[0, 0.75, 0]} r={0.03} h={1.5} c="#90a4ae" seg={6} />
               <mesh position={[0, 1.45, 0]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.18, 0.18, 0.03, 16]} />{m('#1e88e5')}</mesh>
-              <mesh position={[0, 1.45, 0.017]}>
+              {/* Lettering on the disc's face, clear of the pole. */}
+              <mesh position={[0, 1.45, 0.032]}>
                 <planeGeometry args={[0.3, 0.075]} />
                 <meshBasicMaterial map={signTexture('BUS', '#1e88e5', '#ffffff')} toneMapped={false} />
               </mesh>
@@ -1316,7 +1328,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           {[-0.85, 0.85].map((x) => (
             <group key={x}>
               <Box m={m} at={[x, 0.08, 0]} s={[0.3, 0.16, 0.3]} c="#424242" />
-              <Box m={m} at={[x, 0.95, 0]} s={[0.16, 1.7, 0.16]} c="#e53935" />
+              <Box m={m} at={[x, 0.95, 0]} s={[0.16, 1.7, 0.15]} c="#e53935" />
             </group>
           ))}
           <Box m={m} at={[0, 1.85, 0]} s={[2.0, 0.34, 0.16]} c="#212121" />
@@ -1341,14 +1353,16 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
         <group>
           <mesh position={[0, 0.03, 0]} receiveShadow><cylinderGeometry args={[1.85, 1.85, 0.06, 28]} />{m('#d7b77b')}</mesh>
           <mesh position={[0, 0.065, 0]}><cylinderGeometry args={[1.6, 1.6, 0.02, 28]} />{m('#ef9a9a')}</mesh>
-          {/* Slide tower. */}
+          {/* Slide tower: one piece, kept in shape on a merged pair. */}
           <group position={[-0.8, 0, -0.6]}>
-            {[[-0.25, -0.25], [0.25, -0.25], [-0.25, 0.25], [0.25, 0.25]].map(([x, z]) => <Box key={`${x}${z}`} m={m} at={[x, 0.55, z]} s={[0.06, 1.1, 0.06]} c="#1e88e5" />)}
-            <Box m={m} at={[0, 0.7, 0]} s={[0.6, 0.06, 0.6]} c="#fdd835" />
-            <mesh position={[0, 1.25, 0]} rotation-y={Math.PI / 4} castShadow><coneGeometry args={[0.48, 0.35, 4]} />{m('#e53935')}</mesh>
-            <Box m={m} at={[0.62, 0.38, 0]} rot={[0, 0, -0.62]} s={[0.85, 0.04, 0.32]} c="#43a047" />
-            {[-0.16, 0.16].map((z) => <Box key={z} m={m} at={[0.62, 0.44, z]} rot={[0, 0, -0.62]} s={[0.85, 0.08, 0.02]} c="#43a047" />)}
-            {[0.15, 0.32, 0.49].map((y) => <Box key={y} m={m} at={[0, y, -0.3]} s={[0.4, 0.03, 0.03]} c="#fafafa" />)}
+            <Upright>
+              {[[-0.25, -0.25], [0.25, -0.25], [-0.25, 0.25], [0.25, 0.25]].map(([x, z]) => <Box key={`${x}${z}`} m={m} at={[x, 0.55, z]} s={[0.06, 1.1, 0.06]} c="#1e88e5" />)}
+              <Box m={m} at={[0, 0.7, 0]} s={[0.6, 0.06, 0.6]} c="#fdd835" />
+              <mesh position={[0, 1.25, 0]} rotation-y={Math.PI / 4} castShadow><coneGeometry args={[0.48, 0.35, 4]} />{m('#e53935')}</mesh>
+              <Box m={m} at={[0.62, 0.38, 0]} rot={[0, 0, -0.62]} s={[0.85, 0.04, 0.32]} c="#43a047" />
+              {[-0.16, 0.16].map((z) => <Box key={z} m={m} at={[0.62, 0.44, z]} rot={[0, 0, -0.62]} s={[0.85, 0.08, 0.02]} c="#43a047" />)}
+              {[0.15, 0.32, 0.49].map((y) => <Box key={y} m={m} at={[0, y, -0.3]} s={[0.4, 0.03, 0.03]} c="#fafafa" />)}
+            </Upright>
           </group>
           {/* Swing set. */}
           <group position={[0.65, 0, -0.55]}>
@@ -1369,6 +1383,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
             <Box m={m} at={[0, 0.24, 0]} rot={[0, 0, 0.18]} s={[1.1, 0.04, 0.12]} c="#8e24aa" />
           </group>
           <group position={[-0.65, 0, 0.7]}>
+            <Cyl m={m} at={[0, 0.06, 0]} r={0.09} h={0.12} c="#757575" seg={10} />
             <mesh position={[0, 0.14, 0]} castShadow><cylinderGeometry args={[0.42, 0.42, 0.06, 16]} />{m('#fdd835')}</mesh>
             <Cyl m={m} at={[0, 0.3, 0]} r={0.025} h={0.3} c="#e53935" seg={6} />
             {[0, 1, 2, 3].map((i) => (

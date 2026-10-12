@@ -7,20 +7,19 @@ import { BUILDINGS, TILE } from '../game/data'
 import { BuildingModel } from './BuildingModel'
 import { VanguardTower } from './Landmark'
 import { LAYER } from './layers'
+import { appendFileSync } from 'node:fs'
 
 // No flicker (Z-fighting): two flat faces that face the same way, overlap and
 // sit at (almost) the same height or depth fight over the same pixels, which
 // shows as stripes on phones. That's a mat lying flush on the lot paving, a
 // sign glued to a wall at the wall's own depth, two pads with the same top.
-// This draws a building at each growth form, on the lot paving it sits on in
-// town, and lists every such pair. Add a building's id to CHECKED once its
-// model passes. Fix one by lifting the top piece a clear
+// This draws every building at each growth form, on the lot paving it sits on
+// in town, and lists every such pair. Fix one by lifting the top piece a clear
 // step (GAP or more), or give a flat decal `decal()` from layers.ts.
 
 const LEVELS = [1, 4, 7, 10]
-const CHECKED = new Set(['club'])
 // Phones with a 16-bit depth buffer need about this much between two faces.
-const GAP = 0.001
+const GAP = Number(process.env.COPLANAR_GAP ?? 0.001)
 // Overlaps smaller than this (in square units) are seams, not visible fights.
 const AREA = 0.0004
 
@@ -156,10 +155,11 @@ async function scan(def: (typeof BUILDINGS)[number], level: number, model = <Bui
 }
 
 describe('no flickering flat faces', () => {
-  for (const def of BUILDINGS.filter((d) => CHECKED.has(d.id))) {
+  for (const def of BUILDINGS.filter((d) => !d.parked)) {
     it(def.id, async () => {
       const bad = new Set<string>()
       for (const level of LEVELS) for (const b of await scan(def, level)) bad.add(`L${level} ${b}`)
+      if (process.env.COPLANAR_OUT) appendFileSync(process.env.COPLANAR_OUT, [...bad].map((b) => `${def.id} ${b}\n`).join(''))
       expect([...bad]).toEqual([])
     })
   }

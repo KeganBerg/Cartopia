@@ -258,12 +258,12 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
           <mesh position={[1.38, 0.66, 0.79]}><boxGeometry args={[0.7, 0.02, 0.02]} />{bulb}</mesh>
           {/* Walk to the street, lawn strips, planters, a bike rack and the monument sign. */}
           <Box m={m} at={[0, 0.02, 0.68]} s={[3.9, 0.04, 0.62]} c="#ffffff" t={paverTex(4, 1)} shadow={false} />
-          <Box m={m} at={[-0.55, 0.045, 0.6]} s={[2.4, 0.03, 0.3]} c={PAL.grass} shadow={false} />
+          <Box m={m} at={[-0.55, 0.045, 0.6]} s={[2.4, 0.03, 0.31]} c={PAL.grass} shadow={false} />
           {!ghost && (
             <group>
               {[-1.45, -0.55, 0.35].map((x) => <Planter key={x} m={m} at={[x, 0.04, 0.6]} />)}
               <group position={[0.85, 0, 0.7]}>
-                {[-0.12, 0, 0.12].map((x) => <mesh key={x} position={[x, 0.11, 0]} rotation-y={Math.PI / 2}><torusGeometry args={[0.09, 0.012, 5, 12, Math.PI]} />{m('#90a4ae')}</mesh>)}
+                {[-0.12, 0, 0.12].map((x) => <mesh key={x} position={[x, 0.035, 0]} rotation-y={Math.PI / 2}><torusGeometry args={[0.09, 0.012, 5, 12, Math.PI]} />{m('#90a4ae')}</mesh>)}
               </group>
               <group position={[-1.55, 0, 0.88]}>
                 <Box m={m} at={[0, 0.17, 0]} s={[0.78, 0.3, 0.12]} c="#8d8d8d" t={concreteTex(1, 1)} />
@@ -281,6 +281,7 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
               {!ghost && <Trims m={m} lvl={lvl} w={w} d={d} h={h} z0={z0} flag="#455a64" />}
               {!ghost && (
                 <group position={[x0 - 0.3, h + 0.36, zf - 0.06]}>
+                  {[-0.5, 0.5].map((x) => <Box key={x} m={m} at={[x, -0.2, -0.08]} s={[0.04, 0.16, 0.04]} c="#37474f" shadow={false} />)}
                   <Box m={m} at={[0, 0, -0.03]} s={[1.36, 0.4, 0.05]} c="#455a64" shadow={false} />
                   <Sign text="BUSINESS PARK" w={1.28} at={[0, 0, 0]} bg="#fafafa" fg="#37474f" />
                 </group>
@@ -297,7 +298,7 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
                 <GlassBlock m={m} ghost={ghost} x={x0} z={z0} y0={y} w={w} d={d} h={uh} tint="#90caf9" frame="#455a64" />
                 {!ghost && [-1.1, -0.55, 0, 0.55, 1.1].map((x) => <Box key={x} m={m} at={[x0 + x, y + uh / 2, zf + 0.03]} s={[0.04, uh, 0.05]} c="#eceff1" shadow={false} />)}
                 <GlassBlock m={m} ghost={ghost} x={x0 - 0.3} z={z0 - 0.2} y0={y + uh + 0.08} w={1.9} d={0.85} h={0.6} tint="#90caf9" frame="#455a64" />
-                <Box m={m} at={[x0 + 1.0, y + uh + 0.13, z0 + 0.2]} s={[0.7, 0.06, 0.8]} c={PAL.grass} />
+                <Box m={m} at={[x0 + 1.005, y + uh + 0.13, z0 + 0.2]} s={[0.71, 0.06, 0.8]} c={PAL.grass} />
                 {!ghost && [0.75, 1.2].map((x) => <Planter key={x} m={m} at={[x0 + x, y + uh + 0.12, z0 + 0.3]} />)}
                 {!ghost && <LitSign text="BUSINESS PARK" w={1.3} at={[x0 - 0.3, y + uh + 0.38, z0 - 0.2 + 0.43]} bg="#37474f" fg="#ffffff" m={m} />}
                 <RoofPlant m={m} at={[x0 - 0.6, y + uh + 0.76, z0 - 0.3]} />
@@ -318,8 +319,7 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
                 <GlassBlock m={m} ghost={ghost} x={tx} z={tz} y0={y + th + 0.08} w={1.5} d={0.75} h={0.5} tint="#90caf9" frame="#455a64" />
                 {!ghost && <LitSign text="BUSINESS PARK" w={1.2} at={[tx, y + th + 0.33, tz + 0.38]} bg="#37474f" fg="#ffffff" m={m} />}
                 <Box m={m} at={[tx, y + th + 0.66, tz]} s={[0.9, 0.08, 0.45]} c={lvl >= 10 ? GOLD : '#455a64'} />
-                <Cyl m={m} at={[tx + 0.3, y + th + 1.0, tz]} r={0.015} r2={0.03} h={0.62} c="#cfd8dc" seg={6} />
-                <mesh position={[tx + 0.3, y + th + 1.33, tz]}><sphereGeometry args={[0.04, 8, 6]} /><primitive object={glowMats.taillight} attach="material" dispose={null} /></mesh>
+                <Beacon m={m} at={[tx + 0.3, y + th + 0.69, tz]} h={0.62} />
                 {!ghost && lvl >= 8 && <Flag at={[tx - 0.5, y + th + 0.7, tz]} color="#455a64" star={lvl >= 10} />}
                 {!ghost && [-1.5, -0.9].map((x) => <Planter key={x} m={m} at={[x, h + 0.12, z0 + 0.35]} />)}
               </group>
@@ -348,7 +348,7 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
           <Box m={m} at={[0, ph + 0.03, -0.25]} s={[3.66, 0.06, 1.46]} c="#263238" />
           {/* Cantilevered entrance canopy with a revolving door under it. */}
           <Box m={m} at={[0.2, 0.7, 0.75]} s={[1.3, 0.05, 0.6]} c="#263238" />
-          <mesh position={[0.2, 0.672, 1.04]}><boxGeometry args={[1.24, 0.015, 0.02]} />{bulb}</mesh>
+          <mesh position={[0.2, 0.672, 1.035]}><boxGeometry args={[1.24, 0.015, 0.02]} />{bulb}</mesh>
           <mesh position={[0.2, 0.3, 0.55]}><cylinderGeometry args={[0.22, 0.22, 0.58, 16, 1, true]} />{ghost ? m('#90a4ae') : <primitive object={glassMat('#cfd8dc')} attach="material" dispose={null} />}</mesh>
           <Cyl m={m} at={[0.2, 0.6, 0.55]} r={0.24} h={0.04} c="#263238" seg={16} />
           {st < 3 ? (
@@ -366,9 +366,8 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
               <LitSign text="APEXCORP" w={1.3} at={[tx, top + 0.29, tz + 0.354]} bg="#0d1b2a" fg="#4fc3f7" ghost={ghost} m={m} />
               {st === 1 ? (
                 <group>
-                  <Cyl m={m} at={[tx + 0.5, top + 0.88, tz - 0.2]} r={0.015} h={0.75} c="#90a4ae" seg={6} />
-                  <mesh position={[tx + 0.5, top + 1.27, tz - 0.2]}><sphereGeometry args={[0.035, 8, 6]} /><primitive object={glowMats.taillight} attach="material" dispose={null} /></mesh>
-                  <RoofPlant m={m} at={[tx - 0.4, top + 0.5, tz - 0.1]} />
+                  <Beacon m={m} at={[tx + 0.5, top + 0.505, tz - 0.2]} h={0.75} r2={0.015} c="#90a4ae" />
+                  <RoofPlant m={m} at={[tx - 0.4, top + 0.51, tz - 0.1]} />
                 </group>
               ) : (
                 <group position={[tx, top + 0.5, tz - 0.05]}>
@@ -377,8 +376,7 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
                   <mesh position={[0, 0.101, 0]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.84, 0.84]} />{m('#ffffff', helipadTex('#4fc3f7', '#fafafa'))}</mesh>
                   {!ghost && <PadLights bulb={bulb} r={0.45} n={8} y={0.12} />}
                   {[-0.45, 0.45].map((x) => <Box key={x} m={m} at={[x, -0.2, 0.3]} rot={[0, 0, x > 0 ? -0.6 : 0.6]} s={[0.04, 0.5, 0.04]} c="#263238" shadow={false} />)}
-                  <Cyl m={m} at={[0.55, 0.55, -0.35]} r={0.015} r2={0.03} h={1.0} c="#90a4ae" seg={6} />
-                  <mesh position={[0.55, 1.07, -0.35]}><sphereGeometry args={[0.035, 8, 6]} /><primitive object={glowMats.taillight} attach="material" dispose={null} /></mesh>
+                  <Beacon m={m} at={[0.55, 0.05, -0.35]} h={1.0} c="#90a4ae" />
                 </group>
               )}
               {trim && lvl >= 5 && <Bulbs from={[tx - tw / 2, top + 0.02, tz + td / 2 + 0.05]} to={[tx + tw / 2, top + 0.02, tz + td / 2 + 0.05]} n={11} />}
@@ -397,9 +395,11 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
                     <group key={x}>
                       <GlassBlock m={m} ghost={ghost} x={x} z={z} y0={ph} w={1.1} d={0.85} h={th2} tint="#a9c4de" frame="#263238" />
                       {!ghost && [-0.33, -0.11, 0.11, 0.33].map((fx) => <Box key={fx} m={m} at={[x + fx, ph + th2 / 2, z + 0.455]} s={[0.025, th2, 0.06]} c="#b0bec5" shadow={false} />)}
-                      <GlassBlock m={m} ghost={ghost} x={x} z={z - 0.02} y0={ph + th2 + 0.08} w={0.78} d={0.6} h={0.36} tint="#a9c4de" frame="#263238" />
-                      <Cyl m={m} at={[x, ph + th2 + 0.95, z - 0.02]} r={0.02} r2={0.06} h={1.0} c={lvl >= 10 ? GOLD : '#cfd8dc'} seg={8} />
-                      <mesh position={[x, ph + th2 + 1.48, z - 0.02]}><sphereGeometry args={[0.04, 8, 6]} /><primitive object={glowMats.taillight} attach="material" dispose={null} /></mesh>
+                      {/* Crown and mast as one piece, so a merged pair keeps the mast on it. */}
+                      <group>
+                        <GlassBlock m={m} ghost={ghost} x={x} z={z - 0.02} y0={ph + th2 + 0.08} w={0.78} d={0.6} h={0.36} tint="#a9c4de" frame="#263238" />
+                        <Beacon m={m} at={[x, ph + th2 + 0.44, z - 0.02]} h={1.0} r={0.02} r2={0.06} c={lvl >= 10 ? GOLD : '#cfd8dc'} />
+                      </group>
                       {trim && <Bulbs from={[x - 0.55, ph + th2 + 0.02, z + 0.47]} to={[x + 0.55, ph + th2 + 0.02, z + 0.47]} n={7} />}
                     </group>
                   )
@@ -416,14 +416,14 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
           {/* Plaza: three flags, a fountain and the boss's car at the kerb. */}
           {!ghost && (
             <group>
-              {[-1.75, -1.5, -1.25].map((x, i) => <Flag key={x} at={[x, 0, 0.62]} color={['#1e3a5f', '#4fc3f7', '#eceff1'][i]} tall={1.1} />)}
+              {[-1.75, -1.5, -1.25].map((x, i) => <Flag key={x} at={[x, 0, 0.6 + i * 0.02]} color={['#1e3a5f', '#4fc3f7', '#eceff1'][i]} tall={1.1} />)}
               <group position={[-0.95, 0, 0.72]}>
                 <Cyl m={m} at={[0, 0.06, 0]} r={0.3} h={0.12} c="#b0bec5" seg={16} />
-                <Cyl m={m} at={[0, 0.115, 0]} r={0.26} h={0.01} c="#4fc3f7" seg={16} />
+                <Cyl m={m} at={[0, 0.119, 0]} r={0.26} h={0.01} c="#4fc3f7" seg={16} />
                 <Cyl m={m} at={[0, 0.2, 0]} r={0.04} h={0.2} c="#b0bec5" seg={8} />
                 <mesh position={[0, 0.33, 0]}><sphereGeometry args={[0.06, 8, 6]} />{m('#e1f5fe')}</mesh>
               </group>
-              <group position={[1.45, 0.04, 0.68]}>
+              <group position={[1.35, 0.04, 0.68]}>
                 <Upright>
                   <group rotation-y={Math.PI / 2} scale={0.85}>
                     <CarModel body="luxury" color="#1a1a2e" />
@@ -457,7 +457,7 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
           {/* Lobby: tall glass on a dark plinth, canopy and doors facing the plaza. */}
           <GlassBlock m={m} ghost={ghost} x={0} z={tz} w={2.5} d={2.3} h={lob} tint="#e0f2f1" frame="#263238" />
           <Box m={m} at={[0, lob + 0.04, tz + 1.3]} s={[1.4, 0.06, 0.5]} c="#263238" />
-          <mesh position={[0, lob + 0.01, tz + 1.54]}><boxGeometry args={[1.36, 0.015, 0.02]} />{bulb}</mesh>
+          <mesh position={[0, lob + 0.01, tz + 1.535]}><boxGeometry args={[1.36, 0.015, 0.02]} />{bulb}</mesh>
           <mesh position={[0, 0.3, tz + 1.156]}><planeGeometry args={[0.6, 0.56]} />{m('#1c2a33')}</mesh>
           {/* Shaft (whole, split by a sky garden, or twisting), upper setback and crown band. */}
           {st === 1 && <GlassBlock m={m} ghost={ghost} x={0} z={tz} y0={lob + 0.08} w={2.1} d={1.9} h={H - lob} tint="#7fd1c7" frame="#eceff1" />}
@@ -468,12 +468,12 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
               <Box m={m} at={[0, g1 + 0.12, tz]} s={[2.0, 0.06, 1.8]} c={PAL.grass} />
               {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => <Box key={`${sx}${sz}`} m={m} at={[sx * 1.0, g1 + 0.3, tz + sz * 0.9]} s={[0.08, 0.5, 0.08]} c="#eceff1" />))}
               {!ghost && [[-0.75, 0.6], [0.75, 0.6], [-0.75, -0.6], [0.75, -0.6], [0, 0.72]].map(([x, z]) => <Planter key={`${x}${z}`} m={m} at={[x, g1 + 0.12, tz + z]} />)}
-              <GlassBlock m={m} ghost={ghost} x={0} z={tz} y0={g1 + 0.5} w={2.1} d={1.9} h={H - g1 - 0.5} tint="#7fd1c7" frame="#eceff1" />
+              <GlassBlock m={m} ghost={ghost} x={0} z={tz} y0={g1 + 0.5} w={2.1} d={1.9} h={H - g1 - 0.42} tint="#7fd1c7" frame="#eceff1" />
             </group>
           )}
           {st === 3 && Array.from({ length: segs }, (_, i) => (
             <group key={i} position={[0, 0, tz]} rotation-y={i * twist}>
-              <GlassBlock m={m} ghost={ghost} x={0} z={0} y0={lob + 0.08 + i * 0.6} w={2.1} d={1.9} h={0.56} tint="#7fd1c7" frame="#eceff1" roof="#eceff1" />
+              <GlassBlock m={m} ghost={ghost} x={0} z={0} y0={lob + 0.08 + i * 0.6} w={2.1} d={1.9} h={i === segs - 1 ? 0.68 : 0.56} tint="#7fd1c7" frame="#eceff1" roof="#eceff1" />
             </group>
           ))}
           {!ghost && <LitSign text="HORIZON" w={1.0} at={[0, lob + 0.17, tz + 1.552]} bg="#004d40" fg="#e0f2f1" m={m} />}
@@ -484,8 +484,7 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
           <mesh position={[0, H + 0.2, tz - 0.96]}><boxGeometry args={[2.1, 0.03, 0.02]} />{bulb}</mesh>
           {/* Spire with an aircraft warning light. */}
           <Box m={m} at={[0, H + 0.98, tz]} s={[0.7, 0.16, 0.6]} c="#eceff1" />
-          <Cyl m={m} at={[0, H + 1.5, tz]} r={0.02} r2={0.07} h={0.9} c="#eceff1" seg={8} />
-          <mesh position={[0, H + 1.97, tz]}><sphereGeometry args={[0.045, 8, 6]} /><primitive object={glowMats.taillight} attach="material" dispose={null} /></mesh>
+          <Beacon m={m} at={[0, H + 1.05, tz]} h={0.9} r={0.02} r2={0.07} c="#eceff1" />
           {!ghost && <LitSign text="HORIZON" w={1.2} at={[0, H + 0.55, tz + 0.656]} bg="#004d40" fg="#a7ffeb" m={m} />}
           {/* Window-cleaning cradle from level 6, roof garden from 4. */}
           {trim && lvl >= 6 && st < 3 && (
@@ -573,10 +572,11 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
           {[-1.5, -0.4].map((x) => <Cyl key={x} m={m} at={[x, 0.36, zf + 1.0]} r={0.025} h={0.72} c="#eceff1" seg={6} />)}
           <mesh position={[-0.95, 0.69, zf + 1.07]}><boxGeometry args={[1.2, 0.015, 0.02]} />{bulb}</mesh>
           {/* Emergency wing: a low block with a drive-through bay and the ambulance. */}
-          <Box m={m} at={[1.2, 0.42, zf + 0.45]} s={[1.5, 0.84, 0.9]} c="#f2f2f2" />
+          <Box m={m} at={[1.198, 0.42, zf + 0.45]} s={[1.496, 0.84, 0.9]} c="#f2f2f2" />
           <Box m={m} at={[1.2, 0.88, zf + 0.45]} s={[1.56, 0.08, 0.96]} c="#d32f2f" />
-          <LitSign text="EMERGENCY" w={1.1} at={[1.2, 0.66, zf + 0.906]} bg="#c62828" fg="#ffffff" ghost={ghost} m={m} />
-          <mesh position={[1.2, 0.3, zf + 0.904]}><planeGeometry args={[0.8, 0.5]} />{m('#37474f')}</mesh>
+          {/* Under the canopy, over the bay door. */}
+          <LitSign text="EMERGENCY" w={0.84} at={[1.2, 0.6, zf + 0.906]} bg="#c62828" fg="#ffffff" ghost={ghost} m={m} />
+          <mesh position={[1.2, 0.25, zf + 0.904]}><planeGeometry args={[0.8, 0.4]} />{m('#37474f')}</mesh>
           <Box m={m} at={[1.2, 0.74, zf + 1.4]} s={[1.5, 0.05, 1.0]} c="#d32f2f" />
           {[0.52, 1.88].flatMap((x) => [zf + 1.05, zf + 1.85].map((z) => <Cyl key={`${x}${z}`} m={m} at={[x, 0.37, z]} r={0.025} h={0.74} c="#eceff1" seg={6} />))}
           <mesh position={[1.2, 0.715, zf + 1.4]}><boxGeometry args={[0.04, 0.012, 0.9]} />{bulb}</mesh>
@@ -639,7 +639,7 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
                   <mesh key={sx}><boxGeometry args={[sx, sy, 0.03]} />{ghost ? m('#d32f2f') : <primitive object={redCross()} attach="material" dispose={null} />}</mesh>
                 ))}
               </group>
-              {!ghost && <LitSign text="MERCY" w={0.8} at={[tx - 0.45, h + tth - 0.55, -1.05 + 0.72]} bg="#fafafa" fg="#c62828" m={m} />}
+              {!ghost && <LitSign text="MERCY" w={0.8} at={[tx - 0.45, h + tth - 0.55, -1.05 + 0.73]} bg="#fafafa" fg="#c62828" m={m} />}
               {/* The old pad's roof becomes a garden for the patients. */}
               <Box m={m} at={[-1.05, h + 0.13, -1.0]} s={[1.2, 0.06, 1.3]} c={PAL.grass} />
               {!ghost && [[-1.4, -0.6], [-0.7, -1.4], [-1.4, -1.4]].map(([x, z]) => <Planter key={`${x}${z}`} m={m} at={[x, h + 0.14, z]} />)}
@@ -692,7 +692,7 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
           <Box m={m} at={[-0.65, 0.66, -0.4]} s={[0.8, 0.04, 0.4]} c="#ff6f00" />
           <mesh position={[-0.65, 0.28, -0.594]}><planeGeometry args={[0.36, 0.5]} />{m('#263238')}</mesh>
           {!ghost && (
-            <group position={[-1.05, th + 0.3, -0.62]}>
+            <group position={[-1.05, th + 0.255, -0.62]}>
               <Box m={m} at={[0, 0, -0.03]} s={[1.24, 0.35, 0.05]} c="#ff6f00" shadow={false} />
               <Sign text="HELIPORT" w={1.16} at={[0, 0, 0]} bg="#fafafa" fg="#e65100" />
             </group>
@@ -705,15 +705,15 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
               {ghost ? m('#90caf9') : <primitive object={glassMat('#90caf9')} attach="material" dispose={null} />}
             </mesh>
             <Cyl m={m} at={[0, ct + 0.43, 0]} r={0.4} r2={0.36} h={0.06} c="#ff6f00" seg={8} />
-            <Cyl m={m} at={[0.15, ct + 0.7, 0]} r={0.01} h={0.5} c="#90a4ae" seg={4} />
-            <mesh position={[0.15, ct + 0.96, 0]}><sphereGeometry args={[0.03, 8, 6]} /><primitive object={glowMats.taillight} attach="material" dispose={null} /></mesh>
+            <Beacon m={m} at={[0.15, ct + 0.45, 0]} h={0.5} r={0.01} r2={0.01} c="#90a4ae" />
             {/* Rotating radar dish. */}
             <Box m={m} at={[-0.15, ct + 0.52, 0]} s={[0.24, 0.05, 0.03]} c="#cfd8dc" />
           </group>
           {/* Hangar: corrugated walls, a curved roof and an open door with a spare helicopter. */}
           <group position={[1.25, 0, -1.5]}>
             <Box m={m} at={[0, 0.4, -0.1]} s={[1.5, 0.8, 0.85]} c="#b0bec5" t={corrugatedTex(2, 1)} />
-            <mesh position={[0, 0.8, -0.1]} rotation-z={Math.PI / 2} castShadow>
+            {/* The curved roof runs front to back, arching over the door like a Quonset hut. */}
+            <mesh position={[0, 0.8, -0.1]} rotation={[Math.PI / 2, Math.PI / 2, 0]} castShadow>
               <cylinderGeometry args={[0.75, 0.75, 0.88, 16, 1, false, 0, Math.PI]} />
               {m('#90a4ae', corrugatedTex(2, 1, true))}
             </mesh>
@@ -769,4 +769,15 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
     default:
       return null
   }
+}
+
+// Aircraft warning light on a mast.
+// One group, so a merged block keeps the light on its mast.
+export function Beacon({ m, at, h = 0.7, r = 0.015, r2 = 0.03, c = '#cfd8dc' }: { m: Mat; at: V3; h?: number; r?: number; r2?: number; c?: string }) {
+  return (
+    <group position={at}>
+      <Cyl m={m} at={[0, h / 2, 0]} r={r} r2={r2} h={h} c={c} seg={6} />
+      <mesh position={[0, h + 0.03, 0]}><sphereGeometry args={[0.04, 8, 6]} /><primitive object={glowMats.taillight} attach="material" dispose={null} /></mesh>
+    </group>
+  )
 }
