@@ -77,6 +77,17 @@ function Pips({ level }: { level: number }) {
   )
 }
 
+// The cars that love this business, as pictures: a tap opens the showroom on one.
+function FanStrip({ fans, go }: { fans: typeof CARS; go: () => void }) {
+  return (
+    <button className="driver-fans" onClick={go} title={fans.map((c) => c.name).join(', ')}>
+      <span className="driver-fans-tag">❤️ +25%</span>
+      {fans.slice(0, 5).map((c) => <CarThumb key={c.id} size="xs" color={c.colors[0]} body={c.body} model={c.id} />)}
+      <span className="driver-fans-go">➜</span>
+    </button>
+  )
+}
+
 // Who drives for this business: pick one of your cars, favourites first.
 function Driver({ b, d }: { b: PlacedBuilding; d: BuildingDef }) {
   const cars = useGame((s) => s.cars)
@@ -91,6 +102,7 @@ function Driver({ b, d }: { b: PlacedBuilding; d: BuildingDef }) {
   const workplace = (uid: string) => buildings.find((o) => o.car === uid && o.uid !== b.uid)
   const sorted = [...cars].sort((x, y) => Number(loves(carDef(y.model), d.id)) - Number(loves(carDef(x.model), d.id)))
   const anyFan = cars.some((c) => loves(carDef(c.model), d.id))
+  const shopFans = () => s.focusShop(fans.some((f) => !f.rescueOnly) ? 'showroom' : 'rescue', fans.find((f) => !f.rescueOnly)?.id ?? null)
 
   if (car && !picking) {
     const cd = carDef(car.model)
@@ -113,9 +125,7 @@ function Driver({ b, d }: { b: PlacedBuilding; d: BuildingDef }) {
             {car.flat ? '🛞 Flat tire' : '⛽ Out of gas'} · Fix
           </button>
         )}
-        {!broken && !loves(cd, d.id) && fans.length > 0 && (
-          <p className="card-stat driver-tip" title={`Cars that love the ${d.name} earn +25%`}>❤️ +25%: {fans.map((c) => c.name).join(', ')}</p>
-        )}
+        {!broken && !loves(cd, d.id) && fans.length > 0 && <FanStrip fans={fans} go={shopFans} />}
       </div>
     )
   }
@@ -123,7 +133,7 @@ function Driver({ b, d }: { b: PlacedBuilding; d: BuildingDef }) {
   return (
     <div className="driver">
       <div className="driver-head">
-        {car ? 'Pick a new driver' : 'Put a car to work here'}
+        {car ? '🚗 New driver' : '🚗 Driver'}
         {picking && <button className="driver-cancel" onClick={() => setPicking(false)}>Cancel</button>}
       </div>
       <p className="card-stat driver-tip" title={`A driver adds +10% to every job, or +25% if it loves the ${d.name}`}>+10% ${n(Math.round(base * 1.1))} · ❤️ +25% ${n(Math.round(base * 1.25))}</p>
@@ -142,11 +152,7 @@ function Driver({ b, d }: { b: PlacedBuilding; d: BuildingDef }) {
         })}
       </div>
       {car && <button className="driver-remove" onClick={() => { assign(b.uid, null); setPicking(false) }}>Take {carDef(car.model).name} off this job</button>}
-      {!anyFan && fans.length > 0 && (
-        <button className="upgrade-short" onClick={() => s.focusShop(fans.some((f) => !f.rescueOnly) ? 'showroom' : 'rescue', fans.find((f) => !f.rescueOnly)?.id ?? null)}>
-          ❤️ +25%: {fans.map((c) => c.name).join(', ')} ➜
-        </button>
-      )}
+      {!anyFan && fans.length > 0 && <FanStrip fans={fans} go={shopFans} />}
     </div>
   )
 }

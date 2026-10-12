@@ -1220,6 +1220,9 @@ button.lvl-item:hover { border-color: var(--accent); transform: translateY(-2px)
 .driver-bonus { font-weight: 800; font-size: 13px; color: #2e7d32; }
 .driver-bonus.off { color: #e65100; }
 .driver-tip { margin: 0; }
+.driver-fans { display: flex; align-items: center; gap: 4px; background: #fff8e1; border: 2px solid #ffca28; border-radius: 12px; padding: 4px 8px; }
+.driver-fans-tag { font: 15px var(--display); color: #ad1457; margin-right: 4px; white-space: nowrap; }
+.driver-fans-go { margin-left: auto; font-weight: 800; color: #6d4c41; }
 .driver-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; max-height: 210px; overflow-y: auto; }
 .driver-pick { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; text-align: left; background: #fafafa; border: 2px solid #e0e0e0; border-radius: 10px; padding: 4px 8px; }
 .driver-pick.fan { border-color: #f48fb1; background: #fff5f8; }
