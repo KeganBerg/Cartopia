@@ -2,8 +2,8 @@ import { useMemo, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { NeutralToneMapping } from 'three'
 import { useGame, openCrate } from '../game/store'
-import { carDef, modDef, ownedModSkins, ownedSkins } from '../game/data'
-import { CRATES, carOdds, crateCost, crateDef, crateOddsShown, dropTier, modChoices, skinOdds, skinOf, type CrateDef, type CrateId, type CrateOpen } from '../game/crates'
+import { MOD_SLOTS, carDef, modDef, ownedModSkins, ownedSkins, type ModDef } from '../game/data'
+import { CRATES, carOdds, crateCost, crateDef, crateOddsShown, dropTier, homeCars, homeMods, modChoices, skinOdds, skinOf, type CrateDef, type CrateId, type CrateOpen } from '../game/crates'
 import { SKIN_TIERS } from '../game/data'
 import { CrateScene, TIER_GLOW, prizeLook, type CratePhase } from '../scene/CrateScene'
 import { CarThumb } from '../scene/BuildingPreview'
@@ -28,12 +28,13 @@ function CrateIcon({ c }: { c: CrateDef }) {
   )
 }
 
-// The odds a crate shows: coins, parts, cars and skins, and on a tap the cars or skins it can hold.
-// Cars and skins you already have are dimmed with a coin, since they pay coins instead, and the
-// parts slice turns to coins once no part in it fits a car of yours.
+// The odds a crate shows: coins, parts, cars and skins, and on a tap the parts, cars or skins it
+// can hold. Cars and skins you already have are dimmed with a coin, since they pay coins instead;
+// the crate's own cars your level hasn't reached yet show a lock. The parts slice turns to coins
+// once no part in it fits a car of yours.
 function Odds({ c, level }: { c: CrateDef; level: number }) {
-  const [open, setOpen] = useState<'car' | 'skin' | null>(null)
-  const o = crateOddsShown(c)
+  const [open, setOpen] = useState<'mod' | 'car' | 'skin' | null>(null)
+  const o = crateOddsShown(c, level)
   const cars = useGame((s) => s.cars)
   const skinIds = useGame((s) => s.skins)
   const modSkinIds = useGame((s) => s.modSkins)
@@ -43,22 +44,40 @@ function Odds({ c, level }: { c: CrateDef; level: number }) {
     const st = { level, claimedSets, skins: skinIds, modSkins: modSkinIds }
     return new Set([...ownedSkins(st).map((id) => 'b:' + id), ...ownedModSkins(st).map((id) => 'p:' + id)])
   }, [level, claimedSets, skinIds, modSkinIds])
-  const noParts = useMemo(() => !modChoices(c, level, cars).length, [c, level, cars])
+  // Parts that can drop now first, then the crate's own parts that can't (locked, owned or no fit).
+  const parts = useMemo(() => {
+    const now = new Set(modChoices(c, level, cars).flatMap((x) => x.mods))
+    const own = homeMods(c).filter((m) => !now.has(m.id))
+    return [...[...now].map((id) => ({ m: modDef(id)!, live: true })), ...own.map((m) => ({ m, live: false }))]
+  }, [c, level, cars])
+  const noParts = !parts.some((x) => x.live)
   const list = useMemo(() => carOdds(c, level).sort((a, b) => b.p - a.p), [c, level])
+  const locked = useMemo(() => homeCars(c).filter((d) => d.unlockLevel > level).sort((a, b) => a.unlockLevel - b.unlockLevel), [c, level])
   const skins = useMemo(() => skinOdds(c).sort((a, b) => b.p - a.p), [c])
-  const pct = (p: number) => p.toFixed(p < 1 ? 1 : 0)
-  const toggle = (k: 'car' | 'skin') => setOpen(open === k ? null : k)
+  const pct = (p: number) => (p < 0.1 ? p.toFixed(2) : p.toFixed(p < 1 ? 1 : 0))
+  const toggle = (k: 'mod' | 'car' | 'skin') => setOpen(open === k ? null : k)
+  const slot = (m: ModDef) => MOD_SLOTS.find((x) => x.id === m.slot)?.icon
   return (
     <div className="crate-odds">
       <div className="crate-odds-row">
         <span className="odd coins" style={{ flex: o.coins }}><b>🪙</b>{o.coins}%</span>
-        <span className={`odd mod${noParts ? ' spent' : ''}`} style={{ flex: o.mod }} title={noParts ? 'No parts left to fit your cars: pays coins' : undefined}><b>{noParts ? '🔧🪙' : '🔧'}</b>{o.mod}%</span>
+        <button className={`odd mod${noParts ? ' spent' : ''}`} style={{ flex: Math.max(o.mod, 14) }} onClick={() => toggle('mod')} aria-expanded={open === 'mod'} title={noParts ? 'No parts left to fit your cars: pays coins' : undefined}><b>{noParts ? '🔧🪙' : '🔧'}</b>{o.mod}%<small>{open === 'mod' ? '▴' : '▾'}</small></button>
         <button className="odd car" style={{ flex: Math.max(o.car, 14) }} onClick={() => toggle('car')} aria-expanded={open === 'car'}><b>🚗</b>{o.car}%<small>{open === 'car' ? '▴' : '▾'}</small></button>
         {o.skin > 0 && <button className="odd skin" style={{ flex: Math.max(o.skin, 14) }} onClick={() => toggle('skin')} aria-expanded={open === 'skin'}><b>✨</b>{o.skin}%<small>{open === 'skin' ? '▴' : '▾'}</small></button>}
       </div>
+      {open === 'mod' && (
+        <div className="crate-cars">
+          {parts.map(({ m, live }) => (
+            <span key={m.id} className={`crate-part${live ? '' : ' off'}${m.bucks ? ' gem' : ''}`} title={live ? m.name : m.unlockLevel > level ? `${m.name} (level ${m.unlockLevel})` : `${m.name} (no car of yours needs it)`}>
+              <i>{slot(m)}</i>
+              <small>{m.unlockLevel > level ? `🔒${m.unlockLevel}` : m.name}</small>
+            </span>
+          ))}
+        </div>
+      )}
       {open === 'car' && (
         <div className="crate-cars">
-          {list.length ? list.map((x) => {
+          {list.map((x) => {
             const d = carDef(x.model)
             return (
               <span key={x.model} className={`crate-car${have.has(x.model) ? ' owned' : ''}`} title={have.has(x.model) ? `${d.name} (owned: pays coins)` : d.name}>
@@ -66,7 +85,14 @@ function Odds({ c, level }: { c: CrateDef; level: number }) {
                 <small>{pct(x.p * o.car)}%</small>
               </span>
             )
-          }) : <span className="crate-none">No cars at your level yet</span>}
+          })}
+          {locked.map((d) => (
+            <span key={d.id} className="crate-car locked" title={`${d.name} (level ${d.unlockLevel})`}>
+              <CarThumb size="xs" body={d.body} model={d.id} color={d.colors[0]} />
+              <small>🔒{d.unlockLevel}</small>
+            </span>
+          ))}
+          {!list.length && !locked.length && <span className="crate-none">No cars at your level yet</span>}
         </div>
       )}
       {open === 'skin' && (

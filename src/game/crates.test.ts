@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { CARS, MOD_SKINS, SKINS, carDef, modDef, modFits } from './data'
-import { CRATES, carValue, crateCars, crateDef, crateSkins, crateTables, crateValue, modChoices, rollCrate, skinOdds, type CrateDrop } from './crates'
+import { CARS, MODS, MOD_SKINS, SKINS, carDef, modDef, modFits } from './data'
+import { CRATES, carCrate, carValue, carWorth, crateCars, crateDef, crateOdds, crateSkins, crateTables, crateValue, homeCars, homeMods, modChoices, modCrate, modWorth, rollCrate, skinOdds, type CrateDrop } from './crates'
 
 const dir = new URL('../../supabase/migrations/', import.meta.url)
 // The newest migration holding the crate tables.
@@ -32,9 +32,54 @@ describe('crates', () => {
         const cars = crateCars(c, level)
         for (const car of cars) {
           expect(car.unlockLevel).toBeLessThanOrEqual(level)
-          expect(car.rescueOnly || car.season).toBeFalsy()
-          if (!c.gemCars) expect(car.bucks ?? 0).toBe(0)
+          expect(car.season).toBeFalsy()
+          if (c.pay === 'coins') expect(car.bucks ?? 0).toBe(0)
         }
+      }
+    }
+  })
+
+  it('puts every car and part in one crate by what it is worth', () => {
+    for (const car of CARS) {
+      const home = carCrate(car)
+      // Season prize cars are only won on the season track.
+      if (car.season || car.parked) { expect(home).toBeNull(); continue }
+      expect(home, car.id).not.toBeNull()
+      if (car.bucks) expect(crateDef(home!)!.pay).toBe('bucks')
+    }
+    for (const m of MODS) if (m.bucks) expect(crateDef(modCrate(m))!.pay).toBe('bucks')
+    // Dearer crates hold dearer things: each coin-priced car or part is worth more than every one
+    // in the crates below.
+    for (let i = 1; i < CRATES.length; i++) {
+      const below = CRATES.slice(0, i)
+      const top = (xs: number[]) => Math.max(0, ...xs)
+      const carsBelow = top(below.flatMap((c) => homeCars(c).filter((x) => !x.bucks).map(carWorth)))
+      for (const car of homeCars(CRATES[i]).filter((x) => !x.bucks)) expect(carWorth(car), car.id).toBeGreaterThan(carsBelow)
+      const modsBelow = top(below.flatMap((c) => homeMods(c).filter((x) => !x.bucks).map(modWorth)))
+      for (const m of homeMods(CRATES[i]).filter((x) => !x.bucks)) expect(modWorth(m), m.id).toBeGreaterThan(modsBelow)
+    }
+  })
+
+  it('gives the crate below\'s cars and parts until its own are in reach', () => {
+    const diamond = crateDef('diamond')!
+    const own = new Set(homeCars(diamond).map((x) => x.id))
+    expect(crateCars(diamond, 10).length).toBeGreaterThan(0)
+    expect(crateCars(diamond, 10).some((x) => own.has(x.id))).toBe(false)
+    expect(crateCars(diamond, 50).every((x) => own.has(x.id))).toBe(true)
+    // A two-car garage soon runs out of Diamond parts, then gets Gold ones.
+    const parts = modChoices(diamond, 20, garage).flatMap((x) => x.mods)
+    expect(parts.length).toBeGreaterThan(0)
+  })
+
+  it('keeps the car slice worth no more than its share of the crate', () => {
+    for (const c of CRATES) {
+      for (const level of [c.unlockLevel, 12, 24, 40, 50]) {
+        if (level < c.unlockLevel) continue
+        const o = crateOdds(c, level)
+        expect(o.coins + o.jackpot + o.mod + o.car + o.skin).toBeCloseTo(100)
+        const pool = crateCars(c, level)
+        const avg = pool.length / pool.reduce((a, x) => a + 1 / carValue(x, level), 0)
+        expect((o.car / 100) * avg).toBeLessThanOrEqual(c.carShare * crateValue(c, level) + 1e-6)
       }
     }
   })

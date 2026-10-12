@@ -29,7 +29,8 @@
 .crate-odds .odd b { font-weight: normal; font-size: 13px; }
 .crate-odds .odd small { font-size: 10px; opacity: .8; }
 .odd.coins { background: linear-gradient(#f9a825, #c17900); }
-.odd.mod { background: linear-gradient(#9575cd, #5e35b1); }
+.odd.mod { background: linear-gradient(#9575cd, #5e35b1); cursor: pointer; }
+.crate-odds button.odd { min-width: max-content; }
 .odd.skin { background: linear-gradient(#ec407a, #ad1457); cursor: pointer; }
 .odd.car { background: linear-gradient(#ff9800, #e65100); cursor: pointer; }
 .crate-cars { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin-top: 5px; max-height: 128px; overflow-y: auto; }
@@ -78,3 +79,12 @@
 .crate-car.owned > *, .crate-skin.owned > * { opacity: .45; }
 .crate-car.owned::after, .crate-skin.owned::after { content: '🪙'; position: absolute; top: -4px; right: -4px; font-size: 11px; }
 .odd.mod.spent { filter: saturate(.35); }
+/* Parts: the slot's icon and the part's name; gem parts glow blue. Greyed when none of your cars can take it. */
+.crate-part { display: flex; flex-direction: column; align-items: center; gap: 1px; width: 52px; padding: 3px 2px 2px; border-radius: 8px; background: rgba(149,117,205,.22); }
+.crate-part i { font-style: normal; font-size: 18px; line-height: 22px; }
+.crate-part small { font: 10px/1.1 var(--display); color: #d1c4e9; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.crate-part.gem { background: rgba(79,195,247,.22); box-shadow: inset 0 0 0 1px rgba(179,229,252,.5); }
+.crate-part.off > * { opacity: .4; }
+/* Not yet: the crate's own cars your level hasn't reached. */
+.crate-car.locked > * { opacity: .4; }
+.crate-car.locked small { opacity: .8; color: #cfd8dc; }
