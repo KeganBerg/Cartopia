@@ -1,6 +1,6 @@
 /* The photosensitivity warning (FlashWarning.tsx). It sits over the loading
    screen on first launch, so it comes above #splash. */
-.flash-warn { position: fixed; inset: 0; z-index: 2147483100; display: grid; place-items: center; padding: 16px; background: rgba(10, 16, 40, .55); }
+.flash-warn { position: fixed; inset: 0; z-index: 2147483100; display: grid; place-items: center; padding: 16px; background: rgba(8, 12, 30, .72); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); touch-action: none; }
 .fw-card { width: min(380px, 100%); background: var(--sheet); border: 3px solid var(--line); border-radius: 18px; box-shadow: 0 6px 0 var(--line), 0 14px 30px rgba(0,0,0,.35); overflow: hidden; font-family: Nunito, system-ui, sans-serif; color: var(--line); }
 .fw-head { display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: linear-gradient(#ffd43b, #ff9f1a); border-bottom: 3px solid var(--line); }
 .fw-bolt { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--line); font-size: 20px; line-height: 1; box-shadow: 0 2px 0 rgba(0,0,0,.25); }
