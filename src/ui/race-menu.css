@@ -27,7 +27,7 @@
 /* Live player: drag challenge and kart challenge side by side. */
 .rm-qc-pair { margin-top: auto; display: flex; gap: 6px; }
 .rm-qc-pair .buy { flex: 1; min-width: 0; }
-.rm-qc-pair .buy + .buy { flex: 0 0 auto; width: auto; padding-left: 10px; padding-right: 10px; }
+.rm-qc-pair .buy + .buy { flex: 0 0 auto; width: auto; padding: 0 10px; display: grid; place-items: center; font-size: 24px; line-height: 1; }
 .rm-qc-signin { cursor: pointer; }
 
 /* ---------- shared ---------- */
