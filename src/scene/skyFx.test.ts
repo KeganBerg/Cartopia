@@ -16,14 +16,6 @@ describe('skyFx', () => {
     expect(skyFx(at('clear'), NOON, 'summer').banks).toBe(0)
   })
 
-  it('sends sun shafts at sunrise, never in fog, a downpour or at noon on a clear day', () => {
-    expect(skyFx(at('clear'), SUNRISE, 'summer').rays).toBeGreaterThan(0.5)
-    expect(skyFx(at('fog'), NOON, 'fall').rays).toBe(0)
-    expect(skyFx(at('rain'), SUNRISE, 'summer').rays).toBe(0)
-    expect(skyFx(at('clear'), NOON, 'summer').rays).toBe(0)
-    expect(skyFx(at('fog'), MIDNIGHT, 'fall').rays).toBe(0)
-  })
-
   it('puts a rainbow up while the streets dry after a shower, by day and not in winter', () => {
     expect(skyFx(at('clearing', { wet: 0.7 }), NOON, 'summer').rainbow).toBe(1)
     expect(skyFx(at('clearing', { wet: 0 }), NOON, 'summer').rainbow).toBe(0)

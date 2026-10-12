@@ -2,11 +2,11 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import {
   AdditiveBlending, BufferAttribute, Color, DoubleSide, InstancedBufferAttribute, InstancedBufferGeometry, Mesh, Object3D, OrthographicCamera,
-  ShaderMaterial, Vector2, Vector3,
+  ShaderMaterial, Vector3,
 } from 'three'
 import { weatherNow } from '../game/weather'
 import { dayPhase, nightAmount } from './dayNight'
-import { lightDir, townLook } from './look'
+import { lightDir } from './look'
 import { skyUniforms } from './weatherLook'
 import { frameFor, type Frame } from './Weather'
 import { isFree } from './freeCam'
@@ -14,19 +14,10 @@ import { lowSun, sky, skyFx } from './skyFx'
 import { fogUniforms } from './heightFog'
 import { haloSpots, haloVersion } from './halos'
 
-// The air over town: fog rolling along the ground, shafts of sun, a rainbow
+// The air over town: fog rolling along the ground, a rainbow
 // after a shower and lamps haloed in the damp. Each is one instanced draw, and
 // draws nothing at all while it's not needed.
 
-
-const NOISE = /* glsl */ `
-float aHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-float aNoise(vec2 p) {
-  vec2 i = floor(p), f = fract(p);
-  f = f * f * (3.0 - 2.0 * f);
-  return mix(mix(aHash(i), aHash(i + vec2(1, 0)), f.x), mix(aHash(i + vec2(0, 1)), aHash(i + vec2(1, 1)), f.x), f.y);
-}
-`
 
 // ---------- Ground fog ----------
 // The fog itself is in every material's fog chunk (heightFog.ts); this sets it
@@ -48,6 +39,9 @@ const DAWN_LIT = new Color('#ffe6cc')
 const NIGHT_SHADE = new Color('#232a40')
 const NIGHT_LIT = new Color('#3e4766')
 function GroundFog() {
+  const camera = useThree((s) => s.camera)
+  const scene = useThree((s) => s.scene)
+  const size = useThree((s) => s.size)
   useEffect(() => () => { fogUniforms.uHF.value = 0 }, [])
   useFrame((_, dt) => {
     const b = sky.banks
@@ -65,109 +59,26 @@ function GroundFog() {
     u.uHFPatch.value = st.patch
     u.uHFScale.value = st.scale
     u.uHFGlow.value = 0.85 * night
+    // Phones skip the fine wisps: one layer of noise per pixel instead of two.
+    u.uHFDetail.value = Math.min(size.width, size.height) < 700 ? 0 : 1
     const step = Math.min(dt, 0.1) * (0.01 + w.wind * 0.04)
     u.uHFDrift.value.x += step
     u.uHFDrift.value.y += step * 0.45
     // Bright white by day, warm at sunrise and sunset, deep blue by night.
     u.uHFShade.value.copy(DAY_SHADE).lerp(NIGHT_SHADE, night)
     u.uHFLit.value.copy(DAY_LIT).lerp(DAWN_LIT, lowSun(phase) * 0.7).lerp(NIGHT_LIT, night)
+    // In the free view the far haze has its own colour; the ground fog takes it on
+    // so the two blend into one another instead of reading as two layers.
+    const haze = scene.fog && 'color' in scene.fog ? scene.fog.color : null
+    if (isFree(camera) && haze) {
+      u.uHFShade.value.copy(haze).multiplyScalar(0.94)
+      u.uHFLit.value.copy(haze).lerp(u.uHFLit.value, 0.35)
+    }
     // The fog is mixed in after the output colour conversion, so it's given in sRGB.
     u.uHFShade.value.convertLinearToSRGB()
     u.uHFLit.value.convertLinearToSRGB()
   })
   return null
-}
-
-// ---------- Sun shafts ----------
-// Shafts of light fanning across the view from the side the sun is on, slowly
-// shifting, like sun streaming through gaps in cloud or a thinning fog. Drawn
-// over the whole view in one pass: they hang in the air between the camera and
-// the town.
-const RAY_VERT = /* glsl */ `
-varying vec2 vNdc;
-void main() {
-  vNdc = position.xy;
-  gl_Position = vec4(position.xy, 0.0, 1.0);
-}
-`
-const RAY_FRAG = /* glsl */ `
-uniform vec3 uColor;
-uniform float uOpacity;
-uniform float uTime;
-uniform float uAspect;
-uniform vec2 uSrc;
-varying vec2 vNdc;
-${NOISE}
-void main() {
-  vec2 p = vec2(vNdc.x * uAspect, vNdc.y);
-  vec2 d = p - uSrc;
-  float r = length(d);
-  // Angle measured from the line through the middle of the view, so the seam
-  // where the angle wraps round stays off screen.
-  vec2 axis = normalize(-uSrc);
-  float a = atan(axis.x * d.y - axis.y * d.x, dot(axis, d));
-  float n = aNoise(vec2(a * 14.0 + uTime * 0.02, uTime * 0.04)) * 0.6 + aNoise(vec2(a * 41.0 - uTime * 0.03, 5.0 + uTime * 0.05)) * 0.4;
-  float ray = smoothstep(0.5, 0.86, n);
-  // A tall narrow (phone) view is close to the source all across, so fade faster there.
-  float rr = r / min(1.0, uAspect);
-  float reach = 1.0 / (1.0 + rr * rr * 0.12);
-  float glow = exp(-rr * 0.9);
-  gl_FragColor = vec4(uColor, (ray * reach + glow * 0.3) * uOpacity);
-  #include <colorspace_fragment>
-}
-`
-
-const SUN_WARM = new Color('#ff9f55')
-const MOON_BEAM = new Color('#9fb6e0')
-function SunShafts() {
-  const camera = useThree((s) => s.camera)
-  const size = useThree((s) => s.size)
-  const mesh = useMemo(() => {
-    const g = new InstancedBufferGeometry()
-    g.setAttribute('position', new BufferAttribute(new Float32Array([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0]), 3))
-    g.setIndex([0, 1, 2, 0, 2, 3])
-    g.instanceCount = 1
-    const m = new ShaderMaterial({
-      vertexShader: RAY_VERT, fragmentShader: RAY_FRAG, transparent: true, depthWrite: false, depthTest: false, blending: AdditiveBlending,
-      uniforms: { uTime: { value: 0 }, uAspect: { value: 1 }, uSrc: { value: new Vector2() }, uColor: { value: new Color() }, uOpacity: { value: 0 } },
-    })
-    const mesh = new Mesh(g, m)
-    mesh.frustumCulled = false
-    mesh.raycast = () => {}
-    mesh.renderOrder = 8
-    mesh.visible = false
-    return mesh
-  }, [])
-  useEffect(() => () => { mesh.geometry.dispose(); (mesh.material as ShaderMaterial).dispose() }, [mesh])
-  const dir = useMemo(() => new Vector3(), [])
-  useFrame(({ clock }) => {
-    const sun = sky.rays
-    const moon = sky.moon
-    let o = Math.max(sun, moon)
-    mesh.visible = o > 0.01
-    if (!mesh.visible) return
-    const u = (mesh.material as ShaderMaterial).uniforms
-    const phase = dayPhase()
-    lightDir(phase, nightAmount(phase), dir)
-    // Where the sun sits relative to the view: the shafts fan out from just off that edge.
-    dir.transformDirection(camera.matrixWorldInverse)
-    const aspect = size.width / Math.max(1, size.height)
-    const flat = Math.hypot(dir.x, dir.y)
-    // In the free view the sun has to be somewhere ahead to stream into the view.
-    if (isFree(camera)) o *= Math.min(1, Math.max(0, (-dir.z + 0.2) / 0.5))
-    else o *= Math.min(1, flat / 0.25)
-    const k = 1 / Math.max(0.001, flat)
-    // Pushed out past the edge of the view in the sun's direction.
-    const edge = Math.min(aspect / Math.max(0.001, Math.abs(dir.x * k)), 1 / Math.max(0.001, Math.abs(dir.y * k)))
-    u.uSrc.value.set(dir.x * k, dir.y * k).multiplyScalar(edge * 1.08)
-    u.uAspect.value = aspect
-    u.uTime.value = clock.elapsedTime
-    if (sun >= moon) u.uColor.value.copy(townLook.sun).lerp(SUN_WARM, 0.8)
-    else u.uColor.value.copy(MOON_BEAM)
-    // Soft warm shafts that add a glow without washing the town out.
-    u.uOpacity.value = o * 0.13
-  })
-  return <primitive object={mesh} />
 }
 
 // ---------- Rainbow ----------
@@ -366,7 +277,6 @@ export function Atmosphere() {
     <>
       <SkyClock />
       <GroundFog />
-      <SunShafts />
       <Rainbow />
       <LampHalos />
     </>
