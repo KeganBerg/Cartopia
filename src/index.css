@@ -1924,6 +1924,8 @@ button.book-car { font: inherit; color: inherit; }
 
 /* The CARS window's four tabs fit a small phone without their emoji. */
 @media (max-width: 400px) { .tab-emo { display: none; } }
+/* The Shop's Recreation tab reads "Rec" on a phone. */
+@media (max-width: 600px) { .tab-long { display: none; } }
 /* Town news waits while a race fills the screen. */
 body:has(.race-full) .toasts { display: none; }
 .rf-hold { position: absolute; left: 0; right: 0; bottom: calc(200px + var(--sab)); width: fit-content; margin: 0 auto; padding: 6px 16px; border-radius: 999px; background: rgba(27,31,36,.7); color: #ffd54f; font: 18px var(--display); pointer-events: none; white-space: nowrap; }
