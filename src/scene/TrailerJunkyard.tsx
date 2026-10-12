@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import type { Group, Mesh } from 'three'
 import { CarModel } from './CarModel'
 import { Upright } from './mergeScale'
+import { PEOPLE_SIZED } from './keepShape'
 import { SEASON, PAL } from './season'
 import { brickTex, concreteTex, corrugatedTex, gravelTex, paverTex, shingleTex, sidingTex, soilTex } from './textures'
 import { Ball, Box, Bulbs, Cyl, Flag, GOLD, Patch, Pool, Sign, type EdgeProps, type Mat, type V3 } from './edgeKit'
@@ -46,7 +47,7 @@ function SingleWide({ m, win, bulb, at, rot = 0, len = 1.45, color, stripe, ghos
         <mesh position={[0.12, 0.38, zf - 0.005]}><planeGeometry args={[0.15, 0.32]} />{m('#b0bec5')}</mesh>
         <Box m={m} at={[0, 0.58, zf + 0.03]} s={[0.5, 0.02, 0.18]} c={stripe} rot={[0.25, 0, 0]} />
         <Box m={m} at={[-len / 2 - 0.06, 0.17, 0]} s={[0.3, 0.04, 0.06]} c="#37474f" />
-        <Box m={m} at={[-len / 2 - 0.17, 0.075, 0]} s={[0.03, 0.15, 0.03]} c="#37474f" />
+        <Box m={m} at={[-len / 2 - 0.16, 0.075, 0]} s={[0.03, 0.15, 0.03]} c="#37474f" />
         {!ghost && <mesh position={[0.12, 0.6, zf + 0.03]}><boxGeometry args={[0.06, 0.05, 0.04]} />{bulb}</mesh>}
       </group>
     )
@@ -78,13 +79,13 @@ function SingleWide({ m, win, bulb, at, rot = 0, len = 1.45, color, stripe, ghos
       <mesh position={[0.15, 0.44, zf + 0.009]}><planeGeometry args={[0.09, 0.09]} />{win}</mesh>
       <Box m={m} at={[0.15, 0.64, zf + 0.17]} s={[0.46, 0.02, 0.34]} c="#cfd8dc" rot={[0.08, 0, 0]} />
       {[-0.06, 0.36].map((x) => <Cyl key={x} m={m} at={[x, 0.32, zf + 0.32]} r={0.01} h={0.64} c="#b0bec5" seg={5} />)}
-      <Box m={m} at={[0.15, 0.13, zf + 0.12]} s={[0.26, 0.04, 0.12]} c="#8d6e63" />
-      <Box m={m} at={[0.15, 0.06, zf + 0.22]} s={[0.26, 0.04, 0.1]} c="#8d6e63" />
+      <Box m={m} at={[0.15, 0.075, zf + 0.12]} s={[0.26, 0.15, 0.12]} c="#8d6e63" />
+      <Box m={m} at={[0.15, 0.04, zf + 0.23]} s={[0.26, 0.08, 0.1]} c="#8d6e63" />
       {!ghost && <mesh position={[0.32, 0.5, zf + 0.02]}><boxGeometry args={[0.05, 0.05, 0.04]} />{bulb}</mesh>}
       {/* Hitch tongue still on the end, a propane bottle and a window AC unit. */}
       <Box m={m} at={[-len / 2 - 0.08, 0.18, 0]} s={[0.22, 0.035, 0.05]} c="#37474f" rot={[0, 0.0, 0]} />
       <Cyl m={m} at={[-len / 2 - 0.16, 0.1, 0]} r={0.015} h={0.16} c="#37474f" seg={5} />
-      <group position={[-len / 2 + 0.05, 0.15, -zf - 0.08]}>
+      <group position={[-len / 2 + 0.05, 0, -zf - 0.08]}>
         <Cyl m={m} at={[0, 0.1, 0]} r={0.055} h={0.2} c="#fafafa" seg={10} />
         <Ball m={m} at={[0, 0.21, 0]} r={0.055} c="#fafafa" />
       </group>
@@ -119,7 +120,8 @@ function Grill({ m, at }: { m: Mat; at: V3 }) {
   return (
     <group position={at}>
       <mesh position={[0, 0.2, 0]} castShadow><sphereGeometry args={[0.07, 10, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />{m('#212121')}</mesh>
-      <mesh position={[0, 0.2, 0]} castShadow><sphereGeometry args={[0.07, 10, 4, 0, Math.PI * 2, 0, Math.PI / 3]} />{m('#263238')}</mesh>
+      {/* The lid sits on the bowl's rim. */}
+      <mesh position={[0, 0.165, 0]} castShadow><sphereGeometry args={[0.07, 10, 4, 0, Math.PI * 2, 0, Math.PI / 3]} />{m('#263238')}</mesh>
       {[0, 2.1, 4.2].map((a) => <Cyl key={a} m={m} at={[Math.sin(a) * 0.04, 0.08, Math.cos(a) * 0.04]} r={0.006} h={0.17} c="#424242" seg={4} />)}
     </group>
   )
@@ -127,7 +129,8 @@ function Grill({ m, at }: { m: Mat; at: V3 }) {
 
 function Mailbox({ m, at, c = '#37474f' }: { m: Mat; at: V3; c?: string }) {
   return (
-    <group position={at}>
+    // One people-sized piece, so a merged lot keeps the box on its post.
+    <group position={at} userData={PEOPLE_SIZED}>
       <Box m={m} at={[0, 0.17, 0]} s={[0.03, 0.34, 0.03]} c="#6d4c41" />
       <Box m={m} at={[0, 0.37, 0]} s={[0.08, 0.07, 0.14]} c={c} />
       <Box m={m} at={[0.045, 0.39, -0.03]} s={[0.01, 0.06, 0.02]} c="#e53935" shadow={false} />
@@ -215,10 +218,10 @@ function DoubleWide({ m, win, bulb, lvl, color, roof, trim, ghost }: { m: Mat; w
       {!ghost && <mesh position={[0.25, 0.5, zf + 0.02]}><boxGeometry args={[0.05, 0.05, 0.04]} />{bulb}</mesh>}
       {/* Wooden deck along the front with rails and steps. */}
       <Box m={m} at={[0.05, 0.13, zf + 0.22]} s={[1.15, 0.04, 0.44]} c="#a1887f" t={paverTex(3, 1)} />
-      {[-0.5, -0.1, 0.3, 0.6].map((x) => <Box key={x} m={m} at={[x, 0.06, zf + 0.42]} s={[0.04, 0.12, 0.04]} c="#795548" />)}
+      {[-0.5, -0.1, 0.3, 0.6].map((x) => <Box key={x} m={m} at={[x, 0.06, zf + 0.416]} s={[0.04, 0.12, 0.04]} c="#795548" />)}
       <Box m={m} at={[-0.22, 0.3, zf + 0.43]} s={[0.66, 0.025, 0.025]} c="#8d6e63" />
       {[-0.5, -0.38, -0.26, -0.14, -0.02, 0.1].map((x) => <Box key={x} m={m} at={[x, 0.22, zf + 0.43]} s={[0.015, 0.16, 0.015]} c="#8d6e63" shadow={false} />)}
-      <Box m={m} at={[0.45, 0.08, zf + 0.52]} s={[0.26, 0.03, 0.14]} c="#8d6e63" />
+      <Box m={m} at={[0.45, 0.0475, zf + 0.51]} s={[0.26, 0.095, 0.14]} c="#8d6e63" />
       {/* Level 5: string lights over the deck. Level 6: a hot tub out back. */}
       {!ghost && lvl >= 5 && (
         <group>
@@ -276,7 +279,7 @@ function TrailerHome({ m, win, bulb, ghost, lvl, color, roof }: EdgeProps) {
             <Flamingo m={m} at={[0.38, 0, 0.78]} rot={0.4} />
             <Grill m={m} at={[-0.26, 0, 0.12]} />
             <LawnChair m={m} at={[0.2, 0, 0.12]} rot={-2.4} c="#26a69a" />
-            <Mailbox m={m} at={[0.88, 0, 0.6]} />
+            <Mailbox m={m} at={[0.88, 0, 0.7]} />
             <Mailbox m={m} at={[-0.95, 0, 0.6]} c="#1565c0" />
           </group>
         )}
@@ -357,7 +360,7 @@ function Tyres({ m, at, n }: { m: Mat; at: V3; n: number }) {
     <group position={at}>
       {Array.from({ length: n }, (_, i) => (
         <mesh key={i} position={[((i * 37) % 3) * 0.02, 0.05 + i * 0.09, ((i * 53) % 3) * 0.02]} rotation-x={Math.PI / 2} castShadow>
-          <torusGeometry args={[0.11, 0.045, 6, 12]} />
+          <torusGeometry args={[0.11, 0.045, 8, 12]} />
           {m('#263238')}
         </mesh>
       ))}
@@ -409,7 +412,7 @@ export function Crane({ m, at }: { m: Mat; at: V3 }) {
           {[-0.24, 0, 0.24].map((x) => <Cyl key={x} m={m} at={[x, 0.08, z]} r={0.055} h={0.13} c="#455a64" seg={8} rot={[Math.PI / 2, 0, 0]} />)}
         </group>
       ))}
-      <Cyl m={m} at={[0, 0.2, 0]} r={0.16} h={0.08} c="#37474f" seg={12} />
+      <Cyl m={m} at={[0, 0.19, 0]} r={0.16} h={0.08} c="#37474f" seg={12} />
       <group ref={top} userData={LIVE}>
         <Box m={m} at={[0.05, 0.36, 0]} s={[0.5, 0.24, 0.36]} c="#ffb300" />
         <Box m={m} at={[0.26, 0.33, 0]} s={[0.14, 0.2, 0.38]} c="#455a64" />
@@ -480,10 +483,17 @@ export function Crusher({ m, at, bulb }: { m: Mat; at: V3; bulb: ReactNode }) {
 function Junkyard({ m, win, bulb, ghost, lvl, lift }: EdgeProps) {
   const stack = 3 + Math.min(5, Math.floor(lvl / 2))
   const archH = 1.25 + lift * 0.3
-  // Fence panels: corrugated, mismatched, round the back and sides.
+  // Fence panels: corrugated, mismatched, round the back and sides. They
+  // overlap a little, so every other one stands a clear step further in (no
+  // two overlapping faces in one plane: see coplanar.test.tsx).
   const panels: [number, number, boolean][] = []
-  for (let x = -1.72; x <= 1.75; x += 0.31) panels.push([x, -1.88, false])
-  for (let z = -1.57; z <= 1.0; z += 0.31) panels.push([-1.88, z, true], [1.88, z, true])
+  const step = (n: number) => (n % 2) * 0.008
+  let n = 0
+  for (let x = -1.72; x <= 1.75; x += 0.31) panels.push([x, -1.88 + step(n++), false])
+  for (let z = -1.57; z <= 1.0; z += 0.31) {
+    panels.push([-1.88 + step(n), z, true], [1.88 - step(n), z, true])
+    n++
+  }
   return (
     <group>
       {/* Packed dirt yard with a concrete drive from the gate to the crusher. */}
@@ -496,7 +506,8 @@ function Junkyard({ m, win, bulb, ghost, lvl, lift }: EdgeProps) {
         <Box key={i} m={m} at={[x, 0.31 + (i % 3) * 0.02, z]} s={side ? [0.03, 0.62 + (i % 2) * 0.05, 0.32] : [0.32, 0.62 + (i % 2) * 0.05, 0.03]}
           c={['#90a4ae', '#a1887f', '#78909c', '#b0855f', '#8d9a8e'][i % 5]} t={corrugatedTex(1, 1)} />
       ))}
-      {[-1.88, 1.88].map((x) => [-1.88, -0.6, 0.65].map((z) => <Box key={`${x}${z}`} m={m} at={[x, 0.36, z]} s={[0.06, 0.72, 0.06]} c="#546e7a" />))}
+      {/* Posts a touch outside the fence line, so a merged yard's never sit flush with a panel. */}
+      {[-1.89, 1.89].map((x) => [-1.89, -0.6, 0.65].map((z) => <Box key={`${x}${z}`} m={m} at={[x, 0.36, z]} s={[0.06, 0.72, 0.06]} c="#546e7a" />))}
       {/* Chain-link front with barbed wire on top, either side of the gate. */}
       {[[-1.88, -0.48], [0.78, 1.88]].map(([a, b]) => (
         <group key={a}>
@@ -541,7 +552,7 @@ function Junkyard({ m, win, bulb, ghost, lvl, lift }: EdgeProps) {
           <group position={[0.15, 0, -0.55]}>
             <Box m={m} at={[0, 0.11, 0]} s={[0.24, 0.22, 0.26]} c="#8d6e63" />
             <mesh position={[0, 0.27, 0]} rotation-y={Math.PI / 4} castShadow><coneGeometry args={[0.2, 0.12, 4]} />{m('#c62828')}</mesh>
-            <mesh position={[0, 0.1, 0.131]}><planeGeometry args={[0.1, 0.14]} />{m('#212121')}</mesh>
+            <mesh position={[0, 0.1, 0.134]}><planeGeometry args={[0.1, 0.14]} />{m('#212121')}</mesh>
             <group position={[0.02, 0, 0.26]}>
               <mesh position={[0, 0.09, 0]} scale={[0.7, 0.6, 1.3]} castShadow><sphereGeometry args={[0.07, 8, 6]} />{m('#4e342e')}</mesh>
               <Ball m={m} at={[0, 0.14, 0.09]} r={0.045} c="#4e342e" />

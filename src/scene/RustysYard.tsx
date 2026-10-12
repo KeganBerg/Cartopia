@@ -50,7 +50,7 @@ function Cyl({ m, at, r, r2 = r, h, c, seg = 12, rot }: { m: Mat; at: V3; r: num
 function Tyre({ m, at, rot = [Math.PI / 2, 0, 0] }: { m: Mat; at: V3; rot?: V3 }) {
   return (
     <mesh position={at} rotation={rot} castShadow>
-      <torusGeometry args={[0.11, 0.05, 6, 12]} />
+      <torusGeometry args={[0.11, 0.05, 8, 12]} />
       {m('#263238')}
     </mesh>
   )

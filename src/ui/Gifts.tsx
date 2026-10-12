@@ -81,7 +81,7 @@ export function GiftsPanel() {
   return (
     <Panel title="Friends helped you!">
       {inbox.length === 0 ? (
-        <p className="hint">Nothing waiting. When friends help your town or send a gift, it shows up here.</p>
+        <p className="hint" title="Friend helps and gifts show up here">🎁 Nothing waiting</p>
       ) : (
         <>
           <div className="cards rows gift-list">
