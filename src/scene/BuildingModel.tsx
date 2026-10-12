@@ -122,7 +122,7 @@ function RoofProp({ prop, y }: { prop: NonNullable<BuildingDef['prop']>; y: numb
 }
 
 // The grown Speedway: a roof canopy over the stands and a big screen in the gap
-// (level 4), then a full ring roof with VIP suites and light pylons (level 7).
+// (level 4), then a full ring roof with VIP suites (level 7).
 function SpeedwayGrown({ m, sh, roof, lvl, ghost }: { m: ReturnType<typeof useMat>; sh: number; roof: string; lvl: number; ghost?: boolean }) {
   const full = growthStage(lvl) === 3
   const a0 = full ? 0 : Math.PI * 0.15
@@ -159,15 +159,6 @@ function SpeedwayGrown({ m, sh, roof, lvl, ghost }: { m: ReturnType<typeof useMa
             <cylinderGeometry args={[1.98, 1.98, 0.32, 48, 1, true]} />
             {ghost ? m('#90caf9') : <primitive object={glassMat('#90caf9')} attach="material" dispose={null} />}
           </mesh>
-          {!ghost && [0.25, 0.75, 1.25, 1.75].map((t) => {
-            const a = Math.PI * t
-            return (
-              <group key={t} position={[Math.sin(a) * 2.3, 0, Math.cos(a) * 2.3]}>
-                <mesh position={[0, (y + 1.4) / 2, 0]} castShadow><cylinderGeometry args={[0.04, 0.07, y + 1.4, 6]} />{m('#90a4ae')}</mesh>
-                <mesh position={[0, y + 1.45, 0]} rotation-y={a + Math.PI}><boxGeometry args={[0.5, 0.26, 0.06]} /><primitive object={glowMats.bulb} attach="material" dispose={null} /></mesh>
-              </group>
-            )
-          })}
           {!ghost && <Lights from={[-1.4, y + 0.16, 1.45]} to={[1.4, y + 0.16, 1.45]} n={14} />}
         </group>
       )}
@@ -180,6 +171,80 @@ function SpeedwayGrown({ m, sh, roof, lvl, ghost }: { m: ReturnType<typeof useMa
         </group>
       )}
     </group>
+  )
+}
+
+// The Speedway's name board: hung on cables under a lattice gantry that spans
+// the infield on two truss towers, with a lamp at each end lighting the
+// board. Kept as one upright piece so a merged speedway can't pull the board
+// off its gantry.
+function SpeedwayGantry({ m, y, roof, ghost }: { m: ReturnType<typeof useMat>; y: number; roof: string; ghost?: boolean }) {
+  const span = 1.06
+  const top = y + 0.5
+  const steel = '#b0bec5'
+  const lamp = ghost ? m('#fff8e1') : <primitive object={glowMats.bulb} attach="material" dispose={null} />
+  return (
+    <Upright>
+      {[-span, span].map((x) => <Truss key={x} m={m} at={[x, 0, 0]} h={top + 0.08} w={0.16} c={steel} />)}
+      {/* Tower feet: concrete pads on the infield. */}
+      {[-span, span].map((x) => <mesh key={x} position={[x, 0.11, 0]} castShadow><boxGeometry args={[0.24, 0.06, 0.24]} />{m('#9e9e9e')}</mesh>)}
+      {/* The beam: two chords with zig-zag bracing between them, capped in the track colour. */}
+      {[top - 0.06, top + 0.06].map((cy) => (
+        <mesh key={cy} position={[0, cy, 0]} castShadow><boxGeometry args={[span * 2 + 0.18, 0.035, 0.12]} />{m(steel)}</mesh>
+      ))}
+      {Array.from({ length: 10 }, (_, i) => (
+        <mesh key={i} position={[-span + ((i + 0.5) * span * 2) / 10, top, 0]} rotation-z={i % 2 ? 0.75 : -0.75}>
+          <boxGeometry args={[0.018, 0.15, 0.1]} />
+          {m(steel)}
+        </mesh>
+      ))}
+      <mesh position={[0, top + 0.095, 0]} castShadow><boxGeometry args={[span * 2 + 0.22, 0.03, 0.15]} />{m(roof)}</mesh>
+      {/* Cables from the beam down to the board's frame, with clamp plates. */}
+      {[-0.62, 0.62].map((x) => (
+        <group key={x} position={[x, 0, 0]}>
+          <mesh position={[0, (y + 0.27 + top - 0.08) / 2, 0]}><cylinderGeometry args={[0.008, 0.008, top - 0.08 - (y + 0.27), 5]} />{m('#37474f')}</mesh>
+          <mesh position={[0, top - 0.085, 0]}><boxGeometry args={[0.06, 0.015, 0.08]} />{m('#37474f')}</mesh>
+          <mesh position={[0, y + 0.275, 0]}><boxGeometry args={[0.05, 0.03, 0.06]} />{m('#37474f')}</mesh>
+        </group>
+      ))}
+      {/* The board: a steel frame lettered on both faces. */}
+      <mesh position={[0, y, 0]} castShadow><boxGeometry args={[1.86, 0.52, 0.05]} />{m('#37474f')}</mesh>
+      <Sign text="SPEEDWAY" w={1.8} y={y} z={0.027} bg="#c62828" fg="#ffffff" />
+      <group rotation-y={Math.PI}><Sign text="SPEEDWAY" w={1.8} y={y} z={0.027} bg="#c62828" fg="#ffffff" /></group>
+      {/* Spot lamps on the beam's front, tipped down at the board. */}
+      {[-0.85, 0.85].map((x) => (
+        <group key={x} position={[x, top - 0.1, 0.12]} rotation-x={0.6}>
+          <mesh position={[0, 0, -0.04]}><boxGeometry args={[0.03, 0.03, 0.08]} />{m('#37474f')}</mesh>
+          <mesh><cylinderGeometry args={[0.04, 0.03, 0.07, 10]} />{m('#263238')}</mesh>
+          <mesh position={[0, -0.036, 0]} rotation-x={Math.PI / 2}><circleGeometry args={[0.032, 10]} />{lamp}</mesh>
+        </group>
+      ))}
+    </Upright>
+  )
+}
+
+// A stadium floodlight: a tapered mast with a ladder, a catwalk and a dark
+// housing of lamps tipped down at the infield, so it reads as a light from
+// behind and glows from in front.
+function Floodlight({ m, h, face, bulb }: { m: ReturnType<typeof useMat>; h: number; face: number; bulb: ReactNode }) {
+  return (
+    <Upright>
+      <mesh position={[0, h / 2, 0]} castShadow><cylinderGeometry args={[0.035, 0.06, h, 8]} />{m('#90a4ae')}</mesh>
+      <mesh position={[0, 0.04, 0]}><cylinderGeometry args={[0.1, 0.11, 0.08, 10]} />{m('#9e9e9e')}</mesh>
+      <group rotation-y={face}>
+        {/* Ladder up the back of the mast. */}
+        {[-0.03, 0.03].map((x) => <mesh key={x} position={[x, h / 2, -0.065]}><boxGeometry args={[0.008, h - 0.1, 0.008]} />{m('#78909c')}</mesh>)}
+        {/* Catwalk and rail under the lamps. */}
+        <mesh position={[0, h - 0.06, 0.04]}><boxGeometry args={[0.5, 0.02, 0.16]} />{m('#78909c')}</mesh>
+        <mesh position={[0, h + 0.0, -0.035]}><boxGeometry args={[0.5, 0.012, 0.012]} />{m('#78909c')}</mesh>
+        <group position={[0, h + 0.13, 0.06]} rotation-x={0.45}>
+          <mesh castShadow><boxGeometry args={[0.46, 0.26, 0.07]} />{m('#37474f')}</mesh>
+          {[-0.15, 0, 0.15].flatMap((x) => [-0.06, 0.06].map((yy) => (
+            <mesh key={`${x}${yy}`} position={[x, yy, 0.036]}><circleGeometry args={[0.048, 12]} />{bulb}</mesh>
+          )))}
+        </group>
+      </group>
+    </Upright>
   )
 }
 
@@ -768,13 +833,12 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
               <meshStandardMaterial color={['#ffca28', '#42a5f5', '#ef5350'][i]} side={2} />
             </mesh>
           ))}
-          {/* Floodlight towers that light the track at night. */}
-          {!ghost && [[-1.6, 1.6], [1.6, 1.6]].map(([x, z]) => (
-            <group key={x} position={[x, 0, z]}>
-              <group>
-                <mesh position={[0, 1.1 + lift / 2, 0]} castShadow><cylinderGeometry args={[0.04, 0.06, 2.2 + lift, 6]} />{m('#90a4ae')}</mesh>
-                <mesh position={[0, 2.25 + lift, 0]} rotation-y={Math.atan2(-x, -z)}><boxGeometry args={[0.4, 0.22, 0.06]} />{bulb}</mesh>
-              </group>
+          {/* Floodlight towers that light the track at night, on every corner
+              but the one facing the camera so none stands in front of the sign.
+              They rise over the roof once it closes into a ring. */}
+          {!ghost && [[-1.6, 1.6], [1.6, -1.6], [-1.6, -1.6]].map(([x, z]) => (
+            <group key={`${x}${z}`} position={[x, 0, z]}>
+              <Floodlight m={m} h={growthStage(lvl) === 3 ? sh + 2.05 : 2.2 + lift} face={Math.atan2(-x, -z)} bulb={bulb} />
               <LightPool r={1.3} x={-x * 0.5} z={-z * 0.5} y={0.1} />
             </group>
           ))}
@@ -794,7 +858,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
           })}
           {!ghost && <SpeedwayDetail sh={sh} roof={def.roof} />}
           {lvl >= 4 && <SpeedwayGrown m={m} sh={sh} roof={def.roof} lvl={lvl} ghost={ghost} />}
-          {sign && <Sign text="SPEEDWAY" w={2} y={1.25 + lift * 0.5} z={0} bg="#c62828" fg="#ffffff" />}
+          {sign && <SpeedwayGantry m={m} y={1.25 + lift * 0.5} roof={def.roof} ghost={ghost} />}
         </group>
       )
     }
