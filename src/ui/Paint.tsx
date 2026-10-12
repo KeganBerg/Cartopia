@@ -1,6 +1,7 @@
 import { useGame, liveDeal, paintPrice, type OwnedCar } from '../game/store'
-import { FINISHES, PAINTS, STRIPES, dealOffer, finishDef, paintJobCost, type PaintJob } from '../game/data'
-import { PAINTS_TO_COLLECT, paintOpen, paintsOpen, rivalForPaint } from '../game/paintRivals'
+import { FINISHES, PAINTS, STRIPES, dealOffer, finishDef, paintJobCost, type Finish, type PaintJob } from '../game/data'
+import { MASTERY_TIERS, masteryTier } from '../game/mastery'
+import { PAINTS_TO_COLLECT, earnHint, paintOpen, paintsOpen, rivalForPaint } from '../game/paintRivals'
 import { openPaintRival } from './PaintRivals'
 
 export const jobOf = (car: OwnedCar): PaintJob => ({ color: car.color, finish: car.finish ?? 'gloss', stripe: car.stripe ?? null })
@@ -12,7 +13,10 @@ const SHEEN = {
   gloss: 'radial-gradient(circle at 32% 28%, rgba(255,255,255,.75) 0 14%, transparent 34%)',
   matte: 'none',
   chrome: 'linear-gradient(135deg, rgba(255,255,255,.85) 0 18%, rgba(0,0,0,.25) 38%, rgba(255,255,255,.6) 55%, rgba(0,0,0,.3) 78%, rgba(255,255,255,.7))',
-} as const
+  bronze: 'linear-gradient(135deg, rgba(255,214,170,.7) 0 18%, rgba(110,60,20,.55) 45%, rgba(255,214,170,.5) 70%, rgba(110,60,20,.5))',
+  silver: 'linear-gradient(135deg, rgba(255,255,255,.8) 0 18%, rgba(120,130,140,.55) 45%, rgba(255,255,255,.55) 70%, rgba(120,130,140,.5))',
+  gold: 'linear-gradient(135deg, rgba(255,240,170,.8) 0 18%, rgba(170,120,10,.55) 45%, rgba(255,240,170,.55) 70%, rgba(170,120,10,.5))',
+} as const satisfies Record<Finish, string>
 
 // Paint shop for one car: tap a colour, finish or stripe to try it on the preview, then buy the lot.
 export function PaintShop({ car, job, setJob }: { car: OwnedCar; job: PaintJob; setJob: (j: PaintJob | null) => void }) {
@@ -21,8 +25,11 @@ export function PaintShop({ car, job, setJob }: { car: OwnedCar; job: PaintJob; 
   const deals = useGame((s) => s.deals)
   const rivalRow = useGame((s) => s.rivalRow)
   const oldPaints = useGame((s) => s.oldPaints)
+  const road = useGame((s) => s.road)
+  const cups = useGame((s) => s.cups)
+  const tier = useGame((s) => masteryTier(s.mastery, car.model))
   const now = jobOf(car)
-  const open = (color: string) => color === now.color || paintOpen({ rivalRow, oldPaints }, color)
+  const open = (color: string) => color === now.color || paintOpen({ rivalRow, oldPaints, road, cups }, color)
   // A locked colour can be tried on; the bar then points at the rival who has it.
   const lockedBy = open(job.color) ? null : rivalForPaint(job.color)
   const changed = !same(job, now)
@@ -54,7 +61,9 @@ export function PaintShop({ car, job, setJob }: { car: OwnedCar; job: PaintJob; 
       <h4>Finish</h4>
       <div className="finishes">
         {FINISHES.map((f) => {
-          const locked = level < f.unlockLevel && now.finish !== f.id
+          const earn = f.mastery ? MASTERY_TIERS[f.mastery - 1] : undefined
+          const shut = !!earn && tier < f.mastery! && now.finish !== f.id
+          const locked = (level < f.unlockLevel && now.finish !== f.id) || shut
           return (
             <button
               key={f.id}
@@ -64,7 +73,7 @@ export function PaintShop({ car, job, setJob }: { car: OwnedCar; job: PaintJob; 
             >
               <i className="finish-chip" style={{ backgroundColor: job.color, backgroundImage: SHEEN[f.id] }} />
               <b>{f.name}</b>
-              <small>{locked ? `🔒 Level ${f.unlockLevel}` : now.finish === f.id ? 'Yours' : <FinishPrice id={f.id} coins={f.coins} level={level} deals={deals} />}</small>
+              <small title={earn ? f.blurb : undefined}>{shut ? `🔒 ${earn!.icon}` : locked ? `🔒 Level ${f.unlockLevel}` : now.finish === f.id ? 'Yours' : earn ? `${earn.icon} Free` : <FinishPrice id={f.id} coins={f.coins} level={level} deals={deals} />}</small>
             </button>
           )
         })}
@@ -77,7 +86,7 @@ export function PaintShop({ car, job, setJob }: { car: OwnedCar; job: PaintJob; 
           return (
             <button
               key={p.color}
-              title={`${p.name}${p.bucks ? ' (1 gem)' : r ? ` · beat ${r.name}` : ''}`}
+              title={`${p.name}${p.bucks ? ' (1 gem)' : r ? ` · beat ${r.name}` : locked && p.earn ? ` · ${earnHint(p.color)}` : ''}`}
               aria-label={locked ? `${p.name}, locked` : p.name}
               className={`dot big${p.color === job.color ? ' sel' : ''}${p.bucks ? ' premium' : ''}${locked ? ' locked' : ''}`}
               style={{ backgroundColor: p.color, backgroundImage: SHEEN[job.finish] }}

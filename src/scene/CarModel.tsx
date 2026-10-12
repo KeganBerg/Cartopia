@@ -1177,13 +1177,13 @@ function modSkinNumbers(modSkin?: Partial<Record<SkinnedSlot, string>> | null) {
 // The body paint: glossy, matte or chrome, with a skin (by number) drawn into it. Rust is always flat.
 // panels: custom panel paint and patterns, placed by `zones` (none: only a body pattern).
 function PaintMaterial({ color, finish, rusty, highlight, skin = 0, panels, zones }: { color: string; finish?: Finish | null; rusty?: boolean; highlight?: boolean; skin?: number; panels?: Panels | null; zones?: Zones }) {
-  const [metal, rough, lift] = rusty ? [0.1, 0.95, 0] : FINISH_LOOK[finish ?? 'gloss'] ?? FINISH_LOOK.gloss
-  const tint = useMemo(() => (lift ? '#' + new Color(color).lerp(new Color('#ffffff'), lift).getHexString() : color), [color, lift])
+  const [metal, rough, lift, toward = '#ffffff'] = rusty ? [0.1, 0.95, 0] : FINISH_LOOK[finish ?? 'gloss'] ?? FINISH_LOOK.gloss
+  const tint = useMemo(() => (lift ? '#' + new Color(color).lerp(new Color(toward), lift).getHexString() : color), [color, lift, toward])
   const gl = useThree((s) => s.gl)
   const env = !rusty && finish === 'chrome' ? chromeEnv(gl) : null
   const pan = !rusty && paintsPanels(panels)
   const [uni] = useState(panelUniforms)
-  if (pan) setPanels(uni, panels, tint, (c) => (lift ? '#' + new Color(c).lerp(new Color('#ffffff'), lift).getHexString() : c), zones)
+  if (pan) setPanels(uni, panels, tint, (c) => (lift ? '#' + new Color(c).lerp(new Color(toward), lift).getHexString() : c), zones)
   const hook = useMemo(() => (skin || pan ? {
     onBeforeCompile: (sh: Parameters<typeof withSkin>[0]) => {
       if (pan) withPanels(sh, uni)
@@ -1197,8 +1197,8 @@ function PaintMaterial({ color, finish, rusty, highlight, skin = 0, panels, zone
 // The same paint as PaintMaterial, for baking (any finish but chrome).
 // A chrome car with a skin bakes as chrome-like metal, without its studio reflections.
 function paintLook(color: string, finish?: Finish | null, rusty?: boolean, skin = 0): Look {
-  const [metal, rough, lift] = rusty ? [0.1, 0.95, 0] : FINISH_LOOK[finish ?? 'gloss'] ?? FINISH_LOOK.gloss
-  return { color: lift ? '#' + new Color(color).lerp(new Color('#ffffff'), lift).getHexString() : color, metal: Math.min(metal, 0.75), rough: Math.max(rough, skin ? 0.2 : 0), glow: true, skin }
+  const [metal, rough, lift, toward = '#ffffff'] = rusty ? [0.1, 0.95, 0] : FINISH_LOOK[finish ?? 'gloss'] ?? FINISH_LOOK.gloss
+  return { color: lift ? '#' + new Color(color).lerp(new Color(toward), lift).getHexString() : color, metal: Math.min(metal, 0.75), rough: Math.max(rough, skin ? 0.2 : 0), glow: true, skin }
 }
 
 // Toy-style car: bevelled extruded body and cabin so no edge is a hard box corner. Faces +z.

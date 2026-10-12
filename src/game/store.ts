@@ -11,7 +11,7 @@ import { opensLabel } from './clock'
 import { requestTrip, requestVisit } from './trips'
 import { trialPrize } from './trial'
 import { RIVALS, RIVAL_VISITS, RIVAL_BACK_MS, type RivalProgress } from './rivals'
-import { paintOpen, paintRival, rivalForPaint, rowPrize } from './paintRivals'
+import { earnHint, paintOpen, paintRival, rivalForPaint, rowPrize } from './paintRivals'
 import { tunerPrize, tunerTrial } from './tuner'
 import { tourIsBoss, tourLegBonus, tourLegOf, tourPrize } from './tour'
 import { EVENT_RACES, eventBonus, eventFor, eventIsBoss, eventPrize, eventProgress, type EventProgress } from './events'
@@ -21,6 +21,10 @@ import { togglePick } from './meet'
 import { crateCost, crateDef, pityHit, rollCrate, type CrateId, type CrateOpen } from './crates'
 import { LIVE_LOSS_SHARE, LOSS_SHARE, boostFor, boostLabel, emptyBoosts, welcomeBack, type BoostMode, type Boosts } from './boosts'
 import { claim, type WagerEntry } from './wager'
+import { masteryTier, noteRace, type Mastery, type MasteryMode } from './mastery'
+import { roadOpen, roadPatternIndex, roadPrize, roadReached } from './trophyRoad'
+import { cupPrize, cupRace, cupWon } from './cups'
+import type { CarClassId } from './classes'
 
 // rot: quarter turns the player chose (0 faces south). Unset means face the nearest road.
 // level: upgrade level 1-10 (see MAX_BUILDING_LEVEL); unset means 1.
@@ -107,6 +111,12 @@ export type SaveState = {
   rivalRow: Record<string, number>
   // Tuner Trials (game/tuner.ts): wins in each. Some first wins unlock a paint pattern.
   tuner?: Record<string, number>
+  // Car mastery by car model (game/mastery.ts): race counts and tiers reached.
+  mastery?: Record<string, Mastery>
+  // Trophy Road stops claimed (game/trophyRoad.ts).
+  road?: number
+  // Class Cups (game/cups.ts): wins in each race.
+  cups?: Record<string, number>
   // True for towns from before paint rivals, which keep every colour they could already buy.
   oldPaints?: boolean
   // Pro Tour races won (game/tour.ts); the next race is this one.
@@ -167,6 +177,10 @@ type UiState = {
   paintPrize: string | null
   // A Tuner Trial just won for the first time: its id.
   tunerPrize: string | null
+  // A mastery tier just reached: the car model and the tier (1-4).
+  masteryPrize: { model: string; tier: number } | null
+  // A Class Cup just won in full: its class (its colour is now unlocked).
+  cupPrize: CarClassId | null
   // The signed-in player's clan, shown on the Crew House.
   clanBadge: { tag: string; emblem: string; color: string } | null
   // Level-up splash: the levels just reached and the rewards they paid.
@@ -203,6 +217,14 @@ type Actions = {
   finishRace: (won: boolean, reward: number, opts?: { mode?: BoostMode; live?: boolean; loss?: number }) => void
   // Coming back after a long break turns on the welcome-back bonus.
   noteAway: (ms: number) => void
+  // A drag race finished in a car: counts towards its mastery, and pays any tier it reaches.
+  masteryRace: (model: string, won: boolean, mode: MasteryMode, upset: boolean) => void
+  closeMasteryPrize: () => void
+  // Claims every Trophy Road stop the trophies reach.
+  claimRoad: () => void
+  // A Class Cup race finished (game/cups.ts).
+  cupResult: (id: string, won: boolean) => void
+  closeCupPrize: () => void
   // A ghost race against a crewmate: no prize, but it counts as a race for the crew goal and battle.
   crewRace: () => void
   // Arcade mini games pay a little coin and XP (see game/arcade.ts).
@@ -427,6 +449,9 @@ export function starterTown(): SaveState {
     rivals: {},
     rivalRow: {},
     tuner: {},
+    mastery: {},
+    road: 0,
+    cups: {},
     oldPaints: false,
     tour: 0,
     event: null,
@@ -734,6 +759,8 @@ export const useGame = create<GameState>()(
       eventPrize: null,
       paintPrize: null,
       tunerPrize: null,
+      masteryPrize: null,
+      cupPrize: null,
       levelUp: null,
 
       // Building, roads and land edit your own town, which isn't on screen while visiting.
@@ -1216,6 +1243,58 @@ export const useGame = create<GameState>()(
 
       noteAway: (ms) => set((s) => ({ boosts: welcomeBack(s.boosts, ms) })),
 
+      masteryRace: (model, won, mode, upset) => {
+        const s = get()
+        const { next, reached } = noteRace(s.mastery?.[model], won, mode, upset)
+        const bucks = reached.reduce((a, t) => a + t.bucks, 0)
+        const trophies = reached.reduce((a, t) => a + t.trophies, 0)
+        if (reached.length) setTimeout(sfx.levelUp, 300)
+        set({
+          mastery: { ...s.mastery, [model]: next },
+          ...(reached.length ? { bucks: s.bucks + bucks, trophies: s.trophies + trophies, masteryPrize: { model, tier: next.tier } } : {}),
+          updatedAt: Date.now(),
+        })
+      },
+
+      closeMasteryPrize: () => set({ masteryPrize: null }),
+
+      claimRoad: () => {
+        const s = get()
+        const from = s.road ?? 0
+        const to = roadReached(s.trophies)
+        if (to <= from) return
+        let coins = 0
+        let parts = 0
+        for (let i = from; i < to; i++) {
+          const p = roadPrize(i)
+          coins += p.coins ?? 0
+          parts += p.parts ?? 0
+        }
+        sfx.levelUp()
+        set({
+          road: to,
+          coins: s.coins + coins,
+          parts: s.parts + parts,
+          stats: { ...s.stats, coinsEarned: (s.stats.coinsEarned ?? 0) + coins },
+          updatedAt: Date.now(),
+        })
+      },
+
+      cupResult: (id, won) => {
+        const s = get()
+        const r = cupRace(id)
+        if (!r) return
+        const wins = s.cups?.[id] ?? 0
+        s.finishRace(won, cupPrize(r, wins === 0))
+        if (!won) return
+        const cups = { ...s.cups, [id]: wins + 1 }
+        const full = !cupWon(s.cups, r.cls) && cupWon(cups, r.cls)
+        if (full) setTimeout(sfx.levelUp, 200)
+        set((g) => ({ cups, cupPrize: full ? r.cls : g.cupPrize, updatedAt: Date.now() }))
+      },
+
+      closeCupPrize: () => set({ cupPrize: null }),
+
       crewRace: () => {
         const s = get()
         set({ stats: { ...s.stats, races: (s.stats.races ?? 0) + 1 }, updatedAt: Date.now() })
@@ -1504,11 +1583,15 @@ export const useGame = create<GameState>()(
         if (!car || (!paint && job.color !== car.color) || !fin || !STRIPES.includes(job.stripe)) return false
         if (job.color !== car.color && !paintOpen(s, job.color)) {
           const r = rivalForPaint(job.color)
-          s.toast(r ? `Beat ${r.name} to unlock ${paint!.name}` : 'That colour is locked')
+          s.toast(r ? `Beat ${r.name} to unlock ${paint!.name}` : paint?.earn ? `${paint.name}: ${earnHint(job.color)}` : 'That colour is locked')
           return false
         }
         if (s.level < fin.unlockLevel && fin.id !== (car.finish ?? 'gloss')) {
           s.toast(`${fin.name} unlocks at level ${fin.unlockLevel}`)
+          return false
+        }
+        if (fin.mastery && masteryTier(s.mastery, car.model) < fin.mastery && fin.id !== car.finish) {
+          s.toast(`Reach ${fin.name} mastery in this car to unlock it`)
           return false
         }
         const { coins, bucks, deal } = paintPrice(s, car, job)
@@ -1545,13 +1628,21 @@ export const useGame = create<GameState>()(
           // Rival colours stay locked panel by panel too, but a panel keeps the colour it has.
           if (v.color && v.color !== was?.[pn.id]?.color && !paintOpen(s, v.color)) {
             const r = rivalForPaint(v.color)
-            s.toast(r ? `Beat ${r.name} to unlock that colour` : 'That colour is locked')
+            s.toast(r ? `Beat ${r.name} to unlock that colour` : earnHint(v.color) || 'That colour is locked')
             return false
           }
           const pat = v.pattern ? PATTERNS.find((p) => p.id === v.pattern) : undefined
           if (v.pattern && !pat) return false
           if (pat?.trial && !((s.tuner?.[pat.trial] ?? 0) > 0) && was?.[pn.id]?.pattern !== pat.id) {
             s.toast(`Win ${tunerTrial(pat.trial)?.name ?? 'a Tuner Trial'} to unlock ${pat.name}`)
+            return false
+          }
+          if (pat?.mastery && masteryTier(s.mastery, car.model) < pat.mastery && was?.[pn.id]?.pattern !== pat.id) {
+            s.toast(`Reach ${pat.name} mastery in this car to unlock it`)
+            return false
+          }
+          if (pat?.road && !roadOpen(s.road, roadPatternIndex(pat.id)) && was?.[pn.id]?.pattern !== pat.id) {
+            s.toast(`Win ${pat.name} on the Trophy Road`)
             return false
           }
           if (pat && s.level < pat.unlockLevel && was?.[pn.id]?.pattern !== pat.id) {
@@ -2105,14 +2196,14 @@ export const useGame = create<GameState>()(
 )
 
 export function saveOf(s: GameState): SaveState {
-  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, cratePity, boosts, wagers, season, deals, trials, rivals, rivalRow, tuner, oldPaints, tour, event, showcase, raceCar, skins, modSkins, land, updatedAt } = s
-  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, cratePity: cratePity ?? {}, boosts: boosts ?? emptyBoosts(), ...(wagers ? { wagers } : {}), season, deals, trials, rivals, rivalRow, tuner: tuner ?? {}, oldPaints: !!oldPaints, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, land, updatedAt }
+  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, cratePity, boosts, wagers, season, deals, trials, rivals, rivalRow, tuner, mastery, road, cups, oldPaints, tour, event, showcase, raceCar, skins, modSkins, land, updatedAt } = s
+  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, cratePity: cratePity ?? {}, boosts: boosts ?? emptyBoosts(), ...(wagers ? { wagers } : {}), season, deals, trials, rivals, rivalRow, tuner: tuner ?? {}, mastery: mastery ?? {}, road: road ?? 0, cups: cups ?? {}, oldPaints: !!oldPaints, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, land, updatedAt }
 }
 
 // Fields added after launch, so older saves load with sensible values.
-function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'quests' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'gp' | 'campaign' | 'claimedSets' | 'crewChests' | 'visits' | 'crates' | 'cratePity' | 'boosts' | 'wagers' | 'season' | 'deals' | 'trials' | 'rivals' | 'rivalRow' | 'tuner' | 'tour' | 'event' | 'showcase' | 'skins' | 'modSkins' | 'land'> {
+function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'quests' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'gp' | 'campaign' | 'claimedSets' | 'crewChests' | 'visits' | 'crates' | 'cratePity' | 'boosts' | 'wagers' | 'season' | 'deals' | 'trials' | 'rivals' | 'rivalRow' | 'tuner' | 'mastery' | 'road' | 'cups' | 'tour' | 'event' | 'showcase' | 'skins' | 'modSkins' | 'land'> {
   // Saves from before the tutorial existed skip it.
-  return { stats: emptyStats(), claimedGoals: [], quests: null, lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, gp: {}, campaign: {}, claimedSets: [], crewChests: 0, visits: 0, crates: 0, cratePity: {}, boosts: emptyBoosts(), wagers: 0, season: null, deals: null, trials: { claimed: {} }, rivals: {}, rivalRow: {}, tuner: {}, tour: 0, event: null, showcase: [], skins: [], modSkins: [], land: [...START_LAND] }
+  return { stats: emptyStats(), claimedGoals: [], quests: null, lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, gp: {}, campaign: {}, claimedSets: [], crewChests: 0, visits: 0, crates: 0, cratePity: {}, boosts: emptyBoosts(), wagers: 0, season: null, deals: null, trials: { claimed: {} }, rivals: {}, rivalRow: {}, tuner: {}, mastery: {}, road: 0, cups: {}, tour: 0, event: null, showcase: [], skins: [], modSkins: [], land: [...START_LAND] }
 }
 
 

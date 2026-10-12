@@ -925,7 +925,7 @@ export const servicePay = (level: number, kind: 'tires' | 'gas') => (kind === 't
 export const gasCanCost = (level: number) => 30 + level * 15
 export const flatFixCost = (level: number) => 50 + level * 25
 
-export const PAINTS: { color: string; name: string; bucks?: number }[] = [
+export const PAINTS: { color: string; name: string; bucks?: number; earn?: 'road' | 'cup' }[] = [
   { color: '#e53935', name: 'Fire Red' }, { color: '#fb8c00', name: 'Sunset' }, { color: '#fdd835', name: 'Taxi' },
   { color: '#43a047', name: 'Racing Green' }, { color: '#00acc1', name: 'Lagoon' }, { color: '#1e88e5', name: 'Royal Blue' },
   { color: '#3949ab', name: 'Midnight' }, { color: '#8e24aa', name: 'Grape' }, { color: '#ec407a', name: 'Bubblegum' },
@@ -936,6 +936,15 @@ export const PAINTS: { color: string; name: string; bucks?: number }[] = [
   { color: '#00796b', name: 'Deep Teal' },
   { color: '#ffd700', name: 'Gold Flake', bucks: 1 }, { color: '#76ff03', name: 'Neon Lime', bucks: 1 },
   { color: '#ff00e5', name: 'Hot Magenta', bucks: 1 }, { color: '#00e5ff', name: 'Ice Neon', bucks: 1 },
+  // Earned only: on the Trophy Road (game/trophyRoad.ts) or by winning a Class Cup (game/cups.ts).
+  { color: '#6fdcab', name: 'Mint', earn: 'road' }, { color: '#ffb38a', name: 'Peach', earn: 'road' },
+  { color: '#2446c8', name: 'Cobalt', earn: 'road' }, { color: '#e0a899', name: 'Rose Gold', earn: 'road' },
+  { color: '#f4e04d', name: 'Lemon', earn: 'road' }, { color: '#5b2a6e', name: 'Plum', earn: 'road' },
+  { color: '#ff6f00', name: 'Tangerine', earn: 'road' }, { color: '#4a535c', name: 'Gunmetal', earn: 'road' },
+  { color: '#9fd8cb', name: 'Sea Glass', earn: 'road' }, { color: '#d2042d', name: 'Cherry', earn: 'road' },
+  { color: '#a4e22b', name: 'Zest', earn: 'cup' }, { color: '#c1440e', name: 'Rust Orange', earn: 'cup' },
+  { color: '#0f7b5f', name: 'Paddock Green', earn: 'cup' }, { color: '#1a1446', name: 'Afterburner', earn: 'cup' },
+  { color: '#c8a165', name: 'Sandstorm', earn: 'cup' }, { color: '#ff4fa3', name: 'Bubblegum Pop', earn: 'cup' },
 ]
 // The colours every new town can paint with. The rest are won from paint rivals (game/paintRivals.ts).
 export const STARTER_PAINTS = ['#e53935', '#1e88e5', '#fafafa', '#212121']
@@ -946,15 +955,24 @@ export const PAINT_COST = 150
 export const STRIPE_COST = 100
 
 // How the paint catches the light. Glossy is the factory finish every car comes with.
-export type Finish = 'gloss' | 'matte' | 'chrome'
-export const FINISHES: { id: Finish; name: string; coins: number; unlockLevel: number; blurb: string }[] = [
+// Bronze, Silver and Gold are mastery finishes (game/mastery.ts): free, but only on a car
+// model whose mastery has reached that tier (`mastery`), never sold.
+export type Finish = 'gloss' | 'matte' | 'chrome' | 'bronze' | 'silver' | 'gold'
+export const FINISHES: { id: Finish; name: string; coins: number; unlockLevel: number; blurb: string; mastery?: number }[] = [
   { id: 'gloss', name: 'Glossy', coins: 150, unlockLevel: 1, blurb: 'Factory shine' },
   { id: 'matte', name: 'Matte', coins: 400, unlockLevel: 1, blurb: 'Flat, no shine' },
   { id: 'chrome', name: 'Chrome', coins: 2500, unlockLevel: 8, blurb: 'Mirror metal in your colour' },
+  { id: 'bronze', name: 'Bronze', coins: 0, unlockLevel: 1, blurb: 'Bronze mastery in this car', mastery: 1 },
+  { id: 'silver', name: 'Silver', coins: 0, unlockLevel: 1, blurb: 'Silver mastery in this car', mastery: 2 },
+  { id: 'gold', name: 'Gold', coins: 0, unlockLevel: 1, blurb: 'Gold mastery in this car', mastery: 4 },
 ]
 export const finishDef = (id?: Finish | null) => FINISHES.find((f) => f.id === id) ?? FINISHES[0]
-// Material numbers for each finish: [metalness, roughness, how far the colour is lifted towards white].
-export const FINISH_LOOK: Record<Finish, [number, number, number]> = { gloss: [0.4, 0.3, 0], matte: [0.05, 0.92, 0], chrome: [1, 0.12, 0.15] }
+// Material numbers for each finish: [metalness, roughness, how far the colour is lifted, and
+// towards what (white when left out)]. The mastery metals pull your colour towards their own.
+export const FINISH_LOOK: Record<Finish, [number, number, number, string?]> = {
+  gloss: [0.4, 0.3, 0], matte: [0.05, 0.92, 0], chrome: [1, 0.12, 0.15],
+  bronze: [0.85, 0.3, 0.55, '#b0703a'], silver: [0.9, 0.24, 0.6, '#d9dee4'], gold: [0.95, 0.2, 0.62, '#ffc83d'],
+}
 
 export type PaintJob = { color: string; finish: Finish; stripe: string | null }
 // What a paint job costs on a car: each part that changes is charged once. A neon or
@@ -990,7 +1008,9 @@ export const PANELS: { id: PanelId; name: string; color: boolean; pattern: boole
 // Patterns are painted in shades of the panel's own colour, so pink camo is pink.
 // n: the shader's number for it (panelPaint.ts). trial: only won, by a first win in
 // that Tuner Trial (game/tuner.ts).
-export type PatternDef = { id: string; n: number; name: string; coins: number; unlockLevel: number; trial?: string }
+// mastery: only on a car model with that mastery tier (Signature). road: only once won on the
+// Trophy Road (game/trophyRoad.ts). Both are free once open.
+export type PatternDef = { id: string; n: number; name: string; coins: number; unlockLevel: number; trial?: string; mastery?: number; road?: true }
 export const PATTERNS: PatternDef[] = [
   { id: 'camo', n: 1, name: 'Camo', coins: 600, unlockLevel: 1 },
   { id: 'checker', n: 4, name: 'Checker', coins: 800, unlockLevel: 2 },
@@ -1000,6 +1020,9 @@ export const PATTERNS: PatternDef[] = [
   { id: 'hex', n: 6, name: 'Hex', coins: 1000, unlockLevel: 1, trial: 'downforce' },
   { id: 'splatter', n: 7, name: 'Splatter', coins: 1200, unlockLevel: 1, trial: 'featherweight' },
   { id: 'flames', n: 8, name: 'Flames', coins: 2000, unlockLevel: 1, trial: 'tunerking' },
+  { id: 'signature', n: 9, name: 'Signature', coins: 0, unlockLevel: 1, mastery: 3 },
+  { id: 'pinstripe', n: 10, name: 'Pinstripe', coins: 0, unlockLevel: 1, road: true },
+  { id: 'polka', n: 11, name: 'Polka', coins: 0, unlockLevel: 1, road: true },
 ]
 export const patternDef = (id?: string | null) => PATTERNS.find((p) => p.id === id)
 export const PANEL_COLOR_COST = 200
