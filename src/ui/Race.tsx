@@ -1349,7 +1349,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
 
   // The race screen redraws every frame (dials, lanes); the 3D scene only changes with
   // its inputs, so it's built once rather than re-rendered sixty times a second.
-  const mineLook = useMemo(() => ({ body: def.body, model: car.model, color: car.color, finish: car.finish, skin: car.skin, modSkin: car.modSkin, mods: car.mods }), [def.body, car.model, car.color, car.finish, car.skin, car.modSkin, car.mods])
+  const mineLook = useMemo(() => ({ body: def.body, model: car.model, color: car.color, finish: car.finish, skin: car.skin, modSkin: car.modSkin, panels: car.panels, mods: car.mods }), [def.body, car.model, car.color, car.finish, car.skin, car.modSkin, car.panels, car.mods])
   const theirModel = rival.model ?? CARS.find((c) => c.name === rival.carName)?.id
   const theirLook = useMemo(() => ({ body: rival.body, model: theirModel, color: rival.color, mods: rival.mods }), [rival.body, theirModel, rival.color, rival.mods])
   const photo = useRef(() => flash('PHOTO FINISH!', 2200))

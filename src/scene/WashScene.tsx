@@ -273,7 +273,7 @@ export function WashScene({ me, input, running, onHud, onEnd }: {
       <group rotation-y={Math.PI / 2}>
         <CarShadow len={LEN} wid={f.wid * sc} />
         <group scale={sc}>
-          <CarModel body={me.body} model={me.model} color={me.color} finish={me.finish} skin={me.skin} modSkin={me.modSkin} mods={me.mods} beams={view.beams} />
+          <CarModel body={me.body} model={me.model} color={me.color} finish={me.finish} skin={me.skin} modSkin={me.modSkin} panels={me.panels} mods={me.mods} beams={view.beams} />
         </group>
       </group>
       {spots.map((sp, i) => (

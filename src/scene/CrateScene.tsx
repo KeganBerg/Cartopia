@@ -15,7 +15,7 @@ import { concreteTex, corrugatedTex, glowTex, shutterTex } from './textures'
 import { signTexture } from './signTexture'
 import { ToolChest, TyreStack, useFitCamera } from './ArcadeScenery'
 import { tickSkins, withSkin } from './skins'
-import { MODS, SKINNED_SLOTS, carDef, fittedMods, modFits, modSkinNumber, skinNumber, type Body, type Finish, type SkinnedSlot } from '../game/data'
+import { MODS, SKINNED_SLOTS, carDef, fittedMods, modFits, modSkinNumber, skinNumber, type Body, type Finish, type SkinnedSlot, type Panels } from '../game/data'
 import { dropTier, type CrateDef, type CrateDrop, type CrateId } from '../game/crates'
 import { calmFlashing } from '../game/flashing'
 import { bumpSound } from '../lib/arcadeSound'
@@ -558,13 +558,13 @@ function Dust() {
 // ---------------------------------------------------------------------------------------------
 // The prize
 
-type CarLook = { body: Body; model: string; color: string; finish?: Finish | null; stripe?: string | null; mods?: string[] | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null }
+type CarLook = { body: Body; model: string; color: string; finish?: Finish | null; stripe?: string | null; mods?: string[] | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; panels?: Panels | null }
 
 function PrizeCar({ look }: { look: CarLook }) {
   const sc = 2.3 / carSize(look.body).len
   return (
     <group scale={sc}>
-      <CarModel body={look.body} model={look.model} color={look.color} finish={look.finish} stripe={look.stripe} mods={look.mods} skin={look.skin} modSkin={look.modSkin} />
+      <CarModel body={look.body} model={look.model} color={look.color} finish={look.finish} stripe={look.stripe} mods={look.mods} skin={look.skin} modSkin={look.modSkin} panels={look.panels} />
     </group>
   )
 }

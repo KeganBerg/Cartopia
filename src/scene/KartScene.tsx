@@ -638,7 +638,7 @@ function KartView({ look, rig, set }: { look: KartLook; rig: WheelRig; set: (g: 
       <CarShadow len={KART_LEN} wid={f.wid * s} />
       <group ref={body}>
         <group scale={s}>
-          <CarModel body={look.body as Body} model={look.model} color={look.color} finish={look.finish} skin={look.skin} modSkin={look.modSkin} mods={look.mods} rig={rig} beams />
+          <CarModel body={look.body as Body} model={look.model} color={look.color} finish={look.finish} skin={look.skin} modSkin={look.modSkin} panels={look.panels} mods={look.mods} rig={rig} beams />
         </group>
         {[-1, 1].map((sd, k) => (
           <mesh key={sd} ref={(m) => { fx.sparks[k] = m }} position={[sd * half, 0.12, back + 0.25]} visible={false}>

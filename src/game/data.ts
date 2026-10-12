@@ -951,6 +951,67 @@ export function paintJobCost(car: { color: string; finish?: Finish; stripe?: str
   return { coins, bucks }
 }
 
+// ---- Custom parts ----
+// One panel painted on its own: the hood, the doors, the roof or the rims, each in any
+// paint-chart colour and (but the rims) a pattern, plus a pattern over the whole body.
+// A panel left alone matches the body. Drawn by src/scene/panelPaint.ts.
+export type PanelId = 'body' | 'hood' | 'doors' | 'roof' | 'rims'
+export type PanelPaint = { color?: string; pattern?: string }
+export type Panels = Partial<Record<PanelId, PanelPaint>>
+// color / pattern: what the panel can take. car: cars only (bikes have no hood, doors or roof).
+export const PANELS: { id: PanelId; name: string; color: boolean; pattern: boolean; car: boolean }[] = [
+  { id: 'body', name: 'Body', color: false, pattern: true, car: false },
+  { id: 'hood', name: 'Hood', color: true, pattern: true, car: true },
+  { id: 'doors', name: 'Doors', color: true, pattern: true, car: true },
+  { id: 'roof', name: 'Roof', color: true, pattern: true, car: true },
+  { id: 'rims', name: 'Wheels', color: true, pattern: false, car: false },
+]
+// Patterns are painted in shades of the panel's own colour, so pink camo is pink.
+// n: the shader's number for it (panelPaint.ts).
+export type PatternDef = { id: string; n: number; name: string; coins: number; unlockLevel: number }
+export const PATTERNS: PatternDef[] = [
+  { id: 'camo', n: 1, name: 'Camo', coins: 600, unlockLevel: 1 },
+  { id: 'checker', n: 4, name: 'Checker', coins: 800, unlockLevel: 2 },
+  { id: 'digicamo', n: 2, name: 'Digi Camo', coins: 900, unlockLevel: 3 },
+  { id: 'tiger', n: 3, name: 'Tiger', coins: 1200, unlockLevel: 5 },
+  { id: 'carbon', n: 5, name: 'Carbon', coins: 1500, unlockLevel: 8 },
+]
+export const patternDef = (id?: string | null) => PATTERNS.find((p) => p.id === id)
+export const PANEL_COLOR_COST = 200
+export const RIM_COLOR_COST = 150
+
+// Panels with nothing on them dropped, so a car with none has no `panels` at all.
+export function tidyPanels(p?: Panels | null): Panels | undefined {
+  const out: Panels = {}
+  for (const { id } of PANELS) {
+    const v = p?.[id]
+    if (!v) continue
+    const one: PanelPaint = {}
+    if (v.color) one.color = v.color
+    if (v.pattern) one.pattern = v.pattern
+    if (one.color || one.pattern) out[id] = one
+  }
+  return Object.keys(out).length ? out : undefined
+}
+
+// What changing a car's panels costs: each new colour or pattern once; a gem colour
+// costs a gem instead of coins. Taking one off is free.
+export function panelJobCost(was: Panels | null | undefined, next: Panels | null | undefined) {
+  let coins = 0
+  let bucks = 0
+  for (const { id } of PANELS) {
+    const a = was?.[id]
+    const b = next?.[id]
+    if (b?.color && b.color !== a?.color) {
+      const p = PAINTS.find((x) => x.color === b.color)
+      if (p?.bucks) bucks += p.bucks
+      else coins += id === 'rims' ? RIM_COLOR_COST : PANEL_COLOR_COST
+    }
+    if (b?.pattern && b.pattern !== a?.pattern) coins += patternDef(b.pattern)?.coins ?? 0
+  }
+  return { coins, bucks }
+}
+
 // ---- Skins ----
 // Animated patterns that sit at depth inside a car's paint and shift as it turns
 // (drawn by src/scene/skins.ts, picked by `n`). A skin is unlocked once for the whole

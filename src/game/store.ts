@@ -4,6 +4,7 @@ import {
   PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS,
   upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, jobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, refillBucks, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, activeEvent, DAILY_BONUS, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modFits, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, CREW_CHEST, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower, seasonNumber, seasonOf, SEASON_STARS, skinDef, ownedSkins, seasonSkin, modSkinDef, ownedModSkins, seasonModSkin, SKINNED_SLOTS, type SkinnedSlot, fittedMods, SEASON_TIERS, STARS_PER_TIER, SEASON_CAR_BUCKS, dealsFor, dealOffer, type DealDef, type DealKind,
 } from './data'
+import { PANELS, PATTERNS, isBike, panelJobCost, tidyPanels, type Panels } from './data'
 import { sfx } from '../lib/sound'
 import { fx } from './fx'
 import { opensLabel } from './clock'
@@ -23,7 +24,7 @@ import { crateCost, crateDef, rollCrate, type CrateId, type CrateOpen } from './
 // car: uid of the owned car assigned to drive for this business (see DRIVER_BONUS).
 // merge: set on the top-left building of a merged block (see merge.ts); mturn: the turn the player gave that block.
 export type PlacedBuilding = { uid: string; def: string; x: number; z: number; jobEndsAt: number | null; rot?: number; level?: number; jobLevel?: number; car?: string; merge?: number; mturn?: number }
-export type OwnedCar = { uid: string; model: string; color: string; upgrades: Record<UpgradeSlot, number>; flat?: boolean; lowFuel?: boolean; stripe?: string | null; finish?: Finish; plate?: string; mods?: string[]; ownedMods?: string[]; skin?: string; modSkin?: Partial<Record<SkinnedSlot, string>> }
+export type OwnedCar = { uid: string; model: string; color: string; upgrades: Record<UpgradeSlot, number>; flat?: boolean; lowFuel?: boolean; stripe?: string | null; finish?: Finish; plate?: string; mods?: string[]; ownedMods?: string[]; skin?: string; modSkin?: Partial<Record<SkinnedSlot, string>>; panels?: Panels }
 // A rusty find waiting in Rusty's storage, and the one car in the restore bay.
 export type JunkCar = { uid: string; model: string; rarity: Rarity }
 export type Restoring = JunkCar & { endsAt: number; minutes: number }
@@ -194,6 +195,8 @@ type Actions = {
   fixFlat: (uid: string, tow: boolean) => void
   serviceCar: (uid: string, how: 'tires' | 'gas' | 'can') => void
   paintCar: (uid: string, job: PaintJob) => boolean
+  // Paints single panels (hood, doors, roof, rims) and patterns, tried on in the garage first.
+  paintPanels: (uid: string, panels: Panels) => boolean
   // Puts an unlocked skin on a car (null takes it off), buying it with gems first if it's for sale.
   skinCar: (uid: string, skin: string | null) => boolean
   // Adds a skin to the garage (crates and other prizes). False when it was already unlocked.
@@ -1443,6 +1446,41 @@ export const useGame = create<GameState>()(
         set(recolour ? withXp(s, 5, patch) : patch)
         sfx.buy()
         s.toast(recolour ? (paint ? `Painted ${fin.id === 'gloss' ? '' : fin.name + ' '}${paint.name}!` : `${fin.name} finish on!`) : job.stripe ? 'Stripes on!' : 'Stripes off')
+        return true
+      },
+
+      paintPanels: (cuid, want) => {
+        const s = get()
+        const car = s.cars.find((c) => c.uid === cuid)
+        if (!car) return false
+        const next = tidyPanels(want)
+        const was = tidyPanels(car.panels)
+        if (JSON.stringify(next ?? {}) === JSON.stringify(was ?? {})) return false
+        const bike = isBike(carDef(car.model).body)
+        for (const pn of PANELS) {
+          const v = next?.[pn.id]
+          if (!v) continue
+          if ((bike && pn.car) || (v.color && (!pn.color || !PAINTS.some((p) => p.color === v.color))) || (v.pattern && !pn.pattern)) return false
+          const pat = v.pattern ? PATTERNS.find((p) => p.id === v.pattern) : undefined
+          if (v.pattern && !pat) return false
+          if (pat && s.level < pat.unlockLevel && was?.[pn.id]?.pattern !== pat.id) {
+            s.toast(`${pat.name} unlocks at level ${pat.unlockLevel}`)
+            return false
+          }
+        }
+        const { coins, bucks } = panelJobCost(was, next)
+        if (s.coins < coins) { s.showNeed('coins', coins - s.coins, 'custom paint'); return false }
+        if (s.bucks < bucks) { s.showNeed('bucks', bucks - s.bucks, 'custom paint'); return false }
+        const patch = {
+          coins: s.coins - coins,
+          bucks: s.bucks - bucks,
+          cars: s.cars.map((c) => (c.uid === cuid ? { ...c, panels: next } : c)),
+          stats: bump(s, 'painted'),
+          updatedAt: Date.now(),
+        }
+        set(coins || bucks ? withXp(s, 5, patch) : patch)
+        sfx.buy()
+        s.toast(coins || bucks ? 'Custom paint on!' : 'Back to stock')
         return true
       },
 

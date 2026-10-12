@@ -3,12 +3,12 @@ import { createPortal } from 'react-dom'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { MOUSE, TOUCH, Vector3, type Group, type Mesh, type PerspectiveCamera } from 'three'
-import type { Body, Finish, SkinnedSlot } from '../game/data'
+import type { Body, Finish, SkinnedSlot, Panels } from '../game/data'
 import { CarModel, carFrame } from './CarModel'
 import { frame, seat, type Bounds } from './fit'
 import { SkyEnv } from './SkyEnv'
 
-type Look = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; stripe?: string | null; mods?: string[] | null }
+type Look = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; panels?: Panels | null; stripe?: string | null; mods?: string[] | null }
 
 // How big the car's bounding sphere is made, so long trucks and tiny bubble cars both fill the view.
 const FIT = 1.05

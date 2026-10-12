@@ -10,11 +10,11 @@ import { ArcadeSky, CarShadow, StreetStretch, useArcadeLook, useTownPool } from 
 import { CHASE_HEARTS, CHASE_LANES, chaseRow, chaseSpeed } from '../game/arcade'
 import { boxPush, carBox, circlePush, type Footprint } from '../game/collide'
 import { Footprinted, frameFootprint, scaled } from './footprint'
-import { CARS, isBike, type Body, type Finish, type SkinnedSlot } from '../game/data'
+import { CARS, isBike, type Body, type Finish, type SkinnedSlot, type Panels } from '../game/data'
 import { sfx } from '../lib/sound'
 import { crashSound, sirenSound } from '../lib/arcadeSound'
 
-export type ChaseCar = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; mods?: string[] | null }
+export type ChaseCar = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; panels?: Panels | null; mods?: string[] | null }
 // The screen pushes lane moves here (-1 left, +1 right); the scene takes them each frame.
 export type ChaseInput = { moves: number[] }
 export type ChaseHud = { dist: number; coins: number; hearts: number; speed: number }
@@ -351,7 +351,7 @@ export function ChaseScene({ me, input, running, onHud, onBusted }: {
       <group ref={player} rotation-y={Math.PI}>
         <CarShadow len={LEN} />
         <Footprinted id={`${me.body}:${me.model}:${me.mods?.join()}`} scale={fit(me.body)} onFoot={(f) => void (foot.current = f)}>
-          <CarModel body={me.body} model={me.model} color={me.color} finish={me.finish} skin={me.skin} modSkin={me.modSkin} mods={me.mods} beams={view.beams} flames />
+          <CarModel body={me.body} model={me.model} color={me.color} finish={me.finish} skin={me.skin} modSkin={me.modSkin} panels={me.panels} mods={me.mods} beams={view.beams} flames />
         </Footprinted>
       </group>
 
