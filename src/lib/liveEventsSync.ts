@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import { useGame } from '../game/store'
-import { liveEvents, setLiveEvents, type LiveEvent } from '../game/liveEvents'
+import { liveEvents, setLiveEvents, syncHandlers, type LiveEvent } from '../game/liveEvents'
 
 // Keeps src/game/liveEvents.ts in step with the live_events table
 // (0055_live_events.sql). Loads it on start, then Realtime pushes every insert
@@ -30,6 +30,7 @@ function apply(list: LiveEvent[]) {
   const now = Date.now()
   const ended = liveEvents().filter((e) => !list.some((x) => x.id === e.id) && e.from <= now && now < e.to).map((e) => ({ ...e, to: now }))
   setLiveEvents([...list, ...ended])
+  syncHandlers()
   for (const e of list) announce(e)
 }
 
@@ -69,6 +70,7 @@ export function startLiveEvents() {
   setInterval(() => {
     if (!document.hidden) void refresh()
   }, POLL_MS)
+  setInterval(() => syncHandlers(), 1000)
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) void refresh()
   })

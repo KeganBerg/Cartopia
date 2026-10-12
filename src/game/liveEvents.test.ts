@@ -44,3 +44,17 @@ describe('live events', () => {
     expect(forcedPhase(0.3, T + 1000 + EASE_MS)).toBe(0)
   })
 })
+
+describe('registered kinds', () => {
+  it('starts and stops a registered kind with its event', async () => {
+    const { registerLiveKind, syncHandlers } = await import('./liveEvents')
+    const log: string[] = []
+    setLiveEvents([ev('techno', T, T + 60_000, 7)])
+    registerLiveKind('techno', { start: (e) => log.push(`start ${e.id}`), stop: () => log.push('stop') })
+    syncHandlers(T - 1)
+    syncHandlers(T + 1)
+    syncHandlers(T + 2)
+    syncHandlers(T + 60_000)
+    expect(log).toEqual(['start 7', 'stop'])
+  })
+})

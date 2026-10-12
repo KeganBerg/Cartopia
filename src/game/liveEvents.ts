@@ -4,9 +4,9 @@
 // only holds what is live and answers "is it forced right now?", so the clock
 // can ask it without pulling Supabase in.
 //
-// Kinds today: 'night' and 'day' pin the town clock. New kinds (weather, season,
-// bonus hours) add a case to the Kind union and their own lookup like
-// forcedPhase().
+// 'night' and 'day' pin the town clock (forcedPhase below). Any other kind
+// (techno, weather, bonus hours...) is handed to the feature that registered
+// it with registerLiveKind().
 
 export type Kind = 'night' | 'day'
 export type LiveEvent = { id: number; kind: string; payload: Record<string, unknown>; from: number; to: number }
@@ -78,3 +78,33 @@ export function forcedPhase(natural: number, now = Date.now()): number | null {
 // When a forced day ends, so the "night in ..." countdown can count past it.
 export const forcedDayUntil = (now = Date.now()) => activeEvent(['day'], now)?.to ?? null
 
+
+// Other kinds hand off to whatever feature owns them. A feature registers its
+// kind once; start runs when an event of that kind begins (or is already
+// running when the game loads), stop when it ends or is cut short.
+export type KindHandler = { start: (e: LiveEvent) => void; stop: () => void }
+const handlers = new Map<string, KindHandler>()
+const running = new Map<string, number>() // kind -> id of the event started
+
+export function registerLiveKind(kind: string, h: KindHandler) {
+  handlers.set(kind, h)
+  syncHandlers()
+}
+
+// Starts and stops registered kinds to match the live list. Called after every
+// refresh and once a second, so scheduled events begin and end on time.
+export function syncHandlers(now = Date.now()) {
+  for (const [kind, h] of handlers) {
+    const e = activeEvent([kind], now)
+    const was = running.get(kind)
+    if (e?.id === was) continue
+    if (was !== undefined) {
+      running.delete(kind)
+      h.stop()
+    }
+    if (e) {
+      running.set(kind, e.id)
+      h.start(e)
+    }
+  }
+}
