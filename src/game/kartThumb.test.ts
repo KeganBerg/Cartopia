@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { ARCADE_FEEL, KART_FEEL, ThumbDrift, thumbSteer, type SteerFeel } from '../ui/DriveControls'
-import { KartRace, TOUCH_ASSIST, thumbSlide, TRACKS, buildTrack, gpField, idleInput, wrapAngle, type KartEvent, type Track } from './kart'
+import { ARCADE_FEEL, KART_FEEL, KART_SHARP, ThumbDrift, thumbSteer, type SteerFeel } from '../ui/DriveControls'
+import { KartRace, SHARP_ASSIST, TOUCH_ASSIST, thumbSlide, TRACKS, buildTrack, gpField, idleInput, wrapAngle, type KartEvent, type Track } from './kart'
 
 const ALL = TRACKS.flatMap((d) => [buildTrack(d, false), buildTrack(d, true)])
 const DT = 1 / 120
@@ -74,6 +74,22 @@ describe('kart steering with a thumb on a phone', () => {
       expect(now.walls, id).toBeLessThanOrEqual(2)
       expect(now.off, id).toBeLessThan(1)
       expect(now.ratio, id).toBeLessThan(1.06)
+    }
+  })
+
+  it('sharp steering: twitchier but still clean, on every circuit', () => {
+    for (const t of ALL) {
+      const id = `${t.def.id}${t.reverse ? ' rev' : ''}`
+      const now = run(t, KART_SHARP, SHARP_ASSIST), flick = run(t, KART_SHARP, SHARP_ASSIST, true)
+      if (process.env.THUMB_LOG) console.log('sharp', id, JSON.stringify({ now, flick }))
+      expect(now.done, id).not.toBeNull()
+      expect(now.drifts, id).toBeLessThanOrEqual(1)
+      expect(now.walls, id).toBeLessThanOrEqual(2)
+      expect(now.off, id).toBeLessThan(2)
+      expect(now.ratio, id).toBeLessThan(1.08)
+      expect(flick.turbos, id).toBeGreaterThanOrEqual(3)
+      expect(flick.walls, id).toBeLessThanOrEqual(2)
+      expect(flick.ratio, id).toBeLessThan(1.08)
     }
   })
 

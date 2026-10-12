@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { createContext, useContext, useMemo } from 'react'
 import { rand } from './RaceVenues'
 import type { Track } from '../game/kart'
 
@@ -102,3 +102,7 @@ export function useFanZones(t: Track): FanZone[] {
     return out
   }, [t, s])
 }
+
+// How far away cheering fans are still drawn (less on a phone: a fan there is a few pixels).
+export const FansFar = createContext(150)
+export const useFansFar = () => useContext(FansFar)

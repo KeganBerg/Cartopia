@@ -7,9 +7,14 @@ import { Batch } from './Batch'
 import { Box, Cone, Cyl } from './RaceVenues'
 import { Crowd, type Person } from './ArcadeScenery'
 import { signTexture } from './signTexture'
-import { local, nearZone, useFanZones, useSpots, ZONE_R, type FanZone } from './kartSpots'
+import { local, nearZone, useFansFar, useFanZones, useSpots, ZONE_R, type FanZone } from './kartSpots'
 import { CARS, buildingDef, type Body } from '../game/data'
 import type { Track } from '../game/kart'
+
+// A kart crowd: only the fans in view and near enough to see are drawn.
+export function Fans({ people }: { people: Person[] }) {
+  return <Crowd people={people} far={useFansFar()} />
+}
 
 // The second scenery pass round the kart circuits: more going on in every direction you
 // look. Common to all three: a pit lane, flag lines, TV camera towers, a blimp and hot-air
@@ -82,7 +87,7 @@ export function CommonExtras({ t }: { t: Track }) {
           </group>
         ))}
       </Batch>
-      <Crowd people={crew} />
+      <Fans people={crew} />
       <Blimp />
       <Balloons count={t.def.theme === 'docks' ? 2 : 4} seed={t.n} />
     </group>
@@ -222,7 +227,7 @@ export function TownExtras({ t }: { t: Track }) {
       </Batch>
       {wheel && <FerrisWheel x={wheel.x} z={wheel.z} ry={face(wheel.x, wheel.z) + Math.PI / 2} />}
       <FanZones zones={zones} theme="town" />
-      <Crowd people={fans} />
+      <Fans people={fans} />
     </group>
   )
 }
@@ -309,7 +314,7 @@ export function DocksExtras({ t }: { t: Track }) {
       </Batch>
       {ship && <Ship x={ship.x} z={ship.z} ry={face(ship.x, ship.z) + Math.PI / 2} />}
       <OilRigs rigs={rigs} />
-      <Crowd people={crews} />
+      <Fans people={crews} />
       <Buoys spots={buoys} />
       <Birds count={9} color="#fafafa" size={0.55} y={9} r={30} />
     </group>
@@ -419,7 +424,7 @@ export function DesertExtras({ t }: { t: Track }) {
       {pumps.map((p, i) => <Pumpjack key={i} x={p.x} z={p.z} ry={face(p.x, p.z) + Math.PI / 2} k={i} />)}
       <Tumbleweeds spots={weeds} />
       <FanZones zones={zones} theme="desert" />
-      <Crowd people={fans} />
+      <Fans people={fans} />
       <Birds count={5} color="#3e2723" size={0.9} y={16} r={25} />
     </group>
   )
