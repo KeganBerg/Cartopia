@@ -112,7 +112,7 @@ export const DECOR_PROPS = {
     for (let i = 0; i < 8; i++) {
       const x = -0.79 + i * 0.226
       k.ico(cast(L(leaf[i % leaf.length], 0.9)), 0.17, [x, 0.6 + jit(i, 1) * 0.03, jit(i, 2) * 0.06], [0.95, 0.55, 1.6], 1)
-      for (const s of [-1, 1]) k.ico(L(leaf[(i + 1) % leaf.length], 0.9), 0.16, [x + 0.05 + jit(i, s + 4) * 0.05, 0.34 + jit(i, s) * 0.1, s * 0.24], [0.9, 1.3, 0.6], 0)
+      for (const s of [-1, 1]) k.ico(L(leaf[(i + 1) % leaf.length], 0.9), 0.17, [x + 0.05 + jit(i, s + 4) * 0.05, 0.36 + jit(i, s) * 0.08, s * 0.2], [0.85, 1.25, 0.75], 1)
     }
     if (SNOW) for (let i = 0; i < 6; i++) k.sphere(L('#ffffff', 0.9), 0.2, [-0.7 + i * 0.28, 0.66, 0], [1.1, 0.25, 1.1], 10, 3, Math.PI / 2)
     if (SEASON === 'spring' || SEASON === 'summer') {
@@ -122,6 +122,20 @@ export const DECOR_PROPS = {
         k.ico(L('#43a047', 0.85), 0.05, [x + 0.05, 0.11, 0.3], [1, 0.6, 1], 0)
       }
     }
+  }),
+
+  // Pine: a rough trunk with root flare, then five shaggy tiers, each two
+  // offset cones so the outline is ragged, a few branch tips poking out.
+  pine: () => prop(`pine|${SEASON}`, (k) => {
+    k.cyl(cast(L('#5d4037', 0.95)), 0.06, 0.12, 0.55, [0, 0.275, 0], undefined, 8)
+    for (let i = 0; i < 4; i++) k.cone(L('#5d4037', 0.95), 0.05, 0.14, [Math.cos(i * 1.57) * 0.1, 0.03, Math.sin(i * 1.57) * 0.1], [Math.sin(i * 1.57) * 1.1, 0, -Math.cos(i * 1.57) * 1.1], 5)
+    const greens = ['#1b5e20', '#22672a', '#2e7d32', '#347f38', '#388e3c']
+    const tiers: [number, number, number][] = [[0.66, 0.5, 0.48], [0.56, 0.46, 0.8], [0.46, 0.42, 1.08], [0.35, 0.38, 1.34], [0.22, 0.34, 1.58]]
+    tiers.forEach(([r, h, y], i) => {
+      k.cone(cast(L(greens[i], 0.9)), r, h, [0, y, 0], [0, i * 0.5, 0], 9)
+      k.cone(L(greens[Math.min(4, i + 1)], 0.9), r * 0.92, h * 0.9, [0, y + 0.03, 0], [0, i * 0.5 + 0.35, 0], 7)
+      if (SNOW) k.cone(L('#f4f8fb', 0.8), r * 0.6, h * 0.5, [0, y + h * 0.25, 0], [0, i * 0.5, 0], 9)
+    })
   }),
 
   // Victorian lantern post: footing, fluted base, ringed pole, scrolled arm and a

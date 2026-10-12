@@ -1159,6 +1159,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
     // ---- Decorations ----
     case 'pine':
       // Evergreen: stays green all year and catches snow in winter.
+      if (!ghost) return <PropMesh parts={DECOR_PROPS.pine()} />
       return (
         <group>
           <Cyl m={m} at={[0, 0.25, 0]} r={0.08} r2={0.12} h={0.5} c="#6d4c41" seg={7} />
