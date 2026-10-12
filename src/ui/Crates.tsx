@@ -11,6 +11,7 @@ import { BuckIcon, CoinIcon, Icon } from './Icon'
 import { compact } from './format'
 import { openGarageTab } from './Menus'
 import './crates.css'
+import { LoadingScene } from './Loading'
 
 const CRATE_KEY = 'cartopia-crate'
 const price = (c: CrateDef, level: number) => {
@@ -207,6 +208,7 @@ export function CratesPanel() {
       <Canvas className="rf-canvas" shadows camera={{ fov: 42, near: 0.3, far: 60, position: [0, 4, 9] }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
         <CrateScene run={run} def={shownDef} phase={phase} drop={open?.drop ?? null} prizeCar={prizeLook(open?.drop ?? null, carsAt)} onReveal={() => setShown(true)} skip={skip} />
       </Canvas>
+      <LoadingScene label="Opening the Crate Depot" onClose={close} />
       <div className="rf-top">
         <h2>📦 Crate Depot</h2>
         <span className="crate-wallet"><span><CoinIcon size={16} />{compact(coins)}</span><span><BuckIcon size={16} />{compact(bucks)}</span></span>

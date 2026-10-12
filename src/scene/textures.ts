@@ -458,6 +458,20 @@ export const soilTex = (rx = 1, ry = rx) =>
     speckle(g, s, r, ['#4e342e', '#8d6e63', '#5d4037'], 900, 2)
   }), 'soil', rx, ry)
 
+// A grid of white LED tiles, for the club's front window lit in one colour at
+// a time. `lit` is the glow (an emissive map); unlit is the dim daytime look.
+export const ledGridTex = (lit: boolean) =>
+  make(`ledGrid|${lit}`, 128, (g, s) => {
+    const n = 4
+    const t = s / n
+    g.fillStyle = '#0d0618'
+    g.fillRect(0, 0, s, s)
+    g.globalAlpha = lit ? 1 : 0.32
+    g.fillStyle = '#ffffff'
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) g.fillRect(i * t + 2, j * t + 2, t - 4, t - 4)
+    g.globalAlpha = 1
+  })
+
 // Nightclub dance floor: a grid of coloured tiles. `lit` is the glow (an
 // emissive map); unlit is the same floor dimmed for daytime.
 export const danceFloorTex = (lit: boolean, rx = 1, ry = rx) =>

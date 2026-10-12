@@ -7,6 +7,7 @@ import { SHIRTS, PANTS, SKIN, HAIR } from './people'
 import { CarModel, wheelRig, type WheelRig } from './CarModel'
 import { bodyScale } from './townCarSize'
 import { signTexture } from './signTexture'
+import { Upright } from './mergeScale'
 import type { Body } from '../game/data'
 
 // The moving parts of the schools and the driving academy: kids at recess,
@@ -31,6 +32,10 @@ export function Crowd({ n, move, hours = 'always', kids, uniform }: CrowdProps) 
   const legs = useRef<InstancedMesh>(null)
   const dummy = useMemo(() => new Object3D(), [])
   const size = kids ? 0.72 : 1
+  // The spot each person stands on, so a merged block keeps them in one piece.
+  const spot = useMemo(() => new Float32Array(n * 3), [n])
+  const feet = useMemo(() => ({ noBatch: true, feet: (i: number) => spot.subarray(i * 3, i * 3 + 3) }), [spot])
+  const legFeet = useMemo(() => ({ noBatch: true, feet: (i: number) => spot.subarray((i >> 1) * 3, (i >> 1) * 3 + 3) }), [spot])
 
   useLayoutEffect(() => {
     const c = new Color()
@@ -61,6 +66,7 @@ export function Crowd({ n, move, hours = 'always', kids, uniform }: CrowdProps) 
       const stride = Math.min(1, speed * 1.5)
       const phase = time * (6 + speed * 6) + i
       const sx = x / SCALE, sz = z / SCALE
+      spot.set([sx, 0, sz], i * 3)
       const hip = 0.24 * size
       const bob = Math.abs(Math.sin(phase)) * 0.025 * stride
       dummy.rotation.set(0, heading, 0)
@@ -89,19 +95,19 @@ export function Crowd({ n, move, hours = 'always', kids, uniform }: CrowdProps) 
 
   return (
     <group scale={SCALE}>
-      <instancedMesh ref={torso} args={[undefined, undefined, n]} frustumCulled={false} castShadow userData={{ noBatch: true }}>
+      <instancedMesh ref={torso} args={[undefined, undefined, n]} frustumCulled={false} castShadow userData={feet}>
         <capsuleGeometry args={[0.085, 0.16, 3, 8]} />
         <meshStandardMaterial />
       </instancedMesh>
-      <instancedMesh ref={head} args={[undefined, undefined, n]} frustumCulled={false} userData={{ noBatch: true }}>
+      <instancedMesh ref={head} args={[undefined, undefined, n]} frustumCulled={false} userData={feet}>
         <sphereGeometry args={[0.075, 10, 8]} />
         <meshStandardMaterial />
       </instancedMesh>
-      <instancedMesh ref={hair} args={[undefined, undefined, n]} frustumCulled={false} userData={{ noBatch: true }}>
+      <instancedMesh ref={hair} args={[undefined, undefined, n]} frustumCulled={false} userData={feet}>
         <sphereGeometry args={[0.078, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2]} />
         <meshStandardMaterial />
       </instancedMesh>
-      <instancedMesh ref={legs} args={[undefined, undefined, n * 2]} frustumCulled={false} userData={{ noBatch: true }}>
+      <instancedMesh ref={legs} args={[undefined, undefined, n * 2]} frustumCulled={false} userData={legFeet}>
         <boxGeometry args={[0.055, 0.24, 0.055]} />
         <meshStandardMaterial />
       </instancedMesh>
@@ -198,7 +204,8 @@ export function StudentCars({ n, drive }: { n: number; drive: Drive }) {
     <group userData={{ noBatch: true }}>
       {Array.from({ length: n }, (_, i) => (
         <group key={i} ref={(el) => { cars.current[i] = el }}>
-          <LearnerCar i={i} rig={rigs[i]} body={(el) => { bodies.current[i] = el }} />
+          {/* Merged, each car keeps its shape and its topper wherever it drives. */}
+          <Upright><LearnerCar i={i} rig={rigs[i]} body={(el) => { bodies.current[i] = el }} /></Upright>
         </group>
       ))}
     </group>

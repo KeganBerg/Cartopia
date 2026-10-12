@@ -18,6 +18,8 @@ type Part = [BufferGeometry, Finish, V3, V3?, V3?] // geometry, finish, position
 
 const NO_RAY = () => null
 const LIVE = { noBatch: true }
+// A craft that takes off is meant to be off the ground (see floating.ts).
+const FLYING = { ...LIVE, air: true }
 const at = (p: V3, r: V3 = [0, 0, 0], s: V3 = [1, 1, 1]) =>
   new Matrix4().compose(new Vector3(...p), new Quaternion().setFromEuler(new Euler(...r)), new Vector3(...s))
 const bakeParts = (parts: Part[]) => bake(parts.map(([g, f, p, r, s]) => [g, f, at(p, r, s)]))
@@ -172,7 +174,7 @@ export function Helicopter({ look, fly: wantsFly, seed = 0, radius = 7, height =
   })
   return (
     <Upright>
-      <group ref={craft} rotation-y={Math.PI / 2} userData={LIVE}>
+      <group ref={craft} rotation-y={Math.PI / 2} userData={fly ? FLYING : LIVE}>
         <mesh geometry={body} material={mat} castShadow={!ghost} raycast={NO_RAY} />
         <mesh ref={rotor} geometry={bladeGeo} material={mat} position-y={0.92} castShadow={!ghost} raycast={NO_RAY} />
         {fly && <RotorBlur spin={spin} />}

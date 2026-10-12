@@ -65,7 +65,7 @@ function Lamp({ m, bulb, at, ghost, banner }: { m: Mat; bulb: ReactNode; at: V3;
     <group position={at}>
       <Cyl m={m} at={[0, 0.5, 0]} r={0.025} r2={0.035} h={1} c="#263238" seg={6} />
       <mesh position={[0, 1.04, 0]}><sphereGeometry args={[0.07, 8, 6]} />{bulb}</mesh>
-      {banner && <Box m={m} at={[0.08, 0.72, 0]} s={[0.12, 0.3, 0.012]} c={banner} shadow={false} />}
+      {banner && <Box m={m} at={[0.08, 0.72, 0.006]} s={[0.12, 0.3, 0.012]} c={banner} shadow={false} />}
       {!ghost && <Pool r={0.5} />}
     </group>
   )
@@ -107,7 +107,7 @@ function SchoolBus({ m, at, rot = 0 }: { m: Mat; at: V3; rot?: number }) {
             </group>
           ))}
           <Box m={m} at={[0, 0.4, 0.487]} s={[0.36, 0.13, 0.006]} c="#263238" shadow={false} />
-          <Box m={m} at={[0, 0.48, 0.495]} s={[0.24, 0.05, 0.01]} c="#212121" shadow={false} />
+          <Box m={m} at={[0, 0.48, 0.498]} s={[0.24, 0.05, 0.01]} c="#212121" shadow={false} />
           <Box m={m} at={[-0.25, 0.32, 0.3]} s={[0.05, 0.1, 0.01]} c="#d32f2f" shadow={false} />
           <Box m={m} at={[0, 0.12, 0.69]} s={[0.46, 0.06, 0.03]} c="#212121" shadow={false} />
           {[0.42, -0.38].map((z) => (
@@ -214,7 +214,7 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
           {live && (
             <group position={[-0.95, h + 0.15, -1.65]} rotation-x={-0.25}>
               <Box m={m} at={[0, 0.25, -0.03]} s={[0.56, 0.56, 0.04]} c="#d50000" />
-              <mesh position={[0, 0.25, 0]}><planeGeometry args={[0.5, 0.5]} /><meshBasicMaterial map={signTexture('L', '#ffffff', '#d50000')} toneMapped={false} /></mesh>
+              <mesh position={[0, 0.25, 0]}><planeGeometry args={[0.5, 0.5]} /><meshBasicMaterial map={signTexture('L', '#ffffff', '#d50000', 1)} toneMapped={false} /></mesh>
               {[-0.2, 0.2].map((x) => <Box key={x} m={m} at={[x, -0.02, -0.06]} s={[0.04, 0.3, 0.04]} c="#78909c" />)}
             </group>
           )}
@@ -226,7 +226,7 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
             {live && <group position={[-0.4, 0.06, 0.05]}><Upright><LearnerCar i={1} rot={Math.PI} /></Upright></group>}
             {live && lvl < 7 && <group position={[0.4, 0.06, 0.05]}><Upright><LearnerCar i={0} rot={Math.PI} /></Upright></group>}
           </group>
-          {live && <Tree m={m} at={[-1.75, 0.06, -0.55]} s={0.7} />}
+          {live && <Tree m={m} at={[-1.66, 0.06, -0.55]} s={0.7} />}
           {live && <Lamp m={m} bulb={bulb} ghost={ghost} at={[1.85, 0.06, 0.2]} />}
           {live && <Lamp m={m} bulb={bulb} ghost={ghost} at={[-1.85, 0.06, 1.85]} />}
           {live && <StudentCars n={lvl >= 7 ? 3 : 2} drive={weave} />}
@@ -241,7 +241,7 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
       const kids = 6 + Math.floor(lvl / 2)
       return (
         <group>
-          <Box m={m} at={[0, 0.03, 0]} s={[3.9, 0.06, 3.9]} c="#ffffff" t={grassTex(2, 2)} shadow={false} />
+          <Box m={m} at={[0, 0.03, 0]} s={[3.894, 0.06, 3.9]} c="#ffffff" t={grassTex(2, 2)} shadow={false} />
           {/* Bus loop along the front with a yellow curb. */}
           <Box m={m} at={[0, 0.035, 1.5]} s={[3.9, 0.07, 0.8]} c="#ffffff" t={asphaltTex()} shadow={false} />
           <Box m={m} at={[0, 0.06, 1.08]} s={[3.9, 0.05, 0.06]} c={YELLOW} shadow={false} />
@@ -278,14 +278,16 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
           {/* Playground and blacktop: rubber matting, swings, a slide, hopscotch and four-square. */}
           <Box m={m} at={[1.05, 0.065, 0.45]} s={[1.6, 0.03, 1.05]} c="#e57373" shadow={false} />
           <Paint m={m} at={[0.7, 0.083, 0.45]} s={[0.5, 0.5]} c={PAINT} />
-          <Paint m={m} at={[0.7, 0.084, 0.45]} s={[0.46, 0.46]} c="#e57373" />
-          <Paint m={m} at={[0.7, 0.085, 0.45]} s={[0.5, 0.02]} />
-          <Paint m={m} at={[0.7, 0.085, 0.45]} s={[0.02, 0.5]} />
+          <Paint m={m} at={[0.7, 0.085, 0.45]} s={[0.46, 0.46]} c="#e57373" />
+          <Paint m={m} at={[0.7, 0.087, 0.45]} s={[0.5, 0.02]} />
+          <Paint m={m} at={[0.7, 0.087, 0.45]} s={[0.02, 0.5]} />
           {[0, 1, 2, 3].map((i) => <Paint key={i} m={m} at={[1.3 + (i % 2) * 0.1 - 0.05, 0.085, 0.75 - i * 0.14]} s={[0.12, 0.12]} c={['#fdd835', '#4fc3f7', '#81c784', '#ce93d8'][i]} />)}
           <group position={[1.55, 0.08, 0.2]}>
             {[-0.3, 0.3].map((x) => [-1, 1].map((sd) => <Box key={`${x}${sd}`} m={m} at={[x, 0.38, sd * 0.13]} rot={[sd * 0.32, 0, 0]} s={[0.04, 0.78, 0.04]} c="#ff7043" />))}
             <Box m={m} at={[0, 0.74, 0]} s={[0.66, 0.04, 0.04]} c="#ff7043" />
             {[-0.12, 0.12].map((x) => <Box key={x} m={m} at={[x, 0.24, 0]} s={[0.14, 0.025, 0.07]} c="#212121" />)}
+            {/* Chains from the seats up to the top bar. */}
+            {[-0.18, -0.06, 0.06, 0.18].map((x) => <Box key={`c${x}`} m={m} at={[x, 0.485, 0]} s={[0.008, 0.47, 0.008]} c="#90a4ae" shadow={false} />)}
           </group>
           <group position={[0.45, 0.08, 0.15]}>
             <Box m={m} at={[0, 0.32, 0]} s={[0.3, 0.04, 0.3]} c={YELLOW} />
@@ -303,7 +305,7 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
           {live && <Bench m={m} at={[-1.45, 0.06, 0.25]} rot={Math.PI / 2} />}
           <group position={[0.1, 0.06, -0.15]}>
             {[-0.15, 0, 0.15].map((x) => (
-              <mesh key={x} position={[x, 0.1, 0]} rotation-y={Math.PI / 2}><torusGeometry args={[0.08, 0.012, 5, 10, Math.PI]} />{m('#90a4ae')}</mesh>
+              <mesh key={x} position={[x, 0, 0]} rotation-y={Math.PI / 2}><torusGeometry args={[0.08, 0.012, 5, 10, Math.PI]} />{m('#90a4ae')}</mesh>
             ))}
           </group>
           {live && <Tree m={m} at={[-1.6, 0.06, -0.35]} s={0.75} />}
@@ -322,7 +324,7 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
       const towers: [number, number][] = [[0.68, -1.6], [0.68, 1.6], [2.85, -1.7], [2.85, 1.7]]
       return (
         <group>
-          <Box m={m} at={[0, 0.03, 0]} s={[5.9, 0.06, 3.9]} c="#ffffff" t={grassTex(3, 2)} shadow={false} />
+          <Box m={m} at={[0, 0.03, 0]} s={[5.894, 0.06, 3.9]} c="#ffffff" t={grassTex(3, 2)} shadow={false} />
           {/* Student parking in front: stalls, a few cars and a bus at the kerb. */}
           <Box m={m} at={[-1.45, 0.035, 1.2]} s={[2.95, 0.07, 1.45]} c="#ffffff" t={asphaltTex()} shadow={false} />
           {[-2.6, -2.1, -1.6, -1.1, -0.6].map((x) => <Paint key={x} m={m} at={[x, 0.072, 0.85]} s={[0.03, 0.55]} />)}
@@ -337,9 +339,10 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
             <mesh position={[0, 0.55, -0.098]}><planeGeometry args={[0.85, 1.0]} />{win}</mesh>
             <Box m={m} at={[0, 1.24, -0.05]} s={[1.2, 0.06, 0.5]} c="#2e7d32" />
             <mesh position={[0, 0.3, -0.094]}><planeGeometry args={[0.4, 0.58]} />{m('#37474f')}</mesh>
-            <group position={[1.15, h - 0.5, -0.38]}>
-              <Box m={m} at={[0, 0, 0]} s={[0.5, 0.62, 0.02]} c="#2e7d32" shadow={false} />
-              <mesh position={[0, 0, 0.012]}><planeGeometry args={[0.44, 0.56]} /><meshBasicMaterial map={signTexture('BOLTS', '#2e7d32', '#fdd835')} toneMapped={false} /></mesh>
+            {/* Hung between the upper windows, clear of their sills. */}
+            <group position={[0.8, h - 0.5, -0.38]}>
+              <Box m={m} at={[0, 0, 0]} s={[0.42, 0.62, 0.02]} c="#2e7d32" shadow={false} />
+              <mesh position={[0, 0, 0.012]}><planeGeometry args={[0.36, 0.56]} /><meshBasicMaterial map={signTexture('BOLTS', '#2e7d32', '#fdd835', 0.36 / 0.56)} toneMapped={false} /></mesh>
             </group>
             {/* Rooftop air handlers. */}
             {[-0.9, 0.3].map((x) => <Box key={x} m={m} at={[x, h + 0.25, -1.4]} s={[0.4, 0.22, 0.32]} c="#b0bec5" />)}
@@ -349,10 +352,10 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
           <group position={[cx, 0.06, 0]}>
             <Box m={m} at={[0, 0.006, 0]} s={[2 * (r + 0.3), 0.012, straight]} c="#c75b39" shadow={false} />
             {[-1, 1].map((sd) => <Disc key={sd} m={m} at={[0, 0.006, (sd * straight) / 2]} r={r + 0.3} c="#c75b39" seg={28} />)}
-            <Box m={m} at={[0, 0.013, 0]} s={[2 * (r - 0.02), 0.012, straight]} c={PAINT} shadow={false} />
+            <Box m={m} at={[0, 0.013, 0]} s={[2 * (r - 0.02), 0.012, straight - 0.004]} c={PAINT} shadow={false} />
             {[-1, 1].map((sd) => <Disc key={sd} m={m} at={[0, 0.013, (sd * straight) / 2]} r={r - 0.02} c={PAINT} seg={28} />)}
-            <Box m={m} at={[0, 0.02, 0]} s={[2 * (r - 0.06), 0.012, straight]} c="#ffffff" t={grassTex(1, 2)} shadow={false} />
-            {[-1, 1].map((sd) => <Disc key={sd} m={m} at={[0, 0.02, (sd * straight) / 2]} r={r - 0.06} c={PAL.grass} seg={28} />)}
+            <Box m={m} at={[0, 0.02, 0]} s={[2 * (r - 0.06), 0.012, straight - 0.008]} c="#ffffff" t={grassTex(1, 2)} shadow={false} />
+            {[-1, 1].map((sd) => <Disc key={sd} m={m} at={[0, 0.017, (sd * straight) / 2]} r={r - 0.06} c={PAL.grass} seg={28} />)}
             {[-0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75].map((z) => <Paint key={z} m={m} at={[0, 0.032, z * 1.3]} s={[1.3, 0.02]} />)}
             {[-1, 1].map((sd) => (
               <group key={sd} position={[0, 0, sd * 1.25]}>
@@ -364,14 +367,14 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
           </group>
           {/* Bleachers on the near side and a scoreboard at the far end. */}
           <group position={[0.42, 0.06, 0]}>
-            {[0, 1, 2, 3].map((i) => <Box key={i} m={m} at={[-i * 0.07, 0.07 + i * 0.1, 0]} s={[0.1, 0.14 + i * 0.2, 1.8]} c={i % 2 ? '#b0bec5' : '#cfd8dc'} />)}
-            <Box m={m} at={[-0.25, 0.75, 0]} s={[0.02, 0.4, 1.8]} c="#90a4ae" shadow={false} />
+            {[0, 1, 2, 3].map((i) => <Box key={i} m={m} at={[-i * 0.07, 0.07 + i * 0.1, 0]} s={[0.1, 0.14 + i * 0.2, i % 2 ? 1.796 : 1.8]} c={i % 2 ? '#b0bec5' : '#cfd8dc'} />)}
+            <Box m={m} at={[-0.252, 0.75, 0]} s={[0.02, 0.4, 1.8]} c="#90a4ae" shadow={false} />
           </group>
           {live && (
             <group position={[1.0, 0.06, -1.85]} rotation-y={0.3}>
               {[-0.28, 0.28].map((x) => <Box key={x} m={m} at={[x, 0.45, 0]} s={[0.05, 0.9, 0.05]} c="#37474f" />)}
               <Box m={m} at={[0, 1.05, 0]} s={[0.76, 0.3, 0.08]} c="#212121" />
-              <mesh position={[0, 1.05, 0.042]}><planeGeometry args={[0.7, 0.24]} /><meshBasicMaterial map={signTexture('HOME 21  VIS 14', '#212121', '#ffca28')} toneMapped={false} /></mesh>
+              <mesh position={[0, 1.05, 0.042]}><planeGeometry args={[0.7, 0.24]} /><meshBasicMaterial map={signTexture('HOME 21  VIS 14', '#212121', '#ffca28', 0.7 / 0.24)} toneMapped={false} /></mesh>
             </group>
           )}
           {/* Floodlight towers: lit after dark, pooling light on the field. */}
@@ -384,7 +387,7 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
           ))}
           {live && <Pool r={1.4} x={cx} z={-0.7} />}
           {live && <Pool r={1.4} x={cx} z={0.7} />}
-          {live && <Tree m={m} at={[-2.75, 0.06, -0.15]} s={0.7} />}
+          {live && <Tree m={m} at={[-2.66, 0.06, -0.15]} s={0.7} />}
           {live && <Lamp m={m} bulb={bulb} ghost={ghost} at={[0.1, 0.06, 1.85]} />}
           {live && <Crowd n={runners} move={routeMove(track(cx, 0, straight, r + 0.14), 16, 0.03)} hours="school" uniform="#2e7d32" />}
           {live && <Crowd n={4} move={routeMove(loop([[-1.4, 0.2], [-0.2, 0.3], [-0.2, 1.95], [-2.8, 1.95], [-2.8, 0.3]]), 40)} hours="campus" />}
@@ -404,8 +407,8 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
           <Box m={m} at={[0, 0.03, 0]} s={[5.9, 0.06, 5.9]} c="#ffffff" t={grassTex(3, 3)} shadow={false} />
           {/* Paths: the long walk from the gate and a cross walk through the quad. */}
           <Box m={m} at={[0, 0.04, 0.55]} s={[0.6, 0.08, 4.9]} c="#ffffff" t={paverTex(1, 8)} shadow={false} />
-          <Box m={m} at={[0, 0.04, 0.6]} s={[3.3, 0.08, 0.5]} c="#ffffff" t={paverTex(6, 1)} shadow={false} />
-          <Box m={m} at={[0, 0.04, -0.95]} s={[2.9, 0.08, 0.4]} c="#ffffff" t={paverTex(5, 1)} shadow={false} />
+          <Box m={m} at={[0, 0.042, 0.6]} s={[3.3, 0.084, 0.5]} c="#ffffff" t={paverTex(6, 1)} shadow={false} />
+          <Box m={m} at={[0, 0.042, -0.95]} s={[2.9, 0.084, 0.4]} c="#ffffff" t={paverTex(5, 1)} shadow={false} />
           {/* Fountain where the paths cross. */}
           <group position={[0, 0.08, 0.6]}>
             <Cyl m={m} at={[0, 0.07, 0]} r={0.5} h={0.14} c="#cfd8dc" seg={20} />
@@ -449,6 +452,8 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
             <Box m={m} at={[0, 1.4, 0]} s={[0.6, 2.8, 0.6]} c="#b5654a" t={brickTex(1, 3)} />
             {[-0.24, 0.24].map((x) => [-0.24, 0.24].map((z) => <Box key={`${x}${z}`} m={m} at={[x, 3.05, z]} s={[0.1, 0.5, 0.1]} c="#e0d6c8" />))}
             <mesh position={[0, 3.1, 0]}><sphereGeometry args={[0.13, 10, 8]} />{m(GOLD)}</mesh>
+            {/* The yoke the bell hangs from, post to post. */}
+            <Box m={m} at={[0, 3.245, 0]} s={[0.58, 0.04, 0.05]} c="#5d4037" shadow={false} />
             <Box m={m} at={[0, 3.33, 0]} s={[0.7, 0.06, 0.7]} c="#e0d6c8" />
             <mesh position={[0, 3.62, 0]} rotation-y={Math.PI / 4} castShadow><coneGeometry args={[0.5, 0.55, 4]} />{m(roofSnow('#455a64'))}</mesh>
             <mesh position={[0, 2.45, 0.302]}><circleGeometry args={[0.2, 18]} />{bulb}</mesh>

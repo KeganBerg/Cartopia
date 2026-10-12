@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, type ReactNode } from 'react'
 import { BufferAttribute, BufferGeometry, Color, Group, Matrix4, Mesh, Texture, Vector3, type Material } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { glowMats } from './dayNight'
+import { addHours } from './closingTime'
 import { bake, bakeable, bakedMapMaterial, bakedMaterial, finishOf, textureKey, type Finish } from './bake'
 
 // Every road tile, lawn and building is dozens of tiny meshes, and phones choke
@@ -18,6 +19,12 @@ import { bake, bakeable, bakedMapMaterial, bakedMaterial, finishOf, textureKey, 
 // With `cell` set (the town), baked meshes are also split into square cells that
 // many world units wide, so the camera skips the parts of a big town that are off
 // screen instead of pushing every triangle in town through the GPU each frame.
+
+// Edit modes keep the town merged too: drawn piece by piece, a big town is
+// thousands of draws a frame, enough to stall a PC. Only road and bulldoze,
+// which change the town every tile they paint, draw it live. In Move the picked
+// building is marked noBatch so it can be dragged and turned (see World).
+export const batchOff = (mode: string) => mode === 'road' || mode === 'bulldoze'
 
 // Materials that change over time (night glow) must be kept by identity.
 const live = new Set<Material>(Object.values(glowMats))
@@ -95,7 +102,9 @@ export function Batch({ version, off, cell, children }: { version: unknown; off?
       const key = `${look(mesh.material)}#${mesh.castShadow}${mesh.receiveShadow}${mesh.renderOrder}#${names.join()}`
       let set = sets.get(key)
       if (!set) sets.set(key, (set = { mat: mesh.material, cast: mesh.castShadow, receive: mesh.receiveShadow, order: mesh.renderOrder, names, parts: [] }))
-      set.parts.push(prepare(g, new Matrix4().multiplyMatrices(inv, mesh.matrixWorld), names))
+      const part = prepare(g, new Matrix4().multiplyMatrices(inv, mesh.matrixWorld), names)
+      addHours(part, mesh, r, mat)
+      set.parts.push(part)
       hidden.push(mesh)
     })
     const made: Mesh[] = []

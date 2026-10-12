@@ -8,10 +8,11 @@ import { driveClubLeds } from './clubLeds'
 
 // The moving parts of the nightclub, shown only while it's open: people
 // dancing on the rooftop floor, the bouncer at the door and two searchlights
-// sweeping the sky. Instanced meshes (three draws for every figure) that Batch
+// sweeping the sky. Instanced meshes (four draws for every figure) that Batch
 // leaves alone, so they can move.
 
 const SHIRTS = ['#ff2bd6', '#00e5ff', '#ffea00', '#76ff03', '#ff6d00', '#fafafa', '#7c4dff', '#ff1744', '#18ffff', '#f50057']
+const PANTS = ['#212121', '#263238', '#3949ab', '#1a237e', '#4e342e', '#37474f']
 const SKIN = ['#f5d0b5', '#e0ac8a', '#c68863', '#8d5a3b', '#5c3a24', '#f1c27d']
 // Townspeople proportions, drawn at the same size as the ones walking about.
 const SCALE = 1.3
@@ -42,8 +43,13 @@ export function ClubLife({ lvl, roofY, roofZ, floorY, floorZ, floorW, floorD }: 
   const torso = useRef<InstancedMesh>(null)
   const head = useRef<InstancedMesh>(null)
   const arms = useRef<InstancedMesh>(null)
+  const legs = useRef<InstancedMesh>(null)
   const beams = useRef<Group[]>([])
   const dummy = useMemo(() => new Object3D(), [])
+  // The spot each figure stands on, so a merged club keeps them in one piece on the floor.
+  const spot = useMemo(() => new Float32Array(n * 3), [n])
+  const feet = useMemo(() => ({ noBatch: true, feet: (i: number) => spot.subarray(i * 3, i * 3 + 3) }), [spot])
+  const armFeet = useMemo(() => ({ noBatch: true, feet: (i: number) => spot.subarray((i >> 1) * 3, (i >> 1) * 3 + 3) }), [spot])
 
   // Spots spread over the floor in a loose grid, the same every load.
   const spots = useMemo(() => {
@@ -66,8 +72,11 @@ export function ClubLife({ lvl, roofY, roofZ, floorY, floorZ, floorW, floorD }: 
       head.current?.setColorAt(i, color.set(SKIN[(i * 7) % SKIN.length]))
       arms.current?.setColorAt(i * 2, color.set(bouncer ? '#151515' : SHIRTS[i % SHIRTS.length]))
       arms.current?.setColorAt(i * 2 + 1, color)
+      color.set(bouncer ? '#151515' : PANTS[i % PANTS.length])
+      legs.current?.setColorAt(i * 2, color)
+      legs.current?.setColorAt(i * 2 + 1, color)
     }
-    for (const m of [torso.current, head.current, arms.current]) if (m?.instanceColor) m.instanceColor.needsUpdate = true
+    for (const m of [torso.current, head.current, arms.current, legs.current]) if (m?.instanceColor) m.instanceColor.needsUpdate = true
   }, [n, dancers])
 
   useFrame(({ clock }) => {
@@ -75,7 +84,8 @@ export function ClubLife({ lvl, roofY, roofZ, floorY, floorZ, floorW, floorD }: 
     const t = torso.current
     const hd = head.current
     const ar = arms.current
-    if (!t || !hd || !ar) return
+    const lg = legs.current
+    if (!t || !hd || !ar || !lg) return
     const open = isNight()
     const night = nightAmount(dayPhase())
     for (const b of beams.current) {
@@ -91,7 +101,7 @@ export function ClubLife({ lvl, roofY, roofZ, floorY, floorZ, floorW, floorD }: 
     beamMat.opacity = night * 0.3
     const count = open ? n : 0
     t.count = hd.count = count
-    ar.count = count * 2
+    ar.count = lg.count = count * 2
     if (!open) return
     const time = clock.elapsedTime
     for (let i = 0; i < n; i++) {
@@ -119,6 +129,7 @@ export function ClubLife({ lvl, roofY, roofZ, floorY, floorZ, floorW, floorD }: 
       const sx = x / SCALE
       const sz = z / SCALE
       const y = baseY / SCALE + HIP + bob
+      spot.set([sx, baseY / SCALE, sz], i * 3)
       const sin = Math.sin(heading)
       const cos = Math.cos(heading)
       dummy.rotation.set(0, heading, 0)
@@ -140,24 +151,35 @@ export function ClubLife({ lvl, roofY, roofZ, floorY, floorZ, floorW, floorD }: 
         dummy.rotation.set(0, heading, a, 'YXZ')
         dummy.updateMatrix()
         ar.setMatrixAt(i * 2 + (side > 0 ? 1 : 0), dummy.matrix)
+        // Legs from the floor up to the hip, bending with the bounce.
+        dummy.position.set(sx + cos * side * 0.045, baseY / SCALE + (HIP + bob) / 2, sz - sin * side * 0.045)
+        dummy.rotation.set(0, heading, 0)
+        dummy.scale.set(1, (HIP + bob) / HIP, 1)
+        dummy.updateMatrix()
+        lg.setMatrixAt(i * 2 + (side > 0 ? 1 : 0), dummy.matrix)
+        dummy.scale.set(1, 1, 1)
       }
     }
-    for (const m of [t, hd, ar]) m.instanceMatrix.needsUpdate = true
+    for (const m of [t, hd, ar, lg]) m.instanceMatrix.needsUpdate = true
   })
 
   return (
     <group>
       <group scale={SCALE}>
-        <instancedMesh ref={torso} args={[undefined, undefined, n]} frustumCulled={false} userData={{ noBatch: true }}>
+        <instancedMesh ref={torso} args={[undefined, undefined, n]} frustumCulled={false} userData={feet}>
           <capsuleGeometry args={[0.085, 0.16, 3, 8]} />
           <meshStandardMaterial />
         </instancedMesh>
-        <instancedMesh ref={head} args={[undefined, undefined, n]} frustumCulled={false} userData={{ noBatch: true }}>
+        <instancedMesh ref={head} args={[undefined, undefined, n]} frustumCulled={false} userData={feet}>
           <sphereGeometry args={[0.08, 10, 8]} />
           <meshStandardMaterial />
         </instancedMesh>
-        <instancedMesh ref={arms} args={[undefined, undefined, n * 2]} frustumCulled={false} userData={{ noBatch: true }}>
+        <instancedMesh ref={arms} args={[undefined, undefined, n * 2]} frustumCulled={false} userData={armFeet}>
           <boxGeometry args={[0.045, 0.18, 0.045]} />
+          <meshStandardMaterial />
+        </instancedMesh>
+        <instancedMesh ref={legs} args={[undefined, undefined, n * 2]} frustumCulled={false} userData={armFeet}>
+          <boxGeometry args={[0.055, HIP, 0.055]} />
           <meshStandardMaterial />
         </instancedMesh>
       </group>
