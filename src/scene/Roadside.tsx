@@ -42,6 +42,8 @@ const KERB_W = 0.06
 const KERB_COLOR = '#cfd8dc'
 // Radius of the rounded kerb where a sidewalk turns an inside corner (dead ends, bends).
 export const FILLET = 0.2
+// Width of a curb ramp: the crosswalk's stripes are 0.34 long.
+const RAMP = 0.34
 
 // The sides at the -x and +x ends of a side's local frame (see SIDE_ROT).
 export const ENDS: Record<Side, [Side, Side]> = { s: ['w', 'e'], e: ['s', 'n'], w: ['n', 's'], n: ['e', 'w'] }
@@ -169,9 +171,6 @@ export function Sidewalk({ side, ends, drain }: { side: Side; ends: [End, End]; 
     </group>
   )
 }
-// Width of a curb ramp: the crosswalk's stripes are 0.34 long.
-const RAMP = 0.34
-
 const QUAD = { crack: cellQuad(0), patch: cellQuad(1), oil: cellQuad(2), grime: cellQuad(3, true) }
 let wearMat: MeshStandardMaterial | null = null
 const wear = () => (wearMat ??= new MeshStandardMaterial({ map: roadWearTex(), transparent: true, depthWrite: false, roughness: 0.9, ...decal(2) }))
