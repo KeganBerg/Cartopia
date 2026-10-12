@@ -24,6 +24,7 @@ type Shape = {
   lift: number // ground clearance
   cabinLen: number; cabinH: number; cabinZ: number
   taper: number // how much the cabin roof narrows (0 = box)
+  fastback?: number // share of the narrowing taken by the rear window (default 0.28): high for a long sloping fastback
   hood: number // hood bulge height
   wheel: number
   spoiler?: boolean; bed?: boolean; scoop?: boolean
@@ -47,6 +48,9 @@ type Shape = {
   bus?: boolean // window posts down the sides, rub rails, stop arm and roof warning lamps
   plates?: boolean // armoured scout: wheels clear of the hull under faceted fenders, a raked prow, a roll hoop and a rear turret, no windshield
   dog?: boolean // shaggy fur tufts, floppy ears, eyes, nose, tongue and a tail
+  frog?: boolean // rounded front wings standing proud of a low hood, with an upright round headlight in each
+  bubbles?: boolean // double-bubble roof: two raised ridges over the seats
+  lmp?: boolean // endurance prototype: tall rounded wheel pods over all four tyres, louvred on top
   track?: number // wheel distance from the centre line, when the wheels stand clear of the body
   drop: number // how far the hood sits below the rear deck
   nose: number // how far the nose falls away from the hood
@@ -77,6 +81,12 @@ const SHAPES: Record<Body, Shape> = {
   bus: { len: 1.8, wid: 0.8, body: 0.34, lift: 0.14, cabinLen: 1.46, cabinH: 0.32, cabinZ: -0.13, taper: 0.99, hood: 0, wheel: 0.18, drop: 0.1, nose: 0.06, bus: true },
   tusker: { len: 1.42, wid: 0.6, body: 0.2, lift: 0.2, cabinLen: 0.44, cabinH: 0.2, cabinZ: -0.02, taper: 1, hood: 0, wheel: 0.22, drop: 0.02, nose: 0.1, open: true, plates: true, track: 0.42 },
   dogvan: { len: 1.3, wid: 0.74, body: 0.28, lift: 0.12, cabinLen: 1.0, cabinH: 0.33, cabinZ: -0.1, taper: 0.97, hood: 0, wheel: 0.15, drop: 0.02, nose: 0.03, dog: true },
+  // Rear-engined sports car: a short sloping nose between raised front wings, a long fastback roof and a ducktail.
+  rearengine: { len: 1.14, wid: 0.7, body: 0.19, lift: 0.08, cabinLen: 0.72, cabinH: 0.19, cabinZ: -0.13, taper: 0.4, fastback: 0.68, hood: 0, wheel: 0.15, drop: 0.03, nose: 0.1, ducktail: true, frog: true, lightbar: true },
+  // Long-hood V10 roadster-coupe: the cabin sits right over the rear wheels.
+  longnose: { len: 1.4, wid: 0.76, body: 0.2, lift: 0.08, cabinLen: 0.52, cabinH: 0.16, cabinZ: -0.25, taper: 0.46, fastback: 0.58, hood: 0.04, wheel: 0.16, drop: 0.02, nose: 0.07, ducktail: true, bubbles: true },
+  // Closed-cockpit endurance prototype: a low tub between wheel pods, a bubble canopy and a big wing.
+  prototype: { len: 1.46, wid: 0.8, body: 0.13, lift: 0.06, cabinLen: 0.46, cabinH: 0.15, cabinZ: 0.06, taper: 0.45, hood: 0, wheel: 0.15, drop: 0, nose: 0.05, wing: true, lmp: true },
   // Open-wheel racer: drawn by formulaGeo; wid is the full width over the wheels.
   formula: { len: 1.4, wid: 0.84, body: 0.12, lift: 0.05, cabinLen: 0.3, cabinH: 0.1, cabinZ: -0.1, taper: 1, hood: 0, wheel: 0.15, drop: 0, nose: 0.06, track: 0.33 },
   // Motorcycles: only the size, wheel and ride height are used (see bikeGeo).
@@ -127,8 +137,9 @@ function cabinProfile(s: Shape, base: number, b: number) {
   const front = s.cabinZ + s.cabinLen / 2 - b
   const rear = s.cabinZ - s.cabinLen / 2 + b
   const slack = s.cabinLen * (1 - s.taper)
-  const roofF = front - slack * 0.72
-  const roofR = rear + slack * 0.28
+  const fb = s.fastback ?? 0.28
+  const roofF = front - slack * (1 - fb)
+  const roofR = rear + slack * fb
   const roof = base + s.cabinH - b
   const r = Math.min(0.05, s.cabinH * 0.35)
   const sh = new ThreeShape()
@@ -197,10 +208,10 @@ const plane = (w: number, h: number) => new PlaneGeometry(w, h)
 const disc = (r: number, seg = 16) => new CircleGeometry(r, seg)
 const cyl = (rt: number, rb: number, h: number, seg = 10) => new CylinderGeometry(rt, rb, h, seg)
 
-const SLEEK: Body[] = ['super', 'wedge', 'bubble', 'ev']
-const ROUND_LAMPS: Body[] = ['bubble', 'classic', 'offroad', 'compact', 'truck', 'van', 'suv', 'bus', 'dogvan', 'tusker']
+const SLEEK: Body[] = ['super', 'wedge', 'bubble', 'ev', 'prototype']
+const ROUND_LAMPS: Body[] = ['rearengine', 'bubble', 'classic', 'offroad', 'compact', 'truck', 'van', 'suv', 'bus', 'dogvan', 'tusker']
 const BIG_GRILLE: Body[] = ['muscle', 'truck', 'classic', 'wagon', 'luxury', 'bus']
-const LOW: Body[] = ['sports', 'super', 'wedge', 'coupe', 'hatch']
+const LOW: Body[] = ['sports', 'super', 'wedge', 'coupe', 'hatch', 'rearengine', 'longnose', 'prototype']
 const RUGGED: Body[] = ['truck', 'offroad', 'rally', 'suv']
 const VINTAGE: Body[] = ['classic', 'wagon', 'bubble', 'luxury', 'van', 'dogvan', 'bus']
 const FOUR_DOOR: Body[] = ['sedan', 'wagon', 'suv', 'luxury', 'ev', 'van', 'dogvan']
@@ -524,6 +535,10 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
       k.add('paint', box(s.wid * 0.8, 0.022, 0.12), [0, roofY + 0.012, c.roofR - 0.03], [-0.15, 0, 0])
       for (const sd of [-1, 1]) k.add('black', box(0.012, 0.05, 0.1), [sd * s.wid * 0.4, roofY - 0.005, c.roofR - 0.03])
     }
+    if (s.bubbles) {
+      // Double-bubble roof: a raised ridge over each seat with a dip down the middle.
+      for (const sd of [-1, 1]) k.add('paint', rbox(s.wid * 0.3, 0.024, roofLen * 0.86, 0.011), [sd * s.wid * 0.17, roofY + 0.006, roofZ])
+    }
     // Amber cab marker lamps along the front of the truck roof.
     if (body === 'truck') for (const x of [-0.12, 0, 0.12]) k.add('amber', box(0.04, 0.02, 0.03), [x * s.wid, roofY + 0.005, c.roofF - 0.02])
   }
@@ -726,6 +741,39 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
     k.add('tail', rbox(0.07, 0.012, 0.12, 0.005), [0, s.lift + 0.1, front + 0.05], [1.1, 0, 0])
     if (!fit.spoiler) k.add('paint', cyl(0.02, 0.035, 0.24, 8), [0, top + 0.12, -front - 0.04], [-0.6, 0, 0])
   }
+  if (s.frog) {
+    // Front wings standing above the hood, each ending in an upright round headlight.
+    for (const sd of [-1, 1]) {
+      const x = sd * (s.wid / 2 - 0.04)
+      k.add('paint', new SphereGeometry(1, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2), [x, hoodY - 0.03, wz + 0.02], [0, 0, 0], [0.105, 0.11, 0.24])
+      const ly = hoodY + 0.01
+      const lz = wz + 0.02 + 0.24 * Math.cos(0.62) - 0.008
+      k.add('black', cyl(0.05, 0.05, 0.03, 16), [x, ly, lz], [Math.PI / 2 - 0.45, 0, 0])
+      const nx = Math.cos(0.45) * 0.016
+      const ny = Math.sin(0.45) * 0.016
+      k.add('lamp', disc(0.042, 16), [x, ly + ny, lz + nx], [-0.45, 0, 0])
+      k.add('chrome', new TorusGeometry(0.046, 0.006, 4, 18), [x, ly + ny, lz + nx], [-0.45, 0, 0])
+      k.add('chrome', disc(0.012, 10), [x, ly + ny * 1.1, lz + nx * 1.1], [-0.45, 0, 0])
+    }
+    // Rear haunches swelling over the back wheels.
+    for (const sd of [-1, 1]) k.add('paint', new SphereGeometry(1, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2), [sd * (s.wid / 2 - 0.04), top - 0.05, -wz], [0, 0, 0], [0.1, 0.1, 0.26])
+  }
+  if (s.lmp) {
+    // Wheel pods: a tall rounded fairing over each tyre, with louvres on the front pods to vent the brakes.
+    for (const zz of [wz, -wz]) for (const sd of [-1, 1]) {
+      const x = sd * (s.wid / 2 - 0.04)
+      const [ph, pl] = zz > 0 ? [0.16, 0.27] : [0.15, 0.25]
+      k.add('paint', new SphereGeometry(1, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2), [x, top - 0.02, zz], [0, 0, 0], [0.125, ph, pl])
+      // Louvres lying on the back slope of the front pods.
+      if (zz > 0) for (const dz of [-0.03, -0.07, -0.11]) {
+        const u = dz / pl
+        const y = top - 0.02 + ph * Math.sqrt(1 - u * u)
+        k.add('black', box(0.07, 0.004, 0.018), [x, y + 0.003, zz + dz], [Math.atan((ph * u) / (pl * Math.sqrt(1 - u * u))), 0, 0])
+      }
+    }
+    // A dark channel down the middle of the nose between the pods.
+    k.add('dark', box(s.wid * 0.36, 0.004, s.len * 0.2), [0, hoodY + 0.002, front - s.len * 0.14])
+  }
   if (s.spare) {
     k.add('black', cyl(0.12, 0.12, 0.08, 16), [0, s.lift + s.body * 0.62, -front - 0.05], [Math.PI / 2, 0, 0])
     k.add('chrome', disc(0.06, 12), [0, s.lift + s.body * 0.62, -front - 0.091], [0, Math.PI, 0])
@@ -776,7 +824,7 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
       k.add('black', rbox(0.06, 0.04, 0.26, 0.012), [0, hoodY + 0.02, s.len * 0.27])
     }
   }
-  if (s.spoiler && !fit.spoiler) {
+  if (s.spoiler && !fit.spoiler && !hasTrim(model, 'swanWing') && !hasTrim(model, 'lipSpoiler')) {
     for (const sd of [-1, 1]) k.add('black', box(0.03, 0.12, 0.04), [sd * s.wid * 0.32, top + 0.06, -s.len / 2 + 0.07])
     k.add(body === 'super' ? 'black' : 'paint', box(s.wid * 0.95, 0.03, 0.14), [0, top + 0.13, -s.len / 2 + 0.07])
   }
@@ -808,6 +856,8 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
           onNose(intake ? 'chrome' : 'chrome', new TorusGeometry(0.031, 0.005, 4, 16), sd * s.wid * lx, lightY, 0.009)
           if (!intake) onNose('chrome', disc(0.009, 8), sd * s.wid * lx, lightY, 0.01)
         }
+      } else if (s.frog) {
+        // The headlights stand up in the front wings (see above).
       } else if (roundLamps) {
         // Sealed-beam lamp: black bucket, chrome ring, lens and a bulb shield in the middle.
         onNose('black', disc(0.058, 18), x, lightY, 0.002)
@@ -837,7 +887,7 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
       // Fog lamps low on the bumper of off-roaders and rally cars.
       if (RUGGED.includes(body)) k.add('lamp', disc(0.025, 10), [sd * s.wid * 0.3, s.lift + 0.07, front + 0.026])
     }
-    if (!sleek) {
+    if (!sleek && !s.frog) {
       // Grille: a surround with a mesh of slats and bars behind it.
       const gw = s.wid * (bigGrille ? 0.42 : 0.3)
       const gh = bigGrille ? 0.075 : 0.05
@@ -938,7 +988,7 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
   // This model's own trim (see carTrim.ts).
   trimCar(k, model, {
     len: s.len, wid: s.wid, lift: s.lift, body: s.body, wheel: s.wheel, cabinZ: s.cabinZ, cabinLen: s.cabinLen,
-    top, hoodY, bulge: s.hood * 2 > 0 ? s.hood : 0, hoodFront, cowl, front, wz, lightY, plateY, nose: noseAt, exhaust: !!fit.exhaust, ty, roofY, roofLen, roofZ, closed,
+    top, hoodY, bulge: s.hood * 2 > 0 ? s.hood : 0, hoodFront, cowl, front, wz, lightY, plateY, nose: noseAt, exhaust: !!fit.exhaust, spoiler: !!fit.spoiler, ty, roofY, roofLen, roofZ, closed,
   })
 
   // Wheel: one mesh per wheel. The tread and the spoked rim share one texture,

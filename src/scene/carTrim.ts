@@ -27,6 +27,7 @@ export type TrimFrame = {
   ty: number // tail light height
   roofY: number; roofLen: number; roofZ: number // 0 roofLen: no roof
   exhaust: boolean // an exhaust mod is fitted
+  spoiler: boolean // a spoiler mod is fitted
   closed: boolean
 }
 
@@ -39,7 +40,7 @@ type Feature =
   | 'stopArm' | 'roofHatches' | 'schoolSign' | 'crossingArm' | 'busMirrors' | 'bone'
   | 'drl' | 'hoodCreases' | 'meshGrille' | 'popups' | 'quadTails' | 'tripleTails' | 'sideSkirts' | 'rearWiper' | 'diffuserFins'
   | 'centerExhaust' | 'stepBars' | 'ladder' | 'tailgateLettering' | 'fuelCap' | 'towStrap' | 'headlightTape' | 'chromeTrimWindow'
-  | 'roofSeams' | 'chargePort'
+  | 'roofSeams' | 'chargePort' | 'boxFlares' | 'trunkWing' | 'sideBlade' | 'horseshoe' | 'swanWing' | 'lipSpoiler'
 
 // What each car gets on top of its body's own detail. Ids not in this build
 // (another thread's newer cars) are simply skipped.
@@ -79,6 +80,15 @@ const TRIMS: Record<string, Feature[]> = {
   tusker: ['stowage', 'towHitch', 'whip'],
   shaggy: ['roofRack', 'bone', 'towHitch'],
   nightfall: ['splitter', 'canards', 'deckLouvers', 'fenderVents', 'diffuserFins', 'drl', 'centerExhaust'],
+  // Gap fillers.
+  kreis: ['boxFlares', 'trunkWing', 'splitter', 'sideSkirts', 'drl', 'roundel'],
+  bergmeister: ['deckLouvers', 'sideStripe', 'fuelCap'],
+  rattler: ['hoodVents', 'splitter', 'tripleTails', 'sideStripe', 'fenderVents', 'drl'],
+  cottonmouth: ['hoodVents', 'sideExhaust', 'fenderVents', 'splitter', 'canards', 'diffuserFins'],
+  ringmeister: ['lipSpoiler', 'sideBlade', 'drl', 'diffuserFins', 'deckLouvers', 'sideSkirts'],
+  raiden: ['sharkFin', 'roofScoop', 'roundel', 'splitter', 'canards', 'diffuserFins'],
+  sovereign: ['lipSpoiler', 'horseshoe', 'roofScoop', 'diffuserFins', 'centerExhaust', 'drl', 'sideSkirts'],
+  wraith: ['swanWing', 'canards', 'splitter', 'diffuserFins', 'centerExhaust', 'drl', 'roofScoop'],
 }
 
 const box = (w: number, h: number, d: number) => new BoxGeometry(w, h, d)
@@ -109,6 +119,50 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
   const { wid, len, lift, top, hoodY, front, roofY, roofLen, roofZ, wz, wheel } = t
   const roof = roofLen > 0
   switch (f) {
+    case 'boxFlares':
+      // Squared-off blistered arches over all four wheels.
+      for (const sd of SIDES) for (const z of [wz, -wz]) k.add('paint', new TorusGeometry(wheel * 1.22, 0.036, 4, 5, Math.PI), [sd * (wid / 2 + 0.014), wheel, z], [0, (sd * Math.PI) / 2, 0], [1, 1, 1.5])
+      return
+    case 'trunkWing':
+      // Small wing on the trunk lid, standing on two short legs.
+      if (t.spoiler) return
+      for (const sd of SIDES) k.add('black', box(0.02, 0.045, 0.03), [sd * wid * 0.3, top + 0.022, -front + 0.09])
+      k.add('black', box(wid * 0.82, 0.018, 0.1), [0, top + 0.05, -front + 0.08], [0.1, 0, 0])
+      k.add('black', box(wid * 0.82, 0.016, 0.006), [0, top + 0.06, -front + 0.032])
+      return
+    case 'lipSpoiler':
+      // A slim lip along the tail in place of a wing (CarModel leaves out the stock wing).
+      if (t.spoiler) return
+      k.add('paint', box(wid * 0.86, 0.022, 0.07), [0, top + 0.01, -front + 0.05], [0.3, 0, 0])
+      k.add('black', box(wid * 0.84, 0.006, 0.004), [0, top + 0.021, -front + 0.017])
+      return
+    case 'sideBlade':
+      // A contrasting blade behind each door, with an intake slot cut into it.
+      for (const sd of SIDES) {
+        const p: V3 = [sd * (wid / 2 + 0.007), lift + t.body * 0.55, -wz + wheel * 1.45]
+        k.add('black', plane(0.15, t.body * 0.85), p, [0, (sd * Math.PI) / 2, 0])
+        k.add('dark', plane(0.09, 0.03), [p[0] + sd * 0.002, p[1] + 0.01, p[2] - 0.01], [0, (sd * Math.PI) / 2, 0])
+      }
+      return
+    case 'horseshoe': {
+      // A chrome horseshoe grille in the nose, and a chrome curve sweeping round each door.
+      const [z, y, rx] = t.nose(t.lightY - 0.01)
+      k.add('dark', disc(0.04, 14), [0, y, z + 0.008], [rx, 0, 0])
+      k.add('chrome', new TorusGeometry(0.044, 0.008, 4, 16, Math.PI * 1.5), [0, y, z + 0.01], [rx, 0, -Math.PI * 0.25])
+      for (const sd of SIDES) k.add('chrome', new TorusGeometry(t.body * 0.42, 0.006, 3, 16, Math.PI), [sd * (wid / 2 + 0.006), lift + t.body * 0.58, t.cabinZ - t.cabinLen * 0.1], [0, (sd * Math.PI) / 2, sd * Math.PI / 2])
+      return
+    }
+    case 'swanWing':
+      // A big rear wing hung from two swan-neck posts, with endplates.
+      if (t.spoiler) return
+      for (const sd of SIDES) {
+        bar(k, 'black', [sd * wid * 0.18, top, -front + 0.24], [sd * wid * 0.18, top + 0.17, -front + 0.17], 0.02)
+        bar(k, 'black', [sd * wid * 0.18, top + 0.17, -front + 0.17], [sd * wid * 0.18, top + 0.15, -front + 0.1], 0.02)
+        k.add('paint', box(0.012, 0.07, 0.17), [sd * wid * 0.46, top + 0.13, -front + 0.1])
+      }
+      k.add('paint', box(wid * 0.92, 0.02, 0.14), [0, top + 0.14, -front + 0.1], [0.08, 0, 0])
+      k.add('black', box(wid * 0.9, 0.012, 0.05), [0, top + 0.16, -front + 0.04], [0.45, 0, 0])
+      return
     case 'drl':
       // LED brows over the headlights.
       for (const sd of SIDES) {
@@ -552,6 +606,14 @@ const STYLES: Record<string, CarStyle> = {
   gullwing: { rim: 'classic', seat: '#b71c1c' },
   speedster: { rim: 'wire', seat: '#6d4c41' },
   nightfall: { rim: 'turbine', rimColor: '#1d1d1d', caliper: '#00e5ff', seat: '#311b92' },
+  kreis: { rim: 'mesh', rimColor: '#cfd2d4', caliper: '#1e88e5', seat: '#212121' },
+  bergmeister: { rim: 'five', rimColor: '#dfe3e6', caliper: '#e53935', seat: '#3e2723' },
+  rattler: { rim: 'split', rimColor: '#2b2b2b', caliper: '#e53935', seat: '#1c1c1c' },
+  cottonmouth: { rim: 'deep', rimColor: '#d4d4d4', caliper: '#e53935', seat: '#1c1c1c' },
+  ringmeister: { rim: 'turbine', rimColor: '#3a3a3a', caliper: '#d32f2f', seat: '#4a1010' },
+  raiden: { rim: 'five', rimColor: '#eceff1', caliper: '#ff6d00', seat: '#263238' },
+  sovereign: { rim: 'turbine', rimColor: '#c0c6cc', caliper: '#1a237e', seat: '#d7b98e' },
+  wraith: { rim: 'split', rimColor: '#1d1d1d', caliper: '#ff6f00', seat: '#212121' },
 }
 // A car this build doesn't know gets plain five-spokes.
 export const carStyle = (model?: string): CarStyle => (model && STYLES[model]) || { rim: 'five' }

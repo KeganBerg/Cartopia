@@ -243,7 +243,7 @@ export const buildingUpgradeXp = (level: number) => 10 + level * 5
 export const levelLift = (level = 1) => 0.26 * (Math.min(MAX_BUILDING_LEVEL, Math.max(1, level)) - 1)
 
 export type Body = 'compact' | 'sedan' | 'sports' | 'muscle' | 'truck' | 'super' | 'bubble' | 'wagon' | 'wedge' | 'roadster' | 'rally' | 'classic' | 'offroad' | 'coupe' | 'widebody' | 'tank' | 'scooter' | 'chopper' | 'sportbike'
-  | 'hatch' | 'van' | 'suv' | 'ev' | 'luxury' | 'formula' | 'bus' | 'tusker' | 'dogvan'
+  | 'hatch' | 'van' | 'suv' | 'ev' | 'luxury' | 'formula' | 'bus' | 'tusker' | 'dogvan' | 'rearengine' | 'longnose' | 'prototype'
 // Two-wheelers: drawn as motorcycles with a rider, and only take exhaust and rim mods.
 export const BIKES: Body[] = ['scooter', 'chopper', 'sportbike']
 export const isBike = (body: Body) => BIKES.includes(body)
@@ -345,6 +345,15 @@ export const CARS: CarDef[] = [
   { id: 'tusker', name: 'Kodiak Tusker Scout', body: 'tusker', price: 95000, unlockLevel: 20, power: 70, grip: 72, weight: 58, skill: 'torque', likes: ['police', 'helipad', 'tires'], colors: ['#6b7a3a', '#c2a36b', '#eceff1'] },
   { id: 'lambo', name: 'Veloce Corrida V12', body: 'wedge', price: 0, bucks: 90, unlockLevel: 26, power: 86, grip: 70, weight: 34, skill: 'oil', likes: ['cinema', 'club', 'parkade'], colors: ['#fdd835', '#d50000', '#fafafa'] },
   { id: 'hyper', name: 'Veloce Hyperion', body: 'super', price: 300000, unlockLevel: 33, power: 98, grip: 86, weight: 32, skill: 'nitro', likes: ['stadium', 'tuner', 'parkade'], colors: ['#1a237e', '#212121', '#d50000'] },
+  // Gap fillers (2026-10-12): one car for each stretch of levels the Showroom had nothing new at.
+  { id: 'kreis', name: 'Brandt Kreis S', body: 'sedan', price: 48000, unlockLevel: 14, power: 62, grip: 58, weight: 44, skill: 'smooth', likes: ['tuner', 'offices', 'parts'], colors: ['#eceff1', '#0d47a1', '#212121'] },
+  { id: 'bergmeister', name: 'Falke Bergmeister RS', body: 'rearengine', price: 70000, unlockLevel: 17, power: 66, grip: 64, weight: 34, skill: 'launch', likes: ['coffee', 'motel', 'parkade'], colors: ['#fafafa', '#2e7d32', '#ff6f00'] },
+  { id: 'rattler', name: 'Liberty Rattler GT', body: 'muscle', price: 105000, unlockLevel: 21, power: 84, grip: 54, weight: 56, skill: 'nitro', likes: ['burger', 'bowling', 'stadium'], colors: ['#1565c0', '#fafafa', '#b71c1c'] },
+  { id: 'cottonmouth', name: 'Liberty Cottonmouth ACR', body: 'longnose', price: 150000, unlockLevel: 25, power: 88, grip: 62, weight: 46, skill: 'torque', likes: ['club', 'lube', 'stadium'], colors: ['#0d47a1', '#b71c1c', '#fdd835'] },
+  { id: 'ringmeister', name: 'Nordwerk Ring V10', body: 'super', price: 190000, unlockLevel: 28, power: 88, grip: 82, weight: 40, skill: 'slipstream', likes: ['glasstower', 'parkade', 'hq'], colors: ['#9e9e9e', '#d32f2f', '#212121'] },
+  { id: 'raiden', name: 'Kazumi Raiden R26', body: 'prototype', price: 260000, unlockLevel: 32, power: 92, grip: 92, weight: 24, skill: 'smooth', likes: ['stadium', 'tuner', 'parts'], colors: ['#00897b', '#ff6d00', '#eceff1'] },
+  { id: 'sovereign', name: 'Moreau Sovereign 16', body: 'super', price: 0, bucks: 140, unlockLevel: 34, power: 100, grip: 88, weight: 44, skill: 'slipstream', likes: ['hq', 'glasstower', 'cinema'], colors: ['#1a237e', '#90a4ae', '#b71c1c'] },
+  { id: 'wraith', name: 'Nordvik Wraith', body: 'wedge', price: 480000, unlockLevel: 38, legendary: true, power: 100, grip: 90, weight: 30, skill: 'oil', likes: ['club', 'glasstower', 'helipad'], colors: ['#eceff1', '#ff6f00', '#212121'] },
   { id: 'bug', name: 'Bumble Bubble', body: 'bubble', price: 1200, unlockLevel: 1, rescueOnly: true, power: 14, grip: 28, weight: 28, skill: 'freeze', likes: ['icecream', 'donut', 'coffee'], colors: ['#80cbc4', '#ffcc80', '#ef9a9a'] },
   { id: 'woodie', name: 'Lakeside Woodie Wagon', body: 'wagon', price: 2200, unlockLevel: 1, rescueOnly: true, power: 22, grip: 28, weight: 56, skill: 'slipstream', likes: ['diner', 'hospital', 'market'], colors: ['#fafafa', '#fff59d', '#4db6ac'] },
   { id: 'hauler', name: 'Old Faithful Hauler', body: 'truck', price: 3000, unlockLevel: 1, rescueOnly: true, power: 26, grip: 26, weight: 70, skill: 'torque', likes: ['carwash', 'junkyard', 'tacos'], colors: ['#558b2f', '#e65100', '#1565c0'] },
@@ -652,6 +661,8 @@ export const CAR_SETS: CarSet[] = [
   { id: 'grandtour', name: 'Grand Tour', icon: '🎩', cars: ['salon', 'speedster', 'monoposto'], coins: 20000, bucks: 10, trophies: 30, xp: 350 },
   { id: 'heavy', name: 'Heavy Duty', icon: '🚌', cars: ['schoolbus', 'tusker'], coins: 6000, bucks: 3, trophies: 10, xp: 150 },
   { id: 'dream', name: 'Dream Garage', icon: '💎', cars: ['lambo', 'hyper', 'tomahawk', 'zenith'], coins: 30000, bucks: 15, trophies: 40, xp: 500 },
+  { id: 'autobahn', name: 'Autobahn Club', icon: '🛣', cars: ['kreis', 'bergmeister', 'ringmeister', 'sovereign'], coins: 20000, bucks: 10, trophies: 30, xp: 350 },
+  { id: 'apex', name: 'Apex Predators', icon: '🐍', cars: ['rattler', 'cottonmouth', 'raiden', 'wraith'], coins: 30000, bucks: 15, trophies: 40, xp: 500 },
   // Season track prizes; each season adds its car here.
   { id: 'seasons', name: 'Season Rides', icon: '🏁', cars: ['nightfall'], coins: 5000, bucks: 3, trophies: 10, xp: 150 },
 ]

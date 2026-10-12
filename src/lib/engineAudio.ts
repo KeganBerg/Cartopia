@@ -67,6 +67,12 @@ const BODY: Record<Body, EngineProfile> = {
   tusker: p({ ppr: 4, idle: 700, redline: 4600, odd: 0.25, roll: 1.4, lump: 0.3, lumpRatio: 0.25, sub: 0.6, grit: 0.45, noise: 0.4, clatter: 0.45, bright: 0.8, reso: 115, turbo: 0.6, vol: 1.15 }),
   // Wheezy old van four.
   dogvan: p({ ppr: 2, idle: 750, redline: 4400, odd: 0.45, roll: 1.2, lump: 0.4, lumpRatio: 0.5, sub: 0.15, grit: 0.3, noise: 0.35, clatter: 0.4, bright: 0.8, reso: 165, vol: 0.85 }),
+  // Air-cooled flat-six hung out the back: a hard, metallic howl to a high redline.
+  rearengine: p({ ppr: 3, idle: 950, redline: 8600, odd: 0.32, roll: 1.05, lump: 0.2, lumpRatio: 0.5, sub: 0.2, grit: 0.4, noise: 0.35, clatter: 0.15, bright: 1.35, reso: 235, crackle: 0.5, vol: 1.05 }),
+  // Big lazy V10 in a long nose: lumpy, truck-like bark at low revs.
+  longnose: p({ ppr: 5, idle: 800, redline: 6200, odd: 0.35, roll: 1.3, lump: 0.3, lumpRatio: 0.2, sub: 0.55, grit: 0.55, noise: 0.35, bright: 0.95, reso: 150, crackle: 0.55, vol: 1.2 }),
+  // Four-rotor endurance prototype: a shrieking, buzzing wail.
+  prototype: p({ ppr: 2, idle: 1800, redline: 9500, odd: 0.55, roll: 0.95, lump: 0.15, lumpRatio: 0.5, sub: 0.15, grit: 0.5, noise: 0.35, bright: 1.6, reso: 320, crackle: 0.8, vol: 1.2 }),
 }
 
 const MODEL: Record<string, Partial<EngineProfile>> = {
@@ -94,6 +100,16 @@ const MODEL: Record<string, Partial<EngineProfile>> = {
   speedster: { odd: 0.35, lump: 0.35, lumpRatio: 0.5, redline: 6200, clatter: 0.2, crackle: 0.35 },
   // V12 hybrid hypercar: screaming and silky, with an electric whine on top.
   zenith: { ppr: 6, redline: 9500, lump: 0, odd: 0.08, turbo: 0, whine: 0.5, bright: 1.55, crackle: 0.8, reso: 260 },
+  // High-revving four-cylinder touring car.
+  kreis: { redline: 8200, odd: 0.3, grit: 0.35, crackle: 0.45, bright: 1.25 },
+  // Supercharged V8 with the blower whine over the burble.
+  rattler: { whine: 0.7, lump: 0.4, crackle: 0.55 },
+  // Naturally aspirated V10 behind the seats.
+  ringmeister: { ppr: 5, turbo: 0, redline: 8700, lump: 0.05, odd: 0.25, bright: 1.45, crackle: 0.7 },
+  // Sixteen cylinders and four turbos: a deep, smooth rush.
+  sovereign: { ppr: 8, redline: 6700, turbo: 1, sub: 0.6, roll: 1.3, bright: 1.1, crackle: 0.3, vol: 1.25 },
+  // Twin-turbo flat-plane V8 that cracks on every lift.
+  wraith: { ppr: 4, redline: 8500, turbo: 0.9, crackle: 0.9, lump: 0.1, reso: 220 },
 }
 
 export function engineProfile(modelId?: string, body?: Body): EngineProfile {
