@@ -157,8 +157,10 @@ void main() {
   float a = atan(axis.x * d.y - axis.y * d.x, dot(axis, d));
   float n = aNoise(vec2(a * 14.0 + uTime * 0.02, uTime * 0.04)) * 0.6 + aNoise(vec2(a * 41.0 - uTime * 0.03, 5.0 + uTime * 0.05)) * 0.4;
   float ray = smoothstep(0.36, 0.8, n);
-  float reach = 1.0 / (1.0 + r * r * 0.12);
-  float glow = exp(-r * 0.9);
+  // A tall narrow (phone) view is close to the source all across, so fade faster there.
+  float rr = r / min(1.0, uAspect);
+  float reach = 1.0 / (1.0 + rr * rr * 0.12);
+  float glow = exp(-rr * 0.9);
   gl_FragColor = vec4(uColor, (ray * reach + glow * 0.22) * uOpacity);
   #include <colorspace_fragment>
 }
