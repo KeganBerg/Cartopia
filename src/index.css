@@ -866,6 +866,8 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .clan-banner p { margin: 4px 0; font-weight: 800; }
 .clan-banner small { font-weight: 800; opacity: .9; }
 .clan-banner-main { min-width: 0; }
+.clan-banner-stats { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 4px; font: 14px var(--display); }
+.clan-banner-stats em { margin-left: 3px; font: normal 11px var(--display); color: #b9f6ca; }
 .clan-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 10px 0; }
 .clan-stat { background: #fff; border: 2px solid #e0e0e0; border-radius: 12px; padding: 8px 4px; text-align: center; display: flex; flex-direction: column; align-items: center; }
 .clan-stat > span { font-size: 20px; }

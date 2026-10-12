@@ -84,7 +84,7 @@ function useOpen() {
 }
 
 // The crew's shared weekly target, who has chipped in, and the chest at the end.
-export function CrewGoalCard({ members, uid }: { members: Member[]; uid: string }) {
+export function CrewGoalCard({ members, uid, chips = true }: { members: Member[]; uid: string; chips?: boolean }) {
   const goal = useCrewGoal((g) => g.goal)
   const failed = useCrewGoal((g) => g.failed)
   const now = useNow()
@@ -113,7 +113,7 @@ export function CrewGoalCard({ members, uid }: { members: Member[]; uid: string 
         <span><b>{n(w.points)}</b> / {n(w.target)}</span>
         <span className="crew-legend">🍕 +{CREW_POINTS.job} · 🏁 +{CREW_POINTS.race}</span>
       </div>
-      <div className="crew-chips">
+      {chips && <div className="crew-chips">
         {roster.map((m) => {
           const p = pts.get(m.ownerId) ?? 0
           return (
@@ -124,7 +124,7 @@ export function CrewGoalCard({ members, uid }: { members: Member[]; uid: string 
             </span>
           )
         })}
-      </div>
+      </div>}
       <div className={`chest crew-chest${ready ? ' ready' : ''}${w.opened ? ' opened' : ''}`}>
         <span className="chest-icon">{w.opened ? '📭' : '🧰'}</span>
         <div className="chest-main">

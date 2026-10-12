@@ -17,6 +17,9 @@ import { demoBattle, useCrewBattle } from '../lib/battles'
 import { PlayerName } from './Username'
 import { playerName } from '../lib/profiles'
 import { LoadingBand } from './Loading'
+import { CrewLadder, demoCrew } from './CrewLadder'
+import { compact } from './format'
+import { CREW_DEMO } from '../lib/crewRaces'
 
 const n = (v: number) => v.toLocaleString()
 
@@ -237,8 +240,10 @@ export function ClanPanel() {
     <Panel title="Crew" wide>
       <SocialTabs current="clan" />
       {/* ?battle=demo: the battle strip for trying it signed out. */}
-      {uid === null && demoBattle() && <CrewBattleCard />}
-      {!supabase ? (
+      {uid === null && demoBattle() && !CREW_DEMO && <CrewBattleCard />}
+      {CREW_DEMO && !uid ? (
+        <ClanHome data={demoCrew()} uid="me" onChange={() => {}} />
+      ) : !supabase ? (
         <p className="hint">Crews need an internet connection.</p>
       ) : uid === null ? (
         <div className="clan-signin">
@@ -313,6 +318,8 @@ function ClanHome({ data, uid, onChange }: { data: MyClan; uid: string; onChange
   }
 
   const leaderLeaving = role === 'leader' && members.length > 1
+  const goalWeek = useCrewGoal((g) => g.goal?.current)
+  const points = new Map((goalWeek?.members ?? []).map((m) => [m.id, m.points]))
   return (
     <div className="clan-home">
       <div className="clan-banner" style={{ ['--clan' as string]: clan.color }}>
@@ -321,46 +328,39 @@ function ClanHome({ data, uid, onChange }: { data: MyClan; uid: string; onChange
           <h3>{clan.name} <span className="clan-tag">{clan.tag}</span></h3>
           {clan.description && <p>{clan.description}</p>}
           <small>{clan.members}/{clan.memberCap} members{clan.minLevel > 1 ? ` · level ${clan.minLevel}+ to join` : ''}{rank ? ` · #${rank} by power` : ''}</small>
+          <div className="clan-banner-stats">
+            {METRICS.map((m) => (
+              <span key={m.id} title={m.label}>{m.icon} {compact(clan.total[m.id])}{clan.week[m.id] > 0 && <em>+{compact(clan.week[m.id])}</em>}</span>
+            ))}
+          </div>
         </div>
         <button className="buy small alt clan-chat" onClick={() => openChat('crew')}>💬 Chat{crewChat > 0 && <span className="tab-dot">{crewChat > 9 ? '9+' : crewChat}</span>}</button>
       </div>
+      <CrewLadder members={members} uid={uid} points={points} />
       <CrewBattleCard />
-      <CrewGoalCard members={members} uid={uid} />
-      <div className="clan-stats">
-        {METRICS.map((m) => (
-          <div key={m.id} className="clan-stat">
-            <span>{m.icon}</span>
-            <b>{n(clan.total[m.id])}</b>
-            <small>{m.id === 'level' ? 'total levels' : m.label.toLowerCase()}</small>
-            {clan.week[m.id] > 0 && <em>+{n(clan.week[m.id])} this week</em>}
-          </div>
-        ))}
-      </div>
+      <CrewGoalCard members={members} uid={uid} chips={false} />
 
-      {editing && role === 'leader' && <ClanEditor clan={clan} onDone={() => { setEditing(false); onChange() }} />}
-
-      <h3>Members</h3>
-      <div className="leaders">
-        {members.map((m) => {
-          const me = m.ownerId === uid
-          return (
-            <div key={m.ownerId} className={me ? 'leader member-row mine' : 'leader member-row'}>
-              <span className="rank">{m.role === 'leader' ? '👑' : m.level}</span>
-              <div className="leader-main">
-                <b><PlayerName id={m.ownerId} town={m.townName} />{me ? ' (you)' : ''}</b>
-                <div className="card-stat">Lvl {m.level} · ⚡ {n(m.power)} · 🏁 {n(m.raceWins)} · 🏆 {n(m.trophies)}</div>
-              </div>
-              {!me ? <button className="buy small" onClick={() => go(m.ownerId)}>Visit</button> : <span />}
-              {role === 'leader' && !me ? (
+      {editing && role === 'leader' && (
+        <>
+          <ClanEditor clan={clan} onDone={() => { setEditing(false); onChange() }} />
+          <div className="leaders">
+            {members.filter((m) => m.ownerId !== uid).map((m) => (
+              <div key={m.ownerId} className="leader member-row">
+                <span className="rank">{m.level}</span>
+                <div className="leader-main">
+                  <b><PlayerName id={m.ownerId} town={m.townName} /></b>
+                  <div className="card-stat">Lvl {m.level} · ⚡ {n(m.power)} · 🏁 {n(m.raceWins)}</div>
+                </div>
+                <button className="buy small" onClick={() => go(m.ownerId)}>Visit</button>
                 <button className="sell small" disabled={busy} onClick={() => act(() => kickMember(m.ownerId), `${playerName(m.ownerId, m.townName)} was removed`)}>Remove</button>
-              ) : <span />}
-            </div>
-          )
-        })}
-      </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       <div className="clan-actions">
-        {role === 'leader' && !editing && <button className="buy small alt" onClick={() => setEditing(true)}>✏️ Edit crew</button>}
+        {role === 'leader' && !editing && <button className="buy small alt" onClick={() => setEditing(true)}>✏️ Edit crew & members</button>}
         {!confirmLeave ? (
           <button className="sell" onClick={() => setConfirmLeave(true)}>Leave crew</button>
         ) : (
