@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
+import { calmFlashing } from '../game/flashing'
 import { AdditiveBlending, BufferAttribute, BufferGeometry, CanvasTexture, Color, DoubleSide, Group, InstancedMesh, Material, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, PerspectiveCamera, RepeatWrapping, SRGBColorSpace, Vector3, type Texture } from 'three'
 import { CarModel, carFrame, wheelRig, type WheelRig } from './CarModel'
 import { BuildingModel } from './BuildingModel'
@@ -381,7 +382,7 @@ function Trackside({ t }: { t: Track }) {
     <group>
       {stands.map((s, i) => <Grandstand key={i} x={s.x} z={s.z} h={s.h} width={s.w} rows={5} roof={i % 2 ? '#1565c0' : '#c62828'} />)}
       <Crowd people={fans} />
-      <Batch version={t.n} cell={24}>
+      <Batch version={t.n} cell={24} freeze>
         {tyres.map((p, i) => <TyreStack key={i} x={p.x} z={p.z} n={3} band={i % 2 ? '#e53935' : '#fafafa'} />)}
         {marshals.map((m, i) => (
           <group key={i} position={[m.x, 0, m.z]} rotation-y={m.ry}>
@@ -432,7 +433,7 @@ function TownScenery({ t }: { t: Track }) {
   const tex = useMemo(() => { const c = towerTex().clone(); c.repeat.set(2, 4); c.needsUpdate = true; return c }, [])
   return (
     <group>
-      <Batch version={t.n + 1} cell={24}>
+      <Batch version={t.n + 1} cell={24} freeze>
         {shops.map((s, i) => <Building key={i} def={s.def} x={s.x} z={s.z} ry={s.ry} />)}
         {trees.map((p, i) => <Building key={i} def={p.def} x={p.x} z={p.z} ry={i} s={p.s} />)}
         {towers.map((b, i) => (
@@ -496,7 +497,7 @@ function DocksScenery({ t }: { t: Track }) {
   return (
     <group>
       <group position-y={-0.33}><Water x={0} z={0} w={500} d={500} id="kartdocks" color="#8fd0f5" rough={0.6} /></group>
-      <Batch version={t.n + 2} cell={24}>
+      <Batch version={t.n + 2} cell={24} freeze>
         {/* Concrete quay under the whole circuit, so the track sits on land with water round it. */}
         {quay.map((q, i) => <mesh key={i} position={[q.x, -0.22, q.z]}><boxGeometry args={[4.02, 0.44, 4.02]} /><meshStandardMaterial map={concreteTex(1, 1)} color="#b0b6ba" /></mesh>)}
         {stacks.map((s, i) => (
@@ -597,7 +598,7 @@ function DesertScenery({ t }: { t: Track }) {
   const stop = useMemo(() => along(200, 5, 1, 5, 89)[0], [along])
   return (
     <group>
-      <Batch version={t.n + 3} cell={24}>
+      <Batch version={t.n + 3} cell={24} freeze>
         <mesh rotation-x={-Math.PI / 2} position={[0, -0.01, 0]}><planeGeometry args={[460, 460]} /><meshStandardMaterial map={sandTex(60, 60)} color="#e7b98a" /></mesh>
         {mesas.map((m, i) => (
           <group key={i} position={[m.x, 0, m.z]} rotation-y={m.ry}>
@@ -1025,7 +1026,8 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
       events.push(...race.events)
     }
     // Feel: knocks shake the camera, a drift turbo kicks the view wider for a moment.
-    for (const e of events) if (e.kart === me) {
+    // (Not with calm motion on: it follows the device's reduce-motion setting.)
+    if (!calmFlashing()) for (const e of events) if (e.kart === me) {
       if (e.kind === 'wall' || e.kind === 'bump') s.shake = Math.max(s.shake, 0.18)
       else if (e.kind === 'hit' || e.kind === 'boom') s.shake = Math.max(s.shake, 0.45)
       else if (e.kind === 'land') s.shake = Math.max(s.shake, 0.12)
@@ -1175,7 +1177,7 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
     <>
       <ArcadeSky view={view} near={100} far={340} />
       <hemisphereLight args={['#ffffff', '#666666', 0.15]} />
-      <Batch version={t.n * 10 + (t.reverse ? 1 : 0)}>
+      <Batch version={t.n * 10 + (t.reverse ? 1 : 0)} freeze>
         <TrackSurface t={t} />
       </Batch>
       <Trackside t={t} />

@@ -9,7 +9,8 @@ import './drive.css'
 // write into it, so the scene reads it every frame without React re-rendering.
 // steer: +1 full left, -1 full right. gas/brake: 0..1. drift/item: held.
 
-export type DriveInput = { steer: number; gas: number; brake: number; drift: boolean; item: boolean }
+// thumb: drifts come from the steering thumb alone (portrait touch), see game/kart.ts thumbSlide.
+export type DriveInput = { steer: number; gas: number; brake: number; drift: boolean; item: boolean; thumb?: boolean }
 export const newDriveInput = (): DriveInput => ({ steer: 0, gas: 0, brake: 0, drift: false, item: false })
 
 // Phones and tablets get the touch layout; a PC gets key hints. ?touch=1 forces touch.
@@ -100,28 +101,28 @@ export function thumbSteer(dx: number, f: SteerFeel) {
   return -Math.sign(dx) * Math.min(1, (a - f.dead) / (f.range - f.dead)) ** f.curve
 }
 
-// Portrait drifting from the steering thumb alone. 'flick': out past FLICK_OUT within FLICK_MS
-// of being near the middle, so steering wide through a bend never drifts by accident.
-// 'slide': any slide past 0.85. Either way the drift holds while the thumb stays out that way
-// and ends as it comes back towards the middle or crosses over.
-const FLICK_MS = 170, FLICK_OUT = 0.85, FLICK_FROM = 0.35
+// Portrait drifting from the steering thumb alone. 'flick': a quick jerk outwards (at least
+// FLICK_JUMP further out within FLICK_MS) that ends past FLICK_OUT, from the middle or from a
+// steer already held through a bend; easing wide never drifts by accident. 'slide': any slide
+// past 0.85. The drift ends as the thumb comes back near the middle or crosses over.
+const FLICK_MS = 150, FLICK_OUT = 0.85, FLICK_JUMP = 0.5, LET_GO = 0.2 // keep LET_GO in step with THUMB_LET_GO (game/kart.ts)
 export class ThumbDrift {
   dir = 0
-  private calm = -1e9
+  private recent: { t: number; s: number }[] = []
   private mode: SteerFeel['drift']
   constructor(mode: SteerFeel['drift']) { this.mode = mode }
   update(steer: number, now: number) {
-    const a = Math.abs(steer)
+    const a = Math.abs(steer), side = Math.sign(steer)
+    this.recent = this.recent.filter((r) => now - r.t <= FLICK_MS)
     if (this.dir === 0) {
-      if (a < FLICK_FROM) this.calm = now
-      if (a > FLICK_OUT && (this.mode === 'slide' || now - this.calm <= FLICK_MS)) this.dir = Math.sign(steer)
-    } else if (a < 0.2 || (Math.sign(steer) === -this.dir && a > 0.5)) {
-      this.dir = 0
-      this.calm = now
-    }
+      const jerk = this.recent.some((r) => r.s * side <= a - FLICK_JUMP)
+      if (a > FLICK_OUT && (this.mode === 'slide' || jerk)) this.dir = side
+    } else if (a < LET_GO || (side === -this.dir && a > 0.5)) this.dir = 0
+    this.recent.push({ t: now, s: steer })
     return this.dir
   }
-  reset(now = -1e9) { this.dir = 0; this.calm = now }
+  // A thumb landing counts as a sample at the middle, so a flick straight from touch-down drifts.
+  reset(now = -1e9) { this.dir = 0; this.recent = [{ t: now, s: 0 }] }
 }
 
 const buzz = (ms: number) => { try { navigator.vibrate?.(ms) } catch { /* not on this phone */ } }
@@ -154,6 +155,7 @@ const SteerZone = memo(function SteerZone({ input, autoDrift, className, feel }:
         if (autoDrift) {
           const was = drift.dir
           input.drift = drift.update(input.steer, e.timeStamp) !== 0
+          input.thumb = true // the race reads a slide's steer from the thumb's side (game/kart.ts thumbSlide)
           if (input.drift && !was) buzz(12)
         }
         const k = knob.current

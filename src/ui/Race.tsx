@@ -9,6 +9,7 @@ import { CarThumb } from '../scene/BuildingPreview'
 import { supabase } from '../lib/supabase'
 import { Panel } from './Menus'
 import { StageSlot, useStageReady, warmStage } from '../scene/Stage'
+import { pauseTownDraw } from '../scene/renderGate'
 import { RaceScene, startLights, finishView } from '../scene/RaceScene'
 import { heroShot } from '../scene/heroShot'
 import { pickVenue, venue as venueById } from '../scene/venues'
@@ -156,8 +157,29 @@ export function openRaceTab(tab: RaceTab) {
 
 const RACE_CAM = { position: [0.4, 2.2, -4] as [number, number, number], fov: 55, near: 0.3, far: 150 }
 
+// Phones (portrait or on their side): the menu covers the town, so the town stops drawing
+// while it's open and the tile clips get the phone to themselves.
+const COVERS_TOWN = '(max-width: 600px), (max-height: 500px)'
+function usePauseTownUnderMenu() {
+  useEffect(() => {
+    const mq = window.matchMedia(COVERS_TOWN)
+    let release: (() => void) | undefined
+    const sync = () => {
+      release?.()
+      release = mq.matches ? pauseTownDraw() : undefined
+    }
+    sync()
+    mq.addEventListener('change', sync)
+    return () => {
+      mq.removeEventListener('change', sync)
+      release?.()
+    }
+  }, [])
+}
+
 export function RacePanel() {
   useEffect(() => warmStage(), [])
+  usePauseTownUnderMenu()
   const cars = useGame((s) => s.cars)
   const level = useGame((s) => s.level)
   const best = useMemo(() => bestCar(cars), [cars])
