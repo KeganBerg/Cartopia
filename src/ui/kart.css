@@ -27,6 +27,18 @@
 @keyframes kt-blink { to { opacity: .55; } }
 .kt-flash { position: absolute; top: 26%; left: 0; right: 0; text-align: center; color: #fff; font: 64px var(--display, system-ui); text-shadow: 0 5px 0 rgba(0, 0, 0, .4); -webkit-text-stroke: 2px rgba(0, 0, 0, .3); animation: kt-pop 1.1s ease-out forwards; pointer-events: none; z-index: 2; }
 @keyframes kt-pop { 0% { transform: scale(.4); opacity: 0; } 15% { transform: scale(1.12); opacity: 1; } 30% { transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(-20px); } }
+.kt-reel { display: inline-block; animation: kt-reel .06s linear infinite; }
+@keyframes kt-reel { from { transform: translateY(-30%); opacity: .5; } to { transform: translateY(30%); opacity: .9; } }
+.kt-got { display: inline-block; animation: kt-got .35s ease-out; }
+@keyframes kt-got { 0% { transform: scale(1.6); } 100% { transform: scale(1); } }
+.kt.dead .kt-slot, .kt.dead .dc-item { filter: grayscale(1) brightness(.7); animation: none; }
+.kt-fx { position: absolute; top: calc(118px + var(--sat, 0px)); left: calc(12px + var(--sal, 0px)); display: flex; gap: 6px; pointer-events: none; z-index: 2; }
+.kt-fx span { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-size: 21px; background: radial-gradient(circle, rgba(10, 20, 40, .7) 58%, transparent 60%), conic-gradient(var(--ring) var(--left), rgba(255, 255, 255, .2) 0); }
+.kt-fx .bad { --ring: #ff5252; }
+.kt-fx .good { --ring: #69f0ae; }
+.kt-haze { position: absolute; inset: 0; pointer-events: none; z-index: 1; background: radial-gradient(ellipse at 50% 60%, rgba(150, 150, 150, .45), rgba(110, 110, 110, .92) 75%); transition: opacity .3s; }
+.kt-zap { position: absolute; inset: 0; pointer-events: none; z-index: 1; box-shadow: inset 0 0 70px 18px rgba(179, 136, 255, .85); animation: kt-zap .09s steps(2) infinite; }
+@keyframes kt-zap { 50% { box-shadow: inset 0 0 40px 8px rgba(124, 77, 255, .5); } }
 .kt.tall .kt-place b { font-size: 46px; }
 .kt.tall .kt-map { width: 112px; height: 104px; }
 .kt.tall .kt-slot { display: none; }
@@ -53,6 +65,7 @@
   .kt-map { top: calc(40px + var(--sat, 0px)); width: 104px; height: 92px; }
   .kt-slot { top: calc(40px + var(--sat, 0px)); }
   .kt-place b { font-size: 40px; }
+  .kt-fx { top: calc(92px + var(--sat, 0px)); }
   .kt-podium-card { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; width: min(640px, 94vw); align-items: center; }
   .kt-podium-card h2, .kt-podium-card .arc-actions, .kt-podium-card .arc-pay { grid-column: 1 / -1; }
 }
