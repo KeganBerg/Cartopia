@@ -15,6 +15,7 @@ import { limitFor } from './keepShape'
 import { sfx } from '../lib/sound'
 import { Clouds } from './Clouds'
 import { DayNight } from './DayNight'
+import { TechnoLights } from './TechnoLights'
 import { PostFx } from './PostFx'
 import { SkyEnv } from './SkyEnv'
 import { townLook } from './look'
@@ -653,6 +654,7 @@ export function World() {
   return (
     <>
       <DayNight small={Math.min(window.innerWidth, window.innerHeight) < 700} />
+      <TechnoLights />
       {/* Countryside beyond the buildable lot. Its meadow lines up with the one under
           unbought plots (both repeat every 16 units from a half-repeat offset). */}
       <mesh rotation-x={-Math.PI / 2} position-y={LAYER.outer}>

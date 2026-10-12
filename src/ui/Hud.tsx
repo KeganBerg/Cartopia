@@ -11,6 +11,7 @@ import { Icon, CoinIcon, BuckIcon, PartsIcon, FuelIcon } from './Icon'
 import { Roll } from './Fly'
 import { compact } from './format'
 import { useTipTarget } from './Tips'
+import { TechnoTag } from './Techno'
 
 const n = (v: number) => v.toLocaleString()
 
@@ -66,6 +67,7 @@ export function Hud() {
       </div>
       <div className="hud-center">
         <div className="town-name">{s.visiting?.townName ?? s.townName}</div>
+        <TechnoTag />
         {!s.visiting && <button className="my-cars" onClick={() => s.openPanel('garage')}><Icon name="car" size={18} /> <span className="my-cars-label">MY CARS:</span> {s.cars.length}</button>}
         <GoalTracker />
       </div>
@@ -113,6 +115,7 @@ export function Hud() {
           <span className="hud-town-name">{s.visiting?.townName ?? s.townName}</span>
           {!s.visiting && <button onClick={() => s.openPanel('garage')}><Icon name="car" size={15} /> {s.cars.length}</button>}
           <button onClick={() => s.openPanel('leaders')}><Icon name="trophy" size={16} /> {compact(s.trophies)}</button>
+          <TechnoTag short />
         </div>
         <GoalTracker />
       </div>
