@@ -24,6 +24,7 @@ import { claim as claimVisitor, leave as leaveVisitor, setRacing, type Visitor }
 import { RivalResult, type RivalMatch, type RivalBonus } from './Rivals'
 import { RaceBar, RaceHub, Rounds, campaignFocus, type HubTab } from './RaceHub'
 import { artStyle } from './venueArt'
+import { TileClip } from './TileClip'
 import './race-menu.css'
 import { TOUR_RACES, tourLeg, tourLegOf, tourIsBoss, tourRivalPi, tourShift, tourSkills, tourRivalName, tourPrize, tourLegBonus } from '../game/tour'
 import type { WeatherKind } from '../game/weather'
@@ -564,6 +565,7 @@ function Campaign({ sel, setSel, onRace, onTour }: { sel: number; setSel: (ci: n
           })}
         </div>
         <div className="rm-banner rm-photo" style={artStyle('camp', ch.venue)}>
+          <TileClip mode="camp" venue={ch.venue} />
           <span className="rm-eyebrow">Chapter {sel + 1} · {v.name}</span>
           <b className="rm-ttl">{ch.name}</b>
           <span className="rm-chips">
@@ -650,6 +652,7 @@ function Tour({ onRace, onCampaign }: { onRace: () => void; onCampaign: () => vo
           })}
         </div>
         <div className="rm-banner rm-photo" style={artStyle('tour', leg.venue, leg.night)}>
+          <TileClip mode="tour" venue={leg.venue} night={leg.night} sky={sky} />
           <span className="rm-eyebrow">Leg {cur + 1} · {leg.night ? '🌙 Under the lights' : 'Daytime'} · {SKY_ICON[sky]}</span>
           <b className="rm-ttl">{leg.night ? `${v.name} at Midnight` : `${v.name} ${leg.name}`}</b>
           <span className="rm-chips">
@@ -719,6 +722,7 @@ function WeeklyEvent({ base, car, onRace }: { base: number; car: OwnedCar | unde
     <div className="rm-split rm-event" style={{ '--ev': e.color } as React.CSSProperties}>
       <div className="rm-left">
         <div className="rm-banner rm-photo" style={artStyle('tour', e.venue, e.night)}>
+          <TileClip mode="tour" venue={e.venue} night={e.night} sky={e.sky} event={e.id} />
           <span className="rm-eyebrow">{v.icon} {v.name} · {e.night ? '🌙 Night' : 'Day'} · {SKY_ICON[e.sky]}</span>
           <b className="rm-ttl">{e.name}</b>
           <span className="rm-ev-blurb">{e.blurb}</span>
