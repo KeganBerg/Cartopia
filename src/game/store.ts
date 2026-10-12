@@ -16,6 +16,7 @@ import { trialWeek } from './trial'
 import { groupOf, groupTurn, mergeCandidates, applyMerge, applySplit, rotateGroup, isLandmark, LANDMARK_NAME } from './merge'
 import { togglePick } from './meet'
 import { crateCost, crateDef, rollCrate, type CrateId, type CrateOpen } from './crates'
+import { claim, type WagerEntry } from './wager'
 
 // rot: quarter turns the player chose (0 faces south). Unset means face the nearest road.
 // level: upgrade level 1-10 (see MAX_BUILDING_LEVEL); unset means 1.
@@ -83,6 +84,8 @@ export type SaveState = {
   // Crates opened: the server's number for the latest open added here (crate_open()). The guard
   // charges and pays the opens this goes up by.
   crates: number
+  // Wager races: the last server ledger row (wager_ledger) whose coins this save includes.
+  wagers?: number
   // Season track: the season number, stars earned in it, and tiers (0-based) collected.
   season: SeasonProgress | null
   // Daily deals used today (UTC), by deal id. The server guard allows each discount once a day.
@@ -240,6 +243,8 @@ type Actions = {
   visitorPrize: (p: { coins: number; xp: number; parts: number; bucks: number; seq?: number; car?: JunkCar | null }) => void
   // Adds an opened crate to the town: takes its price and gives its prize (see openCrate).
   applyCrate: (o: CrateOpen) => void
+  // Adds the server's wager rows after the save's count: stakes held, races won, refunds.
+  applyWagers: (entries: WagerEntry[]) => number
   closePrize: () => void
   closeLevelUp: () => void
   focusShop: (panel: 'shop' | 'showroom' | 'rescue' | 'race', id: string | null) => void
@@ -1294,6 +1299,19 @@ export const useGame = create<GameState>()(
         })
       },
 
+      applyWagers: (entries) => {
+        const s = get()
+        const { n, coins } = claim(s.wagers ?? 0, entries)
+        if (n === (s.wagers ?? 0)) return 0
+        set({
+          coins: Math.max(0, s.coins + coins),
+          wagers: n,
+          stats: coins > 0 ? { ...s.stats, coinsEarned: (s.stats.coinsEarned ?? 0) + coins } : s.stats,
+          updatedAt: Date.now(),
+        })
+        return coins
+      },
+
       visitorPrize: (p) => {
         const s = get()
         set(withXp(s, p.xp, {
@@ -1939,14 +1957,14 @@ export const useGame = create<GameState>()(
 )
 
 export function saveOf(s: GameState): SaveState {
-  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, season, deals, trials, rivals, tour, event, showcase, raceCar, skins, modSkins, land, updatedAt } = s
-  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, season, deals, trials, rivals, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, land, updatedAt }
+  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, wagers, season, deals, trials, rivals, tour, event, showcase, raceCar, skins, modSkins, land, updatedAt } = s
+  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, ...(wagers ? { wagers } : {}), season, deals, trials, rivals, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, land, updatedAt }
 }
 
 // Fields added after launch, so older saves load with sensible values.
-function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'quests' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'gp' | 'campaign' | 'claimedSets' | 'crewChests' | 'visits' | 'crates' | 'season' | 'deals' | 'trials' | 'rivals' | 'tour' | 'event' | 'showcase' | 'skins' | 'modSkins' | 'land'> {
+function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'quests' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'gp' | 'campaign' | 'claimedSets' | 'crewChests' | 'visits' | 'crates' | 'wagers' | 'season' | 'deals' | 'trials' | 'rivals' | 'tour' | 'event' | 'showcase' | 'skins' | 'modSkins' | 'land'> {
   // Saves from before the tutorial existed skip it.
-  return { stats: emptyStats(), claimedGoals: [], quests: null, lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, gp: {}, campaign: {}, claimedSets: [], crewChests: 0, visits: 0, crates: 0, season: null, deals: null, trials: { claimed: {} }, rivals: {}, tour: 0, event: null, showcase: [], skins: [], modSkins: [], land: [...START_LAND] }
+  return { stats: emptyStats(), claimedGoals: [], quests: null, lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, gp: {}, campaign: {}, claimedSets: [], crewChests: 0, visits: 0, crates: 0, wagers: 0, season: null, deals: null, trials: { claimed: {} }, rivals: {}, tour: 0, event: null, showcase: [], skins: [], modSkins: [], land: [...START_LAND] }
 }
 
 

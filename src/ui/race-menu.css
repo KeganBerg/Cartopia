@@ -559,3 +559,16 @@ div.rm-node { cursor: default; }
   .rm-hub .rm-ev .rm-meta { display: none; }
   .rm-hub .rm-ev .rm-ttl { font-size: 17px; }
 }
+
+/* Wager matches: coin stake chips on a live player's card, and the pot on the strip. */
+.rm-bet-btn { position: absolute; top: 6px; left: 6px; width: 40px; height: 40px; border-radius: 50%; border: 3px solid #fff; background: #ffca28; box-shadow: 0 2px 6px rgba(0,0,0,.3); font-size: 22px; line-height: 1; display: grid; place-items: center; padding: 0; cursor: pointer; animation: pop .25s ease-out; }
+.rm-bet-btn:hover { transform: scale(1.08); }
+.rm-bet-chips { margin-top: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.rm-bet-chip { min-height: 38px; padding: 0 10px; border: 2px solid #ffb300; border-radius: 12px; background: #fff8e1; color: #6d4c00; font: 17px var(--display); cursor: pointer; }
+.rm-bet-chip:hover { background: #ffecb3; }
+.rm-bet-chip.x { border-color: #cfd8dc; background: #eceff1; color: #455a64; }
+.tag.bet { background: #ffb300; color: #3e2700; }
+.rf-pot { position: absolute; top: calc(64px + var(--sat)); right: 12px; padding: 6px 14px; border-radius: 999px; background: #ffca28; color: #3e2700; border: 3px solid #fff; box-shadow: 0 3px 10px rgba(0,0,0,.3); font: 22px var(--display); pointer-events: none; z-index: 5; animation: pop .25s ease-out; }
+.rr-loot span.rr-bet.up { background: #e8f5e9; border-color: #66bb6a; color: #1b5e20; }
+.rr-loot span.rr-bet.down { background: #ffebee; border-color: #ef9a9a; color: #b71c1c; }
+@media (max-width: 600px) { .rf-pot { top: calc(114px + var(--sat)); font-size: 18px; padding: 4px 12px; } }
