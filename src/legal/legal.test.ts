@@ -28,9 +28,11 @@ describe('legal pages', () => {
 
 describe('settings', () => {
   it('fall back to defaults for missing or bad data', () => {
-    expect(parsePrefs(null)).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true })
-    expect(parsePrefs('{oops')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true })
-    expect(parsePrefs('{"graphics":"ultra","reduceMotion":"yes"}')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true })
-    expect(parsePrefs('{"graphics":"saver","reduceMotion":true,"vibration":false}')).toEqual({ graphics: 'saver', reduceMotion: true, vibration: false })
+    expect(parsePrefs(null)).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, muteTaunts: false })
+    expect(parsePrefs('{oops')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, muteTaunts: false })
+    expect(parsePrefs('{"graphics":"ultra","reduceMotion":"yes"}')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, muteTaunts: false })
+    expect(parsePrefs('{"graphics":"saver","reduceMotion":true,"vibration":false}')).toEqual({ graphics: 'saver', reduceMotion: true, vibration: false, muteTaunts: false })
+    expect(parsePrefs('{"muteTaunts":true}').muteTaunts).toBe(true)
+    expect(parsePrefs('{"muteTaunts":"yes"}').muteTaunts).toBe(false)
   })
 })

@@ -638,6 +638,11 @@ export const campaignRivalPi = (ch: CampaignChapter, i: number) => Math.round(ch
 // How cleanly a rival shifts, 0 (early, sloppy) to 1 (every shift perfect), across the whole campaign.
 // Even the first rival shifts decently, so race 1 can't be won with eyes closed.
 export const campaignShift = (chIndex: number, i: number) => Math.min(1, 0.35 + 0.65 * (chIndex + i / (CAMPAIGN_RACES - 1)) / (CAMPAIGN.length - 1))
+// A brand-new racer's first campaign race (Back Streets 1, before any race won): its rival shifts
+// sloppily and is slow off the line, so the first race after the tutorial is one they can win.
+// Only the rival's driving changes; the PI shown and the prize stay the same.
+export const ROOKIE_SHIFT = 0
+export const rookieRace = (chIndex: number, i: number, racesWon: number) => chIndex === 0 && i === 0 && racesWon === 0
 // Rivals use their car's skill from the third chapter on; bosses always do.
 export const campaignRivalSkills = (chIndex: number, i: number) => chIndex >= 2 || i === CAMPAIGN_RACES - 1
 // The first win of each race pays the most; replays pay about a quick race.

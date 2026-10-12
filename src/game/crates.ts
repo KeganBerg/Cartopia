@@ -173,6 +173,8 @@ function pickWeighted<T>(items: T[], weight: (t: T) => number, rand: () => numbe
   return items[items.length - 1]
 }
 
+export const skinOf = (id: string, part: boolean) => (part ? MOD_SKINS : SKINS).find((x) => x.id === id)
+
 // Opens left until the pity prize, given how many opens in a row missed it (null: no pity).
 export const pityLeft = (c: CrateDef, dry: number) => (c.pity ? Math.max(1, c.pity.every - dry) : null)
 // Whether a prize counts as the pity prize, which starts the count again.
@@ -220,7 +222,6 @@ export function rollCrate(c: CrateDef, level: number, cars: CarLike[], rand: () 
   return { kind: 'coins', coins: roundCoins(v * (lo + (hi - lo) * rand())), jackpot: kind === 'jackpot' }
 }
 
-export const skinOf = (id: string, part: boolean) => (part ? MOD_SKINS : SKINS).find((x) => x.id === id)
 
 // How exciting a prize is, for the reveal's glow: 0 coins, 1 a jackpot or part, 2 a gem part or a
 // new rare or epic skin, 3 a new car or legendary skin.

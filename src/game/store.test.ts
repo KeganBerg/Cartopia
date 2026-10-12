@@ -268,3 +268,26 @@ describe('daily check-in calendar', () => {
     expect(g().coins).toBe(DAILY_BONUS[0].coins)
   })
 })
+
+describe('tutorial paint pick', () => {
+  const car = () => ({ uid: 't1', model: 'pip', color: '#e53935', upgrades: { engine: 0, turbo: 0, tires: 0, weight: 0 } })
+
+  it('paints the body and rims in starter colours for free, once, during the tutorial', () => {
+    useGame.setState({ tutorial: 6, coins: 100, bucks: 0, xp: 0, cars: [car()] })
+    const stats = useGame.getState().stats
+    expect(useGame.getState().tutorialStyle('t1', '#1e88e5', '#212121')).toBe(true)
+    const s = useGame.getState()
+    expect(s.cars[0].color).toBe('#1e88e5')
+    expect(s.cars[0].panels).toEqual({ rims: { color: '#212121' } })
+    expect([s.coins, s.bucks, s.xp, s.stats]).toEqual([100, 0, 0, stats])
+  })
+
+  it('refuses locked colours and finished tutorials', () => {
+    useGame.setState({ tutorial: 6, cars: [car()] })
+    expect(useGame.getState().tutorialStyle('t1', '#ffd700', '#212121')).toBe(false)
+    expect(useGame.getState().tutorialStyle('t1', '#1e88e5', '#8e24aa')).toBe(false)
+    useGame.setState({ tutorial: 99 })
+    expect(useGame.getState().tutorialStyle('t1', '#1e88e5', '#212121')).toBe(false)
+    expect(useGame.getState().cars[0].color).toBe('#e53935')
+  })
+})
