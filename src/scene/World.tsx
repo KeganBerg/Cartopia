@@ -9,7 +9,7 @@ import { TILE, PLOT, PLOT_MIN, PLOT_MAX, START_LAND, buildingDef, buildingLevel 
 import { BuildingModel } from './BuildingModel'
 import { rotateCurrent, setGhostTurn, turnOf } from '../game/placement'
 import { mergeGroups, groupOf, groupTurn, groupScale, isLandmark, type MergeGroup } from '../game/merge'
-import { VanguardTower } from './Landmark'
+import { VanguardTower, launchTower } from './Landmark'
 import { KeepShapes, MergeScale } from './mergeScale'
 import { limitFor } from './keepShape'
 import { sfx } from '../lib/sound'
@@ -227,6 +227,7 @@ function Building({ b, roads, group, picked }: { b: PlacedBuilding; roads: Set<s
         }
         if (s.mode !== 'play' || s.visiting || e.delta > 6) return
         e.stopPropagation()
+        if (mark) launchTower(b.uid)
         s.tapBuilding(b.uid)
       }}
       onPointerOver={() => {
@@ -246,7 +247,7 @@ function Building({ b, roads, group, picked }: { b: PlacedBuilding; roads: Set<s
         <MergeScale.Provider value={mark ? [k, k, k] : group ? [sx, sy, sz] : ONE}>
           <PopGroup uid={b.uid}>
             <KeepShapes limit={limitFor(d)}>
-              {mark ? <VanguardTower /> : <BuildingModel def={d} level={buildingLevel(b)} />}
+              {mark ? <VanguardTower uid={b.uid} /> : <BuildingModel def={d} level={buildingLevel(b)} />}
             </KeepShapes>
           </PopGroup>
         </MergeScale.Provider>
