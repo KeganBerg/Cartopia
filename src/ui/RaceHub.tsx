@@ -106,9 +106,9 @@ export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival }: { onOp
           </span>
         )}
         <span className="rm-ev-mid">
-          <span className="rm-tag">WEEKLY EVENT · ⏳ {shortLeft(msToNextWeek())}</span>
+          <span className="rm-tag">WEEKLY EVENT</span>
           <b className="rm-ttl">{ev.name}</b>
-          <span className="rm-meta"><Pips n={evWon} of={EVENT_RACES} /> <span className="rm-ev-skin"><i style={{ background: evSkin.swatch }} />{evSkin.name}{evHas ? ' ✔' : ''}</span></span>
+          <span className="rm-meta"><Pips n={evWon} of={EVENT_RACES} /> <span className="rm-ev-left">⏳ {shortLeft(msToNextWeek())}</span><i className="rm-ev-swatch" style={{ background: evSkin.swatch }} title={`${evSkin.name} skin${evHas ? ' (yours)' : ''}`} /></span>
         </span>
         {evWon < EVENT_RACES
           ? <button className="buy small rm-go" onClick={stop(onEvent)}>🏁 {money(eventPrize(evBase, evWon))}<small>⛽{RACE_FUEL}</small></button>

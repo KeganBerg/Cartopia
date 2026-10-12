@@ -620,11 +620,12 @@ export type CampaignChapter = {
   venue: string // where its races run (scene/venues.ts)
   pi: [number, number] // rival PI from the first race to the boss
   rivals: string[] // the last one is the boss
+  cars?: string[] // each rival's car (car ids), where their name calls for one; otherwise the car nearest their PI
   coins: number; bucks: number; trophies: number; starBucks: number
 }
 export const CAMPAIGN_RACES = 5
 export const CAMPAIGN: CampaignChapter[] = [
-  { id: 'c1', name: 'Back Streets', blurb: 'Local kids with something to prove.', unlockLevel: 1, venue: 'main', pi: [22, 32], rivals: ['Scooter Steve', 'Bubblegum Bea', 'Hubcap Hal', 'Lil Lugnut', 'Big Mike'], coins: 1000, bucks: 1, trophies: 3, starBucks: 1 },
+  { id: 'c1', name: 'Back Streets', blurb: 'Local kids with something to prove.', unlockLevel: 1, venue: 'main', pi: [22, 32], rivals: ['Scooter Steve', 'Bubblegum Bea', 'Hubcap Hal', 'Lil Lugnut', 'Big Mike'], cars: ['pip', 'bug', 'civic', 'buggy', 'hauler'], coins: 1000, bucks: 1, trophies: 3, starBucks: 1 },
   { id: 'c2', name: 'Harbor Run', blurb: 'Dockworkers race the night shift home.', unlockLevel: 4, venue: 'docks', pi: [32, 44], rivals: ['Salty Pete', 'Crane Carla', 'Rusty Anchor', 'Tugboat Ted', 'Captain Kidd'], coins: 2000, bucks: 1, trophies: 3, starBucks: 1 },
   { id: 'c3', name: 'Desert Strip', blurb: 'Long straights, hot tarmac, no mercy.', unlockLevel: 8, venue: 'desert', pi: [44, 58], rivals: ['Dusty Dakota', 'Mirage Mo', 'Sidewinder Sal', 'Coyote Cass', 'The Scorpion'], coins: 3500, bucks: 2, trophies: 4, starBucks: 1 },
   { id: 'c4', name: 'Mountain Pass', blurb: 'Thin air and thinner margins.', unlockLevel: 13, venue: 'snow', pi: [58, 72], rivals: ['Summit Sue', 'Avalanche Al', 'Ridge Runner', 'Peak Paulie', 'The Yeti'], coins: 5500, bucks: 2, trophies: 5, starBucks: 2 },
