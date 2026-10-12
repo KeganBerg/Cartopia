@@ -107,7 +107,7 @@ function Car() {
   return (
     <>
       <group ref={g} rotation-y={Math.PI / 2 + (+(q.get('yaw') ?? 0) * Math.PI) / 180}>
-        <CarModel body={carDef(model).body} model={model} color={mask ? '#ff00ff' : '#ffffff'} />
+        <CarModel body={carDef(model).body} model={model} color={mask ? '#ff00ff' : q.get('color') ?? '#ffffff'} />
       </group>
       <Frame width={width} />
     </>
