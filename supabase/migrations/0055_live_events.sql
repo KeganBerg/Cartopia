@@ -43,7 +43,7 @@ create or replace function public.live_event_start(p_kind text, p_minutes int, p
 returns bigint language plpgsql set search_path = '' as $$
 declare v_id bigint;
 begin
-  update public.live_events set ends_at = now()
+  update public.live_events set ends_at = now(), starts_at = least(starts_at, now() - interval '1 second')
     where starts_at <= now() and ends_at > now()
       and (kind = p_kind or (p_kind in ('night', 'day') and kind in ('night', 'day')));
   insert into public.live_events (kind, payload, starts_at, ends_at)
