@@ -1,18 +1,20 @@
 import { Box3, InstancedMesh, Matrix4, Mesh, Plane, Sphere, SphereGeometry, Triangle, Vector3, type BufferGeometry, type Object3D } from 'three'
 
 // Finds pieces of a model that hang in the air: anything not resting on the
-// ground or touching something that does. Pieces touch when their world
-// bounding boxes meet; a ball (a bulb, a lamp globe) must also really reach the
-// solid shape of what it sits against, since a box round a round plinth or a
-// turned beam reaches well past it. That's the case that matters most: strings
-// of bulbs hanging off nothing. Mark something meant to fly (a bird, a drone, a
+// ground or touching something that does. Pieces touch when their real shapes
+// meet, not just their bounding boxes: a box round a stadium ring, a turned
+// beam or a plinth reaches well past the solid, and a sign hanging inside that
+// box with nothing holding it up would pass (the speedway's sign did). So two
+// pieces touch only when a point on one (a corner, or a point along an edge)
+// is within TOUCH of the other's solid, or a ball (a bulb, a lamp globe) really
+// reaches it. Mark something meant to fly (a bird, a drone, a
 // glow halo) with userData.air on it or a parent group.
 // src/scene/floating.test.tsx runs this over every building.
 export const TOUCH = 0.05
 // Balls must really sit on or against something, within this.
 const SNUG = 0.015
 
-type Piece = { o: Object3D; box: Box3; ball?: Sphere; hull?: Plane[] }
+type Piece = { o: Object3D; box: Box3; ball?: Sphere; hull?: Plane[]; pts?: Vector3[]; tris?: Triangle[] }
 export type Clump = Piece & { n: number; gap: number; members: Piece[] }
 
 // Solid shapes whose faces bound them, so a point's distance outside is the
@@ -27,6 +29,58 @@ function airborne(o: Object3D) {
 function shown(o: Object3D) {
   for (let p: Object3D | null = o; p; p = p.parent) if (!p.visible) return false
   return true
+}
+
+// A shape whose faces really close round it: an open tube, a slice of a cone
+// or a dome has no cap, so its face planes don't bound it.
+function closed(g: BufferGeometry) {
+  const q = (g as unknown as { parameters?: Record<string, number | boolean> }).parameters ?? {}
+  if (q.openEnded) return false
+  if (q.thetaLength != null && (q.thetaLength as number) < Math.PI * 2 - 1e-6 && !/Sphere/.test(g.type)) return false
+  if (/Sphere/.test(g.type) && ((q.phiLength as number) < Math.PI * 2 - 1e-6 || (q.thetaLength as number) < Math.PI - 1e-6)) return false
+  return true
+}
+
+// Points on a shape in its own space: its corners and points along its edges,
+// no further apart than STEP, so a board crossing a post finds the post.
+const STEP = 0.04
+const samples = new WeakMap<BufferGeometry, Vector3[]>()
+function samplesOf(g: BufferGeometry) {
+  let out = samples.get(g)
+  if (out) return out
+  out = []
+  const pos = g.getAttribute('position')
+  const idx = g.getIndex()
+  const n = idx ? idx.count : pos.count
+  const key = (v: Vector3) => `${v.x.toFixed(4)},${v.y.toFixed(4)},${v.z.toFixed(4)}`
+  const seen = new Set<string>()
+  const a = new Vector3(), b = new Vector3()
+  const at = (i: number, v: Vector3) => v.fromBufferAttribute(pos, idx ? idx.getX(i) : i)
+  for (let i = 0; i + 2 < n; i += 3) for (let e = 0; e < 3; e++) {
+    at(i + e, a)
+    at(i + ((e + 1) % 3), b)
+    const k = [key(a), key(b)].sort().join('|')
+    if (seen.has(k)) continue
+    seen.add(k)
+    const m = Math.min(24, Math.max(1, Math.ceil(a.distanceTo(b) / STEP)))
+    for (let j = 0; j < m; j++) out.push(a.clone().lerp(b, j / m))
+  }
+  samples.set(g, out)
+  return out
+}
+
+const tris = new WeakMap<BufferGeometry, Triangle[]>()
+function trisOf(g: BufferGeometry) {
+  let out = tris.get(g)
+  if (out) return out
+  out = []
+  const pos = g.getAttribute('position')
+  const idx = g.getIndex()
+  const n = idx ? idx.count : pos.count
+  const at = (i: number) => new Vector3().fromBufferAttribute(pos, idx ? idx.getX(i) : i)
+  for (let i = 0; i + 2 < n; i += 3) out.push(new Triangle(at(i), at(i + 1), at(i + 2)))
+  tris.set(g, out)
+  return out
 }
 
 const hulls = new WeakMap<BufferGeometry, Plane[]>()
@@ -73,11 +127,14 @@ export function pieces(root: Object3D) {
       const s = mesh.matrixWorld.getMaxScaleOnAxis()
       p.ball = new Sphere(new Vector3().setFromMatrixPosition(mesh.matrixWorld), g.parameters.radius * s)
     }
-    if (CONVEX.test(g.type)) {
+    if (CONVEX.test(g.type) && closed(g)) {
       p.hull = hullOf(g).map((q) => q.clone().applyMatrix4(mesh.matrixWorld))
       // A mirrored piece turns its faces inside out.
       if (mesh.matrixWorld.determinant() < 0) p.hull.forEach((q) => q.negate())
+    } else if (g.getAttribute('position')) {
+      p.tris = trisOf(g).map((t) => new Triangle(t.a.clone().applyMatrix4(mesh.matrixWorld), t.b.clone().applyMatrix4(mesh.matrixWorld), t.c.clone().applyMatrix4(mesh.matrixWorld)))
     }
+    if (g.getAttribute('position')) p.pts = samplesOf(g).map((v) => v.clone().applyMatrix4(mesh.matrixWorld))
     out.push(p)
   })
   return out
@@ -90,12 +147,29 @@ function outside(hull: Plane[], x: Vector3) {
   return d
 }
 
+const near = new Vector3()
+// How far `x` is from a piece's solid (its surface, for an open shape).
+function distance(p: Piece, x: Vector3) {
+  if (p.hull) return outside(p.hull, x)
+  let d = Infinity
+  for (const t of p.tris!) d = Math.min(d, t.closestPointToPoint(x, near).distanceTo(x))
+  return d
+}
+
+// Whether a point on `a` comes within TOUCH of `b`'s solid.
+function reaches(a: Piece, b: Piece, eb: Box3) {
+  for (const x of a.pts!) if (eb.containsPoint(x) && distance(b, x) <= TOUCH) return true
+  return false
+}
+
 function touching(a: Piece, b: Piece, ea: Box3, eb: Box3) {
   if (!ea.intersectsBox(eb)) return false
   if (a.ball && b.ball) return a.ball.center.distanceTo(b.ball.center) <= a.ball.radius + b.ball.radius + SNUG
   if (a.ball && b.hull) return outside(b.hull, a.ball.center) <= a.ball.radius + SNUG
   if (b.ball && a.hull) return outside(a.hull, b.ball.center) <= b.ball.radius + SNUG
-  return true
+  // Crowds (instanced) are only known by their boxes.
+  if (!a.pts || !b.pts || (!a.hull && !a.tris) || (!b.hull && !b.tris)) return true
+  return reaches(a, b, eb) || reaches(b, a, ea)
 }
 
 // Every clump of touching pieces that no chain of touching pieces links to the
