@@ -13,6 +13,8 @@ import { openModSlot } from './Mods'
 import { raceCarOf } from '../game/raceCar'
 import './crates.css'
 import { LoadingScene } from './Loading'
+import { BuildArt } from './Resto'
+import { PIECE_COUNT, RESTO_PIECES, piecesOf, restoCars } from '../game/resto'
 
 const CRATE_KEY = 'cartopia-crate'
 const CRATE_CAM = { position: [0, 4, 9] as [number, number, number], fov: 42, near: 0.3, far: 60, shadows: true }
@@ -35,7 +37,8 @@ function CrateIcon({ c }: { c: CrateDef }) {
 // the crate's own cars your level hasn't reached yet show a lock. The parts slice turns to coins
 // once no part in it fits a car of yours.
 function Odds({ c, level }: { c: CrateDef; level: number }) {
-  const [open, setOpen] = useState<'mod' | 'car' | 'skin' | null>(null)
+  const [open, setOpen] = useState<'mod' | 'car' | 'skin' | 'piece' | null>(null)
+  const restoParts = useGame((s) => s.restoParts)
   const o = crateOddsShown(c, level)
   const cars = useGame((s) => s.cars)
   const skinIds = useGame((s) => s.skins)
@@ -57,7 +60,7 @@ function Odds({ c, level }: { c: CrateDef; level: number }) {
   const locked = useMemo(() => homeCars(c).filter((d) => d.unlockLevel > level).sort((a, b) => a.unlockLevel - b.unlockLevel), [c, level])
   const skins = useMemo(() => skinOdds(c).sort((a, b) => b.p - a.p), [c])
   const pct = (p: number) => (p < 0.1 ? p.toFixed(2) : p.toFixed(p < 1 ? 1 : 0))
-  const toggle = (k: 'mod' | 'car' | 'skin') => setOpen(open === k ? null : k)
+  const toggle = (k: 'mod' | 'car' | 'skin' | 'piece') => setOpen(open === k ? null : k)
   const slot = (m: ModDef) => MOD_SLOTS.find((x) => x.id === m.slot)?.icon
   return (
     <div className="crate-odds">
@@ -65,6 +68,7 @@ function Odds({ c, level }: { c: CrateDef; level: number }) {
         <span className="odd coins" style={{ flex: o.coins }}><b>🪙</b>{o.coins}%</span>
         <button className={`odd mod${noParts ? ' spent' : ''}`} style={{ flex: Math.max(o.mod, 14) }} onClick={() => toggle('mod')} aria-expanded={open === 'mod'} title={noParts ? 'No parts left to fit your cars: pays coins' : undefined}><b>{noParts ? '🔧🪙' : '🔧'}</b>{o.mod}%<small>{open === 'mod' ? '▴' : '▾'}</small></button>
         <button className="odd car" style={{ flex: Math.max(o.car, 14) }} onClick={() => toggle('car')} aria-expanded={open === 'car'}><b>🚗</b>{o.car}%<small>{open === 'car' ? '▴' : '▾'}</small></button>
+        {o.piece > 0 && <button className="odd piece" style={{ flex: Math.max(o.piece, 14) }} onClick={() => toggle('piece')} aria-expanded={open === 'piece'}><b>🧩</b>{o.piece}%<small>{open === 'piece' ? '▴' : '▾'}</small></button>}
         {o.skin > 0 && <button className="odd skin" style={{ flex: Math.max(o.skin, 14) }} onClick={() => toggle('skin')} aria-expanded={open === 'skin'}><b>✨</b>{o.skin}%<small>{open === 'skin' ? '▴' : '▾'}</small></button>}
       </div>
       {open === 'mod' && (
@@ -97,6 +101,21 @@ function Odds({ c, level }: { c: CrateDef; level: number }) {
           {!list.length && !locked.length && <span className="crate-none">No cars at your level yet</span>}
         </div>
       )}
+      {open === 'piece' && (
+        <div className="crate-cars">
+          {restoCars().map((d) => {
+            const have = piecesOf(restoParts, d.id)
+            const done = cars.some((x) => x.model === d.id)
+            const lock = d.unlockLevel > level
+            return (
+              <span key={d.id} className={`crate-car resto${lock ? ' locked' : ''}`} title={d.name}>
+                <BuildArt model={d.id} have={have} done={done} />
+                <small>{lock ? `🔒${d.unlockLevel}` : done ? '✔' : `${have.length}/${PIECE_COUNT}`}</small>
+              </span>
+            )
+          })}
+        </div>
+      )}
       {open === 'skin' && (
         <div className="crate-cars">
           {skins.map((x) => (
@@ -116,6 +135,7 @@ function Odds({ c, level }: { c: CrateDef; level: number }) {
 // it's for (a paint: `paintCar`); the Garage's own buttons fit it.
 function Prize({ open, onAgain, onDone, again, paintCar }: { open: CrateOpen; onAgain: () => void; onDone: () => void; again: React.ReactNode; paintCar: string | null }) {
   const cars = useGame((s) => s.cars)
+  const restoParts = useGame((s) => s.restoParts)
   const d = open.drop
   // A car paint goes on try-on in the Paint tab; a mod paint on a part slot in the Mods tab,
   // the first paintable slot the car has a part in.
@@ -156,7 +176,20 @@ function Prize({ open, onAgain, onDone, again, paintCar }: { open: CrateOpen; on
     icon = '🚗'
     title = carDef(d.model).name
     sub = 'New car!'
-  } else {
+  } else if (d.kind === 'piece' || d.kind === 'piecedupe') {
+    const have = piecesOf(restoParts, d.model)
+    icon = <BuildArt model={d.model} have={have} fresh={d.kind === 'piece' ? d.piece : undefined} done={d.kind === 'piece' && !!d.uid} />
+    if (d.kind === 'piecedupe') {
+      title = `+${d.coins.toLocaleString()} coins`
+      sub = `${RESTO_PIECES[d.piece].name} · already yours`
+    } else if (d.uid) {
+      title = carDef(d.model).name
+      sub = 'Built! Secret car'
+    } else {
+      title = `${RESTO_PIECES[d.piece].icon} ${RESTO_PIECES[d.piece].name} piece`
+      sub = `${carDef(d.model).name} · ${have.length}/${PIECE_COUNT}`
+    }
+  } else if (d.kind === 'mod') {
     const car = cars.find((c) => c.uid === d.car)
     icon = '⚙️'
     title = modDef(d.mod)?.name ?? 'Part'
@@ -170,6 +203,7 @@ function Prize({ open, onAgain, onDone, again, paintCar }: { open: CrateOpen; on
         {d.kind === 'mod' && <button className="buy small" onClick={() => { onDone(); openModSlot(modDef(d.mod)?.slot ?? 'spoiler'); openGarageTab('mods', { car: d.car, mod: d.mod }) }}>Fit it</button>}
         {d.kind === 'skin' && paintCar && <button className="buy small alt" onClick={() => wearSkin(d.skin, d.part)}>Use it</button>}
         {d.kind === 'car' && <button className="buy small alt" onClick={() => { onDone(); useGame.getState().selectCar(d.uid); openGarageTab('tune') }}>Garage</button>}
+        {d.kind === 'piece' && d.uid && <button className="buy small alt" onClick={() => { onDone(); useGame.getState().selectCar(d.uid!); openGarageTab('tune') }}>Garage</button>}
         <button className="buy small" onClick={onAgain}>{again}</button>
         <button className="sell small" onClick={onDone}>Done</button>
       </div>

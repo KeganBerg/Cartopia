@@ -255,6 +255,7 @@ export const levelLift = (level = 1) => 0.26 * (Math.min(MAX_BUILDING_LEVEL, Mat
 export type Body = 'compact' | 'sedan' | 'sports' | 'muscle' | 'truck' | 'super' | 'bubble' | 'wagon' | 'wedge' | 'roadster' | 'rally' | 'classic' | 'offroad' | 'coupe' | 'widebody' | 'tank' | 'scooter' | 'chopper' | 'sportbike'
   | 'hatch' | 'van' | 'suv' | 'ev' | 'luxury' | 'formula' | 'bus' | 'tusker' | 'dogvan' | 'rearengine' | 'longnose' | 'prototype'
   | 'scissor' | 'horseshoe' | 'teardrop'
+  | 'pontoon' | 'stepnose' | 'restomuscle'
 // Two-wheelers: drawn as motorcycles with a rider, and only take exhaust and rim mods.
 export const BIKES: Body[] = ['scooter', 'chopper', 'sportbike']
 export const isBike = (body: Body) => BIKES.includes(body)
@@ -321,6 +322,9 @@ export type CarDef = {
   parked?: boolean
   // Top-tier showroom car, flagged Legendary in the shop.
   legendary?: boolean
+  // Resto-mod: never sold, never a whole-car crate prize; only built from its four crate
+  // pieces (game/resto.ts). Its unlock level is when its pieces start dropping.
+  secret?: boolean
 }
 
 // Parodies of real cars: the shapes and stats nod to the real thing, but the
@@ -369,6 +373,10 @@ export const CARS: CarDef[] = [
   { id: 'fulmine', name: 'Veloce Fulmine V12', body: 'scissor', price: 0, bucks: 220, unlockLevel: 40, legendary: true, power: 100, grip: 92, weight: 30, skill: 'launch', likes: ['club', 'stadium', 'glasstower'], colors: ['#c6ff00', '#ff6d00', '#eceff1'] },
   { id: 'eclat', name: 'Moreau Eclat W16', body: 'horseshoe', price: 650000, unlockLevel: 42, legendary: true, power: 100, grip: 94, weight: 40, skill: 'slipstream', likes: ['hq', 'glasstower', 'helipad'], colors: ['#0d47a1', '#212121', '#b0bec5'] },
   { id: 'orafo', name: 'Aurelio Orafo V12', body: 'teardrop', price: 0, bucks: 180, unlockLevel: 39, legendary: true, power: 98, grip: 94, weight: 28, skill: 'smooth', likes: ['cinema', 'club', 'glasstower'], colors: ['#eceff1', '#bf360c', '#37474f'] },
+  // Resto-mods (2026-10-12): secret cars only built from four crate pieces (see game/resto.ts).
+  { id: 'sprint', name: 'Valtorre Sprint 65', body: 'stepnose', price: 70000, unlockLevel: 10, secret: true, power: 64, grip: 66, weight: 30, skill: 'smooth', likes: ['coffee', 'cinema', 'tuner'], colors: ['#1b4d3e', '#efe7d2', '#6d1b2b'] },
+  { id: 'revenant', name: "Liberty Revenant '69", body: 'restomuscle', price: 110000, unlockLevel: 14, secret: true, power: 82, grip: 54, weight: 56, skill: 'torque', likes: ['burger', 'lube', 'bodyshop'], colors: ['#8d9094', '#1c1c1c', '#0d2a5c'] },
+  { id: 'pontone', name: 'Corvara Pontone 58', body: 'pontoon', price: 170000, unlockLevel: 18, secret: true, power: 80, grip: 74, weight: 26, skill: 'slipstream', likes: ['stadium', 'diner', 'motel'], colors: ['#b71c1c', '#cfd8dc', '#1b5e20'] },
   { id: 'bug', name: 'Bumble Bubble', body: 'bubble', price: 1200, unlockLevel: 1, rescueOnly: true, power: 14, grip: 28, weight: 28, skill: 'freeze', likes: ['icecream', 'donut', 'coffee'], colors: ['#80cbc4', '#ffcc80', '#ef9a9a'] },
   { id: 'woodie', name: 'Lakeside Woodie Wagon', body: 'wagon', price: 2200, unlockLevel: 1, rescueOnly: true, power: 22, grip: 28, weight: 56, skill: 'slipstream', likes: ['diner', 'hospital', 'market'], colors: ['#fafafa', '#fff59d', '#4db6ac'] },
   { id: 'hauler', name: 'Old Faithful Hauler', body: 'truck', price: 3000, unlockLevel: 1, rescueOnly: true, power: 26, grip: 26, weight: 70, skill: 'torque', likes: ['carwash', 'junkyard', 'tacos'], colors: ['#558b2f', '#e65100', '#1565c0'] },
@@ -679,6 +687,7 @@ export const CAR_SETS: CarSet[] = [
   { id: 'dream', name: 'Dream Garage', icon: '💎', cars: ['lambo', 'hyper', 'tomahawk', 'zenith'], coins: 30000, bucks: 15, trophies: 40, xp: 500 },
   { id: 'autobahn', name: 'Autobahn Club', icon: '🛣', cars: ['kreis', 'bergmeister', 'ringmeister', 'sovereign'], coins: 20000, bucks: 10, trophies: 30, xp: 350 },
   { id: 'apex', name: 'Apex Predators', icon: '🐍', cars: ['rattler', 'cottonmouth', 'raiden', 'wraith'], coins: 30000, bucks: 15, trophies: 40, xp: 500 },
+  { id: 'restomods', name: 'Resto Garage', icon: '🧩', cars: ['sprint', 'revenant', 'pontone'], coins: 30000, bucks: 15, trophies: 40, xp: 500 },
   { id: 'exotica', name: 'Exotica', icon: '👑', cars: ['fulmine', 'eclat', 'orafo'], coins: 40000, bucks: 20, trophies: 50, xp: 600 },
   // Season track prizes; each season adds its car here.
   { id: 'seasons', name: 'Season Rides', icon: '🏁', cars: ['nightfall'], coins: 5000, bucks: 3, trophies: 10, xp: 150 },
@@ -691,6 +700,7 @@ export const readySets = (s: { cars: { model: string }[]; claimedSets?: string[]
 // Where to get a car: the Showroom (with its level or bucks price) or Rusty's searches.
 export function carSource(car: CarDef): { icon: string; text: string } {
   if (car.season) return { icon: '🏁', text: `Season ${car.season} prize` }
+  if (car.secret) return { icon: '🧩', text: 'Crate pieces' }
   if (car.rescueOnly) {
     const spot = RESCUE_SPOTS.filter((sp) => sp.cars.some((c) => c.model === car.id)).sort((a, b) => a.unlockLevel - b.unlockLevel)[0]
     return { icon: '🔧', text: spot ? `Rusty's · ${spot.name}` : "Rusty's" }

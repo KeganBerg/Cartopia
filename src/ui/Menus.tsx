@@ -363,7 +363,7 @@ export function ShowroomPanel() {
       )}
       <div ref={body} className={rusty ? 'cards' : 'cards dimmed'}>
         {/* Cars you can buy now first, then level-locked ones by the level they open at. */}
-        {CARS.filter((c) => !c.rescueOnly && !c.season)
+        {CARS.filter((c) => !c.rescueOnly && !c.season && !c.secret)
           .map((c, i) => ({ c, i, gate: level < c.unlockLevel ? c.unlockLevel : 0 }))
           .sort((a, b) => a.gate - b.gate || a.i - b.i)
           .map(({ c }) => {

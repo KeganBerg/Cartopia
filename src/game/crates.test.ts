@@ -43,7 +43,8 @@ describe('crates', () => {
     for (const car of CARS) {
       const home = carCrate(car)
       // Season prize cars are only won on the season track.
-      if (car.season || car.parked) { expect(home).toBeNull(); continue }
+      // Resto-mods are only built from pieces.
+      if (car.season || car.parked || car.secret) { expect(home).toBeNull(); continue }
       expect(home, car.id).not.toBeNull()
       if (car.bucks) expect(crateDef(home!)!.pay).toBe('bucks')
     }
@@ -76,7 +77,7 @@ describe('crates', () => {
       for (const level of [c.unlockLevel, 12, 24, 40, 50]) {
         if (level < c.unlockLevel) continue
         const o = crateOdds(c, level)
-        expect(o.coins + o.jackpot + o.mod + o.car + o.skin).toBeCloseTo(100)
+        expect(o.coins + o.jackpot + o.mod + o.car + o.skin + o.piece).toBeCloseTo(100)
         const pool = crateCars(c, level)
         const avg = pool.length / pool.reduce((a, x) => a + 1 / carValue(x, level), 0)
         expect((o.car / 100) * avg).toBeLessThanOrEqual(c.carShare * crateValue(c, level) + 1e-6)
@@ -106,6 +107,10 @@ describe('crates', () => {
         } else if (d.kind === 'skin' || d.kind === 'skindupe') {
           expect(crateSkins(c).some((x) => x.id === d.skin && x.part === d.part)).toBe(true)
           if (d.kind === 'skindupe') expect(d.coins).toBeGreaterThan(0)
+        } else if (d.kind === 'piece' || d.kind === 'piecedupe') {
+          expect(carDef(d.model).secret).toBe(true)
+          expect(carDef(d.model).unlockLevel).toBeLessThanOrEqual(level)
+          if (d.kind === 'piecedupe') expect(d.coins).toBeGreaterThan(0)
         } else {
           expect(d.coins).toBeGreaterThan(0)
         }
@@ -157,5 +162,45 @@ describe('crates', () => {
         expect(ev).toBeLessThan(1.4)
       }
     }
+  })
+
+  describe('resto-mod pieces', () => {
+    const diamond = crateDef('diamond')!
+    const restos = CARS.filter((c) => c.secret)
+    it('drops pieces of unlocked, unbuilt resto-mods only', () => {
+      const rand = seeded(11)
+      const built = [{ uid: 'z', model: restos[0].id }]
+      for (let i = 0; i < 3000; i++) {
+        const d = rollCrate(diamond, restos[0].unlockLevel, built, rand)
+        if (d.kind !== 'piece' && d.kind !== 'piecedupe') continue
+        expect(d.model).not.toBe(restos[0].id)
+        expect(carDef(d.model).unlockLevel).toBeLessThanOrEqual(restos[0].unlockLevel)
+      }
+      expect(crateDef('street')!.odds.piece).toBe(0)
+    })
+    it('builds the car with the fourth piece and pays coins for a piece you have', () => {
+      const m = restos[0].id
+      const pieces = [`${m}:0`, `${m}:1`, `${m}:2`]
+      let builds = 0
+      let dupes = 0
+      // Only this car is in reach, so every piece slice is one of its pieces.
+      const rand = seeded(5)
+      for (let i = 0; i < 4000; i++) {
+        const d = rollCrate(diamond, restos[0].unlockLevel, [], rand, { skins: [], modSkins: [], pieces })
+        if (d.kind === 'piecedupe') {
+          dupes++
+          expect(d.coins).toBeGreaterThan(0)
+          expect(pieces).toContain(`${d.model}:${d.piece}`)
+        }
+        if (d.kind === 'piece') {
+          expect([d.model, d.piece]).toEqual([m, 3])
+          expect(restos[0].colors).toContain(d.color)
+          expect(d.uid).toBeTruthy()
+          builds++
+        }
+      }
+      expect(builds).toBeGreaterThan(0)
+      expect(dupes).toBeGreaterThan(builds)
+    })
   })
 })

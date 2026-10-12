@@ -56,6 +56,10 @@ const BODY: Record<Body, EngineProfile> = {
   horseshoe: p({ ppr: 8, idle: 800, redline: 6800, odd: 0.05, roll: 1.3, sub: 0.6, grit: 0.3, noise: 0.3, bright: 1.0, reso: 160, turbo: 1.0, crackle: 0.3, vol: 1.25 }),
   // Twin-turbo V12 with a bright edge.
   teardrop: p({ ppr: 6, idle: 950, redline: 8000, odd: 0.08, roll: 1.1, sub: 0.4, grit: 0.35, noise: 0.28, bright: 1.35, reso: 230, turbo: 0.5, crackle: 0.6, vol: 1.15 }),
+  // Resto-mods: a raspy 1950s V12 on open pipes, a revvy twin-cam four, and a lumpy big-block V8.
+  pontoon: p({ ppr: 6, idle: 950, redline: 8400, odd: 0.12, roll: 1.05, sub: 0.3, grit: 0.5, noise: 0.35, bright: 1.3, reso: 240, crackle: 0.9, vol: 1.15 }),
+  stepnose: p({ ppr: 2, idle: 950, redline: 7800, odd: 0.25, roll: 1.1, lump: 0.2, lumpRatio: 0.5, sub: 0.2, grit: 0.4, noise: 0.3, bright: 1.3, reso: 250, crackle: 0.55, vol: 1.0 }),
+  restomuscle: p({ ppr: 4, idle: 700, redline: 6600, odd: 0.15, roll: 1.45, lump: 0.75, lumpRatio: 0.25, sub: 0.7, grit: 0.5, noise: 0.32, bright: 0.9, reso: 130, whine: 0.5, crackle: 0.5, vol: 1.25 }),
   wedge: p({ ppr: 6, idle: 950, redline: 8800, odd: 0.1, roll: 1.05, sub: 0.35, grit: 0.4, noise: 0.3, bright: 1.45, reso: 260, crackle: 0.7, vol: 1.15 }),
   super: p({ ppr: 4, idle: 950, redline: 8500, odd: 0.1, roll: 1.1, lump: 0.15, lumpRatio: 0.25, sub: 0.45, grit: 0.4, noise: 0.3, bright: 1.35, reso: 210, turbo: 0.6, crackle: 0.6, vol: 1.15 }),
   bubble: p({ ppr: 2, idle: 850, redline: 4800, odd: 0.45, roll: 1.1, lump: 0.4, lumpRatio: 0.5, sub: 0.1, grit: 0.3, noise: 0.3, clatter: 0.4, bright: 0.95, reso: 200, vol: 0.85 }),

@@ -20,6 +20,7 @@ import { carStyle, hasTrim, trimBike, trimCar, type CarStyle } from './carTrim'
 import { brakeGeo, wheelGeo, type RimStyle } from './carWheels'
 import { PEOPLE_SIZED } from './keepShape'
 import { EXOTIC } from './exoticCars'
+import { RESTO } from './restoCars'
 
 type Shape = {
   len: number; wid: number
@@ -100,6 +101,10 @@ const SHAPES: Record<Body, Shape> = {
   horseshoe: { len: 1.4, wid: 0.82, body: 0.22, lift: 0.07, cabinLen: 0.62, cabinH: 0.17, cabinZ: -0.06, taper: 0.45, fastback: 0.7, hood: 0, wheel: 0.145, drop: 0.03, nose: 0.08 },
   teardrop: { len: 1.42, wid: 0.8, body: 0.21, lift: 0.07, cabinLen: 0.6, cabinH: 0.17, cabinZ: -0.08, taper: 0.4, fastback: 0.75, hood: 0, wheel: 0.145, drop: 0.03, nose: 0.1 },
   scissor: { len: 1.38, wid: 0.8, body: 0.2, lift: 0.06, cabinLen: 0.6, cabinH: 0.16, cabinZ: -0.06, taper: 0.4, fastback: 0.7, hood: 0, wheel: 0.14, drop: 0.03, nose: 0.1 },
+  // Resto-mods: drawn by restoCars.ts, same as the exotics.
+  pontoon: { len: 1.36, wid: 0.76, body: 0.16, lift: 0.08, cabinLen: 0.3, cabinH: 0.1, cabinZ: -0.05, taper: 0.7, hood: 0, wheel: 0.14, drop: 0.02, nose: 0.06, open: true },
+  stepnose: { len: 1.3, wid: 0.76, body: 0.25, lift: 0.08, cabinLen: 0.62, cabinH: 0.19, cabinZ: -0.14, taper: 0.8, hood: 0, wheel: 0.15, drop: 0.01, nose: 0.05 },
+  restomuscle: { len: 1.42, wid: 0.8, body: 0.25, lift: 0.08, cabinLen: 0.62, cabinH: 0.17, cabinZ: -0.22, taper: 0.8, hood: 0.03, wheel: 0.155, drop: 0.01, nose: 0.03 },
 }
 
 // Motorcycles. head = steering head [y, z]; seat = seat top [y, z].
@@ -387,7 +392,7 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
   if (hit) return hit
   if (body === 'formula') return formulaGeo(key, fit)
   const s = shapeOf(body)
-  const exotic = EXOTIC[body]
+  const exotic = EXOTIC[body] ?? RESTO[body]
   if (exotic) {
     const k = new Kit()
     exotic(k, fit, { seat, steering, brakes, bar })

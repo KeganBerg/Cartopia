@@ -18,21 +18,21 @@ export type ExoticHelpers = {
 }
 export type ExoticFit = { spoiler?: string; hood?: string; exhaust?: string; kit?: string }
 
-const box = (w: number, h: number, d: number) => new BoxGeometry(w, h, d)
-const rbox = (w: number, h: number, d: number, r: number) => new RoundedBoxGeometry(w, h, d, 2, Math.min(r, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001))
-const plane = (w: number, h: number) => new PlaneGeometry(w, h)
-const disc = (r: number, seg = 16) => new CircleGeometry(r, seg)
+export const box = (w: number, h: number, d: number) => new BoxGeometry(w, h, d)
+export const rbox = (w: number, h: number, d: number, r: number) => new RoundedBoxGeometry(w, h, d, 2, Math.min(r, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001))
+export const plane = (w: number, h: number) => new PlaneGeometry(w, h)
+export const disc = (r: number, seg = 16) => new CircleGeometry(r, seg)
 // A flat polygon in its own x/y plane, facing +z.
-const poly = (pts: [number, number][]) => new ShapeGeometry(new Shape(pts.map(([x, y]) => new Vector2(x, y))))
+export const poly = (pts: [number, number][]) => new ShapeGeometry(new Shape(pts.map(([x, y]) => new Vector2(x, y))))
 // The same polygon with a little depth, for raised trim.
-const slab = (pts: [number, number][], d: number) => {
+export const slab = (pts: [number, number][], d: number) => {
   const g = new ExtrudeGeometry(new Shape(pts.map(([x, y]) => new Vector2(x, y))), { depth: d, bevelEnabled: false })
   g.translate(0, 0, -d / 2)
   return g
 }
 
 // Places flat parts on a lofted surface.
-class Surface {
+export class Surface {
   readonly k: Kit
   readonly loft: Loft
   readonly topFrom: number
@@ -72,7 +72,7 @@ class Surface {
 }
 
 // A flat part flipped left to right, still facing the same way.
-function mirrorX(geo: BufferGeometry) {
+export function mirrorX(geo: BufferGeometry) {
   const g = geo.index ? geo.toNonIndexed() : geo
   if (g !== geo) geo.dispose()
   g.scale(-1, 1, 1)
@@ -93,7 +93,7 @@ function mirrorX(geo: BufferGeometry) {
 // Half-ring of a body section: the bottom, a crisp upright side wall, a chamfered
 // shoulder, the fender top and a crease where the fender falls to the middle.
 // soft: a rounded shoulder and fender top instead of a chamfer and crease.
-function bodyRing(z: number, W: number, yb: number, ysh: number, yd: number, wc: number, yc: number, soft = false): Section {
+export function bodyRing(z: number, W: number, yb: number, ysh: number, yd: number, wc: number, yc: number, soft = false): Section {
   const pts: Pt[] = [
     [0, yb], [W - 0.03, yb, true], [W, yb + 0.025, true], [W, ysh, !soft], [W - (soft ? 0.018 : 0.014), ysh + (soft ? 0.02 : 0.012), !soft],
     [W - 0.05, yd, !soft], [Math.min(wc, W - 0.07), yc + 0.006, true], [0, yc],
@@ -102,7 +102,7 @@ function bodyRing(z: number, W: number, yb: number, ysh: number, yd: number, wc:
 }
 
 // Greenhouse half-ring: belt, side glass leaning in, a chamfered roof edge, the roof.
-function glassRing(z: number, wb: number, base: number, wr: number, yt: number, soft = false): Section {
+export function glassRing(z: number, wb: number, base: number, wr: number, yt: number, soft = false): Section {
   const pts: Pt[] = [[0, base], [wb, base, true], [wr, Math.max(base + 0.002, yt - 0.016), !soft], [wr - 0.018, yt, !soft], [0, yt]]
   return { z, pts }
 }
@@ -111,7 +111,7 @@ function glassRing(z: number, wb: number, base: number, wr: number, yt: number, 
 // edge back (narrower than the glass, so the side windows show), black pillars down the
 // windshield's sides, a black belt along the bottom of the side glass, and door mirrors
 // on stalks. Ranges are [front z, back z]; mirror is [z, stalk x, stalk y].
-function greenhouse(k: Kit, h: ExoticHelpers, glass: Loft, o: { roof: [number, number]; pillar: [number, number]; belt: [number, number]; mirror: [number, number, number]; roofPart?: Part }) {
+export function greenhouse(k: Kit, h: ExoticHelpers, glass: Loft, o: { roof: [number, number]; pillar: [number, number]; belt: [number, number]; mirror: [number, number, number]; roofPart?: Part }) {
   const roofKeys: Section[] = []
   const n = 6
   for (let i = 0; i <= n; i++) {
@@ -146,7 +146,7 @@ function greenhouse(k: Kit, h: ExoticHelpers, glass: Loft, o: { roof: [number, n
 // Honeycomb mesh: rows of dark grey hexagons on a black panel w by h centred at (x, y),
 // on the front (dir 1) or the back (dir -1) face at z. The hexagons are interior trim
 // ('dash'), so town traffic shows the plain black panel and pays nothing for them.
-function honey(k: Kit, x: number, y: number, z: number, w: number, h: number, r: number, dir: 1 | -1) {
+export function honey(k: Kit, x: number, y: number, z: number, w: number, h: number, r: number, dir: 1 | -1) {
   k.add('black', plane(w, h), [x, y, z + dir * 0.001], [0, dir < 0 ? Math.PI : 0, 0])
   const dx = r * 1.8
   const dy = r * 1.56
@@ -161,7 +161,7 @@ function honey(k: Kit, x: number, y: number, z: number, w: number, h: number, r:
 
 // A slatted vent lying on a surface: a black opening w wide and l long with n body-colour
 // louvres across it.
-function vent(S: Surface, x: number, z: number, w: number, l: number, n: number, turn = 0) {
+export function vent(S: Surface, x: number, z: number, w: number, l: number, n: number, turn = 0) {
   S.top('black', poly([[-w / 2, -l / 2], [w / 2, -l / 2], [w / 2 * 0.86, l / 2], [-w / 2 * 0.86, l / 2]]), x, z, 0.002, turn)
   for (let i = 0; i < n; i++) {
     const t = (i + 0.5) / n - 0.5
@@ -326,7 +326,7 @@ export function fulmineGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
 }
 
 // Two bucket seats, a dash with a screen, the wheel and a console, seen through the glass.
-function interior(k: Kit, h: ExoticHelpers, seatZ: number, dashZ: number) {
+export function interior(k: Kit, h: ExoticHelpers, seatZ: number, dashZ: number) {
   for (const sd of [-1, 1]) h.seat(k, sd * 0.13, 0.17, seatZ, 0.15, 0.15)
   k.add('dash', rbox(0.5, 0.05, 0.09, 0.02), [0, 0.27, dashZ])
   k.add('display', plane(0.06, 0.035), [0, 0.29, dashZ - 0.05], [-0.4, 0, 0])
@@ -335,7 +335,7 @@ function interior(k: Kit, h: ExoticHelpers, seatZ: number, dashZ: number) {
 }
 
 // Round wheel arches: a black well behind each tyre and a thin dark lip.
-function roundArches(S: Surface, wz: number, r: number) {
+export function roundArches(S: Surface, wz: number, r: number) {
   for (const zz of [wz, -wz]) for (const sd of [-1, 1]) {
     S.wall('black', new CircleGeometry(r * 1.2, 18, 0, Math.PI), sd, zz, r - 0.01, 0.002)
     S.wall('dark', new TorusGeometry(r * 1.2, 0.009, 4, 18, Math.PI), sd, zz, r - 0.01, 0.004)
@@ -344,7 +344,7 @@ function roundArches(S: Surface, wz: number, r: number) {
 
 // A thin fin standing up along the middle of the car, following a surface: base(z) is
 // the surface height and rise(z) how far the fin stands above it.
-function spine(k: Kit, part: Part, z0: number, z1: number, base: (z: number) => number, rise: (z: number) => number, t: number) {
+export function spine(k: Kit, part: Part, z0: number, z1: number, base: (z: number) => number, rise: (z: number) => number, t: number) {
   const n = 14
   const top: [number, number][] = []
   const bot: [number, number][] = []
@@ -358,7 +358,7 @@ function spine(k: Kit, part: Part, z0: number, z1: number, base: (z: number) => 
 }
 
 // An outline with a hole, as a flat slab (a grille surround, a ring of trim).
-function frame(outer: [number, number][], inner: [number, number][], d: number) {
+export function frame(outer: [number, number][], inner: [number, number][], d: number) {
   const sh = new Shape(outer.map(([x, y]) => new Vector2(x, y)))
   sh.holes.push(new Shape(inner.map(([x, y]) => new Vector2(x, y))))
   const g = new ExtrudeGeometry(sh, { depth: d, bevelEnabled: false })
@@ -367,7 +367,7 @@ function frame(outer: [number, number][], inner: [number, number][], d: number) 
 }
 
 // An arch: straight sides with a round top, w half width, h height, base at y = 0.
-const arch = (w: number, h: number, seg = 10): [number, number][] => {
+export const arch = (w: number, h: number, seg = 10): [number, number][] => {
   const out: [number, number][] = [[w, 0]]
   for (let i = 0; i <= seg; i++) {
     const a = (i / seg) * Math.PI
@@ -376,7 +376,7 @@ const arch = (w: number, h: number, seg = 10): [number, number][] => {
   out.push([-w, 0])
   return out
 }
-const ellipse = (rx: number, ry: number, seg = 16): [number, number][] =>
+export const ellipse = (rx: number, ry: number, seg = 16): [number, number][] =>
   Array.from({ length: seg }, (_, i) => [Math.cos((i / seg) * Math.PI * 2) * rx, Math.sin((i / seg) * Math.PI * 2) * ry])
 
 // ---------------------------------------------------------------------------
