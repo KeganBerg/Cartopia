@@ -15,6 +15,18 @@ export function holdTown(): () => void {
   }
 }
 
+// Pauses only the town's drawing, not its sounds: a full-screen menu (the Race menu on a
+// phone) covers the town, and its race clips play smoother without the town drawing behind.
+let drawHolds = 0
+export function pauseTownDraw(): () => void {
+  drawHolds++
+  emit()
+  return () => {
+    drawHolds--
+    emit()
+  }
+}
+
 // For non-React listeners (the town's ambient sounds go quiet during a race).
 export const townHeld = () => holds > 0
 export function onTownHold(l: () => void) {
@@ -28,6 +40,6 @@ export function useTownPaused(): boolean {
       listeners.add(l)
       return () => listeners.delete(l)
     },
-    () => holds > 0,
+    () => holds > 0 || drawHolds > 0,
   )
 }
