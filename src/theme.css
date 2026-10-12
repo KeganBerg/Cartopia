@@ -166,6 +166,8 @@ html {
 :root .tool.active .gi { color: var(--line); }
 :root .tool.done { margin-left: 4px; background: linear-gradient(#8ef05c, #2fae35); border-color: #1d6b22; color: #fff; text-shadow: 0 1.5px 0 rgba(0,0,0,.3); box-shadow: inset 0 2px 0 rgba(255,255,255,.4), 0 2px 0 rgba(0,0,0,.3); }
 :root .tool.done .gi { color: #fff; filter: drop-shadow(0 1.5px 0 rgba(0,0,0,.3)); }
+/* When the tools overflow on a phone (placing adds Rotate), Done stays pinned at the end instead of scrolling off. */
+:root .tool.done { position: sticky; right: 0; z-index: 1; }
 @media (max-width: 600px) {
   :root .edit-bar { left: calc(6px + var(--sal)); right: calc(6px + var(--sar)); transform: none; max-width: none; bottom: calc(6px + var(--sab)); }
   :root .edit-tools { width: 100%; padding: 4px; gap: 2px; border-radius: 18px; }

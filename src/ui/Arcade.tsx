@@ -41,7 +41,7 @@ export function ArcadePanel() {
   }
 
   return (
-    <Panel title="🕹️ Arcade" wide>
+    <Panel title="🕹️ Arcade" wide className="arcade-panel">
       {car && cars.length > 1 && (
         <div className="arc-cars">
           {cars.slice().sort((a, b) => pi(b) - pi(a)).slice(0, 12).map((c) => (

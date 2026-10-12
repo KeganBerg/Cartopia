@@ -31,15 +31,15 @@ export function ChatPanel() {
   return (
     <Panel title="Chat" wide className="chat-panel">
       {!supabase && !uid ? (
-        <p className="hint">Chat needs an internet connection.</p>
+        <div className="chat-empty chat-fill">
+          <span>📡</span>
+          <p>No connection</p>
+        </div>
       ) : !uid ? (
-        <div className="clan-signin">
-          <span className="big-emblem">💬</span>
-          <div>
-            <b>Chat with other drivers</b>
-            <p>Talk to everyone in the global room, or plan races with your crew.</p>
-            <button className="buy" onClick={() => openPanel('account')}>Sign in to chat</button>
-          </div>
+        <div className="chat-empty chat-fill" title="Talk to everyone in the global room, or plan races with your crew">
+          <span>💬</span>
+          <p>🌍 Global · 🛡️ Crew</p>
+          <button className="buy" onClick={() => openPanel('account')}>Sign in to chat</button>
         </div>
       ) : (
         <div className="chat">

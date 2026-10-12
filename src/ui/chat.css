@@ -37,3 +37,5 @@
 .clan-banner .clan-chat { margin-left: auto; flex: none; align-self: flex-start; }
 /* Nav-bar chat button: a plain red dot when only the global room has news. */
 .btn-dot.new { min-width: 14px; width: 14px; height: 14px; padding: 0; }
+.chat-fill span { font-size: 72px; line-height: 1; }
+.chat-fill p { font: 20px var(--display); color: #33475b; }
