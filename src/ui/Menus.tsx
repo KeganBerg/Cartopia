@@ -26,6 +26,7 @@ import { ShowcaseToggle } from './Meet'
 import { tutTarget, tutorialShowing, type TutTarget } from './Tutorial'
 import { useTipTarget, type TipTarget } from './Tips'
 import { setFreeCam, useFreeCam } from '../scene/freeCam'
+import { Confirm, useAsk } from './Confirm'
 
 // Phones and tablets: no hover, so placing takes a preview tap first.
 const TOUCH = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
@@ -508,6 +509,7 @@ export function GaragePanel() {
   const select = useGame((s) => s.selectCar)
   const upgrade = useGame((s) => s.upgradeCar)
   const sell = useGame((s) => s.sellCar)
+  const sellAsk = useAsk('askSell')
   const { list, kinds, kind, sort, setView } = useGarageList(cars)
   const car = cars.find((c) => c.uid === selected) ?? list[0]?.c ?? cars[0]
   const def = car && carDef(car.model)
@@ -649,7 +651,13 @@ export function GaragePanel() {
             {tab === 'paint' && <SkinPicker car={car} trying={trySkin} setTrying={(skin) => setSkinning(skin === undefined ? null : { car: car.uid, skin })} />}
             {tab === 'custom' && <CustomShop car={car} panels={tryPanels ?? car.panels} setPanels={(panels) => setCustomising(panels ? { car: car.uid, panels } : null)} />}
             {tab === 'paint' && <PaintShop car={car} job={tryJob ?? jobOf(car)} setJob={(job) => setPainting(job ? { car: car.uid, job } : null)} />}
-            <button className="sell" onClick={() => sell(car.uid)}>Sell for ${Math.floor(def.price * 0.5).toLocaleString()}</button>
+            <button className="sell" onClick={() => { const uid = car.uid; sellAsk.ask(() => sell(uid)) }}>Sell for ${Math.floor(def.price * 0.5).toLocaleString()}</button>
+            {sellAsk.open && (
+              <Confirm pref="askSell" icon="💰" title="Sell this car?" ok={`Sell · $${Math.floor(def.price * 0.5).toLocaleString()}`} onOk={sellAsk.yes} onCancel={sellAsk.close}>
+                <CarThumb size="sm" color={car.color} finish={car.finish} skin={car.skin} modSkin={car.modSkin} panels={car.panels} body={def.body} model={def.id} stripe={car.stripe} mods={car.mods} />
+                <b>{def.name}</b>
+              </Confirm>
+            )}
           </div>
         )}
       </div>

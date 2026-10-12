@@ -28,9 +28,10 @@ describe('legal pages', () => {
 
 describe('settings', () => {
   it('fall back to defaults for missing or bad data', () => {
-    expect(parsePrefs(null)).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true })
-    expect(parsePrefs('{oops')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true })
-    expect(parsePrefs('{"graphics":"ultra","reduceMotion":"yes"}')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true })
-    expect(parsePrefs('{"graphics":"saver","reduceMotion":true,"vibration":false}')).toEqual({ graphics: 'saver', reduceMotion: true, vibration: false })
+    expect(parsePrefs(null)).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, askLeave: true, askSell: true })
+    expect(parsePrefs('{oops')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, askLeave: true, askSell: true })
+    expect(parsePrefs('{"graphics":"ultra","reduceMotion":"yes"}')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, askLeave: true, askSell: true })
+    expect(parsePrefs('{"graphics":"saver","reduceMotion":true,"vibration":false}')).toEqual({ graphics: 'saver', reduceMotion: true, vibration: false, askLeave: true, askSell: true })
+    expect(parsePrefs('{"askLeave":false,"askSell":false}')).toMatchObject({ askLeave: false, askSell: false })
   })
 })

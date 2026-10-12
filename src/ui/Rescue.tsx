@@ -11,6 +11,7 @@ import { RescueScene, type ScreenAt } from '../scene/RescueScene'
 import { rescueSfx } from '../lib/sound'
 import { buzz } from '../lib/haptics'
 import { LoadingScene } from './Loading'
+import { Confirm, useAsk } from './Confirm'
 
 function lootLabel(l: Loot) {
   switch (l.kind) {
@@ -295,6 +296,13 @@ function SearchScreen({ onHaul }: { onHaul: (items: Loot[]) => void }) {
   const tray = useRef<HTMLDivElement>(null)
   const left = q.revealed.filter((r) => !r).length
   const haul = q.pins.map((l, i) => ({ l, i })).filter(({ l, i }) => aboard.includes(i) && l.kind !== 'nothing')
+  // Leaving throws the haul away, so it asks first (unless the player said not to).
+  const leaveAsk = useAsk('askLeave')
+  const leave = () => {
+    if (!haul.length) return abandon()
+    setAuto(false)
+    leaveAsk.ask(abandon)
+  }
   const trayEnd = () => {
     const r = tray.current?.getBoundingClientRect()
     const last = tray.current?.lastElementChild?.getBoundingClientRect()
@@ -368,7 +376,7 @@ function SearchScreen({ onHaul }: { onHaul: (items: Loot[]) => void }) {
             <b>🛞 Flat tire!</b>
             <div className="row">
               <button className="buy" onClick={fix}>Fix · 💎 1{bucks < 1 ? ' (need 1)' : ''}</button>
-              <button className="sell" onClick={abandon}>Go home</button>
+              <button className="sell" onClick={leave}>Go home</button>
             </div>
           </div>
         </div>
@@ -378,11 +386,16 @@ function SearchScreen({ onHaul }: { onHaul: (items: Loot[]) => void }) {
           {haul.length ? <Haul items={haul.map(({ l }) => l)} /> : <span className="rs-empty">🛻 Haul is empty</span>}
         </div>
         <div className="rs-actions">
-          <button className="sell rs-leave" onClick={abandon} disabled={leaving}>Leave</button>
+          <button className="sell rs-leave" onClick={leave} disabled={leaving}>Leave</button>
           {left > 0 && <button className={auto ? 'buy alt rs-auto on' : 'buy alt rs-auto'} onClick={() => setAuto((a) => !a)} disabled={q.flat || leaving}>{auto ? '⏸ Stop' : '⏩ Search all'}</button>}
           <button className={left ? 'buy rs-home' : 'buy rs-home ready'} disabled={q.flat || !started || leaving} onClick={() => { setAuto(false); setLeaving(true); rescueSfx.home(); buzz([15, 60, 15]) }}>🏠 Tow home</button>
         </div>
       </div>
+      {leaveAsk.open && (
+        <Confirm pref="askLeave" icon="🛻" title="Leave your haul?" ok="Leave" onOk={leaveAsk.yes} onCancel={leaveAsk.close}>
+          <Haul items={haul.map(({ l }) => l)} />
+        </Confirm>
+      )}
     </div>
   )
 }

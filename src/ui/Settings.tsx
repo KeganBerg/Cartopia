@@ -79,6 +79,14 @@ export function SettingsTab({ user }: { user: User | null }) {
           <Switch label="Vibration" on={prefs.vibration} onChange={(on) => setPrefs({ vibration: on })} />
         </Row>
       </Group>
+      <Group icon="✋" title="Ask first">
+        <Row label="Leaving Rusty's" sub="Before your haul is left behind">
+          <Switch label="Ask before leaving Rusty's" on={prefs.askLeave} onChange={(on) => setPrefs({ askLeave: on })} />
+        </Row>
+        <Row label="Selling a car">
+          <Switch label="Ask before selling a car" on={prefs.askSell} onChange={(on) => setPrefs({ askSell: on })} />
+        </Row>
+      </Group>
       <Group icon="🔔" title="Notifications">
         <AlertsMenu />
         {user && <ChallengeSettings />}
