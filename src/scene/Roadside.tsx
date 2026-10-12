@@ -1,8 +1,11 @@
 import { BufferAttribute, BufferGeometry, MeshStandardMaterial } from 'three'
 import { TILE } from '../game/data'
 import { glowMats } from './dayNight'
+import { LightPool } from './BuildingModel'
 import { decal } from './layers'
 import { roadWearTex } from './textures'
+import { PropMesh } from './propKit'
+import { STREET_PROPS, hydrant, plateGeo, speedPlate, streetLamp } from './streetProps'
 
 // Street-level detail for road tiles: wear on the asphalt (grime along the
 // kerbs, hairline cracks, tar patches, oil drips where cars wait) and small
@@ -78,109 +81,46 @@ export function RoadWear({ kerbs, plain, alongX, h }: { kerbs: Side[]; plain: bo
 export type PropKind = 'bin' | 'news' | 'mail' | 'bollards' | 'planter' | 'sign' | 'box' | 'bikes' | 'meter'
 export const PROPS: PropKind[] = ['bin', 'news', 'mail', 'bollards', 'planter', 'sign', 'box', 'bikes', 'meter']
 
-const M = (c: string, rough = 0.8, metal = 0) => <meshStandardMaterial color={c} roughness={rough} metalness={metal} />
-
 export function StreetProp({ kind, side, at }: { kind: PropKind; side: Side; at: number }) {
   return (
     <group rotation-y={SIDE_ROT[side]}>
       <group position={[at, 0.08, HALF - 0.1]}>
-        {kind === 'bin' && (
-          // Green litter bin with a domed lid and a dark mouth.
-          <>
-            <mesh position-y={0.13} castShadow><cylinderGeometry args={[0.075, 0.065, 0.26, 8]} />{M('#2e7d32')}</mesh>
-            <mesh position-y={0.27}><sphereGeometry args={[0.08, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2]} />{M('#1b5e20')}</mesh>
-            <mesh position={[0, 0.22, -0.07]}><boxGeometry args={[0.07, 0.04, 0.02]} />{M('#212121')}</mesh>
-            {[-1, 1].map((s) => <mesh key={s} position={[s * 0.075, 0.08, 0]}><boxGeometry args={[0.01, 0.16, 0.03]} />{M('#9e9e9e', 0.4, 0.6)}</mesh>)}
-          </>
-        )}
-        {kind === 'news' && (
-          // A pair of newspaper boxes, one red, one blue, with windows.
-          <>
-            {[[-0.09, '#c62828'], [0.09, '#1565c0']].map(([x, c]) => (
-              <group key={x as number} position-x={x as number}>
-                <mesh position-y={0.12} castShadow><boxGeometry args={[0.14, 0.2, 0.12]} />{M(c as string, 0.5)}</mesh>
-                <mesh position={[0, 0.15, -0.061]}><boxGeometry args={[0.1, 0.07, 0.005]} />{M('#cfd8dc', 0.2)}</mesh>
-                <mesh position-y={0.01}><boxGeometry args={[0.03, 0.02, 0.03]} />{M('#424242')}</mesh>
-              </group>
-            ))}
-          </>
-        )}
-        {kind === 'mail' && (
-          // Blue curbside mailbox with a rounded top on stubby legs.
-          <>
-            <mesh position-y={0.17} castShadow><boxGeometry args={[0.15, 0.2, 0.14]} />{M('#1e4fa3', 0.5)}</mesh>
-            <mesh position-y={0.27} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.075, 0.075, 0.14, 10, 1, false, 0, Math.PI]} />{M('#1e4fa3', 0.5)}</mesh>
-            <mesh position={[0, 0.24, -0.071]}><boxGeometry args={[0.09, 0.015, 0.005]} />{M('#0d2b5e')}</mesh>
-            {[[-0.06, -0.05], [0.06, -0.05], [-0.06, 0.05], [0.06, 0.05]].map(([x, z]) => (
-              <mesh key={`${x}${z}`} position={[x, 0.035, z]}><boxGeometry args={[0.02, 0.07, 0.02]} />{M('#0d2b5e')}</mesh>
-            ))}
-          </>
-        )}
-        {kind === 'bollards' && (
-          // Three short posts with a reflective band.
-          <>
-            {[-0.3, 0, 0.3].map((x) => (
-              <group key={x} position-x={x}>
-                <mesh position-y={0.1} castShadow><cylinderGeometry args={[0.03, 0.035, 0.2, 8]} />{M('#37474f', 0.5, 0.3)}</mesh>
-                <mesh position-y={0.16}><cylinderGeometry args={[0.032, 0.032, 0.025, 8]} />{M('#fdd835', 0.3)}</mesh>
-              </group>
-            ))}
-          </>
-        )}
-        {kind === 'planter' && (
-          // Concrete planter with a little shrub.
-          <>
-            <mesh position-y={0.07} castShadow><boxGeometry args={[0.32, 0.14, 0.16]} />{M('#b0a99a')}</mesh>
-            <mesh position-y={0.14}><boxGeometry args={[0.28, 0.01, 0.12]} />{M('#5d4037')}</mesh>
-            {[-0.08, 0.08].map((x, i) => <mesh key={x} position={[x, 0.2, 0]}><icosahedronGeometry args={[0.08, 0]} /><meshStandardMaterial color={i ? '#43a047' : '#2e7d32'} flatShading /></mesh>)}
-          </>
-        )}
+        <PropMesh parts={STREET_PROPS[kind]()} />
         {kind === 'sign' && (
-          // Speed limit sign on a post, facing the road.
-          <>
-            <mesh position-y={0.32} castShadow><cylinderGeometry args={[0.012, 0.012, 0.64, 6]} />{M('#9e9e9e', 0.4, 0.6)}</mesh>
-            <mesh position={[0, 0.58, -0.015]}><boxGeometry args={[0.16, 0.2, 0.01]} />{M('#fafafa', 0.4)}</mesh>
-            <mesh position={[0, 0.58, -0.021]}><boxGeometry args={[0.13, 0.17, 0.002]} />{M('#212121', 0.4)}</mesh>
-            <mesh position={[0, 0.58, -0.023]}><boxGeometry args={[0.12, 0.16, 0.002]} />{M('#fafafa', 0.4)}</mesh>
-            <mesh position={[0, 0.54, -0.025]}><boxGeometry args={[0.06, 0.05, 0.002]} />{M('#212121', 0.4)}</mesh>
-            <mesh position={[0, 0.62, -0.025]}><boxGeometry args={[0.09, 0.015, 0.002]} />{M('#212121', 0.4)}</mesh>
-          </>
+          <mesh geometry={plateGeo} material={speedPlate()} position={[0, 0.56, -0.0195]} rotation-y={Math.PI} dispose={null} />
         )}
         {kind === 'box' && (
-          // Grey utility cabinet with vents and a status light.
-          <>
-            <mesh position-y={0.16} castShadow><boxGeometry args={[0.24, 0.32, 0.12]} />{M('#90a4ae', 0.5, 0.2)}</mesh>
-            <mesh position-y={0.33}><boxGeometry args={[0.26, 0.02, 0.14]} />{M('#78909c', 0.5, 0.2)}</mesh>
-            {[0.1, 0.14, 0.18].map((y) => <mesh key={y} position={[0.05, y, -0.061]}><boxGeometry args={[0.08, 0.01, 0.003]} />{M('#546e7a')}</mesh>)}
-            <mesh position={[-0.07, 0.26, -0.062]}><boxGeometry args={[0.02, 0.02, 0.004]} /><primitive object={glowMats.bulb} attach="material" dispose={null} /></mesh>
-          </>
-        )}
-        {kind === 'bikes' && (
-          // Bike rack: two steel hoops, one with a parked bike.
-          <>
-            {[-0.12, 0.12].map((x) => (
-              <mesh key={x} position={[x, 0.1, 0]} rotation-y={Math.PI / 2}><torusGeometry args={[0.09, 0.012, 4, 10, Math.PI]} />{M('#b0bec5', 0.3, 0.7)}</mesh>
-            ))}
-            <group position={[-0.12, 0, 0.04]} rotation-y={Math.PI / 2}>
-              {[-0.11, 0.11].map((z) => <mesh key={z} position={[0, 0.08, z]} rotation-y={Math.PI / 2}><torusGeometry args={[0.07, 0.012, 4, 12]} />{M('#212121')}</mesh>)}
-              <mesh position={[0, 0.12, 0]}><boxGeometry args={[0.015, 0.015, 0.2]} />{M('#e53935', 0.4)}</mesh>
-              <mesh position={[0, 0.16, -0.06]}><boxGeometry args={[0.04, 0.012, 0.05]} />{M('#212121')}</mesh>
-            </group>
-          </>
-        )}
-        {kind === 'meter' && (
-          // Pair of parking meters at the kerb.
-          <>
-            {[-0.15, 0.15].map((x) => (
-              <group key={x} position-x={x}>
-                <mesh position-y={0.14}><cylinderGeometry args={[0.012, 0.012, 0.28, 6]} />{M('#546e7a', 0.4, 0.5)}</mesh>
-                <mesh position-y={0.31}><boxGeometry args={[0.06, 0.08, 0.05]} />{M('#455a64', 0.4, 0.5)}</mesh>
-                <mesh position={[0, 0.32, -0.026]}><boxGeometry args={[0.04, 0.03, 0.003]} />{M('#cfd8dc', 0.2)}</mesh>
-              </group>
-            ))}
-          </>
+          // Status light, lit at night.
+          <mesh position={[-0.07, 0.29, -0.062]}><boxGeometry args={[0.016, 0.016, 0.004]} /><primitive object={glowMats.bulb} attach="material" dispose={null} /></mesh>
         )}
       </group>
+    </group>
+  )
+}
+
+// Fire hydrant on the sidewalk.
+export function Hydrant({ side }: { side: 'e' | 'w' | 's' | 'n' }) {
+  const at = TILE / 2 - 0.2
+  const [x, z] = { e: [at, 0.6], w: [-at, -0.6], s: [-0.6, at], n: [0.6, -at] }[side]
+  // Pumper outlet towards the road.
+  return (
+    <group position={[x, 0.08, z]} rotation-y={SIDE_ROT[side]}>
+      <PropMesh parts={hydrant()} />
+    </group>
+  )
+}
+
+// Street lamp on the sidewalk, arm reaching over the road. Lit at night.
+export function StreetLamp({ side }: { side: 'e' | 'w' | 's' | 'n' }) {
+  const half = TILE / 2 - 0.18
+  const rot = { s: 0, n: Math.PI, e: Math.PI / 2, w: -Math.PI / 2 }[side]
+  return (
+    <group rotation-y={rot}>
+      <group position={[0.55, 0, half]}>
+        <PropMesh parts={streetLamp()} />
+      </group>
+      {/* Above the kerb so the glow spills over the sidewalk too. */}
+      <LightPool r={0.95} x={0.55} z={half - 0.5} y={0.09} />
     </group>
   )
 }

@@ -188,8 +188,8 @@ function TrafficSignals({ roads }: { roads: string[] }) {
     const parts: Record<keyof typeof mats, BufferGeometry[]> = { pole: [], arm: [], housing: [], signPole: [], signRim: [], signFace: [], signBar: [] }
     const at = new Matrix4()
     const local = new Matrix4()
-    const add = (list: BufferGeometry[], g: BufferGeometry, s: Signal, x: number, y: number, z: number, rx = 0, ry = 0) => {
-      local.makeRotationFromEuler(new Euler(rx, ry, 0)).setPosition(x, y, z)
+    const add = (list: BufferGeometry[], g: BufferGeometry, s: Signal, x: number, y: number, z: number, rx = 0, ry = 0, rz = 0) => {
+      local.makeRotationFromEuler(new Euler(rx, ry, rz)).setPosition(x, y, z)
       at.makeRotationY(s.yaw).setPosition(s.x, 0, s.z).multiply(local)
       list.push(g.applyMatrix4(at))
     }
@@ -197,6 +197,8 @@ function TrafficSignals({ roads }: { roads: string[] }) {
       if (s.stop) {
         // A stop sign on a side road with no lights.
         add(parts.signPole, new CylinderGeometry(0.03, 0.03, 1.2, 6), s, 0, 0.6, 0)
+        add(parts.signPole, new CylinderGeometry(0.05, 0.055, 0.03, 8), s, 0, 0.015, 0)
+        for (const y of [1.05, 1.25]) add(parts.signPole, new BoxGeometry(0.06, 0.02, 0.03), s, 0, y, 0.02)
         add(parts.signRim, new CylinderGeometry(0.24, 0.24, 0.02, 8), s, 0, 1.15, 0.03, Math.PI / 2, Math.PI / 8)
         add(parts.signFace, new CylinderGeometry(0.215, 0.215, 0.01, 8), s, 0, 1.15, 0.042, Math.PI / 2, Math.PI / 8)
         add(parts.signBar, new PlaneGeometry(0.24, 0.06), s, 0, 1.15, 0.05)
@@ -205,6 +207,16 @@ function TrafficSignals({ roads }: { roads: string[] }) {
         // Arm out over the lane, towards the middle of the road.
         add(parts.arm, new BoxGeometry(0.5, 0.04, 0.04), s, -0.25, 1.46, 0)
         add(parts.housing, new BoxGeometry(0.17, 0.46, 0.12), s, -0.44, 1.2, 0)
+        // Up close: a cast base and cap on the pole, a brace under the arm, the
+        // housing's mounting bracket and a hood over every lamp, both faces.
+        add(parts.pole, new CylinderGeometry(0.055, 0.07, 0.1, 10), s, 0, 0.05, 0)
+        add(parts.pole, new CylinderGeometry(0.045, 0.045, 0.03, 10), s, 0, 0.3, 0)
+        add(parts.pole, new SphereGeometry(0.035, 10, 4, 0, Math.PI * 2, 0, Math.PI / 2), s, 0, 1.5, 0)
+        add(parts.arm, new CylinderGeometry(0.012, 0.012, 0.4, 6), s, -0.15, 1.33, 0, 0, 0, 0.86)
+        add(parts.arm, new BoxGeometry(0.03, 0.06, 0.03), s, -0.44, 1.46, 0)
+        for (let k = 0; k < 3; k++) for (const f of [1, -1]) {
+          add(parts.housing, new CylinderGeometry(0.068, 0.068, 0.07, 10, 1, true, -Math.PI / 2, Math.PI), s, -0.44, 1.2 + 0.145 - k * 0.145 + 0.01, f * 0.095, Math.PI / 2, f > 0 ? 0 : Math.PI)
+        }
       }
     }
     const out: Partial<Record<keyof typeof mats, BufferGeometry>> = {}

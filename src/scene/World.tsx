@@ -19,15 +19,13 @@ import { PostFx } from './PostFx'
 import { SkyEnv } from './SkyEnv'
 import { townLook } from './look'
 import { SeasonFx } from './SeasonFx'
-import { glowMats } from './dayNight'
-import { LightPool } from './BuildingModel'
 import { TownCars } from './TownCars'
 import { Townspeople } from './Townspeople'
 import { Batch, batchOff } from './Batch'
 import { Manhole } from './BuildingDetail'
 import { GrassTufts } from './Tufts'
 import { Outskirts } from './Outskirts'
-import { RoadWear, StreetProp, PROPS } from './Roadside'
+import { RoadWear, StreetProp, PROPS, Hydrant, StreetLamp } from './Roadside'
 import { toWorld, toTile, DIRS } from './grid'
 import { grassTex, paverTex, drainTex, meadowTex } from './textures'
 import { roadMat } from './weatherLook'
@@ -286,19 +284,6 @@ function Sidewalk({ side, drain }: { side: 'e' | 'w' | 's' | 'n'; drain?: boolea
   )
 }
 
-// Fire hydrant on the sidewalk.
-function Hydrant({ side }: { side: 'e' | 'w' | 's' | 'n' }) {
-  const at = TILE / 2 - 0.2
-  const [x, z] = { e: [at, 0.6], w: [-at, -0.6], s: [-0.6, at], n: [0.6, -at] }[side]
-  return (
-    <group position={[x, 0.08, z]}>
-      <mesh position={[0, 0.12, 0]} castShadow><cylinderGeometry args={[0.06, 0.07, 0.24, 8]} /><meshStandardMaterial color="#e53935" /></mesh>
-      <mesh position={[0, 0.26, 0]}><sphereGeometry args={[0.065, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2]} /><meshStandardMaterial color="#e53935" /></mesh>
-      <mesh position={[0, 0.14, 0]} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.025, 0.025, 0.2, 6]} /><meshStandardMaterial color="#cfd8dc" /></mesh>
-    </group>
-  )
-}
-
 // Zebra crossing painted across the road near one edge of the tile.
 function Crosswalk({ side }: { side: 'e' | 'w' | 's' | 'n' }) {
   const half = TILE / 2
@@ -313,32 +298,6 @@ function Crosswalk({ side }: { side: 'e' | 'w' | 's' | 'n' }) {
           <meshBasicMaterial color="#f5f5f5" {...decal()} />
         </mesh>
       ))}
-    </group>
-  )
-}
-
-// Street lamp on the sidewalk, arm reaching over the road. Lit at night.
-function StreetLamp({ side }: { side: 'e' | 'w' | 's' | 'n' }) {
-  const half = TILE / 2 - 0.18
-  const rot = { s: 0, n: Math.PI, e: Math.PI / 2, w: -Math.PI / 2 }[side]
-  return (
-    <group rotation-y={rot}>
-      <group position={[0.55, 0, half]}>
-        <mesh position={[0, 0.85, 0]} castShadow>
-          <cylinderGeometry args={[0.035, 0.05, 1.7, 6]} />
-          <meshStandardMaterial color="#37474f" />
-        </mesh>
-        <mesh position={[0, 1.68, -0.22]}>
-          <boxGeometry args={[0.05, 0.04, 0.48]} />
-          <meshStandardMaterial color="#37474f" />
-        </mesh>
-        <mesh position={[0, 1.63, -0.44]}>
-          <boxGeometry args={[0.14, 0.06, 0.2]} />
-          <primitive object={glowMats.bulb} attach="material" dispose={null} />
-        </mesh>
-      </group>
-      {/* Above the kerb so the glow spills over the sidewalk too. */}
-      <LightPool r={0.95} x={0.55} z={half - 0.5} y={0.09} />
     </group>
   )
 }
