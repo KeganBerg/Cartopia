@@ -57,14 +57,39 @@ describe('weather', () => {
   it('lets a weather live event set the sky for everyone, fading in and out', () => {
     const t = 1_900_000_000_000
     setLiveEvents([{ id: 1, kind: 'weather', payload: { kind: 'fog' }, from: t, to: t + 10 * 60_000 }])
-    expect({ ...weatherNow(t + 1000) }.strength).toBeLessThan(0.05)
+    expect({ ...weatherNow(t + 1000) }.mix.fog).toBeLessThan(0.05)
     const mid = { ...weatherNow(t + 5 * 60_000) }
     expect(mid.kind).toBe('fog')
-    expect(mid.strength).toBe(1)
+    expect(mid.mix.fog).toBeCloseTo(1)
     // Unknown kinds are ignored.
     setLiveEvents([{ id: 2, kind: 'weather', payload: { kind: 'lava' }, from: t, to: t + 10 * 60_000 }])
-    expect({ ...weatherNow(t + 5 * 60_000 + 500) }.kind).toBe(spellKind(Math.floor((t + 5 * 60_000 + 500) / SPELL_MS)))
+    const x = t + 5 * 60_000 + 500
+    weatherNow(x - 60_000)
+    const lava = { ...weatherNow(x) }
     setLiveEvents([])
+    weatherNow(x - 60_000)
+    const plain = { ...weatherNow(x) }
+    expect(lava.kind).toBe(plain.kind)
+    expect(lava.cloud).toBeCloseTo(plain.cloud)
+  })
+
+  it('glides out of a live event that ends early instead of popping', () => {
+    const t = 1_900_000_600_000
+    setLiveEvents([{ id: 3, kind: 'weather', payload: { kind: 'snow' }, from: t, to: t + 10 * 60_000 }])
+    weatherNow(t + 3 * 60_000)
+    let at = t + 3 * 60_000
+    for (let i = 0; i < 5; i++) weatherNow((at += 1000))
+    expect(weatherNow(at).mix.snow).toBeGreaterThan(0.95)
+    setLiveEvents([])
+    const after = { ...weatherNow((at += 1000)) }
+    expect(after.mix.snow).toBeGreaterThan(0.85)
+    let last = after.snow
+    for (let i = 0; i < 60; i++) {
+      const now = weatherNow((at += 1000)).snow
+      expect(Math.abs(now - last)).toBeLessThan(0.1)
+      last = now
+    }
+    expect(weatherNow(at).mix.snow).toBeLessThan(0.05)
   })
 
   it('never puts two storms back to back', () => {
@@ -74,15 +99,33 @@ describe('weather', () => {
     }
   })
 
-  it('is the same for everyone at the same moment and fades in at a spell start', () => {
+  it('is the same for everyone at the same moment and crossfades between spells', () => {
     const t = 1_800_000_000_000
     const start = Math.floor(t / SPELL_MS) * SPELL_MS
-    const a = { ...weatherNow(start + 1000) }
-    expect(a.strength).toBeLessThan(0.05)
     const mid = { ...weatherNow(start + SPELL_MS / 2) }
     expect(mid.strength).toBe(1)
     expect(mid.cloud).toBeCloseTo(FEEL[mid.kind].cloud)
     expect({ ...weatherNow(start + SPELL_MS / 2 + 500) }.kind).toBe(mid.kind)
+    // Across a change of weather nothing jumps: cloud and rain move a little each second.
+    let i = Math.floor(t / SPELL_MS)
+    while (spellKind(i) === spellKind(i + 1) || FEEL[spellKind(i)].cloud === FEEL[spellKind(i + 1)].cloud) i++
+    const edge = (i + 1) * SPELL_MS
+    let prev = { ...weatherNow(edge - 60_000) }
+    for (let at = edge - 59_000; at <= edge + 60_000; at += 1000) {
+      const w = { ...weatherNow(at) }
+      expect(Math.abs(w.cloud - prev.cloud)).toBeLessThan(0.05)
+      expect(Math.abs(w.rain - prev.rain)).toBeLessThan(0.05)
+      prev = w
+    }
+    expect(prev.kind).toBe(spellKind(i + 1))
+  })
+
+  it('runs straight on with no dip when the next spell brings the same weather', () => {
+    let i = 7_500_000
+    while (spellKind(i) === 'clear' || spellKind(i) !== spellKind(i + 1)) i++
+    const w = { ...weatherNow((i + 1) * SPELL_MS) }
+    expect(w.kind).toBe(spellKind(i))
+    expect(w.strength).toBeCloseTo(1)
   })
 
   it('rolls the same race weather from the same live race id', () => {

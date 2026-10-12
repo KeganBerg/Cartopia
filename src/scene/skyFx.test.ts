@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { FEEL, type Weather, type WeatherKind } from '../game/weather'
+import { FEEL, mixOf, type Weather, type WeatherKind } from '../game/weather'
 import { skyFx } from './skyFx'
 
-const at = (kind: WeatherKind, extra: Partial<Weather> = {}): Weather => ({ kind, strength: 1, ...FEEL[kind], wet: 0, cover: 0, flash: 0, ...extra })
+const at = (kind: WeatherKind, extra: Partial<Weather> = {}): Weather => ({ kind, strength: 1, mix: mixOf(kind), ...FEEL[kind], wet: 0, cover: 0, flash: 0, ...extra })
 const NOON = 0
 const MIDNIGHT = 0.5
 const SUNRISE = 0.77
