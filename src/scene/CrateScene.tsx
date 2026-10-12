@@ -1038,9 +1038,10 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
 
 
 // The car a prize shows: a new car in its colour, or your car wearing the part it won.
-export function prizeLook(drop: CrateDrop | null, cars: { uid: string; model: string; color: string; finish?: Finish; stripe?: string | null; mods?: string[] }[]): CarLook | null {
+// `mine` is the car to show a paint on: the one you have selected, or your race car.
+export function prizeLook(drop: CrateDrop | null, cars: { uid: string; model: string; color: string; finish?: Finish; stripe?: string | null; mods?: string[] }[], mine?: string | null): CarLook | null {
   if (!drop) return null
-  if (drop.kind === 'skin' || drop.kind === 'skindupe') return skinLook(drop.skin, drop.part, cars)
+  if (drop.kind === 'skin' || drop.kind === 'skindupe') return skinLook(drop.skin, drop.part, cars, mine)
   if (drop.kind === 'car') return { body: carDef(drop.model).body, model: drop.model, color: drop.color }
   if (drop.kind === 'dupe') {
     const d = carDef(drop.model)
@@ -1063,9 +1064,9 @@ const bestPart = (slot: SkinnedSlot, body: Body) =>
 // A skin prize, on one of the player's cars. A car paint covers the bare body with no parts on,
 // so the whole car moves; a mod paint goes on a fully kitted car (every paintable part slot
 // filled), and only those parts move while the body keeps its own colour.
-function skinLook(id: string, part: boolean, cars: { model: string; color: string; finish?: Finish; stripe?: string | null; mods?: string[] }[]): CarLook {
+function skinLook(id: string, part: boolean, cars: { uid: string; model: string; color: string; finish?: Finish; stripe?: string | null; mods?: string[] }[], mine?: string | null): CarLook {
   const owned = cars.filter((c) => !carDef(c.model).parked)
-  const car = owned[0] ?? { model: 'civic', color: '#eceff1' }
+  const car = owned.find((c) => c.uid === mine) ?? owned[0] ?? { model: 'civic', color: '#eceff1' }
   const d = carDef(car.model)
   const look: CarLook = { body: d.body, model: car.model, color: car.color, finish: car.finish, stripe: car.stripe }
   if (!part) return { ...look, mods: [], skin: id }
