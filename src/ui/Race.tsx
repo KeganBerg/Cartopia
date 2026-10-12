@@ -25,6 +25,8 @@ import { RivalResult, type RivalMatch, type RivalBonus } from './Rivals'
 import { RaceBar, RaceHub, Rounds, campaignFocus, type HubTab } from './RaceHub'
 import { artStyle } from './venueArt'
 import { PaintRivals, firstRowPick, rowChip, rowPrizeOf } from './PaintRivals'
+import { TunerTrials, firstTrialPick, fixBuild, trialChip, trialPrizeOf } from './TunerTrials'
+import { buildChecks, hostMods, tunerShift, tunerTrial, type TunerTrial } from '../game/tuner'
 import { paintRival, rowShift, rowSkills, type PaintRival } from '../game/paintRivals'
 import { TileClip } from './TileClip'
 import './race-menu.css'
@@ -163,6 +165,9 @@ export function RacePanel() {
   const [tRace, setTRace] = useState<{ race: number; rival: Rival; prize: number } | null>(null)
   const [eRace, setERace] = useState<{ race: number; rival: Rival; prize: number } | null>(null)
   const [pRace, setPRace] = useState<{ def: PaintRival; rival: Rival; prize: number } | null>(null)
+  const [kRace, setKRace] = useState<{ def: TunerTrial; rival: Rival; prize: number } | null>(null)
+  const tuner = useGame((s) => s.tuner)
+  const [trialSel, setTrialSel] = useState(() => firstTrialPick(useGame.getState().tuner))
   const rivalRow = useGame((s) => s.rivalRow)
   const oldPaints = useGame((s) => s.oldPaints)
   // The paint rival on show.
@@ -353,6 +358,26 @@ export function RacePanel() {
     )
   }
 
+  if (kRace && car) {
+    const won = (tuner?.[kRace.def.id] ?? 0) > 0
+    return (
+      <DragRace
+        key={seq}
+        car={car}
+        rival={kRace.rival}
+        next={{ label: won ? `↻ Rematch · $${trialPrizeOf(kRace.def, tuner).toLocaleString()}` : '↻ Retry', go: () => { setKRace(null); startTuner(kRace.def.id) } }}
+        prize={kRace.prize}
+        venueId={kRace.def.venue}
+        night={kRace.def.night}
+        weatherSeed={`tuner-${kRace.def.id}`}
+        dist={kRace.def.dist}
+        title={`${kRace.def.icon} ${kRace.def.name}`}
+        onFinish={(won) => useGame.getState().tunerResult(kRace.def.id, won)}
+        onExit={() => { setKRace(null); setTab('tuner') }}
+      />
+    )
+  }
+
   if (tRace && car) {
     const leg = tourLeg(tourLegOf(tRace.race))
     const step = tRace.race % TOUR_RACES
@@ -416,6 +441,16 @@ export function RacePanel() {
     setRowSel(id)
     setPRace({ def, rival: rowRival(def), prize: rowPrizeOf(def, useGame.getState().rivalRow) })
   }
+  function startTuner(id: string) {
+    const def = tunerTrial(id)
+    if (!def || !car || waiting()) return
+    const checks = buildChecks(def, car)
+    if (!checks.every((c) => c.ok)) return fixBuild(car, checks)
+    if (!spendFuel(RACE_FUEL)) return useGame.getState().showNeed('fuel', RACE_FUEL - useGame.getState().fuel, 'a Tuner Trial')
+    setSeq((n) => n + 1)
+    setTrialSel(id)
+    setKRace({ def, rival: trialRival(def), prize: trialPrizeOf(def, useGame.getState().tuner) })
+  }
   function startTour() {
     if (waiting()) return
     if (!spendFuel(RACE_FUEL)) return useGame.getState().showNeed('fuel', RACE_FUEL - useGame.getState().fuel, 'a Pro Tour race')
@@ -477,14 +512,18 @@ export function RacePanel() {
     : tab === 'tour' && campaignCleared(done, CAMPAIGN[0]) ? { label: `$${tourPrize(tourWon).toLocaleString()}`, onClick: startTour }
     : tab === 'event' && (ev?.won ?? 0) < EVENT_RACES ? { label: `$${eventPrize(evBase, ev?.won ?? 0).toLocaleString()}`, onClick: startEvent }
     : tab === 'rivals' ? { label: `$${rowPrizeOf(paintRival(rowSel)!, rivalRow).toLocaleString()}`, onClick: () => startRow(rowSel) }
+    : tab === 'tuner' && car ? (buildChecks(tunerTrial(trialSel)!, car).every((c) => c.ok)
+      ? { label: `$${trialPrizeOf(tunerTrial(trialSel)!, tuner).toLocaleString()}`, onClick: () => startTuner(trialSel) }
+      : { label: '🔧 Fit parts', onClick: () => startTuner(trialSel), fix: true })
     : null
   const stars = Object.values(done).reduce((a, n) => a + n, 0)
-  const TITLES: Record<RaceTab, string> = { hub: 'Race', quick: 'Quick Race', campaign: 'Campaign', tour: 'Pro Tour', gp: 'Grand Prix', trial: 'Time Trial', event: 'Weekly Event', rivals: 'Rivals' }
+  const TITLES: Record<RaceTab, string> = { hub: 'Race', quick: 'Quick Race', campaign: 'Campaign', tour: 'Pro Tour', gp: 'Grand Prix', trial: 'Time Trial', event: 'Weekly Event', rivals: 'Rivals', tuner: 'Tuner Trials' }
   const chip = tab === 'campaign' ? `⭐ ${stars}/${CAMPAIGN.length * CAMPAIGN_RACES * 3}`
     : tab === 'tour' ? `🌍 ${tourWon.toLocaleString()} wins`
     : tab === 'gp' ? `🏁 ×${GP_ROUNDS} → 🎁`
     : tab === 'event' ? `⏳ ${shortLeft(msToNextWeek())}`
     : tab === 'rivals' ? rowChip(rivalRow, oldPaints)
+    : tab === 'tuner' ? trialChip(tuner)
     : null
 
   return (
@@ -494,6 +533,8 @@ export function RacePanel() {
           <RaceHub onOpen={setTab} onCampaign={startCampaign} onTour={startTour} onEvent={startEvent} onRival={(m) => startRival(m)} />
         ) : tab === 'rivals' ? (
           <PaintRivals sel={rowSel} setSel={setRowSel} car={car} />
+        ) : tab === 'tuner' ? (
+          <TunerTrials sel={trialSel} setSel={setTrialSel} car={car} />
         ) : tab === 'campaign' ? (
           <Campaign sel={campSel} setSel={setCampSel} onTour={() => setTab('tour')} onRace={(ci, i) => startCampaign(ci, i)} />
         ) : tab === 'tour' ? (
@@ -762,6 +803,14 @@ function rowRival(r: PaintRival): Rival {
   }
 }
 
+function trialRival(t: TunerTrial): Rival {
+  const car = carDef(t.car)
+  return {
+    id: `tuner-${t.id}`, town: `${t.icon} ${t.host}`, level: t.tier * 10, carName: car.name, color: t.color, pi: t.pi, online: false,
+    body: car.body, model: car.id, mods: hostMods(t), skill: t.tier >= 2 ? car.skill : undefined, shift: tunerShift(t), boss: t.tier === 3,
+  }
+}
+
 function tourRival(race: number): Rival {
   const target = tourRivalPi(race)
   const car = carNear(target)
@@ -1020,18 +1069,15 @@ export function PrizePopup() {
         <h2>{series.name} champion!</h2>
         {!open ? (
           <>
-            <button className="mystery-box" onClick={() => { sfx.win(); setOpen(true) }}>🎁</button>
-            <p>Tap the mystery box to open it</p>
+            <button className="mystery-box" aria-label="Open the mystery box" onClick={() => { sfx.win(); setOpen(true) }}>🎁</button>
           </>
         ) : (
           <>
+            <button className="close prize-close" aria-label="Close" onClick={() => { close(); setOpen(false) }}>✕</button>
             <CarThumb size="lg" color={prize.color} body={def.body} model={def.id} />
             <h3>{def.name}</h3>
-            <p>PI {performance(def, zero)} · +5 🏆. It's in your garage now.</p>
-            <div className="row">
-              <button className="buy" onClick={() => { close(); setOpen(false); openPanel('garage') }}>See it</button>
-              <button className="buy alt" onClick={() => { close(); setOpen(false) }}>Nice!</button>
-            </div>
+            <div className="prize-stats"><span className="rm-pi">PI {performance(def, zero)}</span><span>+5 🏆</span></div>
+            <button className="buy prize-go" onClick={() => { close(); setOpen(false); openPanel('garage') }}>See it</button>
           </>
         )}
       </div>

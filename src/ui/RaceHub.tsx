@@ -18,7 +18,7 @@ import { TileClip } from './TileClip'
 // The Race menu's front page: every race mode as a tile on one screen, each
 // showing its next race, so nothing needs scrolling to find.
 
-export type HubTab = 'quick' | 'campaign' | 'tour' | 'gp' | 'trial' | 'event' | 'rivals'
+export type HubTab = 'quick' | 'campaign' | 'tour' | 'gp' | 'trial' | 'event' | 'rivals' | 'tuner'
 
 const money = (n: number) => (n >= 10000 ? `$${Math.round(n / 1000)}k` : `$${n.toLocaleString()}`)
 
@@ -146,6 +146,7 @@ export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival }: { onOp
             <span className="rm-mi">🟢</span><span><b>Live</b><small>{!signedIn ? 'Sign in' : live > 0 ? `${live} online` : 'Nobody on'}</small></span>
           </button>
         )}
+        <button className="rm-mini m-tuner" onClick={() => onOpen('tuner')}><span className="rm-mi">🔧</span><span><b>Tuner Trials</b><small>Built cars only</small></span></button>
         <button className="rm-mini m-ghost" onClick={() => openPanel('friends')}><span className="rm-mi">👻</span><span><b>Ghosts</b><small>Friends</small></span></button>
         <button className="rm-mini m-top" onClick={() => openPanel('leaders')}><span className="rm-mi">🏅</span><span><b>Top racers</b><small>Leaders</small></span></button>
       </div>
@@ -165,7 +166,7 @@ export function Rounds({ round }: { round: number }) {
 // (tap to swap) and, where the screen has one, the button for its next race.
 // dist: the next race's distance, to show how each car's build suits it; null on a screen
 // whose races vary (builds shown without a verdict); left out where builds don't count.
-export function RaceBar({ cars, car, onPick, go, note, dist }: { cars: OwnedCar[]; car: OwnedCar | undefined; onPick: (uid: string) => void; go?: { label: string; onClick: () => void } | null; note?: string; dist?: RaceDist | null }) {
+export function RaceBar({ cars, car, onPick, go, note, dist }: { cars: OwnedCar[]; car: OwnedCar | undefined; onPick: (uid: string) => void; go?: { label: string; onClick: () => void; fix?: boolean } | null; note?: string; dist?: RaceDist | null }) {
   const [open, setOpen] = useState(false)
   if (!car) return null
   const d = carDef(car.model)
@@ -199,7 +200,8 @@ export function RaceBar({ cars, car, onPick, go, note, dist }: { cars: OwnedCar[
         </span>
         {cars.length > 1 && <span className="rm-swap" aria-hidden>{open ? 'Done' : 'Change'}</span>}
       </button>
-      {go ? <button className="buy rm-race" onClick={go.onClick}>🏁 {go.label}<small>⛽{RACE_FUEL}</small></button>
+      {go?.fix ? <button className="buy rm-race alt" onClick={go.onClick}>{go.label}</button>
+        : go ? <button className="buy rm-race" onClick={go.onClick}>🏁 {go.label}<small>⛽{RACE_FUEL}</small></button>
         : note ? <span className="rm-note">{note}</span> : null}
     </div>
   )

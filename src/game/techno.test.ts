@@ -93,6 +93,8 @@ describe('Rave Mode', () => {
   })
 
   it('the Neon Owl throws one with the same build-up and minute, and not over one already on', () => {
+    // Frozen clock: startEvent reads Date.now(), which can tick past `now` mid-test.
+    vi.useFakeTimers()
     const now = Date.now()
     throwRave(now)
     expect(technoOn()).toBe(true)

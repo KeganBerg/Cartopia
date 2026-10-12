@@ -10,7 +10,7 @@ const q = new URLSearchParams(location.search)
 const side = Number(q.get('side') ?? 0)
 // lean=1: drawn the way town traffic is (baked, wheels from a pool not shown here).
 const lean = q.get('lean') === '1'
-const ROWS: { body: Body; color: string; finish?: Finish; panels: Panels }[] = [
+const SET1: { body: Body; color: string; finish?: Finish; panels: Panels }[] = [
   { body: 'sports', color: '#43a047', panels: { body: { pattern: 'camo' }, hood: { color: '#212121' }, rims: { color: '#fdd835' } } },
   { body: 'muscle', color: '#1e88e5', panels: { hood: { color: '#fafafa', pattern: 'checker' }, roof: { color: '#212121' }, doors: { color: '#fafafa' }, rims: { color: '#e53935' } } },
   { body: 'sedan', color: '#fb8c00', panels: { body: { pattern: 'tiger' }, doors: { color: '#212121', pattern: 'carbon' } } },
@@ -21,6 +21,19 @@ const ROWS: { body: Body; color: string; finish?: Finish; panels: Panels }[] = [
   { body: 'chopper', color: '#8e24aa', panels: { body: { pattern: 'camo' }, rims: { color: '#fdd835' } } },
   { body: 'classic', color: '#e53935', panels: { roof: { color: '#fafafa' }, hood: { pattern: 'carbon' } } },
 ]
+// set=2: the Tuner Trial prize patterns (hex, splatter, flames).
+const SET2: typeof SET1 = [
+  { body: 'sports', color: '#fafafa', panels: { body: { pattern: 'hex' } } },
+  { body: 'muscle', color: '#212121', panels: { body: { pattern: 'flames' } } },
+  { body: 'super', color: '#ec407a', panels: { body: { pattern: 'splatter' } } },
+  { body: 'sedan', color: '#1e88e5', panels: { hood: { pattern: 'flames' }, doors: { color: '#fafafa', pattern: 'hex' } } },
+  { body: 'truck', color: '#6d4c41', panels: { body: { pattern: 'flames' } } },
+  { body: 'suv', color: '#43a047', panels: { body: { pattern: 'splatter' } } },
+  { body: 'classic', color: '#e53935', panels: { body: { pattern: 'flames' }, roof: { color: '#212121' } } },
+  { body: 'bubble', color: '#00acc1', panels: { body: { pattern: 'hex' } } },
+  { body: 'chopper', color: '#8e24aa', panels: { body: { pattern: 'flames' } } },
+]
+const ROWS = q.get('set') === '2' ? SET2 : SET1
 
 function App() {
   const a = side ? -Math.PI * 0.75 : Math.PI * 0.25
