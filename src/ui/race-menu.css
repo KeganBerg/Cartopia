@@ -613,6 +613,34 @@ div.rm-node { cursor: default; }
 .rr-loot span.rr-bet.down { background: #ffebee; border-color: #ef9a9a; color: #b71c1c; }
 @media (max-width: 600px) { .rf-pot { top: calc(114px + var(--sat)); font-size: 18px; padding: 4px 12px; } }
 
+/* Tuner Trials (TunerTrials.tsx): the host car on the banner, the build sheet as icon rows. */
+.rm-tuner .rm-banner { position: relative; }
+.tt-host { position: absolute; right: 6px; top: 6px; pointer-events: none; }
+.tt-host .thumb3d.sm { --tw: 150px; --th: 96px; background: none; }
+.tt-build { flex: none; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.tt-check { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 6px 8px; background: #fff; border: 2.5px solid #e57373; border-radius: 12px; font: inherit; color: var(--ink, #1b2a4a); cursor: pointer; box-shadow: 0 2px 0 rgba(0,0,0,.2); }
+.tt-check.ok { border-color: #8fd694; background: #f2fff0; cursor: default; opacity: 1; }
+.tt-check b { font: 900 14px Nunito, sans-serif; flex: 1; min-width: 0; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tt-ico { font-size: 18px; }
+.tt-mark { font: 900 15px Nunito, sans-serif; color: #d32f2f; }
+.tt-check.ok .tt-mark { color: #2fae35; }
+.tt-check .pips { display: flex; gap: 2px; }
+.tt-check .pips i { width: 7px; height: 12px; border-radius: 2px; background: #dfe7f2; }
+.tt-check .pips i.on { background: #2fae35; }
+.tt-check .pips i.need { background: #fff; outline: 2px solid #e57373; outline-offset: -2px; }
+.tt-check.ok .pips i.need { outline-color: #8fd694; }
+.pr-tick.tt-wrench { background: #fff; border-color: #c6d7ee; font-size: 12px; }
+.tt-reward { margin-top: 8px; }
+@media (max-width: 700px) {
+  .rm-tuner .rm-left { flex: none; }
+  .rm-tuner .rm-banner { min-height: 190px; }
+  .rm-tuner .tt-reward { margin-top: auto; }
+  .tt-build { gap: 4px; }
+  .tt-check { padding: 4px 6px; }
+  .tt-check b { font-size: 12.5px; }
+  .tt-host .thumb3d.sm { --tw: 104px; --th: 66px; }
+}
+
 /* Grand Prix prize: the car, its name, two stat chips and one button (docs/ui-rules.md). */
 .prize { position: relative; }
 .prize h3 { font: 22px var(--display); margin: 4px 0; color: var(--ink, #1b2a4a); }
