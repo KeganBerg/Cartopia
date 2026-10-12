@@ -6,6 +6,7 @@ import { BlendFunction, Effect, KernelSize, TiltShiftEffect, ToneMappingMode, ty
 import { Uniform, Vector3 } from 'three'
 import { fxState, type Look } from './look'
 import { usePrefs } from '../lib/prefs'
+import { onFx } from '../game/fx'
 
 // Colour grade applied to the whole frame after tone mapping. Keep in step
 // with gradeColor() in look.ts, which repeats it for the page background.
@@ -130,10 +131,21 @@ export function PostFx({ look, town, tiltShift }: { look: Look; town?: boolean; 
   const graphics = usePrefs((p) => p.graphics)
   useEffect(() => setTier(startTier()), [graphics])
   // Shader compiles and texture uploads stutter the first seconds; only judge after.
+  // A burst of effects (Collect All, a build) dips the frame rate for a moment too.
+  // Stepping down then rebuilds every shader, a far longer freeze than the dip
+  // itself, so judging pauses for a few seconds after each one.
   const [armed, setArmed] = useState(false)
   useEffect(() => {
-    const id = setTimeout(() => setArmed(true), 5000)
-    return () => clearTimeout(id)
+    let id = setTimeout(() => setArmed(true), 5000)
+    const off = onFx(() => {
+      clearTimeout(id)
+      setArmed(false)
+      id = setTimeout(() => setArmed(true), 4000)
+    })
+    return () => {
+      off()
+      clearTimeout(id)
+    }
   }, [])
   const grade = useMemo(() => new GradeEffect(), [])
   const tilt = useMemo(() => new SoftTiltShift(0.72, 0.28), [])
