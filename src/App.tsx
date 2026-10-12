@@ -34,7 +34,7 @@ import { GhostRacePanel, TauntWatcher, TauntsPanel } from './ui/GhostRace'
 import { GoalsPanel, DailyPanel, FlatPanel } from './ui/Goals'
 import { SeasonPanel } from './ui/Season'
 import { ArcadePanel } from './ui/Arcade'
-import { useGame, today } from './game/store'
+import { useGame } from './game/store'
 import { startCloudSync } from './lib/cloud'
 import './lib/rescue'
 import './lib/crates'
@@ -42,6 +42,8 @@ import { startAmbience } from './lib/ambience'
 import { startMusic } from './lib/townMusic'
 import { startTechnoMusic } from './lib/technoMusic'
 import { TechnoLayer } from './ui/Techno'
+import { FlashWarning, RaveHeadsUp, openDaily } from './ui/FlashWarning'
+import { flashWarningSeen } from './game/flashing'
 import { useTownPaused } from './scene/renderGate'
 import { useCrewGoalWatcher } from './ui/CrewGoal'
 import { BattlePanel, useCrewBattleWatcher } from './ui/CrewBattle'
@@ -76,7 +78,8 @@ export default function App() {
     const splashFallback = setTimeout(hideSplash, 15000)
     const stopSplashCar = rememberSplashCar()
     // Checked again when it fires: a cloud save may have loaded since, already claimed today.
-    setTimeout(() => { const s = useGame.getState(); if (s.lastDaily !== today() && !s.panel) s.openPanel('daily') }, 800)
+    // On first launch it waits for the flashing-lights warning (FlashWarning opens it after).
+    setTimeout(() => { if (flashWarningSeen()) openDaily() }, 800)
     // ?visitor=racer|tourist|mystery|barn brings a guest's visitor right away (for testing).
     const forced = new URLSearchParams(location.search).get('visitor') as VisitorKind | null
     if (forced) setTimeout(() => forceVisitor(forced), 2500)
@@ -156,6 +159,8 @@ export default function App() {
       <LevelUpSplash />
       <Toasts />
       <FlyLayer />
+      <RaveHeadsUp />
+      <FlashWarning />
     </>
   )
 }
