@@ -18,6 +18,7 @@ import { TILE, buildingDef, type Body } from '../game/data'
 import { BOMB_R, DRIFT_BLUE, DRIFT_ORANGE, KART_LEN, SMOKE_R, KartRace, type ItemId, type KartEvent, type KartInput, type Track } from '../game/kart'
 import type { ChaseCar } from './ChaseScene'
 import { HERO_TIME, heroCam, heroShot, heroWanted, resetHero } from './heroShot'
+import { BoostTrail } from './boostTrail'
 
 // A kart circuit: the tarmac ribbon with kerbs, verges and barriers, the theme's
 // scenery round it (the player's town, a harbour, a red rock canyon), the karts,
@@ -996,6 +997,9 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
   const st = useRef({ acc: 0, hudAt: 0, finished: false, camPos: new Vector3(), camAt: new Vector3(), fov: 0, init: false, shake: 0, kick: 0, hero: -1 })
   const inputs = useMemo(() => race.karts.map(() => input), [race, input])
   const tmpV = useMemo(() => new Vector3(), [])
+  // Every kart lays a glowing ribbon behind it on a boost: nitro, a drift turbo, a boost pad.
+  const trails = useMemo(() => looks.map(() => new BoostTrail()), [looks])
+  useEffect(() => () => trails.forEach((t) => t.dispose()), [trails])
 
   useFrame((state, raw) => {
     const s = st.current
@@ -1064,6 +1068,7 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
           m.scale.setScalar(0.6 + Math.random() * 0.7)
         }
       }
+      trails[i].update(dt, k.x - Math.sin(k.h) * KART_LEN * 0.5, 0.14 + k.y, k.z - Math.cos(k.h) * KART_LEN * 0.5, k.h, k.boost > 0)
       if (fx.flame) {
         fx.flame.visible = k.boost > 0
         if (fx.flame.visible) fx.flame.scale.set(1, 0.8 + Math.random() * 0.8, 1)
@@ -1186,6 +1191,7 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
       <Hazards race={race} />
       <TowBeams race={race} />
       {looks.map((l, i) => <KartView key={i} look={l} rig={rigs[i]} set={setters[i]} />)}
+      {trails.map((t, i) => <primitive key={i} object={t.mesh} dispose={null} />)}
       {/* A warm glow pool under the player, so their kart reads at a glance. */}
       <PlayerRing race={race} me={me} />
     </>

@@ -26,6 +26,7 @@ import { RaceWeather, raceWeather } from './Weather'
 import { gloomOf, weatherLook, wetRoad } from './weatherLook'
 import type { Weather as WeatherState } from '../game/weather'
 import { HERO_TIME, heroCam, heroShot, heroWanted, resetHero } from './heroShot'
+import { BoostTrail } from './boostTrail'
 
 // burning: the boost is firing (the chase camera punches in).
 export type RacerView = { dist: number; burning?: boolean }
@@ -511,6 +512,9 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
   const fx = useRef({ st: 0, vt: 0, hist: [] as { t: number; d: [number, number] }[], phase: 'race' as 'race' | 'slow' | 'after', photo: false, rate: 1, target: 1, side: false, since: 0, cut: false, shake: 0, hero: -1 })
   const heroPos = useMemo(() => new Vector3(), [])
   const heroAt = useMemo(() => new Vector3(), [])
+  // A glowing ribbon on the road behind each car while its boost burns.
+  const trails = useMemo(() => [new BoostTrail(), new BoostTrail()], [])
+  useEffect(() => () => trails.forEach((t) => t.dispose()), [trails])
   useFrame(({ scene }, delta) => {
     scene.environmentIntensity = look.env
     const dt = Math.min(delta, 0.1)
@@ -555,6 +559,8 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
     cars.forEach((g, i) => g?.rotation.set(runs.current[i].dip * 0.035, 0, 0))
     meRef.current?.position.set(LANE, 0, mz)
     themRef.current?.position.set(-LANE, 0, tz)
+    trails[0].update(vdt, LANE, 0.16, mz - noses[0], 0, !!me.current?.burning && runs.current[0].cross < 0)
+    trails[1].update(vdt, -LANE, 0.16, tz - noses[1], 0, !!them.current?.burning && runs.current[1].cross < 0)
 
     // The finish: slow motion as the leader reaches the line when it's close, from the trackside camera when it's very close.
     const [ra, rb] = runs.current
@@ -751,6 +757,7 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
       <LaunchSmoke me={me} them={them} len={len} />
       <FinishFlag len={len} me={me} them={them} />
       {city ? <Skyline len={dress} edge={ROAD + WALK + 4.2} night={night} /> : <VenueBackdrop id={venue.id} len={dress} />}
+      {trails.map((t, i) => <primitive key={i} object={t.mesh} dispose={null} />)}
       {/* Soft shadows under the racers. */}
       {[meRef, themRef].map((r, i) => (
         <group key={i} ref={r} scale={1.4}>
