@@ -1,12 +1,16 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest'
 import { useGame, readyRewards, today, buildPrice, paintPrice } from './store'
+import { boostsSpent } from './boosts'
 import { CAMPAIGN, CAMPAIGN_RACES, DEALS, DEAL_SLOTS, buildingDef, campaignReward, carDef, dealOffer, dealsFor, finishDef, modDef, upgradeCost, xpToNext } from './data'
 
 describe('level-up bonuses', () => {
   it('add on top of a race reward instead of replacing it', () => {
-    useGame.setState({ level: 1, xp: xpToNext(1) - 1, coins: 1000, bucks: 10, levelUp: null })
+    // A Monday with today's bonuses used, so the race pays its plain prize.
+    vi.spyOn(Date, 'now').mockReturnValue(Date.UTC(2026, 9, 12, 12))
+    useGame.setState({ level: 1, xp: xpToNext(1) - 1, coins: 1000, bucks: 10, levelUp: null, boosts: boostsSpent(Date.UTC(2026, 9, 12, 12)) })
     useGame.getState().finishRace(true, 500)
+    vi.restoreAllMocks()
     const s = useGame.getState()
     expect(s.level).toBe(2)
     expect(s.coins).toBe(1000 + 500 + 200)
@@ -245,5 +249,22 @@ describe('daily deals', () => {
     useGame.setState({ level: 20, coins: 50000, bucks: 20, fuel: 0, deals: { day: '2000-01-01', used: [supplies.id] } })
     expect(g().buyDeal(supplies.id)).toBe(true)
     expect(g().deals).toEqual({ day: today(), used: [supplies.id] })
+  })
+})
+
+describe('daily check-in calendar', () => {
+  it('moves one day along per collect, keeps its place over skipped days, and loops', async () => {
+    const { DAILY_BONUS } = await import('./data')
+    const g = () => useGame.getState()
+    useGame.setState({ coins: 0, lastDaily: '2020-01-01', dailyStreak: 2, panel: null })
+    g().claimDaily()
+    // Last collected years ago, but the calendar still pays day 3, not day 1.
+    expect(g().coins).toBe(DAILY_BONUS[2].coins)
+    expect(g().dailyStreak).toBe(3)
+    g().claimDaily()
+    expect(g().dailyStreak).toBe(3)
+    useGame.setState({ coins: 0, lastDaily: '2020-01-01', dailyStreak: DAILY_BONUS.length })
+    g().claimDaily()
+    expect(g().coins).toBe(DAILY_BONUS[0].coins)
   })
 })

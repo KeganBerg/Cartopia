@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { StageSlot, useStageReady } from '../scene/Stage'
 import type { OwnedCar } from '../game/store'
 import { carDef } from '../game/data'
+import { LOSS_SHARE } from '../game/boosts'
 import { EMP_TIME, FLAT_TIME, GHOST_TIME, ITEMS, KartRace, LAPS, ROCKET_TIME, SMOKE_TIME, SPLAT_TIME, TOUCH_ASSIST, TOW_TIME, buildTrack, type ItemId, type KartEvent, type TrackDef } from '../game/kart'
 import { KartScene, kartLights, type KartHud } from '../scene/KartScene'
 import type { ChaseCar } from '../scene/ChaseScene'
@@ -331,7 +332,7 @@ function Podium({ race, field, me, end, prize, next, verdict, onExit }: { race: 
           ))}
         </ol>
         {verdict}
-        {prize !== undefined && <div className="arc-pay"><span>{won ? `🪙 +$${prize.toLocaleString()}` : `🪙 +$${Math.round(prize * 0.1).toLocaleString()}`}</span></div>}
+        {prize !== undefined && <div className="arc-pay"><span>{won ? `🪙 +$${prize.toLocaleString()}` : `🪙 +$${Math.round(prize * LOSS_SHARE).toLocaleString()}`}</span></div>}
         <div className="arc-actions">
           <button className="sell" onClick={onExit}>Back</button>
           {next && <button className="buy" onClick={next.go}>{next.label}</button>}

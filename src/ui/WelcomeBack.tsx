@@ -59,6 +59,8 @@ export function WelcomeBack() {
       const since = readSeen()
       writeSeen()
       const ms = Date.now() - since
+      // Two days or more away turns on double pay for the next few races (game/boosts.ts).
+      if (since) useGame.getState().noteAway(ms)
       // No record means a first visit on this browser: nothing to welcome back to.
       if (since && ms >= AWAY_MS) setTimeout(() => tryOpen(ms), delay)
     }
@@ -86,6 +88,7 @@ function WelcomePanel({ away }: { away: number }) {
   const tankFull = useGame((s) => s.fuel >= fuelCap(s))
   const collectAll = useGame((s) => s.collectAll)
   const openPanel = useGame((s) => s.openPanel)
+  const welcome = useGame((s) => s.boosts?.welcome ?? 0)
   const [now] = useState(() => Date.now())
   const r = readyRewards({ buildings, cars, level }, now)
   const restored = restoring && now >= restoring.endsAt ? carDef(restoring.model) : null
@@ -110,11 +113,12 @@ function WelcomePanel({ away }: { away: number }) {
   return (
     <Panel title="Welcome back!" onClose={close}>
       <p className="hint welcome-sub">⏱ Away {awayText(away)}</p>
-      {(r.coins > 0 || r.parts > 0 || r.xp > 0) && (
+      {(r.coins > 0 || r.parts > 0 || r.xp > 0 || welcome > 0) && (
         <div className="lvl-rewards welcome-rewards">
           {r.coins > 0 && <span className="lvl-chip"><span className="ico coin-ico">$</span>+{r.coins.toLocaleString()}</span>}
           {r.parts > 0 && <span className="lvl-chip">⚙ +{r.parts}</span>}
           {r.xp > 0 && <span className="lvl-chip">⭐ +{r.xp} XP</span>}
+          {welcome > 0 && <span className="lvl-chip">🏁 ×2 · {welcome}</span>}
         </div>
       )}
       <div className="cards rows welcome-list">

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGame, type OwnedCar } from '../game/store'
 import { CARS, performance } from '../game/data'
 import { KartRace, TRACKS, buildTrack } from '../game/kart'
+import { LIVE_LOSS_SHARE } from '../game/boosts'
 import { KartLink } from '../lib/kartNet'
 import { kartChannel, useLive, type LiveRace } from '../lib/live'
 import { joinRefereed, reportFinish, type Verdict } from '../lib/referee'
@@ -149,7 +150,7 @@ export function LiveKart({ live, car, onExit, deps = REAL }: { live: LiveRace; c
   const onFinish = async (_place: number, time: number) => {
     setVerdict('checking')
     const v = await deps.report(live.raceId, time, { cancelled: false })
-    if (v && !v.void) useGame.getState().finishRace(v.won, prize)
+    if (v && !v.void) useGame.getState().finishRace(v.won, prize, { mode: 'kart', live: true })
     if (!mounted.current) return
     setVerdict(!v || v.void ? 'failed' : v)
   }
@@ -160,7 +161,7 @@ export function LiveKart({ live, car, onExit, deps = REAL }: { live: LiveRace; c
     : verdict ? (
       <div className={`kt-verdict ${verdict.won ? 'win' : 'lose'}`}>
         <b>{verdict.won ? `🏆 You beat ${who}` : `${who} wins`}</b>
-        <span>🪙 +${(verdict.won ? prize : Math.round(prize * 0.1)).toLocaleString()}</span>
+        <span>🪙 +${(verdict.won ? prize : Math.round(prize * LIVE_LOSS_SHARE)).toLocaleString()}</span>
       </div>
     ) : null
 

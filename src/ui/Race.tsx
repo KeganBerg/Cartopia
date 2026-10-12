@@ -1,6 +1,7 @@
 import { Icon } from './Icon'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useGame, spendFuel, type OwnedCar } from '../game/store'
+import { LIVE_LOSS_SHARE, LOSS_SHARE } from '../game/boosts'
 import { bestCar, raceCarOf } from '../game/raceCar'
 import { CARS, SKILLS, carDef, performance, RACE_FUEL, GP_SERIES, GP_ROUNDS, gpRivalPi, gpReward, CAMPAIGN, CAMPAIGN_RACES, campaignRaceId, campaignRivalPi, campaignShift, campaignRivalSkills, campaignReward, campaignCleared, type CampaignChapter, skillBoost, skillDrag, liveSkillBoost, smoothShift, type Body, type GpSeries, type SkillId } from '../game/data'
 import { TRACK, freshRacer, stepRacer, shiftQuality, shiftBand, launchRacer, revLaunch, shiftRacer, fireBoost, aiReaction, AI_BOOST_GEAR, TOP_GEAR, LAUNCH_BAND, IDLE, REV_UP, REV_DOWN, RACE_DT } from '../game/race'
@@ -1347,7 +1348,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
           : 'Your connection dropped before your time reached the server, so this one went to your rival.'
         : undefined
       setResult({ won: v.won, myTime: Number.isFinite(v.myTime) ? v.myTime : myTime, theirTime: v.theirTime, note })
-      finishRace(v.won, reward(rivalRef.current))
+      finishRace(v.won, reward(rivalRef.current), { live: true })
     }
     // Live: the server's verdict replaces the local call when both players are signed in.
     const settle = async (myTime: number) => {
@@ -1362,7 +1363,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       const v = await reportFinish(live!.raceId, myTime, { cancelled: false })
       if (signal.cancelled) {
         if (live?.stake) void settleWager(live.raceId)
-        if (v && !v.void) finishRace(v.won, reward(rivalRef.current))
+        if (v && !v.void) finishRace(v.won, reward(rivalRef.current), { live: true })
         return
       }
       setChecking(false)
@@ -1586,7 +1587,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       {theirSkill && theirShown && !result && <div className="skill-flash theirs">{rival.town}: {SKILLS[theirSkill].icon} {SKILLS[theirSkill].name}!</div>}
       {theirBoost && !theirShown && !result && <div className="skill-flash theirs">{rival.town}: 🔥 Boost!</div>}
       {result && !cardUp ? null : result && resultView ? resultView(result) : result ? (
-        <RaceResult won={result.won} myTime={result.myTime} theirTime={result.theirTime} cash={result.counted === false ? 0 : result.won ? payout : Math.round(payout * 0.1)} xp={result.counted === false ? 0 : result.won ? 30 : 8} rival={rival.town} note={result.note} noContest={result.counted === false} stars={result.stars} stats={stats.current} next={next ?? undefined} onExit={onExit} bet={stake ? (result.counted === false ? 0 : result.won ? stake : -stake) : undefined} />
+        <RaceResult won={result.won} myTime={result.myTime} theirTime={result.theirTime} cash={result.counted === false ? 0 : result.won ? payout : Math.round(payout * (live ? LIVE_LOSS_SHARE : LOSS_SHARE))} xp={result.counted === false ? 0 : result.won ? 30 : 8} rival={rival.town} note={result.note} noContest={result.counted === false} stars={result.stars} stats={stats.current} next={next ?? undefined} onExit={onExit} bet={stake ? (result.counted === false ? 0 : result.won ? stake : -stake) : undefined} />
       ) : (
         <div className="rf-bottom">
           <svg viewBox="0 0 120 120" className={`tach${light}`}>

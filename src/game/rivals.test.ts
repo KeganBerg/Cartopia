@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { LOSS_SHARE, boostsSpent } from './boosts'
 import { RIVALS, RIVAL_VISITS, RIVAL_BACK_MS, currentRival, rivalLadderPi, rivalPi, rivalShift } from './rivals'
 import { visitorPiFactor } from '../lib/visitors'
 import { CAMPAIGN, GP_SERIES } from './data'
@@ -62,10 +63,11 @@ describe('town rivals', () => {
   })
 
   it('pay the race, send the rival away, and pay the bonus once on the third win', () => {
-    useGame.setState({ level: 5, xp: 0, coins: 0, bucks: 0, trophies: 0, rivals: {}, levelUp: null })
+    vi.spyOn(Date, 'now').mockReturnValue(Date.UTC(2026, 9, 12, 12))
+    useGame.setState({ level: 5, xp: 0, coins: 0, bucks: 0, trophies: 0, rivals: {}, levelUp: null, boosts: boostsSpent(Date.UTC(2026, 9, 12, 12)) })
     const g = () => useGame.getState()
     expect(g().rivalResult('vinnie', false, 500)).toBeNull()
-    expect(g().coins).toBe(50)
+    expect(g().coins).toBe(500 * LOSS_SHARE)
     expect(g().rivals.vinnie).toBeUndefined()
     const t = Date.now()
     expect(g().rivalResult('vinnie', true, 500)).toBeNull()
@@ -80,6 +82,7 @@ describe('town rivals', () => {
     // Never pays twice.
     expect(g().rivalResult('vinnie', true, 500)).toBeNull()
     expect(g().bucks).toBe(1)
+    vi.restoreAllMocks()
   })
 
   it('settle double or nothing both ways', () => {

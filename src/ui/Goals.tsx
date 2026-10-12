@@ -5,7 +5,7 @@ import {
   type Period, type GameState,
 } from '../game/store'
 import {
-  DAILY_BONUS, GOALS, QUEST_PAY, TASKS_PER_PERIOD, payAt, msToNextDay, msToNextWeek, buildingDef, buildingLevel, upgradable, MAX_BUILDING_LEVEL,
+  DAILY_BONUS, dailyDay, GOALS, QUEST_PAY, TASKS_PER_PERIOD, payAt, msToNextDay, msToNextWeek, buildingDef, buildingLevel, upgradable, MAX_BUILDING_LEVEL,
   carDef, takesDriver, SEASON_STARS, activeEvent, eventEndsAt, plotPrice, START_LAND, type StatKey, type GoalDef, flatFixCost, servicePay, gasCanCost,
 } from '../game/data'
 import { Panel, SheetTabs, openGarageTab } from './Menus'
@@ -297,21 +297,20 @@ export function GoalTracker() {
 }
 
 export function DailyPanel() {
-  const streak = useGame((s) => s.dailyStreak)
+  const collected = useGame((s) => s.dailyStreak)
   const last = useGame((s) => s.lastDaily)
   const claim = useGame((s) => s.claimDaily)
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
-  const day = last === yesterday ? streak + 1 : 1
+  const day = dailyDay(collected)
   const claimed = last === today()
   // A cloud save can arrive already claimed for today: close instead of leaving an invisible panel.
   useEffect(() => { if (claimed) useGame.getState().openPanel(null) }, [claimed])
   if (claimed) return null
   return (
     <Panel title="Daily Bonus">
-      <p className="hint">Come back every day for bigger rewards.</p>
+      <p className="hint">Skip a day, keep your place.</p>
       <div className="daily">
         {DAILY_BONUS.map((r, i) => (
-          <div key={i} className={i + 1 === Math.min(day, DAILY_BONUS.length) ? 'day today' : i + 1 < day ? 'day past' : 'day'}>
+          <div key={i} className={i + 1 === day ? 'day today' : i + 1 < day ? 'day past' : 'day'}>
             <small>Day {i + 1}</small>
             <b>${r.coins}</b>
             {r.fuel && <small>+{r.fuel} ⛽</small>}

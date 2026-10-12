@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { MAX_RACE_PI } from './race'
 import { useGame } from './store'
+import { LOSS_SHARE, boostsSpent } from './boosts'
 import { isCleanName } from '../lib/names'
 import { TOUR_RACES, TOUR_VENUES, tourLeg, tourLegBonus, tourPrize, tourRivalName, tourRivalPi, tourShift, tourSkills, tourIsBoss } from './tour'
 
@@ -46,11 +47,13 @@ describe('Pro Tour', () => {
   })
 
   it('moves on only after a win, and pays the leg bonus once on beating the boss', () => {
-    useGame.setState({ level: 5, xp: 0, coins: 0, trophies: 0, tour: 0, tourPrize: null, levelUp: null })
+    vi.spyOn(Date, 'now').mockReturnValue(Date.UTC(2026, 9, 12, 12))
+    useGame.setState({ level: 5, xp: 0, coins: 0, trophies: 0, tour: 0, tourPrize: null, levelUp: null, boosts: boostsSpent(Date.UTC(2026, 9, 12, 12)) })
     const g = () => useGame.getState()
     g().tourResult(false)
+    vi.restoreAllMocks()
     expect(g().tour).toBe(0)
-    expect(g().coins).toBe(Math.round(tourPrize(0) * 0.1))
+    expect(g().coins).toBe(Math.round(tourPrize(0) * LOSS_SHARE))
     for (let i = 0; i < TOUR_RACES - 1; i++) g().tourResult(true)
     expect(g().tour).toBe(TOUR_RACES - 1)
     expect(g().tourPrize).toBeNull()

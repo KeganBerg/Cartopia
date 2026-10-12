@@ -241,8 +241,7 @@ export function LiveKartParty({ live, car, onExit, deps = REAL }: { live: LiveRa
   const onFinish = async (_place: number, time: number) => {
     setVerdict('checking')
     const v = await deps.report(live.raceId, time)
-    // finishRace pays a loser a tenth of what it's given, so the share is scaled up to match.
-    if (v) useGame.getState().finishRace(v.place === 1, v.place === 1 ? prize : payOf(v.place) * 10)
+    if (v) useGame.getState().finishRace(v.place === 1, prize, { mode: 'kart', live: true, loss: payOf(v.place) })
     if (!mounted.current) return
     setVerdict(v ?? 'failed')
   }

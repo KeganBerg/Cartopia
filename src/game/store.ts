@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
   PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS,
-  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, jobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, refillBucks, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, activeEvent, DAILY_BONUS, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modFits, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, CREW_CHEST, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower, seasonNumber, seasonOf, SEASON_STARS, skinDef, ownedSkins, seasonSkin, modSkinDef, ownedModSkins, seasonModSkin, SKINNED_SLOTS, type SkinnedSlot, fittedMods, SEASON_TIERS, STARS_PER_TIER, SEASON_CAR_BUCKS, dealsFor, dealOffer, type DealDef, type DealKind,
+  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, jobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, refillBucks, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, activeEvent, DAILY_BONUS, dailyDay, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modFits, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, CREW_CHEST, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower, seasonNumber, seasonOf, SEASON_STARS, skinDef, ownedSkins, seasonSkin, modSkinDef, ownedModSkins, seasonModSkin, SKINNED_SLOTS, type SkinnedSlot, fittedMods, SEASON_TIERS, STARS_PER_TIER, SEASON_CAR_BUCKS, dealsFor, dealOffer, type DealDef, type DealKind,
 } from './data'
 import { PANELS, PATTERNS, isBike, panelJobCost, tidyPanels, type Panels } from './data'
 import { sfx } from '../lib/sound'
@@ -19,6 +19,7 @@ import { trialWeek } from './trial'
 import { groupOf, groupTurn, mergeCandidates, applyMerge, applySplit, rotateGroup, isLandmark, LANDMARK_NAME } from './merge'
 import { togglePick } from './meet'
 import { crateCost, crateDef, rollCrate, type CrateId, type CrateOpen } from './crates'
+import { LIVE_LOSS_SHARE, LOSS_SHARE, boostFor, boostLabel, emptyBoosts, welcomeBack, type BoostMode, type Boosts } from './boosts'
 import { claim, type WagerEntry } from './wager'
 
 // rot: quarter turns the player chose (0 faces south). Unset means face the nearest road.
@@ -87,6 +88,10 @@ export type SaveState = {
   // Crates opened: the server's number for the latest open added here (crate_open()). The guard
   // charges and pays the opens this goes up by.
   crates: number
+  // Crate opens in a row without a guaranteed prize, by crate (see CrateDef.pity).
+  cratePity?: Partial<Record<CrateId, number>>
+  // First-win-of-the-day and welcome-back bonuses (game/boosts.ts).
+  boosts?: Boosts
   // Wager races: the last server ledger row (wager_ledger) whose coins this save includes.
   wagers?: number
   // Season track: the season number, stars earned in it, and tiers (0-based) collected.
@@ -193,7 +198,11 @@ type Actions = {
   buyCar: (model: string, color: string) => boolean
   upgradeCar: (uid: string, slot: UpgradeSlot) => boolean
   sellCar: (uid: string) => void
-  finishRace: (won: boolean, reward: number) => void
+  // Pays a race: the prize for a win, a share of it for a loss (see game/boosts.ts), plus any bonus.
+  // `loss` overrides what a loss pays (kart parties pay by place).
+  finishRace: (won: boolean, reward: number, opts?: { mode?: BoostMode; live?: boolean; loss?: number }) => void
+  // Coming back after a long break turns on the welcome-back bonus.
+  noteAway: (ms: number) => void
   // A ghost race against a crewmate: no prize, but it counts as a race for the crew goal and battle.
   crewRace: () => void
   // Arcade mini games pay a little coin and XP (see game/arcade.ts).
@@ -409,6 +418,8 @@ export function starterTown(): SaveState {
     crewChests: 0,
     visits: 0,
     crates: 0,
+    cratePity: {},
+    boosts: emptyBoosts(),
     trials: { claimed: {} },
     rivals: {},
     rivalRow: {},
@@ -1179,26 +1190,37 @@ export const useGame = create<GameState>()(
         set({ cars: s.cars.filter((c) => c.uid !== cuid), buildings, coins: s.coins + value, selectedCar: null, updatedAt: Date.now() })
       },
 
-      finishRace: (won, reward) => {
+      finishRace: (won, reward, opts = {}) => {
         const s = get()
+        const base = won ? reward : opts.loss ?? Math.round(reward * (opts.live ? LIVE_LOSS_SHARE : LOSS_SHARE))
+        const b = boostFor(s.boosts, opts.mode ?? 'race', won, Date.now(), base > 0)
+        const coins = Math.round(base * b.mult)
+        if (b.mult > 1) s.toast(`${boostLabel(b)}: +${coins} coins`)
         set(withXp(s, won ? 30 : 8, {
-          coins: s.coins + (won ? reward : Math.round(reward * 0.1)),
+          coins: s.coins + coins,
           trophies: s.trophies + (won ? 1 : 0),
           racesWon: s.racesWon + (won ? 1 : 0),
-          stats: { ...bump(s, 'racesWon', won ? 1 : 0), races: (s.stats.races ?? 0) + 1, coinsEarned: (s.stats.coinsEarned ?? 0) + (won ? reward : Math.round(reward * 0.1)) },
+          boosts: b.next,
+          stats: { ...bump(s, 'racesWon', won ? 1 : 0), races: (s.stats.races ?? 0) + 1, coinsEarned: (s.stats.coinsEarned ?? 0) + coins },
           updatedAt: Date.now(),
         }))
       },
+
+      noteAway: (ms) => set((s) => ({ boosts: welcomeBack(s.boosts, ms) })),
 
       crewRace: () => {
         const s = get()
         set({ stats: { ...s.stats, races: (s.stats.races ?? 0) + 1 }, updatedAt: Date.now() })
       },
 
-      finishArcade: (coins, xp) => {
+      finishArcade: (pay, xp) => {
         const s = get()
+        const b = boostFor(s.boosts, 'arcade', pay > 0, Date.now(), pay > 0)
+        const coins = Math.round(pay * b.mult)
+        if (b.mult > 1) s.toast(`${boostLabel(b)}: +${coins} coins`)
         set(withXp(s, xp, {
           coins: s.coins + coins,
+          boosts: b.next,
           stats: { ...s.stats, coinsEarned: (s.stats.coinsEarned ?? 0) + coins },
           updatedAt: Date.now(),
         }))
@@ -1356,9 +1378,9 @@ export const useGame = create<GameState>()(
         const s = get()
         const t = today()
         if (s.lastDaily === t) return
-        const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
-        const streak = s.lastDaily === yesterday ? s.dailyStreak + 1 : 1
-        const r = DAILY_BONUS[Math.min(streak, DAILY_BONUS.length) - 1]
+        // dailyStreak counts days collected; a skipped day doesn't reset it (see dailyDay).
+        const r = DAILY_BONUS[dailyDay(s.dailyStreak) - 1]
+        const streak = s.dailyStreak + 1
         set({
           coins: s.coins + r.coins,
           fuel: s.fuel + (r.fuel ?? 0),
@@ -1656,7 +1678,7 @@ export const useGame = create<GameState>()(
         if (!series) return
         const cur = s.gp[seriesId] ?? { round: 0, clears: 0 }
         const reward = gpReward(series, cur.round)
-        s.finishRace(won, reward)
+        s.finishRace(won, reward, { mode: 'kart' })
         if (!won) return
         const round = cur.round + 1
         if (round < GP_ROUNDS) return set({ gp: { ...s.gp, [seriesId]: { ...cur, round } } })
@@ -2062,14 +2084,14 @@ export const useGame = create<GameState>()(
 )
 
 export function saveOf(s: GameState): SaveState {
-  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, wagers, season, deals, trials, rivals, rivalRow, tuner, oldPaints, tour, event, showcase, raceCar, skins, modSkins, land, updatedAt } = s
-  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, ...(wagers ? { wagers } : {}), season, deals, trials, rivals, rivalRow, tuner: tuner ?? {}, oldPaints: !!oldPaints, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, land, updatedAt }
+  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, cratePity, boosts, wagers, season, deals, trials, rivals, rivalRow, tuner, oldPaints, tour, event, showcase, raceCar, skins, modSkins, land, updatedAt } = s
+  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, cratePity: cratePity ?? {}, boosts: boosts ?? emptyBoosts(), ...(wagers ? { wagers } : {}), season, deals, trials, rivals, rivalRow, tuner: tuner ?? {}, oldPaints: !!oldPaints, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, land, updatedAt }
 }
 
 // Fields added after launch, so older saves load with sensible values.
-function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'quests' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'gp' | 'campaign' | 'claimedSets' | 'crewChests' | 'visits' | 'crates' | 'wagers' | 'season' | 'deals' | 'trials' | 'rivals' | 'rivalRow' | 'tuner' | 'tour' | 'event' | 'showcase' | 'skins' | 'modSkins' | 'land'> {
+function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'quests' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'gp' | 'campaign' | 'claimedSets' | 'crewChests' | 'visits' | 'crates' | 'cratePity' | 'boosts' | 'wagers' | 'season' | 'deals' | 'trials' | 'rivals' | 'rivalRow' | 'tuner' | 'tour' | 'event' | 'showcase' | 'skins' | 'modSkins' | 'land'> {
   // Saves from before the tutorial existed skip it.
-  return { stats: emptyStats(), claimedGoals: [], quests: null, lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, gp: {}, campaign: {}, claimedSets: [], crewChests: 0, visits: 0, crates: 0, wagers: 0, season: null, deals: null, trials: { claimed: {} }, rivals: {}, rivalRow: {}, tuner: {}, tour: 0, event: null, showcase: [], skins: [], modSkins: [], land: [...START_LAND] }
+  return { stats: emptyStats(), claimedGoals: [], quests: null, lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, gp: {}, campaign: {}, claimedSets: [], crewChests: 0, visits: 0, crates: 0, cratePity: {}, boosts: emptyBoosts(), wagers: 0, season: null, deals: null, trials: { claimed: {} }, rivals: {}, rivalRow: {}, tuner: {}, tour: 0, event: null, showcase: [], skins: [], modSkins: [], land: [...START_LAND] }
 }
 
 
