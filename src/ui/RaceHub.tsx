@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useGame, type OwnedCar } from '../game/store'
 import { CAMPAIGN, CAMPAIGN_RACES, GP_ROUNDS, GP_SERIES, RACE_FUEL, SKILLS, campaignCleared, campaignRaceId, campaignReward, carDef, carStats, msToNextWeek, performance, skinDef } from '../game/data'
 import { BUILDS, DIST, buildOf, character, fit, tourDist, type RaceDist } from '../game/distance'
@@ -9,9 +9,11 @@ import { localBest } from '../lib/trialServer'
 import { useLive } from '../lib/live'
 import { supabase } from '../lib/supabase'
 import { venue as venueById } from '../scene/venues'
+import { raceWeather } from '../game/weather'
 import { CarThumb } from '../scene/BuildingPreview'
 import { RivalTile, type RivalMatch } from './Rivals'
 import { artStyle } from './venueArt'
+import { TileClip } from './TileClip'
 
 // The Race menu's front page: every race mode as a tile on one screen, each
 // showing its next race, so nothing needs scrolling to find.
@@ -51,6 +53,8 @@ export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival }: { onOp
   const tourOpen = campaignCleared(done, CAMPAIGN[0])
   const leg = tourLeg(tourLegOf(won))
   const tv = venueById(leg.venue)
+  // The next leg's sky, rolled from its number as the race itself rolls it, so the clip shows it.
+  const tourSky = useMemo(() => raceWeather(leg.venue, `tour-${won}`).kind, [leg.venue, won])
 
   // The Grand Prix series most worth showing: one under way, else the first that can be entered.
   const series = GP_SERIES.find((s) => (gp[s.id]?.round ?? 0) > 0 && level >= s.unlockLevel)
@@ -77,6 +81,7 @@ export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival }: { onOp
   return (
     <div className="rm-hub">
       <div className="rm-tile rm-camp rm-photo" style={artStyle('camp', ch.venue)} {...tile('campaign')}>
+        <TileClip mode="camp" venue={ch.venue} />
         <span className="rm-tag">CAMPAIGN</span>
         <b className="rm-ttl">{ch.name}</b>
         <span className="rm-meta">Chapter {ci + 1} of {CAMPAIGN.length} · ⭐ {stars}/{maxStars}</span>
@@ -87,6 +92,7 @@ export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival }: { onOp
       </div>
 
       <div className={`rm-tile rm-tour rm-photo${tourOpen ? '' : ' rm-locked'}`} style={artStyle('tour', leg.venue, leg.night)} {...tile('tour')}>
+        <TileClip mode="tour" venue={leg.venue} night={leg.night} sky={tourSky} />
         <span className="rm-tag">PRO TOUR</span>
         <b className="rm-ttl">{leg.night ? `${tv.name} at Midnight` : `${tv.name} ${leg.name}`}</b>
         {tourOpen ? (
@@ -100,6 +106,7 @@ export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival }: { onOp
       <RivalTile onRace={onRival} />
 
       <div className={`rm-tile rm-ev rm-photo`} style={{ ...artStyle('tour', ev.venue, ev.night), '--ev': ev.color } as React.CSSProperties} {...tile('event')}>
+        <TileClip mode="tour" venue={ev.venue} night={ev.night} sky={ev.sky} event={ev.id} />
         {evCar && (
           <span className="rm-ev-car" aria-hidden>
             <CarThumb size="xs" color={evCar.color} finish={evCar.finish} skin={ev.skin} body={carDef(evCar.model).body} model={evCar.model} stripe={evCar.stripe} mods={evCar.mods} />
@@ -116,6 +123,7 @@ export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival }: { onOp
       </div>
 
       <div className={`rm-tile rm-gp rm-photo${level < series.unlockLevel ? ' rm-locked' : ''}`} style={artStyle('gp')} {...tile('gp')}>
+        <TileClip mode="gp" />
         <span className="rm-tag">GRAND PRIX</span>
         <b className="rm-ttl">{series.name}</b>
         <span className="rm-meta"><Rounds round={round} /></span>
@@ -123,6 +131,7 @@ export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival }: { onOp
       </div>
 
       <div className="rm-tile rm-trial rm-photo" style={artStyle('trial', trial.id)} {...tile('trial')}>
+        <TileClip mode="trial" venue={trial.id} />
         <span className="rm-tag">TIME TRIAL</span>
         <b className="rm-ttl">{trial.name}</b>
         <span className="rm-meta">⏱️ {best !== null ? `${best.toFixed(3)}s` : '--'}</span>
