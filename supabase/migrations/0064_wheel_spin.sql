@@ -1,4 +1,4 @@
--- Daily prize wheel (2026-10-12, thread "Daily prize wheel"): one free spin a UTC day, in place of
+-- 0064 Daily prize wheel (2026-10-12, thread "Daily prize wheel", PR #372): one free spin a UTC day, in place of
 -- the daily log-in bonus. Slices and odds come from WHEEL in src/game/wheel.ts (wheel.test.ts
 -- keeps the table below in step).
 --   * wheel_spin() rolls a signed-in player's spin and keeps it in public.crate_opens as an open
@@ -15,6 +15,13 @@
 --   * One spin per UTC day: a second one raises 'spun today'.
 -- Returns {"slice": <slice id>, "day": "YYYY-MM-DD", "open": <crate_json>}.
 -- Run BEFORE the game update that shows the wheel ships (the client needs the RPC).
+--
+-- Economy review: a negative cost_bucks is only ever written here (crate_open() charges >= 0), and
+-- the guard adds it back as gems through max_bucks; crate_pay() and car_granted() are the only other
+-- readers and neither treats cost_bucks as spend. A reset (0063) deletes crate_opens, so a reset
+-- player can spin again the same day, on a town that has just lost everything: not worth a table.
+-- Any future replacement of crate_open() must keep its dollar-quoted crates table (the regen
+-- scripts do); without it the wheel refuses to spin instead of paying from a missing table.
 
 create or replace function public.wheel_spin() returns jsonb
 language plpgsql security definer set search_path = '' as $$
@@ -66,8 +73,11 @@ begin
     raise exception 'spun today' using errcode = 'P0001';
   end if;
 
-  -- The crate tables, straight from crate_open() (between its $crates$ quotes).
-  t := substring(pg_get_functiondef('public.crate_open(text)'::regprocedure) from '\$crates\$(.*)\$crates\$')::jsonb;
+  -- The crate tables, straight from crate_open() (its dollar-quoted crates table).
+  t := substring(pg_get_functiondef('public.crate_open(text)'::regprocedure) from '\$crates\$(.*?)\$crates\$')::jsonb;
+  if jsonb_typeof(t -> 'crates' -> 'street') is distinct from 'object' then
+    raise exception 'wheel is off' using errcode = 'P0001'; -- crate_open() lost its crates table
+  end if;
   price := (t -> 'crates' -> 'street' ->> 'base')::numeric + (t -> 'crates' -> 'street' ->> 'perLevel')::numeric * lvl;
 
   -- Which slice.
