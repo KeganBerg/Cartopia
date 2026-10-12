@@ -114,3 +114,22 @@ export function CrewGoalTile() {
     </div>
   )
 }
+
+// Chests earned last week by a player who has since left their crew: the crew tiles
+// only show for a current crew, so without this they could never be opened.
+export function LastWeekChests() {
+  const goal = useCrewGoal((g) => g.goal)
+  const ready = useCrewBattle((s) => s.ready)
+  const openPanel = useGame((s) => s.openPanel)
+  const { busy, open } = useOpen()
+  const min = goal?.rules.minPoints ?? 0
+  const last = goal?.last && goal.payable && goal.last.reached && !goal.last.opened && goal.last.mine >= min ? goal.last : null
+  if (!last && !ready) return null
+  return (
+    <div className="rm-tile cr-goal ready cr-last-week">
+      <span className="rm-tag">LAST WEEK</span>
+      {last && <span className="rm-cta"><span>🧰 <Pay /></span><button className="buy small" disabled={busy} onClick={() => open(last.week)}>Open</button></span>}
+      {ready > 0 && <span className="rm-cta"><span>⚔️ 🧰</span><button className="buy small" onClick={() => openPanel('battle')}>Claim</button></span>}
+    </div>
+  )
+}
