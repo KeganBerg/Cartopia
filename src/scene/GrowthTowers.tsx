@@ -5,7 +5,7 @@ import { growthStage, midFloors, towerFloors } from '../game/growth'
 import { Box, Cyl, Sign, Pool, Neon, Bulbs, Flag, Parasol, BlockCar, GOLD, type Mat, type V3 } from './NewBuildings'
 import { Glass, GlassBlock, glassMat, LitSign, RoofPlant, Planter, PadLights } from './OfficeBuildings'
 import { CarModel } from './CarModel'
-import { Upright } from './mergeScale'
+import { PerLot, Upright, useBays } from './mergeScale'
 import { glowMats } from './dayNight'
 import { PAL, SEASON } from './season'
 import { concreteTex, helipadTex, sidingTex, shutterTex, gravelTex } from './textures'
@@ -41,6 +41,8 @@ type Food = {
   wall: string; brick: string; trim: string; awning: string; sign: string; signFg: string; board: string; cafe?: string; giant: Giant
   tower: (k: Kit, y0: number, h: number, lvl: number) => ReactNode
   top: (h: number) => number
+  // A round tower: a pair gets one per lot rather than an oval (see PerLot).
+  round?: true
 }
 
 const FOOD: Record<string, Food> = {
@@ -53,6 +55,7 @@ const FOOD: Record<string, Food> = {
     wall: '#f48fb1', brick: '#ec7aa3', trim: '#fff8e1', awning: '#f06292', sign: 'DONUTS', signFg: '#d81b60', board: '#fff8e1', cafe: '#f06292', giant: 'donut',
     tower: (k, y0, h) => <RibbonDrum k={k} z={-0.22} y0={y0} r={0.62} floors={Math.round(h / GLASS_FH)} fh={GLASS_FH} wall="#f48fb1" band="#fff8e1" tint="#b3e5fc" />,
     top: (h) => h + 0.08,
+    round: true,
   },
   burger: {
     wall: '#ffb300', brick: '#b5532e', trim: '#fff3e0', awning: '#d84315', sign: 'BURGERS', signFg: '#d84315', board: '#fff3e0', cafe: '#d84315', giant: 'burger',
@@ -80,6 +83,7 @@ const FOOD: Record<string, Food> = {
       )
     },
     top: (h) => h + 0.24,
+    round: true,
   },
   coffee: {
     wall: '#8d6e63', brick: '#6d4c41', trim: '#e8f5e9', awning: '#2e7d32', sign: 'COFFEE', signFg: '#2e7d32', board: '#e8f5e9', cafe: '#2e7d32', giant: 'mug',
@@ -121,13 +125,18 @@ function FoodModel({ def, ghost, m, win, bulb, level }: Props) {
   const h = towerFloors(level) * GLASS_FH
   const y0 = 1.01
   const top = y0 + f.top(h)
-  return (
-    <group>
-      <Storefront k={k} w={1.8} d={1.6} z0={-0.05} h={1.0} wall={f.wall} tex="brick" trim={f.trim} awning={f.awning} sign={f.sign} signFg={f.signFg} board={f.board} cafe={f.cafe} />
+  const crown = (
+    <>
       {f.tower(k, y0, h, level)}
       <GiantProp m={m} kind={f.giant} at={[0, top, -0.25]} s={1.2} plinth={level >= 10 ? GOLD : f.trim} />
       {/* The cone's plinth covers the ice cream's narrow top tier, so its mast rises through the plinth. */}
       {!ghost && <Beacon m={m} at={def.id === 'icecream' ? [0.25, top, -0.45] : [0.5, top, -0.55]} h={0.45} />}
+    </>
+  )
+  return (
+    <group>
+      <Storefront k={k} w={1.8} d={1.6} z0={-0.05} h={1.0} wall={f.wall} tex="brick" trim={f.trim} awning={f.awning} sign={f.sign} signFg={f.signFg} board={f.board} cafe={f.cafe} />
+      {f.round ? <PerLot step={2}>{crown}</PerLot> : crown}
       {!ghost && level >= 8 && <Flag at={[-0.75, 1.04, 0.5]} color={f.awning} star={level >= 10} />}
     </group>
   )
@@ -148,9 +157,13 @@ function ribbonGeo(r: number, h: number) {
 }
 
 // A rounded-end block: flat sides in the middle, half drums at each end, a
-// band of glass round every floor and chrome lines between.
-function StreamBlock({ k, x = 0, z, y0, len, d, floors, fh, wall, chrome, tint }: { k: Kit; x?: number; z: number; y0: number; len: number; d: number; floors: number; fh: number; wall: string; chrome: string; tint: string }) {
+// band of glass round every floor and chrome lines between. Along a pair it's
+// drawn in true shape, just longer (or deeper), so its ends stay round.
+function StreamBlock({ k, x = 0, z, y0, len: len0, d: d0, floors, fh, wall, chrome, tint }: { k: Kit; x?: number; z: number; y0: number; len: number; d: number; floors: number; fh: number; wall: string; chrome: string; tint: string }) {
   const { m, ghost } = k
+  const [bx, bz] = useBays()
+  const len = len0 * bx
+  const d = d0 * bz
   const r = d / 2
   const H = floors * fh
   const flat = len - d
@@ -161,21 +174,23 @@ function StreamBlock({ k, x = 0, z, y0, len, d, floors, fh, wall, chrome, tint }
   )
   return (
     <group position={[x, 0, z]}>
-      <Box m={m} at={[0, y0 + H / 2, 0]} s={[flat, H, d]} c={wall} />
-      {[-1, 1].map((sd) => <Cyl key={sd} m={m} at={[(sd * flat) / 2, y0 + H / 2, 0]} r={r} h={H} c={wall} seg={24} />)}
-      {Array.from({ length: floors }, (_, i) => {
-        const y = y0 + i * fh + fh * 0.55
-        return (
-          <group key={i}>
-            <Glass m={m} ghost={ghost} at={[0, y, r + 0.004]} w={flat} h={fh * 0.5} tint={tint} />
-            <Glass m={m} ghost={ghost} at={[0, y, -r - 0.004]} w={flat} h={fh * 0.5} ry={Math.PI} tint={tint} />
-            {[-1, 1].map((sd) => glass(`${sd}`, [(sd * flat) / 2, y, 0], ribbonGeo(r + 0.004, fh * 0.5)))}
-            {!ghost && <Box m={m} at={[0, y0 + i * fh, r + 0.01]} s={[flat, 0.025, 0.02]} c={chrome} shadow={false} />}
-          </group>
-        )
-      })}
-      <Box m={m} at={[0, y0 + H + 0.04, 0]} s={[flat, 0.08, d + 0.08]} c={chrome} />
-      {[-1, 1].map((sd) => <Cyl key={sd} m={m} at={[(sd * flat) / 2, y0 + H + 0.04, 0]} r={r + 0.04} h={0.08} c={chrome} seg={24} />)}
+      <Upright>
+        <Box m={m} at={[0, y0 + H / 2, 0]} s={[flat, H, d]} c={wall} />
+        {[-1, 1].map((sd) => <Cyl key={sd} m={m} at={[(sd * flat) / 2, y0 + H / 2, 0]} r={r} h={H} c={wall} seg={24} />)}
+        {Array.from({ length: floors }, (_, i) => {
+          const y = y0 + i * fh + fh * 0.55
+          return (
+            <group key={i}>
+              <Glass m={m} ghost={ghost} at={[0, y, r + 0.004]} w={flat} h={fh * 0.5} tint={tint} />
+              <Glass m={m} ghost={ghost} at={[0, y, -r - 0.004]} w={flat} h={fh * 0.5} ry={Math.PI} tint={tint} />
+              {[-1, 1].map((sd) => glass(`${sd}`, [(sd * flat) / 2, y, 0], ribbonGeo(r + 0.004, fh * 0.5)))}
+              {!ghost && <Box m={m} at={[0, y0 + i * fh, r + 0.01]} s={[flat, 0.025, 0.02]} c={chrome} shadow={false} />}
+            </group>
+          )
+        })}
+        <Box m={m} at={[0, y0 + H + 0.04, 0]} s={[flat, 0.08, d + 0.08]} c={chrome} />
+        {[-1, 1].map((sd) => <Cyl key={sd} m={m} at={[(sd * flat) / 2, y0 + H + 0.04, 0]} r={r + 0.04} h={0.08} c={chrome} seg={24} />)}
+      </Upright>
     </group>
   )
 }
@@ -520,28 +535,35 @@ function TunerModel({ def, ghost, m, win, bulb, level }: Props) {
       <GlassBlock m={m} ghost={ghost} x={1.2} z={-0.1} w={1.3} d={1.5} h={0.9} tint="#cfd8dc" frame="#212121" />
       {!ghost && <LitSign text="TUNER" w={1.0} at={[1.2, 1.12, 0.66]} bg="#212121" fg={orange} m={m} />}
       <Box m={m} at={[1.2, 0.98, 0.625]} s={[1.08, 0.3, 0.04]} c={orange} shadow={false} />
-      <GlassDrum k={k} x={cx} z={cz} y0={0} r={0.26} h={H + 0.3} tint="#cfd8dc" frame="#212121" bands={false} />
-      {Array.from({ length: fl }, (_, i) => {
-        const y = (i + 1) * fh - 0.1
-        return (
-          <group key={i} position={[cx, 0, cz]}>
-            <Cyl m={m} at={[0, y, 0]} r={r} h={0.05} c="#37474f" seg={20} />
-            <Cyl m={m} at={[0, y + 0.12, 0]} r={r + 0.01} h={0.015} c="#cfd8dc" seg={20} />
-            {!ghost && [0, 1, 2, 3].map((j) => {
-              const a = (j / 4) * Math.PI * 2 + i * 0.6
-              return <BlockCar key={j} m={m} at={[Math.sin(a) * 0.55, y + 0.025, Math.cos(a) * 0.55]} c={CAR_COLS[(i * 4 + j) % CAR_COLS.length]} rot={a + Math.PI / 2} />
+      {/* The car tower stays round along a pair: kept in shape round its own axis. */}
+      <group position={[cx, 0, cz]}>
+        <Upright>
+          <group position={[-cx, 0, -cz]}>
+            <GlassDrum k={k} x={cx} z={cz} y0={0} r={0.26} h={H + 0.3} tint="#cfd8dc" frame="#212121" bands={false} />
+            {Array.from({ length: fl }, (_, i) => {
+              const y = (i + 1) * fh - 0.1
+              return (
+                <group key={i} position={[cx, 0, cz]}>
+                  <Cyl m={m} at={[0, y, 0]} r={r} h={0.05} c="#37474f" seg={20} />
+                  <Cyl m={m} at={[0, y + 0.12, 0]} r={r + 0.01} h={0.015} c="#cfd8dc" seg={20} />
+                  {!ghost && [0, 1, 2, 3].map((j) => {
+                    const a = (j / 4) * Math.PI * 2 + i * 0.6
+                    return <BlockCar key={j} m={m} at={[Math.sin(a) * 0.55, y + 0.025, Math.cos(a) * 0.55]} c={CAR_COLS[(i * 4 + j) % CAR_COLS.length]} rot={a + Math.PI / 2} />
+                  })}
+                </group>
+              )
             })}
+            {[0, 1, 2, 3, 4, 5].map((j) => {
+              const a = (j / 6) * Math.PI * 2
+              return <Box key={j} m={m} at={[cx + Math.sin(a) * (r + 0.02), (H + 0.1) / 2, cz + Math.cos(a) * (r + 0.02)]} s={[0.05, H + 0.1, 0.05]} c="#212121" />
+            })}
+            <Cyl m={m} at={[cx, H + 0.1, cz]} r={r + 0.08} h={0.08} c={orange} seg={20} />
+            {!ghost && <Neon at={[cx, H + 0.16, cz]} s={[0.02, 0.02, 0.02]} c={orange} />}
+            {!ghost && <Beacon m={m} at={[cx, H + 0.14, cz]} h={0.6} />}
+            {level >= 10 && <Cyl m={m} at={[cx, H + 0.18, cz]} r={r + 0.1} h={0.03} c={GOLD} seg={20} />}
           </group>
-        )
-      })}
-      {[0, 1, 2, 3, 4, 5].map((j) => {
-        const a = (j / 6) * Math.PI * 2
-        return <Box key={j} m={m} at={[cx + Math.sin(a) * (r + 0.02), (H + 0.1) / 2, cz + Math.cos(a) * (r + 0.02)]} s={[0.05, H + 0.1, 0.05]} c="#212121" />
-      })}
-      <Cyl m={m} at={[cx, H + 0.1, cz]} r={r + 0.08} h={0.08} c={orange} seg={20} />
-      {!ghost && <Neon at={[cx, H + 0.16, cz]} s={[0.02, 0.02, 0.02]} c={orange} />}
-      {!ghost && <Beacon m={m} at={[cx, H + 0.14, cz]} h={0.6} />}
-      {level >= 10 && <Cyl m={m} at={[cx, H + 0.18, cz]} r={r + 0.1} h={0.03} c={GOLD} seg={20} />}
+        </Upright>
+      </group>
       {!ghost && <Pool r={1.0} x={1.2} z={0.8} />}
     </group>
   )
