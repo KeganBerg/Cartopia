@@ -158,6 +158,14 @@ export async function sentBy(raceId: string, fromUid: string, party: boolean): P
   return (party ? (data as { host: string }).host : (data as { a: string }).a) === fromUid
 }
 
+// The same for an accept: the player who said yes has joined the race on the server.
+export async function joinedBy(raceId: string, uid: string): Promise<boolean> {
+  if (!supabase) return false
+  const { data, error } = await supabase.from('live_races').select('b, b_pi').eq('id', raceId).maybeSingle()
+  const r = data as { b: string; b_pi: number | null } | null
+  return !error && !!r && r.b === uid && r.b_pi !== null
+}
+
 let lobby: RealtimeChannel | null = null
 let authUid: string | null = null
 let watching = false
@@ -275,6 +283,9 @@ async function openLobby(uid: string) {
       // Only the player we challenged can answer it.
       const from = verified(raw)
       if (!from || from.id !== out.to) return
+      // A real accept joined the race on the server before it was sent.
+      if (payload.accept && !(await joinedBy(out.raceId, from.uid!))) return
+      if (useLive.getState().outgoing?.raceId !== out.raceId) return
       useLive.setState({ outgoing: null })
       if (!payload.accept) {
         useLive.setState((l) => ({ cooldownTo: { ...l.cooldownTo, [out.to]: Date.now() + COOLDOWN_MS } }))
@@ -345,6 +356,11 @@ export function cancelChallenge() {
 export async function answer(raceId: string, accept: boolean) {
   const inv0 = useLive.getState().invites.find((i) => i.raceId === raceId)
   if (!inv0) return
+  // Join the race on the server before saying yes, so the challenger can check the yes is ours.
+  if (accept && !inv0.party && !(await joinRefereed(raceId, inv0.from.uid))) {
+    useGame.getState().toast('That race is off')
+    accept = false
+  }
   if (accept && inv0.stake && !(await acceptWager(raceId, inv0.stake))) {
     useGame.getState().toast('That bet is off')
     accept = false
