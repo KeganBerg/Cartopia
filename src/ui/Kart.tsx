@@ -48,7 +48,8 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
   const [hud, setHud] = useState<KartHud | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
   const [end, setEnd] = useState<{ place: number; order: number[] } | null>(null)
-  useDriveKeys(input, { enabled: running && !end })
+  // Keys count from the countdown on, so gas held through the lights goes at GO.
+  useDriveKeys(input, { enabled: !end })
   const engine = useRef<EngineVoice | null>(null)
 
   // Engine note for the player's car, from the speed through a pretend six-speed box.
