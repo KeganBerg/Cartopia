@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { sunDay } from '../game/sun'
-
-const DAY_MS = 86_400_000
+import { DAY_MS } from '../game/clock'
 import { GROOVES, grooveFor } from './clubGrooves'
 
 describe('club grooves', () => {
   it('plays a different groove on back-to-back nights, the same all night', () => {
-    const night = sunDay(20_000).noon + 0.5 * DAY_MS // the middle of a night
+    const night = 1000 * DAY_MS + 0.5 * DAY_MS // midnight of town day 1000
     const g = grooveFor(night)
     expect(grooveFor(night - 0.2 * DAY_MS)).toBe(g) // evening
     expect(grooveFor(night + 0.19 * DAY_MS)).toBe(g) // before dawn

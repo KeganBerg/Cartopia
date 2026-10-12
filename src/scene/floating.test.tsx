@@ -10,12 +10,12 @@ import { KeepShapes, MergeScale } from './mergeScale'
 import { limitFor } from './keepShape'
 import { describe, floating } from './floating'
 import { groupScale, mergeable, type MergeGroup } from '../game/merge'
-import { sunDay } from '../game/sun'
+import { DAY_MS } from '../game/clock'
 
 type Scale = [number, number, number]
 // Noon, then midnight: night spots (the club's dancers, lit signs) only show after dark.
-// A real noon and the midnight after it (the town clock follows local time).
-const NOON = sunDay(20_000).noon, MIDNIGHT = NOON + 12 * 3_600_000
+// Noon and midnight on the town clock.
+const NOON = 0, MIDNIGHT = DAY_MS / 2
 // How the town draws a merged pair (two side by side, facing south).
 const PAIR = groupScale({ cols: 2, rows: 1 } as MergeGroup, 0)
 // Every level on its own (trims come in one level at a time), and each growth

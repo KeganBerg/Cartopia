@@ -88,7 +88,7 @@ export function spellKind(index: number, season: Season = SEASON): WeatherKind {
   let kind = rolled(index, season)
   // Two big storms in a row feel endless: the second one calms to rain or snow.
   if ((kind === 'storm' || kind === 'blizzard') && spellKind(index - 1, season) === kind) kind = kind === 'storm' ? 'rain' : 'snow'
-  // Morning where the player is: from just before dawn to mid-morning (0.5 is midnight, 0 noon).
+  // Morning on the town clock: from just before dawn to mid-morning (0.5 is midnight, 0 noon).
   const phase = naturalPhase(index * SPELL_MS)
   const morning = phase >= 0.68 && phase <= 0.9
   if (kind === 'fog' && season === 'summer' && !morning) kind = 'clear'
