@@ -126,6 +126,25 @@ export function Upright({ children, size, tall }: { children: ReactNode; size?: 
 // as it is drawn (twice `len` along a pair) and lays its windows, piers or
 // mullions out across that, centred on 0, in true size. Place it at the face
 // (`at`, turned by `ry` so its x runs along the face, z out of it).
+// A round piece (a drum tower, a tank) drawn once per lot along a pair, each in
+// true shape, instead of one squashed into an oval: a pair of donut shops gets
+// two drum towers. `step` is a lot's width in the model's own units.
+export function PerLot({ step, children }: { step: number; children: ReactNode }) {
+  const [bx, bz] = useBays()
+  const n = Math.round(Math.max(bx, bz))
+  if (n <= 1) return <Upright>{children}</Upright>
+  const alongX = bx >= bz
+  return Array.from({ length: n }, (_, i) => {
+    // True offset from the middle, then back into the stretched model's units.
+    const t = ((i + 0.5) / n - 0.5) * n * step
+    return (
+      <group key={i} position={alongX ? [t / n, 0, 0] : [0, 0, t / n]}>
+        <Upright>{children}</Upright>
+      </group>
+    )
+  })
+}
+
 export function Facade({ at, ry = 0, len, children }: { at: [number, number, number]; ry?: number; len: number; children: (L: number) => ReactNode }) {
   const [bx, bz] = useBays()
   const b = Math.abs(Math.sin(ry)) > 0.5 ? bz : bx
