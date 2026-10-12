@@ -1,6 +1,7 @@
 import { TILE, levelLift, type BuildingDef } from '../game/data'
 import { useGame } from '../game/store'
 import { signTexture } from './signTexture'
+import { signMat } from './closingTime'
 import { CarModel } from './CarModel'
 import { Upright, useBays } from './mergeScale'
 import { ObstacleDetail, BenchDetail, BillboardDetail, DriveInDetail, FlowerDetail, FountainDetail, GarageDetail, HouseDetail, LampDetail, PondDetail, ShopDetail, SpeedwayDetail, StatueDetail, TreeDetail } from './BuildingDetail'
@@ -386,7 +387,7 @@ function Sign({ text, w, y, z, bg, fg }: { text: string; w: number; y: number; z
   return (
     <mesh position={[0, y, z]}>
       <planeGeometry args={[w, w / 4]} />
-      <meshBasicMaterial map={signTexture(text, bg, fg)} toneMapped={false} />
+      <primitive object={signMat(text, bg, fg)} attach="material" dispose={null} />
     </mesh>
   )
 }

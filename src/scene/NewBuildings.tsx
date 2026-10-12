@@ -3,6 +3,7 @@ import type { Texture } from 'three'
 import { levelLift, type BuildingDef } from '../game/data'
 import { growthStage } from '../game/growth'
 import { signTexture } from './signTexture'
+import { signMat } from './closingTime'
 import { CarModel } from './CarModel'
 import { Facade, Upright } from './mergeScale'
 import { glowMats, onNight } from './dayNight'
@@ -55,7 +56,7 @@ export function Sign({ text, w, at, bg, fg }: { text: string; w: number; at: V3;
   return (
     <mesh position={at}>
       <planeGeometry args={[w, w / 4]} />
-      <meshBasicMaterial map={signTexture(text, bg, fg)} toneMapped={false} />
+      <primitive object={signMat(text, bg, fg)} attach="material" dispose={null} />
     </mesh>
   )
 }

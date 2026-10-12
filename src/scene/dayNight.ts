@@ -2,13 +2,17 @@ import { AdditiveBlending, Color, MeshBasicMaterial, MeshStandardMaterial } from
 import { danceFloorTex, glowTex, windowGlowTex, windowTex } from './textures'
 import { decal } from './layers'
 import { movieTex } from './movie'
+import { closingGlow, hoursUniforms } from './closingTime'
+import { clockHour } from '../game/hours'
+import { dayPhase } from '../game/clock'
 
 export { DAY_MS, dayPhase, nightAmount, duskAmount } from '../game/clock'
 
 // Shared materials whose glow follows the time of day. One instance each
 // keeps the per-frame update to a handful of objects.
 export const glowMats = {
-  window: new MeshStandardMaterial({ map: windowTex(), emissiveMap: windowGlowTex(), emissive: new Color('#ffc46a'), emissiveIntensity: 0 }),
+  // Three panes per window, each switched off on its own at closing time.
+  window: closingGlow(new MeshStandardMaterial({ map: windowTex(), emissiveMap: windowGlowTex(), emissive: new Color('#ffc46a'), emissiveIntensity: 0 }), [3, 1], 'window'),
   bulb: new MeshStandardMaterial({ color: '#fff4dc', emissive: new Color('#ffbb55'), emissiveIntensity: 0.2 }),
   headlight: new MeshStandardMaterial({ color: '#fffde7', emissive: new Color('#fff3c4'), emissiveIntensity: 0.1 }),
   taillight: new MeshStandardMaterial({ color: '#d32f2f', emissive: new Color('#ff1744'), emissiveIntensity: 0 }),
@@ -53,6 +57,8 @@ export function applyNight(n: number, gloom = 0) {
   for (const m of [glowMats.pool, glowMats.beam]) m.visible = m.opacity > 0.01
   for (const m of [glowMats.neonPink, glowMats.neonCyan, glowMats.neonViolet]) m.emissiveIntensity = 0.05 + n * 1.5
   glowMats.danceFloor.emissiveIntensity = n * 1.3
+  hoursUniforms.uHour.value = clockHour(dayPhase())
+  hoursUniforms.uNight.value = n
   nightNow = n
   for (const f of hooks) f(n)
 }
