@@ -545,7 +545,7 @@ function addXp(s: GameState, amount: number): Partial<GameState> {
   }
   if (!ups.length) return { xp }
   const fresh = { ...s, level }
-  setTimeout(sfx.levelUp, 250)
+  // The splash plays the level-up sound (a beat drop) when it opens.
   // Fold into a splash that's still open, so two quick level-ups show as one.
   const prev = s.levelUp
   const levelUp = {

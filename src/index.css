@@ -943,6 +943,11 @@ button.pill.trophies { cursor: pointer; }
   animation: lvl-spark .8s ease-out 1s both; }
 @keyframes lvl-spark { 0% { opacity: 1; transform: rotate(var(--a)) translateY(0) scale(1); } 100% { opacity: 0; transform: rotate(var(--a)) translateY(-90px) scale(.3); } }
 .lvl-title { margin: 0; font: 40px/1.05 var(--display); color: #e65100; text-shadow: 0 3px 0 #ffe0b2; animation: lvl-pop .5s cubic-bezier(.2, 1.6, .4, 1) .9s both; }
+/* The level-up beat drop: the badge and title thump on each kick (150 bpm) for two bars. */
+.lvl-drop .lvl-badge { animation: lvl-thump .4s cubic-bezier(.2, .9, .3, 1) 8; }
+.lvl-drop .lvl-title { animation: lvl-thump .4s cubic-bezier(.2, .9, .3, 1) 8; }
+.lvl-drop .lvl-rays { filter: hue-rotate(-35deg) saturate(1.4); transition: filter .2s; }
+@keyframes lvl-thump { 0% { scale: 1.16; } 100% { scale: 1; } }
 @keyframes lvl-pop { from { transform: scale(.4); opacity: 0; } }
 .lvl-sub { margin: 2px 0 8px; font-weight: 800; color: #546e7a; animation: lvl-up .4s ease-out 1s both; }
 @keyframes lvl-up { from { transform: translateY(10px); opacity: 0; } }

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { BAR_MS, BUILD_MS, kickOn, sectionOf, startEvent, stopEvent, technoBeat, technoLeft, technoNight, technoOn, technoToDrop, weeklyRave } from './techno'
+import { BAR_MS, BUILD_MS, kickOn, sectionOf, startEvent, stopEvent, technoBeat, technoLeft, technoNight, technoOn, technoToDrop, throwRave, weeklyRave } from './techno'
 import { dayPhase, isNight } from './clock'
 
 // The drop, as a wall-clock time.
@@ -90,5 +90,15 @@ describe('Rave Mode', () => {
     expect(weeklyRave(drop - BUILD_MS - 1000)).toBeNull()
     expect(weeklyRave(drop + 61_000)).toBeNull()
     expect(weeklyRave(new Date(2026, 9, 17, 22, 0, 30).getTime())).toBeNull()
+  })
+
+  it('the Neon Owl throws one with the same build-up and minute, and not over one already on', () => {
+    const now = Date.now()
+    throwRave(now)
+    expect(technoOn()).toBe(true)
+    expect(technoToDrop(now)).toBe(BUILD_MS)
+    expect(technoLeft(now)).toBe(BUILD_MS + 60_000)
+    throwRave(now + 5000)
+    expect(technoToDrop(now)).toBe(BUILD_MS)
   })
 })

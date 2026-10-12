@@ -168,5 +168,12 @@ if (typeof window !== 'undefined') {
   setInterval(checkWeekly, 1000)
 }
 
+// The Neon Owl can throw one any time: the same build-up, drop and minute as
+// the weekly one, on this player's screen only.
+export function throwRave(now = Date.now()) {
+  if (technoOn(now)) return
+  startEvent('techno', { until: now + BUILD_MS + WEEKLY.minutes * 60000 })
+}
+
 // ?event=rave (or techno) turns it on for testing, with no end.
 if (typeof location !== 'undefined' && ['rave', 'techno'].includes(new URLSearchParams(location.search).get('event') ?? '')) startEvent('techno')
