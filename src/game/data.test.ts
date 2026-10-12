@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildingDef, carDef, knownBuilding, BUILDINGS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost, jobLevel, houseResidents, levelName, performance, fittedMods, modStats, modCost, MODS, MOD_SLOTS, modFits, ownedMods, CARS, takesDriver, loves, driverPayout, skillBoost, skillDrag, liveSkillBoost, SKILLS , CAMPAIGN, CAMPAIGN_RACES, campaignRivalPi, campaignReward, campaignShift, campaignStars, CAR_SETS, carSource, readySets } from './data'
+import { buildingDef, carDef, knownBuilding, BUILDINGS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost, jobLevel, houseResidents, levelName, performance, fittedMods, modStats, modCost, MODS, MOD_SLOTS, modFits, ownedMods, CARS, takesDriver, loves, driverPayout, skillBoost, skillDrag, liveSkillBoost, SKILLS , CAMPAIGN, CAMPAIGN_RACES, campaignRivalPi, campaignReward, campaignShift, rookieRace, ROOKIE_SHIFT, campaignStars, CAR_SETS, carSource, readySets } from './data'
 import { MAX_RACE_PI } from './race'
 import { VENUES } from '../scene/venues'
 
@@ -220,6 +220,14 @@ describe('campaign ladder', () => {
     expect(campaignStars(9.9, 10)).toBe(1)
     expect(campaignStars(9.65, 10)).toBe(2)
     expect(campaignStars(9.3, 10)).toBe(3)
+  })
+
+  it('eases only a brand-new racer\'s very first race, without touching the prize', () => {
+    expect(rookieRace(0, 0, 0)).toBe(true)
+    expect(rookieRace(0, 0, 1)).toBe(false)
+    expect(rookieRace(0, 1, 0)).toBe(false)
+    expect(rookieRace(1, 0, 0)).toBe(false)
+    expect(ROOKIE_SHIFT).toBeLessThan(campaignShift(0, 0))
   })
 })
 

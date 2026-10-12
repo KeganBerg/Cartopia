@@ -4,7 +4,7 @@ import {
   PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS,
   upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, jobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, refillBucks, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, activeEvent, DAILY_BONUS, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modFits, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, CREW_CHEST, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower, seasonNumber, seasonOf, SEASON_STARS, skinDef, ownedSkins, seasonSkin, modSkinDef, ownedModSkins, seasonModSkin, SKINNED_SLOTS, type SkinnedSlot, fittedMods, SEASON_TIERS, STARS_PER_TIER, SEASON_CAR_BUCKS, dealsFor, dealOffer, type DealDef, type DealKind,
 } from './data'
-import { PANELS, PATTERNS, isBike, panelJobCost, tidyPanels, type Panels } from './data'
+import { PANELS, PATTERNS, STARTER_PAINTS, isBike, panelJobCost, tidyPanels, type Panels } from './data'
 import { sfx } from '../lib/sound'
 import { fx } from './fx'
 import { opensLabel } from './clock'
@@ -212,6 +212,9 @@ type Actions = {
   paintCar: (uid: string, job: PaintJob) => boolean
   // Paints single panels (hood, doors, roof, rims) and patterns, tried on in the garage first.
   paintPanels: (uid: string, panels: Panels) => boolean
+  // The tutorial's one free pick (src/ui/Tutorial.tsx): a starter colour for the body and one
+  // for the rims. Only while the tutorial runs; no coins, XP or stats either way.
+  tutorialStyle: (uid: string, color: string, rim: string) => boolean
   // Puts an unlocked skin on a car (null takes it off), buying it with gems first if it's for sale.
   skinCar: (uid: string, skin: string | null) => boolean
   // Adds a skin to the garage (crates and other prizes). False when it was already unlocked.
@@ -1540,6 +1543,16 @@ export const useGame = create<GameState>()(
         set(coins || bucks ? withXp(s, 5, patch) : patch)
         sfx.buy()
         s.toast(coins || bucks ? 'Custom paint on!' : 'Back to stock')
+        return true
+      },
+
+      tutorialStyle: (cuid, color, rim) => {
+        const s = get()
+        const car = s.cars.find((c) => c.uid === cuid)
+        if (!car || s.tutorial >= 99 || !STARTER_PAINTS.includes(color) || !STARTER_PAINTS.includes(rim)) return false
+        const panels = tidyPanels({ ...car.panels, rims: { color: rim } })
+        set({ cars: s.cars.map((c) => (c.uid === cuid ? { ...c, color, panels } : c)), updatedAt: Date.now() })
+        sfx.buy()
         return true
       },
 
