@@ -647,7 +647,7 @@ html.calm *, html.calm *::before, html.calm *::after { animation-duration: .001m
   .chip-fuel-bar { position: relative; flex: 1 1 0; width: 0; min-width: 0; height: 14px; border-radius: 7px; background: #11151a; overflow: hidden; }
   .chip-fuel { padding-right: 4px; }
   .chip-fuel-bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 0; background: linear-gradient(#ffee58, #f9a825); }
-  .chip-fuel-bar b { position: absolute; inset: 0; display: grid; place-items: center; white-space: nowrap; letter-spacing: -.02em; font: 10px var(--display); font-weight: normal; color: #fff; text-shadow: 0 1px 1px #000; }
+  .chip-fuel-bar b { position: absolute; inset: 0; display: grid; place-items: center; white-space: nowrap; letter-spacing: -.02em; font: 10px var(--display); font-weight: normal; color: #fff; /* A full outline: a plain drop shadow left the count unreadable on the yellow fill. */ text-shadow: -1px 0 #14213d, 1px 0 #14213d, 0 -1px #14213d, 0 1px #14213d, 0 1.5px 1px #14213d; }
   .hud-actions { display: flex; gap: 4px; flex: none; }
   /* Four or more tiles stack two-high so the money chips keep their room. */
   .hud-actions:has(> :nth-child(4)) { display: grid; grid-auto-flow: column; grid-template-rows: 26px 26px; gap: 3px; }
