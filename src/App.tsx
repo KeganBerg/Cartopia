@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, type ComponentType } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { NeutralToneMapping, type Material, type Mesh } from 'three'
 import { World } from './scene/World'
@@ -20,10 +20,8 @@ import { Badges } from './ui/Badges'
 import { ThoughtBubble } from './ui/Thought'
 import { NeedPanel } from './ui/Need'
 import { UpgradePanel } from './ui/Upgrade'
-import { RescuePanel } from './ui/Rescue'
 import { BankPanel } from './ui/Bank'
 import { DealsPanel } from './ui/Deals'
-import { CratesPanel } from './ui/Crates'
 import { LevelUpSplash } from './ui/LevelUp'
 import { AccountPanel, openLegal } from './ui/Account'
 import { AlertsCard } from './ui/Alerts'
@@ -33,7 +31,6 @@ import { UsernameWatcher } from './ui/Username'
 import { GhostRacePanel, TauntWatcher, TauntsPanel } from './ui/GhostRace'
 import { GoalsPanel, DailyPanel, FlatPanel } from './ui/Goals'
 import { SeasonPanel } from './ui/Season'
-import { ArcadePanel } from './ui/Arcade'
 import { useGame } from './game/store'
 import { startCloudSync } from './lib/cloud'
 import './lib/rescue'
@@ -53,6 +50,33 @@ import type { VisitorKind } from './game/data'
 import { hideSplash, splashProgress } from './lib/splash'
 import { rememberSplashCar } from './lib/splashCar'
 import { usePrefs } from './lib/prefs'
+
+// Rusty's yard, the crate depot and the arcade each bring their own 3D scenes,
+// so they load on first open instead of with the town. Once the town is up they
+// are fetched in the background, so opening one later is still instant.
+const loadRescue = () => import('./ui/Rescue')
+const loadCrates = () => import('./ui/Crates')
+const loadArcade = () => import('./ui/Arcade')
+// Shows nothing for the moment the file is loading, then the panel. (A plain
+// state flip rather than React.lazy, which never showed the panel in the dev server.)
+function onDemand<M>(load: () => Promise<M>, pick: (m: M) => ComponentType) {
+  let Loaded: ComponentType | null = null
+  return function OnDemand() {
+    const [, setReady] = useState(false)
+    useEffect(() => {
+      if (!Loaded) load().then((m) => { Loaded = pick(m); setReady(true) })
+    }, [])
+    return Loaded ? <Loaded /> : null
+  }
+}
+const RescuePanel = onDemand(loadRescue, (m) => m.RescuePanel)
+const CratesPanel = onDemand(loadCrates, (m) => m.CratesPanel)
+const ArcadePanel = onDemand(loadArcade, (m) => m.ArcadePanel)
+const prefetchPanels = () => {
+  const go = () => { loadRescue(); loadCrates(); loadArcade() }
+  if ('requestIdleCallback' in window) requestIdleCallback(go, { timeout: 4000 })
+  else go()
+}
 
 // Phones get a lighter renderer: lower pixel ratio keeps iOS from dropping the WebGL context.
 const SMALL = typeof window !== 'undefined' && Math.min(window.innerWidth, window.innerHeight) < 700
@@ -81,6 +105,7 @@ export default function App() {
     tick(Date.now())
     // The loading screen leaves after the town's first frames; this is the fallback if they never come.
     const splashFallback = setTimeout(hideSplash, 15000)
+    const prefetch = setTimeout(prefetchPanels, 6000)
     const stopSplashCar = rememberSplashCar()
     // Checked again when it fires: a cloud save may have loaded since, already claimed today.
     // On first launch it waits for the flashing-lights warning (FlashWarning opens it after).
@@ -95,6 +120,7 @@ export default function App() {
     return () => {
       clearInterval(id)
       clearTimeout(splashFallback)
+      clearTimeout(prefetch)
       stopSplashCar()
     }
   }, [tick])

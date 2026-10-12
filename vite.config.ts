@@ -34,4 +34,19 @@ const legal = (): Plugin => ({
 export default defineConfig({
   plugins: [react(), siteUrl(), version(), legal()],
   define: { __BUILD_ID__: JSON.stringify(BUILD_ID) },
+  build: {
+    rolldownOptions: {
+      output: {
+        // Libraries change far less often than the game, so they get their own
+        // files: after a deploy, returning players only download the game code.
+        codeSplitting: {
+          groups: [
+            { name: 'three', test: /node_modules[\\/]three[\\/]/ },
+            { name: 'react', test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/ },
+            { name: 'r3f', test: /node_modules[\\/](@react-three|postprocessing|three-stdlib|zustand|its-fine|suspend-react)[\\/]/ },
+          ],
+        },
+      },
+    },
+  },
 })
