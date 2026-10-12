@@ -2026,3 +2026,11 @@ body:has(.race-full) .toasts { display: none; }
   .pit-big { width: 86px; height: 86px; margin-left: -43px; font-size: 30px; bottom: calc(14px + var(--sab)); }
   .pit-pop, .pit-tip { top: calc(76px + var(--sat)); }
 }
+
+/* Arcade: the game tiles fill the window instead of leaving an empty bottom half. */
+.arcade-panel .panel-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.arcade-panel .arc-cars, .arcade-panel .arc-back, .arcade-panel .arc-fuel { flex: none; }
+.arcade-panel .arc-games { flex: 1; grid-auto-rows: minmax(min-content, 1fr); }
+.arcade-panel .arc-tile { justify-content: center; }
+.arcade-panel .arc-art { font-size: 54px; }
+@media (max-width: 600px) { .arcade-panel .arc-art { font-size: 40px; } }
