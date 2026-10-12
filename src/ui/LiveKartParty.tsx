@@ -70,7 +70,6 @@ export function LiveKartParty({ live, car, onExit, deps = REAL }: { live: LiveRa
   const lobbyMe = useLive((l) => l.me)
   const me = deps.me ?? lobbyMe
   const party = useLive((l) => l.party)
-  const lobbyPlayers = useLive((l) => l.players)
   const mine = useMemo(() => playerRacer(car), [car])
   const host = live.opponent // for a guest: the host. For the host: the first invited (unused).
   const [setup, setSetup] = useState<Setup | null>(null)
@@ -89,11 +88,14 @@ export function LiveKartParty({ live, car, onExit, deps = REAL }: { live: LiveRa
     return { id: me, uid: signedInUser(), town: useGame.getState().townName, level: useGame.getState().level, carName: d?.name ?? '', color: car.color, body: d?.body ?? 'coupe', pi: mine.pi, mods: car.mods }
   }, [me, car, mine.pi])
 
+  // Built once per setup. The lobby's player list changes whenever anyone joins or leaves the
+  // lobby; depending on it rebuilt the race mid-run (every kart back on the grid, clock at 0).
   const built = useMemo(() => {
     if (!setup) return null
-    const racers = setup.players.map((id, i) => (id === me ? mine : racerOf(lobbyPlayers.find((p) => p.id === id) ?? setup.cards[i])))
+    const lobby = useLive.getState().players
+    const racers = setup.players.map((id, i) => (id === me ? mine : racerOf(lobby.find((p) => p.id === id) ?? setup.cards[i])))
     return partyField(setup, racers)
-  }, [setup, me, mine, lobbyPlayers])
+  }, [setup, me, mine])
   const net = useMemo(() => {
     if (!setup || !built || !chan) return null
     const race = new KartRace(buildTrack(TRACKS[setup.track], setup.reverse), built.field.map((f) => ({ name: f.name, pi: f.pi, ai: f.ai, skill: f.skill })), setup.seed)
