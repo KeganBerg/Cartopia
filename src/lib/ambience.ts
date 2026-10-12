@@ -13,7 +13,7 @@ import { toWorld } from '../scene/grid'
 import { pickSpecies, sing, type Species } from './birdsong'
 import { onThunder, weatherNow } from '../game/weather'
 import { GROOVES, grooveFor, type Tone } from './clubGrooves'
-import { clubHit } from './clubBeat'
+import { clubHit, type CueKind } from './clubBeat'
 import { technoOn } from '../game/techno'
 
 // How much of each layer plays, 0 to 1, for how dark it is and the season.
@@ -102,6 +102,11 @@ type Voice = { o: OscillatorNode; g: GainNode; next: number }
 // An open nightclub in town: where it is on screen (-1 left .. 1 right), and
 // how close it sounds (1 on screen, quieter the further off screen it is).
 export type Club = { pan: number; near?: number }
+
+// The club's kick and bass notes swell in over 30 ms, so they're heard about
+// 27 ms after they start (measured on offline renders, scripts/clubav). The
+// lights' cues are timed to that, and the clap's to its loudest burst.
+const SWELL = 0.027
 // Where a point in the town sits left to right on screen, -1..1, and how close
 // it sounds, 0..1 (both set by the scene).
 let ear = (x: number, z: number) => Math.max(-1, Math.min(1, (x - z) / 40))
@@ -152,8 +157,9 @@ export class Soundscape {
   private playing = -1
   // Pins the club to one groove (for rendering clips); null follows the night.
   groove: number | null = null
-  // Told of every kick and bass note as it's scheduled (t in the audio clock), for the club's lights.
-  onHit: ((t: number, kick: boolean) => void) | null = null
+  // Told of every club note as it's scheduled, for the club's lights: when it
+  // will be heard (t in the audio clock), which part, how strongly, which groove.
+  onHit: ((t: number, kind: CueKind, amt: number, groove: number) => void) | null = null
   // The Techno Night track is playing, so the club's own music stops.
   techno = false
   private vowels: BiquadFilterNode[]
@@ -483,8 +489,10 @@ export class Soundscape {
       const chord = g.loop[bar]
       // Sweeping grooves open the chord filter over eight bars and close it again.
       const sweep = g.sweep ? 0.35 + 0.65 * (0.5 - 0.5 * Math.cos((((n % 8) * 16 + k) / 128) * Math.PI * 2)) : 1
+      // Each cue is timed to when its note is heard, not when it starts (SWELL).
+      const cue = (kind: CueKind, late: number, amt = 1) => this.onHit?.(b + late, kind, amt, gi)
       if (k % 4 === 0) {
-        this.onHit?.(b, true)
+        cue('kick', SWELL)
         this.blip(b, 0.32, 0.7 * g.gain, null, (o) => {
           o.frequency.setValueAtTime(160, b)
           o.frequency.exponentialRampToValueAtTime(46, b + 0.12)
@@ -492,7 +500,7 @@ export class Soundscape {
       }
       const note = g.bass[k]
       if (note) {
-        if (k % 4) this.onHit?.(b, false)
+        if (k % 4) cue('bass', SWELL, Math.min(1, note))
         const f = chord.root * note
         const last = k === 14 && note >= 2
         this.blip(b, sixteenth * (last ? 1.2 : g.bassLen), (last ? 0.11 : 0.16) * g.gain, null, (o) => {
@@ -502,11 +510,19 @@ export class Soundscape {
       }
       const hits = g.stabs[bar % g.stabs.length]
       if (hits.includes(k)) {
+        cue('stab', g.tone === 'piano' ? 0.004 : 0.007, sweep)
         const long = bar === g.loop.length - 1 && k === hits[hits.length - 1] && g.tone !== 'chop'
         this.stab(b, chord.notes, sixteenth * (long ? 4 : g.stabLen), g.tone, g.gain, sweep)
       }
       const step = g.acid?.notes[k]
-      if (g.acid && step !== null && step !== undefined) this.acid(b, chord.root * 2 * 2 ** (step / 12), sixteenth, g.acid.accents.includes(k), sweep, g.gain)
+      if (g.acid && step !== null && step !== undefined) {
+        const accent = g.acid.accents.includes(k)
+        cue('acid', 0.004, accent ? 1 : 0.15 + 0.45 * sweep)
+        this.acid(b, chord.root * 2 * 2 ** (step / 12), sixteenth, accent, sweep, g.gain)
+      }
+      if (g.claps.includes(k)) cue('clap', 0.023)
+      if (g.openHats.includes(k)) cue('open', 0)
+      else if (g.closedHats === 'all' ? k % 4 !== 0 : k % 2) cue('hat', 0, 0.6)
       if (near) {
         if (g.claps.includes(k)) this.clap(b)
         if (g.openHats.includes(k)) this.noiseHit(b, 0.16, 0.09, this.filter('highpass', 7000, this.hats))
@@ -972,8 +988,15 @@ function tick() {
     if (!scape) {
       const c = ctx
       scape = new Soundscape(c, audioOut() ?? c.destination)
-      // Hits land on the page's clock when they'll actually be heard.
-      scape.onHit = (at, kick) => clubHit(performance.now() + (at - c.currentTime + (c.outputLatency || c.baseLatency || 0)) * 1000, kick)
+      // Cues land on the page's clock when they'll actually come out of the
+      // speakers: the output timestamp pairs a moment on the audio clock with
+      // when it's heard, so it carries the device's output delay (Bluetooth
+      // headphones included). Older browsers fall back to the reported latency.
+      scape.onHit = (at, kind, amt, groove) => {
+        const o = c.getOutputTimestamp?.()
+        const heard = o?.contextTime && o.performanceTime ? o.performanceTime + (at - o.contextTime) * 1000 : performance.now() + (at - c.currentTime + (c.outputLatency || c.baseLatency || 0)) * 1000
+        clubHit(heard, kind, amt, groove)
+      }
     }
     quietSince = 0
     scape.level(v, t)
