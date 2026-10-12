@@ -516,7 +516,7 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .tour .camp-node.night.sel { border-color: #ffd54f; box-shadow: 0 3px 0 #ffd54f; }
 .camp-chapter.night .camp-banner { background: radial-gradient(1.5px 1.5px at 18% 30%, #fff 60%, transparent), radial-gradient(1px 1px at 42% 70%, #fff 60%, transparent), radial-gradient(1.5px 1.5px at 66% 22%, #fff 60%, transparent), radial-gradient(1px 1px at 84% 64%, #fff 60%, transparent), linear-gradient(120deg, #0d1240, #283593 60%, #4a148c); }
 .camp-chapter.night .camp-rewards > span { background: rgba(255,213,79,.25); }
-.tour-beat { font: 13px var(--display); color: #2e7d32; min-width: 84px; text-align: center; }
+.tour-beat { font: 20px var(--display); color: #2e7d32; min-width: 84px; text-align: center; }
 .trial { display: grid; gap: 10px; }
 .trial-me { display: flex; align-items: center; gap: 12px; padding: 10px 12px; }
 .trial-best { display: flex; flex-direction: column; line-height: 1.1; }

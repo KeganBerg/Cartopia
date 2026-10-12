@@ -109,7 +109,7 @@ function WelcomePanel({ away }: { away: number }) {
 
   return (
     <Panel title="Welcome back!" onClose={close}>
-      <p className="hint welcome-sub">You were away {awayText(away)}. Here's what your town got done.</p>
+      <p className="hint welcome-sub">⏱ Away {awayText(away)}</p>
       {(r.coins > 0 || r.parts > 0 || r.xp > 0) && (
         <div className="lvl-rewards welcome-rewards">
           {r.coins > 0 && <span className="lvl-chip"><span className="ico coin-ico">$</span>+{r.coins.toLocaleString()}</span>}
@@ -137,7 +137,6 @@ function WelcomePanel({ away }: { away: number }) {
         {tankFull && <Row icon="⛽" name="Fuel tank refilled" stat="Ready for more jobs" />}
       </div>
       <div className="welcome-actions">
-        {r.collected > 0 && <p className="hint">Idle businesses start new jobs while your fuel lasts.</p>}
         <button className="buy welcome-collect" onClick={collect}>{r.collected + r.cleared + r.filled > 0 ? 'Collect all' : "Go to Rusty's"}</button>
       </div>
     </Panel>

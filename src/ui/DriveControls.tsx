@@ -134,17 +134,19 @@ function SteerZone({ input, autoDrift, className }: { input: DriveInput; autoDri
   )
 }
 
-// The touch layout. Gas is automatic (hold brake to slow or reverse).
+// The touch layout. Gas is automatic (hold brake to slow or reverse); with autoGas off
+// there's a gas pedal too, for games that need to creep and stop (parking).
 // item: what to show on the item button (null = empty; leave out for games without items).
 // drift: show drift (landscape button; portrait drifts on a hard slide).
 export function TouchDrive({ input, tall, drift = true, item, autoGas = true }: { input: DriveInput; tall: boolean; drift?: boolean; item?: ReactNode | null; autoGas?: boolean }) {
   const [brake, setBrake] = useState(false)
+  const [gas, setGas] = useState(false)
   const [drifting, setDrifting] = useState(false)
   const [using, setUsing] = useState(false)
   useEffect(() => {
-    input.gas = autoGas && !brake ? 1 : 0
+    input.gas = (autoGas || gas) && !brake ? 1 : 0
     input.brake = brake ? 1 : 0
-  }, [input, brake, autoGas])
+  }, [input, brake, gas, autoGas])
   useEffect(() => () => { Object.assign(input, newDriveInput()) }, [input])
   const itemBtn = item !== undefined && (
     <button className={`dc-btn dc-item${item ? ' full' : ''}${using ? ' on' : ''}`} aria-label="Use item"
@@ -157,9 +159,14 @@ export function TouchDrive({ input, tall, drift = true, item, autoGas = true }: 
       <small>BRAKE</small>
     </button>
   )
+  const gasBtn = !autoGas && (
+    <button className={`dc-btn dc-gas${gas ? ' on' : ''}`} aria-label="Gas" {...hold(() => setGas(true), () => setGas(false))}>
+      <small>GAS</small>
+    </button>
+  )
   if (tall) return (
     <div className="dc dc-tall">
-      <div className="dc-row">{brakeBtn}{itemBtn}</div>
+      <div className="dc-row">{brakeBtn}{itemBtn}{gasBtn}</div>
       <SteerZone input={input} autoDrift={drift} className="tall" />
     </div>
   )
@@ -175,6 +182,7 @@ export function TouchDrive({ input, tall, drift = true, item, autoGas = true }: 
           </button>
         )}
         {brakeBtn}
+        {gasBtn}
       </div>
     </div>
   )
