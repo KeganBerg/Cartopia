@@ -155,7 +155,8 @@ export function RivalTile({ onRace }: { onRace: (m: RivalMatch) => void }) {
       ) : away ? (
         <button className="buy small alt" disabled>⏱ {left}m</button>
       ) : (
-        <button className="buy rm-go" onClick={() => onRace(m)}>🏁 ${money(m.prize)}<small>⛽{RACE_FUEL}</small></button>
+        // The same "!" as the RACE button, so the bar badge points here.
+        <button className="buy rm-go rm-alert" onClick={() => onRace(m)}>🏁 ${money(m.prize)}<small>⛽{RACE_FUEL}</small><span className="btn-dot" aria-label="Your rival is in town">!</span></button>
       )}
     </div>
   )
