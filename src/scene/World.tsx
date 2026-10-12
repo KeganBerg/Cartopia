@@ -173,7 +173,8 @@ function holdToMove(b: PlacedBuilding, e: ThreeEvent<PointerEvent>) {
     held = true
     navigator.vibrate?.(15)
     sfx.click()
-    useGame.setState({ mode: 'move', placing: null })
+    // again: the "Build another" offer belongs to the last build, not this move.
+    useGame.setState({ mode: 'move', placing: null, again: null })
     startDrag(b, tile, pointerId)
   }, HOLD_MS)
   // Raw updates aren't held back to the next frame, so a swipe cancels the hold even on a slow phone.

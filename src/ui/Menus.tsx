@@ -336,7 +336,8 @@ export function ShowroomPanel() {
   const [inspect, setInspect] = useState<string | null>(null)
   const { body, focus } = useShopFocus()
   const look = inspect ? carDef(inspect) : null
-  const [tab, setTab] = useState<'shop' | 'book'>(() => lastShowroomTab)
+  // Opened to show a car (level-up splash, a driver's fans): the For Sale tab, where it is.
+  const [tab, setTab] = useState<'shop' | 'book'>(() => (focus ? 'shop' : lastShowroomTab))
   useEffect(() => { lastCars = 'showroom' }, [])
   const pickTab = (t: 'shop' | 'book') => {
     lastShowroomTab = t
@@ -651,7 +652,7 @@ export function GaragePanel() {
             {tab === 'paint' && <SkinPicker car={car} trying={trySkin} setTrying={(skin) => setSkinning(skin === undefined ? null : { car: car.uid, skin })} />}
             {tab === 'custom' && <CustomShop car={car} panels={tryPanels ?? car.panels} setPanels={(panels) => setCustomising(panels ? { car: car.uid, panels } : null)} />}
             {tab === 'paint' && <PaintShop car={car} job={tryJob ?? jobOf(car)} setJob={(job) => setPainting(job ? { car: car.uid, job } : null)} />}
-            <button className="sell" onClick={() => { const uid = car.uid; sellAsk.ask(() => sell(uid)) }}>Sell for ${Math.floor(def.price * 0.5).toLocaleString()}</button>
+            {!def.bucks && <button className="sell" onClick={() => { const uid = car.uid; sellAsk.ask(() => sell(uid)) }}>Sell for ${Math.floor(def.price * 0.5).toLocaleString()}</button>}
             {sellAsk.open && (
               <Confirm pref="askSell" icon="💰" title="Sell this car?" ok={`Sell · $${Math.floor(def.price * 0.5).toLocaleString()}`} onOk={sellAsk.yes} onCancel={sellAsk.close}>
                 <CarThumb size="sm" color={car.color} finish={car.finish} skin={car.skin} modSkin={car.modSkin} panels={car.panels} body={def.body} model={def.id} stripe={car.stripe} mods={car.mods} />

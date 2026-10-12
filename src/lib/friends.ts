@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import type { SaveState, VisitedTown, PlacedBuilding, OwnedCar } from '../game/store'
+import { useGame, type SaveState, type VisitedTown, type PlacedBuilding, type OwnedCar } from '../game/store'
 import { CARS } from '../game/data'
 import { displayName } from './names'
 
@@ -66,6 +66,16 @@ export async function fetchLeaderboard(): Promise<Leader[]> {
     }))
   }
   return [...real, ...demoLeaders].sort((a, b) => b.trophies - a.trophies || b.level - a.level)
+}
+
+// Loads a town to visit. 'stale' when the player tapped another Visit, or left the
+// screen they tapped it on, before it loaded: the late town must not pull them away.
+let visitSeq = 0
+export async function townToVisit(ownerId: string): Promise<VisitedTown | null | 'stale'> {
+  const n = ++visitSeq
+  const panel = useGame.getState().panel
+  const town = await fetchTown(ownerId)
+  return n !== visitSeq || useGame.getState().panel !== panel ? 'stale' : town
 }
 
 export async function fetchTown(ownerId: string): Promise<VisitedTown | null> {

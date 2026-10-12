@@ -117,21 +117,28 @@ export function beginTrialRun() {
   started = startRun()
 }
 
+// Saves and posts a run the moment it crosses the line, so closing before the
+// result card shows can't lose it. The card reads the outcome from here.
+let committed: { t: number; before: number | null; posted: Promise<Board | 'local'> } | null = null
+export function commitTrialRun(myTime: number) {
+  const before = localBest()
+  saveLocalBest(myTime)
+  const posted = started.then(async (ok) => (ok ? (await submitRun(myTime)) ?? 'local' : 'local'))
+  committed = { t: myTime, before, posted }
+}
+
 // The end-of-run card: the time, whether it's a new best, and where it put you.
 export function TrialResult({ myTime, target, ghost, onAgain, onExit }: { myTime: number; target: number; ghost: string; onAgain: () => void; onExit: () => void }) {
-  // This device's best before this run, read once (the run is saved as the new best below).
-  const [before] = useState(() => localBest())
+  const [run] = useState(() => (committed?.t === myTime ? committed : null))
+  // This device's best before this run (the run itself was saved at the line).
+  const before = run ? run.before : localBest()
   const [posted, setPosted] = useState<Board | null | 'local' | 'pending'>('pending')
   useEffect(() => {
-    saveLocalBest(myTime)
     let live = true
-    started.then(async (ok) => {
-      if (!ok) return live && setPosted('local')
-      const b = await submitRun(myTime)
-      if (live) setPosted(b ?? 'local')
-    })
+    if (!run) setPosted('local')
+    else run.posted.then((b) => live && setPosted(b))
     return () => { live = false }
-  }, [myTime])
+  }, [run])
   const best = before === null || myTime < before
   const beat = myTime < target
   const board = typeof posted === 'object' ? posted : null
