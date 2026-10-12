@@ -1,4 +1,5 @@
 import type { Vector3, WebGLProgramParametersWithUniforms } from 'three'
+import { addFog } from './heightFog'
 
 // Car skins: animated patterns that sit at depth inside the paint, like a holo
 // decal under a clear coat. Each layer is drawn as if it lay a little way under
@@ -851,6 +852,7 @@ export type SkinSpace = { origin: { value: Vector3 }; scale: number }
 // constant for one car's own paint, or the baked per-vertex number for town cars.
 // `space` draws it in world space instead of the mesh's own (see VERTEX_WORLD).
 export function withSkin(sh: WebGLProgramParametersWithUniforms, id: string, attr = false, space?: SkinSpace) {
+  addFog(sh)
   sh.uniforms.uSkinT = skinClock
   if (space) {
     sh.uniforms.uSkO = space.origin

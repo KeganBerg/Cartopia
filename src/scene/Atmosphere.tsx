@@ -7,10 +7,11 @@ import {
 import { weatherNow } from '../game/weather'
 import { dayPhase, nightAmount } from './dayNight'
 import { lightDir, townLook } from './look'
-import { hazeColor, skyUniforms } from './weatherLook'
+import { skyUniforms } from './weatherLook'
 import { frameFor, type Frame } from './Weather'
 import { isFree } from './freeCam'
-import { sky, skyFx } from './skyFx'
+import { lowSun, sky, skyFx } from './skyFx'
+import { fogUniforms } from './heightFog'
 import { haloSpots, haloVersion } from './halos'
 
 // The air over town: fog rolling along the ground, shafts of sun, a rainbow
@@ -28,103 +29,53 @@ float aNoise(vec2 p) {
 `
 
 // ---------- Ground fog ----------
-// A stack of thin see-through sheets from the ground up, each with the same
-// drifting banks of noise. Seen from above they add up to fog with depth:
-// streets and lawns sink into it while roofs and towers stand clear.
-const FOG_VERT = /* glsl */ `
-attribute float aLayer;
-uniform vec3 uCenter;
-uniform float uSpan;
-uniform float uTop;
-varying vec3 vWorld;
-varying float vLayer;
-void main() {
-  vLayer = aLayer;
-  vec3 p = vec3(uCenter.x + position.x * uSpan, 0.04 + aLayer * aLayer * uTop, uCenter.z + position.y * uSpan);
-  vWorld = p;
-  gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
+// The fog itself is in every material's fog chunk (heightFog.ts); this sets it
+// for the weather, the time of day and the wind.
+type FogStyle = { floor: number; height: number; density: number; patch: number; scale: number }
+const FOG_STYLES: Record<string, FogStyle> = {
+  // A low, even blanket: streets and lawns sink into it, roofs stay clear.
+  valley: { floor: 0, height: 0.9, density: 1.5, patch: 0.35, scale: 0.05 },
+  // Rolling banks drifting through town, with clear gaps between them.
+  banks: { floor: 0, height: 1.7, density: 0.9, patch: 1, scale: 0.04 },
+  // A sea of cloud: only the towers break through.
+  sea: { floor: 2.6, height: 0.8, density: 1.6, patch: 0.3, scale: 0.03 },
 }
-`
-const FOG_FRAG = /* glsl */ `
-uniform vec3 uCenter;
-uniform float uSpan;
-uniform float uDensity;
-uniform float uOpacity;
-uniform vec2 uDrift;
-uniform vec3 uShade;
-uniform vec3 uLit;
-varying vec3 vWorld;
-varying float vLayer;
-${NOISE}
-void main() {
-  vec2 p = vWorld.xz;
-  // Big slow banks, and wisps curling through them a little faster.
-  float big = aNoise(p * 0.09 + uDrift) * 0.62 + aNoise(p * 0.23 - uDrift * 1.3 + 7.0) * 0.38;
-  float wisp = aNoise(p * 0.5 + uDrift * 2.6 + vLayer * 2.3);
-  float n = big * 0.82 + wisp * 0.18;
-  float bank = smoothstep(0.66 - uDensity * 0.3, 0.86 - uDensity * 0.22, n + (1.0 - vLayer) * 0.1);
-  // Thick at the ground, thinning towards the top of the stack.
-  float h = 1.0 - vLayer;
-  float a = bank * (0.2 + 0.8 * h * h) * uOpacity;
-  vec2 e = abs(p - uCenter.xz) / (0.5 * uSpan);
-  a *= 1.0 - smoothstep(0.8, 1.0, max(e.x, e.y));
-  vec3 c = mix(uShade, uLit, clamp(vLayer * 0.7 + wisp * 0.45, 0.0, 1.0));
-  gl_FragColor = vec4(c, a);
-  #include <colorspace_fragment>
-}
-`
-
-const WHITE = new Color('#ffffff')
-const MOONLIT = new Color('#5a6690')
-function GroundFog({ layers }: { layers: number }) {
-  const camera = useThree((s) => s.camera)
-  const mesh = useMemo(() => {
-    const g = new InstancedBufferGeometry()
-    g.setAttribute('position', new BufferAttribute(new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0]), 3))
-    g.setIndex([0, 2, 1, 0, 3, 2])
-    g.setAttribute('aLayer', new InstancedBufferAttribute(Float32Array.from({ length: layers }, (_, i) => i / (layers - 1)), 1))
-    g.instanceCount = layers
-    const m = new ShaderMaterial({
-      vertexShader: FOG_VERT, fragmentShader: FOG_FRAG, transparent: true, depthWrite: false, side: DoubleSide,
-      uniforms: {
-        uCenter: { value: new Vector3() }, uSpan: { value: 60 }, uTop: { value: 2 }, uDensity: { value: 0 }, uOpacity: { value: 0 },
-        uDrift: { value: new Vector2() }, uShade: { value: new Color() }, uLit: { value: new Color() },
-      },
-    })
-    const mesh = new Mesh(g, m)
-    mesh.frustumCulled = false
-    mesh.raycast = () => {}
-    mesh.renderOrder = 3
-    mesh.visible = false
-    return mesh
-  }, [layers])
-  useEffect(() => () => { mesh.geometry.dispose(); (mesh.material as ShaderMaterial).dispose() }, [mesh])
-  const frame = useMemo<Frame>(() => ({ center: new Vector3(), span: 60, top: 22, px: 0.03 }), [])
+const pinnedStyle = typeof location === 'undefined' ? null : new URLSearchParams(location.search).get('fogstyle')
+const FOG_STYLE = FOG_STYLES[pinnedStyle ?? ''] ?? FOG_STYLES.banks
+const DAY_SHADE = new Color('#c9d3dd')
+const DAY_LIT = new Color('#ffffff')
+const DAWN_LIT = new Color('#ffe6cc')
+const NIGHT_SHADE = new Color('#232a40')
+const NIGHT_LIT = new Color('#3e4766')
+function GroundFog() {
+  useEffect(() => () => { fogUniforms.uHF.value = 0 }, [])
   useFrame((_, dt) => {
     const b = sky.banks
-    mesh.visible = b > 0.01
-    if (!mesh.visible) return
+    const u = fogUniforms
+    u.uHF.value = Math.min(1, b * 1.25)
+    if (b < 0.01) return
     const w = weatherNow()
-    frameFor(camera, frame, false)
-    const u = (mesh.material as ShaderMaterial).uniforms
-    u.uCenter.value.copy(frame.center)
-    u.uSpan.value = Math.min(frame.span * 1.4, 160)
-    // Mist lies knee-high; real fog reaches the eaves.
-    u.uTop.value = 0.7 + 1.9 * (1 - sky.low) * b
-    u.uDensity.value = b
-    u.uOpacity.value = Math.min(1, b * 1.6) * (10 / layers) * 0.3
-    // The fog drifts slowly with the breeze.
-    const step = Math.min(dt, 0.1) * (0.012 + w.wind * 0.04)
-    u.uDrift.value.x += step
-    u.uDrift.value.y += step * 0.45
-    const night = nightAmount(dayPhase())
-    hazeColor(u.uShade.value, w, night)
-    // The tops of the banks catch the light: warm in low sun, silver by moonlight.
-    u.uLit.value.copy(u.uShade.value).lerp(WHITE, 0.55 * (1 - night)).lerp(townLook.sun, 0.15 * (1 - night))
-    if (night > 0) u.uLit.value.lerp(MOONLIT, 0.5 * night)
-    u.uShade.value.multiplyScalar(0.92)
+    const phase = dayPhase()
+    const night = nightAmount(phase)
+    // Mist lies lower and thinner than real fog.
+    const st = FOG_STYLE
+    u.uHFHeight.value = st.height * (0.55 + 0.45 * (1 - sky.low))
+    u.uHFFloor.value = st.floor * (0.4 + 0.6 * (1 - sky.low))
+    u.uHFDensity.value = st.density
+    u.uHFPatch.value = st.patch
+    u.uHFScale.value = st.scale
+    u.uHFGlow.value = 0.85 * night
+    const step = Math.min(dt, 0.1) * (0.01 + w.wind * 0.04)
+    u.uHFDrift.value.x += step
+    u.uHFDrift.value.y += step * 0.45
+    // Bright white by day, warm at sunrise and sunset, deep blue by night.
+    u.uHFShade.value.copy(DAY_SHADE).lerp(NIGHT_SHADE, night)
+    u.uHFLit.value.copy(DAY_LIT).lerp(DAWN_LIT, lowSun(phase) * 0.7).lerp(NIGHT_LIT, night)
+    // The fog is mixed in after the output colour conversion, so it's given in sRGB.
+    u.uHFShade.value.convertLinearToSRGB()
+    u.uHFLit.value.convertLinearToSRGB()
   })
-  return <primitive object={mesh} />
+  return null
 }
 
 // ---------- Sun shafts ----------
@@ -156,17 +107,17 @@ void main() {
   vec2 axis = normalize(-uSrc);
   float a = atan(axis.x * d.y - axis.y * d.x, dot(axis, d));
   float n = aNoise(vec2(a * 14.0 + uTime * 0.02, uTime * 0.04)) * 0.6 + aNoise(vec2(a * 41.0 - uTime * 0.03, 5.0 + uTime * 0.05)) * 0.4;
-  float ray = smoothstep(0.36, 0.8, n);
+  float ray = smoothstep(0.5, 0.86, n);
   // A tall narrow (phone) view is close to the source all across, so fade faster there.
   float rr = r / min(1.0, uAspect);
   float reach = 1.0 / (1.0 + rr * rr * 0.12);
   float glow = exp(-rr * 0.9);
-  gl_FragColor = vec4(uColor, (ray * reach + glow * 0.22) * uOpacity);
+  gl_FragColor = vec4(uColor, (ray * reach + glow * 0.3) * uOpacity);
   #include <colorspace_fragment>
 }
 `
 
-const SUN_WARM = new Color('#ffd49a')
+const SUN_WARM = new Color('#ff9f55')
 const MOON_BEAM = new Color('#9fb6e0')
 function SunShafts() {
   const camera = useThree((s) => s.camera)
@@ -211,10 +162,10 @@ function SunShafts() {
     u.uSrc.value.set(dir.x * k, dir.y * k).multiplyScalar(edge * 1.08)
     u.uAspect.value = aspect
     u.uTime.value = clock.elapsedTime
-    if (sun >= moon) u.uColor.value.copy(townLook.sun).lerp(SUN_WARM, 0.6)
+    if (sun >= moon) u.uColor.value.copy(townLook.sun).lerp(SUN_WARM, 0.8)
     else u.uColor.value.copy(MOON_BEAM)
-    // Shafts show best through fog and mist.
-    u.uOpacity.value = o * (0.36 + 0.1 * sky.banks)
+    // Soft warm shafts that add a glow without washing the town out.
+    u.uOpacity.value = o * 0.13
   })
   return <primitive object={mesh} />
 }
@@ -410,11 +361,11 @@ function SkyClock() {
   return null
 }
 
-export function Atmosphere({ small }: { small: boolean }) {
+export function Atmosphere() {
   return (
     <>
       <SkyClock />
-      <GroundFog layers={small ? 6 : 9} />
+      <GroundFog />
       <SunShafts />
       <Rainbow />
       <LampHalos />
