@@ -32,7 +32,7 @@ const PIERCE = 0.02
 // Rusty's Rescue is still being reworked in its own thread: its crane yard
 // reaches past the back of the lot and the 24H TOW board is squashed. Drop it
 // from here once that lands.
-const LATER = new Set(['rescue'])
+const LATER = new Set<string>([])
 
 function shown(o: Object3D) {
   for (let p: Object3D | null = o; p; p = p.parent) if (!p.visible) return false

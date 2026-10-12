@@ -189,8 +189,9 @@ export function RustysYard({ m, ghost, sign, bulb, win, lvl, lift }: Props) {
       )}
 
       {/* The junkyard: sheet-metal fence of odd panels round the back corner. */}
+      {/* The last panel is a little narrower so it stops at the lot's edge. */}
       {[0.32, 0.62, 0.92, 1.22, 1.52, 1.8].map((x, i) => (
-        <Box key={x} m={m} at={[x + 0.14, 0.3 + (i % 2) * 0.03, -0.9]} s={[0.29, 0.6 + (i % 2) * 0.06, 0.03]} c={['#90a4ae', '#a1887f', '#78909c', '#b0855f'][i % 4]} t={corrugatedTex(1, 1)} />
+        <Box key={x} m={m} at={[i === 5 ? 1.925 : x + 0.14, 0.3 + (i % 2) * 0.03, -0.9]} s={[i === 5 ? 0.23 : 0.29, 0.6 + (i % 2) * 0.06, 0.03]} c={['#90a4ae', '#a1887f', '#78909c', '#b0855f'][i % 4]} t={corrugatedTex(1, 1)} />
       ))}
       {[-0.62, -0.32, -0.02].map((z, i) => (
         <Box key={z} m={m} at={[1.92, 0.3 + (i % 2) * 0.03, z]} s={[0.03, 0.6 + (i % 2) * 0.06, 0.29]} c={['#a1887f', '#78909c', '#90a4ae'][i]} t={corrugatedTex(1, 1)} />
@@ -223,7 +224,7 @@ export function RustysYard({ m, ghost, sign, bulb, win, lvl, lift }: Props) {
           )}
           {/* Recovery Yard: a tracked crane swinging over the junk. */}
           {stage >= 2 && (
-            <group position={[0.86, 0.05, -0.45]} rotation-y={Math.PI} scale={0.62}>
+            <group position={[0.86, 0.05, -0.45]} rotation-y={Math.PI / 2} scale={0.62}>
               <Crane m={m} at={[0, 0, 0]} />
             </group>
           )}
@@ -266,7 +267,7 @@ export function RustysYard({ m, ghost, sign, bulb, win, lvl, lift }: Props) {
         {sign && (
           <mesh position={[0.22, pole - 0.1, 0.027]}>
             <planeGeometry args={[0.5, 0.25]} />
-            <meshBasicMaterial map={signTexture('24H TOW', '#fffde7', '#c62828')} toneMapped={false} />
+            <meshBasicMaterial map={signTexture('24H TOW', '#fffde7', '#c62828', 2)} toneMapped={false} />
           </mesh>
         )}
         <group position={[0.22, pole + 0.2, 0]} rotation-z={0.6}>
