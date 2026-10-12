@@ -80,7 +80,10 @@ function loadCloud(cloud: SaveState, at: string, message: string) {
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = null
   reloading = true
-  useGame.getState().loadSave(cloud)
+  // Write the cloud town straight to storage instead of loading it into the running game: drawing a whole
+  // other town only to throw it away a moment later froze the page while signing in to another account.
+  const { name, version, storage } = useGame.persist.getOptions()
+  storage?.setItem(name!, { state: cloud, version: version ?? 0 })
   // Freeze this browser's copy at the cloud town so nothing that happens before the reload replaces it.
   useGame.persist.setOptions({ storage: { getItem: () => null, setItem: () => {}, removeItem: () => {} } })
   cloudAt = at
