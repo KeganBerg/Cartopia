@@ -326,15 +326,18 @@ export function ParkScene({ lot, me, input, running, onHud, onEnd }: {
       const wob = s.jolt * Math.exp(-s.joltT * 7) * Math.cos(s.joltT * 26)
       rock.current.rotation.set(-s.pitch * wob * 0.14, 0, s.roll * wob * 0.1)
     }
+    // "Hold still" (and the green spot) only once the car is in and slowing down, so
+    // driving straight across the spot doesn't flash it on and off.
+    const settling = s.inSpot && Math.abs(s.v) < 1.2
     if (spotFill.current) {
       const m = spotFill.current.material as MeshStandardMaterial
-      m.color.set(s.inSpot ? '#00e676' : '#ffd54f')
-      m.emissive.set(s.inSpot ? '#00e676' : '#ffd54f')
-      m.opacity = 0.28 + Math.sin(state.clock.elapsedTime * 5) * 0.1 + (s.inSpot ? 0.2 : 0)
+      m.color.set(settling ? '#00e676' : '#ffd54f')
+      m.emissive.set(settling ? '#00e676' : '#ffd54f')
+      m.opacity = 0.28 + Math.sin(state.clock.elapsedTime * 5) * 0.1 + (settling ? 0.2 : 0)
     }
     if (state.clock.elapsedTime - s.hudAt > 0.1) {
       s.hudAt = state.clock.elapsedTime
-      onHud({ time: s.t, bumps: s.bumps, inSpot: s.inSpot })
+      onHud({ time: s.t, bumps: s.bumps, inSpot: settling })
     }
   })
 

@@ -171,10 +171,10 @@ function ChaseGame({ car, onExit }: { car: OwnedCar; onExit: () => void }) {
         input.moves.push(e.clientX > window.innerWidth / 2 ? 1 : -1)
       }}
     >
-      <Canvas key={run} className="rf-canvas" camera={{ position: [0, 4.4, 8.5], fov: 55, near: 0.3, far: 160 }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
+      <Canvas key={`scene${run}`} className="rf-canvas" camera={{ position: [0, 4.4, 8.5], fov: 55, near: 0.3, far: 160 }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
         <ChaseScene me={look(car)} input={input} running={running} onHud={setHud} onBusted={busted} />
       </Canvas>
-      <LoadingScene key={run} label="Getting away" onReady={() => setDrawn(run)} onClose={onExit} />
+      <LoadingScene key={`load${run}`} label="Getting away" onReady={() => setDrawn(run)} onClose={onExit} />
       <div className="rf-top">
         <h2>🚓 Getaway Chase</h2>
         <button className="close" onClick={onExit} aria-label="Close">✕</button>
@@ -184,7 +184,7 @@ function ChaseGame({ car, onExit }: { car: OwnedCar; onExit: () => void }) {
         <span className="arc-score">{chaseScore(hud.dist, hud.coins).toLocaleString()}</span>
         <span className="arc-coins">🪙 {hud.coins}</span>
       </div>
-      {!running && !end && drawn === run && <Countdown key={run} onGo={() => setRunning(true)} />}
+      {!running && !end && drawn === run && <Countdown key={`count${run}`} onGo={() => setRunning(true)} />}
       {running && hud.dist < 40 && <div className="arc-tip">{touch ? '👈 Swipe or tap to dodge 👉' : '👈 A / D or arrows to dodge 👉'}</div>}
       {end && (
         <Result win={end.record} title={end.record ? '🏆 New best!' : '🚨 Busted!'}
@@ -240,10 +240,10 @@ function ParkGame({ car, lot, onExit, onLot }: { car: OwnedCar; lot: number; onE
 
   return (
     <div className="race-full arc-full park">
-      <Canvas key={`${lot}-${run}`} className="rf-canvas" camera={{ fov: 40, near: 0.5, far: 120, position: [0, 20, 5] }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
+      <Canvas key={`scene${lot}-${run}`} className="rf-canvas" camera={{ fov: 40, near: 0.5, far: 120, position: [0, 20, 5] }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
         <ParkScene lot={def} me={look(car)} input={input} running={running} onHud={setHud} onEnd={done} />
       </Canvas>
-      <LoadingScene key={`${lot}-${run}`} label={`Driving to ${def.name}`} onReady={() => setDrawn(`${lot}-${run}`)} onClose={onExit} />
+      <LoadingScene key={`load${lot}-${run}`} label={`Driving to ${def.name}`} onReady={() => setDrawn(`${lot}-${run}`)} onClose={onExit} />
       <div className="rf-top">
         <h2>🅿️ {lot + 1}. {def.name}</h2>
         <button className="close" onClick={onExit} aria-label="Close">✕</button>
@@ -253,7 +253,7 @@ function ParkGame({ car, lot, onExit, onLot }: { car: OwnedCar; lot: number; onE
         <span className={hud.inSpot ? 'arc-spot in' : 'arc-spot'}>{hud.inSpot ? '✅ Hold still' : '🅿️'}</span>
         <span className="arc-bumps">💥 {hud.bumps}/{PARK_MAX_BUMPS}</span>
       </div>
-      {!running && !end && drawn === `${lot}-${run}` && <Countdown key={`${lot}-${run}`} onGo={() => setRunning(true)} />}
+      {!running && !end && drawn === `${lot}-${run}` && <Countdown key={`count${lot}-${run}`} onGo={() => setRunning(true)} />}
       {running && !end && (touch ? <TouchDrive input={input} tall={tall} drift={false} autoGas={false} /> : <KeyHints drift={false} item={false} />)}
       {end && (
         <Result win={end.parked} title={end.parked ? '🅿️ Parked!' : '💥 Too many dents'}

@@ -1768,7 +1768,12 @@ button.book-car { font: inherit; color: inherit; }
 
 .arc-full { background: #7cb85a; }
 .arc-hud { position: absolute; top: calc(50px + var(--sat)); left: 0; right: 0; display: flex; justify-content: center; gap: 8px; pointer-events: none; }
-.arc-hud > span { padding: 4px 12px; border-radius: 999px; background: rgba(27,31,36,.65); color: #fff; font: 18px var(--display); white-space: nowrap; }
+.arc-hud > span { padding: 4px 12px; border-radius: 999px; background: rgba(27,31,36,.65); color: #fff; font: 18px var(--display); white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* The clock ticks ten times a second: a fixed width keeps the row from twitching with each digit. */
+.arc-hud > .arc-time { min-width: 4.4em; text-align: center; box-sizing: border-box; }
+.arc-full.park .arc-hud > .arc-time { min-width: 7.4em; }
+/* Wide enough for "Hold still", so stepping in and out of the spot does not shove its neighbours. */
+.arc-hud > .arc-spot { min-width: 6.4em; text-align: center; box-sizing: border-box; }
 .arc-hud small { font-size: 13px; opacity: .7; }
 .arc-score { font-size: 22px !important; min-width: 70px; text-align: center; }
 .arc-spot.in { background: rgba(0,150,70,.85) !important; animation: pop .2s ease-out; }
