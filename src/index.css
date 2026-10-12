@@ -1175,7 +1175,7 @@ button.lvl-item:hover { border-color: var(--accent); transform: translateY(-2px)
 .upgrade-more { display: block; margin: 0 auto 6px; background: none; border: none; font: 14px var(--display); color: var(--blue, #1e88e5); text-decoration: underline; }
 
 /* Garage tabs and the mod shop. */
-.garage-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; background: #eceff1; border-radius: 12px; padding: 4px; margin: 10px 0 6px; }
+.garage-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; background: #eceff1; border-radius: 12px; padding: 4px; margin: 10px 0 6px; }
 .garage-tabs button { border: 0; background: transparent; border-radius: 9px; padding: 8px 4px; font: 14px var(--display); color: #546e7a; cursor: pointer; }
 .garage-tabs button.sel { background: #fff; color: #263238; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15); }
 .mod-tabs { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; }
@@ -1391,6 +1391,18 @@ button.lvl-item:hover { border-color: var(--accent); transform: translateY(-2px)
 .fin-opt.sel { border-color: var(--blue); box-shadow: 0 0 0 2px var(--blue) inset; }
 .fin-opt.locked { opacity: .55; }
 .finish-chip { width: 34px; height: 22px; border-radius: 8px; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+
+/* Custom paint: part picker drawn as a car with that part filled in, then pattern tiles. */
+.custom-shop .mod-tabs { margin-top: 4px; }
+.part-icon { width: 44px; height: 21px; display: block; }
+.patterns { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.pat-opt { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 5px 2px; border-radius: 12px; border: 1.5px solid #dfe5ea; background: #fff; font: 12px var(--display); color: #37474f; min-width: 0; }
+.pat-opt b { font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.pat-opt small { font: 700 11px Nunito, sans-serif; color: #607d8b; }
+.pat-opt.sel { border-color: var(--blue); box-shadow: 0 0 0 2px var(--blue) inset; }
+.pat-opt.locked { opacity: .55; }
+.pattern-swatch { width: 100%; max-width: 46px; aspect-ratio: 40 / 24; border-radius: 7px; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+@media (max-width: 520px) { .patterns { grid-template-columns: repeat(3, 1fr); } .garage-tabs button { font-size: 13px; padding: 8px 2px; white-space: nowrap; } }
 
 /* Skins: a wrapping grid of animated chips edged in their tier colour, try-on bar under it. */
 .garage-detail { min-width: 0; }

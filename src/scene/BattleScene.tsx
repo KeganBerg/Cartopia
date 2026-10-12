@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { AdditiveBlending, CanvasTexture, DoubleSide, PlaneGeometry, SRGBColorSpace, type Group, type Mesh, type PerspectiveCamera } from 'three'
-import type { Body, Finish, SkinnedSlot } from '../game/data'
+import type { Body, Finish, Panels, SkinnedSlot } from '../game/data'
 import { RaceScene, startLights, type RacerView } from './RaceScene'
 import { ROAD } from './RaceVenues'
 import { carSize } from './CarModel'
@@ -14,7 +14,7 @@ import type { Venue } from './venues'
 // the crews' colours sweeping the sky, and a slow low camera drifting behind the line.
 // The street, crowd, lamps and weather are the race's own (RaceScene); this adds the crews.
 
-type Look = { body: Body; model?: string; color: string; finish?: Finish; skin?: string; modSkin?: Partial<Record<SkinnedSlot, string>>; mods?: string[] }
+type Look = { body: Body; model?: string; color: string; finish?: Finish; skin?: string; modSkin?: Partial<Record<SkinnedSlot, string>>; panels?: Panels; mods?: string[] }
 export type Crew = { tag: string; color: string }
 type Props = { venue: Venue; mine: Look; theirs: Look; us: Crew; them: Crew; lead: number }
 

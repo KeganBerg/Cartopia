@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { chromeEnv } from './chromeEnv'
 import {
@@ -10,7 +10,8 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { wheelTex } from './textures'
 import { glowMats } from './dayNight'
-import { FINISH_LOOK, SKINNED_SLOTS, fittedMods, isBike, modSkinNumber, skinNumber, type Body, type Finish, type ModSlot, type SkinnedSlot } from '../game/data'
+import { FINISH_LOOK, SKINNED_SLOTS, fittedMods, isBike, modSkinNumber, skinNumber, type Body, type Finish, type ModSlot, type Panels, type SkinnedSlot } from '../game/data'
+import { paintsPanels, panelUniforms, setPanels, withPanels, type Zones } from './panelPaint'
 import { tickSkins, withSkin } from './skins'
 import { CarMods, RIM_LOOK, carbon, chrome as modChrome, glass as modGlass, modGeo, modIds, splitSkinned } from './CarMods'
 import { carBody, wheelPool, type WheelSlot } from './carBatch'
@@ -258,7 +259,8 @@ export function carFrame(body: Body): ModFrame {
   }
 }
 
-type CarGeo = { parts: Partial<Record<Part, BufferGeometry>>; wheel: BufferGeometry }
+// zones: where the hood, doors and roof are, for custom panel paint (panelPaint.ts).
+type CarGeo = { parts: Partial<Record<Part, BufferGeometry>>; wheel: BufferGeometry; zones?: Zones }
 const geoCache = new Map<string, CarGeo>()
 
 // Open-wheel racer: needle nose, sidepods, airbox, halo, front and rear wings, wheels on arms.
@@ -1000,7 +1002,7 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
   for (let i = 0; i < uv.count; i++) uv.setX(i, i < side ? 0.5 + uv.getX(i) * 0.5 : uv.getX(i) * 0.5)
   wheel.rotateZ(Math.PI / 2)
 
-  const out = { parts: k.build(), wheel }
+  const out = { parts: k.build(), wheel, zones: [cowl, top, Math.min(wz - s.wheel * 1.3, cowl + 0.02), Math.max(-wz + s.wheel * 1.3, s.cabinZ - s.cabinLen / 2)] as Zones }
   geoCache.set(key, out)
   return out
 }
@@ -1033,23 +1035,26 @@ function matOf(key: string, color: string, metal: number, rough: number) {
 }
 // Wheel materials: stock, and one per rim finish from the Rims mod.
 const wheelMats = new Map<string, MeshStandardMaterial>()
-function wheelMaterial(rim?: string) {
+// `tint`: custom rim paint, which colours the rim (the tyre stays near black).
+function wheelMaterial(rim?: string, tint?: string) {
   const look = rim ? RIM_LOOK[rim] : undefined
-  const key = look ? rim! : ''
+  const key = `${look ? rim! : ''}|${tint ?? ''}`
   let m = wheelMats.get(key)
-  if (!m) wheelMats.set(key, (m = new MeshStandardMaterial({ map: wheelTex(), color: look?.[0] ?? '#ffffff', metalness: look?.[1] ?? 0.35, roughness: look?.[2] ?? 0.6 })))
+  if (!m) wheelMats.set(key, (m = new MeshStandardMaterial({ map: wheelTex(), color: tint ?? look?.[0] ?? '#ffffff', metalness: look?.[1] ?? 0.35, roughness: look?.[2] ?? 0.6 })))
   return m
 }
+// A rim in a custom colour, keeping the shine of a rims mod's finish when one is fitted.
+const rimPaint = (color: string, mod?: [string, number, number]) => matOf('rim', color, mod ? Math.max(0.6, mod[1] + 0.4) : 0.75, mod ? mod[2] : 0.28)
 
 // A rims mod swaps the stock rim for its own style and finish.
 const RIM_STYLE: Record<string, RimStyle> = { chrome: 'deep', goldmesh: 'mesh', forged: 'split' }
 
 // Close-up wheels: a tyre and a 3D rim each, steering and rolling with the rig.
-function Wheels({ at, r, w, rig, rims, rusty, look }: { at: number[][]; r: number; w: number; rig?: WheelRig; rims?: string; rusty?: boolean; look: CarStyle }) {
+function Wheels({ at, r, w, rig, rims, rimColor, rusty, look }: { at: number[][]; r: number; w: number; rig?: WheelRig; rims?: string; rimColor?: string; rusty?: boolean; look: CarStyle }) {
   const mod = rims ? RIM_LOOK[rims] : undefined
   const style = (rims && RIM_STYLE[rims]) || look.rim
   const geo = wheelGeo(style, r, w, look.ww && !mod)
-  const rim = rusty ? matOf('rim', '#7a5a44', 0.2, 0.9) : mod ? matOf('rim', mod[0], Math.max(0.6, mod[1] + 0.4), mod[2]) : matOf('rim', look.rimColor ?? '#d5d9de', 0.75, 0.28)
+  const rim = rusty ? matOf('rim', '#7a5a44', 0.2, 0.9) : rimColor ? rimPaint(rimColor, mod) : mod ? matOf('rim', mod[0], Math.max(0.6, mod[1] + 0.4), mod[2]) : matOf('rim', look.rimColor ?? '#d5d9de', 0.75, 0.28)
   return (
     <>
       {at.map(([x, z], i) => (
@@ -1072,16 +1077,17 @@ export type WheelRig = { steer: (Group | null)[]; spin: (Group | null)[]; radius
 // traffic). Needs `rig`, whose owner places the wheels each frame; no exhaust flames.
 // skin: a skin id (game/data.ts SKINS) drawn into the paint.
 // modSkin: a mod skin id (game/data.ts MOD_SKINS) for the part in each slot.
-type CarProps = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean; rig?: WheelRig; mods?: string[] | null; flames?: boolean; lean?: boolean }
+// panels: custom paint on the hood, doors, roof and rims, and a body pattern (game/data.ts PANELS).
+type CarProps = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; panels?: Panels | null; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean; rig?: WheelRig; mods?: string[] | null; flames?: boolean; lean?: boolean }
 
 // A lean car: every part baked into two meshes (the parts that cast a shadow and the
 // rest) with the finish it would otherwise be drawn with, except the see-through screen;
 // the wheels' groups stay for steering and rolling but are drawn from the shared wheel pool.
 // `extra` is drawn as is (chrome paint, which mirrors its own studio and can't be baked).
-function LeanCar({ parts, looks, casters, mods, modPaint, highlight, wheels, radius, width, rims, rig, beams, extra }: {
+function LeanCar({ parts, looks, casters, mods, modPaint, highlight, wheels, radius, width, rims, rimColor, rig, beams, extra }: {
   parts: Partial<Record<Part, BufferGeometry>>; looks: Partial<Record<Part, Look>>; casters: Part[]
   mods: { body: Body; ids: string[]; skins?: Partial<Record<SkinnedSlot, number>> }; modPaint: Look; highlight?: boolean
-  wheels: V3[]; radius: number; width: number; rims?: string; rig: WheelRig; beams: React.ReactNode; extra?: React.ReactNode
+  wheels: V3[]; radius: number; width: number; rims?: string; rimColor?: string; rig: WheelRig; beams: React.ReactNode; extra?: React.ReactNode
 }) {
   const key = (Object.keys(looks) as Part[]).map((k) => `${k}:${parts[k]?.uuid ?? 0}:${JSON.stringify(looks[k])}`).join() + mods.ids.join() + JSON.stringify(mods.skins ?? {}) + JSON.stringify(modPaint)
   const geo = useMemo(() => {
@@ -1108,13 +1114,13 @@ function LeanCar({ parts, looks, casters, mods, modPaint, highlight, wheels, rad
     geo.rest?.dispose()
   }, [geo])
   useEffect(() => {
-    const mat = wheelMaterial(rims)
+    const mat = wheelMaterial(rims, rimColor)
     rig.slots = wheels.map(() => wheelPool.take(mat, radius, width))
     return () => {
       rig.slots?.forEach((w) => w && wheelPool.give(w))
       rig.slots = undefined
     }
-  }, [rig, rims, radius, width, wheels.length]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [rig, rims, rimColor, radius, width, wheels.length]) // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <group>
       {geo.shade && <mesh geometry={geo.shade} material={highlight ? carBody.picked : carBody.plain} castShadow />}
@@ -1150,13 +1156,23 @@ function modSkinNumbers(modSkin?: Partial<Record<SkinnedSlot, string>> | null) {
 }
 
 // The body paint: glossy, matte or chrome, with a skin (by number) drawn into it. Rust is always flat.
-function PaintMaterial({ color, finish, rusty, highlight, skin = 0 }: { color: string; finish?: Finish | null; rusty?: boolean; highlight?: boolean; skin?: number }) {
+// panels: custom panel paint and patterns, placed by `zones` (none: only a body pattern).
+function PaintMaterial({ color, finish, rusty, highlight, skin = 0, panels, zones }: { color: string; finish?: Finish | null; rusty?: boolean; highlight?: boolean; skin?: number; panels?: Panels | null; zones?: Zones }) {
   const [metal, rough, lift] = rusty ? [0.1, 0.95, 0] : FINISH_LOOK[finish ?? 'gloss'] ?? FINISH_LOOK.gloss
   const tint = useMemo(() => (lift ? '#' + new Color(color).lerp(new Color('#ffffff'), lift).getHexString() : color), [color, lift])
   const gl = useThree((s) => s.gl)
   const env = !rusty && finish === 'chrome' ? chromeEnv(gl) : null
-  const skinHook = useMemo(() => (skin ? { onBeforeCompile: (sh: Parameters<typeof withSkin>[0]) => withSkin(sh, String(skin)), customProgramCacheKey: () => `skin-${skin}` } : {}), [skin])
-  return <meshStandardMaterial key={`${env ? 'chrome' : 'paint'}-${skin}`} {...skinHook} color={tint} metalness={metal} roughness={rough} envMap={env} envMapIntensity={env ? 1.3 : 1} emissive={highlight ? '#ffffff' : '#000000'} emissiveIntensity={highlight ? 0.25 : 0} />
+  const pan = !rusty && paintsPanels(panels)
+  const [uni] = useState(panelUniforms)
+  if (pan) setPanels(uni, panels, tint, (c) => (lift ? '#' + new Color(c).lerp(new Color('#ffffff'), lift).getHexString() : c), zones)
+  const hook = useMemo(() => (skin || pan ? {
+    onBeforeCompile: (sh: Parameters<typeof withSkin>[0]) => {
+      if (pan) withPanels(sh, uni)
+      if (skin) withSkin(sh, String(skin))
+    },
+    customProgramCacheKey: () => `skin-${skin}${pan ? '-panels' : ''}`,
+  } : {}), [skin, pan, uni])
+  return <meshStandardMaterial key={`${env ? 'chrome' : 'paint'}-${skin}-${pan ? 1 : 0}`} {...hook} color={tint} metalness={metal} roughness={rough} envMap={env} envMapIntensity={env ? 1.3 : 1} emissive={highlight ? '#ffffff' : '#000000'} emissiveIntensity={highlight ? 0.25 : 0} />
 }
 
 // The same paint as PaintMaterial, for baking (any finish but chrome).
@@ -1167,7 +1183,7 @@ function paintLook(color: string, finish?: Finish | null, rusty?: boolean, skin 
 }
 
 // Toy-style car: bevelled extruded body and cabin so no edge is a hard box corner. Faces +z.
-function CarBody({ body, model, color, finish, skin, modSkin, highlight, stripe, beams, rusty, rig, mods, flames, lean }: CarProps) {
+function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight, stripe, beams, rusty, rig, mods, flames, lean }: CarProps) {
   // Rusty finds come home stock.
   const fit = rusty ? {} : fittedMods(mods, body)
   const sk = rusty ? 0 : skinNumber(skin)
@@ -1189,23 +1205,27 @@ function CarBody({ body, model, color, finish, skin, modSkin, highlight, stripe,
       <primitive object={glowMats.beam} attach="material" dispose={null} />
     </mesh>
   )
+  const pan = rusty ? null : panels
+  const rimColor = pan?.rims?.color
   if (lean && rig) {
+    // Chrome (its studio reflections) and custom panels can't be baked: that paint is drawn on its own.
     const chromed = !rusty && finish === 'chrome' && !sk
+    const own = chromed || paintsPanels(pan)
     const looks: Partial<Record<Part, Look>> = {
-      ...(chromed ? {} : { paint: paintLook(tint, finish, rusty, sk) }), dark: { color: dark }, ...(stripe ? { stripe: { color: stripe } } : {}),
+      ...(own ? {} : { paint: paintLook(tint, finish, rusty, sk) }), dark: { color: dark }, ...(stripe ? { stripe: { color: stripe } } : {}),
       black: finishOf(MAT.black), chrome: finishOf(MAT.chrome), glass: finishOf(MAT.glass), seat: finishOf(MAT.seat), wood: finishOf(MAT.wood),
       lamp: finishOf(MAT.lamp), tail: finishOf(MAT.tail), amber: finishOf(MAT.amber),
     }
     return (
       <LeanCar parts={p} looks={looks} casters={['paint', 'glass']} mods={{ body, ids: modIds(fit), skins: msk }} modPaint={{ color: tint, metal: rusty ? 0.1 : 0.4, rough: 0.3 }} highlight={highlight}
-        wheels={[[-wx, s.wheel, wz], [wx, s.wheel, wz], [-wx, s.wheel, -wz], [wx, s.wheel, -wz]]} radius={s.wheel} width={0.14} rims={fit.rims} rig={rig} beams={beam}
-        extra={chromed && <mesh geometry={p.paint} castShadow><PaintMaterial color={tint} finish={finish} highlight={highlight} /></mesh>} />
+        wheels={[[-wx, s.wheel, wz], [wx, s.wheel, wz], [-wx, s.wheel, -wz], [wx, s.wheel, -wz]]} radius={s.wheel} width={0.14} rims={fit.rims} rimColor={rimColor} rig={rig} beams={beam}
+        extra={own && <mesh geometry={p.paint} castShadow><PaintMaterial color={tint} finish={finish} highlight={highlight} skin={chromed ? 0 : sk} panels={pan} zones={g.zones} /></mesh>} />
     )
   }
   return (
     <group>
       <mesh geometry={p.paint} castShadow>
-        <PaintMaterial color={tint} finish={finish} rusty={rusty} highlight={highlight} skin={sk} />
+        <PaintMaterial color={tint} finish={finish} rusty={rusty} highlight={highlight} skin={sk} panels={pan} zones={g.zones} />
       </mesh>
       {p.dark && (
         <mesh geometry={p.dark}>
@@ -1224,7 +1244,7 @@ function CarBody({ body, model, color, finish, skin, modSkin, highlight, stripe,
       <CarMods body={body} fit={fit} tint={tint} metal={rusty ? 0.1 : 0.4} flames={flames} skins={msk} />
       {/* Headlight beams on the road, visible after dark. */}
       {beam}
-      <Wheels at={[[-wx, wz], [wx, wz], [-wx, -wz], [wx, -wz]]} r={s.wheel} w={s.track ? 0.16 : 0.14} rig={rig} rims={fit.rims} rusty={rusty} look={look} />
+      <Wheels at={[[-wx, wz], [wx, wz], [-wx, -wz], [wx, -wz]]} r={s.wheel} w={s.track ? 0.16 : 0.14} rig={rig} rims={fit.rims} rimColor={rimColor} rusty={rusty} look={look} />
     </group>
   )
 }
@@ -1320,7 +1340,7 @@ function bikeGeo(body: BikeBody, fit: Partial<Record<ModSlot, string>>, model?: 
 }
 
 // Bikes take every mod slot, with bike-sized parts.
-function BikeModel({ body, model, color, finish, skin, modSkin, highlight, beams, rusty, rig, mods, flames, lean }: CarProps) {
+function BikeModel({ body, model, color, finish, skin, modSkin, panels, highlight, beams, rusty, rig, mods, flames, lean }: CarProps) {
   const fit = rusty ? {} : fittedMods(mods, body)
   const sk = rusty ? 0 : skinNumber(skin)
   const msk = useMemo(() => (rusty ? undefined : modSkinNumbers(modSkin)), [rusty, modSkin])
@@ -1337,7 +1357,9 @@ function BikeModel({ body, model, color, finish, skin, modSkin, highlight, beams
   const bikeStyle: RimStyle = (fit.rims && RIM_STYLE[fit.rims]) || (bb === 'chopper' ? 'wire' : bb === 'sportbike' ? 'split' : 'steel')
   const bw = wheelGeo(bikeStyle, r, 0.07)
   const rimLook = fit.rims ? RIM_LOOK[fit.rims] : undefined
-  const bikeRim = rusty ? matOf('rim', '#7a5a44', 0.2, 0.9) : rimLook ? matOf('rim', rimLook[0], Math.max(0.6, rimLook[1] + 0.4), rimLook[2]) : matOf('rim', bb === 'sportbike' ? '#2b2b2b' : '#d5d9de', 0.75, 0.28)
+  const pan = rusty ? null : panels
+  const rimColor = pan?.rims?.color
+  const bikeRim = rusty ? matOf('rim', '#7a5a44', 0.2, 0.9) : rimColor ? rimPaint(rimColor, rimLook) : rimLook ? matOf('rim', rimLook[0], Math.max(0.6, rimLook[1] + 0.4), rimLook[2]) : matOf('rim', bb === 'sportbike' ? '#2b2b2b' : '#d5d9de', 0.75, 0.28)
   const beam = beams && (
     <mesh rotation-x={-Math.PI / 2} position={[0, 0.03, SHAPES[bb].len / 2 + 0.5]} renderOrder={2}>
       <planeGeometry args={[0.5, 1.1]} />
@@ -1346,21 +1368,22 @@ function BikeModel({ body, model, color, finish, skin, modSkin, highlight, beams
   )
   if (lean && rig) {
     const chromed = !rusty && finish === 'chrome' && !sk
+    const own = chromed || paintsPanels(pan)
     const looks: Partial<Record<Part, Look>> = {
-      ...(chromed ? {} : { paint: paintLook(tint, finish, rusty, sk) }), dark: { color: dark },
+      ...(own ? {} : { paint: paintLook(tint, finish, rusty, sk) }), dark: { color: dark },
       black: finishOf(MAT.black), chrome: finishOf(MAT.chrome), glass: finishOf(MAT.glass), seat: finishOf(MAT.seat),
       lamp: finishOf(MAT.lamp), tail: finishOf(MAT.tail),
     }
     return (
       <LeanCar parts={p} looks={looks} casters={['paint', 'black']} mods={{ body, ids: modIds(fit), skins: msk }} modPaint={{ color: tint, metal: rusty ? 0.1 : 0.4, rough: 0.3 }} highlight={highlight}
-        wheels={[[0, r, wz], [0, r, -wz]]} radius={r} width={0.07} rims={fit.rims} rig={rig} beams={beam}
-        extra={chromed && <mesh geometry={p.paint} castShadow><PaintMaterial color={tint} finish={finish} highlight={highlight} /></mesh>} />
+        wheels={[[0, r, wz], [0, r, -wz]]} radius={r} width={0.07} rims={fit.rims} rimColor={rimColor} rig={rig} beams={beam}
+        extra={own && <mesh geometry={p.paint} castShadow><PaintMaterial color={tint} finish={finish} highlight={highlight} skin={chromed ? 0 : sk} panels={pan} /></mesh>} />
     )
   }
   return (
     <group>
       <mesh geometry={p.paint} castShadow>
-        <PaintMaterial color={tint} finish={finish} rusty={rusty} highlight={highlight} skin={sk} />
+        <PaintMaterial color={tint} finish={finish} rusty={rusty} highlight={highlight} skin={sk} panels={pan} />
       </mesh>
       {p.dark && (
         <mesh geometry={p.dark}>

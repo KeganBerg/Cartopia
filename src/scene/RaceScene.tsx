@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { BackSide, Color, IcosahedronGeometry, MeshBasicMaterial, MeshStandardMaterial, Object3D, type PerspectiveCamera, type Group, type InstancedMesh, type Mesh } from 'three'
-import type { Body, Finish, SkinnedSlot } from '../game/data'
+import type { Body, Finish, Panels, SkinnedSlot } from '../game/data'
 import { CarModel, carSize } from './CarModel'
 import { signTexture } from './signTexture'
 import { skyTex, asphaltTex, paverTex, glowTex, sandTex, grassTex, beachSandTex, snowTex, concreteTex } from './textures'
@@ -55,7 +55,7 @@ type Props = {
   track: number
   me: RefObject<RacerView>
   them: RefObject<RacerView>
-  mine: { body: Body; model?: string; color: string; finish?: Finish; skin?: string; modSkin?: Partial<Record<SkinnedSlot, string>>; mods?: string[] }
+  mine: { body: Body; model?: string; color: string; finish?: Finish; skin?: string; modSkin?: Partial<Record<SkinnedSlot, string>>; panels?: Panels; mods?: string[] }
   theirs: { body: Body; model?: string; color: string; mods?: string[] }
   venue: Venue
   weatherSeed?: string // a live race's id, so both racers get the same weather
@@ -725,7 +725,7 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
             <planeGeometry args={[0.9, 1.5]} />
             <meshBasicMaterial map={glowTex()} color="#000000" transparent opacity={0.35} depthWrite={false} {...decal(3)} />
           </mesh>
-          {i === 0 ? <CarModel body={mine.body} model={mine.model} color={mine.color} finish={mine.finish} skin={mine.skin} modSkin={mine.modSkin} mods={mine.mods} flames beams={beams} /> : <CarModel body={theirs.body} model={theirs.model} color={theirs.color} mods={theirs.mods} flames beams={beams} />}
+          {i === 0 ? <CarModel body={mine.body} model={mine.model} color={mine.color} finish={mine.finish} skin={mine.skin} modSkin={mine.modSkin} panels={mine.panels} mods={mine.mods} flames beams={beams} /> : <CarModel body={theirs.body} model={theirs.model} color={theirs.color} mods={theirs.mods} flames beams={beams} />}
         </group>
       ))}
     </>
