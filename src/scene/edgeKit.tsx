@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { Texture } from 'three'
 import { glowMats } from './dayNight'
-import { signTexture } from './signTexture'
+import { signMat } from './closingTime'
 import { decal } from './layers'
 
 // Small shared pieces for the edge-of-town models (trailer homes, junkyard,
@@ -45,7 +45,7 @@ export function Sign({ text, w, at, bg, fg, rot }: { text: string; w: number; at
   return (
     <mesh position={at} rotation={rot}>
       <planeGeometry args={[w, w / 4]} />
-      <meshBasicMaterial map={signTexture(text, bg, fg)} toneMapped={false} />
+      <primitive object={signMat(text, bg, fg)} attach="material" dispose={null} />
     </mesh>
   )
 }
