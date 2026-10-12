@@ -242,3 +242,31 @@ export function nearest(root: Object3D, c: Clump) {
   }
   return best
 }
+
+// Low slabs that hover: a doorstep, a mat, a ramp or a planter's base just off
+// the ground with daylight under it. The contact check above lets anything
+// within TOUCH of the ground or a wall count as held, so a step 0.04 up next to
+// a wall passes there; up close at street level the gap and its shadow show.
+// A slab-like piece low down (its bottom between the lot paving and LOW, no
+// taller than SLAB, at least FOOT across) must sit on the lot paving
+// (LOT, see layers.ts) or on top of something under it, within REST.
+const LOT = 0.02
+const LOW = 0.2
+const SLAB = 0.12
+const FOOT = 0.1
+export const REST = 0.006
+export function hovering(root: Object3D) {
+  const ps = pieces(root).filter((p) => !p.ball)
+  const out: Piece[] = []
+  for (const p of ps) {
+    const b = p.box
+    const lo = b.min.y
+    if (lo <= LOT + REST || lo > LOW) continue
+    if (b.max.y - lo > SLAB || Math.min(b.max.x - b.min.x, b.max.z - b.min.z) < FOOT) continue
+    const under = ps.some((q) => q !== p && q.box.min.y < lo - 1e-4 && q.box.max.y >= lo - REST &&
+      Math.min(b.max.x, q.box.max.x) - Math.max(b.min.x, q.box.min.x) > 0.01 &&
+      Math.min(b.max.z, q.box.max.z) - Math.max(b.min.z, q.box.min.z) > 0.01)
+    if (!under) out.push(p)
+  }
+  return out
+}
