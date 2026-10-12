@@ -1,20 +1,20 @@
-// Seasons follow the calendar on the North American East Coast, using
-// meteorological seasons. ?season=winter|spring|summer|fall pins one for testing.
+// Seasons follow the calendar where the player is (meteorological seasons on
+// the device's local date, flipped south of the equator; see game/sun.ts).
+// ?season=winter|spring|summer|fall pins one for testing.
+import { south } from '../game/sun'
+
 export type Season = 'winter' | 'spring' | 'summer' | 'fall'
+const ORDER: Season[] = ['winter', 'spring', 'summer', 'fall']
+
+export function seasonOf(month: number, southern = false): Season {
+  const i = Math.floor((month % 12) / 3) // 0 Dec-Feb, 1 Mar-May, 2 Jun-Aug, 3 Sep-Nov
+  return ORDER[(i + (southern ? 2 : 0)) % 4]
+}
 
 function currentSeason(): Season {
   const pin = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('season') : null
   if (pin === 'winter' || pin === 'spring' || pin === 'summer' || pin === 'fall') return pin
-  let month = new Date().getMonth() + 1
-  try {
-    month = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', month: 'numeric' }).format(new Date()))
-  } catch {
-    // Older browsers without time zone support fall back to local time.
-  }
-  if (month === 12 || month <= 2) return 'winter'
-  if (month <= 5) return 'spring'
-  if (month <= 8) return 'summer'
-  return 'fall'
+  return seasonOf(new Date().getMonth() + 1, south())
 }
 
 export const SEASON: Season = currentSeason()

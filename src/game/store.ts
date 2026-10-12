@@ -6,7 +6,7 @@ import {
 } from './data'
 import { sfx } from '../lib/sound'
 import { fx } from './fx'
-import { msUntilNight } from './clock'
+import { opensLabel } from './clock'
 import { requestTrip, requestVisit } from './trips'
 import { trialPrize } from './trial'
 import { RIVALS, RIVAL_VISITS, RIVAL_BACK_MS, type RivalProgress } from './rivals'
@@ -586,7 +586,7 @@ function tapMerged(s: GameState, set: (p: Partial<GameState>) => void, uids: str
   }
   const idle = members.filter((o) => o.jobEndsAt === null)
   if (!idle.length) return s.openUpgrade(members[0].uid)
-  if (!isOpen(d, now)) return s.toast(`The ${d.name} only opens at night. Doors open in ${Math.max(1, Math.ceil(msUntilNight(now) / 60000))} min.`)
+  if (!isOpen(d, now)) return s.toast(`The ${d.name} only opens at night. Doors open ${opensLabel(now)}.`)
   const cost = d.fuelCost ?? 0
   const n = cost ? Math.min(idle.length, Math.floor(s.fuel / cost)) : idle.length
   if (!n) return s.showNeed('fuel', cost * idle.length - s.fuel, `the merged ${d.name}`)
@@ -881,7 +881,7 @@ export const useGame = create<GameState>()(
         const secs = jobSeconds(d, lvl, s.stats.jobs ?? 0)
         if (b.jobEndsAt !== null && now < b.jobEndsAt) return s.openUpgrade(buid)
         if (b.jobEndsAt === null) {
-          if (!isOpen(d, now)) return s.toast(`The ${d.name} only opens at night. Doors open in ${Math.max(1, Math.ceil(msUntilNight(now) / 60000))} min.`)
+          if (!isOpen(d, now)) return s.toast(`The ${d.name} only opens at night. Doors open ${opensLabel(now)}.`)
           if (s.fuel < d.fuelCost!) {
             return s.showNeed('fuel', d.fuelCost! - s.fuel, `a ${d.name} job`)
           }
