@@ -475,9 +475,11 @@ export class EngineVoice {
     this.target = amount
   }
 
-  // Gear change: a quick throttle cut and a soft clunk, then a short turbo
-  // blow-off or a pop or two. Kept short and varied so a long race doesn't
-  // repeat the same loud noise; `soft` is for the rival's car.
+  // Gear change, as it happens in a real car: the driver lifts (the note goes
+  // dull, a turbo vents, a hot exhaust pops), the clutch goes in and the revs
+  // fall freely, then the clutch bites at the new gear's revs with a soft
+  // driveline clunk and the engine pulls again. A cheap manual takes its time;
+  // an expensive car's paddle box is done in a blink. `soft` is the rival's car.
   shift(soft = 1) {
     if (this.prof.electric) return
     const a = this.a
@@ -485,17 +487,30 @@ export class EngineVoice {
     // A double call (a stray repeat) is not a second gear change.
     if (t - this.lastShift < 0.3) return
     this.lastShift = t
-    this.cutUntil = t + 0.07
+    const cut = this.shiftTime()
+    this.cutUntil = t + cut
     const vary = 0.9 + Math.random() * 0.2
-    blip(a, this.out, t, 70 * vary, 0.06, 0.13 * this.prof.vol * soft, 'sine', 45 * vary)
-    burst(a, this.out, t, 0.03, 0.025 * soft, 'bandpass', 1400 * vary, 900, 2)
+    const manual = this.q < 0.6
+    // The lever (or the paddle box's selector) moving: a small mechanical tick.
+    burst(a, this.out, t + 0.01, 0.025, (manual ? 0.02 : 0.012) * soft, 'bandpass', 2600 * vary, 2000, 4)
+    // The clutch biting: a low driveline thud with a little metal in it.
+    blip(a, this.out, t + cut, 62 * vary, 0.07, (manual ? 0.11 : 0.07) * this.prof.vol * soft, 'sine', 40 * vary)
+    burst(a, this.out, t + cut, 0.035, 0.018 * soft, 'bandpass', 1100 * vary, 700, 2)
     if (this.prof.turbo > 0.3 && this.boost > 0.3) {
-      burst(a, this.out, t + 0.02, 0.24, 0.05 * this.prof.turbo * soft, 'bandpass', 3400 * vary, 1100, 1.2)
+      // Blow-off as the throttle shuts.
+      burst(a, this.out, t + 0.015, 0.2 + cut * 0.5, 0.05 * this.prof.turbo * soft, 'bandpass', 3400 * vary, 1100, 1.2)
       // Flutter on the cheaper tuned cars, a clean psssh on the expensive ones.
       if (this.q < 0.7) for (let i = 0; i < 3; i++) burst(a, this.out, t + 0.03 + i * 0.045, 0.03, 0.025 * this.prof.turbo * soft, 'bandpass', 2400, 1800, 3)
       this.boost *= 0.3
     }
-    if (soft >= 1) this.pops(t + 0.02, 0.15, Math.floor(this.prof.crackle * 2.5))
+    // Unburnt fuel popping in the exhaust while the throttle is shut.
+    if (soft >= 1) this.pops(t + 0.02, cut, Math.floor(this.prof.crackle * 2.5))
+  }
+
+  // How long the throttle is off for a shift, in seconds.
+  private shiftTime() {
+    const slow = this.prof.clatter > 0.4 ? 0.1 : 0 // trucks and old diesels
+    return 0.06 + (1 - this.q) * 0.16 + slow
   }
 
   // Launch: wheelspin chirp, longer and louder on stronger cars.
@@ -568,7 +583,11 @@ export class EngineVoice {
     }
     // Revs chase the target; quick up, slower down, like a real flywheel.
     const k = this.mode === 'race' ? 0.6 : this.target > this.rpm ? 0.3 : 0.12
-    this.rpm += (this.target - this.rpm) * k
+    if (this.mode === 'race' && t < this.cutUntil && this.target < this.rpm) {
+      // Clutch in mid-shift: the revs fall at the flywheel's pace, and catch the
+      // new gear when it bites. Light, pricey engines spin down faster.
+      this.rpm = Math.max(this.target, this.rpm - (1.6 + this.q * 1.4) * 0.025)
+    } else this.rpm += (this.target - this.rpm) * k
     this.apply(false)
   }
 
