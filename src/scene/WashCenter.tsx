@@ -65,11 +65,11 @@ function Tunnel({ m, bulb, x0, x1, z, n, level, room }: { m: Mat; bulb: ReactNod
   return (
     <group position={[0, 0, z]}>
       {/* Floor channel, back wall and the end piers. */}
-      <Box m={m} at={[cx, 0.06, 0]} s={[len, 0.04, d]} c="#cfd8dc" t={concreteTex(len, 1)} shadow={false} />
-      <Box m={m} at={[cx, h / 2, -zf + 0.05]} s={[len, h, 0.1]} c="#e1f5fe" />
+      <Box m={m} at={[cx, 0.06, 0]} s={[len, 0.04, d - 0.01]} c="#cfd8dc" t={concreteTex(len, 1)} shadow={false} />
+      <Box m={m} at={[cx, (h - 0.01) / 2, -zf + 0.05]} s={[len, h - 0.01, 0.1]} c="#e1f5fe" />
       {[x0, x1].map((x) => (
         <group key={x}>
-          {[-1, 1].map((sd) => <Box key={sd} m={m} at={[x, h / 2, sd * (zf - 0.06)]} s={[0.14, h, 0.12]} c={BLUE} />)}
+          {[-1, 1].map((sd) => <Box key={sd} m={m} at={[x, h / 2, sd * (zf - 0.058)]} s={[0.14, h, 0.124]} c={BLUE} />)}
           <Box m={m} at={[x, h + 0.06, 0]} s={[0.16, 0.12, d]} c={BLUE} />
         </group>
       ))}
@@ -135,7 +135,7 @@ function Tunnel({ m, bulb, x0, x1, z, n, level, room }: { m: Mat; bulb: ReactNod
           <Box m={m} at={[0, 0.06, 0]} s={[0.5, 0.06, 0.26]} c="#cfd8dc" />
           <Box m={m} at={[0, 0.36, -0.02]} s={[0.22, 0.56, 0.16]} c="#eceff1" />
           <Box m={m} at={[0, 0.66, -0.02]} s={[0.3, 0.05, 0.22]} c={PINK} />
-          <mesh position={[0.111, 0.46, -0.02]} rotation-y={Math.PI / 2}><planeGeometry args={[0.1, 0.12]} />{bulb}</mesh>
+          <mesh position={[0.114, 0.46, -0.02]} rotation-y={Math.PI / 2}><planeGeometry args={[0.1, 0.12]} />{bulb}</mesh>
           {/* The gate arm. */}
           <Box m={m} at={[0.3, 0.235, -0.02]} s={[0.04, 0.37, 0.04]} c="#455a64" shadow={false} />
           <Box m={m} at={[0.3, 0.4, -0.3]} s={[0.025, 0.025, 0.56]} c="#fafafa" shadow={false} />
@@ -221,7 +221,7 @@ function Pylon({ m, at, level }: { m: Mat; at: V3; level: number }) {
   const w = 1.1
   return (
     <group position={at}>
-      <Box m={m} at={[0, h / 2, 0]} s={[0.1, h, 0.1]} c="#90a4ae" />
+      <Box m={m} at={[0, (h - 0.01) / 2, 0]} s={[0.1, h - 0.01, 0.09]} c="#90a4ae" />
       <Box m={m} at={[0, 0.12, 0]} s={[0.5, 0.24, 0.3]} c={BLUE} />
       <Box m={m} at={[0, h - 0.2, 0]} s={[w + 0.1, 0.4, 0.1]} c={PINK} />
       <LitSign text={NAME} w={w} h={0.3} at={[0, h - 0.2, 0.052]} bg={PINK} fg="#ffffff" m={m} />
