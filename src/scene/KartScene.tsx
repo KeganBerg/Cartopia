@@ -8,6 +8,7 @@ import { holdTown } from './renderGate'
 import { ArcadeSky, CarShadow, Grandstand, Lamp, TyreStack, useArcadeLook, useTownPool, type Person, Crowd } from './ArcadeScenery'
 import { Box, Cone, Cyl, Palm, Scatter, Water, rand } from './RaceVenues'
 import { local, nearZone, useFanZones, useSpots, ZONE_R } from './kartSpots'
+import { KartHorizon } from './KartHorizon'
 import { CommonExtras, DesertExtras, DocksExtras, SpectatorBoats, TownExtras, boatPeople, type BoatSpot } from './KartExtras'
 import { asphaltTex, checkerTex, concreteTex, containerTex, glowTex, grassTex, gravelTex, sandTex, towerTex } from './textures'
 import { signTexture } from './signTexture'
@@ -479,7 +480,7 @@ function DocksScenery({ t }: { t: Track }) {
   }, [r, clearOf, t])
   return (
     <group>
-      <group position-y={-0.33}><Water x={0} z={0} w={460} d={460} id="kartdocks" /></group>
+      <group position-y={-0.33}><Water x={0} z={0} w={500} d={500} id="kartdocks" color="#8fd0f5" rough={0.6} /></group>
       <Batch version={t.n + 2}>
         {/* Concrete quay under the whole circuit, so the track sits on land with water round it. */}
         {quay.map((q, i) => <mesh key={i} position={[q.x, -0.22, q.z]}><boxGeometry args={[4.02, 0.44, 4.02]} /><meshStandardMaterial map={concreteTex(1, 1)} color="#b0b6ba" /></mesh>)}
@@ -969,7 +970,7 @@ export function KartScene({ race, looks, me, input, running, cam = (DEV?.get('ca
 
   return (
     <>
-      <ArcadeSky view={view} near={60} far={210} />
+      <ArcadeSky view={view} near={100} far={340} />
       <hemisphereLight args={['#ffffff', '#666666', 0.15]} />
       <Batch version={t.n * 10 + (t.reverse ? 1 : 0)}>
         <TrackSurface t={t} />
@@ -979,6 +980,7 @@ export function KartScene({ race, looks, me, input, running, cam = (DEV?.get('ca
       {t.def.theme === 'docks' && <DocksScenery t={t} />}
       {t.def.theme === 'desert' && <DesertScenery t={t} />}
       <CommonExtras t={t} />
+      <KartHorizon theme={t.def.theme} fog={view.fog} />
       {t.def.theme === 'town' && <TownExtras t={t} />}
       {t.def.theme === 'docks' && <DocksExtras t={t} />}
       {t.def.theme === 'desert' && <DesertExtras t={t} />}
