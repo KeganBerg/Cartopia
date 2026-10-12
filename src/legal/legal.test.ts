@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { legalHtml, PRIVACY, TERMS } from './legal'
-import { parsePrefs } from '../lib/prefs'
+import { dprFor, parsePrefs } from '../lib/prefs'
 
 describe('legal pages', () => {
   it('build as plain HTML the site CSP allows (no scripts), linking each other', () => {
@@ -28,9 +28,15 @@ describe('legal pages', () => {
 
 describe('settings', () => {
   it('fall back to defaults for missing or bad data', () => {
-    expect(parsePrefs(null)).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true })
-    expect(parsePrefs('{oops')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true })
-    expect(parsePrefs('{"graphics":"ultra","reduceMotion":"yes"}')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true })
-    expect(parsePrefs('{"graphics":"saver","reduceMotion":true,"vibration":false}')).toEqual({ graphics: 'saver', reduceMotion: true, vibration: false })
+    expect(parsePrefs(null)).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: true })
+    expect(parsePrefs('{oops')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: true })
+    expect(parsePrefs('{"graphics":"ultra","reduceMotion":"yes"}')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: true })
+    expect(parsePrefs('{"graphics":"saver","reduceMotion":true,"vibration":false,"raceWeather":false}')).toEqual({ graphics: 'saver', reduceMotion: true, vibration: false, raceWeather: false })
+  })
+  it('Saver draws every 3D view at one pixel per screen pixel', () => {
+    expect(dprFor('saver')).toBe(1)
+    expect(dprFor('saver', 2)).toBe(1)
+    expect(dprFor('auto')).toEqual([1, 1.5])
+    expect(dprFor('high', 2)).toEqual([1, 2])
   })
 })

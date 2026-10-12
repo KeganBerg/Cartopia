@@ -46,6 +46,7 @@ import { playerName } from '../lib/profiles'
 import { LoadingScene } from './Loading'
 import { settleWager, startWager, startWagers, voidWager, wagersOn } from '../lib/wagers'
 import { shortCoins, stakesFor } from '../game/wager'
+import { usePrefs } from '../lib/prefs'
 
 // skill: the rival car's race skill. AI rivals use it; live players use theirs on their own device.
 // shift: how cleanly an AI rival shifts, 0 (sloppy) to 1 (always perfect, the default).
@@ -1176,7 +1177,8 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   // The sky over the strip, rolled once: a live race from its id (both racers match), the weekly
   // time trial from its week (everyone races the same conditions), a Pro Tour race from its number
   // (so the card can show it), anything else from the town.
-  const [weather] = useState(() => raceWeather(venue.id, live?.raceId ?? (trial ? `trial-${trialWeek()}` : weatherSeed), live ? undefined : sky))
+  // Weather off in Settings clears the sky for casual races only (see prefs.ts).
+  const [weather] = useState(() => raceWeather(venue.id, live?.raceId ?? (trial ? `trial-${trialWeek()}` : weatherSeed), live ? undefined : (sky ?? (!trial && !usePrefs.getState().raceWeather ? 'clear' : undefined))))
   // What the weather and venue do to each car's grip (see grip.ts). AI rivals race on stock tires.
   const grip = useMemo(() => conditions(weather.kind, venue.id, carGrip(def, car.upgrades, car.mods), car.mods), [weather, venue, def, car.upgrades, car.mods])
   const theirGrip = useMemo(() => conditions(weather.kind, venue.id, CARS.find((c) => c.name === shownRival.carName)?.grip ?? 50), [weather, venue, shownRival.carName])

@@ -68,6 +68,11 @@ export function SettingsTab({ user }: { user: User | null }) {
         </div>
         <small className="set-note">{GRAPHICS.find((g) => g.id === prefs.graphics)!.sub}</small>
       </Group>
+      <Group icon="🏁" title="Racing">
+        <Row label="Race weather" sub="Off: clear skies in casual races">
+          <Switch label="Race weather" on={prefs.raceWeather} onChange={(on) => setPrefs({ raceWeather: on })} />
+        </Row>
+      </Group>
       <Group icon="♿" title="Accessibility">
         <Row label="Reduce motion" sub="Calmer animations and effects">
           <Switch label="Reduce motion" on={motion} onChange={(on) => setPrefs({ reduceMotion: on })} />

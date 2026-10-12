@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Canvas, useThree } from '@react-three/fiber'
 import { NeutralToneMapping, PCFSoftShadowMap, type PerspectiveCamera, type WebGLProgram, type WebGLRenderer } from 'three'
 import { warmShaders } from './warm'
+import { useCanvasDpr } from '../lib/prefs'
 import { create } from 'zustand'
 
 // The race (and the Crate Depot) draws in its own full-screen canvas. Building a fresh canvas for every race
@@ -47,13 +48,14 @@ export function warmStage() {
 // Mounted once in App. Renders nothing until the first race (or warmStage).
 export function StageCanvas() {
   const { node, used, slot, run, ready, gen } = useStage()
+  const dpr = useCanvasDpr()
   if (!used) return null
   return createPortal(
     <Canvas
       key={gen}
       className="rf-canvas"
       camera={{ position: [0, 2, -4], fov: 55, near: 0.3, far: 150 }}
-      dpr={[1, 1.5]}
+      dpr={dpr}
       gl={{ toneMapping: NeutralToneMapping }}
       frameloop={slot && node && ready === run ? 'always' : 'never'}
       onCreated={({ gl }) => {

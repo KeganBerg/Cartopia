@@ -18,6 +18,7 @@ import { decal } from './layers'
 import { TILE, buildingDef, type Body } from '../game/data'
 import { BOMB_R, DRIFT_BLUE, DRIFT_ORANGE, KART_LEN, SMOKE_R, KartRace, type ItemId, type KartEvent, type KartInput, type Track } from '../game/kart'
 import type { ChaseCar } from './ChaseScene'
+import { placeCones, stepCones } from '../game/cones'
 
 // A kart circuit: the tarmac ribbon with kerbs, verges and barriers, the theme's
 // scenery round it (the player's town, a harbour, a red rock canyon), the karts,
@@ -811,6 +812,33 @@ function Crates({ race }: { race: KartRace }) {
   )
 }
 
+// Traffic cones on the inside of the tightest bends. Clipping one sends it flying
+// and costs nothing (game/cones.ts); it's back on its spot a few seconds later.
+function SmashCones({ race }: { race: KartRace }) {
+  const ref = useRef<InstancedMesh>(null)
+  const tmp = useMemo(() => new Object3D(), [])
+  const cones = useMemo(() => placeCones(race.track), [race.track])
+  useFrame((_, dt) => {
+    const m = ref.current
+    if (!m) return
+    stepCones(cones, race.karts, race.t, Math.min(dt, 0.05))
+    cones.forEach((c, i) => {
+      tmp.position.set(c.x, c.y + 0.35, c.z)
+      tmp.rotation.set(c.rx, 0, c.rz)
+      tmp.updateMatrix()
+      m.setMatrixAt(i, tmp.matrix)
+    })
+    m.instanceMatrix.needsUpdate = true
+  })
+  if (!cones.length) return null
+  return (
+    <instancedMesh ref={ref} args={[undefined, undefined, cones.length]} frustumCulled={false}>
+      <coneGeometry args={[0.28, 0.7, 10]} />
+      <meshStandardMaterial color="#ff6d00" flatShading />
+    </instancedMesh>
+  )
+}
+
 const STRIPS = 8, SPIKES = 9, CLOUDS = 6, PUFFS = 16, BOMBS = 4
 function Hazards({ race }: { race: KartRace }) {
   const oil = useRef<InstancedMesh>(null)
@@ -1163,6 +1191,7 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
       {t.def.theme === 'docks' && <DocksExtras t={t} />}
       {t.def.theme === 'desert' && <DesertExtras t={t} />}
       <Crates race={race} />
+      <SmashCones race={race} />
       <Hazards race={race} />
       <TowBeams race={race} />
       {looks.map((l, i) => <KartView key={i} look={l} rig={rigs[i]} set={setters[i]} />)}

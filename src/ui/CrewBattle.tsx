@@ -18,6 +18,7 @@ import { PlayerName } from './Username'
 import { LoadingScene } from './Loading'
 import { Crest } from './CrewHub'
 import { artStyle } from './venueArt'
+import { useCanvasDpr } from '../lib/prefs'
 
 // Crew battles: a strip in the Crew window and the full-screen showdown, where the two crews' cars
 // face off at the start line of the week's venue with the live score and both rosters docked below.
@@ -206,6 +207,7 @@ function NoCrew({ onFind }: { onFind: () => void }) {
 }
 
 export function BattlePanel() {
+  const dpr = useCanvasDpr()
   const battle = useCrewBattle((s) => s.battle)
   const cars = useGame((s) => s.cars)
   const openPanel = useGame((s) => s.openPanel)
@@ -236,7 +238,7 @@ export function BattlePanel() {
   const rec = battle!.record
   return (
     <div className="race-full cb-full">
-      <Canvas className="rf-canvas" camera={{ position: [0, 1.1, -5], fov: 55, near: 0.3, far: 150 }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
+      <Canvas className="rf-canvas" camera={{ position: [0, 1.1, -5], fov: 55, near: 0.3, far: 150 }} dpr={dpr} gl={{ toneMapping: NeutralToneMapping }}>
         <BattleScene venue={v} lead={lead}
           mine={{ body: carDef(car.model).body, model: car.model, color: car.color, finish: car.finish, skin: car.skin, modSkin: car.modSkin, panels: car.panels, mods: car.mods }}
           theirs={{ body: rival.body, model: rival.id, color: b.them.color }}

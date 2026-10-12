@@ -14,6 +14,7 @@ import { VanguardTower } from '../scene/Landmark'
 import { frame, seat } from '../scene/fit'
 import { Panel } from './Menus'
 import { RaveButton } from './Techno'
+import { useCanvasDpr } from '../lib/prefs'
 
 const n = (v: number) => v.toLocaleString()
 const time = (sec: number) => (sec >= 60 ? `${Math.floor(sec / 60)}m${sec % 60 ? ` ${sec % 60}s` : ''}` : `${sec}s`)
@@ -57,9 +58,10 @@ function Spinner({ def, level, landmark }: { def: BuildingDef; level: number; la
 
 // `landmark`: the block is (or this upgrade makes it) a Vanguard Tower, so show that instead of one house.
 function LevelPreview({ def, level, landmark }: { def: BuildingDef; level: number; landmark?: boolean }) {
+  const dpr = useCanvasDpr()
   return (
     <div className="upgrade-preview">
-      <Canvas camera={{ position: VIEW.toArray(), fov: 35 }} dpr={[1, 1.5]}>
+      <Canvas camera={{ position: VIEW.toArray(), fov: 35 }} dpr={dpr}>
         <hemisphereLight args={['#ffffff', '#90a4ae', 1]} />
         <directionalLight position={[3, 5, 2]} intensity={1.4} />
         <Spinner def={def} level={level} landmark={landmark} />

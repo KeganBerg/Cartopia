@@ -7,6 +7,7 @@ import type { Body, Finish, SkinnedSlot, Panels } from '../game/data'
 import { CarModel, carFrame } from './CarModel'
 import { frame, seat, type Bounds } from './fit'
 import { SkyEnv } from './SkyEnv'
+import { useCanvasDpr } from '../lib/prefs'
 
 type Look = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; panels?: Panels | null; stripe?: string | null; mods?: string[] | null }
 
@@ -198,11 +199,12 @@ function Viewer({ look, handle, onTouch, dyno, floorSize }: { look: Look; handle
 }
 
 function Stage({ look, big, onExpand, dyno }: { look: Look; big?: boolean; onExpand?: () => void; dyno?: DynoFeed | null }) {
+  const dpr = useCanvasDpr(big ? 2 : 1.5)
   const handle = useRef<Handle>(null)
   const [touched, setTouched] = useState(false)
   return (
     <>
-      <Canvas camera={{ position: VIEW.toArray(), fov: 35 }} dpr={big ? [1, 2] : [1, 1.5]}>
+      <Canvas camera={{ position: VIEW.toArray(), fov: 35 }} dpr={dpr}>
         <SkyEnv />
         <hemisphereLight args={['#ffffff', '#90a4ae', 1]} />
         <directionalLight position={[3, 5, 2]} intensity={1.4} />

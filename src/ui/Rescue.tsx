@@ -11,6 +11,7 @@ import { RescueScene, type ScreenAt } from '../scene/RescueScene'
 import { rescueSfx } from '../lib/sound'
 import { buzz } from '../lib/haptics'
 import { LoadingScene } from './Loading'
+import { useCanvasDpr } from '../lib/prefs'
 
 function lootLabel(l: Loot) {
   switch (l.kind) {
@@ -275,6 +276,7 @@ function Fly({ loot, from, to, onLand }: { loot: Loot; from: ScreenAt; to: () =>
 // The search, full screen: Rusty's tow truck drives a 3D lot (RescueScene)
 // and the controls float over it, like a race.
 function SearchScreen({ onHaul }: { onHaul: (items: Loot[]) => void }) {
+  const dpr = useCanvasDpr()
   const q = useGame((s) => s.search)!
   const bucks = useGame((s) => s.bucks)
   const reveal = useGame((s) => s.revealPin)
@@ -326,7 +328,7 @@ function SearchScreen({ onHaul }: { onHaul: (items: Loot[]) => void }) {
   const popLabel = pop ? lootLabel(pop) : null
   return (
     <div className="race-full rescue-full">
-      <Canvas className="rf-canvas" camera={{ position: [0, 14, 12], fov: 42, near: 0.5, far: 200 }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
+      <Canvas className="rf-canvas" camera={{ position: [0, 14, 12], fov: 42, near: 0.5, far: 200 }} dpr={dpr} gl={{ toneMapping: NeutralToneMapping }}>
         <RescueScene
           search={q}
           fast={auto}

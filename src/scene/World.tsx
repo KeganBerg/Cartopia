@@ -42,6 +42,7 @@ import { hoursOf, seedOf } from '../game/hours'
 import { VIEW, isFree, useFreeCam } from './freeCam'
 import { FreeCam } from './FreeCam'
 import { TutorialCamera } from './TutorialCamera'
+import { useLite } from '../lib/prefs'
 
 // Meadow ground that drifting cloud shadows pass over, one per tiling.
 const meadows = new Map<number, MeshStandardMaterial>()
@@ -697,6 +698,8 @@ export const World = memo(function World() {
   const land = useGame((s) => (s.visiting ? (s.visiting.land ?? START_LAND) : s.land))
   const popping = usePops((s) => Object.keys(s.pops).join())
   const free = useFreeCam((f) => f.on)
+  // Saver draws the effects at their phone-sized counts on every screen.
+  const lite = useLite()
   // Rebuild the merged town only when something's footprint changes, not on every job timer.
   const merges = useMemo(() => mergeGroups(buildings), [buildings])
   const turns = useMemo(
@@ -738,13 +741,13 @@ export const World = memo(function World() {
           <Ear />
           <TownCars />
           <Townspeople />
-          <WorldFx small={small()} />
+          <WorldFx small={lite || small()} />
         </>
       ),
       sky: (
         <>
-          <SeasonFx small={small()} />
-          <Weather small={small()} />
+          <SeasonFx small={lite || small()} />
+          <Weather small={lite || small()} />
           <Atmosphere />
           <SkyEnv />
           <FreeCam />
