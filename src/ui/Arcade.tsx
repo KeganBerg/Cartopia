@@ -8,7 +8,8 @@ import {
   ARCADE_FUEL, CHASE_HEARTS, PARK_LOTS, PARK_MAX_BUMPS, chaseReward, chaseScore, loadBests, lotOpen, parkReward, parkStars, saveBests,
 } from '../game/arcade'
 import { ChaseScene, type ChaseHud, type ChaseInput } from '../scene/ChaseScene'
-import { ParkScene, type ParkEnd, type ParkHud, type ParkInput } from '../scene/ParkScene'
+import { ParkScene, type ParkEnd, type ParkHud } from '../scene/ParkScene'
+import { KeyHints, TouchDrive, newDriveInput, useDriveKeys, useTall, useTouchDevice } from './DriveControls'
 import { CarThumb } from '../scene/BuildingPreview'
 import { Panel } from './Menus'
 import { sfx } from '../lib/sound'
@@ -113,15 +114,25 @@ function ChaseGame({ car, onExit }: { car: OwnedCar; onExit: () => void }) {
   const [hud, setHud] = useState<ChaseHud>({ dist: 0, coins: 0, hearts: CHASE_HEARTS, speed: 0 })
   const [end, setEnd] = useState<{ score: number; coins: number; xp: number; record: boolean } | null>(null)
 
-  // Keys and swipes; a tap on either half of the screen moves one lane that way.
+  // The shared driving keys (A/D or arrows): each press moves one lane that way.
+  // On a phone, swipes and taps on either half of the screen do the same.
+  const keys = useRef(newDriveInput()).current
+  const touch = useTouchDevice()
+  useDriveKeys(keys)
   useEffect(() => {
-    const key = (e: KeyboardEvent) => {
-      if (['ArrowLeft', 'a', 'A'].includes(e.key)) input.moves.push(-1)
-      if (['ArrowRight', 'd', 'D'].includes(e.key)) input.moves.push(1)
+    let last = 0
+    let raf = 0
+    const tick = () => {
+      const s = Math.sign(keys.steer)
+      if (s !== last) {
+        if (s) input.moves.push(-s)
+        last = s
+      }
+      raf = requestAnimationFrame(tick)
     }
-    window.addEventListener('keydown', key)
-    return () => window.removeEventListener('keydown', key)
-  }, [input])
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [input, keys])
   const down = useRef<{ x: number; done: boolean } | null>(null)
 
   const busted = (dist: number, coins: number) => {
@@ -174,7 +185,7 @@ function ChaseGame({ car, onExit }: { car: OwnedCar; onExit: () => void }) {
         <span className="arc-coins">🪙 {hud.coins}</span>
       </div>
       {!running && !end && drawn === run && <Countdown key={run} onGo={() => setRunning(true)} />}
-      {running && hud.dist < 40 && <div className="arc-tip">👈 Swipe or tap to dodge 👉</div>}
+      {running && hud.dist < 40 && <div className="arc-tip">{touch ? '👈 Swipe or tap to dodge 👉' : '👈 A / D or arrows to dodge 👉'}</div>}
       {end && (
         <Result win={end.record} title={end.record ? '🏆 New best!' : '🚨 Busted!'}
           actions={<>
@@ -189,40 +200,19 @@ function ChaseGame({ car, onExit }: { car: OwnedCar; onExit: () => void }) {
   )
 }
 
-const KEYS: Record<string, [keyof ParkInput, number]> = {
-  ArrowLeft: ['steer', 1], a: ['steer', 1], A: ['steer', 1], ArrowRight: ['steer', -1], d: ['steer', -1], D: ['steer', -1],
-  ArrowUp: ['pedal', 1], w: ['pedal', 1], W: ['pedal', 1], ArrowDown: ['pedal', -1], s: ['pedal', -1], S: ['pedal', -1],
-}
-
 function ParkGame({ car, lot, onExit, onLot }: { car: OwnedCar; lot: number; onExit: () => void; onLot: (lot: number) => void }) {
   const level = useGame((s) => s.level)
   const finish = useGame((s) => s.finishArcade)
   const def = PARK_LOTS[lot]
-  const input = useRef<ParkInput>({ steer: 0, pedal: 0 }).current
+  const input = useRef(newDriveInput()).current
+  const touch = useTouchDevice()
+  const tall = useTall()
+  useDriveKeys(input)
   const [run, setRun] = useState(0)
   const [running, setRunning] = useState(false)
   const [drawn, setDrawn] = useState('')
   const [hud, setHud] = useState<ParkHud>({ time: 0, bumps: 0, inSpot: false })
   const [end, setEnd] = useState<(ParkEnd & { stars: number; coins: number; xp: number }) | null>(null)
-
-  useEffect(() => {
-    const held = new Set<string>()
-    const apply = () => {
-      input.steer = 0
-      input.pedal = 0
-      for (const k of held) {
-        const [axis, v] = KEYS[k]
-        input[axis] += v
-      }
-      input.steer = Math.max(-1, Math.min(1, input.steer))
-      input.pedal = Math.max(-1, Math.min(1, input.pedal))
-    }
-    const kd = (e: KeyboardEvent) => { if (KEYS[e.key]) { held.add(e.key); apply(); e.preventDefault() } }
-    const ku = (e: KeyboardEvent) => { if (KEYS[e.key]) { held.delete(e.key); apply() } }
-    window.addEventListener('keydown', kd)
-    window.addEventListener('keyup', ku)
-    return () => { window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku) }
-  }, [input])
 
   const done = (e: ParkEnd) => {
     const stars = e.parked ? parkStars(e.time, e.bumps, def.par) : 0
@@ -239,20 +229,13 @@ function ParkGame({ car, lot, onExit, onLot }: { car: OwnedCar; lot: number; onE
   }
   const restart = (next = lot) => {
     if (!payFuel('a parking run')) return
-    input.steer = 0
-    input.pedal = 0
+    Object.assign(input, { steer: 0, gas: 0, brake: 0 })
     setEnd(null)
     setRunning(false)
     setHud({ time: 0, bumps: 0, inSpot: false })
     if (next !== lot) onLot(next)
     setRun((r) => r + 1)
   }
-  const hold = (axis: keyof ParkInput, v: number) => ({
-    onPointerDown: (e: React.PointerEvent) => { (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId); input[axis] = v },
-    onPointerUp: () => { input[axis] = 0 },
-    onPointerCancel: () => { input[axis] = 0 },
-    onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
-  })
   const hasNext = lot + 1 < PARK_LOTS.length
 
   return (
@@ -271,16 +254,7 @@ function ParkGame({ car, lot, onExit, onLot }: { car: OwnedCar; lot: number; onE
         <span className="arc-bumps">💥 {hud.bumps}/{PARK_MAX_BUMPS}</span>
       </div>
       {!running && !end && drawn === `${lot}-${run}` && <Countdown key={`${lot}-${run}`} onGo={() => setRunning(true)} />}
-      <div className="arc-pads">
-        <div className="arc-pad">
-          <button className="arc-btn" aria-label="Steer left" {...hold('steer', 1)}>◀</button>
-          <button className="arc-btn" aria-label="Steer right" {...hold('steer', -1)}>▶</button>
-        </div>
-        <div className="arc-pad">
-          <button className="arc-btn rev" aria-label="Reverse" {...hold('pedal', -1)}>R</button>
-          <button className="arc-btn gas" aria-label="Gas" {...hold('pedal', 1)}>▲</button>
-        </div>
-      </div>
+      {running && !end && (touch ? <TouchDrive input={input} tall={tall} drift={false} autoGas={false} /> : <KeyHints drift={false} item={false} />)}
       {end && (
         <Result win={end.parked} title={end.parked ? '🅿️ Parked!' : '💥 Too many dents'}
           actions={<>

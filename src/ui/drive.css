@@ -19,6 +19,9 @@
 .dc-item.full { background: radial-gradient(circle, #7c4dff, #311b92); border-color: #ffd740; box-shadow: 0 0 16px rgba(255, 215, 64, .7); animation: dc-pulse 1s infinite alternate; }
 .dc-brake { width: 64px; height: 64px; background: rgba(183, 28, 28, .65); }
 .dc-brake.on { background: #d50000; }
+.dc-gas { width: 84px; height: 84px; background: rgba(46, 125, 50, .75); }
+.dc-gas.on { background: #2e7d32; }
+.dc-wide .dc-gas { position: absolute; right: 0; bottom: 0; }
 @keyframes dc-pulse { to { box-shadow: 0 0 26px rgba(255, 215, 64, 1); } }
 .dc-tall .dc-row { display: flex; justify-content: space-between; align-items: flex-end; padding: 0 calc(16px + var(--sar, 0px)) 0 calc(16px + var(--sal, 0px)); margin-bottom: -40px; position: relative; z-index: 1; pointer-events: none; }
 .dc-tall .dc-row .dc-btn { pointer-events: auto; }
@@ -32,6 +35,7 @@
   .dc-drift { width: 82px; height: 82px; }
   .dc-item { width: 62px; height: 62px; font-size: 30px; }
   .dc-brake { width: 54px; height: 54px; }
+  .dc-gas { width: 72px; height: 72px; }
   .dc-wide .dc-cluster { width: 170px; height: 160px; }
   .dc-wide .dc-item { right: 92px; bottom: 96px; }
   .dc-wide .dc-brake { right: 102px; }
