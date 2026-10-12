@@ -7,8 +7,8 @@ import { ledGridTex, ledPaneTex, windowTex } from './textures'
 
 // The nightclub's LED windows: every window shows the same colour of the
 // rainbow, and on every kick they all move on to the next colour together
-// and flash (clubBeat.ts). Between kicks each night's groove plays the lights
-// its own way (LOOKS). The big front window is a grid of LED cells in that
+// and flash (clubBeat.ts). Between kicks each groove of the club's set plays
+// the lights its own way (LOOKS), switching as the set mixes into the next. The big front window is a grid of LED cells in that
 // same colour. Dark by day and while closed. Two shared materials, kept out of
 // Batch by `live`, so the cost is the same for any number of windows.
 
@@ -34,6 +34,10 @@ export const LOOKS: Look[] = [
   { w: { kick: 1.4, acid: 0.5 }, f: { kick: 0.7, acid: 1.6 } },
   // Disco: the off-beat open hats pump the windows; the front flashes on the chopped chords.
   { w: { kick: 1.3, open: 0.9 }, f: { kick: 0.7, stab: 1.4, open: 0.4 } },
+  // Tech: the front window rolls with the off-beat bass; the windows tick with the hats.
+  { w: { kick: 1.4, hat: 0.7 }, f: { kick: 0.7, bass: 1.3, stab: 0.6 } },
+  // Jackin': the windows bounce with the bass and claps; the front jabs with the organ.
+  { w: { kick: 1.4, bass: 0.5, clap: 0.7 }, f: { kick: 0.8, stab: 1.3, hat: 0.4 } },
 ]
 // No groove (the muted pulse, Rave Mode): the kick alone.
 const KICK: Look = { w: { kick: 1.6 }, f: { kick: 1.4 } }
