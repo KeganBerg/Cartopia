@@ -3,7 +3,7 @@ import { Atmosphere } from './Atmosphere'
 import { MapControls } from '@react-three/drei'
 import { AnchorProjector, anchorEls } from './anchors'
 import { useThree, type ThreeEvent } from '@react-three/fiber'
-import { MeshStandardMaterial, Plane, Vector3 } from 'three'
+import { MeshStandardMaterial, Plane, Vector3, type TOUCH } from 'three'
 import { create } from 'zustand'
 import { useGame, canPlace, buyablePlots, lotSize, movable, type PlacedBuilding } from '../game/store'
 import { TILE, PLOT, PLOT_MIN, PLOT_MAX, START_LAND, buildingDef, buildingLevel } from '../game/data'
@@ -42,6 +42,7 @@ import { hoursOf, seedOf } from '../game/hours'
 import { VIEW, isFree, useFreeCam } from './freeCam'
 import { FreeCam } from './FreeCam'
 import { TutorialCamera } from './TutorialCamera'
+import { TownTouch, townFingers } from './TownTouch'
 
 // Meadow ground that drifting cloud shadows pass over, one per tiling.
 const meadows = new Map<number, MeshStandardMaterial>()
@@ -169,7 +170,8 @@ function holdToMove(b: PlacedBuilding, e: ThreeEvent<PointerEvent>) {
   watch.timer = window.setTimeout(() => {
     watch.stop()
     const s = useGame.getState()
-    if (s.mode !== 'play' || s.panel || s.visiting) return
+    // A finger resting on a building while another pinches is zooming, not picking it up.
+    if (s.mode !== 'play' || s.panel || s.visiting || townFingers() > 1) return
     held = true
     navigator.vibrate?.(15)
     sfx.click()
@@ -437,6 +439,9 @@ function Roads() {
 }
 
 
+// No touch gesture: MapControls leaves fingers alone.
+const NO_TOUCH = { ONE: -1 as TOUCH, TWO: -1 as TOUCH }
+
 function Interaction() {
   const mode = useGame((s) => s.mode)
   const placing = useGame((s) => s.placing)
@@ -628,7 +633,10 @@ function Interaction() {
         minZoom={12}
         maxZoom={90}
         screenSpacePanning={false}
+        // Fingers are TownTouch's; these keep the mouse and trackpad.
+        touches={NO_TOUCH}
       />
+      <TownTouch enabled={!(free || mode === 'road' || mode === 'bulldoze' || drag)} />
     </>
   )
 }
