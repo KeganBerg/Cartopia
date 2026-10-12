@@ -17,11 +17,13 @@ import { TileClip } from './TileClip'
 import { MasteryMedal, cupChip } from './ClassCups'
 import { roadReady } from './TrophyRoad'
 import { flairChip, flairNew } from './Flair'
+import { dailyBest } from './DailyRun'
+import { dailyDay } from '../game/daily'
 
 // The Race menu's front page: every race mode as a tile on one screen, each
 // showing its next race, so nothing needs scrolling to find.
 
-export type HubTab = 'quick' | 'campaign' | 'tour' | 'gp' | 'trial' | 'event' | 'rivals' | 'tuner' | 'cups' | 'road' | 'flair'
+export type HubTab = 'quick' | 'campaign' | 'tour' | 'gp' | 'trial' | 'event' | 'rivals' | 'tuner' | 'cups' | 'road' | 'flair' | 'daily'
 
 const money = (n: number) => (n >= 10000 ? `$${Math.round(n / 1000)}k` : `$${n.toLocaleString()}`)
 
@@ -49,6 +51,8 @@ export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival }: { onOp
   const cups = useGame((s) => s.cups)
   const trophies = useGame((s) => s.trophies)
   const roadDue = roadReady(trophies, useGame((s) => s.road))
+  const daily = useGame((s) => s.daily)
+  const dailyDue = daily?.day !== dailyDay()
   const flairSave = { trophies, cups, stats: useGame((s) => s.stats), mastery: useGame((s) => s.mastery) }
   const flairDue = flairNew({ ...flairSave, flairSeen: useGame((s) => s.flairSeen) })
   const signedIn = useLive((l) => l.signedIn)
@@ -159,6 +163,10 @@ export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival }: { onOp
         <button className="rm-mini m-road" onClick={() => onOpen('road')}>
           {roadDue > 0 && <span className="rm-dot">{roadDue}</span>}
           <span className="rm-mi">🛣️</span><span><b>Trophy Road</b><small>🏆 {trophies.toLocaleString()}</small></span>
+        </button>
+        <button className="rm-mini m-daily" onClick={() => onOpen('daily')}>
+          {dailyDue && <span className="rm-dot">!</span>}
+          <span className="rm-mi">📅</span><span><b>Daily Run</b><small>{dailyBest(daily, dailyDay())?.toFixed(2) ?? 'New today'}</small></span>
         </button>
         <button className="rm-mini m-flair" onClick={() => onOpen('flair')}>
           {flairDue > 0 && <span className="rm-dot">{flairDue}</span>}

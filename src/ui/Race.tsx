@@ -59,6 +59,8 @@ import { cupFits, cupRace, cupShift, type CupRace } from '../game/cups'
 import { ClassCups, cupChip, cupPrizeOf, firstCupPick } from './ClassCups'
 import { TrophyRoad, roadReady } from './TrophyRoad'
 import { Flair } from './Flair'
+import { DailyRunTab, DailyResult } from './DailyRun'
+import type { DailyRun } from '../game/daily'
 import { CHALLENGER_BONUS, makeChallenger } from '../game/challenger'
 
 // skill: the rival car's race skill. AI rivals use it; live players use theirs on their own device.
@@ -232,6 +234,7 @@ export function RacePanel() {
     return v
   })
   const [trial, setTrial] = useState<(TrialRun & { n: number }) | null>(null)
+  const [daily, setDaily] = useState<{ run: DailyRun; n: number } | null>(null)
   // The town rival race; bet: the double-or-nothing rematch. n remounts the race for each run.
   const [rv, setRv] = useState<{ match: RivalMatch; bet: boolean; n: number } | null>(null)
   const rvBonus = useRef<RivalBonus>(null)
@@ -288,6 +291,12 @@ export function RacePanel() {
     return true
   }
 
+  const startDaily = (run: DailyRun) => {
+    if (waiting()) return
+    if (!spendFuel(TRIAL_FUEL)) return useGame.getState().showNeed('fuel', TRIAL_FUEL - useGame.getState().fuel, 'the Daily Run')
+    setDaily((d) => ({ run, n: (d?.n ?? 0) + 1 }))
+  }
+
   const startTrial = (run: TrialRun) => {
     if (waiting()) return
     if (!spendFuel(TRIAL_FUEL)) return useGame.getState().showNeed('fuel', TRIAL_FUEL - useGame.getState().fuel, 'a time trial run')
@@ -342,6 +351,25 @@ export function RacePanel() {
         title={`${GP_CUP[GP_SERIES.indexOf(gpRace.series)] ?? '🏆'} ${round + 1}/${GP_ROUNDS} · ${def.icon} ${def.short}${reverse ? ' ↺' : ''}`}
         onFinish={(place) => gpResult(gpRace.series.id, place === 1, place, gpRace.field.length)}
         onExit={() => { setGpRace(null); setTab('gp') }}
+      />
+    )
+  }
+
+  if (daily) {
+    // The day's loaner car, stock, raced against the par ghost in the day's weather.
+    const { run, n } = daily
+    const loaner: OwnedCar = { uid: 'daily', model: run.car.id, color: run.color, upgrades: zero }
+    return (
+      <DragRace
+        key={n}
+        car={loaner}
+        rival={{ id: 'trial', town: '👻 Par', level: 0, carName: run.car.name, color: '#eceff1', pi: run.pi, online: false, body: run.car.body, model: run.car.id }}
+        trial={{ target: run.par, seed: `daily-${run.day}`, key: `daily:${run.day}` }}
+        venueId={run.venue.id}
+        title={`📅 Daily Run · ${run.venue.name}`}
+        onFinish={(_won, myTime) => useGame.getState().dailyResult(myTime)}
+        resultView={(r) => <DailyResult run={run} myTime={r.myTime} onAgain={() => startDaily(run)} onExit={() => { setDaily(null); setTab('daily') }} />}
+        onExit={() => { setDaily(null); setTab('daily') }}
       />
     )
   }
@@ -622,7 +650,7 @@ export function RacePanel() {
     : tab === 'road' && roadReady(trophies, roadClaimed) > 0 ? { label: `🎁 Claim ${roadReady(trophies, roadClaimed)}`, onClick: () => useGame.getState().claimRoad() }
     : null
   const stars = Object.values(done).reduce((a, n) => a + n, 0)
-  const TITLES: Record<RaceTab, string> = { hub: 'Race', quick: 'Quick Race', campaign: 'Campaign', tour: 'Pro Tour', gp: 'Grand Prix', trial: 'Time Trial', event: 'Weekly Event', rivals: 'Rivals', tuner: 'Tuner Trials', cups: 'Class Cups', road: 'Trophy Road', flair: 'Flair' }
+  const TITLES: Record<RaceTab, string> = { hub: 'Race', quick: 'Quick Race', campaign: 'Campaign', tour: 'Pro Tour', gp: 'Grand Prix', trial: 'Time Trial', event: 'Weekly Event', rivals: 'Rivals', tuner: 'Tuner Trials', cups: 'Class Cups', road: 'Trophy Road', flair: 'Flair', daily: 'Daily Run' }
   const chip = tab === 'campaign' ? `⭐ ${stars}/${CAMPAIGN.length * CAMPAIGN_RACES * 3}`
     : tab === 'tour' ? `🌍 ${tourWon.toLocaleString()} wins`
     : tab === 'gp' ? `🏁 ×${GP_ROUNDS} → 🎁`
@@ -647,6 +675,8 @@ export function RacePanel() {
           <TrophyRoad />
         ) : tab === 'flair' ? (
           <Flair />
+        ) : tab === 'daily' ? (
+          <DailyRunTab onRun={startDaily} />
         ) : tab === 'campaign' ? (
           <Campaign sel={campSel} setSel={setCampSel} onTour={() => setTab('tour')} onRace={(ci, i) => startCampaign(ci, i)} />
         ) : tab === 'tour' ? (
@@ -1237,7 +1267,7 @@ type NextPick = NextRace | ((won: boolean) => NextRace | null)
 type RunStats = { launch: string; perfect: number; shifts: number; top: number }
 // dist: a Grand Prix or Pro Tour distance (game/distance.ts); the car's build counts in these.
 // next: the result card's button for the next race in this series (or a retry), when there is one.
-export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title, venueId, trial, resultView, night, weatherSeed, sky, next, dist }: { car: OwnedCar; rival: Rival; onExit: () => void; next?: NextPick | null; live?: LiveRace; prize?: number; onFinish?: (won: boolean, myTime: number, theirTime: number) => number | void; title?: string; venueId?: string; trial?: { target: number; mine?: boolean }; resultView?: (r: Result) => ReactNode; night?: boolean; weatherSeed?: string; sky?: WeatherKind; dist?: RaceDist }) {
+export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title, venueId, trial, resultView, night, weatherSeed, sky, next, dist }: { car: OwnedCar; rival: Rival; onExit: () => void; next?: NextPick | null; live?: LiveRace; prize?: number; onFinish?: (won: boolean, myTime: number, theirTime: number) => number | void; title?: string; venueId?: string; trial?: { target: number; mine?: boolean; seed?: string; key?: string }; resultView?: (r: Result) => ReactNode; night?: boolean; weatherSeed?: string; sky?: WeatherKind; dist?: RaceDist }) {
   // A signed-in live rival's PI comes from the server, not from their browser.
   const [serverRivalPi, setServerRivalPi] = useState<number | null>(null)
   const rival = useMemo(() => (serverRivalPi === null ? shownRival : { ...shownRival, pi: serverRivalPi }), [shownRival, serverRivalPi])
@@ -1277,7 +1307,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   // The sky over the strip, rolled once: a live race from its id (both racers match), the weekly
   // time trial from its week (everyone races the same conditions), a Pro Tour race from its number
   // (so the card can show it), anything else from the town.
-  const [weather] = useState(() => raceWeather(venue.id, live?.raceId ?? (trial ? `trial-${trialWeek()}` : weatherSeed), live ? undefined : sky))
+  const [weather] = useState(() => raceWeather(venue.id, live?.raceId ?? (trial ? trial.seed ?? `trial-${trialWeek()}` : weatherSeed), live ? undefined : sky))
   // What the weather and venue do to each car's grip (see grip.ts). AI rivals race on stock tires.
   const grip = useMemo(() => conditions(weather.kind, venue.id, carGrip(def, car.upgrades, car.mods), car.mods), [weather, venue, def, car.upgrades, car.mods])
   const theirGrip = useMemo(() => conditions(weather.kind, venue.id, CARS.find((c) => c.name === shownRival.carName)?.grip ?? 50), [weather, venue, shownRival.carName])
@@ -1318,7 +1348,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   const stats = useRef<RunStats>({ launch: '', perfect: 0, shifts: 0, top: 0 })
   // Split times against the ghost (game/splits.ts): when it passes each checkpoint, when we did,
   // and the gap shown for the last one passed.
-  const splitKey = `${venue.id}:${track}`
+  const splitKey = trial?.key ?? `${venue.id}:${track}`
   const target = trial?.target
   const vsMine = !!trial?.mine
   const ghostSplits = useMemo(() => (target !== undefined ? refSplits(target, vsMine ? bestSplits(splitKey) : null) : null), [target, vsMine, splitKey])

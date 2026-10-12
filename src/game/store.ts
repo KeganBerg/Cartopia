@@ -24,6 +24,7 @@ import { claim, type WagerEntry } from './wager'
 import { carClassTier, classTier, classWon, galaxy, masteryTier, noteRace, type Mastery, type MasteryMode } from './mastery'
 import { roadClaim, roadOpen, roadReached } from './trophyRoad'
 import { CHEERS, TRAILS, flairOpen, flairOpenCount } from './flair'
+import { DAILY_MEDALS, DAILY_PAY, dailyMedal, dailyRun, type DailySave } from './daily'
 import { cupCrateSource, cupPrize, cupRace } from './cups'
 import { CAR_CLASSES } from './classes'
 import type { CarClassId } from './classes'
@@ -124,6 +125,8 @@ export type SaveState = {
   trail?: string
   cheer?: string
   flairSeen?: number
+  // The Daily Run (game/daily.ts): today's best time and whether its pay is taken.
+  daily?: DailySave
   // The tutorial was skipped before its free paint pick, so the next coin colour is free.
   freePaint?: boolean
   // Class Cups (game/cups.ts): wins in each race.
@@ -240,6 +243,8 @@ type Actions = {
   // Picks a boost trail or win celebration (only ones whose challenge is done).
   pickFlair: (kind: 'trail' | 'cheer', id: string) => void
   seeFlair: () => void
+  // A finished Daily Run: keeps the day's best and pays the first run of the day.
+  dailyResult: (time: number) => void
   // A ghost race against a crewmate: no prize, but it counts as a race for the crew goal and battle.
   crewRace: () => void
   // Arcade mini games pay a little coin and XP (see game/arcade.ts).
@@ -1329,6 +1334,16 @@ export const useGame = create<GameState>()(
         if (!d || !flairOpen(d.challenge, s)) return
         set({ [kind]: id, updatedAt: Date.now() })
       },
+      dailyResult: (time) => {
+        const s = get()
+        const run = dailyRun()
+        const was = s.daily?.day === run.day ? s.daily : { day: run.day, best: null, paid: false }
+        const best = was.best === null ? time : Math.min(was.best, time)
+        set({ daily: { day: run.day, best, paid: true } })
+        if (was.paid) return
+        const medal = dailyMedal(run, time)
+        s.finishRace(medal < DAILY_MEDALS.length, DAILY_PAY[Math.min(medal, DAILY_MEDALS.length - 1)], { loss: DAILY_PAY[DAILY_MEDALS.length] })
+      },
       seeFlair: () => {
         const n = flairOpenCount(get())
         if (n !== get().flairSeen) set({ flairSeen: n })
@@ -2241,8 +2256,8 @@ export const useGame = create<GameState>()(
 )
 
 export function saveOf(s: GameState): SaveState {
-  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, cratePity, boosts, wagers, season, deals, trials, rivals, rivalRow, tuner, mastery, road, roadItems, freeCrates, trail, cheer, flairSeen, cups, freePaint, oldPaints, tour, event, showcase, raceCar, skins, modSkins, land, updatedAt } = s
-  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, cratePity: cratePity ?? {}, boosts: boosts ?? emptyBoosts(), ...(wagers ? { wagers } : {}), season, deals, trials, rivals, rivalRow, tuner: tuner ?? {}, mastery: mastery ?? {}, road: road ?? 0, roadItems: roadItems ?? [], freeCrates: freeCrates ?? [], ...(trail ? { trail } : {}), ...(cheer ? { cheer } : {}), ...(flairSeen ? { flairSeen } : {}), cups: cups ?? {}, ...(freePaint ? { freePaint } : {}), oldPaints: !!oldPaints, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, land, updatedAt }
+  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, cratePity, boosts, wagers, season, deals, trials, rivals, rivalRow, tuner, mastery, road, roadItems, freeCrates, trail, cheer, flairSeen, daily, cups, freePaint, oldPaints, tour, event, showcase, raceCar, skins, modSkins, land, updatedAt } = s
+  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, cratePity: cratePity ?? {}, boosts: boosts ?? emptyBoosts(), ...(wagers ? { wagers } : {}), season, deals, trials, rivals, rivalRow, tuner: tuner ?? {}, mastery: mastery ?? {}, road: road ?? 0, roadItems: roadItems ?? [], freeCrates: freeCrates ?? [], ...(trail ? { trail } : {}), ...(cheer ? { cheer } : {}), ...(flairSeen ? { flairSeen } : {}), ...(daily ? { daily } : {}), cups: cups ?? {}, ...(freePaint ? { freePaint } : {}), oldPaints: !!oldPaints, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, land, updatedAt }
 }
 
 // Fields added after launch, so older saves load with sensible values.

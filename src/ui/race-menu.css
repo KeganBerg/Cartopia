@@ -771,3 +771,9 @@ div.rm-node { cursor: default; }
 @media (max-width: 520px) {
   .fl-grid { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
 }
+
+/* Daily Run (DailyRun.tsx): the day's loaner car under the banner. */
+.daily-car { display: flex; align-items: center; gap: 10px; padding: 8px 12px; }
+.daily-car > span { display: flex; flex-direction: column; min-width: 0; }
+.daily-car b { font: 900 16px Nunito, sans-serif; }
+.daily-car small { font: 800 12px Nunito, sans-serif; color: #4a6283; }
