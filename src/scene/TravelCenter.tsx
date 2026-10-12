@@ -418,7 +418,7 @@ function Pylon({ m, t, level }: { m: Mat; t: TravelLayout; level: number }) {
       <Box m={m} at={[0, h - 0.72, 0]} s={[w * 0.8, 0.5, 0.09]} c="#263238" />
       <mesh position={[0, h - 0.72, 0.048]}>
         <planeGeometry args={[w * 0.72, 0.42]} />
-        <meshBasicMaterial map={signTexture('⛽ 1.79', '#263238', '#ffca28', (w * 0.72) / 0.42)} toneMapped={false} />
+        <meshBasicMaterial map={signTexture('⛽ 4.89', '#263238', '#ffca28', (w * 0.72) / 0.42)} toneMapped={false} />
       </mesh>
       <Logo m={m} at={[0, h + w * 0.42, 0]} r={w * 0.45} />
       <Bulbs from={[-w / 2, h + 0.03, 0.06]} to={[w / 2, h + 0.03, 0.06]} n={9} />
