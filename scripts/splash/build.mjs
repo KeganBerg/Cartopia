@@ -7,7 +7,8 @@
 // town has drawn. Run: node scripts/splash/build.mjs
 //
 // The scene matches the link-preview cards: a sunburst panel with the logo, and
-// the player's own race car (in their paint) parked in front of a busy town
+// the player's own race car (in their paint, centred in the space under the
+// loading pill and sized to fit it) parked in front of a busy town
 // that slowly pans, in the real season and the game's 20-minute day/night clock
 // (src/game/clock.ts), or a live night/day event cached by src/game/liveEvents.ts.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
@@ -71,9 +72,11 @@ left:-30%;width:160%;top:-24%;height:70%;--cx:50%;--cy:52%}
 #splash .wm{left:23%;top:15%;width:min(36vw,520px)}
 #splash .tag{left:0;right:auto;width:46%;top:calc(15% + min(36vw,520px) * .32);font-size:clamp(18px,2.1vw,30px)}
 #splash .ld{left:23%;bottom:auto;top:calc(15% + min(36vw,520px) * .32 + clamp(18px,2.1vw,30px) * 4.6)}
-#splash .car{left:24%;top:auto;bottom:-1%;width:calc(min(30vw,460px) * var(--k,1))}
+#splash .car{--vh:1vh;--ldb:calc(15 * var(--vh) + min(36vw,520px) * .32 + clamp(18px,2.1vw,30px) * 4.6 + 64px);--cmax:min(30vw,460px)}
+@supports (height:1dvh){#splash .car{--vh:1dvh}}
+#splash .car{left:24%;--cw:min(calc(var(--cmax) * var(--k,1)),calc((100 * var(--vh) - var(--ldb) - 8 * var(--vh)) / var(--ar,.75)));width:var(--cw);top:calc(var(--ldb) + (100 * var(--vh) - var(--ldb) - var(--cw) * var(--ar,.75)) / 2)}
 }
-@media (min-aspect-ratio:1/1) and (max-height:520px){#splash .tag{display:none}#splash .ld{top:calc(15% + min(36vw,520px) * .32 + 12px)}#splash .car{width:calc(min(22vw,300px) * var(--k,1))}}
+@media (min-aspect-ratio:1/1) and (max-height:520px){#splash .tag{display:none}#splash .ld{top:calc(15% + min(36vw,520px) * .32 + 12px)}#splash .car{--ldb:calc(15 * var(--vh) + min(36vw,520px) * .32 + 76px);--cmax:min(22vw,300px)}}
 @media (max-aspect-ratio:1/1) and (max-height:640px){#splash .tag{display:none}#splash .car{top:30%}}
 @media (prefers-reduced-motion:reduce){#splash *,#splash *::before{animation:none!important}}
 `
@@ -98,7 +101,7 @@ var c={};try{c=JSON.parse(localStorage.getItem('cartopia-splash-car'))||{}}catch
 var model=/^[a-z0-9]+$/.test(c.model)?c.model:'hotshot',car=el.querySelector('.car'),img=car.querySelector('img'),paint=car.querySelector('.paint');
 paint.style.setProperty('--paint',/^#[0-9a-f]{3,8}$/i.test(c.color)?c.color:'#d32f2f');
 function useCar(id){var mk='url(/splash/hero-'+id+'-mask.webp)';paint.style.webkitMaskImage=mk;paint.style.maskImage=mk;img.src='/splash/hero-'+id+'.webp'}
-img.onload=function(){car.style.setProperty('--k',Math.max(.8,Math.min(1.25,img.naturalWidth/${HERO_W})));car.classList.add('on')};img.onerror=function(){if(model!='hotshot'){model='hotshot';useCar(model)}};useCar(model);
+img.onload=function(){car.style.setProperty('--k',Math.max(.8,Math.min(1.25,img.naturalWidth/${HERO_W})));car.style.setProperty('--ar',img.naturalHeight/img.naturalWidth);car.classList.add('on')};img.onerror=function(){if(model!='hotshot'){model='hotshot';useCar(model)}};useCar(model);
 var bar=el.querySelector('.ld .fill'),lab=el.querySelector('.ld b'),v=.06,cap=.6,end=0;
 function draw(){bar.style.transform='scaleX('+v+')'}
 var tick=setInterval(function(){v+=(cap-v)*.04;draw()},120);
