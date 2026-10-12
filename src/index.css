@@ -1924,3 +1924,11 @@ body:has(.race-full) .toasts { display: none; }
 @media (max-height: 500px) { .rf-hold { bottom: calc(130px + var(--sab)); font-size: 15px; } }
 .race-full .shift-btn.launch.now { box-shadow: 0 4px 0 rgba(0,0,0,.35), 0 0 22px rgba(118,255,3,.8); }
 .race-full .shift-btn.launch.late { background: linear-gradient(#ff5252, #8e0000); }
+
+/* My Cars: filter + sort row pinned at the top of the car list. */
+.garage-filter { position: sticky; top: 0; z-index: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; margin-bottom: 2px; background: var(--seg, #eceff1); border-radius: 12px; }
+.garage.picking .garage-list .garage-filter { grid-column: 1 / -1; }
+.gf-pick { position: relative; display: flex; align-items: center; min-width: 0; background: #fff; border-radius: 9px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15); }
+.gf-pick .gi { position: absolute; left: 7px; width: 15px; height: 15px; color: #2f7ff0; pointer-events: none; }
+.gf-pick::after { content: '▾'; position: absolute; right: 8px; font-size: 11px; color: #546e7a; pointer-events: none; }
+.gf-pick select { appearance: none; -webkit-appearance: none; width: 100%; min-width: 0; border: 0; background: transparent; padding: 7px 20px 7px 26px; font: 13px var(--display); color: #263238; cursor: pointer; text-overflow: ellipsis; }

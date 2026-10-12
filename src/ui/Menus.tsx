@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGame, hasRusty, buildPrice, type OwnedCar } from '../game/store'
 import { raceCarOf } from '../game/raceCar'
 import { reducedMotion } from '../game/fx'
-import { activeEvent, garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, carDef, performance, upgradeCost, buildingDef, upgradable, loves, readySets, type BuildingDef } from '../game/data'
+import { activeEvent, garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, carDef, performance, upgradeCost, buildingDef, upgradable, loves, readySets, isBike, type BuildingDef } from '../game/data'
 import { CarInspect, CarPreview, type DynoFeed } from '../scene/CarPreview'
 import { DynoOverlay, type DynoRun } from './Dyno'
 import { CollectAllButton } from './CollectAll'
@@ -349,7 +349,11 @@ export function ShowroomPanel() {
         </div>
       )}
       <div ref={body} className={rusty ? 'cards' : 'cards dimmed'}>
-        {CARS.filter((c) => !c.rescueOnly && !c.season).map((c) => {
+        {/* Cars you can buy now first, then level-locked ones by the level they open at. */}
+        {CARS.filter((c) => !c.rescueOnly && !c.season)
+          .map((c, i) => ({ c, i, gate: level < c.unlockLevel ? c.unlockLevel : 0 }))
+          .sort((a, b) => a.gate - b.gate || a.i - b.i)
+          .map(({ c }) => {
           const locked = level < c.unlockLevel
           const color = colorFor[c.id] ?? c.colors[0]
           const pi = performance(c, { engine: 0, turbo: 0, tires: 0, weight: 0 })
@@ -439,13 +443,55 @@ function RaceCarToggle({ car }: { car: string }) {
   )
 }
 
+// My Cars list filter and sort, kept while the game is open. Default: top PI first.
+type CarSort = 'pi' | 'pi-low' | 'name' | 'new'
+const CAR_SORTS: { id: CarSort; label: string }[] = [
+  { id: 'pi', label: 'Top PI' }, { id: 'pi-low', label: 'Low PI' }, { id: 'name', label: 'A–Z' }, { id: 'new', label: 'Newest' },
+]
+let garageView: { kind: string; sort: CarSort } = { kind: 'all', sort: 'pi' }
+const bodyLabel = (b: string) => (b === 'dogvan' ? 'Dog van' : b === 'ev' ? 'EV' : b === 'suv' ? 'SUV' : b[0].toUpperCase() + b.slice(1))
+
+function useGarageList(cars: OwnedCar[]) {
+  const [view, setViewState] = useState(garageView)
+  const setView = (v: Partial<typeof view>) => setViewState((o) => (garageView = { ...o, ...v }))
+  const rows = useMemo(() => cars.map((c, i) => {
+    const d = carDef(c.model)
+    return { c, d, i, pi: performance(d, c.upgrades, c.mods) }
+  }), [cars])
+  // Only offer kinds the player owns, with counts.
+  const kinds = useMemo(() => {
+    const n = new Map<string, number>()
+    for (const r of rows) n.set(r.d.body, (n.get(r.d.body) ?? 0) + 1)
+    const out = [{ id: 'all', label: `All (${rows.length})` }]
+    const legend = rows.filter((r) => r.d.legendary).length
+    if (legend) out.push({ id: 'legendary', label: `★ Legendary (${legend})` })
+    const bikes = rows.filter((r) => isBike(r.d.body)).length
+    if (bikes && bikes < rows.length) out.push({ id: 'bikes', label: `Bikes (${bikes})` })
+    for (const [b, k] of [...n].sort((a, z) => a[0].localeCompare(z[0]))) out.push({ id: b, label: `${bodyLabel(b)} (${k})` })
+    return out
+  }, [rows])
+  const kind = kinds.some((k) => k.id === view.kind) ? view.kind : 'all'
+  const list = useMemo(() => {
+    const keep = rows.filter((r) => kind === 'all' || (kind === 'legendary' ? r.d.legendary : kind === 'bikes' ? isBike(r.d.body) : r.d.body === kind))
+    const by: Record<CarSort, (a: typeof rows[0], b: typeof rows[0]) => number> = {
+      pi: (a, b) => b.pi - a.pi || a.d.name.localeCompare(b.d.name),
+      'pi-low': (a, b) => a.pi - b.pi || a.d.name.localeCompare(b.d.name),
+      name: (a, b) => a.d.name.localeCompare(b.d.name) || b.pi - a.pi,
+      new: (a, b) => b.i - a.i,
+    }
+    return keep.sort(by[view.sort])
+  }, [rows, kind, view.sort])
+  return { list, kinds, kind, sort: view.sort, setView }
+}
+
 export function GaragePanel() {
   const cars = useGame((s) => s.cars)
   const selected = useGame((s) => s.selectedCar)
   const select = useGame((s) => s.selectCar)
   const upgrade = useGame((s) => s.upgradeCar)
   const sell = useGame((s) => s.sellCar)
-  const car = cars.find((c) => c.uid === selected) ?? cars[0]
+  const { list, kinds, kind, sort, setView } = useGarageList(cars)
+  const car = cars.find((c) => c.uid === selected) ?? list[0]?.c ?? cars[0]
   const def = car && carDef(car.model)
   useEffect(() => { lastCars = 'garage' }, [])
   const [tab, setTab] = useState<GarageTab>(() => {
@@ -458,8 +504,13 @@ export function GaragePanel() {
   const tryMod = trying && trying.car === car?.uid && tab === 'mods' ? trying.mod : null
   const [inspect, setInspect] = useState(false)
   const [picking, setPicking] = useState(false)
-  const idx = Math.max(0, cars.findIndex((c) => c.uid === car?.uid))
-  const step = (d: number) => select(cars[(idx + d + cars.length) % cars.length].uid)
+  // Arrows step through the filtered, sorted list.
+  const pos = list.findIndex((r) => r.c.uid === car?.uid)
+  const step = (d: number) => {
+    if (!list.length) return
+    const at = pos < 0 ? (d > 0 ? -1 : 0) : pos
+    select(list[(at + d + list.length) % list.length].c.uid)
+  }
   // A paint job being tried on, cleared when another car is picked.
   const [painting, setPainting] = useState<{ car: string; job: PaintJob } | null>(null)
   const tryJob = painting && painting.car === car?.uid && tab === 'paint' ? painting.job : null
@@ -491,26 +542,37 @@ export function GaragePanel() {
       <CarsTabs current="garage" />
       <div className={picking ? 'garage picking' : 'garage'}>
         <div className="garage-list">
-          {cars.map((c) => {
-            const d = carDef(c.model)
-            return (
-              <button key={c.uid} className={c.uid === car?.uid ? 'garage-item sel' : 'garage-item'} onClick={() => { select(c.uid); setPicking(false) }}>
-                <CarThumb size="sm" color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} body={d.body} model={d.id} stripe={c.stripe} mods={c.mods} />
-                <span>{d.name}{c.plate && <span className="mini-plate">{c.plate}</span>}</span>
-                <small>PI {performance(d, c.upgrades, c.mods)}</small>
-              </button>
-            )
-          })}
+          <div className="garage-filter">
+            <label className="gf-pick">
+              <Icon name="filter" />
+              <select aria-label="Show" value={kind} onChange={(e) => setView({ kind: e.target.value })}>
+                {kinds.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
+              </select>
+            </label>
+            <label className="gf-pick">
+              <Icon name="sort" />
+              <select aria-label="Sort" value={sort} onChange={(e) => setView({ sort: e.target.value as CarSort })}>
+                {CAR_SORTS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+              </select>
+            </label>
+          </div>
+          {list.map(({ c, d, pi: p }) => (
+            <button key={c.uid} className={c.uid === car?.uid ? 'garage-item sel' : 'garage-item'} onClick={() => { select(c.uid); setPicking(false) }}>
+              <CarThumb size="sm" color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} body={d.body} model={d.id} stripe={c.stripe} mods={c.mods} />
+              <span>{d.name}{c.plate && <span className="mini-plate">{c.plate}</span>}</span>
+              <small>PI {p}</small>
+            </button>
+          ))}
         </div>
         {car && def && (
           <div className="garage-detail" onClickCapture={() => { tapped.current = Date.now() }}>
             {/* Phones: step through cars here, or open the grid of all of them. */}
             <div className="car-switch">
-              <button aria-label="Previous car" onClick={() => step(-1)} disabled={cars.length < 2}>‹</button>
+              <button aria-label="Previous car" onClick={() => step(-1)} disabled={list.length < (pos < 0 ? 1 : 2)}>‹</button>
               <button className="car-switch-name" onClick={() => setPicking((p) => !p)} aria-expanded={picking}>
-                <b>{def.name}</b><small>{idx + 1}/{cars.length} {picking ? '▴' : '▾'}</small>
+                <b>{def.name}</b><small>{pos < 0 ? '–' : pos + 1}/{list.length} {picking ? '▴' : '▾'}</small>
               </button>
-              <button aria-label="Next car" onClick={() => step(1)} disabled={cars.length < 2}>›</button>
+              <button aria-label="Next car" onClick={() => step(1)} disabled={list.length < (pos < 0 ? 1 : 2)}>›</button>
             </div>
             {inspect ? (
               <>
