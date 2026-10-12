@@ -1738,7 +1738,8 @@ export const useGame = create<GameState>()(
 
       eventResult: (won) => {
         const s = get()
-        const p = eventProgress(s.event)
+        // Not eventProgress(): a race started before the Monday reset still counts for its own week.
+        const p = s.event
         if (!p || p.won >= EVENT_RACES) return
         s.finishRace(won, eventPrize(p.pi, p.won))
         if (!won) return

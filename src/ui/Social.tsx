@@ -10,16 +10,16 @@ import {
 } from '../lib/clans'
 import { Panel, SheetTabs } from './Menus'
 import { isCleanName, NAME_REJECTED } from '../lib/names'
-import { useCrewGoal } from './CrewGoal'
+import { refreshCrewGoal, useCrewGoal } from './CrewGoal'
 import { refreshChatRooms } from '../lib/chat'
 import { CrewBattleCard } from './CrewBattle'
-import { demoBattle, useCrewBattle } from '../lib/battles'
+import { demoBattle, refreshCrewBattle, useCrewBattle } from '../lib/battles'
 import { PlayerName } from './Username'
 import { playerName } from '../lib/profiles'
 import { LoadingBand } from './Loading'
 import { CrewLadder, demoCrew } from './CrewLadder'
-import { CrewBattleTile, CrewGoalTile, CrewHero } from './CrewHub'
-import { CREW_DEMO } from '../lib/crewRaces'
+import { CrewBattleTile, CrewGoalTile, CrewHero, LastWeekChests } from './CrewHub'
+import { CREW_DEMO, useCrewMates } from '../lib/crewRaces'
 
 const n = (v: number) => v.toLocaleString()
 
@@ -231,9 +231,16 @@ export function ClanPanel() {
     fetchMyClan(uid).then((m) => {
       setMine(m)
       useGame.setState({ clanBadge: m ? { tag: m.clan.tag, emblem: m.clan.emblem, color: m.clan.color } : null })
+      if (!m) useCrewMates.setState({ ids: [] })
       void refreshChatRooms()
     }).catch(() => setMine(null))
   }, [uid])
+  // Joining, leaving or switching crews: the goal and battle belong to the new crew now.
+  const changed = useCallback(() => {
+    reload()
+    void refreshCrewGoal()
+    void refreshCrewBattle()
+  }, [reload])
   useEffect(() => { if (uid !== undefined) reload() }, [uid, reload])
 
   return (
@@ -257,9 +264,9 @@ export function ClanPanel() {
       ) : mine === undefined ? (
         <LoadingBand label="Loading your crew" />
       ) : mine ? (
-        <><CrewHouseNudge /><ClanHome data={mine} uid={uid!} onChange={reload} /></>
+        <><CrewHouseNudge /><ClanHome data={mine} uid={uid!} onChange={changed} /></>
       ) : (
-        <><CrewHouseNudge /><ClanBrowser onJoined={reload} /></>
+        <><CrewHouseNudge /><LastWeekChests /><ClanBrowser onJoined={changed} /></>
       )}
     </Panel>
   )

@@ -67,6 +67,14 @@ describe('weekly events', () => {
     expect(g().coins).toBe(after)
   })
 
+  it('still pays a race that started before the Monday reset and finished after it', () => {
+    useGame.setState({ level: 10, xp: 0, coins: 0, event: { week: '2020-01-06', pi: 70, won: 1 }, eventPrize: null, skins: [], levelUp: null })
+    useGame.getState().eventResult(true)
+    expect(useGame.getState().coins).toBe(eventPrize(70, 1))
+    // This week's event starts fresh.
+    expect(eventProgress(useGame.getState().event)).toBeNull()
+  })
+
   it('pays a double bonus when the skin is already owned, and starts fresh next week', () => {
     const e = eventFor()
     useGame.setState({ level: 10, xp: 0, coins: 0, event: { week: trialWeek(), pi: 60, won: EVENT_RACES - 1 }, eventPrize: null, skins: [e.skin], levelUp: null })

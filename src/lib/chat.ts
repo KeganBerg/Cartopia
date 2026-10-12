@@ -63,12 +63,16 @@ export function toMsg(r: Row): ChatMsg | null {
 
 const roomKey = (room: Room) => (room === 'global' ? 'global' : useChat.getState().crewRoom)
 
-// count: whether new messages add to the unread count (not for a room's first history load).
+// Rooms whose history has loaded. Before that, arriving messages are old news and
+// don't add to the unread count; after it, every new message does, even in a room
+// that was empty (a new crew's first "hi").
+const loaded: Partial<Record<Room, boolean>> = {}
+
 function add(room: Room, list: ChatMsg[]) {
   loadUsernames(list.map((m) => m.owner))
   useChat.setState((s) => {
     const byId = new Map(s.msgs[room].map((m) => [m.id, m]))
-    const count = s.msgs[room].length > 0
+    const count = !!loaded[room]
     let fresh = 0
     for (const m of list) {
       if (!byId.has(m.id) && count) fresh += m.owner === s.uid || s.muted[m.owner] ? 0 : 1
@@ -91,6 +95,7 @@ function leave(room: Room) {
   if (ch && supabase) void supabase.removeChannel(ch)
   delete channels[room]
   live[room] = false
+  loaded[room] = false
 }
 
 async function join(room: Room) {
@@ -115,7 +120,9 @@ export async function loadRecent(room: Room) {
   if (!supabase || !key || !useChat.getState().uid) return
   const { data, error } = await supabase.rpc('chat_recent', { p_room: key })
   if (error || !Array.isArray(data)) return
+  if (roomKey(room) !== key) return
   add(room, (data as Row[]).map(toMsg).filter((m): m is ChatMsg => !!m))
+  loaded[room] = true
 }
 
 // Look up the player's crew and (re)join the crew room. Call after joining or leaving a crew.
