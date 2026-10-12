@@ -6,3 +6,16 @@
 .cf-no { background: #fff; color: var(--line); border: 2.5px solid var(--line); box-shadow: 0 3px 0 rgba(0,0,0,.2); }
 .cf-yes { background: linear-gradient(#ef5350, #c62828); color: #fff; border: 2.5px solid #fff; box-shadow: 0 3px 0 rgba(0,0,0,.25); }
 .cf-actions button:focus-visible { outline: 3px solid #4fc3f7; outline-offset: 2px; }
+
+/* Custom kart race setup (CustomKart.tsx). */
+.ck-modal .fw-head { background: linear-gradient(#64b5f6, #1e88e5); }
+.ck-tracks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 14px 0; }
+.ck-tracks button, .ck-rules button { display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 64px; padding: 6px; background: #fff; border: 2.5px solid #cfd8dc; border-radius: 12px; font: 14px var(--display); color: var(--line); cursor: pointer; }
+.ck-tracks button span, .ck-rules button span { font-size: 24px; line-height: 1; }
+.ck-tracks button.sel { border-color: #1e88e5; background: #e3f2fd; box-shadow: 0 3px 0 #1565c0; }
+.ck-dir { margin: 10px 14px 0; }
+.ck-rules { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 14px 0; }
+.ck-rules button { position: relative; }
+.ck-rules button.on { border-color: #43a047; background: #e8f5e9; box-shadow: 0 3px 0 #2e7d32; }
+.ck-rules button i { position: absolute; top: 4px; right: 6px; font-style: normal; color: #2e7d32; font-weight: 900; }
+.ck-go { background: linear-gradient(#66bb6a, #2e7d32); }

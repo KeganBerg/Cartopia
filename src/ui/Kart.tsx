@@ -12,6 +12,7 @@ import { look as lookOf, pi } from './ArcadeBits'
 import { sfx, audioContext, audioOut } from '../lib/sound'
 import { airSound, buzzSound, bumpSound, crashSound, dingSound, fuelSound, landSound, revSound, splashSound } from '../lib/arcadeSound'
 import { EngineVoice } from '../lib/engineAudio'
+import { SnapshotButton } from './Snapshot'
 import './kart.css'
 
 // The kart race screen: the 3D circuit, the HUD (place, lap, item, minimap), the
@@ -311,6 +312,7 @@ function Podium({ race, field, me, end, prize, next, verdict, onExit }: { race: 
   return (
     <div className={won ? 'rr win kt-end' : 'rr lose kt-end'}>
       <div className="kt-podium-card">
+        {won && <SnapshotButton caption="🏆 1st place" />}
         <h2>{won ? '🏆 You win!' : `${ORD(end.place)} place`}</h2>
         <div className="kt-podium">
           {[1, 0, 2].map((p) => {
