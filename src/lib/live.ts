@@ -8,6 +8,9 @@ import { joinRefereed } from './referee'
 import { SERVER_CAR_COLUMNS, serverCar } from './serverCar'
 import { raceCarOf } from '../game/raceCar'
 import { loadUsernames, playerName } from './profiles'
+import { acceptWager, offerWager, startWagers, syncWagers } from './wagers'
+import { STAKES, shortCoins } from '../game/wager'
+import { signedInUser } from './cloud'
 
 // Live drag racing over Supabase Realtime. A shared lobby channel carries
 // presence and challenges; each race gets its own channel for positions.
@@ -19,15 +22,16 @@ import { loadUsernames, playerName } from './profiles'
 export type LivePlayer = { id: string; uid?: string | null; town: string; level: number; carName: string; color: string; body: Body; pi: number; mods?: string[]; car?: string | null; closed?: boolean }
 // drag: the classic head-to-head strip. kart: a kart circuit race, the two of you plus AI.
 export type LiveMode = 'drag' | 'kart'
-export type Invite = { raceId: string; from: LivePlayer; at: number; mode: LiveMode }
-export type LiveRace = { raceId: string; opponent: LivePlayer; host: boolean; mode: LiveMode }
+// stake: coins each racer puts up in a wager race; the winner takes both.
+export type Invite = { raceId: string; from: LivePlayer; at: number; mode: LiveMode; stake?: number }
+export type LiveRace = { raceId: string; opponent: LivePlayer; host: boolean; mode: LiveMode; stake?: number }
 
 type LiveState = {
   me: string
   players: LivePlayer[]
   // Challenges waiting in the inbox, at most one per sender.
   invites: Invite[]
-  outgoing: { raceId: string; to: string; mode: LiveMode } | null
+  outgoing: { raceId: string; to: string; mode: LiveMode; stake?: number } | null
   race: LiveRace | null
   muted: Record<string, string>
   closed: boolean
@@ -170,8 +174,20 @@ export function joinLobby() {
     leaveLobby()
     // Outside the callback: supabase-js shouldn't be called back into from inside it.
     if (uid) setTimeout(() => void openLobby(uid), 0)
+    if (uid) void wagersOnceSynced(uid)
   })
 }
+
+// Wager payouts owed from earlier races land once sign-in sync has settled on this account.
+async function wagersOnceSynced(uid: string) {
+  for (let i = 0; i < 30 && authUid === uid; i++) {
+    if (signedInUser() === uid) return startWagers()
+    await new Promise((r) => setTimeout(r, 1000))
+  }
+}
+
+// A stake from another browser counts only if it's one of the game's stakes.
+const cleanStake = (v: unknown) => (typeof v === 'number' && STAKES.some(([s]) => s === v) ? v : undefined)
 
 async function openLobby(uid: string) {
   if (!supabase) return
@@ -199,9 +215,10 @@ async function openLobby(uid: string) {
       if ((l.cooldownFrom[from.id] ?? 0) > Date.now()) return
       // One pending challenge per sender: a repeat just replaces the old one.
       const fresh = !l.invites.some((i) => i.from.id === from.id)
-      const mode: LiveMode = payload.mode === 'kart' ? 'kart' : 'drag'
-      useLive.setState({ invites: [...l.invites.filter((i) => i.from.id !== from.id), { raceId: payload.raceId, from, at: Date.now(), mode }] })
-      if (fresh) useGame.getState().toast(`${playerName(from.uid, from.town)} challenged you to a ${mode === 'kart' ? 'kart race' : 'race'}! Tap 🏁 to answer.`)
+      const stake = cleanStake(payload.stake)
+      const mode: LiveMode = payload.mode === 'kart' && !stake ? 'kart' : 'drag'
+      useLive.setState({ invites: [...l.invites.filter((i) => i.from.id !== from.id), { raceId: payload.raceId, from, at: Date.now(), mode, stake }] })
+      if (fresh) useGame.getState().toast(`${playerName(from.uid, from.town)} ${stake ? `bet 🪙${shortCoins(stake)} on a race` : `challenged you to a ${mode === 'kart' ? 'kart race' : 'race'}`}! Tap 🏁`)
     })
     .on('broadcast', { event: 'cancel' }, ({ payload }) => {
       const l = useLive.getState()
@@ -235,7 +252,9 @@ async function openLobby(uid: string) {
         useLive.setState((l) => ({ cooldownTo: { ...l.cooldownTo, [out.to]: Date.now() + COOLDOWN_MS } }))
         return useGame.getState().toast('Challenge declined')
       }
-      useLive.setState({ race: { raceId: out.raceId, opponent: from, host: true, mode: out.mode } })
+      useLive.setState({ race: { raceId: out.raceId, opponent: from, host: true, mode: out.mode, stake: out.stake } })
+      // Accepting held our stake on the server too.
+      if (out.stake) void syncWagers()
     })
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') ch.track(myCard())
@@ -252,11 +271,13 @@ export function refreshPresence() {
   lobby?.track(myCard())
 }
 
-export async function challenge(to: string, mode: LiveMode = 'drag') {
+// stake: coins to bet on a drag race (wager match), held by the server once they accept.
+export async function challenge(to: string, mode: LiveMode = 'drag', stake?: number) {
   const l = useLive.getState()
   if (l.outgoing || (l.cooldownTo[to] ?? 0) > Date.now()) return
   const raceId = crypto.randomUUID()
-  useLive.setState({ outgoing: { raceId, to, mode } })
+  if (stake) mode = 'drag'
+  useLive.setState({ outgoing: { raceId, to, mode, stake } })
   // Claim the race on the server before its id goes out to the lobby, so nobody
   // else in the lobby can take the id first and block the race.
   const ok = await joinRefereed(raceId, l.players.find((p) => p.id === to)?.uid)
@@ -266,8 +287,14 @@ export async function challenge(to: string, mode: LiveMode = 'drag') {
     useGame.getState().toast("Couldn't send the challenge. Try again in a moment.")
     return
   }
+  if (stake && !(await offerWager(raceId, stake))) {
+    if (useLive.getState().outgoing?.raceId === raceId) useLive.setState({ outgoing: null })
+    useGame.getState().toast("Couldn't place that bet")
+    return
+  }
+  if (useLive.getState().outgoing?.raceId !== raceId) return
   sentIds.add(raceId)
-  lobby?.send({ type: 'broadcast', event: 'challenge', payload: { to, raceId, from: myCard(), mode } })
+  lobby?.send({ type: 'broadcast', event: 'challenge', payload: { to, raceId, from: myCard(), mode, ...(stake ? { stake } : {}) } })
   // Give up if nobody answers.
   setTimeout(() => {
     if (useLive.getState().outgoing?.raceId === raceId) {
@@ -286,15 +313,23 @@ export function cancelChallenge() {
   useGame.getState().toast('Challenge cancelled')
 }
 
-export function answer(raceId: string, accept: boolean) {
+// A wager challenge holds both stakes on the server first; if that fails it's declined.
+export async function answer(raceId: string, accept: boolean) {
+  const inv0 = useLive.getState().invites.find((i) => i.raceId === raceId)
+  if (!inv0) return
+  if (accept && inv0.stake && !(await acceptWager(raceId, inv0.stake))) {
+    useGame.getState().toast('That bet is off')
+    accept = false
+  }
   const l = useLive.getState()
-  const inv = l.invites.find((i) => i.raceId === raceId)
+  // Stakes already held still race, even if the invite timed out meanwhile.
+  const inv = l.invites.find((i) => i.raceId === raceId) ?? (accept && inv0.stake ? inv0 : undefined)
   if (!inv) return
   lobby?.send({ type: 'broadcast', event: 'answer', payload: { raceId, accept, from: myCard() } })
   useLive.setState({
     invites: l.invites.filter((i) => i.raceId !== raceId),
     cooldownFrom: accept ? l.cooldownFrom : { ...l.cooldownFrom, [inv.from.id]: Date.now() + COOLDOWN_MS },
-    race: accept ? { raceId, opponent: inv.from, host: false, mode: inv.mode } : l.race,
+    race: accept ? { raceId, opponent: inv.from, host: false, mode: inv.mode, stake: inv.stake } : l.race,
   })
 }
 

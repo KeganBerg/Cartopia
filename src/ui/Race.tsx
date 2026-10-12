@@ -40,6 +40,8 @@ import { msToNextWeek, skinDef, SKIN_TIERS, carStats } from '../game/data'
 import { DIST, character, characterMul, tourDist, type RaceDist } from '../game/distance'
 import { playerName } from '../lib/profiles'
 import { LoadingScene } from './Loading'
+import { settleWager, startWagers, wagersOn } from '../lib/wagers'
+import { shortCoins, stakesFor } from '../game/wager'
 
 // skill: the rival car's race skill. AI rivals use it; live players use theirs on their own device.
 // shift: how cleanly an AI rival shifts, 0 (sloppy) to 1 (always perfect, the default).
@@ -196,6 +198,9 @@ export function RacePanel() {
   const outgoing = useLive((l) => l.outgoing)
   const mutedIds = useLive((l) => l.muted)
   const cooldownTo = useLive((l) => l.cooldownTo)
+  const coins = useGame((s) => s.coins)
+  // The live player whose stake chips are open (wager match).
+  const [betFor, setBetFor] = useState<string | null>(null)
 
   // Closing the race menu ends a street race too.
   useEffect(() => () => setRacing(false), [])
@@ -203,6 +208,7 @@ export function RacePanel() {
   useEffect(() => {
     fetchOnlineRivals().then(setOnline)
     refreshPresence()
+    void startWagers()
   }, [])
 
   // An accepted live challenge takes over the screen, so don't start a race that it would cut short.
@@ -502,14 +508,34 @@ export function RacePanel() {
             )}
             {supabase && livePlayers.filter((p) => !mutedIds[p.id]).map((p) => {
               const wait = (cooldownTo[p.id] ?? 0) > Date.now()
+              const stakes = wagersOn() ? stakesFor(level, p.level, coins) : []
+              if (betFor === p.id) return (
+                <div key={p.id} className="rm-qc rm-qc-live rm-qc-bet" style={{ ['--qc' as string]: p.color }}>
+                  <span className="rm-qc-top"><CarThumb size="sm" color={p.color} body={p.body} mods={p.mods} /><span className="tag bet">🪙 BET</span></span>
+                  <span className="rm-qc-body">
+                    <b><PlayerName id={p.uid} town={p.town} /></b>
+                    <span className="rm-bet-chips">
+                      {stakes.map((st) => (
+                        <button key={st} className="rm-bet-chip" title={`Bet ${st.toLocaleString()} coins. Winner takes ${(st * 2).toLocaleString()}.`} onClick={() => { setBetFor(null); void challenge(p.id, 'drag', st) }}>🪙{shortCoins(st)}</button>
+                      ))}
+                      <button className="rm-bet-chip x" onClick={() => setBetFor(null)} aria-label="Close">✕</button>
+                    </span>
+                  </span>
+                </div>
+              )
               return (
                 <div key={p.id} className="rm-qc rm-qc-live" style={{ ['--qc' as string]: p.color }}>
-                  <span className="rm-qc-top"><CarThumb size="sm" color={p.color} body={p.body} mods={p.mods} /><span className="tag live">LIVE</span></span>
+                  <span className="rm-qc-top">
+                    <CarThumb size="sm" color={p.color} body={p.body} mods={p.mods} /><span className="tag live">LIVE</span>
+                    {!p.closed && !wait && !outgoing && stakes.length > 0 && (
+                      <button className="rm-bet-btn" onClick={() => setBetFor(p.id)} title="Wager match: bet coins, winner takes both" aria-label="Wager match">🪙</button>
+                    )}
+                  </span>
                   <span className="rm-qc-body">
                     <b><PlayerName id={p.uid} town={p.town} /></b>
                     <span className="rm-qc-chips"><span>Lv {p.level}</span><span className="rm-pi">PI {p.pi}</span></span>
                     {outgoing?.to === p.id ? (
-                      <button className="buy small alt" onClick={cancelChallenge} title="Waiting for an answer. Tap to call it off.">⏳ Cancel</button>
+                      <button className="buy small alt" onClick={cancelChallenge} title="Waiting for an answer. Tap to call it off.">⏳ {outgoing.stake ? `🪙${shortCoins(outgoing.stake)}` : 'Cancel'}</button>
                     ) : (
                       <span className="rm-qc-pair">
                         <button className="buy small alt" disabled={!!outgoing || p.closed || wait} onClick={() => void challenge(p.id)} title="Drag race">
@@ -518,6 +544,7 @@ export function RacePanel() {
                         {!p.closed && !wait && (
                           <button className="buy small alt" disabled={!!outgoing} onClick={() => void challenge(p.id, 'kart')} title="Kart race" aria-label="Kart race">🏎️</button>
                         )}
+
                       </span>
                     )}
                   </span>
@@ -1055,6 +1082,8 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   const [label, setLabel] = useState('')
   const labelTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const [result, setResult] = useState<null | { won: boolean; myTime: number; theirTime: number; note?: string; counted?: boolean; stars?: number }>(null)
+  // Wager match: the server pays the winner both stakes, or refunds both if the race doesn't count.
+  const stake = live?.stake ?? 0
   // The result card waits a moment so both cars can be seen rolling through the finish,
   // and for a slow-motion finish to play out (never more than a few seconds).
   const [cardUp, setCardUp] = useState(false)
@@ -1205,6 +1234,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
     let myFinishSentAt: number | null = null
     const signal = { cancelled: false }
     const applyVerdict = (v: Verdict | null, myTime: number) => {
+      if (live?.stake) void settleWager(live.raceId)
       if (!v || v.void) {
         sfx.lose()
         setResult({
@@ -1440,6 +1470,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       {countdown === 0 && t.current < 0.5 && !label && !result && <div className="countdown big go">GO!</div>}
       {onLine && countdown > 0 && countdown !== 99 && !result && <div className="rf-hold">{pedal.current ? (light === ' now' ? 'Hold it there!' : light === ' late' ? 'Too many revs!' : 'Revving...') : 'Hold the pedal: revs in the green'}</div>}
       {me.current.burning && !result && <div className="rf-boost-fx" />}
+      {stake > 0 && !result && <div className="rf-pot" title="Winner takes both stakes">🪙 {shortCoins(stake * 2)}</div>}
       {countdown === 99 && (
         <div className="rf-wait">
           {slow ? `No answer from ${rival.town} yet. Cancel the race?` : `Waiting for ${rival.town} to join...`}
@@ -1455,7 +1486,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       {theirSkill && theirShown && !result && <div className="skill-flash theirs">{rival.town}: {SKILLS[theirSkill].icon} {SKILLS[theirSkill].name}!</div>}
       {theirBoost && !theirShown && !result && <div className="skill-flash theirs">{rival.town}: 🔥 Boost!</div>}
       {result && !cardUp ? null : result && resultView ? resultView(result) : result ? (
-        <RaceResult won={result.won} myTime={result.myTime} theirTime={result.theirTime} cash={result.counted === false ? 0 : result.won ? payout : Math.round(payout * 0.1)} xp={result.counted === false ? 0 : result.won ? 30 : 8} rival={rival.town} note={result.note} noContest={result.counted === false} stars={result.stars} stats={stats.current} next={next ?? undefined} onExit={onExit} />
+        <RaceResult won={result.won} myTime={result.myTime} theirTime={result.theirTime} cash={result.counted === false ? 0 : result.won ? payout : Math.round(payout * 0.1)} xp={result.counted === false ? 0 : result.won ? 30 : 8} rival={rival.town} note={result.note} noContest={result.counted === false} stars={result.stars} stats={stats.current} next={next ?? undefined} onExit={onExit} bet={stake ? (result.counted === false ? 0 : result.won ? stake : -stake) : undefined} />
       ) : (
         <div className="rf-bottom">
           <svg viewBox="0 0 120 120" className={`tach${light}`}>
@@ -1519,7 +1550,8 @@ function useCountUp(target: number, delay: number, ms = 900) {
 
 const CONFETTI = ['#ffd54f', '#ef5350', '#42a5f5', '#66bb6a', '#ab47bc', '#ff7043', '#ffffff']
 
-function RaceResult({ won, myTime, theirTime, cash, xp, rival, note, noContest, stars, stats, next, onExit }: { won: boolean; myTime: number; theirTime: number; cash: number; xp: number; rival: string; note?: string; noContest?: boolean; stars?: number; stats?: RunStats; next?: NextRace; onExit: () => void }) {
+// bet: a wager match's coin change (+stake won, -stake lost, 0 refunded).
+export function RaceResult({ won, myTime, theirTime, cash, xp, rival, note, noContest, stars, stats, next, onExit, bet }: { won: boolean; myTime: number; theirTime: number; cash: number; xp: number; rival: string; note?: string; noContest?: boolean; stars?: number; stats?: RunStats; next?: NextRace; onExit: () => void; bet?: number }) {
   const money = useCountUp(cash, 700)
   const exp = useCountUp(xp, 900)
   const margin = Number.isFinite(theirTime) ? Math.abs(theirTime - myTime) : null
@@ -1560,6 +1592,7 @@ function RaceResult({ won, myTime, theirTime, cash, xp, rival, note, noContest, 
           </div>
         )}
         <div className="rr-loot">
+          {bet !== undefined && <span className={`rr-bet ${bet > 0 ? 'up' : bet < 0 ? 'down' : ''}`} style={{ animationDelay: '.4s' }}>🪙 {bet > 0 ? '+' : bet < 0 ? '−' : '±'}{Math.abs(bet).toLocaleString()}</span>}
           <span style={{ animationDelay: '.6s' }}>💵 +${money.toLocaleString()}</span>
           {won && <span style={{ animationDelay: '.8s' }}>🏆 +1</span>}
           <span style={{ animationDelay: won ? '1s' : '.8s' }}>⭐ +{exp} XP</span>
@@ -1625,8 +1658,9 @@ export function InvitesPanel() {
   const cars = useGame((s) => s.cars)
   const car = raceCarOf(cars, useGame((s) => s.raceCar))
   const setRaceCar = useGame((s) => s.setRaceCar)
+  const coins = useGame((s) => s.coins)
   const accept = (raceId: string) => {
-    answer(raceId, true)
+    void answer(raceId, true)
     openPanel(null)
   }
   return (
@@ -1642,11 +1676,12 @@ export function InvitesPanel() {
                 <i style={{ background: i.from.color }} />
                 <div>
                   <b><PlayerName id={i.from.uid} town={i.from.town} /></b> <span className="tag live">{i.mode === 'kart' ? '🏎️ KART' : 'LIVE'}</span>
+                  {i.stake && <span className="tag bet" title={`Winner takes ${(i.stake * 2).toLocaleString()} coins`}>🪙 {shortCoins(i.stake)}</span>}
                   <div className="card-stat">Lvl {i.from.level} · {i.from.carName} · PI {i.from.pi} · {Math.max(0, Math.ceil((INVITE_MS - (Date.now() - i.at)) / 1000))}s left</div>
                 </div>
                 <div className="invite-actions">
-                  <button className="buy small" onClick={() => accept(i.raceId)}>Race!</button>
-                  <button className="sell" onClick={() => answer(i.raceId, false)}>Decline</button>
+                  <button className="buy small" disabled={!!i.stake && coins < i.stake} onClick={() => accept(i.raceId)}>{i.stake ? (coins < i.stake ? `🔒 🪙${shortCoins(i.stake)}` : `Bet 🪙${shortCoins(i.stake)}`) : 'Race!'}</button>
+                  <button className="sell" onClick={() => void answer(i.raceId, false)}>Decline</button>
                   <button className="mute-btn" onClick={() => mute(i.from)} title="Ignore all challenges from this player">🔇 Mute</button>
                 </div>
               </div>
