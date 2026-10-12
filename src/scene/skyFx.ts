@@ -35,12 +35,11 @@ export function lowSun(phase: number) {
 export function skyFx(w: Weather, phase: number, season: Season = SEASON, out: SkyFx = { banks: 0, low: 0, rays: 0, moon: 0, rainbow: 0, glint: 0, heat: 0, halo: 0, shade: 0 }): SkyFx {
   const night = nightAmount(phase)
   const day = 1 - night
-  const k = w.kind
-  const s = w.strength
-  const fog = k === 'fog' ? s : 0
-  const mist = k === 'mist' ? s : 0
-  const clearing = k === 'clearing' ? s : 0
-  const drizzle = k === 'drizzle' ? s : 0
+  // How much of each kind is in the sky, so every effect fades as the weather changes.
+  const fog = w.mix.fog
+  const mist = w.mix.mist
+  const clearing = w.mix.clearing
+  const drizzle = w.mix.drizzle
   const rainy = clamp(w.rain * 3)
   // Warm wet streets steam a little as the sun dries them.
   const steam = season === 'winter' ? 0 : clearing * smooth(0.1, 0.5, w.wet) * day
@@ -55,10 +54,10 @@ export function skyFx(w: Weather, phase: number, season: Season = SEASON, out: S
   out.moon = 0
   out.rainbow = season === 'winter' ? 0 : clearing * smooth(0.12, 0.4, w.wet) * smooth(0.5, 0.8, day)
   out.glint = sunny * smooth(0.05, 0.4, w.wet) * (1 - 0.6 * fog)
-  out.heat = k === 'heat' ? s * day : 0
+  out.heat = w.mix.heat * day
   const lamps = Math.max(night, gloomOf(w) * 0.8)
   // Broken cloud on a sunny day; none under overcast, in fog, or after dark.
-  out.shade = 0.4 * day * (1 - smooth(0.25, 0.6, w.cloud)) * (1 - out.banks) * (k === 'heat' ? 0.4 : 1)
+  out.shade = 0.4 * day * (1 - smooth(0.25, 0.6, w.cloud)) * (1 - out.banks) * (1 - 0.6 * w.mix.heat)
   out.halo = lamps * (0.35 + 0.65 * clamp(Math.max(fog, 0.8 * mist, w.haze, 0.6 * rainy)))
   return out
 }

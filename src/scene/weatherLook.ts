@@ -56,8 +56,8 @@ export function weatherLook(look: Look, w: Weather) {
     look.grade.shadows.add(tmp.setRGB(0.02, 0.008, -0.02).multiplyScalar(w.dust))
   }
   // A scorcher: hot white light, warm highlights and a touch of shimmer haze.
-  if (w.kind === 'heat' && w.strength > 0) {
-    const h = w.strength
+  if (w.mix.heat > 0) {
+    const h = w.mix.heat
     look.sun.lerp(heatSun, 0.35 * h)
     look.sunIntensity *= 1 + 0.08 * h
     look.grade.exposure *= 1 + 0.05 * h
