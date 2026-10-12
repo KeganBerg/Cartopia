@@ -163,3 +163,17 @@ export function Facade({ at, ry = 0, len, children }: { at: [number, number, num
   )
 }
 
+
+const ONE: [number, number, number] = [1, 1, 1]
+
+// A whole model built for a merged block in true units (the travel stop, the
+// wash center): it draws at true size inside the scaled-up block, and true
+// size all the way down, so the cars and signs inside don't shrink again.
+// Lay it out from the block's size (useMergeScale() before wrapping).
+export function TrueSize({ children }: { children: ReactNode }) {
+  return (
+    <Upright size={1}>
+      <MergeScale.Provider value={ONE}>{children}</MergeScale.Provider>
+    </Upright>
+  )
+}

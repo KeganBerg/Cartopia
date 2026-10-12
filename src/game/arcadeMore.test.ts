@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  BLOCK, FUEL_BAND, GRID, STREET, TOWN, blockCentre, dashStars, flips, fuelOk, insideBlock, jumpLength, jumpScore, kerbSpot,
-  landed, pitOrder, pitStars, starReward, stuntStars, washStars,
+  BLOCK, GRID, STREET, TOWN, blockCentre, brakeDistance, dashStars, flips, gunTimes, insideBlock, jumpLength, jumpScore, kerbSpot,
+  landed, pitStars, stopGrade, stopPenalty, starReward, stuntStars, washStars,
 } from './arcadeMore'
 import { chaseReward } from './arcade'
 
@@ -16,14 +16,20 @@ describe('arcade second wave', () => {
     }
   })
 
-  it('pit stop: every wheel once, fuel in the band, faster is better', () => {
+  it('pit stop: stopping on the marks is free, sloppy stops cost, faster is better', () => {
     let seed = 3
-    const order = pitOrder(() => ((seed = (seed * 16807) % 2147483647) / 2147483647))
-    expect([...order].sort()).toEqual([0, 1, 2, 3])
-    expect(fuelOk((FUEL_BAND[0] + FUEL_BAND[1]) / 2)).toBe(true)
-    expect(fuelOk(FUEL_BAND[0] - 0.01)).toBe(false)
-    expect(fuelOk(1)).toBe(false)
-    expect([pitStars(5), pitStars(9), pitStars(30)]).toEqual([3, 2, 1])
+    const times = gunTimes(() => ((seed = (seed * 16807) % 2147483647) / 2147483647))
+    expect(times).toHaveLength(4)
+    for (const t of times.flat()) {
+      expect(t).toBeGreaterThanOrEqual(0.5)
+      expect(t).toBeLessThanOrEqual(0.95)
+    }
+    expect(brakeDistance(8)).toBeCloseTo(64 / 24)
+    expect([stopGrade(0.1), stopGrade(-0.4), stopGrade(-1), stopGrade(1.2)]).toEqual(['perfect', 'good', 'short', 'long'])
+    expect(stopPenalty(0.4)).toBe(0)
+    expect(stopPenalty(2)).toBeGreaterThan(stopPenalty(1))
+    expect(stopPenalty(50)).toBe(2.5)
+    expect([pitStars(5), pitStars(7), pitStars(30)]).toEqual([3, 2, 1])
   })
 
   it('car wash: all spots with time to spare for three stars', () => {

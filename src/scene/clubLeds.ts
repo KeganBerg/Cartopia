@@ -1,6 +1,7 @@
 import { Color, MeshStandardMaterial } from 'three'
 import { clubPulse, CUES, type ClubPulse, type CueKind } from '../lib/clubBeat'
 import { isNight } from '../game/clock'
+import { calmFlashing } from '../game/flashing'
 import { nightAmount, dayPhase } from './dayNight'
 import { ledGridTex, ledPaneTex, windowTex } from './textures'
 
@@ -38,7 +39,10 @@ export const LOOKS: Look[] = [
 const KICK: Look = { w: { kick: 1.6 }, f: { kick: 1.4 } }
 
 const lookOf = (p: ClubPulse) => LOOKS[p.groove] ?? KICK
+// Reduce flashing: a steady glow, no flashes (flashing.ts).
+const CALM_GLOW = 0.3
 function flashOf(p: ClubPulse, mix: Partial<Record<CueKind, number>>) {
+  if (calmFlashing()) return CALM_GLOW
   let v = 0
   for (const k of CUES) v += (mix[k] ?? 0) * p.env[k]
   // Rave Mode's drop flashes everything.
@@ -51,7 +55,9 @@ function flashOf(p: ClubPulse, mix: Partial<Record<CueKind, number>>) {
 // shows the exact same colour on the same beat. Tag such a material
 // `userData.clubLed` so clubLeds.test.tsx checks it stays in step.
 export function clubLedColor(out = new Color(), now = shownNow()) {
-  return out.set(RAINBOW[clubPulse(now).step % RAINBOW.length])
+  const step = clubPulse(now).step
+  // Reduce flashing moves the colour on every fourth kick (once a bar), not every kick.
+  return out.set(RAINBOW[(calmFlashing() ? Math.floor(step / 4) : step) % RAINBOW.length])
 }
 export function clubLedGlow(now = shownNow()) {
   const lit = isNight() ? nightAmount(dayPhase()) : 0

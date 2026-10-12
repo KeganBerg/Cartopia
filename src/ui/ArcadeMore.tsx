@@ -4,10 +4,10 @@ import { NeutralToneMapping } from 'three'
 import { useGame, type OwnedCar } from '../game/store'
 import { ARCADE_FUEL } from '../game/arcade'
 import {
-  DASH_TIME, FUEL_BAND, PIT_WHEELS, STUNT_JUMPS, WASH_SPOTS, WASH_TIME,
+  DASH_TIME, STUNT_JUMPS, WASH_SPOTS, WASH_TIME,
   dashStars, pitStars, recordStars, starReward, stuntStars, washStars, type StarGameId,
 } from '../game/arcadeMore'
-import { PitScene, type PitHud, type PitInput } from '../scene/PitScene'
+import { PitScene, type PitEnd, type PitHud, type PitInput } from '../scene/PitScene'
 import { WashScene, type WashHud, type WashInput } from '../scene/WashScene'
 import { DeliveryScene, type DashHud } from '../scene/DeliveryScene'
 import { StuntScene, type StuntHud, type StuntInput } from '../scene/StuntScene'
@@ -20,7 +20,7 @@ import { LoadingScene } from './Loading'
 // fuel, the countdown, star pay and the result card.
 
 export const STAR_GAMES: { id: StarGameId; name: string; art: string; tip: string }[] = [
-  { id: 'pit', name: 'Pit Stop', art: '🔧🏎️', tip: 'Tap wheels, fill up' },
+  { id: 'pit', name: 'Pit Stop', art: '🔧🏎️', tip: 'Brake, swap, go' },
   { id: 'wash', name: 'Car Wash', art: '🧽🫧', tip: 'Scrub off the mud' },
   { id: 'delivery', name: 'Delivery Dash', art: '🍕🚗', tip: 'Beat the clock' },
   { id: 'stunt', name: 'Stunt Ramp', art: '🔥🚙', tip: 'Jump and flip' },
@@ -91,37 +91,54 @@ function holdTo(set: (on: boolean) => void) {
   }
 }
 
+// One line for the result card: the time, how the stop went, and the getaway.
+const pitLine = (e: PitEnd) =>
+  `⏱ ${e.time.toFixed(1)}s · ${e.grade === 'perfect' ? '🎯' : e.grade === 'good' ? '👍' : '😬'} ${e.grade === 'perfect' ? 'Perfect stop' : e.grade === 'good' ? 'Good stop' : 'Pushed'} · ⚡ ${e.react.toFixed(2)}s${e.slips ? ` · ${e.slips} slip${e.slips > 1 ? 's' : ''}` : ''}`
+
 function PitGame({ car, running, onDone }: GameProps) {
-  const input = useRef<PitInput>({ fuel: false }).current
-  const [hud, setHud] = useState<PitHud>({ phase: 'wheels', wheels: 0, fuel: 0, time: 0 })
+  const input = useRef<PitInput>({ pedal: false, presses: 0, taps: [], pads: [] }).current
+  const [hud, setHud] = useState<PitHud>({ phase: 'in', left: 4, time: 0, pop: null })
+  const [pop, setPop] = useState<PitHud['pop']>(null)
+  const onHud = (h: PitHud) => {
+    setHud(h)
+    if (h.pop) setPop(h.pop)
+  }
   useEffect(() => {
-    const kd = (e: KeyboardEvent) => { if (e.key === ' ') { input.fuel = true; e.preventDefault() } }
-    const ku = (e: KeyboardEvent) => { if (e.key === ' ') input.fuel = false }
+    const kd = (e: KeyboardEvent) => {
+      if (e.key !== ' ') return
+      e.preventDefault()
+      if (!e.repeat) input.presses++
+      input.pedal = true
+    }
+    const ku = (e: KeyboardEvent) => { if (e.key === ' ') input.pedal = false }
     window.addEventListener('keydown', kd)
     window.addEventListener('keyup', ku)
     return () => { window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku) }
   }, [input])
+  const pedal = running && (hud.phase === 'in' || hud.phase === 'hold' || hud.phase === 'green')
   return (
     <>
       <Canvas className="rf-canvas" camera={{ fov: 45, near: 0.3, far: 140, position: [0, 8, 7] }} dpr={[1, 1.5]} gl={gl}>
-        <PitScene me={look(car)} input={input} running={running}
-          onHud={setHud} onEnd={(e) => onDone(pitStars(e.time), Math.round(e.time * 10) / 10, `⏱ ${e.time.toFixed(1)}s · ❌ ${e.misses}`)} />
+        <PitScene me={look(car)} input={input} running={running} onHud={onHud} onEnd={(e) => onDone(pitStars(e.time), Math.round(e.time * 10) / 10, pitLine(e))} />
       </Canvas>
+      {/* Brake and go: hold or tap anywhere, with the big button as the picture of it. */}
+      {pedal && <div className="pit-pedal" {...holdTo((on) => { if (on) input.presses++; input.pedal = on })} />}
+      {[0, 1, 2, 3].map((i) => (
+        <button key={i} ref={(el) => { input.pads[i] = el }} className="pit-pad off" aria-label={`Wheel ${i + 1}`}
+          onPointerDown={(e) => { e.preventDefault(); input.taps.push(i) }} onContextMenu={(e) => e.preventDefault()}><b /></button>
+      ))}
       <div className="arc-hud">
         <span className="arc-time">⏱ {hud.time.toFixed(1)}s</span>
-        <span>🛞 {hud.wheels}/{PIT_WHEELS}</span>
+        {hud.phase === 'wheels' && <span>🛞 {hud.left}</span>}
       </div>
-      {running && hud.phase === 'wheels' && <div className="arc-tip">Tap the glowing wheel 👆</div>}
-      {hud.phase === 'fuel' && (
-        <div className="arc-fuelrig">
-          <div className="arc-gauge">
-            <i className="band" style={{ bottom: `${FUEL_BAND[0] * 100}%`, height: `${(FUEL_BAND[1] - FUEL_BAND[0]) * 100}%` }} />
-            <i className="fill" style={{ height: `${Math.min(1, hud.fuel) * 100}%` }} />
-          </div>
-          <button className="arc-btn gas big" {...holdTo((on) => { input.fuel = on })}>⛽<small>Hold</small></button>
-          <div className="arc-tip">Let go in the green</div>
+      {pop && <div key={pop.id} className={`pit-pop ${pop.kind}`}>{pop.text}</div>}
+      {pedal && (
+        <div className={`pit-big ${hud.phase}`}>
+          {hud.phase === 'in' ? <>🛑<small>Hold to brake</small></> : hud.phase === 'hold' ? <>✋<small>Wait</small></> : <>GO!<small>Tap</small></>}
         </div>
       )}
+      {running && hud.phase === 'in' && <div className="arc-tip pit-tip">Stop on the white line</div>}
+      {running && hud.phase === 'wheels' && <div className="arc-tip pit-tip">Tap each ring when it's green</div>}
     </>
   )
 }
