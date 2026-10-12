@@ -1,4 +1,4 @@
--- Casual economy (2026-10-12, Cartopia Build Order tiers 0 to 3). Six changes, run together
+-- Casual economy (2026-10-12, Cartopia Build Order tiers 0 to 3). Seven changes, run together
 -- before the game update that needs them:
 --   1. econ_catalog() rebuilt from econCatalog(): gem cars 40 / 70 / 100 (were 45 / 90 / 140) and the
 --      five dearest coin cars about 20% cheaper (Raiden 210k, Hyperion 240k, Tomahawk 340k, Wraith
@@ -6,9 +6,9 @@
 --   2. crate_open() with the crate tables regenerated from crateTables() (new car values, and each
 --      crate's pity) and bad-luck protection: every 8th Gold crate in a row without a skin gives one,
 --      every 10th Diamond crate without a legendary skin gives a legendary one. Otherwise as 0054.
---   3. econ_guard() as 0041, but the daily bonus is a check-in calendar that never resets: a new day
---      always moves dailyStreak up by one, and the bonus paid is day ((dailyStreak - 1) mod 5) + 1.
---      Without this, a game that keeps a player's place after a skipped day gets trimmed to day 1.
+--   3. econ_guard() as 0041, but a new day may move dailyStreak up by at most one and never trims it
+--      back to day 1. The daily log-in bonus is now the prize wheel (0064_wheel_spin), which pays
+--      through crate opens; the old bonus allowance below is left as it was.
 --   4. Car mastery and the Trophy Road (Build Order tier 3): econ_guard() pays each car mastery
 --      step's gems and trophies once per car model and each Trophy Road stop's coins and parts once,
 --      from the catalog's `mastery` and `road` keys, and checks the counts against race wins and
@@ -18,10 +18,12 @@
 --   5. Free crates: crate_opens.source, and crate_open(crate, source) opens a Garage crate free
 --      once per Class Cup race the save has won (source 'cup:<race id>').
 --   6. econ_xp_to_next(): XP per level is flat after level 100 (it kept rising before).
+--   7. wheel_spin() as 0064_wheel_spin, but reading the crate tables from crate_open(text, text),
+--      since change 5 replaces crate_open(text). Without it the wheel would stop spinning.
 -- Race payouts (loss pay by place, the win streak, first-win, welcome-back and weekend boosts in src/game/boosts.ts) aren't
 -- itemised in the catalog: they count against the guard's coin bank like every race prize, and the
 -- x2.5 cap keeps them inside it.
--- Runs after 0062_exotic_cars and 0063_friendly_taunts; the catalog and crate tables below include
+-- Runs after 0064_wheel_spin and 0065_friendly_taunts; the catalog and crate tables below include
 -- the exotic cars. If data.ts changes again, regenerate them (economy.test.ts and
 -- crates.test.ts fail until they match).
 
@@ -763,7 +765,7 @@ begin
     s := s || jsonb_build_object('level', n_lvl, 'xp', n_xp);
     select coalesce(sum(l * 100), 0) into levelup_coins from generate_series(o_lvl + 1, n_lvl) l;
 
-    -- Daily check-in calendar (0064): once per UTC day, one day along whether or not yesterday was
+    -- Daily check-in (0066): once per UTC day, one day along whether or not yesterday was
     -- collected; dailyStreak counts days collected and the calendar loops after day 5.
     od := o ->> 'lastDaily';
     nd := s ->> 'lastDaily';
@@ -1243,3 +1245,147 @@ begin
     where cat -> 'cars' ? (x ->> 'model') order by public.econ_car_pi(x, cat) desc limit 1;
   return new;
 end $$;
+
+-- 7. The prize wheel reads the crate tables from the new crate_open(text, text) (otherwise as 0064).
+create or replace function public.wheel_spin() returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  me uuid := auth.uid();
+  -- wheel:begin
+  w jsonb := $wheel${"slices":[{"id":"coins-s","kind":"coins","weight":31,"mult":0.3},{"id":"part","kind":"part","weight":14},{"id":"coins-m","kind":"coins","weight":22,"mult":0.7},{"id":"gems-1","kind":"gems","weight":12,"gems":1},{"id":"coins-l","kind":"coins","weight":9,"mult":2},{"id":"skin","kind":"skin","weight":4},{"id":"gems-3","kind":"gems","weight":7,"gems":3},{"id":"jackpot","kind":"jackpot","weight":1,"gems":15}],"fallback":"coins-m","dupe":"coins-l"}$wheel$::jsonb;
+  -- wheel:end
+  t jsonb;
+  st jsonb;
+  lvl int;
+  saved int;
+  last_seq int;
+  pend jsonb;
+  day date := (now() at time zone 'utc')::date;
+  price numeric;
+  sl jsonb;
+  total numeric;
+  r numeric;
+  cc text;
+  car jsonb;
+  cdef jsonb;
+  have jsonb;
+  mods jsonb;
+  choices jsonb := '[]';
+  pick jsonb;
+  pool jsonb;
+  owned boolean;
+  o public.crate_opens;
+begin
+  if me is null then
+    raise exception 'sign in to spin' using errcode = 'insufficient_privilege';
+  end if;
+  perform pg_advisory_xact_lock(hashtext('crate:' || me::text));
+  select g.state, g.level into st, lvl from public.game_saves g where g.owner_id = me;
+  if jsonb_typeof(st) is distinct from 'object' then
+    raise exception 'no saved town yet' using errcode = 'P0001';
+  end if;
+  lvl := greatest(coalesce(lvl, 1), 1);
+  select coalesce(max(x.seq), 0) into last_seq from public.crate_opens x where x.owner_id = me;
+  saved := floor(public.econ_num(st, 'crates'))::int;
+  if saved < last_seq then
+    select coalesce(jsonb_agg(econ_private.crate_json(x) order by x.seq), '[]') into pend
+      from public.crate_opens x where x.owner_id = me and x.seq > saved;
+    return jsonb_build_object('pending', pend);
+  end if;
+  if exists (select 1 from public.crate_opens x where x.owner_id = me and x.crate = 'wheel'
+             and (x.created_at at time zone 'utc')::date = day) then
+    raise exception 'spun today' using errcode = 'P0001';
+  end if;
+
+  -- The crate tables, straight from crate_open() (its dollar-quoted crates table).
+  t := substring(pg_get_functiondef('public.crate_open(text, text)'::regprocedure) from '\$crates\$(.*?)\$crates\$')::jsonb;
+  if jsonb_typeof(t -> 'crates' -> 'street') is distinct from 'object' then
+    raise exception 'wheel is off' using errcode = 'P0001'; -- crate_open() lost its crates table
+  end if;
+  price := (t -> 'crates' -> 'street' ->> 'base')::numeric + (t -> 'crates' -> 'street' ->> 'perLevel')::numeric * lvl;
+
+  -- Which slice.
+  select sum((x ->> 'weight')::numeric) into total from jsonb_array_elements(w -> 'slices') x;
+  r := random()::numeric * total;
+  for sl in select x from jsonb_array_elements(w -> 'slices') x loop
+    r := r - (sl ->> 'weight')::numeric;
+    exit when r <= 0;
+  end loop;
+
+  -- A part: for one of the player's cars, a Garage Crate part (Street when none fit) that's
+  -- unlocked and not owned yet. None at all pays the fallback coins.
+  if sl ->> 'kind' = 'part' then
+    cc := 'garage';
+    loop
+      for car in select x from jsonb_array_elements(case when jsonb_typeof(st -> 'cars') = 'array' then st -> 'cars' else '[]' end) x
+                 where jsonb_typeof(x) = 'object' and coalesce(x ->> 'uid', '') <> '' loop
+        cdef := t -> 'cars' -> (car ->> 'model');
+        continue when cdef is null;
+        have := (case when jsonb_typeof(car -> 'ownedMods') = 'array' then car -> 'ownedMods' else '[]' end)
+             || (case when jsonb_typeof(car -> 'mods') = 'array' then car -> 'mods' else '[]' end);
+        select coalesce(jsonb_agg(e.key order by e.key), '[]') into mods from jsonb_each(t -> 'mods') e
+          where e.value ->> 'crate' = cc
+            and (e.value ->> 'unlock')::int <= lvl
+            and case when e.value ? 'only' then (e.value -> 'only') ? (cdef ->> 'body') else not coalesce((e.value -> 'notOn') ? (cdef ->> 'body'), false) end
+            and not have ? e.key;
+        if jsonb_array_length(mods) > 0 then
+          choices := choices || jsonb_build_array(jsonb_build_object('car', car ->> 'uid', 'mods', mods));
+        end if;
+      end loop;
+      exit when jsonb_array_length(choices) > 0 or jsonb_typeof(t -> 'crates' -> cc -> 'below') is distinct from 'string';
+      cc := t -> 'crates' -> cc ->> 'below';
+    end loop;
+    if jsonb_array_length(choices) > 0 then
+      pick := choices -> floor(random()::numeric * jsonb_array_length(choices))::int;
+      insert into public.crate_opens (owner_id, seq, crate, kind, car_uid, mod)
+        values (me, last_seq + 1, 'wheel', 'mod', pick ->> 'car', (pick -> 'mods') ->> floor(random()::numeric * jsonb_array_length(pick -> 'mods'))::int)
+        returning * into o;
+      return jsonb_build_object('slice', sl ->> 'id', 'day', day, 'open', econ_private.crate_json(o));
+    end if;
+    select x into sl from jsonb_array_elements(w -> 'slices') x where x ->> 'id' = w ->> 'fallback';
+  end if;
+
+  -- A skin: a Garage Crate tier skin, rarer tiers less likely. One the player has pays the dupe coins.
+  if sl ->> 'kind' = 'skin' then
+    select coalesce(jsonb_agg(jsonb_build_object('id', e.key, 'part', e.part, 'tier', e.value ->> 'tier', 'level', e.value -> 'level', 'set', e.value -> 'set') order by e.part, e.key), '[]')
+      into pool from (select false as part, x.key, x.value from jsonb_each(t -> 'skins') x
+                      union all select true, y.key, y.value from jsonb_each(t -> 'modSkins') y) e
+      where (t -> 'crates' -> 'garage' -> 'skins') ? (e.value ->> 'tier');
+    if jsonb_array_length(pool) > 0 then
+      select sum((t -> 'skinWeight' ->> (x ->> 'tier'))::numeric) into total from jsonb_array_elements(pool) x;
+      r := random()::numeric * total;
+      for pick in select x from jsonb_array_elements(pool) x loop
+        r := r - (t -> 'skinWeight' ->> (pick ->> 'tier'))::numeric;
+        exit when r <= 0;
+      end loop;
+      have := case when (pick ->> 'part')::boolean then st -> 'modSkins' else st -> 'skins' end;
+      owned := (jsonb_typeof(have) = 'array' and have ? (pick ->> 'id'))
+        or (jsonb_typeof(pick -> 'level') = 'number' and lvl >= (pick ->> 'level')::int)
+        or (jsonb_typeof(pick -> 'set') = 'string' and jsonb_typeof(st -> 'claimedSets') = 'array' and (st -> 'claimedSets') ? (pick ->> 'set'));
+      insert into public.crate_opens (owner_id, seq, crate, kind, coins, skin, part)
+        values (me, last_seq + 1, 'wheel', case when owned then 'skindupe' else 'skin' end,
+          case when owned then econ_private.crate_round(price * (select (x ->> 'mult')::numeric from jsonb_array_elements(w -> 'slices') x where x ->> 'id' = w ->> 'dupe')) else 0 end,
+          pick ->> 'id', (pick ->> 'part')::boolean)
+        returning * into o;
+      return jsonb_build_object('slice', sl ->> 'id', 'day', day, 'open', econ_private.crate_json(o));
+    end if;
+    select x into sl from jsonb_array_elements(w -> 'slices') x where x ->> 'id' = w ->> 'fallback';
+  end if;
+
+  -- Gems (and the jackpot): no coins, a negative gem cost.
+  if sl ->> 'kind' in ('gems', 'jackpot') then
+    insert into public.crate_opens (owner_id, seq, crate, cost_bucks, kind, coins)
+      values (me, last_seq + 1, 'wheel', -(sl ->> 'gems')::int, case when sl ->> 'kind' = 'jackpot' then 'jackpot' else 'coins' end, 0)
+      returning * into o;
+    return jsonb_build_object('slice', sl ->> 'id', 'day', day, 'open', econ_private.crate_json(o));
+  end if;
+
+  -- Coins: a share of a Street Crate's price.
+  insert into public.crate_opens (owner_id, seq, crate, kind, coins)
+    values (me, last_seq + 1, 'wheel', 'coins', econ_private.crate_round(price * (sl ->> 'mult')::numeric))
+    returning * into o;
+  return jsonb_build_object('slice', sl ->> 'id', 'day', day, 'open', econ_private.crate_json(o));
+end $$;
+
+revoke execute on function public.wheel_spin() from public, anon;
+grant execute on function public.wheel_spin() to authenticated;

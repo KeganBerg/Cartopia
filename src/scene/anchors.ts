@@ -33,6 +33,9 @@ let hudAge = 0
 const underHud = (x: number, y: number, w: number, h: number) =>
   hud.some((r) => x + w / 2 > r.left && x - w / 2 < r.right && y > r.top && y - h < r.bottom)
 
+// How far a pill's count chip pokes out past its top-right corner, in px.
+const CHIP = 8
+
 // Off screen by more than this, in px, a bubble is hidden and skipped.
 const OFF = 120
 const sizes = new WeakMap<HTMLElement, { w: number; h: number; age: number }>()
@@ -136,25 +139,27 @@ export function AnchorProjector() {
     placed.sort((a, b) => b.y - a.y)
     const top = Math.min(200, size.height / 3)
     const free = (a: Placed, x: number, y: number, upto: number) => {
-      if (x - a.w / 2 < 2 || x + a.w / 2 > size.width - 2 || y - a.h < top || underHud(x, y, a.w, a.h)) return false
+      // A bubble already up near the HUD may dodge sideways at its own height, just not higher.
+      if (x - a.w / 2 < 2 || x + a.w / 2 + CHIP > size.width - 2 || y - a.h < Math.min(top, a.y0 - a.h) || underHud(x, y, a.w, a.h)) return false
       for (let j = 0; j < upto; j++) {
         const b = placed[j]
-        if (Math.abs(x - b.x) < (a.w + b.w) / 2 && y > b.y - b.h && y - a.h < b.y) return false
+        if (Math.abs(x - b.x) < (a.w + b.w) / 2 + CHIP && y > b.y - b.h - CHIP && y - a.h - CHIP < b.y) return false
       }
       return true
     }
     for (let i = 0; i < placed.length; i++) {
       const a = placed[i]
-      // Keep plain bubbles fully on screen sideways too.
-      if (!a.fixed) a.x = Math.min(Math.max(a.x, a.w / 2 + 4), size.width - a.w / 2 - 4)
+      // Keep plain bubbles fully on screen sideways too, count chip included.
+      if (!a.fixed) a.x = Math.min(Math.max(a.x, a.w / 2 + 4), size.width - a.w / 2 - CHIP - 4)
       if (!a.fixed && !free(a, a.x, a.y, i)) {
         let best: [number, number] | null = null
         let bestD = HOP * HOP
         for (let j = 0; j < i; j++) {
           const b = placed[j]
+          // Neighbours leave room for each other's count chips.
           const spots: [number, number][] = [
-            [a.x, b.y - b.h - 2], [a.x, b.y + a.h + 2],
-            [b.x - (a.w + b.w) / 2 - 2, a.y], [b.x + (a.w + b.w) / 2 + 2, a.y],
+            [a.x, b.y - b.h - CHIP - 1], [a.x, b.y + a.h + CHIP + 1],
+            [b.x - (a.w + b.w) / 2 - CHIP - 1, a.y], [b.x + (a.w + b.w) / 2 + CHIP + 1, a.y],
           ]
           for (const [x, y] of spots) {
             const d = (x - a.x) ** 2 + (y - a.y) ** 2

@@ -253,23 +253,6 @@ describe('daily deals', () => {
   })
 })
 
-describe('daily check-in calendar', () => {
-  it('moves one day along per collect, keeps its place over skipped days, and loops', async () => {
-    const { DAILY_BONUS } = await import('./data')
-    const g = () => useGame.getState()
-    useGame.setState({ coins: 0, lastDaily: '2020-01-01', dailyStreak: 2, panel: null })
-    g().claimDaily()
-    // Last collected years ago, but the calendar still pays day 3, not day 1.
-    expect(g().coins).toBe(DAILY_BONUS[2].coins)
-    expect(g().dailyStreak).toBe(3)
-    g().claimDaily()
-    expect(g().dailyStreak).toBe(3)
-    useGame.setState({ coins: 0, lastDaily: '2020-01-01', dailyStreak: DAILY_BONUS.length })
-    g().claimDaily()
-    expect(g().coins).toBe(DAILY_BONUS[0].coins)
-  })
-})
-
 describe('tutorial paint pick', () => {
   const car = () => ({ uid: 't1', model: 'pip', color: '#e53935', upgrades: { engine: 0, turbo: 0, tires: 0, weight: 0 } })
 

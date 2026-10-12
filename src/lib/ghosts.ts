@@ -13,7 +13,7 @@ import { raceFloor } from '../game/race'
 export const GHOST_FUEL = RACE_FUEL
 
 // Preset taunts only: no free text reaches another player. Brag ones need a win.
-// public.ghost_taunt_ids() (newest in 0063) holds the same ids; ghosts.test.ts checks.
+// public.ghost_taunt_ids() (newest in 0065) holds the same ids; ghosts.test.ts checks.
 // The friendliest come first so they're the first chips on the result card.
 export const TAUNTS: { id: number; text: string; brag?: true }[] = [
   { id: 10, text: 'GG! 🤝' },

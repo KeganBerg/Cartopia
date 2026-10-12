@@ -33,7 +33,7 @@ import { WelcomeBack } from './ui/WelcomeBack'
 import { GiftWatcher, GiftsPanel } from './ui/Gifts'
 import { UsernameWatcher } from './ui/Username'
 import { GhostRacePanel, TauntWatcher, TauntsPanel } from './ui/GhostRace'
-import { GoalsPanel, DailyPanel, FlatPanel } from './ui/Goals'
+import { GoalsPanel, FlatPanel } from './ui/Goals'
 import { SeasonPanel } from './ui/Season'
 import { useGame } from './game/store'
 import { startCloudSync } from './lib/cloud'
@@ -61,6 +61,7 @@ import { usePrefs } from './lib/prefs'
 const loadRescue = () => import('./ui/Rescue')
 const loadCrates = () => import('./ui/Crates')
 const loadArcade = () => import('./ui/Arcade')
+const loadWheel = () => import('./ui/Wheel')
 // Shows nothing for the moment the file is loading, then the panel. (A plain
 // state flip rather than React.lazy, which never showed the panel in the dev server.)
 function onDemand<M>(load: () => Promise<M>, pick: (m: M) => ComponentType) {
@@ -76,6 +77,7 @@ function onDemand<M>(load: () => Promise<M>, pick: (m: M) => ComponentType) {
 const RescuePanel = onDemand(loadRescue, (m) => m.RescuePanel)
 const CratesPanel = onDemand(loadCrates, (m) => m.CratesPanel)
 const ArcadePanel = onDemand(loadArcade, (m) => m.ArcadePanel)
+const WheelPanel = onDemand(loadWheel, (m) => m.WheelPanel)
 const prefetchPanels = () => {
   const go = () => { loadRescue(); loadCrates(); loadArcade() }
   if ('requestIdleCallback' in window) requestIdleCallback(go, { timeout: 4000 })
@@ -179,7 +181,7 @@ export default function App() {
       {panel === 'account' && <AccountPanel />}
       {panel === 'goals' && <GoalsPanel />}
       {panel === 'season' && <SeasonPanel />}
-      {panel === 'daily' && <DailyPanel />}
+      {panel === 'daily' && <WheelPanel />}
       {panel === 'flat' && <FlatPanel />}
       <WelcomeBack />
       <GiftWatcher />

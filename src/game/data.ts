@@ -908,18 +908,7 @@ export function drawTasks(pool: TaskDef[], key: string, level: number, owned: (d
   return ok.slice(0, TASKS_PER_PERIOD).map((t) => ({ id: t.id, n: t.n(level) }))
 }
 
-// Daily check-in calendar: every day you collect moves you one day along, whether you played
-// yesterday or not, and it starts over after the last day. Missing a day never loses progress.
-export const DAILY_BONUS = [
-  { coins: 200 },
-  { coins: 400 },
-  { coins: 600, fuel: 5 },
-  { coins: 800, parts: 5 },
-  { coins: 1200, bucks: 1 },
-]
-// The calendar day (1-based) the next collect pays, from how many days have been collected.
-export const dailyDay = (collected: number) => (Math.max(0, Math.floor(collected)) % DAILY_BONUS.length) + 1
-
+// Daily login bonus by streak day (repeats the last entry).
 export const FLAT_CHANCE = 0.2
 export const LOW_FUEL_CHANCE = 0.15
 // What your own Tire Shop or Gas Station earns for servicing a stranded car.

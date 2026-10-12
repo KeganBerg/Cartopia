@@ -279,6 +279,58 @@ export function exportData(account: { id: string; email?: string; username?: str
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
+// Game progress this browser keeps outside the save, cleared by a reset so nothing old comes back.
+const PROGRESS_KEYS = ['cartopia-arcade', 'cartopia-arcade-stars', 'cartopia-crate', 'cartopia-trial-best', 'cartopia-collect-all', 'cartopia-last-seen']
+
+// Wipes the signed-in player's progress (public.reset_my_account) and starts them on a fresh
+// starter town, keeping the login and player name. The server deletes the old save row, so the
+// level-drop guard never sees it; the fresh town goes in as a new row, like a new player's.
+export async function resetAccount(): Promise<string | null> {
+  if (!supabase || !userId) return 'Offline'
+  const uid = userId
+  // No saves while the reset runs, or the old town could land after it.
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = null
+  reloading = true
+  if (pushing) await pushing.catch(() => {})
+  const { error } = await supabase.rpc('reset_my_account')
+  if (error) {
+    reloading = false
+    return error.message
+  }
+  try {
+    for (const k of [BACKUP_KEY, ...PROGRESS_KEYS]) localStorage.removeItem(k)
+  } catch {
+    // Storage blocked: nothing was kept there either.
+  }
+  const fresh = starterTown()
+  const { data: made, error: insertError } = await supabase.from('game_saves').insert(rowOf(uid, fresh)).select('updated_at')
+  // Another tab made the new row first: play on from that copy, which is also a fresh town.
+  if (insertError?.code === '23505') {
+    reloading = false
+    await pullNewer(uid, true, 'Your town was reset')
+    return null
+  }
+  // Either way the fresh town replaces this browser's copy, so the old one can never upload again.
+  // If the insert failed, sign-in sync finds no cloud row after the reload and uploads this one.
+  loadCloud(fresh, made?.[0]?.updated_at ?? '', 'Your town was reset')
+  return null
+}
+
+// A signed-out player's reset: only this browser holds the town, so wiping it is the whole reset.
+export function resetLocal() {
+  if (saveTimer) clearTimeout(saveTimer)
+  reloading = true
+  useGame.persist.setOptions({ storage: { getItem: () => null, setItem: () => {}, removeItem: () => {} } })
+  try {
+    for (const k of ['cartopia-save', OWNER_KEY, BACKUP_KEY, ...PROGRESS_KEYS]) localStorage.removeItem(k)
+    sessionStorage.setItem(TOAST_KEY, 'Your town was reset')
+  } catch {
+    // Storage blocked: nothing was kept there either.
+  }
+  page.reload()
+}
+
 // Deletes the account and everything stored with it (public.delete_my_account),
 // then wipes this browser's copy and starts over with a new town.
 export async function deleteAccount(): Promise<string | null> {

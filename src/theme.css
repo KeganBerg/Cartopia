@@ -118,7 +118,16 @@ html {
 :root .tool.done { background: linear-gradient(#8ef05c, #2fae35); border-color: #1d6b22; color: #fff; text-shadow: 0 1.5px 0 rgba(0,0,0,.3); box-shadow: inset 0 2px 0 rgba(255,255,255,.4), 0 2px 0 rgba(0,0,0,.3); }
 :root .tutorial { background: linear-gradient(#2a4370, #1c2e52); border: 3px solid var(--line); box-shadow: inset 0 2px 0 rgba(255,255,255,.15), 0 5px 0 rgba(0,0,0,.3); }
 :root .badge { border-color: var(--line); border-width: 2.5px; box-shadow: 0 3px 0 rgba(0,0,0,.3); }
-:root .badge::after { border-top-color: var(--line); }
+/* The pill's pointer: a corner of a square in the pill's own fill and outline, so the
+   outline runs on down the point instead of a separate triangle sitting on the border. */
+:root .badge::after { left: 50%; bottom: -6.5px; width: 13px; height: 13px; margin-left: -6.5px; box-sizing: border-box; transform: rotate(45deg); background: var(--tail, inherit); border: inherit; border-top-width: 0; border-left-width: 0; border-radius: 0 0 3px 0; clip-path: polygon(-20% 100%, 100% -20%, 120% 120%); }
+:root .badge-ready, :root .badge-visitor-tourist { --tail: #ffecb3; }
+:root .badge-help { --tail: #b9f6ca; }
+:root .badge-arcade { --tail: #ec407a; }
+:root .badge-visitor-racer { --tail: #d84315; }
+:root .badge-visitor-mystery { --tail: #311b92; }
+/* Count chip: tucked onto the pill's corner, with the same drop shadow. */
+:root .badge-lvl { top: -8px; right: -8px; box-shadow: 0 2px 0 rgba(0,0,0,.3); }
 :root .tab.sel { box-shadow: 0 2px 0 #b9cde8; color: var(--ink); }
 :root .source, :root .leader, :root .rival { border-color: #c6d7ee; box-shadow: 0 2px 0 #c6d7ee; }
 :root .leader.mine { border-color: var(--accent); box-shadow: 0 2px 0 var(--accent); }

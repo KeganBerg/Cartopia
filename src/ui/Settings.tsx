@@ -5,7 +5,9 @@ import { AmbienceControl, EffectsControl, MusicControl, SoundControl } from './M
 import { AlertsMenu } from './Alerts'
 import { useLive, setClosed, unmute } from '../lib/live'
 import { setPrefs, usePrefs, reduceMotionOn, type Graphics, type Steer } from '../lib/prefs'
-import { deleteAccount, exportData } from '../lib/cloud'
+import { deleteAccount, exportData, resetAccount, resetLocal } from '../lib/cloud'
+import { BuckIcon, CoinIcon } from './Icon'
+import { compact } from './format'
 import { useNames } from '../lib/profiles'
 import { LEGAL, DRAFT_NOTE, type LegalDoc } from '../legal/legal'
 import { setCalmFlashing, useCalmFlashing } from '../game/flashing'
@@ -143,6 +145,7 @@ export function AccountData({ user }: { user: User }) {
       <Row label="Export my data" sub="Your town and account as a file">
         <button className="buy small alt" onClick={() => exportData({ id: user.id, email: user.email, username })}>Save</button>
       </Row>
+      <ResetAccount />
       <Row label="Delete account" sub="Removes your cloud town for good">
         <button className="sell small" onClick={() => setConfirm(true)}>Delete</button>
       </Row>
@@ -166,6 +169,66 @@ export function AccountData({ user }: { user: User }) {
   )
 }
 
+const RESET_WORD = 'reset'
+
+// Start over from a fresh town, keeping the login and player name. The player types "reset" first.
+function ResetAccount({ guest = false }: { guest?: boolean }) {
+  const level = useGame((s) => s.level)
+  const cars = useGame((s) => s.cars.length)
+  const coins = useGame((s) => s.coins)
+  const bucks = useGame((s) => s.bucks)
+  const crew = useGame((s) => s.clanBadge)
+  const [open, setOpen] = useState(false)
+  const [typed, setTyped] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const ready = typed.trim().toLowerCase() === RESET_WORD
+  const close = () => { setOpen(false); setTyped(''); setErr('') }
+  const go = async () => {
+    if (!ready || busy) return
+    setBusy(true)
+    if (guest) return resetLocal()
+    const e = await resetAccount()
+    setBusy(false)
+    if (!e) return
+    if (e.includes('reset_my_account')) setErr('Reset is not switched on yet. Try again later.')
+    else if (e.includes('wager')) setErr('Finish your wager race first.')
+    else setErr(e)
+  }
+  return (
+    <>
+      <Row label="Reset account" sub="Start over from a new town">
+        <button className="sell small" onClick={() => setOpen(true)}>Reset</button>
+      </Row>
+      {open && (
+        <div className="set-danger reset-warn" role="alertdialog" aria-labelledby="reset-title">
+          <b id="reset-title" className="reset-title">⚠️ Reset your town?</b>
+          <div className="reset-lose" aria-label="You lose">
+            <span>⭐ Lv {level}</span>
+            <span>🚗 {cars}</span>
+            <span><CoinIcon size={18} />{compact(coins)}</span>
+            <span><BuckIcon size={18} />{compact(bucks)}</span>
+            {crew && <span>🛡️ {crew.tag}</span>}
+          </div>
+          <p>All progress goes back to level 1. This can't be undone.</p>
+          {!guest && <small className="reset-keep">✔ Keeps your login and player name</small>}
+          <label className="reset-type">
+            Type <b>{RESET_WORD}</b> to confirm
+            <input value={typed} autoComplete="off" autoCapitalize="none" spellCheck={false} placeholder={RESET_WORD}
+              aria-label={`Type ${RESET_WORD} to confirm`} disabled={busy}
+              onChange={(e) => setTyped(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') go() }} />
+          </label>
+          <div className="row">
+            <button className="buy small alt" disabled={busy} onClick={close}>Keep it</button>
+            <button className="danger-btn" disabled={!ready || busy} onClick={go}>{busy ? 'Resetting…' : 'Reset forever'}</button>
+          </div>
+          {err && <small className="hint">{err}</small>}
+        </div>
+      )}
+    </>
+  )
+}
+
 // Signed-out players can still keep a copy of the town in this browser.
 export function GuestData() {
   return (
@@ -173,6 +236,7 @@ export function GuestData() {
       <Row label="Export my town" sub="A copy of this browser's save">
         <button className="buy small alt" onClick={() => exportData(null)}>Save</button>
       </Row>
+      <ResetAccount guest />
     </Group>
   )
 }

@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import { flushSave, signedInUser } from './cloud'
-import { setCrateOpener } from '../game/store'
+import { setCrateOpener, setWheelSpinner, today, useGame } from '../game/store'
 import type { CrateOpen } from '../game/crates'
 
 // A signed-in player's crates are opened by the server (crate_open() in
@@ -17,4 +17,27 @@ setCrateOpener(async (crate, free) => {
   }
   const d = data as CrateOpen | { pending: CrateOpen[] }
   return 'pending' in d ? d.pending : [d]
+})
+
+// The daily wheel spin, rolled by wheel_spin() (supabase/migrations/0064_wheel_spin.sql). Opens the save
+// never counted come back first: they're added and saved, then the spin is asked for again.
+setWheelSpinner(async () => {
+  if (!supabase || !signedInUser()) return null
+  await flushSave()
+  const pending: CrateOpen[] = []
+  for (let i = 0; i < 2; i++) {
+    const { data, error } = await supabase.rpc('wheel_spin')
+    if (error) {
+      if (error.code === 'PGRST202') throw new Error('soon')
+      // A spin that never reached the save came back with the pending opens: it's been added.
+      if (pending.some((o) => o.crate === 'wheel') && error.message.includes('spun today')) return { spin: null, day: today(), pending }
+      throw new Error(error.message)
+    }
+    const d = data as { slice: string; day: string; open: CrateOpen } | { pending: CrateOpen[] }
+    if (!('pending' in d)) return { spin: { slice: d.slice, open: d.open }, day: d.day, pending }
+    for (const o of d.pending) useGame.getState().applyCrate(o)
+    pending.push(...d.pending)
+    await flushSave()
+  }
+  throw new Error('busy')
 })
