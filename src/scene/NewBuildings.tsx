@@ -17,7 +17,7 @@ import { PAL, SEASON } from './season'
 import { LAYER, decal } from './layers'
 import { Bulbs as EdgeBulbs } from './edgeKit'
 import { brickTex, sidingTex, gravelTex, awningTex, paverTex, shutterTex, shingleTex, checkerTex } from './textures'
-import { ShopLot } from './BuildingDetail'
+import { Generator, Sandwich, ShopLot } from './BuildingDetail'
 import { PEOPLE_SIZED } from './keepShape'
 
 // Models for the second wave of shop items: businesses and services (coffee,
@@ -437,6 +437,9 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           </group>
           {/* Patio: one table to start, a second and string lights as it levels up. */}
           {!ghost && <Parasol m={m} at={[-0.55, 0, 0.62]} c="#ff7043" />}
+          {/* The truck's generator out back, and the day's menu out front. */}
+          {!ghost && <group position={[0.68, 0.05, -0.8]}><Generator /></group>}
+          {!ghost && <Sandwich at={[0.25, 0.05, 0.82]} board="#263238" />}
           {trim && lvl >= 3 && <Parasol m={m} at={[0.55, 0, 0.62]} c="#43a047" />}
           {trim && lvl >= 5 && (
             <Upright>
@@ -486,6 +489,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
             <mesh position={[0, 0.5, 0]} castShadow><coneGeometry args={[0.2, 0.36, 14]} />{m('#ffb300')}</mesh>
           </group>
           {!ghost && <Pool r={0.7} x={-0.3} z={0.85} />}
+          {!ghost && <ShopLot id="lube" W={2} F={0.65} />}
         </ShellBuilding>
       )
     }
