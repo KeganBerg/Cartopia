@@ -4,9 +4,9 @@ import { clubHit, clubPulse, resetClubBeat } from './clubBeat'
 describe('club beat', () => {
   beforeEach(resetClubBeat)
 
-  it('moves the colours on and flashes when a scheduled note is heard, not before', () => {
-    clubHit(1000, true)
-    clubHit(1120, false)
+  it('moves the colours on and flashes when a scheduled kick is heard, not before', () => {
+    clubHit(1000, 'kick')
+    clubHit(1120, 'bass')
     const before = clubPulse(990, 124)
     expect(before.step).toBe(0)
     const kick = clubPulse(1000, 124)
@@ -15,9 +15,11 @@ describe('club beat', () => {
     expect(kick.live).toBe(true)
     const later = clubPulse(1100, 124)
     expect(later.flash).toBeLessThan(0.6)
+    // An off-beat bass note keeps the colour and doesn't flash.
     const bass = clubPulse(1120, 124)
-    expect(bass.step).toBe(2)
-    expect(bass.flash).toBeCloseTo(0.6)
+    expect(bass.step).toBe(1)
+    expect(bass.flash).toBeLessThan(0.6)
+    expect(bass.live).toBe(true)
   })
 
   it('keeps a gentle pulse at the tempo when no music plays', () => {
@@ -32,9 +34,30 @@ describe('club beat', () => {
   })
 
   it('a backlog from a sleeping tab moves the colours without a late flash', () => {
-    for (let i = 0; i < 5; i++) clubHit(100 + i * 100, true)
+    for (let i = 0; i < 5; i++) clubHit(100 + i * 100, 'kick')
     const p = clubPulse(5000, 124)
     expect(p.step).toBe(5)
     expect(p.flash).toBe(0)
+  })
+
+  it('the other parts flash their own layer and never move the colour on', () => {
+    clubHit(1000, 'kick', 1, 2)
+    clubHit(1100, 'hat', 0.6, 2)
+    clubHit(1200, 'clap', 1, 2)
+    const hat = clubPulse(1100, 124)
+    expect(hat.step).toBe(1)
+    expect(hat.env.hat).toBeCloseTo(0.6)
+    expect(hat.env.clap).toBe(0)
+    const clap = clubPulse(1200, 124)
+    expect(clap.step).toBe(1)
+    expect(clap.env.clap).toBeCloseTo(1)
+    expect(clap.env.hat).toBeLessThan(0.1)
+    expect(clap.groove).toBe(2)
+  })
+
+  it('counts the beat from the last kick, at the groove\'s own tempo', () => {
+    clubHit(1000, 'kick', 1, 4) // Disco, 122 bpm
+    expect(clubPulse(1000, 124).beat).toBe(0)
+    expect(clubPulse(1000 + 60000 / 122 / 2, 124).beat).toBeCloseTo(0.5)
   })
 })

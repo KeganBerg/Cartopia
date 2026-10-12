@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useGame, today } from '../game/store'
 import { fetchLeaderboard, fetchTown, demoLeaders, type Leader } from '../lib/friends'
 import { supabase } from '../lib/supabase'
-import { Panel } from './Menus'
+import { FreeCamButton, Panel } from './Menus'
 import { SocialTabs, useUserId } from './Social'
 import { useFriends, refreshFriends, addFriend, respondFriend, removeFriend, seenAgo, MAX_FRIENDS, type Friend } from '../lib/friendsList'
 import { useNames, loadUsernames, usePlayerName } from '../lib/profiles'
@@ -237,6 +237,7 @@ export function VisitBanner() {
             <b>{left ? `🤝 ${left}` : '🤝 ✔'}</b>
           </span>
         )}
+        <FreeCamButton className="buy small alt visit-cam" />
         <button className="buy small alt" onClick={() => visit(null)}>🏠 Home</button>
       </div>
     </div>

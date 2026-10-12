@@ -21,12 +21,15 @@ import { PEOPLE_SIZED } from './keepShape'
 type Props = { def: BuildingDef; ghost?: boolean; m: Mat; win: ReactNode; bulb: ReactNode; level: number }
 
 
+// Spray in the air: meant to float (see floating.ts).
+const AIR = { air: true }
+
 // Rooftop sign on a steel frame, like the old downtown walk-ups.
 function RoofSign({ m, text, w, at, bg, fg, board, ghost }: { m: Mat; text: string; w: number; at: V3; bg: string; fg: string; board: string; ghost?: boolean }) {
   return (
     <group position={at}>
       {[-1, 1].map((sd) => <Box key={sd} m={m} at={[(sd * w) / 2.6, 0.12, -0.06]} s={[0.03, 0.24, 0.03]} c="#37474f" shadow={false} />)}
-      <Box m={m} at={[0, 0.12, -0.12]} rot={[0.5, 0, 0]} s={[0.03, 0.03, 0.26]} c="#37474f" shadow={false} />
+      <Box m={m} at={[0, 0.11, -0.18]} rot={[-0.73, 0, 0]} s={[0.03, 0.03, 0.33]} c="#37474f" shadow={false} />
       <Box m={m} at={[0, 0.24 + w / 8, -0.03]} s={[w + 0.08, w / 4 + 0.08, 0.05]} c={board} shadow={false} />
       {!ghost && <Sign text={text} w={w} at={[0, 0.24 + w / 8, 0]} bg={bg} fg={fg} />}
       <Bulbs from={[-w / 2, 0.28 + w / 4 + 0.04, 0.03]} to={[w / 2, 0.28 + w / 4 + 0.04, 0.03]} n={7} />
@@ -533,9 +536,9 @@ function Landmark({ m, id, at, s }: { m: Mat; id: string; at: V3; s: number }) {
           {/* A giant spray can mid-spray. */}
           <Cyl m={m} at={[0, 0.5, 0]} r={0.22} h={0.85} c="#ff7043" seg={14} />
           <Cyl m={m} at={[0, 0.5, 0]} r={0.225} h={0.2} c="#fafafa" seg={14} />
-          <mesh position={[0, 0.98, 0]}><sphereGeometry args={[0.22, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />{m('#cfd8dc')}</mesh>
-          <Box m={m} at={[0, 1.22, 0]} s={[0.08, 0.1, 0.08]} c="#263238" />
-          {[[0.08, 1.24], [0.19, 1.3], [0.35, 1.38]].map(([x, y], i) => <mesh key={x} position={[x, y, 0]}><sphereGeometry args={[0.055 + i * 0.03, 8, 6]} />{m(['#ff7043', '#ab47bc', '#29b6f6'][i])}</mesh>)}
+          <mesh position={[0, 0.925, 0]}><sphereGeometry args={[0.22, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />{m('#cfd8dc')}</mesh>
+          <Box m={m} at={[0, 1.18, 0]} s={[0.08, 0.1, 0.08]} c="#263238" />
+          {[[0.08, 1.24], [0.19, 1.3], [0.35, 1.38]].map(([x, y], i) => <mesh key={x} position={[x, y, 0]} userData={AIR}><sphereGeometry args={[0.055 + i * 0.03, 8, 6]} />{m(['#ff7043', '#ab47bc', '#29b6f6'][i])}</mesh>)}
         </group>
       )}
     </group>

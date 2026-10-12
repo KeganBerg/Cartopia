@@ -17,7 +17,7 @@ import { PAL, SEASON } from './season'
 import { LAYER, decal } from './layers'
 import { Bulbs as EdgeBulbs } from './edgeKit'
 import { brickTex, sidingTex, gravelTex, awningTex, paverTex, shutterTex, shingleTex, checkerTex } from './textures'
-import { ShopLot } from './BuildingDetail'
+import { Generator, Sandwich, ShopLot } from './BuildingDetail'
 import { PEOPLE_SIZED } from './keepShape'
 
 // Models for the second wave of shop items: businesses and services (coffee,
@@ -437,6 +437,9 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           </group>
           {/* Patio: one table to start, a second and string lights as it levels up. */}
           {!ghost && <Parasol m={m} at={[-0.55, 0, 0.62]} c="#ff7043" />}
+          {/* The truck's generator out back, and the day's menu out front. */}
+          {!ghost && <group position={[0.68, 0.05, -0.8]}><Generator /></group>}
+          {!ghost && <Sandwich at={[0.25, 0.05, 0.82]} board="#263238" />}
           {trim && lvl >= 3 && <Parasol m={m} at={[0.55, 0, 0.62]} c="#43a047" />}
           {trim && lvl >= 5 && (
             <Upright>
@@ -486,6 +489,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
             <mesh position={[0, 0.5, 0]} castShadow><coneGeometry args={[0.2, 0.36, 14]} />{m('#ffb300')}</mesh>
           </group>
           {!ghost && <Pool r={0.7} x={-0.3} z={0.85} />}
+          {!ghost && <ShopLot id="lube" W={2} F={0.65} />}
         </ShellBuilding>
       )
     }
@@ -654,7 +658,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
               ))}
               {!ghost && <Box m={m} at={[1.66, (th - 0.6) / 2 + 0.3, -0.55]} s={[0.02, th - 0.6, 0.12]} c="#cfd8dc" shadow={false} />}
               {!ghost && (
-                <group position={[1.35, th + 0.37, -0.55]}>
+                <group position={[1.35, th + 0.28, -0.55]}>
                   <Box m={m} at={[0, 0.12, 0]} s={[0.14, 0.1, 0.14]} c="#eceff1" />
                   <mesh position={[0, 0.22, 0]}><sphereGeometry args={[0.06, 8, 6]} /><primitive object={glowMats.taillight} attach="material" dispose={null} /></mesh>
                 </group>
@@ -668,7 +672,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
               <mesh position={[-0.4, h + 0.32, 0.205]}><planeGeometry args={[2.3, 0.34]} />{win}</mesh>
               <Box m={m} at={[-0.4, h + 0.6, -0.3]} s={[2.46, 0.06, 1.06]} c="#c62828" />
               {!ghost && (
-                <group position={[-0.4, h + 0.88, 0.1]}>
+                <group position={[-0.4, h + 0.83, 0.1]}>
                   <Box m={m} at={[0, 0, -0.03]} s={[1.38, 0.39, 0.05]} c="#c62828" shadow={false} />
                   <Sign text="FIRE HQ" w={1.3} at={[0, 0, 0]} bg="#fafafa" fg="#c62828" />
                 </group>
@@ -1123,31 +1127,47 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
       )
     }
     case 'deadtree': {
-      // Bare, twisted branches with lanterns hanging off them.
-      const branches: [number, number, number, number, number][] = [
-        [0.28, 1.55, 0, 0.9, 0.55], [-0.3, 1.45, 0.1, -0.85, 0.5], [0.05, 1.8, -0.06, 0.25, 0.45], [-0.12, 1.25, -0.25, -0.5, 0.4],
+      // Bare, twisted branches growing out of the trunk, lanterns hanging off
+      // them. Each branch: [height it leaves the trunk, heading, lean from
+      // upright, length]; its tip and where a lantern hangs follow from that.
+      const branches: [number, number, number, number][] = [
+        [1.42, 0.1, 0.95, 0.55], [1.32, Math.PI, 0.9, 0.5], [1.55, -1.2, 0.3, 0.45], [1.18, 2.3, 0.6, 0.4],
       ]
+      // Along the upper trunk's leaning axis.
+      const onTrunk = (y: number): [number, number, number] => [0.06 + (y - 1.3) * 0.15, y, 0]
+      const along = ([y, yaw, lean]: (typeof branches)[number], d: number): [number, number, number] => {
+        const [x0, y0, z0] = onTrunk(y)
+        return [x0 + Math.sin(lean) * Math.cos(yaw) * d, y0 + Math.cos(lean) * d, z0 + Math.sin(lean) * Math.sin(yaw) * d]
+      }
       return (
         <group>
           <Cyl m={m} at={[0, 0.55, 0]} r={0.1} r2={0.2} h={1.1} c="#3e2723" seg={7} />
           <Cyl m={m} at={[0.06, 1.3, 0]} r={0.07} r2={0.1} h={0.6} c="#3e2723" seg={7} rot={[0, 0, -0.15]} />
-          {branches.map(([x, y, z, rz, len], i) => (
-            <group key={i}>
-              <Cyl m={m} at={[x, y, z]} r={0.025} r2={0.05} h={len} c="#3e2723" seg={5} rot={[0, 0, rz]} />
-              <Cyl m={m} at={[x * 1.6, y + 0.18, z]} r={0.012} r2={0.025} h={0.25} c="#3e2723" seg={4} rot={[0, 0, -rz * 0.6]} />
+          {branches.map(([y, yaw, lean, len], i) => (
+            <group key={i} position={onTrunk(y)} rotation-y={-yaw}>
+              <group rotation-z={-lean}>
+                <Cyl m={m} at={[0, len / 2, 0]} r={0.025} r2={0.05} h={len} c="#3e2723" seg={5} />
+                {/* A twig curling up off the tip. */}
+                <group position={[0, len - 0.02, 0]} rotation-z={lean * 0.6}>
+                  <Cyl m={m} at={[0, 0.11, 0]} r={0.012} r2={0.025} h={0.25} c="#3e2723" seg={4} />
+                </group>
+              </group>
             </group>
           ))}
-          {[[0.55, 1.45, 0.05], [-0.55, 1.36, 0.12], [0.1, 1.72, -0.06]].map(([x, y, z], i) => (
-            <group key={i} position={[x, y, z]}>
-              <Cyl m={m} at={[0, 0.1, 0]} r={0.006} h={0.2} c="#212121" seg={4} />
-              <mesh position={[0, -0.04, 0]}><sphereGeometry args={[0.07, 8, 6]} />{bulb}</mesh>
-            </group>
-          ))}
+          {[0, 1, 3].map((b) => {
+            const [x, y, z] = along(branches[b], branches[b][3] * 0.8)
+            return (
+              <group key={b} position={[x, y - 0.22, z]}>
+                <Cyl m={m} at={[0, 0.12, 0]} r={0.006} h={0.22} c="#212121" seg={4} />
+                <mesh position={[0, -0.04, 0]}><sphereGeometry args={[0.07, 8, 6]} />{bulb}</mesh>
+              </group>
+            )
+          })}
           {/* Roots, and a bat resting on the top branch. */}
           {[0, 1, 2, 3].map((i) => (
             <Cyl key={i} m={m} at={[Math.sin(i * 1.7) * 0.22, 0.06, Math.cos(i * 1.7) * 0.22]} r={0.03} r2={0.06} h={0.35} c="#3e2723" seg={5} rot={[Math.cos(i * 1.7) * 1.2, 0, -Math.sin(i * 1.7) * 1.2]} />
           ))}
-          <group position={[0.0, 2.07, -0.06]}>
+          <group position={along(branches[2], branches[2][3] + 0.03)}>
             <mesh><sphereGeometry args={[0.05, 6, 5]} />{m('#212121')}</mesh>
             {[-1, 1].map((sd) => <Box key={sd} m={m} at={[sd * 0.09, 0.01, 0]} rot={[0, 0, sd * 0.4]} s={[0.12, 0.015, 0.07]} c="#212121" shadow={false} />)}
           </group>
@@ -1411,7 +1431,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           {/* Swing set. */}
           <group position={[0.65, 0, -0.55]}>
             {[-0.55, 0.55].map((x) => [-1, 1].map((sd) => (
-              <Box key={`${x}${sd}`} m={m} at={[x, 0.55, sd * 0.2]} rot={[sd * 0.35, 0, 0]} s={[0.05, 1.15, 0.05]} c="#ff7043" />
+              <Box key={`${x}${sd}`} m={m} at={[x, 0.55, sd * 0.2]} rot={[-sd * 0.35, 0, 0]} s={[0.05, 1.15, 0.05]} c="#ff7043" />
             )))}
             <Box m={m} at={[0, 1.08, 0]} s={[1.2, 0.05, 0.05]} c="#ff7043" />
             {[-0.22, 0.22].map((x) => (

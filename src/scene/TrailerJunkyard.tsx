@@ -45,7 +45,8 @@ function SingleWide({ m, win, bulb, at, rot = 0, len = 1.45, color, stripe, ghos
         ))}
         <mesh position={[0.12, 0.38, zf - 0.005]}><planeGeometry args={[0.15, 0.32]} />{m('#b0bec5')}</mesh>
         <Box m={m} at={[0, 0.58, zf + 0.03]} s={[0.5, 0.02, 0.18]} c={stripe} rot={[0.25, 0, 0]} />
-        <Box m={m} at={[-len / 2 - 0.12, 0.17, 0]} s={[0.26, 0.04, 0.06]} c="#37474f" />
+        <Box m={m} at={[-len / 2 - 0.06, 0.17, 0]} s={[0.3, 0.04, 0.06]} c="#37474f" />
+        <Box m={m} at={[-len / 2 - 0.17, 0.075, 0]} s={[0.03, 0.15, 0.03]} c="#37474f" />
         {!ghost && <mesh position={[0.12, 0.6, zf + 0.03]}><boxGeometry args={[0.06, 0.05, 0.04]} />{bulb}</mesh>}
       </group>
     )
