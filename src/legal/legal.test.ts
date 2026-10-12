@@ -28,9 +28,9 @@ describe('legal pages', () => {
 
 describe('settings', () => {
   it('fall back to defaults for missing or bad data', () => {
-    expect(parsePrefs(null)).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: true })
-    expect(parsePrefs('{oops')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: true })
-    expect(parsePrefs('{"graphics":"ultra","reduceMotion":"yes"}')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: true })
+    expect(parsePrefs(null)).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: false })
+    expect(parsePrefs('{oops')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: false })
+    expect(parsePrefs('{"graphics":"ultra","reduceMotion":"yes"}')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: false })
     expect(parsePrefs('{"graphics":"saver","reduceMotion":true,"vibration":false,"raceWeather":false}')).toEqual({ graphics: 'saver', reduceMotion: true, vibration: false, raceWeather: false })
   })
   it('Saver draws every 3D view at one pixel per screen pixel', () => {

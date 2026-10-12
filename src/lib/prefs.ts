@@ -19,7 +19,7 @@ export type Prefs = {
 }
 
 const KEY = 'cartopia-prefs'
-const DEFAULTS: Prefs = { graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: true }
+const DEFAULTS: Prefs = { graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: false }
 
 export function parsePrefs(raw: string | null): Prefs {
   try {
@@ -28,7 +28,7 @@ export function parsePrefs(raw: string | null): Prefs {
       graphics: p.graphics === 'high' || p.graphics === 'saver' ? p.graphics : 'auto',
       reduceMotion: typeof p.reduceMotion === 'boolean' ? p.reduceMotion : null,
       vibration: p.vibration !== false,
-      raceWeather: p.raceWeather !== false,
+      raceWeather: p.raceWeather === true,
     }
   } catch {
     return { ...DEFAULTS }

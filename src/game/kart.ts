@@ -254,7 +254,12 @@ const BLAST_SPIN = 9 // closing speed that spins out the kart that got hit
 const SLIDE = 3 // how fast a kart pressed against a pile of boxes slides along it to the open lane
 
 // obstacles: the road has obstacles (game/obstacles.ts). blast: Bumper Blast.
-export type KartRules = { obstacles?: boolean; blast?: boolean }
+// maxBoost: every kart boosts whenever it's on the gas, and holds the road less at that
+// speed, so the sharp bends are about knowing when to lift.
+export type KartRules = { obstacles?: boolean; blast?: boolean; maxBoost?: boolean }
+// Coins for winning a party race (Bumper Blast or a custom race); a loss pays the usual tenth.
+export const partyPrize = (level: number) => Math.round((200 + level * 40) / 10) * 10
+const MAX_BOOST = 1.45
 
 export class KartRace {
   track: Track
@@ -275,6 +280,7 @@ export class KartRace {
   notes: KartNote[] = []
   obstacles: Obstacle[]
   blast: boolean
+  maxBoost: boolean
   // The crossing a glass pane was last smashed on, per obstacle (-1: never).
   glassBroke: number[]
   private seq = 0
@@ -282,6 +288,7 @@ export class KartRace {
   constructor(track: Track, field: { name: string; pi: number; ai: boolean; skill?: number }[], seed = 1, rules: KartRules = {}) {
     this.track = track
     this.blast = !!rules.blast
+    this.maxBoost = !!rules.maxBoost
     this.obstacles = rules.obstacles || rules.blast ? placeObstacles(track, this.blast) : []
     this.glassBroke = this.obstacles.map(() => -1)
     let s = seed * 9301 + 49297
@@ -355,10 +362,12 @@ export class KartRace {
       const ahead = wrapI(p.i - k.idx, t.n)
       if (ahead > 4 && ahead < 30) off = p.off
     }
-    // Steer round a pile of boxes, to the open side.
+    // Steer round a pile of boxes, to the open side, and lift if still lined up with it.
+    let blocked = false
     for (const o of this.obstacles) {
       if (o.kind !== 'boxes') continue
       const ahead = wrapI(o.i - k.idx, t.n)
+      if (ahead < 6 + speed * 0.6 && Math.abs(lateral(t, o.i, k.x, k.z) - o.off) < o.w / 2 + 0.9) blocked = true
       // From well before it until the kart is past it, so one alongside doesn't cut back in.
       if ((ahead < 28 || ahead > t.n - 4) && Math.abs(off - o.off) < o.w / 2 + 1.1) off = o.off - Math.sign(o.off) * (o.w / 2 + 1.4)
     }
@@ -379,7 +388,7 @@ export class KartRace {
     const corner = Math.sqrt(36 / Math.max(peak, 0.005)) * (0.85 + 0.25 * k.skill)
     const fast = speed > corner + 1.5
     // A gentle rubber band: rivals well behind the leader find a little pace, the leader none.
-    const inp: KartInput = { steer, gas: cruise ? 0.6 : fast ? 0 : 1, brake: fast && speed > corner + 4 ? 0.6 : 0, drift: false, item: false }
+    const inp: KartInput = { steer, gas: cruise ? 0.6 : fast ? 0 : blocked ? (speed > 6 ? 0 : 0.45) : 1, brake: (fast && speed > corner + 4) || (blocked && speed > 9) ? 0.6 : 0, drift: false, item: false }
     if (!cruise && k.item && k.emp <= 0) {
       const rank = order.indexOf(k)
       const chaser = this.karts.some((o) => o !== k && wrapI(k.idx - o.idx, t.n) < 14 && Math.abs(this.progress(o) - this.progress(k)) < 0.5)
@@ -422,6 +431,8 @@ export class KartRace {
     const band = k.ai ? 1 + Math.min(0.06, Math.max(-0.03, (rank - 2) * 0.015)) : 1
     // Static storm: the boost and any drift charge go dead for a moment.
     if (k.emp > 0) { k.boost = 0; k.charge = 0 }
+    const flatOut = this.maxBoost && inp.gas > 0.5 && k.emp <= 0 && k.bump <= 0
+    if (flatOut) k.boost = Math.max(k.boost, 0.1)
     let top = k.stats.top * band * (k.offroad ? 0.55 : 1)
     if (k.flat > 0) top *= 0.74
     if (k.smoke > 0) top *= 0.84
@@ -429,7 +440,7 @@ export class KartRace {
     if (k.splat > 0) top *= 0.94
     if (k.ghost > 0) top *= 1.1
     if (k.rocket > 0) top = k.stats.top * 1.45
-    else if (k.boost > 0) top *= 1.32
+    else if (k.boost > 0) top *= flatOut ? MAX_BOOST : 1.32
     else if (k.tow > 0) top *= 1.26
     k.boost = Math.max(0, k.boost - dt)
     k.shield = Math.max(0, k.shield - dt)
@@ -502,7 +513,9 @@ export class KartRace {
       k.vz += (want.z - k.vz) * a
     } else {
       // On ice the tyres barely hold, so the kart slides wide.
-      vl *= Math.exp(-(k.air ? 0.6 : k.ice > 0 ? 1.4 : 9) * dt)
+      // Max boost: past normal top speed the tyres hold less, so a bend taken too fast runs wide.
+      const loose = this.maxBoost && Math.abs(vf) > k.stats.top * 1.1
+      vl *= Math.exp(-(k.air ? 0.6 : k.ice > 0 ? 1.4 : loose ? 3.5 : 9) * dt)
       k.vx = fx * vf + sx * vl
       k.vz = fz * vf + sz * vl
     }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BLAST_PI, KartRace, TRACKS, buildTrack, idleInput, kartStats } from './kart'
+import { BLAST_PI, partyPrize, KartRace, TRACKS, buildTrack, idleInput, kartStats } from './kart'
 import { glassAt, placeObstacles } from './obstacles'
 
 const field = (n = 6) => Array.from({ length: n }, (_, i) => ({ name: `K${i}`, pi: 20 + i * 10, ai: i < n - 1 }))
@@ -60,9 +60,9 @@ describe('road obstacles', () => {
 
 describe('AI with obstacles', () => {
   it('every rival still finishes on every track', () => {
-    for (const def of TRACKS) for (const blast of [false, true]) {
+    for (const def of TRACKS) for (const [blast, maxBoost] of [[false, false], [true, false], [false, true], [true, true]]) {
       const all = field().map((f) => ({ ...f, ai: true }))
-      const race = new KartRace(buildTrack(def, true), all, 7, { obstacles: true, blast })
+      const race = new KartRace(buildTrack(def, true), all, 7, { obstacles: true, blast, maxBoost })
       for (let f = 0; f < 60 * 240 && race.karts.some((k) => k.done === null); f++) race.step(1 / 60, [], true)
       expect(race.karts.every((k) => k.done !== null)).toBe(true)
     }
@@ -89,5 +89,23 @@ describe('Bumper Blast', () => {
     expect(wild.q).toBeGreaterThan(calm.q * 2)
     expect(calm.spin).toBe(0)
     expect(wild.spin).toBeGreaterThan(0)
+  })
+})
+
+describe('Max boost', () => {
+  it('karts on the gas go faster than a normal boost, and AI rivals finish quicker', () => {
+    const lap = (maxBoost: boolean) => {
+      const race = new KartRace(buildTrack(TRACKS[0]), field().map((f) => ({ ...f, ai: true })), 3, { maxBoost })
+      for (let f = 0; f < 60 * 240 && race.karts.some((k) => k.done === null); f++) race.step(1 / 60, [], true)
+      return Math.min(...race.karts.map((k) => k.done ?? Infinity))
+    }
+    expect(lap(true)).toBeLessThan(lap(false))
+  })
+})
+
+describe('party prize', () => {
+  it('pays more as you level up', () => {
+    expect(partyPrize(1)).toBe(240)
+    expect(partyPrize(20)).toBeGreaterThan(partyPrize(5))
   })
 })
