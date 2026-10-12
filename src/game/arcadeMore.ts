@@ -2,6 +2,8 @@
 // Delivery Dash and Stunt Ramp. Every run ends in 0-3 stars; pay follows the stars,
 // small like a quick race, so the server's usual earning limits cover it.
 
+import type { Box } from './collide'
+
 export type StarGameId = 'pit' | 'wash' | 'delivery' | 'stunt'
 
 export function starReward(stars: number, level: number) {
@@ -83,6 +85,23 @@ export function insideBlock(x: number, z: number, pad: number) {
   }
   return Math.abs(x) > TOWN / 2 - pad || Math.abs(z) > TOWN / 2 - pad
 }
+
+// What a delivery car can't drive through: each block's raised sidewalk, kerb edge to
+// kerb edge (the lamps, hydrants, trees and shops all stand on it), and the end of the
+// asphalt all round town.
+const EDGE = 4
+export const TOWN_SOLIDS: Box[] = [
+  ...Array.from({ length: GRID * GRID }, (_, i) => ({ x: blockCentre(i % GRID), z: blockCentre(Math.floor(i / GRID)), h: 0, w: BLOCK, l: BLOCK })),
+  { x: -TOWN / 2 - EDGE / 2, z: 0, h: 0, w: EDGE, l: TOWN + EDGE * 2 },
+  { x: TOWN / 2 + EDGE / 2, z: 0, h: 0, w: EDGE, l: TOWN + EDGE * 2 },
+  { x: 0, z: -TOWN / 2 - EDGE / 2, h: 0, w: TOWN + EDGE * 2, l: EDGE },
+  { x: 0, z: TOWN / 2 + EDGE / 2, h: 0, w: TOWN + EDGE * 2, l: EDGE },
+]
+// The pickup and drop-off ring painted on the road: you're there once the middle of
+// your car is inside its outer edge.
+export const DROP_R = 1.05
+export const DROP_LINE = 0.2 // the ring's painted width
+export const atDrop = (x: number, z: number, spot: { x: number; z: number }) => Math.hypot(x - spot.x, z - spot.z) <= DROP_R
 
 // ---------- Stunt Ramp ----------
 // Three jumps. Stop the power needle, then hold to flip in the air and let go to land flat.
