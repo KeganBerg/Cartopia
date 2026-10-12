@@ -9,6 +9,8 @@ import { MYSTERY_EVERY, ROAD_STEP, roadMystery, roadPay, roadReached, roadTrophi
 
 const AHEAD = 12
 const BEHIND = 6
+// One empty list for a save with no road cosmetics yet (a fresh `[]` in the selector would re-render for ever).
+const NONE: string[] = []
 
 // What a mystery stop gave: a colour swatch or a pattern name.
 function Item({ id }: { id: string }) {
@@ -20,7 +22,7 @@ function Item({ id }: { id: string }) {
 export function TrophyRoad() {
   const trophies = useGame((s) => s.trophies)
   const claimed = useGame((s) => s.road ?? 0)
-  const items = useGame((s) => s.roadItems ?? [])
+  const items = useGame((s) => s.roadItems) ?? NONE
   const reached = roadReached(trophies)
   const toNext = roadTrophies(reached) - trophies
   // The last few stops claimed and the next ones. Mystery stops claimed line up, in order, with the items they gave.
