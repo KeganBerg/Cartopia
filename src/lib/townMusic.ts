@@ -226,7 +226,7 @@ export class TownMusic {
   private nodes: AudioNode[] = []
   // Tests and the clip renderer can pin the songs to play, in order.
   queue: string[] = []
-  gap: [number, number] = [20, 50] // seconds of quiet between songs
+  gap: [number, number] = [0, 1] // seconds after the last chord's ring-out before the next song
 
   constructor(ctx: BaseAudioContext, dest: AudioNode) {
     this.ctx = ctx
@@ -321,7 +321,7 @@ export class TownMusic {
     }
   }
 
-  // The song rings out on its first chord, then the town has a quiet spell.
+  // The song rings out on its first chord, and the next one comes in as it fades.
   private end(t: number) {
     const song = this.song!
     const d = { ctx: this.ctx, out: this.input }
@@ -332,7 +332,7 @@ export class TownMusic {
     choir(d, t, notes.slice(0, 4), 0.016, 3.5)
     this.song = null
     setPlaying(null)
-    this.resting = t + 6 + this.gap[0] + Math.random() * (this.gap[1] - this.gap[0])
+    this.resting = t + 3 + this.gap[0] + Math.random() * (this.gap[1] - this.gap[0])
   }
 
   // The tune for a two-bar slot: A, its answer (same rhythm, the next chords),
@@ -510,7 +510,8 @@ function tick() {
   } else if (music) {
     music.level(0, t, 0.3)
     if (!quietSince) quietSince = t
-    else if (t - quietSince > 2) {
+    // A hidden tab only pauses the song, so coming back carries on where it was.
+    else if (t - quietSince > 2 && !document.hidden) {
       music.stop()
       music = null
     }
