@@ -1,5 +1,7 @@
 import { useGame, liveDeal, paintPrice, type OwnedCar } from '../game/store'
 import { FINISHES, PAINTS, STRIPES, dealOffer, finishDef, paintJobCost, type PaintJob } from '../game/data'
+import { PAINTS_TO_COLLECT, paintOpen, paintsOpen, rivalForPaint } from '../game/paintRivals'
+import { openPaintRival } from './PaintRivals'
 
 export const jobOf = (car: OwnedCar): PaintJob => ({ color: car.color, finish: car.finish ?? 'gloss', stripe: car.stripe ?? null })
 
@@ -17,7 +19,12 @@ export function PaintShop({ car, job, setJob }: { car: OwnedCar; job: PaintJob; 
   const level = useGame((s) => s.level)
   const paintCar = useGame((s) => s.paintCar)
   const deals = useGame((s) => s.deals)
+  const rivalRow = useGame((s) => s.rivalRow)
+  const oldPaints = useGame((s) => s.oldPaints)
   const now = jobOf(car)
+  const open = (color: string) => color === now.color || paintOpen({ rivalRow, oldPaints }, color)
+  // A locked colour can be tried on; the bar then points at the rival who has it.
+  const lockedBy = open(job.color) ? null : rivalForPaint(job.color)
   const changed = !same(job, now)
   const cost = paintPrice({ deals, level }, car, job)
   const full = paintJobCost(car, job)
@@ -37,7 +44,11 @@ export function PaintShop({ car, job, setJob }: { car: OwnedCar; job: PaintJob; 
         <div className="try-bar on">
           <span className="try-what">Trying <b>{label}</b></span>
           <button className="try-cancel" onClick={() => setJob(null)}>Undo</button>
-          <button className={cost.bucks ? 'buy small premium' : 'buy small'} onClick={() => { if (paintCar(car.uid, job)) setJob(null) }}>{cost.deal && <span className="deal-tag">DEAL</span>}Buy · {cost.deal && <s>${full.coins.toLocaleString()}</s>} {price}</button>
+          {lockedBy ? (
+            <button className="buy small paint-rival-go" onClick={() => openPaintRival(lockedBy.id)} title={`Beat ${lockedBy.name} to unlock`}>🏁 {lockedBy.icon} {lockedBy.name.split(' ')[0]}</button>
+          ) : (
+            <button className={cost.bucks ? 'buy small premium' : 'buy small'} onClick={() => { if (paintCar(car.uid, job)) setJob(null) }}>{cost.deal && <span className="deal-tag">DEAL</span>}Buy · {cost.deal && <s>${full.coins.toLocaleString()}</s>} {price}</button>
+          )}
         </div>
       )}
       <h4>Finish</h4>
@@ -58,18 +69,22 @@ export function PaintShop({ car, job, setJob }: { car: OwnedCar; job: PaintJob; 
           )
         })}
       </div>
-      <h4>Colour <small>$150 · neon and gold B1</small></h4>
+      <h4>Colour <small title="Beat paint rivals in the Race menu to win more colours">🎨 {paintsOpen({ rivalRow, oldPaints })}/{PAINTS_TO_COLLECT}</small></h4>
       <div className="paints">
-        {PAINTS.map((p) => (
-          <button
-            key={p.color}
-            title={`${p.name}${p.bucks ? ' (1 gem)' : ''}`}
-            aria-label={p.name}
-            className={p.color === job.color ? 'dot big sel' : p.bucks ? 'dot big premium' : 'dot big'}
-            style={{ backgroundColor: p.color, backgroundImage: SHEEN[job.finish] }}
-            onClick={() => pick({ color: p.color })}
-          />
-        ))}
+        {PAINTS.map((p) => {
+          const locked = !open(p.color)
+          const r = locked ? rivalForPaint(p.color) : null
+          return (
+            <button
+              key={p.color}
+              title={`${p.name}${p.bucks ? ' (1 gem)' : r ? ` · beat ${r.name}` : ''}`}
+              aria-label={locked ? `${p.name}, locked` : p.name}
+              className={`dot big${p.color === job.color ? ' sel' : ''}${p.bucks ? ' premium' : ''}${locked ? ' locked' : ''}`}
+              style={{ backgroundColor: p.color, backgroundImage: SHEEN[job.finish] }}
+              onClick={() => pick({ color: p.color })}
+            >{locked && <span className="dot-lock" aria-hidden>🔒</span>}</button>
+          )
+        })}
       </div>
       <h4>Racing stripes <small>$100</small></h4>
       <div className="paints">

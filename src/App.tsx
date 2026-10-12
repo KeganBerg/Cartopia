@@ -7,6 +7,7 @@ import { FlyLayer } from './ui/Fly'
 import { ThumbRenderer } from './scene/BuildingPreview'
 import { StageCanvas } from './scene/Stage'
 import { BottomBar, ShopPanel, ShowroomPanel, GaragePanel, Toasts } from './ui/Menus'
+import { PaintPrizePopup } from './ui/PaintRivals'
 import { RacePanel, LiveRaceOverlay, InvitesPanel, PrizePopup, CampaignPrizePopup, TourPrizePopup, EventPrizePopup } from './ui/Race'
 import { joinLobby, useLive } from './lib/live'
 import { chatDemo, startChat } from './lib/chat'
@@ -188,6 +189,7 @@ export default function App() {
       <CampaignPrizePopup />
       <TourPrizePopup />
       <EventPrizePopup />
+      <PaintPrizePopup />
       <LevelUpSplash />
       <Toasts />
       <FlyLayer />

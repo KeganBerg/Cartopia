@@ -10,6 +10,7 @@ import { opensLabel } from './clock'
 import { requestTrip, requestVisit } from './trips'
 import { trialPrize } from './trial'
 import { RIVALS, RIVAL_VISITS, RIVAL_BACK_MS, type RivalProgress } from './rivals'
+import { paintOpen, paintRival, rivalForPaint, rowPrize } from './paintRivals'
 import { tourIsBoss, tourLegBonus, tourLegOf, tourPrize } from './tour'
 import { EVENT_RACES, eventBonus, eventFor, eventIsBoss, eventPrize, eventProgress, type EventProgress } from './events'
 import { trialWeek } from './trial'
@@ -92,6 +93,10 @@ export type SaveState = {
   // Town rivals: times each one has been beaten (0-3) and when a beaten one comes back.
   // The server guard pays a rival's bonus once, when they're first beaten three times.
   rivals: Record<string, RivalProgress>
+  // Paint rivals (game/paintRivals.ts): wins over each one. The first win unlocks their colour.
+  rivalRow: Record<string, number>
+  // True for towns from before paint rivals, which keep every colour they could already buy.
+  oldPaints?: boolean
   // Pro Tour races won (game/tour.ts); the next race is this one.
   tour: number
   // This week's event (game/events.ts): its week, the rival base PI and races won. Older weeks are ignored.
@@ -146,6 +151,8 @@ type UiState = {
   tourPrize: { leg: number; coins: number } | null
   // A weekly event just cleared: its id, the skin it gave (null: already owned) and the bonus coins.
   eventPrize: { id: string; skin: string | null; coins: number } | null
+  // A paint rival just beaten for the first time: their id (their colour is now unlocked).
+  paintPrize: string | null
   // The signed-in player's clan, shown on the Crew House.
   clanBadge: { tag: string; emblem: string; color: string } | null
   // Level-up splash: the levels just reached and the rewards they paid.
@@ -234,6 +241,9 @@ type Actions = {
   rivalResult: (id: string, won: boolean, prize: number) => { coins: number; bucks: number; trophies: number } | null
   // Settles a double-or-nothing rematch: wins the stake again, or gives it back.
   rivalBet: (won: boolean, stake: number) => void
+  // Records a race against a paint rival; the first win unlocks their colour.
+  rowResult: (id: string, won: boolean) => void
+  closePaintPrize: () => void
   // Pays a finished week's time trial prize (the place comes from the server's board).
   claimTrialPrize: (week: string, place: number) => void
   // Pays a town visitor's prize (fixed by the server for signed-in players); seq is the server's claim number.
@@ -385,6 +395,8 @@ export function starterTown(): SaveState {
     crates: 0,
     trials: { claimed: {} },
     rivals: {},
+    rivalRow: {},
+    oldPaints: false,
     tour: 0,
     event: null,
     deals: null,
@@ -688,6 +700,7 @@ export const useGame = create<GameState>()(
       campaignPrize: null,
       tourPrize: null,
       eventPrize: null,
+      paintPrize: null,
       levelUp: null,
 
       // Building, roads and land edit your own town, which isn't on screen while visiting.
@@ -1423,6 +1436,11 @@ export const useGame = create<GameState>()(
         const fin = FINISHES.find((f) => f.id === job.finish)
         // A car can keep a factory colour that isn't on the paint chart.
         if (!car || (!paint && job.color !== car.color) || !fin || !STRIPES.includes(job.stripe)) return false
+        if (job.color !== car.color && !paintOpen(s, job.color)) {
+          const r = rivalForPaint(job.color)
+          s.toast(r ? `Beat ${r.name} to unlock ${paint!.name}` : 'That colour is locked')
+          return false
+        }
         if (s.level < fin.unlockLevel && fin.id !== (car.finish ?? 'gloss')) {
           s.toast(`${fin.name} unlocks at level ${fin.unlockLevel}`)
           return false
@@ -1552,7 +1570,7 @@ export const useGame = create<GameState>()(
         return true
       },
 
-      loadSave: (save) => set({ ...starterDefaults(), ...save }),
+      loadSave: (save) => set({ ...starterDefaults(), ...save, oldPaints: save.oldPaints ?? true }),
 
       gpResult: (seriesId, won) => {
         const s = get()
@@ -1688,6 +1706,19 @@ export const useGame = create<GameState>()(
         }))
         return { coins: def.coins, bucks: def.bucks, trophies: def.trophies }
       },
+
+      rowResult: (id, won) => {
+        const s = get()
+        const r = paintRival(id)
+        if (!r) return
+        const wins = s.rivalRow[id] ?? 0
+        s.finishRace(won, rowPrize(r, wins === 0))
+        if (!won) return
+        if (wins === 0) setTimeout(sfx.levelUp, 200)
+        set((g) => ({ rivalRow: { ...g.rivalRow, [id]: wins + 1 }, paintPrize: wins === 0 ? id : g.paintPrize, updatedAt: Date.now() }))
+      },
+
+      closePaintPrize: () => set({ paintPrize: null }),
 
       rivalBet: (won, stake) => {
         const s = get()
@@ -1933,20 +1964,21 @@ export const useGame = create<GameState>()(
     {
       name: 'cartopia-save',
       partialize: (s) => saveOf(s),
-      merge: (persisted, current) => (persisted ? { ...current, ...starterDefaults(), ...(persisted as Partial<SaveState>) } : current),
+      // A town saved before paint rivals has no oldPaints and keeps its colours.
+      merge: (persisted, current) => (persisted ? { ...current, ...starterDefaults(), ...(persisted as Partial<SaveState>), oldPaints: (persisted as Partial<SaveState>).oldPaints ?? true } : current),
     },
   ),
 )
 
 export function saveOf(s: GameState): SaveState {
-  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, season, deals, trials, rivals, tour, event, showcase, raceCar, skins, modSkins, land, updatedAt } = s
-  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, season, deals, trials, rivals, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, land, updatedAt }
+  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, season, deals, trials, rivals, rivalRow, oldPaints, tour, event, showcase, raceCar, skins, modSkins, land, updatedAt } = s
+  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, season, deals, trials, rivals, rivalRow, oldPaints: !!oldPaints, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, land, updatedAt }
 }
 
 // Fields added after launch, so older saves load with sensible values.
-function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'quests' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'gp' | 'campaign' | 'claimedSets' | 'crewChests' | 'visits' | 'crates' | 'season' | 'deals' | 'trials' | 'rivals' | 'tour' | 'event' | 'showcase' | 'skins' | 'modSkins' | 'land'> {
+function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'quests' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'gp' | 'campaign' | 'claimedSets' | 'crewChests' | 'visits' | 'crates' | 'season' | 'deals' | 'trials' | 'rivals' | 'rivalRow' | 'tour' | 'event' | 'showcase' | 'skins' | 'modSkins' | 'land'> {
   // Saves from before the tutorial existed skip it.
-  return { stats: emptyStats(), claimedGoals: [], quests: null, lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, gp: {}, campaign: {}, claimedSets: [], crewChests: 0, visits: 0, crates: 0, season: null, deals: null, trials: { claimed: {} }, rivals: {}, tour: 0, event: null, showcase: [], skins: [], modSkins: [], land: [...START_LAND] }
+  return { stats: emptyStats(), claimedGoals: [], quests: null, lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, gp: {}, campaign: {}, claimedSets: [], crewChests: 0, visits: 0, crates: 0, season: null, deals: null, trials: { claimed: {} }, rivals: {}, rivalRow: {}, tour: 0, event: null, showcase: [], skins: [], modSkins: [], land: [...START_LAND] }
 }
 
 
