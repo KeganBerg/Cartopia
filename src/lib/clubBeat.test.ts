@@ -4,7 +4,7 @@ import { clubHit, clubPulse, resetClubBeat } from './clubBeat'
 describe('club beat', () => {
   beforeEach(resetClubBeat)
 
-  it('moves the colours on and flashes when a scheduled note is heard, not before', () => {
+  it('moves the colours on and flashes when a scheduled kick is heard, not before', () => {
     clubHit(1000, true)
     clubHit(1120, false)
     const before = clubPulse(990, 124)
@@ -15,9 +15,11 @@ describe('club beat', () => {
     expect(kick.live).toBe(true)
     const later = clubPulse(1100, 124)
     expect(later.flash).toBeLessThan(0.6)
+    // An off-beat bass note keeps the colour and doesn't flash.
     const bass = clubPulse(1120, 124)
-    expect(bass.step).toBe(2)
-    expect(bass.flash).toBeCloseTo(0.6)
+    expect(bass.step).toBe(1)
+    expect(bass.flash).toBeLessThan(0.6)
+    expect(bass.live).toBe(true)
   })
 
   it('keeps a gentle pulse at the tempo when no music plays', () => {
