@@ -7,6 +7,8 @@ import { Glass, GlassBlock, glassMat, LitSign, RoofPlant, PadLights } from './Of
 import { CarModel } from './CarModel'
 import { Upright, useBays, useMergeScale } from './mergeScale'
 import { WashCenter } from './WashCenter'
+import { isMarketCenter } from '../game/marketCenter'
+import { MarketCenter } from './MarketCenter'
 import { isWashCenter } from '../game/washCenter'
 import { ShopTower } from './ShopTower'
 import { glowMats } from './dayNight'
@@ -254,6 +256,8 @@ function MotelModel({ def, ghost, m, win, bulb, level }: Props) {
 // ---- Fresh Mart: a two-level plaza with roof parking, then a tower ----
 
 function MarketModel({ def, ghost, m, win, bulb, level }: Props) {
+  const scale = useMergeScale()
+  if (isMarketCenter(def.id, level, scale)) return <MarketCenter m={m} win={win} bulb={bulb} level={level} ghost={ghost} />
   const k: Kit = { m, win, bulb, ghost }
   const green = def.roof
   if (growthStage(level) === 2) {

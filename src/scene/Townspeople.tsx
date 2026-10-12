@@ -14,7 +14,7 @@ import { headGeo, legGeo, torsoGeo } from './peopleGeo'
 import { dayPhase, nightAmount } from './dayNight'
 import { isNight } from '../game/clock'
 import { CLUB } from './clubLayout'
-import { storeDoors } from '../game/travelCenter'
+import { storeDoors, STORE_DEFS } from '../game/storeDoors'
 
 const LEG_SIDES = [-1, 1]
 
@@ -234,7 +234,7 @@ export function Townspeople() {
   const planned = useRef<WalkGraph | null>(null)
   const places = useMemo(() => destinations(graph), [graph])
   // Merged travel stops: people cross the forecourt and go in at the doors.
-  const storeKey = useGame((s) => (s.visiting ?? s).buildings.filter((b) => b.def === 'gas').map((b) => `${b.uid}:${b.x},${b.z}:${b.merge ?? ''}:${b.mturn ?? ''}:${buildingLevel(b)}`).join('|'))
+  const storeKey = useGame((s) => (s.visiting ?? s).buildings.filter((b) => STORE_DEFS.includes(b.def)).map((b) => `${b.uid}:${b.x},${b.z}:${b.merge ?? ''}:${b.mturn ?? ''}:${buildingLevel(b)}`).join('|'))
   const stores = useMemo(() => {
     void storeKey
     const s = useGame.getState()
