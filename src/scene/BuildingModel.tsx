@@ -5,7 +5,7 @@ import { signTexture } from './signTexture'
 import { signMat } from './closingTime'
 import { CarModel } from './CarModel'
 import { Upright, useBays, useMergeScale } from './mergeScale'
-import { ObstacleDetail, BillboardDetail, DriveInDetail, FountainDetail, GarageDetail, HouseDetail, PondDetail, ShopDetail, ShopLot, SpeedwayDetail, StatueDetail } from './BuildingDetail'
+import { ObstacleDetail, BillboardDetail, DriveInDetail, FountainDetail, GarageDetail, HouseDetail, PondDetail, ShopDetail, ShopLot, GasLot, GarageLot, CrewDeck, SpeedwayDetail, StatueDetail } from './BuildingDetail'
 import { NEW_MODELS, NewBuildingModel } from './NewBuildings'
 import { PropMesh } from './propKit'
 import { DECOR_PROPS, benchBin } from './decorProps'
@@ -223,6 +223,16 @@ function Pump({ m, roof, x }: { m: ReturnType<typeof useMat>; roof: string; x: n
 // The pump island under the gas canopy: two pumps. A 2x2 or 4x4 block's canopy
 // is two or four times as big, but pumps stay pump-sized (people fill up at
 // them): it gets a second island and more pumps along each one instead.
+// A crash post at the end of a pump island.
+function Bollard({ m, roof, at }: { m: ReturnType<typeof useMat>; roof: string; at: [number, number, number] }) {
+  return (
+    <group position={at}>
+      <mesh position={[0, 0.16, 0]} castShadow><cylinderGeometry args={[0.04, 0.04, 0.32, 8]} />{m(roof)}</mesh>
+      <mesh position={[0, 0.22, 0]}><cylinderGeometry args={[0.042, 0.042, 0.05, 8]} />{m('#fafafa')}</mesh>
+    </group>
+  )
+}
+
 function GasPumps({ m, roof }: { m: ReturnType<typeof useMat>; roof: string }) {
   const [sx, sy, sz] = useMergeScale()
   const k = sx === sy && sy === sz ? sx : 1
@@ -238,6 +248,7 @@ function GasPumps({ m, roof }: { m: ReturnType<typeof useMat>; roof: string }) {
             <Pump m={m} roof={roof} x={x} />
           </group>
         ))}
+        {[-0.69, 0.69].map((x) => <Bollard key={x} m={m} roof={roof} at={[x, 0.15, -0.45]} />)}
       </group>
     )
   }
@@ -256,6 +267,7 @@ function GasPumps({ m, roof }: { m: ReturnType<typeof useMat>; roof: string }) {
             </mesh>
             <group position-y={0.1}>
               {Array.from({ length: n }, (_, i) => <Pump key={i} m={m} roof={roof} x={((i + 0.5) / n - 0.5) * (len - 0.3)} />)}
+              {[-1, 1].map((sd) => <Bollard key={sd} m={m} roof={roof} at={[sd * (len / 2 - 0.06), 0, 0]} />)}
             </group>
           </Upright>
         </group>
@@ -442,6 +454,8 @@ function CrewHouse({ m, ghost, sign, bulb, win }: { m: ReturnType<typeof useMat>
           <LightPool r={0.6} x={0.62} z={0.55} />
         </group>
       )}
+      {!ghost && <CrewDeck />}
+      {!ghost && <Lights from={[0.1, 0.78, 0.55]} to={[1.78, 0.9, 0.68]} n={8} />}
       {!ghost && <CrewFlag x={1.5} z={-0.7} />}
       {!ghost && <CrewFlag x={-1.85} z={0.75} />}
       {/* Sign on a frame across the top of the arch. */}
@@ -972,6 +986,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             </mesh>
           ))}
           {!ghost && <GarageDetail W={W} D={D} />}
+          {!ghost && <GarageLot front={D * 0.3 - 0.3} />}
           {/* A board standing on the roof edge (it used to sit inside the wall, and
               under the eave the roof hid its top half). */}
           {sign && (
@@ -1025,6 +1040,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
           </mesh>
           {!ghost && <LightPool r={1.2} z={0} />}
           <GasPumps m={m} roof={def.roof} />
+          {!ghost && <GasLot />}
           {/* Little shop tucked in the back corner, with a striped awning: one
               piece with its windows, so a merged pair keeps them on its walls. */}
           <group>
