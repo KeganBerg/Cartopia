@@ -50,6 +50,12 @@ const BODY: Record<Body, EngineProfile> = {
   scooter: p({ ppr: 1, idle: 2200, redline: 9500, odd: 0.7, roll: 0.85, sub: 0, grit: 0.35, noise: 0.35, bright: 1.4, reso: 420, vol: 0.7 }),
   chopper: p({ ppr: 1, idle: 900, redline: 5600, odd: 0.25, roll: 1.4, lump: 0.85, lumpRatio: 0.5, sub: 0.5, grit: 0.45, noise: 0.3, bright: 0.85, reso: 110, crackle: 0.4, vol: 1.1 }),
   sportbike: p({ ppr: 2, idle: 1300, redline: 14000, odd: 0.25, roll: 1.0, sub: 0.1, grit: 0.35, noise: 0.35, bright: 1.5, reso: 320, crackle: 0.45, vol: 0.95 }),
+  // Mid-engined V12 exotic: a high, clean howl.
+  scissor: p({ ppr: 6, idle: 1000, redline: 9200, odd: 0.08, roll: 1.0, sub: 0.35, grit: 0.35, noise: 0.28, bright: 1.5, reso: 270, crackle: 0.8, vol: 1.2 }),
+  // Quad-turbo W16: a deep, smooth rush with turbo whistle.
+  horseshoe: p({ ppr: 8, idle: 800, redline: 6800, odd: 0.05, roll: 1.3, sub: 0.6, grit: 0.3, noise: 0.3, bright: 1.0, reso: 160, turbo: 1.0, crackle: 0.3, vol: 1.25 }),
+  // Twin-turbo V12 with a bright edge.
+  teardrop: p({ ppr: 6, idle: 950, redline: 8000, odd: 0.08, roll: 1.1, sub: 0.4, grit: 0.35, noise: 0.28, bright: 1.35, reso: 230, turbo: 0.5, crackle: 0.6, vol: 1.15 }),
   wedge: p({ ppr: 6, idle: 950, redline: 8800, odd: 0.1, roll: 1.05, sub: 0.35, grit: 0.4, noise: 0.3, bright: 1.45, reso: 260, crackle: 0.7, vol: 1.15 }),
   super: p({ ppr: 4, idle: 950, redline: 8500, odd: 0.1, roll: 1.1, lump: 0.15, lumpRatio: 0.25, sub: 0.45, grit: 0.4, noise: 0.3, bright: 1.35, reso: 210, turbo: 0.6, crackle: 0.6, vol: 1.15 }),
   bubble: p({ ppr: 2, idle: 850, redline: 4800, odd: 0.45, roll: 1.1, lump: 0.4, lumpRatio: 0.5, sub: 0.1, grit: 0.3, noise: 0.3, clatter: 0.4, bright: 0.95, reso: 200, vol: 0.85 }),
