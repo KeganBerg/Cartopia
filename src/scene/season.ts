@@ -19,6 +19,44 @@ function currentSeason(): Season {
 
 export const SEASON: Season = currentSeason()
 
+// How far through the current season today is (0 at its first day, 1 at its last),
+// from the same East Coast calendar. ?seasonT=0..1 pins it for testing.
+function seasonProgress(): number {
+  const pin = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('seasonT') : null
+  if (pin !== null && !Number.isNaN(Number(pin))) return Math.max(0, Math.min(1, Number(pin)))
+  const now = new Date()
+  let y = now.getFullYear(), m = now.getMonth() + 1, d = now.getDate()
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: 'numeric', day: 'numeric' }).formatToParts(now)
+    const get = (t: string) => Number(parts.find((p) => p.type === t)?.value)
+    y = get('year'); m = get('month'); d = get('day')
+  } catch {
+    // Local time is close enough.
+  }
+  // Seasons start on the first of March, June, September and December.
+  const startMonth = { spring: 3, summer: 6, fall: 9, winter: 12 }[SEASON]
+  const startYear = SEASON === 'winter' && m <= 2 ? y - 1 : y
+  const start = Date.UTC(startYear, startMonth - 1, 1)
+  const end = Date.UTC(startYear, startMonth + 2, 1)
+  return Math.max(0, Math.min(1, (Date.UTC(y, m - 1, d) - start) / (end - start)))
+}
+export const SEASON_T = seasonProgress()
+
+const ORDER: Season[] = ['winter', 'spring', 'summer', 'fall']
+const smooth = (a: number, b: number, x: number) => {
+  const t = Math.max(0, Math.min(1, (x - a) / (b - a)))
+  return t * t * (3 - 2 * t)
+}
+// Seasons hand over gradually: through the last couple of weeks of a season the
+// world takes on more and more of the next one, and through the first couple of
+// weeks of the next it lets go of the last, meeting half way on the changeover day.
+// `other` is the neighbouring season and `mix` (0..0.5) how much of it shows.
+export const SEASON_MIX: { other: Season; mix: number } = (() => {
+  const i = ORDER.indexOf(SEASON)
+  if (SEASON_T > 0.5) return { other: ORDER[(i + 1) % 4], mix: 0.5 * smooth(0.82, 1, SEASON_T) }
+  return { other: ORDER[(i + 3) % 4], mix: 0.5 * (1 - smooth(0, 0.18, SEASON_T)) }
+})()
+
 type Palette = {
   grass: string
   grassSpeckle: string[]
@@ -51,4 +89,28 @@ export const PALETTES: Record<Season, Palette> = {
   },
 }
 
-export const PAL = PALETTES[SEASON]
+// The palette in use, blended toward the neighbouring season during a changeover:
+// single colours fade across; lists (leaves, flowers) swap colour by colour, so a
+// canopy in late summer is part green, part turning orange.
+function blend(a: Palette, b: Palette, f: number): Palette {
+  if (f <= 0.001) return a
+  const lerp = (x: string, y: string) => {
+    const p = parseInt(x.slice(1), 16), q = parseInt(y.slice(1), 16)
+    const ch = (sh: number) => Math.round(((p >> sh) & 255) + ((((q >> sh) & 255) - ((p >> sh) & 255)) * f))
+    return `#${((ch(16) << 16) | (ch(8) << 8) | ch(0)).toString(16).padStart(6, '0')}`
+  }
+  const swap = <T extends string[]>(x: T, y: string[]) => x.map((c, i) => ((i + 0.5) / x.length < f ? y[i % y.length] : c)) as T
+  return {
+    grass: lerp(a.grass, b.grass),
+    grassSpeckle: a.grassSpeckle.map((c, i) => lerp(c, b.grassSpeckle[i % b.grassSpeckle.length])),
+    grassDots: swap(a.grassDots, b.grassDots),
+    dots: Math.round(a.dots + (b.dots - a.dots) * f),
+    ground: lerp(a.ground, b.ground),
+    leaves: swap(a.leaves, b.leaves),
+    bush: swap(a.bush, b.bush),
+    fronds: a.fronds.map((c, i) => lerp(c, b.fronds[i])) as [string, string],
+    sun: lerp(a.sun, b.sun),
+    bare: a.bare,
+  }
+}
+export const PAL = blend(PALETTES[SEASON], PALETTES[SEASON_MIX.other], SEASON_MIX.mix)

@@ -1,5 +1,5 @@
 import { BufferAttribute, BufferGeometry, Color } from 'three'
-import { PAL, SEASON } from './season'
+import { PALETTES, SEASON, SEASON_MIX, type Season } from './season'
 
 // The shape and colour of the land around the town, for the free view's
 // horizon (Horizon.tsx). Pure maths, no rendering, so it can be tested.
@@ -122,14 +122,22 @@ export function heightAt(x: number, z: number) {
 // What the land is made of at a point: fields, meadow, forest floor, rock or snow.
 export const SNOWLINE = { winter: 0, spring: 150, summer: 205, fall: 175 }[SEASON]
 const C = (h: string) => new Color(h)
-const GRASS = SEASON === 'winter' ? [C('#e9eff4'), C('#dde6ec')] : SEASON === 'fall' ? [C('#93a046'), C('#a7a24c')] : [C(PAL.ground), C(PAL.grassSpeckle[1])]
-const CROPS = {
-  spring: ['#7fc04f', '#a4d65e', '#e8d84a', '#6a8f3a', '#8b6a4a'],
-  summer: ['#6fb141', '#d9b44a', '#e6c65a', '#5f9e38', '#a07a52'],
-  fall: ['#c49a3e', '#8d6b45', '#b5873a', '#d1aa52', '#7a5a3c'],
-  winter: ['#eef3f7', '#e2e9ee', '#f7fafc', '#dfe7ed', '#e8eef2'],
-}[SEASON].map(C)
-const ROCK = C('#8a8378'), ROCK_DARK = C('#6f6a62'), SNOW = C('#f4f8fb'), SAND = C('#d8c79a'), FOREST_FLOOR = C(SEASON === 'winter' ? '#d9e2e8' : SEASON === 'fall' ? '#7c6a34' : '#3f7a34')
+// During a changeover (SEASON_MIX) the land shades toward the next season and
+// some fields have already turned over to its crops.
+const MIX = SEASON_MIX
+const grassOf = (k: Season) => (k === 'winter' ? [C('#e9eff4'), C('#dde6ec')] : k === 'fall' ? [C('#93a046'), C('#a7a24c')] : [C(PALETTES[k].ground), C(PALETTES[k].grassSpeckle[1])])
+const GRASS = grassOf(SEASON).map((c, i) => c.lerp(grassOf(MIX.other)[i], MIX.mix))
+const CROPS_BY: Record<Season, Color[]> = {
+  spring: ['#7fc04f', '#a4d65e', '#e8d84a', '#6a8f3a', '#8b6a4a'].map(C),
+  summer: ['#6fb141', '#d9b44a', '#e6c65a', '#5f9e38', '#a07a52'].map(C),
+  fall: ['#c49a3e', '#8d6b45', '#b5873a', '#d1aa52', '#7a5a3c'].map(C),
+  winter: ['#eef3f7', '#e2e9ee', '#f7fafc', '#dfe7ed', '#e8eef2'].map(C),
+}
+const floorOf = (k: Season) => C(k === 'winter' ? '#d9e2e8' : k === 'fall' ? '#7c6a34' : '#3f7a34')
+const ROCK = C('#8a8378'), ROCK_DARK = C('#6f6a62'), SNOW = C('#f4f8fb'), SAND = C('#d8c79a'), FOREST_FLOOR = floorOf(SEASON).lerp(floorOf(MIX.other), MIX.mix)
+// How much of the low ground lies under snow (0..1): all of it in winter, less as
+// spring melts it, patches of first snow at the end of fall.
+export const SNOW_COVER = SEASON === 'winter' ? (MIX.other === 'spring' ? 1 - MIX.mix : 1) : MIX.other === 'winter' ? MIX.mix : 0
 const tmp = new Color()
 
 function groundColor(out: Color, x: number, z: number, h: number, slope: number) {
@@ -137,14 +145,16 @@ function groundColor(out: Color, x: number, z: number, h: number, slope: number)
   out.copy(GRASS[0]).lerp(GRASS[1], g)
   // Patchwork fields on the farm side.
   const f = fieldAt(x, z)
-  if (f && slope < 0.35) out.copy(CROPS[f.kind])
+  if (f && slope < 0.35) out.copy(CROPS_BY[f.season][f.kind])
   // Forest floor under the woods.
   if (forest(x, z) > 0.5 && slope < 0.6) out.lerp(FOREST_FLOOR, 0.6)
   // Beaches round the lake, rock on steep faces, snow up high.
   if (lakeOf(x, z) < 1.12 && h < 2.5) out.copy(SAND)
   if (slope > 0.75) out.lerp(g > 0.5 ? ROCK : ROCK_DARK, smooth(0.75, 1.2, slope))
   else if (h > 90) out.lerp(ROCK, smooth(90, 160, h) * 0.8)
-  const snow = SEASON === 'winter' ? 1 - smooth(0.9, 1.4, slope) * 0.6 : smooth(SNOWLINE - 25, SNOWLINE + 15, h + g * 30) * (1 - smooth(1.1, 1.5, slope))
+  // Low snow lies in patches while it comes and goes (noise against the cover), up high it follows the snowline.
+  const low = SNOW_COVER >= 1 ? 1 : SNOW_COVER <= 0 ? 0 : 1 - smooth(SNOW_COVER - 0.08, SNOW_COVER + 0.08, smooth(0.25, 0.75, fbm(x / 60 + 3, z / 60 - 9, 3)))
+  const snow = Math.max(low * (1 - smooth(0.9, 1.4, slope) * 0.6), SEASON === 'winter' ? 0 : smooth(SNOWLINE - 25, SNOWLINE + 15, h + g * 30) * (1 - smooth(1.1, 1.5, slope)))
   if (snow > 0) out.lerp(SNOW, snow)
   const { d } = hwy(x, z)
   if (d < 18) out.lerp(tmp.set(SEASON === 'winter' ? '#cfd6dc' : '#7d8a5a'), smooth(18, 9, d) * 0.6)
@@ -175,7 +185,9 @@ export function fieldAt(x: number, z: number) {
   const { fx, fz } = fieldCell(x, z)
   const k = hash(fx, fz)
   if (k >= 0.78) return null
-  return { fx, fz, kind: Math.floor(k * 6.4) % 5 }
+  // Some fields turn over to the next season's crop before others.
+  const season = hash(fx + 31.7, fz - 12.3) < MIX.mix * 1.6 ? MIX.other : SEASON
+  return { fx, fz, kind: Math.floor(k * 6.4) % 5, season }
 }
 
 // Height of the terrain MESH at a point, which between its vertices differs a

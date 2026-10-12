@@ -10,7 +10,7 @@ import { lightDir } from './look'
 import { hazeColor } from './weatherLook'
 import { Kit, kitMat } from './kit'
 import { PAL, SEASON } from './season'
-import { A_CITY, A_LAKE, A_MTN, A_WOODS, CITY, HWY0, HWY_DIR, HWY_LEN, R0, R1, SNOWLINE, TAU, angDist, buildTerrain, forest, heightAt, hwy, hwyHeight, lakeOf, polar, rail, smooth } from './horizonLand'
+import { A_CITY, A_LAKE, A_MTN, A_WOODS, CITY, HWY0, HWY_DIR, HWY_LEN, R0, R1, SNOWLINE, TAU, angDist, buildTerrain, forest, heightAt, hwy, hwyHeight, lakeOf, polar, rail, smooth, SNOW_COVER } from './horizonLand'
 import { towerGlowTex, towerTex, waterTex } from './textures'
 import { rand } from './RaceVenues'
 import { Countryside } from './Countryside'
@@ -324,8 +324,9 @@ function farTree(kind: 'pine' | 'oak') {
   }
   return k.geometry()!
 }
-const PINE_TINTS = SEASON === 'winter' ? ['#e9f0f2', '#cfdcd6', '#b9ccc0'] : ['#2e6b30', '#3a7d3a', '#245a2a', '#41823f']
-const TREE_TINTS = { pine: PINE_TINTS, oak: [...PAL.leaves] }
+const SNOWY_PINES = ['#e9f0f2', '#cfdcd6', '#b9ccc0']
+const PINES = ['#2e6b30', '#3a7d3a', '#245a2a', '#41823f']
+const TREE_TINTS = { pine: PINES, oak: [...PAL.leaves] }
 let treeGeo: { pine: BufferGeometry; oak: BufferGeometry } | null = null
 
 function Trees({ spots, kind }: { spots: Spot[]; kind: 'pine' | 'oak' }) {
@@ -343,7 +344,10 @@ function Trees({ spots, kind }: { spots: Spot[]; kind: 'pine' | 'oak' }) {
       o.scale.set(p.s, p.s * (kind === 'pine' ? 1.35 : 1.05), p.s)
       o.updateMatrix()
       m.setMatrixAt(i, o.matrix)
-      m.setColorAt(i, c.set(tints[Math.floor(p.tint * tints.length) % tints.length]))
+      // Pines carry snow in winter, on some trees first as it comes and goes.
+      const snowy = kind === 'pine' && ((p.tint * 7.31) % 1) < SNOW_COVER
+      const list = snowy ? SNOWY_PINES : tints
+      m.setColorAt(i, c.set(list[Math.floor(p.tint * list.length) % list.length]))
     })
     m.instanceMatrix.needsUpdate = true
     if (m.instanceColor) m.instanceColor.needsUpdate = true

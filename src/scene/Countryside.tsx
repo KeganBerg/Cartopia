@@ -7,9 +7,9 @@ import {
 import { weatherNow } from '../game/weather'
 import { dayPhase, nightAmount } from './dayNight'
 import { Kit, kitMat } from './kit'
-import { SEASON } from './season'
+import { PAL, SEASON, type Season } from './season'
 import {
-  A_CITY, A_LAKE, FIELD, FIELD_AXES, HWY_DIR, LAKE, RAIL_LEN, TAU, angDist, fieldAt, fieldCentre, groundAt, hwy, lakeOf, rail, railHeight, railPoint,
+  A_CITY, A_LAKE, FIELD, FIELD_AXES, SNOW_COVER, HWY_DIR, LAKE, RAIL_LEN, TAU, angDist, fieldAt, fieldCentre, groundAt, hwy, lakeOf, rail, railHeight, railPoint,
 } from './horizonLand'
 import { rand } from './RaceVenues'
 
@@ -21,7 +21,8 @@ import { rand } from './RaceVenues'
 // flocks of birds. The still parts are one baked mesh; the moving parts are a
 // handful of instanced meshes.
 
-const W = SEASON === 'winter'
+// Snow on the roofs once the ground is mostly white.
+const W = SNOW_COVER > 0.5
 const facet = (g: BufferGeometry) => {
   const n = g.index ? g.toNonIndexed() : g
   n.computeVertexNormals()
@@ -46,7 +47,7 @@ CONE.translate(0, 0.5, 0)
 
 // What grows in each kind of field (see fieldAt), by season.
 type Crop = { rows?: { h: number; c: string }; heads?: string; trees?: string[]; bales?: number; pumpkins?: boolean }
-const CROP: Crop[] = {
+const CROP_BY: Record<Season, Crop[]> = {
   spring: [
     { rows: { h: 0.5, c: '#7fc04f' } },
     { rows: { h: 0.4, c: '#9ccf58' } },
@@ -75,7 +76,7 @@ const CROP: Crop[] = {
     { trees: ['#eef3f6'] },
     { bales: 2 },
   ],
-}[SEASON]
+}
 
 type Smoke = { x: number; y: number; z: number }
 type Built = { still: BufferGeometry; lights: BufferGeometry | null; smoke: Smoke[]; ribbon: BufferGeometry }
@@ -94,7 +95,7 @@ function build(small: boolean): Built {
 
   // ---- Fields --------------------------------------------------------------------
   const seen = new Set<string>()
-  const fields: { fx: number; fz: number; kind: number; cx: number; cz: number }[] = []
+  const fields: { fx: number; fz: number; kind: number; season: Season; cx: number; cz: number }[] = []
   for (let x = -720; x < 120; x += 15) {
     for (let z = -720; z < 120; z += 15) {
       const f = fieldAt(x, z)
@@ -116,7 +117,7 @@ function build(small: boolean): Built {
   let heads = 0
   const maxHeads = small ? 500 : 1600
   for (const f of fields) {
-    const crop = CROP[f.kind]
+    const crop = CROP_BY[f.season][f.kind]
     if (crop.rows) {
       const { h, c } = crop.rows
       for (let i = 0; i < rowsPer; i++) {
@@ -208,7 +209,7 @@ function build(small: boolean): Built {
     k.add(ROOF, W ? roofSnow : '#6d4c41', hx, hy + 5, hz, yaw + Math.PI / 2, 9, 3.4, 9)
     const [cx, cz] = fwd(6, -14.2)
     k.add(BOX, '#8d6e63', cx, hy + 5, cz, yaw, 1, 4.4, 1)
-    if (W || SEASON === 'fall') smoke.push({ x: cx, y: hy + 9.6, z: cz })
+    if (SNOW_COVER > 0 || SEASON === 'fall' || SEASON === 'winter') smoke.push({ x: cx, y: hy + 9.6, z: cz })
     for (const w of [-2, 2]) {
       const [wx, wz] = fwd(4 + w, -12.95)
       night.add(BOX, '#ffcf6e', wx, hy + 1.6, wz, yaw, 1.3, 1.4, 0.1, 0, 0, 1)
@@ -217,7 +218,7 @@ function build(small: boolean): Built {
     const [tx, tz] = fwd(-9, -14)
     const ty = groundAt(tx, tz)
     k.add(CYL, '#5d4030', tx, ty - 0.3, tz, 0, 0.5, 4.5, 0.5)
-    k.add(BALL, W ? '#eef3f6' : SEASON === 'fall' ? '#e67e22' : SEASON === 'spring' ? '#8bd96a' : '#4caf50', tx, ty + 6, tz, r() * TAU, 3.6, 3.2, 3.6)
+    k.add(BALL, W ? '#eef3f6' : PAL.leaves[farms % PAL.leaves.length], tx, ty + 6, tz, r() * TAU, 3.6, 3.2, 3.6)
   }
 
   // ---- Water tower -----------------------------------------------------------------
@@ -243,7 +244,7 @@ function build(small: boolean): Built {
       k.add(BOX, '#a1887f', px, -0.55, pz, yaw, 4, 0.3, 3.6)
       for (const side of [-1.7, 1.7]) k.add(BOX, '#6d4c41', px - dz * side, -3, pz + dx * side, 0, 0.35, 2.6, 0.35)
     }
-    if (W) {
+    if (SEASON === 'winter') {
       for (let i = 0; i < 6; i++) {
         const a = r() * TAU, rr = 40 + r() * 100
         const px = LAKE[0] + Math.cos(a) * rr * 1.35, pz = LAKE[1] + Math.sin(a) * rr
@@ -302,7 +303,7 @@ export function Countryside({ small }: { small: boolean }) {
       <mesh geometry={b.ribbon} material={ribbonMat} raycast={() => null} />
       <WaterTowerSign />
       <Train />
-      {!W && <Boats />}
+      {SEASON !== 'winter' && <Boats />}
       {b.smoke.length > 0 && <Smoke spots={b.smoke} />}
       <Birds />
     </group>
