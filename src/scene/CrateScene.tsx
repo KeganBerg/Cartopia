@@ -1024,7 +1024,7 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
   const flash = useRef<PointLight>(null)
   const burstAt = useRef<number | null>(null)
   const coinAt = useRef<number | null>(null)
-  const st = useRef({ born: -1, openAt: -1, lid: { y: 0, vy: 0, x: 0, vx: 0, rx: 0, landed: false }, revealed: false, hops: 0, skipped: skip })
+  const st = useRef({ born: -1, openAt: -1, lid: { y: 0, vy: 0, x: 0, vx: 0, rx: 0, landed: false }, revealed: false, hops: 0, skipped: skip, vary: { dir: 0, spin: 1, lag: [0, 0, 0, 0], wob: 11, side: 1 } })
   const coins = drop?.kind === 'coins' || drop?.kind === 'dupe' || drop?.kind === 'skindupe'
   // Rare and legendary pulls (cars, gem parts, epic and legendary skins) throw gems instead.
   const gems = !coins && tier >= 2
@@ -1082,7 +1082,17 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
         crateOpenSound(def.id)
         if (style !== 'pop') sfx.boost()
         // Street's lid pops off and tumbles aside; Garage's floats up and away on the beam.
-        s.lid = style === 'roll' ? { y: 0, vy: 1.5, x: 0, vx: 0, rx: 0, landed: false } : { y: 0, vy: 5, x: 0, vx: 1.2, rx: 0, landed: false }
+        s.lid = style === 'roll' ? { y: 0, vy: 1.5, x: 0, vx: 0, rx: 0, landed: false } : { y: 0, vy: 4.4 + Math.random() * 1.4, x: 0, vx: 1 + Math.random() * 0.5, rx: 0, landed: false }
+        // A little chance in every opening so no two look the same: which way the lid goes and
+        // spins, which sides drop first, how hard the chest lid wobbles, which way the camera swings.
+        const side = Math.random() < 0.5 ? -1 : 1
+        s.vary = {
+          dir: -Math.PI / 2 + side * (0.4 + Math.random() * 0.7),
+          spin: side * (0.7 + Math.random() * 0.6),
+          lag: [0, 1, 2, 3].map(() => Math.random() * 0.14),
+          wob: 9 + Math.random() * 5,
+          side,
+        }
       }
     }
     root.position.set((Math.random() - 0.5) * shake, y, (Math.random() - 0.5) * shake)
@@ -1102,12 +1112,12 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
         // Lifted straight up the beam, speeding up and turning, until it's gone.
         L.vy += 9 * dt
         L.y += L.vy * dt
-        L.rx += dt * 2.5
+        L.rx += dt * 2.5 * s.vary.spin
       } else if (style === 'pop' && !L.landed) {
         L.vy -= 16 * dt
         L.y += L.vy * dt
         L.x += L.vx * dt
-        L.rx += dt * 5
+        L.rx += dt * 5 * s.vary.spin
         const floor = -(S + 0.15) - y + 0.04
         if (L.y < floor) {
           L.y = floor
@@ -1118,25 +1128,27 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
       if (p.lid) {
         p.lid.visible = style !== 'shatter' && L.y < 7
         if (style === 'pop') {
-          p.lid.position.set(L.x * 0.6, S + 0.15 + L.y, -L.x)
+          p.lid.position.set(Math.cos(s.vary.dir) * L.x, S + 0.15 + L.y, Math.sin(s.vary.dir) * L.x)
           p.lid.rotation.set(L.landed ? 0 : -L.rx, L.rx * 0.3, L.landed ? 0.05 : L.rx * 0.2)
         } else if (style === 'roll') {
           p.lid.position.set(0, S + 0.15 + L.y, 0)
           p.lid.rotation.set(0, L.rx, 0)
         } else if (style === 'chest') {
           // Swung back on its hinge along the back edge, past upright, with a heavy wobble.
-          const a = 2.35 * (1 - Math.exp(-after * 6) * Math.cos(after * 11))
+          const a = 2.35 * (1 - Math.exp(-after * 6) * Math.cos(after * s.vary.wob))
           p.lid.position.set(0, S + 0.15 + (S / 2) * Math.sin(a), -S / 2 + (S / 2) * Math.cos(a))
           p.lid.rotation.set(-a, 0, 0)
         }
       }
-      const k = Math.min(1, after / 0.42)
-      const open = k < 1 ? 1 - (1 - k) * (1 - k) : 1
-      const bounce = after > 0.42 && after < 0.7 ? Math.sin(((after - 0.42) / 0.28) * Math.PI) * 0.12 : 0
-      // Shutters roll down into the base, a beat after the lid lifts.
-      const roll = Math.min(1, Math.max(0, (after - 0.08) / 0.55))
       p.panels.forEach((g, i) => {
         if (!g) return
+        // Each side goes a moment after the last, in a different order every time.
+        const at = Math.max(0, after - s.vary.lag[i])
+        const k = Math.min(1, at / 0.42)
+        const open = k < 1 ? 1 - (1 - k) * (1 - k) : 1
+        const bounce = at > 0.42 && at < 0.7 ? Math.sin(((at - 0.42) / 0.28) * Math.PI) * 0.12 : 0
+        // Shutters roll down into the base, a beat after the lid lifts.
+        const roll = Math.min(1, Math.max(0, (at - 0.08) / 0.55))
         if (style === 'shatter') g.scale.setScalar(0.001)
         else if (style === 'roll') g.scale.y = Math.max(0.001, 1 - roll * roll * (3 - 2 * roll))
         // A chest keeps its back standing, with the lid hinged on it.
@@ -1172,7 +1184,7 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
       camera.position.set(b.x + (Math.random() - 0.5) * kick, b.y + (Math.random() - 0.5) * kick - push * 0.34, b.z - push)
       if (drama.orbit) {
         const o = Math.min(1, after / 1.8)
-        const turn = drama.orbit * o * o * (3 - 2 * o)
+        const turn = drama.orbit * s.vary.side * o * o * (3 - 2 * o)
         camera.position.sub(PIVOT).applyAxisAngle(UP, turn).add(PIVOT)
         camera.quaternion.setFromAxisAngle(UP, turn).multiply(baseQ.current)
       }
