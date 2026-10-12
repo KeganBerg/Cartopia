@@ -284,7 +284,7 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
           <Paint m={m} at={[0.7, 0.087, 0.45]} s={[0.02, 0.5]} />
           {[0, 1, 2, 3].map((i) => <Paint key={i} m={m} at={[1.3 + (i % 2) * 0.1 - 0.05, 0.085, 0.75 - i * 0.14]} s={[0.12, 0.12]} c={['#fdd835', '#4fc3f7', '#81c784', '#ce93d8'][i]} />)}
           <group position={[1.55, 0.08, 0.2]}>
-            {[-0.3, 0.3].map((x) => [-1, 1].map((sd) => <Box key={`${x}${sd}`} m={m} at={[x, 0.38, sd * 0.13]} rot={[sd * 0.32, 0, 0]} s={[0.04, 0.78, 0.04]} c="#ff7043" />))}
+            {[-0.3, 0.3].map((x) => [-1, 1].map((sd) => <Box key={`${x}${sd}`} m={m} at={[x, 0.38, sd * 0.13]} rot={[-sd * 0.32, 0, 0]} s={[0.04, 0.78, 0.04]} c="#ff7043" />))}
             <Box m={m} at={[0, 0.74, 0]} s={[0.66, 0.04, 0.04]} c="#ff7043" />
             {[-0.12, 0.12].map((x) => <Box key={x} m={m} at={[x, 0.24, 0]} s={[0.14, 0.025, 0.07]} c="#212121" />)}
             {/* Chains from the seats up to the top bar. */}

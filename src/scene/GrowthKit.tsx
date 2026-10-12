@@ -393,7 +393,7 @@ function GiantShape({ m, kind }: { m: Mat; kind: Giant }) {
           <Cyl m={m} at={[0, 0.23, 0]} r={0.41} h={0.03} c="#66bb6a" seg={20} />
           <Cyl m={m} at={[0, 0.26, 0]} r={0.37} h={0.03} c="#e53935" seg={20} />
           <mesh position={[0, 0.28, 0]} castShadow><sphereGeometry args={[0.37, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />{m('#e0a052')}</mesh>
-          {[[0.1, 0.12], [-0.12, 0.05], [0.02, -0.14], [-0.05, 0.2]].map(([x, z]) => <Box key={`${x}${z}`} m={m} at={[x, 0.6 - Math.hypot(x, z) * 0.5, z]} s={[0.04, 0.015, 0.02]} c="#fff8e1" shadow={false} />)}
+          {[[0.1, 0.12], [-0.12, 0.05], [0.02, -0.14], [-0.05, 0.2]].map(([x, z]) => <Box key={`${x}${z}`} m={m} at={[x, 0.28 + Math.sqrt(0.37 ** 2 - x * x - z * z) - 0.004, z]} s={[0.04, 0.015, 0.02]} c="#fff8e1" shadow={false} />)}
         </group>
       )
     case 'cone':
