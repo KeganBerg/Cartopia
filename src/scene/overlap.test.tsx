@@ -5,6 +5,7 @@ import ReactThreeTestRenderer from '@react-three/test-renderer'
 import { Box3, Matrix4, Vector3, type Material, type Mesh, type Object3D, type Texture } from 'three'
 import { BUILDINGS, TILE } from '../game/data'
 import { BuildingModel } from './BuildingModel'
+import { VanguardTower } from './Landmark'
 import { DAY_MS } from '../game/clock'
 
 // Nothing poking out or cut off. For every building at each growth form:
@@ -126,4 +127,19 @@ describe('nothing off the lot or cut off', () => {
       expect([...bad]).toEqual([])
     })
   }
+})
+
+describe('nothing off the lot on landmarks', () => {
+  it('vanguard tower', async () => {
+    const bad = new Set<string>()
+    for (const time of [0, DAY_MS / 2]) {
+      vi.spyOn(Date, 'now').mockReturnValue(time)
+      const r = await ReactThreeTestRenderer.create(<VanguardTower />)
+      await ReactThreeTestRenderer.act(async () => r.advanceFrames(2, 1 / 60))
+      for (const p of problems(r.scene.instance as Object3D, 2 * TILE, 2 * TILE)) bad.add(`${time ? 'night ' : ''}${p}`)
+      await r.unmount()
+      vi.restoreAllMocks()
+    }
+    expect([...bad]).toEqual([])
+  })
 })

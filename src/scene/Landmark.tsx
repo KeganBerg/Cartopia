@@ -36,9 +36,9 @@ const BASE = 1.3 // top of the ribbed podium
 const DECK = 9.3 // underside line of the deck at the tower
 const DECK_TOP = 9.85
 const CROWN = 12.55 // where the penthouse ends and the crown begins
-const TIP: [number, number] = [1.45, 12.5] // the hook's blade tip
+const TIP: [number, number] = [1.35, 12.5] // the hook's blade tip
 const PEAK = 15.35 // top of the spire
-const DECK_END = 2.45
+const DECK_END = 2.0 // the lot's edge
 // The penthouse suite's three floors, deck to crown.
 const SUITE: [number, number][] = [[DECK_TOP, 10.75], [10.75, 11.65], [11.65, CROWN]]
 const BALCONY = 11.65
@@ -139,7 +139,7 @@ const GEO = (() => {
   deck.moveTo(LEFT - 0.05, DECK)
   deck.lineTo(rightEdge(DECK) + 0.02, DECK)
   deck.lineTo(rightEdge(8.75) + 0.02, 8.75)
-  deck.quadraticCurveTo(1.0, 9.4, DECK_END, 9.6)
+  deck.quadraticCurveTo(0.95, 9.4, DECK_END, 9.6)
   deck.lineTo(DECK_END, DECK_TOP)
   deck.lineTo(LEFT - 0.05, DECK_TOP)
   deck.closePath()
@@ -184,7 +184,7 @@ function spanAt(y: number): [number, number] {
 const MULLIONS = [-0.72, -0.44, -0.16, 0.12]
 
 export function VanguardTower() {
-  const padX = 1.9
+  const padX = 1.5
   const padY = DECK_TOP + 0.04
   useLaunches()
   return (
@@ -241,12 +241,12 @@ export function VanguardTower() {
 
         {/* Landing pad on the deck's end, where the Skyhopper rests. */}
         <group position={[padX, padY, 0]}>
-          <Cyl m={mat} at={[0, -0.02, 0]} r={0.52} h={0.04} c="#455a64" seg={28} />
+          <Cyl m={mat} at={[0, -0.02, 0]} r={0.47} h={0.04} c="#455a64" seg={28} />
           <mesh position={[0, 0.0015, 0]} rotation-x={-Math.PI / 2}>
-            <circleGeometry args={[0.48, 28]} />
+            <circleGeometry args={[0.43, 28]} />
             {mat('#ffffff', helipadTex('#ffca28', '#6d7377'))}
           </mesh>
-          <PadLights bulb={bulb} r={0.48} n={14} y={0.02} />
+          <PadLights bulb={bulb} r={0.43} n={14} y={0.02} />
           <Skyhopper pad={[padX, padY, 0]} />
         </group>
         <Pulse />
@@ -511,7 +511,7 @@ function Skyhopper({ pad }: { pad: V3 }) {
     sm.instanceMatrix.needsUpdate = true
   })
   return (
-    <group userData={{ noBatch: true }}>
+    <group userData={{ noBatch: true, air: true }}>
       <instancedMesh ref={smoke} args={[puffGeo, puffMat, PUFFS]} frustumCulled={false} raycast={NO_RAY} />
       <group ref={craft}>
         <group scale={0.72}>
