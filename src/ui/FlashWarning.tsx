@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
+import { createPortal } from 'react-dom'
 import { flashWarningSeen, markFlashWarningSeen, setCalmFlashing, useCalmFlashing } from '../game/flashing'
 import { onTechnoChange, technoOn, technoToDrop } from '../game/techno'
 import { today, useGame } from '../game/store'
@@ -39,6 +40,15 @@ export function CalmSwitch() {
 
 export function FlashWarning() {
   const shown = useSyncExternalStore(onOpen, () => open)
+  // A real modal: the game underneath can't be tapped or tabbed to while it's up.
+  useEffect(() => {
+    const root = document.getElementById('root')
+    if (!shown || !root) return
+    root.inert = true
+    return () => {
+      root.inert = false
+    }
+  }, [shown])
   if (!shown) return null
   const close = () => {
     const first = !flashWarningSeen()
@@ -46,7 +56,7 @@ export function FlashWarning() {
     setOpen(false)
     if (first) openDaily()
   }
-  return (
+  return createPortal(
     <div className="flash-warn" role="dialog" aria-modal="true" aria-labelledby="flash-warn-title">
       <div className="fw-card">
         <div className="fw-head"><span className="fw-bolt" aria-hidden>⚡</span><h2 id="flash-warn-title">Flashing lights</h2></div>
@@ -57,7 +67,8 @@ export function FlashWarning() {
         </label>
         <button className="buy fw-ok" onClick={close} autoFocus>Got it</button>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
