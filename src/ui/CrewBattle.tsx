@@ -3,7 +3,7 @@ import { Canvas } from '@react-three/fiber'
 import { NeutralToneMapping } from 'three'
 import { raceCarOf } from '../game/raceCar'
 import { useGame, type OwnedCar } from '../game/store'
-import { CARS, CREW_CHEST, carDef, msToNextWeek, payAt } from '../game/data'
+import { CARS, CLAN_COLORS, CLAN_EMBLEMS, CREW_CHEST, carDef, msToNextWeek, payAt } from '../game/data'
 import { supabase } from '../lib/supabase'
 import { signedInUser } from '../lib/cloud'
 import { useLive, challenge } from '../lib/live'
@@ -16,6 +16,8 @@ import { compact } from './format'
 import './crew-battle.css'
 import { PlayerName } from './Username'
 import { LoadingScene } from './Loading'
+import { Crest } from './CrewHub'
+import { artStyle } from './venueArt'
 
 // Crew battles: a strip in the Crew window and the full-screen showdown, where the two crews' cars
 // face off at the start line of the week's venue with the live score and both rosters docked below.
@@ -185,6 +187,24 @@ function rivalCar(mine: OwnedCar, tag: string) {
   return near[h % near.length] ?? CARS[0]
 }
 
+// No crew yet: two crests squaring off under the lights, and the way into the crew list.
+function NoCrew({ onFind }: { onFind: () => void }) {
+  return (
+    <div className="cb-none rm-photo" style={artStyle('tour', 'main', true)}>
+      <div className="cb-none-card">
+        <div className="cb-none-vs">
+          <Crest emblem={CLAN_EMBLEMS[0]} color={CLAN_COLORS[0]} size={76} />
+          <span className="cr-vs">VS</span>
+          <Crest emblem="❔" color="#546e7a" size={76} />
+        </div>
+        <b className="rm-ttl">Crew Battles</b>
+        <span className="cb-none-sub">⚔️ Weekly crew vs crew · 🧰 victory chests</span>
+        <button className="buy cb-none-go" onClick={onFind}>🛡️ Find a crew</button>
+      </div>
+    </div>
+  )
+}
+
 export function BattlePanel() {
   const battle = useCrewBattle((s) => s.battle)
   const cars = useGame((s) => s.cars)
@@ -204,8 +224,9 @@ export function BattlePanel() {
   if (!b || !car || !rival) {
     return (
       <div className="race-full cb-full">
+        {battle === null && <NoCrew onFind={() => openPanel('clan')} />}
         <div className="rf-top"><h2>⚔️ Crew Battle</h2><button className="close" onClick={close} aria-label="Close"><Icon name="close" size={16} /></button></div>
-        {battle === null ? <p className="cb-loading">Join a crew to battle other crews.</p> : <LoadingScene key="cb" ready={false} max={Infinity} label="Finding your rival crew" onClose={close} />}
+        {battle !== null && <LoadingScene key="cb" ready={false} max={Infinity} label="Finding your rival crew" onClose={close} />}
       </div>
     )
   }
