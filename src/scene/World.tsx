@@ -738,7 +738,7 @@ export const World = memo(function World() {
       {fixed.before}
       {outskirts}
       {fixed.controls}
-      <Batch version={`${layout}|${picked ?? ''}`} off={batchOff(mode)} cell={24}>
+      <Batch version={`${layout}|${picked ?? ''}`} off={batchOff(mode)} cell={24} freeze>
         {fixed.land}
         {tufts}
         {fixed.roads}

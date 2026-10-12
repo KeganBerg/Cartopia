@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, type ReactNode } from 'react'
-import { BufferAttribute, BufferGeometry, Color, Group, Matrix4, Mesh, Texture, Vector3, type Material, type Object3D } from 'three'
+import { BufferAttribute, BufferGeometry, Color, Group, Matrix4, Mesh, Object3D, Texture, Vector3, type Material } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { glowMats } from './dayNight'
 import { addHours } from './closingTime'
@@ -63,6 +63,34 @@ function cellOf(g: BufferGeometry, at: Matrix4, size: number) {
   return `${Math.floor(centre.x / size)},${Math.floor(centre.z / size)}`
 }
 
+// Freezing (the town): three works out every object's matrix every frame, and a
+// big town is ~40,000 objects, nearly all of them hidden originals of merged
+// meshes that never move. A frozen Batch updates them all only when it rebuilds;
+// between rebuilds, each frame updates only the lots (buildings) with something
+// live in them (noBatch parts, particles, instanced or unmerged meshes), plus any
+// lot something was just added to.
+type Frozen = { on: boolean; live: Set<Object3D>; pending: Set<Object3D> }
+const fullUpdate = Object3D.prototype.updateMatrixWorld
+const spotWorld = new Matrix4()
+// New objects mounted between rebuilds (R3F and three both announce them with
+// 'childadded') get their lot updated on the next frame, so nothing shows up at
+// the origin.
+const dispatch = Object3D.prototype.dispatchEvent
+Object3D.prototype.dispatchEvent = function (this: Object3D, e: Parameters<typeof dispatch>[0]) {
+  if (e.type === 'childadded') {
+    let lot: Object3D | null = null
+    for (let p: Object3D | null = (e as { child?: Object3D }).child ?? this; p; p = p.parent) {
+      const f = p.userData.frozen as Frozen | undefined
+      if (f) {
+        if (f.on && lot) f.pending.add(lot)
+        break
+      }
+      if (!lot && (p.userData.hours || p.parent?.userData.frozen)) lot = p
+    }
+  }
+  return dispatch.call(this, e)
+} as typeof dispatch
+
 // One merged mesh and the parts it was built from. `sig` lists those parts (and
 // where and how they sit), so a rebuild can tell which merged meshes still match.
 type Merged = { sig: string; mesh: Mesh }
@@ -82,7 +110,7 @@ const finishSig = (m: Material) => {
   return `${x.color?.getHex()}|${x.emissive?.getHex()}|${x.emissiveIntensity}|${x.roughness}|${x.metalness}|${m.side}|${x.map?.uuid}|${x.map?.matrix.elements.join()}`
 }
 
-export function Batch({ version, off, cell, children }: { version: unknown; off?: boolean; cell?: number; children: ReactNode }) {
+export function Batch({ version, off, cell, freeze, children }: { version: unknown; off?: boolean; cell?: number; freeze?: boolean; children: ReactNode }) {
   const root = useRef<Group>(null)
   const merged = useRef<Group>(null)
   // What the last rebuild made, by bucket, and the originals it hid. A rebuild
@@ -92,6 +120,28 @@ export function Batch({ version, off, cell, children }: { version: unknown; off?
   const hidden = useRef(new Set<Mesh>())
   const prepared = useRef(new WeakMap<Mesh, { id: string; part: BufferGeometry }>()).current
   const placed = useRef(new WeakMap<Mesh, { at: Matrix4; gid: number; id: string; where: string }>()).current
+  const frozen = useRef<Frozen | null>(null)
+  // With `freeze`, everything merged stops having its matrices worked out every frame (see Frozen).
+  const setRoot = (g: Group | null) => {
+    root.current = g
+    if (!g || !freeze || frozen.current) return
+    const f: Frozen = (frozen.current = { on: false, live: new Set(), pending: new Set() })
+    g.userData.frozen = f
+    g.updateMatrixWorld = (force?: boolean) => {
+      if (!f.on) return fullUpdate.call(g, force)
+      if (g.matrixAutoUpdate) g.updateMatrix()
+      if (g.matrixWorldNeedsUpdate || force) {
+        if (g.parent) spotWorld.multiplyMatrices(g.parent.matrixWorld, g.matrix)
+        else spotWorld.copy(g.matrix)
+        // The whole batch moved: everything under it moved with it.
+        if (!spotWorld.equals(g.matrixWorld)) return fullUpdate.call(g, true)
+        g.matrixWorldNeedsUpdate = false
+      }
+      for (const o of f.live) o.updateMatrixWorld(true)
+      for (const o of f.pending) if (o.parent) o.updateMatrixWorld(true)
+      f.pending.clear()
+    }
+  }
 
   useLayoutEffect(() => {
     const r = root.current
@@ -111,8 +161,24 @@ export function Batch({ version, off, cell, children }: { version: unknown; off?
       made.current = keep
       hidden.current = nowHidden
     }
+    const f = frozen.current
+    if (f) {
+      f.on = false
+      f.live.clear()
+      f.pending.clear()
+    }
     if (off) return drop(new Map(), new Set())
-    r.updateMatrixWorld(true)
+    fullUpdate.call(r, true)
+    // The lot (building) or top-level piece something live sits in: what to keep updating.
+    const lotOf = (o: Object3D) => {
+      let top = o
+      for (let p: Object3D | null = o; p && p !== r; p = p.parent) {
+        if (p.userData.hours) return p
+        top = p
+      }
+      return top
+    }
+    const alive = (o: Object3D) => f?.live.add(lotOf(o))
     const inv = new Matrix4().copy(r.matrixWorld).invert()
     const spot = new Matrix4()
     const buckets = new Map<string, Bucket>()
@@ -137,12 +203,14 @@ export function Batch({ version, off, cell, children }: { version: unknown; off?
     }
     const names: string[] = []
     const take = (mesh: Mesh) => {
-      if (!mesh.isMesh || (mesh as { isInstancedMesh?: boolean }).isInstancedMesh) return
-      if (Array.isArray(mesh.material) || mesh.morphTargetInfluences) return
+      const o = mesh as Object3D & { isPoints?: boolean; isLine?: boolean; isSprite?: boolean; isLight?: boolean; isInstancedMesh?: boolean }
+      // Anything drawn that stays out of the merge keeps its matrices updated.
+      if (!mesh.isMesh) return void ((o.isPoints || o.isLine || o.isSprite || o.isLight) && alive(o))
+      if (o.isInstancedMesh || Array.isArray(mesh.material) || mesh.morphTargetInfluences) return void alive(o)
       const g = mesh.geometry
       names.length = 0
       for (const n of ATTRS) if (g.getAttribute(n)) names.push(n)
-      if (!names.includes('position')) return
+      if (!names.includes('position')) return void alive(o)
       const mat = mesh.material
       // Where it sits in the town, worked out again only when it moved.
       spot.multiplyMatrices(inv, mesh.matrixWorld)
@@ -211,7 +279,7 @@ export function Batch({ version, off, cell, children }: { version: unknown; off?
     // Walks the tree, skipping whatever is hidden (by its owner, not by this Batch)
     // or marked noBatch (a building mid-bounce), with everything under it.
     const visit = (o: Object3D) => {
-      if (o !== r && ((!o.visible && !o.userData.batched) || o.userData.noBatch)) return
+      if (o !== r && ((!o.visible && !o.userData.batched) || o.userData.noBatch)) return void alive(o)
       take(o as Mesh)
       for (const c of o.children) visit(c)
     }
@@ -224,7 +292,10 @@ export function Batch({ version, off, cell, children }: { version: unknown; off?
       let m: Merged | null = old && old.sig === sig ? old : null
       if (!m) {
         const geo = b.build()
-        if (!geo) continue
+        if (!geo) {
+          b.members.forEach(alive)
+          continue
+        }
         const mesh = new Mesh(geo, b.mat)
         mesh.castShadow = b.cast
         mesh.receiveShadow = b.receive
@@ -241,6 +312,7 @@ export function Batch({ version, off, cell, children }: { version: unknown; off?
       }
     }
     drop(keep, nowHidden)
+    if (f) f.on = true
   }, [version, off, cell])
 
   // Gone from the scene: put the originals back and free the merged meshes.
@@ -262,7 +334,7 @@ export function Batch({ version, off, cell, children }: { version: unknown; off?
 
   return (
     <>
-      <group ref={root}>{children}</group>
+      <group ref={setRoot}>{children}</group>
       <group ref={merged} />
     </>
   )

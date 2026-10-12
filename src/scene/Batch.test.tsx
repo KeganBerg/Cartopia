@@ -107,3 +107,54 @@ describe('Batch rebuilds only what changed', () => {
     expect((scene.getObjectByName('solo') as Mesh).visible).toBe(true)
   })
 })
+
+// A frozen town only updates matrices for what moves: a bouncing building and
+// anything mounted after the last rebuild.
+function Frozen({ extra, spin }: { extra?: boolean; spin: { x: number } }) {
+  return (
+    <Batch version={1} freeze>
+      <group name="still" position={[3, 0, 0]} userData={{ hours: { seed: 1, kind: 1 } }}>
+        <mesh name="still-box">
+          <boxGeometry />
+          <meshStandardMaterial />
+        </mesh>
+        {extra && (
+          <mesh name="late" position={[0, 2, 0]}>
+            <boxGeometry />
+            <meshStandardMaterial />
+          </mesh>
+        )}
+      </group>
+      <group name="bouncy" position={[-3, 0, 0]} userData={{ hours: { seed: 2, kind: 1 } }}>
+        <group name="pop" userData={{ noBatch: true }} ref={(g) => void (g && Object.assign(spin, { g }))}>
+          <mesh name="pop-box">
+            <boxGeometry />
+            <meshStandardMaterial />
+          </mesh>
+        </group>
+      </group>
+    </Batch>
+  )
+}
+
+describe('frozen Batch', () => {
+  it('keeps live parts and late arrivals in step without updating the rest', async () => {
+    const spin = { x: 0 } as { x: number; g?: Object3D }
+    const r = await ReactThreeTestRenderer.create(<Frozen spin={spin} />)
+    const scene = r.scene.instance as Object3D
+    const y = (name: string) => scene.getObjectByName(name)!.matrixWorld.elements[13]
+    // The bouncing part follows its animation.
+    spin.g!.position.y = 1.5
+    scene.updateMatrixWorld()
+    expect(y('pop-box')).toBeCloseTo(1.5)
+    // A merged original isn't recomputed between rebuilds (it isn't drawn).
+    scene.getObjectByName('still-box')!.position.y = 5
+    scene.updateMatrixWorld()
+    expect(y('still-box')).toBeCloseTo(0)
+    // Something mounted later lands in place on the next frame, not at the origin.
+    await r.update(<Frozen spin={spin} extra />)
+    scene.updateMatrixWorld()
+    expect(y('late')).toBeCloseTo(2)
+    expect(scene.getObjectByName('late')!.matrixWorld.elements[12]).toBeCloseTo(3)
+  })
+})
