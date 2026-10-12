@@ -544,6 +544,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
     }
     case 'palm':
       // Curved, banded trunk with drooping fronds and coconuts.
+      if (!ghost) return <PropMesh parts={DECOR_PROPS.palm()} />
       return (
         <group>
           {[0, 1, 2, 3, 4].map((i) => (
