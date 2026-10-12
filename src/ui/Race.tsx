@@ -59,6 +59,7 @@ import { cupFits, cupRace, cupShift, type CupRace } from '../game/cups'
 import { ClassCups, cupChip, cupPrizeOf, firstCupPick } from './ClassCups'
 import { TrophyRoad, roadReady } from './TrophyRoad'
 import { Flair } from './Flair'
+import { RepChip } from './Reputation'
 import { DailyRunTab, DailyResult } from './DailyRun'
 import type { DailyRun } from '../game/daily'
 import { CHALLENGER_BONUS, makeChallenger } from '../game/challenger'
@@ -658,6 +659,7 @@ export function RacePanel() {
     : tab === 'rivals' ? rowChip(rivalRow, oldPaints)
     : tab === 'tuner' ? trialChip(tuner)
     : tab === 'cups' ? cupChip(cups)
+    : tab === 'hub' ? <RepChip />
     : null
 
   return (

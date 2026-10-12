@@ -777,3 +777,8 @@ div.rm-node { cursor: default; }
 .daily-car > span { display: flex; flex-direction: column; min-width: 0; }
 .daily-car b { font: 900 16px Nunito, sans-serif; }
 .daily-car small { font: 800 12px Nunito, sans-serif; color: #4a6283; }
+
+/* Reputation title in the Race menu header (Reputation.tsx). */
+.rep-chip { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.rep-bar { display: inline-block; width: 44px; height: 6px; border-radius: 3px; background: rgba(20,33,61,.18); overflow: hidden; }
+.rep-bar > i { display: block; height: 100%; background: #ffb300; }
