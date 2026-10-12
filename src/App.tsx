@@ -17,6 +17,7 @@ import { MeetPanel } from './ui/Meet'
 import { Tutorial } from './ui/Tutorial'
 import { Tips } from './ui/Tips'
 import { Badges } from './ui/Badges'
+import { UpdatePill } from './ui/UpdatePill'
 import { ThoughtBubble } from './ui/Thought'
 import { NeedPanel } from './ui/Need'
 import { UpgradePanel } from './ui/Upgrade'
@@ -155,6 +156,7 @@ export default function App() {
       <EventPrizePopup />
       <LevelUpSplash />
       <Toasts />
+      <UpdatePill />
       <FlyLayer />
     </>
   )
