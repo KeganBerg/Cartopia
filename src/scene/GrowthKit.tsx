@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { CylinderGeometry } from 'three'
-import { Box, Cyl, Sign, Pool, Bulbs, Parasol, GOLD, type Mat, type V3 } from './NewBuildings'
+import { Box, Cyl, Sign, Pool, Bulbs, GOLD, type Mat, type V3 } from './NewBuildings'
 import { Glass, glassMat, Planter } from './OfficeBuildings'
 import { glowMats } from './dayNight'
 import { Facade, Upright, useBays } from './mergeScale'
@@ -89,11 +89,31 @@ export function Storefront({ k, w, d, z0 = 0, h = 0.95, wall, tex, trim = '#fafa
       )}
       {!ghost && (
         <group>
-          {[-1, 1].map((sd) => <Planter key={sd} m={m} at={[sd * (w / 2 - 0.16), 0.02, zf + 0.2]} />)}
-          {cafe && [-1, 1].map((sd) => <Parasol key={sd} m={m} at={[sd * Math.min(w / 2 - 0.2, 0.75), 0, zf + 0.62]} c={cafe} />)}
+          {/* Café tables under the awning, kept on the lot (parasols would hang over the road). */}
+          {!cafe && [-1, 1].map((sd) => <Planter key={sd} m={m} at={[sd * (w / 2 - 0.16), 0.02, zf + 0.2]} />)}
+          {cafe && [-1, 1].map((sd) => <Bistro key={sd} m={m} at={[sd * Math.min(w / 2 - 0.25, 0.6), 0, zf + 0.22]} c={cafe} />)}
           <Pool r={0.7} z={zf + 0.4} />
         </group>
       )}
+    </group>
+  )
+}
+
+// A little café table with a chair either side, in the shop's colour.
+function Bistro({ m, at, c }: { m: Mat; at: V3; c: string }) {
+  return (
+    <group position={at}>
+      <Cyl m={m} at={[0, 0.115, 0]} r={0.015} h={0.23} c="#455a64" seg={6} />
+      <Cyl m={m} at={[0, 0.02, 0]} r={0.06} h={0.02} c="#455a64" seg={10} />
+      <Cyl m={m} at={[0, 0.24, 0]} r={0.11} h={0.02} c="#fafafa" seg={14} />
+      <mesh position={[0.03, 0.27, 0.02]}><cylinderGeometry args={[0.025, 0.02, 0.04, 8]} />{m(c)}</mesh>
+      {[-1, 1].map((sd) => (
+        <group key={sd} position={[sd * 0.17, 0, 0]}>
+          <Box m={m} at={[0, 0.065, 0]} s={[0.08, 0.13, 0.08]} c="#455a64" shadow={false} />
+          <Box m={m} at={[0, 0.14, 0]} s={[0.1, 0.02, 0.1]} c={c} shadow={false} />
+          <Box m={m} at={[sd * 0.045, 0.21, 0]} s={[0.015, 0.13, 0.1]} c={c} shadow={false} />
+        </group>
+      ))}
     </group>
   )
 }
@@ -298,15 +318,7 @@ export function EdgeBulbs({ w, d, y, z = 0, x = 0 }: { w: number; d: number; y: 
   )
 }
 
-// Aircraft warning light on a mast.
-export function Beacon({ m, at, h = 0.7 }: { m: Mat; at: V3; h?: number }) {
-  return (
-    <group position={at}>
-      <Cyl m={m} at={[0, h / 2, 0]} r={0.015} r2={0.03} h={h} c="#cfd8dc" seg={6} />
-      <mesh position={[0, h + 0.03, 0]}><sphereGeometry args={[0.04, 8, 6]} /><primitive object={glowMats.taillight} attach="material" dispose={null} /></mesh>
-    </group>
-  )
-}
+export { Beacon } from './OfficeBuildings'
 
 // A stepped art deco top: three shrinking tiers, lit edges and a spire.
 export function DecoCrown({ m, at, w, d, c, trim, gold }: { m: Mat; at: V3; w: number; d: number; c: string; trim: string; gold?: boolean }) {
@@ -325,8 +337,10 @@ export function DecoCrown({ m, at, w, d, c, trim, gold }: { m: Mat; at: V3; w: n
         y += h + 0.04
         return el
       })}
-      <mesh position={[0, y + 0.45, 0]} castShadow><coneGeometry args={[0.07, 0.9, 8]} /><meshStandardMaterial color={gold ? GOLD : trim} metalness={0.6} roughness={0.3} /></mesh>
-      <mesh position={[0, y + 0.93, 0]}><sphereGeometry args={[0.04, 8, 6]} /><primitive object={glowMats.taillight} attach="material" dispose={null} /></mesh>
+      <group position-y={y}>
+        <mesh position={[0, 0.45, 0]} castShadow><coneGeometry args={[0.07, 0.9, 8]} /><meshStandardMaterial color={gold ? GOLD : trim} metalness={0.6} roughness={0.3} /></mesh>
+        <mesh position={[0, 0.93, 0]}><sphereGeometry args={[0.04, 8, 6]} /><primitive object={glowMats.taillight} attach="material" dispose={null} /></mesh>
+      </group>
     </group>
   )
 }
@@ -336,10 +350,19 @@ export type Giant = 'donut' | 'burger' | 'cone' | 'pizza' | 'mug' | 'pin' | 'app
 export function GiantProp({ m, kind, at, s = 1, plinth = '#eceff1' }: { m: Mat; kind: Giant; at: V3; s?: number; plinth?: string }) {
   return (
     <group position={at}>
-      {/* Bigger than a prop, but a giant donut must stay round on a merged pair. */}
+      {/* One piece in a merged pair: it keeps its shape, standing on the roof. */}
       <Upright>
         <Cyl m={m} at={[0, 0.06, 0]} r={0.36 * s} r2={0.4 * s} h={0.12} c={plinth} seg={16} />
-        <Bulbs from={[-0.36 * s, 0.13, 0.36 * s]} to={[0.36 * s, 0.13, 0.36 * s]} n={6} />
+        {/* Marquee bulbs set round the plinth's rim. */}
+        {Array.from({ length: 14 }, (_, i) => {
+          const a = (i / 14) * Math.PI * 2
+          return (
+            <mesh key={i} position={[Math.sin(a) * 0.385 * s, 0.06, Math.cos(a) * 0.385 * s]}>
+              <sphereGeometry args={[0.03, 6, 5]} />
+              <primitive object={glowMats.bulb} attach="material" dispose={null} />
+            </mesh>
+          )
+        })}
         <group position={[0, 0.12, 0]} scale={s}>
           <GiantShape m={m} kind={kind} />
         </group>
@@ -385,7 +408,7 @@ function GiantShape({ m, kind }: { m: Mat; kind: Giant }) {
     case 'pizza':
       return (
         // A whole pie tipped up to face the street, one slice pulled out.
-        <group position={[0, 0.55, 0]} rotation-x={1.05}>
+        <group position={[0, 0.5, 0]} rotation-x={1.05}>
           <Cyl m={m} at={[0, 0, 0]} r={0.5} h={0.06} c="#ffca28" seg={20} />
           <mesh rotation-x={Math.PI / 2} castShadow><torusGeometry args={[0.5, 0.06, 6, 24]} />{m('#d7a86e')}</mesh>
           {[[0.22, 0.1], [-0.2, 0.18], [0.05, -0.25], [-0.26, -0.12], [0.28, -0.2], [0, 0.32], [-0.05, 0.02]].map(([x, z]) => (
@@ -402,7 +425,7 @@ function GiantShape({ m, kind }: { m: Mat; kind: Giant }) {
           <Cyl m={m} at={[0, 0.25, 0]} r={0.235} r2={0.215} h={0.12} c="#2e7d32" seg={16} />
           <Cyl m={m} at={[0, 0.5, 0]} r={0.235} h={0.01} c="#5d4037" seg={16} />
           <mesh position={[0.26, 0.29, 0]} castShadow><torusGeometry args={[0.1, 0.03, 6, 12]} />{m('#fafafa')}</mesh>
-          {[0, 1, 2].map((i) => <mesh key={i} position={[Math.sin(i * 2) * 0.06, 0.66 + i * 0.15, 0]}><sphereGeometry args={[0.07 + i * 0.02, 8, 6]} />{m('#eceff1')}</mesh>)}
+          {[0, 1, 2].map((i) => <mesh key={i} position={[Math.sin(i * 2) * 0.05, 0.55 + i * 0.13, 0]}><sphereGeometry args={[0.07 + i * 0.02, 8, 6]} />{m('#eceff1')}</mesh>)}
         </group>
       )
     case 'pin':

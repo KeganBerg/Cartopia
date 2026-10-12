@@ -7,18 +7,18 @@ import { CarModel } from './CarModel'
 import { Upright } from './mergeScale'
 import { glowMats, onNight } from './dayNight'
 import { concreteTex, curtainGlowTex, curtainTex, helipadTex, paverTex } from './textures'
-import { RAINBOW } from './clubLeds'
-import { clubPulse } from '../lib/clubBeat'
-import { dayPhase, isNight, nightAmount } from '../game/clock'
+import { clubLedColor, clubLedGlow } from './clubLeds'
 import { PAL } from './season'
 import { useGame } from '../game/store'
 import { sfx } from '../lib/sound'
 
 // Vanguard Tower: the landmark four level 10 houses become when merged into a
 // 2x2 block. A heroes' headquarters skyline piece (no emblems or lettering):
-// a glass tower whose right side leans in as it climbs, a white arch sweeping up
-// its face, a deck cantilevered out with a landing pad for the Skyhopper flying
-// car, and a glass penthouse under a roof that curves up into a tall white fin.
+// a tapering shaft of dark curtain glass whose right side leans in as it climbs,
+// a lit seam running up its face that peels off into a long curved strut holding
+// up a cantilevered deck with a landing pad for the Skyhopper flying car, a
+// three-floor glass penthouse that juts out over the deck with a balcony, and a
+// crown that sweeps up from a blade-like hook into a tall spire.
 // It fills a 2x2 lot (4x4 units round the origin) facing +z. Static pieces are
 // plain meshes the town's Batch merges; the glass, LED strips and pad lights use
 // the shared night materials so it lights up with the rest of the town.
@@ -26,15 +26,22 @@ import { sfx } from '../lib/sound'
 // Skyhopper takes off for a flight round it (see the bottom of this file).
 
 const FRAME = '#f3f5f7'
-const TINT = '#bfe9ff'
+const STEEL = '#b0bec5'
+const TINT = '#bfe9ff' // penthouse glass
+const DARK = '#6e93ad' // the shaft's darker, reflective curtain glass
 const Z = -0.35 // tower centre: the plaza takes the front of the lot
 const D = 1.7 // tower depth
-const BASE = 0.8 // top of the lobby podium
+const LEFT = -1.0 // the tower's straight left wall
+const BASE = 1.3 // top of the ribbed podium
 const DECK = 9.3 // underside line of the deck at the tower
 const DECK_TOP = 9.85
-const PEAK = 14.9 // top of the fin
-// The penthouse suite's three floors, deck to roof.
-const SUITE: [number, number][] = [[DECK_TOP, 11.2], [11.2, 12.55], [12.55, 13.9]]
+const CROWN = 12.55 // where the penthouse ends and the crown begins
+const TIP: [number, number] = [1.35, 12.5] // the hook's blade tip
+const PEAK = 15.35 // top of the spire
+const DECK_END = 2.0 // the lot's edge
+// The penthouse suite's three floors, deck to crown.
+const SUITE: [number, number][] = [[DECK_TOP, 10.75], [10.75, 11.65], [11.65, CROWN]]
+const BALCONY = 11.65
 
 const mat: Mat = (color: string, map?: Texture) => <meshStandardMaterial color={color} map={map ?? null} />
 const bulb = <primitive object={glowMats.bulb} attach="material" dispose={null} />
@@ -52,9 +59,9 @@ function coreMat() {
 }
 const coreEl = () => <primitive object={coreMat()} attach="material" dispose={null} />
 
-// The penthouse suite dances with the nightclub at night: each floor's lit
-// panes take a colour of the club's rainbow, a step apart, moving on and
-// flashing with every bass note (clubBeat.ts; a soft beat when the music's off).
+// The penthouse suite dances with the nightclub at night: every floor's lit
+// panes show the club's windows' colour, moving on to the next one and
+// flashing on every bass note (clubLeds.ts; a soft beat when the music's off).
 // Glass by day like the rest of the tower.
 const suiteMats = SUITE.map(() => {
   const m = new MeshStandardMaterial({ color: TINT, map: curtainTex(), emissiveMap: curtainGlowTex(), emissive: new Color('#000000'), emissiveIntensity: 1, metalness: 0.15, roughness: 0.22 })
@@ -64,25 +71,28 @@ const suiteMats = SUITE.map(() => {
 const suiteTint = new Color()
 function SuiteLights() {
   useFrame(() => {
-    const p = clubPulse()
-    const lit = isNight() ? nightAmount(dayPhase()) : 0
-    const glow = lit * (0.8 + 1.6 * p.flash)
-    suiteMats.forEach((m, i) => m.emissive.copy(suiteTint.set(RAINBOW[(i * 2 + p.step) % RAINBOW.length])).multiplyScalar(glow))
+    clubLedColor(suiteTint).multiplyScalar(clubLedGlow())
+    for (const m of suiteMats) m.emissive.copy(suiteTint)
   })
   return null
 }
 
 // ---- Shapes (front elevation, x across, y up), extruded front to back ----
 
-// The tower's right edge below the deck: leans in from the podium to the deck.
-const rightEdge = (y: number) => 1.05 - 0.6 * Math.pow(Math.min(1, Math.max(0, (y - BASE) / (DECK - BASE))), 1.4)
-// The penthouse roof: from its right wall curving up to the fin.
-const ROOF: [Vector2, Vector2, Vector2] = [new Vector2(0.85, 11.3), new Vector2(0.1, 13.2), new Vector2(-0.75, 13.9)]
-const roofAt = (t: number) => {
-  const [a, c, b] = ROOF
+const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
+// The shaft's right edge below the deck: leans in from the podium to the deck.
+const rightEdge = (y: number) => 1.0 - 0.55 * Math.pow(clamp01((y - BASE) / (DECK - BASE)), 1.3)
+// The penthouse's right wall leans out as it climbs, so the top juts over the deck.
+const suiteEdge = (y: number) => 0.85 + (TIP[0] - 0.12 - 0.85) * clamp01((y - DECK_TOP) / (CROWN - DECK_TOP))
+// The crown's hook: from the blade tip, a hollow curve sweeping up into the spire.
+const HOOK: [Vector2, Vector2, Vector2] = [new Vector2(TIP[0], TIP[1] + 0.1), new Vector2(-0.05, 12.85), new Vector2(-0.3, 15.0)]
+const hookAt = (t: number) => {
+  const [a, c, b] = HOOK
   const u = 1 - t
   return new Vector2(u * u * a.x + 2 * u * t * c.x + t * t * b.x, u * u * a.y + 2 * u * t * c.y + t * t * b.y)
 }
+// The seam: up the face from the podium, then off the leaning side as the strut under the deck's end.
+const SEAM: [Vector2, Vector2, Vector2] = [new Vector2(0.3, BASE), new Vector2(0.55, 6.7), new Vector2(DECK_END - 0.2, 9.62)]
 
 // Curtain-wall UVs: faces looking front or back get x/y, the sides run round
 // with x+z, so every wall shows panes the same size as the town's other towers.
@@ -123,53 +133,58 @@ const quad = (a: Vector2, c: Vector2, b: Vector2, n = 20) =>
 
 const GEO = (() => {
   const edge = Array.from({ length: 13 }, (_, i) => new Vector2(rightEdge(BASE + ((DECK - BASE) * i) / 12), BASE + ((DECK - BASE) * i) / 12))
-  const body = new Shape([new Vector2(-1.05, BASE), ...edge, new Vector2(-1.05, DECK)])
+  const body = new Shape([new Vector2(LEFT, BASE), ...edge, new Vector2(LEFT, DECK)])
+  // The deck: a slab out to the pad, thickening into the tower.
   const deck = new Shape()
-  deck.moveTo(-1.1, DECK)
+  deck.moveTo(LEFT - 0.05, DECK)
   deck.lineTo(rightEdge(DECK) + 0.02, DECK)
-  deck.lineTo(rightEdge(8.6) + 0.02, 8.6)
-  deck.quadraticCurveTo(1.3, 9.45, 2.1, 9.68)
-  deck.lineTo(2.1, DECK_TOP)
-  deck.lineTo(-1.1, DECK_TOP)
+  deck.lineTo(rightEdge(8.75) + 0.02, 8.75)
+  deck.quadraticCurveTo(0.95, 9.4, DECK_END, 9.6)
+  deck.lineTo(DECK_END, DECK_TOP)
+  deck.lineTo(LEFT - 0.05, DECK_TOP)
   deck.closePath()
-  const roof = quad(ROOF[0], ROOF[1], ROOF[2])
-  // The penthouse suite: three floors, each cut from the outline under the curving roof.
-  const right = (y: number) => (y <= ROOF[0].y ? 0.85 : roof.reduce((best, p) => (Math.abs(p.y - y) < Math.abs(best.y - y) ? p : best)).x)
-  const suite = SUITE.map(([y0, y1]) => {
-    const edge = roof.filter((p) => p.y > y0 && p.y < y1)
-    return new Shape([new Vector2(-1.05, y0), new Vector2(right(y0), y0), ...edge, new Vector2(right(y1), y1), new Vector2(-1.05, y1)])
-  })
-  // The fin: a white band along the roof that rises into a peak over the left wall.
-  const finLine = [...quad(new Vector2(1.08, 11.15), new Vector2(0.15, 13.25), new Vector2(-0.82, 14.05)), new Vector2(-1.0, PEAK - 0.2), new Vector2(-1.05, PEAK)]
-  const fin = band(finLine, -0.22)
-  // White cladding up the leaning right edge, and the arch sweeping up the face.
-  const clad = band(edge.map((p) => p.clone()), -0.12)
-  const archLine = quad(new Vector2(0.62, BASE), new Vector2(0.5, 7.4), new Vector2(-1.05, 8.95), 24)
+  // Three penthouse floors, glazed all the way round, and the slim white floor plates between them.
+  const suite = SUITE.map(([y0, y1]) => new Shape([new Vector2(LEFT, y0), new Vector2(suiteEdge(y0), y0), new Vector2(suiteEdge(y1), y1), new Vector2(LEFT, y1)]))
+  const plate = (y: number, out: number) => new Shape([new Vector2(LEFT - 0.04, y - 0.035), new Vector2(suiteEdge(y) + out, y - 0.035), new Vector2(suiteEdge(y) + out, y + 0.035), new Vector2(LEFT - 0.04, y + 0.035)])
+  // The crown: dark glass from the hook's blade tip, up the hollow curve, to a pointed spire.
+  const hook = quad(HOOK[0], HOOK[1], HOOK[2], 24)
+  const crown = new Shape([new Vector2(LEFT, CROWN), new Vector2(TIP[0] - 0.12, CROWN), new Vector2(TIP[0], TIP[1]), ...hook, new Vector2(-0.6, PEAK), new Vector2(LEFT, PEAK - 0.3)])
+  // White trim: along the hook (the blade's edge), and up the spire's top.
+  const blade = band([new Vector2(TIP[0] - 0.14, CROWN - 0.06), new Vector2(TIP[0] + 0.02, TIP[1] - 0.02), ...hook.slice(1)], -0.1)
+  const cap = band([new Vector2(-0.3, 15.0), new Vector2(-0.6, PEAK), new Vector2(LEFT, PEAK - 0.3)], -0.08)
+  const seam = quad(SEAM[0], SEAM[1], SEAM[2], 28)
   return {
     body: extrude(body, D, true),
     deck: extrude(deck, 1.9),
-    suite: suite.map((f) => extrude(f, D - 0.2, true)),
-    fin: extrude(fin, D - 0.1),
-    clad: extrude(clad, 0.14),
-    arch: extrude(band(archLine, 0.17), 0.08),
-    archLed: extrude(band(archLine.map((p) => p.clone().add(new Vector2(0.17, 0))), 0.035), 0.09),
-    finLed: extrude(band(finLine.slice(0, 21), 0.035), 0.02),
+    suite: suite.map((f) => extrude(f, D - 0.1, true)),
+    plates: [extrude(plate(SUITE[0][1], 0.05), D), extrude(plate(BALCONY, 0.32), D + 0.36)],
+    crown: extrude(crown, D, true),
+    blade: extrude(blade, D + 0.04),
+    cap: extrude(cap, D + 0.04),
+    clad: extrude(band(edge.map((p) => p.clone()), -0.08), 0.1),
+    strut: extrude(band(seam, -0.13), 0.16),
+    seamLed: extrude(band(seam.map((p) => p.clone().add(new Vector2(-0.13, 0))), -0.03), 0.17),
+    bladeLed: extrude(band(hook.slice(0, 19), 0.03), 0.02),
   }
 })()
 
 // How wide the tower is at a height (left and right x), for the pulse of light.
 function spanAt(y: number): [number, number] {
-  if (y < DECK) return [-1.05, rightEdge(y)]
-  if (y < DECK_TOP) return [-1.1, 2.1]
-  if (y < ROOF[0].y) return [-1.05, 0.85]
-  // On the roof curve: find where it reaches this height.
+  if (y < DECK) return [LEFT, rightEdge(y)]
+  if (y < DECK_TOP) return [LEFT - 0.05, DECK_END]
+  if (y < CROWN) return [LEFT, suiteEdge(y)]
+  if (y < HOOK[0].y) return [LEFT, TIP[0]]
+  // On the hook's curve: find where it reaches this height.
   let t = 0
-  for (let i = 0; i <= 20; i++) if (roofAt(i / 20).y <= y) t = i / 20
-  return [-1.05, Math.max(-0.9, roofAt(t).x)]
+  for (let i = 0; i <= 24; i++) if (hookAt(i / 24).y <= y) t = i / 24
+  return [LEFT, Math.max(-0.6, hookAt(t).x)]
 }
 
+// Vertical mullions down the shaft's front and back, clear of the leaning side.
+const MULLIONS = [-0.72, -0.44, -0.16, 0.12]
+
 export function VanguardTower() {
-  const padX = 1.45
+  const padX = 1.5
   const padY = DECK_TOP + 0.04
   useLaunches()
   return (
@@ -178,43 +193,60 @@ export function VanguardTower() {
       <Box m={mat} at={[0, 0.025, 0]} s={[3.9, 0.05, 3.9]} c="#ffffff" t={paverTex(4, 4)} shadow={false} />
       {[0, 1, 2].map((k) => <Box key={k} m={mat} at={[0, 0.06 + k * 0.03, Z + 1.35 - k * 0.1]} s={[1.6 - k * 0.1, 0.03, 0.3]} c="#cfd8dc" t={concreteTex(1, 1)} shadow={false} />)}
 
-      {/* Podium: a two-storey glass lobby with a dark frame and a lit canopy. */}
+      {/* Podium: a tall glass lobby wrapped in white ribs, a band at the mezzanine and a lit canopy. */}
       <GlassBlock m={mat} x={0} z={Z} w={2.9} d={2.3} h={BASE} tint="#e0f7fa" frame="#263238" />
-      <Box m={mat} at={[-0.2, 0.66, Z + 1.4]} s={[1.5, 0.06, 0.55]} c="#263238" />
-      <mesh position={[-0.2, 0.625, Z + 1.66]}><boxGeometry args={[1.46, 0.02, 0.02]} />{bulb}</mesh>
+      {Array.from({ length: 10 }, (_, i) => -1.3 + i * 0.289).filter((x) => Math.abs(x + 0.2) > 0.45).map((x) => (
+        <Box key={`f${x}`} m={mat} at={[x, BASE / 2, Z + 1.18]} s={[0.05, BASE, 0.07]} c={FRAME} />
+      ))}
+      {Array.from({ length: 10 }, (_, i) => -1.3 + i * 0.289).map((x) => <Box key={`b${x}`} m={mat} at={[x, BASE / 2, Z - 1.18]} s={[0.05, BASE, 0.07]} c={FRAME} />)}
+      {[-1, 1].flatMap((sx) => [-0.85, -0.42, 0, 0.42, 0.85].map((z) => <Box key={`s${sx}${z}`} m={mat} at={[sx * 1.48, BASE / 2, Z + z]} s={[0.07, BASE, 0.05]} c={FRAME} />))}
+      <Box m={mat} at={[0, 0.82, Z]} s={[3.0, 0.07, 2.4]} c={FRAME} />
+      <Box m={mat} at={[-0.2, 0.68, Z + 1.45]} s={[1.5, 0.06, 0.6]} c="#263238" />
+      <mesh position={[-0.2, 0.645, Z + 1.765]}><boxGeometry args={[1.46, 0.02, 0.02]} />{bulb}</mesh>
       <mesh position={[-0.2, 0.3, Z + 1.156]}><planeGeometry args={[0.7, 0.56]} />{mat('#1c2a33')}</mesh>
 
       <group position={[0, 0, Z]}>
-        {/* Glass shaft, white cladding up the leaning side, and the arch with its LED strip. */}
-        <mesh geometry={GEO.body} castShadow receiveShadow><primitive object={glassMat(TINT)} attach="material" dispose={null} /></mesh>
-        {[-1, 1].map((sz) => <mesh key={sz} geometry={GEO.clad} position-z={sz * (D / 2 - 0.05)} castShadow>{mat(FRAME)}</mesh>)}
-        <group position-z={D / 2}>
-          <mesh geometry={GEO.arch} castShadow>{mat(FRAME)}</mesh>
-          <mesh geometry={GEO.archLed}>{bulb}</mesh>
-        </group>
+        {/* Dark glass shaft with mullions, white trim up the leaning side, and the lit seam that becomes the strut. */}
+        <mesh geometry={GEO.body} castShadow receiveShadow><primitive object={glassMat(DARK)} attach="material" dispose={null} /></mesh>
+        {[-1, 1].flatMap((sz) => MULLIONS.map((x) => <Box key={`${sz}${x}`} m={mat} at={[x, (BASE + DECK) / 2, sz * (D / 2 + 0.012)]} s={[0.035, DECK - BASE, 0.04]} c={STEEL} />))}
+        {[-1, 1].map((sz) => <mesh key={sz} geometry={GEO.clad} position-z={sz * (D / 2 - 0.03)} castShadow>{mat(FRAME)}</mesh>)}
+        {[-1, 1].map((sz) => (
+          <group key={sz} position-z={sz * (D / 2 - 0.02)}>
+            <mesh geometry={GEO.strut} castShadow>{mat(FRAME)}</mesh>
+            <mesh geometry={GEO.seamLed}>{coreEl()}</mesh>
+          </group>
+        ))}
         {/* Corner posts up the straight side, front and back. */}
-        {[-1, 1].map((sz) => <Box key={sz} m={mat} at={[-1.08, (BASE + PEAK - 0.3) / 2, sz * (D / 2 - 0.02)]} s={[0.1, PEAK - 0.3 - BASE, 0.1]} c={FRAME} />)}
+        {[-1, 1].map((sz) => <Box key={sz} m={mat} at={[LEFT - 0.03, (BASE + PEAK - 0.3) / 2, sz * (D / 2 - 0.02)]} s={[0.1, PEAK - 0.3 - BASE, 0.1]} c={FRAME} />)}
         {/* The deck, cantilevered out to the landing pad, with lights along its lip. */}
         <mesh geometry={GEO.deck} castShadow receiveShadow>{mat(FRAME)}</mesh>
-        <mesh position={[0.5, DECK_TOP - 0.06, 0.96]}><boxGeometry args={[3.2, 0.025, 0.02]} />{bulb}</mesh>
-        {/* Penthouse glass, then the roof fin rising to the peak, lit along its edge. */}
+        <mesh position={[(LEFT + DECK_END) / 2, DECK_TOP - 0.06, 0.96]}><boxGeometry args={[DECK_END - LEFT + 0.05, 0.025, 0.02]} />{bulb}</mesh>
+        {/* Penthouse: three floors glazed all round, a floor plate and a balcony with a glass rail. */}
         {GEO.suite.map((g, i) => <mesh key={i} geometry={g} castShadow><primitive object={suiteMats[i]} attach="material" dispose={null} /></mesh>)}
         <SuiteLights />
-        <mesh geometry={GEO.fin} castShadow>{mat(FRAME)}</mesh>
-        <group position-z={(D - 0.1) / 2}><mesh geometry={GEO.finLed}>{bulb}</mesh></group>
-        {/* Mast and warning light on the peak. */}
-        <Cyl m={mat} at={[-1.0, PEAK + 0.45, 0]} r={0.02} r2={0.045} h={0.9} c="#cfd8dc" seg={8} />
-        <mesh position={[-1.0, PEAK + 0.92, 0]}><sphereGeometry args={[0.05, 8, 6]} /><primitive object={glowMats.taillight} attach="material" dispose={null} /></mesh>
-        {[-0.5, 0.5].map((z) => <mesh key={z} position={[-0.95, PEAK - 0.02, z]}><sphereGeometry args={[0.04, 8, 6]} />{bulb}</mesh>)}
+        {GEO.plates.map((g, i) => <mesh key={i} geometry={g} castShadow>{mat(FRAME)}</mesh>)}
+        <mesh position={[(LEFT + suiteEdge(BALCONY) + 0.32) / 2, BALCONY + 0.17, D / 2 + 0.17]}>
+          <boxGeometry args={[suiteEdge(BALCONY) + 0.3 - LEFT, 0.26, 0.015]} />
+          <meshStandardMaterial color="#d6f3ff" transparent opacity={0.45} metalness={0.3} roughness={0.1} />
+        </mesh>
+        <mesh position={[(LEFT + suiteEdge(BALCONY) + 0.32) / 2, BALCONY + 0.31, D / 2 + 0.17]}><boxGeometry args={[suiteEdge(BALCONY) + 0.3 - LEFT, 0.02, 0.03]} />{bulb}</mesh>
+        {/* Crown: dark glass hooking out to a blade and sweeping up into the spire, trimmed and lit along its edge. */}
+        <mesh geometry={GEO.crown} castShadow><primitive object={glassMat(DARK)} attach="material" dispose={null} /></mesh>
+        <mesh geometry={GEO.blade} castShadow>{mat(FRAME)}</mesh>
+        <mesh geometry={GEO.cap} castShadow>{mat(FRAME)}</mesh>
+        <group position-z={D / 2 + 0.02}><mesh geometry={GEO.bladeLed}>{coreEl()}</mesh></group>
+        {/* Mast and warning light on the spire. */}
+        <Cyl m={mat} at={[-0.6, PEAK + 0.45, 0]} r={0.02} r2={0.045} h={0.9} c="#cfd8dc" seg={8} />
+        <mesh position={[-0.6, PEAK + 0.92, 0]}><sphereGeometry args={[0.05, 8, 6]} /><primitive object={glowMats.taillight} attach="material" dispose={null} /></mesh>
 
         {/* Landing pad on the deck's end, where the Skyhopper rests. */}
         <group position={[padX, padY, 0]}>
-          <Cyl m={mat} at={[0, -0.02, 0]} r={0.56} h={0.04} c="#455a64" seg={28} />
+          <Cyl m={mat} at={[0, -0.02, 0]} r={0.47} h={0.04} c="#455a64" seg={28} />
           <mesh position={[0, 0.0015, 0]} rotation-x={-Math.PI / 2}>
-            <circleGeometry args={[0.52, 28]} />
+            <circleGeometry args={[0.43, 28]} />
             {mat('#ffffff', helipadTex('#ffca28', '#6d7377'))}
           </mesh>
-          <PadLights bulb={bulb} r={0.52} n={14} y={0.02} />
+          <PadLights bulb={bulb} r={0.43} n={14} y={0.02} />
           <Skyhopper pad={[padX, padY, 0]} />
         </group>
         <Pulse />
@@ -244,7 +276,6 @@ export function VanguardTower() {
     </group>
   )
 }
-
 
 // ---- Launches: coins in, light up, take off ----
 
@@ -300,7 +331,7 @@ function Pulse() {
 const HOP = 0.55
 // (climb - lift) + (glide - up) must equal one lap's time, (down - climb) / 2.
 export const T = { lift: 1.0, climb: 2.8, down: 8.8, up: 14.8, glide: 19.0, cut1: 19.4, catch1: 19.75, cut2: 20.5, catch2: 20.85, land: 22.4 }
-const R = 2.75 // spiral radius round the tower's middle
+const R = 2.9 // spiral radius round the tower's middle
 const AXIS: [number, number] = [0, 0] // the tower's middle, in its own frame
 const HIGH = PEAK + 1.0
 const LOW = 1.9
@@ -480,7 +511,7 @@ function Skyhopper({ pad }: { pad: V3 }) {
     sm.instanceMatrix.needsUpdate = true
   })
   return (
-    <group userData={{ noBatch: true }}>
+    <group userData={{ noBatch: true, air: true }}>
       <instancedMesh ref={smoke} args={[puffGeo, puffMat, PUFFS]} frustumCulled={false} raycast={NO_RAY} />
       <group ref={craft}>
         <group scale={0.72}>

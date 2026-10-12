@@ -11,7 +11,7 @@ import { rotateCurrent, setGhostTurn, turnOf } from '../game/placement'
 import { mergeGroups, groupOf, groupTurn, groupScale, isLandmark, type MergeGroup } from '../game/merge'
 import { VanguardTower } from './Landmark'
 import { KeepShapes, MergeScale } from './mergeScale'
-import { propLimit } from './keepShape'
+import { limitFor } from './keepShape'
 import { sfx } from '../lib/sound'
 import { Clouds } from './Clouds'
 import { DayNight } from './DayNight'
@@ -19,15 +19,13 @@ import { PostFx } from './PostFx'
 import { SkyEnv } from './SkyEnv'
 import { townLook } from './look'
 import { SeasonFx } from './SeasonFx'
-import { glowMats } from './dayNight'
-import { LightPool } from './BuildingModel'
 import { TownCars } from './TownCars'
 import { Townspeople } from './Townspeople'
-import { Batch } from './Batch'
+import { Batch, batchOff } from './Batch'
 import { Manhole } from './BuildingDetail'
 import { GrassTufts } from './Tufts'
 import { Outskirts } from './Outskirts'
-import { RoadWear, StreetProp, PROPS } from './Roadside'
+import { RoadWear, StreetProp, PROPS, Hydrant, StreetLamp } from './Roadside'
 import { toWorld, toTile, DIRS } from './grid'
 import { grassTex, paverTex, drainTex, meadowTex } from './textures'
 import { roadMat } from './weatherLook'
@@ -38,6 +36,7 @@ import { Ear } from './Ear'
 import { WorldFx, PopGroup, usePops } from './WorldFx'
 import { helpable } from '../game/help'
 import { helpBuilding } from '../lib/help'
+import { hoursOf, seedOf } from '../game/hours'
 import { VIEW, isFree, useFreeCam } from './freeCam'
 import { FreeCam } from './FreeCam'
 
@@ -181,7 +180,8 @@ const ONE: [number, number, number] = [1, 1, 1]
 
 // `group` is set on the top-left building of a merged block: it stands in,
 // scaled up, for the whole block. The others in the block draw nothing.
-function Building({ b, roads, group }: { b: PlacedBuilding; roads: Set<string>; group?: MergeGroup }) {
+// `picked` (the building picked in Move) draws live, outside the merged town.
+function Building({ b, roads, group, picked }: { b: PlacedBuilding; roads: Set<string>; group?: MergeGroup; picked?: boolean }) {
   const d = buildingDef(b.def)
   const [cx, cz] = group ? groupCenter(group) : centerOf(b.def, b.x, b.z, b.rot)
   const turn = group ? groupTurn(group, roads) : turnOf(b, roads)
@@ -196,6 +196,7 @@ function Building({ b, roads, group }: { b: PlacedBuilding; roads: Set<string>; 
     <group
       position={[cx, 0, cz]}
       rotation-y={(turn * Math.PI) / 2}
+      userData={{ hours: { seed: seedOf(b.uid), kind: hoursOf(b.def) }, noBatch: !!picked }}
       onPointerDown={(e) => {
         const s = useGame.getState()
         if (s.visiting || e.button !== 0) return
@@ -244,7 +245,7 @@ function Building({ b, roads, group }: { b: PlacedBuilding; roads: Set<string>; 
       <group scale={mark ? [k, k, k] : [sx, sy, sz]}>
         <MergeScale.Provider value={mark ? [k, k, k] : group ? [sx, sy, sz] : ONE}>
           <PopGroup uid={b.uid}>
-            <KeepShapes limit={propLimit(d.w * TILE, d.h * TILE)}>
+            <KeepShapes limit={limitFor(d)}>
               {mark ? <VanguardTower /> : <BuildingModel def={d} level={buildingLevel(b)} />}
             </KeepShapes>
           </PopGroup>
@@ -283,19 +284,6 @@ function Sidewalk({ side, drain }: { side: 'e' | 'w' | 's' | 'n'; drain?: boolea
   )
 }
 
-// Fire hydrant on the sidewalk.
-function Hydrant({ side }: { side: 'e' | 'w' | 's' | 'n' }) {
-  const at = TILE / 2 - 0.2
-  const [x, z] = { e: [at, 0.6], w: [-at, -0.6], s: [-0.6, at], n: [0.6, -at] }[side]
-  return (
-    <group position={[x, 0.08, z]}>
-      <mesh position={[0, 0.12, 0]} castShadow><cylinderGeometry args={[0.06, 0.07, 0.24, 8]} /><meshStandardMaterial color="#e53935" /></mesh>
-      <mesh position={[0, 0.26, 0]}><sphereGeometry args={[0.065, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2]} /><meshStandardMaterial color="#e53935" /></mesh>
-      <mesh position={[0, 0.14, 0]} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.025, 0.025, 0.2, 6]} /><meshStandardMaterial color="#cfd8dc" /></mesh>
-    </group>
-  )
-}
-
 // Zebra crossing painted across the road near one edge of the tile.
 function Crosswalk({ side }: { side: 'e' | 'w' | 's' | 'n' }) {
   const half = TILE / 2
@@ -310,32 +298,6 @@ function Crosswalk({ side }: { side: 'e' | 'w' | 's' | 'n' }) {
           <meshBasicMaterial color="#f5f5f5" {...decal()} />
         </mesh>
       ))}
-    </group>
-  )
-}
-
-// Street lamp on the sidewalk, arm reaching over the road. Lit at night.
-function StreetLamp({ side }: { side: 'e' | 'w' | 's' | 'n' }) {
-  const half = TILE / 2 - 0.18
-  const rot = { s: 0, n: Math.PI, e: Math.PI / 2, w: -Math.PI / 2 }[side]
-  return (
-    <group rotation-y={rot}>
-      <group position={[0.55, 0, half]}>
-        <mesh position={[0, 0.85, 0]} castShadow>
-          <cylinderGeometry args={[0.035, 0.05, 1.7, 6]} />
-          <meshStandardMaterial color="#37474f" />
-        </mesh>
-        <mesh position={[0, 1.68, -0.22]}>
-          <boxGeometry args={[0.05, 0.04, 0.48]} />
-          <meshStandardMaterial color="#37474f" />
-        </mesh>
-        <mesh position={[0, 1.63, -0.44]}>
-          <boxGeometry args={[0.14, 0.06, 0.2]} />
-          <primitive object={glowMats.bulb} attach="material" dispose={null} />
-        </mesh>
-      </group>
-      {/* Above the kerb so the glow spills over the sidewalk too. */}
-      <LightPool r={0.95} x={0.55} z={half - 0.5} y={0.09} />
     </group>
   )
 }
@@ -697,6 +659,8 @@ export function World() {
     [buildings, roadsList, land, popping],
   )
   const merges = useMemo(() => mergeGroups(buildings), [layout]) // eslint-disable-line react-hooks/exhaustive-deps
+  // The building picked in Move draws live; the rest stays merged (see batchOff).
+  const picked = useGame((s) => (s.mode === 'move' ? s.selected : null))
   return (
     <>
       <DayNight small={Math.min(window.innerWidth, window.innerHeight) < 700} />
@@ -710,13 +674,12 @@ export function World() {
       <ResponsiveZoom />
       <ExpandZoom />
       <Interaction />
-      {/* Pieces move while building or dragging, so merging waits for plain play. */}
-      <Batch version={layout} off={mode !== 'play'} cell={24}>
+      <Batch version={`${layout}|${picked ?? ''}`} off={batchOff(mode)} cell={24}>
         <Land />
         <GrassTufts land={land} roads={roadsList} buildings={buildings} />
         <Roads />
         {buildings.map((b) =>
-          merges.owner.has(b.uid) && !merges.groups.has(b.uid) ? null : <Building key={b.uid} b={b} roads={roads} group={merges.groups.get(b.uid)} />,
+          merges.owner.has(b.uid) && !merges.groups.has(b.uid) ? null : <Building key={b.uid} b={b} roads={roads} group={merges.groups.get(b.uid)} picked={b.uid === picked} />,
         )}
       </Batch>
       <AnchorProjector />

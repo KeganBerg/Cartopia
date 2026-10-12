@@ -15,6 +15,7 @@ import { HELPS_PER_TOWN } from '../game/help'
 import { signedInUser } from '../lib/cloud'
 import { LikeButton } from './Meet'
 import { GhostButton } from './GhostRace'
+import { LoadingBand } from './Loading'
 
 export function FriendsPanel() {
   const uid = useUserId()
@@ -94,7 +95,7 @@ export function FriendsPanel() {
       {canFriend && (
         <>
           <h3 className="fr-h">Friends <small>{friends.length ? `${friends.filter((f) => online.has(f.id)).length} online · ${friends.length}/${MAX_FRIENDS}` : ''}</small></h3>
-          {!loaded && <p className="hint">Loading...</p>}
+          {!loaded && <LoadingBand label="Finding your friends" />}
           {loaded && friends.length === 0 && <p className="empty-board fr-empty">No friends yet. Add someone by username or from the drivers below.</p>}
           <div className="leaders">
             {friends.map((f) => (

@@ -1,4 +1,5 @@
 import { Box3, BoxGeometry, Matrix3, Matrix4, Object3D, PlaneGeometry, RepeatWrapping, Vector2, Vector3, type BufferAttribute, type BufferGeometry, type InstancedMesh, type Material, type Mesh, type Texture } from 'three'
+import { TILE } from '../game/data'
 
 // The maths behind merged blocks keeping their props in shape: see THE RULE
 // in mergeScale.tsx.
@@ -10,6 +11,14 @@ export const uniform = ([x, y, z]: readonly number[]) => x === y && y === z
 export function propLimit(w: number, d: number) {
   return Math.min(1.45, 0.42 * Math.min(w, d))
 }
+// A one-tile decoration (a tree, a lamp, a statue) is one prop as a whole:
+// merged, it grows evenly to the pair's height instead of having its trunk and
+// crown, or post and arm, kept apart. Runs meant to stretch (hedges, fences) don't.
+const RUNS = new Set(['hedge', 'fence'])
+export function limitFor(def: { id: string; kind: string; w: number; h: number }) {
+  if ((def.kind === 'decor' || def.kind === 'obstacle') && def.w === 1 && def.h === 1 && !RUNS.has(def.id)) return Infinity
+  return propLimit(def.w * TILE, def.h * TILE)
+}
 // Anything lower than this is a ground mark (paint, a pad, a pond) and may stretch.
 export const FLAT = 0.03
 
@@ -20,7 +29,11 @@ const pInv = new Matrix3()
 const c3 = new Matrix3()
 const own = new Matrix3()
 
-type Shape = { root: Object3D; scale: readonly number[]; k: number }
+// `off` is how far the prop's origin sits from the point it rests on (the
+// bottom of its box, and its inner side when it's off to one side), in the
+// block's own unstretched units. Kept at that point, a prop stays on the roof,
+// wall or ground it touches instead of drifting off it as the block stretches.
+type Shape = { root: Object3D; scale: readonly number[]; k: number; off?: Vector3 }
 
 // What's being kept, by object (not in userData: models share userData objects).
 const kept = new WeakMap<Object3D, Shape>()
@@ -54,6 +67,27 @@ function fixFor(parent: Object3D, s: Shape, out: Matrix3) {
   return true
 }
 
+const shift = new Vector3()
+// Moves a kept prop back onto what it rests on (see Shape.off); call after fixFor.
+function applyAnchor(target: Matrix4, s: Shape) {
+  if (!s.off) return
+  const [sx, sy, sz] = s.scale
+  shift.set(s.off.x * (s.k / sx - 1), s.off.y * (s.k / sy - 1), s.off.z * (s.k / sz - 1)).applyMatrix3(pInv)
+  target.elements[12] += shift.x
+  target.elements[13] += shift.y
+  target.elements[14] += shift.z
+}
+
+const zero = new Vector3()
+// The anchor offset for a prop with box `b` and origin `o`, hung off a parent
+// whose origin is at `p` (all root space, unstretched). A prop off to one side
+// of its parent rests on the parent's side facing it: a window on a hall's
+// wall, a sign on a booth, a lamp on the lot edge.
+export function anchorOf(b: Box3, o: Vector3, p = zero) {
+  const side = (lo: number, hi: number, at: number) => (lo > 0 ? at - lo : hi < 0 ? at - hi : 0)
+  return new Vector3(side(b.min.x - p.x, b.max.x - p.x, o.x - p.x), o.y - b.min.y, side(b.min.z - p.z, b.max.z - p.z, o.z - p.z))
+}
+
 function applyLinear(target: Matrix4, fix: Matrix3) {
   own.setFromMatrix4(target)
   own.premultiply(fix)
@@ -71,8 +105,8 @@ function underKept(o: Object3D, root: Object3D) {
 }
 
 // Keeps `o` in true shape every frame, wherever it moves or turns.
-export function keepShape(o: Object3D, root: Object3D, scale: readonly number[], k = Math.min(scale[0], scale[2])) {
-  const shape: Shape = { root, scale, k }
+export function keepShape(o: Object3D, root: Object3D, scale: readonly number[], k = Math.min(scale[0], scale[2]), off?: Vector3) {
+  const shape: Shape = { root, scale, k, off }
   const had = kept.get(o)
   if (had) return void Object.assign(had, shape)
   kept.set(o, shape)
@@ -80,7 +114,9 @@ export function keepShape(o: Object3D, root: Object3D, scale: readonly number[],
     Object3D.prototype.updateMatrix.call(this)
     const s = kept.get(this)
     if (!s || !this.parent || uniform(s.scale) || underKept(this, s.root)) return
-    if (fixFor(this.parent, s, c3)) applyLinear(this.matrix, c3)
+    if (!fixFor(this.parent, s, c3)) return
+    applyLinear(this.matrix, c3)
+    applyAnchor(this.matrix, s)
   }
   o.matrixAutoUpdate = true
   o.updateMatrix()
@@ -116,6 +152,15 @@ export function keepInstances(mesh: InstancedMesh, root: Object3D, scale: readon
     if (!fixFor(mesh, s, fix)) return set(i, m)
     tmp.copy(m)
     applyLinear(tmp, fix)
+    // People (userData.feet) keep their true shape round the spot they stand
+    // on, so heads and arms stay on bodies instead of drifting with the
+    // stretch. `feet(i)` gives that spot for instance i, in the mesh's own
+    // units (a mesh squared up with the block).
+    const feet = mesh.userData.feet as ((i: number) => readonly number[]) | undefined
+    if (feet) {
+      const at = feet(i)
+      for (let a = 0; a < 3; a++) tmp.elements[12 + a] = at[a] + (tmp.elements[12 + a] - at[a]) * (s.k / s.scale[a])
+    }
     return set(i, tmp)
   }
   mesh.setMatrixAt = fixed
@@ -129,6 +174,8 @@ export function keepInstances(mesh: InstancedMesh, root: Object3D, scale: readon
 }
 
 const box = new Box3()
+const at = new Vector3()
+const from = new Vector3()
 
 const lettered = (mat: Material | Material[]) => [mat].flat().some((m) => !!(m as { map?: Texture | null }).map?.userData?.text)
 const tiles = (mat: Material | Material[]) => [mat].flat().some((m) => (m as { map?: Texture | null }).map?.wrapS === RepeatWrapping)
@@ -203,12 +250,16 @@ export function keepProps(root: Object3D, scale: readonly number[], limit: numbe
         continue
       }
       box.setFromObject(c).applyMatrix4(back)
+      if (c.userData.upright && !box.isEmpty()) {
+        keepShape(c, root, scale, c.userData.tall ? scale[1] : c.userData.size, anchorOf(box, at.setFromMatrixPosition(c.matrixWorld).applyMatrix4(back), from.setFromMatrixPosition(o.matrixWorld).applyMatrix4(back)))
+        continue
+      }
       if (box.isEmpty()) {
         visit(c)
         continue
       }
       const small = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) <= limit && box.max.y - box.min.y >= FLAT
-      if (small) keepShape(c, root, scale)
+      if (small) keepShape(c, root, scale, undefined, anchorOf(box, at.setFromMatrixPosition(c.matrixWorld).applyMatrix4(back), from.setFromMatrixPosition(o.matrixWorld).applyMatrix4(back)))
       else if (leaf) retile(c as Mesh, back, scale)
       else visit(c)
     }

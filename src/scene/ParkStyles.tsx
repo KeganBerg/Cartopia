@@ -2,6 +2,7 @@ import { useMemo, useRef, type ReactNode } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { ExtrudeGeometry, Shape, type Group } from 'three'
 import { SEASON, PAL } from './season'
+import { Upright } from './mergeScale'
 import { brickTex, concreteTex, gravelTex, grassTex, paverTex, soilTex } from './textures'
 import { Ball, Bench, Box, Cyl, Lamp, Patch, Sign, Tree, type EdgeProps, type Mat, type V3 } from './edgeKit'
 
@@ -92,7 +93,7 @@ function DogPark({ m, bulb, ghost }: EdgeProps) {
           <Box m={m} at={[-Math.sign(x) * -0.2, 0.3, 0]} s={[0.38, 0.5, 0.02]} c="#90a4ae" />
         </group>
       ))}
-      <group position={[-0.95, 0, 1.92]}>
+      <group position={[-1.1, 0, 1.92]}>
         {[-0.25, 0.25].map((x) => <Box key={x} m={m} at={[x, 0.25, 0]} s={[0.04, 0.5, 0.04]} c="#5d4037" />)}
         <Box m={m} at={[0, 0.5, -0.01]} s={[0.62, 0.17, 0.03]} c="#2e7d32" />
         {!ghost && <Sign text="DOG PARK" w={0.56} at={[0, 0.5, 0.008]} bg="#fff8e1" fg="#2e7d32" />}
@@ -230,8 +231,9 @@ function SkatePark({ m, bulb, ghost }: EdgeProps) {
         </mesh>
         {[-1, 1].map((sd) => (
           <group key={sd}>
-            <Cyl m={m} at={[0, HP.r + 0.012, sd * (hpHalf - HP.deck)]} r={0.018} h={HP.w} c="#b0bec5" seg={8} rot={[0, 0, Math.PI / 2]} />
-            {[-0.8, 0, 0.8].map((x) => <Cyl key={x} m={m} at={[x, HP.r + 0.18, sd * (hpHalf - 0.03)]} r={0.012} h={0.36} c="#78909c" seg={5} />)}
+            {/* Square coping, posts and rails: merged, they run the pipe's whole width. */}
+            <Box m={m} at={[0, HP.r + 0.012, sd * (hpHalf - HP.deck)]} s={[HP.w, 0.034, 0.034]} c="#b0bec5" />
+            {[-0.8, 0, 0.8].map((x) => <Box key={x} m={m} at={[x, HP.r + 0.18, sd * (hpHalf - 0.03)]} s={[0.022, 0.36, 0.022]} c="#78909c" shadow={false} />)}
             <Box m={m} at={[0, HP.r + 0.34, sd * (hpHalf - 0.03)]} s={[HP.w, 0.02, 0.02]} c="#78909c" />
           </group>
         ))}
@@ -248,14 +250,14 @@ function SkatePark({ m, bulb, ghost }: EdgeProps) {
       <group position={[1.25, 0.06, -1.0]}>
         <Box m={m} at={[0, 0.2, -0.3]} s={[0.9, 0.4, 0.6]} c="#b0bec5" t={concreteTex(1, 1)} />
         <Box m={m} at={[0, 0.12, 0.17]} s={[0.9, 0.04, 0.6]} c="#b0bec5" rot={[0.62, 0, 0]} />
-        <Cyl m={m} at={[0, 0.41, 0.0]} r={0.015} h={0.9} c="#b0bec5" seg={6} rot={[0, 0, Math.PI / 2]} />
+        <Box m={m} at={[0, 0.41, 0.0]} s={[0.9, 0.028, 0.028]} c="#b0bec5" />
       </group>
       <group position={[0.3, 0.06, 0.9]}>
         <Box m={m} at={[0, 0.12, 0]} s={[0.8, 0.24, 0.5]} c="#90a4ae" t={concreteTex(1, 1)} />
         {[-1, 1].map((sd) => <Box key={sd} m={m} at={[sd * 0.6, 0.06, 0]} s={[0.42, 0.04, 0.5]} c="#90a4ae" rot={[0, 0, sd * -0.55]} />)}
         <Box m={m} at={[0, 0.25, 0.24]} s={[0.8, 0.025, 0.03]} c="#ffb300" />
-        <Cyl m={m} at={[0, 0.38, -0.12]} r={0.015} h={1.0} c="#cfd8dc" seg={6} rot={[0, 0, Math.PI / 2]} />
-        {[-0.4, 0.4].map((x) => <Cyl key={x} m={m} at={[x, 0.3, -0.12]} r={0.012} h={0.16} c="#cfd8dc" seg={5} />)}
+        <Box m={m} at={[0, 0.38, -0.12]} s={[1.0, 0.028, 0.028]} c="#cfd8dc" />
+        {[-0.4, 0.4].map((x) => <Box key={x} m={m} at={[x, 0.3, -0.12]} s={[0.022, 0.16, 0.022]} c="#cfd8dc" shadow={false} />)}
       </group>
       <group position={[1.4, 0.06, 0.8]} rotation-y={-Math.PI / 2}>
         {[0, 1, 2].map((i) => <Box key={i} m={m} at={[0, 0.05 + i * 0.07, -0.25 + i * 0.12]} s={[0.6, 0.1 + i * 0.14, 0.14]} c="#9e9e9e" t={concreteTex(1, 1)} />)}
@@ -271,7 +273,7 @@ function SkatePark({ m, bulb, ghost }: EdgeProps) {
       {/* Bleacher, a spare board, a second skater sitting on the deck, lights. */}
       <group position={[-1.75, 0.06, 0.05]} rotation-y={Math.PI / 2}>
         {[0, 1].map((i) => <Box key={i} m={m} at={[0, 0.1 + i * 0.12, -i * 0.15]} s={[0.9, 0.03, 0.14]} c="#90a4ae" />)}
-        {[-0.4, 0.4].map((x) => <Box key={x} m={m} at={[x, 0.12, -0.08]} s={[0.03, 0.24, 0.3]} c="#607d8b" />)}
+        {[-0.4, 0.4].map((x) => <Box key={x} m={m} at={[x, 0.12, -0.08]} s={[0.03, 0.24, 0.296]} c="#607d8b" />)}
       </group>
       {!ghost && (
         <group>
@@ -287,7 +289,7 @@ function SkatePark({ m, bulb, ghost }: EdgeProps) {
       )}
       <group position={[0, 0.06, 1.88]}>
         {[-0.45, 0.45].map((x) => <Box key={x} m={m} at={[x, 0.25, 0]} s={[0.05, 0.5, 0.05]} c="#212121" />)}
-        <Box m={m} at={[0, 0.48, -0.01]} s={[1.0, 0.24, 0.03]} c="#ff7043" />
+        <Box m={m} at={[0, 0.48, -0.01]} s={[1.0, 0.24, 0.026]} c="#ff7043" />
         {!ghost && <Sign text="SKATE PARK" w={0.92} at={[0, 0.48, 0.008]} bg="#212121" fg="#ff7043" />}
       </group>
     </group>
@@ -379,6 +381,7 @@ function KoiGarden({ m, bulb, ghost }: EdgeProps) {
         <mesh position={[0, 0.82, 0]} rotation-y={Math.PI / 4} scale={[1, 0.55, 1]} castShadow><coneGeometry args={[0.8, 0.6, 4]} />{m(SNOW ? '#f4f8fb' : '#37474f')}</mesh>
         <Box m={m} at={[0, 0.69, 0]} s={[0.98, 0.04, 0.84]} c="#4e342e" />
         <Box m={m} at={[0, 0.2, 0]} s={[0.36, 0.04, 0.26]} c="#4e342e" />
+        <Box m={m} at={[0, 0.14, 0]} s={[0.08, 0.1, 0.08]} c="#4e342e" />
         <mesh position={[0, 0.66, 0.34]}><boxGeometry args={[0.06, 0.08, 0.06]} />{bulb}</mesh>
       </group>
       {/* Maples, bamboo and stepping stones from the front gate. */}
@@ -442,7 +445,7 @@ function Glasshouse({ m, bulb, ghost }: { m: Mat; bulb: ReactNode; ghost?: boole
         </group>
       ))}
       {[0.16 + h, 0.16 + h * 0.5].map((y) => [-1, 1].map((sd) => <Box key={`${y}${sd}`} m={m} at={[0, y, sd * (d / 2)]} s={[w, 0.025, 0.025]} c="#fafafa" shadow={false} />))}
-      {[-1, 1].map((sd) => <Box key={sd} m={m} at={[sd * (w / 2), 0.16 + h / 2, 0]} s={[0.03, h, d]} c="#fafafa" shadow={false} />)}
+      {[-1, 1].map((sd) => <Box key={sd} m={m} at={[sd * (w / 2), 0.16 + (h - 0.004) / 2, 0]} s={[0.03, h - 0.004, d - 0.004]} c="#fafafa" shadow={false} />)}
       <group position={[0, 0.16 + h + r - 0.05, 0]}>
         <mesh><sphereGeometry args={[0.36, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />{glass}</mesh>
         {[0, 1, 2, 3].map((k) => <mesh key={k} rotation-y={(k * Math.PI) / 4}><torusGeometry args={[0.36, 0.012, 4, 16, Math.PI]} />{m('#fafafa')}</mesh>)}
@@ -463,15 +466,15 @@ function Garden({ m, bulb, ghost }: EdgeProps) {
   return (
     <group>
       <Lawn m={m} />
-      <Box m={m} at={[0, 0.045, 0.6]} s={[0.5, 0.02, 2.7]} c="#ffffff" t={paverTex(1, 4)} shadow={false} />
-      <Box m={m} at={[0, 0.046, 0.85]} s={[3.6, 0.02, 0.4]} c="#ffffff" t={paverTex(5, 1)} shadow={false} />
-      <Box m={m} at={[0, 0.045, -0.55]} s={[3.2, 0.02, 0.35]} c="#ffffff" t={paverTex(5, 1)} shadow={false} />
+      <Box m={m} at={[0, 0.045, 0.598]} s={[0.5, 0.02, 2.696]} c="#ffffff" t={paverTex(1, 4)} shadow={false} />
+      <Box m={m} at={[0, 0.048, 0.85]} s={[3.6, 0.02, 0.4]} c="#ffffff" t={paverTex(5, 1)} shadow={false} />
+      <Box m={m} at={[0, 0.048, -0.55]} s={[3.2, 0.02, 0.35]} c="#ffffff" t={paverTex(5, 1)} shadow={false} />
       <Glasshouse m={m} bulb={bulb} ghost={ghost} />
       {beds.map(([x, z], i) => (
         <group key={i} position={[x, 0, z]}>
           <Box m={m} at={[0, 0.05, 0]} s={[1.3, 0.04, 0.62]} c="#ffffff" t={soilTex(1, 1)} shadow={false} />
           {[-1, 1].map((sd) => <Box key={sd} m={m} at={[0, 0.09, sd * 0.31]} s={[1.32, 0.1, 0.07]} c="#33691e" />)}
-          {[-1, 1].map((sd) => <Box key={sd} m={m} at={[sd * 0.65, 0.09, 0]} s={[0.07, 0.1, 0.62]} c="#33691e" />)}
+          {[-1, 1].map((sd) => <Box key={sd} m={m} at={[sd * 0.65, 0.09, 0]} s={[0.07, 0.1, 0.616]} c="#33691e" />)}
           {!ghost && Array.from({ length: 12 }, (_, k) => (
             <Ball key={k} m={m} at={[-0.48 + (k % 6) * 0.19, 0.11, (k < 6 ? -0.11 : 0.11)]} r={0.06} c={blooms[(k + i) % blooms.length]} />
           ))}
@@ -501,12 +504,15 @@ function Garden({ m, bulb, ghost }: EdgeProps) {
       <Bench m={m} at={[1.05, 0.05, -0.2]} rot={0} />
       {/* Rose arch at the entrance with the garden's name on a stone plinth. */}
       <group position={[0, 0.05, 1.82]}>
-        <mesh position={[0, 0.48, 0]}><torusGeometry args={[0.3, 0.025, 6, 14, Math.PI]} />{m('#fafafa')}</mesh>
-        {[-0.3, 0.3].map((x) => <Cyl key={x} m={m} at={[x, 0.24, 0]} r={0.025} h={0.48} c="#fafafa" seg={6} />)}
-        {!PAL.bare && Array.from({ length: 9 }, (_, k) => {
-          const a = (k / 8) * Math.PI
-          return <Ball key={k} m={m} at={[Math.cos(a) * 0.3, 0.48 + Math.sin(a) * 0.3, 0.02]} r={0.04} c={k % 2 ? '#e91e63' : '#43a047'} />
-        })}
+        {/* One piece, so a merged garden doesn't pull the posts out from under the hoop. */}
+        <Upright>
+          <mesh position={[0, 0.48, 0]}><torusGeometry args={[0.3, 0.025, 6, 14, Math.PI]} />{m('#fafafa')}</mesh>
+          {[-0.3, 0.3].map((x) => <Cyl key={x} m={m} at={[x, 0.24, 0]} r={0.025} h={0.48} c="#fafafa" seg={6} />)}
+          {!PAL.bare && Array.from({ length: 9 }, (_, k) => {
+            const a = (k / 8) * Math.PI
+            return <Ball key={k} m={m} at={[Math.cos(a) * 0.3, 0.48 + Math.sin(a) * 0.3, 0.02]} r={0.04} c={k % 2 ? '#e91e63' : '#43a047'} />
+          })}
+        </Upright>
         <group position={[-1.1, 0, 0]}>
           <Box m={m} at={[0, 0.12, 0]} s={[0.9, 0.24, 0.12]} c="#bdbdbd" t={brickTex(2, 1)} />
           {!ghost && <Sign text="BOTANICAL GARDEN" w={0.84} at={[0, 0.13, 0.065]} bg="#1b5e20" fg="#fff8e1" />}
@@ -514,7 +520,7 @@ function Garden({ m, bulb, ghost }: EdgeProps) {
       </group>
       <Tree m={m} at={[1.6, 0, 1.7]} s={0.9} leaves={PAL.leaves} bare={PAL.bare} />
       <Tree m={m} at={[1.65, 0, -0.45]} s={0.8} leaves={PAL.leaves} bare={PAL.bare} />
-      <Tree m={m} at={[-1.7, 0, -0.45]} s={0.85} leaves={PAL.leaves} bare={PAL.bare} />
+      <Tree m={m} at={[-1.62, 0, -0.45]} s={0.85} leaves={PAL.leaves} bare={PAL.bare} />
     </group>
   )
 }

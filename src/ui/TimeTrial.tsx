@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase'
 import { signedInUser } from '../lib/cloud'
 import { displayName } from '../lib/names'
 import { fetchBoard, fetchPrizes, localBest, saveLocalBest, startRun, submitRun, type Board, type TrialPrizes } from '../lib/trialServer'
+import { LoadingBand } from './Loading'
 
 // The Race menu's weekly time trial tab: this week's venue, prizes, the board, and runs.
 
@@ -85,7 +86,7 @@ export function TrialTab({ myPi, onRun }: { myPi: number; onRun: (run: TrialRun)
 
       {supabase && (
         <div className="leaders">
-          {board === undefined && <p className="hint">Loading...</p>}
+          {board === undefined && <LoadingBand label="Loading lap times" />}
           {board && rows.length === 0 && <p className="empty-board">No times yet this week. Be the first!</p>}
           {rows.map((r) => <Row key={r.owner} r={r} mine={r.owner === uid} />)}
           {board?.me && !meShown && uid && <Row r={{ owner: uid, town: useGame.getState().townName, t: board.me.t, pi: myPi, car: null, place: board.me.place }} mine />}
