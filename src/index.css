@@ -592,6 +592,44 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .menu-sound .ambience-vol { flex: 1; min-width: 0; accent-color: var(--green); }
 .menu-sound .ambience-vol:disabled { opacity: .4; }
 
+/* Menu > Settings: titled cards of rows (src/ui/Settings.tsx). */
+.set-group { background: #fff; border: 2.5px solid #b9cde8; border-radius: 16px; box-shadow: 0 3px 0 #b9cde8; margin: 0 0 12px; overflow: hidden; }
+.panel-body .set-head { display: flex; align-items: center; gap: 8px; margin: 0; padding: 7px 12px; font: 16px var(--display); color: #24406b; background: linear-gradient(#f4f8fd, #e6eef9); border-bottom: 2px solid #d5e2f3; }
+.set-ico { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: #fff; border: 2px solid #b9cde8; font-size: 14px; }
+.set-group .menu-sound, .set-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; margin: 0; padding: 5px 12px; background: none; border: 0; border-radius: 0; font-weight: 800; }
+.set-group .menu-sound + .menu-sound, .set-group > * + .set-row, .set-group .set-row + *, .set-group .menu-sound + .set-row { border-top: 1.5px solid #edf2f8; }
+.set-group .menu-sound > span:first-child { width: 104px; flex: none; white-space: nowrap; }
+.set-label { display: flex; flex-direction: column; min-width: 0; }
+.set-label small { font-weight: 600; font-size: 12px; color: #78909c; }
+.set-group .menu-sound .goals-btn { width: 38px; height: 34px; padding: 0; font-size: 17px; }
+.set-group .hint { margin: 6px 12px; }
+.set-group .bank-menu-btn { width: calc(100% - 24px); margin: 6px 12px; }
+.set-seg { margin: 10px 12px 4px; }
+.set-note { display: block; padding: 0 14px 10px; color: #607d8b; font-weight: 600; font-size: 12.5px; }
+.switch { flex: none; position: relative; width: 50px; height: 30px; padding: 0; border-radius: 16px; border: 2.5px solid var(--line, #14213d); background: #cfd8dc; box-shadow: inset 0 2px 3px rgba(0,0,0,.18); cursor: pointer; transition: background .15s; }
+.switch i { position: absolute; top: 2px; left: 2px; width: 21px; height: 21px; border-radius: 50%; background: linear-gradient(#fff, #e3ecf7); border: 2px solid var(--line, #14213d); box-sizing: border-box; transition: transform .15s; }
+.switch.on { background: linear-gradient(#8ef05c, #2fae35); }
+.switch.on i { transform: translateX(20px); }
+.set-link { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 44px; padding: 5px 12px; background: none; border: 0; border-top: 1.5px solid #edf2f8; font: 800 15px Nunito, sans-serif; color: var(--ink, #263238); text-decoration: none; text-align: left; cursor: pointer; }
+.set-head + .set-link { border-top: 0; }
+.set-link b { font: 22px var(--display); color: #90a4ae; }
+.set-ver { font: 700 13px ui-monospace, monospace; background: #eceff1; border-radius: 6px; padding: 2px 6px; color: #546e7a; }
+.set-tips { list-style: none; margin: 0; padding: 4px 12px 8px; font-size: 13.5px; line-height: 1.35; }
+.set-tips li { display: flex; gap: 8px; align-items: baseline; padding: 4px 0; }
+.set-tips li span { flex: none; width: 20px; text-align: center; }
+.switch:disabled { opacity: .45; }
+.set-danger { margin: 0 10px 10px; padding: 10px; border: 2px solid #c62828; border-radius: 12px; background: #fff5f5; }
+.set-danger p { margin: 4px 0 8px; font-size: 13px; color: #6d4c41; }
+.set-danger .row { justify-content: flex-end; gap: 8px; }
+.danger-btn { font: 14px var(--display); color: #fff; background: linear-gradient(#ff6b6b, #d6283b); border: 2.5px solid #7f1020; border-radius: 12px; padding: 5px 12px; box-shadow: 0 3px 0 rgba(0,0,0,.3); text-shadow: 0 1px 0 rgba(0,0,0,.3); }
+.agree { font-size: 12.5px; margin: 6px 0 12px; }
+.legal { font-size: 14px; line-height: 1.55; }
+.legal h3 { color: #1e5fbf; }
+.legal ul { padding-left: 20px; }
+.legal-draft { background: #fff8e1; border: 2px solid #ffca28; border-radius: 10px; padding: 6px 10px; font-weight: 800; font-size: 13px; }
+/* Settings > Reduce motion: animations and transitions end at once, like the device setting. */
+html.calm *, html.calm *::before, html.calm *::after { animation-duration: .001ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+
 @media (max-width: 600px) {
   .hud-left, .hud-center, .hud-right { display: none !important; }
   .hud-mobile { display: block; position: absolute; z-index: 50; top: 0; left: 0; right: 0; padding: calc(6px + var(--sat)) calc(8px + var(--sar)) 0 calc(8px + var(--sal)); pointer-events: none; }

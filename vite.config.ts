@@ -1,5 +1,6 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
+import { legalHtml, PRIVACY, TERMS } from './src/legal/legal.ts'
 
 // Link previews need absolute URLs. Netlify sets URL to the site's primary
 // domain (cartopia.lol once it is primary), so shared links point at it.
@@ -18,8 +19,19 @@ const version = (): Plugin => ({
   },
 })
 
+// Public Terms of Service and Privacy Policy pages at /terms and /privacy, from
+// the same text the game shows in its Menu (src/legal/legal.ts).
+const legal = (): Plugin => ({
+  name: 'legal',
+  apply: 'build',
+  generateBundle() {
+    this.emitFile({ type: 'asset', fileName: 'terms/index.html', source: legalHtml(TERMS, PRIVACY) })
+    this.emitFile({ type: 'asset', fileName: 'privacy/index.html', source: legalHtml(PRIVACY, TERMS) })
+  },
+})
+
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), siteUrl(), version()],
+  plugins: [react(), siteUrl(), version(), legal()],
   define: { __BUILD_ID__: JSON.stringify(BUILD_ID) },
 })

@@ -2,7 +2,7 @@
 // coins ring like small metal discs, gems tink like glass. Built from the glockenspiel and
 // shaker in instruments.ts, kept quiet and thinned out so a shower of 70 stays a patter.
 import { glock, shaker } from './instruments'
-import { audioContext, audioOut } from './sound'
+import { audioContext, sfxOut } from './sound'
 
 type Dest = { ctx: BaseAudioContext; out: AudioNode }
 
@@ -29,7 +29,7 @@ let recent = 0
 // One landing. `speed` is how hard it hit (m/s), which sets how loud the clink is.
 export function landClink(gem: boolean, speed: number) {
   const ctx = audioContext()
-  const out = audioOut()
+  const out = sfxOut()
   if (!ctx || !out) return
   const now = ctx.currentTime
   if (now - last < GAP) return
