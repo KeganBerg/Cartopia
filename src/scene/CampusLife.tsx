@@ -146,7 +146,7 @@ export function LearnerCar({ i, at, rot = 0, rig, body: tilt }: { i: number; at?
           <boxGeometry args={[0.26, 0.08, 0.07]} />
           <meshStandardMaterial color="#ffeb3b" emissive="#ffc400" emissiveIntensity={0.35} />
         </mesh>
-        <mesh position={[0, roof + 0.05, -0.004]}>
+        <mesh position={[0, roof + 0.05, 0.003]}>
           <planeGeometry args={[0.24, 0.06]} />
           <meshBasicMaterial map={signTexture('STUDENT', '#ffeb3b', '#212121')} toneMapped={false} />
         </mesh>

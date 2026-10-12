@@ -172,7 +172,7 @@ export function BrickFloors({ k, w, d, z0 = 0, y0, floors, fh = 0.44, wall, trim
       {!ghost && fx.concat(fx.map((x) => x + w / nf / 2)).filter((x) => Math.abs(x) < w / 2 - 0.05).map((x) => (
         <Box key={x} m={m} at={[x, y0 + H - 0.03, zf + 0.035]} s={[0.04, 0.07, 0.07]} c={trim} shadow={false} />
       ))}
-      <mesh position={[0, y0 + H + 0.101, z0]} rotation-x={-Math.PI / 2}>
+      <mesh position={[0, y0 + H + 0.104, z0]} rotation-x={-Math.PI / 2}>
         <planeGeometry args={[w, d]} />
         {m(ROOFTOP, SNOW ? undefined : gravelTex(Math.max(1, Math.round(w)), Math.max(1, Math.round(d))))}
       </mesh>
@@ -193,7 +193,7 @@ export function FireEscape({ m, x, z, y0, floors, fh, len }: { m: Mat; x: number
         return (
           <group key={i}>
             <Box m={m} at={[0, y, 0]} s={[0.18, 0.015, len]} c={c} shadow={false} />
-            <Box m={m} at={[0.095, y + 0.1, 0]} s={[0.01, 0.02, len]} c={c} shadow={false} />
+            <Box m={m} at={[0.095, y + 0.104, 0]} s={[0.01, 0.02, len]} c={c} shadow={false} />
             <Box m={m} at={[0.095, y + 0.05, 0]} s={[0.01, 0.1, 0.01]} c={c} shadow={false} />
             {[-1, 1].map((sd) => <Box key={sd} m={m} at={[0.095, y + 0.05, (sd * len) / 2]} s={[0.01, 0.1, 0.01]} c={c} shadow={false} />)}
             {i < floors - 1 && (

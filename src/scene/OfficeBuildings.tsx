@@ -37,7 +37,7 @@ export function glassMat(tint: string) {
   g = new MeshStandardMaterial({ color: tint, map: curtainTex(), emissiveMap: curtainGlowTex(), emissive: new Color('#ffffff'), emissiveIntensity: 0, metalness: 0.15, roughness: 0.22 })
   g.userData.live = true
   // Four panes across and four floors per texture, emptied out one by one at night.
-  closingGlow(g, [4, 4], 'curtain')
+  closingGlow(g, [4, 4], 'curtain', 0.3)
   const mat = g
   onNight((n) => (mat.emissiveIntensity = n * 0.7))
   glassMats.set(tint, g)
@@ -76,10 +76,10 @@ export function GlassBlock({ m, ghost, x, z, y0 = 0, w, d, h, tint, frame, roof 
       <Glass m={m} ghost={ghost} at={[x + w / 2, y, z]} w={d} h={h} ry={Math.PI / 2} tint={tint} />
       <Glass m={m} ghost={ghost} at={[x - w / 2, y, z]} w={d} h={h} ry={-Math.PI / 2} tint={tint} />
       {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => (
-        <Box key={`${sx}${sz}`} m={m} at={[x + sx * (w / 2), y, z + sz * (d / 2)]} s={[0.05, h, 0.05]} c={frame} shadow={false} />
+        <Box key={`${sx}${sz}`} m={m} at={[x + sx * (w / 2 + 0.006), y, z + sz * (d / 2 + 0.006)]} s={[0.05, h, 0.05]} c={frame} shadow={false} />
       )))}
       <Box m={m} at={[x, y0 + h + 0.04, z]} s={[w + 0.06, 0.08, d + 0.06]} c={frame} />
-      <mesh position={[x, y0 + h + 0.081, z]} rotation-x={-Math.PI / 2}>
+      <mesh position={[x, y0 + h + 0.084, z]} rotation-x={-Math.PI / 2}>
         <planeGeometry args={[w - 0.04, d - 0.04]} />
         {m(roof, SNOW ? undefined : gravelTex(Math.max(1, Math.round(w)), Math.max(1, Math.round(d))))}
       </mesh>
@@ -247,7 +247,7 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
             </group>
           ))}
           <Box m={m} at={[x0, h + 0.05, z0]} s={[w + 0.06, 0.1, d + 0.06]} c="#455a64" />
-          <mesh position={[x0, h + 0.101, z0]} rotation-x={-Math.PI / 2}>
+          <mesh position={[x0, h + 0.104, z0]} rotation-x={-Math.PI / 2}>
             <planeGeometry args={[w - 0.04, d - 0.04]} />
             {m(ROOF, SNOW ? undefined : gravelTex(3, 1))}
           </mesh>
@@ -260,7 +260,7 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
           <mesh position={[1.38, 0.66, 0.79]}><boxGeometry args={[0.7, 0.02, 0.02]} />{bulb}</mesh>
           {/* Walk to the street, lawn strips, planters, a bike rack and the monument sign. */}
           <Box m={m} at={[0, 0.02, 0.68]} s={[3.9, 0.04, 0.62]} c="#ffffff" t={paverTex(4, 1)} shadow={false} />
-          <Box m={m} at={[-0.55, 0.045, 0.6]} s={[2.4, 0.03, 0.31]} c={PAL.grass} shadow={false} />
+          <Box m={m} at={[-0.55, 0.045, 0.6]} s={[2.4, 0.03, 0.34]} c={PAL.grass} shadow={false} />
           {!ghost && (
             <group>
               {[-1.45, -0.55, 0.35].map((x) => <Planter key={x} m={m} at={[x, 0.04, 0.6]} />)}
@@ -323,7 +323,8 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
                 <Box m={m} at={[tx, y + th + 0.66, tz]} s={[0.9, 0.08, 0.45]} c={lvl >= 10 ? GOLD : '#455a64'} />
                 <Beacon m={m} at={[tx + 0.3, y + th + 0.69, tz]} h={0.62} />
                 {!ghost && lvl >= 8 && <Flag at={[tx - 0.5, y + th + 0.7, tz]} color="#455a64" star={lvl >= 10} />}
-                {!ghost && [-1.5, -0.9].map((x) => <Planter key={x} m={m} at={[x, h + 0.12, z0 + 0.35]} />)}
+                {/* Beside the tower on the podium roof, clear of its glass. */}
+                {!ghost && [0.35, -0.25].map((z) => <Planter key={z} m={m} at={[-1.7, h + 0.12, z0 + z]} />)}
               </group>
             )
           })()}
@@ -375,7 +376,7 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
                 <group position={[tx, top + 0.5, tz - 0.05]}>
                   {/* HQ Campus: an executive helipad over the crown, and a mast. */}
                   <Box m={m} at={[0, 0.05, 0]} s={[1.2, 0.1, 0.9]} c="#78909c" />
-                  <mesh position={[0, 0.101, 0]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.84, 0.84]} />{m('#ffffff', helipadTex('#4fc3f7', '#fafafa'))}</mesh>
+                  <mesh position={[0, 0.104, 0]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.84, 0.84]} />{m('#ffffff', helipadTex('#4fc3f7', '#fafafa'))}</mesh>
                   {!ghost && <PadLights bulb={bulb} r={0.45} n={8} y={0.12} />}
                   {[-0.45, 0.45].map((x) => <Box key={x} m={m} at={[x, -0.2, 0.3]} rot={[0, 0, x > 0 ? -0.6 : 0.6]} s={[0.04, 0.5, 0.04]} c="#263238" shadow={false} />)}
                   <Beacon m={m} at={[0.55, 0.05, -0.35]} h={1.0} c="#90a4ae" />
@@ -468,7 +469,7 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
               <GlassBlock m={m} ghost={ghost} x={0} z={tz} y0={lob + 0.08} w={2.1} d={1.9} h={g1 - lob - 0.08} tint="#7fd1c7" frame="#eceff1" />
               <Box m={m} at={[0, g1 + 0.25, tz]} s={[1.3, 0.5, 1.1]} c="#37474f" />
               <Box m={m} at={[0, g1 + 0.12, tz]} s={[2.0, 0.06, 1.8]} c={PAL.grass} />
-              {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => <Box key={`${sx}${sz}`} m={m} at={[sx * 1.0, g1 + 0.3, tz + sz * 0.9]} s={[0.08, 0.5, 0.08]} c="#eceff1" />))}
+              {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => <Box key={`${sx}${sz}`} m={m} at={[sx * 1.006, g1 + 0.3, tz + sz * 0.906]} s={[0.08, 0.5, 0.08]} c="#eceff1" />))}
               {!ghost && [[-0.75, 0.6], [0.75, 0.6], [-0.75, -0.6], [0.75, -0.6], [0, 0.72]].map(([x, z]) => <Planter key={`${x}${z}`} m={m} at={[x, g1 + 0.12, tz + z]} />)}
               <GlassBlock m={m} ghost={ghost} x={0} z={tz} y0={g1 + 0.5} w={2.1} d={1.9} h={H - g1 - 0.42} tint="#7fd1c7" frame="#eceff1" />
             </group>
@@ -595,7 +596,7 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
           {/* Rooftop helipad with edge lights, and the air ambulance on it. */}
           <group position={padAt}>
             <Box m={m} at={[0, 0.06, 0]} s={[1.6, 0.12, 1.5]} c="#9e9e9e" />
-            <mesh position={[0, 0.121, 0]} rotation-x={-Math.PI / 2}>
+            <mesh position={[0, 0.124, 0]} rotation-x={-Math.PI / 2}>
               <planeGeometry args={[1.5, 1.5]} />
               {m('#ffffff', helipadTex('#fafafa', '#fafafa', true))}
             </mesh>
@@ -676,7 +677,7 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
           <Box m={m} at={[0, 0.025, 0]} s={[3.9, 0.05, 3.9]} c="#ffffff" t={concreteTex(4, 4)} shadow={false} />
           {/* The pad: a raised deck with the H, ringed by edge lights. */}
           <Cyl m={m} at={[pad[0], 0.07, pad[2]]} r={1.25} h={0.06} c="#78909c" seg={28} />
-          <mesh position={[pad[0], 0.101, pad[2]]} rotation-x={-Math.PI / 2}>
+          <mesh position={[pad[0], 0.104, pad[2]]} rotation-x={-Math.PI / 2}>
             <circleGeometry args={[1.2, 28]} />
             {m('#ffffff', helipadTex('#ffca28', '#fafafa'))}
           </mesh>
@@ -684,13 +685,13 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
           {/* Taxiway to the hangar with blue edge lights. */}
           <Box m={m} at={[1.25, 0.052, -0.85]} s={[0.7, 0.01, 0.9]} c="#607d8b" shadow={false} />
           {!ghost && [-1.25, -0.95, -0.65].flatMap((z) => [0.88, 1.62].map((x) => (
-            <mesh key={`${x}${z}`} position={[x, 0.08, z]}><boxGeometry args={[0.04, 0.05, 0.04]} /><meshStandardMaterial color="#1565c0" emissive="#2979ff" emissiveIntensity={0.8} /></mesh>
+            <mesh key={`${x}${z}`} position={[x, 0.085, z]}><boxGeometry args={[0.04, 0.05, 0.04]} /><meshStandardMaterial color="#1565c0" emissive="#2979ff" emissiveIntensity={0.8} /></mesh>
           )))}
           {/* Terminal with a control tower. */}
           <Box m={m} at={[-1.05, th / 2, -1.2]} s={[1.6, th, 1.2]} c="#eceff1" t={concreteTex(2, 1)} />
           <Glass m={m} ghost={ghost} at={[-1.05, th / 2 + 0.02, -0.596]} w={1.4} h={th - 0.25} tint="#90caf9" />
           <Box m={m} at={[-1.05, th + 0.04, -1.2]} s={[1.66, 0.08, 1.26]} c="#ff6f00" />
-          <mesh position={[-1.05, th + 0.081, -1.2]} rotation-x={-Math.PI / 2}><planeGeometry args={[1.6, 1.2]} />{m(ROOF, SNOW ? undefined : gravelTex(2, 1))}</mesh>
+          <mesh position={[-1.05, th + 0.084, -1.2]} rotation-x={-Math.PI / 2}><planeGeometry args={[1.6, 1.2]} />{m(ROOF, SNOW ? undefined : gravelTex(2, 1))}</mesh>
           <Box m={m} at={[-0.65, 0.66, -0.4]} s={[0.8, 0.04, 0.4]} c="#ff6f00" />
           <mesh position={[-0.65, 0.28, -0.594]}><planeGeometry args={[0.36, 0.5]} />{m('#263238')}</mesh>
           {!ghost && (
@@ -754,7 +755,7 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
           {trim && lvl >= 5 && (
             <group position={[-1.25, 0, 0.95]}>
               <Cyl m={m} at={[0, 0.06, 0]} r={0.65} h={0.04} c="#78909c" seg={20} />
-              <mesh position={[0, 0.081, 0]} rotation-x={-Math.PI / 2}><circleGeometry args={[0.62, 20]} />{m('#ffffff', helipadTex('#fafafa', '#ffca28'))}</mesh>
+              <mesh position={[0, 0.084, 0]} rotation-x={-Math.PI / 2}><circleGeometry args={[0.62, 20]} />{m('#ffffff', helipadTex('#fafafa', '#ffca28'))}</mesh>
               <group position={[0, 0.08, 0]} scale={0.55}>
                 <Helicopter look={{ body: '#1565c0', stripe: '#fafafa' }} fly={lvl >= 8} seed={11} radius={11} height={8} />
               </group>

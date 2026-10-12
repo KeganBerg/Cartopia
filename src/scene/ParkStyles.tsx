@@ -258,13 +258,14 @@ function SkatePark({ m, bulb, ghost }: EdgeProps) {
       <group position={[0.3, 0.06, 0.9]}>
         <Box m={m} at={[0, 0.12, 0]} s={[0.8, 0.24, 0.5]} c="#90a4ae" t={concreteTex(1, 1)} />
         {[-1, 1].map((sd) => <Box key={sd} m={m} at={[sd * 0.6, 0.06, 0]} s={[0.42, 0.04, 0.5]} c="#90a4ae" rot={[0, 0, sd * -0.55]} />)}
-        <Box m={m} at={[0, 0.25, 0.24]} s={[0.8, 0.025, 0.03]} c="#ffb300" />
+        <Box m={m} at={[0, 0.25, 0.24]} s={[0.79, 0.025, 0.03]} c="#ffb300" />
         <Box m={m} at={[0, 0.38, -0.12]} s={[1.0, 0.028, 0.028]} c="#cfd8dc" />
         {[-0.4, 0.4].map((x) => <Box key={x} m={m} at={[x, 0.3, -0.12]} s={[0.022, 0.16, 0.022]} c="#cfd8dc" shadow={false} />)}
       </group>
       <group position={[1.4, 0.06, 0.8]} rotation-y={-Math.PI / 2}>
-        {[0, 1, 2].map((i) => <Box key={i} m={m} at={[0, 0.05 + i * 0.07, -0.25 + i * 0.12]} s={[0.6, 0.1 + i * 0.14, 0.14]} c="#9e9e9e" t={concreteTex(1, 1)} />)}
-        <Box m={m} at={[0, 0.36, 0.25]} s={[0.6, 0.2, 0.3]} c="#9e9e9e" t={concreteTex(1, 1)} />
+        {/* Steps overlap the next one, so their widths differ a hair: no shared side planes. */}
+        {[0, 1, 2].map((i) => <Box key={i} m={m} at={[0, 0.05 + i * 0.07, -0.25 + i * 0.12]} s={[0.6 - (i % 2) * 0.008, 0.1 + i * 0.14, 0.14]} c="#9e9e9e" t={concreteTex(1, 1)} />)}
+        <Box m={m} at={[0, 0.36, 0.25]} s={[0.584, 0.2, 0.3]} c="#9e9e9e" t={concreteTex(1, 1)} />
         <Cyl m={m} at={[0, 0.42, 0.02]} r={0.012} h={0.62} c="#ffb300" seg={6} rot={[-0.55, 0, 0]} />
       </group>
       {/* Grind rail and a kicker in the middle. */}
@@ -360,10 +361,11 @@ function KoiGarden({ m, bulb, ghost }: EdgeProps) {
         )}
       </group>
       {/* Red arched bridge across the narrow part. */}
-      <group position={[0.95, 0, -0.15]} rotation-y={0.5}>
+      {/* One piece when merged, so the planks stay a bridge; its end planks rest on the banks. */}
+      <group position={[0.95, 0, -0.15]} rotation-y={0.5} userData={{ whole: true }}>
         {Array.from({ length: 9 }, (_, i) => {
           const t = i / 8 - 0.5
-          return <Box key={i} m={m} at={[0, 0.12 + Math.cos(t * Math.PI) * 0.18, t * 0.9]} s={[0.36, 0.03, 0.11]} c="#8d6e63" rot={[-Math.sin(t * Math.PI) * 0.55, 0, 0]} />
+          return <Box key={i} m={m} at={[0, 0.06 + Math.cos(t * Math.PI) * 0.24, t * 0.9]} s={[0.36, 0.03, 0.11]} c="#8d6e63" rot={[-Math.sin(t * Math.PI) * 0.55, 0, 0]} />
         })}
         {[-0.19, 0.19].map((x) => (
           <group key={x}>
@@ -374,7 +376,7 @@ function KoiGarden({ m, bulb, ghost }: EdgeProps) {
       </group>
       {/* Stone lantern lit at night, and a little tea pavilion. */}
       <group position={[-0.5, 0, 0.95]}>
-        <Cyl m={m} at={[0, 0.04, 0]} r={0.12} h={0.08} c="#9e9e9e" seg={6} />
+        <Cyl m={m} at={[0, 0.0425, 0]} r={0.12} h={0.085} c="#9e9e9e" seg={6} />
         <Cyl m={m} at={[0, 0.22, 0]} r={0.04} h={0.3} c="#9e9e9e" seg={6} />
         <Cyl m={m} at={[0, 0.39, 0]} r={0.1} h={0.04} c="#9e9e9e" seg={6} />
         <mesh position={[0, 0.47, 0]}><boxGeometry args={[0.12, 0.12, 0.12]} />{bulb}</mesh>
@@ -444,14 +446,15 @@ function Glasshouse({ m, bulb, ghost }: { m: Mat; bulb: ReactNode; ghost?: boole
       <mesh position={[0, 0.16 + h / 2, 0]}><boxGeometry args={[w, h, d]} />{glass}</mesh>
       <mesh position={[0, 0.16 + h, 0]} rotation-z={Math.PI / 2}><cylinderGeometry args={[r, r, w, 16, 1, true, 0, Math.PI]} />{glass}</mesh>
       {/* White ironwork: posts, rails, roof ribs, the dome and its lantern. */}
-      {Array.from({ length: 9 }, (_, i) => -w / 2 + (w * i) / 8).map((x) => (
+      {Array.from({ length: 9 }, (_, i) => -w / 2 + (w * i) / 8).map((x, i) => (
         <group key={x}>
-          {[-1, 1].map((sd) => <Box key={sd} m={m} at={[x, 0.16 + h / 2, sd * (d / 2)]} s={[0.025, h, 0.025]} c="#fafafa" shadow={false} />)}
+          {/* Just outside the glass, so a merged glasshouse's posts never sit flush with it. */}
+          {[-1, 1].map((sd) => <Box key={sd} m={m} at={[x + (i === 0 ? -0.003 : i === 8 ? 0.003 : 0), 0.16 + (h - 0.004) / 2, sd * (d / 2 + 0.003)]} s={[0.025, h - 0.004, 0.025]} c="#fafafa" shadow={false} />)}
           <mesh position={[x, 0.16 + h, 0]} rotation-z={Math.PI / 2}><cylinderGeometry args={[r + 0.01, r + 0.01, 0.025, 16, 1, true, 0, Math.PI]} />{m('#fafafa')}</mesh>
         </group>
       ))}
-      {[0.16 + h, 0.16 + h * 0.5].map((y) => [-1, 1].map((sd) => <Box key={`${y}${sd}`} m={m} at={[0, y, sd * (d / 2)]} s={[w, 0.025, 0.025]} c="#fafafa" shadow={false} />))}
-      {[-1, 1].map((sd) => <Box key={sd} m={m} at={[sd * (w / 2), 0.16 + (h - 0.004) / 2, 0]} s={[0.03, h - 0.004, d - 0.004]} c="#fafafa" shadow={false} />)}
+      {[0.16 + h, 0.16 + h * 0.5].map((y) => [-1, 1].map((sd) => <Box key={`${y}${sd}`} m={m} at={[0, y, sd * (d / 2 + 0.004)]} s={[w + 0.012, 0.025, 0.025]} c="#fafafa" shadow={false} />))}
+      {[-1, 1].map((sd) => <Box key={sd} m={m} at={[sd * (w / 2 + 0.004), 0.16 + (h - 0.004) / 2, 0]} s={[0.03, h - 0.004, d - 0.004]} c="#fafafa" shadow={false} />)}
       <group position={[0, 0.16 + h + r - 0.05, 0]}>
         <mesh><sphereGeometry args={[0.36, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />{glass}</mesh>
         {[0, 1, 2, 3].map((k) => <mesh key={k} rotation-y={(k * Math.PI) / 4}><torusGeometry args={[0.36, 0.012, 4, 16, Math.PI]} />{m('#fafafa')}</mesh>)}
