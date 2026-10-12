@@ -20,29 +20,21 @@ function currentSeason(): Season {
 export const SEASON: Season = currentSeason()
 
 // How far through the current season today is (0 at its first day, 1 at its last),
-// from the same East Coast calendar. ?seasonT=0..1 pins it for testing.
+// on the same local calendar. ?seasonT=0..1 pins it for testing.
 function seasonProgress(): number {
   const pin = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('seasonT') : null
   if (pin !== null && !Number.isNaN(Number(pin))) return Math.max(0, Math.min(1, Number(pin)))
   const now = new Date()
-  let y = now.getFullYear(), m = now.getMonth() + 1, d = now.getDate()
-  try {
-    const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: 'numeric', day: 'numeric' }).formatToParts(now)
-    const get = (t: string) => Number(parts.find((p) => p.type === t)?.value)
-    y = get('year'); m = get('month'); d = get('day')
-  } catch {
-    // Local time is close enough.
-  }
-  // Seasons start on the first of March, June, September and December.
-  const startMonth = { spring: 3, summer: 6, fall: 9, winter: 12 }[SEASON]
-  const startYear = SEASON === 'winter' && m <= 2 ? y - 1 : y
+  const y = now.getFullYear(), m = now.getMonth() + 1, d = now.getDate()
+  // Each season is a three-month block starting on the first of December, March, June or September.
+  const startMonth = [12, 3, 6, 9][Math.floor((m % 12) / 3)]
+  const startYear = startMonth === 12 && m <= 2 ? y - 1 : y
   const start = Date.UTC(startYear, startMonth - 1, 1)
   const end = Date.UTC(startYear, startMonth + 2, 1)
   return Math.max(0, Math.min(1, (Date.UTC(y, m - 1, d) - start) / (end - start)))
 }
 export const SEASON_T = seasonProgress()
 
-const ORDER: Season[] = ['winter', 'spring', 'summer', 'fall']
 const smooth = (a: number, b: number, x: number) => {
   const t = Math.max(0, Math.min(1, (x - a) / (b - a)))
   return t * t * (3 - 2 * t)
