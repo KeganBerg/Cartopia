@@ -16,6 +16,7 @@ import { CrewBattleCard } from './CrewBattle'
 import { demoBattle, useCrewBattle } from '../lib/battles'
 import { PlayerName } from './Username'
 import { playerName } from '../lib/profiles'
+import { LoadingBand } from './Loading'
 
 const n = (v: number) => v.toLocaleString()
 
@@ -166,7 +167,7 @@ export function LeadersPanel() {
 
       {scope === 'players' ? (
         <>
-          {!list && <p className="hint">Loading...</p>}
+          {!list && <LoadingBand label="Loading the leaderboard" />}
           {list && list.length === 0 && <p className="empty-board">Nobody has scored this week yet. Be the first!</p>}
           <div className="leaders">
             {list?.map((l, i) => (
@@ -192,7 +193,7 @@ export function LeadersPanel() {
         </>
       ) : (
         <>
-          {!clans && <p className="hint">Loading...</p>}
+          {!clans && <LoadingBand label="Loading crew rankings" />}
           {clans && clans.length === 0 && (
             <div className="empty-board">
               No crews yet. <button className="buy small" onClick={() => openPanel('clan')}>Start the first one</button>
@@ -249,7 +250,7 @@ export function ClanPanel() {
           </div>
         </div>
       ) : mine === undefined ? (
-        <p className="hint">Loading...</p>
+        <LoadingBand label="Loading your crew" />
       ) : mine ? (
         <><CrewHouseNudge /><ClanHome data={mine} uid={uid!} onChange={reload} /></>
       ) : (
@@ -498,7 +499,7 @@ function ClanBrowser({ onJoined }: { onJoined: () => void }) {
         <input className="clan-search" value={search} placeholder="Search crews" onChange={(e) => setSearch(e.target.value)} />
         <button className="buy" onClick={() => setCreating(true)}>+ Start a crew</button>
       </div>
-      {!shown && <p className="hint">Loading...</p>}
+      {!shown && <LoadingBand label="Finding crews" />}
       {shown && shown.length === 0 && (
         <p className="empty-board">{q ? 'No crews match that search.' : 'No crews yet. Start the first one and invite your friends!'}</p>
       )}

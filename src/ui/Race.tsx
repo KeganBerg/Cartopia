@@ -31,6 +31,7 @@ import { WEEKLY_EVENTS, EVENT_RACES, eventBonus, eventFor, eventIsBoss, eventPri
 import { msToNextWeek, skinDef, SKIN_TIERS, carStats } from '../game/data'
 import { DIST, character, characterMul, gpDist, tourDist, type RaceDist } from '../game/distance'
 import { playerName } from '../lib/profiles'
+import { LoadingScene } from './Loading'
 
 // skill: the rival car's race skill. AI rivals use it; live players use theirs on their own device.
 // shift: how cleanly an AI rival shifts, 0 (sloppy) to 1 (always perfect, the default).
@@ -1311,6 +1312,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   return (
     <div className="race-full">
       <StageSlot cam={RACE_CAM}>{scene}</StageSlot>
+      <LoadingScene ready={stageReady} label={`Heading to ${venue.name}`} onClose={close} />
       <div className="rf-top">
         <h2>{title ?? `Drag Race vs ${rival.town}`}</h2>
         <button className="close" onClick={close} aria-label="Leave race">✕</button>

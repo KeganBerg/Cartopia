@@ -8,6 +8,7 @@ import { supabase } from '../lib/supabase'
 import { useNow } from '../scene/useNow'
 import { PlayerName } from './Username'
 import { playerName } from '../lib/profiles'
+import { LoadingBand } from './Loading'
 
 const n = (v: number) => v.toLocaleString()
 
@@ -90,7 +91,7 @@ export function CrewGoalCard({ members, uid }: { members: Member[]; uid: string 
   const { busy, open } = useOpen()
   const w = goal?.current
   if (failed && !w) return null
-  if (!goal || !w) return <div className="crew-goal loading"><span className="hint">Loading crew goal...</span></div>
+  if (!goal || !w) return <LoadingBand label="Loading crew goal" />
   const min = goal.rules.minPoints
   const pct = Math.min(100, (w.points / Math.max(1, w.target)) * 100)
   const ready = goal.payable && w.reached && !w.opened && w.mine >= min
