@@ -27,6 +27,9 @@ import { gloomOf, weatherLook, wetRoad } from './weatherLook'
 import type { Weather as WeatherState } from '../game/weather'
 import { HERO_TIME, heroCam, heroShot, heroWanted, resetHero } from './heroShot'
 import { BoostTrail } from './boostTrail'
+import { Celebration } from './celebration'
+import { cheerDef, myCheer, myTrail, trailDef } from '../game/flair'
+import { reducedMotion } from '../game/fx'
 
 // burning: the boost is firing (the chase camera punches in).
 export type RacerView = { dist: number; burning?: boolean }
@@ -515,6 +518,12 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
   // A glowing ribbon on the road behind each car while its boost burns.
   const trails = useMemo(() => [new BoostTrail(), new BoostTrail()], [])
   useEffect(() => () => trails.forEach((t) => t.dispose()), [trails])
+  // The player's own flair (game/flair.ts): their trail colour, and a celebration on a win.
+  const trailId = useGame((s) => myTrail(s).id)
+  useEffect(() => trails[0].setLook(trailDef(trailId).look), [trails, trailId])
+  const cheerId = useGame((s) => myCheer(s).id)
+  const cheer = useMemo(() => new Celebration(), [])
+  useEffect(() => () => cheer.dispose(), [cheer])
   useFrame(({ scene }, delta) => {
     scene.environmentIntensity = look.env
     const dt = Math.min(delta, 0.1)
@@ -561,6 +570,7 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
     themRef.current?.position.set(-LANE, 0, tz)
     trails[0].update(vdt, LANE, 0.16, mz - noses[0], 0, !!me.current?.burning && runs.current[0].cross < 0)
     trails[1].update(vdt, -LANE, 0.16, tz - noses[1], 0, !!them.current?.burning && runs.current[1].cross < 0)
+    cheer.update(dt)
 
     // The finish: slow motion as the leader reaches the line when it's close, from the trackside camera when it's very close.
     const [ra, rb] = runs.current
@@ -604,6 +614,8 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
       if (caught && f.hero === -1 && ra.cross >= 0 && f.vt - ra.cross > 0.35) {
         f.hero = heroWanted() ? 0 : -2
         heroShot.on = f.hero === 0
+        const car = meRef.current?.position
+        if (car && (rb.cross < 0 || ra.cross <= rb.cross) && !reducedMotion()) cheer.start(cheerDef(cheerId), car.x, 0, car.z, noses[0] / 0.7)
       }
       if (caught) finishView.busy = false
     }
@@ -758,6 +770,7 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
       <FinishFlag len={len} me={me} them={them} />
       {city ? <Skyline len={dress} edge={ROAD + WALK + 4.2} night={night} /> : <VenueBackdrop id={venue.id} len={dress} />}
       {trails.map((t, i) => <primitive key={i} object={t.mesh} dispose={null} />)}
+      <primitive object={cheer.mesh} dispose={null} />
       {/* Soft shadows under the racers. */}
       {[meRef, themRef].map((r, i) => (
         <group key={i} ref={r} scale={1.4}>

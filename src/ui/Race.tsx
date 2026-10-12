@@ -58,6 +58,7 @@ import { carClass } from '../game/classes'
 import { cupFits, cupRace, cupShift, type CupRace } from '../game/cups'
 import { ClassCups, cupChip, cupPrizeOf, firstCupPick } from './ClassCups'
 import { TrophyRoad, roadReady } from './TrophyRoad'
+import { Flair } from './Flair'
 
 // skill: the rival car's race skill. AI rivals use it; live players use theirs on their own device.
 // shift: how cleanly an AI rival shifts, 0 (sloppy) to 1 (always perfect, the default).
@@ -610,7 +611,7 @@ export function RacePanel() {
     : tab === 'road' && roadReady(trophies, roadClaimed) > 0 ? { label: `🎁 Claim ${roadReady(trophies, roadClaimed)}`, onClick: () => useGame.getState().claimRoad() }
     : null
   const stars = Object.values(done).reduce((a, n) => a + n, 0)
-  const TITLES: Record<RaceTab, string> = { hub: 'Race', quick: 'Quick Race', campaign: 'Campaign', tour: 'Pro Tour', gp: 'Grand Prix', trial: 'Time Trial', event: 'Weekly Event', rivals: 'Rivals', tuner: 'Tuner Trials', cups: 'Class Cups', road: 'Trophy Road' }
+  const TITLES: Record<RaceTab, string> = { hub: 'Race', quick: 'Quick Race', campaign: 'Campaign', tour: 'Pro Tour', gp: 'Grand Prix', trial: 'Time Trial', event: 'Weekly Event', rivals: 'Rivals', tuner: 'Tuner Trials', cups: 'Class Cups', road: 'Trophy Road', flair: 'Flair' }
   const chip = tab === 'campaign' ? `⭐ ${stars}/${CAMPAIGN.length * CAMPAIGN_RACES * 3}`
     : tab === 'tour' ? `🌍 ${tourWon.toLocaleString()} wins`
     : tab === 'gp' ? `🏁 ×${GP_ROUNDS} → 🎁`
@@ -633,6 +634,8 @@ export function RacePanel() {
           <ClassCups sel={cupSel} setSel={setCupSel} car={car} />
         ) : tab === 'road' ? (
           <TrophyRoad />
+        ) : tab === 'flair' ? (
+          <Flair />
         ) : tab === 'campaign' ? (
           <Campaign sel={campSel} setSel={setCampSel} onTour={() => setTab('tour')} onRace={(ci, i) => startCampaign(ci, i)} />
         ) : tab === 'tour' ? (

@@ -755,3 +755,19 @@ div.rm-node { cursor: default; }
   .cup-classes { grid-template-columns: repeat(3, 1fr); }
   .tr-strip { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
 }
+
+/* Flair screen (Flair.tsx): boost trails and win celebrations. */
+.fl-flair { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 8px; padding: 2px; }
+.fl-flair h4 { margin: 4px 0 0; font: 900 15px Nunito, sans-serif; }
+.fl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+.fl-tile { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; padding: 8px 4px; background: #fff; border: 2.5px solid #c6d7ee; border-radius: 14px; font: inherit; color: var(--ink, #1b2a4a); cursor: pointer; }
+.fl-tile b { font: 900 13px Nunito, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.fl-tile small { font: 800 11px Nunito, sans-serif; color: #4a6283; min-height: 14px; white-space: nowrap; }
+.fl-tile.sel { border-color: var(--line, #14213d); background: #fff8e1; }
+.fl-tile.locked { opacity: .55; cursor: default; }
+.fl-tile.locked .fl-cheer, .fl-tile.locked .fl-trail { filter: grayscale(1); }
+.fl-trail { display: block; width: 80%; height: 14px; border-radius: 7px; }
+.fl-cheer { font-style: normal; font-size: 26px; line-height: 28px; }
+@media (max-width: 520px) {
+  .fl-grid { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
+}

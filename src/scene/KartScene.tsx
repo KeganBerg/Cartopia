@@ -21,6 +21,10 @@ import { BOMB_R, DRIFT_BLUE, DRIFT_ORANGE, KART_LEN, SMOKE_R, KartRace, type Ite
 import type { ChaseCar } from './ChaseScene'
 import { HERO_TIME, heroCam, heroShot, heroWanted, resetHero } from './heroShot'
 import { BoostTrail } from './boostTrail'
+import { Celebration } from './celebration'
+import { useGame } from '../game/store'
+import { cheerDef, myCheer, myTrail, trailDef } from '../game/flair'
+import { reducedMotion } from '../game/fx'
 
 // A kart circuit: the tarmac ribbon with kerbs, verges and barriers, the theme's
 // scenery round it (the player's town, a harbour, a red rock canyon), the karts,
@@ -1014,6 +1018,12 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
   // Every kart lays a glowing ribbon behind it on a boost: nitro, a drift turbo, a boost pad.
   const trails = useMemo(() => looks.map(() => new BoostTrail()), [looks])
   useEffect(() => () => trails.forEach((t) => t.dispose()), [trails])
+  // The player's own flair (game/flair.ts): their trail colour, and a celebration on a win.
+  const trailId = useGame((g) => myTrail(g).id)
+  useEffect(() => trails[me]?.setLook(trailDef(trailId).look), [trails, me, trailId])
+  const cheerId = useGame((g) => myCheer(g).id)
+  const cheer = useMemo(() => new Celebration(), [])
+  useEffect(() => () => cheer.dispose(), [cheer])
 
   useFrame((state, raw) => {
     const s = st.current
@@ -1057,6 +1067,8 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
       // Across the line: the hero shot round the player's own kart while it coasts on.
       s.hero = cam === 'chase' && heroWanted() ? 0 : -2
       heroShot.on = s.hero === 0
+      // First over the line: the player's celebration round their kart.
+      if (race.karts.every((k) => k === mine || k.done === null || k.done > mine.done!) && !reducedMotion()) cheer.start(cheerDef(cheerId), mine.x, mine.y, mine.z, KART_LEN)
       onFinish()
     }
 
@@ -1084,6 +1096,7 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
         }
       }
       trails[i].update(dt, k.x - Math.sin(k.h) * KART_LEN * 0.5, 0.14 + k.y, k.z - Math.cos(k.h) * KART_LEN * 0.5, k.h, k.boost > 0)
+      if (i === me) cheer.update(dt)
       if (fx.flame) {
         fx.flame.visible = k.boost > 0
         if (fx.flame.visible) fx.flame.scale.set(1, 0.8 + Math.random() * 0.8, 1)
@@ -1207,6 +1220,7 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
       <TowBeams race={race} />
       {looks.map((l, i) => <KartView key={i} look={l} rig={rigs[i]} set={setters[i]} />)}
       {trails.map((t, i) => <primitive key={i} object={t.mesh} dispose={null} />)}
+      <primitive object={cheer.mesh} dispose={null} />
       {/* A warm glow pool under the player, so their kart reads at a glance. */}
       <PlayerRing race={race} me={me} />
     </FansFar.Provider>
