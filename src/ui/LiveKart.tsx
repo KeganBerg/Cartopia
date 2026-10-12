@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGame, type OwnedCar } from '../game/store'
-import { CARS, performance } from '../game/data'
+import { CARS, carDef, performance } from '../game/data'
 import { KartRace, TRACKS, buildTrack } from '../game/kart'
 import { LIVE_LOSS_SHARE } from '../game/boosts'
 import { KartLink } from '../lib/kartNet'
@@ -77,7 +77,7 @@ export function LiveKart({ live, car, onExit, deps = REAL }: { live: LiveRace; c
   }, [live.host, me, o.id])
   const net = useMemo(() => {
     if (!setup || !field || !chan) return null
-    const race = new KartRace(buildTrack(TRACKS[setup.track], setup.reverse), field.map((f) => ({ name: f.name, pi: f.pi, ai: f.ai, skill: f.skill })), setup.seed)
+    const race = new KartRace(buildTrack(TRACKS[setup.track], setup.reverse), field.map((f) => ({ name: f.name, pi: f.pi, ai: f.ai, skill: f.skill, weight: f.look.model ? carDef(f.look.model).weight : undefined })), setup.seed)
     const link = new KartLink(race, me, owners, chan)
     link.onGone = () => useGame.getState().toast(`${playerName(o.uid, o.town)} lost their connection. An AI driver takes their kart.`)
     return { race, link }

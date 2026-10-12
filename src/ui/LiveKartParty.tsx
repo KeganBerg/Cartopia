@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGame, type OwnedCar } from '../game/store'
-import { CARS, performance } from '../game/data'
+import { CARS, carDef, performance } from '../game/data'
 import { FIELD, KartRace, TRACKS, buildTrack } from '../game/kart'
 import { KartLink } from '../lib/kartNet'
 import { INVITE_MS, cleanCard, endParty, useLive, type LivePlayer, type LiveRace } from '../lib/live'
@@ -99,7 +99,7 @@ export function LiveKartParty({ live, car, onExit, deps = REAL }: { live: LiveRa
   }, [setup, me, mine])
   const net = useMemo(() => {
     if (!setup || !built || !chan) return null
-    const race = new KartRace(buildTrack(TRACKS[setup.track], setup.reverse), built.field.map((f) => ({ name: f.name, pi: f.pi, ai: f.ai, skill: f.skill })), setup.seed)
+    const race = new KartRace(buildTrack(TRACKS[setup.track], setup.reverse), built.field.map((f) => ({ name: f.name, pi: f.pi, ai: f.ai, skill: f.skill, weight: f.look.model ? carDef(f.look.model).weight : undefined })), setup.seed)
     const link = new KartLink(race, me, built.owners, chan)
     link.onGone = (p) => {
       const i = setup.players.indexOf(p)

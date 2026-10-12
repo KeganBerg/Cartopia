@@ -53,7 +53,7 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
 }) {
   const t = useMemo(() => buildTrack(track, reverse), [track, reverse])
   const me = live ? live.me : field.findIndex((f) => !f.ai)
-  const race = useMemo(() => live?.race ?? new KartRace(t, field.map((f) => ({ name: f.name, pi: f.pi, ai: f.ai, skill: f.skill })), Math.floor(Math.random() * 1e6)), [t, field, live?.race])
+  const race = useMemo(() => live?.race ?? new KartRace(t, field.map((f) => ({ name: f.name, pi: f.pi, ai: f.ai, skill: f.skill, weight: f.look.model ? carDef(f.look.model).weight : undefined })), Math.floor(Math.random() * 1e6)), [t, field, live?.race])
   const looks = useMemo(() => field.map((f) => f.look), [field])
   const touch = useTouchDevice()
   // On a phone the kart leans gently towards the racing line while the thumb is near the middle.

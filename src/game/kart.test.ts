@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BOMB_R, CATCH_UP, catchUp, DRIFT_ORANGE, FIELD, GHOST_TIME, KartRace, LAPS, TRACKS, buildTrack, gpField, idleInput, itemOdds, kartStats, lateral, locate, type ItemId, type Kart } from './kart'
+import { BOMB_R, CATCH_UP, catchUp, DRIFT_ORANGE, FIELD, GHOST_TIME, KartRace, LAPS, TRACKS, buildTrack, gpField, idleInput, itemOdds, kartMass, kartStats, lateral, locate, type ItemId, type Kart } from './kart'
 
 const ALL = TRACKS.flatMap((d) => [buildTrack(d, false), buildTrack(d, true)])
 
@@ -343,5 +343,29 @@ describe('kart catch-up', () => {
     expect(catchUp(7, 8)).toBeCloseTo(CATCH_UP)
     expect(catchUp(6, 8)).toBeLessThan(catchUp(7, 8))
     expect(catchUp(0, 1)).toBe(0)
+  })
+})
+
+describe('kart weight', () => {
+  // Two karts touching, the first driving into the second at 10; what each is left with.
+  const bump = (wa: number, wb: number) => {
+    const race = new KartRace(buildTrack(TRACKS[0], false), [{ name: 'A', pi: 50, ai: false, weight: wa }, { name: 'B', pi: 50, ai: false, weight: wb }], 1)
+    const [a, b] = race.karts
+    Object.assign(a, { x: 0, z: 0, y: 0, vx: 10, vz: 0 })
+    Object.assign(b, { x: 1, z: 0, y: 0, vx: 0, vz: 0 })
+    race.collideKarts()
+    return { a: a.vx, b: b.vx, moved: b.x - 1 }
+  }
+  it('makes big cars heavy and pocket cars light', () => {
+    expect(kartMass(20)).toBeLessThan(kartMass(45))
+    expect(kartMass(1000)).toBe(1.5)
+    expect(kartMass(undefined)).toBe(1)
+  })
+  it('a heavy kart shoves a light one further and keeps more of its own speed', () => {
+    const even = bump(45, 45)
+    const ram = bump(100, 20)
+    expect(ram.b).toBeGreaterThan(even.b)
+    expect(ram.a).toBeGreaterThan(even.a)
+    expect(ram.moved).toBeGreaterThan(even.moved)
   })
 })

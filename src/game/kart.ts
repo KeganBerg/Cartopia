@@ -10,6 +10,9 @@ import type { VenueId } from '../scene/venues'
 export const LAPS = 3
 export const KART_LEN = 1.7
 export const KART_R = 0.72 // collision radius between karts
+// How heavy a kart is in a bump, from its car's weight (data.ts): a typical car is 1, a pocket car
+// about 0.75 and a big truck 1.5. In a bump the lighter kart is shoved further and loses more speed.
+export const kartMass = (weight?: number) => (weight === undefined ? 1 : Math.min(1.5, Math.max(0.7, 0.55 + weight / 100)))
 export const FIELD = 6 // karts on the grid, the player included
 
 export type KartTheme = 'town' | 'docks' | 'desert'
@@ -227,6 +230,7 @@ export type Kart = {
   spinYaw: number
   flat: number; smoke: number; emp: number; tow: number // effect timers, seconds left
   ghost: number; splat: number; rocket: number
+  mass: number // see kartMass
   towTarget: number // kart being reeled in, -1 for none
   uses: number // cans left in a Nitro Triple
 }
@@ -274,7 +278,7 @@ export class KartRace {
   notes: KartNote[] = []
   private seq = 0
 
-  constructor(track: Track, field: { name: string; pi: number; ai: boolean; skill?: number }[], seed = 1) {
+  constructor(track: Track, field: { name: string; pi: number; ai: boolean; skill?: number; weight?: number }[], seed = 1) {
     this.track = track
     let s = seed * 9301 + 49297
     this.rand = () => ((s = (s * 16807) % 2147483647) / 2147483647)
@@ -289,7 +293,7 @@ export class KartRace {
         x: track.x[i] + track.nx[i] * off, z: track.z[i] + track.nz[i] * off, y: 0, vx: 0, vz: 0, vy: 0, h: Math.atan2(track.tx[i], track.tz[i]),
         steer: 0, idx: i, lap: 0, done: null, drift: 0, charge: 0, boost: 0, spin: 0, shield: 0, item: null, itemHeld: false, bump: 0, offroad: false, air: false,
         lane: (this.rand() - 0.5) * track.half * 0.9, skill: f.skill ?? 0.8, spinYaw: 0,
-        flat: 0, smoke: 0, emp: 0, tow: 0, towTarget: -1, ghost: 0, splat: 0, rocket: 0, uses: 0,
+        flat: 0, smoke: 0, emp: 0, tow: 0, towTarget: -1, ghost: 0, splat: 0, rocket: 0, uses: 0, mass: kartMass(f.weight),
       }
     })
   }
@@ -757,7 +761,10 @@ export class KartRace {
       // ours takes the whole shove (the other browser does the same for theirs).
       const mp = this.owned(p.id) ? 1 : 0, mq = this.owned(q.id) ? 1 : 0
       if (!mp && !mq) continue
-      const wp = mp / (mp + mq) * 2, wq = mq / (mp + mq) * 2
+      // Each kart's share of the shove: the lighter one takes more (2 * the other's mass over both).
+      // Against a kart driven elsewhere ours still takes only its own share; that browser moves theirs.
+      const sum = (p.mass ?? 1) + (q.mass ?? 1)
+      const wp = mp * (2 * (q.mass ?? 1)) / sum, wq = mq * (2 * (p.mass ?? 1)) / sum
       if (Math.abs(p.y - q.y) > 0.8 || p.ghost > 0 || q.ghost > 0) continue
       const dx = q.x - p.x, dz = q.z - p.z
       const d = Math.hypot(dx, dz)
