@@ -4,7 +4,8 @@ import { AdditiveBlending, CanvasTexture, Color, DoubleSide, MeshBasicMaterial, 
 import type { Group, InstancedMesh } from 'three'
 import { dayPhase, isNight, nightAmount } from '../game/clock'
 import { CLUB } from './clubLayout'
-import { driveClubLeds } from './clubLeds'
+import { clubPulse } from '../lib/clubBeat'
+import { driveClubLeds, shownNow } from './clubLeds'
 
 // The moving parts of the nightclub, shown only while it's open: people
 // dancing on the rooftop floor, the bouncer at the door and two searchlights
@@ -80,7 +81,11 @@ export function ClubLife({ lvl, roofY, roofZ, floorY, floorZ, floorW, floorD }: 
   }, [n, dancers])
 
   useFrame(({ clock }) => {
-    driveClubLeds()
+    const now = shownNow()
+    driveClubLeds(now)
+    // The dancers move to the music: down on every kick, up between.
+    const music = clubPulse(now)
+    const beats = music.step + music.beat
     const t = torso.current
     const hd = head.current
     const ar = arms.current
@@ -116,14 +121,15 @@ export function ClubLife({ lvl, roofY, roofZ, floorY, floorZ, floorW, floorD }: 
         lift = 0.6
         wave = 0
       } else {
-        const beat = time * 5.6 + i * 1.7
+        const beat = beats * Math.PI
         x = spots[i][0] + Math.sin(time * 0.7 + i) * 0.05
         z = spots[i][1] + Math.cos(time * 0.6 + i * 2) * 0.04
         heading = i * 1.3 + Math.sin(time * 1.4 + i) * 0.9
-        bob = Math.abs(Math.sin(beat)) * 0.07
-        // Some wave their arms in the air, some keep them low and pump.
-        lift = i % 3 === 0 ? 2.6 : i % 3 === 1 ? 2.2 + Math.sin(beat) * 0.5 : 1.1 + Math.sin(beat * 2) * 0.4
-        wave = Math.sin(beat * 0.5) * 0.25
+        bob = Math.sin(music.beat * Math.PI) * 0.07
+        // Some wave their arms in the air, some keep them low and pump, and
+        // some throw their hands up on the claps.
+        lift = i % 3 === 0 ? 2.6 - music.env.clap * 0.5 : i % 3 === 1 ? 2.2 + Math.sin(beat) * 0.5 : 1.1 + Math.sin(beat * 2) * 0.4 + music.env.clap * 1.2
+        wave = Math.sin(beat * 0.5 + i * 1.7) * 0.25
       }
       const baseY = bouncer ? 0 : floorY
       const sx = x / SCALE

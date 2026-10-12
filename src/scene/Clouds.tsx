@@ -1,17 +1,29 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Color, MeshLambertMaterial, type Group } from 'three'
+import { Color, IcosahedronGeometry, MeshLambertMaterial, type Group } from 'three'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { dayPhase, nightAmount } from './dayNight'
 import { weatherNow } from '../game/weather'
 
 const cloudMat = new MeshLambertMaterial({ color: '#ffffff', emissive: '#dfefff', emissiveIntensity: 0.35, transparent: true, opacity: 0.6, depthWrite: false, flatShading: true })
 
-// A few puffy clouds drifting high over the town. They never cast shadows or
-// catch taps, and wrap around once they leave the map.
+// A few puffy clouds drifting high over the town. They never cast shadows
+// (Atmosphere.tsx drifts broad cloud shadows over the town instead) or catch
+// taps, and wrap around once they leave the map.
 const SPAN = 70
 const PUFFS = [
   [0, 0, 0, 1.6], [1.5, -0.2, 0.3, 1.2], [-1.4, -0.3, -0.2, 1.1], [0.6, 0.5, -0.6, 1.0], [-0.5, 0.4, 0.7, 0.9],
 ] as const
+
+// Each cloud's puffs merged into one mesh: one draw per cloud.
+let puffGeo: IcosahedronGeometry | null = null
+function cloudGeo() {
+  if (puffGeo) return puffGeo
+  const parts = PUFFS.map(([x, y, z, r]) => new IcosahedronGeometry(r, 1).translate(x, y, z))
+  puffGeo = mergeGeometries(parts) as IcosahedronGeometry
+  parts.forEach((p) => p.dispose())
+  return puffGeo
+}
 
 const WHITE = new Color('#ffffff')
 const STORM = new Color('#8a939e')
@@ -46,12 +58,7 @@ export function Clouds() {
     <>
       {clouds.map((c, i) => (
         <group key={i} ref={(g) => { refs.current[i] = g }} position={[c.x, c.y, c.z]} scale={c.s}>
-          {PUFFS.map(([x, y, z, r], k) => (
-            <mesh key={k} position={[x, y, z]} raycast={() => null}>
-              <icosahedronGeometry args={[r, 1]} />
-              <primitive object={cloudMat} attach="material" dispose={null} />
-            </mesh>
-          ))}
+          <mesh geometry={cloudGeo()} material={cloudMat} raycast={() => null} dispose={null} />
         </group>
       ))}
     </>

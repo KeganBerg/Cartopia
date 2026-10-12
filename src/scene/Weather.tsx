@@ -10,6 +10,7 @@ import { applyNight, dayPhase, nightAmount } from './dayNight'
 import { gloomOf, groundUniforms, hazeColor } from './weatherLook'
 import type { Look } from './look'
 import { isFree } from './freeCam'
+import { sky } from './skyFx'
 
 
 // Rain, snow, splashes, lightning and fog. Everything that falls is one
@@ -120,9 +121,9 @@ function seeded(g: InstancedBufferGeometry, count: number) {
 }
 
 // Where the weather box sits and how big it is, so it always fills the view.
-type Frame = { center: Vector3; span: number; top: number; px: number }
+export type Frame = { center: Vector3; span: number; top: number; px: number }
 const fwd = new Vector3()
-function frameFor(camera: Camera, out: Frame, race: boolean) {
+export function frameFor(camera: Camera, out: Frame, race: boolean) {
   camera.getWorldDirection(fwd)
   if (race) {
     out.center.copy(camera.position).addScaledVector(fwd, 9).setY(0)
@@ -357,7 +358,8 @@ function TownFog() {
     // The free view's far haze is set by Horizon instead.
     if (isFree(camera)) return
     const w = weatherNow()
-    const h = w.haze
+    // Ground fog banks (Atmosphere.tsx) carry most of a fog's look; the far haze stays light under them.
+    const h = w.haze * (1 - 0.65 * sky.banks)
     if (h < 0.01) {
       fog.near = 1e5
       fog.far = 2e5

@@ -610,7 +610,60 @@ function Vacuum() {
   )
 }
 
+// An engine block on a stand and a pallet of boxed parts.
+function EngineStand() {
+  return (
+    <group>
+      <group position={[-0.15, 0, 0]}>
+        {[-0.07, 0.07].map((x) => <Box key={x} p={[x, 0.02, 0]} s={[0.03, 0.04, 0.18]}>{c('#37474f')}</Box>)}
+        <Box p={[0, 0.12, 0]} s={[0.03, 0.22, 0.03]}>{c('#37474f')}</Box>
+        <Box p={[0, 0.3, 0]} s={[0.18, 0.15, 0.14]} cast>{c('#78909c')}</Box>
+        <Box p={[0, 0.4, 0]} s={[0.14, 0.05, 0.1]}>{c('#1565c0')}</Box>
+        {[-0.05, 0, 0.05].map((x) => <Box key={x} p={[x, 0.3, 0.075]} s={[0.025, 0.06, 0.012]}>{c('#b0bec5')}</Box>)}
+      </group>
+      <group position={[0.18, 0, 0]}>
+        <Box p={[0, 0.03, 0]} s={[0.26, 0.06, 0.16]}>{c('#a1887f')}</Box>
+        <Box p={[-0.06, 0.12, 0]} s={[0.12, 0.12, 0.14]} cast>{c('#d7ccc8')}</Box>
+        <Box p={[0.065, 0.11, 0]} s={[0.11, 0.1, 0.13]} cast>{c('#bcaaa4')}</Box>
+        <Box p={[-0.05, 0.22, 0]} s={[0.1, 0.08, 0.12]} cast>{c('#d7ccc8')}</Box>
+      </group>
+    </group>
+  )
+}
+
+// Cases of motor oil on a pallet, and a waste-oil tank.
+function OilCases() {
+  return (
+    <group>
+      <group position={[-0.12, 0, 0]}>
+        <Box p={[0, 0.03, 0]} s={[0.26, 0.06, 0.16]}>{c('#a1887f')}</Box>
+        {[[-0.06, 0.11], [0.06, 0.11], [0, 0.19]].map(([x, y], i) => <Box key={i} p={[x, y, 0]} s={[0.11, 0.08, 0.13]} cast>{c('#ffb300')}</Box>)}
+      </group>
+      <group position={[0.2, 0, 0]}>
+        <mesh position={[0, 0.16, 0]} castShadow><cylinderGeometry args={[0.09, 0.09, 0.3, 12]} />{c('#37474f')}</mesh>
+        <mesh position={[0, 0.32, 0]}><cylinderGeometry args={[0.03, 0.03, 0.04, 8]} />{c('#ffb300')}</mesh>
+      </group>
+    </group>
+  )
+}
+
+// A food truck's generator, humming behind it.
+export function Generator() {
+  return (
+    <group>
+      <Box p={[0, 0.03, 0]} s={[0.26, 0.06, 0.18]}>{c('#37474f')}</Box>
+      <Box p={[0, 0.16, 0]} s={[0.24, 0.2, 0.16]} cast>{c('#fdd835')}</Box>
+      <Box p={[0, 0.17, 0.082]} s={[0.14, 0.1, 0.004]}>{c('#37474f')}</Box>
+      <mesh position={[0.08, 0.3, -0.03]}><cylinderGeometry args={[0.015, 0.015, 0.08, 6]} />{c('#90a4ae')}</mesh>
+    </group>
+  )
+}
+
+export { Sandwich }
+
 const SIDE_PROP: Record<string, () => ReactNode> = {
+  parts: EngineStand,
+  lube: OilCases,
   pizza: Scooter,
   burger: MenuBoard,
   arcade: ClawMachine,

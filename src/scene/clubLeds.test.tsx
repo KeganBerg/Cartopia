@@ -43,7 +43,7 @@ describe('club LEDs stay in step', () => {
       expect(mats.size).toBeGreaterThanOrEqual(3)
       const seen = new Set<string>()
       for (let note = 0; note < 7; note++) {
-        clubHit(performance.now() - 1, true)
+        clubHit(performance.now() - 1, 'kick')
         await ReactThreeTestRenderer.act(async () => r.advanceFrames(1, 1 / 60))
         const hues = new Set([...mats.keys()].map((m) => hue(m.emissive)))
         expect([...hues]).toHaveLength(1)
@@ -55,4 +55,15 @@ describe('club LEDs stay in step', () => {
       await r.unmount()
     })
   }
+})
+
+describe('each groove plays the lights its own way', () => {
+  it('between kicks, a groove flashes the lights on its own parts', async () => {
+    const { LOOKS } = await import('./clubLeds')
+    // Every groove has a look, and no two are the same.
+    expect(LOOKS).toHaveLength(5)
+    expect(new Set(LOOKS.map((l) => JSON.stringify(l))).size).toBe(5)
+    // The kick always flashes the windows hardest.
+    for (const l of LOOKS) for (const [k, v] of Object.entries(l.w)) if (k !== 'kick') expect(v).toBeLessThan(l.w.kick!)
+  })
 })

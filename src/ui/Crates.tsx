@@ -10,6 +10,7 @@ import { CarThumb } from '../scene/BuildingPreview'
 import { BuckIcon, CoinIcon, Icon } from './Icon'
 import { compact } from './format'
 import { openGarageTab } from './Menus'
+import { raceCarOf } from '../game/raceCar'
 import './crates.css'
 import { LoadingScene } from './Loading'
 
@@ -188,6 +189,10 @@ export function CratesPanel() {
   // A part prize shows the car as it was before the part was added, so keep that car.
   const [carsAt, setCarsAt] = useState(cars)
   const open = queue[0] ?? null
+  // A new paint is shown on your selected car, or else the car you race with.
+  const selectedCar = useGame((s) => s.selectedCar)
+  const raceCar = useGame((s) => s.raceCar)
+  const paintCar = (selectedCar && carsAt.some((c) => c.uid === selectedCar) ? selectedCar : raceCarOf(carsAt, raceCar)?.uid) ?? null
   const shownDef = open ? crateDef(open.crate) ?? def : def
 
   const choose = (id: CrateId) => {
@@ -234,7 +239,7 @@ export function CratesPanel() {
   return (
     <div className="race-full crate-full" onClick={() => { if (phase === 'open' && !shown) setSkip((k) => k + 1) }}>
       <Canvas className="rf-canvas" shadows camera={{ fov: 42, near: 0.3, far: 60, position: [0, 4, 9] }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
-        <CrateScene run={run} def={shownDef} phase={phase} drop={open?.drop ?? null} prizeCar={prizeLook(open?.drop ?? null, carsAt)} onReveal={() => setShown(true)} skip={skip} />
+        <CrateScene run={run} def={shownDef} phase={phase} drop={open?.drop ?? null} prizeCar={prizeLook(open?.drop ?? null, carsAt, paintCar)} onReveal={() => setShown(true)} skip={skip} />
       </Canvas>
       <LoadingScene label="Opening the Crate Depot" onClose={close} />
       <div className="rf-top">

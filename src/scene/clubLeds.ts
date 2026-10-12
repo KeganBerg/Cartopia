@@ -1,28 +1,62 @@
 import { Color, MeshStandardMaterial } from 'three'
-import { clubPulse } from '../lib/clubBeat'
+import { clubPulse, CUES, type ClubPulse, type CueKind } from '../lib/clubBeat'
 import { isNight } from '../game/clock'
 import { nightAmount, dayPhase } from './dayNight'
 import { ledGridTex, ledPaneTex, windowTex } from './textures'
 
 // The nightclub's LED windows: every window shows the same colour of the
 // rainbow, and on every kick they all move on to the next colour together
-// and flash (clubBeat.ts). The big front window is a grid of LED cells in that
+// and flash (clubBeat.ts). Between kicks each night's groove plays the lights
+// its own way (LOOKS). The big front window is a grid of LED cells in that
 // same colour. Dark by day and while closed. Two shared materials, kept out of
 // Batch by `live`, so the cost is the same for any number of windows.
 
 export const RAINBOW = ['#ff1744', '#ff9100', '#ffea00', '#00e676', '#00b0ff', '#d500f9']
+
+// The lights are worked out for the moment the frame reaches the screen,
+// about one frame after it's drawn, so they show with the note you hear.
+export const SHOWN_MS = 16
+export const shownNow = () => performance.now() + SHOWN_MS
+
+// How each groove plays the lights between kicks, as how much each part of the
+// music flashes them: w for the upper windows (and the Vanguard penthouse), f
+// for the big front LED window. The colour itself only moves on the kick.
+type Look = { w: Partial<Record<CueKind, number>>; f: Partial<Record<CueKind, number>> }
+export const LOOKS: Look[] = [
+  // Deep: the windows swell with the rolling bass; the front breathes with the organ chords.
+  { w: { kick: 1.5, bass: 0.7 }, f: { kick: 1, bass: 0.5, stab: 0.8 } },
+  // Piano: the front window sparkles on every piano chord.
+  { w: { kick: 1.5, stab: 0.4 }, f: { kick: 0.7, stab: 1.6 } },
+  // Garage: the windows pop on the claps; the front flutters with the swung hats.
+  { w: { kick: 1.4, clap: 1 }, f: { kick: 0.7, hat: 1.1, open: 0.6, clap: 0.5 } },
+  // Acid: the front strobes with the squelchy line, hardest on its accents.
+  { w: { kick: 1.4, acid: 0.5 }, f: { kick: 0.7, acid: 1.6 } },
+  // Disco: the off-beat open hats pump the windows; the front flashes on the chopped chords.
+  { w: { kick: 1.3, open: 0.9 }, f: { kick: 0.7, stab: 1.4, open: 0.4 } },
+]
+// No groove (the muted pulse, Rave Mode): the kick alone.
+const KICK: Look = { w: { kick: 1.6 }, f: { kick: 1.4 } }
+
+const lookOf = (p: ClubPulse) => LOOKS[p.groove] ?? KICK
+function flashOf(p: ClubPulse, mix: Partial<Record<CueKind, number>>) {
+  let v = 0
+  for (const k of CUES) v += (mix[k] ?? 0) * p.env[k]
+  // Rave Mode's drop flashes everything.
+  return Math.max(v, p.groove < 0 ? 1.6 * p.flash : 0)
+}
 
 // The colour the club's windows show right now, and how brightly (0 by day,
 // about 0.75 at night between notes, up to about 2.3 on a kick). Anything that
 // lights up with the club (the Vanguard Tower's penthouse) reads it here so it
 // shows the exact same colour on the same beat. Tag such a material
 // `userData.clubLed` so clubLeds.test.tsx checks it stays in step.
-export function clubLedColor(out = new Color(), now = performance.now()) {
+export function clubLedColor(out = new Color(), now = shownNow()) {
   return out.set(RAINBOW[clubPulse(now).step % RAINBOW.length])
 }
-export function clubLedGlow(now = performance.now()) {
+export function clubLedGlow(now = shownNow()) {
   const lit = isNight() ? nightAmount(dayPhase()) : 0
-  return lit * (0.75 + 1.6 * clubPulse(now).flash)
+  const p = clubPulse(now)
+  return lit * (0.75 + flashOf(p, lookOf(p).w))
 }
 
 export const ledWindow = new MeshStandardMaterial({ map: windowTex(), emissiveMap: ledPaneTex(), emissive: new Color('#000000'), emissiveIntensity: 1 })
@@ -36,10 +70,11 @@ ledFront.userData.clubLed = true
 const tmp = new Color()
 
 // Once a frame (ClubLife).
-export function driveClubLeds(now = performance.now()) {
+export function driveClubLeds(now = shownNow()) {
   const p = clubPulse(now)
   const lit = isNight() ? nightAmount(dayPhase()) : 0
+  const look = lookOf(p)
   clubLedColor(tmp, now)
-  ledWindow.emissive.copy(tmp).multiplyScalar(lit * (0.75 + 1.6 * p.flash))
-  ledFront.emissive.copy(tmp).multiplyScalar(lit * (0.9 + 1.4 * p.flash))
+  ledWindow.emissive.copy(tmp).multiplyScalar(lit * (0.75 + flashOf(p, look.w)))
+  ledFront.emissive.copy(tmp).multiplyScalar(lit * (0.9 + flashOf(p, look.f)))
 }
