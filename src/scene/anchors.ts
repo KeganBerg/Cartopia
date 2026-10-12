@@ -33,6 +33,36 @@ let hudAge = 0
 const underHud = (x: number, y: number, w: number, h: number) =>
   hud.some((r) => x + w / 2 > r.left && x - w / 2 < r.right && y > r.top && y - h < r.bottom)
 
+// Off screen by more than this, in px, a bubble is hidden and skipped.
+const OFF = 120
+const sizes = new WeakMap<HTMLElement, { w: number; h: number; age: number }>()
+// What each bubble was last given, so unchanged ones aren't written again every frame.
+const last = new WeakMap<HTMLElement, { seen?: boolean; at?: string; cls: Record<string, boolean> }>()
+const memo = (el: HTMLElement) => {
+  let m = last.get(el)
+  if (!m) last.set(el, (m = { cls: {} }))
+  return m
+}
+const show = (el: HTMLElement, on: boolean) => {
+  const m = memo(el)
+  if (m.seen === on) return
+  m.seen = on
+  el.style.visibility = on ? 'visible' : 'hidden'
+}
+const toggle = (el: HTMLElement, c: string, on: boolean) => {
+  const m = memo(el)
+  if (m.cls[c] === on) return
+  m.cls[c] = on
+  el.classList.toggle(c, on)
+}
+const move = (el: HTMLElement, x: number, y: number) => {
+  const m = memo(el)
+  const at = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`
+  if (m.at === at) return
+  m.at = at
+  el.style.transform = at
+}
+
 export function AnchorProjector() {
   const camera = useThree((s) => s.camera)
   const size = useThree((s) => s.size)
@@ -49,7 +79,7 @@ export function AnchorProjector() {
     for (const [id, el] of anchorEls) {
       const p = anchors.get(id)
       if (!p) {
-        el.style.visibility = 'hidden'
+        show(el, false)
         continue
       }
       v.copy(p).project(camera)
@@ -60,28 +90,44 @@ export function AnchorProjector() {
       if (v.z > 1) {
         // Behind the free camera. A pinned bubble flips to the edge it's really past.
         if (!clamp) {
-          el.style.visibility = 'hidden'
+          show(el, false)
           continue
         }
         x = size.width - x
         y = size.height * 2
       }
-      el.style.visibility = 'visible'
+      // Well off screen: nothing to show or to dodge (a big town has hundreds of these).
+      if (!clamp && (x < -OFF || x > size.width + OFF || y < -OFF || y > size.height + OFF)) {
+        show(el, false)
+        continue
+      }
+      show(el, true)
       if (clamp) {
         const cx = Math.min(Math.max(x, 60), size.width - 60)
         const cy = Math.min(Math.max(y, 210), size.height - 110)
-        el.classList.toggle('edge', cx !== x || cy !== y)
+        toggle(el, 'edge', cx !== x || cy !== y)
         x = cx
         y = cy
       }
       const hide = far && !clamp && quiet(el)
-      el.classList.toggle('far', hide)
+      toggle(el, 'far', hide)
       if (hide) {
-        el.classList.remove('under')
-        el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`
+        toggle(el, 'under', false)
+        move(el, x, y)
         continue
       }
-      placed.push({ el, x, y, x0: x, y0: y, w: el.offsetWidth, h: el.offsetHeight, fixed: clamp })
+      placed.push({ el, x, y, x0: x, y0: y, w: 0, h: 0, fixed: clamp })
+    }
+    // Sizes, read together after the writes above (reading between writes re-ran layout once
+    // per bubble) and only every second or so: they change only when a bubble's text does.
+    for (const a of placed) {
+      let s = sizes.get(a.el)
+      if (!s || s.age-- <= 0) {
+        s = { w: a.el.offsetWidth, h: a.el.offsetHeight, age: 30 + (Math.random() * 30) | 0 }
+        sizes.set(a.el, s)
+      }
+      a.w = s.w
+      a.h = s.h
     }
     // Bubbles on neighbouring buildings would pile on top of each other. Bubbles nearest the
     // bottom of the screen keep their spot; each later one moves to the closest free spot beside,
@@ -121,7 +167,7 @@ export function AnchorProjector() {
         if (best) [a.x, a.y] = best
       }
       // Still behind the HUD (a building near the top edge): fade it rather than show half a pill.
-      a.el.classList.toggle('under', !a.fixed && underHud(a.x, a.y, a.w, a.h))
+      toggle(a.el, 'under', !a.fixed && underHud(a.x, a.y, a.w, a.h))
       if (!a.fixed) {
         let n = nudges.get(a.el)
         if (!n) nudges.set(a.el, (n = { x: a.x - a.x0, y: a.y - a.y0 }))
@@ -130,7 +176,7 @@ export function AnchorProjector() {
         a.x = a.x0 + n.x
         a.y = a.y0 + n.y
       }
-      a.el.style.transform = `translate(${a.x.toFixed(1)}px, ${a.y.toFixed(1)}px) translate(-50%, -100%)`
+      move(a.el, a.x, a.y)
     }
   })
   return null

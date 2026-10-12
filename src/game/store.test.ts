@@ -247,3 +247,15 @@ describe('daily deals', () => {
     expect(g().deals).toEqual({ day: today(), used: [supplies.id] })
   })
 })
+
+describe('selling a car', () => {
+  it('takes it off the meet display and stops racing with it', () => {
+    const car = (uid: string) => ({ uid, model: 'pip', color: '#fff', upgrades: { engine: 0, turbo: 0, tires: 0, weight: 0 } })
+    useGame.setState({ cars: [car('s1'), car('s2')], showcase: ['s1', 's2'], raceCar: 's1', buildings: [], coins: 0 })
+    useGame.getState().sellCar('s1')
+    const s = useGame.getState()
+    expect(s.cars.map((c) => c.uid)).toEqual(['s2'])
+    expect(s.showcase).toEqual(['s2'])
+    expect(s.raceCar).toBeNull()
+  })
+})

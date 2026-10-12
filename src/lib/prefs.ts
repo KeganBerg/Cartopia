@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 
 // Player settings that live on this device only (they never go into the save):
-// graphics quality, reduced motion and phone vibration. Sound volumes keep
+// graphics quality, reduced motion, phone vibration and which "Are you sure?"
+// steps the player turned off. Sound volumes keep
 // their own keys in sound.ts, townMusic.ts and ambience.ts.
 
 // auto: the game picks by device and steps down if it struggles.
@@ -16,10 +17,13 @@ export type Prefs = {
   // false: casual races run on a clear day. Live races, the weekly trial and
   // races with set weather keep theirs, so everyone in them races the same sky.
   raceWeather: boolean
+  // "Are you sure?" before leaving Rusty's with a haul, and before selling a car.
+  askLeave: boolean
+  askSell: boolean
 }
 
 const KEY = 'cartopia-prefs'
-const DEFAULTS: Prefs = { graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: false }
+const DEFAULTS: Prefs = { graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: false, askLeave: true, askSell: true }
 
 export function parsePrefs(raw: string | null): Prefs {
   try {
@@ -29,6 +33,8 @@ export function parsePrefs(raw: string | null): Prefs {
       reduceMotion: typeof p.reduceMotion === 'boolean' ? p.reduceMotion : null,
       vibration: p.vibration !== false,
       raceWeather: p.raceWeather === true,
+      askLeave: p.askLeave !== false,
+      askSell: p.askSell !== false,
     }
   } catch {
     return { ...DEFAULTS }

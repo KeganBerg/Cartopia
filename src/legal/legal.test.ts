@@ -28,10 +28,11 @@ describe('legal pages', () => {
 
 describe('settings', () => {
   it('fall back to defaults for missing or bad data', () => {
-    expect(parsePrefs(null)).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: false })
-    expect(parsePrefs('{oops')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: false })
-    expect(parsePrefs('{"graphics":"ultra","reduceMotion":"yes"}')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: false })
-    expect(parsePrefs('{"graphics":"saver","reduceMotion":true,"vibration":false,"raceWeather":false}')).toEqual({ graphics: 'saver', reduceMotion: true, vibration: false, raceWeather: false })
+    expect(parsePrefs(null)).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: false, askLeave: true, askSell: true })
+    expect(parsePrefs('{oops')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: false, askLeave: true, askSell: true })
+    expect(parsePrefs('{"graphics":"ultra","reduceMotion":"yes"}')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: false, askLeave: true, askSell: true })
+    expect(parsePrefs('{"graphics":"saver","reduceMotion":true,"vibration":false,"raceWeather":true}')).toEqual({ graphics: 'saver', reduceMotion: true, vibration: false, raceWeather: true, askLeave: true, askSell: true })
+    expect(parsePrefs('{"askLeave":false,"askSell":false}')).toMatchObject({ askLeave: false, askSell: false })
   })
   it('Saver draws every 3D view at one pixel per screen pixel', () => {
     expect(dprFor('saver')).toBe(1)

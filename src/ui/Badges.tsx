@@ -1,5 +1,5 @@
 import { Vector3 } from 'three'
-import { useMemo, useState, type CSSProperties } from 'react'
+import { memo, useMemo, useState, type CSSProperties } from 'react'
 import { useGame, buyablePlots, today, type PlacedBuilding } from '../game/store'
 import { buildingDef, buildingLevel, jobLevel, carDef, loves, levelLift, plotPrice, START_LAND, jobSeconds, isOpen } from '../game/data'
 import { msUntilNight } from '../game/clock'
@@ -21,8 +21,21 @@ const short = (sec: number) => (sec >= 3600 ? `${Math.floor(sec / 3600)}h` : sec
 // Badge height over a merged block: as tall as its model grows (see groupScale).
 const lift = (g: MergeGroup) => (g.cols === g.rows ? g.cols : 1)
 
+type JobProps = { b: PlacedBuilding; now: number; g?: MergeGroup; members?: PlacedBuilding[] }
+
+// A badge whose text moves with the clock: a job timer, or a night countdown while closed.
+const ticking = ({ b, now, members = [b] }: JobProps) =>
+  members.some((o) => o.jobEndsAt !== null && now < o.jobEndsAt) || !isOpen(buildingDef(b.def), now)
+// Only those redraw every second; a town full of ready coins otherwise redrew them all.
+const sameBadge = (a: JobProps, z: JobProps) =>
+  a.b === z.b &&
+  a.g === z.g &&
+  (a.members ?? []).length === (z.members ?? []).length &&
+  (a.members ?? []).every((m, i) => m === z.members![i]) &&
+  (a.now === z.now || (!ticking(a) && !ticking(z)))
+
 // `g` and `members` are the whole block for a merged business: one badge for all of it.
-function JobBadge({ b, now, g, members = [b] }: { b: PlacedBuilding; now: number; g?: MergeGroup; members?: PlacedBuilding[] }) {
+const JobBadge = memo(function JobBadge({ b, now, g, members = [b] }: JobProps) {
   const d = buildingDef(b.def)
   const tap = useGame((s) => s.tapBuilding)
   const lit = useGame((s) => !!s.highlight?.includes(b.def) || (b.def === 'pizza' && tutTarget(s) === 'pizza'))
@@ -65,7 +78,7 @@ function JobBadge({ b, now, g, members = [b] }: { b: PlacedBuilding; now: number
       </button>
     </div>
   )
-}
+}, sameBadge)
 
 // Merge tool: a puzzle piece over every square of four matching buildings, and
 // scissors over every merged one.

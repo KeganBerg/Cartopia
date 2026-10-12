@@ -1176,7 +1176,12 @@ export const useGame = create<GameState>()(
         if (carDef(car.model).parked) return s.toast('This car is coming in a future update, so it stays in your garage')
         const value = Math.floor(carDef(car.model).price * 0.5)
         const buildings = s.buildings.map((b) => (b.car === cuid ? { ...b, car: undefined } : b))
-        set({ cars: s.cars.filter((c) => c.uid !== cuid), buildings, coins: s.coins + value, selectedCar: null, updatedAt: Date.now() })
+        // A sold car leaves the meet display and stops being the race car too.
+        set({
+          cars: s.cars.filter((c) => c.uid !== cuid), buildings, coins: s.coins + value, selectedCar: null,
+          showcase: (s.showcase ?? []).filter((u) => u !== cuid), ...(s.raceCar === cuid ? { raceCar: null } : {}),
+          updatedAt: Date.now(),
+        })
       },
 
       finishRace: (won, reward) => {
@@ -1738,7 +1743,8 @@ export const useGame = create<GameState>()(
 
       eventResult: (won) => {
         const s = get()
-        const p = eventProgress(s.event)
+        // Not eventProgress(): a race started before the Monday reset still counts for its own week.
+        const p = s.event
         if (!p || p.won >= EVENT_RACES) return
         s.finishRace(won, eventPrize(p.pi, p.won))
         if (!won) return

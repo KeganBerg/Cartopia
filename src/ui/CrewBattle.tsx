@@ -189,7 +189,7 @@ function rivalCar(mine: OwnedCar, tag: string) {
 }
 
 // No crew yet: two crests squaring off under the lights, and the way into the crew list.
-function NoCrew({ onFind }: { onFind: () => void }) {
+function NoCrew({ onFind, children }: { onFind: () => void; children?: React.ReactNode }) {
   return (
     <div className="cb-none rm-photo" style={artStyle('tour', 'main', true)}>
       <div className="cb-none-card">
@@ -201,6 +201,7 @@ function NoCrew({ onFind }: { onFind: () => void }) {
         <b className="rm-ttl">Crew Battles</b>
         <span className="cb-none-sub">⚔️ Weekly crew vs crew · 🧰 victory chests</span>
         <button className="buy cb-none-go" onClick={onFind}>🛡️ Find a crew</button>
+        {children}
       </div>
     </div>
   )
@@ -224,11 +225,13 @@ export function BattlePanel() {
     if (!battle) refreshCrewBattle()
   }, [battle])
   if (!b || !car || !rival) {
+    const noCrew = battle === null || !battle.current
     return (
       <div className="race-full cb-full">
-        {battle === null && <NoCrew onFind={() => openPanel('clan')} />}
+        {/* No crew now (never had one, or left): last week's chests, if any, still claim here. */}
+        {noCrew && <NoCrew onFind={() => openPanel('clan')}>{battle?.last && <LastBattle b={battle.last} payable={battle.payable} />}</NoCrew>}
         <div className="rf-top"><h2>⚔️ Crew Battle</h2><button className="close" onClick={close} aria-label="Close"><Icon name="close" size={16} /></button></div>
-        {battle !== null && <LoadingScene key="cb" ready={false} max={Infinity} label="Finding your rival crew" onClose={close} />}
+        {!noCrew && <LoadingScene key="cb" ready={false} max={Infinity} label="Finding your rival crew" onClose={close} />}
       </div>
     )
   }
