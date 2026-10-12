@@ -4,6 +4,7 @@ import { Color } from 'three'
 import { applyNight, dayPhase, glowMats, nightAmount } from './dayNight'
 import { clubLedColor } from './clubLeds'
 import { technoBeat, technoOn } from '../game/techno'
+import { calmFlashing } from '../game/flashing'
 import { weatherNow } from '../game/weather'
 import { gloomOf } from './weatherLook'
 
@@ -31,7 +32,8 @@ export function TechnoLights() {
     was.current = true
     const b = technoBeat()
     const n = nightAmount(dayPhase())
-    const hit = Math.max(b.kick, b.drop)
+    // Reduce flashing holds the lamps at a steady glow instead of hitting on the kick.
+    const hit = calmFlashing() ? 0.25 : Math.max(b.kick, b.drop)
     clubLedColor(tint)
     glowMats.bulb.emissive.copy(tint).lerp(BULB, 0.15)
     glowMats.bulb.emissiveIntensity = 0.2 + n * (1.2 + 2.4 * hit)

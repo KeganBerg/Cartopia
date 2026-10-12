@@ -8,6 +8,8 @@ import { setPrefs, usePrefs, reduceMotionOn, type Graphics } from '../lib/prefs'
 import { deleteAccount, exportData } from '../lib/cloud'
 import { useNames } from '../lib/profiles'
 import { LEGAL, DRAFT_NOTE, type LegalDoc } from '../legal/legal'
+import { setCalmFlashing, useCalmFlashing } from '../game/flashing'
+import { showFlashWarning } from './FlashWarning'
 
 // Contact address for the Help tab. Empty hides the row until the owner sets one.
 export const SUPPORT_EMAIL = ''
@@ -48,6 +50,8 @@ const GRAPHICS: { id: Graphics; label: string; sub: string }[] = [
 export function SettingsTab({ user }: { user: User | null }) {
   const prefs = usePrefs()
   const motion = prefs.reduceMotion ?? reduceMotionOn()
+  // Reduce flashing's logic lives in game/flashing.ts (the photosensitivity work).
+  const calmFlash = useCalmFlashing()
   return (
     <>
       <Group icon="🔊" title="Sound">
@@ -68,7 +72,9 @@ export function SettingsTab({ user }: { user: User | null }) {
         <Row label="Reduce motion" sub="Calmer animations and effects">
           <Switch label="Reduce motion" on={motion} onChange={(on) => setPrefs({ reduceMotion: on })} />
         </Row>
-        {/* Reduce flashing: added here by the photosensitivity work, which owns its logic. */}
+        <Row label="Reduce flashing" sub="Softer lightning, club and Rave lights">
+          <Switch label="Reduce flashing" on={calmFlash} onChange={setCalmFlashing} />
+        </Row>
         <Row label="Vibration" sub="Phone buzz on big moments">
           <Switch label="Vibration" on={prefs.vibration} onChange={(on) => setPrefs({ vibration: on })} />
         </Row>
@@ -175,6 +181,7 @@ export function HelpTab({ openLegal }: { openLegal: (id: LegalDoc['id']) => void
       </Group>
       <Group icon="💬" title="Support">
         {SUPPORT_EMAIL && <a className="set-link" href={`mailto:${SUPPORT_EMAIL}?subject=Cartopia%20help%20(${__BUILD_ID__})`}><span>✉️ Contact us</span><b>›</b></a>}
+        <button className="set-link" onClick={showFlashWarning}><span>⚡ Photosensitivity warning</span><b>›</b></button>
         <button className="set-link" onClick={() => openPanel('chat')}><span>🗨️ Ask other players in chat</span><b>›</b></button>
         <Row label="Version"><code className="set-ver">{__BUILD_ID__.slice(0, 7)}</code></Row>
       </Group>

@@ -10,8 +10,8 @@ import { applyNight, dayPhase, nightAmount } from './dayNight'
 import { gloomOf, groundUniforms, hazeColor } from './weatherLook'
 import type { Look } from './look'
 import { isFree } from './freeCam'
+import { calmFlashing } from '../game/flashing'
 import { sky } from './skyFx'
-import { reduceMotionOn } from '../lib/prefs'
 
 
 // Rain, snow, splashes, lightning and fog. Everything that falls is one
@@ -262,7 +262,7 @@ function Precip({ sizes, race, get }: { sizes: Sizes; race: boolean; get: () => 
 // the whole scene, then thunder (for sound) a moment later.
 const SEGS = 22
 const flashCurve = (t: number) => (t < 0 ? 0 : t < 0.07 ? 1 : t < 0.13 ? 0.25 : t < 0.2 ? 0.85 : Math.max(0, 0.85 * (1 - (t - 0.2) / 0.45)))
-// Players who ask for less motion get one soft glow per strike instead of a flicker.
+// Reduce flashing (or reduced motion) gets one soft glow per strike instead of a flicker.
 const softFlash = (t: number) => (t < 0 ? 0 : 0.3 * Math.max(0, 1 - Math.abs(t - 0.25) / 0.25))
 
 function Lightning({ race, get }: { race: boolean; get: () => WeatherState }) {
@@ -333,7 +333,7 @@ function Lightning({ race, get }: { race: boolean; get: () => WeatherState }) {
       const far = Math.random()
       strike(400 + far * 2200, 1 - far * 0.6)
     } else if (!stormy && s.next < t + 2) s.next = t + 2 + Math.random() * 4
-    const f = (reduceMotionOn() ? softFlash : flashCurve)(t - s.at)
+    const f = (calmFlashing() ? softFlash : flashCurve)(t - s.at)
     w.flash = f
     const m = bolt.material as MeshBasicMaterial
     m.opacity = Math.min(1, f * 1.4)
