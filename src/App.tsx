@@ -40,8 +40,7 @@ import { startAmbience } from './lib/ambience'
 import { startMusic } from './lib/townMusic'
 import { startTechnoMusic } from './lib/technoMusic'
 import { TechnoLayer } from './ui/Techno'
-import { FlashWarning, RaveHeadsUp, openDaily } from './ui/FlashWarning'
-import { flashWarningSeen } from './game/flashing'
+import { FlashWarning, RaveHeadsUp, flashWarningOpen, openDaily } from './ui/FlashWarning'
 import { useTownPaused } from './scene/renderGate'
 import { useCrewGoalWatcher } from './ui/CrewGoal'
 import { BattlePanel, useCrewBattleWatcher } from './ui/CrewBattle'
@@ -110,7 +109,7 @@ export default function App() {
     const stopSplashCar = rememberSplashCar()
     // Checked again when it fires: a cloud save may have loaded since, already claimed today.
     // On first launch it waits for the flashing-lights warning (FlashWarning opens it after).
-    setTimeout(() => { if (flashWarningSeen()) openDaily() }, 800)
+    setTimeout(() => { if (!flashWarningOpen()) openDaily() }, 800)
     // ?visitor=racer|tourist|mystery|barn brings a guest's visitor right away (for testing).
     const forced = new URLSearchParams(location.search).get('visitor') as VisitorKind | null
     if (forced) setTimeout(() => forceVisitor(forced), 2500)

@@ -1,14 +1,15 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
-import { flashWarningSeen, markFlashWarningSeen, setCalmFlashing, useCalmFlashing } from '../game/flashing'
+import { flashWarningHidden, setCalmFlashing, setFlashWarningHidden, useCalmFlashing } from '../game/flashing'
 import { onTechnoChange, technoOn, technoToDrop } from '../game/techno'
 import { today, useGame } from '../game/store'
 import './flash.css'
 
-// The photosensitivity warning: once on first launch (over the loading
-// screen), again from the menu, and a short heads-up as Rave Mode builds up.
+// The photosensitivity warning: on every launch (over the loading screen)
+// until the player ticks "Don't show me this again", again from Settings, and
+// a short heads-up as Rave Mode builds up.
 
-let open = !flashWarningSeen()
+let open = !flashWarningHidden()
 const listeners = new Set<() => void>()
 const setOpen = (v: boolean) => {
   open = v
@@ -21,6 +22,7 @@ const onOpen = (l: () => void) => {
   }
 }
 export const showFlashWarning = () => setOpen(true)
+export const flashWarningOpen = () => open
 
 // The daily bonus waits behind the first-launch warning, so the two never stack.
 export function openDaily() {
@@ -49,12 +51,13 @@ export function FlashWarning() {
       root.inert = false
     }
   }, [shown])
+  const [hide, setHide] = useState(flashWarningHidden)
   if (!shown) return null
   const close = () => {
-    const first = !flashWarningSeen()
-    markFlashWarningSeen()
+    setFlashWarningHidden(hide)
     setOpen(false)
-    if (first) openDaily()
+    // Opened at launch, the daily bonus was waiting; from Settings, a panel is open and this does nothing.
+    openDaily()
   }
   return createPortal(
     <div className="flash-warn" role="dialog" aria-modal="true" aria-labelledby="flash-warn-title">
@@ -64,6 +67,10 @@ export function FlashWarning() {
         <label className="fw-row">
           <span>Reduce flashing</span>
           <CalmSwitch />
+        </label>
+        <label className="fw-hide">
+          <input type="checkbox" checked={hide} onChange={(e) => setHide(e.target.checked)} />
+          <span>Don't show me this again</span>
         </label>
         <button className="buy fw-ok" onClick={close} autoFocus>Got it</button>
       </div>
