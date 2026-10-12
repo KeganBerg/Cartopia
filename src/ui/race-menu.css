@@ -612,3 +612,11 @@ div.rm-node { cursor: default; }
 .rr-loot span.rr-bet.up { background: #e8f5e9; border-color: #66bb6a; color: #1b5e20; }
 .rr-loot span.rr-bet.down { background: #ffebee; border-color: #ef9a9a; color: #b71c1c; }
 @media (max-width: 600px) { .rf-pot { top: calc(114px + var(--sat)); font-size: 18px; padding: 4px 12px; } }
+/* Kart party: the card that starts one, and the player cards while picking who to invite. */
+.rm-qc-party .rm-qc-top { background: radial-gradient(circle at 50% 120%, rgba(255,255,255,.7), rgba(255,255,255,0) 60%), linear-gradient(135deg, #b388ff, #5e35b1); }
+.rm-qc-party.on { border-color: #5e35b1; }
+.rm-qc-party button, .rm-qc-pick { min-height: 44px; }
+.rm-qc-pick { cursor: pointer; }
+.rm-qc-pick.on { border-color: #2f9e35; box-shadow: 0 0 0 3px #7ee05a, 0 4px 0 rgba(0,0,0,.3); }
+.rm-qc-pick:disabled { opacity: .5; cursor: default; }
+.rm-pick-tick { position: absolute; top: 6px; right: 6px; font-size: 24px; line-height: 1; }

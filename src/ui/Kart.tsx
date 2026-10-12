@@ -34,7 +34,8 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
   // A live race: the race shared with the other browser, the link that keeps it in step,
   // which kart is ours, whether both players are in (the lights wait for it), and what the
   // podium says about the server's verdict.
-  live?: { race: KartRace; tick: () => void; me: number; ready: boolean; verdict: ReactNode; loading?: string }
+  // lobby: shown instead of the waiting line before the start (a kart party's roster).
+  live?: { race: KartRace; tick: () => void; me: number; ready: boolean; verdict: ReactNode; loading?: string; lobby?: ReactNode }
 }) {
   const t = useMemo(() => buildTrack(track, reverse), [track, reverse])
   const me = live ? live.me : field.findIndex((f) => !f.ai)
@@ -138,12 +139,12 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
         <KartScene race={race} looks={looks} me={me} input={input} running={running} onHud={setHud} onEvents={onEvents} onFinish={finish} afterStep={live?.tick} />
       </Canvas>
       <LoadingScene label={live?.loading ?? `Driving to ${track.name}`} onReady={() => setDrawn(true)} onClose={onExit} />
-      {drawn && !ready && <div className="kt-wait">⏳ {live?.loading}</div>}
+      {drawn && !ready && (live?.lobby ?? <div className="kt-wait">⏳ {live?.loading}</div>)}
       <div className="rf-top">
         <h2>{title}</h2>
         <button className="close" onClick={onExit} aria-label="Close">✕</button>
       </div>
-      {hud && !end && (
+      {hud && !end && ready && (
         <>
           <div className="kt-hud">
             <span className={`kt-place p${hud.place}`}><b>{hud.place}</b><small>{ORD(hud.place).slice(-2)}</small><i>/{field.length}</i></span>
