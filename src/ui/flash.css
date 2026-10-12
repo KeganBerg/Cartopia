@@ -19,7 +19,7 @@
 .menu-sound .fw-info { margin-left: auto; width: 30px; height: 30px; padding: 0; border-radius: 9px; border: 2px solid #e0e0e0; background: #fff8e1; font-size: 15px; cursor: pointer; }
 
 /* The heads-up as Rave Mode builds: a compact strip under the top HUD, over the light show. */
-.rave-heads-up { position: fixed; z-index: 60; left: 50%; top: calc(96px + var(--sat, 0px)); translate: -50% 0; display: flex; align-items: center; gap: 10px; max-width: calc(100vw - 20px); padding: 6px 8px 6px 12px; border-radius: 14px; background: linear-gradient(#2a1150, #12082b); border: 2.5px solid #ffd43b; box-shadow: 0 4px 0 rgba(0,0,0,.35); color: #fff; animation: rh-in .35s ease-out both; }
+.rave-heads-up { position: fixed; z-index: 60; left: 50%; top: calc(126px + var(--sat, 0px)); translate: -50% 0; display: flex; align-items: center; gap: 10px; max-width: calc(100vw - 20px); padding: 6px 8px 6px 12px; border-radius: 14px; background: linear-gradient(#2a1150, #12082b); border: 2.5px solid #ffd43b; box-shadow: 0 4px 0 rgba(0,0,0,.35); color: #fff; animation: rh-in .35s ease-out both; }
 .rh-text { display: flex; flex-direction: column; min-width: 0; }
 .rh-text b { font: 16px/1.1 var(--display); letter-spacing: .3px; white-space: nowrap; color: #ffe066; }
 .rh-text small { font: 700 12px Nunito, sans-serif; opacity: .85; white-space: nowrap; }
