@@ -19,6 +19,12 @@ import { bake, bakeable, bakedMapMaterial, bakedMaterial, finishOf, textureKey, 
 // many world units wide, so the camera skips the parts of a big town that are off
 // screen instead of pushing every triangle in town through the GPU each frame.
 
+// Edit modes keep the town merged too: drawn piece by piece, a big town is
+// thousands of draws a frame, enough to stall a PC. Only road and bulldoze,
+// which change the town every tile they paint, draw it live. In Move the picked
+// building is marked noBatch so it can be dragged and turned (see World).
+export const batchOff = (mode: string) => mode === 'road' || mode === 'bulldoze'
+
 // Materials that change over time (night glow) must be kept by identity.
 const live = new Set<Material>(Object.values(glowMats))
 const ATTRS = ['position', 'normal', 'uv'] as const
