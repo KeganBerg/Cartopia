@@ -43,7 +43,7 @@ describe('club LEDs stay in step', () => {
       expect(mats.size).toBeGreaterThanOrEqual(3)
       const seen = new Set<string>()
       for (let note = 0; note < 7; note++) {
-        clubHit(performance.now() - 1, note % 2 === 0)
+        clubHit(performance.now() - 1, true)
         await ReactThreeTestRenderer.act(async () => r.advanceFrames(1, 1 / 60))
         const hues = new Set([...mats.keys()].map((m) => hue(m.emissive)))
         expect([...hues]).toHaveLength(1)

@@ -1,7 +1,9 @@
 // The nightclub's beat, shared from the music to the club's LED windows. The
 // club track (ambience.ts) reports each kick and bass note as it schedules it,
 // at the moment it will be heard, so the lights land on the note without
-// listening to the sound. With no music (muted, sound off, or too far from the
+// listening to the sound. Only the kick moves the colour on and flashes, once a
+// beat ("doot doot doot doot"): the busy off-beat bass notes in between made it
+// flicker two or three times a beat. With no music (muted, sound off, or too far from the
 // club to hear it) the lights keep a gentle pulse at the night's tempo instead.
 import { GROOVES, grooveFor } from './clubGrooves'
 import { technoBeat, technoOn } from '../game/techno'
@@ -18,6 +20,8 @@ let flashAt = -Infinity
 let flashOf = 0
 let heard = -Infinity
 let pulse = -1
+let rave = 0
+let raveBeat = -1
 
 // A kick or bass note that will be heard at `at` (performance.now() time, ms).
 export function clubHit(at: number, kick: boolean) {
@@ -26,28 +30,34 @@ export function clubHit(at: number, kick: boolean) {
 }
 
 export type ClubPulse = {
-  step: number // goes up by one on every bass note: the colours move on
+  step: number // goes up by one on every kick: the colours move on
   flash: number // 0..1, peaks on each hit and fades
   live: boolean // following the music (false: the muted pulse)
 }
 
 export function clubPulse(now = performance.now(), bpm = GROOVES[grooveFor()].bpm): ClubPulse {
   // Techno Night: everything follows the event's kick, on the shared clock
-  // (so it keeps time while muted too), a new colour on every beat.
+  // (so it keeps time while muted too), a new colour on every kick. Through the
+  // kickless breakdown the colour holds.
   const wall = Date.now() - (performance.now() - now)
   if (technoOn(wall)) {
     const b = technoBeat(wall)
-    return { step: b.beat + 6000, flash: Math.max(b.kick, b.drop), live: true }
+    if (b.kick > 0 && b.beat !== raveBeat) {
+      rave++
+      raveBeat = b.beat
+    }
+    return { step: rave, flash: Math.max(b.kick, b.drop), live: true }
   }
   hits.sort((a, b) => a.at - b.at)
   while (hits.length && hits[0].at <= now) {
     const h = hits.shift()!
-    // A hit that is long gone (the tab slept) just moves the colours on.
-    step++
     heard = h.at
+    if (!h.kick) continue
+    // A kick that is long gone (the tab slept) just moves the colours on.
+    step++
     if (now - h.at < FADE_MS * 3) {
       flashAt = h.at
-      flashOf = h.kick ? 1 : 0.6
+      flashOf = 1
     }
   }
   const live = now - heard < QUIET_MS
@@ -74,4 +84,6 @@ export function resetClubBeat() {
   flashOf = 0
   heard = -Infinity
   pulse = -1
+  rave = 0
+  raveBeat = -1
 }
