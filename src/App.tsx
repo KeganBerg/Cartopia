@@ -131,7 +131,7 @@ export default function App() {
   return (
     <>
       {/* Camera sits well back with a tight near/far range so depth stays precise and flat layers never flicker. */}
-      <Canvas shadows={graphics !== 'saver'} orthographic camera={{ position: [75, 80, 75], zoom: 36, near: 1, far: 320 }} dpr={graphics === 'saver' ? 1 : SMALL && graphics === 'auto' ? [1, 1.5] : [1, 2]} gl={{ toneMapping: NeutralToneMapping }} frameloop={townPaused ? 'never' : 'always'}
+      <Canvas shadows={graphics !== 'saver'} orthographic camera={{ position: [75, 80, 75], zoom: 36, near: 1, far: 320 }} dpr={graphics === 'saver' ? 1 : SMALL && graphics === 'auto' ? [1, 1.5] : [1, 2]} gl={{ toneMapping: NeutralToneMapping }} frameloop={townPaused ? 'never' : 'demand'}
         onCreated={({ gl }) => {
           splashProgress(0.9)
           // Let the browser restore the 3D view after it drops the context, instead of leaving it blank.
@@ -141,6 +141,7 @@ export default function App() {
       >
         <World />
         <SplashHandoff />
+        <FrameCap fps={graphics === 'saver' ? 30 : 60} paused={townPaused} />
         <ShadowSwitch on={graphics !== 'saver'} />
       </Canvas>
       <TechnoLayer />
@@ -212,6 +213,26 @@ function SplashHandoff() {
   useFrame(() => {
     if (++frames.current === 3) hideSplash()
   })
+  return null
+}
+
+// Draws the town at most about 60 times a second (30 on battery saver). Left to the screen,
+// a 120 or 144 Hz laptop drew it twice as often for no visible gain, and kept its CPU busy.
+function FrameCap({ fps, paused }: { fps: number; paused: boolean }) {
+  const invalidate = useThree((s) => s.invalidate)
+  useEffect(() => {
+    if (paused) return
+    // A little under the gap, so a 60 Hz screen still gets every frame and 144 Hz gets every other.
+    const gap = 800 / fps
+    let last = -Infinity
+    let id = requestAnimationFrame(function step(t) {
+      id = requestAnimationFrame(step)
+      if (t - last < gap) return
+      last = t
+      invalidate()
+    })
+    return () => cancelAnimationFrame(id)
+  }, [invalidate, fps, paused])
   return null
 }
 

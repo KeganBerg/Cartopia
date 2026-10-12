@@ -4,12 +4,13 @@ import { useGame } from '../game/store'
 import { AmbienceControl, EffectsControl, MusicControl, SoundControl } from './MuteButton'
 import { AlertsMenu } from './Alerts'
 import { useLive, setClosed, unmute } from '../lib/live'
-import { setPrefs, usePrefs, reduceMotionOn, type Graphics } from '../lib/prefs'
+import { setPrefs, usePrefs, reduceMotionOn, type Graphics, type Steer } from '../lib/prefs'
 import { deleteAccount, exportData } from '../lib/cloud'
 import { useNames } from '../lib/profiles'
 import { LEGAL, DRAFT_NOTE, type LegalDoc } from '../legal/legal'
 import { setCalmFlashing, useCalmFlashing } from '../game/flashing'
 import { showFlashWarning } from './FlashWarning'
+import { useTouchDevice } from './DriveControls'
 
 // Contact address for the Help tab. Empty hides the row until the owner sets one.
 export const SUPPORT_EMAIL = ''
@@ -47,8 +48,14 @@ const GRAPHICS: { id: Graphics; label: string; sub: string }[] = [
   { id: 'saver', label: 'Saver', sub: 'No shadows or glow. Cooler phone, longer battery.' },
 ]
 
+const STEER: { id: Steer; label: string }[] = [
+  { id: 'smooth', label: '🌊 Smooth' },
+  { id: 'sharp', label: '⚡ Sharp' },
+]
+
 export function SettingsTab({ user }: { user: User | null }) {
   const prefs = usePrefs()
+  const touch = useTouchDevice()
   const motion = prefs.reduceMotion ?? reduceMotionOn()
   // Reduce flashing's logic lives in game/flashing.ts (the photosensitivity work).
   const calmFlash = useCalmFlashing()
@@ -68,6 +75,15 @@ export function SettingsTab({ user }: { user: User | null }) {
         </div>
         <small className="set-note">{GRAPHICS.find((g) => g.id === prefs.graphics)!.sub}</small>
       </Group>
+      {touch && (
+        <Group icon="🏎️" title="Kart steering">
+          <div className="seg set-seg" role="radiogroup" aria-label="Kart steering">
+            {STEER.map((g) => (
+              <button key={g.id} role="radio" aria-checked={prefs.steer === g.id} className={prefs.steer === g.id ? 'sel' : ''} onClick={() => setPrefs({ steer: g.id })}>{g.label}</button>
+            ))}
+          </div>
+        </Group>
+      )}
       <Group icon="♿" title="Accessibility">
         <Row label="Reduce motion" sub="Calmer animations and effects">
           <Switch label="Reduce motion" on={motion} onChange={(on) => setPrefs({ reduceMotion: on })} />
@@ -77,6 +93,14 @@ export function SettingsTab({ user }: { user: User | null }) {
         </Row>
         <Row label="Vibration" sub="Phone buzz on big moments">
           <Switch label="Vibration" on={prefs.vibration} onChange={(on) => setPrefs({ vibration: on })} />
+        </Row>
+      </Group>
+      <Group icon="✋" title="Ask first">
+        <Row label="Leaving Rusty's" sub="Before your haul is left behind">
+          <Switch label="Ask before leaving Rusty's" on={prefs.askLeave} onChange={(on) => setPrefs({ askLeave: on })} />
+        </Row>
+        <Row label="Selling a car">
+          <Switch label="Ask before selling a car" on={prefs.askSell} onChange={(on) => setPrefs({ askSell: on })} />
         </Row>
       </Group>
       <Group icon="🔔" title="Notifications">

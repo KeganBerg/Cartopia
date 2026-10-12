@@ -1,0 +1,8 @@
+/* "Are you sure?" (Confirm.tsx): the flashing-warning card with a red head and two buttons. */
+.cf-modal .fw-head { background: linear-gradient(#ff8a65, #e53935); }
+.cf-body { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; margin: 12px 14px 0; padding: 10px; background: #fff; border: 2px solid #e0e0e0; border-radius: 12px; font-size: 18px; font-weight: 800; }
+.cf-actions { display: flex; gap: 10px; margin: 12px 14px 14px; }
+.cf-actions button { flex: 1; min-height: 46px; font: 18px var(--display); border-radius: 12px; cursor: pointer; }
+.cf-no { background: #fff; color: var(--line); border: 2.5px solid var(--line); box-shadow: 0 3px 0 rgba(0,0,0,.2); }
+.cf-yes { background: linear-gradient(#ef5350, #c62828); color: #fff; border: 2.5px solid #fff; box-shadow: 0 3px 0 rgba(0,0,0,.25); }
+.cf-actions button:focus-visible { outline: 3px solid #4fc3f7; outline-offset: 2px; }
