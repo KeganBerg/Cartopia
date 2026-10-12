@@ -134,7 +134,7 @@ const SHORE = -(EDGE + 5.5) // beach waterline
 const QUAY = -(EDGE + 3) // dock edge
 
 // Open water with crests that drift slowly toward the shore.
-export function Water({ x, z, w, d, id }: { x: number; z: number; w: number; d: number; id: string }) {
+export function Water({ x, z, w, d, id, color = '#ffffff', rough = 0.25 }: { x: number; z: number; w: number; d: number; id: string; color?: string; rough?: number }) {
   const map = useMemo(() => waterTex(id, w / 8, d / 8), [id, w, d])
   useFrame((_, dt) => {
     map.offset.x += dt * 0.012
@@ -143,7 +143,7 @@ export function Water({ x, z, w, d, id }: { x: number; z: number; w: number; d: 
   return (
     <mesh rotation-x={-Math.PI / 2} position={[x, 0.015, z]}>
       <planeGeometry args={[w, d]} />
-      <meshStandardMaterial map={map} roughness={0.25} metalness={0.05} />
+      <meshStandardMaterial map={map} color={color} roughness={rough} metalness={0.05} />
     </mesh>
   )
 }
