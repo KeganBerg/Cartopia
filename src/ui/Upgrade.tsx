@@ -109,11 +109,11 @@ function Driver({ b, d }: { b: PlacedBuilding; d: BuildingDef }) {
         </div>
         {broken && (
           <button className="upgrade-short" onClick={() => { s.selectCar(car.uid); s.openPanel('flat') }}>
-            {car.flat ? '🛞 It has a flat tire.' : '⛽ It ran out of gas.'} Fix it to get the bonus back.
+            {car.flat ? '🛞 Flat tire' : '⛽ Out of gas'} · Fix
           </button>
         )}
         {!broken && !loves(cd, d.id) && fans.length > 0 && (
-          <p className="card-stat driver-tip">A car that loves the {d.name} earns +25%: {fans.map((c) => c.name).join(', ')}.</p>
+          <p className="card-stat driver-tip" title={`Cars that love the ${d.name} earn +25%`}>❤️ +25%: {fans.map((c) => c.name).join(', ')}</p>
         )}
       </div>
     )
@@ -125,7 +125,7 @@ function Driver({ b, d }: { b: PlacedBuilding; d: BuildingDef }) {
         {car ? 'Pick a new driver' : 'Put a car to work here'}
         {picking && <button className="driver-cancel" onClick={() => setPicking(false)}>Cancel</button>}
       </div>
-      <p className="card-stat driver-tip">A driver adds +10% to every job (${n(Math.round(base * 1.1))}), or +25% (${n(Math.round(base * 1.25))}) if it ❤️ loves the {d.name}.</p>
+      <p className="card-stat driver-tip" title={`A driver adds +10% to every job, or +25% if it loves the ${d.name}`}>+10% ${n(Math.round(base * 1.1))} · ❤️ +25% ${n(Math.round(base * 1.25))}</p>
       <div className="driver-list">
         {sorted.map((c) => {
           const cd = carDef(c.model)
@@ -143,7 +143,7 @@ function Driver({ b, d }: { b: PlacedBuilding; d: BuildingDef }) {
       {car && <button className="driver-remove" onClick={() => { assign(b.uid, null); setPicking(false) }}>Take {carDef(car.model).name} off this job</button>}
       {!anyFan && fans.length > 0 && (
         <button className="upgrade-short" onClick={() => s.focusShop(fans.some((f) => !f.rescueOnly) ? 'showroom' : 'rescue', fans.find((f) => !f.rescueOnly)?.id ?? null)}>
-          None of your cars love the {d.name} yet. These do: {fans.map((c) => c.name).join(', ')}. How do I get one?
+          ❤️ +25%: {fans.map((c) => c.name).join(', ')} ➜
         </button>
       )}
     </div>
@@ -197,7 +197,7 @@ export function UpgradePanel() {
         <LevelPreview def={d} level={next} landmark={becomes} />
         <Pips level={lvl} />
         {max ? (
-          <p className="upgrade-max">⭐ Max level! Your {name} is as fancy as it gets.</p>
+          <p className="upgrade-max">⭐ Max level</p>
         ) : (
           <>
             <table className="upgrade-stats">
@@ -208,17 +208,12 @@ export function UpgradePanel() {
                 ))}
               </tbody>
             </table>
-            <p className="card-stat upgrade-note">{d.id === 'trailer'
-              ? 'Every level adds 1 max fuel and more residents. It becomes a double-wide at level 4 and a trailer court at level 7, on the same lot.'
-              : d.kind === 'house'
-              ? 'Every level adds 1 max fuel and more residents. Homes grow into apartments at level 4 and a sky tower at level 7, on the same lot.'
-              : 'Each level makes it taller and fancier on the same lot.'}</p>
             <button className={`buy upgrade-buy${shortCoins || shortParts ? ' short' : ''}`} onClick={() => s.upgradeBuilding(b.uid)}>
               ⬆ Upgrade · ${n(cost.coins)}{cost.parts ? ` · ⚙ ${cost.parts}` : ''}
             </button>
             {(shortCoins > 0 || shortParts > 0) && (
               <button className="upgrade-short" onClick={() => (shortCoins ? s.showNeed('coins', shortCoins, `upgrading your ${name}`) : s.showNeed('parts', shortParts, `upgrading your ${name}`))}>
-                You need {shortCoins ? `$${n(shortCoins)} more` : ''}{shortCoins && shortParts ? ' and ' : ''}{shortParts ? `${shortParts} more parts` : ''}. How do I get more?
+                Need {[shortCoins && `$${n(shortCoins)}`, shortParts && `⚙ ${shortParts}`].filter(Boolean).join(' · ')} ➜
               </button>
             )}
           </>
@@ -247,7 +242,6 @@ export function ShopUpgrades() {
   if (!sorted.length) return null
   return (
     <section>
-      <p className="hint">Upgraded buildings grow taller and fancier. Businesses pay more and finish jobs sooner, and homes add max fuel as they grow into apartments and sky towers. Cheapest first.</p>
       <div className="upgrade-list">
         {sorted.map((b) => {
           const d = buildingDef(b.def)

@@ -284,18 +284,6 @@ div.rm-node { cursor: default; }
 .rm-ev-done { flex: none; font: 15px var(--display); background: #2fae35; border: 2px solid var(--line, #14213d); border-radius: 12px; padding: 4px 10px; }
 
 .rm-event .rm-banner { min-height: 150px; }
-.rm-ev-blurb { font: 800 12.5px Nunito, sans-serif; text-shadow: 0 1px 2px rgba(0,0,0,.8); }
-.rm-event .rm-chips > span:first-child { background: color-mix(in srgb, var(--ev, #ff4fd8) 80%, #000); }
-.rm-ev-prize { flex: none; display: flex; align-items: center; gap: 10px; background: #fff; border: 3px solid var(--line, #14213d); border-radius: 18px; padding: 6px 12px 6px 6px; box-shadow: 0 3px 0 rgba(0,0,0,.3), inset 0 0 0 3px color-mix(in srgb, var(--ev, #ff4fd8) 35%, transparent); }
-.rm-ev-prize .thumb3d { flex: none; background: radial-gradient(ellipse at 50% 70%, #fff 0 30%, color-mix(in srgb, var(--ev, #ff4fd8) 25%, #e8f1fc) 80%); border-radius: 12px; }
-.rm-ev-prize.got { box-shadow: 0 3px 0 rgba(0,0,0,.3), inset 0 0 0 3px #2fae35; }
-.rm-ev-ptxt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; color: var(--ink, #1b2a4a); }
-.rm-ev-ptxt > small { font: 900 10.5px Nunito, sans-serif; letter-spacing: .8px; color: #4a6283; }
-.rm-ev-ptxt > small:last-child { letter-spacing: 0; font-size: 11.5px; }
-.rm-ev-ptxt b { font: 22px var(--display); line-height: 1.05; }
-.rm-ev-ptxt > span { display: flex; align-items: center; gap: 5px; font: 800 12px Nunito, sans-serif; }
-.rm-ev-ptxt .skin-chip { width: 18px; height: 18px; border-width: 1.5px; }
-.rm-ev-ptxt em { font-style: normal; font-weight: 900; color: #14213d; border: 1.5px solid #14213d; border-radius: 6px; padding: 0 6px; font-size: 11px; letter-spacing: .3px; }
 .ev-prize .thumb3d { margin: 6px auto; }
 
 @media (max-width: 600px) {
@@ -303,7 +291,6 @@ div.rm-node { cursor: default; }
   .rm-ev-car { width: 52px; height: 52px; }
   .rm-ev .rm-ttl { font-size: 18px; }
   .rm-event .rm-banner { min-height: 110px; }
-  .rm-ev-prize .thumb3d.sm { --tw: 96px; --th: 70px; }
 }
 @media (min-width: 601px) and (max-width: 1000px) and (orientation: portrait) {
   .rm-hub { grid-template-rows: 1.35fr 1fr 1fr 1fr auto; grid-template-areas: "camp tour" "ev ev" "rival rival" "gp trial" "minis minis"; }
@@ -313,7 +300,6 @@ div.rm-node { cursor: default; }
   .rm-ev-car { width: 42px; height: 42px; }
   .rm-ev .rm-ttl { font-size: 16px; }
   .rm-ev .rm-meta { font-size: 11px; }
-  .rm-ev-blurb { display: none; }
 }
 @media (max-height: 500px) {
   .rm-hub { grid-template-rows: 1fr 1fr auto; grid-template-areas: "camp tour ev ev" "camp tour rival rival" "gp trial minis minis"; }
@@ -325,14 +311,8 @@ div.rm-node { cursor: default; }
   .rm-hub .rm-mini small { display: none; }
   .rm-ev-car { width: 40px; height: 40px; border-width: 2px; }
   .rm-ev .rm-ttl { font-size: 16px; }
-  .rm-ev-blurb { display: none; }
   .rm-event .rm-banner { min-height: 0; }
-  .rm-ev-prize { padding: 3px 8px 3px 3px; }
-  .rm-ev-prize .thumb3d.sm { --tw: 76px; --th: 50px; }
-  .rm-ev-ptxt b { font-size: 17px; }
 }
-.rm-event .rm-rows { flex: 1; }
-.rm-event .rm-rows > .rm-row { flex: 1; }
 
 /* The race-car bar on top of the challenges inbox: its car list opens below it, pushing the
    challenges down instead of covering them. */
@@ -347,3 +327,63 @@ div.rm-node { cursor: default; }
 .rm-build { margin-left: 4px; font-weight: 900; white-space: nowrap; }
 .rm-build.good { color: #2e7d32; }
 .rm-build.bad { color: #c62828; }
+
+/* Weekly event screen: a ladder of five rival cars and the prize skin on your car. */
+.ev-ladder { flex: none; background: #fff; border: 2px solid #c6d7ee; border-radius: 16px; box-shadow: 0 3px 0 #c6d7ee; padding: 10px 8px 8px; display: flex; flex-direction: column; gap: 6px; }
+.ev-steps { position: relative; display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.ev-steps::before { content: ''; position: absolute; left: 10%; right: 10%; top: 31px; height: 5px; background: repeating-linear-gradient(90deg, #8aa0bf 0 8px, transparent 8px 14px); }
+.ev-step { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
+.ev-step .thumb3d.sm { --tw: 74px; --th: 62px; position: relative; background: #eef4fc; border: 2.5px solid #b9cde8; border-radius: 14px; }
+.ev-step b { font: 900 15px Nunito, sans-serif; color: #4a6283; white-space: nowrap; }
+.ev-badge { position: absolute; top: -9px; right: calc(50% - 45px); min-width: 28px; height: 28px; border-radius: 999px; display: grid; place-items: center; font: 900 15px Nunito, sans-serif; background: #dfe7f1; color: #4a6283; border: 2px solid #fff; box-shadow: 0 1px 0 rgba(0,0,0,.25); }
+.ev-step.done .thumb3d { border-color: #2fae35; background: #eaffe4; }
+.ev-step.done .ev-badge { background: #2fae35; color: #fff; }
+.ev-step.next .thumb3d { border-color: var(--line, #14213d); background: linear-gradient(#fff3c4, #ffd84a); transform: scale(1.1); box-shadow: 0 3px 0 rgba(0,0,0,.3); }
+.ev-step.next .ev-badge { background: #ff9f1a; color: #fff; }
+.ev-step.next b { color: var(--ink, #1b2a4a); }
+.ev-step.locked .thumb3d { filter: grayscale(1); opacity: .55; }
+.ev-step.boss .ev-badge { background: #ffd84a; color: #14213d; }
+.ev-step.boss.done .ev-badge { background: #2fae35; color: #fff; }
+.ev-vs { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 32px; font-size: 20px; color: var(--ink, #1b2a4a); }
+.ev-vs b { font: 23px var(--display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ev-vs-tag { flex: none; font: 17px var(--display); color: #fff; background: #ff9f1a; border: 2px solid var(--line, #14213d); border-radius: 8px; padding: 0 6px; }
+.ev-vs.done b { color: #1d6b22; }
+.ev-reward { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 8px 12px 12px; background: radial-gradient(ellipse at 50% 42%, #fff 0 22%, color-mix(in srgb, var(--ev, #ff4fd8) 30%, #e8f1fc) 75%); border: 3px solid var(--line, #14213d); border-radius: 18px; box-shadow: 0 3px 0 rgba(0,0,0,.3), inset 0 0 0 3px color-mix(in srgb, var(--ev, #ff4fd8) 45%, transparent); color: var(--ink, #1b2a4a); }
+.ev-reward.got { box-shadow: 0 3px 0 rgba(0,0,0,.3), inset 0 0 0 3px #2fae35; }
+.ev-reward-car { position: relative; }
+.ev-reward-car .thumb3d.lg { --tw: 290px; --th: 200px; width: var(--tw); background: none; }
+.ev-reward-state { position: absolute; top: 10%; right: 6%; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; font-size: 21px; background: #ffd84a; border: 3px solid var(--line, #14213d); box-shadow: 0 2px 0 rgba(0,0,0,.3); }
+.ev-reward.got .ev-reward-state { background: #2fae35; color: #fff; }
+.ev-reward-info { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; }
+.ev-reward-info b { font: 34px var(--display); line-height: 1; }
+.ev-reward-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font: 800 15px Nunito, sans-serif; }
+.ev-reward-chips .skin-chip { width: 26px; height: 26px; border-width: 1.5px; }
+.ev-reward-chips em { font-style: normal; font-weight: 900; color: #14213d; border: 1.5px solid #14213d; border-radius: 7px; padding: 1px 8px; font-size: 15px; }
+.ev-bonus { white-space: nowrap; font: 18px var(--display); background: #fff; border: 2px solid var(--line, #14213d); border-radius: 999px; padding: 0 8px; }
+
+@media (max-width: 600px), (max-height: 500px) {
+  .ev-reward { flex-direction: row; flex: none; padding: 6px 12px 6px 6px; justify-content: flex-start; }
+  .ev-reward-car .thumb3d.lg { --tw: 130px; --th: 94px; }
+  .ev-reward-state { width: 32px; height: 32px; font-size: 16px; top: 0; right: auto; left: 0; }
+  .ev-reward-info { align-items: flex-start; }
+  .ev-reward-info b { font-size: 28px; }
+  .ev-reward-chips { font-size: 14px; }
+  .ev-reward-chips em { font-size: 14px; }
+  .ev-bonus { font-size: 17px; }
+  .ev-step b { font-size: 13.5px; }
+  .ev-vs b { font-size: 21px; }
+  .ev-step .thumb3d.sm { --tw: 62px; --th: 50px; }
+  .ev-steps::before { top: 25px; }
+  .ev-badge { right: calc(50% - 38px); min-width: 24px; height: 24px; font-size: 13px; }
+}
+@media (max-height: 500px) {
+  .ev-ladder { padding: 6px 6px 4px; gap: 2px; }
+  .ev-step .thumb3d.sm { --tw: 48px; --th: 38px; }
+  .ev-reward-car .thumb3d.lg { --tw: 90px; --th: 60px; }
+}
+.rm-event .rm-banner .rm-ttl { font-size: 30px; }
+.rm-event .rm-banner .rm-eyebrow { font-size: 14px; }
+.rm-event .rm-banner .rm-chips > span { font-size: 16px; padding: 3px 11px; }
+@media (max-width: 600px), (max-height: 500px) {
+  .rm-event .rm-banner .rm-ttl { font-size: 24px; }
+}

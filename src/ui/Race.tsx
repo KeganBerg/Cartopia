@@ -422,7 +422,7 @@ export function RacePanel() {
         ) : tab === 'tour' ? (
           <Tour onCampaign={() => setTab('campaign')} onRace={startTour} />
         ) : tab === 'event' ? (
-          <WeeklyEvent base={evBase} car={car} onRace={startEvent} />
+          <WeeklyEvent base={evBase} car={car} />
         ) : tab === 'trial' ? (
           car && <TrialTab myPi={pi(car)} onRun={startTrial} />
         ) : tab === 'gp' ? (
@@ -678,7 +678,7 @@ function Tour({ onRace, onCampaign }: { onRace: () => void; onCampaign: () => vo
                     <b>{r.town}</b>
                     <small><DistChip d={tourDist(race)} /> PI {r.pi}{r.skill && <span className="rival-skill" title={`${SKILLS[r.skill].name}: ${SKILLS[r.skill].text}`}> {SKILLS[r.skill].icon}</span>}</small>
                   </div>
-                  {beat ? <span className="tour-beat">Beaten</span> : (
+                  {beat ? <span className="tour-beat" title="Beaten">✔</span> : (
                     <button className="buy small" disabled={!next} onClick={onRace}>
                       {next ? `🏁 $${tourPrize(race).toLocaleString()}` : '🔒'}
                     </button>
@@ -703,62 +703,71 @@ function eventRival(base: number, race: number): Rival {
   }
 }
 
-// Weekly event (game/events.ts): this week's series, its exclusive skin shown on
-// your own car, and its five races.
-function WeeklyEvent({ base, car, onRace }: { base: number; car: OwnedCar | undefined; onRace: () => void }) {
+// Weekly event (game/events.ts): this week's venue, its five rivals as a ladder of
+// cars, and the exclusive skin shown on your own car. The race bar's button races
+// the next rival, so the screen has no per-row buttons.
+function WeeklyEvent({ base, car }: { base: number; car: OwnedCar | undefined }) {
   const p = eventProgress(useGame((s) => s.event))
   const owned = useGame((s) => s.skins ?? [])
   const e = eventFor()
   const won = p?.won ?? 0
+  const done = won >= EVENT_RACES
   const skin = skinDef(e.skin)!
   const has = owned.includes(e.skin)
   const v = venueById(e.venue)
   const next = eventFor(nextEventWeek())
   const d = car ? carDef(car.model) : CARS[0]
+  const rivals = Array.from({ length: EVENT_RACES }, (_, i) => eventRival(base, i))
+  const vs = done ? null : rivals[won]
+  const bonus = has && !done ? eventBonus(base) * 2 : eventBonus(base)
   return (
     <div className="rm-split rm-event" style={{ '--ev': e.color } as React.CSSProperties}>
       <div className="rm-left">
         <div className="rm-banner rm-photo" style={artStyle('tour', e.venue, e.night)}>
-          <span className="rm-eyebrow">{v.icon} {v.name} · {e.night ? '🌙 Night' : 'Day'} · {SKY_ICON[e.sky]}</span>
+          <span className="rm-eyebrow">{v.icon} {v.name}{e.night && ' · 🌙'} · {SKY_ICON[e.sky]}</span>
           <b className="rm-ttl">{e.name}</b>
-          <span className="rm-ev-blurb">{e.blurb}</span>
           <span className="rm-chips">
-            <span>{won} of {EVENT_RACES} won</span>
-            <span title="Next week's event">Next: {next.name}</span>
-          </span>
-        </div>
-        <div className={`rm-ev-prize${won >= EVENT_RACES ? ' got' : ''}`}>
-          <CarThumb size="sm" color={car?.color ?? d.colors[0]} finish={car?.finish} skin={e.skin} body={d.body} model={d.id} stripe={car?.stripe} mods={car?.mods} />
-          <span className="rm-ev-ptxt">
-            <small>{won >= EVENT_RACES ? 'WON' : has ? 'ALREADY YOURS' : 'EXCLUSIVE PRIZE'}</small>
-            <b>{skin.name}</b>
-            <span><i className="skin-chip" style={{ background: skin.swatch }} /> <em style={{ background: SKIN_TIERS[skin.tier].color }}>{SKIN_TIERS[skin.tier].name}</em> skin</span>
-            <small>{won >= EVENT_RACES ? 'Fit it in the Paint Shop' : has ? `Win again for $${(eventBonus(base) * 2).toLocaleString()}` : `Beat the boss · +$${eventBonus(base).toLocaleString()}`}</small>
+            <span title={`Next week: ${next.name}`}>⏭ {next.name}</span>
           </span>
         </div>
       </div>
       <div className="rm-right">
-        <div className="rm-rows">
-          {Array.from({ length: EVENT_RACES }, (_, i) => {
-            const r = eventRival(base, i)
-            const beat = i < won
-            const isNext = i === won
-            return (
-              <div key={i} className={`rm-row${r.boss ? ' boss' : ''}${!beat && !isNext ? ' locked' : ''}${isNext ? ' next' : ''}${beat ? ' done' : ''}`}>
-                <span className="rm-step">{beat ? '✔' : r.boss ? '👑' : i + 1}</span>
-                <CarThumb size="xs" color={r.color} body={r.body} model={r.model} skin={r.boss ? e.skin : undefined} />
-                <div className="rm-who">
-                  <b>{r.town}</b>
-                  <small>PI {r.pi}{r.skill && <span className="rival-skill" title={`${SKILLS[r.skill].name}: ${SKILLS[r.skill].text}`}> {SKILLS[r.skill].icon}</span>}{r.boss && ' · 🎨 Skin'}</small>
+        <div className="ev-ladder">
+          <div className="ev-steps">
+            {rivals.map((r, i) => {
+              const state = i < won ? 'done' : i === won ? 'next' : 'locked'
+              return (
+                <div key={i} className={`ev-step ${state}${r.boss ? ' boss' : ''}`} title={`${r.town} · PI ${r.pi}`}>
+                  <CarThumb size="sm" color={r.color} body={r.body} model={r.model} skin={r.boss ? e.skin : undefined} />
+                  <span className="ev-badge">{state === 'done' ? '✔' : r.boss ? '👑' : i + 1}</span>
+                  <b>PI {r.pi}</b>
                 </div>
-                {beat ? <span className="tour-beat">Beaten</span> : (
-                  <button className="buy small" disabled={!isNext} onClick={onRace}>
-                    {isNext ? `🏁 $${eventPrize(base, i).toLocaleString()}` : '🔒'}
-                  </button>
-                )}
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
+          <div className={`ev-vs${done ? ' done' : ''}`}>
+            {vs ? (
+              <>
+                <span className="ev-vs-tag">VS</span>
+                <b>{vs.town}</b>
+                {vs.skill && <span className="rival-skill" title={`${SKILLS[vs.skill].name}: ${SKILLS[vs.skill].text}`}>{SKILLS[vs.skill].icon}</span>}
+              </>
+            ) : <b>🏆 {EVENT_RACES}/{EVENT_RACES}</b>}
+          </div>
+        </div>
+        <div className={`ev-reward${done ? ' got' : ''}`} title={done ? 'Yours: put it on any car in the Paint Shop' : 'Beat the boss to win it'}>
+          <div className="ev-reward-car">
+            <CarThumb size="lg" color={car?.color ?? d.colors[0]} finish={car?.finish} skin={e.skin} body={d.body} model={d.id} stripe={car?.stripe} mods={car?.mods} />
+            <span className="ev-reward-state">{done || has ? '✔' : '👑'}</span>
+          </div>
+          <div className="ev-reward-info">
+            <b>{skin.name}</b>
+            <span className="ev-reward-chips">
+              <i className="skin-chip" style={{ background: skin.swatch }} />
+              <em style={{ background: SKIN_TIERS[skin.tier].color }}>{SKIN_TIERS[skin.tier].name}</em>
+              {!done && <span className="ev-bonus">👑 +${bonus.toLocaleString()}</span>}
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -782,7 +791,7 @@ export function EventPrizePopup() {
         <CarThumb size="lg" color={top?.color ?? d.colors[0]} finish={top?.finish} skin={e.skin} body={d.body} model={d.id} stripe={top?.stripe} mods={top?.mods} />
         <h3>{prize.skin ? <>🎨 {skin.name} skin unlocked</> : <>You already have {skin.name}</>}</h3>
         <p className="camp-prize"><span>💵 +${prize.coins.toLocaleString()}</span></p>
-        <p>{prize.skin ? 'An event exclusive. Put it on any car in the Paint Shop.' : 'Double bonus instead.'} Next week: {eventFor(nextEventWeek()).name}.</p>
+        <p className="camp-prize"><span title="Next week's event">⏭ {eventFor(nextEventWeek()).name}</span></p>
         <div className="row">
           <button className="buy" onClick={close}>Awesome!</button>
         </div>
@@ -829,8 +838,12 @@ export function CampaignPrizePopup() {
           {prize.bucks > 0 && <span><span className="ico buck-ico">💎</span> +{prize.bucks}</span>}
           {prize.trophies > 0 && <span>🏆 +{prize.trophies}</span>}
         </p>
-        {prize.cleared && prize.perfect && <p>Plus the three-star bonus. Flawless!</p>}
-        {prize.cleared && <p>{next ? `Next up: ${next.name}${next.unlockLevel > useGame.getState().level ? ` (opens at level ${next.unlockLevel}). The Pro Tour has races until then` : ''}.` : "You've beaten the whole campaign. The Pro Tour never ends!"}</p>}
+        {prize.cleared && (
+          <p className="camp-prize">
+            {prize.perfect && <span title="Three-star bonus">★★★</span>}
+            {next ? <span>⏭ {next.name}{next.unlockLevel > useGame.getState().level && ` · 🔒 Lv ${next.unlockLevel}`}</span> : <span>🏆 Campaign done · 🌍 Pro Tour</span>}
+          </p>
+        )}
         <div className="row">
           <button className="buy" onClick={close}>Awesome!</button>
         </div>

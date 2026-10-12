@@ -352,7 +352,6 @@ export function ShowroomPanel() {
           <span className="rusty-icon">🔧</span>
           <div>
             <b>Build Rusty's Rescue first</b>
-            <p>Rusty tracks down and restores cars for your town. Build his shop to start getting new cars.</p>
           </div>
           <button className="buy" onClick={() => openShop('rescue')}>Build · $1,000</button>
         </div>

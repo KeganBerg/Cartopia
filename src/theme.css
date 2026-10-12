@@ -289,3 +289,7 @@ body:has(.edit-bar) .tutorial { bottom: calc(150px + var(--sab)); }
 :root.techno-calm .tk-lasers, :root.techno-calm .tk-strobe { display: none; }
 :root.techno-calm .tk-title { animation: none; opacity: 0; }
 :root.techno-calm .tk-eq i { animation: none; }
+
+/* Flat tire / out of gas: the stuck car instead of a sentence (docs/ui-rules.md). */
+:root .need-car { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; font: 18px var(--display); }
+:root .bank-uses { font-size: 20px; letter-spacing: 4px; }
