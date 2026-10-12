@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { travelLayout, storeDoors, isTravelCenter, ISLAND } from './travelCenter'
+import { travelLayout, isTravelCenter, ISLAND } from './travelCenter'
+import { storeDoors } from './storeDoors'
 import type { PlacedBuilding } from './store'
 import { toWorld } from '../scene/grid'
 
