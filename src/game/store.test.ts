@@ -259,3 +259,27 @@ describe('selling a car', () => {
     expect(s.raceCar).toBeNull()
   })
 })
+
+describe('second bug hunt', () => {
+  const car = (uid: string, model = 'pip') => ({ uid, model, color: '#fff', upgrades: { engine: 0, turbo: 0, tires: 0, weight: 0 } })
+
+  it("won't sell a gem car for nothing", () => {
+    useGame.setState({ cars: [car('g1', 'sovereign'), car('g2')], buildings: [], coins: 0, toast: () => {} })
+    useGame.getState().sellCar('g1')
+    expect(useGame.getState().cars.map((c) => c.uid)).toEqual(['g1', 'g2'])
+  })
+
+  it('only counts a paid paint job toward painting goals', () => {
+    useGame.setState({ cars: [{ ...car('p1'), stripe: '#fafafa', panels: { hood: { color: '#e53935' } } } as never], coins: 0, bucks: 0, stats: {} as never })
+    expect(useGame.getState().paintCar('p1', { color: '#fff', finish: 'gloss', stripe: null })).toBe(true)
+    expect(useGame.getState().paintPanels('p1', {})).toBe(true)
+    expect(useGame.getState().stats.painted ?? 0).toBe(0)
+  })
+
+  it('counts a car from a crate as a new car', () => {
+    useGame.setState({ cars: [car('c1')], coins: 1000, crates: 0, stats: {} as never })
+    useGame.getState().applyCrate({ seq: 1, crate: 'street', cost: { coins: 300, bucks: 0 }, drop: { kind: 'car', model: 'pip', uid: 'c9', color: '#fff' } })
+    expect(useGame.getState().cars).toHaveLength(2)
+    expect(useGame.getState().stats.carsBought).toBe(1)
+  })
+})

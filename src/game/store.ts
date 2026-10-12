@@ -1174,6 +1174,8 @@ export const useGame = create<GameState>()(
         const car = s.cars.find((c) => c.uid === cuid)
         if (!car) return
         if (carDef(car.model).parked) return s.toast('This car is coming in a future update, so it stays in your garage')
+        // Gem cars have no coin price, so selling one would pay nothing.
+        if (carDef(car.model).bucks) return s.toast('Gem cars stay in your garage')
         const value = Math.floor(carDef(car.model).price * 0.5)
         const buildings = s.buildings.map((b) => (b.car === cuid ? { ...b, car: undefined } : b))
         // A sold car leaves the meet display and stops being the race car too.
@@ -1275,7 +1277,7 @@ export const useGame = create<GameState>()(
         if (car) {
           const d = carDef(car)
           s.toast(`🏁 Season prize! The ${d.name} is yours.`)
-          return set({ season, ...skins, cars: [...s.cars, { uid: uid(), model: car, color: d.colors[0], upgrades: noUpgrades() }], updatedAt: now })
+          return set({ season, ...skins, cars: [...s.cars, { uid: uid(), model: car, color: d.colors[0], upgrades: noUpgrades() }], stats: bump(s, 'carsBought'), updatedAt: now })
         }
         const bucks = prize.bucks + (prize.car ? SEASON_CAR_BUCKS : 0)
         s.toast(`Tier ${tier + 1}! ${[prize.coins && `+${prize.coins.toLocaleString()} coins`, prize.parts && `+${prize.parts} parts`, bucks && `+${bucks} gems`].filter(Boolean).join(', ')}`)
@@ -1319,7 +1321,9 @@ export const useGame = create<GameState>()(
         const d = o.drop
         const won = d.kind === 'coins' || d.kind === 'dupe' || d.kind === 'skindupe' ? d.coins : 0
         let cars = s.cars
-        if (d.kind === 'car' && !cars.some((c) => c.uid === d.uid)) cars = [...cars, { uid: d.uid, model: d.model, color: d.color, upgrades: noUpgrades() }]
+        // A new car counts for the "Get a new car" goals, like one bought or restored.
+        const newCar = d.kind === 'car' && !cars.some((c) => c.uid === d.uid)
+        if (newCar) cars = [...cars, { uid: d.uid, model: d.model, color: d.color, upgrades: noUpgrades() }]
         if (d.kind === 'mod') cars = cars.map((c) => (c.uid === d.car ? { ...c, ownedMods: [...new Set([...ownedMods(c), d.mod])] } : c))
         set({
           coins: Math.max(0, s.coins - o.cost.coins + won),
@@ -1328,7 +1332,7 @@ export const useGame = create<GameState>()(
           ...(d.kind === 'skin' && !d.part && !(s.skins ?? []).includes(d.skin) ? { skins: [...(s.skins ?? []), d.skin] } : {}),
           ...(d.kind === 'skin' && d.part && !(s.modSkins ?? []).includes(d.skin) ? { modSkins: [...(s.modSkins ?? []), d.skin] } : {}),
           crates: o.seq ?? s.crates ?? 0,
-          stats: won ? { ...s.stats, coinsEarned: (s.stats.coinsEarned ?? 0) + won } : s.stats,
+          stats: { ...s.stats, ...(won ? { coinsEarned: (s.stats.coinsEarned ?? 0) + won } : {}), ...(newCar ? { carsBought: (s.stats.carsBought ?? 0) + 1 } : {}) },
           updatedAt: Date.now(),
         })
       },
@@ -1494,7 +1498,8 @@ export const useGame = create<GameState>()(
           bucks: s.bucks - bucks,
           ...spendDeal(s, deal),
           cars: s.cars.map((c) => (c.uid === cuid ? { ...c, color: job.color, finish: job.finish === 'gloss' ? undefined : job.finish, stripe: job.stripe } : c)),
-          stats: bump(s, 'painted'),
+          // Taking stripes off is free, so it doesn't count as a paint job for goals and tasks.
+          ...(coins || bucks ? { stats: bump(s, 'painted') } : {}),
           updatedAt: Date.now(),
         }
         set(recolour ? withXp(s, 5, patch) : patch)
@@ -1539,7 +1544,8 @@ export const useGame = create<GameState>()(
           coins: s.coins - coins,
           bucks: s.bucks - bucks,
           cars: s.cars.map((c) => (c.uid === cuid ? { ...c, panels: next } : c)),
-          stats: bump(s, 'painted'),
+          // Back to stock is free, so it doesn't count as a paint job.
+          ...(coins || bucks ? { stats: bump(s, 'painted') } : {}),
           updatedAt: Date.now(),
         }
         set(coins || bucks ? withXp(s, 5, patch) : patch)

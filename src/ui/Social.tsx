@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useGame, type Panel as PanelId } from '../game/store'
 import { BUILDINGS, CLAN_CAP, CLAN_COLORS, CLAN_COST, CLAN_EMBLEMS, garagePower } from '../game/data'
 import { supabase } from '../lib/supabase'
-import { fetchTown } from '../lib/friends'
+import { townToVisit } from '../lib/friends'
 import {
   METRICS, demoRows, fetchBoard, fetchClans, fetchMyClan, rankOf, statOf,
   createClan, joinClan, leaveClan, kickMember, updateClan,
@@ -56,7 +56,8 @@ export function useVisit() {
   const visit = useGame((s) => s.visit)
   const toast = useGame((s) => s.toast)
   return async (id: string) => {
-    const town = await fetchTown(id)
+    const town = await townToVisit(id)
+    if (town === 'stale') return
     if (!town) return toast("Couldn't load that town")
     visit(town)
   }
@@ -225,15 +226,17 @@ export function ClanPanel() {
   const uid = useUserId()
   const openPanel = useGame((s) => s.openPanel)
   const [mine, setMine] = useState<MyClan | null | undefined>(undefined)
+  const [failed, setFailed] = useState(false)
 
   const reload = useCallback(() => {
     if (!uid) return setMine(null)
+    setFailed(false)
     fetchMyClan(uid).then((m) => {
       setMine(m)
       useGame.setState({ clanBadge: m ? { tag: m.clan.tag, emblem: m.clan.emblem, color: m.clan.color } : null })
       if (!m) useCrewMates.setState({ ids: [] })
       void refreshChatRooms()
-    }).catch(() => setMine(null))
+    }).catch(() => setFailed(true))
   }, [uid])
   // Joining, leaving or switching crews: the goal and battle belong to the new crew now.
   const changed = useCallback(() => {
@@ -261,6 +264,8 @@ export function ClanPanel() {
             <button className="buy" onClick={() => openPanel('account')}>Sign in to join</button>
           </div>
         </div>
+      ) : failed && mine === undefined ? (
+        <div className="clan-retry"><span>📡 Couldn't load your crew</span><button className="buy small" onClick={reload}>Retry</button></div>
       ) : mine === undefined ? (
         <LoadingBand label="Loading your crew" />
       ) : mine ? (

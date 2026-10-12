@@ -1,4 +1,5 @@
 import { useGame, type OwnedCar } from '../game/store'
+import { raceCarOf } from '../game/raceCar'
 import { CARS, MAX_UPGRADE, MODS, MOD_SLOTS, carDef, patternDef, type UpgradeSlot } from '../game/data'
 import { DIST } from '../game/distance'
 import { TUNER_TRIALS, buildChecks, hostMods, tunerPrize, tunerTrial, type BuildCheck, type TunerTrial } from '../game/tuner'
@@ -137,7 +138,8 @@ export function TunerPrizePopup() {
   const t = id ? tunerTrial(id) : null
   const pat = t?.pattern ? patternDef(t.pattern) : undefined
   if (!t || !pat) return null
-  const car = cars.find((c) => c.uid === raceCar) ?? cars[0]
+  // The car that raced: the picked race car, else the best one (as Race.tsx does).
+  const car = raceCarOf(cars, raceCar)
   const d = car ? carDef(car.model) : CARS[0]
   const paintIt = () => {
     close()
