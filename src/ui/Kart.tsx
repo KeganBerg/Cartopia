@@ -12,6 +12,10 @@ import { look as lookOf, pi } from './ArcadeBits'
 import { sfx, audioContext, audioOut } from '../lib/sound'
 import { airSound, buzzSound, bumpSound, crashSound, dingSound, fuelSound, landSound, revSound, splashSound } from '../lib/arcadeSound'
 import { EngineVoice } from '../lib/engineAudio'
+import { buzz as haptic } from '../lib/haptics'
+import { nearMiss, stepNearMiss } from '../game/nearMiss'
+import { Callout } from './Callout'
+import { useCallout } from './useCallout'
 import './kart.css'
 
 // The kart race screen: the 3D circuit, the HUD (place, lap, item, minimap), the
@@ -124,6 +128,23 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
       else if (e.kind === 'lap') { dingSound(1); setFlash(e.value === LAPS ? 'FINAL LAP!' : `LAP ${e.value}`) }
     }
   }
+  // Near misses, watched every frame (the HUD only hears ten times a second).
+  const [call, pop] = useCallout()
+  useEffect(() => {
+    if (!running || end) return
+    const s = nearMiss()
+    let raf = 0
+    const look = () => {
+      const k = race.karts[me]
+      if (k.done === null && stepNearMiss(s, k, race.karts, race.t)) {
+        pop('Near miss!')
+        haptic([10, 40, 10])
+      }
+      raf = requestAnimationFrame(look)
+    }
+    raf = requestAnimationFrame(look)
+    return () => cancelAnimationFrame(raf)
+  }, [running, end, race, me, pop])
   const podium = useRef<ReturnType<typeof setTimeout>>(undefined)
   useEffect(() => () => clearTimeout(podium.current), [])
   const finish = () => {
@@ -184,6 +205,7 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
         </>
       )}
       {flash && <div key={flash} className="kt-flash">{flash}</div>}
+      {!end && <Callout call={call} />}
       {!end && running && (touch ? <TouchDrive input={input} tall={tall} item={slot} feel={KART_FEEL} /> : <KeyHints />)}
       {end && <Podium race={race} field={field} me={me} end={end} prize={prize} next={next} verdict={live?.verdict} onExit={onExit} />}
     </div>

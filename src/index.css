@@ -1052,6 +1052,11 @@ button.lvl-item:hover { border-color: var(--accent); transform: translateY(-2px)
 .rf-split { position: absolute; top: calc(150px + var(--sat)); left: 0; right: 0; width: fit-content; margin: 0 auto; padding: 4px 16px; border-radius: 999px; background: rgba(27,31,36,.7); color: #fff; font: 26px var(--display); font-variant-numeric: tabular-nums; pointer-events: none; animation: pop .25s ease-out; }
 .rf-split.ahead { background: #2e7d32; }
 .rf-split.behind { background: #c62828; }
+/* A pop-up call over a race (Perfect shift!, Near miss!). */
+.callout { position: absolute; top: 44%; left: 0; right: 0; z-index: 3; text-align: center; color: #fff; font: 34px var(--display); text-shadow: 0 3px 0 #e65100, 0 0 18px rgba(255,213,79,.8); pointer-events: none; animation: callout .9s ease-out forwards; }
+@keyframes callout { 0% { transform: scale(.4) rotate(-6deg); opacity: 0; } 18% { transform: scale(1.15) rotate(2deg); opacity: 1; } 32% { transform: scale(1) rotate(0); } 75% { opacity: 1; } 100% { transform: translateY(-24px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .callout { animation: none; } }
+html.calm .callout { animation: none !important; }
 /* Wheelspin on a slick strip: a small pulsing tag above the tach. */
 .rf-spin { position: absolute; left: calc(16px + var(--sal)); bottom: calc(160px + var(--sab)); padding: 4px 12px; border-radius: 999px; background: rgba(255,255,255,.85); color: #37474f; font: 15px var(--display); pointer-events: none; animation: spin-pulse .4s ease-in-out infinite alternate; }
 @keyframes spin-pulse { from { transform: translateX(-2px); } to { transform: translateX(2px); } }

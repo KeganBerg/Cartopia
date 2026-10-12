@@ -31,6 +31,9 @@ import { TunerTrials, firstTrialPick, fixBuild, trialChip, trialPrizeOf } from '
 import { buildChecks, hostMods, tunerShift, tunerTrial, type TunerTrial } from '../game/tuner'
 import { paintRival, rowShift, rowSkills, type PaintRival } from '../game/paintRivals'
 import { TileClip } from './TileClip'
+import { Callout } from './Callout'
+import { useCallout } from './useCallout'
+import { buzz } from '../lib/haptics'
 import './race-menu.css'
 import { KartGame, playerRacer, type KartRacer } from './Kart'
 import { LiveKart } from './LiveKart'
@@ -1209,6 +1212,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
     const id = setTimeout(() => setSplit(null), 1600)
     return () => clearTimeout(id)
   }, [split])
+  const [call, pop] = useCallout()
   const flash = (text: string, ms = 800) => {
     setLabel(text)
     clearTimeout(labelTimer.current)
@@ -1517,7 +1521,11 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
     stats.current.shifts++
     if (s.q >= 1) stats.current.perfect++
     sound.current?.shift('me', r.gear, Math.min(1, myPi / 200))
-    flash(r.streak >= 2 ? `${s.label.replace('!', '')} x${r.streak}!` : s.label)
+    // A perfect shift gets its own pop and a buzz in the hand; the rest a plain call.
+    if (s.label === 'PERFECT!') {
+      pop(r.streak >= 2 ? `Perfect shift x${r.streak}!` : 'Perfect shift!')
+      buzz(15)
+    } else flash(r.streak >= 2 ? `${s.label.replace('!', '')} x${r.streak}!` : s.label)
   }
   const boost = () => {
     if (countdown > 0 || result || !fireBoost(me.current)) return
@@ -1605,6 +1613,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       )}
       {checking && !result && <div className="rf-wait">Checking the result with the race server...</div>}
       {label && <div className="shift-label big">{label}</div>}
+      {!result && <Callout call={call} />}
       {split && !result && <div key={split.i} className={`rf-split${split.d < 0 ? ' ahead' : split.d > 0 ? ' behind' : ''}`} title="Gap to the ghost at this checkpoint">⏱ {splitLabel(split.d)}</div>}
       {def.skill && skillShown && !result && <div className="skill-flash">{SKILLS[def.skill].icon} {SKILLS[def.skill].name}!</div>}
       {theirSkill && theirShown && !result && <div className="skill-flash theirs">{rival.town}: {SKILLS[theirSkill].icon} {SKILLS[theirSkill].name}!</div>}
