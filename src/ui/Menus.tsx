@@ -22,7 +22,7 @@ import { useCrewBattle } from '../lib/battles'
 import { useChat } from '../lib/chat'
 import { useRivalWaiting } from './Rivals'
 import { ShowcaseToggle } from './Meet'
-import { tutTarget, type TutTarget } from './Tutorial'
+import { tutTarget, tutorialShowing, type TutTarget } from './Tutorial'
 import { useTipTarget, type TipTarget } from './Tips'
 import { setFreeCam, useFreeCam } from '../scene/freeCam'
 
@@ -101,6 +101,7 @@ function EditBar() {
     return !!b && upgradable(buildingDef(b.def))
   })
   const tutDone = useGame((s) => tutTarget(s) === 'done')
+  const tutCard = useGame(tutorialShowing)
   const pickedMerged = useGame((s) => !!s.selected && !!groupOf(s.buildings, s.selected))
   const canMerge = useGame((s) => (s.mode === 'merge' ? mergeCandidates(s.buildings).length > 0 || s.buildings.some((b) => b.merge) : true))
   const hint =
@@ -113,7 +114,7 @@ function EditBar() {
     : `${TOUCH ? 'Tap to preview, tap again to build' : 'Click to place'} ${placing ? BUILDINGS.find((b) => b.id === placing)?.name : ''}`
   return (
     <div className="edit-bar">
-      <div className="edit-hint">{hint}</div>
+      {!tutCard && <div className="edit-hint">{hint}</div>}
       <div className="edit-tools">
         <button className={mode === 'road' ? 'tool active' : 'tool'} onClick={() => setMode('road')}><Icon name="road" size={22} /><span>Road</span></button>
         <button className={mode === 'bulldoze' ? 'tool active' : 'tool'} onClick={() => setMode('bulldoze')}><Icon name="bulldoze" size={22} /><span>Bulldoze</span></button>

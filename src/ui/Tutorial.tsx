@@ -42,6 +42,9 @@ export function tutTarget(s: Game): TutTarget | null {
   return st.target(s)
 }
 
+// Is the tutorial card on screen? Other hints stay quiet so one instruction shows at a time.
+export const tutorialShowing = (s: Game) => !!STEPS[s.tutorial] && !s.panel && !s.visiting
+
 export function Tutorial() {
   const step = useGame((s) => s.tutorial)
   const setStep = useGame((s) => s.setTutorial)
