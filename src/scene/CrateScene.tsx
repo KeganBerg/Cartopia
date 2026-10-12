@@ -19,6 +19,7 @@ import { MODS, SKINNED_SLOTS, carDef, fittedMods, modFits, modSkinNumber, skinNu
 import { dropTier, type CrateDef, type CrateDrop, type CrateId } from '../game/crates'
 import { bumpSound, crashSound } from '../lib/arcadeSound'
 import { crateSfx, sfx } from '../lib/sound'
+import { landClink } from '../lib/crateClinks'
 
 // The Crate Depot: a warehouse loading bay at night where crates are opened. The crate sits on a
 // hazard-striped lift under a work lamp, racking full of stock either side, a forklift parked up,
@@ -616,6 +617,8 @@ function CoinBurst({ start, gems = false }: { start: React.RefObject<number | nu
         if (c.y < floor + reach && c.sy < 0) {
           c.y = floor + reach
           c.bounces++
+          // A soft clink as each one first lands; the bounces after stay quiet.
+          if (c.bounces === 1) landClink(gems, -c.sy)
           // Each hit loses most of the spin and height; after a couple it lies down.
           c.sy = Math.abs(c.sy) * (c.bounces === 1 ? 0.38 : 0.22)
           c.sx *= 0.55
