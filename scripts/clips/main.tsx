@@ -3,7 +3,8 @@
 // launch and boost from src/game/race.ts) in the real race scene, filmed by a shot camera
 // or the race's own chase camera.
 // Dev only: `npm run dev`, then `node scripts/clips/shoot.mjs` captures and encodes them.
-// A clip is picked by URL: ?shot=camp|tour|trial&venue=<id>&night=1, or ?shot=ev&event=<id> for
+// A clip is picked by URL: ?shot=camp|tour|trial&venue=<id>&night=1, ?shot=gp&autopilot for the
+// Grand Prix (a kart race on Main Street, every kart on the race's own AI), or ?shot=ev&event=<id> for
 // a weekly event at its own venue, time of day and forced sky. &sky=<kind> races under that sky.
 // The capture script drives the page's clock; window.__clip says how many frames to keep.
 import { createRoot } from 'react-dom/client'
@@ -15,6 +16,8 @@ import { venue as venueById } from '../../src/scene/venues'
 import { raceWeather, type WeatherKind } from '../../src/game/weather'
 import { carDef } from '../../src/game/data'
 import { WEEKLY_EVENTS } from '../../src/game/events'
+import { KartRace, TRACKS, buildTrack, gpField, idleInput } from '../../src/game/kart'
+import { KartScene } from '../../src/scene/KartScene'
 import { TRACK, RACE_DT, TOP_GEAR, AI_BOOST_GEAR, freshRacer, stepRacer, shiftBand, shiftQuality, shiftRacer, fireBoost, launchRacer, revLaunch, type Racer } from '../../src/game/race'
 
 const q = new URLSearchParams(location.search)
@@ -138,9 +141,24 @@ const PLANS: Record<string, () => { plan: Plan; me: Trace; them: Trace | null }>
     },
   }),
 }
-const { plan, me: meTrace, them: themTrace } = PLANS[shot]()
+// The Grand Prix: a six-kart race on Main Street seen from the player's own chase camera,
+// joining the pack a few seconds after the start as it piles into the first bends.
+const GP_WARM = 3.2
+const gp = shot === 'gp'
+const { plan, me: meTrace, them: themTrace } = gp ? { plan: { dur: 5.5, warm: GP_WARM, start: 0 } as Plan, me: A, them: null } : PLANS[shot]()
 const total = Math.round((plan.warm + plan.dur) * FPS)
 ;(window as never as { __clip: unknown }).__clip = { frames: total, keepFrom: Math.round(plan.warm * FPS), fps: FPS }
+
+const KART_CARS = ['stallion', 'rally', 'buggy', 'bandit', 'vette', 'hotshot']
+const KART_COLORS = ['#e53935', '#1e88e5', '#fdd835', '#212121', '#43a047', '#ff7043']
+function KartClip() {
+  const field = gpField(['Nitro Nina', 'Torque Tony', 'Drift Dee', 'Boost Bo', 'Redline Rae', 'King Kurt'], 2, 46, { name: 'You', pi: 48 })
+  const race = useRef(new KartRace(buildTrack(TRACKS[0], false), field, Number(q.get('seed') ?? 4242))).current
+  const looks = useRef(field.map((_, i) => car({ model: KART_CARS[i], color: KART_COLORS[i], finish: 'metallic' }))).current
+  const input = useRef({ ...idleInput(), gas: 1 }).current
+  const me = field.findIndex((f) => !f.ai)
+  return <KartScene race={race} looks={looks} me={me} input={input} running onHud={() => {}} onFinish={() => {}} />
+}
 
 function Driven() {
   // Already where the race has them on the first frame, so the scene doesn't see them jump there.
@@ -196,7 +214,7 @@ function FrontLights() {
 }
 
 createRoot(document.getElementById('root')!).render(
-  <Canvas camera={{ position: [LANE * 0.5, 2.2, -4.2], fov: 55, near: 0.1, far: 150 }} dpr={1} gl={{ toneMapping: NeutralToneMapping, preserveDrawingBuffer: true }}>
-    <Driven />
+  <Canvas camera={gp ? { position: [0, 4, -8], fov: 60, near: 0.3, far: 420 } : { position: [LANE * 0.5, 2.2, -4.2], fov: 55, near: 0.1, far: 150 }} dpr={1} gl={{ toneMapping: NeutralToneMapping, preserveDrawingBuffer: true }}>
+    {gp ? <KartClip /> : <Driven />}
   </Canvas>,
 )

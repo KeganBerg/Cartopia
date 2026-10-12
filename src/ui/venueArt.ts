@@ -17,8 +17,8 @@ export function heroArt(mode: ArtMode, venue = 'main', night = false): string {
 export const artStyle = (mode: ArtMode, venue?: string, night = false) => ({ backgroundImage: `url(${heroArt(mode, venue, night)})` })
 
 // Short looping clips of real races for the same tiles (scripts/clips records them): the start,
-// the run to the line and a lone time-trial run. The still above is the poster. The Grand Prix
-// keeps its still until it has a clip of its own (gp-main).
+// the run to the line, a lone time-trial run and the kart pack on Main Street (gp-main).
+// The still above is the poster.
 // MP4 (H.264) where the browser plays it, else the WebM (VP9).
 const CLIPS = import.meta.glob<string>('../assets/race-clips/*.{mp4,webm}', { eager: true, query: '?url', import: 'default' })
 let ext: 'mp4' | 'webm' | null = null
