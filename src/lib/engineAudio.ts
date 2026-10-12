@@ -756,17 +756,24 @@ export class RaceAudio {
     out.threshold.value = -20
     out.knee.value = 6
     out.ratio.value = 12
-    out.attack.value = 0.004
-    out.release.value = 0.2
+    // Slow enough not to ride each firing pulse: at low revs (right after a shift)
+    // a 4 ms attack squeezed every pulse and made the engine sound scratchy.
+    out.attack.value = 0.015
+    out.release.value = 0.25
     // Races sit a little above the town ambience, not at full blast on headphones.
     const trim = a.createGain()
-    trim.gain.value = 0.28
+    trim.gain.value = 0.31
     out.connect(trim).connect(dest)
     this.bus = out
     this.trim = trim
     // Your car sits in the left lane on screen, the rival on the right.
-    this.me = new EngineVoice(a, out, { model: this.mine.model, mods: this.mine.mods, pan: -0.2 })
-    this.them = new EngineVoice(a, out, { model: this.theirs.model, body: this.theirs.body, mods: this.theirs.mods, pan: 0.6, level: 0.5 })
+    // The engines come in a little under the limiter, so it only catches peaks
+    // instead of compressing them hard all race long (which distorted them).
+    const engines = a.createGain()
+    engines.gain.value = 0.4
+    engines.connect(out)
+    this.me = new EngineVoice(a, engines, { model: this.mine.model, mods: this.mine.mods, pan: -0.2 })
+    this.them = new EngineVoice(a, engines, { model: this.theirs.model, body: this.theirs.body, mods: this.theirs.mods, pan: 0.6, level: 0.5 })
     this.crowd = new Crowd(a, out)
     return true
   }
