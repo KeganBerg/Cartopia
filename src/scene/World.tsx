@@ -23,7 +23,7 @@ import { glowMats } from './dayNight'
 import { LightPool } from './BuildingModel'
 import { TownCars } from './TownCars'
 import { Townspeople } from './Townspeople'
-import { Batch } from './Batch'
+import { Batch, batchOff } from './Batch'
 import { Manhole } from './BuildingDetail'
 import { GrassTufts } from './Tufts'
 import { Outskirts } from './Outskirts'
@@ -182,7 +182,8 @@ const ONE: [number, number, number] = [1, 1, 1]
 
 // `group` is set on the top-left building of a merged block: it stands in,
 // scaled up, for the whole block. The others in the block draw nothing.
-function Building({ b, roads, group }: { b: PlacedBuilding; roads: Set<string>; group?: MergeGroup }) {
+// `picked` (the building picked in Move) draws live, outside the merged town.
+function Building({ b, roads, group, picked }: { b: PlacedBuilding; roads: Set<string>; group?: MergeGroup; picked?: boolean }) {
   const d = buildingDef(b.def)
   const [cx, cz] = group ? groupCenter(group) : centerOf(b.def, b.x, b.z, b.rot)
   const turn = group ? groupTurn(group, roads) : turnOf(b, roads)
@@ -197,7 +198,7 @@ function Building({ b, roads, group }: { b: PlacedBuilding; roads: Set<string>; 
     <group
       position={[cx, 0, cz]}
       rotation-y={(turn * Math.PI) / 2}
-      userData={{ hours: { seed: seedOf(b.uid), kind: hoursOf(b.def) } }}
+      userData={{ hours: { seed: seedOf(b.uid), kind: hoursOf(b.def) }, noBatch: !!picked }}
       onPointerDown={(e) => {
         const s = useGame.getState()
         if (s.visiting || e.button !== 0) return
@@ -702,6 +703,8 @@ export function World() {
     [buildings, roadsList, land, popping],
   )
   const merges = useMemo(() => mergeGroups(buildings), [layout]) // eslint-disable-line react-hooks/exhaustive-deps
+  // The building picked in Move draws live; the rest stays merged (see batchOff).
+  const picked = useGame((s) => (s.mode === 'move' ? s.selected : null))
   return (
     <>
       <DayNight small={Math.min(window.innerWidth, window.innerHeight) < 700} />
@@ -715,13 +718,12 @@ export function World() {
       <ResponsiveZoom />
       <ExpandZoom />
       <Interaction />
-      {/* Pieces move while building or dragging, so merging waits for plain play. */}
-      <Batch version={layout} off={mode !== 'play'} cell={24}>
+      <Batch version={`${layout}|${picked ?? ''}`} off={batchOff(mode)} cell={24}>
         <Land />
         <GrassTufts land={land} roads={roadsList} buildings={buildings} />
         <Roads />
         {buildings.map((b) =>
-          merges.owner.has(b.uid) && !merges.groups.has(b.uid) ? null : <Building key={b.uid} b={b} roads={roads} group={merges.groups.get(b.uid)} />,
+          merges.owner.has(b.uid) && !merges.groups.has(b.uid) ? null : <Building key={b.uid} b={b} roads={roads} group={merges.groups.get(b.uid)} picked={b.uid === picked} />,
         )}
       </Batch>
       <AnchorProjector />
