@@ -6,6 +6,7 @@ import { bake, bakedMaterial, type Finish } from './bake'
 import { liveTraffic as sim } from './traffic/live'
 import { onNight } from './dayNight'
 import { Upright } from './mergeScale'
+import { PEOPLE_SIZED } from './keepShape'
 
 // Vehicles that belong to buildings rather than the player's garage: the
 // helicopters at the heliport and on the hospital roof, and the hospital's
@@ -173,7 +174,8 @@ export function Helicopter({ look, fly: wantsFly, seed = 0, radius = 7, height =
     if (tail.current) tail.current.rotation.x = s.a * 1.6
   })
   return (
-    <Upright>
+    // A helicopter is helicopter-sized however big the block it lands on.
+    <Upright size={1}>
       <group ref={craft} rotation-y={Math.PI / 2} userData={fly ? FLYING : LIVE}>
         <mesh geometry={body} material={mat} castShadow={!ghost} raycast={NO_RAY} />
         <mesh ref={rotor} geometry={bladeGeo} material={mat} position-y={0.92} castShadow={!ghost} raycast={NO_RAY} />
@@ -250,9 +252,10 @@ const ambulanceGeo = (() => {
 })()
 const lightGeo = new BoxGeometry(0.16, 0.06, 0.08)
 
+const PARKED = { ...LIVE, ...PEOPLE_SIZED }
 export function AmbulanceModel({ lit = true }: { lit?: boolean }) {
   return (
-    <group userData={LIVE}>
+    <group userData={PARKED}>
       <mesh geometry={ambulanceGeo} material={mat} castShadow raycast={NO_RAY} />
       {/* Light bar on the cab roof, plus corner lights on the box. */}
       <mesh geometry={lightGeo} material={lit ? flash.red : flash.beacon} position={[-0.12, 0.65, 0.4]} raycast={NO_RAY} />

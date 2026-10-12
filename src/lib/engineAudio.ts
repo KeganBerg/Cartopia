@@ -6,6 +6,7 @@
 import { audioContext, audioOut, onStopEngine, onMuteChange, isMuted } from './sound'
 import { loadEngineWorklet, engineWorkletReady, type PulseConfig } from './engineWorklet'
 import { CARS, carDef, type Body, type CarDef } from '../game/data'
+import { TOP_GEAR } from '../game/race'
 
 export type EngineProfile = {
   ppr: number // firing pulses per crank turn (cylinders / 2 for four-strokes)
@@ -294,6 +295,10 @@ export class EngineVoice {
   private boost = 0
   private cutUntil = 0
   private revUntil = 0
+  private gear = 0
+  // Settled at top speed in top gear: the engine eases back to a steady cruise.
+  private cruise = 0
+  private lastShift = -1
   private timer: ReturnType<typeof setInterval>
   private dead = false
 
@@ -461,6 +466,7 @@ export class EngineVoice {
     // An electric motor has no gears to hear: its whine follows road speed instead.
     this.target = this.prof.electric ? Math.min(1, (gear + Math.min(1, rpm)) / 3.95) : rpm
     this.throttle = throttle
+    this.gear = gear
   }
 
   // Pre-race: blip the throttle (each countdown beat).
@@ -469,21 +475,42 @@ export class EngineVoice {
     this.target = amount
   }
 
-  // Gear change: throttle cut, clunk, then turbo blow-off or exhaust pops.
-  shift() {
+  // Gear change, as it happens in a real car: the driver lifts (the note goes
+  // dull, a turbo vents, a hot exhaust pops), the clutch goes in and the revs
+  // fall freely, then the clutch bites at the new gear's revs with a soft
+  // driveline clunk and the engine pulls again. A cheap manual takes its time;
+  // an expensive car's paddle box is done in a blink. `soft` is the rival's car.
+  shift(soft = 1) {
     if (this.prof.electric) return
     const a = this.a
     const t = a.currentTime
-    this.cutUntil = t + 0.09
-    blip(a, this.out, t, 70, 0.08, 0.22 * this.prof.vol, 'sine', 45)
-    burst(a, this.out, t, 0.04, 0.05, 'bandpass', 1400, 900, 2)
+    // A double call (a stray repeat) is not a second gear change.
+    if (t - this.lastShift < 0.3) return
+    this.lastShift = t
+    const cut = this.shiftTime()
+    this.cutUntil = t + cut
+    const vary = 0.9 + Math.random() * 0.2
+    const manual = this.q < 0.6
+    // The lever (or the paddle box's selector) moving: a small mechanical tick.
+    burst(a, this.out, t + 0.01, 0.025, (manual ? 0.02 : 0.012) * soft, 'bandpass', 2600 * vary, 2000, 4)
+    // The clutch biting: a low driveline thud with a little metal in it.
+    blip(a, this.out, t + cut, 62 * vary, 0.07, (manual ? 0.11 : 0.07) * this.prof.vol * soft, 'sine', 40 * vary)
+    burst(a, this.out, t + cut, 0.035, 0.018 * soft, 'bandpass', 1100 * vary, 700, 2)
     if (this.prof.turbo > 0.3 && this.boost > 0.3) {
-      burst(a, this.out, t + 0.02, 0.38, 0.09 * this.prof.turbo, 'bandpass', 3800, 1100, 1.2)
+      // Blow-off as the throttle shuts.
+      burst(a, this.out, t + 0.015, 0.2 + cut * 0.5, 0.05 * this.prof.turbo * soft, 'bandpass', 3400 * vary, 1100, 1.2)
       // Flutter on the cheaper tuned cars, a clean psssh on the expensive ones.
-      if (this.q < 0.7) for (let i = 0; i < 4; i++) burst(a, this.out, t + 0.03 + i * 0.045, 0.03, 0.04 * this.prof.turbo, 'bandpass', 2400, 1800, 3)
+      if (this.q < 0.7) for (let i = 0; i < 3; i++) burst(a, this.out, t + 0.03 + i * 0.045, 0.03, 0.025 * this.prof.turbo * soft, 'bandpass', 2400, 1800, 3)
       this.boost *= 0.3
     }
-    this.pops(t + 0.02, 0.15, 1 + Math.floor(this.prof.crackle * 3))
+    // Unburnt fuel popping in the exhaust while the throttle is shut.
+    if (soft >= 1) this.pops(t + 0.02, cut, Math.floor(this.prof.crackle * 2.5))
+  }
+
+  // How long the throttle is off for a shift, in seconds.
+  private shiftTime() {
+    const slow = this.prof.clatter > 0.4 ? 0.1 : 0 // trucks and old diesels
+    return 0.06 + (1 - this.q) * 0.16 + slow
   }
 
   // Launch: wheelspin chirp, longer and louder on stronger cars.
@@ -556,7 +583,11 @@ export class EngineVoice {
     }
     // Revs chase the target; quick up, slower down, like a real flywheel.
     const k = this.mode === 'race' ? 0.6 : this.target > this.rpm ? 0.3 : 0.12
-    this.rpm += (this.target - this.rpm) * k
+    if (this.mode === 'race' && t < this.cutUntil && this.target < this.rpm) {
+      // Clutch in mid-shift: the revs fall at the flywheel's pace, and catch the
+      // new gear when it bites. Light, pricey engines spin down faster.
+      this.rpm = Math.max(this.target, this.rpm - (1.6 + this.q * 1.4) * 0.025)
+    } else this.rpm += (this.target - this.rpm) * k
     this.apply(false)
   }
 
@@ -564,11 +595,18 @@ export class EngineVoice {
     const a = this.a
     const t = a.currentTime
     const prof = this.prof
-    const r = Math.min(1.05, Math.max(0, this.rpm))
+    // At top speed the revs sit just under the redline rather than dithering on it.
+    const r = Math.min(this.gear >= TOP_GEAR && this.mode === 'race' && !prof.electric ? 0.98 : 1.05, Math.max(0, this.rpm))
     let thr = this.throttle
     if (t < this.cutUntil) thr = 0
-    // Bouncing off the limiter chops the throttle about 18 times a second.
-    if (this.mode === 'race' && !prof.electric && this.rpm >= 0.995 && Math.floor(t * 18) % 2 === 0) thr = 0.1
+    // Top gear doesn't bounce off a limiter (the sim just stops pulling there):
+    // at top speed the engine settles into a steady, slightly eased-off cruise
+    // instead of chopping for the rest of a long race.
+    const top = this.mode === 'race' && !prof.electric && this.gear >= TOP_GEAR
+    this.cruise += ((top && this.rpm >= 0.96 ? 1 : 0) - this.cruise) * (now ? 1 : 0.04)
+    thr *= 1 - 0.4 * this.cruise
+    // A lower gear left too long bounces off the limiter, a stutter about 9 times a second.
+    if (this.mode === 'race' && !prof.electric && !top && this.rpm >= 0.995 && Math.floor(t * 18) % 2 === 0) thr = Math.min(thr, 0.35)
     const realRpm = prof.electric ? 600 + 14000 * r : prof.idle + (prof.redline - prof.idle) * r
     // Tiny unsteadiness at idle so it never sounds like a test tone.
     const wob = r < 0.1 && !prof.electric ? 1 + Math.sin(t * 7.3) * 0.012 + Math.sin(t * 2.1) * 0.01 : 1
@@ -780,7 +818,8 @@ export class RaceAudio {
   shift(who: 'me' | 'them', gear: number, power: number) {
     const v = who === 'me' ? this.me : this.them
     if (!v) return
-    v.shift()
+    // The rival's shifts sit well back: you hear your own car's.
+    v.shift(who === 'me' ? 1 : 0.45)
     if (gear === 1) v.chirp(power)
   }
 

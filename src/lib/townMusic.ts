@@ -13,6 +13,7 @@ import { SEASON, type Season } from '../scene/season'
 import { onTownHold, townHeld } from '../scene/renderGate'
 import { weatherNow } from '../game/weather'
 import { clubOpen } from './ambience'
+import { onTechnoChange, technoOn } from '../game/techno'
 
 type Lead = 'epiano' | 'vibes' | 'flute'
 // A chord: its bass note, then the voicing played above it.
@@ -492,7 +493,7 @@ let quietSince = 0
 // Silent while muted, during races and arcade games, in a hidden tab, and
 // giving way to the club's beat while the club is on screen.
 function target() {
-  if (!settings.on || isMuted() || townHeld() || document.hidden) return 0
+  if (!settings.on || isMuted() || townHeld() || document.hidden || technoOn()) return 0
   const club = clubOpen()
   return settings.volume * TRIM * (club ? 1 - (club.near ?? 1) : 1)
 }
@@ -536,6 +537,7 @@ export function startMusic() {
   document.addEventListener('visibilitychange', wake)
   onMuteChange(wake)
   onTownHold(wake)
+  onTechnoChange(wake)
   // The club comes and goes with the clock and the camera, so check now and then.
   setInterval(wake, 2000)
 }
