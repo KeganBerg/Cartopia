@@ -24,7 +24,7 @@ function fakeCtx(): BaseAudioContext {
 function colourStepsPerBeat(groove: number, beats = 32) {
   const s = new Soundscape(fakeCtx(), fakeCtx() as unknown as AudioNode)
   s.groove = groove
-  s.onHit = (at, kick) => clubHit(at * 1000, kick)
+  s.onHit = (at, kind, amt, g) => clubHit(at * 1000, kind, amt, g)
   const bpm = GROOVES[groove].bpm
   const beat = 60 / bpm
   // Schedule ahead in 0.2 s chunks as the game does, and watch the lights at

@@ -10,19 +10,38 @@ export function starReward(stars: number, level: number) {
 }
 
 // ---------- Pit Stop ----------
-// Four wheels in a random order, then fuel: hold until the gauge sits in the green band.
+// A whole stop: brake onto the box marks, run all four wheel guns at once (each corner's
+// ring fills; tap when it's green to undo the nut, the crew swaps the wheel, tap again to
+// do it up), then go the moment the lollipop turns green. The clock stops while the
+// lollipop man holds you for traffic, so only what the player does counts.
 export const PIT_WHEELS = 4
-export const PIT_MISS = 1 // seconds added for a wrong tap
-export const FUEL_RATE = 0.55 // gauge per second while held
-export const FUEL_BAND: [number, number] = [0.82, 0.95]
-export function pitOrder(rand: () => number) {
-  return [0, 1, 2, 3].sort(() => rand() - 0.5)
+export const PIT_SPEED = 8 // pit lane limiter, world units a second
+export const PIT_BRAKE = 12 // slowing while the brake is held
+export const PIT_COAST = 0 // off the brake the limiter holds the speed
+export const PIT_START = -17 // where the car enters, the box is at 0
+export const PIT_PUSH = 0.45 // seconds lost per unit the crew must push the car to the marks
+export const GUN_SLIP = 0.6 // a tap before green slips the nut: the ring drops back this far
+export const PIT_JUMP = 1 // seconds added for going before the lollipop turns green
+
+// How long each corner's ring takes to fill, for undoing then doing up the nut.
+export function gunTimes(rand: () => number, wheels = PIT_WHEELS) {
+  return Array.from({ length: wheels }, () => [0.5 + rand() * 0.45, 0.5 + rand() * 0.45] as [number, number])
 }
-export function fuelOk(level: number) {
-  return level >= FUEL_BAND[0] && level <= FUEL_BAND[1]
+// Where the car rolls to from `speed` with the brake held for the whole way.
+export const brakeDistance = (speed: number) => (speed * speed) / (2 * PIT_BRAKE)
+// How the stop went, from how far the car is past (+) or short of (-) the marks.
+export type StopGrade = 'perfect' | 'good' | 'short' | 'long'
+export function stopGrade(err: number): StopGrade {
+  const e = Math.abs(err)
+  return e <= 0.2 ? 'perfect' : e <= 0.5 ? 'good' : err < 0 ? 'short' : 'long'
+}
+// Seconds lost pushing the car onto the marks after a sloppy stop.
+export function stopPenalty(err: number) {
+  const e = Math.abs(err)
+  return e <= 0.5 ? 0 : Math.min(2.5, 0.3 + (e - 0.5) * PIT_PUSH)
 }
 export function pitStars(time: number) {
-  return time <= 7 ? 3 : time <= 10 ? 2 : 1
+  return time <= 5.8 ? 3 : time <= 7.5 ? 2 : 1
 }
 
 // ---------- Car Wash Frenzy ----------

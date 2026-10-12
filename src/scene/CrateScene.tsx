@@ -17,9 +17,11 @@ import { ToolChest, TyreStack, useFitCamera } from './ArcadeScenery'
 import { tickSkins, withSkin } from './skins'
 import { MODS, SKINNED_SLOTS, carDef, fittedMods, modFits, modSkinNumber, skinNumber, type Body, type Finish, type SkinnedSlot } from '../game/data'
 import { dropTier, type CrateDef, type CrateDrop, type CrateId } from '../game/crates'
+import { calmFlashing } from '../game/flashing'
 import { bumpSound, crashSound } from '../lib/arcadeSound'
 import { crateSfx, sfx } from '../lib/sound'
 import { landClink } from '../lib/crateClinks'
+import { PartPrize } from './PartPrize'
 
 // The Crate Depot: a warehouse loading bay at night where crates are opened. The crate sits on a
 // hazard-striped lift under a work lamp, racking full of stock either side, a forklift parked up,
@@ -672,63 +674,6 @@ function CoinBurst({ start, gems = false }: { start: React.RefObject<number | nu
 }
 
 // A stack of gold coins with a big coin standing on top.
-// A part prize: a big machined cog turning on its axle, steel for coin parts and gold for gem parts.
-const TEETH = 12
-function CogPrize({ gem }: { gem: boolean }) {
-  const wheel = useRef<Group>(null)
-  useFrame((_, dt) => {
-    if (wheel.current) wheel.current.rotation.z -= Math.min(dt, 0.05) * 0.9
-  })
-  const metal = useMemo(() => new MeshStandardMaterial({ color: gem ? '#ffca28' : '#b0bec5', metalness: 1, roughness: gem ? 0.2 : 0.28, emissive: gem ? '#ff8f00' : '#263238', emissiveIntensity: gem ? 0.25 : 0.15 }), [gem])
-  const dark = useMemo(() => new MeshStandardMaterial({ color: gem ? '#8d5a00' : '#455a64', metalness: 0.9, roughness: 0.4 }), [gem])
-  useEffect(() => () => { metal.dispose(); dark.dispose() }, [metal, dark])
-  return (
-    <group position-y={0.85} scale={1.25}>
-      <group ref={wheel}>
-        {/* Rim, teeth, spokes and hub, all facing the camera. */}
-        <mesh rotation-x={Math.PI / 2} material={metal} castShadow>
-          <cylinderGeometry args={[0.4, 0.4, 0.12, 36, 1, true]} />
-        </mesh>
-        {[1, -1].map((sd) => (
-          <mesh key={sd} position-z={sd * 0.06} rotation-y={sd < 0 ? Math.PI : 0} material={metal}>
-            <ringGeometry args={[0.27, 0.4, 36]} />
-          </mesh>
-        ))}
-        <mesh rotation-x={Math.PI / 2} material={dark}>
-          <cylinderGeometry args={[0.27, 0.27, 0.1, 36, 1, true]} />
-        </mesh>
-        {Array.from({ length: TEETH }, (_, i) => {
-          const a = (i / TEETH) * Math.PI * 2
-          return (
-            <mesh key={i} position={[Math.cos(a) * 0.45, Math.sin(a) * 0.45, 0]} rotation-z={a} material={metal} castShadow>
-              <boxGeometry args={[0.13, 0.12, 0.12]} />
-            </mesh>
-          )
-        })}
-        {Array.from({ length: 5 }, (_, i) => (
-          <mesh key={i} rotation-z={(i / 5) * Math.PI * 2} position-z={0} material={metal}>
-            <boxGeometry args={[0.06, 0.56, 0.07]} />
-          </mesh>
-        ))}
-        <mesh rotation-x={Math.PI / 2} material={metal}>
-          <cylinderGeometry args={[0.11, 0.11, 0.18, 24]} />
-        </mesh>
-        <mesh rotation-x={Math.PI / 2} material={dark}>
-          <cylinderGeometry args={[0.045, 0.045, 0.19, 6]} />
-        </mesh>
-        {Array.from({ length: 5 }, (_, i) => {
-          const a = ((i + 0.5) / 5) * Math.PI * 2
-          return [1, -1].map((sd) => (
-            <mesh key={`${i}${sd}`} position={[Math.cos(a) * 0.335, Math.sin(a) * 0.335, sd * 0.065]} rotation-x={Math.PI / 2} material={dark}>
-              <cylinderGeometry args={[0.022, 0.022, 0.02, 6]} />
-            </mesh>
-          ))
-        })}
-      </group>
-    </group>
-  )
-}
-
 function CoinPile() {
   return (
     <group>
@@ -889,8 +834,8 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
   const coins = drop?.kind === 'coins' || drop?.kind === 'dupe' || drop?.kind === 'skindupe'
   // Rare and legendary pulls (cars, gem parts, epic and legendary skins) throw gems instead.
   const gems = !coins && tier >= 2
-  // A part shows a cog; cars and paints show the car.
-  const cog = drop?.kind === 'mod'
+  // A part shows the part itself; cars and paints show the car.
+  const part = drop?.kind === 'mod' ? drop.mod : null
   const showCar = (drop?.kind === 'car' || drop?.kind === 'dupe' || drop?.kind === 'skin' || drop?.kind === 'skindupe') && !!prizeCar
 
   useFrame((state, rawDt) => {
@@ -950,7 +895,8 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
     const coreMat = p.core?.material as MeshBasicMaterial | undefined
     if (coreMat) coreMat.opacity = after >= 0 ? Math.max(0, 1 - after * 1.5) : charge * 0.95
     if (p.light) p.light.intensity = after >= 0 ? 6 + Math.max(0, 30 * (1 - after * 2)) : charge * 14
-    if (flash.current) flash.current.intensity = after >= 0 ? Math.max(0, 60 * (1 - after * 3)) : 0
+    // Reduce flashing: a softer, slower glow instead of the white burst.
+    if (flash.current) flash.current.intensity = after >= 0 ? (calmFlashing() ? Math.max(0, 14 * (1 - after * 1.2)) : Math.max(0, 60 * (1 - after * 3))) : 0
     // Burst: the lid flies, the sides fall open, the bands snap away.
     if (after >= 0) {
       const L = s.lid
@@ -989,7 +935,7 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
         g.visible = r > 0
         g.position.y = LIFT + 0.2 + ease * 0.5
         g.scale.setScalar(Math.max(0.01, ease))
-        g.rotation.y = (coins || cog) && !showCar ? Math.pow(1 - r, 3) * Math.PI * 4 : -0.6 + after * 0.55
+        g.rotation.y = coins && !showCar ? Math.pow(1 - r, 3) * Math.PI * 4 : -0.6 + after * 0.55
       }
       if (!s.revealed && after > SETTLE - CHARGE) {
         s.revealed = true
@@ -1025,7 +971,7 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
       <group ref={prize} visible={false}>
         {showCar && prizeCar && <PrizeCar look={prizeCar} />}
         {coins && !showCar && <CoinPile />}
-        {cog && <CogPrize gem={tier >= 2} />}
+        {part && <PartPrize id={part} body={prizeCar?.body} tint={prizeCar?.color ?? '#90a4ae'} />}
         {/* A slowly turning ring of light under the prize. */}
         <mesh rotation-x={-Math.PI / 2} position-y={0.02}>
           <ringGeometry args={[1.05, 1.2, 48]} />
@@ -1038,9 +984,10 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
 
 
 // The car a prize shows: a new car in its colour, or your car wearing the part it won.
-export function prizeLook(drop: CrateDrop | null, cars: { uid: string; model: string; color: string; finish?: Finish; stripe?: string | null; mods?: string[] }[]): CarLook | null {
+// `mine` is the car to show a paint on: the one you have selected, or your race car.
+export function prizeLook(drop: CrateDrop | null, cars: { uid: string; model: string; color: string; finish?: Finish; stripe?: string | null; mods?: string[] }[], mine?: string | null): CarLook | null {
   if (!drop) return null
-  if (drop.kind === 'skin' || drop.kind === 'skindupe') return skinLook(drop.skin, drop.part, cars)
+  if (drop.kind === 'skin' || drop.kind === 'skindupe') return skinLook(drop.skin, drop.part, cars, mine)
   if (drop.kind === 'car') return { body: carDef(drop.model).body, model: drop.model, color: drop.color }
   if (drop.kind === 'dupe') {
     const d = carDef(drop.model)
@@ -1063,9 +1010,9 @@ const bestPart = (slot: SkinnedSlot, body: Body) =>
 // A skin prize, on one of the player's cars. A car paint covers the bare body with no parts on,
 // so the whole car moves; a mod paint goes on a fully kitted car (every paintable part slot
 // filled), and only those parts move while the body keeps its own colour.
-function skinLook(id: string, part: boolean, cars: { model: string; color: string; finish?: Finish; stripe?: string | null; mods?: string[] }[]): CarLook {
+function skinLook(id: string, part: boolean, cars: { uid: string; model: string; color: string; finish?: Finish; stripe?: string | null; mods?: string[] }[], mine?: string | null): CarLook {
   const owned = cars.filter((c) => !carDef(c.model).parked)
-  const car = owned[0] ?? { model: 'civic', color: '#eceff1' }
+  const car = owned.find((c) => c.uid === mine) ?? owned[0] ?? { model: 'civic', color: '#eceff1' }
   const d = carDef(car.model)
   const look: CarLook = { body: d.body, model: car.model, color: car.color, finish: car.finish, stripe: car.stripe }
   if (!part) return { ...look, mods: [], skin: id }
