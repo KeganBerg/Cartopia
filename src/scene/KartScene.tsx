@@ -19,6 +19,7 @@ import { TILE, buildingDef, type Body } from '../game/data'
 import { BOMB_R, DRIFT_BLUE, DRIFT_ORANGE, KART_LEN, SMOKE_R, KartRace, type ItemId, type KartEvent, type KartInput, type Track } from '../game/kart'
 import type { ChaseCar } from './ChaseScene'
 import { placeCones, stepCones } from '../game/cones'
+import { GLASS_W, glassAt } from '../game/obstacles'
 
 // A kart circuit: the tarmac ribbon with kerbs, verges and barriers, the theme's
 // scenery round it (the player's town, a harbour, a red rock canyon), the karts,
@@ -812,6 +813,85 @@ function Crates({ race }: { race: KartRace }) {
   )
 }
 
+// Road obstacles (game/obstacles.ts): a pile of boxes, a pothole, an ice patch, and two
+// workers carrying a pane of glass across the road (it shatters into a puff of shards).
+function Obstacles({ race }: { race: KartRace }) {
+  const t = race.track
+  return (
+    <>
+      {race.obstacles.map((o, i) => {
+        const ry = o.h
+        if (o.kind === 'boxes') return (
+          <group key={i} position={[o.x, 0, o.z]} rotation-y={ry}>
+            {/* x: across the pile, -1..1 of its half width. */}
+            {[[-0.82, 0.35, 0, 0.7], [-0.45, 0.35, 0.15, 0.7], [-0.1, 0.32, -0.1, 0.62], [0.25, 0.35, 0.05, 0.7], [0.6, 0.32, -0.05, 0.62], [0.88, 0.3, 0.1, 0.58],
+              [-0.62, 0.95, 0.05, 0.55], [0.05, 0.92, 0, 0.5], [0.42, 0.95, 0.02, 0.55], [-0.2, 1.42, 0, 0.42]].map(([x, y, z, s], j) => (
+              <mesh key={j} position={[x * o.w / 2, y, z]} rotation-y={j * 0.4}>
+                <boxGeometry args={[s, s, s]} />
+                <meshStandardMaterial color={j % 2 ? '#c8a165' : '#b98b4e'} />
+              </mesh>
+            ))}
+          </group>
+        )
+        if (o.kind === 'pothole') return (
+          <mesh key={i} position={[o.x, Y_PAINT + 0.005, o.z]} rotation-x={-Math.PI / 2} raycast={() => null}>
+            <circleGeometry args={[o.w / 2, 14]} />
+            <meshStandardMaterial color="#26221f" roughness={1} />
+          </mesh>
+        )
+        if (o.kind === 'ice') return (
+          <mesh key={i} position={[o.x, Y_PAINT + 0.004, o.z]} rotation={[-Math.PI / 2, 0, ry]} raycast={() => null}>
+            <planeGeometry args={[o.w, o.l]} />
+            <meshStandardMaterial color="#cdeffd" transparent opacity={0.75} roughness={0.08} metalness={0.2} />
+          </mesh>
+        )
+        return <GlassCrossing key={i} race={race} i={i} t={t} />
+      })}
+    </>
+  )
+}
+
+function GlassCrossing({ race, i, t }: { race: KartRace; i: number; t: Track }) {
+  const o = race.obstacles[i]
+  const g = useRef<Group>(null)
+  const pane = useRef<Mesh>(null)
+  const shards = useRef<Group>(null)
+  useFrame(() => {
+    const at = glassAt(o, race.t)
+    if (!g.current || !pane.current || !shards.current) return
+    g.current.visible = !!at
+    if (!at) return
+    g.current.position.set(o.x + t.nx[o.i] * at.across, 0, o.z + t.nz[o.i] * at.across)
+    const broke = race.glassBroke[i] === at.cycle
+    pane.current.visible = !broke
+    shards.current.visible = broke
+    if (broke) shards.current.children.forEach((c, j) => { c.position.y = Math.max(0.05, c.position.y - 0.02); c.rotation.x += 0.1 + j * 0.01 })
+    else shards.current.children.forEach((c, j) => c.position.set(Math.sin(j * 2.1) * 0.8, 0.6 + (j % 3) * 0.35, Math.cos(j * 1.3) * 0.2))
+  })
+  // The workers walk across the road, so the group faces across it.
+  const across = Math.atan2(t.nx[o.i], t.nz[o.i])
+  return (
+    <group ref={g} rotation-y={across}>
+      {[-1.1, 1.1].map((z) => (
+        <group key={z} position={[0, 0, z]}>
+          <mesh position={[0, 0.55, 0]}><capsuleGeometry args={[0.18, 0.6, 4, 8]} /><meshStandardMaterial color="#ff9800" /></mesh>
+          <mesh position={[0, 1.1, 0]}><sphereGeometry args={[0.16, 10, 8]} /><meshStandardMaterial color="#f1c27d" /></mesh>
+          <mesh position={[0, 1.27, 0]}><cylinderGeometry args={[0.18, 0.2, 0.1, 10]} /><meshStandardMaterial color="#fdd835" /></mesh>
+        </group>
+      ))}
+      <mesh ref={pane} position={[0, 0.85, 0]} rotation-y={Math.PI / 2}>
+        <boxGeometry args={[GLASS_W, 1.2, 0.04]} />
+        <meshStandardMaterial color="#b3e5fc" transparent opacity={0.45} metalness={0.3} roughness={0.05} />
+      </mesh>
+      <group ref={shards}>
+        {Array.from({ length: 9 }, (_, j) => (
+          <mesh key={j}><boxGeometry args={[0.22, 0.04, 0.16]} /><meshStandardMaterial color="#e1f5fe" transparent opacity={0.7} /></mesh>
+        ))}
+      </group>
+    </group>
+  )
+}
+
 // Traffic cones on the inside of the tightest bends. Clipping one sends it flying
 // and costs nothing (game/cones.ts); it's back on its spot a few seconds later.
 function SmashCones({ race }: { race: KartRace }) {
@@ -1046,7 +1126,8 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
     // Feel: knocks shake the camera, a drift turbo kicks the view wider for a moment.
     // (Not with calm motion on: it follows the device's reduce-motion setting.)
     if (!calmFlashing()) for (const e of events) if (e.kart === me) {
-      if (e.kind === 'wall' || e.kind === 'bump') s.shake = Math.max(s.shake, 0.18)
+      if (e.kind === 'wall' || e.kind === 'bump' || e.kind === 'pothole') s.shake = Math.max(s.shake, 0.18)
+      else if (e.kind === 'boxes' || e.kind === 'glass') s.shake = Math.max(s.shake, 0.3)
       else if (e.kind === 'hit' || e.kind === 'boom') s.shake = Math.max(s.shake, 0.45)
       else if (e.kind === 'land') s.shake = Math.max(s.shake, 0.12)
       else if (e.kind === 'turbo') s.kick = e.value === 2 ? 9 : 6
@@ -1192,6 +1273,7 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
       {t.def.theme === 'desert' && <DesertExtras t={t} />}
       <Crates race={race} />
       <SmashCones race={race} />
+      <Obstacles race={race} />
       <Hazards race={race} />
       <TowBeams race={race} />
       {looks.map((l, i) => <KartView key={i} look={l} rig={rigs[i]} set={setters[i]} />)}

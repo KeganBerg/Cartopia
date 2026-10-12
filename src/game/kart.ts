@@ -1,5 +1,6 @@
 import { CatmullRomCurve3, Vector3 } from 'three'
 import type { VenueId } from '../scene/venues'
+import { GLASS_W, glassAt, local, placeObstacles, type Obstacle } from './obstacles'
 
 // Kart circuits: the Grand Prix is driven, not dragged. Each race is three laps of a
 // looping circuit against five AI rivals, with drifts that charge a mini turbo, boost
@@ -218,6 +219,7 @@ export type Kart = {
   spinYaw: number
   flat: number; smoke: number; emp: number; tow: number // effect timers, seconds left
   ghost: number; splat: number; rocket: number
+  ice: number // seconds of slide left after an ice patch
   towTarget: number // kart being reeled in, -1 for none
   uses: number // cans left in a Nitro Triple
 }
@@ -236,7 +238,7 @@ export type KartNote =
   | { k: 'crate'; kart: number; i: number }
   | { k: 'gone'; id: number }
 export type KartEvent = {
-  kind: 'bump' | 'wall' | 'boost' | 'item' | 'hit' | 'lap' | 'finish' | 'turbo' | 'jump' | 'land' | 'crate' | 'block' | 'flat' | 'smoke' | 'zap' | 'tow' | 'ghost' | 'splat' | 'rocket' | 'boom'
+  kind: 'bump' | 'wall' | 'boost' | 'item' | 'hit' | 'lap' | 'finish' | 'turbo' | 'jump' | 'land' | 'crate' | 'block' | 'flat' | 'smoke' | 'zap' | 'tow' | 'ghost' | 'splat' | 'rocket' | 'boom' | 'boxes' | 'pothole' | 'ice' | 'glass'
   kart: number; value?: number
 }
 export const SMOKE_R = 3.6
@@ -245,6 +247,14 @@ const SMOKE_LIFE = 7
 export const DRIFT_BLUE = 0.75
 export const DRIFT_ORANGE = 1.7
 const GRAVITY = 30
+// Bumper Blast: everyone races the same kart, and bumps land hard.
+export const BLAST_PI = 40
+const BLAST_KNOCK = 2.6
+const BLAST_SPIN = 9 // closing speed that spins out the kart that got hit
+const SLIDE = 3 // how fast a kart pressed against a pile of boxes slides along it to the open lane
+
+// obstacles: the road has obstacles (game/obstacles.ts). blast: Bumper Blast.
+export type KartRules = { obstacles?: boolean; blast?: boolean }
 
 export class KartRace {
   track: Track
@@ -263,10 +273,17 @@ export class KartRace {
   // what needs telling to them. Single player owns every kart and nobody reads the notes.
   owned: (id: number) => boolean = () => true
   notes: KartNote[] = []
+  obstacles: Obstacle[]
+  blast: boolean
+  // The crossing a glass pane was last smashed on, per obstacle (-1: never).
+  glassBroke: number[]
   private seq = 0
 
-  constructor(track: Track, field: { name: string; pi: number; ai: boolean; skill?: number }[], seed = 1) {
+  constructor(track: Track, field: { name: string; pi: number; ai: boolean; skill?: number }[], seed = 1, rules: KartRules = {}) {
     this.track = track
+    this.blast = !!rules.blast
+    this.obstacles = rules.obstacles || rules.blast ? placeObstacles(track, this.blast) : []
+    this.glassBroke = this.obstacles.map(() => -1)
     let s = seed * 9301 + 49297
     this.rand = () => ((s = (s * 16807) % 2147483647) / 2147483647)
     this.crateTaken = track.crates.map(() => -99)
@@ -276,11 +293,11 @@ export class KartRace {
       const i = wrapI(-6 - row * 4, track.n)
       const off = col * track.half * 0.45 + (row % 2 ? 0.4 : -0.4)
       return {
-        id: k, name: f.name, ai: f.ai, stats: kartStats(f.pi),
+        id: k, name: f.name, ai: f.ai, stats: kartStats(this.blast ? BLAST_PI : f.pi),
         x: track.x[i] + track.nx[i] * off, z: track.z[i] + track.nz[i] * off, y: 0, vx: 0, vz: 0, vy: 0, h: Math.atan2(track.tx[i], track.tz[i]),
         steer: 0, idx: i, lap: 0, done: null, drift: 0, charge: 0, boost: 0, spin: 0, shield: 0, item: null, itemHeld: false, bump: 0, offroad: false, air: false,
         lane: (this.rand() - 0.5) * track.half * 0.9, skill: f.skill ?? 0.8, spinYaw: 0,
-        flat: 0, smoke: 0, emp: 0, tow: 0, towTarget: -1, ghost: 0, splat: 0, rocket: 0, uses: 0,
+        flat: 0, smoke: 0, emp: 0, tow: 0, towTarget: -1, ghost: 0, splat: 0, rocket: 0, uses: 0, ice: 0,
       }
     })
   }
@@ -337,6 +354,13 @@ export class KartRace {
     for (const p of t.boosts) {
       const ahead = wrapI(p.i - k.idx, t.n)
       if (ahead > 4 && ahead < 30) off = p.off
+    }
+    // Steer round a pile of boxes, to the open side.
+    for (const o of this.obstacles) {
+      if (o.kind !== 'boxes') continue
+      const ahead = wrapI(o.i - k.idx, t.n)
+      // From well before it until the kart is past it, so one alongside doesn't cut back in.
+      if ((ahead < 28 || ahead > t.n - 4) && Math.abs(off - o.off) < o.w / 2 + 1.1) off = o.off - Math.sign(o.off) * (o.w / 2 + 1.4)
     }
     // Ease around a kart right in front.
     for (const o of this.karts) {
@@ -418,6 +442,7 @@ export class KartRace {
     k.ghost = Math.max(0, k.ghost - dt)
     k.splat = Math.max(0, k.splat - dt)
     k.rocket = Math.max(0, k.rocket - dt)
+    k.ice = Math.max(0, k.ice - dt)
 
     if (k.spin > 0) {
       k.spin -= dt
@@ -459,7 +484,7 @@ export class KartRace {
       const steer = inp.thumb && k.drift !== 0 ? thumbSlide(inp.steer, k.drift) : inp.steer
       const want = Math.max(-1, Math.min(1, steer + pull + tug))
       k.steer += (want - k.steer) * Math.min(1, dt * 10)
-      const turn = 2.3 * Math.min(1, speed / 5) * (1 - 0.3 * Math.min(1, speed / k.stats.top)) * Math.sign(vf || 1)
+      const turn = 2.3 * Math.min(1, speed / 5) * (1 - 0.3 * Math.min(1, speed / k.stats.top)) * Math.sign(vf || 1) * (k.ice > 0 ? 0.7 : 1)
       let yaw: number
       if (k.drift !== 0) {
         yaw = k.drift * turn * (0.75 + 0.45 * k.steer * k.drift)
@@ -476,7 +501,8 @@ export class KartRace {
       k.vx += (want.x - k.vx) * a
       k.vz += (want.z - k.vz) * a
     } else {
-      vl *= Math.exp(-(k.air ? 0.6 : 9) * dt)
+      // On ice the tyres barely hold, so the kart slides wide.
+      vl *= Math.exp(-(k.air ? 0.6 : k.ice > 0 ? 1.4 : 9) * dt)
       k.vx = fx * vf + sx * vl
       k.vz = fz * vf + sz * vl
     }
@@ -534,6 +560,7 @@ export class KartRace {
         k.air = true
         this.events.push({ kind: 'jump', kart: k.id })
       }
+      this.obstacleHits(k, dt)
     }
 
     // Prize crates.
@@ -554,6 +581,55 @@ export class KartRace {
     // Items: a press uses the one held.
     if (inp.item && !k.itemHeld && k.item && k.spin <= 0 && k.emp <= 0) this.useItem(k, order)
     k.itemHeld = inp.item
+  }
+
+  // Boxes, potholes, ice and glass (game/obstacles.ts). Only ever slows a kart.
+  obstacleHits(k: Kart, dt: number) {
+    const t = this.track
+    this.obstacles.forEach((o, oi) => {
+      if (k.ghost > 0) return
+      const { fwd, side } = local(o, t, k.x, k.z)
+      const r = KART_R * 0.6
+      if (o.kind === 'boxes') {
+        const inF = o.l / 2 + r - Math.abs(fwd), inS = o.w / 2 + r - Math.abs(side)
+        if (inF <= 0 || inS <= 0) return
+        // Out the short way, losing most of the speed into the pile.
+        const fx = Math.sin(o.h), fz = Math.cos(o.h)
+        if (inF < inS) {
+          const sg = Math.sign(fwd) || -1
+          // Back off the face and slide along it towards the open lane, so nobody stays pinned.
+          const open = -Math.sign(o.off) * SLIDE * dt
+          k.x += fx * inF * sg + t.nx[o.i] * open
+          k.z += fz * inF * sg + t.nz[o.i] * open
+        }
+        else { const sg = Math.sign(side) || -Math.sign(o.off); k.x += t.nx[o.i] * inS * sg; k.z += t.nz[o.i] * inS * sg }
+        if (k.bump <= 0) {
+          k.vx *= 0.45
+          k.vz *= 0.45
+          k.bump = 0.4
+          this.events.push({ kind: 'boxes', kart: k.id })
+        }
+      } else if (o.kind === 'pothole') {
+        if (Math.hypot(fwd, side) > o.w / 2) return
+        k.vx *= 0.8
+        k.vz *= 0.8
+        k.vy = 2.4
+        k.air = true
+        this.events.push({ kind: 'pothole', kart: k.id })
+      } else if (o.kind === 'ice') {
+        if (Math.abs(fwd) > o.l / 2 || Math.abs(side) > o.w / 2) return
+        if (k.ice <= 0) this.events.push({ kind: 'ice', kart: k.id })
+        k.ice = 1.2
+      } else {
+        const g = glassAt(o, this.t)
+        if (!g || this.glassBroke[oi] === g.cycle) return
+        if (Math.abs(fwd) > o.l / 2 + r || Math.abs(side - g.across) > GLASS_W / 2 + r) return
+        this.glassBroke[oi] = g.cycle
+        k.vx *= 0.75
+        k.vz *= 0.75
+        this.events.push({ kind: 'glass', kart: k.id })
+      }
+    })
   }
 
   crossLine(k: Kart) {
@@ -764,7 +840,12 @@ export class KartRace {
       q.x += nx * push * wq; q.z += nz * push * wq
       const rel = (q.vx - p.vx) * nx + (q.vz - p.vz) * nz
       if (rel < 0) {
-        const j = -rel * 0.65
+        const j = -rel * 0.65 * (this.blast ? BLAST_KNOCK : 1)
+        // Bumper Blast: a hard ram spins out whoever was hit (the slower of the two along the hit).
+        if (this.blast && -rel > BLAST_SPIN) {
+          const victim = (p.vx * nx + p.vz * nz) < -(q.vx * nx + q.vz * nz) ? p : q
+          if (this.owned(victim.id) && victim.shield <= 0 && victim.spin <= 0) victim.spin = 0.45
+        }
         p.vx -= nx * j * wp; p.vz -= nz * j * wp
         q.vx += nx * j * wq; q.vz += nz * j * wq
         if (-rel > 2.5 && p.bump <= 0) { this.events.push({ kind: 'bump', kart: p.id, value: -rel }); p.bump = 0.25; q.bump = 0.25 }

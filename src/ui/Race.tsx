@@ -34,7 +34,7 @@ import './race-menu.css'
 import { KartGame, playerRacer, type KartRacer } from './Kart'
 import { LiveKart } from './LiveKart'
 import { LiveKartParty } from './LiveKartParty'
-import { gpField, gpTrack } from '../game/kart'
+import { BLAST_PI, TRACKS, gpField, gpTrack } from '../game/kart'
 import { gpClearPi } from '../game/gpBeat'
 import { look as kartLook } from './ArcadeBits'
 import { TOUR_RACES, tourLeg, tourLegOf, tourIsBoss, tourRivalPi, tourShift, tourSkills, tourRivalName, tourPrize, tourLegBonus } from '../game/tour'
@@ -80,6 +80,18 @@ function gpKartField(series: GpSeries, round: number, rival: Rival, car: OwnedCa
     return { name: f.name, pi: f.pi, ai: true, skill: f.skill, look: kartLook({ uid: '', model: c.id, color: f.name === rival.town ? rival.color : c.colors[i % c.colors.length], upgrades: zero }) }
   })
 }
+
+// Bumper Blast: five rivals in random cars, every kart tuned the same (game/kart.ts BLAST_PI).
+const BLASTERS = ['Crash Carla', 'Dent Dexter', 'Fender Fran', 'Wreck Rex', 'Smash Sami', 'Bonk Benny', 'Crunch Cleo', 'Rumble Ray']
+function blastField(car: OwnedCar): KartRacer[] {
+  const names = [...BLASTERS].sort(() => Math.random() - 0.5)
+  const field: KartRacer[] = Array.from({ length: 5 }, (_, i) => {
+    const c = CARS[Math.floor(Math.random() * CARS.length)]
+    return { name: names[i], pi: BLAST_PI, ai: true, skill: 0.45 + i * 0.1, look: kartLook({ uid: '', model: c.id, color: c.colors[i % c.colors.length], upgrades: zero }) }
+  })
+  return [...field, playerRacer(car)]
+}
+const blastSetup = (car: OwnedCar) => ({ track: Math.floor(Math.random() * TRACKS.length), reverse: Math.random() < 0.5, field: blastField(car) })
 
 // The car PI the series' final race needs before the server will accept the clear (0 before the final).
 export function gpFinalNeed(series: GpSeries, clears: number, round: number) {
@@ -189,6 +201,7 @@ export function RacePanel() {
   const [eRace, setERace] = useState<{ race: number; rival: Rival; prize: number } | null>(null)
   const [pRace, setPRace] = useState<{ def: PaintRival; rival: Rival; prize: number } | null>(null)
   const [kRace, setKRace] = useState<{ def: TunerTrial; rival: Rival; prize: number } | null>(null)
+  const [blast, setBlast] = useState<{ track: number; reverse: boolean; field: KartRacer[] } | null>(null)
   const tuner = useGame((s) => s.tuner)
   const [trialSel, setTrialSel] = useState(() => firstTrialPick(useGame.getState().tuner))
   const rivalRow = useGame((s) => s.rivalRow)
@@ -298,11 +311,30 @@ export function RacePanel() {
         track={def}
         reverse={reverse}
         field={gpRace.field}
+        rules={{ obstacles: reverse }}
         next={gpNext(gpRace.series)}
         prize={gpRace.prize}
         title={`${GP_CUP[GP_SERIES.indexOf(gpRace.series)] ?? '🏆'} ${round + 1}/${GP_ROUNDS} · ${def.icon} ${def.short}${reverse ? ' ↺' : ''}`}
         onFinish={(place) => gpResult(gpRace.series.id, place === 1)}
         onExit={() => { setGpRace(null); setTab('gp') }}
+      />
+    )
+  }
+
+  if (blast && car) {
+    const def = TRACKS[blast.track]
+    return (
+      <KartGame
+        key={seq}
+        car={car}
+        track={def}
+        reverse={blast.reverse}
+        field={blast.field}
+        rules={{ blast: true }}
+        next={{ label: '↻ Again', go: () => { setBlast(null); startBlast() } }}
+        title={`💥 Bumper Blast · ${def.icon} ${def.short}`}
+        onFinish={() => {}}
+        onExit={() => setBlast(null)}
       />
     )
   }
@@ -500,6 +532,12 @@ export function RacePanel() {
     setSeq((n) => n + 1)
     setERace({ race: p.won, rival: eventRival(p.pi, p.won), prize: eventPrize(p.pi, p.won) })
   }
+  // Free to play and no prize: it's a party mode, every kart the same.
+  function startBlast() {
+    if (waiting() || !car) return
+    setSeq((n) => n + 1)
+    setBlast(blastSetup(car))
+  }
   function startGp(series: GpSeries, rival: Rival, prize: number) {
     if (waiting() || !car) return
     const round = Number(rival.id.split('-').pop())
@@ -563,7 +601,7 @@ export function RacePanel() {
     <Panel title={TITLES[tab]} wide className="race-panel" onBack={tab === 'hub' ? undefined : () => setTab('hub')} head={chip && <span className="rm-head-chip">{chip}</span>}>
       <div className={`rm-screen rm-s-${tab}`}>
         {tab === 'hub' ? (
-          <RaceHub onOpen={setTab} onCampaign={startCampaign} onTour={startTour} onEvent={startEvent} onRival={(m) => startRival(m)} />
+          <RaceHub onOpen={setTab} onCampaign={startCampaign} onTour={startTour} onEvent={startEvent} onRival={(m) => startRival(m)} onBlast={startBlast} />
         ) : tab === 'rivals' ? (
           <PaintRivals sel={rowSel} setSel={setRowSel} car={car} />
         ) : tab === 'tuner' ? (
