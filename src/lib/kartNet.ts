@@ -21,7 +21,7 @@ const MAX_EXTRAP = 0.35
 export const QUIET = 5 // seconds without a snapshot before a player counts as gone
 
 // One kart in a snapshot. Positions and timers, rounded to keep messages small.
-const F = ['x', 'z', 'y', 'h', 'vx', 'vz', 'vy', 'steer', 'drift', 'charge', 'boost', 'spin', 'spinYaw', 'shield', 'flat', 'smoke', 'emp', 'tow', 'towTarget', 'lap', 'idx', 'done', 'air'] as const
+const F = ['x', 'z', 'y', 'h', 'vx', 'vz', 'vy', 'steer', 'drift', 'charge', 'boost', 'spin', 'spinYaw', 'shield', 'flat', 'smoke', 'emp', 'tow', 'ghost', 'splat', 'rocket', 'towTarget', 'lap', 'idx', 'done', 'air'] as const
 type Field = (typeof F)[number]
 const r2 = (v: number) => Math.round(v * 100) / 100
 
@@ -36,7 +36,7 @@ type Snap = { t: number; v: number[] }
 
 // Anything from another browser gets checked before it touches the race.
 const fin = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
-const LIMIT: Partial<Record<Field, number>> = { x: 2000, z: 2000, y: 40, vx: 80, vz: 80, vy: 80, steer: 1, drift: 1, charge: 5, boost: 3, spin: 2, shield: 9, flat: 5, smoke: 3, emp: 3, tow: 4 }
+const LIMIT: Partial<Record<Field, number>> = { x: 2000, z: 2000, y: 40, vx: 80, vz: 80, vy: 80, steer: 1, drift: 1, charge: 5, boost: 3, spin: 2, shield: 9, flat: 5, smoke: 3, emp: 3, tow: 4, ghost: 4, splat: 4, rocket: 4 }
 function cleanSnap(raw: unknown, n: number): { id: number; v: number[] } | null {
   if (!Array.isArray(raw) || raw.length !== F.length + 1 || !raw.every(fin)) return null
   const id = raw[0]
@@ -60,7 +60,7 @@ function cleanNote(raw: unknown, n: number): KartNote | null {
   if (!fin(kart) || kart < 0 || kart >= n) return null
   if (o.k === 'crate') return fin(o.i) ? { k: 'crate', kart, i: o.i } : null
   if (o.k === 'item' && typeof o.item === 'string' && o.item in ITEMS && fin(o.x) && fin(o.z) && fin(o.h) && fin(o.id) && fin(o.target)) {
-    const targets = Array.isArray(o.targets) ? o.targets.filter((t): t is number => fin(t) && t >= 0 && t < n).slice(0, 3) : undefined
+    const targets = Array.isArray(o.targets) ? o.targets.filter((t): t is number => fin(t) && t >= 0 && t < n).slice(0, FIELD) : undefined
     return { k: 'item', kart, item: o.item as ItemId, x: o.x, z: o.z, h: o.h, id: o.id, target: o.target >= 0 && o.target < n ? o.target : -1, targets }
   }
   return null
@@ -139,7 +139,9 @@ export class KartLink {
       if (!n || (n.k !== 'gone' && this.owners[n.kart] !== p.from)) continue
       // An item needs a crate behind it.
       if (n.k === 'crate') this.picked[n.kart] = Math.min(2, this.picked[n.kart] + 1)
-      if (n.k === 'item') {
+      // A Nitro Triple's later cans ride on the crate its first can used up (they only boost
+      // the kart that uses them, which its own snapshots carry anyway).
+      if (n.k === 'item' && !(n.item === 'nitro3' && n.target < 2)) {
         if (this.picked[n.kart] <= 0) continue
         this.picked[n.kart]--
       }

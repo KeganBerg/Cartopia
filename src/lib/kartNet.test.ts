@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { FIELD, KartRace, TRACKS, buildTrack, gpField, idleInput, type KartInput } from '../game/kart'
-import { KartLink, type NetChannel } from './kartNet'
+import { KartLink, packKart, type NetChannel } from './kartNet'
 
 // A fake broadcast channel between two browsers: each message arrives after 50-130 ms
 // of race time, in order per sender, unless the sender has been cut off.
@@ -158,11 +158,41 @@ describe('live kart netcode', () => {
     expect(b.karts[4].emp).toBeGreaterThan(0)
     b.karts[4].emp = 0
     // A snapshot pointing a tow at a kart that doesn't exist, then silence: the takeover drives on.
-    const v = [5, ...Array(23).fill(0)]
-    v[18] = 2 // tow
-    v[19] = 99 // towTarget
-    raw.onSnap({ t: b.t + 1, from: 'host', k: [v] })
-    lb.show()
-    expect(b.karts[5].towTarget).toBe(-1)
+    const bad = packKart({ ...b.karts[5], tow: 3.25, towTarget: 99 })
+    const tow = bad.indexOf(3.25) - 1, target = bad.indexOf(99) - 1 // slots in the snapshot after the id
+    raw.onSnap({ t: b.t + 1, from: 'host', k: [bad] })
+    const got = (lb as unknown as { bufs: { v: number[] }[][] }).bufs[5].at(-1)!.v
+    expect(got[tow]).toBe(3.25) // the snapshot did land...
+    expect(got[target]).toBe(-1) // ...without its bad target
+  })
+
+  it('the second batch of items crosses over: splats, bombs and a Nitro Triple\'s cans', () => {
+    const { a, b, la, lb, bus, step } = setup()
+    step(3)
+    const raw = lb as unknown as { onNotes: (p: unknown) => void }
+    // The host's kart splats the guest's (just ahead of it, say).
+    raw.onNotes({ from: 'host', n: [{ k: 'crate', kart: 5, i: 0 }, { k: 'item', kart: 5, item: 'splat', x: 0, z: 0, h: 0, id: 10, target: -1, targets: [4] }] })
+    expect(b.karts[4].splat).toBeGreaterThan(0)
+    // A Nitro Triple: one crate pays for all three cans, and a fourth "first can" needs another.
+    const can = (id: number, left: number) => ({ k: 'item', kart: 5, item: 'nitro3', x: 0, z: 0, h: 0, id, target: left })
+    const items = () => b.events.filter((e) => e.kind === 'item' && e.kart === 5).length
+    b.events = []
+    raw.onNotes({ from: 'host', n: [{ k: 'crate', kart: 5, i: 1 }, can(11, 2), can(12, 1), can(13, 0), can(14, 2)] })
+    expect(items()).toBe(3)
+    // A bumper bomb the host throws lands on both tracks in the same spot.
+    const host = a.karts[5]
+    host.item = 'bomb'
+    a.notes.push({ k: 'crate', kart: 5, i: 2 })
+    a.useItem(host, a.order())
+    const bomb = a.bombs[0]
+    la.tick()
+    bus.now += 0.2
+    bus.deliver()
+    expect(b.bombs.length).toBe(1)
+    expect(Math.hypot(b.bombs[0].x - bomb.x, b.bombs[0].z - bomb.z)).toBeLessThan(0.01)
+    // Ghost, splat and rocket timers ride the snapshots.
+    a.karts[5].ghost = 2
+    step(0.5)
+    expect(b.karts[5].ghost).toBeGreaterThan(0)
   })
 })

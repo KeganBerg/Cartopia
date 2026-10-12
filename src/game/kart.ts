@@ -130,11 +130,14 @@ const along = (t: Track, i: number, x: number, z: number) => (x - t.x[i]) * t.tx
 
 // ---------- karts ----------
 
-export type ItemId = 'nitro' | 'oil' | 'hornet' | 'shield' | 'tow' | 'tacks' | 'smoke' | 'emp'
+export type ItemId = 'nitro' | 'oil' | 'hornet' | 'shield' | 'tow' | 'tacks' | 'smoke' | 'emp' | 'nitro3' | 'ghost' | 'bomb' | 'splat' | 'rocket'
 // Invented names and looks. Power-ups: a can of nitro, a bubble shield, a tow magnet that
 // reels you up to the kart ahead. Debuffs for others: an oil slick (spin), a homing hornet
 // drone (spin), a tack strip (flat tyre), a smoke bomb (slow, can't see) and a static
-// storm that zaps the karts ahead (no boost, no items).
+// storm that zaps the karts ahead (no boost, no items). The second batch: three nitro cans
+// in one, a phantom mode that drives through karts and hazards, a bumper bomb lobbed up the
+// road, a paint splat over the screens of everyone ahead and a rocket ride that drives
+// itself up the field, bowling karts aside.
 export const ITEMS: Record<ItemId, { name: string; icon: string }> = {
   nitro: { name: 'Nitro Can', icon: '🧪' },
   oil: { name: 'Oil Slick', icon: '🛢️' },
@@ -144,6 +147,11 @@ export const ITEMS: Record<ItemId, { name: string; icon: string }> = {
   tacks: { name: 'Tack Strip', icon: '📌' },
   smoke: { name: 'Smoke Bomb', icon: '💨' },
   emp: { name: 'Static Storm', icon: '⚡' },
+  nitro3: { name: 'Nitro Triple', icon: '🔥' },
+  ghost: { name: 'Phantom Mode', icon: '👻' },
+  bomb: { name: 'Bumper Bomb', icon: '💣' },
+  splat: { name: 'Paint Splat', icon: '🎨' },
+  rocket: { name: 'Rocket Ride', icon: '🚀' },
 }
 
 // How often each item comes out of a crate, from the leader's odds to last place's.
@@ -151,15 +159,17 @@ export const ITEMS: Record<ItemId, { name: string; icon: string }> = {
 const ODDS: Record<ItemId, [number, number]> = {
   shield: [3, 0.4], oil: [3, 0.8], tacks: [2.2, 0.8], smoke: [2, 0.8],
   nitro: [1.2, 3.2], hornet: [0.4, 2.6], tow: [0.2, 2.8], emp: [0, 1.6],
+  ghost: [1.6, 1], bomb: [1.4, 1.4], splat: [0, 1.6], nitro3: [0, 1.8], rocket: [0, 1.2],
 }
+// Catch-up items only the back half of the field draws: they never help a leader pull away.
+const BACK_HALF: ItemId[] = ['emp', 'splat', 'nitro3', 'rocket']
 export function itemOdds(rank: number, field = FIELD): Record<ItemId, number> {
   const back = field > 1 ? rank / (field - 1) : 0 // 0 leading, 1 last
   const w = {} as Record<ItemId, number>
   let sum = 0
   for (const id of Object.keys(ODDS) as ItemId[]) {
     const [a, b] = ODDS[id]
-    // The storm only comes to the back half: it never helps a leader pull away.
-    w[id] = id === 'emp' && back < 0.5 ? 0 : a + (b - a) * back
+    w[id] = BACK_HALF.includes(id) && back < 0.5 ? 0 : a + (b - a) * back
     sum += w[id]
   }
   for (const id of Object.keys(w) as ItemId[]) w[id] /= sum
@@ -169,6 +179,9 @@ export function itemOdds(rank: number, field = FIELD): Record<ItemId, number> {
 // Effects that last a while: seconds left on each.
 export const FLAT_TIME = 4, SMOKE_TIME = 1.6, EMP_TIME = 2.6, TOW_TIME = 3.2
 export const TOW_RANGE = 45
+export const GHOST_TIME = 3.5, SPLAT_TIME = 3.2, ROCKET_TIME = 3
+export const BOMB_R = 4.5 // blast radius
+const BOMB_FUSE = 0.8, BOMB_THROW = 20 // seconds in the air, track points ahead it lands
 
 export type KartStats = { top: number; acc: number }
 // Performance from PI, flattening out at the top so a big PI edge is worth a few
@@ -192,13 +205,17 @@ export type Kart = {
   skill: number // AI: 0..1, how neat its line and braking are
   spinYaw: number
   flat: number; smoke: number; emp: number; tow: number // effect timers, seconds left
+  ghost: number; splat: number; rocket: number
   towTarget: number // kart being reeled in, -1 for none
+  uses: number // cans left in a Nitro Triple
 }
 
 // id: unique across every browser in a live race (the dropping kart's id * 1e5 + a count).
 export type Hazard = { x: number; z: number; t: number; id?: number }
 export type Strip = Hazard & { h: number } // tack strip lying across the road
 export type Hornet = { x: number; z: number; from: number; target: number; t: number; id?: number }
+// A bumper bomb flies from where it was thrown (sx, sz) to where it lands, then goes off.
+export type Bomb = Hazard & { sx: number; sz: number; from: number; boom: boolean }
 
 // What happened to karts this browser drives that the other browsers in a live race need to
 // copy: an item used (with where it landed), a crate taken, a dropped hazard or hornet used up.
@@ -207,7 +224,7 @@ export type KartNote =
   | { k: 'crate'; kart: number; i: number }
   | { k: 'gone'; id: number }
 export type KartEvent = {
-  kind: 'bump' | 'wall' | 'boost' | 'item' | 'hit' | 'lap' | 'finish' | 'turbo' | 'jump' | 'land' | 'crate' | 'block' | 'flat' | 'smoke' | 'zap' | 'tow'
+  kind: 'bump' | 'wall' | 'boost' | 'item' | 'hit' | 'lap' | 'finish' | 'turbo' | 'jump' | 'land' | 'crate' | 'block' | 'flat' | 'smoke' | 'zap' | 'tow' | 'ghost' | 'splat' | 'rocket' | 'boom'
   kart: number; value?: number
 }
 export const SMOKE_R = 3.6
@@ -225,6 +242,7 @@ export class KartRace {
   hornets: Hornet[] = []
   tacks: Strip[] = []
   smoke: Hazard[] = []
+  bombs: Bomb[] = []
   crateTaken: number[]
   events: KartEvent[] = []
   rand: () => number
@@ -250,7 +268,7 @@ export class KartRace {
         x: track.x[i] + track.nx[i] * off, z: track.z[i] + track.nz[i] * off, y: 0, vx: 0, vz: 0, vy: 0, h: Math.atan2(track.tx[i], track.tz[i]),
         steer: 0, idx: i, lap: 0, done: null, drift: 0, charge: 0, boost: 0, spin: 0, shield: 0, item: null, itemHeld: false, bump: 0, offroad: false, air: false,
         lane: (this.rand() - 0.5) * track.half * 0.9, skill: f.skill ?? 0.8, spinYaw: 0,
-        flat: 0, smoke: 0, emp: 0, tow: 0, towTarget: -1,
+        flat: 0, smoke: 0, emp: 0, tow: 0, towTarget: -1, ghost: 0, splat: 0, rocket: 0, uses: 0,
       }
     })
   }
@@ -325,19 +343,36 @@ export class KartRace {
     if (!cruise && k.item && k.emp <= 0) {
       const rank = order.indexOf(k)
       const chaser = this.karts.some((o) => o !== k && wrapI(k.idx - o.idx, t.n) < 14 && Math.abs(this.progress(o) - this.progress(k)) < 0.5)
-      if (k.item === 'nitro' && Math.abs(bend) < 0.15) inp.item = true
-      else if ((k.item === 'hornet' || k.item === 'emp') && rank > 0) inp.item = true
+      if ((k.item === 'nitro' || k.item === 'nitro3') && Math.abs(bend) < 0.15) inp.item = true
+      else if ((k.item === 'hornet' || k.item === 'emp' || k.item === 'splat' || k.item === 'rocket') && rank > 0) inp.item = true
+      else if (k.item === 'bomb' && (rank === 0 || this.karts.some((o) => o !== k && o.done === null && wrapI(o.idx - k.idx, t.n) > 10 && wrapI(o.idx - k.idx, t.n) < 30))) inp.item = true
+      else if (k.item === 'ghost' && (this.hornets.some((h) => h.target === k.id) || this.dangerAhead(k) || (chaser && rank === 0))) inp.item = true
       else if ((k.item === 'oil' || k.item === 'tacks' || k.item === 'smoke') && chaser) inp.item = true
       else if (k.item === 'tow' && rank > 0 && this.towTargetFor(k, order) >= 0) inp.item = true
       else if (k.item === 'shield') inp.item = true
     }
+    // Paint on the visor: the line wanders until it wipes off.
+    if (k.splat > 0 && !cruise) inp.steer = Math.max(-1, Math.min(1, inp.steer + Math.sin(this.t * 4.3 + k.id * 1.7) * 0.45))
     return inp
+  }
+
+  // An oil slick, tack strip or smoke cloud on the road just ahead.
+  dangerAhead(k: Kart) {
+    const fx = Math.sin(k.h), fz = Math.cos(k.h)
+    const near = (h: Hazard) => {
+      const dx = h.x - k.x, dz = h.z - k.z
+      const a = dx * fx + dz * fz
+      return a > 2 && a < 16 && Math.abs(dx * fz - dz * fx) < 2.5
+    }
+    return this.oil.some(near) || this.tacks.some(near) || this.smoke.some(near)
   }
 
   // ---------- physics ----------
 
   drive(k: Kart, inp: KartInput, dt: number, order: Kart[]) {
     const t = this.track
+    // Rocket ride: the rocket does the driving (the AI's line, flat out).
+    if (k.rocket > 0 && k.spin <= 0) inp = { ...this.autoInput(k, order, true), gas: 1, brake: 0, drift: false, item: false }
     const fx = Math.sin(k.h), fz = Math.cos(k.h)
     const sx = fz, sz = -fx // left
     let vf = k.vx * fx + k.vz * fz
@@ -351,7 +386,10 @@ export class KartRace {
     if (k.flat > 0) top *= 0.74
     if (k.smoke > 0) top *= 0.84
     if (k.emp > 0) top *= 0.68
-    if (k.boost > 0) top *= 1.32
+    if (k.splat > 0) top *= 0.94
+    if (k.ghost > 0) top *= 1.1
+    if (k.rocket > 0) top = k.stats.top * 1.45
+    else if (k.boost > 0) top *= 1.32
     else if (k.tow > 0) top *= 1.26
     k.boost = Math.max(0, k.boost - dt)
     k.shield = Math.max(0, k.shield - dt)
@@ -361,6 +399,9 @@ export class KartRace {
     k.emp = Math.max(0, k.emp - dt)
     k.tow = Math.max(0, k.tow - dt)
     if (k.tow <= 0) k.towTarget = -1
+    k.ghost = Math.max(0, k.ghost - dt)
+    k.splat = Math.max(0, k.splat - dt)
+    k.rocket = Math.max(0, k.rocket - dt)
 
     if (k.spin > 0) {
       k.spin -= dt
@@ -371,7 +412,7 @@ export class KartRace {
       k.charge = 0
       if (k.spin <= 0) k.spinYaw = 0
     } else {
-      if (k.boost > 0 || (k.tow > 0 && inp.gas > 0)) vf += (top - vf) * Math.min(1, dt * (k.boost > 0 ? 4 : 2.5))
+      if (k.boost > 0 || k.rocket > 0 || (k.tow > 0 && inp.gas > 0)) vf += (top - vf) * Math.min(1, dt * (k.boost > 0 || k.rocket > 0 ? 4 : 2.5))
       else if (inp.gas > 0 && vf < top) vf += k.stats.acc * inp.gas * Math.max(0.15, 1 - vf / top) * dt
       else if (vf > top) vf += (top - vf) * Math.min(1, dt * 2)
       if (inp.brake > 0) vf = vf > 0.5 ? vf - 22 * inp.brake * dt : Math.max(-top * 0.35, vf - 7 * inp.brake * dt)
@@ -486,7 +527,10 @@ export class KartRace {
         this.crateTaken[ci] = this.t
         this.notes.push({ k: 'crate', kart: k.id, i: ci })
         this.events.push({ kind: 'crate', kart: k.id })
-        if (!k.item && k.done === null) k.item = this.rollItem(order.indexOf(k))
+        if (!k.item && k.done === null) {
+          k.item = this.rollItem(order.indexOf(k))
+          k.uses = k.item === 'nitro3' ? 3 : 1
+        }
       }
     })
 
@@ -525,14 +569,22 @@ export class KartRace {
 
   useItem(k: Kart, order: Kart[]) {
     const item = k.item!
-    k.item = null
+    // A Nitro Triple stays in the slot until its third can.
+    k.uses = Math.max(0, k.uses - 1)
+    if (item !== 'nitro3' || k.uses <= 0) k.item = null
     this.events.push({ kind: 'item', kart: k.id })
     const rank = order.indexOf(k)
     const id = k.id * 1e5 + ++this.seq
     let target = -1, targets: number[] | undefined
     if (item === 'nitro') k.boost = Math.max(k.boost, 1.6)
+    else if (item === 'nitro3') { k.boost = Math.min(3, k.boost + 1.1); target = k.uses } // cans used back to back stack up
     else if (item === 'shield') k.shield = 8
-    else if (item === 'tow') {
+    else if (item === 'ghost') { k.ghost = GHOST_TIME; this.events.push({ kind: 'ghost', kart: k.id }) }
+    else if (item === 'rocket') { k.rocket = ROCKET_TIME; k.drift = 0; k.charge = 0; this.events.push({ kind: 'rocket', kart: k.id }) }
+    else if (item === 'splat') {
+      // Everyone ahead still racing gets a faceful.
+      targets = order.slice(0, Math.max(0, rank)).filter((o) => o.done === null).map((o) => o.id)
+    } else if (item === 'tow') {
       // With nobody in reach it still gives a short shove, so it's never a dud.
       k.tow = TOW_TIME
       k.towTarget = target = this.towTargetFor(k, order)
@@ -558,7 +610,16 @@ export class KartRace {
     else if (n.item === 'tacks') this.tacks.push({ x: bx, z: bz, t: this.t, h: n.h, id: n.id })
     else if (n.item === 'smoke') this.smoke.push({ x: n.x - Math.sin(n.h) * 3, z: n.z - Math.cos(n.h) * 3, t: this.t, id: n.id })
     else if (n.item === 'hornet' && n.target >= 0) this.hornets.push({ x: n.x, z: n.z, from: n.kart, target: n.target, t: this.t, id: n.id })
-    else if (n.item === 'emp') for (const i of n.targets ?? []) if (this.owned(i)) this.hit(this.karts[i], 'zap')
+    else if (n.item === 'emp' || n.item === 'splat') {
+      for (const i of n.targets ?? []) if (this.owned(i)) this.hit(this.karts[i], n.item === 'emp' ? 'zap' : 'splat')
+    } else if (n.item === 'bomb') {
+      // Lobbed up the road: lands on the line BOMB_THROW points on, at the thrower's offset.
+      const t = this.track
+      const i0 = locate(t, n.x, n.z, this.karts[n.kart]?.idx ?? 0, 40)
+      const off = Math.max(-t.half + 1, Math.min(t.half - 1, lateral(t, i0, n.x, n.z)))
+      const i = wrapI(i0 + BOMB_THROW, t.n)
+      this.bombs.push({ sx: n.x, sz: n.z, x: t.x[i] + t.nx[i] * off, z: t.z[i] + t.nz[i] * off, t: this.t, from: n.kart, boom: false, id: n.id })
+    }
   }
 
   // A live race's note from another browser.
@@ -581,10 +642,13 @@ export class KartRace {
     if (h.id !== undefined) this.notes.push({ k: 'gone', id: h.id })
   }
 
-  hit(k: Kart, how: 'spin' | 'flat' | 'zap' | 'smoke' = 'spin') {
+  hit(k: Kart, how: 'spin' | 'flat' | 'zap' | 'smoke' | 'splat' = 'spin') {
+    // A phantom or a rocket can't be touched.
+    if (k.ghost > 0 || k.rocket > 0) return
     if (k.shield > 0) { k.shield = 0; this.events.push({ kind: 'block', kart: k.id }); return }
     if (how === 'flat') { k.flat = FLAT_TIME; this.events.push({ kind: 'flat', kart: k.id }); return }
     if (how === 'zap') { k.emp = EMP_TIME; k.boost = 0; k.tow = 0; this.events.push({ kind: 'zap', kart: k.id }); return }
+    if (how === 'splat') { k.splat = SPLAT_TIME; this.events.push({ kind: 'splat', kart: k.id }); return }
     if (how === 'smoke') {
       if (k.smoke <= 0) this.events.push({ kind: 'smoke', kart: k.id })
       k.smoke = SMOKE_TIME
@@ -599,7 +663,7 @@ export class KartRace {
   updateItems(dt: number) {
     this.oil = this.oil.filter((o) => {
       if (this.t - o.t > 25) return false
-      const victim = this.karts.find((k) => this.owned(k.id) && k.spin <= 0 && k.y < 0.5 && (k.x - o.x) ** 2 + (k.z - o.z) ** 2 < 1.1 ** 2 && this.t - o.t > 0.4)
+      const victim = this.karts.find((k) => this.owned(k.id) && k.spin <= 0 && k.ghost <= 0 && k.rocket <= 0 && k.y < 0.5 && (k.x - o.x) ** 2 + (k.z - o.z) ** 2 < 1.1 ** 2 && this.t - o.t > 0.4)
       if (victim) { this.hit(victim); this.used(o); return false }
       return true
     })
@@ -607,7 +671,7 @@ export class KartRace {
     this.tacks = this.tacks.filter((s) => {
       if (this.t - s.t > 25) return false
       const victim = this.karts.find((k) => {
-        if (!this.owned(k.id) || k.y > 0.4 || k.flat > 0 || this.t - s.t < 0.4) return false
+        if (!this.owned(k.id) || k.y > 0.4 || k.flat > 0 || k.ghost > 0 || k.rocket > 0 || this.t - s.t < 0.4) return false
         const dx = k.x - s.x, dz = k.z - s.z
         const along = dx * Math.sin(s.h) + dz * Math.cos(s.h), across = dx * Math.cos(s.h) - dz * Math.sin(s.h)
         return Math.abs(along) < 0.7 && Math.abs(across) < 1.3 + KART_R * 0.6
@@ -623,11 +687,25 @@ export class KartRace {
       const r = SMOKE_R * Math.min(1, 0.6 + age * 0.4)
       for (const k of this.karts) {
         if ((k.x - c.x) ** 2 + (k.z - c.z) ** 2 < r * r && k.y < 2) {
-          if (k.shield > 0 || !this.owned(k.id)) continue
+          if (k.shield > 0 || k.ghost > 0 || k.rocket > 0 || !this.owned(k.id)) continue
           this.hit(k, 'smoke')
         }
       }
       return true
+    })
+    // Bombs: fly, land, go off. Everyone this browser drives inside the blast spins out (the
+    // thrower too, if they drove into it). The blast lingers on screen a moment after.
+    this.bombs = this.bombs.filter((b) => {
+      const age = this.t - b.t
+      if (!b.boom && age >= BOMB_FUSE) {
+        b.boom = true
+        this.events.push({ kind: 'boom', kart: b.from })
+        for (const k of this.karts) {
+          if (!this.owned(k.id) || k.y > 2.5 || (k.x - b.x) ** 2 + (k.z - b.z) ** 2 > BOMB_R * BOMB_R) continue
+          this.hit(k)
+        }
+      }
+      return age < BOMB_FUSE + 0.6
     })
     this.hornets = this.hornets.filter((h) => {
       const k = this.karts[h.target]
@@ -654,10 +732,15 @@ export class KartRace {
       const mp = this.owned(p.id) ? 1 : 0, mq = this.owned(q.id) ? 1 : 0
       if (!mp && !mq) continue
       const wp = mp / (mp + mq) * 2, wq = mq / (mp + mq) * 2
-      if (Math.abs(p.y - q.y) > 0.8) continue
+      if (Math.abs(p.y - q.y) > 0.8 || p.ghost > 0 || q.ghost > 0) continue
       const dx = q.x - p.x, dz = q.z - p.z
       const d = Math.hypot(dx, dz)
       if (d >= KART_R * 2 || d < 1e-4) continue
+      // A rocket bowls through: whoever it touches spins out (decided by the victim's browser).
+      if (p.rocket > 0 || q.rocket > 0) {
+        if (p.rocket > 0 && q.rocket <= 0 && mq && q.spin <= 0) this.hit(q)
+        if (q.rocket > 0 && p.rocket <= 0 && mp && p.spin <= 0) this.hit(p)
+      }
       const nx = dx / d, nz = dz / d
       const push = (KART_R * 2 - d) / 2
       p.x -= nx * push * wp; p.z -= nz * push * wp

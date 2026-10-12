@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DRIFT_ORANGE, FIELD, KartRace, LAPS, TRACKS, buildTrack, gpField, idleInput, itemOdds, kartStats, lateral, locate, type ItemId, type Kart } from './kart'
+import { BOMB_R, DRIFT_ORANGE, FIELD, GHOST_TIME, KartRace, LAPS, TRACKS, buildTrack, gpField, idleInput, itemOdds, kartStats, lateral, locate, type ItemId, type Kart } from './kart'
 
 const ALL = TRACKS.flatMap((d) => [buildTrack(d, false), buildTrack(d, true)])
 
@@ -103,13 +103,14 @@ const shift = (race: KartRace, k: Kart, ahead: number) => {
 }
 
 describe('kart items', () => {
-  const CATCH: ItemId[] = ['nitro', 'hornet', 'tow', 'emp']
+  const CATCH: ItemId[] = ['nitro', 'hornet', 'tow', 'emp', 'nitro3', 'splat', 'rocket']
   const sum = (o: Record<ItemId, number>, ids: ItemId[]) => ids.reduce((a, id) => a + o[id], 0)
 
   it('leaders get defence, the back of the field gets the catch-up', () => {
     for (let r = 0; r < FIELD; r++) expect(Object.values(itemOdds(r)).reduce((a, b) => a + b)).toBeCloseTo(1)
     expect(itemOdds(0).emp).toBe(0)
     expect(itemOdds(1).emp).toBe(0)
+    for (const id of ['splat', 'nitro3', 'rocket'] as ItemId[]) expect(itemOdds(1)[id], id).toBe(0)
     expect(sum(itemOdds(0), CATCH)).toBeLessThan(0.25)
     expect(sum(itemOdds(FIELD - 1), CATCH)).toBeGreaterThan(0.6)
     for (let r = 1; r < FIELD; r++) expect(sum(itemOdds(r), CATCH)).toBeGreaterThan(sum(itemOdds(r - 1), CATCH))
@@ -214,5 +215,122 @@ describe('kart items', () => {
     c.item = 'hornet'
     race.useItem(c, race.order())
     expect(race.hornets.map((h) => h.target)).toEqual([b.id])
+  })
+})
+
+describe('kart items, second batch', () => {
+  // Karts driven by the test (not the AI, which would use whatever they hold).
+  const field = (n: number) => Array.from({ length: n }, (_, i) => ({ name: 'K' + i, pi: 50, ai: false, skill: 1 }))
+  const run = (race: KartRace, secs: number) => {
+    for (let f = 0; f < secs * 60; f++) race.step(1 / 60, race.karts.map((k) => ({ ...race.autoInput(k, race.order(), false), item: false })), true)
+  }
+
+  it('a Nitro Triple boosts three times, then the slot is empty', () => {
+    const race = new KartRace(RING, field(1), 1)
+    const k = race.karts[0]
+    run(race, 2)
+    k.item = 'nitro3'; k.uses = 3
+    for (let n = 0; n < 3; n++) {
+      expect(k.item).toBe('nitro3')
+      race.useItem(k, race.order())
+      expect(k.boost).toBeGreaterThan(1)
+      run(race, 1.5)
+    }
+    expect(k.item).toBe(null)
+    expect(race.notes.filter((x) => x.k === 'item').map((x) => (x as { target: number }).target)).toEqual([2, 1, 0])
+  })
+
+  it('Phantom Mode drives through karts and hazards untouched', () => {
+    const race = new KartRace(RING, field(2), 1)
+    const [a, b] = race.karts
+    run(race, 2)
+    a.item = 'ghost'
+    race.useItem(a, race.order())
+    expect(a.ghost).toBe(GHOST_TIME)
+    // Oil right under it, a hornet on it, and the other kart sat on top of it: nothing.
+    race.oil.push({ x: a.x, z: a.z, t: race.t - 1 })
+    race.hit(a)
+    race.step(1 / 60, [], true)
+    expect(a.spin).toBe(0)
+    expect(race.oil.length).toBe(1)
+    race.oil = []
+    b.x = a.x + 0.3; b.z = a.z; b.y = a.y; b.vx = 0; b.vz = 0
+    const bx = b.x
+    race.step(1 / 60, [], true)
+    expect(Math.abs(b.x - bx)).toBeLessThan(0.1)
+    // Once it wears off, the oil bites again.
+    a.ghost = 0
+    race.oil.push({ x: a.x, z: a.z, t: race.t - 1 })
+    race.step(1 / 60, [], true)
+    expect(a.spin).toBeGreaterThan(0)
+  })
+
+  it('a Bumper Bomb lands up the road and spins out whoever is near it', () => {
+    const race = new KartRace(RING, field(3), 1)
+    const [a, b, c] = race.karts
+    run(race, 2)
+    shift(race, b, 20)
+    shift(race, c, 60)
+    a.item = 'bomb'
+    race.useItem(a, race.order())
+    expect(race.bombs.length).toBe(1)
+    const bomb = race.bombs[0]
+    expect(Math.hypot(bomb.x - a.x, bomb.z - a.z)).toBeGreaterThan(10)
+    // Park b on the landing spot.
+    b.x = bomb.x + 1; b.z = bomb.z; b.vx = 0; b.vz = 0
+    for (let f = 0; f < 60; f++) { b.vx = 0; b.vz = 0; race.step(1 / 60, [], true) }
+    expect(Math.hypot(b.x - bomb.x, b.z - bomb.z)).toBeLessThan(BOMB_R)
+    expect(b.spin).toBeGreaterThan(0)
+    expect(c.spin).toBe(0)
+    expect(a.spin).toBe(0)
+  })
+
+  it('a Paint Splat hits everyone ahead (not through a shield) and costs the AI pace', () => {
+    const race = new KartRace(ALL[0], gpField(['A', 'B', 'C', 'D', 'E', 'F'], 2, 40, { name: 'Me', pi: 40 }).map((f) => ({ ...f, ai: true })), 3)
+    drive(race, 6)
+    const order = race.order()
+    for (const k of order) { k.shield = 0; k.ghost = 0; k.rocket = 0 }
+    order[1].shield = 5
+    order[4].item = 'splat'
+    race.useItem(order[4], order)
+    expect(order.map((k) => k.splat > 0)).toEqual([true, false, true, true, false, false])
+
+    const pace = (splat: boolean) => {
+      const r = new KartRace(ALL[0], [{ name: 'A', pi: 50, ai: true, skill: 1 }], 1)
+      drive(r, 3)
+      const p0 = r.progress(r.karts[0])
+      drive(r, 3, ([k]) => { if (splat) k.splat = 1 })
+      return r.progress(r.karts[0]) - p0
+    }
+    expect(pace(true)).toBeLessThan(pace(false) * 0.97)
+  })
+
+  it('a Rocket Ride drives itself up the field and bowls karts aside', () => {
+    const go = (rocket: boolean) => {
+      const race = new KartRace(ALL[0], field(1), 1)
+      const k = race.karts[0]
+      run(race, 2)
+      const p0 = race.progress(k)
+      if (rocket) { k.item = 'rocket'; race.useItem(k, race.order()) }
+      // No input at all: the rocket steers.
+      let hits = 0
+      for (let f = 0; f < 3 * 60; f++) { race.step(1 / 60, [rocket ? idleInput() : { ...race.autoInput(k, race.order(), false), item: false }], true); hits += race.events.filter((e) => e.kind === 'wall').length }
+      return { gone: (race.progress(k) - p0) * race.track.n, hits }
+    }
+    const plain = go(false), rocket = go(true)
+    expect(rocket.gone).toBeGreaterThan(plain.gone * 1.15)
+    expect(rocket.hits).toBeLessThanOrEqual(1)
+
+    // Through a kart and an oil slick: the kart spins, the rocket doesn't.
+    const race = new KartRace(RING, field(2), 1)
+    const [a, b] = race.karts
+    run(race, 2)
+    a.item = 'rocket'
+    race.useItem(a, race.order())
+    race.oil.push({ x: a.x, z: a.z, t: race.t - 1 })
+    b.x = a.x + 0.8; b.z = a.z
+    race.step(1 / 60, [], true)
+    expect(b.spin).toBeGreaterThan(0)
+    expect(a.spin).toBe(0)
   })
 })

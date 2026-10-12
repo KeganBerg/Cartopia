@@ -39,6 +39,11 @@
 .kt-haze { position: absolute; inset: 0; pointer-events: none; z-index: 1; background: radial-gradient(ellipse at 50% 60%, rgba(150, 150, 150, .45), rgba(110, 110, 110, .92) 75%); transition: opacity .3s; }
 .kt-zap { position: absolute; inset: 0; pointer-events: none; z-index: 1; box-shadow: inset 0 0 70px 18px rgba(179, 136, 255, .85); animation: kt-zap .09s steps(2) infinite; }
 @keyframes kt-zap { 50% { box-shadow: inset 0 0 40px 8px rgba(124, 77, 255, .5); } }
+.kt-splat { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 1; transition: opacity .3s; }
+.kt-splat svg { position: absolute; transform: translate(-50%, -50%) scale(2.2); filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .35)); }
+.kt-ghost { position: absolute; inset: 0; pointer-events: none; z-index: 1; box-shadow: inset 0 0 90px 24px rgba(209, 196, 233, .75); }
+.kt-item { position: relative; display: inline-grid; place-items: center; }
+.kt-uses { position: absolute; right: -14px; bottom: -12px; font: 800 15px/1 var(--font, system-ui); color: #fff; background: #ff6d00; border: 2px solid #fff; border-radius: 10px; padding: 2px 5px; }
 .kt.tall .kt-place b { font-size: 46px; }
 .kt.tall .kt-map { width: 112px; height: 104px; }
 /* Phones carry the item on the touch button; a tall desktop window keeps the slot, below the HUD. */
