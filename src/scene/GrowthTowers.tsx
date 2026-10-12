@@ -15,6 +15,7 @@ import { glowMats } from './dayNight'
 import { concreteTex, helipadTex, shutterTex, gravelTex } from './textures'
 import { Storefront, BrickFloors, StoneShaft, GlassDrum, WaterTank, GiantProp, Beacon, type Kit, type Giant } from './GrowthKit'
 import { PEOPLE_SIZED } from './keepShape'
+import { LAYER } from './layers'
 
 // The grown forms of shops and services (names in src/game/growth.ts). Level
 // 4-6 rebuilds the business as a bigger building of its kind (a brick walk-up
@@ -414,9 +415,9 @@ function PoliceModel({ def, ghost, m, win, bulb, level }: Props) {
       {[0, 1, 2].map((i) => <Box key={i} m={m} at={[0, 0.03 + i * 0.05, z + 0.57 - i * 0.1]} s={[1.0, 0.06 + i * 0.05, 0.12]} c="#e0e0e0" shadow={false} />)}
       {!ghost && [-0.32, 0.32].map((x) => <mesh key={x} position={[x, 0.78, z + 0.08]}><sphereGeometry args={[0.07, 10, 8]} /><meshStandardMaterial color="#42a5f5" emissive="#1e88e5" emissiveIntensity={0.6} /></mesh>)}
       {!ghost && (
-        <group position={[-1.3, 0.05, z + 0.4]}>
+        <group position={[-1.3, LAYER.lot, z + 0.4]}>
           <Upright>
-            <group rotation-y={Math.PI / 2}>
+            <group rotation-y={Math.PI / 2} userData={PEOPLE_SIZED}>
               <CarModel body="sedan" color="#fafafa" stripe="#1a237e" />
               <Box m={m} at={[-0.08, 0.6, -0.02]} s={[0.1, 0.05, 0.34]} c="#e0e0e0" />
               <Box m={m} at={[-0.08, 0.64, 0.088]} s={[0.096, 0.05, 0.116]} c="#e53935" />

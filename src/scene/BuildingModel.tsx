@@ -1303,8 +1303,10 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             <boxGeometry args={[0.5, 0.68, 0.02]} />
             {m('#eceff1')}
           </mesh>
-          <mesh position={[0, 0.03, F + 0.12]} receiveShadow>
-            <boxGeometry args={[0.6, 0.06, 0.22]} />
+          {/* Tall enough to stand clear of the sidewalk pavers (0.08) the
+              shop front meets, so it reads as a step, not a slab under them. */}
+          <mesh position={[0, 0.05, F + 0.12]} castShadow receiveShadow>
+            <boxGeometry args={[0.6, 0.1, 0.22]} />
             {m('#cfd8dc')}
           </mesh>
           {[-0.36, 0.36].map((x) => (
@@ -1419,8 +1421,8 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             </mesh>
           ))}</group>}
           {def.id === 'carwash' && !ghost && [-0.45, 0.45].map((x) => (
-            <mesh key={x} position={[x, 0.6, F + 0.15]} castShadow>
-              <cylinderGeometry args={[0.13, 0.13, 0.9, 10]} />
+            <mesh key={x} position={[x, 0.525, F + 0.15]} castShadow>
+              <cylinderGeometry args={[0.13, 0.13, 1.05, 10]} />
               <meshStandardMaterial color={x < 0 ? '#29b6f6' : '#ffca28'} roughness={1} />
             </mesh>
           ))}

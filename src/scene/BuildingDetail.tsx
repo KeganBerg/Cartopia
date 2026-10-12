@@ -637,7 +637,7 @@ function OilCases() {
     <group>
       <group position={[-0.12, 0, 0]}>
         <Box p={[0, 0.03, 0]} s={[0.26, 0.06, 0.16]}>{c('#a1887f')}</Box>
-        {[[-0.06, 0.11], [0.06, 0.11], [0, 0.19]].map(([x, y], i) => <Box key={i} p={[x, y, 0]} s={[0.11, 0.08, 0.13]} cast>{c('#ffb300')}</Box>)}
+        {[[-0.06, 0.1], [0.06, 0.1], [0, 0.18]].map(([x, y], i) => <Box key={i} p={[x, y, 0]} s={[0.11, 0.08, 0.13]} cast>{c('#ffb300')}</Box>)}
       </group>
       <group position={[0.2, 0, 0]}>
         <mesh position={[0, 0.16, 0]} castShadow><cylinderGeometry args={[0.09, 0.09, 0.3, 12]} />{c('#37474f')}</mesh>
@@ -723,7 +723,7 @@ export function GarageLot({ front }: { front: number }) {
     <group position-y={0.055}>
       <group position={[-1.6, 0, front + 0.3]}>
         {[0, 1, 2].map((i) => (
-          <mesh key={i} position={[0, 0.06 + i * 0.1, 0]} rotation-x={Math.PI / 2} castShadow>
+          <mesh key={i} position={[0, 0.05 + i * 0.1, 0]} rotation-x={Math.PI / 2} castShadow>
             <torusGeometry args={[0.12, 0.05, 8, 14]} />
             {c('#212121')}
           </mesh>

@@ -156,28 +156,33 @@ function distance(p: Piece, x: Vector3) {
   return d
 }
 
-// Whether a point on `a` comes within TOUCH of `b`'s solid.
+// How close counts as touching for the model being checked: TOUCH, grown with
+// a merged block (a 4x4 block draws every gap four times as wide).
+let touch = TOUCH
+// Whether a point on `a` comes within touch of `b`'s solid.
 function reaches(a: Piece, b: Piece) {
-  const near = b.box.clone().expandByScalar(TOUCH)
-  for (const x of a.pts!) if (near.containsPoint(x) && distance(b, x) <= TOUCH) return true
+  const near = b.box.clone().expandByScalar(touch)
+  for (const x of a.pts!) if (near.containsPoint(x) && distance(b, x) <= touch) return true
   return false
 }
 
 function touching(a: Piece, b: Piece, ea: Box3, eb: Box3) {
   if (!ea.intersectsBox(eb)) return false
-  if (a.ball && b.ball) return a.ball.center.distanceTo(b.ball.center) <= a.ball.radius + b.ball.radius + SNUG
-  if (a.ball && b.hull) return outside(b.hull, a.ball.center) <= a.ball.radius + SNUG
-  if (b.ball && a.hull) return outside(a.hull, b.ball.center) <= b.ball.radius + SNUG
+  if (a.ball && b.ball) return a.ball.center.distanceTo(b.ball.center) <= a.ball.radius + b.ball.radius + (SNUG * touch) / TOUCH
+  if (a.ball && b.hull) return outside(b.hull, a.ball.center) <= a.ball.radius + (SNUG * touch) / TOUCH
+  if (b.ball && a.hull) return outside(a.hull, b.ball.center) <= b.ball.radius + (SNUG * touch) / TOUCH
   // Crowds (instanced) are only known by their boxes.
   if (!a.pts || !b.pts || (!a.hull && !a.tris) || (!b.hull && !b.tris)) return true
   return reaches(a, b) || reaches(b, a)
 }
 
 // Every clump of touching pieces that no chain of touching pieces links to the
-// ground (y = 0), with how far it is from the nearest grounded piece.
-export function floating(root: Object3D, ground = TOUCH) {
+// ground (y = 0), with how far it is from the nearest grounded piece. `k` is
+// how much a merged block scales the model up (2 for a 2x2, 4 for a 4x4).
+export function floating(root: Object3D, ground = TOUCH, k = 1) {
+  touch = TOUCH * k
   const ps = pieces(root)
-  const big = ps.map((p) => p.box.clone().expandByScalar(TOUCH / 2))
+  const big = ps.map((p) => p.box.clone().expandByScalar(touch / 2))
   const held = ps.map((p) => p.box.min.y <= ground)
   const spread = (seed: number[], mark: boolean[], ok: (j: number) => boolean) => {
     const queue = [...seed]
@@ -249,24 +254,42 @@ export function nearest(root: Object3D, c: Clump) {
 // a wall passes there; up close at street level the gap and its shadow show.
 // A slab-like piece low down (its bottom between the lot paving and LOW, no
 // taller than SLAB, at least FOOT across) must sit on the lot paving
-// (LOT, see layers.ts) or on top of something under it, within REST.
+// (LOT, see layers.ts) or on top of something under it, within REST, or be
+// held at both ends (a shelf between two posts). A flat sheet (paint, a lily
+// pad) has no side to show a gap, so it may sit up to SHEET above what's under it.
 const LOT = 0.02
 const LOW = 0.2
 const SLAB = 0.12
 const FOOT = 0.1
+const SHEET = 0.02
 export const REST = 0.006
+const up = new Vector3()
 export function hovering(root: Object3D) {
   const ps = pieces(root).filter((p) => !p.ball)
   const out: Piece[] = []
+  const over = (a0: number, a1: number, b0: number, b1: number) => Math.min(a1, b1) - Math.max(a0, b0)
   for (const p of ps) {
     const b = p.box
     const lo = b.min.y
+    const flat = b.max.y - lo < 0.002
+    const rest = flat ? SHEET : REST
     if (lo <= LOT + REST || lo > LOW) continue
     if (b.max.y - lo > SLAB || Math.min(b.max.x - b.min.x, b.max.z - b.min.z) < FOOT) continue
-    const under = ps.some((q) => q !== p && q.box.min.y < lo - 1e-4 && q.box.max.y >= lo - REST &&
-      Math.min(b.max.x, q.box.max.x) - Math.max(b.min.x, q.box.min.x) > 0.01 &&
-      Math.min(b.max.z, q.box.max.z) - Math.max(b.min.z, q.box.min.z) > 0.01)
-    if (!under) out.push(p)
+    // Level slabs only: a tilted plank (a ramp, an arched bridge) leans on its neighbours.
+    if (up.setFromMatrixColumn(p.o.matrixWorld, 1).normalize().y < 0.995 && !flat) continue
+    const others = ps.filter((q) => q !== p && q.box.min.y < lo - 1e-4)
+    const under = others.some((q) => q.box.max.y >= lo - rest && over(b.min.x, b.max.x, q.box.min.x, q.box.max.x) > 0.01 && over(b.min.z, b.max.z, q.box.min.z, q.box.max.z) > 0.01)
+    if (under) continue
+    // Held at both ends: something coming up from below touches each end (the
+    // posts of a shelf, the next planks of an arched bridge).
+    const end = (axis: 'x' | 'z', side: -1 | 1) => others.some((q) => {
+      const cross = axis === 'x' ? 'z' : 'x'
+      if (q.box.max.y < lo || over(b.min[cross], b.max[cross], q.box.min[cross], q.box.max[cross]) <= 0) return false
+      const face = side < 0 ? b.min[axis] : b.max[axis]
+      return q.box.min[axis] <= face + REST && q.box.max[axis] >= face - REST && (side < 0 ? q.box.min[axis] < face : q.box.max[axis] > face)
+    })
+    if ((end('x', -1) && end('x', 1)) || (end('z', -1) && end('z', 1))) continue
+    out.push(p)
   }
   return out
 }

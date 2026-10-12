@@ -79,13 +79,13 @@ function SingleWide({ m, win, bulb, at, rot = 0, len = 1.45, color, stripe, ghos
       <mesh position={[0.15, 0.44, zf + 0.009]}><planeGeometry args={[0.09, 0.09]} />{win}</mesh>
       <Box m={m} at={[0.15, 0.64, zf + 0.17]} s={[0.46, 0.02, 0.34]} c="#cfd8dc" rot={[0.08, 0, 0]} />
       {[-0.06, 0.36].map((x) => <Cyl key={x} m={m} at={[x, 0.32, zf + 0.32]} r={0.01} h={0.64} c="#b0bec5" seg={5} />)}
-      <Box m={m} at={[0.15, 0.13, zf + 0.12]} s={[0.26, 0.04, 0.12]} c="#8d6e63" />
-      <Box m={m} at={[0.15, 0.06, zf + 0.22]} s={[0.26, 0.04, 0.1]} c="#8d6e63" />
+      <Box m={m} at={[0.15, 0.075, zf + 0.12]} s={[0.26, 0.15, 0.12]} c="#8d6e63" />
+      <Box m={m} at={[0.15, 0.04, zf + 0.23]} s={[0.26, 0.08, 0.1]} c="#8d6e63" />
       {!ghost && <mesh position={[0.32, 0.5, zf + 0.02]}><boxGeometry args={[0.05, 0.05, 0.04]} />{bulb}</mesh>}
       {/* Hitch tongue still on the end, a propane bottle and a window AC unit. */}
       <Box m={m} at={[-len / 2 - 0.08, 0.18, 0]} s={[0.22, 0.035, 0.05]} c="#37474f" rot={[0, 0.0, 0]} />
       <Cyl m={m} at={[-len / 2 - 0.16, 0.1, 0]} r={0.015} h={0.16} c="#37474f" seg={5} />
-      <group position={[-len / 2 + 0.05, 0.15, -zf - 0.08]}>
+      <group position={[-len / 2 + 0.05, 0, -zf - 0.08]}>
         <Cyl m={m} at={[0, 0.1, 0]} r={0.055} h={0.2} c="#fafafa" seg={10} />
         <Ball m={m} at={[0, 0.21, 0]} r={0.055} c="#fafafa" />
       </group>
@@ -120,7 +120,8 @@ function Grill({ m, at }: { m: Mat; at: V3 }) {
   return (
     <group position={at}>
       <mesh position={[0, 0.2, 0]} castShadow><sphereGeometry args={[0.07, 10, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />{m('#212121')}</mesh>
-      <mesh position={[0, 0.2, 0]} castShadow><sphereGeometry args={[0.07, 10, 4, 0, Math.PI * 2, 0, Math.PI / 3]} />{m('#263238')}</mesh>
+      {/* The lid sits on the bowl's rim. */}
+      <mesh position={[0, 0.165, 0]} castShadow><sphereGeometry args={[0.07, 10, 4, 0, Math.PI * 2, 0, Math.PI / 3]} />{m('#263238')}</mesh>
       {[0, 2.1, 4.2].map((a) => <Cyl key={a} m={m} at={[Math.sin(a) * 0.04, 0.08, Math.cos(a) * 0.04]} r={0.006} h={0.17} c="#424242" seg={4} />)}
     </group>
   )
@@ -220,7 +221,7 @@ function DoubleWide({ m, win, bulb, lvl, color, roof, trim, ghost }: { m: Mat; w
       {[-0.5, -0.1, 0.3, 0.6].map((x) => <Box key={x} m={m} at={[x, 0.06, zf + 0.416]} s={[0.04, 0.12, 0.04]} c="#795548" />)}
       <Box m={m} at={[-0.22, 0.3, zf + 0.43]} s={[0.66, 0.025, 0.025]} c="#8d6e63" />
       {[-0.5, -0.38, -0.26, -0.14, -0.02, 0.1].map((x) => <Box key={x} m={m} at={[x, 0.22, zf + 0.43]} s={[0.015, 0.16, 0.015]} c="#8d6e63" shadow={false} />)}
-      <Box m={m} at={[0.45, 0.08, zf + 0.52]} s={[0.26, 0.03, 0.14]} c="#8d6e63" />
+      <Box m={m} at={[0.45, 0.0475, zf + 0.51]} s={[0.26, 0.095, 0.14]} c="#8d6e63" />
       {/* Level 5: string lights over the deck. Level 6: a hot tub out back. */}
       {!ghost && lvl >= 5 && (
         <group>
@@ -359,7 +360,7 @@ function Tyres({ m, at, n }: { m: Mat; at: V3; n: number }) {
     <group position={at}>
       {Array.from({ length: n }, (_, i) => (
         <mesh key={i} position={[((i * 37) % 3) * 0.02, 0.05 + i * 0.09, ((i * 53) % 3) * 0.02]} rotation-x={Math.PI / 2} castShadow>
-          <torusGeometry args={[0.11, 0.045, 6, 12]} />
+          <torusGeometry args={[0.11, 0.045, 8, 12]} />
           {m('#263238')}
         </mesh>
       ))}
@@ -411,7 +412,7 @@ export function Crane({ m, at }: { m: Mat; at: V3 }) {
           {[-0.24, 0, 0.24].map((x) => <Cyl key={x} m={m} at={[x, 0.08, z]} r={0.055} h={0.13} c="#455a64" seg={8} rot={[Math.PI / 2, 0, 0]} />)}
         </group>
       ))}
-      <Cyl m={m} at={[0, 0.2, 0]} r={0.16} h={0.08} c="#37474f" seg={12} />
+      <Cyl m={m} at={[0, 0.19, 0]} r={0.16} h={0.08} c="#37474f" seg={12} />
       <group ref={top} userData={LIVE}>
         <Box m={m} at={[0.05, 0.36, 0]} s={[0.5, 0.24, 0.36]} c="#ffb300" />
         <Box m={m} at={[0.26, 0.33, 0]} s={[0.14, 0.2, 0.38]} c="#455a64" />

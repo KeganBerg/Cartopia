@@ -361,10 +361,11 @@ function KoiGarden({ m, bulb, ghost }: EdgeProps) {
         )}
       </group>
       {/* Red arched bridge across the narrow part. */}
-      <group position={[0.95, 0, -0.15]} rotation-y={0.5}>
+      {/* One piece when merged, so the planks stay a bridge; its end planks rest on the banks. */}
+      <group position={[0.95, 0, -0.15]} rotation-y={0.5} userData={{ whole: true }}>
         {Array.from({ length: 9 }, (_, i) => {
           const t = i / 8 - 0.5
-          return <Box key={i} m={m} at={[0, 0.12 + Math.cos(t * Math.PI) * 0.18, t * 0.9]} s={[0.36, 0.03, 0.11]} c="#8d6e63" rot={[-Math.sin(t * Math.PI) * 0.55, 0, 0]} />
+          return <Box key={i} m={m} at={[0, 0.06 + Math.cos(t * Math.PI) * 0.24, t * 0.9]} s={[0.36, 0.03, 0.11]} c="#8d6e63" rot={[-Math.sin(t * Math.PI) * 0.55, 0, 0]} />
         })}
         {[-0.19, 0.19].map((x) => (
           <group key={x}>

@@ -734,9 +734,10 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           ))}
           {/* A patrol car parked out front, light bar on the roof. */}
           {!ghost && (
-            <group position={[-1.25, 0.05, 0.72]}>
+            <group position={[-1.25, LAYER.lot, 0.72]}>
               <Upright>
-                <group rotation-y={Math.PI / 2}>
+                {/* Car and light bar kept true size together in a 2x2 or 4x4 block. */}
+                <group rotation-y={Math.PI / 2} userData={PEOPLE_SIZED}>
                   <CarModel body="sedan" color="#fafafa" stripe="#1a237e" />
                   <Box m={m} at={[-0.08, 0.6, -0.02]} s={[0.1, 0.05, 0.34]} c="#e0e0e0" />
                   <Box m={m} at={[-0.08, 0.64, 0.088]} s={[0.096, 0.05, 0.116]} c="#e53935" />

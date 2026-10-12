@@ -8,7 +8,7 @@ import { BuildingModel } from './BuildingModel'
 import { VanguardTower } from './Landmark'
 import { KeepShapes, MergeScale } from './mergeScale'
 import { limitFor } from './keepShape'
-import { describe, floating, hovering, REST } from './floating'
+import { describe, floating, hovering, REST, TOUCH } from './floating'
 import { groupScale, mergeable, type MergeGroup } from '../game/merge'
 import { sunDay } from '../game/sun'
 
@@ -50,9 +50,10 @@ group('nothing floats', () => {
         )
         await ReactThreeTestRenderer.act(async () => r.advanceFrames(2, 1 / 60))
         const at = `L${level}${tag(scale)}${time === MIDNIGHT ? ' night' : ''}`
-        for (const p of floating(r.scene.instance as Object3D)) bad.add(`${at}: ${describe(p)}`)
+        for (const p of floating(r.scene.instance as Object3D, TOUCH * scale[1], scale[1])) bad.add(`${at}: ${describe(p)}`)
         // Low slabs (steps, mats, ramps) sit right on the lot or what's under them, not just near it.
-        for (const p of hovering(r.scene.instance as Object3D)) bad.add(`${at}: hovers more than ${REST} up: ${describe({ ...p, n: 1, gap: p.box.min.y, members: [p] })}`)
+        // (A 2x2 or 4x4 block scales its slabs and their gaps alike; the contact check covers those.)
+        if (scale[1] === 1) for (const p of hovering(r.scene.instance as Object3D)) bad.add(`${at}: hovers more than ${REST} up: ${describe({ ...p, n: 1, gap: p.box.min.y, members: [p] })}`)
         await r.unmount()
         vi.restoreAllMocks()
       }
