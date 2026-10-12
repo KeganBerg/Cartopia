@@ -19,6 +19,7 @@ import { bake, finishOf, type Finish as Look } from './bake'
 import { carStyle, hasTrim, trimBike, trimCar, type CarStyle } from './carTrim'
 import { brakeGeo, wheelGeo, type RimStyle } from './carWheels'
 import { PEOPLE_SIZED } from './keepShape'
+import { EXOTIC } from './exoticCars'
 
 type Shape = {
   len: number; wid: number
@@ -95,6 +96,10 @@ const SHAPES: Record<Body, Shape> = {
   scooter: { len: 0.8, wid: 0.22, body: 0.16, lift: 0.1, cabinLen: 0, cabinH: 0, cabinZ: 0, taper: 1, hood: 0, wheel: 0.12, drop: 0, nose: 0 },
   chopper: { len: 1.04, wid: 0.22, body: 0.16, lift: 0.12, cabinLen: 0, cabinH: 0, cabinZ: 0, taper: 1, hood: 0, wheel: 0.16, drop: 0, nose: 0 },
   sportbike: { len: 0.94, wid: 0.22, body: 0.18, lift: 0.12, cabinLen: 0, cabinH: 0, cabinZ: 0, taper: 1, hood: 0, wheel: 0.16, drop: 0, nose: 0 },
+  // Exotics: drawn by exoticCars.ts; these numbers place the wheels and the bolt-on mods.
+  horseshoe: { len: 1.4, wid: 0.82, body: 0.22, lift: 0.07, cabinLen: 0.62, cabinH: 0.17, cabinZ: -0.06, taper: 0.45, fastback: 0.7, hood: 0, wheel: 0.145, drop: 0.03, nose: 0.08 },
+  teardrop: { len: 1.42, wid: 0.8, body: 0.21, lift: 0.07, cabinLen: 0.6, cabinH: 0.17, cabinZ: -0.08, taper: 0.4, fastback: 0.75, hood: 0, wheel: 0.145, drop: 0.03, nose: 0.1 },
+  scissor: { len: 1.38, wid: 0.8, body: 0.2, lift: 0.06, cabinLen: 0.6, cabinH: 0.16, cabinZ: -0.06, taper: 0.4, fastback: 0.7, hood: 0, wheel: 0.14, drop: 0.03, nose: 0.1 },
 }
 
 // Motorcycles. head = steering head [y, z]; seat = seat top [y, z].
@@ -316,7 +321,7 @@ function formulaGeo(key: string, fit: Partial<Record<ModSlot, string>>): CarGeo 
 }
 
 // A bucket seat: cushion, a raked back and a headrest, seen through the glass.
-function seat(k: Kit, x: number, y: number, z: number, w: number, back: number) {
+export function seat(k: Kit, x: number, y: number, z: number, w: number, back: number) {
   k.add('cabin', rbox1(w, 0.045, 0.11, 0.018), [x, y + 0.025, z + 0.045])
   k.add('cabin', rbox1(w, back, 0.04, 0.016), [x, y + back / 2 + 0.03, z - 0.02], [-0.18, 0, 0])
   // Side bolsters on the back, a shade darker.
@@ -325,7 +330,7 @@ function seat(k: Kit, x: number, y: number, z: number, w: number, back: number) 
 }
 
 // Steering wheel on its column, tilted toward the driver.
-function steering(k: Kit, x: number, y: number, z: number) {
+export function steering(k: Kit, x: number, y: number, z: number) {
   k.add('dash', new TorusGeometry(0.038, 0.008, 5, 16), [x, y, z], [-0.5, 0, 0])
   k.add('dash', box(0.07, 0.008, 0.008), [x, y, z], [-0.5, 0, 0])
   k.add('dash', cyl(0.01, 0.012, 0.08, 6), [x, y - 0.02, z + 0.04], [1.0, 0, 0])
@@ -367,7 +372,7 @@ function cabinInside(k: Kit, s: Shape, top: number, c: { front: number; rear: nu
 }
 
 // Brake rotors and calipers behind each wheel's spokes.
-function brakes(k: Kit, wx: number, wz: number, r: number, w: number) {
+export function brakes(k: Kit, wx: number, wz: number, r: number, w: number) {
   for (const z of [wz, -wz]) for (const sd of [-1, 1]) {
     const b = brakeGeo(r, w, sd)
     k.add('dash', b.rotor, [sd * wx, r, z])
@@ -382,6 +387,20 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
   if (hit) return hit
   if (body === 'formula') return formulaGeo(key, fit)
   const s = shapeOf(body)
+  const exotic = EXOTIC[body]
+  if (exotic) {
+    const k = new Kit()
+    exotic(k, fit, { seat, steering, brakes, bar })
+    const wheel = new CylinderGeometry(s.wheel, s.wheel, 0.14, 18, 1)
+    const uv = wheel.getAttribute('uv')
+    for (let i = 0; i < uv.count; i++) uv.setX(i, i < 38 ? 0.5 + uv.getX(i) * 0.5 : uv.getX(i) * 0.5)
+    wheel.rotateZ(Math.PI / 2)
+    const wz = s.len * 0.33
+    const cowl = s.cabinZ + s.cabinLen / 2
+    const out = { parts: k.build(), wheel, zones: [cowl, s.lift + s.body, wz - s.wheel * 1.3, -wz + s.wheel * 1.3] as Zones }
+    geoCache.set(key, out)
+    return out
+  }
   const k = new Kit()
   const b = s.round ? Math.min(0.1, s.body * 0.4) : 0.035
   const lower = bodyProfile(s, b)
@@ -1250,7 +1269,7 @@ function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight,
 }
 
 // A box stretched from a to b (a strut, a limb, a fork leg).
-function bar(k: Kit, part: Part, a: V3, b: V3, t: number) {
+export function bar(k: Kit, part: Part, a: V3, b: V3, t: number) {
   const d = new Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2])
   const q = new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), d.clone().normalize())
   const e = new Euler().setFromQuaternion(q)
