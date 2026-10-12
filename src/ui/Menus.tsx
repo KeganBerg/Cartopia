@@ -61,7 +61,7 @@ export function BottomBar() {
 }
 
 // The first couple of times, a one-line toast says how to steer.
-function toggleFreeCam(on: boolean) {
+export function toggleFreeCam(on: boolean) {
   setFreeCam(on)
   if (!on) return
   try {
@@ -74,12 +74,13 @@ function toggleFreeCam(on: boolean) {
   useGame.getState().toast(TOUCH ? 'Pinch to zoom · two fingers to turn and tilt' : 'WASD to fly · Space up, Shift down · Ctrl for speed')
 }
 
-// Switches the town between the bird's-eye view and the free camera.
-function FreeCamButton() {
+// Switches the town between the bird's-eye view and the free camera. Sits over
+// Goals at home, and on the visit banner in someone else's town.
+export function FreeCamButton({ className = 'goals-btn cam-dock' }: { className?: string }) {
   const on = useFreeCam((f) => f.on)
   const label = on ? "Back to bird's-eye view" : 'Free camera'
   return (
-    <button className={`goals-btn cam-dock${on ? ' on' : ''}`} onClick={() => toggleFreeCam(!on)} title={label} aria-label={label} aria-pressed={on}>
+    <button className={`${className}${on ? ' on' : ''}`} onClick={() => toggleFreeCam(!on)} title={label} aria-label={label} aria-pressed={on}>
       <Icon name={on ? 'birdseye' : 'orbit'} />
     </button>
   )
