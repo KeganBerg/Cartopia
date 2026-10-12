@@ -2,7 +2,7 @@
 // coins, a part for one of your cars, a car, or a body or part skin. Every car and part has one
 // home crate, picked by what it's worth (see homeCrate), so dearer crates hold dearer cars and
 // parts. Cars only come once your level has unlocked them, so a crate never skips a level gate. A signed-in player's crates are
-// rolled by the server (crate_open() in supabase/migrations/0040_crates.sql, same tables and
+// rolled by the server (crate_open(), newest copy in supabase/migrations/0072_crate_hats.sql, same tables and
 // rules); guests roll here. crates.test.ts keeps the server's tables in step.
 import { CARS, MODS, MOD_SKINS, SKINS, carDef, modDef, modFits, ownedMods, type CarDef, type ModDef, type SkinDef, type SkinTier } from './data'
 import { crateHats, hatDef } from './hats'
@@ -125,9 +125,8 @@ export const SKIN_DUPE: Record<SkinTier, number> = { rare: 0.6, epic: 1, legenda
 export type OwnedSkins = { skins: string[]; modSkins: string[]; hats?: string[] }
 
 // Hats (game/hats.ts crateHats): a slice of each crate, out of 100 like CrateOdds, taken from its
-// coin prizes. Only hats the player doesn't have drop; with none left it stays coins.
-// Guests only for now: the server's crate_open() has no hat slice yet, so it's kept out of
-// crateTables() and signed-in players' crates don't drop hats.
+// coin prizes. Only hats the player doesn't have drop; with none left it stays coins. The server
+// rolls the same slice (crateTables() hat and hats).
 export const HAT_ODDS: Record<CrateId, number> = { street: 3, garage: 4, gold: 6, diamond: 8 }
 
 type CarLike = { uid: string; model: string; mods?: string[] | null; ownedMods?: string[] | null }
@@ -264,6 +263,8 @@ export function crateTables() {
     crates: Object.fromEntries(CRATES.map((c) => [c.id, {
       pay: c.pay, unlock: c.unlockLevel, base: c.base, perLevel: c.perLevel, odds: c.odds,
       carShare: c.carShare, coinMult: c.coinMult, jackpotMult: c.jackpotMult, skins: c.skins, below: crateBelow(c)?.id ?? null,
+      // The hat slice (out of 100, taken from coins) and the hats it can give, in HATS order.
+      hat: HAT_ODDS[c.id], hats: crateHats(c.id).map((h) => h.id),
     }])),
     // Body skins by id, part skins by id: tier, and the level or collection set that also unlocks one.
     skinWeight: SKIN_WEIGHT,

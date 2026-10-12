@@ -4,7 +4,8 @@ import { setCrateOpener } from '../game/store'
 import type { CrateOpen } from '../game/crates'
 
 // A signed-in player's crates are opened by the server (crate_open() in
-// supabase/migrations/0040_crates.sql), so the save guard only pays prizes it really rolled.
+// supabase/migrations/0040_crates.sql, newest copy 0072_crate_hats.sql; hat prizes come back as
+// { kind: 'hat', hat } like the game's own), so the save guard only pays prizes it really rolled.
 // Guests roll in the browser.
 setCrateOpener(async (crate) => {
   if (!supabase || !signedInUser()) return null
