@@ -53,7 +53,7 @@ export function CommonExtras({ t }: { t: Track }) {
   const flagsClear = useMemo(() => flags.filter((f) => !nearZone(zones, f.x, f.z, 7)), [flags, zones])
   return (
     <group>
-      <Batch version={t.n + 11} cell={24}>
+      <Batch version={t.n + 11} cell={24} freeze>
         {pits.map((p) => (
           <group key={p.k} position={[p.x, 0, p.z]} rotation-y={p.ry}>
             <Box p={[0, 1.6, 0.8]} s={[4.6, 3.2, 4.4]} c="#eceff1" />
@@ -187,7 +187,7 @@ export function TownExtras({ t }: { t: Track }) {
   const PARK = ['fountain', 'playground', 'gazebo', 'picnic', 'pond', 'statue', 'flowers', 'hedge', 'bench', 'billboard', 'clocktower', 'flowers', 'picnic', 'hedge']
   return (
     <group>
-      <Batch version={t.n + 21} cell={24}>
+      <Batch version={t.n + 21} cell={24} freeze>
         {houses.map((h, i) => <B key={i} def="house" x={h.x} z={h.z} ry={face(h.x, h.z) + (h.r() - 0.5) * 0.3} />)}
         {park.map((p, i) => <B key={i} def={PARK[i % PARK.length]} x={p.x} z={p.z} ry={face(p.x, p.z)} />)}
         {lots.map((l, li) => (
@@ -276,7 +276,7 @@ export function DocksExtras({ t }: { t: Track }) {
   const crews = useMemo(() => rigPeople(rigs), [rigs])
   return (
     <group>
-      <Batch version={t.n + 31} cell={24}>
+      <Batch version={t.n + 31} cell={24} freeze>
         {quay.map((q, i) => (
           // Forklifts and container trucks working the quay.
           <group key={i} position={[q.x, 0, q.z]} rotation-y={q.ry + Math.PI / 2}>
@@ -368,7 +368,7 @@ export function DesertExtras({ t }: { t: Track }) {
   const weeds = useMemo(() => open({ need: 3, count: 7, seed: 531, gap: 10, reach: 70 }), [open])
   return (
     <group>
-      <Batch version={t.n + 41} cell={24}>
+      <Batch version={t.n + 41} cell={24} freeze>
         {arch && (
           <group position={[arch.x, 0, arch.z]} rotation-y={face(arch.x, arch.z) + Math.PI / 2}>
             <Box p={[-5, 3.5, 0]} s={[3, 7, 3.4]} c="#b5532f" />
@@ -502,7 +502,7 @@ export function FanZones({ zones, theme }: { zones: FanZone[]; theme: 'town' | '
   const desert = theme === 'desert'
   const step = desert ? ['#c8693a', '#d4844e', '#b5532f'] : ['#cfd8dc', '#b0bec5', '#cfd8dc']
   return (
-    <Batch version={zones.length * 7 + (desert ? 1 : 0)}>
+    <Batch version={zones.length * 7 + (desert ? 1 : 0)} freeze>
       {zones.map((zn, zi) => (
         <group key={zi} position={[zn.x, 0, zn.z]} rotation-y={zn.ry}>
           {STEP.map((h, r) => <Box key={r} p={[0, h / 2, 0.6 - r]} s={[ZONE_W, h, 1]} c={step[r]} />)}
@@ -568,7 +568,7 @@ export function boatPeople(boats: BoatSpot[]): Person[] {
 const HULLS = ['#fafafa', '#eceff1', '#fafafa']
 export function SpectatorBoats({ boats }: { boats: BoatSpot[] }) {
   return (
-    <Batch version={boats.length * 3 + 1}>
+    <Batch version={boats.length * 3 + 1} freeze>
       {boats.map((b, i) => (
         <group key={i} position={[b.x, 0, b.z]} rotation-y={b.ry}>
           {b.k % 3 === 0 ? (
@@ -640,7 +640,7 @@ export function rigPeople(rigs: RigSpot[]): Person[] {
 const TILT = Math.atan(1.3 / 13)
 export function OilRigs({ rigs }: { rigs: RigSpot[] }) {
   return (
-    <Batch version={rigs.length * 5 + 2}>
+    <Batch version={rigs.length * 5 + 2} freeze>
       {rigs.map((r, i) => (
         <group key={i} position={[r.x, 0, r.z]} rotation-y={r.ry}>
           {[-5, 5].map((x) => [-5, 5].map((z) => <Cyl key={`${x}${z}`} p={[x, 4.4, z]} r={0.8} h={11.2} c="#fbc02d" seg={10} />))}

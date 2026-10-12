@@ -193,7 +193,16 @@ export function kartStats(pi: number): KartStats {
 
 // assist (touch only, 0..1): with the thumb near the middle the kart leans towards the racing
 // line, fading out as the thumb steers harder, so a phone player isn't fighting tiny slips.
-export type KartInput = { steer: number; gas: number; brake: number; drift: boolean; item: boolean; assist?: number }
+// thumb (portrait touch): drifts come from the steering thumb, which in a slide only has its
+// own side of the slider, so that side covers the whole slide (see thumbSlide).
+export type KartInput = { steer: number; gas: number; brake: number; drift: boolean; item: boolean; assist?: number; thumb?: boolean }
+// In a thumb drift: just out of the middle swings it widest, all the way out pulls it tightest.
+// (Below THUMB_LET_GO the slider has already ended the drift.)
+export const THUMB_LET_GO = 0.2
+export function thumbSlide(steer: number, dir: number) {
+  const u = Math.max(THUMB_LET_GO, Math.min(1, steer * dir))
+  return dir * (-1 + (2 * (u - THUMB_LET_GO)) / (1 - THUMB_LET_GO))
+}
 export const TOUCH_ASSIST = 0.45 // how much a phone player's kart leans to the line
 export const idleInput = (): KartInput => ({ steer: 0, gas: 0, brake: 0, drift: false, item: false })
 
@@ -298,7 +307,7 @@ export class KartRace {
     this.karts.forEach((k, i) => {
       if (!this.owned(k.id)) return
       let inp = !running ? idleInput() : k.done !== null ? this.autoInput(k, order, true) : k.ai ? this.autoInput(k, order, false) : inputs[i] ?? idleInput()
-      if (running && inp.assist && k.drift === 0 && k.done === null && !k.ai) {
+      if (running && inp.assist && !inp.brake && k.drift === 0 && k.done === null && !k.ai) {
         const w = inp.assist * Math.max(0, 1 - Math.abs(inp.steer) * 2)
         if (w > 0) inp = { ...inp, steer: inp.steer + (this.autoInput(k, order, false).steer - inp.steer) * w }
       }
@@ -447,7 +456,8 @@ export class KartRace {
         const o = this.karts[k.towTarget]
         tug = Math.max(-0.35, Math.min(0.35, wrapAngle(Math.atan2(o.x - k.x, o.z - k.z) - k.h) * 1.2))
       }
-      const want = Math.max(-1, Math.min(1, inp.steer + pull + tug))
+      const steer = inp.thumb && k.drift !== 0 ? thumbSlide(inp.steer, k.drift) : inp.steer
+      const want = Math.max(-1, Math.min(1, steer + pull + tug))
       k.steer += (want - k.steer) * Math.min(1, dt * 10)
       const turn = 2.3 * Math.min(1, speed / 5) * (1 - 0.3 * Math.min(1, speed / k.stats.top)) * Math.sign(vf || 1)
       let yaw: number
