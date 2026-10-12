@@ -308,3 +308,17 @@ body:has(.edit-bar) .tutorial { bottom: calc(150px + var(--sab)); }
 /* Flat tire / out of gas: the stuck car instead of a sentence (docs/ui-rules.md). */
 :root .need-car { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; font: 18px var(--display); }
 :root .bank-uses { font-size: 20px; letter-spacing: 4px; }
+
+/* Touch screens: 44px tap targets (docs/ui-rules.md) for the panel close button, the top
+   tabs, segmented switches and small buttons, which were 24-36px tall on phones. */
+@media (pointer: coarse) {
+  :root .panel-head .close { width: 44px; height: 44px; }
+  :root .sheet-tabs button { min-height: 44px; }
+  :root .seg button { min-height: 44px; }
+  :root .buy.small, :root .sell.small { min-height: 44px; }
+  /* pills and text links keep their look; an invisible pad makes the tap area 44px */
+  :root .showcase-toggle, :root .garage-detail .sell { position: relative; }
+  :root .showcase-toggle::after, :root .garage-detail .sell::after { content: ''; position: absolute; inset: -10px -4px; }
+  :root .garage-tabs button { min-height: 44px; }
+  :root .cp-btn { width: 44px; height: 44px; }
+}

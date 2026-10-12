@@ -1,13 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Canvas } from '@react-three/fiber'
-import { NeutralToneMapping } from 'three'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { StageSlot, useStageReady } from '../scene/Stage'
 import type { OwnedCar } from '../game/store'
 import { carDef } from '../game/data'
-import { EMP_TIME, FLAT_TIME, GHOST_TIME, ITEMS, KartRace, LAPS, ROCKET_TIME, SMOKE_TIME, SPLAT_TIME, TOW_TIME, buildTrack, type ItemId, type KartEvent, type TrackDef } from '../game/kart'
+import { EMP_TIME, FLAT_TIME, GHOST_TIME, ITEMS, KartRace, LAPS, ROCKET_TIME, SMOKE_TIME, SPLAT_TIME, TOUCH_ASSIST, TOW_TIME, buildTrack, type ItemId, type KartEvent, type TrackDef } from '../game/kart'
 import { KartScene, kartLights, type KartHud } from '../scene/KartScene'
 import type { ChaseCar } from '../scene/ChaseScene'
 import { CarThumb } from '../scene/BuildingPreview'
-import { KeyHints, TouchDrive, newDriveInput, useDriveKeys, useTall, useTouchDevice } from './DriveControls'
+import { KART_FEEL, KeyHints, TouchDrive, newDriveInput, useDriveKeys, useTall, useTouchDevice } from './DriveControls'
 import { LoadingScene } from './Loading'
 import { look as lookOf, pi } from './ArcadeBits'
 import { sfx, audioContext, audioOut } from '../lib/sound'
@@ -23,6 +22,14 @@ export type KartNext = { label: string; go: () => void }
 
 const fmt = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, '0')}`
 const ORD = (n: number) => `${n}${n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'}`
+
+const KART_CAM = { position: [0, 4, -8] as [number, number, number], fov: 60, near: 0.3, far: 420 }
+// A short buzz in the hand for the moments that matter (phones that can).
+const BUZZ: Partial<Record<KartEvent['kind'], number | number[]>> = { wall: 25, bump: 12, hit: [40, 30, 60], boom: 80, turbo: 18, boost: 12, land: 15, crate: 8 }
+function buzz(kind: KartEvent['kind']) {
+  const p = BUZZ[kind]
+  if (p) try { navigator.vibrate?.(p) } catch { /* not on this phone */ }
+}
 
 export function KartGame({ car, title, track, reverse, field, prize, next, onFinish, onExit, live }: {
   car: OwnedCar; title: string; track: TrackDef; reverse: boolean
@@ -41,8 +48,9 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
   const me = live ? live.me : field.findIndex((f) => !f.ai)
   const race = useMemo(() => live?.race ?? new KartRace(t, field.map((f) => ({ name: f.name, pi: f.pi, ai: f.ai, skill: f.skill })), Math.floor(Math.random() * 1e6)), [t, field, live?.race])
   const looks = useMemo(() => field.map((f) => f.look), [field])
-  const input = useRef(newDriveInput()).current
   const touch = useTouchDevice()
+  // On a phone the kart leans gently towards the racing line while the thumb is near the middle.
+  const input = useRef({ ...newDriveInput(), assist: touch ? TOUCH_ASSIST : 0 }).current
   const tall = useTall()
   const [drawn, setDrawn] = useState(false)
   const [running, setRunning] = useState(false)
@@ -97,6 +105,7 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
         if (e.kind === 'boom' && race.bombs.some((b) => b.boom && Math.hypot(b.x - race.karts[me].x, b.z - race.karts[me].z) < 40)) crashSound()
         continue
       }
+      if (touch) buzz(e.kind)
       if (e.kind === 'wall' || e.kind === 'bump') bumpSound()
       else if (e.kind === 'hit') crashSound()
       else if (e.kind === 'crate') dingSound(1.4)
@@ -129,16 +138,30 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
     podium.current = setTimeout(() => setEnd({ place, order }), 1400)
   }
 
+  // The scene is memoised, so it gets callbacks that never change and call the latest ones.
+  const latest = useRef({ onEvents, finish, tick: live?.tick })
+  useLayoutEffect(() => { latest.current = { onEvents, finish, tick: live?.tick } })
+  const sceneEvents = useCallback((es: KartEvent[]) => latest.current.onEvents(es), [])
+  const sceneFinish = useCallback(() => latest.current.finish(), [])
+  const sceneTick = useCallback(() => latest.current.tick?.(), [])
+  // Drawn in the shared race canvas (scene/Stage.tsx): a canvas of its own meant a new WebGL
+  // context and every shader compiled again on each race. The element is memoised so the
+  // HUD's renders don't reach the scene.
+  const isLive = !!live
+  const scene = useMemo(
+    () => <KartScene race={race} looks={looks} me={me} input={input} running={running} onHud={setHud} onEvents={sceneEvents} onFinish={sceneFinish} afterStep={isLive ? sceneTick : undefined} />,
+    [race, looks, me, input, running, sceneEvents, sceneFinish, sceneTick, isLive],
+  )
+  const stageReady = useStageReady()
+
   const item = hud?.item ? ITEMS[hud.item as ItemId] : null
   const dead = !!hud && hud.fx.emp > 0 // a static storm locks the item slot
   // A Nitro Triple shows how many cans are left.
   const slot = item ? <span className="kt-item"><Roulette key={hud!.item} icon={item.icon} />{hud!.item === 'nitro3' && <b className="kt-uses">×{hud!.uses}</b>}</span> : null
   return (
     <div className={`race-full kt${tall ? ' tall' : ' wide'}${touch ? ' touch' : ''}${dead ? ' dead' : ''}`}>
-      <Canvas className="rf-canvas" camera={{ fov: 60, near: 0.3, far: 420 }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
-        <KartScene race={race} looks={looks} me={me} input={input} running={running} onHud={setHud} onEvents={onEvents} onFinish={finish} afterStep={live?.tick} />
-      </Canvas>
-      <LoadingScene label={live?.loading ?? `Driving to ${track.name}`} onReady={() => setDrawn(true)} onClose={onExit} />
+      <StageSlot cam={KART_CAM}>{scene}</StageSlot>
+      <LoadingScene ready={stageReady} label={live?.loading ?? `Driving to ${track.name}`} onReady={() => setDrawn(true)} onClose={onExit} />
       {drawn && !ready && (live?.lobby ?? <div className="kt-wait">⏳ {live?.loading}</div>)}
       <div className="rf-top">
         <h2>{title}</h2>
@@ -161,7 +184,7 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
         </>
       )}
       {flash && <div key={flash} className="kt-flash">{flash}</div>}
-      {!end && running && (touch ? <TouchDrive input={input} tall={tall} item={slot} /> : <KeyHints />)}
+      {!end && running && (touch ? <TouchDrive input={input} tall={tall} item={slot} feel={KART_FEEL} /> : <KeyHints />)}
       {end && <Podium race={race} field={field} me={me} end={end} prize={prize} next={next} verdict={live?.verdict} onExit={onExit} />}
     </div>
   )
