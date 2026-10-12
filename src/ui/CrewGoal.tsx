@@ -50,7 +50,7 @@ function left(ms: number) {
   return h > 24 ? `${Math.floor(h / 24)}d ${h % 24}h` : `${h}h`
 }
 
-function Pay() {
+export function Pay() {
   const level = useGame((s) => s.level)
   const pay = payAt(CREW_CHEST, level)
   return (
@@ -62,7 +62,7 @@ function Pay() {
   )
 }
 
-function useOpen() {
+export function useOpen() {
   const toast = useGame((s) => s.toast)
   const [busy, setBusy] = useState(false)
   const open = async (week: string) => {

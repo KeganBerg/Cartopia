@@ -10,15 +10,15 @@ import {
 } from '../lib/clans'
 import { Panel, SheetTabs } from './Menus'
 import { isCleanName, NAME_REJECTED } from '../lib/names'
-import { CrewGoalCard, useCrewGoal } from './CrewGoal'
-import { openChat, refreshChatRooms, useChat } from '../lib/chat'
+import { useCrewGoal } from './CrewGoal'
+import { refreshChatRooms } from '../lib/chat'
 import { CrewBattleCard } from './CrewBattle'
 import { demoBattle, useCrewBattle } from '../lib/battles'
 import { PlayerName } from './Username'
 import { playerName } from '../lib/profiles'
 import { LoadingBand } from './Loading'
 import { CrewLadder, demoCrew } from './CrewLadder'
-import { compact } from './format'
+import { CrewBattleTile, CrewGoalTile, CrewHero } from './CrewHub'
 import { CREW_DEMO } from '../lib/crewRaces'
 
 const n = (v: number) => v.toLocaleString()
@@ -289,7 +289,6 @@ function CrewHouseNudge() {
 
 function ClanHome({ data, uid, onChange }: { data: MyClan; uid: string; onChange: () => void }) {
   const { clan, members, role } = data
-  const crewChat = useChat((c) => c.unread.crew)
   const toast = useGame((s) => s.toast)
   const go = useVisit()
   const [confirmLeave, setConfirmLeave] = useState(false)
@@ -318,27 +317,16 @@ function ClanHome({ data, uid, onChange }: { data: MyClan; uid: string; onChange
   }
 
   const leaderLeaving = role === 'leader' && members.length > 1
-  const goalWeek = useCrewGoal((g) => g.goal?.current)
-  const points = new Map((goalWeek?.members ?? []).map((m) => [m.id, m.points]))
   return (
-    <div className="clan-home">
-      <div className="clan-banner" style={{ ['--clan' as string]: clan.color }}>
-        <span className="big-emblem">{clan.emblem}</span>
-        <div className="clan-banner-main">
-          <h3>{clan.name} <span className="clan-tag">{clan.tag}</span></h3>
-          {clan.description && <p>{clan.description}</p>}
-          <small>{clan.members}/{clan.memberCap} members{clan.minLevel > 1 ? ` · level ${clan.minLevel}+ to join` : ''}{rank ? ` · #${rank} by power` : ''}</small>
-          <div className="clan-banner-stats">
-            {METRICS.map((m) => (
-              <span key={m.id} title={m.label}>{m.icon} {compact(clan.total[m.id])}{clan.week[m.id] > 0 && <em>+{compact(clan.week[m.id])}</em>}</span>
-            ))}
-          </div>
+    <div className="clan-home cr-home">
+      <CrewHero clan={clan} rank={rank} />
+      <div className="cr-grid">
+        <CrewLadder members={members} uid={uid} />
+        <div className="cr-side">
+          <CrewBattleTile />
+          <CrewGoalTile />
         </div>
-        <button className="buy small alt clan-chat" onClick={() => openChat('crew')}>💬 Chat{crewChat > 0 && <span className="tab-dot">{crewChat > 9 ? '9+' : crewChat}</span>}</button>
       </div>
-      <CrewLadder members={members} uid={uid} points={points} />
-      <CrewBattleCard />
-      <CrewGoalCard members={members} uid={uid} chips={false} />
 
       {editing && role === 'leader' && (
         <>
