@@ -614,6 +614,9 @@ const STYLES: Record<string, CarStyle> = {
   raiden: { rim: 'five', rimColor: '#eceff1', caliper: '#ff6d00', seat: '#263238' },
   sovereign: { rim: 'turbine', rimColor: '#c0c6cc', caliper: '#1a237e', seat: '#d7b98e' },
   wraith: { rim: 'split', rimColor: '#1d1d1d', caliper: '#ff6f00', seat: '#212121' },
+  eclat: { rim: 'turbine', rimColor: '#c0c6cc', caliper: '#1565c0', seat: '#d7b98e' },
+  orafo: { rim: 'mesh', rimColor: '#c9a227', caliper: '#212121', seat: '#8d4a2a' },
+  fulmine: { rim: 'turbine', rimColor: '#1d1d1d', caliper: '#ffd600', seat: '#212121' },
 }
 // A car this build doesn't know gets plain five-spokes.
 export const carStyle = (model?: string): CarStyle => (model && STYLES[model]) || { rim: 'five' }
