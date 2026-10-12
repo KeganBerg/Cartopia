@@ -17,6 +17,7 @@ import { PAL, SEASON } from './season'
 import { LAYER, decal } from './layers'
 import { Bulbs as EdgeBulbs } from './edgeKit'
 import { brickTex, sidingTex, gravelTex, awningTex, paverTex, shutterTex, shingleTex, checkerTex } from './textures'
+import { ShopLot } from './BuildingDetail'
 import { PEOPLE_SIZED } from './keepShape'
 
 // Models for the second wave of shop items: businesses and services (coffee,
@@ -507,6 +508,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
             <mesh position={[0, 0.56, 0]} castShadow><sphereGeometry args={[0.12, 12, 10]} />{m('#e53935')}</mesh>
             {[-0.13, 0.13].map((x) => <Cyl key={x} m={m} at={[x, 0.17, 0.1]} r={0.05} h={0.03} c={x < 0 ? '#ffeb3b' : '#00e5ff'} seg={10} />)}
           </group>
+          {!ghost && <ShopLot id="arcade" W={2} F={0.625} />}
         </ShellBuilding>
       )
     }
@@ -1263,6 +1265,24 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
         </group>
       )
     case 'busstop':
+      if (!ghost)
+        return (
+          <group>
+            <Box m={m} at={[0, 0.025, 0]} s={[1.6, 0.05, 1.0]} c="#ffffff" t={paverTex(2, 1)} shadow={false} />
+            <PropMesh parts={DECOR_PROPS.busstop()} />
+            {/* Strip light under the canopy and a lit advert on the end wall. */}
+            <mesh position={[0, 1.25, -0.18]} rotation-x={Math.PI / 2}><planeGeometry args={[1.2, 0.4]} />{bulb}</mesh>
+            <mesh position={[0.655, 0.66, -0.2]} rotation-y={-Math.PI / 2}><planeGeometry args={[0.3, 0.6]} />{bulb}</mesh>
+            <group position={[0.6, 0, 0.55]}>
+              <mesh position={[0, 1.45, 0]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.18, 0.18, 0.03, 16]} />{m('#1e88e5')}</mesh>
+              <mesh position={[0, 1.45, 0.032]}>
+                <planeGeometry args={[0.3, 0.075]} />
+                <meshBasicMaterial map={signTexture('BUS', '#1e88e5', '#ffffff')} toneMapped={false} />
+              </mesh>
+            </group>
+            <Pool r={0.7} z={0} />
+          </group>
+        )
       return (
         <group>
           <Box m={m} at={[0, 0.025, 0]} s={[1.6, 0.05, 1.0]} c="#ffffff" t={paverTex(2, 1)} shadow={false} />
@@ -1290,6 +1310,22 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
         </group>
       )
     case 'hotdog':
+      if (!ghost)
+        return (
+          <group>
+            <PropMesh parts={DECOR_PROPS.hotdog()} />
+            <Cyl m={m} at={[0, 1.0, 0]} r={0.02} h={0.7} c="#eceff1" seg={6} />
+            <mesh position={[0, 1.35, 0]} castShadow>
+              <coneGeometry args={[0.6, 0.22, 16]} />
+              {m('#ffffff', awningTex('#fdd835', '#e53935'))}
+            </mesh>
+            <group position={[0, 0.78, 0]}>
+              <mesh rotation-z={Math.PI / 2} castShadow><capsuleGeometry args={[0.07, 0.42, 4, 10]} />{m('#e0a052')}</mesh>
+              <mesh position={[0, 0.06, 0]} rotation-z={Math.PI / 2}><capsuleGeometry args={[0.045, 0.5, 4, 10]} />{m('#c0392b')}</mesh>
+              <Box m={m} at={[0, 0.105, 0]} s={[0.4, 0.012, 0.02]} c="#fdd835" shadow={false} />
+            </group>
+          </group>
+        )
       return (
         <group>
           <Box m={m} at={[0, 0.42, 0]} s={[0.9, 0.42, 0.5]} c="#eceff1" />
@@ -1423,6 +1459,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           <mesh position={[0, 2.12, 0]}><sphereGeometry args={[0.07, 8, 6]} />{m(GOLD)}</mesh>
           <mesh position={[0, 1.36, 0]} rotation-x={Math.PI / 2}><circleGeometry args={[0.2, 10]} />{bulb}</mesh>
           {!ghost && <Pool r={0.9} />}
+          {!ghost && <PropMesh parts={DECOR_PROPS.gazeboTrim()} />}
         </group>
       )
     }
