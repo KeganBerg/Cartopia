@@ -1,11 +1,11 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Canvas, useThree } from '@react-three/fiber'
-import { NeutralToneMapping, type PerspectiveCamera, type WebGLProgram, type WebGLRenderer } from 'three'
+import { NeutralToneMapping, PCFSoftShadowMap, type PerspectiveCamera, type WebGLProgram, type WebGLRenderer } from 'three'
 import { warmShaders } from './warm'
 import { create } from 'zustand'
 
-// The race draws in its own full-screen canvas. Building a fresh canvas for every race
+// The race (and the Crate Depot) draws in its own full-screen canvas. Building a fresh canvas for every race
 // meant a new WebGL context and every shader compiled again from scratch, all on the
 // tap that starts the race: the game froze before the countdown, worst on Windows.
 // So the race canvas is made once and kept: between races it waits, parked and idle,
@@ -13,7 +13,8 @@ import { create } from 'zustand'
 // Each race's scene is compiled in the background (compileAsync) before its first
 // frame; `ready` says when that's done so the countdown can wait for it.
 
-type Cam = { position: [number, number, number]; fov: number; near: number; far: number }
+// shadows: the view draws shadows (the crate depot's work lamp); races don't.
+type Cam = { position: [number, number, number]; fov: number; near: number; far: number; shadows?: boolean }
 type StageState = { node: ReactNode; slot: HTMLElement | null; cam: Cam; run: number; ready: number; used: boolean; gen: number }
 const useStage = create<StageState>(() => ({ node: null, slot: null, cam: { position: [0, 2, -4], fov: 55, near: 0.3, far: 150 }, run: 0, ready: -1, used: false, gen: 0 }))
 
@@ -97,7 +98,9 @@ function Rig({ run }: { run: number }) {
     c.far = cam.far
     c.lookAt(0, 0, 0)
     c.updateProjectionMatrix()
-  }, [run, camera])
+    gl.shadowMap.enabled = !!cam.shadows
+    gl.shadowMap.type = PCFSoftShadowMap
+  }, [run, camera, gl])
   useEffect(() => {
     if (!run) return
     let live = true
