@@ -8,7 +8,7 @@ pieces. Pieces of a car start dropping at its level.
 - Odds: the 🧩 slice is 2% of Garage, 3% of Gold and 4% of Diamond opens (`piece` in `CRATES`).
 - Code: `src/game/resto.ts` (pieces, pool), `rollCrate` in `src/game/crates.ts`, the 2x2 build
   card `src/ui/Resto.tsx`, bodies in `src/scene/restoCars.ts` (lofted like the exotics).
-- Server: `supabase/migrations/0063_resto_pieces.sql`. Pieces are counted from `crate_opens`,
+- Server: `supabase/migrations/0065_resto_pieces.sql`. Pieces are counted from `crate_opens`,
   so the save's `restoParts` is only a mirror. The catalog lists resto cars at unlock 999 so the
   guard refunds any copy the server didn't build (`car_granted`).
 - Adding one: a car with `secret: true` in `CARS`, a body in `RESTO`, a set entry, splash renders
