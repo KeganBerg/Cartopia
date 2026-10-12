@@ -1,5 +1,5 @@
 import { BufferAttribute, BufferGeometry, Color } from 'three'
-import { PAL, SEASON } from './season'
+import { PALETTES, SEASON, SEASON_MIX, type Season } from './season'
 
 // The shape and colour of the land around the town, for the free view's
 // horizon (Horizon.tsx). Pure maths, no rendering, so it can be tested.
@@ -10,6 +10,7 @@ const SMALL = typeof window !== 'undefined' && Math.min(window.innerWidth, windo
 const RINGS = SMALL ? 46 : 56
 const SEGS = SMALL ? 150 : 180
 export const TAU = Math.PI * 2
+const ringR = (i: number) => R0 + (R1 - R0) * (i / RINGS) ** 1.75
 
 // Directions (angle of atan2(z, x)) of each side's landmark.
 export const A_MTN = Math.PI / 4
@@ -23,6 +24,9 @@ export const LAKE = polar(520, A_LAKE)
 export const HWY0 = polar(520, A_CITY)
 export const HWY_DIR: [number, number] = [Math.cos(A_CITY + Math.PI / 2), Math.sin(A_CITY + Math.PI / 2)]
 export const HWY_LEN = 950
+// A railway runs the same way, nearer town, so a train crosses the farmland.
+export const RAIL0 = polar(390, A_CITY)
+export const RAIL_LEN = 900
 
 export const smooth = (a: number, b: number, x: number) => {
   const t = Math.max(0, Math.min(1, (x - a) / (b - a)))
@@ -74,6 +78,15 @@ export function hwy(x: number, z: number) {
   return { s, d: Math.abs(s) > HWY_LEN ? d + (Math.abs(s) - HWY_LEN) : d }
 }
 export const hwyHeight = (s: number) => 1.2 + 9 * fbm(s / 420 + 40, 3.3, 2)
+// The same for the railway (it runs parallel to the highway).
+export function rail(x: number, z: number) {
+  const dx = x - RAIL0[0], dz = z - RAIL0[1]
+  const s = dx * HWY_DIR[0] + dz * HWY_DIR[1]
+  const d = Math.abs(dx * -HWY_DIR[1] + dz * HWY_DIR[0])
+  return { s, d: Math.abs(s) > RAIL_LEN ? d + (Math.abs(s) - RAIL_LEN) : d }
+}
+export const railHeight = (s: number) => 1.6 + 7 * fbm(s / 380 - 20, 8.1, 2)
+export const railPoint = (s: number): [number, number] => [RAIL0[0] + HWY_DIR[0] * s, RAIL0[1] + HWY_DIR[1] * s]
 const LAKE_R = 190
 export const lakeOf = (x: number, z: number) => Math.hypot((x - LAKE[0]) / 1.35, z - LAKE[1]) / LAKE_R
 
@@ -97,6 +110,8 @@ export function heightAt(x: number, z: number) {
   const { s, d } = hwy(x, z)
   const bed = smooth(70, 13, d)
   h += (hwyHeight(s) - 0.3 - h) * bed
+  const rl = rail(x, z)
+  h += (railHeight(rl.s) - 0.3 - h) * smooth(60, 11, rl.d)
   // The lake bowl.
   const lk = lakeOf(x, z)
   // (kept clear of the town's meadow, which ends about 200 units out)
@@ -107,39 +122,105 @@ export function heightAt(x: number, z: number) {
 // What the land is made of at a point: fields, meadow, forest floor, rock or snow.
 export const SNOWLINE = { winter: 0, spring: 150, summer: 205, fall: 175 }[SEASON]
 const C = (h: string) => new Color(h)
-const GRASS = SEASON === 'winter' ? [C('#e9eff4'), C('#dde6ec')] : SEASON === 'fall' ? [C('#93a046'), C('#a7a24c')] : [C(PAL.ground), C(PAL.grassSpeckle[1])]
-const CROPS = {
-  spring: ['#7fc04f', '#a4d65e', '#e8d84a', '#6a8f3a', '#8b6a4a'],
-  summer: ['#6fb141', '#d9b44a', '#e6c65a', '#5f9e38', '#a07a52'],
-  fall: ['#c49a3e', '#8d6b45', '#b5873a', '#d1aa52', '#7a5a3c'],
-  winter: ['#eef3f7', '#e2e9ee', '#f7fafc', '#dfe7ed', '#e8eef2'],
-}[SEASON].map(C)
-const ROCK = C('#8a8378'), ROCK_DARK = C('#6f6a62'), SNOW = C('#f4f8fb'), SAND = C('#d8c79a'), FOREST_FLOOR = C(SEASON === 'winter' ? '#d9e2e8' : SEASON === 'fall' ? '#7c6a34' : '#3f7a34')
+// During a changeover (SEASON_MIX) the land shades toward the next season and
+// some fields have already turned over to its crops.
+const MIX = SEASON_MIX
+const grassOf = (k: Season) => (k === 'winter' ? [C('#e9eff4'), C('#dde6ec')] : k === 'fall' ? [C('#93a046'), C('#a7a24c')] : [C(PALETTES[k].ground), C(PALETTES[k].grassSpeckle[1])])
+const GRASS = grassOf(SEASON).map((c, i) => c.lerp(grassOf(MIX.other)[i], MIX.mix))
+const CROPS_BY: Record<Season, Color[]> = {
+  spring: ['#7fc04f', '#a4d65e', '#e8d84a', '#6a8f3a', '#8b6a4a'].map(C),
+  summer: ['#6fb141', '#d9b44a', '#e6c65a', '#5f9e38', '#a07a52'].map(C),
+  fall: ['#c49a3e', '#8d6b45', '#b5873a', '#d1aa52', '#7a5a3c'].map(C),
+  winter: ['#eef3f7', '#e2e9ee', '#f7fafc', '#dfe7ed', '#e8eef2'].map(C),
+}
+const floorOf = (k: Season) => C(k === 'winter' ? '#d9e2e8' : k === 'fall' ? '#7c6a34' : '#3f7a34')
+const ROCK = C('#8a8378'), ROCK_DARK = C('#6f6a62'), SNOW = C('#f4f8fb'), SAND = C('#d8c79a'), FOREST_FLOOR = floorOf(SEASON).lerp(floorOf(MIX.other), MIX.mix)
+// How much of the low ground lies under snow (0..1): all of it in winter, less as
+// spring melts it, patches of first snow at the end of fall.
+export const SNOW_COVER = SEASON === 'winter' ? (MIX.other === 'spring' ? 1 - MIX.mix : 1) : MIX.other === 'winter' ? MIX.mix : 0
 const tmp = new Color()
 
 function groundColor(out: Color, x: number, z: number, h: number, slope: number) {
-  const r = Math.hypot(x, z)
-  const a = Math.atan2(z, x)
   const g = fbm(x / 40, z / 40, 2)
   out.copy(GRASS[0]).lerp(GRASS[1], g)
   // Patchwork fields on the farm side.
-  const farm = 1 - smooth(0.55, 1.15, angDist(a, A_CITY))
-  if (farm > 0.3 && r > 230 && r < 700 && slope < 0.35) {
-    const fx = Math.floor((x * 0.8 + z * 0.6) / 46), fz = Math.floor((z * 0.8 - x * 0.6) / 34)
-    const k = hash(fx, fz)
-    if (k < 0.78) out.copy(CROPS[Math.floor(k * 6.4) % CROPS.length])
-  }
+  const f = fieldAt(x, z)
+  if (f && slope < 0.35) out.copy(CROPS_BY[f.season][f.kind])
   // Forest floor under the woods.
   if (forest(x, z) > 0.5 && slope < 0.6) out.lerp(FOREST_FLOOR, 0.6)
   // Beaches round the lake, rock on steep faces, snow up high.
   if (lakeOf(x, z) < 1.12 && h < 2.5) out.copy(SAND)
   if (slope > 0.75) out.lerp(g > 0.5 ? ROCK : ROCK_DARK, smooth(0.75, 1.2, slope))
   else if (h > 90) out.lerp(ROCK, smooth(90, 160, h) * 0.8)
-  const snow = SEASON === 'winter' ? 1 - smooth(0.9, 1.4, slope) * 0.6 : smooth(SNOWLINE - 25, SNOWLINE + 15, h + g * 30) * (1 - smooth(1.1, 1.5, slope))
+  // Low snow lies in patches while it comes and goes (noise against the cover), up high it follows the snowline.
+  const low = SNOW_COVER >= 1 ? 1 : SNOW_COVER <= 0 ? 0 : 1 - smooth(SNOW_COVER - 0.08, SNOW_COVER + 0.08, smooth(0.25, 0.75, fbm(x / 60 + 3, z / 60 - 9, 3)))
+  const snow = Math.max(low * (1 - smooth(0.9, 1.4, slope) * 0.6), SEASON === 'winter' ? 0 : smooth(SNOWLINE - 25, SNOWLINE + 15, h + g * 30) * (1 - smooth(1.1, 1.5, slope)))
   if (snow > 0) out.lerp(SNOW, snow)
   const { d } = hwy(x, z)
   if (d < 18) out.lerp(tmp.set(SEASON === 'winter' ? '#cfd6dc' : '#7d8a5a'), smooth(18, 9, d) * 0.6)
+  const rd = rail(x, z).d
+  if (rd < 12) out.lerp(tmp.set(SEASON === 'winter' ? '#d4dadf' : '#8a8064'), smooth(12, 6, rd) * 0.55)
   return out
+}
+
+// The farm side is cut into fields on a slanted grid. Each cell is a crop (kind
+// 0..4, see Countryside.tsx for what grows in each season) or plain grass.
+export const FIELD = { w: 46, d: 34 }
+const U = [0.8, 0.6], V = [-0.6, 0.8]
+export const FIELD_AXES = { u: U as [number, number], v: V as [number, number] }
+export function fieldCell(x: number, z: number) {
+  return { fx: Math.floor((x * U[0] + z * U[1]) / FIELD.w), fz: Math.floor((x * V[0] + z * V[1]) / FIELD.d) }
+}
+export function fieldCentre(fx: number, fz: number): [number, number] {
+  const u = (fx + 0.5) * FIELD.w, v = (fz + 0.5) * FIELD.d
+  return [u * U[0] + v * V[0], u * U[1] + v * V[1]]
+}
+// The field a point is in, or null: only on the farm side, clear of the roads, rail, lake and city.
+export function fieldAt(x: number, z: number) {
+  const r = Math.hypot(x, z)
+  if (r < 230 || r > 700) return null
+  const farm = 1 - smooth(0.55, 1.15, angDist(Math.atan2(z, x), A_CITY))
+  if (farm <= 0.3) return null
+  if (hwy(x, z).d < 16 || rail(x, z).d < 12) return null
+  const { fx, fz } = fieldCell(x, z)
+  const k = hash(fx, fz)
+  if (k >= 0.78) return null
+  // Some fields turn over to the next season's crop before others.
+  const season = hash(fx + 31.7, fz - 12.3) < MIX.mix * 1.6 ? MIX.other : SEASON
+  return { fx, fz, kind: Math.floor(k * 6.4) % 5, season }
+}
+
+// Height of the terrain MESH at a point, which between its vertices differs a
+// little from heightAt (the land is flat facets). Things standing on the ground
+// use this so they neither float nor sink.
+export function groundAt(x: number, z: number) {
+  const r = Math.hypot(x, z)
+  if (r < R0 || r >= R1) return heightAt(x, z)
+  const i = Math.min(RINGS - 1, Math.floor(RINGS * ((r - R0) / (R1 - R0)) ** (1 / 1.75)))
+  let a = Math.atan2(z, x)
+  if (a < 0) a += TAU
+  const step = TAU / SEGS
+  const vert = (ii: number, jj: number): [number, number, number] => {
+    const ang = (jj + (ii % 2) * 0.5) * step
+    const rr = ringR(ii)
+    const vx = Math.cos(ang) * rr, vz = Math.sin(ang) * rr
+    return [vx, heightAt(vx, vz), vz]
+  }
+  const j0 = Math.floor(a / step - (i % 2) * 0.5)
+  for (let ii = Math.max(0, i - 1); ii <= Math.min(RINGS - 1, i + 1); ii++) {
+    for (let jj = j0 - 2; jj <= j0 + 2; jj++) {
+      const p = (di: number, dj: number) => vert(ii + di, jj + dj)
+      const tris = ii % 2 === 0 ? [[p(0, 0), p(1, 0), p(0, 1)], [p(0, 1), p(1, 0), p(1, 1)]] : [[p(0, 0), p(1, 0), p(1, 1)], [p(0, 0), p(1, 1), p(0, 1)]]
+      for (const [A, B, Cc] of tris) {
+        const det = (B[2] - Cc[2]) * (A[0] - Cc[0]) + (Cc[0] - B[0]) * (A[2] - Cc[2])
+        const l1 = ((B[2] - Cc[2]) * (x - Cc[0]) + (Cc[0] - B[0]) * (z - Cc[2])) / det
+        const l2 = ((Cc[2] - A[2]) * (x - Cc[0]) + (A[0] - Cc[0]) * (z - Cc[2])) / det
+        const l3 = 1 - l1 - l2
+        if (l1 >= -1e-6 && l2 >= -1e-6 && l3 >= -1e-6) return l1 * A[1] + l2 * B[1] + l3 * Cc[1]
+      }
+    }
+  }
+  return heightAt(x, z)
 }
 
 // Where the woods grow (0..1).
@@ -153,7 +234,7 @@ export function forest(x: number, z: number) {
 // distance, a flat colour per triangle like the rest of the low-poly world.
 export function buildTerrain() {
   const radii: number[] = []
-  for (let i = 0; i <= RINGS; i++) radii.push(R0 + (R1 - R0) * (i / RINGS) ** 1.75)
+  for (let i = 0; i <= RINGS; i++) radii.push(ringR(i))
   const grid: number[][] = radii.map((r, i) =>
     Array.from({ length: SEGS }, (_, j) => {
       // Stagger alternate rings by half a step so triangles don't line up into spokes.

@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import ReactThreeTestRenderer from '@react-three/test-renderer'
 import { Color, type Mesh, type MeshStandardMaterial, type Object3D } from 'three'
 import { BUILDINGS } from '../game/data'
-import { DAY_MS } from '../game/clock'
+import { sunDay } from '../game/sun'
 import { clubHit, resetClubBeat } from '../lib/clubBeat'
 import { BuildingModel } from './BuildingModel'
 import { VanguardTower } from './Landmark'
@@ -14,7 +14,7 @@ import { VanguardTower } from './Landmark'
 // few notes, and check every lit material tagged `clubLed` shows the same hue
 // each frame (brightness may differ; the colour may not).
 
-const MIDNIGHT = DAY_MS / 2
+const MIDNIGHT = sunDay(20_000).noon + 12 * 3_600_000 // the town clock follows local time
 const club = BUILDINGS.find((d) => d.id === 'club')!
 
 const hue = (c: Color) => {

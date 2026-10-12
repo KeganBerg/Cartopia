@@ -8,8 +8,9 @@
 //
 // The scene matches the link-preview cards: a sunburst panel with the logo, and
 // the player's own race car (in their paint) parked in front of a busy town
-// that slowly pans, in the real season and the game's 20-minute day/night clock
-// (src/game/clock.ts), or a live night/day event cached by src/game/liveEvents.ts.
+// that slowly pans, in the real season and time of day where the player is
+// (today's sunrise and sunset, cached by src/game/clock.ts; 6am and 7pm until
+// the game has run once), or a live night/day event cached by src/game/liveEvents.ts.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 
@@ -50,7 +51,7 @@ left:-30%;width:160%;top:-24%;height:70%;--cx:50%;--cy:52%}
 @keyframes sp-spin{to{transform:rotate(1turn)}}
 #splash .wm{position:absolute;left:50%;top:calc(6% + env(safe-area-inset-top));width:min(80vw,560px);transform:translateX(-50%);filter:drop-shadow(0 6px 14px rgba(20,33,61,.3));z-index:5;animation:sp-in .7s cubic-bezier(.2,1.6,.4,1) both}
 @keyframes sp-in{from{transform:translateX(-50%) scale(.6);opacity:0}}
-#splash .tag{position:absolute;left:0;right:0;top:calc(6% + env(safe-area-inset-top) + min(80vw,560px) * .3);margin:0;text-align:center;font-size:clamp(15px,4.6vw,24px);line-height:1.25;letter-spacing:.3px;-webkit-text-stroke:4px ${N};paint-order:stroke fill;text-shadow:0 3px 0 ${N};z-index:5;animation:sp-up .6s .15s ease-out both}
+#splash .tag{position:absolute;left:0;right:0;background:none;padding:0;border-radius:0;font-family:inherit;top:calc(6% + env(safe-area-inset-top) + min(80vw,560px) * .3);margin:0;text-align:center;font-size:clamp(15px,4.6vw,24px);line-height:1.25;letter-spacing:.3px;-webkit-text-stroke:4px ${N};paint-order:stroke fill;text-shadow:0 3px 0 ${N};z-index:5;animation:sp-up .6s .15s ease-out both}
 @keyframes sp-up{from{transform:translateY(10px);opacity:0}}
 #splash .car{position:absolute;left:50%;top:37%;width:calc(min(76vw,340px) * var(--k,1));transform:translateX(-50%);z-index:4;opacity:0;transition:opacity .35s ease}
 #splash .car.on{opacity:1;animation:sp-park .7s cubic-bezier(.2,1.3,.4,1) both}
@@ -85,11 +86,13 @@ const JS = `(function(){
 var q=new URLSearchParams(location.search),el=document.getElementById('splash');
 var f=document.createElement('link');f.rel='stylesheet';f.href='https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800&display=swap';document.head.appendChild(f);
 if(q.has('nosplash')){el.remove();return}
-var t=q.get('time'),p=t===null?(Date.now()%12e5)/12e5:+t,lv=[];
+var t=q.get('time'),n,sun={},lv=[];
+try{sun=JSON.parse(localStorage.getItem('cartopia-sun'))||{}}catch(e){}
 try{lv=JSON.parse(localStorage.getItem('cartopia-live-events'))||[]}catch(e){}
-lv.forEach(function(e){var k={night:.5,day:0}[e.kind],now=Date.now();if(t===null&&k!==undefined&&e.from<=now&&now<e.to)p=k});
-var d=Math.abs(p-.5),n=d<.14?1:d>.26?0:1-(d-.14)/.12;
-var m=new Date().getMonth(),tod=n>.7?'night':n>.08?'dusk':'day',season=q.get('season')||(m<2||m>10?'winter':m<5?'spring':m<8?'summer':'fall');
+var now=new Date(),mi=now.getHours()*60+now.getMinutes(),r=+sun.r||360,s=+sun.s||1140;
+if(t!==null){var d=Math.abs(t-.5);n=d<.14?1:d>.26?0:1-(d-.14)/.12}else n=mi>=s-40&&mi<s+50?(mi-s+40)/90:mi>r+40&&mi<s-40?0:mi>=r-50&&mi<=r+40?(r+40-mi)/90:1;
+lv.forEach(function(e){var k={night:1,day:0}[e.kind];if(t===null&&k!==undefined&&e.from<=+now&&+now<e.to)n=k});
+var tod=n>.7?'night':n>.08?'dusk':'day',season=q.get('season')||['winter','spring','summer','fall'][(Math.floor((now.getMonth()+1)%12/3)+(sun.south?2:0))%4];
 el.className=tod;
 var key=season+'-'+tod,lq=${JSON.stringify(LQIP)},town=el.querySelector('.town'),ti=town.querySelector('img');
 if(lq[key])town.style.backgroundImage='url('+lq[key]+')';

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { clubHit, clubPulse, resetClubBeat } from './clubBeat'
 import { GROOVES } from './clubGrooves'
 import { Soundscape } from './ambience'
-import { technoBeat, startEvent, stopEvent, SIXTEENTH_MS } from '../game/techno'
+import { technoBeat, startEvent, stopEvent, SIXTEENTH_MS, BUILD_MS } from '../game/techno'
 
 // Kegan: the club's colour should move "doot doot doot doot", once per kick,
 // not on every bass note. Play each groove through the real Soundscape (on a
@@ -64,16 +64,17 @@ describe('club colour steps per beat', () => {
   })
 
   it('Rave Mode: a new colour only on kicks (none through the kickless break)', () => {
-    startEvent('techno', { from: 0, until: Infinity })
+    startEvent('techno', { from: -BUILD_MS, drop: 0, until: Infinity })
     try {
-      // 24 bars from bar 0: drop, groove, peak, tension, then the break (20-23).
+      // The build-up and its kickless breakdown, then 24 bars from the drop:
+      // drop, groove, peak, tension, then the break (20-23).
       let last = -1
       let changes = 0
       let kicks = 0
       let lastKickBeat = -1
-      for (let wall = 0; wall < 24 * 16 * SIXTEENTH_MS; wall += 1000 / 60) {
+      for (let wall = -BUILD_MS; wall < 24 * 16 * SIXTEENTH_MS; wall += 1000 / 60) {
         vi.spyOn(Date, 'now').mockReturnValue(wall)
-        const p = clubPulse(performance.now())
+        const p = clubPulse(performance.now(), 124)
         const b = technoBeat(wall)
         if (b.kick > 0 && b.beat !== lastKickBeat) {
           kicks++
