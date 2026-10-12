@@ -10,9 +10,11 @@ import { liveTraffic, crossingSignal } from './traffic/live'
 import { useThought, placeChip } from '../game/thoughts'
 import { SEASON } from './season'
 import { SHIRTS, PANTS, SKIN, HAIR, BEANIES } from './people'
+import { headGeo, legGeo, torsoGeo } from './peopleGeo'
 import { dayPhase, nightAmount } from './dayNight'
 import { isNight } from '../game/clock'
 import { CLUB } from './clubLayout'
+import { storeDoors, STORE_DEFS } from '../game/storeDoors'
 
 const LEG_SIDES = [-1, 1]
 
@@ -32,6 +34,9 @@ const extraPeople = (level: number) => Math.min(10, Math.floor(level / 2))
 const LEG = 0.24
 // Figures are modelled at race-crowd proportions and drawn a little bigger so they read from the town camera.
 const SCALE = 1.3
+const TORSO = torsoGeo()
+const HEAD = headGeo()
+const LEGS = legGeo(LEG)
 
 
 const NAMES = ['Alex', 'Sam', 'Jordan', 'Riley', 'Casey', 'Morgan', 'Taylor', 'Jamie', 'Quinn', 'Avery', 'Rowan', 'Skyler', 'Drew', 'Kai', 'Robin', 'Charlie', 'Frankie', 'Jesse', 'Remy', 'Sage']
@@ -180,7 +185,8 @@ function person(id: string, home: string, pos: Pt): Person {
 
 type Places = ReturnType<typeof destinations>
 type Club = { dest: Dest; center: Pt; turn: number }
-type Ctx = { graph: WalkGraph; places: Places; dirty: { current: boolean }; queues: Map<string, Person[]>; gates: Map<string, number> }
+// `stores`: the walk in to a big store's doors, by building key (see storeDoors).
+type Ctx = { graph: WalkGraph; places: Places; dirty: { current: boolean }; queues: Map<string, Person[]>; gates: Map<string, number>; stores: Map<string, Pt[]> }
 
 // Places worth walking to, sorted by what kind of outing they make.
 function destinations(g: WalkGraph) {
@@ -227,6 +233,13 @@ export function Townspeople() {
   }, [roadsList, footprint, land])
   const planned = useRef<WalkGraph | null>(null)
   const places = useMemo(() => destinations(graph), [graph])
+  // Merged travel stops: people cross the forecourt and go in at the doors.
+  const storeKey = useGame((s) => (s.visiting ?? s).buildings.filter((b) => STORE_DEFS.includes(b.def)).map((b) => `${b.uid}:${b.x},${b.z}:${b.merge ?? ''}:${b.mturn ?? ''}:${buildingLevel(b)}`).join('|'))
+  const stores = useMemo(() => {
+    void storeKey
+    const s = useGame.getState()
+    return storeDoors((s.visiting ?? s).buildings, new Set(roadsList))
+  }, [storeKey, roadsList])
   const people = useRef<Person[]>([])
   const colorsDirty = useRef(true)
   const queues = useRef(new Map<string, Person[]>())
@@ -328,7 +341,7 @@ export function Townspeople() {
     const dt = Math.min(rawDt, 0.1)
     const list = people.current
     const night = nightAmount(dayPhase()) > 0.5
-    const ctx: Ctx = { graph, places, dirty: colorsDirty, queues: queues.current, gates: gates.current }
+    const ctx: Ctx = { graph, places, dirty: colorsDirty, queues: queues.current, gates: gates.current, stores }
     const t = torso.current
     const hd = head.current
     const hr = hair.current
@@ -441,20 +454,20 @@ export function Townspeople() {
   return (
     <group scale={SCALE}>
       <instancedMesh ref={torso} args={[undefined, undefined, MAX_PEOPLE]} frustumCulled={false} castShadow={!SMALL}>
-        <capsuleGeometry args={[0.085, 0.16, 3, 8]} />
-        <meshStandardMaterial />
+        <primitive object={TORSO} attach="geometry" />
+        <meshStandardMaterial vertexColors />
       </instancedMesh>
       <instancedMesh ref={head} args={[undefined, undefined, MAX_PEOPLE]} frustumCulled={false}>
-        <sphereGeometry args={[0.08, 10, 8]} />
-        <meshStandardMaterial />
+        <primitive object={HEAD} attach="geometry" />
+        <meshStandardMaterial vertexColors />
       </instancedMesh>
       <instancedMesh ref={hair} args={[undefined, undefined, MAX_PEOPLE]} frustumCulled={false}>
         <sphereGeometry args={[0.085, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2]} />
         <meshStandardMaterial />
       </instancedMesh>
       <instancedMesh ref={legs} args={[undefined, undefined, MAX_PEOPLE * 2]} frustumCulled={false}>
-        <boxGeometry args={[0.06, LEG, 0.07]} />
-        <meshStandardMaterial />
+        <primitive object={LEGS} attach="geometry" />
+        <meshStandardMaterial vertexColors />
       </instancedMesh>
       <instancedMesh ref={items} args={[undefined, undefined, MAX_PEOPLE]} frustumCulled={false}>
         <boxGeometry args={[1, 1, 1]} />
@@ -576,6 +589,10 @@ function setOff(ctx: Ctx, p: Person, night: boolean) {
     p.si = 0
     const last = g.nodes[goal!]
     if (last.kind === 't') settle(p, last)
+    // Across the forecourt and in at a big store's doors (and back out the same way).
+    for (const q of ctx.stores.get(d.key) ?? []) p.steps.push({ p: [...q] })
+    const out = p.state === 'inside' ? ctx.stores.get(p.at) : undefined
+    if (out) p.steps.unshift(...[...out].reverse().map((q): Step => ({ p: [...q] })))
     if (p.state === 'inside') {
       // Step out of the front door.
       const first = p.steps[0]

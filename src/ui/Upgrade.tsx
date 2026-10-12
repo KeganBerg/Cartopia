@@ -13,6 +13,7 @@ import { BuildingModel } from '../scene/BuildingModel'
 import { VanguardTower } from '../scene/Landmark'
 import { frame, seat } from '../scene/fit'
 import { Panel } from './Menus'
+import { RaveButton } from './Techno'
 
 const n = (v: number) => v.toLocaleString()
 const time = (sec: number) => (sec >= 60 ? `${Math.floor(sec / 60)}m${sec % 60 ? ` ${sec % 60}s` : ''}` : `${sec}s`)
@@ -76,6 +77,17 @@ function Pips({ level }: { level: number }) {
   )
 }
 
+// The cars that love this business, as pictures: a tap opens the showroom on one.
+function FanStrip({ fans, go }: { fans: typeof CARS; go: () => void }) {
+  return (
+    <button className="driver-fans" onClick={go} title={fans.map((c) => c.name).join(', ')}>
+      <span className="driver-fans-tag">❤️ +25%</span>
+      {fans.slice(0, 5).map((c) => <CarThumb key={c.id} size="xs" color={c.colors[0]} body={c.body} model={c.id} />)}
+      <span className="driver-fans-go">➜</span>
+    </button>
+  )
+}
+
 // Who drives for this business: pick one of your cars, favourites first.
 function Driver({ b, d }: { b: PlacedBuilding; d: BuildingDef }) {
   const cars = useGame((s) => s.cars)
@@ -90,6 +102,7 @@ function Driver({ b, d }: { b: PlacedBuilding; d: BuildingDef }) {
   const workplace = (uid: string) => buildings.find((o) => o.car === uid && o.uid !== b.uid)
   const sorted = [...cars].sort((x, y) => Number(loves(carDef(y.model), d.id)) - Number(loves(carDef(x.model), d.id)))
   const anyFan = cars.some((c) => loves(carDef(c.model), d.id))
+  const shopFans = () => s.focusShop(fans.some((f) => !f.rescueOnly) ? 'showroom' : 'rescue', fans.find((f) => !f.rescueOnly)?.id ?? null)
 
   if (car && !picking) {
     const cd = carDef(car.model)
@@ -109,12 +122,10 @@ function Driver({ b, d }: { b: PlacedBuilding; d: BuildingDef }) {
         </div>
         {broken && (
           <button className="upgrade-short" onClick={() => { s.selectCar(car.uid); s.openPanel('flat') }}>
-            {car.flat ? '🛞 It has a flat tire.' : '⛽ It ran out of gas.'} Fix it to get the bonus back.
+            {car.flat ? '🛞 Flat tire' : '⛽ Out of gas'} · Fix
           </button>
         )}
-        {!broken && !loves(cd, d.id) && fans.length > 0 && (
-          <p className="card-stat driver-tip">A car that loves the {d.name} earns +25%: {fans.map((c) => c.name).join(', ')}.</p>
-        )}
+        {!broken && !loves(cd, d.id) && fans.length > 0 && <FanStrip fans={fans} go={shopFans} />}
       </div>
     )
   }
@@ -122,10 +133,10 @@ function Driver({ b, d }: { b: PlacedBuilding; d: BuildingDef }) {
   return (
     <div className="driver">
       <div className="driver-head">
-        {car ? 'Pick a new driver' : 'Put a car to work here'}
+        {car ? '🚗 New driver' : '🚗 Driver'}
         {picking && <button className="driver-cancel" onClick={() => setPicking(false)}>Cancel</button>}
       </div>
-      <p className="card-stat driver-tip">A driver adds +10% to every job (${n(Math.round(base * 1.1))}), or +25% (${n(Math.round(base * 1.25))}) if it ❤️ loves the {d.name}.</p>
+      <p className="card-stat driver-tip" title={`A driver adds +10% to every job, or +25% if it loves the ${d.name}`}>+10% ${n(Math.round(base * 1.1))} · ❤️ +25% ${n(Math.round(base * 1.25))}</p>
       <div className="driver-list">
         {sorted.map((c) => {
           const cd = carDef(c.model)
@@ -141,11 +152,7 @@ function Driver({ b, d }: { b: PlacedBuilding; d: BuildingDef }) {
         })}
       </div>
       {car && <button className="driver-remove" onClick={() => { assign(b.uid, null); setPicking(false) }}>Take {carDef(car.model).name} off this job</button>}
-      {!anyFan && fans.length > 0 && (
-        <button className="upgrade-short" onClick={() => s.focusShop(fans.some((f) => !f.rescueOnly) ? 'showroom' : 'rescue', fans.find((f) => !f.rescueOnly)?.id ?? null)}>
-          None of your cars love the {d.name} yet. These do: {fans.map((c) => c.name).join(', ')}. How do I get one?
-        </button>
-      )}
+      {!anyFan && fans.length > 0 && <FanStrip fans={fans} go={shopFans} />}
     </div>
   )
 }
@@ -197,7 +204,7 @@ export function UpgradePanel() {
         <LevelPreview def={d} level={next} landmark={becomes} />
         <Pips level={lvl} />
         {max ? (
-          <p className="upgrade-max">⭐ Max level! Your {name} is as fancy as it gets.</p>
+          <p className="upgrade-max">⭐ Max level</p>
         ) : (
           <>
             <table className="upgrade-stats">
@@ -208,21 +215,17 @@ export function UpgradePanel() {
                 ))}
               </tbody>
             </table>
-            <p className="card-stat upgrade-note">{d.id === 'trailer'
-              ? 'Every level adds 1 max fuel and more residents. It becomes a double-wide at level 4 and a trailer court at level 7, on the same lot.'
-              : d.kind === 'house'
-              ? 'Every level adds 1 max fuel and more residents. Homes grow into apartments at level 4 and a sky tower at level 7, on the same lot.'
-              : 'Each level makes it taller and fancier on the same lot.'}</p>
             <button className={`buy upgrade-buy${shortCoins || shortParts ? ' short' : ''}`} onClick={() => s.upgradeBuilding(b.uid)}>
               ⬆ Upgrade · ${n(cost.coins)}{cost.parts ? ` · ⚙ ${cost.parts}` : ''}
             </button>
             {(shortCoins > 0 || shortParts > 0) && (
               <button className="upgrade-short" onClick={() => (shortCoins ? s.showNeed('coins', shortCoins, `upgrading your ${name}`) : s.showNeed('parts', shortParts, `upgrading your ${name}`))}>
-                You need {shortCoins ? `$${n(shortCoins)} more` : ''}{shortCoins && shortParts ? ' and ' : ''}{shortParts ? `${shortParts} more parts` : ''}. How do I get more?
+                Need {[shortCoins && `$${n(shortCoins)}`, shortParts && `⚙ ${shortParts}`].filter(Boolean).join(' · ')} ➜
               </button>
             )}
           </>
         )}
+        {d.id === 'club' && <RaveButton onStart={close} />}
         {takesDriver(d) && <Driver b={b} d={d} />}
       </div>
     </Panel>
@@ -247,7 +250,6 @@ export function ShopUpgrades() {
   if (!sorted.length) return null
   return (
     <section>
-      <p className="hint">Upgraded buildings grow taller and fancier. Businesses pay more and finish jobs sooner, and homes add max fuel as they grow into apartments and sky towers. Cheapest first.</p>
       <div className="upgrade-list">
         {sorted.map((b) => {
           const d = buildingDef(b.def)

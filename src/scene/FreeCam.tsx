@@ -38,6 +38,13 @@ export function FreeCam() {
   useEffect(() => {
     if (mode !== 'play') setFreeCam(false)
   }, [mode])
+  // Heading into someone's town, or back home, starts on the bird's-eye view.
+  const town = useGame((s) => s.visiting?.ownerId ?? null)
+  const was = useRef(town)
+  useEffect(() => {
+    if (was.current !== town) setFreeCam(false)
+    was.current = town
+  }, [town])
   return on && mode === 'play' ? (
     <>
       <Rig />
@@ -93,6 +100,8 @@ function Rig() {
     keepIn(to)
     rig.current = { cur: { ...from }, goal: { ...from }, vel: { x: 0, z: 0, yaw: 0 }, held: false, swoop: { t: 0, from, to } }
     cam.current = c
+    // Dev builds only: lets headless screenshot scripts set a pose.
+    if (import.meta.env.DEV) (window as unknown as { __freeRig?: unknown }).__freeRig = rig
     place(c, from)
     set({ camera: c })
     return () => {

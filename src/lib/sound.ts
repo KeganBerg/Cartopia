@@ -6,6 +6,9 @@ import { choir, glock, hz, marimba, pluck, shaker, softKick, vibes, woodblock } 
 
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
+// Sound effects and engines go through their own fader into the master, so
+// Settings can turn them down without touching the music or town sounds.
+let effects: GainNode | null = null
 let muted = (() => {
   try {
     return localStorage.getItem('cartopia-muted') === '1'
@@ -23,6 +26,34 @@ let volume = (() => {
   }
 })()
 
+// A safety net on the master output: untouched below -6 dBFS, rounding off
+// anything louder instead of clipping, so a level-up landing on a collect, the
+// music and the town sounds never crackles on phone speakers.
+export function softClipCurve(n = 4097) {
+  const c = new Float32Array(n)
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 2 - 1
+    const a = Math.abs(x)
+    c[i] = Math.sign(x) * (a <= 0.5 ? a : 0.5 + 0.5 * Math.tanh((a - 0.5) / 0.5))
+  }
+  return c
+}
+function softClip(c: BaseAudioContext) {
+  const w = c.createWaveShaper()
+  w.curve = softClipCurve()
+  w.oversample = '2x'
+  return w
+}
+
+let effectsVolume = (() => {
+  try {
+    const v = localStorage.getItem('cartopia-sfx-volume')
+    return v !== null && Number.isFinite(Number(v)) ? Math.min(1, Math.max(0, Number(v))) : 1
+  } catch {
+    return 1
+  }
+})()
+
 const listeners = new Set<() => void>()
 const hidden = () => typeof document !== 'undefined' && document.hidden
 
@@ -33,7 +64,10 @@ function audio() {
       ctx = new AudioContext()
       master = ctx.createGain()
       master.gain.value = volume
-      master.connect(ctx.destination)
+      master.connect(softClip(ctx)).connect(ctx.destination)
+      effects = ctx.createGain()
+      effects.gain.value = effectsVolume
+      effects.connect(master)
     } catch {
       return null
     }
@@ -62,6 +96,8 @@ if (typeof document !== 'undefined') document.addEventListener('visibilitychange
 // The shared context and master output for other synthesised audio; null while muted.
 export const audioContext = () => audio()
 export const audioOut = (): AudioNode | null => (audio() ? master : null)
+// The effects fader: sound effects, engines and the arcade play through this.
+export const sfxOut = (): AudioNode | null => (audio() ? effects : null)
 
 // iPhone: audio may only start inside a tap, and the ring/silent switch mutes
 // web audio unless the page asks for media playback.
@@ -111,6 +147,17 @@ export function setVolume(v: number) {
   if (ctx && master && !muted && !hidden()) master.gain.setTargetAtTime(volume, ctx.currentTime, 0.05)
   listeners.forEach((l) => l())
 }
+export const getSfxVolume = () => effectsVolume
+export function setSfxVolume(v: number) {
+  effectsVolume = Math.min(1, Math.max(0, v))
+  try {
+    localStorage.setItem('cartopia-sfx-volume', String(effectsVolume))
+  } catch {
+    /* storage unavailable */
+  }
+  if (ctx && effects) effects.gain.setTargetAtTime(effectsVolume, ctx.currentTime, 0.05)
+  listeners.forEach((l) => l())
+}
 export function onMuteChange(l: () => void) {
   listeners.add(l)
   return () => listeners.delete(l)
@@ -119,8 +166,8 @@ export function onMuteChange(l: () => void) {
 // Each effect is played on a little instrument (see instruments.ts) rather than a raw beep.
 function play(f: (d: { ctx: BaseAudioContext; out: AudioNode }, t: number) => void, delay = 0) {
   const a = audio()
-  if (!a || !master) return
-  f({ ctx: a, out: master }, a.currentTime + 0.005 + delay)
+  if (!a || !effects) return
+  f({ ctx: a, out: effects }, a.currentTime + 0.005 + delay)
 }
 
 // A soft car horn: two filtered reed-like tones, not square-wave beeps.
@@ -135,8 +182,8 @@ function horn(d: { ctx: BaseAudioContext; out: AudioNode }, t: number) {
     o.type = 'sawtooth'
     o.frequency.value = f
     g.gain.setValueAtTime(0, t)
-    g.gain.linearRampToValueAtTime(0.03, t + 0.02)
-    g.gain.setValueAtTime(0.03, t + 0.3)
+    g.gain.linearRampToValueAtTime(0.045, t + 0.02)
+    g.gain.setValueAtTime(0.045, t + 0.3)
     g.gain.exponentialRampToValueAtTime(0.0001, t + 0.4)
     o.connect(g).connect(lp)
     o.start(t)
@@ -144,23 +191,62 @@ function horn(d: { ctx: BaseAudioContext; out: AudioNode }, t: number) {
   }
 }
 
+// The mid-range body of a thud: phone speakers can't play a kick drum's low
+// thump, so anything that lands or bumps gets this knock on top to be heard.
+export function knock(d: { ctx: BaseAudioContext; out: AudioNode }, t: number, freq = 420, vol = 0.1) {
+  const o = d.ctx.createOscillator()
+  const g = d.ctx.createGain()
+  const lp = d.ctx.createBiquadFilter()
+  o.type = 'triangle'
+  o.frequency.setValueAtTime(freq * 1.8, t)
+  o.frequency.exponentialRampToValueAtTime(freq, t + 0.04)
+  lp.type = 'lowpass'
+  lp.frequency.value = freq * 5
+  g.gain.setValueAtTime(0, t)
+  g.gain.linearRampToValueAtTime(vol, t + 0.003)
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14)
+  o.connect(lp).connect(g).connect(d.out)
+  o.start(t)
+  o.stop(t + 0.16)
+  shaker(d, t, vol * 0.5, 0.05, freq * 6)
+}
+
+// The coin sound: two bright bell notes with a little sparkle on top.
+function coinChime(d: { ctx: BaseAudioContext; out: AudioNode }, t: number, v: number) {
+  glock(d, t, hz('B5'), 0.07 * v, 0.5)
+  glock(d, t + 0.07, hz('E6'), 0.085 * v, 1)
+  glock(d, t + 0.07, hz('E7'), 0.012 * v, 0.4)
+}
+
 const arp = (notes: string[], gap: number, inst: typeof marimba, vol: number) => (d: { ctx: BaseAudioContext; out: AudioNode }, t: number) =>
   notes.forEach((n, i) => inst(d, t + i * gap, hz(n), vol))
 
 export const sfx = {
   click: () => play((d, t) => woodblock(d, t, 1300, 0.09)),
-  coin: () => play((d, t) => {
-    glock(d, t, hz('B5'), 0.06, 0.5)
-    glock(d, t + 0.07, hz('E6'), 0.07, 0.9)
+  coin: () => play((d, t) => coinChime(d, t, 1)),
+  // Collect All: a short cascade of coins, longer the more it gathered.
+  coins: (n: number) => play((d, t) => {
+    const k = Math.max(1, Math.min(6, Math.round(n)))
+    coinChime(d, t, 1)
+    const run = ['G6', 'B6', 'D7', 'E7', 'G7']
+    for (let i = 1; i < k; i++) glock(d, t + 0.1 + i * 0.055, hz(run[i - 1]), 0.035, 0.5)
+    if (k > 2) shaker(d, t + 0.08, 0.025, 0.06 * k, 6500)
   }),
   start: () => play(arp(['G4', 'D5'], 0.08, marimba, 0.12)),
+  // A gentle "uh-uh": low enough to read as no, an octave up so phones play it.
   error: () => play((d, t) => {
-    marimba(d, t, hz('E3'), 0.14, 0.35)
-    marimba(d, t + 0.12, hz('C3'), 0.14, 0.45)
+    marimba(d, t, hz('E4'), 0.1, 0.3)
+    marimba(d, t, hz('E3'), 0.07, 0.3)
+    marimba(d, t + 0.12, hz('C4'), 0.1, 0.4)
+    marimba(d, t + 0.12, hz('C3'), 0.07, 0.4)
   }),
+  // The biggest everyday moment: a harp run up to a bell, with a soft choir under it.
   levelUp: () => play((d, t) => {
-    arp(['C4', 'E4', 'G4', 'C5', 'E5', 'G5'], 0.07, pluck, 0.13)(d, t)
-    glock(d, t + 0.42, hz('C6'), 0.07, 1.4)
+    arp(['C4', 'E4', 'G4', 'C5', 'E5', 'G5'], 0.07, pluck, 0.17)(d, t)
+    glock(d, t + 0.42, hz('C6'), 0.09, 1.6)
+    vibes(d, t + 0.42, hz('G5'), 0.05, 2)
+    choir(d, t + 0.1, [hz('C4'), hz('G4'), hz('E5')], 0.022, 1.1)
+    softKick(d, t + 0.42, 0.1)
   }),
   buy: () => play((d, t) => {
     arp(['G4', 'B4', 'D5'], 0.06, marimba, 0.11)(d, t)
@@ -179,8 +265,9 @@ export const sfx = {
   lose: () => play(arp(['A3', 'F3', 'D3'], 0.2, pluck, 0.3)),
   // A flying car's engine catching then cutting: a soft thump with a puff of exhaust.
   putt: () => play((d, t) => {
-    softKick(d, t, 0.16)
-    shaker(d, t + 0.01, 0.03, 0.12, 900)
+    softKick(d, t, 0.14)
+    knock(d, t, 320, 0.16)
+    shaker(d, t + 0.01, 0.05, 0.14, 900)
   }),
   // Hover jets lighting up: a low rush of air that swells and fades.
   jet: () => play((d, t) => {
@@ -197,7 +284,7 @@ export const sfx = {
     lp.frequency.exponentialRampToValueAtTime(500, t + len)
     const g = d.ctx.createGain()
     g.gain.setValueAtTime(0.0001, t)
-    g.gain.exponentialRampToValueAtTime(0.12, t + 0.25)
+    g.gain.exponentialRampToValueAtTime(0.22, t + 0.25)
     g.gain.exponentialRampToValueAtTime(0.0001, t + len)
     src.connect(lp).connect(g).connect(d.out)
     src.start(t)
@@ -218,7 +305,7 @@ export const sfx = {
     bp.frequency.exponentialRampToValueAtTime(2600, t + len)
     const g = d.ctx.createGain()
     g.gain.setValueAtTime(0.0001, t)
-    g.gain.exponentialRampToValueAtTime(0.16, t + 0.08)
+    g.gain.exponentialRampToValueAtTime(0.3, t + 0.08)
     g.gain.exponentialRampToValueAtTime(0.0001, t + len)
     src.connect(bp).connect(g).connect(d.out)
     src.start(t)
@@ -312,11 +399,13 @@ export const rescueSfx = {
   // The hook bites: a metal clunk.
   clunk: () => play((d, t) => {
     woodblock(d, t, 520, 0.1)
+    knock(d, t, 440, 0.08)
     marimba(d, t, hz('A2'), 0.1, 0.2)
   }),
   // A find lands: a car settles onto the tow line, a small find drops in the bed.
   land: (car: boolean) => play((d, t) => {
-    softKick(d, t, car ? 0.16 : 0.07)
+    softKick(d, t, car ? 0.14 : 0.07)
+    knock(d, t, car ? 340 : 520, car ? 0.18 : 0.07)
     if (car) marimba(d, t + 0.02, hz('G2'), 0.12, 0.3)
     else woodblock(d, t, 1700, 0.05)
   }),
@@ -335,6 +424,50 @@ export const rescueSfx = {
     pluck(d, t + 0.4, hz('C3'), 0.13)
     softKick(d, t + 0.4, 0.14)
     if (big) choir(d, t + 0.4, [hz('C4'), hz('G4'), hz('E5')], 0.025, 2)
+  }),
+}
+
+// Crate openings: a swell while the crate strains, and a reveal that says how good the pull is.
+export const crateSfx = {
+  // The glow building inside: a rising choir and a quickening shimmer.
+  charge: (len: number) => play((d, t) => {
+    choir(d, t, [hz('G3'), hz('D4')], 0.012, len * 0.7)
+    let at = 0
+    const notes = ['G5', 'A5', 'B5', 'D6', 'E6', 'G6', 'A6', 'B6', 'D7']
+    for (let i = 0; at < len; i++) {
+      glock(d, t + at, hz(notes[Math.min(i, notes.length - 1)]), 0.012 + (at / len) * 0.03, 0.4)
+      at += 0.16 - (at / len) * 0.11
+    }
+  }),
+  // 0 coins or a common part, 1 a good part or a jackpot, 2 rare, 3 a car or legendary skin.
+  reveal: (tier: number, coins: boolean) => play((d, t) => {
+    if (tier === 0) {
+      if (coins) {
+        coinChime(d, t, 1)
+        for (const [i, n] of ['G6', 'B6', 'D7'].entries()) glock(d, t + 0.12 + i * 0.06, hz(n), 0.03, 0.5)
+      } else arp(['G4', 'B4', 'D5'], 0.06, marimba, 0.12)(d, t)
+      return
+    }
+    if (tier === 1) {
+      for (const n of ['C4', 'E4', 'G4']) marimba(d, t, hz(n), 0.11)
+      glock(d, t + 0.1, hz('C6'), 0.07, 1.2)
+      glock(d, t + 0.17, hz('G6'), 0.04, 1)
+      return
+    }
+    if (tier === 2) {
+      arp(['D4', 'F#4', 'A4', 'D5', 'F#5', 'A5'], 0.06, pluck, 0.15)(d, t)
+      vibes(d, t + 0.36, hz('A5'), 0.07)
+      glock(d, t + 0.36, hz('D6'), 0.08, 1.6)
+      choir(d, t, [hz('D4'), hz('A4')], 0.016, 1.2)
+      return
+    }
+    arp(['C4', 'E4', 'G4', 'C5', 'E5', 'G5', 'C6'], 0.05, pluck, 0.16)(d, t)
+    choir(d, t, [hz('C4'), hz('G4'), hz('E5')], 0.03, 2.2)
+    vibes(d, t + 0.36, hz('G5'), 0.08)
+    glock(d, t + 0.36, hz('C7'), 0.06, 1.8)
+    glock(d, t + 0.36, hz('E6'), 0.07, 1.8)
+    softKick(d, t + 0.36, 0.12)
+    knock(d, t + 0.36, 400, 0.08)
   }),
 }
 

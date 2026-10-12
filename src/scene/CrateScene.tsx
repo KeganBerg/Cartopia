@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import {
   AdditiveBlending, CanvasTexture, Color, DoubleSide, MeshBasicMaterial, MeshStandardMaterial, Object3D, RepeatWrapping, SRGBColorSpace,
-  Vector3, type Group, type PerspectiveCamera, type InstancedMesh, type Mesh, type PointLight, type Points, type SpotLight,
+  Quaternion, Vector3, type Group, type PerspectiveCamera, type InstancedMesh, type Mesh, type PointLight, type Points, type SpotLight,
 } from 'three'
 import { CarModel, carSize } from './CarModel'
 import { holdTown } from './renderGate'
@@ -17,8 +17,12 @@ import { ToolChest, TyreStack, useFitCamera } from './ArcadeScenery'
 import { tickSkins, withSkin } from './skins'
 import { MODS, SKINNED_SLOTS, carDef, fittedMods, modFits, modSkinNumber, skinNumber, type Body, type Finish, type SkinnedSlot } from '../game/data'
 import { dropTier, type CrateDef, type CrateDrop, type CrateId } from '../game/crates'
-import { bumpSound, crashSound, dingSound } from '../lib/arcadeSound'
-import { sfx } from '../lib/sound'
+import { calmFlashing } from '../game/flashing'
+import { bumpSound } from '../lib/arcadeSound'
+import { crateOpenSound } from '../lib/crateOpenSfx'
+import { crateSfx, sfx } from '../lib/sound'
+import { landClink } from '../lib/crateClinks'
+import { PartPrize } from './PartPrize'
 
 // The Crate Depot: a warehouse loading bay at night where crates are opened. The crate sits on a
 // hazard-striped lift under a work lamp, racking full of stock either side, a forklift parked up,
@@ -35,6 +39,25 @@ export const REVEAL_AT = SETTLE
 
 // How exciting a prize is, as a glow colour: coins, a part or jackpot, a gem part, a car.
 export const TIER_GLOW = ['#4fc3f7', '#b388ff', '#ff4fd8', '#ffb300'] as const
+
+// How each crate bursts open, grander the rarer the crate: Street pops its lid off, Garage's
+// lid lifts away on the beam while its sides roll down like shutters, Gold swings its lid back
+// like a treasure chest and Diamond shatters into crystal shards.
+type OpenStyle = 'pop' | 'roll' | 'chest' | 'shatter'
+const OPEN_STYLE: Record<CrateId, OpenStyle> = { street: 'pop', garage: 'roll', gold: 'chest', diamond: 'shatter' }
+// Which sides end up lying open on the floor (front, back, left, right): coins land on those.
+type Flaps = readonly boolean[]
+const ALL_FLAPS: Flaps = [true, true, true, true]
+const NO_FLAPS: Flaps = [false, false, false, false]
+const FLAPS: Record<OpenStyle, Flaps> = { pop: ALL_FLAPS, roll: NO_FLAPS, chest: [true, false, true, true], shatter: NO_FLAPS }
+// How big each style's moment is: confetti thrown, the flash, the camera's kick and push in,
+// and how far the camera swings round the crate.
+const DRAMA: Record<OpenStyle, { confetti: number; flash: number; kick: number; push: number; orbit: number; beam: number }> = {
+  pop: { confetti: 0.45, flash: 35, kick: 0.05, push: 0.25, orbit: 0, beam: 0.85 },
+  roll: { confetti: 0.65, flash: 45, kick: 0.06, push: 0.3, orbit: 0, beam: 1 },
+  chest: { confetti: 1, flash: 90, kick: 0.08, push: 0.35, orbit: 0, beam: 1.3 },
+  shatter: { confetti: 1, flash: 120, kick: 0.15, push: 0.45, orbit: 0.25, beam: 1.4 },
+}
 
 function rng(seed: number) {
   let s = seed % 2147483647 || 1
@@ -548,11 +571,43 @@ function PrizeCar({ look }: { look: CarLook }) {
 
 // A shower of gold coins thrown out of the crate: each one tumbles through the
 // air, bounces once or twice, then slides to a stop lying flat on the floor.
-const COINS = 70
+const COINS = 110
 // Coins, or for a rare or legendary pull cut gems (a six-sided table cut), thrown the same way.
 const SHAPES = {
   coin: { r: 0.11, h: 0.025 },
   gem: { r: 0.1, h: 0.07 },
+}
+// How a shower is thrown, picked at random each opening (a big win always heaps up a pile).
+// Each sets how many fly, every piece's launch and delay, and the note its clink rings at.
+type BurstPattern = 'fountain' | 'spiral' | 'ring' | 'rain' | 'pile'
+const BURST_PATTERNS: BurstPattern[] = ['fountain', 'spiral', 'ring', 'rain']
+type Launch = { vx: number; vy: number; vz: number; delay: number; tune?: number }
+const BURSTS: Record<BurstPattern, { n: number; launch: (i: number, n: number, r: () => number) => Launch }> = {
+  // Up and out in a loose spray, tipped toward the camera.
+  fountain: { n: 70, launch: (i, n, r) => {
+    const a = r() * Math.PI * 2, sp = 1.2 + r() * 2.6
+    return { vx: Math.cos(a) * sp, vy: 4.5 + r() * 3.5, vz: Math.sin(a) * sp * 0.7 + 0.6, delay: (i / n) * 0.5 }
+  } },
+  // One after another round a turning arm that reaches further each time; the clinks climb.
+  spiral: { n: 70, launch: (i, n, r) => {
+    const k = i / n, a = k * Math.PI * 3.2, sp = 0.9 + k * 2.8
+    return { vx: Math.cos(a) * sp, vy: 5.2 + r() * 0.6, vz: Math.sin(a) * sp * 0.8 + 0.2, delay: k * 0.9, tune: 0.8 + k * 0.5 }
+  } },
+  // All at once, evenly round two rings, so they land as a splash of two circles ringing in fifths.
+  ring: { n: 72, launch: (i, n) => {
+    const inner = i % 2 === 0, a = (i / n) * Math.PI * 2 + (inner ? 0.09 : 0), sp = inner ? 1.65 : 2.6
+    return { vx: Math.cos(a) * sp, vy: 5, vz: Math.sin(a) * sp * 0.85 + 0.15, delay: inner ? 0.07 : 0, tune: inner ? 1.5 : 1 }
+  } },
+  // Shot high out of sight, then raining down scattered over a second and a bit: a steady patter.
+  rain: { n: 70, launch: (i, n, r) => {
+    const a = r() * Math.PI * 2, sp = 0.4 + r() * 1.9
+    return { vx: Math.cos(a) * sp, vy: 10 + r() * 1.5, vz: Math.sin(a) * sp * 0.75 + 0.35, delay: (i / n) * 1.2 + r() * 0.1 }
+  } },
+  // A big win: a heavy, low heave in two waves that heaps up round the crate, with deeper clinks.
+  pile: { n: 110, launch: (i, n, r) => {
+    const a = r() * Math.PI * 2, sp = 0.2 + r() * r() * 2.4
+    return { vx: Math.cos(a) * sp, vy: 3.4 + r() * 2.4, vz: Math.sin(a) * sp * 0.8 + 0.25, delay: (i % 2) * 0.35 + (i / n) * 0.35, tune: 0.72 + r() * 0.18 }
+  } },
 }
 // Snap an angle to the nearest face-up/face-down orientation.
 const flatOf = (a: number) => Math.round(a / Math.PI) * Math.PI
@@ -560,30 +615,33 @@ const flatOf = (a: number) => Math.round(a / Math.PI) * Math.PI
 // around it (hinged 0.15 up, tipped just short of flat so the far end rises a little), the lift
 // or the depot floor.
 const CRATE_FLOOR = LIFT + 0.15
-function groundAt(x: number, z: number) {
+// `flaps` says which sides lie open on the floor, in the panels' order (front, back, left, right).
+function groundAt(x: number, z: number, flaps: Flaps = ALL_FLAPS) {
   const ax = Math.abs(x), az = Math.abs(z)
   const h = S / 2
   if (ax < h && az < h) return CRATE_FLOOR
-  const out = ax >= h && az < h ? ax - h : az >= h && ax < h ? az - h : -1
-  if (out >= 0 && out < S) return CRATE_FLOOR + 0.08 + out * 0.07
+  const side = ax >= h && az < h ? (x < 0 ? 2 : 3) : az >= h && ax < h ? (z > 0 ? 0 : 1) : -1
+  const out = side >= 2 ? ax - h : az - h
+  if (side >= 0 && flaps[side] && out < S) return CRATE_FLOOR + 0.08 + out * 0.07
   return Math.hypot(x, z) < 1.5 ? LIFT : 0
 }
-function CoinBurst({ start, gems = false }: { start: React.RefObject<number | null>; gems?: boolean }) {
+function CoinBurst({ start, gems = false, big = false, style = 'pop' }: { start: React.RefObject<number | null>; gems?: boolean; big?: boolean; style?: OpenStyle }) {
+  const flaps = FLAPS[style]
   const { r: COIN_R, h: COIN_H } = SHAPES[gems ? 'gem' : 'coin']
   const ref = useRef<InstancedMesh>(null)
   const tmp = useMemo(() => new Object3D(), [])
   const run = useRef<number | null>(null)
+  const shown = useRef(0)
   const coins = useMemo(() => {
     const r = rng(41)
-    return Array.from({ length: COINS }, (_, i) => {
-      const a = r() * Math.PI * 2, sp = 1.2 + r() * 2.6
-      return {
-        vx: Math.cos(a) * sp, vy: 4.5 + r() * 3.5, vz: Math.sin(a) * sp * 0.7 + 0.6, delay: (i / COINS) * 0.5,
-        // Flip rate (end over end) and a slower wobble, both in radians/second.
-        flip: (8 + r() * 10) * (r() < 0.5 ? -1 : 1), wob: (r() - 0.5) * 6, yaw: r() * Math.PI * 2,
-        x: 0, y: 0, z: 0, sx: 0, sy: 0, sz: 0, rx: r() * 6, rz: 0, wx: 0, wz: 0, bounces: 0, rest: false, fl: 0, live: false,
-      }
-    })
+    return Array.from({ length: COINS }, () => ({
+      vx: 0, vy: 0, vz: 0, delay: 0, tune: undefined as number | undefined,
+      // Flip rate (end over end) and a slower wobble, both in radians/second.
+      flip: (8 + r() * 10) * (r() < 0.5 ? -1 : 1), wob: (r() - 0.5) * 6, yaw: r() * Math.PI * 2,
+      x: 0, y: 0, z: 0, sx: 0, sy: 0, sz: 0, rx: r() * 6, rz: 0, wx: 0, wz: 0, bounces: 0, rest: false, fl: 0, live: false,
+      // How high it sits on the pieces that settled under it, and when it settled (-1 while flying).
+      lift: 0, settled: -1,
+    }))
   }, [])
   useFrame((state, rawDt) => {
     const m = ref.current
@@ -593,17 +651,21 @@ function CoinBurst({ start, gems = false }: { start: React.RefObject<number | nu
     // A new crate opening throws the whole shower again.
     if (run.current !== start.current) {
       run.current = start.current
-      for (const c of coins) c.live = false
+      const pattern: BurstPattern = big ? 'pile' : BURST_PATTERNS[Math.floor(Math.random() * BURST_PATTERNS.length)]
+      const { n, launch } = BURSTS[pattern]
+      const r = rng(Math.floor(Math.random() * 1e6))
+      shown.current = n
+      coins.forEach((c, i) => Object.assign(c, { live: false, lift: 0, settled: -1, tune: undefined }, i < n ? launch(i, n, r) : {}))
     }
     coins.forEach((c, i) => {
-      if (t < c.delay) {
+      if (i >= shown.current || t < c.delay) {
         tmp.position.set(0, -10, 0)
         tmp.updateMatrix()
         m.setMatrixAt(i, tmp.matrix)
         return
       }
       if (!c.live) Object.assign(c, { live: true, x: 0, y: S * 0.8, z: 0, sx: c.vx, sy: c.vy, sz: c.vz, wx: c.flip, wz: c.wob, bounces: 0, rest: false })
-      const floor = groundAt(c.x, c.z)
+      const floor = groundAt(c.x, c.z, flaps)
       if (!c.rest) {
         c.sy -= 14 * dt
         c.x += c.sx * dt
@@ -611,18 +673,26 @@ function CoinBurst({ start, gems = false }: { start: React.RefObject<number | nu
         c.z += c.sz * dt
         c.rx += c.wx * dt
         c.rz += c.wz * dt
+        // A chest's back stays standing: a piece thrown at it from inside bounces back off it.
+        const wall = -S / 2 + COIN_R
+        if (style === 'chest' && c.z < wall && c.z - c.sz * dt >= wall && c.y < S + 0.15 + LIFT) {
+          c.z = wall
+          c.sz = Math.abs(c.sz) * 0.35
+        }
         // How high the tilted coin's lowest rim sits above its centre.
         const reach = COIN_R * Math.min(1, Math.hypot(Math.sin(c.rx), Math.sin(c.rz))) + COIN_H / 2
         if (c.y < floor + reach && c.sy < 0) {
           c.y = floor + reach
           c.bounces++
+          // A soft clink as each one first lands; the bounces after stay quiet.
+          if (c.bounces === 1) landClink(gems, -c.sy, c.tune)
           // Each hit loses most of the spin and height; after a couple it lies down.
           c.sy = Math.abs(c.sy) * (c.bounces === 1 ? 0.38 : 0.22)
           c.sx *= 0.55
           c.sz *= 0.55
           c.wx *= 0.4
           c.wz *= 0.3
-          if (c.bounces >= 3 || c.sy < 0.8) Object.assign(c, { rest: true, fl: floor })
+          if (c.bounces >= 3 || c.sy < 0.8) Object.assign(c, { rest: true, fl: floor, settled: t })
         }
       } else {
         // Slide to a stop and settle flat: no more spinning on the floor.
@@ -630,19 +700,30 @@ function CoinBurst({ start, gems = false }: { start: React.RefObject<number | nu
         c.sx *= 1 - Math.min(1, 6 * dt)
         c.sz *= 1 - Math.min(1, 6 * dt)
         const nx = c.x + c.sx * dt, nz = c.z + c.sz * dt
-        const under = groundAt(nx, nz)
+        const under = groundAt(nx, nz, flaps)
         // It follows a gentle slope, stops against a step up and drops off an edge again.
         if (under > c.fl + 0.04) c.sx = c.sz = 0
         else {
           c.x = nx
           c.z = nz
-          if (under < c.fl - 0.04) Object.assign(c, { rest: false, sy: 0, bounces: 2 })
+          if (under < c.fl - 0.04) Object.assign(c, { rest: false, sy: 0, bounces: 2, lift: 0, settled: -1 })
           else c.fl = under
         }
         c.rx += (flatOf(c.rx) - c.rx) * k
         c.rz += (flatOf(c.rz) - c.rz) * k
+        // Lie on top of any piece that settled here first, so a heap stacks up instead of
+        // pieces sinking into each other. Once it stops sliding, where it sits is fixed.
+        if (Math.abs(c.sx) + Math.abs(c.sz) > 0.02 || t - c.settled < 0.3) {
+          let top = 0
+          for (let j = 0; j < shown.current; j++) {
+            const o = coins[j]
+            if (o === c || !o.rest || o.settled < 0 || o.settled > c.settled || (o.settled === c.settled && j > i)) continue
+            if (Math.abs(o.fl - c.fl) < 0.04 && Math.hypot(o.x - c.x, o.z - c.z) < COIN_R * 1.5) top = Math.max(top, o.lift + COIN_H * 0.95)
+          }
+          c.lift += (top - c.lift) * Math.min(1, 20 * dt)
+        }
         const reach = COIN_R * Math.min(1, Math.hypot(Math.sin(c.rx), Math.sin(c.rz))) + COIN_H / 2
-        c.y = c.fl + reach
+        c.y = c.fl + c.lift + reach
       }
       tmp.position.set(c.x, c.y, c.z)
       tmp.rotation.set(c.rx, c.yaw, c.rz, 'YXZ')
@@ -669,63 +750,6 @@ function CoinBurst({ start, gems = false }: { start: React.RefObject<number | nu
 }
 
 // A stack of gold coins with a big coin standing on top.
-// A part prize: a big machined cog turning on its axle, steel for coin parts and gold for gem parts.
-const TEETH = 12
-function CogPrize({ gem }: { gem: boolean }) {
-  const wheel = useRef<Group>(null)
-  useFrame((_, dt) => {
-    if (wheel.current) wheel.current.rotation.z -= Math.min(dt, 0.05) * 0.9
-  })
-  const metal = useMemo(() => new MeshStandardMaterial({ color: gem ? '#ffca28' : '#b0bec5', metalness: 1, roughness: gem ? 0.2 : 0.28, emissive: gem ? '#ff8f00' : '#263238', emissiveIntensity: gem ? 0.25 : 0.15 }), [gem])
-  const dark = useMemo(() => new MeshStandardMaterial({ color: gem ? '#8d5a00' : '#455a64', metalness: 0.9, roughness: 0.4 }), [gem])
-  useEffect(() => () => { metal.dispose(); dark.dispose() }, [metal, dark])
-  return (
-    <group position-y={0.85} scale={1.25}>
-      <group ref={wheel}>
-        {/* Rim, teeth, spokes and hub, all facing the camera. */}
-        <mesh rotation-x={Math.PI / 2} material={metal} castShadow>
-          <cylinderGeometry args={[0.4, 0.4, 0.12, 36, 1, true]} />
-        </mesh>
-        {[1, -1].map((sd) => (
-          <mesh key={sd} position-z={sd * 0.06} rotation-y={sd < 0 ? Math.PI : 0} material={metal}>
-            <ringGeometry args={[0.27, 0.4, 36]} />
-          </mesh>
-        ))}
-        <mesh rotation-x={Math.PI / 2} material={dark}>
-          <cylinderGeometry args={[0.27, 0.27, 0.1, 36, 1, true]} />
-        </mesh>
-        {Array.from({ length: TEETH }, (_, i) => {
-          const a = (i / TEETH) * Math.PI * 2
-          return (
-            <mesh key={i} position={[Math.cos(a) * 0.45, Math.sin(a) * 0.45, 0]} rotation-z={a} material={metal} castShadow>
-              <boxGeometry args={[0.13, 0.12, 0.12]} />
-            </mesh>
-          )
-        })}
-        {Array.from({ length: 5 }, (_, i) => (
-          <mesh key={i} rotation-z={(i / 5) * Math.PI * 2} position-z={0} material={metal}>
-            <boxGeometry args={[0.06, 0.56, 0.07]} />
-          </mesh>
-        ))}
-        <mesh rotation-x={Math.PI / 2} material={metal}>
-          <cylinderGeometry args={[0.11, 0.11, 0.18, 24]} />
-        </mesh>
-        <mesh rotation-x={Math.PI / 2} material={dark}>
-          <cylinderGeometry args={[0.045, 0.045, 0.19, 6]} />
-        </mesh>
-        {Array.from({ length: 5 }, (_, i) => {
-          const a = ((i + 0.5) / 5) * Math.PI * 2
-          return [1, -1].map((sd) => (
-            <mesh key={`${i}${sd}`} position={[Math.cos(a) * 0.335, Math.sin(a) * 0.335, sd * 0.065]} rotation-x={Math.PI / 2} material={dark}>
-              <cylinderGeometry args={[0.022, 0.022, 0.02, 6]} />
-            </mesh>
-          ))
-        })}
-      </group>
-    </group>
-  )
-}
-
 function CoinPile() {
   return (
     <group>
@@ -756,7 +780,7 @@ function CoinPile() {
 
 // Confetti and sparks thrown up when the lid blows.
 const BITS = 140
-function Burst({ start, glow }: { start: React.RefObject<number | null>; glow: string }) {
+function Burst({ start, glow, amount = 1 }: { start: React.RefObject<number | null>; glow: string; amount?: number }) {
   const ref = useRef<InstancedMesh>(null)
   const tmp = useMemo(() => new Object3D(), [])
   const bits = useMemo(() => {
@@ -782,6 +806,7 @@ function Burst({ start, glow }: { start: React.RefObject<number | null>; glow: s
     const t = start.current == null ? -1 : state.clock.elapsedTime - start.current
     m.visible = t >= 0 && t < 4
     if (!m.visible) return
+    m.count = Math.round(BITS * amount)
     bits.forEach((b, i) => {
       // Fall slows like paper once it's past the top of its throw.
       const drag = Math.min(t, 0.6) + Math.max(0, t - 0.6) * 0.25
@@ -798,6 +823,114 @@ function Burst({ start, glow }: { start: React.RefObject<number | null>; glow: s
     <instancedMesh ref={ref} args={[undefined, undefined, BITS]} frustumCulled={false} visible={false}>
       <planeGeometry args={[0.09, 0.05]} />
       <meshBasicMaterial side={DoubleSide} toneMapped={false} />
+    </instancedMesh>
+  )
+}
+
+// Diamond's crystal shards: the sides and lid break into pieces that fly out, spin, land
+// on the floor, lie there glinting and then shrink away.
+const SHARDS = 72
+function Shards({ start, glow }: { start: React.RefObject<number | null>; glow: string }) {
+  const ref = useRef<InstancedMesh>(null)
+  const tmp = useMemo(() => new Object3D(), [])
+  const run = useRef<number | null>(null)
+  // Seconds the shards have flown, counted in frames so a slow phone sees them land before they go.
+  const age = useRef(0)
+  const shards = useMemo(() => {
+    const r = rng(29)
+    const h = S / 2
+    return Array.from({ length: SHARDS }, (_, i) => {
+      // Where on the crate it breaks from: one of the four sides, or the lid.
+      const side = i % 5
+      const u = (r() - 0.5) * S, v = 0.15 + r() * S
+      const [x, y, z, nx, nz] = side === 0 ? [u, v, h, 0, 1] : side === 1 ? [u, v, -h, 0, -1] : side === 2 ? [-h, v, u, -1, 0] : side === 3 ? [h, v, u, 1, 0] : [u, S + 0.15, (r() - 0.5) * S, u, 0]
+      const out = 1.6 + r() * 3
+      return {
+        x0: x, y0: y + LIFT, z0: z,
+        vx0: nx * out + (r() - 0.5) * 1.5, vy0: 2 + r() * 4 + (side === 4 ? 2 : 0), vz0: nz * out * 0.9 + (r() - 0.5) * 1.5 + 0.3,
+        w: [(r() - 0.5) * 16, (r() - 0.5) * 10, (r() - 0.5) * 16] as const,
+        size: [0.07 + r() * 0.12, 0.025 + r() * 0.03, 0.05 + r() * 0.1] as const,
+        x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, rx: r() * 6, ry: r() * 6, rz: r() * 6, rest: false, bounces: 0,
+      }
+    })
+  }, [])
+  const colors = useMemo(() => {
+    const palette = ['#e1f5fe', glow, '#b3e5fc', '#ffffff', '#e1bee7']
+    return shards.map((_, i) => new Color(palette[i % palette.length]))
+  }, [shards, glow])
+  useLayoutEffect(() => {
+    const m = ref.current
+    if (!m) return
+    colors.forEach((c, i) => m.setColorAt(i, c))
+    if (m.instanceColor) m.instanceColor.needsUpdate = true
+  }, [colors])
+  useFrame((_, rawDt) => {
+    const m = ref.current
+    if (!m) return
+    const dt = Math.min(rawDt, 1 / 30)
+    // Drawn (at no size) from the start, so its material is ready before the crate breaks.
+    if (start.current == null) {
+      if (run.current !== -1) {
+        run.current = -1
+        tmp.scale.setScalar(0)
+        tmp.updateMatrix()
+        for (let i = 0; i < SHARDS; i++) m.setMatrixAt(i, tmp.matrix)
+        m.instanceMatrix.needsUpdate = true
+      }
+      return
+    }
+    if (run.current !== start.current) {
+      run.current = start.current
+      age.current = 0
+      for (const c of shards) Object.assign(c, { x: c.x0, y: c.y0, z: c.z0, vx: c.vx0, vy: c.vy0, vz: c.vz0, rest: false, bounces: 0 })
+    }
+    age.current += dt
+    m.visible = age.current < 4.2
+    if (!m.visible) return
+    // They lie there glinting for a moment, then shrink away.
+    const fade = Math.max(0, 1 - Math.max(0, age.current - 3) / 1.2)
+    shards.forEach((c, i) => {
+      const floor = groundAt(c.x, c.z, NO_FLAPS) + c.size[1] / 2
+      if (!c.rest) {
+        c.vy -= 13 * dt
+        c.x += c.vx * dt
+        c.y += c.vy * dt
+        c.z += c.vz * dt
+        c.rx += c.w[0] * dt
+        c.ry += c.w[1] * dt
+        c.rz += c.w[2] * dt
+        if (c.y < floor && c.vy < 0) {
+          c.y = floor
+          c.bounces++
+          c.vy = Math.abs(c.vy) * 0.25
+          c.vx *= 0.5
+          c.vz *= 0.5
+          if (c.bounces >= 2 || c.vy < 0.6) c.rest = true
+        }
+      } else {
+        // Slide to a stop and settle flat.
+        const k = 1 - Math.exp(-10 * dt)
+        c.vx *= 1 - Math.min(1, 5 * dt)
+        c.vz *= 1 - Math.min(1, 5 * dt)
+        c.x += c.vx * dt
+        c.z += c.vz * dt
+        c.rx += (flatOf(c.rx) - c.rx) * k
+        c.rz += (flatOf(c.rz) - c.rz) * k
+        c.y = groundAt(c.x, c.z, NO_FLAPS) + c.size[1] / 2
+      }
+      tmp.position.set(c.x, c.y, c.z)
+      tmp.rotation.set(c.rx, c.ry, c.rz)
+      tmp.scale.set(c.size[0] * fade, c.size[1] * fade, c.size[2] * fade)
+      tmp.updateMatrix()
+      m.setMatrixAt(i, tmp.matrix)
+    })
+    m.instanceMatrix.needsUpdate = true
+  })
+  return (
+    <instancedMesh ref={ref} args={[undefined, undefined, SHARDS]} castShadow frustumCulled={false}>
+      {/* A unit crystal, stretched per shard into a sliver. */}
+      <octahedronGeometry args={[1, 0]} />
+      <meshStandardMaterial color="#ffffff" metalness={0.3} roughness={0.05} emissive={glow} emissiveIntensity={0.45} flatShading />
     </instancedMesh>
   )
 }
@@ -871,9 +1004,18 @@ type StageProps = {
   skip: number
 }
 
+// Diamond's camera swing turns about the crate.
+const PIVOT = new Vector3(0, 1, 0)
+const UP = new Vector3(0, 1, 0)
+
 // One crate on the lift, from dropping in to its prize: remounted for every crate.
 function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps & { base: React.RefObject<Vector3> }) {
   const camera = useThree((s) => s.camera)
+  const style = OPEN_STYLE[def.id]
+  const drama = DRAMA[style]
+  // The camera's own facing, put back after Diamond's swing round the crate.
+  const baseQ = useRef<Quaternion | null>(null)
+  useEffect(() => () => void (drama.orbit && baseQ.current && camera.quaternion.copy(baseQ.current)), [camera, drama])
   const tier = drop ? dropTier(drop) : 0
   const glow = drop ? TIER_GLOW[tier] : def.look.glow
   const parts = useRef<CrateParts>({ root: null, lid: null, panels: [], bands: [], core: null, light: null })
@@ -882,12 +1024,14 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
   const flash = useRef<PointLight>(null)
   const burstAt = useRef<number | null>(null)
   const coinAt = useRef<number | null>(null)
-  const st = useRef({ born: -1, openAt: -1, lid: { y: 0, vy: 0, x: 0, vx: 0, rx: 0, landed: false }, revealed: false, hops: 0, skipped: skip })
+  const st = useRef({ born: -1, openAt: -1, lid: { y: 0, vy: 0, x: 0, vx: 0, rx: 0, landed: false }, revealed: false, hops: 0, skipped: skip, vary: { dir: 0, spin: 1, lag: [0, 0, 0, 0], wob: 11, side: 1 } })
   const coins = drop?.kind === 'coins' || drop?.kind === 'dupe' || drop?.kind === 'skindupe'
   // Rare and legendary pulls (cars, gem parts, epic and legendary skins) throw gems instead.
   const gems = !coins && tier >= 2
-  // A part shows a cog; cars and paints show the car.
-  const cog = drop?.kind === 'mod'
+  // A jackpot or a legendary pull heaps its shower into a pile.
+  const big = (drop?.kind === 'coins' && drop.jackpot) || tier >= 3
+  // A part shows the part itself; cars and paints show the car.
+  const part = drop?.kind === 'mod' ? drop.mod : null
   const showCar = (drop?.kind === 'car' || drop?.kind === 'dupe' || drop?.kind === 'skin' || drop?.kind === 'skindupe') && !!prizeCar
 
   useFrame((state, rawDt) => {
@@ -909,7 +1053,10 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
     }
     let shake = 0
     let charge = 0
-    if (phase === 'open' && s.openAt < 0) s.openAt = now
+    if (phase === 'open' && s.openAt < 0) {
+      s.openAt = now
+      crateSfx.charge(CHARGE)
+    }
     if (skip !== s.skipped) {
       s.skipped = skip
       if (s.openAt > 0) s.openAt = Math.min(s.openAt, now - SETTLE)
@@ -932,9 +1079,20 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
       if (t >= CHARGE && burstAt.current == null) {
         burstAt.current = now
         if (coins || gems) coinAt.current = now + 0.15
-        crashSound()
-        sfx.boost()
-        s.lid = { y: 0, vy: 6.5, x: 0, vx: 1.6, rx: 0, landed: false }
+        crateOpenSound(def.id)
+        if (style !== 'pop') sfx.boost()
+        // Street's lid pops off and tumbles aside; Garage's floats up and away on the beam.
+        s.lid = style === 'roll' ? { y: 0, vy: 1.5, x: 0, vx: 0, rx: 0, landed: false } : { y: 0, vy: 4.4 + Math.random() * 1.4, x: 0, vx: 1 + Math.random() * 0.5, rx: 0, landed: false }
+        // A little chance in every opening so no two look the same: which way the lid goes and
+        // spins, which sides drop first, how hard the chest lid wobbles, which way the camera swings.
+        const side = Math.random() < 0.5 ? -1 : 1
+        s.vary = {
+          dir: -Math.PI / 2 + side * (0.4 + Math.random() * 0.7),
+          spin: side * (0.7 + Math.random() * 0.6),
+          lag: [0, 1, 2, 3].map(() => Math.random() * 0.14),
+          wob: 9 + Math.random() * 5,
+          side,
+        }
       }
     }
     root.position.set((Math.random() - 0.5) * shake, y, (Math.random() - 0.5) * shake)
@@ -944,15 +1102,22 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
     const coreMat = p.core?.material as MeshBasicMaterial | undefined
     if (coreMat) coreMat.opacity = after >= 0 ? Math.max(0, 1 - after * 1.5) : charge * 0.95
     if (p.light) p.light.intensity = after >= 0 ? 6 + Math.max(0, 30 * (1 - after * 2)) : charge * 14
-    if (flash.current) flash.current.intensity = after >= 0 ? Math.max(0, 60 * (1 - after * 3)) : 0
-    // Burst: the lid flies, the sides fall open, the bands snap away.
+    // Reduce flashing: a softer, slower glow instead of the white burst.
+    if (flash.current) flash.current.intensity = after >= 0 ? (calmFlashing() ? Math.max(0, 14 * (1 - after * 1.2)) : Math.max(0, drama.flash * (1 - after * 3))) : 0
+    if (!baseQ.current) baseQ.current = camera.quaternion.clone()
+    // Burst: the crate opens its own way (see OPEN_STYLE) and the bands snap away.
     if (after >= 0) {
       const L = s.lid
-      if (!L.landed) {
+      if (style === 'roll') {
+        // Lifted straight up the beam, speeding up and turning, until it's gone.
+        L.vy += 9 * dt
+        L.y += L.vy * dt
+        L.rx += dt * 2.5 * s.vary.spin
+      } else if (style === 'pop' && !L.landed) {
         L.vy -= 16 * dt
         L.y += L.vy * dt
         L.x += L.vx * dt
-        L.rx += dt * 5
+        L.rx += dt * 5 * s.vary.spin
         const floor = -(S + 0.15) - y + 0.04
         if (L.y < floor) {
           L.y = floor
@@ -961,17 +1126,38 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
         }
       }
       if (p.lid) {
-        p.lid.position.set(L.x * 0.6, S + 0.15 + L.y, -L.x)
-        p.lid.rotation.set(L.landed ? 0 : -L.rx, L.rx * 0.3, L.landed ? 0.05 : L.rx * 0.2)
+        p.lid.visible = style !== 'shatter' && L.y < 7
+        if (style === 'pop') {
+          p.lid.position.set(Math.cos(s.vary.dir) * L.x, S + 0.15 + L.y, Math.sin(s.vary.dir) * L.x)
+          p.lid.rotation.set(L.landed ? 0 : -L.rx, L.rx * 0.3, L.landed ? 0.05 : L.rx * 0.2)
+        } else if (style === 'roll') {
+          p.lid.position.set(0, S + 0.15 + L.y, 0)
+          p.lid.rotation.set(0, L.rx, 0)
+        } else if (style === 'chest') {
+          // Swung back on its hinge along the back edge, past upright, with a heavy wobble.
+          const a = 2.35 * (1 - Math.exp(-after * 6) * Math.cos(after * s.vary.wob))
+          p.lid.position.set(0, S + 0.15 + (S / 2) * Math.sin(a), -S / 2 + (S / 2) * Math.cos(a))
+          p.lid.rotation.set(-a, 0, 0)
+        }
       }
-      const k = Math.min(1, after / 0.42)
-      const open = k < 1 ? 1 - (1 - k) * (1 - k) : 1
-      const bounce = after > 0.42 && after < 0.7 ? Math.sin(((after - 0.42) / 0.28) * Math.PI) * 0.12 : 0
-      p.panels.forEach((g) => g && g.rotation.set(open * 1.5 - bounce, 0, 0))
-      p.bands.forEach((g) => g && g.scale.setScalar(Math.max(0.001, 1 - after * 6)))
+      p.panels.forEach((g, i) => {
+        if (!g) return
+        // Each side goes a moment after the last, in a different order every time.
+        const at = Math.max(0, after - s.vary.lag[i])
+        const k = Math.min(1, at / 0.42)
+        const open = k < 1 ? 1 - (1 - k) * (1 - k) : 1
+        const bounce = at > 0.42 && at < 0.7 ? Math.sin(((at - 0.42) / 0.28) * Math.PI) * 0.12 : 0
+        // Shutters roll down into the base, a beat after the lid lifts.
+        const roll = Math.min(1, Math.max(0, (at - 0.08) / 0.55))
+        if (style === 'shatter') g.scale.setScalar(0.001)
+        else if (style === 'roll') g.scale.y = Math.max(0.001, 1 - roll * roll * (3 - 2 * roll))
+        // A chest keeps its back standing, with the lid hinged on it.
+        else g.rotation.set(style === 'chest' && i === 1 ? 0 : open * 1.5 - bounce, 0, 0)
+      })
+      p.bands.forEach((g, i) => g && !(style === 'chest' && i === 1) && g.scale.setScalar(Math.max(0.001, 1 - after * 6)))
       if (beam.current) {
         beam.current.visible = true
-        beam.current.scale.set(1, Math.min(1, after * 4), 1)
+        beam.current.scale.set(drama.beam, Math.min(1, after * 4), drama.beam)
         ;(beam.current.material as MeshBasicMaterial).opacity = Math.max(0.12, 0.7 * (1 - after * 0.6))
       }
       // The prize rises out of the box and turns slowly; a coin prize spins as it rises,
@@ -983,22 +1169,28 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
         g.visible = r > 0
         g.position.y = LIFT + 0.2 + ease * 0.5
         g.scale.setScalar(Math.max(0.01, ease))
-        g.rotation.y = (coins || cog) && !showCar ? Math.pow(1 - r, 3) * Math.PI * 4 : -0.6 + after * 0.55
+        g.rotation.y = coins && !showCar ? Math.pow(1 - r, 3) * Math.PI * 4 : -0.6 + after * 0.55
       }
       if (!s.revealed && after > SETTLE - CHARGE) {
         s.revealed = true
-        if (tier >= 3) sfx.levelUp()
-        else if (coins) sfx.coin()
-        else sfx.win()
-        if (tier >= 2) dingSound(1.3)
+        crateSfx.reveal(tier, coins)
         onReveal()
       }
       // Camera kick at the burst, then a slow push in.
-      const kick = Math.max(0, 1 - after * 4) * 0.08
+      // Diamond also swings the camera part way round the crate.
+      const kick = Math.max(0, 1 - after * 4) * drama.kick
       const b = base.current
-      camera.position.set(b.x + (Math.random() - 0.5) * kick, b.y + (Math.random() - 0.5) * kick - Math.min(after, 2) * 0.12, b.z - Math.min(after, 2) * 0.35)
+      const push = Math.min(after, 2) * drama.push
+      camera.position.set(b.x + (Math.random() - 0.5) * kick, b.y + (Math.random() - 0.5) * kick - push * 0.34, b.z - push)
+      if (drama.orbit) {
+        const o = Math.min(1, after / 1.8)
+        const turn = drama.orbit * s.vary.side * o * o * (3 - 2 * o)
+        camera.position.sub(PIVOT).applyAxisAngle(UP, turn).add(PIVOT)
+        camera.quaternion.setFromAxisAngle(UP, turn).multiply(baseQ.current)
+      }
     } else {
       camera.position.copy(base.current)
+      if (drama.orbit) camera.quaternion.copy(baseQ.current)
       if (beam.current) beam.current.visible = false
       if (prize.current) prize.current.visible = false
     }
@@ -1017,12 +1209,13 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
         <circleGeometry args={[1.6, 32]} />
         <meshBasicMaterial map={glowTex()} color={glow} transparent opacity={0.35} blending={AdditiveBlending} depthWrite={false} toneMapped={false} />
       </mesh>
-      <Burst start={burstAt} glow={glow} />
-      {(coins || gems) && <CoinBurst start={coinAt} gems={gems} />}
+      <Burst start={burstAt} glow={glow} amount={drama.confetti} />
+      {style === 'shatter' && <Shards start={burstAt} glow={glow} />}
+      {(coins || gems) && <CoinBurst start={coinAt} gems={gems} big={big} style={style} />}
       <group ref={prize} visible={false}>
         {showCar && prizeCar && <PrizeCar look={prizeCar} />}
         {coins && !showCar && <CoinPile />}
-        {cog && <CogPrize gem={tier >= 2} />}
+        {part && <PartPrize id={part} body={prizeCar?.body} tint={prizeCar?.color ?? '#90a4ae'} />}
         {/* A slowly turning ring of light under the prize. */}
         <mesh rotation-x={-Math.PI / 2} position-y={0.02}>
           <ringGeometry args={[1.05, 1.2, 48]} />
@@ -1035,9 +1228,10 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
 
 
 // The car a prize shows: a new car in its colour, or your car wearing the part it won.
-export function prizeLook(drop: CrateDrop | null, cars: { uid: string; model: string; color: string; finish?: Finish; stripe?: string | null; mods?: string[] }[]): CarLook | null {
+// `mine` is the car to show a paint on: the one you have selected, or your race car.
+export function prizeLook(drop: CrateDrop | null, cars: { uid: string; model: string; color: string; finish?: Finish; stripe?: string | null; mods?: string[] }[], mine?: string | null): CarLook | null {
   if (!drop) return null
-  if (drop.kind === 'skin' || drop.kind === 'skindupe') return skinLook(drop.skin, drop.part, cars)
+  if (drop.kind === 'skin' || drop.kind === 'skindupe') return skinLook(drop.skin, drop.part, cars, mine)
   if (drop.kind === 'car') return { body: carDef(drop.model).body, model: drop.model, color: drop.color }
   if (drop.kind === 'dupe') {
     const d = carDef(drop.model)
@@ -1060,9 +1254,9 @@ const bestPart = (slot: SkinnedSlot, body: Body) =>
 // A skin prize, on one of the player's cars. A car paint covers the bare body with no parts on,
 // so the whole car moves; a mod paint goes on a fully kitted car (every paintable part slot
 // filled), and only those parts move while the body keeps its own colour.
-function skinLook(id: string, part: boolean, cars: { model: string; color: string; finish?: Finish; stripe?: string | null; mods?: string[] }[]): CarLook {
+function skinLook(id: string, part: boolean, cars: { uid: string; model: string; color: string; finish?: Finish; stripe?: string | null; mods?: string[] }[], mine?: string | null): CarLook {
   const owned = cars.filter((c) => !carDef(c.model).parked)
-  const car = owned[0] ?? { model: 'civic', color: '#eceff1' }
+  const car = owned.find((c) => c.uid === mine) ?? owned[0] ?? { model: 'civic', color: '#eceff1' }
   const d = carDef(car.model)
   const look: CarLook = { body: d.body, model: car.model, color: car.color, finish: car.finish, stripe: car.stripe }
   if (!part) return { ...look, mods: [], skin: id }

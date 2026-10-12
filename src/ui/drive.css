@@ -1,0 +1,42 @@
+/* Shared touch driving controls (DriveControls.tsx). */
+.dc { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; pointer-events: none; user-select: none; -webkit-user-select: none; touch-action: none; }
+.dc * { touch-action: none; }
+.dc-steer { pointer-events: auto; position: relative; }
+.dc-steer.tall { height: 30vh; min-height: 150px; margin: 0 calc(8px + var(--sar, 0px)) 0 calc(8px + var(--sal, 0px)); }
+.dc-steer.wide { position: absolute; left: 0; bottom: 0; width: 46vw; height: 62vh; }
+.dc-hint { position: absolute; left: 50%; bottom: calc(26px + var(--sab, 0px)); transform: translateX(-50%); padding: 8px 16px; border-radius: 999px; background: rgba(10, 20, 40, .42); color: rgba(255, 255, 255, .9); font: 700 13px var(--ui, system-ui); white-space: nowrap; letter-spacing: .02em; }
+.dc-steer.wide .dc-hint { left: calc(110px + var(--sal, 0px)); bottom: calc(40px + var(--sab, 0px)); }
+.dc-stick { position: absolute; width: 0; height: 0; }
+.dc-track { position: absolute; left: -76px; top: -12px; width: 152px; height: 24px; border-radius: 12px; background: rgba(10, 20, 40, .38); border: 2px solid rgba(255, 255, 255, .45); }
+.dc-knob { position: absolute; left: -30px; top: -30px; width: 60px; height: 60px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #cfd8dc 70%); box-shadow: 0 4px 10px rgba(0, 0, 0, .35); }
+.dc-knob.drift { background: radial-gradient(circle at 35% 30%, #fff, #ffab40 70%); box-shadow: 0 0 18px #ff9100; }
+.dc-btn { pointer-events: auto; border: 0; border-radius: 50%; display: grid; place-items: center; color: #fff; font: 800 15px var(--display, system-ui); letter-spacing: .03em; background: rgba(10, 20, 40, .5); border: 3px solid rgba(255, 255, 255, .7); box-shadow: 0 4px 0 rgba(0, 0, 0, .3); transition: transform .06s; }
+.dc-btn small { font-size: 11px; font-weight: 800; letter-spacing: .06em; }
+.dc-btn.on { transform: scale(.92); }
+.dc-drift { width: 96px; height: 96px; background: linear-gradient(#ffab40, #e65100); border-color: #fff3e0; font-size: 18px; }
+.dc-drift.on { box-shadow: 0 0 24px #ff9100; }
+.dc-item { width: 74px; height: 74px; font-size: 36px; }
+.dc-item.full { background: radial-gradient(circle, #7c4dff, #311b92); border-color: #ffd740; box-shadow: 0 0 16px rgba(255, 215, 64, .7); animation: dc-pulse 1s infinite alternate; }
+.dc-brake { width: 64px; height: 64px; background: rgba(183, 28, 28, .65); }
+.dc-brake.on { background: #d50000; }
+.dc-gas { width: 84px; height: 84px; background: rgba(46, 125, 50, .75); }
+.dc-gas.on { background: #2e7d32; }
+.dc-wide .dc-gas { position: absolute; right: 0; bottom: 0; }
+@keyframes dc-pulse { to { box-shadow: 0 0 26px rgba(255, 215, 64, 1); } }
+.dc-tall .dc-row { display: flex; justify-content: space-between; align-items: flex-end; padding: 0 calc(16px + var(--sar, 0px)) 0 calc(16px + var(--sal, 0px)); margin-bottom: -40px; position: relative; z-index: 1; pointer-events: none; }
+.dc-tall .dc-row .dc-btn { pointer-events: auto; }
+.dc-wide .dc-cluster { position: absolute; right: calc(18px + var(--sar, 0px)); bottom: calc(18px + var(--sab, 0px)); width: 190px; height: 190px; }
+.dc-wide .dc-drift { position: absolute; right: 0; bottom: 34px; }
+.dc-wide .dc-item { position: absolute; right: 108px; bottom: 112px; }
+.dc-wide .dc-brake { position: absolute; right: 118px; bottom: 0; }
+.dc-keys { position: absolute; left: 50%; bottom: calc(14px + var(--sab, 0px)); transform: translateX(-50%); display: flex; gap: 14px; padding: 7px 14px; border-radius: 999px; background: rgba(10, 20, 40, .45); color: #fff; font: 600 12px var(--ui, system-ui); white-space: nowrap; pointer-events: none; z-index: 3; }
+.dc-keys kbd { display: inline-block; min-width: 18px; padding: 1px 5px; margin-right: 2px; border-radius: 5px; background: #fff; color: #263238; font: 800 11px system-ui; text-align: center; box-shadow: 0 2px 0 #90a4ae; }
+@media (max-height: 420px) {
+  .dc-drift { width: 82px; height: 82px; }
+  .dc-item { width: 62px; height: 62px; font-size: 30px; }
+  .dc-brake { width: 54px; height: 54px; }
+  .dc-gas { width: 72px; height: 72px; }
+  .dc-wide .dc-cluster { width: 170px; height: 160px; }
+  .dc-wide .dc-item { right: 92px; bottom: 96px; }
+  .dc-wide .dc-brake { right: 102px; }
+}

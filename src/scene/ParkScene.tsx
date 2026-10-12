@@ -1,20 +1,23 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Group, Mesh, MeshStandardMaterial, PerspectiveCamera } from 'three'
-import { CarModel, carFrame } from './CarModel'
+import { CarModel } from './CarModel'
 import { BuildingModel } from './BuildingModel'
 import { holdTown } from './renderGate'
 import { Batch } from './Batch'
 import { LAYER, decal } from './layers'
 import { asphaltTex, brickTex, paverTex, grassTex } from './textures'
 import { ArcadeSky, Bin, CarShadow, Hydrant, Lamp, useArcadeLook } from './ArcadeScenery'
-import { PARK_LEN, PARK_LOTS, PARK_MAX_BUMPS, PARKED_W, carHits, drive, parkedIn, type Box, type ParkLot, type Pose } from '../game/arcade'
+import { PARK_LEN, PARK_LOTS, PARK_MAX_BUMPS, PARKED_W, drive, lotSolids, parkedIn, type Box, type ParkLot, type Pose } from '../game/arcade'
+import { carBox, step, type Footprint, type Solid } from '../game/collide'
+import { Footprinted, frameFootprint } from './footprint'
 import { BUILDINGS, CARS, TILE, buildingDef, isBike, type Body } from '../game/data'
 import type { ChaseCar } from './ChaseScene'
+import type { DriveInput } from '../ui/DriveControls'
 import { bumpSound } from '../lib/arcadeSound'
 
-// The screen writes the held controls here: steer +1 is left, pedal +1 is gas, -1 reverse.
-export type ParkInput = { steer: number; pedal: number }
+// The screen's shared driving controls write here (steer +1 is left); brake slows, then reverses.
+export type ParkInput = DriveInput
 export type ParkHud = { time: number; bumps: number; inSpot: boolean }
 export type ParkEnd = { parked: boolean; time: number; bumps: number }
 
@@ -37,6 +40,15 @@ const BACKDROPS: string[][] = [
 
 const PARKED_BODIES: Body[] = ['sedan', 'compact', 'suv', 'hatch', 'wagon', 'van', 'classic', 'coupe', 'truck', 'ev', 'luxury', 'muscle']
 const PARKED = CARS.filter((c) => !c.parked && !isBike(c.body) && PARKED_BODIES.includes(c.body))
+
+// Every car is scaled evenly to fit the lot's car size and collides at its measured
+// footprint; this is the guess from its frame until the model has been measured.
+const FIT: [number, number] = [PARK_LEN, PARKED_W]
+function fitIn(body: Body): Footprint {
+  const f = frameFootprint(body)
+  const k = Math.min(PARK_LEN / f.l, PARKED_W / f.w)
+  return { w: f.w * k, l: f.l * k, cz: 0 }
+}
 
 function Line({ x, z, h, w, l, color = '#f5f5f5', y = LAYER.paint }: { x: number; z: number; h: number; w: number; l: number; color?: string; y?: number }) {
   return (
@@ -241,26 +253,39 @@ export function ParkScene({ lot, me, input, running, onHud, onEnd }: {
     camera.updateProjectionMatrix()
   }, [camera, size, lot])
 
-  const carW = Math.min(PARKED_W, Math.max(0.55, (PARK_LEN * carFrame(me.body).wid) / carFrame(me.body).len))
-  const scale = PARK_LEN / carFrame(me.body).len
+  const foot = useRef<Footprint>(fitIn(me.body))
+  const shadow = fitIn(me.body)
   const player = useRef<Group>(null)
+  const rock = useRef<Group>(null)
   const spotFill = useRef<Mesh>(null)
-  const st = useRef({ pose: { ...lot.start } as Pose, v: 0, steer: 0, t: 0, bumps: 0, cool: 0, hold: 0, done: false, hudAt: 0, inSpot: false })
+  const st = useRef({ pose: { ...lot.start } as Pose, v: 0, steer: 0, t: 0, bumps: 0, cool: 0, hold: 0, done: false, hudAt: 0, inSpot: false, jolt: 0, pitch: 0, roll: 0, joltT: 0 })
   useEffect(() => {
-    st.current = { pose: { ...lot.start }, v: 0, steer: 0, t: 0, bumps: 0, cool: 0, hold: 0, done: false, hudAt: 0, inSpot: false }
+    st.current = { pose: { ...lot.start }, v: 0, steer: 0, t: 0, bumps: 0, cool: 0, hold: 0, done: false, hudAt: 0, inSpot: false, jolt: 0, pitch: 0, roll: 0, joltT: 0 }
   }, [lot])
 
   const parked = useMemo(() => lot.cars.map((p, i) => {
     const c = PARKED[(i * 5 + index * 3) % PARKED.length]
     return { ...p, body: c.body, model: c.id, color: c.colors[(i + index) % c.colors.length] }
   }), [lot, index])
+  // What the car can hit, rebuilt as each parked car's footprint is measured.
+  const feet = useRef<Box[]>([])
+  const solids = useRef<Solid[]>([])
+  useMemo(() => {
+    feet.current = parked.map((p) => carBox(p, fitIn(p.body)))
+    solids.current = lotSolids(lot, feet.current)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parked, lot])
+  const parkedFoot = (i: number) => (ft: Footprint) => {
+    feet.current[i] = carBox(parked[i], ft)
+    solids.current = lotSolids(lot, feet.current)
+  }
 
   useFrame((state, rawDt) => {
     const s = st.current
     const dt = Math.min(rawDt, 1 / 20)
     const live = running && !s.done
     if (live) s.t += dt
-    const pedal = live ? input.pedal : 0
+    const pedal = live ? input.gas - input.brake : 0
     if (pedal > 0) s.v = Math.min(MAX_FWD, s.v + (s.v < 0 ? 9 : 4) * dt)
     else if (pedal < 0) s.v = Math.max(-MAX_REV, s.v - (s.v > 0 ? 9 : 4) * dt)
     else s.v = Math.sign(s.v) * Math.max(0, Math.abs(s.v) - 6 * dt)
@@ -268,18 +293,21 @@ export function ParkScene({ lot, me, input, running, onHud, onEnd }: {
     s.cool = Math.max(0, s.cool - dt)
 
     if (s.v !== 0) {
-      const next = drive(s.pose, s.v, s.steer, dt)
-      if (carHits({ ...next, w: carW, l: PARK_LEN }, lot)) {
-        if (s.cool <= 0 && live) {
-          s.bumps++
-          s.cool = 1
-          bumpSound()
-        }
-        s.v = -s.v * 0.25
-      } else s.pose = next
+      // Scrape along whatever you touch; any real knock is a bump on your record.
+      const r = step(s.pose, s.v, drive(s.pose, s.v, s.steer, dt), foot.current, solids.current)
+      s.pose = r.pose
+      s.v = r.v
+      if (r.impact > 0.15 && s.cool <= 0 && live) {
+        s.bumps++
+        s.cool = 1
+        bumpSound()
+        const c = Math.cos(s.pose.h), sn = Math.sin(s.pose.h)
+        Object.assign(s, { jolt: Math.min(1, 0.4 + r.impact / 3), pitch: r.nx * sn + r.nz * c, roll: r.nx * c - r.nz * sn, joltT: 0 })
+      }
     }
+    s.joltT += dt
 
-    s.inSpot = parkedIn({ ...s.pose, w: carW, l: PARK_LEN }, lot.spot)
+    s.inSpot = parkedIn(carBox(s.pose, foot.current), lot.spot)
     s.hold = s.inSpot && Math.abs(s.v) < 0.3 && live ? s.hold + dt : 0
     if (live && s.hold > 0.6) {
       s.done = true
@@ -292,6 +320,11 @@ export function ParkScene({ lot, me, input, running, onHud, onEnd }: {
     if (player.current) {
       player.current.position.set(s.pose.x, 0, s.pose.z)
       player.current.rotation.y = s.pose.h
+    }
+    if (rock.current) {
+      // Rock away from a knock and settle.
+      const wob = s.jolt * Math.exp(-s.joltT * 7) * Math.cos(s.joltT * 26)
+      rock.current.rotation.set(-s.pitch * wob * 0.14, 0, s.roll * wob * 0.1)
     }
     if (spotFill.current) {
       const m = spotFill.current.material as MeshStandardMaterial
@@ -317,18 +350,23 @@ export function ParkScene({ lot, me, input, running, onHud, onEnd }: {
         <meshStandardMaterial color="#ffd54f" transparent opacity={0.35} emissive="#ffd54f" emissiveIntensity={0.4} depthWrite={false} {...decal(2)} />
       </mesh>
       <Outline b={spot} t={0.09} color="#ffd54f" />
-      {parked.map((p, i) => (
-        <group key={i} position={[p.x, 0, p.z]} rotation-y={p.h}>
-          <CarShadow len={PARK_LEN} wid={PARKED_W} />
-          <group scale={PARK_LEN / carFrame(p.body).len}>
-            <CarModel body={p.body} model={p.model} color={p.color} />
+      {parked.map((p, i) => {
+        const sh = fitIn(p.body)
+        return (
+          <group key={i} position={[p.x, 0, p.z]} rotation-y={p.h}>
+            <CarShadow len={sh.l} wid={sh.w} />
+            <Footprinted id={`${index}:${i}:${p.model}`} fit={FIT} onFoot={parkedFoot(i)}>
+              <CarModel body={p.body} model={p.model} color={p.color} />
+            </Footprinted>
           </group>
-        </group>
-      ))}
-      <group ref={player} position={[lot.start.x, 0, lot.start.z]} rotation-y={lot.start.h}>
-        <CarShadow len={PARK_LEN} wid={carW} />
-        <group scale={scale}>
-          <CarModel body={me.body} model={me.model} color={me.color} finish={me.finish} skin={me.skin} modSkin={me.modSkin} mods={me.mods} beams={view.beams} />
+        )
+      })}
+      <group ref={player} name="player" position={[lot.start.x, 0, lot.start.z]} rotation-y={lot.start.h}>
+        <CarShadow len={shadow.l} wid={shadow.w} />
+        <group ref={rock}>
+          <Footprinted id={`${me.body}:${me.model}:${me.mods?.join()}`} fit={FIT} onFoot={(ft) => void (foot.current = ft)}>
+            <CarModel body={me.body} model={me.model} color={me.color} finish={me.finish} skin={me.skin} modSkin={me.modSkin} mods={me.mods} beams={view.beams} />
+          </Footprinted>
         </group>
       </group>
     </>

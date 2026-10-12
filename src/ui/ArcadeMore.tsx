@@ -4,14 +4,14 @@ import { NeutralToneMapping } from 'three'
 import { useGame, type OwnedCar } from '../game/store'
 import { ARCADE_FUEL } from '../game/arcade'
 import {
-  DASH_TIME, FUEL_BAND, PIT_WHEELS, STUNT_JUMPS, WASH_SPOTS, WASH_TIME,
+  DASH_TIME, STUNT_JUMPS, WASH_SPOTS, WASH_TIME,
   dashStars, pitStars, recordStars, starReward, stuntStars, washStars, type StarGameId,
 } from '../game/arcadeMore'
-import { PitScene, type PitHud, type PitInput } from '../scene/PitScene'
+import { PitScene, type PitEnd, type PitHud, type PitInput } from '../scene/PitScene'
 import { WashScene, type WashHud, type WashInput } from '../scene/WashScene'
 import { DeliveryScene, type DashHud } from '../scene/DeliveryScene'
 import { StuntScene, type StuntHud, type StuntInput } from '../scene/StuntScene'
-import type { ParkInput } from '../scene/ParkScene'
+import { KeyHints, TouchDrive, newDriveInput, useDriveKeys, useTall, useTouchDevice } from './DriveControls'
 import { Countdown, Result, look, payFuel } from './ArcadeBits'
 import { sfx } from '../lib/sound'
 import { LoadingScene } from './Loading'
@@ -20,7 +20,7 @@ import { LoadingScene } from './Loading'
 // fuel, the countdown, star pay and the result card.
 
 export const STAR_GAMES: { id: StarGameId; name: string; art: string; tip: string }[] = [
-  { id: 'pit', name: 'Pit Stop', art: '🔧🏎️', tip: 'Tap wheels, fill up' },
+  { id: 'pit', name: 'Pit Stop', art: '🔧🏎️', tip: 'Brake, remember, go' },
   { id: 'wash', name: 'Car Wash', art: '🧽🫧', tip: 'Scrub off the mud' },
   { id: 'delivery', name: 'Delivery Dash', art: '🍕🚗', tip: 'Beat the clock' },
   { id: 'stunt', name: 'Stunt Ramp', art: '🔥🚙', tip: 'Jump and flip' },
@@ -91,37 +91,54 @@ function holdTo(set: (on: boolean) => void) {
   }
 }
 
+// One line for the result card: the time, how the stop went, and the getaway.
+const pitLine = (e: PitEnd) =>
+  `⏱ ${e.time.toFixed(1)}s · ${e.grade === 'perfect' ? '🎯' : e.grade === 'good' ? '👍' : '😬'} ${e.grade === 'perfect' ? 'Perfect stop' : e.grade === 'good' ? 'Good stop' : 'Pushed'} · ⚡ ${e.react.toFixed(2)}s${e.slips ? ` · ${e.slips} slip${e.slips > 1 ? 's' : ''}` : ''}`
+
 function PitGame({ car, running, onDone }: GameProps) {
-  const input = useRef<PitInput>({ fuel: false }).current
-  const [hud, setHud] = useState<PitHud>({ phase: 'wheels', wheels: 0, fuel: 0, time: 0 })
+  const input = useRef<PitInput>({ pedal: false, presses: 0, taps: [], pads: [] }).current
+  const [hud, setHud] = useState<PitHud>({ phase: 'in', left: 4, time: 0, pop: null, calling: false })
+  const [pop, setPop] = useState<PitHud['pop']>(null)
+  const onHud = (h: PitHud) => {
+    setHud(h)
+    if (h.pop) setPop(h.pop)
+  }
   useEffect(() => {
-    const kd = (e: KeyboardEvent) => { if (e.key === ' ') { input.fuel = true; e.preventDefault() } }
-    const ku = (e: KeyboardEvent) => { if (e.key === ' ') input.fuel = false }
+    const kd = (e: KeyboardEvent) => {
+      if (e.key !== ' ') return
+      e.preventDefault()
+      if (!e.repeat) input.presses++
+      input.pedal = true
+    }
+    const ku = (e: KeyboardEvent) => { if (e.key === ' ') input.pedal = false }
     window.addEventListener('keydown', kd)
     window.addEventListener('keyup', ku)
     return () => { window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku) }
   }, [input])
+  const pedal = running && (hud.phase === 'in' || hud.phase === 'hold' || hud.phase === 'green')
   return (
     <>
       <Canvas className="rf-canvas" camera={{ fov: 45, near: 0.3, far: 140, position: [0, 8, 7] }} dpr={[1, 1.5]} gl={gl}>
-        <PitScene me={look(car)} input={input} running={running}
-          onHud={setHud} onEnd={(e) => onDone(pitStars(e.time), Math.round(e.time * 10) / 10, `⏱ ${e.time.toFixed(1)}s · ❌ ${e.misses}`)} />
+        <PitScene me={look(car)} input={input} running={running} onHud={onHud} onEnd={(e) => onDone(pitStars(e.time), Math.round(e.time * 10) / 10, pitLine(e))} />
       </Canvas>
+      {/* Brake and go: hold or tap anywhere, with the big button as the picture of it. */}
+      {pedal && <div className="pit-pedal" {...holdTo((on) => { if (on) input.presses++; input.pedal = on })} />}
+      {[0, 1, 2, 3].map((i) => (
+        <button key={i} ref={(el) => { input.pads[i] = el }} className="pit-pad off" aria-label={`Wheel ${i + 1}`}
+          onPointerDown={(e) => { e.preventDefault(); input.taps.push(i) }} onContextMenu={(e) => e.preventDefault()}><b /></button>
+      ))}
       <div className="arc-hud">
         <span className="arc-time">⏱ {hud.time.toFixed(1)}s</span>
-        <span>🛞 {hud.wheels}/{PIT_WHEELS}</span>
+        {hud.phase === 'wheels' && <span>🛞 {hud.left}</span>}
       </div>
-      {running && hud.phase === 'wheels' && <div className="arc-tip">Tap the glowing wheel 👆</div>}
-      {hud.phase === 'fuel' && (
-        <div className="arc-fuelrig">
-          <div className="arc-gauge">
-            <i className="band" style={{ bottom: `${FUEL_BAND[0] * 100}%`, height: `${(FUEL_BAND[1] - FUEL_BAND[0]) * 100}%` }} />
-            <i className="fill" style={{ height: `${Math.min(1, hud.fuel) * 100}%` }} />
-          </div>
-          <button className="arc-btn gas big" {...holdTo((on) => { input.fuel = on })}>⛽<small>Hold</small></button>
-          <div className="arc-tip">Let go in the green</div>
+      {pop && <div key={pop.id} className={`pit-pop ${pop.kind}`}>{pop.text}</div>}
+      {pedal && (
+        <div className={`pit-big ${hud.phase}`}>
+          {hud.phase === 'in' ? <>🛑<small>Hold to brake</small></> : hud.phase === 'hold' ? <>✋<small>Wait</small></> : <>GO!<small>Tap</small></>}
         </div>
       )}
+      {running && hud.phase === 'in' && <div className="arc-tip pit-tip">Stop on the white line</div>}
+      {running && hud.phase === 'wheels' && <div className="arc-tip pit-tip">{hud.calling ? '🧠 Remember the order!' : 'Wheels off in that order, on green'}</div>}
     </>
   )
 }
@@ -165,30 +182,12 @@ function WashGame({ car, running, onDone }: GameProps) {
   )
 }
 
-const KEYS: Record<string, [keyof ParkInput, number]> = {
-  ArrowLeft: ['steer', 1], a: ['steer', 1], A: ['steer', 1], ArrowRight: ['steer', -1], d: ['steer', -1], D: ['steer', -1],
-  ArrowUp: ['pedal', 1], w: ['pedal', 1], W: ['pedal', 1], ArrowDown: ['pedal', -1], s: ['pedal', -1], S: ['pedal', -1],
-}
-
 function DeliveryGame({ car, running, onDone }: GameProps) {
-  const input = useRef<ParkInput>({ steer: 0, pedal: 0 }).current
+  const input = useRef(newDriveInput()).current
   const [hud, setHud] = useState<DashHud>({ drops: 0, time: DASH_TIME, carrying: false })
-  useEffect(() => {
-    const held = new Set<string>()
-    const apply = () => {
-      input.steer = 0
-      input.pedal = 0
-      for (const k of held) input[KEYS[k][0]] += KEYS[k][1]
-      input.steer = Math.max(-1, Math.min(1, input.steer))
-      input.pedal = Math.max(-1, Math.min(1, input.pedal))
-    }
-    const kd = (e: KeyboardEvent) => { if (KEYS[e.key]) { held.add(e.key); apply(); e.preventDefault() } }
-    const ku = (e: KeyboardEvent) => { if (KEYS[e.key]) { held.delete(e.key); apply() } }
-    window.addEventListener('keydown', kd)
-    window.addEventListener('keyup', ku)
-    return () => { window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku) }
-  }, [input])
-  const pad = (axis: keyof ParkInput, v: number) => holdTo((on) => { input[axis] = on ? v : 0 })
+  const touch = useTouchDevice()
+  const tall = useTall()
+  useDriveKeys(input)
   return (
     <>
       <Canvas className="rf-canvas" camera={{ fov: 50, near: 0.3, far: 120, position: [0, 14, 10] }} dpr={[1, 1.5]} gl={gl}>
@@ -200,16 +199,7 @@ function DeliveryGame({ car, running, onDone }: GameProps) {
         <span className={hud.carrying ? 'arc-spot in' : 'arc-spot'}>{hud.carrying ? '🏠 Deliver' : '🍕 Pick up'}</span>
         <span>✅ {hud.drops}</span>
       </div>
-      <div className="arc-pads">
-        <div className="arc-pad">
-          <button className="arc-btn" aria-label="Steer left" {...pad('steer', 1)}>◀</button>
-          <button className="arc-btn" aria-label="Steer right" {...pad('steer', -1)}>▶</button>
-        </div>
-        <div className="arc-pad">
-          <button className="arc-btn rev" aria-label="Reverse" {...pad('pedal', -1)}>R</button>
-          <button className="arc-btn gas" aria-label="Gas" {...pad('pedal', 1)}>▲</button>
-        </div>
-      </div>
+      {running && (touch ? <TouchDrive input={input} tall={tall} drift={false} /> : <KeyHints drift={false} item={false} />)}
     </>
   )
 }

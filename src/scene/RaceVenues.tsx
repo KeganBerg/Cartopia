@@ -83,7 +83,7 @@ function along(len: number, step: (r: () => number) => number, seed: number, fro
 }
 
 // Beach palms stay tropical whatever the season back in town.
-function Palm({ x, z, h, lean }: { x: number; z: number; h: number; lean: number }) {
+export function Palm({ x, z, h, lean }: { x: number; z: number; h: number; lean: number }) {
   const top: V3 = [lean * h * 0.35, h, 0]
   return (
     <group position={[x, 0, z]}>
@@ -134,7 +134,7 @@ const SHORE = -(EDGE + 5.5) // beach waterline
 const QUAY = -(EDGE + 3) // dock edge
 
 // Open water with crests that drift slowly toward the shore.
-function Water({ x, z, w, d, id }: { x: number; z: number; w: number; d: number; id: string }) {
+export function Water({ x, z, w, d, id }: { x: number; z: number; w: number; d: number; id: string }) {
   const map = useMemo(() => waterTex(id, w / 8, d / 8), [id, w, d])
   useFrame((_, dt) => {
     map.offset.x += dt * 0.012
@@ -393,7 +393,7 @@ type Spot = { x: number; z: number; s?: number; ry?: number; rx?: number; y?: nu
 
 // Lots of one small thing (grass, pebbles, corn) as a single instanced draw,
 // each copy tinted from a short list so the patch doesn't look stamped.
-function Scatter({ spots, colors, y = 0, children }: { spots: Spot[]; colors: string[]; y?: number; children: ReactNode }) {
+export function Scatter({ spots, colors, y = 0, children }: { spots: Spot[]; colors: string[]; y?: number; children: ReactNode }) {
   const ref = useRef<InstancedMesh>(null)
   useLayoutEffect(() => {
     const m = ref.current

@@ -12,8 +12,10 @@ import type { Agent } from '../scene/traffic/sim'
 import { toWorld } from '../scene/grid'
 import { pickSpecies, sing, type Species } from './birdsong'
 import { onThunder, weatherNow } from '../game/weather'
-import { GROOVES, grooveFor, type Tone } from './clubGrooves'
-import { clubHit } from './clubBeat'
+import { GROOVES, type Tone } from './clubGrooves'
+import { decksAt, SIXTEENTH_MS, type Deck } from './clubSet'
+import { clubHit, type CueKind } from './clubBeat'
+import { technoOn } from '../game/techno'
 
 // How much of each layer plays, 0 to 1, for how dark it is and the season.
 export type Mix = {
@@ -101,6 +103,11 @@ type Voice = { o: OscillatorNode; g: GainNode; next: number }
 // An open nightclub in town: where it is on screen (-1 left .. 1 right), and
 // how close it sounds (1 on screen, quieter the further off screen it is).
 export type Club = { pan: number; near?: number }
+
+// The club's kick and bass notes swell in over 30 ms, so they're heard about
+// 27 ms after they start (measured on offline renders, scripts/clubav). The
+// lights' cues are timed to that, and the clap's to its loudest burst.
+const SWELL = 0.027
 // Where a point in the town sits left to right on screen, -1..1, and how close
 // it sounds, 0..1 (both set by the scene).
 let ear = (x: number, z: number) => Math.max(-1, Math.min(1, (x - z) / 40))
@@ -147,12 +154,18 @@ export class Soundscape {
   private keys: BiquadFilterNode
   private hats: GainNode
   private doorUntil = 0
-  private beat = 0
-  private playing = -1
-  // Pins the club to one groove (for rendering clips); null follows the night.
-  groove: number | null = null
-  // Told of every kick and bass note as it's scheduled (t in the audio clock), for the club's lights.
-  onHit: ((t: number, kick: boolean) => void) | null = null
+  // The next sixteenth of the club's set to schedule (-1: start afresh), and
+  // where the wall clock sits against the audio clock (ms at audio time 0).
+  private nextSix = -1
+  private wallOff = NaN
+  // The wall clock at an audio time (ms), which the club's set runs on.
+  // Offline renders replace it to film any moment of the set.
+  wallAt = (t: number) => Date.now() + (t - this.ctx.currentTime) * 1000
+  // Told of every club note as it's scheduled, for the club's lights: when it
+  // will be heard (t in the audio clock), which part, how strongly, which groove.
+  onHit: ((t: number, kind: CueKind, amt: number, groove: number) => void) | null = null
+  // The Techno Night track is playing, so the club's own music stops.
+  techno = false
   private vowels: BiquadFilterNode[]
   private howl: GainNode
   private howlTone: BiquadFilterNode
@@ -168,7 +181,6 @@ export class Soundscape {
   private gustAt = 0
   private cicadaAt = 0
   private cicadaOn = false
-  private beatAt = 0
   private last = -1
   private room: ConvolverNode
   private singers: Singer[] = []
@@ -187,8 +199,11 @@ export class Soundscape {
     // Beds: looping noise shaped into a steady layer, faded in and out by step().
     this.trafficTone = this.filter('lowpass', SEASON === 'winter' ? 170 : 300) // snow muffles the town
     this.traffic = this.bed(this.brown, this.trafficTone)
+    // Wind loses its sub-bass rumble: phones can't play it, and it only ate headroom.
+    this.wind = ctx.createGain()
     this.windTone = this.filter('lowpass', 400)
-    this.wind = this.bed(this.brown, this.windTone)
+    this.windTone.connect(this.filter('highpass', 110, this.wind))
+    this.bed(this.brown, this.windTone, this.wind)
     // People out and about: a soft hubbub of breath-like voices, too far off to
     // make out words, made from noise through moving vowel-like bands.
     this.murmur = ctx.createGain()
@@ -379,7 +394,7 @@ export class Soundscape {
       if (gust > 0.75 && season !== 'summer') this.chimes(t + 0.5, m.wind)
       fade(this.wind, m.wind * (0.03 + gust * 0.08))
       this.howlTone.frequency.setTargetAtTime(450 + gust * 500, t, 0.8)
-      fade(this.howl, sky.wind * sky.wind * gust * 0.05)
+      fade(this.howl, sky.wind * sky.wind * gust * 0.07)
       fade(this.leaves, m.leaves * (0.004 + gust * gust * 0.03))
     }
     // Cicadas swell for a while, then rest.
@@ -438,13 +453,14 @@ export class Soundscape {
   }
 
   // Night music: house thumping through the walls of your own nightclub while
-  // it's open, or faintly from somewhere across town. Each night plays a
-  // different groove (clubGrooves.ts): deep, piano, garage, acid or disco
-  // house. Every so often someone opens the door and the music spills out
-  // bright for a moment.
+  // it's open, or faintly from somewhere across town. The club plays a DJ set
+  // (clubSet.ts) that mixes through its grooves (clubGrooves.ts) a few minutes
+  // each, on the wall clock so every town hears the same moment of it. Every
+  // so often someone opens the door and the music spills out bright for a moment.
   private clubMusic(t: number, club: Club | boolean | null) {
     // Only a town with its own nightclub hears it, louder the closer it is.
-    const near = !club ? 0 : typeof club === 'object' ? (club.near ?? 1) : 1
+    // During Techno Night the event track takes over and the club falls quiet.
+    const near = !club || this.techno ? 0 : typeof club === 'object' ? (club.near ?? 1) : 1
     const level = 0.62 * near
     if (near > 0.6 && t > this.doorUntil + 4 && Math.random() < 0.025) this.doorUntil = t + rand(1.8, 3)
     const door = near > 0.6 && t < this.doorUntil ? 1 : 0
@@ -456,58 +472,94 @@ export class Soundscape {
     this.gritTone.frequency.setTargetAtTime(650 + 450 * near, t, 1)
     if (this.musicPan) this.musicPan.pan.setTargetAtTime(typeof club === 'object' && club ? club.pan * 0.8 : 0.4, t, 0.5)
     if (level < 0.01) {
-      this.beatAt = 0
+      this.nextSix = -1
       return
     }
-    const gi = this.groove ?? grooveFor()
-    if (gi !== this.playing) {
-      this.playing = gi
-      this.beat = 0
+    // Keep one steady mapping from the wall clock to the audio clock, so the
+    // notes don't jitter with each reading; only re-sync if it drifts.
+    const off = this.wallAt(t) - t * 1000
+    if (!(Math.abs(off - this.wallOff) < 30)) {
+      this.wallOff = off
+      this.nextSix = -1
     }
-    const g = GROOVES[gi]
-    const sixteenth = 60 / g.bpm / 4
-    if (this.beatAt < t) this.beatAt = t + 0.1
-    while (this.beatAt < t + 0.5) {
-      // A shuffle: the in-between sixteenths land a touch late.
-      const b = this.beatAt + (this.beat % 2 ? sixteenth * g.swing : 0)
-      const k = this.beat % 16
-      const n = Math.floor(this.beat / 16)
-      const bar = n % g.loop.length
-      const chord = g.loop[bar]
-      // Sweeping grooves open the chord filter over eight bars and close it again.
-      const sweep = g.sweep ? 0.35 + 0.65 * (0.5 - 0.5 * Math.cos((((n % 8) * 16 + k) / 128) * Math.PI * 2)) : 1
-      if (k % 4 === 0) {
-        this.onHit?.(b, true)
-        this.blip(b, 0.32, 0.7 * g.gain, null, (o) => {
-          o.frequency.setValueAtTime(160, b)
-          o.frequency.exponentialRampToValueAtTime(46, b + 0.12)
-        }, () => this.thump)
-      }
-      const note = g.bass[k]
-      if (note) {
-        if (k % 4) this.onHit?.(b, false)
-        const f = chord.root * note
-        const last = k === 14 && note >= 2
-        this.blip(b, sixteenth * (last ? 1.2 : g.bassLen), (last ? 0.11 : 0.16) * g.gain, null, (o) => {
-          o.type = 'sawtooth'
-          o.frequency.value = f
-        }, () => this.thump)
-      }
-      const hits = g.stabs[bar % g.stabs.length]
-      if (hits.includes(k)) {
-        const long = bar === g.loop.length - 1 && k === hits[hits.length - 1] && g.tone !== 'chop'
-        this.stab(b, chord.notes, sixteenth * (long ? 4 : g.stabLen), g.tone, g.gain, sweep)
-      }
-      const step = g.acid?.notes[k]
-      if (g.acid && step !== null && step !== undefined) this.acid(b, chord.root * 2 * 2 ** (step / 12), sixteenth, g.acid.accents.includes(k), sweep, g.gain)
-      if (near) {
-        if (g.claps.includes(k)) this.clap(b)
-        if (g.openHats.includes(k)) this.noiseHit(b, 0.16, 0.09, this.filter('highpass', 7000, this.hats))
-        else if (g.closedHats === 'all' ? k % 4 !== 0 : k % 2) this.noiseHit(b, 0.03, k % 2 ? 0.035 : 0.025, this.filter('highpass', 9000, this.hats))
-      }
-      this.beat++
-      this.beatAt += sixteenth
+    const audioAt = (n: number) => (n * SIXTEENTH_MS - this.wallOff) / 1000
+    if (this.nextSix < 0 || audioAt(this.nextSix) < t) this.nextSix = Math.ceil(((t + 0.1) * 1000 + this.wallOff) / SIXTEENTH_MS)
+    while (audioAt(this.nextSix) < t + 0.5) {
+      const n = this.nextSix++
+      const decks = decksAt(n)
+      const lead = decks.find((d) => d.lows) ?? decks[decks.length - 1]
+      // The dancers keep the beat even through a breakdown.
+      if (n % 4 === 0) this.onHit?.(audioAt(n) + SWELL, 'beat', 0, lead.groove)
+      for (const d of decks) this.playDeck(d, audioAt(n), near, lead.groove)
     }
+  }
+
+  // One sixteenth of one deck of the club's set.
+  private playDeck(d: Deck, at: number, near: number, lead: number) {
+    const g = GROOVES[d.groove]
+    const sixteenth = SIXTEENTH_MS / 1000
+    const k = d.k
+    // A shuffle: the in-between sixteenths land a touch late.
+    const b = at + (k % 2 ? sixteenth * g.swing : 0)
+    const chord = g.loop[d.bar % g.loop.length]
+    // Sweeping grooves open the chord filter over eight bars and close it
+    // again; the set's mixes and breakdowns close it further.
+    const sweep = (g.sweep ? 0.35 + 0.65 * (0.5 - 0.5 * Math.cos((((d.bar % 8) * 16 + k) / 128) * Math.PI * 2)) : 1) * d.bright
+    const vol = d.highs
+    // Each cue is timed to when its note is heard, not when it starts (SWELL).
+    const cue = (kind: CueKind, late: number, amt = 1) => this.onHit?.(b + late, kind, amt, lead)
+    if (d.kick) {
+      cue('kick', SWELL)
+      this.blip(b, 0.32, 0.7 * g.gain, null, (o) => {
+        o.frequency.setValueAtTime(160, b)
+        o.frequency.exponentialRampToValueAtTime(46, b + 0.12)
+      }, () => this.thump)
+    }
+    // The second half's bass line jumps up an octave now and then.
+    const note = g.bass[k] * (d.variant && k % 8 === 6 && g.bass[k] ? 2 : 1)
+    if (d.bass && note) {
+      if (k % 4) cue('bass', SWELL, Math.min(1, note))
+      const f = chord.root * note
+      const last = k === 14 && note >= 2
+      this.blip(b, sixteenth * (last ? 1.2 : g.bassLen), (last ? 0.11 : 0.16) * g.gain, null, (o) => {
+        o.type = 'sawtooth'
+        o.frequency.value = f
+      }, () => this.thump)
+    }
+    const hits = g.stabs[d.bar % g.stabs.length]
+    if (d.stabs && hits.includes(k)) {
+      cue('stab', g.tone === 'piano' ? 0.004 : 0.007, sweep * vol)
+      const long = d.bar % g.loop.length === g.loop.length - 1 && k === hits[hits.length - 1] && g.tone !== 'chop'
+      this.stab(b, chord.notes, sixteenth * (long ? 4 : g.stabLen), g.tone, g.gain * vol, Math.max(0.05, sweep))
+    }
+    const step = g.acid?.notes[k]
+    if (g.acid && step !== null && step !== undefined) {
+      const accent = g.acid.accents.includes(k)
+      cue('acid', 0.004, (accent ? 1 : 0.15 + 0.45 * sweep) * vol)
+      this.acid(b, chord.root * 2 * 2 ** (step / 12), sixteenth, accent, sweep, g.gain * vol)
+    }
+    const clap = (d.claps && g.claps.includes(k)) || d.roll > 0
+    const open = g.openHats.includes(k)
+    const closed = d.closedHats && (g.closedHats === 'all' ? k % 4 !== 0 : k % 2)
+    if (clap) cue('clap', 0.023, d.roll || vol)
+    if (open) cue('open', 0, vol)
+    else if (closed) cue('hat', 0, 0.6 * vol)
+    if (d.crash) cue('open', 0, 1)
+    if (d.riser && k % 4 === 0) this.riser(b, sixteenth * 4, d.riser * vol)
+    if (near) {
+      if (clap) this.clap(b, d.roll ? 0.4 + 0.6 * d.roll : vol)
+      if (open) this.noiseHit(b, 0.16, 0.09 * vol, this.filter('highpass', 7000, this.hats))
+      else if (closed) this.noiseHit(b, 0.03, (k % 2 ? 0.035 : 0.025) * vol, this.filter('highpass', 9000, this.hats))
+      if (d.crash) this.noiseHit(b, 1.4, 0.12, this.filter('highpass', 5000, this.hats))
+    }
+  }
+
+  // A rising whoosh into the drop: noise through a band that climbs, one beat at a time.
+  private riser(t: number, dur: number, x: number) {
+    const band = this.filter('bandpass', 500 + 4000 * x, this.keys, 2)
+    band.frequency.setValueAtTime(500 + 4000 * x, t)
+    band.frequency.linearRampToValueAtTime(500 + 4000 * Math.min(1, x + 0.25), t + dur)
+    this.noiseHit(t, dur * 1.05, 0.03 + 0.05 * x, band)
   }
 
   // A chord stab. Organ: soft detuned saws, short and plucky. Piano: bright
@@ -565,9 +617,9 @@ export class Soundscape {
   }
 
   // A hand clap: three quick slaps of noise and a short room tail.
-  private clap(t: number) {
+  private clap(t: number, vol = 1) {
     const band = this.filter('bandpass', 1300, this.wall, 0.9)
-    for (const [at, peak, dur] of [[0, 0.07, 0.02], [0.011, 0.07, 0.02], [0.023, 0.1, 0.13]]) this.noiseHit(t + at, dur, peak, band)
+    for (const [at, peak, dur] of [[0, 0.07, 0.02], [0.011, 0.07, 0.02], [0.023, 0.1, 0.13]]) this.noiseHit(t + at, dur, peak * vol, band)
   }
 
   // A car horn: a tap, a double toot or a long lean on it when someone's stuck.
@@ -682,26 +734,43 @@ export class Soundscape {
     })
   }
 
-  // A dog a few yards away: one to three barks.
+  // A dog a few yards away: one to three barks. Each bark is a rough, breathy
+  // voice through the two resonances of a dog's mouth, not a bare buzz.
   private dog(t: number) {
     const p = rand(-0.9, 0.9)
     const dist = rand(0.3, 1)
     const big = Math.random() < 0.5
     const f = big ? rand(280, 360) : rand(500, 650)
     const dest = this.spot(p, dist)
+    const mouth = this.ctx.createGain()
+    mouth.gain.value = 0.35 * (1 - dist * 0.5)
+    for (const [ff, q, v] of big ? [[700, 3, 1], [1600, 4, 0.5]] : [[1200, 3, 1], [2600, 4, 0.45]]) {
+      const bp = this.filter('bandpass', ff, undefined, q)
+      const bg = this.ctx.createGain()
+      bg.gain.value = v
+      mouth.connect(bp).connect(bg).connect(dest)
+    }
     for (let i = Math.floor(rand(1, 4)); i > 0; i--) {
       const at = t
-      const tone = this.filter('bandpass', big ? 900 : 1500, dest, 2)
-      const g = this.ctx.createGain()
-      g.gain.value = 0.35 * (1 - dist * 0.5)
-      g.connect(tone)
-      this.blip(at, 0.14, 1, 0, (o) => {
+      const len = rand(0.11, 0.16)
+      // A growly flutter in the throat.
+      const rough = this.ctx.createGain()
+      rough.gain.value = 0.6
+      const lfo = this.ctx.createOscillator()
+      const depth = this.ctx.createGain()
+      lfo.frequency.value = rand(35, 55)
+      depth.gain.value = 0.4
+      lfo.connect(depth).connect(rough.gain)
+      rough.connect(mouth)
+      lfo.start(at)
+      lfo.stop(at + len + 0.05)
+      this.blip(at, len, 1, null, (o) => {
         o.type = 'sawtooth'
         o.frequency.setValueAtTime(f, at)
-        o.frequency.linearRampToValueAtTime(f * 1.25, at + 0.03)
-        o.frequency.exponentialRampToValueAtTime(f * 0.7, at + 0.14)
-      }, () => g)
-      this.noiseHit(at, 0.08, 0.05 * (1 - dist * 0.5), tone)
+        o.frequency.linearRampToValueAtTime(f * 1.3, at + 0.03)
+        o.frequency.exponentialRampToValueAtTime(f * 0.65, at + len)
+      }, () => rough)
+      this.noiseHit(at, len * 0.7, 0.12 * (1 - dist * 0.5), mouth)
       t += rand(0.3, 0.6)
     }
   }
@@ -817,11 +886,25 @@ export class Soundscape {
     }
   }
 
+  // A crow's "caw caw": a hoarse, raspy call with some breath in it.
   private crow(t: number) {
     const p = rand(-0.9, 0.9)
+    const dest = this.spot(p, rand(0.2, 0.9))
     for (let i = 0; i < Math.floor(rand(2, 4)); i++) {
-      const s = t + i * 0.5
-      this.blip(s, 0.28, 0.05, p, (o) => { o.type = 'sawtooth'; o.frequency.setValueAtTime(560, s); o.frequency.linearRampToValueAtTime(440, s + 0.28) }, (d) => this.filter('bandpass', 1150, d, 1.8))
+      const s = t + i * rand(0.42, 0.58)
+      const rasp = this.ctx.createGain()
+      rasp.gain.value = 0.55
+      const lfo = this.ctx.createOscillator()
+      const depth = this.ctx.createGain()
+      lfo.frequency.value = rand(70, 95)
+      depth.gain.value = 0.45
+      lfo.connect(depth).connect(rasp.gain)
+      lfo.start(s)
+      lfo.stop(s + 0.35)
+      const tone = this.filter('bandpass', 1250, dest, 1.6)
+      rasp.connect(tone)
+      this.blip(s, 0.28, 0.07, null, (o) => { o.type = 'sawtooth'; o.frequency.setValueAtTime(rand(540, 600), s); o.frequency.linearRampToValueAtTime(430, s + 0.28) }, () => rasp)
+      this.noiseHit(s, 0.22, 0.02, tone)
     }
   }
 
@@ -874,7 +957,8 @@ let scape: Soundscape | null = null
 let timer: ReturnType<typeof setInterval> | null = null
 let quietSince = 0
 
-const target = () => (settings.on && !isMuted() && !townHeld() && !document.hidden ? settings.volume : 0)
+// Techno Night turns the town down a little under the music.
+const target = () => (settings.on && !isMuted() && !townHeld() && !document.hidden ? settings.volume * (technoOn() ? 0.5 : 1) : 0)
 
 export function clubOpen(): Club | null {
   if (!isNight()) return null
@@ -933,11 +1017,19 @@ function tick() {
     if (!scape) {
       const c = ctx
       scape = new Soundscape(c, audioOut() ?? c.destination)
-      // Hits land on the page's clock when they'll actually be heard.
-      scape.onHit = (at, kick) => clubHit(performance.now() + (at - c.currentTime + (c.outputLatency || c.baseLatency || 0)) * 1000, kick)
+      // Cues land on the page's clock when they'll actually come out of the
+      // speakers: the output timestamp pairs a moment on the audio clock with
+      // when it's heard, so it carries the device's output delay (Bluetooth
+      // headphones included). Older browsers fall back to the reported latency.
+      scape.onHit = (at, kind, amt, groove) => {
+        const o = c.getOutputTimestamp?.()
+        const heard = o?.contextTime && o.performanceTime ? o.performanceTime + (at - o.contextTime) * 1000 : performance.now() + (at - c.currentTime + (c.outputLatency || c.baseLatency || 0)) * 1000
+        clubHit(heard, kind, amt, groove)
+      }
     }
     quietSince = 0
     scape.level(v, t)
+    scape.techno = technoOn()
     scape.step(t + 0.05, nightAmount(dayPhase()), SEASON, clubOpen(), weatherNow())
     honks(scape, t + 0.05)
   } else if (scape) {

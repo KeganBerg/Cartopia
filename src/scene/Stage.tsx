@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Canvas, useThree } from '@react-three/fiber'
 import { NeutralToneMapping, type PerspectiveCamera, type WebGLProgram, type WebGLRenderer } from 'three'
@@ -66,7 +66,7 @@ export function StageCanvas() {
       }}
     >
       <Rig run={run} />
-      {node}
+      <StageRun run={run}>{node}</StageRun>
     </Canvas>,
     hostDiv(),
   )
@@ -118,6 +118,14 @@ function Rig({ run }: { run: number }) {
     }
   }, [run, gl, scene, camera, get])
   return null
+}
+
+// Each race gets a fresh scene. The next race's scene arrives in the same commit as the
+// last one leaves (Retry, Next), so without the key React would hand the old scene the
+// new props and its per-race state would carry over: the finish replay stayed finished,
+// and every race after the first lost its slow-motion and photo finish.
+export function StageRun({ run, children }: { run: number; children: ReactNode }) {
+  return <Fragment key={run}>{children}</Fragment>
 }
 
 let runs = 0

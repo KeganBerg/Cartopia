@@ -5,6 +5,16 @@
 [build.environment]
   NODE_VERSION = "22"
 
+# Public Terms of Service and Privacy Policy, written by the build (vite.config.ts).
+[[redirects]]
+  from = "/terms"
+  to = "/terms/index.html"
+  status = 200
+[[redirects]]
+  from = "/privacy"
+  to = "/privacy/index.html"
+  status = 200
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
@@ -15,7 +25,7 @@
 [[headers]]
   for = "/*"
   [headers.values]
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'sha256-Tap7WPo1wnRTozocM1iIIsf/9Y2DdDBs/nYmKmL1QGg='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' data: blob: https://*.supabase.co wss://*.supabase.co; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'sha256-bxnphGH+1cgljptlRgjJfuFqumLmk0ayLDzoZtXuYh4='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' data: blob: https://*.supabase.co wss://*.supabase.co; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
@@ -28,6 +38,10 @@
   [headers.values]
     Cache-Control = "no-cache"
     Service-Worker-Allowed = "/"
+[[headers]]
+  for = "/version.json"
+  [headers.values]
+    Cache-Control = "no-cache"
 [[headers]]
   for = "/manifest.webmanifest"
   [headers.values]

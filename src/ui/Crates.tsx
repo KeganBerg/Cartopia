@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { NeutralToneMapping } from 'three'
 import { useGame, openCrate } from '../game/store'
-import { MOD_SLOTS, carDef, modDef, ownedModSkins, ownedSkins, type ModDef } from '../game/data'
+import { MOD_SLOTS, SKINNED_SLOTS, carDef, fittedMods, modDef, ownedModSkins, ownedSkins, type ModDef } from '../game/data'
 import { CRATES, carOdds, crateCost, crateDef, crateOddsShown, dropTier, homeCars, homeMods, modChoices, skinOdds, skinOf, type CrateDef, type CrateId, type CrateOpen } from '../game/crates'
 import { SKIN_TIERS } from '../game/data'
 import { CrateScene, TIER_GLOW, prizeLook, type CratePhase } from '../scene/CrateScene'
@@ -10,6 +10,8 @@ import { CarThumb } from '../scene/BuildingPreview'
 import { BuckIcon, CoinIcon, Icon } from './Icon'
 import { compact } from './format'
 import { openGarageTab } from './Menus'
+import { openModSlot } from './Mods'
+import { raceCarOf } from '../game/raceCar'
 import './crates.css'
 import { LoadingScene } from './Loading'
 
@@ -110,11 +112,23 @@ function Odds({ c, level }: { c: CrateDef; level: number }) {
 }
 
 // What came out, under the reveal.
-function Prize({ open, onAgain, onDone, again }: { open: CrateOpen; onAgain: () => void; onDone: () => void; again: React.ReactNode }) {
+// The prize buttons leave the crates for the Garage with the prize on try-on there, on the car
+// it's for (a paint: `paintCar`); the Garage's own buttons fit it.
+function Prize({ open, onAgain, onDone, again, paintCar }: { open: CrateOpen; onAgain: () => void; onDone: () => void; again: React.ReactNode; paintCar: string | null }) {
   const cars = useGame((s) => s.cars)
-  const modCar = useGame((s) => s.modCar)
-  const [fitted, setFitted] = useState(false)
   const d = open.drop
+  // A car paint goes on try-on in the Paint tab; a mod paint on a part slot in the Mods tab,
+  // the first paintable slot the car has a part in.
+  const wearSkin = (skin: string, part: boolean) => {
+    if (!paintCar) return
+    onDone()
+    if (!part) return openGarageTab('paint', { car: paintCar, skin })
+    const car = cars.find((c) => c.uid === paintCar)
+    const fit = car ? fittedMods(car.mods, carDef(car.model).body) : {}
+    const slot = SKINNED_SLOTS.find((sl) => fit[sl]) ?? 'spoiler'
+    openModSlot(slot)
+    openGarageTab('mods', { car: paintCar, modSkin: { slot, skin } })
+  }
   const tier = dropTier(d)
   let title = ''
   let sub = ''
@@ -153,9 +167,9 @@ function Prize({ open, onAgain, onDone, again }: { open: CrateOpen; onAgain: () 
       <span className="cp-icon">{icon}</span>
       <div className="cp-text"><small>{sub}</small><b>{title}</b></div>
       <div className="cp-actions">
-        {d.kind === 'mod' && !fitted && <button className="buy small" onClick={() => { if (modCar(d.car, d.mod)) setFitted(true) }}>Fit it</button>}
-        {d.kind === 'skin' && <button className="buy small alt" onClick={() => { onDone(); openGarageTab(d.part ? 'mods' : 'paint'); useGame.getState().openPanel('garage') }}>Use it</button>}
-        {d.kind === 'car' && <button className="buy small alt" onClick={() => { onDone(); openGarageTab('tune'); useGame.getState().openPanel('garage') }}>Garage</button>}
+        {d.kind === 'mod' && <button className="buy small" onClick={() => { onDone(); openModSlot(modDef(d.mod)?.slot ?? 'spoiler'); openGarageTab('mods', { car: d.car, mod: d.mod }) }}>Fit it</button>}
+        {d.kind === 'skin' && paintCar && <button className="buy small alt" onClick={() => wearSkin(d.skin, d.part)}>Use it</button>}
+        {d.kind === 'car' && <button className="buy small alt" onClick={() => { onDone(); useGame.getState().selectCar(d.uid); openGarageTab('tune') }}>Garage</button>}
         <button className="buy small" onClick={onAgain}>{again}</button>
         <button className="sell small" onClick={onDone}>Done</button>
       </div>
@@ -188,6 +202,10 @@ export function CratesPanel() {
   // A part prize shows the car as it was before the part was added, so keep that car.
   const [carsAt, setCarsAt] = useState(cars)
   const open = queue[0] ?? null
+  // A new paint is shown on your selected car, or else the car you race with.
+  const selectedCar = useGame((s) => s.selectedCar)
+  const raceCar = useGame((s) => s.raceCar)
+  const paintCar = (selectedCar && carsAt.some((c) => c.uid === selectedCar) ? selectedCar : raceCarOf(carsAt, raceCar)?.uid) ?? null
   const shownDef = open ? crateDef(open.crate) ?? def : def
 
   const choose = (id: CrateId) => {
@@ -234,7 +252,7 @@ export function CratesPanel() {
   return (
     <div className="race-full crate-full" onClick={() => { if (phase === 'open' && !shown) setSkip((k) => k + 1) }}>
       <Canvas className="rf-canvas" shadows camera={{ fov: 42, near: 0.3, far: 60, position: [0, 4, 9] }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
-        <CrateScene run={run} def={shownDef} phase={phase} drop={open?.drop ?? null} prizeCar={prizeLook(open?.drop ?? null, carsAt)} onReveal={() => setShown(true)} skip={skip} />
+        <CrateScene run={run} def={shownDef} phase={phase} drop={open?.drop ?? null} prizeCar={prizeLook(open?.drop ?? null, carsAt, paintCar)} onReveal={() => setShown(true)} skip={skip} />
       </Canvas>
       <LoadingScene label="Opening the Crate Depot" onClose={close} />
       <div className="rf-top">
@@ -244,7 +262,7 @@ export function CratesPanel() {
       </div>
       {phase === 'open' && !shown && <div className="crate-skip">Tap to skip</div>}
       {phase === 'open' && shown && open && (
-        <Prize open={open} onDone={queue.length > 1 ? next : () => { next() }} onAgain={again}
+        <Prize open={open} paintCar={paintCar} onDone={queue.length > 1 ? next : () => { next() }} onAgain={again}
           again={queue.length > 1 ? 'Next' : <>Again · {price(crateDef(open.crate) ?? def, level)}</>} />
       )}
       {phase !== 'open' && (

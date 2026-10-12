@@ -7,9 +7,12 @@
 // town has drawn. Run: node scripts/splash/build.mjs
 //
 // The scene matches the link-preview cards: a sunburst panel with the logo, and
-// the player's own race car (in their paint) parked in front of a busy town
-// that slowly pans, in the real season and the game's 20-minute day/night clock
-// (src/game/clock.ts), or a live night/day event cached by src/game/liveEvents.ts.
+// the player's own race car (in their paint, centred in the space under the
+// loading pill and sized to fit it) parked in front of a busy town
+// that slowly pans, in the real season (flipped south of the equator, cached by
+// src/game/clock.ts) and the game's 20-minute day/night clock (src/game/clock.ts),
+// or a live night/day event cached by src/game/liveEvents.ts.
+// When the game is ready the car drives off screen and the splash fades away.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 
@@ -50,11 +53,14 @@ left:-30%;width:160%;top:-24%;height:70%;--cx:50%;--cy:52%}
 @keyframes sp-spin{to{transform:rotate(1turn)}}
 #splash .wm{position:absolute;left:50%;top:calc(6% + env(safe-area-inset-top));width:min(80vw,560px);transform:translateX(-50%);filter:drop-shadow(0 6px 14px rgba(20,33,61,.3));z-index:5;animation:sp-in .7s cubic-bezier(.2,1.6,.4,1) both}
 @keyframes sp-in{from{transform:translateX(-50%) scale(.6);opacity:0}}
-#splash .tag{position:absolute;left:0;right:0;top:calc(6% + env(safe-area-inset-top) + min(80vw,560px) * .3);margin:0;text-align:center;font-size:clamp(15px,4.6vw,24px);line-height:1.25;letter-spacing:.3px;-webkit-text-stroke:4px ${N};paint-order:stroke fill;text-shadow:0 3px 0 ${N};z-index:5;animation:sp-up .6s .15s ease-out both}
+#splash .tag{position:absolute;left:0;right:0;background:none;padding:0;border-radius:0;font-family:inherit;top:calc(6% + env(safe-area-inset-top) + min(80vw,560px) * .3);margin:0;text-align:center;font-size:clamp(15px,4.6vw,24px);line-height:1.25;letter-spacing:.3px;-webkit-text-stroke:4px ${N};paint-order:stroke fill;text-shadow:0 3px 0 ${N};z-index:5;animation:sp-up .6s .15s ease-out both}
 @keyframes sp-up{from{transform:translateY(10px);opacity:0}}
 #splash .car{position:absolute;left:50%;top:37%;width:calc(min(76vw,340px) * var(--k,1));transform:translateX(-50%);z-index:4;opacity:0;transition:opacity .35s ease}
 #splash .car.on{opacity:1;animation:sp-park .7s cubic-bezier(.2,1.3,.4,1) both}
 @keyframes sp-park{from{transform:translate(-20%,-14%) scale(.9)}}
+#splash .car.go{animation:sp-go .9s cubic-bezier(.5,0,.9,.6) forwards}
+#splash .car.go .body{animation:none}
+@keyframes sp-go{0%{transform:translateX(-50%)}18%{transform:translate(-44%,-3%) rotate(-1.5deg)}100%{transform:translate(calc(-50% - 95vmax),42vmax) rotate(2deg)}}
 #splash .car .body{position:relative;isolation:isolate;animation:sp-bob 1.6s ease-in-out infinite alternate}
 #splash .car img{display:block;width:100%;height:auto}
 #splash .paint{position:absolute;inset:0;mix-blend-mode:multiply;background:var(--paint,#d32f2f);-webkit-mask-size:100% 100%;mask-size:100% 100%}
@@ -71,11 +77,13 @@ left:-30%;width:160%;top:-24%;height:70%;--cx:50%;--cy:52%}
 #splash .wm{left:23%;top:15%;width:min(36vw,520px)}
 #splash .tag{left:0;right:auto;width:46%;top:calc(15% + min(36vw,520px) * .32);font-size:clamp(18px,2.1vw,30px)}
 #splash .ld{left:23%;bottom:auto;top:calc(15% + min(36vw,520px) * .32 + clamp(18px,2.1vw,30px) * 4.6)}
-#splash .car{left:24%;top:auto;bottom:-1%;width:calc(min(30vw,460px) * var(--k,1))}
+#splash .car{--vh:1vh;--ldb:calc(15 * var(--vh) + min(36vw,520px) * .32 + clamp(18px,2.1vw,30px) * 4.6 + 64px);--cmax:min(30vw,460px)}
+@supports (height:1dvh){#splash .car{--vh:1dvh}}
+#splash .car{left:24%;--cw:min(calc(var(--cmax) * var(--k,1)),calc((100 * var(--vh) - var(--ldb) - 8 * var(--vh)) / var(--ar,.75)));width:var(--cw);top:calc(var(--ldb) + (100 * var(--vh) - var(--ldb) - var(--cw) * var(--ar,.75)) / 2)}
 }
-@media (min-aspect-ratio:1/1) and (max-height:520px){#splash .tag{display:none}#splash .ld{top:calc(15% + min(36vw,520px) * .32 + 12px)}#splash .car{width:calc(min(22vw,300px) * var(--k,1))}}
+@media (min-aspect-ratio:1/1) and (max-height:520px){#splash .tag{display:none}#splash .ld{top:calc(15% + min(36vw,520px) * .32 + 12px)}#splash .car{--ldb:calc(15 * var(--vh) + min(36vw,520px) * .32 + 76px);--cmax:min(22vw,300px)}}
 @media (max-aspect-ratio:1/1) and (max-height:640px){#splash .tag{display:none}#splash .car{top:30%}}
-@media (prefers-reduced-motion:reduce){#splash *,#splash *::before{animation:none!important}}
+@media (prefers-reduced-motion:reduce){#splash *,#splash *::before{animation:none!important}#splash .car.go{opacity:0}}
 `
 
 // Picks the time of day, season and the player's car, eases the pill forward
@@ -85,11 +93,13 @@ const JS = `(function(){
 var q=new URLSearchParams(location.search),el=document.getElementById('splash');
 var f=document.createElement('link');f.rel='stylesheet';f.href='https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800&display=swap';document.head.appendChild(f);
 if(q.has('nosplash')){el.remove();return}
-var t=q.get('time'),p=t===null?(Date.now()%12e5)/12e5:+t,lv=[];
+var t=q.get('time'),n,sun={},lv=[];
+try{sun=JSON.parse(localStorage.getItem('cartopia-sun'))||{}}catch(e){}
 try{lv=JSON.parse(localStorage.getItem('cartopia-live-events'))||[]}catch(e){}
-lv.forEach(function(e){var k={night:.5,day:0}[e.kind],now=Date.now();if(t===null&&k!==undefined&&e.from<=now&&now<e.to)p=k});
-var d=Math.abs(p-.5),n=d<.14?1:d>.26?0:1-(d-.14)/.12;
-var m=new Date().getMonth(),tod=n>.7?'night':n>.08?'dusk':'day',season=q.get('season')||(m<2||m>10?'winter':m<5?'spring':m<8?'summer':'fall');
+var now=new Date(),m=(now%12e5)/6e4,p=t!==null?+t:m<5?m*.06:m<15?.3+(m-5)*.04:.7+(m-15)*.06,d=Math.abs(p-.5);
+n=d<.14?1:d>.26?0:1-(d-.14)/.12;
+lv.forEach(function(e){var k={night:1,day:0}[e.kind];if(t===null&&k!==undefined&&e.from<=+now&&+now<e.to)n=k});
+var tod=n>.7?'night':n>.08?'dusk':'day',season=q.get('season')||['winter','spring','summer','fall'][(Math.floor((now.getMonth()+1)%12/3)+(sun.south?2:0))%4];
 el.className=tod;
 var key=season+'-'+tod,lq=${JSON.stringify(LQIP)},town=el.querySelector('.town'),ti=town.querySelector('img');
 if(lq[key])town.style.backgroundImage='url('+lq[key]+')';
@@ -98,12 +108,12 @@ var c={};try{c=JSON.parse(localStorage.getItem('cartopia-splash-car'))||{}}catch
 var model=/^[a-z0-9]+$/.test(c.model)?c.model:'hotshot',car=el.querySelector('.car'),img=car.querySelector('img'),paint=car.querySelector('.paint');
 paint.style.setProperty('--paint',/^#[0-9a-f]{3,8}$/i.test(c.color)?c.color:'#d32f2f');
 function useCar(id){var mk='url(/splash/hero-'+id+'-mask.webp)';paint.style.webkitMaskImage=mk;paint.style.maskImage=mk;img.src='/splash/hero-'+id+'.webp'}
-img.onload=function(){car.style.setProperty('--k',Math.max(.8,Math.min(1.25,img.naturalWidth/${HERO_W})));car.classList.add('on')};img.onerror=function(){if(model!='hotshot'){model='hotshot';useCar(model)}};useCar(model);
+img.onload=function(){car.style.setProperty('--k',Math.max(.8,Math.min(1.25,img.naturalWidth/${HERO_W})));car.style.setProperty('--ar',img.naturalHeight/img.naturalWidth);car.classList.add('on')};img.onerror=function(){if(model!='hotshot'){model='hotshot';useCar(model)}};useCar(model);
 var bar=el.querySelector('.ld .fill'),lab=el.querySelector('.ld b'),v=.06,cap=.6,end=0;
 function draw(){bar.style.transform='scaleX('+v+')'}
 var tick=setInterval(function(){v+=(cap-v)*.04;draw()},120);
 var slow=setTimeout(function(){lab.textContent='Still loading\\u2026 tap to retry';el.querySelector('.ld').onclick=function(){location.reload()}},30000);
-window.cartopiaSplash={set:function(x){if(x>v)v=x;cap=Math.max(cap,Math.min(.97,x+.08));draw()},done:function(){if(end)return;end=1;clearInterval(tick);clearTimeout(slow);v=1;draw();lab.textContent='Let\\u2019s go!';setTimeout(function(){el.classList.add('out');setTimeout(function(){el.remove()},650)},300)}};
+window.cartopiaSplash={set:function(x){if(x>v)v=x;cap=Math.max(cap,Math.min(.97,x+.08));draw()},done:function(){if(end)return;end=1;clearInterval(tick);clearTimeout(slow);v=1;draw();lab.textContent='Let\\u2019s go!';setTimeout(function(){car.classList.add('go');setTimeout(function(){el.classList.add('out');setTimeout(function(){el.remove()},650)},750)},250)}};
 })()`
 
 const BODY = `<div id="splash">

@@ -3,13 +3,21 @@ import { CylinderGeometry } from 'three'
 import type { BuildingDef } from '../game/data'
 import { growthStage, midFloors, towerFloors } from '../game/growth'
 import { Box, Cyl, Sign, Pool, Neon, Bulbs, Flag, Parasol, BlockCar, GOLD, type Mat, type V3 } from './NewBuildings'
-import { Glass, GlassBlock, glassMat, LitSign, RoofPlant, Planter, PadLights } from './OfficeBuildings'
+import { Glass, GlassBlock, glassMat, LitSign, RoofPlant, PadLights } from './OfficeBuildings'
 import { CarModel } from './CarModel'
-import { PerLot, Upright, useBays } from './mergeScale'
+import { Upright, useBays, useMergeScale } from './mergeScale'
+import { WashCenter } from './WashCenter'
+import { isMarketCenter } from '../game/marketCenter'
+import { isResort } from '../game/resortCenter'
+import { ResortCenter } from './ResortCenter'
+import { MarketCenter } from './MarketCenter'
+import { isWashCenter } from '../game/washCenter'
+import { ShopTower } from './ShopTower'
 import { glowMats } from './dayNight'
-import { PAL, SEASON } from './season'
-import { concreteTex, helipadTex, sidingTex, shutterTex, gravelTex } from './textures'
-import { Storefront, BrickFloors, StoneShaft, GlassDrum, RibbonDrum, WaterTank, GiantProp, Beacon, type Kit, type Giant } from './GrowthKit'
+import { concreteTex, helipadTex, shutterTex, gravelTex } from './textures'
+import { Storefront, BrickFloors, StoneShaft, GlassDrum, WaterTank, GiantProp, Beacon, type Kit, type Giant } from './GrowthKit'
+import { PEOPLE_SIZED } from './keepShape'
+import { LAYER } from './layers'
 
 // The grown forms of shops and services (names in src/game/growth.ts). Level
 // 4-6 rebuilds the business as a bigger building of its kind (a brick walk-up
@@ -19,15 +27,16 @@ import { Storefront, BrickFloors, StoneShaft, GlassDrum, RibbonDrum, WaterTank, 
 
 type Props = { def: BuildingDef; ghost?: boolean; m: Mat; win: ReactNode; bulb: ReactNode; level: number }
 
-const SNOW = SEASON === 'winter'
-const GLASS_FH = 0.3
+
+// Spray in the air: meant to float (see floating.ts).
+const AIR = { air: true }
 
 // Rooftop sign on a steel frame, like the old downtown walk-ups.
 function RoofSign({ m, text, w, at, bg, fg, board, ghost }: { m: Mat; text: string; w: number; at: V3; bg: string; fg: string; board: string; ghost?: boolean }) {
   return (
     <group position={at}>
       {[-1, 1].map((sd) => <Box key={sd} m={m} at={[(sd * w) / 2.6, 0.12, -0.06]} s={[0.03, 0.24, 0.03]} c="#37474f" shadow={false} />)}
-      <Box m={m} at={[0, 0.12, -0.12]} rot={[0.5, 0, 0]} s={[0.03, 0.03, 0.26]} c="#37474f" shadow={false} />
+      <Box m={m} at={[0, 0.11, -0.18]} rot={[-0.73, 0, 0]} s={[0.03, 0.03, 0.33]} c="#37474f" shadow={false} />
       <Box m={m} at={[0, 0.24 + w / 8, -0.03]} s={[w + 0.08, w / 4 + 0.08, 0.05]} c={board} shadow={false} />
       {!ghost && <Sign text={text} w={w} at={[0, 0.24 + w / 8, 0]} bg={bg} fg={fg} />}
       <Bulbs from={[-w / 2, 0.28 + w / 4 + 0.04, 0.03]} to={[w / 2, 0.28 + w / 4 + 0.04, 0.03]} n={7} />
@@ -39,68 +48,23 @@ function RoofSign({ m, text, w, at, bg, fg, board, ghost }: { m: Mat; text: stri
 
 type Food = {
   wall: string; brick: string; trim: string; awning: string; sign: string; signFg: string; board: string; cafe?: string; giant: Giant
-  tower: (k: Kit, y0: number, h: number, lvl: number) => ReactNode
-  top: (h: number) => number
-  // A round tower: a pair gets one per lot rather than an oval (see PerLot).
-  round?: true
 }
 
 const FOOD: Record<string, Food> = {
   pizza: {
     wall: '#c0504d', brick: '#a8483a', trim: '#f5f5f5', awning: '#c62828', sign: 'PIZZA', signFg: '#c62828', board: '#f5f5f5', cafe: '#c62828', giant: 'pizza',
-    tower: (k, y0, h) => <StoneShaft k={k} z={-0.25} y0={y0} w={1.3} d={1.0} h={h} stone="#c8734f" tint="#a9c4de" pier="#f3e5d0" bays={3} />,
-    top: (h) => h + 0.08,
   },
   donut: {
     wall: '#f48fb1', brick: '#ec7aa3', trim: '#fff8e1', awning: '#f06292', sign: 'DONUTS', signFg: '#d81b60', board: '#fff8e1', cafe: '#f06292', giant: 'donut',
-    tower: (k, y0, h) => <RibbonDrum k={k} z={-0.22} y0={y0} r={0.62} floors={Math.round(h / GLASS_FH)} fh={GLASS_FH} wall="#f48fb1" band="#fff8e1" tint="#b3e5fc" />,
-    top: (h) => h + 0.08,
-    round: true,
   },
   burger: {
     wall: '#ffb300', brick: '#b5532e', trim: '#fff3e0', awning: '#d84315', sign: 'BURGERS', signFg: '#d84315', board: '#fff3e0', cafe: '#d84315', giant: 'burger',
-    tower: (k, y0, h) => (
-      <group>
-        <GlassBlock m={k.m} ghost={k.ghost} x={0} z={-0.25} y0={y0} w={1.3} d={1.0} h={h} tint="#ffcc80" frame="#5d4037" />
-        {!k.ghost && [-0.45, -0.15, 0.15, 0.45].map((x) => <Box key={x} m={k.m} at={[x, y0 + h / 2, 0.27]} s={[0.04, h, 0.05]} c="#d84315" shadow={false} />)}
-      </group>
-    ),
-    top: (h) => h + 0.08,
   },
   icecream: {
     wall: '#b3e5fc', brick: '#e1bee7', trim: '#ffffff', awning: '#f06292', sign: 'ICE CREAM', signFg: '#ec407a', board: '#ffffff', cafe: '#4fc3f7', giant: 'cone',
-    // Soft-serve tiers: three drums, each narrower than the one below.
-    tower: (k, y0, h) => {
-      const h1 = Math.round((h * 0.55) / GLASS_FH) * GLASS_FH
-      const h2 = Math.round((h * 0.3) / GLASS_FH) * GLASS_FH
-      const h3 = Math.max(GLASS_FH * 2, h - h1 - h2)
-      return (
-        <group>
-          <GlassDrum k={k} z={-0.22} y0={y0} r={0.66} h={h1} tint="#b3e5fc" frame="#f8bbd0" />
-          <GlassDrum k={k} z={-0.22} y0={y0 + h1 + 0.08} r={0.52} h={h2} tint="#b3e5fc" frame="#f8bbd0" />
-          <GlassDrum k={k} z={-0.22} y0={y0 + h1 + h2 + 0.16} r={0.38} h={h3} tint="#b3e5fc" frame="#f8bbd0" />
-        </group>
-      )
-    },
-    top: (h) => h + 0.24,
-    round: true,
   },
   coffee: {
     wall: '#8d6e63', brick: '#6d4c41', trim: '#e8f5e9', awning: '#2e7d32', sign: 'COFFEE', signFg: '#2e7d32', board: '#e8f5e9', cafe: '#2e7d32', giant: 'mug',
-    // A slim brick tower under a green copper mansard.
-    tower: (k, y0, h) => {
-      const fl = Math.round(h / 0.34)
-      return (
-        <group position={[0, 0, -0.25]}>
-          <BrickFloors k={k} w={1.3} d={1.0} y0={y0} floors={fl} fh={0.34} wall="#6d4c41" trim="#e8f5e9" escape={false} />
-          <mesh position={[0, y0 + fl * 0.34 + 0.32, 0]} rotation-y={Math.PI / 4} castShadow>
-            <cylinderGeometry args={[0.55, 0.98, 0.42, 4]} />
-            {k.m(SNOW ? '#eef4f7' : '#4db6ac')}
-          </mesh>
-        </group>
-      )
-    },
-    top: (h) => Math.round(h / 0.34) * 0.34 + 0.53,
   },
 }
 
@@ -122,24 +86,7 @@ function FoodModel({ def, ghost, m, win, bulb, level }: Props) {
       </group>
     )
   }
-  const h = towerFloors(level) * GLASS_FH
-  const y0 = 1.01
-  const top = y0 + f.top(h)
-  const crown = (
-    <>
-      {f.tower(k, y0, h, level)}
-      <GiantProp m={m} kind={f.giant} at={[0, top, -0.25]} s={1.2} plinth={level >= 10 ? GOLD : f.trim} />
-      {/* The cone's plinth covers the ice cream's narrow top tier, so its mast rises through the plinth. */}
-      {!ghost && <Beacon m={m} at={def.id === 'icecream' ? [0.25, top, -0.45] : [0.5, top, -0.55]} h={0.45} />}
-    </>
-  )
-  return (
-    <group>
-      <Storefront k={k} w={1.8} d={1.6} z0={-0.05} h={1.0} wall={f.wall} tex="brick" trim={f.trim} awning={f.awning} sign={f.sign} signFg={f.signFg} board={f.board} cafe={f.cafe} />
-      {f.round ? <PerLot step={2}>{crown}</PerLot> : crown}
-      {!ghost && level >= 8 && <Flag at={[-0.75, 1.04, 0.5]} color={f.awning} star={level >= 10} />}
-    </group>
-  )
+  return <ShopTower def={def} ghost={ghost} m={m} win={win} bulb={bulb} level={level} look={{ sign: f.sign, color: f.awning, brick: f.brick, giant: f.giant }} />
 }
 
 // ---- Diner: streamline moderne, rounded ends and ribbon windows ----
@@ -233,25 +180,7 @@ function DinerModel({ def, ghost, m, win, bulb, level }: Props) {
       </group>
     )
   }
-  const h = towerFloors(level) * 0.32
-  const y0 = 1.0
-  return (
-    <group>
-      <StreamBlock k={k} z={-0.15} y0={0} len={3.6} d={1.45} floors={1} fh={0.95} wall={def.color} chrome="#eceff1" tint={tint} />
-      <StreamBlock k={k} z={-0.3} y0={y0} len={2.3} d={1.0} floors={towerFloors(level)} fh={0.32} wall={wall} chrome={def.roof} tint={tint} />
-      {/* A fin up the front carrying the name, like a 1930s picture palace. */}
-      <Box m={m} at={[-0.95, y0 + h * 0.35, 0.25]} s={[0.08, h * 0.7, 0.32]} c={def.roof} />
-      {!ghost && <LitSign text="DINER" w={0.9} at={[-0.95, 1.6, 0.42]} bg="#fffde7" fg="#c62828" m={m} />}
-      <Box m={m} at={[0, 0.9, 0.82]} s={[1.3, 0.04, 0.42]} c={def.roof} />
-      <Box m={m} at={[0, 0.5, 0.585]} s={[0.5, 0.82, 0.02]} c="#eceff1" shadow={false} />
-      <mesh position={[0, 0.42, 0.6]}><planeGeometry args={[0.4, 0.7]} />{m('#37474f')}</mesh>
-      <Bulbs from={[-0.65, 0.86, 1.03]} to={[0.65, 0.86, 1.03]} n={8} />
-      <Starburst m={m} at={[0, y0 + h + 0.08, -0.3]} c={def.roof} />
-      {level >= 10 && <Cyl m={m} at={[0, y0 + h + 0.12, -0.3]} r={0.3} h={0.04} c={GOLD} seg={16} />}
-      {!ghost && <Pool r={0.9} z={1.0} />}
-      {!ghost && [-1.4, 1.4].map((x) => <Parasol key={x} m={m} at={[x, 0, 0.82]} c={def.roof} />)}
-    </group>
-  )
+  return <ShopTower def={def} ghost={ghost} m={m} win={win} bulb={bulb} level={level} look={{ sign: 'DINER', color: def.roof, brick: '#8f3a3a', crown: <group scale={2.2}><Starburst m={m} at={[0, -0.04, 0]} c={def.roof} /></group> }} />
 }
 
 // ---- Bowling: a wide alley with a pin pylon, then a tower with a giant pin ----
@@ -279,18 +208,7 @@ function BowlingModel({ def, ghost, m, win, bulb, level }: Props) {
       </group>
     )
   }
-  const h = towerFloors(level) * GLASS_FH
-  const y0 = 1.06
-  return (
-    <group>
-      <Storefront k={k} w={3.6} d={1.6} z0={-0.15} h={1.05} wall={def.color} tex="plain" trim="#ede7f6" awning="#7e57c2" sign="BOWLING" signBg="#311b92" signFg="#ffeb3b" board="#7e57c2" />
-      <GlassBlock m={m} ghost={ghost} x={-0.3} z={-0.35} y0={y0} w={2.0} d={1.0} h={h} tint="#b39ddb" frame="#4527a0" />
-      {!ghost && [-1, 1].map((sd) => <Neon key={sd} at={[-0.3 + sd * 1.01, y0 + h / 2, 0.16]} s={[0.03, h, 0.03]} c="#d500f9" />)}
-      <GiantProp m={m} kind="pin" at={[-0.3, y0 + h + 0.08, -0.35]} s={1.25} plinth={level >= 10 ? GOLD : '#ede7f6'} />
-      {!ghost && <Beacon m={m} at={[0.5, y0 + h + 0.08, -0.7]} h={0.5} />}
-      {!ghost && <Pool r={0.9} z={0.9} />}
-    </group>
-  )
+  return <ShopTower def={def} ghost={ghost} m={m} win={win} bulb={bulb} level={level} look={{ sign: 'BOWLING', color: '#7e57c2', brick: '#4a2f8a', giant: 'pin' }} />
 }
 
 // ---- Motel: a hotel with balconies, then a grand hotel tower with a roof pool ----
@@ -312,21 +230,9 @@ function Balconies({ m, w, z, ys, c, rail }: { m: Mat; w: number; z: number; ys:
   )
 }
 
-function RoofPool({ m, at, w, d, ghost }: { m: Mat; at: V3; w: number; d: number; ghost?: boolean }) {
-  return (
-    <group position={at}>
-      <Box m={m} at={[0, 0.03, 0]} s={[w, 0.06, d]} c="#d7ccc8" shadow={false} />
-      <mesh position={[0, 0.065, 0]} rotation-x={-Math.PI / 2}>
-        <planeGeometry args={[w * 0.6, d * 0.55]} />
-        <meshStandardMaterial color={SNOW ? '#cfe8f3' : '#4fc3f7'} roughness={0.1} metalness={0.2} />
-      </mesh>
-      {!ghost && [-1, 1].map((sd) => <Parasol key={sd} m={m} at={[sd * w * 0.36, 0.06, d * 0.3]} c="#00897b" />)}
-      {!ghost && [-0.15, 0.15].map((x) => <Box key={x} m={m} at={[x, 0.1, -d * 0.38]} rot={[-0.2, 0, 0]} s={[0.12, 0.03, 0.3]} c="#fafafa" shadow={false} />)}
-    </group>
-  )
-}
-
 function MotelModel({ def, ghost, m, win, bulb, level }: Props) {
+  const scale = useMergeScale()
+  if (isResort(def.id, level, scale)) return <ResortCenter m={m} win={win} bulb={bulb} level={level} ghost={ghost} />
   const k: Kit = { m, win, bulb, ghost }
   const teal = def.roof
   if (growthStage(level) === 2) {
@@ -349,43 +255,14 @@ function MotelModel({ def, ghost, m, win, bulb, level }: Props) {
       </group>
     )
   }
-  const fl = towerFloors(level)
-  const fh = 0.3
-  const h = fl * fh
-  const y0 = 1.0
-  const ys = Array.from({ length: fl }, (_, i) => y0 + i * fh)
-  return (
-    <group>
-      <Storefront k={k} w={3.6} d={1.6} z0={-0.15} h={1.0} wall="#d7ccc8" tex="stone" trim="#fafafa" awning={teal} />
-      {/* A slab tower in cream stucco, balconies on every floor, glass behind. */}
-      <GlassBlock m={m} ghost={ghost} x={0} z={-0.35} y0={y0} w={2.8} d={0.9} h={h} tint="#80cbc4" frame="#fafafa" />
-      {/* The top floor carries the hotel's name instead of balconies. */}
-      <Balconies m={m} w={2.8} z={0.1} ys={ys.slice(0, -1)} c="#fafafa" rail={teal} />
-      {[-1, 1].map((sd) => <Box key={sd} m={m} at={[sd * 1.48, y0 + h / 2, -0.35]} s={[0.22, h, 1.0]} c={def.color} t={sidingTex(1, Math.max(1, Math.round(h * 1.5)))} />)}
-      <RoofPool m={m} at={[0, y0 + h + 0.08, -0.35]} w={2.6} d={0.85} ghost={ghost} />
-      {!ghost && <LitSign text="GRAND HOTEL" w={1.5} at={[0, y0 + h - 0.25, 0.11 + 0.02]} bg={teal} fg="#fff8e1" m={m} />}
-      {/* Porte-cochere, kept to a step over the pavement. */}
-      <Box m={m} at={[0, 0.9, 0.78]} s={[1.6, 0.06, 0.76]} c={teal} />
-      {[-0.75, 0.75].map((x) => <Cyl key={x} m={m} at={[x, 0.45, 1.1]} r={0.035} h={0.9} c={level >= 10 ? GOLD : '#fafafa'} seg={8} />)}
-      <Bulbs from={[-0.78, 0.86, 1.15]} to={[0.78, 0.86, 1.15]} n={9} />
-      {!ghost && level >= 8 && [-1.5, 1.5].map((x) => <Flag key={x} at={[x, y0 + h + 0.08, -0.35]} color={teal} star={level >= 10} />)}
-      {!ghost && (
-        <group position={[1.35, 0.05, 0.75]}>
-          <Upright>
-            <group rotation-y={Math.PI / 2} scale={0.85}>
-              <CarModel body="luxury" color="#1a1a2e" />
-            </group>
-          </Upright>
-        </group>
-      )}
-      {!ghost && <Pool r={1.0} z={1.0} />}
-    </group>
-  )
+  return <ShopTower def={def} ghost={ghost} m={m} win={win} bulb={bulb} level={level} look={{ sign: 'HOTEL', color: teal, brick: '#a1887f' }} />
 }
 
 // ---- Fresh Mart: a two-level plaza with roof parking, then a tower ----
 
 function MarketModel({ def, ghost, m, win, bulb, level }: Props) {
+  const scale = useMergeScale()
+  if (isMarketCenter(def.id, level, scale)) return <MarketCenter m={m} win={win} bulb={bulb} level={level} ghost={ghost} />
   const k: Kit = { m, win, bulb, ghost }
   const green = def.roof
   if (growthStage(level) === 2) {
@@ -416,28 +293,12 @@ function MarketModel({ def, ghost, m, win, bulb, level }: Props) {
       </group>
     )
   }
-  const h = towerFloors(level) * GLASS_FH
-  const y0 = 1.7
-  return (
-    <group>
-      {/* Two floors of shops behind glass, the tower set back on top. */}
-      <Storefront k={k} w={3.6} d={1.6} z0={-0.15} h={1.0} wall={def.color} tex="plain" trim="#fafafa" awning="#43a047" />
-      <GlassBlock m={m} ghost={ghost} x={0} z={-0.15} y0={1.0} w={3.6} d={1.6} h={0.62} tint="#a5d6a7" frame="#fafafa" />
-      {!ghost && <LitSign text="FRESH MART" w={1.6} at={[0, 1.31, 0.66]} bg="#fafafa" fg={green} m={m} />}
-      <GlassBlock m={m} ghost={ghost} x={0.5} z={-0.4} y0={y0} w={1.9} d={1.0} h={h} tint="#a5d6a7" frame={green} />
-      <Box m={m} at={[-1.0, y0 + 0.05, 0]} s={[0.9, 0.1, 0.9]} c={PAL.grass} />
-      {!ghost && [-1.25, -0.75].map((x) => <Planter key={x} m={m} at={[x, y0 + 0.08, 0.1]} />)}
-      <GiantProp m={m} kind="apple" at={[0.5, y0 + h + 0.08, -0.4]} s={1.3} plinth={level >= 10 ? GOLD : '#fafafa'} />
-      {!ghost && <Beacon m={m} at={[1.2, y0 + h + 0.08, -0.7]} h={0.45} />}
-      {!ghost && [-1.25, 1.25].map((x) => <Parasol key={x} m={m} at={[x, 0, 0.85]} c="#43a047" />)}
-      {!ghost && <Pool r={0.9} z={0.95} />}
-    </group>
-  )
+  return <ShopTower def={def} ghost={ghost} m={m} win={win} bulb={bulb} level={level} look={{ sign: 'FRESH MART', color: green, brick: '#8d6e63', giant: 'apple' }} />
 }
 
 // ---- Pixel Palace: a neon block, then a tower of offset glowing boxes ----
 
-function ArcadeModel({ ghost, m, win, bulb, level }: Props) {
+function ArcadeModel({ def, ghost, m, win, bulb, level }: Props) {
   const k: Kit = { m, win, bulb, ghost }
   const violet = '#4527a0'
   const neon = ['#ff4fd8', '#00e5ff', '#76ff03', '#ffea00']
@@ -455,8 +316,9 @@ function ArcadeModel({ ghost, m, win, bulb, level }: Props) {
             {Array.from({ length: 12 }, (_, i) => (
               <Neon key={i} at={[-0.4 + (i % 4) * 0.27, 1.25 + Math.floor(i / 4) * 0.22 * (fl / 3), 0.645]} s={[0.18, 0.12, 0.01]} c={neon[(i * 7) % 4]} />
             ))}
-            {[-1, 1].map((sd) => <Neon key={sd} at={[sd * 0.86, H / 2, 0.62]} s={[0.035, H, 0.035]} c={neon[sd < 0 ? 0 : 1]} />)}
-            <Neon at={[0, H, 0.62]} s={[1.72, 0.035, 0.035]} c="#76ff03" />
+            {/* Posts just past the bar's ends and a thinner bar, so no two neon faces share a plane. */}
+            {[-1, 1].map((sd) => <Neon key={sd} at={[sd * 0.866, H / 2, 0.626]} s={[0.035, H, 0.035]} c={neon[sd < 0 ? 0 : 1]} />)}
+            <Neon at={[0, H, 0.624]} s={[1.72, 0.035, 0.026]} c="#76ff03" />
           </group>
         )}
         <RoofSign m={m} text="ARCADE" w={1.2} at={[0, H + 0.08, 0.4]} bg="#1a1035" fg="#ff4fd8" board="#ec407a" ghost={ghost} />
@@ -464,32 +326,7 @@ function ArcadeModel({ ghost, m, win, bulb, level }: Props) {
       </group>
     )
   }
-  const fl = towerFloors(level)
-  const blocks = Math.ceil(fl / 3)
-  const fh = 0.3
-  const y0 = 1.01
-  const top = y0 + blocks * fh * 3
-  return (
-    <group>
-      <Storefront k={k} w={1.8} d={1.6} z0={-0.05} h={1.0} wall={violet} tex="plain" trim="#1a1035" awning="#ec407a" sign="ARCADE" signBg="#1a1035" signFg="#ff4fd8" board="#ec407a" />
-      {/* Three-floor boxes stacked with a shift each, like a pile of cartridges. */}
-      {Array.from({ length: blocks }, (_, i) => {
-        const y = y0 + i * fh * 3
-        const x = [0, 0.14, -0.1, 0.08][i % 4]
-        const z = -0.25 + [0, -0.06, 0.05, -0.02][i % 4]
-        const c = neon[i % 4]
-        return (
-          <group key={i} position={[x, 0, z]}>
-            <GlassBlock m={m} ghost={ghost} x={0} z={0} y0={y} w={1.25} d={0.95} h={fh * 3 - 0.04} tint={i % 2 ? '#b39ddb' : '#90caf9'} frame="#1a1035" />
-            {!ghost && [-1, 1].map((sd) => <Neon key={sd} at={[sd * 0.63, y + fh * 1.5, 0.48]} s={[0.03, fh * 3 - 0.06, 0.03]} c={c} />)}
-            {!ghost && <Neon at={[0, y + fh * 3 - 0.02, 0.485]} s={[1.27, 0.03, 0.03]} c={c} />}
-          </group>
-        )
-      })}
-      <GiantProp m={m} kind="joystick" at={[0.08, top + 0.04, -0.27]} s={1.2} plinth={level >= 10 ? GOLD : '#1a1035'} />
-      {!ghost && <Beacon m={m} at={[-0.45, top + 0.04, -0.55]} h={0.45} />}
-    </group>
-  )
+  return <ShopTower def={def} ghost={ghost} m={m} win={win} bulb={bulb} level={level} look={{ sign: 'ARCADE', color: '#ec407a', brick: '#311b92', giant: 'joystick' }} />
 }
 
 // ---- Tuner: a glass showroom with cars on two floors, then a car tower ----
@@ -513,7 +350,7 @@ function TunerModel({ def, ghost, m, win, bulb, level }: Props) {
           </group>
         ))}
         <Box m={m} at={[0, H + 0.04, -0.25]} s={[3.6, 0.08, 1.4]} c="#212121" />
-        {[-1.75, -0.58, 0.58, 1.75].flatMap((x) => [0.43, -0.93].map((z) => <Box key={`${x}${z}`} m={m} at={[x, H / 2, z]} s={[0.06, H, 0.06]} c="#212121" shadow={false} />))}
+        {[-1.756, -0.58, 0.58, 1.756].flatMap((x) => [0.43, -0.93].map((z) => <Box key={`${x}${z}`} m={m} at={[x, H / 2, z]} s={[0.06, H, 0.06]} c="#212121" shadow={false} />))}
         {/* Glass on the sides and back, the front left open to show the cars. */}
         <Glass m={m} ghost={ghost} at={[0, H / 2, -0.94]} w={3.5} h={H} ry={Math.PI} tint="#cfd8dc" />
         {[-1, 1].map((sd) => <Glass key={sd} m={m} ghost={ghost} at={[sd * 1.77, H / 2, -0.25]} w={1.3} h={H} ry={(sd * Math.PI) / 2} tint="#cfd8dc" />)}
@@ -582,9 +419,9 @@ function PoliceModel({ def, ghost, m, win, bulb, level }: Props) {
       {[0, 1, 2].map((i) => <Box key={i} m={m} at={[0, 0.03 + i * 0.05, z + 0.57 - i * 0.1]} s={[1.0, 0.06 + i * 0.05, 0.12]} c="#e0e0e0" shadow={false} />)}
       {!ghost && [-0.32, 0.32].map((x) => <mesh key={x} position={[x, 0.78, z + 0.08]}><sphereGeometry args={[0.07, 10, 8]} /><meshStandardMaterial color="#42a5f5" emissive="#1e88e5" emissiveIntensity={0.6} /></mesh>)}
       {!ghost && (
-        <group position={[-1.3, 0.05, z + 0.4]}>
+        <group position={[-1.3, LAYER.lot, z + 0.4]}>
           <Upright>
-            <group rotation-y={Math.PI / 2}>
+            <group rotation-y={Math.PI / 2} userData={PEOPLE_SIZED}>
               <CarModel body="sedan" color="#fafafa" stripe="#1a237e" />
               <Box m={m} at={[-0.08, 0.6, -0.02]} s={[0.1, 0.05, 0.34]} c="#e0e0e0" />
               <Box m={m} at={[-0.08, 0.64, 0.088]} s={[0.096, 0.05, 0.116]} c="#e53935" />
@@ -632,7 +469,7 @@ function PoliceModel({ def, ghost, m, win, bulb, level }: Props) {
       {/* Rooftop helipad and the comms mast. */}
       <group position={[0, y0 + h + 0.08, -0.45]}>
         <Box m={m} at={[0, 0.05, 0]} s={[1.0, 0.1, 0.95]} c="#78909c" />
-        <mesh position={[0, 0.101, 0]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.9, 0.9]} />{m('#ffffff', helipadTex('#fafafa', '#fafafa'))}</mesh>
+        <mesh position={[0, 0.104, 0]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.9, 0.9]} />{m('#ffffff', helipadTex('#fafafa', '#fafafa'))}</mesh>
         {!ghost && <PadLights bulb={bulb} r={0.48} n={8} y={0.12} />}
         <group position={[0.85, 0, 0.3]}>
           {[0, 1, 2].map((i) => <Box key={i} m={m} at={[0, 0.35 + i * 0.3, 0]} rot={[0, 0, i % 2 ? 0.4 : -0.4]} s={[0.02, 0.32, 0.02]} c="#b0bec5" shadow={false} />)}
@@ -711,9 +548,9 @@ function Landmark({ m, id, at, s }: { m: Mat; id: string; at: V3; s: number }) {
           {/* A giant spray can mid-spray. */}
           <Cyl m={m} at={[0, 0.5, 0]} r={0.22} h={0.85} c="#ff7043" seg={14} />
           <Cyl m={m} at={[0, 0.5, 0]} r={0.225} h={0.2} c="#fafafa" seg={14} />
-          <mesh position={[0, 0.98, 0]}><sphereGeometry args={[0.22, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />{m('#cfd8dc')}</mesh>
-          <Box m={m} at={[0, 1.22, 0]} s={[0.08, 0.1, 0.08]} c="#263238" />
-          {[[0.08, 1.24], [0.19, 1.3], [0.35, 1.38]].map(([x, y], i) => <mesh key={x} position={[x, y, 0]}><sphereGeometry args={[0.055 + i * 0.03, 8, 6]} />{m(['#ff7043', '#ab47bc', '#29b6f6'][i])}</mesh>)}
+          <mesh position={[0, 0.925, 0]}><sphereGeometry args={[0.22, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />{m('#cfd8dc')}</mesh>
+          <Box m={m} at={[0, 1.18, 0]} s={[0.08, 0.1, 0.08]} c="#263238" />
+          {[[0.08, 1.24], [0.19, 1.3], [0.35, 1.38]].map(([x, y], i) => <mesh key={x} position={[x, y, 0]} userData={AIR}><sphereGeometry args={[0.055 + i * 0.03, 8, 6]} />{m(['#ff7043', '#ab47bc', '#29b6f6'][i])}</mesh>)}
         </group>
       )}
     </group>
@@ -723,6 +560,9 @@ function Landmark({ m, id, at, s }: { m: Mat; id: string; at: V3; s: number }) {
 }
 
 function AutoModel({ def, ghost, m, win, bulb, level }: Props) {
+  // A merged car wash's last form is a whole wash center, built for the block.
+  const scale = useMergeScale()
+  if (isWashCenter(def.id, level, scale)) return <WashCenter m={m} win={win} bulb={bulb} level={level} ghost={ghost} />
   const a = AUTO[def.id]
   const st = growthStage(level)
   const wide = def.w > 1
@@ -753,7 +593,7 @@ function AutoModel({ def, ghost, m, win, bulb, level }: Props) {
       {/* Office corner and roof edge. */}
       {wide && <mesh position={[1.45, 0.45, zf + 0.006]}><planeGeometry args={[0.4, 0.5]} />{win}</mesh>}
       <Box m={m} at={[0, h + 0.04, z0]} s={[W + 0.08, 0.08, D + 0.08]} c={a.trim} />
-      <mesh position={[0, h + 0.081, z0]} rotation-x={-Math.PI / 2}><planeGeometry args={[W, D]} />{m('#cfd8dc', gravelTex(Math.max(1, Math.round(W)), 1))}</mesh>
+      <mesh position={[0, h + 0.084, z0]} rotation-x={-Math.PI / 2}><planeGeometry args={[W, D]} />{m('#cfd8dc', gravelTex(Math.max(1, Math.round(W)), 1))}</mesh>
       {st === 3 && (
         // Showroom floor: a glass band set back on the roof.
         <GlassBlock m={m} ghost={ghost} x={0} z={z0 - 0.1} y0={h + 0.08} w={W - 0.3} d={D - 0.4} h={up - 0.08} tint="#cfd8dc" frame={a.trim} />
@@ -769,8 +609,8 @@ function AutoModel({ def, ghost, m, win, bulb, level }: Props) {
               <mesh position={[0, 0.1, 0]} castShadow><coneGeometry args={[0.06, 0.2, 8]} />{m('#ff6d00')}</mesh>
             </group>
           ))}
-          {def.id === 'tires' && <group>{[0, 1, 2, 3].map((i) => <mesh key={i} position={[-W / 2 + 0.25, 0.08 + i * 0.12, zf + 0.25]} rotation-x={Math.PI / 2} castShadow><torusGeometry args={[0.13, 0.06, 8, 14]} />{m('#212121')}</mesh>)}</group>}
-          {def.id === 'lube' && [0, 1].map((i) => <Cyl key={i} m={m} at={[W / 2 - 0.3 - i * 0.22, 0.16, zf + 0.25]} r={0.1} h={0.3} c={i ? '#1565c0' : '#ffb300'} seg={10} />)}
+          {def.id === 'tires' && <group userData={PEOPLE_SIZED}>{[0, 1, 2, 3].map((i) => <mesh key={i} position={[-W / 2 + 0.25, 0.08 + i * 0.12, zf + 0.25]} rotation-x={Math.PI / 2} castShadow><torusGeometry args={[0.13, 0.06, 8, 14]} />{m('#212121')}</mesh>)}</group>}
+          {def.id === 'lube' && <group userData={PEOPLE_SIZED}>{[0, 1].map((i) => <Cyl key={i} m={m} at={[W / 2 - 0.3 - i * 0.22, 0.16, zf + 0.25]} r={0.1} h={0.3} c={i ? '#1565c0' : '#ffb300'} seg={10} />)}</group>}
           {st === 3 && <Flag at={[-W / 2 + 0.1, h + up + 0.08, z0 - 0.5]} color={a.board} star={level >= 10} />}
           <Pool r={0.9} z={zf + 0.4} />
         </group>

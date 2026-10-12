@@ -130,12 +130,15 @@ const LEARNERS: { body: Body; model: string }[] = [
 // Roof height of each learner body (CarModel's lift + body + cabin).
 const SHAPE_TOP: Record<string, number> = { compact: 0.65, hatch: 0.59, sedan: 0.59 }
 
+// One prop with its topper, even outside an Upright (see keepProps).
+const WHOLE = { whole: true }
+
 export function LearnerCar({ i, at, rot = 0, rig, body: tilt }: { i: number; at?: [number, number, number]; rot?: number; rig?: WheelRig; body?: (g: Group | null) => void }) {
   const { body, model } = LEARNERS[i % LEARNERS.length]
   const k = bodyScale(body)
   const roof = SHAPE_TOP[body] ?? 0.6
   return (
-    <group position={at} rotation-y={rot}>
+    <group position={at} rotation-y={rot} userData={WHOLE}>
       <group scale={k} ref={tilt}>
         <CarModel body={body} model={model} color={CAR_COLORS[i % CAR_COLORS.length]} rig={rig} beams={!!rig} />
         {/* STUDENT DRIVER topper on two little feet. */}
@@ -143,7 +146,7 @@ export function LearnerCar({ i, at, rot = 0, rig, body: tilt }: { i: number; at?
           <boxGeometry args={[0.26, 0.08, 0.07]} />
           <meshStandardMaterial color="#ffeb3b" emissive="#ffc400" emissiveIntensity={0.35} />
         </mesh>
-        <mesh position={[0, roof + 0.05, -0.004]}>
+        <mesh position={[0, roof + 0.05, 0.003]}>
           <planeGeometry args={[0.24, 0.06]} />
           <meshBasicMaterial map={signTexture('STUDENT', '#ffeb3b', '#212121')} toneMapped={false} />
         </mesh>
@@ -205,7 +208,7 @@ export function StudentCars({ n, drive }: { n: number; drive: Drive }) {
       {Array.from({ length: n }, (_, i) => (
         <group key={i} ref={(el) => { cars.current[i] = el }}>
           {/* Merged, each car keeps its shape and its topper wherever it drives. */}
-          <Upright><LearnerCar i={i} rig={rigs[i]} body={(el) => { bodies.current[i] = el }} /></Upright>
+          <Upright size={1}><LearnerCar i={i} rig={rigs[i]} body={(el) => { bodies.current[i] = el }} /></Upright>
         </group>
       ))}
     </group>

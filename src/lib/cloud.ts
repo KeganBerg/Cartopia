@@ -263,3 +263,42 @@ export function restoreLocalBackup() {
   }
   useGame.getState().toast('Restored your town from this device')
 }
+
+// Everything this game knows about the player, as a JSON file they can keep:
+// the town save (the same one the cloud holds) plus the account it belongs to.
+export function exportData(account: { id: string; email?: string; username?: string | null } | null) {
+  const data = { game: 'Cartopia', exportedAt: new Date().toISOString(), account, save: saveOf(useGame.getState()) }
+  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `cartopia-${new Date().toISOString().slice(0, 10)}.json`
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+// Deletes the account and everything stored with it (public.delete_my_account),
+// then wipes this browser's copy and starts over with a new town.
+export async function deleteAccount(): Promise<string | null> {
+  if (!supabase) return 'Offline'
+  // No saves while the account goes, or one could land after it.
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = null
+  reloading = true
+  const { error } = await supabase.rpc('delete_my_account')
+  if (error) {
+    reloading = false
+    return error.message
+  }
+  userId = null
+  // Nothing may write the old town back before the reload.
+  useGame.persist.setOptions({ storage: { getItem: () => null, setItem: () => {}, removeItem: () => {} } })
+  try {
+    for (const k of ['cartopia-save', OWNER_KEY, BACKUP_KEY]) localStorage.removeItem(k)
+    sessionStorage.setItem(TOAST_KEY, 'Your account and its data were deleted.')
+  } catch {
+    // Storage blocked: nothing was kept there either.
+  }
+  await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
+  page.reload()
+  return null
+}

@@ -22,7 +22,7 @@ export const ROOFTOP = SNOW ? '#f4f8fb' : '#cfd8dc'
 // name on a board over it, lamps, planters and the lights' glow on the pavement.
 // Evenly spaced bay centres across a face `len` long: one every `pitch`, the
 // outer ones `fill` of the way to the ends.
-function spread(len: number, pitch: number, fill: number) {
+export function spread(len: number, pitch: number, fill: number) {
   const n = Math.max(2, Math.round(len / pitch))
   return Array.from({ length: n }, (_, i) => ((i + 0.5) / n - 0.5) * len * fill)
 }
@@ -172,7 +172,7 @@ export function BrickFloors({ k, w, d, z0 = 0, y0, floors, fh = 0.44, wall, trim
       {!ghost && fx.concat(fx.map((x) => x + w / nf / 2)).filter((x) => Math.abs(x) < w / 2 - 0.05).map((x) => (
         <Box key={x} m={m} at={[x, y0 + H - 0.03, zf + 0.035]} s={[0.04, 0.07, 0.07]} c={trim} shadow={false} />
       ))}
-      <mesh position={[0, y0 + H + 0.101, z0]} rotation-x={-Math.PI / 2}>
+      <mesh position={[0, y0 + H + 0.104, z0]} rotation-x={-Math.PI / 2}>
         <planeGeometry args={[w, d]} />
         {m(ROOFTOP, SNOW ? undefined : gravelTex(Math.max(1, Math.round(w)), Math.max(1, Math.round(d))))}
       </mesh>
@@ -193,7 +193,7 @@ export function FireEscape({ m, x, z, y0, floors, fh, len }: { m: Mat; x: number
         return (
           <group key={i}>
             <Box m={m} at={[0, y, 0]} s={[0.18, 0.015, len]} c={c} shadow={false} />
-            <Box m={m} at={[0.095, y + 0.1, 0]} s={[0.01, 0.02, len]} c={c} shadow={false} />
+            <Box m={m} at={[0.095, y + 0.104, 0]} s={[0.01, 0.02, len]} c={c} shadow={false} />
             <Box m={m} at={[0.095, y + 0.05, 0]} s={[0.01, 0.1, 0.01]} c={c} shadow={false} />
             {[-1, 1].map((sd) => <Box key={sd} m={m} at={[0.095, y + 0.05, (sd * len) / 2]} s={[0.01, 0.1, 0.01]} c={c} shadow={false} />)}
             {i < floors - 1 && (
@@ -393,7 +393,7 @@ function GiantShape({ m, kind }: { m: Mat; kind: Giant }) {
           <Cyl m={m} at={[0, 0.23, 0]} r={0.41} h={0.03} c="#66bb6a" seg={20} />
           <Cyl m={m} at={[0, 0.26, 0]} r={0.37} h={0.03} c="#e53935" seg={20} />
           <mesh position={[0, 0.28, 0]} castShadow><sphereGeometry args={[0.37, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />{m('#e0a052')}</mesh>
-          {[[0.1, 0.12], [-0.12, 0.05], [0.02, -0.14], [-0.05, 0.2]].map(([x, z]) => <Box key={`${x}${z}`} m={m} at={[x, 0.6 - Math.hypot(x, z) * 0.5, z]} s={[0.04, 0.015, 0.02]} c="#fff8e1" shadow={false} />)}
+          {[[0.1, 0.12], [-0.12, 0.05], [0.02, -0.14], [-0.05, 0.2]].map(([x, z]) => <Box key={`${x}${z}`} m={m} at={[x, 0.28 + Math.sqrt(0.37 ** 2 - x * x - z * z) - 0.004, z]} s={[0.04, 0.015, 0.02]} c="#fff8e1" shadow={false} />)}
         </group>
       )
     case 'cone':

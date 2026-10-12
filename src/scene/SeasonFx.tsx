@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { BufferAttribute, BufferGeometry, Color, DoubleSide, InstancedBufferAttribute, MeshLambertMaterial, Object3D, Shape, ShapeGeometry, type InstancedMesh } from 'three'
 import { SEASON } from './season'
+import { addFog } from './heightFog'
 import { dayPhase, nightAmount } from './dayNight'
 import { weatherNow } from '../game/weather'
 import { isFree } from './freeCam'
@@ -111,6 +112,7 @@ function Leaves({ fx, count }: { fx: Fx; count: number }) {
   const mat = useMemo(() => {
     const m = new MeshLambertMaterial({ side: DoubleSide, transparent: true })
     m.onBeforeCompile = (sh) => {
+      addFog(sh)
       sh.vertexShader = sh.vertexShader
         .replace('#include <common>', '#include <common>\nattribute float aFade;\nvarying float vFade;')
         .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFade = aFade;')

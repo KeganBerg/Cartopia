@@ -18,6 +18,7 @@ import { SkinPicker } from './Skins'
 import type { PaintJob, SkinnedSlot } from '../game/data'
 import { Icon } from './Icon'
 import { useCrewGoal } from './CrewGoal'
+import { useCrewBattle } from '../lib/battles'
 import { useChat } from '../lib/chat'
 import { useRivalWaiting } from './Rivals'
 import { ShowcaseToggle } from './Meet'
@@ -34,7 +35,8 @@ export function BottomBar() {
   const mode = useGame((s) => s.mode)
   const visiting = useGame((s) => !!s.visiting)
   const setsReady = useGame((s) => readySets(s).length)
-  const crewChests = useCrewGoal((g) => g.ready)
+  // Same count as the Crew tab's dot, and the button opens that tab while a chest waits.
+  const crewChests = useCrewGoal((g) => g.ready) + useCrewBattle((b) => b.ready)
   const crewChat = useChat((c) => c.unread.crew)
   const globalChat = useChat((c) => c.unread.global > 0)
   const rival = useRivalWaiting()
@@ -48,7 +50,7 @@ export function BottomBar() {
       <div className="bottom-bar">
         <button className={`icon-btn${pulse('shop')}`} onClick={() => openPanel('shop')}><span className="i i-shop"><Icon name="shop" /></span>SHOP</button>
         <button className={`icon-btn${pulse('cars')}`} onClick={() => openCars(setsReady > 0)}><span className="i i-showroom"><Icon name="car" />{setsReady > 0 && <span className="btn-dot">{setsReady}</span>}</span>CARS</button>
-        <button className="icon-btn" onClick={() => openPanel('friends')}><span className="i i-friends"><Icon name="friends" />{crewChests > 0 && <span className="btn-dot">{crewChests}</span>}</span>FRIENDS</button>
+        <button className="icon-btn" onClick={() => openPanel(crewChests > 0 ? 'clan' : 'friends')}><span className="i i-friends"><Icon name="friends" />{crewChests > 0 && <span className="btn-dot">{crewChests}</span>}</span>FRIENDS</button>
         <button className="icon-btn" onClick={() => openPanel('chat')}><span className="i i-chat"><Icon name="chat" />{crewChat > 0 ? <span className="btn-dot">{crewChat > 9 ? '9+' : crewChat}</span> : globalChat && <span className="btn-dot new" />}</span>CHAT</button>
         <button className="icon-btn" onClick={() => setMode('road')}><span className="i i-edit"><Icon name="cone" /></span>EDIT</button>
         <button className={`big-btn race-btn${pulse('race')}`} onClick={() => openPanel('race')}><span className="i"><Icon name="flag" />{rival && <span className="btn-dot" title="Your rival is in town">!</span>}</span>RACE</button>
@@ -61,7 +63,7 @@ export function BottomBar() {
 }
 
 // The first couple of times, a one-line toast says how to steer.
-function toggleFreeCam(on: boolean) {
+export function toggleFreeCam(on: boolean) {
   setFreeCam(on)
   if (!on) return
   try {
@@ -74,12 +76,13 @@ function toggleFreeCam(on: boolean) {
   useGame.getState().toast(TOUCH ? 'Pinch to zoom · two fingers to turn and tilt' : 'WASD to fly · Space up, Shift down · Ctrl for speed')
 }
 
-// Switches the town between the bird's-eye view and the free camera.
-function FreeCamButton() {
+// Switches the town between the bird's-eye view and the free camera. Sits over
+// Goals at home, and on the visit banner in someone else's town.
+export function FreeCamButton({ className = 'goals-btn cam-dock' }: { className?: string }) {
   const on = useFreeCam((f) => f.on)
   const label = on ? "Back to bird's-eye view" : 'Free camera'
   return (
-    <button className={`goals-btn cam-dock${on ? ' on' : ''}`} onClick={() => toggleFreeCam(!on)} title={label} aria-label={label} aria-pressed={on}>
+    <button className={`${className}${on ? ' on' : ''}`} onClick={() => toggleFreeCam(!on)} title={label} aria-label={label} aria-pressed={on}>
       <Icon name={on ? 'birdseye' : 'orbit'} />
     </button>
   )
@@ -192,12 +195,13 @@ export function SheetTabs<T extends string>({ items, value, onChange }: { items:
   )
 }
 
-type ShopTab = 'cars' | 'business' | 'services' | 'homes' | 'event' | 'upgrades'
-const SHOP_GROUPS: { id: Exclude<ShopTab, 'upgrades'>; label: string; filter: (b: BuildingDef) => boolean }[] = [
+type ShopTab = 'cars' | 'business' | 'services' | 'rec' | 'event' | 'upgrades'
+const SHOP_GROUPS: { id: Exclude<ShopTab, 'upgrades'>; label: React.ReactNode; filter: (b: BuildingDef) => boolean }[] = [
   { id: 'cars', label: '🔧 Cars & parts', filter: (b) => b.id === 'rescue' || b.kind === 'parts' },
   { id: 'business', label: '🍕 Businesses', filter: (b) => b.kind === 'business' && b.id !== 'rescue' && b.id !== 'crew' && !b.service },
-  { id: 'services', label: '⛽ Services', filter: (b) => b.kind === 'gas' || b.id === 'crew' || !!b.service },
-  { id: 'homes', label: '🏡 Homes', filter: (b) => (b.kind === 'house' || b.kind === 'decor') && !b.event },
+  // Homes sit with the gas stations: both keep the town fuelled.
+  { id: 'services', label: '⛽ Services', filter: (b) => b.kind === 'gas' || b.kind === 'house' || b.id === 'crew' || !!b.service },
+  { id: 'rec', label: <>🎡 Rec<span className="tab-long">reation</span></>, filter: (b) => b.kind === 'decor' && !b.event },
   // Limited-time decorations for the running event (the tab only shows while it runs).
   { id: 'event', label: '🎃 Spooky', filter: (b) => !!b.event && b.event === activeEvent()?.id },
 ]
@@ -349,7 +353,6 @@ export function ShowroomPanel() {
           <span className="rusty-icon">🔧</span>
           <div>
             <b>Build Rusty's Rescue first</b>
-            <p>Rusty tracks down and restores cars for your town. Build his shop to start getting new cars.</p>
           </div>
           <button className="buy" onClick={() => openShop('rescue')}>Build · $1,000</button>
         </div>
@@ -432,9 +435,16 @@ const withSlot = (m: OwnedCar['modSkin'], slot: SkinnedSlot, skin: string | null
 
 type GarageTab = 'tune' | 'mods' | 'paint'
 let nextGarageTab: GarageTab = 'tune'
-// Opens the Garage on a given tab (goals use it for paint and mods).
-export function openGarageTab(tab: GarageTab) {
+// Something to try on when the Garage opens (a crate prize): a part, a paint or a mod paint
+// on one slot, on this car. Nothing is fitted until the player taps the Garage's own button.
+export type GarageTry = { car: string; mod?: string; skin?: string; modSkin?: { slot: SkinnedSlot; skin: string } }
+let nextTry: GarageTry | null = null
+// Opens the Garage on a given tab (goals use it for paint and mods), optionally with that
+// car picked and something on try-on.
+export function openGarageTab(tab: GarageTab, tryOn?: GarageTry) {
   nextGarageTab = tab
+  nextTry = tryOn ?? null
+  if (tryOn) useGame.getState().selectCar(tryOn.car)
   useGame.getState().openPanel('garage')
 }
 
@@ -505,8 +515,13 @@ export function GaragePanel() {
     nextGarageTab = 'tune'
     return t
   })
+  const [pre] = useState(() => {
+    const t = nextTry
+    nextTry = null
+    return t
+  })
   // A mod being tried on in the preview, cleared when another car is picked.
-  const [trying, setTrying] = useState<{ car: string; mod: string } | null>(null)
+  const [trying, setTrying] = useState<{ car: string; mod: string } | null>(pre?.mod ? { car: pre.car, mod: pre.mod } : null)
   const tryMod = trying && trying.car === car?.uid && tab === 'mods' ? trying.mod : null
   const [inspect, setInspect] = useState(false)
   const [picking, setPicking] = useState(false)
@@ -521,10 +536,10 @@ export function GaragePanel() {
   const [painting, setPainting] = useState<{ car: string; job: PaintJob } | null>(null)
   const tryJob = painting && painting.car === car?.uid && tab === 'paint' ? painting.job : null
   // A skin being tried on (null: trying no skin), cleared when another car is picked.
-  const [skinning, setSkinning] = useState<{ car: string; skin: string | null } | null>(null)
+  const [skinning, setSkinning] = useState<{ car: string; skin: string | null } | null>(pre?.skin ? { car: pre.car, skin: pre.skin } : null)
   const trySkin = skinning && skinning.car === car?.uid && tab === 'paint' ? skinning.skin : undefined
   // A mod skin being tried on one slot's part, cleared when another car is picked.
-  const [modSkinning, setModSkinning] = useState<{ car: string; slot: SkinnedSlot; skin: string | null } | null>(null)
+  const [modSkinning, setModSkinning] = useState<{ car: string; slot: SkinnedSlot; skin: string | null } | null>(pre?.modSkin ? { car: pre.car, ...pre.modSkin } : null)
   const tryModSkin = modSkinning && modSkinning.car === car?.uid && tab === 'mods' ? modSkinning : null
   const modSkin = car && tryModSkin ? withSlot(car.modSkin, tryModSkin.slot, tryModSkin.skin) : car?.modSkin
   const look = car && def && { body: def.body, model: def.id, ...(tryJob ?? jobOf(car)), skin: trySkin === undefined ? car.skin : trySkin, modSkin, mods: withMod(car.mods, tryMod) }

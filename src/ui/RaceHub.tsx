@@ -134,20 +134,20 @@ export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival }: { onOp
         <TileClip mode="trial" venue={trial.id} />
         <span className="rm-tag">TIME TRIAL</span>
         <b className="rm-ttl">{trial.name}</b>
-        <span className="rm-meta">⏱️ {best !== null ? `${best.toFixed(3)}s` : 'No time yet'}</span>
-        <span className="rm-meta">⏳ {shortLeft(msToNextWeek())} left</span>
+        <span className="rm-meta">⏱️ {best !== null ? `${best.toFixed(3)}s` : '--'}</span>
+        <span className="rm-meta">⏳ {shortLeft(msToNextWeek())}</span>
       </div>
 
       <div className="rm-minis">
-        <button className="rm-mini" onClick={() => onOpen('quick')}><span className="rm-mi">🏁</span><span><b>Quick race</b><small>Pick a rival</small></span></button>
+        <button className="rm-mini m-quick" onClick={() => onOpen('quick')}><span className="rm-mi">🏁</span><span><b>Quick race</b><small>Pick a rival</small></span></button>
         {supabase && (
-          <button className="rm-mini" onClick={() => onOpen('quick')}>
+          <button className="rm-mini m-live" onClick={() => onOpen('quick')}>
             {live > 0 && <span className="rm-dot">{live}</span>}
             <span className="rm-mi">🟢</span><span><b>Live</b><small>{!signedIn ? 'Sign in' : live > 0 ? `${live} online` : 'Nobody on'}</small></span>
           </button>
         )}
-        <button className="rm-mini" onClick={() => openPanel('friends')}><span className="rm-mi">👻</span><span><b>Ghosts</b><small>Friends</small></span></button>
-        <button className="rm-mini" onClick={() => openPanel('leaders')}><span className="rm-mi">🏅</span><span><b>Top racers</b><small>Leaders</small></span></button>
+        <button className="rm-mini m-ghost" onClick={() => openPanel('friends')}><span className="rm-mi">👻</span><span><b>Ghosts</b><small>Friends</small></span></button>
+        <button className="rm-mini m-top" onClick={() => openPanel('leaders')}><span className="rm-mi">🏅</span><span><b>Top racers</b><small>Leaders</small></span></button>
       </div>
     </div>
   )

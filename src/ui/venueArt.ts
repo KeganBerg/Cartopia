@@ -3,7 +3,7 @@ import type { WeatherKind } from '../game/weather'
 // Hero pictures for the Race menu's tiles and banners: one shot per mode, rendered
 // from the race scene at each venue (scripts/hero renders them again).
 // Campaign: the face-off under the start lights. Pro Tour: both noses on the finish
-// line, day or midnight. Grand Prix: the podium. Time Trial: a lone run past the split board.
+// line, day or midnight. Grand Prix: a kart circuit (scripts/kartshot, ?clean). Time Trial: a lone run past the split board.
 const ART = import.meta.glob<string>('../assets/race-menu/*.webp', { eager: true, import: 'default' })
 
 export type ArtMode = 'camp' | 'tour' | 'gp' | 'trial'

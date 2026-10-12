@@ -1,12 +1,10 @@
-// The nightclub's house grooves. Each town night plays a different one, picked
-// from the shared town clock so every player hears the same set on the same
-// night, and a reload doesn't change it. ?groove=0..4 pins one for testing.
-import { DAY_MS } from '../game/clock'
+// The nightclub's house grooves, which the club's DJ set (clubSet.ts) mixes
+// between all night, all at the set's one tempo. ?groove=0..6 pins one for
+// testing.
 
 export type Tone = 'organ' | 'piano' | 'chop'
 export type Groove = {
   name: string
-  bpm: number
   swing: number // how late the in-between sixteenths land, as a share of one
   // One chord per bar: the bass root (Hz) and the chord's notes (Hz).
   loop: { root: number; notes: number[] }[]
@@ -32,7 +30,6 @@ export const GROOVES: Groove[] = [
   // Deep house: minor-ninth organ stabs over Am9, Fmaj9, Cmaj9, G6/9.
   {
     name: 'Deep',
-    bpm: 124,
     swing: 0.14,
     loop: [
       { root: 55, notes: [220, 261.63, 329.63, 392, 493.88] },
@@ -53,7 +50,6 @@ export const GROOVES: Groove[] = [
   // Piano house: bright Chicago-style piano chords and a bouncing octave bass.
   {
     name: 'Piano',
-    bpm: 125,
     swing: 0.08,
     loop: [
       { root: 87.31, notes: [261.63, 329.63, 349.23, 440, 523.25] },
@@ -74,7 +70,6 @@ export const GROOVES: Groove[] = [
   // Garage: heavy swing, long rolling bass notes and short organ hits in D minor.
   {
     name: 'Garage',
-    bpm: 130,
     swing: 0.3,
     loop: [
       { root: 73.42, notes: [174.61, 220, 261.63, 329.63] },
@@ -95,7 +90,6 @@ export const GROOVES: Groove[] = [
   // Acid house: a squelchy, resonant bassline in A that slowly opens up.
   {
     name: 'Acid',
-    bpm: 126,
     swing: 0.1,
     loop: [{ root: 55, notes: [] }],
     bass: Array(16).fill(0),
@@ -114,7 +108,6 @@ export const GROOVES: Groove[] = [
   // an octave-hopping disco bass in Eb, Dm, Cm, F.
   {
     name: 'Disco',
-    bpm: 122,
     swing: 0.06,
     loop: [
       { root: 77.78, notes: [311.13, 392, 466.16, 587.33] },
@@ -133,18 +126,52 @@ export const GROOVES: Groove[] = [
     sweep: true,
     gain: 1,
   },
+  // Tech house: a rolling off-beat bass, sparse chopped hits and busy hats in F minor.
+  {
+    name: 'Tech',
+    swing: 0.1,
+    loop: [
+      { root: 43.65, notes: [174.61, 207.65, 261.63, 311.13, 392] },
+      { root: 43.65, notes: [174.61, 207.65, 261.63, 311.13, 392] },
+      { root: 69.3, notes: [138.59, 174.61, 207.65, 261.63, 311.13] },
+      { root: 58.27, notes: [233.08, 277.18, 349.23, 415.3] },
+    ],
+    bass: [0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 1, 2],
+    bassLen: 0.9,
+    stabs: [[7], [7, 13], [7], [3, 7, 13]],
+    stabLen: 0.8,
+    tone: 'chop',
+    claps: [4, 12],
+    openHats: off,
+    closedHats: 'all',
+    sweep: true,
+    gain: 1,
+  },
+  // Jackin' house: a bouncy sixteenth bass and swung organ jabs in G minor.
+  {
+    name: 'Jackin',
+    swing: 0.22,
+    loop: [
+      { root: 49, notes: [196, 233.08, 293.66, 349.23] },
+      { root: 65.41, notes: [261.63, 329.63, 392, 466.16] },
+      { root: 77.78, notes: [155.56, 196, 233.08, 293.66] },
+      { root: 73.42, notes: [185, 220, 261.63, 293.66] },
+    ],
+    bass: [1, 0, 2, 0, 0, 1, 0, 2, 0, 0, 1, 0, 2, 0, 1, 0],
+    bassLen: 1.2,
+    stabs: [[2, 6, 10, 14], [2, 6, 11], [2, 6, 10, 14], [2, 5, 8, 11]],
+    stabLen: 1,
+    tone: 'organ',
+    claps: [4, 12],
+    openHats: off,
+    closedHats: 'odd',
+    gain: 1,
+  },
 ]
 
-const pinned = (() => {
+// ?groove=n plays only that groove (for testing and rendering clips).
+export const pinned = (() => {
   if (typeof location === 'undefined') return null
   const v = new URLSearchParams(location.search).get('groove')
-  return v === null ? null : Number(v)
+  return v === null || !GROOVES[Number(v)] ? null : Number(v)
 })()
-
-// The groove for the night that's on at a given moment. Nights fall inside one
-// town day (phase 0.3 to 0.7), so the day number is the night number, and
-// stepping through the list means two nights in a row never repeat.
-export function grooveFor(now = Date.now()): number {
-  if (pinned !== null && GROOVES[pinned]) return pinned
-  return Math.floor(now / DAY_MS) % GROOVES.length
-}

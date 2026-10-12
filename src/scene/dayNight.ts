@@ -3,10 +3,9 @@ import { danceFloorTex, glowTex, windowGlowTex, windowTex } from './textures'
 import { decal } from './layers'
 import { movieTex } from './movie'
 import { closingGlow, hoursUniforms } from './closingTime'
-import { clockHour } from '../game/hours'
-import { dayPhase } from '../game/clock'
+import { townHour } from '../game/clock'
 
-export { DAY_MS, dayPhase, nightAmount, duskAmount } from '../game/clock'
+export { dayPhase, nightAmount, duskAmount } from '../game/clock'
 
 // Shared materials whose glow follows the time of day. One instance each
 // keeps the per-frame update to a handful of objects.
@@ -21,6 +20,8 @@ export const glowMats = {
   screen: new MeshBasicMaterial({ map: movieTex(), toneMapped: false }),
   // Glows lie flat on the ground, so they get a depth nudge to never flicker against it.
   pool: new MeshBasicMaterial({ map: glowTex(), color: '#ffc070', transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false, toneMapped: false, ...decal() }),
+  // Underwater lights: a swimming pool's water glowing aqua after dark.
+  poolWater: new MeshBasicMaterial({ color: '#2fd8ff', transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false, toneMapped: false, ...decal() }),
   beam: new MeshBasicMaterial({ map: glowTex(), color: '#fff2c0', transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false, toneMapped: false, ...decal() }),
   // Nightclub neon: dark tubes by day that light up after dusk.
   neonPink: neon('#ff2bd6'),
@@ -54,10 +55,11 @@ export function applyNight(n: number, gloom = 0) {
   glowMats.screen.color.setScalar(0.72 + n * 0.16)
   glowMats.pool.opacity = lamps * 0.75
   glowMats.beam.opacity = Math.max(n, gloom) * 0.5
-  for (const m of [glowMats.pool, glowMats.beam]) m.visible = m.opacity > 0.01
+  glowMats.poolWater.opacity = lamps * 0.45
+  for (const m of [glowMats.pool, glowMats.beam, glowMats.poolWater]) m.visible = m.opacity > 0.01
   for (const m of [glowMats.neonPink, glowMats.neonCyan, glowMats.neonViolet]) m.emissiveIntensity = 0.05 + n * 1.5
   glowMats.danceFloor.emissiveIntensity = n * 1.3
-  hoursUniforms.uHour.value = clockHour(dayPhase())
+  hoursUniforms.uHour.value = townHour()
   hoursUniforms.uNight.value = n
   nightNow = n
   for (const f of hooks) f(n)

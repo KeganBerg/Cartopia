@@ -6,7 +6,7 @@ import {
 } from './data'
 import { sfx } from '../lib/sound'
 import { fx } from './fx'
-import { msUntilNight } from './clock'
+import { opensLabel } from './clock'
 import { requestTrip, requestVisit } from './trips'
 import { trialPrize } from './trial'
 import { RIVALS, RIVAL_VISITS, RIVAL_BACK_MS, type RivalProgress } from './rivals'
@@ -178,6 +178,8 @@ type Actions = {
   upgradeCar: (uid: string, slot: UpgradeSlot) => boolean
   sellCar: (uid: string) => void
   finishRace: (won: boolean, reward: number) => void
+  // A ghost race against a crewmate: no prize, but it counts as a race for the crew goal and battle.
+  crewRace: () => void
   // Arcade mini games pay a little coin and XP (see game/arcade.ts).
   finishArcade: (coins: number, xp: number) => void
   renameTown: (name: string) => void
@@ -543,7 +545,7 @@ function addXp(s: GameState, amount: number): Partial<GameState> {
   }
   if (!ups.length) return { xp }
   const fresh = { ...s, level }
-  setTimeout(sfx.levelUp, 250)
+  // The splash plays the level-up sound (a beat drop) when it opens.
   // Fold into a splash that's still open, so two quick level-ups show as one.
   const prev = s.levelUp
   const levelUp = {
@@ -586,7 +588,7 @@ function tapMerged(s: GameState, set: (p: Partial<GameState>) => void, uids: str
   }
   const idle = members.filter((o) => o.jobEndsAt === null)
   if (!idle.length) return s.openUpgrade(members[0].uid)
-  if (!isOpen(d, now)) return s.toast(`The ${d.name} only opens at night. Doors open in ${Math.max(1, Math.ceil(msUntilNight(now) / 60000))} min.`)
+  if (!isOpen(d, now)) return s.toast(`The ${d.name} only opens at night. Doors open ${opensLabel(now)}.`)
   const cost = d.fuelCost ?? 0
   const n = cost ? Math.min(idle.length, Math.floor(s.fuel / cost)) : idle.length
   if (!n) return s.showNeed('fuel', cost * idle.length - s.fuel, `the merged ${d.name}`)
@@ -881,7 +883,7 @@ export const useGame = create<GameState>()(
         const secs = jobSeconds(d, lvl, s.stats.jobs ?? 0)
         if (b.jobEndsAt !== null && now < b.jobEndsAt) return s.openUpgrade(buid)
         if (b.jobEndsAt === null) {
-          if (!isOpen(d, now)) return s.toast(`The ${d.name} only opens at night. Doors open in ${Math.max(1, Math.ceil(msUntilNight(now) / 60000))} min.`)
+          if (!isOpen(d, now)) return s.toast(`The ${d.name} only opens at night. Doors open ${opensLabel(now)}.`)
           if (s.fuel < d.fuelCost!) {
             return s.showNeed('fuel', d.fuelCost! - s.fuel, `a ${d.name} job`)
           }
@@ -1048,7 +1050,7 @@ export const useGame = create<GameState>()(
         }
         if (!collected && !started && !cleared && !filled) return s.toast('Nothing to collect or fuel right now')
         setLastCollectAll(now)
-        if (collected || filled) sfx.coin()
+        if (collected || filled) sfx.coins(collected + filled)
         else sfx.start()
         for (const u of removed) fx({ kind: 'cleared', uid: u })
         if (paid.length || earned) fx({ kind: 'collect', uids: paid, coins: earned, parts: parts - s.parts, xp })
@@ -1152,6 +1154,11 @@ export const useGame = create<GameState>()(
           stats: { ...bump(s, 'racesWon', won ? 1 : 0), races: (s.stats.races ?? 0) + 1, coinsEarned: (s.stats.coinsEarned ?? 0) + (won ? reward : Math.round(reward * 0.1)) },
           updatedAt: Date.now(),
         }))
+      },
+
+      crewRace: () => {
+        const s = get()
+        set({ stats: { ...s.stats, races: (s.stats.races ?? 0) + 1 }, updatedAt: Date.now() })
       },
 
       finishArcade: (coins, xp) => {
