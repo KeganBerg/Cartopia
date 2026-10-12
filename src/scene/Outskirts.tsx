@@ -7,12 +7,12 @@ import { Batch } from './Batch'
 import { Box, Cone, Cyl, rand } from './RaceVenues'
 import { glowMats, onNight } from './dayNight'
 import { kitMat, Kit } from './kit'
-import { oak, pine, birch, bush, rock, tuft, flower, log, stump, heap, mushroom, reeds, crop, pumpkin, shade } from './flora'
+import { oak, pine, birch, bush, rock, tuft, blades, flower, bloom, log, stump, heap, mushroom, reeds, crop, pumpkin, shade } from './flora'
 import { PAL, SEASON } from './season'
 import { gravelTex, waterTex } from './textures'
 import { toWorld } from './grid'
 import { LAYER } from './layers'
-import { VIEW, isFree } from './freeCam'
+import { VIEW, isFree, useFreeCam } from './freeCam'
 
 // Everything past the edge of the player's land: wild meadow on the plots they
 // could still buy (cleared the moment they buy one), a split-rail fence along
@@ -37,7 +37,7 @@ export type Spot = { x: number; z: number; ry?: number; s?: number; sy?: number;
 let shapes: ReturnType<typeof makeShapes> | null = null
 function makeShapes() {
   return {
-    oakA: oak(0), oakB: oak(2), pine: pine(), birch: birch(), bush: bush(), rock: rock(), tuft: tuft(), flower: flower(),
+    oakA: oak(0), oakB: oak(2), pine: pine(), birch: birch(), bush: bush(), rock: rock(), tuft: tuft(), blades: blades(), flower: flower(), bloom: bloom(),
     log: log(), stump: stump(), heap: heap(), mushroom: mushroom(), reeds: reeds(), crop: crop(), pumpkin: pumpkin(),
   }
 }
@@ -65,16 +65,21 @@ function Many({ geo, spots }: { geo: BufferGeometry; spots: Spot[] }) {
     if (m.instanceColor) m.instanceColor.needsUpdate = true
     m.computeBoundingSphere()
     m.computeBoundingBox()
-  }, [spots])
+  }, [spots, geo])
   if (!spots.length) return null
-  return <instancedMesh key={spots.length} ref={ref} args={[geo, kitMat, spots.length]} receiveShadow raycast={() => null} userData={{ noBatch: true }} />
+  return <instancedMesh key={`${spots.length}|${geo.uuid}`} ref={ref} args={[geo, kitMat, spots.length]} receiveShadow raycast={() => null} userData={{ noBatch: true }} />
 }
 
+// Grass and wildflowers swap to finer models while the free camera is on: up
+// close they read as the real thing, but from the bird's-eye view they would
+// only cost triangles.
+const CLOSE: Partial<Record<Shape, Shape>> = { tuft: 'blades', flower: 'bloom' }
 export function Scatter({ sets }: { sets: Partial<Record<Shape, Spot[]>> }) {
   const s = getShapes()
+  const free = useFreeCam((f) => f.on)
   return (
     <>
-      {(Object.keys(sets) as Shape[]).map((k) => <Many key={k} geo={s[k]} spots={sets[k]!} />)}
+      {(Object.keys(sets) as Shape[]).map((k) => <Many key={k} geo={free ? s[CLOSE[k] ?? k] : s[k]} spots={sets[k]!} />)}
     </>
   )
 }

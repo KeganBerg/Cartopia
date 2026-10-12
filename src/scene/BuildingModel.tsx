@@ -5,8 +5,10 @@ import { signTexture } from './signTexture'
 import { signMat } from './closingTime'
 import { CarModel } from './CarModel'
 import { Upright, useBays, useMergeScale } from './mergeScale'
-import { ObstacleDetail, BenchDetail, BillboardDetail, DriveInDetail, FlowerDetail, FountainDetail, GarageDetail, HouseDetail, LampDetail, PondDetail, ShopDetail, SpeedwayDetail, StatueDetail, TreeDetail } from './BuildingDetail'
+import { ObstacleDetail, BillboardDetail, DriveInDetail, FountainDetail, GarageDetail, HouseDetail, PondDetail, ShopDetail, SpeedwayDetail, StatueDetail, TreeDetail } from './BuildingDetail'
 import { NEW_MODELS, NewBuildingModel } from './NewBuildings'
+import { PropMesh } from './propKit'
+import { DECOR_PROPS, benchBin } from './decorProps'
 import { Bulbs } from './edgeKit'
 import { OFFICE_MODELS, OfficeModel } from './OfficeBuildings'
 import { CAMPUS_MODELS, CampusModel } from './CampusBuildings'
@@ -659,32 +661,45 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
         </group>
       )
     case 'flowers':
+      if (!ghost) return <PropMesh parts={DECOR_PROPS.flowers()} />
       return (
         <group>
           <mesh position={[0, 0.08, 0]} receiveShadow><boxGeometry args={[1.3, 0.16, 1.3]} />{m(def.roof)}</mesh>
           {[[-0.4, -0.4], [0, -0.35], [0.4, -0.4], [-0.35, 0], [0.05, 0.05], [0.4, 0], [-0.4, 0.4], [0, 0.4], [0.4, 0.38]].map(([x, z], i) => (
             <mesh key={i} position={[x, 0.26, z]}><sphereGeometry args={[0.13, 8, 6]} />{m(['#e91e63', '#ffeb3b', '#ab47bc', '#ff7043'][i % 4])}</mesh>
           ))}
-          {!ghost && <FlowerDetail />}
         </group>
       )
     case 'lamp':
+      if (!ghost)
+        return (
+          <group>
+            <PropMesh parts={DECOR_PROPS.lamp()} />
+            <LightPool r={0.9} x={0.4} />
+          </group>
+        )
       return (
         <group>
           <mesh position={[0, 0.9, 0]} castShadow><cylinderGeometry args={[0.04, 0.06, 1.8]} />{m(def.color)}</mesh>
           <mesh position={[0.2, 1.78, 0]}><boxGeometry args={[0.45, 0.05, 0.08]} />{m(def.color)}</mesh>
           <mesh position={[0.38, 1.72, 0]}><sphereGeometry args={[0.1, 10, 8]} />{bulb}</mesh>
           {!ghost && <LightPool r={0.9} x={0.38} />}
-          {!ghost && <LampDetail iron={def.color} />}
         </group>
       )
     case 'bench':
+      if (!ghost)
+        return (
+          <group>
+            <PropMesh parts={DECOR_PROPS.bench(def.color)} />
+            {/* A litter bin beside it. */}
+            <group position={[0.74, 0, 0.08]} scale={1.2}><PropMesh parts={benchBin()} /></group>
+          </group>
+        )
       return (
         <group>
           <mesh position={[0, 0.3, 0]} castShadow><boxGeometry args={[1, 0.06, 0.32]} />{m(def.color)}</mesh>
           <mesh position={[0, 0.5, -0.15]} castShadow><boxGeometry args={[1, 0.3, 0.05]} />{m(def.color)}</mesh>
           {[-0.42, 0.42].map((x) => <mesh key={x} position={[x, 0.15, 0]}><boxGeometry args={[0.06, 0.3, 0.3]} />{m(def.roof)}</mesh>)}
-          {!ghost && <BenchDetail wood={def.color} iron={def.roof} />}
         </group>
       )
     case 'billboard':

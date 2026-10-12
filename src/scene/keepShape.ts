@@ -343,7 +343,10 @@ export function keepProps(root: Object3D, scale: readonly number[], limit: numbe
         visit(c)
         continue
       }
-      const small = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) <= limit && box.max.y - box.min.y >= FLAT
+      // A whole car (CarModel) is one prop whatever its box, headlight beams and
+      // all: kept piece by piece, its wheels would ride out on the stretch while
+      // each stayed round, and stick out from the body like outriggers.
+      const small = c.userData.whole || (Math.max(box.max.x - box.min.x, box.max.z - box.min.z) <= limit && box.max.y - box.min.y >= FLAT)
       if (small) keepShape(c, root, scale, undefined, anchorOf(box, at.setFromMatrixPosition(c.matrixWorld).applyMatrix4(back), from.setFromMatrixPosition(o.matrixWorld).applyMatrix4(back)))
       else if (leaf) retile(c as Mesh, back, scale)
       else visit(c)
