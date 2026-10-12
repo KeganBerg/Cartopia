@@ -8,6 +8,7 @@ import { AlertsMenu } from './Alerts'
 import { localBackup, restoreLocalBackup } from '../lib/cloud'
 import { isCleanName, NAME_REJECTED } from '../lib/names'
 import { UsernameRow } from './Username'
+import { useLive, setClosed, unmute } from '../lib/live'
 
 type MenuTab = 'town' | 'account' | 'help'
 const MENU_TABS = [{ id: 'town', label: '🏠 Town' }, { id: 'account', label: '👤 Account' }, { id: 'help', label: '❓ How to play' }] as const
@@ -68,6 +69,7 @@ export function AccountPanel() {
         <>
           <p>Signed in as <b>{user.email}</b>. Your town saves to the cloud and other players can race your best car.</p>
           <UsernameRow />
+          <ChallengeSettings />
           {backup && (
             <>
               <p className="hint">This device has an older town that is further along: {backup.townName}, level {backup.level}, {backup.cars.length} cars.</p>
@@ -100,6 +102,26 @@ export function AccountPanel() {
         <li>Level up to unlock new businesses and cars. Gas Stations raise your fuel cap.</li>
       </ul>}
     </Panel>
+  )
+}
+
+// Live race challenges: the on/off switch plus anyone the player muted from a challenge.
+function ChallengeSettings() {
+  const closed = useLive((l) => l.closed)
+  const muted = useLive((l) => l.muted)
+  return (
+    <>
+      <div className="menu-sound">
+        <span>Race challenges{closed && <small> · off</small>}</span>
+        <button className="goals-btn" title={closed ? 'Challenges off' : 'Challenges on'} onClick={() => setClosed(!closed)}>{closed ? '🚫' : '🏁'}</button>
+      </div>
+      {Object.entries(muted).map(([id, town]) => (
+        <div key={id} className="menu-sound">
+          <span>🔇 {town}<small> · muted</small></span>
+          <button className="buy small alt" onClick={() => unmute(id)}>Unmute</button>
+        </div>
+      ))}
+    </>
   )
 }
 

@@ -173,7 +173,7 @@ export const DECOR_PROPS = {
             const b2 = a + s * 1.0
             const cb = Math.cos(b2), sb = Math.sin(b2)
             const look = L(leaf[(f + j + (s > 0 ? 1 : 0)) % 2], 0.85)
-            k.box(j < 2 ? cast(look) : look, [w, 0.008, 0.085], [px + cb * w * 0.45, py - w * 0.17, pz + sb * w * 0.45], [0, -b2, -0.38])
+            k.box(cast(look), [w, 0.008, 0.085], [px + cb * w * 0.45, py - w * 0.17, pz + sb * w * 0.45], [0, -b2, -0.38])
           }
         }
       }
