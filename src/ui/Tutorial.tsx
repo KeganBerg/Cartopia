@@ -35,6 +35,9 @@ const STEPS: { icon: string; text: (s: Game) => string; target?: (s: Game) => Tu
   { icon: '🏁', text: () => 'While Rusty works, tap RACE for your first race!', target: () => 'race', done: (s) => s.panel === 'race' || (s.stats.races ?? 0) > 0 },
 ]
 
+// After the last step the goal screen shows (GoalSplash), then the tutorial is done (99).
+export const TUTORIAL_STEPS = STEPS.length
+
 // The thing to pulse right now, or null when the tutorial isn't pointing anywhere.
 export function tutTarget(s: Game): TutTarget | null {
   const st = STEPS[s.tutorial]

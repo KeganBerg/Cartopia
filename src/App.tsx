@@ -24,6 +24,7 @@ import { UpgradePanel } from './ui/Upgrade'
 import { BankPanel } from './ui/Bank'
 import { DealsPanel } from './ui/Deals'
 import { LevelUpSplash } from './ui/LevelUp'
+import { GoalSplash } from './ui/GoalSplash'
 import { AccountPanel, openLegal } from './ui/Account'
 import { AlertsCard } from './ui/Alerts'
 import { WelcomeBack } from './ui/WelcomeBack'
@@ -169,6 +170,7 @@ export default function App() {
       <VisitBanner />
       <Tutorial />
       <Tips />
+      <GoalSplash />
       <AlertsCard />
       {panel === 'account' && <AccountPanel />}
       {panel === 'goals' && <GoalsPanel />}
