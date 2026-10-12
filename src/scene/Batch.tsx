@@ -69,13 +69,13 @@ type Merged = { sig: string; mesh: Mesh }
 type Bucket = { sig: string[]; build: () => BufferGeometry | null; mat: Material; cast: boolean; receive: boolean; order: number; members: Mesh[] }
 
 // Enough of a part's place to notice it moved, turned or grew, as one number.
+const PLACE = [0, 1, 2, 5, 8, 10, 12, 13, 14]
 const placeOf = (m: Matrix4) => {
   const e = m.elements
   let h = 0
   for (const i of PLACE) h = Math.imul(h ^ Math.round(e[i] * 1e4), 0x5bd1e995) >>> 0
   return h
 }
-const PLACE = [0, 1, 2, 5, 8, 10, 12, 13, 14]
 // Plain looks are baked into vertices, so a colour changed in place counts as a change too.
 const finishSig = (m: Material) => {
   const x = m as Material & { color?: Color; emissive?: Color; emissiveIntensity?: number; roughness?: number; metalness?: number; map?: Texture | null }
@@ -136,13 +136,6 @@ export function Batch({ version, off, cell, children }: { version: unknown; off?
       return l
     }
     const names: string[] = []
-    // Walks the tree, skipping whatever is hidden (by its owner, not by this Batch)
-    // or marked noBatch (a building mid-bounce), with everything under it.
-    const visit = (o: Object3D) => {
-      if (o !== r && ((!o.visible && !o.userData.batched) || o.userData.noBatch)) return
-      take(o as Mesh)
-      for (const c of o.children) visit(c)
-    }
     const take = (mesh: Mesh) => {
       if (!mesh.isMesh || (mesh as { isInstancedMesh?: boolean }).isInstancedMesh) return
       if (Array.isArray(mesh.material) || mesh.morphTargetInfluences) return
@@ -214,6 +207,13 @@ export function Batch({ version, off, cell, children }: { version: unknown; off?
       sets.get(b)!.push([mesh, at, id])
       b.sig.push(id)
       b.members.push(mesh)
+    }
+    // Walks the tree, skipping whatever is hidden (by its owner, not by this Batch)
+    // or marked noBatch (a building mid-bounce), with everything under it.
+    const visit = (o: Object3D) => {
+      if (o !== r && ((!o.visible && !o.userData.batched) || o.userData.noBatch)) return
+      take(o as Mesh)
+      for (const c of o.children) visit(c)
     }
     visit(r)
     const keep = new Map<string, Merged>()
