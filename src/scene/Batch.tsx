@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, type ReactNode } from 'react'
 import { BufferAttribute, BufferGeometry, Color, Group, Matrix4, Mesh, Texture, Vector3, type Material } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { glowMats } from './dayNight'
+import { addHours } from './closingTime'
 import { bake, bakeable, bakedMapMaterial, bakedMaterial, finishOf, textureKey, type Finish } from './bake'
 
 // Every road tile, lawn and building is dozens of tiny meshes, and phones choke
@@ -95,7 +96,9 @@ export function Batch({ version, off, cell, children }: { version: unknown; off?
       const key = `${look(mesh.material)}#${mesh.castShadow}${mesh.receiveShadow}${mesh.renderOrder}#${names.join()}`
       let set = sets.get(key)
       if (!set) sets.set(key, (set = { mat: mesh.material, cast: mesh.castShadow, receive: mesh.receiveShadow, order: mesh.renderOrder, names, parts: [] }))
-      set.parts.push(prepare(g, new Matrix4().multiplyMatrices(inv, mesh.matrixWorld), names))
+      const part = prepare(g, new Matrix4().multiplyMatrices(inv, mesh.matrixWorld), names)
+      addHours(part, mesh, r, mat)
+      set.parts.push(part)
       hidden.push(mesh)
     })
     const made: Mesh[] = []

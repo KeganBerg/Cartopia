@@ -156,7 +156,7 @@ function Apartments({ level, ghost, m, win, bulb }: Props) {
               <mesh position={[0, 0.07, 0.1]}><boxGeometry args={[0.38, 0.12, 0.015]} />{m('#455a64')}</mesh>
             </group>
           )))}
-          <mesh position={[0, 0.03, D / 2 + 0.4]} receiveShadow><boxGeometry args={[0.5, 0.06, 0.5]} />{m('#bdbdbd')}</mesh>
+          <mesh position={[0, 0.03, D / 2 + 0.25]} receiveShadow><boxGeometry args={[0.5, 0.06, 0.4]} />{m('#bdbdbd')}</mesh>
           <Shrub x={-0.6} z={D / 2 + 0.2} />
           <Shrub x={0.6} z={D / 2 + 0.2} />
           <Shrub x={-0.85} z={-0.5} r={0.12} />
@@ -239,14 +239,23 @@ function Tower({ level, ghost, m, win, bulb }: Props) {
           )}
           {level >= 9 && (
             <group position={[0, BASE + H1, 0]}>
-              {[[-0.52, 0.45], [0.52, 0.45], [-0.52, -0.45], [0.52, -0.45]].map(([x, z]) => <Shrub key={`${x}${z}`} x={x} z={z} r={0.09} />)}
+              {/* Corner planters out on the setback ledge, clear of the upper floors. */}
+              {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => (
+                <group key={`${sx}${sz}`} position={[(sx * (W + w2)) / 4, 0, (sz * (D + d2)) / 4]}>
+                  <mesh position={[0, 0.05, 0]}><boxGeometry args={[0.13, 0.1, 0.12]} />{m('#8d6e63')}</mesh>
+                  <group position-y={0.06}><Shrub x={0} z={0} r={0.07} /></group>
+                </group>
+              )))}
             </group>
           )}
           {level >= 10 && (
             <group position={[0, top, 0]}>
               <mesh position={[0, 0.06, 0]}><boxGeometry args={[w2 + 0.06, 0.12, d2 + 0.06]} />{m(GOLD)}</mesh>
-              <mesh position={[-0.15, 0.75, 0.1]} castShadow><coneGeometry args={[0.09, 1.3, 8]} /><meshStandardMaterial color={GOLD} metalness={0.6} roughness={0.3} /></mesh>
-              <mesh position={[-0.15, 1.45, 0.1]}><sphereGeometry args={[0.05, 8, 6]} />{bulb}</mesh>
+              {/* Spire and its light as one piece, so a merged pair keeps the light on the tip. */}
+              <group position={[-0.15, 0.1, 0.1]}>
+                <mesh position-y={0.65} castShadow><coneGeometry args={[0.09, 1.3, 8]} /><meshStandardMaterial color={GOLD} metalness={0.6} roughness={0.3} /></mesh>
+                <mesh position-y={1.33}><sphereGeometry args={[0.05, 8, 6]} />{bulb}</mesh>
+              </group>
             </group>
           )}
         </>

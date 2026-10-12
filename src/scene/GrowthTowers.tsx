@@ -119,14 +119,15 @@ function FoodModel({ def, ghost, m, win, bulb, level }: Props) {
     )
   }
   const h = towerFloors(level) * GLASS_FH
-  const y0 = 1.06
+  const y0 = 1.01
   const top = y0 + f.top(h)
   return (
     <group>
       <Storefront k={k} w={1.8} d={1.6} z0={-0.05} h={1.0} wall={f.wall} tex="brick" trim={f.trim} awning={f.awning} sign={f.sign} signFg={f.signFg} board={f.board} cafe={f.cafe} />
       {f.tower(k, y0, h, level)}
       <GiantProp m={m} kind={f.giant} at={[0, top, -0.25]} s={1.2} plinth={level >= 10 ? GOLD : f.trim} />
-      {!ghost && <Beacon m={m} at={[0.5, top, -0.55]} h={0.45} />}
+      {/* The cone's plinth covers the ice cream's narrow top tier, so its mast rises through the plinth. */}
+      {!ghost && <Beacon m={m} at={def.id === 'icecream' ? [0.25, top, -0.45] : [0.5, top, -0.55]} h={0.45} />}
       {!ghost && level >= 8 && <Flag at={[-0.75, 1.04, 0.5]} color={f.awning} star={level >= 10} />}
     </group>
   )
@@ -185,7 +186,7 @@ function Starburst({ m, at, c }: { m: Mat; at: V3; c: string }) {
     <group position={at}>
       <Cyl m={m} at={[0, 0.35, 0]} r={0.025} h={0.7} c="#eceff1" seg={6} />
       {[0, 1, 2, 3, 4, 5].map((i) => (
-        <Box key={i} m={m} at={[0, 0.8, 0]} rot={[0, (i * Math.PI) / 6, (i * Math.PI) / 3]} s={[0.5, 0.03, 0.03]} c={i % 2 ? c : GOLD} shadow={false} />
+        <Box key={i} m={m} at={[0, 0.8 + i * 0.002, 0]} rot={[0, (i * Math.PI) / 6, (i * Math.PI) / 3]} s={[0.5, 0.03, 0.03]} c={i % 2 ? c : GOLD} shadow={false} />
       ))}
       <mesh position={[0, 0.8, 0]}><sphereGeometry args={[0.06, 10, 8]} /><primitive object={glowMats.bulb} attach="material" dispose={null} /></mesh>
     </group>
@@ -224,7 +225,7 @@ function DinerModel({ def, ghost, m, win, bulb, level }: Props) {
       <StreamBlock k={k} z={-0.15} y0={0} len={3.6} d={1.45} floors={1} fh={0.95} wall={def.color} chrome="#eceff1" tint={tint} />
       <StreamBlock k={k} z={-0.3} y0={y0} len={2.3} d={1.0} floors={towerFloors(level)} fh={0.32} wall={wall} chrome={def.roof} tint={tint} />
       {/* A fin up the front carrying the name, like a 1930s picture palace. */}
-      <Box m={m} at={[-0.95, y0 + h * 0.5, 0.25]} s={[0.08, h * 0.7, 0.32]} c={def.roof} />
+      <Box m={m} at={[-0.95, y0 + h * 0.35, 0.25]} s={[0.08, h * 0.7, 0.32]} c={def.roof} />
       {!ghost && <LitSign text="DINER" w={0.9} at={[-0.95, 1.6, 0.42]} bg="#fffde7" fg="#c62828" m={m} />}
       <Box m={m} at={[0, 0.9, 0.82]} s={[1.3, 0.04, 0.42]} c={def.roof} />
       <Box m={m} at={[0, 0.5, 0.585]} s={[0.5, 0.82, 0.02]} c="#eceff1" shadow={false} />
@@ -253,7 +254,7 @@ function BowlingModel({ def, ghost, m, win, bulb, level }: Props) {
         {[-1.3, -0.45, 0.4, 1.25].map((x, i) => (
           <Box key={x} m={m} at={[x, H + 0.2, -0.2]} rot={[0, 0, i % 2 ? 0.35 : -0.35]} s={[0.9, 0.05, 1.55]} c="#ede7f6" />
         ))}
-        {!ghost && <LitSign text="BOWLING" w={1.6} at={[0, H - 0.25, 0.536]} bg="#311b92" fg="#ffeb3b" m={m} />}
+        {!ghost && <LitSign text="BOWLING" w={1.6} at={[0, H - 0.21, 0.536]} bg="#311b92" fg="#ffeb3b" m={m} />}
         {/* The pylon: a tall mast with a giant pin and ball on top. */}
         <group position={[1.55, 0, 0.75]}>
           <Cyl m={m} at={[0, (H + 0.8) / 2, 0]} r={0.05} h={H + 0.8} c="#eceff1" seg={8} />
@@ -264,7 +265,7 @@ function BowlingModel({ def, ghost, m, win, bulb, level }: Props) {
     )
   }
   const h = towerFloors(level) * GLASS_FH
-  const y0 = 1.1
+  const y0 = 1.06
   return (
     <group>
       <Storefront k={k} w={3.6} d={1.6} z0={-0.15} h={1.05} wall={def.color} tex="plain" trim="#ede7f6" awning="#7e57c2" sign="BOWLING" signBg="#311b92" signFg="#ffeb3b" board="#7e57c2" />
@@ -343,13 +344,15 @@ function MotelModel({ def, ghost, m, win, bulb, level }: Props) {
       <Storefront k={k} w={3.6} d={1.6} z0={-0.15} h={1.0} wall="#d7ccc8" tex="stone" trim="#fafafa" awning={teal} />
       {/* A slab tower in cream stucco, balconies on every floor, glass behind. */}
       <GlassBlock m={m} ghost={ghost} x={0} z={-0.35} y0={y0} w={2.8} d={0.9} h={h} tint="#80cbc4" frame="#fafafa" />
-      <Balconies m={m} w={2.8} z={0.1} ys={ys} c="#fafafa" rail={teal} />
+      {/* The top floor carries the hotel's name instead of balconies. */}
+      <Balconies m={m} w={2.8} z={0.1} ys={ys.slice(0, -1)} c="#fafafa" rail={teal} />
       {[-1, 1].map((sd) => <Box key={sd} m={m} at={[sd * 1.48, y0 + h / 2, -0.35]} s={[0.22, h, 1.0]} c={def.color} t={sidingTex(1, Math.max(1, Math.round(h * 1.5)))} />)}
       <RoofPool m={m} at={[0, y0 + h + 0.08, -0.35]} w={2.6} d={0.85} ghost={ghost} />
       {!ghost && <LitSign text="GRAND HOTEL" w={1.5} at={[0, y0 + h - 0.25, 0.11 + 0.02]} bg={teal} fg="#fff8e1" m={m} />}
-      <Box m={m} at={[0, 0.9, 0.85]} s={[1.6, 0.06, 0.9]} c={teal} />
-      {[-0.75, 0.75].map((x) => <Cyl key={x} m={m} at={[x, 0.45, 1.22]} r={0.035} h={0.9} c={level >= 10 ? GOLD : '#fafafa'} seg={8} />)}
-      <Bulbs from={[-0.78, 0.86, 1.3]} to={[0.78, 0.86, 1.3]} n={9} />
+      {/* Porte-cochere, kept to a step over the pavement. */}
+      <Box m={m} at={[0, 0.9, 0.78]} s={[1.6, 0.06, 0.76]} c={teal} />
+      {[-0.75, 0.75].map((x) => <Cyl key={x} m={m} at={[x, 0.45, 1.1]} r={0.035} h={0.9} c={level >= 10 ? GOLD : '#fafafa'} seg={8} />)}
+      <Bulbs from={[-0.78, 0.86, 1.15]} to={[0.78, 0.86, 1.15]} n={9} />
       {!ghost && level >= 8 && [-1.5, 1.5].map((x) => <Flag key={x} at={[x, y0 + h + 0.08, -0.35]} color={teal} star={level >= 10} />)}
       {!ghost && (
         <group position={[1.35, 0.05, 0.75]}>
@@ -390,10 +393,10 @@ function MarketModel({ def, ghost, m, win, bulb, level }: Props) {
         })}
         <Box m={m} at={[0, H + 0.03, -0.15]} s={[3.66, 0.06, 1.66]} c="#757575" />
         {!ghost && [-1.0, 0, 1.0].map((x) => <Box key={x} m={m} at={[x, H + 0.065, -0.15]} s={[0.04, 0.005, 0.9]} c="#fafafa" shadow={false} />)}
-        <Box m={m} at={[-1.95, (H + 0.1) / 2, -0.1]} rot={[0, 0, 0.0]} s={[0.25, H + 0.1, 1.4]} c="#8d8d8d" t={concreteTex(1, 2)} />
+        <Box m={m} at={[-1.9, (H + 0.1) / 2, -0.1]} rot={[0, 0, 0.0]} s={[0.25, H + 0.1, 1.4]} c="#8d8d8d" t={concreteTex(1, 2)} />
         <RoofSign m={m} text="FRESH MART" w={1.6} at={[0.8, H + 0.06, 0.45]} bg="#fffde7" fg={green} board={green} ghost={ghost} />
         <GiantProp m={m} kind="apple" at={[-1.0, H + 0.06, 0.2]} s={0.8} plinth="#fafafa" />
-        {!ghost && [-1.25, 1.25].map((x) => <Parasol key={x} m={m} at={[x, 0, 0.9]} c="#43a047" />)}
+        {!ghost && [-1.25, 1.25].map((x) => <Parasol key={x} m={m} at={[x, 0, 0.85]} c="#43a047" />)}
         {!ghost && <Pool r={0.9} z={0.95} />}
       </group>
     )
@@ -411,7 +414,7 @@ function MarketModel({ def, ghost, m, win, bulb, level }: Props) {
       {!ghost && [-1.25, -0.75].map((x) => <Planter key={x} m={m} at={[x, y0 + 0.08, 0.1]} />)}
       <GiantProp m={m} kind="apple" at={[0.5, y0 + h + 0.08, -0.4]} s={1.3} plinth={level >= 10 ? GOLD : '#fafafa'} />
       {!ghost && <Beacon m={m} at={[1.2, y0 + h + 0.08, -0.7]} h={0.45} />}
-      {!ghost && [-1.25, 1.25].map((x) => <Parasol key={x} m={m} at={[x, 0, 0.9]} c="#43a047" />)}
+      {!ghost && [-1.25, 1.25].map((x) => <Parasol key={x} m={m} at={[x, 0, 0.85]} c="#43a047" />)}
       {!ghost && <Pool r={0.9} z={0.95} />}
     </group>
   )
@@ -449,7 +452,7 @@ function ArcadeModel({ ghost, m, win, bulb, level }: Props) {
   const fl = towerFloors(level)
   const blocks = Math.ceil(fl / 3)
   const fh = 0.3
-  const y0 = 1.05
+  const y0 = 1.01
   const top = y0 + blocks * fh * 3
   return (
     <group>
@@ -510,13 +513,13 @@ function TunerModel({ def, ghost, m, win, bulb, level }: Props) {
   const H = fl * fh
   const r = 0.85
   const cx = -0.6
-  const cz = -0.15
+  const cz = -0.08
   return (
     <group>
       {/* Lobby pavilion and the car tower: open floors round a glass lift core. */}
       <GlassBlock m={m} ghost={ghost} x={1.2} z={-0.1} w={1.3} d={1.5} h={0.9} tint="#cfd8dc" frame="#212121" />
       {!ghost && <LitSign text="TUNER" w={1.0} at={[1.2, 1.12, 0.66]} bg="#212121" fg={orange} m={m} />}
-      <Box m={m} at={[1.2, 0.98, 0.66]} s={[1.08, 0.3, 0.04]} c={orange} shadow={false} />
+      <Box m={m} at={[1.2, 0.98, 0.625]} s={[1.08, 0.3, 0.04]} c={orange} shadow={false} />
       <GlassDrum k={k} x={cx} z={cz} y0={0} r={0.26} h={H + 0.3} tint="#cfd8dc" frame="#212121" bands={false} />
       {Array.from({ length: fl }, (_, i) => {
         const y = (i + 1) * fh - 0.1
@@ -562,8 +565,8 @@ function PoliceModel({ def, ghost, m, win, bulb, level }: Props) {
             <group rotation-y={Math.PI / 2}>
               <CarModel body="sedan" color="#fafafa" stripe="#1a237e" />
               <Box m={m} at={[-0.08, 0.6, -0.02]} s={[0.1, 0.05, 0.34]} c="#e0e0e0" />
-              <Box m={m} at={[-0.08, 0.64, 0.09]} s={[0.1, 0.05, 0.12]} c="#e53935" />
-              <Box m={m} at={[-0.08, 0.64, -0.13]} s={[0.1, 0.05, 0.12]} c="#1e88e5" />
+              <Box m={m} at={[-0.08, 0.64, 0.088]} s={[0.096, 0.05, 0.116]} c="#e53935" />
+              <Box m={m} at={[-0.08, 0.64, -0.128]} s={[0.096, 0.05, 0.116]} c="#1e88e5" />
             </group>
           </Upright>
         </group>
@@ -581,7 +584,7 @@ function PoliceModel({ def, ghost, m, win, bulb, level }: Props) {
         {[-1.25, -0.65, 0.65, 1.25].map((x) => <mesh key={x} position={[x, 0.6, 0.377]}><planeGeometry args={[0.42, 0.5]} />{win}</mesh>)}
         <mesh position={[0, 0.42, 0.378]}><planeGeometry args={[0.44, 0.74]} />{m('#37474f')}</mesh>
         <BrickFloors k={k} w={3.5} d={1.35} z0={-0.3} y0={1.1} floors={fl} fh={0.42} wall="#b0bec5" trim="#eceff1" tex="stone" escape={false} />
-        <Box m={m} at={[0, 1.12, 0.385]} s={[3.52, 0.12, 0.02]} c="#1565c0" shadow={false} />
+        <Box m={m} at={[0, 1.12, 0.389]} s={[3.52, 0.12, 0.02]} c="#1565c0" shadow={false} />
         {front(0.35)}
         <RoofSign m={m} text="POLICE" w={1.3} at={[-0.7, H + 0.1, 0.1]} bg={navy} fg="#ffffff" board={navy} ghost={ghost} />
         {/* Radio mast on the roof. */}
@@ -614,7 +617,7 @@ function PoliceModel({ def, ghost, m, win, bulb, level }: Props) {
           <Beacon m={m} at={[0, 0, 0]} h={1.1} />
         </group>
       </group>
-      {level >= 10 && <Box m={m} at={[0, y0 + h + 0.02, 0.08]} s={[1.98, 0.05, 0.03]} c={GOLD} shadow={false} />}
+      {level >= 10 && <Box m={m} at={[0, y0 + h + 0.02, 0.08]} s={[1.99, 0.05, 0.03]} c={GOLD} shadow={false} />}
     </group>
   )
 }
@@ -633,7 +636,11 @@ const AUTO: Record<string, Auto> = {
 
 function Landmark({ m, id, at, s }: { m: Mat; id: string; at: V3; s: number }) {
   return (
-    <group position={at} scale={s}>
+    <group position={at}>
+    <Upright>
+    <group scale={s}>
+      {/* A low plinth bolts the landmark to the roof. */}
+      {id !== 'tires' && <Cyl m={m} at={[0, 0.03, 0]} r={0.42} r2={0.46} h={0.06} c="#78909c" seg={16} />}
       {id === 'tires' && (
         <group position={[0, 0.62, 0]}>
           <mesh castShadow><torusGeometry args={[0.42, 0.2, 12, 24]} />{m('#212121')}</mesh>
@@ -663,7 +670,8 @@ function Landmark({ m, id, at, s }: { m: Mat; id: string; at: V3; s: number }) {
             </group>
           ))}
           <Box m={m} at={[0, 1.08, 0]} s={[0.8, 0.06, 0.08]} c="#90a4ae" />
-          {[[0.0, 1.3, 0.1, 0.14], [-0.25, 1.45, -0.05, 0.1], [0.22, 1.5, 0.05, 0.12], [0.05, 1.7, 0, 0.08]].map(([x, y, z, r]) => (
+          {/* Soap foam heaped on the bar. */}
+          {[[0.0, 1.2, 0.02, 0.14], [-0.21, 1.18, -0.02, 0.11], [0.21, 1.19, 0.03, 0.12], [0.03, 1.38, 0, 0.1], [-0.12, 1.33, 0.05, 0.08], [0.15, 1.34, -0.03, 0.07]].map(([x, y, z, r]) => (
             <mesh key={`${x}${y}`} position={[x, y, z]}><sphereGeometry args={[r, 10, 8]} /><meshStandardMaterial color="#e1f5fe" roughness={0.1} metalness={0.3} /></mesh>
           ))}
         </group>
@@ -677,15 +685,17 @@ function Landmark({ m, id, at, s }: { m: Mat; id: string; at: V3; s: number }) {
         </group>
       )}
       {id === 'bodyshop' && (
-        <group rotation-z={-0.25}>
+        <group position-y={-0.02} rotation-z={-0.25}>
           {/* A giant spray can mid-spray. */}
           <Cyl m={m} at={[0, 0.5, 0]} r={0.22} h={0.85} c="#ff7043" seg={14} />
           <Cyl m={m} at={[0, 0.5, 0]} r={0.225} h={0.2} c="#fafafa" seg={14} />
           <mesh position={[0, 0.98, 0]}><sphereGeometry args={[0.22, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />{m('#cfd8dc')}</mesh>
           <Box m={m} at={[0, 1.22, 0]} s={[0.08, 0.1, 0.08]} c="#263238" />
-          {[[0.18, 1.3], [0.32, 1.38], [0.46, 1.48]].map(([x, y], i) => <mesh key={x} position={[x, y, 0]}><sphereGeometry args={[0.05 + i * 0.03, 8, 6]} />{m(['#ff7043', '#ab47bc', '#29b6f6'][i])}</mesh>)}
+          {[[0.08, 1.24], [0.19, 1.3], [0.35, 1.38]].map(([x, y], i) => <mesh key={x} position={[x, y, 0]}><sphereGeometry args={[0.055 + i * 0.03, 8, 6]} />{m(['#ff7043', '#ab47bc', '#29b6f6'][i])}</mesh>)}
         </group>
       )}
+    </group>
+    </Upright>
     </group>
   )
 }
@@ -727,7 +737,8 @@ function AutoModel({ def, ghost, m, win, bulb, level }: Props) {
         <GlassBlock m={m} ghost={ghost} x={0} z={z0 - 0.1} y0={h + 0.08} w={W - 0.3} d={D - 0.4} h={up - 0.08} tint="#cfd8dc" frame={a.trim} />
       )}
       <RoofSign m={m} text={a.sign} w={wide ? 1.7 : 1.2} at={[wide ? -0.6 : 0, h + up + 0.08, zf - 0.15]} bg="#fffde7" fg={a.signFg} board={a.board} ghost={ghost} />
-      <Landmark m={m} id={def.id} at={[wide ? 1.05 : 0.45, h + up + 0.08, z0 - 0.2]} s={st === 3 ? 1.5 : 0.8} />
+      {/* Sized and placed to stay on the roof (the giant tyre stands wide, so it sits nearer the middle). */}
+      <Landmark m={m} id={def.id} at={[wide ? 1.05 : def.id === 'tires' ? 0.2 : 0.45, h + up + 0.08, z0 - 0.1]} s={st === 3 ? 1.2 : 0.8} />
       {/* Forecourt: cones, a tyre stack or oil drums by the door. */}
       {!ghost && (
         <group>
@@ -736,7 +747,7 @@ function AutoModel({ def, ghost, m, win, bulb, level }: Props) {
               <mesh position={[0, 0.1, 0]} castShadow><coneGeometry args={[0.06, 0.2, 8]} />{m('#ff6d00')}</mesh>
             </group>
           ))}
-          {def.id === 'tires' && [0, 1, 2, 3].map((i) => <mesh key={i} position={[-W / 2 + 0.25, 0.08 + i * 0.12, zf + 0.25]} rotation-x={Math.PI / 2} castShadow><torusGeometry args={[0.13, 0.06, 8, 14]} />{m('#212121')}</mesh>)}
+          {def.id === 'tires' && <group>{[0, 1, 2, 3].map((i) => <mesh key={i} position={[-W / 2 + 0.25, 0.08 + i * 0.12, zf + 0.25]} rotation-x={Math.PI / 2} castShadow><torusGeometry args={[0.13, 0.06, 8, 14]} />{m('#212121')}</mesh>)}</group>}
           {def.id === 'lube' && [0, 1].map((i) => <Cyl key={i} m={m} at={[W / 2 - 0.3 - i * 0.22, 0.16, zf + 0.25]} r={0.1} h={0.3} c={i ? '#1565c0' : '#ffb300'} seg={10} />)}
           {st === 3 && <Flag at={[-W / 2 + 0.1, h + up + 0.08, z0 - 0.5]} color={a.board} star={level >= 10} />}
           <Pool r={0.9} z={zf + 0.4} />

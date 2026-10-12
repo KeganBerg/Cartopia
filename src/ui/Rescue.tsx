@@ -10,6 +10,7 @@ import { CarThumb } from '../scene/BuildingPreview'
 import { RescueScene, type ScreenAt } from '../scene/RescueScene'
 import { rescueSfx } from '../lib/sound'
 import { buzz } from '../lib/haptics'
+import { LoadingScene } from './Loading'
 
 function lootLabel(l: Loot) {
   switch (l.kind) {
@@ -340,6 +341,7 @@ function SearchScreen({ onHaul }: { onHaul: (items: Loot[]) => void }) {
           onBusy={setBusy}
         />
       </Canvas>
+      <LoadingScene label={`Heading to ${spot.name}`} onClose={() => openPanel(null)} />
       <div className="rf-top">
         <h2>{spot.icon} {spot.name}</h2>
         <button className="close" onClick={() => openPanel(null)} aria-label="Close">✕</button>

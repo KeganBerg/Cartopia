@@ -11,7 +11,7 @@ import { rotateCurrent, setGhostTurn, turnOf } from '../game/placement'
 import { mergeGroups, groupOf, groupTurn, groupScale, isLandmark, type MergeGroup } from '../game/merge'
 import { VanguardTower } from './Landmark'
 import { KeepShapes, MergeScale } from './mergeScale'
-import { propLimit } from './keepShape'
+import { limitFor } from './keepShape'
 import { sfx } from '../lib/sound'
 import { Clouds } from './Clouds'
 import { DayNight } from './DayNight'
@@ -38,6 +38,7 @@ import { Ear } from './Ear'
 import { WorldFx, PopGroup, usePops } from './WorldFx'
 import { helpable } from '../game/help'
 import { helpBuilding } from '../lib/help'
+import { hoursOf, seedOf } from '../game/hours'
 import { FREE, VIEW, isFree, useFreeCam } from './freeCam'
 import { FreeCam } from './FreeCam'
 
@@ -196,6 +197,7 @@ function Building({ b, roads, group }: { b: PlacedBuilding; roads: Set<string>; 
     <group
       position={[cx, 0, cz]}
       rotation-y={(turn * Math.PI) / 2}
+      userData={{ hours: { seed: seedOf(b.uid), kind: hoursOf(b.def) } }}
       onPointerDown={(e) => {
         const s = useGame.getState()
         if (s.visiting || e.button !== 0) return
@@ -244,7 +246,7 @@ function Building({ b, roads, group }: { b: PlacedBuilding; roads: Set<string>; 
       <group scale={mark ? [k, k, k] : [sx, sy, sz]}>
         <MergeScale.Provider value={mark ? [k, k, k] : group ? [sx, sy, sz] : ONE}>
           <PopGroup uid={b.uid}>
-            <KeepShapes limit={propLimit(d.w * TILE, d.h * TILE)}>
+            <KeepShapes limit={limitFor(d)}>
               {mark ? <VanguardTower /> : <BuildingModel def={d} level={buildingLevel(b)} />}
             </KeepShapes>
           </PopGroup>

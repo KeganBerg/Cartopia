@@ -9,6 +9,7 @@ import { CarThumb } from '../scene/BuildingPreview'
 import { Panel } from './Menus'
 import { SocialTabs } from './Social'
 import { PlayerName } from './Username'
+import { LoadingBand } from './Loading'
 
 const Thumb = ({ car, size }: { car: OwnedCar; size?: 'sm' }) => {
   const d = carDef(car.model)
@@ -123,7 +124,7 @@ export function MeetPanel() {
       <SocialTabs current="meet" />
       <MyDisplay />
       <div className="meet-list">
-        {!rows && <p className="hint">Loading...</p>}
+        {!rows && <LoadingBand label="Loading the car meet" />}
         {rows?.map((d) => <DisplayRow key={d.ownerId} d={d} />)}
       </div>
     </Panel>

@@ -1,7 +1,8 @@
 // Renders the loading screen's pictures from the real game models into public/splash/.
 // node scripts/splash/shoot.mjs [only]   (needs `npm run dev` on :5173 and Playwright)
 // Street strips: one per season, day and night. Cars: every model in white paint plus a
-// paint mask, so the splash can show the player's own car in their colour.
+// paint mask, so the splash can show the player's own car in their colour, side on
+// (the in-game loader) and three quarters on (the loading screen's hero car).
 import { chromium } from 'playwright'
 import { mkdirSync, writeFileSync } from 'node:fs'
 
@@ -18,6 +19,8 @@ const jobs = []
 for (const season of ['spring', 'summer', 'fall', 'winter'])
   for (const night of [0, 1]) jobs.push([`street-${season}-${night ? 'night' : 'day'}`, 4400, 800, `what=street&y=3&season=${season}&night=${night}`])
 for (const id of models) for (const mask of [0, 1]) jobs.push([`car-${id}${mask ? '-mask' : ''}`, 1200, 520, `what=car&y=0.5&model=${id}&mask=${mask}&season=summer`, mask])
+// The hero shot on the loading screen: three quarters from the front, from above.
+for (const id of models) for (const mask of [0, 1]) jobs.push([`hero-${id}${mask ? '-mask' : ''}`, 1800, 1400, `what=car&y=0.5&model=${id}&mask=${mask}&season=summer&yaw=-140&pitch=24&w=4`, mask])
 
 let box = ''
 for (const [name, W, H, query, mask] of jobs.filter(([n]) => !only || n.startsWith(only))) {

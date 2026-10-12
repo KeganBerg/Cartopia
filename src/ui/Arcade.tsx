@@ -15,6 +15,7 @@ import { sfx } from '../lib/sound'
 import { Countdown, Result, look, payFuel, pi } from './ArcadeBits'
 import { STAR_GAMES, StarGame } from './ArcadeMore'
 import { loadStars, type StarGameId } from '../game/arcadeMore'
+import { LoadingScene } from './Loading'
 
 type Playing = { game: 'chase' } | { game: 'park'; lot: number } | { game: 'star'; id: StarGameId }
 
@@ -108,6 +109,7 @@ function ChaseGame({ car, onExit }: { car: OwnedCar; onExit: () => void }) {
   const input = useRef<ChaseInput>({ moves: [] }).current
   const [run, setRun] = useState(0)
   const [running, setRunning] = useState(false)
+  const [drawn, setDrawn] = useState(-1)
   const [hud, setHud] = useState<ChaseHud>({ dist: 0, coins: 0, hearts: CHASE_HEARTS, speed: 0 })
   const [end, setEnd] = useState<{ score: number; coins: number; xp: number; record: boolean } | null>(null)
 
@@ -161,6 +163,7 @@ function ChaseGame({ car, onExit }: { car: OwnedCar; onExit: () => void }) {
       <Canvas key={run} className="rf-canvas" camera={{ position: [0, 4.4, 8.5], fov: 55, near: 0.3, far: 160 }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
         <ChaseScene me={look(car)} input={input} running={running} onHud={setHud} onBusted={busted} />
       </Canvas>
+      <LoadingScene key={run} label="Getting away" onReady={() => setDrawn(run)} onClose={onExit} />
       <div className="rf-top">
         <h2>🚓 Getaway Chase</h2>
         <button className="close" onClick={onExit} aria-label="Close">✕</button>
@@ -170,7 +173,7 @@ function ChaseGame({ car, onExit }: { car: OwnedCar; onExit: () => void }) {
         <span className="arc-score">{chaseScore(hud.dist, hud.coins).toLocaleString()}</span>
         <span className="arc-coins">🪙 {hud.coins}</span>
       </div>
-      {!running && !end && <Countdown key={run} onGo={() => setRunning(true)} />}
+      {!running && !end && drawn === run && <Countdown key={run} onGo={() => setRunning(true)} />}
       {running && hud.dist < 40 && <div className="arc-tip">👈 Swipe or tap to dodge 👉</div>}
       {end && (
         <Result win={end.record} title={end.record ? '🏆 New best!' : '🚨 Busted!'}
@@ -198,6 +201,7 @@ function ParkGame({ car, lot, onExit, onLot }: { car: OwnedCar; lot: number; onE
   const input = useRef<ParkInput>({ steer: 0, pedal: 0 }).current
   const [run, setRun] = useState(0)
   const [running, setRunning] = useState(false)
+  const [drawn, setDrawn] = useState('')
   const [hud, setHud] = useState<ParkHud>({ time: 0, bumps: 0, inSpot: false })
   const [end, setEnd] = useState<(ParkEnd & { stars: number; coins: number; xp: number }) | null>(null)
 
@@ -256,6 +260,7 @@ function ParkGame({ car, lot, onExit, onLot }: { car: OwnedCar; lot: number; onE
       <Canvas key={`${lot}-${run}`} className="rf-canvas" camera={{ fov: 40, near: 0.5, far: 120, position: [0, 20, 5] }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
         <ParkScene lot={def} me={look(car)} input={input} running={running} onHud={setHud} onEnd={done} />
       </Canvas>
+      <LoadingScene key={`${lot}-${run}`} label={`Driving to ${def.name}`} onReady={() => setDrawn(`${lot}-${run}`)} onClose={onExit} />
       <div className="rf-top">
         <h2>🅿️ {lot + 1}. {def.name}</h2>
         <button className="close" onClick={onExit} aria-label="Close">✕</button>
@@ -265,7 +270,7 @@ function ParkGame({ car, lot, onExit, onLot }: { car: OwnedCar; lot: number; onE
         <span className={hud.inSpot ? 'arc-spot in' : 'arc-spot'}>{hud.inSpot ? '✅ Hold still' : '🅿️'}</span>
         <span className="arc-bumps">💥 {hud.bumps}/{PARK_MAX_BUMPS}</span>
       </div>
-      {!running && !end && <Countdown key={`${lot}-${run}`} onGo={() => setRunning(true)} />}
+      {!running && !end && drawn === `${lot}-${run}` && <Countdown key={`${lot}-${run}`} onGo={() => setRunning(true)} />}
       <div className="arc-pads">
         <div className="arc-pad">
           <button className="arc-btn" aria-label="Steer left" {...hold('steer', 1)}>◀</button>

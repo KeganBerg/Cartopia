@@ -24,10 +24,18 @@ describe('loading screen', () => {
     }
   })
 
-  // The splash shows the player's race car from a render in public/splash/.
-  // A new car without one falls back to the Hot Shot: run scripts/splash/shoot.mjs car-<id>.
+  // The loaders show the player's race car from renders in public/splash/: side
+  // on in panels, three quarters on (hero) on the splash and scene covers. A new
+  // car without them falls back to the Hot Shot: run scripts/splash/shoot.mjs car-<id>
+  // and shoot.mjs hero-<id>.
   it('has a render of every car', () => {
-    const missing = CARS.map((c) => c.id).filter((id) => !['', '-mask'].every((m) => existsSync(new URL(`../public/splash/car-${id}${m}.webp`, import.meta.url))))
-    expect(missing).toEqual([])
+    const files = CARS.flatMap((c) => ['car', 'hero'].flatMap((k) => ['', '-mask'].map((m) => `${k}-${c.id}${m}.webp`)))
+    expect(files.filter((f) => !existsSync(new URL(`../public/splash/${f}`, import.meta.url)))).toEqual([])
+  })
+
+  // The town behind the splash, for every season and time of day (town.mjs).
+  it('has a town for every season and time of day', () => {
+    const files = ['spring', 'summer', 'fall', 'winter'].flatMap((s) => ['day', 'dusk', 'night'].map((t) => `town-${s}-${t}.webp`))
+    expect(files.filter((f) => !existsSync(new URL(`../public/splash/${f}`, import.meta.url)))).toEqual([])
   })
 })
