@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useGame, today } from '../game/store'
-import { fetchLeaderboard, fetchTown, demoLeaders, type Leader } from '../lib/friends'
+import { fetchLeaderboard, townToVisit, demoLeaders, type Leader } from '../lib/friends'
 import { supabase } from '../lib/supabase'
 import { FreeCamButton, Panel } from './Menus'
 import { SocialTabs, useUserId } from './Social'
@@ -130,7 +130,8 @@ function useVisitTown() {
   const visit = useGame((s) => s.visit)
   const toast = useGame((s) => s.toast)
   return async (id: string) => {
-    const town = await fetchTown(id)
+    const town = await townToVisit(id)
+    if (town === 'stale') return
     if (!town) return toast("Couldn't load that town")
     visit(town)
   }

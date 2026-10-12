@@ -1,4 +1,5 @@
 import { useGame, type OwnedCar } from '../game/store'
+import { raceCarOf } from '../game/raceCar'
 import { CARS, PAINTS, SKILLS, carDef } from '../game/data'
 import { DIST } from '../game/distance'
 import { PAINT_RIVALS, PAINTS_TO_COLLECT, TIERS, paintRival, paintsOpen, rowPrize, rowSkills, type PaintRival } from '../game/paintRivals'
@@ -98,7 +99,8 @@ export function PaintPrizePopup() {
   const raceCar = useGame((s) => s.raceCar)
   const r = id ? paintRival(id) : null
   if (!r) return null
-  const car = cars.find((c) => c.uid === raceCar) ?? cars[0]
+  // The car that raced: the picked race car, else the best one (as Race.tsx does).
+  const car = raceCarOf(cars, raceCar)
   const d = car ? carDef(car.model) : CARS[0]
   const paintIt = () => {
     close()

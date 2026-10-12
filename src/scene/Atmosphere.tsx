@@ -36,7 +36,7 @@ const FOG_STYLES: Record<string, FogStyle> = {
   // A low, even blanket: streets and lawns sink into it, roofs stay clear.
   valley: { floor: 0, height: 0.9, density: 1.5, patch: 0.35, scale: 0.05 },
   // Rolling banks drifting through town, with clear gaps between them.
-  banks: { floor: 0, height: 1.7, density: 0.9, patch: 1, scale: 0.04 },
+  banks: { floor: 0, height: 1.7, density: 0.6, patch: 1, scale: 0.04 },
   // A sea of cloud: only the towers break through.
   sea: { floor: 2.6, height: 0.8, density: 1.6, patch: 0.3, scale: 0.03 },
 }

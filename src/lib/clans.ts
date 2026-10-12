@@ -160,13 +160,16 @@ export async function fetchClans(m: Metric = 'power', p: Period = 'all'): Promis
 
 export async function fetchMyClan(uid: string): Promise<MyClan | null> {
   if (!supabase) return null
-  const { data: mine } = await supabase.from('clan_members').select('clan_id, role').eq('owner_id', uid).maybeSingle()
+  // A failed lookup throws rather than reading as "not in a crew".
+  const { data: mine, error } = await supabase.from('clan_members').select('clan_id, role').eq('owner_id', uid).maybeSingle()
+  if (error) throw error
   if (!mine) return null
-  const [{ data: c }, { data: roster }, { data: players }] = await Promise.all([
+  const [{ data: c, error: e1 }, { data: roster, error: e2 }, { data: players, error: e3 }] = await Promise.all([
     supabase.from('clan_leaderboard').select('*').eq('id', mine.clan_id).maybeSingle(),
     supabase.from('clan_members').select('owner_id, role, joined_at').eq('clan_id', mine.clan_id),
     supabase.from('player_leaderboard').select('*').eq('clan_id', mine.clan_id),
   ])
+  if (e1 || e2 || e3) throw e1 ?? e2 ?? e3
   if (!c) return null
   const stats = new Map((players as PlayerRow[] | null ?? []).map((r) => [r.owner_id, toRow(r)]))
   const members: Member[] = (roster ?? []).map((r) => ({

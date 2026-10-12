@@ -3,7 +3,7 @@ import { useGame, hasRusty, type OwnedCar } from '../game/store'
 import { carDef, performance } from '../game/data'
 import { supabase } from '../lib/supabase'
 import { signedInUser } from '../lib/cloud'
-import { fetchTown } from '../lib/friends'
+import { townToVisit } from '../lib/friends'
 import { useGhost, runGhost, raceTown, submitRun, sendTaunt, refreshTaunts, markSeen, tauntText, tauntsFor, receivedTaunt, GHOST_FUEL, type GhostResult, type Taunt } from '../lib/ghosts'
 import { DragRace } from './Race'
 import { Panel } from './Menus'
@@ -28,6 +28,9 @@ export function GhostButton({ town }: { town: { ownerId: string; townName: strin
   return <button className="buy small ghost-btn" disabled={busy} onClick={go} title={`Race their best run · ⛽${GHOST_FUEL}`}>👻 Race</button>
 }
 
+// The last run's post to the server, started as it crossed the line (null: kept on this device).
+let posting: { t: number; posted: Promise<GhostResult | null> | null } | null = null
+
 export function GhostRacePanel() {
   const ghost = useGhost((g) => g.ghost)
   const n = useGhost((g) => g.n)
@@ -44,7 +47,11 @@ export function GhostRacePanel() {
       trial={{ target: ghost.target }}
       venueId="main"
       title={isCrewMate(ghost.owner) ? `🛡️ Crew race · ${ghost.town}` : `👻 ${ghost.town}'s ${ghost.par ? 'par time' : 'best run'}`}
-      onFinish={() => { if (ghost.real && isCrewMate(ghost.owner)) useGame.getState().crewRace() }}
+      onFinish={(_won, myTime) => {
+        if (ghost.real && isCrewMate(ghost.owner)) useGame.getState().crewRace()
+        // Posted at the line, so closing before the result card can't lose the run.
+        posting = { t: myTime, posted: ghost.real && signedInUser() ? submitRun(myTime) : null }
+      }}
       resultView={(r) => <GhostResultCard myTime={r.myTime} onAgain={() => runGhost(ghost)} onExit={exit} />}
       onExit={exit}
     />
@@ -54,15 +61,15 @@ export function GhostRacePanel() {
 // The end-of-run card: who won, by how much, and a taunt to leave them.
 function GhostResultCard({ myTime, onAgain, onExit }: { myTime: number; onAgain: () => void; onExit: () => void }) {
   const ghost = useGhost((g) => g.ghost)!
+  const [run] = useState(() => (posting?.t === myTime ? posting.posted : null))
   // undefined while posting, null when this run stays on this device
-  const [posted, setPosted] = useState<GhostResult | null | undefined>(ghost.real && signedInUser() ? undefined : null)
+  const [posted, setPosted] = useState<GhostResult | null | undefined>(run ? undefined : null)
   const [sent, setSent] = useState<number | null>(null)
   useEffect(() => {
     let live = true
-    if (posted === undefined) submitRun(myTime).then((r) => live && setPosted(r))
+    run?.then((r) => live && setPosted(r))
     return () => { live = false }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [myTime])
+  }, [run])
   const time = posted?.kept ?? myTime
   const their = posted ? posted.their ?? ghost.target : ghost.target
   const won = posted ? posted.won : time < their
@@ -148,7 +155,8 @@ export function TauntsPanel() {
   const [shown] = useState(inbox)
   useEffect(() => markSeen(shown.map((t) => t.id)), [shown])
   const rematch = async (t: Taunt) => {
-    const town = await fetchTown(t.from)
+    const town = await townToVisit(t.from)
+    if (town === 'stale') return
     if (!town) return useGame.getState().toast("Couldn't load that town")
     useGame.getState().visit(town)
     await raceTown(town)

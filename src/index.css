@@ -201,7 +201,7 @@ button.card:hover:not(:disabled) { border-color: var(--accent); }
 
 /* Bubbles pinned over the 3D scene. */
 .badges { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 10; }
-.anchor { position: absolute; left: 0; top: 0; visibility: hidden; pointer-events: auto; padding-bottom: 9px; will-change: transform; transition: opacity .25s; }
+.anchor { position: absolute; left: 0; top: 0; visibility: hidden; pointer-events: auto; touch-action: none; padding-bottom: 9px; will-change: transform; transition: opacity .25s; }
 .anchor.far, .anchor.under { opacity: 0; pointer-events: none; }
 
 /* Rusty's Rescue gate */
@@ -904,6 +904,7 @@ html.calm *, html.calm *::before, html.calm *::after { animation-duration: .001m
 .clan-emblem.big { width: 42px; height: 42px; font-size: 24px; border-radius: 12px; }
 .big-emblem { display: grid; place-items: center; width: 64px; height: 64px; flex: none; font-size: 38px; border-radius: 18px; border: 3px solid #fff; background: #90a4ae; box-shadow: 0 3px 0 rgba(0,0,0,.2); }
 .clan-signin { display: flex; gap: 14px; align-items: center; background: #fff; border: 2px solid #e0e0e0; border-radius: 14px; padding: 12px; }
+.clan-retry { display: flex; gap: 10px; align-items: center; justify-content: space-between; background: #fff; border: 2px solid #e0e0e0; border-radius: 14px; padding: 12px; font-weight: 800; font-size: 16px; }
 .clan-signin p { margin: 4px 0 10px; }
 .clan-banner { display: flex; gap: 14px; align-items: center; padding: 12px; border-radius: 16px; color: #fff; background: linear-gradient(135deg, var(--clan), #263238); border: 3px solid #fff; box-shadow: 0 4px 0 rgba(0,0,0,.2); }
 .clan-banner .big-emblem { background: rgba(255,255,255,.2); }

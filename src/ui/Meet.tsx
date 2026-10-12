@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useGame, type OwnedCar } from '../game/store'
 import { carDef, performance } from '../game/data'
 import { SHOWCASE_MAX, showcaseOf } from '../game/meet'
-import { fetchTown } from '../lib/friends'
+import { townToVisit } from '../lib/friends'
 import { fetchMeet, likeDisplay, refreshLikes, useMeet, type Display } from '../lib/meet'
 import { signedInUser } from '../lib/cloud'
 import { CarThumb } from '../scene/BuildingPreview'
@@ -93,7 +93,8 @@ function DisplayRow({ d }: { d: Display }) {
   const visit = useGame((s) => s.visit)
   const toast = useGame((s) => s.toast)
   const go = async () => {
-    const town = await fetchTown(d.ownerId)
+    const town = await townToVisit(d.ownerId)
+    if (town === 'stale') return
     if (!town) return toast("Couldn't load that town")
     visit(town)
   }

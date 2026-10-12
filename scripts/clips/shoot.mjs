@@ -29,6 +29,7 @@ const jobs = [
   ...Object.entries(SKIES).flatMap(([v, ks]) => ks.flatMap((k) => [['tour', v, 0, k], ['tour', v, 1, k]])),
   ...EVENTS.map((e) => ['ev', e, 0]),
   ...VENUES.map((v) => ['trial', v, 0]),
+  ['gp', 'main', 0],
 ].filter(([s, v, n, k]) => !only || only.split(',').some((o) => `${s}-${v}${n ? '-night' : ''}${k ? `-${k}` : ''}`.startsWith(o)))
 
 mkdirSync(OUT, { recursive: true })
@@ -66,7 +67,7 @@ async function record(shot, v, n, k, dir) {
     }
   })
   // Events bring their own sky, so the weather isn't pinned for them.
-  const where = shot === 'ev' ? `event=${v}` : k ? `venue=${v}&night=${n}&sky=${k}` : `venue=${v}&night=${n}&weather=clear`
+  const where = shot === 'gp' ? 'autopilot&weather=clear' : shot === 'ev' ? `event=${v}` : k ? `venue=${v}&night=${n}&sky=${k}` : `venue=${v}&night=${n}&weather=clear`
   await p.goto(`http://localhost:5173/scripts/clips/index.html?shot=${shot}&${where}&time=0.08&season=summer`)
   await p.waitForSelector('canvas', { timeout: 60000 })
   await p.waitForFunction(() => window.__clip, null, { timeout: 60000 })

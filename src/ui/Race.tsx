@@ -24,7 +24,7 @@ import { SPLIT_MARKS, crossings, refSplits, splitDelta, splitLabel } from '../ga
 import { bestSplits, saveBestSplits } from '../lib/bestSplits'
 import { raceWeather } from '../game/weather'
 import { carGrip, conditions, conditionsNote, gripMul, spinning } from '../game/grip'
-import { TrialTab, TrialResult, beginTrialRun, type TrialRun } from './TimeTrial'
+import { TrialTab, TrialResult, beginTrialRun, commitTrialRun, type TrialRun } from './TimeTrial'
 import { claim as claimVisitor, leave as leaveVisitor, setRacing, type Visitor } from '../lib/visitors'
 import { RivalResult, type RivalMatch, type RivalBonus } from './Rivals'
 import { RaceBar, RaceHub, Rounds, campaignFocus, type HubTab } from './RaceHub'
@@ -260,8 +260,18 @@ export function RacePanel() {
   const [pick, setPick] = useState<string[] | null>(null)
   const hosting = useLive((l) => !!l.party)
 
+  // A street race left before the line counts as a loss: the racer drives off, so
+  // quitting while behind can't buy a free rematch for the visitor's prize.
+  const streetLive = useRef(street !== null)
+  const forfeitStreet = () => {
+    if (streetLive.current) leaveVisitor()
+    streetLive.current = false
+  }
   // Closing the race menu ends a street race too.
-  useEffect(() => () => setRacing(false), [])
+  useEffect(() => () => {
+    forfeitStreet()
+    setRacing(false)
+  }, [])
 
   useEffect(() => {
     fetchOnlineRivals().then(setOnline)
@@ -292,6 +302,7 @@ export function RacePanel() {
         rival={rival}
         title="🏁 Street challenge"
         onFinish={(won) => {
+          streetLive.current = false
           useGame.getState().finishRace(won, reward(rival))
           setRacing(false)
           if (won) void claimVisitor()
@@ -300,7 +311,7 @@ export function RacePanel() {
             leaveVisitor()
           }
         }}
-        onExit={() => { setRacing(false); setStreet(null); useGame.getState().openPanel(null) }}
+        onExit={() => { forfeitStreet(); setRacing(false); setStreet(null); useGame.getState().openPanel(null) }}
       />
     )
   }
@@ -338,7 +349,7 @@ export function RacePanel() {
         trial={{ target: trial.target, mine: trial.ghost === 'Your best' }}
         venueId={trial.venue}
         title={`⏱️ Time trial · ${venueById(trial.venue).name}`}
-        onFinish={() => {}}
+        onFinish={(_won, myTime) => commitTrialRun(myTime)}
         resultView={(r) => <TrialResult myTime={r.myTime} target={trial.target} ghost={trial.ghost} onAgain={() => again(r.myTime)} onExit={() => { setTrial(null); setTab('trial') }} />}
         onExit={() => { setTrial(null); setTab('trial') }}
       />

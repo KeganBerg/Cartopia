@@ -290,6 +290,12 @@ async function openLobby(uid: string) {
       if (payload.accept && !(await joinedBy(out.raceId, from.uid!))) return
       if (useLive.getState().outgoing?.raceId !== out.raceId) return
       useLive.setState({ outgoing: null })
+      // Already racing someone else (we took another invite meanwhile): this yes came too late.
+      if (payload.accept && useLive.getState().race) {
+        lobby?.send({ type: 'broadcast', event: 'expired', payload: { raceId: out.raceId, to: from.id } })
+        if (out.stake) void voidWager(out.raceId)
+        return
+      }
       if (!payload.accept) {
         useLive.setState((l) => ({ cooldownTo: { ...l.cooldownTo, [out.to]: Date.now() + COOLDOWN_MS } }))
         return useGame.getState().toast('Challenge declined')
@@ -359,6 +365,8 @@ export function cancelChallenge() {
 export async function answer(raceId: string, accept: boolean) {
   const inv0 = useLive.getState().invites.find((i) => i.raceId === raceId)
   if (!inv0) return
+  // One race at a time: saying yes calls off the challenge we were waiting on.
+  if (accept && useLive.getState().outgoing) cancelChallenge()
   // Join the race on the server before saying yes, so the challenger can check the yes is ours.
   if (accept && !inv0.party && !(await joinRefereed(raceId, inv0.from.uid))) {
     useGame.getState().toast('That race is off')
