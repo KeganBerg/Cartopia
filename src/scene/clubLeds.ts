@@ -2,45 +2,41 @@ import { Color, MeshStandardMaterial } from 'three'
 import { clubPulse } from '../lib/clubBeat'
 import { isNight } from '../game/clock'
 import { nightAmount, dayPhase } from './dayNight'
-import { danceFloorTex, ledPaneTex, windowTex } from './textures'
+import { ledGridTex, ledPaneTex, windowTex } from './textures'
 
-// The nightclub's LED windows: every window lights a colour of the rainbow,
-// each a step along from its neighbour, and on every bass note the colours
-// move on one step and flash (clubBeat.ts). The big front window is a grid of
-// coloured cells that slides one cell per note. Dark by day and while closed.
-// A handful of shared materials, kept out of Batch by `live`, so the cost is
-// the same for any number of windows.
+// The nightclub's LED windows: every window shows the same colour of the
+// rainbow, and on every bass note they all move on to the next colour together
+// and flash (clubBeat.ts). The big front window is a grid of LED cells in that
+// same colour. Dark by day and while closed. Two shared materials, kept out of
+// Batch by `live`, so the cost is the same for any number of windows.
 
-export const LED_COUNT = 6
 export const RAINBOW = ['#ff1744', '#ff9100', '#ffea00', '#00e676', '#00b0ff', '#d500f9']
 
-export const ledWindows = Array.from({ length: LED_COUNT }, () => {
-  const m = new MeshStandardMaterial({ map: windowTex(), emissiveMap: ledPaneTex(), emissive: new Color('#000000'), emissiveIntensity: 1 })
-  m.userData.live = true
-  return m
-})
+// The colour the club's windows show right now, and how brightly (0 by day,
+// about 0.75 at night between notes, up to about 2.3 on a kick). Anything that
+// lights up with the club (the Vanguard Tower's penthouse) reads it here so it
+// shows the exact same colour on the same beat.
+export function clubLedColor(out = new Color(), now = performance.now()) {
+  return out.set(RAINBOW[clubPulse(now).step % RAINBOW.length])
+}
+export function clubLedGlow(now = performance.now()) {
+  const lit = isNight() ? nightAmount(dayPhase()) : 0
+  return lit * (0.75 + 1.6 * clubPulse(now).flash)
+}
 
-// The front window's own copies of the dance-floor cells, so sliding them leaves the roof floor alone.
-const cells = danceFloorTex(true, 4, 1).clone()
-const cellsDim = danceFloorTex(false, 4, 1).clone()
-cells.needsUpdate = cellsDim.needsUpdate = true
-export const ledFront = new MeshStandardMaterial({ map: cellsDim, emissiveMap: cells, emissive: new Color('#ffffff'), emissiveIntensity: 0, roughness: 0.35 })
+export const ledWindow = new MeshStandardMaterial({ map: windowTex(), emissiveMap: ledPaneTex(), emissive: new Color('#000000'), emissiveIntensity: 1 })
+ledWindow.userData.live = true
+
+export const ledFront = new MeshStandardMaterial({ map: ledGridTex(false), emissiveMap: ledGridTex(true), emissive: new Color('#000000'), emissiveIntensity: 1, roughness: 0.35 })
 ledFront.userData.live = true
 
 const tmp = new Color()
-let lastStep = -1
 
-// Brings the lights up to date; cheap enough to call every frame.
+// Once a frame (ClubLife).
 export function driveClubLeds(now = performance.now()) {
   const p = clubPulse(now)
   const lit = isNight() ? nightAmount(dayPhase()) : 0
-  const glow = lit * (0.75 + 1.6 * p.flash)
-  for (let i = 0; i < LED_COUNT; i++) {
-    ledWindows[i].emissive.copy(tmp.set(RAINBOW[(i + p.step) % LED_COUNT])).multiplyScalar(glow)
-  }
-  ledFront.emissiveIntensity = lit * (0.9 + 1.4 * p.flash)
-  if (p.step !== lastStep) {
-    lastStep = p.step
-    cells.offset.x = cellsDim.offset.x = (p.step % 4) * 0.25
-  }
+  clubLedColor(tmp, now)
+  ledWindow.emissive.copy(tmp).multiplyScalar(lit * (0.75 + 1.6 * p.flash))
+  ledFront.emissive.copy(tmp).multiplyScalar(lit * (0.9 + 1.4 * p.flash))
 }

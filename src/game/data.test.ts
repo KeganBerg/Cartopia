@@ -243,3 +243,13 @@ describe('collection book', () => {
     expect(readySets({ cars, claimedSets: ['daily'] })).toEqual([])
   })
 })
+
+describe('quick first jobs', () => {
+  it('runs a new town\'s first jobs in 25 seconds, then the normal time', async () => {
+    const { jobSeconds, QUICK_JOBS } = await import('./data')
+    const pizza = buildingDef('pizza')
+    expect(jobSeconds(pizza, 1, 0)).toBe(25)
+    expect(jobSeconds(pizza, 1, QUICK_JOBS - 1)).toBe(25)
+    expect(jobSeconds(pizza, 1, QUICK_JOBS)).toBe(upgradeJobSeconds(pizza, 1))
+  })
+})

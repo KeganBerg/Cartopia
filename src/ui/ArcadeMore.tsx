@@ -14,6 +14,7 @@ import { StuntScene, type StuntHud, type StuntInput } from '../scene/StuntScene'
 import type { ParkInput } from '../scene/ParkScene'
 import { Countdown, Result, look, payFuel } from './ArcadeBits'
 import { sfx } from '../lib/sound'
+import { LoadingScene } from './Loading'
 
 // The second wave of arcade games. Each runs inside one shell that handles the
 // fuel, the countdown, star pay and the result card.
@@ -36,6 +37,7 @@ export function StarGame({ id, car, onExit }: { id: StarGameId; car: OwnedCar; o
   const meta = STAR_GAMES.find((g) => g.id === id)!
   const [run, setRun] = useState(0)
   const [running, setRunning] = useState(false)
+  const [drawn, setDrawn] = useState(-1)
   const [end, setEnd] = useState<{ stars: number; coins: number; xp: number; record: boolean; line: string } | null>(null)
 
   const done: Done = (stars, result, line) => {
@@ -58,11 +60,12 @@ export function StarGame({ id, car, onExit }: { id: StarGameId; car: OwnedCar; o
   return (
     <div className={`race-full arc-full arc-${id}`}>
       <Game key={run} car={car} running={running && !end} onDone={done} />
+      <LoadingScene key={`load${run}`} label={`Opening ${meta.name}`} onReady={() => setDrawn(run)} onClose={onExit} />
       <div className="rf-top">
         <h2>{meta.art.slice(0, 2)} {meta.name}</h2>
         <button className="close" onClick={onExit} aria-label="Close">✕</button>
       </div>
-      {!running && !end && <Countdown key={`count${run}`} onGo={() => setRunning(true)} />}
+      {!running && !end && drawn === run && <Countdown key={`count${run}`} onGo={() => setRunning(true)} />}
       {end && (
         <Result win={end.stars > 0} title={end.stars === 0 ? '😬 So close' : end.record ? '🏆 New best!' : end.stars === 3 ? '🌟 Perfect!' : '👏 Nice!'}
           actions={<>

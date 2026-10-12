@@ -1,7 +1,7 @@
 import { Vector3 } from 'three'
 import { useMemo, useState, type CSSProperties } from 'react'
 import { useGame, buyablePlots, today, type PlacedBuilding } from '../game/store'
-import { buildingDef, buildingLevel, jobLevel, carDef, loves, levelLift, plotPrice, START_LAND, upgradeJobSeconds, isOpen } from '../game/data'
+import { buildingDef, buildingLevel, jobLevel, carDef, loves, levelLift, plotPrice, START_LAND, jobSeconds, isOpen } from '../game/data'
 import { msUntilNight } from '../game/clock'
 import { anchors, anchorRef } from '../scene/anchors'
 import { centerOf, groupCenter, plotCenter } from '../scene/World'
@@ -31,6 +31,7 @@ function JobBadge({ b, now, g, members = [b] }: { b: PlacedBuilding; now: number
   const n = members.length
   const k = g ? lift(g) : 1
   const [cx, cz] = g ? groupCenter(g) : centerOf(b.def, b.x, b.z, b.rot)
+  const jobsDone = useGame((s) => s.stats.jobs ?? 0)
   const lvl = buildingLevel(b)
   anchors.set(b.uid, new Vector3(cx, ((d.w > 1 ? 2.6 : 2.2) + levelLift(lvl)) * k, cz))
   const ready = members.some((o) => o.jobEndsAt !== null && now >= o.jobEndsAt)
@@ -38,7 +39,7 @@ function JobBadge({ b, now, g, members = [b] }: { b: PlacedBuilding; now: number
   const working = !ready && !idle
   const end = Math.max(...members.map((o) => o.jobEndsAt ?? 0))
   const left = working ? Math.ceil((end - now) / 1000) : 0
-  const pct = working ? Math.max(0, 1 - left / upgradeJobSeconds(d, jobLevel(b))) : 0
+  const pct = working ? Math.max(0, 1 - left / jobSeconds(d, jobLevel(b), jobsDone)) : 0
   return (
     <div className="anchor" ref={anchorRef(b.uid)}>
       <button className={`badge ${ready ? 'badge-ready' : working ? 'badge-working' : 'badge-idle'}${lit ? ' badge-pulse' : ''}`} onClick={() => tap(b.uid)} title={d.name}>
