@@ -128,13 +128,15 @@ function Prize({ open, onAgain, onDone, again }: { open: CrateOpen; onAgain: () 
     sub = `${carDef(d.model).name} · already yours`
   } else if (d.kind === 'skin' || d.kind === 'skindupe') {
     const def = skinOf(d.skin, d.part)
-    icon = <span className="cp-swatch" style={{ background: def?.swatch }} />
+    // Mod paints go on parts, car paints on the whole body: say which in the name.
+    const kind = d.part ? 'Mod paint' : 'Car paint'
+    icon = <span className={`cp-swatch ${d.part ? 'mod' : 'car'}`} style={{ background: def?.swatch }}>{d.part ? '⚙️' : '🚗'}</span>
     if (d.kind === 'skindupe') {
       title = `+${d.coins.toLocaleString()} coins`
-      sub = `${def?.name ?? 'Skin'} · already yours`
+      sub = `${def?.name ?? ''} ${kind} · already yours`
     } else {
-      title = def?.name ?? 'Skin'
-      sub = `${def ? SKIN_TIERS[def.tier].name : 'New'} ${d.part ? 'part skin' : 'skin'}!`
+      title = `${def?.name ?? ''} ${kind}`
+      sub = `New ${def ? SKIN_TIERS[def.tier].name.toLowerCase() : ''} ${kind.toLowerCase()}!`
     }
   } else if (d.kind === 'car') {
     icon = '🚗'
@@ -142,7 +144,7 @@ function Prize({ open, onAgain, onDone, again }: { open: CrateOpen; onAgain: () 
     sub = 'New car!'
   } else {
     const car = cars.find((c) => c.uid === d.car)
-    icon = '🔧'
+    icon = '⚙️'
     title = modDef(d.mod)?.name ?? 'Part'
     sub = car ? `For your ${carDef(car.model).name}` : 'New part'
   }
