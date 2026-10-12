@@ -215,6 +215,15 @@ html {
   :root .rf-venue-ico { width: 30px; height: 30px; font-size: 18px; border-radius: 10px; }
   :root .rf-venue-txt b { font-size: 16px; }
 }
+/* Phones in portrait: the venue card sits in the sky above the START gantry during the
+   countdown (the lane strip that lives there only appears once the race starts). */
+@media (max-width: 600px) and (min-height: 501px) {
+  :root .rf-venue { top: calc(50px + var(--sat)); }
+}
+/* A skill badge pops up when the skill kicks in, then gets out of the way: skills like
+   Slipstream or Oil Slick stay on for most of a race and shouldn't cover the road. */
+:root .race-full .skill-flash { animation: pop .2s ease-out, skill-away .35s ease-in 2s forwards; }
+@keyframes skill-away { to { opacity: 0; transform: translateX(-50%) translateY(-8px) scale(.9); visibility: hidden; } }
 
 /* Tutorial tip sits above the build toolbar instead of on top of it. */
 body:has(.edit-bar) .tutorial { bottom: calc(150px + var(--sab)); }
