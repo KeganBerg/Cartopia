@@ -25,3 +25,13 @@ describe('town re-renders on Collect All', () => {
     }
   })
 })
+
+// Opening a panel re-renders App, and switching modes re-renders World. Neither
+// may re-run the whole town scene (roads, outskirts, cars): that cost phones
+// hundreds of milliseconds per tap in a big town.
+describe('town re-renders on panels and modes', () => {
+  it('World is memoised', async () => {
+    const { World } = await import('./World')
+    expect((World as unknown as { $$typeof: symbol }).$$typeof).toBe(Symbol.for('react.memo'))
+  })
+})
