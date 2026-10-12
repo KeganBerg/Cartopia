@@ -13,7 +13,7 @@ for (const id of ids.split(',')) for (const lv of levels.split(',')) for (const 
   await p.goto(`http://localhost:${port}/scripts/assets/index.html?id=${id}&level=${lv}&pair=${pr}&night=${night}&side=${side}&mark=${mark}&zoom=${zoom}&season=summer&weather=clear`)
   await p.waitForSelector('canvas', { timeout: 60000 })
   await p.waitForTimeout(2500)
-  const name = `${id}-L${lv}${mark === '1' ? '-mark' : ''}${pr === '1' ? '-pair' : ''}${night === '1' ? '-n' : ''}${side !== '0' ? '-s' + side : ''}.png`
+  const name = `${id}-L${lv}${mark === '1' ? '-mark' : ''}${pr === '1' ? '-pair' : pr !== '0' ? `-m${pr}` : ''}${night === '1' ? '-n' : ''}${side !== '0' ? '-s' + side : ''}.png`
   await p.screenshot({ path: `${out}/${name}` })
   console.log(name)
   await p.close()

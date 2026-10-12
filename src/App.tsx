@@ -40,6 +40,8 @@ import './lib/rescue'
 import './lib/crates'
 import { startAmbience } from './lib/ambience'
 import { startMusic } from './lib/townMusic'
+import { startTechnoMusic } from './lib/technoMusic'
+import { TechnoLayer } from './ui/Techno'
 import { useTownPaused } from './scene/renderGate'
 import { useCrewGoalWatcher } from './ui/CrewGoal'
 import { BattlePanel, useCrewBattleWatcher } from './ui/CrewBattle'
@@ -64,6 +66,7 @@ export default function App() {
     startCloudSync()
     startAmbience()
     startMusic()
+    startTechnoMusic()
     joinLobby()
     // ?chatdemo shows sample messages so the chat window can be checked signed out.
     if (new URLSearchParams(location.search).has('chatdemo')) chatDemo()
@@ -102,6 +105,7 @@ export default function App() {
         <World />
         <SplashHandoff />
       </Canvas>
+      <TechnoLayer />
       <Badges />
       <VisitorBadges />
       <ThoughtBubble />
