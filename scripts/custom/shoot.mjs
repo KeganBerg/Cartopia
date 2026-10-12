@@ -21,7 +21,7 @@ for (const [form, size] of [['desktop', { width: 1280, height: 800 }], ['phone',
       const g = window.__game
       const s = g.getState()
       const cars = s.cars.map((c, i) => (i === 0 ? { ...c, color, panels } : c))
-      g.setState({ tutorial: 99, level: 12, coins: 50000, cars, selectedCar: cars[0].uid, panel: 'garage' })
+      g.setState({ tutorial: 99, oldPaints: false, rivalRow: {}, level: 12, coins: 50000, cars, selectedCar: cars[0].uid, panel: 'garage' })
     }, [panels, name === 'camo' ? '#43a047' : name === 'tiger' ? '#fb8c00' : name === 'digi' ? '#9e9e9e' : '#1e88e5'])
     await p.waitForTimeout(1500)
     await p.evaluate(() => [...document.querySelectorAll('[role=tab]')].find((b) => b.textContent.includes('Custom'))?.click())

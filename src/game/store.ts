@@ -1479,6 +1479,12 @@ export const useGame = create<GameState>()(
           const v = next?.[pn.id]
           if (!v) continue
           if ((bike && pn.car) || (v.color && (!pn.color || !PAINTS.some((p) => p.color === v.color))) || (v.pattern && !pn.pattern)) return false
+          // Rival colours stay locked panel by panel too, but a panel keeps the colour it has.
+          if (v.color && v.color !== was?.[pn.id]?.color && !paintOpen(s, v.color)) {
+            const r = rivalForPaint(v.color)
+            s.toast(r ? `Beat ${r.name} to unlock that colour` : 'That colour is locked')
+            return false
+          }
           const pat = v.pattern ? PATTERNS.find((p) => p.id === v.pattern) : undefined
           if (v.pattern && !pat) return false
           if (pat && s.level < pat.unlockLevel && was?.[pn.id]?.pattern !== pat.id) {

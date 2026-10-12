@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import { useGame } from './store'
-import { PANEL_COLOR_COST, PATTERNS, RIM_COLOR_COST, panelJobCost, patternDef, tidyPanels } from './data'
+import { PAINT_RIVALS } from './paintRivals'
+import { PAINTS, PANEL_COLOR_COST, PATTERNS, RIM_COLOR_COST, panelJobCost, patternDef, tidyPanels } from './data'
 import { readFileSync } from 'node:fs'
 
 const up = { engine: 0, turbo: 0, tires: 0, weight: 0 }
@@ -32,7 +33,7 @@ describe('tidyPanels', () => {
 describe('paintPanels', () => {
   const g = () => useGame.getState()
   it('paints panels, charges for them and keeps them on the car', () => {
-    useGame.setState({ level: 10, coins: 5000, bucks: 0, levelUp: null, cars: [{ uid: 'p1', model: 'pip', color: '#e53935', upgrades: up }] })
+    useGame.setState({ oldPaints: true, level: 10, coins: 5000, bucks: 0, levelUp: null, cars: [{ uid: 'p1', model: 'pip', color: '#e53935', upgrades: up }] })
     expect(g().paintPanels('p1', { hood: { color: '#212121' }, body: { pattern: 'camo' } })).toBe(true)
     expect(g().coins).toBe(5000 - PANEL_COLOR_COST - camo)
     expect(g().cars[0].panels).toEqual({ body: { pattern: 'camo' }, hood: { color: '#212121' } })
@@ -47,10 +48,20 @@ describe('paintPanels', () => {
     expect(g().coins).toBe(50000)
   })
   it('refuses colours off the chart and car-only panels on a bike', () => {
-    useGame.setState({ level: 10, coins: 50000, cars: [{ uid: 'b1', model: 'baron', color: '#212121', upgrades: up }] })
+    useGame.setState({ oldPaints: true, level: 10, coins: 50000, cars: [{ uid: 'b1', model: 'baron', color: '#212121', upgrades: up }] })
     expect(g().paintPanels('b1', { hood: { color: '#212121' } })).toBe(false)
     expect(g().paintPanels('b1', { rims: { color: '#123456' } })).toBe(false)
     expect(g().paintPanels('b1', { body: { pattern: 'tiger' }, rims: { color: '#fdd835' } })).toBe(true)
+  })
+})
+
+describe('rival colours on panels', () => {
+  it('stay locked until the rival is beaten', () => {
+    const r = PAINT_RIVALS.find((x) => PAINTS.some((p) => p.color === x.paint))!
+    useGame.setState({ oldPaints: false, rivalRow: {}, level: 10, coins: 50000, cars: [{ uid: 'r1', model: 'pip', color: '#e53935', upgrades: up }] })
+    expect(useGame.getState().paintPanels('r1', { hood: { color: r.paint } })).toBe(false)
+    useGame.setState({ rivalRow: { [r.id]: 1 } })
+    expect(useGame.getState().paintPanels('r1', { hood: { color: r.paint } })).toBe(true)
   })
 })
 

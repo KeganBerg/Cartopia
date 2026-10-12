@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useGame, type OwnedCar } from '../game/store'
+import { paintOpen, rivalForPaint } from '../game/paintRivals'
+import { openPaintRival } from './PaintRivals'
 import { PAINTS, PANELS, PATTERNS, carDef, isBike, panelJobCost, tidyPanels, type PanelId, type Panels } from '../game/data'
 
 const same = (a?: Panels | null, b?: Panels | null) => JSON.stringify(tidyPanels(a) ?? {}) === JSON.stringify(tidyPanels(b) ?? {})
@@ -69,6 +71,8 @@ function PatternSwatch({ id, color }: { id: string | null; color: string }) {
 export function CustomShop({ car, panels, setPanels }: { car: OwnedCar; panels: Panels | undefined; setPanels: (p: Panels | null) => void }) {
   const level = useGame((s) => s.level)
   const paintPanels = useGame((s) => s.paintPanels)
+  const rivalRow = useGame((s) => s.rivalRow)
+  const oldPaints = useGame((s) => s.oldPaints)
   const bike = isBike(carDef(car.model).body)
   const parts = PANELS.filter((p) => !bike || !p.car)
   const [part, setPart] = useState<PanelId>('hood')
@@ -85,6 +89,9 @@ export function CustomShop({ car, panels, setPanels }: { car: OwnedCar; panels: 
     const next = tidyPanels({ ...panels, [info.id]: one })
     setPanels(same(next, now) ? null : next ?? {})
   }
+  // A locked colour can be tried on; the bar then points at the rival who has it.
+  const open = (id: PanelId, c: string) => c === now?.[id]?.color || paintOpen({ rivalRow, oldPaints }, c)
+  const lockedBy = PANELS.map((p) => panels?.[p.id]?.color && !open(p.id, panels[p.id]!.color!) ? rivalForPaint(panels[p.id]!.color!) : undefined).find(Boolean)
   const price = [cost.coins && `$${cost.coins.toLocaleString()}`, cost.bucks && `💎 ${cost.bucks}`].filter(Boolean).join(' + ') || 'Free'
   return (
     <div className="custom-shop">
@@ -92,7 +99,11 @@ export function CustomShop({ car, panels, setPanels }: { car: OwnedCar; panels: 
         <div className="try-bar on">
           <span className="try-what">Trying <b>custom paint</b></span>
           <button className="try-cancel" onClick={() => setPanels(null)}>Undo</button>
-          <button className={cost.bucks ? 'buy small premium' : 'buy small'} onClick={() => { if (paintPanels(car.uid, panels ?? {})) setPanels(null) }}>Buy · {price}</button>
+          {lockedBy ? (
+            <button className="buy small paint-rival-go" onClick={() => openPaintRival(lockedBy.id)} title={`Beat ${lockedBy.name} to unlock`}>🏁 {lockedBy.icon} {lockedBy.name.split(' ')[0]}</button>
+          ) : (
+            <button className={cost.bucks ? 'buy small premium' : 'buy small'} onClick={() => { if (paintPanels(car.uid, panels ?? {})) setPanels(null) }}>Buy · {price}</button>
+          )}
         </div>
       )}
       <div className="mod-tabs" role="tablist">
@@ -126,16 +137,20 @@ export function CustomShop({ car, panels, setPanels }: { car: OwnedCar; panels: 
         <h4>Colour</h4>
         <div className="paints">
           <button title="Match body" aria-label="Match body" className={!mine?.color ? 'dot big sel' : 'dot big'} style={{ background: info.id === 'rims' ? '#cfd8dc' : car.color }} onClick={() => pick({ color: null })}>∅</button>
-          {PAINTS.map((p) => (
-            <button
-              key={p.color}
-              title={`${p.name}${p.bucks ? ' (1 gem)' : ''}`}
-              aria-label={p.name}
-              className={mine?.color === p.color ? 'dot big sel' : p.bucks ? 'dot big premium' : 'dot big'}
-              style={{ backgroundColor: p.color }}
-              onClick={() => pick({ color: p.color })}
-            />
-          ))}
+          {PAINTS.map((p) => {
+            const locked = !open(info.id, p.color)
+            const r = locked ? rivalForPaint(p.color) : null
+            return (
+              <button
+                key={p.color}
+                title={`${p.name}${p.bucks ? ' (1 gem)' : r ? ` · beat ${r.name}` : ''}`}
+                aria-label={locked ? `${p.name}, locked` : p.name}
+                className={`dot big${mine?.color === p.color ? ' sel' : ''}${p.bucks ? ' premium' : ''}${locked ? ' locked' : ''}`}
+                style={{ backgroundColor: p.color }}
+                onClick={() => pick({ color: p.color })}
+              >{locked && <span className="dot-lock" aria-hidden>🔒</span>}</button>
+            )
+          })}
         </div>
       </>}
     </div>
