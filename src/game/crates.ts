@@ -156,7 +156,7 @@ export type CrateDrop =
   | { kind: 'mod'; car: string; mod: string }
   | { kind: 'skin'; skin: string; part: boolean }
   | { kind: 'skindupe'; skin: string; part: boolean; coins: number }
-export type CrateOpen = { seq?: number; crate: CrateId; cost: { coins: number; bucks: number }; drop: CrateDrop }
+export type CrateOpen = { seq?: number; crate: CrateId | 'wheel'; cost: { coins: number; bucks: number }; drop: CrateDrop }
 
 const newUid = (rand: () => number) => 'k' + Array.from({ length: 14 }, () => Math.floor(rand() * 36).toString(36)).join('')
 
