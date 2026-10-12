@@ -10,7 +10,7 @@ const players = [
 for (const [form, size] of [['desktop', { width: 1280, height: 800 }], ['phone', { width: 390, height: 844 }]]) {
   const p = await b.newPage({ viewport: size, deviceScaleFactor: form === 'phone' ? 2 : 1 })
   p.on('pageerror', (e) => console.log('error', e.message))
-  await p.addInitScript(() => localStorage.setItem('cartopia-flash-warning', '1'))
+  await p.addInitScript(() => localStorage.setItem('cartopia-flash-warning-hide', '1'))
   await p.goto('http://localhost:5173/?time=0.3&season=fall')
   await p.waitForFunction(() => window.__game, null, { timeout: 90000 })
   await p.waitForTimeout(2500)
@@ -34,7 +34,7 @@ for (const [form, size] of [['desktop', { width: 1280, height: 800 }], ['phone',
   for (const r of ['', 'win', 'lose']) {
     const h = await b.newPage({ viewport: size, deviceScaleFactor: form === 'phone' ? 2 : 1 })
     h.on('pageerror', (e) => console.log('error', e.message))
-    await h.addInitScript(() => localStorage.setItem('cartopia-flash-warning', '1'))
+    await h.addInitScript(() => localStorage.setItem('cartopia-flash-warning-hide', '1'))
     await h.goto(`http://localhost:5173/scripts/wagershot/index.html${r ? `?result=${r}` : ''}`)
     await h.waitForTimeout(9000)
     await h.screenshot({ path: `${out}/${form}-4-race${r ? '-' + r : ''}.png` })

@@ -10,7 +10,7 @@
 import { useSyncExternalStore } from 'react'
 
 const KEY = 'cartopia-calm-flash' // 'on' | 'off'; missing = follow the device
-const SEEN_KEY = 'cartopia-flash-warning' // set once the first-launch warning is dismissed
+const HIDE_KEY = 'cartopia-flash-warning-hide' // set when the player ticks "Don't show me this again"
 
 function read(key: string) {
   try {
@@ -58,6 +58,7 @@ export function onCalmFlashingChange(l: () => void) {
 
 export const useCalmFlashing = () => useSyncExternalStore(onCalmFlashingChange, calmFlashing)
 
-// The first-launch warning: shown until the player taps through it once.
-export const flashWarningSeen = () => read(SEEN_KEY) === '1'
-export const markFlashWarningSeen = () => write(SEEN_KEY, '1')
+// The launch warning: shown every time the game opens, until the player ticks
+// "Don't show me this again" (it stays in Settings to read again).
+export const flashWarningHidden = () => read(HIDE_KEY) === '1'
+export const setFlashWarningHidden = (hide: boolean) => write(HIDE_KEY, hide ? '1' : '0')
