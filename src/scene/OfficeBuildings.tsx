@@ -8,6 +8,7 @@ import { Upright } from './mergeScale'
 import { glowMats, onNight } from './dayNight'
 import { signTexture } from './signTexture'
 import { PAL, SEASON } from './season'
+import { closingGlow } from './closingTime'
 import { brickTex, concreteTex, corrugatedTex, curtainGlowTex, curtainTex, gravelTex, helipadTex, paverTex } from './textures'
 import { Helicopter, AmbulanceModel } from './ServiceVehicles'
 
@@ -35,6 +36,8 @@ export function glassMat(tint: string) {
   if (g) return g
   g = new MeshStandardMaterial({ color: tint, map: curtainTex(), emissiveMap: curtainGlowTex(), emissive: new Color('#ffffff'), emissiveIntensity: 0, metalness: 0.15, roughness: 0.22 })
   g.userData.live = true
+  // Four panes across and four floors per texture, emptied out one by one at night.
+  closingGlow(g, [4, 4], 'curtain')
   const mat = g
   onNight((n) => (mat.emissiveIntensity = n * 0.7))
   glassMats.set(tint, g)

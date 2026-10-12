@@ -38,6 +38,7 @@ import { Ear } from './Ear'
 import { WorldFx, PopGroup, usePops } from './WorldFx'
 import { helpable } from '../game/help'
 import { helpBuilding } from '../lib/help'
+import { hoursOf, seedOf } from '../game/hours'
 import { FREE, VIEW, isFree, useFreeCam } from './freeCam'
 import { FreeCam } from './FreeCam'
 
@@ -196,6 +197,7 @@ function Building({ b, roads, group }: { b: PlacedBuilding; roads: Set<string>; 
     <group
       position={[cx, 0, cz]}
       rotation-y={(turn * Math.PI) / 2}
+      userData={{ hours: { seed: seedOf(b.uid), kind: hoursOf(b.def) } }}
       onPointerDown={(e) => {
         const s = useGame.getState()
         if (s.visiting || e.button !== 0) return
