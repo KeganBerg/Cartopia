@@ -87,6 +87,10 @@ function pinPrograms() {
   }
 }
 
+// A picture of what the race canvas shows right now (the snapshot button after a win).
+let snap: (() => Promise<Blob | null>) | null = null
+export const stageSnapshot = () => (snap && useStage.getState().slot ? snap() : Promise.resolve(null))
+
 // Each race starts from the same camera, and compiles its shaders before its first frame.
 function Rig({ run }: { run: number }) {
   const { camera, gl, scene, get } = useThree()
@@ -140,10 +144,6 @@ function Rig({ run }: { run: number }) {
 export function StageRun({ run, children }: { run: number; children: ReactNode }) {
   return <Fragment key={run}>{children}</Fragment>
 }
-
-// A picture of what the race canvas shows right now (the snapshot button after a win).
-let snap: (() => Promise<Blob | null>) | null = null
-export const stageSnapshot = () => (snap && useStage.getState().slot ? snap() : Promise.resolve(null))
 
 let runs = 0
 // Takes the place of a <Canvas> in a full-screen view: the shared canvas moves in here
