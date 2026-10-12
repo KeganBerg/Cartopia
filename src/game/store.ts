@@ -583,7 +583,8 @@ function addXp(s: GameState, amount: number): Partial<GameState> {
     coins: (prev?.coins ?? 0) + (coins - s.coins),
     bucks: (prev?.bucks ?? 0) + (bucks - s.bucks),
   }
-  return { level, xp, bucks, coins, fuel: fuelCap(fresh), fuelUpdatedAt: Date.now(), levelUp }
+  // Tops the tank up to the new cap, but never takes away fuel already above it.
+  return { level, xp, bucks, coins, fuel: Math.max(s.fuel, fuelCap(fresh)), fuelUpdatedAt: Date.now(), levelUp }
 }
 
 // Apply an action's changes, then its XP. Level-up bonuses add on top of the
@@ -829,6 +830,8 @@ export const useGame = create<GameState>()(
         const b = s.buildings.find((b) => b.uid === what)!
         const d = buildingDef(b.def)
         if (d.kind === 'showroom' || d.kind === 'garage') return s.toast(`${d.name} can't be removed`)
+        // Rusty's holds the lot and the restore bay, so losing it would strand those cars.
+        if (b.def === 'rescue') return s.toast(`${d.name} can't be removed. Use Move to put it somewhere else.`)
         if (d.parked) return s.toast('This one is coming in a future update, so it stays put')
         if (d.kind === 'obstacle') return s.toast(`Tap the ${d.name.toLowerCase()} in play mode to clear it`)
         if (groupOf(s.buildings, b.uid)) return s.toast(`Split your merged ${d.name} first (Edit, then Merge)`)
@@ -1632,16 +1635,15 @@ export const useGame = create<GameState>()(
           return false
         }
         sfx.buy()
-        set({
+        set(withXp(s, modXp(modId), {
           coins: s.coins - cost.coins,
           parts: s.parts - cost.parts,
           bucks: s.bucks - cost.bucks,
           ...spendDeal(s, cost.deal),
           cars: s.cars.map((c) => (c.uid === cuid ? { ...c, mods: [...others, modId], ownedMods: [...owned, modId] } : c)),
           stats: bump(s, 'modsBought'),
-          ...addXp(s, modXp(modId)),
           updatedAt: Date.now(),
-        })
+        }))
         s.toast(`${m.name} fitted!`)
         return true
       },

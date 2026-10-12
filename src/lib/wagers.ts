@@ -45,6 +45,23 @@ export async function syncWagers(): Promise<number> {
   return useGame.getState().applyWagers((data ?? []).map((e) => ({ ...e, delta: Number(e.delta) }) as WagerEntry))
 }
 
+// On GO: from now on the wager can't be called off (wager_void refuses).
+export function startWager(raceId: string) {
+  if (!supabase || !signedInUser() || missing) return
+  void supabase.rpc('wager_start', { race_id: raceId }).then(({ error }) => error && fail(error.code))
+}
+
+// The race fell through before GO (expired challenge, Cancel race): both stakes come straight back.
+export async function voidWager(raceId: string): Promise<number> {
+  if (!supabase || !signedInUser() || missing) return 0
+  const { data, error } = await supabase.rpc('wager_void', { race_id: raceId })
+  if (error) {
+    fail(error.code)
+    return 0
+  }
+  return data ? settleWager(raceId) : 0
+}
+
 // After the referee calls a wager race: waits for its payout (a win or a refund) to land.
 export async function settleWager(raceId: string): Promise<number> {
   if (!supabase || !signedInUser() || missing) return 0

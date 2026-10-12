@@ -11,6 +11,9 @@ const money = (n: number) => (n >= 1000 ? `${Math.round(n / 100) / 10}k` : `${n}
 
 export type RivalMatch = { def: RivalDef; visit: number; prize: number; rival: { id: string; town: string; level: number; carName: string; color: string; pi: number; online: false; body: ReturnType<typeof carDef>['body']; model?: string; skill?: ReturnType<typeof carDef>['skill']; shift: number; boss: boolean } }
 
+// Your best car's PI: rivals bring a car close to it.
+const bestPi = (s: ReturnType<typeof useGame.getState>) => Math.max(10, ...s.cars.map((c) => performance(carDef(c.model), c.upgrades, c.mods)))
+
 // The race against this rival on this visit, in a car close to your best one (myPi).
 export function rivalMatch(def: RivalDef, visit: number, level: number, myPi?: number): RivalMatch {
   const pi = rivalPi(def, visit, myPi)
@@ -44,7 +47,7 @@ export function RivalCard({ onRace }: { onRace: (m: RivalMatch) => void }) {
   const level = useGame((s) => s.level)
   const progress = useGame((s) => s.rivals ?? NONE)
   const showNeed = useGame((s) => s.showNeed)
-  const myPi = useGame((s) => Math.max(10, ...s.cars.map((c) => performance(carDef(c.model), c.upgrades, c.mods))))
+  const myPi = useGame(bestPi)
   const cur = currentRival(level, progress, now)
   if (!cur) return <div className="rv-card rv-done">🏆 <b>Town champ!</b> <small>No rival dares race you.</small></div>
   const { def, visit, locked, away } = cur
@@ -132,6 +135,7 @@ export function RivalTile({ onRace, onOpen }: { onRace: (m: RivalMatch) => void;
   const progress = useGame((s) => s.rivals ?? NONE)
   const row = useGame((s) => s.rivalRow ?? NONE)
   const showNeed = useGame((s) => s.showNeed)
+  const myPi = useGame(bestPi)
   const cur = currentRival(level, progress, now)
   const open = { role: 'button', tabIndex: 0, onClick: onOpen, onKeyDown: (e: React.KeyboardEvent) => (e.key === 'Enter' || e.key === ' ') && onOpen() }
   const stop = (fn: () => void) => (e: React.MouseEvent) => { e.stopPropagation(); fn() }
@@ -150,7 +154,7 @@ export function RivalTile({ onRace, onOpen }: { onRace: (m: RivalMatch) => void;
     )
   }
   const { def, visit, locked, away } = cur
-  const m = rivalMatch(def, visit, level)
+  const m = rivalMatch(def, visit, level, myPi)
   const left = Math.max(0, Math.ceil((away - now) / 60000))
   const line = locked ? `Rolls into town at level ${def.unlockLevel}.` : away ? `Tuning up. Back in ${left}m.` : visit === 0 ? def.lines.intro : def.lines.back[visit - 1]
   return (

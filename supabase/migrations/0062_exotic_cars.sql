@@ -2,7 +2,8 @@
 -- V12, gem car), eclat (Moreau Eclat W16) and orafo (Aurelio Orafo V12, gem car), plus the
 -- Exotica set. econ_catalog() is rebuilt from econCatalog() and crate_open() gets the crate
 -- tables regenerated from crateTables() so crates can give the new cars.
--- Both functions are otherwise unchanged from 0054; econ_guard() is 0041.
+-- Both functions are otherwise unchanged from 0054 (still the live copies); econ_guard() is 0041.
+-- Economy thread review: catalog and crate JSON match econCatalog()/crateTables() on this branch.
 -- Run it only after the client with these cars is shipped (ORDER RULE): crates hand out the new
 -- car ids, and a game that doesn't know them yet would show "Coming Soon" crates.
 

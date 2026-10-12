@@ -150,6 +150,15 @@ describe('merged buildings in the store', () => {
   })
 })
 
+describe("Rusty's Rescue", () => {
+  it("can't be bulldozed, so the lot and restore bay stay reachable", () => {
+    useGame.setState({ buildings: [b('rescue', 4, 4)], coins: 0, visiting: null })
+    useGame.getState().bulldoze(4, 4)
+    expect(useGame.getState().buildings).toHaveLength(1)
+    expect(useGame.getState().coins).toBe(0)
+  })
+})
+
 describe('turning merged blocks', () => {
   const all = () => true
   const one = (town: PlacedBuilding[]) => [...mergeGroups(town).groups.values()][0]
