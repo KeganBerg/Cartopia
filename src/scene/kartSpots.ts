@@ -63,3 +63,42 @@ export function useSpots(t: Track) {
     return { clearOf, along, outside, inside, open }
   }, [t])
 }
+
+// A point `lx` across and `lz` toward the track from a spot facing the track.
+export const local = (o: { x: number; z: number; ry: number }, lx: number, lz: number) => ({
+  x: o.x + lx * Math.cos(o.ry) + lz * Math.sin(o.ry),
+  z: o.z - lx * Math.sin(o.ry) + lz * Math.cos(o.ry),
+})
+
+export type FanZone = { x: number; z: number; ry: number; i: number }
+export const ZONE_R = 9 // keep other scenery this far from a fan zone's middle
+export const nearZone = (zones: FanZone[], x: number, z: number, r = ZONE_R) => zones.some((q) => (q.x - x) ** 2 + (q.z - z) ** 2 < r * r)
+
+// Fan zones: terraces just behind the barrier on the outside of bends, where the town or
+// canyon folk stand and cheer. Shared so every scenery layer can keep out of them. None at
+// the harbour, where the fans watch from boats.
+export function useFanZones(t: Track): FanZone[] {
+  const s = useSpots(t)
+  return useMemo(() => {
+    if (t.def.theme === 'docks') return []
+    // Keep clear of the canyon's roadside stop (same pick as the scenery's).
+    const avoid = t.def.theme === 'desert' ? s.along(200, 5, 1, 5, 89).slice(0, 1) : []
+    const out: FanZone[] = []
+    const K = 16
+    for (let k = 0; k < K && out.length < 4; k++) {
+      const i = Math.floor(((k + 0.4) / K) * t.n)
+      // Not on the start straight, which has the grandstands and pits.
+      if (i < 24 || i > t.n - 50) continue
+      const side = s.outside(i)
+      const o = side * (t.wall + 4.6)
+      const z0 = { x: t.x[i] + t.nx[i] * o, z: t.z[i] + t.nz[i] * o, ry: Math.atan2(-t.nx[i] * side, -t.nz[i] * side) }
+      const ok = [-8.5, -4, 0, 4, 8.5].every((lx) => [-2.8, 1.8].every((lz) => {
+        const p = local(z0, lx, lz)
+        return s.clearOf(p.x, p.z, t.wall + 2.2)
+      }))
+      if (!ok || out.some((q) => (q.x - z0.x) ** 2 + (q.z - z0.z) ** 2 < 32 * 32) || avoid.some((a) => (a.x - z0.x) ** 2 + (a.z - z0.z) ** 2 < 18 * 18)) continue
+      out.push({ ...z0, i })
+    }
+    return out
+  }, [t, s])
+}

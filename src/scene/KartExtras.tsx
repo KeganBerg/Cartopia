@@ -2,20 +2,20 @@ import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { DoubleSide, type Group } from 'three'
 import { BuildingModel } from './BuildingModel'
-import { CarModel } from './CarModel'
+import { CarModel, carFrame } from './CarModel'
 import { Batch } from './Batch'
 import { Box, Cone, Cyl } from './RaceVenues'
 import { Crowd, type Person } from './ArcadeScenery'
 import { signTexture } from './signTexture'
-import { useSpots } from './kartSpots'
+import { local, nearZone, useFanZones, useSpots, ZONE_R, type FanZone } from './kartSpots'
 import { CARS, buildingDef, type Body } from '../game/data'
 import type { Track } from '../game/kart'
 
 // The second scenery pass round the kart circuits: more going on in every direction you
 // look. Common to all three: a pit lane, flag lines, TV camera towers, a blimp and hot-air
-// balloons. Then per theme: a suburb, park and funfair (town); a cargo ship, buoys, gulls,
-// quay traffic and a far skyline (harbour); pumpjacks, a rock arch, a ghost town, wind
-// turbines, tumbleweeds and vultures (canyon).
+// balloons. Then per theme: a suburb, park and funfair (town); a cargo ship, oil rigs, buoys,
+// gulls, quay traffic and spectator boats (harbour); pumpjacks, a rock arch, a ghost town,
+// wind turbines, tumbleweeds and vultures (canyon). Town and canyon get fan zones.
 
 const B = ({ def, x, z, ry = 0, s = 1 }: { def: string; x: number; z: number; ry?: number; s?: number }) => (
   <group position={[x, 0, z]} rotation-y={ry} scale={s}><BuildingModel def={buildingDef(def)} /></group>
@@ -48,7 +48,9 @@ export function CommonExtras({ t }: { t: Track }) {
   // Flag poles every so often on both sides, in team colours.
   const flags = useMemo(() => along(16, 0.5, 1, 0.3, 211).concat(along(19, 0.5, -1, 0.3, 213)), [along])
   // TV camera scaffolds on the outside of a few bends.
-  const cams = useMemo(() => along(90, 3.2, 1, 2.6, 223).concat(along(110, 3.2, -1, 2.6, 227)), [along])
+  const zones = useFanZones(t)
+  const cams = useMemo(() => along(90, 3.2, 1, 2.6, 223).concat(along(110, 3.2, -1, 2.6, 227)).filter((c) => !nearZone(zones, c.x, c.z)), [along, zones])
+  const flagsClear = useMemo(() => flags.filter((f) => !nearZone(zones, f.x, f.z, 7)), [flags, zones])
   return (
     <group>
       <Batch version={t.n + 11}>
@@ -62,7 +64,7 @@ export function CommonExtras({ t }: { t: Track }) {
             <Box p={[1.5, 0.35, -2.4]} s={[0.5, 0.7, 0.5]} c="#455a64" />
           </group>
         ))}
-        {flags.map((f, i) => (
+        {flagsClear.map((f, i) => (
           <group key={i} position={[f.x, 0, f.z]} rotation-y={f.ry}>
             <Cyl p={[0, 2.2, 0]} r={0.04} h={4.4} c="#cfd8dc" />
             <Box p={[0.45, 4.05, 0]} s={[0.9, 0.55, 0.02]} c={TEAMS[i % TEAMS.length]} />
@@ -173,10 +175,13 @@ function Birds({ count, color, size, y, r }: { count: number; color: string; siz
 const PARKED = ['miata', 'stallion', 'rally', 'vette', 'charger', 'bug', 'woodie', 'camper', 'zippy', 'baron']
 export function TownExtras({ t }: { t: Track }) {
   const { open } = useSpots(t)
+  const zones = useFanZones(t)
+  const fans = useMemo(() => zonePeople(zones), [zones])
+  const zoneTaken = useMemo(() => zones.map((z) => ({ ...z, r: ZONE_R })), [zones])
   // Big things first so the small ones fill round them.
-  const wheel = useMemo(() => open({ need: 16, count: 1, seed: 301, reach: 75 })[0], [open])
-  const lots = useMemo(() => open({ need: 9, count: 3, seed: 307, gap: 20, reach: 80, taken: wheel ? [{ ...wheel, r: 14 }] : [] }), [open, wheel])
-  const taken = useMemo(() => [...(wheel ? [{ ...wheel, r: 14 }] : []), ...lots.map((l) => ({ ...l, r: 9 }))], [wheel, lots])
+  const wheel = useMemo(() => open({ need: 16, count: 1, seed: 301, reach: 75, taken: zoneTaken })[0], [open, zoneTaken])
+  const lots = useMemo(() => open({ need: 9, count: 3, seed: 307, gap: 20, reach: 80, taken: [...zoneTaken, ...(wheel ? [{ ...wheel, r: 14 }] : [])] }), [open, wheel, zoneTaken])
+  const taken = useMemo(() => [...zoneTaken, ...(wheel ? [{ ...wheel, r: 14 }] : []), ...lots.map((l) => ({ ...l, r: 9 }))], [wheel, lots, zoneTaken])
   const park = useMemo(() => open({ need: 6, count: 26, seed: 311, gap: 7, reach: 70, taken }), [open, taken])
   const houses = useMemo(() => open({ need: 7, count: 34, seed: 313, gap: 7.5, reach: 100, where: 'out', taken: [...taken, ...park.map((p) => ({ ...p, r: 3 }))] }), [open, taken, park])
   const PARK = ['fountain', 'playground', 'gazebo', 'picnic', 'pond', 'statue', 'flowers', 'hedge', 'bench', 'billboard', 'clocktower', 'flowers', 'picnic', 'hedge']
@@ -206,6 +211,8 @@ export function TownExtras({ t }: { t: Track }) {
         ))}
       </Batch>
       {wheel && <FerrisWheel x={wheel.x} z={wheel.z} ry={face(wheel.x, wheel.z) + Math.PI / 2} />}
+      <FanZones zones={zones} theme="town" />
+      <Crowd people={fans} />
     </group>
   )
 }
@@ -263,11 +270,10 @@ export function DocksExtras({ t }: { t: Track }) {
   const ship = useMemo(() => open({ need: 26, count: 1, seed: 401, where: 'out', reach: 120 })[0] ?? open({ need: 18, count: 1, seed: 401, where: 'in', reach: 60 })[0], [open])
   const buoys = useMemo(() => open({ need: 6, count: 10, seed: 409, gap: 9, where: 'in', reach: 60 }), [open])
   const quay = useMemo(() => along(26, 1.6, 1, 1.2, 419).concat(along(31, 1.6, -1, 1.2, 421)), [along])
-  // A far shore: a city skyline right round the bay.
-  const skyline = useMemo(() => Array.from({ length: 40 }, (_, i) => {
-    const a = (i / 40) * Math.PI * 2, d = 170 + (i % 3) * 8
-    return { x: Math.cos(a) * d, z: Math.sin(a) * d, w: 7 + (i * 37 % 9), h: 8 + (i * 53 % 30) }
-  }), [])
+  // Oil rigs out in the bay, their crews cheering from the rail.
+  const rigs = useMemo(() => open({ need: 26, count: 3, seed: 431, gap: 55, where: 'out', reach: 135, taken: ship ? [{ ...ship, r: 22 }] : [] })
+    .map((p) => ({ x: p.x, z: p.z, ry: face(p.x, p.z) })), [open, ship])
+  const crews = useMemo(() => rigPeople(rigs), [rigs])
   return (
     <group>
       <Batch version={t.n + 31}>
@@ -290,9 +296,10 @@ export function DocksExtras({ t }: { t: Track }) {
             )}
           </group>
         ))}
-        {skyline.map((b, i) => <Box key={i} p={[b.x, b.h / 2, b.z]} s={[b.w, b.h, b.w]} c={i % 2 ? '#90a4ae' : '#b0bec5'} />)}
       </Batch>
       {ship && <Ship x={ship.x} z={ship.z} ry={face(ship.x, ship.z) + Math.PI / 2} />}
+      <OilRigs rigs={rigs} />
+      <Crowd people={crews} />
       <Buoys spots={buoys} />
       <Birds count={9} color="#fafafa" size={0.55} y={9} r={30} />
     </group>
@@ -350,9 +357,12 @@ function Buoys({ spots }: { spots: { x: number; z: number }[] }) {
 const WEST = [['SALOON', '#8d6e63'], ['GENERAL STORE', '#a1887f'], ['SHERIFF', '#6d4c41'], ['ASSAY OFFICE', '#8d6e63'], ['HOTEL', '#795548']] as const
 export function DesertExtras({ t }: { t: Track }) {
   const { open } = useSpots(t)
-  const arch = useMemo(() => open({ need: 14, count: 1, seed: 501, where: 'out', reach: 95 })[0], [open])
-  const town = useMemo(() => open({ need: 11, count: 1, seed: 503, reach: 85, taken: arch ? [{ ...arch, r: 12 }] : [] })[0], [open, arch])
-  const taken = useMemo(() => [arch, town].filter(Boolean).map((p) => ({ ...p!, r: 12 })), [arch, town])
+  const zones = useFanZones(t)
+  const fans = useMemo(() => zonePeople(zones), [zones])
+  const zoneTaken = useMemo(() => zones.map((z) => ({ ...z, r: ZONE_R })), [zones])
+  const arch = useMemo(() => open({ need: 14, count: 1, seed: 501, where: 'out', reach: 95, taken: zoneTaken })[0], [open, zoneTaken])
+  const town = useMemo(() => open({ need: 11, count: 1, seed: 503, reach: 85, taken: [...zoneTaken, ...(arch ? [{ ...arch, r: 12 }] : [])] })[0], [open, arch, zoneTaken])
+  const taken = useMemo(() => [...zoneTaken, ...[arch, town].filter(Boolean).map((p) => ({ ...p!, r: 12 }))], [arch, town, zoneTaken])
   const pumps = useMemo(() => open({ need: 6, count: 5, seed: 509, gap: 7, reach: 90, taken }), [open, taken])
   const turbines = useMemo(() => open({ need: 12, count: 5, seed: 521, gap: 14, reach: 120, where: 'out', taken: [...taken, ...pumps.map((p) => ({ ...p, r: 4 }))] }), [open, taken, pumps])
   const weeds = useMemo(() => open({ need: 3, count: 7, seed: 531, gap: 10, reach: 70 }), [open])
@@ -398,6 +408,8 @@ export function DesertExtras({ t }: { t: Track }) {
       {turbines.map((w, i) => <Rotor key={i} x={w.x} z={w.z} ry={face(w.x, w.z)} k={i} />)}
       {pumps.map((p, i) => <Pumpjack key={i} x={p.x} z={p.z} ry={face(p.x, p.z) + Math.PI / 2} k={i} />)}
       <Tumbleweeds spots={weeds} />
+      <FanZones zones={zones} theme="desert" />
+      <Crowd people={fans} />
       <Birds count={5} color="#3e2723" size={0.9} y={16} r={25} />
     </group>
   )
@@ -460,5 +472,209 @@ function Tumbleweeds({ spots }: { spots: { x: number; z: number }[] }) {
         </group>
       ))}
     </>
+  )
+}
+
+// ---------- fans ----------
+
+// Fan zones (town and canyon): stepped terraces behind a rail, a banner over the back row,
+// bunting on the rail and a snack cart or a camper at the side, packed with cheering locals.
+const STEP = [0.2, 0.5, 0.8]
+const ZONE_W = 11
+export function zonePeople(zones: FanZone[]): Person[] {
+  const out: Person[] = []
+  zones.forEach((zn, zi) => {
+    const rows: [number, number][] = [[1.0, 0], ...STEP.map((y, r): [number, number] => [0.6 - r, y])]
+    rows.forEach(([lz, y], r) => {
+      for (let k = 0; k < 16; k++) {
+        if ((k * 7 + r * 5 + zi * 3) % 6 === 0) continue
+        const p = local(zn, -ZONE_W / 2 + 0.45 + k * 0.67 + (r % 2) * 0.2, lz)
+        out.push({ x: p.x, z: p.z, h: zn.ry + ((k * 13 + r) % 5 - 2) * 0.08, y, cheer: (k + r + zi) % 4 !== 0 })
+      }
+    })
+  })
+  return out
+}
+
+const CHEERS = { town: ['GO GO GO!', 'MAIN ST FANS', 'FULL THROTTLE', 'VROOM VROOM'], desert: ['CANYON CREW', 'DUST EM!', 'GO GO GO!', 'RED ROCK RACERS'] }
+const BUNTING = ['#e53935', '#fdd835', '#1e88e5', '#43a047', '#fb8c00']
+export function FanZones({ zones, theme }: { zones: FanZone[]; theme: 'town' | 'desert' }) {
+  const desert = theme === 'desert'
+  const step = desert ? ['#c8693a', '#d4844e', '#b5532f'] : ['#cfd8dc', '#b0bec5', '#cfd8dc']
+  return (
+    <Batch version={zones.length * 7 + (desert ? 1 : 0)}>
+      {zones.map((zn, zi) => (
+        <group key={zi} position={[zn.x, 0, zn.z]} rotation-y={zn.ry}>
+          {STEP.map((h, r) => <Box key={r} p={[0, h / 2, 0.6 - r]} s={[ZONE_W, h, 1]} c={step[r]} />)}
+          {/* The rail along the front, with bunting. */}
+          <Box p={[0, 1.0, 1.55]} s={[ZONE_W + 0.4, 0.08, 0.08]} c="#eceff1" />
+          <Box p={[0, 0.55, 1.55]} s={[ZONE_W + 0.4, 0.06, 0.06]} c="#eceff1" />
+          {Array.from({ length: 7 }, (_, k) => <Box key={k} p={[-ZONE_W / 2 - 0.1 + k * ((ZONE_W + 0.2) / 6), 0.52, 1.55]} s={[0.09, 1.04, 0.09]} c="#b0bec5" />)}
+          {Array.from({ length: 18 }, (_, k) => <Box key={k} p={[-ZONE_W / 2 + 0.3 + k * 0.62, 0.86, 1.6]} s={[0.3, 0.22, 0.02]} c={BUNTING[k % BUNTING.length]} />)}
+          {/* A banner over the back row. */}
+          {[-1, 1].map((sd) => <Cyl key={sd} p={[sd * 4.8, 2.3, -2.2]} r={0.07} h={4.6} c="#90a4ae" />)}
+          <mesh position={[0, 3.9, -2.18]}><planeGeometry args={[9.2, 1.2]} /><meshBasicMaterial map={signTexture(CHEERS[theme][zi % 4], desert ? '#4e342e' : '#1565c0', '#ffffff', 7.6)} toneMapped={false} side={DoubleSide} /></mesh>
+          {desert ? (
+            <>
+              {/* A shade canopy and a camper parked up beside the terraces. */}
+              {[-1, 1].map((a) => [-1, 1].map((b) => <Box key={`${a}${b}`} p={[-7.6 + a * 1.3, 1.1, -0.4 + b * 1.3]} s={[0.08, 2.2, 0.08]} c="#9e9e9e" />))}
+              <Cone p={[-7.6, 2.55, -0.4]} r={2.1} h={0.8} c={zi % 2 ? '#e53935' : '#1e88e5'} seg={4} ry={Math.PI / 4} />
+              {(() => {
+                const d = CARS.find((c) => c.id === 'camper')
+                return d && <group position={[7.8, 0, -0.8]} rotation-y={0.25} scale={4.4 / carFrame(d.body as Body).len}><CarModel body={d.body as Body} model={d.id} color={d.colors[zi % d.colors.length]} /></group>
+              })()}
+            </>
+          ) : (
+            <>
+              <B def="hotdog" x={-7.6} z={-0.2} ry={0} s={0.8} />
+              <B def="icecream" x={7.6} z={-0.2} ry={0} s={0.7} />
+            </>
+          )}
+        </group>
+      ))}
+    </Batch>
+  )
+}
+
+// ---------- harbour fans ----------
+
+// Spectator boats moored off the quay, decks full of fans: a motor yacht, a party barge
+// and a sightseeing ferry. Length along local x, the track off local +z.
+export type BoatSpot = { x: number; z: number; ry: number; k: number }
+export function boatPeople(boats: BoatSpot[]): Person[] {
+  const out: Person[] = []
+  const add = (b: BoatSpot, lx: number, lz: number, y: number, n: number) => {
+    const p = local(b, lx, lz)
+    out.push({ x: p.x, z: p.z, h: b.ry + ((n * 7) % 5 - 2) * 0.12, y, cheer: n % 4 !== 1 })
+  }
+  boats.forEach((b, bi) => {
+    const v = b.k % 3
+    let n = bi * 5
+    if (v === 0) {
+      for (let k = 0; k < 7; k++) add(b, 0.4 + k * 0.62, 1.1 - (k % 2) * 0.9, 1.04, n++)
+      for (let k = 0; k < 4; k++) add(b, -3.4 + k * 0.7, 0.9, 2.35, n++)
+      for (let k = 0; k < 3; k++) add(b, -4.6, -1 + k * 0.8, 1.04, n++)
+    } else if (v === 1) {
+      for (let row = 0; row < 3; row++) for (let k = 0; k < 7; k++) if ((k + row + bi) % 5) add(b, -3.6 + k * 1.2 + (row % 2) * 0.5, 1.3 - row * 1.1, 0.66, n++)
+    } else {
+      for (let k = 0; k < 10; k++) add(b, -3.6 + k * 0.8, 1.55, 2.62, n++)
+      for (let k = 0; k < 6; k++) add(b, -2.8 + k * 0.9, 0.4, 2.62, n++)
+      for (let k = 0; k < 4; k++) add(b, 3.9 + (k % 2) * 0.6, -0.8 + k * 0.5, 1.22, n++)
+    }
+  })
+  return out
+}
+
+const HULLS = ['#fafafa', '#eceff1', '#fafafa']
+export function SpectatorBoats({ boats }: { boats: BoatSpot[] }) {
+  return (
+    <Batch version={boats.length * 3 + 1}>
+      {boats.map((b, i) => (
+        <group key={i} position={[b.x, 0, b.z]} rotation-y={b.ry}>
+          {b.k % 3 === 0 ? (
+            <>
+              {/* Motor yacht. */}
+              <Box p={[0, 0.3, 0]} s={[10, 1.4, 3.6]} c={HULLS[i % 3]} />
+              <Box p={[0, -0.12, 0]} s={[10.04, 0.36, 3.64]} c={['#0d47a1', '#b71c1c', '#004d40'][i % 3]} />
+              <Bow x={5} w={3.6} y={0.3} h={1.4} c={HULLS[i % 3]} />
+              <Box p={[0.3, 1.03, 0]} s={[9.2, 0.06, 3.3]} c="#c8a27a" />
+              <Box p={[-2.2, 1.65, -0.2]} s={[4, 1.2, 2.6]} c="#fafafa" />
+              <Box p={[-2.2, 1.75, -0.2]} s={[4.04, 0.4, 2.64]} c="#263238" />
+              <Box p={[-2.2, 2.3, -0.2]} s={[4.4, 0.1, 3]} c="#eceff1" />
+              <Box p={[0.5, 1.5, 1.72]} s={[9, 0.05, 0.05]} c="#cfd8dc" />
+              <Cyl p={[-2.2, 3.3, -0.6]} r={0.05} h={2} c="#b0bec5" />
+              {Array.from({ length: 7 }, (_, k) => <Box key={k} p={[-1.4 + k * 0.95, 4 - k * 0.42, -0.6]} s={[0.25, 0.25, 0.02]} c={BUNTING[k % BUNTING.length]} />)}
+            </>
+          ) : b.k % 3 === 1 ? (
+            <>
+              {/* Party barge: twin pontoons, a striped canopy and a banner. */}
+              {[-1.4, 1.4].map((z) => <Cyl key={z} p={[0, 0.05, z]} r={0.5} h={9.4} c="#b0bec5" rot={[0, 0, Math.PI / 2]} />)}
+              <Box p={[0, 0.55, 0]} s={[9.6, 0.22, 4]} c="#78909c" />
+              {[-1, 1].map((a) => [-1, 1].map((c) => <Box key={`${a}${c}`} p={[a * 4.5, 1.7, c * 1.8]} s={[0.08, 2.1, 0.08]} c="#eceff1" />))}
+              {Array.from({ length: 6 }, (_, k) => <Box key={k} p={[-4 + k * 1.6, 2.8, 0]} s={[1.6, 0.12, 4.1]} c={k % 2 ? '#fafafa' : ['#e53935', '#1e88e5', '#fb8c00'][i % 3]} />)}
+              <mesh position={[0, 2.45, 2.07]}><planeGeometry args={[6, 0.55]} /><meshBasicMaterial map={signTexture('GO GO GO!', '#fdd835', '#c62828', 10.9)} toneMapped={false} /></mesh>
+              <Box p={[4.4, 0.95, -1.3]} s={[0.7, 0.6, 0.9]} c="#37474f" />
+            </>
+          ) : (
+            <>
+              {/* Sightseeing ferry with an open top deck. */}
+              <Box p={[0, 0.35, 0]} s={[11, 1.5, 4.2]} c="#fafafa" />
+              <Box p={[0, -0.15, 0]} s={[11.04, 0.4, 4.24]} c="#c62828" />
+              <Bow x={5.5} w={4.2} y={0.35} h={1.5} c="#fafafa" />
+              <Box p={[-1, 1.9, 0]} s={[8, 1.4, 3.8]} c="#eceff1" />
+              <Box p={[-1, 2.0, 0]} s={[8.04, 0.6, 3.84]} c="#1a237e" />
+              <Box p={[-1, 2.6, 0]} s={[8.4, 0.04, 4]} c="#90a4ae" />
+              <Box p={[-1, 3.1, 1.95]} s={[8.4, 0.05, 0.05]} c="#eceff1" />
+              <Cyl p={[-4.2, 3.4, 0]} r={0.35} h={1.6} c="#fdd835" />
+            </>
+          )}
+        </group>
+      ))}
+    </Batch>
+  )
+}
+
+// A pointed bow on the +x end of a hull w wide: a three-sided prism with one flat face on the hull.
+function Bow({ x, w, y, h, c }: { x: number; w: number; y: number; h: number; c: string }) {
+  const r = w / Math.sqrt(3)
+  return <mesh position={[x + r / 2, y, 0]} rotation-y={Math.PI / 2}><cylinderGeometry args={[r, r, h, 3]} /><meshStandardMaterial color={c} flatShading /></mesh>
+}
+
+// Oil rigs standing in the bay, crews in hi-vis cheering from the deck rail and the helipad.
+export type RigSpot = { x: number; z: number; ry: number }
+export function rigPeople(rigs: RigSpot[]): Person[] {
+  const out: Person[] = []
+  rigs.forEach((r, ri) => {
+    for (let k = 0; k < 10; k++) {
+      const p = local(r, -5.6 + k * 1.25, 6.3)
+      out.push({ x: p.x, z: p.z, h: r.ry, y: 11, cheer: (k + ri) % 3 !== 0, shirt: k % 2 ? '#ff9800' : '#fdd835' })
+    }
+    for (let k = 0; k < 3; k++) {
+      const p = local(r, -3.5 + k * 1, -0.5)
+      out.push({ x: p.x, z: p.z, h: r.ry, y: 14.2, cheer: true, shirt: '#ff9800' })
+    }
+  })
+  return out
+}
+
+const TILT = Math.atan(1.3 / 13)
+export function OilRigs({ rigs }: { rigs: RigSpot[] }) {
+  return (
+    <Batch version={rigs.length * 5 + 2}>
+      {rigs.map((r, i) => (
+        <group key={i} position={[r.x, 0, r.z]} rotation-y={r.ry}>
+          {[-5, 5].map((x) => [-5, 5].map((z) => <Cyl key={`${x}${z}`} p={[x, 4.4, z]} r={0.8} h={11.2} c="#fbc02d" seg={10} />))}
+          {[3, 7].map((y) => [-5, 5].map((s) => (
+            <group key={`${y}${s}`}>
+              <Box p={[0, y, s]} s={[10, 0.3, 0.3]} c="#f9a825" />
+              <Box p={[s, y, 0]} s={[0.3, 0.3, 10]} c="#f9a825" />
+            </group>
+          )))}
+          <Box p={[0, 10.5, 0]} s={[14, 1, 14]} c="#78909c" />
+          <mesh position={[0, 10.5, 7.02]}><planeGeometry args={[10, 0.8]} /><meshBasicMaterial map={signTexture(['RIG 7', 'DEEP BLUE 2', 'NORTH STAR'][i % 3], '#263238', '#fdd835', 12.5)} toneMapped={false} /></mesh>
+          <Box p={[0, 11.9, 6.9]} s={[14, 0.06, 0.06]} c="#fdd835" />
+          <Box p={[0, 11.45, 6.9]} s={[14, 0.05, 0.05]} c="#fdd835" />
+          {/* Living quarters with a helipad on the roof. */}
+          <Box p={[-3, 12.6, -2.5]} s={[7, 3.2, 7]} c="#eceff1" />
+          <Box p={[-3, 12.8, -2.5]} s={[7.04, 0.6, 7.04]} c="#37474f" />
+          <Cyl p={[-3, 14.3, -2.5]} r={3.6} h={0.2} c="#37474f" seg={16} />
+          <mesh position={[-3, 14.42, -2.5]} rotation-x={-Math.PI / 2}><torusGeometry args={[2.6, 0.12, 6, 28]} /><meshStandardMaterial color="#fdd835" /></mesh>
+          {/* The derrick. */}
+          {[-1, 1].map((sx) => [-1, 1].map((sz) => (
+            <mesh key={`${sx}${sz}`} position={[3.5 + sx * 0.95, 17.5, -2 + sz * 0.95]} rotation={[-sz * TILT, 0, sx * TILT]}>
+              <boxGeometry args={[0.22, 13.1, 0.22]} />
+              <meshStandardMaterial color="#e53935" flatShading />
+            </mesh>
+          )))}
+          {[14, 18, 22].map((y, k) => <Box key={y} p={[3.5, y, -2]} s={[2.9 - k * 0.8, 0.14, 2.9 - k * 0.8]} c="#e53935" />)}
+          <Box p={[3.5, 24.2, -2]} s={[0.9, 0.5, 0.9]} c="#fafafa" />
+          {/* A deck crane and the flare boom. */}
+          <Cyl p={[5.2, 12, 3.5]} r={0.6} h={2} c="#fbc02d" />
+          <mesh position={[5.2, 14.2, 0.6]} rotation-x={0.45}><boxGeometry args={[0.5, 0.5, 7]} /><meshStandardMaterial color="#fbc02d" flatShading /></mesh>
+          <Box p={[9.5, 11.6, -5]} s={[6, 0.3, 0.3]} c="#9e9e9e" />
+          <mesh position={[12.6, 12.4, -5]}><coneGeometry args={[0.45, 1.6, 8]} /><meshStandardMaterial color="#ff9100" emissive="#ff6d00" emissiveIntensity={1.4} toneMapped={false} /></mesh>
+        </group>
+      ))}
+    </Batch>
   )
 }
