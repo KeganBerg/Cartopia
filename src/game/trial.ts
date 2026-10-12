@@ -36,7 +36,8 @@ export function trialVenue(week: string): Venue {
 
 // Where the ghost is after t seconds of a run that finishes in `time`: it pulls away from the line
 // like a real car, then holds its pace.
-export const ghostDist = (t: number, time: number) => TRACK * Math.min(1, Math.max(0, t / time)) ** 1.6
+export const GHOST_CURVE = 1.6
+export const ghostDist = (t: number, time: number) => TRACK * Math.min(1, Math.max(0, t / time)) ** GHOST_CURVE
 
 // "2d 5h", "5h 12m", "9m"
 export function shortLeft(ms: number) {

@@ -18,6 +18,8 @@ import { useLive, challenge, cancelChallenge, refreshPresence, raceChannel, endL
 import { displayName } from '../lib/names'
 import { joinRefereed, reportFinish, serverPi, type Verdict } from '../lib/referee'
 import { ghostDist, shortLeft, trialWeek, TRIAL_FUEL } from '../game/trial'
+import { SPLIT_MARKS, crossings, refSplits, splitDelta, splitLabel } from '../game/splits'
+import { bestSplits, saveBestSplits } from '../lib/bestSplits'
 import { raceWeather } from '../game/weather'
 import { carGrip, conditions, conditionsNote, gripMul, spinning } from '../game/grip'
 import { TrialTab, TrialResult, beginTrialRun, type TrialRun } from './TimeTrial'
@@ -30,6 +32,9 @@ import { TunerTrials, firstTrialPick, fixBuild, trialChip, trialPrizeOf } from '
 import { buildChecks, hostMods, tunerShift, tunerTrial, type TunerTrial } from '../game/tuner'
 import { paintRival, rowShift, rowSkills, type PaintRival } from '../game/paintRivals'
 import { TileClip } from './TileClip'
+import { Callout } from './Callout'
+import { useCallout } from './useCallout'
+import { buzz } from '../lib/haptics'
 import './race-menu.css'
 import { KartGame, playerRacer, type KartRacer } from './Kart'
 import { LiveKart } from './LiveKart'
@@ -297,7 +302,7 @@ export function RacePanel() {
         key={trial.n}
         car={car}
         rival={{ id: 'trial', town: `👻 ${trial.ghost}`, level: 0, carName: d.name, color: '#eceff1', pi: pi(car), online: false, body: d.body, model: d.id }}
-        trial={{ target: trial.target }}
+        trial={{ target: trial.target, mine: trial.ghost === 'Your best' }}
         venueId={trial.venue}
         title={`⏱️ Time trial · ${venueById(trial.venue).name}`}
         onFinish={() => {}}
@@ -1118,6 +1123,7 @@ const fresh = freshRacer
 const step = stepRacer
 
 // trial: a solo run against a ghost that finishes in `target` seconds; the run ends when you cross the line.
+// mine: the ghost is the player's own best, so the splits are timed against their best run's.
 // resultView: replaces the usual result card.
 type Result = { won: boolean; myTime: number; theirTime: number }
 type NextRace = { label: string; go: () => void }
@@ -1125,7 +1131,7 @@ type NextRace = { label: string; go: () => void }
 type RunStats = { launch: string; perfect: number; shifts: number; top: number }
 // dist: a Grand Prix or Pro Tour distance (game/distance.ts); the car's build counts in these.
 // next: the result card's button for the next race in this series (or a retry), when there is one.
-export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title, venueId, trial, resultView, night, weatherSeed, sky, next, dist }: { car: OwnedCar; rival: Rival; onExit: () => void; next?: NextRace | null; live?: LiveRace; prize?: number; onFinish?: (won: boolean, myTime: number, theirTime: number) => number | void; title?: string; venueId?: string; trial?: { target: number }; resultView?: (r: Result) => ReactNode; night?: boolean; weatherSeed?: string; sky?: WeatherKind; dist?: RaceDist }) {
+export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title, venueId, trial, resultView, night, weatherSeed, sky, next, dist }: { car: OwnedCar; rival: Rival; onExit: () => void; next?: NextRace | null; live?: LiveRace; prize?: number; onFinish?: (won: boolean, myTime: number, theirTime: number) => number | void; title?: string; venueId?: string; trial?: { target: number; mine?: boolean }; resultView?: (r: Result) => ReactNode; night?: boolean; weatherSeed?: string; sky?: WeatherKind; dist?: RaceDist }) {
   // A signed-in live rival's PI comes from the server, not from their browser.
   const [serverRivalPi, setServerRivalPi] = useState<number | null>(null)
   const rival = useMemo(() => (serverRivalPi === null ? shownRival : { ...shownRival, pi: serverRivalPi }), [shownRival, serverRivalPi])
@@ -1194,6 +1200,20 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   const [checking, setChecking] = useState(false)
   const finishRace = useGame((s) => s.finishRace)
   const stats = useRef<RunStats>({ launch: '', perfect: 0, shifts: 0, top: 0 })
+  // Split times against the ghost (game/splits.ts): when it passes each checkpoint, when we did,
+  // and the gap shown for the last one passed.
+  const splitKey = `${venue.id}:${track}`
+  const target = trial?.target
+  const vsMine = !!trial?.mine
+  const ghostSplits = useMemo(() => (target !== undefined ? refSplits(target, vsMine ? bestSplits(splitKey) : null) : null), [target, vsMine, splitKey])
+  const mySplits = useRef<number[]>([])
+  const [split, setSplit] = useState<{ i: number; d: number } | null>(null)
+  useEffect(() => {
+    if (!split) return
+    const id = setTimeout(() => setSplit(null), 1600)
+    return () => clearTimeout(id)
+  }, [split])
+  const [call, pop] = useCallout()
   const flash = (text: string, ms = 800) => {
     setLabel(text)
     clearTimeout(labelTimer.current)
@@ -1386,8 +1406,13 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       const theirOn = theirBoost !== 1 || theirDrag !== 1
       if (theirOn !== theirActive.current) { theirActive.current = theirOn; setTheirShown(theirOn) }
       const myMul = (live ? mine : skillBoost(sk, me.current, th0)) * theirDrag * gripMul(grip, me.current.gear, me.current.rpm, t.current)
+      const was = me.current.dist
       step(me.current, myPi, dt, t.current, build === null ? myMul : myMul * characterMul(build, me.current.gear, me.current.dist), track)
       stats.current.top = Math.max(stats.current.top, me.current.speed)
+      if (ghostSplits) for (const c of crossings(was, me.current.dist, t.current - dt, t.current, track)) {
+        mySplits.current[c.i] = c.t
+        setSplit({ i: c.i, d: splitDelta(c.t, ghostSplits[c.i]) })
+      }
       const spinNow = me.current.launched && me.current.finished === null && (spinning(grip, me.current.gear, me.current.rpm, t.current) || (me.current.gear === 0 && me.current.quality < 0.84))
       if (spinNow !== spinShown.current) { spinShown.current = spinNow; setSpin(spinNow) }
       const th = them.current
@@ -1446,6 +1471,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
         else sfx.lose()
         sound.current?.finish(won)
         const stars = finishCb.current ? finishCb.current(won, me.current.finished, theirTime) : finishRace(won, reward(rivalRef.current))
+        if (trial) saveBestSplits(splitKey, me.current.finished, mySplits.current)
         setResult({ won, myTime: me.current.finished, theirTime, stars: typeof stars === 'number' ? stars : undefined })
         return
       }
@@ -1456,7 +1482,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       signal.cancelled = true
       cancelAnimationFrame(raf)
     }
-  }, [countdown, result, myPi, skill, finishRace, live, def, theirSkill, trial, theirReaction, grip, theirGrip, build, track])
+  }, [countdown, result, myPi, skill, finishRace, live, def, theirSkill, trial, theirReaction, grip, theirGrip, build, track, ghostSplits, splitKey])
 
   // Revving on the line: the needle climbs while the pedal is held and falls when it's let go.
   useEffect(() => {
@@ -1496,7 +1522,11 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
     stats.current.shifts++
     if (s.q >= 1) stats.current.perfect++
     sound.current?.shift('me', r.gear, Math.min(1, myPi / 200))
-    flash(r.streak >= 2 ? `${s.label.replace('!', '')} x${r.streak}!` : s.label)
+    // A perfect shift gets its own pop and a buzz in the hand; the rest a plain call.
+    if (s.label === 'PERFECT!') {
+      pop(r.streak >= 2 ? `Perfect shift x${r.streak}!` : 'Perfect shift!')
+      buzz(15)
+    } else flash(r.streak >= 2 ? `${s.label.replace('!', '')} x${r.streak}!` : s.label)
   }
   const boost = () => {
     if (countdown > 0 || result || !fireBoost(me.current)) return
@@ -1560,6 +1590,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
         ].map((lane) => (
           <div key={lane.name} className="rf-lane">
             <span className="lane-name">{lane.name}</span>
+            {ghostSplits && SPLIT_MARKS.map((m, i) => <i key={i} className={mySplits.current[i] !== undefined ? 'lane-cp passed' : 'lane-cp'} style={{ left: `${m * 90 + 2.5}%` }} />)}
             <div className="lane-car" style={{ left: `${Math.min(1, lane.r.dist / track) * 90}%`, background: lane.color }} />
             <div className="finish" />
           </div>
@@ -1583,6 +1614,8 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       )}
       {checking && !result && <div className="rf-wait">Checking the result with the race server...</div>}
       {label && <div className="shift-label big">{label}</div>}
+      {!result && <Callout call={call} />}
+      {split && !result && <div key={split.i} className={`rf-split${split.d < 0 ? ' ahead' : split.d > 0 ? ' behind' : ''}`} title="Gap to the ghost at this checkpoint">⏱ {splitLabel(split.d)}</div>}
       {def.skill && skillShown && !result && <div className="skill-flash">{SKILLS[def.skill].icon} {SKILLS[def.skill].name}!</div>}
       {theirSkill && theirShown && !result && <div className="skill-flash theirs">{rival.town}: {SKILLS[theirSkill].icon} {SKILLS[theirSkill].name}!</div>}
       {theirBoost && !theirShown && !result && <div className="skill-flash theirs">{rival.town}: 🔥 Boost!</div>}
