@@ -1,6 +1,8 @@
 [build]
   command = "npm run build"
   publish = "dist"
+  # Builds only ship on demand: a deploy-branch commit with "[deploy]" in its message.
+  ignore = "sh ./scripts/netlify-ignore.sh"
 
 [build.environment]
   NODE_VERSION = "22"
