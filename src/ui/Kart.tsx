@@ -327,7 +327,7 @@ function Podium({ race, field, me, end, prize, next, verdict, onExit }: { race: 
             const d = carDef(f.look.model ?? '')
             return (
               <div key={p} className={`kt-step s${p + 1}${i === me ? ' me' : ''}`}>
-                <CarThumb size="sm" color={f.look.color} finish={f.look.finish} skin={f.look.skin} modSkin={f.look.modSkin} body={f.look.body as never} model={d.id} mods={f.look.mods} />
+                <CarThumb size="sm" color={f.look.color} finish={f.look.finish} skin={f.look.skin} modSkin={f.look.modSkin} hat={f.look.hat} body={f.look.body as never} model={d.id} mods={f.look.mods} />
                 <b>{i === me ? 'You' : f.name}</b>
                 <span className="kt-block">{p + 1}</span>
               </div>

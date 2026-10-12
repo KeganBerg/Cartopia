@@ -187,14 +187,14 @@ export function RaceBar({ cars, car, onPick, go, note, dist }: { cars: OwnedCar[
         <div className="rm-picker" role="listbox" aria-label="Pick the car you race with">
           {[...cars].sort((a, b) => pi(b) - pi(a)).map((c) => (
             <button key={c.uid} role="option" aria-selected={c.uid === car.uid} className={c.uid === car.uid ? 'chip sel' : 'chip'} onClick={() => { onPick(c.uid); setOpen(false) }}>
-              <CarThumb size="xs" color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} body={carDef(c.model).body} model={c.model} stripe={c.stripe} mods={c.mods} />
+              <CarThumb size="xs" color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} hat={c.hat} body={carDef(c.model).body} model={c.model} stripe={c.stripe} mods={c.mods} />
               <span>{carDef(c.model).name}</span><span className="rm-pi">PI {pi(c)}</span>{carDef(c.model).skill ? ` ${SKILLS[carDef(c.model).skill!].icon}` : ''}{tag(c)}
             </button>
           ))}
         </div>
       )}
       <button className="rm-car" onClick={() => setOpen((o) => !o)} disabled={cars.length < 2} aria-expanded={open}>
-        <CarThumb size="xs" color={car.color} finish={car.finish} skin={car.skin} modSkin={car.modSkin} body={d.body} model={car.model} stripe={car.stripe} mods={car.mods} />
+        <CarThumb size="xs" color={car.color} finish={car.finish} skin={car.skin} modSkin={car.modSkin} hat={car.hat} body={d.body} model={car.model} stripe={car.stripe} mods={car.mods} />
         <span className="rm-car-txt">
           <small className="rm-car-lbl">🏁 Racing with</small>
           <b>{d.name}</b>

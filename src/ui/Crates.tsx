@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { StageSlot, useStageReady } from '../scene/Stage'
 import { useGame, openCrate } from '../game/store'
 import { MOD_SLOTS, SKINNED_SLOTS, carDef, fittedMods, modDef, ownedModSkins, ownedSkins, type ModDef } from '../game/data'
+import { hatDef } from '../game/hats'
 import { CRATES, carOdds, crateCost, crateDef, crateOddsShown, dropTier, homeCars, homeMods, modChoices, skinOdds, skinOf, type CrateDef, type CrateId, type CrateOpen } from '../game/crates'
 import { SKIN_TIERS } from '../game/data'
 import { CrateScene, TIER_GLOW, prizeLook, type CratePhase } from '../scene/CrateScene'
@@ -156,6 +157,11 @@ function Prize({ open, onAgain, onDone, again, paintCar }: { open: CrateOpen; on
     icon = '🚗'
     title = carDef(d.model).name
     sub = 'New car!'
+  } else if (d.kind === 'hat') {
+    const h = hatDef(d.hat)
+    icon = h?.icon ?? '🎩'
+    title = h?.name ?? 'Hat'
+    sub = 'New hat!'
   } else {
     const car = cars.find((c) => c.uid === d.car)
     icon = '⚙️'
@@ -169,6 +175,7 @@ function Prize({ open, onAgain, onDone, again, paintCar }: { open: CrateOpen; on
       <div className="cp-actions">
         {d.kind === 'mod' && <button className="buy small" onClick={() => { onDone(); openModSlot(modDef(d.mod)?.slot ?? 'spoiler'); openGarageTab('mods', { car: d.car, mod: d.mod }) }}>Fit it</button>}
         {d.kind === 'skin' && paintCar && <button className="buy small alt" onClick={() => wearSkin(d.skin, d.part)}>Use it</button>}
+        {d.kind === 'hat' && paintCar && <button className="buy small alt" onClick={() => { onDone(); openGarageTab('hats', { car: paintCar, hat: d.hat }) }}>Wear it</button>}
         {d.kind === 'car' && <button className="buy small alt" onClick={() => { onDone(); useGame.getState().selectCar(d.uid); openGarageTab('tune') }}>Garage</button>}
         <button className="buy small" onClick={onAgain}>{again}</button>
         <button className="sell small" onClick={onDone}>Done</button>

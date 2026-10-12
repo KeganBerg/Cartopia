@@ -13,7 +13,7 @@ import { LoadingBand } from './Loading'
 
 const Thumb = ({ car, size }: { car: OwnedCar; size?: 'sm' }) => {
   const d = carDef(car.model)
-  return <CarThumb size={size} color={car.color} finish={car.finish} skin={car.skin} modSkin={car.modSkin} panels={car.panels} body={d.body} model={d.id} stripe={car.stripe} mods={car.mods} />
+  return <CarThumb size={size} color={car.color} finish={car.finish} skin={car.skin} modSkin={car.modSkin} panels={car.panels} hat={car.hat} body={d.body} model={d.id} stripe={car.stripe} mods={car.mods} />
 }
 
 // A heart with the like count. Your own display just shows the count.

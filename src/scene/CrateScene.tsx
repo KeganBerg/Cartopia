@@ -16,6 +16,7 @@ import { signTexture } from './signTexture'
 import { ToolChest, TyreStack, useFitCamera } from './ArcadeScenery'
 import { tickSkins, withSkin } from './skins'
 import { MODS, SKINNED_SLOTS, carDef, fittedMods, modFits, modSkinNumber, skinNumber, type Body, type Finish, type SkinnedSlot, type Panels } from '../game/data'
+import type { HatFit } from '../game/hats'
 import { dropTier, type CrateDef, type CrateDrop, type CrateId } from '../game/crates'
 import { calmFlashing } from '../game/flashing'
 import { bumpSound } from '../lib/arcadeSound'
@@ -558,13 +559,13 @@ function Dust() {
 // ---------------------------------------------------------------------------------------------
 // The prize
 
-type CarLook = { body: Body; model: string; color: string; finish?: Finish | null; stripe?: string | null; mods?: string[] | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; panels?: Panels | null }
+type CarLook = { body: Body; model: string; color: string; finish?: Finish | null; stripe?: string | null; mods?: string[] | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; panels?: Panels | null; hat?: HatFit | null }
 
 function PrizeCar({ look }: { look: CarLook }) {
   const sc = 2.3 / carSize(look.body).len
   return (
     <group scale={sc}>
-      <CarModel body={look.body} model={look.model} color={look.color} finish={look.finish} stripe={look.stripe} mods={look.mods} skin={look.skin} modSkin={look.modSkin} panels={look.panels} />
+      <CarModel body={look.body} model={look.model} color={look.color} finish={look.finish} stripe={look.stripe} mods={look.mods} skin={look.skin} modSkin={look.modSkin} panels={look.panels} hat={look.hat} />
     </group>
   )
 }
@@ -1032,7 +1033,7 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
   const big = (drop?.kind === 'coins' && drop.jackpot) || tier >= 3
   // A part shows the part itself; cars and paints show the car.
   const part = drop?.kind === 'mod' ? drop.mod : null
-  const showCar = (drop?.kind === 'car' || drop?.kind === 'dupe' || drop?.kind === 'skin' || drop?.kind === 'skindupe') && !!prizeCar
+  const showCar = (drop?.kind === 'car' || drop?.kind === 'dupe' || drop?.kind === 'skin' || drop?.kind === 'skindupe' || drop?.kind === 'hat') && !!prizeCar
 
   useFrame((state, rawDt) => {
     const s = st.current
@@ -1233,6 +1234,13 @@ export function prizeLook(drop: CrateDrop | null, cars: { uid: string; model: st
   if (!drop) return null
   if (drop.kind === 'skin' || drop.kind === 'skindupe') return skinLook(drop.skin, drop.part, cars, mine)
   if (drop.kind === 'car') return { body: carDef(drop.model).body, model: drop.model, color: drop.color }
+  if (drop.kind === 'hat') {
+    // A hat, on your own car.
+    const owned = cars.filter((c) => !carDef(c.model).parked)
+    const car = owned.find((c) => c.uid === mine) ?? owned[0] ?? { model: 'civic', color: '#eceff1' }
+    const d = carDef(car.model)
+    return { body: d.body, model: car.model, color: car.color, finish: car.finish, stripe: car.stripe, mods: car.mods, hat: { id: drop.hat } }
+  }
   if (drop.kind === 'dupe') {
     const d = carDef(drop.model)
     return { body: d.body, model: d.id, color: d.colors[0] }

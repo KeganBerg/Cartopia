@@ -15,6 +15,7 @@ import { ModShop, withMod } from './Mods'
 import { CollectionBook, useFindCar } from './Collection'
 import { PaintShop, jobOf } from './Paint'
 import { CustomShop } from './Custom'
+import { HatShop, type HatTry } from './Hats'
 import { SkinPicker } from './Skins'
 import type { PaintJob, Panels, SkinnedSlot } from '../game/data'
 import { Icon } from './Icon'
@@ -436,11 +437,11 @@ const withSlot = (m: OwnedCar['modSkin'], slot: SkinnedSlot, skin: string | null
   return next
 }
 
-type GarageTab = 'tune' | 'mods' | 'paint' | 'custom'
+type GarageTab = 'tune' | 'mods' | 'paint' | 'custom' | 'hats'
 let nextGarageTab: GarageTab = 'tune'
-// Something to try on when the Garage opens (a crate prize): a part, a paint, a colour or a mod paint
-// on one slot, on this car. Nothing is fitted until the player taps the Garage's own button.
-export type GarageTry = { car: string; mod?: string; skin?: string; modSkin?: { slot: SkinnedSlot; skin: string }; color?: string }
+// Something to try on when the Garage opens (a crate prize): a part, a paint, a colour, a mod paint
+// on one slot or a hat, on this car. Nothing is fitted until the player taps the Garage's own button.
+export type GarageTry = { car: string; mod?: string; skin?: string; modSkin?: { slot: SkinnedSlot; skin: string }; color?: string; hat?: string }
 let nextTry: GarageTry | null = null
 // Opens the Garage on a given tab (goals use it for paint and mods), optionally with that
 // car picked and something on try-on.
@@ -551,8 +552,11 @@ export function GaragePanel() {
   // Custom panel paint being tried on, cleared when another car is picked.
   const [customising, setCustomising] = useState<{ car: string; panels: Panels } | null>(null)
   const tryPanels = customising && customising.car === car?.uid && tab === 'custom' ? customising.panels : null
+  // A hat being tried on (null: trying no hat), cleared when another car is picked.
+  const [hatting, setHatting] = useState<{ car: string; hat: HatTry } | null>(pre?.hat ? { car: pre.car, hat: { id: pre.hat } } : null)
+  const tryHat = hatting && hatting.car === car?.uid && tab === 'hats' ? hatting.hat : undefined
   const modSkin = car && tryModSkin ? withSlot(car.modSkin, tryModSkin.slot, tryModSkin.skin) : car?.modSkin
-  const look = car && def && { body: def.body, model: def.id, ...(tryJob ?? jobOf(car)), skin: trySkin === undefined ? car.skin : trySkin, modSkin, panels: tryPanels ?? car.panels, mods: withMod(car.mods, tryMod) }
+  const look = car && def && { body: def.body, model: def.id, ...(tryJob ?? jobOf(car)), skin: trySkin === undefined ? car.skin : trySkin, modSkin, panels: tryPanels ?? car.panels, mods: withMod(car.mods, tryMod), hat: tryHat === undefined ? car.hat : tryHat }
   // After an upgrade or a part goes on, the car does a dyno pull showing the old and new time.
   const pi = car && def ? performance(def, car.upgrades, car.mods) : 0
   const [dyno, setDyno] = useState<DynoRun | null>(null)
@@ -589,7 +593,7 @@ export function GaragePanel() {
           </div>
           {list.map(({ c, d, pi: p }) => (
             <button key={c.uid} className={c.uid === car?.uid ? 'garage-item sel' : 'garage-item'} onClick={() => { select(c.uid); setPicking(false) }}>
-              <CarThumb size="sm" color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} panels={c.panels} body={d.body} model={d.id} stripe={c.stripe} mods={c.mods} />
+              <CarThumb size="sm" color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} panels={c.panels} hat={c.hat} body={d.body} model={d.id} stripe={c.stripe} mods={c.mods} />
               <span>{d.name}{c.plate && <span className="mini-plate">{c.plate}</span>}</span>
               <small>PI {p}</small>
             </button>
@@ -628,8 +632,8 @@ export function GaragePanel() {
               <RaceCarToggle car={car.uid} />
             </div>
             <div className="garage-tabs" role="tablist">
-              {([['tune', '🔧 Upgrades'], ['mods', '🪽 Mods'], ['paint', '🎨 Paint'], ['custom', '🖌️ Custom']] as const).map(([id, label]) => (
-                <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'sel' : ''} onClick={() => setTab(id)}>{label}</button>
+              {([['tune', '🔧', 'Upgrades'], ['mods', '🪽', 'Mods'], ['paint', '🎨', 'Paint'], ['custom', '🖌️', 'Custom'], ['hats', '🎩', 'Hats']] as const).map(([id, icon, label]) => (
+                <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'sel' : ''} onClick={() => setTab(id)}><i aria-hidden>{icon}</i>{label}</button>
               ))}
             </div>
             {tab === 'mods' && <ModShop car={car} trying={tryMod} setTrying={(id) => setTrying(id ? { car: car.uid, mod: id } : null)} skinTry={tryModSkin} setSkinTry={(t) => setModSkinning(t ? { car: car.uid, ...t } : null)} />}
@@ -650,6 +654,7 @@ export function GaragePanel() {
             })}
             {tab === 'paint' && <SkinPicker car={car} trying={trySkin} setTrying={(skin) => setSkinning(skin === undefined ? null : { car: car.uid, skin })} />}
             {tab === 'custom' && <CustomShop car={car} panels={tryPanels ?? car.panels} setPanels={(panels) => setCustomising(panels ? { car: car.uid, panels } : null)} />}
+            {tab === 'hats' && <HatShop car={car} trying={tryHat} setTrying={(hat) => setHatting(hat === undefined ? null : { car: car.uid, hat })} />}
             {tab === 'paint' && <PaintShop car={car} job={tryJob ?? jobOf(car)} setJob={(job) => setPainting(job ? { car: car.uid, job } : null)} />}
             <button className="sell" onClick={() => { const uid = car.uid; sellAsk.ask(() => sell(uid)) }}>Sell for ${Math.floor(def.price * 0.5).toLocaleString()}</button>
             {sellAsk.open && (

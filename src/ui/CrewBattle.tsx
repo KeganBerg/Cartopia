@@ -243,7 +243,7 @@ export function BattlePanel() {
     <div className="race-full cb-full">
       <Canvas className="rf-canvas" camera={{ position: [0, 1.1, -5], fov: 55, near: 0.3, far: 150 }} dpr={dpr} gl={{ toneMapping: NeutralToneMapping }}>
         <BattleScene venue={v} lead={lead}
-          mine={{ body: carDef(car.model).body, model: car.model, color: car.color, finish: car.finish, skin: car.skin, modSkin: car.modSkin, panels: car.panels, mods: car.mods }}
+          mine={{ body: carDef(car.model).body, model: car.model, color: car.color, finish: car.finish, skin: car.skin, modSkin: car.modSkin, panels: car.panels, mods: car.mods, hat: car.hat }}
           theirs={{ body: rival.body, model: rival.id, color: b.them.color }}
           us={{ tag: b.us.tag, color: b.us.color }} them={{ tag: b.them.tag, color: b.them.color }} />
       </Canvas>

@@ -365,7 +365,7 @@ export function ParkScene({ lot, me, input, running, onHud, onEnd }: {
         <CarShadow len={shadow.l} wid={shadow.w} />
         <group ref={rock}>
           <Footprinted id={`${me.body}:${me.model}:${me.mods?.join()}`} fit={FIT} onFoot={(ft) => void (foot.current = ft)}>
-            <CarModel body={me.body} model={me.model} color={me.color} finish={me.finish} skin={me.skin} modSkin={me.modSkin} panels={me.panels} mods={me.mods} beams={view.beams} />
+            <CarModel body={me.body} model={me.model} color={me.color} finish={me.finish} skin={me.skin} modSkin={me.modSkin} panels={me.panels} hat={me.hat} mods={me.mods} beams={view.beams} />
           </Footprinted>
         </group>
       </group>

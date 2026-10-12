@@ -5,6 +5,7 @@
 // rolled by the server (crate_open() in supabase/migrations/0040_crates.sql, same tables and
 // rules); guests roll here. crates.test.ts keeps the server's tables in step.
 import { CARS, MODS, MOD_SKINS, SKINS, carDef, modDef, modFits, ownedMods, type CarDef, type ModDef, type SkinDef, type SkinTier } from './data'
+import { crateHats, hatDef } from './hats'
 
 export type CrateId = 'street' | 'garage' | 'gold' | 'diamond'
 export type CrateOdds = { coins: number; jackpot: number; mod: number; car: number; skin: number }
@@ -120,8 +121,14 @@ export function skinOdds(c: CrateDef): (CrateSkin & { p: number })[] {
 }
 // What a skin you already have turns into, by tier, as a share of the crate's worth.
 export const SKIN_DUPE: Record<SkinTier, number> = { rare: 0.6, epic: 1, legendary: 1.5 }
-// Skins the player already has, body and part (from ownedSkins / ownedModSkins in data.ts).
-export type OwnedSkins = { skins: string[]; modSkins: string[] }
+// Skins the player already has, body and part (from ownedSkins / ownedModSkins in data.ts), and hats.
+export type OwnedSkins = { skins: string[]; modSkins: string[]; hats?: string[] }
+
+// Hats (game/hats.ts crateHats): a slice of each crate, out of 100 like CrateOdds, taken from its
+// coin prizes. Only hats the player doesn't have drop; with none left it stays coins.
+// Guests only for now: the server's crate_open() has no hat slice yet, so it's kept out of
+// crateTables() and signed-in players' crates don't drop hats.
+export const HAT_ODDS: Record<CrateId, number> = { street: 3, garage: 4, gold: 6, diamond: 8 }
 
 type CarLike = { uid: string; model: string; mods?: string[] | null; ownedMods?: string[] | null }
 
@@ -156,6 +163,7 @@ export type CrateDrop =
   | { kind: 'mod'; car: string; mod: string }
   | { kind: 'skin'; skin: string; part: boolean }
   | { kind: 'skindupe'; skin: string; part: boolean; coins: number }
+  | { kind: 'hat'; hat: string }
 export type CrateOpen = { seq?: number; crate: CrateId; cost: { coins: number; bucks: number }; drop: CrateDrop }
 
 const newUid = (rand: () => number) => 'k' + Array.from({ length: 14 }, () => Math.floor(rand() * 36).toString(36)).join('')
@@ -203,6 +211,11 @@ export function rollCrate(c: CrateDef, level: number, cars: CarLike[], rand: () 
     }
     kind = 'coins'
   }
+  if (kind === 'coins') {
+    const hats = crateHats(c.id).filter((h) => !(owned.hats ?? []).includes(h.id))
+    const coinW = crateOdds(c, level).coins
+    if (hats.length && rand() * coinW < HAT_ODDS[c.id]) return { kind: 'hat', hat: hats[Math.floor(rand() * hats.length)].id }
+  }
   const [lo, hi] = kind === 'jackpot' ? c.jackpotMult : c.coinMult
   return { kind: 'coins', coins: roundCoins(v * (lo + (hi - lo) * rand())), jackpot: kind === 'jackpot' }
 }
@@ -210,9 +223,10 @@ export function rollCrate(c: CrateDef, level: number, cars: CarLike[], rand: () 
 export const skinOf = (id: string, part: boolean) => (part ? MOD_SKINS : SKINS).find((x) => x.id === id)
 
 // How exciting a prize is, for the reveal's glow: 0 coins, 1 a jackpot or part, 2 a gem part or a
-// new rare or epic skin, 3 a new car or legendary skin.
+// new rare or epic skin or a hat, 3 a new car, legendary skin or crate-only hat.
 export function dropTier(d: CrateDrop): 0 | 1 | 2 | 3 {
   if (d.kind === 'car') return 3
+  if (d.kind === 'hat') return hatDef(d.hat)?.challenge ? 2 : 3
   if (d.kind === 'skin') return skinOf(d.skin, d.part)?.tier === 'legendary' ? 3 : 2
   if (d.kind === 'mod') return modDef(d.mod)?.bucks ? 2 : 1
   if (d.kind === 'coins' && d.jackpot) return 1

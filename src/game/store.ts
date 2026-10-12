@@ -5,6 +5,8 @@ import {
   upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, jobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, refillBucks, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, activeEvent, DAILY_BONUS, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modFits, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, CREW_CHEST, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower, seasonNumber, seasonOf, SEASON_STARS, skinDef, ownedSkins, seasonSkin, modSkinDef, ownedModSkins, seasonModSkin, SKINNED_SLOTS, type SkinnedSlot, fittedMods, SEASON_TIERS, STARS_PER_TIER, SEASON_CAR_BUCKS, dealsFor, dealOffer, type DealDef, type DealKind,
 } from './data'
 import { PANELS, PATTERNS, isBike, panelJobCost, tidyPanels, type Panels } from './data'
+import { cleanHat, earnedHats, hatDef, hatQuestOf, newHatQuest, ownedHats, sameHat, type HatFit, type HatQuest } from './hats'
+import { raceCarOf } from './raceCar'
 import { sfx } from '../lib/sound'
 import { fx } from './fx'
 import { opensLabel } from './clock'
@@ -27,7 +29,7 @@ import { claim, type WagerEntry } from './wager'
 // car: uid of the owned car assigned to drive for this business (see DRIVER_BONUS).
 // merge: set on the top-left building of a merged block (see merge.ts); mturn: the turn the player gave that block.
 export type PlacedBuilding = { uid: string; def: string; x: number; z: number; jobEndsAt: number | null; rot?: number; level?: number; jobLevel?: number; car?: string; merge?: number; mturn?: number }
-export type OwnedCar = { uid: string; model: string; color: string; upgrades: Record<UpgradeSlot, number>; flat?: boolean; lowFuel?: boolean; stripe?: string | null; finish?: Finish; plate?: string; mods?: string[]; ownedMods?: string[]; skin?: string; modSkin?: Partial<Record<SkinnedSlot, string>>; panels?: Panels }
+export type OwnedCar = { uid: string; model: string; color: string; upgrades: Record<UpgradeSlot, number>; flat?: boolean; lowFuel?: boolean; stripe?: string | null; finish?: Finish; plate?: string; mods?: string[]; ownedMods?: string[]; skin?: string; modSkin?: Partial<Record<SkinnedSlot, string>>; panels?: Panels; hat?: HatFit | null }
 // A rusty find waiting in Rusty's storage, and the one car in the restore bay.
 export type JunkCar = { uid: string; model: string; rarity: Rarity }
 export type Restoring = JunkCar & { endsAt: number; minutes: number }
@@ -116,6 +118,10 @@ export type SaveState = {
   skins: string[]
   // Mod skins bought or won; level and set ones are worked out (ownedModSkins()).
   modSkins: string[]
+  // Hats won by challenges or from crates (game/hats.ts); each car wears one of them (OwnedCar.hat).
+  hats: string[]
+  // Hat challenge progress (game/hats.ts HatQuest). Never resets.
+  hatQuest: HatQuest
   land: string[]
   updatedAt: number
 }
@@ -220,6 +226,8 @@ type Actions = {
   skinMod: (uid: string, slot: SkinnedSlot, skin: string | null) => boolean
   // Adds a mod skin to the garage (crates and other prizes). False when it was already unlocked.
   grantModSkin: (id: string) => boolean
+  // Puts an owned hat (with its colours) on a car; null takes it off. Hats are never bought.
+  hatCar: (uid: string, hat: HatFit | null) => boolean
   visit: (town: VisitedTown | null) => void
   // Every business in this town has had today's help (the Friends list shows it).
   markHelped: (ownerId: string) => void
@@ -420,6 +428,8 @@ export function starterTown(): SaveState {
     showcase: [],
     skins: [],
     modSkins: [],
+    hats: [],
+    hatQuest: newHatQuest(),
     land: [...START_LAND],
     updatedAt: now,
   }
@@ -693,6 +703,13 @@ function setLastCollectAll(t: number) {
     // Private mode: the cooldown just won't survive a reload.
   }
   collectAllListeners.forEach((fn) => fn())
+}
+
+// The hat quest after a race win: the race car's model joins the cars that have won.
+function hatRaceWin(s: SaveState): HatQuest {
+  const q = hatQuestOf(s)
+  const model = raceCarOf(s.cars, s.raceCar)?.model
+  return !model || q.cars.includes(model) ? q : { ...q, cars: [...q.cars, model] }
 }
 
 export const useGame = create<GameState>()(
@@ -1187,6 +1204,7 @@ export const useGame = create<GameState>()(
       finishRace: (won, reward) => {
         const s = get()
         set(withXp(s, won ? 30 : 8, {
+          ...(won ? { hatQuest: hatRaceWin(s) } : {}),
           coins: s.coins + (won ? reward : Math.round(reward * 0.1)),
           trophies: s.trophies + (won ? 1 : 0),
           racesWon: s.racesWon + (won ? 1 : 0),
@@ -1202,7 +1220,9 @@ export const useGame = create<GameState>()(
 
       finishArcade: (coins, xp) => {
         const s = get()
+        const q = hatQuestOf(s)
         set(withXp(s, xp, {
+          hatQuest: { ...q, arcade: q.arcade + 1 },
           coins: s.coins + coins,
           stats: { ...s.stats, coinsEarned: (s.stats.coinsEarned ?? 0) + coins },
           updatedAt: Date.now(),
@@ -1327,6 +1347,7 @@ export const useGame = create<GameState>()(
           cars,
           ...(d.kind === 'skin' && !d.part && !(s.skins ?? []).includes(d.skin) ? { skins: [...(s.skins ?? []), d.skin] } : {}),
           ...(d.kind === 'skin' && d.part && !(s.modSkins ?? []).includes(d.skin) ? { modSkins: [...(s.modSkins ?? []), d.skin] } : {}),
+          ...(d.kind === 'hat' && hatDef(d.hat) && !(s.hats ?? []).includes(d.hat) ? { hats: [...(s.hats ?? []), d.hat] } : {}),
           crates: o.seq ?? s.crates ?? 0,
           stats: won ? { ...s.stats, coinsEarned: (s.stats.coinsEarned ?? 0) + won } : s.stats,
           updatedAt: Date.now(),
@@ -1602,6 +1623,18 @@ export const useGame = create<GameState>()(
         return true
       },
 
+      hatCar: (cuid, want) => {
+        const s = get()
+        const car = s.cars.find((c) => c.uid === cuid)
+        const next = want ? cleanHat(want) : null
+        if (!car || (want && !next) || sameHat(car.hat, next)) return false
+        const d = hatDef(next?.id)
+        if (d && !ownedHats(s).includes(d.id)) { s.toast(`🔒 ${d.name}`); return false }
+        set({ cars: s.cars.map((c) => (c.uid === cuid ? { ...c, hat: next ?? undefined } : c)), updatedAt: Date.now() })
+        s.toast(d ? `${d.icon} ${d.name} on!` : 'Hat off')
+        return true
+      },
+
       modCar: (cuid, modId, remove) => {
         const s = get()
         const car = s.cars.find((c) => c.uid === cuid)
@@ -1653,7 +1686,7 @@ export const useGame = create<GameState>()(
         return true
       },
 
-      loadSave: (save) => set({ ...starterDefaults(), ...save, oldPaints: save.oldPaints ?? true }),
+      loadSave: (save) => set({ ...starterDefaults(), ...save, hatQuest: hatQuestOf(save), oldPaints: save.oldPaints ?? true }),
 
       gpResult: (seriesId, won) => {
         const s = get()
@@ -1663,6 +1696,7 @@ export const useGame = create<GameState>()(
         const reward = gpReward(series, cur.round)
         s.finishRace(won, reward)
         if (!won) return
+        set((g) => ({ hatQuest: { ...hatQuestOf(g), kart: hatQuestOf(g).kart + 1 } }))
         const round = cur.round + 1
         if (round < GP_ROUNDS) return set({ gp: { ...s.gp, [seriesId]: { ...cur, round } } })
         const model = series.box[Math.floor(Math.random() * series.box.length)]
@@ -1821,6 +1855,7 @@ export const useGame = create<GameState>()(
         const s = get()
         const amount = won ? stake : -Math.min(stake, s.coins)
         set({
+          ...(won ? { hatQuest: hatRaceWin(s) } : {}),
           coins: s.coins + amount,
           racesWon: s.racesWon + (won ? 1 : 0),
           stats: { ...bump(s, 'racesWon', won ? 1 : 0), races: (s.stats.races ?? 0) + 1, coinsEarned: (s.stats.coinsEarned ?? 0) + Math.max(0, amount) },
@@ -2062,20 +2097,20 @@ export const useGame = create<GameState>()(
       name: 'cartopia-save',
       partialize: (s) => saveOf(s),
       // A town saved before paint rivals has no oldPaints and keeps its colours.
-      merge: (persisted, current) => (persisted ? { ...current, ...starterDefaults(), ...(persisted as Partial<SaveState>), oldPaints: (persisted as Partial<SaveState>).oldPaints ?? true } : current),
+      merge: (persisted, current) => (persisted ? { ...current, ...starterDefaults(), ...(persisted as Partial<SaveState>), hatQuest: hatQuestOf(persisted as Partial<SaveState>), oldPaints: (persisted as Partial<SaveState>).oldPaints ?? true } : current),
     },
   ),
 )
 
 export function saveOf(s: GameState): SaveState {
-  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, wagers, season, deals, trials, rivals, rivalRow, tuner, oldPaints, tour, event, showcase, raceCar, skins, modSkins, land, updatedAt } = s
-  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, ...(wagers ? { wagers } : {}), season, deals, trials, rivals, rivalRow, tuner: tuner ?? {}, oldPaints: !!oldPaints, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, land, updatedAt }
+  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, wagers, season, deals, trials, rivals, rivalRow, tuner, oldPaints, tour, event, showcase, raceCar, skins, modSkins, hats, hatQuest, land, updatedAt } = s
+  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, ...(wagers ? { wagers } : {}), season, deals, trials, rivals, rivalRow, tuner: tuner ?? {}, oldPaints: !!oldPaints, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, hats: hats ?? [], hatQuest: hatQuestOf({ stats, hatQuest }), land, updatedAt }
 }
 
 // Fields added after launch, so older saves load with sensible values.
-function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'quests' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'gp' | 'campaign' | 'claimedSets' | 'crewChests' | 'visits' | 'crates' | 'wagers' | 'season' | 'deals' | 'trials' | 'rivals' | 'rivalRow' | 'tuner' | 'tour' | 'event' | 'showcase' | 'skins' | 'modSkins' | 'land'> {
+function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'quests' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'gp' | 'campaign' | 'claimedSets' | 'crewChests' | 'visits' | 'crates' | 'wagers' | 'season' | 'deals' | 'trials' | 'rivals' | 'rivalRow' | 'tuner' | 'tour' | 'event' | 'showcase' | 'skins' | 'modSkins' | 'hats' | 'land'> {
   // Saves from before the tutorial existed skip it.
-  return { stats: emptyStats(), claimedGoals: [], quests: null, lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, gp: {}, campaign: {}, claimedSets: [], crewChests: 0, visits: 0, crates: 0, wagers: 0, season: null, deals: null, trials: { claimed: {} }, rivals: {}, rivalRow: {}, tuner: {}, tour: 0, event: null, showcase: [], skins: [], modSkins: [], land: [...START_LAND] }
+  return { stats: emptyStats(), claimedGoals: [], quests: null, lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, gp: {}, campaign: {}, claimedSets: [], crewChests: 0, visits: 0, crates: 0, wagers: 0, season: null, deals: null, trials: { claimed: {} }, rivals: {}, rivalRow: {}, tuner: {}, tour: 0, event: null, showcase: [], skins: [], modSkins: [], hats: [], land: [...START_LAND] }
 }
 
 
@@ -2149,7 +2184,20 @@ export async function openCrate(id: CrateId): Promise<CrateOpen[] | null> {
     useGame.getState().toast(msg === 'soon' ? 'Crates open for signed-in towns very soon!' : msg.includes('one crate') ? 'One crate at a time!' : "Couldn't open the crate. Try again.")
     return null
   }
-  if (!opens) opens = [{ crate: id, cost, drop: rollCrate(def, s.level, s.cars, Math.random, { skins: ownedSkins(s), modSkins: ownedModSkins(s) }) }]
+  if (!opens) opens = [{ crate: id, cost, drop: rollCrate(def, s.level, s.cars, Math.random, { skins: ownedSkins(s), modSkins: ownedModSkins(s), hats: ownedHats(s) }) }]
   for (const o of opens) useGame.getState().applyCrate(o)
   return opens
 }
+
+// A hat is won the moment its challenge is done, whatever finished it (game/hats.ts).
+useGame.subscribe((s, prev) => {
+  if (s.stats === prev.stats && s.hatQuest === prev.hatQuest && s.hats === prev.hats) return
+  const won = earnedHats(s)
+  if (!won.length) return
+  useGame.setState({ hats: [...ownedHats(s), ...won], updatedAt: Date.now() })
+  for (const id of won) {
+    const d = hatDef(id)!
+    s.toast(`${d.icon} ${d.name} unlocked!`)
+  }
+  sfx.levelUp()
+})

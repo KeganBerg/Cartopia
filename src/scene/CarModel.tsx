@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { chromeEnv } from './chromeEnv'
 import {
   BoxGeometry, BufferGeometry, CircleGeometry, Color, CylinderGeometry, DoubleSide, Euler, ExtrudeGeometry, Matrix4,
-  MeshBasicMaterial, MeshStandardMaterial, PlaneGeometry, Quaternion, Shape as ThreeShape, SphereGeometry, TorusGeometry, Vector3,
+  Mesh, MeshBasicMaterial, MeshStandardMaterial, PlaneGeometry, Quaternion, Raycaster, Shape as ThreeShape, SphereGeometry, TorusGeometry, Vector3,
   type Group,
 } from 'three'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
@@ -20,6 +20,8 @@ import { carStyle, hasTrim, trimBike, trimCar, type CarStyle } from './carTrim'
 import { brakeGeo, wheelGeo, type RimStyle } from './carWheels'
 import { PEOPLE_SIZED } from './keepShape'
 import { EXOTIC } from './exoticCars'
+import { HatModel } from './CarHat'
+import type { HatFit } from '../game/hats'
 
 type Shape = {
   len: number; wid: number
@@ -262,6 +264,77 @@ export function carFrame(body: Body): ModFrame {
     deck: roofMount ? c.roof : p.deck, deckZ: roofMount ? c.roofR + 0.05 : -s.len / 2 + 0.08, deckW: roofMount ? s.wid * 0.84 : s.wid,
     hoodTop: p.hood + s.hood, hoodZ: (cowl + s.len / 2 - s.len * 0.1) / 2, hs: Math.min(1.15, s.wid / 0.7),
   }
+}
+
+// Where a hat (game/hats.ts) sits: on the rider's helmet on a bike or the driver's on a formula
+// car, on the middle of the roof on a closed car, and on the highest point behind the seats
+// (roll bar, turret or rear deck) on an open one. The height is found by dropping a ray onto
+// the body, so it follows each body's real roof; tilt follows the surface it lands on.
+type HatSpot = { pos: V3; tilt: number; scale: number }
+const hatSpots = new Map<string, HatSpot>()
+const rayMat = new MeshBasicMaterial({ side: DoubleSide })
+const ray = new Raycaster()
+const DOWN = new Vector3(0, -1, 0)
+function topAt(parts: Partial<Record<Part, BufferGeometry>>, z: number) {
+  ray.set(new Vector3(0, 5, z), DOWN)
+  let best: { y: number; tilt: number } | null = null
+  for (const g of Object.values(parts)) {
+    if (!g) continue
+    const hit = ray.intersectObject(new Mesh(g, rayMat), false)[0]
+    if (hit && (!best || hit.point.y > best.y)) {
+      const n = hit.face?.normal ?? new Vector3(0, 1, 0)
+      best = { y: hit.point.y, tilt: Math.max(-0.3, Math.min(0.3, Math.atan2(n.z, Math.abs(n.y)))) }
+    }
+  }
+  return best
+}
+function hatSpot(body: Body, model: string | undefined, parts: Partial<Record<Part, BufferGeometry>>): HatSpot {
+  const key = `${body}|${model ?? ''}`
+  const hit = hatSpots.get(key)
+  if (hit) return hit
+  const s = shapeOf(body)
+  let spot: HatSpot
+  if (isBike(body)) {
+    // The rider's helmet (see bikeGeo): the hat sits over its top half.
+    const b = BIKE[body as BikeBody]
+    const [sy, sz] = b.seat
+    const ny = sy + 0.32 - b.lean * 0.3
+    const nz = sz + 0.06 + b.lean * 0.5
+    spot = { pos: [0, ny + 0.09 + 0.075 * 0.45, nz + 0.01], tilt: b.lean * 0.5, scale: 0.72 }
+  } else if (body === 'formula') {
+    spot = { pos: [0, 0.28 + 0.055 * 0.45, 0.02], tilt: 0, scale: 0.55 }
+  } else {
+    const scale = Math.max(0.9, Math.min(1.15, s.wid / 0.7))
+    let zs: number[]
+    if (s.open) {
+      // From the middle of the seats back: the highest point wins, ties go to the nearer.
+      zs = Array.from({ length: 24 }, (_, i) => s.cabinZ - i * 0.02).filter((z) => z > -s.len / 2 + 0.06)
+    } else if (s.round) {
+      zs = [s.cabinZ]
+    } else {
+      const cb = 0.025
+      const slack = s.cabinLen * (1 - s.taper)
+      const fb = s.fastback ?? 0.28
+      const roofF = s.cabinZ + s.cabinLen / 2 - cb - slack * (1 - fb)
+      const roofR = s.cabinZ - s.cabinLen / 2 + cb + slack * fb
+      zs = [(roofF + roofR) / 2]
+    }
+    let best: { y: number; tilt: number; z: number } | null = null
+    for (const z of zs) {
+      const t = topAt(parts, z)
+      if (t && (!best || t.y > best.y + 0.01)) best = { ...t, z }
+    }
+    spot = { pos: [0, (best?.y ?? s.lift + s.body + s.cabinH) - 0.004, best?.z ?? s.cabinZ], tilt: best?.tilt ?? 0, scale }
+  }
+  hatSpots.set(key, spot)
+  return spot
+}
+function Hat({ hat, spot }: { hat: HatFit; spot: HatSpot }) {
+  return (
+    <group position={spot.pos} rotation-x={spot.tilt} scale={spot.scale}>
+      <HatModel hat={hat} />
+    </group>
+  )
 }
 
 // zones: where the hood, doors and roof are, for custom panel paint (panelPaint.ts).
@@ -1097,7 +1170,8 @@ export type WheelRig = { steer: (Group | null)[]; spin: (Group | null)[]; radius
 // skin: a skin id (game/data.ts SKINS) drawn into the paint.
 // modSkin: a mod skin id (game/data.ts MOD_SKINS) for the part in each slot.
 // panels: custom paint on the hood, doors, roof and rims, and a body pattern (game/data.ts PANELS).
-type CarProps = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; panels?: Panels | null; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean; rig?: WheelRig; mods?: string[] | null; flames?: boolean; lean?: boolean }
+// hat: the hat it wears (game/hats.ts), on the roof or the rider's helmet.
+type CarProps = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; panels?: Panels | null; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean; rig?: WheelRig; mods?: string[] | null; flames?: boolean; lean?: boolean; hat?: HatFit | null }
 
 // A lean car: every part baked into two meshes (the parts that cast a shadow and the
 // rest) with the finish it would otherwise be drawn with, except the see-through screen;
@@ -1202,7 +1276,7 @@ function paintLook(color: string, finish?: Finish | null, rusty?: boolean, skin 
 }
 
 // Toy-style car: bevelled extruded body and cabin so no edge is a hard box corner. Faces +z.
-function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight, stripe, beams, rusty, rig, mods, flames, lean }: CarProps) {
+function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight, stripe, beams, rusty, rig, mods, flames, lean, hat }: CarProps) {
   // Rusty finds come home stock.
   const fit = rusty ? {} : fittedMods(mods, body)
   const sk = rusty ? 0 : skinNumber(skin)
@@ -1226,6 +1300,7 @@ function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight,
   )
   const pan = rusty ? null : panels
   const rimColor = pan?.rims?.color
+  const topper = hat && !rusty && <Hat hat={hat} spot={hatSpot(body, model, p)} />
   if (lean && rig) {
     // Chrome (its studio reflections) and custom panels can't be baked: that paint is drawn on its own.
     const chromed = !rusty && finish === 'chrome' && !sk
@@ -1238,7 +1313,7 @@ function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight,
     return (
       <LeanCar parts={p} looks={looks} casters={['paint', 'glass']} mods={{ body, ids: modIds(fit), skins: msk }} modPaint={{ color: tint, metal: rusty ? 0.1 : 0.4, rough: 0.3 }} highlight={highlight}
         wheels={[[-wx, s.wheel, wz], [wx, s.wheel, wz], [-wx, s.wheel, -wz], [wx, s.wheel, -wz]]} radius={s.wheel} width={0.14} rims={fit.rims} rimColor={rimColor} rig={rig} beams={beam}
-        extra={own && <mesh geometry={p.paint} castShadow><PaintMaterial color={tint} finish={finish} highlight={highlight} skin={chromed ? 0 : sk} panels={pan} zones={g.zones} /></mesh>} />
+        extra={<>{own && <mesh geometry={p.paint} castShadow><PaintMaterial color={tint} finish={finish} highlight={highlight} skin={chromed ? 0 : sk} panels={pan} zones={g.zones} /></mesh>}{topper}</>} />
     )
   }
   return (
@@ -1261,6 +1336,7 @@ function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight,
       {p.cabin && <mesh geometry={p.cabin} material={matOf('seat', look.seat ?? '#2b2b2b', 0, 0.75)} />}
       {p.caliper && <mesh geometry={p.caliper} material={matOf('cal', look.caliper ?? '#4a4d52', look.caliper ? 0.2 : 0.5, 0.45)} />}
       <CarMods body={body} fit={fit} tint={tint} metal={rusty ? 0.1 : 0.4} flames={flames} skins={msk} />
+      {topper}
       {/* Headlight beams on the road, visible after dark. */}
       {beam}
       <Wheels at={[[-wx, wz], [wx, wz], [-wx, -wz], [wx, -wz]]} r={s.wheel} w={s.track ? 0.16 : 0.14} rig={rig} rims={fit.rims} rimColor={rimColor} rusty={rusty} look={look} />
@@ -1359,7 +1435,7 @@ function bikeGeo(body: BikeBody, fit: Partial<Record<ModSlot, string>>, model?: 
 }
 
 // Bikes take every mod slot, with bike-sized parts.
-function BikeModel({ body, model, color, finish, skin, modSkin, panels, highlight, beams, rusty, rig, mods, flames, lean }: CarProps) {
+function BikeModel({ body, model, color, finish, skin, modSkin, panels, highlight, beams, rusty, rig, mods, flames, lean, hat }: CarProps) {
   const fit = rusty ? {} : fittedMods(mods, body)
   const sk = rusty ? 0 : skinNumber(skin)
   const msk = useMemo(() => (rusty ? undefined : modSkinNumbers(modSkin)), [rusty, modSkin])
@@ -1379,6 +1455,7 @@ function BikeModel({ body, model, color, finish, skin, modSkin, panels, highligh
   const pan = rusty ? null : panels
   const rimColor = pan?.rims?.color
   const bikeRim = rusty ? matOf('rim', '#7a5a44', 0.2, 0.9) : rimColor ? rimPaint(rimColor, rimLook) : rimLook ? matOf('rim', rimLook[0], Math.max(0.6, rimLook[1] + 0.4), rimLook[2]) : matOf('rim', bb === 'sportbike' ? '#2b2b2b' : '#d5d9de', 0.75, 0.28)
+  const topper = hat && !rusty && <Hat hat={hat} spot={hatSpot(body, model, p)} />
   const beam = beams && (
     <mesh rotation-x={-Math.PI / 2} position={[0, 0.03, SHAPES[bb].len / 2 + 0.5]} renderOrder={2}>
       <planeGeometry args={[0.5, 1.1]} />
@@ -1396,7 +1473,7 @@ function BikeModel({ body, model, color, finish, skin, modSkin, panels, highligh
     return (
       <LeanCar parts={p} looks={looks} casters={['paint', 'black']} mods={{ body, ids: modIds(fit), skins: msk }} modPaint={{ color: tint, metal: rusty ? 0.1 : 0.4, rough: 0.3 }} highlight={highlight}
         wheels={[[0, r, wz], [0, r, -wz]]} radius={r} width={0.07} rims={fit.rims} rimColor={rimColor} rig={rig} beams={beam}
-        extra={own && <mesh geometry={p.paint} castShadow><PaintMaterial color={tint} finish={finish} highlight={highlight} skin={chromed ? 0 : sk} panels={pan} /></mesh>} />
+        extra={<>{own && <mesh geometry={p.paint} castShadow><PaintMaterial color={tint} finish={finish} highlight={highlight} skin={chromed ? 0 : sk} panels={pan} /></mesh>}{topper}</>} />
     )
   }
   return (
@@ -1411,6 +1488,7 @@ function BikeModel({ body, model, color, finish, skin, modSkin, panels, highligh
       )}
       {shared.map((k) => <mesh key={k} geometry={p[k]} material={MAT[k]} castShadow={k === 'black'} />)}
       <CarMods body={body} fit={fit} tint={tint} metal={rusty ? 0.1 : 0.4} flames={flames} skins={msk} />
+      {topper}
       {beam}
       {[wz, -wz].map((z, i) => (
         <group key={i} position={[0, r, z]} ref={rig && i === 0 ? (o) => void (rig.steer[0] = o) : undefined}>
