@@ -310,49 +310,6 @@ export function FountainDetail({ stone }: { stone: string }) {
   )
 }
 
-// Flower bed: a timber border and leaves under the blooms.
-export function FlowerDetail() {
-  return (
-    <group>
-      {[0, 1, 2, 3].map((i) => (
-        <mesh key={i} position={[[0, 0, -0.66, 0.66][i], 0.11, [-0.66, 0.66, 0, 0][i]]} castShadow>
-          <boxGeometry args={i < 2 ? [1.4, 0.22, 0.08] : [0.08, 0.22, 1.4]} />
-          {c('#8d6e63')}
-        </mesh>
-      ))}
-      {[[-0.4, -0.4], [0, -0.35], [0.4, -0.4], [-0.35, 0], [0.05, 0.05], [0.4, 0], [-0.4, 0.4], [0, 0.4], [0.4, 0.38]].map(([x, z], i) => (
-        <mesh key={i} position={[x + 0.07, 0.2, z + 0.06]}><icosahedronGeometry args={[0.12, 0]} />{flat('#43a047')}</mesh>
-      ))}
-    </group>
-  )
-}
-
-// Park bench: slatted seat and back, armrests and a bin.
-export function BenchDetail({ wood, iron }: { wood: string; iron: string }) {
-  return (
-    <group>
-      {[-0.1, 0, 0.1].map((z) => <Box key={z} p={[0, 0.34, z]} s={[1, 0.03, 0.08]}>{c(wood)}</Box>)}
-      {[0.46, 0.58].map((y) => <Box key={y} p={[0, y, -0.18]} s={[1, 0.08, 0.03]} cast>{c(wood)}</Box>)}
-      {[-0.48, 0.48].map((x) => <Box key={x} p={[x, 0.45, 0]} s={[0.05, 0.04, 0.3]}>{c(iron)}</Box>)}
-      <group position={[0.72, 0, 0.1]}>
-        <mesh position={[0, 0.16, 0]} castShadow><cylinderGeometry args={[0.1, 0.09, 0.32, 10]} />{c('#37474f')}</mesh>
-        <mesh position={[0, 0.33, 0]}><cylinderGeometry args={[0.11, 0.11, 0.03, 10]} />{c('#546e7a')}</mesh>
-      </group>
-    </group>
-  )
-}
-
-// Street lamp: a cast base and a cap over the globe.
-export function LampDetail({ iron }: { iron: string }) {
-  return (
-    <group>
-      <mesh position={[0, 0.08, 0]} castShadow><cylinderGeometry args={[0.09, 0.12, 0.16, 8]} />{c(iron)}</mesh>
-      <mesh position={[0.38, 1.81, 0]}><coneGeometry args={[0.13, 0.08, 8]} />{c(iron)}</mesh>
-      <mesh position={[0.07, 1.68, 0]} rotation-z={0.8}><boxGeometry args={[0.03, 0.18, 0.03]} />{c(iron)}</mesh>
-    </group>
-  )
-}
-
 // Billboard: a catwalk under the board and a ladder up to it.
 export function BillboardDetail() {
   return (

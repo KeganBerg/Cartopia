@@ -5,6 +5,8 @@ import { growthStage } from '../game/growth'
 import { signTexture } from './signTexture'
 import { signMat } from './closingTime'
 import { CarModel } from './CarModel'
+import { PropMesh } from './propKit'
+import { DECOR_PROPS } from './decorProps'
 import { Facade, Upright } from './mergeScale'
 import { glowMats, onNight } from './dayNight'
 import { ClubLife } from './ClubLife'
@@ -1177,6 +1179,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
         </group>
       )
     case 'hedge':
+      if (!ghost) return <PropMesh parts={DECOR_PROPS.hedge()} />
       return (
         <group>
           {/* Boxwood stays green through the fall: a stone kerb, a clipped body
@@ -1240,6 +1243,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
         </group>
       )
     case 'picnic':
+      if (!ghost) return <PropMesh parts={DECOR_PROPS.picnic(def.color)} />
       return (
         <group>
           <Box m={m} at={[0, 0.38, 0]} s={[1.1, 0.05, 0.5]} c="#a1887f" />
@@ -1304,6 +1308,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
         </group>
       )
     case 'flagpole':
+      if (!ghost) return <PropMesh parts={DECOR_PROPS.flagpole(GOLD)} />
       return (
         <group>
           <Cyl m={m} at={[0, 0.1, 0]} r={0.36} r2={0.42} h={0.2} c="#cfd8dc" seg={12} />
