@@ -37,7 +37,7 @@ export function clubPulse(now = performance.now(), bpm = GROOVES[grooveFor()].bp
   const wall = Date.now() - (performance.now() - now)
   if (technoOn(wall)) {
     const b = technoBeat(wall)
-    return { step: b.beat, flash: Math.max(b.kick, b.drop), live: true }
+    return { step: b.beat + 6000, flash: Math.max(b.kick, b.drop), live: true }
   }
   hits.sort((a, b) => a.at - b.at)
   while (hits.length && hits[0].at <= now) {

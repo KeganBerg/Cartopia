@@ -4,10 +4,11 @@
 // acid line, dub-delayed minor chord stabs, and a breakdown with a pad, a
 // riser and a clap roll into the drop.
 //
-// It follows the shared wall clock (techno.ts): sixteenth n plays at n * 100 ms
-// since 1970, so every player's town is on the same bar. step() schedules a
-// little ahead, so it also drives an offline render in tests.
-import { CYCLE_BARS, SIXTEENTH_MS, kickOn, sectionOf, type Section } from '../game/techno'
+// It follows the wall clock from the drop (techno.ts): sixteenth n plays at
+// drop + n * 100 ms, negative through the minute-long build-up, where the whole
+// mix starts muffled and opens up before the breakdown, riser and drop.
+// step() schedules a little ahead, so it also drives an offline render in tests.
+import { BREAK_BARS, BUILD_BARS, CYCLE_BARS, SIXTEENTH_MS, breakBuild, kickOn, sectionOf, type Section } from '../game/techno'
 
 const S = SIXTEENTH_MS / 1000 // one sixteenth, in seconds
 const F1 = 43.65
@@ -21,6 +22,7 @@ const SLIDES = new Set([3, 7, 11, 15])
 const ACCENTS = new Set([0, 6, 10, 14])
 // Closed hat loudness by sixteenth: the off-beat leans in.
 const HAT = [0, 0.35, 1, 0.45]
+const mod = (a: number, b: number) => ((a % b) + b) % b
 
 // ---- Drum hits, rendered once into buffers so playing one costs one node ----
 
@@ -130,6 +132,8 @@ export class TechnoTrack {
   private ctx: BaseAudioContext
   private out: GainNode
   private mix: GainNode
+  private tone: BiquadFilterNode
+  private swell: GainNode
   private duck: GainNode
   private drums: GainNode
   private hats: GainNode
@@ -144,7 +148,7 @@ export class TechnoTrack {
   private ride: AudioBuffer
   private crash: AudioBuffer
   private noise: AudioBuffer
-  private next = -1 // the next sixteenth to schedule
+  private next: number | null = null // the next sixteenth to schedule, counted from the drop
   private acidHz = 0
   private sources: AudioScheduledSourceNode[] = []
 
@@ -160,7 +164,11 @@ export class TechnoTrack {
     comp.ratio.value = 4
     comp.attack.value = 0.004
     comp.release.value = 0.14
-    comp.connect(this.out)
+    // After it, the build-up opens a filter over the whole mix, muffled to
+    // bright, and swells it up from half volume.
+    this.swell = this.gain(1, this.out)
+    this.tone = this.filter('lowpass', 20000, this.swell, 0.9)
+    comp.connect(this.tone)
     this.mix = ctx.createGain()
     this.mix.connect(comp)
     this.drums = this.gain(1, this.mix)
@@ -200,16 +208,17 @@ export class TechnoTrack {
     this.out.gain.setTargetAtTime(v, t, tc)
   }
 
-  // Schedules the next half second. `t` is the audio clock now and `wall` the
-  // wall-clock time (ms since 1970) that will be heard at `t`.
-  step(t: number, wall: number) {
-    const ahead = wall + 500
-    const first = Math.ceil((wall + 40) / SIXTEENTH_MS)
-    // Starting out, or after a stall (a hidden tab): pick up on the next sixteenth.
-    if (this.next < first || this.next > first + 8) this.next = first
-    while (this.next * SIXTEENTH_MS < ahead) {
+  // Schedules the next half second. `t` is the audio clock now, `wall` the
+  // wall-clock time (ms since 1970) that will be heard at `t`, and `drop` the
+  // wall-clock time of the drop.
+  step(t: number, wall: number, drop: number) {
+    const rel = wall - drop
+    const first = Math.ceil((rel + 40) / SIXTEENTH_MS)
+    // Starting out, after a stall (a hidden tab) or a new event: pick up on the next sixteenth.
+    if (this.next === null || this.next < first || this.next > first + 8) this.next = first
+    while (this.next * SIXTEENTH_MS < rel + 500) {
       const n = this.next++
-      this.sixteenth(n, t + (n * SIXTEENTH_MS - wall) / 1000)
+      this.sixteenth(n, t + (n * SIXTEENTH_MS - rel) / 1000)
     }
     this.sources = this.sources.filter((s) => (s as AudioScheduledSourceNode & { _end?: number })._end! > t)
   }
@@ -227,14 +236,27 @@ export class TechnoTrack {
   }
 
   private sixteenth(n: number, at: number) {
-    const k = n % 16
+    const k = mod(n, 16)
     const bar = Math.floor(n / 16)
-    const p = ((bar % CYCLE_BARS) + CYCLE_BARS) % CYCLE_BARS
+    const p = mod(bar, CYCLE_BARS)
     const sec: Section = sectionOf(bar)
-    const root = F1 * ROOTS[bar % 4]
+    const ratio = ROOTS[mod(bar, 4)]
+    const root = F1 * ratio
     const brk = sec === 'break'
-    // Through the breakdown, 0 at its start to 1 at the drop.
-    const build = brk ? (p - 20 + k / 16) / 4 : 0
+    const intro = sec === 'intro'
+    // Through the build-up's groove, 0 at its start to 1 at its breakdown.
+    const rise = intro ? (bar + BUILD_BARS + k / 16) / (BUILD_BARS - BREAK_BARS) : 1
+    // Through a breakdown, 0 at its start to 1 at the drop.
+    const build = breakBuild(bar, k / 16)
+    // The last bar before a drop, and a breakdown's first bar.
+    const lastBar = bar === -1 || (bar >= 0 && p === 23)
+    const breakStart = bar === -BREAK_BARS || (bar >= 0 && p === 20)
+
+    // The build-up opens the whole mix from a muffled thud to full brightness.
+    if (k === 0) {
+      this.tone.frequency.setTargetAtTime(intro ? 220 * 14 ** Math.min(1, rise) : 20000, at, intro ? 0.4 : 0.05)
+      this.swell.gain.setTargetAtTime(intro ? 0.3 + 0.7 * Math.min(1, rise) : 1, at, 0.4)
+    }
 
     // Kick, and the sidechain dip it carves into everything melodic.
     if (kickOn(n)) {
@@ -245,30 +267,33 @@ export class TechnoTrack {
     }
 
     // The drop: a crash and a falling sub boom.
-    if (p === 0 && k === 0) {
+    if (bar >= 0 && p === 0 && k === 0) {
       this.play(this.crash, at, 0.5, this.hats)
       this.boom(at)
     }
 
-    // Claps on two and four, and a roll that speeds up through the last bar of the breakdown.
-    if (!brk && (k === 4 || k === 12)) this.play(this.clap, at, 0.55, this.drums, this.room, 0.3)
-    if (brk && p === 23) {
+    // Claps on two and four (joining halfway through the build-up), and a roll
+    // that speeds up through the last bar before a drop.
+    if (!brk && (k === 4 || k === 12) && (!intro || rise > 0.5)) this.play(this.clap, at, 0.55, this.drums, this.room, 0.3)
+    if (lastBar) {
       const every = k < 8 ? 2 : 1
       if (k % every === 0) this.play(this.clap, at, 0.18 + 0.35 * (k / 16), this.drums, this.room, 0.25)
       if (k >= 12) this.play(this.clap, at + S / 2, 0.2 + 0.3 * (k / 16), this.drums)
-    }
+    } else if (bar === -2 && k % 4 === 0) this.play(this.clap, at, 0.2, this.drums, this.room, 0.3)
 
     // Hats: sixteenth closed hats, an open hat on every off-beat, ride in the peak and drop.
+    const sparse = sec === 'tension' || (intro && rise < 0.6)
     if (!brk) {
-      if (k % 4) this.play(this.hatC, at, HAT[k % 4] * (sec === 'tension' ? 0.7 : 1) * (0.9 + Math.random() * 0.2), this.hats)
-      if (k % 4 === 2 && sec !== 'tension') this.play(this.hatO, at, 0.55, this.hats)
+      if (k % 4) this.play(this.hatC, at, HAT[k % 4] * (sparse ? 0.7 : 1) * (0.9 + Math.random() * 0.2), this.hats)
+      if (k % 4 === 2 && !sparse) this.play(this.hatO, at, 0.55, this.hats)
       if ((sec === 'peak' || sec === 'drop') && k % 2 === 0) this.play(this.ride, at, k % 4 ? 0.3 : 0.18, this.hats)
-    } else if (p >= 22) this.play(this.hatC, at, (0.2 + 0.6 * build) * HAT[k % 4 || 2], this.hats)
+    } else if (build > 0.5) this.play(this.hatC, at, (0.2 + 0.6 * build) * HAT[k % 4 || 2], this.hats)
 
     // The rolling bass on the sixteenths between kicks.
-    if (!brk && k % 4) this.bass(at, root * (k % 4 === 3 && bar % 2 ? 2 : 1), k % 4 === 2 ? 1 : 0.75)
+    if (!brk && k % 4) this.bass(at, root * (k % 4 === 3 && mod(bar, 2) ? 2 : 1), k % 4 === 2 ? 1 : 0.75)
 
-    // The acid line: closed in the stripped-back bars, opening through the groove, wide open on the drop.
+    // The acid line: creeping open through the build-up, closed in the stripped-back
+    // bars, opening through the groove, wide open on the drop.
     const step = ACID[k]
     if (step !== null) {
       const open =
@@ -276,16 +301,17 @@ export class TechnoTrack {
         sec === 'peak' ? 0.85 :
         sec === 'groove' ? 0.25 + 0.6 * ((p - 4 + k / 16) / 8) :
         sec === 'tension' ? 0.15 :
+        intro ? 0.08 + 0.4 * rise :
         0.1 + 0.6 * build
-      this.acid(at, F1 * 2 * ROOTS[bar % 4] * 2 ** (step / 12), SLIDES.has(k), ACCENTS.has(k), open, brk ? 0.6 : 1)
+      this.acid(at, F1 * 2 * ratio * 2 ** (step / 12), SLIDES.has(k), ACCENTS.has(k), open, brk ? 0.6 : 1)
     }
 
     // Minor chord stabs with a dub delay, in the peak and the drop.
-    if ((sec === 'peak' && (k === 3 || k === 6 || k === 11)) || (sec === 'drop' && (k === 2 || k === 10 || (k === 7 && bar % 2)))) this.stab(at, ROOTS[bar % 4])
+    if ((sec === 'peak' && (k === 3 || k === 6 || k === 11)) || (sec === 'drop' && (k === 2 || k === 10 || (k === 7 && mod(bar, 2))))) this.stab(at, ratio)
 
-    // The breakdown: a dark pad that opens up and a noise riser.
-    if (brk && k === 0) this.pad(at, ROOTS[bar % 4], p - 20)
-    if (p === 20 && k === 0) this.riser(at)
+    // Breakdowns: a dark pad that opens up and a noise riser into the drop.
+    if (brk && k === 0) this.pad(at, ratio, Math.min(3, build * 4))
+    if (breakStart && k === 0) this.riser(at, bar < 0 ? BREAK_BARS : 4)
   }
 
   private play(buf: AudioBuffer, at: number, gain: number, dest: AudioNode, send?: AudioNode, sendGain = 0) {
@@ -368,9 +394,9 @@ export class TechnoTrack {
     for (const f of CHORD.slice(0, 4)) for (const d of [0.996, 1.004]) this.osc('sawtooth', (f / 2) * ratio * d, at, at + len + 0.15).connect(lp)
   }
 
-  // White noise sweeping up through the four bars of the breakdown.
-  private riser(at: number) {
-    const len = S * 64
+  // White noise sweeping up through a breakdown, `bars` long.
+  private riser(at: number, bars: number) {
+    const len = S * 16 * bars
     const s = this.ctx.createBufferSource()
     s.buffer = this.noise
     s.loop = true
