@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { AdditiveBlending, Group, MeshBasicMaterial, Vector3 } from 'three'
+import { AdditiveBlending, Group, InstancedMesh, MeshBasicMaterial, Object3D, Vector3 } from 'three'
 import { CarModel, carFrame } from './CarModel'
 import { BuildingModel } from './BuildingModel'
 import { holdTown } from './renderGate'
@@ -8,11 +8,13 @@ import { Batch } from './Batch'
 import { LAYER, decal } from './layers'
 import { asphaltTex, grassTex, paverTex } from './textures'
 import { ArcadeSky, Bin, CarShadow, Crowd, Hydrant, K, Lamp, useArcadeLook, useTownPool, type Person } from './ArcadeScenery'
-import { BLOCK, DASH_BONUS, DASH_TIME, GRID, STREET, TOWN, blockCentre, insideBlock, kerbSpot } from '../game/arcadeMore'
+import { BLOCK, DASH_BONUS, DASH_TIME, DROP_LINE, DROP_R, GRID, STREET, TOWN, TOWN_SOLIDS, atDrop, blockCentre, kerbSpot } from '../game/arcadeMore'
+import { carBox, step, type Footprint } from '../game/collide'
+import { Footprinted, frameFootprint, scaled } from './footprint'
 import { buildingDef, TILE } from '../game/data'
 import type { ChaseCar } from './ChaseScene'
 import type { ParkInput } from './ParkScene'
-import { bumpSound, dingSound } from '../lib/arcadeSound'
+import { bumpSound, dingSound, scrubSound } from '../lib/arcadeSound'
 
 export type DashHud = { drops: number; time: number; carrying: boolean }
 export type DashEnd = { drops: number }
@@ -21,7 +23,7 @@ const LEN = 1.5
 const MAX_FWD = 7
 const MAX_REV = 3
 const WALK = 0.9 // sidewalk inside each block's edge
-const REACH = 1.4 // how close counts as arriving
+const SPARKS = 14
 
 // Shop blocks and house blocks alternate like a checkerboard.
 const isShops = (bx: number, bz: number) => (bx + bz) % 2 === 0
@@ -165,7 +167,7 @@ function Beacon({ beam, ring }: { beam: React.Ref<Group>; ring: React.Ref<MeshBa
         <meshBasicMaterial ref={ring} color="#ffd54f" transparent opacity={0.28} blending={AdditiveBlending} depthWrite={false} side={2} toneMapped={false} />
       </mesh>
       <mesh rotation-x={-Math.PI / 2} position-y={LAYER.paint + 0.01}>
-        <ringGeometry args={[0.85, 1.05, 32]} />
+        <ringGeometry args={[DROP_R - DROP_LINE, DROP_R, 40]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0.8} depthWrite={false} toneMapped={false} {...decal(3)} />
       </mesh>
     </group>
@@ -185,8 +187,17 @@ export function DeliveryScene({ me, input, running, onHud, onEnd }: {
   const sc = LEN / f.len
   const start = useMemo(() => ({ x: blockCentre(1) + BLOCK / 2 + STREET / 2, z: blockCentre(2), h: Math.PI }), [])
   const first = useMemo(() => pickFar(SHOP_SPOTS, start.x, start.z), [start])
-  const st = useRef({ pose: { ...start }, v: 0, t: 0, left: DASH_TIME, drops: 0, carrying: false, target: first, cool: 0, done: false, hudAt: 0 })
+  const st = useRef({
+    pose: { ...start }, v: 0, t: 0, left: DASH_TIME, drops: 0, carrying: false, target: first, cool: 0, done: false, hudAt: 0,
+    // A knock: how hard, which way it rocks the car (pitch, roll), and how long ago.
+    jolt: 0, pitch: 0, roll: 0, joltT: 0, shake: 0,
+    sparks: Array.from({ length: SPARKS }, () => ({ x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, age: 1 })),
+  })
+  const foot = useRef<Footprint>(scaled(frameFootprint(me.body), sc))
   const car = useRef<Group>(null)
+  const body = useRef<Group>(null)
+  const sparkMesh = useRef<InstancedMesh>(null)
+  const dummy = useMemo(() => new Object3D(), [])
   const box = useRef<Group>(null)
   const beam = useRef<Group>(null)
   const ring = useRef<MeshBasicMaterial>(null)
@@ -225,17 +236,48 @@ export function DeliveryScene({ me, input, running, onHud, onEnd }: {
     if (s.v !== 0) {
       const steer = live ? input.steer : 0
       const h = s.pose.h + steer * 2.4 * Math.sign(s.v) * Math.min(1, Math.abs(s.v) / 2.5) * dt
-      const x = s.pose.x + Math.sin(h) * s.v * dt, z = s.pose.z + Math.cos(h) * s.v * dt
-      const nose = Math.sign(s.v) * LEN * 0.45
-      if (insideBlock(x, z, 0.35) || insideBlock(x + Math.sin(h) * nose, z + Math.cos(h) * nose, 0.1)) {
-        if (s.cool <= 0 && Math.abs(s.v) > 2) { bumpSound(); s.cool = 0.5 }
-        s.v = -s.v * 0.3
-        s.pose.h = h
-      } else s.pose = { x, z, h }
+      const next = { x: s.pose.x + Math.sin(h) * s.v * dt, z: s.pose.z + Math.cos(h) * s.v * dt, h }
+      // The car's own measured box against the kerbs: scrape along them, rock and spark on a knock.
+      const r = step(s.pose, s.v, next, foot.current, TOWN_SOLIDS)
+      s.pose = r.pose
+      s.v = r.v
+      if (r.impact > 0.4) {
+        const hard = r.impact > 2.2
+        if (s.cool <= 0) {
+          if (hard) bumpSound()
+          else scrubSound()
+          s.cool = hard ? 0.4 : 0.3
+        }
+        // Which side took it, in the car's own frame (+z ahead, +x across).
+        const c = Math.cos(s.pose.h), sn = Math.sin(s.pose.h)
+        const along = r.nx * sn + r.nz * c, across = r.nx * c - r.nz * sn
+        const jolt = Math.min(1, r.impact / 6)
+        if (jolt > s.jolt * Math.exp(-s.joltT * 4)) {
+          s.jolt = jolt
+          s.pitch = along
+          s.roll = across
+          s.joltT = 0
+          if (hard) s.shake = Math.max(s.shake, 0.25 * s.jolt + 0.1)
+        }
+        // Sparks where the car meets the kerb.
+        const b = carBox(s.pose, foot.current)
+        const ext = (Math.abs(across) * b.w + Math.abs(along) * b.l) / 2
+        const px = b.x - r.nx * ext, pz = b.z - r.nz * ext
+        const n = Math.min(4, Math.ceil(r.impact))
+        for (let k = 0, made = 0; k < SPARKS && made < n; k++) {
+          const p = s.sparks[k]
+          if (p.age < 1) continue
+          const sp = 1.5 + Math.random() * 2.5
+          Object.assign(p, { x: px, y: 0.15, z: pz, vx: r.nx * sp + (Math.random() - 0.5) * 2, vy: 1 + Math.random() * 2, vz: r.nz * sp + (Math.random() - 0.5) * 2, age: 0 })
+          made++
+        }
+      }
     }
+    s.joltT += dt
+    s.shake = Math.max(0, s.shake - dt)
     if (live) {
       const g = s.target
-      if (Math.hypot(s.pose.x - g.x, s.pose.z - g.z) < REACH) {
+      if (atDrop(s.pose.x, s.pose.z, g)) {
         if (s.carrying) {
           s.drops++
           s.left += DASH_BONUS
@@ -258,6 +300,27 @@ export function DeliveryScene({ me, input, running, onHud, onEnd }: {
       car.current.position.set(s.pose.x, 0, s.pose.z)
       car.current.rotation.y = s.pose.h
     }
+    if (body.current) {
+      // Rock away from the knock and settle in a few wobbles.
+      const wob = s.jolt * Math.exp(-s.joltT * 7) * Math.cos(s.joltT * 26)
+      body.current.rotation.set(-s.pitch * wob * 0.16, 0, s.roll * wob * 0.12)
+    }
+    if (sparkMesh.current) {
+      s.sparks.forEach((p, i) => {
+        if (p.age < 1) {
+          p.age += dt * 2.6
+          p.vy -= 14 * dt
+          p.x += p.vx * dt
+          p.y = Math.max(0.03, p.y + p.vy * dt)
+          p.z += p.vz * dt
+        }
+        dummy.position.set(p.x, p.age < 1 ? p.y : -5, p.z)
+        dummy.scale.setScalar(p.age < 1 ? 1 - p.age : 0)
+        dummy.updateMatrix()
+        sparkMesh.current!.setMatrixAt(i, dummy.matrix)
+      })
+      sparkMesh.current.instanceMatrix.needsUpdate = true
+    }
     if (box.current) box.current.visible = s.carrying
     if (beam.current) beam.current.position.set(s.target.x, 0, s.target.z)
     if (ring.current) {
@@ -275,6 +338,7 @@ export function DeliveryScene({ me, input, running, onHud, onEnd }: {
     look.set(s.pose.x, 0, s.pose.z - 1)
     camera.position.lerp(eye.set(s.pose.x, 12 * back, s.pose.z + 6.5 * back), Math.min(1, dt * 4))
     camera.lookAt(look)
+    if (s.shake > 0) camera.position.add(eye.set((Math.random() - 0.5) * s.shake, (Math.random() - 0.5) * s.shake, (Math.random() - 0.5) * s.shake))
     if (t - s.hudAt > 0.1) {
       s.hudAt = t
       onHud({ drops: s.drops, time: Math.max(0, s.left), carrying: s.carrying })
@@ -289,13 +353,19 @@ export function DeliveryScene({ me, input, running, onHud, onEnd }: {
       </Batch>
       <Crowd people={people} scale={0.9} />
       <Beacon beam={beam} ring={ring} />
+      <instancedMesh ref={sparkMesh} args={[undefined, undefined, SPARKS]} frustumCulled={false}>
+        <boxGeometry args={[0.07, 0.07, 0.07]} />
+        <meshBasicMaterial color="#ffcc66" toneMapped={false} />
+      </instancedMesh>
       <group ref={arrow}>
         <mesh rotation-x={Math.PI / 2}><coneGeometry args={[0.28, 0.6, 3]} /><meshBasicMaterial color="#ffffff" toneMapped={false} /></mesh>
       </group>
-      <group ref={car} position={[start.x, 0, start.z]} rotation-y={start.h}>
+      <group ref={car} name="player" position={[start.x, 0, start.z]} rotation-y={start.h}>
         <CarShadow len={LEN} wid={f.wid * sc} />
-        <group scale={sc}>
-          <CarModel body={me.body} model={me.model} color={me.color} finish={me.finish} skin={me.skin} modSkin={me.modSkin} mods={me.mods} beams={view.beams} />
+        <group ref={body}>
+          <Footprinted id={`${me.body}:${me.model}:${me.mods?.join()}`} scale={sc} onFoot={(ft) => void (foot.current = ft)}>
+            <CarModel body={me.body} model={me.model} color={me.color} finish={me.finish} skin={me.skin} modSkin={me.modSkin} mods={me.mods} beams={view.beams} />
+          </Footprinted>
         </group>
         {/* The pizza box on the roof while there's an order on board. */}
         <group ref={box} position={[0, f.deck * sc + 0.06, -0.1]} visible={false}>
