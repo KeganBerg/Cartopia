@@ -1,11 +1,11 @@
 /* The end-of-tutorial goal screen. It reuses the level-up splash (.lvl), with the
    dream car parked on top of the card where the level badge sits. */
-.goal { padding-top: 80px; margin-top: 70px; }
+.lvl.goal { padding-top: 80px; margin-top: 70px; }
 .goal-hero { position: absolute; top: -78px; left: 50%; width: 260px; margin-left: -130px; pointer-events: none; animation: lvl-pop .5s cubic-bezier(.2, 1.6, .4, 1) .5s both; }
 .goal-hero .thumb3d { --th: 170px; background: none; filter: drop-shadow(0 10px 10px rgba(0, 0, 0, .3)); }
 .goal-text { display: flex; flex-direction: column; align-items: center; }
-.goal .lvl-sub { font-size: 18px; color: #37474f; }
-.goal .lvl-chip { font-size: 18px; padding: 4px 12px; }
+.lvl.goal .lvl-sub { font-size: 18px; color: #37474f; }
+.lvl.goal .lvl-chip { font-size: 18px; padding: 4px 12px; }
 .goal-items { margin-top: 10px; grid-template-columns: repeat(3, minmax(0, 176px)); }
 .goal-item { padding-top: 6px; }
 .goal-item .card-name { font-size: 17px; }
@@ -14,10 +14,10 @@
 .goal-lock { position: absolute; top: 4px; right: 6px; font: 13px var(--display); color: #fff; background: #455a64; padding: 1px 7px; border-radius: 8px; }
 
 @media (max-width: 600px) {
-  .goal { padding-top: 62px; margin-top: 64px; }
+  .lvl.goal { padding-top: 62px; margin-top: 64px; }
   .goal-hero { top: -70px; width: 220px; margin-left: -110px; }
   .goal-hero .thumb3d { --th: 140px; }
-  .goal .lvl-sub { font-size: 16px; }
+  .lvl.goal .lvl-sub { font-size: 16px; }
   .goal-items { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
   .goal-item { padding: 4px 4px 6px; }
   .goal-item .thumb3d, .goal-shot { height: 74px; }
@@ -26,14 +26,14 @@
 
 /* Phone on its side: the car and goal on the left, the features in one row. */
 @media (max-height: 500px) {
-  .goal { display: grid; grid-template-columns: 200px 1fr; grid-template-rows: auto 1fr auto; column-gap: 12px; padding: 10px 14px; margin-top: 0; width: min(780px, 100%); text-align: center; }
+  .lvl.goal { display: grid; grid-template-columns: 200px 1fr; grid-template-rows: auto 1fr auto; column-gap: 12px; padding: 10px 14px; margin-top: 0; width: min(780px, 100%); text-align: center; }
   .goal-hero { position: static; grid-row: 1 / 3; width: 200px; margin: 0; align-self: center; }
   .goal-hero .thumb3d { --th: 130px; }
   .goal-text { grid-column: 2; }
-  .goal .lvl-title { font-size: 28px; }
+  .lvl.goal .lvl-title { font-size: 28px; }
   .goal-items { grid-column: 2; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); overflow: visible; margin-top: 6px; gap: 6px; }
   .goal-item { flex: initial; }
   .goal-item .thumb3d, .goal-shot { height: 58px; }
   .goal-item .card-name { font-size: 13px; }
-  .goal .lvl-continue { grid-column: 1 / 3; justify-self: center; min-width: 220px; }
+  .lvl.goal .lvl-continue { grid-column: 1 / 3; justify-self: center; min-width: 220px; }
 }
