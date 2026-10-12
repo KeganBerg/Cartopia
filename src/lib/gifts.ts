@@ -51,17 +51,20 @@ export async function sendGift(to: string, item: GiftItem) {
 
 // Collects what the server allows today and adds it to the town.
 export async function claimGifts() {
-  if (!supabase || !signedIn()) return
-  const { data, error } = await supabase.rpc('claim_gifts')
   const s = useGame.getState()
+  if (!supabase || !signedIn()) return s.toast('Sign in to collect gifts')
+  const { data, error } = await supabase.rpc('claim_gifts')
   if (error || !data) return s.toast("Couldn't collect right now. Try again soon.")
   const got = data as { fuel: number; parts: number; count: number; left: number }
   if (got.count > 0) {
+    // Paid oldest first; the inbox lists newest first. Drop them now so the panel
+    // reacts even if the refresh below is slow.
+    useGifts.setState((g) => ({ inbox: g.inbox.slice(0, Math.max(0, g.inbox.length - got.count)) }))
     s.receiveGifts(got.fuel, got.parts)
     await flushSave()
   }
-  if (got.left > 0) s.toast(`${got.left} more waiting. You can collect 10 a day.`)
-  await refreshGifts()
+  if (got.left > 0) s.toast(got.count > 0 ? `${got.left} more waiting. You can collect 10 a day.` : "You've collected 10 today. The rest wait for tomorrow.")
+  await refreshGifts().catch(() => {})
 }
 
 // Inbox totals, for the collect button.

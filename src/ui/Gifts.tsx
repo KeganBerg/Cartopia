@@ -69,9 +69,13 @@ export function GiftsPanel() {
   const openPanel = useGame((s) => s.openPanel)
   const t = noteTotals(inbox)
   const collect = async () => {
+    if (busy) return
     setBusy(true)
-    await claimGifts()
-    setBusy(false)
+    try {
+      await claimGifts()
+    } finally {
+      setBusy(false)
+    }
     if (!useGifts.getState().inbox.length) openPanel(null)
   }
   return (
@@ -88,13 +92,14 @@ export function GiftsPanel() {
                   <div className="card-name"><PlayerName id={n.from} town={n.fromName} /></div>
                   <div className="card-stat">{noteText(n)}</div>
                 </div>
-                <span className="price">+{n.amount} {n.kind === 'parts' ? '⚙' : '⛽'}</span>
+                {/* The server pays waiting notes together, so any amount collects them all. */}
+                <button className="buy small gift-take" disabled={busy} onClick={collect}>+{n.amount} {n.kind === 'parts' ? '⚙' : '⛽'}</button>
               </div>
             ))}
           </div>
           <div className="welcome-actions">
             <button className="buy welcome-collect" disabled={busy} onClick={collect}>
-              Collect{t.fuel ? ` +${t.fuel} ⛽` : ''}{t.parts ? ` +${t.parts} ⚙` : ''}
+              {busy ? 'Collecting…' : <>Collect{t.fuel ? ` +${t.fuel} ⛽` : ''}{t.parts ? ` +${t.parts} ⚙` : ''}</>}
             </button>
           </div>
         </>
