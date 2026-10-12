@@ -16,7 +16,7 @@ export type ExoticHelpers = {
   brakes: (k: Kit, wx: number, wz: number, r: number, w: number) => void
   bar: (k: Kit, part: Part, a: V3, b: V3, t: number) => void
 }
-export type ExoticFit = { spoiler?: boolean; hood?: boolean; exhaust?: boolean; kit?: boolean }
+export type ExoticFit = { spoiler?: string; hood?: string; exhaust?: string; kit?: string }
 
 const box = (w: number, h: number, d: number) => new BoxGeometry(w, h, d)
 const rbox = (w: number, h: number, d: number, r: number) => new RoundedBoxGeometry(w, h, d, 2, Math.min(r, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001))
@@ -33,7 +33,16 @@ const slab = (pts: [number, number][], d: number) => {
 
 // Places flat parts on a lofted surface.
 class Surface {
-  constructor(readonly k: Kit, readonly loft: Loft, readonly topFrom: number, readonly sideAt: number) {}
+  readonly k: Kit
+  readonly loft: Loft
+  readonly topFrom: number
+  readonly sideAt: number
+  constructor(k: Kit, loft: Loft, topFrom: number, sideAt: number) {
+    this.k = k
+    this.loft = loft
+    this.topFrom = topFrom
+    this.sideAt = sideAt
+  }
   y(x: number, z: number) { return this.loft.top(x, z, this.topFrom) }
   // Lays a part flat on the top surface at (x, z), its own +y pointing forward and +x to
   // the car's left, lifted `out` along the surface normal, turned `turn` about it.

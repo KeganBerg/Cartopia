@@ -16,7 +16,12 @@ const cr = (a: number, b: number, c: number, d: number, t: number) =>
   0.5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t * t + (-a + 3 * b - 3 * c + d) * t * t * t)
 
 export class Loft {
-  constructor(readonly keys: Section[], readonly steps = 5) {}
+  readonly keys: Section[]
+  readonly steps: number
+  constructor(keys: Section[], steps = 5) {
+    this.keys = keys
+    this.steps = steps
+  }
 
   // The section at key index t (fractional).
   at(t: number): Section {
