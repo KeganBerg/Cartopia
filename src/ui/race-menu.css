@@ -24,6 +24,10 @@
 .rm-qc-chips { display: flex; gap: 5px; align-items: center; font-size: 12px; font-weight: 800; color: #4a6283; }
 .rm-qc-body .buy { margin-top: auto; width: 100%; }
 .rm-qc-body .buy small { opacity: .85; font-size: 11px; }
+/* Live player: drag challenge and kart challenge side by side. */
+.rm-qc-pair { margin-top: auto; display: flex; gap: 6px; }
+.rm-qc-pair .buy { flex: 1; min-width: 0; }
+.rm-qc-pair .buy + .buy { flex: 0 0 auto; width: auto; padding-left: 10px; padding-right: 10px; }
 .rm-qc-signin { cursor: pointer; }
 
 /* ---------- shared ---------- */

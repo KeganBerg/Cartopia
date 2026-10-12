@@ -195,9 +195,17 @@ export type Kart = {
   towTarget: number // kart being reeled in, -1 for none
 }
 
-export type Hazard = { x: number; z: number; t: number }
+// id: unique across every browser in a live race (the dropping kart's id * 1e5 + a count).
+export type Hazard = { x: number; z: number; t: number; id?: number }
 export type Strip = Hazard & { h: number } // tack strip lying across the road
-export type Hornet = { x: number; z: number; from: number; target: number; t: number }
+export type Hornet = { x: number; z: number; from: number; target: number; t: number; id?: number }
+
+// What happened to karts this browser drives that the other browsers in a live race need to
+// copy: an item used (with where it landed), a crate taken, a dropped hazard or hornet used up.
+export type KartNote =
+  | { k: 'item'; kart: number; item: ItemId; x: number; z: number; h: number; id: number; target: number; targets?: number[] }
+  | { k: 'crate'; kart: number; i: number }
+  | { k: 'gone'; id: number }
 export type KartEvent = {
   kind: 'bump' | 'wall' | 'boost' | 'item' | 'hit' | 'lap' | 'finish' | 'turbo' | 'jump' | 'land' | 'crate' | 'block' | 'flat' | 'smoke' | 'zap' | 'tow'
   kart: number; value?: number
@@ -221,6 +229,11 @@ export class KartRace {
   events: KartEvent[] = []
   rand: () => number
   finishOrder: number[] = []
+  // Live races: which karts this browser drives (the rest are copied from the others), and
+  // what needs telling to them. Single player owns every kart and nobody reads the notes.
+  owned: (id: number) => boolean = () => true
+  notes: KartNote[] = []
+  private seq = 0
 
   constructor(track: Track, field: { name: string; pi: number; ai: boolean; skill?: number }[], seed = 1) {
     this.track = track
@@ -250,7 +263,8 @@ export class KartRace {
 
   // Finished karts by finishing order, then everyone else by distance.
   order(): Kart[] {
-    const done = this.finishOrder.map((i) => this.karts[i])
+    // By finishing time, which in a live race also settles karts whose finish reached us late.
+    const done = this.finishOrder.map((i) => this.karts[i]).sort((a, b) => a.done! - b.done!)
     const rest = this.karts.filter((k) => k.done === null).sort((a, b) => this.progress(b) - this.progress(a))
     return [...done, ...rest]
   }
@@ -261,6 +275,7 @@ export class KartRace {
     if (running) this.t += dt
     const order = this.order()
     this.karts.forEach((k, i) => {
+      if (!this.owned(k.id)) return
       const inp = !running ? idleInput() : k.done !== null ? this.autoInput(k, order, true) : k.ai ? this.autoInput(k, order, false) : inputs[i] ?? idleInput()
       this.drive(k, inp, dt, order)
     })
@@ -466,8 +481,10 @@ export class KartRace {
     // Prize crates.
     t.crates.forEach((c, ci) => {
       if (this.t - this.crateTaken[ci] < 3 || k.y > 1.6) return
+      if (!this.owned(k.id)) return
       if ((c.x - k.x) ** 2 + (c.z - k.z) ** 2 < 1.3 ** 2) {
         this.crateTaken[ci] = this.t
+        this.notes.push({ k: 'crate', kart: k.id, i: ci })
         this.events.push({ kind: 'crate', kart: k.id })
         if (!k.item && k.done === null) k.item = this.rollItem(order.indexOf(k))
       }
@@ -510,25 +527,57 @@ export class KartRace {
     const item = k.item!
     k.item = null
     this.events.push({ kind: 'item', kart: k.id })
-    const bx = k.x - Math.sin(k.h) * 1.8, bz = k.z - Math.cos(k.h) * 1.8
     const rank = order.indexOf(k)
+    const id = k.id * 1e5 + ++this.seq
+    let target = -1, targets: number[] | undefined
     if (item === 'nitro') k.boost = Math.max(k.boost, 1.6)
     else if (item === 'shield') k.shield = 8
-    else if (item === 'oil') this.oil.push({ x: bx, z: bz, t: this.t })
-    else if (item === 'tacks') this.tacks.push({ x: bx, z: bz, t: this.t, h: k.h })
-    else if (item === 'smoke') this.smoke.push({ x: k.x - Math.sin(k.h) * 3, z: k.z - Math.cos(k.h) * 3, t: this.t })
     else if (item === 'tow') {
       // With nobody in reach it still gives a short shove, so it's never a dud.
       k.tow = TOW_TIME
-      k.towTarget = this.towTargetFor(k, order)
+      k.towTarget = target = this.towTargetFor(k, order)
       this.events.push({ kind: 'tow', kart: k.id, value: k.towTarget })
     } else if (item === 'emp') {
       // Zaps up to three karts ahead, nearest first; a bubble shield soaks it up.
-      for (const o of order.slice(Math.max(0, rank - 3), rank)) if (o.done === null) this.hit(o, 'zap')
-    } else {
-      const target = order[Math.max(0, rank - 1)]
-      if (target !== k) this.hornets.push({ x: k.x, z: k.z, from: k.id, target: target.id, t: this.t })
+      targets = order.slice(Math.max(0, rank - 3), rank).filter((o) => o.done === null).map((o) => o.id)
+    } else if (item === 'hornet') {
+      const o = order[Math.max(0, rank - 1)]
+      target = o === k ? -1 : o.id
     }
+    const note: KartNote = { k: 'item', kart: k.id, item, x: k.x, z: k.z, h: k.h, id, target, targets }
+    this.notes.push(note)
+    this.drop(note)
+  }
+
+  // Puts down what an item leaves on the track (or zaps its targets): for our own karts as
+  // they use one, and for a live race's other karts as their notes come in.
+  drop(n: KartNote & { k: 'item' }) {
+    const bx = n.x - Math.sin(n.h) * 1.8, bz = n.z - Math.cos(n.h) * 1.8
+    if (n.item === 'oil') this.oil.push({ x: bx, z: bz, t: this.t, id: n.id })
+    else if (n.item === 'tacks') this.tacks.push({ x: bx, z: bz, t: this.t, h: n.h, id: n.id })
+    else if (n.item === 'smoke') this.smoke.push({ x: n.x - Math.sin(n.h) * 3, z: n.z - Math.cos(n.h) * 3, t: this.t, id: n.id })
+    else if (n.item === 'hornet' && n.target >= 0) this.hornets.push({ x: n.x, z: n.z, from: n.kart, target: n.target, t: this.t, id: n.id })
+    else if (n.item === 'emp') for (const i of n.targets ?? []) if (this.owned(i)) this.hit(this.karts[i], 'zap')
+  }
+
+  // A live race's note from another browser.
+  apply(n: KartNote) {
+    if (n.k === 'item') {
+      if (n.kart >= 0 && n.kart < this.karts.length && !this.owned(n.kart)) {
+        this.events.push({ kind: 'item', kart: n.kart })
+        this.drop(n)
+      }
+    } else if (n.k === 'crate') {
+      if (n.i >= 0 && n.i < this.crateTaken.length) this.crateTaken[n.i] = this.t
+    } else {
+      const keep = (h: { id?: number }) => h.id !== n.id
+      this.oil = this.oil.filter(keep)
+      this.tacks = this.tacks.filter(keep)
+      this.hornets = this.hornets.filter(keep)
+    }
+  }
+  private used(h: { id?: number }) {
+    if (h.id !== undefined) this.notes.push({ k: 'gone', id: h.id })
   }
 
   hit(k: Kart, how: 'spin' | 'flat' | 'zap' | 'smoke' = 'spin') {
@@ -549,20 +598,20 @@ export class KartRace {
   updateItems(dt: number) {
     this.oil = this.oil.filter((o) => {
       if (this.t - o.t > 25) return false
-      const victim = this.karts.find((k) => k.spin <= 0 && k.y < 0.5 && (k.x - o.x) ** 2 + (k.z - o.z) ** 2 < 1.1 ** 2 && this.t - o.t > 0.4)
-      if (victim) { this.hit(victim); return false }
+      const victim = this.karts.find((k) => this.owned(k.id) && k.spin <= 0 && k.y < 0.5 && (k.x - o.x) ** 2 + (k.z - o.z) ** 2 < 1.1 ** 2 && this.t - o.t > 0.4)
+      if (victim) { this.hit(victim); this.used(o); return false }
       return true
     })
     // Tacks: a strip across the road, 2.6 wide; driving over it (not jumping it) pops a tyre.
     this.tacks = this.tacks.filter((s) => {
       if (this.t - s.t > 25) return false
       const victim = this.karts.find((k) => {
-        if (k.y > 0.4 || k.flat > 0 || this.t - s.t < 0.4) return false
+        if (!this.owned(k.id) || k.y > 0.4 || k.flat > 0 || this.t - s.t < 0.4) return false
         const dx = k.x - s.x, dz = k.z - s.z
         const along = dx * Math.sin(s.h) + dz * Math.cos(s.h), across = dx * Math.cos(s.h) - dz * Math.sin(s.h)
         return Math.abs(along) < 0.7 && Math.abs(across) < 1.3 + KART_R * 0.6
       })
-      if (victim) { this.hit(victim, 'flat'); return false }
+      if (victim) { this.hit(victim, 'flat'); this.used(s); return false }
       return true
     })
     // Smoke: a cloud that lingers; anyone inside (but not the shielded) is slowed and blinded.
@@ -573,7 +622,7 @@ export class KartRace {
       const r = SMOKE_R * Math.min(1, 0.6 + age * 0.4)
       for (const k of this.karts) {
         if ((k.x - c.x) ** 2 + (k.z - c.z) ** 2 < r * r && k.y < 2) {
-          if (k.shield > 0) continue
+          if (k.shield > 0 || !this.owned(k.id)) continue
           this.hit(k, 'smoke')
         }
       }
@@ -584,7 +633,8 @@ export class KartRace {
       const dx = k.x - h.x, dz = k.z - h.z
       const d = Math.hypot(dx, dz)
       if (d < 1 || this.t - h.t > 8) {
-        if (d < 1) this.hit(k)
+        // Only the browser driving the target decides the hit; the others just lose the drone.
+        if (d < 1 && this.owned(k.id)) this.hit(k)
         return false
       }
       const v = 42 * dt
@@ -598,19 +648,24 @@ export class KartRace {
     const ks = this.karts
     for (let a = 0; a < ks.length; a++) for (let b = a + 1; b < ks.length; b++) {
       const p = ks[a], q = ks[b]
+      // In a live race each browser moves only its own karts: against a kart driven elsewhere,
+      // ours takes the whole shove (the other browser does the same for theirs).
+      const mp = this.owned(p.id) ? 1 : 0, mq = this.owned(q.id) ? 1 : 0
+      if (!mp && !mq) continue
+      const wp = mp / (mp + mq) * 2, wq = mq / (mp + mq) * 2
       if (Math.abs(p.y - q.y) > 0.8) continue
       const dx = q.x - p.x, dz = q.z - p.z
       const d = Math.hypot(dx, dz)
       if (d >= KART_R * 2 || d < 1e-4) continue
       const nx = dx / d, nz = dz / d
       const push = (KART_R * 2 - d) / 2
-      p.x -= nx * push; p.z -= nz * push
-      q.x += nx * push; q.z += nz * push
+      p.x -= nx * push * wp; p.z -= nz * push * wp
+      q.x += nx * push * wq; q.z += nz * push * wq
       const rel = (q.vx - p.vx) * nx + (q.vz - p.vz) * nz
       if (rel < 0) {
         const j = -rel * 0.65
-        p.vx -= nx * j; p.vz -= nz * j
-        q.vx += nx * j; q.vz += nz * j
+        p.vx -= nx * j * wp; p.vz -= nz * j * wp
+        q.vx += nx * j * wq; q.vz += nz * j * wq
         if (-rel > 2.5 && p.bump <= 0) { this.events.push({ kind: 'bump', kart: p.id, value: -rel }); p.bump = 0.25; q.bump = 0.25 }
       }
     }

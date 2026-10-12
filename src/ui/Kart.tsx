@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { NeutralToneMapping } from 'three'
 import type { OwnedCar } from '../game/store'
@@ -24,17 +24,21 @@ export type KartNext = { label: string; go: () => void }
 const fmt = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, '0')}`
 const ORD = (n: number) => `${n}${n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'}`
 
-export function KartGame({ car, title, track, reverse, field, prize, next, onFinish, onExit }: {
+export function KartGame({ car, title, track, reverse, field, prize, next, onFinish, onExit, live }: {
   car: OwnedCar; title: string; track: TrackDef; reverse: boolean
-  field: KartRacer[] // the player is the one with ai: false
+  field: KartRacer[] // the player is the one with ai: false (in a live race: live.me)
   prize?: number
   next?: KartNext | null
-  onFinish: (place: number) => void
+  onFinish: (place: number, time: number) => void
   onExit: () => void
+  // A live race: the race shared with the other browser, the link that keeps it in step,
+  // which kart is ours, whether both players are in (the lights wait for it), and what the
+  // podium says about the server's verdict.
+  live?: { race: KartRace; tick: () => void; me: number; ready: boolean; verdict: ReactNode; loading?: string }
 }) {
   const t = useMemo(() => buildTrack(track, reverse), [track, reverse])
-  const me = field.findIndex((f) => !f.ai)
-  const race = useMemo(() => new KartRace(t, field.map((f) => ({ name: f.name, pi: f.pi, ai: f.ai, skill: f.skill })), Math.floor(Math.random() * 1e6)), [t, field])
+  const me = live ? live.me : field.findIndex((f) => !f.ai)
+  const race = useMemo(() => live?.race ?? new KartRace(t, field.map((f) => ({ name: f.name, pi: f.pi, ai: f.ai, skill: f.skill })), Math.floor(Math.random() * 1e6)), [t, field, live?.race])
   const looks = useMemo(() => field.map((f) => f.look), [field])
   const input = useRef(newDriveInput()).current
   const touch = useTouchDevice()
@@ -65,15 +69,18 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
     e.drive(Math.min(1, rpm), gear + 1, running ? 1 : 0)
   }, [hud, race, me, running])
 
-  // Five lights, one every 0.6 s, then all out: GO.
+  // Five lights, one every 0.6 s, then all out: GO. A live race waits for both players and
+  // drops the random hold so the two browsers go together.
+  const ready = !live || live.ready
+  const fixed = !!live
   useEffect(() => {
-    if (!drawn) return
+    if (!drawn || !ready) return
     const timers: ReturnType<typeof setTimeout>[] = []
     kartLights.n = 0
     for (let i = 1; i <= 5; i++) timers.push(setTimeout(() => { kartLights.n = i; sfx.countdown(false) }, 600 + i * 600))
-    timers.push(setTimeout(() => { kartLights.n = 0; sfx.countdown(true); setRunning(true); setFlash('GO!') }, 600 + 6 * 600 + Math.random() * 400))
+    timers.push(setTimeout(() => { kartLights.n = 0; sfx.countdown(true); setRunning(true); setFlash('GO!') }, 600 + 6 * 600 + (fixed ? 200 : Math.random() * 400)))
     return () => { timers.forEach(clearTimeout); kartLights.n = 0 }
-  }, [drawn])
+  }, [drawn, ready, fixed])
   useEffect(() => {
     if (!flash) return
     const id = setTimeout(() => setFlash(null), 1100)
@@ -109,7 +116,7 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
     // Let the player coast over the line before the podium comes up.
     setTimeout(() => {
       setEnd({ place, order })
-      onFinish(place)
+      onFinish(place, race.karts[me].done ?? race.t)
     }, 1400)
   }
 
@@ -119,9 +126,10 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
   return (
     <div className={`race-full kt${tall ? ' tall' : ' wide'}${dead ? ' dead' : ''}`}>
       <Canvas className="rf-canvas" camera={{ fov: 60, near: 0.3, far: 420 }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
-        <KartScene race={race} looks={looks} me={me} input={input} running={running && !end} onHud={setHud} onEvents={onEvents} onFinish={finish} />
+        <KartScene race={race} looks={looks} me={me} input={input} running={running && !end} onHud={setHud} onEvents={onEvents} onFinish={finish} afterStep={live?.tick} />
       </Canvas>
-      <LoadingScene label={`Driving to ${track.name}`} onReady={() => setDrawn(true)} onClose={onExit} />
+      <LoadingScene label={live?.loading ?? `Driving to ${track.name}`} onReady={() => setDrawn(true)} onClose={onExit} />
+      {drawn && !ready && <div className="kt-wait">⏳ {live?.loading}</div>}
       <div className="rf-top">
         <h2>{title}</h2>
         <button className="close" onClick={onExit} aria-label="Close">✕</button>
@@ -144,7 +152,7 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
       )}
       {flash && <div key={flash} className="kt-flash">{flash}</div>}
       {!end && running && (touch ? <TouchDrive input={input} tall={tall} item={slot} /> : <KeyHints />)}
-      {end && <Podium race={race} field={field} end={end} prize={prize} next={next} onExit={onExit} />}
+      {end && <Podium race={race} field={field} me={me} end={end} prize={prize} next={next} verdict={live?.verdict} onExit={onExit} />}
     </div>
   )
 }
@@ -208,10 +216,17 @@ function MiniMap({ race, hud }: { race: KartRace; hud: KartHud }) {
   )
 }
 
-function Podium({ race, field, end, prize, next, onExit }: { race: KartRace; field: KartRacer[]; end: { place: number; order: number[] }; prize?: number; next?: KartNext | null; onExit: () => void }) {
-  const top = end.order.slice(0, 3)
+function Podium({ race, field, me, end, prize, next, verdict, onExit }: { race: KartRace; field: KartRacer[]; me: number; end: { place: number; order: number[] }; prize?: number; next?: KartNext | null; verdict?: ReactNode; onExit: () => void }) {
+  // Finishers who came in after the podium went up still slot into the list.
+  const [, tick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => tick((n) => n + 1), 500)
+    return () => clearInterval(id)
+  }, [])
+  const order = race.order().map((k) => k.id)
+  const top = order.slice(0, 3)
   const won = end.place === 1
-  const times = end.order.map((i) => race.karts[i].done)
+  const times = order.map((i) => race.karts[i].done)
   return (
     <div className={won ? 'rr win kt-end' : 'rr lose kt-end'}>
       <div className="kt-podium-card">
@@ -223,21 +238,22 @@ function Podium({ race, field, end, prize, next, onExit }: { race: KartRace; fie
             const f = field[i]
             const d = carDef(f.look.model ?? '')
             return (
-              <div key={p} className={`kt-step s${p + 1}${f.ai ? '' : ' me'}`}>
+              <div key={p} className={`kt-step s${p + 1}${i === me ? ' me' : ''}`}>
                 <CarThumb size="sm" color={f.look.color} finish={f.look.finish} skin={f.look.skin} modSkin={f.look.modSkin} body={f.look.body as never} model={d.id} mods={f.look.mods} />
-                <b>{f.ai ? f.name : 'You'}</b>
+                <b>{i === me ? 'You' : f.name}</b>
                 <span className="kt-block">{p + 1}</span>
               </div>
             )
           })}
         </div>
         <ol className="kt-results">
-          {end.order.map((i, n) => (
-            <li key={i} className={field[i].ai ? '' : 'me'}>
-              <span>{ORD(n + 1)}</span><b>{field[i].ai ? field[i].name : 'You'}</b><small>{times[n] !== null ? fmt(times[n]!) : '—'}</small>
+          {order.map((i, n) => (
+            <li key={i} className={i === me ? 'me' : ''}>
+              <span>{ORD(n + 1)}</span><b>{i === me ? 'You' : field[i].name}</b><small>{times[n] !== null ? fmt(times[n]!) : '—'}</small>
             </li>
           ))}
         </ol>
+        {verdict}
         {prize !== undefined && <div className="arc-pay"><span>{won ? `🪙 +$${prize.toLocaleString()}` : `🪙 +$${Math.round(prize * 0.1).toLocaleString()}`}</span></div>}
         <div className="arc-actions">
           <button className="sell" onClick={onExit}>Back</button>

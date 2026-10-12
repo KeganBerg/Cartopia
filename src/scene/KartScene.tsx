@@ -844,9 +844,10 @@ export type KartSceneProps = {
   onHud: (h: KartHud) => void
   onEvents?: (e: KartEvent[]) => void
   onFinish: () => void
+  afterStep?: () => void // live races: swap snapshots with the other browser
 }
 
-export function KartScene({ race, looks, me, input, running, cam = (DEV?.get('cam') as KartCam) ?? 'chase', onHud, onEvents, onFinish }: KartSceneProps) {
+export function KartScene({ race, looks, me, input, running, cam = (DEV?.get('cam') as KartCam) ?? 'chase', onHud, onEvents, onFinish, afterStep }: KartSceneProps) {
   useEffect(() => holdTown(), [])
   const view = useArcadeLook()
   const t = race.track
@@ -875,6 +876,12 @@ export function KartScene({ race, looks, me, input, running, cam = (DEV?.get('ca
     while (s.acc >= step) {
       s.acc -= step
       race.step(step, inputs, running)
+      events.push(...race.events)
+    }
+    if (afterStep) {
+      // Whatever the link copied in from the other browser (their items, finishes) counts too.
+      race.events = []
+      afterStep()
       events.push(...race.events)
     }
     if (events.length) onEvents?.(events)

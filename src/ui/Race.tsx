@@ -26,6 +26,7 @@ import { RaceBar, RaceHub, Rounds, campaignFocus, type HubTab } from './RaceHub'
 import { artStyle } from './venueArt'
 import './race-menu.css'
 import { KartGame, playerRacer, type KartRacer } from './Kart'
+import { LiveKart } from './LiveKart'
 import { gpField, gpTrack } from '../game/kart'
 import { gpClearPi } from '../game/gpBeat'
 import { look as kartLook } from './ArcadeBits'
@@ -470,9 +471,14 @@ export function RacePanel() {
                     {outgoing?.to === p.id ? (
                       <button className="buy small alt" onClick={cancelChallenge} title="Waiting for an answer. Tap to call it off.">⏳ Cancel</button>
                     ) : (
-                      <button className="buy small alt" disabled={!!outgoing || p.closed || wait} onClick={() => void challenge(p.id)}>
-                        {p.closed ? '🚫 Busy' : wait ? '⏱ Soon' : `⚔️ $${liveReward(p.pi)}`}
-                      </button>
+                      <span className="rm-qc-pair">
+                        <button className="buy small alt" disabled={!!outgoing || p.closed || wait} onClick={() => void challenge(p.id)} title="Drag race">
+                          {p.closed ? '🚫 Busy' : wait ? '⏱ Soon' : `⚔️ $${liveReward(p.pi)}`}
+                        </button>
+                        {!p.closed && !wait && (
+                          <button className="buy small alt" disabled={!!outgoing} onClick={() => void challenge(p.id, 'kart')} title="Kart race" aria-label="Kart race">🏎️</button>
+                        )}
+                      </span>
                     )}
                   </span>
                 </div>
@@ -1532,6 +1538,7 @@ export function LiveRaceOverlay() {
   // Picked as the race starts, so switching cars mid-race doesn't swap the car under you.
   const car = useMemo(() => (raceId ? raceCarOf(useGame.getState().cars, useGame.getState().raceCar) : undefined), [raceId])
   if (!race || !car) return null
+  if (race.mode === 'kart') return <LiveKart key={race.raceId} live={race} car={car} onExit={endLiveRace} />
   const o = race.opponent
   const rival: Rival = { id: `live:${o.id}`, town: playerName(o.uid, o.town), level: o.level, carName: o.carName, color: o.color, pi: o.pi, online: true, body: o.body, mods: o.mods }
   return <DragRace key={race.raceId} car={car} rival={rival} live={race} onExit={endLiveRace} />
@@ -1583,7 +1590,7 @@ export function InvitesPanel() {
               <div key={i.raceId} className="rival invite">
                 <i style={{ background: i.from.color }} />
                 <div>
-                  <b><PlayerName id={i.from.uid} town={i.from.town} /></b> <span className="tag live">LIVE</span>
+                  <b><PlayerName id={i.from.uid} town={i.from.town} /></b> <span className="tag live">{i.mode === 'kart' ? '🏎️ KART' : 'LIVE'}</span>
                   <div className="card-stat">Lvl {i.from.level} · {i.from.carName} · PI {i.from.pi} · {Math.max(0, Math.ceil((INVITE_MS - (Date.now() - i.at)) / 1000))}s left</div>
                 </div>
                 <div className="invite-actions">
