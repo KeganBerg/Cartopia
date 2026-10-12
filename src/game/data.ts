@@ -974,14 +974,18 @@ export const PANELS: { id: PanelId; name: string; color: boolean; pattern: boole
   { id: 'rims', name: 'Wheels', color: true, pattern: false, car: false },
 ]
 // Patterns are painted in shades of the panel's own colour, so pink camo is pink.
-// n: the shader's number for it (panelPaint.ts).
-export type PatternDef = { id: string; n: number; name: string; coins: number; unlockLevel: number }
+// n: the shader's number for it (panelPaint.ts). trial: only won, by a first win in
+// that Tuner Trial (game/tuner.ts).
+export type PatternDef = { id: string; n: number; name: string; coins: number; unlockLevel: number; trial?: string }
 export const PATTERNS: PatternDef[] = [
   { id: 'camo', n: 1, name: 'Camo', coins: 600, unlockLevel: 1 },
   { id: 'checker', n: 4, name: 'Checker', coins: 800, unlockLevel: 2 },
   { id: 'digicamo', n: 2, name: 'Digi Camo', coins: 900, unlockLevel: 3 },
   { id: 'tiger', n: 3, name: 'Tiger', coins: 1200, unlockLevel: 5 },
   { id: 'carbon', n: 5, name: 'Carbon', coins: 1500, unlockLevel: 8 },
+  { id: 'hex', n: 6, name: 'Hex', coins: 1000, unlockLevel: 1, trial: 'downforce' },
+  { id: 'splatter', n: 7, name: 'Splatter', coins: 1200, unlockLevel: 1, trial: 'featherweight' },
+  { id: 'flames', n: 8, name: 'Flames', coins: 2000, unlockLevel: 1, trial: 'tunerking' },
 ]
 export const patternDef = (id?: string | null) => PATTERNS.find((p) => p.id === id)
 export const PANEL_COLOR_COST = 200

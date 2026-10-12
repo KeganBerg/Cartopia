@@ -118,6 +118,37 @@ vec3 panPattern(int id, vec3 c, vec3 p, vec3 n) {
     float sheen = 0.5 + 0.5 * sin(across * 3.14159);
     return mix(vec3(0.012), c * 0.35 + 0.02, sheen * (along ? 0.75 : 0.45));
   }
+  if (id == 6) {
+    // Hex: a honeycomb of cells in two shades, with dark seams.
+    vec2 h = panFace(q, n) / 0.075;
+    vec2 r = vec2(1.0, 1.732);
+    vec2 a = mod(h, r) - r * 0.5;
+    vec2 b = mod(h - r * 0.5, r) - r * 0.5;
+    vec2 g = dot(a, a) < dot(b, b) ? a : b;
+    float d = max(dot(abs(g), vec2(0.5, 0.866)), abs(g.x));
+    float shade = panH(vec3(floor(h - g + 0.5), 2.3));
+    vec3 cell = c * (0.78 + 0.22 * step(0.5, shade));
+    return mix(cell, c * 0.4, smoothstep(0.44, 0.47, d));
+  }
+  if (id == 7) {
+    // Splatter: big light splashes, dark drops and a spray of flecks.
+    vec3 o = mix(c, mix(c, vec3(1.0), 0.75), smoothstep(0.64, 0.66, panF(q * 9.0 + vec3(1.3, 7.7, 2.1))));
+    o = mix(o, c * 0.12, smoothstep(0.69, 0.71, panF(q * 14.0 + vec3(5.1, 2.2, 9.4))));
+    return mix(o, vec3(0.95), step(0.93, panN(q * 70.0)) * step(0.5, panF(q * 6.0)));
+  }
+  if (id == 8) {
+    // Flames: licking back from the nose, yellow at the front through orange to red tips, outlined.
+    float start = uZoneOn > 0.5 ? uZone.x - 0.3 : -0.15;
+    float u = q.z - start;
+    float w = (abs(n.y) > 0.6 ? q.x * 34.0 : q.y * 44.0 + q.x * 6.0) + panF(q * 5.0) * 3.0;
+    float tongue = pow(sin(w) * 0.5 + 0.5, 1.6);
+    float edge = 0.4 * (1.0 - tongue) + 0.04;
+    float fl = smoothstep(edge, edge + 0.012, u);
+    float line = fl * (1.0 - smoothstep(edge + 0.012, edge + 0.03, u));
+    vec3 fire = mix(vec3(0.85, 0.06, 0.02), vec3(1.0, 0.85, 0.1), smoothstep(edge + 0.02, edge + 0.3, u));
+    fire = mix(fire, vec3(1.0, 0.45, 0.02), 0.35 * (1.0 - smoothstep(edge + 0.05, edge + 0.18, u)));
+    return mix(mix(c, fire, fl), vec3(0.03), line);
+  }
   return c;
 }
 `

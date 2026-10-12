@@ -8,6 +8,7 @@ import { ThumbRenderer } from './scene/BuildingPreview'
 import { StageCanvas } from './scene/Stage'
 import { BottomBar, ShopPanel, ShowroomPanel, GaragePanel, Toasts } from './ui/Menus'
 import { PaintPrizePopup } from './ui/PaintRivals'
+import { TunerPrizePopup } from './ui/TunerTrials'
 import { RacePanel, LiveRaceOverlay, InvitesPanel, PrizePopup, CampaignPrizePopup, TourPrizePopup, EventPrizePopup } from './ui/Race'
 import { joinLobby, useLive } from './lib/live'
 import { chatDemo, startChat } from './lib/chat'
@@ -191,6 +192,7 @@ export default function App() {
       <TourPrizePopup />
       <EventPrizePopup />
       <PaintPrizePopup />
+      <TunerPrizePopup />
       <LevelUpSplash />
       <Toasts />
       <FlyLayer />

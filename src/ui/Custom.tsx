@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useGame, type OwnedCar } from '../game/store'
 import { paintOpen, rivalForPaint } from '../game/paintRivals'
 import { openPaintRival } from './PaintRivals'
+import { openTunerTrial } from './TunerTrials'
+import { tunerTrial } from '../game/tuner'
 import { PAINTS, PANELS, PATTERNS, carDef, isBike, panelJobCost, tidyPanels, type PanelId, type Panels } from '../game/data'
 
 const same = (a?: Panels | null, b?: Panels | null) => JSON.stringify(tidyPanels(a) ?? {}) === JSON.stringify(tidyPanels(b) ?? {})
@@ -62,6 +64,18 @@ function PatternSwatch({ id, color }: { id: string | null; color: string }) {
         const along = (i % 8 + Math.floor(i / 8)) % 2 === 0
         return <rect key={i} x={x + (along ? 0 : 1.5)} y={y + (along ? 1.5 : 0)} width={along ? 5 : 2} height={along ? 2 : 5} fill={shade(color, -0.6)} opacity=".8" />
       })}
+      {id === 'hex' && Array.from({ length: 24 }, (_, i) => {
+        const x = (i % 6) * 7 + (Math.floor(i / 6) % 2) * 3.5
+        const y = Math.floor(i / 6) * 6 + 1
+        return <path key={i} d={`M${x} ${y + 2} l3 -2 l3 2 v3 l-3 2 l-3 -2Z`} fill="none" stroke={dd} strokeWidth="1" />
+      })}
+      {id === 'splatter' && [[6, 6, 4], [20, 15, 5], [33, 5, 3], [12, 19, 2.5], [29, 20, 2], [26, 9, 1.5], [3, 14, 1.5]].map(([x, y, rr], i) => (
+        <circle key={i} cx={x} cy={y} r={rr} fill={i % 2 ? lt : dd} />
+      ))}
+      {id === 'flames' && <>
+        <path d="M-1 4 Q14 2 22 7 Q16 7 26 11 Q18 11 30 15 Q16 15 22 19 Q10 20 -1 20Z" fill="#ffb300" />
+        <path d="M-1 8 Q10 7 15 10 Q11 11 18 14 Q8 14 12 17 Q4 17 -1 16Z" fill="#e53935" />
+      </>}
     </svg>
   )
 }
@@ -91,6 +105,13 @@ export function CustomShop({ car, panels, setPanels }: { car: OwnedCar; panels: 
   }
   // A locked colour can be tried on; the bar then points at the rival who has it.
   const open = (id: PanelId, c: string) => c === now?.[id]?.color || paintOpen({ rivalRow, oldPaints }, c)
+  // A pattern won in a Tuner Trial (game/tuner.ts) stays shut until that trial is won.
+  const tuner = useGame((s) => s.tuner)
+  const shut = (id: PanelId, pattern: string) => {
+    const t = tunerTrial(PATTERNS.find((x) => x.id === pattern)?.trial ?? '')
+    return t && !((tuner?.[t.id] ?? 0) > 0) && now?.[id]?.pattern !== pattern ? t : undefined
+  }
+  const trialFor = PANELS.map((p) => panels?.[p.id]?.pattern ? shut(p.id, panels[p.id]!.pattern!) : undefined).find(Boolean)
   const lockedBy = PANELS.map((p) => panels?.[p.id]?.color && !open(p.id, panels[p.id]!.color!) ? rivalForPaint(panels[p.id]!.color!) : undefined).find(Boolean)
   const price = [cost.coins && `$${cost.coins.toLocaleString()}`, cost.bucks && `💎 ${cost.bucks}`].filter(Boolean).join(' + ') || 'Free'
   return (
@@ -99,7 +120,9 @@ export function CustomShop({ car, panels, setPanels }: { car: OwnedCar; panels: 
         <div className="try-bar on">
           <span className="try-what">Trying <b>custom paint</b></span>
           <button className="try-cancel" onClick={() => setPanels(null)}>Undo</button>
-          {lockedBy ? (
+          {trialFor ? (
+            <button className="buy small paint-rival-go" onClick={() => openTunerTrial(trialFor.id)} title={`Win ${trialFor.name} to unlock`}>🏁 {trialFor.icon} {trialFor.name}</button>
+          ) : lockedBy ? (
             <button className="buy small paint-rival-go" onClick={() => openPaintRival(lockedBy.id)} title={`Beat ${lockedBy.name} to unlock`}>🏁 {lockedBy.icon} {lockedBy.name.split(' ')[0]}</button>
           ) : (
             <button className={cost.bucks ? 'buy small premium' : 'buy small'} onClick={() => { if (paintPanels(car.uid, panels ?? {})) setPanels(null) }}>Buy · {price}</button>
@@ -123,11 +146,12 @@ export function CustomShop({ car, panels, setPanels }: { car: OwnedCar; panels: 
             const on = (mine?.pattern ?? null) === id
             const had = now?.[info.id]?.pattern === id
             const locked = !!pt && level < pt.unlockLevel && !had
+            const trial = pt ? shut(info.id, pt.id) : undefined
             return (
               <button key={id ?? 'solid'} className={`pat-opt${on ? ' sel' : ''}${locked ? ' locked' : ''}`} disabled={locked} onClick={() => pick({ pattern: id })} title={pt?.name ?? 'Solid'}>
                 <PatternSwatch id={id} color={colour(info.id)} />
                 <b>{pt?.name ?? 'Solid'}</b>
-                <small>{locked ? `🔒 Lv ${pt!.unlockLevel}` : !pt ? 'Free' : had ? '✔' : `$${pt.coins.toLocaleString()}`}</small>
+                <small>{locked ? `🔒 Lv ${pt!.unlockLevel}` : trial ? `🏁 ${trial.icon}` : !pt ? 'Free' : had ? '✔' : `$${pt.coins.toLocaleString()}`}</small>
               </button>
             )
           })}
