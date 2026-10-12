@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { StageSlot, useStageReady } from '../scene/Stage'
 import { useGame, openCrate } from '../game/store'
 import { MOD_SLOTS, SKINNED_SLOTS, carDef, fittedMods, modDef, ownedModSkins, ownedSkins, type ModDef } from '../game/data'
-import { CRATES, carOdds, crateCost, crateDef, crateOddsShown, dropTier, homeCars, homeMods, modChoices, skinOdds, skinOf, type CrateDef, type CrateId, type CrateOpen } from '../game/crates'
+import { CRATES, carOdds, crateCost, crateDef, crateOddsShown, dropTier, homeCars, homeMods, modChoices, pityLeft, skinOdds, skinOf, type CrateDef, type CrateId, type CrateOpen } from '../game/crates'
 import { SKIN_TIERS } from '../game/data'
 import { CrateScene, TIER_GLOW, prizeLook, type CratePhase } from '../scene/CrateScene'
 import { CarThumb } from '../scene/BuildingPreview'
@@ -41,6 +41,7 @@ function Odds({ c, level }: { c: CrateDef; level: number }) {
   const skinIds = useGame((s) => s.skins)
   const modSkinIds = useGame((s) => s.modSkins)
   const claimedSets = useGame((s) => s.claimedSets)
+  const left = pityLeft(c, useGame((s) => s.cratePity?.[c.id] ?? 0))
   const have = useMemo(() => new Set(cars.map((x) => x.model)), [cars])
   const haveSkin = useMemo(() => {
     const st = { level, claimedSets, skins: skinIds, modSkins: modSkinIds }
@@ -67,6 +68,11 @@ function Odds({ c, level }: { c: CrateDef; level: number }) {
         <button className="odd car" style={{ flex: Math.max(o.car, 14) }} onClick={() => toggle('car')} aria-expanded={open === 'car'}><b>🚗</b>{o.car}%<small>{open === 'car' ? '▴' : '▾'}</small></button>
         {o.skin > 0 && <button className="odd skin" style={{ flex: Math.max(o.skin, 14) }} onClick={() => toggle('skin')} aria-expanded={open === 'skin'}><b>✨</b>{o.skin}%<small>{open === 'skin' ? '▴' : '▾'}</small></button>}
       </div>
+      {left != null && (
+        <div className="crate-pity" title={`A ${c.pity?.tier ?? ''} skin is guaranteed within ${left} ${left === 1 ? 'open' : 'opens'}`.replace('  ', ' ')}>
+          <b>{c.pity?.tier === 'legendary' ? '🌟' : '✨'}</b>{left === 1 ? 'Next one' : `≤ ${left}`}
+        </div>
+      )}
       {open === 'mod' && (
         <div className="crate-cars">
           {parts.map(({ m, live }) => (

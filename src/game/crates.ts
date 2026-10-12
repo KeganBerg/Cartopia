@@ -30,6 +30,9 @@ export type CrateDef = {
   modMax?: number
   // Which skin tiers it can hold (body and part skins alike).
   skins: SkinTier[]
+  // Bad-luck protection: after every - 1 opens in a row without a skin (of `tier`, if set), the
+  // next open is one. The crate shows how many opens are left.
+  pity?: { every: number; tier?: SkinTier }
   // Look of the crate in the depot.
   look: { wood: string; band: string; glow: string }
 }
@@ -48,12 +51,12 @@ export const CRATES: CrateDef[] = [
   {
     id: 'gold', name: 'Gold Crate', pay: 'bucks', unlockLevel: 3, base: 8, perLevel: 0,
     odds: { coins: 34, jackpot: 6, mod: 30, car: 20, skin: 10 }, carShare: 0.15, coinMult: [0.45, 0.85], jackpotMult: [2, 3],
-    carMax: 130000, modMax: 15000, skins: ['rare', 'epic', 'legendary'], look: { wood: '#d4a017', band: '#7a4b12', glow: '#ffd54f' },
+    carMax: 130000, modMax: 15000, skins: ['rare', 'epic', 'legendary'], pity: { every: 8 }, look: { wood: '#d4a017', band: '#7a4b12', glow: '#ffd54f' },
   },
   {
     id: 'diamond', name: 'Diamond Crate', pay: 'bucks', unlockLevel: 8, base: 25, perLevel: 0,
     odds: { coins: 24, jackpot: 6, mod: 24, car: 32, skin: 14 }, carShare: 0.2, coinMult: [0.4, 0.8], jackpotMult: [2, 3],
-     skins: ['epic', 'legendary'], look: { wood: '#4fc3f7', band: '#e1f5fe', glow: '#b388ff' },
+     skins: ['epic', 'legendary'], pity: { every: 10, tier: 'legendary' }, look: { wood: '#4fc3f7', band: '#e1f5fe', glow: '#b388ff' },
   },
 ]
 
@@ -170,13 +173,23 @@ function pickWeighted<T>(items: T[], weight: (t: T) => number, rand: () => numbe
   return items[items.length - 1]
 }
 
+// Opens left until the pity prize, given how many opens in a row missed it (null: no pity).
+export const pityLeft = (c: CrateDef, dry: number) => (c.pity ? Math.max(1, c.pity.every - dry) : null)
+// Whether a prize counts as the pity prize, which starts the count again.
+export function pityHit(c: CrateDef, d: CrateDrop) {
+  if (!c.pity || (d.kind !== 'skin' && d.kind !== 'skindupe')) return false
+  return !c.pity.tier || skinOf(d.skin, d.part)?.tier === c.pity.tier
+}
+
 // Rolls one crate for a player at this level with these cars and skins. A part with nothing left
 // to fit, or a car prize with no cars in reach, becomes a coin prize instead; a car or skin the
-// player already has turns into coins.
-export function rollCrate(c: CrateDef, level: number, cars: CarLike[], rand: () => number = Math.random, owned: OwnedSkins = { skins: [], modSkins: [] }): CrateDrop {
+// player already has turns into coins. `dry` opens in a row without the pity prize make the next
+// one it when pityLeft reaches 1.
+export function rollCrate(c: CrateDef, level: number, cars: CarLike[], rand: () => number = Math.random, owned: OwnedSkins = { skins: [], modSkins: [] }, dry = 0): CrateDrop {
   const v = crateValue(c, level)
   const kinds = Object.entries(crateOdds(c, level)) as [keyof CrateOdds, number][]
-  let kind = pickWeighted(kinds, (k) => k[1], rand)[0]
+  const pity = pityLeft(c, dry) === 1
+  let kind = pity ? 'skin' : pickWeighted(kinds, (k) => k[1], rand)[0]
   if (kind === 'mod') {
     const choices = modChoices(c, level, cars)
     if (choices.length) {
@@ -186,7 +199,7 @@ export function rollCrate(c: CrateDef, level: number, cars: CarLike[], rand: () 
     kind = 'coins'
   }
   if (kind === 'skin') {
-    const pool = crateSkins(c)
+    const pool = crateSkins(c).filter((x) => !pity || !c.pity?.tier || x.def.tier === c.pity.tier)
     if (pool.length) {
       const x = pickWeighted(pool, (y) => SKIN_WEIGHT[y.def.tier], rand)
       if ((x.part ? owned.modSkins : owned.skins).includes(x.id)) return { kind: 'skindupe', skin: x.id, part: x.part, coins: roundCoins(v * SKIN_DUPE[x.def.tier]) }
@@ -250,6 +263,7 @@ export function crateTables() {
     crates: Object.fromEntries(CRATES.map((c) => [c.id, {
       pay: c.pay, unlock: c.unlockLevel, base: c.base, perLevel: c.perLevel, odds: c.odds,
       carShare: c.carShare, coinMult: c.coinMult, jackpotMult: c.jackpotMult, skins: c.skins, below: crateBelow(c)?.id ?? null,
+      ...(c.pity ? { pity: c.pity } : {}),
     }])),
     // Body skins by id, part skins by id: tier, and the level or collection set that also unlocks one.
     skinWeight: SKIN_WEIGHT,

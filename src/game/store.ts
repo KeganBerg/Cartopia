@@ -18,7 +18,7 @@ import { EVENT_RACES, eventBonus, eventFor, eventIsBoss, eventPrize, eventProgre
 import { trialWeek } from './trial'
 import { groupOf, groupTurn, mergeCandidates, applyMerge, applySplit, rotateGroup, isLandmark, LANDMARK_NAME } from './merge'
 import { togglePick } from './meet'
-import { crateCost, crateDef, rollCrate, type CrateId, type CrateOpen } from './crates'
+import { crateCost, crateDef, pityHit, rollCrate, type CrateId, type CrateOpen } from './crates'
 import { LIVE_LOSS_SHARE, LOSS_SHARE, boostFor, boostLabel, emptyBoosts, welcomeBack, type BoostMode, type Boosts } from './boosts'
 import { claim, type WagerEntry } from './wager'
 
@@ -1334,6 +1334,7 @@ export const useGame = create<GameState>()(
         // A server open the save already counted is never added twice.
         if (o.seq != null && o.seq <= (s.crates ?? 0)) return
         const d = o.drop
+        const def = crateDef(o.crate)
         const won = d.kind === 'coins' || d.kind === 'dupe' || d.kind === 'skindupe' ? d.coins : 0
         let cars = s.cars
         if (d.kind === 'car' && !cars.some((c) => c.uid === d.uid)) cars = [...cars, { uid: d.uid, model: d.model, color: d.color, upgrades: noUpgrades() }]
@@ -1345,6 +1346,7 @@ export const useGame = create<GameState>()(
           ...(d.kind === 'skin' && !d.part && !(s.skins ?? []).includes(d.skin) ? { skins: [...(s.skins ?? []), d.skin] } : {}),
           ...(d.kind === 'skin' && d.part && !(s.modSkins ?? []).includes(d.skin) ? { modSkins: [...(s.modSkins ?? []), d.skin] } : {}),
           crates: o.seq ?? s.crates ?? 0,
+          ...(def?.pity ? { cratePity: { ...s.cratePity, [o.crate]: pityHit(def, d) ? 0 : (s.cratePity?.[o.crate] ?? 0) + 1 } } : {}),
           stats: won ? { ...s.stats, coinsEarned: (s.stats.coinsEarned ?? 0) + won } : s.stats,
           updatedAt: Date.now(),
         })
@@ -2165,7 +2167,7 @@ export async function openCrate(id: CrateId): Promise<CrateOpen[] | null> {
     useGame.getState().toast(msg === 'soon' ? 'Crates open for signed-in towns very soon!' : msg.includes('one crate') ? 'One crate at a time!' : "Couldn't open the crate. Try again.")
     return null
   }
-  if (!opens) opens = [{ crate: id, cost, drop: rollCrate(def, s.level, s.cars, Math.random, { skins: ownedSkins(s), modSkins: ownedModSkins(s) }) }]
+  if (!opens) opens = [{ crate: id, cost, drop: rollCrate(def, s.level, s.cars, Math.random, { skins: ownedSkins(s), modSkins: ownedModSkins(s) }, s.cratePity?.[id] ?? 0) }]
   for (const o of opens) useGame.getState().applyCrate(o)
   return opens
 }

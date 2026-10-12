@@ -231,7 +231,7 @@ describe('collection book', () => {
 
   it('says where to find each car', () => {
     expect(carSource(carDef('bug')).text).toBe("Rusty's · Suburbs")
-    expect(carSource(carDef('lambo')).text).toBe('Showroom · 💎90')
+    expect(carSource(carDef('lambo')).text).toBe('Showroom · 💎70')
     expect(carSource(carDef('vette')).text).toBe('Showroom · Lv 15')
   })
 

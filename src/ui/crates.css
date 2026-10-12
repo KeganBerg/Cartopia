@@ -25,6 +25,7 @@
 
 .crate-odds { background: rgba(24,18,38,.82); border: 2px solid rgba(255,255,255,.25); border-radius: 14px; padding: 5px; }
 .crate-odds-row { display: flex; gap: 4px; }
+.crate-pity { margin-top: 4px; font-size: 12px; opacity: 0.85; display: flex; gap: 4px; align-items: center; justify-content: center; }
 .crate-odds .odd { min-width: 0; display: flex; align-items: center; justify-content: center; gap: 3px; padding: 3px 4px; border-radius: 9px; font: 13px var(--display); color: #fff; border: none; white-space: nowrap; }
 .crate-odds .odd b { font-weight: normal; font-size: 13px; }
 .crate-odds .odd small { font-size: 10px; opacity: .8; }

@@ -159,3 +159,23 @@ describe('crates', () => {
     }
   })
 })
+
+describe('crate pity', () => {
+  it('gives a skin of the pity tier once the dry run reaches the limit, and resets on one', async () => {
+    const { pityHit, pityLeft, skinOf } = await import('./crates')
+    for (const c of CRATES.filter((x) => x.pity)) {
+      const every = c.pity!.every
+      expect(pityLeft(c, 0)).toBe(every)
+      expect(pityLeft(c, every - 1)).toBe(1)
+      for (let seed = 1; seed < 40; seed++) {
+        const d = rollCrate(c, 40, garage, seeded(seed), { skins: [], modSkins: [] }, every - 1)
+        expect(d.kind === 'skin' || d.kind === 'skindupe', c.id).toBe(true)
+        if (d.kind === 'skin' || d.kind === 'skindupe') {
+          if (c.pity!.tier) expect(skinOf(d.skin, d.part)?.tier).toBe(c.pity!.tier)
+          expect(pityHit(c, d)).toBe(true)
+        }
+      }
+    }
+    expect(pityLeft(crateDef('street')!, 50)).toBeNull()
+  })
+})
