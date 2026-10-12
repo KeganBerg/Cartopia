@@ -266,6 +266,12 @@ body:has(.edit-bar) .tutorial { bottom: calc(150px + var(--sab)); }
 .tk-title span { display: inline-block; margin-top: 8px; font: 15px var(--display); letter-spacing: 2px; color: #fff; background: rgba(10, 6, 30, .7); border: 2px solid var(--tk-c); border-radius: 10px; padding: 3px 12px; }
 @keyframes tk-title { 0% { opacity: 0; transform: scale(.6); } 12% { opacity: 1; transform: scale(1.06); } 20% { transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: scale(1.1); } }
 @media (max-width: 600px) { .tk-title b { font-size: 38px; } .tk-title span { font-size: 12px; } }
+/* The build-up: the light show starts soft, and the last five seconds count down over the town. */
+:root.techno-build .tk-lasers { opacity: calc(.25 + var(--tk-build) * .75); }
+.tk-count { position: absolute; left: 50%; top: 42%; translate: -50% -50%; font: 120px/1 var(--display); color: #fff; -webkit-text-stroke: 3px var(--line); text-shadow: 0 6px 0 var(--line), 0 0 40px var(--tk-c); animation: tk-count 1s ease-out both; }
+@keyframes tk-count { 0% { opacity: 0; transform: scale(1.8); } 15% { opacity: 1; transform: scale(1); } 85% { opacity: 1; } 100% { opacity: 0; transform: scale(.85); } }
+@media (max-width: 600px) { .tk-count { font-size: 84px; } }
+:root.techno-calm .tk-count { animation: none; }
 
 /* The HUD tag: a little equaliser and the time left. */
 .tk-tag { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; padding: 2px 9px 2px 7px; border-radius: 10px; background: linear-gradient(#2a1150, #12082b); border: 2px solid var(--tk-c); color: #fff; font: 13px var(--display); letter-spacing: 1px; box-shadow: 0 0 calc(var(--tk) * 12px) var(--tk-c); pointer-events: none; }

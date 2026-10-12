@@ -93,6 +93,8 @@ function Rig() {
     keepIn(to)
     rig.current = { cur: { ...from }, goal: { ...from }, vel: { x: 0, z: 0, yaw: 0 }, held: false, swoop: { t: 0, from, to } }
     cam.current = c
+    // Dev builds only: lets headless screenshot scripts set a pose.
+    if (import.meta.env.DEV) (window as unknown as { __freeRig?: unknown }).__freeRig = rig
     place(c, from)
     set({ camera: c })
     return () => {

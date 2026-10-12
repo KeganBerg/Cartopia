@@ -2,7 +2,7 @@ import { Vector3 } from 'three'
 import { useMemo, useState, type CSSProperties } from 'react'
 import { useGame, buyablePlots, today, type PlacedBuilding } from '../game/store'
 import { buildingDef, buildingLevel, jobLevel, carDef, loves, levelLift, plotPrice, START_LAND, jobSeconds, isOpen } from '../game/data'
-import { msUntilNight } from '../game/clock'
+import { opensLabel } from '../game/clock'
 import { anchors, anchorRef } from '../scene/anchors'
 import { centerOf, groupCenter, plotCenter } from '../scene/World'
 import { mergeGroups, mergeCandidates, type MergeGroup } from '../game/merge'
@@ -53,7 +53,7 @@ function JobBadge({ b, now, g, members = [b] }: { b: PlacedBuilding; now: number
             <span className="time-short">{short(left)}</span>
           </>
         ) : !isOpen(d, now) ? (
-          <span className="start">🌙 {fmt(Math.max(1, Math.ceil(msUntilNight(now) / 1000)))}</span>
+          <span className="start">🌙 {opensLabel(now).replace(/^(in|at) /, '')}</span>
         ) : d.kind === 'obstacle' ? (
           <span className="start">🪓 ${d.price.toLocaleString()}</span>
         ) : (

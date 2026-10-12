@@ -6,7 +6,10 @@ import { Box3, Matrix4, Vector3, type Material, type Mesh, type Object3D, type T
 import { BUILDINGS, TILE } from '../game/data'
 import { BuildingModel } from './BuildingModel'
 import { VanguardTower } from './Landmark'
-import { DAY_MS } from '../game/clock'
+import { sunDay } from '../game/sun'
+
+// A real noon and the midnight after it (the town clock follows local time).
+const NOON = sunDay(20_000).noon, MIDNIGHT = NOON + 12 * 3_600_000
 
 // Nothing poking out or cut off. For every building at each growth form:
 //  - off the lot: no piece reaches past the building's own tiles into a
@@ -115,11 +118,11 @@ describe('nothing off the lot or cut off', () => {
     it(def.id, async () => {
       const bad = new Set<string>()
       // Noon and midnight: some pieces only come out after dark.
-      for (const level of LEVELS) for (const time of [0, DAY_MS / 2]) {
+      for (const level of LEVELS) for (const time of [NOON, MIDNIGHT]) {
         vi.spyOn(Date, 'now').mockReturnValue(time)
         const r = await ReactThreeTestRenderer.create(<BuildingModel def={def} level={level} />)
         await ReactThreeTestRenderer.act(async () => r.advanceFrames(2, 1 / 60))
-        for (const p of problems(r.scene.instance as Object3D, def.w * TILE, def.h * TILE)) bad.add(`L${level}${time ? ' night' : ''} ${p}`)
+        for (const p of problems(r.scene.instance as Object3D, def.w * TILE, def.h * TILE)) bad.add(`L${level}${time === MIDNIGHT ? ' night' : ''} ${p}`)
         await r.unmount()
         vi.restoreAllMocks()
       }
@@ -132,11 +135,11 @@ describe('nothing off the lot or cut off', () => {
 describe('nothing off the lot on landmarks', () => {
   it('vanguard tower', async () => {
     const bad = new Set<string>()
-    for (const time of [0, DAY_MS / 2]) {
+    for (const time of [NOON, MIDNIGHT]) {
       vi.spyOn(Date, 'now').mockReturnValue(time)
       const r = await ReactThreeTestRenderer.create(<VanguardTower />)
       await ReactThreeTestRenderer.act(async () => r.advanceFrames(2, 1 / 60))
-      for (const p of problems(r.scene.instance as Object3D, 2 * TILE, 2 * TILE)) bad.add(`${time ? 'night ' : ''}${p}`)
+      for (const p of problems(r.scene.instance as Object3D, 2 * TILE, 2 * TILE)) bad.add(`${time === MIDNIGHT ? 'night ' : ''}${p}`)
       await r.unmount()
       vi.restoreAllMocks()
     }

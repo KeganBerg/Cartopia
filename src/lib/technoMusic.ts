@@ -5,7 +5,7 @@
 import { audioContext, audioOut, isMuted, onMuteChange } from './sound'
 import { musicSettings, onMusicChange } from './townMusic'
 import { onTownHold, townHeld } from '../scene/renderGate'
-import { onTechnoChange, technoOn } from '../game/techno'
+import { onTechnoChange, technoDrop, technoOn } from '../game/techno'
 import { TechnoTrack } from './technoTrack'
 
 // How loud the track runs at full music slider. It sits well above the town
@@ -31,9 +31,9 @@ function tick() {
     if (!track) track = new TechnoTrack(ctx, audioOut() ?? ctx.destination)
     quietSince = 0
     track.level(v, t, 0.8)
-    // The wall-clock moment that will be heard at `t`, so every town is on the same beat.
+    // The wall-clock moment that will be heard at `t`, so every town in the event is on the same beat.
     const lag = (ctx.outputLatency || ctx.baseLatency || 0) * 1000
-    track.step(t, Date.now() + lag)
+    track.step(t, Date.now() + lag, technoDrop())
   } else if (track) {
     track.level(0, t, 0.3)
     if (!quietSince) quietSince = t

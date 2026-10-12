@@ -642,3 +642,68 @@ export function ShopLot({ id, W, F }: { id: string; W: number; F: number }) {
     </group>
   )
 }
+
+// A gas station's extras beside the shop: an ice chest and a coin air pump,
+// clear of the forecourt cars swing through.
+export function GasLot() {
+  return (
+    <group>
+      <group position={[1.62, 0, -0.2]}>
+        <Box p={[0, 0.17, 0]} s={[0.4, 0.34, 0.2]} cast>{c('#eceff1')}</Box>
+        <Box p={[0, 0.35, 0]} s={[0.42, 0.03, 0.22]}>{c('#0277bd')}</Box>
+        <Box p={[0, 0.24, 0.102]} s={[0.26, 0.08, 0.004]}>{c('#29b6f6')}</Box>
+      </group>
+      <group position={[-1.72, 0, 0.05]}>
+        <Box p={[0, 0.03, 0]} s={[0.18, 0.06, 0.18]}>{c('#cfd8dc')}</Box>
+        <Box p={[0, 0.3, 0]} s={[0.12, 0.48, 0.12]} cast>{c('#1565c0')}</Box>
+        <Box p={[0, 0.42, 0.062]} s={[0.08, 0.1, 0.004]}>{bulbMat}</Box>
+        <mesh position={[0.08, 0.22, 0]} rotation-y={Math.PI / 2}><torusGeometry args={[0.07, 0.012, 6, 12, Math.PI * 1.5]} />{c('#212121')}</mesh>
+      </group>
+    </group>
+  )
+}
+
+// The garage's apron: tyres and drums by the left bay, the tool chest by the right.
+export function GarageLot({ front }: { front: number }) {
+  // Standing on the paved apron (its top is 0.055 up).
+  return (
+    <group position-y={0.055}>
+      <group position={[-1.6, 0, front + 0.3]}>
+        {[0, 1, 2].map((i) => (
+          <mesh key={i} position={[0, 0.06 + i * 0.1, 0]} rotation-x={Math.PI / 2} castShadow>
+            <torusGeometry args={[0.12, 0.05, 8, 14]} />
+            {c('#212121')}
+          </mesh>
+        ))}
+      </group>
+      {[0, 1].map((i) => (
+        <group key={i} position={[-1.6 + i * 0.05, 0, front + 0.62 + i * 0.22]}>
+          <mesh position={[0, 0.15, 0]} castShadow><cylinderGeometry args={[0.1, 0.1, 0.3, 12]} />{c(i ? '#1565c0' : '#c62828')}</mesh>
+          <mesh position={[0, 0.2, 0]}><cylinderGeometry args={[0.103, 0.103, 0.02, 12]} />{c('#eceff1')}</mesh>
+        </group>
+      ))}
+      <group position={[1.62, 0, front + 0.45]} rotation-y={Math.PI / 2}>
+        <Toolkit />
+      </group>
+    </group>
+  )
+}
+
+// The crew's deck: a kettle grill, a cooler, and bulbs strung from the hut to a post.
+export function CrewDeck() {
+  return (
+    <group>
+      <group position={[0.75, 0.13, 0.5]}>
+        {[0, 2.1, 4.2].map((a) => <Box key={a} p={[Math.sin(a) * 0.07, 0.12, Math.cos(a) * 0.07]} s={[0.02, 0.24, 0.02]}>{c('#37474f')}</Box>)}
+        <mesh position={[0, 0.24, 0]} rotation-x={Math.PI} castShadow><sphereGeometry args={[0.13, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2]} />{c('#212121')}</mesh>
+        <mesh position={[0, 0.24, 0]}><sphereGeometry args={[0.13, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2]} />{c('#212121')}</mesh>
+        <Box p={[0, 0.38, 0]} s={[0.04, 0.03, 0.04]}>{c('#90a4ae')}</Box>
+      </group>
+      <group position={[1.62, 0.13, -0.35]}>
+        <Box p={[0, 0.1, 0]} s={[0.3, 0.2, 0.18]} cast>{c('#1e88e5')}</Box>
+        <Box p={[0, 0.215, 0]} s={[0.31, 0.03, 0.19]}>{c('#fafafa')}</Box>
+      </group>
+      <Box p={[1.78, 0.5, 0.68]} s={[0.05, 0.84, 0.05]} cast>{c('#6d4c41')}</Box>
+    </group>
+  )
+}
