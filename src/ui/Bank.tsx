@@ -25,7 +25,7 @@ export function BankPanel() {
         <span className="ico buck-ico bank-ico">💎</span>
         <div>
           <b>You have {bucks} gems</b>
-          <p>Use gems to finish restores, refill fuel, fix the tow truck, and buy premium cars and paint.</p>
+          <p className="bank-uses" title="Gems finish restores, refill fuel, fix the tow truck, and buy premium cars and paint">🔧 ⛽ 🚚 🚗 🎨</p>
         </div>
       </div>
       <div className="bank-packs">
@@ -54,7 +54,7 @@ export function BankPanel() {
         <span className="source-icon">⭐</span>
         <div>
           <b>Free gems</b>
-          <div className="card-stat">Level up, finish goals and keep your daily streak going.</div>
+          <div className="card-stat">⬆ Levels · 🎯 Goals · 🔥 Streaks</div>
         </div>
         <button className="buy small alt" onClick={() => showNeed('bucks', 0)}>How</button>
       </div>

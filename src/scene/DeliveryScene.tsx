@@ -228,7 +228,7 @@ export function DeliveryScene({ me, input, running, onHud, onEnd }: {
       s.t += dt
       s.left -= dt
     }
-    const pedal = live ? input.pedal : 0
+    const pedal = live ? input.gas - input.brake : 0
     if (pedal > 0) s.v = Math.min(MAX_FWD, s.v + (s.v < 0 ? 14 : 6) * dt)
     else if (pedal < 0) s.v = Math.max(-MAX_REV, s.v - (s.v > 0 ? 14 : 6) * dt)
     else s.v = Math.sign(s.v) * Math.max(0, Math.abs(s.v) - 5 * dt)

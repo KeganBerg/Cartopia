@@ -11,7 +11,7 @@ import { PitScene, type PitEnd, type PitHud, type PitInput } from '../scene/PitS
 import { WashScene, type WashHud, type WashInput } from '../scene/WashScene'
 import { DeliveryScene, type DashHud } from '../scene/DeliveryScene'
 import { StuntScene, type StuntHud, type StuntInput } from '../scene/StuntScene'
-import type { ParkInput } from '../scene/ParkScene'
+import { KeyHints, TouchDrive, newDriveInput, useDriveKeys, useTall, useTouchDevice } from './DriveControls'
 import { Countdown, Result, look, payFuel } from './ArcadeBits'
 import { sfx } from '../lib/sound'
 import { LoadingScene } from './Loading'
@@ -182,30 +182,12 @@ function WashGame({ car, running, onDone }: GameProps) {
   )
 }
 
-const KEYS: Record<string, [keyof ParkInput, number]> = {
-  ArrowLeft: ['steer', 1], a: ['steer', 1], A: ['steer', 1], ArrowRight: ['steer', -1], d: ['steer', -1], D: ['steer', -1],
-  ArrowUp: ['pedal', 1], w: ['pedal', 1], W: ['pedal', 1], ArrowDown: ['pedal', -1], s: ['pedal', -1], S: ['pedal', -1],
-}
-
 function DeliveryGame({ car, running, onDone }: GameProps) {
-  const input = useRef<ParkInput>({ steer: 0, pedal: 0 }).current
+  const input = useRef(newDriveInput()).current
   const [hud, setHud] = useState<DashHud>({ drops: 0, time: DASH_TIME, carrying: false })
-  useEffect(() => {
-    const held = new Set<string>()
-    const apply = () => {
-      input.steer = 0
-      input.pedal = 0
-      for (const k of held) input[KEYS[k][0]] += KEYS[k][1]
-      input.steer = Math.max(-1, Math.min(1, input.steer))
-      input.pedal = Math.max(-1, Math.min(1, input.pedal))
-    }
-    const kd = (e: KeyboardEvent) => { if (KEYS[e.key]) { held.add(e.key); apply(); e.preventDefault() } }
-    const ku = (e: KeyboardEvent) => { if (KEYS[e.key]) { held.delete(e.key); apply() } }
-    window.addEventListener('keydown', kd)
-    window.addEventListener('keyup', ku)
-    return () => { window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku) }
-  }, [input])
-  const pad = (axis: keyof ParkInput, v: number) => holdTo((on) => { input[axis] = on ? v : 0 })
+  const touch = useTouchDevice()
+  const tall = useTall()
+  useDriveKeys(input)
   return (
     <>
       <Canvas className="rf-canvas" camera={{ fov: 50, near: 0.3, far: 120, position: [0, 14, 10] }} dpr={[1, 1.5]} gl={gl}>
@@ -217,16 +199,7 @@ function DeliveryGame({ car, running, onDone }: GameProps) {
         <span className={hud.carrying ? 'arc-spot in' : 'arc-spot'}>{hud.carrying ? '🏠 Deliver' : '🍕 Pick up'}</span>
         <span>✅ {hud.drops}</span>
       </div>
-      <div className="arc-pads">
-        <div className="arc-pad">
-          <button className="arc-btn" aria-label="Steer left" {...pad('steer', 1)}>◀</button>
-          <button className="arc-btn" aria-label="Steer right" {...pad('steer', -1)}>▶</button>
-        </div>
-        <div className="arc-pad">
-          <button className="arc-btn rev" aria-label="Reverse" {...pad('pedal', -1)}>R</button>
-          <button className="arc-btn gas" aria-label="Gas" {...pad('pedal', 1)}>▲</button>
-        </div>
-      </div>
+      {running && (touch ? <TouchDrive input={input} tall={tall} drift={false} /> : <KeyHints drift={false} item={false} />)}
     </>
   )
 }

@@ -67,7 +67,7 @@ function Walk({ m, t }: { m: Mat; t: TravelLayout }) {
   const n = Math.max(0, Math.floor(walk / 0.18))
   return (
     <group>
-      <Box m={m} at={[store.x, 0.06, z0 + 0.25]} s={[store.w + 0.2, 0.06, 0.5]} c="#ffffff" t={concreteTex(store.w / 2, 0.3)} shadow={false} />
+      <Box m={m} at={[store.x, 0.06, z0 + 0.253]} s={[store.w + 0.2, 0.06, 0.494]} c="#ffffff" t={concreteTex(store.w / 2, 0.3)} shadow={false} />
       {Array.from({ length: n }, (_, i) => (
         <mesh key={i} position={[door[0], 0.051, z0 + 0.6 + i * 0.18]} rotation-x={-Math.PI / 2}>
           <planeGeometry args={[0.5, 0.09]} />
@@ -105,7 +105,7 @@ function Store({ m, win, bulb, level, t }: { m: Mat; win: ReactNode; bulb: React
             <planeGeometry args={[0.42, 0.68]} />
             {win}
           </mesh>
-          <Box m={m} at={[x, 0.3, zf + 0.02]} s={[0.46, 0.04, 0.04]} c="#eceff1" shadow={false} />
+          <Box m={m} at={[x, 0.34, zf + 0.02]} s={[0.46, 0.04, 0.04]} c="#eceff1" shadow={false} />
         </group>
       ))}
       {/* Stepped false fronts along the roofline, like an old main street. */}
@@ -177,7 +177,7 @@ function PorchLife({ m, t, ent }: { m: Mat; t: TravelLayout; ent: number }) {
             <group key={x} position={[x, 0, z]}>
               <Box m={m} at={[0, 0.17, 0]} s={[0.34, 0.34, 0.2]} c="#eceff1" />
               <Box m={m} at={[0, 0.35, 0]} s={[0.36, 0.03, 0.22]} c="#0277bd" />
-              <mesh position={[0, 0.2, 0.101]}>
+              <mesh position={[0, 0.2, 0.104]}>
                 <planeGeometry args={[0.26, 0.08]} />
                 <meshBasicMaterial map={signTexture('ICE', '#29b6f6', '#ffffff', 0.26 / 0.08)} />
               </mesh>
@@ -242,7 +242,7 @@ function Canopy({ m, bulb, level, t }: { m: Mat; bulb: ReactNode; level: number;
               <planeGeometry args={[c.w - 0.1, st.d - 0.1]} />
               {bulb}
             </mesh>
-            {first && names.map((x) => <LitSign key={x} text={NAME} w={1.2} at={[x, y, zf + 0.03]} bg={RED} fg="#fffde7" m={m} />)}
+            {first && names.map((x) => <LitSign key={x} text={NAME} w={1.2} at={[x, y, zf + 0.034]} bg={RED} fg="#fffde7" m={m} />)}
             {first && <Bulbs from={[c.x - c.w / 2, y - 0.13, zf + 0.03]} to={[c.x + c.w / 2, y - 0.13, zf + 0.03]} n={Math.round(c.w * 3)} />}
             {/* Roof vents, and solar panels at level 10. */}
             {Array.from({ length: vents }, (_, j) => (
@@ -293,7 +293,7 @@ function Island({ m, at, h, n, side }: { m: Mat; at: V3; h: number; n: number; s
       {[-0.36, 0.36].map((x) => (
         <group key={x} position={[x, 0.14, 0]}>
           <Box m={m} at={[0, 0.3, 0]} s={[0.3, 0.6, 0.22]} c="#fafafa" />
-          {[0.111, -0.111].map((z) => (
+          {[0.114, -0.114].map((z) => (
             <mesh key={z} position={[0, 0.3, z]} rotation-y={z < 0 ? Math.PI : 0}>
               <planeGeometry args={[0.28, 0.58]} />
               {m('#ffffff', pumpTex(RED))}
@@ -411,12 +411,12 @@ function Pylon({ m, t, level }: { m: Mat; t: TravelLayout; level: number }) {
   const w = 1.1
   return (
     <group position={[x, 0, z]}>
-      {[-1, 1].map((sd) => <Box key={sd} m={m} at={[(sd * w) / 3, h / 2, 0]} s={[0.08, h, 0.08]} c="#90a4ae" />)}
+      {[-1, 1].map((sd) => <Box key={sd} m={m} at={[(sd * w) / 3, (h - 0.01) / 2, 0]} s={[0.08, h - 0.01, 0.08]} c="#90a4ae" />)}
       <Box m={m} at={[0, 0.15, 0]} s={[w * 0.9, 0.3, 0.24]} c="#8d6e63" />
       <Box m={m} at={[0, h - 0.2, 0]} s={[w + 0.1, 0.4, 0.1]} c={RED} />
       <LitSign text={NAME} w={w} h={0.3} at={[0, h - 0.2, 0.052]} bg={RED} fg="#fffde7" m={m} />
-      <Box m={m} at={[0, h - 0.72, 0]} s={[w * 0.8, 0.5, 0.08]} c="#263238" />
-      <mesh position={[0, h - 0.72, 0.042]}>
+      <Box m={m} at={[0, h - 0.72, 0]} s={[w * 0.8, 0.5, 0.09]} c="#263238" />
+      <mesh position={[0, h - 0.72, 0.048]}>
         <planeGeometry args={[w * 0.72, 0.42]} />
         <meshBasicMaterial map={signTexture('⛽ 1.79', '#263238', '#ffca28', (w * 0.72) / 0.42)} toneMapped={false} />
       </mesh>
@@ -455,7 +455,7 @@ function Chargers({ m, t }: { m: Mat; t: TravelLayout }) {
       {[-0.25, 0.2].map((dz) => (
         <group key={dz} position={[-L / 2 + 0.16, 0, s.z + dz]}>
           <Box m={m} at={[0, 0.28, 0]} s={[0.1, 0.56, 0.16]} c="#eceff1" />
-          <mesh position={[0.051, 0.4, 0]} rotation-y={Math.PI / 2}><planeGeometry args={[0.08, 0.08]} /><primitive object={glowMats.bulb} attach="material" dispose={null} /></mesh>
+          <mesh position={[0.054, 0.4, 0]} rotation-y={Math.PI / 2}><planeGeometry args={[0.08, 0.08]} /><primitive object={glowMats.bulb} attach="material" dispose={null} /></mesh>
           <Box m={m} at={[0, 0.58, 0]} s={[0.12, 0.04, 0.18]} c="#43a047" shadow={false} />
         </group>
       ))}

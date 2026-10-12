@@ -6,10 +6,10 @@ import { Box3, Matrix4, Vector3, type Material, type Mesh, type Object3D, type T
 import { BUILDINGS, TILE } from '../game/data'
 import { BuildingModel } from './BuildingModel'
 import { VanguardTower } from './Landmark'
-import { sunDay } from '../game/sun'
+import { DAY_MS } from '../game/clock'
 
-// A real noon and the midnight after it (the town clock follows local time).
-const NOON = sunDay(20_000).noon, MIDNIGHT = NOON + 12 * 3_600_000
+// Noon and midnight on the town clock.
+const NOON = 0, MIDNIGHT = DAY_MS / 2
 
 // Nothing poking out or cut off. For every building at each growth form:
 //  - off the lot: no piece reaches past the building's own tiles into a

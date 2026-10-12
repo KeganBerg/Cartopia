@@ -2,7 +2,7 @@
 import './testCanvas'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Color } from 'three'
-import { sunDay } from '../game/sun'
+import { DAY_MS } from '../game/clock'
 import { startEvent, stopEvent, BUILD_MS } from '../game/techno'
 import { calmFlashing, setCalmFlashing } from '../game/flashing'
 import { clubHit, resetClubBeat } from '../lib/clubBeat'
@@ -12,7 +12,7 @@ import { clubLedColor, clubLedGlow } from './clubLeds'
 // lights change no more than 3 times a second. Play a few seconds at midnight
 // and count every rise in brightness and every change of colour.
 
-const MIDNIGHT = sunDay(20_000).noon + 12 * 3_600_000
+const MIDNIGHT = DAY_MS / 2
 const SECS = 6
 
 function sample(start: number) {

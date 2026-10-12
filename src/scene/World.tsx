@@ -687,7 +687,7 @@ export function World() {
       {!free && <Clouds />}
       <SeasonFx small={Math.min(window.innerWidth, window.innerHeight) < 700} />
       <Weather small={Math.min(window.innerWidth, window.innerHeight) < 700} />
-      <Atmosphere small={Math.min(window.innerWidth, window.innerHeight) < 700} />
+      <Atmosphere />
       <SkyEnv />
       <FreeCam />
       <PostFx look={townLook} town tiltShift={!free} />

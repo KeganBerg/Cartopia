@@ -49,9 +49,10 @@ export function skyFx(w: Weather, phase: number, season: Season = SEASON, out: S
   // The sun only shows through broken cloud.
   const sunny = day * (1 - rainy) * (1 - smooth(0.4, 0.8, w.cloud))
   const low = lowSun(phase)
-  out.rays = sunny * Math.max(0.8 * low, 0.85 * fog, mist, 0.6 * clearing, k === 'wind' ? 0.35 : 0, k === 'heat' ? 0.3 : 0)
-  // Cold moonbeams through night fog.
-  out.moon = night * Math.max(fog, 0.8 * mist) * 0.22
+  // Fog swallows the shafts rather than showing them off.
+  // Golden hour only (and the sun breaking through after a shower), never at midday.
+  out.rays = sunny * Math.max(0.8 * low, 0.5 * clearing * low) * (1 - out.banks)
+  out.moon = 0
   out.rainbow = season === 'winter' ? 0 : clearing * smooth(0.12, 0.4, w.wet) * smooth(0.5, 0.8, day)
   out.glint = sunny * smooth(0.05, 0.4, w.wet) * (1 - 0.6 * fog)
   out.heat = k === 'heat' ? s * day : 0

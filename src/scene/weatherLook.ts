@@ -2,6 +2,7 @@ import { Color, MeshStandardMaterial, Vector2, Vector3, type ColorRepresentation
 import type { Weather } from '../game/weather'
 import type { Look } from './look'
 import { asphaltTex } from './textures'
+import { addFog } from './heightFog'
 
 // How weather changes the light and the ground. Kept apart from the weather
 // schedule (game/weather.ts) so that stays plain data the sound code can read.
@@ -122,6 +123,7 @@ float cloudShadow() {
 `
 
 function hook(sh: WebGLProgramParametersWithUniforms) {
+  addFog(sh)
   sh.uniforms.uWet = groundUniforms.uWet
   sh.uniforms.uCover = groundUniforms.uCover
   sh.uniforms.uTime = skyUniforms.uTime
