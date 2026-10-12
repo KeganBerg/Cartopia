@@ -5,7 +5,7 @@ import { signTexture } from './signTexture'
 import { signMat } from './closingTime'
 import { CarModel } from './CarModel'
 import { Upright, useBays, useMergeScale } from './mergeScale'
-import { ObstacleDetail, BillboardDetail, DriveInDetail, FountainDetail, GarageDetail, HouseDetail, PondDetail, ShopDetail, ShopLot, GasLot, GarageLot, CrewDeck, SpeedwayDetail, StatueDetail } from './BuildingDetail'
+import { ObstacleDetail, BillboardDetail, DriveInDetail, FountainDetail, GarageDetail, HouseDetail, PondDetail, ShopDetail, ShopLot, GasLot, GarageLot, CrewDeck, SpeedwayDetail, SpeedwayStands, StatueDetail } from './BuildingDetail'
 import { NEW_MODELS, NewBuildingModel } from './NewBuildings'
 import { PropMesh } from './propKit'
 import { DECOR_PROPS, benchBin } from './decorProps'
@@ -137,8 +137,9 @@ function SpeedwayGrown({ m, sh, roof, lvl, ghost }: { m: ReturnType<typeof useMa
         <cylinderGeometry args={[1.45, 2.02, 0.22, 48, 1, true, a0, arc]} />
         <meshStandardMaterial color="#eceff1" side={2} />
       </mesh>
-      <mesh position={[0, y + 0.115, 0]}>
-        <cylinderGeometry args={[2.03, 2.03, 0.04, 48, 1, true, a0, arc]} />
+      {/* Fascia round the canopy's outer rim. */}
+      <mesh position={[0, y - 0.09, 0]}>
+        <cylinderGeometry args={[2.025, 2.025, 0.06, 48, 1, true, a0, arc]} />
         <meshStandardMaterial color={lvl >= 10 ? GOLD : roof} metalness={lvl >= 10 ? 0.5 : 0} side={2} />
       </mesh>
       {Array.from({ length: posts }, (_, i) => {
@@ -840,13 +841,8 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
               <meshBasicMaterial map={signTexture('▚▚▚▚', '#ffffff', '#111111')} {...decal(2)} />
             </mesh>
           )}
-          {/* Crowd: coloured seat rows along the stands. */}
-          {!ghost && [0.3, 0.55, 0.8].map((y, i) => (
-            <mesh key={y} position={[0, (y * sh) / 0.9, 0]}>
-              <cylinderGeometry args={[1.9 - i * 0.02, 1.9 - i * 0.02, 0.06, 40, 1, true, Math.PI * 0.15, Math.PI * 1.1]} />
-              <meshStandardMaterial color={['#ffca28', '#42a5f5', '#ef5350'][i]} side={2} />
-            </mesh>
-          ))}
+          {/* Stepped seating tiers, one colour each, for the crowd to sit on. */}
+          {!ghost && <SpeedwayStands sh={sh} colors={['#ffca28', '#42a5f5', '#ef5350'].map((c) => <meshStandardMaterial key={c} color={c} side={2} />)} />}
           {/* Floodlight towers that light the track at night, on every corner
               but the one facing the camera so none stands in front of the sign.
               They rise over the roof once it closes into a ring. */}
