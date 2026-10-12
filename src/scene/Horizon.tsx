@@ -10,9 +10,10 @@ import { lightDir } from './look'
 import { hazeColor } from './weatherLook'
 import { Kit, kitMat } from './kit'
 import { PAL, SEASON } from './season'
-import { A_CITY, A_LAKE, A_MTN, A_WOODS, CITY, HWY0, HWY_DIR, HWY_LEN, R0, R1, SNOWLINE, TAU, angDist, buildTerrain, forest, heightAt, hwy, hwyHeight, lakeOf, polar, smooth } from './horizonLand'
+import { A_CITY, A_LAKE, A_MTN, A_WOODS, CITY, HWY0, HWY_DIR, HWY_LEN, R0, R1, SNOWLINE, TAU, angDist, buildTerrain, forest, heightAt, hwy, hwyHeight, lakeOf, polar, rail, smooth, SNOW_COVER } from './horizonLand'
 import { towerGlowTex, towerTex, waterTex } from './textures'
 import { rand } from './RaceVenues'
+import { Countryside } from './Countryside'
 
 // The world past the edge of town, seen only from the free camera: a sky that
 // follows the clock, the season and the weather, and generated country rolling
@@ -42,7 +43,7 @@ function buildWorld(small: boolean) {
     const [x, z] = polar(rr, a)
     const f = forest(x, z)
     if (f < 0.62 || r() > (f - 0.5) * 2.4) continue
-    if (lakeOf(x, z) < 1.15 || hwy(x, z).d < 24 || Math.hypot(x - CITY[0], z - CITY[1]) < 200) continue
+    if (lakeOf(x, z) < 1.15 || hwy(x, z).d < 24 || rail(x, z).d < 16 || Math.hypot(x - CITY[0], z - CITY[1]) < 200) continue
     const farm = 1 - smooth(0.55, 1.15, angDist(Math.atan2(z, x), A_CITY))
     if (farm > 0.3 && rr > 230 && rr < 700 && r() < 0.85) continue
     const y = heightAt(x, z)
@@ -60,20 +61,42 @@ function buildWorld(small: boolean) {
     const [x, z] = polar(rr, a)
     turbines.push({ x, y: heightAt(x, z) - 0.5, z, s: 1, ry: 0, tint: r() })
   }
-  // City towers, tallest in the middle.
-  const towers: { x: number; z: number; w: number; d: number; h: number; c: number }[] = []
+  // City: towers tallest in the middle, many stepping back in tiers near the top,
+  // a ring of low blocks round their feet, so the skyline has depth rather than a row of boxes.
+  const towers: Tower[] = []
   for (let i = 0; i < (small ? 46 : 70); i++) {
     const rr = 120 * Math.sqrt(r())
     const a = r() * TAU
     const mid = 1 - rr / 120
-    const w = 14 + r() * 16
-    towers.push({ x: CITY[0] + Math.cos(a) * rr * 1.5, z: CITY[1] + Math.sin(a) * rr, w, d: w * (0.7 + r() * 0.5), h: 22 + r() * 40 + mid * mid * 120, c: Math.floor(r() * 99) })
+    const slim = r() < 0.3
+    const w = slim ? 10 + r() * 6 : 14 + r() * 16
+    const d = w * (0.7 + r() * 0.5)
+    const h = 22 + r() * 40 + mid * mid * 120
+    const x = CITY[0] + Math.cos(a) * rr * 1.5, z = CITY[1] + Math.sin(a) * rr
+    const c = Math.floor(r() * 99)
+    towers.push({ x, z, w, d, h, c, y: 2 })
+    // Setbacks: one or two narrower tiers on the taller towers.
+    if (h > 55 && r() < 0.75) {
+      const h2 = h * (0.12 + r() * 0.1)
+      towers.push({ x, z, w: w * 0.72, d: d * 0.72, h: h2, c, y: 2 + h })
+      if (h > 110 && r() < 0.7) towers.push({ x, z, w: w * 0.45, d: d * 0.45, h: h * 0.08, c, y: 2 + h + h2 })
+    } else if (r() < 0.6) {
+      // Plant rooms and water tanks on the lower roofs.
+      towers.push({ x: x + w * 0.15, z, w: w * 0.35, d: d * 0.3, h: 3.5, c: 3, y: 2 + h })
+    }
+  }
+  for (let i = 0; i < (small ? 34 : 60); i++) {
+    const a = r() * TAU
+    const rr = 125 + r() * 75
+    const w = 16 + r() * 22
+    towers.push({ x: CITY[0] + Math.cos(a) * rr * 1.5, z: CITY[1] + Math.sin(a) * rr, w, d: w * (0.6 + r() * 0.6), h: 7 + r() * 18, c: Math.floor(r() * 99), y: 2 })
   }
   return { terrain, pines, oaks, turbines, towers }
 }
 const world = (small: boolean) => (made ??= buildWorld(small))
 
 type Spot = { x: number; y: number; z: number; s: number; ry: number; tint: number }
+type Tower = { x: number; z: number; w: number; d: number; h: number; c: number; y: number }
 
 // Kept in step with the sky so fog fades the hills into the horizon colour.
 const skyHorizon = new Color('#cfe6f7')
@@ -95,6 +118,7 @@ export function Horizon() {
       <City towers={w.towers} />
       <WindFarm spots={w.turbines} />
       <Balloons />
+      <Countryside small={small} />
     </group>
   )
 }
@@ -300,8 +324,9 @@ function farTree(kind: 'pine' | 'oak') {
   }
   return k.geometry()!
 }
-const PINE_TINTS = SEASON === 'winter' ? ['#e9f0f2', '#cfdcd6', '#b9ccc0'] : ['#2e6b30', '#3a7d3a', '#245a2a', '#41823f']
-const TREE_TINTS = { pine: PINE_TINTS, oak: [...PAL.leaves] }
+const SNOWY_PINES = ['#e9f0f2', '#cfdcd6', '#b9ccc0']
+const PINES = ['#2e6b30', '#3a7d3a', '#245a2a', '#41823f']
+const TREE_TINTS = { pine: PINES, oak: [...PAL.leaves] }
 let treeGeo: { pine: BufferGeometry; oak: BufferGeometry } | null = null
 
 function Trees({ spots, kind }: { spots: Spot[]; kind: 'pine' | 'oak' }) {
@@ -319,7 +344,10 @@ function Trees({ spots, kind }: { spots: Spot[]; kind: 'pine' | 'oak' }) {
       o.scale.set(p.s, p.s * (kind === 'pine' ? 1.35 : 1.05), p.s)
       o.updateMatrix()
       m.setMatrixAt(i, o.matrix)
-      m.setColorAt(i, c.set(tints[Math.floor(p.tint * tints.length) % tints.length]))
+      // Pines carry snow in winter, on some trees first as it comes and goes.
+      const snowy = kind === 'pine' && ((p.tint * 7.31) % 1) < SNOW_COVER
+      const list = snowy ? SNOWY_PINES : tints
+      m.setColorAt(i, c.set(list[Math.floor(p.tint * list.length) % list.length]))
     })
     m.instanceMatrix.needsUpdate = true
     if (m.instanceColor) m.instanceColor.needsUpdate = true
@@ -436,20 +464,35 @@ function Highway({ small }: { small: boolean }) {
 
 // ---- City ---------------------------------------------------------------------
 
-const CITY_DAY = ['#b0bec5', '#cfd8dc', '#90a4ae', '#d7ccc8', '#bcaaa4', '#9fa8da', '#b3c7d6']
-function City({ towers }: { towers: { x: number; z: number; w: number; d: number; h: number; c: number }[] }) {
+const CITY_DAY = ['#b0bec5', '#cfd8dc', '#90a4ae', '#d7ccc8', '#bcaaa4', '#9fa8da', '#b3c7d6', '#6f8aa3', '#58718a', '#e0d6c8', '#a3b8a8']
+function City({ towers }: { towers: Tower[] }) {
   const ref = useRef<InstancedMesh>(null)
   const beacon = useRef<Mesh>(null)
   const mat = useMemo(() => new MeshStandardMaterial({ map: towerTex(), emissiveMap: towerGlowTex(), emissive: new Color('#ffffff'), emissiveIntensity: 0, roughness: 0.7, metalness: 0.15 }), [])
   useEffect(() => () => mat.dispose(), [mat])
-  const tallest = useMemo(() => towers.reduce((a, b) => (b.h > a.h ? b : a), towers[0]), [towers])
+  const tallest = useMemo(() => towers.reduce((a, b) => (b.y + b.h > a.y + a.h ? b : a), towers[0]), [towers])
+  // Red aircraft lights on the tops of the tallest few.
+  const tops = useMemo(() => [...towers].sort((a, b) => b.y + b.h - (a.y + a.h)).slice(1, 9), [towers])
+  const blink = useRef<InstancedMesh>(null)
+  useLayoutEffect(() => {
+    const m = blink.current
+    if (!m) return
+    const o = new Object3D()
+    tops.forEach((t, i) => {
+      o.position.set(t.x, t.y + t.h + 1.2, t.z)
+      o.updateMatrix()
+      m.setMatrixAt(i, o.matrix)
+    })
+    m.instanceMatrix.needsUpdate = true
+    m.computeBoundingSphere()
+  }, [tops])
   useLayoutEffect(() => {
     const m = ref.current
     if (!m) return
     const o = new Object3D()
     const c = new Color()
     towers.forEach((t, i) => {
-      o.position.set(t.x, 2 + t.h / 2, t.z)
+      o.position.set(t.x, t.y + t.h / 2, t.z)
       o.rotation.set(0, A_CITY, 0)
       o.scale.set(t.w, t.h, t.d)
       o.updateMatrix()
@@ -464,6 +507,7 @@ function City({ towers }: { towers: { x: number; z: number; w: number; d: number
     const n = nightAmount(dayPhase())
     mat.emissiveIntensity = Math.max(n, weatherNow().cloud * 0.4) * 1.2
     if (beacon.current) beacon.current.visible = Math.sin(clock.elapsedTime * 3) > 0.2
+    if (blink.current) blink.current.visible = Math.sin(clock.elapsedTime * 2.1 + 1) > 0.1
   })
   return (
     <group>
@@ -471,14 +515,18 @@ function City({ towers }: { towers: { x: number; z: number; w: number; d: number
         <boxGeometry />
       </instancedMesh>
       {/* A radio mast on the tallest tower, its red light blinking for aircraft. */}
-      <mesh position={[tallest.x, 2 + tallest.h + 14, tallest.z]} raycast={() => null}>
+      <mesh position={[tallest.x, tallest.y + tallest.h + 14, tallest.z]} raycast={() => null}>
         <cylinderGeometry args={[0.5, 1.4, 28, 5]} />
         <meshStandardMaterial color="#9aa3ab" />
       </mesh>
-      <mesh ref={beacon} position={[tallest.x, 2 + tallest.h + 29, tallest.z]} raycast={() => null}>
+      <mesh ref={beacon} position={[tallest.x, tallest.y + tallest.h + 29, tallest.z]} raycast={() => null}>
         <sphereGeometry args={[2.2, 8, 6]} />
         <meshBasicMaterial color="#ff3030" toneMapped={false} />
       </mesh>
+      <instancedMesh ref={blink} args={[undefined, undefined, tops.length]} raycast={() => null}>
+        <sphereGeometry args={[1.5, 6, 4]} />
+        <meshBasicMaterial color="#ff2a2a" toneMapped={false} />
+      </instancedMesh>
     </group>
   )
 }
