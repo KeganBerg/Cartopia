@@ -145,4 +145,24 @@ describe('live kart netcode', () => {
     expect(b.karts[4].x).toBe(before[4][0])
     expect(b.karts[4].emp).toBe(0)
   })
+
+  it('an item with no crate behind it does nothing, and a bad tow target is dropped', () => {
+    const { b, lb, step } = setup()
+    step(2)
+    const raw = lb as unknown as { onSnap: (p: unknown) => void; onNotes: (p: unknown) => void }
+    // The host's own kart "uses" a static storm on the guest with no crate taken first.
+    raw.onNotes({ from: 'host', n: [{ k: 'item', kart: 5, item: 'emp', x: 0, z: 0, h: 0, id: 7, target: -1, targets: [4] }] })
+    expect(b.karts[4].emp).toBe(0)
+    // After a crate it counts, once.
+    raw.onNotes({ from: 'host', n: [{ k: 'crate', kart: 5, i: 0 }, { k: 'item', kart: 5, item: 'emp', x: 0, z: 0, h: 0, id: 8, target: -1, targets: [4] }, { k: 'item', kart: 5, item: 'emp', x: 0, z: 0, h: 0, id: 9, target: -1, targets: [4] }] })
+    expect(b.karts[4].emp).toBeGreaterThan(0)
+    b.karts[4].emp = 0
+    // A snapshot pointing a tow at a kart that doesn't exist, then silence: the takeover drives on.
+    const v = [5, ...Array(23).fill(0)]
+    v[18] = 2 // tow
+    v[19] = 99 // towTarget
+    raw.onSnap({ t: b.t + 1, from: 'host', k: [v] })
+    lb.show()
+    expect(b.karts[5].towTarget).toBe(-1)
+  })
 })

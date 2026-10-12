@@ -53,7 +53,7 @@ export function CommonExtras({ t }: { t: Track }) {
   const flagsClear = useMemo(() => flags.filter((f) => !nearZone(zones, f.x, f.z, 7)), [flags, zones])
   return (
     <group>
-      <Batch version={t.n + 11}>
+      <Batch version={t.n + 11} cell={24}>
         {pits.map((p) => (
           <group key={p.k} position={[p.x, 0, p.z]} rotation-y={p.ry}>
             <Box p={[0, 1.6, 0.8]} s={[4.6, 3.2, 4.4]} c="#eceff1" />
@@ -187,7 +187,7 @@ export function TownExtras({ t }: { t: Track }) {
   const PARK = ['fountain', 'playground', 'gazebo', 'picnic', 'pond', 'statue', 'flowers', 'hedge', 'bench', 'billboard', 'clocktower', 'flowers', 'picnic', 'hedge']
   return (
     <group>
-      <Batch version={t.n + 21}>
+      <Batch version={t.n + 21} cell={24}>
         {houses.map((h, i) => <B key={i} def="house" x={h.x} z={h.z} ry={face(h.x, h.z) + (h.r() - 0.5) * 0.3} />)}
         {park.map((p, i) => <B key={i} def={PARK[i % PARK.length]} x={p.x} z={p.z} ry={face(p.x, p.z)} />)}
         {lots.map((l, li) => (
@@ -276,7 +276,7 @@ export function DocksExtras({ t }: { t: Track }) {
   const crews = useMemo(() => rigPeople(rigs), [rigs])
   return (
     <group>
-      <Batch version={t.n + 31}>
+      <Batch version={t.n + 31} cell={24}>
         {quay.map((q, i) => (
           // Forklifts and container trucks working the quay.
           <group key={i} position={[q.x, 0, q.z]} rotation-y={q.ry + Math.PI / 2}>
@@ -368,7 +368,7 @@ export function DesertExtras({ t }: { t: Track }) {
   const weeds = useMemo(() => open({ need: 3, count: 7, seed: 531, gap: 10, reach: 70 }), [open])
   return (
     <group>
-      <Batch version={t.n + 41}>
+      <Batch version={t.n + 41} cell={24}>
         {arch && (
           <group position={[arch.x, 0, arch.z]} rotation-y={face(arch.x, arch.z) + Math.PI / 2}>
             <Box p={[-5, 3.5, 0]} s={[3, 7, 3.4]} c="#b5532f" />

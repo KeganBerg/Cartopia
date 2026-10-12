@@ -205,4 +205,14 @@ describe('kart items', () => {
       expect(done[FIELD - 1] - done[0], t.def.id).toBeLessThan(30)
     }
   })
+
+  it('a hornet flies past a kart that has already finished', () => {
+    const race = new KartRace(RING, [{ name: 'A', pi: 40, ai: false }, { name: 'B', pi: 40, ai: false }, { name: 'C', pi: 40, ai: false }], 1)
+    const [a, b, c] = race.karts
+    shift(race, a, 60); shift(race, b, 30)
+    a.done = 50; race.finishOrder.push(a.id)
+    c.item = 'hornet'
+    race.useItem(c, race.order())
+    expect(race.hornets.map((h) => h.target)).toEqual([b.id])
+  })
 })

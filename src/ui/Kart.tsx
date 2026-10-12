@@ -108,26 +108,27 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
       else if (e.kind === 'lap') { dingSound(1); setFlash(e.value === LAPS ? 'FINAL LAP!' : `LAP ${e.value}`) }
     }
   }
+  const podium = useRef<ReturnType<typeof setTimeout>>(undefined)
+  useEffect(() => () => clearTimeout(podium.current), [])
   const finish = () => {
     const order = race.order().map((k) => k.id)
     const place = order.indexOf(me) + 1
     if (place === 1) sfx.win()
     else sfx.lose()
     engine.current?.setLevel(0.25)
-    // Let the player coast over the line before the podium comes up.
-    setTimeout(() => {
-      setEnd({ place, order })
-      onFinish(place, race.karts[me].done ?? race.t)
-    }, 1400)
+    // The result counts the moment the line is crossed (closing during the coast can't lose
+    // it); the podium waits while the player coasts on.
+    onFinish(place, race.karts[me].done ?? race.t)
+    podium.current = setTimeout(() => setEnd({ place, order }), 1400)
   }
 
   const item = hud?.item ? ITEMS[hud.item as ItemId] : null
   const dead = !!hud && hud.fx.emp > 0 // a static storm locks the item slot
   const slot = item ? <Roulette key={hud!.item} icon={item.icon} /> : null
   return (
-    <div className={`race-full kt${tall ? ' tall' : ' wide'}${dead ? ' dead' : ''}`}>
+    <div className={`race-full kt${tall ? ' tall' : ' wide'}${touch ? ' touch' : ''}${dead ? ' dead' : ''}`}>
       <Canvas className="rf-canvas" camera={{ fov: 60, near: 0.3, far: 420 }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
-        <KartScene race={race} looks={looks} me={me} input={input} running={running && !end} onHud={setHud} onEvents={onEvents} onFinish={finish} afterStep={live?.tick} />
+        <KartScene race={race} looks={looks} me={me} input={input} running={running} onHud={setHud} onEvents={onEvents} onFinish={finish} afterStep={live?.tick} />
       </Canvas>
       <LoadingScene label={live?.loading ?? `Driving to ${track.name}`} onReady={() => setDrawn(true)} onClose={onExit} />
       {drawn && !ready && <div className="kt-wait">⏳ {live?.loading}</div>}

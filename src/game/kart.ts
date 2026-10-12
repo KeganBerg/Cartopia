@@ -541,8 +541,9 @@ export class KartRace {
       // Zaps up to three karts ahead, nearest first; a bubble shield soaks it up.
       targets = order.slice(Math.max(0, rank - 3), rank).filter((o) => o.done === null).map((o) => o.id)
     } else if (item === 'hornet') {
-      const o = order[Math.max(0, rank - 1)]
-      target = o === k ? -1 : o.id
+      // The nearest kart ahead still racing (a finished one isn't worth a hornet).
+      const o = order.slice(0, Math.max(0, rank)).reverse().find((x) => x.done === null)
+      target = o ? o.id : -1
     }
     const note: KartNote = { k: 'item', kart: k.id, item, x: k.x, z: k.z, h: k.h, id, target, targets }
     this.notes.push(note)

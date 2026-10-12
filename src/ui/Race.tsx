@@ -54,6 +54,8 @@ const liveReward = (oppPi: number) => 300 + oppPi * 8
 const reward = (r: Rival) => (r.id.startsWith('live:') ? liveReward(r.pi) : 150 + r.pi * 6)
 const performance_now = () => window.performance.now()
 
+const GP_CUP = ['🥉', '🏆', '🏆', '👑']
+
 function carNear(target: number) {
   return [...CARS].sort((a, b) => Math.abs(performance(a, zero) - target) - Math.abs(performance(b, zero) - target))[0]
 }
@@ -258,7 +260,7 @@ export function RacePanel() {
         field={gpRace.field}
         next={gpNext(gpRace.series)}
         prize={gpRace.prize}
-        title={`${gpRace.series.name} · Race ${round + 1} of ${GP_ROUNDS} · ${def.name}${reverse ? ' (reverse)' : ''}`}
+        title={`${GP_CUP[GP_SERIES.indexOf(gpRace.series)] ?? '🏆'} ${round + 1}/${GP_ROUNDS} · ${def.icon} ${def.short}${reverse ? ' ↺' : ''}`}
         onFinish={(place) => gpResult(gpRace.series.id, place === 1)}
         onExit={() => { setGpRace(null); setTab('gp') }}
       />
@@ -476,7 +478,7 @@ export function RacePanel() {
   const TITLES: Record<RaceTab, string> = { hub: 'Race', quick: 'Quick Race', campaign: 'Campaign', tour: 'Pro Tour', gp: 'Grand Prix', trial: 'Time Trial', event: 'Weekly Event', rivals: 'Rivals' }
   const chip = tab === 'campaign' ? `⭐ ${stars}/${CAMPAIGN.length * CAMPAIGN_RACES * 3}`
     : tab === 'tour' ? `🌍 ${tourWon.toLocaleString()} wins`
-    : tab === 'gp' ? '🏆 Win 6 in a row'
+    : tab === 'gp' ? `🏁 ×${GP_ROUNDS} → 🎁`
     : tab === 'event' ? `⏳ ${shortLeft(msToNextWeek())}`
     : tab === 'rivals' ? rowChip(rivalRow, oldPaints)
     : null
@@ -570,7 +572,6 @@ export function RacePanel() {
   )
 }
 
-const GP_CUP = ['🥉', '🏆', '🏆', '👑']
 
 // A race's distance, as a small tag.
 const DistChip = ({ d }: { d: RaceDist }) => <span className={`rm-dist d-${d}`} title={`${DIST[d].label} race`}>{DIST[d].label}</span>
@@ -605,7 +606,7 @@ function GrandPrix({ onRace }: { onRace: (s: GpSeries, r: Rival, prize: number) 
               <span className="rm-cup" aria-hidden>{GP_CUP[si] ?? '🏆'}</span>
               <b className="rm-ttl">{s.name}</b>
               <Rounds round={prog.round} />
-              {prog.clears > 0 && <span className="rm-wchip">Won ×{prog.clears}</span>}
+              {prog.clears > 0 && <span className="rm-wchip">🏆×{prog.clears}</span>}
             </div>
             <div className="rm-gpc-body">
               <span className="rm-next"><TrackChip round={prog.round} /> Race {prog.round + 1}: <b>{rival.town}</b> · PI {rival.pi}</span>
