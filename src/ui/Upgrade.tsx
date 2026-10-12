@@ -13,6 +13,7 @@ import { BuildingModel } from '../scene/BuildingModel'
 import { VanguardTower } from '../scene/Landmark'
 import { frame, seat } from '../scene/fit'
 import { Panel } from './Menus'
+import { RaveButton } from './Techno'
 
 const n = (v: number) => v.toLocaleString()
 const time = (sec: number) => (sec >= 60 ? `${Math.floor(sec / 60)}m${sec % 60 ? ` ${sec % 60}s` : ''}` : `${sec}s`)
@@ -223,6 +224,7 @@ export function UpgradePanel() {
             )}
           </>
         )}
+        {d.id === 'club' && <RaveButton onStart={close} />}
         {takesDriver(d) && <Driver b={b} d={d} />}
       </div>
     </Panel>

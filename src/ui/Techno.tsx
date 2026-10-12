@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { onTechnoChange, technoBeat, technoLeft, technoOn, technoToDrop } from '../game/techno'
+import { onTechnoChange, technoBeat, technoLeft, technoOn, technoToDrop, throwRave } from '../game/techno'
 import { reducedMotion } from '../game/fx'
 import { useCalmFlashing } from '../game/flashing'
 
@@ -112,5 +112,15 @@ export function TechnoTag({ short }: { short?: boolean }) {
       {!short && <span className="tk-name">RAVE MODE</span>}
       {clock && <span className="tk-left">{clock}</span>}
     </span>
+  )
+}
+
+// The Neon Owl's button: throws a Rave Mode party on this player's screen.
+export function RaveButton({ onStart }: { onStart: () => void }) {
+  const on = useTechno()
+  return (
+    <button className="buy rave-btn" disabled={on} onClick={() => { throwRave(); onStart() }}>
+      {on ? '🎧 Rave on!' : '🎧 Throw a rave'}
+    </button>
   )
 }

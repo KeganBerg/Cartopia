@@ -1,0 +1,911 @@
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { useFrame, useThree } from '@react-three/fiber'
+import { BufferAttribute, BufferGeometry, CanvasTexture, Color, DoubleSide, Group, InstancedMesh, Mesh, MeshStandardMaterial, Object3D, PerspectiveCamera, RepeatWrapping, SRGBColorSpace, Vector3, type Texture } from 'three'
+import { CarModel, carFrame, wheelRig, type WheelRig } from './CarModel'
+import { BuildingModel } from './BuildingModel'
+import { Batch } from './Batch'
+import { holdTown } from './renderGate'
+import { ArcadeSky, CarShadow, Grandstand, Lamp, TyreStack, useArcadeLook, useTownPool, type Person, Crowd } from './ArcadeScenery'
+import { Box, Cone, Cyl, Palm, Scatter, Water, rand } from './RaceVenues'
+import { asphaltTex, checkerTex, concreteTex, containerTex, glowTex, grassTex, gravelTex, sandTex, shutterTex, towerTex } from './textures'
+import { signTexture } from './signTexture'
+import { glowMats } from './dayNight'
+import { decal } from './layers'
+import { TILE, buildingDef, type Body } from '../game/data'
+import { DRIFT_BLUE, DRIFT_ORANGE, KART_LEN, KartRace, type KartEvent, type KartInput, type Track } from '../game/kart'
+import type { ChaseCar } from './ChaseScene'
+
+// A kart circuit: the tarmac ribbon with kerbs, verges and barriers, the theme's
+// scenery round it (the player's town, a harbour, a red rock canyon), the karts,
+// and a chase camera. The race itself is game/kart.ts; this draws it and steps it.
+
+export type KartHud = { lap: number; place: number; item: string | null; speed: number; charge: number; boost: boolean; t: number; dots: { x: number; z: number; me: boolean }[]; wrong: boolean }
+export type KartCam = 'chase' | 'top'
+
+// Dev only: ?autopilot drives the player's kart, ?warp=<s> skips ahead once the race starts (for screenshots).
+const DEV = import.meta.env.DEV && typeof location !== 'undefined' ? new URLSearchParams(location.search) : null
+const AUTOPILOT = !!DEV?.has('autopilot')
+let warp = Number(DEV?.get('warp') ?? 0)
+
+const Y_ROAD = 0.02
+const Y_KERB = 0.035
+const Y_PAINT = 0.04
+
+// ---------- textures ----------
+
+const texCache = new Map<string, CanvasTexture>()
+function canvasTex(key: string, w: number, h: number, draw: (g: CanvasRenderingContext2D) => void) {
+  const hit = texCache.get(key)
+  if (hit) return hit
+  const c = document.createElement('canvas')
+  c.width = w
+  c.height = h
+  draw(c.getContext('2d')!)
+  const t = new CanvasTexture(c)
+  t.colorSpace = SRGBColorSpace
+  t.wrapS = t.wrapT = RepeatWrapping
+  t.anisotropy = 4
+  texCache.set(key, t)
+  return t
+}
+// Red and white kerb blocks, one pair per texture repeat.
+const kerbTex = (a: string, b: string) => canvasTex(`kerb${a}${b}`, 16, 64, (g) => {
+  g.fillStyle = a; g.fillRect(0, 0, 16, 32)
+  g.fillStyle = b; g.fillRect(0, 32, 16, 32)
+  g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(12, 0, 4, 64)
+})
+// Boost pad: glowing chevrons pointing along +v.
+const boostTex = () => canvasTex('boostpad', 64, 128, (g) => {
+  g.fillStyle = '#ff6d00'; g.fillRect(0, 0, 64, 128)
+  for (let i = 0; i < 3; i++) {
+    const y = 110 - i * 40
+    g.fillStyle = i % 2 ? '#ffe082' : '#fff8e1'
+    g.beginPath(); g.moveTo(6, y); g.lineTo(32, y - 26); g.lineTo(58, y); g.lineTo(58, y - 12); g.lineTo(32, y - 38); g.lineTo(6, y - 12); g.closePath(); g.fill()
+  }
+  g.strokeStyle = '#bf360c'; g.lineWidth = 4; g.strokeRect(2, 2, 60, 124)
+})
+const rampTex = () => canvasTex('ramp', 64, 64, (g) => {
+  for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? '#212121' : '#ffd600'; g.beginPath(); g.moveTo(i * 16 - 32, 64); g.lineTo(i * 16, 0); g.lineTo(i * 16 + 8, 0); g.lineTo(i * 16 - 24, 64); g.fill() }
+})
+// Barrier panel: a run of sponsor boards in invented names.
+const ADS = ['CARTOPIA', 'RUSTY\'S', 'BIG BISON', 'TURBO TONIC', 'GEARBOX', 'NITRO NUTS', 'SKYHOPPER', 'LUGNUT CO']
+const AD_COLORS: [string, string][] = [['#1565c0', '#ffffff'], ['#c62828', '#ffeb3b'], ['#2e7d32', '#ffffff'], ['#212121', '#ff9100'], ['#6a1b9a', '#ffffff'], ['#ffeb3b', '#c62828'], ['#00838f', '#ffffff'], ['#ef6c00', '#212121']]
+const adTex = () => canvasTex('adwall', 2048, 128, (g) => {
+  ADS.forEach((text, i) => {
+    const [bg, fg] = AD_COLORS[i]
+    g.fillStyle = bg; g.fillRect(i * 256, 0, 256, 128)
+    g.fillStyle = fg
+    let size = 54
+    g.font = `900 ${size}px "Arial Black", Impact, system-ui, sans-serif`
+    while (g.measureText(text).width > 228 && size > 20) { size -= 3; g.font = `900 ${size}px "Arial Black", Impact, system-ui, sans-serif` }
+    g.textAlign = 'center'; g.textBaseline = 'middle'
+    g.fillText(text, i * 256 + 128, 68)
+    g.fillStyle = 'rgba(255,255,255,0.18)'; g.fillRect(i * 256, 0, 256, 10)
+  })
+})
+const crateTex = () => canvasTex('kartcrate', 128, 128, (g) => {
+  const grd = g.createLinearGradient(0, 0, 128, 128)
+  grd.addColorStop(0, '#ff4081'); grd.addColorStop(0.5, '#7c4dff'); grd.addColorStop(1, '#00e5ff')
+  g.fillStyle = grd; g.fillRect(0, 0, 128, 128)
+  g.strokeStyle = 'rgba(255,255,255,0.85)'; g.lineWidth = 10; g.strokeRect(5, 5, 118, 118)
+  // A gem, the game's own prize mark.
+  g.fillStyle = '#ffffff'
+  g.beginPath(); g.moveTo(64, 98); g.lineTo(30, 56); g.lineTo(44, 36); g.lineTo(84, 36); g.lineTo(98, 56); g.closePath(); g.fill()
+  g.fillStyle = 'rgba(124,77,255,0.45)'
+  g.beginPath(); g.moveTo(64, 98); g.lineTo(52, 56); g.lineTo(76, 56); g.closePath(); g.fill()
+  g.fillRect(30, 54, 68, 4)
+})
+
+// ---------- track geometry ----------
+
+// A strip following the centre line between two offsets across it (+ is left).
+// u runs across (0..1), v along in world units / vScale.
+function ribbon(t: Track, a: number, b: number, y: number, vScale: number, uScale = 1) {
+  const n = t.n
+  const pos = new Float32Array((n + 1) * 2 * 3)
+  const uv = new Float32Array((n + 1) * 2 * 2)
+  const nor = new Float32Array((n + 1) * 2 * 3)
+  let s = 0
+  for (let k = 0; k <= n; k++) {
+    const i = k % n
+    if (k > 0) s += Math.hypot(t.x[i] - t.x[(k - 1) % n], t.z[i] - t.z[(k - 1) % n])
+    for (let e = 0; e < 2; e++) {
+      const o = e ? b : a
+      const j = (k * 2 + e)
+      pos.set([t.x[i] + t.nx[i] * o, y, t.z[i] + t.nz[i] * o], j * 3)
+      uv.set([e * uScale, s / vScale], j * 2)
+      nor.set([0, 1, 0], j * 3)
+    }
+  }
+  const idx: number[] = []
+  for (let k = 0; k < n; k++) {
+    const p = k * 2
+    // Winding so the face points up whichever side a and b sit.
+    if (b > a) idx.push(p, p + 2, p + 1, p + 1, p + 2, p + 3)
+    else idx.push(p, p + 1, p + 2, p + 1, p + 3, p + 2)
+  }
+  const g = new BufferGeometry()
+  g.setAttribute('position', new BufferAttribute(pos, 3))
+  g.setAttribute('uv', new BufferAttribute(uv, 2))
+  g.setAttribute('normal', new BufferAttribute(nor, 3))
+  g.setIndex(idx)
+  return g
+}
+
+// An upright wall along an offset, `h` tall, facing the track.
+function wallGeo(t: Track, o: number, y0: number, h: number, vScale: number) {
+  const n = t.n
+  const pos = new Float32Array((n + 1) * 2 * 3)
+  const uv = new Float32Array((n + 1) * 2 * 2)
+  const nor = new Float32Array((n + 1) * 2 * 3)
+  const sg = -Math.sign(o)
+  let s = 0
+  for (let k = 0; k <= n; k++) {
+    const i = k % n
+    if (k > 0) s += Math.hypot(t.x[i] - t.x[(k - 1) % n], t.z[i] - t.z[(k - 1) % n])
+    for (let e = 0; e < 2; e++) {
+      const j = k * 2 + e
+      pos.set([t.x[i] + t.nx[i] * o, y0 + e * h, t.z[i] + t.nz[i] * o], j * 3)
+      // Seen from the track, lettering on the right-hand wall runs against the direction of travel.
+      uv.set([(o > 0 ? s : -s) / vScale, e], j * 2)
+      nor.set([t.nx[i] * sg, 0, t.nz[i] * sg], j * 3)
+    }
+  }
+  const idx: number[] = []
+  for (let k = 0; k < n; k++) {
+    const p = k * 2
+    if (o > 0) idx.push(p, p + 2, p + 1, p + 1, p + 2, p + 3)
+    else idx.push(p, p + 1, p + 2, p + 1, p + 3, p + 2)
+  }
+  const g = new BufferGeometry()
+  g.setAttribute('position', new BufferAttribute(pos, 3))
+  g.setAttribute('uv', new BufferAttribute(uv, 2))
+  g.setAttribute('normal', new BufferAttribute(nor, 3))
+  g.setIndex(idx)
+  return g
+}
+
+type Theme = { ground: string; groundTex: (rx: number) => Texture; verge: string; vergeTex: (rx: number, ry: number) => Texture; kerb: [string, string]; barrier: string; cap: string }
+const THEMES: Record<string, Theme> = {
+  town: { ground: '#ffffff', groundTex: (r) => grassTex(r, r), verge: '#ffffff', vergeTex: (a, b) => grassTex(a, b), kerb: ['#e53935', '#fafafa'], barrier: '#eceff1', cap: '#c62828' },
+  docks: { ground: '#9aa3a9', groundTex: (r) => concreteTex(r, r), verge: '#b0b6ba', vergeTex: (a, b) => concreteTex(a, b), kerb: ['#fbc02d', '#212121'], barrier: '#cfd8dc', cap: '#fbc02d' },
+  desert: { ground: '#d9a066', groundTex: (r) => sandTex(r, r), verge: '#c9925a', vergeTex: (a, b) => gravelTex(a, b), kerb: ['#e53935', '#fafafa'], barrier: '#d7ccc8', cap: '#1565c0' },
+}
+
+function TrackSurface({ t }: { t: Track }) {
+  const th = THEMES[t.def.theme]
+  const geo = useMemo(() => {
+    const kw = 0.55
+    return {
+      road: ribbon(t, -t.half, t.half, Y_ROAD, 4, t.half / 2),
+      kerbL: ribbon(t, t.half, t.half + kw, Y_KERB, 2),
+      kerbR: ribbon(t, -t.half - kw, -t.half, Y_KERB, 2),
+      vergeL: ribbon(t, t.half + kw, t.wall + 0.3, 0.012, 3, 1),
+      vergeR: ribbon(t, -t.wall - 0.3, -t.half - kw, 0.012, 3, 1),
+      lineL: ribbon(t, t.half - 0.32, t.half - 0.2, Y_PAINT, 4),
+      lineR: ribbon(t, -t.half + 0.2, -t.half + 0.32, Y_PAINT, 4),
+      wallL: wallGeo(t, t.wall, 0, 0.62, 16),
+      wallR: wallGeo(t, -t.wall, 0, 0.62, 16),
+      capL: ribbon(t, t.wall - 0.06, t.wall + 0.22, 0.64, 4),
+      capR: ribbon(t, -t.wall - 0.22, -t.wall + 0.06, 0.64, 4),
+      backL: wallGeo(t, t.wall + 0.22, 0, 0.64, 16),
+      backR: wallGeo(t, -t.wall - 0.22, 0, 0.64, 16),
+    }
+  }, [t])
+  const road = useMemo(() => { const a = asphaltTex().clone(); a.needsUpdate = true; return a }, [])
+  const verge = th.vergeTex(1, 1)
+  const ad = adTex()
+  return (
+    <group>
+      <mesh geometry={geo.road} receiveShadow><meshStandardMaterial map={road} roughness={0.92} /></mesh>
+      {[geo.kerbL, geo.kerbR].map((g, i) => <mesh key={i} geometry={g}><meshStandardMaterial map={kerbTex(...th.kerb)} roughness={0.6} {...decal(1)} /></mesh>)}
+      {[geo.vergeL, geo.vergeR].map((g, i) => <mesh key={i} geometry={g}><meshStandardMaterial map={verge} color={th.verge} /></mesh>)}
+      {[geo.lineL, geo.lineR].map((g, i) => <mesh key={i} geometry={g}><meshStandardMaterial color="#f5f5f5" {...decal(2)} /></mesh>)}
+      {[geo.wallL, geo.wallR].map((g, i) => <mesh key={i} geometry={g}><meshStandardMaterial map={ad} roughness={0.5} /></mesh>)}
+      {[geo.backL, geo.backR].map((g, i) => <mesh key={i} geometry={g}><meshStandardMaterial color={th.barrier} side={DoubleSide} /></mesh>)}
+      {[geo.capL, geo.capR].map((g, i) => <mesh key={i} geometry={g}><meshStandardMaterial color={th.cap} side={DoubleSide} /></mesh>)}
+      <StartLine t={t} />
+      {t.boosts.map((p, i) => (
+        <mesh key={i} position={[p.x, Y_PAINT + 0.004, p.z]} rotation={[-Math.PI / 2, 0, p.h + Math.PI]}>
+          <planeGeometry args={[p.w, p.l]} />
+          <meshStandardMaterial map={boostTex()} emissive="#ff6d00" emissiveIntensity={0.55} emissiveMap={boostTex()} {...decal(3)} />
+        </mesh>
+      ))}
+      {t.ramps.map((p, i) => <Ramp key={i} p={p} />)}
+    </group>
+  )
+}
+
+// A jump: a striped kicker up, a flat top, and a kicker down the far side, so it works both ways round.
+function Ramp({ p }: { p: Track['ramps'][number] }) {
+  const h = 0.5
+  return (
+    <group position={[p.x, 0, p.z]} rotation-y={p.h}>
+      {[-1, 1].map((sd) => (
+        <mesh key={sd} position={[0, h / 2, sd * p.l * 0.33]} rotation-x={sd * 0.42}>
+          <boxGeometry args={[p.w, 0.06, p.l * 0.4]} />
+          <meshStandardMaterial map={rampTex()} />
+        </mesh>
+      ))}
+      <mesh position={[0, h / 2 - 0.02, 0]}><boxGeometry args={[p.w - 0.02, h - 0.04, p.l * 0.5]} /><meshStandardMaterial color="#455a64" /></mesh>
+      {[-1, 1].map((sd) => <mesh key={sd} position={[sd * (p.w / 2 + 0.06), h / 2, 0]}><boxGeometry args={[0.12, h + 0.1, p.l * 0.9]} /><meshStandardMaterial color="#ffd600" /></mesh>)}
+    </group>
+  )
+}
+
+// Chequered line, painted grid boxes, and a gantry with the start lights.
+function StartLine({ t }: { t: Track }) {
+  const h = Math.atan2(t.tx[0], t.tz[0])
+  const w = t.wall * 2 + 0.6
+  const check = useMemo(() => { const c = checkerTex(1).clone(); c.repeat.set(t.half * 2 / 0.5, 2); c.needsUpdate = true; return c }, [t])
+  const boxes = useMemo(() => Array.from({ length: 6 }, (_, k) => {
+    const row = Math.floor(k / 2), col = k % 2 ? -1 : 1
+    const i = (t.n - 6 - row * 4 + t.n) % t.n
+    const off = col * t.half * 0.45 + (row % 2 ? 0.4 : -0.4)
+    return { x: t.x[i] + t.nx[i] * off, z: t.z[i] + t.nz[i] * off, h: Math.atan2(t.tx[i], t.tz[i]) }
+  }), [t])
+  return (
+    <group>
+      <mesh position={[t.x[0], Y_PAINT + 0.003, t.z[0]]} rotation={[-Math.PI / 2, 0, h]}>
+        <planeGeometry args={[t.half * 2, 1]} />
+        <meshStandardMaterial map={check} {...decal(3)} />
+      </mesh>
+      {boxes.map((b, i) => (
+        <group key={i} position={[b.x, Y_PAINT, b.z]} rotation-y={b.h}>
+          {[[-0.55, 0, 0.08, 1.6], [0.55, 0, 0.08, 1.6], [0, 0.78, 1.18, 0.08]].map(([x, z, ww, l], j) => (
+            <mesh key={j} position={[x, 0.002, z]} rotation-x={-Math.PI / 2}><planeGeometry args={[ww, l]} /><meshStandardMaterial color="#fafafa" {...decal(2)} /></mesh>
+          ))}
+        </group>
+      ))}
+      <group position={[t.x[0], 0, t.z[0]]} rotation-y={h}>
+        {[-1, 1].map((sd) => <Box key={sd} p={[sd * w / 2, 2.3, 0]} s={[0.4, 4.6, 0.4]} c="#37474f" />)}
+        <Box p={[0, 4.4, 0]} s={[w + 0.4, 0.9, 0.5]} c="#263238" />
+        {[1, -1].map((f) => (
+          <mesh key={f} position={[0, 4.4, f * 0.26]} rotation-y={f > 0 ? 0 : Math.PI}>
+            <planeGeometry args={[w * 0.62, 0.7]} />
+            <meshBasicMaterial map={signTexture('CARTOPIA GRAND PRIX', '#c62828', '#ffffff', (w * 0.62) / 0.7)} toneMapped={false} />
+          </mesh>
+        ))}
+        {[-1, 1].map((sd) => (
+          <mesh key={sd} position={[sd * (w * 0.31 + 0.9), 4.4, -0.26]} rotation-y={Math.PI}>
+            <planeGeometry args={[1.4, 0.7]} />
+            <meshBasicMaterial map={checkerTex(2)} />
+          </mesh>
+        ))}
+        <StartLights w={w} />
+      </group>
+    </group>
+  )
+}
+
+// Five red lights on the gantry, lit one by one in the countdown and out together at GO.
+export const kartLights = { n: 0 }
+function StartLights({ w }: { w: number }) {
+  const mats = useMemo(() => Array.from({ length: 5 }, () => new MeshStandardMaterial({ color: '#3a1010', emissive: '#ff1744', emissiveIntensity: 0 })), [])
+  useFrame(() => mats.forEach((m, i) => {
+    const on = i < kartLights.n
+    m.emissiveIntensity = on ? 2.2 : 0
+    m.color.set(on ? '#ff1744' : '#3a1010')
+  }))
+  return (
+    <group position={[0, 3.6, -0.3]}>
+      <Box p={[0, 0, 0]} s={[3.4, 0.6, 0.3]} c="#111111" />
+      {mats.map((m, i) => (
+        <mesh key={i} position={[-1.3 + i * 0.65, 0, -0.17]} rotation-x={Math.PI / 2} material={m}>
+          <cylinderGeometry args={[0.2, 0.2, 0.05, 14]} />
+        </mesh>
+      ))}
+      <Box p={[w * 0.12, 0.55, 0]} s={[0.1, 0.5, 0.1]} c="#111111" />
+    </group>
+  )
+}
+
+// ---------- scenery ----------
+
+// Spots beside the track: walking the centre line, `off` beyond the barrier on either side,
+// skipping any spot that would land within `clear` of another stretch of track.
+function useSpots(t: Track) {
+  return useMemo(() => {
+    const cell = 8
+    const grid = new Map<string, number[]>()
+    for (let i = 0; i < t.n; i++) {
+      const k = `${Math.floor(t.x[i] / cell)},${Math.floor(t.z[i] / cell)}`
+      const l = grid.get(k) ?? []
+      l.push(i)
+      grid.set(k, l)
+    }
+    const clearOf = (x: number, z: number, d: number) => {
+      const r = Math.ceil(d / cell)
+      const cx = Math.floor(x / cell), cz = Math.floor(z / cell)
+      for (let a = -r; a <= r; a++) for (let b = -r; b <= r; b++) for (const i of grid.get(`${cx + a},${cz + b}`) ?? []) if ((t.x[i] - x) ** 2 + (t.z[i] - z) ** 2 < d * d) return false
+      return true
+    }
+    const along = (step: number, off: number, side: -1 | 1, clear: number, seed: number, jitter = 0) => {
+      const r = rand(seed)
+      const out: { x: number; z: number; ry: number; i: number; r: () => number }[] = []
+      for (let s = r() * step; s < t.n; s += step * (0.75 + r() * 0.5)) {
+        const i = Math.floor(s)
+        const o = side * (t.wall + off + r() * jitter)
+        const x = t.x[i] + t.nx[i] * o, z = t.z[i] + t.nz[i] * o
+        if (!clearOf(x, z, t.wall + clear)) continue
+        // Facing back toward the track.
+        out.push({ x, z, ry: Math.atan2(-t.nx[i] * side, -t.nz[i] * side), i, r })
+      }
+      return out
+    }
+    // The bend's outside: + left when the track turns right.
+    const outside = (i: number) => (t.curve[i] < 0 ? 1 : -1) as -1 | 1
+    return { clearOf, along, outside }
+  }, [t])
+}
+
+function Building({ def, x, z, ry, s = 1 }: { def: string; x: number; z: number; ry: number; s?: number }) {
+  return (
+    <group position={[x, 0, z]} rotation-y={ry} scale={s}>
+      <BuildingModel def={buildingDef(def)} />
+    </group>
+  )
+}
+
+// Grandstands and a crowd along the start straight, tyre walls on the outside of tight bends.
+function Trackside({ t }: { t: Track }) {
+  const { along, outside, clearOf } = useSpots(t)
+  const stands = useMemo(() => {
+    const out: { x: number; z: number; h: number; w: number }[] = []
+    for (const [i0, side] of [[(t.n - 22) % t.n, 1], [8, -1], [(t.n - 40) % t.n, -1]] as [number, -1 | 1][]) {
+      const o = side * (t.wall + 2.6)
+      const x = t.x[i0] + t.nx[i0] * o, z = t.z[i0] + t.nz[i0] * o
+      if (clearOf(x, z, t.wall + 2)) out.push({ x, z, h: Math.atan2(-t.nx[i0] * side, -t.nz[i0] * side), w: 14 })
+    }
+    return out
+  }, [t, clearOf])
+  const tyres = useMemo(() => {
+    const out: { x: number; z: number }[] = []
+    for (let i = 0; i < t.n; i += 3) {
+      if (Math.abs(t.curve[i]) < 0.07) continue
+      const sd = outside(i)
+      for (const extra of [0.55, 1.05]) {
+        const o = sd * (t.wall + extra)
+        out.push({ x: t.x[i] + t.nx[i] * o, z: t.z[i] + t.nz[i] * o })
+      }
+    }
+    return out.filter((p) => clearOf(p.x, p.z, t.wall + 0.2))
+  }, [t, outside, clearOf])
+  const marshals = useMemo(() => along(38, 1.4, 1, 1, 91).concat(along(46, 1.4, -1, 1, 97)), [along])
+  const fans = useMemo(() => {
+    const out: Person[] = []
+    for (const p of along(9, 2.2, 1, 1.5, 41).concat(along(11, 2.2, -1, 1.5, 43))) {
+      if (p.r() < 0.45) continue
+      const n = 2 + Math.floor(p.r() * 4)
+      for (let k = 0; k < n; k++) out.push({ x: p.x + (p.r() - 0.5) * 2.4, z: p.z + (p.r() - 0.5) * 2.4, h: p.ry + (p.r() - 0.5) * 0.6, cheer: p.r() < 0.5 })
+    }
+    return out
+  }, [along])
+  return (
+    <group>
+      {stands.map((s, i) => <Grandstand key={i} x={s.x} z={s.z} h={s.h} width={s.w} rows={5} roof={i % 2 ? '#1565c0' : '#c62828'} />)}
+      <Crowd people={fans} />
+      <Batch version={t.n}>
+        {tyres.map((p, i) => <TyreStack key={i} x={p.x} z={p.z} n={3} band={i % 2 ? '#e53935' : '#fafafa'} />)}
+        {marshals.map((m, i) => (
+          <group key={i} position={[m.x, 0, m.z]} rotation-y={m.ry}>
+            <Box p={[0, 0.9, 0]} s={[1.4, 1.8, 1.0]} c="#eceff1" />
+            <Box p={[0, 1.85, 0]} s={[1.6, 0.1, 1.2]} c="#ff6f00" />
+            <Box p={[0, 1.0, 0.51]} s={[1.0, 0.5, 0.02]} c="#90caf9" />
+            <Cyl p={[0.6, 2.4, 0]} r={0.025} h={1.1} c="#9e9e9e" />
+            <Box p={[0.85, 2.75, 0]} s={[0.5, 0.32, 0.02]} c={i % 2 ? '#fdd835' : '#43a047'} />
+          </group>
+        ))}
+      </Batch>
+    </group>
+  )
+}
+
+// The player's own town shops round the outside, a park in the middle, office towers beyond.
+function TownScenery({ t }: { t: Track }) {
+  const pool = useTownPool()
+  const { along, clearOf } = useSpots(t)
+  const r = useMemo(() => rand(17), [])
+  const shops = useMemo(() => {
+    const out: { def: string; x: number; z: number; ry: number }[] = []
+    let k = 0
+    for (const side of [1, -1] as const) for (const p of along(6.5, 4.6, side, 4.2, 5 + side)) {
+      const def = pool[k++ % pool.length]
+      const d = buildingDef(def)
+      if (d.w * TILE > 6 || d.h * TILE > 6) continue
+      out.push({ def, x: p.x, z: p.z, ry: p.ry })
+    }
+    return out
+  }, [along, pool])
+  const trees = useMemo(() => {
+    const out: { x: number; z: number; def: string; s: number }[] = []
+    for (let k = 0; k < 900 && out.length < 150; k++) {
+      const x = (r() - 0.5) * 160, z = (r() - 0.5) * 150
+      if (!clearOf(x, z, t.wall + 2.5)) continue
+      if (shops.some((s) => (s.x - x) ** 2 + (s.z - z) ** 2 < 20)) continue
+      out.push({ x, z, def: r() < 0.3 ? 'pine' : r() < 0.15 ? 'bush' : 'tree', s: 0.9 + r() * 0.5 })
+    }
+    return out
+  }, [r, clearOf, shops, t])
+  const props = useMemo(() => along(14, 0.9, 1, 0.6, 61).concat(along(14, 0.9, -1, 0.6, 67)), [along])
+  const towers = useMemo(() => Array.from({ length: 28 }, (_, i) => {
+    const a = (i / 28) * Math.PI * 2 + r() * 0.1, d = 105 + r() * 25
+    return { x: Math.cos(a) * d * 1.1, z: Math.sin(a) * d, w: 6 + r() * 6, h: 10 + r() * 26 }
+  }), [r])
+  const tex = useMemo(() => { const c = towerTex().clone(); c.repeat.set(2, 4); c.needsUpdate = true; return c }, [])
+  return (
+    <group>
+      <Batch version={t.n + 1}>
+        {shops.map((s, i) => <Building key={i} def={s.def} x={s.x} z={s.z} ry={s.ry} />)}
+        {trees.map((p, i) => <Building key={i} def={p.def} x={p.x} z={p.z} ry={i} s={p.s} />)}
+        {towers.map((b, i) => (
+          <mesh key={i} position={[b.x, b.h / 2, b.z]}>
+            <boxGeometry args={[b.w, b.h, b.w]} />
+            <meshStandardMaterial map={tex} color={i % 3 ? '#cfd8dc' : '#b0bec5'} />
+          </mesh>
+        ))}
+        <mesh rotation-x={-Math.PI / 2} position={[0, -0.01, 0]}><planeGeometry args={[420, 420]} /><meshStandardMaterial map={grassTex(70, 70)} /></mesh>
+      </Batch>
+      {props.map((p, i) => <Lamp key={i} x={p.x} z={p.z} ry={p.ry} />)}
+    </group>
+  )
+}
+
+// A harbour: open water inside the circuit, container stacks, cranes, sheds and a lighthouse outside.
+function DocksScenery({ t }: { t: Track }) {
+  const { along, clearOf } = useSpots(t)
+  const r = useMemo(() => rand(29), [])
+  const colors = ['#c62828', '#1565c0', '#2e7d32', '#ef6c00', '#00838f', '#6d4c41']
+  const stacks = useMemo(() => {
+    const out: { x: number; z: number; y: number; ry: number; c: number }[] = []
+    for (const side of [1, -1] as const) for (const p of along(4.2, 2.6, side, 2.2, 31 + side, 2)) {
+      if (p.r() < 0.25) continue
+      const n = 1 + Math.floor(p.r() * 3)
+      for (let k = 0; k < n; k++) out.push({ x: p.x, z: p.z, y: 0.6 + k * 1.2, ry: p.ry + Math.PI / 2, c: Math.floor(p.r() * colors.length) })
+    }
+    return out
+  }, [along, colors.length])
+  const cranes = useMemo(() => along(70, 7, 1, 6, 37).concat(along(80, 7, -1, 6, 39)), [along])
+  const sheds = useMemo(() => along(30, 12, 1, 9, 43).concat(along(36, 12, -1, 9, 47)).filter((p) => p.r() < 0.7), [along])
+  // Water fills the infield: wherever the grid says there's no track or quay.
+  const quay = useMemo(() => {
+    const out: { x: number; z: number }[] = []
+    for (let x = -90; x <= 90; x += 4) for (let z = -80; z <= 80; z += 4) if (!clearOf(x, z, t.wall + 3.5)) out.push({ x, z })
+    return out
+  }, [clearOf, t])
+  const yard = useMemo(() => {
+    const out = { barrels: [] as { x: number; z: number; ry: number }[], crates: [] as { x: number; z: number; ry: number }[] }
+    for (let k = 0; k < 600; k++) {
+      const x = (r() - 0.5) * 170, z = (r() - 0.5) * 150
+      if (!clearOf(x, z, t.wall + 0.8) || clearOf(x, z, t.wall + 3)) continue
+      ;(r() < 0.5 ? out.barrels : out.crates).push({ x, z, ry: r() * 6 })
+    }
+    return out
+  }, [r, clearOf, t])
+  return (
+    <group>
+      <group position-y={-0.33}><Water x={0} z={0} w={460} d={460} id="kartdocks" /></group>
+      <Batch version={t.n + 2}>
+        {/* Concrete quay under the whole circuit, so the track sits on land with water round it. */}
+        {quay.map((q, i) => <mesh key={i} position={[q.x, -0.22, q.z]}><boxGeometry args={[4.02, 0.44, 4.02]} /><meshStandardMaterial map={concreteTex(1, 1)} color="#b0b6ba" /></mesh>)}
+        {stacks.map((s, i) => (
+          <mesh key={i} position={[s.x, s.y, s.z]} rotation-y={s.ry} scale={[1.15, 1.2, 2.8]}>
+            <boxGeometry />
+            <meshStandardMaterial map={containerTex()} color={colors[s.c]} />
+          </mesh>
+        ))}
+        {cranes.map((c, i) => (
+          <group key={i} position={[c.x, 0, c.z]} rotation-y={c.ry}>
+            {[-1.6, 1.6].map((dx) => [-1.6, 1.6].map((dz) => <Box key={`${dx}${dz}`} p={[dx, 4.5, dz]} s={[0.35, 9, 0.35]} c="#fbc02d" />))}
+            <Box p={[0, 9, 0]} s={[3.6, 0.5, 3.6]} c="#fbc02d" />
+            <Box p={[0, 9.8, 4]} s={[0.7, 0.6, 16]} c="#fbc02d" />
+            <Box p={[0, 10.4, -1]} s={[2, 1.4, 2.4]} c="#c62828" />
+            <Box p={[0, 7.4, 8]} s={[0.05, 4.2, 0.05]} c="#263238" />
+            <Box p={[0, 5.3, 8]} s={[1.3, 0.3, 2.8]} c="#455a64" />
+          </group>
+        ))}
+        {sheds.map((s, i) => (
+          <group key={i} position={[s.x, 0, s.z]} rotation-y={s.ry}>
+            <Box p={[0, 2.2, -2]} s={[12, 4.4, 7]} c="#90a4ae" />
+            <Box p={[0, 4.55, -2]} s={[12.3, 0.3, 7.3]} c="#607d8b" />
+            <mesh position={[0, 1.5, 1.51]}><planeGeometry args={[4.5, 3]} /><meshStandardMaterial map={shutterTex()} color="#cfd8dc" /></mesh>
+            <mesh position={[0, 3.8, 1.52]}><planeGeometry args={[6, 0.8]} /><meshBasicMaterial map={signTexture(['PIER 7', 'COLD STORE', 'DOCK 3', 'FREIGHT'][i % 4], '#1565c0', '#ffffff', 7.5)} toneMapped={false} /></mesh>
+          </group>
+        ))}
+      </Batch>
+      <Scatter spots={yard.barrels} colors={['#c62828', '#1565c0', '#2e7d32', '#fbc02d']} y={0.22}><cylinderGeometry args={[0.2, 0.2, 0.5, 10]} /></Scatter>
+      <Scatter spots={yard.crates} colors={['#a1795a', '#8d6e63', '#b08968']} y={0.25}><boxGeometry args={[0.5, 0.5, 0.5]} /></Scatter>
+      <Lighthouse x={-20} z={10} />
+      <Boats />
+    </group>
+  )
+}
+
+function Lighthouse({ x, z }: { x: number; z: number }) {
+  return (
+    <group position={[x, 0, z]}>
+      <Cyl p={[0, 0.5, 0]} r={2.6} h={1} c="#9aa3a9" seg={12} />
+      {[0, 1, 2, 3, 4].map((i) => <Cyl key={i} p={[0, 1.9 + i * 1.8, 0]} r={1.15 - i * 0.12} h={1.8} c={i % 2 ? '#ffffff' : '#c62828'} seg={12} />)}
+      <Cyl p={[0, 10.1, 0]} r={0.9} h={0.2} c="#263238" seg={12} />
+      <mesh position={[0, 10.6, 0]}><cylinderGeometry args={[0.55, 0.55, 0.8, 12]} /><primitive object={glowMats.bulb} attach="material" dispose={null} /></mesh>
+      <Cone p={[0, 11.35, 0]} r={0.75} h={0.7} c="#263238" seg={12} />
+    </group>
+  )
+}
+
+// Small boats bobbing in the basin.
+function Boats() {
+  const refs = useRef<(Group | null)[]>([])
+  const boats = useMemo(() => [{ x: -8, z: 22, c: '#c62828' }, { x: 14, z: 30, c: '#1565c0' }, { x: -30, z: 18, c: '#fafafa' }, { x: 2, z: 12, c: '#fbc02d' }], [])
+  useFrame(({ clock }) => boats.forEach((_, i) => {
+    const g = refs.current[i]
+    if (!g) return
+    const t = clock.elapsedTime + i * 1.3
+    g.position.y = Math.sin(t * 1.4) * 0.06
+    g.rotation.z = Math.sin(t * 1.1) * 0.05
+  }))
+  return (
+    <>
+      {boats.map((b, i) => (
+        <group key={i} position={[b.x, 0, b.z]} rotation-y={i * 1.7}>
+          <group ref={(g) => { refs.current[i] = g }}>
+            <Box p={[0, 0.2, 0]} s={[1.3, 0.5, 3.4]} c={b.c} />
+            <Box p={[0, 0.48, 0.2]} s={[1.1, 0.06, 2.6]} c="#d7ccc8" />
+            <Box p={[0, 0.85, -0.3]} s={[0.9, 0.7, 1.1]} c="#eceff1" />
+            <Box p={[0, 1.4, -0.3]} s={[0.05, 0.6, 0.05]} c="#455a64" />
+          </group>
+        </group>
+      ))}
+    </>
+  )
+}
+
+// Red rock canyon: banded mesas and spires round the outside, saguaros, scrub and a roadside stop.
+function DesertScenery({ t }: { t: Track }) {
+  const { along, clearOf } = useSpots(t)
+  const r = useMemo(() => rand(53), [])
+  const strata = ['#b5532f', '#c8693a', '#a84a2a', '#d4844e']
+  const mesas = useMemo(() => {
+    const out: { x: number; z: number; w: number; d: number; h: number; ry: number; spire: boolean }[] = []
+    for (let k = 0; k < 700 && out.length < 60; k++) {
+      const x = (r() - 0.5) * 220, z = (r() - 0.5) * 200
+      const w = 5 + r() * 9
+      if (!clearOf(x, z, t.wall + w * 0.8 + 3)) continue
+      if (out.some((m) => (m.x - x) ** 2 + (m.z - z) ** 2 < (w + m.w) ** 2 * 0.35)) continue
+      out.push({ x, z, w, d: 4 + r() * 8, h: 3 + r() * 10, ry: r() * 3, spire: r() < 0.25 })
+    }
+    return out
+  }, [r, clearOf, t])
+  const saguaros = useMemo(() => along(5, 1.2, 1, 1, 71, 5).concat(along(5, 1.2, -1, 1, 73, 5)).map((p) => ({ ...p, h: 1.4 + p.r() * 1.2, arm: p.r() })), [along])
+  const small = useMemo(() => along(6, 0.5, 1, 0.3, 79, 2).concat(along(6, 0.5, -1, 0.3, 83, 2)).map((p) => ({ ...p, def: p.r() < 0.6 ? 'cactus' : 'rock' })), [along])
+  const scrub = useMemo(() => {
+    const out: { x: number; z: number; s: number; ry: number }[] = []
+    for (let k = 0; k < 3000 && out.length < 700; k++) {
+      const x = (r() - 0.5) * 200, z = (r() - 0.5) * 180
+      if (clearOf(x, z, t.wall + 0.4)) out.push({ x, z, s: 0.6 + r() * 0.8, ry: r() * 6 })
+    }
+    return out
+  }, [r, clearOf, t])
+  const stop = useMemo(() => along(200, 5, 1, 5, 89)[0], [along])
+  return (
+    <group>
+      <Batch version={t.n + 3}>
+        <mesh rotation-x={-Math.PI / 2} position={[0, -0.01, 0]}><planeGeometry args={[460, 460]} /><meshStandardMaterial map={sandTex(60, 60)} color="#e7b98a" /></mesh>
+        {mesas.map((m, i) => (
+          <group key={i} position={[m.x, 0, m.z]} rotation-y={m.ry}>
+            {m.spire ? (
+              <>
+                <Box p={[0, m.h * 0.35, 0]} s={[m.w * 0.35, m.h * 0.7, m.d * 0.35]} c={strata[0]} />
+                <Box p={[0, m.h * 0.85, 0]} s={[m.w * 0.24, m.h * 0.3, m.d * 0.24]} c={strata[1]} />
+                <Box p={[0, m.h + 0.12, 0]} s={[m.w * 0.3, 0.25, m.d * 0.3]} c={strata[3]} />
+              </>
+            ) : (
+              <>
+                <Box p={[0, m.h * 0.2, 0]} s={[m.w * 1.08, m.h * 0.4, m.d * 1.08]} c={strata[0]} />
+                <Box p={[0, m.h * 0.52, 0]} s={[m.w, m.h * 0.26, m.d]} c={strata[1]} />
+                <Box p={[0, m.h * 0.78, 0]} s={[m.w * 0.94, m.h * 0.28, m.d * 0.94]} c={strata[2]} />
+                <Box p={[0, m.h + 0.15, 0]} s={[m.w * 0.98, 0.3, m.d * 0.98]} c={strata[3]} />
+              </>
+            )}
+          </group>
+        ))}
+        {saguaros.map((c, i) => (
+          <group key={i} position={[c.x, 0, c.z]} rotation-y={c.ry + i}>
+            <Cyl p={[0, c.h / 2, 0]} r={0.14} h={c.h} c="#4f8a3a" />
+            {[1, -1].map((sd) => ((sd > 0 ? c.arm > 0.25 : c.arm > 0.6) ? (
+              <group key={sd}>
+                <Cyl p={[sd * 0.22, c.h * 0.45, 0]} r={0.08} h={0.26} c="#4f8a3a" rot={[0, 0, Math.PI / 2]} />
+                <Cyl p={[sd * 0.34, c.h * 0.6, 0]} r={0.085} h={c.h * 0.32} c="#4f8a3a" />
+              </group>
+            ) : null))}
+          </group>
+        ))}
+        {small.map((o, i) => <Building key={i} def={o.def} x={o.x} z={o.z} ry={i} s={0.9} />)}
+        {stop && (
+          <group position={[stop.x, 0, stop.z]} rotation-y={stop.ry}>
+            <mesh rotation-x={-Math.PI / 2} position={[0, 0.012, -2]}><planeGeometry args={[16, 7]} /><meshStandardMaterial map={gravelTex(6, 3)} color="#d9b98e" /></mesh>
+            <Building def="gas" x={-5} z={-3} ry={0} />
+            <Building def="diner" x={0} z={-3} ry={0} />
+            <Building def="motel" x={5.5} z={-3} ry={0} />
+          </group>
+        )}
+        {/* An old water tower on the infield. */}
+        <group position={[2, 0, 2]}>
+          {[-0.9, 0.9].map((dx) => [-0.9, 0.9].map((dz) => <Box key={`${dx}${dz}`} p={[dx, 2.2, dz]} s={[0.14, 4.4, 0.14]} c="#6d4c41" />))}
+          <Cyl p={[0, 5.2, 0]} r={1.5} h={1.8} c="#8d6e63" seg={12} />
+          <Cone p={[0, 6.5, 0]} r={1.6} h={0.8} c="#6d4c41" seg={12} />
+        </group>
+      </Batch>
+      <Scatter spots={scrub} colors={['#c9a85c', '#b39550', '#d8bd72', '#9c8a4a', '#a8b28a']} y={0.12}><icosahedronGeometry args={[0.2, 0]} /></Scatter>
+      <Palm x={stop?.x ?? 0} z={(stop?.z ?? 0) + 1} h={3.4} lean={0.2} />
+    </group>
+  )
+}
+
+// ---------- karts ----------
+
+type KartLook = ChaseCar
+function KartView({ look, rig, set }: { look: KartLook; rig: WheelRig; set: (g: { root: Group | null; body: Group | null; fx: KartFx }) => void }) {
+  const f = carFrame(look.body)
+  const s = KART_LEN / f.len
+  const fx = useMemo<KartFx>(() => ({ sparks: [], flame: null, shield: null }), [])
+  const root = useRef<Group>(null)
+  const body = useRef<Group>(null)
+  useLayoutEffect(() => set({ root: root.current, body: body.current, fx }), [set, fx])
+  const back = -KART_LEN / 2 - 0.05
+  const half = (f.wid * s) / 2
+  return (
+    <group ref={root}>
+      <CarShadow len={KART_LEN} wid={f.wid * s} />
+      <group ref={body}>
+        <group scale={s}>
+          <CarModel body={look.body as Body} model={look.model} color={look.color} finish={look.finish} skin={look.skin} modSkin={look.modSkin} mods={look.mods} rig={rig} beams />
+        </group>
+        {[-1, 1].map((sd, k) => (
+          <mesh key={sd} ref={(m) => { fx.sparks[k] = m }} position={[sd * half, 0.12, back + 0.25]} visible={false}>
+            <sphereGeometry args={[0.16, 8, 6]} />
+            <meshBasicMaterial color="#40c4ff" transparent opacity={0.9} toneMapped={false} depthWrite={false} />
+          </mesh>
+        ))}
+        <mesh ref={(m) => { fx.flame = m }} position={[0, 0.3, back - 0.25]} rotation-x={-Math.PI / 2} visible={false}>
+          <coneGeometry args={[0.18, 0.8, 10]} />
+          <meshBasicMaterial color="#ffab40" transparent opacity={0.85} toneMapped={false} depthWrite={false} />
+        </mesh>
+        <mesh ref={(m) => { fx.shield = m }} position={[0, 0.45, 0]} visible={false}>
+          <sphereGeometry args={[1.25, 18, 12]} />
+          <meshStandardMaterial color="#80d8ff" transparent opacity={0.28} emissive="#40c4ff" emissiveIntensity={0.6} depthWrite={false} />
+        </mesh>
+      </group>
+    </group>
+  )
+}
+type KartFx = { sparks: (Mesh | null)[]; flame: Mesh | null; shield: Mesh | null }
+
+function Crates({ race }: { race: KartRace }) {
+  const ref = useRef<InstancedMesh>(null)
+  const tmp = useMemo(() => new Object3D(), [])
+  const t = race.track
+  useFrame(({ clock }) => {
+    const m = ref.current
+    if (!m) return
+    const time = clock.elapsedTime
+    t.crates.forEach((c, i) => {
+      const since = race.t - race.crateTaken[i]
+      const grow = since < 3 ? 0 : Math.min(1, (since - 3) * 3)
+      tmp.position.set(c.x, 0.75 + Math.sin(time * 2.5 + i) * 0.12, c.z)
+      tmp.rotation.set(0.5, time * 1.6 + i, 0.4)
+      tmp.scale.setScalar(0.62 * grow + 0.0001)
+      tmp.updateMatrix()
+      m.setMatrixAt(i, tmp.matrix)
+    })
+    m.instanceMatrix.needsUpdate = true
+  })
+  return (
+    <instancedMesh ref={ref} args={[undefined, undefined, t.crates.length]} frustumCulled={false}>
+      <boxGeometry />
+      <meshStandardMaterial map={crateTex()} emissiveMap={crateTex()} emissive="#ffffff" emissiveIntensity={0.35} transparent opacity={0.92} />
+    </instancedMesh>
+  )
+}
+
+function Hazards({ race }: { race: KartRace }) {
+  const oil = useRef<InstancedMesh>(null)
+  const bees = useRef<InstancedMesh>(null)
+  const tmp = useMemo(() => new Object3D(), [])
+  useFrame(({ clock }) => {
+    const o = oil.current, b = bees.current
+    if (!o || !b) return
+    for (let i = 0; i < 12; i++) {
+      const h = race.oil[i]
+      tmp.position.set(h?.x ?? 0, Y_PAINT + 0.01, h?.z ?? 0)
+      tmp.rotation.set(-Math.PI / 2, 0, i)
+      tmp.scale.setScalar(h ? 1 : 0.0001)
+      tmp.updateMatrix()
+      o.setMatrixAt(i, tmp.matrix)
+    }
+    o.instanceMatrix.needsUpdate = true
+    for (let i = 0; i < 6; i++) {
+      const h = race.hornets[i]
+      tmp.position.set(h?.x ?? 0, 0.9 + Math.sin(clock.elapsedTime * 20 + i) * 0.08, h?.z ?? 0)
+      tmp.rotation.set(0, clock.elapsedTime * 6, 0)
+      tmp.scale.set(h ? 0.32 : 0.0001, h ? 0.24 : 0.0001, h ? 0.5 : 0.0001)
+      tmp.updateMatrix()
+      b.setMatrixAt(i, tmp.matrix)
+    }
+    b.instanceMatrix.needsUpdate = true
+  })
+  return (
+    <>
+      <instancedMesh ref={oil} args={[undefined, undefined, 12]} frustumCulled={false}>
+        <circleGeometry args={[1, 16]} />
+        <meshStandardMaterial color="#1a1a24" roughness={0.1} metalness={0.6} transparent opacity={0.9} {...decal(4)} />
+      </instancedMesh>
+      <instancedMesh ref={bees} args={[undefined, undefined, 6]} frustumCulled={false}>
+        <sphereGeometry args={[1, 10, 8]} />
+        <meshStandardMaterial color="#ffd600" emissive="#ffab00" emissiveIntensity={0.6} />
+      </instancedMesh>
+    </>
+  )
+}
+
+// ---------- the scene ----------
+
+export type KartSceneProps = {
+  race: KartRace
+  looks: KartLook[] // one per kart, same order as race.karts
+  me: number // the player's kart index
+  input: KartInput
+  running: boolean
+  cam?: KartCam
+  onHud: (h: KartHud) => void
+  onEvents?: (e: KartEvent[]) => void
+  onFinish: () => void
+}
+
+export function KartScene({ race, looks, me, input, running, cam = (DEV?.get('cam') as KartCam) ?? 'chase', onHud, onEvents, onFinish }: KartSceneProps) {
+  useEffect(() => holdTown(), [])
+  const view = useArcadeLook()
+  const t = race.track
+  const camera = useThree((s) => s.camera) as PerspectiveCamera
+  const size = useThree((s) => s.size)
+  const tall = size.height > size.width
+  const rigs = useMemo(() => looks.map((l) => wheelRig(l.body as Body)), [looks])
+  const views = useRef<{ root: Group | null; body: Group | null; fx: KartFx }[]>([])
+  const setters = useMemo(() => looks.map((_, i) => (g: { root: Group | null; body: Group | null; fx: KartFx }) => { views.current[i] = g }), [looks])
+  const st = useRef({ acc: 0, hudAt: 0, finished: false, camPos: new Vector3(), camAt: new Vector3(), fov: 0, init: false })
+  const inputs = useMemo(() => race.karts.map(() => input), [race, input])
+  const tmpV = useMemo(() => new Vector3(), [])
+
+  useFrame((state, raw) => {
+    const s = st.current
+    const dt = Math.min(raw, 1 / 20)
+    s.acc += dt
+    const step = 1 / 120
+    const events: KartEvent[] = []
+    if (AUTOPILOT && running) Object.assign(input, race.autoInput(race.karts[me], race.order(), false))
+    if (warp > 0 && running) {
+      for (let f = 0; f < warp * 120; f++) { Object.assign(input, race.autoInput(race.karts[me], race.order(), false)); race.step(step, inputs, true) }
+      warp = 0
+      s.init = false
+    }
+    while (s.acc >= step) {
+      s.acc -= step
+      race.step(step, inputs, running)
+      events.push(...race.events)
+    }
+    if (events.length) onEvents?.(events)
+    const mine = race.karts[me]
+    if (DEV) (window as unknown as { kart: unknown }).kart = { race, camera }
+    if (mine.done !== null && !s.finished) {
+      s.finished = true
+      onFinish()
+    }
+
+    race.karts.forEach((k, i) => {
+      const v = views.current[i]
+      if (!v?.root || !v.body) return
+      v.root.position.set(k.x, 0, k.z)
+      v.root.rotation.y = k.h
+      v.body.position.y = k.y
+      const sp = Math.hypot(k.vx, k.vz)
+      // Lean out of turns and a touch of pitch on jumps; spin when hit.
+      v.body.rotation.set(k.air ? Math.max(-0.25, Math.min(0.25, -k.vy * 0.03)) : 0, k.spinYaw + k.drift * 0.32, -k.steer * Math.min(1, sp / 15) * 0.06 - k.drift * 0.05)
+      const rig = rigs[i]
+      for (const w of rig.steer) if (w) w.rotation.y = k.steer * 0.42
+      const roll = (sp * dt) / (rig.radius * (KART_LEN / carFrame(looks[i].body as Body).len))
+      for (const w of rig.spin) if (w) w.rotation.x = (w.rotation.x + roll) % (Math.PI * 2)
+      const fx = v.fx
+      const sparking = k.drift !== 0 && k.charge > DRIFT_BLUE * 0.6
+      const color = k.charge >= DRIFT_ORANGE ? '#ff9100' : k.charge >= DRIFT_BLUE ? '#40c4ff' : '#fff59d'
+      for (const m of fx.sparks) if (m) {
+        m.visible = sparking && !k.air
+        if (m.visible) {
+          ;(m.material as MeshStandardMaterial).color.set(color)
+          m.scale.setScalar(0.6 + Math.random() * 0.7)
+        }
+      }
+      if (fx.flame) {
+        fx.flame.visible = k.boost > 0
+        if (fx.flame.visible) fx.flame.scale.set(1, 0.8 + Math.random() * 0.8, 1)
+      }
+      if (fx.shield) fx.shield.visible = k.shield > 0
+    })
+
+    // Camera.
+    const fwd = tmpV.set(Math.sin(mine.h), 0, Math.cos(mine.h))
+    const mv = Math.hypot(mine.vx, mine.vz)
+    if (cam === 'top') {
+      const want = new Vector3(mine.x, tall ? 30 : 24, mine.z - (tall ? 9 : 11))
+      if (!s.init) s.camPos.copy(want)
+      s.camPos.lerp(want, Math.min(1, dt * 4))
+      camera.position.copy(s.camPos)
+      camera.up.set(0, 1, 0)
+      camera.lookAt(mine.x, 0, mine.z + 1.5)
+      camera.fov = tall ? 62 : 46
+    } else {
+      // Behind and above the kart; swings a little wide in a drift, pulls back on a boost.
+      const back = (tall ? 7.4 : 6.0) + (mine.boost > 0 ? 0.6 : 0)
+      const up = tall ? 3.7 : 3.0
+      const swing = mine.drift * 0.35
+      const hx = Math.sin(mine.h - swing), hz = Math.cos(mine.h - swing)
+      const want = new Vector3(mine.x - hx * back, up + mine.y * 0.6, mine.z - hz * back)
+      if (!s.init) s.camPos.copy(want)
+      s.camPos.lerp(want, Math.min(1, dt * 7))
+      // Never let the camera sink into a barrier: keep it a little above the wall top.
+      camera.position.copy(s.camPos)
+      camera.up.set(0, 1, 0)
+      const at = new Vector3(mine.x + fwd.x * 4, 0.55 + mine.y * 0.8, mine.z + fwd.z * 4)
+      if (!s.init) s.camAt.copy(at)
+      s.camAt.lerp(at, Math.min(1, dt * 10))
+      camera.lookAt(s.camAt)
+      const fov = (tall ? 70 : 58) + (mine.boost > 0 ? 7 : 0) + Math.min(5, mv * 0.2)
+      s.fov += (fov - s.fov) * Math.min(1, dt * 4)
+      camera.fov = s.fov || fov
+    }
+    s.init = true
+    camera.updateProjectionMatrix()
+
+    if (state.clock.elapsedTime - s.hudAt > 0.1) {
+      s.hudAt = state.clock.elapsedTime
+      // Wrong way: the nose points back along the track while moving.
+      const dir = t.tx[mine.idx] * Math.sin(mine.h) + t.tz[mine.idx] * Math.cos(mine.h)
+      onHud({
+        lap: Math.max(1, Math.min(3, mine.lap)), place: race.place(mine), item: mine.item, speed: mv, charge: mine.drift ? mine.charge : 0, boost: mine.boost > 0, t: race.t,
+        dots: race.karts.map((k, i) => ({ x: k.x, z: k.z, me: i === me })), wrong: running && dir < -0.5 && mv > 2,
+      })
+    }
+  })
+
+  return (
+    <>
+      <ArcadeSky view={view} near={60} far={210} />
+      <hemisphereLight args={['#ffffff', '#666666', 0.15]} />
+      <Batch version={t.n * 10 + (t.reverse ? 1 : 0)}>
+        <TrackSurface t={t} />
+      </Batch>
+      <Trackside t={t} />
+      {t.def.theme === 'town' && <TownScenery t={t} />}
+      {t.def.theme === 'docks' && <DocksScenery t={t} />}
+      {t.def.theme === 'desert' && <DesertScenery t={t} />}
+      <Crates race={race} />
+      <Hazards race={race} />
+      {looks.map((l, i) => <KartView key={i} look={l} rig={rigs[i]} set={setters[i]} />)}
+      {/* A warm glow pool under the player, so their kart reads at a glance. */}
+      <PlayerRing race={race} me={me} />
+    </>
+  )
+}
+
+function PlayerRing({ race, me }: { race: KartRace; me: number }) {
+  const ref = useRef<Mesh>(null)
+  useFrame(() => {
+    const k = race.karts[me]
+    ref.current?.position.set(k.x, Y_PAINT + 0.02, k.z)
+  })
+  return (
+    <mesh ref={ref} rotation-x={-Math.PI / 2}>
+      <planeGeometry args={[3.2, 3.2]} />
+      <meshBasicMaterial map={glowTex()} color={new Color('#ffd54f')} transparent opacity={0.35} depthWrite={false} {...decal(5)} />
+    </mesh>
+  )
+}

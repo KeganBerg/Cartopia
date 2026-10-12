@@ -1,15 +1,17 @@
 // Renders the club's music offline, exactly as the town plays it, and keeps
 // every light cue the music reports (its time on the audio clock). The capture
-// script pulls the WAV and the cues out with window.render(groove, seconds).
+// script pulls the WAV and the cues out with window.render(bar, seconds): the
+// stretch of the club's set from that bar.
 import { Soundscape } from '../../src/lib/ambience'
+import { BAR_MS } from '../../src/lib/clubSet'
 
 type Cue = [number, ...unknown[]]
 
-async function render(groove: number, secs: number) {
+async function render(bar: number, secs: number) {
   const sr = 44100
   const ctx = new OfflineAudioContext(2, sr * secs, sr)
   const s = new Soundscape(ctx, ctx.destination)
-  s.groove = groove
+  s.wallAt = (t) => bar * BAR_MS + t * 1000
   const cues: Cue[] = []
   s.onHit = (at: number, ...rest: unknown[]) => cues.push([at, ...rest])
   s.level(1, 0, 0.01)

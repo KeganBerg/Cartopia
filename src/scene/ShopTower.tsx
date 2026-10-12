@@ -71,7 +71,7 @@ export function ShopTower({ def, ghost, m, win, bulb, level, look }: Props) {
                   <group key={sd} rotation-y={sd > 0 ? 0 : Math.PI}>
                     <Box m={m} at={[0, 0, 0.032]} s={[0.46, blade, 0.004]} c="#212121" shadow={false} />
                     {letters.map((ch, i) => ch !== ' ' && (
-                      <LitSign key={i} text={ch} w={step} h={step} at={[0, blade / 2 - (i + 0.5) * step - 0.04, 0.036]} bg="#212121" fg="#fffde7" m={m} />
+                      <LitSign key={i} text={ch} w={step} h={step} at={[0, blade / 2 - (i + 0.5) * step - 0.04, 0.04]} bg="#212121" fg="#fffde7" m={m} />
                     ))}
                   </group>
                 ))}

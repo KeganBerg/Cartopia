@@ -8,7 +8,7 @@ import { BuildingModel } from './BuildingModel'
 import { VanguardTower } from './Landmark'
 import { KeepShapes, MergeScale } from './mergeScale'
 import { limitFor } from './keepShape'
-import { describe, floating } from './floating'
+import { describe, floating, hovering, REST, TOUCH } from './floating'
 import { groupScale, mergeable, type MergeGroup } from '../game/merge'
 import { sunDay } from '../game/sun'
 
@@ -19,12 +19,15 @@ const NOON = sunDay(20_000).noon, MIDNIGHT = NOON + 12 * 3_600_000
 // How the town draws a merged pair (two side by side, facing south).
 const PAIR = groupScale({ cols: 2, rows: 1 } as MergeGroup, 0)
 // Every level on its own (trims come in one level at a time), and each growth
-// form as a merged pair for buildings that can merge.
+// form as a merged pair, a 2x2 and a 4x4 block for buildings that can merge.
+const BLOCKS: Scale[] = [[2, 2, 2], [4, 4, 4]]
 const runs = (id: string): [number, Scale, number][] => [
   ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((l): [number, Scale, number] => [l, [1, 1, 1], NOON]),
   ...[1, 4, 7, 10].map((l): [number, Scale, number] => [l, [1, 1, 1], MIDNIGHT]),
   ...(mergeable(id) ? [NOON, MIDNIGHT].flatMap((t) => [1, 4, 7, 10].map((l): [number, Scale, number] => [l, PAIR, t])) : []),
+  ...(mergeable(id) ? BLOCKS.flatMap((sc) => [1, 4, 7, 10].map((l): [number, Scale, number] => [l, sc, NOON])) : []),
 ]
+const tag = (s: Scale) => (s[0] === 1 && s[2] === 1 ? '' : s[0] === s[1] ? ` ${s[0]}x${s[0]}` : ' pair')
 
 // Buildings still being fixed in their own work; none right now.
 const LATER = new Set<string>([])
@@ -45,13 +48,17 @@ group('nothing floats', () => {
           </group>,
         )
         await ReactThreeTestRenderer.act(async () => r.advanceFrames(2, 1 / 60))
-        for (const p of floating(r.scene.instance as Object3D)) bad.add(`L${level}${scale.some((v) => v !== 1) ? ' pair' : ''}${time === MIDNIGHT ? ' night' : ''}: ${describe(p)}`)
+        const at = `L${level}${tag(scale)}${time === MIDNIGHT ? ' night' : ''}`
+        for (const p of floating(r.scene.instance as Object3D, TOUCH * scale[1], scale[1])) bad.add(`${at}: ${describe(p)}`)
+        // Low slabs (steps, mats, ramps) sit right on the lot or what's under them, not just near it.
+        // (A 2x2 or 4x4 block scales its slabs and their gaps alike; the contact check covers those.)
+        if (scale[1] === 1) for (const p of hovering(r.scene.instance as Object3D)) bad.add(`${at}: hovers more than ${REST} up: ${describe({ ...p, n: 1, gap: p.box.min.y, members: [p] })}`)
         await r.unmount()
         vi.restoreAllMocks()
       }
       if (process.env.FLOAT_REPORT) (await import('node:fs')).appendFileSync(process.env.FLOAT_REPORT, JSON.stringify({ id: def.id, bad: [...bad] }) + '\n')
       expect([...bad]).toEqual([])
-    }, 60_000)
+    }, 180_000)
   }
 })
 

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { clubHit, clubPulse, resetClubBeat } from './clubBeat'
+import { SET_BPM } from './clubSet'
 
 describe('club beat', () => {
   beforeEach(resetClubBeat)
@@ -55,9 +56,15 @@ describe('club beat', () => {
     expect(clap.groove).toBe(2)
   })
 
-  it('counts the beat from the last kick, at the groove\'s own tempo', () => {
-    clubHit(1000, 'kick', 1, 4) // Disco, 122 bpm
-    expect(clubPulse(1000, 124).beat).toBe(0)
-    expect(clubPulse(1000 + 60000 / 122 / 2, 124).beat).toBeCloseTo(0.5)
+  it('counts the beat from the last kick or beat mark, at the set\'s tempo', () => {
+    clubHit(1000, 'kick', 1, 4)
+    expect(clubPulse(1000).beat).toBe(0)
+    expect(clubPulse(1000 + 60000 / SET_BPM / 2).beat).toBeCloseTo(0.5)
+    // A breakdown has no kick, but the beat marks keep the count.
+    clubHit(1000 + 60000 / SET_BPM, 'beat', 0, 4)
+    const p = clubPulse(1000 + 60000 / SET_BPM)
+    expect(p.beat).toBe(0)
+    expect(p.step).toBe(1)
+    expect(p.flash).toBeLessThan(0.7)
   })
 })
