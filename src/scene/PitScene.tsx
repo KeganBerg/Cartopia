@@ -9,7 +9,7 @@ import { asphaltTex, concreteTex, grassTex, shutterTex, towerTex } from './textu
 import { signTexture } from './signTexture'
 import { ArcadeSky, CarShadow, Crowd, Grandstand, Lamp, ToolChest, Tyre, TyreStack, useArcadeLook, type Person } from './ArcadeScenery'
 import {
-  GUN_SLIP, PIT_BRAKE, PIT_COAST, PIT_JUMP, PIT_SPEED, PIT_START, gunTimes, stopGrade, stopPenalty, type StopGrade,
+  CALL_MISS, CALL_SHOW, GUN_SLIP, PIT_BRAKE, PIT_COAST, PIT_JUMP, PIT_SPEED, PIT_START, gunTimes, pitCall, stopGrade, stopPenalty, type StopGrade,
 } from '../game/arcadeMore'
 import { CARS, isBike } from '../game/data'
 import type { ChaseCar } from './ChaseScene'
@@ -26,7 +26,7 @@ export type PitPhase = 'in' | 'push' | 'wheels' | 'hold' | 'green' | 'go'
 // rings, and hands over the ring elements so the scene can pin them to the wheels.
 export type PitInput = { pedal: boolean; presses: number; taps: number[]; pads: (HTMLElement | null)[] }
 export type PitPop = { id: number; text: string; kind: 'good' | 'bad' }
-export type PitHud = { phase: PitPhase; left: number; time: number; pop: PitPop | null }
+export type PitHud = { phase: PitPhase; left: number; time: number; pop: PitPop | null; calling: boolean }
 export type PitEnd = { time: number; slips: number; grade: StopGrade; react: number }
 
 const LEN = 3.4 // the player's car, drawn this long: true to the crew beside it
@@ -382,6 +382,8 @@ export function PitScene({ me, input, running, onHud, onEnd }: {
     t: 0, x: PIT_START, v: PIT_SPEED, phase: 'in' as PitPhase, pushFrom: 0, pushT: 0, pushK: 0, grade: 'good' as StopGrade,
     lift: 0, pen: 0, slips: 0, wait: 0, laneGo: false, greenAt: 0, react: 0, go: 0, done: false,
     squeal: 0, glug: 0, shake: 0, camX: 1.6, hudAt: 0, popN: 0, pop: null as PitPop | null, crewK: 0,
+    // The crew chief's call: the order the nuts come off, flashed once as the car goes up.
+    call: pitCall(Math.random, wheels.length), callIdx: 0, callT: 0,
     corners: wheels.map((): Corner => ({ stage: 0, fill: 0, swap: 0, green: -1, slip: 0, gun: 0, cls: '' })),
   })
   const v3 = useMemo(() => new Vector3(), [])
@@ -423,10 +425,23 @@ export function PitScene({ me, input, running, onHud, onEnd }: {
       if (s.pushK >= 1) { s.phase = 'wheels'; airSound() }
     } else if (s.phase === 'wheels') {
       s.lift = Math.min(1, s.lift + dt * 6)
+      if (s.callT < CALL_SHOW * s.call.length) s.callT += dt
+      const calling = s.callT < CALL_SHOW * s.call.length
       for (const i of taps) {
         const c = s.corners[i]
-        if (!c || c.stage === 1 || c.stage === 3 || s.lift < 1) continue
+        if (!c || c.stage === 1 || c.stage === 3 || s.lift < 1 || calling) continue
+        if (c.stage === 0 && c.fill >= 1 && s.call[s.callIdx] !== i) {
+          // Off in the called order only: the wrong wheel costs time and doesn't count.
+          s.pen += CALL_MISS
+          c.slip = 0.4
+          s.slips++
+          s.shake = 0.12
+          buzzSound()
+          pop(`Wrong wheel! +${CALL_MISS}s`, 'bad')
+          continue
+        }
         if (c.fill >= 1) {
+          if (c.stage === 0) s.callIdx++
           const quick = t - c.green < 0.25
           if (c.stage === 0) { wrenchSound(); c.stage = 1; c.swap = 0 } else { gunSound(); c.stage = 3 }
           c.gun = 0.3
@@ -442,7 +457,7 @@ export function PitScene({ me, input, running, onHud, onEnd }: {
         }
       }
       s.corners.forEach((c, i) => {
-        if (s.lift < 1) return
+        if (s.lift < 1 || calling) return
         if (c.stage === 0 || c.stage === 2) {
           const was = c.fill
           c.fill = Math.min(1, c.fill + dt / times[i][c.stage === 0 ? 0 : 1])
@@ -568,7 +583,10 @@ export function PitScene({ me, input, running, onHud, onEnd }: {
       const w = wheels[i]
       if (!c || !w) { el.style.display = 'none'; return }
       const show = s.phase === 'wheels' && c.stage !== 3 && s.lift >= 1
-      const cls = !show ? 'pit-pad off' : c.slip > 0 ? 'pit-pad slip' : c.stage === 1 ? 'pit-pad swap' : c.fill >= 1 ? 'pit-pad ready' : 'pit-pad'
+      const callAt = Math.floor(s.callT / CALL_SHOW)
+      const lit = callAt < s.call.length && s.call[callAt] === i
+      if (lit) el.dataset.n = String(callAt + 1)
+      const cls = !show ? 'pit-pad off' : callAt < s.call.length ? (lit ? 'pit-pad call lit' : 'pit-pad call') : c.slip > 0 ? 'pit-pad slip' : c.stage === 1 ? 'pit-pad swap' : c.fill >= 1 ? 'pit-pad ready' : 'pit-pad'
       if (cls !== c.cls) { el.className = cls; c.cls = cls }
       el.style.setProperty('--p', `${Math.round(c.fill * 100)}%`)
       el.dataset.step = c.stage === 0 ? 'off' : 'on'
@@ -601,7 +619,7 @@ export function PitScene({ me, input, running, onHud, onEnd }: {
 
     if (t - s.hudAt > 0.05 || s.pop) {
       s.hudAt = t
-      onHud({ phase: s.phase, left: s.corners.filter((c) => c.stage !== 3).length, time: s.t + s.pen, pop: s.pop })
+      onHud({ phase: s.phase, left: s.corners.filter((c) => c.stage !== 3).length, time: s.t + s.pen, pop: s.pop, calling: s.phase === 'wheels' && s.callT < CALL_SHOW * s.call.length })
       s.pop = null
     }
   })

@@ -27,6 +27,17 @@ export const PIT_JUMP = 1 // seconds added for going before the lollipop turns g
 export function gunTimes(rand: () => number, wheels = PIT_WHEELS) {
   return Array.from({ length: wheels }, () => [0.5 + rand() * 0.45, 0.5 + rand() * 0.45] as [number, number])
 }
+// The crew chief's call: which order the wheels come off, shown one at a time.
+export const CALL_SHOW = 0.45 // seconds each wheel in the call is lit
+export const CALL_MISS = 0.5 // seconds added for undoing a wheel out of order
+export function pitCall(rand: () => number, wheels = PIT_WHEELS) {
+  const order = Array.from({ length: wheels }, (_, i) => i)
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1))
+    ;[order[i], order[j]] = [order[j], order[i]]
+  }
+  return order
+}
 // Where the car rolls to from `speed` with the brake held for the whole way.
 export const brakeDistance = (speed: number) => (speed * speed) / (2 * PIT_BRAKE)
 // How the stop went, from how far the car is past (+) or short of (-) the marks.
@@ -41,7 +52,7 @@ export function stopPenalty(err: number) {
   return e <= 0.5 ? 0 : Math.min(2.5, 0.3 + (e - 0.5) * PIT_PUSH)
 }
 export function pitStars(time: number) {
-  return time <= 5.8 ? 3 : time <= 7.5 ? 2 : 1
+  return time <= 8.4 ? 3 : time <= 10.5 ? 2 : 1
 }
 
 // ---------- Car Wash Frenzy ----------

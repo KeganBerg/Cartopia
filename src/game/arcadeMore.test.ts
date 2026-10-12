@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   BLOCK, GRID, STREET, TOWN, blockCentre, brakeDistance, dashStars, flips, gunTimes, insideBlock, jumpLength, jumpScore, kerbSpot,
-  landed, pitStars, stopGrade, stopPenalty, starReward, stuntStars, washStars,
+  landed, pitCall, pitStars, stopGrade, stopPenalty, starReward, stuntStars, washStars,
 } from './arcadeMore'
 import { chaseReward } from './arcade'
 
@@ -29,7 +29,9 @@ describe('arcade second wave', () => {
     expect(stopPenalty(0.4)).toBe(0)
     expect(stopPenalty(2)).toBeGreaterThan(stopPenalty(1))
     expect(stopPenalty(50)).toBe(2.5)
-    expect([pitStars(5), pitStars(7), pitStars(30)]).toEqual([3, 2, 1])
+    expect([pitStars(8), pitStars(10), pitStars(30)]).toEqual([3, 2, 1])
+    let r = 7
+    expect([...pitCall(() => ((r = (r * 16807) % 2147483647) / 2147483647))].sort()).toEqual([0, 1, 2, 3])
   })
 
   it('car wash: all spots with time to spare for three stars', () => {
