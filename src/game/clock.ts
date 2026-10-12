@@ -14,36 +14,29 @@ const pinned = (() => {
   return v === null ? null : Number(v)
 })()
 
-// The phase at key minutes of each 20-minute day, starting at noon. Dusk is
-// halfway done (phase 0.3) at 5 minutes and dawn (0.7) at 15, so day and night
-// get 10 minutes each; the light fades over about two and a half minutes.
-const KEYS: [number, number][] = [[0, 0], [5, 0.3], [15, 0.7], [20, 1]]
+// The phase over each 20-minute day, starting at noon: a gentle S-curve so
+// dusk is halfway done (phase 0.3) at 5 minutes and dawn (0.7) at 15, giving
+// day and night 10 minutes each, with no sudden change of pace anywhere.
+const WARP = 0.05
+const cyclePhase = (t: number) => t + WARP * Math.sin(2 * Math.PI * t) // t: 0..1 of the day
 
 // The shared clock's phase at `now`, ignoring pins and events. 0 = noon, 0.5 = midnight.
 export function naturalPhase(now = Date.now()) {
-  const t = ((((now % DAY_MS) + DAY_MS) % DAY_MS) / MIN)
-  for (let i = 1; i < KEYS.length; i++) {
-    const [t1, p1] = KEYS[i]
-    if (t < t1) {
-      const [t0, p0] = KEYS[i - 1]
-      return p0 + ((t - t0) / (t1 - t0)) * (p1 - p0)
-    }
-  }
-  return 0
+  return cyclePhase((((now % DAY_MS) + DAY_MS) % DAY_MS) / DAY_MS)
 }
 
 // The next moment (at or after `now`) the shared clock reaches `phase`.
 export function nextPhaseAt(phase: number, now = Date.now()) {
-  const start = now - ((((now % DAY_MS) + DAY_MS) % DAY_MS))
-  for (let day = start; ; day += DAY_MS) {
-    for (let i = 1; i < KEYS.length; i++) {
-      const [t0, p0] = KEYS[i - 1], [t1, p1] = KEYS[i]
-      if (phase >= p0 && phase < p1) {
-        const t = day + (t0 + ((phase - p0) / (p1 - p0)) * (t1 - t0)) * MIN
-        if (t >= now) return t
-      }
-    }
+  // cyclePhase only ever climbs, so halve the interval until it pins the moment.
+  let lo = 0, hi = 1
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2
+    if (cyclePhase(mid) < phase) lo = mid
+    else hi = mid
   }
+  const day = now - (((now % DAY_MS) + DAY_MS) % DAY_MS)
+  const t = day + Math.round(hi * DAY_MS)
+  return t >= now ? t : t + DAY_MS
 }
 
 // A feature with its own night (Techno Night, techno.ts) pulls the town into
@@ -71,18 +64,23 @@ export const nightNumber = (now = Date.now()) => Math.floor(now / DAY_MS)
 // midnight is 24).
 export const townHour = (now = Date.now()) => clockHour(dayPhase(now))
 
-// How dark it is, 0 (day) to 1 (night), with gentle dusk and dawn ramps.
+// How dark it is, 0 (day) to 1 (night). The light eases out over about four
+// minutes of every dusk (and back in at dawn), slow at both ends so neither the
+// first lamps nor the last glow of sunset arrive with a jump.
+const ease = (x: number) => x * x * (3 - 2 * x)
 export function nightAmount(phase: number) {
   const d = Math.abs(phase - 0.5) // 0 at midnight, 0.5 at noon
-  if (d < 0.14) return 1
-  if (d > 0.26) return 0
-  return 1 - (d - 0.14) / 0.12
+  if (d <= 0.1) return 1
+  if (d >= 0.3) return 0
+  return ease((0.3 - d) / 0.2)
 }
 
-// How much of a sunset tint to add: peaks halfway through dusk and dawn.
+// How much of a sunset tint to add: swells through dusk and dawn over about
+// five minutes, peaking just before the light is half gone, and fades away
+// smoothly on both sides.
 export function duskAmount(phase: number) {
-  const n = nightAmount(phase)
-  return Math.max(0, 1 - Math.abs(n - 0.35) / 0.35)
+  const d = Math.abs(phase - 0.5)
+  return ease(Math.max(0, 1 - Math.abs(d - 0.22) / 0.13))
 }
 
 // Night spots open halfway through dusk and close halfway through dawn: the

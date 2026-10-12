@@ -96,8 +96,8 @@ if(q.has('nosplash')){el.remove();return}
 var t=q.get('time'),n,sun={},lv=[];
 try{sun=JSON.parse(localStorage.getItem('cartopia-sun'))||{}}catch(e){}
 try{lv=JSON.parse(localStorage.getItem('cartopia-live-events'))||[]}catch(e){}
-var now=new Date(),m=(now%12e5)/6e4,p=t!==null?+t:m<5?m*.06:m<15?.3+(m-5)*.04:.7+(m-15)*.06,d=Math.abs(p-.5);
-n=d<.14?1:d>.26?0:1-(d-.14)/.12;
+var now=new Date(),m=now%12e5/12e5,p=t!==null?+t:m+.05*Math.sin(2*Math.PI*m),d=Math.abs(p-.5),x=Math.min(1,Math.max(0,(.3-d)/.2));
+n=x*x*(3-2*x);
 lv.forEach(function(e){var k={night:1,day:0}[e.kind];if(t===null&&k!==undefined&&e.from<=+now&&+now<e.to)n=k});
 var tod=n>.7?'night':n>.08?'dusk':'day',season=q.get('season')||['winter','spring','summer','fall'][(Math.floor((now.getMonth()+1)%12/3)+(sun.south?2:0))%4];
 el.className=tod;
