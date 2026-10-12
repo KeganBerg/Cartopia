@@ -8,6 +8,7 @@ import { useGhost, runGhost, raceTown, submitRun, sendTaunt, refreshTaunts, mark
 import { DragRace } from './Race'
 import { Panel } from './Menus'
 import { PlayerName } from './Username'
+import { isCrewMate } from '../lib/crewRaces'
 
 // Friend ghost races: the race itself, the result card with taunts, and the taunt inbox.
 
@@ -41,8 +42,8 @@ export function GhostRacePanel() {
       rival={{ id: 'ghost', town: `👻 ${ghost.town}`, level: 0, carName: ghost.car, color: ghost.color, pi: ghost.pi, online: false, body: ghost.body }}
       trial={{ target: ghost.target }}
       venueId="main"
-      title={`👻 ${ghost.town}'s ${ghost.par ? 'par time' : 'best run'}`}
-      onFinish={() => {}}
+      title={isCrewMate(ghost.owner) ? `🛡️ Crew race · ${ghost.town}` : `👻 ${ghost.town}'s ${ghost.par ? 'par time' : 'best run'}`}
+      onFinish={() => { if (ghost.real && isCrewMate(ghost.owner)) useGame.getState().crewRace() }}
       resultView={(r) => <GhostResultCard myTime={r.myTime} onAgain={() => runGhost(ghost)} onExit={exit} />}
       onExit={exit}
     />
@@ -83,6 +84,7 @@ function GhostResultCard({ myTime, onAgain, onExit }: { myTime: number; onAgain:
           <span className={won ? 'win' : ''}><small>You</small><b>{secs(time)}</b></span>
           <span className={won ? '' : 'win'}><small>👻 {ghost.par ? 'Par' : 'Their best'}</small><b>{secs(their)}</b></span>
         </div>
+        {isCrewMate(ghost.owner) && <p className="rr-sub crew-counts">🛡️ Counts for your crew goal and battle</p>}
         {posted === undefined && <p className="rr-sub">Posting...</p>}
         {posted && (sent === null ? (
           <div className="taunt-pick">

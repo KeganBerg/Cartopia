@@ -195,12 +195,13 @@ export function SheetTabs<T extends string>({ items, value, onChange }: { items:
   )
 }
 
-type ShopTab = 'cars' | 'business' | 'services' | 'homes' | 'event' | 'upgrades'
-const SHOP_GROUPS: { id: Exclude<ShopTab, 'upgrades'>; label: string; filter: (b: BuildingDef) => boolean }[] = [
+type ShopTab = 'cars' | 'business' | 'services' | 'rec' | 'event' | 'upgrades'
+const SHOP_GROUPS: { id: Exclude<ShopTab, 'upgrades'>; label: React.ReactNode; filter: (b: BuildingDef) => boolean }[] = [
   { id: 'cars', label: '🔧 Cars & parts', filter: (b) => b.id === 'rescue' || b.kind === 'parts' },
   { id: 'business', label: '🍕 Businesses', filter: (b) => b.kind === 'business' && b.id !== 'rescue' && b.id !== 'crew' && !b.service },
-  { id: 'services', label: '⛽ Services', filter: (b) => b.kind === 'gas' || b.id === 'crew' || !!b.service },
-  { id: 'homes', label: '🏡 Homes', filter: (b) => (b.kind === 'house' || b.kind === 'decor') && !b.event },
+  // Homes sit with the gas stations: both keep the town fuelled.
+  { id: 'services', label: '⛽ Services', filter: (b) => b.kind === 'gas' || b.kind === 'house' || b.id === 'crew' || !!b.service },
+  { id: 'rec', label: <>🎡 Rec<span className="tab-long">reation</span></>, filter: (b) => b.kind === 'decor' && !b.event },
   // Limited-time decorations for the running event (the tab only shows while it runs).
   { id: 'event', label: '🎃 Spooky', filter: (b) => !!b.event && b.event === activeEvent()?.id },
 ]
@@ -435,9 +436,16 @@ const withSlot = (m: OwnedCar['modSkin'], slot: SkinnedSlot, skin: string | null
 
 type GarageTab = 'tune' | 'mods' | 'paint'
 let nextGarageTab: GarageTab = 'tune'
-// Opens the Garage on a given tab (goals use it for paint and mods).
-export function openGarageTab(tab: GarageTab) {
+// Something to try on when the Garage opens (a crate prize): a part, a paint or a mod paint
+// on one slot, on this car. Nothing is fitted until the player taps the Garage's own button.
+export type GarageTry = { car: string; mod?: string; skin?: string; modSkin?: { slot: SkinnedSlot; skin: string } }
+let nextTry: GarageTry | null = null
+// Opens the Garage on a given tab (goals use it for paint and mods), optionally with that
+// car picked and something on try-on.
+export function openGarageTab(tab: GarageTab, tryOn?: GarageTry) {
   nextGarageTab = tab
+  nextTry = tryOn ?? null
+  if (tryOn) useGame.getState().selectCar(tryOn.car)
   useGame.getState().openPanel('garage')
 }
 
@@ -508,8 +516,13 @@ export function GaragePanel() {
     nextGarageTab = 'tune'
     return t
   })
+  const [pre] = useState(() => {
+    const t = nextTry
+    nextTry = null
+    return t
+  })
   // A mod being tried on in the preview, cleared when another car is picked.
-  const [trying, setTrying] = useState<{ car: string; mod: string } | null>(null)
+  const [trying, setTrying] = useState<{ car: string; mod: string } | null>(pre?.mod ? { car: pre.car, mod: pre.mod } : null)
   const tryMod = trying && trying.car === car?.uid && tab === 'mods' ? trying.mod : null
   const [inspect, setInspect] = useState(false)
   const [picking, setPicking] = useState(false)
@@ -524,10 +537,10 @@ export function GaragePanel() {
   const [painting, setPainting] = useState<{ car: string; job: PaintJob } | null>(null)
   const tryJob = painting && painting.car === car?.uid && tab === 'paint' ? painting.job : null
   // A skin being tried on (null: trying no skin), cleared when another car is picked.
-  const [skinning, setSkinning] = useState<{ car: string; skin: string | null } | null>(null)
+  const [skinning, setSkinning] = useState<{ car: string; skin: string | null } | null>(pre?.skin ? { car: pre.car, skin: pre.skin } : null)
   const trySkin = skinning && skinning.car === car?.uid && tab === 'paint' ? skinning.skin : undefined
   // A mod skin being tried on one slot's part, cleared when another car is picked.
-  const [modSkinning, setModSkinning] = useState<{ car: string; slot: SkinnedSlot; skin: string | null } | null>(null)
+  const [modSkinning, setModSkinning] = useState<{ car: string; slot: SkinnedSlot; skin: string | null } | null>(pre?.modSkin ? { car: pre.car, ...pre.modSkin } : null)
   const tryModSkin = modSkinning && modSkinning.car === car?.uid && tab === 'mods' ? modSkinning : null
   const modSkin = car && tryModSkin ? withSlot(car.modSkin, tryModSkin.slot, tryModSkin.skin) : car?.modSkin
   const look = car && def && { body: def.body, model: def.id, ...(tryJob ?? jobOf(car)), skin: trySkin === undefined ? car.skin : trySkin, modSkin, mods: withMod(car.mods, tryMod) }
