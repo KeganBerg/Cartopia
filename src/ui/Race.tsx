@@ -59,6 +59,7 @@ import { cupFits, cupRace, cupShift, type CupRace } from '../game/cups'
 import { ClassCups, cupChip, cupPrizeOf, firstCupPick } from './ClassCups'
 import { TrophyRoad, roadReady } from './TrophyRoad'
 import { Flair } from './Flair'
+import { CHALLENGER_BONUS, makeChallenger } from '../game/challenger'
 
 // skill: the rival car's race skill. AI rivals use it; live players use theirs on their own device.
 // shift: how cleanly an AI rival shifts, 0 (sloppy) to 1 (always perfect, the default).
@@ -68,7 +69,7 @@ const TOWNS = ['Transamsylvania', 'Gearville', 'Piston Peak', 'Nitro Bay', 'Chro
 const zero = { engine: 0, turbo: 0, tires: 0, weight: 0 }
 const pi = (c: OwnedCar) => performance(carDef(c.model), c.upgrades, c.mods)
 const liveReward = (oppPi: number) => 300 + oppPi * 8
-const reward = (r: Rival) => (r.id.startsWith('live:') ? liveReward(r.pi) : 150 + r.pi * 6)
+const reward = (r: Rival) => (r.id.startsWith('live:') ? liveReward(r.pi) : Math.round((150 + r.pi * 6) * (r.id.startsWith('chal-') ? CHALLENGER_BONUS : 1)))
 const performance_now = () => window.performance.now()
 
 const GP_CUP = ['🥉', '🏆', '🏆', '👑']
@@ -294,7 +295,17 @@ export function RacePanel() {
     setTrial((t) => ({ ...run, n: (t?.n ?? 0) + 1 }))
   }
 
-  if (race && car) return <DragRace key={seq} car={car} rival={race} next={{ label: '↻ Rematch', go: () => { setRace(null); start(race) } }} onExit={() => setRace(null)} />
+  if (race && car) {
+    // A quick race won brings a faster challenger straight away (game/challenger.ts); a loss offers the rematch.
+    const chal = race.id.startsWith('chal-') ? Number(race.id.slice(5)) + 1 : 0
+    const rematch = { label: '↻ Rematch', go: () => { setRace(null); start(race) } }
+    const next = (won: boolean) => {
+      if (!won) return rematch
+      const c: Rival = { ...makeChallenger(chal, race.pi, car.model, pi(car)), level: race.level + 1, online: false }
+      return { label: `⚔️ Challenger · $${reward(c).toLocaleString()}`, go: () => { setRace(null); start(c) } }
+    }
+    return <DragRace key={seq} car={car} rival={race} title={race.id.startsWith('chal-') ? `⚔️ Challenger ${chal}` : undefined} next={next} onExit={() => setRace(null)} />
+  }
   if (street && car) {
     const rival: Rival = { id: `street-${street.id}`, town: street.name, level, carName: carDef(street.model).name, color: street.color, pi: street.pi, online: false, body: street.body, model: street.model, skill: carDef(street.model).skill }
     return (
@@ -1219,12 +1230,14 @@ const step = stepRacer
 // mine: the ghost is the player's own best, so the splits are timed against their best run's.
 // resultView: replaces the usual result card.
 type Result = { won: boolean; myTime: number; theirTime: number }
+// A function picks the button once the result is in (won or lost).
 type NextRace = { label: string; go: () => void }
+type NextPick = NextRace | ((won: boolean) => NextRace | null)
 // How the run went, for the result card: reaction off the line (null for a jump start), clean shifts, top speed.
 type RunStats = { launch: string; perfect: number; shifts: number; top: number }
 // dist: a Grand Prix or Pro Tour distance (game/distance.ts); the car's build counts in these.
 // next: the result card's button for the next race in this series (or a retry), when there is one.
-export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title, venueId, trial, resultView, night, weatherSeed, sky, next, dist }: { car: OwnedCar; rival: Rival; onExit: () => void; next?: NextRace | null; live?: LiveRace; prize?: number; onFinish?: (won: boolean, myTime: number, theirTime: number) => number | void; title?: string; venueId?: string; trial?: { target: number; mine?: boolean }; resultView?: (r: Result) => ReactNode; night?: boolean; weatherSeed?: string; sky?: WeatherKind; dist?: RaceDist }) {
+export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title, venueId, trial, resultView, night, weatherSeed, sky, next, dist }: { car: OwnedCar; rival: Rival; onExit: () => void; next?: NextPick | null; live?: LiveRace; prize?: number; onFinish?: (won: boolean, myTime: number, theirTime: number) => number | void; title?: string; venueId?: string; trial?: { target: number; mine?: boolean }; resultView?: (r: Result) => ReactNode; night?: boolean; weatherSeed?: string; sky?: WeatherKind; dist?: RaceDist }) {
   // A signed-in live rival's PI comes from the server, not from their browser.
   const [serverRivalPi, setServerRivalPi] = useState<number | null>(null)
   const rival = useMemo(() => (serverRivalPi === null ? shownRival : { ...shownRival, pi: serverRivalPi }), [shownRival, serverRivalPi])
@@ -1734,7 +1747,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
           if (!finishView.busy) setCardUp(true)
         }}><span>⏭</span></button>
       ) : result && resultView ? resultView(result) : result ? (
-        <RaceResult won={result.won} myTime={result.myTime} theirTime={result.theirTime} cash={result.counted === false ? 0 : result.won ? payout : Math.round(payout * (live ? LIVE_LOSS_SHARE : LOSS_SHARE))} xp={result.counted === false ? 0 : result.won ? 30 : 8} rival={rival.town} note={result.note} noContest={result.counted === false} stars={result.stars} stats={stats.current} next={next ?? undefined} onExit={onExit} bet={stake ? (result.counted === false ? 0 : result.won ? stake : -stake) : undefined} />
+        <RaceResult won={result.won} myTime={result.myTime} theirTime={result.theirTime} cash={result.counted === false ? 0 : result.won ? payout : Math.round(payout * (live ? LIVE_LOSS_SHARE : LOSS_SHARE))} xp={result.counted === false ? 0 : result.won ? 30 : 8} rival={rival.town} note={result.note} noContest={result.counted === false} stars={result.stars} stats={stats.current} next={(typeof next === 'function' ? next(result.won) : next) ?? undefined} onExit={onExit} bet={stake ? (result.counted === false ? 0 : result.won ? stake : -stake) : undefined} />
       ) : (
         <div className="rf-bottom">
           <svg viewBox="0 0 120 120" className={`tach${light}`}>
