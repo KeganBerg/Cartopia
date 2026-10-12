@@ -1,6 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Canvas } from '@react-three/fiber'
-import { NeutralToneMapping } from 'three'
+import { useCallback, useMemo, useState } from 'react'
+import { StageSlot, useStageReady } from '../scene/Stage'
 import { useGame, openCrate } from '../game/store'
 import { MOD_SLOTS, SKINNED_SLOTS, carDef, fittedMods, modDef, ownedModSkins, ownedSkins, type ModDef } from '../game/data'
 import { CRATES, carOdds, crateCost, crateDef, crateOddsShown, dropTier, homeCars, homeMods, modChoices, skinOdds, skinOf, type CrateDef, type CrateId, type CrateOpen } from '../game/crates'
@@ -16,6 +15,7 @@ import './crates.css'
 import { LoadingScene } from './Loading'
 
 const CRATE_KEY = 'cartopia-crate'
+const CRATE_CAM = { position: [0, 4, 9] as [number, number, number], fov: 42, near: 0.3, far: 60, shadows: true }
 const price = (c: CrateDef, level: number) => {
   const p = crateCost(c, level)
   return p.coins ? <><CoinIcon size={16} />{compact(p.coins)}</> : <><BuckIcon size={16} />{p.bucks}</>
@@ -248,13 +248,22 @@ export function CratesPanel() {
     if (queue.length <= 1) setTimeout(go, 650)
   }
 
+  // The depot draws in the shared race canvas (scene/Stage.tsx): a canvas of its own
+  // meant a new WebGL context and ~20 shaders compiled on every visit.
+  const drop = open?.drop ?? null
+  const prizeCar = useMemo(() => prizeLook(drop, carsAt, paintCar), [drop, carsAt, paintCar])
+  const onReveal = useCallback(() => setShown(true), [])
+  const scene = useMemo(
+    () => <CrateScene run={run} def={shownDef} phase={phase} drop={drop} prizeCar={prizeCar} onReveal={onReveal} skip={skip} />,
+    [run, shownDef, phase, drop, prizeCar, onReveal, skip],
+  )
+  const stageReady = useStageReady()
+
   const locked = level < def.unlockLevel
   return (
     <div className="race-full crate-full" onClick={() => { if (phase === 'open' && !shown) setSkip((k) => k + 1) }}>
-      <Canvas className="rf-canvas" shadows camera={{ fov: 42, near: 0.3, far: 60, position: [0, 4, 9] }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
-        <CrateScene run={run} def={shownDef} phase={phase} drop={open?.drop ?? null} prizeCar={prizeLook(open?.drop ?? null, carsAt, paintCar)} onReveal={() => setShown(true)} skip={skip} />
-      </Canvas>
-      <LoadingScene label="Opening the Crate Depot" onClose={close} />
+      <StageSlot cam={CRATE_CAM}>{scene}</StageSlot>
+      <LoadingScene ready={stageReady} label="Opening the Crate Depot" onClose={close} />
       <div className="rf-top">
         <h2>📦 Crate Depot</h2>
         <span className="crate-wallet"><span><CoinIcon size={16} />{compact(coins)}</span><span><BuckIcon size={16} />{compact(bucks)}</span></span>

@@ -7,8 +7,7 @@ import type { PlacedBuilding } from '../game/store'
 // Collect All swaps every building object at once (job timers). The town must
 // not re-render for that, only for changes that show.
 const shop: PlacedBuilding = { uid: 'a', def: 'pizza', x: 2, z: 3, rot: 1, jobEndsAt: null }
-const roads = new Set<string>()
-const props = (b: PlacedBuilding) => ({ b, roads })
+const props = (b: PlacedBuilding) => ({ b, turn: 0 })
 
 describe('town re-renders on Collect All', () => {
   it('ignores job timers', () => {

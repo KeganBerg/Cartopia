@@ -23,7 +23,7 @@ import { townLook } from './look'
 import { SeasonFx } from './SeasonFx'
 import { TownCars } from './TownCars'
 import { Townspeople } from './Townspeople'
-import { Batch, batchOff } from './Batch'
+import { Batch } from './Batch'
 import { Manhole } from './BuildingDetail'
 import { GrassTufts } from './Tufts'
 import { Outskirts } from './Outskirts'
@@ -188,21 +188,22 @@ const ONE: [number, number, number] = [1, 1, 1]
 // `group` is set on the top-left building of a merged block: it stands in,
 // scaled up, for the whole block. The others in the block draw nothing.
 // `picked` (the building picked in Move) draws live, outside the merged town.
-type BuildingProps = { b: PlacedBuilding; roads: Set<string>; group?: MergeGroup; picked?: boolean }
+// `turn`: quarter turns to face its road (World works it out, so laying a road
+// only re-renders the buildings that turn to face it).
+type BuildingProps = { b: PlacedBuilding; turn: number; group?: MergeGroup; picked?: boolean }
 
 // Starting or collecting a job swaps every building object, but none of that
 // shows in the model. Re-rendering a whole town of models at once is what made
 // Collect All stall phones, so a building only re-renders when its lot or look changes.
 const sameLook = (a: PlacedBuilding, b: PlacedBuilding) =>
   a.uid === b.uid && a.def === b.def && a.x === b.x && a.z === b.z && a.rot === b.rot && a.level === b.level && a.merge === b.merge && a.mturn === b.mturn
-export const sameBuilding = (p: BuildingProps, n: BuildingProps) => p.roads === n.roads && p.group === n.group && p.picked === n.picked && sameLook(p.b, n.b)
+export const sameBuilding = (p: BuildingProps, n: BuildingProps) => p.turn === n.turn && p.group === n.group && p.picked === n.picked && sameLook(p.b, n.b)
 
 const Building = memo(BuildingLot, sameBuilding)
 
-function BuildingLot({ b, roads, group, picked }: BuildingProps) {
+function BuildingLot({ b, turn, group, picked }: BuildingProps) {
   const d = buildingDef(b.def)
   const [cx, cz] = group ? groupCenter(group) : centerOf(b.def, b.x, b.z, b.rot)
-  const turn = group ? groupTurn(group, roads) : turnOf(b, roads)
   const [sx, sy, sz] = group ? groupScale(group, turn) : [1, 1, 1]
   // Four max-level houses in a square are a landmark built for a 2x2 lot, not a scaled-up house.
   const mark = group && isLandmark(group)
@@ -349,6 +350,61 @@ const endsOf = (arms: boolean[], xing: boolean[], i: number): [End, End] =>
     return !arms[j] ? 'corner' : xing[j] ? 'ramp' : 'open'
   }) as [End, End]
 
+type Tile = ReturnType<typeof layoutRoads>['tiles'] extends Map<string, infer T> ? T & { xing: boolean[]; corners: (string | null)[] } : never
+// Painting one road tile changes only it and its neighbours; the rest skip re-rendering.
+const sameTile = (a: { t: Tile; asphalt: MeshStandardMaterial }, b: { t: Tile; asphalt: MeshStandardMaterial }) =>
+  a.asphalt === b.asphalt &&
+  a.t.x === b.t.x &&
+  a.t.z === b.t.z &&
+  a.t.junction === b.t.junction &&
+  a.t.oneWay === b.t.oneWay &&
+  a.t.mate === b.t.mate &&
+  a.t.arms.join() === b.t.arms.join() &&
+  a.t.xing.join() === b.t.xing.join() &&
+  a.t.corners.join() === b.t.corners.join()
+
+const RoadTile = memo(function RoadTile({ t, asphalt }: { t: Tile; asphalt: MeshStandardMaterial }) {
+  const { x, z, arms, junction, oneWay, mate, xing, corners } = t
+  const [wx, wz] = toWorld(x, z)
+  const [e, w, s, nn] = arms
+  const straightX = !junction && (e || w) && !s && !nn
+  const straightZ = !junction && (s || nn) && !e && !w
+  const avenue = oneWay >= 0
+  const plain = (straightX || straightZ) && !xing.some(Boolean)
+  // Lamps go on the outside edge of an avenue.
+  const outer = avenue ? SIDES[mate ^ 1] : null
+  return (
+    <group position={[wx, 0, wz]}>
+      <mesh rotation-x={-Math.PI / 2} position-y={LAYER.lot} receiveShadow>
+        <planeGeometry args={[TILE, TILE]} />
+        <primitive object={asphalt} attach="material" dispose={null} />
+      </mesh>
+      {/* Drains and manholes only on plain straight stretches, clear of crossings. */}
+      {SIDES.map((sd, i) => !arms[i] && <Sidewalk key={sd} side={sd} ends={endsOf(arms, xing, i)} drain={plain && (x * 2 + z + i) % 4 === 0} />)}
+      {corners.map((c, i) => (c === 'curb' ? <CornerCurb key={i} turn={i} /> : c === 'fillet' ? <CornerFillet key={i} turn={i} /> : null))}
+      {(straightX || straightZ) && (x * 5 + z * 3) % 7 === 0 && <Hydrant side={straightX ? ((x + z) % 2 ? 'n' : 's') : ((x + z) % 2 ? 'w' : 'e')} />}
+      {plain && (x * 3 + z * 7) % 5 === 1 && <Manhole x={straightX ? 0 : 0.45} z={straightX ? 0.45 : 0} />}
+      {SIDES.map((sd, i) => xing[i] && <Crosswalk key={sd} side={sd} />)}
+      {xing.map((on, i) => on && (oneWay < 0 || oneWay === i) && <StopLine key={i} side={i} />)}
+      {/* Street lamps every few tiles along straight roads, alternating sides. */}
+      {(straightX || straightZ) && !xing.some(Boolean) && (x * 7 + z * 5) % 3 === 0 && (
+        <StreetLamp side={straightX ? ((x + z) % 2 ? 's' : 'n') : ((x + z) % 2 ? 'e' : 'w')} />
+      )}
+      {/* A lamp lighting the corner where a side road meets the street. */}
+      {junction && arms.filter(Boolean).length === 3 && <StreetLamp side={SIDES[arms.indexOf(false)]} />}
+      {avenue && outer && !xing.some(Boolean) && (x * 7 + z * 5) % 3 === 0 && <StreetLamp side={outer} />}
+      <RoadWear kerbs={SIDES.filter((_, i) => !arms[i])} plain={plain} alongX={!!straightX} h={((x * 73 + z * 151) % 97) / 97} />
+      {/* Sidewalk furniture on some straight stretches, on the side without a lamp. */}
+      {plain && (x * 11 + z * 13) % 4 === 0 && (
+        <StreetProp kind={PROPS[(x * 5 + z * 3) % PROPS.length]} side={straightX ? ((x + z) % 2 ? 'n' : 's') : ((x + z) % 2 ? 'w' : 'e')} at={-0.2} />
+      )}
+      {(straightX || straightZ) && <Dashes alongX={straightX} />}
+      {avenue && <Dashes alongX={oneWay < 2} />}
+      {avenue && (mate === 0 || mate === 2) && <Median side={mate} />}
+    </group>
+  )
+}, sameTile)
+
 function Roads() {
   const roadsList = useGame((s) => (s.visiting ?? s).roads)
   const tiles = useMemo(() => {
@@ -372,49 +428,13 @@ function Roads() {
 
   return (
     <group>
-      {tiles.map(({ key: k, x, z, arms, junction, oneWay, mate, xing, corners }) => {
-        const [wx, wz] = toWorld(x, z)
-        const [e, w, s, nn] = arms
-        const straightX = !junction && (e || w) && !s && !nn
-        const straightZ = !junction && (s || nn) && !e && !w
-        const avenue = oneWay >= 0
-        const plain = (straightX || straightZ) && !xing.some(Boolean)
-        // Lamps go on the outside edge of an avenue.
-        const outer = avenue ? SIDES[mate ^ 1] : null
-        return (
-          <group key={k} position={[wx, 0, wz]}>
-            <mesh rotation-x={-Math.PI / 2} position-y={LAYER.lot} receiveShadow>
-              <planeGeometry args={[TILE, TILE]} />
-              <primitive object={asphalt} attach="material" dispose={null} />
-            </mesh>
-            {/* Drains and manholes only on plain straight stretches, clear of crossings. */}
-            {SIDES.map((sd, i) => !arms[i] && <Sidewalk key={sd} side={sd} ends={endsOf(arms, xing, i)} drain={plain && (x * 2 + z + i) % 4 === 0} />)}
-            {corners.map((c, i) => (c === 'curb' ? <CornerCurb key={i} turn={i} /> : c === 'fillet' ? <CornerFillet key={i} turn={i} /> : null))}
-            {(straightX || straightZ) && (x * 5 + z * 3) % 7 === 0 && <Hydrant side={straightX ? ((x + z) % 2 ? 'n' : 's') : ((x + z) % 2 ? 'w' : 'e')} />}
-            {plain && (x * 3 + z * 7) % 5 === 1 && <Manhole x={straightX ? 0 : 0.45} z={straightX ? 0.45 : 0} />}
-            {SIDES.map((sd, i) => xing[i] && <Crosswalk key={sd} side={sd} />)}
-            {xing.map((on, i) => on && (oneWay < 0 || oneWay === i) && <StopLine key={i} side={i} />)}
-            {/* Street lamps every few tiles along straight roads, alternating sides. */}
-            {(straightX || straightZ) && !xing.some(Boolean) && (x * 7 + z * 5) % 3 === 0 && (
-              <StreetLamp side={straightX ? ((x + z) % 2 ? 's' : 'n') : ((x + z) % 2 ? 'e' : 'w')} />
-            )}
-            {/* A lamp lighting the corner where a side road meets the street. */}
-            {junction && arms.filter(Boolean).length === 3 && <StreetLamp side={SIDES[arms.indexOf(false)]} />}
-            {avenue && outer && !xing.some(Boolean) && (x * 7 + z * 5) % 3 === 0 && <StreetLamp side={outer} />}
-            <RoadWear kerbs={SIDES.filter((_, i) => !arms[i])} plain={plain} alongX={!!straightX} h={((x * 73 + z * 151) % 97) / 97} />
-            {/* Sidewalk furniture on some straight stretches, on the side without a lamp. */}
-            {plain && (x * 11 + z * 13) % 4 === 0 && (
-              <StreetProp kind={PROPS[(x * 5 + z * 3) % PROPS.length]} side={straightX ? ((x + z) % 2 ? 'n' : 's') : ((x + z) % 2 ? 'w' : 'e')} at={-0.2} />
-            )}
-            {(straightX || straightZ) && <Dashes alongX={straightX} />}
-            {avenue && <Dashes alongX={oneWay < 2} />}
-            {avenue && (mate === 0 || mate === 2) && <Median side={mate} />}
-          </group>
-        )
-      })}
+      {tiles.map((t) => (
+        <RoadTile key={t.key} t={t} asphalt={asphalt} />
+      ))}
     </group>
   )
 }
+
 
 function Interaction() {
   const mode = useGame((s) => s.mode)
@@ -657,7 +677,7 @@ function ExpandZoom() {
 export const shapeOf = (buildings: PlacedBuilding[]) =>
   buildings.map((b) => `${b.uid}:${b.def}:${b.x}:${b.z}:${b.rot}:${b.level ?? 1}:${b.merge ?? ''}:${b.mturn ?? ''}`).join()
 
-// World re-renders when the mode, the picked building or the town's layout
+// World re-renders when the picked building or the town's layout
 // changes. Everything that doesn't depend on those is built once here and handed
 // back as the same elements each time, so React skips it: on a big town, re-running
 // the roads, outskirts, cars and effects on every mode switch (or every panel the
@@ -675,16 +695,18 @@ export const World = memo(function World() {
   const roadsList = useGame((s) => (s.visiting ?? s).roads)
   const roads = useMemo(() => new Set(roadsList), [roadsList])
   const land = useGame((s) => (s.visiting ? (s.visiting.land ?? START_LAND) : s.land))
-  const mode = useGame((s) => s.mode)
   const popping = usePops((s) => Object.keys(s.pops).join())
   const free = useFreeCam((f) => f.on)
   // Rebuild the merged town only when something's footprint changes, not on every job timer.
-  const layout = useMemo(
-    () => [shape, roadsList.join(), land.join(), popping].join('/'),
-    [shape, roadsList, land, popping],
+  const merges = useMemo(() => mergeGroups(buildings), [buildings])
+  const turns = useMemo(
+    () => buildings.map((b) => {
+      const group = merges.groups.get(b.uid)
+      return group ? groupTurn(group, roads) : turnOf(b, roads)
+    }),
+    [buildings, merges, roads],
   )
-  const merges = useMemo(() => mergeGroups(buildings), [layout]) // eslint-disable-line react-hooks/exhaustive-deps
-  // The building picked in Move draws live; the rest stays merged (see batchOff).
+  // The building picked in Move draws live; the rest stays merged.
   const picked = useGame((s) => (s.mode === 'move' ? s.selected : null))
   const fixed = useMemo(
     () => ({
@@ -738,12 +760,16 @@ export const World = memo(function World() {
       {fixed.before}
       {outskirts}
       {fixed.controls}
-      <Batch version={`${layout}|${picked ?? ''}`} off={batchOff(mode)} cell={24} freeze>
+      {/* Ground and buildings merge separately, and only what changed is merged
+          again (see Batch): laying road re-merges the road's patch of ground. */}
+      <Batch version={`${roadsList.join()}/${land.join()}/${shape}`} cell={24} freeze>
         {fixed.land}
         {tufts}
         {fixed.roads}
-        {buildings.map((b) =>
-          merges.owner.has(b.uid) && !merges.groups.has(b.uid) ? null : <Building key={b.uid} b={b} roads={roads} group={merges.groups.get(b.uid)} picked={b.uid === picked} />,
+      </Batch>
+      <Batch version={`${shape}/${turns.join('')}/${popping}|${picked ?? ''}`} cell={24} freeze>
+        {buildings.map((b, i) =>
+          merges.owner.has(b.uid) && !merges.groups.has(b.uid) ? null : <Building key={b.uid} b={b} turn={turns[i]} group={merges.groups.get(b.uid)} picked={b.uid === picked} />,
         )}
       </Batch>
       {fixed.after}
