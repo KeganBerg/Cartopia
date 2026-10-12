@@ -16,7 +16,10 @@
 --     before-triggers run in name order) takes the claimed rows' coins back out so the guard only
 --     sees play, and "econ_wagers" (fires after econ_guard and econ_progress) puts them back.
 --     Rows a page hasn't claimed two minutes on are applied there anyway (a closed tab, or a page
---     that skips a loss), and the page reloads the server copy.
+--     that skips a loss), and the page reloads the server copy. A stake the page already spent
+--     isn't written off: what coins can't cover is kept as a debt (econ.wager_debt, server-only)
+--     and taken from later coins, and a player in debt can't bet.
+--   * Stakes are only offered and accepted on a race nobody has finished yet.
 
 create table if not exists public.wagers (
   race_id text primary key references public.live_races on delete cascade,
@@ -30,7 +33,7 @@ create table if not exists public.wagers (
 alter table public.wagers enable row level security;
 drop policy if exists "racers read their wagers" on public.wagers;
 create policy "racers read their wagers" on public.wagers for select using (auth.uid() in (a, b));
-revoke insert, update, delete on public.wagers from anon, authenticated;
+revoke all on public.wagers from anon, authenticated;
 grant select on public.wagers to authenticated;
 create index if not exists wagers_held_a_idx on public.wagers (a) where status = 'held';
 create index if not exists wagers_held_b_idx on public.wagers (b) where status = 'held';
@@ -47,7 +50,7 @@ create table if not exists public.wager_ledger (
 alter table public.wager_ledger enable row level security;
 drop policy if exists "players read their wager ledger" on public.wager_ledger;
 create policy "players read their wager ledger" on public.wager_ledger for select using (auth.uid() = owner_id);
-revoke insert, update, delete on public.wager_ledger from anon, authenticated;
+revoke all on public.wager_ledger from anon, authenticated;
 grant select on public.wager_ledger to authenticated;
 
 -- A stake both racers may bet at level `lvl` (the lower of the two).
@@ -65,6 +68,7 @@ language sql stable set search_path = '' as $$
   select public.econ_num(g.state, 'coins')
        + coalesce((select sum(l.delta) from public.wager_ledger l
                    where l.owner_id = who and l.seq > floor(public.econ_num(g.state, 'wagers'))), 0)
+       - coalesce((g.econ ->> 'wager_debt')::numeric, 0)
   from public.game_saves g where g.owner_id = who
 $$;
 
@@ -85,7 +89,8 @@ declare
   lvl int;
 begin
   select * into r from public.live_races x where x.id = race_id;
-  if me is null or r.id is null or r.a <> me or r.created_at < now() - interval '2 minutes' then
+  if me is null or r.id is null or r.a <> me or r.created_at < now() - interval '2 minutes'
+     or r.a_t is not null or r.b_t is not null or r.winner is not null or r.void then
     raise exception 'not your race' using errcode = 'insufficient_privilege';
   end if;
   select min(g.level) into lvl from public.game_saves g where g.owner_id in (r.a, r.b);
@@ -106,10 +111,14 @@ language plpgsql security definer set search_path = '' as $$
 declare
   me uuid := auth.uid();
   w public.wagers;
+  r public.live_races;
 begin
+  -- The race row first (race_finish locks it too), so nobody finishes while the stakes go down.
+  select * into r from public.live_races x where x.id = wager_accept.race_id for update;
   select * into w from public.wagers x where x.race_id = wager_accept.race_id for update;
   if me is null or w.race_id is null or w.b <> me or w.status <> 'offered' or w.created_at < now() - interval '90 seconds'
-     or w.stake is distinct from wager_accept.stake then
+     or w.stake is distinct from wager_accept.stake
+     or r.a_t is not null or r.b_t is not null or r.winner is not null or r.void then
     raise exception 'wager expired' using errcode = 'insufficient_privilege';
   end if;
   if coalesce(econ_private.wager_coins(w.b), 0) < w.stake then
@@ -123,22 +132,29 @@ begin
   update public.wagers x set status = 'held', held_at = now() where x.race_id = w.race_id;
 end $$;
 
--- Pays out once the referee decides the race.
-create or replace function econ_private.wager_settle() returns trigger
+-- Pays out a decided race's held wager once: the winner gets both stakes, no winner refunds both.
+create or replace function econ_private.wager_pay(race text, winner uuid) returns void
 language plpgsql security definer set search_path = '' as $$
 declare
   w public.wagers;
 begin
-  if (new.winner is not null or new.void) and old.winner is null and not old.void then
-    update public.wagers x set status = 'settled' where x.race_id = new.id and x.status = 'held' returning * into w;
-    if w.race_id is not null then
-      if new.winner is null then
-        perform econ_private.wager_post(w.a, w.race_id, w.stake, 'refund');
-        perform econ_private.wager_post(w.b, w.race_id, w.stake, 'refund');
-      else
-        perform econ_private.wager_post(new.winner, w.race_id, 2::bigint * w.stake, 'win');
-      end if;
+  update public.wagers x set status = 'settled' where x.race_id = race and x.status = 'held' returning * into w;
+  if w.race_id is not null then
+    if winner is null then
+      perform econ_private.wager_post(w.a, w.race_id, w.stake, 'refund');
+      perform econ_private.wager_post(w.b, w.race_id, w.stake, 'refund');
+    else
+      perform econ_private.wager_post(winner, w.race_id, 2::bigint * w.stake, 'win');
     end if;
+  end if;
+end $$;
+
+-- Pays out once the referee decides the race.
+create or replace function econ_private.wager_settle() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if (new.winner is not null or new.void) and old.winner is null and not old.void then
+    perform econ_private.wager_pay(new.id, new.winner);
   end if;
   return null;
 end $$;
@@ -160,6 +176,9 @@ begin
     r := public.race_decide(w.race_id);
     if r.winner is null and not r.void then
       update public.live_races x set void = true where x.id = w.race_id;
+    else
+      -- Decided but never paid (shouldn't happen): pay it now.
+      perform econ_private.wager_pay(w.race_id, r.winner);
     end if;
   end loop;
 end $$;
@@ -194,6 +213,8 @@ declare
   n int := greatest(floor(public.econ_num(new.state, 'wagers')), 0)::int;
   late int;
   net numeric := 0;
+  debt numeric := coalesce((new.econ ->> 'wager_debt')::numeric, 0);
+  coins numeric;
 begin
   -- Rows left unclaimed for two minutes are applied here.
   select max(l.seq) into late from public.wager_ledger l
@@ -202,11 +223,20 @@ begin
     new.corrections := coalesce(new.corrections, '{}') || jsonb_build_object('wagers', jsonb_build_object('sent', n, 'kept', late));
     n := late;
   end if;
-  if n <= o_n then return new; end if;
-  select coalesce(sum(l.delta), 0) into net from public.wager_ledger l
-    where l.owner_id = new.owner_id and l.seq > o_n and l.seq <= n;
-  new.state := jsonb_set(new.state, '{wagers}', to_jsonb(n));
-  new.state := jsonb_set(new.state, '{coins}', to_jsonb(greatest(floor(public.econ_num(new.state, 'coins') + net), 0)));
+  if n <= o_n and debt <= 0 then return new; end if;
+  if n > o_n then
+    select coalesce(sum(l.delta), 0) into net from public.wager_ledger l
+      where l.owner_id = new.owner_id and l.seq > o_n and l.seq <= n;
+    new.state := jsonb_set(new.state, '{wagers}', to_jsonb(n));
+  end if;
+  -- A stake already spent stays owed: what the coins can't cover now comes off later coins.
+  coins := floor(public.econ_num(new.state, 'coins') + net - debt);
+  if coins < 0 or debt > 0 then
+    new.econ := coalesce(new.econ, '{}') || jsonb_build_object('wager_debt', greatest(-coins, 0));
+    -- Any correction makes the page reload the server's coins.
+    new.corrections := coalesce(new.corrections, '{}') || jsonb_build_object('wager_debt', jsonb_build_object('owed', debt, 'left', greatest(-coins, 0)));
+  end if;
+  new.state := jsonb_set(new.state, '{coins}', to_jsonb(greatest(coins, 0)));
   return new;
 end $$;
 
@@ -219,7 +249,7 @@ create trigger econ_wagers before update on public.game_saves
   for each row execute function econ_private.wager_claims_in();
 
 revoke execute on function econ_private.wager_stake_ok(int, int), econ_private.wager_coins(uuid),
-  econ_private.wager_post(uuid, text, bigint, text), econ_private.wager_settle(),
+  econ_private.wager_post(uuid, text, bigint, text), econ_private.wager_pay(text, uuid), econ_private.wager_settle(),
   econ_private.wager_claims_out(), econ_private.wager_claims_in() from public, anon, authenticated;
 revoke execute on function public.wager_offer(text, int), public.wager_accept(text, int), public.wager_sync() from public, anon;
 grant execute on function public.wager_offer(text, int), public.wager_accept(text, int), public.wager_sync() to authenticated;
