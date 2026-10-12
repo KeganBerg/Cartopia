@@ -16,12 +16,20 @@ import { keepProps, keepShape, releaseShape, uniform } from './keepShape'
 //  - Things laid out in bays (rows of windows, columns) draw more of them
 //    along the longer side: lay them out in a <Facade> (or read useBays()).
 // Decorations that are one object (trees, lamps) don't merge at all (game/merge.ts).
+// THE RULE, inside a 2x2 or 4x4 block (drawn 2x or 4x evenly): the building
+// grows, people don't. Anything person-sized (no taller than HUMAN) standing
+// free on the lot draws at true size, on the spot it stood on (keepPeople in
+// keepShape.ts). Mark things that must stay true size even when something
+// touches them with userData={PEOPLE_SIZED} (cars, parasols, tyre stacks) or
+// <Upright size={1}>. Lay out more of them in a bigger block rather than
+// letting one grow (GasPumps in BuildingModel.tsx). src/scene/humanScale.test.tsx
+// fails anything person-sized that grows in a block.
 // Opt-outs and overrides:
 //  - <Stretch> marks a small piece that must stretch with the building
 //    (a fence run, a trim that has to meet the walls). Things inside still
 //    get checked.
 //  - <Upright> forces a group to keep its shape whatever its size, and with
-//    `size` sets how big it draws in a uniform 2x2 block (the Drive-In's cars).
+//    `size` sets how big it draws in a 2x2 or 4x4 block (size={1}: true size).
 // src/scene/mergeShape.test.tsx renders every building as a pair and fails if
 // anything round, lettered or instanced comes out stretched.
 export const MergeScale = createContext<[number, number, number]>([1, 1, 1])
@@ -87,7 +95,7 @@ export function KeepShapes({ limit, children }: { limit: number; children: React
   return (
     <group userData={MERGE_ROOT}>
       {children}
-      {!uniform(scale) && <Watch scale={scale} limit={limit} />}
+      {(!uniform(scale) || scale[0] !== 1) && <Watch scale={scale} limit={limit} />}
     </group>
   )
 }
@@ -126,6 +134,25 @@ export function Upright({ children, size, tall }: { children: ReactNode; size?: 
 // as it is drawn (twice `len` along a pair) and lays its windows, piers or
 // mullions out across that, centred on 0, in true size. Place it at the face
 // (`at`, turned by `ry` so its x runs along the face, z out of it).
+// A round piece (a drum tower, a tank) drawn once per lot along a pair, each in
+// true shape, instead of one squashed into an oval: a pair of donut shops gets
+// two drum towers. `step` is a lot's width in the model's own units.
+export function PerLot({ step, children }: { step: number; children: ReactNode }) {
+  const [bx, bz] = useBays()
+  const n = Math.round(Math.max(bx, bz))
+  if (n <= 1) return <Upright>{children}</Upright>
+  const alongX = bx >= bz
+  return Array.from({ length: n }, (_, i) => {
+    // True offset from the middle, then back into the stretched model's units.
+    const t = ((i + 0.5) / n - 0.5) * n * step
+    return (
+      <group key={i} position={alongX ? [t / n, 0, 0] : [0, 0, t / n]}>
+        <Upright>{children}</Upright>
+      </group>
+    )
+  })
+}
+
 export function Facade({ at, ry = 0, len, children }: { at: [number, number, number]; ry?: number; len: number; children: (L: number) => ReactNode }) {
   const [bx, bz] = useBays()
   const b = Math.abs(Math.sin(ry)) > 0.5 ? bz : bx

@@ -319,8 +319,11 @@ function Koi() {
     <group ref={g} userData={LIVE}>
       {fish.map((f, i) => (
         <group key={i}>
-          <mesh scale={[0.4, 0.35, 1]}><sphereGeometry args={[0.07, 8, 5]} /><meshStandardMaterial color={f.c} /></mesh>
-          <mesh position={[0, 0, -0.08]} rotation-x={Math.PI / 2} scale={[1, 0.3, 1]}><coneGeometry args={[0.035, 0.05, 5]} /><meshStandardMaterial color={f.c} /></mesh>
+          {/* Fish stay fish-sized in a merged garden's bigger pond. */}
+          <Upright size={1}>
+            <mesh scale={[0.4, 0.35, 1]}><sphereGeometry args={[0.07, 8, 5]} /><meshStandardMaterial color={f.c} /></mesh>
+            <mesh position={[0, 0, -0.08]} rotation-x={Math.PI / 2} scale={[1, 0.3, 1]}><coneGeometry args={[0.035, 0.05, 5]} /><meshStandardMaterial color={f.c} /></mesh>
+          </Upright>
         </group>
       ))}
     </group>

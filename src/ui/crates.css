@@ -88,3 +88,7 @@
 /* Not yet: the crate's own cars your level hasn't reached. */
 .crate-car.locked > * { opacity: .4; }
 .crate-car.locked small { opacity: .8; color: #cfd8dc; }
+/* Paint prizes: a car paint is a square chip, a mod paint a round one, each badged with what it covers. */
+.cp-swatch { position: relative; }
+.cp-swatch.mod { border-radius: 50%; }
+.cp-swatch.car, .cp-swatch.mod { display: flex; align-items: flex-end; justify-content: flex-end; font-size: 15px; line-height: 1; }

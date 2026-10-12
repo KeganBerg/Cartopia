@@ -13,7 +13,7 @@ import { pickVenue, venue as venueById } from '../scene/venues'
 import { sfx } from '../lib/sound'
 import { raceAudio, type RaceAudio } from '../lib/engineAudio'
 import { PlayerName } from './Username'
-import { useLive, challenge, cancelChallenge, refreshPresence, raceChannel, endLiveRace, answer, pruneInvites, mute, unmute, setClosed, INVITE_MS, type LiveRace } from '../lib/live'
+import { useLive, challenge, cancelChallenge, refreshPresence, raceChannel, endLiveRace, answer, pruneInvites, mute, INVITE_MS, type LiveRace } from '../lib/live'
 import { displayName } from '../lib/names'
 import { joinRefereed, reportFinish, serverPi, type Verdict } from '../lib/referee'
 import { ghostDist, shortLeft, trialWeek, TRIAL_FUEL } from '../game/trial'
@@ -1492,26 +1492,24 @@ export function LiveRaceOverlay() {
 // Challenges land in an inbox instead of popping up over the game.
 export function ChallengeBell() {
   const count = useLive((l) => l.invites.length)
-  const closed = useLive((l) => l.closed)
   const openPanel = useGame((s) => s.openPanel)
   const visiting = useGame((s) => !!s.visiting)
   useEffect(() => {
     const id = setInterval(pruneInvites, 1000)
     return () => clearInterval(id)
   }, [])
-  if (!supabase || visiting) return null
+  // Only shows while a challenge is waiting; the on/off switch lives in Menu > Account.
+  if (!supabase || visiting || !count) return null
   return (
-    <button className={`challenge-bell${count ? ' has' : ''}`} onClick={() => openPanel('invites')} title="Race challenges">
-      <Icon name="flag" />{closed && <span className="bell-off">✕</span>}
-      {count > 0 && <span className="bell-count">{count}</span>}
+    <button className="challenge-bell has" onClick={() => openPanel('invites')} title="Race challenges">
+      <Icon name="flag" />
+      <span className="bell-count">{count}</span>
     </button>
   )
 }
 
 export function InvitesPanel() {
   const invites = useLive((l) => l.invites)
-  const muted = useLive((l) => l.muted)
-  const closed = useLive((l) => l.closed)
   const openPanel = useGame((s) => s.openPanel)
   const [, tick] = useState(0)
   useEffect(() => {
@@ -1527,45 +1525,29 @@ export function InvitesPanel() {
   }
   return (
     <Panel title="Race challenges">
-      {invites.length > 0 && <div className="invites-car"><RaceBar cars={cars} car={car} onPick={setRaceCar} /></div>}
-      <label className="toggle-row">
-        <input type="checkbox" checked={closed} onChange={(e) => setClosed(e.target.checked)} />
-        <span>Don't accept challenges <small>Other players will see you're not taking races.</small></span>
-      </label>
       {invites.length === 0 ? (
-        <p className="hint">{closed ? 'Challenges are off.' : 'No challenges right now. When someone challenges you, it shows up here.'}</p>
+        <p className="hint">No challenges right now.</p>
       ) : (
-        <div className="rivals">
-          {invites.map((i) => (
-            <div key={i.raceId} className="rival invite">
-              <i style={{ background: i.from.color }} />
-              <div>
-                <b><PlayerName id={i.from.uid} town={i.from.town} /></b> <span className="tag live">LIVE</span>
-                <div className="card-stat">Lvl {i.from.level} · {i.from.carName} · PI {i.from.pi} · {Math.max(0, Math.ceil((INVITE_MS - (Date.now() - i.at)) / 1000))}s left</div>
-              </div>
-              <div className="invite-actions">
-                <button className="buy small" onClick={() => accept(i.raceId)}>Race!</button>
-                <button className="sell" onClick={() => answer(i.raceId, false)}>Decline</button>
-                <button className="mute-btn" onClick={() => mute(i.from)} title="Ignore all challenges from this player">🔇 Mute</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-      {Object.keys(muted).length > 0 && (
         <>
-          <h3>Muted players</h3>
+          <div className="invites-car"><RaceBar cars={cars} car={car} onPick={setRaceCar} /></div>
           <div className="rivals">
-            {Object.entries(muted).map(([id, town]) => (
-              <div key={id} className="rival muted-row">
-                <span>🔇 {town}</span>
-                <button className="buy small alt" onClick={() => unmute(id)}>Unmute</button>
+            {invites.map((i) => (
+              <div key={i.raceId} className="rival invite">
+                <i style={{ background: i.from.color }} />
+                <div>
+                  <b><PlayerName id={i.from.uid} town={i.from.town} /></b> <span className="tag live">LIVE</span>
+                  <div className="card-stat">Lvl {i.from.level} · {i.from.carName} · PI {i.from.pi} · {Math.max(0, Math.ceil((INVITE_MS - (Date.now() - i.at)) / 1000))}s left</div>
+                </div>
+                <div className="invite-actions">
+                  <button className="buy small" onClick={() => accept(i.raceId)}>Race!</button>
+                  <button className="sell" onClick={() => answer(i.raceId, false)}>Decline</button>
+                  <button className="mute-btn" onClick={() => mute(i.from)} title="Ignore all challenges from this player">🔇 Mute</button>
+                </div>
               </div>
             ))}
           </div>
         </>
       )}
-      <p className="hint">Each player can only send you one challenge at a time, and after you decline they have to wait a minute before asking again.</p>
     </Panel>
   )
 }

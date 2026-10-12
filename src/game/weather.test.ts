@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { naturalPhase } from './clock'
+import { setLiveEvents } from './liveEvents'
 import { FEEL, SPELL_MS, seedRoll, spellKind, weatherNow, type WeatherKind } from './weather'
 
 describe('weather', () => {
@@ -25,8 +27,7 @@ describe('weather', () => {
   })
 
   it('brings mist only on mornings, sun after showers, heat only in summer afternoons', () => {
-    const DAY = 20 * 60 * 1000
-    const phase = (i: number) => ((i * SPELL_MS) % DAY) / DAY
+    const phase = (i: number) => naturalPhase(i * SPELL_MS)
     let mist = 0, clearing = 0, heat = 0
     for (const season of ['winter', 'spring', 'summer', 'fall'] as const) {
       for (let i = 1; i < 4000; i++) {
@@ -51,6 +52,19 @@ describe('weather', () => {
     expect(mist).toBeGreaterThan(50)
     expect(clearing).toBeGreaterThan(200)
     expect(heat).toBeGreaterThan(20)
+  })
+
+  it('lets a weather live event set the sky for everyone, fading in and out', () => {
+    const t = 1_900_000_000_000
+    setLiveEvents([{ id: 1, kind: 'weather', payload: { kind: 'fog' }, from: t, to: t + 10 * 60_000 }])
+    expect({ ...weatherNow(t + 1000) }.strength).toBeLessThan(0.05)
+    const mid = { ...weatherNow(t + 5 * 60_000) }
+    expect(mid.kind).toBe('fog')
+    expect(mid.strength).toBe(1)
+    // Unknown kinds are ignored.
+    setLiveEvents([{ id: 2, kind: 'weather', payload: { kind: 'lava' }, from: t, to: t + 10 * 60_000 }])
+    expect({ ...weatherNow(t + 5 * 60_000 + 500) }.kind).toBe(spellKind(Math.floor((t + 5 * 60_000 + 500) / SPELL_MS)))
+    setLiveEvents([])
   })
 
   it('never puts two storms back to back', () => {

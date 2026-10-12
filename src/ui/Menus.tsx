@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGame, hasRusty, buildPrice, type OwnedCar } from '../game/store'
 import { raceCarOf } from '../game/raceCar'
 import { reducedMotion } from '../game/fx'
-import { activeEvent, garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, carDef, performance, upgradeCost, buildingDef, upgradable, loves, readySets, isBike, type BuildingDef } from '../game/data'
+import { activeEvent, garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, carDef, performance, upgradeCost, buildingDef, upgradable, loves, readySets, isBike, FEATURES, type BuildingDef } from '../game/data'
 import { CarInspect, CarPreview, type DynoFeed } from '../scene/CarPreview'
 import { DynoOverlay, type DynoRun } from './Dyno'
 import { CollectAllButton } from './CollectAll'
@@ -22,6 +22,7 @@ import { useChat } from '../lib/chat'
 import { useRivalWaiting } from './Rivals'
 import { ShowcaseToggle } from './Meet'
 import { tutTarget, type TutTarget } from './Tutorial'
+import { useTipTarget, type TipTarget } from './Tips'
 import { setFreeCam, useFreeCam } from '../scene/freeCam'
 
 // Phones and tablets: no hover, so placing takes a preview tap first.
@@ -38,14 +39,15 @@ export function BottomBar() {
   const globalChat = useChat((c) => c.unread.global > 0)
   const rival = useRivalWaiting()
   const tut = useGame(tutTarget)
-  const pulse = (t: TutTarget) => (tut === t ? ' tut-pulse' : '')
+  const tip = useTipTarget()
+  const pulse = (t: TutTarget | TipTarget) => (tut === t || tip === t ? ' tut-pulse' : '')
   if (visiting) return null
   if (mode !== 'play') return <EditBar />
   return (
     <>
       <div className="bottom-bar">
         <button className={`icon-btn${pulse('shop')}`} onClick={() => openPanel('shop')}><span className="i i-shop"><Icon name="shop" /></span>SHOP</button>
-        <button className="icon-btn" onClick={() => openCars(setsReady > 0)}><span className="i i-showroom"><Icon name="car" />{setsReady > 0 && <span className="btn-dot">{setsReady}</span>}</span>CARS</button>
+        <button className={`icon-btn${pulse('cars')}`} onClick={() => openCars(setsReady > 0)}><span className="i i-showroom"><Icon name="car" />{setsReady > 0 && <span className="btn-dot">{setsReady}</span>}</span>CARS</button>
         <button className="icon-btn" onClick={() => openPanel('friends')}><span className="i i-friends"><Icon name="friends" />{crewChests > 0 && <span className="btn-dot">{crewChests}</span>}</span>FRIENDS</button>
         <button className="icon-btn" onClick={() => openPanel('chat')}><span className="i i-chat"><Icon name="chat" />{crewChat > 0 ? <span className="btn-dot">{crewChat > 9 ? '9+' : crewChat}</span> : globalChat && <span className="btn-dot new" />}</span>CHAT</button>
         <button className="icon-btn" onClick={() => setMode('road')}><span className="i i-edit"><Icon name="cone" /></span>EDIT</button>
@@ -209,6 +211,9 @@ function shopTabFor(focus: string | null): ShopTab | null {
   return (def && SHOP_GROUPS.find((g) => g.filter(def))?.id) || null
 }
 
+// Rusty's first, then the other buildings that open up a feature.
+const featureRank = (b: { id: string }) => (b.id === 'rescue' ? 2 : FEATURES[b.id] ? 1 : 0)
+
 export function ShopPanel() {
   const level = useGame((s) => s.level)
   const coins = useGame((s) => s.coins)
@@ -241,12 +246,13 @@ export function ShopPanel() {
       {tab === 'upgrades' && <ShopUpgrades />}
       {group && (
           <div className="cards rows">
-            {BUILDINGS.filter((b) => b.unlockLevel < 99 && group.filter(b)).sort((a, b) => Number(b.id === 'rescue') - Number(a.id === 'rescue')).map((b) => {
+            {BUILDINGS.filter((b) => b.unlockLevel < 99 && group.filter(b)).sort((a, b) => featureRank(b) - featureRank(a)).map((b) => {
               const locked = level < b.unlockLevel
               const sale = buildPrice({ deals, level }, b.id)
               const broke = coins < sale.coins
               const owned = !!b.unique && buildings.some((o) => o.def === b.id)
               const highlight = b.id === 'rescue' && !rusty
+              const feature = !highlight && !locked && !!FEATURES[b.id] && !buildings.some((o) => o.def === b.id)
               const focused = b.id === focus
               return (
                 <button
@@ -257,6 +263,7 @@ export function ShopPanel() {
                   onClick={() => (locked ? showNeed('level', b.unlockLevel, b.name) : broke ? showNeed('coins', sale.coins - coins, b.name) : setMode('place', b.id))}
                 >
                   {highlight && <span className="ribbon">START HERE</span>}
+                  {feature && <span className="ribbon feature">★ NEW FEATURE</span>}
                   {sale.deal && !locked && <span className="ribbon deal">DEAL</span>}
                   {b.event && <span className="ribbon spooky">LIMITED</span>}
                   <BuildingThumb def={b} />
@@ -268,8 +275,7 @@ export function ShopPanel() {
                       </div>
                     )}
                     {b.nightOnly && <div className="card-stat">🌙 Open at night only</div>}
-                    {b.id === 'rescue' && <div className="card-stat">Search for old cars and restore them</div>}
-                    {b.id === 'crew' && <div className="card-stat">Your crew's clubhouse: roster, rank and crew boards</div>}
+                    {FEATURES[b.id] && <div className="card-stat feature-line">✨ {FEATURES[b.id][0].toUpperCase() + FEATURES[b.id].slice(1)}</div>}
                     {b.fuelCap && <div className="card-stat">+{b.fuelCap} max fuel</div>}
                   </div>
                   {owned ? <span className="price">✔ Built</span> : locked ? <span className="price">🔒 Level {b.unlockLevel}</span> : price(b, sale.deal && sale)}

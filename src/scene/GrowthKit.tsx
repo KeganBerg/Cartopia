@@ -22,7 +22,7 @@ export const ROOFTOP = SNOW ? '#f4f8fb' : '#cfd8dc'
 // name on a board over it, lamps, planters and the lights' glow on the pavement.
 // Evenly spaced bay centres across a face `len` long: one every `pitch`, the
 // outer ones `fill` of the way to the ends.
-function spread(len: number, pitch: number, fill: number) {
+export function spread(len: number, pitch: number, fill: number) {
   const n = Math.max(2, Math.round(len / pitch))
   return Array.from({ length: n }, (_, i) => ((i + 0.5) / n - 0.5) * len * fill)
 }

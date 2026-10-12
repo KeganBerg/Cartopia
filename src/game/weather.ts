@@ -1,4 +1,5 @@
-import { DAY_MS } from './clock'
+import { naturalPhase } from './clock'
+import { activeEvent } from './liveEvents'
 import { SEASON, type Season } from '../scene/season'
 import type { VenueId } from '../scene/venues'
 
@@ -6,7 +7,8 @@ import type { VenueId } from '../scene/venues'
 // player sees the same shower at the same moment. Time is cut into spells of a
 // few minutes; each spell rolls a kind of weather that suits the season (East
 // Coast calendar), fading in and out at its ends. Clear spells stay the most common.
-// ?weather=clear|rain|storm|drizzle|fog|wind|snow|blizzard|mist|clearing|heat pins one for testing.
+// ?weather=clear|rain|storm|drizzle|fog|wind|snow|blizzard|mist|clearing|heat pins one for testing,
+// and a 'weather' live event sets one for every player (see forcedAt).
 //
 // Other parts of the game (sounds, visuals) read weatherNow() each frame, and
 // onThunder() fires a little after each lightning flash.
@@ -55,9 +57,7 @@ const MIST: Record<Season, number> = { spring: 0.45, summer: 0.4, fall: 0.6, win
 
 export const SPELL_MS = 4 * 60 * 1000
 const FADE_MS = 35 * 1000
-
-// Where a spell falls in the day: 0 is noon, 0.5 midnight (like dayPhase).
-const phaseOf = (index: number) => (((index * SPELL_MS) % DAY_MS) + DAY_MS) % DAY_MS / DAY_MS
+const DAY = 24 * 60 * 60 * 1000
 
 const PIN = (() => {
   if (typeof location === 'undefined') return null
@@ -88,18 +88,19 @@ export function spellKind(index: number, season: Season = SEASON): WeatherKind {
   let kind = rolled(index, season)
   // Two big storms in a row feel endless: the second one calms to rain or snow.
   if ((kind === 'storm' || kind === 'blizzard') && spellKind(index - 1, season) === kind) kind = kind === 'storm' ? 'rain' : 'snow'
-  const phase = phaseOf(index)
-  // Morning: from just before dawn to mid-morning.
+  // Morning where the player is: from just before dawn to mid-morning (0.5 is midnight, 0 noon).
+  const phase = naturalPhase(index * SPELL_MS)
   const morning = phase >= 0.68 && phase <= 0.9
   if (kind === 'fog' && season === 'summer' && !morning) kind = 'clear'
   if (kind === 'clear') {
-    const roll = hash(index * 13 + 5)
+    // Some days are misty mornings or summer scorchers all through, not spell by spell.
+    const day = Math.floor((index * SPELL_MS) / DAY)
     // The sun comes out on wet streets after most showers.
     if (season !== 'winter' && RAINY.has(rolled(index - 1, season))) {
-      if (roll < 0.7) kind = 'clearing'
-    } else if (morning && roll < MIST[season]) kind = 'mist'
-    // Summer afternoons (noon to late afternoon) can bake.
-    else if (season === 'summer' && (phase < 0.2 || phase > 0.95) && roll > 0.6) kind = 'heat'
+      if (hash(index * 13 + 5) < 0.7) kind = 'clearing'
+    } else if (morning && hash(day * 31 + 7) < MIST[season]) kind = 'mist'
+    // Summer afternoons (noon to late afternoon) bake on hot days.
+    else if (season === 'summer' && (phase < 0.2 || phase > 0.95) && hash(day * 17 + 3) < 0.4) kind = 'heat'
   }
   return kind
 }
@@ -120,9 +121,22 @@ export type Weather = Feel & {
   flash: number // lightning brightness right now (set by the weather visuals)
 }
 
+// A 'weather' live event (live_events table) sets the sky for everyone, e.g.
+//   select live_event_start('weather', 30, '{"kind": "fog"}');
+// It fades in and out like a spell. ?weather= still wins, for testing.
+function forcedAt(now: number) {
+  if (PIN) return null
+  const e = activeEvent(['weather'], now)
+  const k = e?.payload.kind
+  if (!e || typeof k !== 'string' || !(WEATHER_KINDS as string[]).includes(k) || k === 'dust') return null
+  const up = Math.max(0, Math.min(1, (now - e.from) / FADE_MS, (e.to - now) / FADE_MS))
+  return { kind: k as WeatherKind, s: up * up * (3 - 2 * up) }
+}
+
 function feelAt(now: number, out: Feel & { kind: WeatherKind; strength: number }) {
-  const kind = spellKind(Math.floor(now / SPELL_MS))
-  const s = strengthAt(now)
+  const forced = forcedAt(now)
+  const kind = forced?.kind ?? spellKind(Math.floor(now / SPELL_MS))
+  const s = forced?.s ?? strengthAt(now)
   const f = FEEL[kind]
   out.kind = kind
   out.strength = s
