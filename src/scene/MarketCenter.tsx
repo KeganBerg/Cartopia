@@ -184,7 +184,7 @@ function Walk({ m, t }: { m: Mat; t: MarketLayout }) {
   const deep = D >= 3.5
   return (
     <group>
-      <Box m={m} at={[s.x, 0.06, zf + 0.17]} s={[s.w, 0.06, 0.34]} c="#ffffff" t={concreteTex(s.w / 2, 0.3)} shadow={false} />
+      <Box m={m} at={[s.x, 0.06, zf + 0.165]} s={[s.w, 0.06, 0.33]} c="#ffffff" t={concreteTex(s.w / 2, 0.3)} shadow={false} />
       {Array.from({ length: n }, (_, i) => (
         <mesh key={i} position={[door[0], 0.051, z0 + i * 0.18]} rotation-x={-Math.PI / 2}>
           <planeGeometry args={[0.5, 0.09]} />
@@ -224,8 +224,8 @@ function Garden({ m, bulb, t }: { m: Mat; bulb: ReactNode; t: MarketLayout }) {
       {/* Fence along the front and the open side, with a gap by the store. */}
       {posts.map((x) => <Box key={x} m={m} at={[x, 0.3, g.d / 2 - 0.02]} s={[0.03, 0.48, 0.03]} c={GREEN} shadow={false} />)}
       <Box m={m} at={[0, 0.52, g.d / 2 - 0.02]} s={[g.w, 0.03, 0.03]} c={GREEN} shadow={false} />
-      <Box m={m} at={[0, 0.3, g.d / 2 - 0.02]} s={[g.w, 0.3, 0.008]} c="#a5d6a7" shadow={false} />
-      <Box m={m} at={[-g.w / 2 + 0.01, 0.3, 0]} s={[0.008, 0.3, g.d]} c="#a5d6a7" shadow={false} />
+      <Box m={m} at={[0, 0.3, g.d / 2 - 0.02]} s={[g.w - 0.04, 0.3, 0.008]} c="#a5d6a7" shadow={false} />
+      <Box m={m} at={[-g.w / 2 + 0.004, 0.3, 0]} s={[0.008, 0.3, g.d - 0.04]} c="#a5d6a7" shadow={false} />
       <Box m={m} at={[-g.w / 2 + 0.01, 0.52, 0]} s={[0.03, 0.03, g.d]} c={GREEN} shadow={false} />
       {/* Tables of potted flowers and shrubs. */}
       {rows.map((z, r) => (
@@ -311,7 +311,7 @@ function Pylon({ m, t, level }: { m: Mat; t: MarketLayout; level: number }) {
   const w = 1.1
   return (
     <group position={[x, 0, z]}>
-      <Box m={m} at={[0, h / 2, 0]} s={[0.12, h, 0.12]} c="#90a4ae" />
+      <Box m={m} at={[0, (h - 0.01) / 2, 0]} s={[0.12, h - 0.01, 0.12]} c="#90a4ae" />
       <Box m={m} at={[0, 0.13, 0]} s={[0.5, 0.26, 0.3]} c="#a1887f" />
       <Box m={m} at={[0, h - 0.2, 0]} s={[w + 0.1, 0.4, 0.1]} c={GREEN} />
       <LitSign text={NAME} w={w} h={0.3} at={[0, h - 0.2, 0.052]} bg={GREEN} fg="#ffffff" m={m} />

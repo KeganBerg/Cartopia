@@ -80,8 +80,8 @@ function Wing({ m, win, r, floors, faces, sign, level }: { m: Mat; win: ReactNod
                   </mesh>
                   {/* Balcony slab and its glass rail. */}
                   <Box m={m} at={[0, y + 0.02, out + 0.09]} s={[along - 0.1, 0.035, 0.18]} c="#fafafa" />
-                  <Box m={m} at={[0, y + 0.1, out + 0.175]} s={[along - 0.1, 0.13, 0.012]} c="#b2ebf2" shadow={false} />
-                  <Box m={m} at={[0, y + 0.17, out + 0.175]} s={[along - 0.1, 0.015, 0.02]} c={TEAL} shadow={false} />
+                  <Box m={m} at={[0, y + 0.1, out + 0.178]} s={[along - 0.1, 0.13, 0.012]} c="#b2ebf2" shadow={false} />
+                  <Box m={m} at={[0, y + 0.17, out + 0.178]} s={[along - 0.1, 0.015, 0.024]} c={TEAL} shadow={false} />
                 </group>
               )
             })}
@@ -117,7 +117,7 @@ function Lobby({ m, bulb, r, drive }: { m: Mat; bulb: ReactNode; r: Rect; drive:
         <meshStandardMaterial color="#b2ebf2" roughness={0.1} metalness={0.4} />
       </mesh>
       <Box m={m} at={[0, 0.86, 0.05]} s={[r.w + 0.3, 0.12, r.d + 0.3]} c={TEAL} />
-      <LitSign text={NAME} w={Math.min(1.4, r.w * 0.7)} h={0.18} at={[0, 0.86, zf + 0.201]} bg={TEAL} fg="#ffffff" m={m} />
+      <LitSign text={NAME} w={Math.min(1.4, r.w * 0.7)} h={0.18} at={[0, 0.86, zf + 0.204]} bg={TEAL} fg="#ffffff" m={m} />
       {drive && (
         <group>
           {/* The canopy out over the drive on four posts, lit underneath. */}
@@ -143,12 +143,12 @@ function Doors({ m, bulb, t }: { m: Mat; bulb: ReactNode; t: ResortLayout }) {
   return (
     <group position={[x, BASE, zf]}>
       {[-1, 1].map((sd) => (
-        <mesh key={sd} position={[sd * 0.13, 0.38, 0.006]}>
+        <mesh key={sd} position={[sd * 0.13, 0.38, 0.02]}>
           <planeGeometry args={[0.24, 0.66]} />
           {bulb}
         </mesh>
       ))}
-      <Box m={m} at={[0, 0.38, 0.01]} s={[0.025, 0.66, 0.01]} c="#cfd8dc" shadow={false} />
+      <Box m={m} at={[0, 0.38, 0.026]} s={[0.025, 0.66, 0.008]} c="#cfd8dc" shadow={false} />
       <Box m={m} at={[0, 0.78, 0.12]} s={[0.7, 0.05, 0.24]} c={TEAL} />
     </group>
   )
@@ -180,7 +180,7 @@ function Deck({ m, bulb, t, level }: { m: Mat; bulb: ReactNode; t: ResortLayout;
       {[-1, 1].map((sd) => <Box key={sd} m={m} at={[p.x, y + 0.01, p.z + (sd * (p.d + 0.06)) / 2]} s={[p.w + 0.12, 0.02, 0.06]} c="#fafafa" shadow={false} />)}
       {[-1, 1].map((sd) => <Box key={`e${sd}`} m={m} at={[p.x + (sd * (p.w + 0.06)) / 2, y + 0.01, p.z]} s={[0.06, 0.02, p.d]} c="#fafafa" shadow={false} />)}
       {lights.map((x) => (
-        <mesh key={x} position={[x, BASE + 0.03, p.z + p.d / 2 - 0.001]} rotation-y={Math.PI}>
+        <mesh key={x} position={[x, BASE + 0.03, p.z + p.d / 2 - 0.004]} rotation-y={Math.PI}>
           <planeGeometry args={[0.08, 0.02]} />
           <primitive object={glowMats.neonCyan} attach="material" dispose={null} />
         </mesh>
@@ -299,7 +299,7 @@ function Hedges({ m, t }: { m: Mat; t: ResortLayout }) {
       {runs.some(([a, b]) => a < signAt && signAt < b) && (
         <group position={[signAt, BASE, z]}>
           <Box m={m} at={[0, 0.14, 0]} s={[0.9, 0.28, 0.16]} c="#bcaaa4" />
-          <LitSign text={NAME} w={0.8} h={0.2} at={[0, 0.15, 0.081]} bg={TEAL} fg="#ffffff" m={m} />
+          <LitSign text={NAME} w={0.8} h={0.2} at={[0, 0.15, 0.084]} bg={TEAL} fg="#ffffff" m={m} />
         </group>
       )}
     </group>

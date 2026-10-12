@@ -13,16 +13,6 @@ import { KeepShapes, MergeScale } from './mergeScale'
 import { limitFor } from './keepShape'
 import { FREE } from './freeCam'
 import { appendFileSync } from 'node:fs'
-import { isTravelCenter } from '../game/travelCenter'
-import { isWashCenter } from '../game/washCenter'
-import { isMarketCenter } from '../game/marketCenter'
-
-// Merged landmarks still being built in their own work (the "Merged building
-// stretching" thread: Big Bison, Bubble Spa, the market hall). Take each out
-// of here once its faces pass.
-const LANDMARK_LATER = (id: string, level: number, sc: readonly number[]) =>
-  isTravelCenter(id, level, sc) || isWashCenter(id, level, sc) || isMarketCenter(id, level, sc)
-
 // No flicker (Z-fighting): two flat faces that face the same way, overlap and
 // sit at (almost) the same height or depth fight over the same pixels, which
 // shows as stripes on phones. That's a mat lying flush on the lot paving, a
@@ -201,7 +191,7 @@ describe('no flickering flat faces', () => {
       const bad = new Set<string>()
       for (const sc of mergeable(def.id) ? MERGES : MERGES.slice(0, 1)) {
         const tag = sc[0] === 1 && sc[2] === 1 ? '' : ` ${sc[0]}x${sc[2]}`
-        for (const level of LEVELS) if (!LANDMARK_LATER(def.id, level, sc)) for (const b of await scan(def, level, undefined, undefined, sc)) bad.add(`L${level}${tag} ${b}`)
+        for (const level of LEVELS) for (const b of await scan(def, level, undefined, undefined, sc)) bad.add(`L${level}${tag} ${b}`)
       }
       if (process.env.COPLANAR_OUT) appendFileSync(process.env.COPLANAR_OUT, [...bad].map((b) => `${def.id} ${b}\n`).join(''))
       expect([...bad]).toEqual([])
