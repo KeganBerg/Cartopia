@@ -5,7 +5,7 @@ import { Box, Cyl, Bulbs, Flag, GOLD, type Mat, type V3 } from './NewBuildings'
 import { LitSign } from './OfficeBuildings'
 import { CarModel } from './CarModel'
 import { bodyScale } from './townCarSize'
-import { MergeScale, Upright, useMergeScale } from './mergeScale'
+import { TrueSize, useMergeScale } from './mergeScale'
 import { glowMats } from './dayNight'
 import { signTexture } from './signTexture'
 import { asphaltTex, brickTex, concreteTex, pumpTex } from './textures'
@@ -21,7 +21,6 @@ const RED = '#c62828'
 const YELLOW = '#ffca28'
 const BROWN = '#5d4037'
 const TAN = '#d9b98c'
-const ONE: V3 = [1, 1, 1]
 
 type Props = { def: BuildingDef; m: Mat; win: ReactNode; bulb: ReactNode; level: number; ghost?: boolean }
 
@@ -29,13 +28,9 @@ export function TravelCenter(props: Props) {
   const [sx, , sz] = useMergeScale()
   const t = travelLayout(sx, sz)
   return (
-    // Drawn at true size inside the scaled-up block, and true size all the
-    // way down: the cars and signs inside don't shrink a second time.
-    <Upright size={1}>
-      <MergeScale.Provider value={ONE}>
-        <Stop {...props} t={t} />
-      </MergeScale.Provider>
-    </Upright>
+    <TrueSize>
+      <Stop {...props} t={t} />
+    </TrueSize>
   )
 }
 
@@ -259,7 +254,7 @@ function Canopy({ m, bulb, level, t }: { m: Mat; bulb: ReactNode; level: number;
           </group>
         )
       })}
-      {t.islands.map((p, i) => <Island key={i} m={m} at={[p.x, 0, p.z]} h={y - 0.08} n={i} />)}
+      {t.islands.map((p, i) => <Island key={i} m={m} at={[p.x, 0, p.z]} h={y - 0.08} n={i} side={p.z === rows[rows.length - 1] ? 1 : p.z === rows[0] ? -1 : 0} />)}
       {t.islands.map((p, i) => (
         <mesh key={`p${i}`} rotation-x={-Math.PI / 2} position={[p.x, 0.056, p.z]} renderOrder={2}>
           <planeGeometry args={[1.8, 1.1]} />
@@ -274,7 +269,7 @@ const CAR_COLORS = ['#e53935', '#1e88e5', '#fafafa', '#43a047', '#212121', '#fdd
 const BODIES = ['sedan', 'hatch', 'truck', 'suv', 'coupe', 'van', 'wagon', 'compact'] as const
 
 // A customer's car, at the size cars drive round town.
-function TownCar({ n }: { n: number }) {
+export function TownCar({ n }: { n: number }) {
   const body = BODIES[n % BODIES.length]
   return (
     <group scale={bodyScale(body)}>
@@ -285,9 +280,11 @@ function TownCar({ n }: { n: number }) {
 
 // A pump island: two pumps either side of the canopy post, bollards at the ends,
 // and now and then a car filling up.
-function Island({ m, at, h, n }: { m: Mat; at: V3; h: number; n: number }) {
+// `side`: which side has room for a car (1 the front, -1 the back, 0 neither,
+// between two rows).
+function Island({ m, at, h, n, side }: { m: Mat; at: V3; h: number; n: number; side: number }) {
   const half = ISLAND / 2
-  const car = n % 3 === 1
+  const car = side !== 0 && n % 3 !== 2
   return (
     <group position={at}>
       <Box m={m} at={[0, 0.08, 0]} s={[ISLAND, 0.1, 0.32]} c="#cfd8dc" t={concreteTex(2, 0.5)} />
@@ -312,7 +309,7 @@ function Island({ m, at, h, n }: { m: Mat; at: V3; h: number; n: number }) {
       ))}
       <Cyl m={m} at={[0, 0.27, 0.13]} r={0.06} h={0.26} c="#455a64" seg={10} />
       {car && (
-        <group position={[n % 2 ? -0.3 : 0.3, 0.05, n % 4 === 1 ? 0.42 : -0.42]} rotation-y={Math.PI / 2}>
+        <group position={[n % 2 ? -0.15 : 0.15, 0.05, side * 0.46]} rotation-y={Math.PI / 2}>
           <TownCar n={n} />
         </group>
       )}
