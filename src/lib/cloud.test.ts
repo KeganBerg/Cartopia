@@ -173,7 +173,11 @@ describe('moving between devices', () => {
     await play(phone, { level: 3, townName: 'Stale Phone Town' })
     expect(serverWrites).toBe(writes)
     expect(db.get('kegan')!.state.townName).toBe('Desk Town')
+    // The phone reloads into the desktop town.
+    expect(phone.reloads).toBe(1)
+    phone = await boot(phone.snapshot(), 'kegan')
     expect(phone.useGame.getState().townName).toBe('Desk Town')
+    expect(phone.reloads).toBe(0)
   })
 
   it('keeps a guest town when signing in to a brand-new account', async () => {
@@ -193,6 +197,28 @@ describe('moving between devices', () => {
     sameBrowser = await signIn(sameBrowser, 'nate')
     expect(db.get('nate')!.state.townName).toBe('Nate Town')
     expect(sameBrowser.useGame.getState().townName).toBe('Nate Town')
+  })
+
+  it("switches accounts in an open tab without drawing the other town before the reload", async () => {
+    let tab = await openGame({})
+    tab = await signIn(tab, 'kegan')
+    await play(tab, { level: 5, townName: 'Kegan Town' })
+    db.set('nate', { owner_id: 'nate', level: 2, state: { level: 2, townName: 'Nate Town', updatedAt: 1 }, updated_at: '2026-10-10T00:00:00+00:00' })
+
+    const writes = serverWrites
+    tab.client.signIn('nate')
+    await vi.advanceTimersByTimeAsync(10)
+    // Nate's town goes straight to storage and the page reloads; the running game never rebuilds for it.
+    expect(tab.reloads).toBe(1)
+    expect(tab.useGame.getState().townName).toBe('Kegan Town')
+    await play(tab, { level: 5, townName: 'Kegan Town Again' })
+    expect(serverWrites).toBe(writes)
+
+    tab = await boot(tab.snapshot(), 'nate')
+    expect(tab.reloads).toBe(0)
+    expect(tab.useGame.getState().townName).toBe('Nate Town')
+    expect(db.get('kegan')!.state.townName).toBe('Kegan Town')
+    expect(db.get('nate')!.state.townName).toBe('Nate Town')
   })
 })
 
