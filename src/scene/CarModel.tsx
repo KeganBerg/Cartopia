@@ -20,6 +20,7 @@ import { carStyle, hasTrim, trimBike, trimCar, type CarStyle } from './carTrim'
 import { brakeGeo, wheelGeo, type RimStyle } from './carWheels'
 import { PEOPLE_SIZED } from './keepShape'
 import { EXOTIC } from './exoticCars'
+import { tintDef, trimDef, type Trim } from '../game/trim'
 
 type Shape = {
   len: number; wid: number
@@ -182,7 +183,7 @@ export const wheelRig = (body: Body): WheelRig => ({ steer: [], spin: [], radius
 // thirty at once, and phones pay for every draw).
 // 'cabin' (seats), 'dash' (dark trim inside, brake rotors), 'display' (the dash screen) and 'caliper' are only drawn
 // on cars shown whole: town traffic has solid glass and pooled wheels that hide them.
-export type Part = 'paint' | 'dark' | 'black' | 'chrome' | 'glass' | 'screen' | 'seat' | 'wood' | 'lamp' | 'tail' | 'amber' | 'stripe' | 'cabin' | 'dash' | 'caliper' | 'display'
+export type Part = 'paint' | 'dark' | 'black' | 'chrome' | 'glass' | 'screen' | 'seat' | 'wood' | 'lamp' | 'tail' | 'amber' | 'stripe' | 'cabin' | 'dash' | 'caliper' | 'display' | 'handle'
 type V3 = [number, number, number]
 
 export class Kit {
@@ -984,13 +985,13 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
     for (const sd of [-1, 1]) {
       k.add('dark', plane(0.008, top - s.lift - 0.11), [sd * (s.wid / 2 + 0.003), (s.lift + 0.07 + top) / 2, s.cabinZ + s.cabinLen * 0.08], [0, (sd * Math.PI) / 2, 0])
       k.add('dark', plane(0.008, top - s.lift - 0.11), [sd * (s.wid / 2 + 0.003), (s.lift + 0.07 + top) / 2, s.cabinZ + s.cabinLen * 0.5], [0, (sd * Math.PI) / 2, 0])
-      k.add('chrome', box(0.01, 0.012, 0.05), [sd * (s.wid / 2 + 0.004), top - 0.05, s.cabinZ + s.cabinLen * 0.08 - 0.06])
+      k.add('handle', box(0.01, 0.012, 0.05), [sd * (s.wid / 2 + 0.004), top - 0.05, s.cabinZ + s.cabinLen * 0.08 - 0.06])
       k.add('paint', rbox(0.06, 0.04, 0.03, 0.012), [sd * (s.wid * 0.4 + 0.03), top + 0.05, cowl - 0.04])
       k.add('black', box(0.03, 0.012, 0.012), [sd * (s.wid * 0.4 - 0.005), top + 0.035, cowl - 0.04])
       k.add('glass', plane(0.045, 0.028), [sd * (s.wid * 0.4 + 0.03), top + 0.05, cowl - 0.056], [0, Math.PI, 0])
     }
   }
-  if (closed && FOUR_DOOR.includes(body)) for (const sd of [-1, 1]) k.add('chrome', box(0.01, 0.012, 0.05), [sd * (s.wid / 2 + 0.004), top - 0.05, s.cabinZ + s.cabinLen * 0.5 - 0.06])
+  if (closed && FOUR_DOOR.includes(body)) for (const sd of [-1, 1]) k.add('handle', box(0.01, 0.012, 0.05), [sd * (s.wid / 2 + 0.004), top - 0.05, s.cabinZ + s.cabinLen * 0.5 - 0.06])
   // Panel lines: the hood's edges and front, and the trunk lid on cars with a trunk.
   const hoodLen = hoodFront - cowl
   if (!s.plates && !s.dog && !s.armor && hoodLen > 0.12) {
@@ -1044,6 +1045,31 @@ const MAT = {
 // Tinted glass you can see the cabin through, for cars shown whole. Town traffic
 // bakes MAT.glass solid instead.
 const seeGlass = new MeshStandardMaterial({ color: '#3d6a8c', metalness: 0.6, roughness: 0.04, transparent: true, opacity: 0.55, depthWrite: false })
+// Trim materials (game/trim.ts), one per pick in use; stock picks use the shared ones above.
+const trimMats = new Map<string, MeshStandardMaterial | MeshBasicMaterial>()
+function trimMat<M extends MeshStandardMaterial | MeshBasicMaterial>(key: string, make: () => M): M {
+  let m = trimMats.get(key) as M | undefined
+  if (!m) trimMats.set(key, (m = make()))
+  return m
+}
+// See-through glass in a tint, and the solid glass town traffic bakes in its place.
+function tintGlass(id?: string) {
+  const t = tintDef(id)
+  if (t.id === 'stock') return { see: seeGlass, solid: MAT.glass }
+  const mirror = t.id === 'blue' || t.id === 'gold'
+  return {
+    see: trimMat(`see|${t.id}`, () => new MeshStandardMaterial({ color: t.color, metalness: mirror ? 0.9 : 0.6, roughness: mirror ? 0.02 : 0.04, transparent: true, opacity: t.opacity, depthWrite: false })),
+    solid: trimMat(`solid|${t.id}`, () => new MeshStandardMaterial({ color: t.color, metalness: mirror ? 0.9 : 0.55, roughness: 0.06 })),
+  }
+}
+const lampOf = (id?: string) => (id && id !== 'stock' ? trimMat(`lamp|${id}`, () => new MeshBasicMaterial({ color: trimDef('lights', id).color })) : MAT.lamp)
+// Door handles: chrome, black, or the car's own colour (a little metallic, like the paint).
+function handleOf(id: string | undefined, body: string) {
+  if (id === 'black') return MAT.black
+  if (id === 'body') return matOf('handle', body, 0.4, 0.3)
+  return MAT.chrome
+}
+
 // One material per seat, caliper or rim colour in use.
 const tinted = new Map<string, MeshStandardMaterial>()
 function matOf(key: string, color: string, metal: number, rough: number) {
@@ -1097,7 +1123,8 @@ export type WheelRig = { steer: (Group | null)[]; spin: (Group | null)[]; radius
 // skin: a skin id (game/data.ts SKINS) drawn into the paint.
 // modSkin: a mod skin id (game/data.ts MOD_SKINS) for the part in each slot.
 // panels: custom paint on the hood, doors, roof and rims, and a body pattern (game/data.ts PANELS).
-type CarProps = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; panels?: Panels | null; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean; rig?: WheelRig; mods?: string[] | null; flames?: boolean; lean?: boolean }
+// trim: window tint, headlight colour and door handles (game/trim.ts).
+type CarProps = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; panels?: Panels | null; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean; rig?: WheelRig; mods?: string[] | null; flames?: boolean; lean?: boolean; trim?: Trim | null }
 
 // A lean car: every part baked into two meshes (the parts that cast a shadow and the
 // rest) with the finish it would otherwise be drawn with, except the see-through screen;
@@ -1202,7 +1229,7 @@ function paintLook(color: string, finish?: Finish | null, rusty?: boolean, skin 
 }
 
 // Toy-style car: bevelled extruded body and cabin so no edge is a hard box corner. Faces +z.
-function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight, stripe, beams, rusty, rig, mods, flames, lean }: CarProps) {
+function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight, stripe, beams, rusty, rig, mods, flames, lean, trim }: CarProps) {
   // Rusty finds come home stock.
   const fit = rusty ? {} : fittedMods(mods, body)
   const sk = rusty ? 0 : skinNumber(skin)
@@ -1216,8 +1243,13 @@ function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight,
   const dark = useMemo(() => '#' + new Color(tint).multiplyScalar(0.6).getHexString(), [tint])
   const wz = s.len * 0.33
   const wx = s.track ?? s.wid / 2 - 0.02
-  const shared = (['black', 'chrome', 'screen', 'seat', 'wood', 'lamp', 'tail', 'amber', 'dash', 'display'] as const).filter((k) => p[k])
+  const shared = (['black', 'chrome', 'screen', 'seat', 'wood', 'tail', 'amber', 'dash', 'display'] as const).filter((k) => p[k])
   const look = carStyle(model)
+  // Rusty finds come home with stock trim.
+  const tr = rusty ? undefined : trim ?? undefined
+  const glass = tintGlass(tr?.tint)
+  const lamp = lampOf(tr?.lights)
+  const handle = handleOf(tr?.handles, tint)
   const beam = beams && (
     <mesh rotation-x={-Math.PI / 2} position={[0, 0.03, s.len / 2 + 0.55]} renderOrder={2}>
       <planeGeometry args={[s.wid * 1.5, 1.3]} />
@@ -1232,8 +1264,8 @@ function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight,
     const own = chromed || paintsPanels(pan)
     const looks: Partial<Record<Part, Look>> = {
       ...(own ? {} : { paint: paintLook(tint, finish, rusty, sk) }), dark: { color: dark }, ...(stripe ? { stripe: { color: stripe } } : {}),
-      black: finishOf(MAT.black), chrome: finishOf(MAT.chrome), glass: finishOf(MAT.glass), seat: finishOf(MAT.seat), wood: finishOf(MAT.wood),
-      lamp: finishOf(MAT.lamp), tail: finishOf(MAT.tail), amber: finishOf(MAT.amber),
+      black: finishOf(MAT.black), chrome: finishOf(MAT.chrome), glass: finishOf(glass.solid), seat: finishOf(MAT.seat), wood: finishOf(MAT.wood),
+      lamp: finishOf(lamp), tail: finishOf(MAT.tail), amber: finishOf(MAT.amber), handle: finishOf(handle),
     }
     return (
       <LeanCar parts={p} looks={looks} casters={['paint', 'glass']} mods={{ body, ids: modIds(fit), skins: msk }} modPaint={{ color: tint, metal: rusty ? 0.1 : 0.4, rough: 0.3 }} highlight={highlight}
@@ -1257,7 +1289,9 @@ function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight,
         </mesh>
       )}
       {shared.map((k) => <mesh key={k} geometry={p[k]} material={MAT[k]} />)}
-      {p.glass && <mesh geometry={p.glass} material={seeGlass} castShadow />}
+      {p.lamp && <mesh geometry={p.lamp} material={lamp} />}
+      {p.handle && <mesh geometry={p.handle} material={handle} />}
+      {p.glass && <mesh geometry={p.glass} material={glass.see} castShadow />}
       {p.cabin && <mesh geometry={p.cabin} material={matOf('seat', look.seat ?? '#2b2b2b', 0, 0.75)} />}
       {p.caliper && <mesh geometry={p.caliper} material={matOf('cal', look.caliper ?? '#4a4d52', look.caliper ? 0.2 : 0.5, 0.45)} />}
       <CarMods body={body} fit={fit} tint={tint} metal={rusty ? 0.1 : 0.4} flames={flames} skins={msk} />
@@ -1359,7 +1393,7 @@ function bikeGeo(body: BikeBody, fit: Partial<Record<ModSlot, string>>, model?: 
 }
 
 // Bikes take every mod slot, with bike-sized parts.
-function BikeModel({ body, model, color, finish, skin, modSkin, panels, highlight, beams, rusty, rig, mods, flames, lean }: CarProps) {
+function BikeModel({ body, model, color, finish, skin, modSkin, panels, highlight, beams, rusty, rig, mods, flames, lean, trim }: CarProps) {
   const fit = rusty ? {} : fittedMods(mods, body)
   const sk = rusty ? 0 : skinNumber(skin)
   const msk = useMemo(() => (rusty ? undefined : modSkinNumbers(modSkin)), [rusty, modSkin])
@@ -1369,7 +1403,9 @@ function BikeModel({ body, model, color, finish, skin, modSkin, panels, highligh
   const p = g.parts
   const tint = useMemo(() => (rusty ? '#' + new Color(color).lerp(new Color('#8a5a3c'), 0.72).getHexString() : color), [color, rusty])
   const dark = useMemo(() => '#' + new Color('#37474f').lerp(new Color(tint), 0.15).getHexString(), [tint])
-  const shared = (['black', 'chrome', 'glass', 'screen', 'seat', 'lamp', 'tail'] as const).filter((k) => p[k])
+  const shared = (['black', 'chrome', 'glass', 'screen', 'seat', 'tail'] as const).filter((k) => p[k])
+  // A bike's only trim is its headlight colour.
+  const lamp = lampOf(rusty ? undefined : trim?.lights)
   const r = SHAPES[bb].wheel
   const wz = BIKE[bb].wz
   // Close-up wheels: wire spokes on the cruiser, split spokes on the sport bike, pressed steel on the scooter.
@@ -1391,7 +1427,7 @@ function BikeModel({ body, model, color, finish, skin, modSkin, panels, highligh
     const looks: Partial<Record<Part, Look>> = {
       ...(own ? {} : { paint: paintLook(tint, finish, rusty, sk) }), dark: { color: dark },
       black: finishOf(MAT.black), chrome: finishOf(MAT.chrome), glass: finishOf(MAT.glass), seat: finishOf(MAT.seat),
-      lamp: finishOf(MAT.lamp), tail: finishOf(MAT.tail),
+      lamp: finishOf(lamp), tail: finishOf(MAT.tail),
     }
     return (
       <LeanCar parts={p} looks={looks} casters={['paint', 'black']} mods={{ body, ids: modIds(fit), skins: msk }} modPaint={{ color: tint, metal: rusty ? 0.1 : 0.4, rough: 0.3 }} highlight={highlight}
@@ -1410,6 +1446,7 @@ function BikeModel({ body, model, color, finish, skin, modSkin, panels, highligh
         </mesh>
       )}
       {shared.map((k) => <mesh key={k} geometry={p[k]} material={MAT[k]} castShadow={k === 'black'} />)}
+      {p.lamp && <mesh geometry={p.lamp} material={lamp} />}
       <CarMods body={body} fit={fit} tint={tint} metal={rusty ? 0.1 : 0.4} flames={flames} skins={msk} />
       {beam}
       {[wz, -wz].map((z, i) => (

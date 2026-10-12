@@ -30,6 +30,7 @@ import { BoostTrail } from './boostTrail'
 import { Celebration } from './celebration'
 import { cheerDef, myCheer, myTrail, trailDef } from '../game/flair'
 import { reducedMotion } from '../game/fx'
+import type { Trim } from '../game/trim'
 
 // burning: the boost is firing (the chase camera punches in).
 export type RacerView = { dist: number; burning?: boolean }
@@ -60,7 +61,7 @@ type Props = {
   track: number
   me: RefObject<RacerView>
   them: RefObject<RacerView>
-  mine: { body: Body; model?: string; color: string; finish?: Finish; skin?: string; modSkin?: Partial<Record<SkinnedSlot, string>>; panels?: Panels; mods?: string[] }
+  mine: { body: Body; model?: string; color: string; finish?: Finish; skin?: string; modSkin?: Partial<Record<SkinnedSlot, string>>; panels?: Panels; mods?: string[]; trim?: Trim }
   theirs: { body: Body; model?: string; color: string; mods?: string[] }
   venue: Venue
   weatherSeed?: string // a live race's id, so both racers get the same weather
@@ -778,7 +779,7 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
             <planeGeometry args={[0.9, 1.5]} />
             <meshBasicMaterial map={glowTex()} color="#000000" transparent opacity={0.35} depthWrite={false} {...decal(3)} />
           </mesh>
-          {i === 0 ? <CarModel body={mine.body} model={mine.model} color={mine.color} finish={mine.finish} skin={mine.skin} modSkin={mine.modSkin} panels={mine.panels} mods={mine.mods} flames beams={beams} /> : <CarModel body={theirs.body} model={theirs.model} color={theirs.color} mods={theirs.mods} flames beams={beams} />}
+          {i === 0 ? <CarModel body={mine.body} model={mine.model} color={mine.color} finish={mine.finish} skin={mine.skin} modSkin={mine.modSkin} panels={mine.panels} trim={mine.trim} mods={mine.mods} flames beams={beams} /> : <CarModel body={theirs.body} model={theirs.model} color={theirs.color} mods={theirs.mods} flames beams={beams} />}
         </group>
       ))}
     </>

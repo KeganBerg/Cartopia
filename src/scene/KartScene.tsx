@@ -703,7 +703,7 @@ function KartView({ look, rig, set }: { look: KartLook; rig: WheelRig; set: (g: 
       <CarShadow len={KART_LEN} wid={f.wid * s} />
       <group ref={body}>
         <group scale={s} ref={(g) => { fx.car = g }}>
-          <CarModel body={look.body as Body} model={look.model} color={look.color} finish={look.finish} skin={look.skin} modSkin={look.modSkin} panels={look.panels} mods={look.mods} rig={rig} beams />
+          <CarModel body={look.body as Body} model={look.model} color={look.color} finish={look.finish} skin={look.skin} modSkin={look.modSkin} panels={look.panels} trim={look.trim} mods={look.mods} rig={rig} beams />
           {/* Paint splat: wet blobs over the bonnet and the back deck (in the car's own units). */}
           <group ref={(g) => { fx.splat = g }} visible={false}>
             {SPLATS.map((b, n) => (

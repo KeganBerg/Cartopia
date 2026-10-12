@@ -7,8 +7,9 @@ import type { Body, Finish, SkinnedSlot, Panels } from '../game/data'
 import { CarModel, carFrame } from './CarModel'
 import { frame, seat, type Bounds } from './fit'
 import { SkyEnv } from './SkyEnv'
+import type { Trim } from '../game/trim'
 
-type Look = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; panels?: Panels | null; stripe?: string | null; mods?: string[] | null }
+type Look = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; panels?: Panels | null; stripe?: string | null; mods?: string[] | null; trim?: Trim | null }
 
 // How big the car's bounding sphere is made, so long trucks and tiny bubble cars both fill the view.
 const FIT = 1.05

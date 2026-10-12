@@ -12,6 +12,7 @@ import { requestTrip, requestVisit } from './trips'
 import { trialPrize } from './trial'
 import { RIVALS, RIVAL_VISITS, RIVAL_BACK_MS, type RivalProgress } from './rivals'
 import { earnHint, paintOpen, paintRival, rivalForPaint, rowPrize } from './paintRivals'
+import { PRESET_SLOTS, sameTrim, tidyTrim, trimCost, trimLocked, type Trim } from './trim'
 import { WORLD_TOUR, worldDone, worldPrize } from './worldTour'
 import { tunerPrize, tunerTrial } from './tuner'
 import { tourIsBoss, tourLegBonus, tourLegOf, tourPrize } from './tour'
@@ -37,7 +38,9 @@ import type { CarClassId } from './classes'
 // car: uid of the owned car assigned to drive for this business (see DRIVER_BONUS).
 // merge: set on the top-left building of a merged block (see merge.ts); mturn: the turn the player gave that block.
 export type PlacedBuilding = { uid: string; def: string; x: number; z: number; jobEndsAt: number | null; rot?: number; level?: number; jobLevel?: number; car?: string; merge?: number; mturn?: number }
-export type OwnedCar = { uid: string; model: string; color: string; upgrades: Record<UpgradeSlot, number>; flat?: boolean; lowFuel?: boolean; stripe?: string | null; finish?: Finish; plate?: string; mods?: string[]; ownedMods?: string[]; skin?: string; modSkin?: Partial<Record<SkinnedSlot, string>>; panels?: Panels }
+// A saved look: a car's paint, panels and trim.
+export type Preset = { color: string; finish?: Finish; stripe?: string | null; panels?: Panels; trim?: Trim }
+export type OwnedCar = { uid: string; model: string; color: string; upgrades: Record<UpgradeSlot, number>; flat?: boolean; lowFuel?: boolean; stripe?: string | null; finish?: Finish; plate?: string; mods?: string[]; ownedMods?: string[]; skin?: string; modSkin?: Partial<Record<SkinnedSlot, string>>; panels?: Panels; trim?: Trim }
 // A rusty find waiting in Rusty's storage, and the one car in the restore bay.
 export type JunkCar = { uid: string; model: string; rarity: Rarity }
 export type Restoring = JunkCar & { endsAt: number; minutes: number }
@@ -131,6 +134,8 @@ export type SaveState = {
   daily?: DailySave
   // The last reputation title announced (game/reputation.ts).
   repSeen?: number
+  // Saved looks (paint, panels and trim) to put on any car, by slot (game/trim.ts PRESET_SLOTS).
+  presets?: (Preset | null)[]
   // World Tour racers beaten, in order (game/worldTour.ts).
   worldTour?: number
   // The tutorial was skipped before its free paint pick, so the next coin colour is free.
@@ -271,6 +276,10 @@ type Actions = {
   paintCar: (uid: string, job: PaintJob) => boolean
   // Paints single panels (hood, doors, roof, rims) and patterns, tried on in the garage first.
   paintPanels: (uid: string, panels: Panels) => boolean
+  setTrim: (uid: string, trim: Trim) => boolean
+  savePreset: (slot: number, uid: string) => void
+  clearPreset: (slot: number) => void
+  applyPreset: (slot: number, uid: string) => boolean
   // The tutorial's one free pick (src/ui/Tutorial.tsx): a starter colour for the body and one
   // for the rims. Only while the tutorial runs; no coins, XP or stats either way.
   tutorialStyle: (uid: string, color: string, rim: string) => boolean
@@ -1730,6 +1739,62 @@ export const useGame = create<GameState>()(
         return true
       },
 
+      // Window tint, headlights and door handles: each new pick costs coins once; stock is free.
+      setTrim: (cuid, want) => {
+        const s = get()
+        const car = s.cars.find((c) => c.uid === cuid)
+        if (!car) return false
+        const next = tidyTrim(want)
+        if (sameTrim(next, car.trim)) return false
+        const lock = trimLocked(s.level, car.trim, next)
+        if (lock) { s.toast(`${lock.name} unlocks at level ${lock.level}`); return false }
+        const coins = trimCost(car.trim, next)
+        if (s.coins < coins) { s.showNeed('coins', coins - s.coins, 'new trim'); return false }
+        set({ coins: s.coins - coins, cars: s.cars.map((c) => (c.uid === cuid ? { ...c, trim: next } : c)), updatedAt: Date.now() })
+        sfx.buy()
+        s.toast(coins ? 'New trim on!' : 'Back to stock trim')
+        return true
+      },
+
+      savePreset: (slot, cuid) => {
+        const s = get()
+        const car = s.cars.find((c) => c.uid === cuid)
+        if (!car || slot < 0 || slot >= PRESET_SLOTS) return
+        const presets = Array.from({ length: PRESET_SLOTS }, (_, i) => s.presets?.[i] ?? null)
+        presets[slot] = { color: car.color, ...(car.finish ? { finish: car.finish } : {}), ...(car.stripe ? { stripe: car.stripe } : {}), ...(car.panels ? { panels: car.panels } : {}), ...(car.trim ? { trim: car.trim } : {}) }
+        set({ presets, updatedAt: Date.now() })
+        s.toast(`Look saved to slot ${slot + 1}`)
+      },
+
+      clearPreset: (slot) => {
+        const s = get()
+        if (!s.presets?.[slot]) return
+        set({ presets: s.presets.map((p, i) => (i === slot ? null : p)), updatedAt: Date.now() })
+      },
+
+      // Puts a saved look on a car: paint, then panels, then trim, each at its usual price, once
+      // the whole lot is affordable. A locked colour or pattern stops that part with its usual toast.
+      applyPreset: (slot, cuid) => {
+        const s = get()
+        const car = s.cars.find((c) => c.uid === cuid)
+        const pr = s.presets?.[slot]
+        if (!car || !pr) return false
+        const job: PaintJob = { color: pr.color, finish: pr.finish ?? 'gloss', stripe: pr.stripe ?? null }
+        const repaint = job.color !== car.color || job.finish !== (car.finish ?? 'gloss') || job.stripe !== (car.stripe ?? null)
+        const paint = repaint ? paintPrice(s, car, job) : { coins: 0, bucks: 0 }
+        const pan = panelJobCost(tidyPanels(car.panels), tidyPanels(pr.panels))
+        const coins = paint.coins + pan.coins + trimCost(car.trim, pr.trim)
+        const bucks = paint.bucks + pan.bucks
+        if (s.coins < coins) { s.showNeed('coins', coins - s.coins, 'this look'); return false }
+        if (s.bucks < bucks) { s.showNeed('bucks', bucks - s.bucks, 'this look'); return false }
+        let done = false
+        if (repaint) done = get().paintCar(cuid, job) || done
+        if (JSON.stringify(tidyPanels(pr.panels) ?? {}) !== JSON.stringify(tidyPanels(car.panels) ?? {})) done = get().paintPanels(cuid, pr.panels ?? {}) || done
+        if (!sameTrim(pr.trim, car.trim)) done = get().setTrim(cuid, pr.trim ?? {}) || done
+        if (!done && !repaint) s.toast('This car already has that look')
+        return done
+      },
+
       tutorialStyle: (cuid, color, rim) => {
         const s = get()
         const car = s.cars.find((c) => c.uid === cuid)
@@ -2275,8 +2340,8 @@ export const useGame = create<GameState>()(
 )
 
 export function saveOf(s: GameState): SaveState {
-  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, cratePity, boosts, wagers, season, deals, trials, rivals, rivalRow, tuner, mastery, road, roadItems, freeCrates, trail, cheer, flairSeen, daily, repSeen, worldTour, cups, freePaint, oldPaints, tour, event, showcase, raceCar, skins, modSkins, land, updatedAt } = s
-  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, cratePity: cratePity ?? {}, boosts: boosts ?? emptyBoosts(), ...(wagers ? { wagers } : {}), season, deals, trials, rivals, rivalRow, tuner: tuner ?? {}, mastery: mastery ?? {}, road: road ?? 0, roadItems: roadItems ?? [], freeCrates: freeCrates ?? [], ...(trail ? { trail } : {}), ...(cheer ? { cheer } : {}), ...(flairSeen ? { flairSeen } : {}), ...(daily ? { daily } : {}), ...(repSeen !== undefined ? { repSeen } : {}), ...(worldTour ? { worldTour } : {}), cups: cups ?? {}, ...(freePaint ? { freePaint } : {}), oldPaints: !!oldPaints, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, land, updatedAt }
+  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, cratePity, boosts, wagers, season, deals, trials, rivals, rivalRow, tuner, mastery, road, roadItems, freeCrates, trail, cheer, flairSeen, daily, repSeen, worldTour, presets, cups, freePaint, oldPaints, tour, event, showcase, raceCar, skins, modSkins, land, updatedAt } = s
+  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, cratePity: cratePity ?? {}, boosts: boosts ?? emptyBoosts(), ...(wagers ? { wagers } : {}), season, deals, trials, rivals, rivalRow, tuner: tuner ?? {}, mastery: mastery ?? {}, road: road ?? 0, roadItems: roadItems ?? [], freeCrates: freeCrates ?? [], ...(trail ? { trail } : {}), ...(cheer ? { cheer } : {}), ...(flairSeen ? { flairSeen } : {}), ...(daily ? { daily } : {}), ...(repSeen !== undefined ? { repSeen } : {}), ...(worldTour ? { worldTour } : {}), ...(presets?.some(Boolean) ? { presets } : {}), cups: cups ?? {}, ...(freePaint ? { freePaint } : {}), oldPaints: !!oldPaints, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, land, updatedAt }
 }
 
 // Fields added after launch, so older saves load with sensible values.
