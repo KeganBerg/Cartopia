@@ -3,6 +3,7 @@ import { CARS, RACE_FUEL, carDef, performance } from '../game/data'
 import { RIVALS, RIVAL_VISITS, currentRival, rivalLadderPi, rivalPi, rivalPrize, rivalShift, type RivalDef } from '../game/rivals'
 import { CarThumb } from '../scene/BuildingPreview'
 import { useNow } from '../scene/useNow'
+import { PAINT_RIVALS } from '../game/paintRivals'
 
 const zero = { engine: 0, turbo: 0, tires: 0, weight: 0 }
 const NONE = {}
@@ -123,18 +124,28 @@ export function RivalResult({ match, won, bet, bonus, myTime, theirTime, onBet, 
   )
 }
 
-// The town rival's tile on the Race menu hub: face, taunt, and a one-tap race.
-export function RivalTile({ onRace }: { onRace: (m: RivalMatch) => void }) {
+// The town rival's tile on the Race menu hub: face, taunt, and a one-tap race. The tile
+// itself opens the paint rivals roster, with the colours won so far on a strip.
+export function RivalTile({ onRace, onOpen }: { onRace: (m: RivalMatch) => void; onOpen: () => void }) {
   const now = useNow(1000)
   const level = useGame((s) => s.level)
   const progress = useGame((s) => s.rivals ?? NONE)
+  const row = useGame((s) => s.rivalRow ?? NONE)
   const showNeed = useGame((s) => s.showNeed)
   const cur = currentRival(level, progress, now)
+  const open = { role: 'button', tabIndex: 0, onClick: onOpen, onKeyDown: (e: React.KeyboardEvent) => (e.key === 'Enter' || e.key === ' ') && onOpen() }
+  const stop = (fn: () => void) => (e: React.MouseEvent) => { e.stopPropagation(); fn() }
+  const strip = (
+    <span className="rm-paints" title="Paint rivals: beat each one for their colour">
+      {PAINT_RIVALS.map((r) => <i key={r.id} className={(row[r.id] ?? 0) > 0 ? 'on' : ''} style={{ background: r.paint }} />)}
+    </span>
+  )
   if (!cur) {
     return (
-      <div className="rm-tile rm-rival rv-idle">
+      <div className="rm-tile rm-rival rv-idle" {...open}>
         <span className="rm-face" aria-hidden>🏆</span>
-        <div className="rm-rmid"><span className="rm-tag">RIVALS</span><b className="rm-ttl">Town champ!</b><span className="rm-bub">No rival dares race you.</span></div>
+        <div className="rm-rmid"><span className="rm-tag">RIVALS</span><b className="rm-ttl">Town champ!</b>{strip}</div>
+        <span className="buy small rm-go">🎨 {PAINT_RIVALS.filter((r) => (row[r.id] ?? 0) > 0).length}/{PAINT_RIVALS.length}</span>
       </div>
     )
   }
@@ -143,20 +154,21 @@ export function RivalTile({ onRace }: { onRace: (m: RivalMatch) => void }) {
   const left = Math.max(0, Math.ceil((away - now) / 60000))
   const line = locked ? `Rolls into town at level ${def.unlockLevel}.` : away ? `Tuning up. Back in ${left}m.` : visit === 0 ? def.lines.intro : def.lines.back[visit - 1]
   return (
-    <div className={`rm-tile rm-rival${locked || away ? ' rv-idle' : ''}`} style={{ ['--rv' as string]: def.color }}>
+    <div className={`rm-tile rm-rival${locked || away ? ' rv-idle' : ''}`} style={{ ['--rv' as string]: def.color }} {...open}>
       <span className="rm-face" aria-hidden>{locked ? '❔' : def.icon}</span>
       <div className="rm-rmid">
         <span className="rm-tag">{locked ? 'RIVAL' : away ? 'RIVAL AWAY' : 'RIVAL IN TOWN'}</span>
         <b className="rm-ttl">{locked ? '???' : def.name} {!locked && <Pips n={visit} />}</b>
         <span className="rm-bub">{line}</span>
+        {strip}
       </div>
       {locked ? (
-        <button className="buy small alt" onClick={() => showNeed('level', def.unlockLevel, def.name)}>🔒 Lv{def.unlockLevel}</button>
+        <button className="buy small alt" onClick={stop(() => showNeed('level', def.unlockLevel, def.name))}>🔒 Lv{def.unlockLevel}</button>
       ) : away ? (
-        <button className="buy small alt" disabled>⏱ {left}m</button>
+        <button className="buy small alt" disabled onClick={(e) => e.stopPropagation()}>⏱ {left}m</button>
       ) : (
         // The same "!" as the RACE button, so the bar badge points here.
-        <button className="buy rm-go rm-alert" onClick={() => onRace(m)}>🏁 ${money(m.prize)}<small>⛽{RACE_FUEL}</small><span className="btn-dot" aria-label="Your rival is in town">!</span></button>
+        <button className="buy rm-go rm-alert" onClick={stop(() => onRace(m))}>🏁 ${money(m.prize)}<small>⛽{RACE_FUEL}</small><span className="btn-dot" aria-label="Your rival is in town">!</span></button>
       )}
     </div>
   )
