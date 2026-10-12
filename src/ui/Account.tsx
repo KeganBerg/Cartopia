@@ -5,6 +5,7 @@ import { useGame } from '../game/store'
 import { Panel, SheetTabs } from './Menus'
 import { AmbienceControl, MusicControl, SoundControl } from './MuteButton'
 import { AlertsMenu } from './Alerts'
+import { FlashSetting } from './FlashWarning'
 import { localBackup, restoreLocalBackup } from '../lib/cloud'
 import { isCleanName, NAME_REJECTED } from '../lib/names'
 import { UsernameRow } from './Username'
@@ -55,6 +56,7 @@ export function AccountPanel() {
       <SoundControl />
       <MusicControl />
       <AmbienceControl />
+      <FlashSetting />
       <AlertsMenu />
       <h3>Town name</h3>
       <div className="row">

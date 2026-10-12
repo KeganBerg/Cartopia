@@ -17,6 +17,7 @@ import { ToolChest, TyreStack, useFitCamera } from './ArcadeScenery'
 import { tickSkins, withSkin } from './skins'
 import { MODS, SKINNED_SLOTS, carDef, fittedMods, modFits, modSkinNumber, skinNumber, type Body, type Finish, type SkinnedSlot } from '../game/data'
 import { dropTier, type CrateDef, type CrateDrop, type CrateId } from '../game/crates'
+import { calmFlashing } from '../game/flashing'
 import { bumpSound, crashSound } from '../lib/arcadeSound'
 import { crateSfx, sfx } from '../lib/sound'
 import { landClink } from '../lib/crateClinks'
@@ -950,7 +951,8 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
     const coreMat = p.core?.material as MeshBasicMaterial | undefined
     if (coreMat) coreMat.opacity = after >= 0 ? Math.max(0, 1 - after * 1.5) : charge * 0.95
     if (p.light) p.light.intensity = after >= 0 ? 6 + Math.max(0, 30 * (1 - after * 2)) : charge * 14
-    if (flash.current) flash.current.intensity = after >= 0 ? Math.max(0, 60 * (1 - after * 3)) : 0
+    // Reduce flashing: a softer, slower glow instead of the white burst.
+    if (flash.current) flash.current.intensity = after >= 0 ? (calmFlashing() ? Math.max(0, 14 * (1 - after * 1.2)) : Math.max(0, 60 * (1 - after * 3))) : 0
     // Burst: the lid flies, the sides fall open, the bands snap away.
     if (after >= 0) {
       const L = s.lid
