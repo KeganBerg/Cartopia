@@ -5,6 +5,7 @@ import { Bloom, EffectComposer, ToneMapping } from '@react-three/postprocessing'
 import { BlendFunction, Effect, KernelSize, TiltShiftEffect, ToneMappingMode, type BloomEffect } from 'postprocessing'
 import { Uniform, Vector3 } from 'three'
 import { fxState, type Look } from './look'
+import { usePrefs } from '../lib/prefs'
 
 // Colour grade applied to the whole frame after tone mapping. Keep in step
 // with gradeColor() in look.ts, which repeats it for the page background.
@@ -102,6 +103,10 @@ function startTier(): FxTier {
   if (typeof window === 'undefined') return 'low'
   const pin = new URLSearchParams(location.search).get('fx')
   if (pin === 'high' || pin === 'low' || pin === 'off') return pin
+  // The player's choice in Settings > Graphics wins over the device guess.
+  const pick = usePrefs.getState().graphics
+  if (pick === 'high') return 'high'
+  if (pick === 'saver') return 'off'
   let tier: FxTier = 'high'
   const phone = Math.min(window.innerWidth, window.innerHeight) < 700 || /iPhone|iPod|Android.*Mobile/.test(navigator.userAgent)
   if (phone || (navigator.hardwareConcurrency ?? 8) <= 4) tier = 'low'
@@ -122,6 +127,8 @@ const pinned = typeof location !== 'undefined' && new URLSearchParams(location.s
 // tier by itself if the frame rate drops.
 export function PostFx({ look, town, tiltShift }: { look: Look; town?: boolean; tiltShift?: boolean }) {
   const [tier, setTier] = useState<FxTier>(startTier)
+  const graphics = usePrefs((p) => p.graphics)
+  useEffect(() => setTier(startTier()), [graphics])
   // Shader compiles and texture uploads stutter the first seconds; only judge after.
   const [armed, setArmed] = useState(false)
   useEffect(() => {
@@ -161,7 +168,7 @@ export function PostFx({ look, town, tiltShift }: { look: Look; town?: boolean; 
 
   return (
     <>
-      {armed && !pinned && <PerformanceMonitor bounds={() => [40, 120]} flipflops={3} onDecline={stepDown} />}
+      {armed && !pinned && graphics === 'auto' && <PerformanceMonitor bounds={() => [40, 120]} flipflops={3} onDecline={stepDown} />}
       {tier !== 'off' && (
         <EffectComposer multisampling={tier === 'high' ? 4 : 2} enableNormalPass={false}>
           {/* Tilt-shift blurs the raw frame, so it goes before bloom; after it, the blurred bands lost their glow. */}

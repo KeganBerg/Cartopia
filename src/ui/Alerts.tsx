@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useGame } from '../game/store'
+import { Switch } from './Settings'
 import { usePush, setAlerts, dismissCard, installApp, notifySupported, isIOS, isStandalone } from '../lib/push'
 
 // The one-off "want alerts?" card, shown after the player starts a long job.
@@ -33,10 +34,10 @@ export function AlertsMenu() {
   return (
     <>
       {notifySupported() && (
-        <div className="menu-sound">
-          <span>Job alerts{denied && <small> · blocked in browser</small>}</span>
-          <button className="goals-btn" title={on ? 'Alerts on' : 'Alerts off'} disabled={denied || busy}
-            onClick={async () => { setBusy(true); await setAlerts(!on); setBusy(false) }}>{on ? '🔔' : '🔕'}</button>
+        <div className="set-row">
+          <span className="set-label">Job alerts<small>{denied ? 'Blocked in your browser settings' : 'A ping when jobs and fuel are ready'}</small></span>
+          <Switch label="Job alerts" on={on} disabled={denied || busy}
+            onChange={async (v) => { setBusy(true); await setAlerts(v); setBusy(false) }} />
         </div>
       )}
       {installable && <button className="buy bank-menu-btn" onClick={installApp}>📲 Install Cartopia</button>}

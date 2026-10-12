@@ -7,6 +7,7 @@ import { Grounded } from './ServiceVehicles'
 import { CarModel } from './CarModel'
 import { SEASON } from './season'
 import { frame, seat, type Bounds } from './fit'
+import { reduceMotionOn } from '../lib/prefs'
 
 // Shop, showroom and garage thumbnails are live 3D renders, drawn every display
 // frame. One hidden WebGL canvas renders every on-screen model into a shared
@@ -15,7 +16,6 @@ import { frame, seat, type Bounds } from './fit'
 // spin is a real rotation at the screen's refresh rate rather than baked frames.
 const SPIN_MS = 8000
 const DPR = typeof window === 'undefined' ? 1 : Math.min(window.devicePixelRatio || 1, 1.5)
-const still = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
 
 // Each model is measured once it's mounted and the camera is fitted to it, so
 // tall towers, wide lots and long trucks all fill their box whole.
@@ -159,7 +159,7 @@ function Renderer() {
     if (width > src.width || height > src.height) gl.setSize(Math.max(src.width, width), Math.max(src.height, height), false)
     const ah = src.height
 
-    const turn = still ? 0.12 : (performance.now() % SPIN_MS) / SPIN_MS
+    const turn = reduceMotionOn() ? 0.12 : (performance.now() % SPIN_MS) / SPIN_MS
     const lift = (LO + HI) / 2 + Math.sin(turn * Math.PI * 4) * ((HI - LO) / 2)
     for (const g of groups.current.values()) g.visible = false
     gl.setScissorTest(true)

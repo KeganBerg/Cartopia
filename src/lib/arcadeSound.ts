@@ -1,11 +1,11 @@
 // Synthesized arcade sounds: a crash thump, a bumper tap and a short two-tone siren.
 import { glock, marimba, shaker, woodblock } from './instruments'
-import { audioContext, audioOut, knock } from './sound'
+import { audioContext, sfxOut, knock } from './sound'
 
 // The shared context, master output and a start time, or null while muted.
 function dest() {
   const ctx = audioContext()
-  const out = audioOut()
+  const out = sfxOut()
   return ctx && out ? { ctx, out, t: ctx.currentTime + 0.005 } : null
 }
 
@@ -20,7 +20,7 @@ function noise(ctx: BaseAudioContext, secs: number) {
 
 function thump(vol: number, cutoff: number, secs: number) {
   const ctx = audioContext()
-  const out = audioOut()
+  const out = sfxOut()
   if (!ctx || !out) return
   const t = ctx.currentTime + 0.005
   const n = noise(ctx, secs)
@@ -58,7 +58,7 @@ export const bumpSound = () => thump(0.16, 600, 0.22)
 // Wee-woo: a soft sine siren, quiet enough to sit under the music.
 export function sirenSound(cycles = 2) {
   const ctx = audioContext()
-  const out = audioOut()
+  const out = sfxOut()
   if (!ctx || !out) return
   const t = ctx.currentTime + 0.005
   const o = ctx.createOscillator()
@@ -77,7 +77,7 @@ export function sirenSound(cycles = 2) {
 // A short filtered noise burst: the base of a wrench rattle, a spray hiss or a scrub.
 function hiss(vol: number, type: BiquadFilterType, freq: number, secs: number, q = 1) {
   const ctx = audioContext()
-  const out = audioOut()
+  const out = sfxOut()
   if (!ctx || !out) return
   const t = ctx.currentTime + 0.005
   const n = noise(ctx, secs)
