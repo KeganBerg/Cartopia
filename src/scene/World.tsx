@@ -9,7 +9,7 @@ import { TILE, PLOT, PLOT_MIN, PLOT_MAX, START_LAND, buildingDef, buildingLevel 
 import { BuildingModel } from './BuildingModel'
 import { rotateCurrent, setGhostTurn, turnOf } from '../game/placement'
 import { mergeGroups, groupOf, groupTurn, groupScale, isLandmark, type MergeGroup } from '../game/merge'
-import { VanguardTower } from './Landmark'
+import { VanguardTower, launchTower } from './Landmark'
 import { KeepShapes, MergeScale } from './mergeScale'
 import { limitFor } from './keepShape'
 import { sfx } from '../lib/sound'
@@ -25,9 +25,9 @@ import { Batch, batchOff } from './Batch'
 import { Manhole } from './BuildingDetail'
 import { GrassTufts } from './Tufts'
 import { Outskirts } from './Outskirts'
-import { RoadWear, StreetProp, PROPS, Hydrant, StreetLamp } from './Roadside'
+import { RoadWear, StreetProp, PROPS, Hydrant, StreetLamp, Sidewalk, CornerCurb, CornerFillet, ENDS, type End } from './Roadside'
 import { toWorld, toTile, DIRS } from './grid'
-import { grassTex, paverTex, drainTex, meadowTex } from './textures'
+import { grassTex, paverTex, meadowTex } from './textures'
 import { roadMat } from './weatherLook'
 import { Weather } from './Weather'
 import { layoutRoads } from './traffic/layout'
@@ -37,7 +37,7 @@ import { WorldFx, PopGroup, usePops } from './WorldFx'
 import { helpable } from '../game/help'
 import { helpBuilding } from '../lib/help'
 import { hoursOf, seedOf } from '../game/hours'
-import { FREE, VIEW, isFree, useFreeCam } from './freeCam'
+import { VIEW, isFree, useFreeCam } from './freeCam'
 import { FreeCam } from './FreeCam'
 
 // Every controls instance (a new one is made whenever the camera swaps) aims at
@@ -227,6 +227,7 @@ function Building({ b, roads, group, picked }: { b: PlacedBuilding; roads: Set<s
         }
         if (s.mode !== 'play' || s.visiting || e.delta > 6) return
         e.stopPropagation()
+        if (mark) launchTower(b.uid)
         s.tapBuilding(b.uid)
       }}
       onPointerOver={() => {
@@ -246,40 +247,11 @@ function Building({ b, roads, group, picked }: { b: PlacedBuilding; roads: Set<s
         <MergeScale.Provider value={mark ? [k, k, k] : group ? [sx, sy, sz] : ONE}>
           <PopGroup uid={b.uid}>
             <KeepShapes limit={limitFor(d)}>
-              {mark ? <VanguardTower /> : <BuildingModel def={d} level={buildingLevel(b)} />}
+              {mark ? <VanguardTower uid={b.uid} /> : <BuildingModel def={d} level={buildingLevel(b)} />}
             </KeepShapes>
           </PopGroup>
         </MergeScale.Provider>
       </group>
-    </group>
-  )
-}
-
-// Raised sidewalk strip along a road edge with no connecting road.
-function Sidewalk({ side, drain }: { side: 'e' | 'w' | 's' | 'n'; drain?: boolean }) {
-  const half = TILE / 2
-  const w = 0.4
-  const along = side === 'e' || side === 'w'
-  const pos: [number, number, number] =
-    side === 'e' ? [half - w / 2, 0.04, 0] : side === 'w' ? [-half + w / 2, 0.04, 0]
-    : side === 's' ? [0, 0.04, half - w / 2] : [0, 0.04, -half + w / 2]
-  return (
-    <group>
-      <mesh position={pos} receiveShadow>
-        <boxGeometry args={along ? [w, 0.08, TILE] : [TILE, 0.08, w]} />
-        <meshStandardMaterial map={along ? paverTex(0.5, 2) : paverTex(2, 0.5)} />
-      </mesh>
-      {/* Kerbstones along the road edge, and a drain grate in the gutter. */}
-      <mesh position={along ? [pos[0] - Math.sign(pos[0]) * (w / 2 - 0.03), 0.045, 0] : [0, 0.045, pos[2] - Math.sign(pos[2]) * (w / 2 - 0.03)]}>
-        <boxGeometry args={along ? [0.06, 0.09, TILE] : [TILE, 0.09, 0.06]} />
-        <meshStandardMaterial color="#cfd8dc" />
-      </mesh>
-      {drain && (
-        <mesh rotation={[-Math.PI / 2, 0, along ? 0 : Math.PI / 2]} position={along ? [pos[0] - Math.sign(pos[0]) * (w / 2 + 0.06), LAYER.paint, 0.5] : [0.5, LAYER.paint, pos[2] - Math.sign(pos[2]) * (w / 2 + 0.06)]}>
-          <planeGeometry args={[0.12, 0.3]} />
-          <meshStandardMaterial map={drainTex()} {...decal()} />
-        </mesh>
-      )}
     </group>
   )
 }
@@ -349,6 +321,15 @@ function StopLine({ side }: { side: number }) {
 }
 
 const SIDES = ['e', 'w', 's', 'n'] as const
+// A tile's corners in CornerCurb turn order: [east/west arm, south/north arm, diagonal step].
+const CORNERS: [number, number, number, number][] = [[0, 2, 1, 1], [0, 3, 1, -1], [1, 3, -1, -1], [1, 2, -1, 1]]
+const SIDE_INDEX = { e: 0, w: 1, s: 2, n: 3 } as const
+// What the sidewalk on side `i` meets at each end.
+const endsOf = (arms: boolean[], xing: boolean[], i: number): [End, End] =>
+  ENDS[SIDES[i]].map((sd) => {
+    const j = SIDE_INDEX[sd]
+    return !arms[j] ? 'corner' : xing[j] ? 'ramp' : 'open'
+  }) as [End, End]
 
 function Roads() {
   const roadsList = useGame((s) => (s.visiting ?? s).roads)
@@ -358,7 +339,14 @@ function Roads() {
       const near = DIRS.map(([dx, dz]) => all.get(`${t.x + dx},${t.z + dz}`))
       // Zebra crossings where a road meets an intersection.
       const xing = near.map((n) => !t.junction && !!n?.junction)
-      return { ...t, xing }
+      // Corners, south-east round to south-west (CornerCurb turns), as [east/west, south/north] arms.
+      const corners = CORNERS.map(([a, b, dx, dz]) => {
+        if (!t.arms[a] && !t.arms[b]) return 'fillet'
+        // Both roads lead off and the block between them isn't road: round the sidewalk off.
+        if (t.arms[a] && t.arms[b] && !all.has(`${t.x + dx},${t.z + dz}`)) return 'curb'
+        return null
+      })
+      return { ...t, xing, corners }
     })
   }, [roadsList])
   // Shared so rain and snow can change every road at once (weatherLook.ts).
@@ -366,7 +354,7 @@ function Roads() {
 
   return (
     <group>
-      {tiles.map(({ key: k, x, z, arms, junction, oneWay, mate, xing }) => {
+      {tiles.map(({ key: k, x, z, arms, junction, oneWay, mate, xing, corners }) => {
         const [wx, wz] = toWorld(x, z)
         const [e, w, s, nn] = arms
         const straightX = !junction && (e || w) && !s && !nn
@@ -382,7 +370,8 @@ function Roads() {
               <primitive object={asphalt} attach="material" dispose={null} />
             </mesh>
             {/* Drains and manholes only on plain straight stretches, clear of crossings. */}
-            {SIDES.map((sd, i) => !arms[i] && <Sidewalk key={sd} side={sd} drain={plain && (x * 2 + z + i) % 4 === 0} />)}
+            {SIDES.map((sd, i) => !arms[i] && <Sidewalk key={sd} side={sd} ends={endsOf(arms, xing, i)} drain={plain && (x * 2 + z + i) % 4 === 0} />)}
+            {corners.map((c, i) => (c === 'curb' ? <CornerCurb key={i} turn={i} /> : c === 'fillet' ? <CornerFillet key={i} turn={i} /> : null))}
             {(straightX || straightZ) && (x * 5 + z * 3) % 7 === 0 && <Hydrant side={straightX ? ((x + z) % 2 ? 'n' : 's') : ((x + z) % 2 ? 'w' : 'e')} />}
             {plain && (x * 3 + z * 7) % 5 === 1 && <Manhole x={straightX ? 0 : 0.45} z={straightX ? 0.45 : 0} />}
             {SIDES.map((sd, i) => xing[i] && <Crosswalk key={sd} side={sd} />)}
@@ -594,14 +583,11 @@ function Interaction() {
       <MapControls
         ref={shareView}
         makeDefault
-        enabled={!(mode === 'road' || mode === 'bulldoze' || drag)}
-        enableRotate={free}
+        // The free view steers itself (FreeCam.tsx); these stay in charge of the bird's-eye view.
+        enabled={!(free || mode === 'road' || mode === 'bulldoze' || drag)}
+        enableRotate={false}
         minZoom={12}
         maxZoom={90}
-        minDistance={free ? FREE.minDist : 0}
-        maxDistance={free ? FREE.maxDist : Infinity}
-        minPolarAngle={free ? FREE.minPolar : 0}
-        maxPolarAngle={free ? FREE.maxPolar : Math.PI}
         screenSpacePanning={false}
       />
     </>

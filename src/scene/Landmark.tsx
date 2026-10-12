@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { AdditiveBlending, BoxGeometry, Color, ConeGeometry, ExtrudeGeometry, IcosahedronGeometry, InstancedMesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, Shape, Vector2, type BufferGeometry, type Group, type Mesh, type Texture } from 'three'
 import { Box, Cyl, Pool, type Mat, type V3 } from './NewBuildings'
@@ -9,7 +9,6 @@ import { glowMats, onNight } from './dayNight'
 import { concreteTex, curtainGlowTex, curtainTex, helipadTex, paverTex } from './textures'
 import { clubLedColor, clubLedGlow } from './clubLeds'
 import { PAL } from './season'
-import { useGame } from '../game/store'
 import { sfx } from '../lib/sound'
 
 // Vanguard Tower: the landmark four level 10 houses become when merged into a
@@ -22,7 +21,7 @@ import { sfx } from '../lib/sound'
 // It fills a 2x2 lot (4x4 units round the origin) facing +z. Static pieces are
 // plain meshes the town's Batch merges; the glass, LED strips and pad lights use
 // the shared night materials so it lights up with the rest of the town.
-// Whenever the player gains coins, a pulse of light runs up the tower and the
+// When the player taps the tower, a pulse of light runs up it and the
 // Skyhopper takes off for a flight round it (see the bottom of this file).
 
 const FRAME = '#f3f5f7'
@@ -183,10 +182,9 @@ function spanAt(y: number): [number, number] {
 // Vertical mullions down the shaft's front and back, clear of the leaning side.
 const MULLIONS = [-0.72, -0.44, -0.16, 0.12]
 
-export function VanguardTower() {
+export function VanguardTower({ uid }: { uid?: string } = {}) {
   const padX = 1.5
   const padY = DECK_TOP + 0.04
-  useLaunches()
   return (
     <group>
       {/* Plaza paving and steps up to the lobby. */}
@@ -247,9 +245,9 @@ export function VanguardTower() {
             {mat('#ffffff', helipadTex('#ffca28', '#6d7377'))}
           </mesh>
           <PadLights bulb={bulb} r={0.43} n={14} y={0.02} />
-          <Skyhopper pad={[padX, padY, 0]} />
+          <Skyhopper pad={[padX, padY, 0]} uid={uid} />
         </group>
-        <Pulse />
+        <Pulse uid={uid} />
       </group>
 
       {/* Plaza: fountain, planters, benches, lamps and a car at the kerb. */}
@@ -277,37 +275,31 @@ export function VanguardTower() {
   )
 }
 
-// ---- Launches: coins in, light up, take off ----
+// ---- Launches: tapped, light up, take off ----
 
-// Every time the player's coins go up (a collect, Collect All, a bonus), each
-// tower runs a pulse of light up its face and its Skyhopper takes off.
-// One store subscription for every tower; each one notices the count change.
-let launches = 0
-let watching = false
-function useLaunches() {
-  useEffect(() => {
-    if (watching) return
-    watching = true
-    return useGame.subscribe((s, prev) => {
-      if (s.coins > prev.coins) launches++
-    })
-  }, [])
+// When the player taps the tower (World.tsx calls launchTower), a pulse of
+// light runs up its face and its Skyhopper takes off. Each tower counts its
+// own launches by its anchor house's uid; previews (no uid) never launch.
+const launches = new Map<string, number>()
+export function launchTower(uid: string) {
+  launches.set(uid, (launches.get(uid) ?? 0) + 1)
 }
+const launchesOf = (uid?: string) => (uid ? launches.get(uid) ?? 0 : 0)
 
 // The pulse: a glowing band that sweeps from the podium to the peak, hugging the tower's width.
 const PULSE_S = 1.6
 const pulseMat = new MeshBasicMaterial({ color: '#7ff0ff', transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false, toneMapped: false })
 const pulseGeo = new BoxGeometry(1, 0.4, 1)
-function Pulse() {
+function Pulse({ uid }: { uid?: string }) {
   const band = useRef<Mesh>(null)
-  const run = useRef({ seen: launches, at: -99 })
+  const run = useRef({ seen: launchesOf(uid), at: -99 })
   useFrame(({ clock }) => {
     const m = band.current
     if (!m) return
     const t = clock.elapsedTime
     const r = run.current
-    if (r.seen !== launches) {
-      r.seen = launches
+    if (r.seen !== launchesOf(uid)) {
+      r.seen = launchesOf(uid)
       r.at = t
     }
     const u = (t - r.at) / PULSE_S
@@ -437,14 +429,14 @@ const once = (t: number, f: () => void) => {
   f()
 }
 
-function Skyhopper({ pad }: { pad: V3 }) {
+function Skyhopper({ pad, uid }: { pad: V3; uid?: string }) {
   const craft = useRef<Group>(null)
   const jets = useRef<Group>(null)
   const flames = useRef<(Mesh | null)[]>([])
   const smoke = useRef<InstancedMesh>(null)
   const puffs = useRef(Array.from({ length: PUFFS }, () => ({ x: 0, y: 0, z: 0, born: -99 })))
   const emit = useRef({ next: 0, i: 0 })
-  const run = useRef({ seen: launches, at: -999, last: 999 })
+  const run = useRef({ seen: launchesOf(uid), at: -999, last: 999 })
   const at = useRef<Pose>({ x: 0, y: 0, z: 0, bank: 0, thrust: 0 })
   const next = useRef<Pose>({ x: 0, y: 0, z: 0, bank: 0, thrust: 0 })
   useLayoutEffect(() => {
@@ -456,8 +448,8 @@ function Skyhopper({ pad }: { pad: V3 }) {
     const t = clock.elapsedTime
     const r = run.current
     // A new launch only takes off from the pad; mid-flight it's ignored.
-    if (r.seen !== launches) {
-      r.seen = launches
+    if (r.seen !== launchesOf(uid)) {
+      r.seen = launchesOf(uid)
       if (t - r.at >= T.land) {
         r.at = t
         r.last = -1

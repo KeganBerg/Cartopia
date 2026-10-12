@@ -91,6 +91,7 @@ const STOP_LINE = 0.6 // how far short of an intersection cars wait
 const PULL = 1.04 // how far a broken-down car pulls over onto the verge, clear of its lane and the sidewalk
 const PULL_RAMP = 1.4 // distance over which it eases off the road (and back on)
 const PULL_FLAT = 0.9 // either side of the spot, where it is all the way over
+const STALL_REACH = 4 // how far up the road a broken-down car looks for somewhere to pull over
 const JAMMED = 45 // seconds stuck before a car gives up
 // Traffic lights that answer to who's waiting. A green lasts at least MIN_GREEN,
 // changes early once its road goes quiet and someone waits across it, and at
@@ -287,13 +288,26 @@ export class Traffic {
     const nodes = [...this.net.nodes.values()].filter((n) => !n.junction && n.degree > 1)
     if (!nodes.length) return
     const start = Math.floor(rand() * nodes.length)
-    for (let i = 0; i < nodes.length * 2; i++) {
-      const n = nodes[(start + (i >> 1)) % nodes.length]
-      const ins = [0, 1, 2, 3].filter((d) => n.arms[opp(d)] && exits(n, d).length && (n.oneWay < 0 || n.oneWay === d))
+    // Already broken down (a reload, say): it appears pulled over on a straight,
+    // on the verge if there's one, well apart from the others, rather than driving.
+    const spots = spec.stalled ? this.stallSpots(null) : []
+    // Plain road for `k` tiles either side, so others get round it clear of any junction.
+    const run = (n: Node, d: number, k: number) => [1, -1].every((sd) => Array.from({ length: k }, (_, m) => m + 1).every((m) => {
+      const b = this.net.nodes.get(tkey(n.x + D[d][0] * m * sd, n.z + D[d][1] * m * sd))
+      return !!b && !b.junction
+    }))
+    const spot = (n: Node, d: number, k = 2) => exits(n, d).includes(d) && !n.spur && run(n, d, k) && !this.nearStall(n.key, spots)
+    const verge = (n: Node, d: number) => this.net.verge.has(tkey(n.x - D[d][1], n.z + D[d][0]))
+    const pass = spec.stalled ? [(n: Node, d: number) => spot(n, d, 1) && verge(n, d), spot, () => true] : [() => true]
+    for (let i = 0; i < nodes.length * 2 * pass.length; i++) {
+      const ok = pass[Math.floor(i / (nodes.length * 2))]
+      const n = nodes[(start + ((i % (nodes.length * 2)) >> 1)) % nodes.length]
+      const ins = [0, 1, 2, 3].filter((d) => n.arms[opp(d)] && exits(n, d).length && (n.oneWay < 0 || n.oneWay === d) && ok(n, d))
       if (!ins.length) continue
       const inDir = ins[(i + (start & 1)) % ins.length]
       const outs = exits(n, inDir)
-      const leg = this.makeLeg(n, inDir, outs[Math.floor(rand() * outs.length)])
+      const stop = spec.stalled && (spot(n, inDir) || (spot(n, inDir, 1) && verge(n, inDir)))
+      const leg = this.makeLeg(n, inDir, stop ? inDir : outs[Math.floor(rand() * outs.length)])
       const p = pointAt(leg.c, leg.c.len / 2)
       const clear = [...this.agents.values()].every((o) => Math.hypot(o.x - p[0], o.z - p[1]) > 1.9)
       if (!clear) continue
@@ -307,9 +321,18 @@ export class Traffic {
         show: 0, leaving: false, queuedAt: -1, pull: null,
       }
       this.agents.set(a.uid, a)
+      if (stop) {
+        a.stalled = true
+        leg.stopS = a.s
+        leg.stopFor = Infinity
+        leg.stopKind = 'stall'
+        a.parked = Infinity
+        a.parkedAt = leg
+        if (verge(n, inDir) && spot(n, inDir, 1)) a.pull = a.odo
+      }
       this.extend(a)
       this.pose(a)
-      if (spec.stalled) this.setStalled(a, true)
+      if (spec.stalled && !stop) this.setStalled(a, true)
       return
     }
   }
@@ -755,7 +778,7 @@ export class Traffic {
   }
 
   // Tiles where other broken-down cars have stopped (`parkedOnly`) or mean to.
-  private stallSpots(a: Agent, parkedOnly = false) {
+  private stallSpots(a: Agent | null, parkedOnly = false) {
     const out: string[] = []
     for (const o of this.agents.values()) {
       if (o === a || !o.stalled) continue
@@ -806,11 +829,8 @@ export class Traffic {
         return !!b && !b.junction
       })
     }
-    // Limp on to a spot others can pass; settle for less only once it has gone a long way.
+    // How far it has limped since it broke down.
     const since = a.odo - (this.limp.get(a.uid) ?? (this.limp.set(a.uid, a.odo), a.odo))
-    // Well clear of other broken-down cars, so no stretch needs two cars passed at once.
-    const spots = this.stallSpots(a)
-    const apart = (i: number) => !this.nearStall(a.legs[i].node, spots)
     // Best of all: straight road with open ground beside it to pull right off onto.
     const verge = (i: number) => {
       const l = a.legs[i]
@@ -819,30 +839,38 @@ export class Traffic {
       const next = a.legs[i + 1]
       if (!n || n.junction || l.turn || !prev?.node || !next?.node || prev.junction || next.junction) return false
       const [dx, dz] = D[l.inDir]
-      return this.net.verge.has(tkey(n.x - dz, n.z + dx)) && !this.nearStall(n.key, spots)
+      return this.net.verge.has(tkey(n.x - dz, n.z + dx))
     }
     const tests = [
       verge,
-      (i: number) => good(i) && open(i) && roomy(i) && apart(i),
-      (i: number) => fallback(i) && open(i) && roomy(i) && apart(i),
-      (i: number) => fallback(i) && roomy(i) && apart(i),
+      (i: number) => good(i) && open(i) && roomy(i),
+      (i: number) => fallback(i) && open(i) && roomy(i),
+      (i: number) => fallback(i) && roomy(i),
       good,
       fallback,
+      // Still nowhere after limping a while: on a bend, if that's all there is.
+      (i: number) => since > STALL_REACH && !!a.legs[i].node && !a.legs[i].junction && a.legs[i].turn !== 2,
     ]
-    for (const test of since > 120 ? tests : since > 60 ? tests.slice(0, 4) : since > 25 ? tests.slice(0, 3) : tests.slice(0, 2)) {
+    // Well clear of other broken-down cars (stopped or about to), so no stretch
+    // needs two cars passed at once, and think() never has to move it on again.
+    const spots = this.stallSpots(a)
+    // It pulls over within a few tiles, taking the best spot in reach; if there's
+    // nowhere at all (deep in a run of junctions) it takes the first spot past them.
+    const reach = STALL_REACH + since
+    for (const test of tests) {
+      let to = -a.s
       for (let i = a.ci; i < a.legs.length - 1; i++) {
         const l = a.legs[i]
         const at = l.c.len / 2
+        const dist = to + at
+        to += l.c.len
+        if (dist > reach) break
         if (i === a.ci && a.s + (a.v * a.v) / (2 * BRAKE) > at - 0.05) continue
-        if (!test(i) || l.stopKind) continue
+        if (!test(i) || l.stopKind || this.nearStall(l.node, spots)) continue
         l.stopS = at
         l.stopFor = Infinity
         l.stopKind = 'stall'
-        if (test === verge) {
-          let dist = at - a.s
-          for (let j = a.ci; j < i; j++) dist += a.legs[j].c.len
-          a.pull = a.odo + dist
-        } else a.pull = null
+        a.pull = test === verge ? a.odo + dist : null
         a.trip = null
         a.plan = []
         // Nothing past the stop: give back any junction it had a turn for.

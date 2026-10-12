@@ -11,6 +11,8 @@ import { CarModel } from '../../src/scene/CarModel'
 import { SkyEnv } from '../../src/scene/SkyEnv'
 import { Grounded } from '../../src/scene/ServiceVehicles'
 import { applyNight } from '../../src/scene/dayNight'
+import { paverTex } from '../../src/scene/textures'
+import { LAYER } from '../../src/scene/layers'
 import { lookFor } from '../../src/scene/look'
 import { CARS, TILE, buildingDef, carDef } from '../../src/game/data'
 
@@ -29,6 +31,8 @@ const ROW = (q.get('row') ?? 'donut:2,rescue:3,diner:2,offices:5,pizza:2,burger:
 const PROPS = (q.get('props') ?? 'lamp,tree,lamp,busstop,tree,lamp,hotdog,tree,lamp,bench,tree,lamp,flowers,tree')
   .split(',')
 const GAP = +(q.get('gap') ?? 0.15)
+// Sidewalk depth in front of the lots; the props stand on it at TILE * 0.6.
+const WALK = TILE * 0.85
 
 function Frame({ width }: { width: number }) {
   const { camera, size } = useThree()
@@ -59,9 +63,25 @@ function Street() {
   const props = PROPS.slice(0, ends.length - 1).map((id, i) => (
     <group key={'p' + i} position={[ends[i % ends.length], 0, TILE * 0.6]}><Grounded.Provider value><BuildingModel def={buildingDef(id)} /></Grounded.Provider></group>
   ))
+  // The ground everything stands on: paving from the back of the deepest lot to a
+  // sidewalk out front with a kerb, so the lots, the gaps between them and the
+  // props all sit on one surface and the strip's bottom edge is the kerb, which
+  // lines up with the road the loaders draw under it. Without it each lot was a
+  // slab hanging over clear background, and the buildings looked like they floated.
+  const back = Math.max(...ROW.map(([id]) => buildingDef(id).h)) * TILE
+  const front = WALK
+  const depth = back + front
   return (
     <>
       <group position={[-x / 2, 0, 0]}>{items}{props}</group>
+      <mesh position={[0, LAYER.lot - 0.004 - 0.06, (front - back) / 2]}>
+        <boxGeometry args={[x + 2, 0.12, depth]} />
+        <meshStandardMaterial map={paverTex((x + 2) / 2, depth / 2)} />
+      </mesh>
+      <mesh position={[0, LAYER.lot - 0.06, front - 0.04]}>
+        <boxGeometry args={[x + 2, 0.14, 0.08]} />
+        <meshStandardMaterial color="#cfd8dc" />
+      </mesh>
       <Frame width={x} />
     </>
   )
@@ -87,7 +107,7 @@ function Car() {
   return (
     <>
       <group ref={g} rotation-y={Math.PI / 2 + (+(q.get('yaw') ?? 0) * Math.PI) / 180}>
-        <CarModel body={carDef(model).body} model={model} color={mask ? '#ff00ff' : '#ffffff'} />
+        <CarModel body={carDef(model).body} model={model} color={mask ? '#ff00ff' : q.get('color') ?? '#ffffff'} />
       </group>
       <Frame width={width} />
     </>

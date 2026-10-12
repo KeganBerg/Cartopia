@@ -10,7 +10,10 @@ export const anchorEls = new Map<string, HTMLElement>()
 
 const v = new Vector3()
 
-type Placed = { el: HTMLElement; x: number; y: number; w: number; h: number; fixed: boolean }
+type Placed = { el: HTMLElement; x: number; y: number; x0: number; y0: number; w: number; h: number; fixed: boolean }
+// How far each bubble is currently nudged off its building. It slides to a new spot rather
+// than hopping, so bubbles don't flicker between spots while the camera turns.
+const nudges = new WeakMap<HTMLElement, { x: number; y: number }>()
 const placed: Placed[] = []
 // Furthest a bubble may be nudged from its building, in px.
 const HOP = 64
@@ -33,8 +36,9 @@ const underHud = (x: number, y: number, w: number, h: number) =>
 export function AnchorProjector() {
   const camera = useThree((s) => s.camera)
   const size = useThree((s) => s.size)
-  useFrame(() => {
+  useFrame((_, delta) => {
     placed.length = 0
+    const slide = Math.min(1, delta * 14)
     if (hudAge-- <= 0) {
       hudAge = 20
       hud = [...document.querySelectorAll(HUD)].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0 && r.height > 0)
@@ -77,7 +81,7 @@ export function AnchorProjector() {
         el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`
         continue
       }
-      placed.push({ el, x, y, w: el.offsetWidth, h: el.offsetHeight, fixed: clamp })
+      placed.push({ el, x, y, x0: x, y0: y, w: el.offsetWidth, h: el.offsetHeight, fixed: clamp })
     }
     // Bubbles on neighbouring buildings would pile on top of each other. Bubbles nearest the
     // bottom of the screen keep their spot; each later one moves to the closest free spot beside,
@@ -118,6 +122,14 @@ export function AnchorProjector() {
       }
       // Still behind the HUD (a building near the top edge): fade it rather than show half a pill.
       a.el.classList.toggle('under', !a.fixed && underHud(a.x, a.y, a.w, a.h))
+      if (!a.fixed) {
+        let n = nudges.get(a.el)
+        if (!n) nudges.set(a.el, (n = { x: a.x - a.x0, y: a.y - a.y0 }))
+        n.x += (a.x - a.x0 - n.x) * slide
+        n.y += (a.y - a.y0 - n.y) * slide
+        a.x = a.x0 + n.x
+        a.y = a.y0 + n.y
+      }
       a.el.style.transform = `translate(${a.x.toFixed(1)}px, ${a.y.toFixed(1)}px) translate(-50%, -100%)`
     }
   })

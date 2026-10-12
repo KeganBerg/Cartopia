@@ -1,12 +1,12 @@
 // Crates: bought with coins (Street, Garage) or gems (Gold, Diamond). Each holds one prize:
-// coins, a part for one of your cars, a car, or a body or part skin. Cars only come from what your level has already
-// unlocked in the Showroom, so a crate never skips a level gate. A signed-in player's crates are
+// coins, a part for one of your cars, a car, or a body or part skin. Every car and part has one
+// home crate, picked by what it's worth (see homeCrate), so dearer crates hold dearer cars and
+// parts. Cars only come once your level has unlocked them, so a crate never skips a level gate. A signed-in player's crates are
 // rolled by the server (crate_open() in supabase/migrations/0040_crates.sql, same tables and
 // rules); guests roll here. crates.test.ts keeps the server's tables in step.
 import { CARS, MODS, MOD_SKINS, SKINS, carDef, modDef, modFits, ownedMods, type CarDef, type ModDef, type SkinDef, type SkinTier } from './data'
 
 export type CrateId = 'street' | 'garage' | 'gold' | 'diamond'
-export type ModTier = 'basic' | 'pro' | 'gem'
 export type CrateOdds = { coins: number; jackpot: number; mod: number; car: number; skin: number }
 
 export type CrateDef = {
@@ -17,17 +17,17 @@ export type CrateDef = {
   // Price: base + perLevel x level (coins), or a flat gem price.
   base: number
   perLevel: number
-  // Weights out of 100.
+  // Weights out of 100. The car weight is the most it can be: see crateOdds.
   odds: CrateOdds
+  // The most the car slice is worth, as a share of the crate.
+  carShare: number
   // Coin prizes as a share of what the crate is worth (see crateValue).
   coinMult: [number, number]
   jackpotMult: [number, number]
-  // Which parts it can hold.
-  mods: ModTier[]
-  // The dearest car it can hold, as a multiple of what the crate is worth.
-  carCap: number
-  // Whether gem-priced Showroom cars are in it.
-  gemCars: boolean
+  // The dearest car and part (by carWorth / modWorth) whose home is this crate; the top crate
+  // has no limit. Gem-priced cars and parts only live in gem crates.
+  carMax?: number
+  modMax?: number
   // Which skin tiers it can hold (body and part skins alike).
   skins: SkinTier[]
   // Look of the crate in the depot.
@@ -37,23 +37,23 @@ export type CrateDef = {
 export const CRATES: CrateDef[] = [
   {
     id: 'street', name: 'Street Crate', pay: 'coins', unlockLevel: 2, base: 300, perLevel: 120,
-    odds: { coins: 62, jackpot: 6, mod: 28, car: 4, skin: 0 }, coinMult: [0.6, 1.1], jackpotMult: [2, 3],
-    mods: ['basic'], carCap: 4, gemCars: false, skins: [], look: { wood: '#b7844f', band: '#5d6670', glow: '#64b5f6' },
+    odds: { coins: 56, jackpot: 6, mod: 28, car: 10, skin: 0 }, carShare: 0.12, coinMult: [0.5, 1], jackpotMult: [2, 3],
+    carMax: 10000, modMax: 2500, skins: [], look: { wood: '#b7844f', band: '#5d6670', glow: '#64b5f6' },
   },
   {
     id: 'garage', name: 'Garage Crate', pay: 'coins', unlockLevel: 6, base: 1500, perLevel: 500,
-    odds: { coins: 45, jackpot: 8, mod: 31, car: 12, skin: 4 }, coinMult: [0.6, 1.1], jackpotMult: [2, 3],
-    mods: ['basic', 'pro'], carCap: 8, gemCars: false, skins: ['rare', 'epic'], look: { wood: '#2e7d4f', band: '#cfd8dc', glow: '#69f0ae' },
+    odds: { coins: 41, jackpot: 8, mod: 31, car: 16, skin: 4 }, carShare: 0.15, coinMult: [0.45, 0.85], jackpotMult: [2, 3],
+    carMax: 40000, modMax: 10000, skins: ['rare', 'epic'], look: { wood: '#2e7d4f', band: '#cfd8dc', glow: '#69f0ae' },
   },
   {
     id: 'gold', name: 'Gold Crate', pay: 'bucks', unlockLevel: 3, base: 8, perLevel: 0,
-    odds: { coins: 36, jackpot: 6, mod: 30, car: 18, skin: 10 }, coinMult: [0.6, 1.1], jackpotMult: [2, 3],
-    mods: ['pro', 'gem'], carCap: 6, gemCars: false, skins: ['rare', 'epic', 'legendary'], look: { wood: '#d4a017', band: '#7a4b12', glow: '#ffd54f' },
+    odds: { coins: 34, jackpot: 6, mod: 30, car: 20, skin: 10 }, carShare: 0.15, coinMult: [0.45, 0.85], jackpotMult: [2, 3],
+    carMax: 130000, modMax: 15000, skins: ['rare', 'epic', 'legendary'], look: { wood: '#d4a017', band: '#7a4b12', glow: '#ffd54f' },
   },
   {
     id: 'diamond', name: 'Diamond Crate', pay: 'bucks', unlockLevel: 8, base: 25, perLevel: 0,
-    odds: { coins: 24, jackpot: 6, mod: 24, car: 32, skin: 14 }, coinMult: [0.8, 1.3], jackpotMult: [2.5, 3.5],
-    mods: ['gem'], carCap: 6, gemCars: true, skins: ['epic', 'legendary'], look: { wood: '#4fc3f7', band: '#e1f5fe', glow: '#b388ff' },
+    odds: { coins: 24, jackpot: 6, mod: 24, car: 32, skin: 14 }, carShare: 0.2, coinMult: [0.4, 0.8], jackpotMult: [2, 3],
+     skins: ['epic', 'legendary'], look: { wood: '#4fc3f7', band: '#e1f5fe', glow: '#b388ff' },
   },
 ]
 
@@ -68,13 +68,33 @@ export const crateCost = (c: CrateDef, level: number) =>
 // What a crate is worth in coins: its coin price, or its gems at gemCoins.
 export const crateValue = (c: CrateDef, level: number) => (c.pay === 'coins' ? cratePrice(c, level) : cratePrice(c, level) * gemCoins(level))
 
-export const modTier = (m: ModDef): ModTier => (m.bucks ? 'gem' : m.parts ? 'pro' : 'basic')
 export const carValue = (car: CarDef, level: number) => car.price + (car.bucks ?? 0) * gemCoins(level)
 
-// Cars a crate can hold at this level: Showroom cars the level has unlocked, up to its price cap.
+// What a car or part is worth in coins, which picks its home crate: its price, with parts at 50
+// coins each and gems at what a gem buys at the level it unlocks.
+export const PART_COINS = 50
+export const carWorth = (car: CarDef) => car.price + (car.bucks ?? 0) * gemCoins(car.unlockLevel)
+export const modWorth = (m: ModDef) => m.coins + m.parts * PART_COINS + m.bucks * gemCoins(m.unlockLevel)
+
+// The home crate: the cheapest one (CRATES runs cheapest first) whose limit it fits under, and a
+// gem crate for anything priced in gems. New cars and parts sort themselves in. Season prize cars
+// stay out of crates, like event skins: they're only won on the season track.
+const home = (worth: number, gems: boolean, max: (c: CrateDef) => number | undefined): CrateId =>
+  CRATES.find((c) => (!gems || c.pay === 'bucks') && worth <= (max(c) ?? Infinity))!.id
+export const carCrate = (car: CarDef): CrateId | null => (car.parked || car.season ? null : home(carWorth(car), !!car.bucks, (c) => c.carMax))
+export const modCrate = (m: ModDef): CrateId => home(modWorth(m), m.bucks > 0, (c) => c.modMax)
+export const homeCars = (c: CrateDef) => CARS.filter((car) => carCrate(car) === c.id)
+export const homeMods = (c: CrateDef) => MODS.filter((m) => modCrate(m) === c.id)
+
+// The next crate down. When none of a crate's own cars (or parts) are in reach yet, it gives the
+// ones from the crate below instead, so a Diamond Crate at level 10 still holds cars.
+export const crateBelow = (c: CrateDef): CrateDef | undefined => CRATES[CRATES.indexOf(c) - 1]
+
+// Cars a crate can hold at this level: its own cars your level has unlocked.
 export function crateCars(c: CrateDef, level: number): CarDef[] {
-  const cap = crateValue(c, level) * c.carCap
-  return CARS.filter((car) => !car.parked && !car.rescueOnly && !car.season && car.unlockLevel <= level && (c.gemCars || !car.bucks) && carValue(car, level) <= cap)
+  const cars = homeCars(c).filter((car) => car.unlockLevel <= level)
+  const below = crateBelow(c)
+  return cars.length || !below ? cars : crateCars(below, level)
 }
 
 // The chance of each car among the car prizes: cheaper cars are likelier (weight 1 / value).
@@ -105,18 +125,20 @@ export type OwnedSkins = { skins: string[]; modSkins: string[] }
 
 type CarLike = { uid: string; model: string; mods?: string[] | null; ownedMods?: string[] | null }
 
-// Parts a crate could give: for each of your cars, the parts of its tiers that fit it, that your
-// level has unlocked and that the car doesn't already have.
+// Parts a crate could give: for each of your cars, the crate's own parts that fit it, that your
+// level has unlocked and that the car doesn't already have. With none left, the crate below's.
 export function modChoices(c: CrateDef, level: number, cars: CarLike[]): { car: string; mods: string[] }[] {
+  const own = homeMods(c).filter((m) => m.unlockLevel <= level)
   const out: { car: string; mods: string[] }[] = []
   for (const car of cars) {
     const def = carDef(car.model)
     if (def.parked) continue
     const have = ownedMods(car)
-    const mods = MODS.filter((m) => c.mods.includes(modTier(m)) && m.unlockLevel <= level && modFits(m, def.body) && !have.includes(m.id)).map((m) => m.id)
+    const mods = own.filter((m) => modFits(m, def.body) && !have.includes(m.id)).map((m) => m.id)
     if (mods.length) out.push({ car: car.uid, mods })
   }
-  return out
+  const below = crateBelow(c)
+  return out.length || !below ? out : modChoices(below, level, cars)
 }
 
 const roundCoins = (n: number) => Math.max(10, Math.round(n / 10) * 10)
@@ -153,7 +175,7 @@ function pickWeighted<T>(items: T[], weight: (t: T) => number, rand: () => numbe
 // player already has turns into coins.
 export function rollCrate(c: CrateDef, level: number, cars: CarLike[], rand: () => number = Math.random, owned: OwnedSkins = { skins: [], modSkins: [] }): CrateDrop {
   const v = crateValue(c, level)
-  const kinds = Object.entries(c.odds) as [keyof CrateOdds, number][]
+  const kinds = Object.entries(crateOdds(c, level)) as [keyof CrateOdds, number][]
   let kind = pickWeighted(kinds, (k) => k[1], rand)[0]
   if (kind === 'mod') {
     const choices = modChoices(c, level, cars)
@@ -197,12 +219,26 @@ export function dropTier(d: CrateDrop): 0 | 1 | 2 | 3 {
   return 0
 }
 
-// The odds as a player sees them: coins (with jackpots), parts, cars and skins, in whole percent.
-export function crateOddsShown(c: CrateDef) {
-  const o = c.odds
+// The odds a crate rolls from at this level. Cars are worth more than the crate, so the car slice
+// shrinks until it's worth no more than carShare of the crate (cars dear next to the crate are
+// rarer), and what it loses goes to coins. Each car's value is weighed at 1 / value (carOdds), so
+// a car slice's average car is worth n / sum(1 / value).
+export function crateOdds(c: CrateDef, level: number): CrateOdds {
+  const pool = crateCars(c, level)
+  if (!pool.length) return c.odds
+  const avg = pool.length / pool.reduce((a, car) => a + 1 / carValue(car, level), 0)
+  const car = Math.min(c.odds.car, Math.floor((1000 * c.carShare * crateValue(c, level)) / avg) / 10)
+  return { ...c.odds, coins: c.odds.coins + c.odds.car - car, car }
+}
+
+// The odds as a player sees them: coins (with jackpots), parts, cars and skins, in whole percent
+// (cars to a tenth below 1%).
+export function crateOddsShown(c: CrateDef, level: number) {
+  const o = crateOdds(c, level)
   const t = o.coins + o.jackpot + o.mod + o.car + o.skin
   const pc = (n: number) => Math.round((n / t) * 100)
-  return { coins: pc(o.coins + o.jackpot), mod: pc(o.mod), car: pc(o.car), skin: pc(o.skin) }
+  const car = (o.car / t) * 100
+  return { coins: pc(o.coins + o.jackpot), mod: pc(o.mod), car: car < 1 ? Math.round(car * 10) / 10 : Math.round(car), skin: pc(o.skin) }
 }
 
 // Weekly event skins never go in crates.
@@ -213,7 +249,7 @@ export function crateTables() {
   return {
     crates: Object.fromEntries(CRATES.map((c) => [c.id, {
       pay: c.pay, unlock: c.unlockLevel, base: c.base, perLevel: c.perLevel, odds: c.odds,
-      coinMult: c.coinMult, jackpotMult: c.jackpotMult, mods: c.mods, carCap: c.carCap, gemCars: c.gemCars, skins: c.skins,
+      carShare: c.carShare, coinMult: c.coinMult, jackpotMult: c.jackpotMult, skins: c.skins, below: crateBelow(c)?.id ?? null,
     }])),
     // Body skins by id, part skins by id: tier, and the level or collection set that also unlocks one.
     skinWeight: SKIN_WEIGHT,
@@ -221,12 +257,13 @@ export function crateTables() {
     skins: Object.fromEntries(SKINS.filter(inCrates).map((d) => [d.id, skinRow(d)])),
     modSkins: Object.fromEntries(MOD_SKINS.filter(inCrates).map((d) => [d.id, skinRow(d)])),
     gem: GEM_COINS,
-    // Every car's body (parts are rolled for any car you own); `pool` marks the ones a crate can hold.
+    // Every car's body (parts are rolled for any car you own); `crate` is its home crate, if any.
+    // A crate rolls from its own cars or parts, and from `below` when none are in reach.
     cars: Object.fromEntries(CARS.map((car) => [car.id, {
-      body: car.body, pool: !car.rescueOnly && !car.season, unlock: car.unlockLevel, price: car.price, bucks: car.bucks ?? 0, colors: car.colors,
+      body: car.body, crate: carCrate(car), unlock: car.unlockLevel, price: car.price, bucks: car.bucks ?? 0, colors: car.colors,
     }])),
     mods: Object.fromEntries(MODS.map((m) => [m.id, {
-      tier: modTier(m), unlock: m.unlockLevel, ...(m.only ? { only: m.only } : {}), ...(m.notOn ? { notOn: m.notOn } : {}),
+      crate: modCrate(m), unlock: m.unlockLevel, ...(m.only ? { only: m.only } : {}), ...(m.notOn ? { notOn: m.notOn } : {}),
     }])),
   }
 }
