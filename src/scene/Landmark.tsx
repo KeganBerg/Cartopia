@@ -7,9 +7,7 @@ import { CarModel } from './CarModel'
 import { Upright } from './mergeScale'
 import { glowMats, onNight } from './dayNight'
 import { concreteTex, curtainGlowTex, curtainTex, helipadTex, paverTex } from './textures'
-import { RAINBOW } from './clubLeds'
-import { clubPulse } from '../lib/clubBeat'
-import { dayPhase, isNight, nightAmount } from '../game/clock'
+import { clubLedColor, clubLedGlow } from './clubLeds'
 import { PAL } from './season'
 import { useGame } from '../game/store'
 import { sfx } from '../lib/sound'
@@ -52,9 +50,9 @@ function coreMat() {
 }
 const coreEl = () => <primitive object={coreMat()} attach="material" dispose={null} />
 
-// The penthouse suite dances with the nightclub at night: each floor's lit
-// panes take a colour of the club's rainbow, a step apart, moving on and
-// flashing with every bass note (clubBeat.ts; a soft beat when the music's off).
+// The penthouse suite dances with the nightclub at night: every floor's lit
+// panes show the club's windows' colour, moving on to the next one and
+// flashing on every bass note (clubLeds.ts; a soft beat when the music's off).
 // Glass by day like the rest of the tower.
 const suiteMats = SUITE.map(() => {
   const m = new MeshStandardMaterial({ color: TINT, map: curtainTex(), emissiveMap: curtainGlowTex(), emissive: new Color('#000000'), emissiveIntensity: 1, metalness: 0.15, roughness: 0.22 })
@@ -64,10 +62,8 @@ const suiteMats = SUITE.map(() => {
 const suiteTint = new Color()
 function SuiteLights() {
   useFrame(() => {
-    const p = clubPulse()
-    const lit = isNight() ? nightAmount(dayPhase()) : 0
-    const glow = lit * (0.8 + 1.6 * p.flash)
-    suiteMats.forEach((m, i) => m.emissive.copy(suiteTint.set(RAINBOW[(i * 2 + p.step) % RAINBOW.length])).multiplyScalar(glow))
+    clubLedColor(suiteTint).multiplyScalar(clubLedGlow())
+    for (const m of suiteMats) m.emissive.copy(suiteTint)
   })
   return null
 }

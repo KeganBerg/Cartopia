@@ -9,7 +9,7 @@ import { Facade, Upright } from './mergeScale'
 import { glowMats, onNight } from './dayNight'
 import { ClubLife } from './ClubLife'
 import { CLUB } from './clubLayout'
-import { LED_COUNT, ledFront, ledWindows } from './clubLeds'
+import { ledFront, ledWindow } from './clubLeds'
 import { MeshBasicMaterial, MeshStandardMaterial, Color } from 'three'
 import { PAL, SEASON } from './season'
 import { LAYER, decal } from './layers'
@@ -766,7 +766,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
       const ropeR = (gap * gap / 4 + sag * sag) / (2 * sag)
       const ropeArc = 2 * Math.asin(gap / 2 / ropeR)
       return (
-        <ShellBuilding {...shell} w={w} d={d} h0={1.3} z0={z0} wall="#3a2160" roof="#d500f9" shopfront={null} rowFrom={1.6} winAt={ghost ? undefined : (i) => <primitive object={ledWindows[i % LED_COUNT]} attach="material" dispose={null} />}>
+        <ShellBuilding {...shell} w={w} d={d} h0={1.3} z0={z0} wall="#3a2160" roof="#d500f9" shopfront={null} rowFrom={1.6} winAt={ghost ? undefined : () => <primitive object={ledWindow} attach="material" dispose={null} />}>
           {/* Entrance: gold-framed double doors with porthole windows, up one step. */}
           <Box m={m} at={[dx, 0.4, zf + 0.012]} s={[0.54, 0.8, 0.024]} c={GOLD} shadow={false} />
           {[-1, 1].map((sd) => (
