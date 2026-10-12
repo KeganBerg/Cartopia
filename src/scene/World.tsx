@@ -11,7 +11,7 @@ import { rotateCurrent, setGhostTurn, turnOf } from '../game/placement'
 import { mergeGroups, groupOf, groupTurn, groupScale, isLandmark, type MergeGroup } from '../game/merge'
 import { VanguardTower } from './Landmark'
 import { KeepShapes, MergeScale } from './mergeScale'
-import { propLimit } from './keepShape'
+import { limitFor } from './keepShape'
 import { sfx } from '../lib/sound'
 import { Clouds } from './Clouds'
 import { DayNight } from './DayNight'
@@ -244,7 +244,7 @@ function Building({ b, roads, group }: { b: PlacedBuilding; roads: Set<string>; 
       <group scale={mark ? [k, k, k] : [sx, sy, sz]}>
         <MergeScale.Provider value={mark ? [k, k, k] : group ? [sx, sy, sz] : ONE}>
           <PopGroup uid={b.uid}>
-            <KeepShapes limit={propLimit(d.w * TILE, d.h * TILE)}>
+            <KeepShapes limit={limitFor(d)}>
               {mark ? <VanguardTower /> : <BuildingModel def={d} level={buildingLevel(b)} />}
             </KeepShapes>
           </PopGroup>
