@@ -9,6 +9,7 @@ import { SERVER_CAR_COLUMNS, serverCar } from './serverCar'
 import { raceCarOf } from '../game/raceCar'
 import { loadUsernames, playerName } from './profiles'
 import { acceptWager, offerWager, startWagers, syncWagers } from './wagers'
+import { openParty } from './party'
 import { STAKES, shortCoins } from '../game/wager'
 import { signedInUser } from './cloud'
 
@@ -23,8 +24,12 @@ export type LivePlayer = { id: string; uid?: string | null; town: string; level:
 // drag: the classic head-to-head strip. kart: a kart circuit race, the two of you plus AI.
 export type LiveMode = 'drag' | 'kart'
 // stake: coins each racer puts up in a wager race; the winner takes both.
-export type Invite = { raceId: string; from: LivePlayer; at: number; mode: LiveMode; stake?: number }
-export type LiveRace = { raceId: string; opponent: LivePlayer; host: boolean; mode: LiveMode; stake?: number }
+// party: a kart party (3-6 players), the host's invite to it or the race it became.
+export type Invite = { raceId: string; from: LivePlayer; at: number; mode: LiveMode; stake?: number; party?: boolean }
+export type LiveRace = { raceId: string; opponent: LivePlayer; host: boolean; mode: LiveMode; stake?: number; party?: boolean }
+// A kart party we're hosting: who we invited and what each answered (lobby id -> yes/no).
+export type Party = { raceId: string; invited: LivePlayer[]; answers: Record<string, boolean> }
+export const PARTY_MAX = 6
 
 type LiveState = {
   me: string
@@ -33,6 +38,7 @@ type LiveState = {
   invites: Invite[]
   outgoing: { raceId: string; to: string; mode: LiveMode; stake?: number } | null
   race: LiveRace | null
+  party: Party | null
   muted: Record<string, string>
   closed: boolean
   // Sender id -> time before which their challenges are ignored, and
@@ -78,7 +84,7 @@ const myId = (() => {
 })()
 
 export const useLive = create<LiveState>(() => ({
-  me: myId, players: [], invites: [], outgoing: null, race: null,
+  me: myId, players: [], invites: [], outgoing: null, race: null, party: null,
   muted: load('cartopia-muted', {}), closed: load('cartopia-closed', false), cooldownFrom: {}, cooldownTo: {}, signedIn: false,
 }))
 
@@ -217,8 +223,9 @@ async function openLobby(uid: string) {
       const fresh = !l.invites.some((i) => i.from.id === from.id)
       const stake = cleanStake(payload.stake)
       const mode: LiveMode = payload.mode === 'kart' && !stake ? 'kart' : 'drag'
-      useLive.setState({ invites: [...l.invites.filter((i) => i.from.id !== from.id), { raceId: payload.raceId, from, at: Date.now(), mode, stake }] })
-      if (fresh) useGame.getState().toast(`${playerName(from.uid, from.town)} ${stake ? `bet 🪙${shortCoins(stake)} on a race` : `challenged you to a ${mode === 'kart' ? 'kart race' : 'race'}`}! Tap 🏁`)
+      const party = mode === 'kart' && payload.party === true ? true : undefined
+      useLive.setState({ invites: [...l.invites.filter((i) => i.from.id !== from.id), { raceId: payload.raceId, from, at: Date.now(), mode, stake, party }] })
+      if (fresh) useGame.getState().toast(`${playerName(from.uid, from.town)} ${stake ? `bet 🪙${shortCoins(stake)} on a race` : party ? 'invited you to a kart party' : `challenged you to a ${mode === 'kart' ? 'kart race' : 'race'}`}! Tap 🏁`)
     })
     .on('broadcast', { event: 'cancel' }, ({ payload }) => {
       const l = useLive.getState()
@@ -236,6 +243,14 @@ async function openLobby(uid: string) {
     .on('broadcast', { event: 'answer' }, async ({ payload }) => {
       const raw = cleanCard(payload.from)
       if (raw?.uid) await lookUp([raw])
+      // An answer to our kart party: noted against the player we invited.
+      const party = useLive.getState().party
+      if (party && payload.raceId === party.raceId) {
+        const from = verified(raw)
+        if (!from || !party.invited.some((p) => p.id === from.id) || from.id in party.answers) return
+        useLive.setState({ party: { ...party, answers: { ...party.answers, [from.id]: !!payload.accept } } })
+        return
+      }
       const out = useLive.getState().outgoing
       if (!out || payload.raceId !== out.raceId) {
         // They accepted after we cancelled or gave up: let them know instead of leaving them waiting.
@@ -329,8 +344,37 @@ export async function answer(raceId: string, accept: boolean) {
   useLive.setState({
     invites: l.invites.filter((i) => i.raceId !== raceId),
     cooldownFrom: accept ? l.cooldownFrom : { ...l.cooldownFrom, [inv.from.id]: Date.now() + COOLDOWN_MS },
-    race: accept ? { raceId, opponent: inv.from, host: false, mode: inv.mode, stake: inv.stake } : l.race,
+    race: accept ? { raceId, opponent: inv.from, host: false, mode: inv.mode, stake: inv.stake, party: inv.party } : l.race,
   })
+}
+
+// Host a kart party: claim it on the server for everyone invited, invite them, and wait in
+// the party's lobby (LiveKartParty) for answers. Up to five guests.
+export async function hostParty(ids: string[]) {
+  const l = useLive.getState()
+  if (l.outgoing || l.party || l.race) return
+  const invited = ids.map((id) => l.players.find((p) => p.id === id)).filter((p): p is LivePlayer => !!p?.uid && !p.closed).slice(0, PARTY_MAX - 1)
+  if (invited.length < 1) return
+  const raceId = crypto.randomUUID()
+  const party: Party = { raceId, invited, answers: {} }
+  useLive.setState({ party })
+  if (!(await openParty(raceId, invited.map((p) => p.uid!)))) {
+    if (useLive.getState().party?.raceId === raceId) useLive.setState({ party: null })
+    useGame.getState().toast("Couldn't start the party. Try again in a moment.")
+    return
+  }
+  if (useLive.getState().party?.raceId !== raceId) return
+  sentIds.add(raceId)
+  for (const p of invited) lobby?.send({ type: 'broadcast', event: 'challenge', payload: { to: p.id, raceId, from: myCard(), mode: 'kart', party: true } })
+  useLive.setState({ race: { raceId, opponent: invited[0], host: true, mode: 'kart', party: true } })
+}
+
+// The host leaves their party: anyone who hasn't answered loses the invite.
+export function endParty() {
+  const party = useLive.getState().party
+  if (!party) return
+  for (const p of party.invited) if (!(p.id in party.answers)) lobby?.send({ type: 'broadcast', event: 'cancel', payload: { raceId: party.raceId, to: p.id, from: myId } })
+  useLive.setState({ party: null })
 }
 
 // Drop challenges the sender has given up on.
@@ -366,6 +410,7 @@ export function setClosed(closed: boolean) {
 }
 
 export function endLiveRace() {
+  endParty()
   useLive.setState({ race: null })
 }
 
@@ -386,10 +431,11 @@ export function raceChannel(raceId: string, handlers: { onPos: (p: { dist: numbe
 
 // A live kart race's channel (the same private race topic): any event name, any payload,
 // for lib/kartNet's KartLink. Call close() when the race screen goes.
-export function kartChannel(raceId: string, onJoined: () => void) {
+// A kart party (3-6 players) runs the same way on its own topic, party:<id> (0058).
+export function kartChannel(raceId: string, onJoined: () => void, topic = raceTopic(raceId)) {
   if (!supabase) return null
   const sb = supabase
-  const ch = sb.channel(raceTopic(raceId), { config: { private: true, broadcast: { self: false } } })
+  const ch = sb.channel(topic, { config: { private: true, broadcast: { self: false } } })
   const subs = new Map<string, ((p: unknown) => void)[]>()
   const on = (event: string, cb: (p: unknown) => void) => {
     if (!subs.has(event)) {
@@ -400,7 +446,7 @@ export function kartChannel(raceId: string, onJoined: () => void) {
   }
   let joined = false
   // Every event this race uses has to be listened for before subscribing.
-  for (const e of ['snap', 'notes', 'setup', 'ready', 'go', 'leave']) on(e, () => {})
+  for (const e of ['snap', 'notes', 'setup', 'ready', 'go', 'leave', 'here']) on(e, () => {})
   ch.subscribe((status) => {
     if (status === 'SUBSCRIBED' && !joined) { joined = true; onJoined() }
   })

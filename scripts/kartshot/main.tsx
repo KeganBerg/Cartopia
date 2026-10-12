@@ -2,6 +2,7 @@
 // ?track=0..2&rev=1&me=<car id>&autopilot&warp=<s>&touch=1&time=0..1
 // ?live=host / ?live=guest in two tabs of one browser: a live kart race between them over a
 // BroadcastChannel (no server), to check the netcode by eye.
+// ?party=host / ?party=g1 / ?party=g2 in three tabs: a kart party, the same way.
 import { createRoot } from 'react-dom/client'
 import { CARS } from '../../src/game/data'
 import { TRACKS, gpField } from '../../src/game/kart'
@@ -9,6 +10,8 @@ import { KartGame, playerRacer, type KartRacer } from '../../src/ui/Kart'
 import { look } from '../../src/ui/ArcadeBits'
 import { LiveKart, type LiveKartDeps } from '../../src/ui/LiveKart'
 import type { NetChannel } from '../../src/lib/kartNet'
+import { LiveKartParty, type PartyDeps } from '../../src/ui/LiveKartParty'
+import { useLive, type LivePlayer } from '../../src/lib/live'
 import '../../src/index.css'
 import '../../src/theme.css'
 
@@ -26,7 +29,50 @@ const field: KartRacer[] = f.map((r, i) => {
 if (q.has('clean')) document.head.insertAdjacentHTML('beforeend', '<style>.rf-top,.kt-hud,.kt-map,.kt-slot,.dc,.dc-keys,.kt-flash,.kt-charge{display:none!important}</style>')
 const track = TRACKS[Number(q.get('track') ?? 0)]
 const live = q.get('live')
-if (live) {
+// Over a BroadcastChannel between tabs, standing in for the race's private channel.
+const tabChannel = (name: string, onJoined: () => void) => {
+  const bc = new BroadcastChannel(name)
+  const subs = new Map<string, ((p: unknown) => void)[]>()
+  bc.onmessage = (e) => { for (const f of subs.get(e.data.event) ?? []) f(e.data.payload) }
+  setTimeout(onJoined, 50)
+  const ch: NetChannel & { close: () => void } = {
+    send: (event, payload) => bc.postMessage({ event, payload: JSON.parse(JSON.stringify(payload)) }),
+    on: (event, cb) => { subs.set(event, [...(subs.get(event) ?? []), cb]) },
+    close: () => bc.close(),
+  }
+  return ch
+}
+const party = q.get('party')
+if (party) {
+  const card = (id: string, i: number): LivePlayer => {
+    const c = CARS.find((o) => o.id === ids[i])!
+    return { id, uid: null, town: ['Gearville', 'Nitro Bay', 'Piston Point'][i], level: 12, carName: c.name, color: c.colors[0], body: c.body, pi: 46 + i }
+  }
+  const cards = ['host', 'g1', 'g2'].map(card)
+  const raceId = q.get('race') ?? 'devparty'
+  if (party === 'host') useLive.setState({ party: { raceId, invited: cards.slice(1), answers: {} } })
+  const deps: PartyDeps = {
+    me: party,
+    join: async () => true,
+    channel: (id, onJoined) => tabChannel('party-' + id, onJoined),
+    // Stands in for the server: everyone posts a time, places by time once all three are in.
+    report: (id, t) => new Promise((done) => {
+      const bc = new BroadcastChannel('party-fin-' + id)
+      const times = new Map<string, number>([[party, t]])
+      const send = () => bc.postMessage({ from: party, t })
+      bc.onmessage = (e) => {
+        if (times.has(e.data.from)) return
+        times.set(e.data.from, e.data.t)
+        send()
+        if (times.size === 3) done({ place: [...times.values()].filter((x) => x < t).length + 1, of: 3, myTime: t, void: false })
+      }
+      send()
+    }),
+  }
+  createRoot(document.getElementById('root')!).render(
+    <LiveKartParty live={{ raceId, opponent: party === 'host' ? cards[1] : cards[0], host: party === 'host', mode: 'kart', party: true }} car={me as never} onExit={() => {}} deps={deps} />,
+  )
+} else if (live) {
   const other = live === 'host' ? 'guest' : 'host'
   const deps: LiveKartDeps = {
     me: live,

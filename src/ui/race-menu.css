@@ -656,3 +656,11 @@ div.rm-node { cursor: default; }
   .rm-gpc .rm-cup { display: none; }
   .rm-gpc-top .rm-ttl { padding-right: 0; }
 }
+/* Kart party: the card that starts one, and the player cards while picking who to invite. */
+.rm-qc-party .rm-qc-top { background: radial-gradient(circle at 50% 120%, rgba(255,255,255,.7), rgba(255,255,255,0) 60%), linear-gradient(135deg, #b388ff, #5e35b1); }
+.rm-qc-party.on { border-color: #5e35b1; }
+.rm-qc-party button, .rm-qc-pick { min-height: 44px; }
+.rm-qc-pick { cursor: pointer; }
+.rm-qc-pick.on { border-color: #2f9e35; box-shadow: 0 0 0 3px #7ee05a, 0 4px 0 rgba(0,0,0,.3); }
+.rm-qc-pick:disabled { opacity: .5; cursor: default; }
+.rm-pick-tick { position: absolute; top: 6px; right: 6px; font-size: 24px; line-height: 1; }

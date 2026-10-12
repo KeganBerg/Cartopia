@@ -7,7 +7,8 @@ import { FIELD, ITEMS, wrapAngle, type ItemId, type Kart, type KartNote, type Ka
 //     running on with the last speed for a moment if one is late,
 //   * items, crates and used-up hazards go out as notes so every track looks the same, and
 //     a hit is always decided by the browser driving the kart that was hit,
-//   * a player who goes quiet has their kart taken over by an AI driver on the other browser.
+//   * a player who goes quiet has their kart taken over by an AI driver on one of the other
+//     browsers: the first player in the owners' order (the host first) who is still there.
 // The channel is anything with send/on, so tests run it over a fake one.
 
 export type NetChannel = {
@@ -82,6 +83,7 @@ export class KartLink {
   race: KartRace
   me: string
   owners: string[] // per kart: the player id whose browser drives it
+  players: string[] // everyone in the race, host first: who takes over a quiet player's karts
   ch: NetChannel
   private bufs: Snap[][]
   private off: number | null = null // their race clock minus ours, smoothed
@@ -95,6 +97,7 @@ export class KartLink {
     this.race = race
     this.me = me
     this.owners = owners
+    this.players = [...new Set(owners)] // the host drives the AI, which come first
     this.ch = ch
     this.bufs = race.karts.map(() => [])
     this.picked = race.karts.map(() => 0)
@@ -104,10 +107,14 @@ export class KartLink {
     ch.on('notes', (p) => this.onNotes(p))
   }
 
-  // Karts we drive: our own, plus any whose player has gone quiet (taken over by AI here).
-  drives(id: number) {
+  // Who drives a kart now: its player, or while they're gone, the first player still here.
+  driver(id: number) {
     const o = this.owners[id]
-    return o === this.me || this.gone.has(o)
+    return this.gone.has(o) ? this.players.find((p) => !this.gone.has(p)) ?? this.me : o
+  }
+  // Karts we drive: our own, plus any we've taken over from a player who went quiet.
+  drives(id: number) {
+    return this.driver(id) === this.me
   }
 
   private onSnap(raw: unknown) {
@@ -121,7 +128,7 @@ export class KartLink {
     this.off = this.off === null || sample < this.off ? sample : this.off * 0.95 + sample * 0.05
     for (const raw2 of p.k) {
       const s = cleanSnap(raw2, this.race.karts.length)
-      if (!s || this.owners[s.id] !== p.from) continue
+      if (!s || this.driver(s.id) !== p.from) continue
       const buf = this.bufs[s.id]
       if (buf.length && buf[buf.length - 1].t >= p.t) continue
       buf.push({ t: p.t, v: s.v })
@@ -136,7 +143,7 @@ export class KartLink {
     for (const r of p.n.slice(0, 20)) {
       const n = cleanNote(r, this.race.karts.length)
       // Only a kart's own browser speaks for it.
-      if (!n || (n.k !== 'gone' && this.owners[n.kart] !== p.from)) continue
+      if (!n || (n.k !== 'gone' && this.driver(n.kart) !== p.from)) continue
       // An item needs a crate behind it.
       if (n.k === 'crate') this.picked[n.kart] = Math.min(2, this.picked[n.kart] + 1)
       // A Nitro Triple's later cans ride on the crate its first can used up (they only boost
@@ -165,7 +172,13 @@ export class KartLink {
     if (race.t > QUIET) for (const [p, at] of this.heard) {
       if (this.gone.has(p) || race.t - at < QUIET) continue
       this.gone.add(p)
-      for (const k of race.karts) if (this.owners[k.id] === p) k.ai = true
+      for (const k of race.karts) if (this.owners[k.id] === p) {
+        k.ai = true
+        // Their newest snapshot is where the new driver picks the kart up.
+        if (!this.drives(k.id)) continue
+        const last = this.bufs[k.id].at(-1)
+        if (last) set(k, last.v)
+      }
       this.onGone?.(p)
     }
     this.show()

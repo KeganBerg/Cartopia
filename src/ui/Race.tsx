@@ -13,7 +13,7 @@ import { pickVenue, venue as venueById } from '../scene/venues'
 import { sfx } from '../lib/sound'
 import { raceAudio, type RaceAudio } from '../lib/engineAudio'
 import { PlayerName } from './Username'
-import { useLive, challenge, cancelChallenge, refreshPresence, raceChannel, endLiveRace, answer, pruneInvites, mute, INVITE_MS, type LiveRace } from '../lib/live'
+import { useLive, challenge, cancelChallenge, refreshPresence, raceChannel, endLiveRace, answer, pruneInvites, mute, hostParty, INVITE_MS, PARTY_MAX, type LiveRace } from '../lib/live'
 import { displayName } from '../lib/names'
 import { joinRefereed, reportFinish, serverPi, type Verdict } from '../lib/referee'
 import { ghostDist, shortLeft, trialWeek, TRIAL_FUEL } from '../game/trial'
@@ -32,6 +32,7 @@ import { TileClip } from './TileClip'
 import './race-menu.css'
 import { KartGame, playerRacer, type KartRacer } from './Kart'
 import { LiveKart } from './LiveKart'
+import { LiveKartParty } from './LiveKartParty'
 import { gpField, gpTrack } from '../game/kart'
 import { gpClearPi } from '../game/gpBeat'
 import { look as kartLook } from './ArcadeBits'
@@ -208,6 +209,9 @@ export function RacePanel() {
   const coins = useGame((s) => s.coins)
   // The live player whose stake chips are open (wager match).
   const [betFor, setBetFor] = useState<string | null>(null)
+  // Picking players for a kart party: the lobby ids ticked so far (null: not picking).
+  const [pick, setPick] = useState<string[] | null>(null)
+  const hosting = useLive((l) => !!l.party)
 
   // Closing the race menu ends a street race too.
   useEffect(() => () => setRacing(false), [])
@@ -549,8 +553,38 @@ export function RacePanel() {
                 <span className="rm-qc-body"><b>Race players live</b><span className="buy small alt">Sign in</span></span>
               </button>
             )}
+            {supabase && livePlayers.filter((p) => !mutedIds[p.id] && !p.closed).length >= 2 && (
+              <div className={`rm-qc rm-qc-live rm-qc-party${pick ? ' on' : ''}`}>
+                <span className="rm-qc-top"><span className="rm-mi">🏎️</span><span className="tag live">👥 {PARTY_MAX}</span></span>
+                <span className="rm-qc-body">
+                  <b>Kart party</b>
+                  {pick ? (
+                    <span className="rm-qc-pair">
+                      <button className="buy small" disabled={!pick.length || hosting} onClick={() => { void hostParty(pick); setPick(null) }}>🏁 ×{pick.length + 1}</button>
+                      <button className="sell small" onClick={() => setPick(null)} aria-label="Close">✕</button>
+                    </span>
+                  ) : (
+                    <button className="buy small alt" disabled={!!outgoing || hosting} onClick={() => setPick([])}>🎉 Pick</button>
+                  )}
+                </span>
+              </div>
+            )}
             {supabase && livePlayers.filter((p) => !mutedIds[p.id]).map((p) => {
               const wait = (cooldownTo[p.id] ?? 0) > Date.now()
+              if (pick && !p.closed) {
+                const on = pick.includes(p.id)
+                const full = !on && pick.length >= PARTY_MAX - 1
+                return (
+                  <button key={p.id} className={`rm-qc rm-qc-live rm-qc-pick${on ? ' on' : ''}`} style={{ ['--qc' as string]: p.color }} disabled={full}
+                    onClick={() => setPick(on ? pick.filter((x) => x !== p.id) : [...pick, p.id])} aria-pressed={on}>
+                    <span className="rm-qc-top"><CarThumb size="sm" color={p.color} body={p.body} mods={p.mods} /><span className="rm-pick-tick">{on ? '✅' : '➕'}</span></span>
+                    <span className="rm-qc-body">
+                      <b><PlayerName id={p.uid} town={p.town} /></b>
+                      <span className="rm-qc-chips"><span>Lv {p.level}</span><span className="rm-pi">PI {p.pi}</span></span>
+                    </span>
+                  </button>
+                )
+              }
               const stakes = wagersOn() ? stakesFor(level, p.level, coins) : []
               if (betFor === p.id) return (
                 <div key={p.id} className="rm-qc rm-qc-live rm-qc-bet" style={{ ['--qc' as string]: p.color }}>
@@ -1669,6 +1703,7 @@ export function LiveRaceOverlay() {
   // Picked as the race starts, so switching cars mid-race doesn't swap the car under you.
   const car = useMemo(() => (raceId ? raceCarOf(useGame.getState().cars, useGame.getState().raceCar) : undefined), [raceId])
   if (!race || !car) return null
+  if (race.mode === 'kart' && race.party) return <LiveKartParty key={race.raceId} live={race} car={car} onExit={endLiveRace} />
   if (race.mode === 'kart') return <LiveKart key={race.raceId} live={race} car={car} onExit={endLiveRace} />
   const o = race.opponent
   const rival: Rival = { id: `live:${o.id}`, town: playerName(o.uid, o.town), level: o.level, carName: o.carName, color: o.color, pi: o.pi, online: true, body: o.body, mods: o.mods }
@@ -1722,7 +1757,7 @@ export function InvitesPanel() {
               <div key={i.raceId} className="rival invite">
                 <i style={{ background: i.from.color }} />
                 <div>
-                  <b><PlayerName id={i.from.uid} town={i.from.town} /></b> <span className="tag live">{i.mode === 'kart' ? '🏎️ KART' : 'LIVE'}</span>
+                  <b><PlayerName id={i.from.uid} town={i.from.town} /></b> <span className="tag live">{i.party ? '🏎️ PARTY' : i.mode === 'kart' ? '🏎️ KART' : 'LIVE'}</span>
                   {i.stake && <span className="tag bet" title={`Winner takes ${(i.stake * 2).toLocaleString()} coins`}>🪙 {shortCoins(i.stake)}</span>}
                   <div className="card-stat">Lvl {i.from.level} · {i.from.carName} · PI {i.from.pi} · {Math.max(0, Math.ceil((INVITE_MS - (Date.now() - i.at)) / 1000))}s left</div>
                 </div>

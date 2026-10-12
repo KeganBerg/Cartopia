@@ -130,6 +130,43 @@ describe('live kart netcode', () => {
     expect(b.finishOrder.length).toBe(FIELD)
   })
 
+  it('a party of three: whoever drops out, one browser (and only one) takes their kart', () => {
+    const track = buildTrack(TRACKS[1], false)
+    const field = gpField(['A1', 'A2', 'A3', 'A4', 'A5', 'A6'], 1, 45, { name: 'Host', pi: 45 })
+    field[3] = { name: 'G1', pi: 45, ai: false, skill: 1 }
+    field[4] = { name: 'G2', pi: 45, ai: false, skill: 1 }
+    const owners = ['host', 'host', 'host', 'g1', 'g2', 'host']
+    const bus = new Bus()
+    const ids = ['host', 'g1', 'g2']
+    const races = ids.map(() => new KartRace(track, field, 9))
+    const links = ids.map((id, i) => new KartLink(races[i], id, owners, bus.channel(id)))
+    const mine = [5, 3, 4]
+    const step = (secs: number) => {
+      for (let f = 0; f < secs * 60; f++) {
+        bus.now += 1 / 60
+        bus.deliver()
+        races.forEach((r, i) => {
+          if (bus.cut.has(ids[i])) return
+          r.step(1 / 60, r.karts.map((k, j) => (j === mine[i] ? { ...r.autoInput(k, r.order(), false) } : idleInput())), true)
+          links[i].tick()
+        })
+      }
+    }
+    step(8)
+    // Guest 1 drops: the host takes their kart, guest 2 keeps watching it.
+    bus.cut.add('g1')
+    step(8)
+    expect(links[0].drives(3)).toBe(true)
+    expect(links[2].drives(3)).toBe(false)
+    const watch = races[2].karts[3], drive = races[0].karts[3]
+    expect(Math.hypot(watch.x - drive.x, watch.z - drive.z)).toBeLessThan(6)
+    // Then the host drops too: guest 2 drives the whole field home.
+    bus.cut.add('host')
+    step(150)
+    for (let k = 0; k < FIELD; k++) expect(links[2].drives(k)).toBe(true)
+    expect(races[2].finishOrder.length).toBe(FIELD)
+  })
+
   it('ignores junk from the channel', () => {
     const { b, lb, step } = setup()
     step(2)
