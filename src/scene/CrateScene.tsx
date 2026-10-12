@@ -46,7 +46,7 @@ export const TIER_GLOW = ['#4fc3f7', '#b388ff', '#ff4fd8', '#ffb300'] as const
 type OpenStyle = 'pop' | 'roll' | 'chest' | 'shatter'
 const OPEN_STYLE: Record<CrateId, OpenStyle> = { street: 'pop', garage: 'roll', gold: 'chest', diamond: 'shatter' }
 // Which sides end up lying open on the floor (front, back, left, right): coins land on those.
-type Flaps = readonly [boolean, boolean, boolean, boolean]
+type Flaps = readonly boolean[]
 const ALL_FLAPS: Flaps = [true, true, true, true]
 const NO_FLAPS: Flaps = [false, false, false, false]
 const FLAPS: Record<OpenStyle, Flaps> = { pop: ALL_FLAPS, roll: NO_FLAPS, chest: [true, false, true, true], shatter: NO_FLAPS }
