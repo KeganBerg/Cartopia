@@ -12,6 +12,9 @@
 -- Race payouts (loss pay, first-win, welcome-back and weekend boosts in src/game/boosts.ts) aren't
 -- itemised in the catalog: they count against the guard's coin bank like every race prize, and the
 -- x2.5 cap keeps them inside it.
+-- Numbered after 0062_exotic_cars (another branch) and 0063_friendly_taunts. If exotic cars merge first,
+-- regenerate the catalog and crate tables below from the merged data.ts (economy.test.ts and
+-- crates.test.ts fail until they match).
 
 create or replace function public.econ_catalog() returns jsonb
 language sql immutable set search_path = '' as $$
@@ -703,7 +706,7 @@ begin
     s := s || jsonb_build_object('level', n_lvl, 'xp', n_xp);
     select coalesce(sum(l * 100), 0) into levelup_coins from generate_series(o_lvl + 1, n_lvl) l;
 
-    -- Daily check-in calendar (0062): once per UTC day, one day along whether or not yesterday was
+    -- Daily check-in calendar (0064): once per UTC day, one day along whether or not yesterday was
     -- collected; dailyStreak counts days collected and the calendar loops after day 5.
     od := o ->> 'lastDaily';
     nd := s ->> 'lastDaily';
