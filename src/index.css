@@ -2144,3 +2144,16 @@ body:has(.race-full) .toasts { display: none; }
 .wh-prize-line { display: flex; align-items: center; gap: 8px; font: 26px/1.1 var(--display); color: #14213d; text-align: center; }
 @keyframes wh-pop { from { transform: scale(.6); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .wh-prize { animation: none; } .wh-hit { animation: none; opacity: .25; } }
+
+/* Photo mode in the full-screen car view (scene/photo.ts). */
+.ci-head .ci-photo { margin-left: auto; }
+.car-inspect.photo { background: #263238; }
+.ci-photo-bar { flex: none; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px 12px 14px; background: rgba(20, 26, 32, .92); }
+.ci-chips { display: flex; gap: 6px; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.ci-chips button { flex: none; border: 2px solid rgba(255,255,255,.35); background: rgba(255,255,255,.08); color: #fff; border-radius: 999px; padding: 6px 12px; font: 800 13px Nunito, sans-serif; white-space: nowrap; cursor: pointer; }
+.ci-chips button.sel { background: #fff; color: #1b2a4a; border-color: #fff; }
+.ci-shutter { width: 64px; height: 64px; border-radius: 50%; border: 5px solid #fff; background: radial-gradient(circle, #fff 0 55%, rgba(255,255,255,.25) 56%); cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.4); }
+.ci-shutter:active { transform: scale(.94); }
+.ci-flash { position: absolute; inset: 0; background: #fff; pointer-events: none; animation: ci-flash .35s ease-out forwards; }
+@keyframes ci-flash { from { opacity: .85; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .ci-flash { animation: none; opacity: 0; } }
