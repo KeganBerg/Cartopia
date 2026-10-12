@@ -1,10 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { EASE_MS, forcedPhase, setLiveEvents } from './liveEvents'
-import { isNight, msUntilNight } from './clock'
-import { sunDay } from './sun'
+import { DAY_MS, isNight, msUntilNight } from './clock'
 
-const DAY_MS = 86_400_000
-const T = sunDay(20_000).noon // a real noon
+const T = 1_000 * DAY_MS // a noon on the town clock
 const ev = (kind: string, from: number, to: number, id = 1) => ({ id, kind, payload: {}, from, to })
 
 describe('live events', () => {
