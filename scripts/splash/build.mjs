@@ -9,7 +9,7 @@
 // The scene matches the link-preview cards: a sunburst panel with the logo, and
 // the player's own race car (in their paint) parked in front of a busy town
 // that slowly pans, in the real season and the game's 20-minute day/night clock
-// (src/game/clock.ts).
+// (src/game/clock.ts), or a live night/day event cached by src/game/liveEvents.ts.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 
@@ -85,7 +85,10 @@ const JS = `(function(){
 var q=new URLSearchParams(location.search),el=document.getElementById('splash');
 var f=document.createElement('link');f.rel='stylesheet';f.href='https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800&display=swap';document.head.appendChild(f);
 if(q.has('nosplash')){el.remove();return}
-var t=q.get('time'),p=t===null?(Date.now()%12e5)/12e5:+t,d=Math.abs(p-.5),n=d<.14?1:d>.26?0:1-(d-.14)/.12;
+var t=q.get('time'),p=t===null?(Date.now()%12e5)/12e5:+t,lv=[];
+try{lv=JSON.parse(localStorage.getItem('cartopia-live-events'))||[]}catch(e){}
+lv.forEach(function(e){var k={night:.5,day:0}[e.kind],now=Date.now();if(t===null&&k!==undefined&&e.from<=now&&now<e.to)p=k});
+var d=Math.abs(p-.5),n=d<.14?1:d>.26?0:1-(d-.14)/.12;
 var m=new Date().getMonth(),tod=n>.7?'night':n>.08?'dusk':'day',season=q.get('season')||(m<2||m>10?'winter':m<5?'spring':m<8?'summer':'fall');
 el.className=tod;
 var key=season+'-'+tod,lq=${JSON.stringify(LQIP)},town=el.querySelector('.town'),ti=town.querySelector('img');
