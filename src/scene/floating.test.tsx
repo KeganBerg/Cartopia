@@ -26,9 +26,8 @@ const runs = (id: string): [number, Scale, number][] => [
   ...(mergeable(id) ? [NOON, MIDNIGHT].flatMap((t) => [1, 4, 7, 10].map((l): [number, Scale, number] => [l, PAIR, t])) : []),
 ]
 
-// Being fixed in their own work: the speedway's sign and seating rings
-// (the "Speedway sign support" thread). Take it out of here once that lands.
-const LATER = new Set(['stadium'])
+// Buildings still being fixed in their own work; none right now.
+const LATER = new Set<string>([])
 
 group('nothing floats', () => {
   for (const def of BUILDINGS.filter((d) => !d.parked && !LATER.has(d.id))) {
