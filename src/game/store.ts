@@ -307,7 +307,7 @@ export const setCrateOpener = (f: typeof crateOpener) => {
 }
 
 // A signed-in player's daily spin is rolled by the server too (wheel_spin() in
-// supabase/pending/wheel_spin.sql); src/lib/crates.ts plugs it in. It returns the spin and any
+// supabase/migrations/0064_wheel_spin.sql); src/lib/crates.ts plugs it in. It returns the spin and any
 // earlier opens the save never counted, or null to roll here (guests). Throws 'soon' or 'spun today'.
 export type ServerSpin = { spin: WheelSpin | null; day: string; pending: CrateOpen[] }
 let wheelSpinner: (() => Promise<ServerSpin | null>) | null = null
