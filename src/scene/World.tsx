@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Atmosphere } from './Atmosphere'
 import { MapControls } from '@react-three/drei'
 import { AnchorProjector, anchorEls } from './anchors'
 import { useThree, type ThreeEvent } from '@react-three/fiber'
-import { Plane, Vector3 } from 'three'
+import { MeshStandardMaterial, Plane, Vector3 } from 'three'
 import { create } from 'zustand'
 import { useGame, canPlace, buyablePlots, lotSize, movable, type PlacedBuilding } from '../game/store'
 import { TILE, PLOT, PLOT_MIN, PLOT_MAX, START_LAND, buildingDef, buildingLevel } from '../game/data'
@@ -28,7 +29,7 @@ import { Outskirts } from './Outskirts'
 import { RoadWear, StreetProp, PROPS, Hydrant, StreetLamp, Sidewalk, CornerCurb, CornerFillet, ENDS, type End } from './Roadside'
 import { toWorld, toTile, DIRS } from './grid'
 import { grassTex, paverTex, meadowTex } from './textures'
-import { roadMat } from './weatherLook'
+import { cloudyGround, roadMat } from './weatherLook'
 import { Weather } from './Weather'
 import { layoutRoads } from './traffic/layout'
 import { LAYER, decal } from './layers'
@@ -39,6 +40,10 @@ import { helpBuilding } from '../lib/help'
 import { hoursOf, seedOf } from '../game/hours'
 import { VIEW, isFree, useFreeCam } from './freeCam'
 import { FreeCam } from './FreeCam'
+
+// Meadow ground that drifting cloud shadows pass over, one per tiling.
+const meadows = new Map<number, MeshStandardMaterial>()
+const meadow = (repeat: number) => meadows.get(repeat) ?? meadows.set(repeat, cloudyGround(meadowTex(repeat))).get(repeat)!
 
 // Every controls instance (a new one is made whenever the camera swaps) aims at
 // the same shared point, so the view stays put across the swap.
@@ -577,7 +582,7 @@ function Interaction() {
         onClick={onClick}
       >
         <planeGeometry args={[ALL, ALL]} />
-        <meshStandardMaterial map={meadowTex(ALL / 16)} />
+        <primitive object={meadow(ALL / 16)} attach="material" dispose={null} />
       </mesh>
       {ghost}
       <MapControls
@@ -657,7 +662,7 @@ export function World() {
           unbought plots (both repeat every 16 units from a half-repeat offset). */}
       <mesh rotation-x={-Math.PI / 2} position-y={LAYER.outer}>
         <planeGeometry args={[OUTER, OUTER]} />
-        <meshStandardMaterial map={meadowTex(OUTER / 16)} />
+        <primitive object={meadow(OUTER / 16)} attach="material" dispose={null} />
       </mesh>
       <Outskirts land={land} roads={roadsList} small={Math.min(window.innerWidth, window.innerHeight) < 700} />
       <ResponsiveZoom />
@@ -680,6 +685,7 @@ export function World() {
       {!free && <Clouds />}
       <SeasonFx small={Math.min(window.innerWidth, window.innerHeight) < 700} />
       <Weather small={Math.min(window.innerWidth, window.innerHeight) < 700} />
+      <Atmosphere small={Math.min(window.innerWidth, window.innerHeight) < 700} />
       <SkyEnv />
       <FreeCam />
       <PostFx look={townLook} town tiltShift={!free} />

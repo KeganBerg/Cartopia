@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { HaloSpot } from './halos'
 import { TILE, levelLift, type BuildingDef } from '../game/data'
 import { useGame } from '../game/store'
 import { signTexture } from './signTexture'
@@ -612,6 +613,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
           <mesh position={[0.2, 1.78, 0]}><boxGeometry args={[0.45, 0.05, 0.08]} />{m(def.color)}</mesh>
           <mesh position={[0.38, 1.72, 0]}><sphereGeometry args={[0.1, 10, 8]} />{bulb}</mesh>
           {!ghost && <LightPool r={0.9} x={0.38} />}
+          {!ghost && <HaloSpot at={[0.38, 1.7, 0]} />}
           {!ghost && <LampDetail iron={def.color} />}
         </group>
       )

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { HaloSpot } from './halos'
 import { Quaternion, Vector3, type Texture } from 'three'
 import { glowMats } from './dayNight'
 import { signMat } from './closingTime'
@@ -124,6 +125,7 @@ export function Lamp({ m, at, h = 0.9, bulb, ghost }: { m: Mat; at: V3; h?: numb
       <mesh position={[0, h + 0.05, 0]}><boxGeometry args={[0.1, 0.1, 0.1]} />{bulb}</mesh>
       <mesh position={[0, h + 0.12, 0]} castShadow><coneGeometry args={[0.09, 0.07, 4]} />{m('#263238')}</mesh>
       {!ghost && <Pool r={0.55} y={0.08} />}
+      {!ghost && <HaloSpot at={[0, h + 0.05, 0]} size={0.7} />}
     </group>
   )
 }

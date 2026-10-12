@@ -24,6 +24,35 @@ describe('weather', () => {
     }
   })
 
+  it('brings mist only on mornings, sun after showers, heat only in summer afternoons', () => {
+    const DAY = 20 * 60 * 1000
+    const phase = (i: number) => ((i * SPELL_MS) % DAY) / DAY
+    let mist = 0, clearing = 0, heat = 0
+    for (const season of ['winter', 'spring', 'summer', 'fall'] as const) {
+      for (let i = 1; i < 4000; i++) {
+        const k = spellKind(i, season)
+        if (k === 'mist') {
+          mist++
+          expect(season).not.toBe('winter')
+          expect(phase(i)).toBeGreaterThanOrEqual(0.68)
+          expect(phase(i)).toBeLessThanOrEqual(0.9)
+        }
+        if (k === 'clearing') {
+          clearing++
+          expect(season).not.toBe('winter')
+          expect(['rain', 'storm', 'drizzle']).toContain(spellKind(i - 1, season))
+        }
+        if (k === 'heat') {
+          heat++
+          expect(season).toBe('summer')
+        }
+      }
+    }
+    expect(mist).toBeGreaterThan(50)
+    expect(clearing).toBeGreaterThan(200)
+    expect(heat).toBeGreaterThan(20)
+  })
+
   it('never puts two storms back to back', () => {
     for (let i = 1; i < 4000; i++) {
       const k = spellKind(i, 'summer')

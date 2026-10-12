@@ -6,14 +6,19 @@ import type { VenueId } from '../scene/venues'
 // player sees the same shower at the same moment. Time is cut into spells of a
 // few minutes; each spell rolls a kind of weather that suits the season (East
 // Coast calendar), fading in and out at its ends. Clear spells stay the most common.
-// ?weather=clear|rain|storm|drizzle|fog|wind|snow|blizzard pins one for testing.
+// ?weather=clear|rain|storm|drizzle|fog|wind|snow|blizzard|mist|clearing|heat pins one for testing.
 //
 // Other parts of the game (sounds, visuals) read weatherNow() each frame, and
 // onThunder() fires a little after each lightning flash.
 
 // 'dust' only blows through the desert race venue; the town never rolls it.
-export type WeatherKind = 'clear' | 'rain' | 'storm' | 'drizzle' | 'fog' | 'wind' | 'snow' | 'blizzard' | 'dust'
-export const WEATHER_KINDS: WeatherKind[] = ['clear', 'rain', 'storm', 'drizzle', 'fog', 'wind', 'snow', 'blizzard', 'dust']
+// Three gentler kinds only happen in town, and only on top of a clear sky:
+// 'mist' lies low on spring, summer and fall mornings; 'clearing' follows a
+// shower (wet streets drying in the sun, maybe a rainbow); 'heat' is a summer
+// afternoon scorcher.
+export type WeatherKind = 'clear' | 'rain' | 'storm' | 'drizzle' | 'fog' | 'wind' | 'snow' | 'blizzard' | 'dust' | 'mist' | 'clearing' | 'heat'
+export const WEATHER_KINDS: WeatherKind[] = ['clear', 'rain', 'storm', 'drizzle', 'fog', 'wind', 'snow', 'blizzard', 'dust', 'mist', 'clearing', 'heat']
+export const TOWN_ONLY = new Set<WeatherKind>(['mist', 'clearing', 'heat'])
 
 // What a kind looks like at full strength. All 0..1.
 // rain/snow: how hard it falls. cloud: how overcast and dim. haze: how far you can see
@@ -29,18 +34,30 @@ export const FEEL: Record<WeatherKind, Feel> = {
   snow: { rain: 0, snow: 0.55, cloud: 0.55, haze: 0.3, wind: 0.2, dust: 0 },
   blizzard: { rain: 0, snow: 1, cloud: 0.8, haze: 0.8, wind: 1, dust: 0 },
   dust: { rain: 0, snow: 0, cloud: 0.3, haze: 0.6, wind: 1, dust: 1 },
+  mist: { rain: 0, snow: 0, cloud: 0.05, haze: 0.3, wind: 0, dust: 0 },
+  clearing: { rain: 0, snow: 0, cloud: 0.08, haze: 0.05, wind: 0.1, dust: 0 },
+  heat: { rain: 0, snow: 0, cloud: 0, haze: 0.12, wind: 0, dust: 0 },
 }
+
+const RAINY = new Set<WeatherKind>(['rain', 'storm', 'drizzle'])
 
 // Odds of each kind per spell, by season. Summer fog only rolls in the morning.
 const ODDS: Record<Season, [WeatherKind, number][]> = {
   spring: [['clear', 55], ['rain', 22], ['storm', 10], ['drizzle', 6], ['fog', 7]],
   summer: [['clear', 60], ['rain', 10], ['storm', 18], ['fog', 12]],
-  fall: [['clear', 52], ['drizzle', 16], ['wind', 18], ['rain', 10], ['fog', 4]],
+  fall: [['clear', 52], ['drizzle', 16], ['wind', 18], ['rain', 10], ['fog', 6]],
   winter: [['clear', 48], ['snow', 32], ['blizzard', 14], ['wind', 6]],
 }
 
+// How often a clear morning is misty, by season.
+const MIST: Record<Season, number> = { spring: 0.45, summer: 0.4, fall: 0.6, winter: 0 }
+
+
 export const SPELL_MS = 4 * 60 * 1000
 const FADE_MS = 35 * 1000
+
+// Where a spell falls in the day: 0 is noon, 0.5 midnight (like dayPhase).
+const phaseOf = (index: number) => (((index * SPELL_MS) % DAY_MS) + DAY_MS) % DAY_MS / DAY_MS
 
 const PIN = (() => {
   if (typeof location === 'undefined') return null
@@ -57,21 +74,32 @@ function hash(n: number) {
 }
 
 // The kind of weather a spell brings.
-export function spellKind(index: number, season: Season = SEASON): WeatherKind {
-  if (PIN) return PIN
+// The season's roll for a spell, before the fix-ups below.
+function rolled(index: number, season: Season): WeatherKind {
   const odds = ODDS[season]
   const total = odds.reduce((s, [, w]) => s + w, 0)
   let r = hash(index * 7 + season.length) * total
-  let kind: WeatherKind = 'clear'
-  for (const [k, w] of odds) {
-    if ((r -= w) < 0) { kind = k; break }
-  }
+  for (const [k, w] of odds) if ((r -= w) < 0) return k
+  return 'clear'
+}
+
+export function spellKind(index: number, season: Season = SEASON): WeatherKind {
+  if (PIN) return PIN
+  let kind = rolled(index, season)
   // Two big storms in a row feel endless: the second one calms to rain or snow.
   if ((kind === 'storm' || kind === 'blizzard') && spellKind(index - 1, season) === kind) kind = kind === 'storm' ? 'rain' : 'snow'
-  if (kind === 'fog' && season === 'summer') {
-    // Morning: from just before dawn to mid-morning (0.5 is midnight, 0 noon).
-    const phase = (((index * SPELL_MS) % DAY_MS) + DAY_MS) % DAY_MS / DAY_MS
-    if (phase < 0.68 || phase > 0.9) kind = 'clear'
+  const phase = phaseOf(index)
+  // Morning: from just before dawn to mid-morning.
+  const morning = phase >= 0.68 && phase <= 0.9
+  if (kind === 'fog' && season === 'summer' && !morning) kind = 'clear'
+  if (kind === 'clear') {
+    const roll = hash(index * 13 + 5)
+    // The sun comes out on wet streets after most showers.
+    if (season !== 'winter' && RAINY.has(rolled(index - 1, season))) {
+      if (roll < 0.7) kind = 'clearing'
+    } else if (morning && roll < MIST[season]) kind = 'mist'
+    // Summer afternoons (noon to late afternoon) can bake.
+    else if (season === 'summer' && (phase < 0.2 || phase > 0.95) && roll > 0.6) kind = 'heat'
   }
   return kind
 }
@@ -114,14 +142,15 @@ function feelAt(now: number, out: Feel & { kind: WeatherKind; strength: number }
 const STEP_MS = 5000
 const scratch = { kind: 'clear' as WeatherKind, strength: 0, rain: 0, snow: 0, cloud: 0, haze: 0, wind: 0, dust: 0 }
 function groundAt(now: number) {
-  if (PIN) return { wet: FEEL[PIN].rain > 0 ? 1 : 0, cover: FEEL[PIN].snow > 0 ? 1 : 0 }
+  if (PIN) return { wet: FEEL[PIN].rain > 0 ? 1 : PIN === 'clearing' ? 0.7 : 0, cover: FEEL[PIN].snow > 0 ? 1 : 0 }
   let wet = 0, cover = 0
   const start = Math.floor(now / STEP_MS) * STEP_MS - 2 * SPELL_MS
   for (let t = start; t <= now; t += STEP_MS) {
     const f = feelAt(t, scratch)
     const dt = STEP_MS / 1000
     // Soaks in about 40 s of real rain, dries in about two minutes.
-    wet = f.rain > 0.05 ? Math.min(1, wet + dt * (0.6 + f.rain) / 40) : Math.max(0, wet - dt / 120)
+    // Puddles hang on longer while the sun comes out after a shower.
+    wet = f.rain > 0.05 ? Math.min(1, wet + dt * (0.6 + f.rain) / 40) : Math.max(0, wet - dt / (f.kind === 'clearing' ? 260 : 120))
     // Snow settles over a minute or so and melts slowly.
     cover = f.snow > 0.05 ? Math.min(1, cover + dt * (0.4 + f.snow) / 60) : Math.max(0, cover - dt / 150)
   }
@@ -194,7 +223,7 @@ export function raceWeather(venue: VenueId, seed?: string, force?: WeatherKind):
   if (PIN) kind = town.kind
   else if (force) kind = force
   else if (seed) kind = rollVenue(venue, seedRoll(seed))
-  else kind = town.kind !== 'clear' && town.strength > 0.3 ? town.kind : rollVenue(venue, Math.random())
+  else kind = town.kind !== 'clear' && !TOWN_ONLY.has(town.kind) && town.strength > 0.3 ? town.kind : rollVenue(venue, Math.random())
   if (force && !PIN) kind = force
   else if (venue === 'snow') kind = AS_SNOW[kind] ?? kind
   else if (venue === 'desert') kind = IN_DESERT[kind] ?? kind

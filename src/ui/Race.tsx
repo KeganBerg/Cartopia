@@ -620,7 +620,7 @@ function tourRival(race: number): Rival {
   }
 }
 
-const SKY_ICON: Record<WeatherKind, string> = { clear: '☀️', rain: '🌧️', storm: '⛈️', drizzle: '🌦️', fog: '🌫️', wind: '💨', snow: '🌨️', blizzard: '❄️', dust: '🌪️' }
+const SKY_ICON: Record<WeatherKind, string> = { clear: '☀️', rain: '🌧️', storm: '⛈️', drizzle: '🌦️', fog: '🌫️', wind: '💨', snow: '🌨️', blizzard: '❄️', dust: '🌪️', mist: '🌁', clearing: '🌈', heat: '🔆' }
 
 // Pro Tour (game/tour.ts): the endless ladder. Shows the leg being raced, the legs
 // either side of it on a strip, and the five races of the current leg.
