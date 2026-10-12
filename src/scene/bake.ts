@@ -1,5 +1,4 @@
-import { BufferAttribute, BufferGeometry, Color, DoubleSide, FrontSide, Material, MeshBasicMaterial, MeshStandardMaterial, type Matrix3, type Matrix4, type Texture } from 'three'
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { BufferAttribute, BufferGeometry, Color, DoubleSide, FrontSide, Material, Matrix3, MeshBasicMaterial, MeshStandardMaterial, type Matrix4, type Texture } from 'three'
 import { weatherBaked } from './weatherLook'
 import { withSkin } from './skins'
 
@@ -17,35 +16,102 @@ import { withSkin } from './skins'
 export type Finish = { color: Color | string; metal?: number; rough?: number; unlit?: boolean; emissive?: Color; glow?: boolean; double?: boolean; uv?: Matrix3; skin?: number }
 
 const tmp = new Color()
+const normalMat = new Matrix3()
 
 // Merge parts (each optionally moved by a matrix) into one indexed geometry carrying
 // `color` (linear RGB, as a material's colour is), `emissive` (colour times intensity)
 // and `look` (metalness, roughness, unlit, glow). `uvs` keeps texture coordinates.
 // When any part sets a skin (0 for none), every part gets a `skin` number.
+// Written straight into one set of arrays: a big town bakes tens of thousands of
+// parts, and copying each into its own geometry first cost phones seconds.
 export function bake(parts: [BufferGeometry, Finish, Matrix4?][], uvs = false) {
   const skinned = parts.some(([, f]) => f.skin !== undefined)
-  const list = parts.map(([geo, f, m]) => {
+  let verts = 0
+  let tris = 0
+  for (const [geo, f] of parts) {
+    const both = f.double ? 2 : 1
+    const n = geo.getAttribute('position').count
+    verts += n * both
+    tris += (geo.index ? geo.index.count : n) * both
+  }
+  const position = new Float32Array(verts * 3)
+  const normal = new Float32Array(verts * 3)
+  const uv = uvs ? new Float32Array(verts * 2) : null
+  const color = new Float32Array(verts * 3)
+  const emissive = new Float32Array(verts * 3)
+  const look = new Float32Array(verts * 4)
+  const skin = skinned ? new Float32Array(verts) : null
+  const index = verts > 65535 ? new Uint32Array(tris) : new Uint16Array(tris)
+  let v = 0
+  let t = 0
+  for (const [geo, f, m] of parts) {
     const pos = geo.getAttribute('position')
+    const nor = geo.getAttribute('normal')
     const n = pos.count
-    const g = new BufferGeometry()
-    g.setAttribute('position', pos.clone())
-    g.setAttribute('normal', geo.getAttribute('normal').clone())
-    g.setIndex(geo.index ? geo.index.clone() : new BufferAttribute(Uint32Array.from({ length: n }, (_, i) => i), 1))
-    if (uvs) {
-      const uv = geo.getAttribute('uv').clone()
-      if (f.uv) uv.applyMatrix3(f.uv)
-      g.setAttribute('uv', uv)
+    const start = v
+    const e = m?.elements
+    if (m) normalMat.getNormalMatrix(m)
+    const ne = normalMat.elements
+    for (let i = 0; i < n; i++, v++) {
+      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i)
+      if (e) {
+        const w = 1 / (e[3] * x + e[7] * y + e[11] * z + e[15])
+        position[v * 3] = (e[0] * x + e[4] * y + e[8] * z + e[12]) * w
+        position[v * 3 + 1] = (e[1] * x + e[5] * y + e[9] * z + e[13]) * w
+        position[v * 3 + 2] = (e[2] * x + e[6] * y + e[10] * z + e[14]) * w
+      } else {
+        position[v * 3] = x
+        position[v * 3 + 1] = y
+        position[v * 3 + 2] = z
+      }
+      let a = nor.getX(i), b = nor.getY(i), c = nor.getZ(i)
+      if (e) {
+        const na = ne[0] * a + ne[3] * b + ne[6] * c
+        const nb = ne[1] * a + ne[4] * b + ne[7] * c
+        const nc = ne[2] * a + ne[5] * b + ne[8] * c
+        const l = Math.sqrt(na * na + nb * nb + nc * nc) || 1
+        a = na / l
+        b = nb / l
+        c = nc / l
+      }
+      normal[v * 3] = a
+      normal[v * 3 + 1] = b
+      normal[v * 3 + 2] = c
     }
-    if (m) g.applyMatrix4(m)
+    if (uv) {
+      const src = geo.getAttribute('uv')
+      const u = f.uv?.elements
+      for (let i = 0; i < n; i++) {
+        const x = src.getX(i), y = src.getY(i)
+        uv[(start + i) * 2] = u ? u[0] * x + u[3] * y + u[6] : x
+        uv[(start + i) * 2 + 1] = u ? u[1] * x + u[4] * y + u[7] : y
+      }
+    }
+    const idx = geo.index
+    const count = idx ? idx.count : n
+    for (let i = 0; i < count; i++) index[t + i] = (idx ? idx.getX(i) : i) + start
+    t += count
     // Double-sided parts get a reversed copy of every triangle with the normals flipped,
     // so one front-sided material draws (and shadows) both faces.
-    const both = f.double ? 2 : 1
-    const color = new Float32Array(n * 3 * both)
-    const emissive = new Float32Array(n * 3 * both)
-    const look = new Float32Array(n * 4 * both)
+    if (f.double) {
+      position.copyWithin(v * 3, start * 3, (start + n) * 3)
+      for (let i = 0; i < n * 3; i++) normal[v * 3 + i] = -normal[start * 3 + i]
+      if (uv) uv.copyWithin(v * 2, start * 2, (start + n) * 2)
+      for (let i = 0; i < count; i += 3) {
+        index[t + i] = index[t - count + i] + n
+        index[t + i + 1] = index[t - count + i + 2] + n
+        index[t + i + 2] = index[t - count + i + 1] + n
+      }
+      v += n
+      t += count
+    }
     if (typeof f.color === 'string') tmp.set(f.color)
     else tmp.copy(f.color)
-    for (let i = 0; i < n * both; i++) {
+    const metal = f.metal ?? 0
+    const rough = f.rough ?? 1
+    const unlit = f.unlit ? 1 : 0
+    const glow = f.glow ? 1 : 0
+    for (let i = start; i < v; i++) {
       color[i * 3] = tmp.r
       color[i * 3 + 1] = tmp.g
       color[i * 3 + 2] = tmp.b
@@ -54,44 +120,23 @@ export function bake(parts: [BufferGeometry, Finish, Matrix4?][], uvs = false) {
         emissive[i * 3 + 1] = f.emissive.g
         emissive[i * 3 + 2] = f.emissive.b
       }
-      look[i * 4] = f.metal ?? 0
-      look[i * 4 + 1] = f.rough ?? 1
-      look[i * 4 + 2] = f.unlit ? 1 : 0
-      look[i * 4 + 3] = f.glow ? 1 : 0
+      look[i * 4] = metal
+      look[i * 4 + 1] = rough
+      look[i * 4 + 2] = unlit
+      look[i * 4 + 3] = glow
     }
-    if (f.double) withBackFaces(g)
-    g.setAttribute('color', new BufferAttribute(color, 3))
-    g.setAttribute('emissive', new BufferAttribute(emissive, 3))
-    g.setAttribute('look', new BufferAttribute(look, 4))
-    if (skinned) g.setAttribute('skin', new BufferAttribute(new Float32Array(n * both).fill(f.skin ?? 0), 1))
-    return g
-  })
-  const out = mergeGeometries(list)!
-  list.forEach((g) => g.dispose())
-  return out
-}
-
-function withBackFaces(g: BufferGeometry) {
-  const p = g.getAttribute('position').array
-  const nr = g.getAttribute('normal').array
-  const n = p.length / 3
-  const pos = new Float32Array(n * 6)
-  const nor = new Float32Array(n * 6)
-  pos.set(p)
-  pos.set(p, n * 3)
-  nor.set(nr)
-  for (let i = 0; i < n * 3; i++) nor[n * 3 + i] = -nr[i]
-  const idx = g.index!.array
-  const out = new Uint32Array(idx.length * 2)
-  out.set(idx)
-  for (let t = 0; t < idx.length; t += 3) {
-    out[idx.length + t] = idx[t] + n
-    out[idx.length + t + 1] = idx[t + 2] + n
-    out[idx.length + t + 2] = idx[t + 1] + n
+    if (skin) skin.fill(f.skin ?? 0, start, v)
   }
-  g.setAttribute('position', new BufferAttribute(pos, 3))
-  g.setAttribute('normal', new BufferAttribute(nor, 3))
-  g.setIndex(new BufferAttribute(out, 1))
+  const out = new BufferGeometry()
+  out.setAttribute('position', new BufferAttribute(position, 3))
+  out.setAttribute('normal', new BufferAttribute(normal, 3))
+  if (uv) out.setAttribute('uv', new BufferAttribute(uv, 2))
+  out.setAttribute('color', new BufferAttribute(color, 3))
+  out.setAttribute('emissive', new BufferAttribute(emissive, 3))
+  out.setAttribute('look', new BufferAttribute(look, 4))
+  if (skin) out.setAttribute('skin', new BufferAttribute(skin, 1))
+  out.setIndex(new BufferAttribute(index, 1))
+  return out
 }
 
 // A standard material whose colour, glow, metalness and roughness come from the
