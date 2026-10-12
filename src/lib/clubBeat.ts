@@ -3,16 +3,18 @@
 // moment it will be heard, so the lights land on the note without listening to
 // the sound. Only the kick moves the colour on, once a beat ("doot doot doot
 // doot"); the other parts (bass, chords, hats, claps, the acid line) only make
-// the lights flash, each night's groove in its own way (clubLeds.ts). With no
-// music (muted, sound off, or too far from the club to hear it) the lights
-// keep a gentle pulse at the night's tempo instead.
-import { GROOVES, grooveFor } from './clubGrooves'
+// the lights flash, each groove of the club's set in its own way
+// (clubLeds.ts). With no music (muted, sound off, or too far from the club to
+// hear it) the lights keep a gentle pulse at the set's tempo instead.
+import { SET_BPM } from './clubSet'
 import { SIXTEENTH_MS, technoBeat, technoDrop, technoOn } from '../game/techno'
 
-export type CueKind = 'kick' | 'bass' | 'stab' | 'acid' | 'clap' | 'hat' | 'open'
-export const CUES: CueKind[] = ['kick', 'bass', 'stab', 'acid', 'clap', 'hat', 'open']
+// 'beat' marks every beat of the set, kick or not (a breakdown has none), so
+// the dancers keep time; it never flashes.
+export type CueKind = 'kick' | 'bass' | 'stab' | 'acid' | 'clap' | 'hat' | 'open' | 'beat'
+export const CUES: CueKind[] = ['kick', 'bass', 'stab', 'acid', 'clap', 'hat', 'open', 'beat']
 // How fast each part's flash dies away (ms): a hat is a blink, a chord rings.
-const FADE: Record<CueKind, number> = { kick: 140, bass: 220, stab: 240, acid: 110, clap: 110, hat: 45, open: 150 }
+const FADE: Record<CueKind, number> = { kick: 140, bass: 220, stab: 240, acid: 110, clap: 110, hat: 45, open: 150, beat: 1 }
 
 type Hit = { at: number; kind: CueKind; amt: number; groove: number }
 const hits: Hit[] = []
@@ -40,13 +42,13 @@ export type ClubPulse = {
   flash: number // 0..1, peaks on each kick and fades
   live: boolean // following the music (false: the muted pulse)
   groove: number // the groove playing (-1: none, the muted pulse or Rave Mode)
-  beat: number // 0..1 through the current beat, from the last kick
+  beat: number // 0..1 through the current beat
   env: Record<CueKind, number> // 0..1 per part, peaking on each of its notes
 }
 
 const env = (now: number) => Object.fromEntries(CUES.map((k) => [k, last[k].amt * Math.exp(-Math.max(0, now - last[k].at) / FADE[k]) * (now >= last[k].at ? 1 : 0)])) as Record<CueKind, number>
 
-export function clubPulse(now = performance.now(), bpm = GROOVES[grooveFor()].bpm): ClubPulse {
+export function clubPulse(now = performance.now(), bpm = SET_BPM): ClubPulse {
   // Rave Mode: everything follows the event's kick, on the shared clock (so
   // it keeps time while muted too), a new colour on every kick. Through the
   // kickless breakdown the colour holds.
@@ -72,10 +74,11 @@ export function clubPulse(now = performance.now(), bpm = GROOVES[grooveFor()].bp
       step++
       kickAt = h.at
     }
+    if (h.kind === 'beat') kickAt = h.at
     if (now - h.at < FADE[h.kind] * 3) last[h.kind] = { at: h.at, amt: h.amt }
   }
   const live = now - heard < QUIET_MS
-  const beatMs = 60000 / (live && GROOVES[groove] ? GROOVES[groove].bpm : bpm)
+  const beatMs = 60000 / bpm
   if (!live) {
     const beat = Math.floor(now / beatMs)
     if (beat !== pulse) {

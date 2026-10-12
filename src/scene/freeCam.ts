@@ -12,7 +12,9 @@ export const setFreeCam = (on: boolean) => useFreeCam.setState({ on })
 export const VIEW = new Vector3()
 
 // Limits on the free view: how close and far it may get, and how low it may tilt
-// (just above the horizon, so the sky and the hills come into view).
-export const FREE = { fovWide: 42, fovTall: 52, near: 0.5, far: 2600, minDist: 5, maxDist: 170, minPolar: 0.12, maxPolar: 1.45 }
+// (just above the horizon, so the sky and the hills come into view). `near`
+// sets how fine depth is far off (see coplanar.test.tsx): at 1 two faces 0.002
+// apart still sort right at the furthest zoom; halving it doubles that gap.
+export const FREE = { fovWide: 42, fovTall: 52, near: 1, far: 2600, minDist: 5, maxDist: 170, minPolar: 0.12, maxPolar: 1.45 }
 
 export const isFree = (c: Camera): c is PerspectiveCamera => (c as PerspectiveCamera).isPerspectiveCamera === true

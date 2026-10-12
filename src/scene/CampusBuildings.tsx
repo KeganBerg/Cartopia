@@ -103,12 +103,12 @@ function SchoolBus({ m, at, rot = 0 }: { m: Mat; at: V3; rot?: number }) {
           <Box m={m} at={[0, 0.51, -0.06]} s={[0.4, 0.04, 1.08]} c="#fafafa" />
           {[-1, 1].map((sd) => (
             <group key={sd}>
-              <Box m={m} at={[sd * 0.222, 0.4, -0.08]} s={[0.006, 0.12, 0.96]} c="#263238" shadow={false} />
-              {[0.22, 0.14].map((y) => <Box key={y} m={m} at={[sd * 0.223, y, -0.06]} s={[0.006, 0.02, 1.1]} c="#212121" shadow={false} />)}
+              <Box m={m} at={[sd * 0.226, 0.4, -0.08]} s={[0.006, 0.12, 0.96]} c="#263238" shadow={false} />
+              {[0.22, 0.14].map((y) => <Box key={y} m={m} at={[sd * 0.228, y, -0.06]} s={[0.006, 0.02, 1.1]} c="#212121" shadow={false} />)}
             </group>
           ))}
           <Box m={m} at={[0, 0.4, 0.487]} s={[0.36, 0.13, 0.006]} c="#263238" shadow={false} />
-          <Box m={m} at={[0, 0.48, 0.498]} s={[0.24, 0.05, 0.01]} c="#212121" shadow={false} />
+          <Box m={m} at={[0, 0.48, 0.505]} s={[0.24, 0.05, 0.01]} c="#212121" shadow={false} />
           <Box m={m} at={[-0.25, 0.32, 0.3]} s={[0.05, 0.1, 0.01]} c="#d32f2f" shadow={false} />
           <Box m={m} at={[0, 0.12, 0.69]} s={[0.46, 0.06, 0.03]} c="#212121" shadow={false} />
           {[0.42, -0.38].map((z) => (
@@ -141,7 +141,7 @@ function FrontWindows({ m, win, xs, y, z, w = 0.34, h = 0.36 }: { m: Mat; win: R
 function Portico({ m, x, z, w, h, n, c = '#fafafa' }: { m: Mat; x: number; z: number; w: number; h: number; n: number; c?: string }) {
   return (
     <group position={[x, 0, z]}>
-      {[0, 1, 2].map((i) => <Box key={i} m={m} at={[0, 0.03 + i * 0.05, 0.12 - i * 0.07 + 0.12]} s={[w + 0.3 - i * 0.1, 0.06 + i * 0.05, 0.3]} c="#e0e0e0" shadow={false} />)}
+      {[0, 1, 2].map((i) => <Box key={i} m={m} at={[0, 0.033 + i * 0.05, 0.12 - i * 0.07 + 0.12]} s={[w + 0.3 - i * 0.1, 0.066 + i * 0.05, 0.3]} c="#e0e0e0" shadow={false} />)}
       {Array.from({ length: n }, (_, i) => (
         <Cyl key={i} m={m} at={[-w / 2 + (w * i) / (n - 1), h / 2 + 0.12, 0]} r={0.06} r2={0.07} h={h - 0.12} c={c} seg={10} />
       ))}
@@ -245,8 +245,8 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
           <Box m={m} at={[0, 0.03, 0]} s={[3.894, 0.06, 3.9]} c="#ffffff" t={grassTex(2, 2)} shadow={false} />
           {/* Bus loop along the front with a yellow curb. */}
           <Box m={m} at={[0, 0.035, 1.5]} s={[3.9, 0.07, 0.8]} c="#ffffff" t={asphaltTex()} shadow={false} />
-          <Box m={m} at={[0, 0.06, 1.08]} s={[3.9, 0.05, 0.06]} c={YELLOW} shadow={false} />
-          <Paint m={m} at={[-0.6, 0.072, 1.82]} s={[0.9, 0.18]} c={YELLOW} />
+          <Box m={m} at={[0, 0.06, 1.08]} s={[3.88, 0.05, 0.06]} c={YELLOW} shadow={false} />
+          <Paint m={m} at={[-0.6, 0.075, 1.82]} s={[0.9, 0.18]} c={YELLOW} />
           <SchoolBus m={m} at={[-0.95, 0.07, 1.5]} rot={Math.PI / 2} />
           {lvl >= 5 && <SchoolBus m={m} at={[0.75, 0.07, 1.5]} rot={Math.PI / 2} />}
           {/* Path to the door and a flag out front. */}
@@ -278,10 +278,11 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
           </group>
           {/* Playground and blacktop: rubber matting, swings, a slide, hopscotch and four-square. */}
           <Box m={m} at={[1.05, 0.065, 0.45]} s={[1.6, 0.03, 1.05]} c="#e57373" shadow={false} />
-          <Paint m={m} at={[0.7, 0.083, 0.45]} s={[0.5, 0.5]} c={PAINT} />
-          <Paint m={m} at={[0.7, 0.085, 0.45]} s={[0.46, 0.46]} c="#e57373" />
-          <Paint m={m} at={[0.7, 0.087, 0.45]} s={[0.5, 0.02]} />
-          <Paint m={m} at={[0.7, 0.087, 0.45]} s={[0.02, 0.5]} />
+          {/* Paint layers a clear step apart (see coplanar.test.tsx). */}
+          <Paint m={m} at={[0.7, 0.084, 0.45]} s={[0.5, 0.5]} c={PAINT} />
+          <Paint m={m} at={[0.7, 0.088, 0.45]} s={[0.46, 0.46]} c="#e57373" />
+          <Paint m={m} at={[0.7, 0.092, 0.45]} s={[0.5, 0.02]} />
+          <Paint m={m} at={[0.7, 0.092, 0.45]} s={[0.02, 0.5]} />
           {[0, 1, 2, 3].map((i) => <Paint key={i} m={m} at={[1.3 + (i % 2) * 0.1 - 0.05, 0.085, 0.75 - i * 0.14]} s={[0.12, 0.12]} c={['#fdd835', '#4fc3f7', '#81c784', '#ce93d8'][i]} />)}
           <group position={[1.55, 0.08, 0.2]}>
             {[-0.3, 0.3].map((x) => [-1, 1].map((sd) => <Box key={`${x}${sd}`} m={m} at={[x, 0.38, sd * 0.13]} rot={[-sd * 0.32, 0, 0]} s={[0.04, 0.78, 0.04]} c="#ff7043" />))}
@@ -292,7 +293,7 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
           </group>
           <group position={[0.45, 0.08, 0.15]}>
             <Box m={m} at={[0, 0.32, 0]} s={[0.3, 0.04, 0.3]} c={YELLOW} />
-            {[[-0.13, -0.13], [0.13, -0.13], [-0.13, 0.13], [0.13, 0.13]].map(([x, z]) => <Box key={`${x}${z}`} m={m} at={[x, 0.17, z]} s={[0.035, 0.34, 0.035]} c="#1e88e5" />)}
+            {[[-0.13, -0.13], [0.13, -0.13], [-0.13, 0.13], [0.13, 0.13]].map(([x, z]) => <Box key={`${x}${z}`} m={m} at={[x, 0.165, z]} s={[0.035, 0.33, 0.035]} c="#1e88e5" />)}
             <Box m={m} at={[0.32, 0.18, 0]} rot={[0, 0, -0.6]} s={[0.46, 0.03, 0.18]} c="#43a047" />
           </group>
           {/* Welcome sign with this week's news, a bench and a bike rack. */}
@@ -328,7 +329,7 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
           <Box m={m} at={[0, 0.03, 0]} s={[5.894, 0.06, 3.9]} c="#ffffff" t={grassTex(3, 2)} shadow={false} />
           {/* Student parking in front: stalls, a few cars and a bus at the kerb. */}
           <Box m={m} at={[-1.45, 0.035, 1.2]} s={[2.95, 0.07, 1.45]} c="#ffffff" t={asphaltTex()} shadow={false} />
-          {[-2.6, -2.1, -1.6, -1.1, -0.6].map((x) => <Paint key={x} m={m} at={[x, 0.072, 0.85]} s={[0.03, 0.55]} />)}
+          {[-2.6, -2.1, -1.6, -1.1, -0.6].map((x) => <Paint key={x} m={m} at={[x, 0.075, 0.85]} s={[0.03, 0.55]} />)}
           {live && ([[-2.35, '#e53935'], [-1.85, '#fafafa'], [-0.85, '#1e88e5']] as const).map(([x, c]) => <BlockCar key={x} m={m} at={[x, 0.07, 0.85]} c={c} rot={Math.PI} />)}
           {live && lvl >= 4 && <BlockCar m={m} at={[-1.35, 0.07, 0.85]} c="#43a047" rot={Math.PI} />}
           <SchoolBus m={m} at={[-1.6, 0.07, 1.6]} rot={Math.PI / 2} />
@@ -368,8 +369,8 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
           </group>
           {/* Bleachers on the near side and a scoreboard at the far end. */}
           <group position={[0.42, 0.06, 0]}>
-            {[0, 1, 2, 3].map((i) => <Box key={i} m={m} at={[-i * 0.07, 0.07 + i * 0.1, 0]} s={[0.1, 0.14 + i * 0.2, i % 2 ? 1.796 : 1.8]} c={i % 2 ? '#b0bec5' : '#cfd8dc'} />)}
-            <Box m={m} at={[-0.252, 0.75, 0]} s={[0.02, 0.4, 1.8]} c="#90a4ae" shadow={false} />
+            {[0, 1, 2, 3].map((i) => <Box key={i} m={m} at={[-i * 0.07, 0.07 + i * 0.1, 0]} s={[0.1, 0.14 + i * 0.2, i % 2 ? 1.79 : 1.8]} c={i % 2 ? '#b0bec5' : '#cfd8dc'} />)}
+            <Box m={m} at={[-0.256, 0.75, 0]} s={[0.02, 0.4, 1.8]} c="#90a4ae" shadow={false} />
           </group>
           {live && (
             <group position={[1.0, 0.06, -1.85]} rotation-y={0.3}>

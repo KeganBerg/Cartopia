@@ -6,6 +6,9 @@ import { choir, glock, hz, marimba, pluck, shaker, softKick, vibes, woodblock } 
 
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
+// Sound effects and engines go through their own fader into the master, so
+// Settings can turn them down without touching the music or town sounds.
+let effects: GainNode | null = null
 let muted = (() => {
   try {
     return localStorage.getItem('cartopia-muted') === '1'
@@ -42,6 +45,15 @@ function softClip(c: BaseAudioContext) {
   return w
 }
 
+let effectsVolume = (() => {
+  try {
+    const v = localStorage.getItem('cartopia-sfx-volume')
+    return v !== null && Number.isFinite(Number(v)) ? Math.min(1, Math.max(0, Number(v))) : 1
+  } catch {
+    return 1
+  }
+})()
+
 const listeners = new Set<() => void>()
 const hidden = () => typeof document !== 'undefined' && document.hidden
 
@@ -53,6 +65,9 @@ function audio() {
       master = ctx.createGain()
       master.gain.value = volume
       master.connect(softClip(ctx)).connect(ctx.destination)
+      effects = ctx.createGain()
+      effects.gain.value = effectsVolume
+      effects.connect(master)
     } catch {
       return null
     }
@@ -81,6 +96,8 @@ if (typeof document !== 'undefined') document.addEventListener('visibilitychange
 // The shared context and master output for other synthesised audio; null while muted.
 export const audioContext = () => audio()
 export const audioOut = (): AudioNode | null => (audio() ? master : null)
+// The effects fader: sound effects, engines and the arcade play through this.
+export const sfxOut = (): AudioNode | null => (audio() ? effects : null)
 
 // iPhone: audio may only start inside a tap, and the ring/silent switch mutes
 // web audio unless the page asks for media playback.
@@ -130,6 +147,17 @@ export function setVolume(v: number) {
   if (ctx && master && !muted && !hidden()) master.gain.setTargetAtTime(volume, ctx.currentTime, 0.05)
   listeners.forEach((l) => l())
 }
+export const getSfxVolume = () => effectsVolume
+export function setSfxVolume(v: number) {
+  effectsVolume = Math.min(1, Math.max(0, v))
+  try {
+    localStorage.setItem('cartopia-sfx-volume', String(effectsVolume))
+  } catch {
+    /* storage unavailable */
+  }
+  if (ctx && effects) effects.gain.setTargetAtTime(effectsVolume, ctx.currentTime, 0.05)
+  listeners.forEach((l) => l())
+}
 export function onMuteChange(l: () => void) {
   listeners.add(l)
   return () => listeners.delete(l)
@@ -138,8 +166,8 @@ export function onMuteChange(l: () => void) {
 // Each effect is played on a little instrument (see instruments.ts) rather than a raw beep.
 function play(f: (d: { ctx: BaseAudioContext; out: AudioNode }, t: number) => void, delay = 0) {
   const a = audio()
-  if (!a || !master) return
-  f({ ctx: a, out: master }, a.currentTime + 0.005 + delay)
+  if (!a || !effects) return
+  f({ ctx: a, out: effects }, a.currentTime + 0.005 + delay)
 }
 
 // A soft car horn: two filtered reed-like tones, not square-wave beeps.

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
-import { NeutralToneMapping } from 'three'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { NeutralToneMapping, type Material, type Mesh } from 'three'
 import { World } from './scene/World'
 import { Hud } from './ui/Hud'
 import { FlyLayer } from './ui/Fly'
@@ -25,7 +25,7 @@ import { BankPanel } from './ui/Bank'
 import { DealsPanel } from './ui/Deals'
 import { CratesPanel } from './ui/Crates'
 import { LevelUpSplash } from './ui/LevelUp'
-import { AccountPanel } from './ui/Account'
+import { AccountPanel, openLegal } from './ui/Account'
 import { AlertsCard } from './ui/Alerts'
 import { WelcomeBack } from './ui/WelcomeBack'
 import { GiftWatcher, GiftsPanel } from './ui/Gifts'
@@ -52,6 +52,7 @@ import { visitorTick, forceVisitor } from './lib/visitors'
 import type { VisitorKind } from './game/data'
 import { hideSplash, splashProgress } from './lib/splash'
 import { rememberSplashCar } from './lib/splashCar'
+import { usePrefs } from './lib/prefs'
 
 // Phones get a lighter renderer: lower pixel ratio keeps iOS from dropping the WebGL context.
 const SMALL = typeof window !== 'undefined' && Math.min(window.innerWidth, window.innerHeight) < 700
@@ -61,6 +62,7 @@ export default function App() {
   const liveRace = useLive((l) => l.race)
   const tick = useGame((s) => s.tick)
   const townPaused = useTownPaused()
+  const graphics = usePrefs((p) => p.graphics)
   useCrewGoalWatcher()
   useCrewBattleWatcher()
 
@@ -70,6 +72,9 @@ export default function App() {
     startMusic()
     startTechnoMusic()
     joinLobby()
+    // /terms and /privacy open in the Menu when the dev server (or an old cached page) serves the game there.
+    const legal = location.pathname.replace(/\/$/, '').slice(1)
+    if (legal === 'terms' || legal === 'privacy') openLegal(legal)
     // ?chatdemo shows sample messages so the chat window can be checked signed out.
     if (new URLSearchParams(location.search).has('chatdemo')) chatDemo()
     else startChat()
@@ -97,7 +102,7 @@ export default function App() {
   return (
     <>
       {/* Camera sits well back with a tight near/far range so depth stays precise and flat layers never flicker. */}
-      <Canvas shadows orthographic camera={{ position: [75, 80, 75], zoom: 36, near: 1, far: 320 }} dpr={SMALL ? [1, 1.5] : [1, 2]} gl={{ toneMapping: NeutralToneMapping }} frameloop={townPaused ? 'never' : 'always'}
+      <Canvas shadows={graphics !== 'saver'} orthographic camera={{ position: [75, 80, 75], zoom: 36, near: 1, far: 320 }} dpr={graphics === 'saver' ? 1 : SMALL && graphics === 'auto' ? [1, 1.5] : [1, 2]} gl={{ toneMapping: NeutralToneMapping }} frameloop={townPaused ? 'never' : 'always'}
         onCreated={({ gl }) => {
           splashProgress(0.9)
           // Let the browser restore the 3D view after it drops the context, instead of leaving it blank.
@@ -107,6 +112,7 @@ export default function App() {
       >
         <World />
         <SplashHandoff />
+        <ShadowSwitch on={graphics !== 'saver'} />
       </Canvas>
       <TechnoLayer />
       <Badges />
@@ -172,5 +178,24 @@ function SplashHandoff() {
   useFrame(() => {
     if (++frames.current === 3) hideSplash()
   })
+  return null
+}
+
+// Shadows switched in Settings: every material rebuilds its shader so the
+// change shows at once instead of leaving the last shadows painted on.
+function ShadowSwitch({ on }: { on: boolean }) {
+  const scene = useThree((s) => s.scene)
+  const first = useRef(true)
+  useEffect(() => {
+    if (first.current) {
+      first.current = false
+      return
+    }
+    scene.traverse((o) => {
+      const m = (o as Mesh).material as Material | Material[] | undefined
+      if (Array.isArray(m)) m.forEach((x) => (x.needsUpdate = true))
+      else if (m) m.needsUpdate = true
+    })
+  }, [on, scene])
   return null
 }

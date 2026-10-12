@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { GP_ROUNDS, GP_SERIES, gpRivalPi } from './data'
+import { GP_BEAT } from './gpBeat'
 import { gpBeatTable, gpRivalSlowest, gpSeries, rarities, rescueRoll, rescueSpots, restoreMinutes, spotCosts, visitorTable } from './guardTables'
 import { rollSearch } from './store'
 import { raceFloor } from './race'
@@ -44,6 +45,7 @@ describe('restore and Grand Prix checks', () => {
   it('has the Grand Prix rivals the game uses', () => {
     expect(newest('$gpseries$')).toEqual(gpSeries())
     expect(newest('$gpbeat$')).toEqual(gpBeatTable())
+    expect(GP_BEAT).toEqual(gpBeatTable())
     for (const s of GP_SERIES) {
       for (const clears of [0, 1, 5, 12]) {
         expect(Math.round(gpSeries()[s.id].last * (1 + clears * 0.08))).toBe(gpRivalPi(s, GP_ROUNDS - 1, clears))
