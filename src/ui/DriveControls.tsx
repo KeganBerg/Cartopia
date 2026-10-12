@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import './drive.css'
 
 // Shared driving controls for every game where the player steers a car: keyboard
@@ -86,18 +86,56 @@ function hold(on: () => void, off: () => void) {
   }
 }
 
-const RANGE = 56 // px of thumb travel for full lock
+// How thumb travel turns into steering. range: px from where the thumb landed to full lock;
+// dead: px that still count as straight; curve > 1 is finer near the middle.
+// drift (portrait only): 'slide' drifts on any hard slide, 'flick' only on a quick flick out.
+export type SteerFeel = { range: number; dead: number; curve: number; drift: 'slide' | 'flick' }
+export const ARCADE_FEEL: SteerFeel = { range: 56, dead: 0, curve: 1, drift: 'slide' }
+export const KART_FEEL: SteerFeel = { range: 84, dead: 6, curve: 1.5, drift: 'flick' }
+
+// steer: +1 full left, -1 full right (dx > 0 is the thumb to the right).
+export function thumbSteer(dx: number, f: SteerFeel) {
+  const a = Math.abs(dx)
+  if (a <= f.dead) return 0
+  return -Math.sign(dx) * Math.min(1, (a - f.dead) / (f.range - f.dead)) ** f.curve
+}
+
+// Portrait drifting from the steering thumb alone. 'flick': out past FLICK_OUT within FLICK_MS
+// of being near the middle, so steering wide through a bend never drifts by accident.
+// 'slide': any slide past 0.85. Either way the drift holds while the thumb stays out that way
+// and ends as it comes back towards the middle or crosses over.
+const FLICK_MS = 170, FLICK_OUT = 0.85, FLICK_FROM = 0.35
+export class ThumbDrift {
+  dir = 0
+  private calm = -1e9
+  private mode: SteerFeel['drift']
+  constructor(mode: SteerFeel['drift']) { this.mode = mode }
+  update(steer: number, now: number) {
+    const a = Math.abs(steer)
+    if (this.dir === 0) {
+      if (a < FLICK_FROM) this.calm = now
+      if (a > FLICK_OUT && (this.mode === 'slide' || now - this.calm <= FLICK_MS)) this.dir = Math.sign(steer)
+    } else if (a < 0.2 || (Math.sign(steer) === -this.dir && a > 0.5)) {
+      this.dir = 0
+      this.calm = now
+    }
+    return this.dir
+  }
+  reset(now = -1e9) { this.dir = 0; this.calm = now }
+}
+
+const buzz = (ms: number) => { try { navigator.vibrate?.(ms) } catch { /* not on this phone */ } }
 
 // A floating thumb stick that only steers: put a thumb down anywhere in the zone and
-// slide it left or right. In portrait (`autoDrift`) a hard slide starts a drift, which
-// holds until the thumb comes back near the middle.
-function SteerZone({ input, autoDrift, className }: { input: DriveInput; autoDrift: boolean; className: string }) {
-  const [knob, setKnob] = useState<{ x0: number; y: number; dx: number } | null>(null)
-  const drift = useRef(0)
+// slide it left or right. The knob moves by hand (no React render per finger move).
+const SteerZone = memo(function SteerZone({ input, autoDrift, className, feel }: { input: DriveInput; autoDrift: boolean; className: string; feel: SteerFeel }) {
+  const [at, setAt] = useState<{ x0: number; y: number } | null>(null)
+  const knob = useRef<HTMLElement>(null)
+  const drift = useMemo(() => new ThumbDrift(feel.drift), [feel.drift])
   const end = () => {
     input.steer = 0
-    if (autoDrift) { input.drift = false; drift.current = 0 }
-    setKnob(null)
+    if (autoDrift) { input.drift = false; drift.reset() }
+    setAt(null)
   }
   return (
     <div className={`dc-steer ${className}`}
@@ -105,40 +143,45 @@ function SteerZone({ input, autoDrift, className }: { input: DriveInput; autoDri
         e.preventDefault()
         ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
         const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
-        setKnob({ x0: e.clientX - r.left, y: e.clientY - r.top, dx: 0 })
+        if (autoDrift) drift.reset(e.timeStamp)
+        setAt({ x0: e.clientX - r.left, y: e.clientY - r.top })
       }}
       onPointerMove={(e) => {
-        if (!knob) return
+        if (!at) return
         const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
-        const dx = Math.max(-RANGE, Math.min(RANGE, e.clientX - r.left - knob.x0))
-        input.steer = -dx / RANGE
+        const dx = Math.max(-feel.range, Math.min(feel.range, e.clientX - r.left - at.x0))
+        input.steer = thumbSteer(dx, feel)
         if (autoDrift) {
-          const s = input.steer
-          if (drift.current === 0 && Math.abs(s) > 0.85) drift.current = Math.sign(s)
-          else if (drift.current !== 0 && (Math.abs(s) < 0.2 || Math.sign(s) === -drift.current && Math.abs(s) > 0.6)) drift.current = 0
-          input.drift = drift.current !== 0
+          const was = drift.dir
+          input.drift = drift.update(input.steer, e.timeStamp) !== 0
+          if (input.drift && !was) buzz(12)
         }
-        setKnob({ ...knob, dx })
+        const k = knob.current
+        if (k) {
+          k.style.transform = `translateX(${dx}px)`
+          k.classList.toggle('drift', input.drift)
+        }
       }}
       onPointerUp={end} onPointerCancel={end} onLostPointerCapture={end}
       onContextMenu={(e) => e.preventDefault()}>
-      {knob ? (
-        <span className="dc-stick" style={{ left: knob.x0, top: knob.y }}>
-          <i className="dc-track" />
-          <b className={`dc-knob${input.drift ? ' drift' : ''}`} style={{ transform: `translateX(${knob.dx}px)` }} />
+      {at ? (
+        <span className="dc-stick" style={{ left: at.x0, top: at.y }}>
+          <i className="dc-track" style={{ left: -feel.range - 20, width: (feel.range + 20) * 2 }} />
+          <b ref={knob} className="dc-knob" />
         </span>
       ) : (
-        <span className="dc-hint">◀ slide to steer ▶</span>
+        <span className="dc-hint">{autoDrift && feel.drift === 'flick' ? '◀ slide to steer · flick to drift ▶' : '◀ slide to steer ▶'}</span>
       )}
     </div>
   )
-}
+})
 
 // The touch layout. Gas is automatic (hold brake to slow or reverse); with autoGas off
 // there's a gas pedal too, for games that need to creep and stop (parking).
 // item: what to show on the item button (null = empty; leave out for games without items).
 // drift: show drift (landscape button; portrait drifts on a hard slide).
-export function TouchDrive({ input, tall, drift = true, item, autoGas = true }: { input: DriveInput; tall: boolean; drift?: boolean; item?: ReactNode | null; autoGas?: boolean }) {
+// feel: how the thumb steers (karts pass KART_FEEL).
+export function TouchDrive({ input, tall, drift = true, item, autoGas = true, feel = ARCADE_FEEL }: { input: DriveInput; tall: boolean; drift?: boolean; item?: ReactNode | null; autoGas?: boolean; feel?: SteerFeel }) {
   const [brake, setBrake] = useState(false)
   const [gas, setGas] = useState(false)
   const [drifting, setDrifting] = useState(false)
@@ -167,12 +210,12 @@ export function TouchDrive({ input, tall, drift = true, item, autoGas = true }: 
   if (tall) return (
     <div className="dc dc-tall">
       <div className="dc-row">{brakeBtn}{itemBtn}{gasBtn}</div>
-      <SteerZone input={input} autoDrift={drift} className="tall" />
+      <SteerZone input={input} autoDrift={drift} className="tall" feel={feel} />
     </div>
   )
   return (
     <div className="dc dc-wide">
-      <SteerZone input={input} autoDrift={false} className="wide" />
+      <SteerZone input={input} autoDrift={false} className="wide" feel={feel} />
       <div className="dc-cluster">
         {itemBtn}
         {drift && (

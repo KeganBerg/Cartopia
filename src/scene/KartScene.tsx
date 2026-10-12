@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { AdditiveBlending, BufferAttribute, BufferGeometry, CanvasTexture, Color, DoubleSide, Group, InstancedMesh, Material, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, PerspectiveCamera, RepeatWrapping, SRGBColorSpace, Vector3, type Texture } from 'three'
 import { CarModel, carFrame, wheelRig, type WheelRig } from './CarModel'
@@ -974,7 +974,10 @@ export type KartSceneProps = {
   afterStep?: () => void // live races: swap snapshots with the other browser
 }
 
-export function KartScene({ race, looks, me, input, running, cam = (DEV?.get('cam') as KartCam) ?? 'chase', onHud, onEvents, onFinish, afterStep }: KartSceneProps) {
+// Memoised: the screen re-renders for its HUD ten times a second, and the scenery under here
+// must not re-render with it (that alone ate most of a phone's frame). Callers pass stable callbacks.
+export const KartScene = memo(KartSceneImpl)
+function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam') as KartCam) ?? 'chase', onHud, onEvents, onFinish, afterStep }: KartSceneProps) {
   useEffect(() => holdTown(), [])
   const view = useArcadeLook()
   const t = race.track
@@ -984,7 +987,7 @@ export function KartScene({ race, looks, me, input, running, cam = (DEV?.get('ca
   const rigs = useMemo(() => looks.map((l) => wheelRig(l.body as Body)), [looks])
   const views = useRef<{ root: Group | null; body: Group | null; fx: KartFx }[]>([])
   const setters = useMemo(() => looks.map((_, i) => (g: { root: Group | null; body: Group | null; fx: KartFx }) => { views.current[i] = g }), [looks])
-  const st = useRef({ acc: 0, hudAt: 0, finished: false, camPos: new Vector3(), camAt: new Vector3(), fov: 0, init: false })
+  const st = useRef({ acc: 0, hudAt: 0, finished: false, camPos: new Vector3(), camAt: new Vector3(), fov: 0, init: false, shake: 0, kick: 0 })
   const inputs = useMemo(() => race.karts.map(() => input), [race, input])
   const tmpV = useMemo(() => new Vector3(), [])
 
@@ -1011,6 +1014,15 @@ export function KartScene({ race, looks, me, input, running, cam = (DEV?.get('ca
       afterStep()
       events.push(...race.events)
     }
+    // Feel: knocks shake the camera, a drift turbo kicks the view wider for a moment.
+    for (const e of events) if (e.kart === me) {
+      if (e.kind === 'wall' || e.kind === 'bump') s.shake = Math.max(s.shake, 0.18)
+      else if (e.kind === 'hit' || e.kind === 'boom') s.shake = Math.max(s.shake, 0.45)
+      else if (e.kind === 'land') s.shake = Math.max(s.shake, 0.12)
+      else if (e.kind === 'turbo') s.kick = e.value === 2 ? 9 : 6
+    }
+    s.shake = Math.max(0, s.shake - dt * 1.6)
+    s.kick = Math.max(0, s.kick - dt * 14)
     if (events.length) onEvents?.(events)
     const mine = race.karts[me]
     if (DEV) (window as unknown as { kart: unknown }).kart = { race, camera, scene: state.scene, gl: state.gl }
@@ -1102,6 +1114,11 @@ export function KartScene({ race, looks, me, input, running, cam = (DEV?.get('ca
       s.camPos.lerp(want, Math.min(1, dt * 7))
       // Never let the camera sink into a barrier: keep it a little above the wall top.
       camera.position.copy(s.camPos)
+      if (s.shake > 0) {
+        camera.position.x += (Math.random() - 0.5) * s.shake
+        camera.position.y += (Math.random() - 0.5) * s.shake * 0.6
+        camera.position.z += (Math.random() - 0.5) * s.shake
+      }
       camera.up.set(0, 1, 0)
       const at = new Vector3(mine.x + fwd.x * 4, 0.55 + mine.y * 0.8, mine.z + fwd.z * 4)
       if (!s.init) s.camAt.copy(at)
@@ -1109,7 +1126,7 @@ export function KartScene({ race, looks, me, input, running, cam = (DEV?.get('ca
       camera.lookAt(s.camAt)
       const fov = (tall ? 70 : 58) + (mine.boost > 0 ? 7 : 0) + Math.min(5, mv * 0.2)
       s.fov += (fov - s.fov) * Math.min(1, dt * 4)
-      camera.fov = s.fov || fov
+      camera.fov = (s.fov || fov) + s.kick
     }
     s.init = true
     camera.updateProjectionMatrix()

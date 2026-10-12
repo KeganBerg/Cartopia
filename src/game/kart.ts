@@ -191,7 +191,10 @@ export function kartStats(pi: number): KartStats {
   return { top: 15 + 9 * k, acc: 9 + 6 * k }
 }
 
-export type KartInput = { steer: number; gas: number; brake: number; drift: boolean; item: boolean }
+// assist (touch only, 0..1): with the thumb near the middle the kart leans towards the racing
+// line, fading out as the thumb steers harder, so a phone player isn't fighting tiny slips.
+export type KartInput = { steer: number; gas: number; brake: number; drift: boolean; item: boolean; assist?: number }
+export const TOUCH_ASSIST = 0.45 // how much a phone player's kart leans to the line
 export const idleInput = (): KartInput => ({ steer: 0, gas: 0, brake: 0, drift: false, item: false })
 
 export type Kart = {
@@ -294,7 +297,11 @@ export class KartRace {
     const order = this.order()
     this.karts.forEach((k, i) => {
       if (!this.owned(k.id)) return
-      const inp = !running ? idleInput() : k.done !== null ? this.autoInput(k, order, true) : k.ai ? this.autoInput(k, order, false) : inputs[i] ?? idleInput()
+      let inp = !running ? idleInput() : k.done !== null ? this.autoInput(k, order, true) : k.ai ? this.autoInput(k, order, false) : inputs[i] ?? idleInput()
+      if (running && inp.assist && k.drift === 0 && k.done === null && !k.ai) {
+        const w = inp.assist * Math.max(0, 1 - Math.abs(inp.steer) * 2)
+        if (w > 0) inp = { ...inp, steer: inp.steer + (this.autoInput(k, order, false).steer - inp.steer) * w }
+      }
       this.drive(k, inp, dt, order)
     })
     this.collideKarts()

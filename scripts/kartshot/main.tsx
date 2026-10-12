@@ -4,6 +4,7 @@
 // BroadcastChannel (no server), to check the netcode by eye.
 // ?party=host / ?party=g1 / ?party=g2 in three tabs: a kart party, the same way.
 import { createRoot } from 'react-dom/client'
+import { StageCanvas } from '../../src/scene/Stage'
 import { CARS } from '../../src/game/data'
 import { TRACKS, gpField } from '../../src/game/kart'
 import { KartGame, playerRacer, type KartRacer } from '../../src/ui/Kart'
@@ -70,7 +71,7 @@ if (party) {
     }),
   }
   createRoot(document.getElementById('root')!).render(
-    <LiveKartParty live={{ raceId, opponent: party === 'host' ? cards[1] : cards[0], host: party === 'host', mode: 'kart', party: true }} car={me as never} onExit={() => {}} deps={deps} />,
+    <><StageCanvas /><LiveKartParty live={{ raceId, opponent: party === 'host' ? cards[1] : cards[0], host: party === 'host', mode: 'kart', party: true }} car={me as never} onExit={() => {}} deps={deps} /></>,
   )
 } else if (live) {
   const other = live === 'host' ? 'guest' : 'host'
@@ -102,10 +103,10 @@ if (party) {
   }
   const opp = { id: other, uid: null, town: other === 'host' ? 'Gearville' : 'Nitro Bay', level: 12, carName: 'Stallion', color: '#c62828', body: CARS.find((c) => c.id === 'stallion')!.body, pi: 48 }
   createRoot(document.getElementById('root')!).render(
-    <LiveKart live={{ raceId: q.get('race') ?? 'dev', opponent: opp, host: live === 'host', mode: 'kart' }} car={me as never} onExit={() => {}} deps={deps} />,
+    <><StageCanvas /><LiveKart live={{ raceId: q.get('race') ?? 'dev', opponent: opp, host: live === 'host', mode: 'kart' }} car={me as never} onExit={() => {}} deps={deps} /></>,
   )
 } else {
   createRoot(document.getElementById('root')!).render(
-    <KartGame car={me as never} title={`Street Kings · Race 3 of 6`} track={track} reverse={q.get('rev') === '1'} field={field} prize={950} next={{ label: '▶ Race 4 · $1,050', go: () => {} }} onFinish={() => {}} onExit={() => {}} />,
+    <><StageCanvas /><KartGame car={me as never} title={`Street Kings · Race 3 of 6`} track={track} reverse={q.get('rev') === '1'} field={field} prize={950} next={{ label: '▶ Race 4 · $1,050', go: () => {} }} onFinish={() => {}} onExit={() => {}} /></>,
   )
 }
