@@ -3,7 +3,8 @@ import { dynoPull, type Racer } from '../game/race'
 import type { DynoFeed } from '../scene/CarPreview'
 import { EngineVoice } from '../lib/engineAudio'
 import { loadEngineWorklet } from '../lib/engineWorklet'
-import { audioContext, audioOut, isMuted, onMuteChange } from '../lib/sound'
+import { audioContext, sfxOut, isMuted, onMuteChange } from '../lib/sound'
+import { reduceMotionOn } from '../lib/prefs'
 
 // One dyno run after an upgrade or a new part: the PI it had and has now.
 export type DynoRun = { id: number; car: string; model: string; mods?: string[]; before: number; after: number }
@@ -12,12 +13,11 @@ export type DynoRun = { id: number; car: string; model: string; mods?: string[];
 const PULL = 2.4
 const HOLD = 1.8
 
-const REDUCED = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
 // The engine for a dyno run, through the same synth as races. Quiet if muted.
 function dynoEngine(model: string, mods?: string[]) {
   const a = audioContext()
-  const dest = audioOut()
+  const dest = sfxOut()
   let voice: EngineVoice | null = null
   let trim: GainNode | null = null
   let done = false
@@ -56,11 +56,11 @@ function usePull(run: DynoRun, feed: DynoFeed, onEnd: () => void) {
     dynoPull(run.after, (r) => f.push({ rpm: r.rpm, gear: r.gear, speed: r.speed }))
     return f
   }, [run.after])
-  const [shown, setShown] = useState({ rpm: 0, gear: 0, t: 0, done: REDUCED })
+  const [shown, setShown] = useState({ rpm: 0, gear: 0, t: 0, done: reduceMotionOn() })
   const end = useRef(onEnd)
   end.current = onEnd
   useEffect(() => {
-    if (REDUCED) {
+    if (reduceMotionOn()) {
       const id = setTimeout(() => end.current(), HOLD * 1000)
       return () => clearTimeout(id)
     }

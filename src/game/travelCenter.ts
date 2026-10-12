@@ -1,10 +1,5 @@
-import { TILE, buildingLevel } from './data'
+import { TILE } from './data'
 import { growthStage } from './growth'
-import { mergeGroups, groupScale, groupTurn } from './merge'
-import type { PlacedBuilding } from './store'
-import { toWorld } from '../scene/grid'
-
-type Pt = [number, number]
 
 // A merged gas station at its last form (level 7-10) is no longer one station
 // drawn bigger: it's a Big Bison travel stop built for the whole block, with
@@ -83,24 +78,4 @@ export function travelLayout(sx: number, sz: number): TravelLayout {
   const pylon: [number, number] = !deep ? [-L / 2 + 0.3, front - 0.25] : wide ? [-L / 2 + 0.5, front - 0.35] : [L / 2 - 0.15, back + 0.2]
   const statue: [number, number, number] | null = !deep ? [store.x - sw / 2 - 0.05, 0.05, store.z] : wide ? [-L / 2 + 0.5, 0.05, porch + 0.75] : null
   return { L, D, store, door, canopy, islands, bays, pylon, statue }
-}
-
-// Where townspeople go in: for every member of a merged travel stop (keyed
-// like the walk graph's building nodes, `b<uid>`), the walk from the street
-// edge of the lot in front of the doors to the doors, in town coordinates.
-export function storeDoors(buildings: PlacedBuilding[], roads: Set<string>) {
-  const out = new Map<string, Pt[]>()
-  for (const g of mergeGroups(buildings).groups.values()) {
-    const turn = groupTurn(g, roads)
-    const scale = groupScale(g, turn)
-    if (!isTravelCenter(g.anchor.def, buildingLevel(g.anchor), scale)) continue
-    const t = travelLayout(scale[0], scale[2])
-    const [cx, cz] = toWorld(g.x + (g.w - 1) / 2, g.z + (g.h - 1) / 2)
-    const a = (turn * Math.PI) / 2
-    const c = Math.cos(a), s = Math.sin(a)
-    const at = ([x, z]: Pt): Pt => [cx + x * c + z * s, cz - x * s + z * c]
-    const walk = [at([t.door[0], t.D / 2 - 0.12]), at(t.door)]
-    for (const b of g.members) out.set(`b${b.uid}`, walk)
-  }
-  return out
 }

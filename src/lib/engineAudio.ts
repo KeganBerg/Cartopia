@@ -3,7 +3,7 @@
 // by the race sim's rpm. Plus gear changes, launches, turbo blow-off, exhaust pops,
 // and the crowd at the finish.
 
-import { audioContext, audioOut, onStopEngine, onMuteChange, isMuted } from './sound'
+import { audioContext, sfxOut, onStopEngine, onMuteChange, isMuted } from './sound'
 import { loadEngineWorklet, engineWorkletReady, type PulseConfig } from './engineWorklet'
 import { CARS, carDef, type Body, type CarDef } from '../game/data'
 import { TOP_GEAR } from '../game/race'
@@ -747,7 +747,7 @@ export class RaceAudio {
   private ensure() {
     if (this.closed || this.me || isMuted()) return !!this.me
     const a = audioContext()
-    const dest = audioOut()
+    const dest = sfxOut()
     if (!a || !dest) return false
     this.warm()
     if (!this.loaded) return false

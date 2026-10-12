@@ -1,6 +1,6 @@
 import { Icon } from './Icon'
 import { useEffect, useState } from 'react'
-import { getVolume, isMuted, setMuted, setVolume, onMuteChange } from '../lib/sound'
+import { getSfxVolume, getVolume, isMuted, setMuted, setSfxVolume, setVolume, onMuteChange } from '../lib/sound'
 import { musicSettings, onMusicChange, setMusic } from '../lib/townMusic'
 import { ambienceSettings, onAmbienceChange, setAmbience } from '../lib/ambience'
 
@@ -76,10 +76,34 @@ export function SoundControl() {
   }, [])
   return (
     <div className="menu-sound">
-      <span>Sound</span>
+      <span>Master</span>
       <input className="ambience-vol" type="range" min={0} max={100} step={5} aria-label="Volume" disabled={muted}
         value={Math.round(v * 100)} onChange={(e) => setVolume(Number(e.target.value) / 100)} />
       <MuteButton />
+    </div>
+  )
+}
+
+// Sound effects and engines: a volume slider, and a button that silences them
+// (and brings back the last level).
+let lastEffects = 1
+export function EffectsControl() {
+  const [v, set] = useState(getSfxVolume())
+  useEffect(() => {
+    const off = onMuteChange(() => set(getSfxVolume()))
+    return () => {
+      off()
+    }
+  }, [])
+  return (
+    <div className="menu-sound">
+      <span>Effects</span>
+      <input className="ambience-vol" type="range" min={0} max={100} step={5} aria-label="Effects volume"
+        value={Math.round(v * 100)} onChange={(e) => setSfxVolume(Number(e.target.value) / 100)} />
+      <button className="goals-btn" title={v > 0 ? 'Effects on' : 'Effects off'}
+        onClick={() => { if (v > 0) { lastEffects = v; setSfxVolume(0) } else setSfxVolume(lastEffects) }}>
+        {v > 0 ? '💥' : '🔕'}
+      </button>
     </div>
   )
 }

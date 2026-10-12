@@ -5,7 +5,13 @@ import { growthStage, midFloors, towerFloors } from '../game/growth'
 import { Box, Cyl, Sign, Pool, Neon, Bulbs, Flag, Parasol, BlockCar, GOLD, type Mat, type V3 } from './NewBuildings'
 import { Glass, GlassBlock, glassMat, LitSign, RoofPlant, PadLights } from './OfficeBuildings'
 import { CarModel } from './CarModel'
-import { Upright, useBays } from './mergeScale'
+import { Upright, useBays, useMergeScale } from './mergeScale'
+import { WashCenter } from './WashCenter'
+import { isMarketCenter } from '../game/marketCenter'
+import { isResort } from '../game/resortCenter'
+import { ResortCenter } from './ResortCenter'
+import { MarketCenter } from './MarketCenter'
+import { isWashCenter } from '../game/washCenter'
 import { ShopTower } from './ShopTower'
 import { glowMats } from './dayNight'
 import { concreteTex, helipadTex, shutterTex, gravelTex } from './textures'
@@ -224,6 +230,8 @@ function Balconies({ m, w, z, ys, c, rail }: { m: Mat; w: number; z: number; ys:
 }
 
 function MotelModel({ def, ghost, m, win, bulb, level }: Props) {
+  const scale = useMergeScale()
+  if (isResort(def.id, level, scale)) return <ResortCenter m={m} win={win} bulb={bulb} level={level} ghost={ghost} />
   const k: Kit = { m, win, bulb, ghost }
   const teal = def.roof
   if (growthStage(level) === 2) {
@@ -252,6 +260,8 @@ function MotelModel({ def, ghost, m, win, bulb, level }: Props) {
 // ---- Fresh Mart: a two-level plaza with roof parking, then a tower ----
 
 function MarketModel({ def, ghost, m, win, bulb, level }: Props) {
+  const scale = useMergeScale()
+  if (isMarketCenter(def.id, level, scale)) return <MarketCenter m={m} win={win} bulb={bulb} level={level} ghost={ghost} />
   const k: Kit = { m, win, bulb, ghost }
   const green = def.roof
   if (growthStage(level) === 2) {
@@ -548,6 +558,9 @@ function Landmark({ m, id, at, s }: { m: Mat; id: string; at: V3; s: number }) {
 }
 
 function AutoModel({ def, ghost, m, win, bulb, level }: Props) {
+  // A merged car wash's last form is a whole wash center, built for the block.
+  const scale = useMergeScale()
+  if (isWashCenter(def.id, level, scale)) return <WashCenter m={m} win={win} bulb={bulb} level={level} ghost={ghost} />
   const a = AUTO[def.id]
   const st = growthStage(level)
   const wide = def.w > 1

@@ -3,16 +3,22 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { useGame } from '../game/store'
 import { Panel, SheetTabs } from './Menus'
-import { AmbienceControl, MusicControl, SoundControl } from './MuteButton'
-import { AlertsMenu } from './Alerts'
 import { localBackup, restoreLocalBackup } from '../lib/cloud'
 import { isCleanName, NAME_REJECTED } from '../lib/names'
 import { UsernameRow } from './Username'
-import { useLive, setClosed, unmute } from '../lib/live'
+import { AccountData, Group, GuestData, HelpTab, LegalView, SettingsTab } from './Settings'
+import { LEGAL, type LegalDoc } from '../legal/legal'
 
-type MenuTab = 'town' | 'account' | 'help'
-const MENU_TABS = [{ id: 'town', label: '🏠 Town' }, { id: 'account', label: '👤 Account' }, { id: 'help', label: '❓ How to play' }] as const
+type MenuTab = 'town' | 'settings' | 'account' | 'help'
+const MENU_TABS = [{ id: 'town', label: '🏠 Town' }, { id: 'settings', label: '⚙️ Settings' }, { id: 'account', label: '👤 Account' }, { id: 'help', label: '❓ Help' }] as const
 let lastTab: MenuTab = 'town'
+// A Terms or Privacy page to open with the Menu (from /terms, /privacy or a sign-up link).
+let pendingLegal: LegalDoc['id'] | null = null
+
+export function openLegal(id: LegalDoc['id']) {
+  pendingLegal = id
+  useGame.getState().openPanel('account')
+}
 
 export function AccountPanel() {
   const townName = useGame((s) => s.townName)
@@ -23,6 +29,11 @@ export function AccountPanel() {
   const [password, setPassword] = useState('')
   const [msg, setMsg] = useState('')
   const [tab, setTab] = useState<MenuTab>(lastTab)
+  const [legal, setLegal] = useState<LegalDoc['id'] | null>(() => {
+    const id = pendingLegal
+    pendingLegal = null
+    return id
+  })
   const [name, setName] = useState(townName)
   // Follow the town when sign-in swaps in the cloud save while this menu is open.
   useEffect(() => setName(townName), [townName])
@@ -47,36 +58,46 @@ export function AccountPanel() {
     setMsg(signUp && !data.session ? 'Check your email to confirm your account, then sign in.' : 'Signed in. Your town now saves to the cloud.')
   }
 
+  if (legal) return (
+    <Panel title={LEGAL[legal].title} onBack={() => setLegal(null)}>
+      <LegalView id={legal} />
+    </Panel>
+  )
+
   return (
     <Panel title="Menu">
       <SheetTabs items={MENU_TABS} value={tab} onChange={(t) => { lastTab = t; setTab(t) }} />
       {tab === 'town' && <>
       <button className="buy bank-menu-btn" onClick={() => openPanel('bank')}>🏦 Bank · get gems</button>
-      <SoundControl />
-      <MusicControl />
-      <AmbienceControl />
-      <AlertsMenu />
       <h3>Town name</h3>
       <div className="row">
         <input value={name} maxLength={24} onChange={(e) => setName(e.target.value)} />
         <button className="buy small" onClick={() => (isCleanName(name) ? rename(name) : useGame.getState().toast(NAME_REJECTED))}>Save</button>
       </div>
       </>}
+      {tab === 'settings' && <SettingsTab user={user} />}
       {tab === 'account' && <>
       {!supabase ? (
-        <p className="hint">Offline mode: progress saves in this browser only.</p>
+        <>
+          <p className="hint">Offline mode: progress saves in this browser only.</p>
+          <GuestData />
+        </>
       ) : user ? (
         <>
-          <p>Signed in as <b>{user.email}</b>. Your town saves to the cloud and other players can race your best car.</p>
+          <Group icon="☁️" title="Cloud save">
+            <div className="set-row">
+              <span className="set-label">{user.email}<small>Your town saves to the cloud</small></span>
+              <button className="sell small" onClick={() => supabase!.auth.signOut()}>Sign out</button>
+            </div>
+          </Group>
           <UsernameRow />
-          <ChallengeSettings />
           {backup && (
             <>
               <p className="hint">This device has an older town that is further along: {backup.townName}, level {backup.level}, {backup.cars.length} cars.</p>
               <button className="buy" onClick={restoreLocalBackup}>Restore town from this device</button>
             </>
           )}
-          <button className="sell" onClick={() => supabase!.auth.signOut()}>Sign out</button>
+          <AccountData user={user} />
         </>
       ) : (
         <>
@@ -87,41 +108,14 @@ export function AccountPanel() {
             <button className="buy" onClick={() => signIn(false)}>Sign in</button>
             <button className="buy alt" onClick={() => signIn(true)}>Create account</button>
           </div>
+          <p className="hint agree">By creating an account you agree to the <button className="link" onClick={() => setLegal('terms')}>Terms</button> and <button className="link" onClick={() => setLegal('privacy')}>Privacy Policy</button>.</p>
+          <GuestData />
         </>
       )}
       {msg && <p className="hint">{msg}</p>}
       </>}
-      {tab === 'help' && <ul className="howto">
-        <li>Tap a business to send a car on a job. It costs fuel; fuel refills 1 per minute.</li>
-        <li>When the coin bubble pops up, tap it to collect coins and XP.</li>
-        <li>Buy cars in the Showroom. Every car you own drives around your roads.</li>
-        <li>Build Rusty's Rescue first. Tap it to search for old cars, tow them home and restore them. Some classics can only be rescued.</li>
-        <li>Upgrade cars in the Garage with coins and parts (⚙). Tire Shops, Parts Depots and Tuner Shops make parts, and Rusty's searches find some too.</li>
-        <li>Short on anything? Tap the coins, parts or fuel counters at the top to see how to get more.</li>
-        <li>Race rivals for coins and trophies. Shift in the green zone.</li>
-        <li>Level up to unlock new businesses and cars. Gas Stations raise your fuel cap.</li>
-      </ul>}
+      {tab === 'help' && <HelpTab openLegal={setLegal} />}
     </Panel>
-  )
-}
-
-// Live race challenges: the on/off switch plus anyone the player muted from a challenge.
-function ChallengeSettings() {
-  const closed = useLive((l) => l.closed)
-  const muted = useLive((l) => l.muted)
-  return (
-    <>
-      <div className="menu-sound">
-        <span>Race challenges{closed && <small> · off</small>}</span>
-        <button className="goals-btn" title={closed ? 'Challenges off' : 'Challenges on'} onClick={() => setClosed(!closed)}>{closed ? '🚫' : '🏁'}</button>
-      </div>
-      {Object.entries(muted).map(([id, town]) => (
-        <div key={id} className="menu-sound">
-          <span>🔇 {town}<small> · muted</small></span>
-          <button className="buy small alt" onClick={() => unmute(id)}>Unmute</button>
-        </div>
-      ))}
-    </>
   )
 }
 
