@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { Atmosphere } from './Atmosphere'
 import { MapControls } from '@react-three/drei'
 import { AnchorProjector, anchorEls } from './anchors'
@@ -188,7 +188,18 @@ const ONE: [number, number, number] = [1, 1, 1]
 // `group` is set on the top-left building of a merged block: it stands in,
 // scaled up, for the whole block. The others in the block draw nothing.
 // `picked` (the building picked in Move) draws live, outside the merged town.
-function Building({ b, roads, group, picked }: { b: PlacedBuilding; roads: Set<string>; group?: MergeGroup; picked?: boolean }) {
+type BuildingProps = { b: PlacedBuilding; roads: Set<string>; group?: MergeGroup; picked?: boolean }
+
+// Starting or collecting a job swaps every building object, but none of that
+// shows in the model. Re-rendering a whole town of models at once is what made
+// Collect All stall phones, so a building only re-renders when its lot or look changes.
+const sameLook = (a: PlacedBuilding, b: PlacedBuilding) =>
+  a.uid === b.uid && a.def === b.def && a.x === b.x && a.z === b.z && a.rot === b.rot && a.level === b.level && a.merge === b.merge && a.mturn === b.mturn
+export const sameBuilding = (p: BuildingProps, n: BuildingProps) => p.roads === n.roads && p.group === n.group && p.picked === n.picked && sameLook(p.b, n.b)
+
+const Building = memo(BuildingLot, sameBuilding)
+
+function BuildingLot({ b, roads, group, picked }: BuildingProps) {
   const d = buildingDef(b.def)
   const [cx, cz] = group ? groupCenter(group) : centerOf(b.def, b.x, b.z, b.rot)
   const turn = group ? groupTurn(group, roads) : turnOf(b, roads)
@@ -641,8 +652,19 @@ function ExpandZoom() {
   return null
 }
 
+// Where each building stands and how it looks: everything about the town's
+// buildings that shows, leaving out job timers.
+export const shapeOf = (buildings: PlacedBuilding[]) =>
+  buildings.map((b) => `${b.uid}:${b.def}:${b.x}:${b.z}:${b.rot}:${b.level ?? 1}:${b.merge ?? ''}:${b.mturn ?? ''}`).join()
+
 export function World() {
-  const buildings = useGame((s) => (s.visiting ?? s).buildings)
+  // Collect All starts or collects every job at once, which swaps the whole
+  // buildings array. The town only re-renders when its shape changes.
+  const shape = useGame((s) => shapeOf((s.visiting ?? s).buildings))
+  const buildings = useMemo(() => {
+    const s = useGame.getState()
+    return (s.visiting ?? s).buildings
+  }, [shape]) // eslint-disable-line react-hooks/exhaustive-deps
   const roadsList = useGame((s) => (s.visiting ?? s).roads)
   const roads = useMemo(() => new Set(roadsList), [roadsList])
   const land = useGame((s) => (s.visiting ? (s.visiting.land ?? START_LAND) : s.land))
@@ -651,8 +673,8 @@ export function World() {
   const free = useFreeCam((f) => f.on)
   // Rebuild the merged town only when something's footprint changes, not on every job timer.
   const layout = useMemo(
-    () => [buildings.map((b) => `${b.uid}:${b.def}:${b.x}:${b.z}:${b.rot}:${b.level ?? 1}:${b.merge ?? ''}`).join(), roadsList.join(), land.join(), popping].join('/'),
-    [buildings, roadsList, land, popping],
+    () => [shape, roadsList.join(), land.join(), popping].join('/'),
+    [shape, roadsList, land, popping],
   )
   const merges = useMemo(() => mergeGroups(buildings), [layout]) // eslint-disable-line react-hooks/exhaustive-deps
   // The building picked in Move draws live; the rest stays merged (see batchOff).
