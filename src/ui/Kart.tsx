@@ -4,6 +4,7 @@ import type { OwnedCar } from '../game/store'
 import { carDef } from '../game/data'
 import { EMP_TIME, FLAT_TIME, GHOST_TIME, ITEMS, KartRace, LAPS, ROCKET_TIME, SMOKE_TIME, SPLAT_TIME, TOUCH_ASSIST, TOW_TIME, buildTrack, type ItemId, type KartEvent, type TrackDef } from '../game/kart'
 import { KartScene, kartLights, type KartHud } from '../scene/KartScene'
+import { heroShot } from '../scene/heroShot'
 import type { ChaseCar } from '../scene/ChaseScene'
 import { CarThumb } from '../scene/BuildingPreview'
 import { KART_FEEL, KeyHints, TouchDrive, newDriveInput, useDriveKeys, useTall, useTouchDevice } from './DriveControls'
@@ -57,6 +58,8 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
   const [hud, setHud] = useState<KartHud | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
   const [end, setEnd] = useState<{ place: number; order: number[] } | null>(null)
+  // Set on crossing the line, while the podium waits (it's what a tap on the hero shot brings up).
+  const [over, setOver] = useState<{ place: number; order: number[] } | null>(null)
   // Keys count from the countdown on, so gas held through the lights goes at GO.
   useDriveKeys(input, { enabled: !end })
   const engine = useRef<EngineVoice | null>(null)
@@ -135,7 +138,19 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
     // The result counts the moment the line is crossed (closing during the coast can't lose
     // it); the podium waits while the player coasts on.
     onFinish(place, race.karts[me].done ?? race.t)
-    podium.current = setTimeout(() => setEnd({ place, order }), 1400)
+    // ...and for the hero shot round the player's kart, a few seconds at most.
+    const out = { place, order }
+    setOver(out)
+    const until = performance.now() + 4000
+    podium.current = setTimeout(function wait() {
+      if (heroShot.on && performance.now() < until) podium.current = setTimeout(wait, 100)
+      else setEnd(out)
+    }, 1400)
+  }
+  const skipHero = () => {
+    heroShot.skip = true
+    clearTimeout(podium.current)
+    if (over) setEnd(over)
   }
 
   // The scene is memoised, so it gets callbacks that never change and call the latest ones.
@@ -185,6 +200,7 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
       )}
       {flash && <div key={flash} className="kt-flash">{flash}</div>}
       {!end && running && (touch ? <TouchDrive input={input} tall={tall} item={slot} feel={KART_FEEL} /> : <KeyHints />)}
+      {over && !end && <button className="hero-skip" aria-label="Skip" onPointerDown={skipHero}><span>⏭</span></button>}
       {end && <Podium race={race} field={field} me={me} end={end} prize={prize} next={next} verdict={live?.verdict} onExit={onExit} />}
     </div>
   )

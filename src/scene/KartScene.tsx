@@ -17,6 +17,7 @@ import { decal } from './layers'
 import { TILE, buildingDef, type Body } from '../game/data'
 import { BOMB_R, DRIFT_BLUE, DRIFT_ORANGE, KART_LEN, SMOKE_R, KartRace, type ItemId, type KartEvent, type KartInput, type Track } from '../game/kart'
 import type { ChaseCar } from './ChaseScene'
+import { HERO_TIME, heroCam, heroShot, heroWanted, resetHero } from './heroShot'
 
 // A kart circuit: the tarmac ribbon with kerbs, verges and barriers, the theme's
 // scenery round it (the player's town, a harbour, a red rock canyon), the karts,
@@ -979,6 +980,10 @@ export type KartSceneProps = {
 export const KartScene = memo(KartSceneImpl)
 function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam') as KartCam) ?? 'chase', onHud, onEvents, onFinish, afterStep }: KartSceneProps) {
   useEffect(() => holdTown(), [])
+  useEffect(() => {
+    resetHero()
+    return resetHero
+  }, [])
   const view = useArcadeLook()
   const t = race.track
   const camera = useThree((s) => s.camera) as PerspectiveCamera
@@ -987,7 +992,8 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
   const rigs = useMemo(() => looks.map((l) => wheelRig(l.body as Body)), [looks])
   const views = useRef<{ root: Group | null; body: Group | null; fx: KartFx }[]>([])
   const setters = useMemo(() => looks.map((_, i) => (g: { root: Group | null; body: Group | null; fx: KartFx }) => { views.current[i] = g }), [looks])
-  const st = useRef({ acc: 0, hudAt: 0, finished: false, camPos: new Vector3(), camAt: new Vector3(), fov: 0, init: false, shake: 0, kick: 0 })
+  // hero: seconds into the finish hero shot (heroShot.ts), -1 before it, -2 once it's over.
+  const st = useRef({ acc: 0, hudAt: 0, finished: false, camPos: new Vector3(), camAt: new Vector3(), fov: 0, init: false, shake: 0, kick: 0, hero: -1 })
   const inputs = useMemo(() => race.karts.map(() => input), [race, input])
   const tmpV = useMemo(() => new Vector3(), [])
 
@@ -1029,6 +1035,9 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
     if (DEV && running) devFx(race, me)
     if (mine.done !== null && !s.finished) {
       s.finished = true
+      // Across the line: the hero shot round the player's own kart while it coasts on.
+      s.hero = cam === 'chase' && heroWanted() ? 0 : -2
+      heroShot.on = s.hero === 0
       onFinish()
     }
 
@@ -1103,7 +1112,20 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
       camera.up.set(0, 1, 0)
       camera.lookAt(mine.x, 0, mine.z + 1.5)
       camera.fov = tall ? 62 : 46
+    } else if (s.hero >= 0 && !heroShot.skip && s.hero + dt < HERO_TIME) {
+      s.hero += dt
+      heroCam(s.hero, mine.x, mine.y, mine.z, mine.h, KART_LEN, 1, KART_LEN * 2.2, s.camPos, s.camAt)
+      camera.position.copy(s.camPos)
+      camera.up.set(0, 1, 0)
+      camera.lookAt(s.camAt)
+      camera.fov = tall ? 60 : 42
+      // The chase view eases back from here once it's over.
+      s.fov = camera.fov
     } else {
+      if (s.hero >= 0) {
+        s.hero = -2
+        heroShot.on = false
+      }
       // Behind and above the kart; swings a little wide in a drift, pulls back on a boost.
       const back = (tall ? 7.4 : 6.0) + (mine.boost > 0 ? 0.6 : 0)
       const up = tall ? 3.7 : 3.0

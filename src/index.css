@@ -1668,6 +1668,9 @@ button.book-car { font: inherit; color: inherit; }
   animation: boost-streak .12s linear infinite; }
 @keyframes boost-streak { 50% { transform: scale(1.04); opacity: .8; } }
 @media (prefers-reduced-motion: reduce) { .rf-boost-fx { animation: none; } .boost-btn.full:not(:disabled) { animation: none; } }
+/* The finish hero shot: tap anywhere below the top bar to skip it; a small skip mark in the corner. */
+.hero-skip { position: absolute; z-index: 5; top: calc(56px + var(--sat)); left: 0; right: 0; bottom: 0; margin: 0; padding: 0 calc(16px + var(--sar)) calc(16px + var(--sab)) 0; border: 0; background: none; display: flex; align-items: flex-end; justify-content: flex-end; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.hero-skip span { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; background: rgba(10,20,40,.45); color: #fff; font-size: 20px; }
 @media (max-height: 500px) { .boost-btn { width: 64px; height: 64px; } .boost-btn span { font-size: 22px; } .boost-btn small { font-size: 10px; } }
 @media (max-width: 420px) { .boost-btn { width: 70px; height: 70px; } .rf-buttons { gap: 8px; } }
 /* Phone held upright: tach, boost and SHIFT must fit side by side with the speed above them. */
