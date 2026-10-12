@@ -1,4 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { buzz } from '../lib/haptics'
 import './drive.css'
 
 // Shared driving controls for every game where the player steers a car: keyboard
@@ -93,6 +94,8 @@ function hold(on: () => void, off: () => void) {
 export type SteerFeel = { range: number; dead: number; curve: number; drift: 'slide' | 'flick' }
 export const ARCADE_FEEL: SteerFeel = { range: 56, dead: 0, curve: 1, drift: 'slide' }
 export const KART_FEEL: SteerFeel = { range: 84, dead: 6, curve: 1.5, drift: 'flick' }
+// The Sharp setting (Settings > Controls): shorter travel, more direct.
+export const KART_SHARP: SteerFeel = { range: 66, dead: 5, curve: 1.3, drift: 'flick' }
 
 // steer: +1 full left, -1 full right (dx > 0 is the thumb to the right).
 export function thumbSteer(dx: number, f: SteerFeel) {
@@ -125,7 +128,6 @@ export class ThumbDrift {
   reset(now = -1e9) { this.dir = 0; this.recent = [{ t: now, s: 0 }] }
 }
 
-const buzz = (ms: number) => { try { navigator.vibrate?.(ms) } catch { /* not on this phone */ } }
 
 // A floating thumb stick that only steers: put a thumb down anywhere in the zone and
 // slide it left or right. The knob moves by hand (no React render per finger move).

@@ -1,8 +1,8 @@
 import { create } from 'zustand'
 
 // Player settings that live on this device only (they never go into the save):
-// graphics quality, reduced motion, phone vibration and which "Are you sure?"
-// steps the player turned off. Sound volumes keep
+// graphics quality, reduced motion, phone vibration, kart steering and which
+// "Are you sure?" steps the player turned off. Sound volumes keep
 // their own keys in sound.ts, townMusic.ts and ambience.ts.
 
 // auto: the game picks by device and steps down if it struggles.
@@ -17,10 +17,13 @@ export type Prefs = {
   // "Are you sure?" before leaving Rusty's with a haul, and before selling a car.
   askLeave: boolean
   askSell: boolean
+  // Kart steering on a touch screen: smooth (long slide, steadied near the middle) or sharp.
+  steer: Steer
 }
+export type Steer = 'smooth' | 'sharp'
 
 const KEY = 'cartopia-prefs'
-const DEFAULTS: Prefs = { graphics: 'auto', reduceMotion: null, vibration: true, askLeave: true, askSell: true }
+const DEFAULTS: Prefs = { graphics: 'auto', reduceMotion: null, vibration: true, askLeave: true, askSell: true, steer: 'smooth' }
 
 export function parsePrefs(raw: string | null): Prefs {
   try {
@@ -31,6 +34,7 @@ export function parsePrefs(raw: string | null): Prefs {
       vibration: p.vibration !== false,
       askLeave: p.askLeave !== false,
       askSell: p.askSell !== false,
+      steer: p.steer === 'sharp' ? 'sharp' : 'smooth',
     }
   } catch {
     return { ...DEFAULTS }

@@ -6,11 +6,12 @@ import { CarModel, carFrame, wheelRig, type WheelRig } from './CarModel'
 import { BuildingModel } from './BuildingModel'
 import { Batch } from './Batch'
 import { holdTown } from './renderGate'
-import { ArcadeSky, CarShadow, Grandstand, Lamp, TyreStack, useArcadeLook, useTownPool, type Person, Crowd } from './ArcadeScenery'
+import { ArcadeSky, CarShadow, Grandstand, Lamp, TyreStack, useArcadeLook, useTownPool, type Person } from './ArcadeScenery'
 import { Box, Cone, Cyl, Palm, Scatter, Water, rand } from './RaceVenues'
-import { local, nearZone, useFanZones, useSpots, ZONE_R } from './kartSpots'
+import { usePrefs } from '../lib/prefs'
+import { FansFar, local, nearZone, useFansFar, useFanZones, useSpots, ZONE_R } from './kartSpots'
 import { KartHorizon } from './KartHorizon'
-import { CommonExtras, DesertExtras, DocksExtras, SpectatorBoats, TownExtras, boatPeople, type BoatSpot } from './KartExtras'
+import { CommonExtras, DesertExtras, DocksExtras, Fans, SpectatorBoats, TownExtras, boatPeople, type BoatSpot } from './KartExtras'
 import { asphaltTex, checkerTex, concreteTex, containerTex, glowTex, grassTex, gravelTex, sandTex, towerTex } from './textures'
 import { signTexture } from './signTexture'
 import { glowMats } from './dayNight'
@@ -345,6 +346,7 @@ function Building({ def, x, z, ry, s = 1 }: { def: string; x: number; z: number;
 function Trackside({ t }: { t: Track }) {
   const { along, outside, clearOf } = useSpots(t)
   const zones = useFanZones(t)
+  const far = useFansFar()
   const stands = useMemo(() => {
     const out: { x: number; z: number; h: number; w: number }[] = []
     for (const [i0, side] of [[(t.n - 22) % t.n, 1], [8, -1], [(t.n - 40) % t.n, -1]] as [number, -1 | 1][]) {
@@ -378,8 +380,8 @@ function Trackside({ t }: { t: Track }) {
   }, [along, zones])
   return (
     <group>
-      {stands.map((s, i) => <Grandstand key={i} x={s.x} z={s.z} h={s.h} width={s.w} rows={5} roof={i % 2 ? '#1565c0' : '#c62828'} />)}
-      <Crowd people={fans} />
+      {stands.map((s, i) => <Grandstand key={i} x={s.x} z={s.z} h={s.h} width={s.w} rows={5} roof={i % 2 ? '#1565c0' : '#c62828'} far={far} />)}
+      <Fans people={fans} />
       <Batch version={t.n} cell={24} freeze>
         {tyres.map((p, i) => <TyreStack key={i} x={p.x} z={p.z} n={3} band={i % 2 ? '#e53935' : '#fafafa'} />)}
         {marshals.map((m, i) => (
@@ -522,7 +524,7 @@ function DocksScenery({ t }: { t: Track }) {
       <Lighthouse x={-20} z={10} />
       <Boats />
       <SpectatorBoats boats={boats} />
-      <Crowd people={boatFans} />
+      <Fans people={boatFans} />
     </group>
   )
 }
@@ -973,13 +975,24 @@ export type KartSceneProps = {
   onEvents?: (e: KartEvent[]) => void
   onFinish: () => void
   afterStep?: () => void // live races: swap snapshots with the other browser
+  lite?: boolean // a phone: fewer pixels, and fans drawn less far out
 }
 
 // Memoised: the screen re-renders for its HUD ten times a second, and the scenery under here
 // must not re-render with it (that alone ate most of a phone's frame). Callers pass stable callbacks.
 export const KartScene = memo(KartSceneImpl)
-function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam') as KartCam) ?? 'chase', onHud, onEvents, onFinish, afterStep }: KartSceneProps) {
+function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam') as KartCam) ?? 'chase', onHud, onEvents, onFinish, afterStep, lite }: KartSceneProps) {
   useEffect(() => holdTown(), [])
+  // Pixels follow Settings > Graphics: Saver draws at 1x, and Auto on a phone at up to 1.25x
+  // (sharp enough on a small screen). The shared canvas goes back to normal after the race.
+  const graphics = usePrefs((p) => p.graphics)
+  const light = graphics === 'saver' ? 2 : lite && graphics === 'auto' ? 1 : 0
+  const setDpr = useThree((s) => s.setDpr)
+  useEffect(() => {
+    if (!light) return
+    setDpr(light === 2 ? 1 : [1, 1.25])
+    return () => setDpr([1, 1.5])
+  }, [light, setDpr])
   const view = useArcadeLook()
   const t = race.track
   const camera = useThree((s) => s.camera) as PerspectiveCamera
@@ -1147,7 +1160,7 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
   })
 
   return (
-    <>
+    <FansFar.Provider value={[150, 110, 90][light]}>
       <ArcadeSky view={view} near={100} far={340} />
       <hemisphereLight args={['#ffffff', '#666666', 0.15]} />
       <Batch version={t.n * 10 + (t.reverse ? 1 : 0)} freeze>
@@ -1168,7 +1181,7 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
       {looks.map((l, i) => <KartView key={i} look={l} rig={rigs[i]} set={setters[i]} />)}
       {/* A warm glow pool under the player, so their kart reads at a glance. */}
       <PlayerRing race={race} me={me} />
-    </>
+    </FansFar.Provider>
   )
 }
 

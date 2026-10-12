@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { Color, Object3D, Vector3, type InstancedMesh, type PerspectiveCamera } from 'three'
+import { Color, Frustum, Matrix4, Object3D, Sphere, Vector3, type Group, type InstancedMesh, type PerspectiveCamera } from 'three'
 import { SHIRTS, PANTS, SKIN, HAIR } from './people'
 import { BuildingModel, LightPool } from './BuildingModel'
 import { Manhole } from './BuildingDetail'
@@ -277,64 +277,97 @@ export function StreetStretch({ len, half, walk = 1.6, lanes, seed, pool }: { le
 export type Person = { x: number; z: number; h: number; y?: number; cheer?: boolean; shirt?: string }
 const FAN = 1.3
 const FAN_LEG = 0.24
-export function Crowd({ people, scale = 1 }: { people: Person[]; scale?: number }) {
+// `far` (opt-in): only the people in view and within `far` of the camera are drawn and
+// animated, packed into the first instances (a big crowd behind the camera cost a phone
+// as much as the whole town in front of it). The last few metres shrink them away.
+const FADE = 12
+const view = new Frustum(), viewM = new Matrix4(), at = new Vector3(), ball = new Sphere(undefined, 1.5)
+export function Crowd({ people, scale = 1, far }: { people: Person[]; scale?: number; far?: number }) {
+  const group = useRef<Group>(null)
   const torso = useRef<InstancedMesh>(null)
   const head = useRef<InstancedMesh>(null)
   const hair = useRef<InstancedMesh>(null)
   const legs = useRef<InstancedMesh>(null)
   const arms = useRef<InstancedMesh>(null)
+  // Each person's shirt, skin, hair and trousers.
+  const looks = useMemo(() => people.map((p, i) => {
+    const k = (i * 2654435761) >>> 0
+    const shirt = p.shirt ?? SHIRTS[k % SHIRTS.length]
+    return [shirt, SKIN[(k >> 6) % SKIN.length], HAIR[(k >> 9) % HAIR.length], p.shirt ? '#263238' : PANTS[(k >> 3) % PANTS.length]].map((c) => new Color(c))
+  }), [people])
+  // Which person each instance slot is showing (-1: not painted yet).
+  const owner = useMemo(() => new Int32Array(people.length).fill(-1), [people])
+  const paint = (slot: number, i: number) => {
+    const [shirt, skin, hair_, pants] = looks[i]
+    torso.current?.setColorAt(slot, shirt)
+    head.current?.setColorAt(slot, skin)
+    hair.current?.setColorAt(slot, hair_)
+    legs.current?.setColorAt(slot * 2, pants)
+    legs.current?.setColorAt(slot * 2 + 1, pants)
+    arms.current?.setColorAt(slot * 2, shirt)
+    arms.current?.setColorAt(slot * 2 + 1, shirt)
+    owner[slot] = i
+  }
   useEffect(() => {
-    const c = new Color()
-    people.forEach((p, i) => {
-      const k = (i * 2654435761) >>> 0
-      const shirt = p.shirt ?? SHIRTS[k % SHIRTS.length]
-      torso.current?.setColorAt(i, c.set(shirt))
-      head.current?.setColorAt(i, c.set(SKIN[(k >> 6) % SKIN.length]))
-      hair.current?.setColorAt(i, c.set(HAIR[(k >> 9) % HAIR.length]))
-      legs.current?.setColorAt(i * 2, c.set(p.shirt ? '#263238' : PANTS[(k >> 3) % PANTS.length]))
-      legs.current?.setColorAt(i * 2 + 1, c)
-      arms.current?.setColorAt(i * 2, c.set(shirt))
-      arms.current?.setColorAt(i * 2 + 1, c)
-    })
+    people.forEach((_, i) => paint(i, i))
     for (const m of [torso, head, hair, legs, arms]) if (m.current?.instanceColor) m.current.instanceColor.needsUpdate = true
-  }, [people])
+  }, [people]) // eslint-disable-line react-hooks/exhaustive-deps
   const tmp = useMemo(() => new Object3D(), [])
   const S = FAN * scale
-  useFrame(({ clock }) => {
+  useFrame(({ clock, camera }) => {
     const t = clock.elapsedTime
+    const g = group.current
+    if (far && g) view.setFromProjectionMatrix(viewM.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse))
+    let slot = 0, repaint = false
     people.forEach((f, i) => {
+      let size = 1
+      if (far && g) {
+        at.set(f.x / S, (f.y ?? 0) / S, f.z / S).applyMatrix4(g.matrixWorld)
+        const d = at.distanceTo(camera.position)
+        if (d > far) return
+        ball.center.copy(at)
+        if (!view.intersectsSphere(ball)) return
+        size = Math.min(1, (far - d) / FADE)
+        if (owner[slot] !== i) { paint(slot, i); repaint = true }
+      }
+      const s = slot++
       const phase = i * 1.7
       const hop = f.cheer ? Math.max(0, Math.sin(t * 6 + phase)) * 0.09 : 0
-      const hip = FAN_LEG + hop + (f.y ?? 0) / S
+      const hip = (FAN_LEG + hop) * size + (f.y ?? 0) / S
       const sin = Math.sin(f.h), cos = Math.cos(f.h)
       const x = f.x / S, z = f.z / S
-      const put = (m: InstancedMesh | null, at: number, px: number, py: number, pz: number, rz = 0, rx = 0, sy = 1) => {
+      const put = (m: InstancedMesh | null, idx: number, px: number, py: number, pz: number, rz = 0, rx = 0, sy = 1) => {
         if (!m) return
-        tmp.position.set(px, py, pz)
+        tmp.position.set(x + (px - x) * size, py, z + (pz - z) * size)
         tmp.rotation.set(rx, f.h, rz)
-        tmp.scale.set(1, sy, 1)
+        tmp.scale.set(size, sy * size, size)
         tmp.updateMatrix()
-        m.setMatrixAt(at, tmp.matrix)
+        m.setMatrixAt(idx, tmp.matrix)
       }
-      put(torso.current, i, x, hip + 0.15, z)
-      put(head.current, i, x, hip + 0.36, z)
-      put(hair.current, i, x - sin * 0.02, hip + 0.385, z - cos * 0.02, 0, 0, 0.8)
+      put(torso.current, s, x, hip + 0.15 * size, z)
+      put(head.current, s, x, hip + 0.36 * size, z)
+      put(hair.current, s, x - sin * 0.02, hip + 0.385 * size, z - cos * 0.02, 0, 0, 0.8)
       for (const side of [-1, 1]) {
         const lx = side * 0.045
-        put(legs.current, i * 2 + (side > 0 ? 1 : 0), x + cos * lx, hip - FAN_LEG * 0.5, z - sin * lx, 0, hop * side * 2)
+        put(legs.current, s * 2 + (side > 0 ? 1 : 0), x + cos * lx, hip - FAN_LEG * 0.5 * size, z - sin * lx, 0, hop * side * 2)
       }
       const wave = Math.sin(t * (f.cheer ? 6 : 2) + phase)
       for (const side of [-1, 1]) {
         const a = f.cheer ? 2.5 + wave * 0.35 * side : 0.15 + (side > 0 ? Math.max(0, wave) * 2.2 : 0)
         const lx = side * (0.11 + Math.sin(a) * 0.085)
-        put(arms.current, i * 2 + (side > 0 ? 1 : 0), x + cos * lx, hip + 0.25 - Math.cos(a) * 0.085, z - sin * lx, side * a)
+        put(arms.current, s * 2 + (side > 0 ? 1 : 0), x + cos * lx, hip + (0.25 - Math.cos(a) * 0.085) * size, z - sin * lx, side * a)
       }
     })
-    for (const m of [torso, head, hair, legs, arms]) if (m.current) m.current.instanceMatrix.needsUpdate = true
+    for (const [m, k] of [[torso, 1], [head, 1], [hair, 1], [legs, 2], [arms, 2]] as const) {
+      if (!m.current) continue
+      m.current.count = slot * k
+      m.current.instanceMatrix.needsUpdate = true
+      if (repaint && m.current.instanceColor) m.current.instanceColor.needsUpdate = true
+    }
   })
   const n = people.length
   return (
-    <group scale={S}>
+    <group ref={group} scale={S}>
       <instancedMesh ref={torso} args={[undefined, undefined, n]} frustumCulled={false}><capsuleGeometry args={[0.085, 0.16, 3, 8]} /><meshStandardMaterial /></instancedMesh>
       <instancedMesh ref={head} args={[undefined, undefined, n]} frustumCulled={false}><sphereGeometry args={[0.08, 10, 8]} /><meshStandardMaterial /></instancedMesh>
       <instancedMesh ref={hair} args={[undefined, undefined, n]} frustumCulled={false}><sphereGeometry args={[0.085, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2]} /><meshStandardMaterial /></instancedMesh>
@@ -345,7 +378,7 @@ export function Crowd({ people, scale = 1 }: { people: Person[]; scale?: number 
 }
 
 // Rows of stepped seating with fans, facing h (0 = facing +z), centred at x/z.
-export function Grandstand({ x, z, h, width, rows = 4, roof = '#c62828' }: { x: number; z: number; h: number; width: number; rows?: number; roof?: string }) {
+export function Grandstand({ x, z, h, width, rows = 4, roof = '#c62828', far }: { x: number; z: number; h: number; width: number; rows?: number; roof?: string; far?: number }) {
   const people = useMemo(() => {
     const out: Person[] = []
     for (let r = 0; r < rows; r++) for (let i = 0; i < Math.floor(width / 0.55); i++) {
@@ -377,7 +410,7 @@ export function Grandstand({ x, z, h, width, rows = 4, roof = '#c62828' }: { x: 
           <meshStandardMaterial color={roof} />
         </mesh>
       </group>
-      <Crowd people={people} />
+      <Crowd people={people} far={far} />
     </>
   )
 }
