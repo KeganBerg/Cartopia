@@ -5,6 +5,7 @@ import ReactThreeTestRenderer from '@react-three/test-renderer'
 import type { Object3D } from 'three'
 import { BUILDINGS } from '../game/data'
 import { BuildingModel } from './BuildingModel'
+import { VanguardTower } from './Landmark'
 import { KeepShapes, MergeScale } from './mergeScale'
 import { limitFor } from './keepShape'
 import { describe, floating } from './floating'
@@ -48,4 +49,19 @@ group('nothing floats', () => {
       expect([...bad]).toEqual([])
     })
   }
+})
+
+group('nothing floats on landmarks', () => {
+  it('vanguard tower', async () => {
+    const bad = new Set<string>()
+    for (const time of [NOON, MIDNIGHT]) {
+      vi.spyOn(Date, 'now').mockReturnValue(time)
+      const r = await ReactThreeTestRenderer.create(<VanguardTower />)
+      await ReactThreeTestRenderer.act(async () => r.advanceFrames(2, 1 / 60))
+      for (const p of floating(r.scene.instance as Object3D)) bad.add(`${time ? 'night' : 'day'}: ${describe(p)}`)
+      await r.unmount()
+      vi.restoreAllMocks()
+    }
+    expect([...bad]).toEqual([])
+  })
 })
