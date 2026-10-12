@@ -19,7 +19,7 @@ setCrateOpener(async (crate) => {
   return 'pending' in d ? d.pending : [d]
 })
 
-// The daily wheel spin, rolled by wheel_spin() (supabase/pending/wheel_spin.sql). Opens the save
+// The daily wheel spin, rolled by wheel_spin() (supabase/migrations/0064_wheel_spin.sql). Opens the save
 // never counted come back first: they're added and saved, then the spin is asked for again.
 setWheelSpinner(async () => {
   if (!supabase || !signedInUser()) return null

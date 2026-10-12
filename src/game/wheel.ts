@@ -1,6 +1,6 @@
 // The daily prize wheel: one free spin a UTC day, in place of the old daily log-in bonus. Eight
 // slices, each one prize; the more a slice gives, the rarer it is. A signed-in player's spin is
-// rolled by the server (wheel_spin() in supabase/pending/wheel_spin.sql) and kept in crate_opens
+// rolled by the server (wheel_spin() in supabase/migrations/0064_wheel_spin.sql) and kept in crate_opens
 // like a crate open, so the save guard already pays it; guests roll here. wheel.test.ts keeps the
 // server's table in step.
 //   coins: a share of what a Street Crate costs at your level, so it grows as you do.
