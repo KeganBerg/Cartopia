@@ -657,7 +657,14 @@ function ExpandZoom() {
 export const shapeOf = (buildings: PlacedBuilding[]) =>
   buildings.map((b) => `${b.uid}:${b.def}:${b.x}:${b.z}:${b.rot}:${b.level ?? 1}:${b.merge ?? ''}:${b.mturn ?? ''}`).join()
 
-export function World() {
+// World re-renders when the mode, the picked building or the town's layout
+// changes. Everything that doesn't depend on those is built once here and handed
+// back as the same elements each time, so React skips it: on a big town, re-running
+// the roads, outskirts, cars and effects on every mode switch (or every panel the
+// HUD opens) cost a phone hundreds of milliseconds.
+const small = () => Math.min(window.innerWidth, window.innerHeight) < 700
+
+export const World = memo(function World() {
   // Collect All starts or collects every job at once, which swaps the whole
   // buildings array. The town only re-renders when its shape changes.
   const shape = useGame((s) => shapeOf((s.visiting ?? s).buildings))
@@ -679,42 +686,71 @@ export function World() {
   const merges = useMemo(() => mergeGroups(buildings), [layout]) // eslint-disable-line react-hooks/exhaustive-deps
   // The building picked in Move draws live; the rest stays merged (see batchOff).
   const picked = useGame((s) => (s.mode === 'move' ? s.selected : null))
+  const fixed = useMemo(
+    () => ({
+      before: (
+        <>
+          <DayNight small={small()} />
+          <TechnoLights />
+          {/* Countryside beyond the buildable lot. Its meadow lines up with the one under
+              unbought plots (both repeat every 16 units from a half-repeat offset). */}
+          <mesh rotation-x={-Math.PI / 2} position-y={LAYER.outer}>
+            <planeGeometry args={[OUTER, OUTER]} />
+            <primitive object={meadow(OUTER / 16)} attach="material" dispose={null} />
+          </mesh>
+        </>
+      ),
+      controls: (
+        <>
+          <ResponsiveZoom />
+          <ExpandZoom />
+          <TutorialCamera />
+          <Interaction />
+        </>
+      ),
+      land: <Land />,
+      roads: <Roads />,
+      after: (
+        <>
+          <AnchorProjector />
+          <Ear />
+          <TownCars />
+          <Townspeople />
+          <WorldFx small={small()} />
+        </>
+      ),
+      sky: (
+        <>
+          <SeasonFx small={small()} />
+          <Weather small={small()} />
+          <Atmosphere />
+          <SkyEnv />
+          <FreeCam />
+        </>
+      ),
+    }),
+    [],
+  )
+  const outskirts = useMemo(() => <Outskirts land={land} roads={roadsList} small={small()} />, [land, roadsList])
+  const tufts = useMemo(() => <GrassTufts land={land} roads={roadsList} buildings={buildings} />, [land, roadsList, buildings])
   return (
     <>
-      <DayNight small={Math.min(window.innerWidth, window.innerHeight) < 700} />
-      <TechnoLights />
-      {/* Countryside beyond the buildable lot. Its meadow lines up with the one under
-          unbought plots (both repeat every 16 units from a half-repeat offset). */}
-      <mesh rotation-x={-Math.PI / 2} position-y={LAYER.outer}>
-        <planeGeometry args={[OUTER, OUTER]} />
-        <primitive object={meadow(OUTER / 16)} attach="material" dispose={null} />
-      </mesh>
-      <Outskirts land={land} roads={roadsList} small={Math.min(window.innerWidth, window.innerHeight) < 700} />
-      <ResponsiveZoom />
-      <ExpandZoom />
-      <TutorialCamera />
-      <Interaction />
+      {fixed.before}
+      {outskirts}
+      {fixed.controls}
       <Batch version={`${layout}|${picked ?? ''}`} off={batchOff(mode)} cell={24}>
-        <Land />
-        <GrassTufts land={land} roads={roadsList} buildings={buildings} />
-        <Roads />
+        {fixed.land}
+        {tufts}
+        {fixed.roads}
         {buildings.map((b) =>
           merges.owner.has(b.uid) && !merges.groups.has(b.uid) ? null : <Building key={b.uid} b={b} roads={roads} group={merges.groups.get(b.uid)} picked={b.uid === picked} />,
         )}
       </Batch>
-      <AnchorProjector />
-      <Ear />
-      <TownCars />
-      <Townspeople />
-      <WorldFx small={Math.min(window.innerWidth, window.innerHeight) < 700} />
+      {fixed.after}
       {/* The free view's sky draws its own clouds; these puffs hang at camera height there. */}
       {!free && <Clouds />}
-      <SeasonFx small={Math.min(window.innerWidth, window.innerHeight) < 700} />
-      <Weather small={Math.min(window.innerWidth, window.innerHeight) < 700} />
-      <Atmosphere />
-      <SkyEnv />
-      <FreeCam />
+      {fixed.sky}
       <PostFx look={townLook} town tiltShift={!free} />
     </>
   )
-}
+})
