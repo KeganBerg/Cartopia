@@ -24,6 +24,8 @@ import { claim as claimVisitor, leave as leaveVisitor, setRacing, type Visitor }
 import { RivalResult, type RivalMatch, type RivalBonus } from './Rivals'
 import { RaceBar, RaceHub, Rounds, campaignFocus, type HubTab } from './RaceHub'
 import { artStyle } from './venueArt'
+import { PaintRivals, firstRowPick, rowChip, rowPrizeOf } from './PaintRivals'
+import { paintRival, rowShift, rowSkills, type PaintRival } from '../game/paintRivals'
 import { TileClip } from './TileClip'
 import './race-menu.css'
 import { KartGame, playerRacer, type KartRacer } from './Kart'
@@ -155,6 +157,11 @@ export function RacePanel() {
   const [cRace, setCRace] = useState<{ chapter: CampaignChapter; race: number; rival: Rival; prize: number } | null>(null)
   const [tRace, setTRace] = useState<{ race: number; rival: Rival; prize: number } | null>(null)
   const [eRace, setERace] = useState<{ race: number; rival: Rival; prize: number } | null>(null)
+  const [pRace, setPRace] = useState<{ def: PaintRival; rival: Rival; prize: number } | null>(null)
+  const rivalRow = useGame((s) => s.rivalRow)
+  const oldPaints = useGame((s) => s.oldPaints)
+  // The paint rival on show.
+  const [rowSel, setRowSel] = useState(() => firstRowPick(useGame.getState().rivalRow))
   // Bumped for every race started, so "Next race" mounts a fresh one.
   const [seq, setSeq] = useState(0)
   const [tab, setTab] = useState<RaceTab>(() => {
@@ -314,6 +321,26 @@ export function RacePanel() {
     )
   }
 
+  if (pRace && car) {
+    const won = (rivalRow[pRace.def.id] ?? 0) > 0
+    return (
+      <DragRace
+        key={seq}
+        car={car}
+        rival={pRace.rival}
+        next={{ label: won ? `↻ Rematch · $${rowPrizeOf(pRace.def, rivalRow).toLocaleString()}` : '↻ Retry', go: () => { setPRace(null); startRow(pRace.def.id) } }}
+        prize={pRace.prize}
+        venueId={pRace.def.venue}
+        night={pRace.def.night}
+        weatherSeed={`row-${pRace.def.id}`}
+        dist={pRace.def.dist}
+        title={`${pRace.def.icon} ${pRace.def.name}`}
+        onFinish={(won) => useGame.getState().rowResult(pRace.def.id, won)}
+        onExit={() => { setPRace(null); setTab('rivals') }}
+      />
+    )
+  }
+
   if (tRace && car) {
     const leg = tourLeg(tourLegOf(tRace.race))
     const step = tRace.race % TOUR_RACES
@@ -368,6 +395,14 @@ export function RacePanel() {
     const stars = useGame.getState().campaign
     setSeq((n) => n + 1)
     setCRace({ chapter: ch, race: i, rival: campaignRival(ch, ci, i), prize: campaignReward(ch, i, (stars[campaignRaceId(ch, i)] ?? 0) === 0) })
+  }
+  function startRow(id: string) {
+    const def = paintRival(id)
+    if (!def || waiting()) return
+    if (!spendFuel(RACE_FUEL)) return useGame.getState().showNeed('fuel', RACE_FUEL - useGame.getState().fuel, 'a rival race')
+    setSeq((n) => n + 1)
+    setRowSel(id)
+    setPRace({ def, rival: rowRival(def), prize: rowPrizeOf(def, useGame.getState().rivalRow) })
   }
   function startTour() {
     if (waiting()) return
@@ -429,13 +464,15 @@ export function RacePanel() {
   const go = tab === 'campaign' && campNext >= 0 ? { label: `$${campaignReward(CAMPAIGN[campSel], campNext, true).toLocaleString()}`, onClick: () => startCampaign(campSel, campNext) }
     : tab === 'tour' && campaignCleared(done, CAMPAIGN[0]) ? { label: `$${tourPrize(tourWon).toLocaleString()}`, onClick: startTour }
     : tab === 'event' && (ev?.won ?? 0) < EVENT_RACES ? { label: `$${eventPrize(evBase, ev?.won ?? 0).toLocaleString()}`, onClick: startEvent }
+    : tab === 'rivals' ? { label: `$${rowPrizeOf(paintRival(rowSel)!, rivalRow).toLocaleString()}`, onClick: () => startRow(rowSel) }
     : null
   const stars = Object.values(done).reduce((a, n) => a + n, 0)
-  const TITLES: Record<RaceTab, string> = { hub: 'Race', quick: 'Quick Race', campaign: 'Campaign', tour: 'Pro Tour', gp: 'Grand Prix', trial: 'Time Trial', event: 'Weekly Event' }
+  const TITLES: Record<RaceTab, string> = { hub: 'Race', quick: 'Quick Race', campaign: 'Campaign', tour: 'Pro Tour', gp: 'Grand Prix', trial: 'Time Trial', event: 'Weekly Event', rivals: 'Rivals' }
   const chip = tab === 'campaign' ? `⭐ ${stars}/${CAMPAIGN.length * CAMPAIGN_RACES * 3}`
     : tab === 'tour' ? `🌍 ${tourWon.toLocaleString()} wins`
     : tab === 'gp' ? '🏆 Win 6 in a row'
     : tab === 'event' ? `⏳ ${shortLeft(msToNextWeek())}`
+    : tab === 'rivals' ? rowChip(rivalRow, oldPaints)
     : null
 
   return (
@@ -443,6 +480,8 @@ export function RacePanel() {
       <div className={`rm-screen rm-s-${tab}`}>
         {tab === 'hub' ? (
           <RaceHub onOpen={setTab} onCampaign={startCampaign} onTour={startTour} onEvent={startEvent} onRival={(m) => startRival(m)} />
+        ) : tab === 'rivals' ? (
+          <PaintRivals sel={rowSel} setSel={setRowSel} car={car} />
         ) : tab === 'campaign' ? (
           <Campaign sel={campSel} setSel={setCampSel} onTour={() => setTab('tour')} onRace={(ci, i) => startCampaign(ci, i)} />
         ) : tab === 'tour' ? (
@@ -651,6 +690,14 @@ function Campaign({ sel, setSel, onRace, onTour }: { sel: number; setSel: (ci: n
       </div>
     </div>
   )
+}
+
+function rowRival(r: PaintRival): Rival {
+  const car = carDef(r.car)
+  return {
+    id: `row-${r.id}`, town: `${r.icon} ${r.name}`, level: r.tier * 8, carName: car.name, color: r.paint, pi: r.pi, online: false,
+    body: car.body, model: car.id, skill: rowSkills(r) ? car.skill : undefined, shift: rowShift(r), boss: r.tier === 5,
+  }
 }
 
 function tourRival(race: number): Rival {

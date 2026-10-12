@@ -18,7 +18,7 @@ import { TileClip } from './TileClip'
 // The Race menu's front page: every race mode as a tile on one screen, each
 // showing its next race, so nothing needs scrolling to find.
 
-export type HubTab = 'quick' | 'campaign' | 'tour' | 'gp' | 'trial' | 'event'
+export type HubTab = 'quick' | 'campaign' | 'tour' | 'gp' | 'trial' | 'event' | 'rivals'
 
 const money = (n: number) => (n >= 10000 ? `$${Math.round(n / 1000)}k` : `$${n.toLocaleString()}`)
 
@@ -103,7 +103,7 @@ export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival }: { onOp
         ) : <span className="rm-meta">🔒 Clear Back Streets to open</span>}
       </div>
 
-      <RivalTile onRace={onRival} />
+      <RivalTile onRace={onRival} onOpen={() => onOpen('rivals')} />
 
       <div className={`rm-tile rm-ev rm-photo`} style={{ ...artStyle('tour', ev.venue, ev.night), '--ev': ev.color } as React.CSSProperties} {...tile('event')}>
         <TileClip mode="tour" venue={ev.venue} night={ev.night} sky={ev.sky} event={ev.id} />

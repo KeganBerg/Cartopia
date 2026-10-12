@@ -917,9 +917,16 @@ export const PAINTS: { color: string; name: string; bucks?: number }[] = [
   { color: '#3949ab', name: 'Midnight' }, { color: '#8e24aa', name: 'Grape' }, { color: '#ec407a', name: 'Bubblegum' },
   { color: '#fafafa', name: 'Pearl' }, { color: '#9e9e9e', name: 'Silver' }, { color: '#212121', name: 'Jet Black' },
   { color: '#6d4c41', name: 'Mocha' },
+  { color: '#ff7a5c', name: 'Coral' }, { color: '#81d4fa', name: 'Sky' }, { color: '#c0703a', name: 'Copper' },
+  { color: '#b39ddb', name: 'Lavender' }, { color: '#7d8a2c', name: 'Olive' }, { color: '#8c1d40', name: 'Burgundy' },
+  { color: '#00796b', name: 'Deep Teal' },
   { color: '#ffd700', name: 'Gold Flake', bucks: 1 }, { color: '#76ff03', name: 'Neon Lime', bucks: 1 },
   { color: '#ff00e5', name: 'Hot Magenta', bucks: 1 }, { color: '#00e5ff', name: 'Ice Neon', bucks: 1 },
 ]
+// The colours every new town can paint with. The rest are won from paint rivals (game/paintRivals.ts).
+export const STARTER_PAINTS = ['#e53935', '#1e88e5', '#fafafa', '#212121']
+// The coin colours from before paint rivals: towns that had them keep them.
+export const LEGACY_PAINTS = ['#e53935', '#fb8c00', '#fdd835', '#43a047', '#00acc1', '#1e88e5', '#3949ab', '#8e24aa', '#ec407a', '#fafafa', '#9e9e9e', '#212121', '#6d4c41']
 export const STRIPES = [null, '#fafafa', '#212121', '#e53935', '#fdd835', '#1e88e5']
 export const PAINT_COST = 150
 export const STRIPE_COST = 100

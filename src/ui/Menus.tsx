@@ -437,9 +437,9 @@ const withSlot = (m: OwnedCar['modSkin'], slot: SkinnedSlot, skin: string | null
 
 type GarageTab = 'tune' | 'mods' | 'paint' | 'custom'
 let nextGarageTab: GarageTab = 'tune'
-// Something to try on when the Garage opens (a crate prize): a part, a paint or a mod paint
+// Something to try on when the Garage opens (a crate prize): a part, a paint, a colour or a mod paint
 // on one slot, on this car. Nothing is fitted until the player taps the Garage's own button.
-export type GarageTry = { car: string; mod?: string; skin?: string; modSkin?: { slot: SkinnedSlot; skin: string } }
+export type GarageTry = { car: string; mod?: string; skin?: string; modSkin?: { slot: SkinnedSlot; skin: string }; color?: string }
 let nextTry: GarageTry | null = null
 // Opens the Garage on a given tab (goals use it for paint and mods), optionally with that
 // car picked and something on try-on.
@@ -535,7 +535,10 @@ export function GaragePanel() {
     select(list[(at + d + list.length) % list.length].c.uid)
   }
   // A paint job being tried on, cleared when another car is picked.
-  const [painting, setPainting] = useState<{ car: string; job: PaintJob } | null>(null)
+  const [painting, setPainting] = useState<{ car: string; job: PaintJob } | null>(() => {
+    const c = pre && cars.find((x) => x.uid === pre.car)
+    return c && pre.color && pre.color !== c.color ? { car: c.uid, job: { ...jobOf(c), color: pre.color } } : null
+  })
   const tryJob = painting && painting.car === car?.uid && tab === 'paint' ? painting.job : null
   // A skin being tried on (null: trying no skin), cleared when another car is picked.
   const [skinning, setSkinning] = useState<{ car: string; skin: string | null } | null>(pre?.skin ? { car: pre.car, skin: pre.skin } : null)
