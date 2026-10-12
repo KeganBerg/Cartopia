@@ -63,8 +63,9 @@ const coreEl = () => <primitive object={coreMat()} attach="material" dispose={nu
 // flashing on every bass note (clubLeds.ts; a soft beat when the music's off).
 // Glass by day like the rest of the tower.
 const suiteMats = SUITE.map(() => {
-  const m = new MeshStandardMaterial({ color: TINT, map: curtainTex(), emissiveMap: curtainGlowTex(), emissive: new Color('#000000'), emissiveIntensity: 1, metalness: 0.15, roughness: 0.22 })
+  const m = new MeshStandardMaterial({ color: TINT, map: curtainTex(), emissiveMap: curtainGlowTex(1, 1, true), emissive: new Color('#000000'), emissiveIntensity: 1, metalness: 0.15, roughness: 0.22 })
   m.userData.live = true
+  m.userData.clubLed = true
   return m
 })
 const suiteTint = new Color()

@@ -740,16 +740,19 @@ export const curtainTex = (rx = 1, ry = rx) =>
   }), 'curtain', rx, ry)
 
 // Matching night glow: about half the offices lit, warm or cool white.
-export const curtainGlowTex = (rx = 1, ry = rx) =>
-  rep(make('curtainGlow', 128, (g, s, r) => {
+// `white` lights them plain white, for panes tinted by their material's
+// emissive colour (the Vanguard penthouse, which glows the club's colour).
+export const curtainGlowTex = (rx = 1, ry = rx, white = false) =>
+  rep(make(white ? 'curtainGlowW' : 'curtainGlow', 128, (g, s, r) => {
     g.fillStyle = '#000000'
     g.fillRect(0, 0, s, s)
     for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) {
       if (r() < 0.5) continue
-      g.fillStyle = r() < 0.55 ? '#ffd892' : '#c4e0f7'
+      const warm = r() < 0.55
+      g.fillStyle = white ? '#ffffff' : warm ? '#ffd892' : '#c4e0f7'
       g.fillRect(x * 32 + 3, y * 32 + 3, 26, 20)
     }
-  }), 'curtainGlow', rx, ry)
+  }), white ? 'curtainGlowW' : 'curtainGlow', rx, ry)
 
 // Landing pad: a painted circle with a big H on dark concrete. `ring` is the
 // circle's colour, `mark` the letter's (a hospital pad's H sits in a red cross).
