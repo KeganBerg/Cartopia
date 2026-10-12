@@ -255,7 +255,8 @@ function pulseConfig(prof: EngineProfile, q: number): PulseConfig {
     weights,
     jitter: 0.05 + (1 - q) * 0.08 + prof.grit * 0.06,
     width: Math.min(0.5, Math.max(0.16, 0.44 - prof.bright * 0.1 - prof.clatter * 0.1)),
-    rough: 0.12 + prof.grit * 0.3 + (1 - q) * 0.12,
+    // Enough combustion grit to sound mechanical; much more turns into static through the drive stage.
+    rough: (0.12 + prof.grit * 0.3 + (1 - q) * 0.12) * 0.6,
     pipe: Math.min(0.025, 1 / Math.max(40, prof.reso)),
     feedback: 0.22 + q * 0.14,
   }
@@ -628,11 +629,11 @@ export class EngineVoice {
     set(this.lope.frequency, fire * prof.lumpRatio)
     set(this.tick.frequency, fire)
     const load = 0.3 + 0.7 * thr
-    set(this.lp.frequency, Math.min(4200, (200 + fire * (2 + 2.5 * thr) + r * 1400 * thr) * prof.bright))
+    set(this.lp.frequency, Math.min(3600, (200 + fire * (2 + 2.5 * thr) + r * 1400 * thr) * prof.bright))
     set(this.engGain.gain, (0.32 + 0.4 * r) * load)
     set(this.nf.frequency, Math.min(1800, 200 + fire * 2))
     // Hard-worked top gear: less hiss and rasp, more tone, so the strain reads as a rising howl.
-    set(this.noiseGain.gain, prof.noise * (0.015 + 0.08 * r * thr) * (top ? 0.5 : 1))
+    set(this.noiseGain.gain, prof.noise * (0.012 + 0.055 * r * thr) * (top ? 0.5 : 1))
     set(this.tickGain.gain, prof.clatter * (0.02 + 0.03 * (1 - r)) * (0.5 + 0.5 * load))
     // Boost builds with revs under load and bleeds off when lifting.
     this.boost += ((thr > 0.5 ? (top ? 0.75 + 0.25 * this.strain : r) : 0) - this.boost) * (thr > 0.5 ? 0.08 : 0.3)
