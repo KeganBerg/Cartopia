@@ -8,7 +8,7 @@ import { joinRefereed } from './referee'
 import { SERVER_CAR_COLUMNS, serverCar } from './serverCar'
 import { raceCarOf } from '../game/raceCar'
 import { loadUsernames, playerName } from './profiles'
-import { acceptWager, offerWager, startWagers, syncWagers } from './wagers'
+import { acceptWager, offerWager, startWagers, syncWagers, voidWager } from './wagers'
 import { openParty } from './party'
 import { STAKES, shortCoins } from '../game/wager'
 import { signedInUser } from './cloud'
@@ -251,6 +251,7 @@ async function openLobby(uid: string) {
       const race = useLive.getState().race
       if (payload.to !== myId || !race || race.raceId !== payload.raceId || race.host) return
       useLive.setState({ race: null })
+      if (race.stake) void voidWager(race.raceId)
       useGame.getState().toast(`${race.opponent.town}'s challenge had already expired`)
     })
     .on('broadcast', { event: 'answer' }, async ({ payload }) => {
@@ -269,6 +270,8 @@ async function openLobby(uid: string) {
         // They accepted after we cancelled or gave up: let them know instead of leaving them waiting.
         if (payload.accept && sentIds.has(payload.raceId) && raw) {
           lobby?.send({ type: 'broadcast', event: 'expired', payload: { raceId: payload.raceId, to: raw.id } })
+          // If it was a bet, they've already put both stakes down: call it off from this side too.
+          void voidWager(payload.raceId)
         }
         return
       }

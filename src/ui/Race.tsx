@@ -43,7 +43,7 @@ import { msToNextWeek, skinDef, SKIN_TIERS, carStats } from '../game/data'
 import { DIST, character, characterMul, tourDist, type RaceDist } from '../game/distance'
 import { playerName } from '../lib/profiles'
 import { LoadingScene } from './Loading'
-import { settleWager, startWagers, wagersOn } from '../lib/wagers'
+import { settleWager, startWager, startWagers, voidWager, wagersOn } from '../lib/wagers'
 import { shortCoins, stakesFor } from '../game/wager'
 
 // skill: the rival car's race skill. AI rivals use it; live players use theirs on their own device.
@@ -1247,6 +1247,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
     const go = () => {
       if (started) return
       started = true
+      if (live.stake) startWager(live.raceId)
       setCountdown(3)
     }
     const uid = live.opponent.uid
@@ -1296,6 +1297,8 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       clearInterval(ping)
       // Leaving before the start tells the other player instead of leaving them waiting.
       if (!started) ch?.send({ type: 'broadcast', event: 'leave', payload: {} })
+      // A bet on a race that never started is called off, so both stakes come straight back.
+      if (!started && live.stake) void voidWager(live.raceId)
       if (ch && supabase) supabase.removeChannel(ch)
     }
   }, [live])
