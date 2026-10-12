@@ -405,6 +405,20 @@ export const drainTex = () =>
     for (let y = 4; y < s - 4; y += 6) g.fillRect(5, y, s - 10, 3)
   })
 
+// Tactile paving at a curb ramp: yellow slab with rows of raised domes.
+export const tactileTex = (rx = 1, ry = rx) =>
+  rep(make('tactile', 64, (g, s) => {
+    g.fillStyle = '#e8b730'
+    g.fillRect(0, 0, s, s)
+    for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) {
+      const cx = (x + 0.5) * (s / 4), cy = (y + 0.5) * (s / 4)
+      g.fillStyle = '#b8891c'
+      g.beginPath(); g.arc(cx + 1, cy + 1.5, 4.5, 0, Math.PI * 2); g.fill()
+      g.fillStyle = '#f6d257'
+      g.beginPath(); g.arc(cx, cy, 4, 0, Math.PI * 2); g.fill()
+    }
+  }), 'tactile', rx, ry)
+
 // Desert sand: warm base, wind ripples, darker grit and the odd pebble.
 export const sandTex = (rx = 1, ry = rx) =>
   rep(make('sand', 256, (g, s, r) => {
