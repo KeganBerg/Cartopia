@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { flyFrom, openChestFx, type Amounts } from './Fly'
 import {
-  useGame, activeGoals, eventGoals, goalOpen, goalDone, statValue, today, claimable, taskDef, taskText, taskProgress, periodSlots, periodDone, chestOpened,
+  useGame, activeGoals, eventGoals, goalOpen, goalDone, statValue, claimable, taskDef, taskText, taskProgress, periodSlots, periodDone, chestOpened,
   type Period, type GameState,
 } from '../game/store'
 import {
-  DAILY_BONUS, GOALS, QUEST_PAY, TASKS_PER_PERIOD, payAt, msToNextDay, msToNextWeek, buildingDef, buildingLevel, upgradable, MAX_BUILDING_LEVEL,
+  GOALS, QUEST_PAY, TASKS_PER_PERIOD, payAt, msToNextDay, msToNextWeek, buildingDef, buildingLevel, upgradable, MAX_BUILDING_LEVEL,
   carDef, takesDriver, SEASON_STARS, activeEvent, eventEndsAt, plotPrice, START_LAND, type StatKey, type GoalDef, flatFixCost, servicePay, gasCanCost,
 } from '../game/data'
 import { Panel, SheetTabs, openGarageTab } from './Menus'
@@ -293,35 +293,6 @@ export function GoalTracker() {
       <span className="gt-text">{g.text}</span>
       <span className="gt-bar"><i style={{ width: `${(have / g.target) * 100}%` }} /></span>
     </button>
-  )
-}
-
-export function DailyPanel() {
-  const streak = useGame((s) => s.dailyStreak)
-  const last = useGame((s) => s.lastDaily)
-  const claim = useGame((s) => s.claimDaily)
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
-  const day = last === yesterday ? streak + 1 : 1
-  const claimed = last === today()
-  // A cloud save can arrive already claimed for today: close instead of leaving an invisible panel.
-  useEffect(() => { if (claimed) useGame.getState().openPanel(null) }, [claimed])
-  if (claimed) return null
-  return (
-    <Panel title="Daily Bonus">
-      <p className="hint">Come back every day for bigger rewards.</p>
-      <div className="daily">
-        {DAILY_BONUS.map((r, i) => (
-          <div key={i} className={i + 1 === Math.min(day, DAILY_BONUS.length) ? 'day today' : i + 1 < day ? 'day past' : 'day'}>
-            <small>Day {i + 1}</small>
-            <b>${r.coins}</b>
-            {r.fuel && <small>+{r.fuel} ⛽</small>}
-            {r.parts && <small>+{r.parts} ⚙</small>}
-            {r.bucks && <small>+💎{r.bucks}</small>}
-          </div>
-        ))}
-      </div>
-      <button className="buy" onClick={claim}>Collect day {day}</button>
-    </Panel>
   )
 }
 

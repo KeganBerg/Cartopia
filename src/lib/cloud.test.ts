@@ -7,6 +7,8 @@ let db: Map<string, Row>
 let serverWrites: number
 // Stands in for the server's economy guard: trims a save and says what it changed.
 let serverTrim: ((s: Row['state']) => object | null) | null
+// Server functions the fake client knows, like reset_my_account. Missing ones error like PostgREST.
+let rpcs: Record<string, (uid: string) => void>
 
 function stamp(iso: string) {
   // Postgres hands timestamps back in its own format, not the one we sent.
@@ -58,6 +60,12 @@ function fakeClient(signedInAs?: string) {
       }
       return q
     },
+    rpc: async (name: string) => {
+      const fn = rpcs[name]
+      if (!fn) return { error: { code: 'PGRST202', message: `Could not find the function public.${name}` } }
+      fn(session!.user.id)
+      return { error: null }
+    },
     signIn(uid: string) {
       session = { user: { id: uid } }
       listeners.forEach((fn) => fn('SIGNED_IN', session))
@@ -108,6 +116,8 @@ beforeEach(() => {
   db = new Map()
   serverWrites = 0
   serverTrim = null
+  // reset_my_account deletes the save row; no trigger runs on delete, so no level guard.
+  rpcs = { reset_my_account: (uid) => void db.delete(uid) }
 })
 
 afterEach(() => {
@@ -278,5 +288,62 @@ describe('server economy checks', () => {
     await play(phone, { level: 5, townName: 'Still Phone Town' })
     expect(serverWrites).toBe(writes + 1)
     expect(phone.reloads).toBe(0)
+  })
+})
+
+describe('reset account', () => {
+  it('starts the player on a fresh town that the old one can never replace', async () => {
+    let phone = await openGame({})
+    phone = await signIn(phone, 'kegan')
+    await play(phone, { level: 7, townName: 'Big Town' })
+    // The player resets on desktop while a phone tab is still open on the old town.
+    let desktop = await openGame(phone.snapshot())
+    desktop = await signIn(desktop, 'kegan')
+    expect(desktop.useGame.getState().townName).toBe('Big Town')
+
+    const { resetAccount } = await import('./cloud')
+    vi.advanceTimersByTime(1000)
+    expect(await resetAccount()).toBeNull()
+    expect(db.get('kegan')!.state.level).toBe(1)
+    expect(db.get('kegan')!.state.townName).toBe('My Town')
+    expect(desktop.reloads).toBe(1)
+
+    desktop = await boot(desktop.snapshot(), 'kegan')
+    expect(desktop.reloads).toBe(0)
+    expect(desktop.useGame.getState().level).toBe(1)
+    expect(desktop.useGame.getState().tutorial).toBe(0)
+    expect((await import('./cloud')).localBackup()).toBeNull()
+    const writes = serverWrites
+    await play(desktop, { level: 1, townName: 'Fresh Start' })
+    expect(serverWrites).toBe(writes + 1)
+
+    // The old phone tab's next save is refused and it loads the fresh town instead.
+    await play(phone, { level: 8, townName: 'Big Town' })
+    expect(db.get('kegan')!.state.townName).toBe('Fresh Start')
+    expect(phone.reloads).toBe(1)
+  })
+
+  it('changes nothing and keeps saving when the server has no reset yet', async () => {
+    delete rpcs.reset_my_account
+    let phone = await openGame({})
+    phone = await signIn(phone, 'kegan')
+    await play(phone, { level: 3, townName: 'Kept Town' })
+    const { resetAccount } = await import('./cloud')
+    expect(await resetAccount()).toContain('reset_my_account')
+    expect(phone.reloads).toBe(0)
+    expect(db.get('kegan')!.state.townName).toBe('Kept Town')
+    await play(phone, { level: 4, townName: 'Kept Town' })
+    expect(db.get('kegan')!.state.level).toBe(4)
+  })
+
+  it('wipes a guest town in this browser only', async () => {
+    const laptop = await openGame({})
+    await play(laptop, { level: 4, townName: 'Guest Town' })
+    const { resetLocal } = await import('./cloud')
+    resetLocal()
+    expect(laptop.reloads).toBe(1)
+    const after = await boot(laptop.snapshot())
+    expect(after.useGame.getState().townName).toBe('My Town')
+    expect(after.useGame.getState().level).toBe(1)
   })
 })
