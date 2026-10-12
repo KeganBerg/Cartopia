@@ -18,6 +18,8 @@ import { bake, finishOf, type Finish as Look } from './bake'
 import { carStyle, hasTrim, trimBike, trimCar, type CarStyle } from './carTrim'
 import { brakeGeo, wheelGeo, type RimStyle } from './carWheels'
 import { PEOPLE_SIZED } from './keepShape'
+import { SCANS, type Scan } from './scans'
+import { hullEdge, hullEnd, hullGeo, hullTop, hullX, hullY, patch } from './scans/hull'
 
 type Shape = {
   len: number; wid: number
@@ -313,6 +315,122 @@ function formulaGeo(key: string, fit: Partial<Record<ModSlot, string>>): CarGeo 
   return out
 }
 
+// A restyled scan (scans/): the baked hull with our own windows, lights and trim laid
+// over its surface, wheel wells, mirrors and brakes. Wheels sit where the body puts them.
+function scanGeo(key: string, body: Body, { hull: h, look: L }: Scan): CarGeo {
+  const s = shapeOf(body)
+  const k = new Kit()
+  for (const [part, g] of Object.entries(hullGeo(h)) as [Part, BufferGeometry][]) k.add(part, g)
+  const wz = s.len * 0.33
+  const lerp = (a: number, b: number, t: number) => a + (b - a) * t
+  const side = (z: number, y: number): [number, number, number] => [hullX(h, z, y), y, z]
+  const top = (z: number, x: number): [number, number, number] => [x, hullY(h, z, x), z]
+  const nose = (x: number, y: number): [number, number, number] => [x, y, hullEnd(h, x, y, 1)]
+  const tail = (x: number, y: number): [number, number, number] => [x, y, hullEnd(h, x, y, -1)]
+
+  // Side glass: rows from the beltline up to where the side turns into the roof, each row
+  // running between the windshield (less the A-pillar) and a raked C-pillar.
+  const zs = Array.from({ length: 121 }, (_, i) => lerp(L.back[0], L.shield[1], i / 120))
+  const edgeY = zs.map((z) => hullEdge(h, z)[1])
+  const peak = Math.max(...edgeY)
+  const sideGlass = (grow: number) => {
+    const y0 = L.belt - grow
+    const y1 = peak - 0.012 + grow
+    const rows = Array.from({ length: 9 }, (_, j) => {
+      const y = lerp(y0, y1, j / 8)
+      const ok = zs.filter((z, i) => edgeY[i] - 0.012 + grow >= y && hullEdge(h, z + L.aPillar - grow)[1] - 0.012 >= y && z >= L.cPillar - grow + (y - y0) * L.cRake)
+      return ok.length ? [ok[0], ok[ok.length - 1]] : null
+    })
+    // Rows the outline doesn't reach close up onto the last row that it does.
+    let last = rows.find((r) => r) ?? [0, 0]
+    const fixed = rows.map((r) => (r ? (last = r) : [(last[0] + last[1]) / 2, (last[0] + last[1]) / 2]))
+    return (u: number, v: number) => {
+      const j = Math.min(7, Math.floor(v * 8))
+      const t = v * 8 - j
+      const a = fixed[j], b = fixed[j + 1]
+      const y = lerp(y0, y1, v)
+      return side(lerp(lerp(a[0], b[0], t), lerp(a[1], b[1], t), u), y)
+    }
+  }
+  k.add('black', patch(sideGlass(0.008), 12, 8, 0.003, true))
+  k.add('glass', patch(sideGlass(0), 12, 8, 0.006, true))
+  // Windshield and back light across the top, inside the A- and C-pillars.
+  // Each pane narrows from its base toward the roof: [half width at z0, at z1].
+  const pane = (z0: number, z1: number, [w0, w1]: [number, number], grow: number) => (u: number, v: number) => {
+    const z = lerp(z0, z1, v)
+    const w = Math.min(hullEdge(h, z)[0] - 0.01, lerp(w0, w1, v)) + grow
+    return top(z, lerp(-w, w, u))
+  }
+  for (const [[z0, z1], w] of [[L.shield, L.shieldW], [L.back, L.backW]] as const) {
+    k.add('black', patch(pane(z0 - 0.008, z1 + 0.008, w, 0.012), 10, 8, 0.003))
+    k.add('glass', patch(pane(z0, z1, w, 0), 10, 8, 0.006))
+  }
+
+  // Headlights: a black housing and a lamp strip sweeping up toward the corners, an amber
+  // marker at the outer end; a black intake across the lower nose.
+  const [hx0, hx1, hy] = L.head
+  const lamp = (grow: number, x0: number, x1: number) => (u: number, v: number) => {
+    const x = lerp(x0 - grow, x1 + grow, u)
+    return nose(x, hy + (x - hx0) * 0.12 + lerp(-0.012 - grow, 0.012 + grow, v))
+  }
+  k.add('black', patch(lamp(0.008, hx0, hx1), 10, 3, 0.003, true, [0, 0.15, 0]))
+  k.add('lamp', patch(lamp(0, hx0, hx1 - 0.03), 10, 3, 0.006, true, [0, 0.15, 0]))
+  k.add('amber', patch(lamp(0, hx1 - 0.025, hx1), 3, 3, 0.006, true, [0, 0.15, 0]))
+  k.add('black', patch((u, v) => nose(lerp(-0.17, 0.17, u), lerp(s.lift + 0.045, s.lift + 0.085, v)), 14, 3, 0.003, false, [0, 0.15, 0]))
+  // Tail: one light bar across the back in a black band, a diffuser and the plate.
+  const [tw, ty] = L.tail
+  k.add('black', patch((u, v) => tail(lerp(-tw - 0.01, tw + 0.01, u), lerp(ty - 0.022, ty + 0.018, v)), 20, 3, 0.003, false, [0, 0.15, 0]))
+  k.add('tail', patch((u, v) => tail(lerp(-tw, tw, u), lerp(ty - 0.01, ty + 0.008, v)), 20, 2, 0.006, false, [0, 0.15, 0]))
+  k.add('black', patch((u, v) => tail(lerp(-0.22, 0.22, u), lerp(s.lift + 0.04, s.lift + 0.075, v)), 14, 3, 0.003, false, [0, 0.15, 0]))
+  const plateY = s.lift + 0.13
+  const plateZ = hullEnd(h, 0.06, plateY, -1)
+  k.add('black', plane(0.124, 0.054), [0, plateY, plateZ - 0.006], [0, Math.PI, 0])
+  k.add('chrome', plane(0.11, 0.042), [0, plateY, plateZ - 0.009], [0, Math.PI, 0])
+
+  // Sides: a black rocker between the wheels, door seams and a handle, wells behind each tyre.
+  k.add('black', patch((u, v) => side(lerp(-wz + s.wheel * 1.25, wz - s.wheel * 1.25, u), lerp(s.lift + 0.035, s.lift + 0.065, v)), 12, 2, 0.003, true))
+  // A black air intake on each rear quarter, ahead of the rear wheel, and hood panel lines.
+  const iz = -wz + s.wheel * 1.3
+  k.add('black', patch((u, v) => side(lerp(iz, iz + 0.1, u), lerp(s.lift + 0.11, s.lift + 0.11 + lerp(0.02, 0.07, u), v)), 6, 3, 0.003, true))
+  for (const sd of [-1, 1]) k.add('dark', patch((u, v) => top(lerp(L.shield[1] + 0.02, h.z[h.z.length - 1] - 0.09, u), sd * (lerp(0.2, 0.17, u) + lerp(-0.0025, 0.0025, v))), 12, 1, 0.002))
+  for (const z of L.door) k.add('dark', patch((u, v) => side(z + lerp(-0.003, 0.003, u), lerp(s.lift + 0.07, L.belt - 0.01, v)), 1, 6, 0.002, true))
+  for (const sd of [-1, 1]) {
+    const hz = L.door[1] + 0.06
+    const hyy = L.belt - 0.03
+    k.add('chrome', rbox(0.01, 0.012, 0.05, 0.004), [sd * (hullX(h, hz, hyy) + 0.003), hyy, hz])
+  }
+  // Wheel wells: a dark arch laid on the body side over each tyre.
+  const r0 = s.wheel * 1.05
+  const r1 = s.wheel * 1.13
+  for (const z of [wz, -wz]) {
+    // Cut short where the overhang is shorter than the arch.
+    const room = (end: number) => Math.min(1, Math.abs(end - z) / r1)
+    const aLo = Math.acos(room(h.z[h.z.length - 1] - 0.05))
+    const aHi = Math.PI - Math.acos(room(h.z[0] + 0.05))
+    const arch = (r: number) => (u: number, v: number) => {
+      const a = lerp(aHi, aLo, u)
+      const rr = lerp(r0 - 0.03, r, v)
+      const zz = z + Math.cos(a) * rr
+      // Kept below the fender's top edge, where the side turns into the hood or deck.
+      return side(zz, Math.min(s.wheel + Math.sin(a) * rr, hullEdge(h, zz)[1] - 0.012))
+    }
+    k.add('black', patch(arch(r1), 16, 2, 0.003, true))
+  }
+  // Mirrors on stalks at the foot of the A-pillars.
+  const mz = L.shield[1] - 0.02
+  const my = hullTop(h, mz) + 0.01
+  for (const sd of [-1, 1]) {
+    const mx = hullEdge(h, mz)[0] + 0.03
+    k.add('paint', rbox(0.06, 0.035, 0.03, 0.012), [sd * mx, my, mz])
+    k.add('black', box(0.035, 0.01, 0.012), [sd * (mx - 0.03), my - 0.012, mz])
+    k.add('glass', plane(0.045, 0.024), [sd * mx, my, mz - 0.0155], [0, Math.PI, 0])
+  }
+  brakes(k, s.wid / 2 - 0.02, wz, s.wheel, 0.14)
+  const out = { parts: k.build(), wheel: stockWheel(s.wheel, 0.14) }
+  geoCache.set(key, out)
+  return out
+}
+
 // A bucket seat: cushion, a raked back and a headrest, seen through the glass.
 function seat(k: Kit, x: number, y: number, z: number, w: number, back: number) {
   k.add('cabin', rbox1(w, 0.045, 0.11, 0.018), [x, y + 0.025, z + 0.045])
@@ -375,10 +493,11 @@ function brakes(k: Kit, wx: number, wz: number, r: number, w: number) {
 
 // Stock parts that a fitted mod replaces are left out of the merged body.
 function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: string): CarGeo {
-  const key = `${body}|${model ?? ''}|${fit.spoiler ? 1 : 0}${fit.hood ? 1 : 0}${fit.exhaust ? 1 : 0}${fit.kit ? 1 : 0}`
+  const key = `${body}|${model ?? ''}|${fit.spoiler ? 1 : 0}${fit.hood ? 1 : 0}${fit.exhaust ? 1 : 0}${fit.kit ? 1 : 0}${model && SCANS[model] ? '|scan' : ''}`
   const hit = geoCache.get(key)
   if (hit) return hit
   if (body === 'formula') return formulaGeo(key, fit)
+  if (model && SCANS[model]) return scanGeo(key, body, SCANS[model])
   const s = shapeOf(body)
   const k = new Kit()
   const b = s.round ? Math.min(0.1, s.body * 0.4) : 0.035
@@ -992,17 +1111,22 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
     top, hoodY, bulge: s.hood * 2 > 0 ? s.hood : 0, hoodFront, cowl, front, wz, lightY, plateY, nose: noseAt, exhaust: !!fit.exhaust, spoiler: !!fit.spoiler, ty, roofY, roofLen, roofZ, closed,
   })
 
-  // Wheel: one mesh per wheel. The tread and the spoked rim share one texture,
-  // so tyre and rim are a single draw.
-  const wheel = new CylinderGeometry(s.wheel, s.wheel, 0.14, 18, 1)
-  const uv = wheel.getAttribute('uv')
-  const side = (18 + 1) * 2
-  for (let i = 0; i < uv.count; i++) uv.setX(i, i < side ? 0.5 + uv.getX(i) * 0.5 : uv.getX(i) * 0.5)
-  wheel.rotateZ(Math.PI / 2)
+  const wheel = stockWheel(s.wheel, 0.14)
 
   const out = { parts: k.build(), wheel }
   geoCache.set(key, out)
   return out
+}
+
+// Wheel: one mesh per wheel. The tread and the spoked rim share one texture,
+// so tyre and rim are a single draw.
+function stockWheel(r: number, w: number) {
+  const wheel = new CylinderGeometry(r, r, w, 18, 1)
+  const uv = wheel.getAttribute('uv')
+  const side = (18 + 1) * 2
+  for (let i = 0; i < uv.count; i++) uv.setX(i, i < side ? 0.5 + uv.getX(i) * 0.5 : uv.getX(i) * 0.5)
+  wheel.rotateZ(Math.PI / 2)
+  return wheel
 }
 
 // Materials every car shares; only the paint differs from car to car.
