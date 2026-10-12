@@ -550,11 +550,43 @@ function PrizeCar({ look }: { look: CarLook }) {
 
 // A shower of gold coins thrown out of the crate: each one tumbles through the
 // air, bounces once or twice, then slides to a stop lying flat on the floor.
-const COINS = 70
+const COINS = 110
 // Coins, or for a rare or legendary pull cut gems (a six-sided table cut), thrown the same way.
 const SHAPES = {
   coin: { r: 0.11, h: 0.025 },
   gem: { r: 0.1, h: 0.07 },
+}
+// How a shower is thrown, picked at random each opening (a big win always heaps up a pile).
+// Each sets how many fly, every piece's launch and delay, and the note its clink rings at.
+export type BurstPattern = 'fountain' | 'spiral' | 'ring' | 'rain' | 'pile'
+export const BURST_PATTERNS: BurstPattern[] = ['fountain', 'spiral', 'ring', 'rain']
+type Launch = { vx: number; vy: number; vz: number; delay: number; tune?: number }
+const BURSTS: Record<BurstPattern, { n: number; launch: (i: number, n: number, r: () => number) => Launch }> = {
+  // Up and out in a loose spray, tipped toward the camera.
+  fountain: { n: 70, launch: (i, n, r) => {
+    const a = r() * Math.PI * 2, sp = 1.2 + r() * 2.6
+    return { vx: Math.cos(a) * sp, vy: 4.5 + r() * 3.5, vz: Math.sin(a) * sp * 0.7 + 0.6, delay: (i / n) * 0.5 }
+  } },
+  // One after another round a turning arm that reaches further each time; the clinks climb.
+  spiral: { n: 70, launch: (i, n, r) => {
+    const k = i / n, a = k * Math.PI * 3.2, sp = 0.9 + k * 2.8
+    return { vx: Math.cos(a) * sp, vy: 5.2 + r() * 0.6, vz: Math.sin(a) * sp * 0.8 + 0.2, delay: k * 0.9, tune: 0.8 + k * 0.5 }
+  } },
+  // All at once, evenly round two rings, so they land as a splash of two circles ringing in fifths.
+  ring: { n: 72, launch: (i, n) => {
+    const inner = i % 2 === 0, a = (i / n) * Math.PI * 2 + (inner ? 0.09 : 0), sp = inner ? 1.65 : 2.6
+    return { vx: Math.cos(a) * sp, vy: 5, vz: Math.sin(a) * sp * 0.85 + 0.15, delay: inner ? 0.07 : 0, tune: inner ? 1.5 : 1 }
+  } },
+  // Shot high out of sight, then raining down scattered over a second and a bit: a steady patter.
+  rain: { n: 70, launch: (i, n, r) => {
+    const a = r() * Math.PI * 2, sp = 0.4 + r() * 1.9
+    return { vx: Math.cos(a) * sp, vy: 10 + r() * 1.5, vz: Math.sin(a) * sp * 0.75 + 0.35, delay: (i / n) * 1.2 + r() * 0.1 }
+  } },
+  // A big win: a heavy, low heave in two waves that heaps up round the crate, with deeper clinks.
+  pile: { n: 110, launch: (i, n, r) => {
+    const a = r() * Math.PI * 2, sp = 0.2 + r() * r() * 2.4
+    return { vx: Math.cos(a) * sp, vy: 3.4 + r() * 2.4, vz: Math.sin(a) * sp * 0.8 + 0.25, delay: (i % 2) * 0.35 + (i / n) * 0.35, tune: 0.72 + r() * 0.18 }
+  } },
 }
 // Snap an angle to the nearest face-up/face-down orientation.
 const flatOf = (a: number) => Math.round(a / Math.PI) * Math.PI
@@ -570,22 +602,22 @@ function groundAt(x: number, z: number) {
   if (out >= 0 && out < S) return CRATE_FLOOR + 0.08 + out * 0.07
   return Math.hypot(x, z) < 1.5 ? LIFT : 0
 }
-function CoinBurst({ start, gems = false }: { start: React.RefObject<number | null>; gems?: boolean }) {
+function CoinBurst({ start, gems = false, big = false }: { start: React.RefObject<number | null>; gems?: boolean; big?: boolean }) {
   const { r: COIN_R, h: COIN_H } = SHAPES[gems ? 'gem' : 'coin']
   const ref = useRef<InstancedMesh>(null)
   const tmp = useMemo(() => new Object3D(), [])
   const run = useRef<number | null>(null)
+  const shown = useRef(0)
   const coins = useMemo(() => {
     const r = rng(41)
-    return Array.from({ length: COINS }, (_, i) => {
-      const a = r() * Math.PI * 2, sp = 1.2 + r() * 2.6
-      return {
-        vx: Math.cos(a) * sp, vy: 4.5 + r() * 3.5, vz: Math.sin(a) * sp * 0.7 + 0.6, delay: (i / COINS) * 0.5,
-        // Flip rate (end over end) and a slower wobble, both in radians/second.
-        flip: (8 + r() * 10) * (r() < 0.5 ? -1 : 1), wob: (r() - 0.5) * 6, yaw: r() * Math.PI * 2,
-        x: 0, y: 0, z: 0, sx: 0, sy: 0, sz: 0, rx: r() * 6, rz: 0, wx: 0, wz: 0, bounces: 0, rest: false, fl: 0, live: false,
-      }
-    })
+    return Array.from({ length: COINS }, () => ({
+      vx: 0, vy: 0, vz: 0, delay: 0, tune: undefined as number | undefined,
+      // Flip rate (end over end) and a slower wobble, both in radians/second.
+      flip: (8 + r() * 10) * (r() < 0.5 ? -1 : 1), wob: (r() - 0.5) * 6, yaw: r() * Math.PI * 2,
+      x: 0, y: 0, z: 0, sx: 0, sy: 0, sz: 0, rx: r() * 6, rz: 0, wx: 0, wz: 0, bounces: 0, rest: false, fl: 0, live: false,
+      // How high it sits on the pieces that settled under it, and when it settled (-1 while flying).
+      lift: 0, settled: -1,
+    }))
   }, [])
   useFrame((state, rawDt) => {
     const m = ref.current
@@ -595,10 +627,14 @@ function CoinBurst({ start, gems = false }: { start: React.RefObject<number | nu
     // A new crate opening throws the whole shower again.
     if (run.current !== start.current) {
       run.current = start.current
-      for (const c of coins) c.live = false
+      const pattern: BurstPattern = big ? 'pile' : BURST_PATTERNS[Math.floor(Math.random() * BURST_PATTERNS.length)]
+      const { n, launch } = BURSTS[pattern]
+      const r = rng(Math.floor(Math.random() * 1e6))
+      shown.current = n
+      coins.forEach((c, i) => Object.assign(c, { live: false, lift: 0, settled: -1, tune: undefined }, i < n ? launch(i, n, r) : {}))
     }
     coins.forEach((c, i) => {
-      if (t < c.delay) {
+      if (i >= shown.current || t < c.delay) {
         tmp.position.set(0, -10, 0)
         tmp.updateMatrix()
         m.setMatrixAt(i, tmp.matrix)
@@ -619,14 +655,14 @@ function CoinBurst({ start, gems = false }: { start: React.RefObject<number | nu
           c.y = floor + reach
           c.bounces++
           // A soft clink as each one first lands; the bounces after stay quiet.
-          if (c.bounces === 1) landClink(gems, -c.sy)
+          if (c.bounces === 1) landClink(gems, -c.sy, c.tune)
           // Each hit loses most of the spin and height; after a couple it lies down.
           c.sy = Math.abs(c.sy) * (c.bounces === 1 ? 0.38 : 0.22)
           c.sx *= 0.55
           c.sz *= 0.55
           c.wx *= 0.4
           c.wz *= 0.3
-          if (c.bounces >= 3 || c.sy < 0.8) Object.assign(c, { rest: true, fl: floor })
+          if (c.bounces >= 3 || c.sy < 0.8) Object.assign(c, { rest: true, fl: floor, settled: t })
         }
       } else {
         // Slide to a stop and settle flat: no more spinning on the floor.
@@ -640,13 +676,24 @@ function CoinBurst({ start, gems = false }: { start: React.RefObject<number | nu
         else {
           c.x = nx
           c.z = nz
-          if (under < c.fl - 0.04) Object.assign(c, { rest: false, sy: 0, bounces: 2 })
+          if (under < c.fl - 0.04) Object.assign(c, { rest: false, sy: 0, bounces: 2, lift: 0, settled: -1 })
           else c.fl = under
         }
         c.rx += (flatOf(c.rx) - c.rx) * k
         c.rz += (flatOf(c.rz) - c.rz) * k
+        // Lie on top of any piece that settled here first, so a heap stacks up instead of
+        // pieces sinking into each other. Once it stops sliding, where it sits is fixed.
+        if (Math.abs(c.sx) + Math.abs(c.sz) > 0.02 || t - c.settled < 0.3) {
+          let top = 0
+          for (let j = 0; j < shown.current; j++) {
+            const o = coins[j]
+            if (o === c || !o.rest || o.settled < 0 || o.settled > c.settled || (o.settled === c.settled && j > i)) continue
+            if (Math.abs(o.fl - c.fl) < 0.04 && Math.hypot(o.x - c.x, o.z - c.z) < COIN_R * 1.5) top = Math.max(top, o.lift + COIN_H * 0.95)
+          }
+          c.lift += (top - c.lift) * Math.min(1, 20 * dt)
+        }
         const reach = COIN_R * Math.min(1, Math.hypot(Math.sin(c.rx), Math.sin(c.rz))) + COIN_H / 2
-        c.y = c.fl + reach
+        c.y = c.fl + c.lift + reach
       }
       tmp.position.set(c.x, c.y, c.z)
       tmp.rotation.set(c.rx, c.yaw, c.rz, 'YXZ')
@@ -833,6 +880,8 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
   const coins = drop?.kind === 'coins' || drop?.kind === 'dupe' || drop?.kind === 'skindupe'
   // Rare and legendary pulls (cars, gem parts, epic and legendary skins) throw gems instead.
   const gems = !coins && tier >= 2
+  // A jackpot or a legendary pull heaps its shower into a pile.
+  const big = (drop?.kind === 'coins' && drop.jackpot) || tier >= 3
   // A part shows the part itself; cars and paints show the car.
   const part = drop?.kind === 'mod' ? drop.mod : null
   const showCar = (drop?.kind === 'car' || drop?.kind === 'dupe' || drop?.kind === 'skin' || drop?.kind === 'skindupe') && !!prizeCar
@@ -965,7 +1014,7 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
         <meshBasicMaterial map={glowTex()} color={glow} transparent opacity={0.35} blending={AdditiveBlending} depthWrite={false} toneMapped={false} />
       </mesh>
       <Burst start={burstAt} glow={glow} />
-      {(coins || gems) && <CoinBurst start={coinAt} gems={gems} />}
+      {(coins || gems) && <CoinBurst start={coinAt} gems={gems} big={big} />}
       <group ref={prize} visible={false}>
         {showCar && prizeCar && <PrizeCar look={prizeCar} />}
         {coins && !showCar && <CoinPile />}
