@@ -87,7 +87,7 @@ export function KeepShapes({ limit, children }: { limit: number; children: React
   return (
     <group userData={MERGE_ROOT}>
       {children}
-      {!uniform(scale) && <Watch scale={scale} limit={limit} />}
+      {(!uniform(scale) || scale[0] !== 1) && <Watch scale={scale} limit={limit} />}
     </group>
   )
 }

@@ -205,7 +205,7 @@ export function StudentCars({ n, drive }: { n: number; drive: Drive }) {
       {Array.from({ length: n }, (_, i) => (
         <group key={i} ref={(el) => { cars.current[i] = el }}>
           {/* Merged, each car keeps its shape and its topper wherever it drives. */}
-          <Upright><LearnerCar i={i} rig={rigs[i]} body={(el) => { bodies.current[i] = el }} /></Upright>
+          <Upright size={1}><LearnerCar i={i} rig={rigs[i]} body={(el) => { bodies.current[i] = el }} /></Upright>
         </group>
       ))}
     </group>

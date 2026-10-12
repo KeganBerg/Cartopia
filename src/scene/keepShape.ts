@@ -104,6 +104,9 @@ function underKept(o: Object3D, root: Object3D) {
   return false
 }
 
+// Nothing to fix: a block grown evenly to exactly the size wanted.
+const same = (s: Shape) => uniform(s.scale) && s.k === s.scale[0]
+
 // Keeps `o` in true shape every frame, wherever it moves or turns.
 export function keepShape(o: Object3D, root: Object3D, scale: readonly number[], k = Math.min(scale[0], scale[2]), off?: Vector3) {
   const shape: Shape = { root, scale, k, off }
@@ -113,7 +116,7 @@ export function keepShape(o: Object3D, root: Object3D, scale: readonly number[],
   o.updateMatrix = function () {
     Object3D.prototype.updateMatrix.call(this)
     const s = kept.get(this)
-    if (!s || !this.parent || uniform(s.scale) || underKept(this, s.root)) return
+    if (!s || !this.parent || same(s) || underKept(this, s.root)) return
     if (!fixFor(this.parent, s, c3)) return
     applyLinear(this.matrix, c3)
     applyAnchor(this.matrix, s)
@@ -136,8 +139,8 @@ export function releaseShape(o: Object3D) {
 }
 
 // Crowds are instanced: each person part is fixed as it's placed.
-export function keepInstances(mesh: InstancedMesh, root: Object3D, scale: readonly number[]) {
-  const shape: Shape = { root, scale, k: Math.min(scale[0], scale[2]) }
+export function keepInstances(mesh: InstancedMesh, root: Object3D, scale: readonly number[], k = Math.min(scale[0], scale[2])) {
+  const shape: Shape = { root, scale, k }
   const had = kept.get(mesh)
   if (had) return void Object.assign(had, shape)
   kept.set(mesh, shape)
@@ -148,7 +151,7 @@ export function keepInstances(mesh: InstancedMesh, root: Object3D, scale: readon
   const fix = new Matrix3()
   const fixed = (i: number, m: Matrix4) => {
     const s = kept.get(mesh)
-    if (!s || uniform(s.scale) || underKept(mesh, s.root)) return set(i, m)
+    if (!s || same(s) || underKept(mesh, s.root)) return set(i, m)
     if (!fixFor(mesh, s, fix)) return set(i, m)
     tmp.copy(m)
     applyLinear(tmp, fix)
@@ -227,8 +230,90 @@ function retile(mesh: Mesh, back: Matrix4, scale: readonly number[]) {
   mesh.geometry = g
 }
 
+// Square blocks (2x2, 4x4) grow the building evenly, but people don't grow
+// with it: anything person-sized standing free on the lot (a pump, a parked
+// car, a bench, a bin, a townsperson) keeps its true size at its place in the
+// bigger block. Model units: a townsperson is about 0.6 tall.
+export const HUMAN = 0.9
+// Marks something people-sized wherever it stands (a car on a lift, a bus at
+// the kerb, a parasol on a patio): kept true size even when it isn't free-standing.
+export const PEOPLE_SIZED = { human: true }
+// Standing on the lot: on the ground, a kerb, an island or a low deck.
+export const GROUND = 0.25
+
+// Animated every frame (models mark these noBatch so Batch leaves them be).
+export function moving(o: Object3D) {
+  for (let p: Object3D | null = o; p; p = p.parent) if (p.userData.noBatch) return true
+  return false
+}
+
+function keepPeople(root: Object3D, scale: readonly number[], limit: number) {
+  root.updateWorldMatrix(true, true)
+  const back = new Matrix4().copy(root.matrixWorld).invert()
+  // Moving things (learner cars, fish) aren't structure: what they brush
+  // against changes by the frame.
+  const boxes: [Object3D, Box3][] = []
+  root.traverse((o) => {
+    if ((o as Mesh).isMesh && !(o as InstancedMesh).isInstancedMesh && !moving(o)) boxes.push([o, new Box3().setFromObject(o).applyMatrix4(back)])
+  })
+  const inside = (o: Object3D, c: Object3D) => {
+    for (let p: Object3D | null = o; p; p = p.parent) if (p === c) return true
+    return false
+  }
+  // Free-standing: nothing touches it higher than its middle (what it stands
+  // on, a kerb or a wheel stop is fine). A fence post with rails through it,
+  // a door on a wall or a pillar under a roof is part of something bigger and
+  // grows with it.
+  const grow = new Box3()
+  const free = (c: Object3D, b: Box3) => {
+    if (moving(c)) return true
+    grow.copy(b).expandByScalar(0.02)
+    for (const [o, ob] of boxes) {
+      if (ob.isEmpty() || !ob.intersectsBox(grow) || ob.max.y <= (b.min.y + b.max.y) / 2 || inside(o, c)) continue
+      return false
+    }
+    return true
+  }
+  const marked = (o: Object3D) => {
+    o.traverse((c) => {
+      if (c === o || !c.userData.human || kept.has(c) || underKept(c, root)) return
+      box.setFromObject(c).applyMatrix4(back)
+      if (!box.isEmpty()) keepShape(c, root, scale, 1, new Vector3(0, at.setFromMatrixPosition(c.matrixWorld).applyMatrix4(back).y - box.min.y, 0))
+    })
+  }
+  const visit = (o: Object3D) => {
+    for (const c of o.children) {
+      if (kept.has(c)) continue
+      if ((c as InstancedMesh).isInstancedMesh) {
+        keepInstances(c as InstancedMesh, root, scale, 1)
+        continue
+      }
+      // An Upright with a size draws at that size itself.
+      if (c.userData.upright && c.userData.size != null) continue
+      box.setFromObject(c).applyMatrix4(back)
+      if (c.userData.human && !box.isEmpty()) {
+        keepShape(c, root, scale, 1, new Vector3(0, at.setFromMatrixPosition(c.matrixWorld).applyMatrix4(back).y - box.min.y, 0))
+        continue
+      }
+      if (box.isEmpty() || c.userData.stretch) {
+        visit(c)
+        continue
+      }
+      const h = box.max.y - box.min.y
+      const person = box.min.y <= GROUND && h >= FLAT && h <= HUMAN && Math.max(box.max.x - box.min.x, box.max.z - box.min.z) <= limit && free(c, box)
+      // Kept standing where it stood: its bottom stays on what it stands on.
+      if (person) keepShape(c, root, scale, 1, new Vector3(0, at.setFromMatrixPosition(c.matrixWorld).applyMatrix4(back).y - box.min.y, 0))
+      // Inside a whole-piece Upright only marked people-sized things are looked for.
+      else if (!c.userData.upright) visit(c)
+      else marked(c)
+    }
+  }
+  visit(root)
+}
+
 // Finds the props under `root` (see THE RULE above) and keeps them upright.
 export function keepProps(root: Object3D, scale: readonly number[], limit: number) {
+  if (uniform(scale)) return keepPeople(root, scale, Math.min(limit, 1.2))
   root.updateWorldMatrix(true, true)
   const back = new Matrix4().copy(root.matrixWorld).invert()
   const visit = (o: Object3D) => {

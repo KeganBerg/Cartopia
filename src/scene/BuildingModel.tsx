@@ -4,7 +4,7 @@ import { useGame } from '../game/store'
 import { signTexture } from './signTexture'
 import { signMat } from './closingTime'
 import { CarModel } from './CarModel'
-import { Upright, useBays } from './mergeScale'
+import { Upright, useBays, useMergeScale } from './mergeScale'
 import { ObstacleDetail, BenchDetail, BillboardDetail, DriveInDetail, FlowerDetail, FountainDetail, GarageDetail, HouseDetail, LampDetail, PondDetail, ShopDetail, SpeedwayDetail, StatueDetail, TreeDetail } from './BuildingDetail'
 import { NEW_MODELS, NewBuildingModel } from './NewBuildings'
 import { Bulbs } from './edgeKit'
@@ -24,6 +24,7 @@ import { useFrame } from '@react-three/fiber'
 import { PAL, SEASON } from './season'
 import { LAYER, decal } from './layers'
 import { brickTex, sidingTex, shingleTex, gravelTex, awningTex, windowTex, paverTex, shutterTex, pumpTex } from './textures'
+import { PEOPLE_SIZED } from './keepShape'
 
 type Props = { def: BuildingDef; ghost?: boolean; valid?: boolean; level?: number }
 
@@ -193,6 +194,68 @@ function Truss({ m, at, h, w = 0.3, c = '#90a4ae' }: { m: ReturnType<typeof useM
               <mesh position={[0, (i + 0.5) * (h / n), w / 2]} rotation-z={i % 2 ? 0.7 : -0.7}><boxGeometry args={[0.015, Math.hypot(w, h / n), 0.015]} />{m(c)}</mesh>
             </group>
           ))}
+        </group>
+      ))}
+    </group>
+  )
+}
+
+// One pump, facing the forecourt both ways, standing on y = 0.
+function Pump({ m, roof, x }: { m: ReturnType<typeof useMat>; roof: string; x: number }) {
+  return (
+    <group position={[x, 0, 0]}>
+      <mesh position={[0, 0.33, 0]} castShadow>
+        <boxGeometry args={[0.34, 0.66, 0.26]} />
+        {m('#fafafa')}
+      </mesh>
+      {[0.137, -0.137].map((z) => (
+        <mesh key={z} position={[0, 0.33, z]} rotation-y={z < 0 ? Math.PI : 0}>
+          <planeGeometry args={[0.32, 0.64]} />
+          {m('#ffffff', pumpTex(roof))}
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+// The pump island under the gas canopy: two pumps. A 2x2 or 4x4 block's canopy
+// is two or four times as big, but pumps stay pump-sized (people fill up at
+// them): it gets a second island and more pumps along each one instead.
+function GasPumps({ m, roof }: { m: ReturnType<typeof useMat>; roof: string }) {
+  const [sx, sy, sz] = useMergeScale()
+  const k = sx === sy && sy === sz ? sx : 1
+  if (k === 1) {
+    return (
+      <group>
+        <mesh position={[0, 0.1, -0.45]} receiveShadow>
+          <boxGeometry args={[1.5, 0.1, 0.36]} />
+          {m('#ffca28')}
+        </mesh>
+        {[-0.4, 0.4].map((x) => (
+          <group key={x} position={[0, 0.15, -0.45]}>
+            <Pump m={m} roof={roof} x={x} />
+          </group>
+        ))}
+      </group>
+    )
+  }
+  // Islands as long as the block's island, at true height, true-sized pumps
+  // spread along them; one row on the back posts' line, one under the front.
+  const len = 1.5 * k
+  const n = 2 * k - 1
+  return (
+    <group>
+      {[-0.45, 0.15].map((z) => (
+        <group key={z} position={[0, 0.055, z]}>
+          <Upright size={1}>
+            <mesh position={[0, 0.05, 0]} receiveShadow>
+              <boxGeometry args={[len, 0.1, 0.36]} />
+              {m('#ffca28')}
+            </mesh>
+            <group position-y={0.1}>
+              {Array.from({ length: n }, (_, i) => <Pump key={i} m={m} roof={roof} x={((i + 0.5) / n - 0.5) * (len - 0.3)} />)}
+            </group>
+          </Upright>
         </group>
       ))}
     </group>
@@ -963,25 +1026,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             {bulb}
           </mesh>
           {!ghost && <LightPool r={1.2} z={0} />}
-          {/* Pump island with two pumps facing the forecourt. */}
-          <mesh position={[0, 0.1, -0.45]} receiveShadow>
-            <boxGeometry args={[1.5, 0.1, 0.36]} />
-            {m('#ffca28')}
-          </mesh>
-          {[-0.4, 0.4].map((x) => (
-            <group key={x} position={[x, 0, -0.45]}>
-              <mesh position={[0, 0.48, 0]} castShadow>
-                <boxGeometry args={[0.34, 0.66, 0.26]} />
-                {m('#fafafa')}
-              </mesh>
-              {[0.137, -0.137].map((z) => (
-                <mesh key={z} position={[0, 0.48, z]} rotation-y={z < 0 ? Math.PI : 0}>
-                  <planeGeometry args={[0.32, 0.64]} />
-                  {m('#ffffff', pumpTex(def.roof))}
-                </mesh>
-              ))}
-            </group>
-          ))}
+          <GasPumps m={m} roof={def.roof} />
           {/* Little shop tucked in the back corner, with a striped awning: one
               piece with its windows, so a merged pair keeps them on its walls. */}
           <group>
@@ -1280,7 +1325,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             </group>
           )}
           {/* One group, so a merged shop keeps the stack stacked. */}
-          {def.id === 'tires' && !ghost && <group>{[0, 1, 2, 3].map((i) => (
+          {def.id === 'tires' && !ghost && <group userData={PEOPLE_SIZED}>{[0, 1, 2, 3].map((i) => (
             <mesh key={i} position={[-W * 0.36, 0.08 + i * 0.13, F + 0.32]} rotation-x={Math.PI / 2} castShadow>
               <torusGeometry args={[0.15, 0.065, 8, 16]} />
               {m('#212121')}

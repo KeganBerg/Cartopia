@@ -17,6 +17,7 @@ import { carBody, wheelPool, type WheelSlot } from './carBatch'
 import { bake, finishOf, type Finish as Look } from './bake'
 import { carStyle, hasTrim, trimBike, trimCar, type CarStyle } from './carTrim'
 import { brakeGeo, wheelGeo, type RimStyle } from './carWheels'
+import { PEOPLE_SIZED } from './keepShape'
 
 type Shape = {
   len: number; wid: number
@@ -1132,7 +1133,8 @@ function LeanCar({ parts, looks, casters, mods, modPaint, highlight, wheels, rad
 
 // Any vehicle: a motorcycle for bike bodies, otherwise a car. Faces +z.
 export function CarModel(props: CarProps) {
-  return isBike(props.body) ? <BikeModel {...props} /> : <CarBody {...props} />
+  // Car-sized however big a merged block it's parked in (see keepShape.ts).
+  return <group userData={PEOPLE_SIZED}>{isBike(props.body) ? <BikeModel {...props} /> : <CarBody {...props} />}</group>
 }
 
 // Mod skin numbers by slot, or undefined when no part wears one.

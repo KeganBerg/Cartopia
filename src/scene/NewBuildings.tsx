@@ -15,6 +15,7 @@ import { PAL, SEASON } from './season'
 import { LAYER, decal } from './layers'
 import { Bulbs as EdgeBulbs } from './edgeKit'
 import { brickTex, sidingTex, gravelTex, awningTex, paverTex, shutterTex, shingleTex, checkerTex } from './textures'
+import { PEOPLE_SIZED } from './keepShape'
 
 // Models for the second wave of shop items: businesses and services (coffee,
 // tacos, oil change, arcade, body shop, market, fire and police stations,
@@ -238,7 +239,7 @@ function Wheel({ m, at }: { m: Mat; at: V3 }) {
 // Patio table under a parasol.
 export function Parasol({ m, at, c }: { m: Mat; at: V3; c: string }) {
   return (
-    <group position={at}>
+    <group position={at} userData={PEOPLE_SIZED}>
       <Cyl m={m} at={[0, 0.2, 0]} r={0.16} h={0.03} c="#fafafa" seg={10} />
       <Cyl m={m} at={[0, 0.1, 0]} r={0.02} h={0.2} c="#78909c" seg={6} />
       <Cyl m={m} at={[0, 0.4, 0]} r={0.015} h={0.45} c="#eceff1" seg={6} />
@@ -254,7 +255,8 @@ export function Parasol({ m, at, c }: { m: Mat; at: V3; c: string }) {
 export function BlockCar({ m, at, c, rot = 0 }: { m: Mat; at: V3; c: string; rot?: number }) {
   return (
     <group position={at}>
-      <Upright>
+      {/* A car is car-sized however big the block it's parked in. */}
+      <Upright size={1}>
         <group rotation-y={rot}>
           {/* Body on four wheels, so it sits on the deck or lot it's parked on. */}
           <Box m={m} at={[0, 0.115, 0]} s={[0.36, 0.13, 0.66]} c={c} />
@@ -473,9 +475,9 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           </mesh>
           <Box m={m} at={[0, 0.03, 0.78]} s={[1.6, 0.05, 0.5]} c="#ffffff" t={paverTex(2, 1)} shadow={false} />
           {/* Oil drums by the door and a giant oil drop on the roof. */}
-          {!ghost && [[0.72, 0.68, '#c62828'], [0.48, 0.78, '#1565c0'], [0.66, 0.9, '#ffb300']].map(([x, z, c]) => (
+          {!ghost && <group userData={PEOPLE_SIZED}>{[[0.72, 0.68, '#c62828'], [0.48, 0.78, '#1565c0'], [0.66, 0.9, '#ffb300']].map(([x, z, c]) => (
             <Cyl key={c as string} m={m} at={[x as number, 0.17, z as number]} r={0.1} h={0.34} c={c as string} seg={10} />
-          ))}
+          ))}</group>}
           <group position={[0.4, h + 0.14, -0.45]}>
             <mesh position={[0, 0.22, 0]} castShadow><sphereGeometry args={[0.22, 14, 10]} />{m('#ffb300')}</mesh>
             <mesh position={[0, 0.5, 0]} castShadow><coneGeometry args={[0.2, 0.36, 14]} />{m('#ffb300')}</mesh>
