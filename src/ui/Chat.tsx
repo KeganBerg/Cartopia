@@ -83,11 +83,13 @@ function ChatRoom({ room }: { room: Room }) {
   const shown = msgs.filter((m) => !muted[m.owner])
   const hidden = Object.keys(muted).length
 
-  // Stay at the newest message unless the player scrolled up to read.
+  // Stay at the newest message unless the player scrolled up to read. Keyed on
+  // the newest message, not the count: a full room keeps the same count.
+  const newest = shown[shown.length - 1]?.id
   useLayoutEffect(() => {
     const el = log.current
     if (el && pinned.current) el.scrollTop = el.scrollHeight
-  }, [shown.length, room])
+  }, [newest, room])
 
   const send = async (e: React.FormEvent) => {
     e.preventDefault()

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { NeutralToneMapping } from 'three'
 import { useGame, openCrate } from '../game/store'
@@ -218,8 +218,12 @@ export function CratesPanel() {
       // Not remembered.
     }
   }
+  // The latest phase, for Again: its delayed go() comes from the render where the prize was still open.
+  const phaseNow = useRef(phase)
+  useEffect(() => { phaseNow.current = phase }, [phase])
   const go = async () => {
-    if (phase !== 'idle') return
+    if (phaseNow.current !== 'idle') return
+    phaseNow.current = 'wait'
     const before = useGame.getState().cars
     setPhase('wait')
     const got = await openCrate(pick)

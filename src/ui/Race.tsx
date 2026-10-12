@@ -194,6 +194,14 @@ export function RacePanel() {
   // The town rival race; bet: the double-or-nothing rematch. n remounts the race for each run.
   const [rv, setRv] = useState<{ match: RivalMatch; bet: boolean; n: number } | null>(null)
   const rvBonus = useRef<RivalBonus>(null)
+  // A double-or-nothing stake that's on the line until its race finishes. Leaving
+  // early (the ✕ or closing the menu) counts as a loss, so a bet can't be dodged.
+  const betStake = useRef<number | null>(null)
+  const forfeitBet = () => {
+    if (betStake.current !== null) useGame.getState().rivalBet(false, betStake.current)
+    betStake.current = null
+  }
+  useEffect(() => forfeitBet, [])
   const gpResult = useGame((s) => s.gpResult)
   const campaignResult = useGame((s) => s.campaignResult)
   const tourResult = useGame((s) => s.tourResult)
@@ -308,16 +316,18 @@ export function RacePanel() {
         prize={match.prize}
         title={bet ? `🎲 Double or nothing · $${match.prize.toLocaleString()}` : `${match.def.icon} ${match.def.name} · Round ${match.visit + 1} of 3`}
         onFinish={(won) => {
-          if (bet) useGame.getState().rivalBet(won, match.prize)
-          else rvBonus.current = useGame.getState().rivalResult(match.def.id, won, match.prize)
+          if (bet) {
+            betStake.current = null
+            useGame.getState().rivalBet(won, match.prize)
+          } else rvBonus.current = useGame.getState().rivalResult(match.def.id, won, match.prize)
         }}
         resultView={(r) => (
           <RivalResult match={match} won={r.won} bet={bet} bonus={bet ? null : rvBonus.current} myTime={r.myTime} theirTime={r.theirTime}
-            onBet={() => setRv({ match, bet: true, n: rv.n + 1 })}
+            onBet={() => { betStake.current = match.prize; setRv({ match, bet: true, n: rv.n + 1 }) }}
             onRetry={() => startRival(match, rv.n + 1)}
             onExit={() => setRv(null)} />
         )}
-        onExit={() => setRv(null)}
+        onExit={() => { forfeitBet(); setRv(null) }}
       />
     )
   }
@@ -1344,8 +1354,14 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       }
       refereed.current = 'yes'
       setChecking(true)
-      const v = await reportFinish(live!.raceId, myTime, signal)
-      if (signal.cancelled) return
+      // Like kart races, the server's call still pays (and settles a wager) if the
+      // player leaves while it's checking; only the result screen needs them here.
+      const v = await reportFinish(live!.raceId, myTime, { cancelled: false })
+      if (signal.cancelled) {
+        if (live?.stake) void settleWager(live.raceId)
+        if (v && !v.void) finishRace(v.won, reward(rivalRef.current))
+        return
+      }
       setChecking(false)
       cancelAnimationFrame(raf)
       applyVerdict(v, myTime)
