@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import './testCanvas'
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import ReactThreeTestRenderer from '@react-three/test-renderer'
 import { Box3, BoxGeometry, InstancedMesh, Matrix3, Matrix4, Mesh, Object3D, PlaneGeometry, Vector3, type Material, type Texture } from 'three'
 import { BUILDINGS, TILE } from '../game/data'
@@ -72,6 +72,11 @@ function intended(o: Object3D) {
 }
 
 describe('merged pairs keep props in shape', () => {
+  // The club's dancers move to the music's clock: hold it still so the merged
+  // and unmerged draws catch them in the same pose.
+  beforeAll(() => void vi.spyOn(performance, 'now').mockReturnValue(1000))
+  afterAll(() => void vi.restoreAllMocks())
+
   for (const def of BUILDINGS.filter((d) => !d.parked)) {
     it(def.id, async () => {
       const bad = new Set<string>()

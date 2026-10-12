@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { HaloSpot } from './halos'
 import { TILE, levelLift, type BuildingDef } from '../game/data'
 import { useGame } from '../game/store'
 import { signTexture } from './signTexture'
@@ -19,6 +20,8 @@ import { RustysYard } from './RustysYard'
 import { glassMat } from './OfficeBuildings'
 import { GROWTH_MODELS, GrowthModel } from './GrowthTowers'
 import { growthStage } from '../game/growth'
+import { isTravelCenter } from '../game/travelCenter'
+import { TravelCenter } from './TravelCenter'
 import type { Texture } from 'three'
 import { glowMats } from './dayNight'
 import { tickMovie } from './movie'
@@ -552,6 +555,7 @@ function Sign({ text, w, y, z, bg, fg }: { text: string; w: number; y: number; z
 
 export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
   const [bx] = useBays()
+  const mergeScale = useMergeScale()
   const m = useMat(ghost, valid)
   const lvl = Math.min(10, Math.max(1, Math.floor(level) || 1))
   const lift = levelLift(lvl)
@@ -738,6 +742,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
           <group>
             <PropMesh parts={DECOR_PROPS.lamp()} />
             <LightPool r={0.9} x={0.4} />
+            <HaloSpot at={[0.4, 1.56, 0]} />
           </group>
         )
       return (
@@ -1071,6 +1076,8 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
         </group>
       )
     case 'gas': {
+      // A merged block's last form is a whole travel stop, built for the block.
+      if (isTravelCenter(def.id, lvl, mergeScale)) return <TravelCenter def={def} m={m} win={win} bulb={bulb} level={lvl} ghost={ghost} />
       // Canopy rises half as fast as the shop grows.
       const cl = lift * 0.5
       const gasRows: number[] = []

@@ -14,6 +14,7 @@ import { headGeo, legGeo, torsoGeo } from './peopleGeo'
 import { dayPhase, nightAmount } from './dayNight'
 import { isNight } from '../game/clock'
 import { CLUB } from './clubLayout'
+import { storeDoors } from '../game/travelCenter'
 
 const LEG_SIDES = [-1, 1]
 
@@ -184,7 +185,8 @@ function person(id: string, home: string, pos: Pt): Person {
 
 type Places = ReturnType<typeof destinations>
 type Club = { dest: Dest; center: Pt; turn: number }
-type Ctx = { graph: WalkGraph; places: Places; dirty: { current: boolean }; queues: Map<string, Person[]>; gates: Map<string, number> }
+// `stores`: the walk in to a big store's doors, by building key (see storeDoors).
+type Ctx = { graph: WalkGraph; places: Places; dirty: { current: boolean }; queues: Map<string, Person[]>; gates: Map<string, number>; stores: Map<string, Pt[]> }
 
 // Places worth walking to, sorted by what kind of outing they make.
 function destinations(g: WalkGraph) {
@@ -231,6 +233,13 @@ export function Townspeople() {
   }, [roadsList, footprint, land])
   const planned = useRef<WalkGraph | null>(null)
   const places = useMemo(() => destinations(graph), [graph])
+  // Merged travel stops: people cross the forecourt and go in at the doors.
+  const storeKey = useGame((s) => (s.visiting ?? s).buildings.filter((b) => b.def === 'gas').map((b) => `${b.uid}:${b.x},${b.z}:${b.merge ?? ''}:${b.mturn ?? ''}:${buildingLevel(b)}`).join('|'))
+  const stores = useMemo(() => {
+    void storeKey
+    const s = useGame.getState()
+    return storeDoors((s.visiting ?? s).buildings, new Set(roadsList))
+  }, [storeKey, roadsList])
   const people = useRef<Person[]>([])
   const colorsDirty = useRef(true)
   const queues = useRef(new Map<string, Person[]>())
@@ -332,7 +341,7 @@ export function Townspeople() {
     const dt = Math.min(rawDt, 0.1)
     const list = people.current
     const night = nightAmount(dayPhase()) > 0.5
-    const ctx: Ctx = { graph, places, dirty: colorsDirty, queues: queues.current, gates: gates.current }
+    const ctx: Ctx = { graph, places, dirty: colorsDirty, queues: queues.current, gates: gates.current, stores }
     const t = torso.current
     const hd = head.current
     const hr = hair.current
@@ -580,6 +589,10 @@ function setOff(ctx: Ctx, p: Person, night: boolean) {
     p.si = 0
     const last = g.nodes[goal!]
     if (last.kind === 't') settle(p, last)
+    // Across the forecourt and in at a big store's doors (and back out the same way).
+    for (const q of ctx.stores.get(d.key) ?? []) p.steps.push({ p: [...q] })
+    const out = p.state === 'inside' ? ctx.stores.get(p.at) : undefined
+    if (out) p.steps.unshift(...[...out].reverse().map((q): Step => ({ p: [...q] })))
     if (p.state === 'inside') {
       // Step out of the front door.
       const first = p.steps[0]
