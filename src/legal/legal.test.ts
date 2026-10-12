@@ -28,9 +28,9 @@ describe('legal pages', () => {
 
 describe('settings', () => {
   it('fall back to defaults for missing or bad data', () => {
-    expect(parsePrefs(null)).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true })
-    expect(parsePrefs('{oops')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true })
-    expect(parsePrefs('{"graphics":"ultra","reduceMotion":"yes"}')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true })
-    expect(parsePrefs('{"graphics":"saver","reduceMotion":true,"vibration":false}')).toEqual({ graphics: 'saver', reduceMotion: true, vibration: false })
+    expect(parsePrefs(null)).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, steer: 'smooth' })
+    expect(parsePrefs('{oops')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, steer: 'smooth' })
+    expect(parsePrefs('{"graphics":"ultra","reduceMotion":"yes"}')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, steer: 'smooth' })
+    expect(parsePrefs('{"graphics":"saver","reduceMotion":true,"vibration":false,"steer":"sharp"}')).toEqual({ graphics: 'saver', reduceMotion: true, vibration: false, steer: 'sharp' })
   })
 })
