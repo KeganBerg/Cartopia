@@ -1,8 +1,8 @@
-import { BufferAttribute, BufferGeometry, MeshStandardMaterial } from 'three'
+import { BufferAttribute, BufferGeometry, ExtrudeGeometry, MeshStandardMaterial, Shape } from 'three'
 import { TILE } from '../game/data'
 import { glowMats } from './dayNight'
-import { decal } from './layers'
-import { roadWearTex } from './textures'
+import { decal, LAYER } from './layers'
+import { drainTex, paverTex, roadWearTex, tactileTex } from './textures'
 
 // Street-level detail for road tiles: wear on the asphalt (grime along the
 // kerbs, hairline cracks, tar patches, oil drips where cars wait) and small
@@ -34,6 +34,143 @@ function cellQuad(cell: number, gradientZ = false) {
   g.setIndex([0, 2, 1, 1, 2, 3])
   return g
 }
+
+// Sidewalk heights: the paving top, and the kerb standing just proud of it.
+const PAVE = 0.08
+const KERB = 0.09
+const KERB_W = 0.06
+const KERB_COLOR = '#cfd8dc'
+// Radius of the rounded kerb where a sidewalk turns an inside corner (dead ends, bends).
+export const FILLET = 0.2
+
+// The sides at the -x and +x ends of a side's local frame (see SIDE_ROT).
+export const ENDS: Record<Side, [Side, Side]> = { s: ['w', 'e'], e: ['s', 'n'], w: ['n', 's'], n: ['e', 'w'] }
+
+// What a sidewalk strip meets at one end: more sidewalk round an inside corner,
+// a crosswalk (a curb ramp), or the next tile's sidewalk carrying straight on.
+export type End = 'corner' | 'ramp' | 'open'
+
+// A flat 2D outline stood up as a slab `h` tall: the outline's (x, y) lands on
+// the ground at (x, z), and its top face carries the outline's own UVs, one
+// texture repeat per world unit.
+function slab(shape: Shape, h: number) {
+  const g = new ExtrudeGeometry(shape, { depth: h, bevelEnabled: false, curveSegments: 10 })
+  g.rotateX(Math.PI / 2)
+  g.translate(0, h, 0)
+  return g
+}
+
+// Pieces for the corner at local (+half, +half). The kerbs reach a hair past the
+// paving they edge so their faces never sit flush with it (no flicker).
+const CORNER = (() => {
+  const r = WALK
+  const c = HALF
+  // Outside corner of a block where two roads meet: a quarter round of paving
+  // that joins the two sidewalks, with the kerb sweeping round its edge.
+  const pave = new Shape()
+  pave.moveTo(c, c)
+  pave.lineTo(c - r, c)
+  pave.absarc(c, c, r, Math.PI, Math.PI * 1.5, false)
+  pave.lineTo(c, c)
+  const kerb = new Shape()
+  kerb.moveTo(c - r - 0.002, c)
+  kerb.absarc(c, c, r + 0.002, Math.PI, Math.PI * 1.5, false)
+  kerb.lineTo(c, c - r + KERB_W)
+  kerb.absarc(c, c, r - KERB_W, Math.PI * 1.5, Math.PI, true)
+  kerb.lineTo(c - r - 0.002, c)
+  // Inside corner, where sidewalks on two sides of a tile meet: fill the square
+  // corner of the road with a rounded kerb instead of a sharp notch.
+  const e = c - r // road edge
+  const o = e - FILLET // centre of the rounding
+  const fill = new Shape()
+  fill.moveTo(e, e)
+  fill.lineTo(e, o)
+  fill.absarc(o, o, FILLET, 0, Math.PI / 2, false)
+  fill.lineTo(e, e)
+  const rim = new Shape()
+  rim.moveTo(e + KERB_W, o)
+  rim.absarc(o, o, FILLET + KERB_W, 0, Math.PI / 2, false)
+  rim.lineTo(o, e - 0.002)
+  rim.absarc(o, o, FILLET - 0.002, Math.PI / 2, 0, true)
+  rim.lineTo(e + KERB_W, o)
+  return { pave: slab(pave, PAVE), kerb: slab(kerb, KERB), fill: slab(fill, PAVE), rim: slab(rim, KERB) }
+})()
+
+// `turn` rotates the piece onto one of the tile's corners: 0 south-east, 1
+// north-east, 2 north-west, 3 south-west.
+const cornerRot = (turn: number) => (turn * Math.PI) / 2
+
+// The rounded sidewalk on the outside corner of a block, where two roads meet
+// at a bend or junction and the sidewalks would otherwise stop short.
+export function CornerCurb({ turn }: { turn: number }) {
+  return (
+    <group rotation-y={cornerRot(turn)}>
+      <mesh geometry={CORNER.pave} receiveShadow><meshStandardMaterial map={paverTex(1, 1)} /></mesh>
+      <mesh geometry={CORNER.kerb} receiveShadow><meshStandardMaterial color={KERB_COLOR} /></mesh>
+    </group>
+  )
+}
+
+// The rounded kerb filling an inside corner, where a tile has sidewalk on two
+// neighbouring sides (bends, dead ends).
+export function CornerFillet({ turn }: { turn: number }) {
+  return (
+    <group rotation-y={cornerRot(turn)}>
+      <mesh geometry={CORNER.fill} receiveShadow><meshStandardMaterial map={paverTex(1, 1)} /></mesh>
+      <mesh geometry={CORNER.rim} receiveShadow><meshStandardMaterial color={KERB_COLOR} /></mesh>
+    </group>
+  )
+}
+
+// Raised sidewalk along one edge of a road tile. Strips along north and south
+// edges stop short of a corner shared with an east or west strip, so the two
+// never overlap. The kerb rounds off inside corners, and drops away where a
+// crosswalk lands, with a yellow tactile pad marking the ramp.
+export function Sidewalk({ side, ends, drain }: { side: Side; ends: [End, End]; drain?: boolean }) {
+  const cut = side === 'n' || side === 's'
+  const lo = ends[0] === 'corner' && cut ? -HALF + WALK : -HALF
+  const hi = ends[1] === 'corner' && cut ? HALF - WALK : HALF
+  // Kerb runs, split around any ramps.
+  const runs: [number, number][] = []
+  let from = ends[0] === 'corner' ? -HALF + WALK + FILLET : -HALF
+  const to = ends[1] === 'corner' ? HALF - WALK - FILLET : HALF
+  const ramps = ([0, 1] as const).filter((i) => ends[i] === 'ramp').map((i) => (i ? 1 : -1) * (HALF - 0.32))
+  for (const r of ramps.sort((a, b) => a - b)) {
+    runs.push([from, r - RAMP / 2])
+    from = r + RAMP / 2
+  }
+  runs.push([from, to])
+  const z = HALF - WALK / 2
+  const kz = HALF - WALK + KERB_W / 2 - 0.002
+  return (
+    <group rotation-y={SIDE_ROT[side]}>
+      <mesh position={[(lo + hi) / 2, PAVE / 2, z]} receiveShadow>
+        <boxGeometry args={[hi - lo, PAVE, WALK]} />
+        <meshStandardMaterial map={paverTex((hi - lo) / 2, 0.5)} />
+      </mesh>
+      {runs.filter(([a, b]) => b - a > 0.01).map(([a, b]) => (
+        <mesh key={a} position={[(a + b) / 2, KERB / 2, kz]}>
+          <boxGeometry args={[b - a, KERB, KERB_W + 0.004]} />
+          <meshStandardMaterial color={KERB_COLOR} />
+        </mesh>
+      ))}
+      {ramps.map((x) => (
+        <mesh key={x} position={[x, PAVE + 0.004, HALF - WALK + 0.075]} receiveShadow>
+          <boxGeometry args={[RAMP - 0.04, 0.008, 0.13]} />
+          <meshStandardMaterial map={tactileTex(2.5, 1)} />
+        </mesh>
+      ))}
+      {drain && (
+        <mesh rotation={[-Math.PI / 2, 0, Math.PI / 2]} position={[0.5, LAYER.paint, HALF - WALK - 0.06]}>
+          <planeGeometry args={[0.12, 0.3]} />
+          <meshStandardMaterial map={drainTex()} {...decal()} />
+        </mesh>
+      )}
+    </group>
+  )
+}
+// Width of a curb ramp: the crosswalk's stripes are 0.34 long.
+const RAMP = 0.34
 
 const QUAD = { crack: cellQuad(0), patch: cellQuad(1), oil: cellQuad(2), grime: cellQuad(3, true) }
 let wearMat: MeshStandardMaterial | null = null
