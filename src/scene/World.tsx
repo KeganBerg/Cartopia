@@ -11,7 +11,7 @@ import { rotateCurrent, setGhostTurn, turnOf } from '../game/placement'
 import { mergeGroups, groupOf, groupTurn, groupScale, isLandmark, type MergeGroup } from '../game/merge'
 import { VanguardTower } from './Landmark'
 import { KeepShapes, MergeScale } from './mergeScale'
-import { propLimit } from './keepShape'
+import { limitFor } from './keepShape'
 import { sfx } from '../lib/sound'
 import { Clouds } from './Clouds'
 import { DayNight } from './DayNight'
@@ -38,6 +38,7 @@ import { Ear } from './Ear'
 import { WorldFx, PopGroup, usePops } from './WorldFx'
 import { helpable } from '../game/help'
 import { helpBuilding } from '../lib/help'
+import { hoursOf, seedOf } from '../game/hours'
 import { FREE, VIEW, isFree, useFreeCam } from './freeCam'
 import { FreeCam } from './FreeCam'
 
@@ -178,12 +179,10 @@ function holdToMove(b: PlacedBuilding, e: ThreeEvent<PointerEvent>) {
 }
 
 const ONE: [number, number, number] = [1, 1, 1]
-// The building picked in Move draws live, outside the merged town (see Batch).
-const NO_BATCH = { noBatch: true }
-const BATCH = {}
 
 // `group` is set on the top-left building of a merged block: it stands in,
 // scaled up, for the whole block. The others in the block draw nothing.
+// `picked` (the building picked in Move) draws live, outside the merged town.
 function Building({ b, roads, group, picked }: { b: PlacedBuilding; roads: Set<string>; group?: MergeGroup; picked?: boolean }) {
   const d = buildingDef(b.def)
   const [cx, cz] = group ? groupCenter(group) : centerOf(b.def, b.x, b.z, b.rot)
@@ -199,7 +198,7 @@ function Building({ b, roads, group, picked }: { b: PlacedBuilding; roads: Set<s
     <group
       position={[cx, 0, cz]}
       rotation-y={(turn * Math.PI) / 2}
-      userData={picked ? NO_BATCH : BATCH}
+      userData={{ hours: { seed: seedOf(b.uid), kind: hoursOf(b.def) }, noBatch: !!picked }}
       onPointerDown={(e) => {
         const s = useGame.getState()
         if (s.visiting || e.button !== 0) return
@@ -248,7 +247,7 @@ function Building({ b, roads, group, picked }: { b: PlacedBuilding; roads: Set<s
       <group scale={mark ? [k, k, k] : [sx, sy, sz]}>
         <MergeScale.Provider value={mark ? [k, k, k] : group ? [sx, sy, sz] : ONE}>
           <PopGroup uid={b.uid}>
-            <KeepShapes limit={propLimit(d.w * TILE, d.h * TILE)}>
+            <KeepShapes limit={limitFor(d)}>
               {mark ? <VanguardTower /> : <BuildingModel def={d} level={buildingLevel(b)} />}
             </KeepShapes>
           </PopGroup>

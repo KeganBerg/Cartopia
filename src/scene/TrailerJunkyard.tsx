@@ -1,6 +1,6 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import type { Group } from 'three'
+import type { Group, Mesh } from 'three'
 import { CarModel } from './CarModel'
 import { Upright } from './mergeScale'
 import { SEASON, PAL } from './season'
@@ -73,18 +73,20 @@ function SingleWide({ m, win, bulb, at, rot = 0, len = 1.45, color, stripe, ghos
         <mesh key={sd} position={[sd * (len / 2 + 0.004), 0.47, 0]} rotation-y={(sd * Math.PI) / 2}><planeGeometry args={[0.18, 0.16]} />{win}</mesh>
       ))}
       {/* Front door, an aluminium awning on two poles and wooden steps. */}
-      <mesh position={[0.15, 0.36, zf + 0.004]}><planeGeometry args={[0.15, 0.34]} />{m('#eceff1')}</mesh>
-      <mesh position={[0.15, 0.44, zf + 0.007]}><planeGeometry args={[0.09, 0.09]} />{win}</mesh>
+      <mesh position={[0.15, 0.36, zf + 0.006]}><planeGeometry args={[0.15, 0.34]} />{m('#eceff1')}</mesh>
+      <mesh position={[0.15, 0.44, zf + 0.009]}><planeGeometry args={[0.09, 0.09]} />{win}</mesh>
       <Box m={m} at={[0.15, 0.64, zf + 0.17]} s={[0.46, 0.02, 0.34]} c="#cfd8dc" rot={[0.08, 0, 0]} />
       {[-0.06, 0.36].map((x) => <Cyl key={x} m={m} at={[x, 0.32, zf + 0.32]} r={0.01} h={0.64} c="#b0bec5" seg={5} />)}
       <Box m={m} at={[0.15, 0.13, zf + 0.12]} s={[0.26, 0.04, 0.12]} c="#8d6e63" />
       <Box m={m} at={[0.15, 0.06, zf + 0.22]} s={[0.26, 0.04, 0.1]} c="#8d6e63" />
       {!ghost && <mesh position={[0.32, 0.5, zf + 0.02]}><boxGeometry args={[0.05, 0.05, 0.04]} />{bulb}</mesh>}
       {/* Hitch tongue still on the end, a propane bottle and a window AC unit. */}
-      <Box m={m} at={[-len / 2 - 0.1, 0.18, 0]} s={[0.22, 0.035, 0.05]} c="#37474f" rot={[0, 0.0, 0]} />
-      <Cyl m={m} at={[-len / 2 - 0.18, 0.1, 0]} r={0.015} h={0.16} c="#37474f" seg={5} />
-      <Cyl m={m} at={[-len / 2 + 0.05, 0.25, -zf - 0.08]} r={0.055} h={0.2} c="#fafafa" seg={10} />
-      <Ball m={m} at={[-len / 2 + 0.05, 0.36, -zf - 0.08]} r={0.055} c="#fafafa" />
+      <Box m={m} at={[-len / 2 - 0.08, 0.18, 0]} s={[0.22, 0.035, 0.05]} c="#37474f" rot={[0, 0.0, 0]} />
+      <Cyl m={m} at={[-len / 2 - 0.16, 0.1, 0]} r={0.015} h={0.16} c="#37474f" seg={5} />
+      <group position={[-len / 2 + 0.05, 0.15, -zf - 0.08]}>
+        <Cyl m={m} at={[0, 0.1, 0]} r={0.055} h={0.2} c="#fafafa" seg={10} />
+        <Ball m={m} at={[0, 0.21, 0]} r={0.055} c="#fafafa" />
+      </group>
       <Box m={m} at={[0.46, 0.3, -zf - 0.05]} s={[0.18, 0.12, 0.1]} c="#b0bec5" />
     </group>
   )
@@ -175,9 +177,10 @@ function WireFence({ m, z }: { m: Mat; z: number }) {
   const posts = [-0.92, -0.62, -0.32, 0.32, 0.62, 0.92]
   return (
     <group>
-      {posts.map((x) => <Cyl key={x} m={m} at={[x, 0.12, z]} r={0.012} h={0.24} c="#78909c" seg={5} />)}
+      {/* Square posts, so a merged lot stretches them with the rails they hold. */}
+      {posts.map((x) => <Box key={x} m={m} at={[x, 0.12, z]} s={[0.022, 0.24, 0.022]} c="#78909c" shadow={false} />)}
       {[0.1, 0.21].map((y) => [-0.62, 0.62].map((x) => (
-        <Box key={`${x}${y}`} m={m} at={[x, y, z]} s={[0.6, 0.006, 0.006]} c="#90a4ae" shadow={false} />
+        <Box key={`${x}${y}`} m={m} at={[x, y, z]} s={[0.6, 0.008, 0.008]} c="#90a4ae" shadow={false} />
       )))}
     </group>
   )
@@ -197,7 +200,7 @@ function DoubleWide({ m, win, bulb, lvl, color, roof, trim, ghost }: { m: Mat; w
         <cylinderGeometry args={[d / 2 + 0.06, d / 2 + 0.06, w + 0.1, 3, 1]} />
         {m(roofC, shingleTex(2, 1))}
       </mesh>
-      <Box m={m} at={[0, 0.14 + h + 0.005, z0]} s={[w + 0.1, 0.03, d + 0.1]} c="#eceff1" shadow={false} />
+      <Box m={m} at={[0, 0.14 + h + 0.005, z0]} s={[w + 0.096, 0.03, d + 0.1]} c="#eceff1" shadow={false} />
       {[-0.55, -0.25, 0.42].map((x) => (
         <group key={x}>
           <mesh position={[x, 0.45, zf + 0.004]}><planeGeometry args={[0.2, 0.2]} />{win}</mesh>
@@ -259,7 +262,7 @@ function TrailerHome({ m, win, bulb, ghost, lvl, color, roof }: EdgeProps) {
             </group>
             <Bulbs from={[-0.32, 0.68, -0.85]} to={[0.32, 0.68, 0.55]} n={9} sag={0.08} />
             <Bulbs from={[0.32, 0.68, -0.85]} to={[-0.32, 0.68, 0.55]} n={9} sag={0.08} />
-            {[[-0.32, -0.85], [0.32, 0.55], [0.32, -0.85], [-0.32, 0.55]].map(([x, z]) => <Cyl key={`${x}${z}`} m={m} at={[x, 0.34, z]} r={0.012} h={0.68} c="#6d4c41" seg={5} />)}
+            {[[-0.32, -0.85], [0.32, 0.55], [0.32, -0.85], [-0.32, 0.55]].map(([x, z]) => <Cyl key={`${x}${z}`} m={m} at={[x, 0.345, z]} r={0.012} h={0.69} c="#6d4c41" seg={5} />)}
             <Pool r={0.5} z={0} />
             {/* Court sign by the road. */}
             <group position={[-0.62, 0, 0.88]}>
@@ -267,7 +270,7 @@ function TrailerHome({ m, win, bulb, ghost, lvl, color, roof }: EdgeProps) {
               <Box m={m} at={[0, 0.37, -0.01]} s={[0.52, 0.16, 0.03]} c={lvl >= 9 ? GOLD : '#5d4037'} />
               <Sign text="SUNNY PINES" w={0.48} at={[0, 0.37, 0.008]} bg="#fff8e1" fg="#2e7d32" />
             </group>
-            {lvl >= 8 && <Flag at={[0.85, 0, 0.85]} color="#2e7d32" star={lvl >= 10} tall={0.75} />}
+            {lvl >= 8 && <Flag at={[0.65, 0, 0.85]} color="#2e7d32" star={lvl >= 10} tall={0.75} />}
             <Flamingo m={m} at={[0.25, 0, 0.82]} rot={-0.6} />
             <Flamingo m={m} at={[0.38, 0, 0.78]} rot={0.4} />
             <Grill m={m} at={[-0.26, 0, 0.12]} />
@@ -304,7 +307,7 @@ function TrailerHome({ m, win, bulb, ghost, lvl, color, roof }: EdgeProps) {
     <group>
       {/* Gravel pad under the home and a gravel drive on the right. */}
       <Box m={m} at={[-0.12, 0.02, -0.25]} s={[1.65, 0.04, 0.85]} c="#ffffff" t={gravelTex(2, 1)} shadow={false} />
-      <Box m={m} at={[0.78, 0.02, 0.45]} s={[0.4, 0.04, 1.05]} c="#ffffff" t={gravelTex(1, 2)} shadow={false} />
+      <Box m={m} at={[0.78, 0.022, 0.45]} s={[0.4, 0.044, 1.05]} c="#ffffff" t={gravelTex(1, 2)} shadow={false} />
       <SingleWide m={m} win={win} bulb={bulb} ghost={ghost} at={[-0.12, 0, -0.3]} color={color} stripe={stripe} />
       {lvl >= 2 && <Dish m={m} at={[-0.55, 0.72, -0.4]} />}
       {yard && (
@@ -341,7 +344,7 @@ function Slab({ m, at, c, rot = 0 }: { m: Mat; at: V3; c: string; rot?: number }
       <Box m={m} at={[0, 0, 0]} s={[0.64, 0.13, 0.34]} c={c} />
       <Box m={m} at={[0.03, 0.005, 0.172]} s={[0.36, 0.05, 0.01]} c="#37474f" shadow={false} />
       <Box m={m} at={[-0.22, -0.01, 0.171]} s={[0.1, 0.07, 0.01]} c="#8d4a24" shadow={false} />
-      <Cyl m={m} at={[0.24, -0.03, 0.17]} r={0.05} h={0.02} c="#263238" seg={8} rot={[Math.PI / 2, 0, 0]} />
+      <Cyl m={m} at={[0.24, -0.03, 0.185]} r={0.05} h={0.02} c="#263238" seg={8} rot={[Math.PI / 2, 0, 0]} />
     </group>
   )
 }
@@ -370,18 +373,35 @@ function Drum({ m, at, c, tipped }: { m: Mat; at: V3; c: string; tipped?: boolea
   )
 }
 
+// Boom pivot on the cab, its angle and length, and where its tip ends up; the
+// magnet bobs around HOOK_Y under the tip.
+const BOOT = [-0.05, 0.55]
+const BOOM_A = 0.92
+const BOOM_L = 1.9
+const TIP = [BOOT[0] - Math.cos(BOOM_A) * BOOM_L, BOOT[1] + Math.sin(BOOM_A) * BOOM_L]
+const HOOK_Y = 1.0
+
 // The crane: tracked base, cab and boom swing between the stacks and the
 // crusher, an electromagnet dangling a flattened car.
 export function Crane({ m, at }: { m: Mat; at: V3 }) {
   const top = useRef<Group>(null)
   const hook = useRef<Group>(null)
+  const cable = useRef<Mesh>(null)
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
     if (top.current) top.current.rotation.y = 1.1 + Math.sin(t * 0.3) * 1.15
-    if (hook.current) hook.current.position.y = 1.0 + Math.sin(t * 0.6 + 1) * 0.18
+    const y = HOOK_Y + Math.sin(t * 0.6 + 1) * 0.18
+    if (hook.current) hook.current.position.y = y
+    // The cable runs from the boom tip down to the magnet, however low it hangs.
+    if (cable.current) {
+      cable.current.position.y = (y + 0.07 + TIP[1]) / 2
+      cable.current.scale.y = TIP[1] - y - 0.07
+    }
   })
   return (
     <group position={at}>
+      {/* A machine: merged, it stays crane-shaped instead of pulling apart. */}
+      <Upright>
       {[-0.17, 0.17].map((z) => (
         <group key={z}>
           <Box m={m} at={[0, 0.08, z]} s={[0.62, 0.14, 0.12]} c="#263238" />
@@ -395,22 +415,27 @@ export function Crane({ m, at }: { m: Mat; at: V3 }) {
         <Box m={m} at={[-0.12, 0.6, 0.09]} s={[0.2, 0.24, 0.17]} c="#ffb300" />
         <mesh position={[-0.12, 0.62, 0.177]}><planeGeometry args={[0.16, 0.14]} /><meshStandardMaterial color="#81d4fa" roughness={0.2} /></mesh>
         <mesh position={[-0.222, 0.62, 0.09]} rotation-y={-Math.PI / 2}><planeGeometry args={[0.13, 0.14]} /><meshStandardMaterial color="#81d4fa" roughness={0.2} /></mesh>
-        {/* Boom, angled up and out towards -x. */}
-        <group position={[-0.05, 0.5, -0.08]} rotation-z={0.62}>
-          <Box m={m} at={[-0.7, 0, 0]} s={[1.45, 0.09, 0.09]} c="#f9a825" />
-          {[-0.3, -0.7, -1.1].map((x) => <Box key={x} m={m} at={[x, 0, 0]} s={[0.03, 0.12, 0.12]} c="#455a64" shadow={false} />)}
-          <Cyl m={m} at={[-0.38, -0.12, 0]} r={0.025} h={0.6} c="#cfd8dc" seg={6} rot={[0, 0, Math.PI / 2 + 0.25]} />
+        {/* Boom, angled up and out towards -x from a pivot on the cab, with a pulley at the tip. */}
+        <group position={[BOOT[0], BOOT[1], -0.08]} rotation-z={-BOOM_A}>
+          <Box m={m} at={[-BOOM_L / 2, 0, 0]} s={[BOOM_L, 0.09, 0.09]} c="#f9a825" />
+          {[0.25, 0.5, 0.75].map((f) => <Box key={f} m={m} at={[-BOOM_L * f, 0, 0]} s={[0.03, 0.12, 0.12]} c="#455a64" shadow={false} />)}
+          <Cyl m={m} at={[-BOOM_L, 0, 0]} r={0.07} h={0.11} c="#455a64" seg={10} rot={[Math.PI / 2, 0, 0]} />
         </group>
-        {/* The boom tip sits about here; the cable hangs from it to the magnet. */}
-        <group position={[-1.2, 0, -0.08]}>
-          <group ref={hook} userData={LIVE}>
-            <Cyl m={m} at={[0, 0.5, 0]} r={0.006} h={0.95} c="#212121" seg={4} />
+        {/* A brace from the cab roof up to the boom. */}
+        <Cyl m={m} at={[-0.1, 0.74, -0.08]} r={0.022} h={0.79} c="#cfd8dc" seg={6} rot={[0, 0, 0.85]} />
+        <group position={[TIP[0], 0, -0.08]}>
+          <mesh ref={cable} userData={LIVE} position-y={TIP[1] - 0.5}>
+            <cylinderGeometry args={[0.006, 0.006, 1, 4]} />
+            <meshStandardMaterial color="#212121" />
+          </mesh>
+          <group ref={hook} position-y={HOOK_Y} userData={LIVE}>
             <Cyl m={m} at={[0, 0, 0]} r={0.16} h={0.07} c="#424242" seg={14} />
             <Cyl m={m} at={[0, 0.05, 0]} r={0.06} h={0.04} c="#ffb300" seg={10} />
             <Slab m={m} at={[0, -0.11, 0]} c="#6a7f99" rot={0.3} />
           </group>
         </group>
       </group>
+      </Upright>
     </group>
   )
 }
@@ -486,7 +511,8 @@ function Junkyard({ m, win, bulb, ghost, lvl, lift }: EdgeProps) {
       {/* Gate arch with the JUNKYARD sign; one gate leaf swung open. */}
       <group position={[0.15, 0, 1.9]}>
         {[-0.62, 0.62].map((x) => <Box key={x} m={m} at={[x, archH / 2, 0]} s={[0.09, archH, 0.09]} c="#37474f" />)}
-        <Box m={m} at={[0, archH + 0.1, 0]} s={[1.38, 0.32, 0.06]} c={lvl >= 9 && !ghost ? GOLD : '#212121'} />
+        {/* The board spans the posts, so it stretches with them on a merged pair. */}
+        <Box m={m} at={[0, archH + 0.1, 0]} s={[1.38, 0.32, 0.06]} c={lvl >= 9 && !ghost ? GOLD : '#212121'} stretch />
         {!ghost && <Sign text="JUNKYARD" w={1.2} at={[0, archH + 0.1, 0.035]} bg="#ffb300" fg="#212121" />}
         {/* A big horseshoe magnet on top of the arch. */}
         <group position={[0, archH + 0.42, 0]}>
@@ -535,16 +561,15 @@ function Junkyard({ m, win, bulb, ghost, lvl, lift }: EdgeProps) {
           ))}
           {/* Rows of wrecks waiting, one stacked on another. */}
           <group position={[-1.3, 0.05, -0.7]} rotation-y={Math.PI / 2}>
-            <Upright><group scale={0.5}><CarModel body="classic" color="#5d8aa8" rusty /></group></Upright>
+            <Upright>
+              <group scale={0.5}><CarModel body="classic" color="#5d8aa8" rusty /></group>
+              {/* Stacked in the same piece, so a merged yard keeps it on the roof below. */}
+              {lvl >= 6 && <group position={[0, 0.32, -0.02]} rotation-y={-0.12} scale={0.5}><CarModel body="compact" color="#9b5145" rusty /></group>}
+            </Upright>
           </group>
           <group position={[-1.3, 0.05, 0.05]} rotation-y={Math.PI / 2 + 0.15}>
             <Upright><group scale={0.5}><CarModel body="truck" color="#8d6e63" rusty /></group></Upright>
           </group>
-          {lvl >= 6 && (
-            <group position={[-1.32, 0.37, -0.7]} rotation-y={Math.PI / 2 - 0.12}>
-              <Upright><group scale={0.5}><CarModel body="compact" color="#9b5145" rusty /></group></Upright>
-            </group>
-          )}
           {/* Tyre piles, drums, engine blocks and a heap of scrap. */}
           <Tyres m={m} at={[1.55, 0, -1.5]} n={4 + Math.min(4, Math.floor(lvl / 3))} />
           <Tyres m={m} at={[1.3, 0, -1.55]} n={3} />
@@ -573,8 +598,10 @@ function Junkyard({ m, win, bulb, ghost, lvl, lift }: EdgeProps) {
           {/* Floodlights for the night shift. */}
           {[[-0.4, -1.75], [1.7, 1.6]].map(([x, z]) => (
             <group key={x} position={[x, 0, z]}>
-              <Cyl m={m} at={[0, 0.85, 0]} r={0.025} h={1.7} c="#78909c" seg={6} />
-              <mesh position={[0, 1.72, 0]} rotation-y={Math.atan2(-x, -z)}><boxGeometry args={[0.24, 0.12, 0.05]} />{bulb}</mesh>
+              <group>
+                <Cyl m={m} at={[0, 0.85, 0]} r={0.025} h={1.7} c="#78909c" seg={6} />
+                <mesh position={[0, 1.72, 0]} rotation-y={Math.atan2(-x, -z)}><boxGeometry args={[0.24, 0.12, 0.05]} />{bulb}</mesh>
+              </group>
               <Pool r={1.0} x={-x * 0.35} z={-z * 0.35} y={0.08} />
             </group>
           ))}

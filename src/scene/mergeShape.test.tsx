@@ -6,7 +6,7 @@ import { Box3, BoxGeometry, InstancedMesh, Matrix3, Matrix4, Mesh, Object3D, Pla
 import { BUILDINGS, TILE } from '../game/data'
 import { BuildingModel } from './BuildingModel'
 import { KeepShapes, MergeScale } from './mergeScale'
-import { FLAT, isKept, propLimit } from './keepShape'
+import { FLAT, isKept, limitFor, propLimit } from './keepShape'
 
 // THE RULE (see mergeScale.tsx): in a stretched 1x2 pair, props keep their
 // shape. This draws every building, at a few levels, as a pair both ways and
@@ -25,7 +25,7 @@ async function draw(def: (typeof BUILDINGS)[number], level: number, scale: [numb
   const r = await ReactThreeTestRenderer.create(
     <group scale={scale}>
       <MergeScale.Provider value={scale}>
-        <KeepShapes limit={propLimit(def.w * TILE, def.h * TILE)}>
+        <KeepShapes limit={limitFor(def)}>
           <BuildingModel def={def} level={level} />
         </KeepShapes>
       </MergeScale.Provider>

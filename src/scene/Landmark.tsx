@@ -6,7 +6,10 @@ import { Bench, GlassBlock, Lamp, PadLights, Planter, glassMat } from './OfficeB
 import { CarModel } from './CarModel'
 import { Upright } from './mergeScale'
 import { glowMats, onNight } from './dayNight'
-import { concreteTex, helipadTex, paverTex } from './textures'
+import { concreteTex, curtainGlowTex, curtainTex, helipadTex, paverTex } from './textures'
+import { RAINBOW } from './clubLeds'
+import { clubPulse } from '../lib/clubBeat'
+import { dayPhase, isNight, nightAmount } from '../game/clock'
 import { PAL } from './season'
 import { useGame } from '../game/store'
 import { sfx } from '../lib/sound'
@@ -30,6 +33,8 @@ const BASE = 0.8 // top of the lobby podium
 const DECK = 9.3 // underside line of the deck at the tower
 const DECK_TOP = 9.85
 const PEAK = 14.9 // top of the fin
+// The penthouse suite's three floors, deck to roof.
+const SUITE: [number, number][] = [[DECK_TOP, 11.2], [11.2, 12.55], [12.55, 13.9]]
 
 const mat: Mat = (color: string, map?: Texture) => <meshStandardMaterial color={color} map={map ?? null} />
 const bulb = <primitive object={glowMats.bulb} attach="material" dispose={null} />
@@ -46,6 +51,26 @@ function coreMat() {
   return c
 }
 const coreEl = () => <primitive object={coreMat()} attach="material" dispose={null} />
+
+// The penthouse suite dances with the nightclub at night: each floor's lit
+// panes take a colour of the club's rainbow, a step apart, moving on and
+// flashing with every bass note (clubBeat.ts; a soft beat when the music's off).
+// Glass by day like the rest of the tower.
+const suiteMats = SUITE.map(() => {
+  const m = new MeshStandardMaterial({ color: TINT, map: curtainTex(), emissiveMap: curtainGlowTex(), emissive: new Color('#000000'), emissiveIntensity: 1, metalness: 0.15, roughness: 0.22 })
+  m.userData.live = true
+  return m
+})
+const suiteTint = new Color()
+function SuiteLights() {
+  useFrame(() => {
+    const p = clubPulse()
+    const lit = isNight() ? nightAmount(dayPhase()) : 0
+    const glow = lit * (0.8 + 1.6 * p.flash)
+    suiteMats.forEach((m, i) => m.emissive.copy(suiteTint.set(RAINBOW[(i * 2 + p.step) % RAINBOW.length])).multiplyScalar(glow))
+  })
+  return null
+}
 
 // ---- Shapes (front elevation, x across, y up), extruded front to back ----
 
@@ -108,7 +133,12 @@ const GEO = (() => {
   deck.lineTo(-1.1, DECK_TOP)
   deck.closePath()
   const roof = quad(ROOF[0], ROOF[1], ROOF[2])
-  const pent = new Shape([new Vector2(-1.05, DECK_TOP), new Vector2(0.85, DECK_TOP), ...roof, new Vector2(-1.05, 13.9)])
+  // The penthouse suite: three floors, each cut from the outline under the curving roof.
+  const right = (y: number) => (y <= ROOF[0].y ? 0.85 : roof.reduce((best, p) => (Math.abs(p.y - y) < Math.abs(best.y - y) ? p : best)).x)
+  const suite = SUITE.map(([y0, y1]) => {
+    const edge = roof.filter((p) => p.y > y0 && p.y < y1)
+    return new Shape([new Vector2(-1.05, y0), new Vector2(right(y0), y0), ...edge, new Vector2(right(y1), y1), new Vector2(-1.05, y1)])
+  })
   // The fin: a white band along the roof that rises into a peak over the left wall.
   const finLine = [...quad(new Vector2(1.08, 11.15), new Vector2(0.15, 13.25), new Vector2(-0.82, 14.05)), new Vector2(-1.0, PEAK - 0.2), new Vector2(-1.05, PEAK)]
   const fin = band(finLine, -0.22)
@@ -118,7 +148,7 @@ const GEO = (() => {
   return {
     body: extrude(body, D, true),
     deck: extrude(deck, 1.9),
-    pent: extrude(pent, D - 0.2, true),
+    suite: suite.map((f) => extrude(f, D - 0.2, true)),
     fin: extrude(fin, D - 0.1),
     clad: extrude(clad, 0.14),
     arch: extrude(band(archLine, 0.17), 0.08),
@@ -168,7 +198,8 @@ export function VanguardTower() {
         <mesh geometry={GEO.deck} castShadow receiveShadow>{mat(FRAME)}</mesh>
         <mesh position={[0.5, DECK_TOP - 0.06, 0.96]}><boxGeometry args={[3.2, 0.025, 0.02]} />{bulb}</mesh>
         {/* Penthouse glass, then the roof fin rising to the peak, lit along its edge. */}
-        <mesh geometry={GEO.pent} castShadow><primitive object={glassMat(TINT)} attach="material" dispose={null} /></mesh>
+        {GEO.suite.map((g, i) => <mesh key={i} geometry={g} castShadow><primitive object={suiteMats[i]} attach="material" dispose={null} /></mesh>)}
+        <SuiteLights />
         <mesh geometry={GEO.fin} castShadow>{mat(FRAME)}</mesh>
         <group position-z={(D - 0.1) / 2}><mesh geometry={GEO.finLed}>{bulb}</mesh></group>
         {/* Mast and warning light on the peak. */}
@@ -267,58 +298,84 @@ function Pulse() {
 // sputters ("put... put": the jets cut, it drops, they catch) before it lands.
 // Times in seconds from take-off. The car moves, so it stays out of Batch and ignores taps.
 const HOP = 0.55
-const T = { lift: 1.0, climb: 2.8, down: 8.8, up: 14.8, glide: 16.6, cut1: 17.0, catch1: 17.35, cut2: 18.0, catch2: 18.35, land: 19.6 }
+// (climb - lift) + (glide - up) must equal one lap's time, (down - climb) / 2.
+export const T = { lift: 1.0, climb: 2.8, down: 8.8, up: 14.8, glide: 19.0, cut1: 19.4, catch1: 19.75, cut2: 20.5, catch2: 20.85, land: 22.4 }
 const R = 2.75 // spiral radius round the tower's middle
 const AXIS: [number, number] = [0, 0] // the tower's middle, in its own frame
 const HIGH = PEAK + 1.0
 const LOW = 1.9
+const DIP = 0.28 // how far it drops each time the engine cuts
 const ease = (u: number) => u * u * (3 - 2 * u)
-const span = (c: number, a: number, b: number) => ease(Math.min(1, Math.max(0, (c - a) / (b - a))))
+const lin = (c: number, a: number, b: number) => Math.min(1, Math.max(0, (c - a) / (b - a)))
+const span = (c: number, a: number, b: number) => ease(lin(c, a, b))
+// Laps turn at a steady rate; the climb speeds up into it and the glide home slows out of it,
+// so the heading never snaps. The glide's sweep is what's left to come round over the pad.
+const W = (4 * Math.PI) / (T.down - T.climb)
+const CLIMB_TURN = (W * (T.climb - T.lift)) / 2
+const GLIDE_TURN = (W * (T.glide - T.up)) / 2
 type Pose = { x: number; y: number; z: number; bank: number; thrust: number }
 
+// One "put": the jets cut and it falls (gathering speed), then they catch and it
+// sinks a touch more before rising back, with no jump in height or speed.
+function dip(c: number, cut: number, back: number) {
+  if (c < cut) return 0
+  const fall = back - cut
+  if (c < back) return DIP * ((c - cut) / fall) ** 2
+  const rec = 0.55
+  const s = (c - back) / rec
+  if (s >= 1) return 0
+  // Hermite from (DIP, still falling) to (0, at rest).
+  const m0 = ((2 * DIP) / fall) * rec
+  return DIP * (2 * s ** 3 - 3 * s * s + 1) + m0 * (s ** 3 - 2 * s * s + s)
+}
+
 // Where the car is `c` seconds into a flight, in the pad's frame (pad centre at the origin, height above the pad).
-function flight(c: number, pad: V3, out: Pose) {
+export function flight(c: number, pad: V3, out: Pose) {
   const [px, py, pz] = pad
   const r0 = Math.hypot(px - AXIS[0], pz - AXIS[1])
   const a0 = Math.atan2(pz - AXIS[1], px - AXIS[0])
+  // Where each phase's turning starts. Climb + glide take one lap's time, so
+  // their sweeps add to a full turn and the glide ends right over the pad.
+  const aDown = a0 + CLIMB_TURN
+  const aUp = aDown + 4 * Math.PI
+  const aGlide = aUp + 4 * Math.PI
   let r = r0, a = a0, y = 0
   out.bank = 0
   out.thrust = 1
   if (c < T.lift) y = HOP * span(c, 0, T.lift)
   else if (c < T.climb) {
-    const u = span(c, T.lift, T.climb)
-    r = r0 + (R - r0) * u
-    a = a0 + 0.6 * u
-    y = HOP + (HIGH - py - HOP) * u
+    const u = lin(c, T.lift, T.climb)
+    r = r0 + (R - r0) * ease(u)
+    a = a0 + CLIMB_TURN * u * u
+    y = HOP + (HIGH - py - HOP) * ease(u)
+    out.bank = 0.4 * u
   } else if (c < T.down) {
     // Two laps down, top to bottom.
-    const u = (c - T.climb) / (T.down - T.climb)
     r = R
-    a = a0 + 0.6 + 4 * Math.PI * u
-    y = HIGH - py - (HIGH - LOW) * ease(u)
+    a = aDown + W * (c - T.climb)
+    y = HIGH - py - (HIGH - LOW) * span(c, T.climb, T.down)
     out.bank = 0.4
   } else if (c < T.up) {
-    // Two laps back up, bottom to top, ending above the pad.
-    const u = (c - T.down) / (T.up - T.down)
+    // Two laps back up, bottom to top.
     r = R
-    a = a0 + 0.6 + 4 * Math.PI + (4 * Math.PI - 0.6) * u
-    y = LOW - py + (py + 1.2 - LOW) * ease(u)
+    a = aUp + W * (c - T.down)
+    y = LOW - py + (py + 1.2 - LOW) * span(c, T.down, T.up)
     out.bank = 0.4
   } else if (c < T.glide) {
-    const u = span(c, T.up, T.glide)
-    r = R + (r0 - R) * u
-    y = 1.2 + (HOP * 1.4 - 1.2) * u
-    out.bank = 0.4 * (1 - u)
+    // Slowing out of the lap and curling in over the pad.
+    const u = lin(c, T.up, T.glide)
+    a = aGlide + GLIDE_TURN * (2 * u - u * u)
+    r = R + (r0 - R) * ease(u)
+    y = 1.2 + (HOP * 1.4 - 1.2) * ease(u)
+    out.bank = 0.4 * (1 - u) * (1 - u)
   } else if (c < T.land) {
     // The sputter: hovering, the jets cut out twice and the car dips, then catches.
-    y = HOP * 1.4
-    const dip = (cut: number, back: number) => (c < cut ? 0 : c < back ? 0.28 * ((c - cut) / (back - cut)) ** 2 : 0.28 * Math.max(0, 1 - (c - back) / 0.35))
-    y -= dip(T.cut1, T.catch1) + dip(T.cut2, T.catch2)
+    y = HOP * 1.4 - dip(c, T.cut1, T.catch1) - dip(c, T.cut2, T.catch2)
     if ((c >= T.cut1 && c < T.catch1) || (c >= T.cut2 && c < T.catch2)) out.thrust = 0
     else if ((c >= T.catch1 && c < T.catch1 + 0.25) || (c >= T.catch2 && c < T.catch2 + 0.25)) out.thrust = 1.6
-    // Then settles onto the pad, jets winding down.
-    const u = span(c, T.catch2 + 0.4, T.land)
-    y = y * (1 - u)
+    // Then settles softly onto the pad, jets winding down.
+    const u = span(c, T.catch2 + 0.6, T.land)
+    y *= 1 - u
     if (u > 0) out.thrust = 1 - u
   } else {
     y = 0
@@ -327,7 +384,7 @@ function flight(c: number, pad: V3, out: Pose) {
   out.x = AXIS[0] + r * Math.cos(a) - px
   out.z = AXIS[1] + r * Math.sin(a) - pz
   out.y = y
-  if (c >= T.land || c < T.lift) out.x = out.z = 0
+  if (c >= T.glide || c < T.lift) out.x = out.z = 0
 }
 
 // Jet fire and the smoke it leaves: shared by every tower, one instanced draw for all the puffs.

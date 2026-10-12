@@ -15,6 +15,7 @@ import { Icon } from './Icon'
 import { compact } from './format'
 import './crew-battle.css'
 import { PlayerName } from './Username'
+import { LoadingScene } from './Loading'
 
 // Crew battles: a strip in the Crew window and the full-screen showdown, where the two crews' cars
 // face off at the start line of the week's venue with the live score and both rosters docked below.
@@ -204,7 +205,7 @@ export function BattlePanel() {
     return (
       <div className="race-full cb-full">
         <div className="rf-top"><h2>⚔️ Crew Battle</h2><button className="close" onClick={close} aria-label="Close"><Icon name="close" size={16} /></button></div>
-        <p className="cb-loading">{battle === null ? 'Join a crew to battle other crews.' : 'Finding your rival crew...'}</p>
+        {battle === null ? <p className="cb-loading">Join a crew to battle other crews.</p> : <LoadingScene key="cb" ready={false} max={Infinity} label="Finding your rival crew" onClose={close} />}
       </div>
     )
   }
@@ -220,6 +221,7 @@ export function BattlePanel() {
           theirs={{ body: rival.body, model: rival.id, color: b.them.color }}
           us={{ tag: b.us.tag, color: b.us.color }} them={{ tag: b.them.tag, color: b.them.color }} />
       </Canvas>
+      <LoadingScene key="cb" label="Finding your rival crew" onClose={close} />
       <div className="rf-top">
         <h2>⚔️ Crew Battle</h2>
         <button className="close" onClick={close} aria-label="Close"><Icon name="close" size={16} /></button>
