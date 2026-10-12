@@ -10,6 +10,7 @@ import { liveTraffic, crossingSignal } from './traffic/live'
 import { useThought, placeChip } from '../game/thoughts'
 import { SEASON } from './season'
 import { SHIRTS, PANTS, SKIN, HAIR, BEANIES } from './people'
+import { headGeo, legGeo, torsoGeo } from './peopleGeo'
 import { dayPhase, nightAmount } from './dayNight'
 import { isNight } from '../game/clock'
 import { CLUB } from './clubLayout'
@@ -32,6 +33,9 @@ const extraPeople = (level: number) => Math.min(10, Math.floor(level / 2))
 const LEG = 0.24
 // Figures are modelled at race-crowd proportions and drawn a little bigger so they read from the town camera.
 const SCALE = 1.3
+const TORSO = torsoGeo()
+const HEAD = headGeo()
+const LEGS = legGeo(LEG)
 
 
 const NAMES = ['Alex', 'Sam', 'Jordan', 'Riley', 'Casey', 'Morgan', 'Taylor', 'Jamie', 'Quinn', 'Avery', 'Rowan', 'Skyler', 'Drew', 'Kai', 'Robin', 'Charlie', 'Frankie', 'Jesse', 'Remy', 'Sage']
@@ -441,20 +445,20 @@ export function Townspeople() {
   return (
     <group scale={SCALE}>
       <instancedMesh ref={torso} args={[undefined, undefined, MAX_PEOPLE]} frustumCulled={false} castShadow={!SMALL}>
-        <capsuleGeometry args={[0.085, 0.16, 3, 8]} />
-        <meshStandardMaterial />
+        <primitive object={TORSO} attach="geometry" />
+        <meshStandardMaterial vertexColors />
       </instancedMesh>
       <instancedMesh ref={head} args={[undefined, undefined, MAX_PEOPLE]} frustumCulled={false}>
-        <sphereGeometry args={[0.08, 10, 8]} />
-        <meshStandardMaterial />
+        <primitive object={HEAD} attach="geometry" />
+        <meshStandardMaterial vertexColors />
       </instancedMesh>
       <instancedMesh ref={hair} args={[undefined, undefined, MAX_PEOPLE]} frustumCulled={false}>
         <sphereGeometry args={[0.085, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2]} />
         <meshStandardMaterial />
       </instancedMesh>
       <instancedMesh ref={legs} args={[undefined, undefined, MAX_PEOPLE * 2]} frustumCulled={false}>
-        <boxGeometry args={[0.06, LEG, 0.07]} />
-        <meshStandardMaterial />
+        <primitive object={LEGS} attach="geometry" />
+        <meshStandardMaterial vertexColors />
       </instancedMesh>
       <instancedMesh ref={items} args={[undefined, undefined, MAX_PEOPLE]} frustumCulled={false}>
         <boxGeometry args={[1, 1, 1]} />
