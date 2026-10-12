@@ -154,6 +154,9 @@ end $$;
 
 revoke execute on function public.kart_party_open(text, uuid[]), public.kart_party_join(text), public.kart_party_finish(text, numeric),
   public.kart_party_status(text), public.kart_party_decide(text), public.kart_party_view(public.kart_parties, uuid), public.kart_floor() from public, anon;
+-- Supabase grants every new function to authenticated by default; the helpers stay server-only
+-- (kart_party_decide would hand anyone a party's players and times).
+revoke execute on function public.kart_party_decide(text), public.kart_party_view(public.kart_parties, uuid), public.kart_floor() from authenticated;
 grant execute on function public.kart_party_open(text, uuid[]), public.kart_party_join(text), public.kart_party_finish(text, numeric),
   public.kart_party_status(text) to authenticated;
 
