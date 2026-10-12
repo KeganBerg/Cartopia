@@ -155,6 +155,8 @@ function DogPark({ m, bulb, ghost }: EdgeProps) {
 // The half-pipe's cross-section, in its own frame: across (u) and up (v).
 const HP = { r: 0.55, flat: 0.5, deck: 0.28, w: 1.7 }
 const hpHalf = HP.flat / 2 + HP.r + HP.deck
+// Graffiti tags on the half-pipe's sides: [along, up, radius].
+const TAGS: [number, number, number][] = [[-0.98, 0.14, 0.1], [-0.83, 0.36, 0.13], [0.84, 0.17, 0.16], [0.97, 0.41, 0.1]]
 
 function halfPipeGeometry() {
   const { r, flat, w } = HP
@@ -238,10 +240,11 @@ function SkatePark({ m, bulb, ghost }: EdgeProps) {
           </group>
         ))}
         {/* Graffiti on the side walls. */}
-        {!ghost && [-1, 1].map((sd) => tags.map((c, i) => (
-          <mesh key={`${sd}${i}`} position={[sd * (HP.w / 2 + 0.004), 0.12 + (i % 2) * 0.16, -hpHalf + 0.3 + i * 0.35]} rotation-y={(sd * Math.PI) / 2}>
-            <circleGeometry args={[0.1 + (i % 3) * 0.03, 8]} />
-            {m(c)}
+        {/* Only on the ramps' full-height ends: over the dip there's no wall to paint. */}
+        {!ghost && [-1, 1].map((sd) => TAGS.map(([u, y, r], i) => (
+          <mesh key={`${sd}${i}`} position={[sd * (HP.w / 2 + 0.004), y, u]} rotation-y={(sd * Math.PI) / 2}>
+            <circleGeometry args={[r, 8]} />
+            {m(tags[i])}
           </mesh>
         )))}
         {!ghost && <Rider m={m} />}

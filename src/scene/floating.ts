@@ -157,8 +157,9 @@ function distance(p: Piece, x: Vector3) {
 }
 
 // Whether a point on `a` comes within TOUCH of `b`'s solid.
-function reaches(a: Piece, b: Piece, eb: Box3) {
-  for (const x of a.pts!) if (eb.containsPoint(x) && distance(b, x) <= TOUCH) return true
+function reaches(a: Piece, b: Piece) {
+  const near = b.box.clone().expandByScalar(TOUCH)
+  for (const x of a.pts!) if (near.containsPoint(x) && distance(b, x) <= TOUCH) return true
   return false
 }
 
@@ -169,7 +170,7 @@ function touching(a: Piece, b: Piece, ea: Box3, eb: Box3) {
   if (b.ball && a.hull) return outside(a.hull, b.ball.center) <= b.ball.radius + SNUG
   // Crowds (instanced) are only known by their boxes.
   if (!a.pts || !b.pts || (!a.hull && !a.tris) || (!b.hull && !b.tris)) return true
-  return reaches(a, b, eb) || reaches(b, a, ea)
+  return reaches(a, b) || reaches(b, a)
 }
 
 // Every clump of touching pieces that no chain of touching pieces links to the
@@ -219,4 +220,25 @@ export function describe(p: Clump) {
   const mesh = p.o as Mesh & { material: { color?: { getHexString(): string } } }
   const args = Object.values((mesh.geometry as unknown as { parameters?: Record<string, unknown> }).parameters ?? {}).filter((v) => typeof v === 'number').slice(0, 3).map((v) => +(v as number).toFixed(3))
   return `${p.n} piece${p.n > 1 ? 's' : ''} ${p.gap.toFixed(2)} off: ${path.join('<')} #${mesh.material?.color?.getHexString?.() ?? '?'} [${args.join(',')}] @${[c.x, c.y, c.z].map((v) => v.toFixed(2)).join(',')}`
+}
+
+// For a floating clump: the nearest other piece and how far its points are
+// from that piece's solid (to tell a hairline gap from a real one).
+export function nearest(root: Object3D, c: Clump) {
+  const ps = pieces(root)
+  const inC = new Set(c.members.map((m) => m.o))
+  let best = { d: Infinity, o: null as Object3D | null }
+  for (const m of c.members) {
+    const mp = ps.find((p) => p.o === m.o && p.box.equals(m.box))
+    if (!mp?.pts) continue
+    for (const q of ps) {
+      if (inC.has(q.o) || (!q.hull && !q.tris)) continue
+      if (gapOf(mp.box, q.box) > 0.3) continue
+      for (const x of mp.pts) {
+        const d = distance(q, x)
+        if (d < best.d) best = { d, o: q.o }
+      }
+    }
+  }
+  return best
 }
