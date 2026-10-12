@@ -359,7 +359,7 @@ function TownFog() {
     if (isFree(camera)) return
     const w = weatherNow()
     // Ground fog banks (Atmosphere.tsx) carry most of a fog's look; the far haze stays light under them.
-    const h = w.haze * (1 - 0.9 * sky.banks)
+    const h = w.haze * (1 - sky.banks)
     if (h < 0.01) {
       fog.near = 1e5
       fog.far = 2e5
