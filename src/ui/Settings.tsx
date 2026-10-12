@@ -42,7 +42,7 @@ function Row({ label, sub, children }: { label: React.ReactNode; sub?: React.Rea
 const GRAPHICS: { id: Graphics; label: string; sub: string }[] = [
   { id: 'auto', label: 'Auto', sub: 'Picks the best look your device can keep smooth.' },
   { id: 'high', label: 'High', sub: 'Full glow, sharpest picture. Uses more battery.' },
-  { id: 'saver', label: '🔋 Saver', sub: 'No shadows or glow. Cooler phone, longer battery.' },
+  { id: 'saver', label: 'Saver', sub: 'No shadows or glow. Cooler phone, longer battery.' },
 ]
 
 export function SettingsTab({ user }: { user: User | null }) {
@@ -108,7 +108,7 @@ export function AccountData({ user }: { user: User }) {
   return (
     <Group icon="🗂️" title="Your data">
       <Row label="Export my data" sub="Your town and account as a file">
-        <button className="buy small alt" onClick={() => exportData({ id: user.id, email: user.email, username })}>⬇ Save</button>
+        <button className="buy small alt" onClick={() => exportData({ id: user.id, email: user.email, username })}>Save</button>
       </Row>
       <Row label="Delete account" sub="Removes your cloud town for good">
         <button className="sell small" onClick={() => setConfirm(true)}>Delete</button>
@@ -138,7 +138,7 @@ export function GuestData() {
   return (
     <Group icon="🗂️" title="Your data">
       <Row label="Export my town" sub="A copy of this browser's save">
-        <button className="buy small alt" onClick={() => exportData(null)}>⬇ Save</button>
+        <button className="buy small alt" onClick={() => exportData(null)}>Save</button>
       </Row>
     </Group>
   )
