@@ -12,14 +12,17 @@ import { signTexture } from './signTexture'
 import { glowMats } from './dayNight'
 import { decal } from './layers'
 import { TILE, buildingDef, type Body } from '../game/data'
-import { DRIFT_BLUE, DRIFT_ORANGE, KART_LEN, KartRace, type KartEvent, type KartInput, type Track } from '../game/kart'
+import { DRIFT_BLUE, DRIFT_ORANGE, KART_LEN, SMOKE_R, KartRace, type KartEvent, type KartInput, type Track } from '../game/kart'
 import type { ChaseCar } from './ChaseScene'
 
 // A kart circuit: the tarmac ribbon with kerbs, verges and barriers, the theme's
 // scenery round it (the player's town, a harbour, a red rock canyon), the karts,
 // and a chase camera. The race itself is game/kart.ts; this draws it and steps it.
 
-export type KartHud = { lap: number; place: number; item: string | null; speed: number; charge: number; boost: boolean; t: number; dots: { x: number; z: number; me: boolean }[]; wrong: boolean }
+export type KartHud = {
+  lap: number; place: number; item: string | null; speed: number; charge: number; boost: boolean; t: number; dots: { x: number; z: number; me: boolean }[]; wrong: boolean
+  fx: { flat: number; smoke: number; emp: number; tow: number; shield: number } // seconds left on each effect on the player
+}
 export type KartCam = 'chase' | 'top'
 
 // Dev only: ?autopilot drives the player's kart, ?warp=<s> skips ahead once the race starts (for screenshots).
@@ -94,6 +97,15 @@ const crateTex = () => canvasTex('kartcrate', 128, 128, (g) => {
   g.fillStyle = 'rgba(124,77,255,0.45)'
   g.beginPath(); g.moveTo(64, 98); g.lineTo(52, 56); g.lineTo(76, 56); g.closePath(); g.fill()
   g.fillRect(30, 54, 68, 4)
+})
+// Tack strip: a black rubber mat with hazard-yellow ends.
+const tackTex = () => canvasTex('karttacks', 256, 64, (g) => {
+  g.fillStyle = '#1c1c1c'; g.fillRect(0, 0, 256, 64)
+  for (let x = 0; x < 256; x += 16) { g.fillStyle = x % 32 ? '#262626' : '#141414'; g.fillRect(x, 0, 16, 64) }
+  for (const x0 of [0, 232]) for (let i = 0; i < 4; i++) {
+    g.fillStyle = i % 2 ? '#212121' : '#ffca28'
+    g.beginPath(); g.moveTo(x0, i * 16); g.lineTo(x0 + 24, i * 16 + 8); g.lineTo(x0 + 24, i * 16 + 24); g.lineTo(x0, i * 16 + 16); g.fill()
+  }
 })
 
 // ---------- track geometry ----------
@@ -648,7 +660,7 @@ type KartLook = ChaseCar
 function KartView({ look, rig, set }: { look: KartLook; rig: WheelRig; set: (g: { root: Group | null; body: Group | null; fx: KartFx }) => void }) {
   const f = carFrame(look.body)
   const s = KART_LEN / f.len
-  const fx = useMemo<KartFx>(() => ({ sparks: [], flame: null, shield: null }), [])
+  const fx = useMemo<KartFx>(() => ({ sparks: [], flame: null, shield: null, zap: null, magnet: null }), [])
   const root = useRef<Group>(null)
   const body = useRef<Group>(null)
   useLayoutEffect(() => set({ root: root.current, body: body.current, fx }), [set, fx])
@@ -675,11 +687,29 @@ function KartView({ look, rig, set }: { look: KartLook; rig: WheelRig; set: (g: 
           <sphereGeometry args={[1.25, 18, 12]} />
           <meshStandardMaterial color="#80d8ff" transparent opacity={0.28} emissive="#40c4ff" emissiveIntensity={0.6} depthWrite={false} />
         </mesh>
+        {/* Static storm: a crackling cage of light round the kart. */}
+        <mesh ref={(m) => { fx.zap = m }} position={[0, 0.5, 0]} visible={false}>
+          <icosahedronGeometry args={[1.15, 1]} />
+          <meshBasicMaterial color="#b388ff" wireframe transparent opacity={0.85} toneMapped={false} depthWrite={false} />
+        </mesh>
+        {/* Tow magnet: a red horseshoe magnet up on the roof, pointing ahead. */}
+        <group ref={(g) => { fx.magnet = g }} position={[0, 1.25, 0.2]} visible={false}>
+          <mesh rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[0.26, 0.09, 8, 16, Math.PI]} />
+            <meshStandardMaterial color="#e53935" roughness={0.4} />
+          </mesh>
+          {[-1, 1].map((sd) => (
+            <mesh key={sd} position={[sd * 0.26, 0, 0.12]} rotation-x={Math.PI / 2}>
+              <cylinderGeometry args={[0.09, 0.09, 0.24, 8]} />
+              <meshStandardMaterial color="#cfd8dc" metalness={0.8} roughness={0.25} />
+            </mesh>
+          ))}
+        </group>
       </group>
     </group>
   )
 }
-type KartFx = { sparks: (Mesh | null)[]; flame: Mesh | null; shield: Mesh | null }
+type KartFx = { sparks: (Mesh | null)[]; flame: Mesh | null; shield: Mesh | null; zap: Mesh | null; magnet: Group | null }
 
 function Crates({ race }: { race: KartRace }) {
   const ref = useRef<InstancedMesh>(null)
@@ -708,13 +738,55 @@ function Crates({ race }: { race: KartRace }) {
   )
 }
 
+const STRIPS = 8, SPIKES = 9, CLOUDS = 6, PUFFS = 16
 function Hazards({ race }: { race: KartRace }) {
   const oil = useRef<InstancedMesh>(null)
   const bees = useRef<InstancedMesh>(null)
+  const mats = useRef<InstancedMesh>(null)
+  const spikes = useRef<InstancedMesh>(null)
+  const puffs = useRef<InstancedMesh>(null)
   const tmp = useMemo(() => new Object3D(), [])
   useFrame(({ clock }) => {
-    const o = oil.current, b = bees.current
-    if (!o || !b) return
+    const o = oil.current, b = bees.current, m = mats.current, sp = spikes.current, pf = puffs.current
+    if (!o || !b || !m || !sp || !pf) return
+    // Tack strips: the mat flat on the road and a row of steel spikes on it.
+    for (let i = 0; i < STRIPS; i++) {
+      const h = race.tacks[i]
+      tmp.position.set(h?.x ?? 0, Y_PAINT + 0.012, h?.z ?? 0)
+      // Flat on the road (x), then turned to lie across it (y): the mat's length runs side to side.
+      tmp.rotation.set(-Math.PI / 2, h?.h ?? 0, 0, 'YXZ')
+      tmp.scale.setScalar(h ? 1 : 0.0001)
+      tmp.updateMatrix()
+      m.setMatrixAt(i, tmp.matrix)
+      for (let j = 0; j < SPIKES; j++) {
+        const a = (j / (SPIKES - 1) - 0.5) * 2.3
+        const side = h ? Math.cos(h.h) : 0, sideZ = h ? -Math.sin(h.h) : 0
+        tmp.rotation.set(0, 0, 0, 'XYZ')
+        tmp.position.set((h?.x ?? 0) + side * a + (j % 2 ? 0.18 : -0.18) * Math.sin(h?.h ?? 0), 0.16, (h?.z ?? 0) + sideZ * a + (j % 2 ? 0.18 : -0.18) * Math.cos(h?.h ?? 0))
+        tmp.scale.setScalar(h ? 1 : 0.0001)
+        tmp.updateMatrix()
+        sp.setMatrixAt(i * SPIKES + j, tmp.matrix)
+      }
+    }
+    m.instanceMatrix.needsUpdate = true
+    sp.instanceMatrix.needsUpdate = true
+    // Smoke: a churning cloud of grey puffs that swells, then thins away.
+    const now = clock.elapsedTime
+    for (let i = 0; i < CLOUDS; i++) {
+      const c = race.smoke[i]
+      const age = c ? race.t - c.t : 0
+      const grow = Math.min(1, 0.4 + age * 1.5) * (c ? Math.min(1, (7 - age) / 1.5) : 0)
+      for (let j = 0; j < PUFFS; j++) {
+        const a = j * 2.4 + now * (0.3 + (j % 3) * 0.1)
+        const r = SMOKE_R * (0.15 + ((j * 37) % 10) / 12)
+        tmp.position.set((c?.x ?? 0) + Math.cos(a) * r * grow, 0.4 + (j % 5) * 0.32 + Math.sin(now * 0.8 + j) * 0.15 + age * 0.1, (c?.z ?? 0) + Math.sin(a) * r * grow)
+        tmp.rotation.set(0, 0, 0)
+        tmp.scale.setScalar(c ? Math.max(0.0001, (0.75 + (j % 4) * 0.22) * grow) : 0.0001)
+        tmp.updateMatrix()
+        pf.setMatrixAt(i * PUFFS + j, tmp.matrix)
+      }
+    }
+    pf.instanceMatrix.needsUpdate = true
     for (let i = 0; i < 12; i++) {
       const h = race.oil[i]
       tmp.position.set(h?.x ?? 0, Y_PAINT + 0.01, h?.z ?? 0)
@@ -743,6 +815,18 @@ function Hazards({ race }: { race: KartRace }) {
       <instancedMesh ref={bees} args={[undefined, undefined, 6]} frustumCulled={false}>
         <sphereGeometry args={[1, 10, 8]} />
         <meshStandardMaterial color="#ffd600" emissive="#ffab00" emissiveIntensity={0.6} />
+      </instancedMesh>
+      <instancedMesh ref={mats} args={[undefined, undefined, STRIPS]} frustumCulled={false}>
+        <planeGeometry args={[2.8, 0.85]} />
+        <meshStandardMaterial map={tackTex()} roughness={0.9} {...decal(4)} />
+      </instancedMesh>
+      <instancedMesh ref={spikes} args={[undefined, undefined, STRIPS * SPIKES]} frustumCulled={false}>
+        <coneGeometry args={[0.1, 0.28, 5]} />
+        <meshStandardMaterial color="#eceff1" metalness={0.9} roughness={0.2} />
+      </instancedMesh>
+      <instancedMesh ref={puffs} args={[undefined, undefined, CLOUDS * PUFFS]} frustumCulled={false}>
+        <sphereGeometry args={[1, 14, 10]} />
+        <meshStandardMaterial color="#e3e6e8" emissive="#9aa3a8" emissiveIntensity={0.35} roughness={1} transparent opacity={0.6} depthWrite={false} />
       </instancedMesh>
     </>
   )
@@ -829,6 +913,16 @@ export function KartScene({ race, looks, me, input, running, cam = (DEV?.get('ca
         if (fx.flame.visible) fx.flame.scale.set(1, 0.8 + Math.random() * 0.8, 1)
       }
       if (fx.shield) fx.shield.visible = k.shield > 0
+      if (fx.zap) {
+        fx.zap.visible = k.emp > 0 && Math.random() > 0.25
+        fx.zap.rotation.set(Math.random() * 6, Math.random() * 6, 0)
+      }
+      if (fx.magnet) fx.magnet.visible = k.tow > 0
+      if (k.flat > 0) {
+        // Down on one corner, thumping round on the flat.
+        v.body.rotation.z += k.id % 2 ? -0.07 : 0.07
+        v.body.position.y += Math.abs(Math.sin(state.clock.elapsedTime * 26)) * 0.05
+      }
     })
 
     // Camera.
@@ -872,6 +966,7 @@ export function KartScene({ race, looks, me, input, running, cam = (DEV?.get('ca
       onHud({
         lap: Math.max(1, Math.min(3, mine.lap)), place: race.place(mine), item: mine.item, speed: mv, charge: mine.drift ? mine.charge : 0, boost: mine.boost > 0, t: race.t,
         dots: race.karts.map((k, i) => ({ x: k.x, z: k.z, me: i === me })), wrong: running && dir < -0.5 && mv > 2,
+        fx: { flat: mine.flat, smoke: mine.smoke, emp: mine.emp, tow: mine.tow, shield: mine.shield },
       })
     }
   })
@@ -889,9 +984,42 @@ export function KartScene({ race, looks, me, input, running, cam = (DEV?.get('ca
       {t.def.theme === 'desert' && <DesertScenery t={t} />}
       <Crates race={race} />
       <Hazards race={race} />
+      <TowBeams race={race} />
       {looks.map((l, i) => <KartView key={i} look={l} rig={rigs[i]} set={setters[i]} />)}
       {/* A warm glow pool under the player, so their kart reads at a glance. */}
       <PlayerRing race={race} me={me} />
+    </>
+  )
+}
+
+// Tow magnet: a pulsing violet beam from the kart to the one it is reeling in.
+function TowBeams({ race }: { race: KartRace }) {
+  const refs = useRef<(Mesh | null)[]>([])
+  const a = useMemo(() => new Vector3(), [])
+  const b = useMemo(() => new Vector3(), [])
+  useFrame(({ clock }) => {
+    race.karts.forEach((k, i) => {
+      const m = refs.current[i]
+      if (!m) return
+      const o = k.tow > 0 && k.towTarget >= 0 ? race.karts[k.towTarget] : null
+      m.visible = !!o
+      if (!o) return
+      a.set(k.x + Math.sin(k.h) * 0.4, 1.3 + k.y, k.z + Math.cos(k.h) * 0.4)
+      b.set(o.x, 0.7 + o.y, o.z)
+      m.position.copy(a).lerp(b, 0.5)
+      m.lookAt(b)
+      m.rotateX(Math.PI / 2)
+      m.scale.set(1 + Math.sin(clock.elapsedTime * 30) * 0.35, a.distanceTo(b), 1 + Math.sin(clock.elapsedTime * 30) * 0.35)
+    })
+  })
+  return (
+    <>
+      {race.karts.map((_, i) => (
+        <mesh key={i} ref={(m) => { refs.current[i] = m }} visible={false} frustumCulled={false}>
+          <cylinderGeometry args={[0.07, 0.07, 1, 6, 1, true]} />
+          <meshBasicMaterial color="#e040fb" transparent opacity={0.7} toneMapped={false} depthWrite={false} />
+        </mesh>
+      ))}
     </>
   )
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DRIFT_ORANGE, FIELD, KartRace, LAPS, TRACKS, buildTrack, gpField, idleInput, kartStats, lateral, locate } from './kart'
+import { DRIFT_ORANGE, FIELD, KartRace, LAPS, TRACKS, buildTrack, gpField, idleInput, itemOdds, kartStats, lateral, locate, type ItemId, type Kart } from './kart'
 
 const ALL = TRACKS.flatMap((d) => [buildTrack(d, false), buildTrack(d, true)])
 
@@ -88,5 +88,121 @@ describe('kart circuits', () => {
     expect(Math.hypot(k.vx, k.vz)).toBeGreaterThan(10)
     go(false, 0.05)
     expect(k.boost).toBeGreaterThan(1)
+  })
+})
+
+const RING = buildTrack({ id: 'ring30', name: 'Ring', short: 'Ring', theme: 'town', venue: 'main', icon: '', half: 7, features: [], pts: Array.from({ length: 16 }, (_, i) => [Math.sin(i / 16 * Math.PI * 2) * 30, Math.cos(i / 16 * Math.PI * 2) * 30] as [number, number]) })
+const drive = (race: KartRace, secs: number, each?: (k: Kart[]) => void) => {
+  for (let f = 0; f < secs * 60; f++) { each?.(race.karts); race.step(1 / 60, [], true) }
+}
+// Put a kart `ahead` points of track in front of where it is now.
+const shift = (race: KartRace, k: Kart, ahead: number) => {
+  const t = race.track
+  const i = (k.idx + ahead + t.n) % t.n
+  k.x = t.x[i]; k.z = t.z[i]; k.idx = i; k.h = Math.atan2(t.tx[i], t.tz[i])
+}
+
+describe('kart items', () => {
+  const CATCH: ItemId[] = ['nitro', 'hornet', 'tow', 'emp']
+  const sum = (o: Record<ItemId, number>, ids: ItemId[]) => ids.reduce((a, id) => a + o[id], 0)
+
+  it('leaders get defence, the back of the field gets the catch-up', () => {
+    for (let r = 0; r < FIELD; r++) expect(Object.values(itemOdds(r)).reduce((a, b) => a + b)).toBeCloseTo(1)
+    expect(itemOdds(0).emp).toBe(0)
+    expect(itemOdds(1).emp).toBe(0)
+    expect(sum(itemOdds(0), CATCH)).toBeLessThan(0.25)
+    expect(sum(itemOdds(FIELD - 1), CATCH)).toBeGreaterThan(0.6)
+    for (let r = 1; r < FIELD; r++) expect(sum(itemOdds(r), CATCH)).toBeGreaterThan(sum(itemOdds(r - 1), CATCH))
+    // Every item turns up somewhere in the field.
+    for (const id of Object.keys(itemOdds(0)) as ItemId[]) expect(Math.max(...Array.from({ length: FIELD }, (_, r) => itemOdds(r)[id])), id).toBeGreaterThan(0.05)
+  })
+
+  it('a tack strip gives a flat tyre that costs real pace', () => {
+    const run = (tacks: boolean) => {
+      const race = new KartRace(RING, [{ name: 'A', pi: 50, ai: true, skill: 1 }], 1)
+      const k = race.karts[0]
+      drive(race, 3)
+      if (tacks) {
+        const t = race.track, i = (k.idx + 12) % t.n
+        race.tacks.push({ x: t.x[i] + t.nx[i] * lateral(t, k.idx, k.x, k.z), z: t.z[i] + t.nz[i] * lateral(t, k.idx, k.x, k.z), t: race.t - 1, h: Math.atan2(t.tx[i], t.tz[i]) })
+      }
+      const start = race.progress(k)
+      drive(race, 3)
+      return { k, race, gone: race.progress(k) - start }
+    }
+    const clean = run(false), hit = run(true)
+    expect(hit.race.tacks.length).toBe(0)
+    expect(hit.k.flat).toBeGreaterThan(0)
+    expect(hit.gone).toBeLessThan(clean.gone * 0.92)
+  })
+
+  it('a smoke bomb slows whoever drives into it, but not through a bubble shield', () => {
+    for (const shielded of [false, true]) {
+      const race = new KartRace(RING, [{ name: 'A', pi: 50, ai: true }], 1)
+      const k = race.karts[0]
+      drive(race, 2)
+      const t = race.track, i = (k.idx + 10) % t.n
+      // Dropped in this kart's lane, as a kart driving the same line ahead would.
+      const off = lateral(t, k.idx, k.x, k.z)
+      race.smoke.push({ x: t.x[i] + t.nx[i] * off, z: t.z[i] + t.nz[i] * off, t: race.t - 1 })
+      let smoked = false
+      drive(race, 2, () => { if (shielded) k.shield = 1; smoked ||= k.smoke > 0 })
+      expect(smoked).toBe(!shielded)
+    }
+  })
+
+  it('a static storm zaps up to three karts ahead and no one behind', () => {
+    const race = new KartRace(ALL[0], gpField(['A', 'B', 'C', 'D', 'E', 'F'], 2, 40, { name: 'Me', pi: 40 }).map((f) => ({ ...f, ai: true })), 3)
+    drive(race, 6)
+    const order = race.order()
+    const user = order[4]
+    order[2].shield = 5
+    user.item = 'emp'
+    race.useItem(user, order)
+    expect(order[0].emp).toBe(0) // out of reach: four ahead
+    expect(order[1].emp).toBeGreaterThan(0)
+    expect(order[2].emp).toBe(0) // the shield took it
+    expect(order[2].shield).toBe(0)
+    expect(order[3].emp).toBeGreaterThan(0)
+    expect(order[5].emp).toBe(0)
+    // While zapped: no boost and the item can't be used.
+    order[1].item = 'nitro'
+    order[1].boost = 1
+    race.step(1 / 60, [], true)
+    expect(order[1].boost).toBe(0)
+    expect(order[1].item).toBe('nitro')
+  })
+
+  it('a tow magnet reels you in to the kart ahead', () => {
+    const run = (tow: boolean) => {
+      const race = new KartRace(RING, [{ name: 'A', pi: 50, ai: true, skill: 1 }, { name: 'B', pi: 50, ai: true, skill: 1 }], 2)
+      const [a, b] = race.karts
+      drive(race, 3)
+      shift(race, b, 0)
+      shift(race, a, -30)
+      a.vx = b.vx; a.vz = b.vz
+      const gap = () => (race.progress(b) - race.progress(a)) * race.track.n
+      const g0 = gap()
+      if (tow) { a.item = 'tow'; race.useItem(a, race.order()) }
+      expect(a.towTarget).toBe(tow ? b.id : -1)
+      drive(race, 2.5)
+      return g0 - gap()
+    }
+    expect(run(true)).toBeGreaterThan(run(false) + 6)
+  })
+
+  it('a race full of items still finishes, every kart within reach of the winner', () => {
+    for (const t of [ALL[0], ALL[3], ALL[4]]) {
+      const race = new KartRace(t, gpField(['A', 'B', 'C', 'D', 'E', 'F'], 3, 50, { name: 'Me', pi: 50 }).map((f) => ({ ...f, ai: true })), 11)
+      const used = new Set<ItemId>()
+      while (race.finishOrder.length < FIELD && race.t < 240) {
+        for (const k of race.karts) if (k.item) used.add(k.item)
+        race.step(1 / 60, [], true)
+      }
+      expect(race.finishOrder.length, t.def.id).toBe(FIELD)
+      expect(used.size, t.def.id).toBeGreaterThan(4)
+      const done = race.finishOrder.map((i) => race.karts[i].done!)
+      expect(done[FIELD - 1] - done[0], t.def.id).toBeLessThan(30)
+    }
   })
 })

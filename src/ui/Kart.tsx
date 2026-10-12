@@ -3,7 +3,7 @@ import { Canvas } from '@react-three/fiber'
 import { NeutralToneMapping } from 'three'
 import type { OwnedCar } from '../game/store'
 import { carDef } from '../game/data'
-import { ITEMS, KartRace, LAPS, buildTrack, type KartEvent, type TrackDef } from '../game/kart'
+import { EMP_TIME, FLAT_TIME, ITEMS, KartRace, LAPS, SMOKE_TIME, TOW_TIME, buildTrack, type ItemId, type KartEvent, type TrackDef } from '../game/kart'
 import { KartScene, kartLights, type KartHud } from '../scene/KartScene'
 import type { ChaseCar } from '../scene/ChaseScene'
 import { CarThumb } from '../scene/BuildingPreview'
@@ -11,7 +11,7 @@ import { KeyHints, TouchDrive, newDriveInput, useDriveKeys, useTall, useTouchDev
 import { LoadingScene } from './Loading'
 import { look as lookOf, pi } from './ArcadeBits'
 import { sfx, audioContext, audioOut } from '../lib/sound'
-import { bumpSound, crashSound, dingSound, landSound } from '../lib/arcadeSound'
+import { airSound, buzzSound, bumpSound, crashSound, dingSound, fuelSound, landSound } from '../lib/arcadeSound'
 import { EngineVoice } from '../lib/engineAudio'
 import './kart.css'
 
@@ -92,6 +92,11 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
       else if (e.kind === 'turbo') { dingSound(e.value === 2 ? 1.8 : 1.5); engine.current?.rev(0.5) }
       else if (e.kind === 'boost') engine.current?.rev(0.7)
       else if (e.kind === 'land') landSound()
+      else if (e.kind === 'flat') { bumpSound(); airSound() }
+      else if (e.kind === 'smoke') fuelSound()
+      else if (e.kind === 'zap') buzzSound()
+      else if (e.kind === 'tow') dingSound(2)
+      else if (e.kind === 'block') dingSound(2.4)
       else if (e.kind === 'lap') { dingSound(1); setFlash(e.value === LAPS ? 'FINAL LAP!' : `LAP ${e.value}`) }
     }
   }
@@ -108,9 +113,11 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
     }, 1400)
   }
 
-  const item = hud?.item ? ITEMS[hud.item as keyof typeof ITEMS] : null
+  const item = hud?.item ? ITEMS[hud.item as ItemId] : null
+  const dead = !!hud && hud.fx.emp > 0 // a static storm locks the item slot
+  const slot = item ? <Roulette key={hud!.item} icon={item.icon} /> : null
   return (
-    <div className={`race-full kt${tall ? ' tall' : ' wide'}`}>
+    <div className={`race-full kt${tall ? ' tall' : ' wide'}${dead ? ' dead' : ''}`}>
       <Canvas className="rf-canvas" camera={{ fov: 60, near: 0.3, far: 420 }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
         <KartScene race={race} looks={looks} me={me} input={input} running={running && !end} onHud={setHud} onEvents={onEvents} onFinish={finish} />
       </Canvas>
@@ -128,16 +135,55 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
           </div>
           <MiniMap race={race} hud={hud} />
           {!touch && (
-            <div className={`kt-slot${item ? ' full' : ''}`} aria-label={item ? item.name : 'No item'}>{item ? item.icon : ''}</div>
+            <div className={`kt-slot${item ? ' full' : ''}${dead ? ' dead' : ''}`} aria-label={item ? item.name : 'No item'}>{slot}</div>
           )}
           {hud.charge > 0 && <div className={`kt-charge${hud.charge >= 1.7 ? ' orange' : hud.charge >= 0.75 ? ' blue' : ''}`}><i style={{ width: `${Math.min(100, (hud.charge / 1.7) * 100)}%` }} /></div>}
           {hud.wrong && <div className="kt-wrong">↩ WRONG WAY</div>}
+          <Effects fx={hud.fx} />
         </>
       )}
       {flash && <div key={flash} className="kt-flash">{flash}</div>}
-      {!end && running && (touch ? <TouchDrive input={input} tall={tall} item={item ? item.icon : null} /> : <KeyHints />)}
+      {!end && running && (touch ? <TouchDrive input={input} tall={tall} item={slot} /> : <KeyHints />)}
       {end && <Podium race={race} field={field} end={end} prize={prize} next={next} onExit={onExit} />}
     </div>
+  )
+}
+
+// A fresh item spins through the reel for a moment before it lands.
+const REEL = Object.values(ITEMS).map((i) => i.icon)
+function Roulette({ icon }: { icon: string }) {
+  const [n, setN] = useState(0)
+  useEffect(() => {
+    if (n >= 8) return
+    const id = setTimeout(() => setN(n + 1), 55 + n * 12)
+    return () => clearTimeout(id)
+  }, [n])
+  return <span className={n >= 8 ? 'kt-got' : 'kt-reel'}>{n >= 8 ? icon : REEL[(n * 3) % REEL.length]}</span>
+}
+
+// What's on the player right now: a badge per effect with a ring that runs down,
+// plus the smoke haze and the static crackle across the screen.
+const FX: { key: keyof KartHud['fx']; icon: string; full: number; bad: boolean }[] = [
+  { key: 'flat', icon: '📌', full: FLAT_TIME, bad: true },
+  { key: 'smoke', icon: '💨', full: SMOKE_TIME, bad: true },
+  { key: 'emp', icon: '⚡', full: EMP_TIME, bad: true },
+  { key: 'tow', icon: '🧲', full: TOW_TIME, bad: false },
+  { key: 'shield', icon: '🫧', full: 8, bad: false },
+]
+function Effects({ fx }: { fx: KartHud['fx'] }) {
+  const on = FX.filter((f) => fx[f.key] > 0)
+  return (
+    <>
+      {fx.smoke > 0 && <div className="kt-haze" style={{ opacity: Math.min(1, fx.smoke / SMOKE_TIME + 0.35) }} />}
+      {fx.emp > 0 && <div className="kt-zap" />}
+      {on.length > 0 && (
+        <div className="kt-fx">
+          {on.map((f) => (
+            <span key={f.key} className={f.bad ? 'bad' : 'good'} style={{ ['--left' as string]: `${Math.min(1, fx[f.key] / f.full) * 360}deg` }}>{f.icon}</span>
+          ))}
+        </div>
+      )}
+    </>
   )
 }
 
