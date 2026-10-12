@@ -556,6 +556,18 @@ const SHAPES = {
 }
 // Snap an angle to the nearest face-up/face-down orientation.
 const flatOf = (a: number) => Math.round(a / Math.PI) * Math.PI
+// What a thrown coin lands on at (x, z): the crate's floor, one of the four sides lying open
+// around it (hinged 0.15 up, tipped just short of flat so the far end rises a little), the lift
+// or the depot floor.
+const CRATE_FLOOR = LIFT + 0.15
+function groundAt(x: number, z: number) {
+  const ax = Math.abs(x), az = Math.abs(z)
+  const h = S / 2
+  if (ax < h && az < h) return CRATE_FLOOR
+  const out = ax >= h && az < h ? ax - h : az >= h && ax < h ? az - h : -1
+  if (out >= 0 && out < S) return CRATE_FLOOR + 0.08 + out * 0.07
+  return Math.hypot(x, z) < 1.5 ? LIFT : 0
+}
 function CoinBurst({ start, gems = false }: { start: React.RefObject<number | null>; gems?: boolean }) {
   const { r: COIN_R, h: COIN_H } = SHAPES[gems ? 'gem' : 'coin']
   const ref = useRef<InstancedMesh>(null)
@@ -591,7 +603,7 @@ function CoinBurst({ start, gems = false }: { start: React.RefObject<number | nu
         return
       }
       if (!c.live) Object.assign(c, { live: true, x: 0, y: S * 0.8, z: 0, sx: c.vx, sy: c.vy, sz: c.vz, wx: c.flip, wz: c.wob, bounces: 0, rest: false })
-      const floor = Math.hypot(c.x, c.z) < 1.5 ? LIFT : 0
+      const floor = groundAt(c.x, c.z)
       if (!c.rest) {
         c.sy -= 14 * dt
         c.x += c.sx * dt
@@ -617,8 +629,16 @@ function CoinBurst({ start, gems = false }: { start: React.RefObject<number | nu
         const k = 1 - Math.exp(-12 * dt)
         c.sx *= 1 - Math.min(1, 6 * dt)
         c.sz *= 1 - Math.min(1, 6 * dt)
-        c.x += c.sx * dt
-        c.z += c.sz * dt
+        const nx = c.x + c.sx * dt, nz = c.z + c.sz * dt
+        const under = groundAt(nx, nz)
+        // It follows a gentle slope, stops against a step up and drops off an edge again.
+        if (under > c.fl + 0.04) c.sx = c.sz = 0
+        else {
+          c.x = nx
+          c.z = nz
+          if (under < c.fl - 0.04) Object.assign(c, { rest: false, sy: 0, bounces: 2 })
+          else c.fl = under
+        }
         c.rx += (flatOf(c.rx) - c.rx) * k
         c.rz += (flatOf(c.rz) - c.rz) * k
         const reach = COIN_R * Math.min(1, Math.hypot(Math.sin(c.rx), Math.sin(c.rz))) + COIN_H / 2
