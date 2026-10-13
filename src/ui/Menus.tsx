@@ -28,6 +28,7 @@ import { useChat } from '../lib/chat'
 import { useRivalWaiting } from './Rivals'
 import { ShowcaseToggle } from './Meet'
 import { tutTarget, tutorialShowing, type TutTarget } from './Tutorial'
+import { buildingIcon } from './buildingIcons'
 import { useTipTarget, type TipTarget } from './Tips'
 import { setFreeCam, useFreeCam } from '../scene/freeCam'
 import { Confirm, useAsk } from './Confirm'
@@ -432,11 +433,16 @@ export function SkillTag({ model }: { model: string }) {
   return <span className="skill-tag" title={SKILLS[sk].text}>{SKILLS[sk].icon} {SKILLS[sk].name}</span>
 }
 
-// The businesses a car loves to drive for, e.g. "❤️ Pizza Place, Donut Shop".
+// The businesses a car loves to drive for, as one row of icons: ❤️ 🍕 🍩 🎬.
 export function LovesTag({ model }: { model: string }) {
   const likes = carDef(model).likes
   if (!likes.length) return null
-  return <div className="loves-tag" title="Assign it to one of these for +25% coins per job">❤️ {likes.map((id) => buildingDef(id).name).join(', ')}</div>
+  const names = likes.map((id) => buildingDef(id).name)
+  return (
+    <div className="loves-tag" title={`+25% coins per job at: ${names.join(', ')}`} aria-label={`Loves ${names.join(', ')}`}>
+      ❤️{likes.map((id, i) => <span key={id} className="loves-ico" title={names[i]}>{buildingIcon(id)}</span>)}
+    </div>
+  )
 }
 
 // Where a car works, or which businesses it would love to.
