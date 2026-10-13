@@ -1,6 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Canvas } from '@react-three/fiber'
-import { NeutralToneMapping } from 'three'
 import { raceCarOf } from '../game/raceCar'
 import { useGame, type OwnedCar } from '../game/store'
 import { CARS, CLAN_COLORS, CLAN_EMBLEMS, CREW_CHEST, carDef, msToNextWeek, payAt } from '../game/data'
@@ -17,7 +15,10 @@ import { PlayerName } from './Username'
 import { LoadingScene } from './Loading'
 import { Crest } from './CrewHub'
 import { artStyle } from './venueArt'
-import { useCanvasDpr } from '../lib/prefs'
+import { StageSlot, useStageReady } from '../scene/Stage'
+
+// Drawn in the shared full-screen canvas (scene/Stage.tsx), not a new one each visit.
+const BATTLE_CAM = { position: [0, 1.1, -5] as [number, number, number], fov: 55, near: 0.3, far: 150 }
 
 // Crew battles: a strip in the Crew window and the full-screen showdown, where the two crews' cars
 // face off at the start line of the week's venue with the live score and both rosters docked below.
@@ -176,7 +177,6 @@ function NoCrew({ onFind, children }: { onFind: () => void; children?: React.Rea
 }
 
 export function BattlePanel() {
-  const dpr = useCanvasDpr()
   const battle = useCrewBattle((s) => s.battle)
   const cars = useGame((s) => s.cars)
   const openPanel = useGame((s) => s.openPanel)
@@ -189,6 +189,14 @@ export function BattlePanel() {
   const rival = useMemo(() => (car && b ? rivalCar(car, b.them.tag) : null), [car, b])
   // Rival crew members in the live lobby right now, by account: they can be challenged here.
   const online = useMemo(() => new Map(players.filter((p) => p.uid).map((p) => [p.uid as string, p.id])), [players])
+  // Memoised so the clock's tick each second doesn't redraw the scene.
+  const scene = useMemo(() => !b || !car || !rival ? null : (
+    <BattleScene venue={venueOf(b.venue)} lead={b.us.score - b.them.score}
+      mine={{ body: carDef(car.model).body, model: car.model, color: car.color, finish: car.finish, skin: car.skin, modSkin: car.modSkin, panels: car.panels, mods: car.mods, hat: car.hat }}
+      theirs={{ body: rival.body, model: rival.id, color: b.them.color }}
+      us={{ tag: b.us.tag, color: b.us.color }} them={{ tag: b.them.tag, color: b.them.color }} />
+  ), [b, car, rival])
+  const stageReady = useStageReady()
   useEffect(() => {
     if (!battle) refreshCrewBattle()
   }, [battle])
@@ -205,17 +213,11 @@ export function BattlePanel() {
   }
   const me = demoBattle() ? 'me' : signedInUser()
   const v = venueOf(b.venue)
-  const lead = b.us.score - b.them.score
   const rec = battle!.record
   return (
     <div className="race-full cb-full">
-      <Canvas className="rf-canvas" camera={{ position: [0, 1.1, -5], fov: 55, near: 0.3, far: 150 }} dpr={dpr} gl={{ toneMapping: NeutralToneMapping }}>
-        <BattleScene venue={v} lead={lead}
-          mine={{ body: carDef(car.model).body, model: car.model, color: car.color, finish: car.finish, skin: car.skin, modSkin: car.modSkin, panels: car.panels, mods: car.mods, hat: car.hat }}
-          theirs={{ body: rival.body, model: rival.id, color: b.them.color }}
-          us={{ tag: b.us.tag, color: b.us.color }} them={{ tag: b.them.tag, color: b.them.color }} />
-      </Canvas>
-      <LoadingScene key="cb" label="Finding your rival crew" onClose={close} />
+      <StageSlot cam={BATTLE_CAM}>{scene}</StageSlot>
+      <LoadingScene key="cb" ready={stageReady} label="Finding your rival crew" onClose={close} />
       <div className="rf-top">
         <h2>⚔️ Crew Battle</h2>
         <button className="close" onClick={close} aria-label="Close"><Icon name="close" size={16} /></button>

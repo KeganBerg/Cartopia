@@ -1,6 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
-import { Canvas } from '@react-three/fiber'
-import { NeutralToneMapping } from 'three'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGame, type OwnedCar } from '../game/store'
 import { bestCar, raceCarOf } from '../game/raceCar'
 import { carDef } from '../game/data'
@@ -13,11 +11,16 @@ import { KeyHints, TouchDrive, newDriveInput, useDriveKeys, useTall, useTouchDev
 import { CarThumb } from '../scene/BuildingPreview'
 import { Panel } from './Menus'
 import { sfx } from '../lib/sound'
-import { Countdown, Result, look, payFuel, pi } from './ArcadeBits'
+import { Countdown, Result, look, payFuel, pi, useStable } from './ArcadeBits'
 import { STAR_GAMES, StarGame } from './ArcadeMore'
 import { loadStars, type StarGameId } from '../game/arcadeMore'
 import { LoadingScene } from './Loading'
-import { useCanvasDpr } from '../lib/prefs'
+import { StageSlot, useStageReady } from '../scene/Stage'
+
+// Both games draw in the shared full-screen canvas (scene/Stage.tsx): no new WebGL
+// context and shader compile on every run.
+const CHASE_CAM = { position: [0, 4.4, 8.5] as [number, number, number], fov: 55, near: 0.3, far: 160 }
+const PARK_CAM = { position: [0, 20, 5] as [number, number, number], fov: 40, near: 0.5, far: 120 }
 
 type Playing = { game: 'chase' } | { game: 'park'; lot: number } | { game: 'star'; id: StarGameId }
 
@@ -106,7 +109,6 @@ export function ArcadePanel() {
 }
 
 function ChaseGame({ car, onExit }: { car: OwnedCar; onExit: () => void }) {
-  const dpr = useCanvasDpr()
   const level = useGame((s) => s.level)
   const finish = useGame((s) => s.finishArcade)
   const input = useRef<ChaseInput>({ moves: [] }).current
@@ -137,7 +139,7 @@ function ChaseGame({ car, onExit }: { car: OwnedCar; onExit: () => void }) {
   }, [input, keys])
   const down = useRef<{ x: number; done: boolean } | null>(null)
 
-  const busted = (dist: number, coins: number) => {
+  const busted = useStable((dist: number, coins: number) => {
     const score = chaseScore(dist, coins)
     const pay = chaseReward(score, level)
     const b = loadBests()
@@ -147,7 +149,9 @@ function ChaseGame({ car, onExit }: { car: OwnedCar; onExit: () => void }) {
     if (record) sfx.win()
     else sfx.lose()
     setEnd({ score, ...pay, record })
-  }
+  })
+  const scene = useMemo(() => <ChaseScene me={look(car)} input={input} running={running} onHud={setHud} onBusted={busted} />, [car, input, running, busted])
+  const stageReady = useStageReady()
   const again = () => {
     if (!payFuel('a getaway')) return
     input.moves.length = 0
@@ -173,10 +177,8 @@ function ChaseGame({ car, onExit }: { car: OwnedCar; onExit: () => void }) {
         input.moves.push(e.clientX > window.innerWidth / 2 ? 1 : -1)
       }}
     >
-      <Canvas key={`scene${run}`} className="rf-canvas" camera={{ position: [0, 4.4, 8.5], fov: 55, near: 0.3, far: 160 }} dpr={dpr} gl={{ toneMapping: NeutralToneMapping }}>
-        <ChaseScene me={look(car)} input={input} running={running} onHud={setHud} onBusted={busted} />
-      </Canvas>
-      <LoadingScene key={`load${run}`} label="Getting away" onReady={() => setDrawn(run)} onClose={onExit} />
+      <StageSlot key={`scene${run}`} cam={CHASE_CAM}>{scene}</StageSlot>
+      <LoadingScene key={`load${run}`} ready={stageReady} label="Getting away" onReady={() => setDrawn(run)} onClose={onExit} />
       <div className="rf-top">
         <h2>🚓 Getaway Chase</h2>
         <button className="close" onClick={onExit} aria-label="Close">✕</button>
@@ -203,7 +205,6 @@ function ChaseGame({ car, onExit }: { car: OwnedCar; onExit: () => void }) {
 }
 
 function ParkGame({ car, lot, onExit, onLot }: { car: OwnedCar; lot: number; onExit: () => void; onLot: (lot: number) => void }) {
-  const dpr = useCanvasDpr()
   const level = useGame((s) => s.level)
   const finish = useGame((s) => s.finishArcade)
   const def = PARK_LOTS[lot]
@@ -217,7 +218,7 @@ function ParkGame({ car, lot, onExit, onLot }: { car: OwnedCar; lot: number; onE
   const [hud, setHud] = useState<ParkHud>({ time: 0, bumps: 0, inSpot: false })
   const [end, setEnd] = useState<(ParkEnd & { stars: number; coins: number; xp: number }) | null>(null)
 
-  const done = (e: ParkEnd) => {
+  const done = useStable((e: ParkEnd) => {
     const stars = e.parked ? parkStars(e.time, e.bumps, def.par) : 0
     const pay = parkReward(lot, stars, level)
     if (stars) {
@@ -229,7 +230,9 @@ function ParkGame({ car, lot, onExit, onLot }: { car: OwnedCar; lot: number; onE
       sfx.win()
     } else sfx.lose()
     setEnd({ ...e, stars, ...pay })
-  }
+  })
+  const scene = useMemo(() => <ParkScene lot={def} me={look(car)} input={input} running={running} onHud={setHud} onEnd={done} />, [def, car, input, running, done])
+  const stageReady = useStageReady()
   const restart = (next = lot) => {
     if (!payFuel('a parking run')) return
     Object.assign(input, { steer: 0, gas: 0, brake: 0 })
@@ -243,10 +246,8 @@ function ParkGame({ car, lot, onExit, onLot }: { car: OwnedCar; lot: number; onE
 
   return (
     <div className="race-full arc-full park">
-      <Canvas key={`scene${lot}-${run}`} className="rf-canvas" camera={{ fov: 40, near: 0.5, far: 120, position: [0, 20, 5] }} dpr={dpr} gl={{ toneMapping: NeutralToneMapping }}>
-        <ParkScene lot={def} me={look(car)} input={input} running={running} onHud={setHud} onEnd={done} />
-      </Canvas>
-      <LoadingScene key={`load${lot}-${run}`} label={`Driving to ${def.name}`} onReady={() => setDrawn(`${lot}-${run}`)} onClose={onExit} />
+      <StageSlot key={`scene${lot}-${run}`} cam={PARK_CAM}>{scene}</StageSlot>
+      <LoadingScene key={`load${lot}-${run}`} ready={stageReady} label={`Driving to ${def.name}`} onReady={() => setDrawn(`${lot}-${run}`)} onClose={onExit} />
       <div className="rf-top">
         <h2>🅿️ {lot + 1}. {def.name}</h2>
         <button className="close" onClick={onExit} aria-label="Close">✕</button>

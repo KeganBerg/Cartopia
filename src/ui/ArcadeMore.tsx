@@ -1,6 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
-import { Canvas } from '@react-three/fiber'
-import { NeutralToneMapping } from 'three'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGame, type OwnedCar } from '../game/store'
 import { ARCADE_FUEL } from '../game/arcade'
 import {
@@ -8,14 +6,14 @@ import {
   dashStars, pitStars, recordStars, starReward, stuntStars, washStars, type StarGameId,
 } from '../game/arcadeMore'
 import { PitScene, type PitEnd, type PitHud, type PitInput } from '../scene/PitScene'
-import { WashScene, type WashHud, type WashInput } from '../scene/WashScene'
-import { DeliveryScene, type DashHud } from '../scene/DeliveryScene'
-import { StuntScene, type StuntHud, type StuntInput } from '../scene/StuntScene'
+import { WashScene, type WashEnd, type WashHud, type WashInput } from '../scene/WashScene'
+import { DeliveryScene, type DashEnd, type DashHud } from '../scene/DeliveryScene'
+import { StuntScene, type StuntEnd, type StuntHud, type StuntInput } from '../scene/StuntScene'
 import { KeyHints, TouchDrive, newDriveInput, useDriveKeys, useTall, useTouchDevice } from './DriveControls'
-import { Countdown, Result, look, payFuel } from './ArcadeBits'
+import { Countdown, Result, look, payFuel, useStable } from './ArcadeBits'
 import { sfx } from '../lib/sound'
 import { LoadingScene } from './Loading'
-import { useCanvasDpr } from '../lib/prefs'
+import { StageSlot, useStageReady } from '../scene/Stage'
 
 // The second wave of arcade games. Each runs inside one shell that handles the
 // fuel, the countdown, star pay and the result card.
@@ -30,7 +28,13 @@ export const STAR_GAMES: { id: StarGameId; name: string; art: string; tip: strin
 type Done = (stars: number, result: number, line: string) => void
 type GameProps = { car: OwnedCar; running: boolean; onDone: Done }
 
-const gl = { toneMapping: NeutralToneMapping }
+// Each game draws in the shared full-screen canvas (scene/Stage.tsx), so a retry or the
+// next game doesn't make a new WebGL context and compile every shader again.
+type Cam = { position: [number, number, number]; fov: number; near: number; far: number }
+const PIT_CAM: Cam = { fov: 45, near: 0.3, far: 140, position: [0, 8, 7] }
+const WASH_CAM: Cam = { fov: 45, near: 0.2, far: 80, position: [0, 2, 6] }
+const DASH_CAM: Cam = { fov: 50, near: 0.3, far: 120, position: [0, 14, 10] }
+const STUNT_CAM: Cam = { fov: 50, near: 0.3, far: 160, position: [-10, 4, 14] }
 
 export function StarGame({ id, car, onExit }: { id: StarGameId; car: OwnedCar; onExit: () => void }) {
   const level = useGame((s) => s.level)
@@ -56,12 +60,13 @@ export function StarGame({ id, car, onExit }: { id: StarGameId; car: OwnedCar; o
     setRunning(false)
     setRun((r) => r + 1)
   }
+  const stageReady = useStageReady()
   const Game = { pit: PitGame, wash: WashGame, delivery: DeliveryGame, stunt: StuntGame }[id]
 
   return (
     <div className={`race-full arc-full arc-${id}`}>
       <Game key={run} car={car} running={running && !end} onDone={done} />
-      <LoadingScene key={`load${run}`} label={`Opening ${meta.name}`} onReady={() => setDrawn(run)} onClose={onExit} />
+      <LoadingScene key={`load${run}`} ready={stageReady} label={`Opening ${meta.name}`} onReady={() => setDrawn(run)} onClose={onExit} />
       <div className="rf-top">
         <h2>{meta.art.slice(0, 2)} {meta.name}</h2>
         <button className="close" onClick={onExit} aria-label="Close">✕</button>
@@ -97,14 +102,15 @@ const pitLine = (e: PitEnd) =>
   `⏱ ${e.time.toFixed(1)}s · ${e.grade === 'perfect' ? '🎯' : e.grade === 'good' ? '👍' : '😬'} ${e.grade === 'perfect' ? 'Perfect stop' : e.grade === 'good' ? 'Good stop' : 'Pushed'} · ⚡ ${e.react.toFixed(2)}s${e.slips ? ` · ${e.slips} slip${e.slips > 1 ? 's' : ''}` : ''}`
 
 function PitGame({ car, running, onDone }: GameProps) {
-  const dpr = useCanvasDpr()
   const input = useRef<PitInput>({ pedal: false, presses: 0, taps: [], pads: [] }).current
   const [hud, setHud] = useState<PitHud>({ phase: 'in', left: 4, time: 0, pop: null, calling: false })
   const [pop, setPop] = useState<PitHud['pop']>(null)
-  const onHud = (h: PitHud) => {
+  const onHud = useStable((h: PitHud) => {
     setHud(h)
     if (h.pop) setPop(h.pop)
-  }
+  })
+  const onEnd = useStable((e: PitEnd) => onDone(pitStars(e.time), Math.round(e.time * 10) / 10, pitLine(e)))
+  const scene = useMemo(() => <PitScene me={look(car)} input={input} running={running} onHud={onHud} onEnd={onEnd} />, [car, input, running, onHud, onEnd])
   useEffect(() => {
     const kd = (e: KeyboardEvent) => {
       if (e.key !== ' ') return
@@ -120,9 +126,7 @@ function PitGame({ car, running, onDone }: GameProps) {
   const pedal = running && (hud.phase === 'in' || hud.phase === 'hold' || hud.phase === 'green')
   return (
     <>
-      <Canvas className="rf-canvas" camera={{ fov: 45, near: 0.3, far: 140, position: [0, 8, 7] }} dpr={dpr} gl={gl}>
-        <PitScene me={look(car)} input={input} running={running} onHud={onHud} onEnd={(e) => onDone(pitStars(e.time), Math.round(e.time * 10) / 10, pitLine(e))} />
-      </Canvas>
+      <StageSlot cam={PIT_CAM}>{scene}</StageSlot>
       {/* Brake and go: hold or tap anywhere, with the big button as the picture of it. */}
       {pedal && <div className="pit-pedal" {...holdTo((on) => { if (on) input.presses++; input.pedal = on })} />}
       {[0, 1, 2, 3].map((i) => (
@@ -146,11 +150,12 @@ function PitGame({ car, running, onDone }: GameProps) {
 }
 
 function WashGame({ car, running, onDone }: GameProps) {
-  const dpr = useCanvasDpr()
   const input = useRef<WashInput>({ x: 0, y: 0, down: false, moved: 0 }).current
   const [hud, setHud] = useState<WashHud>({ left: WASH_SPOTS, time: WASH_TIME })
   const [sponge, setSponge] = useState<{ x: number; y: number } | null>(null)
   const box = useRef<HTMLDivElement>(null)
+  const onEnd = useStable((e: WashEnd) => onDone(washStars(e.cleaned, WASH_SPOTS, e.timeLeft), e.cleaned === WASH_SPOTS ? Math.round(e.timeLeft) : 0, `🧽 ${e.cleaned}/${WASH_SPOTS} · ⏱ ${Math.round(e.timeLeft)}s left`))
+  const scene = useMemo(() => <WashScene me={look(car)} input={input} running={running} onHud={setHud} onEnd={onEnd} />, [car, input, running, onEnd])
   const at = (e: React.PointerEvent) => {
     const r = box.current!.getBoundingClientRect()
     return { x: e.clientX - r.left, y: e.clientY - r.top }
@@ -170,10 +175,7 @@ function WashGame({ car, running, onDone }: GameProps) {
         onPointerCancel={() => { input.down = false; setSponge(null) }}
         onPointerLeave={() => { input.down = false; setSponge(null) }}
       >
-        <Canvas className="rf-canvas" camera={{ fov: 45, near: 0.2, far: 80, position: [0, 2, 6] }} dpr={dpr} gl={gl}>
-          <WashScene me={look(car)} input={input} running={running} onHud={setHud}
-            onEnd={(e) => onDone(washStars(e.cleaned, WASH_SPOTS, e.timeLeft), e.cleaned === WASH_SPOTS ? Math.round(e.timeLeft) : 0, `🧽 ${e.cleaned}/${WASH_SPOTS} · ⏱ ${Math.round(e.timeLeft)}s left`)} />
-        </Canvas>
+        <StageSlot cam={WASH_CAM}>{scene}</StageSlot>
         {sponge && <div className="arc-sponge" style={{ left: sponge.x, top: sponge.y }}>🧽</div>}
       </div>
       <div className="arc-hud">
@@ -186,18 +188,16 @@ function WashGame({ car, running, onDone }: GameProps) {
 }
 
 function DeliveryGame({ car, running, onDone }: GameProps) {
-  const dpr = useCanvasDpr()
   const input = useRef(newDriveInput()).current
   const [hud, setHud] = useState<DashHud>({ drops: 0, time: DASH_TIME, carrying: false })
   const touch = useTouchDevice()
   const tall = useTall()
   useDriveKeys(input)
+  const onEnd = useStable((e: DashEnd) => onDone(dashStars(e.drops), e.drops, `🍕 ${e.drops} delivered`))
+  const scene = useMemo(() => <DeliveryScene me={look(car)} input={input} running={running} onHud={setHud} onEnd={onEnd} />, [car, input, running, onEnd])
   return (
     <>
-      <Canvas className="rf-canvas" camera={{ fov: 50, near: 0.3, far: 120, position: [0, 14, 10] }} dpr={dpr} gl={gl}>
-        <DeliveryScene me={look(car)} input={input} running={running} onHud={setHud}
-          onEnd={(e) => onDone(dashStars(e.drops), e.drops, `🍕 ${e.drops} delivered`)} />
-      </Canvas>
+      <StageSlot cam={DASH_CAM}>{scene}</StageSlot>
       <div className="arc-hud">
         <span className={hud.time < 8 ? 'arc-time low' : 'arc-time'}>⏱ {Math.ceil(hud.time)}s</span>
         <span className={hud.carrying ? 'arc-spot in' : 'arc-spot'}>{hud.carrying ? '🏠 Deliver' : '🍕 Pick up'}</span>
@@ -209,7 +209,6 @@ function DeliveryGame({ car, running, onDone }: GameProps) {
 }
 
 function StuntGame({ car, running, onDone }: GameProps) {
-  const dpr = useCanvasDpr()
   const input = useRef<StuntInput>({ down: false }).current
   const [hud, setHud] = useState<StuntHud>({ jump: 1, score: 0, power: 0, phase: 'aim', last: null })
   useEffect(() => {
@@ -219,16 +218,15 @@ function StuntGame({ car, running, onDone }: GameProps) {
     window.addEventListener('keyup', ku)
     return () => { window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku) }
   }, [input])
+  const onEnd = useStable((e: StuntEnd) => onDone(stuntStars(e.score), e.score, `🔥 ${e.score.toLocaleString()} pts`))
+  const scene = useMemo(() => <StuntScene me={look(car)} input={input} running={running} onHud={setHud} onEnd={onEnd} />, [car, input, running, onEnd])
   const showLast = hud.last && (hud.phase === 'roll' || hud.phase === 'crash')
   return (
     <div className="arc-scrub"
       onPointerDown={(e) => { if (!(e.target as HTMLElement).closest('button')) input.down = true }}
       onPointerUp={() => { input.down = false }}
       onPointerCancel={() => { input.down = false }}>
-      <Canvas className="rf-canvas" camera={{ fov: 50, near: 0.3, far: 160, position: [-10, 4, 14] }} dpr={dpr} gl={gl}>
-        <StuntScene me={look(car)} input={input} running={running} onHud={setHud}
-          onEnd={(e) => onDone(stuntStars(e.score), e.score, `🔥 ${e.score.toLocaleString()} pts`)} />
-      </Canvas>
+      <StageSlot cam={STUNT_CAM}>{scene}</StageSlot>
       <div className="arc-hud">
         <span>🏁 {hud.jump}/{STUNT_JUMPS}</span>
         <span className="arc-score">{hud.score.toLocaleString()}</span>
