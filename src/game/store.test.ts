@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useGame, readyRewards, today, buildPrice, paintPrice } from './store'
 import { boostsSpent } from './boosts'
 import { CAMPAIGN, CAMPAIGN_RACES, DEALS, DEAL_SLOTS, buildingDef, campaignReward, carDef, dealOffer, dealsFor, finishDef, modDef, upgradeCost, xpToNext } from './data'
@@ -92,7 +92,11 @@ describe('welcome back report', () => {
 
 describe('campaign', () => {
   const g = () => useGame.getState()
-  const start = () => useGame.setState((s) => ({ level: 20, xp: 0, coins: 0, bucks: 0, trophies: 0, campaign: {}, campaignPrize: null, levelUp: null, boosts: s.boosts && { ...s.boosts, streak: 0 } }))
+  // On a weekday, with today's first-win bonus already taken, so payouts are the plain rewards.
+  const MON = Date.UTC(2026, 9, 12, 12)
+  beforeEach(() => void vi.spyOn(Date, 'now').mockReturnValue(MON))
+  afterEach(() => vi.restoreAllMocks())
+  const start = () => useGame.setState({ level: 20, xp: 0, coins: 0, bucks: 0, trophies: 0, campaign: {}, campaignPrize: null, levelUp: null, boosts: boostsSpent(MON) })
 
   it('pays the full reward for a first win and less for a replay', () => {
     start()

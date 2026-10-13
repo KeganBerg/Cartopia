@@ -49,7 +49,6 @@ describe('tunerResult', () => {
     vi.spyOn(Date, 'now').mockReturnValue(Date.UTC(2026, 9, 12, 12))
     useGame.setState({ coins: 0, tuner: {}, tunerPrize: null, levelUp: null, boosts: boostsSpent(Date.UTC(2026, 9, 12, 12)) })
     g().tunerResult(t.id, true)
-    vi.restoreAllMocks()
     expect(g().coins).toBe(tunerPrize(t, true))
     expect(g().tuner).toEqual({ downforce: 1 })
     expect(g().tunerPrize).toBe('downforce')
@@ -58,6 +57,7 @@ describe('tunerResult', () => {
     g().tunerResult(t.id, true)
     expect(g().coins).toBe(tunerPrize(t, true) + tunerPrize(t, false))
     expect(g().tunerPrize).toBeNull()
+    vi.restoreAllMocks()
   })
   it('counts nothing for a loss', () => {
     useGame.setState({ tuner: {}, tunerPrize: null })
