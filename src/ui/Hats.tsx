@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useGame, type OwnedCar } from '../game/store'
 import { COWBOY_COLORS, HATS, HAT_PAINTS, cleanHat, hatChoices, hatDef, hatPaint, hatProgress, ownedHats, sameHat, type HatDef, type HatFit } from '../game/hats'
+import { carClass } from '../game/classes'
 import { HatThumb } from '../scene/BuildingPreview'
 
 // undefined: not trying anything; null: trying no hat.
@@ -12,8 +13,10 @@ const COLOUR_NAMES: Record<string, string> = {
 }
 
 // How a hat you don't have is won: its challenge's icon and progress, or 📦 for crates only.
+// A class-only challenge also shows the class icon (💪 for Muscle).
 function how(d: HatDef, n: number) {
-  return d.challenge ? `${d.challenge.icon} ${Math.min(n, d.challenge.goal)}/${d.challenge.goal}` : '🔒 📦'
+  const c = d.challenge
+  return c ? `${c.icon}${c.cls ? carClass(c.cls).icon : ''} ${Math.min(n, c.goal)}/${c.goal}` : '🔒 📦'
 }
 // The tooltip: the challenge, and the crates it drops from.
 function hint(d: HatDef) {
