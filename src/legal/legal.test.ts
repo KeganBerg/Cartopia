@@ -20,6 +20,10 @@ describe('legal pages', () => {
     expect(JSON.stringify(TERMS)).toMatch(/no real-world value/)
   })
 
+  it('have no [BRACKETED] placeholders left', () => {
+    for (const doc of [TERMS, PRIVACY]) expect(legalHtml(doc, doc)).not.toMatch(/\[[A-Z ]+\]/)
+  })
+
   it('escapes text', () => {
     const doc = { ...TERMS, intro: '<b>&' }
     expect(legalHtml(doc, PRIVACY)).toContain('&lt;b&gt;&amp;')
