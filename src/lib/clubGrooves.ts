@@ -7,8 +7,8 @@
 export type Tone = 'organ' | 'piano' | 'chop' | 'pad'
 export type KickTone = 'house' | 'punch' | 'hard' | 'boom'
 export type SnareTone = 'clap' | 'snare' | 'rim'
-export type BassTone = 'saw' | 'square' | 'sub' | 'reese' | 'wobble'
-export type LeadTone = 'supersaw' | 'pluck' | 'square' | 'bell' | 'brass'
+export type BassTone = 'saw' | 'square' | 'sub' | 'reese' | 'wobble' | 'log'
+export type LeadTone = 'supersaw' | 'pluck' | 'square' | 'bell' | 'brass' | 'marimba' | 'vox'
 export type Groove = {
   name: string
   bpm: number
@@ -102,8 +102,8 @@ export const GROOVES: Groove[] = [
     closedHats: 'all',
     gain: 1,
   },
-  // UK garage: a skippy two-step kick, heavy swing, long rolling bass notes,
-  // short organ hits and chopped-up vocal-like plucks in D minor.
+  // UK garage: a skippy two-step kick, heavy swing, a growling speed-garage bass,
+  // short organ hits and chopped-up vocal "ah"/"oh" hits in D minor.
   {
     name: 'Garage',
     bpm: 132,
@@ -116,6 +116,7 @@ export const GROOVES: Groove[] = [
     ],
     bass: [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 1, 0, 0],
     bassLen: 2.6,
+    bassTone: 'reese',
     stabs: [[2, 7, 10], [2, 7], [2, 7, 10], [2, 7, 13]],
     stabLen: 1.1,
     tone: 'organ',
@@ -124,8 +125,8 @@ export const GROOVES: Groove[] = [
     snare: 'snare',
     openHats: off,
     closedHats: 'all',
-    lead: { root: hz('D4'), notes: tune({ 3: 12, 5: 10, 9: 7, 13: 3 }, { 3: 10, 5: 8, 9: 5, 13: 3 }, { 3: 12, 5: 8, 9: 10, 13: 7 }, { 3: 11, 5: 7, 9: 4, 11: 7, 13: 9 }), len: 1.2, tone: 'pluck' },
-    gain: 1,
+    lead: { root: hz('D4'), notes: tune({ 3: 12, 5: 10, 9: 7, 13: 3 }, { 3: 10, 5: 8, 9: 5, 13: 3 }, { 3: 12, 5: 8, 9: 10, 13: 7 }, { 3: 11, 5: 7, 9: 4, 11: 7, 13: 9 }), len: 1.2, tone: 'vox' },
+    gain: 0.9,
   },
   // Acid house: a squelchy, resonant bassline in A that slowly opens up.
   {
@@ -194,25 +195,26 @@ export const GROOVES: Groove[] = [
     sweep: true,
     gain: 1,
   },
-  // Jackin' house: a bouncy sixteenth bass and swung organ jabs in G minor.
+  // Electro swing: a heavy shuffle, a walking bass, oom-pah piano on the
+  // off-beats and a trumpet-like melody over Bb6, G7, Cm7, F7 (a major key,
+  // where most nights are minor).
   {
-    name: 'Jackin',
-    bpm: 125,
-    swing: 0.22,
-    loop: [
-      { root: 49, notes: [196, 233.08, 293.66, 349.23] },
-      { root: 65.41, notes: [261.63, 329.63, 392, 466.16] },
-      { root: 77.78, notes: [155.56, 196, 233.08, 293.66] },
-      { root: 73.42, notes: [185, 220, 261.63, 293.66] },
-    ],
-    bass: [1, 0, 2, 0, 0, 1, 0, 2, 0, 0, 1, 0, 2, 0, 1, 0],
-    bassLen: 1.2,
-    stabs: [[2, 6, 10, 14], [2, 6, 11], [2, 6, 10, 14], [2, 5, 8, 11]],
+    name: 'Swing',
+    bpm: 122,
+    swing: 0.33,
+    loop: [chord('Bb1', 'D4 F4 G4 Bb4'), chord('G1', 'B3 D4 F4 G4'), chord('C2', 'Bb3 C4 Eb4 G4'), chord('F1', 'A3 C4 Eb4 F4')],
+    bass: [1, 0, 0, 0, 1.26, 0, 0, 0, 1.5, 0, 0, 0, 1.68, 0, 0, 0],
+    bassLen: 3,
+    bassTone: 'sub',
+    stabs: [[2, 6, 10, 14]],
     stabLen: 1,
-    tone: 'organ',
+    tone: 'piano',
+    kickTone: 'punch',
     claps: [4, 12],
-    openHats: off,
+    snare: 'snare',
+    openHats: [],
     closedHats: 'odd',
+    lead: { root: hz('Bb4'), notes: tune({ 0: 4, 2: 7, 4: 9, 6: 7, 8: 4, 12: 0 }, { 0: 13, 2: 9, 4: 7, 8: 4, 12: 1 }, { 0: 12, 2: 9, 4: 5, 6: 2, 8: 5, 12: 9 }, { 0: 11, 2: 7, 4: 5, 6: 2, 8: -1, 12: 7, 14: 11 }), len: 1.6, tone: 'brass' },
     gain: 1,
   },
   // Trance: a galloping off-beat bass, held pads and a soaring supersaw
@@ -243,26 +245,27 @@ export const GROOVES: Groove[] = [
     },
     gain: 1,
   },
-  // Drum and bass: a fast broken beat (kick, snare, kick-kick, snare), a deep
-  // growling reese bass, dark pads and a pluck melody in F minor.
+  // Liquid drum and bass: a fast broken beat (kick, snare, kick-kick, snare)
+  // under warm electric-piano chords, a smooth sub bass and a bell melody in
+  // Db major.
   {
-    name: 'Jungle',
-    bpm: 172,
+    name: 'Liquid',
+    bpm: 174,
     swing: 0,
-    loop: [chord('F1', 'F3 Ab3 C4'), chord('Db2', 'F3 Ab3 Db4'), chord('Ab1', 'Eb3 Ab3 C4'), chord('Eb2', 'Eb3 G3 Bb3')],
+    loop: [chord('Db2', 'F3 Ab3 C4 F4'), chord('C2', 'Eb3 G3 Bb3 Eb4'), chord('Bb1', 'Db3 F3 Ab3 Db4'), chord('Gb1', 'Db3 F3 Bb3 Db4')],
     bass: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
     bassLen: 7,
-    bassTone: 'reese',
-    stabs: [[0]],
-    stabLen: 15,
-    tone: 'pad',
+    bassTone: 'sub',
+    stabs: [[0, 3, 10]],
+    stabLen: 3,
+    tone: 'piano',
     kick: [0, 10],
     kickTone: 'punch',
     claps: [4, 12],
     snare: 'snare',
     openHats: [14],
     closedHats: 'eighths',
-    lead: { root: hz('F4'), notes: tune({ 0: 7, 3: 3, 6: 0, 10: 2, 12: 3 }, { 0: 12, 3: 8, 6: 3, 10: 5, 12: 7 }, { 0: 10, 3: 7, 6: 3, 10: 5, 12: 7 }, { 0: 10, 3: 5, 6: 2, 12: 5, 14: 7 }), len: 2, tone: 'pluck' },
+    lead: { root: hz('Db5'), notes: tune({ 0: 12, 4: 11, 6: 7, 10: 4, 12: 7 }, { 0: 11, 4: 9, 6: 6, 10: 2, 12: 6 }, { 0: 9, 4: 7, 6: 4, 10: 0, 12: 4 }, { 0: 16, 4: 12, 6: 9, 10: 5, 12: 7 }), len: 3, tone: 'bell' },
     gain: 1,
   },
   // Dubstep: half-time drums (a kick, then a big snare on beat three) under a
@@ -350,26 +353,29 @@ export const GROOVES: Groove[] = [
     lead: { root: hz('G4'), notes: tune({ 0: 7, 3: 7, 6: 10, 8: 12, 11: 10, 12: 7, 14: 3 }, { 0: 8, 3: 8, 6: 7, 8: 3, 11: 7, 12: 8, 14: 12 }, { 0: 10, 3: 10, 6: 12, 8: 15, 11: 12, 12: 10, 14: 7 }, { 0: 14, 3: 12, 6: 10, 8: 5, 11: 10, 12: 12, 14: 14 }), len: 2.6, tone: 'supersaw' },
     gain: 1,
   },
-  // Afro house: rolling congas and a shaker over a four-to-the-floor kick, a
-  // syncopated sub bass, warm pads and a kalimba-like bell melody.
+  // Amapiano: slow and laid back, a soft kick on one and three, a shaker,
+  // the bouncing pitched "log drum" bass, jazzy piano chords and a marimba
+  // melody in F# minor.
   {
-    name: 'Afro',
-    bpm: 121,
-    swing: 0.12,
-    loop: [chord('A1', 'G3 C4 E4'), chord('D2', 'F3 A3 C4'), chord('A1', 'G3 C4 E4'), chord('E2', 'G3 B3 D4')],
-    bass: [1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0],
-    bassLen: 1.8,
-    bassTone: 'sub',
-    stabs: [[0]],
-    stabLen: 15,
-    tone: 'pad',
+    name: 'Amapiano',
+    bpm: 113,
+    swing: 0.16,
+    loop: [chord('F#1', 'A3 C#4 E4 G#4'), chord('B1', 'A3 C#4 D4 F#4'), chord('F#1', 'A3 C#4 E4 G#4'), chord('C#2', 'G#3 B3 E4 F#4')],
+    bass: [1, 0, 0, 1, 0, 0, 1.5, 0, 0, 0, 1, 2, 0, 0, 1.5, 0],
+    bassLen: 2,
+    bassTone: 'log',
+    stabs: [[0, 7], [3, 10], [0, 7], [3, 10, 13]],
+    stabLen: 2,
+    tone: 'piano',
+    kick: [0, 8],
+    kickTone: 'punch',
     claps: [4, 12],
     snare: 'rim',
     openHats: [],
     closedHats: 'all',
-    perc: [3, 6, 7, 10, 14],
-    lead: { root: hz('A4'), notes: tune({ 0: 12, 3: 7, 6: 10, 10: 7, 12: 3 }, { 0: 5, 3: 8, 6: 12, 10: 8, 12: 3 }, { 0: 12, 3: 7, 6: 10, 10: 7, 12: 0 }, { 0: 7, 3: 10, 6: 14, 10: 10, 12: 5 }), len: 2.5, tone: 'bell' },
-    gain: 1,
+    perc: [7, 15],
+    lead: { root: hz('F#4'), notes: tune({ 0: 12, 3: 7, 6: 10, 8: 12, 10: 7, 12: 3 }, { 0: 5, 3: 8, 6: 12, 8: 15, 10: 8, 12: 3 }, { 0: 12, 3: 7, 6: 10, 8: 12, 10: 7, 12: 0 }, { 0: 7, 3: 10, 6: 14, 8: 17, 10: 10, 12: 5 }), len: 2, tone: 'marimba' },
+    gain: 1.15,
   },
 ]
 

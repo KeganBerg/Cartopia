@@ -9,7 +9,7 @@ import { holdTown } from './renderGate'
 import { ArcadeSky, CarShadow, Grandstand, Lamp, TyreStack, useArcadeLook, useTownPool, type Person } from './ArcadeScenery'
 import { Box, Cone, Cyl, Palm, Scatter, Water, rand } from './RaceVenues'
 import { usePrefs } from '../lib/prefs'
-import { FansFar, local, nearZone, useFansFar, useFanZones, useSpots, ZONE_R } from './kartSpots'
+import { FansEvery, FansFar, local, nearZone, useFansEvery, useFansFar, useFanZones, useSpots, ZONE_R } from './kartSpots'
 import { KartHorizon } from './KartHorizon'
 import { CommonExtras, DesertExtras, DocksExtras, Fans, SpectatorBoats, TownExtras, boatPeople, type BoatSpot } from './KartExtras'
 import { asphaltTex, checkerTex, concreteTex, containerTex, glowTex, grassTex, gravelTex, sandTex, towerTex } from './textures'
@@ -17,7 +17,7 @@ import { signTexture } from './signTexture'
 import { glowMats } from './dayNight'
 import { decal } from './layers'
 import { TILE, buildingDef, type Body } from '../game/data'
-import { BOMB_R, DRIFT_BLUE, DRIFT_ORANGE, KART_LEN, SMOKE_R, KartRace, type ItemId, type KartEvent, type KartInput, type Track } from '../game/kart'
+import { BOMB_R, DRIFT_BLUE, DRIFT_ORANGE, KART_LEN, SMOKE_R, KartRace, wrapAngle, type ItemId, type KartEvent, type KartInput, type Track } from '../game/kart'
 import type { ChaseCar } from './ChaseScene'
 
 // A kart circuit: the tarmac ribbon with kerbs, verges and barriers, the theme's
@@ -347,6 +347,7 @@ function Trackside({ t }: { t: Track }) {
   const { along, outside, clearOf } = useSpots(t)
   const zones = useFanZones(t)
   const far = useFansFar()
+  const every = useFansEvery()
   const stands = useMemo(() => {
     const out: { x: number; z: number; h: number; w: number }[] = []
     for (const [i0, side] of [[(t.n - 22) % t.n, 1], [8, -1], [(t.n - 40) % t.n, -1]] as [number, -1 | 1][]) {
@@ -380,9 +381,9 @@ function Trackside({ t }: { t: Track }) {
   }, [along, zones])
   return (
     <group>
-      {stands.map((s, i) => <Grandstand key={i} x={s.x} z={s.z} h={s.h} width={s.w} rows={5} roof={i % 2 ? '#1565c0' : '#c62828'} far={far} />)}
       <Fans people={fans} />
-      <Batch version={t.n} cell={24} freeze>
+      <Batch version={t.n} cell={24} freeze prune>
+        {stands.map((s, i) => <Grandstand key={i} x={s.x} z={s.z} h={s.h} width={s.w} rows={5} roof={i % 2 ? '#1565c0' : '#c62828'} far={far} every={every} />)}
         {tyres.map((p, i) => <TyreStack key={i} x={p.x} z={p.z} n={3} band={i % 2 ? '#e53935' : '#fafafa'} />)}
         {marshals.map((m, i) => (
           <group key={i} position={[m.x, 0, m.z]} rotation-y={m.ry}>
@@ -433,7 +434,7 @@ function TownScenery({ t }: { t: Track }) {
   const tex = useMemo(() => { const c = towerTex().clone(); c.repeat.set(2, 4); c.needsUpdate = true; return c }, [])
   return (
     <group>
-      <Batch version={t.n + 1} cell={24} freeze>
+      <Batch version={t.n + 1} cell={24} freeze prune>
         {shops.map((s, i) => <Building key={i} def={s.def} x={s.x} z={s.z} ry={s.ry} />)}
         {trees.map((p, i) => <Building key={i} def={p.def} x={p.x} z={p.z} ry={i} s={p.s} />)}
         {towers.map((b, i) => (
@@ -444,7 +445,10 @@ function TownScenery({ t }: { t: Track }) {
         ))}
         <mesh rotation-x={-Math.PI / 2} position={[0, -0.01, 0]}><planeGeometry args={[420, 420]} /><meshStandardMaterial map={grassTex(70, 70)} /></mesh>
       </Batch>
-      {props.map((p, i) => <Lamp key={i} x={p.x} z={p.z} ry={p.ry} />)}
+      {/* Merged too (the bulbs keep their own glowing material): 58 lamps were 290 separate draws. */}
+      <Batch version={t.n + 5} freeze prune>
+        {props.map((p, i) => <Lamp key={i} x={p.x} z={p.z} ry={p.ry} />)}
+      </Batch>
     </group>
   )
 }
@@ -497,7 +501,7 @@ function DocksScenery({ t }: { t: Track }) {
   return (
     <group>
       <group position-y={-0.33}><Water x={0} z={0} w={500} d={500} id="kartdocks" color="#8fd0f5" rough={0.6} /></group>
-      <Batch version={t.n + 2} cell={24} freeze>
+      <Batch version={t.n + 2} cell={24} freeze prune>
         {/* Concrete quay under the whole circuit, so the track sits on land with water round it. */}
         {quay.map((q, i) => <mesh key={i} position={[q.x, -0.22, q.z]}><boxGeometry args={[4.02, 0.44, 4.02]} /><meshStandardMaterial map={concreteTex(1, 1)} color="#b0b6ba" /></mesh>)}
         {stacks.map((s, i) => (
@@ -598,7 +602,7 @@ function DesertScenery({ t }: { t: Track }) {
   const stop = useMemo(() => along(200, 5, 1, 5, 89)[0], [along])
   return (
     <group>
-      <Batch version={t.n + 3} cell={24} freeze>
+      <Batch version={t.n + 3} cell={24} freeze prune>
         <mesh rotation-x={-Math.PI / 2} position={[0, -0.01, 0]}><planeGeometry args={[460, 460]} /><meshStandardMaterial map={sandTex(60, 60)} color="#e7b98a" /></mesh>
         {mesas.map((m, i) => (
           <group key={i} position={[m.x, 0, m.z]} rotation-y={m.ry}>
@@ -978,6 +982,26 @@ export type KartSceneProps = {
   lite?: boolean // a phone: fewer pixels, and fans drawn less far out
 }
 
+// Where each kart is drawn: between its last two race steps (see the frame loop).
+type Pose = { x: number; z: number; h: number; y: number }
+type Poses = { prev: Pose[]; cur: Pose[]; drawn: Pose[] }
+const drawn = new WeakMap<KartRace, Pose[]>()
+function drawnPoses(race: KartRace): Poses {
+  const make = () => race.karts.map((k) => ({ x: k.x, z: k.z, h: k.h, y: k.y }))
+  const p = { prev: make(), cur: make(), drawn: make() }
+  drawn.set(race, p.drawn)
+  return p
+}
+// The kart as drawn this frame (the ring under the player, tow beams); the race's own state if not drawn yet.
+const drawnKart = (race: KartRace, i: number): Pose => drawn.get(race)?.[i] ?? race.karts[i]
+const keep = (p: Pose, k: Pose) => { p.x = k.x; p.z = k.z; p.h = k.h; p.y = k.y }
+function blend(out: Pose, a: Pose, b: Pose, t: number) {
+  out.x = a.x + (b.x - a.x) * t
+  out.z = a.z + (b.z - a.z) * t
+  out.y = a.y + (b.y - a.y) * t
+  out.h = a.h + wrapAngle(b.h - a.h) * t
+}
+
 // Memoised: the screen re-renders for its HUD ten times a second, and the scenery under here
 // must not re-render with it (that alone ate most of a phone's frame). Callers pass stable callbacks.
 export const KartScene = memo(KartSceneImpl)
@@ -1004,6 +1028,7 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
   const st = useRef({ acc: 0, hudAt: 0, finished: false, camPos: new Vector3(), camAt: new Vector3(), fov: 0, init: false, shake: 0, kick: 0 })
   const inputs = useMemo(() => race.karts.map(() => input), [race, input])
   const tmpV = useMemo(() => new Vector3(), [])
+  const poses = useMemo(() => drawnPoses(race), [race])
 
   useFrame((state, raw) => {
     const s = st.current
@@ -1014,20 +1039,31 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
     if (AUTOPILOT && running) Object.assign(input, race.autoInput(race.karts[me], race.order(), false))
     if (warp > 0 && running) {
       for (let f = 0; f < warp * 120; f++) { Object.assign(input, race.autoInput(race.karts[me], race.order(), false)); race.step(step, inputs, true) }
+      race.karts.forEach((k, i) => keep(poses.prev[i], k))
       warp = 0
       s.init = false
     }
+    const ks = race.karts
     while (s.acc >= step) {
       s.acc -= step
+      for (let i = 0; i < ks.length; i++) keep(poses.prev[i], ks[i])
       race.step(step, inputs, running)
       events.push(...race.events)
     }
+    for (let i = 0; i < ks.length; i++) keep(poses.cur[i], ks[i])
     if (afterStep) {
       // Whatever the link copied in from the other browser (their items, finishes) counts too.
       race.events = []
       afterStep()
       events.push(...race.events)
+      // A kart the link just moved (the other player's) is drawn where the link put it.
+      for (let i = 0; i < ks.length; i++) if (ks[i].x !== poses.cur[i].x || ks[i].z !== poses.cur[i].z) { keep(poses.prev[i], ks[i]); keep(poses.cur[i], ks[i]) }
     }
+    // The race steps 120 times a second whatever the screen's rate, so a frame can land between two
+    // steps: everything is drawn that far between them. Without this, on a 90 or 120 Hz phone (or any
+    // uneven frame) a frame got one step, two or none, and the camera and the world jolted along.
+    const alpha = Math.min(1, s.acc / step)
+    for (let i = 0; i < ks.length; i++) blend(poses.drawn[i], poses.prev[i], ks[i], alpha)
     // Feel: knocks shake the camera, a drift turbo kicks the view wider for a moment.
     // (Not with calm motion on: it follows the device's reduce-motion setting.)
     if (!calmFlashing()) for (const e of events) if (e.kart === me) {
@@ -1050,9 +1086,10 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
     race.karts.forEach((k, i) => {
       const v = views.current[i]
       if (!v?.root || !v.body) return
-      v.root.position.set(k.x, 0, k.z)
-      v.root.rotation.y = k.h
-      v.body.position.y = k.y
+      const p = poses.drawn[i]
+      v.root.position.set(p.x, 0, p.z)
+      v.root.rotation.y = p.h
+      v.body.position.y = p.y
       const sp = Math.hypot(k.vx, k.vz)
       // Lean out of turns and a touch of pitch on jumps; spin when hit.
       v.body.rotation.set(k.air ? Math.max(-0.25, Math.min(0.25, -k.vy * 0.03)) : 0, k.spinYaw + k.drift * 0.32, -k.steer * Math.min(1, sp / 15) * 0.06 - k.drift * 0.05)
@@ -1098,8 +1135,9 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
       }
     })
 
-    // Camera.
-    const fwd = tmpV.set(Math.sin(mine.h), 0, Math.cos(mine.h))
+    // Camera: on the drawn kart.
+    const pm = poses.drawn[me]
+    const fwd = tmpV.set(Math.sin(pm.h), 0, Math.cos(pm.h))
     const mv = Math.hypot(mine.vx, mine.vz)
     if (cam === 'sky') {
       // Dev overview: ?ang turns round the middle, ?at=x,z&d=dist looks at one spot.
@@ -1111,20 +1149,20 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
       camera.far = 600
       state.scene.fog = null
     } else if (cam === 'top') {
-      const want = new Vector3(mine.x, tall ? 30 : 24, mine.z - (tall ? 9 : 11))
+      const want = new Vector3(pm.x, tall ? 30 : 24, pm.z - (tall ? 9 : 11))
       if (!s.init) s.camPos.copy(want)
       s.camPos.lerp(want, Math.min(1, dt * 4))
       camera.position.copy(s.camPos)
       camera.up.set(0, 1, 0)
-      camera.lookAt(mine.x, 0, mine.z + 1.5)
+      camera.lookAt(pm.x, 0, pm.z + 1.5)
       camera.fov = tall ? 62 : 46
     } else {
       // Behind and above the kart; swings a little wide in a drift, pulls back on a boost.
       const back = (tall ? 7.4 : 6.0) + (mine.boost > 0 ? 0.6 : 0)
       const up = tall ? 3.7 : 3.0
       const swing = mine.drift * 0.35
-      const hx = Math.sin(mine.h - swing), hz = Math.cos(mine.h - swing)
-      const want = new Vector3(mine.x - hx * back, up + mine.y * 0.6, mine.z - hz * back)
+      const hx = Math.sin(pm.h - swing), hz = Math.cos(pm.h - swing)
+      const want = new Vector3(pm.x - hx * back, up + pm.y * 0.6, pm.z - hz * back)
       if (!s.init) s.camPos.copy(want)
       s.camPos.lerp(want, Math.min(1, dt * 7))
       // Never let the camera sink into a barrier: keep it a little above the wall top.
@@ -1135,7 +1173,7 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
         camera.position.z += (Math.random() - 0.5) * s.shake
       }
       camera.up.set(0, 1, 0)
-      const at = new Vector3(mine.x + fwd.x * 4, 0.55 + mine.y * 0.8, mine.z + fwd.z * 4)
+      const at = new Vector3(pm.x + fwd.x * 4, 0.55 + pm.y * 0.8, pm.z + fwd.z * 4)
       if (!s.init) s.camAt.copy(at)
       s.camAt.lerp(at, Math.min(1, dt * 10))
       camera.lookAt(s.camAt)
@@ -1157,13 +1195,14 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
         uses: mine.uses,
       })
     }
-  })
+  }, -1) // first, so everything else this frame (fans, the ring, tow beams) sees where the karts are drawn
 
   return (
     <FansFar.Provider value={[150, 110, 90][light]}>
+    <FansEvery.Provider value={light ? 2 : 1}>
       <ArcadeSky view={view} near={100} far={340} />
       <hemisphereLight args={['#ffffff', '#666666', 0.15]} />
-      <Batch version={t.n * 10 + (t.reverse ? 1 : 0)} freeze>
+      <Batch version={t.n * 10 + (t.reverse ? 1 : 0)} freeze prune>
         <TrackSurface t={t} />
       </Batch>
       <Trackside t={t} />
@@ -1181,6 +1220,7 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
       {looks.map((l, i) => <KartView key={i} look={l} rig={rigs[i]} set={setters[i]} />)}
       {/* A warm glow pool under the player, so their kart reads at a glance. */}
       <PlayerRing race={race} me={me} />
+    </FansEvery.Provider>
     </FansFar.Provider>
   )
 }
@@ -1194,10 +1234,11 @@ function TowBeams({ race }: { race: KartRace }) {
     race.karts.forEach((k, i) => {
       const m = refs.current[i]
       if (!m) return
-      const o = k.tow > 0 && k.towTarget >= 0 ? race.karts[k.towTarget] : null
+      const o = k.tow > 0 && k.towTarget >= 0 ? drawnKart(race, k.towTarget) : null
       m.visible = !!o
       if (!o) return
-      a.set(k.x + Math.sin(k.h) * 0.4, 1.3 + k.y, k.z + Math.cos(k.h) * 0.4)
+      const p = drawnKart(race, i)
+      a.set(p.x + Math.sin(p.h) * 0.4, 1.3 + p.y, p.z + Math.cos(p.h) * 0.4)
       b.set(o.x, 0.7 + o.y, o.z)
       m.position.copy(a).lerp(b, 0.5)
       m.lookAt(b)
@@ -1220,7 +1261,7 @@ function TowBeams({ race }: { race: KartRace }) {
 function PlayerRing({ race, me }: { race: KartRace; me: number }) {
   const ref = useRef<Mesh>(null)
   useFrame(() => {
-    const k = race.karts[me]
+    const k = drawnKart(race, me)
     ref.current?.position.set(k.x, Y_PAINT + 0.02, k.z)
   })
   return (

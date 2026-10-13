@@ -280,10 +280,12 @@ const FAN_LEG = 0.24
 // `far` (opt-in): only the people in view and within `far` of the camera are drawn and
 // animated, packed into the first instances (a big crowd behind the camera cost a phone
 // as much as the whole town in front of it). The last few metres shrink them away.
+// `every` (opt-in): move them only every so many frames (2 on a phone race: half the work).
 const FADE = 12
 const view = new Frustum(), viewM = new Matrix4(), at = new Vector3(), ball = new Sphere(undefined, 1.5)
-export function Crowd({ people, scale = 1, far }: { people: Person[]; scale?: number; far?: number }) {
+export function Crowd({ people, scale = 1, far, every = 1 }: { people: Person[]; scale?: number; far?: number; every?: number }) {
   const group = useRef<Group>(null)
+  const frame = useRef(0)
   const torso = useRef<InstancedMesh>(null)
   const head = useRef<InstancedMesh>(null)
   const hair = useRef<InstancedMesh>(null)
@@ -314,7 +316,20 @@ export function Crowd({ people, scale = 1, far }: { people: Person[]; scale?: nu
   }, [people]) // eslint-disable-line react-hooks/exhaustive-deps
   const tmp = useMemo(() => new Object3D(), [])
   const S = FAN * scale
+  // Set once per fan, read by put(): no new closure per fan per frame.
+  const cur = useMemo(() => ({ x: 0, z: 0, h: 0, size: 1 }), [])
+  const put = (m: InstancedMesh | null, idx: number, px: number, py: number, pz: number, rz = 0, rx = 0, sy = 1) => {
+    if (!m) return
+    const { x, z, size } = cur
+    tmp.position.set(x + (px - x) * size, py, z + (pz - z) * size)
+    tmp.rotation.set(rx, cur.h, rz)
+    tmp.scale.set(size, sy * size, size)
+    tmp.updateMatrix()
+    m.setMatrixAt(idx, tmp.matrix)
+  }
+  const parts = [[torso, 1], [head, 1], [hair, 1], [legs, 2], [arms, 2]] as const
   useFrame(({ clock, camera }) => {
+    if (every > 1 && frame.current++ % every) return
     const t = clock.elapsedTime
     const g = group.current
     if (far && g) view.setFromProjectionMatrix(viewM.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse))
@@ -336,14 +351,7 @@ export function Crowd({ people, scale = 1, far }: { people: Person[]; scale?: nu
       const hip = (FAN_LEG + hop) * size + (f.y ?? 0) / S
       const sin = Math.sin(f.h), cos = Math.cos(f.h)
       const x = f.x / S, z = f.z / S
-      const put = (m: InstancedMesh | null, idx: number, px: number, py: number, pz: number, rz = 0, rx = 0, sy = 1) => {
-        if (!m) return
-        tmp.position.set(x + (px - x) * size, py, z + (pz - z) * size)
-        tmp.rotation.set(rx, f.h, rz)
-        tmp.scale.set(size, sy * size, size)
-        tmp.updateMatrix()
-        m.setMatrixAt(idx, tmp.matrix)
-      }
+      cur.x = x; cur.z = z; cur.h = f.h; cur.size = size
       put(torso.current, s, x, hip + 0.15 * size, z)
       put(head.current, s, x, hip + 0.36 * size, z)
       put(hair.current, s, x - sin * 0.02, hip + 0.385 * size, z - cos * 0.02, 0, 0, 0.8)
@@ -358,11 +366,21 @@ export function Crowd({ people, scale = 1, far }: { people: Person[]; scale?: nu
         put(arms.current, s * 2 + (side > 0 ? 1 : 0), x + cos * lx, hip + (0.25 - Math.cos(a) * 0.085) * size, z - sin * lx, side * a)
       }
     })
-    for (const [m, k] of [[torso, 1], [head, 1], [hair, 1], [legs, 2], [arms, 2]] as const) {
+    // Only the slots in use go up to the GPU, not the whole crowd's buffer.
+    for (const [m, k] of parts) {
       if (!m.current) continue
-      m.current.count = slot * k
-      m.current.instanceMatrix.needsUpdate = true
-      if (repaint && m.current.instanceColor) m.current.instanceColor.needsUpdate = true
+      const used = slot * k
+      m.current.count = used
+      const mat = m.current.instanceMatrix
+      mat.clearUpdateRanges()
+      mat.addUpdateRange(0, Math.max(1, used) * 16)
+      mat.needsUpdate = true
+      const col = m.current.instanceColor
+      if (repaint && col) {
+        col.clearUpdateRanges()
+        col.addUpdateRange(0, Math.max(1, used) * 3)
+        col.needsUpdate = true
+      }
     }
   })
   const n = people.length
@@ -378,7 +396,7 @@ export function Crowd({ people, scale = 1, far }: { people: Person[]; scale?: nu
 }
 
 // Rows of stepped seating with fans, facing h (0 = facing +z), centred at x/z.
-export function Grandstand({ x, z, h, width, rows = 4, roof = '#c62828', far }: { x: number; z: number; h: number; width: number; rows?: number; roof?: string; far?: number }) {
+export function Grandstand({ x, z, h, width, rows = 4, roof = '#c62828', far, every }: { x: number; z: number; h: number; width: number; rows?: number; roof?: string; far?: number; every?: number }) {
   const people = useMemo(() => {
     const out: Person[] = []
     for (let r = 0; r < rows; r++) for (let i = 0; i < Math.floor(width / 0.55); i++) {
@@ -410,7 +428,7 @@ export function Grandstand({ x, z, h, width, rows = 4, roof = '#c62828', far }: 
           <meshStandardMaterial color={roof} />
         </mesh>
       </group>
-      <Crowd people={people} far={far} />
+      <Crowd people={people} far={far} every={every} />
     </>
   )
 }

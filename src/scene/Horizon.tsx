@@ -182,15 +182,31 @@ void main() {
     star *= 0.6 + 0.4 * sin(uTime * (2.0 + h * 5.0) + h * 40.0);
     col += vec3(star) * uNight * clear * smoothstep(0.02, 0.25, y) * 1.4;
   }
-  // A layer of drifting clouds, thicker when the weather turns.
+  // Puffy clouds drifting overhead, more of them when the weather turns. Crisp
+  // edges, a bright side towards the sun (or moon) and a shaded belly, like the
+  // low-poly town under them. They're pinned to the sky, not the screen.
   if (y > 0.0) {
-    vec2 uv = d.xz / (y + 0.1) * 1.4 + uWind * uTime;
-    float n = fbm(uv);
-    float cov = mix(0.52, 0.1, uCover);
-    float c = smoothstep(cov, cov + 0.28, n) * smoothstep(0.0, 0.18, y);
-    float lit = fbm(uv * 1.9 + 4.0);
-    vec3 cc = mix(uCloudShade, uCloudLit, 0.35 + 0.65 * lit) + uSunCol * pow(s, 5.0) * 0.35 * (1.0 - uNight);
-    col = mix(col, cc, c * 0.94);
+    vec2 uv = d.xz / (y + 0.12) * 1.8 + uWind * uTime;
+    uv += (vec2(noise(uv * 0.6 + 3.1), noise(uv * 0.6 + 7.7)) - 0.5) * 0.35;
+    // Big soft masses with small round puffs along their edges.
+    float n = fbm(uv) + (noise(uv * 5.0 + 2.0) - 0.5) * 0.09;
+    float cov = mix(0.5, 0.16, uCover);
+    float edge = max(mix(0.025, 0.14, uCover), fwidth(n) * 1.5);
+    float c = smoothstep(cov, cov + edge, n) * smoothstep(0.02, 0.2, y);
+    // A step towards the viewer is higher up the cloud: if the cloud ends there,
+    // this is its sunny top; if it goes on, this is the shaded belly.
+    vec2 toEye = -normalize(d.xz + 1e-4);
+    float top = clamp(0.5 + (n - fbm(uv + toEye * 0.3)) * 7.0, 0.0, 1.0);
+    vec3 lightDir = uNight > 0.5 ? uMoonDir : uSunDir;
+    float lit = clamp(0.5 + (n - fbm(uv + normalize(lightDir.xz + 1e-4) * 0.16)) * 6.0, 0.0, 1.0);
+    float body = smoothstep(cov + edge, cov + 0.3, n);
+    // Two soft tones, like the flat-shaded town under them.
+    float tone = smoothstep(0.3, 0.6, 0.65 * top + 0.2 * lit + 0.3 * (1.0 - body));
+    // Overcast skies settle into one soft grey sheet instead of blotches.
+    tone = mix(tone, 0.55, uCover * 0.75);
+    vec3 cc = mix(uCloudShade, uCloudLit, tone);
+    cc += uSunCol * pow(s, 8.0) * (1.0 - body) * 0.25 * (1.0 - uNight);
+    col = mix(col, cc, c * (0.97 - 0.25 * uNight));
   }
   gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>
