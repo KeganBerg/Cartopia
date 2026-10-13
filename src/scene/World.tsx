@@ -5,7 +5,7 @@ import { AnchorProjector, anchorEls } from './anchors'
 import { useThree, type ThreeEvent } from '@react-three/fiber'
 import { MeshStandardMaterial, Plane, Vector3, type TOUCH } from 'three'
 import { create } from 'zustand'
-import { useGame, canPlace, buyablePlots, lotSize, movable, type PlacedBuilding } from '../game/store'
+import { useGame, buildPrice, canPlace, buyablePlots, lotSize, movable, type PlacedBuilding } from '../game/store'
 import { TILE, PLOT, PLOT_MIN, PLOT_MAX, START_LAND, buildingDef, buildingLevel } from '../game/data'
 import { BuildingModel } from './BuildingModel'
 import { rotateCurrent, setGhostTurn, turnOf } from '../game/placement'
@@ -555,7 +555,7 @@ function Interaction() {
       // Keep the new building picked so Rotate (and dragging) can still adjust it.
       const s = useGame.getState()
       const built = s.buildings[s.buildings.length - 1]
-      useGame.setState({ mode: 'move', placing: null, selected: built.uid, again: s.coins >= d.price && !d.unique ? placing : null })
+      useGame.setState({ mode: 'move', placing: null, selected: built.uid, again: !d.unique && s.coins >= buildPrice(s, placing).coins && s.bucks >= buildPrice(s, placing).bucks ? placing : null })
     }
   }
 

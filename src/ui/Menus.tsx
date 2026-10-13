@@ -249,6 +249,7 @@ const featureRank = (b: { id: string }) => (b.id === 'rescue' ? 2 : FEATURES[b.i
 export function ShopPanel() {
   const level = useGame((s) => s.level)
   const coins = useGame((s) => s.coins)
+  const bucks = useGame((s) => s.bucks)
   const setMode = useGame((s) => s.setMode)
   const buildings = useGame((s) => s.buildings)
   const stored = useGame((s) => s.stored ?? NONE)
@@ -282,7 +283,9 @@ export function ShopPanel() {
             {BUILDINGS.filter((b) => b.unlockLevel < 99 && group.filter(b)).sort((a, b) => featureRank(b) - featureRank(a)).map((b) => {
               const locked = level < b.unlockLevel
               const sale = buildPrice({ deals, level }, b.id)
-              const broke = coins < sale.coins
+              // Gem decor (the statue, the arch) is short on gems, not coins.
+              const brokeGems = bucks < sale.bucks
+              const broke = coins < sale.coins || brokeGems
               const owned = !!b.unique && [...buildings, ...stored].some((o) => o.def === b.id)
               const highlight = b.id === 'rescue' && !rusty
               const feature = !highlight && !locked && !!FEATURES[b.id] && !buildings.some((o) => o.def === b.id)
@@ -293,7 +296,7 @@ export function ShopPanel() {
                   ref={focused ? focusRef : undefined}
                   className={`card ${locked ? 'locked' : ''} ${broke && !locked ? 'broke' : ''} ${highlight ? 'start-here' : ''} ${focused ? 'focus' : ''}`}
                   disabled={owned}
-                  onClick={() => (locked ? showNeed('level', b.unlockLevel, b.name) : broke ? showNeed('coins', sale.coins - coins, b.name) : setMode('place', b.id))}
+                  onClick={() => (locked ? showNeed('level', b.unlockLevel, b.name) : brokeGems ? showNeed('bucks', sale.bucks - bucks, b.name) : broke ? showNeed('coins', sale.coins - coins, b.name) : setMode('place', b.id))}
                 >
                   {highlight && <span className="ribbon">START HERE</span>}
                   {feature && <span className="ribbon feature">★ NEW FEATURE</span>}
