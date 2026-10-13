@@ -394,17 +394,35 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .junk-go small { display: inline-flex; align-items: center; font-size: 13px; }
 .junk-go.broke:not(:disabled) { background: linear-gradient(#ff8a8a, #d6283b); border-color: #8a1020; }
 .junk-go:disabled { opacity: .55; }
-/* Search lots: a coloured tile per lot and the best cars it can turn up. */
-.spot-rows .spot-card { padding: 6px 10px 6px 6px; }
-.spot-card .spot-icon { flex: none; display: grid; place-items: center; width: 62px; height: 56px; border-radius: 12px; font-size: 32px; background: linear-gradient(color-mix(in srgb, var(--spot) 60%, #fff), var(--spot)); border: 2px solid rgba(20,33,61,.55); box-shadow: inset 0 2px 0 rgba(255,255,255,.4), 0 2px 0 rgba(0,0,0,.15); }
-.spot-finds { display: flex; gap: 4px; }
-.spot-find { display: grid; place-items: center; border-radius: 8px; background: #f2f6fb; border: 1.5px solid #dbe5f1; }
-.cards.rows .spot-find .thumb3d.xs { --tw: 46px; --th: 34px; width: var(--tw); height: var(--th); }
-.spot-find.rr-rare { background: #fff3e0; border-color: #ffb74d; }
-.spot-find.rr-scarce { background: #e3f2fd; border-color: #90caf9; }
-.spot-card.locked .spot-icon, .spot-card.locked .spot-find { filter: grayscale(1); opacity: .6; }
-.spot-card .price { display: inline-flex; align-items: center; white-space: nowrap; }
-.spot-rows .card-text, .junk-rows .card-text { min-width: 0; }
+/* Search lots: a postcard per lot (a render of its real search scene), every car
+   it can turn up (rusty until the player has one), and its price. */
+.rsc-dex { display: flex; align-items: center; gap: 10px; margin: 12px 2px 10px; font: 20px var(--display); color: var(--line, #14213d); }
+.rsc-dex-ico { font-size: 24px; }
+.rsc-dex-bar { flex: 1; height: 16px; border-radius: 9px; background: #dfe6ef; border: 2.5px solid var(--line, #14213d); overflow: hidden; }
+.rsc-dex-bar i { display: block; height: 100%; min-width: 6px; background: linear-gradient(#ffe082, #ffa000); box-shadow: inset 0 3px 0 rgba(255,255,255,.45); }
+.rsc-spots { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.rsc-spot { display: flex; flex-direction: column; padding: 0; border-radius: 16px; border: 2.5px solid var(--line, #14213d); background: #fff; overflow: hidden; text-align: left; color: inherit; box-shadow: 0 4px 0 rgba(20,33,61,.35); transition: transform .12s ease; }
+.rsc-spot:hover:not(:disabled) { transform: translateY(-2px); }
+.rsc-spot:active:not(:disabled) { transform: translateY(1px); box-shadow: 0 2px 0 rgba(20,33,61,.35); }
+.rsc-art { position: relative; display: block; aspect-ratio: 720 / 298; background: #3d4a33 center / cover no-repeat; }
+.rsc-art::after { content: ''; position: absolute; inset: 0; background: linear-gradient(rgba(0,0,0,.38), transparent 38%, transparent 62%, rgba(0,0,0,.3)); pointer-events: none; }
+.rsc-name { position: absolute; z-index: 1; left: 10px; top: 7px; font: 21px var(--display); color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,.55), 0 0 6px rgba(0,0,0,.4); white-space: nowrap; }
+.rsc-got { position: absolute; z-index: 1; right: 8px; top: 8px; padding: 2px 9px; border-radius: 999px; font: 15px var(--display); color: #fff; background: rgba(20,33,61,.72); border: 2px solid rgba(255,255,255,.5); }
+.rsc-got.done { background: linear-gradient(#ffd54f, #ff9800); border-color: var(--line, #14213d); color: var(--line, #14213d); }
+.rsc-go { position: absolute; z-index: 1; right: 8px; bottom: 8px; display: inline-flex; align-items: center; gap: 5px; padding: 5px 13px; border-radius: 12px; font: 20px var(--display); color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,.35); background: linear-gradient(#7ee36a, #2fae3a); border: 2.5px solid var(--line, #14213d); box-shadow: inset 0 3px 0 rgba(255,255,255,.4), 0 3px 0 rgba(0,0,0,.35); }
+.rsc-spot.broke .rsc-go { background: linear-gradient(#ff9a8a, #d6383b); }
+.rsc-go.lock { background: linear-gradient(#90a4ae, #546e7a); }
+.rsc-cars { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 3px; padding: 5px 6px; background: linear-gradient(#f6f8fb, #e7edf5); border-top: 2.5px solid var(--line, #14213d); }
+.rsc-car { position: relative; display: grid; place-items: center; min-width: 0; border-radius: 8px; background: #fff; border: 2px solid #cfd8e3; }
+.rsc-car.rr-scarce { border-color: #64b5f6; }
+.rsc-car.rr-rare { border-color: #ffb300; background: #fff6e0; }
+.rsc-car .thumb3d.xs { --tw: 100%; --th: 34px; width: 100%; height: var(--th); background: none; }
+.rsc-car i { position: absolute; right: -3px; top: -5px; display: grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; font: 11px/1 var(--display); font-style: normal; color: #fff; background: #2fae3a; border: 1.5px solid var(--line, #14213d); }
+.rsc-spot.locked .rsc-art { filter: grayscale(.85) brightness(.75); }
+.rsc-spot.locked .rsc-car { filter: grayscale(1); opacity: .55; }
+.rsc-spot.locked .rsc-go { filter: none; }
+.rsc-spot:disabled { opacity: .6; }
+.junk-rows .card-text { min-width: 0; }
 @media (max-width: 600px) {
   .bay { gap: 8px; padding-right: 8px; }
   .bay-lift { width: 74px; height: 56px; }
@@ -412,8 +430,9 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
   .bay-btn { padding: 6px 9px; font-size: 14px; }
   .junk-go { min-width: 80px; padding: 5px 6px; font-size: 15px; }
   .junk-rows .card .thumb3d { --tw: 64px; --th: 52px; width: 64px; }
-  .spot-card .spot-icon { width: 50px; height: 50px; font-size: 26px; }
-  .cards.rows .spot-find .thumb3d.xs { --tw: 38px; --th: 30px; }
+  .rsc-spots { grid-template-columns: 1fr; gap: 14px; }
+  .rsc-name { font-size: 22px; }
+  .rsc-car .thumb3d.xs { --th: 36px; }
 }
 .rarity { font: 11px var(--display); color: #fff; border-radius: 6px; padding: 1px 6px; vertical-align: middle; letter-spacing: .3px; }
 .rarity-common { background: #78909c; }
