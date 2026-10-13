@@ -201,8 +201,19 @@ export const buildingDef = (id: string): BuildingDef => BUILDINGS.find((b) => b.
 // fits more residents). Saves keep the level as `level` on the placed
 // building; a missing level is level 1.
 export const MAX_BUILDING_LEVEL = 10
+// Decor that grows in place (level 1-5), purely for looks and tourists: gardens and parks
+// fill out, statues and fountains get a grand plinth, the Clock Tower adds floors.
+export type DecorGrowth = 'garden' | 'statue' | 'tower'
+export const DECOR_GROWTH: Record<string, DecorGrowth> = {
+  garden: 'garden', koi: 'garden', pond: 'garden', dogpark: 'garden', statue: 'statue', fountain: 'statue', clocktower: 'tower',
+}
+export const MAX_DECOR_LEVEL = 5
+export const decorGrows = (d: BuildingDef) => !d.parked && d.kind === 'decor' && d.id in DECOR_GROWTH
+export const maxLevel = (d: BuildingDef) => (decorGrows(d) ? MAX_DECOR_LEVEL : MAX_BUILDING_LEVEL)
+// Anything placed can take a colour theme (game/cityLook.ts), except obstacles waiting to be cleared.
+export const themable = (d: BuildingDef) => !d.parked && d.kind !== 'obstacle'
 export const upgradable = (d: BuildingDef) =>
-  !d.parked && ((!!d.jobSeconds && d.kind !== 'obstacle') || !!d.fuelCap || d.kind === 'house')
+  !d.parked && ((!!d.jobSeconds && d.kind !== 'obstacle') || !!d.fuelCap || d.kind === 'house' || decorGrows(d))
 export const buildingLevel = (b: { level?: number }) =>
   Math.min(MAX_BUILDING_LEVEL, Math.max(1, Math.floor(Number(b.level) || 1)))
 // The level a running job pays at: locked when it started (older saves: the current level).
@@ -228,11 +239,13 @@ export const upgradeFuelCap = (d: BuildingDef, level: number) =>
 
 // Cost to go from `level` to `level + 1`: 75% of the build price, 50% more each
 // level, plus parts from level 4 up. Houses are cheap to build but end up as
-// skyscrapers, so theirs start at $300 and grow 55% a level.
+// skyscrapers, so theirs start at $300 and grow 55% a level. Decor bought with gems (the
+// Golden Car Statue) counts each gem as $1,000 of build price.
+const upgradeBase = (d: BuildingDef) => (d.price || (decorGrows(d) ? (d.bucks ?? 0) * 1000 : 0))
 export const buildingUpgradeCost = (d: BuildingDef, level: number) => ({
   coins: d.kind === 'house'
     ? Math.round((300 * Math.pow(1.55, level - 1)) / 50) * 50
-    : Math.max(100, Math.round((d.price * 0.75 * Math.pow(1.5, level - 1)) / 50) * 50),
+    : Math.max(100, Math.round((upgradeBase(d) * 0.75 * Math.pow(1.5, level - 1)) / 50) * 50),
   parts: level >= 4 ? (level - 2) * 2 : 0,
 })
 
@@ -254,7 +267,7 @@ export const levelLift = (level = 1) => 0.26 * (Math.min(MAX_BUILDING_LEVEL, Mat
 
 export type Body = 'compact' | 'sedan' | 'sports' | 'muscle' | 'truck' | 'super' | 'bubble' | 'wagon' | 'wedge' | 'roadster' | 'rally' | 'classic' | 'offroad' | 'coupe' | 'widebody' | 'tank' | 'scooter' | 'chopper' | 'sportbike'
   | 'hatch' | 'van' | 'suv' | 'ev' | 'luxury' | 'formula' | 'bus' | 'tusker' | 'dogvan' | 'rearengine' | 'longnose' | 'prototype'
-  | 'scissor' | 'horseshoe' | 'teardrop'
+  | 'scissor' | 'horseshoe' | 'teardrop' | 'icecream' | 'monster' | 'parcel'
 // Two-wheelers: drawn as motorcycles with a rider, and only take exhaust and rim mods.
 export const BIKES: Body[] = ['scooter', 'chopper', 'sportbike']
 export const isBike = (body: Body) => BIKES.includes(body)
@@ -369,6 +382,10 @@ export const CARS: CarDef[] = [
   { id: 'fulmine', name: 'Veloce Fulmine V12', body: 'scissor', price: 0, bucks: 220, unlockLevel: 40, legendary: true, power: 100, grip: 92, weight: 30, skill: 'launch', likes: ['club', 'stadium', 'glasstower'], colors: ['#c6ff00', '#ff6d00', '#eceff1'] },
   { id: 'eclat', name: 'Moreau Eclat W16', body: 'horseshoe', price: 650000, unlockLevel: 42, legendary: true, power: 100, grip: 94, weight: 40, skill: 'slipstream', likes: ['hq', 'glasstower', 'helipad'], colors: ['#0d47a1', '#212121', '#b0bec5'] },
   { id: 'orafo', name: 'Aurelio Orafo V12', body: 'teardrop', price: 0, bucks: 180, unlockLevel: 39, legendary: true, power: 98, grip: 94, weight: 28, skill: 'smooth', likes: ['cinema', 'club', 'glasstower'], colors: ['#eceff1', '#bf360c', '#37474f'] },
+  // Oddballs (2026-10-12): goofy vehicles that wouldn't normally race, on their own bodies (see oddballCars.ts).
+  { id: 'scoops', name: 'Lakeside Sundae Wagon', body: 'icecream', price: 6000, unlockLevel: 4, power: 22, grip: 28, weight: 70, skill: 'freeze', likes: ['icecream', 'school', 'arcade'], colors: ['#fafafa', '#f8bbd0', '#b2ebf2'] },
+  { id: 'courier', name: 'Ironside Doorstep Express', body: 'parcel', price: 4500, unlockLevel: 3, power: 24, grip: 26, weight: 74, skill: 'slipstream', likes: ['market', 'offices', 'parts'], colors: ['#5d4037', '#eceff1', '#1b5e20'] },
+  { id: 'crusher', name: 'Kodiak Mud Crusher', body: 'monster', price: 16000, unlockLevel: 8, power: 48, grip: 40, weight: 88, skill: 'torque', likes: ['stadium', 'tires', 'junkyard'], colors: ['#d50000', '#1565c0', '#ffd600'] },
   { id: 'bug', name: 'Bumble Bubble', body: 'bubble', price: 1200, unlockLevel: 1, rescueOnly: true, power: 14, grip: 28, weight: 28, skill: 'freeze', likes: ['icecream', 'donut', 'coffee'], colors: ['#80cbc4', '#ffcc80', '#ef9a9a'] },
   { id: 'woodie', name: 'Lakeside Woodie Wagon', body: 'wagon', price: 2200, unlockLevel: 1, rescueOnly: true, power: 22, grip: 28, weight: 56, skill: 'slipstream', likes: ['diner', 'hospital', 'market'], colors: ['#fafafa', '#fff59d', '#4db6ac'] },
   { id: 'hauler', name: 'Old Faithful Hauler', body: 'truck', price: 3000, unlockLevel: 1, rescueOnly: true, power: 26, grip: 26, weight: 70, skill: 'torque', likes: ['carwash', 'junkyard', 'tacos'], colors: ['#558b2f', '#e65100', '#1565c0'] },
@@ -686,6 +703,7 @@ export const CAR_SETS: CarSet[] = [
   { id: 'dream', name: 'Dream Garage', icon: '💎', cars: ['lambo', 'hyper', 'tomahawk', 'zenith'], coins: 30000, bucks: 15, trophies: 40, xp: 500 },
   { id: 'autobahn', name: 'Autobahn Club', icon: '🛣', cars: ['kreis', 'bergmeister', 'ringmeister', 'sovereign'], coins: 20000, bucks: 10, trophies: 30, xp: 350 },
   { id: 'apex', name: 'Apex Predators', icon: '🐍', cars: ['rattler', 'cottonmouth', 'raiden', 'wraith'], coins: 30000, bucks: 15, trophies: 40, xp: 500 },
+  { id: 'oddballs', name: 'Oddballs', icon: '🍦', cars: ['scoops', 'courier', 'crusher'], coins: 4000, bucks: 3, trophies: 8, xp: 120 },
   { id: 'exotica', name: 'Exotica', icon: '👑', cars: ['fulmine', 'eclat', 'orafo'], coins: 40000, bucks: 20, trophies: 50, xp: 600 },
   // Season track prizes; each season adds its car here.
   { id: 'seasons', name: 'Season Rides', icon: '🏁', cars: ['nightfall'], coins: 5000, bucks: 3, trophies: 10, xp: 150 },
@@ -1295,6 +1313,22 @@ export const VISITORS: Record<VisitorKind, { weight: number; minutes: number; pa
 // Minutes between visitors, and the most a player gets in a UTC day.
 export const VISIT_GAP_MIN = 4
 export const VISITS_PER_DAY = 30
+// Grown gardens, statues and the Clock Tower draw tourists: each level above 1 adds to the
+// tourist odds (capped), and a well-grown town gets a small group of campers at once.
+// Tourist groups never come sooner than TOURIST_GAP_MIN apart. Guests roll this here; a
+// signed-in player's visitor kind comes from the server, so only the group size applies.
+export const TOURIST_PER_LEVEL = 8
+export const TOURIST_BONUS_MAX = 120
+export const TOURIST_GAP_MIN = 5
+export const TOURIST_GROUP_MAX = 3
+export const touristScore = (buildings: { def: string; level?: number }[]) =>
+  buildings.reduce((n, b) => (decorGrows(buildingDef(b.def)) ? n + Math.min(MAX_DECOR_LEVEL, Math.max(1, Math.floor(Number(b.level) || 1))) - 1 : n), 0)
+export const touristWeight = (score: number) => VISITORS.tourist.weight + Math.min(TOURIST_BONUS_MAX, Math.max(0, score) * TOURIST_PER_LEVEL)
+// How many campers turn up together: one, or two from score 4, three from score 12.
+export const touristGroup = (score: number, roll = Math.random()) => {
+  const extra = score >= 12 ? 2 : score >= 4 ? 1 : 0
+  return 1 + (roll < Math.min(0.75, score * 0.05) ? extra : 0)
+}
 // At most this many barn finds a UTC day, and their rarity odds (mostly commons), from the cars at
 // the spots the player has opened.
 export const BARN_PER_DAY = 1

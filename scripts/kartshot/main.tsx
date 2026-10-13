@@ -1,5 +1,6 @@
 // Dev harness: the kart race screen with a made-up garage car.
 // ?track=0..2&rev=1&me=<car id>&autopilot&warp=<s>&touch=1&time=0..1
+// ?obstacles: road obstacles; ?blast: Bumper Blast.
 // ?live=host / ?live=guest in two tabs of one browser: a live kart race between them over a
 // BroadcastChannel (no server), to check the netcode by eye.
 // ?party=host / ?party=g1 / ?party=g2 in three tabs: a kart party, the same way.
@@ -107,6 +108,6 @@ if (party) {
   )
 } else {
   createRoot(document.getElementById('root')!).render(
-    <><StageCanvas /><KartGame car={me as never} title={`Street Kings · Race 3 of 6`} track={track} reverse={q.get('rev') === '1'} field={field} prize={950} next={{ label: '▶ Race 4 · $1,050', go: () => {} }} onFinish={() => {}} onExit={() => {}} /></>,
+    <><StageCanvas /><KartGame car={me as never} title={`Street Kings · Race 3 of 6`} track={track} reverse={q.get('rev') === '1'} field={field} prize={950} next={{ label: '▶ Race 4 · $1,050', go: () => {} }} onFinish={() => {}} onExit={() => {}} rules={{ obstacles: q.has('obstacles'), blast: q.has('blast') }} /></>,
   )
 }

@@ -17,6 +17,7 @@ import { Countdown, Result, look, payFuel, pi } from './ArcadeBits'
 import { STAR_GAMES, StarGame } from './ArcadeMore'
 import { loadStars, type StarGameId } from '../game/arcadeMore'
 import { LoadingScene } from './Loading'
+import { useCanvasDpr } from '../lib/prefs'
 
 type Playing = { game: 'chase' } | { game: 'park'; lot: number } | { game: 'star'; id: StarGameId }
 
@@ -46,7 +47,7 @@ export function ArcadePanel() {
         <div className="arc-cars">
           {cars.slice().sort((a, b) => pi(b) - pi(a)).slice(0, 12).map((c) => (
             <button key={c.uid} className={c.uid === car.uid ? 'arc-car sel' : 'arc-car'} onClick={() => setCarId(c.uid)} title={carDef(c.model).name}>
-              <CarThumb size="xs" color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} body={carDef(c.model).body} model={c.model} stripe={c.stripe} mods={c.mods} />
+              <CarThumb size="xs" color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} hat={c.hat} body={carDef(c.model).body} model={c.model} stripe={c.stripe} mods={c.mods} />
             </button>
           ))}
         </div>
@@ -105,6 +106,7 @@ export function ArcadePanel() {
 }
 
 function ChaseGame({ car, onExit }: { car: OwnedCar; onExit: () => void }) {
+  const dpr = useCanvasDpr()
   const level = useGame((s) => s.level)
   const finish = useGame((s) => s.finishArcade)
   const input = useRef<ChaseInput>({ moves: [] }).current
@@ -171,7 +173,7 @@ function ChaseGame({ car, onExit }: { car: OwnedCar; onExit: () => void }) {
         input.moves.push(e.clientX > window.innerWidth / 2 ? 1 : -1)
       }}
     >
-      <Canvas key={`scene${run}`} className="rf-canvas" camera={{ position: [0, 4.4, 8.5], fov: 55, near: 0.3, far: 160 }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
+      <Canvas key={`scene${run}`} className="rf-canvas" camera={{ position: [0, 4.4, 8.5], fov: 55, near: 0.3, far: 160 }} dpr={dpr} gl={{ toneMapping: NeutralToneMapping }}>
         <ChaseScene me={look(car)} input={input} running={running} onHud={setHud} onBusted={busted} />
       </Canvas>
       <LoadingScene key={`load${run}`} label="Getting away" onReady={() => setDrawn(run)} onClose={onExit} />
@@ -201,6 +203,7 @@ function ChaseGame({ car, onExit }: { car: OwnedCar; onExit: () => void }) {
 }
 
 function ParkGame({ car, lot, onExit, onLot }: { car: OwnedCar; lot: number; onExit: () => void; onLot: (lot: number) => void }) {
+  const dpr = useCanvasDpr()
   const level = useGame((s) => s.level)
   const finish = useGame((s) => s.finishArcade)
   const def = PARK_LOTS[lot]
@@ -240,7 +243,7 @@ function ParkGame({ car, lot, onExit, onLot }: { car: OwnedCar; lot: number; onE
 
   return (
     <div className="race-full arc-full park">
-      <Canvas key={`scene${lot}-${run}`} className="rf-canvas" camera={{ fov: 40, near: 0.5, far: 120, position: [0, 20, 5] }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
+      <Canvas key={`scene${lot}-${run}`} className="rf-canvas" camera={{ fov: 40, near: 0.5, far: 120, position: [0, 20, 5] }} dpr={dpr} gl={{ toneMapping: NeutralToneMapping }}>
         <ParkScene lot={def} me={look(car)} input={input} running={running} onHud={setHud} onEnd={done} />
       </Canvas>
       <LoadingScene key={`load${lot}-${run}`} label={`Driving to ${def.name}`} onReady={() => setDrawn(`${lot}-${run}`)} onClose={onExit} />

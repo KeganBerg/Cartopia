@@ -5,13 +5,15 @@ import { OrbitControls } from '@react-three/drei'
 import { MOUSE, TOUCH, Vector3, type Group, type Mesh, type PerspectiveCamera } from 'three'
 import type { Body, Finish, SkinnedSlot, Panels } from '../game/data'
 import { CarModel, carFrame } from './CarModel'
+import type { HatFit } from '../game/hats'
 import { frame, seat, type Bounds } from './fit'
 import { SkyEnv } from './SkyEnv'
 import type { Trim } from '../game/trim'
 import { BACKDROPS, FILTERS, backdrop, compose, photoFilter, savePhoto, type Backdrop } from './photo'
 import { useGame } from '../game/store'
+import { useCanvasDpr } from '../lib/prefs'
 
-type Look = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; panels?: Panels | null; stripe?: string | null; mods?: string[] | null; trim?: Trim | null }
+type Look = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; panels?: Panels | null; stripe?: string | null; mods?: string[] | null; trim?: Trim | null; hat?: HatFit | null }
 
 // How big the car's bounding sphere is made, so long trucks and tiny bubble cars both fill the view.
 const FIT = 1.05
@@ -81,7 +83,7 @@ function Viewer({ look, handle, onTouch, dyno, floorSize, photo }: { look: Look;
   const spinning = useRef(true)
   const camera = useThree((s) => s.camera as PerspectiveCamera)
   const size = useThree((s) => s.size)
-  const modKey = (look.mods ?? []).join(',')
+  const modKey = (look.mods ?? []).join(',') + (look.hat ? `|${look.hat.id}` : '')
 
   // Seat the car on the turntable and fit the camera to it. A new body or a
   // resized view starts the view over; trying a part on keeps the player's angle.
@@ -216,12 +218,13 @@ function Snapper({ snap }: { snap: React.RefObject<(() => HTMLCanvasElement) | n
 }
 
 function Stage({ look, big, onExpand, dyno, photo, snap }: { look: Look; big?: boolean; onExpand?: () => void; dyno?: DynoFeed | null; photo?: Backdrop | null; snap?: React.RefObject<(() => HTMLCanvasElement) | null> }) {
+  const dpr = useCanvasDpr(big ? 2 : 1.5)
   const handle = useRef<Handle>(null)
   const [touched, setTouched] = useState(false)
   const bd = photo ?? BACKDROPS[0]
   return (
     <>
-      <Canvas camera={{ position: VIEW.toArray(), fov: 35 }} dpr={big ? [1, 2] : [1, 1.5]}>
+      <Canvas camera={{ position: VIEW.toArray(), fov: 35 }} dpr={dpr}>
         <SkyEnv />
         {bd.bg && <color attach="background" args={[bd.bg]} />}
         <hemisphereLight args={[bd.fill[0], bd.fill[1], bd.fill[2]]} />

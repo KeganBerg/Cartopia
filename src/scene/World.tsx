@@ -24,6 +24,8 @@ import { SeasonFx } from './SeasonFx'
 import { TownCars } from './TownCars'
 import { Townspeople } from './Townspeople'
 import { Batch } from './Batch'
+import { LampTone, Tint } from './CityTint'
+import { lampPost, themeFor } from '../game/cityLook'
 import { Manhole } from './BuildingDetail'
 import { GrassTufts } from './Tufts'
 import { Outskirts } from './Outskirts'
@@ -32,6 +34,7 @@ import { toWorld, toTile, DIRS } from './grid'
 import { grassTex, paverTex, meadowTex } from './textures'
 import { cloudyGround, roadMat } from './weatherLook'
 import { Weather } from './Weather'
+import { SkyExtras } from './SkyExtras'
 import { layoutRoads } from './traffic/layout'
 import { LAYER, decal } from './layers'
 import { Ear } from './Ear'
@@ -43,6 +46,7 @@ import { VIEW, isFree, useFreeCam } from './freeCam'
 import { FreeCam } from './FreeCam'
 import { TutorialCamera } from './TutorialCamera'
 import { TownTouch, townFingers } from './TownTouch'
+import { useLite } from '../lib/prefs'
 
 // Meadow ground that drifting cloud shadows pass over, one per tiling.
 const meadows = new Map<number, MeshStandardMaterial>()
@@ -193,18 +197,18 @@ const ONE: [number, number, number] = [1, 1, 1]
 // `picked` (the building picked in Move) draws live, outside the merged town.
 // `turn`: quarter turns to face its road (World works it out, so laying a road
 // only re-renders the buildings that turn to face it).
-type BuildingProps = { b: PlacedBuilding; turn: number; group?: MergeGroup; picked?: boolean }
+type BuildingProps = { b: PlacedBuilding; turn: number; group?: MergeGroup; picked?: boolean; city?: string }
 
 // Starting or collecting a job swaps every building object, but none of that
 // shows in the model. Re-rendering a whole town of models at once is what made
 // Collect All stall phones, so a building only re-renders when its lot or look changes.
 const sameLook = (a: PlacedBuilding, b: PlacedBuilding) =>
-  a.uid === b.uid && a.def === b.def && a.x === b.x && a.z === b.z && a.rot === b.rot && a.level === b.level && a.merge === b.merge && a.mturn === b.mturn
-export const sameBuilding = (p: BuildingProps, n: BuildingProps) => p.turn === n.turn && p.group === n.group && p.picked === n.picked && sameLook(p.b, n.b)
+  a.uid === b.uid && a.def === b.def && a.x === b.x && a.z === b.z && a.rot === b.rot && a.level === b.level && a.merge === b.merge && a.mturn === b.mturn && a.tint === b.tint
+export const sameBuilding = (p: BuildingProps, n: BuildingProps) => p.turn === n.turn && p.city === n.city && p.group === n.group && p.picked === n.picked && sameLook(p.b, n.b)
 
 const Building = memo(BuildingLot, sameBuilding)
 
-function BuildingLot({ b, turn, group, picked }: BuildingProps) {
+function BuildingLot({ b, turn, group, picked, city }: BuildingProps) {
   const d = buildingDef(b.def)
   const [cx, cz] = group ? groupCenter(group) : centerOf(b.def, b.x, b.z, b.rot)
   const [sx, sy, sz] = group ? groupScale(group, turn) : [1, 1, 1]
@@ -255,7 +259,7 @@ function BuildingLot({ b, turn, group, picked }: BuildingProps) {
       onPointerOver={() => {
         const mode = useGame.getState().mode
         if (mode === 'move' && movable(b.def)) document.body.style.cursor = 'grab'
-        else if (mode === 'play' && d.kind !== 'decor' && (!useGame.getState().visiting || helpable(d))) document.body.style.cursor = 'pointer'
+        else if (mode === 'play' && (!useGame.getState().visiting || (d.kind !== 'decor' && helpable(d)))) document.body.style.cursor = 'pointer'
       }}
       onPointerOut={() => (document.body.style.cursor = '')}
     >
@@ -269,7 +273,9 @@ function BuildingLot({ b, turn, group, picked }: BuildingProps) {
         <MergeScale.Provider value={mark ? [k, k, k] : group ? [sx, sy, sz] : ONE}>
           <PopGroup uid={b.uid}>
             <KeepShapes limit={limitFor(d)}>
-              {mark ? <VanguardTower uid={b.uid} /> : <BuildingModel def={d} level={buildingLevel(b)} />}
+              <Tint theme={themeFor(b.tint, city, d.kind === 'decor')}>
+                {mark ? <VanguardTower uid={b.uid} /> : <BuildingModel def={d} level={buildingLevel(b)} />}
+              </Tint>
             </KeepShapes>
           </PopGroup>
         </MergeScale.Provider>
@@ -684,7 +690,7 @@ function ExpandZoom() {
 // Where each building stands and how it looks: everything about the town's
 // buildings that shows, leaving out job timers.
 export const shapeOf = (buildings: PlacedBuilding[]) =>
-  buildings.map((b) => `${b.uid}:${b.def}:${b.x}:${b.z}:${b.rot}:${b.level ?? 1}:${b.merge ?? ''}:${b.mturn ?? ''}`).join()
+  buildings.map((b) => `${b.uid}:${b.def}:${b.x}:${b.z}:${b.rot}:${b.level ?? 1}:${b.merge ?? ''}:${b.mturn ?? ''}:${b.tint ?? ''}`).join()
 
 // World re-renders when the picked building or the town's layout
 // changes. Everything that doesn't depend on those is built once here and handed
@@ -706,6 +712,8 @@ export const World = memo(function World() {
   const land = useGame((s) => (s.visiting ? (s.visiting.land ?? START_LAND) : s.land))
   const popping = usePops((s) => Object.keys(s.pops).join())
   const free = useFreeCam((f) => f.on)
+  // Saver draws the effects at their phone-sized counts on every screen.
+  const lite = useLite()
   // Rebuild the merged town only when something's footprint changes, not on every job timer.
   const merges = useMemo(() => mergeGroups(buildings), [buildings])
   const turns = useMemo(
@@ -717,11 +725,15 @@ export const World = memo(function World() {
   )
   // The building picked in Move draws live; the rest stays merged.
   const picked = useGame((s) => (s.mode === 'move' ? s.selected : null))
+  // City look (Menu > Town): a friend's town is drawn without the player's own theme.
+  const city = useGame((s) => (s.visiting ? undefined : s.cityTheme))
+  const post = useGame((s) => lampPost(s.lights))
   const fixed = useMemo(
     () => ({
       before: (
         <>
           <DayNight small={small()} />
+          <LampTone />
           <TechnoLights />
           {/* Countryside beyond the buildable lot. Its meadow lines up with the one under
               unbought plots (both repeat every 16 units from a half-repeat offset). */}
@@ -747,14 +759,15 @@ export const World = memo(function World() {
           <Ear />
           <TownCars />
           <Townspeople />
-          <WorldFx small={small()} />
+          <WorldFx small={lite || small()} />
         </>
       ),
       sky: (
         <>
-          <SeasonFx small={small()} />
-          <Weather small={small()} />
+          <SeasonFx small={lite || small()} />
+          <Weather small={lite || small()} />
           <Atmosphere />
+          <SkyExtras />
           <SkyEnv />
           <FreeCam />
         </>
@@ -771,14 +784,14 @@ export const World = memo(function World() {
       {fixed.controls}
       {/* Ground and buildings merge separately, and only what changed is merged
           again (see Batch): laying road re-merges the road's patch of ground. */}
-      <Batch version={`${roadsList.join()}/${land.join()}/${shape}`} cell={24} freeze>
+      <Batch version={`${roadsList.join()}/${land.join()}/${shape}/${post}`} cell={24} freeze>
         {fixed.land}
         {tufts}
         {fixed.roads}
       </Batch>
-      <Batch version={`${shape}/${turns.join('')}/${popping}|${picked ?? ''}`} cell={24} freeze>
+      <Batch version={`${shape}/${turns.join('')}/${popping}|${picked ?? ''}|${city ?? ''}|${post}`} cell={24} freeze>
         {buildings.map((b, i) =>
-          merges.owner.has(b.uid) && !merges.groups.has(b.uid) ? null : <Building key={b.uid} b={b} turn={turns[i]} group={merges.groups.get(b.uid)} picked={b.uid === picked} />,
+          merges.owner.has(b.uid) && !merges.groups.has(b.uid) ? null : <Building key={b.uid} b={b} turn={turns[i]} group={merges.groups.get(b.uid)} picked={b.uid === picked} city={city} />,
         )}
       </Batch>
       {fixed.after}

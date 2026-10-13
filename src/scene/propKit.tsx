@@ -9,7 +9,8 @@ import { glowMats } from './dayNight'
 // plain so Batch still bakes them into the town's static mesh at no extra draw.
 
 // glow: a lamp lens, drawn with the town's night-lit bulb material.
-export type Look = { c: string; r?: number; m?: number; e?: string; cast?: boolean; glow?: boolean }
+// glow 'lamp': a street lamp's lens, in the city's chosen light colour.
+export type Look = { c: string; r?: number; m?: number; e?: string; cast?: boolean; glow?: boolean | 'lamp' }
 type V3 = [number, number, number]
 
 const q = new Quaternion()
@@ -29,7 +30,7 @@ const shape = (k: string, make: () => BufferGeometry) => {
 const mats = new Map<string, MeshStandardMaterial>()
 // One material per look, shared everywhere, so Batch's look cache hits.
 export function propMat(l: Look) {
-  if (l.glow) return glowMats.bulb
+  if (l.glow) return l.glow === 'lamp' ? glowMats.lamp : glowMats.bulb
   const k = `${l.c}|${l.r ?? 0.8}|${l.m ?? 0}|${l.e ?? ''}`
   let m = mats.get(k)
   if (!m) mats.set(k, (m = new MeshStandardMaterial({ color: l.c, roughness: l.r ?? 0.8, metalness: l.m ?? 0, ...(l.e ? { emissive: l.e } : {}) })))
@@ -40,7 +41,7 @@ export class PropKit {
   private parts = new Map<string, { look: Look; geos: BufferGeometry[] }>()
 
   private set(look: Look) {
-    const k = look.glow ? 'glow' : `${look.c}|${look.r ?? 0.8}|${look.m ?? 0}|${look.e ?? ''}|${look.cast ? 1 : 0}`
+    const k = look.glow ? `glow${look.glow}` : `${look.c}|${look.r ?? 0.8}|${look.m ?? 0}|${look.e ?? ''}|${look.cast ? 1 : 0}`
     let set = this.parts.get(k)
     if (!set) this.parts.set(k, (set = { look, geos: [] }))
     return set

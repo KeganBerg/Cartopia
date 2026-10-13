@@ -6,6 +6,7 @@ import { setPageTint } from './pageTint'
 import { applyNight, dayPhase, duskAmount, nightAmount } from './dayNight'
 import { fxState, gradeColor, lightDir, lookFor, townLook } from './look'
 import { weatherNow } from '../game/weather'
+import { moonLit, moonPhase } from '../game/skyExtras'
 import { gloomOf, hazeColor, weatherLook } from './weatherLook'
 
 const BG_DAY = new Color(PAL.ground)
@@ -50,7 +51,8 @@ export function DayNight({ small }: { small: boolean }) {
     scene.environmentIntensity = look.env
     if (sun.current) {
       sun.current.color.copy(look.sun)
-      sun.current.intensity = look.sunIntensity
+      // Moonlight dims a little away from full moon, never enough to lose the town.
+      sun.current.intensity = look.sunIntensity * (1 - n * 0.3 * (1 - moonLit(moonPhase())))
       lightDir(phase, n, dir.current)
       sun.current.position.copy(dir.current).multiplyScalar(50).add(at.current)
       sun.current.target.position.copy(at.current)

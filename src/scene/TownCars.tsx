@@ -18,6 +18,7 @@ import { liveTraffic as sim } from './traffic/live'
 import { layoutRoads, type Light } from './traffic/layout'
 import { useVisitors, tapVisitor, type Visitor } from '../lib/visitors'
 import { AMBULANCE, TownAmbulance } from './ServiceVehicles'
+import { townTraffic } from '../game/traffic'
 
 // Buses run the school routes: they drop in at schools more than anywhere else.
 const SCHOOLS = ['school', 'highschool', 'university']
@@ -28,6 +29,11 @@ const visitorCar = (v: Visitor): OwnedCar => ({
   uid: `visitor:${v.id}`, model: v.model, color: v.color, upgrades: { engine: 0, turbo: 0, tires: 0, weight: 0 },
   stripe: v.kind === 'racer' ? '#fafafa' : null,
 })
+// A tour group's other campers, each its own colour, following the first round town.
+const TOUR_COLORS = ['#80deea', '#f8bbd0', '#c5e1a5', '#ffe082']
+const tourCars = (v: Visitor): OwnedCar[] => Array.from({ length: Math.max(0, (v.group ?? 1) - 1) }, (_, i) => ({
+  ...visitorCar(v), uid: `visitor:${v.id}:${i + 2}`, color: TOUR_COLORS[(TOUR_COLORS.indexOf(v.color) + i + 1) % TOUR_COLORS.length],
+}))
 
 // Garage scale, which TowTruck is drawn at on its own (the rescue scene). In town
 // every car is drawn at its lane-fitting size (townCarSize.ts).
@@ -120,7 +126,7 @@ function TownCar({ car, onTap }: { car: OwnedCar; onTap?: () => void }) {
         }}
       >
         <group ref={body} scale={k}>
-          <CarModel body={def.body} model={def.id} color={car.color} finish={car.finish} skin={car.skin} modSkin={car.modSkin} panels={car.panels} trim={car.trim} highlight={selected} stripe={car.stripe} mods={car.mods} beams rig={rig} lean />
+          <CarModel body={def.body} model={def.id} color={car.color} finish={car.finish} skin={car.skin} modSkin={car.modSkin} panels={car.panels} trim={car.trim} hat={car.hat} highlight={selected} stripe={car.stripe} mods={car.mods} beams rig={rig} lean />
         </group>
       </group>
       <group ref={truck} visible={false}>
@@ -319,6 +325,8 @@ function ShowcaseStars({ uids }: { uids: string[] }) {
 export function TownCars() {
   const roads = useGame((s) => (s.visiting ?? s).roads)
   const cars = useGame((s) => (s.visiting ?? s).cars)
+  // Too little road jams the town: everyone crawls (src/game/traffic.ts).
+  const pace = useGame((s) => townTraffic(s.visiting ?? s).pace)
   const buildings = useGame((s) => (s.visiting ?? s).buildings)
   const visitKey = useGame((s) => s.visiting?.ownerId ?? 'home')
   const picks = useGame((s) => (s.visiting ?? s).showcase)
@@ -345,16 +353,17 @@ export function TownCars() {
       return {
         uid: c.uid,
         ...townSize(def.body),
-        cruise: 1.1 + pis.get(c.uid)! / 45,
+        cruise: (1.1 + pis.get(c.uid)! / 45) * pace,
         stalled: !!(c.flat || c.lowFuel),
         low: pis.get(c.uid)! < LOW_PI || slow.has(c.uid),
         favors: def.body === 'bus' ? SCHOOLS : undefined,
       }
     })
-  }, [cars, stars])
+  }, [cars, stars, pace])
   // A visitor's car drives round town too (src/lib/visitors.ts), on top of the usual cap.
   const visitor = useVisitors((v) => (v.visitor && v.visitor.kind !== 'barn' && !visitKeyIsAway(visitKey) ? v.visitor : null))
   const guest = useMemo(() => (visitor ? visitorCar(visitor) : null), [visitor?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  const tour = useMemo(() => (visitor ? tourCars(visitor) : []), [visitor?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const guestGone = !!visitor?.gone
   // Each hospital (up to two) runs an ambulance round town on top of the usual cap.
   const hospitals = useMemo(() => buildings.filter((b) => b.def === 'hospital').slice(0, 2).map((b) => b.uid), [townKey]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -367,9 +376,10 @@ export function TownCars() {
     const cap = max + ambulances.length
     if (!guest || guestGone) return sim.setCars(all, cap)
     const kind = visitor!.kind
-    const spec = { uid: guest.uid, ...townSize(carDef(guest.model).body), cruise: kind === 'racer' ? 2.6 : kind === 'mystery' ? 2.2 : 1.4, stalled: false }
-    sim.setCars([spec, ...all], cap + 1)
-  }, [specs, ambulances, max, town, guest, guestGone]) // eslint-disable-line react-hooks/exhaustive-deps
+    const spec = (uid: string) => ({ uid, ...townSize(carDef(guest.model).body), cruise: kind === 'racer' ? 2.6 : kind === 'mystery' ? 2.2 : 1.4, stalled: false })
+    const guests = [guest, ...tour].map((c) => spec(c.uid))
+    sim.setCars([...guests, ...all], cap + guests.length)
+  }, [specs, ambulances, max, town, guest, tour, guestGone]) // eslint-disable-line react-hooks/exhaustive-deps
   const homesKey = buildings.map((b) => (b.car ? `${b.car}>${b.uid}` : '')).join()
   useEffect(() => {
     sim.homes = new Map([...buildings.filter((b) => b.car).map((b): [string, string] => [b.car!, b.uid]), ...hospitals.map((h): [string, string] => [`ambulance:${h}`, h])])
@@ -417,7 +427,7 @@ export function TownCars() {
       {shown.map((car) => (
         <TownCar key={`${visitKey}-${car.uid}`} car={car} />
       ))}
-      {guest && <TownCar key={guest.uid} car={guest} onTap={tapVisitor} />}
+      {guest && [guest, ...tour].map((c) => <TownCar key={c.uid} car={c} onTap={tapVisitor} />)}
       {hospitals.map((h) => <TownAmbulance key={`${visitKey}-${h}`} uid={`ambulance:${h}`} home={h} scale={townScale(AMBULANCE.wid)} />)}
       <ShowcaseStars uids={stars} />
     </>

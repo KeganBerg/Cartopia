@@ -9,6 +9,7 @@ import { DynoOverlay, type DynoRun } from './Dyno'
 import { CollectAllButton } from './CollectAll'
 import { GoalsButton } from './Goals'
 import { rotateCurrent } from '../game/placement'
+import { TRAFFIC, TRAFFIC_MIN, roadShare, roadsShort, trafficLevel } from '../game/traffic'
 import { BuildingThumb, CarThumb } from '../scene/BuildingPreview'
 import { ShopUpgrades } from './Upgrade'
 import { ModShop, withMod } from './Mods'
@@ -17,6 +18,7 @@ import { PaintShop, jobOf } from './Paint'
 import { TrimShop } from './Trim'
 import type { Trim } from '../game/trim'
 import { CustomShop } from './Custom'
+import { HatShop, type HatTry } from './Hats'
 import { SkinPicker } from './Skins'
 import type { PaintJob, Panels, SkinnedSlot } from '../game/data'
 import { Icon } from './Icon'
@@ -92,6 +94,22 @@ export function FreeCamButton({ className = 'goals-btn cam-dock' }: { className?
   )
 }
 
+// Edit mode: how much of the town is road. Under 15% it jams (src/game/traffic.ts).
+function TrafficMeter() {
+  const share = useGame((s) => roadShare(s.roads, s.land))
+  const short = useGame((s) => roadsShort(s.roads, s.land))
+  const t = TRAFFIC[trafficLevel(share)]
+  const pct = Math.round(share * 100)
+  return (
+    <div className="traffic-meter" style={{ '--tc': t.c } as React.CSSProperties} title={`Roads ${pct}% of your land, aim for ${Math.round(TRAFFIC_MIN * 100)}%+`}>
+      <span aria-hidden>{t.icon}</span>
+      <b>{t.name}</b>
+      <i className="tm-bar"><i style={{ width: `${Math.min(100, (share / (TRAFFIC_MIN * 2)) * 100)}%` }} /><i className="tm-min" /></i>
+      <small>{short ? `+${short} 🛣️` : `${pct}%`}</small>
+    </div>
+  )
+}
+
 function EditBar() {
   const mode = useGame((s) => s.mode)
   const placing = useGame((s) => s.placing)
@@ -119,6 +137,7 @@ function EditBar() {
   return (
     <div className="edit-bar">
       {!tutCard && <div className="edit-hint">{hint}</div>}
+      {!tutCard && <TrafficMeter />}
       <div className="edit-tools">
         <button className={mode === 'road' ? 'tool active' : 'tool'} onClick={() => setMode('road')}><Icon name="road" size={22} /><span>Road</span></button>
         <button className={mode === 'bulldoze' ? 'tool active' : 'tool'} onClick={() => setMode('bulldoze')}><Icon name="bulldoze" size={22} /><span>Bulldoze</span></button>
@@ -439,11 +458,11 @@ const withSlot = (m: OwnedCar['modSkin'], slot: SkinnedSlot, skin: string | null
   return next
 }
 
-type GarageTab = 'tune' | 'mods' | 'paint' | 'custom' | 'trim'
+type GarageTab = 'tune' | 'mods' | 'paint' | 'custom' | 'trim' | 'hats'
 let nextGarageTab: GarageTab = 'tune'
-// Something to try on when the Garage opens (a crate prize): a part, a paint, a colour or a mod paint
-// on one slot, on this car. Nothing is fitted until the player taps the Garage's own button.
-export type GarageTry = { car: string; mod?: string; skin?: string; modSkin?: { slot: SkinnedSlot; skin: string }; color?: string }
+// Something to try on when the Garage opens (a crate prize): a part, a paint, a colour, a mod paint
+// on one slot or a hat, on this car. Nothing is fitted until the player taps the Garage's own button.
+export type GarageTry = { car: string; mod?: string; skin?: string; modSkin?: { slot: SkinnedSlot; skin: string }; color?: string; hat?: string }
 let nextTry: GarageTry | null = null
 // Opens the Garage on a given tab (goals use it for paint and mods), optionally with that
 // car picked and something on try-on.
@@ -471,7 +490,8 @@ const CAR_SORTS: { id: CarSort; label: string }[] = [
   { id: 'pi', label: 'Top PI' }, { id: 'pi-low', label: 'Low PI' }, { id: 'name', label: 'A–Z' }, { id: 'new', label: 'Newest' },
 ]
 let garageView: { kind: string; sort: CarSort } = { kind: 'all', sort: 'pi' }
-const bodyLabel = (b: string) => (b === 'dogvan' ? 'Dog van' : b === 'ev' ? 'EV' : b === 'suv' ? 'SUV' : b[0].toUpperCase() + b.slice(1))
+const BODY_LABEL: Record<string, string> = { dogvan: 'Dog van', ev: 'EV', suv: 'SUV', icecream: 'Ice cream', parcel: 'Parcel van', monster: 'Monster truck' }
+const bodyLabel = (b: string) => BODY_LABEL[b] ?? b[0].toUpperCase() + b.slice(1)
 
 function useGarageList(cars: OwnedCar[]) {
   const [view, setViewState] = useState(garageView)
@@ -557,8 +577,11 @@ export function GaragePanel() {
   // Trim being tried on, cleared when another car is picked.
   const [trimming, setTrimming] = useState<{ car: string; trim: Trim } | null>(null)
   const tryTrim = trimming && trimming.car === car?.uid && tab === 'trim' ? trimming.trim : null
+  // A hat being tried on (null: trying no hat), cleared when another car is picked.
+  const [hatting, setHatting] = useState<{ car: string; hat: HatTry } | null>(pre?.hat ? { car: pre.car, hat: { id: pre.hat } } : null)
+  const tryHat = hatting && hatting.car === car?.uid && tab === 'hats' ? hatting.hat : undefined
   const modSkin = car && tryModSkin ? withSlot(car.modSkin, tryModSkin.slot, tryModSkin.skin) : car?.modSkin
-  const look = car && def && { body: def.body, model: def.id, ...(tryJob ?? jobOf(car)), skin: trySkin === undefined ? car.skin : trySkin, modSkin, panels: tryPanels ?? car.panels, trim: tryTrim ?? car.trim, mods: withMod(car.mods, tryMod) }
+  const look = car && def && { body: def.body, model: def.id, ...(tryJob ?? jobOf(car)), skin: trySkin === undefined ? car.skin : trySkin, modSkin, panels: tryPanels ?? car.panels, trim: tryTrim ?? car.trim, mods: withMod(car.mods, tryMod), hat: tryHat === undefined ? car.hat : tryHat }
   // After an upgrade or a part goes on, the car does a dyno pull showing the old and new time.
   const pi = car && def ? performance(def, car.upgrades, car.mods) : 0
   const [dyno, setDyno] = useState<DynoRun | null>(null)
@@ -595,7 +618,7 @@ export function GaragePanel() {
           </div>
           {list.map(({ c, d, pi: p }) => (
             <button key={c.uid} className={c.uid === car?.uid ? 'garage-item sel' : 'garage-item'} onClick={() => { select(c.uid); setPicking(false) }}>
-              <CarThumb size="sm" color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} panels={c.panels} trim={c.trim} body={d.body} model={d.id} stripe={c.stripe} mods={c.mods} />
+              <CarThumb size="sm" color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} panels={c.panels} trim={c.trim} hat={c.hat} body={d.body} model={d.id} stripe={c.stripe} mods={c.mods} />
               <span>{d.name}{c.plate && <span className="mini-plate">{c.plate}</span>}</span>
               <small>PI {p}</small>
             </button>
@@ -635,8 +658,8 @@ export function GaragePanel() {
               <RaceCarToggle car={car.uid} />
             </div>
             <div className="garage-tabs" role="tablist">
-              {([['tune', '🔧 Upgrades'], ['mods', '🪽 Mods'], ['paint', '🎨 Paint'], ['custom', '🖌️ Custom'], ['trim', '✨ Trim']] as const).map(([id, label]) => (
-                <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'sel' : ''} onClick={() => setTab(id)}>{label}</button>
+              {([['tune', '🔧', 'Upgrades'], ['mods', '🪽', 'Mods'], ['paint', '🎨', 'Paint'], ['custom', '🖌️', 'Custom'], ['trim', '✨', 'Trim'], ['hats', '🎩', 'Hats']] as const).map(([id, icon, label]) => (
+                <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'sel' : ''} onClick={() => setTab(id)}><i aria-hidden>{icon}</i>{label}</button>
               ))}
             </div>
             {tab === 'mods' && <ModShop car={car} trying={tryMod} setTrying={(id) => setTrying(id ? { car: car.uid, mod: id } : null)} skinTry={tryModSkin} setSkinTry={(t) => setModSkinning(t ? { car: car.uid, ...t } : null)} />}
@@ -658,6 +681,7 @@ export function GaragePanel() {
             {tab === 'paint' && <SkinPicker car={car} trying={trySkin} setTrying={(skin) => setSkinning(skin === undefined ? null : { car: car.uid, skin })} />}
             {tab === 'custom' && <CustomShop car={car} panels={tryPanels ?? car.panels} setPanels={(panels) => setCustomising(panels ? { car: car.uid, panels } : null)} />}
             {tab === 'trim' && <TrimShop car={car} trim={tryTrim ?? car.trim} setTrim={(trim) => setTrimming(trim ? { car: car.uid, trim } : null)} />}
+            {tab === 'hats' && <HatShop car={car} trying={tryHat} setTrying={(hat) => setHatting(hat === undefined ? null : { car: car.uid, hat })} />}
             {tab === 'paint' && <PaintShop car={car} job={tryJob ?? jobOf(car)} setJob={(job) => setPainting(job ? { car: car.uid, job } : null)} />}
             {!def.bucks && <button className="sell" onClick={() => { const uid = car.uid; sellAsk.ask(() => sell(uid)) }}>Sell for ${Math.floor(def.price * 0.5).toLocaleString()}</button>}
             {sellAsk.open && (

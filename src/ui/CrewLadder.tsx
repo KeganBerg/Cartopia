@@ -27,7 +27,7 @@ function Car({ r }: { r: Racer }) {
   if (!r.car) return <div className="thumb3d cl-nocar">🚫</div>
   const d = carDef(r.car.model)
   const c = r.car
-  return <CarThumb color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} body={d.body} model={d.id} stripe={c.stripe} mods={c.mods} />
+  return <CarThumb color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} hat={c.hat} body={d.body} model={d.id} stripe={c.stripe} mods={c.mods} />
 }
 
 // Race this crewmate: live when they're in the lobby, otherwise their ghost.

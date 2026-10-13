@@ -18,6 +18,7 @@ import { PlayerName } from './Username'
 import { LoadingScene } from './Loading'
 import { Crest } from './CrewHub'
 import { artStyle } from './venueArt'
+import { useCanvasDpr } from '../lib/prefs'
 
 // Crew battles: a strip in the Crew window and the full-screen showdown, where the two crews' cars
 // face off at the start line of the week's venue with the live score and both rosters docked below.
@@ -178,7 +179,7 @@ function LastBattle({ b, payable }: { b: Battle; payable: boolean }) {
 
 // A car for the rival crew: one near the player's own in class, picked by the crew so it stays put,
 // painted in the crew's colour. Bikes, buses and the like sit this one out.
-const SHOWDOWN = new Set(['scooter', 'chopper', 'sportbike', 'bus', 'dogvan', 'tank', 'van'])
+const SHOWDOWN = new Set(['scooter', 'chopper', 'sportbike', 'bus', 'dogvan', 'tank', 'van', 'icecream', 'parcel', 'monster'])
 function rivalCar(mine: OwnedCar, tag: string) {
   const price = carDef(mine.model).price || 20000
   const near = CARS.filter((c) => c.price > 0 && !c.rescueOnly && !c.season && !SHOWDOWN.has(c.body)).sort((a, b) => Math.abs(Math.log(a.price / price)) - Math.abs(Math.log(b.price / price))).slice(0, 5)
@@ -207,6 +208,7 @@ function NoCrew({ onFind, children }: { onFind: () => void; children?: React.Rea
 }
 
 export function BattlePanel() {
+  const dpr = useCanvasDpr()
   const battle = useCrewBattle((s) => s.battle)
   const cars = useGame((s) => s.cars)
   const openPanel = useGame((s) => s.openPanel)
@@ -239,9 +241,9 @@ export function BattlePanel() {
   const rec = battle!.record
   return (
     <div className="race-full cb-full">
-      <Canvas className="rf-canvas" camera={{ position: [0, 1.1, -5], fov: 55, near: 0.3, far: 150 }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
+      <Canvas className="rf-canvas" camera={{ position: [0, 1.1, -5], fov: 55, near: 0.3, far: 150 }} dpr={dpr} gl={{ toneMapping: NeutralToneMapping }}>
         <BattleScene venue={v} lead={lead}
-          mine={{ body: carDef(car.model).body, model: car.model, color: car.color, finish: car.finish, skin: car.skin, modSkin: car.modSkin, panels: car.panels, mods: car.mods }}
+          mine={{ body: carDef(car.model).body, model: car.model, color: car.color, finish: car.finish, skin: car.skin, modSkin: car.modSkin, panels: car.panels, mods: car.mods, hat: car.hat }}
           theirs={{ body: rival.body, model: rival.id, color: b.them.color }}
           us={{ tag: b.us.tag, color: b.us.color }} them={{ tag: b.them.tag, color: b.them.color }} />
       </Canvas>

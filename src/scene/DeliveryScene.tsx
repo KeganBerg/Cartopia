@@ -364,7 +364,7 @@ export function DeliveryScene({ me, input, running, onHud, onEnd }: {
         <CarShadow len={LEN} wid={f.wid * sc} />
         <group ref={body}>
           <Footprinted id={`${me.body}:${me.model}:${me.mods?.join()}`} scale={sc} onFoot={(ft) => void (foot.current = ft)}>
-            <CarModel body={me.body} model={me.model} color={me.color} finish={me.finish} skin={me.skin} modSkin={me.modSkin} panels={me.panels} trim={me.trim} mods={me.mods} beams={view.beams} />
+            <CarModel body={me.body} model={me.model} color={me.color} finish={me.finish} skin={me.skin} modSkin={me.modSkin} panels={me.panels} trim={me.trim} hat={me.hat} mods={me.mods} beams={view.beams} />
           </Footprinted>
         </group>
         {/* The pizza box on the roof while there's an order on board. */}

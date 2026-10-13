@@ -9,6 +9,8 @@ import { CarThumb } from '../scene/BuildingPreview'
 import { supabase } from '../lib/supabase'
 import { Panel } from './Menus'
 import { StageSlot, useStageReady, warmStage } from '../scene/Stage'
+import { SnapshotButton } from './Snapshot'
+import { CustomKart, type CustomPick } from './CustomKart'
 import { pauseTownDraw } from '../scene/renderGate'
 import { RaceScene, startLights, finishView } from '../scene/RaceScene'
 import { heroShot } from '../scene/heroShot'
@@ -41,7 +43,7 @@ import './race-menu.css'
 import { KartGame, playerRacer, type KartRacer } from './Kart'
 import { LiveKart } from './LiveKart'
 import { LiveKartParty } from './LiveKartParty'
-import { gpField, gpTrack } from '../game/kart'
+import { BLAST_PI, TRACKS, gpField, gpTrack, partyPrize, type KartRules } from '../game/kart'
 import { gpClearPi } from '../game/gpBeat'
 import { look as kartLook } from './ArcadeBits'
 import { TOUR_RACES, tourLeg, tourLegOf, tourIsBoss, tourRivalPi, tourShift, tourSkills, tourRivalName, tourPrize, tourLegBonus } from '../game/tour'
@@ -65,6 +67,7 @@ import type { DailyRun } from '../game/daily'
 import { WorldTour, worldChip } from './WorldTour'
 import { WORLD_TOUR, worldCar, worldPrize, worldShift } from '../game/worldTour'
 import { CHALLENGER_BONUS, makeChallenger } from '../game/challenger'
+import { usePrefs } from '../lib/prefs'
 
 // skill: the rival car's race skill. AI rivals use it; live players use theirs on their own device.
 // shift: how cleanly an AI rival shifts, 0 (sloppy) to 1 (always perfect, the default).
@@ -98,6 +101,23 @@ function gpKartField(series: GpSeries, round: number, rival: Rival, car: OwnedCa
     return { name: f.name, pi: f.pi, ai: true, skill: f.skill, look: kartLook({ uid: '', model: c.id, color: f.name === rival.town ? rival.color : c.colors[i % c.colors.length], upgrades: zero }) }
   })
 }
+
+// Party races: five rivals in random cars, at the player's PI (Bumper Blast tunes every
+// kart the same anyway, game/kart.ts BLAST_PI).
+const BLASTERS = ['Crash Carla', 'Dent Dexter', 'Fender Fran', 'Wreck Rex', 'Smash Sami', 'Bonk Benny', 'Crunch Cleo', 'Rumble Ray']
+function blastField(car: OwnedCar, rivalPi = BLAST_PI): KartRacer[] {
+  const names = [...BLASTERS].sort(() => Math.random() - 0.5)
+  const field: KartRacer[] = Array.from({ length: 5 }, (_, i) => {
+    const c = CARS[Math.floor(Math.random() * CARS.length)]
+    return { name: names[i], pi: rivalPi, ai: true, skill: 0.45 + i * 0.1, look: kartLook({ uid: '', model: c.id, color: c.colors[i % c.colors.length], upgrades: zero }) }
+  })
+  return [...field, playerRacer(car)]
+}
+// A party race (Bumper Blast, or a custom race with its own rules). The field takes
+// random cars; with Bumper Blast's rules every kart is tuned the same anyway.
+type Party = { track: number; reverse: boolean; field: KartRacer[]; rules: KartRules; prize: number; custom: boolean }
+const blastPick = (): CustomPick => ({ track: Math.floor(Math.random() * TRACKS.length), reverse: Math.random() < 0.5, rules: { blast: true } })
+const partySetup = (car: OwnedCar, p: CustomPick, level: number, custom: boolean): Party => ({ ...p, field: blastField(car, p.rules.blast ? BLAST_PI : pi(car)), prize: partyPrize(level), custom })
 
 // The car PI the series' final race needs before the server will accept the clear (0 before the final).
 export function gpFinalNeed(series: GpSeries, clears: number, round: number) {
@@ -207,6 +227,8 @@ export function RacePanel() {
   const [eRace, setERace] = useState<{ race: number; rival: Rival; prize: number } | null>(null)
   const [pRace, setPRace] = useState<{ def: PaintRival; rival: Rival; prize: number } | null>(null)
   const [kRace, setKRace] = useState<{ def: TunerTrial; rival: Rival; prize: number } | null>(null)
+  const [party, setParty] = useState<Party | null>(null)
+  const [customOpen, setCustomOpen] = useState(false)
   const tuner = useGame((s) => s.tuner)
   const [trialSel, setTrialSel] = useState(() => firstTrialPick(useGame.getState().tuner))
   const [uRace, setURace] = useState<{ def: CupRace; rival: Rival; prize: number } | null>(null)
@@ -351,6 +373,7 @@ export function RacePanel() {
         track={def}
         reverse={reverse}
         field={gpRace.field}
+        rules={{ obstacles: reverse }}
         next={gpNext(gpRace.series)}
         prize={gpRace.prize}
         title={`${GP_CUP[GP_SERIES.indexOf(gpRace.series)] ?? '🏆'} ${round + 1}/${GP_ROUNDS} · ${def.icon} ${def.short}${reverse ? ' ↺' : ''}`}
@@ -375,6 +398,27 @@ export function RacePanel() {
         onFinish={(_won, myTime) => useGame.getState().dailyResult(myTime)}
         resultView={(r) => <DailyResult run={run} myTime={r.myTime} onAgain={() => startDaily(run)} onExit={() => { setDaily(null); setTab('daily') }} />}
         onExit={() => { setDaily(null); setTab('daily') }}
+      />
+    )
+  }
+
+  if (party && car) {
+    const def = TRACKS[party.track]
+    const pick: CustomPick = { track: party.track, reverse: party.reverse, rules: party.rules }
+    const title = party.custom ? `🛠️ Custom · ${def.icon} ${def.short}${party.reverse ? ' ↺' : ''}` : `💥 Bumper Blast · ${def.icon} ${def.short}`
+    return (
+      <KartGame
+        key={seq}
+        car={car}
+        track={def}
+        reverse={party.reverse}
+        field={party.field}
+        rules={party.rules}
+        prize={party.prize}
+        next={{ label: '↻ Again', go: () => { setParty(null); startParty(party.custom ? pick : blastPick(), party.custom) } }}
+        title={title}
+        onFinish={(place) => useGame.getState().finishRace(place === 1, party.prize)}
+        onExit={() => setParty(null)}
       />
     )
   }
@@ -633,6 +677,14 @@ export function RacePanel() {
     setSeq((n) => n + 1)
     setERace({ race: p.won, rival: eventRival(p.pi, p.won), prize: eventPrize(p.pi, p.won) })
   }
+  // Party races cost a race's fuel and pay the party prize (game/kart.ts partyPrize).
+  function startParty(p: CustomPick, custom: boolean) {
+    if (waiting() || !car) return
+    if (!spendFuel(RACE_FUEL)) return useGame.getState().showNeed('fuel', RACE_FUEL - useGame.getState().fuel, 'a race')
+    setCustomOpen(false)
+    setSeq((n) => n + 1)
+    setParty(partySetup(car, p, useGame.getState().level, custom))
+  }
   function startGp(series: GpSeries, rival: Rival, prize: number) {
     if (waiting() || !car) return
     const round = Number(rival.id.split('-').pop())
@@ -701,9 +753,10 @@ export function RacePanel() {
 
   return (
     <Panel title={TITLES[tab]} wide className="race-panel" onBack={tab === 'hub' ? undefined : () => setTab('hub')} head={chip && <span className="rm-head-chip">{chip}</span>}>
+      {customOpen && <CustomKart onGo={(p) => startParty(p, true)} onClose={() => setCustomOpen(false)} />}
       <div className={`rm-screen rm-s-${tab}`}>
         {tab === 'hub' ? (
-          <RaceHub onOpen={setTab} onCampaign={startCampaign} onTour={startTour} onEvent={startEvent} onRival={(m) => startRival(m)} />
+          <RaceHub onOpen={setTab} onCampaign={startCampaign} onTour={startTour} onEvent={startEvent} onRival={(m) => startRival(m)} onBlast={() => startParty(blastPick(), false)} onCustom={() => setCustomOpen(true)} />
         ) : tab === 'rivals' ? (
           <PaintRivals sel={rowSel} setSel={setRowSel} car={car} />
         ) : tab === 'tuner' ? (
@@ -1358,7 +1411,8 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   // The sky over the strip, rolled once: a live race from its id (both racers match), the weekly
   // time trial from its week (everyone races the same conditions), a Pro Tour race from its number
   // (so the card can show it), anything else from the town.
-  const [weather] = useState(() => raceWeather(venue.id, live?.raceId ?? (trial ? trial.seed ?? `trial-${trialWeek()}` : weatherSeed), live ? undefined : sky))
+  // Weather off in Settings clears the sky for casual races only (see prefs.ts).
+  const [weather] = useState(() => raceWeather(venue.id, live?.raceId ?? (trial ? trial.seed ?? `trial-${trialWeek()}` : weatherSeed), live ? undefined : (sky ?? (!trial && !usePrefs.getState().raceWeather ? 'clear' : undefined))))
   // What the weather and venue do to each car's grip (see grip.ts). AI rivals race on stock tires.
   const grip = useMemo(() => conditions(weather.kind, venue.id, carGrip(def, car.upgrades, car.mods), car.mods), [weather, venue, def, car.upgrades, car.mods])
   const theirGrip = useMemo(() => conditions(weather.kind, venue.id, CARS.find((c) => c.name === shownRival.carName)?.grip ?? 50), [weather, venue, shownRival.carName])
@@ -1759,7 +1813,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
 
   // The race screen redraws every frame (dials, lanes); the 3D scene only changes with
   // its inputs, so it's built once rather than re-rendered sixty times a second.
-  const mineLook = useMemo(() => ({ body: def.body, model: car.model, color: car.color, finish: car.finish, skin: car.skin, modSkin: car.modSkin, panels: car.panels, mods: car.mods, trim: car.trim }), [def.body, car.model, car.color, car.finish, car.skin, car.modSkin, car.panels, car.mods, car.trim])
+  const mineLook = useMemo(() => ({ body: def.body, model: car.model, color: car.color, finish: car.finish, skin: car.skin, modSkin: car.modSkin, panels: car.panels, mods: car.mods, trim: car.trim, hat: car.hat }), [def.body, car.model, car.color, car.finish, car.skin, car.modSkin, car.panels, car.mods, car.trim, car.hat])
   const theirModel = rival.model ?? CARS.find((c) => c.name === rival.carName)?.id
   const theirLook = useMemo(() => ({ body: rival.body, model: theirModel, color: rival.color, mods: rival.mods }), [rival.body, theirModel, rival.color, rival.mods])
   const photo = useRef(() => flash('PHOTO FINISH!', 2200))
@@ -1912,6 +1966,7 @@ export function RaceResult({ won, myTime, theirTime, cash, xp, rival, note, noCo
         <i key={i} className={c.round ? 'rr-bit round' : 'rr-bit'} style={{ left: `${c.left}%`, background: c.color, animationDelay: `${c.delay}s`, animationDuration: `${c.dur}s`, ['--drift' as string]: `${c.drift}vw` }} />
       ))}
       <div className="rr-card">
+        {won && !noContest && <SnapshotButton caption={`🏆 Beat ${rival}`} />}
         <div className="rr-icon">{won ? '🏆' : '🏁'}</div>
         <h3 className="rr-title">{noContest ? 'NO RESULT' : won ? 'YOU WIN!' : margin !== null && margin < 0.3 ? 'SO CLOSE!' : 'OUTRUN!'}</h3>
         {!noContest && (

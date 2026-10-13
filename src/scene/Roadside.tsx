@@ -1,12 +1,11 @@
 import { BufferAttribute, BufferGeometry, ExtrudeGeometry, MeshStandardMaterial, Shape } from 'three'
-import { HaloSpot } from './halos'
 import { TILE } from '../game/data'
 import { glowMats } from './dayNight'
-import { LightPool } from './BuildingModel'
 import { decal, LAYER } from './layers'
 import { drainTex, paverTex, roadWearTex, tactileTex } from './textures'
 import { PropMesh } from './propKit'
-import { STREET_PROPS, hydrant, plateGeo, speedPlate, streetLamp } from './streetProps'
+import { STREET_PROPS, hydrant, plateGeo, speedPlate } from './streetProps'
+import { LampPost, useLampDesign } from './LampPosts'
 
 // Street-level detail for road tiles: wear on the asphalt (grime along the
 // kerbs, hairline cracks, tar patches, oil drips where cars wait) and small
@@ -251,14 +250,13 @@ export function Hydrant({ side }: { side: 'e' | 'w' | 's' | 'n' }) {
 export function StreetLamp({ side }: { side: 'e' | 'w' | 's' | 'n' }) {
   const half = TILE / 2 - 0.18
   const rot = { s: 0, n: Math.PI, e: Math.PI / 2, w: -Math.PI / 2 }[side]
+  const design = useLampDesign('cobra')
   return (
     <group rotation-y={rot}>
+      {/* The pool sits above the kerb so the glow spills over the sidewalk too. */}
       <group position={[0.55, 0, half]}>
-        <PropMesh parts={streetLamp()} />
+        <LampPost design={design} />
       </group>
-      {/* Above the kerb so the glow spills over the sidewalk too. */}
-      <LightPool r={0.95} x={0.55} z={half - 0.5} y={0.09} />
-      <HaloSpot at={[0.55, 1.7, half - 0.44]} />
     </group>
   )
 }

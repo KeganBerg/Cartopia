@@ -59,6 +59,12 @@ input { font: inherit; padding: 8px 10px; border-radius: 10px; border: 2px solid
 
 .edit-bar { position: absolute; z-index: 50; bottom: calc(10px + var(--sab)); left: 50%; transform: translateX(-50%); background: var(--panel); border: 3px solid #fff; border-radius: 16px; padding: 8px; box-shadow: 0 4px 0 rgba(0,0,0,.3); text-align: center; max-width: calc(100vw - 20px); }
 .edit-hint { font-weight: 800; margin-bottom: 6px; }
+.traffic-meter { display: inline-flex; align-items: center; gap: 6px; margin: 0 auto 6px; padding: 3px 10px; border-radius: 999px; background: rgba(0,0,0,.35); color: #fff; font-size: 13px; }
+.traffic-meter b { color: var(--tc); }
+.traffic-meter .tm-bar { position: relative; display: block; width: 70px; height: 7px; border-radius: 4px; background: rgba(255,255,255,.2); overflow: hidden; }
+.traffic-meter .tm-bar > i { position: absolute; inset: 0 auto 0 0; display: block; background: var(--tc); transition: width .3s; }
+.traffic-meter .tm-bar > .tm-min { left: 50%; width: 2px; background: #fff; }
+.traffic-meter small { font-weight: 700; opacity: .9; }
 .edit-tools { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
 .tool { font: 16px var(--display); padding: 6px 12px; border-radius: 12px; border: 2px solid #b0bec5; background: #fff; }
 .tool.active { background: #ffe082; border-color: #f9a825; }
@@ -1141,6 +1147,8 @@ html.calm .callout { animation: none !important; }
 .rr-bit.round { width: 10px; height: 10px; border-radius: 50%; }
 @keyframes rr-fall { 0% { transform: translate(0, 0) rotate(0); } 100% { transform: translate(var(--drift), 110vh) rotate(720deg); } }
 .rr-card { position: relative; text-align: center; background: var(--panel); border: 4px solid #fff; border-radius: 24px; padding: 18px 26px 20px; width: min(340px, 100%); box-shadow: 0 8px 0 rgba(0,0,0,.25), 0 0 60px rgba(255,213,79,.35); animation: rr-in .55s cubic-bezier(.2,1.6,.4,1) both; }
+.snap-btn { position: absolute; top: 8px; right: 8px; z-index: 2; width: 44px; height: 44px; border-radius: 50%; border: 3px solid #fff; background: #1e88e5; font-size: 20px; line-height: 1; box-shadow: 0 3px 0 rgba(0,0,0,.25); cursor: pointer; }
+.snap-btn:disabled { opacity: .6; }
 .rr.lose .rr-card { box-shadow: 0 8px 0 rgba(0,0,0,.25); animation-duration: .35s; animation-timing-function: ease-out; }
 @keyframes rr-in { from { transform: scale(.4) translateY(40px); opacity: 0; } }
 .rr-icon { font-size: 64px; line-height: 1; margin-top: -58px; filter: drop-shadow(0 4px 0 rgba(0,0,0,.2)); animation: rr-bounce 1.2s ease-in-out .5s infinite; }
@@ -1193,6 +1201,15 @@ html.calm .callout { animation: none !important; }
 .upgrade-pips { display: flex; gap: 4px; justify-content: center; }
 .upgrade-pips i { width: 18px; height: 8px; border-radius: 4px; background: #cfd8dc; }
 .upgrade-pips i.on { background: linear-gradient(#ffd54f, #ff8f00); box-shadow: 0 1px 0 rgba(0,0,0,.2); }
+.theme-strip { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 10px 0 2px; }
+.theme-dot { width: 34px; height: 34px; border-radius: 50%; border: 2px solid rgba(0,0,0,.18); padding: 0; cursor: pointer; font-size: 16px; line-height: 1; background: #fff; }
+.theme-dot.sel { border-color: #ff8f00; box-shadow: 0 0 0 3px rgba(255,143,0,.35); }
+.city-look .theme-strip { justify-content: flex-start; }
+.city-look h3 { margin: 12px 0 4px; }
+.lamp-posts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.lamp-posts button { padding: 8px 4px; border-radius: 10px; border: 2px solid rgba(0,0,0,.12); background: #fff; font-size: 12px; display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; }
+.lamp-posts button.sel { border-color: #ff8f00; background: #fff8e1; }
+.lamp-posts button span { font-size: 20px; }
 .upgrade-stats { width: 100%; border-collapse: collapse; background: #fff; border: 2px solid #e0e0e0; border-radius: 12px; overflow: hidden; font-weight: 800; font-size: 14px; }
 .upgrade-stats th { font: 13px var(--display); color: #607d8b; text-align: right; padding: 6px 10px 2px; }
 .upgrade-stats td { padding: 5px 10px; border-top: 1px solid #eceff1; text-align: right; color: #455a64; }
@@ -1223,8 +1240,9 @@ html.calm .callout { animation: none !important; }
 .upgrade-more { display: block; margin: 0 auto 6px; background: none; border: none; font: 14px var(--display); color: var(--blue, #1e88e5); text-decoration: underline; }
 
 /* Garage tabs and the mod shop. */
-.garage-tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; background: #eceff1; border-radius: 12px; padding: 4px; margin: 10px 0 6px; }
-.garage-tabs button { border: 0; background: transparent; border-radius: 9px; padding: 8px 4px; font: 14px var(--display); color: #546e7a; cursor: pointer; }
+.garage-tabs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; background: #eceff1; border-radius: 12px; padding: 4px; margin: 10px 0 6px; }
+.garage-tabs button { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; border: 0; background: transparent; border-radius: 9px; padding: 6px 2px; font: 13px/1.1 var(--display); color: #546e7a; cursor: pointer; white-space: nowrap; }
+.garage-tabs button i { font-style: normal; font-size: 16px; line-height: 1.1; }
 .garage-tabs button.sel { background: #fff; color: #263238; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15); }
 .mod-tabs { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; }
 .mod-tab { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; border: 2px solid #e0e0e0; background: #fafafa; border-radius: 10px; padding: 6px 2px; font: 800 11px Nunito, sans-serif; color: #455a64; cursor: pointer; }
@@ -1465,7 +1483,7 @@ html.calm .callout { animation: none !important; }
 .preset { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 4px; border-radius: 12px; border: 1.5px solid #dfe5ea; background: #fff; min-width: 0; }
 .preset.empty { justify-content: center; min-height: 92px; border-style: dashed; }
 .preset-row { display: flex; gap: 4px; }
-@media (max-width: 520px) { .patterns, .trim-opts { grid-template-columns: repeat(3, 1fr); } .garage-tabs button { font-size: 12px; padding: 8px 1px; white-space: nowrap; } }
+@media (max-width: 520px) { .patterns, .trim-opts { grid-template-columns: repeat(3, 1fr); } .garage-tabs { grid-template-columns: repeat(3, 1fr); } .garage-tabs button { font-size: 12px; padding: 6px 1px; } }
 
 /* Skins: a wrapping grid of animated chips edged in their tier colour, try-on bar under it. */
 .garage-detail { min-width: 0; }
@@ -2208,3 +2226,17 @@ body:has(.race-full) .toasts { display: none; }
 .pc-msgs button.sel { border-color: var(--blue); background: #e3f0ff; }
 .pc-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 12px; }
 .cr-parts .rm-cta + .rm-cta { margin-top: 4px; }
+
+/* Hats: a grid of turning hat renders, then colour swatches for the one being tried. */
+.hat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; padding: 2px 0 4px; }
+.hat-opt { position: relative; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 2px 5px; border-radius: 12px; border: 1.5px solid #dfe5ea; background: #fff; font: 11px var(--display); color: #37474f; cursor: pointer; }
+.hat-opt .thumb3d.xs { --tw: 60px; --th: 46px; }
+.hat-opt b { font-weight: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.hat-opt small { font: 700 11px Nunito, sans-serif; color: #607d8b; white-space: nowrap; }
+.hat-opt.owned small { color: #2e7d32; }
+.hat-opt.sel { border-color: var(--blue); box-shadow: 0 0 0 2px var(--blue) inset; }
+.hat-opt.locked .thumb3d { filter: grayscale(1); opacity: .6; }
+.hat-none { display: grid; place-items: center; width: 60px; height: 46px; font-style: normal; font-size: 24px; color: #90a4ae; }
+.hat-tone { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: var(--seg); border-radius: 12px; padding: 4px; margin: 10px 0 2px; }
+.hat-tone button { border: 0; background: transparent; border-radius: 9px; padding: 8px 4px; min-height: 40px; font: 13px var(--display); color: #546e7a; cursor: pointer; }
+.hat-tone button.sel { background: #fff; color: #263238; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15); }

@@ -3,7 +3,7 @@ import { StageSlot, useStageReady } from '../scene/Stage'
 import type { OwnedCar } from '../game/store'
 import { carDef } from '../game/data'
 import { placeShare } from '../game/boosts'
-import { EMP_TIME, FLAT_TIME, GHOST_TIME, ITEMS, KartRace, LAPS, ROCKET_TIME, SMOKE_TIME, SPLAT_TIME, SHARP_ASSIST, TOUCH_ASSIST, TOW_TIME, buildTrack, catchUp, type ItemId, type KartEvent, type TrackDef } from '../game/kart'
+import { EMP_TIME, FLAT_TIME, GHOST_TIME, ITEMS, KartRace, LAPS, ROCKET_TIME, SMOKE_TIME, SPLAT_TIME, SHARP_ASSIST, TOUCH_ASSIST, TOW_TIME, buildTrack, catchUp, type ItemId, type KartEvent, type KartRules, type TrackDef } from '../game/kart'
 import { KartScene, kartLights, type KartHud } from '../scene/KartScene'
 import { heroShot } from '../scene/heroShot'
 import type { ChaseCar } from '../scene/ChaseScene'
@@ -14,6 +14,7 @@ import { look as lookOf, pi } from './ArcadeBits'
 import { sfx, audioContext, audioOut } from '../lib/sound'
 import { airSound, buzzSound, bumpSound, crashSound, dingSound, fuelSound, landSound, revSound, splashSound } from '../lib/arcadeSound'
 import { EngineVoice } from '../lib/engineAudio'
+import { SnapshotButton } from './Snapshot'
 import { buzz as haptic } from '../lib/haptics'
 import { nearMiss, stepNearMiss } from '../game/nearMiss'
 import { Callout } from './Callout'
@@ -32,14 +33,15 @@ const ORD = (n: number) => `${n}${n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'r
 
 const KART_CAM = { position: [0, 4, -8] as [number, number, number], fov: 60, near: 0.3, far: 420 }
 // A short buzz in the hand for the moments that matter (phones that can).
-const BUZZ: Partial<Record<KartEvent['kind'], number | number[]>> = { wall: 25, bump: 12, hit: [40, 30, 60], boom: 80, turbo: 18, boost: 12, land: 15, crate: 8 }
+const BUZZ: Partial<Record<KartEvent['kind'], number | number[]>> = { wall: 25, bump: 12, hit: [40, 30, 60], boom: 80, turbo: 18, boost: 12, land: 15, crate: 8, boxes: 40, glass: 30, pothole: 20 }
 function buzzFor(kind: KartEvent['kind']) {
   const p = BUZZ[kind]
   if (p) haptic(p)
 }
 
-export function KartGame({ car, title, track, reverse, field, prize, next, onFinish, onExit, live }: {
+export function KartGame({ car, title, track, reverse, field, prize, next, onFinish, onExit, live, rules }: {
   car: OwnedCar; title: string; track: TrackDef; reverse: boolean
+  rules?: KartRules // road obstacles, Bumper Blast (single-player races only)
   field: KartRacer[] // the player is the one with ai: false (in a live race: live.me)
   prize?: number
   next?: KartNext | null
@@ -53,7 +55,7 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
 }) {
   const t = useMemo(() => buildTrack(track, reverse), [track, reverse])
   const me = live ? live.me : field.findIndex((f) => !f.ai)
-  const race = useMemo(() => live?.race ?? new KartRace(t, field.map((f) => ({ name: f.name, pi: f.pi, ai: f.ai, skill: f.skill, weight: f.look.model ? carDef(f.look.model).weight : undefined })), Math.floor(Math.random() * 1e6)), [t, field, live?.race])
+  const race = useMemo(() => live?.race ?? new KartRace(t, field.map((f) => ({ name: f.name, pi: f.pi, ai: f.ai, skill: f.skill, weight: f.look.model ? carDef(f.look.model).weight : undefined })), Math.floor(Math.random() * 1e6), rules), [t, field, live?.race]) // eslint-disable-line react-hooks/exhaustive-deps
   const looks = useMemo(() => field.map((f) => f.look), [field])
   const touch = useTouchDevice()
   // On a phone the kart leans gently towards the racing line while the thumb is near the middle.
@@ -133,6 +135,9 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
       else if (e.kind === 'rocket') { revSound(1.2); engine.current?.rev(1) }
       else if (e.kind === 'splat') splashSound()
       else if (e.kind === 'boom') crashSound()
+      else if (e.kind === 'boxes' || e.kind === 'glass') crashSound()
+      else if (e.kind === 'pothole') bumpSound()
+      else if (e.kind === 'ice') airSound()
       else if (e.kind === 'lap') { dingSound(1); setFlash(e.value === LAPS ? 'FINAL LAP!' : `LAP ${e.value}`) }
     }
   }
@@ -351,6 +356,7 @@ function Podium({ race, field, me, end, prize, next, verdict, onExit }: { race: 
   return (
     <div className={won ? 'rr win kt-end' : 'rr lose kt-end'}>
       <div className="kt-podium-card">
+        {won && <SnapshotButton caption="🏆 1st place" />}
         <h2>{won ? '🏆 You win!' : `${ORD(end.place)} place`}</h2>
         <div className="kt-podium">
           {[1, 0, 2].map((p) => {
@@ -360,7 +366,7 @@ function Podium({ race, field, me, end, prize, next, verdict, onExit }: { race: 
             const d = carDef(f.look.model ?? '')
             return (
               <div key={p} className={`kt-step s${p + 1}${i === me ? ' me' : ''}`}>
-                <CarThumb size="sm" color={f.look.color} finish={f.look.finish} skin={f.look.skin} modSkin={f.look.modSkin} body={f.look.body as never} model={d.id} mods={f.look.mods} />
+                <CarThumb size="sm" color={f.look.color} finish={f.look.finish} skin={f.look.skin} modSkin={f.look.modSkin} hat={f.look.hat} body={f.look.body as never} model={d.id} mods={f.look.mods} />
                 <b>{i === me ? 'You' : f.name}</b>
                 <span className="kt-block">{p + 1}</span>
               </div>

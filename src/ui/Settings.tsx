@@ -77,6 +77,11 @@ export function SettingsTab({ user }: { user: User | null }) {
         </div>
         <small className="set-note">{GRAPHICS.find((g) => g.id === prefs.graphics)!.sub}</small>
       </Group>
+      <Group icon="🏁" title="Racing">
+        <Row label="Race weather" sub="Off: clear skies in casual races">
+          <Switch label="Race weather" on={prefs.raceWeather} onChange={(on) => setPrefs({ raceWeather: on })} />
+        </Row>
+      </Group>
       <Group icon="🏎️" title="Karts">
         {touch && (
           <div className="seg set-seg" role="radiogroup" aria-label="Kart steering">

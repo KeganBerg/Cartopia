@@ -648,7 +648,7 @@ export function PitScene({ me, input, running, onHud, onEnd }: {
       <group ref={car} rotation-y={Math.PI / 2} position-x={PIT_START}>
         <CarShadow len={LEN} wid={f.wid * sc} />
         <group scale={sc}>
-          <CarModel body={me.body} model={me.model} color={me.color} finish={me.finish} skin={me.skin} modSkin={me.modSkin} panels={me.panels} trim={me.trim} mods={me.mods} beams={view.beams} rig={rig} />
+          <CarModel body={me.body} model={me.model} color={me.color} finish={me.finish} skin={me.skin} modSkin={me.modSkin} panels={me.panels} trim={me.trim} hat={me.hat} mods={me.mods} beams={view.beams} rig={rig} />
         </group>
       </group>
       {[0, 1].map((k) => (
