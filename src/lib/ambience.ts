@@ -122,14 +122,14 @@ export function setEar(f: (x: number, z: number) => number, near?: (x: number, z
 type Singer = { kind: Species; pan: number; dist: number; next: number }
 
 // A short room-like echo tail (decaying stereo noise), so sounds sit in a space.
-function echoTail(ctx: BaseAudioContext, seconds: number) {
+function echoTail(ctx: BaseAudioContext, seconds: number, random = Math.random) {
   const buf = ctx.createBuffer(2, Math.floor(ctx.sampleRate * seconds), ctx.sampleRate)
   for (let c = 0; c < 2; c++) {
     const d = buf.getChannelData(c)
     let lp = 0
     for (let i = 0; i < d.length; i++) {
       const x = i / d.length
-      lp += 0.35 * (Math.random() * 2 - 1 - lp) // soften the highs a little
+      lp += 0.35 * (random() * 2 - 1 - lp) // soften the highs a little
       d[i] = i < ctx.sampleRate * 0.012 ? 0 : lp * Math.pow(1 - x, 3)
     }
   }
@@ -155,6 +155,8 @@ export class Soundscape {
   private musicPan: StereoPannerNode | null
   private keys: BiquadFilterNode
   private hats: GainNode
+  private duck: GainNode
+  private verb: GainNode
   private crush: WaveShaperNode
   private doorUntil = 0
   // The next sixteenth of the club's track to schedule (-1: start afresh), the
@@ -238,7 +240,19 @@ export class Soundscape {
     this.thump.connect(drive).connect(this.filter('highpass', 160)).connect(grit).connect(this.gritTone)
     // Chord stabs come through the walls a little brighter than the bass, and
     // the hi-hats only leak out when you're close (or someone opens the door).
-    this.keys = this.filter('lowpass', 900, this.music)
+    // The chords, pads and hooks duck under every kick (sidechain pumping),
+    // and the hooks get a long hall reverb that pumps with them.
+    this.duck = ctx.createGain()
+    this.duck.connect(this.music)
+    this.keys = this.filter('lowpass', 900, this.duck)
+    this.verb = ctx.createGain()
+    this.verb.gain.value = 0.35
+    const hall = ctx.createConvolver()
+    // Its own fixed noise, so building it doesn't disturb the town's random sounds.
+    let seed = 7
+    hall.buffer = echoTail(ctx, 2.6, () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646)
+    this.verb.connect(this.filter('highpass', 250, hall))
+    hall.connect(this.keys)
     this.hats = ctx.createGain()
     this.hats.gain.value = 0
     this.hats.connect(this.music)
@@ -474,7 +488,9 @@ export class Soundscape {
     // Only a town with its own nightclub hears it, louder the closer it is.
     // During Techno Night the event track takes over and the club falls quiet.
     const near = !club || this.techno ? 0 : typeof club === 'object' ? (club.near ?? 1) : 1
-    const level = 0.62 * near
+    // (0.44: the hall reverb makes the music stereo, so the panner no longer
+    // takes 3 dB off it as it does a mono sound.)
+    const level = 0.44 * near
     if (near > 0.6 && t > this.doorUntil + 4 && Math.random() < 0.025) this.doorUntil = t + rand(1.8, 3)
     const door = near > 0.6 && t < this.doorUntil ? 1 : 0
     this.music.gain.setTargetAtTime(level * (1 + door * 0.25), t, door ? 0.15 : 2)
@@ -538,6 +554,11 @@ export class Soundscape {
     if (d.kick) {
       cue('kick', SWELL)
       this.kick(b, g.kickTone ?? 'house', g.gain)
+      // Sidechain: everything melodic dips on the kick and swells back.
+      const pump = g.pump ?? 0.25
+      this.duck.gain.setValueAtTime(1, b)
+      this.duck.gain.linearRampToValueAtTime(1 - pump, b + 0.015)
+      this.duck.gain.setTargetAtTime(1, b + 0.015, 0.075)
     }
     // The second half's bass line jumps up an octave now and then.
     const note = g.bass[k] * (d.variant && k % 8 === 6 && g.bass[k] ? 2 : 1)
@@ -562,7 +583,11 @@ export class Soundscape {
     const pitch = d.lead && tune ? tune.notes[(d.bar * 16 + k) % tune.notes.length] : null
     if (tune && pitch !== null && pitch !== undefined) {
       cue('lead', 0.01, Math.max(0.3, sweep) * vol)
-      this.lead(b, tune.root * 2 ** (pitch / 12), sixteenth * tune.len, tune.tone, g.gain * vol, Math.max(0.15, sweep))
+      const hz = tune.root * 2 ** (pitch / 12)
+      // A stutter edit: the note chopped into two quick repeats.
+      if (tune.stutter?.includes((d.bar * 16 + k) % tune.notes.length)) {
+        for (const at of [b, b + sixteenth / 2]) this.lead(at, hz, sixteenth * 0.4, tune.tone, g.gain * vol, Math.max(0.15, sweep))
+      } else this.lead(b, hz, sixteenth * tune.len, tune.tone, g.gain * vol, Math.max(0.15, sweep))
     }
     if (d.lows && g.perc?.includes(k)) {
       cue('perc', 0.005, vol)
@@ -665,6 +690,7 @@ export class Soundscape {
     const lp = this.filter('lowpass', 400 + 3600 * bright * bright, this.keys, tone === 'pluck' ? 2 : 0.8)
     const g = this.ctx.createGain()
     g.connect(lp)
+    lp.connect(this.verb)
     const peak = { supersaw: 0.03, pluck: 0.085, square: 0.03, bell: 0.06, brass: 0.04, marimba: 0.08, vox: 0.2 }[tone] * gain
     const ring = tone === 'bell' ? 0.6 : tone === 'pluck' || tone === 'vox' ? 0.25 : tone === 'marimba' ? 0.35 : 0.07
     g.gain.setValueAtTime(0.0001, t)
