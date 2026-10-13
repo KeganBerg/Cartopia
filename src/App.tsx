@@ -39,6 +39,7 @@ import { GoalsPanel, FlatPanel } from './ui/Goals'
 import { SeasonPanel } from './ui/Season'
 import { useGame } from './game/store'
 import { startCloudSync } from './lib/cloud'
+import { startPurchaseSync } from './lib/payments'
 import './lib/rescue'
 import './lib/crates'
 import './lib/accountSwitch'
@@ -100,6 +101,7 @@ export default function App() {
 
   useEffect(() => {
     startCloudSync()
+    startPurchaseSync()
     startAmbience()
     startMusic()
     startTechnoMusic()
