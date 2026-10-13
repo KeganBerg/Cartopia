@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildingDef, carDef, knownBuilding, BUILDINGS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost, jobLevel, houseResidents, levelName, performance, fittedMods, modStats, modCost, MODS, MOD_SLOTS, modFits, ownedMods, CARS, takesDriver, loves, driverPayout, skillBoost, skillDrag, liveSkillBoost, SKILLS , CAMPAIGN, CAMPAIGN_RACES, campaignRivalPi, campaignReward, campaignShift, rookieRace, ROOKIE_SHIFT, campaignStars, CAR_SETS, carSource, readySets } from './data'
+import { buildingDef, carDef, knownBuilding, BUILDINGS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost, jobLevel, houseResidents, levelName, performance, fittedMods, modStats, modCost, MODS, MOD_SLOTS, modFits, ownedMods, CARS, takesDriver, loves, driverPayout, skillBoost, skillDrag, liveSkillBoost, SKILLS , CAMPAIGN, CAMPAIGN_RACES, campaignRivalPi, campaignReward, campaignShift, rookieRace, ROOKIE_SHIFT, campaignStars, CAR_SETS, carSource, readySets, RESCUE_SPOTS } from './data'
 import { MAX_RACE_PI } from './race'
 import { VENUES } from '../scene/venues'
 
@@ -262,5 +262,28 @@ describe('quick first jobs', () => {
     expect(jobSeconds(pizza, 1, 0)).toBe(25)
     expect(jobSeconds(pizza, 1, QUICK_JOBS - 1)).toBe(25)
     expect(jobSeconds(pizza, 1, QUICK_JOBS)).toBe(upgradeJobSeconds(pizza, 1))
+  })
+})
+
+describe('PI by unlock level', () => {
+  const none = { engine: 0, turbo: 0, tires: 0, weight: 0 }
+  const shop = CARS.filter((c) => !c.rescueOnly && !c.season && !c.secret)
+  const bestBefore = (level: number) => Math.max(0, ...shop.filter((c) => c.unlockLevel < level).map((c) => performance(c, none)))
+
+  it('never unlocks a Showroom car slower than one from an earlier level', () => {
+    for (const c of shop) expect(performance(c, none), c.id).toBeGreaterThanOrEqual(bestBefore(c.unlockLevel))
+  })
+
+  it('gives each new level a best car quicker than the last, up to the top of the Showroom', () => {
+    for (const level of new Set(shop.map((c) => c.unlockLevel))) {
+      const best = Math.max(...shop.filter((c) => c.unlockLevel === level).map((c) => performance(c, none)))
+      expect(best, `level ${level}`).toBeGreaterThan(Math.min(95, bestBefore(level)))
+    }
+  })
+
+  it('keeps Rusty finds at least as quick as the Showroom where they first turn up', () => {
+    const first: Record<string, number> = {}
+    for (const spot of RESCUE_SPOTS) for (const { model } of spot.cars) first[model] = Math.min(first[model] ?? 99, spot.unlockLevel)
+    for (const c of CARS.filter((x) => x.rescueOnly)) expect(performance(c, none), c.id).toBeGreaterThanOrEqual(bestBefore(first[c.id] ?? 1))
   })
 })
