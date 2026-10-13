@@ -154,6 +154,15 @@ export function RustysYard({ m, ghost, sign, bulb, win, lvl, lift }: Props) {
         {bulb}
       </mesh>
       {sign && (
+        <>
+          {/* The board the lettering is painted on, bolted to the gable. */}
+          <Box m={m} at={[QX, QY + 0.84, QZ1 + 0.0225]} s={[1.0, 0.28, 0.045]} c="#b71c1c" />
+          {[-0.46, 0.46].flatMap((x) => [-0.11, 0.11].map((y) => (
+            <Cyl key={`${x}${y}`} m={m} at={[QX + x, QY + 0.84 + y, QZ1 + 0.047]} r={0.009} h={0.006} c="#cfd8dc" seg={6} rot={[Math.PI / 2, 0, 0]} />
+          )))}
+        </>
+      )}
+      {sign && (
         <mesh position={[QX, QY + 0.66 + 0.18, QZ1 + 0.05]}>
           <planeGeometry args={[0.95, 0.95 / 4]} />
           <meshBasicMaterial map={signTexture("RUSTY'S", '#fffde7', '#c62828')} toneMapped={false} />
@@ -163,20 +172,63 @@ export function RustysYard({ m, ghost, sign, bulb, win, lvl, lift }: Props) {
       {/* A rescued classic up on the two-post lift in front of the bay. */}
       {!ghost && (
         <group position={[QX, 0.05, 0.62]}>
-          {[-0.36, 0.36].map((x) => (
-            <group key={x}>
-              <Box m={m} at={[x, 0.4, 0]} s={[0.07, 0.8, 0.07]} c="#ffb300" />
-              <Box m={m} at={[x, 0.025, 0]} s={[0.16, 0.03, 0.16]} c="#455a64" />
-              <Box m={m} at={[x * 0.62, 0.2, 0]} s={[0.24, 0.025, 0.05]} c="#37474f" />
+          {/* Two-post lift: channel columns on bolted base plates, a carriage
+              on each column with two swing arms reaching under the car's
+              jacking points, rubber pads, a crossbar with the hydraulic hose,
+              and the control box on the left column. */}
+          {[-1, 1].map((sd) => (
+            <group key={sd} position={[sd * 0.36, 0, 0]}>
+              <Box m={m} at={[0, 0.012, 0]} s={[0.17, 0.024, 0.17]} c="#455a64" />
+              {[[-0.06, -0.06], [0.06, -0.06], [-0.06, 0.06], [0.06, 0.06]].map(([bx, bz]) => <Cyl key={`${bx}${bz}`} m={m} at={[bx, 0.03, bz]} r={0.008} h={0.014} c="#b0bec5" seg={6} />)}
+              <Box m={m} at={[0, 0.42, 0]} s={[0.08, 0.8, 0.08]} c="#ffb300" />
+              {/* The channel the carriage rides in, facing the car, with its safety-lock ladder. */}
+              <Box m={m} at={[-sd * 0.041, 0.42, 0]} s={[0.004, 0.78, 0.036]} c="#37474f" shadow={false} />
+              {Array.from({ length: 8 }, (_, i) => <Box key={i} m={m} at={[-sd * 0.0445, 0.12 + i * 0.08, 0]} s={[0.003, 0.012, 0.03]} c="#90a4ae" shadow={false} />)}
+              <Box m={m} at={[-sd * 0.06, 0.3, 0]} s={[0.04, 0.12, 0.09]} c="#37474f" />
+              {/* Swing arms, angled forward and back, ending in rubber pads under the sills. */}
+              {[-1, 1].map((fz) => {
+                const tx = -sd * 0.2, tz = fz * 0.24, dx = tx - -sd * 0.06, dz = tz
+                const len = Math.hypot(dx, dz)
+                return (
+                  <group key={fz}>
+                    <Box m={m} at={[(-sd * 0.06 + tx) / 2, 0.3, tz / 2]} s={[len, 0.03, 0.04]} c="#ffb300" rot={[0, -Math.atan2(dz, dx), 0]} />
+                    <Cyl m={m} at={[tx, 0.325, tz]} r={0.03} h={0.022} c="#212121" seg={10} />
+                  </group>
+                )
+              })}
             </group>
           ))}
-          <Box m={m} at={[0, 0.82, 0]} s={[0.8, 0.04, 0.05]} c="#ffb300" />
-          <group position={[0, 0.215, 0]} scale={0.55}>
+          <Box m={m} at={[0, 0.835, 0]} s={[0.8, 0.05, 0.06]} c="#ffb300" />
+          <Cyl m={m} at={[0, 0.8, 0.04]} r={0.008} h={0.72} c="#212121" seg={5} rot={[0, 0, Math.PI / 2]} />
+          <group position={[-0.43, 0.5, 0.02]}>
+            <Box m={m} at={[0, 0, 0]} s={[0.06, 0.11, 0.07]} c="#eceff1" />
+            <Cyl m={m} at={[0, 0.02, 0.038]} r={0.012} h={0.008} c="#43a047" seg={8} rot={[Math.PI / 2, 0, 0]} />
+            <Cyl m={m} at={[0, -0.02, 0.038]} r={0.012} h={0.008} c="#e53935" seg={8} rot={[Math.PI / 2, 0, 0]} />
+          </group>
+          {/* Up on the pads, wheels hanging clear of the floor. */}
+          <group position={[0, 0.3, 0]} scale={0.55}>
             {stage === 3 ? <CarModel body="classic" color="#c62828" finish="gloss" /> : <CarModel body="classic" color="#5d8aa8" rusty />}
           </group>
-          {/* Toolbox and a wheel off the car. */}
-          <Box m={m} at={[0.62, 0.16, 0.18]} s={[0.2, 0.28, 0.14]} c="#d32f2f" />
-          <Box m={m} at={[0.62, 0.31, 0.18]} s={[0.21, 0.02, 0.15]} c="#b71c1c" shadow={false} />
+          {/* Rolling tool chest (drawers with chrome pulls, a lid, a push bar
+              and casters) and a wheel off the car. */}
+          <group position={[0.62, 0, 0.18]}>
+            <Box m={m} at={[0, 0.17, 0]} s={[0.2, 0.26, 0.14]} c="#d32f2f" />
+            <Box m={m} at={[0, 0.31, 0]} s={[0.21, 0.02, 0.15]} c="#b71c1c" />
+            {[0.24, 0.19, 0.14, 0.075].map((y, i) => (
+              <group key={y}>
+                <Box m={m} at={[0, y, 0.0715]} s={[0.18, i === 3 ? 0.07 : 0.042, 0.003]} c="#c62828" shadow={false} />
+                <Box m={m} at={[0, y + (i === 3 ? 0.022 : 0.012), 0.075]} s={[0.12, 0.008, 0.006]} c="#cfd8dc" shadow={false} />
+              </group>
+            ))}
+            {[-0.04, 0.04].map((z) => <Box key={z} m={m} at={[0.112, 0.25, z]} s={[0.026, 0.012, 0.012]} c="#90a4ae" />)}
+            <Cyl m={m} at={[0.128, 0.25, 0]} r={0.008} h={0.11} c="#cfd8dc" seg={6} rot={[Math.PI / 2, 0, 0]} />
+            {[[-0.08, -0.05], [0.08, -0.05], [-0.08, 0.05], [0.08, 0.05]].map(([cx, cz]) => (
+              <group key={`${cx}${cz}`}>
+                <Box m={m} at={[cx, 0.035, cz]} s={[0.03, 0.01, 0.03]} c="#37474f" />
+                <Cyl m={m} at={[cx, 0.016, cz]} r={0.016} h={0.014} c="#212121" seg={8} rot={[0, 0, Math.PI / 2]} />
+              </group>
+            ))}
+          </group>
           <Tyre m={m} at={[-0.58, 0.06, 0.2]} rot={[-Math.PI / 2, 0, 0]} />
         </group>
       )}
@@ -264,12 +316,16 @@ export function RustysYard({ m, ghost, sign, bulb, win, lvl, lift }: Props) {
       <group position={[-1.82, 0, 0.8]}>
         <Cyl m={m} at={[0, pole / 2, 0]} r={0.035} h={pole} c="#78909c" seg={8} />
         <Box m={m} at={[0.22, pole - 0.1, 0]} s={[0.56, 0.3, 0.05]} c="#c62828" />
-        {sign && (
-          <mesh position={[0.22, pole - 0.1, 0.027]}>
+        {/* Clamps holding the board to the pole, a cap on the pole, and the
+            lettering on both faces. */}
+        {[pole - 0.2, pole - 0.03].map((y) => <Cyl key={y} m={m} at={[0, y, 0]} r={0.045} h={0.03} c="#546e7a" seg={8} />)}
+        <Cyl m={m} at={[0, pole + 0.01, 0]} r={0.045} h={0.02} c="#546e7a" seg={8} />
+        {sign && [1, -1].map((f) => (
+          <mesh key={f} position={[0.22, pole - 0.1, f * 0.027]} rotation-y={f > 0 ? 0 : Math.PI}>
             <planeGeometry args={[0.5, 0.25]} />
             <meshBasicMaterial map={signTexture('24H TOW', '#fffde7', '#c62828', 2)} toneMapped={false} />
           </mesh>
-        )}
+        ))}
         <group position={[0.22, pole + 0.2, 0]} rotation-z={0.6}>
           <Box m={m} at={[0, 0, 0]} s={[0.07, 0.36, 0.04]} c="#cfd8dc" />
           <mesh position={[0, 0.22, 0]}>

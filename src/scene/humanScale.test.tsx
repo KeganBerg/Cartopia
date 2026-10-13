@@ -47,6 +47,8 @@ function people(root: Object3D, limit: number) {
   const visit = (o: Object3D) => {
     for (const c of o.children) {
       if ((c as InstancedMesh).isInstancedMesh) continue
+      // Marked people-sized: kept whole wherever it stands (picked up below), as keepPeople does.
+      if (c.userData.human) continue
       const b = new Box3().setFromObject(c)
       if (b.isEmpty()) continue
       const h = b.max.y - b.min.y
