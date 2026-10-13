@@ -25,7 +25,8 @@ const FEATURES: { id: string; name: string; level: number; art: () => React.Reac
 ]
 
 // Shows once, right after the tutorial's last step, over the plain town.
-const due = (s: Game) => s.tutorial === TUTORIAL_STEPS && !s.panel && !s.visiting && s.mode === 'play'
+// It waits for the level-up splash (the tutorial's last steps often level you up), so the two never stack.
+const due = (s: Game) => s.tutorial === TUTORIAL_STEPS && !s.levelUp && !s.panel && !s.visiting && s.mode === 'play'
 
 // The end of the tutorial: what you're playing for, and what there is to do.
 export function GoalSplash() {
