@@ -1,4 +1,3 @@
-import { Icon } from './Icon'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useGame, spendFuel, type OwnedCar } from '../game/store'
 import { LIVE_LOSS_SHARE, LOSS_SHARE } from '../game/boosts'
@@ -18,7 +17,7 @@ import { pickVenue, venue as venueById } from '../scene/venues'
 import { sfx } from '../lib/sound'
 import { raceAudio, type RaceAudio } from '../lib/engineAudio'
 import { PlayerName } from './Username'
-import { useLive, challenge, cancelChallenge, refreshPresence, raceChannel, endLiveRace, answer, pruneInvites, mute, hostParty, INVITE_MS, PARTY_MAX, type LiveRace } from '../lib/live'
+import { useLive, challenge, cancelChallenge, refreshPresence, raceChannel, endLiveRace, answer, mute, hostParty, INVITE_MS, PARTY_MAX, type LiveRace } from '../lib/live'
 import { displayName } from '../lib/names'
 import { joinRefereed, reportFinish, serverPi, type Verdict } from '../lib/referee'
 import { ghostDist, shortLeft, trialWeek, TRIAL_FUEL } from '../game/trial'
@@ -29,7 +28,8 @@ import { carGrip, conditions, conditionsNote, gripMul, spinning } from '../game/
 import { TrialTab, TrialResult, beginTrialRun, commitTrialRun, type TrialRun } from './TimeTrial'
 import { claim as claimVisitor, leave as leaveVisitor, setRacing, type Visitor } from '../lib/visitors'
 import { RivalResult, type RivalMatch, type RivalBonus } from './Rivals'
-import { RaceBar, RaceHub, Rounds, campaignFocus, type HubTab } from './RaceHub'
+import { RaceBar, RaceHub, Rounds, campaignFocus } from './RaceHub'
+import { takeRaceTab, takeStreetRace, type RaceTab } from './raceNav'
 import { artStyle } from './venueArt'
 import { PaintRivals, firstRowPick, rowChip, rowPrizeOf } from './PaintRivals'
 import { TunerTrials, firstTrialPick, fixBuild, trialChip, trialPrizeOf } from './TunerTrials'
@@ -172,21 +172,6 @@ async function fetchOnlineRivals(): Promise<Rival[]> {
 // How long a live race waits for the other player before offering to call it off.
 const JOIN_PATIENCE_MS = 30000
 
-type RaceTab = 'hub' | HubTab
-let nextRaceTab: RaceTab = 'hub'
-// A street racer visiting town (src/lib/visitors.ts): the race opens straight away, at no fuel.
-let nextStreet: Visitor | null = null
-export function openStreetRace(v: Visitor) {
-  nextStreet = v
-  nextRaceTab = 'quick'
-  useGame.getState().openPanel('race')
-}
-// Opens the Race menu on a given tab (goals use it to send players to the campaign or Grand Prix).
-export function openRaceTab(tab: RaceTab) {
-  nextRaceTab = tab
-  useGame.getState().openPanel('race')
-}
-
 const RACE_CAM = { position: [0.4, 2.2, -4] as [number, number, number], fov: 55, near: 0.3, far: 150 }
 
 // Phones (portrait or on their side): the menu covers the town, so the town stops drawing
@@ -242,19 +227,14 @@ export function RacePanel() {
   const [rowSel, setRowSel] = useState(() => firstRowPick(useGame.getState().rivalRow))
   // Bumped for every race started, so "Next race" mounts a fresh one.
   const [seq, setSeq] = useState(0)
-  const [tab, setTab] = useState<RaceTab>(() => {
-    const t = nextRaceTab
-    nextRaceTab = 'hub'
-    return t
-  })
+  const [tab, setTab] = useState<RaceTab>(takeRaceTab)
   const done = useGame((s) => s.campaign)
   const gpState = useGame((s) => s.gp)
   const tourWon = useGame((s) => s.tour ?? 0)
   // The campaign chapter on show; it opens on the first one not yet cleared.
   const [campSel, setCampSel] = useState(() => campaignFocus(done, level).ci)
   const [street, setStreet] = useState<Visitor | null>(() => {
-    const v = nextStreet
-    nextStreet = null
+    const v = takeStreetRace()
     if (v) setRacing(true)
     return v
   })
@@ -2024,25 +2004,6 @@ export function LiveRaceOverlay() {
   const o = race.opponent
   const rival: Rival = { id: `live:${o.id}`, town: playerName(o.uid, o.town), level: o.level, carName: o.carName, color: o.color, pi: o.pi, online: true, body: o.body, mods: o.mods }
   return <DragRace key={race.raceId} car={car} rival={rival} live={race} onExit={endLiveRace} />
-}
-
-// Challenges land in an inbox instead of popping up over the game.
-export function ChallengeBell() {
-  const count = useLive((l) => l.invites.length)
-  const openPanel = useGame((s) => s.openPanel)
-  const visiting = useGame((s) => !!s.visiting)
-  useEffect(() => {
-    const id = setInterval(pruneInvites, 1000)
-    return () => clearInterval(id)
-  }, [])
-  // Only shows while a challenge is waiting; the on/off switch lives in Menu > Account.
-  if (!supabase || visiting || !count) return null
-  return (
-    <button className="challenge-bell has" onClick={() => openPanel('invites')} title="Race challenges">
-      <Icon name="flag" />
-      <span className="bell-count">{count}</span>
-    </button>
-  )
 }
 
 export function InvitesPanel() {

@@ -12,7 +12,7 @@ import { Panel, SheetTabs } from './Menus'
 import { isCleanName, NAME_REJECTED } from '../lib/names'
 import { refreshCrewGoal, useCrewGoal } from './CrewGoal'
 import { refreshChatRooms } from '../lib/chat'
-import { CrewBattleCard } from './CrewBattle'
+import { onDemand } from './lazy'
 import { demoBattle, refreshCrewBattle, useCrewBattle } from '../lib/battles'
 import { PlayerName } from './Username'
 import { playerName } from '../lib/profiles'
@@ -21,6 +21,9 @@ import { CrewLadder, demoCrew } from './CrewLadder'
 import { CrewBattleTile, CrewGoalTile, CrewHero, LastWeekChests } from './CrewHub'
 import { CrewPartsTile } from './CrewParts'
 import { CREW_DEMO, useCrewMates } from '../lib/crewRaces'
+
+// The crew battle strip brings the battle screen's code; it loads when a battle shows.
+const CrewBattleCard = onDemand(() => import('./CrewBattle'), (m) => m.CrewBattleCard)
 
 const n = (v: number) => v.toLocaleString()
 

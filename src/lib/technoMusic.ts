@@ -6,7 +6,17 @@ import { audioContext, audioOut, isMuted, onMuteChange } from './sound'
 import { musicSettings, onMusicChange } from './townMusic'
 import { onTownHold, townHeld } from '../scene/renderGate'
 import { onTechnoChange, technoDrop, technoOn } from '../game/techno'
-import { TechnoTrack } from './technoTrack'
+import type { TechnoTrack } from './technoTrack'
+
+// The track's synth code loads in the background after startup (see prefetchTechno), not with the town.
+let Track: typeof TechnoTrack | null = null
+let loading: Promise<unknown> | null = null
+export function prefetchTechno() {
+  loading ??= import('./technoTrack').then((m) => {
+    Track = m.TechnoTrack
+    wake()
+  })
+}
 
 // How loud the track runs at full music slider. It sits well above the town
 // music: it's a party.
@@ -28,7 +38,8 @@ function tick() {
   const v = target()
   const t = ctx.currentTime
   if (v > 0.001) {
-    if (!track) track = new TechnoTrack(ctx, audioOut() ?? ctx.destination)
+    if (!Track) return prefetchTechno()
+    if (!track) track = new Track(ctx, audioOut() ?? ctx.destination)
     quietSince = 0
     track.level(v, t, 0.8)
     // The wall-clock moment that will be heard at `t`, so every town in the event is on the same beat.
@@ -75,7 +86,11 @@ export function startTechnoMusic() {
 export function levelDrop(): number | null {
   const c = audioContext()
   if (!c || technoOn() || document.hidden) return null
-  const t = new TechnoTrack(c, audioOut() ?? c.destination)
+  if (!Track) {
+    prefetchTechno()
+    return null
+  }
+  const t = new Track(c, audioOut() ?? c.destination)
   const at = c.currentTime + 0.05
   t.level(0.5, at, 0.005)
   const drop = t.stinger(at)

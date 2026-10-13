@@ -7,7 +7,7 @@ import { crateDef } from '../game/crates'
 import { CLASS_TIERS, MASTERY_TIERS, classNeed, classTier, emptyMastery, firstPaint, galaxy, masteredIn, masteryBadge, needProgress } from '../game/mastery'
 import { venue as venueById } from '../scene/venues'
 import { CarThumb } from '../scene/BuildingPreview'
-import { openRaceTab } from './Race'
+import { openRaceTab } from './raceNav'
 import { artStyle } from './venueArt'
 import { TileClip } from './TileClip'
 
