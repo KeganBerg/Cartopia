@@ -2,9 +2,9 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
   PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS,
-  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, jobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, refillBucks, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, activeEvent, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modFits, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, CREW_CHEST, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower, seasonNumber, seasonOf, SEASON_STARS, skinDef, ownedSkins, seasonSkin, modSkinDef, ownedModSkins, seasonModSkin, SKINNED_SLOTS, type SkinnedSlot, fittedMods, SEASON_TIERS, STARS_PER_TIER, SEASON_CAR_BUCKS, dealsFor, dealOffer, type DealDef, type DealKind,
+  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, jobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, refillBucks, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, activeEvent, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modFits, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, CREW_CHEST, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower, seasonNumber, seasonOf, SEASON_STARS, skinDef, ownedSkins, seasonSkin, modSkinDef, ownedModSkins, seasonModSkin, SKINNED_SLOTS, type SkinnedSlot, fittedMods, SEASON_TIERS, STARS_PER_TIER, SEASON_CAR_BUCKS, dealsFor, dealOffer, type DealDef, type DealKind,
 } from './data'
-import { PANELS, PATTERNS, isBike, panelJobCost, tidyPanels, type Panels } from './data'
+import { PANELS, PATTERNS, isBike, panelJobCost, tidyPanels, type Panels, RUSTY_SETS, hotSpot, rarityWeight, truckOf, TRUCK, BAY2_LEVEL } from './data'
 import { sfx } from '../lib/sound'
 import { fx } from './fx'
 import { opensLabel } from './clock'
@@ -75,6 +75,9 @@ export type SaveState = {
   tutorial: number
   junkyard: JunkCar[]
   restoring: Restoring | null
+  // Rusty's second restore bay (from BAY2_LEVEL), and the tow truck's upgrade level (TRUCK).
+  restoring2: Restoring | null
+  truck: number
   gp: Record<string, { round: number; clears: number }>
   // Campaign races won, by race id, with the best stars earned (1-3).
   campaign: Record<string, number>
@@ -276,9 +279,11 @@ type Actions = {
   fixTruck: () => void
   abandonSearch: () => void
   towHome: () => void
+  // Puts a car in the first free bay. bay 1 is the second bay (restoring2).
   restoreCar: (uid: string) => void
-  rushRestore: () => void
-  collectRestored: (plate: string) => void
+  rushRestore: (bay?: 0 | 1) => void
+  collectRestored: (plate: string, bay?: 0 | 1) => void
+  upgradeTruck: () => void
   scrapCar: (uid: string) => void
   // force skips the once-a-minute wait (the welcome back screen uses it).
   collectAll: (force?: boolean) => void
@@ -414,6 +419,8 @@ export function starterTown(): SaveState {
     tutorial: 0,
     junkyard: [],
     restoring: null,
+    restoring2: null,
+    truck: 0,
     gp: {},
     campaign: {},
     claimedSets: [],
@@ -1297,7 +1304,7 @@ export const useGame = create<GameState>()(
 
       claimSet: (id) => {
         const s = get()
-        const set_ = CAR_SETS.find((o) => o.id === id)
+        const set_ = [...CAR_SETS, ...RUSTY_SETS].find((o) => o.id === id)
         if (!set_ || s.claimedSets.includes(id) || !setComplete(set_, s.cars)) return
         setTimeout(sfx.levelUp, 200)
         s.toast(`${set_.icon} ${set_.name} complete! +${set_.coins.toLocaleString()} coins, +${set_.bucks} gems, +${set_.trophies} 🏆`)
@@ -1929,7 +1936,7 @@ export const useGame = create<GameState>()(
           sfx.start()
           set({
             coins: g.coins - spot.cost,
-            search: rollSearch(spotId, finds),
+            search: rollSearch(spotId, finds, { truck: g.truck, hot: hotSpot(g.level) === spotId }),
             stats: bump(g, 'searches'),
             updatedAt: Date.now(),
           })
@@ -2011,7 +2018,8 @@ export const useGame = create<GameState>()(
         const car = s.junkyard.find((c) => c.uid === juid)
         if (!car) return
         if (carDef(car.model).parked) return s.toast('This car is coming in a future update. Check back soon!')
-        if (s.restoring) return s.toast('The restore bay is busy. Finish that car first.')
+        const bay = !s.restoring ? 'restoring' : !s.restoring2 && s.level >= BAY2_LEVEL ? 'restoring2' : null
+        if (!bay) return s.toast('The restore bay is busy. Finish that car first.')
         const cost = restoreCost(carDef(car.model))
         if (s.coins < cost) return s.showNeed('coins', cost - s.coins, `restoring the ${carDef(car.model).name}`)
         const minutes = RARITY[car.rarity].minutes
@@ -2019,36 +2027,48 @@ export const useGame = create<GameState>()(
         set({
           coins: s.coins - cost,
           junkyard: s.junkyard.filter((c) => c.uid !== juid),
-          restoring: { ...car, minutes, endsAt: Date.now() + minutes * 60000 },
+          [bay]: { ...car, minutes, endsAt: Date.now() + minutes * 60000 },
           updatedAt: Date.now(),
         })
       },
 
-      rushRestore: () => {
+      rushRestore: (bay = 0) => {
         const s = get()
-        const r = s.restoring
+        const key = bay ? 'restoring2' : 'restoring'
+        const r = s[key]
         if (!r) return
         const left = r.endsAt - Date.now()
         if (left <= 0) return
         const cost = rushBucks(left)
         if (s.bucks < cost) return s.showNeed('bucks', cost - s.bucks, 'finishing the restore now')
         sfx.buy()
-        set({ bucks: s.bucks - cost, restoring: { ...r, endsAt: Date.now() }, updatedAt: Date.now() })
+        set({ bucks: s.bucks - cost, [key]: { ...r, endsAt: Date.now() }, updatedAt: Date.now() })
       },
 
-      collectRestored: (plate) => {
+      collectRestored: (plate, bay = 0) => {
         const s = get()
-        const r = s.restoring
+        const key = bay ? 'restoring2' : 'restoring'
+        const r = s[key]
         if (!r || Date.now() < r.endsAt) return
         const c = carDef(r.model)
         sfx.buy()
         s.toast(`${c.name} restored and added to your garage!`)
         set(withXp(s, 25 + Math.round(c.price / 200), {
-          restoring: null,
+          [key]: null,
           cars: [...s.cars, { uid: r.uid, model: r.model, color: c.colors[0], upgrades: noUpgrades(), plate: cleanPlate(plate) || undefined }],
           stats: { ...s.stats, rescued: (s.stats.rescued ?? 0) + 1, carsBought: (s.stats.carsBought ?? 0) + 1 },
           updatedAt: Date.now(),
         }))
+      },
+
+      upgradeTruck: () => {
+        const s = get()
+        const next = TRUCK[(s.truck ?? 0) + 1]
+        if (!next) return
+        if (s.level < next.level) return s.showNeed('level', next.level, 'the next tow truck upgrade')
+        if (s.parts < next.parts) return s.showNeed('parts', next.parts - s.parts, 'the next tow truck upgrade')
+        sfx.buy()
+        set({ parts: s.parts - next.parts, truck: (s.truck ?? 0) + 1, updatedAt: Date.now() })
       },
 
       scrapCar: (juid) => {
@@ -2072,26 +2092,26 @@ export const useGame = create<GameState>()(
 )
 
 export function saveOf(s: GameState): SaveState {
-  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, wagers, season, deals, trials, rivals, rivalRow, tuner, oldPaints, tour, event, showcase, raceCar, skins, modSkins, land, updatedAt } = s
-  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, ...(wagers ? { wagers } : {}), season, deals, trials, rivals, rivalRow, tuner: tuner ?? {}, oldPaints: !!oldPaints, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, land, updatedAt }
+  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, restoring2, truck, gp, campaign, claimedSets, crewChests, visits, crates, wagers, season, deals, trials, rivals, rivalRow, tuner, oldPaints, tour, event, showcase, raceCar, skins, modSkins, land, updatedAt } = s
+  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, restoring2: restoring2 ?? null, truck: truck ?? 0, gp, campaign, claimedSets, crewChests, visits, crates, ...(wagers ? { wagers } : {}), season, deals, trials, rivals, rivalRow, tuner: tuner ?? {}, oldPaints: !!oldPaints, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, land, updatedAt }
 }
 
 // Fields added after launch, so older saves load with sensible values.
-function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'quests' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'gp' | 'campaign' | 'claimedSets' | 'crewChests' | 'visits' | 'crates' | 'wagers' | 'season' | 'deals' | 'trials' | 'rivals' | 'rivalRow' | 'tuner' | 'tour' | 'event' | 'showcase' | 'skins' | 'modSkins' | 'land'> {
+function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'quests' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'restoring2' | 'truck' | 'gp' | 'campaign' | 'claimedSets' | 'crewChests' | 'visits' | 'crates' | 'wagers' | 'season' | 'deals' | 'trials' | 'rivals' | 'rivalRow' | 'tuner' | 'tour' | 'event' | 'showcase' | 'skins' | 'modSkins' | 'land'> {
   // Saves from before the tutorial existed skip it.
-  return { stats: emptyStats(), claimedGoals: [], quests: null, lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, gp: {}, campaign: {}, claimedSets: [], crewChests: 0, visits: 0, crates: 0, wagers: 0, season: null, deals: null, trials: { claimed: {} }, rivals: {}, rivalRow: {}, tuner: {}, tour: 0, event: null, showcase: [], skins: [], modSkins: [], land: [...START_LAND] }
+  return { stats: emptyStats(), claimedGoals: [], quests: null, lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, restoring2: null, truck: 0, gp: {}, campaign: {}, claimedSets: [], crewChests: 0, visits: 0, crates: 0, wagers: 0, season: null, deals: null, trials: { claimed: {} }, rivals: {}, rivalRow: {}, tuner: {}, tour: 0, event: null, showcase: [], skins: [], modSkins: [], land: [...START_LAND] }
 }
 
 
 const pick = <T,>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)]
 const range = (lo: number, hi: number) => lo + Math.floor(Math.random() * (hi - lo + 1))
 
-function rollCar(spotId: string): Loot {
+function rollCar(spotId: string, hot = false): Loot {
   const spot = RESCUE_SPOTS.find((o) => o.id === spotId)!
-  const total = spot.cars.reduce((n, c) => n + RARITY[c.rarity].weight, 0)
+  const total = spot.cars.reduce((n, c) => n + rarityWeight(c.rarity, hot), 0)
   let r = Math.random() * total
   for (const c of spot.cars) {
-    r -= RARITY[c.rarity].weight
+    r -= rarityWeight(c.rarity, hot)
     if (r <= 0) return { kind: 'car', ...c }
   }
   return { kind: 'car', ...spot.cars[0] }
@@ -2099,22 +2119,24 @@ function rollCar(spotId: string): Loot {
 
 // Pre-rolls what every pin hides. Each search finds at least one car, and
 // about one in four gives the tow truck a flat partway through.
-export function rollSearch(spotId: string, finds: ServerFind[] | null = null): Search {
+export function rollSearch(spotId: string, finds: ServerFind[] | null = null, opts: { truck?: number; hot?: boolean } = {}): Search {
   const spot = RESCUE_SPOTS.find((o) => o.id === spotId)!
   const scale = spot.cost / 500
-  const pins: Loot[] = Array.from({ length: RESCUE_PINS }, () => {
+  const truck = truckOf(opts.truck)
+  const n = truck.pins
+  const pins: Loot[] = Array.from({ length: n }, () => {
     // With server finds, every other pin hides something else.
     const r = finds ? RESCUE_CAR_CHANCE + Math.random() * (1 - RESCUE_CAR_CHANCE) : Math.random()
-    if (r < RESCUE_CAR_CHANCE) return rollCar(spotId)
+    if (r < RESCUE_CAR_CHANCE) return rollCar(spotId, !!opts.hot)
     if (r < 0.42) return { kind: 'coins', n: Math.round(range(4, 14) * 5 * scale) }
     if (r < 0.62) return { kind: 'parts', n: range(1, 3) + Math.floor(scale / 3) }
     if (r < 0.74) return { kind: 'fuel', n: range(1, 3) }
     if (r < 0.77) return { kind: 'trophy' }
     return { kind: 'nothing' }
   })
-  for (const f of finds ?? []) if (f.i >= 0 && f.i < RESCUE_PINS) pins[f.i] = { kind: 'car', model: f.model, rarity: f.rarity, uid: f.uid }
-  if (!pins.some((p) => p.kind === 'car')) pins[Math.floor(Math.random() * RESCUE_PINS)] = rollCar(spotId)
-  const flatAt = Math.random() < 0.25 ? pick(Array.from({ length: RESCUE_PINS }, (_, i) => i).filter((i) => pins[i].kind !== 'car')) : null
+  for (const f of finds ?? []) if (f.i >= 0 && f.i < n) pins[f.i] = { kind: 'car', model: f.model, rarity: f.rarity, uid: f.uid }
+  if (!pins.some((p) => p.kind === 'car')) pins[Math.floor(Math.random() * n)] = rollCar(spotId, !!opts.hot)
+  const flatAt = Math.random() < truck.flat ? pick(Array.from({ length: n }, (_, i) => i).filter((i) => pins[i].kind !== 'car')) : null
   return { spot: spotId, pins, revealed: pins.map(() => false), truckAt: null, flatAt: flatAt ?? null, flat: false }
 }
 

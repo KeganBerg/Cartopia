@@ -2,7 +2,8 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { GP_ROUNDS, GP_SERIES, gpRivalPi } from './data'
 import { GP_BEAT } from './gpBeat'
-import { gpBeatTable, gpRivalSlowest, gpSeries, rarities, rescueRoll, rescueSpots, restoreMinutes, spotCosts, visitorTable } from './guardTables'
+import { bay2Table, gpBeatTable, gpRivalSlowest, gpSeries, hotTable, rarities, rescueRoll, rescueSpots, restoreMinutes, spotCosts, truckTable, visitorTable } from './guardTables'
+import { hotSpot, RESCUE_SPOTS, utcDay } from './data'
 import { rollSearch } from './store'
 import { raceFloor } from './race'
 
@@ -25,6 +26,30 @@ describe('restore and Grand Prix checks', () => {
     expect(newest('$rarity$')).toEqual(rarities())
     expect(newest('$roll$')).toEqual(rescueRoll())
     expect(newest('$spotcost$')).toEqual(spotCosts())
+  })
+
+  it("rolls Rusty's hot tip, truck and second bay like the game", () => {
+    expect(newest('$hot$')).toEqual(hotTable())
+    expect(newest('$truck$')).toEqual(truckTable())
+    expect(newest('$bay2$')).toEqual(bay2Table())
+  })
+
+  it("picks the hot spot the way rescue_roll() does: open spots, by UTC day", () => {
+    const day = 20000 * 86400000
+    for (let d = 0; d < 10; d++) {
+      for (const level of [1, 4, 9, 15, 24, 40]) {
+        const open = RESCUE_SPOTS.filter((sp) => level >= sp.unlockLevel)
+        expect(hotSpot(level, day + d * 86400000)).toBe(open[utcDay(day + d * 86400000) % open.length].id)
+      }
+    }
+  })
+
+  it('rolls extra spots for an upgraded truck', () => {
+    for (const [truck, n] of [[0, 8], [1, 9], [2, 10], [3, 11], [9, 11]]) {
+      const q = rollSearch('suburbs', [{ i: n - 1, uid: 'rx', model: 'pip', rarity: 'common' }], { truck })
+      expect(q.pins.length).toBe(n)
+      expect(q.pins[n - 1]).toEqual({ kind: 'car', model: 'pip', rarity: 'common', uid: 'rx' })
+    }
   })
 
   it('rolls town visitors and barn finds like the game', () => {

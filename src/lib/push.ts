@@ -19,7 +19,7 @@ type Kind = 'jobs' | 'restore' | 'fuel'
 export type Alert = { kind: Kind; at: number; title: string; body: string }
 
 /** The alerts worth sending for this town, soonest first. */
-export function alertsFor(s: Pick<GameState, 'buildings' | 'restoring' | 'fuel' | 'fuelUpdatedAt' | 'level' | 'townName'>, now = Date.now()): Alert[] {
+export function alertsFor(s: Pick<GameState, 'buildings' | 'restoring' | 'fuel' | 'fuelUpdatedAt' | 'level' | 'townName'> & Partial<Pick<GameState, 'restoring2'>>, now = Date.now()): Alert[] {
   const out: Alert[] = []
   const add = (kind: Kind, at: number, title: string, body: string) => {
     if (at - now >= MIN_DELAY) out.push({ kind, at, title, body })
@@ -29,6 +29,7 @@ export function alertsFor(s: Pick<GameState, 'buildings' | 'restoring' | 'fuel' 
   const ends = s.buildings.filter((b) => b.jobEndsAt !== null && b.jobEndsAt > now && buildingDef(b.def).kind !== 'obstacle').map((b) => b.jobEndsAt!)
   if (ends.length) add('jobs', Math.max(...ends), 'Jobs done! 💰', `Your businesses in ${town} are ready to collect.`)
   if (s.restoring && s.restoring.endsAt > now) add('restore', s.restoring.endsAt, 'Restoration finished 🔧', 'Rusty has your car ready.')
+  if (s.restoring2 && s.restoring2.endsAt > now) add('restore', s.restoring2.endsAt, 'Restoration finished 🔧', 'Rusty has your car ready.')
   const cap = fuelCap(s)
   if (s.fuel < cap) add('fuel', s.fuelUpdatedAt + (cap - s.fuel) * FUEL_REGEN_SECONDS * 1000, 'Fuel is full ⛽', `Time to run some jobs in ${town}.`)
   return out.sort((a, b) => a.at - b.at)
