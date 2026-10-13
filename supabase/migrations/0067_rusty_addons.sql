@@ -11,7 +11,7 @@
 --     (piece.gap seconds apart, piece.day a UTC day).
 -- Copies: rescue_roll() from 0038, econ_progress() from 0052, econ_guard() from 0041 (the live
 -- copies), each changed only as above. econ_catalog() is rebuilt from econCatalog().
--- Run after 0065, and before the client with Rusty's add-ons ships.
+-- Runs after 0065 (and after 0066, the restore bay hotfix, whose fixes this copy carries), and before the client with Rusty's add-ons ships.
 
 create or replace function public.econ_catalog() returns jsonb
 language sql immutable set search_path = '' as $$
