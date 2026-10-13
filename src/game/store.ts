@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
   PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS,
-  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, jobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, refillBucks, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, activeEvent, DAILY_BONUS, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modFits, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, CREW_CHEST, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower, seasonNumber, seasonOf, SEASON_STARS, skinDef, ownedSkins, seasonSkin, modSkinDef, ownedModSkins, seasonModSkin, SKINNED_SLOTS, type SkinnedSlot, fittedMods, SEASON_TIERS, STARS_PER_TIER, SEASON_CAR_BUCKS, dealsFor, dealOffer, type DealDef, type DealKind,
+  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, jobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, maxLevel, themable, RESCUE_SPOTS, RESCUE_PINS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, refillBucks, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, activeEvent, DAILY_BONUS, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modFits, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, CREW_CHEST, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower, seasonNumber, seasonOf, SEASON_STARS, skinDef, ownedSkins, seasonSkin, modSkinDef, ownedModSkins, seasonModSkin, SKINNED_SLOTS, type SkinnedSlot, fittedMods, SEASON_TIERS, STARS_PER_TIER, SEASON_CAR_BUCKS, dealsFor, dealOffer, type DealDef, type DealKind,
 } from './data'
 import { PANELS, PATTERNS, isBike, panelJobCost, tidyPanels, type Panels } from './data'
 import { cleanHat, earnedHats, hatDef, hatQuestOf, newHatQuest, ownedHats, sameHat, type HatFit, type HatQuest } from './hats'
@@ -22,13 +22,15 @@ import { groupOf, groupTurn, mergeCandidates, applyMerge, applySplit, rotateGrou
 import { togglePick } from './meet'
 import { crateCost, crateDef, rollCrate, type CrateId, type CrateOpen } from './crates'
 import { claim, type WagerEntry } from './wager'
+import { cleanLights, colorTheme, DEFAULT_LIGHTS, type Lights } from './cityLook'
 
 // rot: quarter turns the player chose (0 faces south). Unset means face the nearest road.
 // level: upgrade level 1-10 (see MAX_BUILDING_LEVEL); unset means 1.
 // jobLevel: the level the running job started at, so an upgrade mid-job only pays from the next job.
 // car: uid of the owned car assigned to drive for this business (see DRIVER_BONUS).
 // merge: set on the top-left building of a merged block (see merge.ts); mturn: the turn the player gave that block.
-export type PlacedBuilding = { uid: string; def: string; x: number; z: number; jobEndsAt: number | null; rot?: number; level?: number; jobLevel?: number; car?: string; merge?: number; mturn?: number }
+// tint: the building's own colour theme (game/cityLook.ts COLOR_THEMES); unset keeps its colours.
+export type PlacedBuilding = { uid: string; def: string; x: number; z: number; jobEndsAt: number | null; rot?: number; level?: number; jobLevel?: number; car?: string; merge?: number; mturn?: number; tint?: string }
 export type OwnedCar = { uid: string; model: string; color: string; upgrades: Record<UpgradeSlot, number>; flat?: boolean; lowFuel?: boolean; stripe?: string | null; finish?: Finish; plate?: string; mods?: string[]; ownedMods?: string[]; skin?: string; modSkin?: Partial<Record<SkinnedSlot, string>>; panels?: Panels; hat?: HatFit | null }
 // A rusty find waiting in Rusty's storage, and the one car in the restore bay.
 export type JunkCar = { uid: string; model: string; rarity: Rarity }
@@ -122,6 +124,9 @@ export type SaveState = {
   hats: string[]
   // Hat challenge progress (game/hats.ts HatQuest). Never resets.
   hatQuest: HatQuest
+  // City look (game/cityLook.ts), cosmetic only: street lights and a theme for every building.
+  lights?: Lights
+  cityTheme?: string
   land: string[]
   updatedAt: number
 }
@@ -205,6 +210,9 @@ type Actions = {
   // Arcade mini games pay a little coin and XP (see game/arcade.ts).
   finishArcade: (coins: number, xp: number) => void
   renameTown: (name: string) => void
+  setLights: (l: Partial<Lights>) => void
+  setCityTheme: (id: string | null) => void
+  setBuildingTint: (uid: string, id: string | null) => void
   claimGoal: (id: string) => void
   claimTask: (period: Period, id: string) => void
   claimChest: (period: Period) => void
@@ -924,8 +932,8 @@ export const useGame = create<GameState>()(
           s.toast(`Cleared! +${d.xp} XP`)
           return set(withXp(s, d.xp!, { buildings: s.buildings.filter((o) => o.uid !== buid), updatedAt: now }))
         }
-        // Gas stations and houses have no jobs; a tap shows their upgrades.
-        if (!d.jobSeconds) return upgradable(d) ? s.openUpgrade(buid) : undefined
+        // Gas stations, houses and decor have no jobs; a tap shows their upgrades and colour themes.
+        if (!d.jobSeconds) return s.openUpgrade(buid)
         const merged = groupOf(s.buildings, buid)
         if (merged) return tapMerged(s, set, merged.members.map((o) => o.uid))
         const now = Date.now()
@@ -983,7 +991,7 @@ export const useGame = create<GameState>()(
       openUpgrade: (buid) => {
         const s = get()
         const b = s.buildings.find((o) => o.uid === buid)
-        if (!b || s.visiting || !upgradable(buildingDef(b.def))) return
+        if (!b || s.visiting || !themable(buildingDef(b.def))) return
         set({ panel: 'upgrade', upgrading: groupOf(s.buildings, buid)?.anchor.uid ?? buid })
       },
 
@@ -993,7 +1001,7 @@ export const useGame = create<GameState>()(
         if (!b) return false
         const d = buildingDef(b.def)
         const lvl = buildingLevel(b)
-        if (!upgradable(d) || lvl >= MAX_BUILDING_LEVEL) return false
+        if (!upgradable(d) || lvl >= maxLevel(d)) return false
         // A merged block upgrades all its buildings together, so they stay merged.
         const ids = new Set(groupOf(s.buildings, buid)?.members.map((o) => o.uid) ?? [buid])
         const one = buildingUpgradeCost(d, lvl)
@@ -1230,6 +1238,14 @@ export const useGame = create<GameState>()(
       },
 
       renameTown: (townName) => set({ townName: townName.slice(0, 24) || 'My Town', updatedAt: Date.now() }),
+      setLights: (l) => set((s) => ({ lights: cleanLights({ ...DEFAULT_LIGHTS, ...s.lights, ...l }), updatedAt: Date.now() })),
+      setCityTheme: (id) => set({ cityTheme: colorTheme(id)?.id, updatedAt: Date.now() }),
+      // A merged block takes the theme as one building.
+      setBuildingTint: (uid, id) => set((s) => {
+        const ids = new Set(groupOf(s.buildings, uid)?.members.map((o) => o.uid) ?? [uid])
+        const tint = colorTheme(id)?.id
+        return { buildings: s.buildings.map((o) => (ids.has(o.uid) ? cleanTint({ ...o, tint }) : o)), updatedAt: Date.now() }
+      }),
 
       claimGoal: (id) => {
         const s = get()
@@ -2103,8 +2119,8 @@ export const useGame = create<GameState>()(
 )
 
 export function saveOf(s: GameState): SaveState {
-  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, wagers, season, deals, trials, rivals, rivalRow, tuner, oldPaints, tour, event, showcase, raceCar, skins, modSkins, hats, hatQuest, land, updatedAt } = s
-  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, ...(wagers ? { wagers } : {}), season, deals, trials, rivals, rivalRow, tuner: tuner ?? {}, oldPaints: !!oldPaints, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, hats: hats ?? [], hatQuest: hatQuestOf({ stats, hatQuest }), land, updatedAt }
+  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, wagers, season, deals, trials, rivals, rivalRow, tuner, oldPaints, tour, event, showcase, raceCar, skins, modSkins, hats, hatQuest, lights, cityTheme, land, updatedAt } = s
+  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, ...(wagers ? { wagers } : {}), season, deals, trials, rivals, rivalRow, tuner: tuner ?? {}, oldPaints: !!oldPaints, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, hats: hats ?? [], hatQuest: hatQuestOf({ stats, hatQuest }), ...(cleanLights(lights) ? { lights: cleanLights(lights) } : {}), ...(colorTheme(cityTheme) ? { cityTheme } : {}), land, updatedAt }
 }
 
 // Fields added after launch, so older saves load with sensible values.
@@ -2201,3 +2217,10 @@ useGame.subscribe((s, prev) => {
   }
   sfx.levelUp()
 })
+
+// Drops an empty tint so saves stay as they were for untinted buildings.
+function cleanTint(b: PlacedBuilding): PlacedBuilding {
+  if (b.tint) return b
+  const { tint: _, ...rest } = b
+  return rest
+}

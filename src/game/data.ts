@@ -201,8 +201,19 @@ export const buildingDef = (id: string): BuildingDef => BUILDINGS.find((b) => b.
 // fits more residents). Saves keep the level as `level` on the placed
 // building; a missing level is level 1.
 export const MAX_BUILDING_LEVEL = 10
+// Decor that grows in place (level 1-5), purely for looks and tourists: gardens and parks
+// fill out, statues and fountains get a grand plinth, the Clock Tower adds floors.
+export type DecorGrowth = 'garden' | 'statue' | 'tower'
+export const DECOR_GROWTH: Record<string, DecorGrowth> = {
+  garden: 'garden', koi: 'garden', pond: 'garden', dogpark: 'garden', statue: 'statue', fountain: 'statue', clocktower: 'tower',
+}
+export const MAX_DECOR_LEVEL = 5
+export const decorGrows = (d: BuildingDef) => !d.parked && d.kind === 'decor' && d.id in DECOR_GROWTH
+export const maxLevel = (d: BuildingDef) => (decorGrows(d) ? MAX_DECOR_LEVEL : MAX_BUILDING_LEVEL)
+// Anything placed can take a colour theme (game/cityLook.ts), except obstacles waiting to be cleared.
+export const themable = (d: BuildingDef) => !d.parked && d.kind !== 'obstacle'
 export const upgradable = (d: BuildingDef) =>
-  !d.parked && ((!!d.jobSeconds && d.kind !== 'obstacle') || !!d.fuelCap || d.kind === 'house')
+  !d.parked && ((!!d.jobSeconds && d.kind !== 'obstacle') || !!d.fuelCap || d.kind === 'house' || decorGrows(d))
 export const buildingLevel = (b: { level?: number }) =>
   Math.min(MAX_BUILDING_LEVEL, Math.max(1, Math.floor(Number(b.level) || 1)))
 // The level a running job pays at: locked when it started (older saves: the current level).
@@ -228,11 +239,13 @@ export const upgradeFuelCap = (d: BuildingDef, level: number) =>
 
 // Cost to go from `level` to `level + 1`: 75% of the build price, 50% more each
 // level, plus parts from level 4 up. Houses are cheap to build but end up as
-// skyscrapers, so theirs start at $300 and grow 55% a level.
+// skyscrapers, so theirs start at $300 and grow 55% a level. Decor bought with gems (the
+// Golden Car Statue) counts each gem as $1,000 of build price.
+const upgradeBase = (d: BuildingDef) => (d.price || (decorGrows(d) ? (d.bucks ?? 0) * 1000 : 0))
 export const buildingUpgradeCost = (d: BuildingDef, level: number) => ({
   coins: d.kind === 'house'
     ? Math.round((300 * Math.pow(1.55, level - 1)) / 50) * 50
-    : Math.max(100, Math.round((d.price * 0.75 * Math.pow(1.5, level - 1)) / 50) * 50),
+    : Math.max(100, Math.round((upgradeBase(d) * 0.75 * Math.pow(1.5, level - 1)) / 50) * 50),
   parts: level >= 4 ? (level - 2) * 2 : 0,
 })
 
@@ -1276,6 +1289,22 @@ export const VISITORS: Record<VisitorKind, { weight: number; minutes: number; pa
 // Minutes between visitors, and the most a player gets in a UTC day.
 export const VISIT_GAP_MIN = 4
 export const VISITS_PER_DAY = 30
+// Grown gardens, statues and the Clock Tower draw tourists: each level above 1 adds to the
+// tourist odds (capped), and a well-grown town gets a small group of campers at once.
+// Tourist groups never come sooner than TOURIST_GAP_MIN apart. Guests roll this here; a
+// signed-in player's visitor kind comes from the server, so only the group size applies.
+export const TOURIST_PER_LEVEL = 8
+export const TOURIST_BONUS_MAX = 120
+export const TOURIST_GAP_MIN = 5
+export const TOURIST_GROUP_MAX = 3
+export const touristScore = (buildings: { def: string; level?: number }[]) =>
+  buildings.reduce((n, b) => (decorGrows(buildingDef(b.def)) ? n + Math.min(MAX_DECOR_LEVEL, Math.max(1, Math.floor(Number(b.level) || 1))) - 1 : n), 0)
+export const touristWeight = (score: number) => VISITORS.tourist.weight + Math.min(TOURIST_BONUS_MAX, Math.max(0, score) * TOURIST_PER_LEVEL)
+// How many campers turn up together: one, or two from score 4, three from score 12.
+export const touristGroup = (score: number, roll = Math.random()) => {
+  const extra = score >= 12 ? 2 : score >= 4 ? 1 : 0
+  return 1 + (roll < Math.min(0.75, score * 0.05) ? extra : 0)
+}
 // At most this many barn finds a UTC day, and their rarity odds (mostly commons), from the cars at
 // the spots the player has opened.
 export const BARN_PER_DAY = 1

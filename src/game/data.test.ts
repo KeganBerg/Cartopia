@@ -42,6 +42,8 @@ describe('building upgrades', () => {
         if (d.jobSeconds) {
           expect(upgradePayout(d, l + 1)).toBeGreaterThan(upgradePayout(d, l))
           expect(upgradeJobSeconds(d, l + 1)).toBeLessThanOrEqual(upgradeJobSeconds(d, l))
+        } else if (d.kind === 'decor') {
+          expect(upgradeFuelCap(d, l + 1)).toBe(0) // decor levels are looks and tourists only
         } else if (d.kind === 'house') {
           expect(houseResidents(l + 1)).toBeGreaterThan(houseResidents(l))
           expect(upgradeFuelCap(d, l + 1)).toBe(upgradeFuelCap(d, l) + 1)
@@ -54,13 +56,14 @@ describe('building upgrades', () => {
     }
   })
 
-  it('only upgrades businesses, parts makers, gas stations and houses', () => {
+  it('only upgrades businesses, parts makers, gas stations, houses and growing decor', () => {
     expect(upgradable(buildingDef('pizza'))).toBe(true)
     expect(upgradable(buildingDef('house'))).toBe(true)
     expect(upgradable(buildingDef('tuner'))).toBe(true)
     expect(upgradable(buildingDef('gas'))).toBe(true)
     expect(upgradable(buildingDef('rescue'))).toBe(false)
     expect(upgradable(buildingDef('tree'))).toBe(false)
+    expect(upgradable(buildingDef('garden'))).toBe(true)
     expect(upgradable(buildingDef('rock'))).toBe(false)
     expect(upgradable(buildingDef('from-the-future'))).toBe(false)
   })

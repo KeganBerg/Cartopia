@@ -1147,6 +1147,15 @@ button.lvl-item:hover { border-color: var(--accent); transform: translateY(-2px)
 .upgrade-pips { display: flex; gap: 4px; justify-content: center; }
 .upgrade-pips i { width: 18px; height: 8px; border-radius: 4px; background: #cfd8dc; }
 .upgrade-pips i.on { background: linear-gradient(#ffd54f, #ff8f00); box-shadow: 0 1px 0 rgba(0,0,0,.2); }
+.theme-strip { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 10px 0 2px; }
+.theme-dot { width: 34px; height: 34px; border-radius: 50%; border: 2px solid rgba(0,0,0,.18); padding: 0; cursor: pointer; font-size: 16px; line-height: 1; background: #fff; }
+.theme-dot.sel { border-color: #ff8f00; box-shadow: 0 0 0 3px rgba(255,143,0,.35); }
+.city-look .theme-strip { justify-content: flex-start; }
+.city-look h3 { margin: 12px 0 4px; }
+.lamp-posts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.lamp-posts button { padding: 8px 4px; border-radius: 10px; border: 2px solid rgba(0,0,0,.12); background: #fff; font-size: 12px; display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; }
+.lamp-posts button.sel { border-color: #ff8f00; background: #fff8e1; }
+.lamp-posts button span { font-size: 20px; }
 .upgrade-stats { width: 100%; border-collapse: collapse; background: #fff; border: 2px solid #e0e0e0; border-radius: 12px; overflow: hidden; font-weight: 800; font-size: 14px; }
 .upgrade-stats th { font: 13px var(--display); color: #607d8b; text-align: right; padding: 6px 10px 2px; }
 .upgrade-stats td { padding: 5px 10px; border-top: 1px solid #eceff1; text-align: right; color: #455a64; }

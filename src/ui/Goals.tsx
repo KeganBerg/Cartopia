@@ -5,7 +5,7 @@ import {
   type Period, type GameState,
 } from '../game/store'
 import {
-  DAILY_BONUS, GOALS, QUEST_PAY, TASKS_PER_PERIOD, payAt, msToNextDay, msToNextWeek, buildingDef, buildingLevel, upgradable, MAX_BUILDING_LEVEL,
+  DAILY_BONUS, GOALS, QUEST_PAY, TASKS_PER_PERIOD, payAt, msToNextDay, msToNextWeek, buildingDef, buildingLevel, upgradable, maxLevel,
   carDef, takesDriver, SEASON_STARS, activeEvent, eventEndsAt, plotPrice, START_LAND, type StatKey, type GoalDef, flatFixCost, servicePay, gasCanCost,
 } from '../game/data'
 import { Panel, SheetTabs, openGarageTab } from './Menus'
@@ -90,7 +90,7 @@ function goTo(stat: StatKey, def?: string): void {
     case 'upgrades':
     case 'bldgLevel':
       // Building upgrades count too; the Shop lists them when there's one to do.
-      return s.buildings.some((b) => upgradable(buildingDef(b.def)) && buildingLevel(b) < MAX_BUILDING_LEVEL) ? s.openShop('upgrades') : s.openPanel('garage')
+      return s.buildings.some((b) => upgradable(buildingDef(b.def)) && buildingLevel(b) < maxLevel(buildingDef(b.def))) ? s.openShop('upgrades') : s.openPanel('garage')
     case 'built':
       return s.openPanel('shop')
     case 'serviced':

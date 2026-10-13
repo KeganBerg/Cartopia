@@ -1492,12 +1492,29 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
       )
     }
     case 'clocktower': {
-      const th = 2.6
+      // Each level adds a floor to the shaft, with a stone band and a lit window on every face;
+      // level 4 adds a balcony under the clocks and level 5 gold pinnacles round the roof.
+      const extra = Math.min(4, lvl - 1)
+      const th = 2.6 + extra * 0.6
       return (
         <group>
           <Box m={m} at={[0, 0.06, 0]} s={[1.3, 0.12, 1.3]} c="#cfd8dc" shadow={false} />
           <Box m={m} at={[0, 0.17, 0]} s={[1.1, 0.1, 1.1]} c="#cfd8dc" />
-          <Box m={m} at={[0, th / 2, 0]} s={[0.8, th, 0.8]} c="#b0796b" t={brickTex(1, 3)} />
+          <Box m={m} at={[0, th / 2, 0]} s={[0.8, th, 0.8]} c="#b0796b" t={brickTex(1, Math.round(th + 0.4))} />
+          {Array.from({ length: extra }, (_, f) => (
+            <group key={f}>
+              <Box m={m} at={[0, 1.7 + f * 0.6, 0]} s={[0.86, 0.06, 0.86]} c="#eceff1" />
+              {[0, 1, 2, 3].map((i) => (
+                <group key={i} rotation-y={(i * Math.PI) / 2}>
+                  <mesh position={[0, 1.98 + f * 0.6, 0.405]}><planeGeometry args={[0.2, 0.3]} />{win}</mesh>
+                </group>
+              ))}
+            </group>
+          ))}
+          {lvl >= 4 && <Box m={m} at={[0, th - 0.86, 0]} s={[1.02, 0.07, 1.02]} c="#eceff1" />}
+          {lvl >= 5 && [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([x, z], i) => (
+            <mesh key={i} position={[x * 0.42, th + 0.26, z * 0.42]} castShadow><coneGeometry args={[0.06, 0.34, 4]} />{m(GOLD)}</mesh>
+          ))}
           <Box m={m} at={[0, th + 0.05, 0]} s={[0.92, 0.1, 0.92]} c="#eceff1" />
           {/* A clock on all four faces, stopped at ten past ten like the ads. */}
           {[0, 1, 2, 3].map((i) => (

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
-import { HaloSpot } from './halos'
-import { TILE, levelLift, type BuildingDef } from '../game/data'
+import { LampPost, useLampDesign } from './LampPosts'
+import { TILE, DECOR_GROWTH, decorGrows, levelLift, type BuildingDef } from '../game/data'
+import { DecorLevels } from './DecorLevels'
 import { useGame } from '../game/store'
 import { signTexture } from './signTexture'
 import { signMat } from './closingTime'
@@ -583,6 +584,9 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
       </group>
     )
 
+  // Gardens, parks, statues and fountains grow around their level 1 model (the Clock Tower grows itself).
+  if (lvl > 1 && decorGrows(def) && DECOR_GROWTH[def.id] !== 'tower')
+    return <DecorLevels def={def} level={lvl} ghost={ghost} m={m} bulb={bulb}><BuildingModel def={def} ghost={ghost} valid={valid} /></DecorLevels>
   if (lvl >= 4 && GROWTH_MODELS.has(def.id)) return <GrowthModel def={def} ghost={ghost} m={m} win={win} bulb={bulb} level={lvl} />
   if (NEW_MODELS.has(def.id)) return <NewBuildingModel def={def} ghost={ghost} valid={valid} m={m} win={win} bulb={bulb} level={lvl} />
   if (OFFICE_MODELS.has(def.id)) return <OfficeModel def={def} ghost={ghost} m={m} bulb={bulb} level={lvl} />
@@ -738,14 +742,8 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
         </group>
       )
     case 'lamp':
-      if (!ghost)
-        return (
-          <group>
-            <PropMesh parts={DECOR_PROPS.lamp()} />
-            <LightPool r={0.9} x={0.4} />
-            <HaloSpot at={[0.4, 1.56, 0]} />
-          </group>
-        )
+      // Turned so the lamp's arm reaches out along +x, as the lantern always has.
+      if (!ghost) return <group rotation-y={-Math.PI / 2}><PlacedLamp /></group>
       return (
         <group>
           <mesh position={[0, 0.9, 0]} castShadow><cylinderGeometry args={[0.04, 0.06, 1.8]} />{m(def.color)}</mesh>
@@ -1455,4 +1453,10 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
       )
     }
   }
+}
+
+// A placed Street Lamp in the city's lamp design (a lantern unless the town picked one).
+function PlacedLamp() {
+  const design = useLampDesign('lantern')
+  return <LampPost design={design} pool={0.9} poolY={0.075} />
 }

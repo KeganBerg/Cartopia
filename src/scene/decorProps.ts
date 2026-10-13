@@ -265,7 +265,7 @@ export const DECOR_PROPS = {
     k.rod(IRON, [0.4, 1.73, 0], [0.4, 1.68, 0], 0.008, 5)
     k.cone(cast(IRON), 0.09, 0.07, [0.4, 1.65, 0], [0, Math.PI / 4, 0], 4)
     k.sphere(IRON, 0.014, [0.4, 1.69, 0], [1, 1, 1], 6, 4)
-    k.cyl({ c: '#fff', glow: true }, 0.07, 0.05, 0.13, [0.4, 1.555, 0], [0, Math.PI / 4, 0], 4)
+    k.cyl({ c: '#fff', glow: 'lamp' }, 0.07, 0.05, 0.13, [0.4, 1.555, 0], [0, Math.PI / 4, 0], 4)
     for (let i = 0; i < 4; i++) {
       const a = (i / 4) * Math.PI * 2
       k.rod(IRON, [0.4 + Math.cos(a) * 0.072, 1.62, Math.sin(a) * 0.072], [0.4 + Math.cos(a) * 0.052, 1.49, Math.sin(a) * 0.052], 0.006, 4)
