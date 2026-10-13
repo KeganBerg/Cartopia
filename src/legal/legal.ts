@@ -2,23 +2,23 @@
 // (Menu > Help) and the public pages at /terms and /privacy, which the build
 // writes as plain HTML (vite.config.ts) for app stores and link sharing.
 //
-// DRAFTS: written by Claude for the owner to review. Not legal advice. Every
-// [BRACKETED] placeholder must be filled in before the game is published to an
-// app store or takes real-money payments.
+// DRAFTS: written by Claude for the owner to review. Not legal advice.
+// Operator, contact and governing-law country (USA) from Kegan, 2026-10-13.
 
 export type LegalBlock = string | { list: string[] }
 export type LegalSection = { h: string; body: LegalBlock[] }
 export type LegalDoc = { id: 'terms' | 'privacy'; title: string; updated: string; intro: string; sections: LegalSection[] }
 
 export const DRAFT_NOTE = 'Draft: this page is being reviewed and may change before it is final.'
-export const OPERATOR = '[OPERATOR NAME]'
-export const CONTACT = '[CONTACT EMAIL]'
+export const OPERATOR = 'Cartopia'
+export const CONTACT = 'support@cartopia.com'
+export const JURISDICTION = 'the United States'
 
 export const TERMS: LegalDoc = {
   id: 'terms',
   title: 'Terms of Service',
-  updated: 'October 12, 2026',
-  intro: `These terms are the rules for playing Cartopia, the town-building and racing game at cartopia.lol. Cartopia is run by ${OPERATOR} ("we", "us"). By playing or creating an account you agree to them. If you don't agree, please don't play.`,
+  updated: 'October 13, 2026',
+  intro: `These terms are the rules for playing Cartopia, the town-building and racing game at cartopia.lol. ${OPERATOR} ("we", "us") runs the game. By playing or creating an account you agree to them. If you don't agree, please don't play.`,
   sections: [
     {
       h: 'Who can play',
@@ -105,7 +105,7 @@ export const TERMS: LegalDoc = {
       h: 'Changes and law',
       body: [
         'We may update these terms. If a change is important we will tell you in the game. Playing after a change means you accept it.',
-        'These terms are governed by the laws of [JURISDICTION].',
+        `These terms are governed by the laws of ${JURISDICTION}.`,
       ],
     },
     { h: 'Contact', body: [`Questions? Email ${CONTACT}.`] },
@@ -115,8 +115,8 @@ export const TERMS: LegalDoc = {
 export const PRIVACY: LegalDoc = {
   id: 'privacy',
   title: 'Privacy Policy',
-  updated: 'October 12, 2026',
-  intro: `This explains what Cartopia collects, why, and the choices you have. Cartopia is run by ${OPERATOR} ("we", "us"). We don't sell your data, show ads or use third-party tracking.`,
+  updated: 'October 13, 2026',
+  intro: `This explains what Cartopia collects, why, and the choices you have. ${OPERATOR} ("we", "us") runs the game. We don't sell your data, show ads or use third-party tracking.`,
   sections: [
     {
       h: 'What we collect',
