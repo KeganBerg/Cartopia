@@ -8,8 +8,8 @@ import { Color, Material, ShaderChunk, Vector2, type WebGLProgramParametersWithU
 // the same way at no extra draw cost. uHF = 0 turns it off (races, clear days).
 export const fogUniforms = {
   uHF: { value: 0 }, // strength 0..1
-  uHFMax: { value: 0.5 },
-  uHFDetail: { value: 1 }, // 0 skips the second layer of noise (phones) // the thickest it gets: the town always shows through
+  uHFMax: { value: 0.38 }, // the thickest it gets: the town always shows through
+  uHFDetail: { value: 1 }, // 0 skips the second layer of noise (phones)
   uHFHeight: { value: 1.5 }, // how fast it thins with height (world units)
   uHFFloor: { value: 0 }, // solid up to here, thinning above
   uHFDensity: { value: 1 },
@@ -106,6 +106,9 @@ ShaderChunk.fog_fragment = /* glsl */ `
     // Fog thinning exponentially with height, summed along the ray.
     float hfTau = uHFDensity * hfBank * hfLen * ( abs( hfDy ) > 0.05 ? hfH * ( hfE0 - hfE1 ) / hfDy : hfE0 );
     float hfF = ( 1.0 - exp( - hfTau ) ) * uHFMax * uHF;
+    // Up close in the free view the air is clear: fog only gathers with distance,
+    // so a street-level shot isn't behind a flat veil.
+    if ( ! isOrthographic ) hfF *= smoothstep( 6.0, 60.0, hfLen );
     // Lit windows and lamps glow through it at night.
     float hfLum = max( gl_FragColor.r, max( gl_FragColor.g, gl_FragColor.b ) );
     hfF *= 1.0 - uHFGlow * smoothstep( 0.5, 0.95, hfLum );
