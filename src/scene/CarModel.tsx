@@ -24,6 +24,7 @@ import { tintDef, trimDef, type Trim } from '../game/trim'
 import { HatModel } from './CarHat'
 import type { HatFit } from '../game/hats'
 import { ODDBALL } from './oddballCars'
+import { RESTO } from './restoCars'
 
 type Shape = {
   len: number; wid: number
@@ -112,6 +113,10 @@ const SHAPES: Record<Body, Shape> = {
   parcel: { len: 1.36, wid: 0.72, body: 0.3, lift: 0.12, cabinLen: 1.1, cabinH: 0.49, cabinZ: -0.13, taper: 0.99, hood: 0, wheel: 0.15, drop: 0, nose: 0.02 },
   // Monster truck: wid spans the huge tyres; the body rides above them (lift), the hood stands proud of the bed.
   monster: { len: 1.4, wid: 1.04, body: 0.14, lift: 0.56, cabinLen: 0.38, cabinH: 0.3, cabinZ: 0.15, taper: 1, hood: 0, wheel: 0.27, drop: -0.12, nose: 0.02, bed: true, track: 0.4, tyre: 0.24 },
+  // Resto-mods: drawn by restoCars.ts, same as the exotics.
+  pontoon: { len: 1.36, wid: 0.76, body: 0.16, lift: 0.08, cabinLen: 0.3, cabinH: 0.1, cabinZ: -0.05, taper: 0.7, hood: 0, wheel: 0.14, drop: 0.02, nose: 0.06, open: true },
+  stepnose: { len: 1.3, wid: 0.76, body: 0.25, lift: 0.08, cabinLen: 0.62, cabinH: 0.19, cabinZ: -0.14, taper: 0.8, hood: 0, wheel: 0.15, drop: 0.01, nose: 0.05 },
+  restomuscle: { len: 1.42, wid: 0.8, body: 0.25, lift: 0.08, cabinLen: 0.62, cabinH: 0.17, cabinZ: -0.22, taper: 0.8, hood: 0.03, wheel: 0.155, drop: 0.01, nose: 0.03 },
 }
 
 // Motorcycles. head = steering head [y, z]; seat = seat top [y, z].
@@ -481,7 +486,7 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
   if (hit) return hit
   if (body === 'formula') return formulaGeo(key, fit)
   const s = shapeOf(body)
-  const exotic = EXOTIC[body] ?? ODDBALL[body]
+  const exotic = EXOTIC[body] ?? ODDBALL[body] ?? RESTO[body]
   if (exotic) {
     const k = new Kit()
     exotic(k, fit, { seat, steering, brakes, bar })

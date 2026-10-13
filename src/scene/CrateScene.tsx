@@ -1026,14 +1026,14 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
   const burstAt = useRef<number | null>(null)
   const coinAt = useRef<number | null>(null)
   const st = useRef({ born: -1, openAt: -1, lid: { y: 0, vy: 0, x: 0, vx: 0, rx: 0, landed: false }, revealed: false, hops: 0, skipped: skip, vary: { dir: 0, spin: 1, lag: [0, 0, 0, 0], wob: 11, side: 1 } })
-  const coins = drop?.kind === 'coins' || drop?.kind === 'dupe' || drop?.kind === 'skindupe'
+  const coins = drop?.kind === 'coins' || drop?.kind === 'dupe' || drop?.kind === 'skindupe' || drop?.kind === 'piecedupe'
   // Rare and legendary pulls (cars, gem parts, epic and legendary skins) throw gems instead.
   const gems = !coins && tier >= 2
   // A jackpot or a legendary pull heaps its shower into a pile.
   const big = (drop?.kind === 'coins' && drop.jackpot) || tier >= 3
   // A part shows the part itself; cars and paints show the car.
   const part = drop?.kind === 'mod' ? drop.mod : null
-  const showCar = (drop?.kind === 'car' || drop?.kind === 'dupe' || drop?.kind === 'skin' || drop?.kind === 'skindupe' || drop?.kind === 'hat') && !!prizeCar
+  const showCar = (drop?.kind === 'car' || drop?.kind === 'dupe' || drop?.kind === 'skin' || drop?.kind === 'skindupe' || drop?.kind === 'hat' || drop?.kind === 'piece') && !!prizeCar
 
   useFrame((state, rawDt) => {
     const s = st.current
@@ -1234,6 +1234,8 @@ export function prizeLook(drop: CrateDrop | null, cars: { uid: string; model: st
   if (!drop) return null
   if (drop.kind === 'skin' || drop.kind === 'skindupe') return skinLook(drop.skin, drop.part, cars, mine)
   if (drop.kind === 'car') return { body: carDef(drop.model).body, model: drop.model, color: drop.color }
+  // A resto-mod piece shows its secret car as a dark shadow; the fourth piece shows it built.
+  if (drop.kind === 'piece') return { body: carDef(drop.model).body, model: drop.model, color: drop.uid && drop.color ? drop.color : '#263238' }
   if (drop.kind === 'hat') {
     // A hat, on your own car.
     const owned = cars.filter((c) => !carDef(c.model).parked)

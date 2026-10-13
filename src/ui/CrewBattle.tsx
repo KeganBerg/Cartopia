@@ -182,7 +182,7 @@ function LastBattle({ b, payable }: { b: Battle; payable: boolean }) {
 const SHOWDOWN = new Set(['scooter', 'chopper', 'sportbike', 'bus', 'dogvan', 'tank', 'van', 'icecream', 'parcel', 'monster'])
 function rivalCar(mine: OwnedCar, tag: string) {
   const price = carDef(mine.model).price || 20000
-  const near = CARS.filter((c) => c.price > 0 && !c.rescueOnly && !c.season && !SHOWDOWN.has(c.body)).sort((a, b) => Math.abs(Math.log(a.price / price)) - Math.abs(Math.log(b.price / price))).slice(0, 5)
+  const near = CARS.filter((c) => c.price > 0 && !c.rescueOnly && !c.season && !c.secret && !SHOWDOWN.has(c.body)).sort((a, b) => Math.abs(Math.log(a.price / price)) - Math.abs(Math.log(b.price / price))).slice(0, 5)
   let h = 0
   for (const ch of tag) h = (h * 31 + ch.charCodeAt(0)) >>> 0
   return near[h % near.length] ?? CARS[0]
