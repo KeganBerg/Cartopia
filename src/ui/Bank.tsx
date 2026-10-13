@@ -1,22 +1,28 @@
 import { useState } from 'react'
 import { useGame } from '../game/store'
-import { BUCKS_PACKS, type BucksPack } from '../game/data'
+import { BUCKS_PACKS, type BucksPack } from '../game/bucksPacks'
 import { purchase } from '../lib/payments'
 import { Panel } from './Menus'
 
-// The Bank: buy bucks in tiers. Checkout is a placeholder until a payment
-// provider is connected.
+const NOTICE = {
+  'not-connected': ['Coming soon', "Gem packs aren't on sale yet. You weren't charged."],
+  'sign-in': ['Sign in first', 'Gems go to your account. Sign in from the Menu.'],
+  failed: ["Couldn't open checkout", "You weren't charged. Try again."],
+} as const
+
+// The Bank: buy bucks in tiers on Stripe Checkout (src/lib/payments.ts). Until the Stripe keys
+// are set on Netlify, a tap says purchases are coming soon and nothing is charged.
 export function BankPanel() {
   const bucks = useGame((s) => s.bucks)
   const showNeed = useGame((s) => s.showNeed)
   const [pending, setPending] = useState<string | null>(null)
-  const [notice, setNotice] = useState<BucksPack | null>(null)
+  const [notice, setNotice] = useState<'not-connected' | 'sign-in' | 'failed' | null>(null)
 
   const buy = async (p: BucksPack) => {
     setPending(p.id)
     const res = await purchase(p)
     setPending(null)
-    if (!res.ok && res.reason === 'not-connected') setNotice(p)
+    if (!res.ok) setNotice(res.reason)
   }
 
   return (
@@ -58,12 +64,12 @@ export function BankPanel() {
         </div>
         <button className="buy small alt" onClick={() => showNeed('bucks', 0)}>How</button>
       </div>
-      <p className="hint">Prices in USD. Purchases aren't switched on yet, so nothing will be charged.</p>
+      <p className="hint">Prices in USD · 🔒 Stripe</p>
       {notice && (
         <div className="overlay bank-notice" onClick={() => setNotice(null)}>
           <div className="prize" onClick={(e) => e.stopPropagation()}>
-            <h2>Coming soon</h2>
-            <p>Checkout for the {notice.name} isn't connected yet, so you weren't charged. Check back soon!</p>
+            <h2>{NOTICE[notice][0]}</h2>
+            <p>{NOTICE[notice][1]}</p>
             <button className="buy" onClick={() => setNotice(null)}>OK</button>
           </div>
         </div>
@@ -71,3 +77,4 @@ export function BankPanel() {
     </Panel>
   )
 }
+

@@ -71,6 +71,8 @@ export type Quests = {
   week: string; weekly: TaskSlot[]; weekBase: Partial<Record<CounterKey, number>>; weekDone: string[]; weekChest: boolean
 }
 export type Period = 'daily' | 'weekly'
+// A paid gem pack, as the server's purchases table records it (src/lib/payments.ts).
+export type Purchase = { seq: number; bucks: number; coins: number; parts: number }
 
 export type SaveState = {
   version: 1
@@ -118,6 +120,8 @@ export type SaveState = {
   boosts?: Boosts
   // Wager races: the last server ledger row (wager_ledger) whose coins this save includes.
   wagers?: number
+  // Gem packs bought: the last server purchases row (seq) whose gems this save includes.
+  purchases?: number
   // Season track: the season number, stars earned in it, and tiers (0-based) collected.
   season: SeasonProgress | null
   // Daily deals used today (UTC), by deal id. The server guard allows each discount once a day.
@@ -382,6 +386,8 @@ type Actions = {
   applyCrate: (o: CrateOpen) => void
   // Adds the server's wager rows after the save's count: stakes held, races won, refunds.
   applyWagers: (entries: WagerEntry[]) => number
+  // Adds paid gem packs (the server's purchases rows) after the save's count. Returns gems added.
+  applyPurchases: (rows: Purchase[]) => number
   closePrize: () => void
   closeLevelUp: () => void
   focusShop: (panel: 'shop' | 'showroom' | 'rescue' | 'race', id: string | null) => void
@@ -1634,6 +1640,20 @@ export const useGame = create<GameState>()(
         return coins
       },
 
+      applyPurchases: (rows) => {
+        const s = get()
+        const from = s.purchases ?? 0
+        const fresh = rows.filter((r) => r.seq > from).sort((a, b) => a.seq - b.seq)
+        if (!fresh.length) return 0
+        const sum = (k: 'bucks' | 'coins' | 'parts') => fresh.reduce((a, r) => a + r[k], 0)
+        set({
+          bucks: s.bucks + sum('bucks'), coins: s.coins + sum('coins'), parts: s.parts + sum('parts'),
+          purchases: fresh[fresh.length - 1].seq,
+          updatedAt: Date.now(),
+        })
+        return sum('bucks')
+      },
+
       visitorPrize: (p) => {
         const s = get()
         set(withXp(s, p.xp, {
@@ -2484,8 +2504,8 @@ export const useGame = create<GameState>()(
 )
 
 export function saveOf(s: GameState): SaveState {
-  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, restoring2, truck, gp, campaign, claimedSets, crewChests, visits, crates, cratePity, boosts, wagers, season, deals, trials, rivals, rivalRow, tuner, mastery, road, roadItems, freeCrates, trail, cheer, flairSeen, daily, repSeen, worldTour, presets, seasonBase, recap, friendship, cups, freePaint, oldPaints, tour, event, showcase, raceCar, skins, modSkins, hats, hatQuest, lights, cityTheme, restoParts, land, stored, updatedAt } = s
-  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings: foldStored(buildings, stored), cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, restoring2: restoring2 ?? null, truck: truck ?? 0, gp, campaign, claimedSets, crewChests, visits, crates, cratePity: cratePity ?? {}, boosts: boosts ?? emptyBoosts(), ...(wagers ? { wagers } : {}), season, deals, trials, rivals, rivalRow, tuner: tuner ?? {}, mastery: mastery ?? {}, road: road ?? 0, roadItems: roadItems ?? [], freeCrates: freeCrates ?? [], ...(trail ? { trail } : {}), ...(cheer ? { cheer } : {}), ...(flairSeen ? { flairSeen } : {}), ...(daily ? { daily } : {}), ...(repSeen !== undefined ? { repSeen } : {}), ...(worldTour ? { worldTour } : {}), ...(presets?.some(Boolean) ? { presets } : {}), ...(seasonBase ? { seasonBase } : {}), ...(recap ? { recap } : {}), ...(friendship ? { friendship } : {}), cups: cups ?? {}, ...(freePaint ? { freePaint } : {}), oldPaints: !!oldPaints, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, hats: hats ?? [], hatQuest: hatQuestOf({ stats, hatQuest }), ...(cleanLights(lights) ? { lights: cleanLights(lights) } : {}), ...(colorTheme(cityTheme) ? { cityTheme } : {}), ...(restoParts?.length ? { restoParts } : {}), land, updatedAt }
+  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, restoring2, truck, gp, campaign, claimedSets, crewChests, visits, crates, cratePity, boosts, wagers, purchases, season, deals, trials, rivals, rivalRow, tuner, mastery, road, roadItems, freeCrates, trail, cheer, flairSeen, daily, repSeen, worldTour, presets, seasonBase, recap, friendship, cups, freePaint, oldPaints, tour, event, showcase, raceCar, skins, modSkins, hats, hatQuest, lights, cityTheme, restoParts, land, stored, updatedAt } = s
+  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings: foldStored(buildings, stored), cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, restoring2: restoring2 ?? null, truck: truck ?? 0, gp, campaign, claimedSets, crewChests, visits, crates, cratePity: cratePity ?? {}, boosts: boosts ?? emptyBoosts(), ...(wagers ? { wagers } : {}), ...(purchases ? { purchases } : {}), season, deals, trials, rivals, rivalRow, tuner: tuner ?? {}, mastery: mastery ?? {}, road: road ?? 0, roadItems: roadItems ?? [], freeCrates: freeCrates ?? [], ...(trail ? { trail } : {}), ...(cheer ? { cheer } : {}), ...(flairSeen ? { flairSeen } : {}), ...(daily ? { daily } : {}), ...(repSeen !== undefined ? { repSeen } : {}), ...(worldTour ? { worldTour } : {}), ...(presets?.some(Boolean) ? { presets } : {}), ...(seasonBase ? { seasonBase } : {}), ...(recap ? { recap } : {}), ...(friendship ? { friendship } : {}), cups: cups ?? {}, ...(freePaint ? { freePaint } : {}), oldPaints: !!oldPaints, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, hats: hats ?? [], hatQuest: hatQuestOf({ stats, hatQuest }), ...(cleanLights(lights) ? { lights: cleanLights(lights) } : {}), ...(colorTheme(cityTheme) ? { cityTheme } : {}), ...(restoParts?.length ? { restoParts } : {}), land, updatedAt }
 }
 
 // The inventory travels inside `buildings`, flagged, so the server's guard sees the same town worth
@@ -2501,9 +2521,9 @@ export function unfoldStored<T extends Partial<SaveState>>(save: T): T & { store
 }
 
 // Fields added after launch, so older saves load with sensible values.
-function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'quests' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'restoring2' | 'truck' | 'gp' | 'campaign' | 'claimedSets' | 'crewChests' | 'visits' | 'crates' | 'cratePity' | 'boosts' | 'wagers' | 'season' | 'deals' | 'trials' | 'rivals' | 'rivalRow' | 'tuner' | 'mastery' | 'road' | 'cups' | 'tour' | 'event' | 'showcase' | 'skins' | 'modSkins' | 'hats' | 'land' | 'stored'> {
+function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'quests' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'restoring2' | 'truck' | 'gp' | 'campaign' | 'claimedSets' | 'crewChests' | 'visits' | 'crates' | 'cratePity' | 'boosts' | 'wagers' | 'purchases' | 'season' | 'deals' | 'trials' | 'rivals' | 'rivalRow' | 'tuner' | 'mastery' | 'road' | 'cups' | 'tour' | 'event' | 'showcase' | 'skins' | 'modSkins' | 'hats' | 'land' | 'stored'> {
   // Saves from before the tutorial existed skip it.
-  return { stats: emptyStats(), claimedGoals: [], quests: null, lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, restoring2: null, truck: 0, gp: {}, campaign: {}, claimedSets: [], crewChests: 0, visits: 0, crates: 0, cratePity: {}, boosts: emptyBoosts(), wagers: 0, season: null, deals: null, trials: { claimed: {} }, rivals: {}, rivalRow: {}, tuner: {}, mastery: {}, road: 0, cups: {}, tour: 0, event: null, showcase: [], skins: [], modSkins: [], hats: [], land: [...START_LAND], stored: [] }
+  return { stats: emptyStats(), claimedGoals: [], quests: null, lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, restoring2: null, truck: 0, gp: {}, campaign: {}, claimedSets: [], crewChests: 0, visits: 0, crates: 0, cratePity: {}, boosts: emptyBoosts(), wagers: 0, purchases: 0, season: null, deals: null, trials: { claimed: {} }, rivals: {}, rivalRow: {}, tuner: {}, mastery: {}, road: 0, cups: {}, tour: 0, event: null, showcase: [], skins: [], modSkins: [], hats: [], land: [...START_LAND], stored: [] }
 }
 
 
