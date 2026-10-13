@@ -7,6 +7,7 @@ import { FlyLayer } from './ui/Fly'
 import { ThumbRenderer } from './scene/BuildingPreview'
 import { StageCanvas } from './scene/Stage'
 import { BottomBar, ShopPanel, ShowroomPanel, GaragePanel, Toasts } from './ui/Menus'
+import { InventoryPanel } from './ui/Inventory'
 import { PaintPrizePopup } from './ui/PaintRivals'
 import { RecapPopup } from './ui/Recap'
 import { TunerPrizePopup } from './ui/TunerTrials'
@@ -157,6 +158,7 @@ export default function App() {
       <Hud />
       <BottomBar />
       {panel === 'shop' && <ShopPanel />}
+      {panel === 'inventory' && <InventoryPanel />}
       {panel === 'showroom' && <ShowroomPanel />}
       {panel === 'garage' && <GaragePanel />}
       {panel === 'race' && !liveRace && <RacePanel />}
