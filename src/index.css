@@ -2157,3 +2157,13 @@ body:has(.race-full) .toasts { display: none; }
 .ci-flash { position: absolute; inset: 0; background: #fff; pointer-events: none; animation: ci-flash .35s ease-out forwards; }
 @keyframes ci-flash { from { opacity: .85; } to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .ci-flash { animation: none; opacity: 0; } }
+
+/* Season recap (ui/Recap.tsx). */
+.recap-eyebrow { font: 900 12px Nunito, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #8a6d00; }
+.recap h2 { margin: 2px 0 10px; }
+.recap-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; }
+.recap-grid > span { display: flex; flex-direction: column; align-items: center; padding: 6px 2px; border-radius: 12px; background: rgba(255, 202, 40, .14); }
+.recap-grid i { font-style: normal; font-size: 20px; }
+.recap-grid b { font: 18px var(--display); }
+.recap-grid small { font: 800 11px Nunito, sans-serif; color: #607d8b; }
+.recap-rep { margin: 0 0 12px; font: 700 13px Nunito, sans-serif; }
