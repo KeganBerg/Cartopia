@@ -249,7 +249,19 @@ export const streetLamp = () => prop('streetLamp', (k) => {
   k.sphere(cast(L('#46565f', 0.45, 0.15)), 1, [0, 1.72, -0.44], [0.075, 0.04, 0.13], 12, 6, Math.PI / 2)
   k.cyl(L('#46565f', 0.45, 0.15), 0.02, 0.02, 0.05, [0, 1.72, -0.335], [Math.PI / 2, 0, 0], 8)
   k.cyl(BLACK, 0.012, 0.012, 0.012, [0, 1.765, -0.43], undefined, 8)
-  k.sphere({ c: '#fff', glow: true }, 1, [0, 1.718, -0.44], [0.066, 0.022, 0.118], 12, 6)
+  k.sphere({ c: '#fff', glow: 'lamp' }, 1, [0, 1.718, -0.44], [0.066, 0.022, 0.118], 12, 6)
+})
+
+// Globe lamp: a slim fluted post with a ring collar and a round frosted globe on top.
+export const globeLamp = () => prop('globeLamp', (k) => {
+  const iron = L('#2f3a40', 0.5, 0.2)
+  k.cyl(CONCRETE, 0.08, 0.085, 0.03, [0, 0.015, 0], undefined, 12)
+  k.cyl(cast(iron), 0.05, 0.075, 0.2, [0, 0.13, 0], undefined, 12)
+  k.cyl(cast(iron), 0.022, 0.03, 1.3, [0, 0.88, 0], undefined, 10)
+  for (const y of [0.45, 1.0, 1.5]) k.cyl(iron, 0.034, 0.034, 0.025, [0, y, 0], undefined, 10)
+  k.cyl(iron, 0.045, 0.03, 0.06, [0, 1.55, 0], undefined, 10)
+  k.sphere({ c: '#fff', glow: 'lamp' }, 0.11, [0, 1.68, 0], [1, 1, 1], 14, 10)
+  k.cyl(iron, 0.02, 0.012, 0.04, [0, 1.8, 0], undefined, 8)
 })
 
 // The speed limit plate's face, painted once.

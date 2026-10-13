@@ -78,6 +78,12 @@ const BODY: Record<Body, EngineProfile> = {
   tusker: p({ ppr: 4, idle: 700, redline: 4600, odd: 0.25, roll: 1.4, lump: 0.3, lumpRatio: 0.25, sub: 0.6, grit: 0.45, noise: 0.4, clatter: 0.45, bright: 0.8, reso: 115, turbo: 0.6, vol: 1.15 }),
   // Wheezy old van four.
   dogvan: p({ ppr: 2, idle: 750, redline: 4400, odd: 0.45, roll: 1.2, lump: 0.4, lumpRatio: 0.5, sub: 0.15, grit: 0.3, noise: 0.35, clatter: 0.4, bright: 0.8, reso: 165, vol: 0.85 }),
+  // Oddballs. Ice cream van: a soft, puttering old four.
+  icecream: p({ ppr: 2, idle: 780, redline: 4300, odd: 0.45, roll: 1.2, lump: 0.35, lumpRatio: 0.5, sub: 0.15, grit: 0.25, noise: 0.3, clatter: 0.35, bright: 0.85, reso: 175, vol: 0.85 }),
+  // Monster truck: a huge, lumpy big-block V8 with a blower whine.
+  monster: p({ ppr: 4, idle: 650, redline: 5200, odd: 0.18, roll: 1.5, lump: 0.75, lumpRatio: 0.25, sub: 0.85, grit: 0.6, noise: 0.4, bright: 0.8, reso: 110, whine: 0.7, crackle: 0.6, vol: 1.3 }),
+  // Parcel van: a clattery four-cylinder diesel.
+  parcel: p({ ppr: 2, idle: 700, redline: 4000, odd: 0.4, roll: 1.25, lump: 0.25, lumpRatio: 0.5, sub: 0.3, grit: 0.3, noise: 0.35, clatter: 0.65, bright: 0.7, reso: 140, turbo: 0.35, vol: 0.95 }),
   // Air-cooled flat-six hung out the back: a hard, metallic howl to a high redline.
   rearengine: p({ ppr: 3, idle: 950, redline: 8600, odd: 0.32, roll: 1.05, lump: 0.2, lumpRatio: 0.5, sub: 0.2, grit: 0.4, noise: 0.35, clatter: 0.15, bright: 1.35, reso: 235, crackle: 0.5, vol: 1.05 }),
   // Big lazy V10 in a long nose: lumpy, truck-like bark at low revs.

@@ -5,9 +5,12 @@ import type { Body, BuildingDef, Finish, SkinnedSlot, Panels } from '../game/dat
 import { BuildingModel } from './BuildingModel'
 import { Grounded } from './ServiceVehicles'
 import { CarModel } from './CarModel'
+import { HatModel } from './CarHat'
+import { hatPaint, type HatFit } from '../game/hats'
 import { SEASON } from './season'
 import { frame, seat, type Bounds } from './fit'
 import { reduceMotionOn } from '../lib/prefs'
+import type { Trim } from '../game/trim'
 
 // Shop, showroom and garage thumbnails are live 3D renders, drawn every display
 // frame. One hidden WebGL canvas renders every on-screen model into a shared
@@ -25,12 +28,12 @@ function buildingItem(def: BuildingDef, level?: number): Item {
   return { key: `b|${def.id}|${level ?? 1}|${SEASON}`, model: () => <Grounded.Provider value><BuildingModel def={def} level={level} /></Grounded.Provider> }
 }
 
-type CarLook = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; panels?: Panels | null; stripe?: string | null; rusty?: boolean; mods?: string[] | null }
+type CarLook = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; panels?: Panels | null; stripe?: string | null; rusty?: boolean; mods?: string[] | null; trim?: Trim | null; hat?: HatFit | null }
 
 function carItem(c: CarLook): Item {
   return {
-    key: `c|${c.body}|${c.model ?? ''}|${c.color}|${c.finish ?? ''}|${c.skin ?? ''}|${JSON.stringify(c.modSkin ?? {})}|${c.stripe ?? ''}|${c.rusty ? 1 : 0}|${c.rusty ? '' : (c.mods ?? []).join(',')}|${c.panels ? JSON.stringify(c.panels) : ''}`,
-    model: () => <CarModel body={c.body} model={c.model} color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} panels={c.panels} stripe={c.stripe} rusty={c.rusty} mods={c.mods} />,
+    key: `c|${c.body}|${c.model ?? ''}|${c.color}|${c.finish ?? ''}|${c.skin ?? ''}|${JSON.stringify(c.modSkin ?? {})}|${c.stripe ?? ''}|${c.rusty ? 1 : 0}|${c.rusty ? '' : (c.mods ?? []).join(',')}|${c.panels ? JSON.stringify(c.panels) : ''}|${c.trim ? JSON.stringify(c.trim) : ''}|${c.hat && !c.rusty ? JSON.stringify(c.hat) : ''}`,
+    model: () => <CarModel body={c.body} model={c.model} color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} panels={c.panels} trim={c.trim} stripe={c.stripe} rusty={c.rusty} mods={c.mods} hat={c.hat} />,
   }
 }
 
@@ -277,6 +280,16 @@ function Thumb({ item, size }: { item: Item; size?: Size }) {
 // A building or decoration floating and turning, exactly as it looks in town.
 export function BuildingThumb({ def, level }: { def: BuildingDef; level?: number }) {
   return <Thumb item={buildingItem(def, level)} />
+}
+
+// Scaled up to about a car's size, so it floats and frames like the other thumbs.
+function hatItem(h: HatFit): Item {
+  return { key: `h|${h.id}|${hatPaint(h).join(',')}`, model: () => <group><group scale={6}><HatModel hat={h} /></group></group> }
+}
+
+// A hat on its own, floating and turning.
+export function HatThumb({ hat, size }: { hat: HatFit; size?: Size }) {
+  return <Thumb item={hatItem(hat)} size={size} />
 }
 
 // A car floating and turning. Rusty finds show the real model in dull, rusted paint.

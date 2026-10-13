@@ -14,11 +14,17 @@ import { CarThumb } from '../scene/BuildingPreview'
 import { RivalTile, type RivalMatch } from './Rivals'
 import { artStyle } from './venueArt'
 import { TileClip } from './TileClip'
+import { MasteryMedal, cupChip } from './ClassCups'
+import { roadReady } from './TrophyRoad'
+import { flairChip, flairNew } from './Flair'
+import { dailyBest } from './DailyRun'
+import { dailyDay } from '../game/daily'
+import { worldChip } from './WorldTour'
 
 // The Race menu's front page: every race mode as a tile on one screen, each
 // showing its next race, so nothing needs scrolling to find.
 
-export type HubTab = 'quick' | 'campaign' | 'tour' | 'gp' | 'trial' | 'event' | 'rivals' | 'tuner'
+export type HubTab = 'quick' | 'campaign' | 'tour' | 'gp' | 'trial' | 'event' | 'rivals' | 'tuner' | 'cups' | 'road' | 'flair' | 'daily' | 'world'
 
 const money = (n: number) => (n >= 10000 ? `$${Math.round(n / 1000)}k` : `$${n.toLocaleString()}`)
 
@@ -35,7 +41,7 @@ export function Pips({ n, of, dark }: { n: number; of: number; dark?: boolean })
   return <span className={dark ? 'rm-pips dark' : 'rm-pips'} aria-label={`${n} of ${of}`}>{Array.from({ length: of }, (_, i) => <i key={i} className={i < n ? 'on' : ''} />)}</span>
 }
 
-export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival }: { onOpen: (t: HubTab) => void; onCampaign: (ci: number, race: number) => void; onTour: () => void; onEvent: () => void; onRival: (m: RivalMatch) => void }) {
+export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival, onBlast, onCustom }: { onOpen: (t: HubTab) => void; onCampaign: (ci: number, race: number) => void; onTour: () => void; onEvent: () => void; onRival: (m: RivalMatch) => void; onBlast: () => void; onCustom: () => void }) {
   const level = useGame((s) => s.level)
   const done = useGame((s) => s.campaign)
   const won = useGame((s) => s.tour ?? 0)
@@ -43,6 +49,14 @@ export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival }: { onOp
   const carCount = useGame((s) => s.cars.length)
   const openPanel = useGame((s) => s.openPanel)
   const live = useLive((l) => l.players.length)
+  const cups = useGame((s) => s.cups)
+  const trophies = useGame((s) => s.trophies)
+  const roadDue = roadReady(trophies, useGame((s) => s.road))
+  const daily = useGame((s) => s.daily)
+  const dailyDue = daily?.day !== dailyDay()
+  const worldTour = useGame((s) => s.worldTour)
+  const flairSave = { trophies, cups, stats: useGame((s) => s.stats), mastery: useGame((s) => s.mastery) }
+  const flairDue = flairNew({ ...flairSave, flairSeen: useGame((s) => s.flairSeen) })
   const signedIn = useLive((l) => l.signedIn)
 
   const { ci, next } = campaignFocus(done, level)
@@ -146,7 +160,25 @@ export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival }: { onOp
             <span className="rm-mi">🟢</span><span><b>Live</b><small>{!signedIn ? 'Sign in' : live > 0 ? `${live} online` : 'Nobody on'}</small></span>
           </button>
         )}
+        <button className="rm-mini m-blast" onClick={onBlast} title="Every kart the same, bumps hit hard, the road full of obstacles"><span className="rm-mi">💥</span><span><b>Bumper Blast</b><small>Chaos karts</small></span></button>
+        <button className="rm-mini m-custom" onClick={onCustom}><span className="rm-mi">🛠️</span><span><b>Custom race</b><small>Mix the rules</small></span></button>
         <button className="rm-mini m-tuner" onClick={() => onOpen('tuner')}><span className="rm-mi">🔧</span><span><b>Tuner Trials</b><small>Built cars only</small></span></button>
+        <button className="rm-mini m-cups" onClick={() => onOpen('cups')}><span className="rm-mi">🏆</span><span><b>Class Cups</b><small>{cupChip(cups)}</small></span></button>
+        <button className="rm-mini m-road" onClick={() => onOpen('road')}>
+          {roadDue > 0 && <span className="rm-dot">{roadDue}</span>}
+          <span className="rm-mi">🛣️</span><span><b>Trophy Road</b><small>🏆 {trophies.toLocaleString()}</small></span>
+        </button>
+        <button className="rm-mini m-daily" onClick={() => onOpen('daily')}>
+          {dailyDue && <span className="rm-dot">!</span>}
+          <span className="rm-mi">📅</span><span><b>Daily Run</b><small>{dailyBest(daily, dailyDay())?.toFixed(2) ?? 'New today'}</small></span>
+        </button>
+        <button className="rm-mini m-world" onClick={() => onOpen('world')}>
+          <span className="rm-mi">🌍</span><span><b>World Tour</b><small>{worldChip(worldTour)}</small></span>
+        </button>
+        <button className="rm-mini m-flair" onClick={() => onOpen('flair')}>
+          {flairDue > 0 && <span className="rm-dot">{flairDue}</span>}
+          <span className="rm-mi">🎆</span><span><b>Flair</b><small>{flairChip(flairSave)}</small></span>
+        </button>
         <button className="rm-mini m-ghost" onClick={() => openPanel('friends')}><span className="rm-mi">👻</span><span><b>Ghosts</b><small>Friends</small></span></button>
         <button className="rm-mini m-top" onClick={() => openPanel('leaders')}><span className="rm-mi">🏅</span><span><b>Top racers</b><small>Leaders</small></span></button>
       </div>
@@ -185,17 +217,17 @@ export function RaceBar({ cars, car, onPick, go, note, dist }: { cars: OwnedCar[
         <div className="rm-picker" role="listbox" aria-label="Pick the car you race with">
           {[...cars].sort((a, b) => pi(b) - pi(a)).map((c) => (
             <button key={c.uid} role="option" aria-selected={c.uid === car.uid} className={c.uid === car.uid ? 'chip sel' : 'chip'} onClick={() => { onPick(c.uid); setOpen(false) }}>
-              <CarThumb size="xs" color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} body={carDef(c.model).body} model={c.model} stripe={c.stripe} mods={c.mods} />
+              <CarThumb size="xs" color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} hat={c.hat} body={carDef(c.model).body} model={c.model} stripe={c.stripe} mods={c.mods} />
               <span>{carDef(c.model).name}</span><span className="rm-pi">PI {pi(c)}</span>{carDef(c.model).skill ? ` ${SKILLS[carDef(c.model).skill!].icon}` : ''}{tag(c)}
             </button>
           ))}
         </div>
       )}
       <button className="rm-car" onClick={() => setOpen((o) => !o)} disabled={cars.length < 2} aria-expanded={open}>
-        <CarThumb size="xs" color={car.color} finish={car.finish} skin={car.skin} modSkin={car.modSkin} body={d.body} model={car.model} stripe={car.stripe} mods={car.mods} />
+        <CarThumb size="xs" color={car.color} finish={car.finish} skin={car.skin} modSkin={car.modSkin} hat={car.hat} body={d.body} model={car.model} stripe={car.stripe} mods={car.mods} />
         <span className="rm-car-txt">
           <small className="rm-car-lbl">🏁 Racing with</small>
-          <b>{d.name}</b>
+          <b>{d.name} <MasteryMedal model={car.model} /></b>
           <small><span className="rm-pi">PI {pi(car)}</span>{skill && <> {skill.icon} {skill.name}</>}{tag(car)}</small>
         </span>
         {cars.length > 1 && <span className="rm-swap" aria-hidden>{open ? 'Done' : 'Change'}</span>}

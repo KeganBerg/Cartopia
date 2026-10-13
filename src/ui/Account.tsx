@@ -8,6 +8,7 @@ import { isCleanName, NAME_REJECTED } from '../lib/names'
 import { UsernameRow } from './Username'
 import { AccountData, Group, GuestData, HelpTab, LegalView, SettingsTab } from './Settings'
 import { LEGAL, type LegalDoc } from '../legal/legal'
+import { CityLook } from './CityLook'
 
 type MenuTab = 'town' | 'settings' | 'account' | 'help'
 const MENU_TABS = [{ id: 'town', label: '🏠 Town' }, { id: 'settings', label: '⚙️ Settings' }, { id: 'account', label: '👤 Account' }, { id: 'help', label: '❓ Help' }] as const
@@ -74,6 +75,7 @@ export function AccountPanel() {
         <input value={name} maxLength={24} onChange={(e) => setName(e.target.value)} />
         <button className="buy small" onClick={() => (isCleanName(name) ? rename(name) : useGame.getState().toast(NAME_REJECTED))}>Save</button>
       </div>
+      <CityLook />
       </>}
       {tab === 'settings' && <SettingsTab user={user} />}
       {tab === 'account' && <>

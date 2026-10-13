@@ -57,5 +57,3 @@ export async function reportPartyFinish(id: string, t: number): Promise<PartyVer
   return view?.done ? { place: view.place, of: view.of, myTime: Number(view.my_t ?? Infinity), void: false } : null
 }
 
-// Coins for a placing: the whole prize for the winner, less down the order.
-export const PARTY_SHARE = [1, 0.4, 0.25, 0.15, 0.1, 0.1]

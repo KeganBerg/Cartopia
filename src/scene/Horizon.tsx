@@ -5,6 +5,8 @@ import {
   Object3D, RingGeometry, ShaderMaterial, SphereGeometry, Vector3, type InstancedMesh, type Mesh,
 } from 'three'
 import { weatherNow } from '../game/weather'
+import { moonLit, moonPhase } from '../game/skyExtras'
+import { south } from '../game/sun'
 import { dayPhase, duskAmount, nightAmount } from './dayNight'
 import { lightDir } from './look'
 import { hazeColor } from './weatherLook'
@@ -140,6 +142,9 @@ uniform vec3 uGlow;
 uniform vec3 uSunDir;
 uniform vec3 uSunCol;
 uniform vec3 uMoonDir;
+uniform float uMoonPhase;
+uniform float uMoonLit;
+uniform float uMoonFlip;
 uniform vec3 uCloudLit;
 uniform vec3 uCloudShade;
 uniform float uNight;
@@ -171,8 +176,24 @@ void main() {
   float s = max(dot(d, uSunDir), 0.0);
   float clear = 1.0 - uCover * 0.9;
   col += uSunCol * (smoothstep(0.9988, 0.9993, s) * 4.0 + pow(s, 40.0) * 0.35 + pow(s, 6.0) * 0.12) * (1.0 - uNight) * clear;
+  // The moon, low over the far city, lit by phase: a glow round it that grows
+  // towards full, and on the disc a terminator that sweeps across through the
+  // month (lit on the right while waxing, on the left in the south), with the
+  // dark side faintly showing.
   float m = max(dot(d, uMoonDir), 0.0);
-  col += vec3(0.92, 0.94, 1.0) * (smoothstep(0.99955, 0.9997, m) * 1.6 + pow(m, 80.0) * 0.14) * uNight * clear;
+  col += vec3(0.8, 0.86, 1.0) * (pow(m, 3000.0) * 0.35 + pow(m, 300.0) * 0.1) * uMoonLit * uNight * clear;
+  if (m > 0.998) {
+    vec3 mr = normalize(cross(uMoonDir, vec3(0.0, 1.0, 0.0)));
+    vec3 mu = cross(mr, uMoonDir);
+    vec2 q = vec2(dot(d, mr), dot(d, mu)) / MOON_R;
+    float r2 = dot(q, q);
+    vec3 nrm = vec3(q, sqrt(max(0.0, 1.0 - r2)));
+    float a = 6.2831853 * uMoonPhase;
+    float lit = smoothstep(-0.04, 0.06, dot(nrm, vec3(sin(a) * uMoonFlip, 0.0, -cos(a))));
+    float maria = 0.8 + 0.2 * noise(q * 2.6 + 3.0);
+    vec3 disc = vec3(1.0, 0.98, 0.9) * 1.25 * maria * (0.02 + 0.98 * lit);
+    col = mix(col, disc, (1.0 - smoothstep(0.88, 1.0, r2)) * (0.45 + 0.55 * lit) * uNight * clear);
+  }
   // Stars, twinkling, fading into the haze near the horizon.
   if (uNight > 0.02) {
     vec3 q = d * 210.0;
@@ -222,6 +243,12 @@ const SKY = {
 }
 const K = Object.fromEntries(Object.entries(SKY).flatMap(([k, v]) => Object.entries(v).map(([kk, vv]) => [`${k}.${kk}`, new Color(vv)]))) as Record<string, Color>
 const sunTmp = new Vector3()
+// The moon's disc hangs low over the far city, a little to the right of it, where the
+// free view can see it (the light it casts on the town comes from higher up).
+// Drawn about twice its real size.
+const MOON_EL = 9 * (Math.PI / 180)
+const MOON_DISC = new Vector3(Math.cos(A_CITY + 0.28) * Math.cos(MOON_EL), Math.sin(MOON_EL), Math.sin(A_CITY + 0.28) * Math.cos(MOON_EL))
+const MOON_R = 0.034
 const haze = new Color()
 const grey = new Color()
 
@@ -231,14 +258,14 @@ function Sky({ small }: { small: boolean }) {
       new ShaderMaterial({
         vertexShader: SKY_VERT,
         fragmentShader: SKY_FRAG,
-        defines: { OCTAVES: small ? 3 : 4 },
+        defines: { OCTAVES: small ? 3 : 4, MOON_R: MOON_R.toFixed(4) },
         side: BackSide,
         depthWrite: false,
         fog: false,
         uniforms: {
           uZenith: { value: new Color() }, uHorizon: { value: new Color() }, uGlow: { value: new Color() }, uSunDir: { value: new Vector3() }, uSunCol: { value: new Color('#fff4d6') },
           uMoonDir: { value: new Vector3() }, uCloudLit: { value: new Color() }, uCloudShade: { value: new Color() }, uNight: { value: 0 }, uDusk: { value: 0 }, uCover: { value: 0 },
-          uTime: { value: 0 }, uWind: { value: { x: 0.004, y: 0.0015 } },
+          uTime: { value: 0 }, uWind: { value: { x: 0.004, y: 0.0015 } }, uMoonPhase: { value: 0 }, uMoonLit: { value: 0 }, uMoonFlip: { value: south() ? -1 : 1 },
         },
       }),
     [small],
@@ -274,7 +301,10 @@ function Sky({ small }: { small: boolean }) {
     sunTmp.y *= 1 - 0.75 * dusk
     ;(u.uSunDir.value as Vector3).copy(sunTmp.normalize())
     ;(u.uSunCol.value as Color).set(dusk > 0.3 ? '#ffb070' : '#fff1d0')
-    ;(u.uMoonDir.value as Vector3).copy(lightDir(phase, 1, sunTmp))
+    ;(u.uMoonDir.value as Vector3).copy(MOON_DISC)
+    const moon = moonPhase()
+    u.uMoonPhase.value = moon
+    u.uMoonLit.value = moonLit(moon)
     u.uWind.value.x = 0.004 + w.wind * 0.012
     // Distant hills take a little of the sky's blue (aerial perspective).
     skyHorizon.copy(h).lerp(z, 0.18)

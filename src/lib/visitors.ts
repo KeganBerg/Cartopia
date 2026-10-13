@@ -3,7 +3,8 @@ import { supabase } from './supabase'
 import { flushSave, signedInUser } from './cloud'
 import { sfx } from './sound'
 import { useGame, type JunkCar } from '../game/store'
-import { CARS, RESCUE_SPOTS, STORAGE_MAX, VISITORS, VISIT_GAP_MIN, BARN_RARITY, carDef, performance, visitorPrize, type Body, type Rarity, type VisitorKind } from '../game/data'
+import { townTraffic } from '../game/traffic'
+import { CARS, RESCUE_SPOTS, STORAGE_MAX, VISITORS, VISIT_GAP_MIN, BARN_RARITY, TOURIST_GAP_MIN, touristGroup, touristScore, touristWeight, carDef, performance, visitorPrize, type Body, type Rarity, type VisitorKind } from '../game/data'
 
 // Surprise visitors in town: every few minutes someone turns up (see VISITORS in data.ts).
 // Signed-in players get theirs from the server (visitor_next() and visitor_claim() in
@@ -29,6 +30,8 @@ export type Visitor = {
   body: Body
   // On its way out of town: still drawn while it fades.
   gone?: boolean
+  // Tourists: how many campers came together (grown gardens and statues draw groups). Just for looks.
+  group?: number
 }
 
 type VisitorState = { visitor: Visitor | null; card: boolean; busy: boolean }
@@ -77,18 +80,28 @@ function dress(id: string, kind: VisitorKind, prize: { coins: number; xp: number
     color = '#15151d'
   }
   const name = kind === 'racer' ? `${pick(RACERS)} from ${pick(TOWNS)}` : ''
-  return { id, kind, ...prize, expiresAt, server, model, color, name, pi, body: carDef(model).body }
+  const group = kind === 'tourist' ? touristGroup(touristScore(useGame.getState().buildings)) : 1
+  return { id, kind, ...prize, expiresAt, server, model, color, name, pi, body: carDef(model).body, ...(group > 1 ? { group } : {}) }
 }
 
-function rollLocal(barn: boolean): Visitor {
+// A guest's visitor kind: tourists come more often to a town with grown gardens and statues,
+// and half as often to a jammed one (src/game/traffic.ts).
+export function rollKind(barn: boolean, score: number, roll = Math.random(), tourists = 1): VisitorKind {
   const kinds = (Object.keys(VISITORS) as VisitorKind[]).filter((k) => k !== 'barn' || barn)
-  let r = Math.random() * kinds.reduce((n, k) => n + VISITORS[k].weight, 0)
+  const weight = (k: VisitorKind) => (k === 'tourist' ? touristWeight(score) * tourists : VISITORS[k].weight)
+  let r = roll * kinds.reduce((n, k) => n + weight(k), 0)
   let kind = kinds[0]
   for (const k of kinds) {
     kind = k
-    r -= VISITORS[k].weight
+    r -= weight(k)
     if (r <= 0) break
   }
+  return kind
+}
+
+function rollLocal(barn: boolean): Visitor {
+  const g = useGame.getState()
+  const kind = rollKind(barn, touristScore(g.buildings), Math.random(), townTraffic(g).tourists)
   return dress(`g${Date.now()}`, kind, visitorPrize(kind, useGame.getState().level), Date.now() + VISITORS[kind].minutes * 60_000, false)
 }
 
@@ -159,8 +172,8 @@ const HELLO: Record<VisitorKind, string> = {
 function arrived() {
   const v = useVisitors.getState().visitor
   if (!v) return
-  sfx.horn()
-  useGame.getState().toast(HELLO[v.kind])
+  sfx.horn(v.body)
+  useGame.getState().toast(v.group ? `📸 A tour group of ${v.group} campers rolled into town!` : HELLO[v.kind])
 }
 
 // Sends the visitor on its way: it fades out of town, and the next one comes a few minutes later.
@@ -171,7 +184,8 @@ export function leave() {
   setTimeout(() => {
     if (useVisitors.getState().visitor?.id === v.id) useVisitors.setState({ visitor: null })
   }, 1200)
-  nextAt = Date.now() + gap()
+  // Tourists, alone or in a group, never pop up more than once every TOURIST_GAP_MIN minutes.
+  nextAt = Date.now() + (v.kind === 'tourist' ? Math.max(gap(), TOURIST_GAP_MIN * 60_000) : gap())
 }
 
 // Collects the visitor's prize. Returns false if it couldn't (it left, or storage is full).

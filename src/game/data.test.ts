@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildingDef, carDef, knownBuilding, BUILDINGS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost, jobLevel, houseResidents, levelName, performance, fittedMods, modStats, modCost, MODS, MOD_SLOTS, modFits, ownedMods, CARS, takesDriver, loves, driverPayout, skillBoost, skillDrag, liveSkillBoost, SKILLS , CAMPAIGN, CAMPAIGN_RACES, campaignRivalPi, campaignReward, campaignShift, campaignStars, CAR_SETS, carSource, readySets } from './data'
+import { buildingDef, carDef, knownBuilding, BUILDINGS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost, jobLevel, houseResidents, levelName, performance, fittedMods, modStats, modCost, MODS, MOD_SLOTS, modFits, ownedMods, CARS, takesDriver, loves, driverPayout, skillBoost, skillDrag, liveSkillBoost, SKILLS , CAMPAIGN, CAMPAIGN_RACES, campaignRivalPi, campaignReward, campaignShift, rookieRace, ROOKIE_SHIFT, campaignStars, CAR_SETS, carSource, readySets } from './data'
 import { MAX_RACE_PI } from './race'
 import { VENUES } from '../scene/venues'
 
@@ -42,6 +42,8 @@ describe('building upgrades', () => {
         if (d.jobSeconds) {
           expect(upgradePayout(d, l + 1)).toBeGreaterThan(upgradePayout(d, l))
           expect(upgradeJobSeconds(d, l + 1)).toBeLessThanOrEqual(upgradeJobSeconds(d, l))
+        } else if (d.kind === 'decor') {
+          expect(upgradeFuelCap(d, l + 1)).toBe(0) // decor levels are looks and tourists only
         } else if (d.kind === 'house') {
           expect(houseResidents(l + 1)).toBeGreaterThan(houseResidents(l))
           expect(upgradeFuelCap(d, l + 1)).toBe(upgradeFuelCap(d, l) + 1)
@@ -54,13 +56,14 @@ describe('building upgrades', () => {
     }
   })
 
-  it('only upgrades businesses, parts makers, gas stations and houses', () => {
+  it('only upgrades businesses, parts makers, gas stations, houses and growing decor', () => {
     expect(upgradable(buildingDef('pizza'))).toBe(true)
     expect(upgradable(buildingDef('house'))).toBe(true)
     expect(upgradable(buildingDef('tuner'))).toBe(true)
     expect(upgradable(buildingDef('gas'))).toBe(true)
     expect(upgradable(buildingDef('rescue'))).toBe(false)
     expect(upgradable(buildingDef('tree'))).toBe(false)
+    expect(upgradable(buildingDef('garden'))).toBe(true)
     expect(upgradable(buildingDef('rock'))).toBe(false)
     expect(upgradable(buildingDef('from-the-future'))).toBe(false)
   })
@@ -221,6 +224,14 @@ describe('campaign ladder', () => {
     expect(campaignStars(9.65, 10)).toBe(2)
     expect(campaignStars(9.3, 10)).toBe(3)
   })
+
+  it('eases only a brand-new racer\'s very first race, without touching the prize', () => {
+    expect(rookieRace(0, 0, 0)).toBe(true)
+    expect(rookieRace(0, 0, 1)).toBe(false)
+    expect(rookieRace(0, 1, 0)).toBe(false)
+    expect(rookieRace(1, 0, 0)).toBe(false)
+    expect(ROOKIE_SHIFT).toBeLessThan(campaignShift(0, 0))
+  })
 })
 
 describe('collection book', () => {
@@ -231,7 +242,7 @@ describe('collection book', () => {
 
   it('says where to find each car', () => {
     expect(carSource(carDef('bug')).text).toBe("Rusty's · Suburbs")
-    expect(carSource(carDef('lambo')).text).toBe('Showroom · 💎90')
+    expect(carSource(carDef('lambo')).text).toBe('Showroom · 💎70')
     expect(carSource(carDef('vette')).text).toBe('Showroom · Lv 15')
   })
 

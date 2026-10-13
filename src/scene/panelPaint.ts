@@ -149,6 +149,28 @@ vec3 panPattern(int id, vec3 c, vec3 p, vec3 n) {
     fire = mix(fire, vec3(1.0, 0.45, 0.02), 0.35 * (1.0 - smoothstep(edge + 0.05, edge + 0.18, u)));
     return mix(mix(c, fire, fl), vec3(0.03), line);
   }
+  if (id == 9) {
+    // Signature (mastery): a dark sash sweeping back along the sides, edged in gold, and a
+    // light twin stripe over the top.
+    float side = q.y * 1.4 - q.z * 0.55;
+    float sash = smoothstep(0.02, 0.025, abs(fract(side * 1.6) - 0.5) - 0.28);
+    float rim = smoothstep(0.012, 0.0, abs(abs(fract(side * 1.6) - 0.5) - 0.28));
+    vec3 o = mix(c * 0.22, c, sash);
+    o = mix(o, vec3(1.0, 0.78, 0.25), rim * step(abs(n.y), 0.6));
+    float top = step(0.6, n.y) * step(0.05, q.x) * step(q.x, 0.11);
+    return mix(o, mix(c, vec3(1.0), 0.7), top);
+  }
+  if (id == 10) {
+    // Pinstripe: thin light lines running nose to tail.
+    float w = abs(n.y) > 0.6 ? q.x : q.y;
+    return mix(c, mix(c, vec3(1.0), 0.65), smoothstep(0.004, 0.0, abs(fract(w / 0.05) - 0.5) * 0.05 - 0.0015));
+  }
+  if (id == 11) {
+    // Polka: light dots on a grid of the face.
+    vec2 g = panFace(q, n) / 0.06;
+    vec2 d = fract(g) - 0.5;
+    return mix(c, mix(c, vec3(1.0), 0.75), smoothstep(0.3, 0.27, length(d)));
+  }
   return c;
 }
 `

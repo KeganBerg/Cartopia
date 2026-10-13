@@ -12,7 +12,7 @@ pieces. Pieces of a car start dropping at its level. They're the top cars in the
   crate_opens row as JSON or null. Either goes to `applyCrate()`.
 - Code: `src/game/resto.ts` (pieces, pool, `restoTables`), `rollPiece`/`rollCrate` in `src/game/crates.ts`, the 2x2 build
   card `src/ui/Resto.tsx`, bodies in `src/scene/restoCars.ts` (lofted like the exotics).
-- Server: `supabase/migrations/0065_resto_pieces.sql`. Pieces are counted from `crate_opens`,
+- Server: `supabase/migrations/0074_resto_pieces.sql` (built on 0072's crate_open). Pieces are counted from `crate_opens`,
   so the save's `restoParts` is only a mirror. The catalog lists resto cars at unlock 999 so the
   guard refunds any copy the server didn't build (`car_granted`).
 - Adding one: a car with `secret: true` in `CARS`, a body in `RESTO`, a set entry, splash renders
