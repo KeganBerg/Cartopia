@@ -10,6 +10,7 @@ import { useLive, challenge, cancelChallenge, refreshPresence, type LivePlayer }
 import { UsernameForm } from './Username'
 import { FRIEND_LEVELS, friendLevel } from '../game/friendship'
 import { GiftButton } from './Gifts'
+import { PostcardButton } from './Postcards'
 import { refreshGifts } from '../lib/gifts'
 import { useHelp, helpsLeft, loadHelps } from '../lib/help'
 import { HELPS_PER_TOWN } from '../game/help'
@@ -185,6 +186,7 @@ function FriendRow({ f, on, helped, onVisit }: { f: Friend; on?: LivePlayer; hel
               ? <button className="buy small alt" onClick={cancelChallenge}>Waiting… ✕</button>
               : <button className="buy small fr-race" disabled={!!outgoing || on.closed || cooldown} onClick={() => void challenge(on.id)} title={on.closed ? 'Not taking races' : 'Challenge to a live race'}>🏁</button>)}
             <GiftButton to={f.id} />
+            <PostcardButton to={f.id} name={f.username ? `@${f.username}` : f.townName} />
             <button className="buy small" onClick={onVisit}>{helped ? 'Visit' : 'Visit & help'}</button>
             <button className="fr-more" aria-label="Unfriend" title="Unfriend" onClick={() => setConfirm(true)}>⋯</button>
           </>
