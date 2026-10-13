@@ -104,8 +104,8 @@ export const GROOVES: Groove[] = [
     closedHats: 'all',
     gain: 1,
   },
-  // UK garage: a skippy two-step kick, heavy swing, a growling speed-garage bass,
-  // short organ hits and chopped-up vocal "ah"/"oh" hits in D minor.
+  // UK garage: a skippy two-step kick, heavy swing, a clean bouncing sub,
+  // short organ hits, rimshots and a stuttering bell hook in D minor.
   {
     name: 'Garage',
     bpm: 132,
@@ -116,19 +116,20 @@ export const GROOVES: Groove[] = [
       { root: 58.27, notes: [174.61, 220, 233.08, 293.66] },
       { root: 55, notes: [196, 220, 293.66, 329.63] },
     ],
-    bass: [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 1, 0, 0],
-    bassLen: 2.6,
-    bassTone: 'reese',
+    bass: [1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 2, 0, 1, 0, 0, 0],
+    bassLen: 1.2,
+    bassTone: 'sub',
     stabs: [[2, 7, 10], [2, 7], [2, 7, 10], [2, 7, 13]],
     stabLen: 1.1,
     tone: 'organ',
-    kick: [0, 7, 10],
+    kick: [0, 10],
     claps: [4, 12],
-    snare: 'snare',
+    snare: 'rim',
     openHats: off,
     closedHats: 'all',
-    lead: { root: hz('D4'), notes: tune({ 3: 12, 5: 10, 9: 7, 13: 3 }, { 3: 10, 5: 8, 9: 5, 13: 3 }, { 3: 12, 5: 8, 9: 10, 13: 7 }, { 3: 11, 5: 7, 9: 4, 11: 7, 13: 9 }), len: 1.2, tone: 'vox' },
-    gain: 0.9,
+    lead: { root: hz('D4'), notes: tune({ 3: 12, 5: 10, 9: 7, 13: 3 }, { 3: 10, 5: 8, 9: 5, 13: 3 }, { 3: 12, 5: 8, 9: 10, 13: 7 }, { 3: 11, 5: 7, 9: 4, 11: 7, 13: 9 }), len: 1.6, tone: 'bell', stutter: [3, 35] },
+    pump: 0.35,
+    gain: 1.1,
   },
   // Acid house: a squelchy, resonant bassline in A that slowly opens up.
   {
@@ -248,7 +249,7 @@ export const GROOVES: Groove[] = [
     gain: 1,
   },
   // Liquid drum and bass: a fast broken beat (kick, snare, kick-kick, snare)
-  // under warm electric-piano chords, a smooth sub bass and a bell melody in
+  // under warm electric-piano chords, a rolling reese bass and a bell melody in
   // Db major.
   {
     name: 'Liquid',
@@ -257,7 +258,7 @@ export const GROOVES: Groove[] = [
     loop: [chord('Db2', 'F3 Ab3 C4 F4'), chord('C2', 'Eb3 G3 Bb3 Eb4'), chord('Bb1', 'Db3 F3 Ab3 Db4'), chord('Gb1', 'Db3 F3 Bb3 Db4')],
     bass: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
     bassLen: 7,
-    bassTone: 'sub',
+    bassTone: 'reese',
     stabs: [[0, 3, 10]],
     stabLen: 3,
     tone: 'piano',
