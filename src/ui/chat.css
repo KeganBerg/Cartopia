@@ -21,6 +21,21 @@
 .chat-bubble small { margin-left: 8px; font-size: 11px; opacity: .75; }
 .chat-menu { display: flex; gap: 6px; margin: 2px 0 4px; }
 .chat-menu button { border: 2px solid #b9cde8; background: #fff; border-radius: 10px; padding: 3px 9px; font: 13px var(--display); color: #4a6283; }
+.chat-menu .chat-del { border-color: #ef9a9a; color: #c62828; }
+.chat-menu .chat-del.sure { background: #e53935; border-color: #e53935; color: #fff; }
+.chat-menu .chat-x { padding: 3px 7px; color: #78909c; }
+.chat-line { display: flex; align-items: center; gap: 4px; max-width: 100%; }
+.chat-msg.mine .chat-line { flex-direction: row-reverse; }
+.chat-bubble { -webkit-touch-callout: none; }
+.chat-msg.open .chat-bubble { box-shadow: 0 0 0 2px #5aa9ff; }
+/* Desktop: a small menu button shows on hover. Phones long-press the bubble instead. */
+.chat-more { display: none; flex: none; border: none; background: #eef3fa; color: #4a6283; border-radius: 50%; width: 26px; height: 26px; padding: 0; font-size: 16px; line-height: 1; }
+@media (hover: hover) and (pointer: fine) {
+  .chat-msg:hover .chat-more, .chat-more:focus-visible { display: inline-block; }
+}
+@media (pointer: coarse) {
+  .chat-bubble { user-select: none; -webkit-user-select: none; }
+}
 .chat-unmute { align-self: center; margin-top: 8px; border: none; background: #eceff1; border-radius: 10px; padding: 4px 10px; font-size: 12px; color: #546e7a; }
 
 .chat-send { flex: none; display: flex; gap: 8px; align-items: center; }
