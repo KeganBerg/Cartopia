@@ -43,7 +43,8 @@ import { cleanLights, colorTheme, DEFAULT_LIGHTS, type Lights } from './cityLook
 // car: uid of the owned car assigned to drive for this business (see DRIVER_BONUS).
 // merge: set on the top-left building of a merged block (see merge.ts); mturn: the turn the player gave that block.
 // tint: the building's own colour theme (game/cityLook.ts COLOR_THEMES); unset keeps its colours.
-export type PlacedBuilding = { uid: string; def: string; x: number; z: number; jobEndsAt: number | null; rot?: number; level?: number; jobLevel?: number; car?: string; merge?: number; mturn?: number; tint?: string }
+// stored: only in the saved copy, on a bulldozed building waiting in the inventory (see saveOf).
+export type PlacedBuilding = { uid: string; def: string; x: number; z: number; jobEndsAt: number | null; rot?: number; level?: number; jobLevel?: number; car?: string; merge?: number; mturn?: number; tint?: string; stored?: boolean }
 // A saved look: a car's paint, panels and trim.
 export type Preset = { color: string; finish?: Finish; stripe?: string | null; panels?: Panels; trim?: Trim }
 export type OwnedCar = { uid: string; model: string; color: string; upgrades: Record<UpgradeSlot, number>; flat?: boolean; lowFuel?: boolean; stripe?: string | null; finish?: Finish; plate?: string; mods?: string[]; ownedMods?: string[]; skin?: string; modSkin?: Partial<Record<SkinnedSlot, string>>; panels?: Panels; trim?: Trim; hat?: HatFit | null }
@@ -176,6 +177,9 @@ export type SaveState = {
   lights?: Lights
   cityTheme?: string
   land: string[]
+  // Bulldozed buildings and decor, kept with their level to place again for free. Saved inside
+  // `buildings` with `stored: true` (saveOf), so the server's guard still counts their worth.
+  stored?: PlacedBuilding[]
   updatedAt: number
 }
 export type SeasonProgress = { n: number; stars: number; claimed: number[] }
@@ -184,7 +188,7 @@ export type Mode = 'play' | 'place' | 'move' | 'road' | 'bulldoze' | 'expand' | 
 export type Resource = 'coins' | 'parts' | 'fuel' | 'bucks' | 'level'
 export type Need = { res: Resource; missing: number; what?: string }
 
-export type Panel = null | 'need' | 'shop' | 'garage' | 'showroom' | 'race' | 'account' | 'goals' | 'daily' | 'flat' | 'friends' | 'rescue' | 'bank' | 'invites' | 'leaders' | 'clan' | 'upgrade' | 'welcome' | 'gifts' | 'season' | 'deals' | 'ghost' | 'taunts' | 'meet' | 'arcade' | 'crates' | 'battle' | 'chat'
+export type Panel = null | 'need' | 'shop' | 'garage' | 'showroom' | 'race' | 'account' | 'goals' | 'daily' | 'flat' | 'friends' | 'rescue' | 'bank' | 'invites' | 'leaders' | 'clan' | 'upgrade' | 'welcome' | 'gifts' | 'season' | 'deals' | 'ghost' | 'taunts' | 'meet' | 'arcade' | 'crates' | 'battle' | 'chat' | 'inventory'
 
 // A read-only copy of another player's town while visiting it.
 export type VisitedTown = { ownerId: string; townName: string; level: number; trophies: number; roads: string[]; buildings: PlacedBuilding[]; cars: OwnedCar[]; land?: string[]; showcase?: string[] }
@@ -196,6 +200,8 @@ type UiState = {
   placeRot: number | null
   // The placed building picked in move mode, for dragging and rotating.
   selected: string | null
+  // The inventory building being placed (placing holds its def).
+  placingStored: string | null
   // Building type just placed, so the edit bar can offer to build another.
   again: string | null
   panel: Panel
@@ -246,6 +252,9 @@ type Actions = {
   moveBuilding: (uid: string, x: number, z: number, rot?: number) => boolean
   paintRoad: (x: number, z: number) => void
   bulldoze: (x: number, z: number) => void
+  // Picks a building from the inventory to place, then puts it down (free, level kept).
+  pickStored: (uid: string) => void
+  placeStored: (uid: string, x: number, z: number, rot?: number) => boolean
   mergeBlock: (anchor: string, size: number) => void
   splitBlock: (uid: string) => void
   rotateBlock: (uid: string) => boolean
@@ -831,6 +840,7 @@ export const useGame = create<GameState>()(
       placing: null,
       placeRot: null,
       selected: null,
+      placingStored: null,
       again: null,
       panel: null,
       selectedCar: null,
@@ -855,7 +865,7 @@ export const useGame = create<GameState>()(
       // Building, roads and land edit your own town, which isn't on screen while visiting.
       setMode: (mode, placing = null) => {
         if (mode !== 'play' && get().visiting) return get().toast('Head home to build in your own town')
-        set((s) => ({ mode, placing, panel: null, selected: null, again: null, placeRot: placing && placing === s.placing ? s.placeRot : null }))
+        set((s) => ({ mode, placing, placingStored: null, panel: null, selected: null, again: null, placeRot: placing && placing === s.placing ? s.placeRot : null }))
       },
       select: (selected) => set({ selected }),
       setPlaceRot: (placeRot) => set({ placeRot }),
@@ -863,7 +873,7 @@ export const useGame = create<GameState>()(
         sfx.error()
         set({ need: { res, missing: Math.max(0, Math.ceil(missing)), what }, panel: 'need', mode: 'play', placing: null, selected: null })
       },
-      openPanel: (panel) => set({ panel, mode: 'play', placing: null, selected: null, shopFocus: null }),
+      openPanel: (panel) => set({ panel, mode: 'play', placing: null, placingStored: null, selected: null, shopFocus: null }),
       openShop: (focus) => set({ panel: 'shop', mode: 'play', placing: null, selected: null, shopFocus: focus ?? null }),
       selectCar: (selectedCar) => set({ selectedCar }),
       toast: (text) => {
@@ -898,7 +908,7 @@ export const useGame = create<GameState>()(
           s.toast(`The ${d.name} comes back next event`)
           return false
         }
-        if (d.unique && s.buildings.some((o) => o.def === def)) {
+        if (d.unique && [...s.buildings, ...(s.stored ?? [])].some((o) => o.def === def)) {
           s.toast(`You already have a ${d.name}`)
           return false
         }
@@ -965,13 +975,40 @@ export const useGame = create<GameState>()(
         if (d.parked) return s.toast('This one is coming in a future update, so it stays put')
         if (d.kind === 'obstacle') return s.toast(`Tap the ${d.name.toLowerCase()} in play mode to clear it`)
         if (groupOf(s.buildings, b.uid)) return s.toast(`Split your merged ${d.name} first (Edit, then Merge)`)
-        // Upgrades would be lost, and a drag can sweep over a building by accident.
-        if (buildingLevel(b) > 1) return s.toast(`Your ${d.name} is upgraded, so it can't be bulldozed. Use Move to put it somewhere else.`)
+        // It goes to the inventory with its level, theme and any job; its driver goes back to the garage.
+        const { car: _driver, ...kept } = b
+        sfx.click()
         set({
           buildings: s.buildings.filter((o) => o.uid !== what),
-          coins: s.coins + Math.floor(d.price / 2),
+          stored: [...(s.stored ?? []), kept],
           updatedAt: Date.now(),
         })
+      },
+
+      pickStored: (suid) => {
+        const s = get()
+        const b = s.stored?.find((o) => o.uid === suid)
+        if (!b) return
+        s.setMode('place', b.def)
+        set({ placingStored: suid, placeRot: b.rot ?? null })
+      },
+
+      placeStored: (suid, x, z, rot) => {
+        const s = get()
+        const b = s.stored?.find((o) => o.uid === suid)
+        if (!b || !canPlace(s, b.def, x, z, rot)) {
+          sfx.error()
+          return false
+        }
+        sfx.click()
+        fx({ kind: 'built', uid: suid })
+        const { rot: _old, ...rest } = b
+        set({
+          buildings: [...s.buildings, { ...rest, x, z, ...(rot == null ? {} : { rot }) }],
+          stored: (s.stored ?? []).filter((o) => o.uid !== suid),
+          updatedAt: Date.now(),
+        })
+        return true
       },
 
       mergeBlock: (anchor, size) => {
@@ -1980,7 +2017,7 @@ export const useGame = create<GameState>()(
         return true
       },
 
-      loadSave: (save) => set({ ...starterDefaults(), ...save, hatQuest: hatQuestOf(save), oldPaints: save.oldPaints ?? true }),
+      loadSave: (save) => set({ ...starterDefaults(), ...unfoldStored(save), hatQuest: hatQuestOf(save), oldPaints: save.oldPaints ?? true }),
 
       gpResult: (seriesId, won, place = won ? 1 : 2, of = 2) => {
         const s = get()
@@ -2406,20 +2443,32 @@ export const useGame = create<GameState>()(
       name: 'cartopia-save',
       partialize: (s) => saveOf(s),
       // A town saved before paint rivals has no oldPaints and keeps its colours.
-      merge: (persisted, current) => (persisted ? { ...current, ...starterDefaults(), ...(persisted as Partial<SaveState>), hatQuest: hatQuestOf(persisted as Partial<SaveState>), oldPaints: (persisted as Partial<SaveState>).oldPaints ?? true } : current),
+      merge: (persisted, current) => (persisted ? { ...current, ...starterDefaults(), ...unfoldStored(persisted as Partial<SaveState>), hatQuest: hatQuestOf(persisted as Partial<SaveState>), oldPaints: (persisted as Partial<SaveState>).oldPaints ?? true } : current),
     },
   ),
 )
 
 export function saveOf(s: GameState): SaveState {
-  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, cratePity, boosts, wagers, season, deals, trials, rivals, rivalRow, tuner, mastery, road, roadItems, freeCrates, trail, cheer, flairSeen, daily, repSeen, worldTour, presets, seasonBase, recap, friendship, cups, freePaint, oldPaints, tour, event, showcase, raceCar, skins, modSkins, hats, hatQuest, lights, cityTheme, land, updatedAt } = s
-  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, cratePity: cratePity ?? {}, boosts: boosts ?? emptyBoosts(), ...(wagers ? { wagers } : {}), season, deals, trials, rivals, rivalRow, tuner: tuner ?? {}, mastery: mastery ?? {}, road: road ?? 0, roadItems: roadItems ?? [], freeCrates: freeCrates ?? [], ...(trail ? { trail } : {}), ...(cheer ? { cheer } : {}), ...(flairSeen ? { flairSeen } : {}), ...(daily ? { daily } : {}), ...(repSeen !== undefined ? { repSeen } : {}), ...(worldTour ? { worldTour } : {}), ...(presets?.some(Boolean) ? { presets } : {}), ...(seasonBase ? { seasonBase } : {}), ...(recap ? { recap } : {}), ...(friendship ? { friendship } : {}), cups: cups ?? {}, ...(freePaint ? { freePaint } : {}), oldPaints: !!oldPaints, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, hats: hats ?? [], hatQuest: hatQuestOf({ stats, hatQuest }), ...(cleanLights(lights) ? { lights: cleanLights(lights) } : {}), ...(colorTheme(cityTheme) ? { cityTheme } : {}), land, updatedAt }
+  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, cratePity, boosts, wagers, season, deals, trials, rivals, rivalRow, tuner, mastery, road, roadItems, freeCrates, trail, cheer, flairSeen, daily, repSeen, worldTour, presets, seasonBase, recap, friendship, cups, freePaint, oldPaints, tour, event, showcase, raceCar, skins, modSkins, hats, hatQuest, lights, cityTheme, land, stored, updatedAt } = s
+  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings: foldStored(buildings, stored), cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, cratePity: cratePity ?? {}, boosts: boosts ?? emptyBoosts(), ...(wagers ? { wagers } : {}), season, deals, trials, rivals, rivalRow, tuner: tuner ?? {}, mastery: mastery ?? {}, road: road ?? 0, roadItems: roadItems ?? [], freeCrates: freeCrates ?? [], ...(trail ? { trail } : {}), ...(cheer ? { cheer } : {}), ...(flairSeen ? { flairSeen } : {}), ...(daily ? { daily } : {}), ...(repSeen !== undefined ? { repSeen } : {}), ...(worldTour ? { worldTour } : {}), ...(presets?.some(Boolean) ? { presets } : {}), ...(seasonBase ? { seasonBase } : {}), ...(recap ? { recap } : {}), ...(friendship ? { friendship } : {}), cups: cups ?? {}, ...(freePaint ? { freePaint } : {}), oldPaints: !!oldPaints, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, hats: hats ?? [], hatQuest: hatQuestOf({ stats, hatQuest }), ...(cleanLights(lights) ? { lights: cleanLights(lights) } : {}), ...(colorTheme(cityTheme) ? { cityTheme } : {}), land, updatedAt }
+}
+
+// The inventory travels inside `buildings`, flagged, so the server's guard sees the same town worth
+// and levels whether a building is placed or stored. unfoldStored splits it back out on load.
+function foldStored(buildings: PlacedBuilding[], stored: PlacedBuilding[] | undefined): PlacedBuilding[] {
+  return stored?.length ? [...buildings, ...stored.map((b) => ({ ...b, stored: true }))] : buildings
+}
+export function unfoldStored<T extends Partial<SaveState>>(save: T): T & { stored: PlacedBuilding[] } {
+  const all = Array.isArray(save.buildings) ? save.buildings : []
+  const flagged = all.filter((b) => b.stored).map(({ stored: _s, ...b }) => b)
+  const stored = [...(save.stored ?? []), ...flagged]
+  return { ...save, ...(save.buildings ? { buildings: all.filter((b) => !b.stored) } : {}), stored }
 }
 
 // Fields added after launch, so older saves load with sensible values.
-function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'quests' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'gp' | 'campaign' | 'claimedSets' | 'crewChests' | 'visits' | 'crates' | 'cratePity' | 'boosts' | 'wagers' | 'season' | 'deals' | 'trials' | 'rivals' | 'rivalRow' | 'tuner' | 'mastery' | 'road' | 'cups' | 'tour' | 'event' | 'showcase' | 'skins' | 'modSkins' | 'hats' | 'land'> {
+function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'quests' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'gp' | 'campaign' | 'claimedSets' | 'crewChests' | 'visits' | 'crates' | 'cratePity' | 'boosts' | 'wagers' | 'season' | 'deals' | 'trials' | 'rivals' | 'rivalRow' | 'tuner' | 'mastery' | 'road' | 'cups' | 'tour' | 'event' | 'showcase' | 'skins' | 'modSkins' | 'hats' | 'land' | 'stored'> {
   // Saves from before the tutorial existed skip it.
-  return { stats: emptyStats(), claimedGoals: [], quests: null, lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, gp: {}, campaign: {}, claimedSets: [], crewChests: 0, visits: 0, crates: 0, cratePity: {}, boosts: emptyBoosts(), wagers: 0, season: null, deals: null, trials: { claimed: {} }, rivals: {}, rivalRow: {}, tuner: {}, mastery: {}, road: 0, cups: {}, tour: 0, event: null, showcase: [], skins: [], modSkins: [], hats: [], land: [...START_LAND] }
+  return { stats: emptyStats(), claimedGoals: [], quests: null, lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, gp: {}, campaign: {}, claimedSets: [], crewChests: 0, visits: 0, crates: 0, cratePity: {}, boosts: emptyBoosts(), wagers: 0, season: null, deals: null, trials: { claimed: {} }, rivals: {}, rivalRow: {}, tuner: {}, mastery: {}, road: 0, cups: {}, tour: 0, event: null, showcase: [], skins: [], modSkins: [], hats: [], land: [...START_LAND], stored: [] }
 }
 
 

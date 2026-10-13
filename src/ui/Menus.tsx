@@ -1,6 +1,6 @@
 import { groupOf, mergeCandidates } from '../game/merge'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useGame, hasRusty, buildPrice, type OwnedCar } from '../game/store'
+import { useGame, hasRusty, buildPrice, type OwnedCar, type PlacedBuilding } from '../game/store'
 import { raceCarOf } from '../game/raceCar'
 import { reducedMotion } from '../game/fx'
 import { activeEvent, garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, carDef, performance, upgradeCost, buildingDef, upgradable, loves, readySets, isBike, FEATURES, type BuildingDef } from '../game/data'
@@ -122,6 +122,7 @@ function EditBar() {
     const b = s.selected ? s.buildings.find((o) => o.uid === s.selected) : undefined
     return !!b && upgradable(buildingDef(b.def))
   })
+  const storedCount = useGame((s) => s.stored?.length ?? 0)
   const tutDone = useGame((s) => tutTarget(s) === 'done')
   const tutCard = useGame(tutorialShowing)
   const pickedMerged = useGame((s) => !!s.selected && !!groupOf(s.buildings, s.selected))
@@ -130,7 +131,7 @@ function EditBar() {
     mode === 'expand' ? 'Tap a For Sale sign to buy land'
     : mode === 'merge' ? (canMerge ? 'Tap a Merge badge to combine buildings' : 'Put 2 or 4 matching buildings side by side')
     : mode === 'road' ? 'Drag to lay road · $10 a tile'
-    : mode === 'bulldoze' ? 'Drag to remove · buildings refund half'
+    : mode === 'bulldoze' ? 'Drag to remove · buildings go to Inventory'
     : mode === 'move' && again && selected ? 'Built! Drag or rotate it'
     : mode === 'move' ? (selected ? (pickedMerged ? 'Rotate turns the whole block. Split it to move it' : 'Drag to move, or rotate it') : 'Drag a building, or tap one to pick it')
     : `${TOUCH ? 'Tap to preview, tap again to build' : 'Click to place'} ${placing ? BUILDINGS.find((b) => b.id === placing)?.name : ''}`
@@ -147,6 +148,7 @@ function EditBar() {
         {((mode === 'place' && placing) || (mode === 'move' && selected)) && <button className="tool" onClick={rotateCurrent} title="Rotate (R)"><Icon name="rotate" size={22} /><span>Rotate</span></button>}
         {mode === 'move' && selected && canUpgrade && <button className="tool" onClick={() => openUpgrade(selected)}><Icon name="up" size={22} /><span>Upgrade</span></button>}
         {mode === 'move' && again && <button className="tool" onClick={() => setMode('place', again)}><Icon name="plus" size={22} /><span>Again</span></button>}
+        <button className="tool" onClick={() => openPanel('inventory')}><Icon name="box" size={22} /><span>Inventory</span>{storedCount > 0 && <b className="tool-count">{storedCount}</b>}</button>
         <button className="tool" onClick={() => openPanel('shop')}><Icon name="shop" size={22} /><span>Shop</span></button>
         <button className={tutDone ? 'tool done tut-pulse' : 'tool done'} onClick={() => setMode('play')}><Icon name="check" size={22} /><span>Done</span></button>
       </div>
@@ -239,6 +241,8 @@ function shopTabFor(focus: string | null): ShopTab | null {
   return (def && SHOP_GROUPS.find((g) => g.filter(def))?.id) || null
 }
 
+const NONE: PlacedBuilding[] = []
+
 // Rusty's first, then the other buildings that open up a feature.
 const featureRank = (b: { id: string }) => (b.id === 'rescue' ? 2 : FEATURES[b.id] ? 1 : 0)
 
@@ -247,6 +251,7 @@ export function ShopPanel() {
   const coins = useGame((s) => s.coins)
   const setMode = useGame((s) => s.setMode)
   const buildings = useGame((s) => s.buildings)
+  const stored = useGame((s) => s.stored ?? NONE)
   const showNeed = useGame((s) => s.showNeed)
   const focus = useGame((s) => s.shopFocus)
   const deals = useGame((s) => s.deals)
@@ -278,7 +283,7 @@ export function ShopPanel() {
               const locked = level < b.unlockLevel
               const sale = buildPrice({ deals, level }, b.id)
               const broke = coins < sale.coins
-              const owned = !!b.unique && buildings.some((o) => o.def === b.id)
+              const owned = !!b.unique && [...buildings, ...stored].some((o) => o.def === b.id)
               const highlight = b.id === 'rescue' && !rusty
               const feature = !highlight && !locked && !!FEATURES[b.id] && !buildings.some((o) => o.def === b.id)
               const focused = b.id === focus
