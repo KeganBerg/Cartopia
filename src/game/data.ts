@@ -439,6 +439,45 @@ export const RESCUE_SPOTS: RescueSpot[] = [
   ] },
 ]
 export const RESCUE_PINS = 8
+
+// Rusty's sets: every car a spot can turn up, restored and in the garage, pays a one-time reward
+// (claimed like a collection book set, through claimedSets; the save guard pays it from econ_catalog()).
+export const RUSTY_SET_PAY: Record<string, { coins: number; bucks: number; trophies: number; xp: number }> = {
+  suburbs: { coins: 2500, bucks: 2, trophies: 5, xp: 80 },
+  farm: { coins: 5000, bucks: 3, trophies: 8, xp: 120 },
+  downtown: { coins: 10000, bucks: 4, trophies: 12, xp: 180 },
+  desert: { coins: 20000, bucks: 6, trophies: 20, xp: 260 },
+  track: { coins: 40000, bucks: 10, trophies: 30, xp: 400 },
+}
+export const rustySetId = (spot: string) => `rusty-${spot}`
+export const RUSTY_SETS: CarSet[] = RESCUE_SPOTS.map((sp) => ({
+  id: rustySetId(sp.id), name: sp.name, icon: sp.icon, cars: [...new Set(sp.cars.map((c) => c.model))], ...RUSTY_SET_PAY[sp.id],
+}))
+
+// Rusty's hot tip: one spot a day (UTC), out of those the player's level has opened, where rare
+// cars turn up HOT_RARE times as often. rescue_roll() picks the same spot from the saved level.
+export const HOT_RARE = 3
+export const utcDay = (t = Date.now()) => Math.floor(t / 86400000)
+export function hotSpot(level: number, t = Date.now()): string {
+  const open = RESCUE_SPOTS.filter((sp) => level >= sp.unlockLevel)
+  return (open.length ? open : RESCUE_SPOTS.slice(0, 1))[utcDay(t) % Math.max(1, open.length)].id
+}
+export const rarityWeight = (r: Rarity, hot: boolean) => RARITY[r].weight * (hot && r === 'rare' ? HOT_RARE : 1)
+
+// Rusty's tow truck: upgraded with parts. Each level adds a spot to every search and makes flats
+// rarer; the top level's magnet shows which tarps hide a car. The save guard checks the parts
+// were spent and the level reached (econ_progress()), and rescue_roll() rolls its extra spots.
+export type TruckLevel = { pins: number; flat: number; parts: number; level: number; magnet?: boolean }
+export const TRUCK: TruckLevel[] = [
+  { pins: 8, flat: 0.25, parts: 0, level: 1 },
+  { pins: 9, flat: 0.18, parts: 25, level: 4 },
+  { pins: 10, flat: 0.12, parts: 60, level: 9 },
+  { pins: 11, flat: 0.06, parts: 120, level: 15, magnet: true },
+]
+export const truckOf = (n: number | undefined) => TRUCK[Math.max(0, Math.min(TRUCK.length - 1, Math.floor(n ?? 0)))]
+
+// A second restore bay opens at this player level (econ_progress() checks the saved level).
+export const BAY2_LEVEL = 12
 // The chance each pin hides a car (every search has at least one).
 export const RESCUE_CAR_CHANCE = 0.1
 export const STORAGE_MAX = 6

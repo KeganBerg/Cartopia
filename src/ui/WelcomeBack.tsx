@@ -37,7 +37,7 @@ function awayText(ms: number) {
 // Something waiting is what makes a welcome worth showing.
 function hasNews(s: ReturnType<typeof useGame.getState>, now: number) {
   const r = readyRewards(s, now)
-  return r.collected + r.cleared + r.filled > 0 || (!!s.restoring && now >= s.restoring.endsAt)
+  return r.collected + r.cleared + r.filled > 0 || (!!s.restoring && now >= s.restoring.endsAt) || (!!s.restoring2 && now >= s.restoring2.endsAt)
 }
 
 let awayFor = 0

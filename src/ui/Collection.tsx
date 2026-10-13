@@ -17,7 +17,7 @@ export function CollectionBook({ onFind }: { onFind: (model: string) => void }) 
       <div className="book-progress">
         <b>📖 {total} / {CARS.length}</b>
         <span className="book-bar"><i style={{ width: `${(100 * total) / CARS.length}%` }} /></span>
-        <small>{claimed.length} / {CAR_SETS.length} sets</small>
+        <small>{CAR_SETS.filter((s) => claimed.includes(s.id)).length} / {CAR_SETS.length} sets</small>
       </div>
       {CAR_SETS.map((set) => <SetRow key={set.id} set={set} onFind={onFind} />)}
     </div>

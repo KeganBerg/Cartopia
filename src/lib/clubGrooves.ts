@@ -35,8 +35,10 @@ export type Groove = {
   // two octaves up (null = rest), and the steps that are accented.
   acid?: { notes: (number | null)[]; accents: number[] }
   // The hook: a melody over whole bars (16 steps each, looping), in
-  // semitones above `root` (null = rest), each note `len` sixteenths long.
-  lead?: { root: number; notes: (number | null)[]; len: number; tone: LeadTone }
+  // semitones above `root` (null = rest), each note `len` sixteenths long;
+  // `stutter` steps play as two quick repeats.
+  lead?: { root: number; notes: (number | null)[]; len: number; tone: LeadTone; stutter?: number[] }
+  pump?: number // how far the chords and hooks duck under each kick, 0-1 (default 0.25)
   sweep?: boolean // the chords' filter opens and closes over eight bars
   gain: number // evens the tracks out so each sits at the same level
 }
@@ -376,6 +378,82 @@ export const GROOVES: Groove[] = [
     perc: [7, 15],
     lead: { root: hz('F#4'), notes: tune({ 0: 12, 3: 7, 6: 10, 8: 12, 10: 7, 12: 3 }, { 0: 5, 3: 8, 6: 12, 8: 15, 10: 8, 12: 3 }, { 0: 12, 3: 7, 6: 10, 8: 12, 10: 7, 12: 0 }, { 0: 7, 3: 10, 6: 14, 8: 17, 10: 10, 12: 5 }), len: 2, tone: 'marimba' },
     gain: 1.15,
+  },
+  // Stutter house (emotional club, in the style of Fred again.. or Swimming
+  // Paul): a steady kick that makes everything pump, melancholic piano chords,
+  // a warm sub and a chopped, stuttering vocal hook in F minor.
+  {
+    name: 'Stutter',
+    bpm: 133,
+    swing: 0.1,
+    loop: [chord('F1', 'Ab3 C4 Eb4 G4'), chord('Db2', 'Ab3 C4 F4'), chord('Ab1', 'Ab3 C4 Eb4'), chord('Eb2', 'G3 Bb3 Eb4')],
+    bass: [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1],
+    bassLen: 1.6,
+    bassTone: 'sub',
+    stabs: [[0, 6, 10], [0, 6, 10], [0, 6, 10], [0, 3, 6, 10]],
+    stabLen: 3,
+    tone: 'piano',
+    kickTone: 'punch',
+    claps: [4, 12],
+    openHats: off,
+    closedHats: 'odd',
+    lead: {
+      root: hz('F4'),
+      notes: tune({ 0: 12, 1: 12, 2: 12, 4: 10, 6: 8, 8: 7, 10: 8, 11: 8, 12: 3 }, { 0: 8, 1: 8, 2: 8, 4: 7, 6: 3, 10: 5, 12: 7 }, { 0: 12, 1: 12, 2: 12, 4: 15, 6: 12, 8: 10, 10: 12, 11: 12, 12: 8 }, { 0: 10, 2: 10, 4: 7, 6: 3, 8: 2, 10: 3, 12: 3, 13: 3, 14: 3, 15: 3 }),
+      len: 1.8,
+      tone: 'vox',
+      stutter: [0, 1, 10, 16, 17, 32, 33, 42, 60, 61, 62, 63],
+    },
+    pump: 0.6,
+    gain: 0.88,
+  },
+  // Emotional two-step garage: a skipping kick, crisp snares and shuffled
+  // hats under sad piano chords, a deep sub and an airy vocal line in D minor.
+  {
+    name: 'Two Step',
+    bpm: 135,
+    swing: 0.26,
+    loop: [chord('D2', 'F3 A3 C4 E4'), chord('Bb1', 'F3 A3 D4'), chord('F2', 'F3 A3 C4 E4'), chord('C2', 'E3 G3 C4')],
+    bass: [1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0],
+    bassLen: 3.5,
+    bassTone: 'sub',
+    stabs: [[0, 3], [0, 3, 11], [0, 3], [0, 10, 13]],
+    stabLen: 4,
+    tone: 'piano',
+    kick: [0, 7, 10],
+    kickTone: 'punch',
+    claps: [4, 12],
+    snare: 'snare',
+    openHats: [14],
+    closedHats: 'all',
+    perc: [11],
+    lead: { root: hz('D5'), notes: tune({ 0: 7, 3: 3, 6: 2, 8: 0, 14: 2 }, { 0: 3, 3: 0, 6: -2, 8: -5 }, { 0: 7, 3: 10, 6: 7, 8: 3, 14: 5 }, { 0: 2, 3: 3, 6: 2, 8: -2, 11: -2, 12: -2 }), len: 2.6, tone: 'vox', stutter: [11, 59, 60] },
+    pump: 0.45,
+    gain: 0.82,
+  },
+  // Nostalgic rave breaks: a shuffled breakbeat, old-school rave piano stabs,
+  // a rolling sub and a wistful plucked hook with stutters, in A minor.
+  {
+    name: 'Rave Breaks',
+    bpm: 136,
+    swing: 0.12,
+    loop: [chord('A1', 'C4 E4 G4 A4'), chord('F1', 'C4 E4 F4 A4'), chord('D2', 'C4 D4 F4 A4'), chord('E2', 'B3 D4 E4 G#4')],
+    bass: [1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0],
+    bassLen: 2,
+    bassTone: 'sub',
+    stabs: [[2, 6, 9, 14], [2, 6, 9], [2, 6, 9, 14], [2, 6, 11, 13]],
+    stabLen: 1.2,
+    tone: 'piano',
+    kick: [0, 6, 10],
+    kickTone: 'punch',
+    claps: [4, 12],
+    snare: 'snare',
+    openHats: [6, 14],
+    closedHats: 'all',
+    perc: [7, 15],
+    lead: { root: hz('A4'), notes: tune({ 0: 12, 2: 12, 3: 10, 6: 7, 10: 3, 12: 5 }, { 0: 8, 3: 7, 6: 3, 10: 0, 12: 3 }, { 0: 5, 3: 7, 6: 8, 10: 12, 12: 10 }, { 0: 11, 3: 7, 6: 4, 8: 2, 12: 4, 13: 4, 14: 4, 15: 4 }), len: 1.6, tone: 'pluck', stutter: [60, 61, 62, 63] },
+    pump: 0.4,
+    gain: 1,
   },
 ]
 

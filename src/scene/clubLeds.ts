@@ -52,6 +52,12 @@ export const LOOKS: Look[] = [
   { w: { kick: 1.7, bass: 0.3 }, f: { kick: 1.2, lead: 1 } },
   // Amapiano: the windows bounce with the log drum; the front rings with the marimba.
   { w: { kick: 1.3, bass: 0.9 }, f: { kick: 0.6, lead: 1.2, stab: 0.5 } },
+  // Stutter house: the windows pump hard on the kick; the front flickers with the vocal chops.
+  { w: { kick: 1.8, stab: 0.5 }, f: { kick: 1, lead: 1.4 } },
+  // Two-step garage: the windows crack on the snares; the front glows with the piano.
+  { w: { kick: 1.5, clap: 1 }, f: { kick: 0.7, stab: 1.2, lead: 0.6 } },
+  // Rave breaks: the windows flash on the rave piano; the front skips with the breakbeat.
+  { w: { kick: 1.4, stab: 0.9 }, f: { kick: 0.8, clap: 0.8, perc: 0.6, lead: 0.7 } },
 ]
 // No groove (the muted pulse, Rave Mode): the kick alone.
 const KICK: Look = { w: { kick: 1.6 }, f: { kick: 1.4 } }

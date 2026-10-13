@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { StageSlot, useStageReady } from '../scene/Stage'
 import { useGame, hasRusty, type Loot } from '../game/store'
-import { RESCUE_SPOTS, RARITY, STORAGE_MAX, carDef, performance, restoreCost, rushBucks, type Rarity } from '../game/data'
+import { RESCUE_SPOTS, RARITY, STORAGE_MAX, carDef, performance, restoreCost, rushBucks, type Rarity, RUSTY_SETS, rustySetId, hotSpot, HOT_RARE, TRUCK, truckOf, BAY2_LEVEL } from '../game/data'
+import { flushSave } from '../lib/cloud'
 import { useNow } from '../scene/useNow'
 import { dayPhase, nightAmount } from '../game/clock'
 import { CoinIcon } from './Icon'
@@ -13,6 +14,11 @@ import { rescueSfx } from '../lib/sound'
 import { buzz } from '../lib/haptics'
 import { LoadingScene } from './Loading'
 import { Confirm, useAsk } from './Confirm'
+import { BuildArt } from './Resto'
+import { piecesOf } from '../game/resto'
+
+// Rusty's top spot, where resto-mod pieces turn up (PIECE_SOURCES.rusty_track, rescue_roll()).
+const PIECE_SPOT = 'track'
 
 function lootLabel(l: Loot) {
   switch (l.kind) {
@@ -46,16 +52,21 @@ function Ring({ pct, children }: { pct: number; children: React.ReactNode }) {
   )
 }
 
-function BayHero({ onCollect, compact }: { onCollect: () => void; compact?: boolean }) {
+type Bay = 0 | 1
+const bayKey = (bay: Bay) => (bay ? 'restoring2' : 'restoring') as 'restoring' | 'restoring2'
+// A car can go into a bay: the first is free, or the second is open and free.
+const bayFree = (s: { restoring: unknown; restoring2: unknown; level: number }) => !s.restoring || (!s.restoring2 && s.level >= BAY2_LEVEL)
+
+function BayHero({ bay = 0, onCollect, compact }: { bay?: Bay; onCollect: () => void; compact?: boolean }) {
   const now = useNow()
-  const r = useGame((s) => s.restoring)
+  const r = useGame((s) => s[bayKey(bay)])
   const rush = useGame((s) => s.rushRestore)
   if (!r)
     return compact ? null : (
       <div className="bayhero empty">
         <div className="bay-stage"><span className="bay-wrench">🔧</span></div>
         <div className="bay-side">
-          <b>Bay is free</b>
+          <b>{bay ? 'Bay 2 is free' : 'Bay is free'}</b>
           <small>Pick a car from your lot ↓</small>
         </div>
       </div>
@@ -78,8 +89,21 @@ function BayHero({ onCollect, compact }: { onCollect: () => void; compact?: bool
         </div>
         {done
           ? <button className="buy bay-btn collect" onClick={onCollect}>✨ Collect</button>
-          : <button className="buy alt bay-btn" onClick={rush}>Finish now · <span className="ico buck-ico rs-ico">💎</span>{rushBucks(left)}</button>}
+          : <button className="buy alt bay-btn" onClick={() => rush(bay)}>Finish now · <span className="ico buck-ico rs-ico">💎</span>{rushBucks(left)}</button>}
       </div>
+    </div>
+  )
+}
+
+// Both bays: the second opens at BAY2_LEVEL; before then a lock shows when it opens.
+function Bays({ onCollect, compact }: { onCollect: (bay: Bay) => void; compact?: boolean }) {
+  const open2 = useGame((s) => s.level >= BAY2_LEVEL)
+  const busy1 = useGame((s) => !!s.restoring)
+  return (
+    <div className={compact ? 'bays compact' : 'bays'}>
+      <BayHero bay={0} compact={compact} onCollect={() => onCollect(0)} />
+      {open2 ? (busy1 || compact ? <BayHero bay={1} compact={compact} onCollect={() => onCollect(1)} /> : null)
+        : !compact && <div className="bay-lock" title="A second restore bay">🔧🔒 <b>Bay 2</b> <span>Lv {BAY2_LEVEL}</span></div>}
     </div>
   )
 }
@@ -99,7 +123,7 @@ function restoreTime(minutes: number) {
 // Rusty's lot: a parking spot for every car he can keep. Tap one to fix it up.
 function Lot({ onFind }: { onFind: () => void }) {
   const junk = useGame((s) => s.junkyard)
-  const busy = useGame((s) => !!s.restoring)
+  const busy = useGame((s) => !bayFree(s))
   const coins = useGame((s) => s.coins)
   const restore = useGame((s) => s.restoreCar)
   const scrap = useGame((s) => s.scrapCar)
@@ -153,13 +177,10 @@ function Lot({ onFind }: { onFind: () => void }) {
   )
 }
 
-// Models the player has (in the garage, on Rusty's lot or up on the lift):
-// a spot's card shows those restored and ticked, the rest still rusty.
+// Models in the player's garage: a spot's card shows those restored and ticked, the rest still rusty.
 function useHave() {
   const cars = useGame((s) => s.cars)
-  const junk = useGame((s) => s.junkyard)
-  const lift = useGame((s) => s.restoring?.model)
-  return useMemo(() => new Set([...cars.map((c) => c.model), ...junk.map((c) => c.model), ...(lift ? [lift] : [])]), [cars, junk, lift])
+  return useMemo(() => new Set(cars.map((c) => c.model)), [cars])
 }
 
 const ALL_FINDS = [...new Set(RESCUE_SPOTS.flatMap((sp) => sp.cars.map((c) => c.model)))]
@@ -168,31 +189,78 @@ const ALL_FINDS = [...new Set(RESCUE_SPOTS.flatMap((sp) => sp.cars.map((c) => c.
 // at night when the town is dark.
 const spotArt = (id: string, night: boolean) => `/rescue/${id}-${night ? 'night' : 'day'}.webp`
 
+// Rusty's tow truck: its level as pips, spots per search, and the next upgrade's parts.
+function TruckRow() {
+  const truck = useGame((s) => s.truck ?? 0)
+  const level = useGame((s) => s.level)
+  const parts = useGame((s) => s.parts)
+  const up = useGame((s) => s.upgradeTruck)
+  const [busy, setBusy] = useState(false)
+  const t = truckOf(truck)
+  const next = TRUCK[truck + 1]
+  // Saved straight away (before and after), so the server sees the parts paid in the same save.
+  const go = async () => {
+    setBusy(true)
+    try {
+      await flushSave()
+      up()
+      await flushSave()
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="rsc-truck">
+      <span className="rsc-truck-ico">🛻</span>
+      <span className="rsc-pips" aria-label={`Truck level ${truck + 1} of ${TRUCK.length}`}>
+        {TRUCK.map((_, i) => <i key={i} className={i <= truck ? 'on' : ''} />)}
+      </span>
+      <span className="rsc-stat" title="Spots per search">📍{t.pins}{next && <small>→{next.pins}</small>}</span>
+      {t.magnet && <span className="rsc-stat" title="Magnet: shows which tarps hide a car">🧲</span>}
+      {next ? (
+        level < next.level
+          ? <span className="rsc-up lock">🔒 Lv {next.level}</span>
+          : <button className={parts < next.parts ? 'rsc-up broke' : 'rsc-up'} onClick={go} disabled={busy} title={next.magnet ? 'Adds a spot, fewer flats and a magnet' : 'Adds a spot and fewer flats'}>⬆ <span className="ico parts-ico rs-ico">⚙</span>{next.parts}</button>
+      ) : <span className="rsc-up max">MAX</span>}
+    </div>
+  )
+}
+
 function SpotList() {
   const level = useGame((s) => s.level)
   const coins = useGame((s) => s.coins)
   const full = useGame((s) => s.junkyard.length >= STORAGE_MAX)
   const start = useGame((s) => s.startSearch)
+  const claimed = useGame((s) => s.claimedSets)
+  const claim = useGame((s) => s.claimSet)
   const have = useHave()
   const [night] = useState(() => nightAmount(dayPhase()) > 0.5)
+  const hot = hotSpot(level)
   const got = ALL_FINDS.filter((m) => have.has(m)).length
   return (
     <>
-      <div className="rsc-dex" title="Cars from Rusty's lots in your collection">
+      <div className="rsc-dex" title="Cars from Rusty's lots in your garage">
         <span className="rsc-dex-ico">🔧</span>
         <span className="rsc-dex-bar"><i style={{ width: `${(got / ALL_FINDS.length) * 100}%` }} /></span>
         <b>{got}/{ALL_FINDS.length}</b>
       </div>
+      <TruckRow />
       <div className="rsc-spots">
         {RESCUE_SPOTS.map((sp) => {
           const locked = level < sp.unlockLevel
-          const n = sp.cars.filter((c) => have.has(c.model)).length
-          const done = n === sp.cars.length
+          const set = RUSTY_SETS.find((x) => x.id === rustySetId(sp.id))!
+          const n = set.cars.filter((m) => have.has(m)).length
+          const done = n === set.cars.length
+          const paid = claimed.includes(set.id)
           return (
-            <button key={sp.id} className={`rsc-spot${locked ? ' locked' : ''}${!locked && coins < sp.cost ? ' broke' : ''}`} onClick={() => start(sp.id)} disabled={full && !locked}>
+            <button key={sp.id} className={`rsc-spot${locked ? ' locked' : ''}${!locked && coins < sp.cost ? ' broke' : ''}${hot === sp.id && !locked ? ' hot' : ''}`} onClick={() => start(sp.id)} disabled={full && !locked}>
               <span className="rsc-art" style={{ backgroundImage: `url(${spotArt(sp.id, night)})` }}>
                 <span className="rsc-name">{sp.icon} {sp.name}</span>
-                {!locked && <span className={done ? 'rsc-got done' : 'rsc-got'}>{done ? '👑' : '✔'} {n}/{sp.cars.length}</span>}
+                {!locked && (done && !paid
+                  ? <span role="button" tabIndex={0} className="rsc-got claim" onClick={(e) => { e.stopPropagation(); claim(set.id) }} onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); claim(set.id) } }}>🎁 <span className="ico buck-ico rs-ico">💎</span>{set.bucks}</span>
+                  : <span className={paid ? 'rsc-got done' : 'rsc-got'} title={`Restore all ${set.cars.length}: +${set.bucks} gems, +${set.coins.toLocaleString()} coins`}>{paid ? '👑' : '✔'} {n}/{set.cars.length}</span>)}
+                {sp.id === PIECE_SPOT && <span className={hot === sp.id && !locked ? 'rsc-piece up' : 'rsc-piece'} title="Resto-mod pieces turn up here">🧩</span>}
+                {hot === sp.id && !locked && <span className="rsc-hot" title={`Rusty's hot tip: rare cars ${HOT_RARE}x as often today`}>🔥 {HOT_RARE}× <span className="rarity rarity-rare">Rare</span></span>}
                 {locked
                   ? <span className="rsc-go lock">🔒 Lv {sp.unlockLevel}</span>
                   : <span className="rsc-go"><CoinIcon size={18} />{sp.cost.toLocaleString()}</span>}
@@ -308,7 +376,9 @@ const RESCUE_CAM = { position: [0, 14, 12] as [number, number, number], fov: 42,
 
 // The search, full screen: Rusty's tow truck drives a 3D lot (RescueScene)
 // and the controls float over it, like a race.
-function SearchScreen({ onHaul }: { onHaul: (items: Loot[]) => void }) {
+type Recap = { items: Loot[]; piece?: { model: string; piece: number } }
+
+function SearchScreen({ onHaul }: { onHaul: (r: Recap) => void }) {
   const q = useGame((s) => s.search)!
   const bucks = useGame((s) => s.bucks)
   const reveal = useGame((s) => s.revealPin)
@@ -317,6 +387,7 @@ function SearchScreen({ onHaul }: { onHaul: (items: Loot[]) => void }) {
   const home = useGame((s) => s.towHome)
   const openPanel = useGame((s) => s.openPanel)
   const spot = RESCUE_SPOTS.find((o) => o.id === q.spot)!
+  const magnet = useGame((s) => !!truckOf(s.truck).magnet)
   const [autoPicked, setAuto] = useState(false)
   const [leaving, setLeaving] = useState(false)
   const [busy, setBusy] = useState(true)
@@ -370,15 +441,15 @@ function SearchScreen({ onHaul }: { onHaul: (items: Loot[]) => void }) {
   cb.current = {
     onFound,
     onLeft: () => {
-      onHaul(q.pins.filter((l, i) => q.revealed[i] && l.kind !== 'nothing'))
+      onHaul({ items: q.pins.filter((l, i) => q.revealed[i] && l.kind !== 'nothing'), piece: q.piece })
       home()
     },
   }
   const sceneFound = useCallback((i: number, at: ScreenAt) => cb.current.onFound(i, at), [])
   const sceneLeft = useCallback(() => cb.current.onLeft(), [])
   const scene = useMemo(
-    () => <RescueScene search={q} fast={auto} auto={auto} leaving={leaving} onArrive={reveal} onFound={sceneFound} onLeft={sceneLeft} onBusy={setBusy} />,
-    [q, auto, leaving, reveal, sceneFound, sceneLeft],
+    () => <RescueScene search={q} magnet={magnet} fast={auto} auto={auto} leaving={leaving} onArrive={reveal} onFound={sceneFound} onLeft={sceneLeft} onBusy={setBusy} />,
+    [q, magnet, auto, leaving, reveal, sceneFound, sceneLeft],
   )
   const stageReady = useStageReady()
 
@@ -440,7 +511,8 @@ function SearchScreen({ onHaul }: { onHaul: (items: Loot[]) => void }) {
 
 // Back from a search: the haul laid out one find at a time, with a fanfare,
 // before Rusty's storage. Cars first, best first, then the small finds summed.
-function HaulCard({ items, onDone }: { items: Loot[]; onDone: (next: 'find' | 'storage') => void }) {
+function HaulCard({ items, piece, onDone }: Recap & { onDone: (next: 'find' | 'storage') => void }) {
+  const restoParts = useGame((s) => s.restoParts)
   const cars = items.flatMap((l) => (l.kind === 'car' ? [l] : [])).sort((a, b) => RARITY_ORDER[b.rarity] - RARITY_ORDER[a.rarity])
   const sum = { coins: 0, parts: 0, fuel: 0, trophy: 0 }
   for (const l of items) {
@@ -490,6 +562,7 @@ function HaulCard({ items, onDone }: { items: Loot[]; onDone: (next: 'find' | 's
         {smalls.map((x, n) => (
           <span key={x.k} className={cars.length + n < shown ? 'haul-item in' : 'haul-item'}>{x.icon}<Count n={cars.length + n < shown ? x.n : 0} /></span>
         ))}
+        {piece && <span className={total < shown ? 'haul-item piece in' : 'haul-item piece'}><BuildArt model={piece.model} have={piecesOf(restoParts, piece.model)} fresh={piece.piece} size="xs" />🧩</span>}
         <span className={total < shown ? 'haul-item xp in' : 'haul-item xp'}>⭐ +{xp} XP</span>
       </div>
       <div className="row haul-go">
@@ -503,8 +576,8 @@ function HaulCard({ items, onDone }: { items: Loot[]; onDone: (next: 'find' | 's
   )
 }
 
-function PlateScreen({ onDone }: { onDone: () => void }) {
-  const r = useGame((s) => s.restoring)!
+function PlateScreen({ bay, onDone }: { bay: Bay; onDone: () => void }) {
+  const r = useGame((s) => s[bayKey(bay)])!
   const collect = useGame((s) => s.collectRestored)
   const selectCar = useGame((s) => s.selectCar)
   const openPanel = useGame((s) => s.openPanel)
@@ -521,7 +594,7 @@ function PlateScreen({ onDone }: { onDone: () => void }) {
       <h3>{d.name} <RarityTag r={r.rarity} /></h3>
       <p className="hint">Name your car on its license plate. You can't change it later.</p>
       <input className="plate-input" value={plate} maxLength={7} placeholder="RUSTY1" onChange={(e) => setPlate(e.target.value.toUpperCase().replace(/[^A-Z0-9 ]/g, ''))} autoFocus />
-      <button className="buy" onClick={() => { const id = r.uid; collect(plate); onDone(); selectCar(id); openPanel('garage') }}>Add to my garage</button>
+      <button className="buy" onClick={() => { const id = r.uid; collect(plate, bay); onDone(); selectCar(id); openPanel('garage') }}>Add to my garage</button>
     </div>
   )
 }
@@ -531,8 +604,8 @@ export function RescuePanel() {
   const searching = useGame((s) => !!s.search)
   const junkCount = useGame((s) => s.junkyard.length)
   const [tab, setTab] = useState<'find' | 'storage'>(junkCount ? 'storage' : 'find')
-  const [naming, setNaming] = useState(false)
-  const [recap, setRecap] = useState<Loot[] | null>(null)
+  const [naming, setNaming] = useState<Bay | null>(null)
+  const [recap, setRecap] = useState<Recap | null>(null)
   // Back from a search with finds: show them, so the next step (restore one) is right there.
   const [wasSearching, setWasSearching] = useState(searching)
   if (wasSearching !== searching) {
@@ -541,12 +614,12 @@ export function RescuePanel() {
   }
 
   if (!rusty) return null
-  if (naming) return <Panel title="Restored!" onClose={() => setNaming(false)}><PlateScreen onDone={() => setNaming(false)} /></Panel>
+  if (naming !== null) return <Panel title="Restored!" onClose={() => setNaming(null)}><PlateScreen bay={naming} onDone={() => setNaming(null)} /></Panel>
   if (searching) return <SearchScreen onHaul={setRecap} />
   if (recap)
     return (
       <Panel title="Rusty's haul" onClose={() => setRecap(null)}>
-        <HaulCard items={recap} onDone={(next) => { setRecap(null); setTab(next) }} />
+        <HaulCard {...recap} onDone={(next) => { setRecap(null); setTab(next) }} />
       </Panel>
     )
   const tabs = [
@@ -558,13 +631,13 @@ export function RescuePanel() {
       <SheetTabs items={tabs} value={tab} onChange={setTab} />
       {tab === 'find' ? (
         <>
-          <BayHero compact onCollect={() => setNaming(true)} />
+          <Bays compact onCollect={setNaming} />
           {junkCount >= STORAGE_MAX && <button className="rs-full" onClick={() => setTab('storage')}>🚗 Your lot is full · restore or scrap a car</button>}
           <SpotList />
         </>
       ) : (
         <div className="rusty-home">
-          <BayHero onCollect={() => setNaming(true)} />
+          <Bays onCollect={setNaming} />
           <Lot onFind={() => setTab('find')} />
         </div>
       )}

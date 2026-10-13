@@ -180,7 +180,7 @@ html {
 @media (max-width: 600px) {
   :root .edit-bar { left: calc(6px + var(--sal)); right: calc(6px + var(--sar)); transform: none; max-width: none; bottom: calc(6px + var(--sab)); }
   :root .edit-tools { width: 100%; padding: 4px; gap: 2px; border-radius: 18px; }
-  :root .tool { flex: 1 0 auto; min-width: 46px; height: 50px; padding: 3px 4px; font-size: 10px; }
+  :root .tool { flex: 1 0 auto; min-width: 40px; height: 50px; padding: 3px 2px; font-size: 10px; }
   :root .tool .gi { width: 22px; height: 22px; }
   :root .edit-hint { font-size: 12px; padding: 4px 12px; }
 }
@@ -331,3 +331,10 @@ body:has(.edit-bar) .tutorial { bottom: calc(150px + var(--sab)); }
   :root .garage-tabs button { min-height: 44px; }
   :root .cp-btn { width: 44px; height: 44px; }
 }
+
+/* Inventory: bulldozed buildings waiting to be placed again. */
+:root .tool { position: relative; }
+:root .tool-count { position: absolute; top: 2px; right: 4px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: #e53935; color: #fff; font: 11px/18px var(--display); border: 1.5px solid #fff; }
+:root .inv-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 32px 12px; font: 18px var(--display); color: #4a6283; }
+:root .inv-empty .gi { color: #2f6fd6; }
+:root .inv-count { font: 18px var(--display); color: var(--ink); }

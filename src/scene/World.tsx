@@ -46,6 +46,7 @@ import { VIEW, isFree, useFreeCam } from './freeCam'
 import { FreeCam } from './FreeCam'
 import { TutorialCamera } from './TutorialCamera'
 import { TownTouch, townFingers } from './TownTouch'
+import { tapOwnedBy } from './pick'
 import { useLite } from '../lib/prefs'
 
 // Meadow ground that drifting cloud shadows pass over, one per tiling.
@@ -111,6 +112,7 @@ export const groupCenter = (g: Pick<MergeGroup, 'x' | 'z' | 'w' | 'h'>) => toWor
 // tiles the pointer is holding.
 type Drag = { uid: string; x: number; z: number; gx: number; gz: number }
 const useDrag = create<{ drag: Drag | null }>(() => ({ drag: null }))
+const dragging = () => useDrag.getState().drag !== null
 
 const GROUND = new Plane(new Vector3(0, 1, 0), 0)
 const hit = new Vector3()
@@ -226,6 +228,9 @@ function BuildingLot({ b, turn, group, picked, city }: BuildingProps) {
       onPointerDown={(e) => {
         const s = useGame.getState()
         if (s.visiting || e.button !== 0) return
+        // The building actually under the finger takes the press, not a neighbour whose faint
+        // shadow or glow sits in front of it (its own handler runs further along the ray).
+        if (!tapOwnedBy(e.intersections, e.eventObject)) return
         if (s.mode === 'play') {
           held = false
           if (movable(b.def) && !group) holdToMove(b, e)
@@ -240,6 +245,7 @@ function BuildingLot({ b, turn, group, picked, city }: BuildingProps) {
       }}
       onClick={(e) => {
         const s = useGame.getState()
+        if (!tapOwnedBy(e.intersections, e.eventObject)) return
         // In move mode the tap already picked it up; don't let it fall through and deselect.
         if (s.mode === 'move' || held) {
           held = false
@@ -452,6 +458,11 @@ function Interaction() {
   const mode = useGame((s) => s.mode)
   const placing = useGame((s) => s.placing)
   const placeRot = useGame((s) => s.placeRot)
+  // Placing from the inventory: the stored building's level, so the ghost shows it as it is.
+  const storedLevel = useGame((s) => {
+    const b = s.placingStored ? s.stored?.find((o) => o.uid === s.placingStored) : undefined
+    return b ? buildingLevel(b) : undefined
+  })
   const selected = useGame((s) => s.selected)
   const drag = useDrag((g) => g.drag)
   const free = useFreeCam((f) => f.on)
@@ -535,6 +546,11 @@ function Interaction() {
     // Hover tile is the footprint's centre; convert to its top-left corner.
     const ox = x - Math.floor((w - 1) / 2)
     const oz = z - Math.floor((h - 1) / 2)
+    const fromStore = useGame.getState().placingStored
+    if (fromStore) {
+      if (useGame.getState().placeStored(fromStore, ox, oz, placeRot ?? undefined)) useGame.setState({ mode: 'move', placing: null, placingStored: null, selected: fromStore, again: null })
+      return
+    }
     if (useGame.getState().placeBuilding(placing, ox, oz, placeRot ?? undefined)) {
       // Keep the new building picked so Rotate (and dragging) can still adjust it.
       const s = useGame.getState()
@@ -561,7 +577,7 @@ function Interaction() {
           <meshBasicMaterial color={valid ? '#66bb6a' : '#ef5350'} transparent opacity={0.4} />
         </mesh>
         <group rotation-y={(turn * Math.PI) / 2}>
-          <BuildingModel def={d} ghost valid={valid} />
+          <BuildingModel def={d} ghost valid={valid} level={storedLevel} />
         </group>
       </group>
     )
@@ -642,7 +658,7 @@ function Interaction() {
         // Fingers are TownTouch's; these keep the mouse and trackpad.
         touches={NO_TOUCH}
       />
-      <TownTouch enabled={!(free || mode === 'road' || mode === 'bulldoze' || drag)} />
+      <TownTouch enabled={!(free || mode === 'road' || mode === 'bulldoze' || drag)} busy={dragging} />
     </>
   )
 }
