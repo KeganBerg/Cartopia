@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { clubHit, clubPulse, resetClubBeat } from './clubBeat'
 import { GROOVES } from './clubGrooves'
-import { BAR_MS, decksAt, grooveOf, MIX_BARS, RUN_BARS, SIXTEENTH_MS as SET_SIX } from './clubSet'
+import { barMs, BREAK_FROM, deckAt, nightWith, sixAt, trackOf, wallOf } from './clubSet'
+import { DAY_MS } from '../game/clock'
 import { Soundscape } from './ambience'
 import { technoBeat, startEvent, stopEvent, SIXTEENTH_MS, BUILD_MS } from '../game/techno'
 
@@ -22,19 +23,20 @@ function fakeCtx(): BaseAudioContext {
   return any as BaseAudioContext
 }
 
-// Play `bars` bars of the club's set from bar `from` (on the set's wall
-// clock) and count the colour changes, the kicks the set plays, and which
-// groove the lights followed.
-function watch(from: number, bars: number) {
+// Play `ms` of the club's music from wall-clock time `from` and count the
+// colour changes, the kicks the track plays, and which tracks the lights followed.
+function watch(from: number, ms: number) {
   const s = new Soundscape(fakeCtx(), fakeCtx() as unknown as AudioNode)
-  // Audio time 1 s is bar `from` of the set.
-  s.wallAt = (t) => from * BAR_MS + (t - 1) * 1000
+  // Audio time 1 s is `from` on the wall clock.
+  s.wallAt = (t) => from + (t - 1) * 1000
   s.onHit = (at, kind, amt, g) => clubHit(at * 1000, kind, amt, g)
   let next = 0.6
   let last = -1
   let changes = 0
+  let lastBeat = -Infinity
+  let longest = 0
   const grooves = new Set<number>()
-  const end = 1000 + bars * BAR_MS
+  const end = 1000 + ms
   // Watch from the second beat on, at 60 fps, scheduling ahead in 0.2 s
   // chunks as the game does.
   for (let now = 600; now < end; now += 1000 / 60) {
@@ -42,7 +44,7 @@ function watch(from: number, bars: number) {
       s.step(next, 1, 'fall', true)
       next += 0.2
     }
-    const p = clubPulse(now)
+    const p = clubPulse(now, 125)
     if (now < 1000 + 500) {
       last = p.step
       continue
@@ -51,10 +53,25 @@ function watch(from: number, bars: number) {
     grooves.add(p.groove)
     if (p.step !== last) changes++
     last = p.step
+    // The beat count restarts on every beat mark: how long between them.
+    if (p.beat < 0.05 && now - lastBeat > 100) {
+      if (lastBeat > 0) longest = Math.max(longest, now - lastBeat)
+      lastBeat = now
+    }
   }
   let kicks = 0
-  for (let n = Math.ceil(((1000 + 500 - 27) / SET_SIX) + from * 16 - 1000 / SET_SIX); n * SET_SIX < from * BAR_MS + (end - 1000 - 27); n++) if (decksAt(n).some((d) => d.kick)) kicks++
-  return { changes, kicks, grooves }
+  // The kicks heard (27 ms after they start) inside the watched stretch.
+  const a = from + 500 - 27
+  const z = from + ms - 27
+  for (let p = sixAt(a), n = p.n + 1, night = p.night; ; n++) {
+    if (wallOf(night, n) >= (night + 1) * DAY_MS) {
+      night++
+      n = 0
+    }
+    if (wallOf(night, n) >= z) break
+    if (deckAt(night, n).kick) kicks++
+  }
+  return { changes, kicks, grooves, longest }
 }
 
 describe('club colour steps per beat', () => {
@@ -63,27 +80,32 @@ describe('club colour steps per beat', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5)
   })
 
-  // A stretch led by each of the first runs' grooves, a mix from one groove
-  // into the next, and a breakdown.
-  const stretches: [string, number][] = [
-    ...GROOVES.map((_, j): [string, number] => [`${GROOVES[grooveOf(j)].name} leading`, j * RUN_BARS + 20]),
-    ['a mix into the next groove', 2 * RUN_BARS - MIX_BARS - 2],
-    ['a breakdown', RUN_BARS - MIX_BARS + 46],
+  // A stretch of each track, a breakdown, and a night running into the next.
+  const start = (g: number, bar: number) => nightWith(g, 40) * DAY_MS + bar * barMs(g)
+  const stretches: [string, number, number][] = [
+    ...GROOVES.map((g, i): [string, number, number] => [g.name, start(i, 18), 12 * barMs(i)]),
+    ['a breakdown', start(0, BREAK_FROM - 2), 12 * barMs(0)],
   ]
-  for (const [what, from] of stretches) {
+  for (const [what, from, ms] of stretches) {
     it(`${what}: one colour per kick, never more than one a beat`, () => {
-      const bars = 12
-      const { changes, kicks } = watch(from, bars)
+      const { changes, kicks, grooves } = watch(from, ms)
+      const beats = ms / (barMs(trackOf(sixAt(from).night)) / 4)
       // The breakdown's eight bars have no kick, so the colour holds.
-      if (what === 'a breakdown') expect(kicks).toBeLessThanOrEqual(bars * 4 - 8 * 4)
+      if (what === 'a breakdown') expect(kicks).toBeLessThanOrEqual(beats - 8 * 4)
       expect(Math.abs(changes - kicks)).toBeLessThanOrEqual(1)
-      expect(changes).toBeLessThanOrEqual(bars * 4)
+      expect(changes).toBeLessThanOrEqual(beats)
+      expect([...grooves]).toEqual([trackOf(sixAt(from).night)])
     })
   }
 
-  it('the lights follow the groove whose kick leads, through the mix', () => {
-    const { grooves } = watch(2 * RUN_BARS - MIX_BARS + 4, 8)
-    expect([...grooves]).toEqual([grooveOf(1), grooveOf(2)])
+  it('into the next night (a live event keeps the club open): the next track takes over with no gap', () => {
+    const night = 77
+    const from = (night + 1) * DAY_MS - 6000
+    const { grooves, longest } = watch(from, 12000)
+    expect([...grooves]).toEqual([trackOf(night), trackOf(night + 1)])
+    // The beat never stops for longer than the slower track's beat (plus a frame).
+    const beat = Math.max(barMs(trackOf(night)), barMs(trackOf(night + 1))) / 4
+    expect(longest).toBeLessThanOrEqual(beat + 40)
   })
 
   it('Rave Mode: a new colour only on kicks (none through the kickless break)', () => {

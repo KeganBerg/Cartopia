@@ -1,22 +1,18 @@
-// The nightclub's DJ set: the club never plays one beat all night. It runs
-// through its grooves (clubGrooves.ts) a few minutes each, mixing from one
-// into the next, and each groove has its own arrangement: parts drop in and
-// out, there's a breakdown and a drop, fills at the ends of phrases. All of
-// it hangs off the wall clock at one tempo, so every player in every town
-// hears the same moment of the same set. Pure numbers: ambience.ts plays it.
+// What the nightclub plays: one track all night, a different one every night.
+// The track is picked from the town clock's night number (the same for every
+// player), and its sixteenths are counted from the start of that night at its
+// own tempo, so every player in every town hears the same moment of it. Each
+// track runs through an arrangement over and over: a groove, the hook comes
+// in, a breakdown with a riser, the drop, parts dropping in and out every
+// eight bars, fills at the ends of phrases. Pure numbers: ambience.ts plays it.
 import { GROOVES, pinned } from './clubGrooves'
+import { DAY_MS } from '../game/clock'
 
-export const SET_BPM = 125
-export const SIXTEENTH_MS = 60000 / SET_BPM / 4 // 120 ms
-export const BAR_MS = SIXTEENTH_MS * 16 // 1.92 s
-// Each groove leads the set for this long (about 3 minutes), so a ten-minute
-// night hears three or four of them.
-export const RUN_BARS = 96
-// Two grooves play together over the mix. Halfway through, the incoming
-// groove's kick and bass take over and the outgoing one fades away on top.
-export const MIX_BARS = 16
-export const SWAP_BARS = 8
-export const SET_MS = RUN_BARS * BAR_MS
+// One pass of the arrangement, in bars (about two minutes at house tempo).
+export const CYCLE_BARS = 64
+// The breakdown: no kick or bass, a riser into the drop.
+export const BREAK_FROM = 32
+export const DROP_AT = 40
 
 // A little hash for picking things that every player picks the same.
 function hash(a: number, b: number) {
@@ -26,9 +22,9 @@ function hash(a: number, b: number) {
   return (h >>> 0) / 4294967296
 }
 
-// The groove that leads the set's k-th run. Every groove plays once in each
-// round, in a shuffled order, never the same one twice in a row.
-export function grooveOf(k: number): number {
+// The track for a night (nightNumber in clock.ts). Every track plays once in
+// each round of nights, in a shuffled order, never the same one twice in a row.
+export function trackOf(night: number): number {
   if (pinned !== null) return pinned
   const n = GROOVES.length
   const order = (r: number) => {
@@ -39,104 +35,107 @@ export function grooveOf(k: number): number {
     }
     return o
   }
-  const r = Math.floor(k / n)
+  const r = Math.floor(night / n)
   const o = order(r)
-  // The round's first groove can't be the last one of the round before.
+  // The round's first track can't be the last one of the round before.
   if (o[0] === order(r - 1)[n - 1]) [o[0], o[1]] = [o[1], o[0]]
-  return o[((k % n) + n) % n]
+  return o[((night % n) + n) % n]
 }
 
-// What one deck plays on one sixteenth.
+// A track's sixteenth and bar, in ms.
+export const sixteenthMs = (g: number) => 60000 / GROOVES[g].bpm / 4
+export const barMs = (g: number) => sixteenthMs(g) * 16
+const nightOf = (wall: number) => Math.floor(wall / DAY_MS)
+
+// Where the music is at a moment on the wall clock: which night, and which
+// sixteenth of that night's track (counted from the night's start).
+export function sixAt(wall: number) {
+  const night = nightOf(wall)
+  return { night, n: Math.floor((wall - night * DAY_MS) / sixteenthMs(trackOf(night))) }
+}
+// When sixteenth n of a night's track plays, on the wall clock.
+export const wallOf = (night: number, n: number) => night * DAY_MS + n * sixteenthMs(trackOf(night))
+// The tempo playing at a moment (the lights' gentle pulse keeps it while muted).
+export const bpmAt = (wall = Date.now()) => GROOVES[trackOf(nightOf(wall))].bpm
+// The first night at or after `from` that plays track g, and when it starts
+// (for clips and tests).
+export function nightWith(g: number, from = 0) {
+  for (let night = from; ; night++) if (trackOf(night) === g) return night
+}
+
+// What the track plays on one sixteenth.
 export type Deck = {
   groove: number
-  run: number // which run of the set this groove leads
-  bar: number // bars since this groove started mixing in (0 .. RUN_BARS + MIX_BARS - 1)
+  night: number
+  cycle: number // which pass of the arrangement
+  bar: number // bar of the arrangement (0 .. CYCLE_BARS - 1)
   k: number // sixteenth in the bar
-  lows: boolean // its kick and bass are in
+  lows: boolean // the kick and bass are in
   kick: boolean
   bass: boolean
-  highs: number // 0..1, how loud its chords, hats, claps and acid line are
-  bright: number // 0..1, how open its filter is
+  highs: number // 0..1, how loud the chords, hats, claps and lines are
+  bright: number // 0..1, how open their filter is
   stabs: boolean
   closedHats: boolean
   claps: boolean
+  lead: boolean // the hook plays
   variant: boolean // the second half's bass line, with octave jumps
-  roll: number // 0..1, a clap roll building into the next phrase (0: none)
+  roll: number // 0..1, a snare roll building into the next phrase (0: none)
   crash: boolean // a cymbal on the downbeat of a new section
   riser: number // 0..1 through a noise riser (0: none)
 }
 
 const ramp = (x: number, a: number, b: number) => Math.min(1, Math.max(0, (x - a) / (b - a)))
 
-// A groove's arrangement, bar by bar from when it starts mixing in:
-//   0-7     mixing in under the last groove: hats and filtered chords only
-//   8-15    its kick and bass take over (the last groove fades out on top)
-//   16-47   the groove, parts dropping in and out every eight bars
-//   48-55   breakdown: no kick or bass, the chords open up, a riser and a clap roll
-//   56-95   the drop, then the groove again with its second bass line
-//   96-103  the next groove mixes in on top
-//   104-111 kick and bass hand over, the rest fades out darker
-function deck(run: number, bar: number, k: number): Deck {
-  const groove = grooveOf(run)
-  const end = RUN_BARS + MIX_BARS
-  const lows = bar >= SWAP_BARS && bar < end - SWAP_BARS && !(bar >= 48 && bar < 56)
-  let highs = 1
-  let bright = 1
-  if (bar < SWAP_BARS) {
-    highs = 0.25 + 0.75 * ramp(bar + k / 16, 0, SWAP_BARS)
-    bright = 0.3 + 0.5 * ramp(bar + k / 16, 0, SWAP_BARS)
-  } else if (bar < MIX_BARS) bright = 0.8 + 0.2 * ramp(bar, SWAP_BARS, MIX_BARS)
-  else if (bar >= end - SWAP_BARS) {
-    const out = ramp(bar + k / 16, end - SWAP_BARS, end)
-    highs = 1 - out
-    bright = 1 - 0.75 * out
-  } else if (bar >= 48 && bar < 56) bright = 0.3 + 0.7 * ramp(bar + k / 16, 48, 56)
-  // Every eight bars of the groove, some parts sit out for a while.
+// The arrangement, bar by bar, played over and over all night:
+//   0-15   the groove; parts drop in and out
+//   16-31  the hook comes in
+//   32-39  breakdown: no kick or bass, the chords open up, a riser and a snare roll
+//   40-63  the drop, then the groove again with its second bass line
+// Something always plays (at least the chords, hats or hook), so the music
+// never goes quiet, and the last bar flows straight into the first.
+export function deckAt(night: number, n: number): Deck {
+  const groove = trackOf(night)
+  const g = GROOVES[groove]
+  const k = ((n % 16) + 16) % 16
+  const total = Math.floor(n / 16)
+  const cycle = Math.floor(total / CYCLE_BARS)
+  const bar = total - cycle * CYCLE_BARS
+  const broken = bar >= BREAK_FROM && bar < DROP_AT
+  const lows = !broken
+  const bright = broken ? 0.3 + 0.7 * ramp(bar + k / 16, BREAK_FROM, DROP_AT) : 1
+  // Every eight bars of the groove, some parts sit out for a while (never in
+  // the first eight bars, the breakdown or the first half of the drop).
   const block = Math.floor(bar / 8)
-  const r = bar >= 24 && bar < 96 && !(bar >= 48 && bar < 64) ? hash(run * 31 + groove, block) : 1
+  const r = (bar >= 8 && bar < BREAK_FROM) || bar >= DROP_AT + 16 ? hash(night * 131 + cycle * 7 + groove, block) : 1
   const stabs = r >= 0.2
   const closedHats = r < 0.2 || r >= 0.38
-  // The last bar of an eight-bar phrase: the kick skips beat four and a clap
-  // roll builds into the next one. The breakdown's last bar rolls all through.
-  const phraseEnd = bar % 8 === 7 && lows && bar >= 16 && bar < 96
-  const breakEnd = bar === 55
-  const roll = breakEnd && k >= 4 ? (k - 3) / 12 : phraseEnd && k >= 12 ? (k - 11) / 4 : 0
+  // The hook: from bar 16 to the end, but resting for eight bars now and then.
+  const lead = !!g.lead && bar >= 16 && !(bar >= DROP_AT + 16 && r < 0.3)
+  // The last bar of an eight-bar phrase: the kick skips the last beat and a
+  // snare roll builds into the next one. The breakdown's last bar rolls all through.
+  const phraseEnd = bar % 8 === 7 && lows
+  const breakEnd = bar === DROP_AT - 1
+  const roll = breakEnd && k >= 4 ? (k - 3) / 12 : phraseEnd && k >= 12 && (bar % 16 === 15 || hash(night, total) < 0.5) ? (k - 11) / 4 : 0
+  const kicks = g.kick ?? [0, 4, 8, 12]
   return {
     groove,
-    run,
+    night,
+    cycle,
     bar,
     k,
     lows,
-    kick: lows && k % 4 === 0 && !(phraseEnd && k === 12),
+    kick: lows && kicks.includes(k) && !(roll > 0 && k >= 12),
     bass: lows,
-    highs,
+    highs: 1,
     bright,
-    stabs,
-    closedHats,
+    stabs: stabs || broken,
+    closedHats: closedHats && !(broken && bar < BREAK_FROM + 4),
     claps: lows || breakEnd,
-    variant: bar >= 72 && bar < 96,
+    lead,
+    variant: bar >= DROP_AT + 8,
     roll,
-    crash: k === 0 && (bar === 56 || bar === 16 || (bar >= 16 && bar < 96 && bar % 16 === 0)),
-    riser: bar >= 52 && bar < 56 ? ramp(bar + k / 16, 52, 56) : 0,
+    crash: k === 0 && (bar === 0 || bar === 16 || bar === DROP_AT || bar === DROP_AT + 16),
+    riser: bar >= DROP_AT - 4 && bar < DROP_AT ? ramp(bar + k / 16, DROP_AT - 4, DROP_AT) : 0,
   }
-}
-
-// Every deck playing on sixteenth n (counted from 1970 on the wall clock):
-// one, or two while the set mixes from one groove into the next.
-export function decksAt(n: number): Deck[] {
-  const bar = Math.floor(n / 16)
-  const k = ((n % 16) + 16) % 16
-  // Run j leads from bar j*RUN_BARS; it starts mixing in MIX_BARS before.
-  const run = Math.floor((bar + MIX_BARS) / RUN_BARS)
-  const into = bar + MIX_BARS - run * RUN_BARS // bars since run `run` started mixing in
-  const out: Deck[] = [deck(run, into, k)]
-  // The run before is still mixing out over this run's first MIX_BARS.
-  if (into < MIX_BARS) out.unshift(deck(run - 1, into + RUN_BARS, k))
-  return out
-}
-
-// The groove whose kick and bass lead at sixteenth n: what the lights follow.
-export function leadAt(n: number): Deck {
-  const d = decksAt(n)
-  return d.find((x) => x.lows) ?? d[d.length - 1]
 }

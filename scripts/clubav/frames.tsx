@@ -13,13 +13,15 @@ import { paverTex } from '../../src/scene/textures'
 import { clubHit, type CueKind } from '../../src/lib/clubBeat'
 import { GROOVES } from '../../src/lib/clubGrooves'
 import { SHOWN_MS } from '../../src/scene/clubLeds'
-import { BAR_MS, decksAt, SIXTEENTH_MS } from '../../src/lib/clubSet'
+import { barMs, deckAt, nightWith, sixteenthMs } from '../../src/lib/clubSet'
 
 const q = new URLSearchParams(location.search)
 const def = BUILDINGS.find((d) => d.id === 'club')!
 const at: [number, number, number] = [-0.5, 1.6, 0.3]
 const START = 100000
 const bar = Number(q.get('bar') ?? 0)
+const track = Number(q.get('track') ?? 0)
+const night = nightWith(track, 1000)
 const label = document.getElementById('label')!
 
 let cues: [number, CueKind, number, number][] = []
@@ -51,9 +53,9 @@ w.at = (ms) => {
     clubHit(START + t * 1000, kind, amt, g)
     fed++
   }
-  // What the set is playing: one groove, or the mix from one into the next.
-  const d = decksAt(Math.floor((bar * BAR_MS + ms) / SIXTEENTH_MS))
-  label.textContent = d.map((x) => GROOVES[x.groove].name + (x.lows ? '' : x.bar >= 48 && x.bar < 56 ? ' (breakdown)' : ' (highs)')).join('  →  ')
+  // What the night's track is playing.
+  const d = deckAt(night, Math.floor((bar * barMs(track) + ms) / sixteenthMs(track)))
+  label.textContent = GROOVES[d.groove].name + (d.lows ? '' : ' (breakdown)')
   invalidate()
 }
 
