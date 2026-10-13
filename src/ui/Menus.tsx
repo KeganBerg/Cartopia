@@ -210,13 +210,33 @@ function price(def: { price: number; bucks?: number }, sale?: { coins: number; b
   return <span className="price">{sale && <s>$ {def.price.toLocaleString()}</s>} $ {(sale ? sale.coins : def.price).toLocaleString()}</span>
 }
 
-// Tabs across the top of a menu, sticky while its body scrolls.
+// Tabs across the top of a menu, sticky while its body scrolls. When the row
+// is wider than the screen, a › arrow at the edge shows there are more tabs.
 export function SheetTabs<T extends string>({ items, value, onChange }: { items: readonly { id: T; label: React.ReactNode }[]; value: T; onChange: (id: T) => void }) {
+  const row = useRef<HTMLDivElement>(null)
+  const [more, setMore] = useState(false)
+  useEffect(() => {
+    const el = row.current
+    if (!el) return
+    const check = () => setMore(el.scrollLeft + el.clientWidth < el.scrollWidth - 4)
+    check()
+    el.addEventListener('scroll', check, { passive: true })
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(check)
+    ro?.observe(el)
+    return () => {
+      el.removeEventListener('scroll', check)
+      ro?.disconnect()
+    }
+  }, [items.length])
+  useEffect(() => {
+    row.current?.querySelector<HTMLElement>('.sel')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+  }, [value])
   return (
-    <div className="sheet-tabs" role="tablist">
+    <div ref={row} className="sheet-tabs" role="tablist">
       {items.map((t) => (
         <button key={t.id} role="tab" aria-selected={t.id === value} className={t.id === value ? 'sel' : ''} onClick={() => onChange(t.id)}>{t.label}</button>
       ))}
+      {more && <button className="sheet-more" aria-label="More tabs" onClick={() => row.current?.scrollBy({ left: row.current.clientWidth * 0.7, behavior: 'smooth' })}>›</button>}
     </div>
   )
 }

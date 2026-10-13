@@ -72,20 +72,28 @@ function weekResetsIn() {
   return h > 24 ? `${Math.floor(h / 24)}d ${h % 24}h` : `${h}h`
 }
 
+// What each board counts, on hover instead of a paragraph under the switches.
+const TIPS: Record<Metric, string> = {
+  power: 'Combined PI of your 5 best cars',
+  race_wins: 'Every drag race and Grand Prix win',
+  trophies: 'From race wins, Grand Prix prizes and Rusty finds',
+  level: 'XP from jobs, races and goals',
+}
+
 function MetricPicker({ metric, setMetric, period, setPeriod, children }: { metric: Metric; setMetric: (m: Metric) => void; period: Period; setPeriod: (p: Period) => void; children?: React.ReactNode }) {
   return (
     <div className="board-controls">
       {children}
       <div className="seg metrics">
         {METRICS.map((m) => (
-          <button key={m.id} className={m.id === metric ? 'sel' : ''} onClick={() => setMetric(m.id)}>
+          <button key={m.id} className={m.id === metric ? 'sel' : ''} title={TIPS[m.id]} onClick={() => setMetric(m.id)}>
             <span className="seg-ico">{m.icon}</span>{m.label}
           </button>
         ))}
       </div>
       <div className="seg periods">
         <button className={period === 'all' ? 'sel' : ''} onClick={() => setPeriod('all')}>All time</button>
-        <button className={period === 'week' ? 'sel' : ''} onClick={() => setPeriod('week')}>This week</button>
+        <button className={period === 'week' ? 'sel' : ''} title="Gains since Monday" onClick={() => setPeriod('week')}>This week</button>
       </div>
     </div>
   )
@@ -157,17 +165,10 @@ export function LeadersPanel() {
       <MetricPicker metric={metric} setMetric={setMetric} period={period} setPeriod={setPeriod}>
         <div className="seg scope">
           <button className={scope === 'players' ? 'sel' : ''} onClick={() => setScope('players')}>Players</button>
-          <button className={scope === 'clans' ? 'sel' : ''} onClick={() => setScope('clans')}>Crews</button>
+          <button className={scope === 'clans' ? 'sel' : ''} title="Ranked by members combined" onClick={() => setScope('clans')}>Crews</button>
         </div>
       </MetricPicker>
-      <p className="hint board-hint">
-        {metric === 'power' && 'Power is the combined PI of your 5 best cars. Upgrade in the Garage to climb. '}
-        {metric === 'race_wins' && 'Every drag race and Grand Prix win counts. '}
-        {metric === 'trophies' && 'Trophies come from race wins, Grand Prix prizes and Rusty finds. '}
-        {metric === 'level' && 'Earn XP from jobs, races and goals to level up. '}
-        {period === 'week' && <>Weekly boards count gains since Monday and reset in <b>{weekResetsIn()}</b>.</>}
-        {scope === 'clans' && ' Crews are ranked by their members combined.'}
-      </p>
+      {period === 'week' && <p className="hint board-hint">⏳ Resets in <b>{weekResetsIn()}</b></p>}
       {failed && <p className="hint">Couldn't reach the leaderboard right now. Showing what we have.</p>}
 
       {scope === 'players' ? (

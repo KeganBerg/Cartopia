@@ -464,6 +464,14 @@ div.rm-node { cursor: default; }
 .rm-hub .rm-mini b { font: 19px/1.05 var(--display); letter-spacing: .3px; color: #fff; -webkit-text-stroke: 4px var(--line, #14213d); paint-order: stroke fill; text-shadow: 0 2px 0 var(--line, #14213d); }
 .rm-hub .rm-mini small { font: 800 12.5px Nunito, sans-serif; color: #dcebff; }
 .rm-hub .rm-dot { font: 12px var(--display); padding: 1px 7px; top: -9px; right: -6px; }
+/* desktop: twelve buttons in one row clipped every name to a letter, so two rows of six */
+@media (min-width: 601px) and (min-height: 501px) and (orientation: landscape) {
+  .rm-hub .rm-minis { grid-auto-flow: row; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+  .rm-hub .rm-mini { gap: 8px; padding: 5px 8px 7px 6px; min-height: 52px; }
+  .rm-hub .rm-mi { width: 38px; height: 38px; font-size: 21px; }
+  .rm-hub .rm-mini b { font-size: 16px; line-height: 1; white-space: normal; }
+  .rm-hub .rm-mini small { display: none; }
+}
 
 /* car bar: a HUD plate on the navy strip */
 .rm-bar { background: linear-gradient(#24406f, #16264a); }
