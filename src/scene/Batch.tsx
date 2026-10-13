@@ -75,9 +75,13 @@ const spotWorld = new Matrix4()
 // New objects mounted between rebuilds (R3F and three both announce them with
 // 'childadded') get their lot updated on the next frame, so nothing shows up at
 // the origin.
+// Groups a pruning Batch hid (kept here, not in userData, which React may replace).
+const prunedSet = new WeakSet<Object3D>()
 const dispatch = Object3D.prototype.dispatchEvent
 Object3D.prototype.dispatchEvent = function (this: Object3D, e: Parameters<typeof dispatch>[0]) {
   if (e.type === 'childadded') {
+    // Something new inside a group a pruning Batch hid: show the group again.
+    for (let p: Object3D | null = this; p; p = p.parent) if (prunedSet.has(p)) { p.visible = true; prunedSet.delete(p) }
     let lot: Object3D | null = null
     for (let p: Object3D | null = (e as { child?: Object3D }).child ?? this; p; p = p.parent) {
       const f = p.userData.frozen as Frozen | undefined
@@ -110,7 +114,9 @@ const finishSig = (m: Material) => {
   return `${x.color?.getHex()}|${x.emissive?.getHex()}|${x.emissiveIntensity}|${x.roughness}|${x.metalness}|${m.side}|${x.map?.uuid}|${x.map?.matrix.elements.join()}`
 }
 
-export function Batch({ version, off, cell, freeze, children }: { version: unknown; off?: boolean; cell?: number; freeze?: boolean; children: ReactNode }) {
+// `prune` (with `freeze`): groups left holding nothing but merged parts are hidden too, so the
+// renderer stops walking thousands of empty groups every frame (most of a kart race's scene).
+export function Batch({ version, off, cell, freeze, prune, children }: { version: unknown; off?: boolean; cell?: number; freeze?: boolean; prune?: boolean; children: ReactNode }) {
   const root = useRef<Group>(null)
   const merged = useRef<Group>(null)
   // What the last rebuild made, by bucket, and the originals it hid. A rebuild
@@ -118,6 +124,11 @@ export function Batch({ version, off, cell, freeze, children }: { version: unkno
   // one building re-merges its own cell, not the whole town (that took seconds).
   const made = useRef(new Map<string, Merged>())
   const hidden = useRef(new Set<Mesh>())
+  const pruned = useRef<Object3D[]>([])
+  const unprune = () => {
+    for (const g of pruned.current) if (prunedSet.has(g)) { g.visible = true; prunedSet.delete(g) }
+    pruned.current = []
+  }
   const prepared = useRef(new WeakMap<Mesh, { id: string; part: BufferGeometry }>()).current
   const placed = useRef(new WeakMap<Mesh, { at: Matrix4; gid: number; id: string; where: string }>()).current
   const frozen = useRef<Frozen | null>(null)
@@ -161,6 +172,7 @@ export function Batch({ version, off, cell, freeze, children }: { version: unkno
       made.current = keep
       hidden.current = nowHidden
     }
+    unprune()
     const f = frozen.current
     if (f) {
       f.on = false
@@ -312,8 +324,23 @@ export function Batch({ version, off, cell, freeze, children }: { version: unkno
       }
     }
     drop(keep, nowHidden)
+    if (f && prune) {
+      // Bottom up: a group whose every child is merged away (or itself pruned) draws nothing.
+      const empty = (o: Object3D): boolean => {
+        let all = o.children.length > 0
+        for (const c of o.children) if (!empty(c)) all = false
+        if (o === r) return false
+        if (o.userData.batched) return true
+        if (!all || !o.visible || (o as Mesh).isMesh || o.userData.noBatch) return false
+        o.visible = false
+        prunedSet.add(o)
+        pruned.current.push(o)
+        return true
+      }
+      empty(r)
+    }
     if (f) f.on = true
-  }, [version, off, cell])
+  }, [version, off, cell, prune])
 
   // Gone from the scene: put the originals back and free the merged meshes.
   useLayoutEffect(
@@ -328,6 +355,7 @@ export function Batch({ version, off, cell, freeze, children }: { version: unkno
       }
       made.current = new Map()
       hidden.current = new Set()
+      unprune()
     },
     [],
   )

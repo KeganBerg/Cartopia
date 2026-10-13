@@ -106,3 +106,6 @@ export function useFanZones(t: Track): FanZone[] {
 // How far away cheering fans are still drawn (less on a phone: a fan there is a few pixels).
 export const FansFar = createContext(150)
 export const useFansFar = () => useContext(FansFar)
+// How many frames each crowd move lasts (2 on a phone: fans wave at half the frame rate).
+export const FansEvery = createContext(1)
+export const useFansEvery = () => useContext(FansEvery)

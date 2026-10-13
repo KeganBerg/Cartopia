@@ -9,7 +9,7 @@ import { holdTown } from './renderGate'
 import { ArcadeSky, CarShadow, Grandstand, Lamp, TyreStack, useArcadeLook, useTownPool, type Person } from './ArcadeScenery'
 import { Box, Cone, Cyl, Palm, Scatter, Water, rand } from './RaceVenues'
 import { dprFor, usePrefs } from '../lib/prefs'
-import { FansFar, local, nearZone, useFansFar, useFanZones, useSpots, ZONE_R } from './kartSpots'
+import { FansEvery, FansFar, local, nearZone, useFansEvery, useFansFar, useFanZones, useSpots, ZONE_R } from './kartSpots'
 import { KartHorizon } from './KartHorizon'
 import { CommonExtras, DesertExtras, DocksExtras, Fans, SpectatorBoats, TownExtras, boatPeople, type BoatSpot } from './KartExtras'
 import { asphaltTex, checkerTex, concreteTex, containerTex, glowTex, grassTex, gravelTex, sandTex, towerTex } from './textures'
@@ -391,6 +391,7 @@ function Trackside({ t }: { t: Track }) {
   const { along, outside, clearOf } = useSpots(t)
   const zones = useFanZones(t)
   const far = useFansFar()
+  const every = useFansEvery()
   const stands = useMemo(() => {
     const out: { x: number; z: number; h: number; w: number }[] = []
     for (const [i0, side] of [[(t.n - 22) % t.n, 1], [8, -1], [(t.n - 40) % t.n, -1]] as [number, -1 | 1][]) {
@@ -424,9 +425,9 @@ function Trackside({ t }: { t: Track }) {
   }, [along, zones])
   return (
     <group>
-      {stands.map((s, i) => <Grandstand key={i} x={s.x} z={s.z} h={s.h} width={s.w} rows={5} roof={i % 2 ? '#1565c0' : '#c62828'} far={far} />)}
       <Fans people={fans} />
-      <Batch version={t.n} cell={24} freeze>
+      <Batch version={t.n} cell={24} freeze prune>
+        {stands.map((s, i) => <Grandstand key={i} x={s.x} z={s.z} h={s.h} width={s.w} rows={5} roof={i % 2 ? '#1565c0' : '#c62828'} far={far} every={every} />)}
         {tyres.map((p, i) => <TyreStack key={i} x={p.x} z={p.z} n={3} band={i % 2 ? '#e53935' : '#fafafa'} />)}
         {marshals.map((m, i) => (
           <group key={i} position={[m.x, 0, m.z]} rotation-y={m.ry}>
@@ -477,7 +478,7 @@ function TownScenery({ t }: { t: Track }) {
   const tex = useMemo(() => { const c = towerTex().clone(); c.repeat.set(2, 4); c.needsUpdate = true; return c }, [])
   return (
     <group>
-      <Batch version={t.n + 1} cell={24} freeze>
+      <Batch version={t.n + 1} cell={24} freeze prune>
         {shops.map((s, i) => <Building key={i} def={s.def} x={s.x} z={s.z} ry={s.ry} />)}
         {trees.map((p, i) => <Building key={i} def={p.def} x={p.x} z={p.z} ry={i} s={p.s} />)}
         {towers.map((b, i) => (
@@ -488,7 +489,10 @@ function TownScenery({ t }: { t: Track }) {
         ))}
         <mesh rotation-x={-Math.PI / 2} position={[0, -0.01, 0]}><planeGeometry args={[420, 420]} /><meshStandardMaterial map={grassTex(70, 70)} /></mesh>
       </Batch>
-      {props.map((p, i) => <Lamp key={i} x={p.x} z={p.z} ry={p.ry} />)}
+      {/* Merged too (the bulbs keep their own glowing material): 58 lamps were 290 separate draws. */}
+      <Batch version={t.n + 5} freeze prune>
+        {props.map((p, i) => <Lamp key={i} x={p.x} z={p.z} ry={p.ry} />)}
+      </Batch>
     </group>
   )
 }
@@ -541,7 +545,7 @@ function DocksScenery({ t }: { t: Track }) {
   return (
     <group>
       <group position-y={-0.33}><Water x={0} z={0} w={500} d={500} id="kartdocks" color="#8fd0f5" rough={0.6} /></group>
-      <Batch version={t.n + 2} cell={24} freeze>
+      <Batch version={t.n + 2} cell={24} freeze prune>
         {/* Concrete quay under the whole circuit, so the track sits on land with water round it. */}
         {quay.map((q, i) => <mesh key={i} position={[q.x, -0.22, q.z]}><boxGeometry args={[4.02, 0.44, 4.02]} /><meshStandardMaterial map={concreteTex(1, 1)} color="#b0b6ba" /></mesh>)}
         {stacks.map((s, i) => (
@@ -642,7 +646,7 @@ function DesertScenery({ t }: { t: Track }) {
   const stop = useMemo(() => along(200, 5, 1, 5, 89)[0], [along])
   return (
     <group>
-      <Batch version={t.n + 3} cell={24} freeze>
+      <Batch version={t.n + 3} cell={24} freeze prune>
         <mesh rotation-x={-Math.PI / 2} position={[0, -0.01, 0]}><planeGeometry args={[460, 460]} /><meshStandardMaterial map={sandTex(60, 60)} color="#e7b98a" /></mesh>
         {mesas.map((m, i) => (
           <group key={i} position={[m.x, 0, m.z]} rotation-y={m.ry}>
@@ -1382,9 +1386,10 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
 
   return (
     <FansFar.Provider value={[150, 110, 90][light]}>
+    <FansEvery.Provider value={light ? 2 : 1}>
       <ArcadeSky view={view} near={100} far={340} />
       <hemisphereLight args={['#ffffff', '#666666', 0.15]} />
-      <Batch version={t.n * 10 + (t.reverse ? 1 : 0)} freeze>
+      <Batch version={t.n * 10 + (t.reverse ? 1 : 0)} freeze prune>
         <TrackSurface t={t} />
       </Batch>
       {showLine && <RacingLine t={t} />}
@@ -1407,6 +1412,7 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
       <primitive object={cheer.mesh} dispose={null} />
       {/* A warm glow pool under the player, so their kart reads at a glance. */}
       <PlayerRing race={race} me={me} />
+    </FansEvery.Provider>
     </FansFar.Provider>
   )
 }
