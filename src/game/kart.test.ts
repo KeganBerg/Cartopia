@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BOMB_R, CATCH_UP, catchUp, DRIFT_ORANGE, FIELD, GHOST_TIME, KartRace, LAPS, TRACKS, buildTrack, gpField, idleInput, itemOdds, kartMass, kartStats, lateral, locate, type ItemId, type Kart } from './kart'
+import { BOMB_R, CATCH_UP, catchUp, DRIFT_ORANGE, FIELD, GHOST_TIME, KartRace, LAPS, TRACKS, buildTrack, gpField, idleInput, itemOdds, kartMass, kartStats, lateral, racingLine, locate, type ItemId, type Kart } from './kart'
 
 const ALL = TRACKS.flatMap((d) => [buildTrack(d, false), buildTrack(d, true)])
 
@@ -367,5 +367,17 @@ describe('kart weight', () => {
     expect(ram.b).toBeGreaterThan(even.b)
     expect(ram.a).toBeGreaterThan(even.a)
     expect(ram.moved).toBeGreaterThan(even.moved)
+  })
+})
+
+describe('kart racing line', () => {
+  it('stays on the tarmac, and goes red only before some bends', () => {
+    for (const t of ALL) {
+      const { off, heat } = racingLine(t)
+      for (const o of off) expect(Math.abs(o)).toBeLessThan(t.half)
+      const hot = Array.from(heat).filter((h) => h > 0.5).length
+      expect(hot).toBeLessThan(t.n / 4)
+      expect(Array.from(heat).some((h) => h === 0)).toBe(true)
+    }
   })
 })

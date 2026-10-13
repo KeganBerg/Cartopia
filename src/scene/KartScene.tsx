@@ -17,7 +17,7 @@ import { signTexture } from './signTexture'
 import { glowMats } from './dayNight'
 import { decal } from './layers'
 import { TILE, buildingDef, type Body } from '../game/data'
-import { BOMB_R, DRIFT_BLUE, DRIFT_ORANGE, KART_LEN, SMOKE_R, KartRace, type ItemId, type KartEvent, type KartInput, type Track } from '../game/kart'
+import { BOMB_R, DRIFT_BLUE, DRIFT_ORANGE, KART_LEN, SMOKE_R, KartRace, racingLine, type ItemId, type KartEvent, type KartInput, type Track } from '../game/kart'
 import type { ChaseCar } from './ChaseScene'
 import { HERO_TIME, heroCam, heroShot, heroWanted, resetHero } from './heroShot'
 import { BoostTrail } from './boostTrail'
@@ -206,6 +206,42 @@ const THEMES: Record<string, Theme> = {
   town: { ground: '#ffffff', groundTex: (r) => grassTex(r, r), verge: '#ffffff', vergeTex: (a, b) => grassTex(a, b), kerb: ['#e53935', '#fafafa'], barrier: '#eceff1', cap: '#c62828' },
   docks: { ground: '#9aa3a9', groundTex: (r) => concreteTex(r, r), verge: '#b0b6ba', vergeTex: (a, b) => concreteTex(a, b), kerb: ['#fbc02d', '#212121'], barrier: '#cfd8dc', cap: '#fbc02d' },
   desert: { ground: '#d9a066', groundTex: (r) => sandTex(r, r), verge: '#c9925a', vergeTex: (a, b) => gravelTex(a, b), kerb: ['#e53935', '#fafafa'], barrier: '#d7ccc8', cap: '#1565c0' },
+}
+
+// The ghost racing line (kart.ts racingLine): dashes along the best line, green where it's
+// flat out, amber, then red before a bend that needs braking. Only this player sees it.
+const LINE_COLS = [new Color('#39e07a'), new Color('#ffc23d'), new Color('#ff4d4d')]
+function RacingLine({ t }: { t: Track }) {
+  const geo = useMemo(() => {
+    const { off, heat } = racingLine(t)
+    const pos: number[] = [], col: number[] = []
+    const c = new Color()
+    const W = 0.16, DASH = 1.6
+    let s = 0
+    for (let i = 0; i < t.n; i++) {
+      const j = (i + 1) % t.n
+      const step = Math.hypot(t.x[j] - t.x[i], t.z[j] - t.z[i])
+      s += step
+      if (Math.floor(s / DASH) % 2) continue
+      const h = heat[i]
+      if (h < 0.5) c.copy(LINE_COLS[0]).lerp(LINE_COLS[1], h * 2)
+      else c.copy(LINE_COLS[1]).lerp(LINE_COLS[2], (h - 0.5) * 2)
+      const p = (k: number, o: number) => [t.x[k] + t.nx[k] * o, Y_PAINT + 0.006, t.z[k] + t.nz[k] * o]
+      const a0 = p(i, off[i] - W), a1 = p(i, off[i] + W), b0 = p(j, off[j] - W), b1 = p(j, off[j] + W)
+      // Both windings, so it faces up whichever way the normals point.
+      for (const v of [a0, b0, a1, a1, b0, b1, a0, a1, b0, a1, b1, b0]) { pos.push(...v); col.push(c.r, c.g, c.b) }
+    }
+    const g = new BufferGeometry()
+    g.setAttribute('position', new BufferAttribute(new Float32Array(pos), 3))
+    g.setAttribute('color', new BufferAttribute(new Float32Array(col), 3))
+    return g
+  }, [t])
+  useEffect(() => () => geo.dispose(), [geo])
+  return (
+    <mesh geometry={geo} renderOrder={1}>
+      <meshBasicMaterial vertexColors transparent opacity={0.6} depthWrite={false} {...decal(3)} />
+    </mesh>
+  )
 }
 
 function TrackSurface({ t }: { t: Track }) {
@@ -996,6 +1032,7 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
   // Pixels follow Settings > Graphics: Saver draws at 1x, and Auto on a phone at up to 1.25x
   // (sharp enough on a small screen). The shared canvas goes back to normal after the race.
   const graphics = usePrefs((p) => p.graphics)
+  const showLine = usePrefs((p) => p.kartLine)
   const light = graphics === 'saver' ? 2 : lite && graphics === 'auto' ? 1 : 0
   const setDpr = useThree((s) => s.setDpr)
   useEffect(() => {
@@ -1206,6 +1243,7 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
       <Batch version={t.n * 10 + (t.reverse ? 1 : 0)} freeze>
         <TrackSurface t={t} />
       </Batch>
+      {showLine && <RacingLine t={t} />}
       <Trackside t={t} />
       {t.def.theme === 'town' && <TownScenery t={t} />}
       {t.def.theme === 'docks' && <DocksScenery t={t} />}

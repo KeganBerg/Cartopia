@@ -197,6 +197,34 @@ export function catchUp(rank: number, field: number) {
 export type KartStats = { top: number; acc: number }
 // Performance from PI, flattening out at the top so a big PI edge is worth a few
 // percent of pace and driving well (drifts, boosts, items) still decides the race.
+// The ghost racing line drawn on the road: where to be across the track at each point
+// (cutting to the inside of bends, as the AI does), and how hard the bend ahead is, 0 (flat
+// out) to 1 (slow right down), so the line can go from green through amber to red.
+export function racingLine(t: Track) {
+  const raw = new Float32Array(t.n)
+  const heat = new Float32Array(t.n)
+  for (let i = 0; i < t.n; i++) {
+    let bend = 0, peak = 0
+    for (let d = 2; d < 30; d += 2) {
+      const c = t.curve[wrapI(i + d, t.n)]
+      bend += c
+      peak = Math.max(peak, Math.abs(c))
+    }
+    raw[i] = Math.max(-1, Math.min(1, bend * 3.2)) * (t.half - 1.4)
+    const corner = Math.sqrt(36 / Math.max(peak, 0.005))
+    heat[i] = Math.max(0, Math.min(1, (20 - corner) / 8))
+  }
+  // Smoothed, so the line sweeps rather than steps.
+  const off = new Float32Array(t.n)
+  const W = 6
+  for (let i = 0; i < t.n; i++) {
+    let sum = 0
+    for (let d = -W; d <= W; d++) sum += raw[wrapI(i + d, t.n)]
+    off[i] = sum / (W * 2 + 1)
+  }
+  return { off, heat }
+}
+
 export function kartStats(pi: number): KartStats {
   const k = 1 - Math.exp(-Math.max(1, pi) / 90)
   return { top: 15 + 9 * k, acc: 9 + 6 * k }

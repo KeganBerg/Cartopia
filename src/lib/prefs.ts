@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 
 // Player settings that live on this device only (they never go into the save):
-// graphics quality, reduced motion, phone vibration, muted ghost race taunts, kart steering and
+// graphics quality, reduced motion, phone vibration, muted ghost race taunts, kart steering, the kart racing line and
 // which "Are you sure?" steps the player turned off. Sound volumes keep
 // their own keys in sound.ts, townMusic.ts and ambience.ts.
 
@@ -21,11 +21,13 @@ export type Prefs = {
   askSell: boolean
   // Kart steering on a touch screen: smooth (long slide, steadied near the middle) or sharp.
   steer: Steer
+  // The ghost racing line on kart tracks: green where it's flat out, red before a hard bend.
+  kartLine: boolean
 }
 export type Steer = 'smooth' | 'sharp'
 
 const KEY = 'cartopia-prefs'
-const DEFAULTS: Prefs = { graphics: 'auto', reduceMotion: null, vibration: true, muteTaunts: false, askLeave: true, askSell: true, steer: 'smooth' }
+const DEFAULTS: Prefs = { graphics: 'auto', reduceMotion: null, vibration: true, muteTaunts: false, askLeave: true, askSell: true, steer: 'smooth', kartLine: true }
 
 export function parsePrefs(raw: string | null): Prefs {
   try {
@@ -38,6 +40,7 @@ export function parsePrefs(raw: string | null): Prefs {
       askLeave: p.askLeave !== false,
       askSell: p.askSell !== false,
       steer: p.steer === 'sharp' ? 'sharp' : 'smooth',
+      kartLine: p.kartLine !== false,
     }
   } catch {
     return { ...DEFAULTS }
