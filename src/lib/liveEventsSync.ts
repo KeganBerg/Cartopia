@@ -77,8 +77,9 @@ function seen(): number[] {
 export function startLiveEvents() {
   if (!supabase) return
   void refresh()
+  // Private: Realtime refuses public channels (0078 lets everyone listen on this one).
   supabase
-    .channel('live-events')
+    .channel('live-events', { config: { private: true } })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'live_events' }, () => void refresh())
     .subscribe()
   setInterval(() => {
