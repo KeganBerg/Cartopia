@@ -4,6 +4,7 @@
 // reset and have no streaks. Each owned car wears at most one hat.
 import type { CounterKey } from './data'
 import type { CrateId } from './crates'
+import { inClass, type CarClassId } from './classes'
 
 // How a hat's colours are chosen:
 // 'fixed': one look. 'pick': one colour from HAT_PAINTS. 'twoTone': one colour, or two
@@ -12,8 +13,9 @@ export type HatColors = 'fixed' | 'pick' | 'twoTone' | string[]
 
 // What a challenge counts: a save counter (game/data.ts COUNTERS) since hats arrived, or one of the
 // hat tracks in HatQuest: different cars that won a race, kart Grand Prix race wins, arcade games.
+// `cls` limits 'raceCars' to cars tagged with that class (game/classes.ts).
 export type HatStat = CounterKey | 'raceCars' | 'kartWins' | 'arcade'
-export type HatChallenge = { name: string; icon: string; text: string; stat: HatStat; goal: number }
+export type HatChallenge = { name: string; icon: string; text: string; stat: HatStat; goal: number; cls?: CarClassId }
 
 export type HatDef = {
   id: string
@@ -54,7 +56,7 @@ export const HAT_PAINTS: { color: string; name: string }[] = [
 
 export const COWBOY_COLORS = ['#8d5a2b', '#5d3a1a', '#212121']
 
-const ch = (name: string, icon: string, text: string, stat: HatStat, goal: number): HatChallenge => ({ name, icon, text, stat, goal })
+const ch = (name: string, icon: string, text: string, stat: HatStat, goal: number, cls?: CarClassId): HatChallenge => ({ name, icon, text, stat, goal, ...(cls ? { cls } : {}) })
 
 export const HATS: HatDef[] = [
   { id: 'cap', name: 'Baseball Cap', icon: '🧢', colors: 'twoTone', base: ['#d32f2f', '#fafafa'], challenge: ch('Rookie', '🏁', 'Win 3 races', 'racesWon', 3) },
@@ -63,8 +65,7 @@ export const HATS: HatDef[] = [
   { id: 'party', name: 'Party Hat', icon: '🥳', colors: 'pick', base: ['#ec407a'], challenge: ch('Arcade Party', '🕹️', 'Finish 10 arcade games', 'arcade', 10), crates: ['street', 'garage'] },
   { id: 'hardhat', name: 'Hard Hat', icon: '👷', colors: 'fixed', base: ['#fbc02d'], challenge: ch('Builder', '🏗', 'Place 10 buildings', 'built', 10) },
   { id: 'cone', name: 'Traffic Cone', icon: '🚧', colors: 'fixed', base: ['#ff6d00'], challenge: ch('Road Crew', '🛣', 'Lay 40 road tiles', 'roads', 40) },
-  // TODO(car classes): make this "win races in 5 different Muscle cars" once the class tags land.
-  { id: 'cowboy', name: 'Cowboy Hat', icon: '🤠', colors: COWBOY_COLORS, base: [COWBOY_COLORS[0]], challenge: ch('Rodeo', '🤠', 'Win races in 5 different cars', 'raceCars', 5) },
+  { id: 'cowboy', name: 'Cowboy Hat', icon: '🤠', colors: COWBOY_COLORS, base: [COWBOY_COLORS[0]], challenge: ch('Rodeo', '🤠', 'Win races in 5 different Muscle cars', 'raceCars', 5, 'muscle') },
   { id: 'fez', name: 'Fez', icon: '🟥', colors: 'fixed', base: ['#c62828'], challenge: ch('Restorer', '🛠', 'Restore 3 rescued cars', 'rescued', 3) },
   { id: 'chef', name: 'Chef Hat', icon: '👨‍🍳', colors: 'fixed', base: ['#fafafa'], challenge: ch('Head Chef', '🍕', 'Collect from 75 businesses', 'jobs', 75) },
   { id: 'propeller', name: 'Propeller Cap', icon: '🌀', colors: 'fixed', base: ['#e53935'], challenge: ch('Tinkerer', '⬆', 'Do 20 upgrades', 'upgrades', 20), crates: ['garage', 'gold'] },
@@ -118,7 +119,7 @@ export function hatProgress(d: HatDef, s: QuestSave): number {
   const c = d.challenge
   if (!c) return 0
   const q = s.hatQuest ?? newHatQuest(s.stats)
-  if (c.stat === 'raceCars') return q.cars.length
+  if (c.stat === 'raceCars') return c.cls ? q.cars.filter((m) => inClass(m, c.cls!)).length : q.cars.length
   if (c.stat === 'kartWins') return q.kart
   if (c.stat === 'arcade') return q.arcade
   return Math.max(0, (s.stats[c.stat] ?? 0) - (q.base[c.stat] ?? 0))

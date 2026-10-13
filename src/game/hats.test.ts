@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import { useGame, saveOf, type SaveState } from './store'
+import { carsInClass } from './classes'
 import { COWBOY_COLORS, HATS, HAT_PAINTS, cleanHat, hatChoices, hatDef, hatPaint, hatProgress, newHatQuest, ownedHats, sameHat } from './hats'
 
 const car = { uid: 'h1', model: 'pip', color: '#fff', upgrades: { engine: 0, turbo: 0, tires: 0, weight: 0 } }
@@ -26,7 +27,14 @@ describe('hat catalogue', () => {
       expect(hatDef(id)!.challenge).toBeUndefined()
       expect(hatDef(id)!.crates!.length).toBeGreaterThan(0)
     }
-    expect(hatDef('cowboy')!.challenge).toMatchObject({ stat: 'raceCars', goal: 5 })
+    expect(hatDef('cowboy')!.challenge).toMatchObject({ stat: 'raceCars', goal: 5, cls: 'muscle' })
+  })
+  it('counts only Muscle car wins toward the Cowboy Hat', () => {
+    const cowboy = hatDef('cowboy')!
+    const quest = { ...newHatQuest(), cars: ['pip', 'stallion', 'charger', 'miata', 'lemans'] }
+    // stallion and charger are Muscle bodies; lemans carries Muscle as its second tag.
+    expect(hatProgress(cowboy, { stats: {}, hatQuest: quest })).toBe(3)
+    expect(carsInClass('muscle').filter((c) => !c.rescueOnly && !c.season && !c.secret).length).toBeGreaterThanOrEqual(cowboy.challenge!.goal)
   })
   it('gives each hat base colours its rule allows', () => {
     for (const h of HATS) {
@@ -109,8 +117,8 @@ describe('hat challenges', () => {
     useGame.setState({ stats: { ...stats, built: 50 } })
     expect(g().hats.filter((h) => h === 'hardhat')).toHaveLength(1)
   })
-  it('the cowboy hat takes race wins in 5 different cars', () => {
-    const models = ['pip', 'civic', 'miata', 'trail', 'hotshot']
+  it('the cowboy hat takes race wins in 5 different Muscle cars', () => {
+    const models = ['stallion', 'charger', 'hellcat', 'rattler', 'bandit']
     fresh({ cars: models.map((model, i) => ({ ...car, uid: `c${i}`, model })) })
     for (const [i, model] of models.entries()) {
       useGame.setState({ raceCar: `c${i}` })
@@ -122,6 +130,13 @@ describe('hat challenges', () => {
       expect(hatProgress(hatDef('cowboy')!, g())).toBe(i + 1)
       expect(g().hats.includes('cowboy')).toBe(i === 4)
     }
+  })
+  it('skips wins in cars outside the Muscle class for the cowboy hat', () => {
+    fresh({ cars: [{ ...car, uid: 'c0', model: 'miata' }] })
+    useGame.setState({ raceCar: 'c0' })
+    g().finishRace(true, 10)
+    expect(g().hatQuest.cars).toContain('miata')
+    expect(hatProgress(hatDef('cowboy')!, g())).toBe(0)
   })
   it('counts kart Grand Prix wins and arcade games', () => {
     fresh()
