@@ -18,6 +18,7 @@ import { liveTraffic as sim } from './traffic/live'
 import { layoutRoads, type Light } from './traffic/layout'
 import { useVisitors, tapVisitor, type Visitor } from '../lib/visitors'
 import { AMBULANCE, TownAmbulance } from './ServiceVehicles'
+import { townTraffic } from '../game/traffic'
 
 // Buses run the school routes: they drop in at schools more than anywhere else.
 const SCHOOLS = ['school', 'highschool', 'university']
@@ -324,6 +325,8 @@ function ShowcaseStars({ uids }: { uids: string[] }) {
 export function TownCars() {
   const roads = useGame((s) => (s.visiting ?? s).roads)
   const cars = useGame((s) => (s.visiting ?? s).cars)
+  // Too little road jams the town: everyone crawls (src/game/traffic.ts).
+  const pace = useGame((s) => townTraffic(s.visiting ?? s).pace)
   const buildings = useGame((s) => (s.visiting ?? s).buildings)
   const visitKey = useGame((s) => s.visiting?.ownerId ?? 'home')
   const picks = useGame((s) => (s.visiting ?? s).showcase)
@@ -350,13 +353,13 @@ export function TownCars() {
       return {
         uid: c.uid,
         ...townSize(def.body),
-        cruise: 1.1 + pis.get(c.uid)! / 45,
+        cruise: (1.1 + pis.get(c.uid)! / 45) * pace,
         stalled: !!(c.flat || c.lowFuel),
         low: pis.get(c.uid)! < LOW_PI || slow.has(c.uid),
         favors: def.body === 'bus' ? SCHOOLS : undefined,
       }
     })
-  }, [cars, stars])
+  }, [cars, stars, pace])
   // A visitor's car drives round town too (src/lib/visitors.ts), on top of the usual cap.
   const visitor = useVisitors((v) => (v.visitor && v.visitor.kind !== 'barn' && !visitKeyIsAway(visitKey) ? v.visitor : null))
   const guest = useMemo(() => (visitor ? visitorCar(visitor) : null), [visitor?.id]) // eslint-disable-line react-hooks/exhaustive-deps

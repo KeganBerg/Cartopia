@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 import { flushSave, signedInUser } from './cloud'
 import { sfx } from './sound'
 import { useGame, type JunkCar } from '../game/store'
+import { townTraffic } from '../game/traffic'
 import { CARS, RESCUE_SPOTS, STORAGE_MAX, VISITORS, VISIT_GAP_MIN, BARN_RARITY, TOURIST_GAP_MIN, touristGroup, touristScore, touristWeight, carDef, performance, visitorPrize, type Body, type Rarity, type VisitorKind } from '../game/data'
 
 // Surprise visitors in town: every few minutes someone turns up (see VISITORS in data.ts).
@@ -83,10 +84,11 @@ function dress(id: string, kind: VisitorKind, prize: { coins: number; xp: number
   return { id, kind, ...prize, expiresAt, server, model, color, name, pi, body: carDef(model).body, ...(group > 1 ? { group } : {}) }
 }
 
-// A guest's visitor kind: tourists come more often to a town with grown gardens and statues.
-export function rollKind(barn: boolean, score: number, roll = Math.random()): VisitorKind {
+// A guest's visitor kind: tourists come more often to a town with grown gardens and statues,
+// and half as often to a jammed one (src/game/traffic.ts).
+export function rollKind(barn: boolean, score: number, roll = Math.random(), tourists = 1): VisitorKind {
   const kinds = (Object.keys(VISITORS) as VisitorKind[]).filter((k) => k !== 'barn' || barn)
-  const weight = (k: VisitorKind) => (k === 'tourist' ? touristWeight(score) : VISITORS[k].weight)
+  const weight = (k: VisitorKind) => (k === 'tourist' ? touristWeight(score) * tourists : VISITORS[k].weight)
   let r = roll * kinds.reduce((n, k) => n + weight(k), 0)
   let kind = kinds[0]
   for (const k of kinds) {
@@ -98,7 +100,8 @@ export function rollKind(barn: boolean, score: number, roll = Math.random()): Vi
 }
 
 function rollLocal(barn: boolean): Visitor {
-  const kind = rollKind(barn, touristScore(useGame.getState().buildings))
+  const g = useGame.getState()
+  const kind = rollKind(barn, touristScore(g.buildings), Math.random(), townTraffic(g).tourists)
   return dress(`g${Date.now()}`, kind, visitorPrize(kind, useGame.getState().level), Date.now() + VISITORS[kind].minutes * 60_000, false)
 }
 

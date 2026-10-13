@@ -9,6 +9,7 @@ import { DynoOverlay, type DynoRun } from './Dyno'
 import { CollectAllButton } from './CollectAll'
 import { GoalsButton } from './Goals'
 import { rotateCurrent } from '../game/placement'
+import { TRAFFIC, TRAFFIC_MIN, roadShare, roadsShort, trafficLevel } from '../game/traffic'
 import { BuildingThumb, CarThumb } from '../scene/BuildingPreview'
 import { ShopUpgrades } from './Upgrade'
 import { ModShop, withMod } from './Mods'
@@ -91,6 +92,22 @@ export function FreeCamButton({ className = 'goals-btn cam-dock' }: { className?
   )
 }
 
+// Edit mode: how much of the town is road. Under 15% it jams (src/game/traffic.ts).
+function TrafficMeter() {
+  const share = useGame((s) => roadShare(s.roads, s.land))
+  const short = useGame((s) => roadsShort(s.roads, s.land))
+  const t = TRAFFIC[trafficLevel(share)]
+  const pct = Math.round(share * 100)
+  return (
+    <div className="traffic-meter" style={{ '--tc': t.c } as React.CSSProperties} title={`Roads ${pct}% of your land, aim for ${Math.round(TRAFFIC_MIN * 100)}%+`}>
+      <span aria-hidden>{t.icon}</span>
+      <b>{t.name}</b>
+      <i className="tm-bar"><i style={{ width: `${Math.min(100, (share / (TRAFFIC_MIN * 2)) * 100)}%` }} /><i className="tm-min" /></i>
+      <small>{short ? `+${short} 🛣️` : `${pct}%`}</small>
+    </div>
+  )
+}
+
 function EditBar() {
   const mode = useGame((s) => s.mode)
   const placing = useGame((s) => s.placing)
@@ -118,6 +135,7 @@ function EditBar() {
   return (
     <div className="edit-bar">
       {!tutCard && <div className="edit-hint">{hint}</div>}
+      {!tutCard && <TrafficMeter />}
       <div className="edit-tools">
         <button className={mode === 'road' ? 'tool active' : 'tool'} onClick={() => setMode('road')}><Icon name="road" size={22} /><span>Road</span></button>
         <button className={mode === 'bulldoze' ? 'tool active' : 'tool'} onClick={() => setMode('bulldoze')}><Icon name="bulldoze" size={22} /><span>Bulldoze</span></button>
