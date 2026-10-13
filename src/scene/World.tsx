@@ -46,6 +46,7 @@ import { VIEW, isFree, useFreeCam } from './freeCam'
 import { FreeCam } from './FreeCam'
 import { TutorialCamera } from './TutorialCamera'
 import { TownTouch, townFingers } from './TownTouch'
+import { tapOwnedBy } from './pick'
 import { useLite } from '../lib/prefs'
 
 // Meadow ground that drifting cloud shadows pass over, one per tiling.
@@ -227,6 +228,9 @@ function BuildingLot({ b, turn, group, picked, city }: BuildingProps) {
       onPointerDown={(e) => {
         const s = useGame.getState()
         if (s.visiting || e.button !== 0) return
+        // The building actually under the finger takes the press, not a neighbour whose faint
+        // shadow or glow sits in front of it (its own handler runs further along the ray).
+        if (!tapOwnedBy(e.intersections, e.eventObject)) return
         if (s.mode === 'play') {
           held = false
           if (movable(b.def) && !group) holdToMove(b, e)
@@ -241,6 +245,7 @@ function BuildingLot({ b, turn, group, picked, city }: BuildingProps) {
       }}
       onClick={(e) => {
         const s = useGame.getState()
+        if (!tapOwnedBy(e.intersections, e.eventObject)) return
         // In move mode the tap already picked it up; don't let it fall through and deselect.
         if (s.mode === 'move' || held) {
           held = false
