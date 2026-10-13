@@ -7,8 +7,8 @@ import { ledGridTex, ledPaneTex, windowTex } from './textures'
 
 // The nightclub's LED windows: every window shows the same colour of the
 // rainbow, and on every kick they all move on to the next colour together
-// and flash (clubBeat.ts). Between kicks each groove of the club's set plays
-// the lights its own way (LOOKS), switching as the set mixes into the next. The big front window is a grid of LED cells in that
+// and flash (clubBeat.ts). Between kicks each of the club's tracks (a new
+// one every night) plays the lights its own way (LOOKS). The big front window is a grid of LED cells in that
 // same colour. Dark by day and while closed. Two shared materials, kept out of
 // Batch by `live`, so the cost is the same for any number of windows.
 
@@ -19,7 +19,7 @@ export const RAINBOW = ['#ff1744', '#ff9100', '#ffea00', '#00e676', '#00b0ff', '
 export const SHOWN_MS = 16
 export const shownNow = () => performance.now() + SHOWN_MS
 
-// How each groove plays the lights between kicks, as how much each part of the
+// How each track plays the lights between kicks, as how much each part of the
 // music flashes them: w for the upper windows (and the Vanguard penthouse), f
 // for the big front LED window. The colour itself only moves on the kick.
 type Look = { w: Partial<Record<CueKind, number>>; f: Partial<Record<CueKind, number>> }
@@ -36,8 +36,22 @@ export const LOOKS: Look[] = [
   { w: { kick: 1.3, open: 0.9 }, f: { kick: 0.7, stab: 1.4, open: 0.4 } },
   // Tech: the front window rolls with the off-beat bass; the windows tick with the hats.
   { w: { kick: 1.4, hat: 0.7 }, f: { kick: 0.7, bass: 1.3, stab: 0.6 } },
-  // Jackin': the windows bounce with the bass and claps; the front jabs with the organ.
-  { w: { kick: 1.4, bass: 0.5, clap: 0.7 }, f: { kick: 0.8, stab: 1.3, hat: 0.4 } },
+  // Electro swing: the windows bounce on the off-beat piano; the front plays the trumpet line.
+  { w: { kick: 1.4, stab: 0.7, clap: 0.5 }, f: { kick: 0.7, lead: 1.3, stab: 0.5 } },
+  // Trance: the front races with the arpeggio; the windows pump on the rolling bass.
+  { w: { kick: 1.5, bass: 0.4 }, f: { kick: 0.6, lead: 1.2, open: 0.3 } },
+  // Liquid drum and bass: the windows crack on the snares; the front glows with the keys and bells.
+  { w: { kick: 1.5, clap: 1.2 }, f: { kick: 0.8, stab: 0.9, lead: 0.7 } },
+  // Dubstep: the front throbs with the wobble; the snare slams the windows.
+  { w: { kick: 1.6, clap: 1.3 }, f: { kick: 0.9, bass: 1.4 } },
+  // Synthwave: the windows glow with the pads; the front follows the melody.
+  { w: { kick: 1.4, stab: 0.6, clap: 0.6 }, f: { kick: 0.6, lead: 1.4 } },
+  // Reggaeton: the windows bounce on the dembow; the front plinks with the hook.
+  { w: { kick: 1.3, clap: 0.9 }, f: { kick: 0.7, lead: 1.3, clap: 0.4 } },
+  // Hardstyle: everything hits on the kick; the front screams with the lead.
+  { w: { kick: 1.7, bass: 0.3 }, f: { kick: 1.2, lead: 1 } },
+  // Amapiano: the windows bounce with the log drum; the front rings with the marimba.
+  { w: { kick: 1.3, bass: 0.9 }, f: { kick: 0.6, lead: 1.2, stab: 0.5 } },
 ]
 // No groove (the muted pulse, Rave Mode): the kick alone.
 const KICK: Look = { w: { kick: 1.6 }, f: { kick: 1.4 } }

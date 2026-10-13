@@ -1137,6 +1137,12 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
     const d = v.d * (1 - (pu ? PUNCH[pu.tier] : 0) * dip)
     camera.position.set(v.x + jx, Math.sin(tilt) * d, v.z + Math.cos(tilt) * d + jz)
     camera.lookAt(v.x + jx, 0, v.z + jz)
+    // Dev only: a fixed camera for the spot list's postcards (scripts/rescue/spotart.mjs).
+    const pc = import.meta.env.DEV ? (window as { __rescueCam?: { p: [number, number, number]; l: [number, number, number] } }).__rescueCam : undefined
+    if (pc) {
+      camera.position.set(...pc.p)
+      camera.lookAt(...pc.l)
+    }
   })
 
   const road = useMemo(() => ribbon(L, 0, HALF, LAYER.lot), [L])

@@ -1,12 +1,12 @@
-// node scripts/clubav/frames.mjs <cues.json> <outdir> <set bar> [seconds] [fps]   (needs vite on :5173)
+// node scripts/clubav/frames.mjs <cues.json> <outdir> <bar> [seconds] [fps] [track]   (needs vite on :5173)
 import { createRequire } from 'node:module'
 import { readFileSync } from 'node:fs'
 const { chromium } = createRequire('/opt/node-tools/node_modules/')('playwright')
-const [, , cuesFile, out, bar = 0, secs = 8, fps = 30] = process.argv
+const [, , cuesFile, out, bar = 0, secs = 8, fps = 30, track = 0] = process.argv
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] })
 const p = await b.newPage({ viewport: { width: 640, height: 520 } })
 p.on('pageerror', (e) => console.log('error', e.message))
-await p.goto(`http://localhost:5173/scripts/clubav/frames.html?time=0.5&bar=${bar}`)
+await p.goto(`http://localhost:5173/scripts/clubav/frames.html?time=0.5&bar=${bar}&track=${track}`)
 await p.waitForSelector('canvas', { timeout: 60000 })
 await p.waitForTimeout(4000)
 await p.evaluate((c) => window.load(c), JSON.parse(readFileSync(cuesFile, 'utf8')))

@@ -46,7 +46,7 @@ function centred(geos: (BufferGeometry | undefined)[]) {
   return { mid, scale: SIZE / Math.max(0.05, size.x, size.y, size.z) }
 }
 
-function BoltOn({ id, body, tint }: { id: string; body: Body; tint: string }) {
+export function BoltOn({ id, body, tint }: { id: string; body: Body; tint: string }) {
   const g = modGeo(bodyFor(id, body), [id])
   const { mid, scale } = useMemo(() => centred([g.paint, g.carbon, g.chrome, g.glass]), [g])
   const paint = useMemo(() => new MeshStandardMaterial({ color: tint, metalness: 0.4, roughness: 0.3 }), [tint])

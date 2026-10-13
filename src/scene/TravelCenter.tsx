@@ -8,6 +8,8 @@ import { bodyScale } from './townCarSize'
 import { TrueSize, useMergeScale } from './mergeScale'
 import { glowMats } from './dayNight'
 import { signTexture } from './signTexture'
+import { useGasPrice } from './useGasPrice'
+import { gasLabel } from '../game/gasPrice'
 import { asphaltTex, brickTex, concreteTex, pumpTex } from './textures'
 import { decal } from './layers'
 
@@ -416,13 +418,22 @@ function Pylon({ m, t, level }: { m: Mat; t: TravelLayout; level: number }) {
       <Box m={m} at={[0, h - 0.2, 0]} s={[w + 0.1, 0.4, 0.1]} c={RED} />
       <LitSign text={NAME} w={w} h={0.3} at={[0, h - 0.2, 0.052]} bg={RED} fg="#fffde7" m={m} />
       <Box m={m} at={[0, h - 0.72, 0]} s={[w * 0.8, 0.5, 0.09]} c="#263238" />
-      <mesh position={[0, h - 0.72, 0.048]}>
-        <planeGeometry args={[w * 0.72, 0.42]} />
-        <meshBasicMaterial map={signTexture('⛽ 4.89', '#263238', '#ffca28', (w * 0.72) / 0.42)} toneMapped={false} />
-      </mesh>
+      <Price w={w} at={[0, h - 0.72, 0.048]} />
       <Logo m={m} at={[0, h + w * 0.42, 0]} r={w * 0.45} />
       <Bulbs from={[-w / 2, h + 0.03, 0.06]} to={[w / 2, h + 0.03, 0.06]} n={9} />
     </group>
+  )
+}
+
+// Today's Los Angeles pump price (src/game/gasPrice.ts). Kept out of the merged town
+// mesh so the digits can change after the town is built.
+function Price({ w, at }: { w: number; at: V3 }) {
+  const p = useGasPrice()
+  return (
+    <mesh position={at} userData={{ noBatch: true }}>
+      <planeGeometry args={[w * 0.72, 0.42]} />
+      <meshBasicMaterial map={signTexture(`⛽ ${gasLabel(p)}`, '#263238', '#ffca28', (w * 0.72) / 0.42)} toneMapped={false} />
+    </mesh>
   )
 }
 

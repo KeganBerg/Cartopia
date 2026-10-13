@@ -13,7 +13,7 @@ type V3 = [number, number, number]
 export type ExoticHelpers = {
   seat: (k: Kit, x: number, y: number, z: number, w: number, back: number) => void
   steering: (k: Kit, x: number, y: number, z: number) => void
-  brakes: (k: Kit, wx: number, wz: number, r: number, w: number) => void
+  brakes: (k: Kit, wx: number | ((z: number) => number), wz: number, r: number, w: number, yaw?: (z: number) => number) => void
   bar: (k: Kit, part: Part, a: V3, b: V3, t: number) => void
 }
 export type ExoticFit = { spoiler?: string; hood?: string; exhaust?: string; kit?: string }
@@ -63,13 +63,21 @@ export class Surface {
   // Stands a part on the side wall (sd: -1 left, 1 right) at height y, leaning with the
   // wall as it narrows. The part's own +x points to the back of the car on both sides
   // (the left side's copy is mirrored), turned rz in its own plane first.
-  wall(part: Part, geo: BufferGeometry, sd: number, z: number, y: number, out = 0.003, rz = 0) {
+  // How far the side wall turns in at z (positive where it widens toward the front).
+  yaw(z: number) {
     const e = 0.01
-    const yaw = Math.atan2(this.side(z + e) - this.side(z - e), 2 * e)
+    return Math.atan2(this.side(z + e) - this.side(z - e), 2 * e)
+  }
+  wall(part: Part, geo: BufferGeometry, sd: number, z: number, y: number, out = 0.003, rz = 0) {
+    const yaw = this.yaw(z)
     if (rz) geo.rotateZ(rz)
-    this.k.add(part, sd < 0 ? mirrorX(geo) : geo, [sd * (this.side(z) + out), y, z], [0, sd * (Math.PI / 2 - yaw), 0])
+    this.k.add(part, sd < 0 ? mirrorX(geo) : geo, [sd * (this.side(z) + out), y, z], [0, sd * (Math.PI / 2 + yaw), 0])
   }
 }
+
+// Where the brakes go on an axle: tucked so the rotor's face stands just proud of the
+// black well on the side wall (the well sits 0.003 off the wall), never flush with it.
+const brakeX = (S: Surface, z: number) => S.side(z) + 0.003 - 0.025
 
 // A flat part flipped left to right, still facing the same way.
 export function mirrorX(geo: BufferGeometry) {
@@ -139,7 +147,7 @@ export function greenhouse(k: Kit, h: ExoticHelpers, glass: Loft, o: { roof: [nu
     const [mz, mx, my] = o.mirror
     h.bar(k, 'black', [sd * mx, my, mz], [sd * (mx + 0.08), my + 0.03, mz - 0.03], 0.012)
     k.add('paint', rbox(0.07, 0.04, 0.035, 0.012), [sd * (mx + 0.11), my + 0.035, mz - 0.03], [0, 0, sd * -0.1])
-    k.add('glass', plane(0.055, 0.028), [sd * (mx + 0.11), my + 0.035, mz - 0.049], [0, Math.PI, 0])
+    k.add('glass', plane(0.055, 0.028), [sd * (mx + 0.11), my + 0.035, mz - 0.051], [0, Math.PI, 0])
   }
 }
 
@@ -155,17 +163,17 @@ export function honey(k: Kit, x: number, y: number, z: number, w: number, h: num
   for (let j = 0; j < rows; j++) for (let i = 0; i < cols - (j % 2); i++) {
     const cx = x - ((cols - 1) * dx) / 2 + i * dx + (j % 2 ? dx / 2 : 0)
     const cy = y - ((rows - 1) * dy) / 2 + j * dy
-    k.add('dash', new CircleGeometry(r * 0.78, 6), [cx, cy, z + dir * 0.002], [0, dir < 0 ? Math.PI : 0, Math.PI / 6])
+    k.add('dash', new CircleGeometry(r * 0.78, 6), [cx, cy, z + dir * 0.0035], [0, dir < 0 ? Math.PI : 0, Math.PI / 6])
   }
 }
 
 // A slatted vent lying on a surface: a black opening w wide and l long with n body-colour
 // louvres across it.
 export function vent(S: Surface, x: number, z: number, w: number, l: number, n: number, turn = 0) {
-  S.top('black', poly([[-w / 2, -l / 2], [w / 2, -l / 2], [w / 2 * 0.86, l / 2], [-w / 2 * 0.86, l / 2]]), x, z, 0.002, turn)
+  S.top('black', poly([[-w / 2, -l / 2], [w / 2, -l / 2], [w / 2 * 0.86, l / 2], [-w / 2 * 0.86, l / 2]]), x, z, 0.0065, turn)
   for (let i = 0; i < n; i++) {
     const t = (i + 0.5) / n - 0.5
-    S.top('dark', box(w * 0.9, 0.006, 0.006), x - Math.sin(turn) * t * l, z + Math.cos(turn) * t * l, 0.005, turn)
+    S.top('dark', box(w * 0.9, 0.006, 0.006), x - Math.sin(turn) * t * l, z + Math.cos(turn) * t * l, 0.0095, turn)
   }
 }
 
@@ -178,7 +186,6 @@ export const FULMINE = { len: 1.38, wid: 0.8, wheel: 0.14, lift: 0.06 }
 export function fulmineGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   const r = FULMINE.wheel
   const wz = FULMINE.len * 0.33
-  const wx = FULMINE.wid / 2 - 0.02
   const front = FULMINE.len / 2
   // z, half width, bottom, shoulder, fender top, crease x, middle height
   const body = new Loft([
@@ -216,20 +223,20 @@ export function fulmineGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   // Hexagonal wheel arches: a black well behind each tyre with a crisp body-dark lip.
   for (const zz of [wz, -wz]) for (const sd of [-1, 1]) {
     const R = r * 1.2
-    S.wall('black', new CircleGeometry(R, 3, 0, Math.PI), sd, zz, r - 0.012, 0.002)
+    S.wall('black', new CircleGeometry(R, 3, 0, Math.PI), sd, zz, r - 0.012, 0.003)
     S.wall('dark', new TorusGeometry(R, 0.011, 4, 3, Math.PI), sd, zz, r - 0.012, 0.004)
   }
   // Side: a sill blade, the door's cut line, and a big intake scooping air in ahead of the rear wheel.
   for (const sd of [-1, 1]) {
     k.add('black', rbox(0.03, 0.035, wz * 2 - r * 2.6, 0.01), [sd * (S.side(0) - 0.005), 0.085, -0.01])
-    S.wall('dark', plane(0.006, 0.15), sd, 0.21, 0.17, 0.003, -0.35)
-    S.wall('dark', plane(0.006, 0.12), sd, -0.11, 0.165, 0.003, 0.2)
+    S.wall('dark', plane(0.006, 0.15), sd, 0.21, 0.17, 0.005, -0.35)
+    S.wall('dark', plane(0.006, 0.12), sd, -0.11, 0.165, 0.005, 0.2)
     S.wall('dark', plane(0.4, 0.006), sd, 0.05, 0.236, 0.003, 0.0)
     // Intake: a dark triangle cut back into the wall, with a blade across its mouth.
     const tri: [number, number][] = [[-0.13, -0.055], [0.12, -0.055], [0.12, 0.06]]
     S.wall('black', poly(tri.map(([x, y]) => [x * 1, y])), sd, -0.22, 0.175, 0.003)
-    S.wall('dark', box(0.25, 0.008, 0.01), sd, -0.21, 0.152, 0.008, 0.38)
-    for (const dz of [-0.03, 0.03, 0.09]) S.wall('dark', box(0.006, 0.07, 0.008), sd, -0.22 + dz, 0.165 - dz * 0.2, 0.006)
+    S.wall('dark', box(0.25, 0.008, 0.01), sd, -0.21, 0.152, 0.01, 0.38)
+    for (const dz of [-0.03, 0.03, 0.09]) S.wall('dark', box(0.006, 0.07, 0.008), sd, -0.22 + dz, 0.165 - dz * 0.2, 0.009)
     // A crease low along the side between the wheels.
     S.wall('dark', box(wz * 2 - r * 2.8, 0.005, 0.004), sd, 0, 0.115, 0.002)
     // Amber marker low on the front of the wall.
@@ -262,10 +269,10 @@ export function fulmineGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   for (const sd of [-1, 1]) G.top('black', poly([[-0.012, -0.04], [0.012, -0.04], [0.02, 0.03], [-0.02, 0.03]]), sd * 0.07, -0.12, 0.012)
   S.top('dark', new CircleGeometry(0.02, 6), 0.33, -0.44, 0.003)
   // Hood: two vents in the channel and a crease down the middle.
-  for (const sd of [-1, 1]) S.top('black', poly([[-0.025, -0.04], [0.02, -0.04], [0.03, 0.04], [-0.02, 0.04]].map(([x, y]) => [-sd * x, y])), sd * 0.07, 0.47, 0.002)
+  for (const sd of [-1, 1]) S.top('black', poly([[-0.025, -0.04], [0.02, -0.04], [0.03, 0.04], [-0.02, 0.04]].map(([x, y]) => [-sd * x, y])), sd * 0.07, 0.47, 0.0065)
   // Cowl: a black strip at the base of the windshield, and a wiper.
-  S.top('black', box(0.48, 0.03, 0.004), 0, 0.345, 0.002)
-  S.top('black', box(0.2, 0.008, 0.006), 0.04, 0.325, 0.006, 0.1)
+  S.top('black', box(0.48, 0.03, 0.004), 0, 0.345, 0.0055)
+  S.top('black', box(0.2, 0.008, 0.006), 0.04, 0.325, 0.0095, 0.1)
 
   // Engine cover: black louvres across the fastback between two painted buttress ridges.
   for (let i = 0; i < 6; i++) {
@@ -273,29 +280,29 @@ export function fulmineGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
     G.top('black', box(G.loft.near(z).pts[2][0] * 1.6, 0.012, 0.006), 0, z, 0.004)
   }
   // Rear deck: a vented panel behind the glass.
-  for (let i = 0; i < 4; i++) S.top('black', box(0.3, 0.012, 0.004), 0, -0.56 - i * 0.025, 0.003)
+  for (let i = 0; i < 4; i++) S.top('black', box(0.3, 0.012, 0.004), 0, -0.56 - i * 0.025, 0.0055)
 
   // Tail: a black mesh panel across the back, a Y of red in each corner, twin hexagonal
   // pipes high in the middle, a plate and a finned diffuser.
   const tz = -front
-  honey(k, 0, 0.17, tz - 0.002, 0.7, 0.12, 0.016, -1)
+  honey(k, 0, 0.17, tz - 0.0015, 0.7, 0.12, 0.016, -1)
   // Body-colour frame round the mesh, split by a bar across the middle.
-  k.add('dark', box(0.7, 0.008, 0.006), [0, 0.2, tz - 0.006])
+  k.add('dark', box(0.7, 0.008, 0.006), [0, 0.2, tz - 0.008])
   for (const sd of [-1, 1]) {
     const x = sd * 0.29
-    k.add('tail', box(0.1, 0.012, 0.004), [x + sd * 0.01, 0.255, tz - 0.004], [0, 0, sd * 0.35])
-    k.add('tail', box(0.1, 0.012, 0.004), [x + sd * 0.01, 0.225, tz - 0.004], [0, 0, -sd * 0.35])
-    k.add('tail', box(0.07, 0.012, 0.004), [x - sd * 0.06, 0.24, tz - 0.004])
-    k.add('lamp', plane(0.03, 0.012), [sd * 0.16, 0.12, tz - 0.006], [0, Math.PI, 0])
+    k.add('tail', box(0.1, 0.012, 0.004), [x + sd * 0.01, 0.255, tz - 0.007], [0, 0, sd * 0.35])
+    k.add('tail', box(0.1, 0.012, 0.004), [x + sd * 0.01, 0.225, tz - 0.007], [0, 0, -sd * 0.35])
+    k.add('tail', box(0.07, 0.012, 0.004), [x - sd * 0.06, 0.24, tz - 0.007])
+    k.add('lamp', plane(0.03, 0.012), [sd * 0.16, 0.12, tz - 0.0075], [0, Math.PI, 0])
   }
   if (!fit.exhaust) {
     for (const sd of [-1, 1]) {
       k.add('chrome', new CylinderGeometry(0.028, 0.028, 0.06, 6), [sd * 0.04, 0.235, tz - 0.01], [Math.PI / 2, 0, 0])
-      k.add('black', disc(0.02, 6), [sd * 0.04, 0.235, tz - 0.041], [0, Math.PI, Math.PI / 6])
+      k.add('black', disc(0.02, 6), [sd * 0.04, 0.235, tz - 0.043], [0, Math.PI, Math.PI / 6])
     }
   }
-  k.add('black', plane(0.124, 0.054), [0, 0.15, tz - 0.006], [0, Math.PI, 0])
-  k.add('lamp', plane(0.11, 0.045), [0, 0.15, tz - 0.008], [0, Math.PI, 0])
+  k.add('black', plane(0.124, 0.054), [0, 0.15, tz - 0.0075], [0, Math.PI, 0])
+  k.add('lamp', plane(0.11, 0.045), [0, 0.15, tz - 0.01], [0, Math.PI, 0])
   if (!fit.kit) {
     k.add('black', box(0.6, 0.03, 0.08), [0, 0.075, tz + 0.02])
     for (const x of [-0.2, -0.1, 0, 0.1, 0.2]) k.add('black', box(0.01, 0.05, 0.08), [x, 0.075, tz + 0.01])
@@ -311,16 +318,16 @@ export function fulmineGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
 
   // Racing stripes down the hood channel, the roof and the engine cover (drawn only when painted on).
   for (const x of [-0.045, 0.045]) {
-    for (let z = 0.62; z > 0.36; z -= 0.05) S.top('stripe', plane(0.06, 0.052), x, z, 0.0015)
+    for (let z = 0.62; z > 0.36; z -= 0.05) S.top('stripe', plane(0.06, 0.052), x, z, 0.003)
     for (let z = 0.04; z > -0.32; z -= 0.05) {
       const p = glass.near(z).pts
       k.add('stripe', box(0.06, 0.004, 0.052), [x, p[4][1] + 0.011, z])
     }
-    for (let z = -0.56; z > -0.67; z -= 0.05) S.top('stripe', plane(0.06, 0.052), x, z, 0.0015)
+    for (let z = -0.56; z > -0.67; z -= 0.05) S.top('stripe', plane(0.06, 0.052), x, z, 0.003)
   }
 
   interior(k, h, -0.14, 0.16)
-  h.brakes(k, wx, wz, r, 0.14)
+  h.brakes(k, (z) => brakeX(S, z), wz, r, 0.14, (z) => S.yaw(z))
   // Third brake light at the top of the fastback.
   G.top('tail', box(0.1, 0.012, 0.004), 0, -0.33, 0.004)
 }
@@ -337,7 +344,7 @@ export function interior(k: Kit, h: ExoticHelpers, seatZ: number, dashZ: number)
 // Round wheel arches: a black well behind each tyre and a thin dark lip.
 export function roundArches(S: Surface, wz: number, r: number) {
   for (const zz of [wz, -wz]) for (const sd of [-1, 1]) {
-    S.wall('black', new CircleGeometry(r * 1.2, 18, 0, Math.PI), sd, zz, r - 0.01, 0.002)
+    S.wall('black', new CircleGeometry(r * 1.2, 18, 0, Math.PI), sd, zz, r - 0.01, 0.003)
     S.wall('dark', new TorusGeometry(r * 1.2, 0.009, 4, 18, Math.PI), sd, zz, r - 0.01, 0.004)
   }
 }
@@ -351,7 +358,7 @@ export function spine(k: Kit, part: Part, z0: number, z1: number, base: (z: numb
   for (let i = 0; i <= n; i++) {
     const z = z0 + ((z1 - z0) * i) / n
     const b = base(z)
-    bot.push([z, b - 0.01])
+    bot.push([z, b - 0.015])
     top.push([z, b + rise(z)])
   }
   k.add(part, slab([...bot, ...top.reverse()], t), [0, 0, 0], [0, -Math.PI / 2, 0])
@@ -428,7 +435,7 @@ export function eclatGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   for (const sd of [-1, 1]) for (let z = 0.56; z > 0.33; z -= 0.035) S.top('dark', box(0.005, 0.036, 0.003), sd * (0.17 - (0.56 - z) * 0.12), z, 0.0015, sd * 0.12)
   // Engine grille: a honeycomb panel on the rear deck behind the glass.
   S.top('black', poly([[-0.17, -0.05], [0.17, -0.05], [0.15, 0.05], [-0.15, 0.05]]), 0, -0.57, 0.002)
-  for (const x of [-0.12, -0.06, 0, 0.06, 0.12]) for (const dz of [-0.025, 0.012]) S.top('dash', new CircleGeometry(0.014, 6), x + (dz > 0 ? 0.03 : 0), -0.57 + dz, 0.004)
+  for (const x of [-0.12, -0.06, 0, 0.06, 0.12]) for (const dz of [-0.025, 0.012]) S.top('dash', new CircleGeometry(0.014, 6), x + (dz > 0 ? 0.03 : 0), -0.57 + dz, 0.005)
   // Two roof intakes either side of the fin.
   for (const sd of [-1, 1]) G.top('black', poly(ellipse(0.025, 0.05, 12)), sd * 0.06, -0.33, 0.004)
 
@@ -437,7 +444,7 @@ export function eclatGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   const hi = arch(0.04, 0.075).map(([x, y]): [number, number] => [x, y + 0.006])
   k.add('chrome', frame(hs, hi, 0.012), [0, 0.088, front + 0.002], [-0.12, 0, 0])
   k.add('dark', poly(hi), [0, 0.088, front + 0.0], [-0.12, 0, 0])
-  for (const x of [-0.02, 0, 0.02]) k.add('black', box(0.004, 0.07, 0.006), [x, 0.125, front + 0.002], [-0.12, 0, 0])
+  for (const x of [-0.02, 0, 0.02]) k.add('black', box(0.004, 0.07, 0.006), [x, 0.1255, front + 0.0035], [-0.12, 0, 0])
   // Big intakes either side of it, and a splitter under the lot.
   for (const sd of [-1, 1]) k.add('black', poly([[0.06, -0.02], [0.2, -0.025], [0.22, 0.02], [0.07, 0.03]].map(([x, y]) => [x * sd, y])), [0, 0.11, front + 0.003], [0, 0, 0])
   if (!fit.kit) k.add('black', box(0.62, 0.012, 0.07), [0, 0.075, front - 0.02])
@@ -468,7 +475,7 @@ export function eclatGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
     })
     S.wall('black', poly(inside), sd, cz - 0.01, cy, 0.003)
     // Door seam ahead of the C, sill blade and a front marker.
-    S.wall('dark', plane(0.006, 0.15), sd, 0.2, 0.17, 0.003, 0.25)
+    S.wall('dark', plane(0.006, 0.15), sd, 0.2, 0.17, 0.005, 0.25)
     // Vent behind the front wheel: three black slots.
     for (let i = 0; i < 3; i++) S.wall('black', box(0.05, 0.008, 0.002), sd, 0.29 - i * 0.004, 0.23 - i * 0.02, 0.003, -0.3)
     k.add('black', rbox(0.03, 0.035, wz * 2 - r * 2.6, 0.01), [sd * (S.side(0) - 0.005), 0.085, -0.01])
@@ -478,19 +485,19 @@ export function eclatGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   // Tail: one light bar right across, honeycomb under it, four big pipes in the middle,
   // a plate, a diffuser and a flat wing that sits just proud of the tail.
   const tz = -front
-  k.add('black', plane(0.76, 0.04), [0, 0.262, tz - 0.003], [0, Math.PI, 0])
-  k.add('tail', box(0.72, 0.014, 0.004), [0, 0.262, tz - 0.005])
+  k.add('black', plane(0.76, 0.04), [0, 0.262, tz - 0.0025], [0, Math.PI, 0])
+  k.add('tail', box(0.72, 0.014, 0.004), [0, 0.262, tz - 0.007])
   honey(k, 0, 0.19, tz - 0.002, 0.7, 0.1, 0.016, -1)
-  for (const sd of [-1, 1]) k.add('lamp', plane(0.035, 0.012), [sd * 0.3, 0.23, tz - 0.006], [0, Math.PI, 0])
+  for (const sd of [-1, 1]) k.add('lamp', plane(0.035, 0.012), [sd * 0.3, 0.23, tz - 0.008], [0, Math.PI, 0])
   if (!fit.exhaust) {
-    k.add('black', rbox(0.15, 0.1, 0.03, 0.02), [0, 0.135, tz - 0.004])
+    k.add('black', rbox(0.15, 0.094, 0.03, 0.02), [0, 0.1385, tz - 0.004])
     for (const [x, y] of [[-0.033, 0.16], [0.033, 0.16], [-0.033, 0.11], [0.033, 0.11]]) {
       k.add('chrome', new CylinderGeometry(0.022, 0.022, 0.05, 14), [x, y, tz - 0.012], [Math.PI / 2, 0, 0])
-      k.add('black', disc(0.016, 14), [x, y, tz - 0.038], [0, Math.PI, 0])
+      k.add('black', disc(0.016, 14), [x, y, tz - 0.04], [0, Math.PI, 0])
     }
   }
-  k.add('black', plane(0.124, 0.054), [0, 0.215, tz - 0.006], [0, Math.PI, 0])
-  k.add('lamp', plane(0.11, 0.045), [0, 0.215, tz - 0.008], [0, Math.PI, 0])
+  k.add('black', plane(0.124, 0.054), [0, 0.215, tz - 0.008], [0, Math.PI, 0])
+  k.add('lamp', plane(0.11, 0.045), [0, 0.215, tz - 0.0105], [0, Math.PI, 0])
   if (!fit.kit) {
     k.add('black', box(0.64, 0.03, 0.08), [0, 0.075, tz + 0.02])
     for (const x of [-0.24, -0.14, 0.14, 0.24]) k.add('black', box(0.01, 0.05, 0.08), [x, 0.075, tz + 0.01])
@@ -503,11 +510,11 @@ export function eclatGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
 
   // Racing stripes over the nose, the roof and the tail (drawn only when painted on).
   for (const x of [-0.05, 0.05]) {
-    for (let z = 0.62; z > 0.36; z -= 0.05) S.top('stripe', plane(0.055, 0.052), x, z, 0.0015)
+    for (let z = 0.62; z > 0.36; z -= 0.05) S.top('stripe', plane(0.055, 0.052), x, z, 0.003)
     for (let z = 0.04; z > -0.28; z -= 0.05) k.add('stripe', box(0.055, 0.004, 0.052), [x, glass.near(z).pts[4][1] + 0.011, z])
   }
   interior(k, h, -0.14, 0.17)
-  h.brakes(k, ECLAT.wid / 2 - 0.02, wz, r, 0.14)
+  h.brakes(k, (z) => brakeX(S, z), wz, r, 0.14, (z) => S.yaw(z))
 }
 
 // ---------------------------------------------------------------------------
@@ -565,23 +572,23 @@ export function orafoGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
     const z = 0.59
     S.top('black', poly(ellipse(0.034, 0.05, 18)), x, z + 0.005, 0.002, sd * 0.35)
     for (const [dx, dz] of [[0, 0.028], [-0.017, -0.004], [0.017, -0.004]]) {
-      S.top('lamp', disc(0.014, 14), x + dx, z + dz, 0.004)
-      S.top('chrome', new TorusGeometry(0.015, 0.003, 3, 14), x + dx, z + dz, 0.005)
+      S.top('lamp', disc(0.014, 14), x + dx, z + dz, 0.005)
+      S.top('chrome', new TorusGeometry(0.015, 0.003, 3, 14), x + dx, z + dz, 0.006)
     }
   }
   // Two vents on the hood.
   for (const sd of [-1, 1]) vent(S, sd * 0.075, 0.46, 0.06, 0.1, 4, sd * -0.15)
   // Chrome bonnet pins, and an oval badge on the nose.
   for (const sd of [-1, 1]) S.top('chrome', disc(0.008, 10), sd * 0.13, 0.6, 0.003)
-  S.top('chrome', poly(ellipse(0.022, 0.014, 14)), 0, 0.665, 0.003)
-  S.top('dash', poly(ellipse(0.016, 0.009, 14)), 0, 0.665, 0.004)
+  S.top('chrome', poly(ellipse(0.022, 0.014, 14)), 0, 0.665, 0.005)
+  S.top('dash', poly(ellipse(0.016, 0.009, 14)), 0, 0.665, 0.007)
   // Louvres across the rear deck.
   for (let i = 0; i < 5; i++) S.top('black', box(0.26 - i * 0.02, 0.01, 0.004), 0, -0.56 - i * 0.022, 0.003)
 
   // Sides: a door seam, a sill blade, an intake on top of each rear haunch, a front marker.
   for (const sd of [-1, 1]) {
-    S.wall('dark', plane(0.006, 0.14), sd, 0.19, 0.17, 0.003, 0.25)
-    S.wall('dark', plane(0.006, 0.12), sd, -0.15, 0.165, 0.003, -0.15)
+    S.wall('dark', plane(0.006, 0.14), sd, 0.19, 0.17, 0.005, 0.25)
+    S.wall('dark', plane(0.006, 0.12), sd, -0.15, 0.165, 0.005, -0.15)
     k.add('black', rbox(0.03, 0.035, wz * 2 - r * 2.6, 0.01), [sd * (S.side(0) - 0.005), 0.085, -0.01])
     vent(S, sd * 0.34, -0.3, 0.05, 0.13, 5)
     S.wall('black', poly(ellipse(0.07, 0.03, 14)), sd, -0.24, 0.18, 0.003)
@@ -593,22 +600,22 @@ export function orafoGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   const tz = -front
   honey(k, 0, 0.15, tz - 0.002, 0.6, 0.09, 0.015, -1)
   for (const sd of [-1, 1]) for (const x of [0.2, 0.28]) {
-    k.add('black', disc(0.03, 16), [sd * x, 0.245, tz - 0.003], [0, Math.PI, 0])
+    k.add('black', disc(0.03, 16), [sd * x, 0.245, tz - 0.0025], [0, Math.PI, 0])
     k.add('tail', disc(0.023, 16), [sd * x, 0.245, tz - 0.005], [0, Math.PI, 0])
     k.add('chrome', new TorusGeometry(0.027, 0.004, 3, 16), [sd * x, 0.245, tz - 0.005])
   }
   if (!fit.exhaust) {
     k.add('chrome', new TorusGeometry(0.05, 0.008, 4, 20), [0, 0.225, tz - 0.012])
-    k.add('black', disc(0.05, 20), [0, 0.225, tz - 0.004], [0, Math.PI, 0])
+    k.add('black', disc(0.05, 20), [0, 0.225, tz - 0.008], [0, Math.PI, 0])
     for (let i = 0; i < 4; i++) {
       const a = (i / 4) * Math.PI * 2 + Math.PI / 4
       const p: V3 = [Math.cos(a) * 0.024, 0.225 + Math.sin(a) * 0.024, tz - 0.02]
       k.add('chrome', new CylinderGeometry(0.014, 0.014, 0.04, 12), p, [Math.PI / 2, 0, 0])
-      k.add('black', disc(0.01, 12), [p[0], p[1], tz - 0.041], [0, Math.PI, 0])
+      k.add('black', disc(0.01, 12), [p[0], p[1], tz - 0.043], [0, Math.PI, 0])
     }
   }
-  k.add('black', plane(0.124, 0.054), [0, 0.15, tz - 0.006], [0, Math.PI, 0])
-  k.add('lamp', plane(0.11, 0.045), [0, 0.15, tz - 0.008], [0, Math.PI, 0])
+  k.add('black', plane(0.124, 0.054), [0, 0.15, tz - 0.008], [0, Math.PI, 0])
+  k.add('lamp', plane(0.11, 0.045), [0, 0.15, tz - 0.0105], [0, Math.PI, 0])
   if (!fit.kit) {
     k.add('black', box(0.56, 0.03, 0.08), [0, 0.085, tz + 0.02])
     for (const x of [-0.18, -0.09, 0.09, 0.18]) k.add('black', box(0.01, 0.05, 0.08), [x, 0.085, tz + 0.01])
@@ -621,10 +628,10 @@ export function orafoGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   }
 
   for (const x of [-0.045, 0.045]) {
-    for (let z = 0.63; z > 0.36; z -= 0.05) S.top('stripe', plane(0.05, 0.052), x, z, 0.0015)
+    for (let z = 0.63; z > 0.36; z -= 0.05) S.top('stripe', plane(0.05, 0.052), x, z, 0.003)
   }
   interior(k, h, -0.14, 0.15)
-  h.brakes(k, ORAFO.wid / 2 - 0.02, wz, r, 0.14)
+  h.brakes(k, (z) => brakeX(S, z), wz, r, 0.14, (z) => S.yaw(z))
 }
 
 // Exotic bodies by name, and what draws each.

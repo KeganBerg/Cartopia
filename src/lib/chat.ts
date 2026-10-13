@@ -25,6 +25,8 @@ type ChatState = {
   viewing: Room | null
   // Players this browser hides.
   muted: Record<string, string>
+  // What the player may delete besides their own messages (public.chat_powers).
+  powers: { mod: boolean; leader: boolean }
 }
 
 const MUTE_KEY = 'cartopia-chat-muted'
@@ -38,6 +40,7 @@ const loadMuted = (): Record<string, string> => {
 
 export const useChat = create<ChatState>(() => ({
   uid: null, crewRoom: null, msgs: { global: [], crew: [] }, unread: { global: 0, crew: 0 }, viewing: null, muted: loadMuted(),
+  powers: { mod: false, leader: false },
 }))
 
 export const MAX_CHAT = 200
@@ -68,14 +71,18 @@ const roomKey = (room: Room) => (room === 'global' ? 'global' : useChat.getState
 // that was empty (a new crew's first "hi").
 const loaded: Partial<Record<Room, boolean>> = {}
 
-function add(room: Room, list: ChatMsg[]) {
+// History replaces everything from its oldest message on, so a message deleted while the
+// channel was down doesn't linger.
+function add(room: Room, list: ChatMsg[], history = false) {
   loadUsernames(list.map((m) => m.owner))
   useChat.setState((s) => {
-    const byId = new Map(s.msgs[room].map((m) => [m.id, m]))
+    const from = history ? (list.length ? Math.min(...list.map((m) => m.id)) : -Infinity) : Infinity
+    const byId = new Map(s.msgs[room].filter((m) => m.id < from).map((m) => [m.id, m]))
+    const had = new Set(s.msgs[room].map((m) => m.id))
     const count = !!loaded[room]
     let fresh = 0
     for (const m of list) {
-      if (!byId.has(m.id) && count) fresh += m.owner === s.uid || s.muted[m.owner] ? 0 : 1
+      if (!had.has(m.id) && count) fresh += m.owner === s.uid || s.muted[m.owner] ? 0 : 1
       byId.set(m.id, m)
     }
     const merged = [...byId.values()].sort((a, b) => a.id - b.id).slice(-KEEP)
@@ -108,6 +115,9 @@ async function join(room: Room) {
   ch.on('broadcast', { event: 'msg' }, ({ payload }) => {
     const m = toMsg(payload as Row)
     if (m) add(room, [m])
+  }).on('broadcast', { event: 'del' }, ({ payload }) => {
+    const id = Number((payload as { id?: unknown })?.id)
+    if (Number.isFinite(id)) drop(room, id)
   }).subscribe((status) => {
     live[room] = status === 'SUBSCRIBED'
     // Catch up on anything sent while the channel was down.
@@ -121,7 +131,7 @@ export async function loadRecent(room: Room) {
   const { data, error } = await supabase.rpc('chat_recent', { p_room: key })
   if (error || !Array.isArray(data)) return
   if (roomKey(room) !== key) return
-  add(room, (data as Row[]).map(toMsg).filter((m): m is ChatMsg => !!m))
+  add(room, (data as Row[]).map(toMsg).filter((m): m is ChatMsg => !!m), true)
   loaded[room] = true
 }
 
@@ -137,6 +147,14 @@ export async function refreshChatRooms() {
   }
   void join('global')
   if (crewRoom) void join('crew')
+  void loadPowers()
+}
+
+async function loadPowers() {
+  if (!supabase) return
+  const { data, error } = await supabase.rpc('chat_powers')
+  const p = (error ? null : data) as { mod?: unknown; leader?: unknown } | null
+  useChat.setState({ powers: { mod: p?.mod === true, leader: p?.leader === true } })
 }
 
 let started = false
@@ -147,7 +165,7 @@ export function startChat() {
     if (uid === useChat.getState().uid) return
     leave('global')
     leave('crew')
-    useChat.setState({ uid, crewRoom: null, msgs: { global: [], crew: [] }, unread: { global: 0, crew: 0 } })
+    useChat.setState({ uid, crewRoom: null, msgs: { global: [], crew: [] }, unread: { global: 0, crew: 0 }, powers: { mod: false, leader: false } })
     if (uid) void refreshChatRooms()
   }
   supabase.auth.getUser().then(({ data }) => onUser(data.user?.id ?? null))
@@ -203,6 +221,25 @@ export async function sendChat(room: Room, text: string): Promise<string | null>
   if (error) return ERRORS[error.message] ?? "Couldn't send. Try again."
   const m = toMsg(data as Row)
   if (m) add(room, [m])
+  return null
+}
+
+function drop(room: Room, id: number) {
+  useChat.setState((s) => ({ msgs: { ...s.msgs, [room]: s.msgs[room].filter((m) => m.id !== id) } }))
+}
+
+// Whether the player may delete a message: their own, any in their crew room as its leader,
+// anything as a chat mod. The server (chat_delete) checks again.
+export function canDelete(room: Room, m: Pick<ChatMsg, 'owner'>, s: Pick<ChatState, 'uid' | 'powers'> = useChat.getState()) {
+  return !!s.uid && (m.owner === s.uid || s.powers.mod || (room === 'crew' && s.powers.leader))
+}
+
+// Returns an error to show, or null once deleted.
+export async function deleteChat(room: Room, id: number): Promise<string | null> {
+  if (!supabase) return 'Chat needs an internet connection'
+  const { error } = await supabase.rpc('chat_delete', { p_id: id })
+  if (error && error.message !== 'gone') return error.message === 'not yours' ? "You can't delete that" : "Couldn't delete. Try again."
+  drop(room, id)
   return null
 }
 

@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
   PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS,
-  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, jobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, refillBucks, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, activeEvent, DAILY_BONUS, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modFits, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, CREW_CHEST, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower, seasonNumber, seasonOf, SEASON_STARS, skinDef, ownedSkins, seasonSkin, modSkinDef, ownedModSkins, seasonModSkin, SKINNED_SLOTS, type SkinnedSlot, fittedMods, SEASON_TIERS, STARS_PER_TIER, SEASON_CAR_BUCKS, dealsFor, dealOffer, type DealDef, type DealKind,
+  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, jobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, MAX_BUILDING_LEVEL, RESCUE_SPOTS, RESCUE_PINS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, refillBucks, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, activeEvent, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modFits, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, CREW_CHEST, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower, seasonNumber, seasonOf, SEASON_STARS, skinDef, ownedSkins, seasonSkin, modSkinDef, ownedModSkins, seasonModSkin, SKINNED_SLOTS, type SkinnedSlot, fittedMods, SEASON_TIERS, STARS_PER_TIER, SEASON_CAR_BUCKS, dealsFor, dealOffer, type DealDef, type DealKind,
 } from './data'
 import { PANELS, PATTERNS, isBike, panelJobCost, tidyPanels, type Panels } from './data'
 import { sfx } from '../lib/sound'
@@ -20,6 +20,7 @@ import { groupOf, groupTurn, mergeCandidates, applyMerge, applySplit, rotateGrou
 import { togglePick } from './meet'
 import { crateCost, crateDef, rollCrate, type CrateId, type CrateOpen } from './crates'
 import { pieceId } from './resto'
+import { rollWheel, type WheelSpin } from './wheel'
 import { claim, type WagerEntry } from './wager'
 
 // rot: quarter turns the player chose (0 faces south). Unset means face the nearest road.
@@ -209,7 +210,8 @@ type Actions = {
   claimSet: (id: string) => void
   // Adds a crew chest's reward once the server has recorded the chest (open_crew_chest).
   openCrewChest: () => void
-  claimDaily: () => void
+  // Marks today's wheel spin taken (the spin itself is a crate open: see spinWheel).
+  markSpun: (day: string) => void
   fixFlat: (uid: string, tow: boolean) => void
   serviceCar: (uid: string, how: 'tires' | 'gas' | 'can') => void
   paintCar: (uid: string, job: PaintJob) => boolean
@@ -305,6 +307,15 @@ export const setRescueRoller = (f: typeof rescueRoller) => {
 let crateOpener: ((id: CrateId) => Promise<CrateOpen[] | null>) | null = null
 export const setCrateOpener = (f: typeof crateOpener) => {
   crateOpener = f
+}
+
+// A signed-in player's daily spin is rolled by the server too (wheel_spin() in
+// supabase/migrations/0064_wheel_spin.sql); src/lib/crates.ts plugs it in. It returns the spin and any
+// earlier opens the save never counted, or null to roll here (guests). Throws 'soon' or 'spun today'.
+export type ServerSpin = { spin: WheelSpin | null; day: string; pending: CrateOpen[] }
+let wheelSpinner: (() => Promise<ServerSpin | null>) | null = null
+export const setWheelSpinner = (f: typeof wheelSpinner) => {
+  wheelSpinner = f
 }
 
 const key = (x: number, z: number) => `${x},${z}`
@@ -1368,24 +1379,11 @@ export const useGame = create<GameState>()(
         }))
       },
 
-      claimDaily: () => {
+      markSpun: (day) => {
         const s = get()
-        const t = today()
-        if (s.lastDaily === t) return
-        const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
-        const streak = s.lastDaily === yesterday ? s.dailyStreak + 1 : 1
-        const r = DAILY_BONUS[Math.min(streak, DAILY_BONUS.length) - 1]
-        set({
-          coins: s.coins + r.coins,
-          fuel: s.fuel + (r.fuel ?? 0),
-          parts: s.parts + (r.parts ?? 0),
-          bucks: s.bucks + (r.bucks ?? 0),
-          lastDaily: t,
-          dailyStreak: streak,
-          panel: null,
-          updatedAt: Date.now(),
-        })
-        s.toast(`Daily bonus: +${r.coins} coins`)
+        if (s.lastDaily != null && s.lastDaily >= day) return
+        const yesterday = new Date(Date.parse(day) - 86400000).toISOString().slice(0, 10)
+        set({ lastDaily: day, dailyStreak: s.lastDaily === yesterday ? s.dailyStreak + 1 : 1, updatedAt: Date.now() })
       },
 
       fixFlat: (cuid, tow) => {
@@ -2165,4 +2163,31 @@ export async function openCrate(id: CrateId): Promise<CrateOpen[] | null> {
   if (!opens) opens = [{ crate: id, cost, drop: rollCrate(def, s.level, s.cars, Math.random, { skins: ownedSkins(s), modSkins: ownedModSkins(s), pieces: s.restoParts ?? [] }) }]
   for (const o of opens) useGame.getState().applyCrate(o)
   return opens
+}
+
+// Today's free spin on the prize wheel (once a UTC day): rolled on the server when signed in,
+// added to the town like a crate open, and returned for the wheel to land on. Null when it can't spin.
+export async function spinWheel(): Promise<WheelSpin | null> {
+  const s = useGame.getState()
+  if (s.lastDaily === today()) return null
+  let got: ServerSpin | null = null
+  try {
+    got = wheelSpinner ? await wheelSpinner() : null
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : ''
+    if (msg.includes('spun today')) useGame.getState().markSpun(today())
+    useGame.getState().toast(msg === 'soon' ? 'The prize wheel opens very soon!' : msg.includes('spun today') ? 'Spun today. Back tomorrow!' : "Couldn't spin. Try again.")
+    return null
+  }
+  if (got) {
+    for (const o of got.pending) useGame.getState().applyCrate(o)
+    if (got.spin) useGame.getState().applyCrate(got.spin.open)
+    useGame.getState().markSpun(got.day)
+    if (!got.spin) useGame.getState().toast('Spun today. Your prize is in!')
+    return got.spin
+  }
+  const spin = rollWheel(s.level, s.cars, { skins: ownedSkins(s), modSkins: ownedModSkins(s) })
+  useGame.getState().applyCrate(spin.open)
+  useGame.getState().markSpun(today())
+  return spin
 }

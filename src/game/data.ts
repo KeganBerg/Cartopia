@@ -912,14 +912,6 @@ export function drawTasks(pool: TaskDef[], key: string, level: number, owned: (d
 }
 
 // Daily login bonus by streak day (repeats the last entry).
-export const DAILY_BONUS = [
-  { coins: 200 },
-  { coins: 400 },
-  { coins: 600, fuel: 5 },
-  { coins: 800, parts: 5 },
-  { coins: 1200, bucks: 1 },
-]
-
 export const FLAT_CHANCE = 0.2
 export const LOW_FUEL_CHANCE = 0.15
 // What your own Tire Shop or Gas Station earns for servicing a stranded car.

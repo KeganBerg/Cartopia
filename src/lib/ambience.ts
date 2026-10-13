@@ -12,8 +12,9 @@ import type { Agent } from '../scene/traffic/sim'
 import { toWorld } from '../scene/grid'
 import { pickSpecies, sing, type Species } from './birdsong'
 import { onThunder, weatherNow } from '../game/weather'
-import { GROOVES, type Tone } from './clubGrooves'
-import { decksAt, SIXTEENTH_MS, type Deck } from './clubSet'
+import { GROOVES, type BassTone, type Groove, type KickTone, type LeadTone, type Tone } from './clubGrooves'
+import { deckAt, sixAt, sixteenthMs, wallOf, type Deck } from './clubSet'
+import { DAY_MS } from '../game/clock'
 import { clubHit, type CueKind } from './clubBeat'
 import { technoOn } from '../game/techno'
 
@@ -153,10 +154,13 @@ export class Soundscape {
   private musicPan: StereoPannerNode | null
   private keys: BiquadFilterNode
   private hats: GainNode
+  private crush: WaveShaperNode
   private doorUntil = 0
-  // The next sixteenth of the club's set to schedule (-1: start afresh), and
-  // where the wall clock sits against the audio clock (ms at audio time 0).
+  // The next sixteenth of the club's track to schedule (-1: start afresh), the
+  // night it belongs to, and where the wall clock sits against the audio clock
+  // (ms at audio time 0).
   private nextSix = -1
+  private night = 0
   private wallOff = NaN
   // The wall clock at an audio time (ms), which the club's set runs on.
   // Offline renders replace it to film any moment of the set.
@@ -237,6 +241,15 @@ export class Soundscape {
     this.hats = ctx.createGain()
     this.hats.gain.value = 0
     this.hats.connect(this.music)
+    // A hardstyle kick's distorted, pitched tail: driven hard, its mids get
+    // through the walls.
+    this.crush = ctx.createWaveShaper()
+    const hard = new Float32Array(1024)
+    for (let i = 0; i < hard.length; i++) hard[i] = Math.tanh(((i / (hard.length - 1)) * 2 - 1) * 14)
+    this.crush.curve = hard
+    const crushGain = ctx.createGain()
+    crushGain.gain.value = 0.05
+    this.crush.connect(this.filter('lowpass', 1400)).connect(crushGain).connect(this.wall)
     const echo = ctx.createGain()
     echo.gain.value = 0.3
     this.music.connect(echo).connect(this.room)
@@ -452,11 +465,10 @@ export class Soundscape {
     this.clubMusic(t, club)
   }
 
-  // Night music: house thumping through the walls of your own nightclub while
-  // it's open, or faintly from somewhere across town. The club plays a DJ set
-  // (clubSet.ts) that mixes through its grooves (clubGrooves.ts) a few minutes
-  // each, on the wall clock so every town hears the same moment of it. Every
-  // so often someone opens the door and the music spills out bright for a moment.
+  // Night music: dance music thumping through the walls of your own nightclub
+  // while it's open. Every night it plays a different track (clubSet.ts,
+  // clubGrooves.ts), on the wall clock so every town hears the same moment of
+  // it. Every so often someone opens the door and the music spills out bright.
   private clubMusic(t: number, club: Club | boolean | null) {
     // Only a town with its own nightclub hears it, louder the closer it is.
     // During Techno Night the event track takes over and the club falls quiet.
@@ -465,9 +477,11 @@ export class Soundscape {
     if (near > 0.6 && t > this.doorUntil + 4 && Math.random() < 0.025) this.doorUntil = t + rand(1.8, 3)
     const door = near > 0.6 && t < this.doorUntil ? 1 : 0
     this.music.gain.setTargetAtTime(level * (1 + door * 0.25), t, door ? 0.15 : 2)
-    // Further off, the walls and distance soak up more of the top end.
+    // Further off, the walls and distance soak up more of the top end. Up
+    // close the hook and chords come through clearly enough to tell the
+    // night's track from the last.
     this.wall.frequency.setTargetAtTime(door ? 1600 : 260 + 440 * near, t, door ? 0.15 : 1)
-    this.keys.frequency.setTargetAtTime(door ? 3200 : 420 + 680 * near, t, door ? 0.15 : 1)
+    this.keys.frequency.setTargetAtTime(door ? 3200 : 450 + 1250 * near, t, door ? 0.15 : 1)
     this.hats.gain.setTargetAtTime(door ? 0.5 : 0.14 * near * near, t, door ? 0.15 : 1)
     this.gritTone.frequency.setTargetAtTime(650 + 450 * near, t, 1)
     if (this.musicPan) this.musicPan.pan.setTargetAtTime(typeof club === 'object' && club ? club.pan * 0.8 : 0.4, t, 0.5)
@@ -482,54 +496,59 @@ export class Soundscape {
       this.wallOff = off
       this.nextSix = -1
     }
-    const audioAt = (n: number) => (n * SIXTEENTH_MS - this.wallOff) / 1000
-    if (this.nextSix < 0 || audioAt(this.nextSix) < t) this.nextSix = Math.ceil(((t + 0.1) * 1000 + this.wallOff) / SIXTEENTH_MS)
-    while (audioAt(this.nextSix) < t + 0.5) {
+    const audioAt = (night: number, n: number) => (wallOf(night, n) - this.wallOff) / 1000
+    if (this.nextSix < 0 || audioAt(this.night, this.nextSix) < t) {
+      const p = sixAt((t + 0.1) * 1000 + this.wallOff)
+      this.night = p.night
+      this.nextSix = p.n + 1
+    }
+    for (;;) {
+      // When a new night starts (only while a live event holds the club open
+      // through it), its track takes over on the very next sixteenth: no gap.
+      if (wallOf(this.night, this.nextSix) >= (this.night + 1) * DAY_MS) {
+        this.night++
+        this.nextSix = 0
+      }
+      const at = audioAt(this.night, this.nextSix)
+      if (at >= t + 0.5) break
       const n = this.nextSix++
-      const decks = decksAt(n)
-      const lead = decks.find((d) => d.lows) ?? decks[decks.length - 1]
+      const d = deckAt(this.night, n)
       // The dancers keep the beat even through a breakdown.
-      if (n % 4 === 0) this.onHit?.(audioAt(n) + SWELL, 'beat', 0, lead.groove)
-      for (const d of decks) this.playDeck(d, audioAt(n), near, lead.groove)
+      if (n % 4 === 0) this.onHit?.(at + SWELL, 'beat', 0, d.groove)
+      this.playDeck(d, at)
     }
   }
 
-  // One sixteenth of one deck of the club's set.
-  private playDeck(d: Deck, at: number, near: number, lead: number) {
+  // One sixteenth of the night's track.
+  private playDeck(d: Deck, at: number) {
     const g = GROOVES[d.groove]
-    const sixteenth = SIXTEENTH_MS / 1000
+    const sixteenth = sixteenthMs(d.groove) / 1000
     const k = d.k
     // A shuffle: the in-between sixteenths land a touch late.
     const b = at + (k % 2 ? sixteenth * g.swing : 0)
     const chord = g.loop[d.bar % g.loop.length]
-    // Sweeping grooves open the chord filter over eight bars and close it
-    // again; the set's mixes and breakdowns close it further.
+    // Sweeping tracks open the chord filter over eight bars and close it
+    // again; the breakdown closes it further.
     const sweep = (g.sweep ? 0.35 + 0.65 * (0.5 - 0.5 * Math.cos((((d.bar % 8) * 16 + k) / 128) * Math.PI * 2)) : 1) * d.bright
     const vol = d.highs
     // Each cue is timed to when its note is heard, not when it starts (SWELL).
-    const cue = (kind: CueKind, late: number, amt = 1) => this.onHit?.(b + late, kind, amt, lead)
+    const cue = (kind: CueKind, late: number, amt = 1) => this.onHit?.(b + late, kind, amt, d.groove)
+    const kicks = g.kick ?? [0, 4, 8, 12]
     if (d.kick) {
       cue('kick', SWELL)
-      this.blip(b, 0.32, 0.7 * g.gain, null, (o) => {
-        o.frequency.setValueAtTime(160, b)
-        o.frequency.exponentialRampToValueAtTime(46, b + 0.12)
-      }, () => this.thump)
+      this.kick(b, g.kickTone ?? 'house', g.gain)
     }
     // The second half's bass line jumps up an octave now and then.
     const note = g.bass[k] * (d.variant && k % 8 === 6 && g.bass[k] ? 2 : 1)
     if (d.bass && note) {
-      if (k % 4) cue('bass', SWELL, Math.min(1, note))
-      const f = chord.root * note
+      if (!kicks.includes(k)) cue('bass', SWELL, Math.min(1, note))
       const last = k === 14 && note >= 2
-      this.blip(b, sixteenth * (last ? 1.2 : g.bassLen), (last ? 0.11 : 0.16) * g.gain, null, (o) => {
-        o.type = 'sawtooth'
-        o.frequency.value = f
-      }, () => this.thump)
+      this.bassNote(b, chord.root * note, sixteenth * (last ? 1.2 : g.bassLen), (last ? 0.11 : 0.16) * g.gain, g, d.variant)
     }
     const hits = g.stabs[d.bar % g.stabs.length]
     if (d.stabs && hits.includes(k)) {
-      cue('stab', g.tone === 'piano' ? 0.004 : 0.007, sweep * vol)
-      const long = d.bar % g.loop.length === g.loop.length - 1 && k === hits[hits.length - 1] && g.tone !== 'chop'
+      cue('stab', g.tone === 'piano' ? 0.004 : g.tone === 'pad' ? 0.15 : 0.007, sweep * vol * (g.tone === 'pad' ? 0.5 : 1))
+      const long = d.bar % g.loop.length === g.loop.length - 1 && k === hits[hits.length - 1] && g.tone !== 'chop' && g.tone !== 'pad'
       this.stab(b, chord.notes, sixteenth * (long ? 4 : g.stabLen), g.tone, g.gain * vol, Math.max(0.05, sweep))
     }
     const step = g.acid?.notes[k]
@@ -538,20 +557,196 @@ export class Soundscape {
       cue('acid', 0.004, (accent ? 1 : 0.15 + 0.45 * sweep) * vol)
       this.acid(b, chord.root * 2 * 2 ** (step / 12), sixteenth, accent, sweep, g.gain * vol)
     }
+    const tune = g.lead
+    const pitch = d.lead && tune ? tune.notes[(d.bar * 16 + k) % tune.notes.length] : null
+    if (tune && pitch !== null && pitch !== undefined) {
+      cue('lead', 0.01, Math.max(0.3, sweep) * vol)
+      this.lead(b, tune.root * 2 ** (pitch / 12), sixteenth * tune.len, tune.tone, g.gain * vol, Math.max(0.15, sweep))
+    }
+    if (d.lows && g.perc?.includes(k)) {
+      cue('perc', 0.005, vol)
+      this.conga(b, k % 4 === 3 || k === 14, vol)
+    }
     const clap = (d.claps && g.claps.includes(k)) || d.roll > 0
     const open = g.openHats.includes(k)
-    const closed = d.closedHats && (g.closedHats === 'all' ? k % 4 !== 0 : k % 2)
+    const closed = d.closedHats && (g.closedHats === 'all' ? k % 4 !== 0 : g.closedHats === 'eighths' ? k % 2 === 0 : k % 2)
     if (clap) cue('clap', 0.023, d.roll || vol)
     if (open) cue('open', 0, vol)
     else if (closed) cue('hat', 0, 0.6 * vol)
     if (d.crash) cue('open', 0, 1)
     if (d.riser && k % 4 === 0) this.riser(b, sixteenth * 4, d.riser * vol)
-    if (near) {
-      if (clap) this.clap(b, d.roll ? 0.4 + 0.6 * d.roll : vol)
-      if (open) this.noiseHit(b, 0.16, 0.09 * vol, this.filter('highpass', 7000, this.hats))
-      else if (closed) this.noiseHit(b, 0.03, (k % 2 ? 0.035 : 0.025) * vol, this.filter('highpass', 9000, this.hats))
-      if (d.crash) this.noiseHit(b, 1.4, 0.12, this.filter('highpass', 5000, this.hats))
+    if (clap) this.snare(b, d.roll ? 'snare' : (g.snare ?? 'clap'), d.roll ? 0.4 + 0.6 * d.roll : vol)
+    if (open) this.noiseHit(b, 0.16, 0.09 * vol, this.filter('highpass', 7000, this.hats))
+    else if (closed) this.noiseHit(b, 0.03, (k % 2 ? 0.035 : 0.025) * vol, this.filter('highpass', 9000, this.hats))
+    if (d.crash) this.noiseHit(b, 1.4, 0.12, this.filter('highpass', 5000, this.hats))
+  }
+
+  // A kick drum. House: a round thump. Punch: tighter and snappier. Boom: a
+  // long deep 808. Hard: a hardstyle kick, a punch with a distorted pitched tail.
+  private kick(b: number, tone: KickTone, gain: number) {
+    const sweep = (from: number, to: number, over: number) => (o: OscillatorNode) => {
+      o.frequency.setValueAtTime(from, b)
+      o.frequency.exponentialRampToValueAtTime(to, b + over)
     }
+    if (tone === 'house') this.blip(b, 0.32, 0.7 * gain, null, sweep(160, 46, 0.12), () => this.thump)
+    else if (tone === 'punch') this.blip(b, 0.26, 0.75 * gain, null, sweep(210, 50, 0.06), () => this.thump)
+    else if (tone === 'boom') this.blip(b, 0.75, 0.65 * gain, null, sweep(130, 42, 0.16), () => this.thump)
+    else {
+      this.blip(b, 0.36, 0.6 * gain, null, sweep(300, 52, 0.05), () => this.thump)
+      this.blip(b, 0.34, gain, null, sweep(240, 62, 0.07), () => this.crush)
+    }
+  }
+
+  // One bass note: a saw, a hollow square, a deep sine, a growling reese (two
+  // detuned saws through a low filter), a wobble (a filter swinging on the
+  // beat) or a log drum.
+  private bassNote(b: number, f: number, dur: number, peak: number, g: Groove, variant: boolean) {
+    const tone: BassTone = g.bassTone ?? 'saw'
+    if (tone === 'log') {
+      // Amapiano's log drum: a pitched drum hit that drops onto its note, with
+      // a woody knock on top that gets through the walls.
+      const drop = (x: number) => (o: OscillatorNode) => {
+        o.frequency.setValueAtTime(f * x * 1.8, b)
+        o.frequency.exponentialRampToValueAtTime(f * x, b + 0.035)
+      }
+      this.blip(b, Math.min(dur, 0.45), peak * 1.8, null, drop(1), () => this.thump)
+      this.blip(b, 0.16, peak * 0.5, null, (o) => {
+        o.type = 'triangle'
+        drop(4)(o)
+      }, () => this.keys)
+      return
+    }
+    if (tone === 'saw' || tone === 'square' || tone === 'sub') {
+      this.blip(b, dur, peak * (tone === 'sub' ? 1.7 : tone === 'square' ? 0.75 : 1), null, (o) => {
+        o.type = tone === 'sub' ? 'sine' : tone === 'square' ? 'square' : 'sawtooth'
+        o.frequency.value = f
+      }, () => this.thump)
+      return
+    }
+    const env = this.ctx.createGain()
+    // Long held notes through a resonant filter carry far more energy than a
+    // short saw note, so they sit lower to match.
+    peak *= tone === 'reese' ? 0.4 : 0.22
+    env.gain.setValueAtTime(0.0001, b)
+    env.gain.exponentialRampToValueAtTime(peak, b + 0.03)
+    env.gain.setValueAtTime(peak, b + dur * 0.8)
+    env.gain.exponentialRampToValueAtTime(0.0001, b + dur)
+    const lp = this.filter('lowpass', tone === 'reese' ? 420 : 500, undefined, tone === 'reese' ? 1 : 7)
+    lp.connect(env).connect(this.thump)
+    if (tone === 'wobble') {
+      // Some of the wobble's wah gets through the walls with the chords.
+      const leak = this.ctx.createGain()
+      leak.gain.value = 0.35
+      env.connect(leak).connect(this.keys)
+      const lfo = this.ctx.createOscillator()
+      const depth = this.ctx.createGain()
+      lfo.frequency.value = (g.bpm / 60) * (g.wobble ?? 2) * (variant ? 2 : 1)
+      depth.gain.value = 480
+      lfo.connect(depth).connect(lp.frequency)
+      lfo.start(b)
+      lfo.stop(b + dur + 0.05)
+    }
+    for (const x of tone === 'reese' ? [0.993, 1.007] : [1, 1.003]) {
+      const o = this.ctx.createOscillator()
+      o.type = tone === 'wobble' && x !== 1 ? 'square' : 'sawtooth'
+      o.frequency.value = f * x
+      o.connect(lp)
+      o.start(b)
+      o.stop(b + dur + 0.05)
+    }
+  }
+
+  // One note of the hook. Supersaw: a wide stack of detuned saws. Pluck: a
+  // quick bright note that dies away. Square: a hollow chiptune-ish tone.
+  // Bell: a kalimba-like ping. Brass: saws whose filter swells open. Marimba:
+  // a woody struck tone. Vox: a chopped-up vocal "ah".
+  private lead(t: number, f: number, dur: number, tone: LeadTone, gain: number, bright: number) {
+    const lp = this.filter('lowpass', 400 + 3600 * bright * bright, this.keys, tone === 'pluck' ? 2 : 0.8)
+    const g = this.ctx.createGain()
+    g.connect(lp)
+    const peak = { supersaw: 0.03, pluck: 0.085, square: 0.03, bell: 0.06, brass: 0.04, marimba: 0.08, vox: 0.2 }[tone] * gain
+    const ring = tone === 'bell' ? 0.6 : tone === 'pluck' || tone === 'vox' ? 0.25 : tone === 'marimba' ? 0.35 : 0.07
+    g.gain.setValueAtTime(0.0001, t)
+    g.gain.exponentialRampToValueAtTime(peak, t + (tone === 'brass' ? 0.03 : 0.005))
+    if (tone === 'bell' || tone === 'pluck' || tone === 'marimba') g.gain.exponentialRampToValueAtTime(0.0001, t + Math.min(dur, 0.12) + ring)
+    else {
+      g.gain.setValueAtTime(peak, t + dur)
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur + ring)
+    }
+    if (tone === 'pluck' || tone === 'brass') {
+      const top = lp.frequency.value
+      lp.frequency.setValueAtTime(tone === 'pluck' ? top : top * 0.25, t)
+      lp.frequency.exponentialRampToValueAtTime(tone === 'pluck' ? Math.max(300, top * 0.15) : top, t + (tone === 'pluck' ? 0.16 : 0.07))
+    }
+    // A vocal chop: a buzzy voice through the two resonances of a vowel
+    // ("ah", "oh" or "eh", picked by the note), cut short.
+    let into: AudioNode = g
+    if (tone === 'vox') {
+      const [f1, f2] = [[730, 1090], [570, 840], [530, 1840]][Math.round(f) % 3]
+      into = this.ctx.createGain()
+      for (const [fq, amp] of [[f1, 1], [f2, 0.6]]) {
+        const a = this.ctx.createGain()
+        a.gain.value = amp
+        into.connect(this.filter('bandpass', fq, a, 6))
+        a.connect(g)
+      }
+    }
+    const parts: [OscillatorType, number, number][] =
+      tone === 'vox' ? [['sawtooth', 1, 1], ['sawtooth', 1.006, 1]]
+      : tone === 'marimba' ? [['sine', 1, 1], ['sine', 4, 0.25], ['sine', 9.2, 0.08]]
+      : tone === 'supersaw' ? [['sawtooth', 0.99, 1], ['sawtooth', 1, 1], ['sawtooth', 1.01, 1]]
+      : tone === 'pluck' ? [['sawtooth', 1, 0.7], ['triangle', 1, 1]]
+      : tone === 'square' ? [['square', 1, 1], ['square', 0.5, 0.4]]
+      : tone === 'bell' ? [['sine', 1, 1], ['sine', 2.76, 0.35], ['sine', 5.4, 0.12]]
+      : [['sawtooth', 0.996, 1], ['sawtooth', 1.004, 1]]
+    for (const [type, x, amp] of parts) {
+      const o = this.ctx.createOscillator()
+      o.type = type
+      o.frequency.value = f * x
+      if (amp === 1) o.connect(into)
+      else {
+        const a = this.ctx.createGain()
+        a.gain.value = amp
+        // A bell's or marimba's upper partials die away first.
+        if (tone === 'bell' || tone === 'marimba') {
+          a.gain.setValueAtTime(amp, t)
+          a.gain.exponentialRampToValueAtTime(0.0001, t + (tone === 'marimba' ? 0.04 : 0.12) / x + 0.05)
+        }
+        o.connect(a).connect(into)
+      }
+      o.start(t)
+      o.stop(t + dur + ring + 0.05)
+    }
+  }
+
+  // A hand drum: a quick pitched slap, high or low.
+  private conga(t: number, high: boolean, vol: number) {
+    const f = high ? 360 : 230
+    this.blip(t, high ? 0.14 : 0.2, 0.09 * vol, null, (o) => {
+      o.frequency.setValueAtTime(f * 1.25, t)
+      o.frequency.exponentialRampToValueAtTime(f, t + 0.03)
+    }, () => this.keys)
+  }
+
+  // What plays on the backbeat: a hand clap, a snare (a crack of noise over a
+  // drum body) or a rim click.
+  private snare(t: number, tone: 'clap' | 'snare' | 'rim', vol: number) {
+    if (tone === 'clap') return this.clap(t, vol)
+    if (tone === 'rim') {
+      this.blip(t, 0.05, 0.05 * vol, null, (o) => {
+        o.type = 'triangle'
+        o.frequency.value = 520
+      }, () => this.keys)
+      this.noiseHit(t, 0.03, 0.05 * vol, this.filter('bandpass', 2500, this.hats, 1.5))
+      return
+    }
+    this.blip(t, 0.13, 0.12 * vol, null, (o) => {
+      o.type = 'triangle'
+      o.frequency.setValueAtTime(230, t)
+      o.frequency.exponentialRampToValueAtTime(175, t + 0.06)
+    }, () => this.wall)
+    this.noiseHit(t, 0.18, 0.12 * vol, this.filter('bandpass', 1500, this.wall, 0.8))
+    this.noiseHit(t, 0.14, 0.05 * vol, this.filter('highpass', 3500, this.hats))
   }
 
   // A rising whoosh into the drop: noise through a band that climbs, one beat at a time.
@@ -564,17 +759,24 @@ export class Soundscape {
 
   // A chord stab. Organ: soft detuned saws, short and plucky. Piano: bright
   // struck tones that ring out. Chop: a tight funky hit through a filter that
-  // the groove sweeps open and shut.
+  // the groove sweeps open and shut. Pad: soft saws held under the whole bar.
   private stab(t: number, notes: number[], dur: number, tone: Tone, gain: number, sweep: number) {
     const g = this.ctx.createGain()
     let dest: AudioNode = this.keys
-    if (sweep < 1) dest = this.filter('lowpass', 300 + 2600 * sweep * sweep, this.keys, tone === 'chop' ? 3 : 1)
+    if (tone === 'pad') dest = this.filter('lowpass', 500 + 1300 * sweep, this.keys)
+    else if (sweep < 1) dest = this.filter('lowpass', 300 + 2600 * sweep * sweep, this.keys, tone === 'chop' ? 3 : 1)
     g.connect(dest)
-    const peak = (tone === 'piano' ? 0.06 : tone === 'chop' ? 0.06 : 0.05) * gain
-    const ring = tone === 'piano' ? 0.5 : tone === 'chop' ? 0.04 : 0.12
+    const peak = (tone === 'piano' ? 0.06 : tone === 'chop' ? 0.06 : tone === 'pad' ? 0.022 : 0.05) * gain
+    const ring = tone === 'piano' ? 0.5 : tone === 'chop' ? 0.04 : tone === 'pad' ? 0.5 : 0.12
     g.gain.setValueAtTime(0.0001, t)
-    g.gain.exponentialRampToValueAtTime(peak, t + (tone === 'piano' ? 0.004 : 0.008))
-    g.gain.exponentialRampToValueAtTime(peak * (tone === 'piano' ? 0.3 : 0.44), t + dur * 0.5)
+    if (tone === 'pad') {
+      // A pad swells in and holds the whole bar.
+      g.gain.exponentialRampToValueAtTime(peak, t + Math.min(0.25, dur / 3))
+      g.gain.setValueAtTime(peak, t + dur)
+    } else {
+      g.gain.exponentialRampToValueAtTime(peak, t + (tone === 'piano' ? 0.004 : 0.008))
+      g.gain.exponentialRampToValueAtTime(peak * (tone === 'piano' ? 0.3 : 0.44), t + dur * 0.5)
+    }
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur + ring)
     for (const f of notes) {
       const parts: [OscillatorType, number, number][] =

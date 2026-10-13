@@ -8,7 +8,8 @@ import { Color, Material, ShaderChunk, Vector2, type WebGLProgramParametersWithU
 // the same way at no extra draw cost. uHF = 0 turns it off (races, clear days).
 export const fogUniforms = {
   uHF: { value: 0 }, // strength 0..1
-  uHFMax: { value: 0.5 }, // the thickest it gets: the town always shows through
+  uHFMax: { value: 0.38 }, // the thickest it gets: the town always shows through
+  uHFDetail: { value: 1 }, // 0 skips the second layer of noise (phones)
   uHFHeight: { value: 1.5 }, // how fast it thins with height (world units)
   uHFFloor: { value: 0 }, // solid up to here, thinning above
   uHFDensity: { value: 1 },
@@ -54,6 +55,7 @@ ShaderChunk.fog_pars_fragment = /* glsl */ `
   #endif
   uniform float uHF;
   uniform float uHFMax;
+  uniform float uHFDetail;
   uniform float uHFHeight;
   uniform float uHFFloor;
   uniform float uHFDensity;
@@ -83,7 +85,15 @@ ShaderChunk.fog_fragment = /* glsl */ `
     // The eye's ray to this pixel, from wherever it enters the air above.
     vec3 hfRay = isOrthographic ? ( vec3( 0.0, 0.0, - 1.0 ) * mat3( viewMatrix ) ) * 300.0 : vFogPos - cameraPosition;
     vec2 hfQ = vFogPos.xz * uHFScale + uHFDrift;
-    float hfN = hfNoise( hfQ ) * 0.62 + hfNoise( hfQ * 2.3 + vec2( 5.2, 1.3 ) - uHFDrift * 0.7 ) * 0.38;
+    float hfN = hfNoise( hfQ );
+    if ( uHFDetail > 0.5 ) hfN = hfN * 0.62 + hfNoise( hfQ * 2.3 + vec2( 5.2, 1.3 ) - uHFDrift * 0.7 ) * 0.38;
+    // The banks are sampled where the ray lands, which only holds while the ray
+    // crosses a short stretch of fog (looking down on the town). A long ray at
+    // street level (free view) passes through many banks, so they average out:
+    // otherwise neighbouring trees and walls come out in jagged light and dark shards.
+    float hfLen = length( hfRay );
+    float hfIn = min( hfLen, uHFHeight * 3.0 / max( abs( hfRay.y ) / hfLen, 0.02 ) );
+    hfN = mix( 0.5, hfN, clamp( 12.0 / hfIn, 0.0, 1.0 ) );
     // Banks: thicker and taller where the noise is high, thin gaps where it's low.
     float hfBank = mix( 1.0, smoothstep( 0.3, 0.7, hfN ) * 2.0, uHFPatch );
     float hfH = uHFHeight * ( 0.7 + 0.6 * hfN );
@@ -94,8 +104,11 @@ ShaderChunk.fog_fragment = /* glsl */ `
     float hfE1 = exp( - hfY1 / hfH );
     float hfDy = hfY1 - hfY0;
     // Fog thinning exponentially with height, summed along the ray.
-    float hfTau = uHFDensity * hfBank * length( hfRay ) * ( abs( hfDy ) > 0.05 ? hfH * ( hfE0 - hfE1 ) / hfDy : hfE0 );
+    float hfTau = uHFDensity * hfBank * hfLen * ( abs( hfDy ) > 0.05 ? hfH * ( hfE0 - hfE1 ) / hfDy : hfE0 );
     float hfF = ( 1.0 - exp( - hfTau ) ) * uHFMax * uHF;
+    // Up close in the free view the air is clear: fog only gathers with distance,
+    // so a street-level shot isn't behind a flat veil.
+    if ( ! isOrthographic ) hfF *= smoothstep( 6.0, 60.0, hfLen );
     // Lit windows and lamps glow through it at night.
     float hfLum = max( gl_FragColor.r, max( gl_FragColor.g, gl_FragColor.b ) );
     hfF *= 1.0 - uHFGlow * smoothstep( 0.5, 0.95, hfLum );

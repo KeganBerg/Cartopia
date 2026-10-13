@@ -182,8 +182,12 @@ export function ShellBuilding({ m, win, bulb, ghost, lvl, w, d, h0, z0 = -0.15, 
             <planeGeometry args={[0.38, 0.6]} />
             {m('#4e342e')}
           </mesh>
+          {/* The door's glass, its push bar and a kick plate. */}
+          <mesh position={[0, 0.45, zf + 0.034]}><planeGeometry args={[0.26, 0.24]} />{win}</mesh>
+          <Box m={m} at={[0, 0.3, zf + 0.04]} s={[0.28, 0.018, 0.014]} c="#cfd8dc" shadow={false} />
+          <mesh position={[0, 0.14, zf + 0.034]}><planeGeometry args={[0.36, 0.08]} />{m('#b0bec5')}</mesh>
           <Box m={m} at={[0, 0.82, zf + 0.2]} rot={[0.45, 0, 0]} s={[w * 0.92, 0.03, 0.44]} c="#ffffff" t={awningTex(shopfront)} />
-          <Box m={m} at={[0, 0.033, zf + 0.12]} s={[0.6, 0.066, 0.22]} c="#cfd8dc" shadow={false} />
+          <Box m={m} at={[0, 0.05, zf + 0.12]} s={[0.6, 0.1, 0.22]} c="#cfd8dc" />
           {[-0.34, 0.34].map((x) => (
             <mesh key={x} position={[x, 0.7, zf + 0.05]}>
               <boxGeometry args={[0.08, 0.1, 0.08]} />
@@ -251,6 +255,16 @@ export function Parasol({ m, at, c }: { m: Mat; at: V3; c: string }) {
         <coneGeometry args={[0.32, 0.16, 8]} />
         {m('#ffffff', awningTex(c))}
       </mesh>
+      {/* Two bistro chairs pulled up to the table. */}
+      {[-1, 1].map((sd) => (
+        <group key={sd} position={[sd * 0.24, 0, 0]} rotation-y={(sd * Math.PI) / 2}>
+          <Box m={m} at={[0, 0.13, 0]} s={[0.12, 0.016, 0.11]} c="#37474f" />
+          <Box m={m} at={[0, 0.21, -0.056]} s={[0.12, 0.13, 0.012]} c="#37474f" />
+          {[[-0.05, -0.045], [0.05, -0.045], [-0.05, 0.045], [0.05, 0.045]].map(([lx, lz]) => (
+            <Cyl key={`${lx}${lz}`} m={m} at={[lx, 0.061, lz]} r={0.008} h={0.122} c="#263238" seg={5} />
+          ))}
+        </group>
+      ))}
     </group>
   )
 }
@@ -536,6 +550,13 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
             {win}
           </mesh>
           <mesh position={[1.1, 0.25, 0.358]}><planeGeometry args={[0.3, 0.46]} />{m('#37474f')}</mesh>
+          {/* Office door: frame, a glass slot and a handle. */}
+          <Box m={m} at={[1.1, 0.48, 0.358]} s={[0.36, 0.03, 0.012]} c="#eceff1" shadow={false} />
+          {[-0.165, 0.165].map((dx) => <Box key={dx} m={m} at={[1.1 + dx, 0.24, 0.358]} s={[0.03, 0.48, 0.012]} c="#eceff1" shadow={false} />)}
+          <mesh position={[1.1, 0.36, 0.36]}><planeGeometry args={[0.16, 0.12]} />{win}</mesh>
+          <Box m={m} at={[1.2, 0.24, 0.368]} s={[0.018, 0.06, 0.014]} c="#cfd8dc" shadow={false} />
+          {/* Lift handles along the foot of each roller door. */}
+          {[-1.15, -0.05].map((x) => <Box key={x} m={m} at={[x, 0.09, 0.366]} s={[0.16, 0.022, 0.016]} c="#78909c" shadow={false} />)}
           {/* Paint splats down the side wall. */}
           {!ghost && [[-1.5, 1.05, '#e53935', 0.16], [-1.3, 0.85, '#1e88e5', 0.12], [-1.62, 0.72, '#fdd835', 0.1], [1.45, 1.1, '#43a047', 0.13]].map(([x, y, c, r], i) => (
             <mesh key={c as string} position={[x as number, y as number, 0.358 + i * 0.002]}>

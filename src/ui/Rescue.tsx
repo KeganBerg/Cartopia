@@ -1,9 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Canvas } from '@react-three/fiber'
-import { NeutralToneMapping } from 'three'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { StageSlot, useStageReady } from '../scene/Stage'
 import { useGame, hasRusty, type Loot } from '../game/store'
 import { RESCUE_SPOTS, RARITY, STORAGE_MAX, carDef, performance, restoreCost, rushBucks, type Rarity } from '../game/data'
 import { useNow } from '../scene/useNow'
+import { dayPhase, nightAmount } from '../game/clock'
+import { CoinIcon } from './Icon'
 import { CarPreview } from '../scene/CarPreview'
 import { Panel, SheetTabs, SkillTag } from './Menus'
 import { CarThumb } from '../scene/BuildingPreview'
@@ -152,37 +153,67 @@ function Lot({ onFind }: { onFind: () => void }) {
   )
 }
 
-// Theme colours for each lot's tile, matching the 3D search lots.
-const SPOT_TINT: Record<string, string> = { suburbs: '#7cc36b', farm: '#e0b04a', downtown: '#7f93a8', desert: '#e3965a', track: '#e25b4f' }
+// Models the player has (in the garage, on Rusty's lot or up on the lift):
+// a spot's card shows those restored and ticked, the rest still rusty.
+function useHave() {
+  const cars = useGame((s) => s.cars)
+  const junk = useGame((s) => s.junkyard)
+  const lift = useGame((s) => s.restoring?.model)
+  return useMemo(() => new Set([...cars.map((c) => c.model), ...junk.map((c) => c.model), ...(lift ? [lift] : [])]), [cars, junk, lift])
+}
+
+const ALL_FINDS = [...new Set(RESCUE_SPOTS.flatMap((sp) => sp.cars.map((c) => c.model)))]
+
+// Each lot's postcard is a render of its real search scene (scripts/rescue/spotart.mjs),
+// at night when the town is dark.
+const spotArt = (id: string, night: boolean) => `/rescue/${id}-${night ? 'night' : 'day'}.webp`
 
 function SpotList() {
   const level = useGame((s) => s.level)
   const coins = useGame((s) => s.coins)
   const full = useGame((s) => s.junkyard.length >= STORAGE_MAX)
   const start = useGame((s) => s.startSearch)
+  const have = useHave()
+  const [night] = useState(() => nightAmount(dayPhase()) > 0.5)
+  const got = ALL_FINDS.filter((m) => have.has(m)).length
   return (
-    <div className="cards rows spot-rows">
-      {RESCUE_SPOTS.map((sp) => {
-        const locked = level < sp.unlockLevel
-        // Best finds first: the rare cars, then a scarce one.
-        const best = [...sp.cars].sort((a, b) => RARITY_ORDER[b.rarity] - RARITY_ORDER[a.rarity]).slice(0, 3)
-        return (
-          <button key={sp.id} className={`card spot-card ${locked ? 'locked' : ''} ${!locked && coins < sp.cost ? 'broke' : ''}`} onClick={() => start(sp.id)} disabled={full && !locked} style={{ '--spot': SPOT_TINT[sp.id] ?? '#90a4ae' } as React.CSSProperties}>
-            <span className="spot-icon">{sp.icon}</span>
-            <div className="card-text">
-              <div className="card-name">{sp.name}</div>
-              <div className="spot-finds">
-                {best.map((c) => {
+    <>
+      <div className="rsc-dex" title="Cars from Rusty's lots in your collection">
+        <span className="rsc-dex-ico">🔧</span>
+        <span className="rsc-dex-bar"><i style={{ width: `${(got / ALL_FINDS.length) * 100}%` }} /></span>
+        <b>{got}/{ALL_FINDS.length}</b>
+      </div>
+      <div className="rsc-spots">
+        {RESCUE_SPOTS.map((sp) => {
+          const locked = level < sp.unlockLevel
+          const n = sp.cars.filter((c) => have.has(c.model)).length
+          const done = n === sp.cars.length
+          return (
+            <button key={sp.id} className={`rsc-spot${locked ? ' locked' : ''}${!locked && coins < sp.cost ? ' broke' : ''}`} onClick={() => start(sp.id)} disabled={full && !locked}>
+              <span className="rsc-art" style={{ backgroundImage: `url(${spotArt(sp.id, night)})` }}>
+                <span className="rsc-name">{sp.icon} {sp.name}</span>
+                {!locked && <span className={done ? 'rsc-got done' : 'rsc-got'}>{done ? '👑' : '✔'} {n}/{sp.cars.length}</span>}
+                {locked
+                  ? <span className="rsc-go lock">🔒 Lv {sp.unlockLevel}</span>
+                  : <span className="rsc-go"><CoinIcon size={18} />{sp.cost.toLocaleString()}</span>}
+              </span>
+              <span className="rsc-cars">
+                {sp.cars.map((c) => {
                   const d = carDef(c.model)
-                  return <span key={c.model} className={`spot-find rr-${c.rarity}`} title={`${d.name} (${RARITY[c.rarity].name})`}><CarThumb size="xs" body={d.body} model={d.id} color={d.colors[0]} /></span>
+                  const own = have.has(c.model)
+                  return (
+                    <span key={c.model} className={`rsc-car rr-${c.rarity}${own ? ' have' : ''}`} title={`${d.name} (${RARITY[c.rarity].name})`}>
+                      <CarThumb size="xs" body={d.body} model={d.id} color={d.colors[0]} rusty={!own} />
+                      {own && <i>✔</i>}
+                    </span>
+                  )
                 })}
-              </div>
-            </div>
-            {locked ? <span className="price">🔒 Lv {sp.unlockLevel}</span> : <span className="price"><span className="ico coin-ico rs-ico">$</span>{sp.cost.toLocaleString()}</span>}
-          </button>
-        )
-      })}
-    </div>
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </>
   )
 }
 
@@ -273,6 +304,8 @@ function Fly({ loot, from, to, onLand }: { loot: Loot; from: ScreenAt; to: () =>
   )
 }
 
+const RESCUE_CAM = { position: [0, 14, 12] as [number, number, number], fov: 42, near: 0.5, far: 200 }
+
 // The search, full screen: Rusty's tow truck drives a 3D lot (RescueScene)
 // and the controls float over it, like a race.
 function SearchScreen({ onHaul }: { onHaul: (items: Loot[]) => void }) {
@@ -330,26 +363,31 @@ function SearchScreen({ onHaul }: { onHaul: (items: Loot[]) => void }) {
     return () => clearTimeout(id)
   }, [found])
 
+  // The lot draws in the shared race canvas (scene/Stage.tsx), like the Crate Depot:
+  // a canvas of its own meant a new WebGL context and every shader compiled per visit.
+  // The scene is memoised, so the found pop-ups and flying finds don't re-render it.
+  const cb = useRef({ onFound, onLeft: () => {} })
+  cb.current = {
+    onFound,
+    onLeft: () => {
+      onHaul(q.pins.filter((l, i) => q.revealed[i] && l.kind !== 'nothing'))
+      home()
+    },
+  }
+  const sceneFound = useCallback((i: number, at: ScreenAt) => cb.current.onFound(i, at), [])
+  const sceneLeft = useCallback(() => cb.current.onLeft(), [])
+  const scene = useMemo(
+    () => <RescueScene search={q} fast={auto} auto={auto} leaving={leaving} onArrive={reveal} onFound={sceneFound} onLeft={sceneLeft} onBusy={setBusy} />,
+    [q, auto, leaving, reveal, sceneFound, sceneLeft],
+  )
+  const stageReady = useStageReady()
+
   const pop = found ? q.pins[found.i] : null
   const popLabel = pop ? lootLabel(pop) : null
   return (
     <div className="race-full rescue-full">
-      <Canvas className="rf-canvas" camera={{ position: [0, 14, 12], fov: 42, near: 0.5, far: 200 }} dpr={[1, 1.5]} gl={{ toneMapping: NeutralToneMapping }}>
-        <RescueScene
-          search={q}
-          fast={auto}
-          auto={auto}
-          leaving={leaving}
-          onArrive={reveal}
-          onFound={onFound}
-          onLeft={() => {
-            onHaul(q.pins.filter((l, i) => q.revealed[i] && l.kind !== 'nothing'))
-            home()
-          }}
-          onBusy={setBusy}
-        />
-      </Canvas>
-      <LoadingScene label={`Heading to ${spot.name}`} onClose={() => openPanel(null)} />
+      <StageSlot cam={RESCUE_CAM}>{scene}</StageSlot>
+      <LoadingScene ready={stageReady} label={`Heading to ${spot.name}`} onClose={() => openPanel(null)} />
       <div className="rf-top">
         <h2>{spot.icon} {spot.name}</h2>
         <button className="close" onClick={() => openPanel(null)} aria-label="Close">✕</button>

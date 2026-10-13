@@ -10,6 +10,7 @@ const size = form === 'phone' ? { width: 390, height: 844 } : { width: 1280, hei
 const b = await chromium.launch({ executablePath: process.env.CHROME ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] })
 const p = await b.newPage({ viewport: size, deviceScaleFactor: form === 'phone' ? 2 : 1 })
 p.on('pageerror', (e) => console.log('error', e.message))
+await p.addInitScript(() => { localStorage.setItem('cartopia-flash-warning-hide', '1'); localStorage.setItem('cartopia-calm-flash', 'off') })
 await p.goto(`http://localhost:5173/?time=${night ? 0.5 : 0.08}&season=summer&weather=${process.env.WEATHER ?? "clear"}`)
 await p.waitForFunction(() => window.__game, null, { timeout: 90000 })
 await p.waitForTimeout(3000)

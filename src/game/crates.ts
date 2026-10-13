@@ -165,7 +165,9 @@ export type CrateDrop =
   // A resto-mod piece (0-3); the fourth one comes with the built car's uid and colour.
   | { kind: 'piece'; model: string; piece: number; uid?: string; color?: string }
   | { kind: 'piecedupe'; model: string; piece: number; coins: number }
-export type CrateOpen = { seq?: number; crate: CrateId; cost: { coins: number; bucks: number }; drop: CrateDrop }
+// `crate` is the crate opened, or another reward that hands out crate drops (the daily wheel,
+// a resto-mod piece from Rusty's Old Race Track).
+export type CrateOpen = { seq?: number; crate: CrateId | 'wheel' | 'rusty_track'; cost: { coins: number; bucks: number }; drop: CrateDrop }
 
 const newUid = (rand: () => number) => 'k' + Array.from({ length: 14 }, () => Math.floor(rand() * 36).toString(36)).join('')
 
