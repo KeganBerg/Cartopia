@@ -1,12 +1,16 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useGame, readyRewards, today, buildPrice, paintPrice } from './store'
+import { boostsSpent } from './boosts'
 import { CAMPAIGN, CAMPAIGN_RACES, DEALS, DEAL_SLOTS, buildingDef, campaignReward, carDef, dealOffer, dealsFor, finishDef, modDef, upgradeCost, xpToNext } from './data'
 
 describe('level-up bonuses', () => {
   it('add on top of a race reward instead of replacing it', () => {
-    useGame.setState({ level: 1, xp: xpToNext(1) - 1, coins: 1000, bucks: 10, levelUp: null })
+    // A Monday with today's bonuses used, so the race pays its plain prize.
+    vi.spyOn(Date, 'now').mockReturnValue(Date.UTC(2026, 9, 12, 12))
+    useGame.setState({ level: 1, xp: xpToNext(1) - 1, coins: 1000, bucks: 10, levelUp: null, boosts: boostsSpent(Date.UTC(2026, 9, 12, 12)) })
     useGame.getState().finishRace(true, 500)
+    vi.restoreAllMocks()
     const s = useGame.getState()
     expect(s.level).toBe(2)
     expect(s.coins).toBe(1000 + 500 + 200)
@@ -88,7 +92,11 @@ describe('welcome back report', () => {
 
 describe('campaign', () => {
   const g = () => useGame.getState()
-  const start = () => useGame.setState({ level: 20, xp: 0, coins: 0, bucks: 0, trophies: 0, campaign: {}, campaignPrize: null, levelUp: null })
+  // On a weekday, with today's first-win bonus already taken, so payouts are the plain rewards.
+  const MON = Date.UTC(2026, 9, 12, 12)
+  beforeEach(() => void vi.spyOn(Date, 'now').mockReturnValue(MON))
+  afterEach(() => vi.restoreAllMocks())
+  const start = () => useGame.setState({ level: 20, xp: 0, coins: 0, bucks: 0, trophies: 0, campaign: {}, campaignPrize: null, levelUp: null, boosts: boostsSpent(MON) })
 
   it('pays the full reward for a first win and less for a replay', () => {
     start()
@@ -96,6 +104,7 @@ describe('campaign', () => {
     expect(g().campaignResult('c1', 0, 9, 9.2)).toBe(1)
     expect(g().coins).toBe(first)
     expect(g().campaign['c1-0']).toBe(1)
+    useGame.setState((s) => ({ boosts: s.boosts && { ...s.boosts, streak: 0 } })) // no win-streak bonus on the payout checked
     g().campaignResult('c1', 0, 9, 10)
     expect(g().coins).toBe(first + campaignReward(CAMPAIGN[0], 0, false))
     expect(g().campaign['c1-0']).toBe(3)
@@ -245,6 +254,29 @@ describe('daily deals', () => {
     useGame.setState({ level: 20, coins: 50000, bucks: 20, fuel: 0, deals: { day: '2000-01-01', used: [supplies.id] } })
     expect(g().buyDeal(supplies.id)).toBe(true)
     expect(g().deals).toEqual({ day: today(), used: [supplies.id] })
+  })
+})
+
+describe('tutorial paint pick', () => {
+  const car = () => ({ uid: 't1', model: 'pip', color: '#e53935', upgrades: { engine: 0, turbo: 0, tires: 0, weight: 0 } })
+
+  it('paints the body and rims in starter colours for free, once, during the tutorial', () => {
+    useGame.setState({ tutorial: 6, coins: 100, bucks: 0, xp: 0, cars: [car()] })
+    const stats = useGame.getState().stats
+    expect(useGame.getState().tutorialStyle('t1', '#1e88e5', '#212121')).toBe(true)
+    const s = useGame.getState()
+    expect(s.cars[0].color).toBe('#1e88e5')
+    expect(s.cars[0].panels).toEqual({ rims: { color: '#212121' } })
+    expect([s.coins, s.bucks, s.xp, s.stats]).toEqual([100, 0, 0, stats])
+  })
+
+  it('refuses locked colours and finished tutorials', () => {
+    useGame.setState({ tutorial: 6, cars: [car()] })
+    expect(useGame.getState().tutorialStyle('t1', '#ffd700', '#212121')).toBe(false)
+    expect(useGame.getState().tutorialStyle('t1', '#1e88e5', '#8e24aa')).toBe(false)
+    useGame.setState({ tutorial: 99 })
+    expect(useGame.getState().tutorialStyle('t1', '#1e88e5', '#212121')).toBe(false)
+    expect(useGame.getState().cars[0].color).toBe('#e53935')
   })
 })
 

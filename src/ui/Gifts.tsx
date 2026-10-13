@@ -6,6 +6,8 @@ import { signedInUser } from '../lib/cloud'
 import { useGifts, refreshGifts, claimGifts, sendGift, noteTotals, GIFTS, type GiftItem, type Note } from '../lib/gifts'
 import { Panel } from './Menus'
 import { PlayerName } from './Username'
+import { refreshPostcards, usePostcards } from '../lib/postcards'
+import { PostcardList, unseenPostcards } from './Postcards'
 
 const REFRESH_MS = 120_000
 
@@ -20,6 +22,7 @@ export function GiftWatcher() {
       if (!signedInUser()) return
       ready = true
       refreshGifts().catch(() => {})
+      refreshPostcards().catch(() => {})
     }
     // Sign-in sync finishes a moment after load; check until it has.
     const wait = setInterval(() => !ready && tick(), 2000)
@@ -48,7 +51,8 @@ export function GiftWatcher() {
 }
 
 export function GiftBell() {
-  const count = useGifts((g) => g.inbox.length)
+  const cards = usePostcards((p) => unseenPostcards(p.inbox, p.seen))
+  const count = useGifts((g) => g.inbox.length) + cards
   const visiting = useGame((s) => !!s.visiting)
   const openPanel = useGame((s) => s.openPanel)
   if (!count || visiting) return null
@@ -65,6 +69,7 @@ function noteText(n: Note) {
 
 export function GiftsPanel() {
   const inbox = useGifts((g) => g.inbox)
+  const cards = usePostcards((p) => p.inbox.length)
   const [busy, setBusy] = useState(false)
   const openPanel = useGame((s) => s.openPanel)
   const t = noteTotals(inbox)
@@ -80,7 +85,8 @@ export function GiftsPanel() {
   }
   return (
     <Panel title="Friends helped you!">
-      {inbox.length === 0 ? (
+      <PostcardList />
+      {inbox.length === 0 ? (cards ? null : 
         <p className="hint" title="Friend helps and gifts show up here">🎁 Nothing waiting</p>
       ) : (
         <>

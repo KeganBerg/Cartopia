@@ -3,6 +3,7 @@
 // output, so the Sound toggle silences it all. Other audio (the town ambience,
 // race engines) gets both from audioContext() and audioOut().
 import { choir, glock, hz, marimba, pluck, shaker, softKick, vibes, woodblock } from './instruments'
+import type { Body } from '../game/data'
 
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
@@ -191,6 +192,25 @@ function horn(d: { ctx: BaseAudioContext; out: AudioNode }, t: number) {
   }
 }
 
+// The ice cream truck's horn: the opening of Greensleeves (an old folk tune ice cream vans
+// play) on a music box, a soft pluck an octave down so phone speakers carry it. About 1.5 s.
+export function iceCreamJingle(d: { ctx: BaseAudioContext; out: AudioNode }, t: number, vol = 1) {
+  const beat = 0.16
+  const tune: [string, number][] = [['A5', 1], ['C6', 2], ['D6', 1], ['E6', 1.5], ['F6', 0.5], ['E6', 1], ['D6', 2], ['B5', 1]]
+  let at = t
+  for (const [n, len] of tune) {
+    const f = hz(n)
+    glock(d, at, f, 0.06 * vol, 0.45 + len * 0.15)
+    glock(d, at + 0.004, f * 2, 0.012 * vol, 0.25)
+    pluck(d, at, f / 2, 0.05 * vol)
+    at += len * beat
+  }
+}
+
+// Bodies whose horn plays a tune instead of a honk.
+const JINGLE_BODIES: readonly Body[] = ['icecream']
+export const hornJingles = (body?: Body | null) => !!body && JINGLE_BODIES.includes(body)
+
 // The mid-range body of a thud: phone speakers can't play a kick drum's low
 // thump, so anything that lands or bumps gets this knock on top to be heard.
 export function knock(d: { ctx: BaseAudioContext; out: AudioNode }, t: number, freq = 420, vol = 0.1) {
@@ -252,7 +272,8 @@ export const sfx = {
     arp(['G4', 'B4', 'D5'], 0.06, marimba, 0.11)(d, t)
     glock(d, t + 0.18, hz('G5'), 0.05, 0.8)
   }),
-  horn: () => play(horn),
+  // A car's horn: the ice cream truck plays its jingle instead.
+  horn: (body?: Body | null) => play(hornJingles(body) ? iceCreamJingle : horn),
   // A soft chime on a clean shift; the race engine plays the gear change itself.
   shift: (good: boolean) => {
     if (good) play((d, t) => glock(d, t, hz('G6'), 0.03, 0.4))

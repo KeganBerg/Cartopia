@@ -12,6 +12,7 @@ import type { Look } from './look'
 import { isFree } from './freeCam'
 import { calmFlashing } from '../game/flashing'
 import { sky } from './skyFx'
+import { useLite } from '../lib/prefs'
 
 
 // Rain, snow, splashes, lightning and fog. Everything that falls is one
@@ -375,10 +376,12 @@ function TownFog() {
 }
 
 const ground = groundUniforms
-const SIZES: Record<'small' | 'big' | 'race', Sizes> = {
+const SIZES: Record<'small' | 'big' | 'race' | 'raceLite', Sizes> = {
   small: { rain: 1400, splash: 260, snow: 1100 },
   big: { rain: 2800, splash: 520, snow: 2200 },
   race: { rain: 1600, splash: 160, snow: 1300 },
+  // A race on Saver graphics.
+  raceLite: { rain: 800, splash: 80, snow: 650 },
 }
 
 // The town's weather.
@@ -402,6 +405,7 @@ export function Weather({ small }: { small: boolean }) {
 // `night` is the race's darkness (a midnight race forces it; otherwise the clock's).
 export function RaceWeather({ w, look, night: dark }: { w: WeatherState; look: Look; night?: number }) {
   const nightOf = () => dark ?? nightAmount(dayPhase())
+  const lite = useLite()
   const scene = useThree((s) => s.scene)
   const camera = useThree((s) => s.camera)
   const base = useRef<{ near: number; far: number; color: Color; exposure: number } | null>(null)
@@ -446,7 +450,7 @@ export function RaceWeather({ w, look, night: dark }: { w: WeatherState; look: L
           <sphereGeometry args={[88, 24, 8, 0, Math.PI * 2, 0.9, Math.PI / 2 - 0.75]} />
         </mesh>
       )}
-      <Precip sizes={SIZES.race} race get={get} />
+      <Precip sizes={lite ? SIZES.raceLite : SIZES.race} race get={get} />
       <Lightning race get={get} />
     </>
   )

@@ -2,10 +2,11 @@
 // coins, a part for one of your cars, a car, or a body or part skin. Every car and part has one
 // home crate, picked by what it's worth (see homeCrate), so dearer crates hold dearer cars and
 // parts. Cars only come once your level has unlocked them, so a crate never skips a level gate. A signed-in player's crates are
-// rolled by the server (crate_open() in supabase/migrations/0040_crates.sql, same tables and
+// rolled by the server (crate_open(), newest copy in supabase/migrations/0072_crate_hats.sql, same tables and
 // rules); guests roll here. crates.test.ts keeps the server's tables in step.
 import { CARS, MODS, MOD_SKINS, SKINS, carDef, modDef, modFits, ownedMods, type CarDef, type ModDef, type SkinDef, type SkinTier } from './data'
 import { PIECE_COUNT, PIECE_SOURCES, pieceId, piecePool } from './resto'
+import { crateHats, hatDef } from './hats'
 
 export type CrateId = 'street' | 'garage' | 'gold' | 'diamond'
 // piece: a resto-mod piece (game/resto.ts).
@@ -32,6 +33,9 @@ export type CrateDef = {
   modMax?: number
   // Which skin tiers it can hold (body and part skins alike).
   skins: SkinTier[]
+  // Bad-luck protection: after every - 1 opens in a row without a skin (of `tier`, if set), the
+  // next open is one. The crate shows how many opens are left.
+  pity?: { every: number; tier?: SkinTier }
   // Look of the crate in the depot.
   look: { wood: string; band: string; glow: string }
 }
@@ -50,12 +54,12 @@ export const CRATES: CrateDef[] = [
   {
     id: 'gold', name: 'Gold Crate', pay: 'bucks', unlockLevel: 3, base: 8, perLevel: 0,
     odds: { coins: 33.9, jackpot: 6, mod: 30, car: 20, skin: 10, piece: 0.1 }, carShare: 0.15, coinMult: [0.45, 0.85], jackpotMult: [2, 3],
-    carMax: 130000, modMax: 15000, skins: ['rare', 'epic', 'legendary'], look: { wood: '#d4a017', band: '#7a4b12', glow: '#ffd54f' },
+    carMax: 130000, modMax: 15000, skins: ['rare', 'epic', 'legendary'], pity: { every: 8 }, look: { wood: '#d4a017', band: '#7a4b12', glow: '#ffd54f' },
   },
   {
     id: 'diamond', name: 'Diamond Crate', pay: 'bucks', unlockLevel: 8, base: 25, perLevel: 0,
     odds: { coins: 23.9, jackpot: 6, mod: 24, car: 32, skin: 14, piece: 0.1 }, carShare: 0.2, coinMult: [0.4, 0.8], jackpotMult: [2, 3],
-     skins: ['epic', 'legendary'], look: { wood: '#4fc3f7', band: '#e1f5fe', glow: '#b388ff' },
+     skins: ['epic', 'legendary'], pity: { every: 10, tier: 'legendary' }, look: { wood: '#4fc3f7', band: '#e1f5fe', glow: '#b388ff' },
   },
 ]
 
@@ -122,12 +126,17 @@ export function skinOdds(c: CrateDef): (CrateSkin & { p: number })[] {
 }
 // What a skin you already have turns into, by tier, as a share of the crate's worth.
 export const SKIN_DUPE: Record<SkinTier, number> = { rare: 0.6, epic: 1, legendary: 1.5 }
-// Skins the player already has, body and part (from ownedSkins / ownedModSkins in data.ts).
+// Skins the player already has, body and part (from ownedSkins / ownedModSkins in data.ts), and hats.
 // pieces: resto-mod pieces held ("model:piece"; the server counts its own ledger).
-export type OwnedSkins = { skins: string[]; modSkins: string[]; pieces?: string[] }
+export type OwnedSkins = { skins: string[]; modSkins: string[]; hats?: string[]; pieces?: string[] }
 
 // What a piece you already have turns into, as a share of the crate's worth.
 export const PIECE_DUPE = 1
+
+// Hats (game/hats.ts crateHats): a slice of each crate, out of 100 like CrateOdds, taken from its
+// coin prizes. Only hats the player doesn't have drop; with none left it stays coins. The server
+// rolls the same slice (crateTables() hat and hats).
+export const HAT_ODDS: Record<CrateId, number> = { street: 3, garage: 4, gold: 6, diamond: 8 }
 
 type CarLike = { uid: string; model: string; mods?: string[] | null; ownedMods?: string[] | null }
 
@@ -162,6 +171,7 @@ export type CrateDrop =
   | { kind: 'mod'; car: string; mod: string }
   | { kind: 'skin'; skin: string; part: boolean }
   | { kind: 'skindupe'; skin: string; part: boolean; coins: number }
+  | { kind: 'hat'; hat: string }
   // A resto-mod piece (0-3); the fourth one comes with the built car's uid and colour.
   | { kind: 'piece'; model: string; piece: number; uid?: string; color?: string }
   | { kind: 'piecedupe'; model: string; piece: number; coins: number }
@@ -181,9 +191,16 @@ function pickWeighted<T>(items: T[], weight: (t: T) => number, rand: () => numbe
   return items[items.length - 1]
 }
 
-// Rolls one crate for a player at this level with these cars and skins. A part with nothing left
-// to fit, or a car prize with no cars in reach, becomes a coin prize instead; a car or skin the
-// player already has turns into coins.
+export const skinOf = (id: string, part: boolean) => (part ? MOD_SKINS : SKINS).find((x) => x.id === id)
+
+// Opens left until the pity prize, given how many opens in a row missed it (null: no pity).
+export const pityLeft = (c: CrateDef, dry: number) => (c.pity ? Math.max(1, c.pity.every - dry) : null)
+// Whether a prize counts as the pity prize, which starts the count again.
+export function pityHit(c: CrateDef, d: CrateDrop) {
+  if (!c.pity || (d.kind !== 'skin' && d.kind !== 'skindupe')) return false
+  return !c.pity.tier || skinOf(d.skin, d.part)?.tier === c.pity.tier
+}
+
 // One resto-mod piece: a random piece of a car the level has unlocked and you haven't built.
 // One you hold pays `dupeCoins`; the last missing one builds the car. Null when no car is in
 // reach. Crates roll it for their piece slice; other rewards (Rusty's top zone) can too, and
@@ -207,10 +224,15 @@ export function rollSourcePiece(source: string, level: number, cars: { model: st
   return rollPiece(level, cars, have, rand, src.dupe)
 }
 
-export function rollCrate(c: CrateDef, level: number, cars: CarLike[], rand: () => number = Math.random, owned: OwnedSkins = { skins: [], modSkins: [] }): CrateDrop {
+// Rolls one crate for a player at this level with these cars and skins. A part with nothing left
+// to fit, or a car prize with no cars in reach, becomes a coin prize instead; a car or skin the
+// player already has turns into coins. `dry` opens in a row without the pity prize make the next
+// one it when pityLeft reaches 1.
+export function rollCrate(c: CrateDef, level: number, cars: CarLike[], rand: () => number = Math.random, owned: OwnedSkins = { skins: [], modSkins: [] }, dry = 0): CrateDrop {
   const v = crateValue(c, level)
   const kinds = Object.entries(crateOdds(c, level)) as [keyof CrateOdds, number][]
-  let kind = pickWeighted(kinds, (k) => k[1], rand)[0]
+  const pity = pityLeft(c, dry) === 1
+  let kind = pity ? 'skin' : pickWeighted(kinds, (k) => k[1], rand)[0]
   if (kind === 'mod') {
     const choices = modChoices(c, level, cars)
     if (choices.length) {
@@ -225,7 +247,7 @@ export function rollCrate(c: CrateDef, level: number, cars: CarLike[], rand: () 
     kind = 'coins'
   }
   if (kind === 'skin') {
-    const pool = crateSkins(c)
+    const pool = crateSkins(c).filter((x) => !pity || !c.pity?.tier || x.def.tier === c.pity.tier)
     if (pool.length) {
       const x = pickWeighted(pool, (y) => SKIN_WEIGHT[y.def.tier], rand)
       if ((x.part ? owned.modSkins : owned.skins).includes(x.id)) return { kind: 'skindupe', skin: x.id, part: x.part, coins: roundCoins(v * SKIN_DUPE[x.def.tier]) }
@@ -242,17 +264,22 @@ export function rollCrate(c: CrateDef, level: number, cars: CarLike[], rand: () 
     }
     kind = 'coins'
   }
+  if (kind === 'coins') {
+    const hats = crateHats(c.id).filter((h) => !(owned.hats ?? []).includes(h.id))
+    const coinW = crateOdds(c, level).coins
+    if (hats.length && rand() * coinW < HAT_ODDS[c.id]) return { kind: 'hat', hat: hats[Math.floor(rand() * hats.length)].id }
+  }
   const [lo, hi] = kind === 'jackpot' ? c.jackpotMult : c.coinMult
   return { kind: 'coins', coins: roundCoins(v * (lo + (hi - lo) * rand())), jackpot: kind === 'jackpot' }
 }
 
-export const skinOf = (id: string, part: boolean) => (part ? MOD_SKINS : SKINS).find((x) => x.id === id)
 
 // How exciting a prize is, for the reveal's glow: 0 coins, 1 a jackpot or part, 2 a gem part or a
-// new rare or epic skin, 3 a new car or legendary skin.
+// new rare or epic skin or a hat, 3 a new car, legendary skin or crate-only hat.
 export function dropTier(d: CrateDrop): 0 | 1 | 2 | 3 {
   if (d.kind === 'car') return 3
   if (d.kind === 'piece') return d.uid ? 3 : 2
+  if (d.kind === 'hat') return hatDef(d.hat)?.challenge ? 2 : 3
   if (d.kind === 'skin') return skinOf(d.skin, d.part)?.tier === 'legendary' ? 3 : 2
   if (d.kind === 'mod') return modDef(d.mod)?.bucks ? 2 : 1
   if (d.kind === 'coins' && d.jackpot) return 1
@@ -290,6 +317,9 @@ export function crateTables() {
     crates: Object.fromEntries(CRATES.map((c) => [c.id, {
       pay: c.pay, unlock: c.unlockLevel, base: c.base, perLevel: c.perLevel, odds: c.odds,
       carShare: c.carShare, coinMult: c.coinMult, jackpotMult: c.jackpotMult, skins: c.skins, below: crateBelow(c)?.id ?? null,
+      ...(c.pity ? { pity: c.pity } : {}),
+      // The hat slice (out of 100, taken from coins) and the hats it can give, in HATS order.
+      hat: HAT_ODDS[c.id], hats: crateHats(c.id).map((h) => h.id),
     }])),
     // Body skins by id, part skins by id: tier, and the level or collection set that also unlocks one.
     skinWeight: SKIN_WEIGHT,

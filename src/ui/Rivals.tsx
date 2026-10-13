@@ -4,6 +4,7 @@ import { RIVALS, RIVAL_VISITS, currentRival, rivalLadderPi, rivalPi, rivalPrize,
 import { CarThumb } from '../scene/BuildingPreview'
 import { useNow } from '../scene/useNow'
 import { PAINT_RIVALS } from '../game/paintRivals'
+import { LOSS_SHARE } from '../game/boosts'
 
 const zero = { engine: 0, turbo: 0, tires: 0, weight: 0 }
 const NONE = {}
@@ -101,7 +102,7 @@ export function RivalResult({ match, won, bet, bonus, myTime, theirTime, onBet, 
         <p className="rr-note">{myTime.toFixed(2)}s vs {Number.isFinite(theirTime) ? `${theirTime.toFixed(2)}s` : 'DNF'}</p>
         <div className="rr-loot">
           {bet ? <span>{won ? `💵 +$${prize.toLocaleString()}` : `💸 −$${prize.toLocaleString()}`}</span>
-            : <span>💵 +${(won ? prize : Math.round(prize * 0.1)).toLocaleString()}</span>}
+            : <span>💵 +${(won ? prize : Math.round(prize * LOSS_SHARE)).toLocaleString()}</span>}
           {bonus && <span style={{ animationDelay: '.3s' }}>💰 +${bonus.coins.toLocaleString()}</span>}
           {bonus && <span style={{ animationDelay: '.45s' }}><span className="ico buck-ico">💎</span> +{bonus.bucks}</span>}
           {bonus && <span style={{ animationDelay: '.6s' }}>🏆 +{bonus.trophies + 1}</span>}

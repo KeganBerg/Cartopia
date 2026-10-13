@@ -19,6 +19,7 @@ import { playerName } from '../lib/profiles'
 import { LoadingBand } from './Loading'
 import { CrewLadder, demoCrew } from './CrewLadder'
 import { CrewBattleTile, CrewGoalTile, CrewHero, LastWeekChests } from './CrewHub'
+import { CrewPartsTile } from './CrewParts'
 import { CREW_DEMO, useCrewMates } from '../lib/crewRaces'
 
 const n = (v: number) => v.toLocaleString()
@@ -337,6 +338,7 @@ function ClanHome({ data, uid, onChange }: { data: MyClan; uid: string; onChange
         <div className="cr-side">
           <CrewBattleTile />
           <CrewGoalTile />
+          <CrewPartsTile uid={uid} />
         </div>
       </div>
 

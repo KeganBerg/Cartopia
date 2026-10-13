@@ -4,7 +4,7 @@ import { Vector3, type Group, type Mesh, type PerspectiveCamera } from 'three'
 import { useGame } from '../game/store'
 import {
   buildingDef, buildingLevel, upgradable, upgradePayout, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap,
-  buildingUpgradeCost, MAX_BUILDING_LEVEL, houseResidents, levelName, buildingUpgradeXp, BUILDINGS, CARS, takesDriver, loves, driverPayout, carDef, type BuildingDef,
+  buildingUpgradeCost, maxLevel, themable, decorGrows, TOURIST_PER_LEVEL, VISITORS, houseResidents, levelName, buildingUpgradeXp, BUILDINGS, CARS, takesDriver, loves, driverPayout, carDef, type BuildingDef,
 } from '../game/data'
 import { workingDriver, type PlacedBuilding } from '../game/store'
 import { groupOf, isLandmark, LANDMARK_NAME, mergeGroups } from '../game/merge'
@@ -14,8 +14,12 @@ import { VanguardTower } from '../scene/Landmark'
 import { frame, seat } from '../scene/fit'
 import { Panel } from './Menus'
 import { RaveButton } from './Techno'
+import { useCanvasDpr } from '../lib/prefs'
+import { COLOR_THEMES } from '../game/cityLook'
 
 const n = (v: number) => v.toLocaleString()
+// The extra tourist odds a grown garden or statue adds, as a share of the usual odds.
+const tourPct = (level: number) => Math.round(((level - 1) * TOURIST_PER_LEVEL * 100) / VISITORS.tourist.weight)
 const time = (sec: number) => (sec >= 60 ? `${Math.floor(sec / 60)}m${sec % 60 ? ` ${sec % 60}s` : ''}` : `${sec}s`)
 
 // Turntable of the building at a given level. The model sits on the floor at
@@ -57,9 +61,10 @@ function Spinner({ def, level, landmark }: { def: BuildingDef; level: number; la
 
 // `landmark`: the block is (or this upgrade makes it) a Vanguard Tower, so show that instead of one house.
 function LevelPreview({ def, level, landmark }: { def: BuildingDef; level: number; landmark?: boolean }) {
+  const dpr = useCanvasDpr()
   return (
     <div className="upgrade-preview">
-      <Canvas camera={{ position: VIEW.toArray(), fov: 35 }} dpr={[1, 1.5]}>
+      <Canvas camera={{ position: VIEW.toArray(), fov: 35 }} dpr={dpr}>
         <hemisphereLight args={['#ffffff', '#90a4ae', 1]} />
         <directionalLight position={[3, 5, 2]} intensity={1.4} />
         <Spinner def={def} level={level} landmark={landmark} />
@@ -69,10 +74,10 @@ function LevelPreview({ def, level, landmark }: { def: BuildingDef; level: numbe
   )
 }
 
-function Pips({ level }: { level: number }) {
+function Pips({ level, max }: { level: number; max: number }) {
   return (
-    <div className="upgrade-pips" aria-label={`Level ${level} of ${MAX_BUILDING_LEVEL}`}>
-      {Array.from({ length: MAX_BUILDING_LEVEL }, (_, i) => <i key={i} className={i < level ? 'on' : ''} />)}
+    <div className="upgrade-pips" aria-label={`Level ${level} of ${max}`}>
+      {Array.from({ length: max }, (_, i) => <i key={i} className={i < level ? 'on' : ''} />)}
     </div>
   )
 }
@@ -111,7 +116,7 @@ function Driver({ b, d }: { b: PlacedBuilding; d: BuildingDef }) {
       <div className="driver">
         <div className="driver-head">Driver</div>
         <div className="driver-car">
-          <CarThumb size="sm" color={car.color} finish={car.finish} skin={car.skin} modSkin={car.modSkin} body={cd.body} model={cd.id} stripe={car.stripe} />
+          <CarThumb size="sm" color={car.color} finish={car.finish} skin={car.skin} modSkin={car.modSkin} hat={car.hat} body={cd.body} model={cd.id} stripe={car.stripe} />
           <div>
             <b>{cd.name}</b>
             <div className={broken ? 'driver-bonus off' : 'driver-bonus'}>
@@ -144,7 +149,7 @@ function Driver({ b, d }: { b: PlacedBuilding; d: BuildingDef }) {
           const at = workplace(c.uid)
           return (
             <button key={c.uid} className={`driver-pick${fan ? ' fan' : ''}${c.uid === b.car ? ' sel' : ''}`} onClick={() => { assign(b.uid, c.uid); setPicking(false) }}>
-              <CarThumb size="xs" color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} body={cd.body} model={cd.id} stripe={c.stripe} />
+              <CarThumb size="xs" color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} hat={c.hat} body={cd.body} model={cd.id} stripe={c.stripe} />
               <span className="driver-pick-name">{cd.name}{(at || c.flat || c.lowFuel) && <small>{[at && `at ${buildingDef(at.def).name}`, c.flat && '🛞 flat tire', c.lowFuel && '⛽ out of gas'].filter(Boolean).join(' · ')}</small>}</span>
               <span className="driver-pick-bonus">{fan ? '❤️ +25%' : '+10%'}</span>
             </button>
@@ -163,9 +168,10 @@ export function UpgradePanel() {
   const close = () => useGame.setState({ panel: null, upgrading: null })
   if (!b) return null
   const d = buildingDef(b.def)
-  if (!upgradable(d)) return null
+  if (!themable(d)) return null
+  const canUp = upgradable(d)
   const lvl = buildingLevel(b)
-  const max = lvl >= MAX_BUILDING_LEVEL
+  const max = lvl >= maxLevel(d)
   const next = max ? lvl : lvl + 1
   // A merged block shows and upgrades all its buildings at once.
   const members = groupOf(s.buildings, b.uid)?.members ?? [b]
@@ -184,6 +190,8 @@ export function UpgradePanel() {
     rows.push({ label: 'Job time', now: time(upgradeJobSeconds(d, lvl)), next: time(upgradeJobSeconds(d, next)) })
     rows.push({ label: 'XP per job', now: `${upgradeXp(d, lvl) * k}`, next: `${upgradeXp(d, next) * k}` })
   }
+  // Grown decor draws more tourists (see touristWeight in data.ts).
+  if (decorGrows(d)) rows.push({ label: '📸 Tourists', now: `+${tourPct(lvl) * k}%`, next: `+${tourPct(next) * k}%` })
   if (upgradeFuelCap(d, next) > 0) rows.push({ label: 'Max fuel', now: `+${upgradeFuelCap(d, lvl) * k}`, next: `+${upgradeFuelCap(d, next) * k}` })
   // A business that rebuilds into its next form says what it becomes.
   if (d.kind !== 'house' && levelName(d, next) !== levelName(d, lvl)) rows.push({ label: 'Building', now: levelName(d, lvl), next: levelName(d, next) })
@@ -199,11 +207,11 @@ export function UpgradePanel() {
   const name = landmark ? LANDMARK_NAME : levelName(d, lvl) + (k > 1 ? ` ×${k}` : '')
 
   return (
-    <Panel title={`${name} · Level ${lvl}`} onClose={close}>
+    <Panel title={canUp ? `${name} · Level ${lvl}` : name} onClose={close}>
       <div className="upgrade">
-        <LevelPreview def={d} level={next} landmark={becomes} />
-        <Pips level={lvl} />
-        {max ? (
+        <LevelPreview def={d} level={canUp ? next : lvl} landmark={becomes} />
+        {canUp && <Pips level={lvl} max={maxLevel(d)} />}
+        {!canUp ? null : max ? (
           <p className="upgrade-max">⭐ Max level</p>
         ) : (
           <>
@@ -225,10 +233,25 @@ export function UpgradePanel() {
             )}
           </>
         )}
+        <ThemeStrip uid={b.uid} tint={b.tint} />
         {d.id === 'club' && <RaveButton onStart={close} />}
         {takesDriver(d) && <Driver b={b} d={d} />}
       </div>
     </Panel>
+  )
+}
+
+// Colour themes for this building: a swatch each, and one to go back to its own colours.
+function ThemeStrip({ uid, tint }: { uid: string; tint?: string }) {
+  const setTint = useGame((s) => s.setBuildingTint)
+  const city = useGame((s) => s.cityTheme)
+  return (
+    <div className="theme-strip" aria-label="Colour theme">
+      <button className={`theme-dot own${!tint ? ' sel' : ''}`} title={city ? 'City theme' : 'Own colours'} onClick={() => setTint(uid, null)}>🎨</button>
+      {COLOR_THEMES.map((t) => (
+        <button key={t.id} className={`theme-dot${tint === t.id ? ' sel' : ''}`} style={{ background: t.c }} title={t.name} aria-label={t.name} onClick={() => setTint(uid, t.id)} />
+      ))}
+    </div>
   )
 }
 
@@ -243,7 +266,7 @@ export function ShopUpgrades() {
   const merges = mergeGroups(buildings)
   const size = (b: (typeof buildings)[number]) => merges.groups.get(b.uid)?.members.length ?? 1
   const costOf = (b: (typeof buildings)[number]) =>
-    buildingLevel(b) >= MAX_BUILDING_LEVEL ? Infinity : buildingUpgradeCost(buildingDef(b.def), buildingLevel(b)).coins * size(b)
+    buildingLevel(b) >= maxLevel(buildingDef(b.def)) ? Infinity : buildingUpgradeCost(buildingDef(b.def), buildingLevel(b)).coins * size(b)
   const sorted = buildings
     .filter((b) => upgradable(buildingDef(b.def)) && (!merges.owner.has(b.uid) || merges.groups.has(b.uid)))
     .sort((a, b) => costOf(a) - costOf(b) || order(a.def) - order(b.def))
@@ -254,7 +277,7 @@ export function ShopUpgrades() {
         {sorted.map((b) => {
           const d = buildingDef(b.def)
           const lvl = buildingLevel(b)
-          const max = lvl >= MAX_BUILDING_LEVEL
+          const max = lvl >= maxLevel(d)
           const k = size(b)
           const one = buildingUpgradeCost(d, lvl)
           const cost = { coins: one.coins * k, parts: one.parts * k }
@@ -262,7 +285,7 @@ export function ShopUpgrades() {
           return (
             <button key={b.uid} className={`upgrade-row${afford && !max ? ' ready' : ''}`} onClick={() => openUpgrade(b.uid)}>
               <span className="upgrade-row-name">{levelName(d, lvl)}{k > 1 ? ` ×${k}` : ''}</span>
-              <Pips level={lvl} />
+              <Pips level={lvl} max={maxLevel(d)} />
               <span className="price">{max ? '⭐ Max' : `$${n(cost.coins)}${cost.parts ? ` ⚙${cost.parts}` : ''}`}</span>
             </button>
           )

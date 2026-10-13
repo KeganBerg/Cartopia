@@ -36,7 +36,7 @@ describe('skinning a car', () => {
     expect(g().cars[0].skin).toBeUndefined()
   })
   it('sells gem skins once, then they are free on any car', () => {
-    useGame.setState({ level: 1, bucks: 40, skins: [], claimedSets: [], cars: [car, { ...car, uid: 's2' }] })
+    useGame.setState({ level: 1, bucks: 30, skins: [], claimedSets: [], cars: [car, { ...car, uid: 's2' }] })
     expect(g().skinCar('s1', 'aurora')).toBe(true)
     expect(g().bucks).toBe(10)
     expect(g().skins).toEqual(['aurora'])

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Canvas, useThree } from '@react-three/fiber'
 import { NeutralToneMapping, PCFSoftShadowMap, type PerspectiveCamera, type WebGLProgram, type WebGLRenderer } from 'three'
 import { warmShaders } from './warm'
+import { useCanvasDpr } from '../lib/prefs'
 import { create } from 'zustand'
 
 // The race (and the Crate Depot) draws in its own full-screen canvas. Building a fresh canvas for every race
@@ -47,13 +48,14 @@ export function warmStage() {
 // Mounted once in App. Renders nothing until the first race (or warmStage).
 export function StageCanvas() {
   const { node, used, slot, run, ready, gen } = useStage()
+  const dpr = useCanvasDpr()
   if (!used) return null
   return createPortal(
     <Canvas
       key={gen}
       className="rf-canvas"
       camera={{ position: [0, 2, -4], fov: 55, near: 0.3, far: 150 }}
-      dpr={[1, 1.5]}
+      dpr={dpr}
       gl={{ toneMapping: NeutralToneMapping }}
       frameloop={slot && node && ready === run ? 'always' : 'never'}
       onCreated={({ gl }) => {
@@ -85,10 +87,22 @@ function pinPrograms() {
   }
 }
 
+// A picture of what the race canvas shows right now (the snapshot button after a win).
+let snap: (() => Promise<Blob | null>) | null = null
+export const stageSnapshot = () => (snap && useStage.getState().slot ? snap() : Promise.resolve(null))
+
 // Each race starts from the same camera, and compiles its shaders before its first frame.
 function Rig({ run }: { run: number }) {
   const { camera, gl, scene, get } = useThree()
   useEffect(() => void (renderer = gl), [gl])
+  useEffect(() => {
+    snap = () => {
+      // Draw a fresh frame and copy it straight away, before the browser clears it.
+      gl.render(scene, camera)
+      return new Promise((done) => gl.domElement.toBlob(done, 'image/jpeg', 0.9))
+    }
+    return () => void (snap = null)
+  }, [gl, scene, camera])
   useLayoutEffect(() => {
     const { cam } = useStage.getState()
     const c = camera as PerspectiveCamera

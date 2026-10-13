@@ -5,7 +5,7 @@ import {
   ShaderMaterial, Vector3,
 } from 'three'
 import { weatherNow } from '../game/weather'
-import { dayPhase, nightAmount } from './dayNight'
+import { dayPhase, lampHalo, nightAmount } from './dayNight'
 import { lightDir } from './look'
 import { skyUniforms } from './weatherLook'
 import { frameFor, type Frame } from './Weather'
@@ -249,6 +249,7 @@ function LampHalos() {
     // Damp air spreads the glow wider.
     u.uSize.value = 0.9 + 1.4 * sky.banks
     u.uOpacity.value = o * 0.55
+    u.uColor.value.copy(lampHalo)
   })
   return <primitive object={mesh} />
 }

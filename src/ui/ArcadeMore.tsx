@@ -15,6 +15,7 @@ import { KeyHints, TouchDrive, newDriveInput, useDriveKeys, useTall, useTouchDev
 import { Countdown, Result, look, payFuel } from './ArcadeBits'
 import { sfx } from '../lib/sound'
 import { LoadingScene } from './Loading'
+import { useCanvasDpr } from '../lib/prefs'
 
 // The second wave of arcade games. Each runs inside one shell that handles the
 // fuel, the countdown, star pay and the result card.
@@ -96,6 +97,7 @@ const pitLine = (e: PitEnd) =>
   `⏱ ${e.time.toFixed(1)}s · ${e.grade === 'perfect' ? '🎯' : e.grade === 'good' ? '👍' : '😬'} ${e.grade === 'perfect' ? 'Perfect stop' : e.grade === 'good' ? 'Good stop' : 'Pushed'} · ⚡ ${e.react.toFixed(2)}s${e.slips ? ` · ${e.slips} slip${e.slips > 1 ? 's' : ''}` : ''}`
 
 function PitGame({ car, running, onDone }: GameProps) {
+  const dpr = useCanvasDpr()
   const input = useRef<PitInput>({ pedal: false, presses: 0, taps: [], pads: [] }).current
   const [hud, setHud] = useState<PitHud>({ phase: 'in', left: 4, time: 0, pop: null, calling: false })
   const [pop, setPop] = useState<PitHud['pop']>(null)
@@ -118,7 +120,7 @@ function PitGame({ car, running, onDone }: GameProps) {
   const pedal = running && (hud.phase === 'in' || hud.phase === 'hold' || hud.phase === 'green')
   return (
     <>
-      <Canvas className="rf-canvas" camera={{ fov: 45, near: 0.3, far: 140, position: [0, 8, 7] }} dpr={[1, 1.5]} gl={gl}>
+      <Canvas className="rf-canvas" camera={{ fov: 45, near: 0.3, far: 140, position: [0, 8, 7] }} dpr={dpr} gl={gl}>
         <PitScene me={look(car)} input={input} running={running} onHud={onHud} onEnd={(e) => onDone(pitStars(e.time), Math.round(e.time * 10) / 10, pitLine(e))} />
       </Canvas>
       {/* Brake and go: hold or tap anywhere, with the big button as the picture of it. */}
@@ -144,6 +146,7 @@ function PitGame({ car, running, onDone }: GameProps) {
 }
 
 function WashGame({ car, running, onDone }: GameProps) {
+  const dpr = useCanvasDpr()
   const input = useRef<WashInput>({ x: 0, y: 0, down: false, moved: 0 }).current
   const [hud, setHud] = useState<WashHud>({ left: WASH_SPOTS, time: WASH_TIME })
   const [sponge, setSponge] = useState<{ x: number; y: number } | null>(null)
@@ -167,7 +170,7 @@ function WashGame({ car, running, onDone }: GameProps) {
         onPointerCancel={() => { input.down = false; setSponge(null) }}
         onPointerLeave={() => { input.down = false; setSponge(null) }}
       >
-        <Canvas className="rf-canvas" camera={{ fov: 45, near: 0.2, far: 80, position: [0, 2, 6] }} dpr={[1, 1.5]} gl={gl}>
+        <Canvas className="rf-canvas" camera={{ fov: 45, near: 0.2, far: 80, position: [0, 2, 6] }} dpr={dpr} gl={gl}>
           <WashScene me={look(car)} input={input} running={running} onHud={setHud}
             onEnd={(e) => onDone(washStars(e.cleaned, WASH_SPOTS, e.timeLeft), e.cleaned === WASH_SPOTS ? Math.round(e.timeLeft) : 0, `🧽 ${e.cleaned}/${WASH_SPOTS} · ⏱ ${Math.round(e.timeLeft)}s left`)} />
         </Canvas>
@@ -183,6 +186,7 @@ function WashGame({ car, running, onDone }: GameProps) {
 }
 
 function DeliveryGame({ car, running, onDone }: GameProps) {
+  const dpr = useCanvasDpr()
   const input = useRef(newDriveInput()).current
   const [hud, setHud] = useState<DashHud>({ drops: 0, time: DASH_TIME, carrying: false })
   const touch = useTouchDevice()
@@ -190,7 +194,7 @@ function DeliveryGame({ car, running, onDone }: GameProps) {
   useDriveKeys(input)
   return (
     <>
-      <Canvas className="rf-canvas" camera={{ fov: 50, near: 0.3, far: 120, position: [0, 14, 10] }} dpr={[1, 1.5]} gl={gl}>
+      <Canvas className="rf-canvas" camera={{ fov: 50, near: 0.3, far: 120, position: [0, 14, 10] }} dpr={dpr} gl={gl}>
         <DeliveryScene me={look(car)} input={input} running={running} onHud={setHud}
           onEnd={(e) => onDone(dashStars(e.drops), e.drops, `🍕 ${e.drops} delivered`)} />
       </Canvas>
@@ -205,6 +209,7 @@ function DeliveryGame({ car, running, onDone }: GameProps) {
 }
 
 function StuntGame({ car, running, onDone }: GameProps) {
+  const dpr = useCanvasDpr()
   const input = useRef<StuntInput>({ down: false }).current
   const [hud, setHud] = useState<StuntHud>({ jump: 1, score: 0, power: 0, phase: 'aim', last: null })
   useEffect(() => {
@@ -220,7 +225,7 @@ function StuntGame({ car, running, onDone }: GameProps) {
       onPointerDown={(e) => { if (!(e.target as HTMLElement).closest('button')) input.down = true }}
       onPointerUp={() => { input.down = false }}
       onPointerCancel={() => { input.down = false }}>
-      <Canvas className="rf-canvas" camera={{ fov: 50, near: 0.3, far: 160, position: [-10, 4, 14] }} dpr={[1, 1.5]} gl={gl}>
+      <Canvas className="rf-canvas" camera={{ fov: 50, near: 0.3, far: 160, position: [-10, 4, 14] }} dpr={dpr} gl={gl}>
         <StuntScene me={look(car)} input={input} running={running} onHud={setHud}
           onEnd={(e) => onDone(stuntStars(e.score), e.score, `🔥 ${e.score.toLocaleString()} pts`)} />
       </Canvas>

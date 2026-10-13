@@ -2,8 +2,10 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { StageSlot, useStageReady } from '../scene/Stage'
 import type { OwnedCar } from '../game/store'
 import { carDef } from '../game/data'
-import { EMP_TIME, FLAT_TIME, GHOST_TIME, ITEMS, KartRace, LAPS, ROCKET_TIME, SMOKE_TIME, SPLAT_TIME, SHARP_ASSIST, TOUCH_ASSIST, TOW_TIME, buildTrack, type ItemId, type KartEvent, type TrackDef } from '../game/kart'
+import { placeShare } from '../game/boosts'
+import { EMP_TIME, FLAT_TIME, GHOST_TIME, ITEMS, KartRace, LAPS, ROCKET_TIME, SMOKE_TIME, SPLAT_TIME, SHARP_ASSIST, TOUCH_ASSIST, TOW_TIME, buildTrack, catchUp, type ItemId, type KartEvent, type KartRules, type TrackDef } from '../game/kart'
 import { KartScene, kartLights, type KartHud } from '../scene/KartScene'
+import { heroShot } from '../scene/heroShot'
 import type { ChaseCar } from '../scene/ChaseScene'
 import { CarThumb } from '../scene/BuildingPreview'
 import { KART_FEEL, KART_SHARP, KeyHints, TouchDrive, newDriveInput, useDriveKeys, useTall, useTouchDevice } from './DriveControls'
@@ -12,7 +14,11 @@ import { look as lookOf, pi } from './ArcadeBits'
 import { sfx, audioContext, audioOut } from '../lib/sound'
 import { airSound, buzzSound, bumpSound, crashSound, dingSound, fuelSound, landSound, revSound, splashSound } from '../lib/arcadeSound'
 import { EngineVoice } from '../lib/engineAudio'
-import { buzz } from '../lib/haptics'
+import { SnapshotButton } from './Snapshot'
+import { buzz as haptic } from '../lib/haptics'
+import { nearMiss, stepNearMiss } from '../game/nearMiss'
+import { Callout } from './Callout'
+import { useCallout } from './useCallout'
 import { usePrefs } from '../lib/prefs'
 import './kart.css'
 
@@ -27,14 +33,15 @@ const ORD = (n: number) => `${n}${n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'r
 
 const KART_CAM = { position: [0, 4, -8] as [number, number, number], fov: 60, near: 0.3, far: 420 }
 // A short buzz in the hand for the moments that matter (phones that can).
-const BUZZ: Partial<Record<KartEvent['kind'], number | number[]>> = { wall: 25, bump: 12, hit: [40, 30, 60], boom: 80, turbo: 18, boost: 12, land: 15, crate: 8 }
+const BUZZ: Partial<Record<KartEvent['kind'], number | number[]>> = { wall: 25, bump: 12, hit: [40, 30, 60], boom: 80, turbo: 18, boost: 12, land: 15, crate: 8, boxes: 40, glass: 30, pothole: 20 }
 function buzzFor(kind: KartEvent['kind']) {
   const p = BUZZ[kind]
-  if (p) buzz(p)
+  if (p) haptic(p)
 }
 
-export function KartGame({ car, title, track, reverse, field, prize, next, onFinish, onExit, live }: {
+export function KartGame({ car, title, track, reverse, field, prize, next, onFinish, onExit, live, rules }: {
   car: OwnedCar; title: string; track: TrackDef; reverse: boolean
+  rules?: KartRules // road obstacles, Bumper Blast (single-player races only)
   field: KartRacer[] // the player is the one with ai: false (in a live race: live.me)
   prize?: number
   next?: KartNext | null
@@ -48,7 +55,7 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
 }) {
   const t = useMemo(() => buildTrack(track, reverse), [track, reverse])
   const me = live ? live.me : field.findIndex((f) => !f.ai)
-  const race = useMemo(() => live?.race ?? new KartRace(t, field.map((f) => ({ name: f.name, pi: f.pi, ai: f.ai, skill: f.skill })), Math.floor(Math.random() * 1e6)), [t, field, live?.race])
+  const race = useMemo(() => live?.race ?? new KartRace(t, field.map((f) => ({ name: f.name, pi: f.pi, ai: f.ai, skill: f.skill, weight: f.look.model ? carDef(f.look.model).weight : undefined })), Math.floor(Math.random() * 1e6), rules), [t, field, live?.race]) // eslint-disable-line react-hooks/exhaustive-deps
   const looks = useMemo(() => field.map((f) => f.look), [field])
   const touch = useTouchDevice()
   // On a phone the kart leans gently towards the racing line while the thumb is near the middle.
@@ -62,6 +69,8 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
   const [hud, setHud] = useState<KartHud | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
   const [end, setEnd] = useState<{ place: number; order: number[] } | null>(null)
+  // Set on crossing the line, while the podium waits (it's what a tap on the hero shot brings up).
+  const [over, setOver] = useState<{ place: number; order: number[] } | null>(null)
   // Keys count from the countdown on, so gas held through the lights goes at GO.
   useDriveKeys(input, { enabled: !end })
   const engine = useRef<EngineVoice | null>(null)
@@ -126,9 +135,29 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
       else if (e.kind === 'rocket') { revSound(1.2); engine.current?.rev(1) }
       else if (e.kind === 'splat') splashSound()
       else if (e.kind === 'boom') crashSound()
+      else if (e.kind === 'boxes' || e.kind === 'glass') crashSound()
+      else if (e.kind === 'pothole') bumpSound()
+      else if (e.kind === 'ice') airSound()
       else if (e.kind === 'lap') { dingSound(1); setFlash(e.value === LAPS ? 'FINAL LAP!' : `LAP ${e.value}`) }
     }
   }
+  // Near misses, watched every frame (the HUD only hears ten times a second).
+  const [call, pop] = useCallout()
+  useEffect(() => {
+    if (!running || end) return
+    const s = nearMiss()
+    let raf = 0
+    const look = () => {
+      const k = race.karts[me]
+      if (k.done === null && stepNearMiss(s, k, race.karts, race.t)) {
+        pop('Near miss!')
+        haptic([10, 40, 10])
+      }
+      raf = requestAnimationFrame(look)
+    }
+    raf = requestAnimationFrame(look)
+    return () => cancelAnimationFrame(raf)
+  }, [running, end, race, me, pop])
   const podium = useRef<ReturnType<typeof setTimeout>>(undefined)
   useEffect(() => () => clearTimeout(podium.current), [])
   const finish = () => {
@@ -140,7 +169,19 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
     // The result counts the moment the line is crossed (closing during the coast can't lose
     // it); the podium waits while the player coasts on.
     onFinish(place, race.karts[me].done ?? race.t)
-    podium.current = setTimeout(() => setEnd({ place, order }), 1400)
+    // ...and for the hero shot round the player's kart, a few seconds at most.
+    const out = { place, order }
+    setOver(out)
+    const until = performance.now() + 4000
+    podium.current = setTimeout(function wait() {
+      if (heroShot.on && performance.now() < until) podium.current = setTimeout(wait, 100)
+      else setEnd(out)
+    }, 1400)
+  }
+  const skipHero = () => {
+    heroShot.skip = true
+    clearTimeout(podium.current)
+    if (over) setEnd(over)
   }
 
   // The scene is memoised, so it gets callbacks that never change and call the latest ones.
@@ -178,6 +219,7 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
             <span className={`kt-place p${hud.place}`}><b>{hud.place}</b><small>{ORD(hud.place).slice(-2)}</small><i>/{field.length}</i></span>
             <span className="kt-lap">LAP <b>{hud.lap}</b>/{LAPS}</span>
             <span className="kt-time">{fmt(hud.t)}</span>
+            {catchUp(hud.place - 1, field.length) > 0 && <span className="kt-catch" title="Catch-up: a little extra speed at the back">⏩</span>}
           </div>
           <MiniMap race={race} hud={hud} />
           {!touch && (
@@ -189,7 +231,9 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
         </>
       )}
       {flash && <div key={flash} className="kt-flash">{flash}</div>}
+      {!end && <Callout call={call} />}
       {!end && running && (touch ? <TouchDrive input={input} tall={tall} item={slot} feel={sharp ? KART_SHARP : KART_FEEL} /> : <KeyHints />)}
+      {over && !end && <button className="hero-skip" aria-label="Skip" onPointerDown={skipHero}><span>⏭</span></button>}
       {end && <Podium race={race} field={field} me={me} end={end} prize={prize} next={next} verdict={live?.verdict} onExit={onExit} />}
     </div>
   )
@@ -312,6 +356,7 @@ function Podium({ race, field, me, end, prize, next, verdict, onExit }: { race: 
   return (
     <div className={won ? 'rr win kt-end' : 'rr lose kt-end'}>
       <div className="kt-podium-card">
+        {won && <SnapshotButton caption="🏆 1st place" />}
         <h2>{won ? '🏆 You win!' : `${ORD(end.place)} place`}</h2>
         <div className="kt-podium">
           {[1, 0, 2].map((p) => {
@@ -321,7 +366,7 @@ function Podium({ race, field, me, end, prize, next, verdict, onExit }: { race: 
             const d = carDef(f.look.model ?? '')
             return (
               <div key={p} className={`kt-step s${p + 1}${i === me ? ' me' : ''}`}>
-                <CarThumb size="sm" color={f.look.color} finish={f.look.finish} skin={f.look.skin} modSkin={f.look.modSkin} body={f.look.body as never} model={d.id} mods={f.look.mods} />
+                <CarThumb size="sm" color={f.look.color} finish={f.look.finish} skin={f.look.skin} modSkin={f.look.modSkin} hat={f.look.hat} body={f.look.body as never} model={d.id} mods={f.look.mods} />
                 <b>{i === me ? 'You' : f.name}</b>
                 <span className="kt-block">{p + 1}</span>
               </div>
@@ -336,7 +381,7 @@ function Podium({ race, field, me, end, prize, next, verdict, onExit }: { race: 
           ))}
         </ol>
         {verdict}
-        {prize !== undefined && <div className="arc-pay"><span>{won ? `🪙 +$${prize.toLocaleString()}` : `🪙 +$${Math.round(prize * 0.1).toLocaleString()}`}</span></div>}
+        {prize !== undefined && <div className="arc-pay"><span>{won ? `🪙 +$${prize.toLocaleString()}` : `🪙 +$${Math.round(prize * placeShare(end.place, field.length)).toLocaleString()}`}</span></div>}
         <div className="arc-actions">
           <button className="sell" onClick={onExit}>Back</button>
           {next && <button className="buy" onClick={next.go}>{next.label}</button>}

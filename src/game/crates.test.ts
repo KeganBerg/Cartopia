@@ -2,7 +2,8 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { PIECE_SOURCES, restoTables } from './resto'
 import { CARS, MODS, MOD_SKINS, SKINS, carDef, modDef, modFits } from './data'
-import { CRATES, carCrate, carValue, carWorth, crateCars, crateDef, crateOdds, crateOddsShown, crateSkins, crateTables, crateValue, homeCars, homeMods, modChoices, modCrate, modWorth, rollCrate, rollSourcePiece, skinOdds, type CrateDrop } from './crates'
+import { crateHats, HATS } from './hats'
+import { CRATES, HAT_ODDS, dropTier, carCrate, carValue, carWorth, crateCars, crateDef, crateOdds, crateOddsShown, crateSkins, crateTables, crateValue, homeCars, homeMods, modChoices, modCrate, modWorth, rollCrate, rollSourcePiece, skinOdds, type CrateDrop } from './crates'
 
 const dir = new URL('../../supabase/migrations/', import.meta.url)
 // The newest migration holding the crate tables.
@@ -112,6 +113,8 @@ describe('crates', () => {
           expect(carDef(d.model).secret).toBe(true)
           expect(carDef(d.model).unlockLevel).toBeLessThanOrEqual(level)
           if (d.kind === 'piecedupe') expect(d.coins).toBeGreaterThan(0)
+        } else if (d.kind === 'hat') {
+          expect(crateHats(c.id).map((h) => h.id)).toContain(d.hat)
         } else {
           expect(d.coins).toBeGreaterThan(0)
         }
@@ -155,7 +158,7 @@ describe('crates', () => {
           const d = rollCrate(c, level, garage, rand)
           if (d.kind === 'coins' || d.kind === 'dupe') total += d.coins
           // Parts are counted at about a crate's worth, cars at their price.
-          else if (d.kind === 'mod' || d.kind === 'skin' || d.kind === 'skindupe') total += d.kind === 'skindupe' ? d.coins : v
+          else if (d.kind === 'mod' || d.kind === 'skin' || d.kind === 'skindupe' || d.kind === 'hat') total += d.kind === 'skindupe' ? d.coins : v
           else total += carValue(CARS.find((x) => x.id === d.model)!, level)
         }
         const ev = total / n / v
@@ -163,6 +166,30 @@ describe('crates', () => {
         expect(ev).toBeLessThan(1.4)
       }
     }
+  })
+
+  it('drops hats you do not have from the coin slice, crate-only hats included', () => {
+    for (const c of CRATES) expect(HAT_ODDS[c.id]).toBeLessThan(crateOdds(c, 50).coins)
+    // The Crown and Top Hat only come from crates.
+    for (const id of ['crown', 'tophat']) {
+      const d = HATS.find((h) => h.id === id)!
+      expect(d.challenge).toBeUndefined()
+      expect(d.crates!.length).toBeGreaterThan(0)
+    }
+    const diamond = crateDef('diamond')!
+    const rand = seeded(5)
+    const got = new Set<string>()
+    let hats = 0
+    for (let i = 0; i < 3000; i++) {
+      const d = rollCrate(diamond, 30, garage, rand)
+      if (d.kind === 'hat') { hats++; got.add(d.hat); expect(dropTier(d)).toBeGreaterThanOrEqual(2) }
+    }
+    expect(hats / 3000).toBeGreaterThan(0.04)
+    expect(hats / 3000).toBeLessThan(0.12)
+    expect(got).toContain('crown')
+    // Hats you have pay coins as before.
+    const all = { skins: [], modSkins: [], hats: HATS.map((h) => h.id) }
+    for (let i = 0; i < 500; i++) expect(rollCrate(diamond, 30, garage, rand, all).kind).not.toBe('hat')
   })
 
   describe('resto-mod pieces', () => {
@@ -215,5 +242,25 @@ describe('crates', () => {
       expect(builds).toBeGreaterThan(0)
       expect(dupes).toBeGreaterThan(builds)
     })
+  })
+})
+
+describe('crate pity', () => {
+  it('gives a skin of the pity tier once the dry run reaches the limit, and resets on one', async () => {
+    const { pityHit, pityLeft, skinOf } = await import('./crates')
+    for (const c of CRATES.filter((x) => x.pity)) {
+      const every = c.pity!.every
+      expect(pityLeft(c, 0)).toBe(every)
+      expect(pityLeft(c, every - 1)).toBe(1)
+      for (let seed = 1; seed < 40; seed++) {
+        const d = rollCrate(c, 40, garage, seeded(seed), { skins: [], modSkins: [] }, every - 1)
+        expect(d.kind === 'skin' || d.kind === 'skindupe', c.id).toBe(true)
+        if (d.kind === 'skin' || d.kind === 'skindupe') {
+          if (c.pity!.tier) expect(skinOf(d.skin, d.part)?.tier).toBe(c.pity!.tier)
+          expect(pityHit(c, d)).toBe(true)
+        }
+      }
+    }
+    expect(pityLeft(crateDef('street')!, 50)).toBeNull()
   })
 })
