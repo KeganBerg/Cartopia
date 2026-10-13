@@ -3,8 +3,7 @@
 // writes as plain HTML (vite.config.ts) for app stores and link sharing.
 //
 // DRAFTS: written by Claude for the owner to review. Not legal advice.
-// Operator and contact from Kegan (2026-10-13); the governing-law country is
-// a default until he confirms it.
+// Operator, contact and governing-law country (USA) from Kegan, 2026-10-13.
 
 export type LegalBlock = string | { list: string[] }
 export type LegalSection = { h: string; body: LegalBlock[] }
