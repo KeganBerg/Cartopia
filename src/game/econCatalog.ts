@@ -1,5 +1,5 @@
 import {
-  BUILDINGS, CAMPAIGN, CAR_SETS, CAMPAIGN_RACES, CARS, GOALS, GP_SERIES, campaignRaceId, MAX_BUILDING_LEVEL, MODS, RESCUE_SPOTS, modXp, buildingUpgradeCost, buildingUpgradeXp, upgradable,
+  BUILDINGS, CAMPAIGN, CAR_SETS, RUSTY_SETS, CAMPAIGN_RACES, CARS, GOALS, GP_SERIES, campaignRaceId, MAX_BUILDING_LEVEL, MODS, RESCUE_SPOTS, modXp, buildingUpgradeCost, buildingUpgradeXp, upgradable,
   upgradeFuelCap, upgradeJobSeconds, FAVORITE_BONUS, DEAL_SLOTS, dealSave, QUEST_PAY, CREW_CHEST, TASKS_PER_PERIOD, upgradePartsPayout, upgradePayout, upgradeXp, type BuildingDef,
   SEASON_START, SEASON_DAYS, STARS_PER_TIER, SEASON_STARS, SEASON_TIERS, SEASON_CAR_BUCKS, seasonCars,
 } from './data'
@@ -62,7 +62,8 @@ export function econCatalog() {
     coins: c.coins, bucks: c.bucks, trophies: c.trophies, starBucks: c.starBucks,
   }]))
   // Collection book sets: the cars each needs and its one-time reward.
-  const sets = Object.fromEntries(CAR_SETS.map((c) => [c.id, { cars: c.cars, coins: c.coins, bucks: c.bucks, trophies: c.trophies, xp: c.xp }]))
+  // Rusty's sets (every car a search spot turns up) are claimed the same way.
+  const sets = Object.fromEntries([...CAR_SETS, ...RUSTY_SETS].map((c) => [c.id, { cars: c.cars, coins: c.coins, bucks: c.bucks, trophies: c.trophies, xp: c.xp }]))
   // Daily and weekly tasks: at most `count` task rewards and one chest per UTC day / ISO week.
   const quests = Object.fromEntries((['daily', 'weekly'] as const).map((p) => [p, { count: TASKS_PER_PERIOD, ...QUEST_PAY[p] }]))
   // Season track: stars per task and chest, stars per tier, each tier's prize, and each season's car.

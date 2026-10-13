@@ -150,7 +150,10 @@ function ArcadeBadge({ b, g }: { b: PlacedBuilding; g?: MergeGroup }) {
 // Rusty's shows what the restore bay is up to.
 function RescueBadge({ b, now }: { b: PlacedBuilding; now: number }) {
   const tap = useGame((s) => s.tapBuilding)
-  const r = useGame((s) => s.restoring)
+  const r1 = useGame((s) => s.restoring)
+  const r2 = useGame((s) => s.restoring2)
+  // Either bay: a finished car first, else the one finishing soonest.
+  const r = [r1, r2].filter((x) => !!x).sort((a, b) => a!.endsAt - b!.endsAt)[0] ?? null
   const lit = useGame((s) => !!s.highlight?.includes('rescue') || tutTarget(s) === 'rescue')
   const [cx, cz] = centerOf(b.def, b.x, b.z, b.rot)
   anchors.set(b.uid, new Vector3(cx, 2.6, cz))

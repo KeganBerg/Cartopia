@@ -394,11 +394,11 @@ const BUZZ: Record<Tier, number | number[]> = { nothing: 8, small: 15, common: 2
 // The find's place on screen (0-1 from the top left), for the HUD to fly it to the tray.
 export type ScreenAt = { x: number; y: number }
 
-type SpotProps = { i: number; at: SpotAt; loot: Loot; open: boolean; gone: boolean; tarp: string; pad: string; speed: number; onPick: (i: number) => void; onFound: (i: number, at: ScreenAt) => void; onHit: (i: number, tier: Tier) => void }
+type SpotProps = { i: number; at: SpotAt; loot: Loot; open: boolean; gone: boolean; tarp: string; pad: string; speed: number; magnet?: boolean; onPick: (i: number) => void; onFound: (i: number, at: ScreenAt) => void; onHit: (i: number, tier: Tier) => void }
 
 const ladderColor = new Color()
 
-function SearchSpot({ i, at: p, loot, open, gone, tarp, pad, speed, onPick, onFound, onHit }: SpotProps) {
+function SearchSpot({ i, at: p, loot, open, gone, tarp, pad, speed, magnet, onPick, onFound, onHit }: SpotProps) {
   const { camera } = useThree()
   // Already open when the scene came up (the panel was reopened): no show.
   const born = useRef(open)
@@ -452,7 +452,8 @@ function SearchSpot({ i, at: p, loot, open, gone, tarp, pad, speed, onPick, onFo
     const rate = 3.2 + build * build * 22
     const pulse = 0.5 + Math.sin(now * rate + i) * 0.5
     const lad = LADDER[tier]
-    ladderColor.set(raw < 0 ? '#ffd54f' : lad[Math.min(lad.length - 1, Math.floor(build * lad.length * 0.999))])
+    // The top tow truck's magnet: a tarp hiding a car glows blue before it's picked.
+    ladderColor.set(raw < 0 ? (magnet && loot.kind === 'car' ? '#4fc3f7' : '#ffd54f') : lad[Math.min(lad.length - 1, Math.floor(build * lad.length * 0.999))])
     if (ring.current) {
       ring.current.opacity = fade * (0.45 + pulse * 0.45 + build * 0.3)
       ring.current.color.copy(ladderColor)
@@ -637,6 +638,8 @@ function LootModel({ loot }: { loot: Loot }) {
 
 type Props = {
   search: Search
+  // The tow truck's magnet (its top upgrade): tarps hiding cars glow blue.
+  magnet?: boolean
   fast: boolean
   auto: boolean
   leaving: boolean
@@ -648,7 +651,7 @@ type Props = {
 
 type Mode = 'intro' | 'idle' | 'drive' | 'leave' | 'gone'
 
-export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, onLeft, onBusy }: Props) {
+export function RescueScene({ search, magnet, fast, auto, leaving, onArrive, onFound, onLeft, onBusy }: Props) {
   const { camera, size } = useThree()
   const tall = size.height > size.width * 1.05
   const L = useMemo(() => makeLayout(tall, search.pins.length), [tall, search.pins.length])
@@ -1215,7 +1218,7 @@ export function RescueScene({ search, fast, auto, leaving, onArrive, onFound, on
       </Batch>
       <Crowd people={rusty} />
       {L.spots.map((p, i) => (
-        <SearchSpot key={i} i={i} at={p} loot={search.pins[i]} open={search.revealed[i]} gone={holding === i || taken.includes(i)} tarp={theme.tarp[i % theme.tarp.length]} pad={theme.pad} speed={speed} onPick={pick} onFound={onFound} onHit={(_, tier) => (punch.current = { at: performance.now() / 1000 / SLOW, tier })} />
+        <SearchSpot key={i} i={i} at={p} loot={search.pins[i]} open={search.revealed[i]} gone={holding === i || taken.includes(i)} tarp={theme.tarp[i % theme.tarp.length]} pad={theme.pad} speed={speed} magnet={magnet} onPick={pick} onFound={onFound} onHit={(_, tier) => (punch.current = { at: performance.now() / 1000 / SLOW, tier })} />
       ))}
       <group ref={truck}>
         <group scale={TS}>
