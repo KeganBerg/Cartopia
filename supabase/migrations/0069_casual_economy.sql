@@ -23,7 +23,7 @@
 -- Race payouts (loss pay by place, the win streak, first-win, welcome-back and weekend boosts in src/game/boosts.ts) aren't
 -- itemised in the catalog: they count against the guard's coin bank like every race prize, and the
 -- x2.5 cap keeps them inside it.
--- Runs after 0064_wheel_spin and 0065_friendly_taunts; the catalog and crate tables below include
+-- Runs after 0064_wheel_spin and 0068_friendly_taunts; the catalog and crate tables below include
 -- the exotic cars. If data.ts changes again, regenerate them (economy.test.ts and
 -- crates.test.ts fail until they match).
 
@@ -765,7 +765,7 @@ begin
     s := s || jsonb_build_object('level', n_lvl, 'xp', n_xp);
     select coalesce(sum(l * 100), 0) into levelup_coins from generate_series(o_lvl + 1, n_lvl) l;
 
-    -- Daily check-in (0066): once per UTC day, one day along whether or not yesterday was
+    -- Daily check-in (0069): once per UTC day, one day along whether or not yesterday was
     -- collected; dailyStreak counts days collected and the calendar loops after day 5.
     od := o ->> 'lastDaily';
     nd := s ->> 'lastDaily';

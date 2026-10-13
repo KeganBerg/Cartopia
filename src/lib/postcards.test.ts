@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { CARDS, MESSAGES } from './postcards'
 import { CREW_ASK, CREW_GIVE_MAX } from './crewParts'
 
-const sql = readFileSync(new URL('../../supabase/migrations/0067_postcards_crew_parts.sql', import.meta.url), 'utf8')
+const sql = readFileSync(new URL('../../supabase/migrations/0070_postcards_crew_parts.sql', import.meta.url), 'utf8')
 
 describe('postcards and crew parts', () => {
   it('only send what the server takes', () => {

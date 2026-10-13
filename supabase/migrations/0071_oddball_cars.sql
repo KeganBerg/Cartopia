@@ -1,8 +1,8 @@
 -- Oddball cars (2026-10-12, thread "Oddballs in the car store"): scoops (Lakeside Sundae Wagon,
 -- an ice cream truck), courier (Ironside Doorstep Express, a parcel van) and crusher (Kodiak Mud
 -- Crusher, a monster truck), plus the Oddballs set. econ_catalog() is rebuilt from econCatalog().
--- (Merged after 0066_casual_economy: the crate tables that give the new cars are regenerated in
--- 0072_crate_hats, on top of 0066's crate_open(text, text), and 0073 rebuilds the catalog again.)
+-- (Merged after 0069_casual_economy: the crate tables that give the new cars are regenerated in
+-- 0072_crate_hats, on top of 0069's crate_open(text, text), and 0073 rebuilds the catalog again.)
 -- Run it only after the client with these cars is shipped (ORDER RULE): crates hand out the new
 -- car ids, and a game that doesn't know them yet would show "Coming Soon" crates.
 

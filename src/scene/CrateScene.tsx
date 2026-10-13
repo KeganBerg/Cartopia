@@ -118,7 +118,7 @@ const plankTex = () =>
   })
 
 // Yellow and black chevrons for the lift's rim and the floor markings.
-const hazardTex = (rx = 1) =>
+export const hazardTex = (rx = 1) =>
   canvasTex(`hazard-${rx}`, 128, 32, (g) => {
     g.fillStyle = '#ffc400'
     g.fillRect(0, 0, 128, 32)
@@ -411,7 +411,7 @@ function Pallet({ x, z, ry = 0, stack = 1 }: { x: number; z: number; ry?: number
 }
 
 // An industrial lamp hanging on a chain: a dark shade, a hot bulb and a faint cone of light.
-function HangingLamp({ x, z, y = 5.4, beam = true }: { x: number; z: number; y?: number; beam?: boolean }) {
+export function HangingLamp({ x, z, y = 5.4, beam = true }: { x: number; z: number; y?: number; beam?: boolean }) {
   return (
     <group position={[x, y, z]}>
       <mesh position-y={1.4}><cylinderGeometry args={[0.012, 0.012, 2.8, 4]} /><meshStandardMaterial color="#263238" /></mesh>
@@ -524,7 +524,7 @@ function Depot() {
 }
 
 // Specks of dust turning slowly in the work lamp's beam.
-function Dust() {
+export function Dust() {
   const ref = useRef<Points>(null)
   const pos = useMemo(() => {
     const r = rng(5)

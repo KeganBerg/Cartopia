@@ -28,6 +28,8 @@ export type TrimFrame = {
   roofY: number; roofLen: number; roofZ: number // 0 roofLen: no roof
   exhaust: boolean // an exhaust mod is fitted
   spoiler: boolean // a spoiler mod is fitted
+  kit: boolean // a body kit is fitted (its arches and skirts cover the doors)
+  hood: boolean // a hood mod is fitted
   closed: boolean
 }
 
@@ -104,12 +106,19 @@ function bar(k: Kit, part: Part, a: V3, b: V3, t: number) {
   k.add(part, rbox(t, d.length() + t, t, t * 0.45), [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2], [e.x, e.y, e.z])
 }
 
+// Where a flat part at height y sits on the nose, lifted `out` off the surface along
+// its normal (so it stays clear where the nose curves back into the hood): [z, y, tilt].
+function onNose(f: TrimFrame, y: number, out: number): V3 {
+  const [z, ny, rx] = f.nose(y)
+  return [z + Math.cos(rx) * out, ny - Math.sin(rx) * out, rx]
+}
+
 // Small finishing touches every car gets: badges front and back, and characters on the plates.
 function badges(k: Kit, f: TrimFrame) {
-  const [bz, by, bt] = f.nose(f.lightY + 0.04)
-  k.add('chrome', disc(0.018, 12), [0, by, bz + 0.008], [bt, 0, 0])
-  k.add('chrome', box(0.07, 0.012, 0.004), [0, f.ty + 0.045, -f.front - 0.006])
-  for (const [z, y, sd] of [[f.front + 0.034, f.plateY, 1], [-f.front - 0.037, f.lift + 0.13, -1]] as const)
+  const [bz, by, bt] = onNose(f, f.lightY + 0.04, 0.0135)
+  k.add('chrome', disc(0.018, 12), [0, by, bz], [bt, 0, 0])
+  k.add('chrome', box(0.07, 0.012, 0.0125), [0, f.ty + 0.045, -f.front - 0.00425])
+  for (const [z, y, sd] of [[f.front + 0.04, f.plateY, 1], [-f.front - 0.0385, f.lift + 0.13, -1]] as const)
     for (const x of [-0.032, 0, 0.032]) k.add('dark', plane(0.018, 0.016), [x, y, z], [0, sd < 0 ? Math.PI : 0, 0])
 }
 
@@ -146,9 +155,9 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
       return
     case 'horseshoe': {
       // A chrome horseshoe grille in the nose, and a chrome curve sweeping round each door.
-      const [z, y, rx] = t.nose(t.lightY - 0.01)
-      k.add('dark', disc(0.04, 14), [0, y, z + 0.008], [rx, 0, 0])
-      k.add('chrome', new TorusGeometry(0.044, 0.008, 4, 16, Math.PI * 1.5), [0, y, z + 0.01], [rx, 0, -Math.PI * 0.25])
+      const [z, y, rx] = onNose(t, t.lightY - 0.01, 0.008)
+      k.add('dark', disc(0.04, 14), [0, y, z], [rx, 0, 0])
+      k.add('chrome', new TorusGeometry(0.044, 0.008, 4, 16, Math.PI * 1.5), [0, y, z + 0.002], [rx, 0, -Math.PI * 0.25])
       for (const sd of SIDES) k.add('chrome', new TorusGeometry(t.body * 0.42, 0.006, 3, 16, Math.PI), [sd * (wid / 2 + 0.006), lift + t.body * 0.58, t.cabinZ - t.cabinLen * 0.1], [0, (sd * Math.PI) / 2, sd * Math.PI / 2])
       return
     }
@@ -166,8 +175,8 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
     case 'drl':
       // LED brows over the headlights.
       for (const sd of SIDES) {
-        const [z, y, rx] = t.nose(t.lightY + 0.036)
-        k.add('lamp', plane(0.12, 0.007), [sd * wid * 0.3, y, z + 0.006], [rx, 0, sd * 0.2])
+        const [z, y, rx] = onNose(t, t.lightY + 0.036, 0.008)
+        k.add('lamp', plane(0.12, 0.007), [sd * wid * 0.3, y, z], [rx, 0, sd * 0.2])
       }
       return
     case 'hoodCreases':
@@ -175,8 +184,8 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
       return
     case 'meshGrille': {
       // Honeycomb dots across the grille.
-      const [z, y, rx] = t.nose(t.lightY)
-      for (let r = -1; r <= 1; r++) for (let i = -4; i <= 4; i++) k.add('black', disc(0.006, 6), [i * 0.022 + (r % 2 ? 0.011 : 0), y + r * 0.014, z + 0.009], [rx, 0, 0])
+      const [z, y, rx] = onNose(t, t.lightY, 0.0135)
+      for (let r = -1; r <= 1; r++) for (let i = -4; i <= 4; i++) k.add('black', disc(0.006, 6), [i * 0.022 + (r % 2 ? 0.011 : 0), y + r * 0.014, z], [rx, 0, 0])
       return
     }
     case 'popups':
@@ -192,20 +201,20 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
     case 'quadTails':
       // Two round lamps a side with chrome rings, over the stock cluster.
       for (const sd of SIDES) for (const lx of [0.2, 0.36]) {
-        k.add('black', disc(0.034, 14), [sd * wid * lx, t.ty, -front - 0.007], [0, Math.PI, 0])
-        k.add('tail', disc(0.027, 14), [sd * wid * lx, t.ty, -front - 0.008], [0, Math.PI, 0])
-        k.add('chrome', new TorusGeometry(0.03, 0.004, 3, 14), [sd * wid * lx, t.ty, -front - 0.009])
+        k.add('black', disc(0.034, 14), [sd * wid * lx, t.ty, -front - 0.011], [0, Math.PI, 0])
+        k.add('tail', disc(0.027, 14), [sd * wid * lx, t.ty, -front - 0.0135], [0, Math.PI, 0])
+        k.add('chrome', new TorusGeometry(0.03, 0.004, 3, 14), [sd * wid * lx, t.ty, -front - 0.0135])
       }
       return
     case 'tripleTails':
       // Three upright bars in each tail light.
       for (const sd of SIDES) {
-        k.add('black', plane(0.16, 0.065), [sd * wid * 0.3, t.ty, -front - 0.007], [0, Math.PI, 0])
-        for (const i of [-1, 0, 1]) k.add('tail', plane(0.036, 0.05), [sd * wid * 0.3 + i * 0.048, t.ty, -front - 0.008], [0, Math.PI, 0])
+        k.add('black', plane(0.16, 0.065), [sd * wid * 0.3, t.ty, -front - 0.011], [0, Math.PI, 0])
+        for (const i of [-1, 0, 1]) k.add('tail', plane(0.036, 0.05), [sd * wid * 0.3 + i * 0.048, t.ty, -front - 0.0135], [0, Math.PI, 0])
       }
       return
     case 'sideSkirts':
-      for (const sd of SIDES) k.add('black', box(0.03, 0.025, wz * 2 - wheel * 2.4), [sd * (wid / 2 + 0.01), lift + 0.035, 0])
+      for (const sd of SIDES) k.add('black', box(0.03, 0.025, wz * 2 - wheel * 2.44), [sd * (wid / 2 + 0.0075), lift + 0.035, 0])
       return
     case 'rearWiper': {
       if (!roof) return
@@ -214,20 +223,20 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
       return
     }
     case 'diffuserFins':
-      k.add('black', box(wid * 0.8, 0.012, 0.09), [0, lift + 0.035, -front + 0.01])
-      for (let i = -3; i <= 3; i++) k.add('black', box(0.008, 0.055, 0.09), [i * wid * 0.11, lift + 0.055, -front + 0.01])
+      k.add('black', box(wid * 0.8 - 0.006, 0.012, 0.09), [0, lift + 0.033, -front + 0.01])
+      for (let i = -3; i <= 3; i++) k.add('black', box(0.006, 0.055, 0.09), [i * wid * 0.11, lift + 0.055, -front + 0.01])
       return
     case 'centerExhaust':
       if (t.exhaust) return
       for (const x of [-0.035, 0.035]) {
         k.add('chrome', cyl(0.022, 0.022, 0.06, 12), [x, lift + 0.1, -front - 0.01], [Math.PI / 2, 0, 0])
-        k.add('black', disc(0.016, 10), [x, lift + 0.1, -front - 0.041], [0, Math.PI, 0])
+        k.add('black', disc(0.016, 10), [x, lift + 0.1, -front - 0.043], [0, Math.PI, 0])
       }
       return
     case 'stepBars':
       for (const sd of SIDES) {
         k.add('chrome', rbox(0.05, 0.02, wz * 2 - wheel * 2.6, 0.008), [sd * (wid / 2 + 0.035), lift + 0.01, 0])
-        for (const z of [-0.5, 0.5]) k.add('black', box(0.04, 0.03, 0.02), [sd * (wid / 2 + 0.015), lift + 0.02, z * (wz * 2 - wheel * 2.8)])
+        for (const z of [-0.5, 0.5]) k.add('black', box(0.04, 0.03, 0.02), [sd * (wid / 2 + 0.0125), lift + 0.02, z * (wz * 2 - wheel * 2.8)])
       }
       return
     case 'ladder': {
@@ -241,8 +250,8 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
       return
     case 'fuelCap':
       // Racing filler on the left rear quarter.
-      k.add('chrome', cyl(0.03, 0.03, 0.01, 14), [-wid * 0.36, top + 0.004, -front + 0.2])
-      k.add('black', disc(0.012, 8), [-wid * 0.36, top + 0.0095, -front + 0.2], [-Math.PI / 2, 0, 0])
+      k.add('chrome', cyl(0.03, 0.03, 0.014, 16), [-wid * 0.36, top + 0.002, -front + 0.2])
+      k.add('black', disc(0.012, 8), [-wid * 0.36, top + 0.0115, -front + 0.2], [-Math.PI / 2, 0, 0])
       return
     case 'towStrap':
       k.add('tail', box(0.035, 0.05, 0.008), [wid * 0.3, lift + 0.05, front + 0.03])
@@ -250,13 +259,19 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
     case 'headlightTape':
       // X of tape over each headlight, endurance style.
       for (const sd of SIDES) {
-        const [z, y, rx] = t.nose(t.lightY)
-        for (const a of [-0.35, 0.35]) k.add('black', plane(0.15, 0.008), [sd * wid * 0.3, y, z + 0.008], [rx, 0, a])
+        const [z, y, rx] = onNose(t, t.lightY, 0.013)
+        for (const a of [-0.35, 0.35]) k.add('black', plane(0.15, 0.008), [sd * wid * 0.3, y, z], [rx, 0, a])
       }
       return
     case 'chromeTrimWindow':
       if (!roof) return
-      for (const sd of SIDES) k.add('chrome', box(0.006, 0.01, t.cabinLen * 0.86), [sd * wid * 0.404, top + 0.022, t.cabinZ])
+      // Centred on the black window trim, in two lengths either side of the door pillar.
+      for (const sd of SIDES) {
+        const z0 = t.cabinZ - t.cabinLen * 0.43
+        const z1 = t.cabinZ + t.cabinLen * 0.43
+        const p = roofZ - roofLen * 0.05
+        for (const [a, b] of [[z0, p - 0.015], [p + 0.015, z1]]) if (b > a) k.add('chrome', box(0.007, 0.01, b - a), [sd * wid * 0.402, top + 0.022, (a + b) / 2])
+      }
       return
     case 'roofSeams':
       if (!roof) return
@@ -271,7 +286,7 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
       if (!roof) return
       for (const sd of SIDES) {
         k.add('chrome', box(0.018, 0.018, roofLen * 0.86), [sd * wid * 0.31, roofY + 0.035, roofZ])
-        for (const z of [-0.38, 0.38]) k.add('black', box(0.02, 0.035, 0.025), [sd * wid * 0.31, roofY + 0.015, roofZ + z * roofLen])
+        for (const z of [-0.38, 0.38]) k.add('black', box(0.024, 0.035, 0.025), [sd * wid * 0.31, roofY + 0.015, roofZ + z * roofLen])
       }
       for (const z of [-0.3, 0, 0.3]) k.add('black', box(wid * 0.66, 0.012, 0.02), [0, roofY + 0.045, roofZ + z * roofLen])
       return
@@ -286,8 +301,8 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
       return
     case 'sunroof':
       if (!roof) return
-      k.add('black', box(wid * 0.48, 0.004, roofLen * 0.42), [0, roofY + 0.002, roofZ + roofLen * 0.12])
-      k.add('glass', box(wid * 0.42, 0.006, roofLen * 0.36), [0, roofY + 0.003, roofZ + roofLen * 0.12])
+      k.add('black', box(wid * 0.48, 0.007, roofLen * 0.42), [0, roofY + 0.0005, roofZ + roofLen * 0.12])
+      k.add('glass', box(wid * 0.42, 0.006, roofLen * 0.36), [0, roofY + 0.0035, roofZ + roofLen * 0.12])
       return
     case 'panoRoof':
       if (roof) k.add('glass', box(wid * 0.74, 0.006, roofLen * 0.9), [0, roofY + 0.003, roofZ])
@@ -320,16 +335,17 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
     case 'lightBar':
       if (!roof) return
       k.add('black', rbox(wid * 0.72, 0.04, 0.05, 0.012), [0, roofY + 0.04, roofZ + roofLen * 0.38])
-      for (const x of [-0.3, -0.15, 0, 0.15, 0.3]) k.add('lamp', disc(0.016, 10), [x * wid, roofY + 0.04, roofZ + roofLen * 0.38 + 0.026])
+      for (const x of [-0.3, -0.15, 0, 0.15, 0.3]) k.add('lamp', disc(0.016, 10), [x * wid, roofY + 0.04, roofZ + roofLen * 0.38 + 0.028])
       for (const sd of SIDES) k.add('black', box(0.015, 0.03, 0.015), [sd * wid * 0.32, roofY + 0.012, roofZ + roofLen * 0.38])
       return
     case 'hoodPins':
       for (const sd of SIDES) {
-        k.add('chrome', cyl(0.013, 0.013, 0.008, 10), [sd * wid * 0.27, hoodY + 0.004, t.hoodFront - 0.05])
+        k.add('chrome', cyl(0.013, 0.013, 0.01, 10), [sd * wid * 0.27, hoodY + 0.003, t.hoodFront - 0.05])
         k.add('black', box(0.004, 0.003, 0.03), [sd * wid * 0.27, hoodY + 0.009, t.hoodFront - 0.05])
       }
       return
     case 'hoodVents':
+      if (t.hood) return
       for (const sd of SIDES) for (let i = 0; i < 4; i++) k.add('black', box(0.1, 0.006, 0.01), [sd * wid * 0.18, hoodY + t.bulge + 0.004, (t.cowl + t.hoodFront) / 2 + (i - 1.5) * 0.024])
       return
     case 'hoodChevron': {
@@ -354,7 +370,7 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
       k.add('black', box(wid * 0.72, 0.014, 0.02), [0, hoodY + 0.03, t.hoodFront - 0.01])
       for (const x of [-0.27, -0.09, 0.09, 0.27]) {
         k.add('black', cyl(0.03, 0.03, 0.03, 12), [x * wid, hoodY + 0.055, t.hoodFront], [Math.PI / 2, 0, 0])
-        k.add('lamp', disc(0.025, 12), [x * wid, hoodY + 0.055, t.hoodFront + 0.016])
+        k.add('lamp', disc(0.025, 12), [x * wid, hoodY + 0.055, t.hoodFront + 0.018])
       }
       return
     case 'louvers': {
@@ -373,7 +389,7 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
       return
     }
     case 'deckLouvers':
-      for (let i = 0; i < 5; i++) k.add('black', box(wid * 0.56, 0.006, 0.016), [0, top + 0.004, -front + 0.12 + i * 0.035])
+      for (let i = 0; i < 5; i++) k.add('black', box(wid * 0.56, 0.006, 0.016), [0, top + 0.006, -front + 0.12 + i * 0.035])
       return
     case 'sharkFin':
       k.add('paint', rbox(0.014, 0.08, len * 0.3, 0.006), [0, top + 0.035, -len * 0.26])
@@ -384,27 +400,27 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
     case 'rearRack':
       for (const sd of SIDES) k.add('chrome', box(0.012, 0.012, 0.16), [sd * wid * 0.22, top + 0.03, -front + 0.13])
       for (const z of [-front + 0.07, -front + 0.13, -front + 0.19]) k.add('chrome', box(wid * 0.46, 0.01, 0.01), [0, top + 0.035, z])
-      for (const sd of SIDES) k.add('chrome', box(0.01, 0.03, 0.01), [sd * wid * 0.22, top + 0.015, -front + 0.07])
+      for (const sd of SIDES) k.add('chrome', box(0.01, 0.033, 0.01), [sd * wid * 0.22, top + 0.0135, -front + 0.07])
       return
     case 'continental':
-      k.add('paint', cyl(wheel * 0.85, wheel * 0.85, 0.07, 18), [0, lift + 0.12, -front - 0.07], [Math.PI / 2, 0, 0])
-      k.add('chrome', new TorusGeometry(wheel * 0.85, 0.012, 5, 18), [0, lift + 0.12, -front - 0.106])
-      k.add('chrome', disc(wheel * 0.35, 14), [0, lift + 0.12, -front - 0.107], [0, Math.PI, 0])
+      k.add('paint', cyl(wheel * 0.85, wheel * 0.85, 0.07, 18), [0, lift + 0.12, -front - 0.0725], [Math.PI / 2, 0, 0])
+      k.add('chrome', new TorusGeometry(wheel * 0.85, 0.012, 5, 18), [0, lift + 0.12, -front - 0.1085])
+      k.add('chrome', disc(wheel * 0.35, 14), [0, lift + 0.12, -front - 0.110], [0, Math.PI, 0])
       return
     case 'spare': {
       const y = t.closed ? lift + t.body * 0.55 : top + 0.06
       k.add('black', cyl(wheel * 0.95, wheel * 0.95, 0.1, 16), [0, y, -front - 0.06], [Math.PI / 2, 0, 0])
-      k.add('chrome', disc(wheel * 0.45, 12), [0, y, -front - 0.111], [0, Math.PI, 0])
-      k.add('dark', disc(wheel * 0.15, 8), [0, y, -front - 0.113], [0, Math.PI, 0])
+      k.add('chrome', disc(wheel * 0.45, 12), [0, y, -front - 0.113], [0, Math.PI, 0])
+      k.add('dark', disc(wheel * 0.15, 8), [0, y, -front - 0.1155], [0, Math.PI, 0])
       return
     }
     case 'stowage':
       // Jerry cans on the tail and a pair of ammo boxes on the deck.
       for (const sd of SIDES) {
-        k.add('dark', rbox(0.06, 0.12, 0.1, 0.012), [sd * wid * 0.3, top - 0.05, -front - 0.05])
+        k.add('dark', rbox(0.06, 0.12, 0.1, 0.012), [sd * wid * 0.3, top - 0.05, -front - 0.0475])
         k.add('black', box(0.04, 0.012, 0.02), [sd * wid * 0.3, top + 0.016, -front - 0.04])
       }
-      for (const x of [-0.08, 0.08]) k.add('dark', rbox(0.12, 0.06, 0.08, 0.008), [x, top + 0.03, -front + 0.12])
+      for (const x of [-0.08, 0.08]) k.add('dark', rbox(0.12, 0.06, 0.08, 0.008), [x, top + 0.027, -front + 0.12])
       return
     case 'towHitch':
       k.add('black', box(0.04, 0.04, 0.1), [0, lift + 0.04, -front - 0.04])
@@ -421,10 +437,10 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
       }
       return
     case 'sideStripe':
-      for (const sd of SIDES) k.add('dark', plane(len * 0.78, 0.035), [sd * (wid / 2 + 0.005), lift + t.body * 0.72, -0.02], [0, (sd * Math.PI) / 2, 0])
+      for (const sd of SIDES) k.add('dark', plane(len * 0.78, 0.035), [sd * (wid / 2 + 0.0022), lift + t.body * 0.72, -0.02], [0, (sd * Math.PI) / 2, 0])
       return
     case 'chromeBelt':
-      for (const sd of SIDES) k.add('chrome', box(0.006, 0.012, len * 0.82), [sd * (wid / 2 + 0.004), lift + t.body * 0.5, 0])
+      for (const sd of SIDES) k.add('chrome', box(0.0175, 0.012, len * 0.82), [sd * (wid / 2 + 0.00575), lift + t.body * 0.5, 0])
       return
     case 'fenderVents':
       for (const sd of SIDES) for (let i = 0; i < 3; i++) k.add('black', box(0.008, 0.01, 0.08), [sd * (wid / 2 + 0.004), lift + t.body * 0.45 + i * 0.024, wz - wheel * 1.45])
@@ -433,17 +449,28 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
       for (const sd of SIDES) for (const z of [wz, -wz]) k.add('chrome', new TorusGeometry(wheel * 1.26, 0.008, 4, 14, Math.PI), [sd * (wid / 2 + 0.006), wheel, z], [0, (sd * Math.PI) / 2, 0], [1, 1, 1.2])
       return
     case 'roundel':
-      // A white racing disc on each door with a black number one.
+      // A white racing disc on each door with a black number one, standing clear of the
+      // door seams and wheel wells. A body kit's arches and skirts would cover the doors, so
+      // then it goes on the roof (and on open cars with a kit there's no number at all).
+      if (t.kit) {
+        if (t.roofLen < 0.2) return
+        const y = t.roofY + 0.0085
+        k.add('lamp', disc(0.065, 18), [0, y, t.roofZ], [-Math.PI / 2, 0, 0])
+        k.add('black', plane(0.014, 0.07), [0, y + 0.0025, t.roofZ], [-Math.PI / 2, 0, 0])
+        k.add('black', plane(0.025, 0.012), [0.008, y + 0.0025, t.roofZ - 0.03], [-Math.PI / 2, 0, -0.6])
+        return
+      }
       for (const sd of SIDES) {
-        const p: V3 = [sd * (wid / 2 + 0.005), lift + t.body * 0.55, t.cabinZ]
+        const p: V3 = [sd * (wid / 2 + 0.0085), lift + t.body * 0.55, t.cabinZ]
         k.add('lamp', disc(0.065, 18), p, [0, (sd * Math.PI) / 2, 0])
-        k.add('black', plane(0.014, 0.07), [p[0] + sd * 0.002, p[1], p[2]], [0, (sd * Math.PI) / 2, 0])
-        k.add('black', plane(0.025, 0.012), [p[0] + sd * 0.002, p[1] + 0.03, p[2] + 0.008], [0, (sd * Math.PI) / 2, -0.6])
+        k.add('black', plane(0.014, 0.07), [p[0] + sd * 0.0045, p[1], p[2]], [0, (sd * Math.PI) / 2, 0])
+        k.add('black', plane(0.025, 0.012), [p[0] + sd * 0.0045, p[1] + 0.03, p[2] + 0.008], [0, (sd * Math.PI) / 2, -0.6])
       }
       return
     case 'splitter':
-      k.add('black', box(wid * 0.98, 0.012, 0.07), [0, lift + 0.012, front + 0.015])
-      for (const sd of SIDES) k.add('black', box(0.012, 0.03, 0.07), [sd * wid * 0.48, lift + 0.025, front + 0.015])
+      // Kept 0.003 inside a body kit's front lip (0.49 of the width) at the sides.
+      k.add('black', box(wid * 0.98 - 0.006, 0.012, 0.07), [0, lift + 0.012, front + 0.015])
+      for (const sd of SIDES) k.add('black', box(0.012, 0.032, 0.07), [sd * (wid * 0.49 - 0.009), lift + 0.024, front + 0.015])
       return
     case 'canards':
       for (const sd of SIDES) for (const dy of [0, -0.035]) k.add('black', box(0.012, 0.006, 0.07), [sd * (wid / 2 + 0.002), t.lightY - 0.04 + dy, front - 0.04], [0, 0, sd * -0.3])
@@ -476,7 +503,7 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
       k.add('wood', box(0.17, 0.12, 0.17), [-wid * 0.15, top + 0.07, -len * 0.33])
       k.add('wood', box(0.14, 0.1, 0.14), [wid * 0.17, top + 0.06, -len * 0.22], [0, 0.3, 0])
       k.add('wood', box(0.12, 0.09, 0.12), [-wid * 0.13, top + 0.175, -len * 0.33], [0, -0.25, 0])
-      for (const y of [0.04, 0.1]) k.add('black', box(0.172, 0.008, 0.172), [-wid * 0.15, top + y, -len * 0.33])
+      for (const y of [0.04, 0.1]) k.add('black', box(0.176, 0.008, 0.176), [-wid * 0.15, top + y, -len * 0.33])
       return
     case 'humps':
       for (const sd of SIDES) k.add('paint', new SphereGeometry(1, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), [sd * wid * 0.2, top, t.cabinZ - t.cabinLen * 0.5 - 0.1], [0, 0, 0], [wid * 0.12, 0.08, 0.22])
@@ -484,9 +511,9 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
     case 'stopArm': {
       // A red stop sign with a white rim, folded flat against the driver's side.
       const p: V3 = [wid / 2 + 0.012, lift + t.body * 0.75, front - 0.42]
-      k.add('black', box(0.012, 0.02, 0.07), [p[0] - 0.004, p[1], p[2] + 0.06])
+      k.add('black', box(0.012, 0.02, 0.07), [p[0] - 0.009, p[1], p[2] + 0.06])
       k.add('lamp', disc(0.068, 8), p, [Math.PI / 8, Math.PI / 2, 0])
-      k.add('tail', disc(0.058, 8), [p[0] + 0.002, p[1], p[2]], [Math.PI / 8, Math.PI / 2, 0])
+      k.add('tail', disc(0.058, 8), [p[0] + 0.0025, p[1], p[2]], [Math.PI / 8, Math.PI / 2, 0])
       k.add('lamp', box(0.002, 0.008, 0.06), [p[0] + 0.004, p[1], p[2]])
       return
     }
@@ -494,17 +521,17 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
       if (!roof) return
       for (const u of [0.24, -0.24]) {
         k.add('black', box(wid * 0.34, 0.014, 0.2), [0, roofY + 0.006, roofZ + u * roofLen])
-        k.add('dark', box(wid * 0.3, 0.018, 0.17), [0, roofY + 0.008, roofZ + u * roofLen])
+        k.add('dark', box(wid * 0.3, 0.015, 0.17), [0, roofY + 0.0095, roofZ + u * roofLen])
       }
       return
     case 'schoolSign': {
       // An amber name board over the windscreen with dark letters.
       if (!roof) return
-      const z = t.cabinZ + t.cabinLen / 2 + 0.012
+      const z = t.cabinZ + t.cabinLen / 2 + 0.018
       const y = roofY - 0.04
       k.add('black', plane(wid * 0.56, 0.05), [0, y, z])
-      k.add('amber', plane(wid * 0.52, 0.036), [0, y, z + 0.001])
-      for (let i = 0; i < 6; i++) k.add('black', plane(0.024, 0.022), [(i - 2.5) * wid * 0.075, y, z + 0.002])
+      k.add('amber', plane(wid * 0.52, 0.036), [0, y, z + 0.0025])
+      for (let i = 0; i < 6; i++) k.add('black', plane(0.024, 0.022), [(i - 2.5) * wid * 0.075, y, z + 0.005])
       return
     }
     case 'crossingArm':
@@ -555,13 +582,13 @@ export function trimBike(k: Kit, model: string | undefined, b: { r: number; wz: 
   if (model === 'baron') {
     for (const sd of SIDES) {
       k.add('seat', rbox(0.07, 0.12, 0.2, 0.03), [sd * 0.12, b.r * 2 + 0.02, -b.wz + 0.06])
-      k.add('chrome', disc(0.012, 8), [sd * 0.156, b.r * 2 + 0.04, -b.wz + 0.06], [0, (sd * Math.PI) / 2, 0])
+      k.add('chrome', disc(0.012, 8), [sd * 0.1575, b.r * 2 + 0.04, -b.wz + 0.06], [0, (sd * Math.PI) / 2, 0])
     }
     k.add('screen', box(0.2, 0.16, 0.008), [0, hy + 0.12, hz + 0.03], [-0.2, 0, 0])
   }
   if (model === 'shinden') {
     k.add('lamp', disc(0.05, 14), [0, hy - 0.08, hz + 0.135], [0, 0, 0])
-    k.add('black', plane(0.012, 0.05), [0, hy - 0.08, hz + 0.137])
+    k.add('black', plane(0.012, 0.05), [0, hy - 0.08, hz + 0.1425])
     for (const sd of SIDES) k.add('dark', plane(0.18, 0.04), [sd * 0.083, b.r + 0.04, 0.04], [0, (sd * Math.PI) / 2, -0.1])
   }
 }

@@ -50,12 +50,12 @@ export function iceCreamGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   k.add('paint', rbox(wid, 0.51, 0.3, 0.05), [0, bot + 0.255, 0.31])
   k.add('paint', rbox(wid, 0.27, 0.28, 0.05), [0, bot + 0.135, 0.56])
   k.add('dark', rbox(wid * 1.01, 0.06, len * 0.8, 0.025), [0, 0.16, 0])
-  arches(k, hw, wz, r)
+  arches(k, hw * 1.01, wz, r)
   // A pink trim band round the roof edge.
   k.add('pink', rbox(wid + 0.012, 0.035, 0.935, 0.012), [0, top - 0.012, -0.24])
 
   // Cab glass: a near-upright windshield and a window in each door.
-  k.add('glass', plane(wid * 0.84, 0.18), [0, 0.555, 0.462], [-0.08, 0, 0])
+  k.add('glass', plane(wid * 0.84, 0.18), [0, 0.555, 0.47], [-0.08, 0, 0])
   k.add('black', box(wid * 0.86, 0.02, 0.012), [0, 0.452, 0.462])
   for (const sd of [-1, 1]) {
     k.add('glass', plane(0.2, 0.16), [sd * (hw + 0.004), 0.55, 0.32], side(sd))
@@ -67,12 +67,12 @@ export function iceCreamGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
     k.add('black', rbox(0.018, 0.08, 0.05, 0.008), [sd * (hw + 0.045), 0.52, 0.44])
   }
   // Wipers on the windshield's base.
-  for (const x of [-0.14, 0.12]) k.add('black', box(0.16, 0.008, 0.01), [x, 0.47, 0.468], [0, 0, 0.2])
+  for (const x of [-0.14, 0.12]) k.add('black', box(0.16, 0.008, 0.01), [x, 0.47, 0.482], [0, 0, 0.2])
 
   // Pastel stripes along both sides of the box and cab, and across the back.
   for (const sd of [-1, 1]) {
-    k.add('pink', plane(1.14, 0.045), [sd * (hw + 0.004), 0.365, -0.12], side(sd))
-    k.add('mint', plane(1.14, 0.045), [sd * (hw + 0.004), 0.415, -0.12], side(sd))
+    k.add('pink', plane(1.14, 0.045), [sd * (hw + 0.008), 0.365, -0.12], side(sd))
+    k.add('mint', plane(1.14, 0.045), [sd * (hw + 0.008), 0.415, -0.12], side(sd))
   }
   k.add('pink', plane(wid * 0.94, 0.045), [0, 0.365, -front - 0.004], BACK)
   k.add('mint', plane(wid * 0.94, 0.045), [0, 0.415, -front - 0.004], BACK)
@@ -100,17 +100,17 @@ export function iceCreamGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   for (let i = 0; i < slats; i++) {
     const z = wzc - 0.25 + sw * (i + 0.5)
     const part = i % 2 ? 'cream' : 'pink'
-    k.add(part, box(out, 0.012, sw + 0.001), [sx + (out / 2) * Math.cos(tilt), 0.8 + (out / 2) * Math.sin(tilt), z], [0, 0, tilt])
+    k.add(part, box(out, 0.012, sw), [sx + (out / 2) * Math.cos(tilt), 0.8 + (out / 2) * Math.sin(tilt), z], [0, 0, tilt])
     k.add(part, half(sw / 2), [sx + out * Math.cos(tilt) + 0.004, 0.8 + out * Math.sin(tilt), z], side(1))
   }
-  k.add('chrome', box(0.012, 0.012, 0.5), [sx + 0.004, 0.8, wzc])
+  k.add('chrome', box(0.012, 0.012, 0.49), [sx + 0.004, 0.8, wzc])
 
   // On the right (-x) side, a big cone picture.
   const dx = -(hw + 0.004)
   k.add('waffle', poly([[-0.08, 0.05], [0.08, 0.05], [0, -0.17]]), [dx, 0.6, -0.25], side(-1))
-  k.add('pink', disc(0.075, 16), [dx - 0.001, 0.69, -0.25], side(-1))
-  k.add('mint', disc(0.06, 16), [dx - 0.002, 0.78, -0.26], side(-1))
-  k.add('tail', disc(0.018, 10), [dx - 0.003, 0.845, -0.26], side(-1))
+  k.add('pink', disc(0.075, 16), [dx - 0.003, 0.69, -0.25], side(-1))
+  k.add('mint', disc(0.06, 16), [dx - 0.006, 0.78, -0.26], side(-1))
+  k.add('tail', disc(0.018, 10), [dx - 0.009, 0.845, -0.26], side(-1))
 
   // The giant cone on the roof: a waffle cone, two scoops and a cherry, on a stand.
   const cz = -0.28
@@ -138,7 +138,7 @@ export function iceCreamGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   k.add('black', plane(0.28, 0.1), [0, 0.31, nz + 0.003])
   for (let i = 0; i < 4; i++) k.add('chrome', box(0.27, 0.008, 0.008), [0, 0.275 + i * 0.024, nz + 0.006])
   k.add('chrome', rbox(wid * 1.02, 0.05, 0.05, 0.02), [0, 0.19, nz + 0.01])
-  k.add('dark', plane(0.13, 0.04), [0, 0.19, nz + 0.036])
+  k.add('dark', plane(0.13, 0.04), [0, 0.19, nz + 0.038])
 
   // Back: tail lamps, a window in the rear door, and a step bumper.
   const rz = -front - 0.004
@@ -149,7 +149,7 @@ export function iceCreamGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   k.add('glass', plane(0.32, 0.14), [0, 0.7, rz], BACK)
   k.add('dark', box(0.006, 0.6, 0.006), [0, 0.5, rz])
   k.add('chrome', box(0.012, 0.03, 0.012), [0.03, 0.5, rz - 0.006])
-  k.add('chrome', rbox(wid * 1.02, 0.05, 0.06, 0.02), [0, 0.19, -front - 0.012])
+  k.add('chrome', rbox(wid * 1.02, 0.05, 0.06, 0.02), [0, 0.19, -front - 0.016])
   if (!fit.exhaust) k.add('chrome', cyl(0.018, 0.018, 0.08, 8), [-0.24, 0.17, -front - 0.01], [Math.PI / 2, 0, 0])
 
   h.brakes(k, hw - 0.02, wz, r, 0.14)
@@ -170,11 +170,12 @@ export function parcelGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   k.add('paint', rbox(wid, top - bot, 1.1, 0.045), [0, (top + bot) / 2, -0.13])
   k.add('paint', rbox(wid * 0.98, 0.27, 0.28, 0.045), [0, bot + 0.135, front - 0.14])
   k.add('dark', rbox(wid * 1.01, 0.06, len * 0.82, 0.025), [0, 0.16, 0])
-  arches(k, hw, wz, r)
+  // Out past the skirt and the parcels in the open doorway.
+  arches(k, hw * 1.01 + 0.005, wz, r)
   const fz = 0.42
   // Windshield in two flat panes with a post between them, and a dark visor over them.
   k.add('glass', plane(wid * 0.86, 0.3), [0, 0.64, fz + 0.002])
-  k.add('black', box(0.018, 0.3, 0.01), [0, 0.64, fz + 0.004])
+  k.add('black', box(0.024, 0.3, 0.01), [0, 0.64, fz + 0.004])
   k.add('black', box(wid * 0.9, 0.022, 0.012), [0, 0.485, fz + 0.004])
   k.add('dark', rbox(wid * 0.96, 0.05, 0.06, 0.015), [0, 0.82, fz + 0.02])
   for (const x of [-0.13, 0.15]) k.add('black', box(0.012, 0.18, 0.008), [x, 0.58, fz + 0.007], [0, 0, 0.12])
@@ -189,14 +190,14 @@ export function parcelGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   k.add('black', plane(dz1 - dz0, 0.66), [ox, 0.52, dzc], side(1))
   for (const [z, y, w, hh] of [[0.2, 0.25, 0.1, 0.09], [0.31, 0.24, 0.08, 0.07], [0.2, 0.35, 0.09, 0.08], [0.32, 0.32, 0.07, 0.07], [0.22, 0.44, 0.07, 0.06]]) {
     k.add('waffle', plane(w, hh), [ox + 0.002, y, z], side(1))
-    k.add('dark', plane(w, 0.012), [ox + 0.003, y, z], side(1))
+    k.add('dark', plane(w, 0.012), [ox + 0.005, y, z], side(1))
   }
   k.add('seat', plane(0.07, 0.16), [ox + 0.002, 0.44, 0.355], side(1))
   k.add('dark', box(0.04, 0.012, dz1 - dz0), [ox + 0.018, 0.2, dzc])
   k.add('black', box(0.012, 0.02, 0.56), [ox + 0.006, 0.855, dzc - 0.14])
   const door = dzc - 0.25
   k.add('paint', rbox(0.016, 0.64, dz1 - dz0, 0.006), [ox + 0.014, 0.52, door])
-  k.add('glass', plane(0.15, 0.2), [ox + 0.023, 0.68, door], side(1))
+  k.add('glass', plane(0.15, 0.2), [ox + 0.025, 0.68, door], side(1))
   k.add('black', box(0.008, 0.06, 0.016), [ox + 0.024, 0.5, door + 0.09])
   // Far side: the driver's door shut, with a window.
   const fx = -(hw + 0.003)
@@ -212,8 +213,8 @@ export function parcelGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
     k.add('black', rbox(0.02, 0.12, 0.05, 0.008), [sd * (hw + 0.045), 0.64, fz + 0.01])
     // A plain parcel picture on the box: no lettering.
     k.add('waffle', plane(0.18, 0.13), [sd * (hw + 0.004), 0.62, -0.38], side(sd))
-    k.add('dark', plane(0.18, 0.016), [sd * (hw + 0.005), 0.62, -0.38], side(sd))
-    k.add('dark', plane(0.016, 0.13), [sd * (hw + 0.005), 0.62, -0.38], side(sd))
+    k.add('dark', plane(0.18, 0.016), [sd * (hw + 0.007), 0.62, -0.38], side(sd))
+    k.add('dark', plane(0.016, 0.13), [sd * (hw + 0.007), 0.62, -0.38], side(sd))
   }
 
   // Flat nose: round lamps, a grille and a black bumper.
@@ -235,7 +236,7 @@ export function parcelGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
     k.add('amber', plane(0.04, 0.03), [sd * 0.33, 0.39, bz], BACK)
     k.add('tail', box(0.04, 0.02, 0.02), [sd * 0.25, top + 0.008, -front + 0.03])
   }
-  k.add('black', rbox(wid * 1.02, 0.05, 0.08, 0.02), [0, 0.18, -front - 0.02])
+  k.add('black', rbox(wid * 1.02, 0.05, 0.065, 0.02), [0, 0.18, -front - 0.0225])
   if (!fit.exhaust) k.add('chrome', cyl(0.016, 0.016, 0.08, 8), [-0.22, 0.15, -front - 0.02], [Math.PI / 2, 0, 0])
 
   h.brakes(k, hw - 0.02, wz, r, 0.14)
@@ -288,7 +289,7 @@ export function monsterGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
 
   // Cab glass and trim.
   const ct = deck + 0.3
-  k.add('glass', plane(bw * 0.82, 0.17), [0, ct - 0.1, 0.342], [-0.1, 0, 0])
+  k.add('glass', plane(bw * 0.82, 0.17), [0, ct - 0.1, 0.352], [-0.1, 0, 0])
   k.add('glass', plane(bw * 0.78, 0.13), [0, ct - 0.09, -0.042], BACK)
   for (const sd of [-1, 1]) {
     k.add('glass', plane(0.3, 0.14), [sd * (hw * 0.96 + 0.004), ct - 0.095, 0.16], side(sd))
@@ -308,7 +309,7 @@ export function monsterGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   // Hood scoop, unless a hood mod sits there instead.
   if (!fit.hood) {
     k.add('chrome', rbox(0.2, 0.07, 0.16, 0.025), [0, deck + 0.16, 0.5])
-    k.add('black', plane(0.16, 0.04), [0, deck + 0.165, 0.581])
+    k.add('black', plane(0.16, 0.04), [0, deck + 0.165, 0.583])
   }
   // Exhaust stacks behind the cab.
   if (!fit.exhaust) for (const sd of [-1, 1]) {
@@ -327,7 +328,7 @@ export function monsterGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   k.add('black', cyl(0.025, 0.025, bw + 0.06, 10), [0, lift + 0.03, front + 0.04], [0, 0, Math.PI / 2])
   for (const sd of [-1, 1]) h.bar(k, 'black', [sd * 0.2, lift + 0.03, front + 0.04], [sd * 0.2, lift + 0.1, front - 0.01], 0.025)
   for (const sd of [-1, 1]) k.add('tail', plane(0.06, 0.07), [sd * 0.27, deck + 0.05, back - 0.004], BACK)
-  k.add('black', rbox(bw + 0.04, 0.05, 0.06, 0.02), [0, lift + 0.02, back - 0.03])
+  k.add('black', rbox(bw + 0.04, 0.05, 0.06, 0.02), [0, lift + 0.015, back - 0.03])
 
   h.brakes(k, track, wz, r, MONSTER.tyre)
 }

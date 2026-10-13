@@ -4,11 +4,11 @@
 --   * The crate tables (crateTables()) gain each crate's hat slice (HAT_ODDS, out of 100, taken
 --     from the coin prizes) and hat pool. A hat the save already has (st -> 'hats') is left out,
 --     and with none left the prize stays coins, as in the game.
--- crate_open(text, text) is 0066_casual_economy's (pity and free Class Cup crates kept) with the
+-- crate_open(text, text) is 0069_casual_economy's (pity and free Class Cup crates kept) with the
 -- hat branch and tables regenerated from the merged crateTables() (0071's new cars included).
--- It keeps 0066's signature, so wheel_spin() (0066) still reads its tables. crate_pay() and
+-- It keeps 0069's signature, so wheel_spin() (0069) still reads its tables. crate_pay() and
 -- econ_guard() are unchanged: the guard doesn't check hats.
--- Run after 0066 and 0071, and only once the game that knows hat prizes is live (ORDER RULE).
+-- Run after 0069 and 0071, and only once the game that knows hat prizes is live (ORDER RULE).
 
 alter table public.crate_opens add column if not exists hat text;
 alter table public.crate_opens drop constraint if exists crate_opens_kind_check;

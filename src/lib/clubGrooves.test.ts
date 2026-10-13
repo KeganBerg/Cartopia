@@ -30,10 +30,10 @@ describe('club tracks', () => {
     const drums = new Set(GROOVES.map((g) => `${g.kick ?? 'four'}|${g.claps}|${g.snare ?? 'clap'}`))
     expect(drums.size).toBeGreaterThanOrEqual(6)
     expect(new Set(GROOVES.map((g) => g.kickTone ?? 'house')).size).toBe(4)
-    expect(new Set(GROOVES.map((g) => g.bassTone ?? 'saw')).size).toBe(5)
+    expect(new Set(GROOVES.map((g) => g.bassTone ?? 'saw')).size).toBe(6)
     // Most have a hook, in several different sounds.
     expect(GROOVES.filter((g) => g.lead).length).toBeGreaterThanOrEqual(9)
-    expect(new Set(GROOVES.map((g) => g.lead?.tone).filter(Boolean)).size).toBe(5)
+    expect(new Set(GROOVES.map((g) => g.lead?.tone).filter(Boolean)).size).toBe(7)
     // No two tracks share a fingerprint.
     const print = (g: (typeof GROOVES)[number]) => JSON.stringify([g.bpm, g.kick, g.claps, g.bass, g.lead?.notes, g.acid])
     expect(new Set(GROOVES.map(print)).size).toBe(GROOVES.length)

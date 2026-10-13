@@ -599,9 +599,24 @@ export class Soundscape {
   }
 
   // One bass note: a saw, a hollow square, a deep sine, a growling reese (two
-  // detuned saws through a low filter) or a wobble (a filter swinging on the beat).
+  // detuned saws through a low filter), a wobble (a filter swinging on the
+  // beat) or a log drum.
   private bassNote(b: number, f: number, dur: number, peak: number, g: Groove, variant: boolean) {
     const tone: BassTone = g.bassTone ?? 'saw'
+    if (tone === 'log') {
+      // Amapiano's log drum: a pitched drum hit that drops onto its note, with
+      // a woody knock on top that gets through the walls.
+      const drop = (x: number) => (o: OscillatorNode) => {
+        o.frequency.setValueAtTime(f * x * 1.8, b)
+        o.frequency.exponentialRampToValueAtTime(f * x, b + 0.035)
+      }
+      this.blip(b, Math.min(dur, 0.45), peak * 1.8, null, drop(1), () => this.thump)
+      this.blip(b, 0.16, peak * 0.5, null, (o) => {
+        o.type = 'triangle'
+        drop(4)(o)
+      }, () => this.keys)
+      return
+    }
     if (tone === 'saw' || tone === 'square' || tone === 'sub') {
       this.blip(b, dur, peak * (tone === 'sub' ? 1.7 : tone === 'square' ? 0.75 : 1), null, (o) => {
         o.type = tone === 'sub' ? 'sine' : tone === 'square' ? 'square' : 'sawtooth'
@@ -644,16 +659,17 @@ export class Soundscape {
 
   // One note of the hook. Supersaw: a wide stack of detuned saws. Pluck: a
   // quick bright note that dies away. Square: a hollow chiptune-ish tone.
-  // Bell: a kalimba-like ping. Brass: saws whose filter swells open.
+  // Bell: a kalimba-like ping. Brass: saws whose filter swells open. Marimba:
+  // a woody struck tone. Vox: a chopped-up vocal "ah".
   private lead(t: number, f: number, dur: number, tone: LeadTone, gain: number, bright: number) {
     const lp = this.filter('lowpass', 400 + 3600 * bright * bright, this.keys, tone === 'pluck' ? 2 : 0.8)
     const g = this.ctx.createGain()
     g.connect(lp)
-    const peak = { supersaw: 0.03, pluck: 0.085, square: 0.03, bell: 0.06, brass: 0.04 }[tone] * gain
-    const ring = tone === 'bell' ? 0.6 : tone === 'pluck' ? 0.25 : 0.07
+    const peak = { supersaw: 0.03, pluck: 0.085, square: 0.03, bell: 0.06, brass: 0.04, marimba: 0.08, vox: 0.2 }[tone] * gain
+    const ring = tone === 'bell' ? 0.6 : tone === 'pluck' || tone === 'vox' ? 0.25 : tone === 'marimba' ? 0.35 : 0.07
     g.gain.setValueAtTime(0.0001, t)
     g.gain.exponentialRampToValueAtTime(peak, t + (tone === 'brass' ? 0.03 : 0.005))
-    if (tone === 'bell' || tone === 'pluck') g.gain.exponentialRampToValueAtTime(0.0001, t + dur + ring)
+    if (tone === 'bell' || tone === 'pluck' || tone === 'marimba') g.gain.exponentialRampToValueAtTime(0.0001, t + Math.min(dur, 0.12) + ring)
     else {
       g.gain.setValueAtTime(peak, t + dur)
       g.gain.exponentialRampToValueAtTime(0.0001, t + dur + ring)
@@ -663,8 +679,23 @@ export class Soundscape {
       lp.frequency.setValueAtTime(tone === 'pluck' ? top : top * 0.25, t)
       lp.frequency.exponentialRampToValueAtTime(tone === 'pluck' ? Math.max(300, top * 0.15) : top, t + (tone === 'pluck' ? 0.16 : 0.07))
     }
+    // A vocal chop: a buzzy voice through the two resonances of a vowel
+    // ("ah", "oh" or "eh", picked by the note), cut short.
+    let into: AudioNode = g
+    if (tone === 'vox') {
+      const [f1, f2] = [[730, 1090], [570, 840], [530, 1840]][Math.round(f) % 3]
+      into = this.ctx.createGain()
+      for (const [fq, amp] of [[f1, 1], [f2, 0.6]]) {
+        const a = this.ctx.createGain()
+        a.gain.value = amp
+        into.connect(this.filter('bandpass', fq, a, 6))
+        a.connect(g)
+      }
+    }
     const parts: [OscillatorType, number, number][] =
-      tone === 'supersaw' ? [['sawtooth', 0.99, 1], ['sawtooth', 1, 1], ['sawtooth', 1.01, 1]]
+      tone === 'vox' ? [['sawtooth', 1, 1], ['sawtooth', 1.006, 1]]
+      : tone === 'marimba' ? [['sine', 1, 1], ['sine', 4, 0.25], ['sine', 9.2, 0.08]]
+      : tone === 'supersaw' ? [['sawtooth', 0.99, 1], ['sawtooth', 1, 1], ['sawtooth', 1.01, 1]]
       : tone === 'pluck' ? [['sawtooth', 1, 0.7], ['triangle', 1, 1]]
       : tone === 'square' ? [['square', 1, 1], ['square', 0.5, 0.4]]
       : tone === 'bell' ? [['sine', 1, 1], ['sine', 2.76, 0.35], ['sine', 5.4, 0.12]]
@@ -673,13 +704,16 @@ export class Soundscape {
       const o = this.ctx.createOscillator()
       o.type = type
       o.frequency.value = f * x
-      if (amp === 1) o.connect(g)
+      if (amp === 1) o.connect(into)
       else {
         const a = this.ctx.createGain()
         a.gain.value = amp
-        // A bell's upper partials die away first.
-        if (tone === 'bell') a.gain.exponentialRampToValueAtTime(0.0001, t + 0.12 / x + 0.05)
-        o.connect(a).connect(g)
+        // A bell's or marimba's upper partials die away first.
+        if (tone === 'bell' || tone === 'marimba') {
+          a.gain.setValueAtTime(amp, t)
+          a.gain.exponentialRampToValueAtTime(0.0001, t + (tone === 'marimba' ? 0.04 : 0.12) / x + 0.05)
+        }
+        o.connect(a).connect(into)
       }
       o.start(t)
       o.stop(t + dur + ring + 0.05)

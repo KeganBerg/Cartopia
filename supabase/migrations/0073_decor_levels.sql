@@ -3,7 +3,7 @@
 -- level 5 for looks and tourists. econ_catalog() is rebuilt from econCatalog() so those buildings
 -- carry an "up" table (coins spent per level, no coins, XP or fuel per minute) and the save guard
 -- accepts their upgrades and pays the usual upgrade XP. It is built from the merged econCatalog(), so it
--- also carries 0066's casual economy prices and 0071's oddball cars; econ_guard() is 0066's and
+-- also carries 0069's casual economy prices and 0071's oddball cars; econ_guard() is 0069's and
 -- crate_open() is 0072's.
 -- Run it only after the client with decor levels is shipped (ORDER RULE): until then the guard
 -- sends a decor upgrade back to its last saved level.

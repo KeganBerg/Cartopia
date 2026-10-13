@@ -1,0 +1,30 @@
+/* Daily Spin (ui/Wheel.tsx): the 3D wheel full screen, odds and the Spin button docked below. */
+.wh-dock { gap: 8px; }
+.wh-odds { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; padding: 5px; background: rgba(24,18,38,.82); border: 2px solid rgba(255,255,255,.25); border-radius: 14px; }
+.wh-odd { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 58px; padding: 5px 2px 4px; border-radius: 10px;
+  background: linear-gradient(color-mix(in srgb, var(--tier) 55%, #1a1428), color-mix(in srgb, var(--tier) 25%, #120c1c)); border: 2px solid var(--tier); }
+.wh-odd b { font: 15px/1 var(--display); color: #fff; text-shadow: 0 1px 0 rgba(0,0,0,.5); }
+.wh-odd small { font: 12px/1 var(--display); color: rgba(255,255,255,.8); }
+.wh-go { font-size: 26px; padding: 12px; }
+.wh-stack { position: relative; display: inline-block; }
+.wh-stack > span { position: absolute; display: flex; }
+.wh-jackpot { display: flex; flex-direction: column; align-items: center; line-height: 1; }
+.wh-crown { font-size: 13px; margin-bottom: -4px; }
+.wh-swatch { display: inline-block; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 6px rgba(255,255,255,.4); }
+.wh-swatch.sm { width: 28px; height: 28px; }
+
+/* The prize card: the render, one line, Collect. */
+.wh-prize { position: absolute; left: 50%; bottom: calc(12px + var(--sab)); transform: translateX(-50%); width: min(520px, calc(100vw - 16px - var(--sal) - var(--sar)));
+  display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px; background: rgba(20,14,32,.92); border: 3px solid var(--tier); border-radius: 18px;
+  box-shadow: 0 0 26px var(--tier), 0 4px 0 rgba(0,0,0,.4); animation: prize-in .45s cubic-bezier(.2,1.4,.4,1) both; }
+.wh-prize .thumb3d { width: 200px; height: 130px; }
+.wh-prize .crate-open { width: 100%; }
+.wh-prize-ico { padding: 4px; filter: drop-shadow(0 0 10px var(--tier)); }
+.wh-prize-line { display: flex; align-items: center; gap: 8px; font: 28px/1.1 var(--display); font-weight: normal; color: #fff; text-align: center; }
+
+@media (min-width: 900px) and (min-aspect-ratio: 5/4) {
+  .wh-odds { grid-template-columns: repeat(2, 1fr); }
+  .wh-odd { flex-direction: row; gap: 8px; justify-content: flex-start; padding: 6px 10px; min-height: 0; }
+  .wh-odd small { margin-left: auto; }
+  .wh-prize { left: auto; right: calc(16px + var(--sar)); bottom: 50%; transform: translateY(50%); width: 360px; animation-name: prize-in-side; }
+}

@@ -4,7 +4,7 @@ import { signedInUser } from './cloud'
 import { displayName } from './names'
 import { useGame } from '../game/store'
 
-// Postcards (supabase/migrations/0067_postcards_crew_parts.sql): a picture card and a set
+// Postcards (supabase/migrations/0070_postcards_crew_parts.sql): a picture card and a set
 // message for another player, one per friend a day. Set messages only, so there's no free
 // text to moderate. Sending one counts towards friendship (game/friendship.ts).
 

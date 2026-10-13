@@ -4,7 +4,7 @@ import { signedInUser, flushSave } from './cloud'
 import { displayName } from './names'
 import { useGame } from '../game/store'
 
-// Crew part requests (supabase/migrations/0067_postcards_crew_parts.sql): once a day you can ask
+// Crew part requests (supabase/migrations/0070_postcards_crew_parts.sql): once a day you can ask
 // your crew for 10 parts. Crewmates give one at a time from their own parts (up to 5 each), and
 // what's been given is collected into your town.
 
