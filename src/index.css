@@ -1390,6 +1390,8 @@ html.calm .callout { animation: none !important; }
 /* Interactive car preview: drag to orbit, pinch/scroll to zoom, two fingers or right-drag to pan. */
 .car-preview { position: relative; touch-action: none; user-select: none; -webkit-user-select: none; }
 .car-preview canvas { cursor: grab; }
+/* The shared turntable canvas (scene/Stage.tsx Preview) fills its view. */
+.car-preview > .stage-slot, .upgrade-preview > .stage-slot { position: absolute; inset: 0; }
 .car-preview canvas:active { cursor: grabbing; }
 .cp-tools { position: absolute; top: 6px; right: 6px; display: flex; gap: 6px; }
 .cp-btn { width: 34px; height: 34px; border-radius: 50%; border: 2px solid #fff; background: rgba(38, 50, 56, .72); color: #fff; font-size: 17px; font-weight: 900; line-height: 1; display: grid; place-items: center; padding: 0; box-shadow: 0 2px 0 rgba(0,0,0,.25); }

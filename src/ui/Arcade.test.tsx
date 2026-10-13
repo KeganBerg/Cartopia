@@ -10,6 +10,7 @@ HTMLCanvasElement.prototype.getContext = (() => ctx) as never
 
 // The 3D parts stand in as plain elements; the parking scene pauses the town like the real one.
 vi.mock('@react-three/fiber', () => ({ Canvas: ({ children }: { children: React.ReactNode }) => <div className="cv">{children}</div>, useFrame: () => {}, useThree: () => ({}) }))
+vi.mock('../scene/Stage', () => ({ StageSlot: ({ children }: { children: React.ReactNode }) => <div className="cv">{children}</div>, useStageReady: () => true }))
 vi.mock('../scene/BuildingPreview', () => ({ CarThumb: () => null }))
 vi.mock('../scene/ChaseScene', () => ({ ChaseScene: () => null }))
 vi.mock('./ArcadeMore', () => ({ STAR_GAMES: [], StarGame: () => null }))

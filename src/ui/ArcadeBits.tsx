@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useGame, spendFuel, type OwnedCar } from '../game/store'
 import { carDef, performance } from '../game/data'
 import { ARCADE_FUEL } from '../game/arcade'
@@ -6,6 +6,14 @@ import type { ChaseCar } from '../scene/ChaseScene'
 import { sfx } from '../lib/sound'
 
 // Pieces every arcade game screen shares: fuel, the 3-2-1, and the result card.
+
+// A callback with one identity for the game's whole run that always calls the latest `fn`,
+// so the memoised scene (drawn in the shared canvas, scene/Stage.tsx) isn't redrawn by the HUD.
+export function useStable<A extends unknown[], R>(fn: (...a: A) => R) {
+  const ref = useRef(fn)
+  useLayoutEffect(() => void (ref.current = fn))
+  return useCallback((...a: A) => ref.current(...a), [])
+}
 
 export const pi = (c: OwnedCar) => performance(carDef(c.model), c.upgrades, c.mods)
 export const look = (c: OwnedCar): ChaseCar => ({ body: carDef(c.model).body, model: c.model, color: c.color, finish: c.finish, skin: c.skin, modSkin: c.modSkin, panels: c.panels, mods: c.mods, trim: c.trim, hat: c.hat })

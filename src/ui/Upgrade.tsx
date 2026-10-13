@@ -1,5 +1,5 @@
-import { useLayoutEffect, useRef, useState } from 'react'
-import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useFrame, useThree } from '@react-three/fiber'
 import { Vector3, type Group, type Mesh, type PerspectiveCamera } from 'three'
 import { useGame } from '../game/store'
 import {
@@ -14,7 +14,7 @@ import { VanguardTower } from '../scene/Landmark'
 import { frame, seat } from '../scene/fit'
 import { Panel } from './Menus'
 import { RaveButton } from './Techno'
-import { useCanvasDpr } from '../lib/prefs'
+import { Preview } from '../scene/Stage'
 import { COLOR_THEMES } from '../game/cityLook'
 
 const n = (v: number) => v.toLocaleString()
@@ -26,6 +26,8 @@ const time = (sec: number) => (sec >= 60 ? `${Math.floor(sec / 60)}m${sec % 60 ?
 // its natural size and the camera backs off until the whole thing, spinning,
 // fills the frame, so a level 10 sky tower is as easy to see as a pizza shop.
 const VIEW = new Vector3(3.4, 2.6, 3.4)
+// Drawn in the shared turntable canvas (scene/Stage.tsx), not a new one each time the panel opens.
+const CAM = { position: VIEW.toArray(), fov: 35, near: 0.1, far: 1000 }
 
 function Spinner({ def, level, landmark }: { def: BuildingDef; level: number; landmark?: boolean }) {
   const ref = useRef<Group>(null)
@@ -61,14 +63,16 @@ function Spinner({ def, level, landmark }: { def: BuildingDef; level: number; la
 
 // `landmark`: the block is (or this upgrade makes it) a Vanguard Tower, so show that instead of one house.
 function LevelPreview({ def, level, landmark }: { def: BuildingDef; level: number; landmark?: boolean }) {
-  const dpr = useCanvasDpr()
+  const scene = useMemo(() => (
+    <>
+      <hemisphereLight args={['#ffffff', '#90a4ae', 1]} />
+      <directionalLight position={[3, 5, 2]} intensity={1.4} />
+      <Spinner def={def} level={level} landmark={landmark} />
+    </>
+  ), [def, level, landmark])
   return (
     <div className="upgrade-preview">
-      <Canvas camera={{ position: VIEW.toArray(), fov: 35 }} dpr={dpr}>
-        <hemisphereLight args={['#ffffff', '#90a4ae', 1]} />
-        <directionalLight position={[3, 5, 2]} intensity={1.4} />
-        <Spinner def={def} level={level} landmark={landmark} />
-      </Canvas>
+      <Preview.StageSlot cam={CAM}>{scene}</Preview.StageSlot>
       <span className="upgrade-tag">{landmark ? LANDMARK_NAME : `Level ${level}${level > 1 ? ' look' : ''}`}</span>
     </div>
   )

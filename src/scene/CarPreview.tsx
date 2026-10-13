@@ -1,6 +1,6 @@
 import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ComponentRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { MOUSE, TOUCH, Vector3, type Group, type Mesh, type PerspectiveCamera } from 'three'
 import type { Body, Finish, SkinnedSlot, Panels } from '../game/data'
@@ -11,13 +11,17 @@ import { SkyEnv } from './SkyEnv'
 import type { Trim } from '../game/trim'
 import { BACKDROPS, FILTERS, backdrop, compose, photoFilter, savePhoto, type Backdrop } from './photo'
 import { useGame } from '../game/store'
-import { useCanvasDpr } from '../lib/prefs'
+import { Preview } from './Stage'
 
 type Look = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; panels?: Panels | null; stripe?: string | null; mods?: string[] | null; trim?: Trim | null; hat?: HatFit | null }
 
 // How big the car's bounding sphere is made, so long trucks and tiny bubble cars both fill the view.
 const FIT = 1.05
 const VIEW = new Vector3(2.7, 1.9, 2.7)
+// Drawn in the shared turntable canvas (scene/Stage.tsx): a canvas of its own meant a new
+// WebGL context, and every car shader compiled again, each time the garage opened.
+const CAM = { position: VIEW.toArray(), fov: 35, near: 0.1, far: 1000 }
+const BIG_CAM = { ...CAM, dpr: 2 }
 const SPIN = 0.6
 // How far the player can zoom, as a share of the distance that fits the whole car.
 const NEAR = 0.3
@@ -217,21 +221,20 @@ function Snapper({ snap }: { snap: React.RefObject<(() => HTMLCanvasElement) | n
   return null
 }
 
-function Stage({ look, big, onExpand, dyno, photo, snap }: { look: Look; big?: boolean; onExpand?: () => void; dyno?: DynoFeed | null; photo?: Backdrop | null; snap?: React.RefObject<(() => HTMLCanvasElement) | null> }) {
-  const dpr = useCanvasDpr(big ? 2 : 1.5)
+function Turntable({ look, big, onExpand, dyno, photo, snap }: { look: Look; big?: boolean; onExpand?: () => void; dyno?: DynoFeed | null; photo?: Backdrop | null; snap?: React.RefObject<(() => HTMLCanvasElement) | null> }) {
   const handle = useRef<Handle>(null)
   const [touched, setTouched] = useState(false)
   const bd = photo ?? BACKDROPS[0]
   return (
     <>
-      <Canvas camera={{ position: VIEW.toArray(), fov: 35 }} dpr={dpr}>
+      <Preview.StageSlot cam={big ? BIG_CAM : CAM}>
         <SkyEnv />
         {bd.bg && <color attach="background" args={[bd.bg]} />}
         <hemisphereLight args={[bd.fill[0], bd.fill[1], bd.fill[2]]} />
         <directionalLight position={[3, 5, 2]} intensity={bd.key[1]} color={bd.key[0]} />
         <Viewer look={look} handle={handle} onTouch={setTouched} dyno={dyno} floorSize={big ? 3 : 1.5} photo={photo} />
         {snap && <Snapper snap={snap} />}
-      </Canvas>
+      </Preview.StageSlot>
       {photo ? null : !dyno && <div className="cp-tools">
         {touched && <button className="cp-btn" title="Reset view" aria-label="Reset view" onClick={() => handle.current?.reset()}>↺</button>}
         {onExpand && <button className="cp-btn" title="Full screen" aria-label="Full screen" onClick={onExpand}>⛶</button>}
@@ -269,7 +272,7 @@ export function CarInspect({ title, onClose, ...look }: Look & { title: string; 
         <button className="close" aria-label={photo ? 'Leave photo mode' : 'Close'} onClick={photo ? () => setPhoto(false) : onClose}>✕</button>
       </div>
       <div className="ci-view car-preview" style={photo ? { filter: photoFilter(fl).css } : undefined}>
-        <Stage look={look} big photo={photo ? backdrop(bd) : null} snap={snap} />
+        <Turntable look={look} big photo={photo ? backdrop(bd) : null} snap={snap} />
         {flash > 0 && <div key={flash} className="ci-flash" aria-hidden />}
       </div>
       {photo && (
@@ -298,7 +301,7 @@ export function CarInspect({ title, onClose, ...look }: Look & { title: string; 
 export function CarPreview({ onExpand, dyno, children, ...look }: Look & { onExpand?: () => void; dyno?: DynoFeed | null; children?: React.ReactNode }) {
   return (
     <div className="car-preview">
-      <Stage look={look} onExpand={onExpand} dyno={dyno} />
+      <Turntable look={look} onExpand={onExpand} dyno={dyno} />
       {children}
     </div>
   )

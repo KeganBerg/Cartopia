@@ -5,7 +5,7 @@ import { World } from './scene/World'
 import { Hud } from './ui/Hud'
 import { FlyLayer } from './ui/Fly'
 import { ThumbRenderer } from './scene/BuildingPreview'
-import { StageCanvas } from './scene/Stage'
+import { Preview, StageCanvas } from './scene/Stage'
 import { BottomBar, ShopPanel, ShowroomPanel, GaragePanel, Toasts } from './ui/Menus'
 import { InventoryPanel } from './ui/Inventory'
 import { PaintPrizePopup } from './ui/PaintRivals'
@@ -161,6 +161,7 @@ export default function App() {
       <ThoughtBubble />
       <ThumbRenderer />
       <StageCanvas />
+      <Preview.StageCanvas />
       <Hud />
       <BottomBar />
       {panel === 'shop' && <ShopPanel />}
