@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useGame } from '../game/store'
 import { supabase } from '../lib/supabase'
-import { MAX_CHAT, firstRoom, sendChat, senderName, setMuted, useChat, viewRoom, type ChatMsg, type Room } from '../lib/chat'
+import { MAX_CHAT, canDelete, deleteChat, firstRoom, sendChat, senderName, setMuted, useChat, viewRoom, type ChatMsg, type Room } from '../lib/chat'
 import { useNames } from '../lib/profiles'
 import { Panel } from './Menus'
 import { ClanTag, useVisit } from './Social'
@@ -70,13 +70,18 @@ function ChatRoom({ room }: { room: Room }) {
   const uid = useChat((c) => c.uid)
   const msgs = useChat((c) => c.msgs[room])
   const muted = useChat((c) => c.muted)
+  const powers = useChat((c) => c.powers)
   // Re-render when senders' usernames arrive.
   useNames((n) => n.byId)
   const toast = useGame((s) => s.toast)
   const go = useVisit()
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
-  const [menu, setMenu] = useState<number | null>(null)
+  const [menu, setMenuId] = useState<number | null>(null)
+  // The message whose Delete was tapped once: the next tap deletes it.
+  const [sure, setSure] = useState<number | null>(null)
+  const setMenu = (id: number | null) => { setMenuId(id); setSure(null) }
+  const press = useRef<number>(0)
   const log = useRef<HTMLDivElement>(null)
   const pinned = useRef(true)
 
@@ -102,6 +107,26 @@ function ChatRoom({ room }: { room: Room }) {
     pinned.current = true
   }
 
+  // Long-press a bubble on a phone (or right-click it) for its menu.
+  const holdProps = (m: ChatMsg, has: boolean) => has ? {
+    onPointerDown: (e: React.PointerEvent) => {
+      if (e.pointerType !== 'touch') return
+      clearTimeout(press.current)
+      press.current = window.setTimeout(() => setMenu(m.id), 450)
+    },
+    onPointerUp: () => clearTimeout(press.current),
+    onPointerCancel: () => clearTimeout(press.current),
+    onPointerLeave: () => clearTimeout(press.current),
+    onContextMenu: (e: React.MouseEvent) => { e.preventDefault(); clearTimeout(press.current); setMenu(m.id) },
+  } : {}
+
+  const remove = async (m: ChatMsg) => {
+    if (sure !== m.id) return setSure(m.id)
+    setMenu(null)
+    const err = await deleteChat(room, m.id)
+    if (err) toast(err)
+  }
+
   return (
     <>
       <div
@@ -116,8 +141,10 @@ function ChatRoom({ room }: { room: Room }) {
         {shown.map((m, i) => {
           const mine = m.owner === uid
           const first = !grouped(shown[i - 1], m)
+          const del = canDelete(room, m, { uid, powers })
+          const has = del || !mine
           return (
-            <div key={m.id} className={`chat-msg${mine ? ' mine' : ''}${first ? ' first' : ''}`}>
+            <div key={m.id} className={`chat-msg${mine ? ' mine' : ''}${first ? ' first' : ''}${menu === m.id ? ' open' : ''}`}>
               {first && !mine && (
                 <button className="chat-who" onClick={() => setMenu(menu === m.id ? null : m.id)}>
                   <ClanTag clan={m.crew} small />
@@ -127,11 +154,22 @@ function ChatRoom({ room }: { room: Room }) {
               )}
               {menu === m.id && (
                 <div className="chat-menu">
-                  <button onClick={() => { setMenu(null); void go(m.owner) }}>🏘️ Visit town</button>
-                  <button onClick={() => { setMenu(null); setMuted(m.owner, senderName(m)); toast(`Muted ${senderName(m)}`) }}>🔇 Mute</button>
+                  {!mine && <button onClick={() => { setMenu(null); void go(m.owner) }}>🏘️ Visit town</button>}
+                  {!mine && <button onClick={() => { setMenu(null); setMuted(m.owner, senderName(m)); toast(`Muted ${senderName(m)}`) }}>🔇 Mute</button>}
+                  {del && (
+                    <button className={`chat-del${sure === m.id ? ' sure' : ''}`} onClick={() => void remove(m)}>
+                      🗑️ {sure === m.id ? 'Delete?' : 'Delete'}
+                    </button>
+                  )}
+                  <button className="chat-x" aria-label="Close" onClick={() => setMenu(null)}>✕</button>
                 </div>
               )}
-              <p className="chat-bubble">{m.body}{mine && first && <small>{ago(m.at)}</small>}</p>
+              <div className="chat-line">
+                <p className="chat-bubble" {...holdProps(m, has)}>{m.body}{mine && first && <small>{ago(m.at)}</small>}</p>
+                {has && menu !== m.id && (
+                  <button className="chat-more" aria-label="Message options" onClick={() => setMenu(m.id)}>⋯</button>
+                )}
+              </div>
             </div>
           )
         })}
