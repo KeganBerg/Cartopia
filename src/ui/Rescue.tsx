@@ -17,6 +17,9 @@ import { Confirm, useAsk } from './Confirm'
 import { BuildArt } from './Resto'
 import { piecesOf } from '../game/resto'
 
+// Rusty's top spot, where resto-mod pieces turn up (PIECE_SOURCES.rusty_track, rescue_roll()).
+const PIECE_SPOT = 'track'
+
 function lootLabel(l: Loot) {
   switch (l.kind) {
     case 'car': return { icon: '🚗', text: carDef(l.model).name }
@@ -373,9 +376,6 @@ const RESCUE_CAM = { position: [0, 14, 12] as [number, number, number], fov: 42,
 
 // The search, full screen: Rusty's tow truck drives a 3D lot (RescueScene)
 // and the controls float over it, like a race.
-// Rusty's top spot, where resto-mod pieces turn up (PIECE_SOURCES.rusty_track, rescue_roll()).
-const PIECE_SPOT = 'track'
-
 type Recap = { items: Loot[]; piece?: { model: string; piece: number } }
 
 function SearchScreen({ onHaul }: { onHaul: (r: Recap) => void }) {
