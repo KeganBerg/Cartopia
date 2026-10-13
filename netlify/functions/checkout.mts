@@ -34,7 +34,7 @@ export default async (req: Request) => {
   const res = await fetch('https://api.stripe.com/v1/checkout/sessions', {
     method: 'POST',
     headers: { Authorization: `Bearer ${stripe}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: sessionForm(pack, user, origin),
+    body: sessionForm(pack, user, origin, process.env.STRIPE_TAX_CODE || undefined),
     signal: AbortSignal.timeout(10000),
   })
   if (!res.ok) {

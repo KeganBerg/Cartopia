@@ -6,9 +6,14 @@ export const packById = (id: unknown): BucksPack | null => BUCKS_PACKS.find((p) 
 export const cents = (p: BucksPack) => Math.round(p.price * 100)
 
 // The form body for POST /v1/checkout/sessions. The price comes from the pack table here, never the page.
-export function sessionForm(p: BucksPack, user: string, origin: string): URLSearchParams {
+// Stripe turns Managed Payments on by default for new accounts, and it refuses a line item without a
+// product tax code. With a code (Netlify env STRIPE_TAX_CODE) the session keeps Managed Payments;
+// without one it's switched off for the session, as Stripe's error suggests.
+export function sessionForm(p: BucksPack, user: string, origin: string, taxCode?: string): URLSearchParams {
   const gems = p.bucks + p.bonus
+  const tax: Record<string, string> = taxCode ? { 'line_items[0][price_data][product_data][tax_code]': taxCode } : { 'managed_payments[enabled]': 'false' }
   return new URLSearchParams({
+    ...tax,
     mode: 'payment',
     client_reference_id: user,
     'metadata[user]': user,
