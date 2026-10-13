@@ -2210,3 +2210,8 @@ body:has(.race-full) .toasts { display: none; }
 .hat-tone { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: var(--seg); border-radius: 12px; padding: 4px; margin: 10px 0 2px; }
 .hat-tone button { border: 0; background: transparent; border-radius: 9px; padding: 8px 4px; min-height: 40px; font: 13px var(--display); color: #546e7a; cursor: pointer; }
 .hat-tone button.sel { background: #fff; color: #263238; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15); }
+
+/* A car's favourite jobs: one line of building icons (names in the tooltips). */
+.loves-tag { display: flex; align-items: center; gap: 3px; white-space: nowrap; overflow: hidden; }
+.car-tags .loves-tag { display: inline-flex; }
+.loves-ico { font-size: 15px; line-height: 1; padding: 2px 3px; background: #fff; border: 1.5px solid #f8bbd0; border-radius: 7px; }
