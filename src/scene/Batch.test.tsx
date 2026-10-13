@@ -152,3 +152,45 @@ describe('frozen Batch', () => {
     expect(scene.getObjectByName('late')!.matrixWorld.elements[12]).toBeCloseTo(3)
   })
 })
+
+// Prune: groups emptied by merging stop being walked each frame, and come back when live.
+function Yard({ live }: { live: boolean }) {
+  return (
+    <Batch version={live ? 1 : 0} freeze prune>
+      <group name="crate">
+        <group name="lid">
+          <mesh name="lid-box"><boxGeometry /><meshStandardMaterial color="#8d6e63" /></mesh>
+        </group>
+      </group>
+      <group name="crew">
+        <mesh name="crew-box"><boxGeometry /><meshStandardMaterial color="#1565c0" /></mesh>
+        <instancedMesh name="crew-fans" args={[new BoxGeometry(), undefined, 2]} />
+      </group>
+      <group name="tool" userData={live ? { noBatch: true } : {}}>
+        <mesh name="tool-box"><boxGeometry /><meshStandardMaterial color="#c62828" /></mesh>
+      </group>
+    </Batch>
+  )
+}
+
+describe('Batch prune', () => {
+  it('hides groups with nothing left to draw, and only those', async () => {
+    const r = await ReactThreeTestRenderer.create(<Yard live={false} />)
+    const scene = r.scene.instance as Object3D
+    const shown = (n: string) => scene.getObjectByName(n)!.visible
+    expect(shown('crate')).toBe(false)
+    expect(shown('lid')).toBe(false)
+    expect(shown('crew')).toBe(true) // the fans are still drawn live
+    expect(shown('tool')).toBe(false)
+    // Marked live: its group shows again and its box is drawn on its own.
+    await r.update(<Yard live />)
+    expect(shown('tool')).toBe(true)
+    expect(shown('tool-box')).toBe(true)
+    expect(shown('crate')).toBe(false)
+    // Gone: the originals are left as they were.
+    const crate = scene.getObjectByName('crate')!, lid = scene.getObjectByName('lid')!
+    await r.unmount()
+    expect(crate.visible).toBe(true)
+    expect(lid.visible).toBe(true)
+  })
+})
