@@ -1,8 +1,8 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { restoTables } from './resto'
+import { PIECE_SOURCES, restoTables } from './resto'
 import { CARS, MODS, MOD_SKINS, SKINS, carDef, modDef, modFits } from './data'
-import { CRATES, carCrate, carValue, carWorth, crateCars, crateDef, crateOdds, crateOddsShown, crateSkins, crateTables, crateValue, homeCars, homeMods, modChoices, modCrate, modWorth, rollCrate, skinOdds, type CrateDrop } from './crates'
+import { CRATES, carCrate, carValue, carWorth, crateCars, crateDef, crateOdds, crateOddsShown, crateSkins, crateTables, crateValue, homeCars, homeMods, modChoices, modCrate, modWorth, rollCrate, rollSourcePiece, skinOdds, type CrateDrop } from './crates'
 
 const dir = new URL('../../supabase/migrations/', import.meta.url)
 // The newest migration holding the crate tables.
@@ -170,6 +170,13 @@ describe('crates', () => {
     const real = crateDef('diamond')!
     const diamond = { ...real, odds: { ...real.odds, piece: 25 } }
     const restos = CARS.filter((c) => c.secret)
+    it('rolls pieces for rewards outside crates', () => {
+      const lvl = restos[0].unlockLevel
+      expect(rollSourcePiece('nowhere', lvl, [], [], () => 0)).toBeNull()
+      expect(rollSourcePiece('rusty_track', lvl, [], [], () => 0.99)).toBeNull()
+      const d = rollSourcePiece('rusty_track', lvl, [], [`${restos[0].id}:0`], () => 0)
+      expect(d).toEqual({ kind: 'piecedupe', model: restos[0].id, piece: 0, coins: PIECE_SOURCES.rusty_track.dupe })
+    })
     it('keeps pieces rare', () => {
       for (const id of ['garage', 'gold', 'diamond']) expect(crateOddsShown(crateDef(id)!, 30).piece).toBe(0.1)
     })

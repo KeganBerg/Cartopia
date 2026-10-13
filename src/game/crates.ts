@@ -5,7 +5,7 @@
 // rolled by the server (crate_open() in supabase/migrations/0040_crates.sql, same tables and
 // rules); guests roll here. crates.test.ts keeps the server's tables in step.
 import { CARS, MODS, MOD_SKINS, SKINS, carDef, modDef, modFits, ownedMods, type CarDef, type ModDef, type SkinDef, type SkinTier } from './data'
-import { PIECE_COUNT, pieceId, piecePool } from './resto'
+import { PIECE_COUNT, PIECE_SOURCES, pieceId, piecePool } from './resto'
 
 export type CrateId = 'street' | 'garage' | 'gold' | 'diamond'
 // piece: a resto-mod piece (game/resto.ts).
@@ -195,6 +195,14 @@ export function rollPiece(level: number, cars: { model: string }[], have: readon
   const done = Array.from({ length: PIECE_COUNT }, (_, i) => i).every((i) => i === piece || have.includes(pieceId(car.id, i)))
   if (!done) return { kind: 'piece', model: car.id, piece }
   return { kind: 'piece', model: car.id, piece, uid: newUid(rand), color: car.colors[Math.floor(rand() * car.colors.length)] }
+}
+
+// A piece from a reward outside crates (PIECE_SOURCES), for guests: null most goes. Hand a drop
+// to applyCrate() with no seq; signed-in players get theirs from econ_private.resto_piece_roll().
+export function rollSourcePiece(source: string, level: number, cars: { model: string }[], have: readonly string[], rand: () => number = Math.random) {
+  const src = PIECE_SOURCES[source]
+  if (!src || rand() >= src.odds) return null
+  return rollPiece(level, cars, have, rand, src.dupe)
 }
 
 export function rollCrate(c: CrateDef, level: number, cars: CarLike[], rand: () => number = Math.random, owned: OwnedSkins = { skins: [], modSkins: [] }): CrateDrop {

@@ -11,7 +11,8 @@
 --   * econ_catalog() rebuilt from econCatalog() (adds the three cars and the Resto Garage set).
 --   * piece_grant() rolls a piece from resto_tables() into crate_opens; crate_open() is 0062's
 --     with the crate tables regenerated from crateTables() and a 0.1% piece slice that calls it.
---     Rusty's Rescue (its own thread) can call piece_grant() for its top zone. econ_guard() is
+--     resto_piece_roll(me, source) rolls a non-crate source's chance (Rusty's Rescue top zone,
+--     wired by its own thread) and grants through piece_grant(). econ_guard() is
 --     unchanged (0041).
 -- Run it only AFTER the client with these cars ships, and after 0062 (ORDER RULE: it writes new
 -- car ids). 0064's wheel reads this crate_open()'s table and still finds the street crate.
@@ -73,7 +74,7 @@ $$;
 
 -- The resto-mods pieces build, from restoTables() in src/game/resto.ts (crates.test.ts checks it).
 create or replace function econ_private.resto_tables() returns jsonb language sql immutable as $$
-  select $resto${"pieces":4,"cars":{"sprint":{"unlock":10,"colors":["#1b4d3e","#efe7d2","#6d1b2b"]},"revenant":{"unlock":14,"colors":["#8d9094","#1c1c1c","#0d2a5c"]},"pontone":{"unlock":18,"colors":["#b71c1c","#cfd8dc","#1b5e20"]}}}$resto$::jsonb
+  select $resto${"pieces":4,"sources":{"rusty_track":{"odds":0.02,"dupe":2000}},"cars":{"sprint":{"unlock":10,"colors":["#1b4d3e","#efe7d2","#6d1b2b"]},"revenant":{"unlock":14,"colors":["#8d9094","#1c1c1c","#0d2a5c"]},"pontone":{"unlock":18,"colors":["#b71c1c","#cfd8dc","#1b5e20"]}}}$resto$::jsonb
 $$;
 revoke all on function econ_private.resto_tables() from public, anon, authenticated;
 
@@ -125,6 +126,37 @@ begin
   return o;
 end $$;
 revoke all on function econ_private.piece_grant(uuid, jsonb, int, int, text, int, int, int) from public, anon, authenticated;
+
+-- A piece from a reward outside crates (Rusty's Rescue): rolls `source`'s chance from
+-- resto_tables() 'sources' and, on a hit, grants a piece (piece_grant(), crate_opens kind 'piece'
+-- with crate = source and no cost) as the player's next crate_opens seq. Returns the row as
+-- crate_json() (the game hands it to applyCrate()), or null on a miss, an unknown source or no car
+-- in reach. Callers are server functions such as rescue_roll(); players can't call it.
+create or replace function econ_private.resto_piece_roll(me uuid, source text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  src jsonb := econ_private.resto_tables() -> 'sources' -> source;
+  st jsonb;
+  lvl int;
+  last_seq int;
+  o public.crate_opens;
+begin
+  if me is null or src is null or random() >= (src ->> 'odds')::numeric then
+    return null;
+  end if;
+  perform pg_advisory_xact_lock(hashtext('crate:' || me::text));
+  select g.state, g.level into st, lvl from public.game_saves g where g.owner_id = me;
+  if jsonb_typeof(st) is distinct from 'object' then
+    return null;
+  end if;
+  select coalesce(max(x.seq), 0) into last_seq from public.crate_opens x where x.owner_id = me;
+  o := econ_private.piece_grant(me, st, greatest(coalesce(lvl, 1), 1), last_seq + 1, source, 0, 0, (src ->> 'dupe')::int);
+  if o.seq is null then
+    return null;
+  end if;
+  return econ_private.crate_json(o);
+end $$;
+revoke all on function econ_private.resto_piece_roll(uuid, text) from public, anon, authenticated;
 
 create or replace function public.crate_open(p_crate text) returns jsonb
 language plpgsql security definer set search_path = '' as $$

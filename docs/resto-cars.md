@@ -7,9 +7,9 @@ pieces. Pieces of a car start dropping at its level. They're the top cars in the
 104, 110 and 116 (the best car sold is 96).
 
 - Odds: the 🧩 slice is 0.1% of Garage, Gold and Diamond opens (`piece` in `CRATES`).
-- Other sources (Rusty's Rescue top zone): roll with `rollPiece()` for guests and hand the drop to
-  `applyCrate()`; on the server call `econ_private.piece_grant()` with your own `p_crate` source
-  and no cost, under the player's crate lock, as the next `crate_opens` seq.
+- Other sources (`PIECE_SOURCES`, e.g. `rusty_track` at 2% per Old Race Track search): guests roll
+  `rollSourcePiece()`; on the server, `econ_private.resto_piece_roll(me, source)` returns a
+  crate_opens row as JSON or null. Either goes to `applyCrate()`.
 - Code: `src/game/resto.ts` (pieces, pool, `restoTables`), `rollPiece`/`rollCrate` in `src/game/crates.ts`, the 2x2 build
   card `src/ui/Resto.tsx`, bodies in `src/scene/restoCars.ts` (lofted like the exotics).
 - Server: `supabase/migrations/0065_resto_pieces.sql`. Pieces are counted from `crate_opens`,
