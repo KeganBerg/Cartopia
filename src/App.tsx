@@ -27,6 +27,7 @@ import { UpgradePanel } from './ui/Upgrade'
 import { BankPanel } from './ui/Bank'
 import { DealsPanel } from './ui/Deals'
 import { LevelUpSplash } from './ui/LevelUp'
+import { PurchaseSplash } from './ui/PurchaseSplash'
 import { GoalSplash } from './ui/GoalSplash'
 import { AccountPanel, openLegal } from './ui/Account'
 import { AlertsCard } from './ui/Alerts'
@@ -212,6 +213,7 @@ export default function App() {
       <MasteryPrizePopup />
       <RecapPopup />
       <LevelUpSplash />
+      <PurchaseSplash />
       <Toasts />
       <FlyLayer />
       <RaveHeadsUp />

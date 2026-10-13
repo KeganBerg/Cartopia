@@ -1,3 +1,4 @@
+import { create } from 'zustand'
 import type { BucksPack } from '../game/bucksPacks'
 import { useGame, type Purchase } from '../game/store'
 import { supabase } from './supabase'
@@ -33,19 +34,26 @@ export async function purchase(pack: BucksPack): Promise<PurchaseResult> {
   }
 }
 
+// Packs just added to the save, for the purchase splash (src/ui/PurchaseSplash.tsx).
+export const useBought = create<{ rows: Purchase[] | null; close: () => void }>((set) => ({ rows: null, close: () => set({ rows: null }) }))
+
 let missing = false
-// Adds paid packs the save hasn't counted yet. Returns the gems added.
+// Adds paid packs the save hasn't counted yet and shows them on the purchase splash. Returns the gems added.
 export async function syncPurchases(): Promise<number> {
   if (!supabase || !signedInUser() || missing) return 0
   const from = useGame.getState().purchases ?? 0
-  const { data, error } = await supabase.from('purchases').select('seq, bucks, coins, parts').gt('seq', from).order('seq')
+  const { data, error } = await supabase.from('purchases').select('seq, pack, bucks, coins, parts').gt('seq', from).order('seq')
   if (error) {
     // Not on this server yet.
     if (error.code === '42P01' || error.code === 'PGRST205') missing = true
     return 0
   }
-  const gems = useGame.getState().applyPurchases((data ?? []) as Purchase[])
-  if (gems) await flushSave()
+  const rows = ((data ?? []) as Purchase[]).filter((r) => r.seq > from)
+  const gems = useGame.getState().applyPurchases(rows)
+  if (gems) {
+    useBought.setState({ rows })
+    await flushSave()
+  }
   return gems
 }
 
@@ -58,11 +66,7 @@ export async function returnFromCheckout(): Promise<'paid' | 'cancel' | null> {
   window.history.replaceState(null, '', window.location.pathname + (q.size ? `?${q}` : '') + window.location.hash)
   if (back === 'cancel') return 'cancel'
   for (let i = 0; i < 24; i++) {
-    const gems = await syncPurchases()
-    if (gems) {
-      useGame.getState().toast(`💎 +${gems} gems`)
-      return 'paid'
-    }
+    if (await syncPurchases()) return 'paid'
     await new Promise((r) => setTimeout(r, 2500))
   }
   useGame.getState().toast('💎 Paid. Your gems show next time you open Cartopia.')
