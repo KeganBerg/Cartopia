@@ -1,6 +1,8 @@
 import { useGame, hasRusty } from '../game/store'
 import { CAR_SETS, CARS, carDef, carSource, setOwned, type CarSet } from '../game/data'
 import { CarThumb } from '../scene/BuildingPreview'
+import { piecesOf } from '../game/resto'
+import { BuildArt, pieceCount } from './Resto'
 
 // The collection book: every car grouped into sets. Owned cars show in their
 // colours, missing ones as silhouettes with where to find them. A full set
@@ -24,6 +26,7 @@ export function CollectionBook({ onFind }: { onFind: (model: string) => void }) 
 
 function SetRow({ set, onFind }: { set: CarSet; onFind: (model: string) => void }) {
   const cars = useGame((s) => s.cars)
+  const restoParts = useGame((s) => s.restoParts)
   const done = useGame((s) => s.claimedSets.includes(set.id))
   const claim = useGame((s) => s.claimSet)
   const have = setOwned(set, cars)
@@ -51,6 +54,14 @@ function SetRow({ set, onFind }: { set: CarSet; onFind: (model: string) => void 
             )
           }
           const src = carSource(def)
+          // A resto-mod shows the pieces you hold on its 2x2 build card.
+          if (def.secret) return (
+            <button key={m} className="book-car missing resto" title={`${def.name}: ${src.text}`} onClick={() => onFind(m)}>
+              <BuildArt model={m} have={piecesOf(restoParts, m)} />
+              <span className="book-car-name">{def.name}</span>
+              <span className="book-src">🧩 {pieceCount(restoParts, m)}</span>
+            </button>
+          )
           return (
             <button key={m} className="book-car missing" title={`${def.name}: ${src.text}`} onClick={() => onFind(m)}>
               <CarThumb size="sm" color="#37474f" body={def.body} model={def.id} />
@@ -71,6 +82,7 @@ export function useFindCar(showShowroom: (model: string) => void) {
   const rusty = useGame((s) => hasRusty(s))
   return (model: string) => {
     if (carDef(model).season) return openPanel('season')
+    if (carDef(model).secret) return openPanel('crates')
     if (!carDef(model).rescueOnly) return showShowroom(model)
     if (rusty) openPanel('rescue')
     else openShop('rescue')
