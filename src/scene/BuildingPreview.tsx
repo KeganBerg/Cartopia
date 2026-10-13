@@ -8,6 +8,7 @@ import { CarModel } from './CarModel'
 import { SEASON } from './season'
 import { frame, seat, type Bounds } from './fit'
 import { reduceMotionOn } from '../lib/prefs'
+import type { Trim } from '../game/trim'
 
 // Shop, showroom and garage thumbnails are live 3D renders, drawn every display
 // frame. One hidden WebGL canvas renders every on-screen model into a shared
@@ -25,12 +26,12 @@ function buildingItem(def: BuildingDef, level?: number): Item {
   return { key: `b|${def.id}|${level ?? 1}|${SEASON}`, model: () => <Grounded.Provider value><BuildingModel def={def} level={level} /></Grounded.Provider> }
 }
 
-type CarLook = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; panels?: Panels | null; stripe?: string | null; rusty?: boolean; mods?: string[] | null }
+type CarLook = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; panels?: Panels | null; stripe?: string | null; rusty?: boolean; mods?: string[] | null; trim?: Trim | null }
 
 function carItem(c: CarLook): Item {
   return {
-    key: `c|${c.body}|${c.model ?? ''}|${c.color}|${c.finish ?? ''}|${c.skin ?? ''}|${JSON.stringify(c.modSkin ?? {})}|${c.stripe ?? ''}|${c.rusty ? 1 : 0}|${c.rusty ? '' : (c.mods ?? []).join(',')}|${c.panels ? JSON.stringify(c.panels) : ''}`,
-    model: () => <CarModel body={c.body} model={c.model} color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} panels={c.panels} stripe={c.stripe} rusty={c.rusty} mods={c.mods} />,
+    key: `c|${c.body}|${c.model ?? ''}|${c.color}|${c.finish ?? ''}|${c.skin ?? ''}|${JSON.stringify(c.modSkin ?? {})}|${c.stripe ?? ''}|${c.rusty ? 1 : 0}|${c.rusty ? '' : (c.mods ?? []).join(',')}|${c.panels ? JSON.stringify(c.panels) : ''}|${c.trim ? JSON.stringify(c.trim) : ''}`,
+    model: () => <CarModel body={c.body} model={c.model} color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} panels={c.panels} trim={c.trim} stripe={c.stripe} rusty={c.rusty} mods={c.mods} />,
   }
 }
 

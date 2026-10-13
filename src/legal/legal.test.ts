@@ -28,10 +28,12 @@ describe('legal pages', () => {
 
 describe('settings', () => {
   it('fall back to defaults for missing or bad data', () => {
-    expect(parsePrefs(null)).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, askLeave: true, askSell: true, steer: 'smooth' })
-    expect(parsePrefs('{oops')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, askLeave: true, askSell: true, steer: 'smooth' })
-    expect(parsePrefs('{"graphics":"ultra","reduceMotion":"yes"}')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, askLeave: true, askSell: true, steer: 'smooth' })
-    expect(parsePrefs('{"graphics":"saver","reduceMotion":true,"vibration":false,"steer":"sharp"}')).toEqual({ graphics: 'saver', reduceMotion: true, vibration: false, askLeave: true, askSell: true, steer: 'sharp' })
+    expect(parsePrefs(null)).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, muteTaunts: false, askLeave: true, askSell: true, steer: 'smooth', kartLine: true })
+    expect(parsePrefs('{oops')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, muteTaunts: false, askLeave: true, askSell: true, steer: 'smooth', kartLine: true })
+    expect(parsePrefs('{"graphics":"ultra","reduceMotion":"yes"}')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, muteTaunts: false, askLeave: true, askSell: true, steer: 'smooth', kartLine: true })
+    expect(parsePrefs('{"graphics":"saver","reduceMotion":true,"vibration":false,"steer":"sharp"}')).toEqual({ graphics: 'saver', reduceMotion: true, vibration: false, muteTaunts: false, askLeave: true, askSell: true, steer: 'sharp', kartLine: true })
     expect(parsePrefs('{"askLeave":false,"askSell":false}')).toMatchObject({ askLeave: false, askSell: false })
+    expect(parsePrefs('{"muteTaunts":true}').muteTaunts).toBe(true)
+    expect(parsePrefs('{"muteTaunts":"yes"}').muteTaunts).toBe(false)
   })
 })

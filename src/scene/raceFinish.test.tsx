@@ -6,6 +6,8 @@ import type { RefObject } from 'react'
 import { finishView, RaceScene, type RacerView } from './RaceScene'
 import { StageRun } from './Stage'
 import { VENUES } from './venues'
+import { HERO_TIME, heroCam, heroShot } from './heroShot'
+import { Vector3 } from 'three'
 
 // A close finish always plays in slow motion, and a photo finish (under 0.15 s)
 // from the kerbside camera with the PHOTO FINISH flash. Every race after the first
@@ -71,4 +73,62 @@ describe('race finish slow motion', () => {
     expect(await run(clear, (s) => R.advanceFrames(1, s), photos)).toEqual({ busy: false, photo: false })
     await R.unmount()
   }, 60000)
+})
+
+// After the finish the camera swings round the player's own car for a couple of seconds
+// (the result card waits on heroShot.on), and a tap (heroShot.skip) cuts it short.
+describe('finish hero shot', () => {
+  const scene = (r: ReturnType<typeof race>, n: number) => (
+    <StageRun run={n}>
+      <RaceScene track={TRACK} me={r.me} them={r.them} mine={look} theirs={look} venue={beach} />
+    </StageRun>
+  )
+  // Steps the race and returns how long (seconds) the hero shot was on for.
+  async function play(r: ReturnType<typeof race>, step: (s: number) => Promise<void>, skipAt = Infinity) {
+    let on = 0
+    for (let t = 0; t < 10; t += 1 / 30) {
+      r.at(t)
+      if (on > skipAt) heroShot.skip = true
+      await step(1 / 30)
+      if (heroShot.on) on += 1 / 30
+    }
+    return on
+  }
+
+  it('plays once the player is over the line, on every race, and a tap cuts it short', async () => {
+    const first = race(0.8)
+    const R = await ReactThreeTestRenderer.create(scene(first, 1), { frameloop: 'never' })
+    const on = await play(first, (s) => R.advanceFrames(1, s))
+    expect(on).toBeGreaterThan(HERO_TIME - 0.15)
+    expect(on).toBeLessThan(HERO_TIME + 0.15)
+    expect(heroShot.on).toBe(false)
+    // Retry on the shared canvas: it plays again, and a tap half a second in ends it.
+    const again = race(0.8)
+    await R.update(scene(again, 2))
+    const cut = await play(again, (s) => R.advanceFrames(1, s), 0.5)
+    expect(cut).toBeGreaterThan(0.4)
+    expect(cut).toBeLessThan(0.7)
+    expect(heroShot.on).toBe(false)
+    await R.unmount()
+  }, 60000)
+
+  it('keeps the camera off the car and on the given flank, within the room it has', () => {
+    const pos = new Vector3()
+    const at = new Vector3()
+    for (let t = 0; t <= HERO_TIME; t += 0.1) {
+      heroCam(t, 0.75, 0, 100, 0, 1.6, -1, 2.3, pos, at)
+      const flat = Math.hypot(pos.x - 0.75, pos.z - 100)
+      expect(flat).toBeGreaterThan(1.6)
+      expect(flat).toBeLessThanOrEqual(2.3 + 1e-6)
+      expect(pos.x).toBeLessThan(0.75) // the inner flank
+      expect(pos.y).toBeGreaterThan(0.2)
+      expect(at.distanceTo(new Vector3(0.75, 0, 100))).toBeLessThan(0.5)
+    }
+    // Starts ahead of the nose and ends behind the car, up high.
+    heroCam(0, 0.75, 0, 100, 0, 1.6, -1, 2.3, pos, at)
+    expect(pos.z).toBeGreaterThan(100)
+    heroCam(HERO_TIME, 0.75, 0, 100, 0, 1.6, -1, 2.3, pos, at)
+    expect(pos.z).toBeLessThan(100)
+    expect(pos.y).toBeGreaterThan(1)
+  })
 })

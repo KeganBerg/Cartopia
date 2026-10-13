@@ -7,8 +7,11 @@ import type { Body, Finish, SkinnedSlot, Panels } from '../game/data'
 import { CarModel, carFrame } from './CarModel'
 import { frame, seat, type Bounds } from './fit'
 import { SkyEnv } from './SkyEnv'
+import type { Trim } from '../game/trim'
+import { BACKDROPS, FILTERS, backdrop, compose, photoFilter, savePhoto, type Backdrop } from './photo'
+import { useGame } from '../game/store'
 
-type Look = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; panels?: Panels | null; stripe?: string | null; mods?: string[] | null }
+type Look = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; panels?: Panels | null; stripe?: string | null; mods?: string[] | null; trim?: Trim | null }
 
 // How big the car's bounding sphere is made, so long trucks and tiny bubble cars both fill the view.
 const FIT = 1.05
@@ -67,7 +70,7 @@ function Rollers({ body, roll }: { body: Body; roll: React.RefObject<Group | nul
   )
 }
 
-function Viewer({ look, handle, onTouch, dyno, floorSize }: { look: Look; handle: React.RefObject<Handle | null>; onTouch: (on: boolean) => void; dyno?: DynoFeed | null; floorSize: number }) {
+function Viewer({ look, handle, onTouch, dyno, floorSize, photo }: { look: Look; handle: React.RefObject<Handle | null>; onTouch: (on: boolean) => void; dyno?: DynoFeed | null; floorSize: number; photo?: Backdrop | null }) {
   const turn = useRef<Group>(null)
   const floor = useRef<Mesh>(null)
   const roll = useRef<Group>(null)
@@ -146,7 +149,7 @@ function Viewer({ look, handle, onTouch, dyno, floorSize }: { look: Look; handle
       // A little shudder that grows with the revs.
       t.position.y = Math.sin(state.clock.elapsedTime * 70) * 0.004 * dyno.rpm
       roll.current?.children.forEach((c) => { if (c.type === 'Group') c.rotation.x += dyno.speed * dt * 0.6 })
-    } else if (spinning.current) t.rotation.y += dt * SPIN
+    } else if (spinning.current && !photo) t.rotation.y += dt * SPIN
   })
 
   // Keep the aim on the car, so panning can never lose it off screen.
@@ -185,11 +188,11 @@ function Viewer({ look, handle, onTouch, dyno, floorSize }: { look: Look; handle
       />
       <mesh ref={floor} rotation-x={-Math.PI / 2}>
         <circleGeometry args={[floorSize, 48]} />
-        <meshStandardMaterial color="#cfd8dc" />
+        <meshStandardMaterial color={photo?.floor ?? '#cfd8dc'} />
       </mesh>
       <group ref={turn}>
         <group ref={inner}>
-          <CarModel {...look} />
+          <CarModel {...look} beams={!!photo?.beams} />
           <Rollers body={look.body} roll={roll} />
         </group>
       </group>
@@ -197,42 +200,90 @@ function Viewer({ look, handle, onTouch, dyno, floorSize }: { look: Look; handle
   )
 }
 
-function Stage({ look, big, onExpand, dyno }: { look: Look; big?: boolean; onExpand?: () => void; dyno?: DynoFeed | null }) {
+// Hands the stage a way to grab the frame as it is now: a fresh render read straight back.
+function Snapper({ snap }: { snap: React.RefObject<(() => HTMLCanvasElement) | null> }) {
+  const gl = useThree((s) => s.gl)
+  const scene = useThree((s) => s.scene)
+  const camera = useThree((s) => s.camera)
+  useEffect(() => {
+    snap.current = () => {
+      gl.render(scene, camera)
+      return gl.domElement
+    }
+    return () => void (snap.current = null)
+  }, [gl, scene, camera, snap])
+  return null
+}
+
+function Stage({ look, big, onExpand, dyno, photo, snap }: { look: Look; big?: boolean; onExpand?: () => void; dyno?: DynoFeed | null; photo?: Backdrop | null; snap?: React.RefObject<(() => HTMLCanvasElement) | null> }) {
   const handle = useRef<Handle>(null)
   const [touched, setTouched] = useState(false)
+  const bd = photo ?? BACKDROPS[0]
   return (
     <>
       <Canvas camera={{ position: VIEW.toArray(), fov: 35 }} dpr={big ? [1, 2] : [1, 1.5]}>
         <SkyEnv />
-        <hemisphereLight args={['#ffffff', '#90a4ae', 1]} />
-        <directionalLight position={[3, 5, 2]} intensity={1.4} />
-        <Viewer look={look} handle={handle} onTouch={setTouched} dyno={dyno} floorSize={big ? 3 : 1.5} />
+        {bd.bg && <color attach="background" args={[bd.bg]} />}
+        <hemisphereLight args={[bd.fill[0], bd.fill[1], bd.fill[2]]} />
+        <directionalLight position={[3, 5, 2]} intensity={bd.key[1]} color={bd.key[0]} />
+        <Viewer look={look} handle={handle} onTouch={setTouched} dyno={dyno} floorSize={big ? 3 : 1.5} photo={photo} />
+        {snap && <Snapper snap={snap} />}
       </Canvas>
-      {!dyno && <div className="cp-tools">
+      {photo ? null : !dyno && <div className="cp-tools">
         {touched && <button className="cp-btn" title="Reset view" aria-label="Reset view" onClick={() => handle.current?.reset()}>↺</button>}
         {onExpand && <button className="cp-btn" title="Full screen" aria-label="Full screen" onClick={onExpand}>⛶</button>}
       </div>}
-      {!touched && !dyno && <div className="cp-hint">{big ? HINT : TOUCHY ? 'Drag · pinch to zoom' : 'Drag · scroll to zoom'}</div>}
+      {!touched && !dyno && !photo && <div className="cp-hint">{big ? HINT : TOUCHY ? 'Drag · pinch to zoom' : 'Drag · scroll to zoom'}</div>}
     </>
   )
 }
 
-// Full-screen look at a car: spin, zoom and pan to see what paint and parts do.
+// Full-screen look at a car: spin, zoom and pan to see what paint and parts do. The 📸 button
+// opens photo mode (scene/photo.ts): pick a backdrop and a filter, line the car up, and snap.
 export function CarInspect({ title, onClose, ...look }: Look & { title: string; onClose: () => void }) {
+  const [photo, setPhoto] = useState(false)
+  const [bd, setBd] = useState('studio')
+  const [fl, setFl] = useState('none')
+  const [flash, setFlash] = useState(0)
+  const snap = useRef<(() => HTMLCanvasElement) | null>(null)
   useEffect(() => {
-    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') (photo ? setPhoto(false) : onClose()) }
     window.addEventListener('keydown', key)
     return () => window.removeEventListener('keydown', key)
-  }, [onClose])
+  }, [onClose, photo])
+  const shoot = async () => {
+    const shot = snap.current?.()
+    const pic = shot && compose(shot, backdrop(bd), photoFilter(fl))
+    if (!pic) return
+    setFlash((n) => n + 1)
+    if (await savePhoto(pic, title)) useGame.getState().toast('📸 Photo saved!')
+  }
   return createPortal(
-    <div className="car-inspect" onClick={(e) => e.stopPropagation()}>
+    <div className={photo ? 'car-inspect photo' : 'car-inspect'} onClick={(e) => e.stopPropagation()}>
       <div className="ci-head">
-        <h2>{title}</h2>
-        <button className="close" aria-label="Close" onClick={onClose}>✕</button>
+        <h2>{photo ? '📸 Photo mode' : title}</h2>
+        {!photo && <button className="cp-btn ci-photo" aria-label="Photo mode" title="Photo mode" onClick={() => setPhoto(true)}>📸</button>}
+        <button className="close" aria-label={photo ? 'Leave photo mode' : 'Close'} onClick={photo ? () => setPhoto(false) : onClose}>✕</button>
       </div>
-      <div className="ci-view car-preview">
-        <Stage look={look} big />
+      <div className="ci-view car-preview" style={photo ? { filter: photoFilter(fl).css } : undefined}>
+        <Stage look={look} big photo={photo ? backdrop(bd) : null} snap={snap} />
+        {flash > 0 && <div key={flash} className="ci-flash" aria-hidden />}
       </div>
+      {photo && (
+        <div className="ci-photo-bar">
+          <div className="ci-chips" role="radiogroup" aria-label="Backdrop">
+            {BACKDROPS.map((b) => (
+              <button key={b.id} role="radio" aria-checked={bd === b.id} className={bd === b.id ? 'sel' : ''} onClick={() => setBd(b.id)}>{b.icon} {b.name}</button>
+            ))}
+          </div>
+          <div className="ci-chips" role="radiogroup" aria-label="Filter">
+            {FILTERS.map((f) => (
+              <button key={f.id} role="radio" aria-checked={fl === f.id} className={fl === f.id ? 'sel' : ''} onClick={() => setFl(f.id)}>{f.name}</button>
+            ))}
+          </div>
+          <button className="ci-shutter" aria-label="Take photo" onClick={() => void shoot()} />
+        </div>
+      )}
     </div>,
     document.body,
   )

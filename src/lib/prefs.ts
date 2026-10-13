@@ -1,8 +1,8 @@
 import { create } from 'zustand'
 
 // Player settings that live on this device only (they never go into the save):
-// graphics quality, reduced motion, phone vibration, kart steering and which
-// "Are you sure?" steps the player turned off. Sound volumes keep
+// graphics quality, reduced motion, phone vibration, muted ghost race taunts, kart steering, the kart racing line and
+// which "Are you sure?" steps the player turned off. Sound volumes keep
 // their own keys in sound.ts, townMusic.ts and ambience.ts.
 
 // auto: the game picks by device and steps down if it struggles.
@@ -14,16 +14,20 @@ export type Prefs = {
   // null follows the device's own "reduce motion" setting.
   reduceMotion: boolean | null
   vibration: boolean
+  // Received ghost race taunts show as a plain 👍.
+  muteTaunts: boolean
   // "Are you sure?" before leaving Rusty's with a haul, and before selling a car.
   askLeave: boolean
   askSell: boolean
   // Kart steering on a touch screen: smooth (long slide, steadied near the middle) or sharp.
   steer: Steer
+  // The ghost racing line on kart tracks: green where it's flat out, red before a hard bend.
+  kartLine: boolean
 }
 export type Steer = 'smooth' | 'sharp'
 
 const KEY = 'cartopia-prefs'
-const DEFAULTS: Prefs = { graphics: 'auto', reduceMotion: null, vibration: true, askLeave: true, askSell: true, steer: 'smooth' }
+const DEFAULTS: Prefs = { graphics: 'auto', reduceMotion: null, vibration: true, muteTaunts: false, askLeave: true, askSell: true, steer: 'smooth', kartLine: true }
 
 export function parsePrefs(raw: string | null): Prefs {
   try {
@@ -32,9 +36,11 @@ export function parsePrefs(raw: string | null): Prefs {
       graphics: p.graphics === 'high' || p.graphics === 'saver' ? p.graphics : 'auto',
       reduceMotion: typeof p.reduceMotion === 'boolean' ? p.reduceMotion : null,
       vibration: p.vibration !== false,
+      muteTaunts: p.muteTaunts === true,
       askLeave: p.askLeave !== false,
       askSell: p.askSell !== false,
       steer: p.steer === 'sharp' ? 'sharp' : 'smooth',
+      kartLine: p.kartLine !== false,
     }
   } catch {
     return { ...DEFAULTS }

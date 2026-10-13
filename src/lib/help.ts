@@ -83,6 +83,8 @@ export async function helpBuilding(uid: string, el?: Element | null) {
       paid = { ...helpPrize(g.level, town.ownerId.startsWith('demo-') ? 1 : buildingLevel(b), h.done.length + 1), bucks: 0 }
       if (!h.done.length) recordHelp(town.ownerId)
     }
+    // The first help on a visit counts towards friendship (game/friendship.ts).
+    if (!h.done.length && !town.ownerId.startsWith('demo-')) useGame.getState().befriend(town.ownerId, 'help', town.townName)
     // Paid even if they've already headed home; the town's list only updates while it's on screen.
     const still = useHelp.getState().owner === town.ownerId
     const done = [...(still ? useHelp.getState().done : h.done), uid]

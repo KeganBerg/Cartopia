@@ -10,6 +10,9 @@ import type { VenueId } from '../scene/venues'
 export const LAPS = 3
 export const KART_LEN = 1.7
 export const KART_R = 0.72 // collision radius between karts
+// How heavy a kart is in a bump, from its car's weight (data.ts): a typical car is 1, a pocket car
+// about 0.75 and a big truck 1.5. In a bump the lighter kart is shoved further and loses more speed.
+export const kartMass = (weight?: number) => (weight === undefined ? 1 : Math.min(1.5, Math.max(0.7, 0.55 + weight / 100)))
 export const FIELD = 6 // karts on the grid, the player included
 
 export type KartTheme = 'town' | 'docks' | 'desert'
@@ -183,9 +186,45 @@ export const GHOST_TIME = 3.5, SPLAT_TIME = 3.2, ROCKET_TIME = 3
 export const BOMB_R = 4.5 // blast radius
 const BOMB_FUSE = 0.8, BOMB_THROW = 20 // seconds in the air, track points ahead it lands
 
+// Catch-up for players at the back: the back half of the field gets a little extra top speed,
+// rising to CATCH_UP at the very back. Nothing ever targets the leader.
+export const CATCH_UP = 0.05
+export function catchUp(rank: number, field: number) {
+  const back = field > 1 ? rank / (field - 1) : 0
+  return back > 0.5 ? CATCH_UP * (back - 0.5) * 2 : 0
+}
+
 export type KartStats = { top: number; acc: number }
 // Performance from PI, flattening out at the top so a big PI edge is worth a few
 // percent of pace and driving well (drifts, boosts, items) still decides the race.
+// The ghost racing line drawn on the road: where to be across the track at each point
+// (cutting to the inside of bends, as the AI does), and how hard the bend ahead is, 0 (flat
+// out) to 1 (slow right down), so the line can go from green through amber to red.
+export function racingLine(t: Track) {
+  const raw = new Float32Array(t.n)
+  const heat = new Float32Array(t.n)
+  for (let i = 0; i < t.n; i++) {
+    let bend = 0, peak = 0
+    for (let d = 2; d < 30; d += 2) {
+      const c = t.curve[wrapI(i + d, t.n)]
+      bend += c
+      peak = Math.max(peak, Math.abs(c))
+    }
+    raw[i] = Math.max(-1, Math.min(1, bend * 3.2)) * (t.half - 1.4)
+    const corner = Math.sqrt(36 / Math.max(peak, 0.005))
+    heat[i] = Math.max(0, Math.min(1, (20 - corner) / 8))
+  }
+  // Smoothed, so the line sweeps rather than steps.
+  const off = new Float32Array(t.n)
+  const W = 6
+  for (let i = 0; i < t.n; i++) {
+    let sum = 0
+    for (let d = -W; d <= W; d++) sum += raw[wrapI(i + d, t.n)]
+    off[i] = sum / (W * 2 + 1)
+  }
+  return { off, heat }
+}
+
 export function kartStats(pi: number): KartStats {
   const k = 1 - Math.exp(-Math.max(1, pi) / 90)
   return { top: 15 + 9 * k, acc: 9 + 6 * k }
@@ -219,6 +258,7 @@ export type Kart = {
   spinYaw: number
   flat: number; smoke: number; emp: number; tow: number // effect timers, seconds left
   ghost: number; splat: number; rocket: number
+  mass: number // see kartMass
   towTarget: number // kart being reeled in, -1 for none
   uses: number // cans left in a Nitro Triple
 }
@@ -266,7 +306,7 @@ export class KartRace {
   notes: KartNote[] = []
   private seq = 0
 
-  constructor(track: Track, field: { name: string; pi: number; ai: boolean; skill?: number }[], seed = 1) {
+  constructor(track: Track, field: { name: string; pi: number; ai: boolean; skill?: number; weight?: number }[], seed = 1) {
     this.track = track
     let s = seed * 9301 + 49297
     this.rand = () => ((s = (s * 16807) % 2147483647) / 2147483647)
@@ -281,7 +321,7 @@ export class KartRace {
         x: track.x[i] + track.nx[i] * off, z: track.z[i] + track.nz[i] * off, y: 0, vx: 0, vz: 0, vy: 0, h: Math.atan2(track.tx[i], track.tz[i]),
         steer: 0, idx: i, lap: 0, done: null, drift: 0, charge: 0, boost: 0, spin: 0, shield: 0, item: null, itemHeld: false, bump: 0, offroad: false, air: false,
         lane: (this.rand() - 0.5) * track.half * 0.9, skill: f.skill ?? 0.8, spinYaw: 0,
-        flat: 0, smoke: 0, emp: 0, tow: 0, towTarget: -1, ghost: 0, splat: 0, rocket: 0, uses: 0,
+        flat: 0, smoke: 0, emp: 0, tow: 0, towTarget: -1, ghost: 0, splat: 0, rocket: 0, uses: 0, mass: kartMass(f.weight),
       }
     })
   }
@@ -396,7 +436,7 @@ export class KartRace {
     let vl = k.vx * sx + k.vz * sz
     const vf0 = vf
     const rank = order.indexOf(k)
-    const band = k.ai ? 1 + Math.min(0.06, Math.max(-0.03, (rank - 2) * 0.015)) : 1
+    const band = k.ai ? 1 + Math.min(0.06, Math.max(-0.03, (rank - 2) * 0.015)) : 1 + catchUp(rank, order.length)
     // Static storm: the boost and any drift charge go dead for a moment.
     if (k.emp > 0) { k.boost = 0; k.charge = 0 }
     let top = k.stats.top * band * (k.offroad ? 0.55 : 1)
@@ -749,7 +789,10 @@ export class KartRace {
       // ours takes the whole shove (the other browser does the same for theirs).
       const mp = this.owned(p.id) ? 1 : 0, mq = this.owned(q.id) ? 1 : 0
       if (!mp && !mq) continue
-      const wp = mp / (mp + mq) * 2, wq = mq / (mp + mq) * 2
+      // Each kart's share of the shove: the lighter one takes more (2 * the other's mass over both).
+      // Against a kart driven elsewhere ours still takes only its own share; that browser moves theirs.
+      const sum = (p.mass ?? 1) + (q.mass ?? 1)
+      const wp = mp * (2 * (q.mass ?? 1)) / sum, wq = mq * (2 * (p.mass ?? 1)) / sum
       if (Math.abs(p.y - q.y) > 0.8 || p.ghost > 0 || q.ghost > 0) continue
       const dx = q.x - p.x, dz = q.z - p.z
       const d = Math.hypot(dx, dz)

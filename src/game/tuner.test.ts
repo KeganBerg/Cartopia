@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { useGame } from './store'
+import { boostsSpent } from './boosts'
 import { MODS, PATTERNS, carDef, modFits } from './data'
 import { TUNER_TRIALS, buildChecks, buildReady, hostMods, tunerPrize, tunerTrial } from './tuner'
 import { venue } from '../scene/venues'
@@ -45,15 +46,18 @@ describe('tunerResult', () => {
   const g = () => useGame.getState()
   it('pays double the first time and unlocks the pattern', () => {
     const t = tunerTrial('downforce')!
-    useGame.setState({ coins: 0, tuner: {}, tunerPrize: null, levelUp: null })
+    vi.spyOn(Date, 'now').mockReturnValue(Date.UTC(2026, 9, 12, 12))
+    useGame.setState({ coins: 0, tuner: {}, tunerPrize: null, levelUp: null, boosts: boostsSpent(Date.UTC(2026, 9, 12, 12)) })
     g().tunerResult(t.id, true)
     expect(g().coins).toBe(tunerPrize(t, true))
     expect(g().tuner).toEqual({ downforce: 1 })
     expect(g().tunerPrize).toBe('downforce')
     g().closeTunerPrize()
+    useGame.setState((s) => ({ boosts: s.boosts && { ...s.boosts, streak: 0 } })) // no win-streak bonus on the payout checked
     g().tunerResult(t.id, true)
     expect(g().coins).toBe(tunerPrize(t, true) + tunerPrize(t, false))
     expect(g().tunerPrize).toBeNull()
+    vi.restoreAllMocks()
   })
   it('counts nothing for a loss', () => {
     useGame.setState({ tuner: {}, tunerPrize: null })

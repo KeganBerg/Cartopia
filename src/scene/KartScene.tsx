@@ -17,8 +17,14 @@ import { signTexture } from './signTexture'
 import { glowMats } from './dayNight'
 import { decal } from './layers'
 import { TILE, buildingDef, type Body } from '../game/data'
-import { BOMB_R, DRIFT_BLUE, DRIFT_ORANGE, KART_LEN, SMOKE_R, KartRace, wrapAngle, type ItemId, type KartEvent, type KartInput, type Track } from '../game/kart'
+import { BOMB_R, DRIFT_BLUE, DRIFT_ORANGE, KART_LEN, SMOKE_R, KartRace, racingLine, wrapAngle, type ItemId, type KartEvent, type KartInput, type Track } from '../game/kart'
 import type { ChaseCar } from './ChaseScene'
+import { HERO_TIME, heroCam, heroShot, heroWanted, resetHero } from './heroShot'
+import { BoostTrail } from './boostTrail'
+import { Celebration } from './celebration'
+import { useGame } from '../game/store'
+import { cheerDef, myCheer, myTrail, trailDef } from '../game/flair'
+import { reducedMotion } from '../game/fx'
 
 // A kart circuit: the tarmac ribbon with kerbs, verges and barriers, the theme's
 // scenery round it (the player's town, a harbour, a red rock canyon), the karts,
@@ -200,6 +206,42 @@ const THEMES: Record<string, Theme> = {
   town: { ground: '#ffffff', groundTex: (r) => grassTex(r, r), verge: '#ffffff', vergeTex: (a, b) => grassTex(a, b), kerb: ['#e53935', '#fafafa'], barrier: '#eceff1', cap: '#c62828' },
   docks: { ground: '#9aa3a9', groundTex: (r) => concreteTex(r, r), verge: '#b0b6ba', vergeTex: (a, b) => concreteTex(a, b), kerb: ['#fbc02d', '#212121'], barrier: '#cfd8dc', cap: '#fbc02d' },
   desert: { ground: '#d9a066', groundTex: (r) => sandTex(r, r), verge: '#c9925a', vergeTex: (a, b) => gravelTex(a, b), kerb: ['#e53935', '#fafafa'], barrier: '#d7ccc8', cap: '#1565c0' },
+}
+
+// The ghost racing line (kart.ts racingLine): dashes along the best line, green where it's
+// flat out, amber, then red before a bend that needs braking. Only this player sees it.
+const LINE_COLS = [new Color('#39e07a'), new Color('#ffc23d'), new Color('#ff4d4d')]
+function RacingLine({ t }: { t: Track }) {
+  const geo = useMemo(() => {
+    const { off, heat } = racingLine(t)
+    const pos: number[] = [], col: number[] = []
+    const c = new Color()
+    const W = 0.16, DASH = 1.6
+    let s = 0
+    for (let i = 0; i < t.n; i++) {
+      const j = (i + 1) % t.n
+      const step = Math.hypot(t.x[j] - t.x[i], t.z[j] - t.z[i])
+      s += step
+      if (Math.floor(s / DASH) % 2) continue
+      const h = heat[i]
+      if (h < 0.5) c.copy(LINE_COLS[0]).lerp(LINE_COLS[1], h * 2)
+      else c.copy(LINE_COLS[1]).lerp(LINE_COLS[2], (h - 0.5) * 2)
+      const p = (k: number, o: number) => [t.x[k] + t.nx[k] * o, Y_PAINT + 0.006, t.z[k] + t.nz[k] * o]
+      const a0 = p(i, off[i] - W), a1 = p(i, off[i] + W), b0 = p(j, off[j] - W), b1 = p(j, off[j] + W)
+      // Both windings, so it faces up whichever way the normals point.
+      for (const v of [a0, b0, a1, a1, b0, b1, a0, a1, b0, a1, b1, b0]) { pos.push(...v); col.push(c.r, c.g, c.b) }
+    }
+    const g = new BufferGeometry()
+    g.setAttribute('position', new BufferAttribute(new Float32Array(pos), 3))
+    g.setAttribute('color', new BufferAttribute(new Float32Array(col), 3))
+    return g
+  }, [t])
+  useEffect(() => () => geo.dispose(), [geo])
+  return (
+    <mesh geometry={geo} renderOrder={1}>
+      <meshBasicMaterial vertexColors transparent opacity={0.6} depthWrite={false} {...decal(3)} />
+    </mesh>
+  )
 }
 
 function TrackSurface({ t }: { t: Track }) {
@@ -697,7 +739,7 @@ function KartView({ look, rig, set }: { look: KartLook; rig: WheelRig; set: (g: 
       <CarShadow len={KART_LEN} wid={f.wid * s} />
       <group ref={body}>
         <group scale={s} ref={(g) => { fx.car = g }}>
-          <CarModel body={look.body as Body} model={look.model} color={look.color} finish={look.finish} skin={look.skin} modSkin={look.modSkin} panels={look.panels} mods={look.mods} rig={rig} beams />
+          <CarModel body={look.body as Body} model={look.model} color={look.color} finish={look.finish} skin={look.skin} modSkin={look.modSkin} panels={look.panels} trim={look.trim} mods={look.mods} rig={rig} beams />
           {/* Paint splat: wet blobs over the bonnet and the back deck (in the car's own units). */}
           <group ref={(g) => { fx.splat = g }} visible={false}>
             {SPLATS.map((b, n) => (
@@ -1003,9 +1045,14 @@ function blend(out: Pose, a: Pose, b: Pose, t: number) {
 export const KartScene = memo(KartSceneImpl)
 function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam') as KartCam) ?? 'chase', onHud, onEvents, onFinish, afterStep, lite }: KartSceneProps) {
   useEffect(() => holdTown(), [])
+  useEffect(() => {
+    resetHero()
+    return resetHero
+  }, [])
   // Pixels follow Settings > Graphics: Saver draws at 1x, and Auto on a phone at up to 1.25x
   // (sharp enough on a small screen). The shared canvas goes back to normal after the race.
   const graphics = usePrefs((p) => p.graphics)
+  const showLine = usePrefs((p) => p.kartLine)
   const light = graphics === 'saver' ? 2 : lite && graphics === 'auto' ? 1 : 0
   const setDpr = useThree((s) => s.setDpr)
   useEffect(() => {
@@ -1021,10 +1068,20 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
   const rigs = useMemo(() => looks.map((l) => wheelRig(l.body as Body)), [looks])
   const views = useRef<{ root: Group | null; body: Group | null; fx: KartFx }[]>([])
   const setters = useMemo(() => looks.map((_, i) => (g: { root: Group | null; body: Group | null; fx: KartFx }) => { views.current[i] = g }), [looks])
-  const st = useRef({ acc: 0, hudAt: 0, finished: false, camPos: new Vector3(), camAt: new Vector3(), fov: 0, init: false, shake: 0, kick: 0 })
+  // hero: seconds into the finish hero shot (heroShot.ts), -1 before it, -2 once it's over.
+  const st = useRef({ acc: 0, hudAt: 0, finished: false, camPos: new Vector3(), camAt: new Vector3(), fov: 0, init: false, shake: 0, kick: 0, hero: -1 })
   const inputs = useMemo(() => race.karts.map(() => input), [race, input])
   const tmpV = useMemo(() => new Vector3(), [])
   const poses = useMemo(() => drawnPoses(race), [race])
+  // Every kart lays a glowing ribbon behind it on a boost: nitro, a drift turbo, a boost pad.
+  const trails = useMemo(() => looks.map(() => new BoostTrail()), [looks])
+  useEffect(() => () => trails.forEach((t) => t.dispose()), [trails])
+  // The player's own flair (game/flair.ts): their trail colour, and a celebration on a win.
+  const trailId = useGame((g) => myTrail(g).id)
+  useEffect(() => trails[me]?.setLook(trailDef(trailId).look), [trails, me, trailId])
+  const cheerId = useGame((g) => myCheer(g).id)
+  const cheer = useMemo(() => new Celebration(), [])
+  useEffect(() => () => cheer.dispose(), [cheer])
 
   useFrame((state, raw) => {
     const s = st.current
@@ -1076,6 +1133,11 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
     if (DEV && running) devFx(race, me)
     if (mine.done !== null && !s.finished) {
       s.finished = true
+      // Across the line: the hero shot round the player's own kart while it coasts on.
+      s.hero = cam === 'chase' && heroWanted() ? 0 : -2
+      heroShot.on = s.hero === 0
+      // First over the line: the player's celebration round their kart.
+      if (race.karts.every((k) => k === mine || k.done === null || k.done > mine.done!) && !reducedMotion()) cheer.start(cheerDef(cheerId), mine.x, mine.y, mine.z, KART_LEN)
       onFinish()
     }
 
@@ -1103,6 +1165,8 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
           m.scale.setScalar(0.6 + Math.random() * 0.7)
         }
       }
+      trails[i].update(dt, k.x - Math.sin(k.h) * KART_LEN * 0.5, 0.14 + k.y, k.z - Math.cos(k.h) * KART_LEN * 0.5, k.h, k.boost > 0)
+      if (i === me) cheer.update(dt)
       if (fx.flame) {
         fx.flame.visible = k.boost > 0
         if (fx.flame.visible) fx.flame.scale.set(1, 0.8 + Math.random() * 0.8, 1)
@@ -1152,7 +1216,20 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
       camera.up.set(0, 1, 0)
       camera.lookAt(pm.x, 0, pm.z + 1.5)
       camera.fov = tall ? 62 : 46
+    } else if (s.hero >= 0 && !heroShot.skip && s.hero + dt < HERO_TIME) {
+      s.hero += dt
+      heroCam(s.hero, pm.x, pm.y, pm.z, pm.h, KART_LEN, 1, KART_LEN * 2.2, s.camPos, s.camAt)
+      camera.position.copy(s.camPos)
+      camera.up.set(0, 1, 0)
+      camera.lookAt(s.camAt)
+      camera.fov = tall ? 60 : 42
+      // The chase view eases back from here once it's over.
+      s.fov = camera.fov
     } else {
+      if (s.hero >= 0) {
+        s.hero = -2
+        heroShot.on = false
+      }
       // Behind and above the kart; swings a little wide in a drift, pulls back on a boost.
       const back = (tall ? 7.4 : 6.0) + (mine.boost > 0 ? 0.6 : 0)
       const up = tall ? 3.7 : 3.0
@@ -1200,6 +1277,7 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
       <Batch version={t.n * 10 + (t.reverse ? 1 : 0)} freeze>
         <TrackSurface t={t} />
       </Batch>
+      {showLine && <RacingLine t={t} />}
       <Trackside t={t} />
       {t.def.theme === 'town' && <TownScenery t={t} />}
       {t.def.theme === 'docks' && <DocksScenery t={t} />}
@@ -1213,6 +1291,8 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
       <Hazards race={race} />
       <TowBeams race={race} />
       {looks.map((l, i) => <KartView key={i} look={l} rig={rigs[i]} set={setters[i]} />)}
+      {trails.map((t, i) => <primitive key={i} object={t.mesh} dispose={null} />)}
+      <primitive object={cheer.mesh} dispose={null} />
       {/* A warm glow pool under the player, so their kart reads at a glance. */}
       <PlayerRing race={race} me={me} />
     </FansFar.Provider>

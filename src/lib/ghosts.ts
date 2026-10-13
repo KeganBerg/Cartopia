@@ -13,20 +13,25 @@ import { raceFloor } from '../game/race'
 export const GHOST_FUEL = RACE_FUEL
 
 // Preset taunts only: no free text reaches another player. Brag ones need a win.
-// public.ghost_taunt_ids() holds the same ids; ghosts.test.ts checks.
+// public.ghost_taunt_ids() (newest in 0065) holds the same ids; ghosts.test.ts checks.
+// The friendliest come first so they're the first chips on the result card.
 export const TAUNTS: { id: number; text: string; brag?: true }[] = [
+  { id: 10, text: 'GG! 🤝' },
+  { id: 14, text: 'Nice race! 👏' },
+  { id: 11, text: 'Rematch? 🔁' },
+  { id: 12, text: "You're quick! ⚡" },
+  { id: 13, text: "I'll be back 😤" },
   { id: 0, text: 'Eat my dust! 💨', brag: true },
   { id: 1, text: 'Too slow! 🐢', brag: true },
   { id: 2, text: 'Nice try, rookie 😎', brag: true },
   { id: 3, text: 'See you at the finish line 🏁', brag: true },
   { id: 4, text: 'Your ghost needs a tune-up 🔧', brag: true },
   { id: 5, text: 'Catch me if you can 🏎️', brag: true },
-  { id: 10, text: 'GG! 🤝' },
-  { id: 11, text: 'Rematch? 🔁' },
-  { id: 12, text: "You're quick! ⚡" },
-  { id: 13, text: "I'll be back 😤" },
 ]
 export const tauntText = (id: number) => TAUNTS.find((t) => t.id === id)?.text ?? '👻'
+// What a received taunt shows: muted (Settings) turns every one into a plain thumbs-up.
+export const MUTED_TAUNT = '👍'
+export const receivedTaunt = (id: number, muted: boolean) => (muted ? MUTED_TAUNT : tauntText(id))
 export const tauntsFor = (won: boolean) => TAUNTS.filter((t) => won || !t.brag)
 
 // The ghost being raced. par: the friend has no time yet, so it runs a par for their car.

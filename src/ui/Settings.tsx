@@ -77,15 +77,18 @@ export function SettingsTab({ user }: { user: User | null }) {
         </div>
         <small className="set-note">{GRAPHICS.find((g) => g.id === prefs.graphics)!.sub}</small>
       </Group>
-      {touch && (
-        <Group icon="🏎️" title="Kart steering">
+      <Group icon="🏎️" title="Karts">
+        {touch && (
           <div className="seg set-seg" role="radiogroup" aria-label="Kart steering">
             {STEER.map((g) => (
               <button key={g.id} role="radio" aria-checked={prefs.steer === g.id} className={prefs.steer === g.id ? 'sel' : ''} onClick={() => setPrefs({ steer: g.id })}>{g.label}</button>
             ))}
           </div>
-        </Group>
-      )}
+        )}
+        <Row label="Racing line" sub="A line on the road: green is flat out, red means slow down">
+          <Switch label="Racing line" on={prefs.kartLine} onChange={(on) => setPrefs({ kartLine: on })} />
+        </Row>
+      </Group>
       <Group icon="♿" title="Accessibility">
         <Row label="Reduce motion" sub="Calmer animations and effects">
           <Switch label="Reduce motion" on={motion} onChange={(on) => setPrefs({ reduceMotion: on })} />
@@ -107,6 +110,9 @@ export function SettingsTab({ user }: { user: User | null }) {
       </Group>
       <Group icon="🔔" title="Notifications">
         <AlertsMenu />
+        <Row label="Mute taunts" sub="Ghost race taunts show as 👍">
+          <Switch label="Mute taunts" on={prefs.muteTaunts} onChange={(on) => setPrefs({ muteTaunts: on })} />
+        </Row>
         {user && <ChallengeSettings />}
       </Group>
     </>

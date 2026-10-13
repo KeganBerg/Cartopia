@@ -4,11 +4,12 @@ import { carDef, performance } from '../game/data'
 import { supabase } from '../lib/supabase'
 import { signedInUser } from '../lib/cloud'
 import { townToVisit } from '../lib/friends'
-import { useGhost, runGhost, raceTown, submitRun, sendTaunt, refreshTaunts, markSeen, tauntText, tauntsFor, GHOST_FUEL, type GhostResult, type Taunt } from '../lib/ghosts'
+import { useGhost, runGhost, raceTown, submitRun, sendTaunt, refreshTaunts, markSeen, tauntText, tauntsFor, receivedTaunt, GHOST_FUEL, type GhostResult, type Taunt } from '../lib/ghosts'
 import { DragRace } from './Race'
 import { Panel } from './Menus'
 import { PlayerName } from './Username'
 import { isCrewMate } from '../lib/crewRaces'
+import { usePrefs } from '../lib/prefs'
 
 // Friend ghost races: the race itself, the result card with taunts, and the taunt inbox.
 
@@ -131,7 +132,8 @@ export function TauntWatcher() {
     if (!count) return
     const id = setInterval(() => {
       const s = useGame.getState()
-      if (useGhost.getState().shown) return clearInterval(id)
+      // Muted taunts wait in the inbox instead of popping up.
+      if (useGhost.getState().shown || usePrefs.getState().muteTaunts) return clearInterval(id)
       if (s.panel || s.levelUp || s.visiting || s.mode !== 'play' || !hasRusty(s)) return
       useGhost.setState({ shown: true })
       s.openPanel('taunts')
@@ -148,6 +150,7 @@ function tauntLine(t: Taunt) {
 
 export function TauntsPanel() {
   const inbox = useGhost((g) => g.inbox)
+  const muted = usePrefs((p) => p.muteTaunts)
   // Keep showing what was on screen when the panel opened; the server marks them read.
   const [shown] = useState(inbox)
   useEffect(() => markSeen(shown.map((t) => t.id)), [shown])
@@ -168,7 +171,7 @@ export function TauntsPanel() {
               <div className="card-text">
                 <div className="card-name"><PlayerName id={t.from} town={t.town} /></div>
                 <div className="card-stat">{tauntLine(t)}</div>
-                <div className="taunt-quote">“{tauntText(t.taunt)}”</div>
+                <div className="taunt-quote">{muted ? receivedTaunt(t.taunt, true) : `“${receivedTaunt(t.taunt, false)}”`}</div>
               </div>
               <button className="buy small" onClick={() => rematch(t)}>Rematch</button>
             </div>

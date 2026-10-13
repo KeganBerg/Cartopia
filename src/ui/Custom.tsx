@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { useGame, type OwnedCar } from '../game/store'
-import { paintOpen, rivalForPaint } from '../game/paintRivals'
+import { earnHint, paintOpen, rivalForPaint } from '../game/paintRivals'
 import { openPaintRival } from './PaintRivals'
 import { openTunerTrial } from './TunerTrials'
 import { tunerTrial } from '../game/tuner'
-import { PAINTS, PANELS, PATTERNS, carDef, isBike, panelJobCost, tidyPanels, type PanelId, type Panels } from '../game/data'
+import { PAINTS, PANELS, PATTERNS, carDef, isBike, panelJobCost, tidyPanels, type PanelId, type Panels, type PatternDef } from '../game/data'
+import { MASTERY_TIERS, masteryTier } from '../game/mastery'
+import { roadOpen } from '../game/trophyRoad'
 
 const same = (a?: Panels | null, b?: Panels | null) => JSON.stringify(tidyPanels(a) ?? {}) === JSON.stringify(tidyPanels(b) ?? {})
 
@@ -76,6 +78,12 @@ function PatternSwatch({ id, color }: { id: string | null; color: string }) {
         <path d="M-1 4 Q14 2 22 7 Q16 7 26 11 Q18 11 30 15 Q16 15 22 19 Q10 20 -1 20Z" fill="#ffb300" />
         <path d="M-1 8 Q10 7 15 10 Q11 11 18 14 Q8 14 12 17 Q4 17 -1 16Z" fill="#e53935" />
       </>}
+      {id === 'signature' && <>
+        <path d="M-1 16 L14 4 L26 4 L11 16Z M20 24 L35 12 L41 12 L41 16 L30 24Z" fill={dd} />
+        <path d="M14 4 L26 4 M11 16 L-1 16 M35 12 L41 12" stroke="#ffc83d" strokeWidth="1" />
+      </>}
+      {id === 'pinstripe' && [3, 8, 13, 18, 23].map((y) => <rect key={y} x="0" y={y} width="40" height="0.8" fill={lt} />)}
+      {id === 'polka' && Array.from({ length: 18 }, (_, i) => <circle key={i} cx={(i % 6) * 7 + 3.5} cy={Math.floor(i / 6) * 8 + 4} r="2" fill={lt} />)}
     </svg>
   )
 }
@@ -104,7 +112,14 @@ export function CustomShop({ car, panels, setPanels }: { car: OwnedCar; panels: 
     setPanels(same(next, now) ? null : next ?? {})
   }
   // A locked colour can be tried on; the bar then points at the rival who has it.
-  const open = (id: PanelId, c: string) => c === now?.[id]?.color || paintOpen({ rivalRow, oldPaints }, c)
+  const roadItems = useGame((s) => s.roadItems)
+  const mastery = useGame((s) => s.mastery)
+  const worldTour = useGame((s) => s.worldTour)
+  const tier = useGame((s) => masteryTier(s.mastery, car.model))
+  const open = (id: PanelId, c: string) => c === now?.[id]?.color || paintOpen({ rivalRow, oldPaints, roadItems, mastery, worldTour }, c)
+  // A mastery pattern needs that step in this car; a Trophy Road one, won at a mystery stop.
+  const earned = (id: PanelId, pt: PatternDef) => now?.[id]?.pattern === pt.id
+    || (pt.mastery ? tier >= pt.mastery : pt.road ? roadOpen(roadItems, pt.id) : true)
   // A pattern won in a Tuner Trial (game/tuner.ts) stays shut until that trial is won.
   const tuner = useGame((s) => s.tuner)
   const shut = (id: PanelId, pattern: string) => {
@@ -145,13 +160,14 @@ export function CustomShop({ car, panels, setPanels }: { car: OwnedCar; panels: 
             const id = pt?.id ?? null
             const on = (mine?.pattern ?? null) === id
             const had = now?.[info.id]?.pattern === id
-            const locked = !!pt && level < pt.unlockLevel && !had
+            const earn = pt && !earned(info.id, pt) ? (pt.mastery ? `🔒 ${MASTERY_TIERS[pt.mastery - 1].icon}` : '🔒 🛣️') : null
+            const locked = (!!pt && level < pt.unlockLevel && !had) || !!earn
             const trial = pt ? shut(info.id, pt.id) : undefined
             return (
               <button key={id ?? 'solid'} className={`pat-opt${on ? ' sel' : ''}${locked ? ' locked' : ''}`} disabled={locked} onClick={() => pick({ pattern: id })} title={pt?.name ?? 'Solid'}>
                 <PatternSwatch id={id} color={colour(info.id)} />
                 <b>{pt?.name ?? 'Solid'}</b>
-                <small>{locked ? `🔒 Lv ${pt!.unlockLevel}` : trial ? `🏁 ${trial.icon}` : !pt ? 'Free' : had ? '✔' : `$${pt.coins.toLocaleString()}`}</small>
+                <small>{earn ?? (locked ? `🔒 Lv ${pt!.unlockLevel}` : trial ? `🏁 ${trial.icon}` : !pt || !pt.coins ? 'Free' : had ? '✔' : `$${pt.coins.toLocaleString()}`)}</small>
               </button>
             )
           })}
@@ -167,7 +183,7 @@ export function CustomShop({ car, panels, setPanels }: { car: OwnedCar; panels: 
             return (
               <button
                 key={p.color}
-                title={`${p.name}${p.bucks ? ' (1 gem)' : r ? ` · beat ${r.name}` : ''}`}
+                title={`${p.name}${p.bucks ? ' (1 gem)' : r ? ` · beat ${r.name}` : locked && p.earn ? ` · ${earnHint(p.color)}` : ''}`}
                 aria-label={locked ? `${p.name}, locked` : p.name}
                 className={`dot big${mine?.color === p.color ? ' sel' : ''}${p.bucks ? ' premium' : ''}${locked ? ' locked' : ''}`}
                 style={{ backgroundColor: p.color }}

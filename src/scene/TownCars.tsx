@@ -120,7 +120,7 @@ function TownCar({ car, onTap }: { car: OwnedCar; onTap?: () => void }) {
         }}
       >
         <group ref={body} scale={k}>
-          <CarModel body={def.body} model={def.id} color={car.color} finish={car.finish} skin={car.skin} modSkin={car.modSkin} panels={car.panels} highlight={selected} stripe={car.stripe} mods={car.mods} beams rig={rig} lean />
+          <CarModel body={def.body} model={def.id} color={car.color} finish={car.finish} skin={car.skin} modSkin={car.modSkin} panels={car.panels} trim={car.trim} highlight={selected} stripe={car.stripe} mods={car.mods} beams rig={rig} lean />
         </group>
       </group>
       <group ref={truck} visible={false}>

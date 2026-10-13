@@ -46,7 +46,10 @@ export async function sendGift(to: string, item: GiftItem) {
   if (error || data === 'no') return toast("Couldn't send that gift")
   if (data === 'limit') return toast("That's all 10 gifts for today")
   useGifts.setState((g) => ({ sent: { ...g.sent, [to]: true } }))
-  if (data === 'sent') toast(`Sent ${GIFTS[item].icon} ${GIFTS[item].amount} ${GIFTS[item].label}!`)
+  if (data === 'sent') {
+    toast(`Sent ${GIFTS[item].icon} ${GIFTS[item].amount} ${GIFTS[item].label}!`)
+    useGame.getState().befriend(to, 'gift')
+  }
 }
 
 // Collects what the server allows today and adds it to the town.

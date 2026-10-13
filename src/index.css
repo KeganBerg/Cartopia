@@ -260,6 +260,12 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .tut-dots i.cur { width: 16px; background: #ffca28; }
 .tut-actions { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .tut-skip { background: none; border: none; padding: 2px 4px; color: #b0bec5; font-weight: 800; font-size: 12px; text-decoration: underline; }
+.tut-car { flex: none; align-self: center; }
+.tut-car .thumb3d { --tw: 64px; --th: 48px; width: var(--tw); height: var(--th); background: radial-gradient(ellipse at 50% 70%, #fff 0 35%, #cfd8dc 80%); border-radius: 10px; }
+.tut-swatches { display: flex; align-items: center; gap: 8px; margin: 0 0 5px; }
+.tut-swatches .dot { width: 24px; height: 24px; }
+.tut-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 5px; }
+.tut-chips span { background: rgba(255,255,255,.12); border-radius: 8px; padding: 2px 6px; font-weight: 800; font-size: 13px; white-space: nowrap; }
 /* Whatever the tutorial is pointing at: a gold ring that breathes. */
 .tut-pulse:not(.icon-btn), .icon-btn.tut-pulse .i { animation: tutPulse 1.1s ease-in-out infinite; }
 @keyframes tutPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,202,40,.95); transform: scale(1); } 50% { box-shadow: 0 0 0 8px rgba(255,202,40,0); transform: scale(1.08); } }
@@ -767,6 +773,8 @@ html.calm *, html.calm *::before, html.calm *::after { animation-duration: .001m
   body:has(.tutorial) .toasts { bottom: calc(146px + var(--sab)); }
   .tutorial p { font-size: 13px; margin-bottom: 4px; }
   .tut-icon { width: 34px; height: 34px; font-size: 18px; }
+  .tut-car .thumb3d { --tw: 52px; --th: 40px; }
+  .tut-swatches { gap: 6px; }
   .rival .buy { grid-column: 1 / -1; }
 
   .race-3d { height: 30dvh; min-height: 170px; }
@@ -1075,6 +1083,17 @@ button.lvl-item:hover { border-color: var(--accent); transform: translateY(-2px)
 .race-full .shift-label.big { top: 34%; font-size: 40px; }
 .race-full .skill-flash { top: calc(118px + var(--sat)); }
 .rf-venue { position: absolute; top: calc(118px + var(--sat)); left: 0; right: 0; width: fit-content; margin: 0 auto; padding: 6px 16px; border-radius: 999px; background: rgba(27,31,36,.6); color: #fff; font: 18px var(--display); white-space: nowrap; pointer-events: none; animation: pop .25s ease-out; }
+/* Split times against the ghost: a tick per checkpoint on the lanes, and the gap as each one is passed. */
+.rf-lane .lane-cp { position: absolute; top: 3px; bottom: 3px; width: 2px; border-radius: 1px; background: rgba(255,255,255,.45); }
+.rf-lane .lane-cp.passed { background: #ffd54f; }
+.rf-split { position: absolute; top: calc(150px + var(--sat)); left: 0; right: 0; width: fit-content; margin: 0 auto; padding: 4px 16px; border-radius: 999px; background: rgba(27,31,36,.7); color: #fff; font: 26px var(--display); font-variant-numeric: tabular-nums; pointer-events: none; animation: pop .25s ease-out; }
+.rf-split.ahead { background: #2e7d32; }
+.rf-split.behind { background: #c62828; }
+/* A pop-up call over a race (Perfect shift!, Near miss!). */
+.callout { position: absolute; top: 44%; left: 0; right: 0; z-index: 3; text-align: center; color: #fff; font: 34px var(--display); text-shadow: 0 3px 0 #e65100, 0 0 18px rgba(255,213,79,.8); pointer-events: none; animation: callout .9s ease-out forwards; }
+@keyframes callout { 0% { transform: scale(.4) rotate(-6deg); opacity: 0; } 18% { transform: scale(1.15) rotate(2deg); opacity: 1; } 32% { transform: scale(1) rotate(0); } 75% { opacity: 1; } 100% { transform: translateY(-24px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .callout { animation: none; } }
+html.calm .callout { animation: none !important; }
 /* Wheelspin on a slick strip: a small pulsing tag above the tach. */
 .rf-spin { position: absolute; left: calc(16px + var(--sal)); bottom: calc(160px + var(--sab)); padding: 4px 12px; border-radius: 999px; background: rgba(255,255,255,.85); color: #37474f; font: 15px var(--display); pointer-events: none; animation: spin-pulse .4s ease-in-out infinite alternate; }
 @keyframes spin-pulse { from { transform: translateX(-2px); } to { transform: translateX(2px); } }
@@ -1204,7 +1223,7 @@ button.lvl-item:hover { border-color: var(--accent); transform: translateY(-2px)
 .upgrade-more { display: block; margin: 0 auto 6px; background: none; border: none; font: 14px var(--display); color: var(--blue, #1e88e5); text-decoration: underline; }
 
 /* Garage tabs and the mod shop. */
-.garage-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; background: #eceff1; border-radius: 12px; padding: 4px; margin: 10px 0 6px; }
+.garage-tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; background: #eceff1; border-radius: 12px; padding: 4px; margin: 10px 0 6px; }
 .garage-tabs button { border: 0; background: transparent; border-radius: 9px; padding: 8px 4px; font: 14px var(--display); color: #546e7a; cursor: pointer; }
 .garage-tabs button.sel { background: #fff; color: #263238; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15); }
 .mod-tabs { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; }
@@ -1431,7 +1450,22 @@ button.lvl-item:hover { border-color: var(--accent); transform: translateY(-2px)
 .pat-opt.sel { border-color: var(--blue); box-shadow: 0 0 0 2px var(--blue) inset; }
 .pat-opt.locked { opacity: .55; }
 .pattern-swatch { width: 100%; max-width: 46px; aspect-ratio: 40 / 24; border-radius: 7px; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
-@media (max-width: 520px) { .patterns { grid-template-columns: repeat(3, 1fr); } .garage-tabs button { font-size: 13px; padding: 8px 2px; white-space: nowrap; } }
+/* Trim: tint, headlight and handle tiles, then the saved looks (ui/Trim.tsx). */
+.trim-opts { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.trim-opt { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 5px 2px; border-radius: 12px; border: 1.5px solid #dfe5ea; background: #fff; font: 12px var(--display); color: #37474f; min-width: 0; cursor: pointer; }
+.trim-opt b { font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.trim-opt small { font: 700 11px Nunito, sans-serif; color: #607d8b; }
+.trim-opt.sel { border-color: var(--blue); box-shadow: 0 0 0 2px var(--blue) inset; }
+.trim-opt.locked { opacity: .55; }
+.trim-chip { width: 34px; height: 20px; border-radius: 7px; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+.trim-tint { border-radius: 10px 10px 4px 4px; }
+.trim-lights { border-radius: 50%; width: 22px; box-shadow: 0 0 8px currentColor, 0 1px 3px rgba(0,0,0,.3); }
+.trim-handles { height: 8px; margin: 6px 0; border-radius: 4px; }
+.presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.preset { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 4px; border-radius: 12px; border: 1.5px solid #dfe5ea; background: #fff; min-width: 0; }
+.preset.empty { justify-content: center; min-height: 92px; border-style: dashed; }
+.preset-row { display: flex; gap: 4px; }
+@media (max-width: 520px) { .patterns, .trim-opts { grid-template-columns: repeat(3, 1fr); } .garage-tabs button { font-size: 12px; padding: 8px 1px; white-space: nowrap; } }
 
 /* Skins: a wrapping grid of animated chips edged in their tier colour, try-on bar under it. */
 .garage-detail { min-width: 0; }
@@ -1697,6 +1731,9 @@ button.book-car { font: inherit; color: inherit; }
   animation: boost-streak .12s linear infinite; }
 @keyframes boost-streak { 50% { transform: scale(1.04); opacity: .8; } }
 @media (prefers-reduced-motion: reduce) { .rf-boost-fx { animation: none; } .boost-btn.full:not(:disabled) { animation: none; } }
+/* The finish hero shot: tap anywhere below the top bar to skip it; a small skip mark in the corner. */
+.hero-skip { position: absolute; z-index: 5; top: calc(56px + var(--sat)); left: 0; right: 0; bottom: 0; margin: 0; padding: 0 calc(16px + var(--sar)) calc(16px + var(--sab)) 0; border: 0; background: none; display: flex; align-items: flex-end; justify-content: flex-end; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.hero-skip span { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; background: rgba(10,20,40,.45); color: #fff; font-size: 20px; }
 @media (max-height: 500px) { .boost-btn { width: 64px; height: 64px; } .boost-btn span { font-size: 22px; } .boost-btn small { font-size: 10px; } }
 @media (max-width: 420px) { .boost-btn { width: 70px; height: 70px; } .rf-buttons { gap: 8px; } }
 /* Phone held upright: tach, boost and SHIFT must fit side by side with the speed above them. */
@@ -2131,3 +2168,43 @@ body:has(.race-full) .toasts { display: none; }
 .wh-prize-line { display: flex; align-items: center; gap: 8px; font: 26px/1.1 var(--display); color: #14213d; text-align: center; }
 @keyframes wh-pop { from { transform: scale(.6); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .wh-prize { animation: none; } .wh-hit { animation: none; opacity: .25; } }
+
+/* Photo mode in the full-screen car view (scene/photo.ts). */
+.ci-head .ci-photo { margin-left: auto; }
+.car-inspect.photo { background: #263238; }
+.ci-photo-bar { flex: none; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px 12px 14px; background: rgba(20, 26, 32, .92); }
+.ci-chips { display: flex; gap: 6px; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.ci-chips button { flex: none; border: 2px solid rgba(255,255,255,.35); background: rgba(255,255,255,.08); color: #fff; border-radius: 999px; padding: 6px 12px; font: 800 13px Nunito, sans-serif; white-space: nowrap; cursor: pointer; }
+.ci-chips button.sel { background: #fff; color: #1b2a4a; border-color: #fff; }
+.ci-shutter { width: 64px; height: 64px; border-radius: 50%; border: 5px solid #fff; background: radial-gradient(circle, #fff 0 55%, rgba(255,255,255,.25) 56%); cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.4); }
+.ci-shutter:active { transform: scale(.94); }
+.ci-flash { position: absolute; inset: 0; background: #fff; pointer-events: none; animation: ci-flash .35s ease-out forwards; }
+@keyframes ci-flash { from { opacity: .85; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .ci-flash { animation: none; opacity: 0; } }
+
+/* Season recap (ui/Recap.tsx). */
+.recap-eyebrow { font: 900 12px Nunito, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #8a6d00; }
+.recap h2 { margin: 2px 0 10px; }
+.recap-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; }
+.recap-grid > span { display: flex; flex-direction: column; align-items: center; padding: 6px 2px; border-radius: 12px; background: rgba(255, 202, 40, .14); }
+.recap-grid i { font-style: normal; font-size: 20px; }
+.recap-grid b { font: 18px var(--display); }
+.recap-grid small { font: 800 11px Nunito, sans-serif; color: #607d8b; }
+.recap-rep { margin: 0 0 12px; font: 700 13px Nunito, sans-serif; }
+.fr-level { margin-left: 5px; font-size: 13px; cursor: help; }
+
+/* Postcards (ui/Postcards.tsx). */
+.pc-overlay { z-index: 170; display: grid; place-items: center; padding: 16px; }
+.pc-pick h3 { margin: 0 0 8px; }
+.pc-face { position: relative; display: flex; flex-direction: column; justify-content: flex-end; min-height: 110px; padding: 10px 12px; border-radius: 14px; color: #fff; text-align: left; box-shadow: 0 3px 10px rgba(0,0,0,.25); text-shadow: 0 1px 3px rgba(0,0,0,.6); }
+.pc-face b { font: 17px var(--display); }
+.pc-face small { font: 800 12px Nunito, sans-serif; opacity: .95; }
+.pc-stamp { position: absolute; top: 8px; right: 8px; width: 34px; height: 40px; display: grid; place-items: center; font-size: 20px; background: #fff; border: 2px dashed #b0bec5; border-radius: 4px; text-shadow: none; }
+.pc-cards { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin: 10px 0 8px; }
+.pc-cards button { aspect-ratio: 1; border-radius: 10px; border: 2px solid transparent; font-size: 18px; cursor: pointer; }
+.pc-cards button.sel { border-color: var(--blue); box-shadow: 0 0 0 2px var(--blue); }
+.pc-msgs { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 12px; }
+.pc-msgs button { border: 1.5px solid #dfe5ea; background: #fff; border-radius: 999px; padding: 5px 10px; font: 800 12px Nunito, sans-serif; color: #37474f; cursor: pointer; }
+.pc-msgs button.sel { border-color: var(--blue); background: #e3f0ff; }
+.pc-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.cr-parts .rm-cta + .rm-cta { margin-top: 4px; }

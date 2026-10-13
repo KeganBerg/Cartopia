@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { StageSlot, useStageReady } from '../scene/Stage'
 import { useGame, openCrate } from '../game/store'
 import { MOD_SLOTS, SKINNED_SLOTS, carDef, fittedMods, modDef, ownedModSkins, ownedSkins, type ModDef } from '../game/data'
-import { CRATES, carOdds, crateCost, crateDef, crateOddsShown, dropTier, homeCars, homeMods, modChoices, skinOdds, skinOf, type CrateDef, type CrateId, type CrateOpen } from '../game/crates'
+import { CRATES, carOdds, crateCost, crateDef, crateOddsShown, dropTier, homeCars, homeMods, modChoices, pityLeft, skinOdds, skinOf, type CrateDef, type CrateId, type CrateOpen } from '../game/crates'
 import { SKIN_TIERS } from '../game/data'
 import { CrateScene, TIER_GLOW, prizeLook, type CratePhase } from '../scene/CrateScene'
 import { CarThumb } from '../scene/BuildingPreview'
@@ -11,6 +11,7 @@ import { compact } from './format'
 import { openGarageTab } from './Menus'
 import { openModSlot } from './Mods'
 import { raceCarOf } from '../game/raceCar'
+import { CUP_CRATE } from '../game/cups'
 import './crates.css'
 import { LoadingScene } from './Loading'
 
@@ -41,6 +42,7 @@ function Odds({ c, level }: { c: CrateDef; level: number }) {
   const skinIds = useGame((s) => s.skins)
   const modSkinIds = useGame((s) => s.modSkins)
   const claimedSets = useGame((s) => s.claimedSets)
+  const left = pityLeft(c, useGame((s) => s.cratePity?.[c.id] ?? 0))
   const have = useMemo(() => new Set(cars.map((x) => x.model)), [cars])
   const haveSkin = useMemo(() => {
     const st = { level, claimedSets, skins: skinIds, modSkins: modSkinIds }
@@ -67,6 +69,11 @@ function Odds({ c, level }: { c: CrateDef; level: number }) {
         <button className="odd car" style={{ flex: Math.max(o.car, 14) }} onClick={() => toggle('car')} aria-expanded={open === 'car'}><b>🚗</b>{o.car}%<small>{open === 'car' ? '▴' : '▾'}</small></button>
         {o.skin > 0 && <button className="odd skin" style={{ flex: Math.max(o.skin, 14) }} onClick={() => toggle('skin')} aria-expanded={open === 'skin'}><b>✨</b>{o.skin}%<small>{open === 'skin' ? '▴' : '▾'}</small></button>}
       </div>
+      {left != null && (
+        <div className="crate-pity" title={`A ${c.pity?.tier ?? ''} skin is guaranteed within ${left} ${left === 1 ? 'open' : 'opens'}`.replace('  ', ' ')}>
+          <b>{c.pity?.tier === 'legendary' ? '🌟' : '✨'}</b>{left === 1 ? 'Next one' : `≤ ${left}`}
+        </div>
+      )}
       {open === 'mod' && (
         <div className="crate-cars">
           {parts.map(({ m, live }) => (
@@ -182,8 +189,11 @@ export function CratesPanel() {
   const coins = useGame((s) => s.coins)
   const bucks = useGame((s) => s.bucks)
   const cars = useGame((s) => s.cars)
+  // Free crates waiting (Class Cup prizes, see game/cups.ts): all of them CUP_CRATEs.
+  const freeCrates = useGame((s) => s.freeCrates) ?? []
   const close = () => useGame.getState().openPanel(null)
   const [pick, setPick] = useState<CrateId>(() => {
+    if (freeCrates.length) return CUP_CRATE
     try {
       const saved = localStorage.getItem(CRATE_KEY) as CrateId | null
       if (saved && crateDef(saved) && level >= crateDef(saved)!.unlockLevel) return saved
@@ -193,6 +203,7 @@ export function CratesPanel() {
     return 'street'
   })
   const def = crateDef(pick)!
+  const free = pick === CUP_CRATE ? freeCrates[0] : undefined
   const [phase, setPhase] = useState<CratePhase>('idle')
   // Opens still to show (more than one when earlier ones are handed over late), the one showing, and whether it's up.
   const [queue, setQueue] = useState<CrateOpen[]>([])
@@ -226,7 +237,7 @@ export function CratesPanel() {
     phaseNow.current = 'wait'
     const before = useGame.getState().cars
     setPhase('wait')
-    const got = await openCrate(pick)
+    const got = await openCrate(pick, free)
     if (!got?.length) {
       setPhase('idle')
       return
@@ -263,7 +274,7 @@ export function CratesPanel() {
   )
   const stageReady = useStageReady()
 
-  const locked = level < def.unlockLevel
+  const locked = !free && level < def.unlockLevel
   return (
     <div className="race-full crate-full" onClick={() => { if (phase === 'open' && !shown) setSkip((k) => k + 1) }}>
       <StageSlot cam={CRATE_CAM}>{scene}</StageSlot>
@@ -276,7 +287,7 @@ export function CratesPanel() {
       {phase === 'open' && !shown && <div className="crate-skip">Tap to skip</div>}
       {phase === 'open' && shown && open && (
         <Prize open={open} paintCar={paintCar} onDone={queue.length > 1 ? next : () => { next() }} onAgain={again}
-          again={queue.length > 1 ? 'Next' : <>Again · {price(crateDef(open.crate) ?? def, level)}</>} />
+          again={queue.length > 1 ? 'Next' : free ? `🎁 Free · ${freeCrates.length}` : <>Again · {price(crateDef(open.crate) ?? def, level)}</>} />
       )}
       {phase !== 'open' && (
         <div className="crate-dock" onClick={(e) => e.stopPropagation()}>
@@ -285,13 +296,13 @@ export function CratesPanel() {
               <button key={c.id} className={`crate-tab${c.id === pick ? ' sel' : ''}${level < c.unlockLevel ? ' locked' : ''}`} onClick={() => choose(c.id)} disabled={phase !== 'idle'}>
                 <CrateIcon c={c} />
                 <b>{c.name.replace(' Crate', '')}</b>
-                <span className={c.pay === 'bucks' ? 'ct-price gem' : 'ct-price'}>{level < c.unlockLevel ? `🔒 Lv ${c.unlockLevel}` : price(c, level)}</span>
+                <span className={c.pay === 'bucks' ? 'ct-price gem' : 'ct-price'}>{c.id === CUP_CRATE && freeCrates.length ? `🎁 ${freeCrates.length}` : level < c.unlockLevel ? `🔒 Lv ${c.unlockLevel}` : price(c, level)}</span>
               </button>
             ))}
           </div>
           <Odds key={pick} c={def} level={level} />
           <button className={`crate-open${def.pay === 'bucks' ? ' gem' : ''}`} disabled={phase !== 'idle'} onClick={go}>
-            {phase === 'wait' ? 'Opening…' : locked ? `🔒 Level ${def.unlockLevel}` : <>Open · {price(def, level)}</>}
+            {phase === 'wait' ? 'Opening…' : free ? `🎁 Free · ${freeCrates.length}` : locked ? `🔒 Level ${def.unlockLevel}` : <>Open · {price(def, level)}</>}
           </button>
         </div>
       )}

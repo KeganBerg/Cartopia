@@ -22,7 +22,7 @@ describe('paint rivals', () => {
   })
 
   it('each hold one coin colour, and every non-starter coin colour has a rival', () => {
-    const coin = PAINTS.filter((p) => !p.bucks).map((p) => p.color)
+    const coin = PAINTS.filter((p) => !p.bucks && !p.earn).map((p) => p.color)
     expect(new Set(PAINT_RIVALS.map((r) => r.paint)).size).toBe(PAINT_RIVALS.length)
     for (const r of PAINT_RIVALS) {
       expect(coin).toContain(r.paint)

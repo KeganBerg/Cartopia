@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MOD_SKINS, SKINS, ownedSkins } from './data'
 import { useGame } from './store'
 import { isCleanName } from '../lib/names'
@@ -10,6 +10,9 @@ import { EVENT_RACES, WEEKLY_EVENTS, eventBonus, eventFor, eventIsBoss, eventPri
 const week = (i: number) => new Date(Date.UTC(2026, 9, 5) + i * 7 * 86400000).toISOString().slice(0, 10)
 
 describe('weekly events', () => {
+  // On a weekday, so no weekend bonus lands on the payouts checked.
+  beforeEach(() => void vi.spyOn(Date, 'now').mockReturnValue(Date.UTC(2026, 9, 12, 12)))
+  afterEach(() => vi.restoreAllMocks())
   it('runs a different event every week and never on the time trial venue', () => {
     for (let i = 0; i < 30; i++) {
       expect(eventFor(week(i)).id).not.toBe(eventFor(week(i + 1)).id)
@@ -56,6 +59,7 @@ describe('weekly events', () => {
     expect(eventProgress(g().event)!.won).toBe(0)
     for (let i = 0; i < EVENT_RACES - 1; i++) g().eventResult(true)
     expect(g().eventPrize).toBeNull()
+    useGame.setState((s) => ({ boosts: s.boosts && { ...s.boosts, streak: 0 } })) // no win-streak bonus on the payout checked
     const before = g().coins
     g().eventResult(true)
     expect(g().skins).toContain(e.skin)
@@ -69,6 +73,7 @@ describe('weekly events', () => {
 
   it('still pays a race that started before the Monday reset and finished after it', () => {
     useGame.setState({ level: 10, xp: 0, coins: 0, event: { week: '2020-01-06', pi: 70, won: 1 }, eventPrize: null, skins: [], levelUp: null })
+    useGame.setState((s) => ({ boosts: s.boosts && { ...s.boosts, streak: 0 } })) // no win-streak bonus on the payout checked
     useGame.getState().eventResult(true)
     expect(useGame.getState().coins).toBe(eventPrize(70, 1))
     // This week's event starts fresh.
