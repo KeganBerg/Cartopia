@@ -1,12 +1,12 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { restoTables } from './resto'
 import { CARS, MODS, MOD_SKINS, SKINS, carDef, modDef, modFits } from './data'
-import { CRATES, carCrate, carValue, carWorth, crateCars, crateDef, crateOdds, crateSkins, crateTables, crateValue, homeCars, homeMods, modChoices, modCrate, modWorth, rollCrate, skinOdds, type CrateDrop } from './crates'
+import { CRATES, carCrate, carValue, carWorth, crateCars, crateDef, crateOdds, crateOddsShown, crateSkins, crateTables, crateValue, homeCars, homeMods, modChoices, modCrate, modWorth, rollCrate, skinOdds, type CrateDrop } from './crates'
 
 const dir = new URL('../../supabase/migrations/', import.meta.url)
 // The newest migration holding the crate tables.
-const serverTables = () => {
-  const tag = '$crates$'
+const serverTables = (tag = '$crates$') => {
   const sql = readdirSync(dir).sort().map((f) => readFileSync(new URL(f, dir), 'utf8')).filter((s) => s.includes(tag)).pop()!
   const at = sql.indexOf(tag) + tag.length
   return JSON.parse(sql.slice(at, sql.indexOf(tag, at)))
@@ -24,6 +24,7 @@ describe('crates', () => {
   // When this fails, regenerate the tables in a new migration.
   it('rolls on the server from the same tables', () => {
     expect(serverTables()).toEqual(JSON.parse(JSON.stringify(crateTables())))
+    expect(serverTables('$resto$')).toEqual(JSON.parse(JSON.stringify(restoTables())))
   })
 
   it('only holds cars your level has unlocked', () => {
@@ -165,8 +166,13 @@ describe('crates', () => {
   })
 
   describe('resto-mod pieces', () => {
-    const diamond = crateDef('diamond')!
+    // Pieces are rare (0.1%), so these rolls use a Diamond crate with a big piece slice.
+    const real = crateDef('diamond')!
+    const diamond = { ...real, odds: { ...real.odds, piece: 25 } }
     const restos = CARS.filter((c) => c.secret)
+    it('keeps pieces rare', () => {
+      for (const id of ['garage', 'gold', 'diamond']) expect(crateOddsShown(crateDef(id)!, 30).piece).toBe(0.1)
+    })
     it('drops pieces of unlocked, unbuilt resto-mods only', () => {
       const rand = seeded(11)
       const built = [{ uid: 'z', model: restos[0].id }]

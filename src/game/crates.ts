@@ -44,17 +44,17 @@ export const CRATES: CrateDef[] = [
   },
   {
     id: 'garage', name: 'Garage Crate', pay: 'coins', unlockLevel: 6, base: 1500, perLevel: 500,
-    odds: { coins: 39, jackpot: 8, mod: 31, car: 16, skin: 4, piece: 2 }, carShare: 0.15, coinMult: [0.45, 0.85], jackpotMult: [2, 3],
+    odds: { coins: 40.9, jackpot: 8, mod: 31, car: 16, skin: 4, piece: 0.1 }, carShare: 0.15, coinMult: [0.45, 0.85], jackpotMult: [2, 3],
     carMax: 40000, modMax: 10000, skins: ['rare', 'epic'], look: { wood: '#2e7d4f', band: '#cfd8dc', glow: '#69f0ae' },
   },
   {
     id: 'gold', name: 'Gold Crate', pay: 'bucks', unlockLevel: 3, base: 8, perLevel: 0,
-    odds: { coins: 31, jackpot: 6, mod: 30, car: 20, skin: 10, piece: 3 }, carShare: 0.15, coinMult: [0.45, 0.85], jackpotMult: [2, 3],
+    odds: { coins: 33.9, jackpot: 6, mod: 30, car: 20, skin: 10, piece: 0.1 }, carShare: 0.15, coinMult: [0.45, 0.85], jackpotMult: [2, 3],
     carMax: 130000, modMax: 15000, skins: ['rare', 'epic', 'legendary'], look: { wood: '#d4a017', band: '#7a4b12', glow: '#ffd54f' },
   },
   {
     id: 'diamond', name: 'Diamond Crate', pay: 'bucks', unlockLevel: 8, base: 25, perLevel: 0,
-    odds: { coins: 20, jackpot: 6, mod: 24, car: 32, skin: 14, piece: 4 }, carShare: 0.2, coinMult: [0.4, 0.8], jackpotMult: [2, 3],
+    odds: { coins: 23.9, jackpot: 6, mod: 24, car: 32, skin: 14, piece: 0.1 }, carShare: 0.2, coinMult: [0.4, 0.8], jackpotMult: [2, 3],
      skins: ['epic', 'legendary'], look: { wood: '#4fc3f7', band: '#e1f5fe', glow: '#b388ff' },
   },
 ]
@@ -182,6 +182,21 @@ function pickWeighted<T>(items: T[], weight: (t: T) => number, rand: () => numbe
 // Rolls one crate for a player at this level with these cars and skins. A part with nothing left
 // to fit, or a car prize with no cars in reach, becomes a coin prize instead; a car or skin the
 // player already has turns into coins.
+// One resto-mod piece: a random piece of a car the level has unlocked and you haven't built.
+// One you hold pays `dupeCoins`; the last missing one builds the car. Null when no car is in
+// reach. Crates roll it for their piece slice; other rewards (Rusty's top zone) can too, and
+// hand the drop to applyCrate() (signed-in players get it from the server's piece_grant()).
+export function rollPiece(level: number, cars: { model: string }[], have: readonly string[], rand: () => number, dupeCoins: number): Extract<CrateDrop, { kind: 'piece' | 'piecedupe' }> | null {
+  const pool = piecePool(level, { cars })
+  if (!pool.length) return null
+  const car = pool[Math.floor(rand() * pool.length)]
+  const piece = Math.floor(rand() * PIECE_COUNT)
+  if (have.includes(pieceId(car.id, piece))) return { kind: 'piecedupe', model: car.id, piece, coins: dupeCoins }
+  const done = Array.from({ length: PIECE_COUNT }, (_, i) => i).every((i) => i === piece || have.includes(pieceId(car.id, i)))
+  if (!done) return { kind: 'piece', model: car.id, piece }
+  return { kind: 'piece', model: car.id, piece, uid: newUid(rand), color: car.colors[Math.floor(rand() * car.colors.length)] }
+}
+
 export function rollCrate(c: CrateDef, level: number, cars: CarLike[], rand: () => number = Math.random, owned: OwnedSkins = { skins: [], modSkins: [] }): CrateDrop {
   const v = crateValue(c, level)
   const kinds = Object.entries(crateOdds(c, level)) as [keyof CrateOdds, number][]
@@ -195,16 +210,8 @@ export function rollCrate(c: CrateDef, level: number, cars: CarLike[], rand: () 
     kind = 'coins'
   }
   if (kind === 'piece') {
-    const pool = piecePool(level, { cars })
-    if (pool.length) {
-      const car = pool[Math.floor(rand() * pool.length)]
-      const piece = Math.floor(rand() * PIECE_COUNT)
-      const have = owned.pieces ?? []
-      if (have.includes(pieceId(car.id, piece))) return { kind: 'piecedupe', model: car.id, piece, coins: roundCoins(v * PIECE_DUPE) }
-      const done = Array.from({ length: PIECE_COUNT }, (_, i) => i).every((i) => i === piece || have.includes(pieceId(car.id, i)))
-      if (!done) return { kind: 'piece', model: car.id, piece }
-      return { kind: 'piece', model: car.id, piece, uid: newUid(rand), color: car.colors[Math.floor(rand() * car.colors.length)] }
-    }
+    const d = rollPiece(level, cars, owned.pieces ?? [], rand, roundCoins(v * PIECE_DUPE))
+    if (d) return d
     kind = 'coins'
   }
   if (kind === 'skin') {
@@ -255,13 +262,13 @@ export function crateOdds(c: CrateDef, level: number): CrateOdds {
 }
 
 // The odds as a player sees them: coins (with jackpots), parts, cars and skins, in whole percent
-// (cars to a tenth below 1%).
+// (cars to a tenth below 1%, resto-mod pieces to a hundredth).
 export function crateOddsShown(c: CrateDef, level: number) {
   const o = crateOdds(c, level)
   const t = o.coins + o.jackpot + o.mod + o.car + o.skin + o.piece
   const pc = (n: number) => Math.round((n / t) * 100)
   const car = (o.car / t) * 100
-  return { coins: pc(o.coins + o.jackpot), mod: pc(o.mod), car: car < 1 ? Math.round(car * 10) / 10 : Math.round(car), skin: pc(o.skin), piece: pc(o.piece) }
+  return { coins: pc(o.coins + o.jackpot), mod: pc(o.mod), car: car < 1 ? Math.round(car * 10) / 10 : Math.round(car), skin: pc(o.skin), piece: Math.round((o.piece / t) * 10000) / 100 }
 }
 
 // Weekly event skins never go in crates.

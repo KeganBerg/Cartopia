@@ -25,3 +25,10 @@ export const built = (s: Saved, model: string) => s.cars.some((c) => c.model ===
 
 // Cars whose pieces can drop for you now: unlocked by level and not built yet.
 export const piecePool = (level: number, s: Saved) => restoCars().filter((c) => c.unlockLevel <= level && !built(s, c.id))
+
+// The table the server's piece_grant() rolls from (econ_private.resto_tables() in the newest
+// migration that sets it; crates.test.ts checks they match).
+export const restoTables = () => ({
+  pieces: PIECE_COUNT,
+  cars: Object.fromEntries(restoCars().map((c) => [c.id, { unlock: c.unlockLevel, colors: c.colors }])),
+})
