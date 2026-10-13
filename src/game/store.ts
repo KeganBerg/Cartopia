@@ -72,7 +72,7 @@ export type Quests = {
 }
 export type Period = 'daily' | 'weekly'
 // A paid gem pack, as the server's purchases table records it (src/lib/payments.ts).
-export type Purchase = { seq: number; bucks: number; coins: number; parts: number }
+export type Purchase = { seq: number; pack?: string; bucks: number; coins: number; parts: number }
 
 export type SaveState = {
   version: 1
