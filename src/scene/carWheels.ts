@@ -66,8 +66,9 @@ export function brakeGeo(r: number, w: number, sd: number) {
   const ri = r * RIM
   const rotor: BufferGeometry[] = []
   const cal: BufferGeometry[] = []
+  // The rotor sits well out from the body side so it never lies flush with the dark wheel well.
   const x = sd * w * 0.12
-  put(rotor, new CylinderGeometry(ri * 0.82, ri * 0.82, 0.012, 20), [x, 0, 0], [0, 0, Math.PI / 2])
+  put(rotor, new CylinderGeometry(ri * 0.82, ri * 0.82, 0.012, 20), [x + sd * 0.0085, 0, 0], [0, 0, Math.PI / 2])
   put(rotor, new CylinderGeometry(ri * 0.34, ri * 0.34, 0.03, 12), [x + sd * 0.01, 0, 0], [0, 0, Math.PI / 2])
   // Caliper clamped over the rotor at the back, top.
   const a = 2.2
