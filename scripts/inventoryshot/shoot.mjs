@@ -9,6 +9,9 @@ for (const [form, size] of [['desktop', { width: 1280, height: 800 }], ['phone',
   await p.addInitScript(() => localStorage.setItem('cartopia-flash-warning-hide', '1'))
   await p.goto('http://localhost:5173/?time=0.3&season=fall')
   await p.waitForFunction(() => window.__game, null, { timeout: 90000 })
+  // The loading splash waits for a tap once the town is ready.
+  await p.locator('#splash button.ld').click({ timeout: 60000 }).catch(() => {})
+  await p.waitForSelector('#splash', { state: 'detached', timeout: 20000 }).catch(() => {})
   await p.waitForTimeout(2500)
   // Three buildings next to the start roads: an upgraded pizza place, a donut shop and a fountain.
   await p.evaluate(() => {
