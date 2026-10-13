@@ -18,8 +18,9 @@ import { EVENT_RACES, eventBonus, eventFor, eventIsBoss, eventPrize, eventProgre
 import { trialWeek } from './trial'
 import { groupOf, groupTurn, mergeCandidates, applyMerge, applySplit, rotateGroup, isLandmark, LANDMARK_NAME } from './merge'
 import { togglePick } from './meet'
-import { crateCost, crateDef, rollCrate, type CrateId, type CrateOpen } from './crates'
+import { crateCost, crateDef, rollCrate, rollSourcePiece, type CrateId, type CrateOpen } from './crates'
 import { rollWheel, type WheelSpin } from './wheel'
+import { pieceId } from './resto'
 import { claim, type WagerEntry } from './wager'
 
 // rot: quarter turns the player chose (0 faces south). Unset means face the nearest road.
@@ -38,7 +39,8 @@ export type Loot =
   | { kind: 'trophy' }
   | { kind: 'nothing' }
 // A search in progress. Not saved: leaving mid-search forfeits it.
-export type Search = { spot: string; pins: Loot[]; revealed: boolean[]; truckAt: number | null; flatAt: number | null; flat: boolean }
+// piece: a resto-mod piece the search turned up (Rusty's top spot), already added by applyCrate().
+export type Search = { spot: string; pins: Loot[]; revealed: boolean[]; truckAt: number | null; flatAt: number | null; flat: boolean; piece?: { model: string; piece: number } }
 
 // Daily and weekly tasks. Each period keeps the three tasks drawn for it (with their targets),
 // the counters as they stood when it began (progress is counted from there), which tasks were
@@ -120,6 +122,8 @@ export type SaveState = {
   skins: string[]
   // Mod skins bought or won; level and set ones are worked out (ownedModSkins()).
   modSkins: string[]
+  // Resto-mod pieces won from crates, as "model:piece" (game/resto.ts).
+  restoParts?: string[]
   land: string[]
   updatedAt: number
 }
@@ -294,9 +298,10 @@ export type GameState = SaveState & UiState & Actions
 // Cars a signed-in player's search finds come from the server (rescue_roll() in
 // supabase/migrations/0022_rescue_rolls.sql), which keeps them so the guard can tell real
 // finds from made-up ones. src/lib/rescue.ts plugs it in; null means roll here (guests, or a server
-// without it yet).
+// without it yet). Rusty's top spot can hand back a resto-mod piece as a crate open.
 export type ServerFind = { i: number; uid: string; model: string; rarity: Rarity }
-let rescueRoller: ((spot: string) => Promise<ServerFind[] | null>) | null = null
+export type ServerSearch = { cars: ServerFind[]; piece?: CrateOpen | null }
+let rescueRoller: ((spot: string) => Promise<ServerSearch | null>) | null = null
 let rolling = false
 export const setRescueRoller = (f: typeof rescueRoller) => {
   rescueRoller = f
@@ -1131,7 +1136,7 @@ export const useGame = create<GameState>()(
       buyCar: (model, color) => {
         const s = get()
         const c = carDef(model)
-        if (c.season || c.rescueOnly) return false
+        if (c.season || c.rescueOnly || c.secret) return false
         if (s.level < c.unlockLevel) {
           s.showNeed('level', c.unlockLevel, c.name)
           return false
@@ -1337,11 +1342,14 @@ export const useGame = create<GameState>()(
         // A server open the save already counted is never added twice.
         if (o.seq != null && o.seq <= (s.crates ?? 0)) return
         const d = o.drop
-        const won = d.kind === 'coins' || d.kind === 'dupe' || d.kind === 'skindupe' ? d.coins : 0
+        const won = d.kind === 'coins' || d.kind === 'dupe' || d.kind === 'skindupe' || d.kind === 'piecedupe' ? d.coins : 0
         let cars = s.cars
-        // A new car counts for the "Get a new car" goals, like one bought or restored.
-        const newCar = d.kind === 'car' && !cars.some((c) => c.uid === d.uid)
-        if (newCar) cars = [...cars, { uid: d.uid, model: d.model, color: d.color, upgrades: noUpgrades() }]
+        // A new car counts for the "Get a new car" goals, like one bought or restored. The
+        // fourth resto-mod piece builds its car.
+        const car = d.kind === 'car' ? d : d.kind === 'piece' && d.uid && d.color ? { uid: d.uid, model: d.model, color: d.color } : null
+        const newCar = !!car && !cars.some((c) => c.uid === car.uid)
+        if (car && newCar) cars = [...cars, { uid: car.uid, model: car.model, color: car.color, upgrades: noUpgrades() }]
+        const piece = d.kind === 'piece' ? pieceId(d.model, d.piece) : null
         if (d.kind === 'mod') cars = cars.map((c) => (c.uid === d.car ? { ...c, ownedMods: [...new Set([...ownedMods(c), d.mod])] } : c))
         set({
           coins: Math.max(0, s.coins - o.cost.coins + won),
@@ -1349,6 +1357,7 @@ export const useGame = create<GameState>()(
           cars,
           ...(d.kind === 'skin' && !d.part && !(s.skins ?? []).includes(d.skin) ? { skins: [...(s.skins ?? []), d.skin] } : {}),
           ...(d.kind === 'skin' && d.part && !(s.modSkins ?? []).includes(d.skin) ? { modSkins: [...(s.modSkins ?? []), d.skin] } : {}),
+          ...(piece && !(s.restoParts ?? []).includes(piece) ? { restoParts: [...(s.restoParts ?? []), piece] } : {}),
           crates: o.seq ?? s.crates ?? 0,
           stats: { ...s.stats, ...(won ? { coinsEarned: (s.stats.coinsEarned ?? 0) + won } : {}), ...(newCar ? { carsBought: (s.stats.carsBought ?? 0) + 1 } : {}) },
           updatedAt: Date.now(),
@@ -1930,16 +1939,22 @@ export const useGame = create<GameState>()(
         if (s.level < spot.unlockLevel) return s.showNeed('level', spot.unlockLevel, spot.name)
         if (s.junkyard.length >= STORAGE_MAX) return s.toast('Storage is full. Restore or scrap a car first.')
         if (s.coins < spot.cost) return s.showNeed('coins', spot.cost - s.coins, `a search in the ${spot.name}`)
-        const go = (finds: ServerFind[] | null) => {
+        const go = (res: ServerSearch | null) => {
           const g = get()
           if (g.search || g.coins < spot.cost) return
+          // A piece from the server, or rolled here for guests (PIECE_SOURCES.rusty_track).
+          const local = !res && spotId === 'track' ? rollSourcePiece('rusty_track', g.level, g.cars, g.restoParts ?? []) : null
+          const open: CrateOpen | null = res?.piece ?? (local ? { crate: 'rusty_track', cost: { coins: 0, bucks: 0 }, drop: local } : null)
+          const d = open?.drop
+          const piece = d && (d.kind === 'piece' || d.kind === 'piecedupe') ? { model: d.model, piece: d.piece } : undefined
           sfx.start()
           set({
             coins: g.coins - spot.cost,
-            search: rollSearch(spotId, finds, { truck: g.truck, hot: hotSpot(g.level) === spotId }),
+            search: { ...rollSearch(spotId, res?.cars ?? null, { truck: g.truck, hot: hotSpot(g.level) === spotId }), ...(piece ? { piece } : {}) },
             stats: bump(g, 'searches'),
             updatedAt: Date.now(),
           })
+          if (open) get().applyCrate(open)
         }
         if (!rescueRoller) return go(null)
         if (rolling) return
@@ -2092,8 +2107,8 @@ export const useGame = create<GameState>()(
 )
 
 export function saveOf(s: GameState): SaveState {
-  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, restoring2, truck, gp, campaign, claimedSets, crewChests, visits, crates, wagers, season, deals, trials, rivals, rivalRow, tuner, oldPaints, tour, event, showcase, raceCar, skins, modSkins, land, updatedAt } = s
-  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, restoring2: restoring2 ?? null, truck: truck ?? 0, gp, campaign, claimedSets, crewChests, visits, crates, ...(wagers ? { wagers } : {}), season, deals, trials, rivals, rivalRow, tuner: tuner ?? {}, oldPaints: !!oldPaints, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, land, updatedAt }
+  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, restoring2, truck, gp, campaign, claimedSets, crewChests, visits, crates, wagers, season, deals, trials, rivals, rivalRow, tuner, oldPaints, tour, event, showcase, raceCar, skins, modSkins, restoParts, land, updatedAt } = s
+  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, restoring2: restoring2 ?? null, truck: truck ?? 0, gp, campaign, claimedSets, crewChests, visits, crates, ...(wagers ? { wagers } : {}), season, deals, trials, rivals, rivalRow, tuner: tuner ?? {}, oldPaints: !!oldPaints, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, ...(restoParts?.length ? { restoParts } : {}), land, updatedAt }
 }
 
 // Fields added after launch, so older saves load with sensible values.
@@ -2175,7 +2190,7 @@ export async function openCrate(id: CrateId): Promise<CrateOpen[] | null> {
     useGame.getState().toast(msg === 'soon' ? 'Crates open for signed-in towns very soon!' : msg.includes('one crate') ? 'One crate at a time!' : "Couldn't open the crate. Try again.")
     return null
   }
-  if (!opens) opens = [{ crate: id, cost, drop: rollCrate(def, s.level, s.cars, Math.random, { skins: ownedSkins(s), modSkins: ownedModSkins(s) }) }]
+  if (!opens) opens = [{ crate: id, cost, drop: rollCrate(def, s.level, s.cars, Math.random, { skins: ownedSkins(s), modSkins: ownedModSkins(s), pieces: s.restoParts ?? [] }) }]
   for (const o of opens) useGame.getState().applyCrate(o)
   return opens
 }

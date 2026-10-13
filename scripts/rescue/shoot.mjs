@@ -47,21 +47,25 @@ await p.evaluate(() => {
   }
 })
 // A fixed haul so every run shows the same finds: a rare car at spot 1, a scarce one at 4.
-await p.evaluate((spot) => {
+// TRUCK=0-3 sets the tow truck (spots per search, the magnet); PIECE=1 adds a resto-mod piece.
+await p.evaluate(({ spot, truck, piece }) => {
   const g = window.__game
   const s = g.getState()
   const pins = [
     { kind: 'coins', n: 60 }, { kind: 'car', model: 'miata', rarity: 'rare' }, { kind: 'parts', n: 2 }, { kind: 'nothing' },
     { kind: 'car', model: 'woodie', rarity: 'scarce' }, { kind: 'fuel', n: 2 }, { kind: 'trophy' }, { kind: 'coins', n: 40 },
-  ]
+    { kind: 'parts', n: 3 }, { kind: 'nothing' }, { kind: 'coins', n: 80 },
+  ].slice(0, 8 + truck)
   const has = s.buildings.some((x) => x.def === 'rescue')
   g.setState({
     tutorial: 99,
     buildings: has ? s.buildings : [...s.buildings, { uid: 'rr', def: 'rescue', x: 4, z: 4, jobEndsAt: null, level: 3 }],
-    search: { spot, pins, revealed: pins.map(() => false), truckAt: null, flatAt: null, flat: false },
+    truck,
+    search: { spot, pins, revealed: pins.map(() => false), truckAt: null, flatAt: null, flat: false, ...(piece ? { piece: { model: 'sprint', piece: 2 } } : {}) },
+    ...(piece ? { restoParts: ['sprint:0', 'sprint:2'] } : {}),
     panel: 'rescue',
   })
-}, spot)
+}, { spot, truck: Number(process.env.TRUCK ?? 0), piece: !!process.env.PIECE })
 const step = async (sec) => {
   for (let t = 0; t < sec - 0.001; t += 0.1) await p.evaluate(() => window.__tick(100, false))
 }

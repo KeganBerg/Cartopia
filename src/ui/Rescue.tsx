@@ -14,6 +14,8 @@ import { rescueSfx } from '../lib/sound'
 import { buzz } from '../lib/haptics'
 import { LoadingScene } from './Loading'
 import { Confirm, useAsk } from './Confirm'
+import { BuildArt } from './Resto'
+import { piecesOf } from '../game/resto'
 
 function lootLabel(l: Loot) {
   switch (l.kind) {
@@ -254,6 +256,7 @@ function SpotList() {
                 {!locked && (done && !paid
                   ? <span role="button" tabIndex={0} className="rsc-got claim" onClick={(e) => { e.stopPropagation(); claim(set.id) }} onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); claim(set.id) } }}>🎁 <span className="ico buck-ico rs-ico">💎</span>{set.bucks}</span>
                   : <span className={paid ? 'rsc-got done' : 'rsc-got'} title={`Restore all ${set.cars.length}: +${set.bucks} gems, +${set.coins.toLocaleString()} coins`}>{paid ? '👑' : '✔'} {n}/{set.cars.length}</span>)}
+                {sp.id === PIECE_SPOT && <span className={hot === sp.id && !locked ? 'rsc-piece up' : 'rsc-piece'} title="Resto-mod pieces turn up here">🧩</span>}
                 {hot === sp.id && !locked && <span className="rsc-hot" title={`Rusty's hot tip: rare cars ${HOT_RARE}x as often today`}>🔥 {HOT_RARE}× <span className="rarity rarity-rare">Rare</span></span>}
                 {locked
                   ? <span className="rsc-go lock">🔒 Lv {sp.unlockLevel}</span>
@@ -370,7 +373,12 @@ const RESCUE_CAM = { position: [0, 14, 12] as [number, number, number], fov: 42,
 
 // The search, full screen: Rusty's tow truck drives a 3D lot (RescueScene)
 // and the controls float over it, like a race.
-function SearchScreen({ onHaul }: { onHaul: (items: Loot[]) => void }) {
+// Rusty's top spot, where resto-mod pieces turn up (PIECE_SOURCES.rusty_track, rescue_roll()).
+const PIECE_SPOT = 'track'
+
+type Recap = { items: Loot[]; piece?: { model: string; piece: number } }
+
+function SearchScreen({ onHaul }: { onHaul: (r: Recap) => void }) {
   const q = useGame((s) => s.search)!
   const bucks = useGame((s) => s.bucks)
   const reveal = useGame((s) => s.revealPin)
@@ -433,7 +441,7 @@ function SearchScreen({ onHaul }: { onHaul: (items: Loot[]) => void }) {
   cb.current = {
     onFound,
     onLeft: () => {
-      onHaul(q.pins.filter((l, i) => q.revealed[i] && l.kind !== 'nothing'))
+      onHaul({ items: q.pins.filter((l, i) => q.revealed[i] && l.kind !== 'nothing'), piece: q.piece })
       home()
     },
   }
@@ -503,7 +511,8 @@ function SearchScreen({ onHaul }: { onHaul: (items: Loot[]) => void }) {
 
 // Back from a search: the haul laid out one find at a time, with a fanfare,
 // before Rusty's storage. Cars first, best first, then the small finds summed.
-function HaulCard({ items, onDone }: { items: Loot[]; onDone: (next: 'find' | 'storage') => void }) {
+function HaulCard({ items, piece, onDone }: Recap & { onDone: (next: 'find' | 'storage') => void }) {
+  const restoParts = useGame((s) => s.restoParts)
   const cars = items.flatMap((l) => (l.kind === 'car' ? [l] : [])).sort((a, b) => RARITY_ORDER[b.rarity] - RARITY_ORDER[a.rarity])
   const sum = { coins: 0, parts: 0, fuel: 0, trophy: 0 }
   for (const l of items) {
@@ -553,6 +562,7 @@ function HaulCard({ items, onDone }: { items: Loot[]; onDone: (next: 'find' | 's
         {smalls.map((x, n) => (
           <span key={x.k} className={cars.length + n < shown ? 'haul-item in' : 'haul-item'}>{x.icon}<Count n={cars.length + n < shown ? x.n : 0} /></span>
         ))}
+        {piece && <span className={total < shown ? 'haul-item piece in' : 'haul-item piece'}><BuildArt model={piece.model} have={piecesOf(restoParts, piece.model)} fresh={piece.piece} size="xs" />🧩</span>}
         <span className={total < shown ? 'haul-item xp in' : 'haul-item xp'}>⭐ +{xp} XP</span>
       </div>
       <div className="row haul-go">
@@ -595,7 +605,7 @@ export function RescuePanel() {
   const junkCount = useGame((s) => s.junkyard.length)
   const [tab, setTab] = useState<'find' | 'storage'>(junkCount ? 'storage' : 'find')
   const [naming, setNaming] = useState<Bay | null>(null)
-  const [recap, setRecap] = useState<Loot[] | null>(null)
+  const [recap, setRecap] = useState<Recap | null>(null)
   // Back from a search with finds: show them, so the next step (restore one) is right there.
   const [wasSearching, setWasSearching] = useState(searching)
   if (wasSearching !== searching) {
@@ -609,7 +619,7 @@ export function RescuePanel() {
   if (recap)
     return (
       <Panel title="Rusty's haul" onClose={() => setRecap(null)}>
-        <HaulCard items={recap} onDone={(next) => { setRecap(null); setTab(next) }} />
+        <HaulCard {...recap} onDone={(next) => { setRecap(null); setTab(next) }} />
       </Panel>
     )
   const tabs = [
