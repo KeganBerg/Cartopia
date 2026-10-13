@@ -93,3 +93,28 @@
 .cp-swatch { position: relative; }
 .cp-swatch.mod { border-radius: 50%; }
 .cp-swatch.car, .cp-swatch.mod { display: flex; align-items: flex-end; justify-content: flex-end; font-size: 15px; line-height: 1; }
+
+/* Resto-mod pieces (game/resto.ts): the slice, and the 2x2 build card. */
+.odd.piece { background: linear-gradient(#26c6da, #00838f); cursor: pointer; }
+.build-art { position: relative; display: inline-block; flex: none; line-height: 0; }
+.build-art .thumb3d { background: none; }
+.build-art .ba-real { position: absolute; inset: 0; mask-size: 50% 50%; -webkit-mask-size: 50% 50%; mask-repeat: no-repeat; -webkit-mask-repeat: no-repeat; }
+.build-art .ba-grid { position: absolute; inset: 0; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 2px; pointer-events: none; }
+.build-art .ba-grid i { border: 1.5px dashed rgba(128,222,234,.55); border-radius: 5px; display: flex; align-items: center; justify-content: center; }
+.build-art .ba-grid i.got { border: 1.5px solid rgba(255,255,255,.18); }
+.build-art .ba-grid i em { font-style: normal; font-size: 12px; opacity: .55; line-height: 1; }
+.build-art.xs .ba-grid i em { font-size: 9px; }
+.build-art .ba-grid i.fresh { border: 2px solid #80deea; box-shadow: 0 0 10px #26c6da, inset 0 0 8px rgba(38,198,218,.6); animation: piece-in .8s ease-out both; }
+.build-art.done .ba-grid { gap: 0; }
+.build-art.done .ba-grid i { border-color: transparent; }
+.crate-prize .build-art { filter: none; }
+.crate-car.resto { padding: 3px; }
+@keyframes piece-in { from { transform: scale(1.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .build-art .ba-grid i.fresh { animation: none; } }
+.book-car.missing.resto .thumb-view { filter: none; opacity: 1; }
+.book-car.missing.resto .build-art > .thumb3d .thumb-view { opacity: .35; }
+.book-car.resto .ba-grid i { border-color: rgba(0,131,143,.45); }
+.book-car.resto .ba-grid i.got { border-color: transparent; }
+.book-car.resto .book-src { color: #00838f; font-weight: 700; }
+.crate-prize .cp-icon .build-art .thumb3d { --tw: 100px; --th: 78px; }
+.crate-car.resto .build-art .thumb3d { background: radial-gradient(ellipse at 50% 70%, rgba(255,255,255,.22) 0 35%, rgba(255,255,255,.06) 75%); }

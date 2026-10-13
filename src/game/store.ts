@@ -25,6 +25,7 @@ import { trialWeek } from './trial'
 import { groupOf, groupTurn, mergeCandidates, applyMerge, applySplit, rotateGroup, isLandmark, LANDMARK_NAME } from './merge'
 import { togglePick } from './meet'
 import { crateCost, crateDef, pityHit, rollCrate, type CrateId, type CrateOpen } from './crates'
+import { pieceId } from './resto'
 import { rollWheel, type WheelSpin } from './wheel'
 import { LIVE_LOSS_SHARE, LOSS_SHARE, boostFor, placeShare, boostLabel, emptyBoosts, welcomeBack, type BoostMode, type Boosts } from './boosts'
 import { claim, type WagerEntry } from './wager'
@@ -168,6 +169,8 @@ export type SaveState = {
   skins: string[]
   // Mod skins bought or won; level and set ones are worked out (ownedModSkins()).
   modSkins: string[]
+  // Resto-mod pieces won from crates, as "model:piece" (game/resto.ts).
+  restoParts?: string[]
   // Hats won by challenges or from crates (game/hats.ts); each car wears one of them (OwnedCar.hat).
   hats: string[]
   // Hat challenge progress (game/hats.ts HatQuest). Never resets.
@@ -1243,7 +1246,7 @@ export const useGame = create<GameState>()(
       buyCar: (model, color) => {
         const s = get()
         const c = carDef(model)
-        if (c.season || c.rescueOnly) return false
+        if (c.season || c.rescueOnly || c.secret) return false
         if (s.level < c.unlockLevel) {
           s.showNeed('level', c.unlockLevel, c.name)
           return false
@@ -1548,11 +1551,14 @@ export const useGame = create<GameState>()(
         if (o.seq != null && o.seq <= (s.crates ?? 0)) return
         const d = o.drop
         const def = crateDef(o.crate)
-        const won = d.kind === 'coins' || d.kind === 'dupe' || d.kind === 'skindupe' ? d.coins : 0
+        const won = d.kind === 'coins' || d.kind === 'dupe' || d.kind === 'skindupe' || d.kind === 'piecedupe' ? d.coins : 0
         let cars = s.cars
-        // A new car counts for the "Get a new car" goals, like one bought or restored.
-        const newCar = d.kind === 'car' && !cars.some((c) => c.uid === d.uid)
-        if (newCar) cars = [...cars, { uid: d.uid, model: d.model, color: d.color, upgrades: noUpgrades() }]
+        // A new car counts for the "Get a new car" goals, like one bought or restored. The
+        // fourth resto-mod piece builds its car.
+        const car = d.kind === 'car' ? d : d.kind === 'piece' && d.uid && d.color ? { uid: d.uid, model: d.model, color: d.color } : null
+        const newCar = !!car && !cars.some((c) => c.uid === car.uid)
+        if (car && newCar) cars = [...cars, { uid: car.uid, model: car.model, color: car.color, upgrades: noUpgrades() }]
+        const piece = d.kind === 'piece' ? pieceId(d.model, d.piece) : null
         if (d.kind === 'mod') cars = cars.map((c) => (c.uid === d.car ? { ...c, ownedMods: [...new Set([...ownedMods(c), d.mod])] } : c))
         set({
           coins: Math.max(0, s.coins - o.cost.coins + won),
@@ -1560,6 +1566,7 @@ export const useGame = create<GameState>()(
           cars,
           ...(d.kind === 'skin' && !d.part && !(s.skins ?? []).includes(d.skin) ? { skins: [...(s.skins ?? []), d.skin] } : {}),
           ...(d.kind === 'skin' && d.part && !(s.modSkins ?? []).includes(d.skin) ? { modSkins: [...(s.modSkins ?? []), d.skin] } : {}),
+          ...(piece && !(s.restoParts ?? []).includes(piece) ? { restoParts: [...(s.restoParts ?? []), piece] } : {}),
           ...(d.kind === 'hat' && hatDef(d.hat) && !(s.hats ?? []).includes(d.hat) ? { hats: [...(s.hats ?? []), d.hat] } : {}),
           crates: o.seq ?? s.crates ?? 0,
           ...(def?.pity ? { cratePity: { ...s.cratePity, [o.crate]: pityHit(def, d) ? 0 : (s.cratePity?.[o.crate as CrateId] ?? 0) + 1 } } : {}),
@@ -2412,8 +2419,8 @@ export const useGame = create<GameState>()(
 )
 
 export function saveOf(s: GameState): SaveState {
-  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, cratePity, boosts, wagers, season, deals, trials, rivals, rivalRow, tuner, mastery, road, roadItems, freeCrates, trail, cheer, flairSeen, daily, repSeen, worldTour, presets, seasonBase, recap, friendship, cups, freePaint, oldPaints, tour, event, showcase, raceCar, skins, modSkins, hats, hatQuest, lights, cityTheme, land, updatedAt } = s
-  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, cratePity: cratePity ?? {}, boosts: boosts ?? emptyBoosts(), ...(wagers ? { wagers } : {}), season, deals, trials, rivals, rivalRow, tuner: tuner ?? {}, mastery: mastery ?? {}, road: road ?? 0, roadItems: roadItems ?? [], freeCrates: freeCrates ?? [], ...(trail ? { trail } : {}), ...(cheer ? { cheer } : {}), ...(flairSeen ? { flairSeen } : {}), ...(daily ? { daily } : {}), ...(repSeen !== undefined ? { repSeen } : {}), ...(worldTour ? { worldTour } : {}), ...(presets?.some(Boolean) ? { presets } : {}), ...(seasonBase ? { seasonBase } : {}), ...(recap ? { recap } : {}), ...(friendship ? { friendship } : {}), cups: cups ?? {}, ...(freePaint ? { freePaint } : {}), oldPaints: !!oldPaints, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, hats: hats ?? [], hatQuest: hatQuestOf({ stats, hatQuest }), ...(cleanLights(lights) ? { lights: cleanLights(lights) } : {}), ...(colorTheme(cityTheme) ? { cityTheme } : {}), land, updatedAt }
+  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, cratePity, boosts, wagers, season, deals, trials, rivals, rivalRow, tuner, mastery, road, roadItems, freeCrates, trail, cheer, flairSeen, daily, repSeen, worldTour, presets, seasonBase, recap, friendship, cups, freePaint, oldPaints, tour, event, showcase, raceCar, skins, modSkins, hats, hatQuest, lights, cityTheme, restoParts, land, updatedAt } = s
+  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, cratePity: cratePity ?? {}, boosts: boosts ?? emptyBoosts(), ...(wagers ? { wagers } : {}), season, deals, trials, rivals, rivalRow, tuner: tuner ?? {}, mastery: mastery ?? {}, road: road ?? 0, roadItems: roadItems ?? [], freeCrates: freeCrates ?? [], ...(trail ? { trail } : {}), ...(cheer ? { cheer } : {}), ...(flairSeen ? { flairSeen } : {}), ...(daily ? { daily } : {}), ...(repSeen !== undefined ? { repSeen } : {}), ...(worldTour ? { worldTour } : {}), ...(presets?.some(Boolean) ? { presets } : {}), ...(seasonBase ? { seasonBase } : {}), ...(recap ? { recap } : {}), ...(friendship ? { friendship } : {}), cups: cups ?? {}, ...(freePaint ? { freePaint } : {}), oldPaints: !!oldPaints, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, hats: hats ?? [], hatQuest: hatQuestOf({ stats, hatQuest }), ...(cleanLights(lights) ? { lights: cleanLights(lights) } : {}), ...(colorTheme(cityTheme) ? { cityTheme } : {}), ...(restoParts?.length ? { restoParts } : {}), land, updatedAt }
 }
 
 // Fields added after launch, so older saves load with sensible values.
@@ -2497,7 +2504,7 @@ export async function openCrate(id: CrateId, free?: string): Promise<CrateOpen[]
     useGame.getState().toast(msg === 'soon' ? 'Crates open for signed-in towns very soon!' : msg.includes('one crate') ? 'One crate at a time!' : "Couldn't open the crate. Try again.")
     return null
   }
-  if (!opens) opens = [{ crate: id, cost, drop: rollCrate(def, s.level, s.cars, Math.random, { skins: ownedSkins(s), modSkins: ownedModSkins(s), hats: ownedHats(s) }, s.cratePity?.[id] ?? 0) }]
+  if (!opens) opens = [{ crate: id, cost, drop: rollCrate(def, s.level, s.cars, Math.random, { skins: ownedSkins(s), modSkins: ownedModSkins(s), hats: ownedHats(s), pieces: s.restoParts ?? [] }, s.cratePity?.[id] ?? 0) }]
   for (const o of opens) useGame.getState().applyCrate(o)
   // The server may hand back earlier opens the save missed instead: the free crate is only used once one opened free.
   if (free && opens.some((o) => o.crate === id && !o.cost.coins && !o.cost.bucks)) used()
