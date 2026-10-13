@@ -452,6 +452,11 @@ function Interaction() {
   const mode = useGame((s) => s.mode)
   const placing = useGame((s) => s.placing)
   const placeRot = useGame((s) => s.placeRot)
+  // Placing from the inventory: the stored building's level, so the ghost shows it as it is.
+  const storedLevel = useGame((s) => {
+    const b = s.placingStored ? s.stored?.find((o) => o.uid === s.placingStored) : undefined
+    return b ? buildingLevel(b) : undefined
+  })
   const selected = useGame((s) => s.selected)
   const drag = useDrag((g) => g.drag)
   const free = useFreeCam((f) => f.on)
@@ -535,6 +540,11 @@ function Interaction() {
     // Hover tile is the footprint's centre; convert to its top-left corner.
     const ox = x - Math.floor((w - 1) / 2)
     const oz = z - Math.floor((h - 1) / 2)
+    const fromStore = useGame.getState().placingStored
+    if (fromStore) {
+      if (useGame.getState().placeStored(fromStore, ox, oz, placeRot ?? undefined)) useGame.setState({ mode: 'move', placing: null, placingStored: null, selected: fromStore, again: null })
+      return
+    }
     if (useGame.getState().placeBuilding(placing, ox, oz, placeRot ?? undefined)) {
       // Keep the new building picked so Rotate (and dragging) can still adjust it.
       const s = useGame.getState()
@@ -561,7 +571,7 @@ function Interaction() {
           <meshBasicMaterial color={valid ? '#66bb6a' : '#ef5350'} transparent opacity={0.4} />
         </mesh>
         <group rotation-y={(turn * Math.PI) / 2}>
-          <BuildingModel def={d} ghost valid={valid} />
+          <BuildingModel def={d} ghost valid={valid} level={storedLevel} />
         </group>
       </group>
     )
