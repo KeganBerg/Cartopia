@@ -2167,3 +2167,4 @@ body:has(.race-full) .toasts { display: none; }
 .recap-grid b { font: 18px var(--display); }
 .recap-grid small { font: 800 11px Nunito, sans-serif; color: #607d8b; }
 .recap-rep { margin: 0 0 12px; font: 700 13px Nunito, sans-serif; }
+.fr-level { margin-left: 5px; font-size: 13px; cursor: help; }

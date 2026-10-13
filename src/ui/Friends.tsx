@@ -8,6 +8,7 @@ import { useFriends, refreshFriends, addFriend, respondFriend, removeFriend, see
 import { useNames, loadUsernames, usePlayerName } from '../lib/profiles'
 import { useLive, challenge, cancelChallenge, refreshPresence, type LivePlayer } from '../lib/live'
 import { UsernameForm } from './Username'
+import { FRIEND_LEVELS, friendLevel } from '../game/friendship'
 import { GiftButton } from './Gifts'
 import { refreshGifts } from '../lib/gifts'
 import { useHelp, helpsLeft, loadHelps } from '../lib/help'
@@ -148,9 +149,12 @@ function Avatar({ name, on }: { name: string; on?: boolean }) {
 
 function FriendName({ f, on }: { f: Friend; on?: LivePlayer }) {
   const seen = seenAgo(f.lastSeen)
+  const pts = useGame((s) => s.friendship?.[f.id] ?? 0)
+  const lv = FRIEND_LEVELS[friendLevel(pts)]
+  const next = FRIEND_LEVELS[friendLevel(pts) + 1]
   return (
     <div className="leader-main">
-      <b>{f.username ? `@${f.username}` : f.townName}</b>
+      <b>{f.username ? `@${f.username}` : f.townName}{f.status === 'friend' && <span className="fr-level" title={`${lv.name}${next ? ` · ${next.at - pts} more to ${next.name}` : ''}. Gifts, help and postcards add up.`}>{lv.icon}</span>}</b>
       <div className="card-stat">
         {f.username && <>{f.townName} · </>}Lvl {f.level}
         {f.status === 'friend' && (on

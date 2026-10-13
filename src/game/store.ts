@@ -15,6 +15,7 @@ import { earnHint, paintOpen, paintRival, rivalForPaint, rowPrize } from './pain
 import { PRESET_SLOTS, sameTrim, tidyTrim, trimCost, trimLocked, type Trim } from './trim'
 import { WORLD_TOUR, worldDone, worldPrize } from './worldTour'
 import type { Recap, SeasonBase } from './recap'
+import { FRIEND_LEVELS, FRIEND_POINTS, friendLevel, type FriendAct } from './friendship'
 import { tunerPrize, tunerTrial } from './tuner'
 import { tourIsBoss, tourLegBonus, tourLegOf, tourPrize } from './tour'
 import { EVENT_RACES, eventBonus, eventFor, eventIsBoss, eventPrize, eventProgress, type EventProgress } from './events'
@@ -139,6 +140,8 @@ export type SaveState = {
   // the last one waiting to be shown.
   seasonBase?: SeasonBase
   recap?: Recap | null
+  // Friendship points by friend id (game/friendship.ts).
+  friendship?: Record<string, number>
   // Saved looks (paint, panels and trim) to put on any car, by slot (game/trim.ts PRESET_SLOTS).
   presets?: (Preset | null)[]
   // World Tour racers beaten, in order (game/worldTour.ts).
@@ -283,6 +286,7 @@ type Actions = {
   paintPanels: (uid: string, panels: Panels) => boolean
   setTrim: (uid: string, trim: Trim) => boolean
   closeRecap: () => void
+  befriend: (id: string, act: FriendAct, name?: string) => void
   savePreset: (slot: number, uid: string) => void
   clearPreset: (slot: number) => void
   applyPreset: (slot: number, uid: string) => boolean
@@ -1747,6 +1751,15 @@ export const useGame = create<GameState>()(
 
       closeRecap: () => set({ recap: null, updatedAt: Date.now() }),
 
+      befriend: (id, act, name) => {
+        const s = get()
+        const was = s.friendship?.[id] ?? 0
+        const now = was + FRIEND_POINTS[act]
+        set({ friendship: { ...s.friendship, [id]: now }, updatedAt: Date.now() })
+        const lv = friendLevel(now)
+        if (lv > friendLevel(was)) s.toast(`${FRIEND_LEVELS[lv].icon} ${name ?? 'Your friend'} is now your ${FRIEND_LEVELS[lv].name}!`)
+      },
+
       // Window tint, headlights and door handles: each new pick costs coins once; stock is free.
       setTrim: (cuid, want) => {
         const s = get()
@@ -2348,8 +2361,8 @@ export const useGame = create<GameState>()(
 )
 
 export function saveOf(s: GameState): SaveState {
-  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, cratePity, boosts, wagers, season, deals, trials, rivals, rivalRow, tuner, mastery, road, roadItems, freeCrates, trail, cheer, flairSeen, daily, repSeen, worldTour, presets, seasonBase, recap, cups, freePaint, oldPaints, tour, event, showcase, raceCar, skins, modSkins, land, updatedAt } = s
-  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, cratePity: cratePity ?? {}, boosts: boosts ?? emptyBoosts(), ...(wagers ? { wagers } : {}), season, deals, trials, rivals, rivalRow, tuner: tuner ?? {}, mastery: mastery ?? {}, road: road ?? 0, roadItems: roadItems ?? [], freeCrates: freeCrates ?? [], ...(trail ? { trail } : {}), ...(cheer ? { cheer } : {}), ...(flairSeen ? { flairSeen } : {}), ...(daily ? { daily } : {}), ...(repSeen !== undefined ? { repSeen } : {}), ...(worldTour ? { worldTour } : {}), ...(presets?.some(Boolean) ? { presets } : {}), ...(seasonBase ? { seasonBase } : {}), ...(recap ? { recap } : {}), cups: cups ?? {}, ...(freePaint ? { freePaint } : {}), oldPaints: !!oldPaints, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, land, updatedAt }
+  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, cratePity, boosts, wagers, season, deals, trials, rivals, rivalRow, tuner, mastery, road, roadItems, freeCrates, trail, cheer, flairSeen, daily, repSeen, worldTour, presets, seasonBase, recap, friendship, cups, freePaint, oldPaints, tour, event, showcase, raceCar, skins, modSkins, land, updatedAt } = s
+  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, gp, campaign, claimedSets, crewChests, visits, crates, cratePity: cratePity ?? {}, boosts: boosts ?? emptyBoosts(), ...(wagers ? { wagers } : {}), season, deals, trials, rivals, rivalRow, tuner: tuner ?? {}, mastery: mastery ?? {}, road: road ?? 0, roadItems: roadItems ?? [], freeCrates: freeCrates ?? [], ...(trail ? { trail } : {}), ...(cheer ? { cheer } : {}), ...(flairSeen ? { flairSeen } : {}), ...(daily ? { daily } : {}), ...(repSeen !== undefined ? { repSeen } : {}), ...(worldTour ? { worldTour } : {}), ...(presets?.some(Boolean) ? { presets } : {}), ...(seasonBase ? { seasonBase } : {}), ...(recap ? { recap } : {}), ...(friendship ? { friendship } : {}), cups: cups ?? {}, ...(freePaint ? { freePaint } : {}), oldPaints: !!oldPaints, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, land, updatedAt }
 }
 
 // Fields added after launch, so older saves load with sensible values.
