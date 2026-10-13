@@ -178,31 +178,31 @@ function SpotList() {
   const got = ALL_FINDS.filter((m) => have.has(m)).length
   return (
     <>
-      <div className="rr-dex" title="Cars from Rusty's lots in your collection">
-        <span className="rr-dex-ico">🔧</span>
-        <span className="rr-dex-bar"><i style={{ width: `${(got / ALL_FINDS.length) * 100}%` }} /></span>
+      <div className="rsc-dex" title="Cars from Rusty's lots in your collection">
+        <span className="rsc-dex-ico">🔧</span>
+        <span className="rsc-dex-bar"><i style={{ width: `${(got / ALL_FINDS.length) * 100}%` }} /></span>
         <b>{got}/{ALL_FINDS.length}</b>
       </div>
-      <div className="rr-spots">
+      <div className="rsc-spots">
         {RESCUE_SPOTS.map((sp) => {
           const locked = level < sp.unlockLevel
           const n = sp.cars.filter((c) => have.has(c.model)).length
           const done = n === sp.cars.length
           return (
-            <button key={sp.id} className={`rr-spot${locked ? ' locked' : ''}${!locked && coins < sp.cost ? ' broke' : ''}`} onClick={() => start(sp.id)} disabled={full && !locked}>
-              <span className="rr-art" style={{ backgroundImage: `url(${spotArt(sp.id, night)})` }}>
-                <span className="rr-name">{sp.icon} {sp.name}</span>
-                {!locked && <span className={done ? 'rr-got done' : 'rr-got'}>{done ? '👑' : '✔'} {n}/{sp.cars.length}</span>}
+            <button key={sp.id} className={`rsc-spot${locked ? ' locked' : ''}${!locked && coins < sp.cost ? ' broke' : ''}`} onClick={() => start(sp.id)} disabled={full && !locked}>
+              <span className="rsc-art" style={{ backgroundImage: `url(${spotArt(sp.id, night)})` }}>
+                <span className="rsc-name">{sp.icon} {sp.name}</span>
+                {!locked && <span className={done ? 'rsc-got done' : 'rsc-got'}>{done ? '👑' : '✔'} {n}/{sp.cars.length}</span>}
                 {locked
-                  ? <span className="rr-go lock">🔒 Lv {sp.unlockLevel}</span>
-                  : <span className="rr-go"><CoinIcon size={18} />{sp.cost.toLocaleString()}</span>}
+                  ? <span className="rsc-go lock">🔒 Lv {sp.unlockLevel}</span>
+                  : <span className="rsc-go"><CoinIcon size={18} />{sp.cost.toLocaleString()}</span>}
               </span>
-              <span className="rr-cars">
+              <span className="rsc-cars">
                 {sp.cars.map((c) => {
                   const d = carDef(c.model)
                   const own = have.has(c.model)
                   return (
-                    <span key={c.model} className={`rr-car rr-${c.rarity}${own ? ' have' : ''}`} title={`${d.name} (${RARITY[c.rarity].name})`}>
+                    <span key={c.model} className={`rsc-car rr-${c.rarity}${own ? ' have' : ''}`} title={`${d.name} (${RARITY[c.rarity].name})`}>
                       <CarThumb size="xs" body={d.body} model={d.id} color={d.colors[0]} rusty={!own} />
                       {own && <i>✔</i>}
                     </span>
