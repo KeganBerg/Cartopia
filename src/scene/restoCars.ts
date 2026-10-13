@@ -2,7 +2,7 @@ import { CircleGeometry, CylinderGeometry, TorusGeometry, type BufferGeometry } 
 import { Loft, type Section } from './loft'
 import type { Kit, Part } from './CarModel'
 import type { Body } from '../game/data'
-import { Surface, bodyRing, box, disc, ellipse, frame, glassRing, greenhouse, plane, poly, rbox, type ExoticFit, type ExoticHelpers } from './exoticCars'
+import { Surface, bodyRing, box, disc, ellipse, frame, glassRing, greenhouse, honey, plane, poly, rbox, type ExoticFit, type ExoticHelpers } from './exoticCars'
 
 // Resto-mods: secret cars only built from four crate pieces (see game/resto.ts). Old
 // shapes (a 1950s pontoon-fender racer, a 1960s step-nose coupe, a '69 muscle coupe)
@@ -44,11 +44,38 @@ function screen(k: Kit, x: number, y: number, z: number, R: number, H: number, a
   k.add('chrome', faceFront(rim, arc), [x, y + H - 0.001, z - R - H * 0.2])
 }
 
-// A round lamp in a chrome ring on a sloping surface.
+// A round lamp in a chrome ring on a sloping surface, with a reflector ring and bulb.
 function roundLamp(S: Surface, x: number, z: number, r: number, part: Part = 'lamp') {
   S.top('black', disc(r + 0.006, 18), x, z, 0.002)
   S.top(part, disc(r, 18), x, z, 0.004)
+  S.top('chrome', new TorusGeometry(r * 0.55, 0.0025, 3, 16), x, z, 0.005)
+  S.top('dark', disc(r * 0.22, 10), x, z, 0.0055)
   S.top('chrome', new TorusGeometry(r + 0.003, 0.004, 4, 18), x, z, 0.005)
+}
+
+// Louvres on a panel `out` above the surface: a black opening w by l with n painted slats.
+function louvres(S: Surface, x: number, z: number, w: number, l: number, n: number, out: number) {
+  S.top('black', plane(w, l), x, z, out)
+  for (let i = 0; i < n; i++) S.top('paint', box(w * 0.9, 0.005, 0.005), x, z + ((i + 0.5) / n - 0.5) * l, out + 0.002)
+}
+
+// Chrome drip rails along both edges of the roof, from z0 back to z1.
+function dripRails(k: Kit, h: ExoticHelpers, glass: Loft, z0: number, z1: number) {
+  for (const sd of SIDES) {
+    let prev: [number, number, number] | null = null
+    for (let i = 0; i <= 6; i++) {
+      const z = z0 + ((z1 - z0) * i) / 6
+      const p = glass.near(z).pts
+      const v: [number, number, number] = [sd * (p[2][0] + 0.003), p[2][1] + 0.003, z]
+      if (prev) h.bar(k, 'chrome', prev, v, 0.008)
+      prev = v
+    }
+  }
+}
+
+// Two black wiper arms parked along the bottom of the windshield.
+function wipers(k: Kit, h: ExoticHelpers, y: number, z: number) {
+  for (const x of [-0.17, 0.05]) h.bar(k, 'black', [x, y, z], [x + 0.17, y + 0.008, z - 0.012], 0.007)
 }
 
 // A round lamp in a chrome ring on an upright face at z, facing forward (dir 1) or back.
@@ -121,7 +148,14 @@ export function pontoneGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   // leather straps over the hood.
   for (const sd of SIDES) roundLamp(S, sd * 0.262, 0.605, 0.034)
   S.top('chrome', poly(ellipse(0.016, 0.012, 12)), 0, 0.655, 0.003)
-  for (const sd of SIDES) S.top('dark', box(0.018, 0.07, 0.004), sd * 0.1, 0.56, 0.003)
+  for (const sd of SIDES) {
+    S.top('dark', box(0.018, 0.09, 0.004), sd * 0.1, 0.55, 0.003)
+    S.top('chrome', box(0.026, 0.012, 0.005), sd * 0.1, 0.52, 0.005)
+    // Louvres either side of the bulge, and a small amber lamp under each headlight.
+    louvres(S, sd * 0.15, 0.34, 0.05, 0.11, 5, 0.002)
+    S.top('amber', disc(0.011, 12), sd * 0.262, 0.655, 0.003)
+    S.top('chrome', new TorusGeometry(0.012, 0.003, 3, 12), sd * 0.262, 0.655, 0.004)
+  }
   // Hood bulge with an air mouth at its front.
   if (!fit.hood) {
     k.add('paint', pod([[0.52, 0.045, 0.232], [0.49, 0.058, 0.24], [0.4, 0.064, 0.25], [0.3, 0.06, 0.252], [0.22, 0.042, 0.238]], 0.16))
@@ -131,24 +165,39 @@ export function pontoneGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   // Cockpit: a dash with two gauges, the driver's bucket and wheel, a black cover
   // over the passenger side, a wrap-round screen and a mirror on the cowl.
   k.add('dash', rbox(0.5, 0.035, 0.05, 0.012), [0, 0.19, 0.115])
-  for (const x of [0.09, 0.15]) k.add('chrome', new TorusGeometry(0.013, 0.003, 3, 12), [x, 0.2, 0.089])
+  for (const x of [0.07, 0.13, 0.19, -0.05]) {
+    k.add('chrome', new TorusGeometry(0.013, 0.003, 3, 12), [x, 0.2, 0.089])
+    k.add('lamp', disc(0.011, 12), [x, 0.2, 0.0885], [0, Math.PI, 0])
+    k.add('black', box(0.002, 0.009, 0.001), [x, 0.203, 0.0878], [0, 0, 0.7])
+  }
   h.seat(k, 0.13, 0.12, -0.09, 0.14, 0.12)
   h.steering(k, 0.13, 0.235, 0.04)
   k.add('dark', rbox(0.27, 0.01, 0.31, 0.004), [-0.13, 0.198, -0.03])
-  for (let i = 0; i < 4; i++) k.add('chrome', disc(0.004, 6), [-0.03, 0.204, 0.09 - i * 0.08], [-Math.PI / 2, 0, 0])
+  for (let i = 0; i < 4; i++) for (const x of [-0.03, -0.25]) k.add('chrome', disc(0.004, 6), [x, 0.204, 0.09 - i * 0.08], [-Math.PI / 2, 0, 0])
+  k.add('dark', rbox(0.004, 0.012, 0.3, 0.002), [-0.13, 0.204, -0.03])
   screen(k, 0.13, 0.205, 0.13, 0.1, 0.065, 2.4)
   k.add('chrome', box(0.006, 0.04, 0.006), [0.27, 0.225, 0.14])
   k.add('chrome', disc(0.018, 12), [0.27, 0.25, 0.135], [0, Math.PI, 0])
   // Fairing behind the driver's head, flowing down the tail.
   k.add('paint', pod([[-0.17, 0.05, 0.31], [-0.2, 0.066, 0.355], [-0.3, 0.07, 0.36], [-0.42, 0.058, 0.33], [-0.54, 0.038, 0.29], [-0.63, 0.015, 0.255]], 0.18), [0.13, 0, 0])
   k.add('dash', rbox(0.1, 0.05, 0.02, 0.008), [0.13, 0.31, -0.168])
+  // A chrome filler on the fairing and a roll hoop tucked into its front.
+  k.add('chrome', new CylinderGeometry(0.016, 0.016, 0.008, 14), [0.13, 0.352, -0.36])
+  k.add('dark', disc(0.01, 10), [0.13, 0.357, -0.36], [-Math.PI / 2, 0, 0])
+  for (const x of [0.07, 0.19]) h.bar(k, 'chrome', [x, 0.2, -0.165], [x, 0.29, -0.17], 0.012)
+  h.bar(k, 'chrome', [0.07, 0.29, -0.17], [0.19, 0.29, -0.17], 0.012)
 
   // Sides: gills behind the front wheel, a roundel on each door, side pipes, a
   // fuel cap on the tail.
   for (const sd of SIDES) {
-    for (let i = 0; i < 3; i++) S.wall('black', box(0.006, 0.05, 0.002), sd, 0.23 - i * 0.025, 0.16, 0.003, 0.25)
+    // Four gills in a chrome surround, and louvres on top of each rear fender.
+    S.wall('chrome', rbox(0.115, 0.066, 0.003, 0.01), sd, 0.2, 0.16, 0.002)
+    S.wall('black', rbox(0.105, 0.056, 0.003, 0.008), sd, 0.2, 0.16, 0.003)
+    for (let i = 0; i < 4; i++) S.wall('paint', box(0.008, 0.052, 0.003), sd, 0.24 - i * 0.026, 0.16, 0.004, 0.25)
+    louvres(S, sd * 0.26, -0.4, 0.05, 0.1, 4, 0.002)
     roundel(S, sd, -0.04, 0.138, 0.046)
     S.wall('dark', plane(0.005, 0.1), sd, 0.1, 0.14, 0.003)
+    S.wall('chrome', rbox(0.03, 0.008, 0.008, 0.003), sd, 0.06, 0.17, 0.004)
   }
   if (!fit.exhaust) {
     for (const dy of [0, 0.028]) {
@@ -171,7 +220,17 @@ export function pontoneGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   }
   k.add('black', plane(0.11, 0.045), [0, 0.15, tz - 0.003], [0, Math.PI, 0])
   k.add('lamp', plane(0.096, 0.035), [0, 0.15, tz - 0.004], [0, Math.PI, 0])
+  k.add('chrome', frame([[-0.06, -0.026], [0.06, -0.026], [0.06, 0.026], [-0.06, 0.026]], [[-0.055, -0.021], [0.055, -0.021], [0.055, 0.021], [-0.055, 0.021]], 0.004), [0, 0.15, tz - 0.004], [0, Math.PI, 0])
   k.add('chrome', new TorusGeometry(0.014, 0.004, 4, 12), [0.12, 0.11, tz - 0.004], [0, Math.PI, 0])
+  // A small oval grille low in the tail for the brakes, and nerf bars at the corners.
+  k.add('black', poly(ellipse(0.07, 0.014, 18)), [0, 0.112, tz - 0.003], [0, Math.PI, 0])
+  for (let i = -2; i <= 2; i++) k.add('chrome', box(0.003, 0.02, 0.004), [i * 0.025, 0.112, tz - 0.005])
+  for (const sd of SIDES) {
+    h.bar(k, 'chrome', [sd * 0.13, 0.12, tz + 0.02], [sd * 0.14, 0.12, tz - 0.025], 0.012)
+    h.bar(k, 'chrome', [sd * 0.14, 0.12, tz - 0.025], [sd * 0.25, 0.12, tz - 0.015], 0.012)
+    h.bar(k, 'chrome', [sd * 0.13, 0.11, front - 0.02], [sd * 0.15, 0.11, front + 0.02], 0.012)
+    h.bar(k, 'chrome', [sd * 0.15, 0.11, front + 0.02], [sd * 0.24, 0.11, front + 0.005], 0.012)
+  }
   h.brakes(k, PONTONE.wid / 2 - 0.02, wz, r, 0.14)
 }
 
@@ -211,6 +270,10 @@ export function sprintGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   ], 5)
   k.add('glass', glass.geometry({ capFront: true, capBack: true }))
   greenhouse(k, h, glass, { roof: [0.0, -0.37], pillar: [0.2, 0.0], belt: [0.2, -0.48], mirror: [0.14, 0.29, 0.34] })
+  dripRails(k, h, glass, 0.02, -0.4)
+  wipers(k, h, 0.338, 0.19)
+  // Chrome strip under the back window.
+  h.bar(k, 'chrome', [-0.29, 0.335, -0.49], [0.29, 0.335, -0.49], 0.008)
   // Thin chrome B pillars and a chrome strip along the bottom of the side glass.
   for (const sd of SIDES) {
     const p = glass.near(-0.24).pts
@@ -222,7 +285,11 @@ export function sprintGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   // The step: the hood lid stands proud of the nose and the fenders.
   if (!fit.hood) {
     S.top('paint', rbox(0.44, 0.36, 0.014, 0.004), 0, 0.41, 0.004)
-    for (const sd of SIDES) S.top('dark', box(0.004, 0.34, 0.004), sd * 0.224, 0.41, 0.004)
+    for (const sd of SIDES) {
+      S.top('dark', box(0.004, 0.34, 0.004), sd * 0.224, 0.41, 0.004)
+      louvres(S, sd * 0.13, 0.33, 0.08, 0.07, 5, 0.019)
+    }
+    S.top('chrome', box(0.006, 0.3, 0.004), 0, 0.42, 0.019)
   }
   // Nose: four round lamps, a chrome oval shield in the middle with a mesh either
   // side of it, a slot under it, slim bumperettes and two small fog lamps.
@@ -231,6 +298,7 @@ export function sprintGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
     faceLamp(k, sd * 0.262, 0.2, fz, 0.036, 1)
     faceLamp(k, sd * 0.176, 0.2, fz, 0.029, 1)
     k.add('black', plane(0.085, 0.04), [sd * 0.085, 0.2, fz + 0.001])
+    k.add('chrome', frame([[-0.045, -0.023], [0.045, -0.023], [0.045, 0.023], [-0.045, 0.023]], [[-0.042, -0.02], [0.042, -0.02], [0.042, 0.02], [-0.042, 0.02]], 0.005), [sd * 0.085, 0.2, fz + 0.002])
     for (const dy of [-0.012, 0, 0.012]) k.add('chrome', box(0.08, 0.003, 0.004), [sd * 0.085, 0.2 + dy, fz + 0.003])
     k.add('chrome', rbox(0.17, 0.018, 0.03, 0.008), [sd * 0.22, 0.128, fz + 0.008])
     k.add('chrome', rbox(0.03, 0.018, 0.06, 0.008), [sd * 0.31, 0.128, fz - 0.015], [0, sd * 0.5, 0])
@@ -255,7 +323,17 @@ export function sprintGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
     S.wall('amber', plane(0.035, 0.012), sd, 0.58, 0.2, 0.003)
     S.wall('tail', plane(0.035, 0.012), sd, -0.58, 0.22, 0.003)
     k.add('black', rbox(0.026, 0.03, wz * 2 - r * 2.5, 0.01), [sd * (S.side(0) - 0.004), 0.092, 0])
+    // A slim chrome spear along the flank and a cooling vent behind the front wheel.
+    S.wall('chrome', box(0.5, 0.005, 0.003), sd, 0.0, 0.14, 0.003)
+    S.wall('chrome', plane(0.06, 0.03), sd, 0.25, 0.19, 0.002)
+    S.wall('black', plane(0.054, 0.024), sd, 0.25, 0.19, 0.003)
+    for (const dy of [-0.007, 0, 0.007]) S.wall('chrome', box(0.05, 0.002, 0.002), sd, 0.25, 0.19 + dy, 0.004)
   }
+  // Fuel filler on the right rear fender, trunk lid cut and a chrome script on it.
+  S.top('chrome', disc(0.022, 16), 0.3, -0.46, 0.003)
+  S.top('dark', disc(0.015, 12), 0.3, -0.46, 0.005)
+  for (const sd of SIDES) S.top('dark', box(0.004, 0.13, 0.003), sd * 0.24, -0.58, 0.002)
+  S.top('dark', box(0.48, 0.004, 0.003), 0, -0.52, 0.002)
 
   // Tail: upright lamps, chrome bumperettes, a plate, twin pipes and a lip.
   const tz = -front
@@ -263,8 +341,12 @@ export function sprintGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
     k.add('black', plane(0.07, 0.07), [sd * 0.25, 0.235, tz - 0.002], [0, Math.PI, 0])
     k.add('tail', plane(0.06, 0.04), [sd * 0.25, 0.245, tz - 0.004], [0, Math.PI, 0])
     k.add('amber', plane(0.06, 0.018), [sd * 0.25, 0.211, tz - 0.004], [0, Math.PI, 0])
+    k.add('chrome', frame([[-0.037, -0.037], [0.037, -0.037], [0.037, 0.037], [-0.037, 0.037]], [[-0.033, -0.033], [0.033, -0.033], [0.033, 0.033], [-0.033, 0.033]], 0.005), [sd * 0.25, 0.235, tz - 0.003], [0, Math.PI, 0])
+    k.add('lamp', plane(0.025, 0.012), [sd * 0.16, 0.235, tz - 0.004], [0, Math.PI, 0])
     k.add('chrome', rbox(0.18, 0.018, 0.03, 0.008), [sd * 0.22, 0.14, tz - 0.008])
   }
+  k.add('chrome', box(0.1, 0.012, 0.006), [-0.13, 0.275, tz - 0.004])
+  k.add('chrome', box(0.6, 0.005, 0.005), [0, 0.183, tz - 0.004])
   k.add('black', plane(0.12, 0.05), [0, 0.215, tz - 0.003], [0, Math.PI, 0])
   k.add('lamp', plane(0.105, 0.04), [0, 0.215, tz - 0.004], [0, Math.PI, 0])
   if (!fit.exhaust) for (const x of [0.12, 0.17]) {
@@ -318,7 +400,10 @@ export function revenantGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
     glassRing(-0.6, 0.285, 0.33, 0.185, 0.338),
   ], 5)
   k.add('glass', glass.geometry({ capFront: true, capBack: true }))
-  greenhouse(k, h, glass, { roof: [-0.02, -0.5], pillar: [0.1, -0.02], belt: [0.1, -0.56], mirror: [0.04, 0.3, 0.34] })
+  greenhouse(k, h, glass, { roof: [-0.02, -0.5], pillar: [0.1, -0.02], belt: [0.1, -0.56], mirror: [0.04, 0.3, 0.34], roofPart: 'black' })
+  dripRails(k, h, glass, -0.01, -0.5)
+  wipers(k, h, 0.334, 0.085)
+  h.bar(k, 'chrome', [-0.3, 0.335, -0.59], [0.3, 0.335, -0.59], 0.009)
   for (const sd of SIDES) k.add('chrome', box(0.006, 0.006, 0.62), [sd * 0.346, 0.331, -0.24])
   arches(S, wz, 0.178, r - 0.01)
 
@@ -326,22 +411,30 @@ export function revenantGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   if (!fit.hood) {
     k.add('paint', pod([[0.62, 0.085, 0.322], [0.56, 0.11, 0.334], [0.4, 0.118, 0.344], [0.2, 0.114, 0.35], [0.11, 0.105, 0.35]], 0.29))
     k.add('black', box(0.16, 0.014, 0.004), [0, 0.344, 0.106])
-    for (const sd of SIDES) S.top('chrome', disc(0.009, 10), sd * 0.24, 0.6, 0.003)
+    for (const sd of SIDES) {
+      S.top('chrome', disc(0.009, 10), sd * 0.24, 0.6, 0.003)
+      louvres(S, sd * 0.25, 0.32, 0.07, 0.12, 6, 0.002)
+    }
+    k.add('black', poly(ellipse(0.06, 0.012, 16)), [0, 0.324, 0.622])
   }
   // Front: a black grille right across with four lamps in chrome cups, chrome bars
   // and a badge; a chrome bumper with two slots; a black splitter under it.
   const fz = front
   k.add('black', plane(0.72, 0.085), [0, 0.225, fz + 0.001])
+  honey(k, 0, 0.225, fz + 0.001, 0.26, 0.07, 0.008, 1)
   k.add('chrome', box(0.73, 0.008, 0.01), [0, 0.27, fz + 0.002])
   for (const sd of SIDES) {
     faceLamp(k, sd * 0.3, 0.225, fz, 0.033, 1)
     faceLamp(k, sd * 0.215, 0.225, fz, 0.033, 1)
-    for (const dy of [-0.016, 0.016]) k.add('chrome', box(0.12, 0.004, 0.005), [sd * 0.09, 0.225 + dy, fz + 0.003])
+    for (const dy of [-0.024, -0.008, 0.008, 0.024]) k.add('chrome', box(0.13, 0.003, 0.005), [sd * 0.095, 0.225 + dy, fz + 0.003])
   }
   k.add('chrome', rbox(0.06, 0.02, 0.008, 0.004), [0, 0.225, fz + 0.005])
   k.add('dark', box(0.04, 0.008, 0.004), [0, 0.225, fz + 0.01])
   k.add('chrome', rbox(0.78, 0.055, 0.05, 0.02), [0, 0.145, fz + 0.008])
-  for (const sd of SIDES) k.add('black', plane(0.12, 0.022), [sd * 0.15, 0.145, fz + 0.034])
+  for (const sd of SIDES) {
+    k.add('black', plane(0.12, 0.022), [sd * 0.15, 0.145, fz + 0.034])
+    k.add('amber', plane(0.05, 0.014), [sd * 0.3, 0.145, fz + 0.035])
+  }
   k.add('black', plane(0.12, 0.045), [0, 0.145, fz + 0.034])
   k.add('lamp', plane(0.105, 0.035), [0, 0.145, fz + 0.035])
   if (!fit.kit) {
@@ -361,15 +454,29 @@ export function revenantGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
     S.wall('dark', box(0.04, 0.006, 0.004), sd, 0.3, 0.24, 0.006)
     S.wall('amber', plane(0.04, 0.014), sd, 0.64, 0.2, 0.003)
     S.wall('tail', plane(0.04, 0.014), sd, -0.64, 0.22, 0.003)
+    // A scoop in the rear quarter ahead of the wheel, with chrome fins.
+    S.wall('chrome', rbox(0.1, 0.034, 0.003, 0.008), sd, -0.3, 0.215, 0.002)
+    S.wall('black', rbox(0.092, 0.026, 0.003, 0.007), sd, -0.3, 0.215, 0.003)
+    for (let i = 0; i < 3; i++) S.wall('chrome', box(0.004, 0.024, 0.002), sd, -0.27 - i * 0.03, 0.215, 0.004)
+    S.wall('chrome', rbox(0.07, 0.008, 0.006, 0.003), sd, 0.42, 0.21, 0.003)
   }
+  // Flip-top filler on the left rear quarter, and the trunk lid's cut and lock.
+  S.wall('chrome', disc(0.022, 16), -1, -0.52, 0.29, 0.003)
+  S.wall('dark', disc(0.014, 12), -1, -0.52, 0.29, 0.005)
+  for (const sd of SIDES) S.top('dark', box(0.004, 0.11, 0.003), sd * 0.3, -0.65, 0.002)
+  S.top('dark', box(0.6, 0.004, 0.003), 0, -0.6, 0.002)
 
   // Tail: a chrome bumper with the lamps set in it, a plate over it, twin pipes and
   // a small ducktail.
   const tz = -front
   k.add('chrome', rbox(0.78, 0.06, 0.05, 0.02), [0, 0.165, tz - 0.008])
   for (const sd of SIDES) {
-    k.add('black', plane(0.15, 0.036), [sd * 0.22, 0.165, tz - 0.034], [0, Math.PI, 0])
-    k.add('tail', plane(0.14, 0.026), [sd * 0.22, 0.165, tz - 0.035], [0, Math.PI, 0])
+    // Each lamp sits in a black recess, split in three by chrome, with a reverse lamp.
+    k.add('black', box(0.16, 0.04, 0.012), [sd * 0.22, 0.165, tz - 0.029])
+    k.add('tail', plane(0.1, 0.026), [sd * 0.24, 0.165, tz - 0.0355], [0, Math.PI, 0])
+    k.add('lamp', plane(0.035, 0.026), [sd * 0.165, 0.165, tz - 0.0355], [0, Math.PI, 0])
+    for (const x of [0.185, 0.24, 0.29]) k.add('chrome', box(0.004, 0.03, 0.004), [sd * x, 0.165, tz - 0.036])
+    k.add('chrome', frame([[-0.082, -0.022], [0.082, -0.022], [0.082, 0.022], [-0.082, 0.022]], [[-0.078, -0.018], [0.078, -0.018], [0.078, 0.018], [-0.078, 0.018]], 0.004), [sd * 0.22, 0.165, tz - 0.035], [0, Math.PI, 0])
   }
   k.add('black', plane(0.124, 0.054), [0, 0.245, tz - 0.003], [0, Math.PI, 0])
   k.add('lamp', plane(0.11, 0.045), [0, 0.245, tz - 0.004], [0, Math.PI, 0])
