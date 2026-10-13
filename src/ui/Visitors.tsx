@@ -6,7 +6,7 @@ import { centerOf } from '../scene/World'
 import { useNow } from '../scene/useNow'
 import { CarThumb } from '../scene/BuildingPreview'
 import { useVisitors, tapVisitor, leave } from '../lib/visitors'
-import { openStreetRace } from './Race'
+import { openStreetRace } from './raceNav'
 import { Panel } from './Menus'
 
 // The bubble over a visitor in town: over its car, or over Rusty's for a barn tip.

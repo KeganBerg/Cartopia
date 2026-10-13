@@ -9,7 +9,7 @@ import {
   carDef, takesDriver, SEASON_STARS, activeEvent, eventEndsAt, plotPrice, START_LAND, type StatKey, type GoalDef, flatFixCost, servicePay, gasCanCost,
 } from '../game/data'
 import { Panel, SheetTabs, openGarageTab } from './Menus'
-import { openRaceTab } from './Race'
+import { openRaceTab } from './raceNav'
 import { useNow } from '../scene/useNow'
 import { Icon } from './Icon'
 import { CrewGoalMini } from './CrewGoal'

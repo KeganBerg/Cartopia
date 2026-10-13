@@ -6,7 +6,7 @@ import { TUNER_TRIALS, buildChecks, hostMods, tunerPrize, tunerTrial, type Build
 import { venue as venueById } from '../scene/venues'
 import { CarThumb } from '../scene/BuildingPreview'
 import { openGarageTab } from './Menus'
-import { openRaceTab } from './Race'
+import { openRaceTab } from './raceNav'
 import { artStyle } from './venueArt'
 import { TileClip } from './TileClip'
 

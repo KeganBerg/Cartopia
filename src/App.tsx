@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ComponentType } from 'react'
+import { useEffect, useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { NeutralToneMapping, type Material, type Mesh } from 'three'
 import { World } from './scene/World'
@@ -12,7 +12,6 @@ import { PaintPrizePopup } from './ui/PaintRivals'
 import { RecapPopup } from './ui/Recap'
 import { TunerPrizePopup } from './ui/TunerTrials'
 import { CupPrizePopup, MasteryPrizePopup } from './ui/ClassCups'
-import { RacePanel, LiveRaceOverlay, InvitesPanel, PrizePopup, CampaignPrizePopup, TourPrizePopup, EventPrizePopup } from './ui/Race'
 import { joinLobby, useLive } from './lib/live'
 import { chatDemo, startChat } from './lib/chat'
 import { ChatPanel } from './ui/Chat'
@@ -44,18 +43,19 @@ import './lib/crates'
 import './lib/accountSwitch'
 import { startAmbience } from './lib/ambience'
 import { startMusic } from './lib/townMusic'
-import { startTechnoMusic } from './lib/technoMusic'
+import { prefetchTechno, startTechnoMusic } from './lib/technoMusic'
 import { TechnoLayer } from './ui/Techno'
 import { FlashWarning, RaveHeadsUp, flashWarningOpen, openDaily } from './ui/FlashWarning'
 import { useTownPaused } from './scene/renderGate'
 import { useCrewGoalWatcher } from './ui/CrewGoal'
-import { BattlePanel, useCrewBattleWatcher } from './ui/CrewBattle'
+import { useCrewBattleWatcher } from './ui/crewBattleWatch'
 import { VisitorBadges, StreetRaceCard } from './ui/Visitors'
 import { visitorTick, forceVisitor } from './lib/visitors'
 import type { VisitorKind } from './game/data'
 import { hideSplash, splashProgress } from './lib/splash'
 import { rememberSplashCar } from './lib/splashCar'
 import { usePrefs } from './lib/prefs'
+import { onDemand } from './ui/lazy'
 
 // Rusty's yard, the crate depot and the arcade each bring their own 3D scenes,
 // so they load on first open instead of with the town. Once the town is up they
@@ -64,24 +64,23 @@ const loadRescue = () => import('./ui/Rescue')
 const loadCrates = () => import('./ui/Crates')
 const loadArcade = () => import('./ui/Arcade')
 const loadWheel = () => import('./ui/Wheel')
-// Shows nothing for the moment the file is loading, then the panel. (A plain
-// state flip rather than React.lazy, which never showed the panel in the dev server.)
-function onDemand<M>(load: () => Promise<M>, pick: (m: M) => ComponentType) {
-  let Loaded: ComponentType | null = null
-  return function OnDemand() {
-    const [, setReady] = useState(false)
-    useEffect(() => {
-      if (!Loaded) load().then((m) => { Loaded = pick(m); setReady(true) })
-    }, [])
-    return Loaded ? <Loaded /> : null
-  }
-}
+// The Race menu, drag races, kart and live races: the biggest share of the game's code.
+const loadRace = () => import('./ui/Race')
+const loadBattle = () => import('./ui/CrewBattle')
 const RescuePanel = onDemand(loadRescue, (m) => m.RescuePanel)
 const CratesPanel = onDemand(loadCrates, (m) => m.CratesPanel)
 const ArcadePanel = onDemand(loadArcade, (m) => m.ArcadePanel)
 const WheelPanel = onDemand(loadWheel, (m) => m.WheelPanel)
+const BattlePanel = onDemand(loadBattle, (m) => m.BattlePanel)
+const RacePanel = onDemand(loadRace, (m) => m.RacePanel)
+const LiveRaceOverlay = onDemand(loadRace, (m) => m.LiveRaceOverlay)
+const InvitesPanel = onDemand(loadRace, (m) => m.InvitesPanel)
+const PrizePopup = onDemand(loadRace, (m) => m.PrizePopup)
+const CampaignPrizePopup = onDemand(loadRace, (m) => m.CampaignPrizePopup)
+const TourPrizePopup = onDemand(loadRace, (m) => m.TourPrizePopup)
+const EventPrizePopup = onDemand(loadRace, (m) => m.EventPrizePopup)
 const prefetchPanels = () => {
-  const go = () => { loadRescue(); loadCrates(); loadArcade() }
+  const go = () => { loadRace(); loadRescue(); loadCrates(); loadArcade(); prefetchTechno() }
   if ('requestIdleCallback' in window) requestIdleCallback(go, { timeout: 4000 })
   else go()
 }
@@ -92,6 +91,11 @@ const SMALL = typeof window !== 'undefined' && Math.min(window.innerWidth, windo
 export default function App() {
   const panel = useGame((s) => s.panel)
   const liveRace = useLive((l) => l.race)
+  // Race prizes: their popups load with the Race menu's code, so they mount only when won.
+  const gpPrize = useGame((s) => !!s.gpPrize)
+  const campaignPrize = useGame((s) => !!s.campaignPrize)
+  const tourPrize = useGame((s) => !!s.tourPrize)
+  const eventPrize = useGame((s) => !!s.eventPrize)
   const tick = useGame((s) => s.tick)
   const townPaused = useTownPaused()
   const graphics = usePrefs((p) => p.graphics)
@@ -195,10 +199,10 @@ export default function App() {
       {panel === 'taunts' && <TauntsPanel />}
       {panel === 'ghost' && <GhostRacePanel />}
       {panel === 'arcade' && <ArcadePanel />}
-      <PrizePopup />
-      <CampaignPrizePopup />
-      <TourPrizePopup />
-      <EventPrizePopup />
+      {gpPrize && <PrizePopup />}
+      {campaignPrize && <CampaignPrizePopup />}
+      {tourPrize && <TourPrizePopup />}
+      {eventPrize && <EventPrizePopup />}
       <PaintPrizePopup />
       <TunerPrizePopup />
       <CupPrizePopup />

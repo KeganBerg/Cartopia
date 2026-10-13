@@ -4,7 +4,6 @@ import { NeutralToneMapping } from 'three'
 import { raceCarOf } from '../game/raceCar'
 import { useGame, type OwnedCar } from '../game/store'
 import { CARS, CLAN_COLORS, CLAN_EMBLEMS, CREW_CHEST, carDef, msToNextWeek, payAt } from '../game/data'
-import { supabase } from '../lib/supabase'
 import { signedInUser } from '../lib/cloud'
 import { useLive, challenge } from '../lib/live'
 import { BATTLE_RULES, battleChests, battleShare, claimBattle, demoBattle, refreshCrewBattle, useCrewBattle, type Battle, type BattleSide } from '../lib/battles'
@@ -28,37 +27,6 @@ const n = (v: number) => v.toLocaleString()
 function left(ms: number) {
   const h = Math.max(1, Math.ceil(ms / 3600000))
   return h > 24 ? `${Math.floor(h / 24)}d ${h % 24}h` : `${h}h`
-}
-
-// Keeps the battle fresh while the crew screens are open, and says when a victory chest is waiting.
-let toldWeek = ''
-export function useCrewBattleWatcher() {
-  const panel = useGame((s) => s.panel)
-  useEffect(() => {
-    // ?battle=demo opens a made-up battle straight away.
-    if (demoBattle()) {
-      refreshCrewBattle()
-      const t = setTimeout(() => useGame.getState().openPanel('battle'), 1500)
-      return () => clearTimeout(t)
-    }
-    if (!supabase) return
-    const sub = supabase.auth.onAuthStateChange(() => setTimeout(async () => {
-      await refreshCrewBattle()
-      const b = useCrewBattle.getState().battle
-      const due = b && b.payable ? battleChests(b.last, b.rules) : []
-      if (due.length && b!.last && toldWeek !== b!.last.week) {
-        toldWeek = b!.last.week
-        useGame.getState().toast(b!.last.result === 'win' ? '⚔️ Your crew won its battle! Claim your victory chest.' : '⚔️ Your crew battle ended in a draw. Claim your chest.')
-      }
-    }, 5000))
-    return () => sub.data.subscription.unsubscribe()
-  }, [])
-  useEffect(() => {
-    if (panel !== 'clan' && panel !== 'battle') return
-    refreshCrewBattle()
-    const id = setInterval(refreshCrewBattle, 60_000)
-    return () => clearInterval(id)
-  }, [panel])
 }
 
 // The crew's badge: emblem on its colour, and the tag.

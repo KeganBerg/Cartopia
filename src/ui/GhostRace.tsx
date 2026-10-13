@@ -5,11 +5,14 @@ import { supabase } from '../lib/supabase'
 import { signedInUser } from '../lib/cloud'
 import { townToVisit } from '../lib/friends'
 import { useGhost, runGhost, raceTown, submitRun, sendTaunt, refreshTaunts, markSeen, tauntText, tauntsFor, receivedTaunt, GHOST_FUEL, type GhostResult, type Taunt } from '../lib/ghosts'
-import { DragRace } from './Race'
+import { onDemand } from './lazy'
 import { Panel } from './Menus'
 import { PlayerName } from './Username'
 import { isCrewMate } from '../lib/crewRaces'
 import { usePrefs } from '../lib/prefs'
+
+// The race itself loads with the Race menu's code, the first time a ghost race starts.
+const DragRace = onDemand(() => import('./Race'), (m) => m.DragRace)
 
 // Friend ghost races: the race itself, the result card with taunts, and the taunt inbox.
 

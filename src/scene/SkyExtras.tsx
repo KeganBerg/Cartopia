@@ -12,7 +12,7 @@ import { dayPhase, nightAmount } from './dayNight'
 import { frameFor, type Frame } from './Weather'
 import { isFree } from './freeCam'
 import { A_CITY } from './horizonLand'
-import { BalloonModel } from './KartExtras'
+import { BalloonModel } from './Balloon'
 import { Box, Cone, Cyl } from './RaceVenues'
 
 // Extras in the town's sky (timing in game/skyExtras.ts): northern lights in

@@ -5,7 +5,8 @@ import { raceCarOf } from '../game/raceCar'
 import { reducedMotion } from '../game/fx'
 import { activeEvent, garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, carDef, performance, upgradeCost, buildingDef, upgradable, loves, readySets, isBike, FEATURES, type BuildingDef } from '../game/data'
 import { CarInspect, CarPreview, type DynoFeed } from '../scene/CarPreview'
-import { DynoOverlay, type DynoRun } from './Dyno'
+import type { DynoRun } from './Dyno'
+import { onDemand } from './lazy'
 import { CollectAllButton } from './CollectAll'
 import { GoalsButton } from './Goals'
 import { rotateCurrent } from '../game/placement'
@@ -31,6 +32,9 @@ import { tutTarget, tutorialShowing, type TutTarget } from './Tutorial'
 import { useTipTarget, type TipTarget } from './Tips'
 import { setFreeCam, useFreeCam } from '../scene/freeCam'
 import { Confirm, useAsk } from './Confirm'
+
+// The dyno run and its engine sound load the first time an upgrade shows on the dyno.
+const DynoOverlay = onDemand(() => import('./Dyno'), (m) => m.DynoOverlay)
 
 // Phones and tablets: no hover, so placing takes a preview tap first.
 const TOUCH = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
