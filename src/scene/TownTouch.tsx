@@ -24,7 +24,11 @@ const b = new Vector3()
 
 type Controls = { target: Vector3; minZoom: number; maxZoom: number; update: () => void }
 
-export function TownTouch({ enabled }: { enabled: boolean }) {
+// `busy`: a building is being dragged. Read live on every move, because `enabled`
+// only turns off once React re-renders, and picking a building in a big town
+// re-merges it first: every finger move until then would pan the map along with
+// the finger, so the building never left its lot.
+export function TownTouch({ enabled, busy }: { enabled: boolean; busy?: () => boolean }) {
   const camera = useThree((s) => s.camera) as OrthographicCamera
   const controls = useThree((s) => s.controls) as unknown as Controls | null
   const canvas = useThree((s) => s.gl.domElement)
@@ -91,6 +95,11 @@ export function TownTouch({ enabled }: { enabled: boolean }) {
       waiting.clear()
     }
     const move = (e: PointerEvent) => {
+      if (busy?.()) {
+        fingers.clear()
+        waiting.clear()
+        return
+      }
       const w = waiting.get(e.pointerId)
       if (w) {
         if (Math.hypot(e.clientX - w.x, e.clientY - w.y) < SLOP) return
@@ -131,6 +140,6 @@ export function TownTouch({ enabled }: { enabled: boolean }) {
       window.removeEventListener('pointercancel', up, true)
       window.removeEventListener('click', click, true)
     }
-  }, [enabled, controls, camera, canvas])
+  }, [enabled, busy, controls, camera, canvas])
   return null
 }

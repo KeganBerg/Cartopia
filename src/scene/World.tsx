@@ -111,6 +111,7 @@ export const groupCenter = (g: Pick<MergeGroup, 'x' | 'z' | 'w' | 'h'>) => toWor
 // tiles the pointer is holding.
 type Drag = { uid: string; x: number; z: number; gx: number; gz: number }
 const useDrag = create<{ drag: Drag | null }>(() => ({ drag: null }))
+const dragging = () => useDrag.getState().drag !== null
 
 const GROUND = new Plane(new Vector3(0, 1, 0), 0)
 const hit = new Vector3()
@@ -642,7 +643,7 @@ function Interaction() {
         // Fingers are TownTouch's; these keep the mouse and trackpad.
         touches={NO_TOUCH}
       />
-      <TownTouch enabled={!(free || mode === 'road' || mode === 'bulldoze' || drag)} />
+      <TownTouch enabled={!(free || mode === 'road' || mode === 'bulldoze' || drag)} busy={dragging} />
     </>
   )
 }
