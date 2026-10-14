@@ -276,7 +276,7 @@ div.rm-node { cursor: default; }
 }
 
 /* ---------- weekly event (game/events.ts) ---------- */
-.rm-hub { grid-template-rows: 1fr 1fr 1fr auto; grid-template-areas: "camp tour rival rival" "camp tour ev ev" "camp tour gp trial" "minis minis minis minis"; }
+.rm-hub { grid-template-rows: 1fr 1fr 1.25fr auto; grid-template-areas: "camp tour rival rival" "camp tour ev ev" "camp tour gp trial" "minis minis minis minis"; }
 .rm-ev { grid-area: ev; flex-direction: row; align-items: center; gap: 10px; }
 .rm-ev .rm-tag { background: var(--ev, #ff4fd8); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .rm-ev .rm-ttl { margin-top: 2px; font-size: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -418,8 +418,11 @@ div.rm-node { cursor: default; }
 .rm-hub .rm-trial .rm-meta { white-space: nowrap; }
 
 /* mode tags: bevelled colour badges; on picture tiles they hang off the top-left corner */
-.rm-hub .rm-tag { --tag: #ffb21a; font: 12.5px/1 var(--display); letter-spacing: .5px; overflow: hidden; text-overflow: ellipsis; max-width: 100%; color: #fff; -webkit-text-stroke: 3px var(--line, #14213d); paint-order: stroke fill; background: linear-gradient(color-mix(in srgb, var(--tag) 70%, #fff), var(--tag)); border: 2.5px solid var(--line, #14213d); border-radius: 10px; padding: 4px 9px 5px; box-shadow: inset 0 2px 0 rgba(255,255,255,.45), inset 0 -3px 0 rgba(0,0,0,.18), 0 2px 0 rgba(0,0,0,.3); white-space: nowrap; }
-.rm-hub .rm-camp .rm-tag, .rm-hub .rm-tour .rm-tag, .rm-hub .rm-gp .rm-tag, .rm-hub .rm-trial .rm-tag { position: absolute; top: -3px; left: -3px; border-radius: 16px 0 14px 0; padding: 7px 12px 6px 14px; box-shadow: inset 0 2px 0 rgba(255,255,255,.45), inset 0 -3px 0 rgba(0,0,0,.18), 2px 3px 0 rgba(0,0,0,.25); }
+.rm-hub .rm-tag { --tag: #ffb21a; font: 19px/1 var(--display); letter-spacing: .6px; overflow: hidden; text-overflow: ellipsis; max-width: 100%; color: #fff; -webkit-text-stroke: 4.5px var(--line, #14213d); paint-order: stroke fill; background: linear-gradient(color-mix(in srgb, var(--tag) 70%, #fff), var(--tag)); border: 3px solid var(--line, #14213d); border-radius: 12px; padding: 6px 12px 7px; box-shadow: inset 0 2px 0 rgba(255,255,255,.45), inset 0 -3px 0 rgba(0,0,0,.18), 0 2px 0 rgba(0,0,0,.3); white-space: nowrap; }
+.rm-hub .rm-camp .rm-tag, .rm-hub .rm-tour .rm-tag, .rm-hub .rm-gp .rm-tag, .rm-hub .rm-trial .rm-tag { position: absolute; top: -3px; left: -3px; border-radius: 16px 0 16px 0; padding: 9px 16px 9px 16px; box-shadow: inset 0 2px 0 rgba(255,255,255,.45), inset 0 -3px 0 rgba(0,0,0,.18), 2px 3px 0 rgba(0,0,0,.25); }
+/* tags inside a row (rival, event) and on the small tiles stay a size smaller so they fit */
+.rm-hub .rm-rival .rm-tag, .rm-hub .rm-ev .rm-tag { font-size: 14px; -webkit-text-stroke-width: 3.5px; padding: 4px 10px 5px; }
+.rm-hub .rm-gp .rm-tag, .rm-hub .rm-trial .rm-tag { font-size: 16px; padding: 7px 13px 7px 14px; }
 .rm-hub .rm-camp .rm-tag { --tag: #ff9f1a; background: linear-gradient(#ffc04d, #ff8a00); }
 .rm-hub .rm-tour .rm-tag { --tag: #8a5cf6; background: linear-gradient(#b796ff, #7a49ee); }
 .rm-hub .rm-gp .rm-tag { --tag: #f5b800; background: linear-gradient(#ffd84a, #f0a400); }
@@ -471,6 +474,9 @@ div.rm-node { cursor: default; }
   .rm-hub .rm-mi { width: 38px; height: 38px; font-size: 21px; }
   .rm-hub .rm-mini b { font-size: 16px; line-height: 1; white-space: normal; }
   .rm-hub .rm-mini small { display: none; }
+  /* the small tiles get the room their bigger tags need; the rival's quip keeps to one line */
+  .rm-hub .rm-bub { display: block; white-space: nowrap; text-overflow: ellipsis; }
+  .rm-hub .rm-rmid { gap: 3px; }
 }
 
 /* car bar: a HUD plate on the navy strip */
@@ -496,7 +502,7 @@ div.rm-node { cursor: default; }
   .rm-hub .rm-tile .rm-ttl { font-size: 20px; -webkit-text-stroke-width: 4px; }
   .rm-hub .rm-gp .rm-ttl, .rm-hub .rm-trial .rm-ttl { font-size: 19px; }
   .rm-hub .rm-rival .rm-ttl, .rm-hub .rm-ev .rm-ttl { font-size: 19px; }
-  .rm-hub .rm-tag { font-size: 11px; -webkit-text-stroke-width: 2.5px; padding: 3px 7px 4px; }
+  .rm-hub .rm-tag { font-size: 15px; -webkit-text-stroke-width: 3.5px; padding: 5px 10px 6px; }
   .rm-hub .rm-camp .rm-tag, .rm-hub .rm-tour .rm-tag, .rm-hub .rm-gp .rm-tag, .rm-hub .rm-trial .rm-tag { padding: 5px 9px 5px 11px; }
   .rm-hub .rm-tile .rm-meta { font-size: 12.5px; padding: 3px 7px; }
   .rm-hub .rm-rounds { gap: 3px; }
@@ -532,7 +538,7 @@ div.rm-node { cursor: default; }
 @media (max-height: 500px) {
   .rm-hub .rm-tile .rm-ttl { font-size: 18px; -webkit-text-stroke-width: 3.5px; }
   .rm-hub .rm-gp .rm-ttl, .rm-hub .rm-trial .rm-ttl, .rm-hub .rm-rival .rm-ttl, .rm-hub .rm-ev .rm-ttl { font-size: 17px; }
-  .rm-hub .rm-tag { font-size: 10.5px; -webkit-text-stroke-width: 2.5px; padding: 2px 6px 3px; }
+  .rm-hub .rm-tag { font-size: 13px; -webkit-text-stroke-width: 3px; padding: 4px 8px 5px; }
   .rm-hub .rm-camp .rm-tag, .rm-hub .rm-tour .rm-tag, .rm-hub .rm-gp .rm-tag, .rm-hub .rm-trial .rm-tag { padding: 4px 8px 4px 10px; }
   .rm-hub .rm-tile .rm-meta { font-size: 11.5px; padding: 2px 6px; }
   .rm-hub .rm-cta > span { font-size: 13px; }

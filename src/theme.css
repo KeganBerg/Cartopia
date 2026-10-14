@@ -71,7 +71,12 @@ html {
   background: linear-gradient(#5aa9ff, #2263d6); border-bottom: 3px solid var(--line); padding: 8px 10px 8px 18px;
   box-shadow: inset 0 3px 0 rgba(255,255,255,.35), inset 0 -4px 0 rgba(0,0,0,.15);
 }
-:root .panel-head h2 { font-size: 24px; letter-spacing: .4px; text-shadow: 0 3px 0 var(--line); -webkit-text-stroke: 1px var(--line); }
+:root .panel-head h2 { font-size: 32px; line-height: 1.05; letter-spacing: .5px; padding: 2px 4px 4px 0; color: #fff; -webkit-text-stroke: 6px var(--line); paint-order: stroke fill; text-shadow: 0 4px 0 var(--line); transform-origin: 0 60%; animation: head-in .38s cubic-bezier(.3, 1.6, .5, 1) both; }
+/* every menu opens by announcing its name: the title pops in like a game banner */
+@keyframes head-in { from { transform: scale(.55) rotate(-4deg); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { :root .panel-head h2 { animation: none; } }
+@media (max-width: 600px) { :root .panel-head h2 { font-size: 29px; -webkit-text-stroke-width: 5px; } }
+@media (max-height: 500px) { :root .panel-head h2 { font-size: 24px; -webkit-text-stroke-width: 4px; } }
 :root .close {
   width: 36px; height: 36px; border-radius: 12px; background: linear-gradient(#ff6b6b, #d6283b); border: 3px solid var(--line);
   box-shadow: inset 0 2px 0 rgba(255,255,255,.4), 0 3px 0 rgba(0,0,0,.35);
@@ -91,6 +96,10 @@ html {
 :root .card { border: 2px solid #c6d7ee; border-radius: 16px; box-shadow: 0 3px 0 #c6d7ee; }
 :root button.card:hover:not(:disabled) { border-color: #2f7ff0; box-shadow: 0 3px 0 #2f7ff0; }
 :root .cards.rows .card { border-width: 2px; border-radius: 14px; }
+/* card pills sit on the top edge, lined up with the card's name, and the card makes room for them */
+:root .cards.rows .ribbon { left: 90px; top: -12px; transform: none; font: 12px/1 var(--display); letter-spacing: .6px; padding: 4px 10px; border: 2px solid var(--line); border-radius: 9px; box-shadow: inset 0 2px 0 rgba(255,255,255,.4), 0 2px 0 rgba(0,0,0,.25); text-shadow: 0 1px 0 rgba(0,0,0,.35); }
+:root .cards.rows .ribbon.deal { left: auto; right: 12px; }
+:root .cards.rows .card:has(> .ribbon) { padding-top: 12px; margin-top: 6px; }
 :root .cards.rows .card > .price {
   background: linear-gradient(#8ef05c, #2fae35); color: #fff; border: 2px solid #1d6b22; border-radius: 12px; text-shadow: 0 1.5px 0 rgba(0,0,0,.35);
   box-shadow: inset 0 2px 0 rgba(255,255,255,.4), 0 2px 0 rgba(0,0,0,.2);
