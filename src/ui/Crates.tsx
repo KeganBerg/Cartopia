@@ -34,9 +34,9 @@ function CrateIcon({ c }: { c: CrateDef }) {
   )
 }
 
-// The odds a crate shows: coins, parts, cars and skins, and on a tap the parts, cars or skins it
-// can hold. Cars and skins you already have are dimmed with a coin, since they pay coins instead;
-// the crate's own cars your level hasn't reached yet show a lock. The parts slice turns to coins
+// The odds a crate shows: coins, hats, parts, paints, cars and resto-mod pieces (rarest last),
+// and on a tap what each can hold. Cars and skins you already have are dimmed with a coin, since
+// they pay coins instead; the crate's own cars your level hasn't reached yet show a lock. The parts slice turns to coins
 // once no part in it fits a car of yours.
 function Odds({ c, level }: { c: CrateDef; level: number }) {
   const [open, setOpen] = useState<'mod' | 'car' | 'skin' | 'piece' | 'hat' | null>(null)
@@ -74,9 +74,9 @@ function Odds({ c, level }: { c: CrateDef; level: number }) {
         <span className="odd coins" style={{ flex: o.coins }}><b>🪙</b>{o.coins}%</span>
         {o.hat > 0 && <button className="odd hat" style={{ flex: Math.max(o.hat, 14) }} onClick={() => toggle('hat')} aria-expanded={open === 'hat'}><b>🎩</b>{o.hat}%<small>{open === 'hat' ? '▴' : '▾'}</small></button>}
         <button className={`odd mod${noParts ? ' spent' : ''}`} style={{ flex: Math.max(o.mod, 14) }} onClick={() => toggle('mod')} aria-expanded={open === 'mod'} title={noParts ? 'No parts left to fit your cars: pays coins' : undefined}><b>{noParts ? '🔧🪙' : '🔧'}</b>{o.mod}%<small>{open === 'mod' ? '▴' : '▾'}</small></button>
+        {o.skin > 0 && <button className="odd skin" style={{ flex: Math.max(o.skin, 14) }} onClick={() => toggle('skin')} aria-expanded={open === 'skin'}><b>✨</b>{o.skin}%<small>{open === 'skin' ? '▴' : '▾'}</small></button>}
         <button className="odd car" style={{ flex: Math.max(o.car, 14) }} onClick={() => toggle('car')} aria-expanded={open === 'car'}><b>🚗</b>{o.car}%<small>{open === 'car' ? '▴' : '▾'}</small></button>
         {o.piece > 0 && <button className="odd piece" style={{ flex: Math.max(o.piece, 14) }} onClick={() => toggle('piece')} aria-expanded={open === 'piece'}><b>🧩</b>{o.piece}%<small>{open === 'piece' ? '▴' : '▾'}</small></button>}
-        {o.skin > 0 && <button className="odd skin" style={{ flex: Math.max(o.skin, 14) }} onClick={() => toggle('skin')} aria-expanded={open === 'skin'}><b>✨</b>{o.skin}%<small>{open === 'skin' ? '▴' : '▾'}</small></button>}
       </div>
       {left != null && (
         <div className="crate-pity" title={`A ${c.pity?.tier ?? ''} skin is guaranteed within ${left} ${left === 1 ? 'open' : 'opens'}`.replace('  ', ' ')}>
