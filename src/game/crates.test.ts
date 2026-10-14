@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { PIECE_SOURCES, restoTables } from './resto'
 import { CARS, MODS, MOD_SKINS, SKINS, carDef, modDef, modFits } from './data'
 import { crateHats, HATS } from './hats'
-import { CRATES, HAT_ODDS, dropTier, carCrate, carValue, carWorth, crateCars, crateDef, crateOdds, crateOddsShown, crateSkins, crateTables, crateValue, homeCars, homeMods, modChoices, modCrate, modWorth, rollCrate, rollSourcePiece, skinOdds, type CrateDrop } from './crates'
+import { CRATES, HAT_ODDS, cratePrice, dropTier, carCrate, carValue, carWorth, crateCars, crateDef, crateOdds, crateOddsShown, crateSkins, crateTables, crateValue, homeCars, homeMods, modChoices, modCrate, modWorth, rollCrate, rollSourcePiece, skinOdds, type CrateDrop } from './crates'
 
 const dir = new URL('../../supabase/migrations/', import.meta.url)
 // The newest migration holding the crate tables.
@@ -26,6 +26,13 @@ describe('crates', () => {
   it('rolls on the server from the same tables', () => {
     expect(serverTables()).toEqual(JSON.parse(JSON.stringify(crateTables())))
     expect(serverTables('$resto$')).toEqual(JSON.parse(JSON.stringify(restoTables())))
+  })
+
+  it('opens every crate from the start, and stops coin crates getting dearer at their cap', () => {
+    for (const c of CRATES) expect(c.unlockLevel).toBe(1)
+    const street = crateDef('street')!
+    expect(cratePrice(street, 50)).toBe(cratePrice(street, street.priceCap!))
+    expect(cratePrice(street, 10)).toBeLessThan(cratePrice(street, 50))
   })
 
   it('only holds cars your level has unlocked', () => {
@@ -131,9 +138,9 @@ describe('crates', () => {
 
   it('holds every body and part skin in some crate, and pays coins for ones you have', () => {
     const anywhere = new Set(CRATES.flatMap((c) => crateSkins(c).map((x) => (x.part ? 'p:' : 'b:') + x.id)))
-    // Weekly event skins are only won in their event.
-    for (const d of SKINS) expect(anywhere.has('b:' + d.id), d.id).toBe(!('event' in d.unlock))
-    for (const d of MOD_SKINS) expect(anywhere).toContain('p:' + d.id)
+    // Weekly event skins are only won in their event, and level skins only by reaching the level.
+    for (const d of SKINS) expect(anywhere.has('b:' + d.id), d.id).toBe(!('event' in d.unlock) && !('level' in d.unlock))
+    for (const d of MOD_SKINS) expect(anywhere.has('p:' + d.id), d.id).toBe(!('level' in d.unlock))
     for (const c of CRATES) {
       const odds = skinOdds(c)
       if (odds.length) expect(odds.reduce((a, x) => a + x.p, 0)).toBeCloseTo(1)
@@ -205,7 +212,8 @@ describe('crates', () => {
       expect(d).toEqual({ kind: 'piecedupe', model: restos[0].id, piece: 0, coins: PIECE_SOURCES.rusty_track.dupe })
     })
     it('keeps pieces rare', () => {
-      for (const id of ['garage', 'gold', 'diamond']) expect(crateOddsShown(crateDef(id)!, 30).piece).toBe(0.1)
+      for (const id of ['garage', 'diamond']) expect(crateOddsShown(crateDef(id)!, 30).piece).toBe(0.1)
+      expect(crateOddsShown(crateDef('gold')!, 30).piece).toBe(0.05)
     })
     it('drops pieces of unlocked, unbuilt resto-mods only', () => {
       const rand = seeded(11)

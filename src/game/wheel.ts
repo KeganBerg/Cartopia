@@ -7,7 +7,7 @@
 //   gems: a few gems (the jackpot is a pile of them).
 //   part: a part for one of your cars, from the Garage Crate's parts (the Street's when none fit).
 //   skin: a body or part skin of the Garage Crate's tiers; one you have already pays coins.
-import { cratePrice, crateDef, crateSkins, modChoices, SKIN_WEIGHT, type CrateDrop, type CrateOpen, type OwnedSkins } from './crates'
+import { crateDef, crateSkins, modChoices, SKIN_WEIGHT, type CrateDrop, type CrateOpen, type OwnedSkins } from './crates'
 
 export type WheelTier = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary'
 export type WheelSlice =
@@ -43,8 +43,9 @@ const roundCoins = (n: number) => Math.max(10, Math.round(n / 10) * 10)
 const street = () => crateDef('street')!
 const garage = () => crateDef('garage')!
 
-// The coins a coin slice pays at this level.
-export const wheelCoins = (mult: number, level: number) => roundCoins(cratePrice(street(), level) * mult)
+// The coins a coin slice pays at this level: a share of the Street Crate's price before its cap
+// (CrateDef.priceCap), as the server's wheel_spin() reckons it.
+export const wheelCoins = (mult: number, level: number) => roundCoins((street().base + street().perLevel * level) * mult)
 
 // A slice's chance in whole percent.
 export const wheelPct = (s: WheelSlice) => (s.weight / WHEEL.reduce((a, x) => a + x.weight, 0)) * 100

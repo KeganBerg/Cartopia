@@ -2,7 +2,7 @@
 // coins, a part for one of your cars, a car, or a body or part skin. Every car and part has one
 // home crate, picked by what it's worth (see homeCrate), so dearer crates hold dearer cars and
 // parts. Cars only come once your level has unlocked them, so a crate never skips a level gate. A signed-in player's crates are
-// rolled by the server (crate_open(), newest copy in supabase/migrations/0072_crate_hats.sql, same tables and
+// rolled by the server (crate_open(), newest copy in supabase/migrations/0084_crate_value_fixes.sql, same tables and
 // rules); guests roll here. crates.test.ts keeps the server's tables in step.
 import { CARS, MODS, MOD_SKINS, SKINS, carDef, modDef, modFits, ownedMods, type CarDef, type ModDef, type SkinDef, type SkinTier } from './data'
 import { PIECE_COUNT, PIECE_SOURCES, pieceId, piecePool } from './resto'
@@ -17,9 +17,11 @@ export type CrateDef = {
   name: string
   pay: 'coins' | 'bucks'
   unlockLevel: number
-  // Price: base + perLevel x level (coins), or a flat gem price.
+  // Price: base + perLevel x level (coins), or a flat gem price. A coin crate stops getting
+  // dearer at priceCap: its prizes stop growing long before, so a dearer crate was a worse deal.
   base: number
   perLevel: number
+  priceCap?: number
   // Weights out of 100. The car weight is the most it can be: see crateOdds.
   odds: CrateOdds
   // The most the car slice is worth, as a share of the crate.
@@ -42,23 +44,23 @@ export type CrateDef = {
 
 export const CRATES: CrateDef[] = [
   {
-    id: 'street', name: 'Street Crate', pay: 'coins', unlockLevel: 2, base: 300, perLevel: 120,
+    id: 'street', name: 'Street Crate', pay: 'coins', unlockLevel: 1, base: 300, perLevel: 120, priceCap: 15,
     odds: { coins: 56, jackpot: 6, mod: 28, car: 10, skin: 0, piece: 0 }, carShare: 0.12, coinMult: [0.5, 1], jackpotMult: [2, 3],
     carMax: 10000, modMax: 2500, skins: [], look: { wood: '#b7844f', band: '#5d6670', glow: '#64b5f6' },
   },
   {
-    id: 'garage', name: 'Garage Crate', pay: 'coins', unlockLevel: 6, base: 1500, perLevel: 500,
+    id: 'garage', name: 'Garage Crate', pay: 'coins', unlockLevel: 1, base: 1500, perLevel: 500, priceCap: 30,
     odds: { coins: 40.9, jackpot: 8, mod: 31, car: 16, skin: 4, piece: 0.1 }, carShare: 0.15, coinMult: [0.45, 0.85], jackpotMult: [2, 3],
     carMax: 40000, modMax: 10000, skins: ['rare', 'epic'], look: { wood: '#2e7d4f', band: '#cfd8dc', glow: '#69f0ae' },
   },
   {
-    id: 'gold', name: 'Gold Crate', pay: 'bucks', unlockLevel: 3, base: 8, perLevel: 0,
-    odds: { coins: 33.9, jackpot: 6, mod: 30, car: 20, skin: 10, piece: 0.1 }, carShare: 0.15, coinMult: [0.45, 0.85], jackpotMult: [2, 3],
+    id: 'gold', name: 'Gold Crate', pay: 'bucks', unlockLevel: 1, base: 8, perLevel: 0,
+    odds: { coins: 33.95, jackpot: 6, mod: 30, car: 20, skin: 10, piece: 0.05 }, carShare: 0.15, coinMult: [0.45, 0.85], jackpotMult: [2, 3],
     carMax: 130000, modMax: 15000, skins: ['rare', 'epic', 'legendary'], pity: { every: 8 }, look: { wood: '#d4a017', band: '#7a4b12', glow: '#ffd54f' },
   },
   {
-    id: 'diamond', name: 'Diamond Crate', pay: 'bucks', unlockLevel: 8, base: 25, perLevel: 0,
-    odds: { coins: 23.9, jackpot: 6, mod: 24, car: 32, skin: 14, piece: 0.1 }, carShare: 0.2, coinMult: [0.4, 0.8], jackpotMult: [2, 3],
+    id: 'diamond', name: 'Diamond Crate', pay: 'bucks', unlockLevel: 1, base: 25, perLevel: 0,
+    odds: { coins: 23.9, jackpot: 6, mod: 24, car: 32, skin: 14, piece: 0.1 }, carShare: 0.2, coinMult: [0.7, 1.1], jackpotMult: [2.5, 3.5],
      skins: ['epic', 'legendary'], pity: { every: 10, tier: 'legendary' }, look: { wood: '#4fc3f7', band: '#e1f5fe', glow: '#b388ff' },
   },
 ]
@@ -68,7 +70,7 @@ export const crateDef = (id: string) => CRATES.find((c) => c.id === id)
 // Roughly what a gem buys at this level, in coins (five fuel's worth of jobs).
 export const GEM_COINS = { base: 300, perLevel: 100 }
 export const gemCoins = (level: number) => GEM_COINS.base + GEM_COINS.perLevel * level
-export const cratePrice = (c: CrateDef, level: number) => c.base + c.perLevel * level
+export const cratePrice = (c: CrateDef, level: number) => c.base + c.perLevel * Math.min(level, c.priceCap ?? level)
 export const crateCost = (c: CrateDef, level: number) =>
   c.pay === 'coins' ? { coins: cratePrice(c, level), bucks: 0 } : { coins: 0, bucks: cratePrice(c, level) }
 // What a crate is worth in coins: its coin price, or its gems at gemCoins.
@@ -112,12 +114,17 @@ export function carOdds(c: CrateDef, level: number): { model: string; p: number 
 
 // Skins a crate can hold: every body skin (SKINS) and part skin (MOD_SKINS) of its tiers, so a new
 // skin joins the crates as soon as it's added there. Rarer tiers are less likely. Weekly event
-// skins (game/events.ts) are the exception: they're only won by clearing their event.
+// skins (game/events.ts) are the exception: they're only won by clearing their event. So are
+// skins a level hands out: everyone past it has one, so in a crate it could only pay coins.
+// Weekly event skins and level skins never go in crates.
+function inCrates(d: SkinDef) {
+  return !('event' in d.unlock) && !('level' in d.unlock)
+}
 export const SKIN_WEIGHT: Record<SkinTier, number> = { rare: 6, epic: 3, legendary: 1 }
 export type CrateSkin = { id: string; part: boolean; def: SkinDef }
 export function crateSkins(c: CrateDef): CrateSkin[] {
   const all = [...SKINS.map((def) => ({ id: def.id, part: false, def })), ...MOD_SKINS.map((def) => ({ id: def.id, part: true, def }))]
-  return all.filter((x) => c.skins.includes(x.def.tier) && !('event' in x.def.unlock))
+  return all.filter((x) => c.skins.includes(x.def.tier) && inCrates(x.def))
 }
 export function skinOdds(c: CrateDef): (CrateSkin & { p: number })[] {
   const list = crateSkins(c)
@@ -310,14 +317,12 @@ export function crateOddsShown(c: CrateDef, level: number, hats = true) {
   return { coins: pc(o.coins + o.jackpot - hat), hat: pc(hat), mod: pc(o.mod), car: car < 1 ? Math.round(car * 10) / 10 : Math.round(car), skin: pc(o.skin), piece: Math.round((o.piece / t) * 10000) / 100 }
 }
 
-// Weekly event skins never go in crates.
-const inCrates = (d: SkinDef) => !('event' in d.unlock)
 
 // The tables crate_open() rolls from, as embedded in the server's SQL.
 export function crateTables() {
   return {
     crates: Object.fromEntries(CRATES.map((c) => [c.id, {
-      pay: c.pay, unlock: c.unlockLevel, base: c.base, perLevel: c.perLevel, odds: c.odds,
+      pay: c.pay, unlock: c.unlockLevel, base: c.base, perLevel: c.perLevel, ...(c.priceCap ? { priceCap: c.priceCap } : {}), odds: c.odds,
       carShare: c.carShare, coinMult: c.coinMult, jackpotMult: c.jackpotMult, skins: c.skins, below: crateBelow(c)?.id ?? null,
       ...(c.pity ? { pity: c.pity } : {}),
       // The hat slice (out of 100, taken from coins) and the hats it can give, in HATS order.
