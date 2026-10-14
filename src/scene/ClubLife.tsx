@@ -71,9 +71,9 @@ export function ClubLife({ lvl, roofY, roofZ, floorY, floorZ, floorW, floorD }: 
     const color = new Color()
     for (let i = 0; i < n; i++) {
       const bouncer = i === dancers
-      torso.current?.setColorAt(i, color.set(bouncer ? '#151515' : SHIRTS[i % SHIRTS.length]))
+      torso.current?.setColorAt(i, color.set(bouncer ? '#2b2b36' : SHIRTS[i % SHIRTS.length]))
       head.current?.setColorAt(i, color.set(SKIN[(i * 7) % SKIN.length]))
-      arms.current?.setColorAt(i * 2, color.set(bouncer ? '#151515' : SHIRTS[i % SHIRTS.length]))
+      arms.current?.setColorAt(i * 2, color.set(bouncer ? '#2b2b36' : SHIRTS[i % SHIRTS.length]))
       arms.current?.setColorAt(i * 2 + 1, color)
       color.set(bouncer ? '#151515' : PANTS[i % PANTS.length])
       legs.current?.setColorAt(i * 2, color)

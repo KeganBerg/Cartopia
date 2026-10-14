@@ -1,5 +1,5 @@
 import { PAL, SEASON } from './season'
-import { CanvasTexture, Color, RepeatWrapping, SRGBColorSpace, type Texture } from 'three'
+import { CanvasTexture, ClampToEdgeWrapping, Color, RepeatWrapping, SRGBColorSpace, type Texture } from 'three'
 
 // Hand-drawn canvas textures, generated once and shared. Small sizes keep
 // them cheap on phones; repeat settings tile them across bigger surfaces.
@@ -343,6 +343,55 @@ export const glowTex = () =>
     g.fillStyle = grd
     g.fillRect(0, 0, s, s)
   })
+
+const smooth = (k: number) => {
+  const c = Math.min(1, Math.max(0, k))
+  return c * c * (3 - 2 * c)
+}
+
+// Light from a lit wall (a window, a neon tube, a sconce) falling on the
+// pavement in front of it: brightest along the wall (the top edge), fading out
+// with distance and widening as it goes. No hot spot in the middle, so it reads
+// as light on the ground rather than a disc. Painted in sRGB so the falloff is
+// smooth once the GPU linearises it.
+export const washTex = () => {
+  const t = make('wash', 64, (g, s) => {
+    const img = g.createImageData(s, s)
+    for (let y = 0; y < s; y++)
+      for (let x = 0; x < s; x++) {
+        const v = y / (s - 1)
+        const u = x / (s - 1)
+        const edge = 0.14 + 0.3 * v
+        const side = smooth(Math.min(u, 1 - u) / edge)
+        const a = Math.pow((1 - v) ** 2 * side, 1 / 2.2) * 255
+        const i = (y * s + x) * 4
+        img.data[i] = img.data[i + 1] = img.data[i + 2] = a
+        img.data[i + 3] = 255
+      }
+    g.putImageData(img, 0, 0)
+  })
+  t.wrapS = t.wrapT = ClampToEdgeWrapping
+  return t
+}
+
+// A soft round spill under a lamp: an even falloff to nothing at the rim, no bright core.
+export const spillTex = () => {
+  const t = make('spill', 64, (g, s) => {
+    const img = g.createImageData(s, s)
+    for (let y = 0; y < s; y++)
+      for (let x = 0; x < s; x++) {
+        const dx = (x + 0.5) / s * 2 - 1
+        const dy = (y + 0.5) / s * 2 - 1
+        const a = Math.pow(Math.max(0, 1 - dx * dx - dy * dy) ** 2.5, 1 / 2.2) * 255
+        const i = (y * s + x) * 4
+        img.data[i] = img.data[i + 1] = img.data[i + 2] = a
+        img.data[i + 3] = 255
+      }
+    g.putImageData(img, 0, 0)
+  })
+  t.wrapS = t.wrapT = ClampToEdgeWrapping
+  return t
+}
 
 // Office tower facade: a grid of windows on a pale wall, tinted per building.
 export const towerTex = () =>
