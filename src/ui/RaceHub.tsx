@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useGame, type OwnedCar } from '../game/store'
-import { CAMPAIGN, CAMPAIGN_RACES, GP_ROUNDS, GP_SERIES, RACE_FUEL, SKILLS, campaignCleared, campaignRaceId, campaignReward, carDef, carStats, msToNextWeek, performance, skinDef } from '../game/data'
+import { type CarDef, CAMPAIGN, CAMPAIGN_RACES, GP_ROUNDS, GP_SERIES, RACE_FUEL, SKILLS, campaignCleared, campaignRaceId, campaignReward, carDef, carStats, msToNextWeek, performance, skinDef } from '../game/data'
 import { BUILDS, DIST, buildOf, character, fit, tourDist, type RaceDist } from '../game/distance'
 import { EVENT_RACES, eventFor, eventPrize, eventProgress } from '../game/events'
 import { TOUR_RACES, tourLeg, tourLegOf, tourPrize, tourRivalName } from '../game/tour'
@@ -198,8 +198,25 @@ export function Rounds({ round }: { round: number }) {
 // (tap to swap) and, where the screen has one, the button for its next race.
 // dist: the next race's distance, to show how each car's build suits it; null on a screen
 // whose races vary (builds shown without a verdict); left out where builds don't count.
-export function RaceBar({ cars, car, onPick, go, note, dist }: { cars: OwnedCar[]; car: OwnedCar | undefined; onPick: (uid: string) => void; go?: { label: string; onClick: () => void; fix?: boolean } | null; note?: string; dist?: RaceDist | null }) {
+// loaner: the car everyone races on this screen (the Daily Run), shown in place of yours.
+export function RaceBar({ cars, car, onPick, go, note, dist, loaner }: { cars: OwnedCar[]; car: OwnedCar | undefined; onPick: (uid: string) => void; go?: { label: string; onClick: () => void; fix?: boolean } | null; note?: string; dist?: RaceDist | null; loaner?: { car: CarDef; color: string; pi: number } }) {
   const [open, setOpen] = useState(false)
+  const goBtn = go?.fix ? <button className="buy rm-race alt" onClick={go.onClick}>{go.label}</button>
+    : go ? <button className="buy rm-race" onClick={go.onClick}>🏁 {go.label}<small>⛽{RACE_FUEL}</small></button>
+    : note ? <span className="rm-note">{note}</span> : null
+  if (loaner) return (
+    <div className="rm-bar">
+      <div className="rm-car">
+        <CarThumb size="xs" color={loaner.color} body={loaner.car.body} model={loaner.car.id} />
+        <span className="rm-car-txt">
+          <small className="rm-car-lbl">🔑 Loaner</small>
+          <b>{loaner.car.name}</b>
+          <small><span className="rm-pi">PI {loaner.pi}</span></small>
+        </span>
+      </div>
+      {goBtn}
+    </div>
+  )
   if (!car) return null
   const d = carDef(car.model)
   const pi = (c: OwnedCar) => performance(carDef(c.model), c.upgrades, c.mods)
@@ -232,9 +249,7 @@ export function RaceBar({ cars, car, onPick, go, note, dist }: { cars: OwnedCar[
         </span>
         {cars.length > 1 && <span className="rm-swap" aria-hidden>{open ? 'Done' : 'Change'}</span>}
       </button>
-      {go?.fix ? <button className="buy rm-race alt" onClick={go.onClick}>{go.label}</button>
-        : go ? <button className="buy rm-race" onClick={go.onClick}>🏁 {go.label}<small>⛽{RACE_FUEL}</small></button>
-        : note ? <span className="rm-note">{note}</span> : null}
+      {goBtn}
     </div>
   )
 }

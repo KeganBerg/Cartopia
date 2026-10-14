@@ -8,8 +8,6 @@
 .race-panel .panel-body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0; overflow: hidden; }
 .rm-head-chip { background: rgba(10,30,70,.35); border: 2px solid rgba(20,33,61,.55); color: #fff; border-radius: 999px; padding: 2px 10px; font: 900 13px Nunito, sans-serif; white-space: nowrap; text-shadow: 0 1px 0 rgba(0,0,0,.4); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .rm-screen { flex: 1; min-height: 0; overflow: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
-.rm-s-trial { display: block; }
-.rm-s-trial > * + * { margin-top: 10px; }
 .rm-s-quick { display: block; }
 
 /* ---------- quick race: one card per rival ---------- */
@@ -24,6 +22,14 @@
 .rm-qc-chips { display: flex; gap: 5px; align-items: center; font-size: 12px; font-weight: 800; color: #4a6283; }
 .rm-qc-body .buy { margin-top: auto; width: 100%; }
 .rm-qc-body .buy small { opacity: .85; font-size: 11px; }
+/* Wider screens: a few big cards across the whole panel, not a row of small ones in the corner. */
+@media (min-width: 601px) and (min-height: 501px) {
+  .rm-q-grid { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+  .rm-qc-top { height: 140px; }
+  .rm-qc-top .thumb3d.sm { --tw: 170px; --th: 120px; }
+  .rm-qc-body { padding: 10px 12px 12px; gap: 8px; }
+  .rm-qc-body b { font-size: 19px; }
+}
 /* Live player: drag challenge and kart challenge side by side. */
 .rm-qc-pair { margin-top: auto; display: flex; gap: 6px; }
 .rm-qc-pair .buy { flex: 1; min-width: 0; }
@@ -227,7 +233,8 @@ div.rm-node { cursor: default; }
 .rm-rival .rm-ttl { flex-wrap: wrap; row-gap: 2px; }
 @media (max-width: 600px), (max-height: 500px) {
   .rm-q-grid { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 8px; }
-  .rm-qc-top { height: 58px; }
+  .rm-qc-top { height: 76px; }
+  .rm-qc-top .thumb3d.sm { --tw: 104px; --th: 72px; }
   .rm-qc-body { padding: 6px 8px 8px; gap: 4px; }
   .rm-qc-body b { font-size: 14px; }
   .rm-box .thumb3d.sm { --tw: 66px; --th: 52px; }
@@ -788,11 +795,40 @@ div.rm-node { cursor: default; }
   .fl-grid { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
 }
 
-/* Daily Run (DailyRun.tsx): the day's loaner car under the banner. */
-.daily-car { display: flex; align-items: center; gap: 10px; padding: 8px 12px; }
-.daily-car > span { display: flex; flex-direction: column; min-width: 0; }
-.daily-car b { font: 900 16px Nunito, sans-serif; }
-.daily-car small { font: 800 12px Nunito, sans-serif; color: #4a6283; }
+/* Daily Run (DailyRun.tsx): venue photo on the left; the loaner, medal times and today's best on the right. */
+.dr .rm-right { justify-content: space-between; }
+.dr-car { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 10px; background: #fff; border: 2px solid #c6d7ee; border-radius: 16px; box-shadow: 0 3px 0 #c6d7ee; text-align: center; min-height: 0; }
+.dr-car .thumb3d.lg { --tw: 240px; --th: 150px; max-width: 100%; }
+.dr-car b { font: 22px var(--display); line-height: 1.1; }
+.dr-tags { display: flex; gap: 6px; font: 900 14px Nunito, sans-serif; color: #4a6283; }
+.dr-tags > span:not(.rm-pi) { background: #eef3fa; border-radius: 999px; padding: 1px 9px; }
+.dr-medals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.dr-medals > span { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 4px; background: #fff; border: 2px solid #c6d7ee; border-radius: 14px; box-shadow: 0 3px 0 #c6d7ee; }
+.dr-medals > span.got { border-color: #2fae35; background: #eaffe4; box-shadow: 0 3px 0 #1d6b22; }
+.dr-medals i { font-style: normal; font-size: 24px; line-height: 1; }
+.dr-medals b { font: 20px var(--display); white-space: nowrap; }
+.dr-best { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #fff; border: 2px solid #c6d7ee; border-radius: 16px; box-shadow: 0 3px 0 #c6d7ee; }
+.dr-best > span { flex: 1; display: flex; flex-direction: column; line-height: 1.1; }
+.dr-best small { font: 900 13px Nunito, sans-serif; color: #4a6283; }
+.dr-best b { font: 28px var(--display); }
+@media (max-width: 600px) {
+  .dr .rm-right { flex: none; }
+  .rm-prow.dr .rm-banner { flex: 1; min-height: 150px; }
+  .dr-car { padding: 8px; }
+  .dr-car .thumb3d.lg { --th: 100px; }
+  .dr-car b { font-size: 19px; }
+  .dr-medals b { font-size: 17px; }
+}
+
+/* Time Trial (TimeTrial.tsx): the same venue photo on the left, the week's board on the right. */
+.tt.solo { grid-template-columns: 1fr; }
+.tt .dr-best .buy { white-space: nowrap; }
+.tt-board { flex: 1; min-height: 0; overflow-y: auto; margin: 0; }
+@media (max-width: 600px) {
+  .rm-prow.tt .rm-banner { flex: 1; min-height: 150px; }
+  .tt .rm-right { flex: none; }
+  .tt-board { overflow: visible; }
+}
 
 /* Reputation title in the Race menu header (Reputation.tsx). */
 .rep-chip { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
