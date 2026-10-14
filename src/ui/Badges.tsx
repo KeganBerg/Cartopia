@@ -1,7 +1,7 @@
 import { Vector3 } from 'three'
 import { memo, useMemo, useState, type CSSProperties } from 'react'
 import { useGame, buyablePlots, today, type PlacedBuilding } from '../game/store'
-import { buildingDef, buildingLevel, jobLevel, carDef, loves, levelLift, plotPrice, START_LAND, jobSeconds, isOpen } from '../game/data'
+import { buildingDef, buildingLevel, jobLevel, carDef, loves, levelLift, plotPrice, START_LAND, jobSeconds, isOpen, mergeBonus, mergeGain } from '../game/data'
 import { msUntilNight } from '../game/clock'
 import { anchors, anchorRef } from '../scene/anchors'
 import { centerOf, groupCenter, plotCenter } from '../scene/World'
@@ -17,6 +17,14 @@ function fmt(sec: number) {
 }
 // Phones show only the biggest unit, next to a progress ring.
 const short = (sec: number) => (sec >= 3600 ? `${Math.floor(sec / 3600)}h` : sec >= 60 ? `${Math.ceil(sec / 60)}m` : `${sec}s`)
+
+const percent = (x: number) => Math.round(x * 100)
+// The merge bonus as a chip: 💰+25% for a business, ⛽+25% for houses and gas stations, none for decor.
+function Gain({ def, n, on }: { def: string; n: number; on?: boolean }) {
+  const icon = mergeGain(buildingDef(def))
+  if (!icon) return null
+  return <span className={`merge-gain${on ? ' on badge' : ''}`} title="Merge bonus">{icon}+{percent(mergeBonus(n))}%</span>
+}
 
 // Badge height over a merged block: as tall as its model grows (see groupScale).
 const lift = (g: MergeGroup) => (g.cols === g.rows ? g.cols : 1)
@@ -72,7 +80,7 @@ const JobBadge = memo(function JobBadge({ b, now, g, members = [b] }: JobProps) 
         ) : (
           <span className="start">⛽ {(d.fuelCost ?? 0) * idle}</span>
         )}
-        {n > 1 && <span className="badge-merge">×{n}</span>}
+        {n > 1 && <span className="badge-merge" title={`${n} merged`}>+{percent(mergeBonus(n))}%</span>}
         {lvl > 1 && <span className="badge-lvl">{lvl}</span>}
         {driver && <span className={`badge-driver${driver.flat || driver.lowFuel ? ' off' : ''}`}>{driver.flat || driver.lowFuel ? '🔧' : loves(carDef(driver.model), d.id) ? '❤️' : '🚗'}</span>}
       </button>
@@ -101,7 +109,7 @@ function MergeBadges() {
       {candidates.map((c) => (
         <div key={`m:${c.anchor.uid}:${c.code}`} className="anchor" ref={pin(`m:${c.anchor.uid}:${c.code}`, c, 1.2 * lift(c))}>
           <button className={`badge badge-merge-go${c.members.length === 2 ? ' pair' : ''}`} onClick={() => merge(c.anchor.uid, c.code)} title={`Merge ${c.members.length} ${buildingDef(c.anchor.def).name}`}>
-            🧩 Merge ×{c.members.length}
+            🧩 Merge ×{c.members.length} <Gain def={c.anchor.def} n={c.members.length} />
           </button>
         </div>
       ))}
@@ -109,6 +117,7 @@ function MergeBadges() {
         <div key={`s:${g.anchor.uid}`} className="anchor" ref={pin(`s:${g.anchor.uid}`, g, 0.6 * lift(g))}>
           <span className="merge-tools">
             <button className="badge badge-split" onClick={() => rotate(g.anchor.uid)} title="Turn it">🔄</button>
+            <Gain def={g.anchor.def} n={g.members.length} on />
             <button className="badge badge-split" onClick={() => split(g.anchor.uid)} title="Split it back up">✂️ Split</button>
           </span>
         </div>
