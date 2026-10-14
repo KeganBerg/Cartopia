@@ -224,6 +224,7 @@ export function DeliveryScene({ me, input, running, onHud, onEnd }: {
   const ring = useRef<MeshBasicMaterial>(null)
   const arrow = useRef<Group>(null)
   const traffic = useRef<(Group | null)[]>([])
+  useEffect(() => { if (import.meta.env.DEV) Object.assign(window, { __dash: st.current }) }, [])
   const look = useMemo(() => new Vector3(), [])
   const eye = useMemo(() => new Vector3(), [])
 
