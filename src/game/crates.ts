@@ -286,6 +286,16 @@ export function dropTier(d: CrateDrop): 0 | 1 | 2 | 3 {
   return 0
 }
 
+// The order a ×10 open shows its prizes in: plain coins first, the rarest last (by dropTier, then
+// cars over paints over hats over pieces over parts over jackpots over coins back for something
+// already yours, then the bigger coin win). Ties keep the order they were opened in.
+const KIND_RANK: Record<CrateDrop['kind'], number> = { coins: 0, dupe: 1, skindupe: 1, piecedupe: 1, mod: 3, piece: 4, hat: 5, skin: 6, car: 7 }
+export function revealOrder<T extends { drop: CrateDrop }>(opens: T[]): T[] {
+  const rank = (d: CrateDrop) => dropTier(d) * 100 + KIND_RANK[d.kind] * 10 + (d.kind === 'coins' && d.jackpot ? 5 : 0)
+  const won = (d: CrateDrop) => ('coins' in d ? d.coins : 0)
+  return opens.map((o, i) => ({ o, i })).sort((a, b) => rank(a.o.drop) - rank(b.o.drop) || won(a.o.drop) - won(b.o.drop) || a.i - b.i).map((x) => x.o)
+}
+
 // The odds a crate rolls from at this level. Cars are worth more than the crate, so the car slice
 // shrinks until it's worth no more than carShare of the crate (cars dear next to the crate are
 // rarer), and what it loses goes to coins. Each car's value is weighed at 1 / value (carOdds), so
