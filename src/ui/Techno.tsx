@@ -1,5 +1,8 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { onTechnoChange, technoBeat, technoLeft, technoOn, technoToDrop, throwRave } from '../game/techno'
+import { onTechnoChange, technoBeat, technoLeft, technoOn, technoToDrop } from '../game/techno'
+import { prefetchTechno } from '../lib/technoMusic'
+import { supabase } from '../lib/supabase'
+import { useGame } from '../game/store'
 import { reducedMotion } from '../game/fx'
 import { useCalmFlashing } from '../game/flashing'
 
@@ -84,7 +87,7 @@ export function TechnoLayer() {
       {dropped && (
         <div className="tk-title">
           <b>RAVE MODE</b>
-          <span>150 BPM · EVERY TOWN</span>
+          <span>onte · halcyon · NCS</span>
         </div>
       )}
     </div>
@@ -115,12 +118,42 @@ export function TechnoTag({ short }: { short?: boolean }) {
   )
 }
 
-// The Neon Owl's button: throws a Rave Mode party on this player's screen.
+// Only this account gets the Rave button (the server's rave_start() checks
+// it too, so hiding the button isn't what keeps everyone else out).
+const RAVE_DJ = 'keganbergeron@gmail.com'
+
+function useIsDj() {
+  const [dj, setDj] = useState(false)
+  useEffect(() => {
+    if (!supabase) return
+    const is = (email?: string | null) => setDj((email ?? '').toLowerCase() === RAVE_DJ)
+    supabase.auth.getUser().then(({ data }) => is(data.user?.email))
+    const sub = supabase.auth.onAuthStateChange((_e, session) => is(session?.user.email))
+    return () => sub.data.subscription.unsubscribe()
+  }, [])
+  return dj
+}
+
+// The Neon Owl's button, for Kegan only: starts Rave Mode in every town. Ten
+// seconds of warning while the build-up fades in, then the drop.
 export function RaveButton({ onStart }: { onStart: () => void }) {
   const on = useTechno()
+  const dj = useIsDj()
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    if (dj) prefetchTechno()
+  }, [dj])
+  if (!dj) return null
+  const go = async () => {
+    setBusy(true)
+    const { error } = await supabase!.rpc('rave_start')
+    setBusy(false)
+    if (error) return useGame.getState().toast('Rave Mode could not start')
+    onStart()
+  }
   return (
-    <button className="buy rave-btn" disabled={on} onClick={() => { throwRave(); onStart() }}>
-      {on ? '🎧 Rave on!' : '🎧 Throw a rave'}
+    <button className="buy rave-btn" disabled={on || busy} onClick={() => void go()}>
+      {on ? '🎧 Rave on!' : '🎧 Rave Mode for everyone'}
     </button>
   )
 }
