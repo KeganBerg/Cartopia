@@ -8,7 +8,7 @@
 --   * crate_json, crate_pay, the guard, the catalog and the daily wheel (Garage tiers, no
 --     legendary) are unchanged. Paint colours were never checked by the guard.
 -- ORDER RULE: it writes a new id into saves, so run it only AFTER the client with Custom Colour
--- ships (an older client would show the prize as a blank paint). Run after 0074-0079.
+-- ships (an older client would show the prize as a blank paint). Run after 0074-0080.
 
 create or replace function public.crate_open(p_crate text, p_free text default null) returns jsonb
 language plpgsql security definer set search_path = '' as $$
