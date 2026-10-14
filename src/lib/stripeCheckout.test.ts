@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createHmac } from 'node:crypto'
 import { BUCKS_PACKS } from '../game/bucksPacks'
-import { cents, packById, paidSession, sessionForm, validSignature } from './stripeCheckout'
+import { cents, packById, paidSession, reversedPayment, sessionForm, validSignature } from './stripeCheckout'
 import { useGame } from '../game/store'
 
 const sign = (body: string, secret: string, t: number) => `t=${t},v1=${createHmac('sha256', secret).update(`${t}.${body}`).digest('hex')}`
@@ -40,6 +40,15 @@ describe('stripe checkout', () => {
     expect(paidSession(ev({ amount_total: 199 }))).toBeNull()
     expect(paidSession(ev({ metadata: { user: 'u1', pack: 'nope' } }))).toBeNull()
     expect(paidSession({ ...ev({}), type: 'charge.refunded' })).toBeNull()
+  })
+
+  it('takes a pack back on a refund or an opened chargeback only', () => {
+    const ev = (type: string, o: Record<string, unknown> = { payment_intent: 'pi_1' }) => ({ type, data: { object: o } })
+    expect(reversedPayment(ev('charge.refunded'))).toEqual({ reason: 'refund', paymentIntent: 'pi_1' })
+    expect(reversedPayment(ev('charge.dispute.created'))).toEqual({ reason: 'dispute', paymentIntent: 'pi_1' })
+    expect(reversedPayment(ev('charge.dispute.closed'))).toBeNull()
+    expect(reversedPayment(ev('checkout.session.completed'))).toBeNull()
+    expect(reversedPayment(ev('charge.refunded', { payment_intent: null }))).toBeNull()
   })
 
   it('adds each purchase row to the save once', () => {

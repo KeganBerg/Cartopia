@@ -33,7 +33,9 @@ const legal = (): Plugin => ({
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), siteUrl(), version(), legal()],
-  define: { __BUILD_ID__: JSON.stringify(BUILD_ID) },
+  // Rave Mode plays onte's "halcyon" (NCS) only once its in-game licence lands:
+  // flip this to true. While false the song isn't built into the game (src/game/raveSong.ts).
+  define: { __BUILD_ID__: JSON.stringify(BUILD_ID), __RAVE_HALCYON__: 'false' },
   build: {
     rolldownOptions: {
       output: {

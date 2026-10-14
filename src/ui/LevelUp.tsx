@@ -3,9 +3,6 @@ import { useGame, hasRusty } from '../game/store'
 import { BUILDINGS, CARS, RESCUE_SPOTS, GP_SERIES, baseFuelCap } from '../game/data'
 import { BuildingThumb, CarThumb } from '../scene/BuildingPreview'
 import { sfx } from '../lib/sound'
-import { levelDrop } from '../lib/technoMusic'
-import { reducedMotion } from '../game/fx'
-import { calmFlashing } from '../game/flashing'
 
 type Unlock = {
   key: string
@@ -86,19 +83,10 @@ function Splash({ from, to, coins, bucks }: { from: number; to: number; coins: n
     return at ? { at, items: unlocksBetween(at - 1, at, rusty, focus) } : null
   })
   const fuel = baseFuelCap(to) - baseFuelCap(from)
-  // A beat drop: a snare roll, then the Rave Mode drop, and the badge thumps
-  // on the kick for two bars. Reduced motion or Reduce flashing keeps the sound and drops the thump.
-  const [drop, setDrop] = useState(false)
+  // A short fanfare as the badge rolls over to the new level.
   useEffect(() => {
-    const timers: ReturnType<typeof setTimeout>[] = []
-    timers.push(setTimeout(() => {
-      const ms = levelDrop()
-      if (ms === null) return sfx.levelUp()
-      if (reducedMotion() || calmFlashing()) return
-      timers.push(setTimeout(() => setDrop(true), ms))
-      timers.push(setTimeout(() => setDrop(false), ms + 3200))
-    }, 250))
-    return () => timers.forEach(clearTimeout)
+    const timer = setTimeout(sfx.levelUp, 250)
+    return () => clearTimeout(timer)
   }, [])
 
   useEffect(() => {
@@ -108,7 +96,7 @@ function Splash({ from, to, coins, bucks }: { from: number; to: number; coins: n
   }, [close])
 
   return (
-    <div className={`overlay lvl-overlay${drop ? ' lvl-drop' : ''}`} onClick={close}>
+    <div className="overlay lvl-overlay" onClick={close}>
       <div className="lvl-rays" aria-hidden />
       <div className="lvl" role="dialog" aria-label={`Level ${to}`} onClick={(e) => e.stopPropagation()}>
         <div className="lvl-badge" aria-hidden>

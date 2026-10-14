@@ -25,15 +25,18 @@
 
 .crate-odds { background: rgba(24,18,38,.82); border: 2px solid rgba(255,255,255,.25); border-radius: 14px; padding: 5px; }
 .crate-odds-row { display: flex; gap: 4px; }
-.crate-pity { margin-top: 4px; font-size: 12px; opacity: 0.85; display: flex; gap: 4px; align-items: center; justify-content: center; }
+.crate-pity { margin-top: 4px; font: 13px var(--display); color: #fff; opacity: 0.9; display: flex; gap: 4px; align-items: center; justify-content: center; }
 .crate-odds .odd { min-width: 0; display: flex; align-items: center; justify-content: center; gap: 3px; padding: 3px 4px; border-radius: 9px; font: 13px var(--display); color: #fff; border: none; white-space: nowrap; }
 .crate-odds .odd b { font-weight: normal; font-size: 13px; }
 .crate-odds .odd small { font-size: 10px; opacity: .8; }
 .odd.coins { background: linear-gradient(#f9a825, #c17900); }
 .odd.mod { background: linear-gradient(#9575cd, #5e35b1); cursor: pointer; }
-.crate-odds button.odd { min-width: max-content; }
+.crate-odds button.odd, .crate-odds .odd.coins { min-width: max-content; }
 .odd.skin { background: linear-gradient(#ec407a, #ad1457); cursor: pointer; }
 .odd.car { background: linear-gradient(#ff9800, #e65100); cursor: pointer; }
+.odd.hat { background: linear-gradient(#c9a98f, #8d6e63); cursor: pointer; }
+.crate-car.hat i { font-style: normal; font-size: 26px; line-height: 34px; width: 40px; text-align: center; }
+.crate-car.hat.owned::after { content: none; }
 .crate-cars { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin-top: 5px; max-height: 128px; overflow-y: auto; }
 .crate-car { display: flex; flex-direction: column; align-items: center; background: rgba(255,255,255,.08); border-radius: 8px; padding: 2px 3px 1px; }
 .crate-skin { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 3px; border-radius: 8px; background: rgba(255,255,255,.08); }
@@ -63,17 +66,61 @@
 .crate-prize.tier3 .cp-text b { background: linear-gradient(90deg, #fff, #ffe082, #fff); -webkit-background-clip: text; background-clip: text; color: transparent; }
 @keyframes prize-in { from { transform: translate(-50%, 30px) scale(.9); opacity: 0; } }
 
+/* Open and ×10 side by side: ×10 is the smaller button, with the full price of all ten. */
+.crate-buttons { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
+.crate-open.ten { font-size: 17px; padding: 9px 12px; gap: 4px; background: linear-gradient(#ab47bc, #6a1b9a); }
+.crate-open.ten.gem { background: linear-gradient(#7e57c2, #311b92); }
+.crate-open .ct-x { font-size: 22px; margin-right: 2px; }
+
+/* A ×10 run: a slot per crate along the top, lit with each prize's icon once it's out. */
+.crate-ten-strip { position: absolute; left: 50%; top: calc(54px + var(--sat)); transform: translateX(-50%); display: flex; gap: 5px; padding: 5px 8px; background: rgba(18,12,28,.78); border: 2px solid rgba(255,255,255,.2); border-radius: 22px; pointer-events: none; }
+.crate-ten-strip i { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-style: normal; font-size: 14px; background: rgba(18,12,28,.7); border: 2px solid rgba(255,255,255,.25); }
+.crate-ten-strip i.now { border-color: #fff; animation: crate-pulse 0.8s ease-in-out infinite; }
+.crate-ten-strip i.got { border-color: var(--glow); box-shadow: 0 0 8px var(--glow); animation: strip-in .3s cubic-bezier(.2,1.6,.4,1) both; }
+@keyframes strip-in { from { transform: scale(1.8); opacity: 0; } }
+.crate-ten-flash { position: absolute; left: 50%; bottom: calc(26px + var(--sab)); transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 6px 16px 6px 8px; max-width: calc(100vw - 96px); background: rgba(20,14,32,.9); border: 3px solid var(--glow); border-radius: 30px; box-shadow: 0 0 18px var(--glow); pointer-events: none; animation: prize-in .3s cubic-bezier(.2,1.4,.4,1) both; }
+.crate-ten-flash .cp-icon { font-size: 24px; }
+.crate-ten-flash .cp-swatch { width: 26px; height: 26px; font-size: 11px; }
+.crate-ten-flash .cp-icon .build-art .thumb3d { --tw: 44px; --th: 34px; }
+.crate-ten-flash b { font: 19px var(--display); font-weight: normal; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.crate-ten-skip { position: absolute; right: calc(14px + var(--sar)); bottom: calc(22px + var(--sab)); width: 48px; height: 48px; border-radius: 50%; border: 3px solid #fff; background: rgba(20,14,32,.85); color: #fff; font-size: 22px; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 0 rgba(0,0,0,.4); }
+
+/* The ×10 summary: all ten prizes as tiles, the one on the lift picked out. */
+.crate-sum { position: absolute; left: 50%; bottom: calc(10px + var(--sab)); transform: translateX(-50%); width: min(520px, calc(100vw - 16px - var(--sal) - var(--sar))); display: flex; flex-direction: column; gap: 8px; padding: 8px; background: rgba(20,14,32,.9); border: 2px solid rgba(255,255,255,.3); border-radius: 18px; box-shadow: 0 4px 0 rgba(0,0,0,.4); animation: prize-in .4s cubic-bezier(.2,1.3,.4,1) both; }
+.crate-sum-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+.crate-sum-tile { position: relative; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 2px 4px; border-radius: 12px; background: rgba(255,255,255,.07); border: 2px solid color-mix(in srgb, var(--glow) 55%, transparent); cursor: pointer; animation: tile-in .35s cubic-bezier(.2,1.5,.4,1) both; }
+.crate-sum-tile:nth-child(2) { animation-delay: .03s; } .crate-sum-tile:nth-child(3) { animation-delay: .06s; } .crate-sum-tile:nth-child(4) { animation-delay: .09s; } .crate-sum-tile:nth-child(5) { animation-delay: .12s; }
+.crate-sum-tile:nth-child(6) { animation-delay: .15s; } .crate-sum-tile:nth-child(7) { animation-delay: .18s; } .crate-sum-tile:nth-child(8) { animation-delay: .21s; } .crate-sum-tile:nth-child(9) { animation-delay: .24s; } .crate-sum-tile:nth-child(10) { animation-delay: .27s; }
+@keyframes tile-in { from { transform: scale(.6); opacity: 0; } }
+.crate-sum-tile.tier2, .crate-sum-tile.tier3 { box-shadow: 0 0 10px color-mix(in srgb, var(--glow) 60%, transparent); }
+.crate-sum-tile.sel { background: color-mix(in srgb, var(--glow) 28%, rgba(20,14,32,.9)); border-color: #fff; }
+.crate-sum-tile .cs-art { position: relative; width: 100%; height: 48px; display: flex; align-items: center; justify-content: center; }
+.crate-sum-tile .thumb3d { --tw: 100%; --th: 48px; width: 100%; height: 48px; background: none; }
+.crate-sum-tile .build-art .thumb3d { --tw: 60px; --th: 46px; width: 60px; }
+.crate-sum-tile .cs-coin { filter: drop-shadow(0 0 6px rgba(255,213,79,.6)); }
+.crate-sum-tile .cs-coin.jackpot { filter: drop-shadow(0 0 10px #ffd54f); transform: scale(1.2); }
+.crate-sum-tile .cs-badge { position: absolute; right: 0; bottom: -2px; font-size: 13px; font-style: normal; line-height: 1; }
+.crate-sum-tile .cs-badge.left { right: auto; left: 0; }
+.crate-sum-tile small { display: flex; align-items: center; justify-content: center; gap: 2px; max-width: 100%; height: 2.3em; font: 11px/1.15 var(--display); color: #fff; text-align: center; overflow: hidden; overflow-wrap: break-word; }
+.crate-sum-tile .cs-act:empty { display: none; }
+.crate-sum-tile .cs-act .buy { font-size: 11px; padding: 2px 6px; border-radius: 9px; border-width: 1.5px; box-shadow: 0 2px 0 rgba(0,0,0,.3); white-space: nowrap; }
+.crate-sum > .cp-actions { display: flex; gap: 6px; justify-content: flex-end; }
+
 /* Wide screens: the picker stands on the right and the crate on the left. */
 @media (min-width: 900px) and (min-aspect-ratio: 5/4) {
-  .crate-dock { left: auto; right: calc(16px + var(--sar)); bottom: 50%; transform: translateY(50%); width: 340px; }
+  .crate-dock { left: auto; right: calc(16px + var(--sar)); bottom: 50%; transform: translateY(50%); width: 384px; }
   .crate-pick { grid-template-columns: repeat(2, 1fr); }
   .crate-tab { padding: 8px 4px 7px; font-size: 15px; }
   .crate-prize { left: auto; right: calc(16px + var(--sar)); bottom: 50%; transform: translateY(50%); width: 360px; animation-name: prize-in-side; }
+  .crate-sum { left: auto; right: calc(16px + var(--sar)); bottom: 50%; transform: translateY(50%); width: 440px; animation-name: prize-in-side; }
+  .crate-sum-tile .cs-art, .crate-sum-tile .thumb3d { height: 56px; --th: 56px; }
+  .crate-ten-strip { left: 37%; }
+  .crate-ten-flash { left: 37%; }
   @keyframes prize-in-side { from { transform: translate(30px, 50%) scale(.92); opacity: 0; } }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .crate-tab.sel .crate-ico, .crate-skip, .crate-prize { animation: none; }
+  .crate-tab.sel .crate-ico, .crate-skip, .crate-prize, .crate-ten-strip i, .crate-ten-flash, .crate-sum, .crate-sum-tile { animation: none; }
 }
 /* Already yours: it pays coins instead. */
 .crate-car.owned, .crate-skin.owned { position: relative; }

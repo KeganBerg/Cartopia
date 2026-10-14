@@ -2,7 +2,7 @@
 // Everything audible shares one AudioContext and goes through one master
 // output, so the Sound toggle silences it all. Other audio (the town ambience,
 // race engines) gets both from audioContext() and audioOut().
-import { choir, glock, hz, marimba, pluck, shaker, softKick, vibes, woodblock } from './instruments'
+import { choir, epiano, glock, hz, marimba, pluck, shaker, softBass, softKick, vibes, woodblock } from './instruments'
 import type { Body } from '../game/data'
 
 let ctx: AudioContext | null = null
@@ -69,6 +69,9 @@ function audio() {
       effects = ctx.createGain()
       effects.gain.value = effectsVolume
       effects.connect(master)
+      const rate = ctx.sampleRate
+      if (typeof requestIdleCallback === 'function') requestIdleCallback(() => bakeFanfare(rate), { timeout: 5000 })
+      else setTimeout(() => bakeFanfare(rate), 3000)
     } catch {
       return null
     }
@@ -238,6 +241,46 @@ function coinChime(d: { ctx: BaseAudioContext; out: AudioNode }, t: number, v: n
   glock(d, t + 0.07, hz('E7'), 0.012 * v, 0.4)
 }
 
+// The biggest everyday moment, the level-up: a short, warm fanfare. A
+// "ta-da-da-DAA" pickup into a held chord, an answering phrase up to a bell,
+// a soft choir under it.
+export function levelFanfare(dest: { ctx: BaseAudioContext; out: AudioNode }, t: number) {
+  const out = dest.ctx.createGain()
+  out.gain.value = 1.4
+  out.connect(dest.out)
+  const d = { ctx: dest.ctx, out }
+  const lift = [['G4', 0], ['A4', 0.1], ['B4', 0.2]] as const
+  for (const [n, at] of lift) {
+    marimba(d, t + at, hz(n), 0.1, 0.35)
+    glock(d, t + at, hz(n) * 2, 0.025, 0.3)
+  }
+  const hit = t + 0.32
+  for (const n of ['C4', 'E4', 'G4', 'C5']) epiano(d, hit, hz(n), 0.045, 1.8)
+  vibes(d, hit, hz('C5'), 0.07, 1.4)
+  softBass(d, hit, hz('C3'), 0.14, 0.9)
+  softKick(d, hit, 0.08)
+  // The answer: up to the high C, where it rings out.
+  marimba(d, hit + 0.36, hz('E5'), 0.09, 0.4)
+  marimba(d, hit + 0.5, hz('G5'), 0.09, 0.4)
+  glock(d, hit + 0.64, hz('C6'), 0.08, 1.8)
+  vibes(d, hit + 0.64, hz('G5'), 0.045, 1.8)
+  choir(d, hit + 0.1, [hz('C4'), hz('G4'), hz('E5')], 0.018, 1.6)
+  shaker(d, hit + 0.64, 0.015, 0.4, 8000)
+}
+
+// The fanfare rendered once ahead of time (when the sound starts up, while the
+// game is idle), so a level-up only starts a buffer: building it live is a
+// burst of main-thread work right as the splash opens.
+let fanfare: AudioBuffer | null = null
+let baking = false
+function bakeFanfare(rate: number) {
+  if (fanfare || baking || typeof OfflineAudioContext === 'undefined') return
+  baking = true
+  const off = new OfflineAudioContext(2, Math.ceil(rate * 3.6), rate)
+  levelFanfare({ ctx: off, out: off.destination }, 0)
+  off.startRendering().then((b) => (fanfare = b), () => (baking = false))
+}
+
 const arp = (notes: string[], gap: number, inst: typeof marimba, vol: number) => (d: { ctx: BaseAudioContext; out: AudioNode }, t: number) =>
   notes.forEach((n, i) => inst(d, t + i * gap, hz(n), vol))
 
@@ -260,13 +303,12 @@ export const sfx = {
     marimba(d, t + 0.12, hz('C4'), 0.1, 0.4)
     marimba(d, t + 0.12, hz('C3'), 0.07, 0.4)
   }),
-  // The biggest everyday moment: a harp run up to a bell, with a soft choir under it.
   levelUp: () => play((d, t) => {
-    arp(['C4', 'E4', 'G4', 'C5', 'E5', 'G5'], 0.07, pluck, 0.17)(d, t)
-    glock(d, t + 0.42, hz('C6'), 0.09, 1.6)
-    vibes(d, t + 0.42, hz('G5'), 0.05, 2)
-    choir(d, t + 0.1, [hz('C4'), hz('G4'), hz('E5')], 0.022, 1.1)
-    softKick(d, t + 0.42, 0.1)
+    if (!fanfare) return levelFanfare(d, t)
+    const src = d.ctx.createBufferSource()
+    src.buffer = fanfare
+    src.connect(d.out)
+    src.start(t)
   }),
   buy: () => play((d, t) => {
     arp(['G4', 'B4', 'D5'], 0.06, marimba, 0.11)(d, t)
