@@ -344,6 +344,11 @@ export const glowTex = () =>
     g.fillRect(0, 0, s, s)
   })
 
+const smooth = (k: number) => {
+  const c = Math.min(1, Math.max(0, k))
+  return c * c * (3 - 2 * c)
+}
+
 // Light from a lit wall (a window, a neon tube, a sconce) falling on the
 // pavement in front of it: brightest along the wall (the top edge), fading out
 // with distance and widening as it goes. No hot spot in the middle, so it reads
@@ -386,10 +391,6 @@ export const spillTex = () => {
   })
   t.wrapS = t.wrapT = ClampToEdgeWrapping
   return t
-}
-const smooth = (k: number) => {
-  const c = Math.min(1, Math.max(0, k))
-  return c * c * (3 - 2 * c)
 }
 
 // Office tower facade: a grid of windows on a pale wall, tinted per building.
