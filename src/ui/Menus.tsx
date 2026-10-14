@@ -183,7 +183,8 @@ export function Panel({ title, children, wide, onClose, onBack, head, className 
       <div className={`${wide ? 'panel wide' : 'panel'}${className ? ` ${className}` : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="panel-head">
           {onBack && <button className="panel-back" aria-label="Back" onClick={onBack}><Icon name="back" size={18} /></button>}
-          <h2>{title}</h2>
+          {/* long titles (a garage with its stats) step down a size so they don't cut off */}
+          <h2 className={title.length > 14 ? 'long' : undefined} title={title}>{title}</h2>
           {head}
           <button className="close" aria-label="Close" onClick={() => close(null)}><Icon name="close" size={16} /></button>
         </div>

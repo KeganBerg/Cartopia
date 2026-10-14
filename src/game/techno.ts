@@ -1,48 +1,44 @@
-// Rave Mode (the techno live event): the whole town drops into the night, a
-// 150 bpm techno track builds up for about a minute and then drops, and the
-// HUD, the club, the Vanguard Tower and the street lamps all go off on the kick.
+// Rave Mode (the techno live event): the whole town drops into the night and
+// plays onte's "halcyon" (NCS): a ten-second warning while its build-up fades
+// in, then its big drop, and the HUD, the club, the Vanguard Tower and the
+// street lamps all go off on the kick.
 //
-// It comes on by itself every Friday from 10:00 to 10:01 pm on each player's
-// own clock, with the build-up running for the minute before. A live event row
-// of kind 'rave' (or 'techno') starts it too: `select public.live_event_start('rave', 15);`
-// builds up from the row's start and drops a minute later. ?event=rave pins it
-// on for testing. In code: startEvent('techno', { until }) / stopEvent('techno').
+// Kegan starts it from the Neon Owl's Rave button (only his account can: the
+// server's rave_start() checks it), and the drop lands exactly ten seconds
+// after the press for everyone. It also comes on by itself every Friday at
+// 10:00 pm on each player's own clock, with the warning in the ten seconds
+// before. A live event row of kind 'rave' (or 'techno') starts it too:
+// `select public.live_event_start('rave', 15);` drops ten seconds after the
+// row's start. ?event=rave pins it on for testing. In code:
+// startEvent('techno', { until }) / stopEvent('techno').
 //
 // The music runs on the wall clock from the drop: sixteenth n plays at
-// drop + n * 100 ms (negative through the build-up), so everyone in the same
-// event hears the same bar, and the lights keep time while the sound is muted.
+// drop + n * SIXTEENTH_MS (negative through the warning), so everyone in the
+// same event hears the same bar, and the lights keep time while the sound is muted.
 import { forceNight } from './clock'
 import { registerLiveKind } from './liveEvents'
 
 export type LiveEventKind = 'techno'
 
-export const TECHNO_BPM = 150
-export const SIXTEENTH_MS = 60000 / TECHNO_BPM / 4 // 100 ms
-export const BAR_MS = SIXTEENTH_MS * 16 // 1.6 s
-// The build-up before the drop: 28 bars of filtered groove opening up, then an
-// 8-bar breakdown with a riser and a clap roll (57.6 s).
-export const BUILD_BARS = 36
-export const BREAK_BARS = 8
-export const BUILD_MS = BUILD_BARS * BAR_MS
-// After the drop the arrangement repeats every 24 bars (38.4 s): the drop,
-// eight bars of groove, four with stabs and ride, four stripped back, then a
-// four-bar breakdown and riser into the next drop.
-export const CYCLE_BARS = 24
-export type Section = 'intro' | 'drop' | 'groove' | 'peak' | 'tension' | 'break'
-// The section of a bar, counted from the drop (negative = the build-up).
+// halcyon's tempo.
+export const TECHNO_BPM = 132
+export const SIXTEENTH_MS = 60000 / TECHNO_BPM / 4 // about 114 ms
+export const BAR_MS = SIXTEENTH_MS * 16 // about 1.82 s
+// The warning before the drop: the song's build-up, fading in.
+export const BUILD_MS = 10_000
+// After the drop its sixteen bars (about 29 s) loop: four bars of drop, eight
+// of groove, four at the peak, then it drops again.
+export const CYCLE_BARS = 16
+export type Section = 'drop' | 'groove' | 'peak' | 'break'
+// The section of a bar, counted from the drop (negative = the warning's build-up).
 export function sectionOf(bar: number): Section {
-  if (bar < 0) return bar < -BREAK_BARS ? 'intro' : 'break'
+  if (bar < 0) return 'break'
   const p = bar % CYCLE_BARS
-  return p < 4 ? 'drop' : p < 12 ? 'groove' : p < 16 ? 'peak' : p < 20 ? 'tension' : 'break'
+  return p < 4 ? 'drop' : p < 12 ? 'groove' : 'peak'
 }
 const mod = (a: number, b: number) => ((a % b) + b) % b
-// Whether the kick plays on sixteenth n (breakdowns drop it).
+// Whether the kick plays on sixteenth n (not through the build-up).
 export const kickOn = (n: number) => mod(n, 4) === 0 && sectionOf(Math.floor(n / 16)) !== 'break'
-// 0..1 through a breakdown (the build-up's, or a cycle's), at bar `bar` plus `frac` of it.
-export function breakBuild(bar: number, frac: number) {
-  if (bar < 0) return Math.max(0, (bar + BREAK_BARS + frac) / BREAK_BARS)
-  return sectionOf(bar) === 'break' ? (mod(bar, CYCLE_BARS) - 20 + frac) / 4 : 0
-}
 
 // How long the town takes to slide into the night and back out of it.
 const EASE_MS = 6000
@@ -118,9 +114,9 @@ export type TechnoBeat = {
   beat: number // quarter-note number
   bar: number
   section: Section
-  kick: number // 0..1, peaks on each kick and dies away (softer early in the build-up)
+  kick: number // 0..1, peaks on each kick and dies away
   side: 1 | -1 // flips every beat, for things that rock left and right
-  build: number // 0..1 through a breakdown, rising into the drop
+  build: number // 0..1 through the build-up, rising into the drop
   drop: number // 0..1, a big flash on the drop that fades over two bars
 }
 export function technoBeat(now = Date.now(), at = dropAt): TechnoBeat {
@@ -130,10 +126,8 @@ export function technoBeat(now = Date.now(), at = dropAt): TechnoBeat {
   const bar = Math.floor(n / 16)
   const section = sectionOf(bar)
   const since = rel - beat * 4 * SIXTEENTH_MS
-  // The build-up's kick starts soft and grows as the filter opens.
-  const energy = section === 'intro' ? 0.25 + 0.6 * ((bar + BUILD_BARS) / (BUILD_BARS - BREAK_BARS)) : 1
-  const kick = kickOn(beat * 4) ? energy * Math.exp(-since / 130) : 0
-  const build = breakBuild(bar, (rel - bar * BAR_MS) / BAR_MS)
+  const kick = kickOn(beat * 4) ? Math.exp(-since / 130) : 0
+  const build = rel < 0 ? Math.max(0, 1 + rel / BUILD_MS) : 0
   const p = mod(bar, CYCLE_BARS)
   const drop = bar >= 0 && p < 2 ? Math.exp(-(rel - (bar - p) * BAR_MS) / 900) : 0
   return { n, beat, bar, section, kick, side: mod(beat, 2) ? -1 : 1, build, drop }
@@ -166,13 +160,6 @@ function checkWeekly() {
 if (typeof window !== 'undefined') {
   checkWeekly()
   setInterval(checkWeekly, 1000)
-}
-
-// The Neon Owl can throw one any time: the same build-up, drop and minute as
-// the weekly one, on this player's screen only.
-export function throwRave(now = Date.now()) {
-  if (technoOn(now)) return
-  startEvent('techno', { until: now + BUILD_MS + WEEKLY.minutes * 60000 })
 }
 
 // ?event=rave (or techno) turns it on for testing, with no end.

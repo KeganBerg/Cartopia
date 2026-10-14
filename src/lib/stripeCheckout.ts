@@ -43,6 +43,16 @@ export function paidSession(event: unknown): Paid | null {
   return { session: o.id, user, pack, amount: o.amount_total as number }
 }
 
+// A refund or chargeback on a payment: what it was and the payment intent it was on, or null for any
+// other event. Any refund (full or partial) and any opened dispute takes the whole pack back.
+export type Reversal = { reason: 'refund' | 'dispute'; paymentIntent: string }
+export function reversedPayment(event: unknown): Reversal | null {
+  const e = event as { type?: string; data?: { object?: Record<string, unknown> } }
+  const reason = e?.type === 'charge.refunded' ? 'refund' : e?.type === 'charge.dispute.created' ? 'dispute' : null
+  const pi = e?.data?.object?.payment_intent
+  return reason && typeof pi === 'string' && pi ? { reason, paymentIntent: pi } : null
+}
+
 const hex = (b: ArrayBuffer) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join('')
 
 // Checks a Stripe-Signature header ("t=...,v1=...") against the raw body.

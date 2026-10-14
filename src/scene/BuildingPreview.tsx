@@ -10,14 +10,20 @@ import { hatPaint, type HatFit } from '../game/hats'
 import { SEASON } from './season'
 import { frame, seat, type Bounds } from './fit'
 import { reduceMotionOn } from '../lib/prefs'
+import { quietShaders } from './warm'
 import type { Trim } from '../game/trim'
 
-// Shop, showroom and garage thumbnails are live 3D renders, drawn every display
-// frame. One hidden WebGL canvas renders every on-screen model into a shared
-// atlas, then copies each one onto that thumbnail's own small 2D canvas. The 2D
-// canvases sit in the page like pictures, so they scroll without lag, and the
-// spin is a real rotation at the screen's refresh rate rather than baked frames.
+// Shop, showroom and garage thumbnails are live 3D renders. One hidden WebGL
+// canvas renders every on-screen model into a shared atlas, then copies each one
+// onto that thumbnail's own small 2D canvas. The 2D canvases sit in the page like
+// pictures, so they scroll without lag, and the spin is a real rotation rather
+// than baked frames.
 const SPIN_MS = 8000
+// A slow spin on a small picture looks smooth at this rate; drawing them all at the
+// screen's 60-120 Hz kept a phone (or laptop) busy the whole time the Shop was open.
+const FPS = 24
+// With reduced motion they stand still, so they're redrawn only when something changes.
+let dirty = true
 const DPR = typeof window === 'undefined' ? 1 : Math.min(window.devicePixelRatio || 1, 1.5)
 
 // Each model is measured once it's mounted and the camera is fitted to it, so
@@ -49,6 +55,7 @@ const subscribe = (fn: () => void) => (listeners.add(fn), () => listeners.delete
 let version = 0
 const changed = () => {
   version++
+  dirty = true
   listeners.forEach((fn) => fn())
 }
 
@@ -59,8 +66,11 @@ const byCanvas = new Map<Element, Slot>()
 function fit(slot: Slot, w: number, h: number) {
   const pw = Math.max(1, Math.round(w * DPR))
   const ph = Math.max(1, Math.round(h * DPR))
-  if (slot.canvas.width !== pw) slot.canvas.width = pw
-  if (slot.canvas.height !== ph) slot.canvas.height = ph
+  // A resized canvas comes back blank, so it's redrawn on the next frame.
+  if (slot.canvas.width === pw && slot.canvas.height === ph) return
+  slot.canvas.width = pw
+  slot.canvas.height = ph
+  dirty = true
 }
 
 function attach(item: Item, canvas: HTMLCanvasElement) {
@@ -75,7 +85,9 @@ function attach(item: Item, canvas: HTMLCanvasElement) {
       (entries) => {
         for (const e of entries) {
           const s = byCanvas.get(e.target)
-          if (s) s.seen = e.isIntersecting
+          if (!s || s.seen === e.isIntersecting) continue
+          s.seen = e.isIntersecting
+          dirty = true
         }
       },
       { rootMargin: '40px' },
@@ -122,8 +134,14 @@ function Renderer() {
   const cam = useRef(new PerspectiveCamera(30, 1, 0.5, 40))
   useSyncExternalStore(subscribe, () => version)
 
+  const last = useRef(-Infinity)
   // Priority 1 takes over rendering from the default loop.
   useFrame(() => {
+    const now = performance.now()
+    const still = reduceMotionOn()
+    if (!dirty && (still || now - last.current < 1000 / FPS - 4)) return
+    last.current = now
+    dirty = false
     // Largest on-screen size per model; the same car in two sizes renders once.
     const need = new Map<string, { w: number; h: number; x: number; y: number; slots: Slot[] }>()
     for (const s of slots) {
@@ -135,7 +153,7 @@ function Renderer() {
         n.slots.push(s)
       } else if (groups.current.has(s.key)) {
         need.set(s.key, { w: s.canvas.width, h: s.canvas.height, x: 0, y: 0, slots: [s] })
-      }
+      } else dirty = true // its model isn't mounted yet: try again next frame
     }
     if (!need.size) return
 
@@ -162,7 +180,7 @@ function Renderer() {
     if (width > src.width || height > src.height) gl.setSize(Math.max(src.width, width), Math.max(src.height, height), false)
     const ah = src.height
 
-    const turn = reduceMotionOn() ? 0.12 : (performance.now() % SPIN_MS) / SPIN_MS
+    const turn = still ? 0.12 : (now % SPIN_MS) / SPIN_MS
     const lift = (LO + HI) / 2 + Math.sin(turn * Math.PI * 4) * ((HI - LO) / 2)
     for (const g of groups.current.values()) g.visible = false
     gl.setScissorTest(true)
@@ -244,6 +262,7 @@ export function ThumbRenderer() {
       gl={{ alpha: true, antialias: true }}
       style={{ width: 1, height: 1 }}
       onCreated={({ gl }) => {
+        quietShaders(gl)
         let t = 0
         // three keeps the canvas restorable; if the browser never restores it, start over.
         gl.domElement.addEventListener('webglcontextlost', () => {

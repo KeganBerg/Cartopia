@@ -58,6 +58,8 @@ export const LOOKS: Look[] = [
   { w: { kick: 1.5, clap: 1 }, f: { kick: 0.7, stab: 1.2, lead: 0.6 } },
   // Rave breaks: the windows flash on the rave piano; the front skips with the breakbeat.
   { w: { kick: 1.4, stab: 0.9 }, f: { kick: 0.8, clap: 0.8, perc: 0.6, lead: 0.7 } },
+  // Witch house: the windows slam on the kick; the front flickers on the off-beat snares.
+  { w: { kick: 1.8, clap: 0.5 }, f: { kick: 0.8, clap: 1.1, lead: 0.6 } },
 ]
 // No groove (the muted pulse, Rave Mode): the kick alone.
 const KICK: Look = { w: { kick: 1.6 }, f: { kick: 1.4 } }
