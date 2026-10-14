@@ -966,7 +966,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           {[-1, 1].map((sd) => tube('neonPink', [sd * (w / 2 + 0.005), h / 2, zf + 0.01], [0.035, h - 0.08, 0.035]))}
           {tube('neonCyan', [0, h - 0.04, zf + 0.02], [w, 0.035, 0.03])}
           {tube('neonViolet', [0.5, 0.33, zf + 0.02], [1.98, 0.03, 0.03])}
-          {/* Rooftop dance floor with a DJ booth, speakers, a mirror ball and a glowing rail. */}
+          {/* Rooftop dance floor with a DJ booth, speakers and a glowing rail. */}
           <mesh position={[0, floor.y, floor.z]} rotation-x={-Math.PI / 2}>
             <planeGeometry args={[floor.w, floor.d]} />
             {glow('danceFloor', '#7c4dff')}
@@ -987,14 +987,6 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
                 <Cyl m={m} at={[x, 0.11, 0.115]} r={0.045} h={0.01} c="#424242" seg={10} rot={[Math.PI / 2, 0, 0]} />
               </group>
             ))}
-          </group>
-          <group position={[1.05, h + 0.14, z0 - d / 2 + 0.15]}>
-            <Cyl m={m} at={[0, 0.45, 0]} r={0.02} h={0.9} c="#9e9e9e" seg={6} />
-            <Box m={m} at={[-0.2, 0.89, 0.12]} rot={[0, 0.5, 0]} s={[0.5, 0.02, 0.02]} c="#9e9e9e" shadow={false} />
-            <mesh position={[-0.42, 0.74, 0.25]} castShadow>
-              <icosahedronGeometry args={[0.12, 1]} />
-              <meshStandardMaterial color="#eceff1" metalness={0.9} roughness={0.15} flatShading />
-            </mesh>
           </group>
           {/* Searchlight lamps on the roof's back corners, so the beams start above the building. */}
           {[-1, 1].map((sd) => (
