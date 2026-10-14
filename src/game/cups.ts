@@ -16,6 +16,8 @@ const VENUE: Record<CarClassId, VenueId> = { compact: 'main', muscle: 'docks', s
 export const CUP_CRATE: CrateId = 'garage'
 // The free crate a race's first win gives, by its source id (crate_open()'s p_free).
 export const cupCrateSource = (id: string) => `cup:${id}`
+// Which crate a free source opens: weekly arcade prizes (arcade:<week>:<game>) are Gold, cup prizes CUP_CRATE.
+export const freeCrateOf = (source: string): CrateId => (source.startsWith('arcade:') ? 'gold' : CUP_CRATE)
 const TUNE = [0, 2, 3]
 const DIST: RaceDist[] = ['quarter', 'half', 'mile']
 const tuned = (n: number): Record<UpgradeSlot, number> => ({ engine: n, turbo: n, tires: n, weight: n })

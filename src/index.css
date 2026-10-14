@@ -1947,6 +1947,21 @@ button.book-car { font: inherit; color: inherit; }
   .arc-callout { font-size: 40px; }
 }
 
+/* Getaway Chase: combo chip, nitro gauge, the cop's warning and score pops. */
+.arc-hud > .arc-combo { background: #ff6d00; animation: pop .25s ease-out; }
+.chase-nitro { position: absolute; top: calc(94px + var(--sat)); left: 50%; translate: -50% 0; width: min(220px, 56vw); height: 12px; border-radius: 6px; border: 2px solid #fff; background: rgba(27,31,36,.5); overflow: hidden; pointer-events: none; }
+.chase-nitro i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #00b0ff, #80d8ff); }
+.chase-warn { position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 60px 14px rgba(255,23,68,.55); animation: chase-warn .9s ease-in-out infinite alternate; }
+@keyframes chase-warn { from { opacity: .35; } }
+.chase-pop { position: absolute; top: 26%; left: 0; right: 0; text-align: center; font: 30px var(--display); color: #ffd54f; text-shadow: 0 3px 0 rgba(0,0,0,.45); pointer-events: none; animation: chase-pop .9s ease-out forwards; }
+.chase-pop.smash { color: #ff9e40; font-size: 34px; }
+.chase-pop.nitro { color: #80d8ff; font-size: 44px; }
+.chase-pop.cop { color: #b9f6ca; }
+.chase-pop.warn { color: #ff8a80; }
+@keyframes chase-pop { 0% { scale: .6; opacity: 0; } 15% { scale: 1.1; opacity: 1; } 30% { scale: 1; } 75% { opacity: 1; translate: 0 -10px; } 100% { opacity: 0; translate: 0 -24px; } }
+@media (prefers-reduced-motion: reduce) { .chase-pop { animation: none; } .chase-warn { animation: none; } }
+@media (max-height: 500px) { .chase-nitro { top: calc(72px + var(--sat)); } }
+
 /* Garage dyno: drawn over the car preview after an upgrade. Tap anywhere to close. */
 .dyno { position: absolute; inset: 0; display: block; width: 100%; padding: 0; border: 0; background: linear-gradient(180deg, rgba(38,50,56,.0) 55%, rgba(38,50,56,.28)); cursor: pointer; font: inherit; color: #263238; text-align: left; animation: dyno-in .25s ease-out; }
 @keyframes dyno-in { from { opacity: 0; } }
@@ -2248,3 +2263,32 @@ body:has(.race-full) .toasts { display: none; }
 /* A car's favourite jobs: one line of building icons (names in the tooltips). */
 .loves-tag { display: flex; align-items: center; gap: 3px; white-space: nowrap; overflow: hidden; }
 .loves-ico { font-size: 15px; line-height: 1; padding: 2px 3px; background: #fff; border: 1.5px solid #f8bbd0; border-radius: 7px; }
+
+/* Arcade free plays on the play buttons. */
+.arc-free { font-weight: 800; }
+
+/* Stunt Ramp: the flip and roll halves of the screen, and a tint during slow motion. */
+.stunt-pads { position: absolute; left: 0; right: 0; bottom: calc(26px + var(--sab)); display: flex; justify-content: space-between; padding: 0 18px; pointer-events: none; }
+.stunt-pads span { width: 92px; height: 92px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 34px; background: rgba(27,31,36,.45); border: 3px solid rgba(255,255,255,.85); color: #fff; }
+.stunt-pads small { font: 15px var(--display); margin-top: 2px; }
+.stunt-slow::after { content: ''; position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 80px 10px rgba(0,0,0,.35); }
+
+/* Delivery Dash: the hot-pizza timer under the HUD while an order is on board. */
+.dash-hot { position: absolute; top: calc(94px + var(--sat)); left: 50%; translate: -50% 0; display: flex; align-items: center; gap: 6px; pointer-events: none; }
+.dash-hot b { font-size: 20px; }
+.dash-hot div { width: min(200px, 50vw); height: 12px; border-radius: 6px; border: 2px solid #fff; background: rgba(27,31,36,.5); overflow: hidden; position: relative; }
+.dash-hot i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #ff3d00, #ffab00); }
+@media (max-height: 500px) { .dash-hot { top: calc(72px + var(--sat)); } }
+
+/* The shared canvas in a view that takes its own taps (see moveTo in scene/Stage.tsx). */
+.stage-through, .stage-through * { pointer-events: none !important; }
+
+/* Weekly arcade boards: the button over the games, the game tabs, and your place on a result card. */
+.arc-weekly { display: block; margin: 0 0 8px auto; font: 16px var(--display); background: #ffd54f; color: #3e2723; border: none; border-radius: 999px; padding: 6px 14px; box-shadow: 0 3px 0 rgba(0,0,0,.2); }
+.arc-board-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
+.arc-board-tabs button { flex: 1; font-size: 26px; padding: 6px 0; border-radius: 12px; border: 2px solid #e0e0e0; background: #fff; }
+.arc-board-tabs button.sel { border-color: #1e88e5; background: #e3f2fd; }
+.arc-week { font: 20px var(--display); color: #ffd54f; margin-top: 6px; }
+.arc-top-row { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 8px; }
+.arc-top-row .arc-weekly { margin: 0; }
+.arc-claim { font: 16px var(--display); background: #43a047; color: #fff; border: none; border-radius: 999px; padding: 6px 14px; box-shadow: 0 3px 0 rgba(0,0,0,.2); animation: pop .3s ease-out; }

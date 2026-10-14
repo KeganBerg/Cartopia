@@ -1,5 +1,6 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
-import { PARK_LEN, PARK_LOTS, PARKED_W, boxesHit, carHits, chaseReward, chaseRow, drive, parkReward, parkStars, parkedIn, lotOpen, type Box } from './arcade'
+import { FREE_PLAYS, comboMult, freeLeft, takeFree, PARK_LEN, PARK_LOTS, PARKED_W, boxesHit, carHits, chaseReward, chaseRow, drive, parkReward, parkStars, parkedIn, lotOpen, type Box } from './arcade'
 
 const car = (x: number, z: number, h = 0): Box => ({ x, z, h, w: 0.8, l: PARK_LEN })
 
@@ -73,5 +74,19 @@ describe('arcade', () => {
     expect(lotOpen([], 0)).toBe(true)
     expect(lotOpen([0], 1)).toBe(false)
     expect(lotOpen([2], 1)).toBe(true)
+  })
+
+  it('gives a few free plays a game each day', () => {
+    localStorage.clear()
+    for (let i = 0; i < FREE_PLAYS; i++) expect(takeFree('stunt')).toBe(true)
+    expect(takeFree('stunt')).toBe(false)
+    expect(freeLeft('stunt')).toBe(0)
+    expect(freeLeft('chase')).toBe(FREE_PLAYS)
+    localStorage.setItem('cartopia-arcade-free', JSON.stringify({ day: '1999-1-1', used: { chase: 9 } }))
+    expect(freeLeft('chase')).toBe(FREE_PLAYS)
+  })
+
+  it('builds the chase combo two near misses at a time, up to x5', () => {
+    expect([0, 1, 2, 3, 4, 8, 20].map(comboMult)).toEqual([1, 1, 2, 2, 3, 5, 5])
   })
 })

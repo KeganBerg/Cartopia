@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Group, InstancedMesh, Mesh, Object3D, Vector3 } from 'three'
 import { CarModel, carFrame } from './CarModel'
@@ -8,15 +8,18 @@ import { LAYER, decal } from './layers'
 import { concreteTex, corrugatedTex, drainTex, glowTex, paverTex } from './textures'
 import { signTexture } from './signTexture'
 import { ArcadeSky, CarShadow, Lamp, useArcadeLook, useFitCamera } from './ArcadeScenery'
-import { SCRUB_PX, WASH_SPOTS, WASH_TIME } from '../game/arcadeMore'
+import { WASH_QUICK, WASH_SPOTS, WASH_TIME, scrubNeed, washBonus } from '../game/arcadeMore'
+import { CARS, isBike } from '../game/data'
 import type { ChaseCar } from './ChaseScene'
 import { dingSound, scrubSound, splashSound } from '../lib/arcadeSound'
 
 // The screen writes the pointer here (canvas pixels) and adds up how far it has moved
 // while pressed; the scene spends that travel scrubbing whichever mud is under it.
 export type WashInput = { x: number; y: number; down: boolean; moved: number }
-export type WashHud = { left: number; time: number }
-export type WashEnd = { cleaned: number; timeLeft: number }
+export type WashPop = { id: number; text: string; kind: 'car' | 'quick' }
+// cars: how many are clean so far; left: mud spots left on the car in the bay.
+export type WashHud = { cars: number; left: number; time: number; pop: WashPop | null }
+export type WashEnd = { cars: number }
 
 const LEN = 2.6
 
@@ -143,6 +146,40 @@ function WashScenery() {
   )
 }
 
+const SLIDE = 0.6 // seconds for a car to roll out or in
+const QUEUE = 8 // different cars in the line, then it repeats
+
+// Who's in line: your car first, then everyday cars from town.
+function washQueue(me: ChaseCar): ChaseCar[] {
+  const pool = CARS.filter((c) => !c.parked && !isBike(c.body) && ['sedan', 'compact', 'van', 'suv', 'truck', 'hatch', 'wagon', 'classic', 'ev', 'bubble'].includes(c.body))
+  return [me, ...Array.from({ length: QUEUE - 1 }, (_, i) => {
+    const c = pool[(i * 7 + 4) % pool.length]
+    return { body: c.body, model: c.id, color: c.colors[(i * 3) % c.colors.length] }
+  })]
+}
+
+// Mud splats on the near side and the top of one car, in the car's own place in the bay
+// (it faces -x, out through the brushes).
+function mudSpots(c: ChaseCar, seed: number) {
+  const f = carFrame(c.body)
+  const sc = LEN / f.len
+  const r = rng(97 + seed * 31)
+  const out: { p: Vector3; up: boolean; size: number }[] = []
+  const side = (f.side + 0.01) * sc
+  const low = (f.lift + f.wheel * 0.55) * sc, belt = Math.max(low + 0.12, f.deck * sc * 0.92)
+  for (let i = 0; i < WASH_SPOTS; i++) {
+    if (i >= 4) {
+      const x = (i === 4 ? -0.3 : 0.2) * f.len * sc
+      out.push({ p: new Vector3(x, (x < 0 ? f.hoodTop : f.deck) * sc + 0.012, (r() - 0.5) * side * 0.9), up: true, size: 0.19 + r() * 0.06 })
+    } else {
+      const x = (-0.4 + (i + 0.5) * 0.2 + (r() - 0.5) * 0.08) * f.len * sc
+      const y = low + (belt - low) * (0.2 + r() * 0.6)
+      out.push({ p: new Vector3(x, y, side), up: false, size: 0.18 + r() * 0.06 })
+    }
+  }
+  return out
+}
+
 export function WashScene({ me, input, running, onHud, onEnd }: {
   me: ChaseCar; input: WashInput; running: boolean
   onHud: (h: WashHud) => void; onEnd: (e: WashEnd) => void
@@ -153,34 +190,23 @@ export function WashScene({ me, input, running, onHud, onEnd }: {
   const size = useThree((s) => s.size)
   const wide = size.width > size.height
   useFitCamera([0, 0.55, 1], [0, 0.5, 0.2], wide ? 3.4 : 1.75, 2)
-  const f = carFrame(me.body)
+  const queue = useMemo(() => washQueue(me), [me])
+  const [slot, setSlot] = useState(0) // which car of the line is in the bay
+  const cur = queue[slot % QUEUE]
+  const f = carFrame(cur.body)
   const sc = LEN / f.len
-
-  // Mud splats on the near side and the top of the car, in world space (the car faces +x).
-  const spots = useMemo(() => {
-    const r = rng(97)
-    const out: { p: Vector3; up: boolean; size: number }[] = []
-    const side = (f.side + 0.01) * sc
-    // Two rows down the side (the lower row heavier, like road spray) and a few on top.
-    const low = (f.lift + f.wheel * 0.55) * sc, belt = Math.max(low + 0.12, f.deck * sc * 0.92)
-    for (let i = 0; i < WASH_SPOTS; i++) {
-      if (i >= 8) {
-        const x = [-0.32, -0.12, 0.18, 0.36][i - 8] * f.len * sc
-        out.push({ p: new Vector3(x, (x > 0 ? f.hoodTop : f.deck) * sc + 0.012, (r() - 0.5) * side * 0.9), up: true, size: 0.17 + r() * 0.06 })
-      } else {
-        const x = (-0.4 + ((i % 4) + 0.5) * 0.2 + (r() - 0.5) * 0.06) * f.len * sc
-        const y = i < 4 ? low + (belt - low) * (0.15 + r() * 0.2) : low + (belt - low) * (0.6 + r() * 0.3)
-        out.push({ p: new Vector3(x, y, side), up: false, size: 0.16 + r() * 0.06 })
-      }
-    }
-    return out
-  }, [f, sc])
+  const spots = useMemo(() => mudSpots(cur, slot), [cur, slot])
+  const rig = useRef<Group>(null)
   const mud = useRef<(Group | null)[]>([])
   const foam = useRef<InstancedMesh>(null)
   const sparkle = useRef<Mesh>(null)
   const tmp = useMemo(() => new Object3D(), [])
   const bubbles = useMemo(() => Array.from({ length: 48 }, () => ({ x: 0, y: -10, z: 0, vy: 0, life: 0, s: 0 })), [])
-  const st = useRef({ t: 0, scrub: spots.map(() => 0), left: WASH_SPOTS, done: false, endAt: 0, hudAt: 0, squish: 0, nextBubble: 0, shine: 0 })
+  const st = useRef({
+    t: 0, left: WASH_TIME, cars: 0, scrub: Array.from({ length: WASH_SPOTS }, () => 0), dirty: WASH_SPOTS, done: false, endAt: 0, hudAt: 0,
+    squish: 0, nextBubble: 0, shine: 0, phase: 'wash' as 'wash' | 'out' | 'in', phaseT: 0, carT: 0, slot: 0, need: scrubNeed(0), popId: 0, pop: null as WashPop | null,
+  })
+  useEffect(() => { if (import.meta.env.DEV) Object.assign(window, { __wash: st.current }) }, [])
   const v = useMemo(() => new Vector3(), [])
 
   useFrame((state, rawDt) => {
@@ -188,26 +214,32 @@ export function WashScene({ me, input, running, onHud, onEnd }: {
     const dt = Math.min(rawDt, 1 / 20)
     const t = state.clock.elapsedTime
     const live = running && !s.done
-    if (live) s.t += dt
+    if (live) {
+      s.t += dt
+      s.left -= dt
+      s.carT += dt
+    }
     const moved = input.moved
     input.moved = 0
-    if (live && input.down && moved > 0) {
-      const reach = Math.max(42, size.height * 0.08)
+    const x0 = rig.current?.position.x ?? 0
+    if (live && s.phase === 'wash' && input.down && moved > 0) {
+      const reach = Math.max(46, size.height * 0.085)
+      const need = s.need
       let hit = false
       spots.forEach((sp, i) => {
-        if (s.scrub[i] >= SCRUB_PX) return
-        v.copy(sp.p).project(camera)
+        if (s.scrub[i] >= need) return
+        v.copy(sp.p).setX(sp.p.x + x0).project(camera)
         const px = ((v.x + 1) / 2) * size.width, py = ((1 - v.y) / 2) * size.height
         if (Math.hypot(px - input.x, py - input.y) > reach) return
         hit = true
-        s.scrub[i] = Math.min(SCRUB_PX, s.scrub[i] + moved)
+        s.scrub[i] = Math.min(need, s.scrub[i] + moved)
         if (s.nextBubble <= 0) {
           const b = bubbles.find((q) => q.life <= 0)
-          if (b) Object.assign(b, { x: sp.p.x + (Math.random() - 0.5) * 0.3, y: sp.p.y, z: sp.p.z + 0.05, vy: 0.3 + Math.random() * 0.4, life: 1, s: 0.04 + Math.random() * 0.05 })
+          if (b) Object.assign(b, { x: sp.p.x + x0 + (Math.random() - 0.5) * 0.3, y: sp.p.y, z: sp.p.z + 0.05, vy: 0.3 + Math.random() * 0.4, life: 1, s: 0.04 + Math.random() * 0.05 })
         }
-        if (s.scrub[i] >= SCRUB_PX) {
-          s.left--
-          dingSound(1 + (WASH_SPOTS - s.left) * 0.03)
+        if (s.scrub[i] >= need) {
+          s.dirty = Math.max(0, s.dirty - 1)
+          dingSound(1 + (WASH_SPOTS - s.dirty) * 0.05)
         }
       })
       s.nextBubble = s.nextBubble <= 0 ? 0.03 : s.nextBubble - dt
@@ -215,20 +247,52 @@ export function WashScene({ me, input, running, onHud, onEnd }: {
         s.squish -= dt
         if (s.squish <= 0) { scrubSound(); s.squish = 0.11 }
       }
+      // Clean: time back, more for a quick one, and it rolls out through the brushes.
+      if (s.dirty <= 0) {
+        const quick = s.carT <= WASH_QUICK
+        const bonus = Math.round(washBonus(s.cars, quick) * 10) / 10
+        s.cars++
+        s.left += bonus
+        s.shine = 0.001
+        splashSound()
+        s.pop = { id: ++s.popId, text: quick ? `⚡ Quick! +${bonus}s` : `✨ +${bonus}s`, kind: quick ? 'quick' : 'car' }
+        s.phase = 'out'
+        s.phaseT = 0
+      }
     }
-    const timeLeft = Math.max(0, WASH_TIME - s.t)
-    if (live && (s.left <= 0 || timeLeft <= 0)) {
+    if (s.phase !== 'wash') {
+      s.phaseT += dt
+      const k = Math.min(1, s.phaseT / SLIDE)
+      if (rig.current) rig.current.position.x = s.phase === 'out' ? -k * k * 9 : (1 - k) * (1 - k) * 9
+      if (k >= 1) {
+        if (s.phase === 'out') {
+          // The next car in line, freshly muddy.
+          s.phase = 'in'
+          s.phaseT = 0
+          s.slot++
+          s.scrub = s.scrub.map(() => 0)
+          s.dirty = WASH_SPOTS
+          s.need = scrubNeed(s.cars)
+          s.shine = 0
+          setSlot(s.slot)
+        } else {
+          s.phase = 'wash'
+          s.carT = 0
+        }
+      }
+    }
+    if (live && s.left <= 0) {
+      s.left = 0
       s.done = true
-      s.endAt = t + (s.left <= 0 ? 1.4 : 0.6)
-      if (s.left <= 0) splashSound()
+      s.endAt = t + 0.6
     }
     if (s.done && s.endAt && t > s.endAt) {
       s.endAt = 0
-      onEnd({ cleaned: WASH_SPOTS - s.left, timeLeft })
+      onEnd({ cars: s.cars })
     }
     mud.current.forEach((g, i) => {
       if (!g) return
-      const k = 1 - s.scrub[i] / SCRUB_PX
+      const k = 1 - s.scrub[i] / s.need
       g.visible = k > 0.02
       g.scale.setScalar(0.35 + k * 0.65)
     })
@@ -247,16 +311,17 @@ export function WashScene({ me, input, running, onHud, onEnd }: {
       })
       foam.current.instanceMatrix.needsUpdate = true
     }
-    // A glint that sweeps along the clean car.
+    // A glint that sweeps along the clean car as it leaves.
     if (sparkle.current) {
-      if (s.left <= 0) s.shine += dt
-      sparkle.current.visible = s.shine > 0 && s.shine < 1.4
-      sparkle.current.position.set(-LEN / 2 + (s.shine / 1.2) * LEN, f.deck * sc * 0.9, f.side * sc + 0.08)
+      if (s.shine > 0) s.shine += dt
+      sparkle.current.visible = s.shine > 0 && s.shine < 0.9
+      sparkle.current.position.set(LEN / 2 - (s.shine / 0.8) * LEN, f.deck * sc * 0.9, f.side * sc + 0.08)
       sparkle.current.rotation.z = t * 4
     }
-    if (t - s.hudAt > 0.1) {
+    if (t - s.hudAt > 0.1 || s.pop) {
       s.hudAt = t
-      onHud({ left: s.left, time: timeLeft })
+      onHud({ cars: s.cars, left: s.dirty, time: Math.max(0, s.left), pop: s.pop })
+      s.pop = null
     }
   })
 
@@ -270,31 +335,33 @@ export function WashScene({ me, input, running, onHud, onEnd }: {
       <Brush x={-3.6} z={-1.7} spin={7} />
       <Brush x={-3.6} z={1.95} spin={-7} />
       <Brush x={-4} z={0} spin={6} flat />
-      <group rotation-y={Math.PI / 2}>
-        <CarShadow len={LEN} wid={f.wid * sc} />
-        <group scale={sc}>
-          <CarModel body={me.body} model={me.model} color={me.color} finish={me.finish} skin={me.skin} modSkin={me.modSkin} panels={me.panels} trim={me.trim} hat={me.hat} mods={me.mods} beams={view.beams} />
-        </group>
-      </group>
-      {spots.map((sp, i) => (
-        <group key={i} ref={(g) => { mud.current[i] = g }} position={sp.p} rotation={sp.up ? [0, 0, 0] : [Math.PI / 2, 0, 0]}>
-          <group rotation-y={i * 1.3}>
-          {[[0, 0, 1], [0.7, 0.25, 0.55], [-0.6, -0.3, 0.65], [0.2, -0.65, 0.4], [-0.3, 0.6, 0.35]].map(([dx, dz, k], j) => (
-            <mesh key={j} position={[dx * sp.size, 0, dz * sp.size]} scale={[sp.size * k, sp.size * 0.12, sp.size * k * 0.85]}>
-              <sphereGeometry args={[1, 10, 6]} />
-              <meshStandardMaterial color={mudColors[(i + j) % 3]} roughness={0.55} />
-            </mesh>
-          ))}
+      <group ref={rig}>
+        <group key={slot} rotation-y={-Math.PI / 2}>
+          <CarShadow len={LEN} wid={f.wid * sc} />
+          <group scale={sc}>
+            <CarModel body={cur.body} model={cur.model} color={cur.color} finish={cur.finish} skin={cur.skin} modSkin={cur.modSkin} panels={cur.panels} trim={cur.trim} hat={cur.hat} mods={cur.mods} beams={view.beams} />
           </group>
-          {/* Drips running down the panel. */}
-          {!sp.up && [-0.3, 0.25].map((dx, j) => (
-            <mesh key={`d${j}`} position={[dx * sp.size, 0, (1 + j * 0.4) * sp.size]} scale={[sp.size * 0.14, sp.size * 0.08, sp.size * (0.55 + j * 0.3)]}>
-              <sphereGeometry args={[1, 8, 5]} />
-              <meshStandardMaterial color={mudColors[(i + 1) % 3]} roughness={0.55} />
-            </mesh>
-          ))}
         </group>
-      ))}
+        {spots.map((sp, i) => (
+          <group key={`${slot}-${i}`} ref={(g) => { mud.current[i] = g }} position={sp.p} rotation={sp.up ? [0, 0, 0] : [Math.PI / 2, 0, 0]}>
+            <group rotation-y={i * 1.3}>
+            {[[0, 0, 1], [0.7, 0.25, 0.55], [-0.6, -0.3, 0.65], [0.2, -0.65, 0.4], [-0.3, 0.6, 0.35]].map(([dx, dz, k], j) => (
+              <mesh key={j} position={[dx * sp.size, 0, dz * sp.size]} scale={[sp.size * k, sp.size * 0.12, sp.size * k * 0.85]}>
+                <sphereGeometry args={[1, 10, 6]} />
+                <meshStandardMaterial color={mudColors[(i + j) % 3]} roughness={0.55} />
+              </mesh>
+            ))}
+            </group>
+            {/* Drips running down the panel. */}
+            {!sp.up && [-0.3, 0.25].map((dx, j) => (
+              <mesh key={`d${j}`} position={[dx * sp.size, 0, (1 + j * 0.4) * sp.size]} scale={[sp.size * 0.14, sp.size * 0.08, sp.size * (0.55 + j * 0.3)]}>
+                <sphereGeometry args={[1, 8, 5]} />
+                <meshStandardMaterial color={mudColors[(i + 1) % 3]} roughness={0.55} />
+              </mesh>
+            ))}
+          </group>
+        ))}
+      </group>
       <instancedMesh ref={foam} args={[undefined, undefined, bubbles.length]} frustumCulled={false}>
         <sphereGeometry args={[1, 8, 6]} />
         <meshStandardMaterial color="#ffffff" roughness={0.2} transparent opacity={0.85} />

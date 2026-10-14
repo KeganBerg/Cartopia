@@ -58,19 +58,30 @@ export function pitStars(time: number) {
 }
 
 // ---------- Car Wash Frenzy ----------
-// Mud spots on the car; each needs this much scrubbing (pointer travel in screen pixels).
-export const WASH_TIME = 25
-export const WASH_SPOTS = 12
-export const SCRUB_PX = 260
-export function washStars(cleaned: number, total: number, timeLeft: number) {
-  if (cleaned < total) return cleaned >= total * 0.75 ? 1 : 0
-  return timeLeft >= 8 ? 3 : timeLeft >= 3 ? 2 : 1
+// A line of muddy cars rolls in: rub the mud spots off each one before the clock runs out.
+// Every clean car adds time (more for a quick one) and the next rolls in.
+export const WASH_TIME = 30
+export const WASH_SPOTS = 6 // mud spots on each car
+// Pointer travel (screen pixels) to clear one spot: each car down the line is muddier.
+export const scrubNeed = (car: number) => 200 + Math.min(12, car) * 30
+// Seconds back for a clean car, shrinking down the line, plus a bonus for a quick one.
+export const washBonus = (car: number, quick: boolean) => Math.max(0.5, 2 - car * 0.15) + (quick ? 1 : 0)
+export const WASH_QUICK = 3.5
+export function washStars(cars: number) {
+  return cars >= 10 ? 3 : cars >= 6 ? 2 : cars >= 3 ? 1 : 0
 }
 
 // ---------- Delivery Dash ----------
 // Pick up at the pizza place, drop at the glowing house, beat the clock. Each drop adds time.
 export const DASH_TIME = 45
 export const DASH_BONUS = 12
+// Hot pizza: drop it off within hotTime of picking up (longer for a further house) and the
+// clock gets extra seconds, more for every hot drop in a row. Bumping traffic costs time.
+export const hotTime = (dist: number) => 4 + dist / 4.5
+export function dropBonus(hot: boolean, streak: number) {
+  return DASH_BONUS + (hot ? 3 + 2 * Math.min(3, streak) : 0)
+}
+export const TRAFFIC_HIT = 2
 export function dashStars(drops: number) {
   return drops >= 6 ? 3 : drops >= 4 ? 2 : drops >= 2 ? 1 : 0
 }
@@ -80,6 +91,8 @@ export const STREET = 3 // road width
 export const GRID = 4 // blocks per side
 export const CELL = BLOCK + STREET
 export const TOWN = GRID * CELL + STREET // full width, roads on every edge
+// Road centre lines across town, between and round the blocks.
+export const roadLine = (i: number) => -TOWN / 2 + STREET / 2 + i * CELL
 export const blockCentre = (i: number) => -TOWN / 2 + STREET + BLOCK / 2 + i * CELL
 // Drive targets sit on the road beside a block's middle (side 0..3 = -z, +x, +z, -x).
 export function kerbSpot(bx: number, bz: number, side: number) {
@@ -115,8 +128,9 @@ export const DROP_LINE = 0.2 // the ring's painted width
 export const atDrop = (x: number, z: number, spot: { x: number; z: number }) => Math.hypot(x - spot.x, z - spot.z) <= DROP_R
 
 // ---------- Stunt Ramp ----------
-// Three jumps. Stop the power needle, then hold to flip in the air and let go to land flat.
-export const STUNT_JUMPS = 3
+// Four jumps. Stop the power needle, then in the air hold one side to flip and the other to
+// barrel roll; let go to land flat. A target on the deck moves further out every jump.
+export const STUNT_JUMPS = 4
 export const GRAVITY = 18
 // Power 0..1 (from the needle) sets take-off speed; the sweet spot is near the top.
 export const launchSpeed = (power: number) => 9 + power * 9
@@ -132,12 +146,23 @@ export function landed(spin: number) {
   return Math.min(r, Math.PI * 2 - r) <= LAND_OK
 }
 export const flips = (spin: number) => Math.floor((Math.abs(spin) + LAND_OK) / (Math.PI * 2))
-// One jump's points: distance, a big bonus per flip, nothing if you crash.
-export function jumpScore(dist: number, spin: number) {
-  return landed(spin) ? Math.round(dist * 10) + flips(spin) * 150 : 0
+// The landing target for each jump (0-based): where its middle sits and how wide it is.
+export const TARGET_W = 1.8
+export const targetX = (jump: number) => 9 + jump * 2
+export const onTarget = (x: number, jump: number) => Math.abs(x - targetX(jump)) <= TARGET_W / 2
+export const FLIP_POINTS = 150
+export const ROLL_POINTS = 120
+export const TARGET_POINTS = 250
+// One jump's points: distance, a bonus per flip and per roll (half again when you mix both),
+// the target bonus, and nothing if you crash.
+export function jumpScore(dist: number, spin: number, roll = 0, target = false) {
+  if (!landed(spin) || !landed(roll)) return 0
+  const tricks = flips(spin) * FLIP_POINTS + flips(roll) * ROLL_POINTS
+  const combo = flips(spin) > 0 && flips(roll) > 0 ? 1.5 : 1
+  return Math.round(dist * 10 + tricks * combo + (target ? TARGET_POINTS : 0))
 }
 export function stuntStars(score: number) {
-  return score >= 900 ? 3 : score >= 500 ? 2 : score >= 150 ? 1 : 0
+  return score >= 2000 ? 3 : score >= 1100 ? 2 : score >= 300 ? 1 : 0
 }
 
 // ---------- Bests ----------
@@ -153,6 +178,8 @@ export function loadStars(): StarBests {
     const raw = JSON.parse(localStorage.getItem(KEY) ?? '{}')
     const out = { ...EMPTY }
     for (const id of Object.keys(EMPTY) as StarGameId[]) {
+      // Car Wash counted seconds left before it became a line of cars (v2); those bests don't carry over.
+      if (id === 'wash' && raw?.v !== 2) continue
       const v = raw?.[id]
       if (v && typeof v.stars === 'number' && typeof v.best === 'number') out[id] = { stars: Math.max(0, Math.min(3, v.stars)), best: v.best }
     }
@@ -168,7 +195,7 @@ export function recordStars(id: StarGameId, stars: number, result: number) {
   const better = stars > 0 && (old.best === 0 || (lowerIsBetter(id) ? result < old.best : result > old.best))
   all[id] = { stars: Math.max(old.stars, stars), best: better ? result : old.best }
   try {
-    localStorage.setItem(KEY, JSON.stringify(all))
+    localStorage.setItem(KEY, JSON.stringify({ ...all, v: 2 }))
   } catch {
     // Private mode: bests just don't stick.
   }

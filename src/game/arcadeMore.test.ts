@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   BLOCK, GRID, STREET, TOWN, blockCentre, brakeDistance, dashStars, flips, gunTimes, insideBlock, jumpLength, jumpScore, kerbSpot,
-  landed, pitCall, pitStars, stopGrade, stopPenalty, starReward, stuntStars, washStars,
+  landed, pitCall, pitStars, stopGrade, stopPenalty, starReward, stuntStars, washStars, scrubNeed, washBonus,
 } from './arcadeMore'
 import { chaseReward } from './arcade'
 
@@ -35,11 +35,13 @@ describe('arcade second wave', () => {
   })
 
   it('car wash: all spots with time to spare for three stars', () => {
-    expect(washStars(12, 12, 10)).toBe(3)
-    expect(washStars(12, 12, 4)).toBe(2)
-    expect(washStars(12, 12, 0)).toBe(1)
-    expect(washStars(9, 12, 0)).toBe(1)
-    expect(washStars(5, 12, 0)).toBe(0)
+    expect(washStars(10)).toBe(3)
+    expect(washStars(6)).toBe(2)
+    expect(washStars(3)).toBe(1)
+    expect(washStars(2)).toBe(0)
+    // Later cars need more scrubbing and give less time back, so a run always ends.
+    expect(scrubNeed(8)).toBeGreaterThan(scrubNeed(0))
+    expect(washBonus(12, true)).toBeLessThan(washBonus(0, false))
   })
 
   it('delivery: kerb spots are on the road, blocks are solid', () => {
@@ -62,8 +64,12 @@ describe('arcade second wave', () => {
     expect(flips(1)).toBe(0)
     expect(jumpScore(10, Math.PI)).toBe(0)
     expect(jumpScore(10, Math.PI * 2)).toBe(250)
-    // Three max-power jumps with a flip each earn three stars.
-    expect(stuntStars(3 * jumpScore(jumpLength(1), Math.PI * 2))).toBe(3)
+    expect(jumpScore(10, 0, Math.PI)).toBe(0)
+    // A flip and a roll in one jump pay half again, and the target adds on top.
+    expect(jumpScore(10, Math.PI * 2, Math.PI * 2, true)).toBe(100 + 270 * 1.5 + 250)
+    // Four big jumps with a flip and a roll each on target earn three stars; plain flips don't.
+    expect(stuntStars(4 * jumpScore(jumpLength(1), Math.PI * 2, Math.PI * 2, true))).toBe(3)
+    expect(stuntStars(4 * jumpScore(jumpLength(1), Math.PI * 2))).toBe(2)
     expect(stuntStars(100)).toBe(0)
   })
 })

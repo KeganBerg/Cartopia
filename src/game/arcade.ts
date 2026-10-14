@@ -12,27 +12,46 @@ export const ARCADE_FUEL = 2
 
 export const CHASE_LANES = [-1.7, 0, 1.7]
 export const CHASE_HEARTS = 3
-// World units per second: starts easy and climbs to the top speed over about 90 seconds.
-export const chaseSpeed = (t: number) => Math.min(30, 13 + t * 0.19)
+// World units per second: starts brisk and climbs to the top speed over about 90 seconds.
+export const chaseSpeed = (t: number) => Math.min(30, 15 + t * 0.17)
 // Each coin grabbed is worth this many score points; distance counts one point per meter.
 export const CHASE_COIN_POINTS = 25
-export const chaseScore = (dist: number, coins: number) => Math.floor(dist) + coins * CHASE_COIN_POINTS
+// Bonus points (near misses, smashes, dodged cops) are added on top, already multiplied.
+export const chaseScore = (dist: number, coins: number, bonus = 0) => Math.floor(dist) + coins * CHASE_COIN_POINTS + bonus
+
+// Near misses: dodge a car that was in your lane close ahead. Each one in a row raises
+// the multiplier (x2 after two, up to x5); a crash or a few quiet seconds resets it.
+export const NEAR_POINTS = 40
+export const NEAR_ZONE = 10 // how close ahead (world units) a car in your lane must be to count
+export const COMBO_TIME = 4
+export const comboMult = (streak: number) => 1 + Math.min(4, Math.floor(streak / 2))
+// Nitro: a can on the road gives a burst of speed; you smash through traffic while it lasts.
+export const NITRO_TIME = 3
+export const NITRO_SPEED = 1.45
+export const SMASH_POINTS = 75
+// The cop lunges for your lane now and then once the run warms up; move out before it lands.
+export const COP_FROM = 20 // seconds into the run before the first lunge
+export const COP_WARN = 0.9 // seconds of flashing warning
+export const copGap = (rand: () => number, t: number) => Math.max(5, 11 - t * 0.04) + rand() * 4
+export const COP_DODGE_POINTS = 120
 
 export function chaseReward(score: number, level: number) {
   const cap = 120 + 40 * level
   return { coins: Math.min(cap, Math.floor(score / 6)), xp: Math.min(25, 4 + Math.floor(score / 150)) }
 }
 
-// One row of the road ahead: which lanes hold a car, and which lane holds a line of coins.
-// There is always at least one open lane, and the coins never sit in a blocked lane.
-export function chaseRow(rand: () => number, t: number): { cars: number[]; coins: number | null } {
+// One row of the road ahead: which lanes hold a car, and which lane holds a line of coins
+// or a nitro can. There is always at least one open lane, and pickups never sit in a blocked lane.
+export function chaseRow(rand: () => number, t: number): { cars: number[]; coins: number | null; nitro: number | null } {
   const lanes = [0, 1, 2]
   const blockTwo = rand() < Math.min(0.55, 0.15 + t * 0.006)
   const shuffled = lanes.sort(() => rand() - 0.5)
   const cars = shuffled.slice(0, blockTwo ? 2 : 1)
   const open = lanes.filter((l) => !cars.includes(l))
-  const coins = rand() < 0.6 ? open[Math.floor(rand() * open.length)] : null
-  return { cars: cars.sort(), coins }
+  const lane = open[Math.floor(rand() * open.length)]
+  const nitro = t > 6 && rand() < 0.09 ? lane : null
+  const coins = nitro === null && rand() < 0.6 ? lane : null
+  return { cars: cars.sort(), coins, nitro }
 }
 
 // ---------- Parking Pro ----------
@@ -195,3 +214,32 @@ export function saveBests(b: Bests) {
 }
 // Lots open one after another: clear a lot with any stars to open the next.
 export const lotOpen = (stars: number[], i: number) => i === 0 || (stars[i - 1] ?? 0) > 0
+
+// Free plays: the first few runs of each game every day cost no fuel, so trying the arcade
+// never eats into racing. Kept on this device, like the bests; pay is still capped by the
+// server's usual earning limits.
+export const FREE_PLAYS = 3
+export type ArcadeGame = 'chase' | 'park' | 'pit' | 'wash' | 'delivery' | 'stunt'
+const FREE_KEY = 'cartopia-arcade-free'
+const today = (now = new Date()) => `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`
+function loadFree(): Record<string, number> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(FREE_KEY) ?? '{}')
+    return raw?.day === today() && raw.used && typeof raw.used === 'object' ? raw.used : {}
+  } catch {
+    return {}
+  }
+}
+export const freeLeft = (game: ArcadeGame) => Math.max(0, FREE_PLAYS - (Number(loadFree()[game]) || 0))
+// Uses up one free play; false when today's are gone.
+export function takeFree(game: ArcadeGame) {
+  if (freeLeft(game) <= 0) return false
+  const used = loadFree()
+  used[game] = (Number(used[game]) || 0) + 1
+  try {
+    localStorage.setItem(FREE_KEY, JSON.stringify({ day: today(), used }))
+  } catch {
+    return false
+  }
+  return true
+}

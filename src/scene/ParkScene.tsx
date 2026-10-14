@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { Group, Mesh, MeshStandardMaterial, PerspectiveCamera } from 'three'
+import { Group, Mesh, MeshStandardMaterial, PerspectiveCamera, Vector3 } from 'three'
 import { CarModel } from './CarModel'
 import { BuildingModel } from './BuildingModel'
 import { holdTown } from './renderGate'
@@ -234,23 +234,36 @@ export function ParkScene({ lot, me, input, running, onHud, onEnd }: {
   const index = PARK_LOTS.indexOf(lot)
   const camera = useThree((s) => s.camera) as PerspectiveCamera
   const size = useThree((s) => s.size)
-  useLayoutEffect(() => {
-    // Fit the whole lot; on a wide screen turn the view so the lot's long side runs across it.
+  const eye = useMemo(() => new Vector3(), [])
+  const at = useMemo(() => new Vector3(), [])
+  const aim = useMemo(() => new Vector3(), [])
+  // The camera frames your car and the spot together, zoomed in as close as that allows
+  // (never past the whole lot), so the car is big on screen right when it counts. On a
+  // wide screen the view turns so the lot's long side runs across it.
+  const frame = (x: number, z: number, k: number) => {
     const wide = size.width > size.height
     const ratio = size.width / size.height
-    const long = lot.l / 2 + 1.2, short = lot.w / 2 + 1.2
+    const sx = lot.spot.x, sz = lot.spot.z
+    const cx = (x + sx) / 2, cz = (z + sz) / 2
+    const spanX = Math.min(lot.w / 2 + 1.2, Math.max(4.2, Math.abs(x - sx) / 2 + 2.6))
+    const spanZ = Math.min(lot.l / 2 + 1.2, Math.max(4.2, Math.abs(z - sz) / 2 + 2.6))
     const half = Math.tan(((camera.fov / 2) * Math.PI) / 180)
-    // Extra height leaves room for the controls over the edges of the lot.
-    const height = 1.18 * (wide ? Math.max(short / half, long / (half * ratio)) : Math.max(long / half, short / (half * ratio)))
-    if (wide) {
-      camera.up.set(1, 0, 0)
-      camera.position.set(-height * 0.28, height, 0)
-    } else {
-      camera.up.set(0, 0, -1)
-      camera.position.set(0, height, height * 0.28)
-    }
-    camera.lookAt(0, 0, 0)
+    // Extra height leaves room for the controls over the edges of the view.
+    const height = 1.25 * (wide ? Math.max(spanX / half, spanZ / (half * ratio)) : Math.max(spanZ / half, spanX / (half * ratio)))
+    // Keep the view inside the lot so it doesn't drift off over the kerb.
+    const fx = Math.max(-lot.w / 2 + spanX - 1.2, Math.min(lot.w / 2 - spanX + 1.2, cx))
+    const fz = Math.max(-lot.l / 2 + spanZ - 1.2, Math.min(lot.l / 2 - spanZ + 1.2, cz))
+    if (wide) camera.up.set(1, 0, 0)
+    else camera.up.set(0, 0, -1)
+    eye.set(fx - (wide ? height * 0.28 : 0), height, fz + (wide ? 0 : height * 0.28))
+    camera.position.lerp(eye, k)
+    aim.lerp(at.set(fx, 0, fz), k)
+    camera.lookAt(aim)
+  }
+  useLayoutEffect(() => {
+    frame(lot.start.x, lot.start.z, 1)
     camera.updateProjectionMatrix()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [camera, size, lot])
 
   const foot = useRef<Footprint>(fitIn(me.body))
@@ -317,6 +330,7 @@ export function ParkScene({ lot, me, input, running, onHud, onEnd }: {
       onEnd({ parked: false, time: s.t, bumps: s.bumps })
     }
 
+    frame(s.pose.x, s.pose.z, Math.min(1, dt * 2.5))
     if (player.current) {
       player.current.position.set(s.pose.x, 0, s.pose.z)
       player.current.rotation.y = s.pose.h
