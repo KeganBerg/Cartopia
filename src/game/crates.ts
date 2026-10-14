@@ -4,7 +4,7 @@
 // parts. Cars only come once your level has unlocked them, so a crate never skips a level gate. A signed-in player's crates are
 // rolled by the server (crate_open(), newest copy in supabase/migrations/0084_crate_value_fixes.sql, same tables and
 // rules); guests roll here. crates.test.ts keeps the server's tables in step.
-import { CARS, MODS, MOD_SKINS, SKINS, carDef, modDef, modFits, ownedMods, type CarDef, type ModDef, type SkinDef, type SkinTier } from './data'
+import { CARS, CUSTOM_PAINT, CUSTOM_PAINT_CRATE, MODS, MOD_SKINS, SKINS, carDef, hasCustomPaint, ownedSkins, modDef, modFits, ownedMods, type CarDef, type ModDef, type SkinDef, type SkinTier } from './data'
 import { PIECE_COUNT, PIECE_SOURCES, pieceId, piecePool } from './resto'
 import { crateHats, hatDef } from './hats'
 
@@ -116,6 +116,7 @@ export function carOdds(c: CrateDef, level: number): { model: string; p: number 
 // skin joins the crates as soon as it's added there. Rarer tiers are less likely. Weekly event
 // skins (game/events.ts) are the exception: they're only won by clearing their event. So are
 // skins a level hands out: everyone past it has one, so in a crate it could only pay coins.
+// Custom Colour (CUSTOM_PAINT) rides in one crate's paint slice as a body skin of its tier.
 // Weekly event skins and level skins never go in crates.
 function inCrates(d: SkinDef) {
   return !('event' in d.unlock) && !('level' in d.unlock)
@@ -124,6 +125,7 @@ export const SKIN_WEIGHT: Record<SkinTier, number> = { rare: 6, epic: 3, legenda
 export type CrateSkin = { id: string; part: boolean; def: SkinDef }
 export function crateSkins(c: CrateDef): CrateSkin[] {
   const all = [...SKINS.map((def) => ({ id: def.id, part: false, def })), ...MOD_SKINS.map((def) => ({ id: def.id, part: true, def }))]
+  if (c.id === CUSTOM_PAINT_CRATE) all.push({ id: CUSTOM_PAINT.id, part: false, def: CUSTOM_PAINT })
   return all.filter((x) => c.skins.includes(x.def.tier) && inCrates(x.def))
 }
 export function skinOdds(c: CrateDef): (CrateSkin & { p: number })[] {
@@ -136,6 +138,8 @@ export const SKIN_DUPE: Record<SkinTier, number> = { rare: 0.6, epic: 1, legenda
 // Skins the player already has, body and part (from ownedSkins / ownedModSkins in data.ts), and hats.
 // pieces: resto-mod pieces held ("model:piece"; the server counts its own ledger).
 export type OwnedSkins = { skins: string[]; modSkins: string[]; hats?: string[]; pieces?: string[] }
+// The body skins a crate counts as yours: ownedSkins plus Custom Colour once won.
+export const crateOwnedSkins = (s: Parameters<typeof ownedSkins>[0]) => [...ownedSkins(s), ...(hasCustomPaint(s) ? [CUSTOM_PAINT.id] : [])]
 
 // What a piece you already have turns into, as a share of the crate's worth.
 export const PIECE_DUPE = 1
@@ -198,7 +202,7 @@ function pickWeighted<T>(items: T[], weight: (t: T) => number, rand: () => numbe
   return items[items.length - 1]
 }
 
-export const skinOf = (id: string, part: boolean) => (part ? MOD_SKINS : SKINS).find((x) => x.id === id)
+export const skinOf = (id: string, part: boolean) => (part ? MOD_SKINS : [...SKINS, CUSTOM_PAINT]).find((x) => x.id === id)
 
 // Opens left until the pity prize, given how many opens in a row missed it (null: no pity).
 export const pityLeft = (c: CrateDef, dry: number) => (c.pity ? Math.max(1, c.pity.every - dry) : null)
@@ -331,7 +335,8 @@ export function crateTables() {
     // Body skins by id, part skins by id: tier, and the level or collection set that also unlocks one.
     skinWeight: SKIN_WEIGHT,
     skinDupe: SKIN_DUPE,
-    skins: Object.fromEntries(SKINS.filter(inCrates).map((d) => [d.id, skinRow(d)])),
+    // Custom Colour drops only from its own crate (`only`).
+    skins: Object.fromEntries([...SKINS.filter(inCrates).map((d) => [d.id, skinRow(d)]), [CUSTOM_PAINT.id, { ...skinRow(CUSTOM_PAINT), only: CUSTOM_PAINT_CRATE }]]),
     modSkins: Object.fromEntries(MOD_SKINS.filter(inCrates).map((d) => [d.id, skinRow(d)])),
     gem: GEM_COINS,
     pieceDupe: PIECE_DUPE,

@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { PIECE_SOURCES, restoTables } from './resto'
-import { CARS, MODS, MOD_SKINS, SKINS, carDef, modDef, modFits } from './data'
+import { CARS, CUSTOM_PAINT, MODS, MOD_SKINS, SKINS, carDef, modDef, modFits } from './data'
 import { crateHats, HATS } from './hats'
 import { CRATES, HAT_ODDS, cratePrice, dropTier, carCrate, carValue, carWorth, crateCars, crateDef, crateOdds, crateOddsShown, crateSkins, crateTables, crateValue, homeCars, homeMods, modChoices, modCrate, modWorth, rollCrate, rollSourcePiece, skinOdds, type CrateDrop } from './crates'
 
@@ -146,7 +146,7 @@ describe('crates', () => {
       if (odds.length) expect(odds.reduce((a, x) => a + x.p, 0)).toBeCloseTo(1)
     }
     const diamond = crateDef('diamond')!
-    const all = { skins: SKINS.map((d) => d.id), modSkins: MOD_SKINS.map((d) => d.id) }
+    const all = { skins: [...SKINS.map((d) => d.id), CUSTOM_PAINT.id], modSkins: MOD_SKINS.map((d) => d.id) }
     const rand = seeded(11)
     for (let i = 0; i < 300; i++) expect(rollCrate(diamond, 20, garage, rand, all).kind).not.toBe('skin')
     let won = 0

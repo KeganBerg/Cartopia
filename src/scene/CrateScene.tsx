@@ -15,7 +15,7 @@ import { concreteTex, corrugatedTex, glowTex, shutterTex } from './textures'
 import { signTexture } from './signTexture'
 import { ToolChest, TyreStack, useFitCamera } from './ArcadeScenery'
 import { tickSkins, withSkin } from './skins'
-import { MODS, SKINNED_SLOTS, carDef, fittedMods, modFits, modSkinNumber, skinNumber, type Body, type Finish, type SkinnedSlot, type Panels } from '../game/data'
+import { CUSTOM_PAINT, CUSTOM_PAINT_SHOW, MODS, SKINNED_SLOTS, carDef, fittedMods, modFits, modSkinNumber, skinNumber, type Body, type Finish, type SkinnedSlot, type Panels } from '../game/data'
 import type { HatFit } from '../game/hats'
 import { dropTier, type CrateDef, type CrateDrop, type CrateId } from '../game/crates'
 import { calmFlashing } from '../game/flashing'
@@ -1272,6 +1272,8 @@ function skinLook(id: string, part: boolean, cars: { uid: string; model: string;
   const car = owned.find((c) => c.uid === mine) ?? owned[0] ?? { model: 'civic', color: '#eceff1' }
   const d = carDef(car.model)
   const look: CarLook = { body: d.body, model: car.model, color: car.color, finish: car.finish, stripe: car.stripe }
+  // Custom Colour shows your car in a colour that isn't on the paint chart.
+  if (!part && id === CUSTOM_PAINT.id) return { ...look, mods: [], color: CUSTOM_PAINT_SHOW }
   if (!part) return { ...look, mods: [], skin: id }
   const have = fittedMods(car.mods ?? [], d.body)
   const kit = SKINNED_SLOTS.map((sl) => have[sl] ?? bestPart(sl, d.body)).filter((m): m is string => !!m)
