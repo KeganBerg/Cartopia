@@ -70,10 +70,10 @@ export function AccountPanel() {
       <SheetTabs items={MENU_TABS} value={tab} onChange={(t) => { lastTab = t; setTab(t) }} />
       {tab === 'town' && <>
       <button className="buy bank-menu-btn" onClick={() => openPanel('bank')}>🏦 Bank · get gems</button>
-      <h3>Town name</h3>
-      <div className="row">
-        <input value={name} maxLength={24} onChange={(e) => setName(e.target.value)} />
-        <button className="buy small" onClick={() => (isCleanName(name) ? rename(name) : useGame.getState().toast(NAME_REJECTED))}>Save</button>
+      <h3 className="cl-head">🏙️ Town name</h3>
+      <div className="row town-name">
+        <input value={name} maxLength={24} aria-label="Town name" onChange={(e) => setName(e.target.value)} />
+        <button className="buy" disabled={!name.trim() || name === townName} onClick={() => (isCleanName(name) ? rename(name) : useGame.getState().toast(NAME_REJECTED))}>Save</button>
       </div>
       <CityLook />
       </>}

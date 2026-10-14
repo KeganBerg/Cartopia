@@ -23,14 +23,20 @@ for (const [form, size] of [['desktop', { width: 1280, height: 800 }], ['phone',
   for (const n of names) for (let tries = 0; tries < 2; tries++) try {
     await p.evaluate(() => window.__game.setState({ panel: null }))
     await p.waitForTimeout(300)
-    if (n.startsWith('race:')) {
-      await p.evaluate(async (t) => { (await import('/src/ui/raceNav.ts')).openRaceTab(t) }, n.slice(5))
+    // panel#Tab opens a panel, then taps the tab whose label contains Tab.
+    const [id, tabName] = n.split('#')
+    if (id.startsWith('race:')) {
+      await p.evaluate(async (t) => { (await import('/src/ui/raceNav.ts')).openRaceTab(t) }, id.slice(5))
     } else {
-      await p.evaluate((n) => window.__game.setState({ panel: n }), n)
+      await p.evaluate((id) => window.__game.setState({ panel: id }), id)
     }
     // Menus load lazily: wait for the panel itself, then let thumbnails render.
     await p.waitForSelector('.panel', { timeout: 30000 }).catch(() => console.log('no panel', n))
     await p.waitForTimeout(2000)
+    if (tabName) {
+      await p.evaluate((t) => [...document.querySelectorAll('[role=tab]')].find((b) => b.textContent.includes(t))?.click(), tabName)
+      await p.waitForTimeout(1500)
+    }
     await p.screenshot({ path: `${out}/${form}-${n.replace(/\W/g, '-')}.png` })
     console.log(form, n)
     break

@@ -1224,12 +1224,35 @@ html.calm .callout { animation: none !important; }
 .theme-strip { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 10px 0 2px; }
 .theme-dot { width: 34px; height: 34px; border-radius: 50%; border: 2px solid rgba(0,0,0,.18); padding: 0; cursor: pointer; font-size: 16px; line-height: 1; background: #fff; }
 .theme-dot.sel { border-color: #ff8f00; box-shadow: 0 0 0 3px rgba(255,143,0,.35); }
-.city-look .theme-strip { justify-content: flex-start; }
-.city-look h3 { margin: 12px 0 4px; }
-.lamp-posts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-.lamp-posts button { padding: 8px 4px; border-radius: 10px; border: 2px solid rgba(0,0,0,.12); background: #fff; font-size: 12px; display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; }
-.lamp-posts button.sel { border-color: #ff8f00; background: #fff8e1; }
-.lamp-posts button span { font-size: 20px; }
+/* Menu > Town: picture cards for lamp posts and town colours, glowing bulbs for the light colour. */
+.cl-head { margin: 16px 0 8px; font-size: 18px; }
+.town-name { gap: 8px; }
+.town-name input { flex: 1 1 0; width: auto; margin: 0; min-width: 0; font: 800 17px Nunito, sans-serif; padding: 10px 12px; border-radius: 12px; }
+.town-name .buy { flex: none; width: auto; min-width: 84px; font-size: 16px; }
+.cl-grid { display: grid; gap: 10px; }
+.cl-lamps { grid-template-columns: repeat(4, 1fr); }
+.cl-themes { grid-template-columns: repeat(4, 1fr); }
+.cl-card { position: relative; display: flex; flex-direction: column; padding: 0; border: 3px solid rgba(20,33,61,.14); border-radius: 14px; background: #fff; overflow: hidden; cursor: pointer; }
+.cl-card img { display: block; width: 100%; aspect-ratio: 240 / 220; object-fit: cover; background: #141a33; }
+.cl-themes .cl-card img { aspect-ratio: 360 / 220; background: #bfe3f7; }
+.cl-name { font: 800 15px Nunito, sans-serif; color: #14213d; padding: 6px 4px 7px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cl-card.sel { border-color: #ff8f00; box-shadow: 0 0 0 3px rgba(255,143,0,.3); }
+.cl-card.sel .cl-name { background: #fff3d6; }
+.cl-card.sel::after { content: '✔'; position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border-radius: 50%; background: #ff8f00; color: #fff; font: 900 14px/24px Nunito, sans-serif; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.35); }
+.cl-bulbs { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 12px; }
+.cl-bulb { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 6px 0; border: 0; background: none; cursor: pointer; min-width: 0; }
+.cl-bulb i { width: 36px; height: 36px; border-radius: 50%; background: radial-gradient(circle at 38% 34%, #fff 0 18%, var(--c) 55%); box-shadow: 0 0 10px var(--c), inset 0 -3px 0 rgba(0,0,0,.18); border: 3px solid #fff; outline: 2px solid rgba(20,33,61,.18); }
+.cl-bulb span { font: 800 12px Nunito, sans-serif; color: #4a6283; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.cl-bulb.sel i { outline: 3px solid #ff8f00; box-shadow: 0 0 18px 4px var(--c), inset 0 -3px 0 rgba(0,0,0,.18); }
+.cl-bulb.sel span { color: #14213d; }
+@media (max-width: 560px) {
+  .cl-grid { gap: 8px; }
+  .cl-themes { grid-template-columns: repeat(2, 1fr); }
+  .cl-lamps .cl-card img { aspect-ratio: 240 / 260; }
+  .cl-lamps .cl-name { font-size: 13px; }
+  .cl-bulb i { width: 32px; height: 32px; }
+  .cl-bulb span { font-size: 11px; }
+}
 .upgrade-stats { width: 100%; border-collapse: collapse; background: #fff; border: 2px solid #e0e0e0; border-radius: 12px; overflow: hidden; font-weight: 800; font-size: 14px; }
 .upgrade-stats th { font: 13px var(--display); color: #607d8b; text-align: right; padding: 6px 10px 2px; }
 .upgrade-stats td { padding: 5px 10px; border-top: 1px solid #eceff1; text-align: right; color: #455a64; }
@@ -2152,6 +2175,18 @@ body:has(.race-full) .toasts { display: none; }
 .gf-pick .gi { position: absolute; left: 7px; width: 15px; height: 15px; color: #2f7ff0; pointer-events: none; }
 .gf-pick::after { content: '▾'; position: absolute; right: 8px; font-size: 11px; color: #546e7a; pointer-events: none; }
 .gf-pick select { appearance: none; -webkit-appearance: none; width: 100%; min-width: 0; border: 0; background: transparent; padding: 7px 20px 7px 26px; font: 13px var(--display); color: #263238; cursor: pointer; text-overflow: ellipsis; }
+/* Shop search and the Cars > For Sale filter row (same pickers as My Cars). */
+.shop-find { display: flex; align-items: center; gap: 8px; margin: 2px 0 10px; padding: 0 6px 0 12px; background: #fff; border: 2px solid rgba(20,33,61,.14); border-radius: 12px; }
+.shop-find > span { font-size: 16px; }
+.shop-find input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; padding: 10px 0; font: 800 16px Nunito, sans-serif; color: #14213d; }
+.shop-find input::-webkit-search-cancel-button { display: none; }
+.shop-find button { border: 0; background: #eceff1; color: #546e7a; width: 28px; height: 28px; border-radius: 50%; font: 900 13px Nunito, sans-serif; cursor: pointer; }
+.shop-none { text-align: center; font: 800 16px Nunito, sans-serif; color: #607d8b; margin: 24px 0; }
+.sale-filter { position: static; margin-bottom: 10px; }
+.sale-filter .gf-pick select { font-size: 15px; padding-top: 9px; padding-bottom: 9px; }
+.owned-badge { position: absolute; left: 4px; top: 4px; padding: 2px 8px; border-radius: 999px; background: #2e8b34; color: #fff; font: 900 12px Nunito, sans-serif; box-shadow: 0 1px 3px rgba(0,0,0,.3); pointer-events: none; }
+.car-card .buy.broke:not(:disabled) { background: linear-gradient(#ff8a8a, #d6283b); border-color: #8a1020; }
+.cars-power { flex: none; margin-left: auto; margin-right: 8px; background: rgba(10,30,70,.35); border: 2px solid rgba(20,33,61,.55); color: #fff; border-radius: 999px; padding: 2px 10px; font: 900 15px Nunito, sans-serif; white-space: nowrap; text-shadow: 0 1px 0 rgba(0,0,0,.4); }
 
 /* Pit Stop: wheel rings pinned beside each wheel, the brake/go pad, and callouts. */
 .pit-pedal { position: absolute; inset: 0; touch-action: none; -webkit-touch-callout: none; }
