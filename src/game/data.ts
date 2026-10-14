@@ -176,6 +176,8 @@ export function eventEndsAt(e: GameEvent, now = Date.now()) {
 export const PLOT = 8
 export const PLOT_MIN = -2
 export const PLOT_MAX = 4
+// The empty lot in the starter town saved for Rusty's Rescue, the mandatory first build (top-left tile).
+export const RUSTY_LOT: [number, number] = [12, 12]
 export const START_LAND = [0, 1, 2].flatMap((x) => [0, 1, 2].map((z) => `${x},${z}`))
 export const plotPrice = (bought: number) => Math.round((5000 * Math.pow(1.45, bought)) / 500) * 500
 
@@ -1183,6 +1185,21 @@ export const SKINS: SkinDef[] = [
     swatch: 'radial-gradient(circle at 50% 30%, #fffbe6 0 10%, transparent 14%), repeating-linear-gradient(170deg, #e0843a 0 6px, #f6b25e 7px 10px), linear-gradient(180deg, #ffd9a0, #c4572a)' },
 ]
 export const skinDef = (id?: string | null) => (id ? SKINS.find((s) => s.id === id) : undefined)
+
+// Custom Colour: a legendary crate unlock (Diamond Crate paints only) that opens every colour,
+// picked from a colour wheel in the Paint and Custom tabs. It isn't a skin to wear, but it drops
+// in a crate's paint slice like one and is kept in the save's `skins`, so the server rolls and
+// pays it with no new prize kind.
+export const CUSTOM_PAINT: SkinDef = {
+  id: 'custompaint', n: 0, name: 'Custom Colour', tier: 'legendary', blurb: 'Paint any colour you like', unlock: { crate: true },
+  swatch: 'radial-gradient(circle, #fff 0 12%, transparent 60%), conic-gradient(#ff2d2d, #ffd400, #3cff3c, #00e5ff, #2d5bff, #ff2dd2, #ff2d2d)',
+}
+export const CUSTOM_PAINT_CRATE = 'diamond'
+// The off-chart colour a won Custom Colour shows on your car, and tries on first.
+export const CUSTOM_PAINT_SHOW = '#19ffb0'
+export const hasCustomPaint = (s: { skins?: string[] }) => !!s.skins?.includes(CUSTOM_PAINT.id)
+const HEX = /^#[0-9a-f]{6}$/
+export const isHexColor = (c: unknown): c is string => typeof c === 'string' && HEX.test(c)
 // The shader number for a car's skin, 0 for none (or one this version doesn't know).
 export const skinNumber = (id?: string | null) => skinDef(id)?.n ?? 0
 // Every skin the player can put on a car right now.

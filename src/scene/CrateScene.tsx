@@ -15,7 +15,7 @@ import { concreteTex, corrugatedTex, glowTex, shutterTex } from './textures'
 import { signTexture } from './signTexture'
 import { ToolChest, TyreStack, useFitCamera } from './ArcadeScenery'
 import { tickSkins, withSkin } from './skins'
-import { MODS, SKINNED_SLOTS, carDef, fittedMods, modFits, modSkinNumber, skinNumber, type Body, type Finish, type SkinnedSlot, type Panels } from '../game/data'
+import { CUSTOM_PAINT, CUSTOM_PAINT_SHOW, MODS, SKINNED_SLOTS, carDef, fittedMods, modFits, modSkinNumber, skinNumber, type Body, type Finish, type SkinnedSlot, type Panels } from '../game/data'
 import type { HatFit } from '../game/hats'
 import { dropTier, type CrateDef, type CrateDrop, type CrateId } from '../game/crates'
 import { calmFlashing } from '../game/flashing'
@@ -32,11 +32,17 @@ import { PartPrize } from './PartPrize'
 // Crate size (metres) and where its floor sits on the lift.
 const S = 1.5
 const LIFT = 0.14
-// Opening timeline (seconds from the tap).
-const CHARGE = 1.15
-const RISE = 0.25
-const SETTLE = 2.35
-export const REVEAL_AT = SETTLE
+// Opening timeline (seconds from the tap): `drop` is how long the crate takes to land, `charge`
+// how long it strains before it bursts, `rise` when the prize starts up out of it after the
+// burst and `lift` how long it takes to come up, `settle` when the prize is shown (from the tap)
+// and `hops` when it jumps as it strains.
+// A single open takes its time; the ×10 run opens the first nine quickly and the last one in full.
+export type CratePace = 'full' | 'quick' | 'show'
+const PACE = {
+  full: { drop: 0.55, charge: 1.15, rise: 0.25, lift: 0.9, settle: 2.35, hops: [0.35, 0.68, 0.95] },
+  quick: { drop: 0.28, charge: 0.36, rise: 0.04, lift: 0.5, settle: 0.86, hops: [0.1, 0.22] },
+} as const
+export const REVEAL_AT = PACE.full.settle
 
 // How exciting a prize is, as a glow colour: coins, a part or jackpot, a gem part, a car.
 export const TIER_GLOW = ['#4fc3f7', '#b388ff', '#ff4fd8', '#ffb300'] as const
@@ -172,7 +178,7 @@ const dollarTex = () =>
 // ---------------------------------------------------------------------------------------------
 // The crate
 
-type CrateParts = { root: Group | null; lid: Group | null; panels: (Group | null)[]; bands: (Group | null)[]; core: Mesh | null; light: PointLight | null }
+type CrateParts = { root: Group | null; base: Group | null; lid: Group | null; panels: (Group | null)[]; bands: (Group | null)[]; core: Mesh | null; light: PointLight | null }
 
 function Plank({ w, h, d, pos, mat, rot = 0 }: { w: number; h: number; d: number; pos: [number, number, number]; mat: MeshStandardMaterial; rot?: number }) {
   return (
@@ -241,8 +247,10 @@ function CrateModel({ def, glow, parts }: { def: CrateDef; glow: string; parts: 
   return (
     <group ref={(o) => void (p.root = o)}>
       {/* Skids and the floor of the crate. */}
-      {[-0.55, 0, 0.55].map((x) => <Plank key={x} w={0.16} h={0.12} d={S + 0.08} pos={[x * S, 0.06, 0]} mat={mats.frame} />)}
-      <Plank w={S} h={0.04} d={S} pos={[0, 0.13, 0]} mat={mats.frame} />
+      <group ref={(o) => void (p.base = o)}>
+        {[-0.55, 0, 0.55].map((x) => <Plank key={x} w={0.16} h={0.12} d={S + 0.08} pos={[x * S, 0.06, 0]} mat={mats.frame} />)}
+        <Plank w={S} h={0.04} d={S} pos={[0, 0.13, 0]} mat={mats.frame} />
+      </group>
       {/* The glow inside: a bright core that lights up through the gaps, and its light. */}
       <mesh ref={(o) => void (p.core = o)} position-y={S / 2 + 0.1} material={mats.core}>
         <boxGeometry args={[S * 0.86, S * 0.86, S * 0.86]} />
@@ -951,8 +959,13 @@ export function CrateScene(props: StageProps & { run: number }) {
   useFitCamera([0, 0.42, 1], [0, 1.5, -0.6], wide ? 5 : 2.5, wide ? 3 : 2.9)
   // Where the camera sits before an opening pushes it in (useFitCamera has just placed it).
   const base = useRef(new Vector3())
+  // And its facing, which Diamond's swing turns. Kept here rather than in Stage: a remounted
+  // Stage can draw a frame before the last one has put the camera back, and would take that
+  // turned facing as its own, leaving the depot a little more askew after every open.
+  const baseQ = useRef(new Quaternion())
   useLayoutEffect(() => {
     base.current.copy(camera.position)
+    baseQ.current.copy(camera.quaternion)
     const cam = camera as PerspectiveCamera
     if (wide) cam.setViewOffset(size.width, size.height, size.width * 0.13, 0, size.width, size.height)
     else cam.setViewOffset(size.width, size.height, 0, size.height * 0.13, size.width, size.height)
@@ -989,7 +1002,7 @@ export function CrateScene(props: StageProps & { run: number }) {
       <PostFx look={look} />
       <Depot />
       <Dust />
-      <Stage key={props.run} {...props} base={base} />
+      <Stage key={props.run} {...props} base={base} baseQ={baseQ} />
     </>
   )
 }
@@ -1003,29 +1016,37 @@ type StageProps = {
   onReveal: () => void
   // Bumped to jump to the end of the opening.
   skip: number
+  // How the opening plays (PACE); 'show' puts a prize already won back on the lift, with no crate.
+  pace?: CratePace
 }
 
 // Diamond's camera swing turns about the crate.
 const PIVOT = new Vector3(0, 1, 0)
 const UP = new Vector3(0, 1, 0)
+// Where the camera looks before an opening (CrateScene's useFitCamera), and the middle of a risen prize.
+const LOOK_AT = new Vector3(0, 1.5, -0.6)
+const PRIZE_AT = new Vector3(0, 1.45, 0)
+const HERO = new Vector3()
+const AIM = new Vector3()
 
 // One crate on the lift, from dropping in to its prize: remounted for every crate.
-function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps & { base: React.RefObject<Vector3> }) {
+function Stage({ def, phase, drop, prizeCar, onReveal, skip, base, baseQ, pace = 'full' }: StageProps & { base: React.RefObject<Vector3>; baseQ: React.RefObject<Quaternion> }) {
   const camera = useThree((s) => s.camera)
   const style = OPEN_STYLE[def.id]
   const drama = DRAMA[style]
-  // The camera's own facing, put back after Diamond's swing round the crate.
-  const baseQ = useRef<Quaternion | null>(null)
-  useEffect(() => () => void (drama.orbit && baseQ.current && camera.quaternion.copy(baseQ.current)), [camera, drama])
+  const show = pace === 'show'
+  const P = PACE[pace === 'quick' ? 'quick' : 'full']
+  // The camera's own facing (baseQ), put back after the prize view aims it (and Diamond's swing turns it).
+  useEffect(() => () => void camera.quaternion.copy(baseQ.current), [camera, baseQ])
   const tier = drop ? dropTier(drop) : 0
   const glow = drop ? TIER_GLOW[tier] : def.look.glow
-  const parts = useRef<CrateParts>({ root: null, lid: null, panels: [], bands: [], core: null, light: null })
+  const parts = useRef<CrateParts>({ root: null, base: null, lid: null, panels: [], bands: [], core: null, light: null })
   const prize = useRef<Group>(null)
   const beam = useRef<Mesh>(null)
   const flash = useRef<PointLight>(null)
   const burstAt = useRef<number | null>(null)
   const coinAt = useRef<number | null>(null)
-  const st = useRef({ born: -1, openAt: -1, lid: { y: 0, vy: 0, x: 0, vx: 0, rx: 0, landed: false }, revealed: false, hops: 0, skipped: skip, vary: { dir: 0, spin: 1, lag: [0, 0, 0, 0], wob: 11, side: 1 } })
+  const st = useRef({ born: -1, openAt: -1, charged: false, lid: { y: 0, vy: 0, x: 0, vx: 0, rx: 0, landed: false }, revealed: false, hops: 0, skipped: skip, vary: { dir: 0, spin: 1, lag: [0, 0, 0, 0], wob: 11, side: 1 } })
   const coins = drop?.kind === 'coins' || drop?.kind === 'dupe' || drop?.kind === 'skindupe' || drop?.kind === 'piecedupe'
   // Rare and legendary pulls (cars, gem parts, epic and legendary skins) throw gems instead.
   const gems = !coins && tier >= 2
@@ -1033,51 +1054,66 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
   const big = (drop?.kind === 'coins' && drop.jackpot) || tier >= 3
   // A part shows the part itself; cars and paints show the car.
   const part = drop?.kind === 'mod' ? drop.mod : null
-  const showCar = (drop?.kind === 'car' || drop?.kind === 'dupe' || drop?.kind === 'skin' || drop?.kind === 'skindupe' || drop?.kind === 'hat' || drop?.kind === 'piece') && !!prizeCar
+  // A part also shows on the car it's for (prizeLook fits it), so its shape reads at a glance.
+  const showCar = (drop?.kind === 'car' || drop?.kind === 'dupe' || drop?.kind === 'skin' || drop?.kind === 'skindupe' || drop?.kind === 'hat' || drop?.kind === 'piece' || drop?.kind === 'mod') && !!prizeCar
+  const key = useRef<PointLight>(null)
+  const rim = useRef<PointLight>(null)
 
   useFrame((state, rawDt) => {
     const s = st.current
     const dt = Math.min(rawDt, 1 / 20)
     const now = state.clock.elapsedTime
-    if (s.born < 0) s.born = now
+    if (s.born < 0) {
+      s.born = now
+      // A prize already won goes straight back on the lift: no crate, no sounds.
+      if (show) {
+        s.openAt = now - 10
+        burstAt.current = now - 10
+        s.revealed = true
+        s.charged = true
+      }
+    }
     const p = parts.current
     const root = p.root
     if (!root) return
+    root.visible = !show
     // Drop in from above on arrival, with a little bounce.
     const age = now - s.born
-    const fall = Math.min(1, age / 0.55)
+    const fall = Math.min(1, age / P.drop)
     let y = LIFT + (1 - fall * fall) * 5
-    if (fall >= 1) y = LIFT + Math.abs(Math.sin(Math.min(1, (age - 0.55) / 0.35) * Math.PI)) * 0.12 * Math.max(0, 1 - (age - 0.55) / 0.35)
+    if (fall >= 1) y = LIFT + Math.abs(Math.sin(Math.min(1, (age - P.drop) / 0.35) * Math.PI)) * 0.12 * Math.max(0, 1 - (age - P.drop) / 0.35)
     if (fall >= 1 && s.hops === 0) {
       s.hops = 1
-      bumpSound()
+      if (!show) bumpSound()
     }
     let shake = 0
     let charge = 0
-    if (phase === 'open' && s.openAt < 0) {
-      s.openAt = now
-      crateSfx.charge(CHARGE)
-    }
+    // A quick open starts straining as soon as it lands.
+    if (phase === 'open' && s.openAt < 0) s.openAt = pace === 'quick' ? now + Math.max(0, P.drop - age) : now
     if (skip !== s.skipped) {
       s.skipped = skip
-      if (s.openAt > 0) s.openAt = Math.min(s.openAt, now - SETTLE)
+      if (s.openAt > 0) s.openAt = Math.min(s.openAt, now - P.settle)
     }
     const t = s.openAt > 0 ? now - s.openAt : -1
+    if (t >= 0 && !s.charged) {
+      s.charged = true
+      if (t < P.charge) crateSfx.charge(P.charge - t)
+    }
     if (phase === 'wait') shake = 0.012
     if (phase === 'idle') root.rotation.y = Math.sin(now * 0.6) * 0.18
     if (t >= 0) {
-      charge = Math.min(1, t / CHARGE)
-      shake = t < CHARGE ? 0.01 + charge * charge * 0.06 : 0
+      charge = Math.min(1, t / P.charge)
+      shake = t < P.charge ? 0.01 + charge * charge * 0.06 : 0
       // Hops as it strains, each with a knock.
-      const hop = [0.35, 0.68, 0.95].findIndex((h) => t >= h && t < h + 0.16)
+      const hop = P.hops.findIndex((h) => t >= h && t < h + 0.16)
       if (hop >= 0) {
-        y += Math.sin(((t - [0.35, 0.68, 0.95][hop]) / 0.16) * Math.PI) * (0.06 + hop * 0.04)
+        y += Math.sin(((t - P.hops[hop]) / 0.16) * Math.PI) * (0.06 + hop * 0.04)
         if (s.hops < hop + 2) {
           s.hops = hop + 2
           bumpSound()
         }
       }
-      if (t >= CHARGE && burstAt.current == null) {
+      if (t >= P.charge && burstAt.current == null) {
         burstAt.current = now
         if (coins || gems) coinAt.current = now + 0.15
         crateOpenSound(def.id)
@@ -1105,7 +1141,6 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
     if (p.light) p.light.intensity = after >= 0 ? 6 + Math.max(0, 30 * (1 - after * 2)) : charge * 14
     // Reduce flashing: a softer, slower glow instead of the white burst.
     if (flash.current) flash.current.intensity = after >= 0 ? (calmFlashing() ? Math.max(0, 14 * (1 - after * 1.2)) : Math.max(0, drama.flash * (1 - after * 3))) : 0
-    if (!baseQ.current) baseQ.current = camera.quaternion.clone()
     // Burst: the crate opens its own way (see OPEN_STYLE) and the bands snap away.
     if (after >= 0) {
       const L = s.lid
@@ -1150,7 +1185,10 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
         const bounce = at > 0.42 && at < 0.7 ? Math.sin(((at - 0.42) / 0.28) * Math.PI) * 0.12 : 0
         // Shutters roll down into the base, a beat after the lid lifts.
         const roll = Math.min(1, Math.max(0, (at - 0.08) / 0.55))
-        if (style === 'shatter') g.scale.setScalar(0.001)
+        if (style === 'shatter') {
+          g.scale.setScalar(0.001)
+          p.base?.scale.setScalar(0.001)
+        }
         else if (style === 'roll') g.scale.y = Math.max(0.001, 1 - roll * roll * (3 - 2 * roll))
         // A chest keeps its back standing, with the lid hinged on it.
         else g.rotation.set(style === 'chest' && i === 1 ? 0 : open * 1.5 - bounce, 0, 0)
@@ -1159,39 +1197,50 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
       if (beam.current) {
         beam.current.visible = true
         beam.current.scale.set(drama.beam, Math.min(1, after * 4), drama.beam)
-        ;(beam.current.material as MeshBasicMaterial).opacity = Math.max(0.12, 0.7 * (1 - after * 0.6))
+        // It fades once the prize is up, so it doesn't wash the prize out.
+        ;(beam.current.material as MeshBasicMaterial).opacity = Math.max(0.04, 0.7 * Math.exp(-after * 1.1))
       }
       // The prize rises out of the box and turns slowly; a coin prize spins as it rises,
       // then stops facing the camera.
       const g = prize.current
       if (g) {
-        const r = Math.min(1, Math.max(0, (after - RISE) / 0.9))
+        const r = Math.min(1, Math.max(0, (after - P.rise) / P.lift))
         const ease = r < 1 ? 1 - Math.pow(1 - r, 3) + Math.sin(r * Math.PI) * 0.12 : 1
         g.visible = r > 0
         g.position.y = LIFT + 0.2 + ease * 0.5
         g.scale.setScalar(Math.max(0.01, ease))
         g.rotation.y = coins && !showCar ? Math.pow(1 - r, 3) * Math.PI * 4 : -0.6 + after * 0.55
+        // The prize's own lights: a soft white key from the camera's side and a rim in its tier's colour.
+        if (key.current) key.current.intensity = ease * 7
+        if (rim.current) rim.current.intensity = ease * 9
       }
-      if (!s.revealed && after > SETTLE - CHARGE) {
+      if (!s.revealed && after > P.settle - P.charge) {
         s.revealed = true
         crateSfx.reveal(tier, coins)
         onReveal()
       }
-      // Camera kick at the burst, then a slow push in.
-      // Diamond also swings the camera part way round the crate.
-      const kick = Math.max(0, 1 - after * 4) * drama.kick
+      // Camera kick at the burst, then a slow push in, then down and in to a showroom view of the
+      // prize, low enough that cars and parts read side on. Diamond also swings the camera part
+      // way round the crate.
+      const kick = show ? 0 : Math.max(0, 1 - after * 4) * drama.kick
       const b = base.current
       const push = Math.min(after, 2) * drama.push
       camera.position.set(b.x + (Math.random() - 0.5) * kick, b.y + (Math.random() - 0.5) * kick - push * 0.34, b.z - push)
+      const hk = Math.min(1, Math.max(0, (after - (P.settle - P.charge) + 0.35) / 1.1))
+      const h = hk * hk * (3 - 2 * hk)
+      HERO.set(PRIZE_AT.x + (b.x - PRIZE_AT.x) * 0.8, PRIZE_AT.y + (b.y - PRIZE_AT.y) * 0.45, PRIZE_AT.z + (b.z - PRIZE_AT.z) * 0.8)
+      camera.position.lerp(HERO, h)
+      AIM.copy(LOOK_AT).lerp(PRIZE_AT, h)
       if (drama.orbit) {
         const o = Math.min(1, after / 1.8)
         const turn = drama.orbit * s.vary.side * o * o * (3 - 2 * o)
         camera.position.sub(PIVOT).applyAxisAngle(UP, turn).add(PIVOT)
-        camera.quaternion.setFromAxisAngle(UP, turn).multiply(baseQ.current)
+        AIM.sub(PIVOT).applyAxisAngle(UP, turn).add(PIVOT)
       }
+      camera.lookAt(AIM)
     } else {
       camera.position.copy(base.current)
-      if (drama.orbit) camera.quaternion.copy(baseQ.current)
+      camera.quaternion.copy(baseQ.current)
       if (beam.current) beam.current.visible = false
       if (prize.current) prize.current.visible = false
     }
@@ -1210,13 +1259,18 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base }: StageProps 
         <circleGeometry args={[1.6, 32]} />
         <meshBasicMaterial map={glowTex()} color={glow} transparent opacity={0.35} blending={AdditiveBlending} depthWrite={false} toneMapped={false} />
       </mesh>
-      <Burst start={burstAt} glow={glow} amount={drama.confetti} />
-      {style === 'shatter' && <Shards start={burstAt} glow={glow} />}
-      {(coins || gems) && <CoinBurst start={coinAt} gems={gems} big={big} style={style} />}
+      {!show && <Burst start={burstAt} glow={glow} amount={drama.confetti} />}
+      {!show && style === 'shatter' && <Shards start={burstAt} glow={glow} />}
+      {!show && (coins || gems) && <CoinBurst start={coinAt} gems={gems} big={big} style={style} />}
       <group ref={prize} visible={false}>
+        <pointLight ref={key} position={[0.8, 2.6, 3.2]} intensity={0} distance={9} color="#fff4e0" />
+        <pointLight ref={rim} position={[0, 2.4, -2.4]} intensity={0} distance={7} color={glow} />
         {showCar && prizeCar && <PrizeCar look={prizeCar} />}
         {coins && !showCar && <CoinPile />}
-        {part && <PartPrize id={part} body={prizeCar?.body} tint={prizeCar?.color ?? '#90a4ae'} />}
+        {/* A part floats over the car wearing it, smaller, still turning; with no car to show, on its own. */}
+        {part && (prizeCar ? (
+          <group position-y={1.05} scale={0.42}><PartPrize id={part} body={prizeCar.body} tint={prizeCar.color} /></group>
+        ) : <PartPrize id={part} tint="#90a4ae" />)}
         {/* A slowly turning ring of light under the prize. */}
         <mesh rotation-x={-Math.PI / 2} position-y={0.02}>
           <ringGeometry args={[1.05, 1.2, 48]} />
@@ -1269,6 +1323,8 @@ function skinLook(id: string, part: boolean, cars: { uid: string; model: string;
   const car = owned.find((c) => c.uid === mine) ?? owned[0] ?? { model: 'civic', color: '#eceff1' }
   const d = carDef(car.model)
   const look: CarLook = { body: d.body, model: car.model, color: car.color, finish: car.finish, stripe: car.stripe }
+  // Custom Colour shows your car in a colour that isn't on the paint chart.
+  if (!part && id === CUSTOM_PAINT.id) return { ...look, mods: [], color: CUSTOM_PAINT_SHOW }
   if (!part) return { ...look, mods: [], skin: id }
   const have = fittedMods(car.mods ?? [], d.body)
   const kit = SKINNED_SLOTS.map((sl) => have[sl] ?? bestPart(sl, d.body)).filter((m): m is string => !!m)

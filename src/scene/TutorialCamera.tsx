@@ -3,12 +3,15 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { Vector3 } from 'three'
 import { useGame } from '../game/store'
 import { tutTarget } from '../ui/Tutorial'
+import { RUSTY_LOT } from '../game/data'
 import { centerOf } from './World'
 import { VIEW, isFree } from './freeCam'
 
 // Where the tutorial is pointing in the town, if anywhere: the pizza place to tap
 // (the one with a job going, else the one nearest the view) or Rusty's.
 function focusOf(s: ReturnType<typeof useGame.getState>): [number, number] | null {
+  // Building Rusty's: the lot kept for it, while the Shop is closed.
+  if (s.tutorial === 3 && !s.panel && !s.visiting && !s.buildings.some((b) => b.def === 'rescue')) return centerOf('rescue', ...RUSTY_LOT)
   const t = tutTarget(s)
   if (t === 'pizza') {
     const pizzas = s.buildings.filter((b) => b.def === 'pizza')
@@ -48,10 +51,11 @@ export function TutorialCamera() {
     const sy = (1 - p.y) / 2
     // Safe box: clear of the HUD on top and the tutorial card and bottom bar below.
     const top = Math.min(0.3, 170 / size.height)
-    const bottom = 1 - Math.min(0.4, 230 / size.height)
+    // Short screens (a phone on its side) lose more to the card, which sits mid-height there.
+    const bottom = 1 - Math.min(size.height < 500 ? 0.55 : 0.4, 230 / size.height)
     if (sx > 0.12 && sx < 0.88 && sy > top && sy < bottom) return
-    // Put it a little above the middle, so the card below never covers it.
-    const want = new Vector3(0, 0.1, 0.5).unproject(camera)
+    // Put it in the middle of that box, so the HUD above and the card below never cover it.
+    const want = new Vector3(0, 1 - (top + bottom), 0.5).unproject(camera)
     const at = new Vector3(f[0], 1, f[1])
     const ray = new Vector3(0, 0, -1).applyQuaternion(camera.quaternion)
     // Move along the ground plane: shift by the difference between where the point is and where we want it.

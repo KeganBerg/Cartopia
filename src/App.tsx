@@ -6,6 +6,7 @@ import { Hud } from './ui/Hud'
 import { FlyLayer } from './ui/Fly'
 import { ThumbRenderer } from './scene/BuildingPreview'
 import { Preview, StageCanvas } from './scene/Stage'
+import { quietShaders } from './scene/warm'
 import { BottomBar, ShopPanel, ShowroomPanel, GaragePanel, Toasts } from './ui/Menus'
 import { InventoryPanel } from './ui/Inventory'
 import { PaintPrizePopup } from './ui/PaintRivals'
@@ -38,6 +39,7 @@ import { GhostRacePanel, TauntWatcher, TauntsPanel } from './ui/GhostRace'
 import { GoalsPanel, FlatPanel } from './ui/Goals'
 import { SeasonPanel } from './ui/Season'
 import { useGame } from './game/store'
+import { setCalmSky } from './game/weather'
 import { startCloudSync } from './lib/cloud'
 import { startPurchaseSync } from './lib/payments'
 import './lib/rescue'
@@ -45,7 +47,7 @@ import './lib/crates'
 import './lib/accountSwitch'
 import { startAmbience } from './lib/ambience'
 import { startMusic } from './lib/townMusic'
-import { prefetchTechno, startTechnoMusic } from './lib/technoMusic'
+import { startTechnoMusic } from './lib/technoMusic'
 import { TechnoLayer } from './ui/Techno'
 import { FlashWarning, RaveHeadsUp, flashWarningOpen, openDaily } from './ui/FlashWarning'
 import { useTownPaused } from './scene/renderGate'
@@ -82,7 +84,7 @@ const CampaignPrizePopup = onDemand(loadRace, (m) => m.CampaignPrizePopup)
 const TourPrizePopup = onDemand(loadRace, (m) => m.TourPrizePopup)
 const EventPrizePopup = onDemand(loadRace, (m) => m.EventPrizePopup)
 const prefetchPanels = () => {
-  const go = () => { loadRace(); loadRescue(); loadCrates(); loadArcade(); prefetchTechno() }
+  const go = () => { loadRace(); loadRescue(); loadCrates(); loadArcade() }
   if ('requestIdleCallback' in window) requestIdleCallback(go, { timeout: 4000 })
   else go()
 }
@@ -125,6 +127,12 @@ export default function App() {
     // Checked again when it fires: a cloud save may have loaded since, already claimed today.
     // On first launch it waits for the flashing-lights warning (FlashWarning opens it after).
     setTimeout(() => { if (!flashWarningOpen()) openDaily() }, 800)
+    // A new player's first spin is the tutorial's reward: it opens once the tutorial is done or skipped.
+    const unsubDaily = useGame.subscribe((s, prev) => {
+      if (s.tutorial >= 99 && prev.tutorial < 99) setTimeout(openDaily, 1200)
+      setCalmSky(s.tutorial < 99)
+    })
+    setCalmSky(useGame.getState().tutorial < 99)
     // ?visitor=racer|tourist|mystery|barn brings a guest's visitor right away (for testing).
     const forced = new URLSearchParams(location.search).get('visitor') as VisitorKind | null
     if (forced) setTimeout(() => forceVisitor(forced), 2500)
@@ -135,6 +143,7 @@ export default function App() {
     return () => {
       clearInterval(id)
       clearTimeout(splashFallback)
+      unsubDaily()
       clearTimeout(prefetch)
       stopSplashCar()
     }
@@ -145,6 +154,7 @@ export default function App() {
       {/* Camera sits well back with a tight near/far range so depth stays precise and flat layers never flicker. */}
       <Canvas shadows={graphics !== 'saver'} orthographic camera={{ position: [75, 80, 75], zoom: 36, near: 1, far: 320 }} dpr={graphics === 'saver' ? 1 : SMALL && graphics === 'auto' ? [1, 1.5] : [1, 2]} gl={{ toneMapping: NeutralToneMapping }} frameloop={townPaused ? 'never' : 'demand'}
         onCreated={({ gl }) => {
+          quietShaders(gl)
           splashProgress(0.9)
           // Let the browser restore the 3D view after it drops the context, instead of leaving it blank.
           gl.domElement.addEventListener('webglcontextlost', (e) => e.preventDefault())

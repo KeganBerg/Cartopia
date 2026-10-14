@@ -2,9 +2,9 @@
 // coins, a part for one of your cars, a car, or a body or part skin. Every car and part has one
 // home crate, picked by what it's worth (see homeCrate), so dearer crates hold dearer cars and
 // parts. Cars only come once your level has unlocked them, so a crate never skips a level gate. A signed-in player's crates are
-// rolled by the server (crate_open(), newest copy in supabase/migrations/0072_crate_hats.sql, same tables and
+// rolled by the server (crate_open(), newest copy in supabase/migrations/0081_custom_paint.sql, same tables and
 // rules); guests roll here. crates.test.ts keeps the server's tables in step.
-import { CARS, MODS, MOD_SKINS, SKINS, carDef, modDef, modFits, ownedMods, type CarDef, type ModDef, type SkinDef, type SkinTier } from './data'
+import { CARS, CUSTOM_PAINT, CUSTOM_PAINT_CRATE, MODS, MOD_SKINS, SKINS, carDef, hasCustomPaint, ownedSkins, modDef, modFits, ownedMods, type CarDef, type ModDef, type SkinDef, type SkinTier } from './data'
 import { PIECE_COUNT, PIECE_SOURCES, pieceId, piecePool } from './resto'
 import { crateHats, hatDef } from './hats'
 
@@ -112,11 +112,13 @@ export function carOdds(c: CrateDef, level: number): { model: string; p: number 
 
 // Skins a crate can hold: every body skin (SKINS) and part skin (MOD_SKINS) of its tiers, so a new
 // skin joins the crates as soon as it's added there. Rarer tiers are less likely. Weekly event
-// skins (game/events.ts) are the exception: they're only won by clearing their event.
+// skins (game/events.ts) are the exception: they're only won by clearing their event. Custom
+// Colour (CUSTOM_PAINT) rides in one crate's paint slice as a body skin of its tier.
 export const SKIN_WEIGHT: Record<SkinTier, number> = { rare: 6, epic: 3, legendary: 1 }
 export type CrateSkin = { id: string; part: boolean; def: SkinDef }
 export function crateSkins(c: CrateDef): CrateSkin[] {
   const all = [...SKINS.map((def) => ({ id: def.id, part: false, def })), ...MOD_SKINS.map((def) => ({ id: def.id, part: true, def }))]
+  if (c.id === CUSTOM_PAINT_CRATE) all.push({ id: CUSTOM_PAINT.id, part: false, def: CUSTOM_PAINT })
   return all.filter((x) => c.skins.includes(x.def.tier) && !('event' in x.def.unlock))
 }
 export function skinOdds(c: CrateDef): (CrateSkin & { p: number })[] {
@@ -129,6 +131,8 @@ export const SKIN_DUPE: Record<SkinTier, number> = { rare: 0.6, epic: 1, legenda
 // Skins the player already has, body and part (from ownedSkins / ownedModSkins in data.ts), and hats.
 // pieces: resto-mod pieces held ("model:piece"; the server counts its own ledger).
 export type OwnedSkins = { skins: string[]; modSkins: string[]; hats?: string[]; pieces?: string[] }
+// The body skins a crate counts as yours: ownedSkins plus Custom Colour once won.
+export const crateOwnedSkins = (s: Parameters<typeof ownedSkins>[0]) => [...ownedSkins(s), ...(hasCustomPaint(s) ? [CUSTOM_PAINT.id] : [])]
 
 // What a piece you already have turns into, as a share of the crate's worth.
 export const PIECE_DUPE = 1
@@ -191,7 +195,7 @@ function pickWeighted<T>(items: T[], weight: (t: T) => number, rand: () => numbe
   return items[items.length - 1]
 }
 
-export const skinOf = (id: string, part: boolean) => (part ? MOD_SKINS : SKINS).find((x) => x.id === id)
+export const skinOf = (id: string, part: boolean) => (part ? MOD_SKINS : [...SKINS, CUSTOM_PAINT]).find((x) => x.id === id)
 
 // Opens left until the pity prize, given how many opens in a row missed it (null: no pity).
 export const pityLeft = (c: CrateDef, dry: number) => (c.pity ? Math.max(1, c.pity.every - dry) : null)
@@ -286,6 +290,16 @@ export function dropTier(d: CrateDrop): 0 | 1 | 2 | 3 {
   return 0
 }
 
+// The order a ×10 open shows its prizes in: plain coins first, the rarest last (by dropTier, then
+// cars over paints over hats over pieces over parts over jackpots over coins back for something
+// already yours, then the bigger coin win). Ties keep the order they were opened in.
+const KIND_RANK: Record<CrateDrop['kind'], number> = { coins: 0, dupe: 1, skindupe: 1, piecedupe: 1, mod: 3, piece: 4, hat: 5, skin: 6, car: 7 }
+export function revealOrder<T extends { drop: CrateDrop }>(opens: T[]): T[] {
+  const rank = (d: CrateDrop) => dropTier(d) * 100 + KIND_RANK[d.kind] * 10 + (d.kind === 'coins' && d.jackpot ? 5 : 0)
+  const won = (d: CrateDrop) => ('coins' in d ? d.coins : 0)
+  return opens.map((o, i) => ({ o, i })).sort((a, b) => rank(a.o.drop) - rank(b.o.drop) || won(a.o.drop) - won(b.o.drop) || a.i - b.i).map((x) => x.o)
+}
+
 // The odds a crate rolls from at this level. Cars are worth more than the crate, so the car slice
 // shrinks until it's worth no more than carShare of the crate (cars dear next to the crate are
 // rarer), and what it loses goes to coins. Each car's value is weighed at 1 / value (carOdds), so
@@ -298,14 +312,16 @@ export function crateOdds(c: CrateDef, level: number): CrateOdds {
   return { ...c.odds, coins: c.odds.coins + c.odds.car - car, car }
 }
 
-// The odds as a player sees them: coins (with jackpots), parts, cars and skins, in whole percent
-// (cars to a tenth below 1%, resto-mod pieces to a hundredth).
-export function crateOddsShown(c: CrateDef, level: number) {
+// The odds as a player sees them: coins (with jackpots), hats, parts, cars and skins, in whole
+// percent (cars to a tenth below 1%, resto-mod pieces to a hundredth). Hats come out of the coin
+// slice (HAT_ODDS), so pass `hats` false once the player has every hat the crate holds.
+export function crateOddsShown(c: CrateDef, level: number, hats = true) {
   const o = crateOdds(c, level)
   const t = o.coins + o.jackpot + o.mod + o.car + o.skin + o.piece
   const pc = (n: number) => Math.round((n / t) * 100)
   const car = (o.car / t) * 100
-  return { coins: pc(o.coins + o.jackpot), mod: pc(o.mod), car: car < 1 ? Math.round(car * 10) / 10 : Math.round(car), skin: pc(o.skin), piece: Math.round((o.piece / t) * 10000) / 100 }
+  const hat = hats && crateHats(c.id).length ? HAT_ODDS[c.id] : 0
+  return { coins: pc(o.coins + o.jackpot - hat), hat: pc(hat), mod: pc(o.mod), car: car < 1 ? Math.round(car * 10) / 10 : Math.round(car), skin: pc(o.skin), piece: Math.round((o.piece / t) * 10000) / 100 }
 }
 
 // Weekly event skins never go in crates.
@@ -324,7 +340,8 @@ export function crateTables() {
     // Body skins by id, part skins by id: tier, and the level or collection set that also unlocks one.
     skinWeight: SKIN_WEIGHT,
     skinDupe: SKIN_DUPE,
-    skins: Object.fromEntries(SKINS.filter(inCrates).map((d) => [d.id, skinRow(d)])),
+    // Custom Colour drops only from its own crate (`only`).
+    skins: Object.fromEntries([...SKINS.filter(inCrates).map((d) => [d.id, skinRow(d)]), [CUSTOM_PAINT.id, { ...skinRow(CUSTOM_PAINT), only: CUSTOM_PAINT_CRATE }]]),
     modSkins: Object.fromEntries(MOD_SKINS.filter(inCrates).map((d) => [d.id, skinRow(d)])),
     gem: GEM_COINS,
     pieceDupe: PIECE_DUPE,

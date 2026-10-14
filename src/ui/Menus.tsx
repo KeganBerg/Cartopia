@@ -23,7 +23,7 @@ import { CustomShop } from './Custom'
 import { HatShop, type HatTry } from './Hats'
 import { SkinPicker } from './Skins'
 import type { PaintJob, Panels, SkinnedSlot } from '../game/data'
-import { Icon } from './Icon'
+import { CoinIcon, Icon } from './Icon'
 import { useCrewGoal } from './CrewGoal'
 import { useCrewBattle } from '../lib/battles'
 import { useChat } from '../lib/chat'
@@ -34,6 +34,7 @@ import { buildingIcon } from './buildingIcons'
 import { useTipTarget, type TipTarget } from './Tips'
 import { setFreeCam, useFreeCam } from '../scene/freeCam'
 import { Confirm, useAsk } from './Confirm'
+import { useUnlock, freshClass } from '../game/unlocks'
 
 // The dyno run and its engine sound load the first time an upgrade shows on the dyno.
 const DynoOverlay = onDemand(() => import('./Dyno'), (m) => m.DynoOverlay)
@@ -55,21 +56,28 @@ export function BottomBar() {
   const tut = useGame(tutTarget)
   const tip = useTipTarget()
   const pulse = (t: TutTarget | TipTarget) => (tut === t || tip === t ? ' tut-pulse' : '')
+  // New players get these one at a time (src/game/unlocks.ts).
+  const shop = useUnlock('shop')
+  const cars = useUnlock('cars')
+  const social = useUnlock('social')
+  const edit = useUnlock('edit')
+  const race = useUnlock('race')
+  const done = useUnlock('gems')
   if (visiting) return null
   if (mode !== 'play') return <EditBar />
   return (
     <>
       <div className="bottom-bar">
-        <button className={`icon-btn${pulse('shop')}`} onClick={() => openPanel('shop')}><span className="i i-shop"><Icon name="shop" /></span>SHOP</button>
-        <button className={`icon-btn${pulse('cars')}`} onClick={() => openCars(setsReady > 0)}><span className="i i-showroom"><Icon name="car" />{setsReady > 0 && <span className="btn-dot">{setsReady}</span>}</span>CARS</button>
-        <button className="icon-btn" onClick={() => openPanel(crewChests > 0 ? 'clan' : 'friends')}><span className="i i-friends"><Icon name="friends" />{crewChests > 0 && <span className="btn-dot">{crewChests}</span>}</span>FRIENDS</button>
-        <button className="icon-btn" onClick={() => openPanel('chat')}><span className="i i-chat"><Icon name="chat" />{crewChat > 0 ? <span className="btn-dot">{crewChat > 9 ? '9+' : crewChat}</span> : globalChat && <span className="btn-dot new" />}</span>CHAT</button>
-        <button className="icon-btn" onClick={() => setMode('road')}><span className="i i-edit"><Icon name="cone" /></span>EDIT</button>
-        <button className={`big-btn race-btn${pulse('race')}`} onClick={() => openPanel('race')}><span className="i"><Icon name="flag" />{rival && <span className="btn-dot" title="Your rival is in town">!</span>}</span>RACE</button>
+        {shop.on && <button className={`icon-btn${pulse('shop')}${freshClass(shop.fresh)}`} onClick={() => openPanel('shop')}><span className="i i-shop"><Icon name="shop" /></span>SHOP</button>}
+        {cars.on && <button className={`icon-btn${pulse('cars')}${freshClass(cars.fresh)}`} onClick={() => openCars(setsReady > 0)}><span className="i i-showroom"><Icon name="car" />{setsReady > 0 && <span className="btn-dot">{setsReady}</span>}</span>CARS</button>}
+        {social.on && <button className={`icon-btn${freshClass(social.fresh)}`} onClick={() => openPanel(crewChests > 0 ? 'clan' : 'friends')}><span className="i i-friends"><Icon name="friends" />{crewChests > 0 && <span className="btn-dot">{crewChests}</span>}</span>FRIENDS</button>}
+        {social.on && <button className={`icon-btn${freshClass(social.fresh)}`} onClick={() => openPanel('chat')}><span className="i i-chat"><Icon name="chat" />{crewChat > 0 ? <span className="btn-dot">{crewChat > 9 ? '9+' : crewChat}</span> : globalChat && <span className="btn-dot new" />}</span>CHAT</button>}
+        {edit.on && <button className={`icon-btn${freshClass(edit.fresh)}`} onClick={() => setMode(useGame.getState().tutorial >= 99 ? 'road' : 'move')}><span className="i i-edit"><Icon name="cone" /></span>EDIT</button>}
+        {race.on && <button className={`big-btn race-btn${pulse('race')}${freshClass(race.fresh)}`} onClick={() => openPanel('race')}><span className="i"><Icon name="flag" />{rival && <span className="btn-dot" title="Your rival is in town">!</span>}</span>RACE</button>}
       </div>
-      <FreeCamButton />
-      <GoalsButton />
-      <CollectAllButton />
+      {social.on && <FreeCamButton />}
+      {done.on && <GoalsButton />}
+      {done.on && <CollectAllButton />}
     </>
   )
 }
@@ -131,6 +139,8 @@ function EditBar() {
   const storedCount = useGame((s) => s.stored?.length ?? 0)
   const tutDone = useGame((s) => tutTarget(s) === 'done')
   const tutCard = useGame(tutorialShowing)
+  // During the tutorial the bar keeps to placing and moving; roads, land and the rest come after.
+  const all = useGame((s) => s.tutorial >= 99)
   const pickedMerged = useGame((s) => !!s.selected && !!groupOf(s.buildings, s.selected))
   const canMerge = useGame((s) => (s.mode === 'merge' ? mergeCandidates(s.buildings).length > 0 || s.buildings.some((b) => b.merge) : true))
   const hint =
@@ -144,18 +154,18 @@ function EditBar() {
   return (
     <div className="edit-bar">
       {!tutCard && <div className="edit-hint">{hint}</div>}
-      {!tutCard && <TrafficMeter />}
+      {!tutCard && all && <TrafficMeter />}
       <div className="edit-tools">
-        <button className={mode === 'road' ? 'tool active' : 'tool'} onClick={() => setMode('road')}><Icon name="road" size={22} /><span>Road</span></button>
-        <button className={mode === 'bulldoze' ? 'tool active' : 'tool'} onClick={() => setMode('bulldoze')}><Icon name="bulldoze" size={22} /><span>Bulldoze</span></button>
+        {all && <button className={mode === 'road' ? 'tool active' : 'tool'} onClick={() => setMode('road')}><Icon name="road" size={22} /><span>Road</span></button>}
+        {all && <button className={mode === 'bulldoze' ? 'tool active' : 'tool'} onClick={() => setMode('bulldoze')}><Icon name="bulldoze" size={22} /><span>Bulldoze</span></button>}
         <button className={mode === 'move' ? 'tool active' : 'tool'} onClick={() => setMode('move')}><Icon name="move" size={22} /><span>Move</span></button>
-        <button className={mode === 'expand' ? 'tool active' : 'tool'} onClick={() => setMode('expand')}><Icon name="land" size={22} /><span>Land</span></button>
-        <button className={mode === 'merge' ? 'tool active' : 'tool'} onClick={() => setMode('merge')}><Icon name="merge" size={22} /><span>Merge</span></button>
+        {all && <button className={mode === 'expand' ? 'tool active' : 'tool'} onClick={() => setMode('expand')}><Icon name="land" size={22} /><span>Land</span></button>}
+        {all && <button className={mode === 'merge' ? 'tool active' : 'tool'} onClick={() => setMode('merge')}><Icon name="merge" size={22} /><span>Merge</span></button>}
         {((mode === 'place' && placing) || (mode === 'move' && selected)) && <button className="tool" onClick={rotateCurrent} title="Rotate (R)"><Icon name="rotate" size={22} /><span>Rotate</span></button>}
         {mode === 'move' && selected && canUpgrade && <button className="tool" onClick={() => openUpgrade(selected)}><Icon name="up" size={22} /><span>Upgrade</span></button>}
         {mode === 'move' && again && <button className="tool" onClick={() => setMode('place', again)}><Icon name="plus" size={22} /><span>Again</span></button>}
-        <button className="tool" onClick={() => openPanel('inventory')}><Icon name="box" size={22} /><span>Inventory</span>{storedCount > 0 && <b className="tool-count">{storedCount}</b>}</button>
-        <button className="tool" onClick={() => openPanel('shop')}><Icon name="shop" size={22} /><span>Shop</span></button>
+        {all && <button className="tool" onClick={() => openPanel('inventory')}><Icon name="box" size={22} /><span>Inventory</span>{storedCount > 0 && <b className="tool-count">{storedCount}</b>}</button>}
+        {all && <button className="tool" onClick={() => openPanel('shop')}><Icon name="shop" size={22} /><span>Shop</span></button>}
         <button className={tutDone ? 'tool done tut-pulse' : 'tool done'} onClick={() => setMode('play')}><Icon name="check" size={22} /><span>Done</span></button>
       </div>
     </div>
@@ -183,7 +193,8 @@ export function Panel({ title, children, wide, onClose, onBack, head, className 
       <div className={`${wide ? 'panel wide' : 'panel'}${className ? ` ${className}` : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="panel-head">
           {onBack && <button className="panel-back" aria-label="Back" onClick={onBack}><Icon name="back" size={18} /></button>}
-          <h2>{title}</h2>
+          {/* long titles (a garage with its stats) step down a size so they don't cut off */}
+          <h2 className={title.length > 14 ? 'long' : undefined} title={title}>{title}</h2>
           {head}
           <button className="close" aria-label="Close" onClick={() => close(null)}><Icon name="close" size={16} /></button>
         </div>
@@ -481,8 +492,8 @@ function DriverRow({ car, model }: { car: string; model: string }) {
   if (job) {
     const d = buildingDef(job.def)
     return (
-      <button className="driver-row" onClick={() => openUpgrade(job.uid)}>
-        🧑‍🔧 Drives for your <b>{d.name}</b> · {loves(def, d.id) ? '❤️ +25%' : '+10%'} coins
+      <button className="driver-row" onClick={() => openUpgrade(job.uid)} title={`Drives for your ${d.name} · ${loves(def, d.id) ? '+25%' : '+10%'} coins`} aria-label={`Drives for your ${d.name}`}>
+        <span aria-hidden>{buildingIcon(d.id)}</span>{loves(def, d.id) && <span aria-hidden>❤️</span>}<b>+{loves(def, d.id) ? 25 : 10}%</b><CoinIcon size={16} />
       </button>
     )
   }
@@ -724,12 +735,17 @@ export function GaragePanel() {
             )}
             {copies.length > 1 && <CopyBubbles copies={copies} selected={car.uid} onPick={select} />}
             <h3 className="garage-name">{def.name}{car.plate && <span className="mini-plate">{car.plate}</span>}</h3>
-            <div className="car-tags">
-              <span className="pi-badge">PI <b>{pi}</b></span>
-              <SkillTag model={car.model} />
-              <DriverRow car={car.uid} model={car.model} />
-              <ShowcaseToggle car={car.uid} />
-              <RaceCarToggle car={car.uid} />
+            {/* Under the preview: the PI tile, then the car's traits, then its two toggles. */}
+            <div className="car-sum">
+              <div className="car-pi" title="Performance Index"><b>{pi}</b><small>PI</small></div>
+              <div className="car-traits">
+                <SkillTag model={car.model} />
+                <DriverRow car={car.uid} model={car.model} />
+              </div>
+              <div className="car-toggles">
+                <RaceCarToggle car={car.uid} />
+                <ShowcaseToggle car={car.uid} />
+              </div>
             </div>
             <div className="garage-tabs" role="tablist">
               {([['tune', '🔧', 'Upgrades'], ['mods', '🪽', 'Mods'], ['paint', '🎨', 'Paint'], ['custom', '🖌️', 'Custom'], ['trim', '✨', 'Trim'], ['hats', '🎩', 'Hats']] as const).map(([id, icon, label]) => (

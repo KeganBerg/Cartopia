@@ -24,10 +24,11 @@ const onOpen = (l: () => void) => {
 export const showFlashWarning = () => setOpen(true)
 export const flashWarningOpen = () => open
 
-// The daily bonus waits behind the first-launch warning, so the two never stack.
+// The daily bonus waits behind the first-launch warning, so the two never stack, and a new
+// player gets it at the end of the tutorial (GoalSplash), not before their first tap.
 export function openDaily() {
   const s = useGame.getState()
-  if (s.lastDaily !== today() && !s.panel) s.openPanel('daily')
+  if (s.lastDaily !== today() && !s.panel && s.tutorial >= 99) s.openPanel('daily')
 }
 
 // The on/off switch, shared by the warning, the Rave heads-up and the menu.

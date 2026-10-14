@@ -6,7 +6,7 @@ import { useThree, type ThreeEvent } from '@react-three/fiber'
 import { MeshStandardMaterial, Plane, Vector3, type TOUCH } from 'three'
 import { create } from 'zustand'
 import { useGame, buildPrice, canPlace, buyablePlots, lotSize, movable, type PlacedBuilding } from '../game/store'
-import { TILE, PLOT, PLOT_MIN, PLOT_MAX, START_LAND, buildingDef, buildingLevel } from '../game/data'
+import { TILE, PLOT, PLOT_MIN, PLOT_MAX, START_LAND, RUSTY_LOT, buildingDef, buildingLevel } from '../game/data'
 import { BuildingModel } from './BuildingModel'
 import { rotateCurrent, setGhostTurn, turnOf } from '../game/placement'
 import { mergeGroups, groupOf, groupTurn, groupScale, isLandmark, type MergeGroup } from '../game/merge'
@@ -29,6 +29,7 @@ import { lampPost, themeFor } from '../game/cityLook'
 import { Manhole } from './BuildingDetail'
 import { GrassTufts } from './Tufts'
 import { Outskirts } from './Outskirts'
+import { townExits } from './townExits'
 import { RoadWear, StreetProp, PROPS, Hydrant, StreetLamp, Sidewalk, CornerCurb, CornerFillet, ENDS, type End } from './Roadside'
 import { toWorld, toTile, DIRS } from './grid'
 import { grassTex, paverTex, meadowTex } from './textures'
@@ -45,6 +46,7 @@ import { hoursOf, seedOf } from '../game/hours'
 import { VIEW, isFree, useFreeCam } from './freeCam'
 import { FreeCam } from './FreeCam'
 import { TutorialCamera } from './TutorialCamera'
+import { RustyLot } from './RustyLot'
 import { TownTouch, townFingers } from './TownTouch'
 import { tapOwnedBy } from './pick'
 import { useLite } from '../lib/prefs'
@@ -489,8 +491,11 @@ function Interaction() {
 
   // Show the ghost mid-screen as soon as placing starts, so Rotate visibly turns it
   // even before the pointer reaches the town (and on phones, which never hover).
+  // A new player placing Rusty's starts on the lot the starter town keeps for it: one tap builds.
   useEffect(() => {
     if (mode !== 'place' || !placing || !controls) return
+    const s = useGame.getState()
+    if (placing === 'rescue' && s.tutorial < 99 && canPlace(s, 'rescue', ...RUSTY_LOT)) return setHover([...RUSTY_LOT])
     setHover(toTile(controls.target.x, controls.target.z))
   }, [mode, placing, controls])
 
@@ -764,6 +769,7 @@ export const World = memo(function World() {
           <ResponsiveZoom />
           <ExpandZoom />
           <TutorialCamera />
+          <RustyLot />
           <Interaction />
         </>
       ),
@@ -791,7 +797,8 @@ export const World = memo(function World() {
     }),
     [],
   )
-  const outskirts = useMemo(() => <Outskirts land={land} roads={roadsList} small={small()} />, [land, roadsList])
+  const exits = useMemo(() => townExits(roadsList), [roadsList])
+  const outskirts = useMemo(() => <Outskirts land={land} exits={exits} small={small()} />, [land, exits])
   const tufts = useMemo(() => <GrassTufts land={land} roads={roadsList} buildings={buildings} />, [land, roadsList, buildings])
   return (
     <>
