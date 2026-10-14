@@ -234,6 +234,9 @@ export function ParkScene({ lot, me, input, running, onHud, onEnd }: {
   const index = PARK_LOTS.indexOf(lot)
   const camera = useThree((s) => s.camera) as PerspectiveCamera
   const size = useThree((s) => s.size)
+  const eye = useMemo(() => new Vector3(), [])
+  const at = useMemo(() => new Vector3(), [])
+  const aim = useMemo(() => new Vector3(), [])
   // The camera frames your car and the spot together, zoomed in as close as that allows
   // (never past the whole lot), so the car is big on screen right when it counts. On a
   // wide screen the view turns so the lot's long side runs across it.
@@ -257,9 +260,6 @@ export function ParkScene({ lot, me, input, running, onHud, onEnd }: {
     aim.lerp(at.set(fx, 0, fz), k)
     camera.lookAt(aim)
   }
-  const eye = useMemo(() => new Vector3(), [])
-  const at = useMemo(() => new Vector3(), [])
-  const aim = useMemo(() => new Vector3(), [])
   useLayoutEffect(() => {
     frame(lot.start.x, lot.start.z, 1)
     camera.updateProjectionMatrix()

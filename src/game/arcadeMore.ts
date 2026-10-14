@@ -82,8 +82,6 @@ export function dropBonus(hot: boolean, streak: number) {
   return DASH_BONUS + (hot ? 3 + 2 * Math.min(3, streak) : 0)
 }
 export const TRAFFIC_HIT = 2
-// Road centre lines across town, between and round the blocks.
-export const roadLine = (i: number) => -TOWN / 2 + STREET / 2 + i * CELL
 export function dashStars(drops: number) {
   return drops >= 6 ? 3 : drops >= 4 ? 2 : drops >= 2 ? 1 : 0
 }
@@ -93,6 +91,8 @@ export const STREET = 3 // road width
 export const GRID = 4 // blocks per side
 export const CELL = BLOCK + STREET
 export const TOWN = GRID * CELL + STREET // full width, roads on every edge
+// Road centre lines across town, between and round the blocks.
+export const roadLine = (i: number) => -TOWN / 2 + STREET / 2 + i * CELL
 export const blockCentre = (i: number) => -TOWN / 2 + STREET + BLOCK / 2 + i * CELL
 // Drive targets sit on the road beside a block's middle (side 0..3 = -z, +x, +z, -x).
 export function kerbSpot(bx: number, bz: number, side: number) {
