@@ -2263,3 +2263,10 @@ body:has(.race-full) .toasts { display: none; }
 
 /* The shared canvas in a view that takes its own taps (see moveTo in scene/Stage.tsx). */
 .stage-through, .stage-through * { pointer-events: none !important; }
+
+/* Weekly arcade boards: the button over the games, the game tabs, and your place on a result card. */
+.arc-weekly { display: block; margin: 0 0 8px auto; font: 16px var(--display); background: #ffd54f; color: #3e2723; border: none; border-radius: 999px; padding: 6px 14px; box-shadow: 0 3px 0 rgba(0,0,0,.2); }
+.arc-board-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
+.arc-board-tabs button { flex: 1; font-size: 26px; padding: 6px 0; border-radius: 12px; border: 2px solid #e0e0e0; background: #fff; }
+.arc-board-tabs button.sel { border-color: #1e88e5; background: #e3f2fd; }
+.arc-week { font: 20px var(--display); color: #ffd54f; margin-top: 6px; }

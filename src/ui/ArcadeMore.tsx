@@ -13,6 +13,8 @@ import { Cost, Countdown, Result, look, payFuel, useStable } from './ArcadeBits'
 import { sfx } from '../lib/sound'
 import { LoadingScene } from './Loading'
 import { StageSlot, useStageReady } from '../scene/Stage'
+import { startArcadeRun, submitArcadeRun } from '../lib/arcadeBoard'
+import { WeekPlace } from './ArcadeBoards'
 
 // The second wave of arcade games. Each runs inside one shell that handles the
 // fuel, the countdown, star pay and the result card.
@@ -42,7 +44,7 @@ export function StarGame({ id, car, onExit }: { id: StarGameId; car: OwnedCar; o
   const [run, setRun] = useState(0)
   const [running, setRunning] = useState(false)
   const [drawn, setDrawn] = useState(-1)
-  const [end, setEnd] = useState<{ stars: number; coins: number; xp: number; record: boolean; line: string } | null>(null)
+  const [end, setEnd] = useState<{ stars: number; coins: number; xp: number; record: boolean; line: string; place?: number } | null>(null)
 
   const done: Done = (stars, result, line) => {
     const pay = starReward(stars, level)
@@ -52,6 +54,7 @@ export function StarGame({ id, car, onExit }: { id: StarGameId; car: OwnedCar; o
       sfx.win()
     } else sfx.lose()
     setEnd({ stars, ...pay, record, line })
+    if (result > 0) void submitArcadeRun(id, result).then((b) => b?.me && setEnd((e) => e && { ...e, place: b.me!.place }))
   }
   const again = () => {
     if (!payFuel(`a ${meta.name} run`, id)) return
@@ -70,7 +73,7 @@ export function StarGame({ id, car, onExit }: { id: StarGameId; car: OwnedCar; o
         <h2>{meta.art.slice(0, 2)} {meta.name}</h2>
         <button className="close" onClick={onExit} aria-label="Close">✕</button>
       </div>
-      {!running && !end && drawn === run && <Countdown key={`count${run}`} onGo={() => setRunning(true)} />}
+      {!running && !end && drawn === run && <Countdown key={`count${run}`} onGo={() => { startArcadeRun(id); setRunning(true) }} />}
       {end && (
         <Result win={end.stars > 0} title={end.stars === 0 ? '😬 So close' : end.record ? '🏆 New best!' : end.stars === 3 ? '🌟 Perfect!' : '👏 Nice!'}
           actions={<>
@@ -80,6 +83,7 @@ export function StarGame({ id, car, onExit }: { id: StarGameId; car: OwnedCar; o
           <div className="arc-stars">{[1, 2, 3].map((n) => <span key={n} className={n <= end.stars ? 'on' : ''}>★</span>)}</div>
           <div className="arc-sub">{end.line}</div>
           {end.stars > 0 && <div className="arc-pay"><span>🪙 +{end.coins}</span><span>⭐ +{end.xp} XP</span></div>}
+          {end.place && <WeekPlace place={end.place} />}
         </Result>
       )}
     </div>

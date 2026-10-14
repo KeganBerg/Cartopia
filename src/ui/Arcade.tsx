@@ -16,6 +16,8 @@ import { STAR_GAMES, StarGame } from './ArcadeMore'
 import { loadStars, type StarGameId } from '../game/arcadeMore'
 import { LoadingScene } from './Loading'
 import { StageSlot, useStageReady } from '../scene/Stage'
+import { startArcadeRun, submitArcadeRun } from '../lib/arcadeBoard'
+import { WeeklyBoards, WeekPlace, useBoardsOn } from './ArcadeBoards'
 
 // Both games draw in the shared full-screen canvas (scene/Stage.tsx): no new WebGL
 // context and shader compile on every run.
@@ -33,6 +35,8 @@ export function ArcadePanel() {
   const car = cars.find((c) => c.uid === carId) ?? bestCar(cars)
   const [playing, setPlaying] = useState<Playing | null>(null)
   const [lots, setLots] = useState(false)
+  const [boards, setBoards] = useState(false)
+  const boardsOn = useBoardsOn()
   const [bests, setBests] = useState(loadBests)
   const [starBests, setStarBests] = useState(loadStars)
   const stars = bests.park
@@ -57,7 +61,8 @@ export function ArcadePanel() {
           ))}
         </div>
       )}
-      {lots ? (
+      {boardsOn && !lots && !boards && <button className="arc-weekly" onClick={() => setBoards(true)}>🏆 Weekly</button>}
+      {boards ? <WeeklyBoards onBack={() => setBoards(false)} /> : lots ? (
         <>
           <button className="arc-back" onClick={() => setLots(false)}>‹ Back</button>
           <div className="arc-lots">
@@ -123,7 +128,7 @@ function ChaseGame({ car, onExit }: { car: OwnedCar; onExit: () => void }) {
     setHud(h)
     if (h.pop) setPop(h.pop)
   })
-  const [end, setEnd] = useState<{ score: number; coins: number; xp: number; record: boolean } | null>(null)
+  const [end, setEnd] = useState<{ score: number; coins: number; xp: number; record: boolean; place?: number } | null>(null)
 
   // The shared driving keys (A/D or arrows): each press moves one lane that way.
   // On a phone, swipes and taps on either half of the screen do the same.
@@ -156,6 +161,7 @@ function ChaseGame({ car, onExit }: { car: OwnedCar; onExit: () => void }) {
     if (record) sfx.win()
     else sfx.lose()
     setEnd({ score, ...pay, record })
+    void submitArcadeRun('chase', score).then((b) => b?.me && setEnd((e) => e && { ...e, place: b.me!.place }))
   })
   const scene = useMemo(() => <ChaseScene me={look(car)} input={input} running={running} onHud={onHud} onBusted={busted} />, [car, input, running, onHud, busted])
   const stageReady = useStageReady()
@@ -199,7 +205,7 @@ function ChaseGame({ car, onExit }: { car: OwnedCar; onExit: () => void }) {
       {hud.nitro > 0 && <div className="chase-nitro"><i style={{ width: `${hud.nitro * 100}%` }} /></div>}
       {hud.warn && <div className="chase-warn" />}
       {pop && <div key={pop.id} className={`chase-pop ${pop.kind}`}>{pop.text}</div>}
-      {!running && !end && drawn === run && <Countdown key={`count${run}`} onGo={() => setRunning(true)} />}
+      {!running && !end && drawn === run && <Countdown key={`count${run}`} onGo={() => { startArcadeRun('chase'); setRunning(true) }} />}
       {running && hud.dist < 40 && <div className="arc-tip">{touch ? '👈 Swipe or tap to dodge 👉' : '👈 A / D or arrows to dodge 👉'}</div>}
       {end && (
         <Result win={end.record} title={end.record ? '🏆 New best!' : '🚨 Busted!'}
@@ -209,6 +215,7 @@ function ChaseGame({ car, onExit }: { car: OwnedCar; onExit: () => void }) {
           </>}>
           <div className="arc-big">{end.score.toLocaleString()}</div>
           <div className="arc-pay"><span>🪙 +{end.coins}</span><span>⭐ +{end.xp} XP</span></div>
+          {end.place && <WeekPlace place={end.place} />}
         </Result>
       )}
     </div>
