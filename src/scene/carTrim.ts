@@ -587,8 +587,6 @@ export function trimBike(k: Kit, model: string | undefined, b: { r: number; wz: 
     k.add('screen', box(0.2, 0.16, 0.008), [0, hy + 0.12, hz + 0.03], [-0.2, 0, 0])
   }
   if (model === 'shinden') {
-    k.add('lamp', disc(0.05, 14), [0, hy - 0.08, hz + 0.135], [0, 0, 0])
-    k.add('black', plane(0.012, 0.05), [0, hy - 0.08, hz + 0.1425])
     for (const sd of SIDES) k.add('dark', plane(0.18, 0.04), [sd * 0.083, b.r + 0.04, 0.04], [0, (sd * Math.PI) / 2, -0.1])
   }
 }

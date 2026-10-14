@@ -1413,11 +1413,12 @@ function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight,
 }
 
 // A box stretched from a to b (a strut, a limb, a fork leg).
-export function bar(k: Kit, part: Part, a: V3, b: V3, t: number) {
-  const d = new Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2])
-  const q = new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), d.clone().normalize())
+// d: its depth, when that differs from its width t.
+export function bar(k: Kit, part: Part, a: V3, b: V3, t: number, d = t) {
+  const v = new Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2])
+  const q = new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), v.clone().normalize())
   const e = new Euler().setFromQuaternion(q)
-  k.add(part, rbox(t, d.length() + t, t, t * 0.45), [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2], [e.x, e.y, e.z])
+  k.add(part, rbox(t, v.length() + t, d, Math.min(t, d) * 0.45), [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2], [e.x, e.y, e.z])
 }
 
 function bikeGeo(body: BikeBody, fit: Partial<Record<ModSlot, string>>, model?: string): CarGeo {
@@ -1428,44 +1429,187 @@ function bikeGeo(body: BikeBody, fit: Partial<Record<ModSlot, string>>, model?: 
   const b = BIKE[body]
   const k = new Kit()
   const r = s.wheel
+  const wz = b.wz
   const [hy, hz] = b.head
   const [sy, sz] = b.seat
-  // Fork legs from the front axle up to the steering head, with a fender over the tyre.
-  for (const x of [-0.045, 0.045]) bar(k, 'chrome', [x, r, b.wz], [x, hy, hz], 0.022)
-  k.add('paint', rbox(0.08, 0.025, r * 1.3, 0.012), [0, r * 2 + 0.03, b.wz], [-0.15, 0, 0])
-  // Headlight and handlebars.
-  k.add('black', cyl(0.05, 0.045, 0.05, 12), [0, hy - 0.02, hz + 0.05], [Math.PI / 2, 0, 0])
-  k.add('lamp', disc(0.042, 12), [0, hy - 0.02, hz + 0.077])
-  for (const sd of [-1, 1]) bar(k, 'black', [0, hy + 0.02, hz - 0.01], [sd * 0.19, hy + 0.04 + b.bars, hz - 0.05], 0.018)
-  for (const sd of [-1, 1]) k.add('black', cyl(0.014, 0.014, 0.05, 6), [sd * 0.2, hy + 0.04 + b.bars, hz - 0.05], [0, 0, Math.PI / 2])
-  // Frame from the head back to the rear axle, and the swingarm.
+  const PI = Math.PI
+  const sport = body === 'sportbike'
+  const chop = body === 'chopper'
+  const scoot = body === 'scooter'
+  // A point up the fork from the front axle (t 0) to the steering head (t 1), and how far the fork leans back.
+  const fk = (x: number, t: number): V3 => [x, r + t * (hy - r), wz + t * (hz - wz)]
+  const rake = Math.atan2(hz - wz, hy - r)
+  // Where a point (y, z) off a part's centre lands once the part is tipped rx about x.
+  const tip = (c: V3, rx: number, y: number, z: number): V3 => [c[0], c[1] + y * Math.cos(rx) - z * Math.sin(rx), c[2] + y * Math.sin(rx) + z * Math.cos(rx)]
+  const gy = hy + 0.04 + b.bars
+  const gz = hz - 0.05
+
+  // Forks: slim chrome sliders under thick dark tubes on the sport bike (upside down), plain chrome
+  // legs on the others; axle nuts on the outside and clamps holding them to the steering head.
+  for (const x of [-0.045, 0.045]) {
+    if (sport) {
+      bar(k, 'chrome', [x, r, wz], fk(x, 0.45), 0.02)
+      bar(k, 'black', fk(x, 0.38), [x, hy, hz], 0.03)
+    } else bar(k, 'chrome', [x, r, wz], [x, hy, hz], 0.022)
+    k.add('chrome', cyl(0.013, 0.013, 0.012, 8), [x * 1.36, r, wz], [0, 0, PI / 2])
+  }
+  if (!scoot) for (const t of [0.8, 1]) k.add('black', rbox(0.13, 0.02, 0.05, 0.008), fk(0, t), [rake, 0, 0])
+  // Fenders: curved bands over the tyres (start angle a0 behind the axle's back, sweeping arc forward over the top).
+  const fender = (z: number, a0: number, arc: number, gap = 0.028) =>
+    k.add('paint', new TorusGeometry(r + gap, 0.01, 5, 12, arc), [0, r, z], [0, PI / 2, a0], [1, 1, 3.6])
+  fender(wz, scoot ? 0.3 * PI : chop ? 0.38 * PI : 0.4 * PI, scoot ? 0.62 * PI : chop ? 0.42 * PI : 0.45 * PI)
+  if (chop) fender(-wz, 0.08 * PI, 0.55 * PI)
+  if (sport) fender(-wz, 0.3 * PI, 0.4 * PI, 0.022)
+
+  // Disc brakes: a thin bright ring inside the fork leg on a dark carrier, so the spokes show between
+  // them, and the caliper clamped over its edge at angle a (0 points back, PI / 2 up).
+  const rotor = (sd: number, z: number, rad: number, a: number) => {
+    const band = rad * 0.22
+    k.add('chrome', new TorusGeometry(rad - band, band, 4, 24), [sd * 0.031, r, z], [0, PI / 2, 0], [1, 1, 0.002 / band])
+    k.add('black', cyl(rad * 0.62, rad * 0.62, 0.012, 12), [sd * 0.032, r, z], [0, 0, PI / 2])
+    k.add('caliper', rbox(0.02, 0.05, 0.026, 0.006), [sd * 0.031, r + Math.sin(a) * rad * 0.8, z - Math.cos(a) * rad * 0.8], [a, 0, 0])
+  }
+  if (sport) for (const sd of [-1, 1]) rotor(sd, wz, r * 0.56, 0.3 * PI)
+  if (chop) rotor(-1, wz, r * 0.5, 0.3 * PI)
+  if (sport) rotor(1, -wz, r * 0.4, -0.85 * PI)
+
+  // Headlight in a chrome bezel, with turn signals either side (the sport bike's sit in its fairing).
+  if (!sport) {
+    k.add('black', cyl(0.05, 0.045, 0.05, 12), [0, hy - 0.02, hz + 0.05], [PI / 2, 0, 0])
+    k.add('lamp', disc(0.042, 12), [0, hy - 0.02, hz + 0.077])
+    k.add('chrome', new TorusGeometry(0.046, 0.006, 4, 16), [0, hy - 0.02, hz + 0.076])
+    for (const sd of [-1, 1]) {
+      bar(k, 'black', [sd * 0.035, hy - 0.03, hz + 0.04], [sd * 0.075, hy - 0.03, hz + 0.05], 0.008)
+      k.add('amber', cyl(0.011, 0.011, 0.022, 8), [sd * 0.085, hy - 0.03, hz + 0.055], [PI / 2, 0, 0])
+    }
+  }
+  // Handlebars with rubber grips, and mirrors on stalks (on the sport bike's fairing instead).
+  for (const sd of [-1, 1]) bar(k, 'black', [0, hy + 0.02, hz - 0.01], [sd * 0.19, gy, gz], 0.018)
+  for (const sd of [-1, 1]) k.add('black', cyl(0.014, 0.014, 0.05, 6), [sd * 0.2, gy, gz], [0, 0, PI / 2])
+  for (const sd of [-1, 1]) {
+    const foot: V3 = sport ? [sd * 0.09, hy - 0.05, hz + 0.06] : [sd * 0.15, gy + 0.005, gz + 0.005]
+    const head: V3 = sport ? [sd * 0.14, hy - 0.01, hz + 0.06] : [sd * 0.19, gy + 0.06, gz + 0.01]
+    bar(k, 'black', foot, head, 0.008)
+    k.add('black', rbox(0.055, 0.032, 0.014, 0.006), head)
+    k.add('glass', plane(0.044, 0.022), [head[0], head[1], head[2] - 0.0095], [0, PI, 0])
+    if (sport) k.add('amber', box(0.01, 0.008, 0.024), [head[0] + sd * 0.0285, head[1], head[2]])
+  }
+  // Clocks: a round dial on the classics, a lit screen on the sport bike.
+  if (sport) {
+    const c: V3 = [0, hy + 0.04, hz - 0.045]
+    k.add('black', rbox(0.08, 0.014, 0.05, 0.005), c, [-0.9, 0, 0])
+    k.add('display', plane(0.064, 0.036), tip(c, -0.9, 0.0095, 0), [-0.9 - PI / 2, 0, 0])
+  } else {
+    const c: V3 = [0, hy + 0.055, hz - 0.03]
+    const ax = (d: number) => tip(c, -0.5, d, 0)
+    k.add('black', cyl(0.03, 0.03, 0.02, 14), c, [-0.5, 0, 0])
+    k.add('lamp', disc(0.025, 14), ax(0.0125), [-0.5 - PI / 2, 0, 0])
+    k.add('chrome', new TorusGeometry(0.029, 0.004, 4, 14), ax(0.011), [-0.5 - PI / 2, 0, 0])
+  }
+
+  // Frame from the head back to the rear axle, the swingarm, and on the cruiser a downtube and twin shocks.
   bar(k, 'black', [0, hy - 0.04, hz - 0.02], [0, sy - 0.08, sz - 0.1], 0.04)
-  for (const x of [-0.05, 0.05]) bar(k, 'black', [x, r, -b.wz], [x, r + 0.08, -0.04], 0.026)
+  for (const x of [-0.05, 0.05]) bar(k, 'black', [x, r, -wz], [x, r + 0.08, -0.04], 0.026)
+  if (chop) {
+    bar(k, 'black', [0, hy - 0.06, hz - 0.02], [0, r + 0.03, 0.11], 0.03)
+    for (const sd of [-1, 1]) {
+      bar(k, 'chrome', [sd * 0.062, r + 0.02, -wz + 0.05], [sd * 0.062, sy - 0.04, sz - 0.12], 0.016)
+      bar(k, 'black', [sd * 0.062, r + 0.07, -wz + 0.068], [sd * 0.062, sy - 0.09, sz - 0.135], 0.024)
+    }
+  }
+  // Chain down the left from the gearbox sprocket to the rear one.
+  if (!scoot) {
+    const [fy, fz, fr] = [r + 0.07, -0.05, 0.028]
+    const rr = r * 0.42
+    k.add('dark', rbox(0.028, 0.075, 0.075, 0.012), [-0.085, fy, fz])
+    k.add('black', cyl(rr, rr, 0.006, 16), [-0.09, r, -wz], [0, 0, PI / 2])
+    k.add('chrome', cyl(rr * 0.4, rr * 0.4, 0.018, 8), [-0.09, r, -wz], [0, 0, PI / 2])
+    for (const sd of [-1, 1]) bar(k, 'black', [-0.09, fy + sd * fr, fz], [-0.09, r + sd * rr, -wz], 0.012)
+  }
+
   // Engine between the wheels.
-  if (body === 'scooter') {
-    // Step-through: a floorboard, a leg shield up to the bars, and a round body over the rear wheel.
+  if (scoot) {
+    // Step-through: a floorboard with rubber strips, a leg shield up to the bars with a horn grille,
+    // and a round body over the rear wheel with a chrome belt.
     k.add('paint', rbox(0.2, 0.04, 0.28, 0.015), [0, r + 0.05, 0.02])
-    k.add('paint', rbox(0.24, hy - r - 0.04, 0.05, 0.02), [0, (hy + r) / 2, hz - 0.02], [-0.18, 0, 0])
-    k.add('paint', new SphereGeometry(1, 14, 10), [0, r + 0.15, -b.wz + 0.08], [0, 0, 0], [0.13, 0.14, 0.2])
-    k.add('dark', rbox(0.12, 0.1, 0.16, 0.03), [0.05, r + 0.03, -b.wz + 0.05])
+    for (const x of [-0.06, -0.02, 0.02, 0.06]) k.add('black', box(0.012, 0.006, 0.22), [x, r + 0.07, 0.02])
+    const sh: V3 = [0, (hy + r) / 2, hz - 0.02]
+    k.add('paint', rbox(0.24, hy - r - 0.04, 0.05, 0.02), sh, [-0.18, 0, 0])
+    for (let i = 0; i < 4; i++) k.add('black', box(0.07, 0.006, 0.008), tip(sh, -0.18, 0.05 + i * 0.016, 0.027), [-0.18, 0, 0])
+    const cw: V3 = [0, r + 0.15, -wz + 0.08]
+    k.add('paint', new SphereGeometry(1, 14, 10), cw, [0, 0, 0], [0.13, 0.14, 0.2])
+    k.add('chrome', new TorusGeometry(1, 0.06, 4, 28), cw, [PI / 2, 0, 0], [0.136, 0.206, 0.15])
+    k.add('dark', rbox(0.12, 0.1, 0.16, 0.03), [0.05, r + 0.03, -wz + 0.05])
   } else {
     k.add('chrome', rbox(0.14, 0.13, 0.17, 0.03), [0, r + 0.1, 0.02])
-    // V-twin cylinders on the cruiser, a sloped block on the sport bike.
-    if (body === 'chopper') for (const sd of [-1, 1]) k.add('chrome', cyl(0.045, 0.05, 0.14, 10), [0, r + 0.22, 0.02 + sd * 0.05], [sd * 0.45, 0, 0])
-    else k.add('dark', rbox(0.15, 0.1, 0.12, 0.03), [0, r + 0.2, 0.06], [0.3, 0, 0])
-    // Fuel tank between the head and the seat.
-    k.add('paint', rbox(0.16, 0.1, (hz - sz) * 0.62, 0.045), [0, (hy + sy) / 2 - 0.02, (hz + sz) / 2 + 0.02], [body === 'sportbike' ? 0.2 : 0.08, 0, 0])
+    if (chop) {
+      // V-twin: two finned cylinders with chrome heads, and a round air cleaner on the right.
+      for (const sd of [-1, 1]) {
+        const c: V3 = [0, r + 0.22, 0.02 + sd * 0.05]
+        const rx = sd * 0.45
+        k.add('chrome', cyl(0.045, 0.05, 0.14, 10), c, [rx, 0, 0])
+        for (const d of [-0.035, -0.01, 0.015, 0.04]) k.add('black', cyl(0.06, 0.06, 0.007, 10), tip(c, rx, d, 0), [rx, 0, 0])
+        k.add('chrome', rbox(0.075, 0.03, 0.075, 0.01), tip(c, rx, 0.075, 0), [rx, 0, 0])
+      }
+      k.add('chrome', cyl(0.045, 0.045, 0.02, 14), [0.085, r + 0.17, 0.02], [0, 0, PI / 2])
+      k.add('black', cyl(0.02, 0.02, 0.026, 8), [0.085, r + 0.17, 0.02], [0, 0, PI / 2])
+    } else {
+      // Sloped block with a radiator ahead of it (the side panels cover the rest).
+      k.add('dark', rbox(0.15, 0.1, 0.12, 0.03), [0, r + 0.2, 0.06], [0.3, 0, 0])
+      k.add('black', rbox(0.15, 0.1, 0.02, 0.006), [0, r + 0.15, 0.16], [-0.25, 0, 0])
+    }
+    // Fuel tank between the head and the seat, with a filler cap on top and a badge each side.
+    const tl = (hz - sz) * 0.62
+    const tc: V3 = [0, (hy + sy) / 2 - 0.02, (hz + sz) / 2 + 0.02]
+    const tr = sport ? 0.2 : 0.08
+    k.add('paint', rbox(0.16, 0.1, tl, 0.045), tc, [tr, 0, 0])
+    k.add('chrome', cyl(0.018, 0.018, 0.012, 10), tip(tc, tr, 0.05, tl * 0.12), [tr, 0, 0])
+    for (const sd of [-1, 1]) k.add('chrome', box(0.012, 0.012, tl * 0.4), [sd * 0.078, tc[1], tc[2]], [tr, 0, 0])
   }
-  // Seat, a rear fender with the tail light.
+  // Foot pegs (the scooter rides on its floorboard).
+  if (!scoot) for (const sd of [-1, 1]) k.add('black', cyl(0.008, 0.008, 0.05, 6), [sd * 0.1, r + 0.03, sz + (chop ? 0.36 : 0.12)], [0, 0, PI / 2])
+  // Seat.
   k.add('seat', rbox(0.15, 0.05, 0.26, 0.022), [0, sy, sz])
-  k.add('paint', rbox(0.1, 0.03, r * 1.5, 0.012), [0, r * 2 + 0.03, -b.wz + 0.02], [0.2, 0, 0])
-  k.add('tail', plane(0.07, 0.03), [0, r * 2 + 0.06, -b.wz - r * 0.7], [0, Math.PI, 0])
-  if (body === 'sportbike') {
-    // Full fairing round the head, a tinted screen, a belly pan and a raised tail.
-    k.add('paint', rbox(0.2, 0.2, 0.22, 0.06), [0, hy - 0.1, hz + 0.02], [0.35, 0, 0])
-    k.add('screen', box(0.15, 0.1, 0.01), [0, hy + 0.05, hz - 0.01], [-0.7, 0, 0])
+  // Tail light in a housing with turn signals, and the number plate on a bracket below.
+  const tail = (y: number, z: number, lamp: boolean, plate: boolean) => {
+    k.add('black', rbox(lamp ? 0.075 : 0.04, 0.032, 0.03, 0.006), [0, y, z])
+    if (lamp) k.add('tail', plane(0.058, 0.016), [0, y, z - 0.0175], [0, PI, 0])
+    for (const sd of [-1, 1]) {
+      bar(k, 'black', [sd * 0.015, y, z], [sd * 0.075, y, z - 0.005], 0.008)
+      k.add('amber', cyl(0.011, 0.011, 0.022, 8), [sd * 0.085, y, z - 0.008], [PI / 2, 0, 0])
+    }
+    if (!plate) return
+    k.add('black', box(0.012, 0.05, 0.012), [0, y - 0.035, z - 0.006])
+    k.add('chrome', box(0.1, 0.055, 0.008), [0, y - 0.075, z - 0.015])
+    k.add('black', plane(0.07, 0.012), [0, y - 0.075, z - 0.0215], [0, PI, 0])
+  }
+  if (scoot) tail(r + 0.17, -wz + 0.08 - 0.19, true, true)
+  if (chop) {
+    const a = 0.22 * PI
+    tail(r + (r + 0.038) * Math.sin(a) + 0.012, -wz - (r + 0.038) * Math.cos(a) - 0.005, true, false)
+    // Side-mounted plate by the rear axle.
+    bar(k, 'black', [-0.063, r, -wz], [-0.094, r + 0.05, -wz - 0.03], 0.01)
+    k.add('chrome', box(0.008, 0.055, 0.1), [-0.1, r + 0.07, -wz - 0.05])
+    k.add('black', plane(0.07, 0.012), [-0.1065, r + 0.07, -wz - 0.05], [0, -PI / 2, 0])
+  }
+  if (sport) {
+    // Raised tail with the lamp in its end, and a slim plate hanger under it.
     k.add('paint', rbox(0.16, 0.08, 0.3, 0.03), [0, r + 0.02, 0.04], [-0.1, 0, 0])
-    k.add('paint', rbox(0.12, 0.08, 0.2, 0.03), [0, sy + 0.03, sz - 0.2], [-0.3, 0, 0])
+    const tc: V3 = [0, sy + 0.03, sz - 0.2]
+    k.add('paint', rbox(0.12, 0.08, 0.2, 0.03), tc, [-0.3, 0, 0])
+    k.add('tail', plane(0.05, 0.014), tip(tc, -0.3, 0, -0.1025), [-0.3, PI, 0])
+    bar(k, 'black', tip(tc, -0.3, -0.03, -0.06), [0, r + 0.2, -wz - 0.15], 0.014)
+    tail(r + 0.2, -wz - 0.16, false, true)
+    // Full fairing round the head with a tinted screen, and side panels with vents over the engine.
+    const fc: V3 = [0, hy - 0.1, hz + 0.02]
+    k.add('paint', rbox(0.2, 0.2, 0.22, 0.06), fc, [0.35, 0, 0])
+    // Twin slanted headlights and a ram-air slot in a dark panel on its nose.
+    k.add('black', plane(0.076, 0.07), tip(fc, 0.35, 0, 0.1125), [0.35, 0, 0])
+    for (const sd of [-1, 1]) k.add('lamp', plane(0.03, 0.016), [sd * 0.019, ...tip(fc, 0.35, 0.012, 0.115).slice(1)] as V3, [0.35, 0, sd * 0.2])
+    k.add('dark', plane(0.04, 0.01), tip(fc, 0.35, -0.024, 0.115), [0.35, 0, 0])
+    k.add('screen', box(0.15, 0.1, 0.01), [0, hy + 0.05, hz - 0.01], [-0.7, 0, 0])
+    k.add('paint', rbox(0.174, 0.12, 0.22, 0.03), [0, r + 0.13, 0.08], [-0.15, 0, 0])
+    for (const sd of [-1, 1]) for (const d of [-0.03, 0, 0.03]) k.add('black', plane(0.06, 0.008), [sd * 0.0895, r + 0.13, 0.08 + d], [0, (sd * PI) / 2, 0.4])
   }
   if (body === 'chopper') {
     // Sissy bar behind the seat and chrome crash bars by the engine.
@@ -1473,22 +1617,41 @@ function bikeGeo(body: BikeBody, fit: Partial<Record<ModSlot, string>>, model?: 
     k.add('seat', rbox(0.12, 0.1, 0.03, 0.015), [0, sy + 0.16, sz - 0.16])
     for (const sd of [-1, 1]) k.add('chrome', new TorusGeometry(0.07, 0.01, 5, 10, Math.PI), [sd * 0.1, r + 0.12, 0.14], [0, Math.PI / 2, Math.PI / 2])
   }
-  // Stock exhaust down the right side.
+  // Stock exhaust down the right side: twin shotgun pipes on the cruiser, an upswept can on the sport bike.
   if (!fit.exhaust) {
-    bar(k, 'chrome', [0.08, r + 0.06, 0.06], [0.1, r + 0.03, -b.wz + 0.02], 0.03)
-    k.add('chrome', cyl(0.03, 0.03, 0.12, 10), [0.1, r + 0.04, -b.wz - 0.02], [Math.PI / 2 - 0.1, 0, 0])
+    bar(k, 'chrome', [0.08, r + 0.06, 0.06], [0.1, r + 0.03, -wz + 0.02], 0.03)
+    if (sport) {
+      bar(k, 'black', [0.1, r + 0.04, -wz + 0.06], [0.11, r + 0.13, -wz - 0.08], 0.05)
+      k.add('chrome', cyl(0.02, 0.02, 0.012, 10), tip([0.11, r + 0.13, -wz - 0.08], Math.atan2(-0.14, 0.09), 0.028, 0), [Math.atan2(-0.14, 0.09), 0, 0])
+    } else k.add('chrome', cyl(0.03, 0.03, 0.12, 10), [0.1, r + 0.04, -wz - 0.02], [Math.PI / 2 - 0.1, 0, 0])
+    if (chop) {
+      bar(k, 'chrome', [0.085, r + 0.14, 0.1], [0.118, r + 0.08, -wz + 0.06], 0.026)
+      k.add('chrome', cyl(0.026, 0.026, 0.12, 10), [0.118, r + 0.078, -wz - 0.0], [Math.PI / 2 - 0.1, 0, 0])
+    }
   }
-  // Rider: helmet in the bike's paint, dark jacket, legs to the pegs, hands on the grips.
+  // Rider: helmet in the bike's paint, a dark jacket with bent arms and leather gloves on the grips,
+  // jeans down to boots on the pegs.
   const hip: V3 = [0, sy + 0.07, sz]
   const neck: V3 = [0, sy + 0.32 - b.lean * 0.3, sz + 0.06 + b.lean * 0.5]
-  bar(k, 'black', hip, neck, 0.15)
+  bar(k, 'black', hip, neck, 0.15, 0.1)
+  // Shoulders, and a collar under the helmet.
+  k.add('black', rbox(0.2, 0.06, 0.1, 0.025), [0, neck[1] - 0.035, neck[2]], [b.lean * 0.6, 0, 0])
+  k.add('dark', rbox(0.14, 0.06, 0.11, 0.025), [0, hip[1] - 0.01, hip[2]])
+  k.add('dark', cyl(0.03, 0.035, 0.05, 8), [0, neck[1] + 0.03, neck[2]])
   k.add('paint', new SphereGeometry(0.075, 12, 10), [0, neck[1] + 0.09, neck[2] + 0.01])
   k.add('glass', new SphereGeometry(0.068, 10, 6, -Math.PI / 2.6, Math.PI / 1.3, Math.PI / 3, Math.PI / 3.2), [0, neck[1] + 0.085, neck[2] + 0.02])
   for (const sd of [-1, 1]) {
-    bar(k, 'black', [sd * 0.08, neck[1] - 0.03, neck[2]], [sd * 0.19, hy + 0.04 + b.bars, hz - 0.06], 0.05)
+    const sh: V3 = [sd * 0.08, neck[1] - 0.035, neck[2]]
+    const hand: V3 = [sd * 0.19, gy + 0.005, gz - 0.005]
+    const elbow: V3 = [(sh[0] + hand[0]) / 2 + sd * 0.03, (sh[1] + hand[1]) / 2 - 0.035, (sh[2] + hand[2]) / 2 - 0.02]
+    bar(k, 'black', sh, elbow, 0.052)
+    bar(k, 'black', elbow, hand, 0.044)
+    k.add('seat', rbox(0.045, 0.04, 0.05, 0.012), hand)
     const knee: V3 = [sd * 0.1, sy + 0.04, sz + 0.2]
+    const foot: V3 = [sd * 0.1, r + 0.05, sz + (chop ? 0.36 : 0.12)]
     bar(k, 'dark', [sd * 0.06, hip[1], hip[2]], knee, 0.07)
-    bar(k, 'dark', knee, [sd * 0.1, r + 0.05, sz + (body === 'chopper' ? 0.36 : 0.12)], 0.06)
+    bar(k, 'dark', knee, foot, 0.06)
+    k.add('black', rbox(0.055, 0.045, 0.1, 0.012), [foot[0], foot[1] - 0.005, foot[2] + 0.02])
   }
   trimBike(k, model, { r, wz: b.wz, head: b.head, seat: b.seat })
 
@@ -1513,7 +1676,9 @@ function BikeModel({ body, model, color, finish, skin, modSkin, panels, highligh
   const p = g.parts
   const tint = useMemo(() => (rusty ? '#' + new Color(color).lerp(new Color('#8a5a3c'), 0.72).getHexString() : color), [color, rusty])
   const dark = useMemo(() => '#' + new Color('#37474f').lerp(new Color(tint), 0.15).getHexString(), [tint])
-  const shared = (['black', 'chrome', 'glass', 'screen', 'seat', 'tail'] as const).filter((k) => p[k])
+  const shared = (['black', 'chrome', 'glass', 'screen', 'seat', 'tail', 'amber', 'display'] as const).filter((k) => p[k])
+  // Brake calipers: gold on the sport bike, bare metal on the others.
+  const cal = matOf('cal', bb === 'sportbike' ? '#d4a72c' : '#8d9399', 0.5, 0.35)
   // A bike's only trim is its headlight colour.
   const lamp = lampOf(rusty ? undefined : trim?.lights)
   const r = SHAPES[bb].wheel
@@ -1538,7 +1703,7 @@ function BikeModel({ body, model, color, finish, skin, modSkin, panels, highligh
     const looks: Partial<Record<Part, Look>> = {
       ...(own ? {} : { paint: paintLook(tint, finish, rusty, sk) }), dark: { color: dark },
       black: finishOf(MAT.black), chrome: finishOf(MAT.chrome), glass: finishOf(MAT.glass), seat: finishOf(MAT.seat),
-      lamp: finishOf(lamp), tail: finishOf(MAT.tail),
+      lamp: finishOf(lamp), tail: finishOf(MAT.tail), amber: finishOf(MAT.amber), display: finishOf(MAT.display), caliper: finishOf(cal),
     }
     return (
       <LeanCar parts={p} looks={looks} casters={['paint', 'black']} mods={{ body, ids: modIds(fit), skins: msk }} modPaint={{ color: tint, metal: rusty ? 0.1 : 0.4, rough: 0.3 }} highlight={highlight}
@@ -1558,6 +1723,7 @@ function BikeModel({ body, model, color, finish, skin, modSkin, panels, highligh
       )}
       {shared.map((k) => <mesh key={k} geometry={p[k]} material={MAT[k]} castShadow={k === 'black'} />)}
       {p.lamp && <mesh geometry={p.lamp} material={lamp} />}
+      {p.caliper && <mesh geometry={p.caliper} material={cal} />}
       <CarMods body={body} fit={fit} tint={tint} metal={rusty ? 0.1 : 0.4} flames={flames} skins={msk} />
       {topper}
       {beam}
