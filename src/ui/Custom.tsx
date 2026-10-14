@@ -7,6 +7,7 @@ import { tunerTrial } from '../game/tuner'
 import { PAINTS, PANELS, PATTERNS, carDef, isBike, panelJobCost, tidyPanels, type PanelId, type Panels, type PatternDef } from '../game/data'
 import { MASTERY_TIERS, masteryTier } from '../game/mastery'
 import { roadOpen } from '../game/trophyRoad'
+import { CustomColour } from './ColourPicker'
 
 const same = (a?: Panels | null, b?: Panels | null) => JSON.stringify(tidyPanels(a) ?? {}) === JSON.stringify(tidyPanels(b) ?? {})
 
@@ -115,8 +116,9 @@ export function CustomShop({ car, panels, setPanels }: { car: OwnedCar; panels: 
   const roadItems = useGame((s) => s.roadItems)
   const mastery = useGame((s) => s.mastery)
   const worldTour = useGame((s) => s.worldTour)
+  const skins = useGame((s) => s.skins)
   const tier = useGame((s) => masteryTier(s.mastery, car.model))
-  const open = (id: PanelId, c: string) => c === now?.[id]?.color || paintOpen({ rivalRow, oldPaints, roadItems, mastery, worldTour }, c)
+  const open = (id: PanelId, c: string) => c === now?.[id]?.color || paintOpen({ rivalRow, oldPaints, roadItems, mastery, worldTour, skins }, c)
   // A mastery pattern needs that step in this car; a Trophy Road one, won at a mystery stop.
   const earned = (id: PanelId, pt: PatternDef) => now?.[id]?.pattern === pt.id
     || (pt.mastery ? tier >= pt.mastery : pt.road ? roadOpen(roadItems, pt.id) : true)
@@ -191,6 +193,7 @@ export function CustomShop({ car, panels, setPanels }: { car: OwnedCar; panels: 
               >{locked && <span className="dot-lock" aria-hidden>🔒</span>}</button>
             )
           })}
+          <CustomColour color={mine?.color ?? colour(info.id)} custom={!!mine?.color && !PAINTS.some((p) => p.color === mine.color)} onPick={(c) => pick({ color: c })} />
         </div>
       </>}
     </div>
