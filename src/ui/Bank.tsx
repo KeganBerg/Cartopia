@@ -46,8 +46,8 @@ export function BankPanel() {
               {p.tag && <span className="ribbon">{p.tag}</span>}
               <div className="pack-art">{p.art}</div>
               <div className="pack-name">{p.name}</div>
-              <div className="pack-bucks">💎 {total}</div>
-              {p.bonus > 0 ? <div className="pack-bonus">{p.bucks} + {p.bonus} bonus ({pct}% more)</div> : <div className="pack-bonus plain">{p.bucks} gems</div>}
+              <div className="pack-bucks">💎 {total.toLocaleString()}</div>
+              {p.bonus > 0 ? <div className="pack-bonus">+{pct}% bonus</div> : <div className="pack-bonus plain">{p.bucks} gems</div>}
               {(coins || parts) > 0 && (
                 <div className="pack-extras">
                   {coins ? <span>+ ${coins.toLocaleString()}</span> : null}

@@ -26,10 +26,12 @@ describe('stripe checkout', () => {
 
   it("grows a pack's coins and parts with the buyer's level, never its gems", () => {
     const vault = packById('vault')!
-    expect(packGrant(vault, 1)).toEqual({ bucks: 140, coins: 4000, parts: 20 })
-    expect(packGrant(vault, 20)).toEqual({ bucks: 140, coins: 23000, parts: 58 })
+    expect(packGrant(vault, 1)).toEqual({ bucks: 260, coins: 10000, parts: 40 })
+    expect(packGrant(vault, 20)).toEqual({ bucks: 260, coins: 57500, parts: 115 })
     expect(packGrant(vault, 'junk')).toEqual(packGrant(vault, 1))
-    expect(packGrant(packById('handful')!, 30)).toEqual({ bucks: 12, coins: 0, parts: 0 })
+    expect(packGrant(packById('handful')!, 30)).toEqual({ bucks: 20, coins: 0, parts: 0 })
+    // Shop numbers end in 5 or 0 at every level.
+    for (const p of BUCKS_PACKS) for (const l of [1, 3, 7, 20, 33, 60]) for (const n of Object.values(packGrant(p, l))) expect(n % 5).toBe(0)
     // Every bigger pack gives more gems per dollar.
     const rate = BUCKS_PACKS.map((p) => packGrant(p, 1).bucks / p.price)
     for (let i = 1; i < rate.length; i++) expect(rate[i]).toBeGreaterThan(rate[i - 1])
