@@ -751,6 +751,9 @@ export type CampaignChapter = {
   id: string; name: string; blurb: string; unlockLevel: number
   venue: string // where its races run (scene/venues.ts)
   pi: [number, number] // rival PI from the first race to the boss
+  // The PI the prizes are worked out from, when it differs from the rivals' (later chapters' rivals
+  // were eased to the cars a player can own at the unlock level, and the pay stayed where it was).
+  payPi?: [number, number]
   rivals: string[] // the last one is the boss
   cars?: string[] // each rival's car (car ids), where their name calls for one; otherwise the car nearest their PI
   coins: number; bucks: number; trophies: number; starBucks: number
@@ -758,15 +761,18 @@ export type CampaignChapter = {
 export const CAMPAIGN_RACES = 5
 export const CAMPAIGN: CampaignChapter[] = [
   { id: 'c1', name: 'Back Streets', blurb: 'Local kids with something to prove.', unlockLevel: 1, venue: 'main', pi: [22, 32], rivals: ['Scooter Steve', 'Bubblegum Bea', 'Hubcap Hal', 'Lil Lugnut', 'Big Mike'], cars: ['pip', 'bug', 'civic', 'buggy', 'hauler'], coins: 1000, bucks: 1, trophies: 3, starBucks: 1 },
-  { id: 'c2', name: 'Harbor Run', blurb: 'Dockworkers race the night shift home.', unlockLevel: 4, venue: 'docks', pi: [32, 44], rivals: ['Salty Pete', 'Crane Carla', 'Rusty Anchor', 'Tugboat Ted', 'Captain Kidd'], coins: 2000, bucks: 1, trophies: 3, starBucks: 1 },
-  { id: 'c3', name: 'Desert Strip', blurb: 'Long straights, hot tarmac, no mercy.', unlockLevel: 8, venue: 'desert', pi: [44, 58], rivals: ['Dusty Dakota', 'Mirage Mo', 'Sidewinder Sal', 'Coyote Cass', 'The Scorpion'], coins: 3500, bucks: 2, trophies: 4, starBucks: 1 },
-  { id: 'c4', name: 'Mountain Pass', blurb: 'Thin air and thinner margins.', unlockLevel: 13, venue: 'snow', pi: [58, 72], rivals: ['Summit Sue', 'Avalanche Al', 'Ridge Runner', 'Peak Paulie', 'The Yeti'], coins: 5500, bucks: 2, trophies: 5, starBucks: 2 },
-  { id: 'c5', name: 'Sunset Boardwalk', blurb: 'Beach crowds, big money, bigger engines.', unlockLevel: 19, venue: 'beach', pi: [72, 88], rivals: ['Surfer Sid', 'Sandy Shores', 'Tidal Tom', 'Riptide Rita', 'Big Kahuna'], coins: 8000, bucks: 3, trophies: 6, starBucks: 2 },
-  { id: 'c6', name: 'Harvest Backroads', blurb: 'Farm-tough racers who never lift.', unlockLevel: 26, venue: 'farm', pi: [88, 104], rivals: ['Hayride Hank', 'Tractor Tina', 'Combine Carl', 'Silo Sam', 'The Scarecrow'], coins: 12000, bucks: 3, trophies: 8, starBucks: 2 },
-  { id: 'c7', name: 'Champions Speedway', blurb: 'The best drivers in the land. Only one leaves a legend.', unlockLevel: 33, venue: 'main', pi: [104, 124], rivals: ['Golden Gabe', 'Iron Ivy', 'Thunder Thea', 'Velvet Vince', 'The Champion'], coins: 20000, bucks: 5, trophies: 10, starBucks: 3 },
+  { id: 'c2', name: 'Harbor Run', blurb: 'Dockworkers race the night shift home.', unlockLevel: 4, venue: 'docks', pi: [32, 44], rivals: ['Salty Pete', 'Crane Carla', 'Rusty Anchor', 'Tugboat Ted', 'Captain Kidd'], cars: ['civic', 'trail', 'schoolbus', 'shaggy', 'hotshot'], coins: 2000, bucks: 1, trophies: 3, starBucks: 1 },
+  { id: 'c3', name: 'Desert Strip', blurb: 'Long straights, hot tarmac, no mercy.', unlockLevel: 8, venue: 'desert', pi: [44, 54], payPi: [44, 58], rivals: ['Dusty Dakota', 'Mirage Mo', 'Sidewinder Sal', 'Coyote Cass', 'The Scorpion'], cars: ['hotshot', 'crusher', 'cruiser', 'kitsune', 'bandit'], coins: 3500, bucks: 2, trophies: 4, starBucks: 1 },
+  { id: 'c4', name: 'Mountain Pass', blurb: 'Thin air and thinner margins.', unlockLevel: 13, venue: 'snow', pi: [56, 61], payPi: [58, 72], rivals: ['Summit Sue', 'Avalanche Al', 'Ridge Runner', 'Peak Paulie', 'The Yeti'], cars: ['rally', 'stomper', 'charger', 'speedster', 'kreis'], coins: 5500, bucks: 2, trophies: 5, starBucks: 2 },
+  { id: 'c5', name: 'Sunset Boardwalk', blurb: 'Beach crowds, big money, bigger engines.', unlockLevel: 19, venue: 'beach', pi: [62, 67], payPi: [72, 88], rivals: ['Surfer Sid', 'Sandy Shores', 'Tidal Tom', 'Riptide Rita', 'Big Kahuna'], cars: ['current', 'hellcat', 'bergmeister', 'lemans', 'gtr'], coins: 8000, bucks: 3, trophies: 6, starBucks: 2 },
+  { id: 'c6', name: 'Harvest Backroads', blurb: 'Farm-tough racers who never lift.', unlockLevel: 26, venue: 'farm', pi: [68, 78], payPi: [88, 104], rivals: ['Hayride Hank', 'Tractor Tina', 'Combine Carl', 'Silo Sam', 'The Scarecrow'], cars: ['tusker', 'rattler', 'cottonmouth', 'lemans', 'gtr'], coins: 12000, bucks: 3, trophies: 8, starBucks: 2 },
+  { id: 'c7', name: 'Champions Speedway', blurb: 'The best drivers in the land. Only one leaves a legend.', unlockLevel: 33, venue: 'main', pi: [78, 91], payPi: [104, 124], rivals: ['Golden Gabe', 'Iron Ivy', 'Thunder Thea', 'Velvet Vince', 'The Champion'], cars: ['cottonmouth', 'shinden', 'hyper', 'monoposto', 'raiden'], coins: 20000, bucks: 5, trophies: 10, starBucks: 3 },
 ]
 export const campaignRaceId = (ch: CampaignChapter, i: number) => `${ch.id}-${i}`
-export const campaignRivalPi = (ch: CampaignChapter, i: number) => Math.round(ch.pi[0] + ((ch.pi[1] - ch.pi[0]) * i) / (CAMPAIGN_RACES - 1))
+const ramp = ([a, b]: [number, number], i: number) => Math.round(a + ((b - a) * i) / (CAMPAIGN_RACES - 1))
+// Each chapter can be won by the best Showroom car of its unlock level, stock, with a perfect launch,
+// perfect shifts and the boost fired in fourth (campaign.test.ts races it). Upgrades give slack.
+export const campaignRivalPi = (ch: CampaignChapter, i: number) => ramp(ch.pi, i)
 // How cleanly a rival shifts, 0 (early, sloppy) to 1 (every shift perfect), across the whole campaign.
 // Even the first rival shifts decently, so race 1 can't be won with eyes closed.
 export const campaignShift = (chIndex: number, i: number) => Math.min(1, 0.35 + 0.65 * (chIndex + i / (CAMPAIGN_RACES - 1)) / (CAMPAIGN.length - 1))
@@ -779,7 +785,7 @@ export const rookieRace = (chIndex: number, i: number, racesWon: number) => chIn
 export const campaignRivalSkills = (chIndex: number, i: number) => chIndex >= 2 || i === CAMPAIGN_RACES - 1
 // The first win of each race pays the most; replays pay about a quick race.
 export const campaignReward = (ch: CampaignChapter, i: number, first: boolean) => {
-  const full = 100 + campaignRivalPi(ch, i) * 10
+  const full = 100 + ramp(ch.payPi ?? ch.pi, i) * 10
   return first ? full : Math.round((full * 0.6) / 10) * 10
 }
 // Stars for a win: one for winning, two for beating them by 3% of their time, three for 6%.

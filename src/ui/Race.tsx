@@ -2,12 +2,12 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useTouchLock } from './DriveControls'
 import { useGame, spendFuel, type OwnedCar } from '../game/store'
 import { LIVE_LOSS_SHARE, LOSS_SHARE } from '../game/boosts'
-import { bestCar, raceCarOf } from '../game/raceCar'
+import { bestCar, carPi, raceCarOf } from '../game/raceCar'
 import { CARS, SKILLS, carDef, performance, RACE_FUEL, GP_SERIES, GP_ROUNDS, gpRivalPi, gpReward, CAMPAIGN, CAMPAIGN_RACES, campaignRaceId, campaignRivalPi, campaignShift, rookieRace, ROOKIE_SHIFT, campaignRivalSkills, campaignReward, campaignCleared, type CampaignChapter, skillBoost, skillDrag, liveSkillBoost, smoothShift, type Body, type GpSeries, type SkillId } from '../game/data'
 import { TRACK, freshRacer, stepRacer, shiftQuality, shiftBand, launchRacer, revLaunch, shiftRacer, fireBoost, aiReaction, AI_BOOST_GEAR, TOP_GEAR, LAUNCH_BAND, IDLE, REV_UP, REV_DOWN, RACE_DT } from '../game/race'
 import { CarThumb } from '../scene/BuildingPreview'
 import { supabase } from '../lib/supabase'
-import { Panel } from './Menus'
+import { Panel, openGarageTab } from './Menus'
 import { StageSlot, useStageReady, warmStage } from '../scene/Stage'
 import { SnapshotButton } from './Snapshot'
 import { CustomKart, type CustomPick } from './CustomKart'
@@ -945,6 +945,8 @@ function Campaign({ sel, setSel, onRace, onTour }: { sel: number; setSel: (ci: n
   const level = useGame((s) => s.level)
   const done = useGame((s) => s.campaign)
   const showNeed = useGame((s) => s.showNeed)
+  // The race car's PI: a rival above it shows its PI in red.
+  const myPi = useGame((s) => { const c = raceCarOf(s.cars, s.raceCar); return c ? carPi(c) : 0 })
   const { opened } = campaignFocus(done, level)
   const starsOf = (ch: CampaignChapter) => Array.from({ length: CAMPAIGN_RACES }, (_, i) => done[campaignRaceId(ch, i)] ?? 0)
   const ch = CAMPAIGN[sel]
@@ -1002,7 +1004,7 @@ function Campaign({ sel, setSel, onRace, onTour }: { sel: number; setSel: (ci: n
                   <CarThumb size="xs" color={r.color} body={r.body} model={r.model} />
                   <div className="rm-who">
                     <b>{r.town}</b>
-                    <small>{n > 0 && <Stars n={n} />} PI {r.pi}{r.skill && <span className="rival-skill" title={`${SKILLS[r.skill].name}: ${SKILLS[r.skill].text}`}> {SKILLS[r.skill].icon}</span>}</small>
+                    <small>{n > 0 && <Stars n={n} />} <span className={r.pi > myPi ? 'rm-pi-up' : undefined} title={r.pi > myPi ? `Your PI is ${myPi}` : undefined}>PI {r.pi}</span>{r.skill && <span className="rival-skill" title={`${SKILLS[r.skill].name}: ${SKILLS[r.skill].text}`}> {SKILLS[r.skill].icon}</span>}</small>
                   </div>
                   <button className={`buy small${n > 0 ? ' alt' : ''}`} disabled={!can} onClick={() => onRace(sel, i)}>
                     {!can ? '🔒' : `${n > 0 ? '↻' : '🏁'} $${prize.toLocaleString()}`}
@@ -1869,7 +1871,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
           if (!finishView.busy) setCardUp(true)
         }}><span>⏭</span></button>
       ) : result && resultView ? resultView(result) : result ? (
-        <RaceResult won={result.won} myTime={result.myTime} theirTime={result.theirTime} cash={result.counted === false ? 0 : result.won ? payout : Math.round(payout * (live ? LIVE_LOSS_SHARE : LOSS_SHARE))} xp={result.counted === false ? 0 : result.won ? 30 : 8} rival={rival.town} note={result.note} noContest={result.counted === false} stars={result.stars} stats={stats.current} next={(typeof next === 'function' ? next(result.won) : next) ?? undefined} onExit={onExit} bet={stake ? (result.counted === false ? 0 : result.won ? stake : -stake) : undefined} />
+        <RaceResult won={result.won} myTime={result.myTime} theirTime={result.theirTime} cash={result.counted === false ? 0 : result.won ? payout : Math.round(payout * (live ? LIVE_LOSS_SHARE : LOSS_SHARE))} xp={result.counted === false ? 0 : result.won ? 30 : 8} rival={rival.town} note={result.note} noContest={result.counted === false} stars={result.stars} stats={stats.current} pi={trial ? undefined : { me: myPi, them: rival.pi }} onUpgrade={live ? undefined : () => { useGame.getState().selectCar(car.uid); openGarageTab('tune') }} next={(typeof next === 'function' ? next(result.won) : next) ?? undefined} onExit={onExit} bet={stake ? (result.counted === false ? 0 : result.won ? stake : -stake) : undefined} />
       ) : (
         // Two thumbs: BOOST under the left, the tach in the middle, a big SHIFT under the right.
         <div className="rf-bottom">
@@ -1950,7 +1952,8 @@ function useCountUp(target: number, delay: number, ms = 900) {
 const CONFETTI = ['#ffd54f', '#ef5350', '#42a5f5', '#66bb6a', '#ab47bc', '#ff7043', '#ffffff']
 
 // bet: a wager match's coin change (+stake won, -stake lost, 0 refunded).
-export function RaceResult({ won, myTime, theirTime, cash, xp, rival, note, noContest, stars, stats, next, onExit, bet }: { won: boolean; myTime: number; theirTime: number; cash: number; xp: number; rival: string; note?: string; noContest?: boolean; stars?: number; stats?: RunStats; next?: NextRace; onExit: () => void; bet?: number }) {
+// pi: both cars' PI, so a loss to a quicker car says so, with a way to the Garage to close the gap.
+export function RaceResult({ won, myTime, theirTime, cash, xp, rival, note, noContest, stars, stats, next, onExit, bet, pi, onUpgrade }: { won: boolean; myTime: number; theirTime: number; cash: number; xp: number; rival: string; note?: string; noContest?: boolean; stars?: number; stats?: RunStats; next?: NextRace; onExit: () => void; bet?: number; pi?: { me: number; them: number }; onUpgrade?: () => void }) {
   const money = useCountUp(cash, 700)
   const exp = useCountUp(xp, 900)
   const margin = Number.isFinite(theirTime) ? Math.abs(theirTime - myTime) : null
@@ -1990,6 +1993,11 @@ export function RaceResult({ won, myTime, theirTime, cash, xp, rival, note, noCo
             <span className={stats.shifts > 0 && stats.perfect === stats.shifts ? 'good' : ''}><small>Perfect</small>{stats.perfect}/{Math.max(stats.shifts, 1)}</span>
             <span><small>Top speed</small>{Math.round(stats.top * 3.6)}<i> km/h</i></span>
           </div>
+        )}
+        {!won && !noContest && pi && pi.me < pi.them && (
+          <button className="rr-pi" onClick={onUpgrade} disabled={!onUpgrade} aria-label={`Your PI ${pi.me}, theirs ${pi.them}. Upgrade your car`}>
+            <span><small>PI</small>{pi.me}</span><i>‹</i><span className="them"><small>PI</small>{pi.them}</span>{onUpgrade && <b>⬆ Upgrade</b>}
+          </button>
         )}
         <div className="rr-loot">
           {bet !== undefined && <span className={`rr-bet ${bet > 0 ? 'up' : bet < 0 ? 'down' : ''}`} style={{ animationDelay: '.4s' }}>🪙 {bet > 0 ? '+' : bet < 0 ? '−' : '±'}{Math.abs(bet).toLocaleString()}</span>}
