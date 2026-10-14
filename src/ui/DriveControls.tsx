@@ -76,6 +76,28 @@ export function useDriveKeys(input: DriveInput, { enabled = true, autoGas = fals
   }, [input, enabled, autoGas])
 }
 
+// While a race is on screen, the page itself never zooms or scrolls under the player's thumbs:
+// iOS ignores user-scalable=no, so two thumbs (steer + brake, shift + boost) would pinch-zoom
+// the page and cancel both touches. CSS touch-action covers Android; this covers Safari.
+export function useTouchLock(on = true) {
+  useEffect(() => {
+    if (!on) return
+    const stop = (e: Event) => { if (e.cancelable) e.preventDefault() }
+    const multi = (e: TouchEvent) => { if (e.touches.length > 1 && e.cancelable) e.preventDefault() }
+    const opts = { passive: false } as AddEventListenerOptions
+    document.addEventListener('gesturestart', stop, opts)
+    document.addEventListener('gesturechange', stop, opts)
+    document.addEventListener('touchmove', multi, opts)
+    document.addEventListener('dblclick', stop, opts)
+    return () => {
+      document.removeEventListener('gesturestart', stop, opts)
+      document.removeEventListener('gesturechange', stop, opts)
+      document.removeEventListener('touchmove', multi, opts)
+      document.removeEventListener('dblclick', stop, opts)
+    }
+  }, [on])
+}
+
 // Hold-to-press handlers for a touch button, with the pointer captured so a thumb
 // sliding off the edge doesn't drop it.
 function hold(on: () => void, off: () => void) {
@@ -135,7 +157,12 @@ const SteerZone = memo(function SteerZone({ input, autoDrift, className, feel }:
   const [at, setAt] = useState<{ x0: number; y: number } | null>(null)
   const knob = useRef<HTMLElement>(null)
   const drift = useMemo(() => new ThumbDrift(feel.drift), [feel.drift])
-  const end = () => {
+  // The finger that owns the stick; a second finger landing in the zone is ignored, so resting
+  // the other thumb (or reaching for brake) never yanks or drops the steering.
+  const owner = useRef<number | null>(null)
+  const end = (e: React.PointerEvent) => {
+    if (e.pointerId !== owner.current) return
+    owner.current = null
     input.steer = 0
     if (autoDrift) { input.drift = false; drift.reset() }
     setAt(null)
@@ -144,13 +171,15 @@ const SteerZone = memo(function SteerZone({ input, autoDrift, className, feel }:
     <div className={`dc-steer ${className}`}
       onPointerDown={(e) => {
         e.preventDefault()
+        if (owner.current !== null) return
+        owner.current = e.pointerId
         ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
         const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
         if (autoDrift) drift.reset(e.timeStamp)
         setAt({ x0: e.clientX - r.left, y: e.clientY - r.top })
       }}
       onPointerMove={(e) => {
-        if (!at) return
+        if (!at || e.pointerId !== owner.current) return
         const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
         const dx = Math.max(-feel.range, Math.min(feel.range, e.clientX - r.left - at.x0))
         input.steer = thumbSteer(dx, feel)
@@ -195,6 +224,7 @@ export function TouchDrive({ input, tall, drift = true, item, autoGas = true, fe
     input.brake = brake ? 1 : 0
   }, [input, brake, gas, autoGas])
   useEffect(() => () => { Object.assign(input, newDriveInput()) }, [input])
+  useTouchLock()
   const itemBtn = item !== undefined && (
     <button className={`dc-btn dc-item${item ? ' full' : ''}${using ? ' on' : ''}`} aria-label="Use item"
       {...hold(() => { input.item = true; setUsing(true) }, () => { input.item = false; setUsing(false) })}>
