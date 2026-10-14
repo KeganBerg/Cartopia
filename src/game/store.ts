@@ -4,7 +4,7 @@ import {
   PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS,
   upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, jobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, maxLevel, themable, RESCUE_SPOTS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, refillBucks, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, activeEvent, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modFits, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, CREW_CHEST, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower, seasonNumber, seasonOf, SEASON_STARS, skinDef, ownedSkins, seasonSkin, modSkinDef, ownedModSkins, seasonModSkin, SKINNED_SLOTS, type SkinnedSlot, fittedMods, SEASON_TIERS, STARS_PER_TIER, SEASON_CAR_BUCKS, dealsFor, dealOffer, type DealDef, type DealKind,
 } from './data'
-import { PAINT_COST, PANELS, PATTERNS, STARTER_PAINTS, isBike, panelJobCost, tidyPanels, type Panels, RUSTY_SETS, hotSpot, rarityWeight, truckOf, TRUCK, BAY2_LEVEL } from './data'
+import { PAINT_COST, hasCustomPaint, isHexColor, PANELS, PATTERNS, STARTER_PAINTS, isBike, panelJobCost, tidyPanels, type Panels, RUSTY_SETS, hotSpot, rarityWeight, truckOf, TRUCK, BAY2_LEVEL } from './data'
 import { cleanHat, earnedHats, hatDef, hatQuestOf, newHatQuest, ownedHats, sameHat, type HatFit, type HatQuest } from './hats'
 import { raceCarOf } from './raceCar'
 import { sfx } from '../lib/sound'
@@ -24,7 +24,7 @@ import { EVENT_RACES, eventBonus, eventFor, eventIsBoss, eventPrize, eventProgre
 import { trialWeek } from './trial'
 import { groupOf, groupTurn, mergeCandidates, applyMerge, applySplit, rotateGroup, isLandmark, LANDMARK_NAME } from './merge'
 import { togglePick } from './meet'
-import { crateCost, crateDef, pityHit, rollCrate, rollSourcePiece, type CrateId, type CrateOpen } from './crates'
+import { crateCost, crateDef, crateOwnedSkins, pityHit, rollCrate, rollSourcePiece, type CrateId, type CrateOpen } from './crates'
 import { pieceId } from './resto'
 import { rollWheel, type WheelSpin } from './wheel'
 import { LIVE_LOSS_SHARE, LOSS_SHARE, boostFor, placeShare, boostLabel, emptyBoosts, welcomeBack, type BoostMode, type Boosts } from './boosts'
@@ -424,7 +424,8 @@ export const setRescueRoller = (f: typeof rescueRoller) => {
 // supabase/migrations/0040_crates.sql); src/lib/crates.ts plugs it in. It returns the opens to add
 // (normally one; more when earlier ones never reached the save), or null to roll here (guests).
 // It throws 'soon' when the server can't open crates yet.
-let crateOpener: ((id: CrateId, free?: string) => Promise<CrateOpen[] | null>) | null = null
+// `count` above 1 opens that many in one go (the ×10 open), all rolled on the server.
+let crateOpener: ((id: CrateId, free?: string, count?: number) => Promise<CrateOpen[] | null>) | null = null
 export const setCrateOpener = (f: typeof crateOpener) => {
   crateOpener = f
 }
@@ -516,10 +517,13 @@ export function starterTown(): SaveState {
     trophies: 0,
     racesWon: 0,
     roads: [...new Set(roads)],
+    // Everything a new player needs sits on the cross street in the middle of the screen:
+    // the pizza places either side of RUSTY_LOT (kept empty for Rusty's), the showroom and
+    // garage across the street. The open lots further along invite the next builds.
     buildings: [
-      b('showroom', 9, 9), b('garage', 13, 9), b('gas', 6, 3), b('pizza', 10, 3), b('pizza', 12, 3),
-      b('pizza', 17, 10), b('house', 5, 9), b('house', 6, 9), b('house', 7, 9), b('house', 5, 10),
-      b('house', 15, 17), b('house', 16, 17), b('house', 17, 17), b('tree', 5, 7), b('tree', 16, 9),
+      b('showroom', 9, 9), b('garage', 13, 9), b('gas', 6, 9), b('pizza', 10, 12), b('pizza', 15, 12),
+      b('pizza', 8, 12), b('house', 5, 5), b('house', 6, 5), b('house', 7, 5), b('house', 5, 6),
+      b('house', 15, 17), b('house', 16, 17), b('house', 17, 17), b('tree', 5, 7), b('tree', 17, 9),
       b('tree', 17, 15), b('tree', 8, 16), b('tree', 6, 14), b('tree', 11, 17), b('tree', 18, 6),
       b('tree', 14, 7), b('tree', 2, 2), b('tree', 21, 3), b('tree', 2, 21), b('tree', 21, 21),
     ],
@@ -1127,11 +1131,11 @@ export const useGame = create<GameState>()(
           sfx.coin()
           fx({ kind: 'collect', uids: [buid], coins: pay, parts, xp })
           s.toast(`+${pay} coins${parts ? `, +${parts} parts` : ''}, +${xp} XP`)
-          // Sometimes a car out on the job comes back with a flat.
+          // Sometimes a car out on the job comes back with a flat (never during the tutorial).
           let cars = s.cars
           const rolling = cars.filter((c) => !c.flat && !c.lowFuel)
           const roll = Math.random()
-          if (rolling.length > 1 && roll < FLAT_CHANCE + LOW_FUEL_CHANCE) {
+          if (s.tutorial >= 99 && rolling.length > 1 && roll < FLAT_CHANCE + LOW_FUEL_CHANCE) {
             const victim = rolling[Math.floor(Math.random() * rolling.length)]
             const flat = roll < FLAT_CHANCE
             cars = cars.map((c) => (c.uid === victim.uid ? (flat ? { ...c, flat: true } : { ...c, lowFuel: true }) : c))
@@ -1769,8 +1773,8 @@ export const useGame = create<GameState>()(
         const car = s.cars.find((c) => c.uid === cuid)
         const paint = PAINTS.find((p) => p.color === job.color)
         const fin = FINISHES.find((f) => f.id === job.finish)
-        // A car can keep a factory colour that isn't on the paint chart.
-        if (!car || (!paint && job.color !== car.color) || !fin || !STRIPES.includes(job.stripe)) return false
+        // A car can keep a factory colour that isn't on the paint chart; Custom Colour paints any.
+        if (!car || (!paint && job.color !== car.color && !(hasCustomPaint(s) && isHexColor(job.color))) || !fin || !STRIPES.includes(job.stripe)) return false
         if (job.color !== car.color && !paintOpen(s, job.color)) {
           const r = rivalForPaint(job.color)
           s.toast(r ? `Beat ${r.name} to unlock ${paint!.name}` : paint?.earn ? `${paint.name}: ${earnHint(job.color)}` : 'That colour is locked')
@@ -1816,7 +1820,7 @@ export const useGame = create<GameState>()(
         for (const pn of PANELS) {
           const v = next?.[pn.id]
           if (!v) continue
-          if ((bike && pn.car) || (v.color && (!pn.color || !PAINTS.some((p) => p.color === v.color))) || (v.pattern && !pn.pattern)) return false
+          if ((bike && pn.car) || (v.color && (!pn.color || !(PAINTS.some((p) => p.color === v.color) || (hasCustomPaint(s) && isHexColor(v.color))))) || (v.pattern && !pn.pattern)) return false
           // Rival colours stay locked panel by panel too, but a panel keeps the colour it has.
           if (v.color && v.color !== was?.[pn.id]?.color && !paintOpen(s, v.color)) {
             const r = rivalForPaint(v.color)
@@ -2574,13 +2578,16 @@ export const spendFuel = (amount: number) => {
 
 // Opens a crate: checks the level and price, rolls it (on the server when signed in), adds it to
 // the town and returns what was opened for the reveal. Null when it couldn't be opened. A free
-// crate (`free` is its source in freeCrates, see cups.ts) skips the level and price.
-export async function openCrate(id: CrateId, free?: string): Promise<CrateOpen[] | null> {
+// crate (`free` is its source in freeCrates, see cups.ts) skips the level and price. `count`
+// opens that many at once (the ×10 open: never free, the price times count, one server call).
+export async function openCrate(id: CrateId, free?: string, count = 1): Promise<CrateOpen[] | null> {
   const s = useGame.getState()
   const def = crateDef(id)
   if (!def) return null
   if (free && !s.freeCrates?.includes(free)) return null
-  const cost = free ? { coins: 0, bucks: 0 } : crateCost(def, s.level)
+  if (free) count = 1
+  const one = free ? { coins: 0, bucks: 0 } : crateCost(def, s.level)
+  const cost = { coins: one.coins * count, bucks: one.bucks * count }
   if (!free && s.level < def.unlockLevel) {
     s.showNeed('level', def.unlockLevel, def.name)
     return null
@@ -2596,15 +2603,25 @@ export async function openCrate(id: CrateId, free?: string): Promise<CrateOpen[]
   const used = () => useGame.setState((g) => ({ freeCrates: (g.freeCrates ?? []).filter((x) => x !== free) }))
   let opens: CrateOpen[] | null = null
   try {
-    opens = crateOpener ? await crateOpener(id, free) : null
+    opens = crateOpener ? await crateOpener(id, free, count) : null
   } catch (e) {
     const msg = e instanceof Error ? e.message : ''
     if (free && msg.includes('already opened')) used()
-    useGame.getState().toast(msg === 'soon' ? 'Crates open for signed-in towns very soon!' : msg.includes('one crate') ? 'One crate at a time!' : "Couldn't open the crate. Try again.")
+    useGame.getState().toast(msg === 'soon' ? (count > 1 ? 'Open ×10 is coming very soon!' : 'Crates open for signed-in towns very soon!') : msg.includes('one crate') ? 'One crate at a time!' : "Couldn't open the crate. Try again.")
     return null
   }
-  if (!opens) opens = [{ crate: id, cost, drop: rollCrate(def, s.level, s.cars, Math.random, { skins: ownedSkins(s), modSkins: ownedModSkins(s), hats: ownedHats(s), pieces: s.restoParts ?? [] }, s.cratePity?.[id] ?? 0) }]
-  for (const o of opens) useGame.getState().applyCrate(o)
+  if (opens) {
+    for (const o of opens) useGame.getState().applyCrate(o)
+  } else {
+    // A guest rolls in the browser, one after another, so each roll knows what the last one gave.
+    opens = []
+    for (let i = 0; i < count; i++) {
+      const g = useGame.getState()
+      const o: CrateOpen = { crate: id, cost: one, drop: rollCrate(def, g.level, g.cars, Math.random, { skins: crateOwnedSkins(g), modSkins: ownedModSkins(g), hats: ownedHats(g), pieces: g.restoParts ?? [] }, g.cratePity?.[id] ?? 0) }
+      g.applyCrate(o)
+      opens.push(o)
+    }
+  }
   // The server may hand back earlier opens the save missed instead: the free crate is only used once one opened free.
   if (free && opens.some((o) => o.crate === id && !o.cost.coins && !o.cost.bucks)) used()
   return opens

@@ -1,7 +1,7 @@
 // Rave Mode (the techno live event): the whole town drops into the night and
-// plays onte's "halcyon" (NCS): a ten-second warning while its build-up fades
-// in, then its big drop, and the HUD, the club, the Vanguard Tower and the
-// street lamps all go off on the kick.
+// plays our techno track (or onte's "halcyon", once licensed: raveSong.ts):
+// a ten-second warning while its build-up fades in, then the drop, and the
+// HUD, the club, the Vanguard Tower and the street lamps all go off on the kick.
 //
 // Kegan starts it from the Neon Owl's Rave button (only his account can: the
 // server's rave_start() checks it), and the drop lands exactly ten seconds
@@ -16,29 +16,42 @@
 // drop + n * SIXTEENTH_MS (negative through the warning), so everyone in the
 // same event hears the same bar, and the lights keep time while the sound is muted.
 import { forceNight } from './clock'
+import { HALCYON } from './raveSong'
 import { registerLiveKind } from './liveEvents'
 
 export type LiveEventKind = 'techno'
 
-// halcyon's tempo.
-export const TECHNO_BPM = 132
-export const SIXTEENTH_MS = 60000 / TECHNO_BPM / 4 // about 114 ms
-export const BAR_MS = SIXTEENTH_MS * 16 // about 1.82 s
-// The warning before the drop: the song's build-up, fading in.
+// With halcyon (raveSong.ts): its tempo, and the sixteen bars of its drop
+// looping (about 29 s): four bars of drop, eight of groove, four at the peak.
+// Our own synthesized track: 150 bpm, repeating every 24 bars (38.4 s): the
+// drop, eight bars of groove, four with stabs and ride, four stripped back,
+// then a four-bar breakdown and riser into the next drop.
+export const TECHNO_BPM = HALCYON ? 132 : 150
+export const SIXTEENTH_MS = 60000 / TECHNO_BPM / 4
+export const BAR_MS = SIXTEENTH_MS * 16
+// The warning before the drop, as the build-up fades in.
 export const BUILD_MS = 10_000
-// After the drop its sixteen bars (about 29 s) loop: four bars of drop, eight
-// of groove, four at the peak, then it drops again.
-export const CYCLE_BARS = 16
-export type Section = 'drop' | 'groove' | 'peak' | 'break'
-// The section of a bar, counted from the drop (negative = the warning's build-up).
+export const CYCLE_BARS = HALCYON ? 16 : 24
+// The synthesized track's build-up shape (its warning starts partway through the breakdown).
+export const BUILD_BARS = 36
+export const BREAK_BARS = 8
+export type Section = 'intro' | 'drop' | 'groove' | 'peak' | 'tension' | 'break'
+// The section of a bar, counted from the drop (negative = the build-up).
 export function sectionOf(bar: number): Section {
-  if (bar < 0) return 'break'
+  if (bar < 0) return bar < -BREAK_BARS ? 'intro' : 'break'
   const p = bar % CYCLE_BARS
-  return p < 4 ? 'drop' : p < 12 ? 'groove' : 'peak'
+  if (HALCYON) return p < 4 ? 'drop' : p < 12 ? 'groove' : 'peak'
+  return p < 4 ? 'drop' : p < 12 ? 'groove' : p < 16 ? 'peak' : p < 20 ? 'tension' : 'break'
 }
 const mod = (a: number, b: number) => ((a % b) + b) % b
-// Whether the kick plays on sixteenth n (not through the build-up).
+// Whether the kick plays on sixteenth n (not through the build-up or breakdowns).
 export const kickOn = (n: number) => mod(n, 4) === 0 && sectionOf(Math.floor(n / 16)) !== 'break'
+// 0..1 through a breakdown of the synthesized track (the build-up's, or a
+// cycle's), at bar `bar` plus `frac` of it.
+export function breakBuild(bar: number, frac: number) {
+  if (bar < 0) return Math.max(0, (bar + BREAK_BARS + frac) / BREAK_BARS)
+  return sectionOf(bar) === 'break' ? (mod(bar, CYCLE_BARS) - 20 + frac) / 4 : 0
+}
 
 // How long the town takes to slide into the night and back out of it.
 const EASE_MS = 6000
@@ -127,7 +140,7 @@ export function technoBeat(now = Date.now(), at = dropAt): TechnoBeat {
   const section = sectionOf(bar)
   const since = rel - beat * 4 * SIXTEENTH_MS
   const kick = kickOn(beat * 4) ? Math.exp(-since / 130) : 0
-  const build = rel < 0 ? Math.max(0, 1 + rel / BUILD_MS) : 0
+  const build = rel < 0 ? Math.max(0, 1 + rel / BUILD_MS) : breakBuild(bar, (rel - bar * BAR_MS) / BAR_MS)
   const p = mod(bar, CYCLE_BARS)
   const drop = bar >= 0 && p < 2 ? Math.exp(-(rel - (bar - p) * BAR_MS) / 900) : 0
   return { n, beat, bar, section, kick, side: mod(beat, 2) ? -1 : 1, build, drop }

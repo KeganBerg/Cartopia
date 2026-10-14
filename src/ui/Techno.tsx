@@ -1,5 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { onTechnoChange, technoBeat, technoLeft, technoOn, technoToDrop } from '../game/techno'
+import { TECHNO_BPM, onTechnoChange, technoBeat, technoLeft, technoOn, technoToDrop } from '../game/techno'
+import { HALCYON } from '../game/raveSong'
 import { prefetchTechno } from '../lib/technoMusic'
 import { supabase } from '../lib/supabase'
 import { useGame } from '../game/store'
@@ -87,7 +88,7 @@ export function TechnoLayer() {
       {dropped && (
         <div className="tk-title">
           <b>RAVE MODE</b>
-          <span>onte · halcyon · NCS</span>
+          <span>{HALCYON ? 'onte · halcyon · NCS' : `${TECHNO_BPM} BPM · EVERY TOWN`}</span>
         </div>
       )}
     </div>

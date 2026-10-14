@@ -3,7 +3,7 @@
 // faster car), and the first win over each one unlocks their colour in the Paint
 // Shop. New towns start with only STARTER_PAINTS; towns from before the roster
 // keep every colour they already had (`oldPaints`).
-import { PAINTS, STARTER_PAINTS, LEGACY_PAINTS } from './data'
+import { PAINTS, STARTER_PAINTS, LEGACY_PAINTS, hasCustomPaint, isHexColor } from './data'
 import { roadOpen } from './trophyRoad'
 import { worldDone } from './worldTour'
 import { classWon, firstPaintClass, type Mastery } from './mastery'
@@ -50,12 +50,13 @@ export const rowSkills = (r: PaintRival) => r.tier >= 3
 // What a race pays: a little more than a town rival at the same PI, plus a first-win bonus.
 export const rowPrize = (r: PaintRival, first: boolean) => Math.round(((260 + r.pi * 9) * (first ? 2 : 1)) / 10) * 10
 
-type PaintSave = { rivalRow?: Record<string, number>; oldPaints?: boolean; road?: number; roadItems?: string[]; mastery?: Record<string, Mastery>; worldTour?: number }
+type PaintSave = { rivalRow?: Record<string, number>; oldPaints?: boolean; road?: number; roadItems?: string[]; mastery?: Record<string, Mastery>; worldTour?: number; skins?: string[] }
 
 // Can this colour go on a car? Starter colours, gem colours (bought each time), colours
 // from beaten rivals, Trophy Road and first-win colours once won, and for older towns every
-// colour they had before the roster.
+// colour they had before the roster. Custom Colour opens every colour, on the chart or off it.
 export function paintOpen(s: PaintSave, color: string) {
+  if (hasCustomPaint(s)) return isHexColor(color)
   const p = PAINTS.find((x) => x.color === color)
   if (!p) return false
   if (p.earn === 'road') return roadOpen(s.roadItems, color)

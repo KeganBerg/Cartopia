@@ -2,7 +2,7 @@ import { Color, MeshStandardMaterial } from 'three'
 import { clubPulse, CUES, type ClubPulse, type CueKind } from '../lib/clubBeat'
 import { isNight } from '../game/clock'
 import { calmFlashing } from '../game/flashing'
-import { nightAmount, dayPhase } from './dayNight'
+import { glowMats, nightAmount, dayPhase } from './dayNight'
 import { ledGridTex, ledPaneTex, windowTex } from './textures'
 
 // The nightclub's LED windows: every window shows the same colour of the
@@ -108,5 +108,9 @@ export function driveClubLeds(now = shownNow()) {
   const look = lookOf(p)
   clubLedColor(tmp, now)
   ledWindow.emissive.copy(tmp).multiplyScalar(lit * (0.75 + flashOf(p, look.w)))
-  ledFront.emissive.copy(tmp).multiplyScalar(lit * (0.9 + flashOf(p, look.f)))
+  const front = flashOf(p, look.f)
+  ledFront.emissive.copy(tmp).multiplyScalar(lit * (0.9 + front))
+  // The window's light on the pavement: the same colour, lifting a little with
+  // the front window's flashes (steady under Reduce flashing).
+  glowMats.washLed.color.copy(tmp).multiplyScalar(lit * (0.85 + 0.35 * Math.min(1.5, front)))
 }

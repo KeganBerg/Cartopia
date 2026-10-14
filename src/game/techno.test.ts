@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { BAR_MS, BUILD_MS, kickOn, sectionOf, startEvent, stopEvent, technoBeat, technoLeft, technoNight, technoOn, technoToDrop, weeklyRave } from './techno'
+import { BAR_MS, BUILD_MS, CYCLE_BARS, kickOn, sectionOf, startEvent, stopEvent, technoBeat, technoLeft, technoNight, technoOn, technoToDrop, weeklyRave } from './techno'
 import { dayPhase, isNight } from './clock'
+import { HALCYON } from './raveSong'
 
 // The drop, as a wall-clock time.
 const AT = 1_800_000_000_000
@@ -11,14 +12,15 @@ describe('Rave Mode', () => {
     vi.useRealTimers()
   })
 
-  it('runs at halcyon’s 132 bpm', () => {
-    expect(BAR_MS).toBeCloseTo((60000 / 132) * 4)
+  it('runs at 150 bpm on our track, 132 with halcyon', () => {
+    expect(BAR_MS).toBeCloseTo((60000 / (HALCYON ? 132 : 150)) * 4)
   })
 
-  it('a ten-second build-up, then the drop’s sixteen bars loop: drop, groove, peak', () => {
+  it('a ten-second build-up, then drop, groove and peak (and tension and breakdown on our track)', () => {
     expect(BUILD_MS).toBe(10_000)
     expect([-5, -1].map(sectionOf)).toEqual(['break', 'break'])
-    expect([0, 3, 4, 11, 12, 15, 16].map(sectionOf)).toEqual(['drop', 'drop', 'groove', 'groove', 'peak', 'peak', 'drop'])
+    if (HALCYON) expect([0, 3, 4, 11, 12, 15, 16].map(sectionOf)).toEqual(['drop', 'drop', 'groove', 'groove', 'peak', 'peak', 'drop'])
+    else expect([0, 3, 4, 11, 12, 15, 16, 19, 20, 23, 24].map(sectionOf)).toEqual(['drop', 'drop', 'groove', 'groove', 'peak', 'peak', 'tension', 'tension', 'break', 'break', 'drop'])
   })
 
   it('keeps four on the floor after the drop, none through the build-up', () => {
@@ -33,7 +35,7 @@ describe('Rave Mode', () => {
   it('flashes on the kick and fades before the next one', () => {
     const t = AT + 6 * BAR_MS
     expect(technoBeat(t + 5, AT).kick).toBeGreaterThan(0.9)
-    expect(technoBeat(t + 420, AT).kick).toBeLessThan(0.1)
+    expect(technoBeat(t + 380, AT).kick).toBeLessThan(0.1)
     expect(technoBeat(t, AT).side).toBe(-technoBeat(t + BAR_MS / 4, AT).side)
   })
 
@@ -42,7 +44,7 @@ describe('Rave Mode', () => {
     expect(technoBeat(AT - 10, AT).build).toBeGreaterThan(0.99)
     expect(technoBeat(AT + 10, AT).drop).toBeGreaterThan(0.9)
     expect(technoBeat(AT + 6 * BAR_MS, AT).drop).toBe(0)
-    expect(technoBeat(AT + 16 * BAR_MS + 10, AT).drop).toBeGreaterThan(0.9)
+    expect(technoBeat(AT + CYCLE_BARS * BAR_MS + 10, AT).drop).toBeGreaterThan(0.9)
   })
 
   it('starts with the build-up, drops a minute later, ends on time and eases the town into the night', () => {

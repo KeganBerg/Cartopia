@@ -48,12 +48,12 @@ export function GoalSplash() {
   return (
     <div className="overlay lvl-overlay goal-overlay">
       <div className="lvl-rays" aria-hidden />
-      <div className="lvl goal" role="dialog" aria-label="Your goal">
+      <div className="lvl goal" role="dialog" aria-label="Chase the dream">
         <div className="goal-hero" aria-hidden>
           <CarThumb body={DREAM.body} model={DREAM.id} color={DREAM.colors[0]} />
         </div>
         <div className="goal-text">
-          <h2 className="lvl-title">Your goal</h2>
+          <h2 className="lvl-title">Chase the dream</h2>
           <p className="lvl-sub">Collect every car. Become a racing Legend.</p>
           <div className="lvl-rewards">
             <span className="lvl-chip" title="Cars collected">🚗 {owned} / {COLLECTABLE.length}</span>
