@@ -456,6 +456,29 @@ export const GROOVES: Groove[] = [
     pump: 0.4,
     gain: 1,
   },
+  // Witch house, after onte's "halcyon" (Kegan's reference): a hard four on the
+  // floor, off-beat hats, a snare on the off-beat, a rolling dark sub, long
+  // haunted pad chords and a low chopped vocal in C# minor.
+  {
+    name: 'Witch',
+    bpm: 131,
+    swing: 0,
+    loop: [chord('C#2', 'G#3 C#4 E4 G#4'), chord('A1', 'A3 C#4 E4 G#4'), chord('F#1', 'A3 C#4 F#4'), chord('G#1', 'G#3 B3 D#4 F#4')],
+    bass: [1, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1],
+    bassLen: 0.9,
+    bassTone: 'saw',
+    stabs: [[0], [0], [0], [0, 8]],
+    stabLen: 14,
+    tone: 'pad',
+    kickTone: 'punch',
+    claps: [2, 6, 10, 14],
+    snare: 'snare',
+    openHats: off,
+    closedHats: 'all',
+    lead: { root: hz('C#4'), notes: tune({ 0: 7, 3: 7, 6: 3, 8: 0, 14: 3 }, { 0: 8, 3: 8, 6: 7, 8: 3 }, { 0: 7, 3: 7, 6: 10, 8: 12, 14: 10 }, { 0: 8, 6: 7, 8: 3, 12: 2, 13: 2, 14: 2, 15: 2 }), len: 2, tone: 'vox', stutter: [3, 35, 60, 61, 62, 63] },
+    pump: 0.55,
+    gain: 0.9,
+  },
 ]
 
 // ?groove=n plays only that track (for testing and rendering clips).

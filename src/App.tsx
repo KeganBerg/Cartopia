@@ -45,7 +45,7 @@ import './lib/crates'
 import './lib/accountSwitch'
 import { startAmbience } from './lib/ambience'
 import { startMusic } from './lib/townMusic'
-import { prefetchTechno, startTechnoMusic } from './lib/technoMusic'
+import { startTechnoMusic } from './lib/technoMusic'
 import { TechnoLayer } from './ui/Techno'
 import { FlashWarning, RaveHeadsUp, flashWarningOpen, openDaily } from './ui/FlashWarning'
 import { useTownPaused } from './scene/renderGate'
@@ -82,7 +82,7 @@ const CampaignPrizePopup = onDemand(loadRace, (m) => m.CampaignPrizePopup)
 const TourPrizePopup = onDemand(loadRace, (m) => m.TourPrizePopup)
 const EventPrizePopup = onDemand(loadRace, (m) => m.EventPrizePopup)
 const prefetchPanels = () => {
-  const go = () => { loadRace(); loadRescue(); loadCrates(); loadArcade(); prefetchTechno() }
+  const go = () => { loadRace(); loadRescue(); loadCrates(); loadArcade() }
   if ('requestIdleCallback' in window) requestIdleCallback(go, { timeout: 4000 })
   else go()
 }
