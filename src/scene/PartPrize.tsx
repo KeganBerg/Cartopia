@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Box3, BoxGeometry, BufferGeometry, MeshStandardMaterial, SphereGeometry, TorusGeometry, Vector3, type Group } from 'three'
+import { Box3, BoxGeometry, BufferGeometry, CylinderGeometry, MeshStandardMaterial, SphereGeometry, TorusGeometry, Vector3, type Group } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { modDef, modFits, CARS, type Body } from '../game/data'
-import { RIM_LOOK, carbon, chrome, glass, modGeo } from './CarMods'
-import { wheelGeo, type RimStyle } from './carWheels'
+import { KIND_MAT, RIM_LOOK, RIM_STYLE, SOLID_KINDS, carbon, chrome, modGeo } from './CarMods'
+import { wheelGeo } from './carWheels'
 
 // A crate's part prize, shown on its own and turning on the lift: the same bolt-on pieces
 // a car wears (CarMods), lifted off the car, centred and scaled up so they read on their own;
@@ -12,8 +12,6 @@ import { wheelGeo, type RimStyle } from './carWheels'
 
 // How big the shown part is: its longest side, in metres.
 const SIZE = 2
-// Rims mods and their rim style (as CarModel draws them).
-const RIM_STYLE: Record<string, RimStyle> = { chrome: 'deep', goldmesh: 'mesh', forged: 'split' }
 
 const rubber = new MeshStandardMaterial({ color: '#1c1c1e', roughness: 0.9 })
 const steelRim = new MeshStandardMaterial({ color: '#b0bec5', metalness: 0.75, roughness: 0.3 })
@@ -48,16 +46,13 @@ function centred(geos: (BufferGeometry | undefined)[]) {
 
 export function BoltOn({ id, body, tint }: { id: string; body: Body; tint: string }) {
   const g = modGeo(bodyFor(id, body), [id])
-  const { mid, scale } = useMemo(() => centred([g.paint, g.carbon, g.chrome, g.glass]), [g])
+  const { mid, scale } = useMemo(() => centred(SOLID_KINDS.map((k) => g[k])), [g])
   const paint = useMemo(() => new MeshStandardMaterial({ color: tint, metalness: 0.4, roughness: 0.3 }), [tint])
   useEffect(() => () => paint.dispose(), [paint])
   return (
     <group scale={scale}>
       <group position={[-mid.x, -mid.y, -mid.z]}>
-        {g.paint && <mesh geometry={g.paint} material={paint} castShadow />}
-        {g.carbon && <mesh geometry={g.carbon} material={carbon} castShadow />}
-        {g.chrome && <mesh geometry={g.chrome} material={chrome} castShadow />}
-        {g.glass && <mesh geometry={g.glass} material={glass} renderOrder={2} />}
+        {SOLID_KINDS.map((k) => g[k] && <mesh key={k} geometry={g[k]} material={k === 'paint' ? paint : KIND_MAT[k]} castShadow={k !== 'glass'} renderOrder={k === 'glass' ? 2 : 0} />)}
         {/* Flame pipes show their nozzles, not the flames. */}
       </group>
     </group>
@@ -138,6 +133,41 @@ function WheelPrize({ id }: { id: string }) {
   )
 }
 
+// A stance prize: the coil-over (or air bag) it fits, standing up. Long for a lift kit,
+// short and red for lowering springs, a black air bag for air ride.
+const springRed = new MeshStandardMaterial({ color: '#e53935', metalness: 0.4, roughness: 0.35 })
+function StancePrize({ id }: { id: string }) {
+  const geo = useMemo(() => {
+    const air = id === 'slammed'
+    const tall = id === 'lifted' ? 1.5 : air ? 0.8 : 1
+    const coils: BufferGeometry[] = []
+    const n = air ? 3 : Math.round(7 * tall)
+    for (let i = 0; i < n; i++) {
+      const t = air ? new TorusGeometry(0.2, 0.09, 10, 24) : new TorusGeometry(0.17, 0.035, 8, 24)
+      t.rotateX(Math.PI / 2)
+      t.translate(0, -0.45 * tall + 0.15 + i * (air ? 0.17 : 0.13), 0)
+      coils.push(t.toNonIndexed())
+    }
+    const rod = new CylinderGeometry(0.07, 0.07, 1.1 * tall, 14)
+    const caps = [-1, 1].map((sd) => new CylinderGeometry(0.24, 0.24, 0.06, 18).translate(0, sd * 0.55 * tall, 0).toNonIndexed())
+    const merged = mergeGeometries(coils)!
+    coils.forEach((g) => g.dispose())
+    return { coil: merged, rod, caps: mergeGeometries(caps)!, air }
+  }, [id])
+  useEffect(() => () => {
+    geo.coil.dispose()
+    geo.rod.dispose()
+    geo.caps.dispose()
+  }, [geo])
+  return (
+    <group scale={1.2}>
+      <mesh geometry={geo.rod} material={chrome} />
+      <mesh geometry={geo.caps} material={carbon} castShadow />
+      <mesh geometry={geo.coil} material={geo.air ? rubber : id === 'lowered' ? springRed : KIND_MAT.ti} castShadow />
+    </group>
+  )
+}
+
 // The part, floating a little above the lift and turning slowly.
 export function PartPrize({ id, body, tint }: { id: string; body?: Body; tint: string }) {
   const turn = useRef<Group>(null)
@@ -152,7 +182,7 @@ export function PartPrize({ id, body, tint }: { id: string; body?: Body; tint: s
       <pointLight position={[0.6, 1.4, 1.6]} intensity={5} distance={5} color="#fff8e1" />
       {/* Tipped toward the camera so parts that lie flat on a car read from above. */}
       <group rotation-x={wheel ? 0 : 0.3}>
-        <group ref={turn} scale={wheel ? 1.5 : 1}>{wheel ? <WheelPrize id={id} /> : <BoltOn id={id} body={body ?? 'sedan'} tint={tint} />}</group>
+        <group ref={turn} scale={wheel ? 1.5 : 1}>{wheel ? <WheelPrize id={id} /> : slot === 'stance' ? <StancePrize id={id} /> : <BoltOn id={id} body={body ?? 'sedan'} tint={tint} />}</group>
       </group>
     </group>
   )

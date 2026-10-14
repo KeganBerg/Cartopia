@@ -533,7 +533,7 @@ export const upgradeCost = (car: CarDef, level: number) => ({
 // fitted mod ids as `mods` on each car (missing means none) and every part
 // bought for that car as `ownedMods`, so a swapped-out part can go back on for
 // free. Ids stay fixed so saves keep working.
-export type ModSlot = 'spoiler' | 'exhaust' | 'kit' | 'hood' | 'rims' | 'tires'
+export type ModSlot = 'spoiler' | 'exhaust' | 'kit' | 'hood' | 'rims' | 'tires' | 'lights' | 'stance'
 export const MOD_SLOTS: { id: ModSlot; name: string; icon: string; stat: string }[] = [
   { id: 'spoiler', name: 'Spoilers', icon: '🪽', stat: 'Downforce for more grip' },
   { id: 'exhaust', name: 'Exhausts', icon: '💨', stat: 'Freer flow for more power' },
@@ -541,6 +541,8 @@ export const MOD_SLOTS: { id: ModSlot; name: string; icon: string; stat: string 
   { id: 'hood', name: 'Hoods', icon: '🔥', stat: 'More air for more power' },
   { id: 'rims', name: 'Rims', icon: '🛞', stat: 'Lighter wheels' },
   { id: 'tires', name: 'Tires', icon: '🌧️', stat: 'Hold the strip in rain, snow and sand' },
+  { id: 'lights', name: 'Lights', icon: '💡', stat: 'See the line for more grip' },
+  { id: 'stance', name: 'Stance', icon: '↕️', stat: 'Ride height for more grip' },
 ]
 
 // Whether a part can go on this body: special parts on their own bodies only, regular parts
@@ -570,6 +572,14 @@ export type ModDef = {
 // Bodies that swap regular spoilers, kits or hoods for parts of their own.
 const ODD: Body[] = ['bus', 'tank', 'dogvan', 'tusker', 'scooter', 'chopper', 'sportbike']
 const BIKE_BODIES: Body[] = ['scooter', 'chopper', 'sportbike']
+// Bodies with no hard roof for a roof light bar to sit on (open cars, the round bubble).
+const NO_ROOF: Body[] = ['roadster', 'offroad', 'tusker', 'pontoon', 'bubble']
+// Bodies whose ride height doesn't change: bikes, the formula car and the tracked tank.
+const FIXED_RIDE: Body[] = [...BIKE_BODIES, 'formula', 'tank']
+// Utility bodies that wear a roof rack and a bull bar.
+const UTILITY: Body[] = ['truck', 'suv', 'van', 'wagon']
+// Box-shaped work vans and the monster truck: no racing flares or aero for them.
+const NO_AERO: Body[] = [...ODD, 'formula', 'icecream', 'parcel', 'monster']
 export const MODS: ModDef[] = [
   { id: 'ducktail', slot: 'spoiler', notOn: ODD, name: 'Ducktail Lip', unlockLevel: 2, coins: 1200, parts: 0, bucks: 0, power: 0, grip: 2, weight: 0 },
   { id: 'gtwing', slot: 'spoiler', notOn: ODD, name: 'GT Wing', unlockLevel: 5, coins: 4000, parts: 10, bucks: 0, power: 0, grip: 4, weight: 0 },
@@ -612,7 +622,39 @@ export const MODS: ModDef[] = [
   { id: 'snowstuds', slot: 'tires', name: 'Studded Snow Tires', unlockLevel: 4, coins: 3500, parts: 6, bucks: 0, power: 0, grip: 0, weight: 0, tread: { snow: 1 } },
   { id: 'allweather', slot: 'tires', name: 'All-Weather Compound', unlockLevel: 7, coins: 0, parts: 0, bucks: 12, power: 0, grip: 0, weight: 0, tread: { wet: 0.7, snow: 0.7, dust: 0.7 } },
   { id: 'forged', slot: 'rims', name: 'Forged Black', unlockLevel: 7, coins: 7000, parts: 12, bucks: 0, power: 0, grip: 2, weight: -3 },
+  // Batch 3: more of every slot, plus lights and stance.
+  { id: 'swanneck', slot: 'spoiler', notOn: ODD, name: 'Swan Neck Wing', unlockLevel: 14, coins: 12000, parts: 25, bucks: 0, power: 0, grip: 5, weight: 0 },
+  { id: 'skydeck', slot: 'spoiler', notOn: ODD, name: 'Twin Deck Wing', unlockLevel: 18, coins: 0, parts: 0, bucks: 16, power: 0, grip: 7, weight: 0 },
+  { id: 'roofrack', slot: 'spoiler', only: UTILITY, name: 'Roof Rack', unlockLevel: 5, coins: 2500, parts: 4, bucks: 0, power: 0, grip: 2, weight: 1 },
+  { id: 'quadtips', slot: 'exhaust', name: 'Quad Tips', unlockLevel: 5, coins: 2200, parts: 4, bucks: 0, power: 3, grip: 0, weight: 0 },
+  { id: 'zoomies', slot: 'exhaust', notOn: [...ODD, 'formula'], name: 'Zoomie Headers', unlockLevel: 11, coins: 10000, parts: 20, bucks: 0, power: 5, grip: 0, weight: 0 },
+  { id: 'titan', slot: 'exhaust', name: 'Burnt Titanium', unlockLevel: 15, coins: 0, parts: 0, bucks: 14, power: 7, grip: 0, weight: -1 },
+  { id: 'rallykit', slot: 'kit', notOn: [...BIKE_BODIES, 'formula'], name: 'Rally Kit', unlockLevel: 5, coins: 2800, parts: 5, bucks: 0, power: 0, grip: 2, weight: -1 },
+  { id: 'boxflares', slot: 'kit', notOn: NO_AERO, name: 'Box Flares', unlockLevel: 11, coins: 11000, parts: 22, bucks: 0, power: 0, grip: 4, weight: -3 },
+  { id: 'aerokit', slot: 'kit', notOn: NO_AERO, name: 'Aero Kit', unlockLevel: 20, coins: 0, parts: 0, bucks: 20, power: 0, grip: 5, weight: -7 },
+  { id: 'bullbar', slot: 'kit', only: [...UTILITY, 'offroad'], name: 'Bull Bar', unlockLevel: 4, coins: 2000, parts: 3, bucks: 0, power: 0, grip: 2, weight: 1 },
+  { id: 'cowl', slot: 'hood', notOn: [...BIKE_BODIES, 'formula'], name: 'Cowl Hood', unlockLevel: 3, coins: 1800, parts: 2, bucks: 0, power: 2, grip: 0, weight: 0 },
+  { id: 'louvres', slot: 'hood', notOn: [...BIKE_BODIES, 'formula'], name: 'Louvred Hood', unlockLevel: 9, coins: 9000, parts: 18, bucks: 0, power: 4, grip: 0, weight: -2 },
+  { id: 'twinturbo', slot: 'hood', notOn: [...BIKE_BODIES, 'formula'], name: 'Twin Turbo', unlockLevel: 16, coins: 0, parts: 0, bucks: 16, power: 7, grip: 0, weight: 0 },
+  { id: 'candy', slot: 'rims', name: 'Candy Fives', unlockLevel: 3, coins: 1500, parts: 2, bucks: 0, power: 0, grip: 0, weight: -1 },
+  { id: 'beadlock', slot: 'rims', name: 'Bronze Beadlocks', unlockLevel: 6, coins: 4000, parts: 6, bucks: 0, power: 0, grip: 1, weight: -2 },
+  { id: 'turbine', slot: 'rims', name: 'Turbine Fans', unlockLevel: 10, coins: 9000, parts: 15, bucks: 0, power: 0, grip: 1, weight: -3 },
+  { id: 'goldwire', slot: 'rims', name: 'Gold Wire Spokes', unlockLevel: 14, coins: 0, parts: 0, bucks: 10, power: 0, grip: 2, weight: -4 },
+  { id: 'foglamps', slot: 'lights', notOn: [...BIKE_BODIES, 'formula'], name: 'Fog Lamps', unlockLevel: 3, coins: 1500, parts: 2, bucks: 0, power: 0, grip: 1, weight: 0 },
+  { id: 'roofbar', slot: 'lights', notOn: [...ODD, ...NO_ROOF, 'formula'], name: 'Roof Light Bar', unlockLevel: 7, coins: 6000, parts: 10, bucks: 0, power: 0, grip: 2, weight: 0 },
+  { id: 'underglow', slot: 'lights', notOn: FIXED_RIDE, name: 'Neon Underglow', unlockLevel: 10, coins: 0, parts: 0, bucks: 12, power: 1, grip: 2, weight: 0 },
+  { id: 'lowered', slot: 'stance', notOn: FIXED_RIDE, name: 'Lowering Springs', unlockLevel: 4, coins: 2500, parts: 4, bucks: 0, power: 0, grip: 2, weight: 0 },
+  { id: 'lifted', slot: 'stance', notOn: FIXED_RIDE, name: 'Lift Kit', unlockLevel: 6, coins: 4500, parts: 8, bucks: 0, power: 0, grip: 2, weight: 1 },
+  { id: 'slammed', slot: 'stance', notOn: FIXED_RIDE, name: 'Air Ride', unlockLevel: 12, coins: 0, parts: 0, bucks: 12, power: 0, grip: 4, weight: -1 },
 ]
+
+// What a stance mod does to the look: how far it moves the body up or down over the wheels,
+// how much bigger and wider the tyres get, and how far the wheels lean in at the top.
+export const STANCE: Record<string, { rise: number; tyre?: number; camber?: number }> = {
+  lowered: { rise: -0.022 },
+  lifted: { rise: 0.07, tyre: 1.2 },
+  slammed: { rise: -0.04, camber: 0.12 },
+}
 
 // Unknown ids (a mod from a newer build) give nothing and draw nothing.
 export const modDef = (id: string): ModDef | undefined => MODS.find((m) => m.id === id)

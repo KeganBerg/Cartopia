@@ -10,10 +10,10 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { wheelTex } from './textures'
 import { glowMats } from './dayNight'
-import { FINISH_LOOK, SKINNED_SLOTS, fittedMods, isBike, modSkinNumber, skinNumber, type Body, type Finish, type ModSlot, type Panels, type SkinnedSlot } from '../game/data'
+import { FINISH_LOOK, SKINNED_SLOTS, STANCE, fittedMods, isBike, modSkinNumber, skinNumber, type Body, type Finish, type ModSlot, type Panels, type SkinnedSlot } from '../game/data'
 import { paintsPanels, panelUniforms, setPanels, withPanels, type Zones } from './panelPaint'
 import { tickSkins, withSkin } from './skins'
-import { CarMods, RIM_LOOK, carbon, chrome as modChrome, glass as modGlass, modGeo, modIds, splitSkinned } from './CarMods'
+import { CarMods, KIND_MAT, RIM_LOOK, RIM_STYLE, UnderglowPool, carbon, modGeo, modIds, splitSkinned } from './CarMods'
 import { carBody, wheelPool, type WheelSlot } from './carBatch'
 import { bake, finishOf, type Finish as Look } from './bake'
 import { carStyle, hasTrim, trimBike, trimCar, type CarStyle } from './carTrim'
@@ -249,6 +249,8 @@ export type ModFrame = {
   body: Body; len: number; wid: number; lift: number; wheel: number; wz: number; wx: number
   bodyW: number; side: number; front: number; rear: number; pipeY: number
   deck: number; deckZ: number; deckW: number; hoodTop: number; hoodZ: number; hs: number
+  // The top of the hard roof (the deck on bodies without one), where it runs, and how wide it is.
+  roof: number; roofZ: number; roofLen: number; roofW: number
 }
 export function carFrame(body: Body): ModFrame {
   const s = shapeOf(body)
@@ -261,12 +263,14 @@ export function carFrame(body: Body): ModFrame {
     return {
       body, len: s.len, wid: s.wid, lift: r * 0.6, wheel: r, wz: b.wz, wx: 0, bodyW: 0.2, side: 0.1, front: b.wz + r, rear: -b.wz - r * 0.4, pipeY: r + 0.04,
       deck: sy + 0.05, deckZ: sz - 0.2, deckW: 0.24, hoodTop: scooter ? hy - 0.02 : (hy + sy) / 2 + 0.04, hoodZ: scooter ? hz - 0.02 : hz - 0.04, hs: 0.5,
+      roof: sy + 0.05, roofZ: sz - 0.2, roofLen: 0.2, roofW: 0.2,
     }
   }
   if (body === 'formula') {
     return {
       body, len: s.len, wid: s.wid, lift: s.lift, wheel: s.wheel, wz: s.len * 0.33, wx: s.track!, bodyW: 0.5, side: 0.25, front: s.len / 2, rear: -s.len / 2 + 0.05, pipeY: 0.24,
       deck: 0.27, deckZ: -s.len / 2 + 0.08, deckW: 0.56, hoodTop: 0.36, hoodZ: -0.17, hs: 0.55,
+      roof: 0.27, roofZ: -0.1, roofLen: 0.3, roofW: 0.3,
     }
   }
   const b = s.round ? Math.min(0.1, s.body * 0.4) : 0.035
@@ -280,6 +284,7 @@ export function carFrame(body: Body): ModFrame {
     bodyW: s.wid, side: s.tracks ? s.wid / 2 + 0.08 : s.wid / 2, front: s.len / 2, rear: -s.len / 2, pipeY: s.lift + 0.06,
     deck: roofMount ? c.roof : p.deck, deckZ: roofMount ? c.roofR + 0.05 : -s.len / 2 + 0.08, deckW: roofMount ? s.wid * 0.84 : s.wid,
     hoodTop: p.hood + s.hood, hoodZ: (cowl + s.len / 2 - s.len * 0.1) / 2, hs: Math.min(1.15, s.wid / 0.7),
+    roof: s.open ? p.deck : c.roof + 0.015, roofZ: (c.roofF + c.roofR) / 2, roofLen: c.roofF - c.roofR, roofW: s.wid * 0.84,
   }
 }
 
@@ -481,7 +486,9 @@ export function brakes(k: Kit, wx: number | ((z: number) => number), wz: number,
 
 // Stock parts that a fitted mod replaces are left out of the merged body.
 function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: string): CarGeo {
-  const key = `${body}|${model ?? ''}|${fit.spoiler ? 1 : 0}${fit.hood ? 1 : 0}${fit.exhaust ? 1 : 0}${fit.kit ? 1 : 0}`
+  // A roof rack or roof light bar mod takes the place of the model's own roof gear.
+  const roofMod = fit.spoiler === 'roofrack' || fit.lights === 'roofbar'
+  const key = `${body}|${model ?? ''}|${fit.spoiler ? 1 : 0}${fit.hood ? 1 : 0}${fit.exhaust ? 1 : 0}${fit.kit ? 1 : 0}${roofMod ? 1 : 0}`
   const hit = geoCache.get(key)
   if (hit) return hit
   if (body === 'formula') return formulaGeo(key, fit)
@@ -1113,7 +1120,7 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
   // This model's own trim (see carTrim.ts).
   trimCar(k, model, {
     len: s.len, wid: s.wid, lift: s.lift, body: s.body, wheel: s.wheel, cabinZ: s.cabinZ, cabinLen: s.cabinLen,
-    top, hoodY, bulge: s.hood * 2 > 0 ? s.hood : 0, hoodFront, cowl, front, wz, lightY, plateY, nose: noseAt, exhaust: !!fit.exhaust, spoiler: !!fit.spoiler, kit: !!fit.kit, hood: !!fit.hood, ty, roofY, roofLen, roofZ, closed,
+    top, hoodY, bulge: s.hood * 2 > 0 ? s.hood : 0, hoodFront, cowl, front, wz, lightY, plateY, nose: noseAt, exhaust: !!fit.exhaust, spoiler: !!fit.spoiler, kit: !!fit.kit, hood: !!fit.hood, roofMod, ty, roofY, roofLen, roofZ, closed,
   })
 
   // Wheel: one mesh per wheel. The tread and the spoked rim share one texture,
@@ -1197,11 +1204,9 @@ function wheelMaterial(rim?: string, tint?: string) {
 // A rim in a custom colour, keeping the shine of a rims mod's finish when one is fitted.
 const rimPaint = (color: string, mod?: [string, number, number]) => matOf('rim', color, mod ? Math.max(0.6, mod[1] + 0.4) : 0.75, mod ? mod[2] : 0.28)
 
-// A rims mod swaps the stock rim for its own style and finish.
-const RIM_STYLE: Record<string, RimStyle> = { chrome: 'deep', goldmesh: 'mesh', forged: 'split' }
-
 // Close-up wheels: a tyre and a 3D rim each, steering and rolling with the rig.
-function Wheels({ at, r, w, rig, rims, rimColor, rusty, look }: { at: number[][]; r: number; w: number; rig?: WheelRig; rims?: string; rimColor?: string; rusty?: boolean; look: CarStyle }) {
+// camber: how far each wheel leans in at the top (Air Ride's stance).
+function Wheels({ at, r, w, rig, rims, rimColor, rusty, look, camber = 0 }: { at: number[][]; r: number; w: number; rig?: WheelRig; rims?: string; rimColor?: string; rusty?: boolean; look: CarStyle; camber?: number }) {
   const mod = rims ? RIM_LOOK[rims] : undefined
   const style = (rims && RIM_STYLE[rims]) || look.rim
   const geo = wheelGeo(style, r, w, look.ww && !mod)
@@ -1210,9 +1215,11 @@ function Wheels({ at, r, w, rig, rims, rimColor, rusty, look }: { at: number[][]
     <>
       {at.map(([x, z], i) => (
         <group key={i} position={[x, r, z]} ref={rig && i < 2 ? (o) => void (rig.steer[i] = o) : undefined}>
-          <group ref={rig ? (o) => void (rig.spin[i] = o) : undefined}>
-            <mesh geometry={geo.tire} material={MAT.rubber} castShadow />
-            <mesh geometry={geo.rims[x < 0 ? 0 : 1]} material={rim} />
+          <group rotation-z={x < 0 ? -camber : camber}>
+            <group ref={rig ? (o) => void (rig.spin[i] = o) : undefined}>
+              <mesh geometry={geo.tire} material={MAT.rubber} castShadow />
+              <mesh geometry={geo.rims[x < 0 ? 0 : 1]} material={rim} />
+            </group>
           </group>
         </group>
       ))}
@@ -1237,10 +1244,11 @@ type CarProps = { body: Body; model?: string; color: string; finish?: Finish | n
 // rest) with the finish it would otherwise be drawn with, except the see-through screen;
 // the wheels' groups stay for steering and rolling but are drawn from the shared wheel pool.
 // `extra` is drawn as is (chrome paint, which mirrors its own studio and can't be baked).
-function LeanCar({ parts, looks, casters, mods, modPaint, highlight, wheels, radius, width, rims, rimColor, rig, beams, extra }: {
+// rise: how far a stance mod lifts (or drops) the body over its wheels.
+function LeanCar({ parts, looks, casters, mods, modPaint, highlight, wheels, radius, width, rims, rimColor, rig, beams, extra, rise = 0 }: {
   parts: Partial<Record<Part, BufferGeometry>>; looks: Partial<Record<Part, Look>>; casters: Part[]
   mods: { body: Body; ids: string[]; skins?: Partial<Record<SkinnedSlot, number>> }; modPaint: Look; highlight?: boolean
-  wheels: V3[]; radius: number; width: number; rims?: string; rimColor?: string; rig: WheelRig; beams: React.ReactNode; extra?: React.ReactNode
+  wheels: V3[]; radius: number; width: number; rims?: string; rimColor?: string; rig: WheelRig; beams: React.ReactNode; extra?: React.ReactNode; rise?: number
 }) {
   const key = (Object.keys(looks) as Part[]).map((k) => `${k}:${parts[k]?.uuid ?? 0}:${JSON.stringify(looks[k])}`).join() + mods.ids.join() + JSON.stringify(mods.skins ?? {}) + JSON.stringify(modPaint)
   const geo = useMemo(() => {
@@ -1256,9 +1264,12 @@ function LeanCar({ parts, looks, casters, mods, modPaint, highlight, wheels, rad
       const m = modGeo(mods.body, ids)
       if (m.paint) shade.push([m.paint, { ...modPaint, skin }])
       if (m.carbon) shade.push([m.carbon, { ...finishOf(carbon), skin }])
-      if (m.chrome) rest.push([m.chrome, { ...finishOf(modChrome), skin }])
+      if (m.ti) shade.push([m.ti, { ...finishOf(KIND_MAT.ti), skin }])
+      if (m.chrome) rest.push([m.chrome, { ...finishOf(KIND_MAT.chrome), skin }])
+      if (m.lamp) rest.push([m.lamp, finishOf(KIND_MAT.lamp)])
+      if (m.neon) rest.push([m.neon, finishOf(KIND_MAT.neon)])
       // Glass mod parts (bike screens, bubbles) bake solid in town traffic.
-      if (m.glass) rest.push([m.glass, finishOf(modGlass)])
+      if (m.glass) rest.push([m.glass, finishOf(KIND_MAT.glass)])
     }
     return { shade: shade.length ? bake(shade) : null, rest: rest.length ? bake(rest) : null }
   }, [key]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -1276,10 +1287,12 @@ function LeanCar({ parts, looks, casters, mods, modPaint, highlight, wheels, rad
   }, [rig, rims, rimColor, radius, width, wheels.length]) // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <group>
-      {geo.shade && <mesh geometry={geo.shade} material={highlight ? carBody.picked : carBody.plain} castShadow />}
-      {geo.rest && <mesh geometry={geo.rest} material={highlight ? carBody.picked : carBody.plain} />}
-      {parts.screen && <mesh geometry={parts.screen} material={MAT.screen} />}
-      {extra}
+      <group position-y={rise}>
+        {geo.shade && <mesh geometry={geo.shade} material={highlight ? carBody.picked : carBody.plain} castShadow />}
+        {geo.rest && <mesh geometry={geo.rest} material={highlight ? carBody.picked : carBody.plain} />}
+        {parts.screen && <mesh geometry={parts.screen} material={MAT.screen} />}
+        {extra}
+      </group>
       {beams}
       {wheels.map(([x, y, z], i) => (
         <group key={i} position={[x, y, z]} ref={i < (wheels.length === 2 ? 1 : 2) ? (o) => void (rig.steer[i] = o) : undefined}>
@@ -1345,6 +1358,12 @@ function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight,
   const s = shapeOf(body)
   const g = carGeo(body, fit, model)
   const p = g.parts
+  // Stance: the body rides higher or lower over its wheels; a lift kit also fits bigger tyres.
+  const st = fit.stance ? STANCE[fit.stance] : undefined
+  const tyre = st?.tyre ?? 1
+  const wr = s.wheel * tyre
+  const rise = (st?.rise ?? 0) + wr - s.wheel
+  const ww = (s.tyre ?? (s.track ? 0.16 : 0.14)) * tyre
   // Rusty finds keep a hint of their paint under brown, matte rust.
   const tint = useMemo(() => (rusty ? '#' + new Color(color).lerp(new Color('#8a5a3c'), 0.72).getHexString() : color), [color, rusty])
   const dark = useMemo(() => '#' + new Color(tint).multiplyScalar(0.6).getHexString(), [tint])
@@ -1366,6 +1385,7 @@ function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight,
   const pan = rusty ? null : panels
   const rimColor = pan?.rims?.color
   const topper = hat && !rusty && <Hat hat={hat} spot={hatSpot(body, model, p)} />
+  const pool = fit.lights === 'underglow' && <UnderglowPool body={body} />
   if (lean && rig) {
     // Chrome (its studio reflections) and custom panels can't be baked: that paint is drawn on its own.
     const chromed = !rusty && finish === 'chrome' && !sk
@@ -1378,36 +1398,39 @@ function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight,
     }
     return (
       <LeanCar parts={p} looks={looks} casters={['paint', 'glass']} mods={{ body, ids: modIds(fit), skins: msk }} modPaint={{ color: tint, metal: rusty ? 0.1 : 0.4, rough: 0.3 }} highlight={highlight}
-        wheels={[[-wx, s.wheel, wz], [wx, s.wheel, wz], [-wx, s.wheel, -wz], [wx, s.wheel, -wz]]} radius={s.wheel} width={s.tyre ?? 0.14} rims={fit.rims} rimColor={rimColor} rig={rig} beams={beam}
+        wheels={[[-wx, wr, wz], [wx, wr, wz], [-wx, wr, -wz], [wx, wr, -wz]]} radius={wr} width={(s.tyre ?? 0.14) * tyre} rims={fit.rims} rimColor={rimColor} rig={rig} beams={<>{beam}{pool}</>} rise={rise}
         extra={<>{own && <mesh geometry={p.paint} castShadow><PaintMaterial color={tint} finish={finish} highlight={highlight} skin={chromed ? 0 : sk} panels={pan} zones={g.zones} /></mesh>}{topper}</>} />
     )
   }
   return (
     <group>
-      <mesh geometry={p.paint} castShadow>
-        <PaintMaterial color={tint} finish={finish} rusty={rusty} highlight={highlight} skin={sk} panels={pan} zones={g.zones} />
-      </mesh>
-      {p.dark && (
-        <mesh geometry={p.dark}>
-          <meshStandardMaterial color={dark} />
+      <group position-y={rise}>
+        <mesh geometry={p.paint} castShadow>
+          <PaintMaterial color={tint} finish={finish} rusty={rusty} highlight={highlight} skin={sk} panels={pan} zones={g.zones} />
         </mesh>
-      )}
-      {stripe && p.stripe && (
-        <mesh geometry={p.stripe}>
-          <meshStandardMaterial color={stripe} />
-        </mesh>
-      )}
-      {shared.map((k) => <mesh key={k} geometry={p[k]} material={MAT[k]} />)}
-      {p.lamp && <mesh geometry={p.lamp} material={lamp} />}
-      {p.handle && <mesh geometry={p.handle} material={handle} />}
-      {p.glass && <mesh geometry={p.glass} material={glass.see} castShadow />}
-      {p.cabin && <mesh geometry={p.cabin} material={matOf('seat', look.seat ?? '#2b2b2b', 0, 0.75)} />}
-      {p.caliper && <mesh geometry={p.caliper} material={matOf('cal', look.caliper ?? '#4a4d52', look.caliper ? 0.2 : 0.5, 0.45)} />}
-      <CarMods body={body} fit={fit} tint={tint} metal={rusty ? 0.1 : 0.4} flames={flames} skins={msk} />
-      {topper}
+        {p.dark && (
+          <mesh geometry={p.dark}>
+            <meshStandardMaterial color={dark} />
+          </mesh>
+        )}
+        {stripe && p.stripe && (
+          <mesh geometry={p.stripe}>
+            <meshStandardMaterial color={stripe} />
+          </mesh>
+        )}
+        {shared.map((k) => <mesh key={k} geometry={p[k]} material={MAT[k]} />)}
+        {p.lamp && <mesh geometry={p.lamp} material={lamp} />}
+        {p.handle && <mesh geometry={p.handle} material={handle} />}
+        {p.glass && <mesh geometry={p.glass} material={glass.see} castShadow />}
+        {p.cabin && <mesh geometry={p.cabin} material={matOf('seat', look.seat ?? '#2b2b2b', 0, 0.75)} />}
+        {p.caliper && <mesh geometry={p.caliper} material={matOf('cal', look.caliper ?? '#4a4d52', look.caliper ? 0.2 : 0.5, 0.45)} />}
+        <CarMods body={body} fit={fit} tint={tint} metal={rusty ? 0.1 : 0.4} flames={flames} skins={msk} />
+        {topper}
+      </group>
       {/* Headlight beams on the road, visible after dark. */}
       {beam}
-      <Wheels at={[[-wx, wz], [wx, wz], [-wx, -wz], [wx, -wz]]} r={s.wheel} w={s.tyre ?? (s.track ? 0.16 : 0.14)} rig={rig} rims={fit.rims} rimColor={rimColor} rusty={rusty} look={look} />
+      {pool}
+      <Wheels at={[[-wx, wz], [wx, wz], [-wx, -wz], [wx, -wz]]} r={wr} w={ww} rig={rig} rims={fit.rims} rimColor={rimColor} rusty={rusty} look={look} camber={st?.camber} />
     </group>
   )
 }

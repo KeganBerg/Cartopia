@@ -43,7 +43,7 @@ Kit.prototype.add = function (this: Kit, part: Part, geo: BufferGeometry, ...res
 
 // Looks that draw the same colour can't be told apart, so they can't flicker:
 // mod paint is the body paint.
-const MOD_LOOK: Record<string, string> = { paint: 'paint', carbon: 'carbon', chrome: 'modchrome', glass: 'modglass' }
+const MOD_LOOK: Record<string, string> = { paint: 'paint', carbon: 'carbon', chrome: 'modchrome', glass: 'modglass', ti: 'modti', lamp: 'modlamp', neon: 'modneon' }
 
 type Tri = { piece: number; look: string; flat: boolean; n: [number, number, number]; d: number; p: number[] }
 
@@ -173,6 +173,7 @@ function fights(list: Piece[]) {
     const [x, y] = a.piece < b.piece ? [a, b] : [b, a]
     const k = `${list[x.piece].at} ${x.look} ~ ${list[y.piece].at} ${y.look}`
     const e = shared.get(k) ?? { area: 0, at: [(a.p[0] + a.p[3] + a.p[6]) / 3, (a.p[1] + a.p[4] + a.p[7]) / 3, (a.p[2] + a.p[5] + a.p[8]) / 3] }
+    if (process.env.FD) console.log('FD', k, 'A', a.n.map((c) => c.toFixed(2)).join(','), a.p.map((c) => c.toFixed(3)).join(','), 'B', b.n.map((c) => c.toFixed(2)).join(','), b.p.map((c) => c.toFixed(3)).join(','))
     e.area += w
     shared.set(k, e)
   }
@@ -267,12 +268,12 @@ function fights(list: Piece[]) {
 
 // Stock, each mod that fits on its own, and every slot filled (the n-th part of each slot).
 function fits(body: Body) {
-  const ok = MODS.filter((m) => modFits(m, body) && m.slot !== 'rims' && m.slot !== 'tires')
+  const ok = MODS.filter((m) => modFits(m, body) && m.slot !== 'rims' && m.slot !== 'tires' && m.slot !== 'stance')
   const out: Partial<Record<ModSlot, string>>[] = [{}]
   for (const m of ok) out.push({ [m.slot]: m.id })
-  for (let n = 0; n < 3; n++) {
+  for (let n = 0; n < 6; n++) {
     const f: Partial<Record<ModSlot, string>> = {}
-    for (const slot of ['spoiler', 'exhaust', 'kit', 'hood'] as ModSlot[]) {
+    for (const slot of ['spoiler', 'exhaust', 'kit', 'hood', 'lights'] as ModSlot[]) {
       const of = ok.filter((m) => m.slot === slot)
       if (of.length) f[slot] = of[n % of.length].id
     }
