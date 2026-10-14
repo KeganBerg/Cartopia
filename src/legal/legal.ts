@@ -11,7 +11,7 @@ export type LegalDoc = { id: 'terms' | 'privacy'; title: string; updated: string
 
 export const DRAFT_NOTE = 'Draft: this page is being reviewed and may change before it is final.'
 export const OPERATOR = 'Cartopia'
-export const CONTACT = 'support@cartopia.com'
+export const CONTACT = 'support@cartopia.lol'
 export const JURISDICTION = 'the United States'
 
 export const TERMS: LegalDoc = {
