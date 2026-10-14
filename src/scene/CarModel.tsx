@@ -1214,12 +1214,11 @@ function Wheels({ at, r, w, rig, rims, rimColor, rusty, look, camber = 0 }: { at
   return (
     <>
       {at.map(([x, z], i) => (
-        <group key={i} position={[x, r, z]} ref={rig && i < 2 ? (o) => void (rig.steer[i] = o) : undefined}>
-          <group rotation-z={x < 0 ? -camber : camber}>
-            <group ref={rig ? (o) => void (rig.spin[i] = o) : undefined}>
-              <mesh geometry={geo.tire} material={MAT.rubber} castShadow />
-              <mesh geometry={geo.rims[x < 0 ? 0 : 1]} material={rim} />
-            </group>
+        // Camber leans the steering group (steering only turns it about y).
+        <group key={i} position={[x, r, z]} rotation-z={x < 0 ? -camber : camber} ref={rig && i < 2 ? (o) => void (rig.steer[i] = o) : undefined}>
+          <group ref={rig ? (o) => void (rig.spin[i] = o) : undefined}>
+            <mesh geometry={geo.tire} material={MAT.rubber} castShadow />
+            <mesh geometry={geo.rims[x < 0 ? 0 : 1]} material={rim} />
           </group>
         </group>
       ))}

@@ -173,7 +173,6 @@ function fights(list: Piece[]) {
     const [x, y] = a.piece < b.piece ? [a, b] : [b, a]
     const k = `${list[x.piece].at} ${x.look} ~ ${list[y.piece].at} ${y.look}`
     const e = shared.get(k) ?? { area: 0, at: [(a.p[0] + a.p[3] + a.p[6]) / 3, (a.p[1] + a.p[4] + a.p[7]) / 3, (a.p[2] + a.p[5] + a.p[8]) / 3] }
-    if (process.env.FD) console.log('FD', k, 'A', a.n.map((c) => c.toFixed(2)).join(','), a.p.map((c) => c.toFixed(3)).join(','), 'B', b.n.map((c) => c.toFixed(2)).join(','), b.p.map((c) => c.toFixed(3)).join(','))
     e.area += w
     shared.set(k, e)
   }

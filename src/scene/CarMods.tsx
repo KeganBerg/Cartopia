@@ -262,7 +262,7 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
     // Short headers bursting out of the sides behind the front wheels, angled up and back.
     const z0 = f.wz - f.wheel * 1.25
     for (const sd of [-1, 1]) {
-      p.carbon.push(box(0.04, 0.06, 0.16, sd * (f.side + 0.01), f.lift + 0.075, z0 - 0.09))
+      p.carbon.push(box(0.03, 0.06, 0.16, sd * (f.side + 0.018), f.lift + 0.075, z0 - 0.09))
       for (let i = 0; i < 4; i++) {
         const z = z0 - i * 0.042
         const a: [number, number, number] = [sd * (f.side + 0.02), f.lift + 0.08, z]
