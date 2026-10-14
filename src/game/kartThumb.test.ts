@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { ARCADE_FEEL, KART_FEEL, KART_SHARP, ThumbDrift, thumbSteer, type SteerFeel } from '../ui/DriveControls'
-import { KartRace, SHARP_ASSIST, TOUCH_ASSIST, thumbSlide, TRACKS, buildTrack, gpField, idleInput, wrapAngle, type KartEvent, type Track } from './kart'
+import { ARCADE_FEEL, KART_FEEL, KART_SHARP, ThumbDrift, padSteer, thumbSteer, type SteerFeel } from '../ui/DriveControls'
+import { BUTTONS_ASSIST, KartRace, SHARP_ASSIST, TOUCH_ASSIST, thumbSlide, TRACKS, buildTrack, gpField, idleInput, wrapAngle, type KartEvent, type Track } from './kart'
 
 const ALL = TRACKS.flatMap((d) => [buildTrack(d, false), buildTrack(d, true)])
 const DT = 1 / 120
@@ -131,5 +131,46 @@ describe('kart steering with a thumb on a phone', () => {
     expect(thumbSteer(KART_FEEL.range, KART_FEEL)).toBe(-1)
     expect(thumbSteer(-KART_FEEL.range, KART_FEEL)).toBe(1)
     expect(Math.abs(thumbSteer(30, KART_FEEL))).toBeLessThan(Math.abs(thumbSteer(30, ARCADE_FEEL)) * 0.6)
+  })
+})
+
+// ◀ ▶ buttons: a player who sees the kart 0.15 s late, presses a side when the kart is clearly
+// off its line, lets go when it's close, and holds each press at least 80-120 ms.
+function runPads(t: Track, seed = 7) {
+  const r = new KartRace(t, gpField(['A', 'B', 'C', 'D', 'E'], 2, 40, { name: 'Me', pi: 40 }), 3)
+  const me = r.karts.findIndex((k) => !k.ai)
+  let s = seed
+  const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647)
+  const hist: number[] = []
+  let walls = 0, off = 0, spins = 0, steer = 0, dir = 0, hold = 0
+  while (r.karts[me].done === null && r.t < 200) {
+    hist.push(aim(t, r, me))
+    const err = hist[Math.max(0, hist.length - 1 - 18)]
+    hold -= DT
+    if (hold <= 0) {
+      const want = err > 0.06 ? 1 : err < -0.06 ? -1 : 0
+      if (want !== dir) { dir = want; hold = 0.08 + rnd() * 0.04 }
+    }
+    steer = padSteer(steer, dir, DT)
+    r.step(DT, r.karts.map((_, i) => (i === me ? { ...idleInput(), gas: 1, steer, assist: BUTTONS_ASSIST } : idleInput())), true)
+    for (const e of r.events as KartEvent[]) if (e.kart === me) { if (e.kind === 'wall') walls++; if (e.kind === 'hit') spins++ }
+    if (r.karts[me].offroad) off += DT
+  }
+  const k = r.karts[me]
+  const best = Math.min(...r.karts.filter((o) => o.done !== null && o.ai).map((o) => o.done!), Infinity)
+  return { done: k.done, walls, off, ratio: best < Infinity && k.done !== null ? (k.done - spins * 2) / best : 1 }
+}
+
+describe('kart steering with ◀ ▶ buttons', () => {
+  it('a tapping player finishes clean and near the pace on every circuit', () => {
+    for (const t of ALL) {
+      const id = `${t.def.id}${t.reverse ? ' rev' : ''}`
+      const now = runPads(t)
+      if (process.env.THUMB_LOG) console.log(id, JSON.stringify(now))
+      expect(now.done, id).not.toBeNull()
+      expect(now.walls, id).toBeLessThanOrEqual(1)
+      expect(now.off, id).toBeLessThan(2)
+      expect(now.ratio, id).toBeLessThan(1.1)
+    }
   })
 })

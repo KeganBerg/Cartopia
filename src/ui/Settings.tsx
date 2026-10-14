@@ -53,6 +53,7 @@ const GRAPHICS: { id: Graphics; label: string; sub: string }[] = [
 const STEER: { id: Steer; label: string }[] = [
   { id: 'smooth', label: '🌊 Smooth' },
   { id: 'sharp', label: '⚡ Sharp' },
+  { id: 'buttons', label: '◀ ▶ Buttons' },
 ]
 
 export function SettingsTab({ user }: { user: User | null }) {

@@ -22,12 +22,12 @@ export type Prefs = {
   // "Are you sure?" before leaving Rusty's with a haul, and before selling a car.
   askLeave: boolean
   askSell: boolean
-  // Kart steering on a touch screen: smooth (long slide, steadied near the middle) or sharp.
+  // Kart steering on a touch screen: smooth (long slide, steadied near the middle), sharp, or ◀ ▶ buttons.
   steer: Steer
   // The ghost racing line on kart tracks: green where it's flat out, red before a hard bend.
   kartLine: boolean
 }
-export type Steer = 'smooth' | 'sharp'
+export type Steer = 'smooth' | 'sharp' | 'buttons'
 
 const KEY = 'cartopia-prefs'
 const DEFAULTS: Prefs = { graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: false, muteTaunts: false, askLeave: true, askSell: true, steer: 'smooth', kartLine: true }
@@ -43,7 +43,7 @@ export function parsePrefs(raw: string | null): Prefs {
       raceWeather: p.raceWeather === true,
       askLeave: p.askLeave !== false,
       askSell: p.askSell !== false,
-      steer: p.steer === 'sharp' ? 'sharp' : 'smooth',
+      steer: p.steer === 'sharp' || p.steer === 'buttons' ? p.steer : 'smooth',
       kartLine: p.kartLine !== false,
     }
   } catch {
