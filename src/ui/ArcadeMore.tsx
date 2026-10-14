@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGame, type OwnedCar } from '../game/store'
-import { ARCADE_FUEL } from '../game/arcade'
 import {
   DASH_TIME, STUNT_JUMPS, WASH_SPOTS, WASH_TIME,
   dashStars, pitStars, recordStars, starReward, stuntStars, washStars, type StarGameId,
@@ -10,7 +9,7 @@ import { WashScene, type WashEnd, type WashHud, type WashInput } from '../scene/
 import { DeliveryScene, type DashEnd, type DashHud } from '../scene/DeliveryScene'
 import { StuntScene, type StuntEnd, type StuntHud, type StuntInput } from '../scene/StuntScene'
 import { KeyHints, TouchDrive, newDriveInput, useDriveKeys, useTall, useTouchDevice } from './DriveControls'
-import { Countdown, Result, look, payFuel, useStable } from './ArcadeBits'
+import { Cost, Countdown, Result, look, payFuel, useStable } from './ArcadeBits'
 import { sfx } from '../lib/sound'
 import { LoadingScene } from './Loading'
 import { StageSlot, useStageReady } from '../scene/Stage'
@@ -55,7 +54,7 @@ export function StarGame({ id, car, onExit }: { id: StarGameId; car: OwnedCar; o
     setEnd({ stars, ...pay, record, line })
   }
   const again = () => {
-    if (!payFuel(`a ${meta.name} run`)) return
+    if (!payFuel(`a ${meta.name} run`, id)) return
     setEnd(null)
     setRunning(false)
     setRun((r) => r + 1)
@@ -76,7 +75,7 @@ export function StarGame({ id, car, onExit }: { id: StarGameId; car: OwnedCar; o
         <Result win={end.stars > 0} title={end.stars === 0 ? '😬 So close' : end.record ? '🏆 New best!' : end.stars === 3 ? '🌟 Perfect!' : '👏 Nice!'}
           actions={<>
             <button className="sell" onClick={onExit}>Back</button>
-            <button className="buy" onClick={again}>Again · ⛽{ARCADE_FUEL}</button>
+            <button className="buy" onClick={again}>Again · <Cost game={id} /></button>
           </>}>
           <div className="arc-stars">{[1, 2, 3].map((n) => <span key={n} className={n <= end.stars ? 'on' : ''}>★</span>)}</div>
           <div className="arc-sub">{end.line}</div>

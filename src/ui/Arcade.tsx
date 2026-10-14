@@ -3,15 +3,15 @@ import { useGame, type OwnedCar } from '../game/store'
 import { bestCar, raceCarOf } from '../game/raceCar'
 import { carDef } from '../game/data'
 import {
-  ARCADE_FUEL, CHASE_HEARTS, PARK_LOTS, PARK_MAX_BUMPS, chaseReward, chaseScore, loadBests, lotOpen, parkReward, parkStars, saveBests,
+  CHASE_HEARTS, PARK_LOTS, PARK_MAX_BUMPS, chaseReward, chaseScore, loadBests, lotOpen, parkReward, parkStars, saveBests,
 } from '../game/arcade'
-import { ChaseScene, type ChaseHud, type ChaseInput } from '../scene/ChaseScene'
+import { ChaseScene, type ChaseHud, type ChaseInput, type ChasePop } from '../scene/ChaseScene'
 import { ParkScene, type ParkEnd, type ParkHud } from '../scene/ParkScene'
 import { KeyHints, TouchDrive, newDriveInput, useDriveKeys, useTall, useTouchDevice } from './DriveControls'
 import { CarThumb } from '../scene/BuildingPreview'
 import { Panel } from './Menus'
 import { sfx } from '../lib/sound'
-import { Countdown, Result, look, payFuel, pi, useStable } from './ArcadeBits'
+import { Cost, Countdown, Result, look, payFuel, pi, useStable } from './ArcadeBits'
 import { STAR_GAMES, StarGame } from './ArcadeMore'
 import { loadStars, type StarGameId } from '../game/arcadeMore'
 import { LoadingScene } from './Loading'
@@ -21,6 +21,8 @@ import { StageSlot, useStageReady } from '../scene/Stage'
 // context and shader compile on every run.
 const CHASE_CAM = { position: [0, 4.4, 8.5] as [number, number, number], fov: 55, near: 0.3, far: 160 }
 const PARK_CAM = { position: [0, 20, 5] as [number, number, number], fov: 40, near: 0.5, far: 120 }
+
+const FRESH_HUD: ChaseHud = { dist: 0, coins: 0, hearts: CHASE_HEARTS, speed: 0, bonus: 0, mult: 1, nitro: 0, warn: false, pop: null }
 
 type Playing = { game: 'chase' } | { game: 'park'; lot: number } | { game: 'star'; id: StarGameId }
 
@@ -63,7 +65,7 @@ export function ArcadePanel() {
               const open = lotOpen(stars, i)
               return (
                 <button key={l.name} className={open ? 'arc-lot' : 'arc-lot locked'} disabled={!open}
-                  onClick={() => { if (payFuel('a parking run')) setPlaying({ game: 'park', lot: i }) }}>
+                  onClick={() => { if (payFuel('a parking run', 'park')) setPlaying({ game: 'park', lot: i }) }}>
                   <b>{open ? i + 1 : '🔒'}</b>
                   <span>{l.name}</span>
                   <small>{[1, 2, 3].map((n) => (n <= (stars[i] ?? 0) ? '★' : '☆')).join('')}</small>
@@ -71,7 +73,7 @@ export function ArcadePanel() {
               )
             })}
           </div>
-          <p className="arc-fuel">Each run ⛽{ARCADE_FUEL}</p>
+          <p className="arc-fuel">Each run <Cost game="park" /></p>
         </>
       ) : (
         <div className="arc-games">
@@ -80,7 +82,7 @@ export function ArcadePanel() {
             <b>Getaway Chase</b>
             <small>Swipe to dodge traffic</small>
             <span className="arc-best">🏆 {bests.chase.toLocaleString()}</span>
-            <button className="buy" disabled={!car} onClick={() => { if (payFuel('a getaway')) setPlaying({ game: 'chase' }) }}>Play · ⛽{ARCADE_FUEL}</button>
+            <button className="buy" disabled={!car} onClick={() => { if (payFuel('a getaway', 'chase')) setPlaying({ game: 'chase' }) }}>Play · <Cost game="chase" /></button>
           </div>
           <div className="arc-tile park">
             <div className="arc-art">🅿️🚙</div>
@@ -98,7 +100,7 @@ export function ArcadePanel() {
                 <b>{g.name}</b>
                 <small>{g.tip}</small>
                 <span className="arc-best">{[1, 2, 3].map((n) => (n <= b.stars ? '★' : '☆')).join('')}{best && ` ${best}`}</span>
-                <button className="buy" disabled={!car} onClick={() => { if (payFuel(`a ${g.name} run`)) setPlaying({ game: 'star', id: g.id }) }}>Play · ⛽{ARCADE_FUEL}</button>
+                <button className="buy" disabled={!car} onClick={() => { if (payFuel(`a ${g.name} run`, g.id)) setPlaying({ game: 'star', id: g.id }) }}>Play · <Cost game={g.id} /></button>
               </div>
             )
           })}
@@ -115,7 +117,12 @@ function ChaseGame({ car, onExit }: { car: OwnedCar; onExit: () => void }) {
   const [run, setRun] = useState(0)
   const [running, setRunning] = useState(false)
   const [drawn, setDrawn] = useState(-1)
-  const [hud, setHud] = useState<ChaseHud>({ dist: 0, coins: 0, hearts: CHASE_HEARTS, speed: 0 })
+  const [hud, setHud] = useState<ChaseHud>(FRESH_HUD)
+  const [pop, setPop] = useState<ChasePop | null>(null)
+  const onHud = useStable((h: ChaseHud) => {
+    setHud(h)
+    if (h.pop) setPop(h.pop)
+  })
   const [end, setEnd] = useState<{ score: number; coins: number; xp: number; record: boolean } | null>(null)
 
   // The shared driving keys (A/D or arrows): each press moves one lane that way.
@@ -139,8 +146,8 @@ function ChaseGame({ car, onExit }: { car: OwnedCar; onExit: () => void }) {
   }, [input, keys])
   const down = useRef<{ x: number; done: boolean } | null>(null)
 
-  const busted = useStable((dist: number, coins: number) => {
-    const score = chaseScore(dist, coins)
+  const busted = useStable((dist: number, coins: number, bonus: number) => {
+    const score = chaseScore(dist, coins, bonus)
     const pay = chaseReward(score, level)
     const b = loadBests()
     const record = score > b.chase
@@ -150,14 +157,15 @@ function ChaseGame({ car, onExit }: { car: OwnedCar; onExit: () => void }) {
     else sfx.lose()
     setEnd({ score, ...pay, record })
   })
-  const scene = useMemo(() => <ChaseScene me={look(car)} input={input} running={running} onHud={setHud} onBusted={busted} />, [car, input, running, busted])
+  const scene = useMemo(() => <ChaseScene me={look(car)} input={input} running={running} onHud={onHud} onBusted={busted} />, [car, input, running, onHud, busted])
   const stageReady = useStageReady()
   const again = () => {
-    if (!payFuel('a getaway')) return
+    if (!payFuel('a getaway', 'chase')) return
     input.moves.length = 0
     setEnd(null)
     setRunning(false)
-    setHud({ dist: 0, coins: 0, hearts: CHASE_HEARTS, speed: 0 })
+    setHud(FRESH_HUD)
+    setPop(null)
     setRun((r) => r + 1)
   }
 
@@ -185,16 +193,19 @@ function ChaseGame({ car, onExit }: { car: OwnedCar; onExit: () => void }) {
       </div>
       <div className="arc-hud">
         <span className="arc-hearts">{Array.from({ length: CHASE_HEARTS }, (_, i) => (i < hud.hearts ? '❤️' : '🖤')).join('')}</span>
-        <span className="arc-score">{chaseScore(hud.dist, hud.coins).toLocaleString()}</span>
-        <span className="arc-coins">🪙 {hud.coins}</span>
+        <span className="arc-score">{chaseScore(hud.dist, hud.coins, hud.bonus).toLocaleString()}</span>
+        {hud.mult > 1 ? <span key={hud.mult} className="arc-combo">×{hud.mult}</span> : <span className="arc-coins">🪙 {hud.coins}</span>}
       </div>
+      {hud.nitro > 0 && <div className="chase-nitro"><i style={{ width: `${hud.nitro * 100}%` }} /></div>}
+      {hud.warn && <div className="chase-warn" />}
+      {pop && <div key={pop.id} className={`chase-pop ${pop.kind}`}>{pop.text}</div>}
       {!running && !end && drawn === run && <Countdown key={`count${run}`} onGo={() => setRunning(true)} />}
       {running && hud.dist < 40 && <div className="arc-tip">{touch ? '👈 Swipe or tap to dodge 👉' : '👈 A / D or arrows to dodge 👉'}</div>}
       {end && (
         <Result win={end.record} title={end.record ? '🏆 New best!' : '🚨 Busted!'}
           actions={<>
             <button className="sell" onClick={onExit}>Back</button>
-            <button className="buy" onClick={again}>Again · ⛽{ARCADE_FUEL}</button>
+            <button className="buy" onClick={again}>Again · <Cost game="chase" /></button>
           </>}>
           <div className="arc-big">{end.score.toLocaleString()}</div>
           <div className="arc-pay"><span>🪙 +{end.coins}</span><span>⭐ +{end.xp} XP</span></div>
@@ -234,7 +245,7 @@ function ParkGame({ car, lot, onExit, onLot }: { car: OwnedCar; lot: number; onE
   const scene = useMemo(() => <ParkScene lot={def} me={look(car)} input={input} running={running} onHud={setHud} onEnd={done} />, [def, car, input, running, done])
   const stageReady = useStageReady()
   const restart = (next = lot) => {
-    if (!payFuel('a parking run')) return
+    if (!payFuel('a parking run', 'park')) return
     Object.assign(input, { steer: 0, gas: 0, brake: 0 })
     setEnd(null)
     setRunning(false)
@@ -263,8 +274,8 @@ function ParkGame({ car, lot, onExit, onLot }: { car: OwnedCar; lot: number; onE
         <Result win={end.parked} title={end.parked ? '🅿️ Parked!' : '💥 Too many dents'}
           actions={<>
             <button className="sell" onClick={onExit}>Back</button>
-            <button className="buy alt" onClick={() => restart()}>Retry · ⛽{ARCADE_FUEL}</button>
-            {end.parked && hasNext && <button className="buy" onClick={() => restart(lot + 1)}>Next · ⛽{ARCADE_FUEL}</button>}
+            <button className="buy alt" onClick={() => restart()}>Retry · <Cost game="park" /></button>
+            {end.parked && hasNext && <button className="buy" onClick={() => restart(lot + 1)}>Next · <Cost game="park" /></button>}
           </>}>
           {end.parked && <div className="arc-stars">{[1, 2, 3].map((n) => <span key={n} className={n <= end.stars ? 'on' : ''}>★</span>)}</div>}
           <div className="arc-sub">⏱ {end.time.toFixed(1)}s · 💥 {end.bumps}</div>

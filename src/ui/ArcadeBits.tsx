@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useGame, spendFuel, type OwnedCar } from '../game/store'
 import { carDef, performance } from '../game/data'
-import { ARCADE_FUEL } from '../game/arcade'
+import { ARCADE_FUEL, freeLeft, takeFree, type ArcadeGame } from '../game/arcade'
 import type { ChaseCar } from '../scene/ChaseScene'
 import { sfx } from '../lib/sound'
 
@@ -18,12 +18,19 @@ export function useStable<A extends unknown[], R>(fn: (...a: A) => R) {
 export const pi = (c: OwnedCar) => performance(carDef(c.model), c.upgrades, c.mods)
 export const look = (c: OwnedCar): ChaseCar => ({ body: carDef(c.model).body, model: c.model, color: c.color, finish: c.finish, skin: c.skin, modSkin: c.modSkin, panels: c.panels, mods: c.mods, trim: c.trim, hat: c.hat })
 
-// Every run costs a little fuel, like a race.
-export function payFuel(what: string) {
+// The first few runs of each game a day are free; after that a run costs a little fuel, like a race.
+export function payFuel(what: string, game: ArcadeGame) {
+  if (takeFree(game)) return true
   if (spendFuel(ARCADE_FUEL)) return true
   const s = useGame.getState()
   s.showNeed('fuel', ARCADE_FUEL - s.fuel, what)
   return false
+}
+
+// What the next run costs, for the play buttons: free plays left, or the fuel.
+export function Cost({ game }: { game: ArcadeGame }) {
+  const free = freeLeft(game)
+  return free > 0 ? <span className="arc-free">Free ×{free}</span> : <>⛽{ARCADE_FUEL}</>
 }
 
 export function Countdown({ onGo }: { onGo: () => void }) {
