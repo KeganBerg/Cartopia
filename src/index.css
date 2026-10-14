@@ -1193,6 +1193,14 @@ html.calm .callout { animation: none !important; }
 .rr-stats span.bad { background: #ffebee; color: #c62828; }
 .rr-stats small { font: 800 10px Nunito, sans-serif; color: #90a4ae; text-transform: uppercase; letter-spacing: .04em; }
 .rr-stats i { font-style: normal; font-size: 11px; }
+.rr-pi { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin: -4px 0 12px; padding: 6px 10px; border: 0; border-radius: 12px; background: #fff3e0; color: #455a64; font: 20px var(--display); cursor: pointer; animation: rr-pop .35s ease-out .6s both; }
+.rr-pi:disabled { cursor: default; }
+.rr-pi span { display: flex; flex-direction: column; align-items: center; line-height: 1; }
+.rr-pi span.them { color: #c62828; }
+.rr-pi small { font: 800 10px Nunito, sans-serif; color: #90a4ae; letter-spacing: .04em; }
+.rr-pi i { font-style: normal; font-size: 26px; color: #90a4ae; }
+.rr-pi b { margin-left: 4px; padding: 6px 10px; border-radius: 10px; background: #ef6c00; color: #fff; font: 15px var(--display); }
+.rm-pi-up { color: #e53935; font-weight: 900; }
 .rr-row { display: flex; gap: 8px; justify-content: center; }
 .rr-row .rr-go { min-width: 0; flex: 1.6; white-space: nowrap; }
 .rr-row .rr-back { flex: 1; font-size: 18px; animation: rr-pop .4s ease-out 1.2s both; }
