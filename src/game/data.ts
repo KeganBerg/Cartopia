@@ -657,8 +657,8 @@ export const modSlotsFor = (body: Body) => MOD_SLOTS.filter((s) => MODS.some((m)
 // how much bigger and wider the tyres get, and how far the wheels lean in at the top.
 export const STANCE: Record<string, { rise: number; tyre?: number; camber?: number }> = {
   lowered: { rise: -0.022 },
-  lifted: { rise: 0.07, tyre: 1.2 },
-  slammed: { rise: -0.04, camber: 0.12 },
+  lifted: { rise: 0.09, tyre: 1.22 },
+  slammed: { rise: -0.055, camber: 0.16 },
 }
 
 // Unknown ids (a mod from a newer build) give nothing and draw nothing.
