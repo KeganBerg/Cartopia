@@ -121,3 +121,9 @@
 .book-car.resto .book-src { color: #00838f; font-weight: 700; }
 .crate-prize .cp-icon .build-art .thumb3d { --tw: 100px; --th: 78px; }
 .crate-car.resto .build-art .thumb3d { background: radial-gradient(ellipse at 50% 70%, rgba(255,255,255,.22) 0 35%, rgba(255,255,255,.06) 75%); }
+
+/* Six pills on a phone: a little tighter so the last one stays inside the tray. */
+@media (max-width: 420px) {
+  .crate-odds-row { gap: 3px; }
+  .crate-odds .odd { padding: 3px; gap: 2px; }
+}
