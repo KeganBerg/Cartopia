@@ -22,6 +22,14 @@
 .dc-gas { width: 84px; height: 84px; background: rgba(46, 125, 50, .75); }
 .dc-gas.on { background: #2e7d32; }
 .dc-wide .dc-gas { position: absolute; right: 0; bottom: 0; }
+/* Steering buttons: two big pads, ◀ and ▶. */
+.dc-pads { pointer-events: auto; display: flex; gap: 10px; }
+.dc-pads.tall { height: 26vh; min-height: 140px; margin: 0 calc(8px + var(--sar, 0px)) calc(8px + var(--sab, 0px)) calc(8px + var(--sal, 0px)); padding-top: 44px; }
+.dc-pads.wide { position: absolute; left: calc(18px + var(--sal, 0px)); bottom: calc(18px + var(--sab, 0px)); }
+.dc-pad { flex: 1; display: grid; place-items: center; border-radius: 22px; background: rgba(10, 20, 40, .42); border: 3px solid rgba(255, 255, 255, .6); color: #fff; font-size: 44px; box-shadow: 0 4px 0 rgba(0, 0, 0, .3); transition: transform .05s, background .05s; }
+.dc-pads.wide .dc-pad { flex: none; width: 112px; height: 112px; border-radius: 50%; }
+.dc-pads.l .dc-pad.left, .dc-pads.r .dc-pad.right { background: rgba(255, 255, 255, .5); transform: scale(.95); }
+.dc-tall.with-pads .dc-row { justify-content: space-between; }
 @keyframes dc-pulse { to { box-shadow: 0 0 26px rgba(255, 215, 64, 1); } }
 .dc-tall .dc-row { display: flex; justify-content: space-between; align-items: flex-end; padding: 0 calc(16px + var(--sar, 0px)) 0 calc(16px + var(--sal, 0px)); margin-bottom: -40px; position: relative; z-index: 1; pointer-events: none; }
 .dc-tall .dc-row .dc-btn { pointer-events: auto; }
@@ -39,4 +47,5 @@
   .dc-wide .dc-cluster { width: 170px; height: 156px; }
   .dc-wide .dc-item { right: 88px; bottom: 84px; }
   .dc-wide .dc-brake { right: 96px; }
+  .dc-pads.wide .dc-pad { width: 96px; height: 96px; }
 }

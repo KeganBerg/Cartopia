@@ -2,7 +2,7 @@
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { describe, expect, it } from 'vitest'
-import { KART_FEEL, TouchDrive, newDriveInput, sideRanges } from './DriveControls'
+import { KART_FEEL, PAD_START, TouchDrive, newDriveInput, padSteer, sideRanges } from './DriveControls'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -68,6 +68,35 @@ describe('TouchDrive near the screen edge', () => {
     finger(zone, 'pointermove', 1, window.innerWidth - 2)
     expect(input.steer).toBe(-1)
     finger(zone, 'pointerup', 1, window.innerWidth - 2)
+    act(() => root.unmount())
+    host.remove()
+  })
+})
+
+describe('steering buttons', () => {
+  it('a press starts part way and winds on to full lock', () => {
+    expect(padSteer(0, 1, 0)).toBe(PAD_START)
+    expect(padSteer(PAD_START, 1, 10)).toBe(1)
+    expect(padSteer(0.8, -1, 0)).toBe(-PAD_START)
+    expect(padSteer(0.8, 0, 0)).toBe(0)
+  })
+  it('◀ steers left, rocking onto ▶ steers right, both is straight, letting go centres', () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const input = newDriveInput()
+    const root = createRoot(host)
+    act(() => root.render(<TouchDrive input={input} tall pads />))
+    const pads = host.querySelector('.dc-pads')!
+    pads.getBoundingClientRect = () => ({ left: 0, top: 0, width: 380, height: 200, right: 380, bottom: 200, x: 0, y: 0, toJSON: () => ({}) })
+    finger(pads, 'pointerdown', 1, 60)
+    expect(input.steer).toBe(PAD_START)
+    finger(pads, 'pointermove', 1, 300)
+    expect(input.steer).toBe(-PAD_START)
+    finger(pads, 'pointerdown', 2, 40)
+    expect(input.steer).toBe(0)
+    finger(pads, 'pointerup', 2, 40)
+    finger(pads, 'pointerup', 1, 300)
+    expect(input.steer).toBe(0)
     act(() => root.unmount())
     host.remove()
   })

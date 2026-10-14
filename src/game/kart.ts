@@ -245,6 +245,7 @@ export function thumbSlide(steer: number, dir: number) {
 }
 export const TOUCH_ASSIST = 0.45 // how much a phone player's kart leans to the line
 export const SHARP_ASSIST = 0.3 // less of it with Sharp steering
+export const BUTTONS_ASSIST = 0.65 // more with ◀ ▶ buttons, which can only press or let go
 export const idleInput = (): KartInput => ({ steer: 0, gas: 0, brake: 0, drift: false, item: false })
 
 export type Kart = {
