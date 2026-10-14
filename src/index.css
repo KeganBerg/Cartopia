@@ -119,6 +119,18 @@ button.card:hover:not(:disabled) { border-color: var(--accent); }
 .garage-item { display: grid; grid-template-columns: 60px 1fr auto; align-items: center; gap: 6px; background: #fff; border: 2px solid #e0e0e0; border-radius: 12px; padding: 4px 8px; text-align: left; font-weight: 800; }
 .garage-item .car-swatch { width: 60px; height: 30px; }
 .garage-item.sel { border-color: var(--accent); background: #fff3e0; }
+/* Copies of one model share a card: the shown copy on top, a round avatar per copy beneath. */
+.garage-item.stack { display: flex; flex-direction: column; align-items: stretch; gap: 4px; }
+.stack-main { display: grid; grid-template-columns: 60px 1fr auto auto; align-items: center; gap: 6px; padding: 0; background: none; border: 0; box-shadow: none; text-align: left; font: inherit; color: inherit; }
+.stack-count { min-width: 26px; padding: 1px 6px; border-radius: 99px; background: #2f7ff0; color: #fff; font-size: 13px; text-align: center; }
+.copy-bubbles { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.copy-bubble { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0; background: none; border: 0; box-shadow: none; font: 800 12px var(--display, inherit); color: #546e7a; }
+.copy-bubble .thumb3d.xs { --tw: 40px; --th: 40px; width: 40px; height: 40px; border-radius: 50%; background: radial-gradient(circle at 50% 60%, #fff 0 40%, #dbe8f7 80%); border: 2.5px solid #c6d7ee; }
+.copy-bubble.sel { color: #2f7ff0; }
+.copy-bubble.sel .thumb3d.xs { border-color: #2f7ff0; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #2f7ff0; }
+.garage-detail > .copy-bubbles { margin: 6px 0 2px; }
+.garage-detail > .copy-bubbles .copy-bubble .thumb3d.xs { --tw: 48px; --th: 48px; width: 48px; height: 48px; }
+.garage-detail > .copy-bubbles .copy-bubble { font-size: 12px; }
 .garage-detail { background: #fff; border-radius: 14px; padding: 12px; border: 2px solid #e0e0e0; }
 .garage-detail .car-swatch { width: 180px; height: 90px; }
 .garage-detail h3 { margin: 0 0 4px; }
@@ -772,6 +784,11 @@ html.calm *, html.calm *::before, html.calm *::after { animation-duration: .001m
   .garage.picking .garage-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; max-height: 46vh; overflow-y: auto; }
   .garage.picking .garage-item { grid-template-columns: 1fr; justify-items: center; text-align: center; padding: 4px; font-size: 12px; line-height: 1.15; }
   .garage.picking .garage-item small { font-size: 11px; }
+  .garage.picking .stack-main { grid-template-columns: 1fr; justify-items: center; text-align: center; position: relative; }
+  .garage.picking .stack-count { position: absolute; top: 0; right: 0; }
+  .garage.picking .garage-list { align-items: start; }
+  .garage.picking .copy-bubbles { gap: 3px; }
+  .garage.picking .copy-bubble .thumb3d.xs { --tw: 29px; --th: 29px; width: 29px; height: 29px; }
   .garage.picking .garage-item .car-swatch { width: 64px; height: 34px; }
   .garage-name { display: none; }
   .car-preview { height: 150px; }

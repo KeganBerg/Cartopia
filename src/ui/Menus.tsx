@@ -2,6 +2,7 @@ import { groupOf, mergeCandidates } from '../game/merge'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGame, hasRusty, buildPrice, type OwnedCar, type PlacedBuilding } from '../game/store'
 import { raceCarOf } from '../game/raceCar'
+import { stackCars, stackFace } from '../game/garageStacks'
 import { reducedMotion } from '../game/fx'
 import { activeEvent, garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, carDef, performance, upgradeCost, buildingDef, upgradable, loves, readySets, isBike, FEATURES, type BuildingDef } from '../game/data'
 import { CarInspect, CarPreview, type DynoFeed } from '../scene/CarPreview'
@@ -561,7 +562,25 @@ function useGarageList(cars: OwnedCar[]) {
     }
     return keep.sort(by[view.sort])
   }, [rows, kind, view.sort])
-  return { list, kinds, kind, sort: view.sort, setView }
+  // Copies of one model share a card, placed where its best-sorted copy would be.
+  const stacks = useMemo(() => stackCars(list), [list])
+  return { stacks, kinds, kind, sort: view.sort, setView }
+}
+
+type GarageRow = ReturnType<typeof useGarageList>['stacks'][0]['top']
+
+// One round avatar per copy of a car; tapping one opens that copy.
+function CopyBubbles({ copies, selected, onPick }: { copies: GarageRow[]; selected?: string; onPick: (uid: string) => void }) {
+  return (
+    <div className="copy-bubbles">
+      {copies.map(({ c, d, pi }) => (
+        <button key={c.uid} className={c.uid === selected ? 'copy-bubble sel' : 'copy-bubble'} aria-label={`${d.name} PI ${pi}`} aria-pressed={c.uid === selected} title={`PI ${pi}`} onClick={() => onPick(c.uid)}>
+          <CarThumb size="xs" color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} panels={c.panels} trim={c.trim} hat={c.hat} body={d.body} model={d.id} stripe={c.stripe} mods={c.mods} />
+          <small>{pi}</small>
+        </button>
+      ))}
+    </div>
+  )
 }
 
 export function GaragePanel() {
@@ -571,8 +590,8 @@ export function GaragePanel() {
   const upgrade = useGame((s) => s.upgradeCar)
   const sell = useGame((s) => s.sellCar)
   const sellAsk = useAsk('askSell')
-  const { list, kinds, kind, sort, setView } = useGarageList(cars)
-  const car = cars.find((c) => c.uid === selected) ?? list[0]?.c ?? cars[0]
+  const { stacks, kinds, kind, sort, setView } = useGarageList(cars)
+  const car = cars.find((c) => c.uid === selected) ?? stacks[0]?.top.c ?? cars[0]
   const def = car && carDef(car.model)
   useEffect(() => { lastCars = 'garage' }, [])
   const [tab, setTab] = useState<GarageTab>(() => {
@@ -590,12 +609,13 @@ export function GaragePanel() {
   const tryMod = trying && trying.car === car?.uid && tab === 'mods' ? trying.mod : null
   const [inspect, setInspect] = useState(false)
   const [picking, setPicking] = useState(false)
-  // Arrows step through the filtered, sorted list.
-  const pos = list.findIndex((r) => r.c.uid === car?.uid)
+  // Arrows step through the filtered, sorted stacks, landing on each one's top-PI copy.
+  const pos = stacks.findIndex((s) => s.copies.some((r) => r.c.uid === car?.uid))
+  const copies = pos < 0 ? [] : stacks[pos].copies
   const step = (d: number) => {
-    if (!list.length) return
+    if (!stacks.length) return
     const at = pos < 0 ? (d > 0 ? -1 : 0) : pos
-    select(list[(at + d + list.length) % list.length].c.uid)
+    select(stacks[(at + d + stacks.length) % stacks.length].top.c.uid)
   }
   // A paint job being tried on, cleared when another car is picked.
   const [painting, setPainting] = useState<{ car: string; job: PaintJob } | null>(() => {
@@ -654,23 +674,38 @@ export function GaragePanel() {
               </select>
             </label>
           </div>
-          {list.map(({ c, d, pi: p }) => (
-            <button key={c.uid} className={c.uid === car?.uid ? 'garage-item sel' : 'garage-item'} onClick={() => { select(c.uid); setPicking(false) }}>
-              <CarThumb size="sm" color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} panels={c.panels} trim={c.trim} hat={c.hat} body={d.body} model={d.id} stripe={c.stripe} mods={c.mods} />
-              <span>{d.name}{c.plate && <span className="mini-plate">{c.plate}</span>}</span>
-              <small>PI {p}</small>
-            </button>
-          ))}
+          {stacks.map((s) => {
+            const { c, d, pi: p } = stackFace(s, car?.uid)
+            const on = c.uid === car?.uid
+            const main = (
+              <>
+                <CarThumb size="sm" color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} panels={c.panels} trim={c.trim} hat={c.hat} body={d.body} model={d.id} stripe={c.stripe} mods={c.mods} />
+                <span>{d.name}{c.plate && <span className="mini-plate">{c.plate}</span>}</span>
+                <small>PI {p}</small>
+              </>
+            )
+            const open = (uid: string) => { select(uid); setPicking(false) }
+            if (s.copies.length < 2) return <button key={s.model} className={on ? 'garage-item sel' : 'garage-item'} onClick={() => open(c.uid)}>{main}</button>
+            return (
+              <div key={s.model} className={on ? 'garage-item stack sel' : 'garage-item stack'}>
+                <button className="stack-main" onClick={() => open(c.uid)}>
+                  {main}
+                  <b className="stack-count">×{s.copies.length}</b>
+                </button>
+                <CopyBubbles copies={s.copies} selected={car?.uid} onPick={open} />
+              </div>
+            )
+          })}
         </div>
         {car && def && (
           <div className="garage-detail" onClickCapture={() => { tapped.current = Date.now() }}>
             {/* Phones: step through cars here, or open the grid of all of them. */}
             <div className="car-switch">
-              <button aria-label="Previous car" onClick={() => step(-1)} disabled={list.length < (pos < 0 ? 1 : 2)}>‹</button>
+              <button aria-label="Previous car" onClick={() => step(-1)} disabled={stacks.length < (pos < 0 ? 1 : 2)}>‹</button>
               <button className="car-switch-name" onClick={() => setPicking((p) => !p)} aria-expanded={picking}>
-                <b>{def.name}</b><small>{pos < 0 ? '–' : pos + 1}/{list.length} {picking ? '▴' : '▾'}</small>
+                <b>{def.name}</b><small>{pos < 0 ? '–' : pos + 1}/{stacks.length} {picking ? '▴' : '▾'}</small>
               </button>
-              <button aria-label="Next car" onClick={() => step(1)} disabled={list.length < (pos < 0 ? 1 : 2)}>›</button>
+              <button aria-label="Next car" onClick={() => step(1)} disabled={stacks.length < (pos < 0 ? 1 : 2)}>›</button>
             </div>
             {inspect ? (
               <>
@@ -687,6 +722,7 @@ export function GaragePanel() {
                 {tab === 'trim' && <div className="paint-sweep" key={JSON.stringify(look!.trim ?? {})} aria-hidden />}
               </div>
             )}
+            {copies.length > 1 && <CopyBubbles copies={copies} selected={car.uid} onPick={select} />}
             <h3 className="garage-name">{def.name}{car.plate && <span className="mini-plate">{car.plate}</span>}</h3>
             <div className="car-tags">
               <span className="pi-badge">PI <b>{pi}</b></span>
