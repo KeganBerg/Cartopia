@@ -175,14 +175,14 @@ function EditBar() {
 // onBack: shows a back button before the title (a sub-screen of the panel).
 // head: extra bits in the title bar, before the close button.
 export function Panel({ title, children, wide, onClose, onBack, head, className }: { title: string; children: React.ReactNode; wide?: boolean; onClose?: () => void; onBack?: () => void; head?: React.ReactNode; className?: string }) {
-  const openPanel = useGame((s) => s.openPanel)
+  const closePanel = useGame((s) => s.closePanel)
   // Slides away before it unmounts; the timer dies with the panel, so a panel
   // swapped in meanwhile is never closed by it.
   const [closing, setClosing] = useState(false)
   const timer = useRef(0)
   useEffect(() => () => clearTimeout(timer.current), [])
   const close = (_: null) => {
-    const done = () => (onClose ? onClose() : openPanel(null))
+    const done = () => (onClose ? onClose() : closePanel())
     if (reducedMotion()) return done()
     if (closing) return
     setClosing(true)
@@ -376,7 +376,8 @@ type CarsTab = 'garage' | 'shop' | 'book' | 'crates'
 
 // My Garage, the Showroom and the Crate Depot share one row of tabs, opened from the CARS button.
 function CarsTabs({ current, onShowroom }: { current: CarsTab; onShowroom?: (t: 'shop' | 'book') => void }) {
-  const openPanel = useGame((s) => s.openPanel)
+  // Tabs swap between sibling menus, so closing still goes back to where the player came from.
+  const openPanel = useGame((s) => s.swapPanel)
   const ready = useGame((s) => readySets(s).length)
   const tabs: { id: CarsTab; label: React.ReactNode }[] = [
     { id: 'garage', label: <><span className="tab-emo">🔧 </span>My Cars</> },

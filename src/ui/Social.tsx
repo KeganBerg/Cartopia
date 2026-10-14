@@ -40,7 +40,7 @@ export function useUserId() {
 
 // Friends, Leaderboards, Crew and Meet share one window with tabs across the top.
 export function SocialTabs({ current }: { current: PanelId }) {
-  const openPanel = useGame((s) => s.openPanel)
+  const openPanel = useGame((s) => s.swapPanel)
   const chests = useCrewGoal((g) => g.ready) + useCrewBattle((b) => b.ready)
   const tabs: { id: PanelId; label: React.ReactNode }[] = [
     { id: 'friends', label: '👫 Friends' },

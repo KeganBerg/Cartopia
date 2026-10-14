@@ -216,6 +216,8 @@ type UiState = {
   // Building type just placed, so the edit bar can offer to build another.
   again: string | null
   panel: Panel
+  // Menus opened on the way to this one, so closing it goes back a step instead of to the town.
+  panelBack: Exclude<Panel, null>[]
   selectedCar: string | null
   toasts: { id: number; text: string }[]
   visiting: VisitedTown | null
@@ -249,10 +251,26 @@ type UiState = {
   levelUp: { from: number; to: number; coins: number; bucks: number } | null
 }
 
+// Opening a menu from another one remembers the way back. Opening from the town (or
+// going to the town) starts a fresh trail; reopening a menu already on the trail cuts
+// back to it, so the trail never loops.
+export function navTo(s: { panel: Panel; panelBack: Exclude<Panel, null>[] }, next: Panel): { panel: Panel; panelBack: Exclude<Panel, null>[] } {
+  if (!next || !s.panel) return { panel: next, panelBack: [] }
+  if (next === s.panel) return { panel: next, panelBack: s.panelBack }
+  const at = s.panelBack.indexOf(next)
+  // A not-enough popup is a stop on the way, not a menu to come back to.
+  const keep = s.panel === 'need' ? s.panelBack : [...s.panelBack, s.panel]
+  return { panel: next, panelBack: at >= 0 ? s.panelBack.slice(0, at) : keep }
+}
+
 type Actions = {
   setMode: (m: Mode, placing?: string | null) => void
   showNeed: (res: Resource, missing: number, what?: string) => void
   openPanel: (p: Panel) => void
+  // Close the open menu: back to the one it was opened from, or the town.
+  closePanel: () => void
+  // Switch to a sibling menu from a tab row (Garage / Showroom / Crates, Friends / Crew): same place in the trail.
+  swapPanel: (p: Exclude<Panel, null>) => void
   openShop: (focus?: string) => void
   selectCar: (uid: string | null) => void
   toast: (text: string) => void
@@ -865,6 +883,7 @@ export const useGame = create<GameState>()(
       placingStored: null,
       again: null,
       panel: null,
+      panelBack: [],
       selectedCar: null,
       toasts: [],
       visiting: null,
@@ -893,10 +912,17 @@ export const useGame = create<GameState>()(
       setPlaceRot: (placeRot) => set({ placeRot }),
       showNeed: (res, missing, what) => {
         sfx.error()
-        set({ need: { res, missing: Math.max(0, Math.ceil(missing)), what }, panel: 'need', mode: 'play', placing: null, selected: null })
+        set((st) => ({ need: { res, missing: Math.max(0, Math.ceil(missing)), what }, ...navTo(st, 'need'), mode: 'play', placing: null, selected: null }))
       },
-      openPanel: (panel) => set({ panel, mode: 'play', placing: null, placingStored: null, selected: null, shopFocus: null }),
-      openShop: (focus) => set({ panel: 'shop', mode: 'play', placing: null, selected: null, shopFocus: focus ?? null }),
+      openPanel: (panel) => set((s) => ({ ...navTo(s, panel), mode: 'play', placing: null, placingStored: null, selected: null, shopFocus: null })),
+      closePanel: () =>
+        set((s) => {
+          const back = s.panelBack.slice(0, -1)
+          const prev = s.panel ? s.panelBack[s.panelBack.length - 1] ?? null : null
+          return { panel: prev, panelBack: prev ? back : [], mode: 'play', placing: null, placingStored: null, selected: null, shopFocus: null }
+        }),
+      swapPanel: (panel) => set((s) => ({ panel, panelBack: s.panelBack.filter((p) => p !== panel), mode: 'play', placing: null, placingStored: null, selected: null, shopFocus: null })),
+      openShop: (focus) => set((s) => ({ ...navTo(s, 'shop'), mode: 'play', placing: null, selected: null, shopFocus: focus ?? null })),
       selectCar: (selectedCar) => set({ selectedCar }),
       toast: (text) => {
         const id = Date.now() + Math.random()
