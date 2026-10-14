@@ -24,7 +24,7 @@ export type Prefs = {
   askSell: boolean
   // Kart steering on a touch screen: smooth (long slide, steadied near the middle), sharp, or ◀ ▶ buttons.
   steer: Steer
-  // The player picked their steering in Settings; until then phones get ◀ ▶ buttons.
+  // The player picked their steering in Settings (buttons only stick when picked there).
   steerSet: boolean
   // The ghost racing line on kart tracks: green where it's flat out, red before a hard bend.
   kartLine: boolean
@@ -32,7 +32,7 @@ export type Prefs = {
 export type Steer = 'smooth' | 'sharp' | 'buttons'
 
 const KEY = 'cartopia-prefs'
-const DEFAULTS: Prefs = { graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: false, muteTaunts: false, askLeave: true, askSell: true, steer: 'buttons', steerSet: false, kartLine: true }
+const DEFAULTS: Prefs = { graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: false, muteTaunts: false, askLeave: true, askSell: true, steer: 'smooth', steerSet: false, kartLine: true }
 
 export function parsePrefs(raw: string | null): Prefs {
   try {
@@ -46,7 +46,9 @@ export function parsePrefs(raw: string | null): Prefs {
       askLeave: p.askLeave !== false,
       askSell: p.askSell !== false,
       // Sharp was always a deliberate pick; a saved Smooth from before buttons existed was just the old default.
-      steer: p.steer === 'sharp' ? 'sharp' : p.steerSet === true && p.steer === 'smooth' ? 'smooth' : 'buttons',
+      // Smooth is the default (Kegan 2026-10-14). Buttons only stick when picked in Settings: a saved
+      // Buttons without steerSet came from the short time buttons were the default.
+      steer: p.steer === 'sharp' ? 'sharp' : p.steer === 'buttons' && p.steerSet === true ? 'buttons' : 'smooth',
       steerSet: p.steerSet === true,
       kartLine: p.kartLine !== false,
     }
