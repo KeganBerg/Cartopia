@@ -3,11 +3,12 @@ import { useGame } from '../game/store'
 import { BUCKS_PACKS, type BucksPack } from '../game/bucksPacks'
 import { purchase } from '../lib/payments'
 import { Panel } from './Menus'
+import { CONTACT } from '../legal/legal'
 
 const NOTICE = {
   'not-connected': ['Coming soon', "Gem packs aren't on sale yet. You weren't charged."],
   'sign-in': ['Sign in first', 'Gems go to your account. Sign in from the Menu.'],
-  blocked: ['Purchases paused', 'Contact support@cartopia.com'],
+  blocked: ['Purchases paused', `Contact ${CONTACT}`],
   failed: ["Couldn't open checkout", "You weren't charged. Try again."],
 } as const
 

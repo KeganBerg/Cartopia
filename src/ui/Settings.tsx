@@ -15,7 +15,7 @@ import { showFlashWarning } from './FlashWarning'
 import { useTouchDevice } from './DriveControls'
 
 // Contact address for the Help tab. Empty hides the row until the owner sets one.
-export const SUPPORT_EMAIL = 'support@cartopia.com'
+export const SUPPORT_EMAIL = 'support@cartopia.lol'
 
 export function Switch({ on, onChange, label, disabled }: { on: boolean; onChange: (on: boolean) => void; label: string; disabled?: boolean }) {
   return (
