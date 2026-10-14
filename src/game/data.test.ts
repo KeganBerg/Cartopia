@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildingDef, carDef, knownBuilding, BUILDINGS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost, jobLevel, houseResidents, levelName, performance, fittedMods, modStats, modCost, MODS, MOD_SLOTS, modFits, ownedMods, CARS, takesDriver, loves, driverPayout, skillBoost, skillDrag, liveSkillBoost, SKILLS , CAMPAIGN, CAMPAIGN_RACES, campaignRivalPi, campaignReward, campaignShift, rookieRace, ROOKIE_SHIFT, campaignStars, CAR_SETS, carSource, readySets, RESCUE_SPOTS } from './data'
+import { buildingDef, carDef, knownBuilding, BUILDINGS, MAX_BUILDING_LEVEL, buildingLevel, upgradable, upgradePayout, upgradeJobSeconds, upgradeXp, upgradeFuelCap, buildingUpgradeCost, jobLevel, houseResidents, levelName, performance, fittedMods, modStats, modCost, MODS, MOD_SLOTS, modFits, modSlotsFor, ownedMods, CARS, takesDriver, loves, driverPayout, skillBoost, skillDrag, liveSkillBoost, SKILLS , CAMPAIGN, CAMPAIGN_RACES, campaignRivalPi, campaignReward, campaignShift, rookieRace, ROOKIE_SHIFT, campaignStars, CAR_SETS, carSource, readySets, RESCUE_SPOTS } from './data'
 import { MAX_RACE_PI } from './race'
 import { VENUES } from '../scene/venues'
 
@@ -139,7 +139,12 @@ describe('car mods', () => {
 
   it('gives every vehicle a part for every slot, none stronger than the generic best', () => {
     const top = (s: string, k: 'power' | 'grip') => Math.max(...MODS.filter((m) => m.slot === s && !m.only).map((m) => m[k]))
-    for (const c of CARS) for (const s of MOD_SLOTS) expect(MODS.some((m) => m.slot === s.id && modFits(m, c.body))).toBe(true)
+    // Lights and stance need a car body: bikes, formula cars and tanks skip those two tabs.
+    const bare: string[] = ['scooter', 'chopper', 'sportbike', 'formula', 'tank']
+    for (const c of CARS) {
+      const want = MOD_SLOTS.filter((s) => !bare.includes(c.body) || (s.id !== 'lights' && s.id !== 'stance'))
+      expect(modSlotsFor(c.body).map((s) => s.id)).toEqual(expect.arrayContaining(want.map((s) => s.id)))
+    }
     for (const m of MODS.filter((x) => x.only)) {
       expect(m.power).toBeLessThanOrEqual(top(m.slot, 'power'))
       expect(m.grip).toBeLessThanOrEqual(top(m.slot, 'grip') + 1)

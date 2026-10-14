@@ -43,7 +43,7 @@ Kit.prototype.add = function (this: Kit, part: Part, geo: BufferGeometry, ...res
 
 // Looks that draw the same colour can't be told apart, so they can't flicker:
 // mod paint is the body paint.
-const MOD_LOOK: Record<string, string> = { paint: 'paint', carbon: 'carbon', chrome: 'modchrome', glass: 'modglass' }
+const MOD_LOOK: Record<string, string> = { paint: 'paint', carbon: 'carbon', chrome: 'modchrome', glass: 'modglass', ti: 'modti', lamp: 'modlamp', neon: 'modneon' }
 
 type Tri = { piece: number; look: string; flat: boolean; n: [number, number, number]; d: number; p: number[] }
 
@@ -267,12 +267,12 @@ function fights(list: Piece[]) {
 
 // Stock, each mod that fits on its own, and every slot filled (the n-th part of each slot).
 function fits(body: Body) {
-  const ok = MODS.filter((m) => modFits(m, body) && m.slot !== 'rims' && m.slot !== 'tires')
+  const ok = MODS.filter((m) => modFits(m, body) && m.slot !== 'rims' && m.slot !== 'tires' && m.slot !== 'stance')
   const out: Partial<Record<ModSlot, string>>[] = [{}]
   for (const m of ok) out.push({ [m.slot]: m.id })
-  for (let n = 0; n < 3; n++) {
+  for (let n = 0; n < 6; n++) {
     const f: Partial<Record<ModSlot, string>> = {}
-    for (const slot of ['spoiler', 'exhaust', 'kit', 'hood'] as ModSlot[]) {
+    for (const slot of ['spoiler', 'exhaust', 'kit', 'hood', 'lights'] as ModSlot[]) {
       const of = ok.filter((m) => m.slot === slot)
       if (of.length) f[slot] = of[n % of.length].id
     }
