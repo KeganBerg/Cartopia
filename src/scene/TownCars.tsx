@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { BoxGeometry, BufferGeometry, CylinderGeometry, Euler, Matrix4, MeshBasicMaterial, MeshStandardMaterial, OctahedronGeometry, PlaneGeometry, Quaternion, SphereGeometry, Vector3 } from 'three'
 import type { Group, InstancedMesh } from 'three'
@@ -66,7 +66,8 @@ export function TowTruck({ rig, crane }: { rig?: WheelRig; crane?: boolean }) {
 }
 
 // onTap: what tapping it does instead of opening the garage (a visitor's car).
-function TownCar({ car, onTap }: { car: OwnedCar; onTap?: () => void }) {
+// Memo: painting a road re-renders TownCars, and every car model redrawing with it cost a frame.
+const TownCar = memo(function TownCar({ car, onTap }: { car: OwnedCar; onTap?: () => void }) {
   const ref = useRef<Group>(null)
   const body = useRef<Group>(null)
   const truck = useRef<Group>(null)
@@ -136,7 +137,7 @@ function TownCar({ car, onTap }: { car: OwnedCar; onTap?: () => void }) {
       </group>
     </>
   )
-}
+})
 
 const dark = new MeshStandardMaterial({ color: '#3a3a3a' })
 const lit: Record<Light, MeshStandardMaterial> = {

@@ -396,10 +396,10 @@ const post = new BoxGeometry(0.09, 0.62, 0.09)
 const rail = new BoxGeometry(1, 0.05, 0.04)
 const lamp = new CylinderGeometry(0.05, 0.06, 1.1, 6)
 
-function TownLine({ land, roads }: { land: string[]; roads: string[] }) {
+function TownLine({ land, exits }: { land: string[]; exits: string }) {
   const built = useMemo(() => {
     const owned = new Set(land)
-    const road = new Set(roads)
+    const road = new Set(exits.split('|'))
     const k = new Kit()
     const gates: { x: number; z: number; along: boolean; out: number }[] = []
     const wood = SEASON === 'winter' ? '#6d5a50' : '#8d6e63'
@@ -441,7 +441,7 @@ function TownLine({ land, roads }: { land: string[]; roads: string[] }) {
       }
     }
     return { geo: k.geometry(), gates }
-  }, [land, roads])
+  }, [land, exits])
   useEffect(() => () => built.geo?.dispose(), [built])
   const gravel = useMemo(() => gravelTex(0.5, 4), [])
   return (
@@ -546,11 +546,12 @@ function Fireflies({ small }: { small: boolean }) {
   return <points ref={ref} geometry={geo} material={mat} frustumCulled={false} raycast={() => null} />
 }
 
-export function Outskirts({ land, roads, small }: { land: string[]; roads: string[]; small: boolean }) {
+// `exits`: townExits(roads), so a road painted inside town leaves all of this alone.
+export function Outskirts({ land, exits, small }: { land: string[]; exits: string; small: boolean }) {
   return (
     <group>
       <Wilds land={land} />
-      <TownLine land={land} roads={roads} />
+      <TownLine land={land} exits={exits} />
       <Forest />
       {(SEASON === 'summer' || SEASON === 'spring') && <Fireflies small={small} />}
     </group>
