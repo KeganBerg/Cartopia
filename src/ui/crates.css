@@ -25,15 +25,18 @@
 
 .crate-odds { background: rgba(24,18,38,.82); border: 2px solid rgba(255,255,255,.25); border-radius: 14px; padding: 5px; }
 .crate-odds-row { display: flex; gap: 4px; }
-.crate-pity { margin-top: 4px; font-size: 12px; opacity: 0.85; display: flex; gap: 4px; align-items: center; justify-content: center; }
+.crate-pity { margin-top: 4px; font: 13px var(--display); color: #fff; opacity: 0.9; display: flex; gap: 4px; align-items: center; justify-content: center; }
 .crate-odds .odd { min-width: 0; display: flex; align-items: center; justify-content: center; gap: 3px; padding: 3px 4px; border-radius: 9px; font: 13px var(--display); color: #fff; border: none; white-space: nowrap; }
 .crate-odds .odd b { font-weight: normal; font-size: 13px; }
 .crate-odds .odd small { font-size: 10px; opacity: .8; }
 .odd.coins { background: linear-gradient(#f9a825, #c17900); }
 .odd.mod { background: linear-gradient(#9575cd, #5e35b1); cursor: pointer; }
-.crate-odds button.odd { min-width: max-content; }
+.crate-odds button.odd, .crate-odds .odd.coins { min-width: max-content; }
 .odd.skin { background: linear-gradient(#ec407a, #ad1457); cursor: pointer; }
 .odd.car { background: linear-gradient(#ff9800, #e65100); cursor: pointer; }
+.odd.hat { background: linear-gradient(#c9a98f, #8d6e63); cursor: pointer; }
+.crate-car.hat i { font-style: normal; font-size: 26px; line-height: 34px; width: 40px; text-align: center; }
+.crate-car.hat.owned::after { content: none; }
 .crate-cars { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin-top: 5px; max-height: 128px; overflow-y: auto; }
 .crate-car { display: flex; flex-direction: column; align-items: center; background: rgba(255,255,255,.08); border-radius: 8px; padding: 2px 3px 1px; }
 .crate-skin { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 3px; border-radius: 8px; background: rgba(255,255,255,.08); }
@@ -105,7 +108,7 @@
 
 /* Wide screens: the picker stands on the right and the crate on the left. */
 @media (min-width: 900px) and (min-aspect-ratio: 5/4) {
-  .crate-dock { left: auto; right: calc(16px + var(--sar)); bottom: 50%; transform: translateY(50%); width: 340px; }
+  .crate-dock { left: auto; right: calc(16px + var(--sar)); bottom: 50%; transform: translateY(50%); width: 384px; }
   .crate-pick { grid-template-columns: repeat(2, 1fr); }
   .crate-tab { padding: 8px 4px 7px; font-size: 15px; }
   .crate-prize { left: auto; right: calc(16px + var(--sar)); bottom: 50%; transform: translateY(50%); width: 360px; animation-name: prize-in-side; }

@@ -959,8 +959,13 @@ export function CrateScene(props: StageProps & { run: number }) {
   useFitCamera([0, 0.42, 1], [0, 1.5, -0.6], wide ? 5 : 2.5, wide ? 3 : 2.9)
   // Where the camera sits before an opening pushes it in (useFitCamera has just placed it).
   const base = useRef(new Vector3())
+  // And its facing, which Diamond's swing turns. Kept here rather than in Stage: a remounted
+  // Stage can draw a frame before the last one has put the camera back, and would take that
+  // turned facing as its own, leaving the depot a little more askew after every open.
+  const baseQ = useRef(new Quaternion())
   useLayoutEffect(() => {
     base.current.copy(camera.position)
+    baseQ.current.copy(camera.quaternion)
     const cam = camera as PerspectiveCamera
     if (wide) cam.setViewOffset(size.width, size.height, size.width * 0.13, 0, size.width, size.height)
     else cam.setViewOffset(size.width, size.height, 0, size.height * 0.13, size.width, size.height)
@@ -997,7 +1002,7 @@ export function CrateScene(props: StageProps & { run: number }) {
       <PostFx look={look} />
       <Depot />
       <Dust />
-      <Stage key={props.run} {...props} base={base} />
+      <Stage key={props.run} {...props} base={base} baseQ={baseQ} />
     </>
   )
 }
@@ -1025,15 +1030,14 @@ const HERO = new Vector3()
 const AIM = new Vector3()
 
 // One crate on the lift, from dropping in to its prize: remounted for every crate.
-function Stage({ def, phase, drop, prizeCar, onReveal, skip, base, pace = 'full' }: StageProps & { base: React.RefObject<Vector3> }) {
+function Stage({ def, phase, drop, prizeCar, onReveal, skip, base, baseQ, pace = 'full' }: StageProps & { base: React.RefObject<Vector3>; baseQ: React.RefObject<Quaternion> }) {
   const camera = useThree((s) => s.camera)
   const style = OPEN_STYLE[def.id]
   const drama = DRAMA[style]
   const show = pace === 'show'
   const P = PACE[pace === 'quick' ? 'quick' : 'full']
-  // The camera's own facing, put back after Diamond's swing round the crate.
-  const baseQ = useRef<Quaternion | null>(null)
-  useEffect(() => () => void (baseQ.current && camera.quaternion.copy(baseQ.current)), [camera])
+  // The camera's own facing (baseQ), put back after the prize view aims it (and Diamond's swing turns it).
+  useEffect(() => () => void camera.quaternion.copy(baseQ.current), [camera, baseQ])
   const tier = drop ? dropTier(drop) : 0
   const glow = drop ? TIER_GLOW[tier] : def.look.glow
   const parts = useRef<CrateParts>({ root: null, base: null, lid: null, panels: [], bands: [], core: null, light: null })
@@ -1137,7 +1141,6 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base, pace = 'full'
     if (p.light) p.light.intensity = after >= 0 ? 6 + Math.max(0, 30 * (1 - after * 2)) : charge * 14
     // Reduce flashing: a softer, slower glow instead of the white burst.
     if (flash.current) flash.current.intensity = after >= 0 ? (calmFlashing() ? Math.max(0, 14 * (1 - after * 1.2)) : Math.max(0, drama.flash * (1 - after * 3))) : 0
-    if (!baseQ.current) baseQ.current = camera.quaternion.clone()
     // Burst: the crate opens its own way (see OPEN_STYLE) and the bands snap away.
     if (after >= 0) {
       const L = s.lid

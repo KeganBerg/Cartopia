@@ -6,6 +6,7 @@ import { dayPhase, isNight, nightAmount } from '../game/clock'
 import { CLUB } from './clubLayout'
 import { clubPulse } from '../lib/clubBeat'
 import { driveClubLeds, shownNow } from './clubLeds'
+import { newDance, stepDance } from './danceClock'
 
 // The moving parts of the nightclub, shown only while it's open: people
 // dancing on the rooftop floor, the bouncer at the door and two searchlights
@@ -47,6 +48,7 @@ export function ClubLife({ lvl, roofY, roofZ, floorY, floorZ, floorW, floorD }: 
   const legs = useRef<InstancedMesh>(null)
   const beams = useRef<Group[]>([])
   const dummy = useMemo(() => new Object3D(), [])
+  const dance = useMemo(() => newDance(), [])
   // The spot each figure stands on, so a merged club keeps them in one piece on the floor.
   const spot = useMemo(() => new Float32Array(n * 3), [n])
   const feet = useMemo(() => ({ noBatch: true, feet: (i: number) => spot.subarray(i * 3, i * 3 + 3) }), [spot])
@@ -69,9 +71,9 @@ export function ClubLife({ lvl, roofY, roofZ, floorY, floorZ, floorW, floorD }: 
     const color = new Color()
     for (let i = 0; i < n; i++) {
       const bouncer = i === dancers
-      torso.current?.setColorAt(i, color.set(bouncer ? '#151515' : SHIRTS[i % SHIRTS.length]))
+      torso.current?.setColorAt(i, color.set(bouncer ? '#2b2b36' : SHIRTS[i % SHIRTS.length]))
       head.current?.setColorAt(i, color.set(SKIN[(i * 7) % SKIN.length]))
-      arms.current?.setColorAt(i * 2, color.set(bouncer ? '#151515' : SHIRTS[i % SHIRTS.length]))
+      arms.current?.setColorAt(i * 2, color.set(bouncer ? '#2b2b36' : SHIRTS[i % SHIRTS.length]))
       arms.current?.setColorAt(i * 2 + 1, color)
       color.set(bouncer ? '#151515' : PANTS[i % PANTS.length])
       legs.current?.setColorAt(i * 2, color)
@@ -80,12 +82,15 @@ export function ClubLife({ lvl, roofY, roofZ, floorY, floorZ, floorW, floorD }: 
     for (const m of [torso.current, head.current, arms.current, legs.current]) if (m?.instanceColor) m.instanceColor.needsUpdate = true
   }, [n, dancers])
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, dt) => {
     const now = shownNow()
     driveClubLeds(now)
-    // The dancers move to the music: down on every kick, up between.
+    // The dancers move to the music: down on every beat, up between, on
+    // their own smooth count that follows the track (danceClock.ts).
     const music = clubPulse(now)
-    const beats = music.step + music.beat
+    stepDance(dance, dt, music.grid, music.bpm, music.env.clap)
+    const beats = dance.phase
+    const clap = dance.clap
     const t = torso.current
     const hd = head.current
     const ar = arms.current
@@ -125,10 +130,10 @@ export function ClubLife({ lvl, roofY, roofZ, floorY, floorZ, floorW, floorD }: 
         x = spots[i][0] + Math.sin(time * 0.7 + i) * 0.05
         z = spots[i][1] + Math.cos(time * 0.6 + i * 2) * 0.04
         heading = i * 1.3 + Math.sin(time * 1.4 + i) * 0.9
-        bob = Math.sin(music.beat * Math.PI) * 0.07
+        bob = Math.sin((beats - Math.floor(beats)) * Math.PI) * 0.07
         // Some wave their arms in the air, some keep them low and pump, and
         // some throw their hands up on the claps.
-        lift = i % 3 === 0 ? 2.6 - music.env.clap * 0.5 : i % 3 === 1 ? 2.2 + Math.sin(beat) * 0.5 : 1.1 + Math.sin(beat * 2) * 0.4 + music.env.clap * 1.2
+        lift = i % 3 === 0 ? 2.6 - clap * 0.5 : i % 3 === 1 ? 2.2 + Math.sin(beat) * 0.5 : 1.1 + Math.sin(beat * 2) * 0.4 + clap * 1.2
         wave = Math.sin(beat * 0.5 + i * 1.7) * 0.25
       }
       const baseY = bouncer ? 0 : floorY
