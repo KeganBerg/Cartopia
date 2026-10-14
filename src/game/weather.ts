@@ -165,7 +165,18 @@ function forcedAt(now: number) {
 }
 
 // Where the sky is heading at this moment.
+// A brand new player's first minutes are always sunny (App turns this on during the tutorial).
+let calmSky = false
+export function setCalmSky(on: boolean) {
+  calmSky = on
+}
+
 function targetMix(now: number, out: Mix) {
+  if (calmSky) {
+    for (const k of WEATHER_KINDS) out[k] = 0
+    out.clear = 1
+    return out
+  }
   spellMix(now, out)
   const forced = forcedAt(now)
   if (forced && forced.s > 0) {
@@ -208,6 +219,7 @@ function feelAt(now: number, out: Feel & { kind: WeatherKind; strength: number }
 const STEP_MS = 5000
 const scratch = { kind: 'clear' as WeatherKind, strength: 0, rain: 0, snow: 0, cloud: 0, haze: 0, wind: 0, dust: 0 }
 function groundAt(now: number) {
+  if (calmSky) return { wet: 0, cover: 0 }
   if (PIN) return { wet: FEEL[PIN].rain > 0 ? 1 : PIN === 'clearing' ? 0.7 : 0, cover: FEEL[PIN].snow > 0 ? 1 : 0 }
   let wet = 0, cover = 0
   const start = Math.floor(now / STEP_MS) * STEP_MS - 2 * SPELL_MS
