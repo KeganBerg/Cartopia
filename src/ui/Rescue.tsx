@@ -385,7 +385,7 @@ function SearchScreen({ onHaul }: { onHaul: (r: Recap) => void }) {
   const fix = useGame((s) => s.fixTruck)
   const abandon = useGame((s) => s.abandonSearch)
   const home = useGame((s) => s.towHome)
-  const openPanel = useGame((s) => s.openPanel)
+  const closePanel = useGame((s) => s.closePanel)
   const spot = RESCUE_SPOTS.find((o) => o.id === q.spot)!
   const magnet = useGame((s) => !!truckOf(s.truck).magnet)
   const [autoPicked, setAuto] = useState(false)
@@ -458,10 +458,10 @@ function SearchScreen({ onHaul }: { onHaul: (r: Recap) => void }) {
   return (
     <div className="race-full rescue-full">
       <StageSlot cam={RESCUE_CAM}>{scene}</StageSlot>
-      <LoadingScene ready={stageReady} label={`Heading to ${spot.name}`} onClose={() => openPanel(null)} />
+      <LoadingScene ready={stageReady} label={`Heading to ${spot.name}`} onClose={closePanel} />
       <div className="rf-top">
         <h2>{spot.icon} {spot.name}</h2>
-        <button className="close" onClick={() => openPanel(null)} aria-label="Close">✕</button>
+        <button className="close" onClick={closePanel} aria-label="Close">✕</button>
       </div>
       <div className="rs-dots" aria-label={`${left} spots left`}>
         {q.revealed.map((r, i) => {
