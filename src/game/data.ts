@@ -648,11 +648,11 @@ export const MODS: ModDef[] = [
   { id: 'slammed', slot: 'stance', notOn: FIXED_RIDE, name: 'Air Ride', unlockLevel: 12, coins: 0, parts: 0, bucks: 12, power: 0, grip: 2, weight: -1 },
 ]
 
-// What a stance mod does to the look: how far it moves the body up or down over the wheels,
-// how much bigger and wider the tyres get, and how far the wheels lean in at the top.
 // The mod slots a body has parts for (bikes, formula cars and tanks have no lights or stance).
 export const modSlotsFor = (body: Body) => MOD_SLOTS.filter((s) => MODS.some((m) => m.slot === s.id && modFits(m, body)))
 
+// What a stance mod does to the look: how far it moves the body up or down over the wheels,
+// how much bigger and wider the tyres get, and how far the wheels lean in at the top.
 export const STANCE: Record<string, { rise: number; tyre?: number; camber?: number }> = {
   lowered: { rise: -0.022 },
   lifted: { rise: 0.07, tyre: 1.2 },
