@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useGame } from '../game/store'
-import { BUCKS_PACKS, type BucksPack } from '../game/bucksPacks'
+import { BUCKS_PACKS, packGrant, type BucksPack } from '../game/bucksPacks'
 import { purchase } from '../lib/payments'
 import { Panel } from './Menus'
 import { CONTACT } from '../legal/legal'
@@ -16,6 +16,7 @@ const NOTICE = {
 // are set on Netlify, a tap says purchases are coming soon and nothing is charged.
 export function BankPanel() {
   const bucks = useGame((s) => s.bucks)
+  const level = useGame((s) => s.level)
   const showNeed = useGame((s) => s.showNeed)
   const [pending, setPending] = useState<string | null>(null)
   const [notice, setNotice] = useState<'not-connected' | 'sign-in' | 'blocked' | 'failed' | null>(null)
@@ -38,7 +39,7 @@ export function BankPanel() {
       </div>
       <div className="bank-packs">
         {BUCKS_PACKS.map((p) => {
-          const total = p.bucks + p.bonus
+          const { bucks: total, coins, parts } = packGrant(p, level)
           const pct = Math.round((p.bonus / p.bucks) * 100)
           return (
             <div key={p.id} className={`bank-pack${p.tag ? ' featured' : ''}`}>
@@ -47,10 +48,10 @@ export function BankPanel() {
               <div className="pack-name">{p.name}</div>
               <div className="pack-bucks">💎 {total}</div>
               {p.bonus > 0 ? <div className="pack-bonus">{p.bucks} + {p.bonus} bonus ({pct}% more)</div> : <div className="pack-bonus plain">{p.bucks} gems</div>}
-              {(p.coins || p.parts) && (
+              {(coins || parts) > 0 && (
                 <div className="pack-extras">
-                  {p.coins ? <span>+ ${p.coins.toLocaleString()}</span> : null}
-                  {p.parts ? <span>+ {p.parts}⚙</span> : null}
+                  {coins ? <span>+ ${coins.toLocaleString()}</span> : null}
+                  {parts ? <span>+ {parts}⚙</span> : null}
                 </div>
               )}
               <button className="buy" disabled={pending === p.id} onClick={() => buy(p)}>{pending === p.id ? '...' : `$${p.price.toFixed(2)}`}</button>

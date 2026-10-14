@@ -7,6 +7,7 @@
 import { CARS, CUSTOM_PAINT, CUSTOM_PAINT_CRATE, MODS, MOD_SKINS, SKINS, carDef, hasCustomPaint, ownedSkins, modDef, modFits, ownedMods, type CarDef, type ModDef, type SkinDef, type SkinTier } from './data'
 import { PIECE_COUNT, PIECE_SOURCES, pieceId, piecePool } from './resto'
 import { crateHats, hatDef } from './hats'
+import { GEM_COINS, gemCoins } from './bucksPacks'
 
 export type CrateId = 'street' | 'garage' | 'gold' | 'diamond'
 // piece: a resto-mod piece (game/resto.ts).
@@ -67,9 +68,8 @@ export const CRATES: CrateDef[] = [
 
 export const crateDef = (id: string) => CRATES.find((c) => c.id === id)
 
-// Roughly what a gem buys at this level, in coins (five fuel's worth of jobs).
-export const GEM_COINS = { base: 300, perLevel: 100 }
-export const gemCoins = (level: number) => GEM_COINS.base + GEM_COINS.perLevel * level
+// Roughly what a gem buys at this level, in coins. Lives with the gem packs, which scale by it too.
+export { GEM_COINS, gemCoins }
 export const cratePrice = (c: CrateDef, level: number) => c.base + c.perLevel * Math.min(level, c.priceCap ?? level)
 export const crateCost = (c: CrateDef, level: number) =>
   c.pay === 'coins' ? { coins: cratePrice(c, level), bucks: 0 } : { coins: 0, bucks: cratePrice(c, level) }
