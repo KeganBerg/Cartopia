@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import {
   BackSide, BoxGeometry, BufferAttribute, BufferGeometry, Color, ConeGeometry, CylinderGeometry, Fog, IcosahedronGeometry, MeshBasicMaterial, MeshStandardMaterial,
-  Object3D, RingGeometry, ShaderMaterial, SphereGeometry, Vector3, type InstancedMesh, type Mesh,
+  Object3D, RingGeometry, ShaderMaterial, SphereGeometry, Vector2, Vector3, type InstancedMesh, type Mesh,
 } from 'three'
 import { weatherNow } from '../game/weather'
 import { moonLit, moonPhase } from '../game/skyExtras'
@@ -151,7 +151,7 @@ uniform float uNight;
 uniform float uDusk;
 uniform float uCover;
 uniform float uTime;
-uniform vec2 uWind;
+uniform vec2 uDrift;
 varying vec3 vDir;
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float noise(vec2 p) {
@@ -207,7 +207,7 @@ void main() {
   // edges, a bright side towards the sun (or moon) and a shaded belly, like the
   // low-poly town under them. They're pinned to the sky, not the screen.
   if (y > 0.0) {
-    vec2 uv = d.xz / (y + 0.12) * 1.8 + uWind * uTime;
+    vec2 uv = d.xz / (y + 0.12) * 1.8 + uDrift;
     uv += (vec2(noise(uv * 0.6 + 3.1), noise(uv * 0.6 + 7.7)) - 0.5) * 0.35;
     // Big soft masses with small round puffs along their edges.
     float n = fbm(uv) + (noise(uv * 5.0 + 2.0) - 0.5) * 0.09;
@@ -265,7 +265,7 @@ function Sky({ small }: { small: boolean }) {
         uniforms: {
           uZenith: { value: new Color() }, uHorizon: { value: new Color() }, uGlow: { value: new Color() }, uSunDir: { value: new Vector3() }, uSunCol: { value: new Color('#fff4d6') },
           uMoonDir: { value: new Vector3() }, uCloudLit: { value: new Color() }, uCloudShade: { value: new Color() }, uNight: { value: 0 }, uDusk: { value: 0 }, uCover: { value: 0 },
-          uTime: { value: 0 }, uWind: { value: { x: 0.004, y: 0.0015 } }, uMoonPhase: { value: 0 }, uMoonLit: { value: 0 }, uMoonFlip: { value: south() ? -1 : 1 },
+          uTime: { value: 0 }, uDrift: { value: new Vector2() }, uMoonPhase: { value: 0 }, uMoonLit: { value: 0 }, uMoonFlip: { value: south() ? -1 : 1 },
         },
       }),
     [small],
@@ -274,7 +274,7 @@ function Sky({ small }: { small: boolean }) {
   const geo = useMemo(() => new SphereGeometry(2000, 32, 16), [])
   useEffect(() => () => geo.dispose(), [geo])
   const ref = useRef<Mesh>(null)
-  useFrame(({ camera, clock }) => {
+  useFrame(({ camera, clock }, dt) => {
     ref.current?.position.copy(camera.position)
     const phase = dayPhase()
     const n = nightAmount(phase)
@@ -305,7 +305,10 @@ function Sky({ small }: { small: boolean }) {
     const moon = moonPhase()
     u.uMoonPhase.value = moon
     u.uMoonLit.value = moonLit(moon)
-    u.uWind.value.x = 0.004 + w.wind * 0.012
+    // The wind is summed frame by frame: wind × total time made the whole sky
+    // jump every time a gust changed it (the weather updates ten times a second).
+    ;(u.uDrift.value as Vector2).x += (0.004 + w.wind * 0.012) * Math.min(dt, 0.1)
+    ;(u.uDrift.value as Vector2).y += 0.0015 * Math.min(dt, 0.1)
     // Distant hills take a little of the sky's blue (aerial perspective).
     skyHorizon.copy(h).lerp(z, 0.18)
   })
