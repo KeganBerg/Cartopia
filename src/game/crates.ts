@@ -298,14 +298,16 @@ export function crateOdds(c: CrateDef, level: number): CrateOdds {
   return { ...c.odds, coins: c.odds.coins + c.odds.car - car, car }
 }
 
-// The odds as a player sees them: coins (with jackpots), parts, cars and skins, in whole percent
-// (cars to a tenth below 1%, resto-mod pieces to a hundredth).
-export function crateOddsShown(c: CrateDef, level: number) {
+// The odds as a player sees them: coins (with jackpots), hats, parts, cars and skins, in whole
+// percent (cars to a tenth below 1%, resto-mod pieces to a hundredth). Hats come out of the coin
+// slice (HAT_ODDS), so pass `hats` false once the player has every hat the crate holds.
+export function crateOddsShown(c: CrateDef, level: number, hats = true) {
   const o = crateOdds(c, level)
   const t = o.coins + o.jackpot + o.mod + o.car + o.skin + o.piece
   const pc = (n: number) => Math.round((n / t) * 100)
   const car = (o.car / t) * 100
-  return { coins: pc(o.coins + o.jackpot), mod: pc(o.mod), car: car < 1 ? Math.round(car * 10) / 10 : Math.round(car), skin: pc(o.skin), piece: Math.round((o.piece / t) * 10000) / 100 }
+  const hat = hats && crateHats(c.id).length ? HAT_ODDS[c.id] : 0
+  return { coins: pc(o.coins + o.jackpot - hat), hat: pc(hat), mod: pc(o.mod), car: car < 1 ? Math.round(car * 10) / 10 : Math.round(car), skin: pc(o.skin), piece: Math.round((o.piece / t) * 10000) / 100 }
 }
 
 // Weekly event skins never go in crates.
