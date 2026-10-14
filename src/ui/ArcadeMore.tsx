@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGame, type OwnedCar } from '../game/store'
 import {
-  DASH_TIME, STUNT_JUMPS, WASH_SPOTS, WASH_TIME,
+  DASH_TIME, STUNT_JUMPS, WASH_SPOTS, WASH_TIME, targetX,
   dashStars, pitStars, recordStars, starReward, stuntStars, washStars, type StarGameId,
 } from '../game/arcadeMore'
 import { PitScene, type PitEnd, type PitHud, type PitInput } from '../scene/PitScene'
 import { WashScene, type WashEnd, type WashHud, type WashInput } from '../scene/WashScene'
-import { DeliveryScene, type DashEnd, type DashHud } from '../scene/DeliveryScene'
+import { DeliveryScene, type DashEnd, type DashHud, type DashPop } from '../scene/DeliveryScene'
 import { StuntScene, type StuntEnd, type StuntHud, type StuntInput } from '../scene/StuntScene'
 import { KeyHints, TouchDrive, newDriveInput, useDriveKeys, useTall, useTouchDevice } from './DriveControls'
 import { Cost, Countdown, Result, look, payFuel, useStable } from './ArcadeBits'
@@ -188,12 +188,17 @@ function WashGame({ car, running, onDone }: GameProps) {
 
 function DeliveryGame({ car, running, onDone }: GameProps) {
   const input = useRef(newDriveInput()).current
-  const [hud, setHud] = useState<DashHud>({ drops: 0, time: DASH_TIME, carrying: false })
+  const [hud, setHud] = useState<DashHud>({ drops: 0, time: DASH_TIME, carrying: false, hot: 0, streak: 0, pop: null })
+  const [pop, setPop] = useState<DashPop | null>(null)
+  const onHud = useStable((h: DashHud) => {
+    setHud(h)
+    if (h.pop) setPop(h.pop)
+  })
   const touch = useTouchDevice()
   const tall = useTall()
   useDriveKeys(input)
   const onEnd = useStable((e: DashEnd) => onDone(dashStars(e.drops), e.drops, `🍕 ${e.drops} delivered`))
-  const scene = useMemo(() => <DeliveryScene me={look(car)} input={input} running={running} onHud={setHud} onEnd={onEnd} />, [car, input, running, onEnd])
+  const scene = useMemo(() => <DeliveryScene me={look(car)} input={input} running={running} onHud={onHud} onEnd={onEnd} />, [car, input, running, onHud, onEnd])
   return (
     <>
       <StageSlot cam={DASH_CAM}>{scene}</StageSlot>
@@ -202,17 +207,26 @@ function DeliveryGame({ car, running, onDone }: GameProps) {
         <span className={hud.carrying ? 'arc-spot in' : 'arc-spot'}>{hud.carrying ? '🏠 Deliver' : '🍕 Pick up'}</span>
         <span>✅ {hud.drops}</span>
       </div>
+      {hud.carrying && hud.hot > 0 && <div className="dash-hot"><b>🔥</b><div><i style={{ width: `${hud.hot * 100}%` }} /></div></div>}
+      {pop && <div key={pop.id} className={`chase-pop ${pop.kind === 'hit' ? 'warn' : pop.kind === 'hot' ? 'smash' : ''}`}>{pop.text}</div>}
       {running && (touch ? <TouchDrive input={input} tall={tall} drift={false} /> : <KeyHints drift={false} item={false} />)}
     </>
   )
 }
 
 function StuntGame({ car, running, onDone }: GameProps) {
-  const input = useRef<StuntInput>({ down: false }).current
-  const [hud, setHud] = useState<StuntHud>({ jump: 1, score: 0, power: 0, phase: 'aim', last: null })
+  const input = useRef<StuntInput>({ down: false, roll: false }).current
+  const [hud, setHud] = useState<StuntHud>({ jump: 1, score: 0, power: 0, phase: 'aim', slow: false, last: null })
   useEffect(() => {
-    const kd = (e: KeyboardEvent) => { if (e.key === ' ' || e.key === 'ArrowUp') { input.down = true; e.preventDefault() } }
-    const ku = (e: KeyboardEvent) => { if (e.key === ' ' || e.key === 'ArrowUp') input.down = false }
+    // Space or up flips, right or D rolls.
+    const set = (e: KeyboardEvent, on: boolean) => {
+      if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w') input.down = on
+      else if (e.key === 'ArrowRight' || e.key === 'd') input.roll = on
+      else return
+      e.preventDefault()
+    }
+    const kd = (e: KeyboardEvent) => set(e, true)
+    const ku = (e: KeyboardEvent) => set(e, false)
     window.addEventListener('keydown', kd)
     window.addEventListener('keyup', ku)
     return () => { window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku) }
@@ -220,15 +234,24 @@ function StuntGame({ car, running, onDone }: GameProps) {
   const onEnd = useStable((e: StuntEnd) => onDone(stuntStars(e.score), e.score, `🔥 ${e.score.toLocaleString()} pts`))
   const scene = useMemo(() => <StuntScene me={look(car)} input={input} running={running} onHud={setHud} onEnd={onEnd} />, [car, input, running, onEnd])
   const showLast = hud.last && (hud.phase === 'roll' || hud.phase === 'crash')
+  const last = hud.last
+  const tricks = last ? [last.flips && (last.flips > 1 ? `${last.flips}× flip` : 'Flip'), last.rolls && (last.rolls > 1 ? `${last.rolls}× roll` : 'Roll'), last.target && '🎯'].filter(Boolean).join(' + ') : ''
+  // Left half of the screen flips, right half rolls; either one stops the needle.
+  const release = () => { input.down = false; input.roll = false }
   return (
-    <div className="arc-scrub"
-      onPointerDown={(e) => { if (!(e.target as HTMLElement).closest('button')) input.down = true }}
-      onPointerUp={() => { input.down = false }}
-      onPointerCancel={() => { input.down = false }}>
+    <div className={hud.slow ? 'arc-scrub stunt-slow' : 'arc-scrub'}
+      onPointerDown={(e) => {
+        if ((e.target as HTMLElement).closest('button')) return
+        if (e.clientX < window.innerWidth / 2) input.down = true
+        else input.roll = true
+      }}
+      onPointerUp={release}
+      onPointerCancel={release}>
       <StageSlot cam={STUNT_CAM}>{scene}</StageSlot>
       <div className="arc-hud">
         <span>🏁 {hud.jump}/{STUNT_JUMPS}</span>
         <span className="arc-score">{hud.score.toLocaleString()}</span>
+        <span>🎯 {targetX(hud.jump - 1)}m</span>
       </div>
       {hud.phase === 'aim' && (
         <div className="arc-power">
@@ -236,10 +259,15 @@ function StuntGame({ car, running, onDone }: GameProps) {
           {running && <div className="arc-tip">Tap at full power</div>}
         </div>
       )}
-      {hud.phase === 'air' && <div className="arc-tip">Hold to flip, let go to land</div>}
-      {showLast && hud.last && (
-        <div key={hud.jump} className={hud.last.ok ? 'arc-callout ok' : 'arc-callout bad'}>
-          {hud.last.ok ? <>+{hud.last.pts}{hud.last.flips > 0 && <small>{hud.last.flips > 1 ? `${hud.last.flips}× flip` : 'Flip!'}</small>}</> : 'Wipeout!'}
+      {(hud.phase === 'run' || hud.phase === 'air') && (
+        <div className="stunt-pads">
+          <span>🔄<small>Flip</small></span>
+          <span>🌀<small>Roll</small></span>
+        </div>
+      )}
+      {showLast && last && (
+        <div key={hud.jump} className={last.ok ? 'arc-callout ok' : 'arc-callout bad'}>
+          {last.ok ? <>+{last.pts}{tricks && <small>{tricks}</small>}</> : 'Wipeout!'}
         </div>
       )}
     </div>

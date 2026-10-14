@@ -71,6 +71,15 @@ export function washStars(cleaned: number, total: number, timeLeft: number) {
 // Pick up at the pizza place, drop at the glowing house, beat the clock. Each drop adds time.
 export const DASH_TIME = 45
 export const DASH_BONUS = 12
+// Hot pizza: drop it off within hotTime of picking up (longer for a further house) and the
+// clock gets extra seconds, more for every hot drop in a row. Bumping traffic costs time.
+export const hotTime = (dist: number) => 4 + dist / 4.5
+export function dropBonus(hot: boolean, streak: number) {
+  return DASH_BONUS + (hot ? 3 + 2 * Math.min(3, streak) : 0)
+}
+export const TRAFFIC_HIT = 2
+// Road centre lines across town, between and round the blocks.
+export const roadLine = (i: number) => -TOWN / 2 + STREET / 2 + i * CELL
 export function dashStars(drops: number) {
   return drops >= 6 ? 3 : drops >= 4 ? 2 : drops >= 2 ? 1 : 0
 }
@@ -115,8 +124,9 @@ export const DROP_LINE = 0.2 // the ring's painted width
 export const atDrop = (x: number, z: number, spot: { x: number; z: number }) => Math.hypot(x - spot.x, z - spot.z) <= DROP_R
 
 // ---------- Stunt Ramp ----------
-// Three jumps. Stop the power needle, then hold to flip in the air and let go to land flat.
-export const STUNT_JUMPS = 3
+// Four jumps. Stop the power needle, then in the air hold one side to flip and the other to
+// barrel roll; let go to land flat. A target on the deck moves further out every jump.
+export const STUNT_JUMPS = 4
 export const GRAVITY = 18
 // Power 0..1 (from the needle) sets take-off speed; the sweet spot is near the top.
 export const launchSpeed = (power: number) => 9 + power * 9
@@ -132,12 +142,23 @@ export function landed(spin: number) {
   return Math.min(r, Math.PI * 2 - r) <= LAND_OK
 }
 export const flips = (spin: number) => Math.floor((Math.abs(spin) + LAND_OK) / (Math.PI * 2))
-// One jump's points: distance, a big bonus per flip, nothing if you crash.
-export function jumpScore(dist: number, spin: number) {
-  return landed(spin) ? Math.round(dist * 10) + flips(spin) * 150 : 0
+// The landing target for each jump (0-based): where its middle sits and how wide it is.
+export const TARGET_W = 1.8
+export const targetX = (jump: number) => 9 + jump * 2
+export const onTarget = (x: number, jump: number) => Math.abs(x - targetX(jump)) <= TARGET_W / 2
+export const FLIP_POINTS = 150
+export const ROLL_POINTS = 120
+export const TARGET_POINTS = 250
+// One jump's points: distance, a bonus per flip and per roll (half again when you mix both),
+// the target bonus, and nothing if you crash.
+export function jumpScore(dist: number, spin: number, roll = 0, target = false) {
+  if (!landed(spin) || !landed(roll)) return 0
+  const tricks = flips(spin) * FLIP_POINTS + flips(roll) * ROLL_POINTS
+  const combo = flips(spin) > 0 && flips(roll) > 0 ? 1.5 : 1
+  return Math.round(dist * 10 + tricks * combo + (target ? TARGET_POINTS : 0))
 }
 export function stuntStars(score: number) {
-  return score >= 900 ? 3 : score >= 500 ? 2 : score >= 150 ? 1 : 0
+  return score >= 2000 ? 3 : score >= 1100 ? 2 : score >= 300 ? 1 : 0
 }
 
 // ---------- Bests ----------

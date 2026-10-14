@@ -62,8 +62,12 @@ describe('arcade second wave', () => {
     expect(flips(1)).toBe(0)
     expect(jumpScore(10, Math.PI)).toBe(0)
     expect(jumpScore(10, Math.PI * 2)).toBe(250)
-    // Three max-power jumps with a flip each earn three stars.
-    expect(stuntStars(3 * jumpScore(jumpLength(1), Math.PI * 2))).toBe(3)
+    expect(jumpScore(10, 0, Math.PI)).toBe(0)
+    // A flip and a roll in one jump pay half again, and the target adds on top.
+    expect(jumpScore(10, Math.PI * 2, Math.PI * 2, true)).toBe(100 + 270 * 1.5 + 250)
+    // Four big jumps with a flip and a roll each on target earn three stars; plain flips don't.
+    expect(stuntStars(4 * jumpScore(jumpLength(1), Math.PI * 2, Math.PI * 2, true))).toBe(3)
+    expect(stuntStars(4 * jumpScore(jumpLength(1), Math.PI * 2))).toBe(2)
     expect(stuntStars(100)).toBe(0)
   })
 })

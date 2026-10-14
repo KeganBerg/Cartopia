@@ -2247,3 +2247,16 @@ body:has(.race-full) .toasts { display: none; }
 
 /* Arcade free plays on the play buttons. */
 .arc-free { font-weight: 800; }
+
+/* Stunt Ramp: the flip and roll halves of the screen, and a tint during slow motion. */
+.stunt-pads { position: absolute; left: 0; right: 0; bottom: calc(26px + var(--sab)); display: flex; justify-content: space-between; padding: 0 18px; pointer-events: none; }
+.stunt-pads span { width: 92px; height: 92px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 34px; background: rgba(27,31,36,.45); border: 3px solid rgba(255,255,255,.85); color: #fff; }
+.stunt-pads small { font: 15px var(--display); margin-top: 2px; }
+.stunt-slow::after { content: ''; position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 80px 10px rgba(0,0,0,.35); }
+
+/* Delivery Dash: the hot-pizza timer under the HUD while an order is on board. */
+.dash-hot { position: absolute; top: calc(94px + var(--sat)); left: 50%; translate: -50% 0; display: flex; align-items: center; gap: 6px; pointer-events: none; }
+.dash-hot b { font-size: 20px; }
+.dash-hot div { width: min(200px, 50vw); height: 12px; border-radius: 6px; border: 2px solid #fff; background: rgba(27,31,36,.5); overflow: hidden; position: relative; }
+.dash-hot i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #ff3d00, #ffab00); }
+@media (max-height: 500px) { .dash-hot { top: calc(72px + var(--sat)); } }

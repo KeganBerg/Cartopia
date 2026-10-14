@@ -8,22 +8,41 @@ import { Batch } from './Batch'
 import { LAYER, decal } from './layers'
 import { asphaltTex, grassTex, paverTex } from './textures'
 import { ArcadeSky, Bin, CarShadow, Crowd, Hydrant, K, Lamp, useArcadeLook, useTownPool, type Person } from './ArcadeScenery'
-import { BLOCK, DASH_BONUS, DASH_TIME, DROP_LINE, DROP_R, GRID, STREET, TOWN, TOWN_SOLIDS, atDrop, blockCentre, kerbSpot } from '../game/arcadeMore'
-import { carBox, step, type Footprint } from '../game/collide'
+import { BLOCK, DASH_TIME, DROP_LINE, DROP_R, GRID, STREET, TOWN, TOWN_SOLIDS, TRAFFIC_HIT, atDrop, blockCentre, dropBonus, hotTime, kerbSpot, roadLine } from '../game/arcadeMore'
+import { carBox, circlePush, step, type Footprint } from '../game/collide'
 import { Footprinted, frameFootprint, scaled } from './footprint'
-import { buildingDef, TILE } from '../game/data'
+import { buildingDef, CARS, isBike, TILE } from '../game/data'
 import type { ChaseCar } from './ChaseScene'
 import type { ParkInput } from './ParkScene'
 import { bumpSound, dingSound, scrubSound } from '../lib/arcadeSound'
 
-export type DashHud = { drops: number; time: number; carrying: boolean }
+export type DashPop = { id: number; text: string; kind: 'hot' | 'drop' | 'hit' }
+// hot: how much of the hot-pizza time is left (0..1) while carrying; streak: hot drops in a row.
+export type DashHud = { drops: number; time: number; carrying: boolean; hot: number; streak: number; pop: DashPop | null }
 export type DashEnd = { drops: number }
 
 const LEN = 1.5
-const MAX_FWD = 7
+const MAX_FWD = 8.5
 const MAX_REV = 3
 const WALK = 0.9 // sidewalk inside each block's edge
 const SPARKS = 14
+const TRAFFIC = 7
+const TRAFFIC_R = 0.62 // a traffic car as a circle, for the bump test
+
+// Town traffic: everyday cars driving up and down the streets, each on its own road and lane.
+type Mover = { axis: 'x' | 'z'; line: number; dir: 1 | -1; pos: number; speed: number }
+const MOVERS: Mover[] = Array.from({ length: TRAFFIC }, (_, i) => ({
+  axis: i % 2 ? 'x' : 'z', line: roadLine((i * 3 + 1) % (GRID + 1)), dir: i % 3 ? 1 : -1, pos: -TOWN / 2 + ((i * 17) % TOWN), speed: 3.2 + (i % 4) * 0.5,
+}))
+const TRAFFIC_LOOKS = (() => {
+  const pool = CARS.filter((c) => !c.parked && !isBike(c.body) && ['sedan', 'compact', 'van', 'suv', 'hatch', 'wagon', 'ev'].includes(c.body))
+  return Array.from({ length: TRAFFIC }, (_, i) => { const c = pool[(i * 5 + 2) % pool.length]; return { body: c.body, model: c.id, color: c.colors[i % c.colors.length] } })
+})()
+// Where a mover is: on its road, kept to the right-hand lane for its direction.
+function moverAt(m: Mover) {
+  const lane = 0.72 * m.dir
+  return m.axis === 'x' ? { x: m.pos, z: m.line + lane, h: m.dir > 0 ? Math.PI / 2 : -Math.PI / 2 } : { x: m.line - lane, z: m.pos, h: m.dir > 0 ? 0 : Math.PI }
+}
 
 // Shop blocks and house blocks alternate like a checkerboard.
 const isShops = (bx: number, bz: number) => (bx + bz) % 2 === 0
@@ -189,6 +208,8 @@ export function DeliveryScene({ me, input, running, onHud, onEnd }: {
   const first = useMemo(() => pickFar(SHOP_SPOTS, start.x, start.z), [start])
   const st = useRef({
     pose: { ...start }, v: 0, t: 0, left: DASH_TIME, drops: 0, carrying: false, target: first, cool: 0, done: false, hudAt: 0,
+    hotUntil: 0, hotFor: 1, streak: 0, hitCool: 0, popId: 0, pop: null as DashPop | null,
+    movers: MOVERS.map((m) => ({ ...m })),
     // A knock: how hard, which way it rocks the car (pitch, roll), and how long ago.
     jolt: 0, pitch: 0, roll: 0, joltT: 0, shake: 0,
     sparks: Array.from({ length: SPARKS }, () => ({ x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, age: 1 })),
@@ -202,6 +223,7 @@ export function DeliveryScene({ me, input, running, onHud, onEnd }: {
   const beam = useRef<Group>(null)
   const ring = useRef<MeshBasicMaterial>(null)
   const arrow = useRef<Group>(null)
+  const traffic = useRef<(Group | null)[]>([])
   const look = useMemo(() => new Vector3(), [])
   const eye = useMemo(() => new Vector3(), [])
 
@@ -275,19 +297,54 @@ export function DeliveryScene({ me, input, running, onHud, onEnd }: {
     }
     s.joltT += dt
     s.shake = Math.max(0, s.shake - dt)
+    // Traffic rolls along its roads and wraps round town; bumping one costs time.
+    s.hitCool = Math.max(0, s.hitCool - dt)
+    const mine = carBox(s.pose, foot.current)
+    s.movers.forEach((m, i) => {
+      if (live) {
+        m.pos += m.dir * m.speed * dt
+        if (m.pos > TOWN / 2 + 2) m.pos -= TOWN + 4
+        if (m.pos < -TOWN / 2 - 2) m.pos += TOWN + 4
+      }
+      const at = moverAt(m)
+      const g = traffic.current[i]
+      if (g) {
+        g.position.set(at.x, 0, at.z)
+        g.rotation.y = at.h
+      }
+      const push = live ? circlePush(mine, { x: at.x, z: at.z, r: TRAFFIC_R }) : null
+      if (push) {
+        // Shoved back out of the other car, and a few seconds lost on the clock.
+        s.pose = { ...s.pose, x: s.pose.x + push.x, z: s.pose.z + push.z }
+        s.v *= -0.3
+        if (s.hitCool <= 0) {
+          s.hitCool = 1
+          s.left -= TRAFFIC_HIT
+          s.shake = 0.3
+          bumpSound()
+          s.pop = { id: ++s.popId, text: `💥 -${TRAFFIC_HIT}s`, kind: 'hit' }
+        }
+      }
+    })
     if (live) {
       const g = s.target
       if (atDrop(s.pose.x, s.pose.z, g)) {
         if (s.carrying) {
+          const hot = s.t <= s.hotUntil
+          s.streak = hot ? s.streak + 1 : 0
+          const bonus = dropBonus(hot, s.streak - 1)
           s.drops++
-          s.left += DASH_BONUS
-          dingSound(1.2)
+          s.left += bonus
+          dingSound(hot ? 1.2 + Math.min(3, s.streak) * 0.12 : 1)
+          s.pop = { id: ++s.popId, text: hot ? `🔥 Hot! +${bonus}s${s.streak > 1 ? `  ×${s.streak}` : ''}` : `+${bonus}s`, kind: hot ? 'hot' : 'drop' }
           s.carrying = false
           s.target = pickFar(SHOP_SPOTS, s.pose.x, s.pose.z)
         } else {
           dingSound()
           s.carrying = true
           s.target = pickFar(HOUSE_SPOTS, s.pose.x, s.pose.z)
+          s.hotFor = hotTime(Math.hypot(s.target.x - s.pose.x, s.target.z - s.pose.z))
+          s.hotUntil = s.t + s.hotFor
         }
       }
       if (s.left <= 0) {
@@ -339,9 +396,10 @@ export function DeliveryScene({ me, input, running, onHud, onEnd }: {
     camera.position.lerp(eye.set(s.pose.x, 12 * back, s.pose.z + 6.5 * back), Math.min(1, dt * 4))
     camera.lookAt(look)
     if (s.shake > 0) camera.position.add(eye.set((Math.random() - 0.5) * s.shake, (Math.random() - 0.5) * s.shake, (Math.random() - 0.5) * s.shake))
-    if (t - s.hudAt > 0.1) {
+    if (t - s.hudAt > 0.1 || s.pop) {
       s.hudAt = t
-      onHud({ drops: s.drops, time: Math.max(0, s.left), carrying: s.carrying })
+      onHud({ drops: s.drops, time: Math.max(0, s.left), carrying: s.carrying, hot: s.carrying ? Math.max(0, (s.hotUntil - s.t) / s.hotFor) : 0, streak: s.streak, pop: s.pop })
+      s.pop = null
     }
   })
 
@@ -360,6 +418,14 @@ export function DeliveryScene({ me, input, running, onHud, onEnd }: {
       <group ref={arrow}>
         <mesh rotation-x={Math.PI / 2}><coneGeometry args={[0.28, 0.6, 3]} /><meshBasicMaterial color="#ffffff" toneMapped={false} /></mesh>
       </group>
+      {TRAFFIC_LOOKS.map((c, i) => (
+        <group key={i} ref={(g) => void (traffic.current[i] = g)}>
+          <CarShadow len={LEN} />
+          <group scale={LEN / carFrame(c.body).len}>
+            <CarModel body={c.body} model={c.model} color={c.color} beams={view.beams} />
+          </group>
+        </group>
+      ))}
       <group ref={car} name="player" position={[start.x, 0, start.z]} rotation-y={start.h}>
         <CarShadow len={LEN} wid={f.wid * sc} />
         <group ref={body}>
