@@ -270,23 +270,6 @@ export class TechnoTrack {
     this.sources = this.sources.filter((s) => (s as AudioScheduledSourceNode & { _end?: number })._end! > t)
   }
 
-  // A five-second beat drop, for a level-up: the end of a breakdown (snare
-  // roll, a lead pickup, the silence and the reverse cymbal), the drop, and
-  // two bars of it fading away. Returns the audio time the drop lands.
-  stinger(at: number) {
-    const drop = at + 8 * S
-    const r = this.ctx.createBufferSource()
-    r.buffer = this.reverse
-    r.connect(this.gain(0.5, this.hats))
-    r.start(at, this.reverse.duration - 8 * S)
-    r.stop(drop)
-    ;(r as AudioScheduledSourceNode & { _end?: number })._end = drop
-    this.sources.push(r)
-    for (let n = -8; n < 32; n++) this.sixteenth(n, drop + n * S)
-    this.out.gain.setTargetAtTime(0, drop + 26 * S, 0.35)
-    return drop
-  }
-
   stop() {
     for (const s of this.sources) {
       try {
