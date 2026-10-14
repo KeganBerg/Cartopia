@@ -151,10 +151,19 @@ export class ThumbDrift {
 }
 
 
+// How far the thumb can travel each way before full lock. A thumb that lands near the edge of
+// the screen can't slide a full range past it, so that side reaches full lock at the edge
+// (keeping EDGE px spare) instead of never reaching it. Never shorter than MIN_SIDE px.
+const EDGE = 14, MIN_SIDE = 20
+export function sideRanges(x: number, screenW: number, range: number) {
+  const side = (room: number) => Math.max(MIN_SIDE, Math.min(range, room - EDGE))
+  return { left: side(x), right: side(screenW - x) }
+}
+
 // A floating thumb stick that only steers: put a thumb down anywhere in the zone and
 // slide it left or right. The knob moves by hand (no React render per finger move).
 const SteerZone = memo(function SteerZone({ input, autoDrift, className, feel }: { input: DriveInput; autoDrift: boolean; className: string; feel: SteerFeel }) {
-  const [at, setAt] = useState<{ x0: number; y: number } | null>(null)
+  const [at, setAt] = useState<{ x0: number; y: number; left: number; right: number } | null>(null)
   const knob = useRef<HTMLElement>(null)
   const drift = useMemo(() => new ThumbDrift(feel.drift), [feel.drift])
   // The finger that owns the stick; a second finger landing in the zone is ignored, so resting
@@ -176,13 +185,15 @@ const SteerZone = memo(function SteerZone({ input, autoDrift, className, feel }:
         ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
         const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
         if (autoDrift) drift.reset(e.timeStamp)
-        setAt({ x0: e.clientX - r.left, y: e.clientY - r.top })
+        setAt({ x0: e.clientX - r.left, y: e.clientY - r.top, ...sideRanges(e.clientX, window.innerWidth, feel.range) })
       }}
       onPointerMove={(e) => {
         if (!at || e.pointerId !== owner.current) return
         const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
-        const dx = Math.max(-feel.range, Math.min(feel.range, e.clientX - r.left - at.x0))
-        input.steer = thumbSteer(dx, feel)
+        const dx = Math.max(-at.left, Math.min(at.right, e.clientX - r.left - at.x0))
+        // Scale the travel to this side's range so the edge side still reaches full lock.
+        const side = dx < 0 ? at.left : at.right
+        input.steer = thumbSteer((dx * feel.range) / side, feel)
         if (autoDrift) {
           const was = drift.dir
           input.drift = drift.update(input.steer, e.timeStamp) !== 0
