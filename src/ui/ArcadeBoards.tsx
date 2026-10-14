@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BOARD_GAMES, fetchArcadeBoard, type ArcadeBoard, type BoardGame } from '../lib/arcadeBoard'
+import { BOARD_GAMES, arcadeCrateSource, fetchArcadeBoard, fetchArcadePrizes, type ArcadeBoard, type ArcadePrize, type BoardGame } from '../lib/arcadeBoard'
 import { useGame } from '../game/store'
 import { signedInUser } from '../lib/cloud'
 import { PlayerName } from './Username'
@@ -65,4 +65,26 @@ function Row({ game, place, owner, town, best, mine }: { game: BoardGame; place:
 // Your place on this week's board, on a result card.
 export function WeekPlace({ place }: { place: number }) {
   return <div className="arc-week">🏅 #{place} this week</div>
+}
+
+// Gold crates won on last weeks' boards and not opened yet: one button sends them to the
+// Crate Depot as free crates (crate_open checks each one on the server).
+export function ClaimPrizes() {
+  const [prizes, setPrizes] = useState<ArcadePrize[]>([])
+  const free = useGame((s) => s.freeCrates) ?? []
+  useEffect(() => {
+    let live = true
+    void fetchArcadePrizes().then((p) => live && setPrizes(p ?? []))
+    return () => { live = false }
+  }, [])
+  const waiting = prizes.filter((p) => !p.claimed).map(arcadeCrateSource)
+  if (!waiting.length) return null
+  const claim = () => {
+    const g = useGame.getState()
+    const have = g.freeCrates ?? []
+    useGame.setState({ freeCrates: [...have, ...waiting.filter((w) => !have.includes(w))], updatedAt: Date.now() })
+    g.openPanel('crates')
+  }
+  const fresh = waiting.filter((w) => !free.includes(w)).length
+  return <button className="arc-claim" onClick={claim}>🎁 {fresh || waiting.length} × Gold crate</button>
 }

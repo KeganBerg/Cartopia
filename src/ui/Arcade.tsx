@@ -17,7 +17,7 @@ import { loadStars, type StarGameId } from '../game/arcadeMore'
 import { LoadingScene } from './Loading'
 import { StageSlot, useStageReady } from '../scene/Stage'
 import { startArcadeRun, submitArcadeRun } from '../lib/arcadeBoard'
-import { WeeklyBoards, WeekPlace, useBoardsOn } from './ArcadeBoards'
+import { ClaimPrizes, WeeklyBoards, WeekPlace, useBoardsOn } from './ArcadeBoards'
 
 // Both games draw in the shared full-screen canvas (scene/Stage.tsx): no new WebGL
 // context and shader compile on every run.
@@ -61,7 +61,12 @@ export function ArcadePanel() {
           ))}
         </div>
       )}
-      {boardsOn && !lots && !boards && <button className="arc-weekly" onClick={() => setBoards(true)}>🏆 Weekly</button>}
+      {boardsOn && !lots && !boards && (
+        <div className="arc-top-row">
+          <ClaimPrizes />
+          <button className="arc-weekly" onClick={() => setBoards(true)}>🏆 Weekly</button>
+        </div>
+      )}
       {boards ? <WeeklyBoards onBack={() => setBoards(false)} /> : lots ? (
         <>
           <button className="arc-back" onClick={() => setLots(false)}>‹ Back</button>

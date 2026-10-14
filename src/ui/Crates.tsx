@@ -12,7 +12,7 @@ import { compact } from './format'
 import { openGarageTab } from './Menus'
 import { openModSlot } from './Mods'
 import { raceCarOf } from '../game/raceCar'
-import { CUP_CRATE } from '../game/cups'
+import { freeCrateOf } from '../game/cups'
 import './crates.css'
 import { LoadingScene } from './Loading'
 import { BuildArt } from './Resto'
@@ -314,11 +314,11 @@ export function CratesPanel() {
   const coins = useGame((s) => s.coins)
   const bucks = useGame((s) => s.bucks)
   const cars = useGame((s) => s.cars)
-  // Free crates waiting (Class Cup prizes, see game/cups.ts): all of them CUP_CRATEs.
+  // Free crates waiting (Class Cup and weekly arcade prizes, see game/cups.ts), each of its own crate.
   const freeCrates = useGame((s) => s.freeCrates) ?? []
   const close = () => useGame.getState().openPanel(null)
   const [pick, setPick] = useState<CrateId>(() => {
-    if (freeCrates.length) return CUP_CRATE
+    if (freeCrates.length) return freeCrateOf(freeCrates[0])
     try {
       const saved = localStorage.getItem(CRATE_KEY) as CrateId | null
       if (saved && crateDef(saved) && level >= crateDef(saved)!.unlockLevel) return saved
@@ -328,7 +328,8 @@ export function CratesPanel() {
     return 'street'
   })
   const def = crateDef(pick)!
-  const free = pick === CUP_CRATE ? freeCrates[0] : undefined
+  const freeHere = freeCrates.filter((f) => freeCrateOf(f) === pick)
+  const free = freeHere[0]
   const [phase, setPhase] = useState<CratePhase>('idle')
   // Opens still to show (more than one when earlier ones are handed over late), the one showing, and whether it's up.
   const [queue, setQueue] = useState<CrateOpen[]>([])
@@ -473,7 +474,7 @@ export function CratesPanel() {
       {phase === 'open' && !shown && !ten && <div className="crate-skip">Tap to skip</div>}
       {phase === 'open' && shown && open && !ten && (
         <Prize open={open} paintCar={paintCar} onDone={queue.length > 1 ? next : () => { next() }} onAgain={() => again()}
-          again={queue.length > 1 ? 'Next' : free ? `🎁 Free · ${freeCrates.length}` : <>Again · {price(crateDef(open.crate) ?? def, level)}</>} />
+          again={queue.length > 1 ? 'Next' : free ? `🎁 Free · ${freeHere.length}` : <>Again · {price(crateDef(open.crate) ?? def, level)}</>} />
       )}
       {ten && summary == null && (
         <>
@@ -500,14 +501,14 @@ export function CratesPanel() {
               <button key={c.id} className={`crate-tab${c.id === pick ? ' sel' : ''}${level < c.unlockLevel ? ' locked' : ''}`} onClick={() => choose(c.id)} disabled={phase !== 'idle'}>
                 <CrateIcon c={c} />
                 <b>{c.name.replace(' Crate', '')}</b>
-                <span className={c.pay === 'bucks' ? 'ct-price gem' : 'ct-price'}>{c.id === CUP_CRATE && freeCrates.length ? `🎁 ${freeCrates.length}` : level < c.unlockLevel ? `🔒 Lv ${c.unlockLevel}` : price(c, level)}</span>
+                <span className={c.pay === 'bucks' ? 'ct-price gem' : 'ct-price'}>{freeCrates.some((f) => freeCrateOf(f) === c.id) ? `🎁 ${freeCrates.filter((f) => freeCrateOf(f) === c.id).length}` : level < c.unlockLevel ? `🔒 Lv ${c.unlockLevel}` : price(c, level)}</span>
               </button>
             ))}
           </div>
           <Odds key={pick} c={def} level={level} />
           <div className="crate-buttons">
             <button className={`crate-open${def.pay === 'bucks' ? ' gem' : ''}`} disabled={phase !== 'idle'} onClick={() => go()}>
-              {phase === 'wait' ? 'Opening…' : free ? `🎁 Free · ${freeCrates.length}` : locked ? `🔒 Level ${def.unlockLevel}` : <>Open · {price(def, level)}</>}
+              {phase === 'wait' ? 'Opening…' : free ? `🎁 Free · ${freeHere.length}` : locked ? `🔒 Level ${def.unlockLevel}` : <>Open · {price(def, level)}</>}
             </button>
             {!tenLocked && (
               <button className={`crate-open ten${def.pay === 'bucks' ? ' gem' : ''}`} disabled={phase !== 'idle'} onClick={() => go(10)}>

@@ -2295,3 +2295,6 @@ body:has(.race-full) .toasts { display: none; }
 .arc-board-tabs button { flex: 1; font-size: 26px; padding: 6px 0; border-radius: 12px; border: 2px solid #e0e0e0; background: #fff; }
 .arc-board-tabs button.sel { border-color: #1e88e5; background: #e3f2fd; }
 .arc-week { font: 20px var(--display); color: #ffd54f; margin-top: 6px; }
+.arc-top-row { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 8px; }
+.arc-top-row .arc-weekly { margin: 0; }
+.arc-claim { font: 16px var(--display); background: #43a047; color: #fff; border: none; border-radius: 999px; padding: 6px 14px; box-shadow: 0 3px 0 rgba(0,0,0,.2); animation: pop .3s ease-out; }

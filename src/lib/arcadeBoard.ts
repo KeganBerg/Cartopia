@@ -35,3 +35,13 @@ export async function submitArcadeRun(game: BoardGame, result: number): Promise<
   const { data, error } = await supabase.rpc('arcade_submit', { g: game, v: result })
   return error ? null : (data as ArcadeBoard)
 }
+
+// Weekly prizes (0087): a Gold crate for each top-3 finish per game, on finished weeks.
+// Null until that SQL is run, so the claim button stays hidden.
+export type ArcadePrize = { week: string; game: BoardGame; place: number; claimed: boolean }
+export const arcadeCrateSource = (p: { week: string; game: string }) => `arcade:${p.week}:${p.game}`
+export async function fetchArcadePrizes(): Promise<ArcadePrize[] | null> {
+  if (!supabase || !signedInUser()) return null
+  const { data, error } = await supabase.rpc('arcade_prizes')
+  return error || !Array.isArray(data) ? null : (data as ArcadePrize[])
+}
