@@ -6,7 +6,7 @@ import { rescueSfx } from '../lib/sound'
 import './purchase.css'
 
 // Back from Stripe with a paid pack: a "purchase successful" splash, then the pack itself and
-// what it paid. It reuses the level-up splash (.lvl) with a check badge.
+// what it paid: gems, coins and parts, each the same size. It reuses the level-up splash (.lvl) with a check badge.
 export function PurchaseSplash() {
   const rows = useBought((s) => s.rows)
   if (!rows?.length) return null
@@ -26,8 +26,8 @@ function Splash({ rows }: { rows: Purchase[] }) {
     }
   }, [close])
 
-  const packs = rows.slice(-3).map((r) => ({ row: r, pack: BUCKS_PACKS.find((p) => p.id === r.pack) }))
-  const title = rows.length > 1 ? `${rows.length} packs` : (packs[0].pack?.name ?? 'Gem pack')
+  const packs = rows.slice(-3)
+  const title = rows.length > 1 ? `${rows.length} packs` : (BUCKS_PACKS.find((p) => p.id === rows[0].pack)?.name ?? 'Gem pack')
 
   return (
     <div className="overlay lvl-overlay buy-overlay" onClick={close}>
@@ -42,16 +42,11 @@ function Splash({ rows }: { rows: Purchase[] }) {
         <p className="lvl-sub">{title}</p>
 
         <div className="buy-packs">
-          {packs.map(({ row, pack }, i) => (
+          {packs.map((row, i) => (
             <div key={row.seq} className="buy-pack" style={{ '--i': i } as React.CSSProperties}>
-              <div className="buy-pack-art">{pack?.art ?? '💎'}</div>
-              <div className="buy-pack-gems"><span className="ico buck-ico">💎</span>+{row.bucks}</div>
-              {(row.coins > 0 || row.parts > 0) && (
-                <div className="lvl-rewards buy-extras">
-                  {row.coins > 0 && <span className="lvl-chip"><span className="ico coin-ico">$</span>+{row.coins.toLocaleString()}</span>}
-                  {row.parts > 0 && <span className="lvl-chip">⚙ +{row.parts}</span>}
-                </div>
-              )}
+              <div className="buy-item"><span className="ico buck-ico">💎</span><b>{row.bucks.toLocaleString()}</b></div>
+              {row.coins > 0 && <div className="buy-item"><span className="ico coin-ico">$</span><b>{row.coins.toLocaleString()}</b></div>}
+              {row.parts > 0 && <div className="buy-item"><span className="ico parts-ico">⚙</span><b>{row.parts.toLocaleString()}</b></div>}
               {Array.from({ length: 7 }, (_, k) => <i key={k} className="buy-fly" style={{ '--k': k } as React.CSSProperties} aria-hidden>💎</i>)}
             </div>
           ))}
