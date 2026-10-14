@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { StageSlot, useStageReady } from '../scene/Stage'
 import { useGame, openCrate } from '../game/store'
 import { MOD_SLOTS, SKINNED_SLOTS, carDef, fittedMods, modDef, ownedModSkins, ownedSkins, type ModDef } from '../game/data'
-import { hatDef } from '../game/hats'
+import { crateHats, hatDef } from '../game/hats'
 import { CRATES, carOdds, crateCost, crateDef, crateOddsShown, dropTier, homeCars, homeMods, modChoices, pityLeft, skinOdds, skinOf, type CrateDef, type CrateId, type CrateOpen } from '../game/crates'
 import { SKIN_TIERS } from '../game/data'
 import { CrateScene, TIER_GLOW, prizeLook, type CratePhase } from '../scene/CrateScene'
@@ -34,14 +34,17 @@ function CrateIcon({ c }: { c: CrateDef }) {
   )
 }
 
-// The odds a crate shows: coins, parts, cars and skins, and on a tap the parts, cars or skins it
-// can hold. Cars and skins you already have are dimmed with a coin, since they pay coins instead;
-// the crate's own cars your level hasn't reached yet show a lock. The parts slice turns to coins
+// The odds a crate shows: coins, hats, parts, paints, cars and resto-mod pieces (rarest last),
+// and on a tap what each can hold. Cars and skins you already have are dimmed with a coin, since
+// they pay coins instead; the crate's own cars your level hasn't reached yet show a lock. The parts slice turns to coins
 // once no part in it fits a car of yours.
 function Odds({ c, level }: { c: CrateDef; level: number }) {
-  const [open, setOpen] = useState<'mod' | 'car' | 'skin' | 'piece' | null>(null)
+  const [open, setOpen] = useState<'mod' | 'car' | 'skin' | 'piece' | 'hat' | null>(null)
   const restoParts = useGame((s) => s.restoParts)
-  const o = crateOddsShown(c, level)
+  const hatIds = useGame((s) => s.hats)
+  // The crate's hats you don't have yet: only those drop, so with none left the slice is coins.
+  const hats = useMemo(() => crateHats(c.id).map((h) => ({ h, have: (hatIds ?? []).includes(h.id) })), [c.id, hatIds])
+  const o = crateOddsShown(c, level, hats.some((x) => !x.have))
   const cars = useGame((s) => s.cars)
   const skinIds = useGame((s) => s.skins)
   const modSkinIds = useGame((s) => s.modSkins)
@@ -63,16 +66,17 @@ function Odds({ c, level }: { c: CrateDef; level: number }) {
   const locked = useMemo(() => homeCars(c).filter((d) => d.unlockLevel > level).sort((a, b) => a.unlockLevel - b.unlockLevel), [c, level])
   const skins = useMemo(() => skinOdds(c).sort((a, b) => b.p - a.p), [c])
   const pct = (p: number) => (p < 0.1 ? p.toFixed(2) : p.toFixed(p < 1 ? 1 : 0))
-  const toggle = (k: 'mod' | 'car' | 'skin' | 'piece') => setOpen(open === k ? null : k)
+  const toggle = (k: 'mod' | 'car' | 'skin' | 'piece' | 'hat') => setOpen(open === k ? null : k)
   const slot = (m: ModDef) => MOD_SLOTS.find((x) => x.id === m.slot)?.icon
   return (
     <div className="crate-odds">
       <div className="crate-odds-row">
         <span className="odd coins" style={{ flex: o.coins }}><b>🪙</b>{o.coins}%</span>
+        {o.hat > 0 && <button className="odd hat" style={{ flex: Math.max(o.hat, 14) }} onClick={() => toggle('hat')} aria-expanded={open === 'hat'}><b>🎩</b>{o.hat}%<small>{open === 'hat' ? '▴' : '▾'}</small></button>}
         <button className={`odd mod${noParts ? ' spent' : ''}`} style={{ flex: Math.max(o.mod, 14) }} onClick={() => toggle('mod')} aria-expanded={open === 'mod'} title={noParts ? 'No parts left to fit your cars: pays coins' : undefined}><b>{noParts ? '🔧🪙' : '🔧'}</b>{o.mod}%<small>{open === 'mod' ? '▴' : '▾'}</small></button>
+        {o.skin > 0 && <button className="odd skin" style={{ flex: Math.max(o.skin, 14) }} onClick={() => toggle('skin')} aria-expanded={open === 'skin'}><b>✨</b>{o.skin}%<small>{open === 'skin' ? '▴' : '▾'}</small></button>}
         <button className="odd car" style={{ flex: Math.max(o.car, 14) }} onClick={() => toggle('car')} aria-expanded={open === 'car'}><b>🚗</b>{o.car}%<small>{open === 'car' ? '▴' : '▾'}</small></button>
         {o.piece > 0 && <button className="odd piece" style={{ flex: Math.max(o.piece, 14) }} onClick={() => toggle('piece')} aria-expanded={open === 'piece'}><b>🧩</b>{o.piece}%<small>{open === 'piece' ? '▴' : '▾'}</small></button>}
-        {o.skin > 0 && <button className="odd skin" style={{ flex: Math.max(o.skin, 14) }} onClick={() => toggle('skin')} aria-expanded={open === 'skin'}><b>✨</b>{o.skin}%<small>{open === 'skin' ? '▴' : '▾'}</small></button>}
       </div>
       {left != null && (
         <div className="crate-pity" title={`A ${c.pity?.tier ?? ''} skin is guaranteed within ${left} ${left === 1 ? 'open' : 'opens'}`.replace('  ', ' ')}>
@@ -107,6 +111,16 @@ function Odds({ c, level }: { c: CrateDef; level: number }) {
             </span>
           ))}
           {!list.length && !locked.length && <span className="crate-none">No cars at your level yet</span>}
+        </div>
+      )}
+      {open === 'hat' && (
+        <div className="crate-cars">
+          {hats.map(({ h, have }) => (
+            <span key={h.id} className={`crate-car hat${have ? ' owned' : ''}`} title={have ? `${h.name} (owned)` : h.name}>
+              <i>{h.icon}</i>
+              <small>{have ? '✔' : `${pct((o.hat / hats.filter((x) => !x.have).length))}%`}</small>
+            </span>
+          ))}
         </div>
       )}
       {open === 'piece' && (
@@ -162,11 +176,11 @@ function Prize({ open, onAgain, onDone, again, paintCar }: { open: CrateOpen; on
   let sub = ''
   let icon: React.ReactNode = <CoinIcon size={36} />
   if (d.kind === 'coins') {
-    title = `+${d.coins.toLocaleString()} coins`
+    title = `${d.coins.toLocaleString()} coins`
     sub = d.jackpot ? 'Jackpot!' : 'Coins'
   } else if (d.kind === 'dupe') {
     icon = '🔁'
-    title = `+${d.coins.toLocaleString()} coins`
+    title = `${d.coins.toLocaleString()} coins`
     sub = `${carDef(d.model).name} · already yours`
   } else if (d.kind === 'skin' || d.kind === 'skindupe') {
     const def = skinOf(d.skin, d.part)
@@ -174,7 +188,7 @@ function Prize({ open, onAgain, onDone, again, paintCar }: { open: CrateOpen; on
     const kind = d.part ? 'Mod Paint' : 'Car Paint'
     icon = <span className={`cp-swatch ${d.part ? 'mod' : 'car'}`} style={{ background: def?.swatch }}>{d.part ? '⚙️' : '🚗'}</span>
     if (d.kind === 'skindupe') {
-      title = `+${d.coins.toLocaleString()} coins`
+      title = `${d.coins.toLocaleString()} coins`
       sub = `${def?.name ?? ''} ${kind} · already yours`
     } else {
       title = `${def?.name ?? ''} ${kind}`
@@ -188,7 +202,7 @@ function Prize({ open, onAgain, onDone, again, paintCar }: { open: CrateOpen; on
     const have = piecesOf(restoParts, d.model)
     icon = <BuildArt model={d.model} have={have} fresh={d.kind === 'piece' ? d.piece : undefined} done={d.kind === 'piece' && !!d.uid} />
     if (d.kind === 'piecedupe') {
-      title = `+${d.coins.toLocaleString()} coins`
+      title = `${d.coins.toLocaleString()} coins`
       sub = `${RESTO_PIECES[d.piece].name} · already yours`
     } else if (d.uid) {
       title = carDef(d.model).name

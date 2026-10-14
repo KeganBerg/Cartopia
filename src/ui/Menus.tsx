@@ -23,7 +23,7 @@ import { CustomShop } from './Custom'
 import { HatShop, type HatTry } from './Hats'
 import { SkinPicker } from './Skins'
 import type { PaintJob, Panels, SkinnedSlot } from '../game/data'
-import { Icon } from './Icon'
+import { CoinIcon, Icon } from './Icon'
 import { useCrewGoal } from './CrewGoal'
 import { useCrewBattle } from '../lib/battles'
 import { useChat } from '../lib/chat'
@@ -193,7 +193,8 @@ export function Panel({ title, children, wide, onClose, onBack, head, className 
       <div className={`${wide ? 'panel wide' : 'panel'}${className ? ` ${className}` : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="panel-head">
           {onBack && <button className="panel-back" aria-label="Back" onClick={onBack}><Icon name="back" size={18} /></button>}
-          <h2>{title}</h2>
+          {/* long titles (a garage with its stats) step down a size so they don't cut off */}
+          <h2 className={title.length > 14 ? 'long' : undefined} title={title}>{title}</h2>
           {head}
           <button className="close" aria-label="Close" onClick={() => close(null)}><Icon name="close" size={16} /></button>
         </div>
@@ -491,8 +492,8 @@ function DriverRow({ car, model }: { car: string; model: string }) {
   if (job) {
     const d = buildingDef(job.def)
     return (
-      <button className="driver-row" onClick={() => openUpgrade(job.uid)}>
-        🧑‍🔧 Drives for your <b>{d.name}</b> · {loves(def, d.id) ? '❤️ +25%' : '+10%'} coins
+      <button className="driver-row" onClick={() => openUpgrade(job.uid)} title={`Drives for your ${d.name} · ${loves(def, d.id) ? '+25%' : '+10%'} coins`} aria-label={`Drives for your ${d.name}`}>
+        <span aria-hidden>{buildingIcon(d.id)}</span>{loves(def, d.id) && <span aria-hidden>❤️</span>}<b>+{loves(def, d.id) ? 25 : 10}%</b><CoinIcon size={16} />
       </button>
     )
   }
@@ -734,12 +735,17 @@ export function GaragePanel() {
             )}
             {copies.length > 1 && <CopyBubbles copies={copies} selected={car.uid} onPick={select} />}
             <h3 className="garage-name">{def.name}{car.plate && <span className="mini-plate">{car.plate}</span>}</h3>
-            <div className="car-tags">
-              <span className="pi-badge">PI <b>{pi}</b></span>
-              <SkillTag model={car.model} />
-              <DriverRow car={car.uid} model={car.model} />
-              <ShowcaseToggle car={car.uid} />
-              <RaceCarToggle car={car.uid} />
+            {/* Under the preview: the PI tile, then the car's traits, then its two toggles. */}
+            <div className="car-sum">
+              <div className="car-pi" title="Performance Index"><b>{pi}</b><small>PI</small></div>
+              <div className="car-traits">
+                <SkillTag model={car.model} />
+                <DriverRow car={car.uid} model={car.model} />
+              </div>
+              <div className="car-toggles">
+                <RaceCarToggle car={car.uid} />
+                <ShowcaseToggle car={car.uid} />
+              </div>
             </div>
             <div className="garage-tabs" role="tablist">
               {([['tune', '🔧', 'Upgrades'], ['mods', '🪽', 'Mods'], ['paint', '🎨', 'Paint'], ['custom', '🖌️', 'Custom'], ['trim', '✨', 'Trim'], ['hats', '🎩', 'Hats']] as const).map(([id, icon, label]) => (

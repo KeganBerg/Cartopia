@@ -29,6 +29,10 @@ export default async (req: Request) => {
   // The purchases table (0079) has to exist, or a paid pack would have nowhere to land.
   const table = await fetch(`${url}/rest/v1/purchases?select=seq&limit=0`, { headers: { apikey: anon, Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(6000) })
   if (!table.ok) return json({ error: 'off' }, 503)
+  // An account that spent gems from a refunded or charged-back pack (purchases.short, 0080) can't buy
+  // more. Before 0080 the column isn't there, the lookup fails and nobody is blocked.
+  const owed = await fetch(`${url}/rest/v1/purchases?select=seq&short=gt.0&limit=1`, { headers: { apikey: anon, Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(6000) })
+  if (owed.ok && ((await owed.json()) as unknown[]).length) return json({ error: 'blocked' }, 403)
 
   const origin = new URL(req.url).origin
   const res = await fetch('https://api.stripe.com/v1/checkout/sessions', {
