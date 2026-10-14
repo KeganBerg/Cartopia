@@ -6,6 +6,7 @@ import { Hud } from './ui/Hud'
 import { FlyLayer } from './ui/Fly'
 import { ThumbRenderer } from './scene/BuildingPreview'
 import { Preview, StageCanvas } from './scene/Stage'
+import { quietShaders } from './scene/warm'
 import { BottomBar, ShopPanel, ShowroomPanel, GaragePanel, Toasts } from './ui/Menus'
 import { InventoryPanel } from './ui/Inventory'
 import { PaintPrizePopup } from './ui/PaintRivals'
@@ -145,6 +146,7 @@ export default function App() {
       {/* Camera sits well back with a tight near/far range so depth stays precise and flat layers never flicker. */}
       <Canvas shadows={graphics !== 'saver'} orthographic camera={{ position: [75, 80, 75], zoom: 36, near: 1, far: 320 }} dpr={graphics === 'saver' ? 1 : SMALL && graphics === 'auto' ? [1, 1.5] : [1, 2]} gl={{ toneMapping: NeutralToneMapping }} frameloop={townPaused ? 'never' : 'demand'}
         onCreated={({ gl }) => {
+          quietShaders(gl)
           splashProgress(0.9)
           // Let the browser restore the 3D view after it drops the context, instead of leaving it blank.
           gl.domElement.addEventListener('webglcontextlost', (e) => e.preventDefault())
