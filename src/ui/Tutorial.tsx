@@ -26,7 +26,7 @@ const STEPS: Step[] = [
   { icon: '💰', text: () => 'When the gold $ pops up, tap it to collect.', target: () => 'pizza', done: (s) => s.stats.jobs > 0 },
   {
     icon: '🔧',
-    text: (s) => s.mode === 'place' ? (TOUCH ? "Tap an empty spot, then tap again to build Rusty's." : "Click an empty spot to build Rusty's.") : "Build Rusty's Rescue: tap SHOP, then START HERE.",
+    text: (s) => s.mode === 'place' ? (TOUCH ? "Tap the see-through Rusty's to build it." : "Click the see-through Rusty's to build it.") : "Build Rusty's Rescue: tap SHOP, then START HERE.",
     target: (s) => (editing(s) ? null : 'shop'), done: (s) => s.buildings.some((b) => b.def === 'rescue'),
   },
   {

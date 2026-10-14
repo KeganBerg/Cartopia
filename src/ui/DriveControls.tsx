@@ -76,6 +76,28 @@ export function useDriveKeys(input: DriveInput, { enabled = true, autoGas = fals
   }, [input, enabled, autoGas])
 }
 
+// While a race is on screen, the page itself never zooms or scrolls under the player's thumbs:
+// iOS ignores user-scalable=no, so two thumbs (steer + brake, shift + boost) would pinch-zoom
+// the page and cancel both touches. CSS touch-action covers Android; this covers Safari.
+export function useTouchLock(on = true) {
+  useEffect(() => {
+    if (!on) return
+    const stop = (e: Event) => { if (e.cancelable) e.preventDefault() }
+    const multi = (e: TouchEvent) => { if (e.touches.length > 1 && e.cancelable) e.preventDefault() }
+    const opts = { passive: false } as AddEventListenerOptions
+    document.addEventListener('gesturestart', stop, opts)
+    document.addEventListener('gesturechange', stop, opts)
+    document.addEventListener('touchmove', multi, opts)
+    document.addEventListener('dblclick', stop, opts)
+    return () => {
+      document.removeEventListener('gesturestart', stop, opts)
+      document.removeEventListener('gesturechange', stop, opts)
+      document.removeEventListener('touchmove', multi, opts)
+      document.removeEventListener('dblclick', stop, opts)
+    }
+  }, [on])
+}
+
 // Hold-to-press handlers for a touch button, with the pointer captured so a thumb
 // sliding off the edge doesn't drop it.
 function hold(on: () => void, off: () => void) {
@@ -129,13 +151,27 @@ export class ThumbDrift {
 }
 
 
+// How far the thumb can travel each way before full lock. A thumb that lands near the edge of
+// the screen can't slide a full range past it, so that side reaches full lock at the edge
+// (keeping EDGE px spare) instead of never reaching it. Never shorter than MIN_SIDE px.
+const EDGE = 14, MIN_SIDE = 20
+export function sideRanges(x: number, screenW: number, range: number) {
+  const side = (room: number) => Math.max(MIN_SIDE, Math.min(range, room - EDGE))
+  return { left: side(x), right: side(screenW - x) }
+}
+
 // A floating thumb stick that only steers: put a thumb down anywhere in the zone and
 // slide it left or right. The knob moves by hand (no React render per finger move).
 const SteerZone = memo(function SteerZone({ input, autoDrift, className, feel }: { input: DriveInput; autoDrift: boolean; className: string; feel: SteerFeel }) {
-  const [at, setAt] = useState<{ x0: number; y: number } | null>(null)
+  const [at, setAt] = useState<{ x0: number; y: number; left: number; right: number } | null>(null)
   const knob = useRef<HTMLElement>(null)
   const drift = useMemo(() => new ThumbDrift(feel.drift), [feel.drift])
-  const end = () => {
+  // The finger that owns the stick; a second finger landing in the zone is ignored, so resting
+  // the other thumb (or reaching for brake) never yanks or drops the steering.
+  const owner = useRef<number | null>(null)
+  const end = (e: React.PointerEvent) => {
+    if (e.pointerId !== owner.current) return
+    owner.current = null
     input.steer = 0
     if (autoDrift) { input.drift = false; drift.reset() }
     setAt(null)
@@ -144,16 +180,20 @@ const SteerZone = memo(function SteerZone({ input, autoDrift, className, feel }:
     <div className={`dc-steer ${className}`}
       onPointerDown={(e) => {
         e.preventDefault()
+        if (owner.current !== null) return
+        owner.current = e.pointerId
         ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
         const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
         if (autoDrift) drift.reset(e.timeStamp)
-        setAt({ x0: e.clientX - r.left, y: e.clientY - r.top })
+        setAt({ x0: e.clientX - r.left, y: e.clientY - r.top, ...sideRanges(e.clientX, window.innerWidth, feel.range) })
       }}
       onPointerMove={(e) => {
-        if (!at) return
+        if (!at || e.pointerId !== owner.current) return
         const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
-        const dx = Math.max(-feel.range, Math.min(feel.range, e.clientX - r.left - at.x0))
-        input.steer = thumbSteer(dx, feel)
+        const dx = Math.max(-at.left, Math.min(at.right, e.clientX - r.left - at.x0))
+        // Scale the travel to this side's range so the edge side still reaches full lock.
+        const side = dx < 0 ? at.left : at.right
+        input.steer = thumbSteer((dx * feel.range) / side, feel)
         if (autoDrift) {
           const was = drift.dir
           input.drift = drift.update(input.steer, e.timeStamp) !== 0
@@ -195,6 +235,7 @@ export function TouchDrive({ input, tall, drift = true, item, autoGas = true, fe
     input.brake = brake ? 1 : 0
   }, [input, brake, gas, autoGas])
   useEffect(() => () => { Object.assign(input, newDriveInput()) }, [input])
+  useTouchLock()
   const itemBtn = item !== undefined && (
     <button className={`dc-btn dc-item${item ? ' full' : ''}${using ? ' on' : ''}`} aria-label="Use item"
       {...hold(() => { input.item = true; setUsing(true) }, () => { input.item = false; setUsing(false) })}>
