@@ -3,12 +3,12 @@ import { StageSlot, useStageReady } from '../scene/Stage'
 import type { OwnedCar } from '../game/store'
 import { carDef } from '../game/data'
 import { placeShare } from '../game/boosts'
-import { EMP_TIME, FLAT_TIME, GHOST_TIME, ITEMS, KartRace, LAPS, ROCKET_TIME, SMOKE_TIME, SPLAT_TIME, SHARP_ASSIST, TOUCH_ASSIST, TOW_TIME, buildTrack, catchUp, type ItemId, type KartEvent, type KartRules, type TrackDef } from '../game/kart'
+import { EMP_TIME, FLAT_TIME, GHOST_TIME, ITEMS, KartRace, LAPS, ROCKET_TIME, SMOKE_TIME, SPLAT_TIME, BUTTONS_ASSIST, SHARP_ASSIST, TOUCH_ASSIST, TOW_TIME, buildTrack, catchUp, type ItemId, type KartEvent, type KartRules, type TrackDef } from '../game/kart'
 import { KartScene, kartLights, type KartHud } from '../scene/KartScene'
 import { heroShot } from '../scene/heroShot'
 import type { ChaseCar } from '../scene/ChaseScene'
 import { CarThumb } from '../scene/BuildingPreview'
-import { KART_FEEL, KART_SHARP, KeyHints, TouchDrive, newDriveInput, useDriveKeys, useTall, useTouchDevice } from './DriveControls'
+import { KART_FEEL, KART_SHARP, KeyHints, TouchDrive, newDriveInput, useDriveKeys, useTall, useTouchDevice, useTouchLock } from './DriveControls'
 import { LoadingScene } from './Loading'
 import { look as lookOf, pi } from './ArcadeBits'
 import { sfx, audioContext, audioOut } from '../lib/sound'
@@ -60,10 +60,13 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
   const touch = useTouchDevice()
   // On a phone the kart leans gently towards the racing line while the thumb is near the middle.
   // Sharp steering (Settings) is shorter travel and leans less.
-  const sharp = usePrefs((p) => p.steer === 'sharp')
+  // ◀ ▶ buttons lean more, since they can only press or let go.
+  const steer = usePrefs((p) => p.steer)
+  const sharp = steer === 'sharp', pads = steer === 'buttons'
   const input = useRef({ ...newDriveInput(), assist: 0 }).current
-  useLayoutEffect(() => { input.assist = touch ? (sharp ? SHARP_ASSIST : TOUCH_ASSIST) : 0 }, [input, touch, sharp])
+  useLayoutEffect(() => { input.assist = touch ? (pads ? BUTTONS_ASSIST : sharp ? SHARP_ASSIST : TOUCH_ASSIST) : 0 }, [input, touch, sharp, pads])
   const tall = useTall()
+  useTouchLock(touch)
   const [drawn, setDrawn] = useState(false)
   const [running, setRunning] = useState(false)
   const [hud, setHud] = useState<KartHud | null>(null)
@@ -232,7 +235,7 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
       )}
       {flash && <div key={flash} className="kt-flash">{flash}</div>}
       {!end && <Callout call={call} />}
-      {!end && running && (touch ? <TouchDrive input={input} tall={tall} item={slot} feel={sharp ? KART_SHARP : KART_FEEL} /> : <KeyHints />)}
+      {!end && running && (touch ? <TouchDrive input={input} tall={tall} item={slot} feel={sharp ? KART_SHARP : KART_FEEL} pads={pads} /> : <KeyHints />)}
       {over && !end && <button className="hero-skip" aria-label="Skip" onPointerDown={skipHero}><span>⏭</span></button>}
       {end && <Podium race={race} field={field} me={me} end={end} prize={prize} next={next} verdict={live?.verdict} onExit={onExit} />}
     </div>

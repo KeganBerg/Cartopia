@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { clipAt, fadeAt } from './technoMusic'
-import { BAR_MS } from '../game/techno'
+import { BAR_MS, CYCLE_BARS } from '../game/techno'
 
 // Kegan: "only give them a 10 second warning then DROP it ... make it slowly
 // transition so it doesn't startle people."
 describe('Rave Mode song', () => {
-  const loop = (16 * BAR_MS) / 1000
+  const loop = (CYCLE_BARS * BAR_MS) / 1000
 
-  it('plays the build-up through the warning, then loops the sixteen-bar drop', () => {
+  it('halcyon: plays the build-up through the warning, then loops the drop', () => {
     expect(clipAt(0)).toBe(0)
     expect(clipAt(9.5)).toBeCloseTo(9.5)
     expect(clipAt(10)).toBeCloseTo(10)

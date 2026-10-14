@@ -424,7 +424,8 @@ export const setRescueRoller = (f: typeof rescueRoller) => {
 // supabase/migrations/0040_crates.sql); src/lib/crates.ts plugs it in. It returns the opens to add
 // (normally one; more when earlier ones never reached the save), or null to roll here (guests).
 // It throws 'soon' when the server can't open crates yet.
-let crateOpener: ((id: CrateId, free?: string) => Promise<CrateOpen[] | null>) | null = null
+// `count` above 1 opens that many in one go (the ×10 open), all rolled on the server.
+let crateOpener: ((id: CrateId, free?: string, count?: number) => Promise<CrateOpen[] | null>) | null = null
 export const setCrateOpener = (f: typeof crateOpener) => {
   crateOpener = f
 }
@@ -516,10 +517,13 @@ export function starterTown(): SaveState {
     trophies: 0,
     racesWon: 0,
     roads: [...new Set(roads)],
+    // Everything a new player needs sits on the cross street in the middle of the screen:
+    // the pizza places either side of RUSTY_LOT (kept empty for Rusty's), the showroom and
+    // garage across the street. The open lots further along invite the next builds.
     buildings: [
-      b('showroom', 9, 9), b('garage', 13, 9), b('gas', 6, 3), b('pizza', 10, 3), b('pizza', 12, 3),
-      b('pizza', 17, 10), b('house', 5, 9), b('house', 6, 9), b('house', 7, 9), b('house', 5, 10),
-      b('house', 15, 17), b('house', 16, 17), b('house', 17, 17), b('tree', 5, 7), b('tree', 16, 9),
+      b('showroom', 9, 9), b('garage', 13, 9), b('gas', 6, 9), b('pizza', 10, 12), b('pizza', 15, 12),
+      b('pizza', 8, 12), b('house', 5, 5), b('house', 6, 5), b('house', 7, 5), b('house', 5, 6),
+      b('house', 15, 17), b('house', 16, 17), b('house', 17, 17), b('tree', 5, 7), b('tree', 17, 9),
       b('tree', 17, 15), b('tree', 8, 16), b('tree', 6, 14), b('tree', 11, 17), b('tree', 18, 6),
       b('tree', 14, 7), b('tree', 2, 2), b('tree', 21, 3), b('tree', 2, 21), b('tree', 21, 21),
     ],
@@ -1127,11 +1131,11 @@ export const useGame = create<GameState>()(
           sfx.coin()
           fx({ kind: 'collect', uids: [buid], coins: pay, parts, xp })
           s.toast(`+${pay} coins${parts ? `, +${parts} parts` : ''}, +${xp} XP`)
-          // Sometimes a car out on the job comes back with a flat.
+          // Sometimes a car out on the job comes back with a flat (never during the tutorial).
           let cars = s.cars
           const rolling = cars.filter((c) => !c.flat && !c.lowFuel)
           const roll = Math.random()
-          if (rolling.length > 1 && roll < FLAT_CHANCE + LOW_FUEL_CHANCE) {
+          if (s.tutorial >= 99 && rolling.length > 1 && roll < FLAT_CHANCE + LOW_FUEL_CHANCE) {
             const victim = rolling[Math.floor(Math.random() * rolling.length)]
             const flat = roll < FLAT_CHANCE
             cars = cars.map((c) => (c.uid === victim.uid ? (flat ? { ...c, flat: true } : { ...c, lowFuel: true }) : c))
@@ -2574,13 +2578,16 @@ export const spendFuel = (amount: number) => {
 
 // Opens a crate: checks the level and price, rolls it (on the server when signed in), adds it to
 // the town and returns what was opened for the reveal. Null when it couldn't be opened. A free
-// crate (`free` is its source in freeCrates, see cups.ts) skips the level and price.
-export async function openCrate(id: CrateId, free?: string): Promise<CrateOpen[] | null> {
+// crate (`free` is its source in freeCrates, see cups.ts) skips the level and price. `count`
+// opens that many at once (the ×10 open: never free, the price times count, one server call).
+export async function openCrate(id: CrateId, free?: string, count = 1): Promise<CrateOpen[] | null> {
   const s = useGame.getState()
   const def = crateDef(id)
   if (!def) return null
   if (free && !s.freeCrates?.includes(free)) return null
-  const cost = free ? { coins: 0, bucks: 0 } : crateCost(def, s.level)
+  if (free) count = 1
+  const one = free ? { coins: 0, bucks: 0 } : crateCost(def, s.level)
+  const cost = { coins: one.coins * count, bucks: one.bucks * count }
   if (!free && s.level < def.unlockLevel) {
     s.showNeed('level', def.unlockLevel, def.name)
     return null
@@ -2596,15 +2603,25 @@ export async function openCrate(id: CrateId, free?: string): Promise<CrateOpen[]
   const used = () => useGame.setState((g) => ({ freeCrates: (g.freeCrates ?? []).filter((x) => x !== free) }))
   let opens: CrateOpen[] | null = null
   try {
-    opens = crateOpener ? await crateOpener(id, free) : null
+    opens = crateOpener ? await crateOpener(id, free, count) : null
   } catch (e) {
     const msg = e instanceof Error ? e.message : ''
     if (free && msg.includes('already opened')) used()
-    useGame.getState().toast(msg === 'soon' ? 'Crates open for signed-in towns very soon!' : msg.includes('one crate') ? 'One crate at a time!' : "Couldn't open the crate. Try again.")
+    useGame.getState().toast(msg === 'soon' ? (count > 1 ? 'Open ×10 is coming very soon!' : 'Crates open for signed-in towns very soon!') : msg.includes('one crate') ? 'One crate at a time!' : "Couldn't open the crate. Try again.")
     return null
   }
-  if (!opens) opens = [{ crate: id, cost, drop: rollCrate(def, s.level, s.cars, Math.random, { skins: crateOwnedSkins(s), modSkins: ownedModSkins(s), hats: ownedHats(s), pieces: s.restoParts ?? [] }, s.cratePity?.[id] ?? 0) }]
-  for (const o of opens) useGame.getState().applyCrate(o)
+  if (opens) {
+    for (const o of opens) useGame.getState().applyCrate(o)
+  } else {
+    // A guest rolls in the browser, one after another, so each roll knows what the last one gave.
+    opens = []
+    for (let i = 0; i < count; i++) {
+      const g = useGame.getState()
+      const o: CrateOpen = { crate: id, cost: one, drop: rollCrate(def, g.level, g.cars, Math.random, { skins: crateOwnedSkins(g), modSkins: ownedModSkins(g), hats: ownedHats(g), pieces: g.restoParts ?? [] }, g.cratePity?.[id] ?? 0) }
+      g.applyCrate(o)
+      opens.push(o)
+    }
+  }
   // The server may hand back earlier opens the save missed instead: the free crate is only used once one opened free.
   if (free && opens.some((o) => o.crate === id && !o.cost.coins && !o.cost.bucks)) used()
   return opens

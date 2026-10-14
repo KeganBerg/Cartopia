@@ -8,3 +8,4 @@ interface ImportMetaEnv {
 
 // Build id from vite.config.ts; matches /version.json for the same deploy.
 declare const __BUILD_ID__: string
+declare const __RAVE_HALCYON__: boolean

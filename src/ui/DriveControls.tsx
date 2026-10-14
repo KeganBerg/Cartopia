@@ -76,6 +76,28 @@ export function useDriveKeys(input: DriveInput, { enabled = true, autoGas = fals
   }, [input, enabled, autoGas])
 }
 
+// While a race is on screen, the page itself never zooms or scrolls under the player's thumbs:
+// iOS ignores user-scalable=no, so two thumbs (steer + brake, shift + boost) would pinch-zoom
+// the page and cancel both touches. CSS touch-action covers Android; this covers Safari.
+export function useTouchLock(on = true) {
+  useEffect(() => {
+    if (!on) return
+    const stop = (e: Event) => { if (e.cancelable) e.preventDefault() }
+    const multi = (e: TouchEvent) => { if (e.touches.length > 1 && e.cancelable) e.preventDefault() }
+    const opts = { passive: false } as AddEventListenerOptions
+    document.addEventListener('gesturestart', stop, opts)
+    document.addEventListener('gesturechange', stop, opts)
+    document.addEventListener('touchmove', multi, opts)
+    document.addEventListener('dblclick', stop, opts)
+    return () => {
+      document.removeEventListener('gesturestart', stop, opts)
+      document.removeEventListener('gesturechange', stop, opts)
+      document.removeEventListener('touchmove', multi, opts)
+      document.removeEventListener('dblclick', stop, opts)
+    }
+  }, [on])
+}
+
 // Hold-to-press handlers for a touch button, with the pointer captured so a thumb
 // sliding off the edge doesn't drop it.
 function hold(on: () => void, off: () => void) {
@@ -129,13 +151,27 @@ export class ThumbDrift {
 }
 
 
+// How far the thumb can travel each way before full lock. A thumb that lands near the edge of
+// the screen can't slide a full range past it, so that side reaches full lock at the edge
+// (keeping EDGE px spare) instead of never reaching it. Never shorter than MIN_SIDE px.
+const EDGE = 14, MIN_SIDE = 20
+export function sideRanges(x: number, screenW: number, range: number) {
+  const side = (room: number) => Math.max(MIN_SIDE, Math.min(range, room - EDGE))
+  return { left: side(x), right: side(screenW - x) }
+}
+
 // A floating thumb stick that only steers: put a thumb down anywhere in the zone and
 // slide it left or right. The knob moves by hand (no React render per finger move).
 const SteerZone = memo(function SteerZone({ input, autoDrift, className, feel }: { input: DriveInput; autoDrift: boolean; className: string; feel: SteerFeel }) {
-  const [at, setAt] = useState<{ x0: number; y: number } | null>(null)
+  const [at, setAt] = useState<{ x0: number; y: number; left: number; right: number } | null>(null)
   const knob = useRef<HTMLElement>(null)
   const drift = useMemo(() => new ThumbDrift(feel.drift), [feel.drift])
-  const end = () => {
+  // The finger that owns the stick; a second finger landing in the zone is ignored, so resting
+  // the other thumb (or reaching for brake) never yanks or drops the steering.
+  const owner = useRef<number | null>(null)
+  const end = (e: React.PointerEvent) => {
+    if (e.pointerId !== owner.current) return
+    owner.current = null
     input.steer = 0
     if (autoDrift) { input.drift = false; drift.reset() }
     setAt(null)
@@ -144,16 +180,20 @@ const SteerZone = memo(function SteerZone({ input, autoDrift, className, feel }:
     <div className={`dc-steer ${className}`}
       onPointerDown={(e) => {
         e.preventDefault()
+        if (owner.current !== null) return
+        owner.current = e.pointerId
         ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
         const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
         if (autoDrift) drift.reset(e.timeStamp)
-        setAt({ x0: e.clientX - r.left, y: e.clientY - r.top })
+        setAt({ x0: e.clientX - r.left, y: e.clientY - r.top, ...sideRanges(e.clientX, window.innerWidth, feel.range) })
       }}
       onPointerMove={(e) => {
-        if (!at) return
+        if (!at || e.pointerId !== owner.current) return
         const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
-        const dx = Math.max(-feel.range, Math.min(feel.range, e.clientX - r.left - at.x0))
-        input.steer = thumbSteer(dx, feel)
+        const dx = Math.max(-at.left, Math.min(at.right, e.clientX - r.left - at.x0))
+        // Scale the travel to this side's range so the edge side still reaches full lock.
+        const side = dx < 0 ? at.left : at.right
+        input.steer = thumbSteer((dx * feel.range) / side, feel)
         if (autoDrift) {
           const was = drift.dir
           input.drift = drift.update(input.steer, e.timeStamp) !== 0
@@ -180,12 +220,73 @@ const SteerZone = memo(function SteerZone({ input, autoDrift, className, feel }:
   )
 })
 
+// Steering buttons (Settings > Karts > ◀ ▶): hold ◀ or ▶ to turn. A press starts at PAD_START
+// of full lock and winds on at PAD_RAMP per second, so a tap nudges and a hold turns hard.
+export const PAD_START = 0.35, PAD_RAMP = 1.5
+export function padSteer(prev: number, dir: number, dt: number) {
+  if (dir === 0) return 0
+  if (Math.sign(prev) !== dir) return dir * PAD_START
+  return dir * Math.min(1, Math.abs(prev) + PAD_RAMP * dt)
+}
+
+// Two big pads, ◀ and ▶. Every finger counts: a thumb rocking from one pad to the other
+// switches side without lifting; both held is straight ahead.
+const SteerPads = memo(function SteerPads({ input, className }: { input: DriveInput; className: string }) {
+  const fingers = useRef(new Map<number, number>())
+  const box = useRef<HTMLDivElement>(null)
+  const dir = useRef(0)
+  useEffect(() => {
+    let raf = 0, last = performance.now()
+    const tick = (now: number) => {
+      input.steer = padSteer(input.steer, dir.current, Math.min(0.1, (now - last) / 1000))
+      last = now
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => { cancelAnimationFrame(raf); input.steer = 0 }
+  }, [input])
+  const update = () => {
+    const sides = [...fingers.current.values()]
+    // steer: +1 is left.
+    const d = (sides.includes(1) ? 1 : 0) - (sides.includes(-1) ? 1 : 0)
+    if (d !== dir.current && d !== 0) buzz(6)
+    dir.current = d
+    input.steer = padSteer(input.steer, d, 0)
+    box.current?.classList.toggle('l', sides.includes(1))
+    box.current?.classList.toggle('r', sides.includes(-1))
+  }
+  const side = (e: React.PointerEvent) => {
+    const r = box.current!.getBoundingClientRect()
+    return e.clientX < r.left + r.width / 2 ? 1 : -1
+  }
+  const up = (e: React.PointerEvent) => { if (fingers.current.delete(e.pointerId)) update() }
+  return (
+    <div ref={box} className={`dc-pads ${className}`}
+      onPointerDown={(e) => {
+        e.preventDefault()
+        ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
+        fingers.current.set(e.pointerId, side(e))
+        update()
+      }}
+      onPointerMove={(e) => {
+        if (!fingers.current.has(e.pointerId)) return
+        const s = side(e)
+        if (fingers.current.get(e.pointerId) !== s) { fingers.current.set(e.pointerId, s); update() }
+      }}
+      onPointerUp={up} onPointerCancel={up} onLostPointerCapture={up}
+      onContextMenu={(e) => e.preventDefault()}>
+      <span className="dc-pad left" aria-label="Steer left">◀</span>
+      <span className="dc-pad right" aria-label="Steer right">▶</span>
+    </div>
+  )
+})
+
 // The touch layout. Gas is automatic (hold brake to slow or reverse); with autoGas off
 // there's a gas pedal too, for games that need to creep and stop (parking).
 // item: what to show on the item button (null = empty; leave out for games without items).
 // drift: show drift (landscape button; portrait drifts on a hard slide).
-// feel: how the thumb steers (karts pass KART_FEEL).
-export function TouchDrive({ input, tall, drift = true, item, autoGas = true, feel = ARCADE_FEEL }: { input: DriveInput; tall: boolean; drift?: boolean; item?: ReactNode | null; autoGas?: boolean; feel?: SteerFeel }) {
+// feel: how the thumb steers (karts pass KART_FEEL). pads: ◀ ▶ buttons instead of the slider.
+export function TouchDrive({ input, tall, drift = true, item, autoGas = true, feel = ARCADE_FEEL, pads = false }: { input: DriveInput; tall: boolean; drift?: boolean; item?: ReactNode | null; autoGas?: boolean; feel?: SteerFeel; pads?: boolean }) {
   const [brake, setBrake] = useState(false)
   const [gas, setGas] = useState(false)
   const [drifting, setDrifting] = useState(false)
@@ -195,6 +296,7 @@ export function TouchDrive({ input, tall, drift = true, item, autoGas = true, fe
     input.brake = brake ? 1 : 0
   }, [input, brake, gas, autoGas])
   useEffect(() => () => { Object.assign(input, newDriveInput()) }, [input])
+  useTouchLock()
   const itemBtn = item !== undefined && (
     <button className={`dc-btn dc-item${item ? ' full' : ''}${using ? ' on' : ''}`} aria-label="Use item"
       {...hold(() => { input.item = true; setUsing(true) }, () => { input.item = false; setUsing(false) })}>
@@ -211,23 +313,25 @@ export function TouchDrive({ input, tall, drift = true, item, autoGas = true, fe
       <small>GAS</small>
     </button>
   )
+  const driftBtn = drift && (
+    <button className={`dc-btn dc-drift${drifting ? ' on' : ''}`} aria-label="Drift"
+      {...hold(() => { input.drift = true; setDrifting(true) }, () => { input.drift = false; setDrifting(false) })}>
+      DRIFT
+    </button>
+  )
   if (tall) return (
-    <div className="dc dc-tall">
-      <div className="dc-row">{brakeBtn}{itemBtn}{gasBtn}</div>
-      <SteerZone input={input} autoDrift={drift} className="tall" feel={feel} />
+    <div className={`dc dc-tall${pads ? ' with-pads' : ''}`}>
+      {/* With pads the slider can't flick into a drift, so drift gets its own button. */}
+      <div className="dc-row">{brakeBtn}{pads && driftBtn}{itemBtn}{gasBtn}</div>
+      {pads ? <SteerPads input={input} className="tall" /> : <SteerZone input={input} autoDrift={drift} className="tall" feel={feel} />}
     </div>
   )
   return (
     <div className="dc dc-wide">
-      <SteerZone input={input} autoDrift={false} className="wide" feel={feel} />
+      {pads ? <SteerPads input={input} className="wide" /> : <SteerZone input={input} autoDrift={false} className="wide" feel={feel} />}
       <div className="dc-cluster">
         {itemBtn}
-        {drift && (
-          <button className={`dc-btn dc-drift${drifting ? ' on' : ''}`} aria-label="Drift"
-            {...hold(() => { input.drift = true; setDrifting(true) }, () => { input.drift = false; setDrifting(false) })}>
-            DRIFT
-          </button>
-        )}
+        {driftBtn}
         {brakeBtn}
         {gasBtn}
       </div>

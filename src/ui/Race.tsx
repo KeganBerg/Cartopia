@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useTouchLock } from './DriveControls'
 import { useGame, spendFuel, type OwnedCar } from '../game/store'
 import { LIVE_LOSS_SHARE, LOSS_SHARE } from '../game/boosts'
 import { bestCar, raceCarOf } from '../game/raceCar'
@@ -63,7 +64,7 @@ import { TrophyRoad, roadReady } from './TrophyRoad'
 import { Flair } from './Flair'
 import { RepChip } from './Reputation'
 import { DailyRunTab, DailyResult } from './DailyRun'
-import type { DailyRun } from '../game/daily'
+import { DAILY_PAY, dailyRun, type DailyRun } from '../game/daily'
 import { WorldTour, worldChip } from './WorldTour'
 import { WORLD_TOUR, worldCar, worldPrize, worldShift } from '../game/worldTour'
 import { CHALLENGER_BONUS, makeChallenger } from '../game/challenger'
@@ -240,6 +241,7 @@ export function RacePanel() {
   })
   const [trial, setTrial] = useState<(TrialRun & { n: number }) | null>(null)
   const [daily, setDaily] = useState<{ run: DailyRun; n: number } | null>(null)
+  const dailySave = useGame((s) => s.daily)
   const [wRace, setWRace] = useState<{ i: number; rival: Rival } | null>(null)
   const worldTour = useGame((s) => s.worldTour)
   // The town rival race; bet: the double-or-nothing rematch. n remounts the race for each run.
@@ -700,6 +702,9 @@ export function RacePanel() {
   }
 
 
+  // The Daily Run: everyone races the day's loaner, and the first run of the day pays.
+  const today = dailyRun()
+  const dailyPaid = dailySave?.day === today.day && dailySave.paid
   // The bar's big button: the next race on this screen, if it has one.
   const campNext = (() => {
     const ch = CAMPAIGN[campSel]
@@ -716,6 +721,7 @@ export function RacePanel() {
     : tab === 'cups' && car ? (cupFits(cupRace(cupSel)!, car.model)
       ? { label: `$${cupPrizeOf(cupRace(cupSel)!, cups).toLocaleString()}`, onClick: () => startCup(cupSel) }
       : { label: `${carClass(cupRace(cupSel)!.cls).icon} ${carClass(cupRace(cupSel)!.cls).name} car`, onClick: () => startCup(cupSel), fix: true })
+    : tab === 'daily' ? { label: dailyPaid ? 'Run' : `$${DAILY_PAY[0].toLocaleString()}`, onClick: () => startDaily(today) }
     : tab === 'road' && roadReady(trophies, roadClaimed) > 0 ? { label: `🎁 Claim ${roadReady(trophies, roadClaimed)}`, onClick: () => useGame.getState().claimRoad() }
     : null
   const stars = Object.values(done).reduce((a, n) => a + n, 0)
@@ -750,7 +756,7 @@ export function RacePanel() {
         ) : tab === 'world' ? (
           <WorldTour onRace={startWorld} />
         ) : tab === 'daily' ? (
-          <DailyRunTab onRun={startDaily} />
+          <DailyRunTab />
         ) : tab === 'campaign' ? (
           <Campaign sel={campSel} setSel={setCampSel} onTour={() => setTab('tour')} onRace={(ci, i) => startCampaign(ci, i)} />
         ) : tab === 'tour' ? (
@@ -858,7 +864,7 @@ export function RacePanel() {
         )}
       </div>
       <RaceBar cars={cars} car={car} onPick={setRaceCar} go={go} note={tab === 'gp' ? 'Races every round' : tab === 'event' ? 'Back next week' : undefined}
-        dist={tab === 'tour' ? tourDist(tourWon) : tab === 'gp' ? null : undefined} />
+        dist={tab === 'tour' ? tourDist(tourWon) : tab === 'gp' ? null : undefined} loaner={tab === 'daily' ? today : undefined} />
     </Panel>
   )
 }
@@ -1371,6 +1377,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
     useGame.getState().masteryRace(car.model, won, mode, rivalRef.current.pi > myPi)
   }
   const noteMastery = (won: boolean) => masteryCb.current(won)
+  useTouchLock()
   // Both cars wait on the line; the player holds the pedal through the countdown to rev, and the
   // car launches at GO on whatever revs it has.
   const me = useRef(fresh(false))
@@ -1864,30 +1871,45 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       ) : result && resultView ? resultView(result) : result ? (
         <RaceResult won={result.won} myTime={result.myTime} theirTime={result.theirTime} cash={result.counted === false ? 0 : result.won ? payout : Math.round(payout * (live ? LIVE_LOSS_SHARE : LOSS_SHARE))} xp={result.counted === false ? 0 : result.won ? 30 : 8} rival={rival.town} note={result.note} noContest={result.counted === false} stars={result.stars} stats={stats.current} next={(typeof next === 'function' ? next(result.won) : next) ?? undefined} onExit={onExit} bet={stake ? (result.counted === false ? 0 : result.won ? stake : -stake) : undefined} />
       ) : (
+        // Two thumbs: BOOST under the left, the tach in the middle, a big SHIFT under the right.
         <div className="rf-bottom">
-          <svg viewBox="0 0 120 120" className={`tach${light}`}>
-            <circle cx="60" cy="60" r="56" fill="#1b1f24" fillOpacity="0.85" stroke="#cfd8dc" strokeWidth="3" />
-            <path d={arcPath(60, 60, 46, -210 + band.lo * 240, -210 + band.hi * 240)} stroke={onLine ? '#ffd54f' : '#76ff03'} strokeWidth="10" fill="none" />
-            <path d={arcPath(60, 60, 46, -210 + 0.95 * 240, 30)} stroke="#ff1744" strokeWidth="10" fill="none" />
-            <line x1="60" y1="60" x2={60 + 44 * Math.cos((rpmAngle * Math.PI) / 180)} y2={60 + 44 * Math.sin((rpmAngle * Math.PI) / 180)} stroke="#ff9100" strokeWidth="4" strokeLinecap="round" />
-            <circle cx="60" cy="60" r="6" fill="#eceff1" />
-            <text x="60" y="92" textAnchor="middle" fill="#fff" fontSize="14" fontWeight="900">GEAR {me.current.gear + 1}</text>
-          </svg>
-          <div className="rf-side">
+          <BoostButton r={me.current} onFire={boost} ready={countdown === 0} />
+          <div className="rf-dial">
             <div className="rf-speed">{Math.round(me.current.speed * 3.6)}<small> km/h</small></div>
-            <div className="rf-buttons">
-              <BoostButton r={me.current} onFire={boost} ready={countdown === 0} />
-              <button className={me.current.launched ? `big-btn shift-btn${light}` : `big-btn shift-btn launch${light}`} onPointerDown={press} onPointerUp={release} onPointerLeave={release} onPointerCancel={release} onContextMenu={(e) => e.preventDefault()} disabled={countdown === 99 || (me.current.launched && me.current.gear >= TOP_GEAR)}>
-                {me.current.launched ? 'SHIFT ▲' : 'HOLD ▶'}
-              </button>
-            </div>
+            <svg viewBox="0 0 120 120" className={`tach${light}`}>
+              <circle cx="60" cy="60" r="56" fill="#1b1f24" fillOpacity="0.85" stroke="#cfd8dc" strokeWidth="3" />
+              <path d={arcPath(60, 60, 46, -210 + band.lo * 240, -210 + band.hi * 240)} stroke={onLine ? '#ffd54f' : '#76ff03'} strokeWidth="10" fill="none" />
+              <path d={arcPath(60, 60, 46, -210 + 0.95 * 240, 30)} stroke="#ff1744" strokeWidth="10" fill="none" />
+              <line x1="60" y1="60" x2={60 + 44 * Math.cos((rpmAngle * Math.PI) / 180)} y2={60 + 44 * Math.sin((rpmAngle * Math.PI) / 180)} stroke="#ff9100" strokeWidth="4" strokeLinecap="round" />
+              <circle cx="60" cy="60" r="6" fill="#eceff1" />
+              <text x="60" y="92" textAnchor="middle" fill="#fff" fontSize="14" fontWeight="900">GEAR {me.current.gear + 1}</text>
+            </svg>
           </div>
+          <button className={me.current.launched ? `big-btn shift-btn${light}` : `big-btn shift-btn launch${light}`} {...pedalPad(press, release)} disabled={countdown === 99 || (me.current.launched && me.current.gear >= TOP_GEAR)}>
+            {me.current.launched ? 'SHIFT ▲' : 'HOLD ▶'}
+          </button>
         </div>
       )}
     </div>
   )
 }
 
+
+// The pedal/SHIFT button: acts the instant a finger lands, keeps the finger while it wobbles off
+// the edge (rev holds through the countdown), and lets go when that finger lifts.
+function pedalPad(down: () => void, up: () => void) {
+  return {
+    onPointerDown: (e: React.PointerEvent) => {
+      e.preventDefault()
+      ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
+      down()
+    },
+    onPointerUp: up,
+    onPointerCancel: up,
+    onLostPointerCapture: up,
+    onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
+  }
+}
 
 // The boost tank as a ring that fills with clean driving; tap it once to fire.
 function BoostButton({ r, onFire, ready }: { r: { boost: number; burning: boolean; boostUsed: boolean; launched: boolean }; onFire: () => void; ready: boolean }) {
@@ -1897,7 +1919,8 @@ function BoostButton({ r, onFire, ready }: { r: { boost: number; burning: boolea
     <button
       className={`boost-btn${r.burning ? ' burning' : ''}${!spent && fill >= 99 ? ' full' : ''}`}
       style={{ ['--fill' as string]: `${fill}%` }}
-      onPointerDown={onFire}
+      onPointerDown={(e) => { e.preventDefault(); onFire() }}
+      onContextMenu={(e) => e.preventDefault()}
       disabled={!ready || spent || !r.launched || r.boost <= 0}
       aria-label={`Boost, ${fill}% full`}
     >
