@@ -464,7 +464,8 @@ export function CratesPanel() {
   }
   return (
     <div className="race-full crate-full" onClick={tap}>
-      <StageSlot cam={CRATE_CAM}>{scene}</StageSlot>
+      {/* Taps go through the canvas to the screen behind it: "Tap to skip". */}
+      <StageSlot cam={CRATE_CAM} through>{scene}</StageSlot>
       <LoadingScene ready={stageReady} label="Opening the Crate Depot" onClose={close} />
       <div className="rf-top">
         <h2>📦 Crate Depot</h2>
