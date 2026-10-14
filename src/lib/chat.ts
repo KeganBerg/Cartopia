@@ -25,8 +25,8 @@ type ChatState = {
   viewing: Room | null
   // Players this browser hides.
   muted: Record<string, string>
-  // What the player may delete besides their own messages (public.chat_powers).
-  powers: { mod: boolean; leader: boolean }
+  // Whether the player is a chat mod, who may delete anyone's messages (public.chat_powers).
+  powers: { mod: boolean }
 }
 
 const MUTE_KEY = 'cartopia-chat-muted'
@@ -40,7 +40,7 @@ const loadMuted = (): Record<string, string> => {
 
 export const useChat = create<ChatState>(() => ({
   uid: null, crewRoom: null, msgs: { global: [], crew: [] }, unread: { global: 0, crew: 0 }, viewing: null, muted: loadMuted(),
-  powers: { mod: false, leader: false },
+  powers: { mod: false },
 }))
 
 export const MAX_CHAT = 200
@@ -153,8 +153,8 @@ export async function refreshChatRooms() {
 async function loadPowers() {
   if (!supabase) return
   const { data, error } = await supabase.rpc('chat_powers')
-  const p = (error ? null : data) as { mod?: unknown; leader?: unknown } | null
-  useChat.setState({ powers: { mod: p?.mod === true, leader: p?.leader === true } })
+  const p = (error ? null : data) as { mod?: unknown } | null
+  useChat.setState({ powers: { mod: p?.mod === true } })
 }
 
 let started = false
@@ -165,7 +165,7 @@ export function startChat() {
     if (uid === useChat.getState().uid) return
     leave('global')
     leave('crew')
-    useChat.setState({ uid, crewRoom: null, msgs: { global: [], crew: [] }, unread: { global: 0, crew: 0 }, powers: { mod: false, leader: false } })
+    useChat.setState({ uid, crewRoom: null, msgs: { global: [], crew: [] }, unread: { global: 0, crew: 0 }, powers: { mod: false } })
     if (uid) void refreshChatRooms()
   }
   supabase.auth.getUser().then(({ data }) => onUser(data.user?.id ?? null))
@@ -228,10 +228,10 @@ function drop(room: Room, id: number) {
   useChat.setState((s) => ({ msgs: { ...s.msgs, [room]: s.msgs[room].filter((m) => m.id !== id) } }))
 }
 
-// Whether the player may delete a message: their own, any in their crew room as its leader,
-// anything as a chat mod. The server (chat_delete) checks again.
-export function canDelete(room: Room, m: Pick<ChatMsg, 'owner'>, s: Pick<ChatState, 'uid' | 'powers'> = useChat.getState()) {
-  return !!s.uid && (m.owner === s.uid || s.powers.mod || (room === 'crew' && s.powers.leader))
+// Whether the player may delete a message: only their own, unless they're a chat mod. The
+// server (chat_delete) checks again.
+export function canDelete(_room: Room, m: Pick<ChatMsg, 'owner'>, s: Pick<ChatState, 'uid' | 'powers'> = useChat.getState()) {
+  return !!s.uid && (m.owner === s.uid || s.powers.mod)
 }
 
 // Returns an error to show, or null once deleted.
