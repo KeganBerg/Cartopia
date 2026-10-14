@@ -1,5 +1,12 @@
 import { HalfFloatType, WebGLRenderTarget, type Camera, type Object3D, type WebGLRenderer } from 'three'
 
+// The live game skips three's check after each shader compile: it asks the driver for the
+// compile logs, which makes the page wait for that compile to finish there and then. Our
+// shaders don't change at runtime, so dev builds (and tests) keep the check to catch errors.
+export function quietShaders(gl: WebGLRenderer) {
+  if (import.meta.env.PROD) gl.debug.checkShaderErrors = false
+}
+
 // Compile every shader a scene will need, in the background where the browser allows it
 // (KHR_parallel_shader_compile), so nothing freezes when it first draws. Parts that start
 // hidden (launch smoke, exhaust flames, rain) are included: otherwise their shaders would

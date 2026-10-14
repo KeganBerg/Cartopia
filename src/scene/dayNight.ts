@@ -1,5 +1,5 @@
 import { AdditiveBlending, Color, MeshBasicMaterial, MeshStandardMaterial } from 'three'
-import { danceFloorTex, glowTex, windowGlowTex, windowTex } from './textures'
+import { danceFloorTex, glowTex, spillTex, washTex, windowGlowTex, windowTex } from './textures'
 import { decal } from './layers'
 import { movieTex } from './movie'
 import { closingGlow, hoursUniforms } from './closingTime'
@@ -30,6 +30,13 @@ export const glowMats = {
   neonPink: neon('#ff2bd6'),
   neonCyan: neon('#00e5ff'),
   neonViolet: neon('#b04dff'),
+  // The nightclub's light on the pavement: its LED window's colour washing out
+  // from the wall (clubLeds.ts sets the colour on the beat), pink from the neon
+  // tubes and sconces, and warm light under the canopy bulbs. Flat additive
+  // decals, so a club adds no real lights.
+  washLed: wash(washTex(), '#000000'),
+  washPink: wash(washTex(), '#ff3fd0'),
+  spillWarm: wash(spillTex(), '#ffcf8a'),
   danceFloor: new MeshStandardMaterial({ map: danceFloorTex(false, 2, 1), emissiveMap: danceFloorTex(true, 2, 1), emissive: new Color('#ffffff'), emissiveIntensity: 0, roughness: 0.35 }),
 }
 
@@ -41,6 +48,10 @@ export function setLampTone(c: string) {
   glowMats.lamp.color.set('#ffffff').lerp(col, 0.25)
   glowMats.lampPool.color.copy(col).lerp(new Color('#ffffff'), 0.15)
   lampHalo.copy(col).lerp(new Color('#ffffff'), 0.2)
+}
+
+function wash(map: ReturnType<typeof washTex>, c: string) {
+  return new MeshBasicMaterial({ map, color: c, transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false, toneMapped: false, ...decal() })
 }
 
 function neon(c: string) {
@@ -71,7 +82,10 @@ export function applyNight(n: number, gloom = 0) {
   glowMats.pool.opacity = lamps * 0.75
   glowMats.beam.opacity = Math.max(n, gloom) * 0.5
   glowMats.poolWater.opacity = lamps * 0.45
-  for (const m of [glowMats.pool, glowMats.lampPool, glowMats.beam, glowMats.poolWater]) m.visible = m.opacity > 0.01
+  glowMats.washLed.opacity = n
+  glowMats.washPink.opacity = n * 0.55
+  glowMats.spillWarm.opacity = lamps * 0.6
+  for (const m of [glowMats.pool, glowMats.lampPool, glowMats.beam, glowMats.poolWater, glowMats.washLed, glowMats.washPink, glowMats.spillWarm]) m.visible = m.opacity > 0.01
   for (const m of [glowMats.neonPink, glowMats.neonCyan, glowMats.neonViolet]) m.emissiveIntensity = 0.05 + n * 1.5
   glowMats.danceFloor.emissiveIntensity = n * 1.3
   hoursUniforms.uHour.value = townHour()

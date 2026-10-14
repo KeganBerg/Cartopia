@@ -2,7 +2,7 @@ import { Color, MeshStandardMaterial } from 'three'
 import { clubPulse, CUES, type ClubPulse, type CueKind } from '../lib/clubBeat'
 import { isNight } from '../game/clock'
 import { calmFlashing } from '../game/flashing'
-import { nightAmount, dayPhase } from './dayNight'
+import { glowMats, nightAmount, dayPhase } from './dayNight'
 import { ledGridTex, ledPaneTex, windowTex } from './textures'
 
 // The nightclub's LED windows: every window shows the same colour of the
@@ -58,6 +58,8 @@ export const LOOKS: Look[] = [
   { w: { kick: 1.5, clap: 1 }, f: { kick: 0.7, stab: 1.2, lead: 0.6 } },
   // Rave breaks: the windows flash on the rave piano; the front skips with the breakbeat.
   { w: { kick: 1.4, stab: 0.9 }, f: { kick: 0.8, clap: 0.8, perc: 0.6, lead: 0.7 } },
+  // Witch house: the windows slam on the kick; the front flickers on the off-beat snares.
+  { w: { kick: 1.8, clap: 0.5 }, f: { kick: 0.8, clap: 1.1, lead: 0.6 } },
 ]
 // No groove (the muted pulse, Rave Mode): the kick alone.
 const KICK: Look = { w: { kick: 1.6 }, f: { kick: 1.4 } }
@@ -106,5 +108,9 @@ export function driveClubLeds(now = shownNow()) {
   const look = lookOf(p)
   clubLedColor(tmp, now)
   ledWindow.emissive.copy(tmp).multiplyScalar(lit * (0.75 + flashOf(p, look.w)))
-  ledFront.emissive.copy(tmp).multiplyScalar(lit * (0.9 + flashOf(p, look.f)))
+  const front = flashOf(p, look.f)
+  ledFront.emissive.copy(tmp).multiplyScalar(lit * (0.9 + front))
+  // The window's light on the pavement: the same colour, lifting a little with
+  // the front window's flashes (steady under Reduce flashing).
+  glowMats.washLed.color.copy(tmp).multiplyScalar(lit * (0.85 + 0.35 * Math.min(1.5, front)))
 }

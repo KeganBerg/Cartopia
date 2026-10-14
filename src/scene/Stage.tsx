@@ -2,7 +2,7 @@ import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode 
 import { createPortal } from 'react-dom'
 import { Canvas, useThree } from '@react-three/fiber'
 import { ACESFilmicToneMapping, NeutralToneMapping, PCFSoftShadowMap, type PerspectiveCamera, type ToneMapping, type WebGLProgram, type WebGLRenderer } from 'three'
-import { warmShaders } from './warm'
+import { quietShaders, warmShaders } from './warm'
 import { useCanvasDpr } from '../lib/prefs'
 import { create } from 'zustand'
 
@@ -92,6 +92,7 @@ function makeStage(tone: ToneMapping) {
         gl={{ toneMapping: tone }}
         frameloop={slot && node && ready === run ? 'always' : 'never'}
         onCreated={({ gl }) => {
+          quietShaders(gl)
           // A phone can take the context back while the canvas waits between races;
           // if it isn't restored, build a fresh canvas (and recompile next race).
           let t = 0

@@ -8,7 +8,7 @@ import { KartScene, kartLights, type KartHud } from '../scene/KartScene'
 import { heroShot } from '../scene/heroShot'
 import type { ChaseCar } from '../scene/ChaseScene'
 import { CarThumb } from '../scene/BuildingPreview'
-import { KART_FEEL, KART_SHARP, KeyHints, TouchDrive, newDriveInput, useDriveKeys, useTall, useTouchDevice } from './DriveControls'
+import { KART_FEEL, KART_SHARP, KeyHints, TouchDrive, newDriveInput, useDriveKeys, useTall, useTouchDevice, useTouchLock } from './DriveControls'
 import { LoadingScene } from './Loading'
 import { look as lookOf, pi } from './ArcadeBits'
 import { sfx, audioContext, audioOut } from '../lib/sound'
@@ -64,6 +64,7 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
   const input = useRef({ ...newDriveInput(), assist: 0 }).current
   useLayoutEffect(() => { input.assist = touch ? (sharp ? SHARP_ASSIST : TOUCH_ASSIST) : 0 }, [input, touch, sharp])
   const tall = useTall()
+  useTouchLock(touch)
   const [drawn, setDrawn] = useState(false)
   const [running, setRunning] = useState(false)
   const [hud, setHud] = useState<KartHud | null>(null)

@@ -3,10 +3,12 @@ import { useGame } from '../game/store'
 import { BUCKS_PACKS, type BucksPack } from '../game/bucksPacks'
 import { purchase } from '../lib/payments'
 import { Panel } from './Menus'
+import { CONTACT } from '../legal/legal'
 
 const NOTICE = {
   'not-connected': ['Coming soon', "Gem packs aren't on sale yet. You weren't charged."],
   'sign-in': ['Sign in first', 'Gems go to your account. Sign in from the Menu.'],
+  blocked: ['Purchases paused', `Contact ${CONTACT}`],
   failed: ["Couldn't open checkout", "You weren't charged. Try again."],
 } as const
 
@@ -16,7 +18,7 @@ export function BankPanel() {
   const bucks = useGame((s) => s.bucks)
   const showNeed = useGame((s) => s.showNeed)
   const [pending, setPending] = useState<string | null>(null)
-  const [notice, setNotice] = useState<'not-connected' | 'sign-in' | 'failed' | null>(null)
+  const [notice, setNotice] = useState<'not-connected' | 'sign-in' | 'blocked' | 'failed' | null>(null)
 
   const buy = async (p: BucksPack) => {
     setPending(p.id)
