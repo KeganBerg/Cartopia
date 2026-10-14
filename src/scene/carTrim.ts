@@ -30,6 +30,7 @@ export type TrimFrame = {
   spoiler: boolean // a spoiler mod is fitted
   kit: boolean // a body kit is fitted (its arches and skirts cover the doors)
   hood: boolean // a hood mod is fitted
+  roofMod: boolean // a roof rack or roof light bar mod is fitted (it replaces the roof gear below)
   closed: boolean
 }
 
@@ -283,7 +284,7 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
       k.add('lamp', plane(0.012, 0.012), [-(wid / 2 + 0.006), top - 0.05, wz + wheel * 1.25], [0, -Math.PI / 2, 0])
       return
     case 'roofRack':
-      if (!roof) return
+      if (!roof || t.roofMod) return
       for (const sd of SIDES) {
         k.add('chrome', box(0.018, 0.018, roofLen * 0.86), [sd * wid * 0.31, roofY + 0.035, roofZ])
         for (const z of [-0.38, 0.38]) k.add('black', box(0.024, 0.035, 0.025), [sd * wid * 0.31, roofY + 0.015, roofZ + z * roofLen])
@@ -291,10 +292,10 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
       for (const z of [-0.3, 0, 0.3]) k.add('black', box(wid * 0.66, 0.012, 0.02), [0, roofY + 0.045, roofZ + z * roofLen])
       return
     case 'roofBox':
-      if (roof) k.add('black', rbox(wid * 0.48, 0.07, roofLen * 0.62, 0.03), [0, roofY + 0.085, roofZ - roofLen * 0.05])
+      if (roof && !t.roofMod) k.add('black', rbox(wid * 0.48, 0.07, roofLen * 0.62, 0.03), [0, roofY + 0.085, roofZ - roofLen * 0.05])
       return
     case 'surfboard':
-      if (!roof) return
+      if (!roof || t.roofMod) return
       k.add('wood', new SphereGeometry(1, 14, 6), [0, roofY + 0.065, roofZ - 0.02], [0, 0, 0], [wid * 0.15, 0.014, len * 0.44])
       k.add('chrome', box(0.012, 0.004, len * 0.7), [0, roofY + 0.08, roofZ - 0.02])
       k.add('black', box(0.004, 0.04, 0.05), [0, roofY + 0.05, roofZ - 0.02 - len * 0.38])
@@ -319,7 +320,7 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
       k.add('chrome', box(0.035, 0.007, roofLen * 0.92), [0, roofY + 0.004, roofZ])
       return
     case 'roofScoop':
-      if (!roof) return
+      if (!roof || t.roofMod) return
       k.add('black', rbox(0.12, 0.045, 0.13, 0.018), [0, roofY + 0.02, roofZ + roofLen * 0.1])
       k.add('dark', box(0.09, 0.022, 0.004), [0, roofY + 0.028, roofZ + roofLen * 0.1 + 0.066])
       return
@@ -333,7 +334,7 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
       k.add('amber', cyl(0.026, 0.03, 0.045, 10), [0, roofY + 0.034, roofZ - roofLen * 0.15])
       return
     case 'lightBar':
-      if (!roof) return
+      if (!roof || t.roofMod) return
       k.add('black', rbox(wid * 0.72, 0.04, 0.05, 0.012), [0, roofY + 0.04, roofZ + roofLen * 0.38])
       for (const x of [-0.3, -0.15, 0, 0.15, 0.3]) k.add('lamp', disc(0.016, 10), [x * wid, roofY + 0.04, roofZ + roofLen * 0.38 + 0.028])
       for (const sd of SIDES) k.add('black', box(0.015, 0.03, 0.015), [sd * wid * 0.32, roofY + 0.012, roofZ + roofLen * 0.38])
@@ -476,6 +477,8 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
       for (const sd of SIDES) for (const dy of [0, -0.035]) k.add('black', box(0.012, 0.006, 0.07), [sd * (wid / 2 + 0.002), t.lightY - 0.04 + dy, front - 0.04], [0, 0, sd * -0.3])
       return
     case 'bullBar': {
+      // A body kit (the Bull Bar mod among them) takes its place.
+      if (t.kit) return
       const z = front + 0.07
       const y = t.lightY + 0.06
       k.add('black', box(wid * 0.74, 0.026, 0.026), [0, y, z])
