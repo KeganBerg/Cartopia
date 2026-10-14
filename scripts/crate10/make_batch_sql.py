@@ -51,7 +51,7 @@ rep("""  if p_free is not null then
   end if;
   -- batch:end
 """)
-pending = open('supabase/pending/crate_open_many.sql').read() if len(sys.argv) < 5 else open(sys.argv[4]).read()
+pending = open(sys.argv[4] if len(sys.argv) > 4 else 'supabase/migrations/0082_crate_open_many.sql').read()
 state = re.search(r"^-- The save as a batch's next roll.*?^revoke all on function econ_private\.crate_batch_state\(uuid, jsonb, int\) from public, anon, authenticated;\n", pending, re.S | re.M).group(0)
 many = re.search(r"^-- Opens p_count .*?^grant execute on function public\.crate_open_many\(text, int\) to authenticated;\n", pending, re.S | re.M).group(0)
 old = "price := ((c ->> 'base')::bigint + (c ->> 'perLevel')::bigint * lvl) * p_count;"
