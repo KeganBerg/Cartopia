@@ -87,7 +87,7 @@ export function SettingsTab({ user }: { user: User | null }) {
         {touch && (
           <div className="seg set-seg" role="radiogroup" aria-label="Kart steering">
             {STEER.map((g) => (
-              <button key={g.id} role="radio" aria-checked={prefs.steer === g.id} className={prefs.steer === g.id ? 'sel' : ''} onClick={() => setPrefs({ steer: g.id })}>{g.label}</button>
+              <button key={g.id} role="radio" aria-checked={prefs.steer === g.id} className={prefs.steer === g.id ? 'sel' : ''} onClick={() => setPrefs({ steer: g.id, steerSet: true })}>{g.label}</button>
             ))}
           </div>
         )}
