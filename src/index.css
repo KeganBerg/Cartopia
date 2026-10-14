@@ -134,6 +134,7 @@ button.card:hover:not(:disabled) { border-color: var(--accent); }
 .garage-detail { background: #fff; border-radius: 14px; padding: 12px; border: 2px solid #e0e0e0; }
 .garage-detail .car-swatch { width: 180px; height: 90px; }
 .garage-detail h3 { margin: 0 0 4px; }
+.garage-detail .garage-name { font: 22px/1.15 var(--display); margin: 10px 0 2px; }
 .pi b { font: 22px var(--display); color: var(--blue); }
 .upgrade-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px dashed #e0e0e0; font-weight: 800; }
 .pips { display: flex; gap: 3px; }
@@ -2025,16 +2026,24 @@ button.book-car { font: inherit; color: inherit; }
 .car-switch-name b { font: 16px var(--display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .car-switch-name small { font: 800 11px Nunito, sans-serif; color: #607d8b; }
 @media (min-width: 601px) { .car-switch { display: none; } }
-.car-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 2px; }
-.car-tags > * { margin: 0; }
-.pi-badge { font: 800 12px Nunito, sans-serif; color: #546e7a; background: var(--seg); border-radius: 999px; padding: 2px 10px; }
-.pi-badge b { font: 16px var(--display); color: var(--blue); }
-.car-tags .loves-tag, .car-tags .driver-row { width: auto; display: inline-block; font-size: 12px; padding: 3px 10px; border-radius: 999px; background: #fce4ec; border: 0; }
-.car-tags .skill-tag { font-size: 12px; }
-.car-tags .showcase-toggle { margin-left: auto; font-size: 12px; }
-.car-tags .race-toggle { margin-left: 0; border-color: #43a047; }
-.race-toggle.on { background: #c8e6c9; }
-.race-toggle:disabled { cursor: default; opacity: 1; color: inherit; }
+/* The car summary under the Garage preview: a PI tile, one row of trait chips, two equal toggles. */
+.car-sum { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: 'pi traits' 'pi toggles'; gap: 8px 12px; align-items: center; margin: 8px 0 4px; }
+.car-pi { grid-area: pi; align-self: stretch; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 68px; padding: 6px 10px; border-radius: 14px; background: linear-gradient(#3f8ff5, #2265d8); color: #fff; box-shadow: inset 0 2px 0 rgba(255, 255, 255, .25), 0 3px 0 #1a4fa8; }
+.car-pi b { font: 30px/1 var(--display); letter-spacing: .5px; text-shadow: 0 2px 0 rgba(0, 0, 0, .2); }
+.car-pi small { font: 800 11px/1.2 Nunito, sans-serif; letter-spacing: 1.5px; opacity: .85; }
+.car-traits { grid-area: traits; display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.car-traits:empty { display: none; }
+.car-traits > .skill-tag, .car-traits > .loves-tag, .car-traits > .driver-row { display: inline-flex; align-items: center; gap: 4px; width: auto; height: 30px; margin: 0; padding: 0 10px; border-radius: 999px; border: 0; font: 800 13px Nunito, sans-serif; white-space: nowrap; }
+.car-traits > .skill-tag { background: #ede7f6; color: #4527a0; }
+.car-traits > .loves-tag { background: #fce4ec; gap: 5px; font-size: 14px; }
+.car-traits .loves-ico { padding: 0; background: none; border: 0; font-size: 16px; }
+.car-traits > .driver-row { background: #e8f5e9; color: #2e7d32; cursor: pointer; font-size: 14px; }
+.car-traits > .driver-row b { font: 15px var(--display); }
+.car-toggles { grid-area: toggles; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-width: 360px; }
+.car-toggles .showcase-toggle { display: flex; align-items: center; justify-content: center; gap: 4px; min-height: 40px; padding: 0 8px; border-radius: 12px; font: 15px var(--display); color: #37474f; background: #fff; border: 2px solid #c6d7ee; box-shadow: 0 2px 0 #c6d7ee; white-space: nowrap; }
+.car-toggles .showcase-toggle.on { background: #ffca28; border-color: #e0a800; box-shadow: 0 2px 0 #c79400; color: #5d4037; }
+.car-toggles .race-toggle.on { background: #43a047; border-color: #2e7d32; box-shadow: 0 2px 0 #1b5e20; color: #fff; opacity: 1; cursor: default; }
+.race-toggle:disabled { cursor: default; opacity: 1; }
 
 /* Helping a friend's town: a round action bubble over each shop, a tick once helped, and pips on the visit banner. */
 .badge-help { width: 34px; height: 34px; padding: 0; justify-content: center; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #f1fff4, #b9f6ca); animation: badge-in .5s cubic-bezier(.2,1.7,.4,1) both, help-nod 1.6s ease-in-out .5s infinite; }
@@ -2227,5 +2236,4 @@ body:has(.race-full) .toasts { display: none; }
 
 /* A car's favourite jobs: one line of building icons (names in the tooltips). */
 .loves-tag { display: flex; align-items: center; gap: 3px; white-space: nowrap; overflow: hidden; }
-.car-tags .loves-tag { display: inline-flex; }
 .loves-ico { font-size: 15px; line-height: 1; padding: 2px 3px; background: #fff; border: 1.5px solid #f8bbd0; border-radius: 7px; }
