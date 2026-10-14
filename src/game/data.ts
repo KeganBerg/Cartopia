@@ -511,8 +511,22 @@ export const takesDriver = (d: BuildingDef) => !d.parked && !!d.jobSeconds && d.
 export const loves = (car: CarDef, buildingId: string) => car.likes.includes(buildingId)
 export const driverBonus = (car: CarDef, buildingId: string) => (loves(car, buildingId) ? FAVORITE_BONUS : DRIVER_BONUS)
 // Coins a job pays with this driver (null: no working driver).
-export const driverPayout = (d: BuildingDef, level: number, car: CarDef | null) =>
-  Math.round(upgradePayout(d, level) * (1 + (car ? driverBonus(car, d.id) : 0)))
+// `boost` is the merge bonus of the block the building sits in (see MERGE_BONUS).
+export const driverPayout = (d: BuildingDef, level: number, car: CarDef | null, boost = 0) =>
+  Math.round(upgradePayout(d, level) * (1 + (car ? driverBonus(car, d.id) : 0) + boost))
+
+// Merging pays: every building in a merged block earns this much more coins and
+// parts per job, and a merged house or gas station holds this much more fuel,
+// keyed by how many buildings went in (a pair, a 2x2, a giant 4x4). The server
+// guard banks the same extra (supabase/migrations/0088_merge_bonus.sql).
+export const MERGE_BONUS: Record<number, number> = { 2: 0.1, 4: 0.25, 16: 0.5 }
+export const mergeBonus = (members: number) => MERGE_BONUS[members] ?? 0
+export const mergedParts = (d: BuildingDef, level: number, boost = 0) => Math.round(upgradePartsPayout(d, level) * (1 + boost))
+// Extra fuel a merged block of `n` houses or gas stations holds, rounded up for the whole block.
+export const mergedFuelExtra = (d: BuildingDef, level: number, n: number) => Math.ceil(upgradeFuelCap(d, level) * n * mergeBonus(n) - 1e-9)
+// What a merge boosts for this kind of building: coins and parts for a business, fuel for a house or gas station.
+export const mergeGain = (d: BuildingDef): '💰' | '⛽' | null =>
+  d.jobSeconds && d.kind !== 'obstacle' ? '💰' : d.fuelCap || d.kind === 'house' ? '⛽' : null
 
 export type UpgradeSlot = 'engine' | 'turbo' | 'tires' | 'weight'
 export const UPGRADE_SLOTS: { id: UpgradeSlot; name: string }[] = [

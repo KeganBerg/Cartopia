@@ -1,14 +1,14 @@
 // Merged buildings: two matching buildings side by side can be merged into one
 // wide building (1x2), four standing in a square into one big building (2x2),
 // and four of those into a giant one (4x4), so a packed town still reads from
-// far out. Merging is only a look and one tap for
-// the lot: every building stays in the save with its own job, level and driver,
-// so the economy and the cloud guard see exactly what they saw before. The
+// far out. One tap works the lot, and every building stays in the save with its
+// own job, level and driver, but each earns the block's merge bonus on top
+// (MERGE_BONUS in data.ts: +10% a pair, +25% a 2x2, +50% a 4x4). The
 // top-left building of the block carries `merge` (see MERGE_CODES); the rest are found by
 // position. A block that no longer lines up (moved on an older build, levels
 // differ) simply shows as separate buildings again.
 
-import { buildingDef, buildingLevel, MAX_BUILDING_LEVEL } from './data'
+import { buildingDef, buildingLevel, MAX_BUILDING_LEVEL, mergeBonus, mergedFuelExtra } from './data'
 import type { PlacedBuilding } from './store'
 
 // Save value -> buildings across and down: 2 is a 2x2 square, 4 a 4x4, 21 two
@@ -98,6 +98,20 @@ export function mergeGroups(buildings: PlacedBuilding[]): Merges {
 export function groupOf(buildings: PlacedBuilding[], uid: string, merges = mergeGroups(buildings)) {
   const a = merges.owner.get(uid)
   return a ? merges.groups.get(a) : undefined
+}
+
+// The merge bonus each merged building earns, by uid (loose buildings are left out).
+export function mergeBoosts(buildings: PlacedBuilding[], merges = mergeGroups(buildings)): Map<string, number> {
+  const out = new Map<string, number>()
+  for (const g of merges.groups.values()) for (const o of g.members) out.set(o.uid, mergeBonus(g.members.length))
+  return out
+}
+
+// Extra fuel every merged house and gas station block holds on top of its buildings' own.
+export function mergeFuel(buildings: PlacedBuilding[], merges = mergeGroups(buildings)) {
+  let n = 0
+  for (const g of merges.groups.values()) n += mergedFuelExtra(buildingDef(g.anchor.def), buildingLevel(g.anchor), g.members.length)
+  return n
 }
 
 // Blocks that could be merged right now: four matching buildings in a square

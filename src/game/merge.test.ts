@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
+import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { mergeGroups, mergeCandidates, applyMerge, applySplit, groupTurn, groupScale, rotateGroup, isLandmark } from './merge'
-import { useGame, type PlacedBuilding } from './store'
-import { buildingDef, buildingUpgradeCost, upgradePayout } from './data'
+import { mergeGroups, mergeCandidates, applyMerge, applySplit, groupTurn, groupScale, rotateGroup, isLandmark, mergeBoosts } from './merge'
+import { useGame, readyRewards, fuelCap, type PlacedBuilding } from './store'
+import { buildingDef, buildingUpgradeCost, upgradePayout, upgradeFuelCap, MERGE_BONUS } from './data'
 
 let n = 0
 const b = (def: string, x: number, z: number, extra: Partial<PlacedBuilding> = {}): PlacedBuilding => ({ uid: `b${n++}`, def, x, z, jobEndsAt: null, ...extra })
@@ -233,5 +234,58 @@ describe('landmark', () => {
     expect(isLandmark(mergeGroups(pair).groups.get(pair[0].uid)!)).toBe(false)
     const shops = [b('pizza', 0, 0, { level: 10, merge: 2 }), b('pizza', 1, 0, { level: 10 }), b('pizza', 0, 1, { level: 10 }), b('pizza', 1, 1, { level: 10 })]
     expect(isLandmark(mergeGroups(shops).groups.get(shops[0].uid)!)).toBe(false)
+  })
+})
+
+describe('merge bonus', () => {
+  const merged = (town: PlacedBuilding[], code: number) => applyMerge(town, mergeCandidates(town).find((c) => c.code === code)!)
+  const done = (town: PlacedBuilding[]) => town.map((o) => ({ ...o, jobEndsAt: 1 }))
+  const pay = (town: PlacedBuilding[]) => readyRewards({ buildings: done(town), cars: [], level: 5 }, Date.now()).coins
+
+  it('grows with the block: a pair, a 2x2, a giant 4x4', () => {
+    expect(MERGE_BONUS[2]).toBeGreaterThan(0)
+    expect(MERGE_BONUS[4]).toBeGreaterThan(MERGE_BONUS[2])
+    expect(MERGE_BONUS[16]).toBeGreaterThan(MERGE_BONUS[4])
+  })
+
+  it('a merged block earns more than the same buildings left loose', () => {
+    const loose = square('pizza', 2, 2, 2, { level: 3 })
+    const one = upgradePayout(buildingDef('pizza'), 3)
+    expect(pay(loose)).toBe(4 * one)
+    expect(pay(merged(loose, 2))).toBe(4 * Math.round(one * (1 + MERGE_BONUS[4])))
+    const pair = loose.slice(0, 2)
+    expect(pay(merged(pair, 21))).toBe(2 * Math.round(one * (1 + MERGE_BONUS[2])))
+    expect([...mergeBoosts(merged(loose, 2)).values()]).toEqual([0.25, 0.25, 0.25, 0.25])
+  })
+
+  it('pays it on a tap and on Collect All', () => {
+    const town = merged(square('pizza', 2, 2, 2), 2)
+    const one = upgradePayout(buildingDef('pizza'), 1)
+    const bonus = 4 * Math.round(one * (1 + MERGE_BONUS[4]))
+    useGame.setState({ buildings: done(town), coins: 0, level: 5, xp: 0, levelUp: null, visiting: null, stats: { ...useGame.getState().stats, coinsEarned: 0 } })
+    useGame.getState().tapBuilding(town[0].uid)
+    expect(useGame.getState().stats.coinsEarned).toBe(bonus)
+    useGame.setState({ buildings: done(town), stats: { ...useGame.getState().stats, coinsEarned: 0 } })
+    useGame.getState().collectAll()
+    expect(useGame.getState().stats.coinsEarned).toBe(bonus)
+  })
+
+  it('merged houses and gas stations hold more fuel', () => {
+    const houses = square('house', 0, 0, 2, { level: 4 })
+    const base = fuelCap({ level: 5, buildings: houses })
+    expect(base).toBe(fuelCap({ level: 5, buildings: [] }) + 4 * upgradeFuelCap(buildingDef('house'), 4))
+    expect(fuelCap({ level: 5, buildings: merged(houses, 2) })).toBe(base + Math.ceil(4 * 3 * MERGE_BONUS[4]))
+  })
+})
+
+describe('merge bonus on the server', () => {
+  // The guard banks the bonus by merge code (see 0088_merge_bonus.sql): its numbers must match MERGE_BONUS.
+  it('matches MERGE_BONUS', () => {
+    const dir = `${process.cwd()}/supabase/migrations`
+    const sql = readdirSync(dir).sort().map((f) => readFileSync(`${dir}/${f}`, 'utf8')).filter((q) => q.includes('-- merge:begin')).pop()!
+    const block = sql.slice(sql.indexOf('-- merge:begin'), sql.indexOf('-- merge:end'))
+    const codes: Record<string, number> = { 21: 2, 12: 2, 2: 4, 4: 16 }
+    for (const [code, n] of Object.entries(codes)) expect(block).toContain(`when '${code}' then ${n} * ${MERGE_BONUS[n]}`)
+    expect(sql).toContain(`least(m.want, ${MERGE_BONUS[16]} * m.n)`)
   })
 })

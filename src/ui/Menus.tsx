@@ -145,7 +145,7 @@ function EditBar() {
   const canMerge = useGame((s) => (s.mode === 'merge' ? mergeCandidates(s.buildings).length > 0 || s.buildings.some((b) => b.merge) : true))
   const hint =
     mode === 'expand' ? 'Tap a For Sale sign to buy land'
-    : mode === 'merge' ? (canMerge ? 'Tap a Merge badge to combine buildings' : 'Put 2 or 4 matching buildings side by side')
+    : mode === 'merge' ? (canMerge ? 'Tap a Merge badge to combine buildings' : 'Line up 2 or 4 matching buildings · up to +50% 💰')
     : mode === 'road' ? 'Drag to lay road · $10 a tile'
     : mode === 'bulldoze' ? 'Drag to remove · buildings go to Inventory'
     : mode === 'move' && again && selected ? 'Built! Drag or rotate it'

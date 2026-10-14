@@ -3,8 +3,8 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { Vector3, type Group, type Mesh, type PerspectiveCamera } from 'three'
 import { useGame } from '../game/store'
 import {
-  buildingDef, buildingLevel, upgradable, upgradePayout, upgradePartsPayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap,
-  buildingUpgradeCost, maxLevel, themable, decorGrows, TOURIST_PER_LEVEL, VISITORS, houseResidents, levelName, buildingUpgradeXp, BUILDINGS, CARS, takesDriver, loves, driverPayout, carDef, type BuildingDef,
+  buildingDef, buildingLevel, upgradable, upgradePayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap,
+  buildingUpgradeCost, maxLevel, themable, decorGrows, TOURIST_PER_LEVEL, VISITORS, houseResidents, levelName, buildingUpgradeXp, BUILDINGS, CARS, takesDriver, loves, driverPayout, mergedParts, mergedFuelExtra, mergeBonus, mergeGain, carDef, type BuildingDef,
 } from '../game/data'
 import { workingDriver, type PlacedBuilding } from '../game/store'
 import { groupOf, isLandmark, LANDMARK_NAME, mergeGroups } from '../game/merge'
@@ -180,6 +180,9 @@ export function UpgradePanel() {
   // A merged block shows and upgrades all its buildings at once.
   const members = groupOf(s.buildings, b.uid)?.members ?? [b]
   const k = members.length
+  // Merged blocks earn a bonus on top (MERGE_BONUS): +10% a pair, +25% a 2x2, +50% a 4x4.
+  const boost = k > 1 ? mergeBonus(k) : 0
+  const gain = boost ? mergeGain(d) : null
   const one = buildingUpgradeCost(d, lvl)
   const cost = { coins: one.coins * k, parts: one.parts * k }
   const sum = (f: (o: PlacedBuilding) => number) => members.reduce((t, o) => t + f(o), 0)
@@ -189,14 +192,15 @@ export function UpgradePanel() {
   const rows: { label: string; now: string; next: string }[] = []
   if (d.jobSeconds) {
     const driver = members.some((o) => workingDriver(s, o))
-    rows.push({ label: driver ? 'Coins per job (with driver)' : 'Coins per job', now: `$${n(sum((o) => driverPayout(d, lvl, workingDriver(s, o))))}`, next: `$${n(sum((o) => driverPayout(d, next, workingDriver(s, o))))}` })
-    if (d.partsPayout) rows.push({ label: 'Parts per job', now: `⚙ ${upgradePartsPayout(d, lvl) * k}`, next: `⚙ ${upgradePartsPayout(d, next) * k}` })
+    rows.push({ label: driver ? 'Coins per job (with driver)' : 'Coins per job', now: `$${n(sum((o) => driverPayout(d, lvl, workingDriver(s, o), boost)))}`, next: `$${n(sum((o) => driverPayout(d, next, workingDriver(s, o), boost)))}` })
+    if (d.partsPayout) rows.push({ label: 'Parts per job', now: `⚙ ${mergedParts(d, lvl, boost) * k}`, next: `⚙ ${mergedParts(d, next, boost) * k}` })
     rows.push({ label: 'Job time', now: time(upgradeJobSeconds(d, lvl)), next: time(upgradeJobSeconds(d, next)) })
     rows.push({ label: 'XP per job', now: `${upgradeXp(d, lvl) * k}`, next: `${upgradeXp(d, next) * k}` })
   }
   // Grown decor draws more tourists (see touristWeight in data.ts).
   if (decorGrows(d)) rows.push({ label: '📸 Tourists', now: `+${tourPct(lvl) * k}%`, next: `+${tourPct(next) * k}%` })
-  if (upgradeFuelCap(d, next) > 0) rows.push({ label: 'Max fuel', now: `+${upgradeFuelCap(d, lvl) * k}`, next: `+${upgradeFuelCap(d, next) * k}` })
+  const fuel = (l: number) => upgradeFuelCap(d, l) * k + (k > 1 ? mergedFuelExtra(d, l, k) : 0)
+  if (upgradeFuelCap(d, next) > 0) rows.push({ label: 'Max fuel', now: `+${fuel(lvl)}`, next: `+${fuel(next)}` })
   // A business that rebuilds into its next form says what it becomes.
   if (d.kind !== 'house' && levelName(d, next) !== levelName(d, lvl)) rows.push({ label: 'Building', now: levelName(d, lvl), next: levelName(d, next) })
   const block = groupOf(s.buildings, b.uid)
@@ -215,6 +219,7 @@ export function UpgradePanel() {
       <div className="upgrade">
         <LevelPreview def={d} level={canUp ? next : lvl} landmark={becomes} />
         {canUp && <Pips level={lvl} max={maxLevel(d)} />}
+        {gain && <p className="merge-boost" title="Merge bonus">🧩 ×{k} · {gain} +{Math.round(boost * 100)}%</p>}
         {!canUp ? null : max ? (
           <p className="upgrade-max">⭐ Max level</p>
         ) : (
