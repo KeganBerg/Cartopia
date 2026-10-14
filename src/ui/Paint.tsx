@@ -3,6 +3,7 @@ import { FINISHES, PAINTS, STRIPES, dealOffer, finishDef, paintJobCost, type Fin
 import { CLASS_TIERS, carClassTier } from '../game/mastery'
 import { PAINTS_TO_COLLECT, earnHint, paintOpen, paintsOpen, rivalForPaint } from '../game/paintRivals'
 import { openPaintRival } from './PaintRivals'
+import { CustomColour } from './ColourPicker'
 
 export const jobOf = (car: OwnedCar): PaintJob => ({ color: car.color, finish: car.finish ?? 'gloss', stripe: car.stripe ?? null })
 
@@ -28,9 +29,10 @@ export function PaintShop({ car, job, setJob }: { car: OwnedCar; job: PaintJob; 
   const roadItems = useGame((s) => s.roadItems)
   const mastery = useGame((s) => s.mastery)
   const worldTour = useGame((s) => s.worldTour)
+  const skins = useGame((s) => s.skins)
   const tier = carClassTier(mastery, car.model)
   const now = jobOf(car)
-  const open = (color: string) => color === now.color || paintOpen({ rivalRow, oldPaints, roadItems, mastery, worldTour }, color)
+  const open = (color: string) => color === now.color || paintOpen({ rivalRow, oldPaints, roadItems, mastery, worldTour, skins }, color)
   // A locked colour can be tried on; the bar then points at the rival who has it.
   const lockedBy = open(job.color) ? null : rivalForPaint(job.color)
   const changed = !same(job, now)
@@ -43,7 +45,7 @@ export function PaintShop({ car, job, setJob }: { car: OwnedCar; job: PaintJob; 
   }
   const label = [
     job.finish !== now.finish && finishDef(job.finish).name,
-    job.color !== now.color && (PAINTS.find((p) => p.color === job.color)?.name ?? 'New colour'),
+    job.color !== now.color && (PAINTS.find((p) => p.color === job.color)?.name ?? 'Custom colour'),
     job.stripe !== now.stripe && (job.stripe ? 'stripes' : 'no stripes'),
   ].filter(Boolean).join(' · ')
   const price = [cost.coins && `$${cost.coins.toLocaleString()}`, cost.bucks && `💎 ${cost.bucks}`].filter(Boolean).join(' + ') || 'Free'
@@ -80,7 +82,7 @@ export function PaintShop({ car, job, setJob }: { car: OwnedCar; job: PaintJob; 
           )
         })}
       </div>
-      <h4>Colour <small title="Beat paint rivals in the Race menu to win more colours">🎨 {paintsOpen({ rivalRow, oldPaints })}/{PAINTS_TO_COLLECT}</small></h4>
+      <h4>Colour <small title="Beat paint rivals in the Race menu to win more colours">🎨 {paintsOpen({ rivalRow, oldPaints, skins })}/{PAINTS_TO_COLLECT}</small></h4>
       <div className="paints">
         {PAINTS.map((p) => {
           const locked = !open(p.color)
@@ -96,6 +98,7 @@ export function PaintShop({ car, job, setJob }: { car: OwnedCar; job: PaintJob; 
             >{locked && <span className="dot-lock" aria-hidden>🔒</span>}</button>
           )
         })}
+        <CustomColour color={job.color} custom={!PAINTS.some((p) => p.color === job.color)} onPick={(c) => pick({ color: c })} />
       </div>
       <h4>Racing stripes <small>$100</small></h4>
       <div className="paints">

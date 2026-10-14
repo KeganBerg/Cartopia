@@ -4,7 +4,7 @@ import {
   PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS,
   upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, jobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, maxLevel, themable, RESCUE_SPOTS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, refillBucks, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, activeEvent, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modFits, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, CREW_CHEST, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower, seasonNumber, seasonOf, SEASON_STARS, skinDef, ownedSkins, seasonSkin, modSkinDef, ownedModSkins, seasonModSkin, SKINNED_SLOTS, type SkinnedSlot, fittedMods, SEASON_TIERS, STARS_PER_TIER, SEASON_CAR_BUCKS, dealsFor, dealOffer, type DealDef, type DealKind,
 } from './data'
-import { PAINT_COST, PANELS, PATTERNS, STARTER_PAINTS, isBike, panelJobCost, tidyPanels, type Panels, RUSTY_SETS, hotSpot, rarityWeight, truckOf, TRUCK, BAY2_LEVEL } from './data'
+import { PAINT_COST, hasCustomPaint, isHexColor, PANELS, PATTERNS, STARTER_PAINTS, isBike, panelJobCost, tidyPanels, type Panels, RUSTY_SETS, hotSpot, rarityWeight, truckOf, TRUCK, BAY2_LEVEL } from './data'
 import { cleanHat, earnedHats, hatDef, hatQuestOf, newHatQuest, ownedHats, sameHat, type HatFit, type HatQuest } from './hats'
 import { raceCarOf } from './raceCar'
 import { sfx } from '../lib/sound'
@@ -24,7 +24,7 @@ import { EVENT_RACES, eventBonus, eventFor, eventIsBoss, eventPrize, eventProgre
 import { trialWeek } from './trial'
 import { groupOf, groupTurn, mergeCandidates, applyMerge, applySplit, rotateGroup, isLandmark, LANDMARK_NAME } from './merge'
 import { togglePick } from './meet'
-import { crateCost, crateDef, pityHit, rollCrate, rollSourcePiece, type CrateId, type CrateOpen } from './crates'
+import { crateCost, crateDef, crateOwnedSkins, pityHit, rollCrate, rollSourcePiece, type CrateId, type CrateOpen } from './crates'
 import { pieceId } from './resto'
 import { rollWheel, type WheelSpin } from './wheel'
 import { LIVE_LOSS_SHARE, LOSS_SHARE, boostFor, placeShare, boostLabel, emptyBoosts, welcomeBack, type BoostMode, type Boosts } from './boosts'
@@ -1769,8 +1769,8 @@ export const useGame = create<GameState>()(
         const car = s.cars.find((c) => c.uid === cuid)
         const paint = PAINTS.find((p) => p.color === job.color)
         const fin = FINISHES.find((f) => f.id === job.finish)
-        // A car can keep a factory colour that isn't on the paint chart.
-        if (!car || (!paint && job.color !== car.color) || !fin || !STRIPES.includes(job.stripe)) return false
+        // A car can keep a factory colour that isn't on the paint chart; Custom Colour paints any.
+        if (!car || (!paint && job.color !== car.color && !(hasCustomPaint(s) && isHexColor(job.color))) || !fin || !STRIPES.includes(job.stripe)) return false
         if (job.color !== car.color && !paintOpen(s, job.color)) {
           const r = rivalForPaint(job.color)
           s.toast(r ? `Beat ${r.name} to unlock ${paint!.name}` : paint?.earn ? `${paint.name}: ${earnHint(job.color)}` : 'That colour is locked')
@@ -1816,7 +1816,7 @@ export const useGame = create<GameState>()(
         for (const pn of PANELS) {
           const v = next?.[pn.id]
           if (!v) continue
-          if ((bike && pn.car) || (v.color && (!pn.color || !PAINTS.some((p) => p.color === v.color))) || (v.pattern && !pn.pattern)) return false
+          if ((bike && pn.car) || (v.color && (!pn.color || !(PAINTS.some((p) => p.color === v.color) || (hasCustomPaint(s) && isHexColor(v.color))))) || (v.pattern && !pn.pattern)) return false
           // Rival colours stay locked panel by panel too, but a panel keeps the colour it has.
           if (v.color && v.color !== was?.[pn.id]?.color && !paintOpen(s, v.color)) {
             const r = rivalForPaint(v.color)
@@ -2603,7 +2603,7 @@ export async function openCrate(id: CrateId, free?: string): Promise<CrateOpen[]
     useGame.getState().toast(msg === 'soon' ? 'Crates open for signed-in towns very soon!' : msg.includes('one crate') ? 'One crate at a time!' : "Couldn't open the crate. Try again.")
     return null
   }
-  if (!opens) opens = [{ crate: id, cost, drop: rollCrate(def, s.level, s.cars, Math.random, { skins: ownedSkins(s), modSkins: ownedModSkins(s), hats: ownedHats(s), pieces: s.restoParts ?? [] }, s.cratePity?.[id] ?? 0) }]
+  if (!opens) opens = [{ crate: id, cost, drop: rollCrate(def, s.level, s.cars, Math.random, { skins: crateOwnedSkins(s), modSkins: ownedModSkins(s), hats: ownedHats(s), pieces: s.restoParts ?? [] }, s.cratePity?.[id] ?? 0) }]
   for (const o of opens) useGame.getState().applyCrate(o)
   // The server may hand back earlier opens the save missed instead: the free crate is only used once one opened free.
   if (free && opens.some((o) => o.crate === id && !o.cost.coins && !o.cost.bucks)) used()

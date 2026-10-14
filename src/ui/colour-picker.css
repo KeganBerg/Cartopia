@@ -1,0 +1,30 @@
+/* Custom Colour: the rainbow dot at the end of a paint row and the picker it flies out. */
+.dot.cc-dot { position: relative; box-shadow: 0 0 0 2px #ffc94d, 0 0 10px #ffc94d; }
+.dot.cc-dot.locked { opacity: .85; }
+.dot.cc-dot.sel, .dot.cc-dot.open { box-shadow: 0 0 0 3px var(--accent), 0 0 12px #ffc94d; }
+.cc-fly {
+  flex: 1 0 100%; box-sizing: border-box; display: grid; gap: 10px; padding: 12px; margin-top: 4px;
+  background: #fff; border: 2.5px solid #ffc94d; border-radius: 14px; box-shadow: 0 4px 0 rgba(0,0,0,.18), 0 0 18px rgba(255,201,77,.45);
+  transform-origin: 100% 0; animation: cc-fly .28s cubic-bezier(.2,1.4,.4,1);
+}
+@keyframes cc-fly { from { opacity: 0; transform: translate(12px, -14px) scale(.3); } }
+.cc-sv {
+  position: relative; height: 150px; border-radius: 10px; touch-action: none; cursor: crosshair;
+  background-image: linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent);
+}
+.cc-hue {
+  position: relative; height: 26px; border-radius: 13px; touch-action: none; cursor: pointer;
+  background: linear-gradient(90deg, #f00, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00);
+}
+.cc-sv i, .cc-hue i {
+  position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; pointer-events: none;
+  border: 3px solid #fff; box-shadow: 0 0 0 1.5px rgba(0,0,0,.5), 0 2px 4px rgba(0,0,0,.4); background: var(--cc);
+}
+.cc-hue i { top: 50%; }
+.cc-now { display: flex; align-items: center; gap: 8px; font: 16px var(--display); color: #37474f; }
+.cc-now span { width: 30px; height: 30px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px #90a4ae; }
+.cc-fly.locked { grid-template-columns: auto 1fr auto; align-items: center; }
+.cc-big { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-size: 18px; box-shadow: 0 0 0 2px #ffc94d; }
+.cc-lock-text { display: grid; line-height: 1.2; }
+.cc-lock-text b { font: 16px var(--display); color: #37474f; }
+.cc-lock-text small { font-weight: 800; font-size: 13px; color: #b7791f; white-space: nowrap; }
