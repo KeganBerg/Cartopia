@@ -1,5 +1,4 @@
--- PENDING: the economy thread gives this its migration number and runs it. Standalone: no change
--- to econ_catalog(), econ_guard() or crates; no prizes yet (see the note at the end).
+-- Standalone: no change to econ_catalog(), econ_guard() or crates; prizes come in 0087.
 --
 -- Weekly arcade boards (src/lib/arcadeBoard.ts). One board per game per week, resetting Monday
 -- 00:00 UTC (public.this_week(), from 0004). Parking Pro has none: its lots are a ladder, not a score.
@@ -38,8 +37,8 @@ language sql immutable set search_path = '' as $$
     when 'wash' then v <= secs and v <= 60
     -- A delivery every 3 seconds at the very most.
     when 'delivery' then v <= secs / 3 and v <= 60
-    -- Four jumps, each under 1,500 points.
-    when 'stunt' then v <= 6000
+    -- Four jumps, each under 1,500 points, and a jump takes over 3 seconds (run-up, air, landing).
+    when 'stunt' then v <= 6000 and v <= 1500 * floor(secs / 3)
     else false end
 $$;
 
@@ -95,7 +94,10 @@ begin
   if me is null then
     raise exception 'sign in to post scores' using errcode = 'insufficient_privilege';
   end if;
-  select * into r from public.arcade_scores where week = wk and game = g and owner_id = me for update;
+  -- The run's own week, so a run that crosses Monday 00:00 UTC still counts (on the week it began).
+  select * into r from public.arcade_scores where game = g and owner_id = me and started_at is not null and week >= wk - 7
+  order by week desc limit 1 for update;
+  wk := coalesce(r.week, wk);
   if r.started_at is null or now() - r.started_at > interval '10 minutes' then
     raise exception 'no run to finish' using errcode = 'check_violation';
   end if;
@@ -117,5 +119,4 @@ revoke execute on function public.arcade_start(text), public.arcade_submit(text,
 grant execute on function public.arcade_start(text), public.arcade_submit(text, numeric), public.arcade_board(text) to authenticated;
 grant execute on function public.arcade_board(text) to anon;
 
--- Prizes (Kegan asked for a crate for each week's top 3): not here. Like trial_prizes in 0026, they
--- need econ_guard to know about them before a client pays them; that is the economy thread's call.
+-- Prizes (a Gold crate for each week's top 3 per game) are 0087, by the economy thread.

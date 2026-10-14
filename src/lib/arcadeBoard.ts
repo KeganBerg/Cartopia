@@ -2,7 +2,7 @@ import { supabase } from './supabase'
 import { signedInUser } from './cloud'
 import type { ArcadeGame } from '../game/arcade'
 
-// Weekly arcade boards (supabase/arcade_boards.pending.sql until it has a migration number).
+// Weekly arcade boards (supabase/migrations/0086_arcade_boards.sql).
 // Signed-in players post results; everyone can look. Until the SQL is run every call here
 // quietly comes back empty and the boards stay hidden.
 
