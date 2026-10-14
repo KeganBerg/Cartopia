@@ -1,4 +1,4 @@
--- 0088 Car value pass (2026-10-14, thread "Car PI progression curve"; Kegan: a weak car costing ~10k more than
+-- 0089 Car value pass (2026-10-14, thread "Car PI progression curve"; Kegan: a weak car costing ~10k more than
 -- what a crate hands out "is not worth getting"). econ_catalog() is rebuilt from econCatalog() and
 -- crate_open(text, text) is 0087's (arcade free-crate source, 0085's caps, 0084's mods, 0082's batch
 -- blocks, 0081's custompaint) with only its tables regenerated from crateTables().
