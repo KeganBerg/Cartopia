@@ -29,6 +29,7 @@ import { lampPost, themeFor } from '../game/cityLook'
 import { Manhole } from './BuildingDetail'
 import { GrassTufts } from './Tufts'
 import { Outskirts } from './Outskirts'
+import { townExits } from './townExits'
 import { RoadWear, StreetProp, PROPS, Hydrant, StreetLamp, Sidewalk, CornerCurb, CornerFillet, ENDS, type End } from './Roadside'
 import { toWorld, toTile, DIRS } from './grid'
 import { grassTex, paverTex, meadowTex } from './textures'
@@ -791,7 +792,8 @@ export const World = memo(function World() {
     }),
     [],
   )
-  const outskirts = useMemo(() => <Outskirts land={land} roads={roadsList} small={small()} />, [land, roadsList])
+  const exits = useMemo(() => townExits(roadsList), [roadsList])
+  const outskirts = useMemo(() => <Outskirts land={land} exits={exits} small={small()} />, [land, exits])
   const tufts = useMemo(() => <GrassTufts land={land} roads={roadsList} buildings={buildings} />, [land, roadsList, buildings])
   return (
     <>

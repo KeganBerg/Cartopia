@@ -27,6 +27,7 @@ let pulse = -1
 let rave = 0
 let raveBeat = -1
 let kickAt = -Infinity
+let gridAt = -Infinity
 let groove = -1
 const last = Object.fromEntries(CUES.map((k) => [k, { at: -Infinity, amt: 0 }])) as Record<CueKind, { at: number; amt: number }>
 
@@ -42,7 +43,9 @@ export type ClubPulse = {
   flash: number // 0..1, peaks on each kick and fades
   live: boolean // following the music (false: the muted pulse)
   groove: number // the track playing (-1: none, the muted pulse or Rave Mode)
-  beat: number // 0..1 through the current beat
+  beat: number // 0..1 since the last kick or beat cue (jumps on an off-beat kick)
+  grid: number // 0..1 through the beat on the track's steady beat grid (never jumps but at the wrap)
+  bpm: number
   env: Record<CueKind, number> // 0..1 per part, peaking on each of its notes
 }
 
@@ -62,7 +65,7 @@ export function clubPulse(now = performance.now(), bpm = bpmAt(Date.now() - (per
     const beat = (wall - technoDrop()) / (4 * SIXTEENTH_MS) - b.beat
     const e = Object.fromEntries(CUES.map((k) => [k, 0])) as Record<CueKind, number>
     e.kick = b.kick
-    return { step: rave, flash: Math.max(b.kick, b.drop), live: true, groove: -1, beat, env: e }
+    return { step: rave, flash: Math.max(b.kick, b.drop), live: true, groove: -1, beat, grid: beat - Math.floor(beat), bpm: 60000 / (4 * SIXTEENTH_MS), env: e }
   }
   hits.sort((a, b) => a.at - b.at)
   while (hits.length && hits[0].at <= now) {
@@ -74,7 +77,7 @@ export function clubPulse(now = performance.now(), bpm = bpmAt(Date.now() - (per
       step++
       kickAt = h.at
     }
-    if (h.kind === 'beat') kickAt = h.at
+    if (h.kind === 'beat') kickAt = gridAt = h.at
     if (now - h.at < FADE[h.kind] * 3) last[h.kind] = { at: h.at, amt: h.amt }
   }
   const live = now - heard < QUIET_MS
@@ -88,10 +91,11 @@ export function clubPulse(now = performance.now(), bpm = bpmAt(Date.now() - (per
       }
       pulse = beat
     }
-    kickAt = Math.floor(now / beatMs) * beatMs
+    kickAt = gridAt = Math.floor(now / beatMs) * beatMs
   } else pulse = -1
   const e = env(now)
-  return { step, flash: e.kick, live, groove: live ? groove : -1, beat: Math.min(1, Math.max(0, (now - kickAt) / beatMs)), env: e }
+  const g = (now - gridAt) / beatMs
+  return { step, flash: e.kick, live, groove: live ? groove : -1, beat: Math.min(1, Math.max(0, (now - kickAt) / beatMs)), grid: Number.isFinite(g) ? g - Math.floor(g) : 0, bpm, env: e }
 }
 
 // For tests.
@@ -103,6 +107,7 @@ export function resetClubBeat() {
   rave = 0
   raveBeat = -1
   kickAt = -Infinity
+  gridAt = -Infinity
   groove = -1
   for (const k of CUES) last[k] = { at: -Infinity, amt: 0 }
 }

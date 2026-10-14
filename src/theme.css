@@ -348,3 +348,17 @@ body:has(.edit-bar) .tutorial { bottom: calc(150px + var(--sab)); }
 :root .inv-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 32px 12px; font: 18px var(--display); color: #4a6283; }
 :root .inv-empty .gi { color: #2f6fd6; }
 :root .inv-count { font: 18px var(--display); color: var(--ink); }
+
+/* Bank: its own gold vault button beside the season star, so gems are never hard to find */
+:root .bank-btn { background: linear-gradient(#ffe066, #f0a400); color: var(--line); border-color: var(--line); }
+:root .bank-btn:hover { filter: brightness(1.05); }
+
+/* Detail pass: one size for long titles, every ribbon in the same bevelled style, a close
+   button that matches the bigger titles, and desktop tabs a touch larger. */
+:root .panel-head h2.long { font-size: 25px; -webkit-text-stroke-width: 5px; }
+@media (max-width: 600px) { :root .panel-head h2.long { font-size: 22px; -webkit-text-stroke-width: 4.5px; } }
+:root .ribbon { font: 12px/1 var(--display); letter-spacing: .6px; padding: 4px 10px; border: 2px solid var(--line); border-radius: 9px; box-shadow: inset 0 2px 0 rgba(255,255,255,.4), 0 2px 0 rgba(0,0,0,.25); text-shadow: 0 1px 0 rgba(0,0,0,.35); top: -12px; }
+@media (min-width: 601px) {
+  :root .panel-head .close { width: 42px; height: 42px; }
+  :root .sheet-tabs button { font-size: 15px; }
+}
