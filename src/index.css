@@ -2260,3 +2260,6 @@ body:has(.race-full) .toasts { display: none; }
 .dash-hot div { width: min(200px, 50vw); height: 12px; border-radius: 6px; border: 2px solid #fff; background: rgba(27,31,36,.5); overflow: hidden; position: relative; }
 .dash-hot i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #ff3d00, #ffab00); }
 @media (max-height: 500px) { .dash-hot { top: calc(72px + var(--sat)); } }
+
+/* The shared canvas in a view that takes its own taps (see moveTo in scene/Stage.tsx). */
+.stage-through, .stage-through * { pointer-events: none !important; }

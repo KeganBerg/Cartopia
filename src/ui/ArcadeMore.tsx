@@ -5,7 +5,7 @@ import {
   dashStars, pitStars, recordStars, starReward, stuntStars, washStars, type StarGameId,
 } from '../game/arcadeMore'
 import { PitScene, type PitEnd, type PitHud, type PitInput } from '../scene/PitScene'
-import { WashScene, type WashEnd, type WashHud, type WashInput } from '../scene/WashScene'
+import { WashScene, type WashEnd, type WashHud, type WashInput, type WashPop } from '../scene/WashScene'
 import { DeliveryScene, type DashEnd, type DashHud, type DashPop } from '../scene/DeliveryScene'
 import { StuntScene, type StuntEnd, type StuntHud, type StuntInput } from '../scene/StuntScene'
 import { KeyHints, TouchDrive, newDriveInput, useDriveKeys, useTall, useTouchDevice } from './DriveControls'
@@ -19,9 +19,9 @@ import { StageSlot, useStageReady } from '../scene/Stage'
 
 export const STAR_GAMES: { id: StarGameId; name: string; art: string; tip: string }[] = [
   { id: 'pit', name: 'Pit Stop', art: '🔧🏎️', tip: 'Brake, remember, go' },
-  { id: 'wash', name: 'Car Wash', art: '🧽🫧', tip: 'Scrub off the mud' },
-  { id: 'delivery', name: 'Delivery Dash', art: '🍕🚗', tip: 'Beat the clock' },
-  { id: 'stunt', name: 'Stunt Ramp', art: '🔥🚙', tip: 'Jump and flip' },
+  { id: 'wash', name: 'Car Wash', art: '🧽🫧', tip: 'Wash the whole line' },
+  { id: 'delivery', name: 'Delivery Dash', art: '🍕🚗', tip: 'Hot pizza, dodge traffic' },
+  { id: 'stunt', name: 'Stunt Ramp', art: '🔥🚙', tip: 'Flip, roll, hit the target' },
 ]
 
 type Done = (stars: number, result: number, line: string) => void
@@ -125,7 +125,7 @@ function PitGame({ car, running, onDone }: GameProps) {
   const pedal = running && (hud.phase === 'in' || hud.phase === 'hold' || hud.phase === 'green')
   return (
     <>
-      <StageSlot cam={PIT_CAM}>{scene}</StageSlot>
+      <StageSlot cam={PIT_CAM} through>{scene}</StageSlot>
       {/* Brake and go: hold or tap anywhere, with the big button as the picture of it. */}
       {pedal && <div className="pit-pedal" {...holdTo((on) => { if (on) input.presses++; input.pedal = on })} />}
       {[0, 1, 2, 3].map((i) => (
@@ -150,11 +150,16 @@ function PitGame({ car, running, onDone }: GameProps) {
 
 function WashGame({ car, running, onDone }: GameProps) {
   const input = useRef<WashInput>({ x: 0, y: 0, down: false, moved: 0 }).current
-  const [hud, setHud] = useState<WashHud>({ left: WASH_SPOTS, time: WASH_TIME })
+  const [hud, setHud] = useState<WashHud>({ cars: 0, left: WASH_SPOTS, time: WASH_TIME, pop: null })
+  const [pop, setPop] = useState<WashPop | null>(null)
+  const onHud = useStable((h: WashHud) => {
+    setHud(h)
+    if (h.pop) setPop(h.pop)
+  })
   const [sponge, setSponge] = useState<{ x: number; y: number } | null>(null)
   const box = useRef<HTMLDivElement>(null)
-  const onEnd = useStable((e: WashEnd) => onDone(washStars(e.cleaned, WASH_SPOTS, e.timeLeft), e.cleaned === WASH_SPOTS ? Math.round(e.timeLeft) : 0, `🧽 ${e.cleaned}/${WASH_SPOTS} · ⏱ ${Math.round(e.timeLeft)}s left`))
-  const scene = useMemo(() => <WashScene me={look(car)} input={input} running={running} onHud={setHud} onEnd={onEnd} />, [car, input, running, onEnd])
+  const onEnd = useStable((e: WashEnd) => onDone(washStars(e.cars), e.cars, `🚗 ${e.cars} washed`))
+  const scene = useMemo(() => <WashScene me={look(car)} input={input} running={running} onHud={onHud} onEnd={onEnd} />, [car, input, running, onHud, onEnd])
   const at = (e: React.PointerEvent) => {
     const r = box.current!.getBoundingClientRect()
     return { x: e.clientX - r.left, y: e.clientY - r.top }
@@ -174,14 +179,16 @@ function WashGame({ car, running, onDone }: GameProps) {
         onPointerCancel={() => { input.down = false; setSponge(null) }}
         onPointerLeave={() => { input.down = false; setSponge(null) }}
       >
-        <StageSlot cam={WASH_CAM}>{scene}</StageSlot>
+        <StageSlot cam={WASH_CAM} through>{scene}</StageSlot>
         {sponge && <div className="arc-sponge" style={{ left: sponge.x, top: sponge.y }}>🧽</div>}
       </div>
       <div className="arc-hud">
         <span className={hud.time < 6 ? 'arc-time low' : 'arc-time'}>⏱ {Math.ceil(hud.time)}s</span>
+        <span>🚗 {hud.cars}</span>
         <span>🟤 {hud.left}</span>
       </div>
-      {running && hud.left === WASH_SPOTS && <div className="arc-tip">Rub the mud off 👆</div>}
+      {pop && <div key={pop.id} className={`chase-pop ${pop.kind === 'quick' ? 'nitro' : ''}`}>{pop.text}</div>}
+      {running && hud.cars === 0 && hud.left === WASH_SPOTS && <div className="arc-tip">Rub the mud off 👆</div>}
     </>
   )
 }
@@ -247,7 +254,7 @@ function StuntGame({ car, running, onDone }: GameProps) {
       }}
       onPointerUp={release}
       onPointerCancel={release}>
-      <StageSlot cam={STUNT_CAM}>{scene}</StageSlot>
+      <StageSlot cam={STUNT_CAM} through>{scene}</StageSlot>
       <div className="arc-hud">
         <span>🏁 {hud.jump}/{STUNT_JUMPS}</span>
         <span className="arc-score">{hud.score.toLocaleString()}</span>

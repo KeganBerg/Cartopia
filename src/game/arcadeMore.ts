@@ -58,13 +58,17 @@ export function pitStars(time: number) {
 }
 
 // ---------- Car Wash Frenzy ----------
-// Mud spots on the car; each needs this much scrubbing (pointer travel in screen pixels).
-export const WASH_TIME = 25
-export const WASH_SPOTS = 12
-export const SCRUB_PX = 260
-export function washStars(cleaned: number, total: number, timeLeft: number) {
-  if (cleaned < total) return cleaned >= total * 0.75 ? 1 : 0
-  return timeLeft >= 8 ? 3 : timeLeft >= 3 ? 2 : 1
+// A line of muddy cars rolls in: rub the mud spots off each one before the clock runs out.
+// Every clean car adds time (more for a quick one) and the next rolls in.
+export const WASH_TIME = 30
+export const WASH_SPOTS = 6 // mud spots on each car
+// Pointer travel (screen pixels) to clear one spot: each car down the line is muddier.
+export const scrubNeed = (car: number) => 200 + Math.min(12, car) * 30
+// Seconds back for a clean car, shrinking down the line, plus a bonus for a quick one.
+export const washBonus = (car: number, quick: boolean) => Math.max(0.5, 2 - car * 0.15) + (quick ? 1 : 0)
+export const WASH_QUICK = 3.5
+export function washStars(cars: number) {
+  return cars >= 10 ? 3 : cars >= 6 ? 2 : cars >= 3 ? 1 : 0
 }
 
 // ---------- Delivery Dash ----------
@@ -174,6 +178,8 @@ export function loadStars(): StarBests {
     const raw = JSON.parse(localStorage.getItem(KEY) ?? '{}')
     const out = { ...EMPTY }
     for (const id of Object.keys(EMPTY) as StarGameId[]) {
+      // Car Wash counted seconds left before it became a line of cars (v2); those bests don't carry over.
+      if (id === 'wash' && raw?.v !== 2) continue
       const v = raw?.[id]
       if (v && typeof v.stars === 'number' && typeof v.best === 'number') out[id] = { stars: Math.max(0, Math.min(3, v.stars)), best: v.best }
     }
@@ -189,7 +195,7 @@ export function recordStars(id: StarGameId, stars: number, result: number) {
   const better = stars > 0 && (old.best === 0 || (lowerIsBetter(id) ? result < old.best : result > old.best))
   all[id] = { stars: Math.max(old.stars, stars), best: better ? result : old.best }
   try {
-    localStorage.setItem(KEY, JSON.stringify(all))
+    localStorage.setItem(KEY, JSON.stringify({ ...all, v: 2 }))
   } catch {
     // Private mode: bests just don't stick.
   }

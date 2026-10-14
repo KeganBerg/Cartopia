@@ -22,7 +22,7 @@ import { create } from 'zustand'
 type Cam = { position: [number, number, number]; fov: number; near: number; far: number; shadows?: boolean; dpr?: number }
 type StageState = { node: ReactNode; slot: HTMLElement | null; cam: Cam; run: number; ready: number; used: boolean; gen: number }
 // A view that's open, under the one on top (a turntable opened over another one).
-type Entry = { run: number; el: HTMLElement; cam: Cam; node: ReactNode }
+type Entry = { run: number; el: HTMLElement; cam: Cam; node: ReactNode; through?: boolean }
 
 let runs = 0
 
@@ -46,10 +46,15 @@ function makeStage(tone: ToneMapping) {
     Object.assign(host.style, { position: 'fixed', left: '-10px', top: '0', width: '2px', height: '2px', visibility: 'hidden', pointerEvents: 'none' })
     document.body.appendChild(host)
   }
-  function moveTo(el: HTMLElement) {
+  // `through`: taps and drags go past the canvas to the view's own elements. The canvas is a
+  // React portal from App, so React handlers on the view (round the slot) never see events
+  // that land on the canvas itself.
+  function moveTo(el: HTMLElement, through = false) {
     const h = hostDiv()
     // Hidden until this race's first frame, so the last race's picture never shows.
     Object.assign(h.style, { position: 'absolute', left: '0', top: '0', width: '100%', height: '100%', visibility: 'hidden', pointerEvents: '' })
+    // The canvas's own wrapper sets pointer-events itself, so a class turns off the lot (index.css).
+    h.classList.toggle('stage-through', through)
     el.appendChild(h)
   }
 
@@ -156,14 +161,14 @@ function makeStage(tone: ToneMapping) {
 
   // Takes the place of a <Canvas>: the shared canvas moves in here and draws `children`.
   // A view opened over another takes the canvas, and gives it back when it closes.
-  function StageSlot({ cam, children }: { cam: Cam; children: ReactNode }) {
+  function StageSlot({ cam, children, through = false }: { cam: Cam; children: ReactNode; through?: boolean }) {
     const slot = useRef<HTMLDivElement>(null)
     const [run] = useState(() => ++runs)
-    const [entry] = useState<Entry>(() => ({ run, el: null!, cam, node: children }))
+    const [entry] = useState<Entry>(() => ({ run, el: null!, cam, node: children, through }))
     useLayoutEffect(() => {
       entry.el = slot.current!
       open.push(entry)
-      moveTo(entry.el)
+      moveTo(entry.el, entry.through)
       useStage.setState({ slot: entry.el, cam, run, used: true, ready: -1, node: children })
       return () => {
         pinPrograms()
@@ -171,7 +176,7 @@ function makeStage(tone: ToneMapping) {
         if (useStage.getState().run !== run) return
         const back = open[open.length - 1]
         if (back) {
-          moveTo(back.el)
+          moveTo(back.el, back.through)
           useStage.setState({ slot: back.el, cam: back.cam, run: back.run, ready: -1, node: back.node })
         } else {
           useStage.setState({ slot: null, node: null })

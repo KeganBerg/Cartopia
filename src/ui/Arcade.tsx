@@ -80,7 +80,7 @@ export function ArcadePanel() {
           <div className="arc-tile chase">
             <div className="arc-art">🚓💨🚗</div>
             <b>Getaway Chase</b>
-            <small>Swipe to dodge traffic</small>
+            <small>Near misses, nitro, lose the cop</small>
             <span className="arc-best">🏆 {bests.chase.toLocaleString()}</span>
             <button className="buy" disabled={!car} onClick={() => { if (payFuel('a getaway', 'chase')) setPlaying({ game: 'chase' }) }}>Play · <Cost game="chase" /></button>
           </div>
@@ -93,7 +93,7 @@ export function ArcadePanel() {
           </div>
           {STAR_GAMES.map((g) => {
             const b = starBests[g.id]
-            const best = b.best ? (g.id === 'pit' ? `⏱ ${b.best}s` : g.id === 'delivery' ? `🍕 ${b.best}` : g.id === 'stunt' ? `🔥 ${b.best.toLocaleString()}` : '') : ''
+            const best = b.best ? (g.id === 'pit' ? `⏱ ${b.best}s` : g.id === 'delivery' ? `🍕 ${b.best}` : g.id === 'stunt' ? `🔥 ${b.best.toLocaleString()}` : `🚗 ${b.best}`) : ''
             return (
               <div key={g.id} className={`arc-tile ${g.id}`}>
                 <div className="arc-art">{g.art}</div>
@@ -185,7 +185,7 @@ function ChaseGame({ car, onExit }: { car: OwnedCar; onExit: () => void }) {
         input.moves.push(e.clientX > window.innerWidth / 2 ? 1 : -1)
       }}
     >
-      <StageSlot key={`scene${run}`} cam={CHASE_CAM}>{scene}</StageSlot>
+      <StageSlot key={`scene${run}`} cam={CHASE_CAM} through>{scene}</StageSlot>
       <LoadingScene key={`load${run}`} ready={stageReady} label="Getting away" onReady={() => setDrawn(run)} onClose={onExit} />
       <div className="rf-top">
         <h2>🚓 Getaway Chase</h2>
