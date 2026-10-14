@@ -75,6 +75,18 @@ export function Pool({ r, x = 0, z = 0 }: { r: number; x?: number; z?: number })
   )
 }
 
+// Light falling on the ground in front of a lit wall, starting at the wall
+// (z) and reaching d out from it. Lies just above the club's red carpet so the
+// carpet catches it too.
+function Wash({ k, x, z, w, d }: { k: 'washLed' | 'washPink' | 'spillWarm'; x: number; z: number; w: number; d: number }) {
+  return (
+    <mesh rotation-x={-Math.PI / 2} position={[x, LAYER.lot + 0.03, z + d / 2]} renderOrder={2}>
+      <planeGeometry args={[w, d]} />
+      <primitive object={glowMats[k]} attach="material" dispose={null} />
+    </mesh>
+  )
+}
+
 // Neon tubes stay lit day and night; one material per colour keeps them mergeable.
 export function Neon({ at, s, c }: { at: V3; s: V3; c: string }) {
   return (
@@ -991,8 +1003,17 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
               <Cyl m={m} at={[0, 0.2, 0]} r={0.09} h={0.08} c="#eceff1" seg={10} />
             </group>
           ))}
-          {!ghost && <Pool r={0.8} x={CLUB.doorX} z={0.8} />}
-          {!ghost && <Pool r={0.9} x={0.75} z={0.85} />}
+          {/* Light on the pavement, from what really lights it: the LED window's
+              colour washing out from the wall, pink from the sconces and the
+              corner neon, warm light under the canopy's bulbs. Kept inside the lot. */}
+          {!ghost && (
+            <>
+              <Wash k="washLed" x={0.5} z={zf} w={2.3} d={0.6} />
+              {[-1, 1].map((sd) => <Wash key={sd} k="washPink" x={dx + sd * 0.36} z={zf} w={0.46} d={0.36} />)}
+              {[-1, 1].map((sd) => <Wash key={`c${sd}`} k="washPink" x={sd * (w / 2 - 0.2)} z={zf} w={0.5} d={0.34} />)}
+              <Wash k="spillWarm" x={dx} z={zf + 0.12} w={0.9} d={0.66} />
+            </>
+          )}
           {!ghost && <ClubLife lvl={lvl} roofY={h + 0.135} roofZ={z0} floorY={floor.y} floorZ={floor.z} floorW={floor.w} floorD={floor.d} />}
         </ShellBuilding>
       )
