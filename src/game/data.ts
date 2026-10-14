@@ -176,6 +176,8 @@ export function eventEndsAt(e: GameEvent, now = Date.now()) {
 export const PLOT = 8
 export const PLOT_MIN = -2
 export const PLOT_MAX = 4
+// The empty lot in the starter town saved for Rusty's Rescue, the mandatory first build (top-left tile).
+export const RUSTY_LOT: [number, number] = [12, 12]
 export const START_LAND = [0, 1, 2].flatMap((x) => [0, 1, 2].map((z) => `${x},${z}`))
 export const plotPrice = (bought: number) => Math.round((5000 * Math.pow(1.45, bought)) / 500) * 500
 

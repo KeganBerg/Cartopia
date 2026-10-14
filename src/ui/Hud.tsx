@@ -12,6 +12,7 @@ import { Icon, CoinIcon, BuckIcon, PartsIcon, FuelIcon } from './Icon'
 import { Roll } from './Fly'
 import { compact } from './format'
 import { useTipTarget } from './Tips'
+import { useUnlock, freshClass } from '../game/unlocks'
 import { TechnoTag } from './Techno'
 
 const n = (v: number) => v.toLocaleString()
@@ -56,42 +57,50 @@ export function Hud() {
   const now = useNow()
   const cap = fuelCap(s)
   const nextIn = s.fuel >= cap ? null : Math.max(0, FUEL_REGEN_SECONDS - Math.floor((now - s.fuelUpdatedAt) / 1000))
+  // New players start with coins and their level; the rest arrives as it's needed (src/game/unlocks.ts).
+  const fuel = useUnlock('fuel')
+  const gems = useUnlock('gems')
+  const parts = useUnlock('parts')
+  const cars = useUnlock('cars')
+  const trophies = useUnlock('trophies')
+  const social = useUnlock('social')
+  const season = useUnlock('season')
   return (
     <>
       <div className="hud-left">
         <Speedometer level={s.level} xp={s.xp} onClick={() => s.openPanel('account')} />
         <div className="pills">
           <button className="pill" onClick={() => s.showNeed('coins', 0)}><span className="ico cur-ico" data-fly="coins"><CoinIcon /></span><Roll value={s.coins} format={compact} /><span className="plus"><Icon name="plus" size={12} /></span></button>
-          <button className={`pill${tip === 'gems' ? ' tut-pulse' : ''}`} onClick={() => s.openPanel('bank')}><span className="ico cur-ico" data-fly="bucks"><BuckIcon /></span>{compact(s.bucks)}<span className="plus"><Icon name="plus" size={12} /></span></button>
-          <button className="pill" onClick={() => s.showNeed('parts', 0)}><span className="ico cur-ico" data-fly="parts"><PartsIcon /></span><Roll value={s.parts} format={compact} /><span className="plus"><Icon name="plus" size={12} /></span></button>
+          {gems.on && <button className={`pill${tip === 'gems' ? ' tut-pulse' : ''}${freshClass(gems.fresh)}`} onClick={() => s.openPanel('bank')}><span className="ico cur-ico" data-fly="bucks"><BuckIcon /></span>{compact(s.bucks)}<span className="plus"><Icon name="plus" size={12} /></span></button>}
+          {parts.on && <button className={`pill${freshClass(parts.fresh)}`} onClick={() => s.showNeed('parts', 0)}><span className="ico cur-ico" data-fly="parts"><PartsIcon /></span><Roll value={s.parts} format={compact} /><span className="plus"><Icon name="plus" size={12} /></span></button>}
         </div>
       </div>
       <div className="hud-center">
         <div className="town-name">{s.visiting?.townName ?? s.townName}</div>
         <TechnoTag />
-        {!s.visiting && <button className="my-cars" onClick={() => s.openPanel('garage')}><Icon name="car" size={18} /> <span className="my-cars-label">MY CARS:</span> {s.cars.length}</button>}
+        {!s.visiting && cars.on && <button className={`my-cars${freshClass(cars.fresh)}`} onClick={() => s.openPanel('garage')}><Icon name="car" size={18} /> <span className="my-cars-label">MY CARS:</span> {s.cars.length}</button>}
         <UpdatePill />
         <GoalTracker />
       </div>
       <div className="hud-right">
-        <button className={`fuel${tip === 'fuel' ? ' tut-pulse' : ''}`} onClick={() => s.showNeed('fuel', 0)}>
+        {fuel.on && <><button className={`fuel${tip === 'fuel' ? ' tut-pulse' : ''}${freshClass(fuel.fresh)}`} onClick={() => s.showNeed('fuel', 0)}>
           <div className="fuel-bar">
             <div style={{ width: `${Math.min(100, (s.fuel / cap) * 100)}%` }} />
             <span>{compact(s.fuel)}/{compact(cap)}</span>
           </div>
           <span className="ico cur-ico"><FuelIcon /></span>
         </button>
-        <div className="fuel-sub">{nextIn === null ? 'Fuel full' : `+1 fuel in ${nextIn}s`}</div>
+        <div className="fuel-sub">{nextIn === null ? 'Fuel full' : `+1 fuel in ${nextIn}s`}</div></>}
         <div className="hud-right-row">
-          <button className="pill trophies" title="Leaderboards" onClick={() => s.openPanel('leaders')}><Icon name="trophy" size={16} /> {compact(s.trophies)}</button>
-          <SeasonButton />
-          <DealsButton />
+          {trophies.on && <button className={`pill trophies${freshClass(trophies.fresh)}`} title="Leaderboards" onClick={() => s.openPanel('leaders')}><Icon name="trophy" size={16} /> {compact(s.trophies)}</button>}
+          {season.on && <SeasonButton />}
+          {season.on && <DealsButton />}
           <MuteButton />
         </div>
-        <div className="hud-right-row">
+        {social.on && <div className="hud-right-row">
           <ChallengeBell />
           <GiftBell />
-        </div>
+        </div>}
       </div>
       {/* Phones: one compact strip across the top, town label under it. */}
       <div className="hud-mobile">
@@ -99,24 +108,24 @@ export function Hud() {
           <Speedometer level={s.level} xp={s.xp} onClick={() => s.openPanel('account')} />
           <div className="hud-chips">
             <button className="chip-stat" onClick={() => s.showNeed('coins', 0)}><span className="ico cur-ico" data-fly="coins"><CoinIcon /></span><Roll value={s.coins} format={compact} /></button>
-            <button className={`chip-stat${tip === 'gems' ? ' tut-pulse' : ''}`} onClick={() => s.openPanel('bank')}><span className="ico cur-ico" data-fly="bucks"><BuckIcon /></span>{compact(s.bucks)}</button>
-            <button className="chip-stat" onClick={() => s.showNeed('parts', 0)}><span className="ico cur-ico" data-fly="parts"><PartsIcon /></span><Roll value={s.parts} format={compact} /></button>
-            <button className={`chip-stat chip-fuel${tip === 'fuel' ? ' tut-pulse' : ''}`} onClick={() => s.showNeed('fuel', 0)}>
+            {gems.on && <button className={`chip-stat${tip === 'gems' ? ' tut-pulse' : ''}${freshClass(gems.fresh)}`} onClick={() => s.openPanel('bank')}><span className="ico cur-ico" data-fly="bucks"><BuckIcon /></span>{compact(s.bucks)}</button>}
+            {parts.on && <button className={`chip-stat${freshClass(parts.fresh)}`} onClick={() => s.showNeed('parts', 0)}><span className="ico cur-ico" data-fly="parts"><PartsIcon /></span><Roll value={s.parts} format={compact} /></button>}
+            {fuel.on && <button className={`chip-stat chip-fuel${tip === 'fuel' ? ' tut-pulse' : ''}${freshClass(fuel.fresh)}`} onClick={() => s.showNeed('fuel', 0)}>
               <span className="ico cur-ico"><FuelIcon /></span>
               <span className="chip-fuel-bar"><i style={{ width: s.fuel > 0 ? `max(4px, ${Math.min(100, (s.fuel / cap) * 100)}%)` : 0 }} /><b>{compact(s.fuel)}/{compact(cap)}</b></span>
-            </button>
+            </button>}
           </div>
           <div className="hud-actions">
-            <SeasonButton />
-            <DealsButton />
-              <ChallengeBell />
-            <GiftBell />
+            {season.on && <SeasonButton />}
+            {season.on && <DealsButton />}
+            {social.on && <ChallengeBell />}
+            {social.on && <GiftBell />}
           </div>
         </div>
         <div className="hud-town">
           <span className="hud-town-name">{s.visiting?.townName ?? s.townName}</span>
-          {!s.visiting && <button onClick={() => s.openPanel('garage')}><Icon name="car" size={15} /> {s.cars.length}</button>}
-          <button onClick={() => s.openPanel('leaders')}><Icon name="trophy" size={16} /> {compact(s.trophies)}</button>
+          {!s.visiting && cars.on && <button className={freshClass(cars.fresh).trim() || undefined} onClick={() => s.openPanel('garage')}><Icon name="car" size={15} /> {s.cars.length}</button>}
+          {trophies.on && <button className={freshClass(trophies.fresh).trim() || undefined} onClick={() => s.openPanel('leaders')}><Icon name="trophy" size={16} /> {compact(s.trophies)}</button>}
           <TechnoTag short />
         </div>
         <UpdatePill />

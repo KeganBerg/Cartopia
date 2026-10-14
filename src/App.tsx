@@ -38,6 +38,7 @@ import { GhostRacePanel, TauntWatcher, TauntsPanel } from './ui/GhostRace'
 import { GoalsPanel, FlatPanel } from './ui/Goals'
 import { SeasonPanel } from './ui/Season'
 import { useGame } from './game/store'
+import { setCalmSky } from './game/weather'
 import { startCloudSync } from './lib/cloud'
 import { startPurchaseSync } from './lib/payments'
 import './lib/rescue'
@@ -125,6 +126,12 @@ export default function App() {
     // Checked again when it fires: a cloud save may have loaded since, already claimed today.
     // On first launch it waits for the flashing-lights warning (FlashWarning opens it after).
     setTimeout(() => { if (!flashWarningOpen()) openDaily() }, 800)
+    // A new player's first spin is the tutorial's reward: it opens once the tutorial is done or skipped.
+    const unsubDaily = useGame.subscribe((s, prev) => {
+      if (s.tutorial >= 99 && prev.tutorial < 99) setTimeout(openDaily, 1200)
+      setCalmSky(s.tutorial < 99)
+    })
+    setCalmSky(useGame.getState().tutorial < 99)
     // ?visitor=racer|tourist|mystery|barn brings a guest's visitor right away (for testing).
     const forced = new URLSearchParams(location.search).get('visitor') as VisitorKind | null
     if (forced) setTimeout(() => forceVisitor(forced), 2500)
@@ -135,6 +142,7 @@ export default function App() {
     return () => {
       clearInterval(id)
       clearTimeout(splashFallback)
+      unsubDaily()
       clearTimeout(prefetch)
       stopSplashCar()
     }

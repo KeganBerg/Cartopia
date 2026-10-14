@@ -19,7 +19,7 @@ const TIPS: Tip[] = [
   { id: 'garage', icon: '🔧', text: 'Upgrade your car under CARS to win more races.', target: 'cars', when: (s) => (s.stats.races ?? 0) >= 1 && (s.stats.upgrades ?? 0) === 0, go: (s) => s.openPanel('garage') },
   { id: 'fuel', icon: '⛽', text: 'Jobs burn fuel. It refills by itself over time.', target: 'fuel', when: (s) => s.fuel <= 3 },
   { id: 'tires', icon: '🛞', text: `Build a Tire Shop: ${FEATURES.tires}.`, target: 'shop', when: (s) => s.level >= 2 && !owns(s, 'tires'), go: build('tires') },
-  { id: 'crates', icon: '📦', text: 'Crates under CARS hold cars, parts and skins.', target: 'cars', when: (s) => s.level >= 2, go: (s) => s.openPanel('crates') },
+  { id: 'crates', icon: '📦', text: 'Crates under CARS hold cars, parts and skins.', target: 'cars', when: () => true, go: (s) => s.openPanel('crates') },
   { id: 'crew', icon: '👥', text: `Build a Crew House: ${FEATURES.crew}.`, target: 'shop', when: (s) => s.level >= 3 && !owns(s, 'crew'), go: build('crew') },
   { id: 'arcade', icon: '🕹️', text: `Build the Arcade: ${FEATURES.arcade}.`, target: 'shop', when: (s) => s.level >= 5 && !owns(s, 'arcade'), go: build('arcade') },
 ]

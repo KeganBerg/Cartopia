@@ -516,10 +516,13 @@ export function starterTown(): SaveState {
     trophies: 0,
     racesWon: 0,
     roads: [...new Set(roads)],
+    // Everything a new player needs sits on the cross street in the middle of the screen:
+    // the pizza places either side of RUSTY_LOT (kept empty for Rusty's), the showroom and
+    // garage across the street. The open lots further along invite the next builds.
     buildings: [
-      b('showroom', 9, 9), b('garage', 13, 9), b('gas', 6, 3), b('pizza', 10, 3), b('pizza', 12, 3),
-      b('pizza', 17, 10), b('house', 5, 9), b('house', 6, 9), b('house', 7, 9), b('house', 5, 10),
-      b('house', 15, 17), b('house', 16, 17), b('house', 17, 17), b('tree', 5, 7), b('tree', 16, 9),
+      b('showroom', 9, 9), b('garage', 13, 9), b('gas', 6, 9), b('pizza', 10, 12), b('pizza', 15, 12),
+      b('pizza', 8, 12), b('house', 5, 5), b('house', 6, 5), b('house', 7, 5), b('house', 5, 6),
+      b('house', 15, 17), b('house', 16, 17), b('house', 17, 17), b('tree', 5, 7), b('tree', 17, 9),
       b('tree', 17, 15), b('tree', 8, 16), b('tree', 6, 14), b('tree', 11, 17), b('tree', 18, 6),
       b('tree', 14, 7), b('tree', 2, 2), b('tree', 21, 3), b('tree', 2, 21), b('tree', 21, 21),
     ],
@@ -1127,11 +1130,11 @@ export const useGame = create<GameState>()(
           sfx.coin()
           fx({ kind: 'collect', uids: [buid], coins: pay, parts, xp })
           s.toast(`+${pay} coins${parts ? `, +${parts} parts` : ''}, +${xp} XP`)
-          // Sometimes a car out on the job comes back with a flat.
+          // Sometimes a car out on the job comes back with a flat (never during the tutorial).
           let cars = s.cars
           const rolling = cars.filter((c) => !c.flat && !c.lowFuel)
           const roll = Math.random()
-          if (rolling.length > 1 && roll < FLAT_CHANCE + LOW_FUEL_CHANCE) {
+          if (s.tutorial >= 99 && rolling.length > 1 && roll < FLAT_CHANCE + LOW_FUEL_CHANCE) {
             const victim = rolling[Math.floor(Math.random() * rolling.length)]
             const flat = roll < FLAT_CHANCE
             cars = cars.map((c) => (c.uid === victim.uid ? (flat ? { ...c, flat: true } : { ...c, lowFuel: true }) : c))
