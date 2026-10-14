@@ -14,7 +14,7 @@ for (const form of (process.env.FORMS ?? 'phone,desktop').split(',')) {
   await p.evaluate(() => window.__game.setState({ tutorial: 99, level: 20, coins: 120000, fuel: 99, panel: null }))
   await p.evaluate(() => window.__game.getState().openPanel('arcade'))
   await p.waitForSelector('.arc-tile', { timeout: 60000 })
-  await p.click('.arc-tile.chase .buy')
+  await p.click('.arc-tile.chase .buy', { noWaitAfter: true, timeout: 90000 })
   await p.waitForFunction(() => window.__chase, null, { timeout: 90000 })
   await p.waitForFunction(() => window.__chase.t > 0.5, null, { timeout: 120000 })
   // Bot: dodge whatever is in our lane close ahead, so near misses happen.

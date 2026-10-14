@@ -20,9 +20,9 @@ for (const form of forms) {
     await p.waitForTimeout(1500)
     if (g === 'panel') { await p.screenshot({ path: `${out}/${form}-panel.png` }); await p.close(); continue }
     if (g === 'park') {
-      await p.click('.arc-tile.park .buy')
-      await p.click('.arc-lot >> nth=0')
-    } else await p.click(`.arc-tile.${g} .buy`)
+      await p.click('.arc-tile.park .buy', { noWaitAfter: true, timeout: 90000 })
+      await p.click('.arc-lot >> nth=0', { noWaitAfter: true, timeout: 90000 })
+    } else await p.click(`.arc-tile.${g} .buy`, { noWaitAfter: true, timeout: 90000 })
     await p.waitForSelector('.stage-slot[data-ready="1"]', { timeout: 90000 }).catch(() => console.log('no ready', g))
     await p.waitForTimeout(Number(process.env.WAIT ?? 9000))
     if (g === 'chase') for (let i = 0; i < 6; i++) { await p.keyboard.press(i % 2 ? 'ArrowLeft' : 'ArrowRight'); await p.waitForTimeout(700) }

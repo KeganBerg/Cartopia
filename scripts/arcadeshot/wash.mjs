@@ -14,7 +14,7 @@ for (const form of (process.env.FORMS ?? 'phone,desktop').split(',')) {
   await p.evaluate(() => window.__game.setState({ tutorial: 99, level: 20, coins: 120000, fuel: 99, panel: null }))
   await p.evaluate(() => window.__game.getState().openPanel('arcade'))
   await p.waitForSelector('.arc-tile', { timeout: 60000 })
-  await p.click('.arc-tile.wash .buy')
+  await p.click('.arc-tile.wash .buy', { noWaitAfter: true, timeout: 90000 })
   await p.waitForFunction(() => window.__wash && window.__wash.t > 0.3, null, { timeout: 120000 })
   // Scrub a few strokes across the car, then (to save time in a slow headless browser) mark the
   // rest clean and finish with one more stroke so the car rolls out and the next one rolls in.

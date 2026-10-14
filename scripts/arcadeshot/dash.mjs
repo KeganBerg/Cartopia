@@ -14,7 +14,7 @@ for (const form of (process.env.FORMS ?? 'phone,desktop').split(',')) {
   await p.evaluate(() => window.__game.setState({ tutorial: 99, level: 20, coins: 120000, fuel: 99, panel: null }))
   await p.evaluate(() => window.__game.getState().openPanel('arcade'))
   await p.waitForSelector('.arc-tile', { timeout: 60000 })
-  await p.click('.arc-tile.delivery .buy')
+  await p.click('.arc-tile.delivery .buy', { noWaitAfter: true, timeout: 90000 })
   await p.waitForFunction(() => window.__dash && window.__dash.t > 0.3, null, { timeout: 120000 })
   // Park the car a little behind a traffic car with a hot order on board, and pop a hot drop.
   await p.evaluate(() => {
