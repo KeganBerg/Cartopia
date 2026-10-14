@@ -8,6 +8,8 @@ import { signedInUser } from '../lib/cloud'
 import { displayName } from '../lib/names'
 import { fetchBoard, fetchPrizes, localBest, saveLocalBest, startRun, submitRun, type Board, type TrialPrizes } from '../lib/trialServer'
 import { LoadingBand } from './Loading'
+import { artStyle } from './venueArt'
+import { TileClip } from './TileClip'
 
 // The Race menu's weekly time trial tab: this week's venue, prizes, the board, and runs.
 
@@ -46,54 +48,49 @@ export function TrialTab({ myPi, onRun }: { myPi: number; onRun: (run: TrialRun)
   const meShown = rows.some((r) => r.owner === uid)
 
   return (
-    <div className="trial">
-      <div className={`camp-chapter venue-${v.id}`}>
-        <div className="camp-banner">
-          <span className="camp-banner-ico">{v.icon}</span>
-          <div>
-            <b>⏱️ Weekly Time Trial</b>
-            <small>{v.name} · ⏳ {shortLeft(msToNextWeek())} left</small>
-          </div>
-          <div className="camp-rewards" title="Prizes when the week ends">
+    <div className={`rm-split rm-prow tt${supabase ? '' : ' solo'}`}>
+      <div className="rm-left">
+        <div className="rm-banner rm-photo" style={artStyle('trial', v.id)}>
+          <TileClip mode="trial" venue={v.id} />
+          <span className="rm-eyebrow">{v.icon} {v.name} · ⏳ {shortLeft(msToNextWeek())}</span>
+          <b className="rm-ttl">⏱️ Weekly Time Trial</b>
+          <span className="rm-chips" title="Prizes when the week ends">
             {TRIAL_PRIZES.slice(0, 3).map((p, i) => <span key={i}>{MEDAL[i]} <Bucks n={p.bucks} /></span>)}
             <span>Top 10 <Bucks n={TRIAL_PRIZES[3].bucks} /></span>
-          </div>
-        </div>
-        <div className="trial-me">
-          <span className="trial-best">
-            <small>Your best</small>
-            <b>{mine !== null ? `${mine.toFixed(3)}s` : '--'}</b>
           </span>
+        </div>
+        <div className="dr-best">
+          <span><small>Your best</small><b>{mine !== null ? `${mine.toFixed(3)}s` : '--'}</b></span>
           {board?.me && <span className="trial-place">{place(board.me.place)} <small>of {board.total}</small></span>}
           <button className="buy" onClick={run}>🏁 Run · ⛽{TRIAL_FUEL}</button>
         </div>
+        {unclaimed.map((p) => {
+          const prize = trialPrize(p.place)
+          return (
+            <div key={p.week} className="trial-prize">
+              <span className="trial-prize-medal">{place(p.place)}</span>
+              <div><b>Week of {weekOf(p.week)}</b><small>{p.t.toFixed(3)}s</small></div>
+              {prizes?.ready ? (
+                <button className="buy small" onClick={() => claim(p.week, p.place)}>
+                  Claim {prize.bucks > 0 && <><Bucks n={prize.bucks} /> </>}{money(prize.coins)} 🏆{prize.trophies}
+                </button>
+              ) : <span className="trial-soon" title="Prizes are being switched on. Yours is saved.">🎁 Soon</span>}
+            </div>
+          )
+        })}
       </div>
-
-      {unclaimed.map((p) => {
-        const prize = trialPrize(p.place)
-        return (
-          <div key={p.week} className="trial-prize">
-            <span className="trial-prize-medal">{place(p.place)}</span>
-            <div><b>Week of {weekOf(p.week)}</b><small>{p.t.toFixed(3)}s</small></div>
-            {prizes?.ready ? (
-              <button className="buy small" onClick={() => claim(p.week, p.place)}>
-                Claim {prize.bucks > 0 && <><Bucks n={prize.bucks} /> </>}{money(prize.coins)} 🏆{prize.trophies}
-              </button>
-            ) : <span className="trial-soon" title="Prizes are being switched on. Yours is saved.">🎁 Soon</span>}
-          </div>
-        )
-      })}
-
       {supabase && (
-        <div className="leaders">
-          {board === undefined && <LoadingBand label="Loading lap times" />}
-          {board && rows.length === 0 && <p className="empty-board">No times yet this week. Be the first!</p>}
-          {rows.map((r) => <Row key={r.owner} r={r} mine={r.owner === uid} />)}
-          {board?.me && !meShown && uid && <Row r={{ owner: uid, town: useGame.getState().townName, t: board.me.t, pi: myPi, car: null, place: board.me.place }} mine />}
+        <div className="rm-right">
+          <div className="leaders tt-board">
+            {board === undefined && <LoadingBand label="Loading lap times" />}
+            {board && rows.length === 0 && <p className="empty-board">No times yet this week. Be the first!</p>}
+            {rows.map((r) => <Row key={r.owner} r={r} mine={r.owner === uid} />)}
+            {board?.me && !meShown && uid && <Row r={{ owner: uid, town: useGame.getState().townName, t: board.me.t, pi: myPi, car: null, place: board.me.place }} mine />}
+          </div>
+          {!uid && (
+            <p className="hint">Sign in from the <button className="link" onClick={() => openPanel('account')}>Menu</button> to post your times and win prizes.</p>
+          )}
         </div>
-      )}
-      {supabase && !uid && (
-        <p className="hint">Sign in from the <button className="link" onClick={() => openPanel('account')}>Menu</button> to post your times and win prizes.</p>
       )}
     </div>
   )

@@ -3,7 +3,8 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { BackSide, Color, IcosahedronGeometry, Vector3, MeshBasicMaterial, MeshStandardMaterial, Object3D, type PerspectiveCamera, type Group, type InstancedMesh, type Mesh } from 'three'
 import type { Body, Finish, Panels, SkinnedSlot } from '../game/data'
 import type { HatFit } from '../game/hats'
-import { CarModel, carSize } from './CarModel'
+import { CarModel, carSize, wheelRig } from './CarModel'
+import { wheelPool } from './carBatch'
 import { signTexture } from './signTexture'
 import { skyTex, asphaltTex, paverTex, glowTex, sandTex, grassTex, beachSandTex, snowTex, concreteTex } from './textures'
 import { BuildingModel, LightPool } from './BuildingModel'
@@ -31,18 +32,22 @@ import { BoostTrail } from './boostTrail'
 import { Celebration } from './celebration'
 import { cheerDef, myCheer, myTrail, trailDef } from '../game/flair'
 import { reducedMotion } from '../game/fx'
+import { TOP_GEAR } from '../game/race'
+import { ANGLE_FOV, angleCam, damp, direct, ease, freshDirector, type Angle } from './raceCam'
 import type { Trim } from '../game/trim'
 
-// burning: the boost is firing (the chase camera punches in).
-export type RacerView = { dist: number; burning?: boolean }
+// burning: the boost is firing (the chase camera punches in); gear: the camera cuts to cinematic angles in top gear.
+export type RacerView = { dist: number; burning?: boolean; gear?: number }
+type CamMode = 'chase' | 'hero' | 'side' | Angle
 const SCALE = 0.25 // metres of race distance per world unit
 // How far past the finish line (race metres) a car has to coast and brake to a stop.
 const RUN_OUT = 150
 // The road carries on this far (world units) past the finish, so its end is always lost in the
-// haze instead of dropping off into nothing. The scenery stops a bit sooner (each venue dresses
-// ~45 units past the length it's given), where the fog has nearly swallowed it anyway.
-const TAIL = 120
-const DRESS = 70
+// haze instead of dropping off into nothing, and the scenery far enough that even with the cars
+// stopped at the end of the run-out (RUN_OUT, ~38 units) the view ahead stays dressed out to
+// where the fog swallows it (fogFar, up to 110 units).
+const TAIL = 170
+const DRESS = 150
 const LANE = 0.75
 
 // The finish plays back from a short history of where the race put each car, so it
@@ -507,6 +512,8 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
   }, [])
   // Each car is drawn with its nose on its race position, so whoever is ahead at the line looks it.
   const noses = [carSize(mine.body).len * 0.7, carSize(theirs.body).len * 0.7]
+  // Handles on each car's wheels, so they roll with the car's speed.
+  const rigs = useMemo(() => [wheelRig(mine.body), wheelRig(theirs.body)], [mine.body, theirs.body])
 
   // Past the line each car lifts, coasts a moment, then brakes to a stop well before the
   // road runs out, nose dipping as the brakes bite. Distances are race metres.
@@ -514,9 +521,14 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
   // The finish replay (see PHOTO_GAP): the race's own positions, stamped on the race's frame clock,
   // played back on a visual clock that can run slower than it.
   // hero: seconds into the finish hero shot (heroShot.ts), -1 before it, -2 once it's over.
-  const fx = useRef({ st: 0, vt: 0, hist: [] as { t: number; d: [number, number] }[], phase: 'race' as 'race' | 'slow' | 'after', photo: false, rate: 1, target: 1, side: false, since: 0, cut: false, shake: 0, hero: -1 })
-  const heroPos = useMemo(() => new Vector3(), [])
-  const heroAt = useMemo(() => new Vector3(), [])
+  const fx = useRef({ st: 0, vt: 0, hist: [] as { t: number; d: [number, number] }[], phase: 'race' as 'race' | 'slow' | 'after', photo: false, rate: 1, target: 1, side: false, since: 0, shake: 0, hero: -1 })
+  // The camera (see raceCam.ts): this frame's shot, the chase view tracked underneath it, and an eased hand-off.
+  const cams = useMemo(() => ({
+    mode: 'chase' as CamMode, started: false, dir: freshDirector(), fov: 55,
+    pos: new Vector3(), at: new Vector3(), chase: new Vector3(), chaseRel: new Vector3(), chasePos: new Vector3(), chaseAt: new Vector3(),
+    lastPos: new Vector3(), lastAt: new Vector3(), fromPos: new Vector3(), fromAt: new Vector3(), tmp: new Vector3(),
+    fromFov: 55, blend: 0, blendFor: 0,
+  }), [])
   // A glowing ribbon on the road behind each car while its boost burns.
   const trails = useMemo(() => [new BoostTrail(), new BoostTrail()], [])
   useEffect(() => () => trails.forEach((t) => t.dispose()), [trails])
@@ -568,6 +580,13 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
     })
     const cars = [meRef.current, themRef.current]
     cars.forEach((g, i) => g?.rotation.set(runs.current[i].dip * 0.035, 0, 0))
+    // Wheels roll at the car's speed (the cars are drawn 1.4x), but never more than about a sixth
+    // of a turn a frame: faster than that a spoked rim strobes and looks to stand still.
+    rigs.forEach((rig, i) => {
+      const roll = Math.min((runs.current[i].v * SCALE * vdt) / (rig.radius * 1.4), 1.1)
+      for (const w of rig.spin) if (w) w.rotation.x = (w.rotation.x + roll) % (Math.PI * 2)
+      rig.slots?.forEach((w, j) => w && wheelPool.place(w, rig.spin[j]))
+    })
     meRef.current?.position.set(LANE, 0, mz)
     themRef.current?.position.set(-LANE, 0, tz)
     trails[0].update(vdt, LANE, 0.16, mz - noses[0], 0, !!me.current?.burning && runs.current[0].cross < 0)
@@ -624,55 +643,110 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
 
     const cam = camera as PerspectiveCamera
     const tall = size.height > size.width
-    if (f.hero >= 0) {
-      f.hero += dt
-      if (heroShot.skip || f.hero >= HERO_TIME) {
-        // Over (or tapped past): the chase view glides back in from wherever the shot left off.
-        f.hero = -2
-        heroShot.on = false
-      } else {
-        const car = meRef.current!.position
-        // Round the inner flank, kept on the tarmac clear of the kerbside barriers.
-        heroCam(f.hero, car.x, 0, car.z, 0, noses[0] * 2 * (tall ? 1.25 : 1), -1, tall ? 2.5 : 2.3, heroPos, heroAt)
-        cam.fov = tall ? fov : 40
-        cam.updateProjectionMatrix()
-        cam.position.copy(heroPos)
-        cam.lookAt(heroAt)
-        return
-      }
-    }
-    if (f.side) {
-      f.cut = true
-      // Low on the kerb just past the line, looking back across it as the noses arrive.
-      if (cam.fov !== (tall ? fov : 34)) {
-        cam.fov = tall ? fov : 34
-        cam.updateProjectionMatrix()
-      }
-      // A tall phone screen stands back a little and looks down more, so the cars fill it rather than the sky.
-      if (tall) cam.position.set(ROAD + 0.5, 1.15, len + 3.9)
-      else cam.position.set(ROAD + 0.55, 0.7, len + 2.6)
-      cam.lookAt(-0.3, tall ? 0.05 : 0.3, len - 0.5)
-      return
-    }
+    const car = meRef.current?.position
+    if (!car) return
+    const c = cams
     // Speed widens the view a little, and the boost punches it wider still, so going fast feels fast.
     const pace = Math.min(1, ra.v / 160)
     const boosting = !!me.current?.burning && ra.cross < 0
     const want = fov + 7 * pace + (boosting ? 6 : 0)
-    if (f.cut) {
-      f.cut = false
-      cam.fov = want
-      // Cut straight back behind the cars rather than swooping through the barriers.
-      cam.position.set(tall ? 0 : LANE * 0.5, tall ? 2.7 : 2.2, mz - (tall ? 5.2 : 4.2))
-    } else cam.fov += (want - cam.fov) * Math.min(1, dt * (boosting ? 8 : 3))
-    cam.updateProjectionMatrix()
+    // The chase view is tracked every frame, even under another shot, so any shot can hand back to it.
     const lead = Math.max(mz, tz)
     const target = Math.min(mz, len + RUN_OUT * SCALE)
     // Tall phone screens get a higher, further-back chase view.
-    camera.position.lerp({ x: tall ? 0 : LANE * 0.5, y: tall ? 2.7 : 2.2, z: target - (tall ? 5.2 : 4.2) } as never, 0.15)
-    camera.lookAt(tall ? 0 : LANE * 0.3, 0.3, Math.min(target + 3 + (lead - target) * 0.3, len + RUN_OUT * SCALE + 4))
-    // A faint road buzz at speed, stronger under boost; gone once the cars are over the line.
-    f.shake += ((ra.cross < 0 ? pace * 0.012 + (boosting ? 0.02 : 0) : 0) - f.shake) * Math.min(1, dt * 6)
-    if (f.shake > 0.0005) camera.position.y += Math.sin(f.st * 53) * f.shake + Math.sin(f.st * 31) * f.shake * 0.6
+    // It rides with the car rather than trailing it, so at speed the world rushes past a car that holds
+    // its place in the frame; it eases back a little as the speed builds, and settles in as the car stops.
+    c.chase.set(tall ? 0 : LANE * 0.5, tall ? 2.7 : 2.2, target - (tall ? 5.2 : 4.2) - pace * 0.8)
+    if (!c.started) {
+      c.started = true
+      c.chaseRel.copy(cam.position).setZ(cam.position.z - target)
+      c.fov = cam.fov
+    }
+    c.chaseRel.lerp(c.tmp.copy(c.chase).setZ(c.chase.z - target), damp(6, dt))
+    c.chasePos.copy(c.chaseRel).setZ(c.chaseRel.z + target)
+    c.chaseAt.set(tall ? 0 : LANE * 0.3, 0.3, Math.min(target + 3 + (lead - target) * 0.3, len + RUN_OUT * SCALE + 4))
+
+    // This frame's shot: the finish hero shot, the trackside photo-finish camera, a top-gear angle, or the chase.
+    let mode: CamMode = 'chase'
+    let shotFov = want
+    let cut = false
+    if (f.hero >= 0) {
+      f.hero += dt
+      if (heroShot.skip || f.hero >= HERO_TIME) {
+        // Over (or tapped past): eases back to the chase view from wherever the shot left off.
+        f.hero = -2
+        heroShot.on = false
+      } else {
+        mode = 'hero'
+        // Round the inner flank, kept on the tarmac clear of the kerbside barriers.
+        heroCam(f.hero, car.x, 0, car.z, 0, noses[0] * 2 * (tall ? 1.25 : 1), -1, tall ? 2.5 : 2.3, c.pos, c.at)
+        shotFov = tall ? fov : 40
+      }
+    }
+    if (mode === 'chase' && f.side) {
+      mode = 'side'
+      // Low on the kerb just past the line, looking back across it as the noses arrive. A tall phone
+      // screen stands back a little and looks down more, so the cars fill it rather than the sky.
+      if (tall) c.pos.set(ROAD + 0.5, 1.15, len + 3.9)
+      else c.pos.set(ROAD + 0.55, 0.7, len + 2.6)
+      c.at.set(-0.3, tall ? 0.05 : 0.3, len - 0.5)
+      shotFov = tall ? fov : 34
+    }
+    // Top gear: nothing left to shift, so the camera cuts round a few angles until just before the line.
+    const eta = ra.cross < 0 && ra.v > 1 ? (track - shown[0]) / ra.v : 0
+    const inTop = (me.current?.gear ?? 0) >= TOP_GEAR
+    cut = direct(c.dir, dt, inTop, eta, mode === 'chase' && f.phase === 'race' && ra.cross < 0 && !reducedMotion())
+    if (mode === 'chase' && c.dir.angle) {
+      mode = c.dir.angle
+      angleCam(c.dir.angle, c.dir.t, car.x, car.z, noses[0], ROAD, tall, c.pos, c.at)
+      shotFov = want + ANGLE_FOV[c.dir.angle]
+    }
+    if (mode === 'chase') {
+      c.pos.copy(c.chasePos)
+      c.at.copy(c.chaseAt)
+    }
+
+    // Changing shot: the photo-finish camera and the top-gear angles cut; into and out of the hero
+    // shot the camera eases from where it was, carried along with the car so it never drops behind.
+    if (mode !== c.mode) {
+      const glide = mode === 'hero' ? 0.8 : c.mode === 'hero' ? 0.8 : 0
+      if (c.mode === 'side' && mode === 'chase') c.chaseRel.copy(c.chase).setZ(c.chase.z - target)
+      if (glide > 0) {
+        c.fromPos.copy(c.lastPos).setZ(c.lastPos.z - car.z)
+        c.fromAt.copy(c.lastAt).setZ(c.lastAt.z - car.z)
+        c.fromFov = c.fov
+        c.blend = 0
+        c.blendFor = glide
+      } else {
+        c.blendFor = 0
+        cut = true
+      }
+      c.mode = mode
+    }
+    // Field of view: eased on the chase (faster when the boost punches in), set outright on a cut.
+    if (cut || mode === 'hero' || mode === 'side') c.fov = shotFov
+    else c.fov += (shotFov - c.fov) * damp(boosting ? 8 : 3, dt)
+    let shownFov = c.fov
+    if (c.blendFor > 0) {
+      c.blend += dt
+      const w = ease(c.blend / c.blendFor)
+      c.pos.lerp(c.tmp.copy(c.fromPos).setZ(c.fromPos.z + car.z), 1 - w)
+      c.at.lerp(c.tmp.copy(c.fromAt).setZ(c.fromAt.z + car.z), 1 - w)
+      shownFov = c.fromFov + (c.fov - c.fromFov) * w
+      if (w >= 1) c.blendFor = 0
+    }
+    c.lastPos.copy(c.pos)
+    c.lastAt.copy(c.at)
+    if (cam.fov !== shownFov) {
+      cam.fov = shownFov
+      cam.updateProjectionMatrix()
+    }
+    cam.position.copy(c.pos)
+    // A faint road buzz at speed, stronger under boost and down low behind the car; gone once the cars are over the line.
+    const buzz = mode === 'low' ? 1.4 : mode === 'chase' ? 1 : 0
+    f.shake += ((ra.cross < 0 ? (pace * 0.012 + (boosting ? 0.02 : 0)) * buzz : 0) - f.shake) * damp(6, dt)
+    if (f.shake > 0.0005) cam.position.y += Math.sin(f.st * 53) * f.shake + Math.sin(f.st * 31) * f.shake * 0.6
+    cam.lookAt(c.at)
   })
 
   return (
@@ -780,7 +854,7 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
             <planeGeometry args={[0.9, 1.5]} />
             <meshBasicMaterial map={glowTex()} color="#000000" transparent opacity={0.35} depthWrite={false} {...decal(3)} />
           </mesh>
-          {i === 0 ? <CarModel body={mine.body} model={mine.model} color={mine.color} finish={mine.finish} skin={mine.skin} modSkin={mine.modSkin} panels={mine.panels} trim={mine.trim} hat={mine.hat} mods={mine.mods} flames beams={beams} /> : <CarModel body={theirs.body} model={theirs.model} color={theirs.color} mods={theirs.mods} flames beams={beams} />}
+          {i === 0 ? <CarModel body={mine.body} rig={rigs[0]} model={mine.model} color={mine.color} finish={mine.finish} skin={mine.skin} modSkin={mine.modSkin} panels={mine.panels} trim={mine.trim} hat={mine.hat} mods={mine.mods} flames beams={beams} /> : <CarModel body={theirs.body} rig={rigs[1]} model={theirs.model} color={theirs.color} mods={theirs.mods} flames beams={beams} />}
         </group>
       ))}
     </>

@@ -32,12 +32,15 @@ describe('legal pages', () => {
 
 describe('settings', () => {
   it('fall back to defaults for missing or bad data', () => {
-    expect(parsePrefs(null)).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: false, muteTaunts: false, askLeave: true, askSell: true, steer: 'smooth', kartLine: true })
-    expect(parsePrefs('{oops')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: false, muteTaunts: false, askLeave: true, askSell: true, steer: 'smooth', kartLine: true })
-    expect(parsePrefs('{"graphics":"ultra","reduceMotion":"yes"}')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: false, muteTaunts: false, askLeave: true, askSell: true, steer: 'smooth', kartLine: true })
-    expect(parsePrefs('{"graphics":"saver","reduceMotion":true,"vibration":false,"raceWeather":true,"steer":"sharp"}')).toEqual({ graphics: 'saver', reduceMotion: true, vibration: false, raceWeather: true, muteTaunts: false, askLeave: true, askSell: true, steer: 'sharp', kartLine: true })
+    expect(parsePrefs(null)).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: false, muteTaunts: false, askLeave: true, askSell: true, steer: 'buttons', steerSet: false, kartLine: true })
+    expect(parsePrefs('{oops')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: false, muteTaunts: false, askLeave: true, askSell: true, steer: 'buttons', steerSet: false, kartLine: true })
+    expect(parsePrefs('{"graphics":"ultra","reduceMotion":"yes"}')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: false, muteTaunts: false, askLeave: true, askSell: true, steer: 'buttons', steerSet: false, kartLine: true })
+    expect(parsePrefs('{"graphics":"saver","reduceMotion":true,"vibration":false,"raceWeather":true,"steer":"sharp"}')).toEqual({ graphics: 'saver', reduceMotion: true, vibration: false, raceWeather: true, muteTaunts: false, askLeave: true, askSell: true, steer: 'sharp', steerSet: false, kartLine: true })
     expect(parsePrefs('{"askLeave":false,"askSell":false}')).toMatchObject({ askLeave: false, askSell: false })
     expect(parsePrefs('{"muteTaunts":true}').muteTaunts).toBe(true)
+    // Phones steer with ◀ ▶ buttons unless the player picked Smooth themselves (a saved Smooth was the old default).
+    expect(parsePrefs('{"steer":"smooth"}').steer).toBe('buttons')
+    expect(parsePrefs('{"steer":"smooth","steerSet":true}').steer).toBe('smooth')
     expect(parsePrefs('{"muteTaunts":"yes"}').muteTaunts).toBe(false)
   })
   it('Saver draws every 3D view at one pixel per screen pixel', () => {

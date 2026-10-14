@@ -64,7 +64,7 @@ import { TrophyRoad, roadReady } from './TrophyRoad'
 import { Flair } from './Flair'
 import { RepChip } from './Reputation'
 import { DailyRunTab, DailyResult } from './DailyRun'
-import type { DailyRun } from '../game/daily'
+import { DAILY_PAY, dailyRun, type DailyRun } from '../game/daily'
 import { WorldTour, worldChip } from './WorldTour'
 import { WORLD_TOUR, worldCar, worldPrize, worldShift } from '../game/worldTour'
 import { CHALLENGER_BONUS, makeChallenger } from '../game/challenger'
@@ -241,6 +241,7 @@ export function RacePanel() {
   })
   const [trial, setTrial] = useState<(TrialRun & { n: number }) | null>(null)
   const [daily, setDaily] = useState<{ run: DailyRun; n: number } | null>(null)
+  const dailySave = useGame((s) => s.daily)
   const [wRace, setWRace] = useState<{ i: number; rival: Rival } | null>(null)
   const worldTour = useGame((s) => s.worldTour)
   // The town rival race; bet: the double-or-nothing rematch. n remounts the race for each run.
@@ -701,6 +702,9 @@ export function RacePanel() {
   }
 
 
+  // The Daily Run: everyone races the day's loaner, and the first run of the day pays.
+  const today = dailyRun()
+  const dailyPaid = dailySave?.day === today.day && dailySave.paid
   // The bar's big button: the next race on this screen, if it has one.
   const campNext = (() => {
     const ch = CAMPAIGN[campSel]
@@ -717,6 +721,7 @@ export function RacePanel() {
     : tab === 'cups' && car ? (cupFits(cupRace(cupSel)!, car.model)
       ? { label: `$${cupPrizeOf(cupRace(cupSel)!, cups).toLocaleString()}`, onClick: () => startCup(cupSel) }
       : { label: `${carClass(cupRace(cupSel)!.cls).icon} ${carClass(cupRace(cupSel)!.cls).name} car`, onClick: () => startCup(cupSel), fix: true })
+    : tab === 'daily' ? { label: dailyPaid ? 'Run' : `$${DAILY_PAY[0].toLocaleString()}`, onClick: () => startDaily(today) }
     : tab === 'road' && roadReady(trophies, roadClaimed) > 0 ? { label: `🎁 Claim ${roadReady(trophies, roadClaimed)}`, onClick: () => useGame.getState().claimRoad() }
     : null
   const stars = Object.values(done).reduce((a, n) => a + n, 0)
@@ -751,7 +756,7 @@ export function RacePanel() {
         ) : tab === 'world' ? (
           <WorldTour onRace={startWorld} />
         ) : tab === 'daily' ? (
-          <DailyRunTab onRun={startDaily} />
+          <DailyRunTab />
         ) : tab === 'campaign' ? (
           <Campaign sel={campSel} setSel={setCampSel} onTour={() => setTab('tour')} onRace={(ci, i) => startCampaign(ci, i)} />
         ) : tab === 'tour' ? (
@@ -859,7 +864,7 @@ export function RacePanel() {
         )}
       </div>
       <RaceBar cars={cars} car={car} onPick={setRaceCar} go={go} note={tab === 'gp' ? 'Races every round' : tab === 'event' ? 'Back next week' : undefined}
-        dist={tab === 'tour' ? tourDist(tourWon) : tab === 'gp' ? null : undefined} />
+        dist={tab === 'tour' ? tourDist(tourWon) : tab === 'gp' ? null : undefined} loaner={tab === 'daily' ? today : undefined} />
     </Panel>
   )
 }

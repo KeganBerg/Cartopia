@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { StageSlot, useStageReady } from '../scene/Stage'
 import { useGame, openCrate } from '../game/store'
-import { MOD_SLOTS, SKINNED_SLOTS, carDef, fittedMods, modDef, ownedModSkins, ownedSkins, type ModDef } from '../game/data'
+import { CUSTOM_PAINT, CUSTOM_PAINT_SHOW, MOD_SLOTS, SKINNED_SLOTS, carDef, fittedMods, modDef, ownedModSkins, type ModDef } from '../game/data'
 import { crateHats, hatDef } from '../game/hats'
-import { CRATES, carOdds, crateCost, crateDef, crateOddsShown, dropTier, homeCars, homeMods, modChoices, pityLeft, revealOrder, skinOdds, skinOf, type CrateDef, type CrateDrop, type CrateId, type CrateOpen } from '../game/crates'
+import { CRATES, carOdds, crateCost, crateOwnedSkins, crateDef, crateOddsShown, dropTier, homeCars, homeMods, modChoices, pityLeft, revealOrder, skinOdds, skinOf, type CrateDef, type CrateDrop, type CrateId, type CrateOpen } from '../game/crates'
 import { SKIN_TIERS } from '../game/data'
 import { CrateScene, TIER_GLOW, prizeLook, type CratePace, type CratePhase } from '../scene/CrateScene'
 import { CarThumb } from '../scene/BuildingPreview'
@@ -53,7 +53,7 @@ function Odds({ c, level }: { c: CrateDef; level: number }) {
   const have = useMemo(() => new Set(cars.map((x) => x.model)), [cars])
   const haveSkin = useMemo(() => {
     const st = { level, claimedSets, skins: skinIds, modSkins: modSkinIds }
-    return new Set([...ownedSkins(st).map((id) => 'b:' + id), ...ownedModSkins(st).map((id) => 'p:' + id)])
+    return new Set([...crateOwnedSkins(st).map((id) => 'b:' + id), ...ownedModSkins(st).map((id) => 'p:' + id)])
   }, [level, claimedSets, skinIds, modSkinIds])
   // Parts that can drop now first, then the crate's own parts that can't (locked, owned or no fit).
   const parts = useMemo(() => {
@@ -169,7 +169,7 @@ function usePrizeInfo(d: CrateDrop) {
   } else if (d.kind === 'skin' || d.kind === 'skindupe') {
     const def = skinOf(d.skin, d.part)
     // Mod paints go on parts, car paints on the whole body: say which in the name.
-    const kind = d.part ? 'Mod Paint' : 'Car Paint'
+    const kind = d.part ? 'Mod Paint' : d.skin === CUSTOM_PAINT.id ? 'Unlock' : 'Car Paint'
     icon = <span className={`cp-swatch ${d.part ? 'mod' : 'car'}`} style={{ background: def?.swatch }}>{d.part ? '⚙️' : '🚗'}</span>
     if (d.kind === 'skindupe') {
       title = `${d.coins.toLocaleString()} coins`
@@ -218,6 +218,7 @@ function PrizeActions({ d, paintCar, onDone, small }: { d: CrateDrop; paintCar: 
   const wearSkin = (skin: string, part: boolean) => {
     if (!paintCar) return
     onDone()
+    if (!part && skin === CUSTOM_PAINT.id) return openGarageTab('paint', { car: paintCar, color: CUSTOM_PAINT_SHOW })
     if (!part) return openGarageTab('paint', { car: paintCar, skin })
     const car = cars.find((c) => c.uid === paintCar)
     const fit = car ? fittedMods(car.mods, carDef(car.model).body) : {}
