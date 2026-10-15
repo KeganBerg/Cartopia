@@ -7,7 +7,7 @@ import { decal, LAYER } from './layers'
 import { manholeTex } from './textures'
 import { fallingWater, waterKinds } from './liveWater'
 import { Upright, useMergeScale } from './mergeScale'
-import { ARC, ARC0, DECK, TERRACE, TRACK } from './speedwayLayout'
+import { ARC, ARC0, BARRIER, DECK, TIERS, TRACK } from './speedwayLayout'
 
 // Small dressing that makes buildings and props read as lived-in: trims,
 // pipes, bins, curbs and so on. Everything here is static and reuses the
@@ -80,22 +80,26 @@ export function ShopDetail({ W, D, h, F, roof, rows, cols, awning, mullions }: {
   )
 }
 
-// The Speedway's seating: two stepped terraces inside the glass wall, low
-// enough to see the race over and through. The front one is a standing rail
-// at the track's edge, the back one a raised row of seats out to the wall
-// (fans in SpeedwayLife.tsx). From level 9 an upper deck hangs off the wall.
+// The Speedway's grandstand: a barrier wall at the track's edge, then three
+// stepped rows of seats out to the glass, one colour each (fans in
+// SpeedwayLife.tsx sit on them). From level 7 a stepped upper deck with two
+// more rows hangs off the wall.
 export function SpeedwayStands({ colors, deck }: { colors: ReactNode[]; deck: boolean }) {
-  const tiers = useMemo(() => {
-    const { front, back, edge } = TERRACE
-    return [
-      [new Vector2(TRACK.outer, 0.06), new Vector2(TRACK.outer, front.y), new Vector2(edge, front.y)],
-      [new Vector2(edge, front.y), new Vector2(edge, back.y), new Vector2(1.95, back.y)],
-    ]
+  const shapes = useMemo(() => {
+    const { r, t, h } = BARRIER
+    const wall = [new Vector2(r, 0.06), new Vector2(r + t, 0.06), new Vector2(r + t, h), new Vector2(r, h), new Vector2(r, 0.06)]
+    const rows = TIERS.map(({ r0, r1, y }) => [new Vector2(r0, 0.06), new Vector2(r0, y), new Vector2(r1, y)])
+    const [a, b] = DECK.rows
+    const balcony = [new Vector2(a.r0, a.y - DECK.t), new Vector2(b.r1, a.y - DECK.t), new Vector2(b.r1, b.y), new Vector2(b.r0, b.y), new Vector2(b.r0, a.y), new Vector2(a.r0, a.y), new Vector2(a.r0, a.y - DECK.t)]
+    return { wall, rows, balcony }
   }, [])
-  const slab = useMemo(() => [new Vector2(DECK.r0, DECK.y - DECK.t / 2), new Vector2(1.95, DECK.y - DECK.t / 2), new Vector2(1.95, DECK.y + DECK.t / 2), new Vector2(DECK.r0, DECK.y + DECK.t / 2), new Vector2(DECK.r0, DECK.y - DECK.t / 2)], [])
   return (
     <group>
-      {tiers.map((pts, i) => (
+      <mesh castShadow receiveShadow>
+        <latheGeometry args={[shapes.wall, 40, ARC0, ARC]} />
+        {colors[3]}
+      </mesh>
+      {shapes.rows.map((pts, i) => (
         <mesh key={i} castShadow receiveShadow>
           <latheGeometry args={[pts, 40, ARC0, ARC]} />
           {colors[i]}
@@ -103,7 +107,7 @@ export function SpeedwayStands({ colors, deck }: { colors: ReactNode[]; deck: bo
       ))}
       {deck && (
         <mesh castShadow receiveShadow>
-          <latheGeometry args={[slab, 40, ARC0, ARC]} />
+          <latheGeometry args={[shapes.balcony, 40, ARC0, ARC]} />
           {colors[2]}
         </mesh>
       )}
