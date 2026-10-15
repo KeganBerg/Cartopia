@@ -63,7 +63,7 @@ import type { VisitorKind } from './game/data'
 import { hideSplash, splashProgress } from './lib/splash'
 import { rememberSplashCar } from './lib/splashCar'
 import { usePrefs } from './lib/prefs'
-import { onDemand } from './ui/lazy'
+import { onDemand, reopenAfterReload } from './ui/lazy'
 
 // Rusty's yard, the crate depot and the arcade each bring their own 3D scenes,
 // so they load on first open instead of with the town. Once the town is up they
@@ -130,7 +130,8 @@ export default function App() {
     const stopSplashCar = rememberSplashCar()
     // Checked again when it fires: a cloud save may have loaded since, already claimed today.
     // On first launch it waits for the flashing-lights warning (FlashWarning opens it after).
-    setTimeout(() => { if (!flashWarningOpen()) openDaily() }, 800)
+    // A menu that couldn't load before a reload onto a new build (ui/lazy.tsx) opens again first.
+    setTimeout(() => { reopenAfterReload(); if (!flashWarningOpen()) openDaily() }, 800)
     // A new player's first spin is the tutorial's reward: it opens once the tutorial is done or skipped.
     const unsubDaily = useGame.subscribe((s, prev) => {
       if (s.tutorial >= 99 && prev.tutorial < 99) setTimeout(openDaily, 1200)
