@@ -129,14 +129,28 @@ export function bake(parts: [BufferGeometry, Finish, Matrix4?][], uvs = false) {
   }
   const out = new BufferGeometry()
   out.setAttribute('position', new BufferAttribute(position, 3))
-  out.setAttribute('normal', new BufferAttribute(normal, 3))
+  // Stored small, as the shader reads them the same: the town's merged meshes were
+  // ~180 MB, and a phone holds them twice (the page and the GPU).
+  out.setAttribute('normal', packed(normal, Int8Array, 127, 3))
   if (uv) out.setAttribute('uv', new BufferAttribute(uv, 2))
-  out.setAttribute('color', new BufferAttribute(color, 3))
-  out.setAttribute('emissive', new BufferAttribute(emissive, 3))
-  out.setAttribute('look', new BufferAttribute(look, 4))
-  if (skin) out.setAttribute('skin', new BufferAttribute(skin, 1))
+  // Colours brighter than white (made to glow under bloom) stay as they are.
+  const rgb = (a: Float32Array) => (a.every((x) => x >= 0 && x <= 1) ? packed(a, Uint16Array, 65535, 3) : new BufferAttribute(a, 3))
+  out.setAttribute('color', rgb(color))
+  out.setAttribute('emissive', rgb(emissive))
+  out.setAttribute('look', packed(look, Uint8Array, 255, 4))
+  if (skin) out.setAttribute('skin', new BufferAttribute(Uint8Array.from(skin), 1))
   out.setIndex(new BufferAttribute(index, 1))
   return out
+}
+
+// Values in 0..1 (or -1..1 for normals) as normalized integers: the GPU hands the
+// shader the same floats, to within 1/127 for a normal and 1/65535 for a colour.
+// Colours keep 16 bits because they're linear: 8 would band the darks.
+function packed(src: Float32Array, Kind: Int8ArrayConstructor | Uint8ArrayConstructor | Uint16ArrayConstructor, max: number, size: number) {
+  const a = new Kind(src.length)
+  const low = Kind === Int8Array ? -1 : 0
+  for (let i = 0; i < src.length; i++) a[i] = Math.round(Math.min(1, Math.max(low, src[i])) * max)
+  return new BufferAttribute(a, size, true)
 }
 
 // A standard material whose colour, glow, metalness and roughness come from the

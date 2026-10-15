@@ -116,7 +116,19 @@ const finishSig = (m: Material) => {
 
 // `prune` (with `freeze`): groups left holding nothing but merged parts are hidden too, so the
 // renderer stops walking thousands of empty groups every frame (most of a kart race's scene).
-export function Batch({ version, off, cell, freeze, prune, children }: { version: unknown; off?: boolean; cell?: number; freeze?: boolean; prune?: boolean; children: ReactNode }) {
+// `release` (the town): a merged mesh's vertices leave the page's memory once they're
+// on the GPU. Nothing reads them back (merged meshes aren't tapped, and a rebuild
+// merges afresh), and the town reloads if the GPU drops its context. In a big town
+// that's the largest thing the page holds: ~180 MB a phone was keeping twice.
+function releaseOnUpload(g: BufferGeometry) {
+  if (!g.boundingSphere) g.computeBoundingSphere()
+  for (const a of [...Object.values(g.attributes), g.index]) if (a instanceof BufferAttribute) a.onUpload(dropArray)
+}
+function dropArray(this: { array: unknown }) {
+  this.array = null
+}
+
+export function Batch({ version, off, cell, freeze, prune, release, children }: { version: unknown; off?: boolean; cell?: number; freeze?: boolean; prune?: boolean; release?: boolean; children: ReactNode }) {
   const root = useRef<Group>(null)
   const merged = useRef<Group>(null)
   // What the last rebuild made, by bucket, and the originals it hid. A rebuild
@@ -308,6 +320,7 @@ export function Batch({ version, off, cell, freeze, prune, children }: { version
           b.members.forEach(alive)
           continue
         }
+        if (release) releaseOnUpload(geo)
         const mesh = new Mesh(geo, b.mat)
         mesh.castShadow = b.cast
         mesh.receiveShadow = b.receive
@@ -340,7 +353,7 @@ export function Batch({ version, off, cell, freeze, prune, children }: { version
       empty(r)
     }
     if (f) f.on = true
-  }, [version, off, cell, prune])
+  }, [version, off, cell, prune, release])
 
   // Gone from the scene: put the originals back and free the merged meshes.
   useLayoutEffect(
