@@ -39,11 +39,15 @@ for (const season of ['spring', 'summer', 'fall', 'winter'])
   for (const [tod, time] of Object.entries(times)) {
     const name = `town-${season}-${tod}`
     if (only && !name.startsWith(only)) continue
-    const ctx = await b.newContext({ viewport: { width: W, height: H } })
+    // Drawn at 2x (3200x2400): the splash zooms the town to cover the screen, and at
+    // 1x it went soft on phones and big monitors.
+    const ctx = await b.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: 2 })
     const p = await ctx.newPage()
     p.on('pageerror', (e) => console.log('error', e.message))
     await p.addInitScript(([t]) => {
-      localStorage.setItem('cartopia-save', JSON.stringify({ state: { version: 1, townName: 'Sunny Hollow', level: 40, xp: 0, coins: 99999, bucks: 500, parts: 500, fuel: 99, fuelUpdatedAt: Date.now(), trophies: 300, racesWon: 50, tutorial: 99, ...t, updatedAt: Date.now() }, version: 0 }))
+      // No photosensitivity warning or daily spin over the town.
+      localStorage.setItem('cartopia-flash-warning-hide', '1')
+      localStorage.setItem('cartopia-save', JSON.stringify({ state: { version: 1, townName: 'Sunny Hollow', level: 40, xp: 0, coins: 99999, bucks: 500, parts: 500, fuel: 99, fuelUpdatedAt: Date.now(), trophies: 300, racesWon: 50, tutorial: 99, lastDaily: new Date().toISOString().slice(0, 10), ...t, updatedAt: Date.now() }, version: 0 }))
     }, [town()])
     await p.goto(`http://localhost:5173/?nosplash&time=${time}&season=${season}&weather=clear`)
     await p.waitForSelector('canvas', { timeout: 90000 })
@@ -53,27 +57,30 @@ for (const season of ['spring', 'summer', 'fall', 'winter'])
     for (let i = 0; i < 3; i++) { await p.mouse.wheel(0, -120); await p.waitForTimeout(80) }
     await p.waitForTimeout(14000)
     const png = await p.screenshot({ timeout: 180000 })
-    // Re-encode as WebP in a blank page; Playwright only writes PNG and JPEG.
+    // Re-encode as WebP in a blank page; Playwright only writes PNG and JPEG. Tall
+    // screens get a centre crop (-p) so phones don't download the sides they never show.
     const enc = await ctx.newPage()
-    const data = await enc.evaluate(async (src) => {
-      const img = new Image()
-      img.src = src
-      await img.decode()
-      const c = document.createElement('canvas')
-      c.width = img.width
-      c.height = img.height
-      c.getContext('2d').drawImage(img, 0, 0)
-      return c.toDataURL('image/webp', 0.72)
-    }, 'data:image/png;base64,' + png.toString('base64'))
-    writeFileSync(new URL(`${name}.webp`, out), Buffer.from(data.split(',')[1], 'base64'))
-    console.log(name, Math.round((data.length * 3) / 4 / 1024), 'KB')
+    for (const [suffix, crop] of [['', 1], ['-p', 0.625 / (W / H)]]) {
+      const data = await enc.evaluate(async ([src, crop]) => {
+        const img = new Image()
+        img.src = src
+        await img.decode()
+        const c = document.createElement('canvas')
+        c.width = Math.round(img.width * crop)
+        c.height = img.height
+        c.getContext('2d').drawImage(img, (c.width - img.width) / 2, 0)
+        return c.toDataURL('image/webp', 0.72)
+      }, ['data:image/png;base64,' + png.toString('base64'), crop])
+      writeFileSync(new URL(`${name}${suffix}.webp`, out), Buffer.from(data.split(',')[1], 'base64'))
+      console.log(name + suffix, Math.round((data.length * 3) / 4 / 1024), 'KB')
+    }
     await ctx.close()
   }
 
 // A 40px-wide blurred thumbnail of each, inlined into the splash by build.mjs.
 const lp = await b.newPage()
 const lqip = {}
-for (const f of readdirSync(out).filter((f) => /^town-.*\.webp$/.test(f)).sort()) {
+for (const f of readdirSync(out).filter((f) => /^town-[a-z]+-[a-z]+\.webp$/.test(f)).sort()) {
   lqip[f.slice(5, -5)] = await lp.evaluate(async (src) => {
     const img = new Image()
     img.src = src

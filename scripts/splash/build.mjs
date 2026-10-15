@@ -103,7 +103,7 @@ var tod=n>.7?'night':n>.08?'dusk':'day',season=q.get('season')||['winter','sprin
 el.className=tod;
 var key=season+'-'+tod,lq=${JSON.stringify(LQIP)},town=el.querySelector('.town'),ti=town.querySelector('img');
 if(lq[key])town.style.backgroundImage='url('+lq[key]+')';
-ti.onload=function(){town.classList.add('on')};ti.src='/splash/town-'+key+'.webp';
+ti.onload=function(){town.classList.add('on')};ti.src='/splash/town-'+key+(innerWidth<innerHeight*.7?'-p':'')+'.webp';
 var c={};try{c=JSON.parse(localStorage.getItem('cartopia-splash-car'))||{}}catch(e){}
 var model=/^[a-z0-9]+$/.test(c.model)?c.model:'hotshot',car=el.querySelector('.car'),img=car.querySelector('img'),paint=car.querySelector('.paint');
 paint.style.setProperty('--paint',/^#[0-9a-f]{3,8}$/i.test(c.color)?c.color:'#d32f2f');
