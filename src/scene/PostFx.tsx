@@ -7,7 +7,7 @@ import { Uniform, Vector3 } from 'three'
 import { fxState, type Look } from './look'
 import { usePrefs } from '../lib/prefs'
 import { onFx } from '../game/fx'
-import { PACES, paceDown, useTownPace } from './townPace'
+import { lowestFps, paceDown, phoneSize, samplesFor, useTownPace } from './townPace'
 
 // Colour grade applied to the whole frame after tone mapping. Keep in step
 // with gradeColor() in look.ts, which repeats it for the page background.
@@ -124,6 +124,7 @@ function startTier(): FxTier {
 
 const pinned = typeof location !== 'undefined' && new URLSearchParams(location.search).has('fx')
 
+
 // Bloom, tilt-shift, tone mapping and the colour grade.
 // `look` is read every frame so the grade follows the time of day. Steps down a
 // tier by itself if the frame rate drops.
@@ -186,10 +187,10 @@ export function PostFx({ look, town, tiltShift }: { look: Look; town?: boolean; 
     <>
       {/* Remounted after each town step so it judges the new setting afresh; at 30 fps the bar drops with it. */}
       {armed && !pinned && graphics === 'auto' && (
-        <PerformanceMonitor key={town ? pace : 0} bounds={() => (town && PACES[pace].fps < 60 ? [22, 120] : [40, 120])} flipflops={3} onDecline={stepDown} />
+        <PerformanceMonitor key={town ? pace : 0} bounds={() => [lowestFps(town, pace, phoneSize(), window.devicePixelRatio), 120]} flipflops={3} onDecline={stepDown} />
       )}
       {tier !== 'off' && (
-        <EffectComposer multisampling={tier === 'high' ? 4 : 2} enableNormalPass={false}>
+        <EffectComposer multisampling={samplesFor(tier, typeof window === 'undefined' ? 1 : window.devicePixelRatio)} enableNormalPass={false}>
           {/* Tilt-shift blurs the raw frame, so it goes before bloom; after it, the blurred bands lost their glow. */}
           {tiltShift ? <primitive object={tilt} /> : <></>}
           <Bloom ref={bloom} mipmapBlur levels={tier === 'high' ? 7 : 5} radius={0.75} luminanceThreshold={1} luminanceSmoothing={0.25} intensity={0.3} />

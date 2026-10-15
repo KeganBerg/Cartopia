@@ -81,6 +81,9 @@ export function SettingsTab({ user }: { user: User | null }) {
           ))}
         </div>
         <small className="set-note">{GRAPHICS.find((g) => g.id === prefs.graphics)!.sub}</small>
+        <Row label="FPS counter">
+          <Switch label="FPS counter" on={prefs.fps} onChange={(on) => setPrefs({ fps: on })} />
+        </Row>
       </Group>
       <Group icon="🏁" title="Racing">
         <Row label="Race weather" sub="Off: clear skies in casual races">
