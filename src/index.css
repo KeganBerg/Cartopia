@@ -920,6 +920,11 @@ html.calm *, html.calm *::before, html.calm *::after { animation-duration: .001m
 .collect-all.cooling .collect-ico { opacity: .45; }
 .collect-time { position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); background: #263238; color: #fff; font: 12px var(--display); padding: 1px 6px; border-radius: 8px; }
 .collect-badge { position: absolute; top: -4px; right: -4px; min-width: 20px; height: 20px; border-radius: 10px; background: #e53935; color: #fff; font: 12px var(--display); display: grid; place-items: center; border: 2px solid #fff; }
+/* Chores Collect All had to skip: struck fuel or coin chips to its left for a few seconds. */
+.collect-skips { position: absolute; right: calc(100% + 6px); top: 50%; transform: translateY(-50%); display: flex; gap: 4px; pointer-events: auto; animation: collect-skip-in .25s ease-out; }
+.collect-skip { position: relative; width: 26px; height: 26px; border-radius: 50%; background: #fff; border: 2px solid #e53935; display: grid; place-items: center; box-shadow: 0 2px 0 rgba(0,0,0,.25); }
+.collect-skip::after { content: ''; position: absolute; left: 3px; right: 3px; top: 50%; height: 2.5px; margin-top: -1.25px; background: #e53935; border-radius: 2px; transform: rotate(-45deg); }
+@keyframes collect-skip-in { from { opacity: 0; transform: translate(8px, -50%) scale(.6); } }
 /* Goals checklist docked straight above Collect All. */
 .goals-btn.goals-dock { position: absolute; z-index: 51; right: calc(26px + var(--sar)); bottom: calc(176px + var(--sab)); width: 60px; height: 60px; font-size: 26px; border-radius: 16px; }
 /* Free camera toggle, docked above Goals. Lit blue while the free view is on. */
