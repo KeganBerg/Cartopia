@@ -10,6 +10,7 @@ import { AccountData, Group, GuestData, HelpTab, LegalView, SettingsTab } from '
 import { LEGAL, type LegalDoc } from '../legal/legal'
 import { CityLook } from './CityLook'
 import { useIsAdmin } from '../lib/admin'
+import { TwoStepGate } from './TwoStep'
 
 type MenuTab = 'town' | 'settings' | 'account' | 'help'
 const MENU_TABS = [{ id: 'town', label: '🏠 Town' }, { id: 'settings', label: '⚙️ Settings' }, { id: 'account', label: '👤 Account' }, { id: 'help', label: '❓ Help' }] as const
@@ -87,13 +88,14 @@ export function AccountPanel() {
           <GuestData />
         </>
       ) : user ? (
-        <>
+        <TwoStepGate uid={user.id}>{(twoStep) => <>
           <Group icon="☁️" title="Cloud save">
             <div className="set-row">
               <span className="set-label">{user.email}<small>Your town saves to the cloud</small></span>
               <button className="sell small" onClick={() => supabase!.auth.signOut()}>Sign out</button>
             </div>
           </Group>
+          {twoStep}
           <UsernameRow />
           {backup && (
             <>
@@ -102,7 +104,7 @@ export function AccountPanel() {
             </>
           )}
           <AccountData user={user} />
-        </>
+        </>}</TwoStepGate>
       ) : (
         <>
           <p className="hint">Sign in to save your town online and race real players.</p>
