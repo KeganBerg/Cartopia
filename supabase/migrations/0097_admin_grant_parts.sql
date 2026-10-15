@@ -27,7 +27,7 @@ language sql stable security definer set search_path = '' as $$
 $$;
 revoke all on function public.admin_player_json(uuid) from public, anon, authenticated;
 
-create or replace function public.admin_grant(p_uid uuid, p_coins numeric, p_gems numeric, p_parts numeric, p_reason text)
+create or replace function public.admin_grant(p_uid uuid, p_coins numeric, p_gems numeric, p_parts numeric default 0, p_reason text default null)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare
   me uuid := public.admin_gate();
