@@ -4,9 +4,9 @@ import { createRoot } from 'react-dom/client'
 import { describe, expect, it, vi } from 'vitest'
 import { useGame } from '../game/store'
 
-// The car on the road is a 3D thumb; the screen's layout is what's tested.
-vi.mock('../scene/BuildingPreview', () => ({ CarThumb: () => null }))
-vi.mock('./Custom', () => ({ PatternSwatch: () => null }))
+// The road is a 3D scene on the shared canvas; the screen around it is what's tested.
+vi.mock('../scene/Stage', () => ({ StageSlot: () => null }))
+vi.mock('../scene/TrophyRoadScene', () => ({ ROAD_FIRST: 6, ROAD_GAP: 8, TrophyRoadScene: () => null }))
 
 const { TrophyRoad } = await import('./TrophyRoad')
 
@@ -20,7 +20,6 @@ describe('Trophy Road screen', () => {
     act(() => root.render(<TrophyRoad />))
     expect(el.querySelectorAll('.tr-stop').length).toBeGreaterThan(0)
     expect(el.querySelectorAll('.tr-stop.ready').length).toBe(2)
-    expect(el.querySelector('.tr-svg path')?.getAttribute('d')).toMatch(/^M /)
     act(() => root.unmount())
   })
 })
