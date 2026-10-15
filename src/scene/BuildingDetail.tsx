@@ -81,8 +81,8 @@ export function ShopDetail({ W, D, h, F, roof, rows, cols, awning, mullions }: {
 }
 
 // The Speedway's grandstand: a barrier wall at the track's edge, then three
-// stepped rows of seats out to the glass, one colour each (fans in
-// SpeedwayLife.tsx sit on them). From level 7 a stepped upper deck with two
+// stepped concrete rows out to the glass (the seats in
+// SpeedwayLife.tsx stand on them). From level 7 a stepped upper deck with two
 // more rows hangs off the wall.
 export function SpeedwayStands({ colors, deck }: { colors: ReactNode[]; deck: boolean }) {
   const shapes = useMemo(() => {
