@@ -121,8 +121,10 @@ const ROUND_NOSE: Body[] = ['horseshoe', 'scissor', 'teardrop', 'formula', 'pont
 // high above the floor (the formula car's engine cover).
 const rearLift = (f: Frame) => Math.max(f.lift, f.pipeY - 0.1)
 // On a low car with a trunk a wing whose top stands this far up the deck would tower over the
-// roof: the wing comes down on shorter posts until its top sits just over the roof line.
-const wingDrop = (f: Frame, top: number) => (f.deck < f.roof - 0.05 ? Math.min(top * 0.45, Math.max(0, f.deck + top - f.roof - 0.03)) : 0)
+// roof: the wing comes down on shorter posts until its top sits just over the roof line, keeping
+// its lowest piece (low, up from the deck) clear above the tallest kit arch over the rear wheels.
+const wingDrop = (f: Frame, top: number, low: number) =>
+  f.deck < f.roof - 0.05 ? Math.min(top * 0.45, f.deck + low - f.wheel * 2.2 - 0.06, Math.max(0, f.deck + top - f.roof - 0.03)) : 0
 // How far the hood sits below the usual hood line where hood mods go, on bodies drawn with
 // their own curved hoods.
 const HOOD_DROP: Partial<Record<Body, number>> = { restomuscle: 0.024, horseshoe: 0.021, teardrop: 0.01, longnose: 0.02, longtail: 0.026 }
@@ -177,7 +179,7 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
   },
   gtwing: (f, p) => {
     const z = f.deckZ
-    const d = wingDrop(f, 0.2)
+    const d = Math.max(0, wingDrop(f, 0.2, 0.145))
     for (const sd of [-1, 1]) {
       // On a round body the posts reach down into a deck that falls away at the sides.
       const deep = POST_DEEP[f.body] ?? 0
@@ -188,7 +190,7 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
   },
   attackwing: (f, p) => {
     const z = f.deckZ - 0.03
-    const d = wingDrop(f, 0.35)
+    const d = Math.max(0, wingDrop(f, 0.35, 0.21))
     for (const sd of [-1, 1]) {
       const deep = POST_DEEP[f.body] ?? 0
       p.carbon.push(box(0.025, 0.28 - d + deep, 0.056, sd * (f.postW ?? f.deckW) * 0.22, f.deck + (0.28 - d) / 2 - deep / 2, z))
@@ -323,7 +325,7 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
   swanneck: (f, p) => {
     // The wing hangs from two curved necks that rise behind it and hook over onto its top.
     const z = f.deckZ + 0.01
-    const d = wingDrop(f, 0.22)
+    const d = Math.max(0, wingDrop(f, 0.22, 0.12))
     const y = f.deck + 0.17 - d
     for (const sd of [-1, 1]) {
       const x = sd * (f.postW ?? f.deckW) * 0.2
@@ -338,7 +340,7 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
   skydeck: (f, p) => {
     // Two stacked elements between tall end plates, on four pylons.
     const z = f.deckZ - 0.02
-    const d = wingDrop(f, 0.36)
+    const d = Math.max(0, wingDrop(f, 0.36, 0.155))
     for (const sd of [-1, 1]) {
       for (const k of [0.12, 0.28]) p.carbon.push(box(0.022, 0.22 - d, 0.05, clearOf(sd * (f.postW ?? f.deckW) * k, 0.011, hoodLines(f)), f.deck + (0.22 - d) / 2, z + 0.02))
       p.carbon.push(box(0.014, 0.19, 0.28, sd * f.deckW * 0.54, f.deck + 0.25 - d, z - 0.04))
