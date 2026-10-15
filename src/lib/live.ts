@@ -302,6 +302,7 @@ async function openLobby(uid: string) {
       }
       if (!payload.accept) {
         useLive.setState((l) => ({ cooldownTo: { ...l.cooldownTo, [out.to]: Date.now() + COOLDOWN_MS } }))
+        sfx.error()
         return useGame.getState().toast('Challenge declined')
       }
       useLive.setState({ race: { raceId: out.raceId, opponent: from, host: true, mode: out.mode, stake: out.stake } })

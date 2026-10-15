@@ -5,6 +5,7 @@
 import type { CounterKey } from './data'
 import type { Mastery } from './mastery'
 import { useGame } from './store'
+import { sfx } from '../lib/sound'
 
 export type RepSave = {
   trophies: number
@@ -55,6 +56,7 @@ export function startRepWatch() {
     if (s.repSeen !== undefined && tier <= s.repSeen) return
     const first = s.repSeen === undefined
     useGame.setState({ repSeen: tier })
+    if (!first) sfx.unlock()
     if (!first) s.toast(`${REP_TITLES[tier].icon} New title: ${REP_TITLES[tier].name}!`)
   }
   check()

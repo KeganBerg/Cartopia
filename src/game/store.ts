@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
   PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS,
-  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, jobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, maxLevel, themable, RESCUE_SPOTS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, refillBucks, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, activeEvent, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modFits, ownedMods, driverPayout, mergedParts, mergeBonus, mergeGain, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, CREW_CHEST, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower, seasonNumber, seasonOf, SEASON_STARS, skinDef, ownedSkins, seasonSkin, modSkinDef, ownedModSkins, seasonModSkin, SKINNED_SLOTS, type SkinnedSlot, fittedMods, SEASON_TIERS, STARS_PER_TIER, SEASON_CAR_BUCKS, dealsFor, dealOffer, type DealDef, type DealKind,
+  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, jobXp, raceXp, serviceXp, jobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, maxLevel, themable, RESCUE_SPOTS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, refillBucks, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, activeEvent, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modFits, ownedMods, driverPayout, mergedParts, mergeBonus, mergeGain, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, CREW_CHEST, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower, seasonNumber, seasonOf, SEASON_STARS, skinDef, ownedSkins, seasonSkin, modSkinDef, ownedModSkins, seasonModSkin, SKINNED_SLOTS, type SkinnedSlot, fittedMods, SEASON_TIERS, STARS_PER_TIER, SEASON_CAR_BUCKS, dealsFor, dealOffer, type DealDef, type DealKind,
 } from './data'
 import { PAINT_COST, hasCustomPaint, isHexColor, PANELS, PATTERNS, STARTER_PAINTS, isBike, panelJobCost, tidyPanels, type Panels, RUSTY_SETS, hotSpot, rarityWeight, truckOf, TRUCK, BAY2_LEVEL } from './data'
 import { cleanHat, earnedHats, hatDef, hatQuestOf, newHatQuest, ownedHats, sameHat, type HatFit, type HatQuest } from './hats'
@@ -29,7 +29,7 @@ import { pieceId } from './resto'
 import { rollWheel, type WheelSpin } from './wheel'
 import { LIVE_LOSS_SHARE, LOSS_SHARE, boostFor, placeShare, boostLabel, emptyBoosts, welcomeBack, type BoostMode, type Boosts } from './boosts'
 import { claim, type WagerEntry } from './wager'
-import { carClassTier, classTier, classWon, galaxy, masteryTier, noteRace, type Mastery, type MasteryMode } from './mastery'
+import { carClassTier, classTier, classWon, galaxy, masteryTier, masteryXp, noteRace, type Mastery, type MasteryMode } from './mastery'
 import { roadClaim, roadOpen, roadReached } from './trophyRoad'
 import { CHEERS, TRAILS, flairOpen, flairOpenCount } from './flair'
 import { DAILY_MEDALS, DAILY_PAY, dailyMedal, dailyRun, type DailySave } from './daily'
@@ -242,7 +242,7 @@ type UiState = {
   tunerPrize: string | null
   // Mastery news from a race: the car model and the step it just reached (0: none), class tiers
   // just reached, Galaxy, and classes whose first-win colour just opened.
-  masteryPrize: { model: string; tier: number; classes: { cls: CarClassId; tier: number }[]; galaxy: boolean; first: CarClassId[] } | null
+  masteryPrize: { model: string; tier: number; classes: { cls: CarClassId; tier: number }[]; galaxy: boolean; first: CarClassId[]; xp?: number } | null
   // A Class Cup race just won for the first time: its id (it gave a free crate).
   cupPrize: string | null
   // The signed-in player's clan, shown on the Crew House.
@@ -621,7 +621,7 @@ export function readyRewards(s: Pick<SaveState, 'buildings' | 'cars' | 'level'>,
     const pay = driverPayout(d, lvl, workingDriver(s, b), boost.get(b.uid))
     r.coins += pay
     r.parts += mergedParts(d, lvl, boost.get(b.uid))
-    r.xp += upgradeXp(d, lvl)
+    r.xp += jobXp(d, lvl, s.level)
     r.collected++
     const row = byDef.get(d.id) ?? { def: d.id, n: 0, coins: 0 }
     row.n++
@@ -631,7 +631,7 @@ export function readyRewards(s: Pick<SaveState, 'buildings' | 'cars' | 'level'>,
   if (s.buildings.some((b) => b.def === 'gas')) {
     r.filled = s.cars.filter((c) => c.lowFuel).length
     r.coins += r.filled * servicePay(s.level, 'gas')
-    r.xp += r.filled * 8
+    r.xp += r.filled * serviceXp('gas', s.level)
   }
   r.jobs = [...byDef.values()].sort((a, b) => b.coins - a.coins)
   return r
@@ -771,7 +771,7 @@ function tapMerged(s: GameState, set: (p: Partial<GameState>) => void, uids: str
     for (const o of ready) {
       pay += driverPayout(d, jobLevel(o), workingDriver(s, o), boost.get(o.uid))
       parts += mergedParts(d, jobLevel(o), boost.get(o.uid))
-      xp += upgradeXp(d, jobLevel(o))
+      xp += jobXp(d, jobLevel(o), s.level)
     }
     const done = new Set(ready.map((o) => o.uid))
     sfx.coin()
@@ -807,6 +807,11 @@ function tapMerged(s: GameState, set: (p: Partial<GameState>) => void, uids: str
     updatedAt: now,
   })
 }
+
+// The XP the last finished race paid (boosts included), for the result screen.
+let lastRaceXp = 0
+export const lastRaceXpPaid = () => lastRaceXp
+export const resetRaceXp = () => { lastRaceXp = 0 }
 
 function withXp(s: GameState, amount: number, patch: Partial<GameState>): Partial<GameState> {
   return { ...patch, ...addXp({ ...s, ...patch }, amount) }
@@ -924,14 +929,21 @@ export const useGame = create<GameState>()(
         sfx.error()
         set((st) => ({ need: { res, missing: Math.max(0, Math.ceil(missing)), what }, ...navTo(st, 'need'), mode: 'play', placing: null, selected: null }))
       },
-      openPanel: (panel) => set((s) => ({ ...navTo(s, panel), mode: 'play', placing: null, placingStored: null, selected: null, shopFocus: null })),
+      openPanel: (panel) => set((s) => {
+        if (s.panel !== panel) sfx.menuOpen()
+        return { ...navTo(s, panel), mode: 'play', placing: null, placingStored: null, selected: null, shopFocus: null }
+      }),
       closePanel: () =>
         set((s) => {
           const back = s.panelBack.slice(0, -1)
           const prev = s.panel ? s.panelBack[s.panelBack.length - 1] ?? null : null
+          if (s.panel) sfx.menuClose()
           return { panel: prev, panelBack: prev ? back : [], mode: 'play', placing: null, placingStored: null, selected: null, shopFocus: null }
         }),
-      swapPanel: (panel) => set((s) => ({ panel, panelBack: s.panelBack.filter((p) => p !== panel), mode: 'play', placing: null, placingStored: null, selected: null, shopFocus: null })),
+      swapPanel: (panel) => set((s) => {
+        if (s.panel !== panel) sfx.tab()
+        return { panel, panelBack: s.panelBack.filter((p) => p !== panel), mode: 'play', placing: null, placingStored: null, selected: null, shopFocus: null }
+      }),
       openShop: (focus) => set((s) => ({ ...navTo(s, 'shop'), mode: 'play', placing: null, selected: null, shopFocus: focus ?? null })),
       selectCar: (selectedCar) => set({ selectedCar }),
       toast: (text) => {
@@ -1165,7 +1177,7 @@ export const useGame = create<GameState>()(
         } else {
           const pay = driverPayout(d, jobLvl, workingDriver(s, b))
           const parts = upgradePartsPayout(d, jobLvl)
-          const xp = upgradeXp(d, jobLvl)
+          const xp = jobXp(d, jobLvl, s.level)
           sfx.coin()
           fx({ kind: 'collect', uids: [buid], coins: pay, parts, xp })
           s.toast(`+${pay} coins${parts ? `, +${parts} parts` : ''}, +${xp} XP`)
@@ -1286,15 +1298,15 @@ export const useGame = create<GameState>()(
                 const pay = servicePay(s.level, 'tires')
                 coins += pay
                 earned += pay
-                xp += 12
+                xp += serviceXp('tires', s.level)
                 serviced++
                 requestTrip(car.uid, 'tires')
               } else if (rusty) {
-                xp += 15
+                xp += serviceXp('tow', s.level)
                 requestTrip(car.uid, 'tow')
               } else if (paid && coins >= flatFixCost(s.level)) {
                 coins -= flatFixCost(s.level)
-                xp += 5
+                xp += serviceXp('fix', s.level)
               } else return car
               fixed++
               car = { ...car, flat: false }
@@ -1304,7 +1316,7 @@ export const useGame = create<GameState>()(
                 const pay = servicePay(s.level, 'gas')
                 coins += pay
                 earned += pay
-                xp += 8
+                xp += serviceXp('gas', s.level)
                 serviced++
                 requestTrip(car.uid, 'gas')
               } else if (paid && coins >= gasCanCost(s.level)) {
@@ -1335,7 +1347,7 @@ export const useGame = create<GameState>()(
           coins += pay
           earned += pay
           parts += mergedParts(d, lvl, boost.get(b.uid))
-          xp += upgradeXp(d, lvl)
+          xp += jobXp(d, lvl, s.level)
           paid.push(b.uid)
           collected++
           return { ...b, jobEndsAt: null, jobLevel: undefined }
@@ -1466,6 +1478,7 @@ export const useGame = create<GameState>()(
           showcase: (s.showcase ?? []).filter((u) => u !== cuid), ...(s.raceCar === cuid ? { raceCar: null } : {}),
           updatedAt: Date.now(),
         })
+        sfx.coin()
       },
 
       finishRace: (won, reward, opts = {}) => {
@@ -1473,8 +1486,11 @@ export const useGame = create<GameState>()(
         const base = won ? reward : opts.loss ?? Math.round(reward * (opts.live ? LIVE_LOSS_SHARE : LOSS_SHARE))
         const b = boostFor(s.boosts, opts.mode ?? 'race', won, Date.now(), base > 0)
         const coins = Math.round(base * b.mult)
-        if (b.mult > 1) s.toast(`${boostLabel(b)}: +${coins} coins`)
-        set(withXp(s, won ? 30 : 8, {
+        // Boosts (first win of the day, welcome back, weekend, streaks) multiply the XP too.
+        const xp = Math.round(raceXp(won, s.level) * b.mult)
+        lastRaceXp = xp
+        if (b.mult > 1) s.toast(`${boostLabel(b)}: +${coins} coins, +${xp} XP`)
+        set(withXp(s, xp, {
           ...(won ? { hatQuest: hatRaceWin(s) } : {}),
           coins: s.coins + coins,
           trophies: s.trophies + (won ? 1 : 0),
@@ -1499,12 +1515,15 @@ export const useGame = create<GameState>()(
         const first = CAR_CLASSES.filter((c) => classWon(mastery, c.id) && !classWon(s.mastery, c.id)).map((c) => c.id)
         const news = reached.length > 0 || classes.length > 0 || sky || first.length > 0
         if (news) setTimeout(sfx.levelUp, 300)
-        set({
+        const was = s.mastery?.[model]?.tier ?? 0
+        const xp = masteryXp(s.level, reached.map((_, i) => was + i),
+          classes.flatMap((c) => Array.from({ length: c.tier - classTier(s.mastery, c.cls) }, (_, i) => c.tier - i)), sky)
+        set(withXp(s, xp, {
           mastery,
           ...(reached.length ? { bucks: s.bucks + bucks, trophies: s.trophies + trophies } : {}),
-          ...(news ? { masteryPrize: { model, tier: reached.length ? next.tier : 0, classes, galaxy: sky, first } } : {}),
+          ...(news ? { masteryPrize: { model, tier: reached.length ? next.tier : 0, classes, galaxy: sky, first, xp } } : {}),
           updatedAt: Date.now(),
-        })
+        }))
       },
 
       closeMasteryPrize: () => set({ masteryPrize: null }),
@@ -1547,6 +1566,7 @@ export const useGame = create<GameState>()(
         const d = kind === 'trail' ? TRAILS.find((t) => t.id === id) : CHEERS.find((c) => c.id === id)
         if (!d || !flairOpen(d.challenge, s)) return
         set({ [kind]: id, updatedAt: Date.now() })
+        sfx.equip()
       },
       dailyResult: (time) => {
         const s = get()
@@ -1572,9 +1592,10 @@ export const useGame = create<GameState>()(
         const s = get()
         const b = boostFor(s.boosts, 'arcade', pay > 0, Date.now(), pay > 0)
         const coins = Math.round(pay * b.mult)
-        if (b.mult > 1) s.toast(`${boostLabel(b)}: +${coins} coins`)
+        const gain = Math.round(xp * b.mult)
+        if (b.mult > 1) s.toast(`${boostLabel(b)}: +${coins} coins, +${gain} XP`)
         const q = hatQuestOf(s)
-        set(withXp(s, xp, {
+        set(withXp(s, gain, {
           hatQuest: { ...q, arcade: q.arcade + 1 },
           coins: s.coins + coins,
           boosts: b.next,
@@ -1583,11 +1604,12 @@ export const useGame = create<GameState>()(
         }))
       },
 
-      renameTown: (townName) => set({ townName: townName.slice(0, 24) || 'My Town', updatedAt: Date.now() }),
-      setLights: (l) => set((s) => ({ lights: cleanLights({ ...DEFAULT_LIGHTS, ...s.lights, ...l }), updatedAt: Date.now() })),
-      setCityTheme: (id) => set({ cityTheme: colorTheme(id)?.id, updatedAt: Date.now() }),
+      renameTown: (townName) => (sfx.equip(), set({ townName: townName.slice(0, 24) || 'My Town', updatedAt: Date.now() })),
+      setLights: (l) => (sfx.equip(), set((s) => ({ lights: cleanLights({ ...DEFAULT_LIGHTS, ...s.lights, ...l }), updatedAt: Date.now() }))),
+      setCityTheme: (id) => (sfx.equip(), set({ cityTheme: colorTheme(id)?.id, updatedAt: Date.now() })),
       // A merged block takes the theme as one building.
       setBuildingTint: (uid, id) => set((s) => {
+        sfx.equip()
         const ids = new Set(groupOf(s.buildings, uid)?.members.map((o) => o.uid) ?? [uid])
         const tint = colorTheme(id)?.id
         return { buildings: s.buildings.map((o) => (ids.has(o.uid) ? cleanTint({ ...o, tint }) : o)), updatedAt: Date.now() }
@@ -1777,7 +1799,8 @@ export const useGame = create<GameState>()(
         const cost = tow && hasRusty ? 0 : flatFixCost(s.level)
         if (tow && !hasRusty) return s.toast("Build Rusty's Rescue to tow for free")
         if (s.coins < cost) return s.showNeed('coins', cost - s.coins, 'the tire repair')
-        set(withXp(s, tow ? 15 : 5, {
+        const xp = serviceXp(tow ? 'tow' : 'fix', s.level)
+        set(withXp(s, xp, {
           coins: s.coins - cost,
           cars: s.cars.map((c) => (c.uid === cuid ? { ...c, flat: false } : c)),
           stats: bump(s, 'flatsFixed'),
@@ -1785,7 +1808,8 @@ export const useGame = create<GameState>()(
           updatedAt: Date.now(),
         }))
         if (tow) requestTrip(cuid, 'tow')
-        s.toast(tow ? "Rusty towed it in and patched it up. +15 XP" : `Tire fixed for $${cost}`)
+        else sfx.buy()
+        s.toast(tow ? `Rusty towed it in and patched it up. +${xp} XP` : `Tire fixed for $${cost}`)
       },
 
       serviceCar: (cuid, how) => {
@@ -1798,9 +1822,10 @@ export const useGame = create<GameState>()(
           if (!owns('tires')) return s.toast('Build a Tire Shop to fix flats for profit')
           const pay = servicePay(s.level, 'tires')
           sfx.coin()
-          s.toast(`Your Tire Shop fixed it! +${pay} coins, +12 XP`)
+          const xp = serviceXp('tires', s.level)
+          s.toast(`Your Tire Shop fixed it! +${pay} coins, +${xp} XP`)
           requestTrip(cuid, 'tires')
-          return set(withXp(s, 12, {
+          return set(withXp(s, xp, {
             coins: s.coins + pay,
             cars: s.cars.map((c) => (c.uid === cuid ? { ...c, flat: false } : c)),
             stats: { ...bump(s, 'flatsFixed'), serviced: (s.stats.serviced ?? 0) + 1, coinsEarned: (s.stats.coinsEarned ?? 0) + pay },
@@ -1813,9 +1838,10 @@ export const useGame = create<GameState>()(
           if (!owns('gas')) return s.toast('Build a Gas Station to fill up for profit')
           const pay = servicePay(s.level, 'gas')
           sfx.coin()
-          s.toast(`Filled up at your Gas Station! +${pay} coins, +8 XP`)
+          const xp = serviceXp('gas', s.level)
+          s.toast(`Filled up at your Gas Station! +${pay} coins, +${xp} XP`)
           requestTrip(cuid, 'gas')
-          return set(withXp(s, 8, {
+          return set(withXp(s, xp, {
             coins: s.coins + pay,
             cars: s.cars.map((c) => (c.uid === cuid ? { ...c, lowFuel: false } : c)),
             stats: { ...bump(s, 'serviced'), coinsEarned: (s.stats.coinsEarned ?? 0) + pay },
@@ -1836,12 +1862,14 @@ export const useGame = create<GameState>()(
         const s = get()
         if (!s.cars.some((c) => c.uid === cuid)) return
         set({ showcase: togglePick(s.showcase ?? [], cuid), updatedAt: Date.now() })
+        sfx.equip()
       },
 
       setRaceCar: (cuid) => {
         const s = get()
         if (s.raceCar === cuid || !s.cars.some((c) => c.uid === cuid)) return
         set({ raceCar: cuid, updatedAt: Date.now() })
+        sfx.equip()
       },
 
       markHelped: (ownerId) => {
@@ -1870,14 +1898,17 @@ export const useGame = create<GameState>()(
         if (!car || (!paint && job.color !== car.color && !(hasCustomPaint(s) && isHexColor(job.color))) || !fin || !STRIPES.includes(job.stripe)) return false
         if (job.color !== car.color && !paintOpen(s, job.color)) {
           const r = rivalForPaint(job.color)
+          sfx.error()
           s.toast(r ? `Beat ${r.name} to unlock ${paint!.name}` : paint?.earn ? `${paint.name}: ${earnHint(job.color)}` : 'That colour is locked')
           return false
         }
         if (s.level < fin.unlockLevel && fin.id !== (car.finish ?? 'gloss')) {
+          sfx.error()
           s.toast(`${fin.name} unlocks at level ${fin.unlockLevel}`)
           return false
         }
         if (fin.mastery && carClassTier(s.mastery, car.model) < fin.mastery && fin.id !== car.finish) {
+          sfx.error()
           s.toast(fin.blurb)
           return false
         }
@@ -1917,24 +1948,29 @@ export const useGame = create<GameState>()(
           // Rival colours stay locked panel by panel too, but a panel keeps the colour it has.
           if (v.color && v.color !== was?.[pn.id]?.color && !paintOpen(s, v.color)) {
             const r = rivalForPaint(v.color)
+            sfx.error()
             s.toast(r ? `Beat ${r.name} to unlock that colour` : earnHint(v.color) || 'That colour is locked')
             return false
           }
           const pat = v.pattern ? PATTERNS.find((p) => p.id === v.pattern) : undefined
           if (v.pattern && !pat) return false
           if (pat?.trial && !((s.tuner?.[pat.trial] ?? 0) > 0) && was?.[pn.id]?.pattern !== pat.id) {
+            sfx.error()
             s.toast(`Win ${tunerTrial(pat.trial)?.name ?? 'a Tuner Trial'} to unlock ${pat.name}`)
             return false
           }
           if (pat?.mastery && masteryTier(s.mastery, car.model) < pat.mastery && was?.[pn.id]?.pattern !== pat.id) {
+            sfx.error()
             s.toast(`Reach ${pat.name} mastery in this car to unlock it`)
             return false
           }
           if (pat?.road && !roadOpen(s.roadItems, pat.id) && was?.[pn.id]?.pattern !== pat.id) {
+            sfx.error()
             s.toast(`${pat.name}: Trophy Road mystery prize`)
             return false
           }
           if (pat && s.level < pat.unlockLevel && was?.[pn.id]?.pattern !== pat.id) {
+            sfx.error()
             s.toast(`${pat.name} unlocks at level ${pat.unlockLevel}`)
             return false
           }
@@ -1964,6 +2000,7 @@ export const useGame = create<GameState>()(
         const now = was + FRIEND_POINTS[act]
         set({ friendship: { ...s.friendship, [id]: now }, updatedAt: Date.now() })
         const lv = friendLevel(now)
+        if (lv > friendLevel(was)) sfx.reward()
         if (lv > friendLevel(was)) s.toast(`${FRIEND_LEVELS[lv].icon} ${name ?? 'Your friend'} is now your ${FRIEND_LEVELS[lv].name}!`)
       },
 
@@ -1991,6 +2028,7 @@ export const useGame = create<GameState>()(
         const presets = Array.from({ length: PRESET_SLOTS }, (_, i) => s.presets?.[i] ?? null)
         presets[slot] = { color: car.color, ...(car.finish ? { finish: car.finish } : {}), ...(car.stripe ? { stripe: car.stripe } : {}), ...(car.panels ? { panels: car.panels } : {}), ...(car.trim ? { trim: car.trim } : {}) }
         set({ presets, updatedAt: Date.now() })
+        sfx.equip()
         s.toast(`Look saved to slot ${slot + 1}`)
       },
 
@@ -2093,8 +2131,9 @@ export const useGame = create<GameState>()(
         const next = want ? cleanHat(want) : null
         if (!car || (want && !next) || sameHat(car.hat, next)) return false
         const d = hatDef(next?.id)
-        if (d && !ownedHats(s).includes(d.id)) { s.toast(`🔒 ${d.name}`); return false }
+        if (d && !ownedHats(s).includes(d.id)) { sfx.error(); s.toast(`🔒 ${d.name}`); return false }
         set({ cars: s.cars.map((c) => (c.uid === cuid ? { ...c, hat: next ?? undefined } : c)), updatedAt: Date.now() })
+        sfx.equip()
         s.toast(d ? `${d.icon} ${d.name} on!` : 'Hat off')
         return true
       },
@@ -2485,6 +2524,7 @@ export const useGame = create<GameState>()(
       abandonSearch: () => {
         const s = get()
         if (s.search?.flat) s.toast('The tow truck limped home empty-handed.')
+        sfx.menuClose()
         set({ search: null })
       },
 

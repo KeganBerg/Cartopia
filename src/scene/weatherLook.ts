@@ -163,12 +163,12 @@ export function wetRoad(map: Texture, color: ColorRepresentation = '#ffffff') {
       roughnessFactor = mix(roughnessFactor, 0.04, puddle * (1.0 - slush));
       roughnessFactor = mix(roughnessFactor, 0.2, mirage);`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-      // The sun glinting off a drying road: tiny sparkles that wink on and off.
+      // The sun glinting off puddles on a drying road: tiny sparkles that wink on and off.
       if (uGlint > 0.01) {
         vec2 cell = floor(vWPos.xz * 11.0);
         float g = wHash(cell);
         float wink = pow(sin(uTime * (1.5 + g * 4.0) + g * 60.0) * 0.5 + 0.5, 8.0);
-        float spark = step(0.965, g) * wink * uGlint * (0.35 + puddle) * (1.0 - slush);
+        float spark = step(0.965, g) * wink * uGlint * puddle * (1.0 - slush);
         totalEmissiveRadiance += vec3(1.0, 0.95, 0.82) * spark * 3.0;
       }`)
       .replace('#include <opaque_fragment>', 'outgoingLight *= 1.0 - cloudShadow();\n#include <opaque_fragment>')

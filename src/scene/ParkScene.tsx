@@ -263,6 +263,7 @@ export function ParkScene({ lot, me, input, running, onHud, onEnd }: {
   useLayoutEffect(() => {
     frame(lot.start.x, lot.start.z, 1)
     camera.updateProjectionMatrix()
+    return () => void camera.up.set(0, 1, 0)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [camera, size, lot])
 
