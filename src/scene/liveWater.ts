@@ -186,14 +186,19 @@ vec3 lwSwell(vec2 p) {
 const DETAIL_FN = /* glsl */ `
 vec4 lwDetail(vec2 p) {
   vec4 h = vec4(0.0);
-  // Wind chop: short waves whose strength drifts across the water.
-  float gust = 0.55 + 0.9 * lwNoise(p * 0.18 + uWT * vec2(0.05, 0.03));
+  // Wind chop: many short waves at odd angles and lengths, their crests bent by a slow warp
+  // and their strength drifting in patches, so no two cross into a regular grid.
+  vec2 q = p + vec2(sin(p.y * 0.37 + uWT * 0.21) + sin(p.y * 0.83 - p.x * 0.29), sin(p.x * 0.41 - uWT * 0.17) + sin(p.x * 0.71 + p.y * 0.33)) * 0.45;
+  float gust = 0.7 + 0.3 * sin(p.x * 0.23 + uWT * 0.11) * sin(p.y * 0.19 - uWT * 0.07) + 0.25 * sin(dot(p, vec2(0.13, -0.17)) + uWT * 0.05);
   float c = (0.006 + uWind * 0.012) * gust;
   vec3 ch = vec3(0.0);
-  lwWave(ch, p, vec2(0.6, 0.8), 0.55, 1.3, c);
-  lwWave(ch, p, vec2(-0.9, 0.42), 0.37, 1.6, c * 0.8);
-  lwWave(ch, p, vec2(0.15, -0.99), 0.29, 1.9, c * 0.6);
-  lwWave(ch, p, vec2(-0.5, -0.86), 0.71, 1.1, c * 0.9);
+  lwWave(ch, q, vec2(0.6, 0.8), 0.61, 1.3, c * 0.8);
+  lwWave(ch, q, vec2(-0.966, 0.259), 0.43, 1.55, c * 0.55);
+  lwWave(ch, q, vec2(0.087, -0.996), 0.33, 1.8, c * 0.4);
+  lwWave(ch, q, vec2(-0.669, -0.743), 0.79, 1.1, c * 0.75);
+  lwWave(ch, q, vec2(0.914, -0.407), 0.53, 1.4, c * 0.5);
+  lwWave(ch, q, vec2(-0.208, 0.978), 0.27, 2.0, c * 0.3);
+  lwWave(ch, q, vec2(0.829, 0.559), 0.97, 0.95, c * 0.6);
   h.xyz += ch;
   for (int i = 0; i < ${MAX_RIPPLES}; i++) {
     if (i >= uRipN) break;
@@ -331,7 +336,7 @@ export function liveWater(look: WaterLook) {
       #endif
       vec3 lwBody = mix(uShallow, uDeep, lwDepth);
       // Light catching the faces of the waves.
-      lwBody *= 1.0 + dot(lwSlope, vec2(0.6, 0.45)) * 1.2;
+      lwBody *= 1.0 + dot(lwSlope, vec2(0.6, 0.45)) * 0.45;
       diffuseColor.rgb = mix(lwBody, uFoam, lwFoam * 0.9);`)
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(0.07 + uWind * 0.08, 0.7, lwFoam);')
       .replace('#include <normal_fragment_begin>', /* glsl */ `#include <normal_fragment_begin>

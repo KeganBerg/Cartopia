@@ -106,6 +106,16 @@ const boat = await p.evaluate(() => window.__fisher ? { x: window.__fisher.x, z:
 await pose({ x: boat.x, z: boat.z, yaw: boat.h + 2.2, pitch: 1.05, dist: 4.5 })
 await step(2)
 await shot('4-closer')
+if (process.env.ROW) {
+  // Low and side-on while he rows: blades in the water on the drive, clear of it on the way back.
+  await p.evaluate(() => { const f = window.__fisher; f.mode = 'row'; f.tx = -94; f.tz = -12 })
+  await step(4)
+  for (const [ph, name] of [[0.16, '9-row-drive'], [0.66, '9-row-back']]) {
+    const f = await p.evaluate((ph) => { const f = window.__fisher; f.stroke = ph; return { x: f.x, z: f.z, h: f.h } }, ph)
+    await pose({ x: f.x, z: f.z, yaw: f.h + Math.PI / 2 + 0.35, pitch: 1.3, dist: 3.4 })
+    await shot(name)
+  }
+}
 if (process.env.POND) {
   await pose({ x: -20, z: -20, yaw: 0.8, pitch: 0.95, dist: 3.6 })
   await step(2)
