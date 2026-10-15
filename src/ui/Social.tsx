@@ -259,7 +259,7 @@ export function ClanPanel() {
       {CREW_DEMO && !uid ? (
         <ClanHome data={demoCrew()} uid="me" onChange={() => {}} />
       ) : !supabase ? (
-        <p className="hint">Crews need an internet connection.</p>
+        <div className="inv-empty" title="Crews need an internet connection"><span className="empty-ico">📡</span><div>No connection</div></div>
       ) : uid === null ? (
         <div className="clan-signin">
           <span className="big-emblem">🛡️</span>
