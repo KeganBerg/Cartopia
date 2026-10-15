@@ -349,6 +349,17 @@ body:has(.edit-bar) .tutorial { bottom: calc(150px + var(--sab)); }
 :root .tool-count { position: absolute; top: 2px; right: 4px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: #e53935; color: #fff; font: 11px/18px var(--display); border: 1.5px solid #fff; }
 :root .inv-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 32px 12px; font: 18px var(--display); color: #4a6283; }
 :root .inv-empty .gi { color: #2f6fd6; }
+:root .inv-empty .empty-ico { font-size: 40px; line-height: 1; }
+/* An empty menu's note sits in the middle of the menu, not stuck to its top. */
+:root .panel-body:has(> .inv-empty) { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+:root .panel-body > .inv-empty { flex: 1; justify-content: center; }
+
+/* Cards in a row line up: names keep two lines' room and the buy button sits at the bottom. */
+:root .car-card .card-name { min-height: 2.5em; line-height: 1.25; display: flex; align-items: center; justify-content: center; }
+:root .car-card > .buy, :root .car-card > .price { margin-top: auto; }
+:root .bank-pack .buy { margin-top: auto; }
+:root .bank-pack > :nth-last-child(2) { margin-bottom: 6px; }
+:root .deal > .buy, :root .deal > .price { margin-top: auto; }
 :root .inv-count { font: 18px var(--display); color: var(--ink); }
 
 /* Bank: its own gold vault button beside the season star, so gems are never hard to find */
