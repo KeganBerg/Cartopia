@@ -6,6 +6,7 @@ import { stackCars, stackFace } from '../game/garageStacks'
 import { reducedMotion } from '../game/fx'
 import { activeEvent, garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, carDef, performance, upgradeCost, buildingDef, upgradable, loves, readySets, isBike, FEATURES, type BuildingDef } from '../game/data'
 import { CarInspect, CarPreview, type DynoFeed } from '../scene/CarPreview'
+import { usePauseTownUnder } from '../scene/renderGate'
 import type { DynoRun } from './Dyno'
 import { onDemand } from './lazy'
 import { CollectAllButton } from './CollectAll'
@@ -182,6 +183,8 @@ export function Panel({ title, children, wide, onClose, onBack, head, className 
   const [closing, setClosing] = useState(false)
   const timer = useRef(0)
   useEffect(() => () => clearTimeout(timer.current), [])
+  const box = useRef<HTMLDivElement>(null)
+  usePauseTownUnder(box)
   const close = (_: null) => {
     const done = () => (onClose ? onClose() : closePanel())
     if (reducedMotion()) return done()
@@ -191,7 +194,7 @@ export function Panel({ title, children, wide, onClose, onBack, head, className 
   }
   return (
     <div className={closing ? 'overlay closing' : 'overlay'} onClick={() => close(null)}>
-      <div className={`${wide ? 'panel wide' : 'panel'}${className ? ` ${className}` : ''}`} onClick={(e) => e.stopPropagation()}>
+      <div ref={box} className={`${wide ? 'panel wide' : 'panel'}${className ? ` ${className}` : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="panel-head">
           {onBack && <button className="panel-back" aria-label="Back" onClick={onBack}><Icon name="back" size={18} /></button>}
           {/* long titles (a garage with its stats) step down a size so they don't cut off */}
