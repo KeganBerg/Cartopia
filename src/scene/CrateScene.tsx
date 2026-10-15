@@ -23,7 +23,7 @@ import { bumpSound } from '../lib/arcadeSound'
 import { crateOpenSound } from '../lib/crateOpenSfx'
 import { crateSfx, sfx } from '../lib/sound'
 import { landClink } from '../lib/crateClinks'
-import { PART_LIFT, PART_SIZE, PART_WHEEL, PartPrize } from './PartPrize'
+import { PART_LIFT, PartPrize, partReach } from './PartPrize'
 
 // The Crate Depot: a warehouse loading bay at night where crates are opened. The crate sits on a
 // hazard-striped lift under a work lamp, racking full of stock either side, a forklift parked up,
@@ -569,20 +569,19 @@ export function Dust() {
 
 type CarLook = { body: Body; model: string; color: string; finish?: Finish | null; stripe?: string | null; mods?: string[] | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; panels?: Panels | null; hat?: HatFit | null }
 
-const prizeScale = (body: Body) => 2.3 / carSize(body).len
+export const prizeScale = (body: Body) => 2.3 / carSize(body).len
 // How tall a hat stands on a car, in the car's own units (CarHat).
 const HAT_HEIGHT = 0.22
 // How much smaller a part shows when it floats over the car wearing it.
-const PART_OVER = 0.42
+export const PART_OVER = 0.42
 // How high that part floats: at least its usual height, and always clear of the car's roll bar,
-// seats and roof (and the hat on top), with a little air between.
-function partOver(look: CarLook, part: string) {
+// seats and roof (and the hat on top), with a little air between, however it turns and tips.
+export function partOver(look: Pick<CarLook, 'body' | 'model' | 'mods' | 'hat'>, part: string) {
   const sc = prizeScale(look.body)
-  const wheel = ['rims', 'tires'].includes(MODS.find((m) => m.id === part)?.slot ?? '')
-  // The part's reach from its turning axis, and how far its lowest point sits below its middle (PartPrize).
-  const half = (wheel ? PART_WHEEL : PART_SIZE / 2) * PART_OVER
-  const top = carTop(look.body, look.model, look.mods, half / sc) * sc + (look.hat ? HAT_HEIGHT * sc : 0)
-  return Math.max(1.05, top + 0.06 - (PART_LIFT * PART_OVER - half))
+  // How far the part swings out from its turning axis, and dips below its middle (PartPrize).
+  const { below, reach } = partReach(part, look.body)
+  const top = carTop(look.body, look.model, look.mods, (reach * PART_OVER) / sc) * sc + (look.hat ? HAT_HEIGHT * sc : 0)
+  return Math.max(1.05, top + 0.06 - (PART_LIFT - below) * PART_OVER)
 }
 
 function PrizeCar({ look }: { look: CarLook }) {

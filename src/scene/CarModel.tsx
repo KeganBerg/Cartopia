@@ -16,7 +16,7 @@ import { tickSkins, withSkin } from './skins'
 import { CarMods, KIND_MAT, RIM_LOOK, RIM_STYLE, UnderglowPool, carbon, modGeo, modIds, splitSkinned } from './CarMods'
 import { carBody, wheelPool, type WheelSlot } from './carBatch'
 import { bake, finishOf, type Finish as Look } from './bake'
-import { carStyle, hasTrim, trimBike, trimCar, type CarStyle } from './carTrim'
+import { carStyle, hasTrim, onPane, trimBike, trimCar, type CarStyle, type Pane, type Panes } from './carTrim'
 import { brakeGeo, wheelGeo, type RimStyle } from './carWheels'
 import { PEOPLE_SIZED } from './keepShape'
 import { EXOTIC } from './exoticCars'
@@ -61,12 +61,13 @@ type Shape = {
   lmp?: boolean // endurance prototype: tall rounded wheel pods over all four tyres, louvred on top
   track?: number // wheel distance from the centre line, when the wheels stand clear of the body
   tyre?: number // tyre width (default 0.14, or 0.16 on wheels standing clear of the body)
+  inset?: number // how far the wheels tuck in under the arches, from the usual track
   drop: number // how far the hood sits below the rear deck
   nose: number // how far the nose falls away from the hood
 }
 
 const SHAPES: Record<Body, Shape> = {
-  compact: { len: 0.95, wid: 0.64, body: 0.27, lift: 0.1, cabinLen: 0.58, cabinH: 0.28, cabinZ: -0.06, taper: 0.72, hood: 0, wheel: 0.15, drop: 0.06, nose: 0.05 },
+  compact: { len: 0.95, wid: 0.64, body: 0.27, lift: 0.1, cabinLen: 0.58, cabinH: 0.28, cabinZ: -0.06, taper: 0.72, hood: 0, wheel: 0.15, drop: 0.06, nose: 0.05, inset: 0.015 },
   sedan: { len: 1.22, wid: 0.66, body: 0.24, lift: 0.1, cabinLen: 0.62, cabinH: 0.25, cabinZ: -0.06, taper: 0.74, hood: 0, wheel: 0.15, drop: 0.05, nose: 0.05 },
   sports: { len: 1.22, wid: 0.7, body: 0.19, lift: 0.08, cabinLen: 0.52, cabinH: 0.18, cabinZ: -0.12, taper: 0.64, hood: 0.03, wheel: 0.15, drop: 0.04, nose: 0.06, spoiler: true },
   muscle: { len: 1.32, wid: 0.7, body: 0.25, lift: 0.1, cabinLen: 0.52, cabinH: 0.21, cabinZ: -0.16, taper: 0.76, hood: 0.05, wheel: 0.16, drop: 0.02, nose: 0.05, scoop: true },
@@ -177,6 +178,36 @@ function cabinProfile(s: Shape, base: number, b: number) {
   return { sh, front: front + b, rear: rear + b, roofF, roofR, roof: roof + b }
 }
 
+// The outside face of the windshield (front) and rear window (back), from cabinProfile: where the
+// glass is at height y (z), the way out of it (ny, nz), and the tilt (about x) that lays a flat
+// part on it. lo and hi bound the flat run of glass, from its foot to where it rounds into the roof.
+export function cabinPanes(s: Shape, base: number, b: number): Panes {
+  const front = s.cabinZ + s.cabinLen / 2 - b
+  const rear = s.cabinZ - s.cabinLen / 2 + b
+  const slack = s.cabinLen * (1 - s.taper)
+  const fb = s.fastback ?? 0.28
+  const roof = base + s.cabinH - b
+  const r = Math.min(0.05, s.cabinH * 0.35)
+  const pane = (z0: number, z1: number, y1: number, out: number): Pane => {
+    const y0 = base - 0.02
+    const dz = z1 - z0
+    const dy = y1 - y0
+    const l = Math.hypot(dz, dy)
+    // The bevel pushes the face out by b, square to it.
+    const ny = (out * -dz) / l
+    const nz = (out * dy) / l
+    // Below the flat run the bevel rounds under; it reaches no further out than the run's foot.
+    const foot = y0 + ny * b
+    return { at: (y) => z0 + nz * b + ((Math.max(y, foot) - foot) * dz) / dy, ny, nz, tilt: Math.atan2(dz, dy), lo: y0 - b, hi: y1 + ny * b }
+  }
+  return {
+    front: pane(front, front - slack * (1 - fb) + r * 0.5, roof - r * 0.4, 1),
+    back: pane(rear, rear + slack * fb - r * 0.3, roof - r * 0.6, -1),
+  }
+}
+// How far each wheel sits from the centre line.
+const wheelX = (s: Shape) => s.track ?? s.wid / 2 - 0.02 - (s.inset ?? 0)
+
 // Extrudes a side profile across the car's width with bevelled (rounded) edges.
 function extrude(sh: ThreeShape, width: number, b: number) {
   const g = new ExtrudeGeometry(sh, { depth: Math.max(0.01, width - 2 * b), bevelEnabled: true, bevelThickness: b, bevelSize: b, bevelSegments: 3, curveSegments: 6 })
@@ -251,6 +282,8 @@ export type ModFrame = {
   deck: number; deckZ: number; deckW: number; hoodTop: number; hoodZ: number; hs: number
   // The top of the hard roof (the deck on bodies without one), where it runs, and how wide it is.
   roof: number; roofZ: number; roofLen: number; roofW: number
+  // The outside of the windshield and back window, on closed cabins.
+  glass?: Panes
 }
 export function carFrame(body: Body): ModFrame {
   const s = shapeOf(body)
@@ -280,11 +313,12 @@ export function carFrame(body: Body): ModFrame {
   const roofMount = !s.open && s.cabinZ - s.cabinLen / 2 < -s.len / 2 + 0.16
   const c = cabinProfile(s, p.deck - 0.01, 0.025)
   return {
-    body, len: s.len, wid: s.wid, lift: s.lift, wheel: s.wheel, wz: s.len * 0.33, wx: s.track ?? s.wid / 2 - 0.02,
+    body, len: s.len, wid: s.wid, lift: s.lift, wheel: s.wheel, wz: s.len * 0.33, wx: wheelX(s),
     bodyW: s.wid, side: s.tracks ? s.wid / 2 + 0.08 : s.wid / 2, front: s.len / 2, rear: -s.len / 2, pipeY: s.lift + 0.06,
     deck: roofMount ? c.roof : p.deck, deckZ: roofMount ? c.roofR + 0.05 : -s.len / 2 + 0.08, deckW: roofMount ? s.wid * 0.84 : s.wid,
     hoodTop: p.hood + s.hood, hoodZ: (cowl + s.len / 2 - s.len * 0.1) / 2, hs: Math.min(1.15, s.wid / 0.7),
     roof: s.open ? p.deck : c.roof + 0.015, roofZ: (c.roofF + c.roofR) / 2, roofLen: c.roofF - c.roofR, roofW: s.wid * 0.84,
+    glass: s.open || s.round ? undefined : cabinPanes(s, p.deck - 0.01, 0.025),
   }
 }
 
@@ -573,6 +607,8 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
   const closed = !s.open && !s.round
   let roofY = top
   let roofLen = 0
+  // The outside of the windshield and back window, on closed cabins (for the trim that lies on them).
+  let glass: Panes | null = null
   let roofZ = s.cabinZ
 
   k.add('paint', extrude(lower.sh, s.wid, b))
@@ -630,6 +666,8 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
   } else {
     const cb = 0.025
     const c = cabinProfile(s, lower.deck - 0.01, cb)
+    const pane = cabinPanes(s, lower.deck - 0.01, cb)
+    glass = pane
     k.add('glass', extrude(c.sh, s.wid * 0.8, cb))
     cabinInside(k, s, top, c)
     // Painted roof panel sitting on the glass, slightly wider so it reads as a roof line.
@@ -653,14 +691,23 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
       k.add(VINTAGE.includes(body) ? 'chrome' : 'black', box(0.008, 0.008, roofLen * 0.96), [sd * (s.wid * 0.42 + 0.002), roofY - 0.006, roofZ])
     }
     // Cowl panel with vent slots across the base of the windshield.
-    k.add('black', box(s.wid * 0.74, 0.008, 0.04), [0, top + 0.005, c.front + 0.009])
-    for (let i = -4; i <= 4; i++) k.add('dark', box(0.012, 0.009, 0.026), [i * s.wid * 0.07, top + 0.0075, c.front + 0.009])
+    // Tucked under the glass's foot, never sunk far into it (an upright windshield stands further out).
+    const cz = Math.max(c.front + 0.009, pane.front.at(top + 0.009) + 0.009)
+    k.add('black', box(s.wid * 0.74, 0.008, 0.04), [0, top + 0.005, cz])
+    for (let i = -4; i <= 4; i++) k.add('dark', box(0.012, 0.009, 0.026), [i * s.wid * 0.07, top + 0.0075, cz])
     // Wipers resting at the base of the windshield.
-    for (const x of [-0.12, 0.08]) k.add('black', box(0.16, 0.008, 0.012), [x * s.wid * 1.6, top + 0.01, c.front - 0.03], [0, 0.25, 0])
+    // They lie on the outside of the glass, following its slope.
+    for (const x of [-0.12, 0.08]) k.add('black', box(0.16, 0.012, 0.006), onPane(pane.front, x * s.wid * 1.6, top + 0.025, 0.006), [pane.front.tilt, 0, 0.12])
     // Third brake light on the rear edge of the roof.
     k.add('tail', plane(0.12, 0.014), [0, roofY - 0.012, c.roofR - 0.012], [0, Math.PI, 0])
     // Radio aerial on everyday cars, roof rails on the wagon.
-    if (body === 'sedan' || body === 'compact' || body === 'classic') k.add('black', cyl(0.004, 0.006, 0.2, 4), [s.wid * 0.3, top + 0.1, -s.len / 2 + 0.12], [-0.3, 0, 0])
+    // The aerial stands on the rear deck behind the back window, raked back, or on the back of the roof
+    // when the window runs too close to the tail.
+    if (body === 'sedan' || body === 'compact' || body === 'classic') {
+      const gz = pane.back.at(top)
+      const [ay, az] = gz + s.len / 2 > 0.07 ? [top - 0.004, (gz - s.len / 2) / 2] : [roofY - 0.004, c.roofR + 0.03]
+      k.add('black', cyl(0.004, 0.006, 0.2, 4), [s.wid * 0.3, ay + 0.1 * Math.cos(0.3), az - 0.1 * Math.sin(0.3)], [-0.3, 0, 0])
+    }
     if (body === 'wagon' || body === 'truck' || body === 'suv' || body === 'van') {
       for (const sd of [-1, 1]) {
         k.add('chrome', box(0.02, 0.02, roofLen * 0.9), [sd * s.wid * 0.33, roofY + 0.02, roofZ])
@@ -673,7 +720,7 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
       for (const t of [0.4, 0.7]) k.add('paint', box(s.wid * 0.8, 0.016, 0.024), [0, top + (c.roof - top) * t, c.front + (c.roofF - c.front) * t + 0.012], [rake, 0, 0])
       k.add('paint', cyl(0.07, 0.08, 0.04, 12), [0, roofY + 0.02, roofZ - roofLen * 0.12])
       k.add('chrome', cyl(0.074, 0.074, 0.008, 12), [0, roofY + 0.042, roofZ - roofLen * 0.12])
-      k.add('black', cyl(0.003, 0.006, 0.34, 4), [-s.wid * 0.32, roofY + 0.15, c.roofR + 0.02], [-0.15, 0, 0])
+      k.add('black', cyl(0.003, 0.006, 0.34, 4), [-s.wid * 0.32, roofY + 0.17 * Math.cos(0.15) - 0.004, c.roofR + 0.04], [-0.15, 0, 0])
     }
     if (s.bus) {
       // Window posts along both sides, roof warning lamps, the stop arm and the rear emergency door.
@@ -685,14 +732,16 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
       k.add('black', box(0.012, 0.012, 0.12), [-(s.wid / 2 + 0.02), top - 0.05, c.front - 0.18])
       k.add('tail', disc(0.045, 8), [-(s.wid / 2 + 0.03), top - 0.05, c.front - 0.24], [0, -Math.PI / 2, 0])
       k.add('dark', plane(0.22, roofY - s.lift - 0.12), [0, (roofY + s.lift + 0.08) / 2, -front - 0.006], [0, Math.PI, 0])
-      k.add('black', box(s.wid * 0.6, 0.06, 0.02), [0, roofY - 0.05, c.front - 0.01])
+      k.add('black', box(s.wid * 0.6, 0.06, 0.02), onPane(pane.front, 0, roofY - 0.05, 0.011), [pane.front.tilt, 0, 0])
     }
     if (s.dog) {
       // Floppy ears hanging over the windshield corners, big eyes above it.
       for (const sd of [-1, 1]) {
-        k.add('dark', rbox(0.06, 0.22, 0.14, 0.03), [sd * s.wid * 0.44, roofY - 0.08, c.roofF - 0.04], [0, 0, sd * 0.35])
-        k.add('lamp', disc(0.045, 14), [sd * 0.12, roofY - 0.045, c.roofF + 0.012], [-0.3, 0, 0])
-        k.add('black', disc(0.02, 10), [sd * 0.11, roofY - 0.05, c.roofF + 0.0225], [-0.3, 0, 0])
+        k.add('dark', rbox(0.06, 0.22, 0.14, 0.03), [sd * s.wid * 0.46, roofY - 0.08, c.roofF - 0.04], [0, 0, sd * 0.35])
+        // The eyes lie on the glass, below where it rounds into the roof.
+        const ey = Math.min(roofY - 0.045, pane.front.hi - 0.05)
+        k.add('lamp', disc(0.045, 14), onPane(pane.front, sd * 0.12, ey, 0.004), [pane.front.tilt, 0, 0])
+        k.add('black', disc(0.02, 10), onPane(pane.front, sd * 0.11, ey - 0.005, 0.0145), [pane.front.tilt, 0, 0])
       }
     }
     if (s.roofwing && !fit.spoiler) {
@@ -995,7 +1044,9 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
   // Racing stripes along the hood, the rear deck and the roof (drawn only when painted on).
   for (const x of [-0.07, 0.07]) {
     k.add('stripe', box(0.066, 0.006, hoodFront - cowl), [x, hoodY + 0.003, (hoodFront + cowl) / 2])
-    k.add('stripe', box(0.066, 0.006, cowl + s.len / 2 - 0.05), [x, top + 0.003, (cowl - s.len / 2) / 2])
+    // The deck stripe stops at the back window rather than running on under the cabin.
+    const z1 = glass ? Math.min(cowl, glass.back.at(top) - 0.004) : cowl
+    if (z1 + s.len / 2 - 0.05 > 0.03) k.add('stripe', box(0.066, 0.006, z1 + s.len / 2 - 0.05), [x, top + 0.003, (z1 - s.len / 2) / 2])
     if (roofLen > 0) k.add('stripe', box(0.066, 0.006, roofLen * 0.95), [x, roofY + 0.003, roofZ])
   }
 
@@ -1129,7 +1180,7 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
       k.add('dark', plane(0.008, top - s.lift - 0.11), [sd * (s.wid / 2 + 0.0065), (s.lift + 0.07 + top) / 2, s.cabinZ + s.cabinLen * 0.5], [0, (sd * Math.PI) / 2, 0])
       k.add('handle', box(0.01, 0.012, 0.05), [sd * (s.wid / 2 + 0.006), top - 0.05, s.cabinZ + s.cabinLen * 0.08 - 0.06])
       k.add('paint', rbox(0.06, 0.04, 0.03, 0.012), [sd * (s.wid * 0.4 + 0.03), top + 0.05, cowl - 0.04])
-      k.add('black', box(0.03, 0.012, 0.012), [sd * (s.wid * 0.4 - 0.005), top + 0.035, cowl - 0.04])
+      k.add('black', box(0.03, 0.012, 0.012), [sd * (s.wid * 0.4 + 0.008), top + 0.028, cowl - 0.04])
       k.add('glass', plane(0.045, 0.028), [sd * (s.wid * 0.4 + 0.03), top + 0.05, cowl - 0.0575], [0, Math.PI, 0])
     }
   }
@@ -1147,13 +1198,16 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
   }
   // Wheel arch lips: a thin dark band round each opening on road cars.
   if (!s.plates && !s.tracks && !s.flares && !RUGGED.includes(body) && !s.open) {
-    for (const z of [wz, -wz]) for (const sd of [-1, 1]) k.add('dark', new TorusGeometry(s.wheel * 1.2, 0.008, 3, 14, Math.PI), [sd * (s.wid / 2 + 0.004), s.wheel, z], [0, (sd * Math.PI) / 2, 0], [1, 1, 0.6])
+    // Smooth, and on wheels tucked in under the body, wide enough to wrap over the tyre's top.
+    const half = s.inset ? (wheelX(s) + 0.076 - s.wid / 2) / 2 : 0.0048
+    const lip = new TorusGeometry(s.wheel * 1.2, 0.008, 8, 28, Math.PI)
+    for (const z of [wz, -wz]) for (const sd of [-1, 1]) k.add('dark', lip.clone(), [sd * (s.wid / 2 + (s.inset ? 0.001 + half : 0.004)), s.wheel, z], [0, (sd * Math.PI) / 2, 0], [1, 1, half / 0.008])
   }
-  if (!s.tracks) brakes(k, s.track ?? s.wid / 2 - 0.02, wz, s.wheel, 0.14)
+  if (!s.tracks) brakes(k, wheelX(s), wz, s.wheel, 0.14)
   // This model's own trim (see carTrim.ts).
   trimCar(k, model, {
     len: s.len, wid: s.wid, lift: s.lift, body: s.body, wheel: s.wheel, cabinZ: s.cabinZ, cabinLen: s.cabinLen,
-    top, hoodY, bulge: s.hood * 2 > 0 ? s.hood : 0, hoodFront, cowl, front, wz, lightY, plateY, nose: noseAt, exhaust: !!fit.exhaust, spoiler: !!fit.spoiler, kit: !!fit.kit, hood: !!fit.hood, roofMod, ty, roofY, roofLen, roofZ, closed,
+    top, hoodY, bulge: s.hood * 2 > 0 ? s.hood : 0, hoodFront, cowl, front, wz, lightY, plateY, nose: noseAt, exhaust: !!fit.exhaust, spoiler: !!fit.spoiler, kit: !!fit.kit, hood: !!fit.hood, roofMod, ty, roofY, roofLen, roofZ, closed, glass,
   })
 
   // Wheel: one mesh per wheel. The tread and the spoked rim share one texture,
@@ -1400,7 +1454,7 @@ function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight,
   const tint = useMemo(() => (rusty ? '#' + new Color(color).lerp(new Color('#8a5a3c'), 0.72).getHexString() : color), [color, rusty])
   const dark = useMemo(() => '#' + new Color(tint).multiplyScalar(0.6).getHexString(), [tint])
   const wz = s.len * 0.33
-  const wx = s.track ?? s.wid / 2 - 0.02
+  const wx = wheelX(s)
   const shared = (['black', 'chrome', 'screen', 'seat', 'wood', 'tail', 'amber', 'dash', 'display', 'pink', 'mint', 'cream', 'waffle'] as const).filter((k) => p[k])
   const look = carStyle(model)
   // Rusty finds come home with stock trim.
