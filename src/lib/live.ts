@@ -12,6 +12,7 @@ import { acceptWager, offerWager, startWagers, syncWagers, voidWager } from './w
 import { openParty } from './party'
 import { STAKES, shortCoins } from '../game/wager'
 import { signedInUser } from './cloud'
+import { sfx } from './sound'
 
 // Live drag racing over Supabase Realtime. A shared lobby channel carries
 // presence and challenges; each race gets its own channel for positions.
@@ -246,7 +247,10 @@ async function openLobby(uid: string) {
       const stake = cleanStake(payload.stake)
       const mode: LiveMode = payload.mode === 'kart' && !stake ? 'kart' : 'drag'
       useLive.setState({ invites: [...l.invites.filter((i) => i.from.id !== from.id), { raceId: payload.raceId, from, at: Date.now(), mode, stake, party }] })
-      if (fresh) useGame.getState().toast(`${playerName(from.uid, from.town)} ${stake ? `bet 🪙${shortCoins(stake)} on a race` : party ? 'invited you to a kart party' : `challenged you to a ${mode === 'kart' ? 'kart race' : 'race'}`}! Tap 🏁`)
+      if (fresh) {
+        sfx.challenge()
+        useGame.getState().toast(`${playerName(from.uid, from.town)} ${stake ? `bet 🪙${shortCoins(stake)} on a race` : party ? 'invited you to a kart party' : `challenged you to a ${mode === 'kart' ? 'kart race' : 'race'}`}! Tap 🏁`)
+      }
     })
     .on('broadcast', { event: 'cancel' }, ({ payload }) => {
       const l = useLive.getState()
