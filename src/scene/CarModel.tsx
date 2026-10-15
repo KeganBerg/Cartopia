@@ -1198,10 +1198,12 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
   }
   // Wheel arch lips: a thin dark band round each opening on road cars.
   if (!s.plates && !s.tracks && !s.flares && !RUGGED.includes(body) && !s.open) {
-    // Smooth, and on wheels tucked in under the body, wide enough to wrap over the tyre's top.
-    const half = s.inset ? (wheelX(s) + 0.076 - s.wid / 2) / 2 : 0.0048
-    const lip = new TorusGeometry(s.wheel * 1.2, 0.008, 8, 28, Math.PI)
-    for (const z of [wz, -wz]) for (const sd of [-1, 1]) k.add('dark', lip.clone(), [sd * (s.wid / 2 + (s.inset ? 0.001 + half : 0.004)), s.wheel, z], [0, (sd * Math.PI) / 2, 0], [1, 1, half / 0.008])
+    // On wheels tucked in under the body, a smooth flare wide enough to wrap over the tyre's top.
+    const half = (wheelX(s) + 0.076 - s.wid / 2) / 2
+    for (const z of [wz, -wz]) for (const sd of [-1, 1]) {
+      if (s.inset) k.add('dark', new TorusGeometry(s.wheel * 1.2, 0.008, 8, 28, Math.PI), [sd * (s.wid / 2 + 0.001 + half), s.wheel, z], [0, (sd * Math.PI) / 2, 0], [1, 1, half / 0.008])
+      else k.add('dark', new TorusGeometry(s.wheel * 1.2, 0.008, 3, 14, Math.PI), [sd * (s.wid / 2 + 0.004), s.wheel, z], [0, (sd * Math.PI) / 2, 0], [1, 1, 0.6])
+    }
   }
   if (!s.tracks) brakes(k, wheelX(s), wz, s.wheel, 0.14)
   // This model's own trim (see carTrim.ts).

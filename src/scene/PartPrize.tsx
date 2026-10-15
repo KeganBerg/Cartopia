@@ -48,6 +48,9 @@ function centred(geos: (BufferGeometry | undefined)[]) {
 
 // How a bolt-on prize tips toward the camera as it turns (PartPrize).
 const TIP = 0.3
+// A wheel prize's radius and width (drawn 1.5 times bigger).
+const R = 0.5
+const W = 0.3
 
 // How far a part prize reaches as it turns and tips, in its own units round its middle (at
 // PART_LIFT): how far its lowest point dips below the middle, and how far it swings out to
@@ -107,8 +110,6 @@ export function BoltOn({ id, body, tint }: { id: string; body: Body; tint: strin
 }
 
 // A full wheel standing up, axle across: a rims prize in its finish, or a tyre prize with its tread.
-const R = 0.5
-const W = 0.3
 function WheelPrize({ id }: { id: string }) {
   const rim = RIM_LOOK[id]
   const tread = TREAD[id]
