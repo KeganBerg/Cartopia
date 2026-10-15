@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { supabase } from './supabase'
+import { sfx } from './sound'
 import { useGame } from '../game/store'
 import { CLAN_EMBLEMS } from '../game/data'
 import { isCleanChat, isCleanName } from './names'
@@ -12,7 +13,8 @@ import type { ClanBadge } from './clans'
 // Realtime topic chat:<room>. Rooms: 'global', and 'crew:<clan id>' for the player's crew.
 
 export type Room = 'global' | 'crew'
-export type ChatMsg = { id: number; owner: string; name: string; level: number; crew: ClanBadge | null; body: string; at: number }
+// mod: the server says this is a chat mod (the Cartopia team), shown with a check mark.
+export type ChatMsg = { id: number; owner: string; name: string; level: number; crew: ClanBadge | null; body: string; at: number; mod?: boolean }
 
 type ChatState = {
   uid: string | null
@@ -51,7 +53,7 @@ const KEEP = 80
 export const senderName = (m: Pick<ChatMsg, 'name' | 'owner'>) => playerName(m.owner, m.name)
 
 // Rows come from the server, but keep only well-formed ones and run the filters again.
-type Row = { id: number; owner: string; name: string; level: number; body: string; at: string; tag?: string | null; emblem?: string | null; color?: string | null }
+type Row = { id: number; owner: string; name: string; level: number; body: string; at: string; tag?: string | null; emblem?: string | null; color?: string | null; mod?: boolean }
 export function toMsg(r: Row): ChatMsg | null {
   if (!r || typeof r.id !== 'number' || typeof r.body !== 'string' || typeof r.owner !== 'string') return null
   const crew = r.tag && isCleanName(r.tag) && /^#[0-9a-f]{6}$/i.test(r.color ?? '')
@@ -61,6 +63,7 @@ export function toMsg(r: Row): ChatMsg | null {
     id: r.id, owner: r.owner, name: String(r.name ?? ''), level: Number(r.level) || 1, crew,
     body: isCleanChat(r.body) ? r.body.slice(0, MAX_CHAT) : '•••',
     at: Date.parse(r.at) || Date.now(),
+    ...(r.mod === true ? { mod: true } : {}),
   }
 }
 
@@ -75,6 +78,7 @@ const loaded: Partial<Record<Room, boolean>> = {}
 // channel was down doesn't linger.
 function add(room: Room, list: ChatMsg[], history = false) {
   loadUsernames(list.map((m) => m.owner))
+  let ping = false
   useChat.setState((s) => {
     const from = history ? (list.length ? Math.min(...list.map((m) => m.id)) : -Infinity) : Infinity
     const byId = new Map(s.msgs[room].filter((m) => m.id < from).map((m) => [m.id, m]))
@@ -86,12 +90,15 @@ function add(room: Room, list: ChatMsg[], history = false) {
       byId.set(m.id, m)
     }
     const merged = [...byId.values()].sort((a, b) => a.id - b.id).slice(-KEEP)
+    // Your crew talking: a soft pluck (the busy global room stays quiet).
+    ping = room === 'crew' && fresh > 0
     const seen = s.viewing === room
     return {
       msgs: { ...s.msgs, [room]: merged },
       unread: { ...s.unread, [room]: seen ? 0 : s.unread[room] + fresh },
     }
   })
+  if (ping) sfx.message()
 }
 
 const channels: Partial<Record<Room, RealtimeChannel>> = {}

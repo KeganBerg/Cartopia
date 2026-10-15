@@ -281,6 +281,8 @@ body:has(.edit-bar) .tutorial { bottom: calc(150px + var(--sab)); }
 
 /* The light show: over the town, under the badges and every control, never takes a tap. */
 .techno-fx { position: fixed; inset: 0; z-index: 5; pointer-events: none; overflow: hidden; }
+/* The countdown and RAVE MODE title: over the building badges (z 10), under the HUD (z 50). */
+.techno-words { position: fixed; inset: 0; z-index: 20; pointer-events: none; overflow: hidden; }
 .tk-glow { position: absolute; inset: 0; box-shadow: inset 0 0 calc(50px + var(--tk) * 90px) calc(var(--tk) * 14px) hsl(var(--tk-h) 100% 55% / calc(.25 + var(--tk) * .4 - var(--tk-build) * .2)); background: radial-gradient(ellipse at 50% 55%, transparent 55%, rgba(8, 0, 30, calc(.18 + var(--tk-build) * .35))); }
 .tk-lasers i { position: absolute; bottom: -10vh; width: 5px; height: 150vh; transform-origin: 50% 100%; mix-blend-mode: screen; opacity: calc(.18 + var(--tk) * .45);
   background: linear-gradient(to top, transparent, hsl(var(--tk-h) 100% 65%) 30%, hsl(var(--tk-h) 100% 80% / .5) 70%, transparent); box-shadow: 0 0 14px 2px hsl(var(--tk-h) 100% 60% / .6);

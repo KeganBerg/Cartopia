@@ -10,7 +10,7 @@ import { liveTraffic, crossingSignal } from './traffic/live'
 import { useThought, placeChip } from '../game/thoughts'
 import { SEASON } from './season'
 import { SHIRTS, PANTS, SKIN, HAIR, BEANIES } from './people'
-import { headGeo, legGeo, torsoGeo } from './peopleGeo'
+import { dogGeo, headGeo, leashGeo, legGeo, torsoGeo, PERSON } from './peopleGeo'
 import { dayPhase, nightAmount } from './dayNight'
 import { isNight } from '../game/clock'
 import { CLUB } from './clubLayout'
@@ -31,12 +31,18 @@ const SMALL = typeof window !== 'undefined' && Math.min(window.innerWidth, windo
 const MAX_PEOPLE = SMALL ? 20 : 44
 // Extra residents as the town levels up: one more for every two levels.
 const extraPeople = (level: number) => Math.min(10, Math.floor(level / 2))
-const LEG = 0.24
+const LEG = PERSON.leg
 // Figures are modelled at race-crowd proportions and drawn a little bigger so they read from the town camera.
-const SCALE = 1.3
+const SCALE = PERSON.scale
 const TORSO = torsoGeo()
 const HEAD = headGeo()
 const LEGS = legGeo(LEG)
+const DOG = dogGeo(SCALE)
+const LEASH = leashGeo()
+const LEASHES = ['#d32f2f', '#1565c0', '#2e7d32', '#212121', '#f9a825', '#6a1b9a']
+// Where the leash clips on: the collar, in the dog's own frame (DOG is built at 1/SCALE).
+const COLLAR_Y = 0.17 / SCALE
+const COLLAR_Z = 0.075 / SCALE
 
 
 const NAMES = ['Alex', 'Sam', 'Jordan', 'Riley', 'Casey', 'Morgan', 'Taylor', 'Jamie', 'Quinn', 'Avery', 'Rowan', 'Skyler', 'Drew', 'Kai', 'Robin', 'Charlie', 'Frankie', 'Jesse', 'Remy', 'Sage']
@@ -119,8 +125,12 @@ const LINGER: Record<string, [number, number]> = {
 const PARKS = new Set(['bench', 'fountain', 'flowers', 'tree', 'palm', 'statue', 'pond', 'pine', 'picnic', 'busstop', 'hotdog', 'flagpole', 'gazebo', 'clocktower', 'pumpkins', 'scarecrow', 'graves', 'deadtree'])
 // Big decorations people walk up to, like the duck pond.
 const BIG_PARKS = new Set(['pond', 'playground', 'dogpark', 'skatepark', 'koi', 'garden'])
-// Seats: benches and the bus stop face out the front; at a picnic table people face the table.
-const SEATS: Record<string, 'out' | 'in'> = { bench: 'out', busstop: 'out', picnic: 'in' }
+// Seats: the bus stop's sitters face out its open front (its turn side); a park bench's backrest
+// is on its turn side, so its sitters sit against it facing the other way. At a picnic table
+// people face the table.
+const SEATS: Record<string, 'out' | 'back' | 'in'> = { bench: 'back', busstop: 'out', picnic: 'in' }
+// Which way someone sits, as a quarter-turn side (SIDES), on a seat facing out or with its back to the turn side.
+const seatFacing = (seat: 'out' | 'back', turn: number) => (seat === 'back' ? (turn + 2) % 4 : turn)
 // Walled on three sides: people go in and out through the open front only.
 const FRONT_DOOR = new Set(['busstop', 'gazebo'])
 const doorOf = (n: Extract<WalkNode, { kind: 't' }>): Pt => [n.center[0] + SIDES[n.turn][0] * 0.95, n.center[1] + SIDES[n.turn][1] * 0.95]
@@ -241,6 +251,7 @@ export function Townspeople() {
     return storeDoors((s.visiting ?? s).buildings, new Set(roadsList))
   }, [storeKey, roadsList])
   const people = useRef<Person[]>([])
+  if (import.meta.env.DEV) (window as unknown as { __people?: unknown }).__people = people
   const colorsDirty = useRef(true)
   const queues = useRef(new Map<string, Person[]>())
   const gates = useRef(new Map<string, number>())
@@ -251,7 +262,7 @@ export function Townspeople() {
   const legs = useRef<InstancedMesh>(null)
   const items = useRef<InstancedMesh>(null)
   const dogBody = useRef<InstancedMesh>(null)
-  const dogHead = useRef<InstancedMesh>(null)
+  const leash = useRef<InstancedMesh>(null)
   const hits = useRef<InstancedMesh>(null)
 
   // Two people per house (more in upgraded ones) plus a few more as the town levels up (or a few
@@ -326,6 +337,7 @@ export function Townspeople() {
   }, [])
   const hidden = useMemo(() => new Matrix4().makeScale(0, 0, 0), [])
   const color = useMemo(() => new Color(), [])
+  const tmp = useMemo(() => new Vector3(), [])
 
   // Tap someone to see what they're up to.
   const onTap = (e: ThreeEvent<MouseEvent>) => {
@@ -348,9 +360,9 @@ export function Townspeople() {
     const lg = legs.current
     const it = items.current
     const db = dogBody.current
-    const dh = dogHead.current
+    const ls = leash.current
     const hit = hits.current
-    if (!t || !hd || !hr || !lg || !it || !db || !dh || !hit) return
+    if (!t || !hd || !hr || !lg || !it || !db || !ls || !hit) return
 
     if (colorsDirty.current) {
       colorsDirty.current = false
@@ -362,18 +374,18 @@ export function Townspeople() {
         lg.setColorAt(i * 2 + 1, color)
         it.setColorAt(i, color.set(p.item ? ITEMS[p.item].color : '#ffffff'))
         db.setColorAt(i, color.set(p.colors.dog))
-        dh.setColorAt(i, color)
+        ls.setColorAt(i, color.set(LEASHES[(p.name.length * 3 + p.dogName.length) % LEASHES.length]))
       })
-      for (const m of [t, hd, hr, lg, it, db, dh]) if (m.instanceColor) m.instanceColor.needsUpdate = true
+      for (const m of [t, hd, hr, lg, it, db, ls]) if (m.instanceColor) m.instanceColor.needsUpdate = true
     }
 
-    const ones = [t, hd, hr, it, db, dh, hit]
+    const ones = [t, hd, hr, it, db, ls, hit]
     bouncers(ctx, dt)
     list.forEach((p, i) => {
       update(ctx, p, dt, night)
       draw(p, i)
     })
-    t.count = hd.count = hr.count = it.count = db.count = dh.count = hit.count = list.length
+    t.count = hd.count = hr.count = it.count = db.count = ls.count = hit.count = list.length
     lg.count = list.length * 2
     for (const m of ones) m.instanceMatrix.needsUpdate = true
     lg.instanceMatrix.needsUpdate = true
@@ -421,19 +433,28 @@ export function Townspeople() {
       if (p.type === 'dog') {
         const dx = p.dogPos[0] / SCALE
         const dz = p.dogPos[1] / SCALE
-        const trot = moving ? Math.abs(Math.sin(p.stride * 1.6)) * 0.03 : 0
-        const ds = Math.sin(p.dogHeading)
-        const dc = Math.cos(p.dogHeading)
-        dummy.position.set(dx, 0.1 + trot, dz)
-        dummy.rotation.set(0, p.dogHeading, 0)
+        const still = p.state === 'linger'
+        const trot = moving ? Math.abs(Math.sin(p.stride * 1.6)) * 0.025 : 0
+        // A rocking trot on the move; sitting tips the nose up and drops the rump.
+        const pitch = still ? -0.32 : moving ? Math.sin(p.stride * 3.2) * 0.07 : 0
+        dummy.position.set(dx, trot, dz)
+        dummy.rotation.set(pitch, p.dogHeading, 0)
+        dummy.scale.set(1, 1, 1)
         dummy.updateMatrix()
         db!.setMatrixAt(i, dummy.matrix)
-        dummy.position.set(dx + ds * 0.12, 0.17 + trot, dz + dc * 0.12)
+        // The leash runs from the owner's right hand down to the collar.
+        const ds = Math.sin(p.dogHeading)
+        const dc = Math.cos(p.dogHeading)
+        const cy = trot + COLLAR_Y + (still ? 0.03 : 0)
+        dummy.position.set(x + cos * 0.118 + sin * 0.005, hip + 0.075, z - sin * 0.118 + cos * 0.005)
+        tmp.set(dx + ds * COLLAR_Z, cy, dz + dc * COLLAR_Z)
+        dummy.scale.set(1, 1, dummy.position.distanceTo(tmp))
+        dummy.lookAt(tmp)
         dummy.updateMatrix()
-        dh!.setMatrixAt(i, dummy.matrix)
+        ls!.setMatrixAt(i, dummy.matrix)
       } else {
         db!.setMatrixAt(i, hidden)
-        dh!.setMatrixAt(i, hidden)
+        ls!.setMatrixAt(i, hidden)
       }
       // Legs swing from the hips; sitting folds them forward.
       for (const side of LEG_SIDES) {
@@ -474,11 +495,11 @@ export function Townspeople() {
         <meshStandardMaterial />
       </instancedMesh>
       <instancedMesh ref={dogBody} args={[undefined, undefined, MAX_PEOPLE]} frustumCulled={false}>
-        <boxGeometry args={[0.09, 0.08, 0.2]} />
-        <meshStandardMaterial />
+        <primitive object={DOG} attach="geometry" />
+        <meshStandardMaterial vertexColors />
       </instancedMesh>
-      <instancedMesh ref={dogHead} args={[undefined, undefined, MAX_PEOPLE]} frustumCulled={false}>
-        <boxGeometry args={[0.08, 0.08, 0.09]} />
+      <instancedMesh ref={leash} args={[undefined, undefined, MAX_PEOPLE]} frustumCulled={false}>
+        <primitive object={LEASH} attach="geometry" />
         <meshStandardMaterial />
       </instancedMesh>
       <instancedMesh ref={hits} args={[undefined, undefined, MAX_PEOPLE]} frustumCulled={false} onClick={onTap}>
@@ -647,7 +668,7 @@ function settle(p: Person, n: Extract<WalkNode, { kind: 't' }>) {
   const entry = p.steps.length ? p.steps[p.steps.length - 1].p : p.pos
   const c = n.center
   const seat = SEATS[n.decor ?? '']
-  const bench = seat === 'out'
+  const bench = seat === 'out' || seat === 'back'
   // Picnic benches run along the front and back of the table.
   const near = sideOf(c, entry)
   const front = FRONT_DOOR.has(n.decor ?? '')
@@ -704,7 +725,9 @@ function arrive(ctx: Ctx, p: Person, night: boolean) {
     p.timer = rand(lo, hi)
     if (node?.kind === 't') {
       p.sit = !!SEATS[d.def]
-      p.face = SEATS[d.def] === 'out' ? Math.atan2(SIDES[node.turn][0], SIDES[node.turn][1]) : Math.atan2(node.center[0] - p.pos[0], node.center[1] - p.pos[1])
+      const seat = SEATS[d.def]
+      const [fx, fz] = seat === 'out' || seat === 'back' ? SIDES[seatFacing(seat, node.turn)] : [node.center[0] - p.pos[0], node.center[1] - p.pos[1]]
+      p.face = Math.atan2(fx, fz)
       // A hot dog to go.
       if (ITEMS[d.def]) {
         p.item = d.def

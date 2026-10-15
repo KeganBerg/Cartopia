@@ -25,6 +25,7 @@ import { HatModel } from './CarHat'
 import type { HatFit } from '../game/hats'
 import { ODDBALL } from './oddballCars'
 import { RESTO } from './restoCars'
+import { PACK_CARS } from './packCars'
 
 type Shape = {
   len: number; wid: number
@@ -117,6 +118,13 @@ const SHAPES: Record<Body, Shape> = {
   pontoon: { len: 1.36, wid: 0.76, body: 0.16, lift: 0.08, cabinLen: 0.3, cabinH: 0.1, cabinZ: -0.05, taper: 0.7, hood: 0, wheel: 0.14, drop: 0.02, nose: 0.06, open: true },
   stepnose: { len: 1.3, wid: 0.76, body: 0.25, lift: 0.08, cabinLen: 0.62, cabinH: 0.19, cabinZ: -0.14, taper: 0.8, hood: 0, wheel: 0.15, drop: 0.01, nose: 0.05 },
   restomuscle: { len: 1.42, wid: 0.8, body: 0.25, lift: 0.08, cabinLen: 0.62, cabinH: 0.17, cabinZ: -0.22, taper: 0.8, hood: 0.03, wheel: 0.155, drop: 0.01, nose: 0.03 },
+  // Car pack cars: drawn by packCars/, same as the exotics.
+  highboy: { len: 1.36, wid: 0.78, body: 0.24, lift: 0.1, cabinLen: 0.36, cabinH: 0.17, cabinZ: -0.16, taper: 0.9, hood: 0.055, wheel: 0.16, drop: 0, nose: 0.02, open: true },
+  timeattack: { len: 1.4, wid: 0.82, body: 0.22, lift: 0.06, cabinLen: 0.56, cabinH: 0.17, cabinZ: -0.1, taper: 0.7, fastback: 0.5, hood: 0.01, wheel: 0.147, drop: 0.02, nose: 0.06 },
+  ponycar: { len: 1.34, wid: 0.74, body: 0.24, lift: 0.09, cabinLen: 0.5, cabinH: 0.19, cabinZ: -0.14, taper: 0.74, fastback: 0.45, hood: 0.04, wheel: 0.155, drop: 0.02, nose: 0.05 },
+  gtcoupe: { len: 1.3, wid: 0.74, body: 0.2, lift: 0.08, cabinLen: 0.5, cabinH: 0.18, cabinZ: -0.14, taper: 0.68, fastback: 0.4, hood: 0.03, wheel: 0.15, drop: 0.03, nose: 0.06 },
+  groupb: { len: 1.34, wid: 0.84, body: 0.24, lift: 0.08, cabinLen: 0.56, cabinH: 0.18, cabinZ: -0.06, taper: 0.75, fastback: 0.5, hood: 0, wheel: 0.15, drop: 0.01, nose: 0.05 },
+  longtail: { len: 1.5, wid: 0.82, body: 0.2, lift: 0.05, cabinLen: 0.5, cabinH: 0.15, cabinZ: 0.02, taper: 0.4, fastback: 0.8, hood: 0, wheel: 0.145, drop: 0.03, nose: 0.1 },
 }
 
 // Motorcycles. head = steering head [y, z]; seat = seat top [y, z].
@@ -369,6 +377,34 @@ export function freshGeo(body: Body, fit: Partial<Record<ModSlot, string>>, mode
   return isBike(body) ? bikeGeo(body as BikeBody, fit, model) : carGeo(body, fit, model)
 }
 
+// How high a vehicle (with its mods) reaches within `reach` either side of its middle, front to
+// back, in its own units: what a part shown turning over the car has to clear, seen from the
+// front. A tall whip off to one side doesn't count.
+export function carTop(body: Body, model: string | undefined, mods: string[] | null | undefined, reach: number) {
+  const fit = fittedMods(mods, body)
+  const g = isBike(body) ? bikeGeo(body as BikeBody, fit, model) : carGeo(body, fit, model)
+  const m = modGeo(body, modIds(fit))
+  let top = 0
+  for (const geo of [...Object.values(g.parts), ...Object.values(m)]) {
+    const pos = geo?.getAttribute('position')
+    if (!pos) continue
+    // By triangle, so a long bar whose corners all lie outside the reach still counts.
+    const idx = geo!.index
+    const n = idx ? idx.count : pos.count
+    for (let i = 0; i < n; i += 3) {
+      let x0 = Infinity, x1 = -Infinity, y = -Infinity
+      for (let j = i; j < i + 3; j++) {
+        const v = idx ? idx.getX(j) : j
+        x0 = Math.min(x0, pos.getX(v))
+        x1 = Math.max(x1, pos.getX(v))
+        y = Math.max(y, pos.getY(v))
+      }
+      if (y > top && x0 < reach && x1 > -reach) top = y
+    }
+  }
+  return top
+}
+
 // Open-wheel racer: needle nose, sidepods, airbox, halo, front and rear wings, wheels on arms.
 function formulaGeo(key: string, fit: Partial<Record<ModSlot, string>>): CarGeo {
   const s = SHAPES.formula
@@ -493,7 +529,7 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
   if (hit) return hit
   if (body === 'formula') return formulaGeo(key, fit)
   const s = shapeOf(body)
-  const exotic = EXOTIC[body] ?? ODDBALL[body] ?? RESTO[body]
+  const exotic = EXOTIC[body] ?? ODDBALL[body] ?? RESTO[body] ?? PACK_CARS[body]
   if (exotic) {
     const k = new Kit()
     exotic(k, fit, { seat, steering, brakes, bar })
@@ -554,7 +590,12 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
   for (const z of [wz, -wz]) for (const sd of [-1, 1]) {
     k.add('black', new CircleGeometry(s.wheel * 1.18, 18, 0, Math.PI), [sd * (s.wid / 2 + 0.0045), s.wheel, z], [0, (sd * Math.PI) / 2, 0])
     // Rugged bodies get chunky black fender flares round the arches.
-    if (RUGGED.includes(body) && !fit.kit) k.add('black', new TorusGeometry(s.wheel * 1.2, 0.03, 5, 14, Math.PI), [sd * (s.wid / 2 + 0.01), s.wheel, z], [0, (sd * Math.PI) / 2, 0], [1, 1, 1.6])
+    // The open buggy's are slimmer and stop short of the axle line, so they read as flares on its
+    // tub rather than mudguards hanging down past the tyres.
+    if (RUGGED.includes(body) && !fit.kit) {
+      if (body === 'offroad') k.add('black', new TorusGeometry(s.wheel * 1.2, 0.022, 5, 14, Math.PI * 0.8), [sd * (s.wid / 2 + 0.01), s.wheel, z], [0, (sd * Math.PI) / 2, Math.PI * 0.1], [1, 1, 1.4])
+      else k.add('black', new TorusGeometry(s.wheel * 1.2, 0.03, 5, 14, Math.PI), [sd * (s.wid / 2 + 0.01), s.wheel, z], [0, (sd * Math.PI) / 2, 0], [1, 1, 1.6])
+    }
   }
 
   if (s.round) {

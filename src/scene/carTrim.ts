@@ -410,9 +410,11 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
       return
     case 'spare': {
       const y = t.closed ? lift + t.body * 0.55 : top + 0.06
-      k.add('black', cyl(wheel * 0.95, wheel * 0.95, 0.1, 16), [0, y, -front - 0.06], [Math.PI / 2, 0, 0])
-      k.add('chrome', disc(wheel * 0.45, 12), [0, y, -front - 0.113], [0, Math.PI, 0])
-      k.add('dark', disc(wheel * 0.15, 8), [0, y, -front - 0.1155], [0, Math.PI, 0])
+      // A tyre with a dark rim dish inside a bright lip, and a domed hub cap.
+      k.add('black', cyl(wheel * 0.95, wheel * 0.95, 0.1, 18), [0, y, -front - 0.06], [Math.PI / 2, 0, 0])
+      k.add('black', disc(wheel * 0.62, 16), [0, y, -front - 0.1125], [0, Math.PI, 0])
+      k.add('chrome', new TorusGeometry(wheel * 0.63, 0.011, 5, 20), [0, y, -front - 0.11])
+      k.add('chrome', cyl(wheel * 0.16, wheel * 0.22, 0.022, 12), [0, y, -front - 0.121], [Math.PI / 2, 0, 0])
       return
     }
     case 'stowage':
@@ -609,6 +611,8 @@ const STYLES: Record<string, CarStyle> = {
   charger: { rim: 'deep', rimColor: '#5f6368', caliper: '#e53935', seat: '#1c1c1c' },
   hellcat: { rim: 'split', rimColor: '#2b2b2b', caliper: '#e53935', seat: '#4a1010' },
   gtr: { rim: 'mesh', rimColor: '#b08d57', caliper: '#ff6d00', seat: '#1c1c1c' },
+  sora: { rim: 'split', rimColor: '#3a3d42', seat: '#1c1c1c' },
+  stinger: { rim: 'split', rimColor: '#2b2b2b', caliper: '#e53935', seat: '#1c1c1c' },
   tomahawk: { rim: 'beadlock', rimColor: '#3a3a3a', seat: '#3e2723' },
   camper: { rim: 'steel', rimColor: '#f5f5f5', ww: true, seat: '#a1887f' },
   hotshot: { rim: 'mesh', rimColor: '#f5f5f5', caliper: '#e53935', seat: '#212121' },

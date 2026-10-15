@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { supabase } from './supabase'
 import { signedInUser } from './cloud'
 import { displayName } from './names'
+import { sfx } from './sound'
 import { useGame } from '../game/store'
 
 // Postcards (supabase/migrations/0070_postcards_crew_parts.sql): a picture card and a set
@@ -32,11 +33,16 @@ export const usePostcards = create<State>(() => ({ inbox: [], sent: {}, seen: re
 
 const ready = () => !!supabase && !!signedInUser()
 
+let polled = false
 export async function refreshPostcards() {
   if (!ready()) return
   const { data, error } = await supabase!.rpc('postcard_inbox')
   if (error) return
   const rows = (data ?? []) as { id: number; card: string; msg: number; sender: string; town_name: string; created_at: string }[]
+  // A card newer than any we had (not on the first look): the doorbell.
+  const top = Math.max(0, ...usePostcards.getState().inbox.map((c) => c.id))
+  if (polled && rows.some((r) => r.id > top)) sfx.notify()
+  polled = true
   usePostcards.setState({ inbox: rows.map((r) => ({ id: r.id, card: r.card, msg: r.msg, from: r.sender, fromName: displayName(r.town_name, r.sender), at: r.created_at })) })
 }
 
@@ -55,6 +61,7 @@ export async function sendPostcard(to: string, card: string, msg: number, name?:
   if (data === 'limit') return toast("That's all 20 postcards for today")
   usePostcards.setState((s) => ({ sent: { ...s.sent, [to]: true } }))
   if (data === 'already') return toast('One postcard a day to each friend')
+  sfx.send()
   toast(`💌 Postcard sent!`)
   useGame.getState().befriend(to, 'postcard', name)
 }
