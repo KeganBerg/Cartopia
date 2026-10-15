@@ -1035,7 +1035,9 @@ button.pill.trophies { cursor: pointer; }
   .seg button { font-size: 12px; padding: 6px 3px; }
   .seg-ico { margin-right: 2px; }
   .board-controls .metrics, .board-controls .periods { flex-basis: 100%; }
-  .board-row { grid-template-columns: 26px 1fr auto auto; gap: 6px; padding: 6px 8px; }
+  /* The Visit column keeps its width on your own row, so every score lines up. */
+  .board-row { grid-template-columns: 26px 1fr auto minmax(44px, auto); gap: 6px; padding: 6px 8px; }
+  .board-row > .buy { justify-self: end; }
   .board-row .buy, .member-row .buy, .clan-row .buy { grid-column: auto; }
   .board-row .buy.small, .member-row .buy.small, .member-row .sell.small { font-size: 12px; padding: 4px 7px; }
   .board-value { font-size: 15px; }

@@ -15,10 +15,16 @@ import { ARC, ARC0, DECK, TIERS, TRACK, deckAt } from './speedwayLayout'
 
 // Townspeople proportions (peopleGeo.ts PERSON), drawn SCALE bigger. Fans are
 // drawn smaller than townspeople (Kegan's call, for this building only) so
-// rows of them fit the grandstand.
-const SCALE = 1.3 * 0.45
-// Hip height sat down: on the seat, legs hanging down out of sight inside the step.
+// they sit in rows of seats with room round them.
+const SCALE = 1.3 * 0.4
+// Hip height sat down: on the seat, legs hanging down out of sight in front of it.
 const SEAT = 0.04
+// Seats: one every SEAT_W along a row, in blocks of BLOCK with an aisle (a
+// seat's width, marked by a white stair nosing) between blocks.
+const SEAT_W = 0.12
+const BLOCK = 6
+// Seat colours, one a row from the front (the deck's two rows last).
+const SEAT_COLORS = ['#1e88e5', '#fdd835', '#e53935', '#1e88e5', '#fdd835']
 const HIP = 0.24
 const SHIRTS = ['#e53935', '#fafafa', '#1e88e5', '#fdd835', '#43a047', '#ff7043', '#8e24aa', '#26c6da']
 const PAINT = ['#d32f2f', '#1565c0', '#fdd835', '#2e7d32', '#fafafa', '#ff6d00', '#6a1b9a', '#212121', '#00acc1', '#c2185b']
@@ -38,6 +44,13 @@ function paint(g: BufferGeometry, hex: string) {
   return geo
 }
 const box = (w: number, h: number, d: number, x: number, y: number, z: number, hex: string) => paint(new BoxGeometry(w, h, d).translate(x, y, z), hex)
+
+// Seat pan and back, facing +z (the track); white takes the row's colour.
+let seatGeo: BufferGeometry | null = null
+function seatShape() {
+  seatGeo ??= mergeGeometries([box(0.085, 0.02, 0.055, 0, 0.03, 0.005, '#ffffff'), box(0.085, 0.07, 0.014, 0, 0.065, -0.03, '#ffffff'), box(0.06, 0.02, 0.03, 0, 0.01, 0, '#455a64')])!
+  return seatGeo
+}
 
 // A GT race car the size of a town sports car, nose to +z, wheels on y = 0.
 // White parts take the car's paint (the instance colour); dark ones stay dark.
@@ -61,6 +74,7 @@ function raceCar() {
   return carGeo
 }
 
+type Seat = { a: number; r: number; y: number; row: number }
 type Fan = { a: number; r: number; y: number; pep: number }
 
 export function SpeedwayLife({ lvl }: { lvl: number }) {
@@ -68,24 +82,35 @@ export function SpeedwayLife({ lvl }: { lvl: number }) {
   // A bigger block has a longer track and longer terraces: fill them, don't grow anyone.
   const k = (sx + sz) / 2
   const cars = Math.round((2 + Math.ceil(lvl / 2)) * k)
-  // Fuller stands every level: 18 a row at level 1, 36 at level 10.
-  const perRow = Math.round((16 + lvl * 2) * k)
-  const fans = useMemo(() => {
-    const out: Fan[] = []
-    // One seat a fan, along the front of each row, rows staggered.
-    const row = (n: number, { r0, y }: { r0: number; y: number }, off: number) => {
-      for (let i = 0; i < n; i++) {
-        const a = ARC0 + (ARC * (i + 0.25 + off)) / n
-        out.push({ a, r: r0 + 0.032, y, pep: ((i * 7 + out.length * 3) % 5) / 5 })
+  // Rows of seats in blocks with aisles between, lined up row over row; more
+  // of them taken every level (about half at level 1, three in four at 10).
+  const { seats, aisles, fans } = useMemo(() => {
+    const seats: Seat[] = [], aisles: Seat[] = [], fans: Fan[] = []
+    const rows = deckAt(lvl) ? [...TIERS, ...DECK.rows] : TIERS
+    const fill = 0.4 + lvl * 0.02
+    // Same slot count every row (set by the front row), so the aisles run straight up.
+    const slots = Math.floor((ARC * (TIERS[0].r0 + 0.04) * k) / SEAT_W)
+    rows.forEach(({ r0, y }, row) => {
+      for (let i = 0; i < slots; i++) {
+        const a = ARC0 + (ARC * (i + 0.5)) / slots
+        const at = { a, r: r0 + 0.04, y, row }
+        if (i % (BLOCK + 1) === BLOCK) {
+          aisles.push(at)
+          continue
+        }
+        seats.push(at)
+        const h = Math.abs(Math.sin(i * 12.9898 + row * 78.233) * 43758.5453) % 1
+        if (h < fill) fans.push({ a, r: at.r, y: y + 0.02, pep: (h * 13) % 1 })
       }
-    }
-    TIERS.forEach((t, j) => row(perRow, t, j * 0.5))
-    if (deckAt(lvl)) DECK.rows.forEach((t, j) => row(perRow - 2, t, 0.25 + j * 0.5))
-    return out
-  }, [perRow, lvl])
+    })
+    return { seats, aisles, fans }
+  }, [k, lvl])
   const n = fans.length
+  const ns = seats.length, na = aisles.length
 
   const body = useRef<InstancedMesh>(null)
+  const seatMesh = useRef<InstancedMesh>(null)
+  const stairMesh = useRef<InstancedMesh>(null)
   const torso = useRef<InstancedMesh>(null)
   const head = useRef<InstancedMesh>(null)
   const hair = useRef<InstancedMesh>(null)
@@ -97,7 +122,29 @@ export function SpeedwayLife({ lvl }: { lvl: number }) {
   const spot = useMemo(() => new Float32Array(n * 3), [n])
   const carFeet = useMemo(() => ({ noBatch: true, feet: (i: number) => carSpot.subarray(i * 3, i * 3 + 3) }), [carSpot])
   const feet = useMemo(() => ({ noBatch: true, feet: (i: number) => spot.subarray(i * 3, i * 3 + 3) }), [spot])
+  const seatSpot = useMemo(() => Float32Array.from(seats.flatMap(({ a, r, y }) => [Math.sin(a) * r, y, Math.cos(a) * r])), [seats])
+  const stairSpot = useMemo(() => Float32Array.from(aisles.flatMap(({ a, r, y }) => [Math.sin(a) * r, y, Math.cos(a) * r])), [aisles])
+  const seatFeet = useMemo(() => ({ noBatch: true, feet: (i: number) => seatSpot.subarray(i * 3, i * 3 + 3) }), [seatSpot])
+  const stairFeet = useMemo(() => ({ noBatch: true, feet: (i: number) => stairSpot.subarray(i * 3, i * 3 + 3) }), [stairSpot])
   const pairFeet = useMemo(() => ({ noBatch: true, feet: (i: number) => spot.subarray((i >> 1) * 3, (i >> 1) * 3 + 3) }), [spot])
+
+  // Seats and stair nosings don't move: placed once, facing the track as the block draws it.
+  useLayoutEffect(() => {
+    const o = new Object3D()
+    for (const [mesh, list, hex] of [[seatMesh.current, seats, ''], [stairMesh.current, aisles, '#fafafa']] as const) {
+      if (!mesh) continue
+      list.forEach(({ a, r, y, row }, i) => {
+        const x = Math.sin(a) * r, z = Math.cos(a) * r
+        o.position.set(x, y, z)
+        o.rotation.set(0, Math.atan2(-x * sx, -z * sz), 0)
+        o.updateMatrix()
+        mesh.setMatrixAt(i, o.matrix)
+        mesh.setColorAt(i, c.set(hex || SEAT_COLORS[row]))
+      })
+      mesh.instanceMatrix.needsUpdate = true
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
+    }
+  }, [seats, aisles, sx, sz])
 
   useLayoutEffect(() => {
     for (let i = 0; i < cars; i++) body.current?.setColorAt(i, c.set(PAINT[(i * 3) % PAINT.length]))
@@ -191,6 +238,14 @@ export function SpeedwayLife({ lvl }: { lvl: number }) {
     <group>
       <instancedMesh ref={body} args={[raceCar(), undefined, cars]} frustumCulled={false} castShadow userData={carFeet}>
         <meshStandardMaterial vertexColors roughness={0.35} metalness={0.2} />
+      </instancedMesh>
+      <instancedMesh ref={seatMesh} args={[seatShape(), undefined, ns]} frustumCulled={false} userData={seatFeet}>
+        <meshStandardMaterial vertexColors roughness={0.6} />
+      </instancedMesh>
+      {/* Stair nosings: a white strip at the front of each step in the aisles. */}
+      <instancedMesh ref={stairMesh} args={[undefined, undefined, na]} frustumCulled={false} userData={stairFeet}>
+        <boxGeometry args={[0.09, 0.008, 0.02]} />
+        <meshStandardMaterial />
       </instancedMesh>
       <group scale={SCALE}>
         <instancedMesh ref={torso} args={[undefined, undefined, n]} frustumCulled={false} userData={feet}>
