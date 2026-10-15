@@ -232,7 +232,8 @@ function Haunted({ ghost, m, lvl, gl, bulb }: { ghost?: boolean; m: Mat; lvl: nu
   const amber = gl('winAmber', '#b8b0d0', windowTex())
   const green = gl('winGreen', '#b8b0d0', windowTex())
   const paneAt = (i: number) => ((i * 7 + 3) % 3 === 0 ? green : amber)
-  // Tower sizes.
+  // Tower sizes. The castle's round tower sits back on the end wall, taking in its back corner.
+  const tz = castle ? -0.4 : TZ
   const TR = castle ? 0.55 : st === 2 ? 0.48 : 0.45
   const tSeg = castle ? 12 : 8
   const th = castle ? H + 1.1 : H + 0.95 + (lift - (st === 2 ? 0.78 : 0)) * 0.5
@@ -441,10 +442,11 @@ function Haunted({ ghost, m, lvl, gl, bulb }: { ghost?: boolean; m: Mat; lvl: nu
           {/* Flat stone roof inside the battlements. */}
           <mesh position={[HX, H + 0.004, HZ]} rotation-x={-Math.PI / 2}><planeGeometry args={[HW - 0.02, HD - 0.02]} />{m('#5a5566')}</mesh>
           <Box m={m} at={[HX, H + 0.05, HZ - HD / 2 + 0.05]} s={[HW, 0.1, 0.1]} c={wall} />
-          {[-1, 1].map((sd) => <Box key={sd} m={m} at={[HX + sd * (HW / 2 - 0.05), H + 0.05, HZ]} s={[0.1, 0.1, HD - 0.2]} c={wall} />)}
+          {/* The right end is inside the round tower. */}
+          <Box m={m} at={[HX - (HW / 2 - 0.05), H + 0.05, HZ]} s={[0.1, 0.1, HD - 0.2]} c={wall} />
         </group>
       )}
-      {tower(TX, TZ, TR, th, tSeg, coneR, coneH, true)}
+      {tower(TX, tz, TR, th, tSeg, coneR, coneH, true)}
       {st >= 2 && tower(LX, LZ, LR, lth, lSeg, castle ? 0.36 : LR + 0.08, castle ? 1.0 : 0.8, false)}
       {/* Ticket booth by the gate. */}
       <group position={[-1.5, G0, 0.5]}>
@@ -474,8 +476,8 @@ function Haunted({ ghost, m, lvl, gl, bulb }: { ghost?: boolean; m: Mat; lvl: nu
               ))}
             </group>
           )}
-          <Bat m={m} at={[TX - 0.7, th + 0.5, TZ + 0.35]} rot={0.4} />
-          <Bat m={m} at={[TX + 0.15, th + 1.05, TZ + 0.45]} rot={-0.5} s={0.8} />
+          <Bat m={m} at={[TX - 0.7, th + 0.5, tz + 0.35]} rot={0.4} />
+          <Bat m={m} at={[TX + 0.15, th + 1.05, tz + 0.45]} rot={-0.5} s={0.8} />
           <Bat m={m} at={[HX - 0.6, H + 1.0, HZ + 0.4]} rot={0.9} s={0.9} />
           <Glowpool gl={gl} k="poolAmber" r={0.6} x={HX} z={0.62} y={G0 + 0.014} />
           <Glowpool gl={gl} k="poolGreen" r={0.55} x={TX} z={0.55} y={G0 + 0.018} />

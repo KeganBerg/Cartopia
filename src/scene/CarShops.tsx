@@ -263,18 +263,19 @@ function Muffler({ k }: { k: K }) {
       <Door m={m} win={win} x={0.36} zf={F1} />
       <Pane m={m} win={win} x={0.71} y={0.5} zf={F1} w={0.24} h={0.34} />
       <Fascia m={m} text="EXHAUST" at={[0, 1.16, F1]} w={1.24} bg="#212121" fg={orange} board={orange} />
-      {/* A car up on the four-post lift, its new pipes poking out the back. */}
+      {/* A car up on the four-post lift, its new pipes poking out the back.
+          Raised only part way, so the car stays under the EXHAUST board. */}
       {!ghost && (
         <group position={[-0.28, 0.05, 0.68]}>
           <Upright>
             <group>
-              {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => <Box key={`${sx}${sz}`} m={m} at={[sx * 0.68, 0.34, sz * 0.36]} s={[0.07, 0.68, 0.07]} c={orange} />))}
-              {[-1, 1].map((sx) => <Box key={sx} m={m} at={[sx * 0.68, 0.53, 0]} s={[0.08, 0.06, 0.8]} c="#455a64" />)}
-              {[-1, 1].map((sz) => <Box key={sz} m={m} at={[0, 0.53, sz * 0.24]} s={[1.28, 0.04, 0.16]} c="#546e7a" />)}
+              {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => <Box key={`${sx}${sz}`} m={m} at={[sx * 0.68, 0.215, sz * 0.36]} s={[0.07, 0.43, 0.07]} c={orange} />))}
+              {[-1, 1].map((sx) => <Box key={sx} m={m} at={[sx * 0.68, 0.28, 0]} s={[0.08, 0.06, 0.8]} c="#455a64" />)}
+              {[-1, 1].map((sz) => <Box key={sz} m={m} at={[0, 0.28, sz * 0.24]} s={[1.28, 0.04, 0.16]} c="#546e7a" />)}
               <Box m={m} at={[0, 0.03, 0]} s={[0.3, 0.06, 0.22]} c="#ff7043" />
-              <Cyl m={m} at={[0, 0.3, 0]} r={0.03} h={0.48} c={STEEL} seg={8} />
-              <Box m={m} at={[0, 0.555, 0]} s={[0.14, 0.03, 0.14]} c="#455a64" shadow={false} />
-              <group position={[0, 0.55, 0]} rotation-y={Math.PI / 2}>
+              <Cyl m={m} at={[0, 0.175, 0]} r={0.03} h={0.23} c={STEEL} seg={8} />
+              <Box m={m} at={[0, 0.305, 0]} s={[0.14, 0.03, 0.14]} c="#455a64" shadow={false} />
+              <group position={[0, 0.3, 0]} rotation-y={Math.PI / 2}>
                 <CarModel body="muscle" color="#1e88e5" stripe="#fafafa" />
               </group>
             </group>
@@ -589,7 +590,7 @@ function Dynolab({ k }: { k: K }) {
               <group position={[0, 0.05, 0]} rotation-y={Math.PI / 2}>
                 <CarModel body="widebody" color="#e53935" stripe="#212121" />
               </group>
-              <group position={[0.92, 0, 0]}>
+              <group position={[0.84, 0, 0]}>
                 {[-1, 1].map((sd) => <Box key={sd} m={m} at={[0, 0.16, sd * 0.16]} s={[0.06, 0.32, 0.05]} c={DARK} />)}
                 <Cyl m={m} at={[0, 0.36, 0]} r={0.26} h={0.2} c={yellow} seg={18} rot={[0, 0, Math.PI / 2]} />
                 <Cyl m={m} at={[0, 0.36, 0]} r={0.22} h={0.23} c={DARK} seg={18} rot={[0, 0, Math.PI / 2]} />
@@ -608,7 +609,7 @@ function Dynolab({ k }: { k: K }) {
       </group>
       {/* The power graph screen, its curves in neon. */}
       {!ghost && (
-        <group position={[0.42, 0.05, 1.0]} rotation-y={0.35}>
+        <group position={[0.45, 0.05, 1.0]} rotation-y={0.35}>
           {[-0.22, 0.22].map((x) => <Box key={x} m={m} at={[x, 0.25, 0]} s={[0.04, 0.5, 0.04]} c={DARK} />)}
           <Box m={m} at={[0, 0.72, 0]} s={[0.62, 0.42, 0.05]} c="#212121" />
           <mesh position={[0, 0.72, 0.026]}><planeGeometry args={[0.56, 0.36]} />{m('#0d1b2a')}</mesh>
@@ -621,7 +622,7 @@ function Dynolab({ k }: { k: K }) {
         </group>
       )}
       <RoofSign m={m} text="DYNO" at={[-0.85, top, F2 - 0.18]} w={1.2} bg="#212121" fg={yellow} board={yellow} />
-      {!ghost && <Tyres m={m} at={st >= 2 ? [0.62, 0.05, 0.5] : [1.45, 0.05, 0.8]} n={4} band={yellow} />}
+      {!ghost && <Tyres m={m} at={st >= 2 ? [0.5, 0.05, 0.56] : [1.45, 0.05, 0.8]} n={4} band={yellow} />}
       {!ghost && <Lamp m={m} bulb={bulb} ghost={ghost} at={[1.86, 0, 0.45]} arm={-Math.PI / 2} />}
       {!ghost && <Pool r={0.9} x={-0.85} z={0.8} />}
       {/* Level 4: a checkered stripe and a second car waiting its run; level 7: the lab floor. */}
