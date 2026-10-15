@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { supabase } from './supabase'
 import { displayName, isCleanName } from './names'
 import { useNames } from './profiles'
+import { sfx } from './sound'
 import { useGame } from '../game/store'
 
 // Friends and friend requests (supabase/migrations/0049_friends_usernames.sql).
@@ -45,6 +46,16 @@ export async function refreshFriends() {
     status: r.status,
     lastSeen: r.last_seen,
   }))
+  // A new request from someone (not on the first load): the doorbell, and a note saying who.
+  const before = useFriends.getState()
+  if (before.loaded) {
+    const had = new Set(before.list.filter((f) => f.status === 'incoming').map((f) => f.id))
+    const fresh = list.filter((f) => f.status === 'incoming' && !had.has(f.id))
+    if (fresh.length) {
+      sfx.notify()
+      useGame.getState().toast(`${fresh[0].username ?? fresh[0].townName} wants to be friends`)
+    }
+  }
   useFriends.setState({ list, loaded: true, missing: false })
   useNames.setState((s) => ({ byId: { ...s.byId, ...Object.fromEntries(list.map((f) => [f.id, f.username])) } }))
 }
@@ -71,6 +82,8 @@ export async function addFriend(to: { username?: string; id?: string }): Promise
     toast(error.code === 'PGRST202' ? 'Friend requests are coming soon' : "Couldn't send that request")
     return false
   }
+  if (data === 'sent') sfx.send()
+  else if (data === 'accepted') sfx.reward()
   toast(ANSWERS[String(data)] ?? ANSWERS.no)
   await refreshFriends()
   return data === 'sent' || data === 'accepted' || data === 'pending'
@@ -82,7 +95,10 @@ export async function respondFriend(id: string, accept: boolean) {
   const toast = useGame.getState().toast
   if (error || data === 'no') toast("Couldn't answer that request")
   else if (data === 'limit') toast(ANSWERS.limit)
-  else if (data === 'accepted') toast(ANSWERS.accepted)
+  else if (data === 'accepted') {
+    sfx.reward()
+    toast(ANSWERS.accepted)
+  }
   await refreshFriends()
 }
 
