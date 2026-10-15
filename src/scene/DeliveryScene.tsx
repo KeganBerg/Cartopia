@@ -178,7 +178,7 @@ function TownScenery({ pool }: { pool: string[] }) {
 }
 
 // A tall glowing column over the spot to drive to.
-function Beacon({ beam, ring }: { beam: React.Ref<Group>; ring: React.Ref<MeshBasicMaterial> }) {
+export function Beacon({ beam, ring }: { beam: React.Ref<Group>; ring: React.Ref<MeshBasicMaterial> }) {
   return (
     <group ref={beam}>
       <mesh position-y={3}>

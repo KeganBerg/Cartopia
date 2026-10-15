@@ -56,7 +56,7 @@ type Slot = { on: boolean; lane: number; z: number; hit: number; mine: boolean }
 type CopPhase = 'idle' | 'warn' | 'go' | 'back'
 
 // A cruiser: the town's sedan in black and white, with a light bar, push bar and door lettering.
-function Cruiser({ beams, red, blue }: { beams: boolean; red: React.Ref<Mesh>; blue: React.Ref<Mesh> }) {
+export function Cruiser({ beams, red, blue }: { beams: boolean; red: React.Ref<Mesh>; blue: React.Ref<Mesh> }) {
   const car = useRef<Group>(null)
   const kit = useRef<Group>(null)
   const f = carFrame('sedan')

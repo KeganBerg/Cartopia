@@ -13,6 +13,7 @@ vi.mock('@react-three/fiber', () => ({ Canvas: ({ children }: { children: React.
 vi.mock('../scene/Stage', () => ({ StageSlot: ({ children }: { children: React.ReactNode }) => <div className="cv">{children}</div>, useStageReady: () => true }))
 vi.mock('../scene/BuildingPreview', () => ({ CarThumb: () => null }))
 vi.mock('../scene/ChaseScene', () => ({ ChaseScene: () => null }))
+vi.mock('../scene/ArcadeCards', () => ({ ArcadeCardScene: () => null }))
 vi.mock('./ArcadeMore', () => ({ STAR_GAMES: [], StarGame: () => null }))
 vi.mock('./Loading', () => ({ LoadingScene: ({ onReady }: { onReady?: () => void }) => { useEffect(() => onReady?.(), [onReady]); return null } }))
 vi.mock('../scene/ParkScene', async () => {
