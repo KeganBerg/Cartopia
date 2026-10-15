@@ -226,6 +226,8 @@ export const jobLevel = (b: { level?: number; jobLevel?: number }) =>
 export const upgradePayout = (d: BuildingDef, level: number) => Math.round((d.payout ?? 0) * (1 + 0.1 * (level - 1)))
 export const upgradePartsPayout = (d: BuildingDef, level: number) => Math.round((d.partsPayout ?? 0) * (1 + 0.1 * (level - 1)))
 export const upgradeXp = (d: BuildingDef, level: number) => Math.round((d.xp ?? 0) * (1 + 0.05 * (level - 1)))
+// Town jobs pay 2.5% more XP for every level past 5 (level 20: +38%, level 40: +88%).
+export const townXpMult = (level: number) => 1 + 0.025 * Math.max(0, level - 5)
 // What a job actually pays in XP: the building's rate, grown by the player's level.
 export const jobXp = (d: BuildingDef, level: number, playerLevel: number) => Math.round(upgradeXp(d, level) * townXpMult(playerLevel))
 export const upgradeJobSeconds = (d: BuildingDef, level: number) =>
@@ -739,8 +741,6 @@ export const RACE_LOSS_XP = 8
 export const raceXp = (won: boolean, level: number) => playXp(won ? RACE_WIN_XP : RACE_LOSS_XP, level)
 export const SERVICE_XP = { gas: 8, tires: 12, tow: 15, fix: 5 } as const
 export const serviceXp = (kind: keyof typeof SERVICE_XP, level: number) => playXp(SERVICE_XP[kind], level)
-// Town jobs pay 2.5% more XP for every level past 5 (level 20: +38%, level 40: +88%).
-export const townXpMult = (level: number) => 1 + 0.025 * Math.max(0, level - 5)
 
 export const baseFuelCap = (level: number) => 15 + level * 2
 export const FUEL_REGEN_SECONDS = 60
