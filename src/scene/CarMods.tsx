@@ -287,7 +287,7 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
     p.carbon.push(box(0.17 * h, 0.04 * h, 0.01, 0, f.hoodTop + 0.035 * h, f.hoodZ + 0.1 * h))
     // A chrome grille of three bars across the mouth, under a chrome rim.
     for (const x of [-0.045, 0, 0.045]) p.chrome.push(box(0.008, 0.032 * h, 0.008, x * h, f.hoodTop + 0.035 * h, f.hoodZ + 0.1 * h + 0.005))
-    p.chrome.push(box(0.18 * h, 0.008, 0.012, 0, f.hoodTop + 0.055 * h + 0.002, f.hoodZ + 0.1 * h))
+    p.chrome.push(box(0.18 * h, 0.008, 0.024, 0, f.hoodTop + 0.055 * h + 0.002, f.hoodZ + 0.1 * h))
   },
   blower: (f, p) => {
     const h = f.hs
@@ -450,7 +450,7 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
           const yb = f.lift + 0.03
           p.paint.push(box(w, top - 0.03 - yb, 0.026, sd * x, (top - 0.03 + yb) / 2, zz + e * (L / 2 - 0.013)))
           p.paint.push(box(wi, 0.03, 0.026, sd * xi, top - 0.015, zz + e * (L / 2 - 0.013)))
-          p.chrome.push(post(0.008, 0.012, sd * (x1 - c - 0.012), top + 0.016, zz + e * (L / 2 - 0.02), 6))
+          p.chrome.push(post(0.008, 0.012, sd * (x1 - c - 0.02), top + 0.016, zz + e * (L / 2 - 0.02), 6))
         }
       }
       p.paint.push(box(0.06, 0.04, f.wz * 2 - f.wheel * 2.56, sd * (f.side + 0.016), f.lift + 0.034, 0))
