@@ -53,8 +53,8 @@ import { look as kartLook } from './ArcadeBits'
 import { TOUR_RACES, tourLeg, tourLegOf, tourIsBoss, tourRivalPi, tourShift, tourSkills, tourRivalName, tourLegBonus } from '../game/tour'
 import type { WeatherKind } from '../game/weather'
 import { WEEKLY_EVENTS, EVENT_RACES, eventBonus, eventFor, eventIsBoss, eventPrize, eventProgress, eventRivalPi, eventShift, nextEventWeek } from '../game/events'
-import { msToNextWeek, skinDef, SKIN_TIERS, carStats } from '../game/data'
-import { DIST, character, characterMul, tourDist, type RaceDist } from '../game/distance'
+import { msToNextWeek, skinDef, SKIN_TIERS } from '../game/data'
+import { DIST, raceCharacter, characterMul, tourDist, type RaceDist } from '../game/distance'
 import { playerName } from '../lib/profiles'
 import { LoadingScene } from './Loading'
 import { settleWager, startWager, startWagers, voidWager, wagersOn } from '../lib/wagers'
@@ -1369,7 +1369,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   // the same eased PI, this makes sure of it for every race. Live rivals and ghosts race as they are.
   const rival = useMemo(() => (serverRivalPi !== null ? { ...shownRival, pi: serverRivalPi }
     : live || trial ? shownRival
-    : { ...shownRival, pi: fairRivalPi(shownRival.pi, dist ? buildPi(pi(car), character(carStats(carDef(car.model), car.upgrades, car.mods)), DIST[dist].m) : pi(car), shownRival.shift ?? 1, shownRival.skill) }),
+    : { ...shownRival, pi: fairRivalPi(shownRival.pi, dist ? buildPi(pi(car), raceCharacter(carDef(car.model)), DIST[dist].m) : pi(car), shownRival.shift ?? 1, shownRival.skill) }),
   [shownRival, serverRivalPi, live, trial, car, dist])
   const payout = prize ?? reward(rival)
   const rivalRef = useRef(rival)
@@ -1398,7 +1398,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   const def = carDef(car.model)
   const track = dist ? DIST[dist].m : TRACK
   // The car's build (sprinter to long-hauler) only counts over a set distance; AI rivals have none.
-  const build = useMemo(() => (dist ? character(carStats(def, car.upgrades, car.mods)) : null), [dist, def, car.upgrades, car.mods])
+  const build = useMemo(() => (dist ? raceCharacter(def) : null), [dist, def])
   const skillActive = useRef(false)
   const [skillShown, setSkillShown] = useState(false)
   // The AI rival's skill, flashed while it is working (live rivals use theirs on their own device).

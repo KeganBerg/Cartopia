@@ -27,9 +27,13 @@ export const gpDist = (round: number): RaceDist => (round < 2 ? 'quarter' : roun
 export const tourDist = (race: number): RaceDist => (['quarter', 'quarter', 'half', 'half', 'mile'] as const)[race % 5]
 
 // -1 (pure sprinter) to 1 (pure long-hauler): power against grip and lightness (most cars carry
-// a little more power than that, hence the 10).
+// a little more power than that, hence the 10). Races take it from the car's stock stats, so
+// Garage upgrades and mods only ever add PI: a weight or tire step used to tip a car toward
+// sprinter and lose more in the mile than its PI gained (statOrder.test.ts checks).
 export const character = (s: { power: number; grip: number; weight: number }) =>
   Math.max(-1, Math.min(1, (s.power - (s.grip + 100 - s.weight) / 2 - 10) / 30))
+// The build a car races with: its stock one, whatever is fitted.
+export const raceCharacter = (def: { power: number; grip: number; weight: number }) => character(def)
 export type Build = 'sprinter' | 'allrounder' | 'longhaul'
 export const buildOf = (c: number): Build => (c < -0.25 ? 'sprinter' : c > 0.25 ? 'longhaul' : 'allrounder')
 export const BUILDS: Record<Build, { name: string; icon: string; text: string }> = {
