@@ -5,6 +5,7 @@ import { BuildingThumb, CarThumb } from '../scene/BuildingPreview'
 import { heroArt } from './venueArt'
 import { TUTORIAL_STEPS } from './Tutorial'
 import './goal.css'
+import { sfx } from '../lib/sound'
 
 type Game = ReturnType<typeof useGame.getState>
 
@@ -37,6 +38,11 @@ export function GoalSplash() {
   const finish = useGame((s) => s.setTutorial)
   const close = () => finish(99)
 
+  useEffect(() => {
+    if (!show) return
+    const timer = setTimeout(sfx.levelUp, 250)
+    return () => clearTimeout(timer)
+  }, [show])
   useEffect(() => {
     if (!show) return
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && finish(99)

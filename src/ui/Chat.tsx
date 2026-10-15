@@ -6,6 +6,7 @@ import { useNames } from '../lib/profiles'
 import { Panel } from './Menus'
 import { ClanTag, useVisit } from './Social'
 import './chat.css'
+import { sfx } from '../lib/sound'
 
 const ago = (at: number) => {
   const m = Math.floor((Date.now() - at) / 60000)
@@ -103,6 +104,7 @@ function ChatRoom({ room }: { room: Room }) {
     const err = await sendChat(room, text)
     setBusy(false)
     if (err) return toast(err)
+    sfx.send()
     setText('')
     pinned.current = true
   }

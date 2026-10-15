@@ -1,5 +1,6 @@
 import { Icon } from './Icon'
 import { useEffect, useState } from 'react'
+import { sfx } from '../lib/sound'
 import { useGame, hasRusty } from '../game/store'
 import { supabase } from '../lib/supabase'
 import { signedInUser } from '../lib/cloud'
@@ -43,6 +44,7 @@ export function GiftWatcher() {
       // Waits for the welcome-back and daily bonus screens, a level-up, a visit or the tutorial.
       if (s.panel || s.levelUp || s.visiting || s.mode !== 'play' || !hasRusty(s)) return
       useGifts.setState({ shown: true })
+      sfx.notify()
       s.openPanel('gifts')
     }, 1000)
     return () => clearInterval(id)

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { supabase } from './supabase'
+import { sfx } from './sound'
 import { useGame } from '../game/store'
 import { CLAN_EMBLEMS } from '../game/data'
 import { isCleanChat, isCleanName } from './names'
@@ -75,6 +76,7 @@ const loaded: Partial<Record<Room, boolean>> = {}
 // channel was down doesn't linger.
 function add(room: Room, list: ChatMsg[], history = false) {
   loadUsernames(list.map((m) => m.owner))
+  let ping = false
   useChat.setState((s) => {
     const from = history ? (list.length ? Math.min(...list.map((m) => m.id)) : -Infinity) : Infinity
     const byId = new Map(s.msgs[room].filter((m) => m.id < from).map((m) => [m.id, m]))
@@ -86,12 +88,15 @@ function add(room: Room, list: ChatMsg[], history = false) {
       byId.set(m.id, m)
     }
     const merged = [...byId.values()].sort((a, b) => a.id - b.id).slice(-KEEP)
+    // Your crew talking: a soft pluck (the busy global room stays quiet).
+    ping = room === 'crew' && fresh > 0
     const seen = s.viewing === room
     return {
       msgs: { ...s.msgs, [room]: merged },
       unread: { ...s.unread, [room]: seen ? 0 : s.unread[room] + fresh },
     }
   })
+  if (ping) sfx.message()
 }
 
 const channels: Partial<Record<Room, RealtimeChannel>> = {}

@@ -12,6 +12,9 @@ import { wheelGeo } from './carWheels'
 
 // How big the shown part is: its longest side, in metres.
 const SIZE = 2
+export const PART_SIZE = SIZE
+// How high its middle sits, and a wheel prize's radius as drawn (R scaled up 1.5).
+export const PART_LIFT = 1.15
 
 const rubber = new MeshStandardMaterial({ color: '#1c1c1e', roughness: 0.9 })
 const steelRim = new MeshStandardMaterial({ color: '#b0bec5', metalness: 0.75, roughness: 0.3 })
@@ -62,6 +65,7 @@ export function BoltOn({ id, body, tint }: { id: string; body: Body; tint: strin
 // A full wheel standing up, axle across: a rims prize in its finish, or a tyre prize with its tread.
 const R = 0.5
 const W = 0.3
+export const PART_WHEEL = R * 1.5
 function WheelPrize({ id }: { id: string }) {
   const rim = RIM_LOOK[id]
   const tread = TREAD[id]
@@ -177,7 +181,7 @@ export function PartPrize({ id, body, tint }: { id: string; body?: Body; tint: s
   const slot = modDef(id)?.slot
   const wheel = slot === 'rims' || slot === 'tires'
   return (
-    <group position-y={1.15}>
+    <group position-y={PART_LIFT}>
       {/* A soft key light so thin parts (pipes, flares) still catch the eye. */}
       <pointLight position={[0.6, 1.4, 1.6]} intensity={5} distance={5} color="#fff8e1" />
       {/* Tipped toward the camera so parts that lie flat on a car read from above. */}

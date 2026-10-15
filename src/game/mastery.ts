@@ -9,7 +9,7 @@
 // The server guard (econ_guard(), catalog key `mastery`) pays the same gems and trophies and
 // checks the counts against the save's race wins. Class tiers pay looks, not gems.
 
-import { PAINTS } from './data'
+import { PAINTS, xpToNext } from './data'
 import { CAR_CLASSES, carsInClass, classesOf, inClass, type CarClassId } from './classes'
 
 export type MasteryMode = 'drag' | 'campaign' | 'rival' | 'tuner' | 'tour' | 'event' | 'live' | 'cup' | 'gp'
@@ -29,6 +29,16 @@ export const MASTERY_TIERS: MasteryTier[] = [
   { id: 'signature', name: 'Signature', icon: '✍️', bucks: 1, trophies: 0, need: { modes: 3 } },
   { id: 'master', name: 'Master', icon: '🎖️', bucks: 2, trophies: 5, need: { upsets: 5 } },
 ]
+
+// XP for each step, as a share of the level you're on (so it means the same at level 5 or 40):
+// Bronze, Silver, Signature, Master; then a class's Gold and Diamond, and Galaxy.
+export const MASTERY_XP = [0.02, 0.03, 0.04, 0.08]
+export const CLASS_XP = [0.1, 0.2]
+export const GALAXY_XP = 0.5
+export function masteryXp(level: number, reached: number[], classes: number[], sky: boolean) {
+  const share = reached.reduce((a, i) => a + (MASTERY_XP[i] ?? 0), 0) + classes.reduce((a, t) => a + (CLASS_XP[t - 1] ?? 0), 0) + (sky ? GALAXY_XP : 0)
+  return Math.round(share * xpToNext(level))
+}
 
 export const emptyMastery = (): Mastery => ({ races: 0, wins: 0, modes: [], upsets: 0, tier: 0 })
 

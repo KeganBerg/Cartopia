@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 import { signedInUser, flushSave } from './cloud'
 import { displayName } from './names'
 import { useGame } from '../game/store'
+import { sfx } from './sound'
 
 // Crew part requests (supabase/migrations/0070_postcards_crew_parts.sql): once a day you can ask
 // your crew for 10 parts. Crewmates give one at a time from their own parts (up to 5 each), and
@@ -29,6 +30,7 @@ export async function askCrewParts() {
   if (!ready()) return say('Sign in to ask your crew')
   const { data, error } = await supabase!.rpc('ask_crew_parts')
   if (error || data === 'no') return say('Join a crew to ask for parts')
+  if (data !== 'already') sfx.send()
   say(data === 'already' ? 'You already asked today' : `⚙ Asked your crew for ${CREW_ASK} parts`)
   await refreshCrewParts()
 }
@@ -44,6 +46,7 @@ export async function giveCrewPart(id: number) {
   if (data === 'limit') return say(`You can give ${CREW_GIVE_MAX} to each request and 20 a day`)
   if (data === 'own') return
   useGame.setState((s) => ({ parts: Math.max(0, s.parts - 1), updatedAt: Date.now() }))
+  sfx.send()
   say('⚙ Part given. Thanks for helping!')
   await refreshCrewParts()
 }
@@ -55,6 +58,7 @@ export async function claimCrewParts() {
   const n = error ? 0 : Number(data) || 0
   if (n > 0) {
     useGame.setState((s) => ({ parts: s.parts + n, updatedAt: Date.now() }))
+    sfx.reward()
     say(`⚙ Collected ${n} part${n > 1 ? 's' : ''} from your crew`)
     await flushSave()
   }

@@ -3,12 +3,13 @@
 // small like a quick race, so the server's usual earning limits cover it.
 
 import type { Box } from './collide'
+import { playXp } from './data'
 
 export type StarGameId = 'pit' | 'wash' | 'delivery' | 'stunt'
 
 export function starReward(stars: number, level: number) {
   if (stars <= 0) return { coins: 0, xp: 0 }
-  return { coins: Math.round(((80 + 25 * level) * [0, 0.5, 0.75, 1][stars]) / 5) * 5, xp: 6 + stars * 4 }
+  return { coins: Math.round(((80 + 25 * level) * [0, 0.5, 0.75, 1][stars]) / 5) * 5, xp: playXp(6 + stars * 4, level) }
 }
 
 // ---------- Pit Stop ----------
@@ -72,16 +73,25 @@ export function washStars(cars: number) {
 }
 
 // ---------- Delivery Dash ----------
-// Pick up at the pizza place, drop at the glowing house, beat the clock. Each drop adds time.
-export const DASH_TIME = 45
-export const DASH_BONUS = 12
-// Hot pizza: drop it off within hotTime of picking up (longer for a further house) and the
-// clock gets extra seconds, more for every hot drop in a row. Bumping traffic costs time.
+// Pick up at the pizza place, drop at the glowing house, as many as you can before the clock
+// runs out. Drops don't refill the clock, so every run ends.
+export const DASH_TIME = 60
+// Hot pizza: drop it off within hotTime of picking up (longer for a further house) for a few
+// extra seconds, more for every hot drop in a row, but no run lasts past DASH_MAX in all.
+// Bumping traffic costs time.
+export const DASH_MAX = 80
 export const hotTime = (dist: number) => 4 + dist / 4.5
+// It gets harder as you go: each delivery speeds the traffic up and shortens the hot window.
+export const trafficPace = (drops: number) => Math.min(1.6, 1 + 0.08 * drops)
+export const hotWindow = (dist: number, drops: number) => hotTime(dist) * Math.max(0.55, 1 - 0.07 * drops)
 export function dropBonus(hot: boolean, streak: number) {
-  return DASH_BONUS + (hot ? 3 + 2 * Math.min(3, streak) : 0)
+  return hot ? 2 + Math.min(3, streak) : 0
 }
-export const TRAFFIC_HIT = 2
+// The seconds a drop actually adds, t into the run with `left` still on the clock.
+export function clockBonus(bonus: number, t: number, left: number) {
+  return Math.max(0, Math.floor(Math.min(bonus, DASH_MAX - t - left)))
+}
+export const TRAFFIC_HIT = 3
 export function dashStars(drops: number) {
   return drops >= 6 ? 3 : drops >= 4 ? 2 : drops >= 2 ? 1 : 0
 }
