@@ -1,5 +1,5 @@
 import { Icon } from './Icon'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { sfx } from '../lib/sound'
 import { useGame, hasRusty } from '../game/store'
 import { supabase } from '../lib/supabase'
@@ -7,8 +7,13 @@ import { signedInUser } from '../lib/cloud'
 import { useGifts, refreshGifts, claimGifts, sendGift, noteTotals, GIFTS, type GiftItem, type Note } from '../lib/gifts'
 import { Panel } from './Menus'
 import { PlayerName } from './Username'
-import { refreshPostcards, usePostcards } from '../lib/postcards'
-import { PostcardList, unseenPostcards } from './Postcards'
+import { usePlayerName } from '../lib/profiles'
+import { cardOf, refreshPostcards, seePostcards, usePostcards, type Postcard } from '../lib/postcards'
+import { CardFace, unseenPostcards } from './Postcards'
+import { StageSlot } from '../scene/Stage'
+import { MailScene, type Parcel } from '../scene/MailScene'
+import { flyFrom } from './Fly'
+import './mail.css'
 
 const REFRESH_MS = 120_000
 
@@ -65,53 +70,73 @@ export function GiftBell() {
   )
 }
 
-function noteText(n: Note) {
-  return n.kind === 'help' ? 'helped your town' : `sent you ${GIFTS[n.kind].label}`
+const MAIL_CAM = { position: [1.2, 2.2, 4.5] as [number, number, number], fov: 40, near: 0.1, far: 60, shadows: true }
+const ICON = { help: '🤝', fuel: '⛽', parts: '⚙' } as const
+// A flat colour per friend, from their id, for the badge behind their initial.
+const TONES = ['#2f7ff0', '#e53935', '#43a047', '#8e44ad', '#ff8f00', '#00897b', '#d81b60']
+const tone = (id: string) => TONES[[...id].reduce((a, c) => a + c.charCodeAt(0), 0) % TONES.length]
+const firstHex = (bg: string) => bg.match(/#[0-9a-f]{6}/i)?.[0] ?? '#ffb36b'
+
+function Friend({ n }: { n: Note }) {
+  const name = usePlayerName(n.from, n.fromName)
+  return (
+    <div className="mail-friend">
+      <span className="mail-face" style={{ background: tone(n.from) }} aria-hidden>
+        {name.replace(/^@/, '').charAt(0).toUpperCase()}
+        <i>{ICON[n.kind]}</i>
+      </span>
+      <b>{name}</b>
+      <em>+{n.amount} {n.kind === 'parts' ? '⚙' : '⛽'}</em>
+    </div>
+  )
 }
 
+// Friends' visits, gifts and postcards, on a doorstep (scene/MailScene.tsx): one parcel for
+// each, the postcards in the mailbox. The button collects what the server pays today.
 export function GiftsPanel() {
   const inbox = useGifts((g) => g.inbox)
-  const cards = usePostcards((p) => p.inbox.length)
+  const cards = usePostcards((p) => p.inbox)
   const [busy, setBusy] = useState(false)
   const openPanel = useGame((s) => s.openPanel)
+  const take = useRef<HTMLButtonElement>(null)
+  useEffect(() => { if (cards.length) seePostcards() }, [cards])
   const t = noteTotals(inbox)
+  const parcels = useMemo(() => inbox.map((n) => n.kind as Parcel), [inbox])
+  const colors = useMemo(() => cards.map((c) => firstHex(cardOf(c.card).bg)), [cards])
+  const scene = useMemo(() => <MailScene parcels={parcels} cards={colors} />, [parcels, colors])
   const collect = async () => {
     if (busy) return
     setBusy(true)
+    const parts = t.parts
     try {
       await claimGifts()
     } finally {
       setBusy(false)
     }
+    sfx.reward()
+    if (parts) flyFrom(take.current, { parts })
     if (!useGifts.getState().inbox.length) openPanel(null)
   }
   return (
-    <Panel title="Friends helped you!">
-      <PostcardList />
-      {inbox.length === 0 ? (cards ? null : 
-        <div className="inv-empty" title="Friend helps and gifts show up here"><span className="empty-ico">🎁</span><div>Nothing waiting</div></div>
-      ) : (
-        <>
-          <div className="cards rows gift-list">
-            {inbox.map((n) => (
-              <div key={n.id} className="card gift-note">
-                <div className="welcome-ico" aria-hidden>{n.kind === 'help' ? '🤝' : '🎁'}</div>
-                <div className="card-text">
-                  <div className="card-name"><PlayerName id={n.from} town={n.fromName} /></div>
-                  <div className="card-stat">{noteText(n)}</div>
-                </div>
-                {/* The server pays waiting notes together, so any amount collects them all. */}
-                <button className="buy small gift-take" disabled={busy} onClick={collect}>+{n.amount} {n.kind === 'parts' ? '⚙' : '⛽'}</button>
-              </div>
-            ))}
+    <Panel title="Friends helped you!" className="mail-panel">
+      <div className="mail-stage">
+        <StageSlot cam={MAIL_CAM}>{scene}</StageSlot>
+        {(t.fuel > 0 || t.parts > 0) && (
+          <div className="mail-totals">
+            {t.fuel > 0 && <span className="mail-total fuel">⛽ +{t.fuel}</span>}
+            {t.parts > 0 && <span className="mail-total parts">⚙ +{t.parts}</span>}
           </div>
-          <div className="welcome-actions">
-            <button className="buy welcome-collect" disabled={busy} onClick={collect}>
-              {busy ? 'Collecting…' : <>Collect{t.fuel ? ` +${t.fuel} ⛽` : ''}{t.parts ? ` +${t.parts} ⚙` : ''}</>}
-            </button>
-          </div>
-        </>
+        )}
+      </div>
+      {inbox.length > 0 && <div className="mail-friends">{inbox.map((n) => <Friend key={n.id} n={n} />)}</div>}
+      {cards.length > 0 && (
+        <div className="mail-cards">
+          {cards.map((p: Postcard) => <CardFace key={p.id} card={p.card} msg={p.msg} from={<PlayerName id={p.from} town={p.fromName} />} />)}
+        </div>
       )}
+      {inbox.length > 0
+        ? <button ref={take} className="buy mail-go" disabled={busy} onClick={collect}>{busy ? 'Collecting…' : <>🎁 Collect</>}</button>
+        : <button className="buy alt mail-go" onClick={() => openPanel(null)}>👍 Nice</button>}
     </Panel>
   )
 }
