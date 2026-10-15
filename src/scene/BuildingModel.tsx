@@ -9,6 +9,10 @@ import { CarModel } from './CarModel'
 import { Upright, useBays, useMergeScale } from './mergeScale'
 import { ObstacleDetail, BillboardDetail, DriveInDetail, FountainDetail, GarageDetail, HouseDetail, PondDetail, ShopDetail, ShopLot, GasLot, GarageLot, CrewDeck, SpeedwayDetail, SpeedwayStands, StatueDetail } from './BuildingDetail'
 import { NEW_MODELS, NewBuildingModel } from './NewBuildings'
+import { CAR_SHOP_MODELS, CarShopModel } from './CarShops'
+import { SERVICE_MODELS, ServiceModel } from './ServiceBuildings'
+import { REC_MODELS, RecModel } from './RecBuildings'
+import { SPOOKY_MODELS, SpookyModel } from './SpookyBuildings'
 import { PropMesh } from './propKit'
 import { DECOR_PROPS, WILD_PROPS, benchBin } from './decorProps'
 import { Bulbs } from './edgeKit'
@@ -594,6 +598,10 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
     return <DecorLevels def={def} level={lvl} ghost={ghost} m={m} bulb={bulb}><BuildingModel def={def} ghost={ghost} valid={valid} /></DecorLevels>
   if (lvl >= 4 && GROWTH_MODELS.has(def.id)) return <GrowthModel def={def} ghost={ghost} m={m} win={win} bulb={bulb} level={lvl} />
   if (NEW_MODELS.has(def.id)) return <NewBuildingModel def={def} ghost={ghost} valid={valid} m={m} win={win} bulb={bulb} level={lvl} />
+  if (CAR_SHOP_MODELS.has(def.id)) return <CarShopModel def={def} ghost={ghost} valid={valid} m={m} win={win} bulb={bulb} level={lvl} />
+  if (SERVICE_MODELS.has(def.id)) return <ServiceModel def={def} ghost={ghost} valid={valid} m={m} win={win} bulb={bulb} level={lvl} />
+  if (REC_MODELS.has(def.id)) return <RecModel def={def} ghost={ghost} valid={valid} m={m} win={win} bulb={bulb} level={lvl} />
+  if (SPOOKY_MODELS.has(def.id)) return <SpookyModel def={def} ghost={ghost} valid={valid} m={m} win={win} bulb={bulb} level={lvl} />
   if (OFFICE_MODELS.has(def.id)) return <OfficeModel def={def} ghost={ghost} m={m} bulb={bulb} level={lvl} />
   if (TRAILER_JUNK.has(def.id)) return <TrailerJunkModel id={def.id} m={m} win={win} bulb={bulb} ghost={ghost} lvl={lvl} lift={lift} roof={def.roof} color={def.color} />
   if (PARK_STYLES.has(def.id)) return <ParkStyleModel id={def.id} m={m} win={win} bulb={bulb} ghost={ghost} lvl={lvl} lift={lift} roof={def.roof} color={def.color} />

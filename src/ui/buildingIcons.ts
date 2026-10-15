@@ -5,6 +5,9 @@ export const BUILDING_ICONS: Record<string, string> = {
   coffee: '☕', diner: '🥞', donut: '🍩', firehouse: '🚒', glasstower: '🏙️', helipad: '🚁', highschool: '🏫', hospital: '🏥',
   hq: '🏢', icecream: '🍦', junkyard: '🧲', lube: '🛢️', market: '🛒', motel: '🛏️', offices: '💼', parkade: '🅿️',
   parts: '⚙️', pizza: '🍕', police: '🚓', school: '🎒', stadium: '🏟️', tacos: '🌮', tires: '🛞', tuner: '🔧', university: '🎓',
+  muffler: '💨', brakes: '🛑', wraps: '🎞️', dynolab: '📈', engines: '🔩', racefab: '🏎️',
+  laundry: '🧺', vet: '🐾', postoffice: '📮', library: '📚', busdepot: '🚌', cityhall: '🏛️',
+  minigolf: '⛳', pool: '🏊', funfair: '🎡', waterpark: '🌊', haunted: '👻',
 }
 
 export const buildingIcon = (id: string) => BUILDING_ICONS[id] ?? '🏪'
