@@ -14,6 +14,10 @@ import { setCalmFlashing, useCalmFlashing } from '../game/flashing'
 import { showFlashWarning } from './FlashWarning'
 import { useTouchDevice } from './DriveControls'
 
+// The Windows app (desktop/) opens the live game, so this download never needs replacing for a deploy.
+export const DESKTOP_DOWNLOAD = 'https://github.com/KeganBerg/Cartopia/releases/latest/download/Cartopia-Setup.exe'
+const showDesktopApp = () => typeof navigator !== 'undefined' && /Windows/.test(navigator.userAgent) && !(window as { __CARTOPIA_DESKTOP__?: boolean }).__CARTOPIA_DESKTOP__
+
 // Contact address for the Help tab. Empty hides the row until the owner sets one.
 export const SUPPORT_EMAIL = 'support@cartopia.lol'
 
@@ -121,6 +125,13 @@ export function SettingsTab({ user }: { user: User | null }) {
         </Row>
         {user && <ChallengeSettings />}
       </Group>
+      {!touch && showDesktopApp() && (
+        <Group icon="🖥️" title="Desktop app">
+          <Row label="Cartopia for Windows" sub="Updates itself with the game">
+            <button className="buy small alt" title="Download Cartopia for Windows" onClick={() => window.location.assign(DESKTOP_DOWNLOAD)}>⬇ Get</button>
+          </Row>
+        </Group>
+      )}
     </>
   )
 }

@@ -309,6 +309,21 @@ export const sfx = {
     if (k > 2) shaker(d, t + 0.08, 0.025, 0.06 * k, 6500)
   }),
   start: () => play(arp(['G4', 'D5'], 0.08, marimba, 0.12)),
+  // Bulldozing wild land: a low engine push, then a tree's crack and fall or a boulder's
+  // crunch into gravel, and a little rising marimba for the cleared tile.
+  bulldoze: (rock: boolean) => play((d, t) => {
+    marimba(d, t, hz('D2'), 0.12, 0.35)
+    softKick(d, t + 0.02, 0.1)
+    if (rock) {
+      knock(d, t + 0.12, 300, 0.16)
+      shaker(d, t + 0.14, 0.05, 0.35, 2600)
+    } else {
+      woodblock(d, t + 0.1, 900, 0.1)
+      whoosh(d, t + 0.14, 0.4, 2400, 500, 0.05)
+      softKick(d, t + 0.52, 0.14)
+    }
+    arp(['G4', 'B4', 'D5'], 0.06, marimba, 0.08)(d, t + 0.6)
+  }),
   // The lightning button: a woodblock tap per repair, a marimba lift for jobs
   // restarted, then the coin cascade for what it collected, all on one chord.
   sweep: (collected: number, started: number, fixed: number) => play((d, t) => {
@@ -403,6 +418,16 @@ export const sfx = {
     src.buffer = fanfare
     src.connect(d.out)
     src.start(t)
+  }),
+  // Auto jobs: a key jingle per car sent to work (up to six), then a bright bell.
+  dispatch: (n: number) => play((d, t) => {
+    const k = Math.max(1, Math.min(6, n))
+    const run = ['C5', 'E5', 'G5', 'C6', 'E6', 'G6']
+    for (let i = 0; i < k; i++) {
+      marimba(d, t + i * 0.07, hz(run[i]), 0.1, 0.35)
+      shaker(d, t + i * 0.07, 0.012, 0.04, 9000)
+    }
+    glock(d, t + k * 0.07 + 0.03, hz('C7'), 0.05, 1)
   }),
   buy: () => play((d, t) => {
     arp(['G4', 'B4', 'D5'], 0.06, marimba, 0.11)(d, t)

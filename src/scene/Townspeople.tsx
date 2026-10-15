@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
-import { Color, Matrix4, Object3D, Vector3 } from 'three'
+import { Color, InstancedBufferAttribute, Matrix4, Object3D, Vector3 } from 'three'
 import type { InstancedMesh } from 'three'
 import { useGame, type PlacedBuilding } from '../game/store'
 import { START_LAND, buildingDef, buildingLevel, houseResidents } from '../game/data'
@@ -10,7 +10,7 @@ import { liveTraffic, crossingSignal } from './traffic/live'
 import { useThought, placeChip } from '../game/thoughts'
 import { SEASON } from './season'
 import { SHIRTS, PANTS, SKIN, HAIR, BEANIES } from './people'
-import { dogGeo, headGeo, leashGeo, legGeo, torsoGeo, PERSON } from './peopleGeo'
+import { dogGeo, dogMaterial, headGeo, leashGeo, legGeo, torsoGeo, PERSON } from './peopleGeo'
 import { dayPhase, nightAmount } from './dayNight'
 import { isNight } from '../game/clock'
 import { CLUB } from './clubLayout'
@@ -38,6 +38,12 @@ const TORSO = torsoGeo()
 const HEAD = headGeo()
 const LEGS = legGeo(LEG)
 const DOG = dogGeo(SCALE)
+const DOG_MAT = dogMaterial(SCALE)
+// Per-dog leg swing and tail wag, read by DOG_MAT.
+const GAIT = new InstancedBufferAttribute(new Float32Array(MAX_PEOPLE * 2), 2)
+DOG.setAttribute('gait', GAIT)
+// Dogs come in a few sizes, from a terrier to a retriever.
+const DOG_SIZES = [0.8, 0.9, 1, 1.1, 1.2]
 const LEASH = leashGeo()
 const LEASHES = ['#d32f2f', '#1565c0', '#2e7d32', '#212121', '#f9a825', '#6a1b9a']
 // Where the leash clips on: the collar, in the dog's own frame (DOG is built at 1/SCALE).
@@ -47,7 +53,7 @@ const COLLAR_Z = 0.075 / SCALE
 
 const NAMES = ['Alex', 'Sam', 'Jordan', 'Riley', 'Casey', 'Morgan', 'Taylor', 'Jamie', 'Quinn', 'Avery', 'Rowan', 'Skyler', 'Drew', 'Kai', 'Robin', 'Charlie', 'Frankie', 'Jesse', 'Remy', 'Sage']
 const DOGS = ['Biscuit', 'Rocket', 'Pepper', 'Daisy', 'Turbo', 'Maple', 'Nugget', 'Scout']
-const DOG_COATS = ['#8d6e63', '#f5f5f5', '#3e2723', '#d4a056', '#a1887f', '#212121']
+const DOG_COATS = ['#8d6e63', '#f5f5f5', '#5d4037', '#d4a056', '#a1887f', '#3a3a3a']
 
 // What people carry out of each shop: size and colour of a little box in their
 // hands, and how a thought bubble describes taking it home.
@@ -156,6 +162,7 @@ type Person = {
   dogName: string
   dogPos: Pt
   dogHeading: number
+  dogSize: number
   home: string // building uid
   at: string // graph node key where they last stopped
   pos: Pt
@@ -192,7 +199,7 @@ function person(id: string, home: string, pos: Pt): Person {
   const type = h % 6 === 0 ? 'jogger' : h % 6 === 1 ? 'dog' : 'walker'
   return {
     id, type, name: NAMES[(h >> 4) % NAMES.length], dogName: DOGS[(h >> 7) % DOGS.length],
-    dogPos: [...pos], dogHeading: 0,
+    dogPos: [...pos], dogHeading: 0, dogSize: DOG_SIZES[(h >> 13) % DOG_SIZES.length],
     home, at: `b${home}`, pos: [...pos], heading: 0, face: null,
     speed: type === 'jogger' ? rand(1.5, 1.8) : rand(0.65, 0.9), stride: rand(0, 6),
     state: 'inside', sit: false, timer: rand(0.5, 10), waited: 0,
@@ -350,6 +357,8 @@ export function Townspeople() {
   const hidden = useMemo(() => new Matrix4().makeScale(0, 0, 0), [])
   const color = useMemo(() => new Color(), [])
   const tmp = useMemo(() => new Vector3(), [])
+  const hand = useMemo(() => new Vector3(), [])
+  const mid = useMemo(() => new Vector3(), [])
 
   // Tap someone to see what they're up to.
   const onTap = (e: ThreeEvent<MouseEvent>) => {
@@ -386,26 +395,34 @@ export function Townspeople() {
         lg.setColorAt(i * 2 + 1, color)
         it.setColorAt(i, color.set(p.item ? ITEMS[p.item].color : '#ffffff'))
         db.setColorAt(i, color.set(p.colors.dog))
-        ls.setColorAt(i, color.set(LEASHES[(p.name.length * 3 + p.dogName.length) % LEASHES.length]))
+        color.set(LEASHES[(p.name.length * 3 + p.dogName.length) % LEASHES.length])
+        ls.setColorAt(i * 2, color)
+        ls.setColorAt(i * 2 + 1, color)
       })
       for (const m of [t, hd, hr, lg, it, db, ls]) if (m.instanceColor) m.instanceColor.needsUpdate = true
     }
 
-    const ones = [t, hd, hr, it, db, ls, hit]
+    const ones = [t, hd, hr, it, db, hit]
+    const wag = performance.now() / 1000
     bouncers(ctx, dt)
     list.forEach((p, i) => {
       update(ctx, p, dt, night)
       draw(p, i)
     })
-    t.count = hd.count = hr.count = it.count = db.count = ls.count = hit.count = list.length
+    t.count = hd.count = hr.count = it.count = db.count = hit.count = list.length
+    ls.count = list.length * 2
     lg.count = list.length * 2
     for (const m of ones) m.instanceMatrix.needsUpdate = true
     lg.instanceMatrix.needsUpdate = true
+    ls.instanceMatrix.needsUpdate = true
+    GAIT.needsUpdate = true
     followThought(list)
 
     function draw(p: Person, i: number) {
       if (p.state === 'inside') {
         for (const m of ones) m.setMatrixAt(i, hidden)
+        ls!.setMatrixAt(i * 2, hidden)
+        ls!.setMatrixAt(i * 2 + 1, hidden)
         lg!.setMatrixAt(i * 2, hidden)
         lg!.setMatrixAt(i * 2 + 1, hidden)
         return
@@ -446,27 +463,39 @@ export function Townspeople() {
         const dx = p.dogPos[0] / SCALE
         const dz = p.dogPos[1] / SCALE
         const still = p.state === 'linger'
-        const trot = moving ? Math.abs(Math.sin(p.stride * 1.6)) * 0.025 : 0
+        const k = p.dogSize
+        const trot = moving ? Math.abs(Math.sin(p.stride * 1.6)) * 0.025 * k : 0
         // A rocking trot on the move; sitting tips the nose up and drops the rump.
         const pitch = still ? -0.32 : moving ? Math.sin(p.stride * 3.2) * 0.07 : 0
         dummy.position.set(dx, trot, dz)
         dummy.rotation.set(pitch, p.dogHeading, 0)
-        dummy.scale.set(1, 1, 1)
+        dummy.scale.set(k, k, k)
         dummy.updateMatrix()
         db!.setMatrixAt(i, dummy.matrix)
-        // The leash runs from the owner's right hand down to the collar.
+        // Legs swing in diagonal pairs while trotting; the tail wags, slower on the move.
+        GAIT.setXY(i, moving ? Math.sin(p.stride * 1.6) * 0.55 : 0, Math.sin(wag * (moving ? 9 : 14) + i) * (still ? 0.5 : 0.35))
+        // The leash runs from the owner's right hand down to the collar, sagging in the middle.
         const ds = Math.sin(p.dogHeading)
         const dc = Math.cos(p.dogHeading)
-        const cy = trot + COLLAR_Y + (still ? 0.03 : 0)
-        dummy.position.set(x + cos * 0.118 + sin * 0.005, hip + 0.075, z - sin * 0.118 + cos * 0.005)
-        tmp.set(dx + ds * COLLAR_Z, cy, dz + dc * COLLAR_Z)
-        dummy.scale.set(1, 1, dummy.position.distanceTo(tmp))
-        dummy.lookAt(tmp)
-        dummy.updateMatrix()
-        ls!.setMatrixAt(i, dummy.matrix)
+        const cy = trot + (COLLAR_Y + (still ? 0.03 : 0)) * k
+        hand.set(x + cos * 0.118 + sin * 0.005, hip + 0.075, z - sin * 0.118 + cos * 0.005)
+        tmp.set(dx + ds * COLLAR_Z * k, cy, dz + dc * COLLAR_Z * k)
+        mid.lerpVectors(hand, tmp, 0.5)
+        mid.y -= Math.min(0.12, hand.distanceTo(tmp) * (still ? 0.3 : 0.12))
+        const span = (m: Vector3, n: Vector3, at: number) => {
+          dummy.position.copy(m)
+          dummy.scale.set(1, 1, m.distanceTo(n))
+          dummy.lookAt(n)
+          dummy.updateMatrix()
+          ls!.setMatrixAt(at, dummy.matrix)
+        }
+        span(hand, mid, i * 2)
+        span(mid, tmp, i * 2 + 1)
       } else {
         db!.setMatrixAt(i, hidden)
-        ls!.setMatrixAt(i, hidden)
+        ls!.setMatrixAt(i * 2, hidden)
+        ls!.setMatrixAt(i * 2 + 1, hidden)
+        GAIT.setXY(i, 0, 0)
       }
       // Legs swing from the hips; sitting folds them forward.
       for (const side of LEG_SIDES) {
@@ -508,9 +537,9 @@ export function Townspeople() {
       </instancedMesh>
       <instancedMesh ref={dogBody} args={[undefined, undefined, MAX_PEOPLE]} frustumCulled={false}>
         <primitive object={DOG} attach="geometry" />
-        <meshStandardMaterial vertexColors />
+        <primitive object={DOG_MAT} attach="material" />
       </instancedMesh>
-      <instancedMesh ref={leash} args={[undefined, undefined, MAX_PEOPLE]} frustumCulled={false}>
+      <instancedMesh ref={leash} args={[undefined, undefined, MAX_PEOPLE * 2]} frustumCulled={false}>
         <primitive object={LEASH} attach="geometry" />
         <meshStandardMaterial />
       </instancedMesh>

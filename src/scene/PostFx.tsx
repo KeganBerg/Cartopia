@@ -7,6 +7,7 @@ import { Uniform, Vector3 } from 'three'
 import { fxState, type Look } from './look'
 import { usePrefs } from '../lib/prefs'
 import { onFx } from '../game/fx'
+import { PACES, paceDown, useTownPace } from './townPace'
 
 // Colour grade applied to the whole frame after tone mapping. Keep in step
 // with gradeColor() in look.ts, which repeats it for the page background.
@@ -166,7 +167,10 @@ export function PostFx({ look, town, tiltShift }: { look: Look; town?: boolean; 
     }
   })
 
+  // The town tries drawing fewer pixels, then fewer frames, before giving up effects.
+  const pace = useTownPace((p) => p.step)
   const stepDown = () => {
+    if (town && paceDown()) return
     setTier((t) => {
       const next = TIERS[Math.min(TIERS.length - 1, TIERS.indexOf(t) + 1)]
       try {
@@ -180,7 +184,10 @@ export function PostFx({ look, town, tiltShift }: { look: Look; town?: boolean; 
 
   return (
     <>
-      {armed && !pinned && graphics === 'auto' && <PerformanceMonitor bounds={() => [40, 120]} flipflops={3} onDecline={stepDown} />}
+      {/* Remounted after each town step so it judges the new setting afresh; at 30 fps the bar drops with it. */}
+      {armed && !pinned && graphics === 'auto' && (
+        <PerformanceMonitor key={town ? pace : 0} bounds={() => (town && PACES[pace].fps < 60 ? [22, 120] : [40, 120])} flipflops={3} onDecline={stepDown} />
+      )}
       {tier !== 'off' && (
         <EffectComposer multisampling={tier === 'high' ? 4 : 2} enableNormalPass={false}>
           {/* Tilt-shift blurs the raw frame, so it goes before bloom; after it, the blurred bands lost their glow. */}

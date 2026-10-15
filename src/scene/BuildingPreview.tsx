@@ -3,6 +3,8 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { PerspectiveCamera, Vector3, type Group, type Mesh } from 'three'
 import type { Body, BuildingDef, Finish, SkinnedSlot, Panels } from '../game/data'
 import { BuildingModel } from './BuildingModel'
+import { Tint } from './CityTint'
+import type { ColorTheme } from '../game/cityLook'
 import { Grounded } from './ServiceVehicles'
 import { CarModel } from './CarModel'
 import { HatModel } from './CarHat'
@@ -28,10 +30,20 @@ const DPR = typeof window === 'undefined' ? 1 : Math.min(window.devicePixelRatio
 
 // Each model is measured once it's mounted and the camera is fitted to it, so
 // tall towers, wide lots and long trucks all fill their box whole.
-type Item = { key: string; model: () => ReactNode }
+// A scene (an arcade card) instead stands still under a fixed camera and moves itself.
+type Item = { key: string; model: () => ReactNode; view?: SceneView }
 
-function buildingItem(def: BuildingDef, level?: number): Item {
-  return { key: `b|${def.id}|${level ?? 1}|${SEASON}`, model: () => <Grounded.Provider value><BuildingModel def={def} level={level} /></Grounded.Provider> }
+// A camera looking at `at` from direction `dir`, backed off until a box halfW wide and
+// halfH tall round `at` fits whatever shape the picture is. `rise` lifts the subject up
+// the picture (0 = middle, 0.5 = half way to the top), clear of text drawn over the bottom.
+export type SceneView = { dir: [number, number, number]; at: [number, number, number]; halfW: number; halfH: number; rise?: number; fov?: number }
+
+// `theme`: the colour theme the building wears in town, so the thumb matches it.
+function buildingItem(def: BuildingDef, level?: number, theme?: ColorTheme | null): Item {
+  return {
+    key: `b|${def.id}|${level ?? 1}|${SEASON}|${theme?.id ?? ''}`,
+    model: () => <Grounded.Provider value><Tint theme={theme ?? null}><BuildingModel def={def} level={level} /></Tint></Grounded.Provider>,
+  }
 }
 
 type CarLook = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; panels?: Panels | null; stripe?: string | null; rusty?: boolean; mods?: string[] | null; trim?: Trim | null; hat?: HatFit | null }
@@ -112,6 +124,8 @@ function attach(item: Item, canvas: HTMLCanvasElement) {
     sizer?.unobserve(canvas)
     const n = models.get(item.key)
     if (n) n.uses--
+    // Scenes animate every frame while mounted, so they go as soon as nothing shows them.
+    if (n && n.uses <= 0 && n.item.view) models.delete(item.key)
     const idle = [...models].filter(([, v]) => v.uses <= 0)
     for (const [k] of idle.slice(0, Math.max(0, idle.length - KEEP_IDLE))) models.delete(k)
     changed()
@@ -122,8 +136,27 @@ function attach(item: Item, canvas: HTMLCanvasElement) {
 const MAX_W = 2048
 // The view comes from above and to the side, as in town; the model bobs between these heights.
 const VIEW = new Vector3(1, 0.8, 1)
+const aim = new Vector3()
+const back = new Vector3()
 const LO = 0.19
 const HI = 0.31
+
+function aimScene(c: PerspectiveCamera, v: SceneView) {
+  c.fov = v.fov ?? 30
+  const t = Math.tan((c.fov * Math.PI) / 360)
+  const d = Math.max(v.halfH / t, v.halfW / (t * c.aspect))
+  aim.set(...v.at)
+  back.set(...v.dir).normalize()
+  c.position.copy(aim).addScaledVector(back, d)
+  c.up.set(0, 1, 0)
+  c.lookAt(aim)
+  c.near = Math.max(0.1, d * 0.1)
+  c.far = d * 6
+  c.updateProjectionMatrix()
+  // Shifts the whole picture down, so the subject sits higher than the middle.
+  c.projectionMatrix.elements[9] -= v.rise ?? 0
+  c.projectionMatrixInverse.copy(c.projectionMatrix).invert()
+}
 
 function Renderer() {
   const { gl, scene } = useThree()
@@ -187,18 +220,29 @@ function Renderer() {
     gl.setClearColor(0x000000, 0)
     for (const [key, n] of need) {
       const g = groups.current.get(key)!
-      let b = sizes.current.get(g)
-      if (!b) {
-        b = seat(g.children[0], g)
-        sizes.current.set(g, b)
-      }
-      g.visible = true
-      g.rotation.y = turn * Math.PI * 2
-      g.position.y = lift
-      shadow.current?.scale.setScalar(b.r * 0.8 * (1 - lift * 0.5))
       const c = cam.current
       c.aspect = n.w / n.h
-      frame(c, b, VIEW, { lo: LO, hi: HI, floor: b.r * 0.8 })
+      const view = models.get(key)?.item.view
+      if (view) {
+        g.visible = true
+        if (shadow.current) shadow.current.visible = false
+        aimScene(c, view)
+      } else {
+        let b = sizes.current.get(g)
+        if (!b) {
+          b = seat(g.children[0], g)
+          sizes.current.set(g, b)
+        }
+        g.visible = true
+        g.rotation.y = turn * Math.PI * 2
+        g.position.y = lift
+        if (shadow.current) {
+          shadow.current.visible = true
+          shadow.current.scale.setScalar(b.r * 0.8 * (1 - lift * 0.5))
+        }
+        c.fov = 30
+        frame(c, b, VIEW, { lo: LO, hi: HI, floor: b.r * 0.8 })
+      }
       // WebGL counts rows from the bottom; the atlas is laid out from the top.
       gl.setViewport(n.x, ah - n.y - n.h, n.w, n.h)
       gl.setScissor(n.x, ah - n.y - n.h, n.w, n.h)
@@ -278,7 +322,7 @@ export function ThumbRenderer() {
 
 type Size = 'xs' | 'sm' | 'lg'
 
-function Thumb({ item, size }: { item: Item; size?: Size }) {
+function Thumb({ item, size, className }: { item: Item; size?: Size; className?: string }) {
   const ref = useRef<HTMLCanvasElement>(null)
   const latest = useRef(item)
   useEffect(() => {
@@ -290,15 +334,15 @@ function Thumb({ item, size }: { item: Item; size?: Size }) {
     if (canvas && key) return attach(latest.current, canvas)
   }, [key])
   return (
-    <div className={size ? `thumb3d ${size}` : 'thumb3d'}>
+    <div className={className ?? (size ? `thumb3d ${size}` : 'thumb3d')}>
       <canvas ref={ref} className="thumb-view" />
     </div>
   )
 }
 
 // A building or decoration floating and turning, exactly as it looks in town.
-export function BuildingThumb({ def, level }: { def: BuildingDef; level?: number }) {
-  return <Thumb item={buildingItem(def, level)} />
+export function BuildingThumb({ def, level, theme }: { def: BuildingDef; level?: number; theme?: ColorTheme | null }) {
+  return <Thumb item={buildingItem(def, level, theme)} />
 }
 
 // Scaled up to about a car's size, so it floats and frames like the other thumbs.
@@ -314,4 +358,9 @@ export function HatThumb({ hat, size }: { hat: HatFit; size?: Size }) {
 // A car floating and turning. Rusty finds show the real model in dull, rusted paint.
 export function CarThumb({ size, ...look }: CarLook & { size?: Size }) {
   return <Thumb item={carItem(look)} size={size} />
+}
+
+// A little scene that animates itself under a fixed camera (the arcade cards).
+export function SceneThumb({ id, view, className, children }: { id: string; view: SceneView; className?: string; children: () => ReactNode }) {
+  return <Thumb item={{ key: `s|${id}`, model: children, view }} className={className} />
 }
