@@ -50,57 +50,57 @@ type Feature =
   | 'sideExhaust' | 'sideStripe' | 'chromeBelt' | 'fenderVents' | 'eyebrows' | 'roundel'
   | 'splitter' | 'canards' | 'bullBar' | 'overriders' | 'snorkel' | 'toolbox' | 'crates' | 'humps'
   | 'stopArm' | 'roofHatches' | 'schoolSign' | 'crossingArm' | 'busMirrors' | 'bone'
-  | 'drl' | 'hoodCreases' | 'meshGrille' | 'popups' | 'quadTails' | 'tripleTails' | 'sideSkirts' | 'rearWiper' | 'diffuserFins'
-  | 'centerExhaust' | 'stepBars' | 'ladder' | 'tailgateLettering' | 'fuelCap' | 'towStrap' | 'headlightTape' | 'chromeTrimWindow'
+  | 'hoodCreases' | 'meshGrille' | 'popups' | 'quadTails' | 'tripleTails' | 'sideSkirts' | 'rearWiper' | 'diffuserFins'
+  | 'centerExhaust' | 'stepBars' | 'ladder' | 'tailgateLettering' | 'fuelCap' | 'towStrap' | 'chromeTrimWindow'
   | 'roofSeams' | 'chargePort' | 'boxFlares' | 'trunkWing' | 'sideBlade' | 'horseshoe' | 'swanWing' | 'lipSpoiler'
 
 // What each car gets on top of its body's own detail. Ids not in this build
 // (another thread's newer cars) are simply skipped.
 const TRIMS: Record<string, Feature[]> = {
   pip: ['roofRack', 'roofBox', 'visors', 'rearWiper'],
-  civic: ['sunroof', 'visors', 'chromeBelt', 'drl', 'hoodCreases'],
+  civic: ['sunroof', 'visors', 'chromeBelt', 'hoodCreases'],
   trail: ['bullBar', 'toolbox', 'towHitch', 'snorkel', 'stepBars', 'tailgateLettering'],
   miata: ['rearRack', 'hoodVents', 'popups'],
   stallion: ['hoodPins', 'sideStripe', 'louvers', 'tripleTails'],
-  rally: ['lightPods', 'roofScoop', 'roundel', 'splitter', 'headlightTape', 'towStrap', 'fuelCap'],
+  rally: ['lightPods', 'roofScoop', 'roundel', 'splitter', 'towStrap', 'fuelCap'],
   vette: ['sideExhaust', 'fenderVents', 'ttop', 'popups', 'quadTails'],
   charger: ['tailBand', 'hoodPins', 'chromeBelt', 'fuelCap', 'hoodCreases'],
-  hellcat: ['hoodVents', 'splitter', 'canards', 'drl', 'diffuserFins'],
-  gtr: ['splitter', 'canards', 'fenderVents', 'sunroof', 'quadTails', 'drl', 'sideSkirts'],
+  hellcat: ['hoodVents', 'splitter', 'canards', 'diffuserFins'],
+  gtr: ['splitter', 'canards', 'fenderVents', 'sunroof', 'quadTails', 'sideSkirts'],
   tomahawk: ['stowage', 'spare', 'beacon'],
   lambo: ['deckLouvers', 'roofScoop', 'splitter', 'popups', 'diffuserFins', 'centerExhaust'],
-  hyper: ['sharkFin', 'hoodVents', 'canards', 'splitter', 'diffuserFins', 'drl', 'sideSkirts'],
+  hyper: ['sharkFin', 'hoodVents', 'canards', 'splitter', 'diffuserFins', 'sideSkirts'],
   bug: ['rearRack', 'overriders', 'sideStripe'],
   woodie: ['surfboard', 'chromeBelt', 'overriders', 'chromeTrimWindow', 'rearWiper'],
   hauler: ['beacon', 'crates', 'towHitch', 'bullBar', 'tailgateLettering', 'stepBars'],
   cruiser: ['twoTone', 'continental', 'chromeBelt', 'chromeTrimWindow', 'hoodCreases'],
   buggy: ['whip', 'spare', 'bullBar'],
   bandit: ['hoodChevron', 'ttop', 'louvers', 'meshGrille', 'sideSkirts'],
-  lemans: ['roundel', 'splitter', 'sharkFin', 'lightPods', 'headlightTape', 'fuelCap', 'diffuserFins'],
+  lemans: ['roundel', 'splitter', 'sharkFin', 'lightPods', 'fuelCap', 'diffuserFins'],
   gullwing: ['eyebrows', 'hoodBulges', 'chromeBelt', 'chromeTrimWindow', 'roofSeams'],
   // Cars from the More cars set.
   camper: ['roofRack', 'surfboard', 'overriders', 'ladder', 'chromeTrimWindow'],
-  hotshot: ['hoodVents', 'sideStripe', 'roundel', 'meshGrille', 'towStrap', 'rearWiper', 'drl'],
+  hotshot: ['hoodVents', 'sideStripe', 'roundel', 'meshGrille', 'towStrap', 'rearWiper'],
   ridgeback: ['roofRack', 'snorkel', 'bullBar', 'towHitch', 'stepBars', 'rearWiper'],
-  kitsune: ['canards', 'fenderVents', 'sideStripe', 'splitter', 'towStrap', 'drl', 'sideSkirts'],
-  current: ['panoRoof', 'sideStripe', 'drl', 'chargePort', 'hoodCreases'],
+  kitsune: ['canards', 'fenderVents', 'sideStripe', 'splitter', 'towStrap', 'sideSkirts'],
+  current: ['panoRoof', 'sideStripe', 'chargePort', 'hoodCreases'],
   salon: ['ornament', 'chromeBelt', 'twoTone', 'chromeTrimWindow', 'hoodCreases'],
   stomper: ['lightBar', 'bullBar', 'snorkel', 'crates', 'stepBars', 'tailgateLettering'],
-  zenith: ['sharkFin', 'canards', 'deckLouvers', 'splitter', 'diffuserFins', 'centerExhaust', 'drl'],
+  zenith: ['sharkFin', 'canards', 'deckLouvers', 'splitter', 'diffuserFins', 'centerExhaust'],
   speedster: ['humps', 'roundel', 'rearRack', 'fuelCap'],
   schoolbus: ['stopArm', 'roofHatches', 'schoolSign', 'crossingArm', 'busMirrors'],
   tusker: ['stowage', 'towHitch', 'whip'],
   shaggy: ['roofRack', 'bone', 'towHitch'],
-  nightfall: ['splitter', 'canards', 'deckLouvers', 'fenderVents', 'diffuserFins', 'drl', 'centerExhaust'],
+  nightfall: ['splitter', 'canards', 'deckLouvers', 'fenderVents', 'diffuserFins', 'centerExhaust'],
   // Gap fillers.
-  kreis: ['boxFlares', 'trunkWing', 'splitter', 'sideSkirts', 'drl', 'roundel'],
+  kreis: ['boxFlares', 'trunkWing', 'splitter', 'sideSkirts', 'roundel'],
   bergmeister: ['deckLouvers', 'sideStripe', 'fuelCap'],
-  rattler: ['hoodVents', 'splitter', 'tripleTails', 'sideStripe', 'fenderVents', 'drl'],
+  rattler: ['hoodVents', 'splitter', 'tripleTails', 'sideStripe', 'fenderVents'],
   cottonmouth: ['hoodVents', 'sideExhaust', 'fenderVents', 'splitter', 'canards', 'diffuserFins'],
-  ringmeister: ['lipSpoiler', 'sideBlade', 'drl', 'diffuserFins', 'deckLouvers', 'sideSkirts'],
+  ringmeister: ['lipSpoiler', 'sideBlade', 'diffuserFins', 'deckLouvers', 'sideSkirts'],
   raiden: ['sharkFin', 'roofScoop', 'roundel', 'splitter', 'canards', 'diffuserFins'],
-  sovereign: ['lipSpoiler', 'horseshoe', 'roofScoop', 'diffuserFins', 'centerExhaust', 'drl', 'sideSkirts'],
-  wraith: ['swanWing', 'canards', 'splitter', 'diffuserFins', 'centerExhaust', 'drl', 'roofScoop'],
+  sovereign: ['lipSpoiler', 'horseshoe', 'roofScoop', 'diffuserFins', 'centerExhaust', 'sideSkirts'],
+  wraith: ['swanWing', 'canards', 'splitter', 'diffuserFins', 'centerExhaust', 'roofScoop'],
 }
 
 const box = (w: number, h: number, d: number) => new BoxGeometry(w, h, d)
@@ -134,7 +134,7 @@ function badges(k: Kit, f: TrimFrame) {
 
 const SIDES = [-1, 1] as const
 
-function feature(k: Kit, f: Feature, t: TrimFrame) {
+function feature(k: Kit, f: Feature, t: TrimFrame, all: Feature[]) {
   const { wid, len, lift, top, hoodY, front, roofY, roofLen, roofZ, wz, wheel } = t
   const roof = roofLen > 0
   switch (f) {
@@ -181,13 +181,6 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
       }
       k.add('paint', box(wid * 0.92, 0.02, 0.14), [0, top + 0.14, -front + 0.1], [0.08, 0, 0])
       k.add('black', box(wid * 0.9, 0.012, 0.05), [0, top + 0.16, -front + 0.04], [0.45, 0, 0])
-      return
-    case 'drl':
-      // LED brows over the headlights.
-      for (const sd of SIDES) {
-        const [z, y, rx] = onNose(t, t.lightY + 0.036, 0.008)
-        k.add('lamp', plane(0.12, 0.007), [sd * wid * 0.3, y, z], [rx, 0, sd * 0.2])
-      }
       return
     case 'hoodCreases':
       for (const sd of SIDES) k.add('dark', box(0.006, 0.003, (t.hoodFront - t.cowl) * 0.85), [sd * wid * 0.27, hoodY + 0.002, (t.cowl + t.hoodFront) / 2])
@@ -239,9 +232,10 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
       return
     case 'centerExhaust':
       if (t.exhaust) return
-      for (const x of [-0.035, 0.035]) {
-        k.add('chrome', cyl(0.022, 0.022, 0.06, 12), [x, lift + 0.1, -front - 0.01], [Math.PI / 2, 0, 0])
-        k.add('black', disc(0.016, 10), [x, lift + 0.1, -front - 0.043], [0, Math.PI, 0])
+      // Out through the bumper either side of the number plate, between the diffuser's fins.
+      for (const x of [-wid * 0.165, wid * 0.165]) {
+        k.add('chrome', cyl(0.022, 0.022, 0.06, 12), [x, lift + 0.07, -front - 0.02], [Math.PI / 2, 0, 0])
+        k.add('black', disc(0.016, 10), [x, lift + 0.07, -front - 0.053], [0, Math.PI, 0])
       }
       return
     case 'stepBars':
@@ -251,9 +245,15 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
       }
       return
     case 'ladder': {
+      // Rails from the bumper up past the roof's back edge, hooked over onto the roof.
       const x = -wid * 0.3
-      for (const sd of [-1, 1]) k.add('chrome', box(0.01, top + 0.06 - lift, 0.01), [x + sd * 0.04, (top + lift) / 2 + 0.06, -front - 0.025])
-      for (let y = lift + 0.08; y < roofY; y += 0.06) k.add('chrome', box(0.08, 0.008, 0.008), [x, y, -front - 0.025])
+      const z = -front - 0.025
+      const y1 = roof ? roofY + 0.02 : top + 0.06
+      for (const sd of [-1, 1]) {
+        k.add('chrome', box(0.01, y1 - lift - 0.03, 0.01), [x + sd * 0.04, (y1 + lift + 0.03) / 2, z])
+        if (roof) bar(k, 'chrome', [x + sd * 0.04, y1, z], [x + sd * 0.04, y1, roofZ - roofLen / 2 + 0.03], 0.01)
+      }
+      for (let y = lift + 0.08; y < y1 - 0.02; y += 0.06) k.add('chrome', box(0.08, 0.008, 0.008), [x, y, z])
       return
     }
     case 'tailgateLettering':
@@ -269,14 +269,8 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
       return
     }
     case 'towStrap':
-      k.add('tail', box(0.035, 0.05, 0.008), [wid * 0.3, lift + 0.05, front + 0.03])
-      return
-    case 'headlightTape':
-      // X of tape over each headlight, endurance style.
-      for (const sd of SIDES) {
-        const [z, y, rx] = onNose(t, t.lightY, 0.013)
-        for (const a of [-0.35, 0.35]) k.add('black', plane(0.15, 0.008), [sd * wid * 0.3, y, z], [rx, 0, a])
-      }
+      // Inboard of the fog lamp on that side.
+      k.add('tail', box(0.035, 0.05, 0.008), [wid * 0.16, lift + 0.05, front + 0.03])
       return
     case 'chromeTrimWindow':
       if (!roof) return
@@ -310,6 +304,11 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
       return
     case 'surfboard':
       if (!roof || t.roofMod) return
+      // With no roof rack under it, the board rides on a pair of bars on feet, as tall as the rack's.
+      if (!all.includes('roofRack')) for (const z of [-0.3, 0.3]) {
+        k.add('black', box(wid * 0.5, 0.012, 0.02), [0, roofY + 0.045, roofZ + z * roofLen])
+        for (const sd of SIDES) k.add('black', box(0.024, 0.04, 0.025), [sd * wid * 0.22, roofY + 0.02, roofZ + z * roofLen])
+      }
       k.add('wood', new SphereGeometry(1, 14, 6), [0, roofY + 0.065, roofZ - 0.02], [0, 0, 0], [wid * 0.15, 0.014, len * 0.44])
       k.add('chrome', box(0.012, 0.004, len * 0.7), [0, roofY + 0.08, roofZ - 0.02])
       k.add('black', box(0.004, 0.04, 0.05), [0, roofY + 0.05, roofZ - 0.02 - len * 0.38])
@@ -382,25 +381,19 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
       k.add('chrome', new SphereGeometry(0.018, 10, 8), [0, hoodY + 0.05, t.hoodFront - 0.02], [0, 0, 0], [0.5, 1, 1.4])
       return
     case 'lightPods':
-      k.add('black', box(wid * 0.72, 0.014, 0.02), [0, hoodY + 0.03, t.hoodFront - 0.01])
-      for (const x of [-0.27, -0.09, 0.09, 0.27]) {
+      // Spread wide, so the inner pair stays clear of a scoop down the middle of the hood.
+      k.add('black', box(wid * 0.76, 0.014, 0.02), [0, hoodY + 0.03, t.hoodFront - 0.01])
+      for (const x of [-0.34, -0.18, 0.18, 0.34]) {
         k.add('black', cyl(0.03, 0.03, 0.03, 12), [x * wid, hoodY + 0.055, t.hoodFront], [Math.PI / 2, 0, 0])
         k.add('lamp', disc(0.025, 12), [x * wid, hoodY + 0.055, t.hoodFront + 0.018])
       }
       return
     case 'louvers': {
-      // Slats over the rear window, from the roof down to the deck.
-      if (!roof) return
-      // From the back edge of the roof down to the base of the rear window (outer glass surface).
-      const z0 = roofZ - roofLen / 2 - 0.025
-      const z1 = t.cabinZ - t.cabinLen / 2
-      const a = Math.atan2(roofY - top, z0 - z1)
-      // Lift each slat off the glass along the window's outward normal.
-      const [ny, nz] = [Math.cos(a) * 0.012, -Math.sin(a) * 0.012]
-      for (let i = 1; i <= 4; i++) {
-        const u = i / 5
-        k.add('black', box(wid * 0.72, 0.008, 0.026), [0, top + (roofY - top) * u + ny, z1 + (z0 - z1) * u + nz], [a, 0, 0])
-      }
+      // Slats lying on the back window, from its foot up to where it rounds into the roof.
+      if (!roof || !t.glass) return
+      const g = t.glass.back
+      const hi = Math.min(roofY, g.hi)
+      for (let i = 1; i <= 4; i++) k.add('black', box(wid * 0.62, 0.024, 0.008), onPane(g, 0, top + (hi - top) * (i / 5), 0.01), [g.tilt, 0, 0])
       return
     }
     case 'deckLouvers':
@@ -434,12 +427,18 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
       k.add('chrome', disc(wheel * 0.35, 14), [0, lift + 0.12, -front - 0.110], [0, Math.PI, 0])
       return
     case 'spare': {
-      const y = t.closed ? lift + t.body * 0.55 : top + 0.06
+      // Closed cars hang it on the tail, high enough to clear the tail lights and bumper;
+      // open ones stand it up on the rear deck behind the seats.
+      // (A wing mod's posts stand on that deck, so the spare comes off when one is fitted.)
+      if (!t.closed && t.spoiler) return
+      const r = wheel * 0.85
+      const [y, z, dz] = t.closed ? [Math.max(lift + t.body * 0.55, t.ty + 0.045 + r), -front - 0.06, -1] : [top + r, -front + 0.08, -1]
+      if (!t.closed) k.add('black', box(0.09, 0.03, 0.12), [0, top + 0.012, z])
       // A tyre with a dark rim dish inside a bright lip, and a domed hub cap.
-      k.add('black', cyl(wheel * 0.95, wheel * 0.95, 0.1, 18), [0, y, -front - 0.06], [Math.PI / 2, 0, 0])
-      k.add('black', disc(wheel * 0.62, 16), [0, y, -front - 0.1125], [0, Math.PI, 0])
-      k.add('chrome', new TorusGeometry(wheel * 0.63, 0.011, 5, 20), [0, y, -front - 0.11])
-      k.add('chrome', cyl(wheel * 0.16, wheel * 0.22, 0.022, 12), [0, y, -front - 0.121], [Math.PI / 2, 0, 0])
+      k.add('black', cyl(r, r, 0.1, 18), [0, y, z], [Math.PI / 2, 0, 0])
+      k.add('black', disc(r * 0.65, 16), [0, y, z + dz * 0.0525], [0, Math.PI, 0])
+      k.add('chrome', new TorusGeometry(r * 0.66, 0.011, 5, 20), [0, y, z + dz * 0.05])
+      k.add('chrome', cyl(r * 0.17, r * 0.23, 0.022, 12), [0, y, z + dz * 0.061], [Math.PI / 2, 0, 0])
       return
     }
     case 'stowage':
@@ -456,7 +455,7 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
       return
     case 'whip':
       k.add('black', cyl(0.004, 0.006, 0.6, 4), [-wid * 0.36, top + 0.3, -front + 0.1])
-      k.add('tail', plane(0.11, 0.06), [-wid * 0.36 - 0.055, top + 0.56, -front + 0.1], [0, Math.PI / 2, 0])
+      k.add('tail', box(0.004, 0.06, 0.11), [-wid * 0.36, top + 0.56, -front + 0.1 - 0.058])
       return
     case 'sideExhaust':
       for (const sd of SIDES) {
@@ -595,7 +594,8 @@ export function trimCar(k: Kit, model: string | undefined, t: TrimFrame) {
   badges(k, t)
   // roofY is the top of the glass; the painted roof panel's rounded edge sits on it.
   const onRoof = t.roofLen > 0 ? { ...t, roofY: t.roofY + 0.016 } : t
-  for (const f of (model && TRIMS[model]) || []) feature(k, f, onRoof)
+  const all = (model && TRIMS[model]) || []
+  for (const f of all) feature(k, f, onRoof, all)
 }
 
 // Bikes: a basket and top box on the scooter, saddlebags and a screen on the
@@ -615,6 +615,8 @@ export function trimBike(k: Kit, model: string | undefined, b: { r: number; wz: 
       k.add('chrome', disc(0.012, 8), [sd * 0.1575, b.r * 2 + 0.04, -b.wz + 0.06], [0, (sd * Math.PI) / 2, 0])
     }
     k.add('screen', box(0.2, 0.16, 0.008), [0, hy + 0.12, hz + 0.03], [-0.2, 0, 0])
+    // Two struts from the screen's foot down to the head tube clamp.
+    for (const sd of SIDES) bar(k, 'chrome', [sd * 0.07, hy + 0.048, hz + 0.044], [sd * 0.03, hy - 0.02, hz + 0.01], 0.008)
   }
   if (model === 'shinden') {
     for (const sd of SIDES) k.add('dark', plane(0.18, 0.04), [sd * 0.083, b.r + 0.04, 0.04], [0, (sd * Math.PI) / 2, -0.1])
