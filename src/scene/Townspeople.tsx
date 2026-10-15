@@ -77,6 +77,12 @@ const SHOP_THOUGHTS: Record<string, [string, string]> = {
   hospital: ['🏥', 'visiting a friend in hospital'], helipad: ['🚁', 'booking a helicopter tour'],
   academy: ['🚗', 'off to a driving lesson'], school: ['🎒', 'picking the kids up from school'], highschool: ['🏈', 'going to the big game'],
   university: ['🎓', 'heading to a lecture'],
+  muffler: ['💨', 'getting a louder exhaust'], brakes: ['🛑', 'getting the brakes checked'], wraps: ['🎞️', 'picking a car wrap'],
+  dynolab: ['📈', 'watching a dyno run'], engines: ['🔩', 'ordering an engine rebuild'], racefab: ['🏎️', 'touring the race shop'],
+  laundry: ['🧺', 'doing the laundry'], vet: ['🐾', 'taking the dog to the vet'], postoffice: ['📮', 'mailing a parcel'],
+  library: ['📚', 'returning library books'], busdepot: ['🚌', 'catching a bus downtown'], cityhall: ['🏛️', 'paying a parking ticket'],
+  minigolf: ['⛳', 'playing mini golf'], pool: ['🏊', 'going for a swim'], funfair: ['🎡', 'riding the ferris wheel'],
+  waterpark: ['🌊', 'hitting the water slides'], haunted: ['👻', 'braving the haunted manor'],
 }
 const PARK_GO: Record<string, [string, string]> = {
   bench: ['🪑', 'heading for a bench'], fountain: ['⛲', 'going to see the fountain'], pond: ['🦆', 'going to see the ducks'],
@@ -89,6 +95,8 @@ const PARK_GO: Record<string, [string, string]> = {
   garden: ['🌺', 'visiting the botanical garden'],
   pumpkins: ['🎃', 'picking a pumpkin'], scarecrow: ['🌾', 'going to see the scarecrow'],
   graves: ['👻', 'daring a friend to visit the graveyard'], deadtree: ['🦇', 'going to see the haunted tree'],
+  court: ['🏀', 'shooting hoops'], tennis: ['🎾', 'playing tennis'], cornmaze: ['🌽', 'getting lost in the corn maze'],
+  cauldron: ['🧪', 'peeking in the cauldron'], jacklamp: ['🎃', 'going to see the jack-o\'-lanterns'],
 }
 const PARK_AT: Record<string, [string, string]> = {
   bench: ['🪑', 'resting on the bench'], fountain: ['⛲', 'watching the fountain'], pond: ['🦆', 'watching the ducks'],
@@ -101,6 +109,8 @@ const PARK_AT: Record<string, [string, string]> = {
   garden: ['🌺', 'admiring the orchids'],
   pumpkins: ['🎃', 'picking out a pumpkin'], scarecrow: ['🌾', 'taking a selfie with the scarecrow'],
   graves: ['👻', 'telling ghost stories'], deadtree: ['🦇', 'spotting bats in the haunted tree'],
+  court: ['🏀', 'shooting hoops'], tennis: ['🎾', 'playing a set'], cornmaze: ['🌽', 'finding the way out'],
+  cauldron: ['🧪', 'stirring the potion'], jacklamp: ['🎃', 'admiring the jack-o\'-lanterns'],
 }
 
 // Where to stand at each decoration, as a distance from its middle.
@@ -108,6 +118,7 @@ const SPOT: Record<string, number> = {
   bench: 0.06, fountain: 0.98, flowers: 0.86, tree: 0.5, palm: 0.5, statue: 0.78, lamp: 0.45, billboard: 0.7,
   pine: 0.7, picnic: 0.45, busstop: -0.22, hotdog: 0.5, flagpole: 0.6, gazebo: 0.25, clocktower: 0.8,
   pumpkins: 0.6, scarecrow: 0.55, graves: 0.65, deadtree: 0.6,
+  court: 0.6, cauldron: 0.6, jacklamp: 0.5,
 }
 // How long people linger, in seconds.
 const LINGER: Record<string, [number, number]> = {
@@ -115,10 +126,11 @@ const LINGER: Record<string, [number, number]> = {
   picnic: [12, 26], busstop: [8, 18], hotdog: [4, 8], gazebo: [8, 18], playground: [10, 22], clocktower: [4, 9],
   dogpark: [10, 22], skatepark: [8, 18], koi: [8, 16], garden: [10, 20],
   pumpkins: [5, 12], graves: [4, 9],
+  court: [10, 22], tennis: [10, 22], cornmaze: [8, 18], cauldron: [4, 9],
 }
-const PARKS = new Set(['bench', 'fountain', 'flowers', 'tree', 'palm', 'statue', 'pond', 'pine', 'picnic', 'busstop', 'hotdog', 'flagpole', 'gazebo', 'clocktower', 'pumpkins', 'scarecrow', 'graves', 'deadtree'])
+const PARKS = new Set(['bench', 'fountain', 'flowers', 'tree', 'palm', 'statue', 'pond', 'pine', 'picnic', 'busstop', 'hotdog', 'flagpole', 'gazebo', 'clocktower', 'pumpkins', 'scarecrow', 'graves', 'deadtree', 'court', 'cauldron', 'jacklamp'])
 // Big decorations people walk up to, like the duck pond.
-const BIG_PARKS = new Set(['pond', 'playground', 'dogpark', 'skatepark', 'koi', 'garden'])
+const BIG_PARKS = new Set(['pond', 'playground', 'dogpark', 'skatepark', 'koi', 'garden', 'tennis', 'cornmaze'])
 // Seats: benches and the bus stop face out the front; at a picnic table people face the table.
 const SEATS: Record<string, 'out' | 'in'> = { bench: 'out', busstop: 'out', picnic: 'in' }
 // Walled on three sides: people go in and out through the open front only.

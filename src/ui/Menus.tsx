@@ -259,13 +259,15 @@ export function SheetTabs<T extends string>({ items, value, onChange }: { items:
   )
 }
 
+// Businesses that work on cars sit with the car shops.
+const CAR_CARE = new Set(['carwash', 'bodyshop'])
 type ShopTab = 'cars' | 'business' | 'services' | 'rec' | 'event' | 'upgrades'
 const SHOP_GROUPS: { id: Exclude<ShopTab, 'upgrades'>; label: React.ReactNode; filter: (b: BuildingDef) => boolean }[] = [
-  { id: 'cars', label: '🔧 Car shops', filter: (b) => b.id === 'rescue' || b.kind === 'parts' },
-  { id: 'business', label: '🍕 Businesses', filter: (b) => b.kind === 'business' && b.id !== 'rescue' && b.id !== 'crew' && !b.service },
+  { id: 'cars', label: '🔧 Car shops', filter: (b) => b.id === 'rescue' || b.kind === 'parts' || CAR_CARE.has(b.id) },
+  { id: 'business', label: '🍕 Businesses', filter: (b) => b.kind === 'business' && b.id !== 'rescue' && b.id !== 'crew' && !b.service && !b.rec && !b.event && !CAR_CARE.has(b.id) },
   // Homes sit with the gas stations: both keep the town fuelled.
   { id: 'services', label: '⛽ Services', filter: (b) => b.kind === 'gas' || b.kind === 'house' || b.id === 'crew' || !!b.service },
-  { id: 'rec', label: <>🎡 Rec<span className="tab-long">reation</span></>, filter: (b) => b.kind === 'decor' && !b.event },
+  { id: 'rec', label: <>🎡 Rec<span className="tab-long">reation</span></>, filter: (b) => (b.kind === 'decor' || !!b.rec) && !b.event },
   // Limited-time decorations for the running event (the tab only shows while it runs).
   { id: 'event', label: '🎃 Spooky', filter: (b) => !!b.event && b.event === activeEvent()?.id },
 ]
