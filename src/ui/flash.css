@@ -10,9 +10,11 @@
 .fw-ok { display: block; width: calc(100% - 28px); margin: 10px 14px 14px; font-size: 18px; }
 /* "Don't show me this again": a big tick box, easy to hit on a phone. */
 .fw-hide { display: flex; align-items: center; gap: 10px; margin: 10px 14px 0; padding: 4px 2px; font-size: 16px; font-weight: 800; cursor: pointer; }
-.fw-hide input { appearance: none; -webkit-appearance: none; flex: none; width: 26px; height: 26px; margin: 0; border: 2.5px solid var(--line); border-radius: 8px; background: #fff; box-shadow: inset 0 -2px 0 rgba(0,0,0,.08); display: grid; place-items: center; cursor: pointer; }
+.fw-hide input { appearance: none; -webkit-appearance: none; flex: none; width: 26px; height: 26px; margin: 0; border: 2.5px solid var(--line); border-radius: 8px; background: #fff; box-shadow: inset 0 -2px 0 rgba(0,0,0,.08); position: relative; cursor: pointer; }
 .fw-hide input:checked { background: linear-gradient(#7ee05a, #2fa52f); }
-.fw-hide input:checked::after { content: ''; width: 7px; height: 13px; margin-top: -3px; border: solid #fff; border-width: 0 3.5px 3.5px 0; rotate: 45deg; }
+/* The tick is pinned to the box's centre (inputs aren't reliable grid containers on every browser);
+   the extra lift balances the L shape so it reads as centred. */
+.fw-hide input:checked::after { content: ''; position: absolute; left: 50%; top: 50%; box-sizing: border-box; width: 8px; height: 14px; border: solid #fff; border-width: 0 3.5px 3.5px 0; transform: translate(-50%, -62%) rotate(45deg); }
 .fw-hide input:focus-visible { outline: 3px solid #4fc3f7; outline-offset: 2px; }
 
 /* The switch: green and knob right when flashing is reduced. */
