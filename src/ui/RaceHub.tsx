@@ -3,7 +3,8 @@ import { useGame, type OwnedCar } from '../game/store'
 import { type CarDef, CAMPAIGN, CAMPAIGN_RACES, GP_ROUNDS, GP_SERIES, RACE_FUEL, SKILLS, campaignCleared, campaignRaceId, campaignReward, carDef, carStats, msToNextWeek, performance, skinDef } from '../game/data'
 import { BUILDS, DIST, buildOf, character, fit, tourDist, type RaceDist } from '../game/distance'
 import { EVENT_RACES, eventFor, eventPrize, eventProgress } from '../game/events'
-import { TOUR_RACES, tourLeg, tourLegOf, tourPrize, tourRivalName } from '../game/tour'
+import { TOUR_RACES, tourLeg, tourLegOf, tourRivalName } from '../game/tour'
+import { tourPayNow } from '../game/fairRace'
 import { shortLeft, trialVenue, trialWeek } from '../game/trial'
 import { localBest } from '../lib/trialServer'
 import { useLive } from '../lib/live'
@@ -112,7 +113,7 @@ export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival, onBlast,
         {tourOpen ? (
           <>
             <span className="rm-meta">Leg {leg.index + 1}{leg.night ? ' · 🌙' : ''} · {DIST[tourDist(won)].label} <Pips n={won % TOUR_RACES} of={TOUR_RACES} /></span>
-            <span className="rm-cta"><span>{tourRivalName(won)}</span><button className="buy small" onClick={stop(onTour)}>{money(tourPrize(won))}</button></span>
+            <span className="rm-cta"><span>{tourRivalName(won)}</span><button className="buy small" onClick={stop(onTour)}>{money(tourPayNow(won))}</button></span>
           </>
         ) : <span className="rm-meta">🔒 Clear Back Streets to open</span>}
       </div>

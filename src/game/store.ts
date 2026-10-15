@@ -379,7 +379,8 @@ type Actions = {
   campaignResult: (chapter: string, race: number, myTime: number, theirTime: number) => number
   closeCampaignPrize: () => void
   // Records the next Pro Tour race.
-  tourResult: (won: boolean) => void
+  // pi: the rival PI raced (lower than the ladder's when it was eased to the player's car).
+  tourResult: (won: boolean, pi?: number) => void
   closeTourPrize: () => void
   // Enters this week's event with rivals set from this PI (no change once entered).
   eventEnter: (pi: number) => void
@@ -2152,10 +2153,10 @@ export const useGame = create<GameState>()(
 
       closeCampaignPrize: () => set({ campaignPrize: null }),
 
-      tourResult: (won) => {
+      tourResult: (won, pi) => {
         const s = get()
         const race = s.tour ?? 0
-        s.finishRace(won, tourPrize(race))
+        s.finishRace(won, tourPrize(race, pi))
         if (!won) return
         if (!tourIsBoss(race)) return set({ tour: race + 1, updatedAt: Date.now() })
         const leg = tourLegOf(race)
