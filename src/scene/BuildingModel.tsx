@@ -1,3 +1,4 @@
+import { plainMat } from './shared'
 import type { ReactNode } from 'react'
 import { LampPost, useLampDesign } from './LampPosts'
 import { TILE, DECOR_GROWTH, decorGrows, levelLift, type BuildingDef } from '../game/data'
@@ -68,8 +69,10 @@ function Lights(props: { from: [number, number, number]; to: [number, number, nu
   return <Bulbs r={0.035} {...props} />
 }
 
-// Shared material props so ghost previews render translucent.
+// Shared material props so ghost previews render translucent. Placed buildings
+// share one material per colour and texture (see shared.ts).
 function useMat(ghost?: boolean, valid?: boolean) {
+  if (!ghost) return (color: string, map?: Texture) => <primitive object={plainMat(color, map)} attach="material" dispose={null} />
   return (color: string, map?: Texture) => (
     <meshStandardMaterial
       map={ghost ? null : map ?? null}
