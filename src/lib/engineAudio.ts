@@ -59,6 +59,12 @@ const BODY: Record<Body, EngineProfile> = {
   // Resto-mods: a raspy 1950s V12 on open pipes, a revvy twin-cam four, and a lumpy big-block V8.
   pontoon: p({ ppr: 6, idle: 950, redline: 8400, odd: 0.12, roll: 1.05, sub: 0.3, grit: 0.5, noise: 0.35, bright: 1.3, reso: 240, crackle: 0.9, vol: 1.15 }),
   stepnose: p({ ppr: 2, idle: 950, redline: 7800, odd: 0.25, roll: 1.1, lump: 0.2, lumpRatio: 0.5, sub: 0.2, grit: 0.4, noise: 0.3, bright: 1.3, reso: 250, crackle: 0.55, vol: 1.0 }),
+  highboy: p({ ppr: 4, idle: 750, redline: 6200, odd: 0.18, roll: 1.4, lump: 0.8, lumpRatio: 0.25, sub: 0.75, grit: 0.6, noise: 0.35, bright: 0.85, reso: 120, whine: 0.7, crackle: 0.6, vol: 1.25 }),
+  timeattack: p({ ppr: 3, idle: 950, redline: 8800, odd: 0.05, roll: 1.0, sub: 0.35, grit: 0.35, noise: 0.3, bright: 1.25, reso: 220, whine: 0.6, crackle: 0.8, vol: 1.1 }),
+  ponycar: p({ ppr: 4, idle: 720, redline: 6400, odd: 0.15, roll: 1.3, lump: 0.7, lumpRatio: 0.25, sub: 0.7, grit: 0.55, noise: 0.3, bright: 0.9, reso: 130, whine: 0.3, crackle: 0.5, vol: 1.2 }),
+  gtcoupe: p({ ppr: 3, idle: 850, redline: 7600, odd: 0.06, roll: 1.0, sub: 0.45, grit: 0.35, noise: 0.25, bright: 1.1, reso: 190, whine: 0.3, crackle: 0.4, vol: 1.05 }),
+  groupb: p({ ppr: 2.5, idle: 1000, redline: 8200, odd: 0.25, roll: 1.1, sub: 0.4, grit: 0.55, noise: 0.4, bright: 1.15, reso: 200, whine: 0.8, crackle: 1, vol: 1.2 }),
+  longtail: p({ ppr: 5, idle: 1000, redline: 9200, odd: 0.05, roll: 0.95, sub: 0.35, grit: 0.3, noise: 0.28, bright: 1.4, reso: 260, crackle: 0.5, vol: 1.15 }),
   restomuscle: p({ ppr: 4, idle: 700, redline: 6600, odd: 0.15, roll: 1.45, lump: 0.75, lumpRatio: 0.25, sub: 0.7, grit: 0.5, noise: 0.32, bright: 0.9, reso: 130, whine: 0.5, crackle: 0.5, vol: 1.25 }),
   wedge: p({ ppr: 6, idle: 950, redline: 8800, odd: 0.1, roll: 1.05, sub: 0.35, grit: 0.4, noise: 0.3, bright: 1.45, reso: 260, crackle: 0.7, vol: 1.15 }),
   super: p({ ppr: 4, idle: 950, redline: 8500, odd: 0.1, roll: 1.1, lump: 0.15, lumpRatio: 0.25, sub: 0.45, grit: 0.4, noise: 0.3, bright: 1.35, reso: 210, turbo: 0.6, crackle: 0.6, vol: 1.15 }),

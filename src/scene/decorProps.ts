@@ -282,15 +282,7 @@ export const DECOR_PROPS = {
     k.sphere(L(gold, 0.3, 0.6), 0.06, [0, 2.86, 0], [1, 1, 1], 10, 6)
     k.box(L('#9e9e9e', 0.4, 0.6), [0.02, 0.06, 0.02], [0.045, 0.9, 0])
     k.rod(L('#f5f5f5', 0.8), [0.03, 0.92, 0], [0.03, 2.7, 0], 0.003, 3)
-    // A flag in waving strips: green over white, a gold car disc in the middle.
-    for (let i = 0; i < 6; i++) {
-      const x = 0.06 + i * 0.11 + 0.055
-      const z = Math.sin(i * 1.2) * 0.06
-      const ry = -Math.cos(i * 1.2) * 0.35
-      k.box(cast(L('#2e7d32', 0.8)), [0.115, 0.22, 0.012], [x, 2.6, z], [0, ry, 0])
-      k.box(cast(L('#fafafa', 0.8)), [0.115, 0.22, 0.012], [x, 2.38, z], [0, ry, 0])
-      if (i === 2 || i === 3) k.box(L(gold, 0.4, 0.4), [0.08, 0.14, 0.02], [x + (i === 2 ? 0.015 : -0.015), 2.49, z], [0, ry, 0])
-    }
+    // The flag itself waves in the wind: WavingFlag.tsx, drawn by the Flag Pole model.
     if (!SNOW) {
       const pal = SEASON === 'fall' ? ['#ff8f00', '#c62828', '#fbc02d'] : ['#e91e63', '#ffeb3b', '#ab47bc']
       for (let i = 0; i < 8; i++) {

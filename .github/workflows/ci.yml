@@ -26,3 +26,7 @@ jobs:
         run: npm run build
       - name: Tests
         run: npx vitest run
+      - name: Startup smoke test (built game opens in Chromium)
+        run: |
+          npx playwright install --with-deps chromium-headless-shell
+          npm run smoke

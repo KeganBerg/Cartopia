@@ -272,7 +272,7 @@ describe('quick first jobs', () => {
 
 describe('PI by unlock level', () => {
   const none = { engine: 0, turbo: 0, tires: 0, weight: 0 }
-  const shop = CARS.filter((c) => !c.rescueOnly && !c.season && !c.secret)
+  const shop = CARS.filter((c) => !c.rescueOnly && !c.season && !c.secret && !c.pack)
   const bestBefore = (level: number) => Math.max(0, ...shop.filter((c) => c.unlockLevel < level).map((c) => performance(c, none)))
 
   it('never unlocks a Showroom car slower than one from an earlier level', () => {

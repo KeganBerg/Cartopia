@@ -419,6 +419,16 @@ export const sfx = {
     src.connect(d.out)
     src.start(t)
   }),
+  // Auto jobs: a key jingle per car sent to work (up to six), then a bright bell.
+  dispatch: (n: number) => play((d, t) => {
+    const k = Math.max(1, Math.min(6, n))
+    const run = ['C5', 'E5', 'G5', 'C6', 'E6', 'G6']
+    for (let i = 0; i < k; i++) {
+      marimba(d, t + i * 0.07, hz(run[i]), 0.1, 0.35)
+      shaker(d, t + i * 0.07, 0.012, 0.04, 9000)
+    }
+    glock(d, t + k * 0.07 + 0.03, hz('C7'), 0.05, 1)
+  }),
   buy: () => play((d, t) => {
     arp(['G4', 'B4', 'D5'], 0.06, marimba, 0.11)(d, t)
     glock(d, t + 0.18, hz('G5'), 0.05, 0.8)

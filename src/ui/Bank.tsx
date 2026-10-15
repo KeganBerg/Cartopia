@@ -2,13 +2,14 @@ import { useState } from 'react'
 import { useGame } from '../game/store'
 import { BUCKS_PACKS, packGrant, type BucksPack } from '../game/bucksPacks'
 import { purchase } from '../lib/payments'
-import { Panel } from './Menus'
+import { Panel, SheetTabs } from './Menus'
 import { CONTACT } from '../legal/legal'
 
 const NOTICE = {
   'not-connected': ['Coming soon', "Gem packs aren't on sale yet. You weren't charged."],
   'sign-in': ['Sign in first', 'Gems go to your account. Sign in from the Menu.'],
   blocked: ['Purchases paused', `Contact ${CONTACT}`],
+  owned: ['Already yours', 'Check your garage.'],
   failed: ["Couldn't open checkout", "You weren't charged. Try again."],
 } as const
 
@@ -18,18 +19,11 @@ export function BankPanel() {
   const bucks = useGame((s) => s.bucks)
   const level = useGame((s) => s.level)
   const showNeed = useGame((s) => s.showNeed)
-  const [pending, setPending] = useState<string | null>(null)
-  const [notice, setNotice] = useState<'not-connected' | 'sign-in' | 'blocked' | 'failed' | null>(null)
-
-  const buy = async (p: BucksPack) => {
-    setPending(p.id)
-    const res = await purchase(p)
-    setPending(null)
-    if (!res.ok) setNotice(res.reason)
-  }
+  const { pending, buy, notice } = useBuy()
 
   return (
     <Panel title="Bank" wide>
+      <BankTabs current="bank" />
       <div className="bank-head">
         <span className="ico buck-ico bank-ico">💎</span>
         <div>
@@ -68,16 +62,40 @@ export function BankPanel() {
         <button className="buy small alt" onClick={() => showNeed('bucks', 0)}>How</button>
       </div>
       <p className="hint">Prices in USD · 🔒 Stripe</p>
-      {notice && (
-        <div className="overlay bank-notice" onClick={() => setNotice(null)}>
-          <div className="prize" onClick={(e) => e.stopPropagation()}>
-            <h2>{NOTICE[notice][0]}</h2>
-            <p>{NOTICE[notice][1]}</p>
-            <button className="buy" onClick={() => setNotice(null)}>OK</button>
-          </div>
-        </div>
-      )}
+      {notice}
     </Panel>
   )
+}
+
+// Gems and Car Packs are sibling menus with one row of tabs, so closing goes back to where the player came from.
+export function BankTabs({ current }: { current: 'bank' | 'carpacks' }) {
+  const swap = useGame((s) => s.swapPanel)
+  const tabs = [
+    { id: 'bank' as const, label: '💎 Gems' },
+    { id: 'carpacks' as const, label: <>🚗 Car Packs<span className="tab-dot new">NEW</span></> },
+  ]
+  return <SheetTabs items={tabs} value={current} onChange={(id) => swap(id)} />
+}
+
+// Opens Stripe Checkout for a pack; a refusal shows why in a small popup.
+export function useBuy() {
+  const [pending, setPending] = useState<string | null>(null)
+  const [why, setWhy] = useState<keyof typeof NOTICE | null>(null)
+  const buy = async (p: BucksPack) => {
+    setPending(p.id)
+    const res = await purchase(p)
+    setPending(null)
+    if (!res.ok) setWhy(res.reason)
+  }
+  const notice = why && (
+    <div className="overlay bank-notice" onClick={() => setWhy(null)}>
+      <div className="prize" onClick={(e) => e.stopPropagation()}>
+        <h2>{NOTICE[why][0]}</h2>
+        <p>{NOTICE[why][1]}</p>
+        <button className="buy" onClick={() => setWhy(null)}>OK</button>
+      </div>
+    </div>
+  )
+  return { pending, buy, notice }
 }
 
