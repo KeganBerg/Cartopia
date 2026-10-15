@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { OpenRoof } from './underTower'
 import type { Texture } from 'three'
 import { levelLift, type BuildingDef } from '../game/data'
 import { growthStage } from '../game/growth'
@@ -13,7 +14,7 @@ import { ClubLife } from './ClubLife'
 import { CLUB } from './clubLayout'
 import { ledFront, ledWindow } from './clubLeds'
 import { WavingFlag } from './WavingFlag'
-import { MeshBasicMaterial, MeshStandardMaterial, Color } from 'three'
+import { MeshBasicMaterial, MeshStandardMaterial, Color, Euler, Quaternion, Vector3 } from 'three'
 import { PAL, SEASON } from './season'
 import { LAYER, decal } from './layers'
 import { Bulbs as EdgeBulbs } from './edgeKit'
@@ -57,6 +58,18 @@ export function Cyl({ m, at, r, r2 = r, h, c, seg = 12, rot }: { m: Mat; at: V3;
     </mesh>
   )
 }
+
+// The pumpkin patch's carved pumpkin: radius, and its eyes laid on the squashed sphere's skin
+// (a point and the rotation that faces it along the surface normal, in units of the radius).
+const BIG = 0.38
+const PATCH_EYES = [-1, 1].map((sd): [V3, Euler] => {
+  const x = sd * 0.31
+  const y = 0.17
+  const z = Math.sqrt(1 - x * x - (y / 0.72) ** 2)
+  const n = new Vector3(x, y / 0.5184, z).normalize()
+  const p: V3 = [x + n.x * 0.012, y + n.y * 0.012, z + n.z * 0.012]
+  return [p, new Euler().setFromQuaternion(new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), n))]
+})
 
 export function Sign({ text, w, at, bg, fg }: { text: string; w: number; at: V3; bg: string; fg: string }) {
   return (
@@ -351,7 +364,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
               <mesh key={i} position={[Math.sin(i * 2) * 0.04, 0.5 + i * 0.105, 0]}><sphereGeometry args={[0.06 + i * 0.015, 8, 6]} />{m('#eceff1')}</mesh>
             ))}
           </group>
-          {!ghost && [-0.62, 0.62].map((x) => <Parasol key={x} m={m} at={[x, 0, 0.75]} c="#2e7d32" />)}
+          {!ghost && [-0.72, 0.72].map((x) => <Parasol key={x} m={m} at={[x, 0, 0.8]} c="#2e7d32" />)}
         </ShellBuilding>
       )
     }
@@ -620,12 +633,14 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
               <Box m={m} at={[0, 0.065, 0.02]} s={[0.08, 0.07, 0.2]} c="#e53935" shadow={false} />
             </group>
           ))}
-          {/* Giant apple on the roof. */}
-          <group position={[-1.2, h + 0.14, -0.6]}>
-            <mesh position={[0, 0.25, 0]} castShadow scale={[1, 0.9, 1]}><sphereGeometry args={[0.27, 14, 10]} />{m('#e53935')}</mesh>
-            <Cyl m={m} at={[0, 0.52, 0]} r={0.02} h={0.12} c="#5d4037" seg={6} />
-            <mesh position={[0.08, 0.53, 0]} rotation-z={-0.6}><boxGeometry args={[0.14, 0.02, 0.07]} />{m('#43a047')}</mesh>
-          </group>
+          {/* Giant apple on the roof (the grown tower carries its own on top instead). */}
+          <OpenRoof>
+            <group position={[-1.2, h + 0.14, -0.6]}>
+              <mesh position={[0, 0.25, 0]} castShadow scale={[1, 0.9, 1]}><sphereGeometry args={[0.27, 14, 10]} />{m('#e53935')}</mesh>
+              <Cyl m={m} at={[0, 0.52, 0]} r={0.02} h={0.12} c="#5d4037" seg={6} />
+              <mesh position={[0.08, 0.53, 0]} rotation-z={-0.6}><boxGeometry args={[0.14, 0.02, 0.07]} />{m('#43a047')}</mesh>
+            </group>
+          </OpenRoof>
         </ShellBuilding>
       )
     }
@@ -636,7 +651,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
       const st = growthStage(lvl)
       const th = h + (st === 3 ? 2.6 : st === 2 ? 1.7 : 0.9)
       return (
-        <ShellBuilding {...shell} w={3.5} d={1.4} h0={1.5} z0={-0.25} wall="#c62828" roof="#37474f" sign={st === 3 ? undefined : 'FIRE STATION'} signBg="#fafafa" signFg="#c62828" shopfront={null}>
+        <ShellBuilding {...shell} w={3.5} d={1.4} h0={1.5} z0={-0.25} rowFrom={1.62} wall="#c62828" roof="#37474f" sign={st === 3 ? undefined : 'FIRE STATION'} signBg="#fafafa" signFg="#c62828" shopfront={null}>
           {/* Two tall engine bays with white trim. */}
           {[-0.9, 0.3].map((x) => (
             <group key={x}>
@@ -768,7 +783,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           ))}
           {/* A patrol car parked out front, light bar on the roof. */}
           {!ghost && (
-            <group position={[-1.25, LAYER.lot, 0.72]}>
+            <group position={[-1.37, LAYER.lot, 0.72]}>
               <Upright>
                 {/* Car and light bar kept true size together in a 2x2 or 4x4 block. */}
                 <group rotation-y={Math.PI / 2} userData={PEOPLE_SIZED}>
@@ -1014,7 +1029,8 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
     case 'parkade': {
       // A concrete deck for every two levels, cars parked on each.
       const decks = 2 + Math.floor((lvl - 1) / 2)
-      const DH = 0.55
+      // Twice a car's height between slabs, so the parked cars show over the parapets.
+      const DH = 0.66
       const top = decks * DH
       const cars = ['#e53935', '#1e88e5', '#fdd835', '#43a047', '#fafafa', '#212121', '#8e24aa', '#ff7043']
       return (
@@ -1043,7 +1059,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           <Box m={m} at={[1.45, (top + 0.6) / 2, -1.495]} s={[0.55, top + 0.6, 0.49]} c="#9e9e9e" />
           <mesh position={[1.45, top + 0.1, -1.245]}><planeGeometry args={[0.3, 0.4]} />{win}</mesh>
           {/* Ramp up the right side. */}
-          <mesh position={[1.2, DH / 2 + 0.05, 0.3]} rotation-x={-0.32} castShadow receiveShadow>
+          <mesh position={[1.2, DH / 2 + 0.05, 0.3]} rotation-x={-Math.asin(DH / 1.7)} castShadow receiveShadow>
             <boxGeometry args={[0.6, 0.06, 1.7]} />
             {m('#9e9e9e')}
           </mesh>
@@ -1081,7 +1097,8 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
 
     // ---- Spooky Season decorations ----
     case 'pumpkins': {
-      const pumpkins: [number, number, number][] = [[-0.45, -0.35, 0.34], [0.4, -0.45, 0.26], [0.5, 0.35, 0.3], [-0.5, 0.45, 0.22], [0.02, 0.05, 0.42]]
+      // Set apart so none sinks into its neighbour; the big carved one in the middle.
+      const pumpkins: [number, number, number][] = [[-0.52, -0.45, 0.32], [0.35, -0.55, 0.22], [0.55, 0.45, 0.28], [-0.5, 0.5, 0.22], [0, 0.05, BIG]]
       return (
         <group>
           <Box m={m} at={[0, 0.03, 0]} s={[1.75, 0.06, 1.75]} c="#5d4037" shadow={false} />
@@ -1095,12 +1112,14 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
               <Cyl m={m} at={[0, r * 0.78, 0]} r={r * 0.12} r2={r * 0.16} h={r * 0.4} c="#33691e" seg={5} />
             </group>
           ))}
-          {/* The big one is carved: its face glows after dark. */}
-          <group position={[0.02, 0.42 * 0.72, 0.05 + 0.4]}>
-            {[-0.13, 0.13].map((x) => (
-              <mesh key={x} position={[x, 0.07, 0.004]} rotation-z={Math.PI}><circleGeometry args={[0.07, 3]} />{bulb}</mesh>
+          {/* The big one is carved: its face, laid on the skin, glows after dark. */}
+          <group position={[0, BIG * 0.72, 0.05]}>
+            {PATCH_EYES.map(([p, e], i) => (
+              <group key={i} position={[p[0] * BIG, p[1] * BIG, p[2] * BIG]} rotation={e}>
+                <mesh rotation-z={Math.PI}><circleGeometry args={[BIG * 0.17, 3]} />{bulb}</mesh>
+              </group>
             ))}
-            <mesh position={[0, -0.09, 0.004]} scale={[1, 0.45, 1]}><circleGeometry args={[0.17, 7, Math.PI, Math.PI]} />{bulb}</mesh>
+            <mesh scale={[1, 0.72, 1]}><sphereGeometry args={[BIG * 1.012, 10, 3, Math.PI / 2 - 0.45, 0.9, 1.78, 0.28]} />{bulb}</mesh>
           </group>
           {trim && <Box m={m} at={[0.75, 0.2, -0.75]} s={[0.36, 0.26, 0.26]} c="#e0c068" />}
         </group>
@@ -1147,8 +1166,8 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           {stones.map(([x, z, h, tilt], i) => (
             <group key={i} position={[x, 0, z]} rotation={[0, 0, tilt]}>
               <Box m={m} at={[0, h / 2, 0]} s={[0.36, h, 0.1]} c="#9e9e9e" />
-              <mesh position={[0, h, 0]} rotation-x={Math.PI / 2} castShadow><cylinderGeometry args={[0.18, 0.18, 0.1, 12, 1, false, -Math.PI / 2, Math.PI]} />{m('#9e9e9e')}</mesh>
-              <Box m={m} at={[0, h * 0.65, 0.052]} s={[0.18, 0.03, 0.01]} c="#616161" shadow={false} />
+              <mesh position={[0, h, 0]} rotation-x={-Math.PI / 2} castShadow><cylinderGeometry args={[0.18, 0.18, 0.1, 12, 1, false, -Math.PI / 2, Math.PI]} />{m('#9e9e9e')}</mesh>
+              <mesh position={[0, h * 0.65, 0.052]}><planeGeometry args={[0.18, 0.03]} />{m('#616161')}</mesh>
               <Box m={m} at={[0, 0.07, 0.3]} s={[0.34, 0.06, 0.4]} c="#5d4037" shadow={false} />
             </group>
           ))}
@@ -1177,7 +1196,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
         [1.42, 0.1, 0.95, 0.55], [1.32, Math.PI, 0.9, 0.5], [1.55, -1.2, 0.3, 0.45], [1.18, 2.3, 0.6, 0.4],
       ]
       // Along the upper trunk's leaning axis.
-      const onTrunk = (y: number): [number, number, number] => [0.06 + (y - 1.3) * 0.15, y, 0]
+      const onTrunk = (y: number): [number, number, number] => [0.045 + (y - 1.35) * 0.15, y, 0]
       const along = ([y, yaw, lean]: (typeof branches)[number], d: number): [number, number, number] => {
         const [x0, y0, z0] = onTrunk(y)
         return [x0 + Math.sin(lean) * Math.cos(yaw) * d, y0 + Math.cos(lean) * d, z0 + Math.sin(lean) * Math.sin(yaw) * d]
@@ -1185,7 +1204,8 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
       return (
         <group>
           <Cyl m={m} at={[0, 0.55, 0]} r={0.1} r2={0.2} h={1.1} c="#3e2723" seg={7} />
-          <Cyl m={m} at={[0.06, 1.3, 0]} r={0.07} r2={0.1} h={0.6} c="#3e2723" seg={7} rot={[0, 0, -0.15]} />
+          {/* Upper trunk: from the lower one's top, narrowing to the top branch's width. */}
+          <Cyl m={m} at={[0.039, 1.31, 0]} r={0.055} r2={0.1} h={0.52} c="#3e2723" seg={7} rot={[0, 0, -0.15]} />
           {branches.map(([y, yaw, lean, len], i) => (
             <group key={i} position={onTrunk(y)} rotation-y={-yaw}>
               <group rotation-z={-lean}>
@@ -1197,11 +1217,12 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
               </group>
             </group>
           ))}
-          {[0, 1, 3].map((b) => {
-            const [x, y, z] = along(branches[b], branches[b][3] * 0.8)
+          {/* The low branch's lantern hangs near its tip, clear of the trunk, and lower than its neighbour's. */}
+          {[[0, 0.8, 0.22], [1, 0.8, 0.22], [3, 0.95, 0.3]].map(([b, at, drop]) => {
+            const [x, y, z] = along(branches[b], branches[b][3] * at)
             return (
-              <group key={b} position={[x, y - 0.22, z]}>
-                <Cyl m={m} at={[0, 0.12, 0]} r={0.006} h={0.22} c="#212121" seg={4} />
+              <group key={b} position={[x, y - drop, z]}>
+                <Cyl m={m} at={[0, (drop + 0.02) / 2, 0]} r={0.006} h={drop} c="#212121" seg={4} />
                 <mesh position={[0, -0.04, 0]}><sphereGeometry args={[0.07, 8, 6]} />{bulb}</mesh>
               </group>
             )
@@ -1337,8 +1358,8 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
             <mesh position={[0, 1.25, -0.18]} rotation-x={Math.PI / 2}><planeGeometry args={[1.2, 0.4]} />{bulb}</mesh>
             <mesh position={[0.655, 0.66, -0.2]} rotation-y={-Math.PI / 2}><planeGeometry args={[0.3, 0.6]} />{bulb}</mesh>
             <group position={[0.6, 0, 0.55]}>
-              <mesh position={[0, 1.45, 0]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.18, 0.18, 0.03, 16]} />{m('#1e88e5')}</mesh>
-              <mesh position={[0, 1.45, 0.032]}>
+              <mesh position={[0, 1.55, 0]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.18, 0.18, 0.03, 16]} />{m('#1e88e5')}</mesh>
+              <mesh position={[0, 1.55, 0.032]}>
                 <planeGeometry args={[0.3, 0.075]} />
                 <meshBasicMaterial map={signTexture('BUS', '#1e88e5', '#ffffff')} toneMapped={false} />
               </mesh>
@@ -1361,9 +1382,9 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           {!ghost && (
             <group position={[0.6, 0, 0.55]}>
               <Cyl m={m} at={[0, 0.75, 0]} r={0.03} h={1.5} c="#90a4ae" seg={6} />
-              <mesh position={[0, 1.45, 0]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.18, 0.18, 0.03, 16]} />{m('#1e88e5')}</mesh>
+              <mesh position={[0, 1.55, 0]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.18, 0.18, 0.03, 16]} />{m('#1e88e5')}</mesh>
               {/* Lettering on the disc's face, clear of the pole. */}
-              <mesh position={[0, 1.45, 0.032]}>
+              <mesh position={[0, 1.55, 0.032]}>
                 <planeGeometry args={[0.3, 0.075]} />
                 <meshBasicMaterial map={signTexture('BUS', '#1e88e5', '#ffffff')} toneMapped={false} />
               </mesh>
@@ -1377,8 +1398,9 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
         return (
           <group>
             <PropMesh parts={DECOR_PROPS.hotdog()} />
-            <Cyl m={m} at={[0, 1.0, 0]} r={0.02} h={0.7} c="#eceff1" seg={6} />
-            <mesh position={[0, 1.35, 0]} castShadow>
+            {/* The umbrella stands at the back of the cart, behind the big hot dog. */}
+            <Cyl m={m} at={[0, 1.0, -0.2]} r={0.02} h={0.7} c="#eceff1" seg={6} />
+            <mesh position={[0, 1.35, -0.2]} castShadow>
               <coneGeometry args={[0.6, 0.22, 16]} />
               {m('#ffffff', awningTex('#fdd835', '#e53935'))}
             </mesh>
@@ -1396,8 +1418,8 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           <Box m={m} at={[0, 0.65, 0]} s={[0.94, 0.04, 0.54]} c="#b0bec5" />
           {[-1, 1].map((sd) => <Cyl key={sd} m={m} at={[-0.2, 0.17, sd * 0.27]} r={0.16} h={0.05} c="#37474f" seg={12} rot={[Math.PI / 2, 0, 0]} />)}
           <Box m={m} at={[0.55, 0.38, 0]} s={[0.3, 0.03, 0.03]} c="#78909c" />
-          <Cyl m={m} at={[0, 1.0, 0]} r={0.02} h={0.7} c="#eceff1" seg={6} />
-          <mesh position={[0, 1.35, 0]} castShadow>
+          <Cyl m={m} at={[0, 1.0, -0.2]} r={0.02} h={0.7} c="#eceff1" seg={6} />
+          <mesh position={[0, 1.35, -0.2]} castShadow>
             <coneGeometry args={[0.6, 0.22, 10]} />
             {m('#ffffff', awningTex('#fdd835', '#e53935'))}
           </mesh>
@@ -1451,7 +1473,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
             </mesh>
           ))}
           {[-0.5, -0.25, 0, 0.25, 0.5].map((x) => (
-            <mesh key={x} position={[x, 1.62, 0.09]}><sphereGeometry args={[0.05, 8, 6]} />{bulb}</mesh>
+            <mesh key={x} position={[x, 1.635, 0.09]}><sphereGeometry args={[0.05, 8, 6]} />{bulb}</mesh>
           ))}
           <mesh position={[0, LAYER.lot + 0.01, 0]} rotation-x={-Math.PI / 2}>
             <planeGeometry args={[1.5, 0.22]} />

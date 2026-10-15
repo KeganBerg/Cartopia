@@ -23,8 +23,8 @@ const LIVE = { noBatch: true }
 // ---- Trailer homes ----
 
 // A single-wide mobile home, long side along x, door side facing +z.
-function SingleWide({ m, win, bulb, at, rot = 0, len = 1.45, color, stripe, ghost, airstream }: {
-  m: Mat; win: ReactNode; bulb: ReactNode; at: V3; rot?: number; len?: number; color: string; stripe: string; ghost?: boolean; airstream?: boolean
+function SingleWide({ m, win, bulb, at, rot = 0, len = 1.45, color, stripe, ghost, airstream, hood }: {
+  m: Mat; win: ReactNode; bulb: ReactNode; at: V3; rot?: number; len?: number; color: string; stripe: string; ghost?: boolean; airstream?: boolean; hood?: boolean
 }) {
   const d = 0.58
   const zf = d / 2
@@ -77,8 +77,15 @@ function SingleWide({ m, win, bulb, at, rot = 0, len = 1.45, color, stripe, ghos
       {/* Front door, an aluminium awning on two poles and wooden steps. */}
       <mesh position={[0.15, 0.36, zf + 0.006]}><planeGeometry args={[0.15, 0.34]} />{m('#eceff1')}</mesh>
       <mesh position={[0.15, 0.44, zf + 0.009]}><planeGeometry args={[0.09, 0.09]} />{win}</mesh>
-      <Box m={m} at={[0.15, 0.64, zf + 0.17]} s={[0.46, 0.02, 0.34]} c="#cfd8dc" rot={[0.08, 0, 0]} />
-      {[-0.06, 0.36].map((x) => <Cyl key={x} m={m} at={[x, 0.32, zf + 0.32]} r={0.01} h={0.64} c="#b0bec5" seg={5} />)}
+      {/* Round a shared patio the awning shrinks to a door hood, so no poles stand in the patio. */}
+      {hood ? (
+        <Box m={m} at={[0.15, 0.66, zf + 0.07]} s={[0.3, 0.02, 0.14]} c="#cfd8dc" rot={[0.12, 0, 0]} />
+      ) : (
+        <>
+          <Box m={m} at={[0.15, 0.64, zf + 0.17]} s={[0.46, 0.02, 0.34]} c="#cfd8dc" rot={[0.08, 0, 0]} />
+          {[-0.06, 0.36].map((x) => <Cyl key={x} m={m} at={[x, 0.32, zf + 0.32]} r={0.01} h={0.64} c="#b0bec5" seg={5} />)}
+        </>
+      )}
       <Box m={m} at={[0.15, 0.075, zf + 0.12]} s={[0.26, 0.15, 0.12]} c="#8d6e63" />
       <Box m={m} at={[0.15, 0.04, zf + 0.23]} s={[0.26, 0.08, 0.1]} c="#8d6e63" />
       {!ghost && <mesh position={[0.32, 0.5, zf + 0.02]}><boxGeometry args={[0.05, 0.05, 0.04]} />{bulb}</mesh>}
@@ -249,15 +256,16 @@ function TrailerHome({ m, win, bulb, ghost, lvl, color, roof }: EdgeProps) {
       <group>
         <Box m={m} at={[0, 0.02, 0]} s={[1.94, 0.04, 1.94]} c="#ffffff" t={gravelTex(3, 3)} shadow={false} />
         <Box m={m} at={[0, 0.045, 0.2]} s={[0.56, 0.03, 1.4]} c="#ffffff" t={paverTex(1, 3)} shadow={false} />
-        <SingleWide m={m} win={win} bulb={bulb} ghost={ghost} at={[-0.6, 0, -0.1]} rot={Math.PI / 2} len={1.4} color={color} stripe={stripe} />
-        <SingleWide m={m} win={win} bulb={bulb} ghost={ghost} at={[0.6, 0, -0.1]} rot={-Math.PI / 2} len={1.4} color="#fff8e1" stripe="#ef6c00" airstream={lvl >= 9} />
+        <SingleWide m={m} win={win} bulb={bulb} ghost={ghost} at={[-0.6, 0, -0.1]} rot={Math.PI / 2} len={1.4} color={color} stripe={stripe} hood />
+        <SingleWide m={m} win={win} bulb={bulb} ghost={ghost} at={[0.6, 0, -0.1]} rot={-Math.PI / 2} len={1.4} color="#fff8e1" stripe="#ef6c00" airstream={lvl >= 9} hood />
         {yard && (
           <group>
             {/* Picnic table and a fire pit on the patio under string lights. */}
             <group position={[0, 0, -0.35]}>
               <Box m={m} at={[0, 0.2, 0]} s={[0.22, 0.03, 0.42]} c="#a1887f" />
               {[-0.16, 0.16].map((x) => <Box key={x} m={m} at={[x, 0.12, 0]} s={[0.07, 0.025, 0.42]} c="#a1887f" />)}
-              {[-0.15, 0.15].map((z) => <Box key={z} m={m} at={[0, 0.1, z]} s={[0.3, 0.2, 0.03]} c="#8d6e63" />)}
+              {/* A-frame legs at each end. */}
+              {[-0.15, 0.15].map((z) => [-1, 1].map((sd) => <Box key={`${z}${sd}`} m={m} at={[sd * 0.14, 0.1, z]} s={[0.025, 0.28, 0.03]} c="#8d6e63" rot={[0, 0, sd * 0.785]} />))}
             </group>
             <group position={[0, 0.05, 0.3]}>
               {Array.from({ length: 8 }, (_, i) => <Ball key={i} m={m} at={[Math.sin(i * 0.785) * 0.12, 0.03, Math.cos(i * 0.785) * 0.12]} r={0.04} c="#9e9e9e" flat />)}

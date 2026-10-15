@@ -174,16 +174,16 @@ export function RustysYard({ m, ghost, sign, bulb, win, lvl, lift }: Props) {
         <group position={[QX, 0.05, 0.62]}>
           {/* Two-post lift: channel columns on bolted base plates, a carriage
               on each column with two swing arms reaching under the car's
-              jacking points, rubber pads, a crossbar with the hydraulic hose,
+              jacking points, rubber pads, the hydraulic lines under a floor plate,
               and the control box on the left column. */}
           {[-1, 1].map((sd) => (
             <group key={sd} position={[sd * 0.36, 0, 0]}>
               <Box m={m} at={[0, 0.012, 0]} s={[0.17, 0.024, 0.17]} c="#455a64" />
               {[[-0.06, -0.06], [0.06, -0.06], [-0.06, 0.06], [0.06, 0.06]].map(([bx, bz]) => <Cyl key={`${bx}${bz}`} m={m} at={[bx, 0.03, bz]} r={0.008} h={0.014} c="#b0bec5" seg={6} />)}
-              <Box m={m} at={[0, 0.42, 0]} s={[0.08, 0.8, 0.08]} c="#ffb300" />
+              <Box m={m} at={[0, 0.33, 0]} s={[0.08, 0.62, 0.08]} c="#ffb300" />
               {/* The channel the carriage rides in, facing the car, with its safety-lock ladder. */}
-              <Box m={m} at={[-sd * 0.041, 0.42, 0]} s={[0.004, 0.78, 0.036]} c="#37474f" shadow={false} />
-              {Array.from({ length: 8 }, (_, i) => <Box key={i} m={m} at={[-sd * 0.0445, 0.12 + i * 0.08, 0]} s={[0.003, 0.012, 0.03]} c="#90a4ae" shadow={false} />)}
+              <Box m={m} at={[-sd * 0.041, 0.33, 0]} s={[0.004, 0.6, 0.036]} c="#37474f" shadow={false} />
+              {Array.from({ length: 6 }, (_, i) => <Box key={i} m={m} at={[-sd * 0.0445, 0.12 + i * 0.08, 0]} s={[0.003, 0.012, 0.03]} c="#90a4ae" shadow={false} />)}
               <Box m={m} at={[-sd * 0.06, 0.3, 0]} s={[0.04, 0.12, 0.09]} c="#37474f" />
               {/* Swing arms, angled forward and back, ending in rubber pads under the sills. */}
               {[-1, 1].map((fz) => {
@@ -198,8 +198,7 @@ export function RustysYard({ m, ghost, sign, bulb, win, lvl, lift }: Props) {
               })}
             </group>
           ))}
-          <Box m={m} at={[0, 0.835, 0]} s={[0.8, 0.05, 0.06]} c="#ffb300" />
-          <Cyl m={m} at={[0, 0.8, 0.04]} r={0.008} h={0.72} c="#212121" seg={5} rot={[0, 0, Math.PI / 2]} />
+          <Box m={m} at={[0, 0.01, 0]} s={[0.55, 0.02, 0.14]} c="#455a64" />
           <group position={[-0.43, 0.5, 0.02]}>
             <Box m={m} at={[0, 0, 0]} s={[0.06, 0.11, 0.07]} c="#eceff1" />
             <Cyl m={m} at={[0, 0.02, 0.038]} r={0.012} h={0.008} c="#43a047" seg={8} rot={[Math.PI / 2, 0, 0]} />
