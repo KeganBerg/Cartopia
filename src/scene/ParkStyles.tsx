@@ -1,11 +1,12 @@
 import { useMemo, useRef, type ReactNode } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { ExtrudeGeometry, Shape, type Group } from 'three'
+import { ExtrudeGeometry, Shape, Vector3, type Group } from 'three'
 import { SEASON, PAL } from './season'
 import { Upright } from './mergeScale'
 import { brickTex, concreteTex, gravelTex, grassTex, paverTex, soilTex } from './textures'
 import { Ball, Bench, Box, Cyl, Lamp, Patch, Sign, Tree, type EdgeProps, type Mat, type V3 } from './edgeKit'
 import { Figure } from './Figure'
+import { splash, waterKinds } from './liveWater'
 
 // Park styles (2x2 decorations, front +z): a dog park, a skate park, a koi
 // garden and a botanical garden. Static pieces bake into Batch; the few
@@ -329,13 +330,22 @@ function Koi() {
     { r: 0.65, sp: 0.28, ph: 4, c: '#ffab00', y: 0.07 },
     { r: 0.3, sp: 0.55, ph: 1, c: '#e53935', y: 0.08 },
   ]
+  const at = useMemo(() => new Vector3(), [])
+  const rise = useRef(fish.map((_, i) => 3 + i * 2.3))
   useFrame(({ clock }) => {
     if (!g.current) return
+    const t = clock.elapsedTime
     g.current.children.forEach((o, i) => {
       const f = fish[i]
-      const a = clock.elapsedTime * f.sp + f.ph
+      const a = t * f.sp + f.ph
       o.position.set(Math.sin(a) * f.r * 1.2, f.y, Math.cos(a) * f.r * 0.8)
-      o.rotation.y = a + (f.sp > 0 ? Math.PI / 2 : -Math.PI / 2) + Math.sin(clock.elapsedTime * 4 + i) * 0.2
+      o.rotation.y = a + (f.sp > 0 ? Math.PI / 2 : -Math.PI / 2) + Math.sin(t * 4 + i) * 0.2
+      // Now and then a fish noses up to the surface and rings the water.
+      if (t > rise.current[i]) {
+        rise.current[i] = t + 5 + Math.random() * 8
+        o.getWorldPosition(at)
+        splash(at.x, at.z, 0.35)
+      }
     })
   })
   return (
@@ -365,8 +375,17 @@ function KoiGarden({ m, bulb, ghost }: EdgeProps) {
       {[[-1.4, -1.25, 0.16], [-0.95, -0.95, 0.11], [-1.05, -1.4, 0.08]].map(([x, z, r], i) => <Ball key={i} m={m} at={[x, 0.06 + r * 0.5, z]} r={r} c="#78909c" flat />)}
       {/* The pond: two overlapping pools ringed with stones, lily pads on top. */}
       <group position={[0.25, 0, 0.1]}>
-        <mesh position={[0, 0.05, 0]} rotation-x={-Math.PI / 2} scale={[1.2, 0.8, 1]}><circleGeometry args={[0.85, 28]} /><meshStandardMaterial color={water} roughness={SNOW ? 0.5 : 0.12} metalness={0.1} /></mesh>
-        <mesh position={[0.75, 0.051, 0.45]} rotation-x={-Math.PI / 2}><circleGeometry args={[0.5, 20]} /><meshStandardMaterial color={water} roughness={SNOW ? 0.5 : 0.12} metalness={0.1} /></mesh>
+        {SNOW || ghost ? (
+          <>
+            <mesh position={[0, 0.05, 0]} rotation-x={-Math.PI / 2} scale={[1.2, 0.8, 1]}><circleGeometry args={[0.85, 28]} /><meshStandardMaterial color={water} roughness={SNOW ? 0.5 : 0.12} metalness={0.1} /></mesh>
+            <mesh position={[0.75, 0.051, 0.45]} rotation-x={-Math.PI / 2}><circleGeometry args={[0.5, 20]} /><meshStandardMaterial color={water} roughness={SNOW ? 0.5 : 0.12} metalness={0.1} /></mesh>
+          </>
+        ) : (
+          <>
+            <mesh position={[0, 0.05, 0]} rotation-x={-Math.PI / 2} scale={[1.2, 0.8, 1]} material={waterKinds().koi}><circleGeometry args={[0.85, 36]} /></mesh>
+            <mesh position={[0.75, 0.051, 0.45]} rotation-x={-Math.PI / 2} material={waterKinds().koi}><circleGeometry args={[0.5, 24]} /></mesh>
+          </>
+        )}
         {Array.from({ length: 26 }, (_, i) => {
           const a = (i / 26) * Math.PI * 2
           return <Ball key={i} m={m} at={[Math.sin(a) * 1.05, 0.06, Math.cos(a) * 0.72]} r={0.07 + (i % 3) * 0.025} c={['#9e9e9e', '#8d8d8d', '#a1a1a1'][i % 3]} flat />
@@ -512,7 +531,9 @@ function Garden({ m, bulb, ghost }: EdgeProps) {
       {/* Tiered fountain where the paths cross. */}
       <group position={[0, 0.05, 0.85]}>
         <Cyl m={m} at={[0, 0.07, 0]} r={0.36} h={0.14} c="#e0e0e0" seg={20} />
-        <mesh position={[0, 0.145, 0]} rotation-x={-Math.PI / 2}><circleGeometry args={[0.32, 20]} /><meshStandardMaterial color={SNOW ? '#cfe6ef' : '#4fc3f7'} roughness={0.1} /></mesh>
+        {SNOW || ghost
+          ? <mesh position={[0, 0.145, 0]} rotation-x={-Math.PI / 2}><circleGeometry args={[0.32, 20]} /><meshStandardMaterial color={SNOW ? '#cfe6ef' : '#4fc3f7'} roughness={0.1} /></mesh>
+          : <mesh position={[0, 0.145, 0]} rotation-x={-Math.PI / 2} material={waterKinds().basin}><circleGeometry args={[0.32, 24]} /></mesh>}
         <Cyl m={m} at={[0, 0.3, 0]} r={0.04} h={0.3} c="#e0e0e0" seg={8} />
         <Cyl m={m} at={[0, 0.46, 0]} r={0.15} r2={0.06} h={0.06} c="#e0e0e0" seg={14} />
         <Ball m={m} at={[0, 0.53, 0]} r={0.04} c="#e0e0e0" />

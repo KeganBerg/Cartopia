@@ -31,6 +31,11 @@ import { PAL, SEASON } from './season'
 import { LAYER, decal } from './layers'
 import { brickTex, sidingTex, shingleTex, gravelTex, awningTex, windowTex, paverTex, shutterTex, pumpTex } from './textures'
 import { PEOPLE_SIZED } from './keepShape'
+import { waterKinds } from './liveWater'
+import { DuckFamily, type DuckKind } from './Ducks'
+
+// The duck pond's family: a drake, a hen and her two ducklings.
+const POND_DUCKS: DuckKind[] = ['drake', 'hen', 'chick', 'chick']
 
 type Props = { def: BuildingDef; ghost?: boolean; valid?: boolean; level?: number }
 
@@ -715,9 +720,9 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             <cylinderGeometry args={[0.85, 0.9, 0.3, 24]} />
             {m(def.color)}
           </mesh>
-          <mesh position={[0, 0.31, 0]}>
-            <cylinderGeometry args={[0.72, 0.72, 0.03, 24]} />
-            {m(def.roof)}
+          <mesh position={[0, 0.31, 0]} material={ghost ? undefined : waterKinds().basin}>
+            <cylinderGeometry args={[0.72, 0.72, 0.03, 32]} />
+            {ghost && m(def.roof)}
           </mesh>
           <mesh position={[0, 0.7, 0]} castShadow>
             <cylinderGeometry args={[0.1, 0.18, 0.8]} />
@@ -804,14 +809,10 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
       return (
         <group>
           <mesh position={[0, 0.03, 0]} receiveShadow><cylinderGeometry args={[1.8, 1.8, 0.06, 32]} />{m(def.roof)}</mesh>
-          <mesh position={[0, 0.07, 0]}><cylinderGeometry args={[1.5, 1.5, 0.04, 32]} />{m(def.color)}</mesh>
-          {!ghost && [[0.4, 0.2], [-0.5, -0.3]].map(([x, z], i) => (
-            <group key={i} position={[x, 0.15, z]}>
-              <mesh><sphereGeometry args={[0.12, 10, 8]} /><meshStandardMaterial color="#fff59d" /></mesh>
-              <mesh position={[0, 0.1, 0.08]}><sphereGeometry args={[0.07, 8, 6]} /><meshStandardMaterial color="#fff59d" /></mesh>
-              <mesh position={[0, 0.1, 0.16]}><coneGeometry args={[0.03, 0.06, 6]} /><meshStandardMaterial color="#ff9800" /></mesh>
-            </group>
-          ))}
+          {ghost
+            ? <mesh position={[0, 0.07, 0]}><cylinderGeometry args={[1.5, 1.5, 0.04, 32]} />{m(def.color)}</mesh>
+            : <mesh position={[0, 0.07, 0]} material={waterKinds().pond} receiveShadow><cylinderGeometry args={[1.5, 1.5, 0.04, 48]} /></mesh>}
+          {!ghost && <DuckFamily kinds={POND_DUCKS} rx={1.45} rz={1.45} y={0.09} />}
           {[[1.4, 1.2], [-1.3, 1.3], [1.3, -1.3]].map(([x, z], i) => (
             <mesh key={i} position={[x, 0.3, z]} castShadow><sphereGeometry args={[0.3, 10, 8]} />{m('#388e3c')}</mesh>
           ))}
