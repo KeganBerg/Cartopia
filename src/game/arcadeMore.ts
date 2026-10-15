@@ -3,12 +3,13 @@
 // small like a quick race, so the server's usual earning limits cover it.
 
 import type { Box } from './collide'
+import { playXp } from './data'
 
 export type StarGameId = 'pit' | 'wash' | 'delivery' | 'stunt'
 
 export function starReward(stars: number, level: number) {
   if (stars <= 0) return { coins: 0, xp: 0 }
-  return { coins: Math.round(((80 + 25 * level) * [0, 0.5, 0.75, 1][stars]) / 5) * 5, xp: 6 + stars * 4 }
+  return { coins: Math.round(((80 + 25 * level) * [0, 0.5, 0.75, 1][stars]) / 5) * 5, xp: playXp(6 + stars * 4, level) }
 }
 
 // ---------- Pit Stop ----------

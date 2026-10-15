@@ -24,6 +24,12 @@ describe('skyFx', () => {
     expect(skyFx(at('clearing', { wet: 0.7 }), NOON, 'summer').glint).toBeGreaterThan(0.5)
   })
 
+  it('stops the road sparkles once the puddles have dried', () => {
+    expect(skyFx(at('clearing', { wet: 0.3 }), NOON, 'summer').glint).toBe(0)
+    expect(skyFx(at('clear', { wet: 0.2 }), NOON, 'summer').glint).toBe(0)
+    expect(skyFx(at('clear'), NOON, 'summer').glint).toBe(0)
+  })
+
   it('haloes the lamps at night, more in fog', () => {
     const clear = skyFx(at('clear'), MIDNIGHT, 'fall').halo
     const fog = skyFx(at('fog'), MIDNIGHT, 'fall').halo

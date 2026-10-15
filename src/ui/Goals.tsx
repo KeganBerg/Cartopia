@@ -6,7 +6,7 @@ import {
 } from '../game/store'
 import {
   GOALS, QUEST_PAY, TASKS_PER_PERIOD, payAt, msToNextDay, msToNextWeek, buildingDef, buildingLevel, upgradable, maxLevel,
-  carDef, takesDriver, SEASON_STARS, activeEvent, eventEndsAt, plotPrice, START_LAND, type StatKey, type GoalDef, flatFixCost, servicePay, gasCanCost,
+  carDef, takesDriver, SEASON_STARS, activeEvent, eventEndsAt, plotPrice, START_LAND, type StatKey, type GoalDef, flatFixCost, servicePay, serviceXp, gasCanCost,
 } from '../game/data'
 import { Panel, SheetTabs, openGarageTab } from './Menus'
 import { openRaceTab } from './raceNav'
@@ -310,7 +310,7 @@ export function FlatPanel() {
         <div className="sources">
           <div className="source">
             <span className="source-icon">⛽</span>
-            <div><b>Fill up at your Gas Station</b><div className="card-stat">{owns('gas') ? `+$${servicePay(s.level, 'gas')} · ⭐ 8 XP` : 'Earns on every fill-up'}</div></div>
+            <div><b>Fill up at your Gas Station</b><div className="card-stat">{owns('gas') ? `+$${servicePay(s.level, 'gas')} · ⭐ ${serviceXp('gas', s.level)} XP` : 'Earns on every fill-up'}</div></div>
             {owns('gas') ? <button className="buy small" onClick={() => s.serviceCar(car.uid, 'gas')}>Fill up · +${servicePay(s.level, 'gas')}</button> : <button className="buy small" onClick={() => s.openShop('gas')}>Build</button>}
           </div>
           <div className="source">
@@ -328,12 +328,12 @@ export function FlatPanel() {
       <div className="sources">
         <div className="source">
           <span className="source-icon">🛞</span>
-          <div><b>Send it to your Tire Shop</b><div className="card-stat">{owns('tires') ? `+$${servicePay(s.level, 'tires')} · ⭐ 12 XP` : s.level < 2 ? '🔒 Level 2' : 'Earns on every flat'}</div></div>
+          <div><b>Send it to your Tire Shop</b><div className="card-stat">{owns('tires') ? `+$${servicePay(s.level, 'tires')} · ⭐ ${serviceXp('tires', s.level)} XP` : s.level < 2 ? '🔒 Level 2' : 'Earns on every flat'}</div></div>
           {owns('tires') ? <button className="buy small" onClick={() => s.serviceCar(car.uid, 'tires')}>Fix · +${servicePay(s.level, 'tires')}</button> : s.level >= 2 ? <button className="buy small" onClick={() => s.openShop('tires')}>Build</button> : null}
         </div>
         <div className="source">
           <span className="source-icon">🔧</span>
-          <div><b>Call Rusty's tow</b><div className="card-stat">{hasRusty ? 'Free · ⭐ 15 XP' : "🔒 Needs Rusty's Rescue"}</div></div>
+          <div><b>Call Rusty's tow</b><div className="card-stat">{hasRusty ? `Free · ⭐ ${serviceXp('tow', s.level)} XP` : "🔒 Needs Rusty's Rescue"}</div></div>
           <button className="buy small alt" onClick={() => s.fixFlat(car.uid, true)} disabled={!hasRusty}>Tow · free</button>
         </div>
         <div className="source">
