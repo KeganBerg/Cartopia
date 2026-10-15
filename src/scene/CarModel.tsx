@@ -660,10 +660,10 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
     const ws: V3 = [0, top + s.cabinH * 0.45, s.cabinZ + s.cabinLen * 0.5]
     if (!s.plates) k.add('screen', box(s.wid * 0.86, s.cabinH * 0.9, 0.02), ws, [-0.5, 0, 0])
     if (!s.plates) k.add('black', box(s.wid * 0.9, 0.025, 0.03), [0, ws[1] + Math.cos(0.5) * s.cabinH * 0.45, ws[2] - Math.sin(0.5) * s.cabinH * 0.45], [-0.5, 0, 0])
-    // The seats sit down in a dark cockpit well, so only their backs and headrests show above the
-    // body, as in a real open car.
+    // The seats sit down in a dark cockpit well (standing clear of any deck stripes), so only their
+    // backs and headrests show above the body, as in a real open car.
     const sink = 0.09
-    k.add('black', box(s.wid * 0.7, 0.01, s.cabinLen * 0.62), [0, top + 0.002, base[2] + 0.02])
+    k.add('black', box(s.wid * 0.7, 0.016, s.cabinLen * 0.62), [0, top + 0.004, base[2] + 0.02])
     for (const sd of [-1, 1]) {
       k.add('seat', rbox(s.wid * 0.28, 0.16, 0.16, 0.04), [sd * s.wid * 0.2, base[1] + 0.06 - sink, base[2]])
       k.add('seat', rbox(s.wid * 0.26, 0.2, 0.05, 0.02), [sd * s.wid * 0.2, base[1] + 0.14 - sink, base[2] - 0.08], [-0.15, 0, 0])
