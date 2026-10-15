@@ -77,21 +77,26 @@ export function TechnoLayer() {
   }, [on, soft])
   if (!on) return null
   return (
-    <div className="techno-fx" aria-hidden>
-      <div className="tk-glow" />
-      <div className="tk-lasers">
-        <i /><i /><i /><i />
-      </div>
-      <div className="tk-strobe" />
-      {count > 0 && <div key={count} className="tk-count">{count}</div>}
-      {/* Lands on the drop, then stays faded out. */}
-      {dropped && (
-        <div className="tk-title">
-          <b>RAVE MODE</b>
-          <span>{HALCYON ? 'onte · halcyon · NCS' : `${TECHNO_BPM} BPM · EVERY TOWN`}</span>
+    <>
+      <div className="techno-fx" aria-hidden>
+        <div className="tk-glow" />
+        <div className="tk-lasers">
+          <i /><i /><i /><i />
         </div>
-      )}
-    </div>
+        <div className="tk-strobe" />
+      </div>
+      {/* The countdown and title sit over the building badges (refuel, collect), still under the HUD. */}
+      <div className="techno-words" aria-hidden>
+        {count > 0 && <div key={count} className="tk-count">{count}</div>}
+        {/* Lands on the drop, then stays faded out. */}
+        {dropped && (
+          <div className="tk-title">
+            <b>RAVE MODE</b>
+            <span>{HALCYON ? 'onte · halcyon · NCS' : `${TECHNO_BPM} BPM · EVERY TOWN`}</span>
+          </div>
+        )}
+      </div>
+    </>
   )
 }
 
