@@ -14,6 +14,7 @@ import { useGame } from '../game/store'
 import { Preview } from './Stage'
 import { CAM_REACH, CAM_TOP, Showroom, ShowroomLights, TT_R, contactTex, discTex } from './Showroom'
 import { decal } from './layers'
+import { pauseTownDraw } from './renderGate'
 
 type Look = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; panels?: Panels | null; stripe?: string | null; mods?: string[] | null; trim?: Trim | null; hat?: HatFit | null }
 
@@ -350,6 +351,8 @@ export function CarInspect({ title, onClose, ...look }: Look & { title: string; 
   const [fl, setFl] = useState('none')
   const [flash, setFlash] = useState(0)
   const snap = useRef<(() => HTMLCanvasElement) | null>(null)
+  // Covers the whole screen, so the town needn't draw behind it.
+  useEffect(() => pauseTownDraw(), [])
   useEffect(() => {
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape') (photo ? setPhoto(false) : onClose()) }
     window.addEventListener('keydown', key)

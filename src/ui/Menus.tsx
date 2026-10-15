@@ -1,11 +1,12 @@
 import { groupOf, mergeCandidates } from '../game/merge'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useGame, hasRusty, buildPrice, type OwnedCar, type PlacedBuilding } from '../game/store'
 import { raceCarOf } from '../game/raceCar'
 import { stackCars, stackFace } from '../game/garageStacks'
 import { reducedMotion } from '../game/fx'
 import { activeEvent, garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, carDef, performance, upgradeCost, buildingDef, upgradable, loves, readySets, isBike, FEATURES, type BuildingDef } from '../game/data'
 import { CarInspect, CarPreview, type DynoFeed } from '../scene/CarPreview'
+import { usePauseTownUnder } from '../scene/renderGate'
 import type { DynoRun } from './Dyno'
 import { onDemand } from './lazy'
 import { CollectAllButton } from './CollectAll'
@@ -175,6 +176,11 @@ function EditBar() {
   )
 }
 
+// A menu that takes another's place (a tab between sibling menus, or going back to the
+// previous menu) appears in place: replaying the slide-in made the menu flash down and up.
+let panelsUp = 0
+let panelGoneAt = -Infinity
+
 // onBack: shows a back button before the title (a sub-screen of the panel).
 // head: extra bits in the title bar, before the close button.
 export function Panel({ title, children, wide, onClose, onBack, head, className }: { title: string; children: React.ReactNode; wide?: boolean; onClose?: () => void; onBack?: () => void; head?: React.ReactNode; className?: string }) {
@@ -184,16 +190,27 @@ export function Panel({ title, children, wide, onClose, onBack, head, className 
   const [closing, setClosing] = useState(false)
   const timer = useRef(0)
   useEffect(() => () => clearTimeout(timer.current), [])
+  const box = useRef<HTMLDivElement>(null)
+  usePauseTownUnder(box)
+  const [still] = useState(() => panelsUp > 0 || Date.now() - panelGoneAt < 250)
+  useLayoutEffect(() => {
+    panelsUp++
+    return () => {
+      panelsUp--
+      panelGoneAt = Date.now()
+    }
+  }, [])
   const close = (_: null) => {
     const done = () => (onClose ? onClose() : closePanel())
-    if (reducedMotion()) return done()
+    // Going back to the previous menu: swap straight to it rather than slide away and back.
+    if (reducedMotion() || (!onClose && useGame.getState().panelBack.length > 0)) return done()
     if (closing) return
     setClosing(true)
     timer.current = window.setTimeout(done, 170)
   }
   return (
-    <div className={closing ? 'overlay closing' : 'overlay'} onClick={() => close(null)}>
-      <div className={`${wide ? 'panel wide' : 'panel'}${className ? ` ${className}` : ''}`} onClick={(e) => e.stopPropagation()}>
+    <div className={closing ? 'overlay closing' : still ? 'overlay still' : 'overlay'} onClick={() => close(null)}>
+      <div ref={box} className={`${wide ? 'panel wide' : 'panel'}${className ? ` ${className}` : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="panel-head">
           {onBack && <button className="panel-back" aria-label="Back" onClick={onBack}><Icon name="back" size={18} /></button>}
           {/* long titles (a garage with its stats) step down a size so they don't cut off */}

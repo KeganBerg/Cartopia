@@ -39,6 +39,11 @@ export default defineConfig({
   build: {
     rolldownOptions: {
       output: {
+        // Keeps rolldown's helper runtime in its own file. Without it, 705d811 folded the
+        // runtime into the game's sound chunk, which imports r3f, which imports react, which
+        // needs the runtime: react ran first and the game never started (stuck splash).
+        // scripts/check-dist.mjs fails the build on any such loop.
+        strictExecutionOrder: true,
         // Libraries change far less often than the game, so they get their own
         // files: after a deploy, returning players only download the game code.
         codeSplitting: {

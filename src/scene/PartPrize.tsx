@@ -173,7 +173,8 @@ function StancePrize({ id }: { id: string }) {
 }
 
 // The part, floating a little above the lift and turning slowly.
-export function PartPrize({ id, body, tint }: { id: string; body?: Body; tint: string }) {
+// lit={false}: the scene lights it instead (the crate keeps its light count fixed; see CrateScene).
+export function PartPrize({ id, body, tint, lit = true }: { id: string; body?: Body; tint: string; lit?: boolean }) {
   const turn = useRef<Group>(null)
   useFrame((_, dt) => {
     if (turn.current) turn.current.rotation.y += Math.min(dt, 0.05) * 1.1
@@ -183,7 +184,7 @@ export function PartPrize({ id, body, tint }: { id: string; body?: Body; tint: s
   return (
     <group position-y={PART_LIFT}>
       {/* A soft key light so thin parts (pipes, flares) still catch the eye. */}
-      <pointLight position={[0.6, 1.4, 1.6]} intensity={5} distance={5} color="#fff8e1" />
+      {lit && <pointLight position={[0.6, 1.4, 1.6]} intensity={5} distance={5} color="#fff8e1" />}
       {/* Tipped toward the camera so parts that lie flat on a car read from above. */}
       <group rotation-x={wheel ? 0 : 0.3}>
         <group ref={turn} scale={wheel ? 1.5 : 1}>{wheel ? <WheelPrize id={id} /> : slot === 'stance' ? <StancePrize id={id} /> : <BoltOn id={id} body={body ?? 'sedan'} tint={tint} />}</group>
