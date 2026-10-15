@@ -7,7 +7,7 @@ import { CarModel, carSize, wheelRig } from './CarModel'
 import { wheelPool } from './carBatch'
 import { signTexture } from './signTexture'
 import { skyTex, asphaltTex, paverTex, glowTex, sandTex, grassTex, beachSandTex, snowTex, concreteTex } from './textures'
-import { BuildingModel, LightPool } from './BuildingModel'
+import { LightPool } from './BuildingModel'
 import { glowMats, dayPhase, duskAmount, nightAmount } from './dayNight'
 import { lookFor } from './look'
 import { PostFx } from './PostFx'
@@ -20,6 +20,7 @@ import { holdPageTint } from './pageTint'
 import { useGame } from '../game/store'
 import { Skyline } from './Skyline'
 import { Batch } from './Batch'
+import { StreetShops, type Slot } from './StreetShops'
 import { Manhole } from './BuildingDetail'
 import { BUILDINGS, TILE, buildingDef } from '../game/data'
 import { VenueScenery, VenueBackdrop, ROAD, WALK } from './RaceVenues'
@@ -89,8 +90,6 @@ export function SkyDome({ tint = '#ffffff' }: { tint?: string }) {
 
 const FALLBACK = ['pizza', 'donut', 'burger', 'diner', 'house', 'motel', 'carwash', 'tires', 'gas', 'bowling', 'icecream', 'house']
 const SHOPS = new Set(['business', 'gas', 'parts', 'tires', 'house'])
-
-type Slot = { z: number; side: -1 | 1; def: string }
 
 // Buildings from the player's own town, repeated down both sides of the street.
 function useStreet(len: number) {
@@ -813,23 +812,12 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
         </mesh>
         <Banner z={-0.8} text="START" bg="#2e7d32" />
         <Banner z={len} text="FINISH" bg="#c62828" />
-        {/* Shops facing the street, with trees in the gaps and lamps on the kerb. */}
+        {/* Lamps on the kerb between the shops (StreetShops draws the shops and trees). */}
         {city ? slots.map((sl, i) => {
-          const d = buildingDef(sl.def)
-          const depth = d.h * TILE
-          return (
+          const z = buildingDef(sl.def).w + 0.7
+          return i % 2 === 0 && !shotClear(sl.z + z, sl.side, len) && (
             <group key={i} position={[0, 0, sl.z]}>
-              <group position={[sl.side * (ROAD + WALK + depth / 2 + 0.1), 0, 0]} rotation-y={sl.side < 0 ? Math.PI / 2 : -Math.PI / 2}>
-                <mesh rotation-x={-Math.PI / 2} position-y={LAYER.lot}>
-                  <planeGeometry args={[d.w * TILE - 0.1, depth - 0.1]} />
-                  <meshStandardMaterial map={paverTex(d.w, d.h)} />
-                </mesh>
-                <BuildingModel def={d} />
-              </group>
-              <group position={[sl.side * (ROAD + WALK + 0.9), 0, d.w + 0.7]}>
-                <BuildingModel def={buildingDef(i % 3 ? 'tree' : 'palm')} />
-              </group>
-              {i % 2 === 0 && !shotClear(sl.z + d.w + 0.7, sl.side, len) && <Lamp z={d.w + 0.7} side={sl.side} />}
+              <Lamp z={z} side={sl.side} />
             </group>
           )
         }) : (
@@ -840,6 +828,7 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
         )}
         <StreetDressing len={len} far={far} city={city} />
       </Batch>
+      {city && <StreetShops slots={slots} />}
       <Spectators len={len} cold={venue.id === 'snow' || SEASON === 'winter'} />
       <StartLights />
       <LaunchSmoke me={me} them={them} len={len} />
