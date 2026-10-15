@@ -1207,7 +1207,8 @@ export const useGame = create<GameState>()(
         const s = get()
         const b = s.buildings.find((o) => o.uid === buid)
         if (!b || s.visiting || !themable(buildingDef(b.def))) return
-        set({ panel: 'upgrade', upgrading: groupOf(s.buildings, buid)?.anchor.uid ?? buid })
+        // Through navTo, so closing it goes back to the menu it was opened from (the Shop's Upgrades list, Goals, a car's job).
+        set({ ...navTo(s, 'upgrade'), upgrading: groupOf(s.buildings, buid)?.anchor.uid ?? buid })
       },
 
       upgradeBuilding: (buid) => {

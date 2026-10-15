@@ -171,7 +171,9 @@ function Driver({ b, d }: { b: PlacedBuilding; d: BuildingDef }) {
 export function UpgradePanel() {
   const s = useGame()
   const b = s.buildings.find((o) => o.uid === s.upgrading)
-  const close = () => useGame.setState({ panel: null, upgrading: null })
+  // Back to the menu it was opened from; opened from the town (a tap, or Edit > Move), it
+  // closes straight back to the town and whatever mode the player was in.
+  const close = () => (useGame.getState().panelBack.length ? useGame.getState().closePanel() : useGame.setState({ panel: null, upgrading: null }))
   if (!b) return null
   const d = buildingDef(b.def)
   if (!themable(d)) return null
