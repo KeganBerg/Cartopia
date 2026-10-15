@@ -4,6 +4,7 @@ import { useGame } from '../game/store'
 import { applyAutoJobs, autoJobs, autoJobsChange, roundPay } from '../game/autoJobs'
 import { buildingDef, buildingLevel, carDef } from '../game/data'
 import { BuildingThumb, CarThumb } from '../scene/BuildingPreview'
+import { themeFor } from '../game/cityLook'
 import { CoinIcon } from './Icon'
 import { sfx } from '../lib/sound'
 import './flash.css'
@@ -28,6 +29,7 @@ export function AutoJobsButton() {
 function AutoJobsSheet({ onClose }: { onClose: () => void }) {
   const buildings = useGame((s) => s.buildings)
   const cars = useGame((s) => s.cars)
+  const city = useGame((s) => s.cityTheme)
   const assign = useGame((s) => s.autoAssign)
   const plan = useMemo(() => autoJobs(buildings, cars), [buildings, cars])
   const changes = autoJobsChange(plan)
@@ -68,7 +70,7 @@ function AutoJobsSheet({ onClose }: { onClose: () => void }) {
             const moved = p.car !== p.was
             return (
               <li key={p.building} className={moved ? 'aj-row new' : 'aj-row'}>
-                <span className="aj-bldg" title={d.name}><BuildingThumb def={d} level={buildingLevel(b)} /></span>
+                <span className="aj-bldg" title={d.name}><BuildingThumb def={d} level={buildingLevel(b)} theme={themeFor(b.tint, city, d.kind === 'decor')} /></span>
                 <span className="aj-car" title={cd.name}><CarThumb size="sm" color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} panels={c.panels} trim={c.trim} hat={c.hat} body={cd.body} model={cd.id} stripe={c.stripe} mods={c.mods} /></span>
                 <b className={p.loves ? 'aj-bonus love' : 'aj-bonus'}>{p.loves ? '❤️ +25%' : '+10%'}</b>
                 <span className="aj-pay"><CoinIcon size={16} />{p.pay.toLocaleString()}</span>
