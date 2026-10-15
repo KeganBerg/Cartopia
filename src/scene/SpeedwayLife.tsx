@@ -4,7 +4,7 @@ import { BoxGeometry, BufferAttribute, Color, CylinderGeometry, Object3D, type B
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { useMergeScale } from './mergeScale'
 import { HAIR, PANTS, SKIN } from './people'
-import { ARC, ARC0, DECK, TERRACE, TRACK, deckAt } from './speedwayLayout'
+import { ARC, ARC0, DECK, TIERS, TRACK, deckAt } from './speedwayLayout'
 
 // The moving parts of the Speedway, seen through its glass walls: race cars
 // lapping the track nose to tail, and fans on the terraces who jump up and
@@ -13,8 +13,12 @@ import { ARC, ARC0, DECK, TERRACE, TRACK, deckAt } from './speedwayLayout'
 // Cars and fans are true size: a merged block draws more of them, not bigger
 // ones (keepInstances in keepShape.ts keeps each one round its `feet`).
 
-// Townspeople proportions (peopleGeo.ts PERSON), drawn SCALE bigger.
-const SCALE = 1.3
+// Townspeople proportions (peopleGeo.ts PERSON), drawn SCALE bigger. Fans are
+// drawn smaller than townspeople (Kegan's call, for this building only) so
+// rows of them fit the grandstand.
+const SCALE = 1.3 * 0.45
+// Hip height sat down: on the seat, legs hanging down out of sight inside the step.
+const SEAT = 0.04
 const HIP = 0.24
 const SHIRTS = ['#e53935', '#fafafa', '#1e88e5', '#fdd835', '#43a047', '#ff7043', '#8e24aa', '#26c6da']
 const PAINT = ['#d32f2f', '#1565c0', '#fdd835', '#2e7d32', '#fafafa', '#ff6d00', '#6a1b9a', '#212121', '#00acc1', '#c2185b']
@@ -57,26 +61,26 @@ function raceCar() {
   return carGeo
 }
 
-type Fan = { a: number; r: number; y: number; sits: boolean; pep: number }
+type Fan = { a: number; r: number; y: number; pep: number }
 
 export function SpeedwayLife({ lvl }: { lvl: number }) {
   const [sx, , sz] = useMergeScale()
   // A bigger block has a longer track and longer terraces: fill them, don't grow anyone.
   const k = (sx + sz) / 2
   const cars = Math.round((2 + Math.ceil(lvl / 2)) * k)
-  // Fuller stands every level: 9 a row at level 1, 16 at level 10.
-  const perRow = Math.round((9 + Math.floor(lvl * 0.7)) * k)
+  // Fuller stands every level: 18 a row at level 1, 36 at level 10.
+  const perRow = Math.round((16 + lvl * 2) * k)
   const fans = useMemo(() => {
     const out: Fan[] = []
-    const row = (n: number, r: number, y: number, sits: boolean, off: number) => {
+    // One seat a fan, along the front of each row, rows staggered.
+    const row = (n: number, { r0, y }: { r0: number; y: number }, off: number) => {
       for (let i = 0; i < n; i++) {
         const a = ARC0 + (ARC * (i + 0.25 + off)) / n
-        out.push({ a, r, y, sits, pep: ((i * 7 + out.length * 3) % 5) / 5 })
+        out.push({ a, r: r0 + 0.032, y, pep: ((i * 7 + out.length * 3) % 5) / 5 })
       }
     }
-    row(perRow, TERRACE.front.r, TERRACE.front.y, false, 0)
-    row(perRow, TERRACE.back.r, TERRACE.back.y, true, 0.5)
-    if (deckAt(lvl)) row(perRow - 2, DECK.fans, DECK.y + DECK.t / 2, true, 0.25)
+    TIERS.forEach((t, j) => row(perRow, t, j * 0.5))
+    if (deckAt(lvl)) DECK.rows.forEach((t, j) => row(perRow - 2, t, 0.25 + j * 0.5))
     return out
   }, [perRow, lvl])
   const n = fans.length
@@ -133,8 +137,7 @@ export function SpeedwayLife({ lvl }: { lvl: number }) {
     b.instanceMatrix.needsUpdate = true
 
     // Fans: up on their feet as a car comes past and as the wave sweeps the
-    // stands, arms in the air; sat down (the back rows) or leaning on the
-    // rail (the front) in between.
+    // stands, arms in the air; sat in their seats in between.
     const wave = ((time / 7) % 1) * 1.6 - 0.3
     for (let i = 0; i < n; i++) {
       const f = fans[i]
@@ -146,12 +149,10 @@ export function SpeedwayLife({ lvl }: { lvl: number }) {
       const along = (f.a - ARC0) / ARC
       const w = Math.exp(-(((along - wave) / 0.07) ** 2))
       const cheer = Math.min(1, Math.max(w, Math.exp(-((near / 0.45) ** 2)) * (0.6 + f.pep * 0.4), f.pep > 0.75 ? 0.35 : 0))
-      // Sat down, the thighs tip forward from the hip (the front row stands at the rail).
-      const knee = f.sits ? (1 - cheer) * 1.25 : 0
       const x = Math.sin(f.a) * f.r, z = Math.cos(f.a) * f.r
       const fx = x / SCALE, fy = f.y / SCALE, fz = z / SCALE
       spot.set([fx, fy, fz], i * 3)
-      const hip = HIP * Math.cos(knee) + Math.abs(Math.sin(time * 8 + i * 1.3)) * 0.03 * cheer
+      const hip = SEAT + (HIP - SEAT) * cheer + Math.abs(Math.sin(time * 8 + i * 1.3)) * 0.03 * cheer
       const heading = Math.atan2(-x * sx, -z * sz)
       const sin = Math.sin(heading), cos = Math.cos(heading)
       dummy.rotation.set(0, heading, 0)
@@ -175,10 +176,10 @@ export function SpeedwayLife({ lvl }: { lvl: number }) {
         dummy.rotation.set(0, heading, a, 'YXZ')
         dummy.updateMatrix()
         ar.setMatrixAt(i * 2 + (side > 0 ? 1 : 0), dummy.matrix)
-        // Legs hang from the hip: straight down standing, forward along the seat sat down.
-        const ox2 = side * 0.045, fw = Math.sin(knee) * HIP / 2
-        dummy.position.set(fx + cos * ox2 + sin * fw, fy + hip - (Math.cos(knee) * HIP) / 2, fz - sin * ox2 + cos * fw)
-        dummy.rotation.set(-knee, heading, 0, 'YXZ')
+        // Legs hang straight down from the hip: inside the step sat down, on it stood up.
+        const ox2 = side * 0.045
+        dummy.position.set(fx + cos * ox2, fy + hip - HIP / 2, fz - sin * ox2)
+        dummy.rotation.set(0, heading, 0)
         dummy.updateMatrix()
         lg.setMatrixAt(i * 2 + (side > 0 ? 1 : 0), dummy.matrix)
       }
