@@ -105,6 +105,8 @@ const tailGeo = bakeParts([
   [new BoxGeometry(0.012, 0.32, 0.04), { color: '#37474f', rough: 0.5 }, [0, 0, 0]],
   [new BoxGeometry(0.012, 0.04, 0.32), { color: '#37474f', rough: 0.5 }, [0, 0, 0]],
 ])
+// The same helicopter for the ones that fly over town (FlyByModels.tsx).
+export const heliParts = { body: heliBody, blades: bladeGeo, tail: tailGeo, mat }
 const discGeo = new CircleGeometry(1.02, 28)
 const discMat = new MeshBasicMaterial({ color: '#263238', transparent: true, opacity: 0, depthWrite: false, side: DoubleSide })
 const tailDiscGeo = new CircleGeometry(0.17, 14)

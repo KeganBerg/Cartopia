@@ -7,17 +7,16 @@ import {
 import { weatherNow } from '../game/weather'
 import { auroraHour, flyByGap, meteorGap, pickFlyBy, skyClear, skyPins, type FlyBy } from '../game/skyExtras'
 import { reduceMotionOn, systemReducedMotion, useLite, usePrefs } from '../lib/prefs'
-import { calmFlashing } from '../game/flashing'
 import { dayPhase, nightAmount } from './dayNight'
 import { frameFor, type Frame } from './Weather'
 import { isFree } from './freeCam'
 import { A_CITY } from './horizonLand'
 import { BalloonModel } from './Balloon'
-import { Box, Cone, Cyl } from './RaceVenues'
+import { Airliner, BannerPlane, Blimp, NewsHeli, LIVERIES, BANNERS, rocketGeo, flyMat } from './FlyByModels'
 
 // Extras in the town's sky (timing in game/skyExtras.ts): northern lights in
-// the small hours, shooting stars, and planes, balloons and the odd rocket
-// passing over. In the free view the lights and stars sit in the sky low over
+// the small hours, shooting stars, and planes, helicopters, banner planes, the
+// blimp, balloons and the odd rocket passing over (models in FlyByModels.tsx). In the free view the lights and stars sit in the sky low over
 // the far city; from the bird's-eye view, which never sees the sky, they hang
 // in the air over the top of the screen like the rainbow does. Saver skips the
 // aurora and the fly-bys; reduced motion skips the shooting stars and slows
@@ -311,7 +310,8 @@ function useDevHook(name: 'meteor' | 'flight', state: React.RefObject<object>) {
 }
 
 // ---------- Fly-bys ----------
-type Flight = { kind: FlyBy | null; at: number; dur: number; next: number; from: Vector3; to: Vector3; scale: number; free: boolean }
+// look: which livery or banner this one wears.
+type Flight = { kind: FlyBy | null; at: number; dur: number; next: number; from: Vector3; to: Vector3; scale: number; free: boolean; look: number }
 const UP = new Vector3(0, 1, 0)
 const quat = new Quaternion()
 const vel = new Vector3()
@@ -323,6 +323,9 @@ const mid = new Vector3()
 // where it can be seen: the free view never tilts far above the horizon.
 const FLIGHT: Record<FlyBy, { dur: number; y: number; el: number }> = {
   plane: { dur: 34, y: 34, el: 9 },
+  heli: { dur: 28, y: 24, el: 6 },
+  banner: { dur: 40, y: 24, el: 6 },
+  blimp: { dur: 95, y: 36, el: 8 },
   balloon: { dur: 80, y: 26, el: 6 },
   rocket: { dur: 7, y: 24, el: 2 },
 }
@@ -331,15 +334,17 @@ const AHEAD = 180
 const BALLOONS = [['#e53935', '#fdd835'], ['#1e88e5', '#ffffff'], ['#43a047', '#ff7043'], ['#8e24aa', '#ffca28']]
 const TOWN_BALLOON = BALLOONS[Math.floor(Math.random() * BALLOONS.length)]
 
+const KINDS: FlyBy[] = ['plane', 'heli', 'banner', 'blimp', 'balloon', 'rocket']
+
 function FlyBys() {
   const camera = useThree((s) => s.camera)
-  const refs = useRef<Record<FlyBy, Group | null>>({ plane: null, balloon: null, rocket: null })
-  const strobe = useRef<Group>(null)
-  const beacon = useRef<Group>(null)
+  const refs = useRef<Record<FlyBy, Group | null>>({ plane: null, heli: null, banner: null, blimp: null, balloon: null, rocket: null })
   const flame = useRef<Group>(null)
   const frame = useMemo<Frame>(() => ({ center: new Vector3(), span: 60, top: 22, px: 0.03 }), [])
   // `next` < 0: not scheduled yet.
-  const st = useRef<Flight>({ kind: null, at: 0, dur: 1, next: -1, from: new Vector3(), to: new Vector3(), scale: 1, free: false })
+  const st = useRef<Flight>({ kind: null, at: 0, dur: 1, next: -1, from: new Vector3(), to: new Vector3(), scale: 1, free: false, look: 0 })
+  const livery = useRef(0)
+  const message = useRef(0)
   useDevHook('flight', st)
   useFrame(({ clock }) => {
     const s = st.current
@@ -350,10 +355,15 @@ function FlyBys() {
       const w = weatherNow()
       const fair = w.rain < 0.1 && w.snow < 0.1 && w.wind < 0.5 && w.haze < 0.4
       s.kind = pickFlyBy(Math.random(), Math.random(), nightAmount(dayPhase()), fair, w.mix.storm + w.mix.blizzard > 0.5)
-      if (s.kind) route(s, t, camera, frame)
+      if (s.kind) {
+        route(s, t, camera, frame)
+        s.look = Math.floor(Math.random() * 1000)
+        livery.current = s.look % LIVERIES.length
+        message.current = s.look % BANNERS.length
+      }
       else s.next = t + flyByGap(Math.random())
     }
-    for (const k of ['plane', 'balloon', 'rocket'] as const) if (refs.current[k]) refs.current[k].visible = s.kind === k
+    for (const k of KINDS) if (refs.current[k]) refs.current[k].visible = s.kind === k
     if (!s.kind) return
     const g = refs.current[s.kind]
     const k = (t - s.at) / s.dur
@@ -370,12 +380,16 @@ function FlyBys() {
       // Bobs gently and turns slowly as it drifts.
       g.position.y += Math.sin(t * 0.4) * 0.6 * s.scale
       g.rotation.set(0, t * 0.05, 0)
-    } else if (s.kind === 'plane') {
+    } else if (s.kind === 'heli') {
+      // Nose down as it pushes along, rocking a little.
+      g.rotation.set(0.14 + Math.sin(t * 0.8) * 0.02, Math.atan2(vel.x, vel.z), Math.sin(t * 0.6) * 0.04, 'YXZ')
+    } else if (s.kind === 'blimp') {
+      // Pitches and wallows gently.
+      g.position.y += Math.sin(t * 0.3) * 0.3 * s.scale
+      g.rotation.set(Math.sin(t * 0.25) * 0.03, Math.atan2(vel.x, vel.z), 0, 'YXZ')
+    } else if (s.kind !== 'rocket') {
+      // Planes: the lights blink in the models (FlyByModels.tsx).
       g.rotation.set(0, Math.atan2(vel.x, vel.z), 0)
-      // Navigation lights: a white strobe and a red beacon, steady when motion is reduced.
-      const calm = reduceMotionOn() || calmFlashing()
-      if (strobe.current) strobe.current.visible = calm || (t * 0.9) % 1 < 0.08
-      if (beacon.current) beacon.current.visible = calm || (t * 0.7 + 0.5) % 1 < 0.35
     } else {
       // Rockets climb as they go, nose first, the flame flickering.
       g.position.y += k * k * 40 * s.scale
@@ -387,7 +401,16 @@ function FlyBys() {
   return (
     <group>
       <group ref={(g) => { refs.current.plane = g }} visible={false}>
-        <group scale={0.7}><Plane strobe={strobe} beacon={beacon} /></group>
+        <group scale={0.9}><Airliner livery={livery} /></group>
+      </group>
+      <group ref={(g) => { refs.current.heli = g }} visible={false}>
+        <group scale={1.2}><NewsHeli /></group>
+      </group>
+      <group ref={(g) => { refs.current.banner = g }} visible={false}>
+        <group scale={1.3}><BannerPlane message={message} /></group>
+      </group>
+      <group ref={(g) => { refs.current.blimp = g }} visible={false}>
+        <group scale={1.4}><Blimp /></group>
       </group>
       <group ref={(g) => { refs.current.balloon = g }} visible={false}>
         <group scale={0.27}><BalloonModel c={TOWN_BALLOON} /></group>
@@ -437,46 +460,12 @@ function route(s: Flight, t: number, camera: Camera, frame: Frame) {
   }
 }
 
-// A little airliner, about 2.4 long, flying along +z.
-function Plane({ strobe, beacon }: { strobe: React.RefObject<Group | null>; beacon: React.RefObject<Group | null> }) {
-  return (
-    <group>
-      <Cyl p={[0, 0, 0]} r={0.16} h={2.2} c="#eceff1" rot={[Math.PI / 2, 0, 0]} />
-      <Cone p={[0, 0, 1.22]} r={0.16} h={0.3} c="#eceff1" />
-      <Box p={[0, 0, 0.1]} s={[2.3, 0.05, 0.42]} c="#cfd8dc" />
-      <Box p={[0, 0, -0.95]} s={[0.9, 0.04, 0.26]} c="#cfd8dc" />
-      <Box p={[0, 0.25, -0.98]} s={[0.05, 0.5, 0.3]} c="#1e88e5" />
-      {[-0.55, 0.55].map((x) => <Cyl key={x} p={[x, -0.12, 0.2]} r={0.08} h={0.38} c="#90a4ae" rot={[Math.PI / 2, 0, 0]} />)}
-      {/* Red on the left wingtip, green on the right. */}
-      <Light p={[1.17, 0, 0.05]} c="#ff2a2a" />
-      <Light p={[-1.17, 0, 0.05]} c="#2aff6a" />
-      <group ref={strobe}><Light p={[0, 0.06, -1.12]} c="#ffffff" r={0.09} /></group>
-      <group ref={beacon}><Light p={[0, -0.18, 0.1]} c="#ff3030" r={0.07} /></group>
-    </group>
-  )
-}
-
-function Light({ p, c, r = 0.07 }: { p: [number, number, number]; c: string; r?: number }) {
-  return (
-    <mesh position={p}>
-      <sphereGeometry args={[r, 8, 6]} />
-      <meshBasicMaterial color={c} toneMapped={false} />
-    </mesh>
-  )
-}
-
-// A cartoon rocket, nose up (+y), about 2 tall.
+// A cartoon rocket, nose up (+y), about 2 tall, its flame flickering.
 function Rocket({ flame }: { flame: React.RefObject<Group | null> }) {
   return (
     <group>
-      <Cyl p={[0, 0, 0]} r={0.3} h={1.2} c="#f5f5f5" seg={12} />
-      <Cone p={[0, 0.85, 0]} r={0.3} h={0.5} c="#e53935" seg={12} />
-      <mesh position={[0, 0.2, 0.28]}>
-        <sphereGeometry args={[0.12, 10, 8]} />
-        <meshStandardMaterial color="#4fc3f7" emissive="#4fc3f7" emissiveIntensity={0.4} />
-      </mesh>
-      {[0, 1, 2].map((i) => <Box key={i} ry={(i * Math.PI * 2) / 3} p={[Math.sin((i * Math.PI * 2) / 3) * 0.32, -0.5, Math.cos((i * Math.PI * 2) / 3) * 0.32]} s={[0.05, 0.4, 0.3]} c="#e53935" />)}
-      <group ref={flame} position={[0, -0.62, 0]}>
+      <mesh geometry={rocketGeo} material={flyMat} raycast={() => null} />
+      <group ref={flame} position={[0, -0.78, 0]}>
         <mesh position={[0, -0.3, 0]} rotation-x={Math.PI}>
           <coneGeometry args={[0.22, 0.6, 10]} />
           <meshBasicMaterial color="#ff9800" toneMapped={false} />
