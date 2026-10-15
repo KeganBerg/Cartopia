@@ -682,7 +682,14 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
       const bz = z - 0.05 - Math.sin(-rake) * hb * 0.5
       k.add('seat', rbox(sw * 0.82, hb, 0.026, 0.01), [x, by, bz], [rake, 0, 0])
       for (const e of [-1, 1]) k.add('seat', rbox(sw * 0.13, hb * 0.85, 0.05, 0.01), [x + e * sw * 0.43, by - hb * 0.05, bz + 0.012], [rake, 0, 0])
-      k.add('seat', rbox(sw * 0.5, 0.045, 0.03, 0.012), [x, fl + 0.03 + hb + 0.03, bz - Math.sin(-rake) * (hb * 0.5 + 0.03)], [rake, 0, 0])
+      // Headrest on two short posts rising from the top of the back, along its rake.
+      const up = (d: number): V3 => [x, by + Math.cos(rake) * d, bz + Math.sin(rake) * d]
+      const hr = up(hb / 2 + 0.012 + 0.0225)
+      k.add('seat', rbox(sw * 0.5, 0.045, 0.03, 0.012), hr, [rake, 0, 0])
+      for (const e of [-1, 1]) {
+        const pp = up(hb / 2 + 0.008)
+        k.add('chrome', cyl(0.004, 0.004, 0.026, 6), [x + e * sw * 0.13, pp[1], pp[2]], [rake, 0, 0])
+      }
     }
     k.add('black', rbox(s.wid * 0.78, 0.06, 0.08, 0.02), [0, top + 0.03, s.cabinZ + s.cabinLen * 0.38])
     // Two round gauges and a row of switches on the dash.
@@ -955,8 +962,6 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
       bar(k, 'black', [hx + sd * 0.012, top - 0.01, s.cabinZ + 0.1], [hx + sd * 0.012, top - 0.01, s.cabinZ - 0.06], 0.012)
       k.add('black', rbox(0.06, 0.012, 0.12, 0.004), [sd * (s.wid / 2 + 0.03), s.lift + 0.03, s.cabinZ])
       for (const dz of [-0.05, 0.05]) k.add('black', box(0.008, 0.05, 0.008), [sd * (s.wid / 2 + 0.006), s.lift + 0.05, s.cabinZ + dz])
-      // Four-point harness over each seat.
-      for (const dx of [-0.035, 0.035]) bar(k, 'black', [sd * s.wid * 0.2 + dx, top + 0.25, s.cabinZ - 0.11], [sd * s.wid * 0.2 + dx * 0.5, top + 0.15, s.cabinZ + 0.02], 0.01)
       // Padding on the roll hoop legs.
       k.add('dark', cyl(0.026, 0.026, 0.1, 8), [sd * s.wid * 0.36, top + 0.07, hz])
     }
