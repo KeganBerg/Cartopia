@@ -6,6 +6,7 @@
 // an old save shows exactly what it showed before.
 import { useEffect, useRef, useState } from 'react'
 import { useGame } from './store'
+import { sfx } from '../lib/sound'
 
 type Game = ReturnType<typeof useGame.getState>
 
@@ -38,6 +39,7 @@ export function useUnlock(id: Unlock): { on: boolean; fresh: boolean } {
     if (on === was.current) return
     was.current = on
     if (!on) return
+    if (!useGame.getState().visiting) sfx.unlock()
     setFresh(true)
     const t = window.setTimeout(() => setFresh(false), 4000)
     return () => window.clearTimeout(t)

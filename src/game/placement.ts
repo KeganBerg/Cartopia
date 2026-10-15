@@ -1,6 +1,7 @@
 import { useGame, canPlace, lotSize, type PlacedBuilding } from './store'
 import { buildingDef } from './data'
 import { groupOf } from './merge'
+import { sfx } from '../lib/sound'
 
 // The turn the placement ghost currently shows, so Rotate turns from what the player sees.
 let ghostTurn = 0
@@ -65,7 +66,9 @@ export function rotateSelected() {
   const far = to % 2 ? Math.ceil : Math.floor
   const spots: [number, number][] = [[near(x), near(z)], [far(x), near(z)], [near(x), far(z)], [far(x), far(z)]]
   const spot = spots.find(([sx, sz]) => canPlace(s, b.def, sx, sz, to, b.uid))
-  if (!spot || !s.moveBuilding(b.uid, spot[0], spot[1], to)) {
+  if (spot && s.moveBuilding(b.uid, spot[0], spot[1], to)) sfx.click()
+  else {
+    sfx.error()
     s.toast('No room to turn it here. Drag it somewhere roomier first.')
   }
 }

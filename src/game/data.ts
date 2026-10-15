@@ -226,6 +226,10 @@ export const jobLevel = (b: { level?: number; jobLevel?: number }) =>
 export const upgradePayout = (d: BuildingDef, level: number) => Math.round((d.payout ?? 0) * (1 + 0.1 * (level - 1)))
 export const upgradePartsPayout = (d: BuildingDef, level: number) => Math.round((d.partsPayout ?? 0) * (1 + 0.1 * (level - 1)))
 export const upgradeXp = (d: BuildingDef, level: number) => Math.round((d.xp ?? 0) * (1 + 0.05 * (level - 1)))
+// Town jobs pay 2.5% more XP for every level past 5 (level 20: +38%, level 40: +88%).
+export const townXpMult = (level: number) => 1 + 0.025 * Math.max(0, level - 5)
+// What a job actually pays in XP: the building's rate, grown by the player's level.
+export const jobXp = (d: BuildingDef, level: number, playerLevel: number) => Math.round(upgradeXp(d, level) * townXpMult(playerLevel))
 export const upgradeJobSeconds = (d: BuildingDef, level: number) =>
   d.jobSeconds ? Math.max(10, Math.round((d.jobSeconds * Math.pow(0.92, level - 1)) / 5) * 5) : 0
 // A brand new town's first few jobs finish in 25 seconds, so the first coins come fast.
@@ -271,6 +275,7 @@ export type Body = 'compact' | 'sedan' | 'sports' | 'muscle' | 'truck' | 'super'
   | 'hatch' | 'van' | 'suv' | 'ev' | 'luxury' | 'formula' | 'bus' | 'tusker' | 'dogvan' | 'rearengine' | 'longnose' | 'prototype'
   | 'scissor' | 'horseshoe' | 'teardrop' | 'icecream' | 'monster' | 'parcel'
   | 'pontoon' | 'stepnose' | 'restomuscle'
+  | 'highboy' | 'timeattack' | 'groupb' | 'longtail' | 'ponycar' | 'gtcoupe'
 // Two-wheelers: drawn as motorcycles with a rider, and only take exhaust and rim mods.
 export const BIKES: Body[] = ['scooter', 'chopper', 'sportbike']
 export const isBike = (body: Body) => BIKES.includes(body)
@@ -340,6 +345,9 @@ export type CarDef = {
   // Resto-mod: never sold, never a whole-car crate prize; only built from its four crate
   // pieces (game/resto.ts). Its unlock level is when its pieces start dropping.
   secret?: boolean
+  // Car pack car: only ever comes in its real-money car pack (bucksPacks.ts), never the
+  // Showroom or a crate. Its unlock level is when the pack goes on sale to you.
+  pack?: boolean
 }
 
 // Parodies of real cars: the shapes and stats nod to the real thing, but the
@@ -396,6 +404,14 @@ export const CARS: CarDef[] = [
   { id: 'sprint', name: 'Valtorre Sprint 65', body: 'stepnose', price: 70000, unlockLevel: 10, secret: true, power: 110, grip: 104, weight: 30, skill: 'smooth', likes: ['coffee', 'cinema', 'tuner'], colors: ['#1b4d3e', '#efe7d2', '#6d1b2b'] },
   { id: 'revenant', name: "Liberty Revenant '69", body: 'restomuscle', price: 110000, unlockLevel: 14, secret: true, power: 130, grip: 92, weight: 56, skill: 'torque', likes: ['burger', 'lube', 'bodyshop'], colors: ['#8d9094', '#1c1c1c', '#0d2a5c'] },
   { id: 'pontone', name: 'Corvara Pontone 58', body: 'pontoon', price: 170000, unlockLevel: 18, secret: true, power: 122, grip: 118, weight: 26, skill: 'slipstream', likes: ['stadium', 'diner', 'motel'], colors: ['#b71c1c', '#cfd8dc', '#1b5e20'] },
+  // Car packs (2026-10-15): cars only sold in the Bank's car packs, each a little quicker than the
+  // Showroom's best at its level (see packCars.ts for the bodies).
+  { id: 'stinger', name: 'Liberty Stinger SS', body: 'ponycar', price: 0, unlockLevel: 12, pack: true, power: 78, grip: 48, weight: 52, skill: 'torque', likes: ['diner', 'burger', 'tires'], colors: ['#ffb300', '#212121', '#c62828'] },
+  { id: 'sora', name: 'Kazumi Sora GT', body: 'gtcoupe', price: 0, unlockLevel: 20, pack: true, power: 84, grip: 72, weight: 40, skill: 'smooth', likes: ['tuner', 'arcade', 'parts'], colors: ['#c62828', '#eceff1', '#1565c0'] },
+  { id: 'firebolt', name: 'Liberty Firebolt Highboy', body: 'highboy', price: 0, unlockLevel: 8, pack: true, power: 122, grip: 70, weight: 40, skill: 'launch', likes: ['diner', 'burger', 'lube'], colors: ['#b71c1c', '#212121', '#ffb300'] },
+  { id: 'kaze', name: 'Kazumi Kaze TA-R', body: 'timeattack', price: 0, unlockLevel: 15, pack: true, power: 114, grip: 96, weight: 36, skill: 'smooth', likes: ['tuner', 'parts', 'arcade'], colors: ['#eceff1', '#0d47a1', '#ff6d00'] },
+  { id: 'sturm', name: 'Falke Sturm S1', body: 'groupb', price: 0, unlockLevel: 25, pack: true, power: 120, grip: 100, weight: 40, skill: 'torque', likes: ['tires', 'stadium', 'junkyard'], colors: ['#fafafa', '#c62828', '#1b5e20'] },
+  { id: 'vanta', name: 'Aether Vanta LT', body: 'longtail', price: 0, unlockLevel: 40, pack: true, power: 130, grip: 110, weight: 30, skill: 'nitro', likes: ['glasstower', 'helipad', 'club'], colors: ['#263238', '#00e5ff', '#e0e0e0'] },
   { id: 'bug', name: 'Bumble Bubble', body: 'bubble', price: 1200, unlockLevel: 1, rescueOnly: true, power: 20, grip: 34, weight: 28, skill: 'freeze', likes: ['icecream', 'donut', 'coffee'], colors: ['#80cbc4', '#ffcc80', '#ef9a9a'] },
   { id: 'woodie', name: 'Lakeside Woodie Wagon', body: 'wagon', price: 2200, unlockLevel: 1, rescueOnly: true, power: 25, grip: 31, weight: 56, skill: 'slipstream', likes: ['diner', 'hospital', 'market'], colors: ['#fafafa', '#fff59d', '#4db6ac'] },
   { id: 'hauler', name: 'Old Faithful Hauler', body: 'truck', price: 3000, unlockLevel: 1, rescueOnly: true, power: 40, grip: 40, weight: 70, skill: 'torque', likes: ['carwash', 'junkyard', 'tacos'], colors: ['#558b2f', '#e65100', '#1565c0'] },
@@ -726,6 +742,18 @@ export function carStats(car: CarDef, up: Record<UpgradeSlot, number>, mods?: st
 export const XP_FLAT_LEVEL = 100
 export const xpToNext = (level: number) => Math.round(100 * Math.pow(Math.min(level, XP_FLAT_LEVEL), 2.15))
 
+// XP for playing grows with your level, so races, arcade games, roadside service and mastery keep
+// counting on the steep late curve instead of shrinking to nothing. Levels 1-4 are unchanged: the
+// first ten minutes unlock one feature at a time on them. The server's XP bank (econ_guard: a level
+// every 20 minutes, up to 3 banked) sits far above any of this, so it needs no SQL.
+export const playXpMult = (level: number) => Math.max(1, (12 * level - 20) / 30)
+export const playXp = (base: number, level: number) => Math.round(base * playXpMult(level))
+export const RACE_WIN_XP = 30
+export const RACE_LOSS_XP = 8
+export const raceXp = (won: boolean, level: number) => playXp(won ? RACE_WIN_XP : RACE_LOSS_XP, level)
+export const SERVICE_XP = { gas: 8, tires: 12, tow: 15, fix: 5 } as const
+export const serviceXp = (kind: keyof typeof SERVICE_XP, level: number) => playXp(SERVICE_XP[kind], level)
+
 export const baseFuelCap = (level: number) => 15 + level * 2
 export const FUEL_REGEN_SECONDS = 60
 export const RACE_FUEL = 3
@@ -824,6 +852,7 @@ export const CAR_SETS: CarSet[] = [
   { id: 'oddballs', name: 'Oddballs', icon: '🍦', cars: ['scoops', 'courier', 'crusher'], coins: 4000, bucks: 3, trophies: 8, xp: 120 },
   { id: 'restomods', name: 'Resto Garage', icon: '🧩', cars: ['sprint', 'revenant', 'pontone'], coins: 30000, bucks: 15, trophies: 40, xp: 500 },
   { id: 'exotica', name: 'Exotica', icon: '👑', cars: ['fulmine', 'eclat', 'orafo'], coins: 40000, bucks: 20, trophies: 50, xp: 600 },
+  { id: 'carpacks', name: 'Pack Legends', icon: '💳', cars: ['stinger', 'sora', 'firebolt', 'kaze', 'sturm', 'vanta'], coins: 40000, bucks: 20, trophies: 50, xp: 600 },
   // Season track prizes; each season adds its car here.
   { id: 'seasons', name: 'Season Rides', icon: '🏁', cars: ['nightfall'], coins: 5000, bucks: 3, trophies: 10, xp: 150 },
 ]
@@ -836,6 +865,7 @@ export const readySets = (s: { cars: { model: string }[]; claimedSets?: string[]
 export function carSource(car: CarDef): { icon: string; text: string } {
   if (car.season) return { icon: '🏁', text: `Season ${car.season} prize` }
   if (car.secret) return { icon: '🧩', text: 'Crate pieces' }
+  if (car.pack) return { icon: '💳', text: 'Car pack' }
   if (car.rescueOnly) {
     const spot = RESCUE_SPOTS.filter((sp) => sp.cars.some((c) => c.model === car.id)).sort((a, b) => a.unlockLevel - b.unlockLevel)[0]
     return { icon: '🔧', text: spot ? `Rusty's · ${spot.name}` : "Rusty's" }

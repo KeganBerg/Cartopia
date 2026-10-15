@@ -121,6 +121,8 @@ function makeStage(tone: ToneMapping) {
     useLayoutEffect(() => {
       const { cam } = useStage.getState()
       const c = camera as PerspectiveCamera
+      // Parking Pro turns the camera's up on wide screens; the next game must not start on its side.
+      c.up.set(0, 1, 0)
       c.position.set(...cam.position)
       c.fov = cam.fov
       c.near = cam.near

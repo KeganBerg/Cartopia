@@ -6,6 +6,7 @@ import { useNames } from '../lib/profiles'
 import { Panel } from './Menus'
 import { ClanTag, useVisit } from './Social'
 import './chat.css'
+import { sfx } from '../lib/sound'
 
 const ago = (at: number) => {
   const m = Math.floor((Date.now() - at) / 60000)
@@ -103,6 +104,7 @@ function ChatRoom({ room }: { room: Room }) {
     const err = await sendChat(room, text)
     setBusy(false)
     if (err) return toast(err)
+    sfx.send()
     setText('')
     pinned.current = true
   }
@@ -149,6 +151,7 @@ function ChatRoom({ room }: { room: Room }) {
                 <button className="chat-who" onClick={() => setMenu(menu === m.id ? null : m.id)}>
                   <ClanTag clan={m.crew} small />
                   <b>{senderName(m)}</b>
+                  {m.mod && <span className="chat-mod" title="Cartopia team" aria-label="Cartopia team">✔</span>}
                   <small>Lv {m.level} · {ago(m.at)}</small>
                 </button>
               )}

@@ -50,3 +50,36 @@ export function legGeo(len: number) {
     paint(at(new BoxGeometry(0.066, 0.04, 0.105), 0, -len / 2 + 0.01, 0.017), '#2b2b2b'),
   ])!
 }
+
+// Walked dog: the Dog Park dog (body, head, snout, nose, eyes, ears, legs and a
+// raised tail) plus a collar, as ONE geometry so it rides one instance. White
+// takes the coat tint; darker shades give the ears and collar a shade of their
+// own. Origin on the ground, nose toward +z, at the Dog Park's world size
+// divided by `scale` (the townspeople group's scale).
+export function dogGeo(scale: number) {
+  const box = (sx: number, sy: number, sz: number, x: number, y: number, z: number, hex: string, rx = 0, rz = 0) =>
+    paint(new BoxGeometry(sx, sy, sz).rotateX(rx).rotateZ(rz).translate(x, y, z), hex)
+  const ball = (r: number, x: number, y: number, z: number, hex: string, w = 8, h = 6) => paint(new SphereGeometry(r, w, h).translate(x, y, z), hex)
+  return mergeGeometries([
+    paint(new SphereGeometry(0.08, 10, 7).scale(0.7, 0.65, 1.3).translate(0, 0.13, 0), '#ffffff'),
+    ball(0.055, 0, 0.2, 0.11, '#ffffff', 10, 7),
+    box(0.04, 0.035, 0.05, 0, 0.185, 0.17, '#f2f2f2'),
+    box(0.022, 0.02, 0.01, 0, 0.195, 0.197, '#151515'),
+    ...[-1, 1].map((s) => ball(0.008, s * 0.024, 0.215, 0.157, '#151515', 6, 4)),
+    ...[-1, 1].map((s) => box(0.025, 0.05, 0.02, s * 0.04, 0.24, 0.1, '#9a9a9a', 0, s * 0.24)),
+    ...[[-1, 1], [1, 1], [-1, -1], [1, -1]].map(([x, z]) => box(0.025, 0.1, 0.025, x * 0.035, 0.05, z * 0.06, '#ffffff')),
+    box(0.015, 0.015, 0.08, 0, 0.18, -0.11, '#ffffff', 0.7),
+    paint(new CylinderGeometry(0.043, 0.047, 0.016, 10, 1, true).rotateX(-0.9).translate(0, 0.17, 0.075), '#c62828'),
+  ])!.scale(1 / scale, 1 / scale, 1 / scale)
+}
+
+// A leash: one unit long from the origin along +z, stretched to reach the dog.
+export function leashGeo() {
+  return new BoxGeometry(0.009, 0.009, 1).translate(0, 0, 0.5)
+}
+
+// Townspeople proportions, shared by every figure that should match them:
+// parts are placed from the hip up, in model units, and drawn `scale` bigger.
+export const PERSON = { scale: 1.3, leg: 0.24, torso: 0.15, head: 0.36, hair: 0.385 }
+// A standing townsperson's height in world units, feet to the top of the hair.
+export const PERSON_H = (PERSON.leg + PERSON.hair + 0.085 * 0.8) * PERSON.scale

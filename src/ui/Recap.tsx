@@ -1,11 +1,19 @@
+import { useEffect } from 'react'
 import { useGame } from '../game/store'
 import { REP_TITLES } from '../game/reputation'
 import { recapShare } from '../game/recap'
+import { sfx } from '../lib/sound'
 
 // The season recap card (game/recap.ts), shown once when a new season starts.
 export function RecapPopup() {
   const r = useGame((s) => s.recap)
   const close = useGame((s) => s.closeRecap)
+  const open = !!r
+  useEffect(() => {
+    if (!open) return
+    const timer = setTimeout(sfx.reward, 250)
+    return () => clearTimeout(timer)
+  }, [open])
   if (!r) return null
   const from = REP_TITLES[r.repFrom], to = REP_TITLES[r.repTo]
   const share = async () => {

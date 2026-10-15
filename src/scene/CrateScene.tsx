@@ -4,7 +4,7 @@ import {
   AdditiveBlending, CanvasTexture, Color, DoubleSide, MeshBasicMaterial, MeshStandardMaterial, Object3D, RepeatWrapping, SRGBColorSpace,
   Quaternion, Vector3, type Group, type PerspectiveCamera, type InstancedMesh, type Mesh, type PointLight, type Points, type SpotLight,
 } from 'three'
-import { CarModel, carSize } from './CarModel'
+import { CarModel, carSize, carTop } from './CarModel'
 import { holdTown } from './renderGate'
 import { holdPageTint } from './pageTint'
 import { PostFx } from './PostFx'
@@ -23,7 +23,7 @@ import { bumpSound } from '../lib/arcadeSound'
 import { crateOpenSound } from '../lib/crateOpenSfx'
 import { crateSfx, sfx } from '../lib/sound'
 import { landClink } from '../lib/crateClinks'
-import { PartPrize } from './PartPrize'
+import { PART_LIFT, PART_SIZE, PART_WHEEL, PartPrize } from './PartPrize'
 import { pinPrograms, warmShaders } from './warm'
 
 // The Crate Depot: a warehouse loading bay at night where crates are opened. The crate sits on a
@@ -570,8 +570,24 @@ export function Dust() {
 
 type CarLook = { body: Body; model: string; color: string; finish?: Finish | null; stripe?: string | null; mods?: string[] | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; panels?: Panels | null; hat?: HatFit | null }
 
+const prizeScale = (body: Body) => 2.3 / carSize(body).len
+// How tall a hat stands on a car, in the car's own units (CarHat).
+const HAT_HEIGHT = 0.22
+// How much smaller a part shows when it floats over the car wearing it.
+const PART_OVER = 0.42
+// How high that part floats: at least its usual height, and always clear of the car's roll bar,
+// seats and roof (and the hat on top), with a little air between.
+function partOver(look: CarLook, part: string) {
+  const sc = prizeScale(look.body)
+  const wheel = ['rims', 'tires'].includes(MODS.find((m) => m.id === part)?.slot ?? '')
+  // The part's reach from its turning axis, and how far its lowest point sits below its middle (PartPrize).
+  const half = (wheel ? PART_WHEEL : PART_SIZE / 2) * PART_OVER
+  const top = carTop(look.body, look.model, look.mods, half / sc) * sc + (look.hat ? HAT_HEIGHT * sc : 0)
+  return Math.max(1.05, top + 0.06 - (PART_LIFT * PART_OVER - half))
+}
+
 function PrizeCar({ look }: { look: CarLook }) {
-  const sc = 2.3 / carSize(look.body).len
+  const sc = prizeScale(look.body)
   return (
     <group scale={sc}>
       <CarModel body={look.body} model={look.model} color={look.color} finish={look.finish} stripe={look.stripe} mods={look.mods} skin={look.skin} modSkin={look.modSkin} panels={look.panels} hat={look.hat} />
@@ -1294,14 +1310,15 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base, baseQ, pace =
         <pointLight ref={key} position={[0.8, 2.6, 3.2]} intensity={0} distance={9} color="#fff4e0" />
         <pointLight ref={rim} position={[0, 2.4, -2.4]} intensity={0} distance={7} color={glow} />
         {/* PartPrize's own key light, where it sits: on its own, or small over the car wearing it. */}
-        <pointLight ref={partKey} position={prizeCar ? [0.25, 2.12, 0.67] : [0.6, 2.55, 1.6]} intensity={0} distance={prizeCar ? 2.1 : 5} color="#fff8e1" />
+        <pointLight ref={partKey} position={part && prizeCar ? [0.6 * PART_OVER, partOver(prizeCar, part) + (PART_LIFT + 1.4) * PART_OVER, 1.6 * PART_OVER] : [0.6, PART_LIFT + 1.4, 1.6]}
+          intensity={0} distance={prizeCar ? 5 * PART_OVER : 5} color="#fff8e1" />
       </group>
       <group ref={prize} visible={false}>
         {showCar && prizeCar && <PrizeCar look={prizeCar} />}
         {coins && !showCar && <CoinPile />}
         {/* A part floats over the car wearing it, smaller, still turning; with no car to show, on its own. */}
         {part && (prizeCar ? (
-          <group position-y={1.05} scale={0.42}><PartPrize id={part} body={prizeCar.body} tint={prizeCar.color} lit={false} /></group>
+          <group position-y={partOver(prizeCar, part)} scale={PART_OVER}><PartPrize id={part} body={prizeCar.body} tint={prizeCar.color} lit={false} /></group>
         ) : <PartPrize id={part} tint="#90a4ae" lit={false} />)}
         {/* A slowly turning ring of light under the prize. */}
         <mesh rotation-x={-Math.PI / 2} position-y={0.02}>

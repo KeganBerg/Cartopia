@@ -10,6 +10,8 @@ import { Panel } from './Menus'
 import { SocialTabs } from './Social'
 import { PlayerName } from './Username'
 import { LoadingBand } from './Loading'
+import { PlayerCardPopup } from './PlayerCard'
+import { openPlayerCard } from '../lib/playerCard'
 
 const Thumb = ({ car, size }: { car: OwnedCar; size?: 'sm' }) => {
   const d = carDef(car.model)
@@ -27,7 +29,7 @@ export function LikeButton({ owner, mine }: { owner: string; mine?: boolean }) {
   const n = l?.likes ?? 0
   if (mine) return <span className="meet-likes" title="Likes on your display">❤️ {n}</span>
   return (
-    <button className={l?.liked ? 'buy small alt meet-like liked' : 'buy small meet-like'} disabled={l?.liked} onClick={() => likeDisplay(owner)} title={l?.liked ? 'Liked today' : 'Like this display'}>
+    <button className={l?.liked ? 'buy small alt meet-like liked' : 'buy small meet-like'} disabled={l?.liked} onClick={() => likeDisplay(owner)} title={l?.liked ? 'Liked' : 'Like this town'}>
       {l?.liked ? '❤️' : '🤍'} {n}
     </button>
   )
@@ -100,12 +102,16 @@ function DisplayRow({ d }: { d: Display }) {
   }
   return (
     <div className="meet-row">
-      <div className="meet-who">
+      <button className="meet-who" onClick={() => openPlayerCard(d.ownerId, d.townName)} title="Profile">
         <b><PlayerName id={d.demo ? null : d.ownerId} town={d.townName} /></b>
-        <div className="card-stat">Lvl {d.level}{d.demo ? ' · neighbour' : ''}</div>
-      </div>
+        <div className="card-stat">⭐ {d.level}{d.demo ? ' · neighbour' : ''}</div>
+      </button>
       <div className="meet-cars">
-        {d.cars.map((c) => <Thumb key={c.uid} car={c} size="sm" />)}
+        {d.cars.map((c) => (
+          <button key={c.uid} className="meet-car" onClick={() => openPlayerCard(d.ownerId, d.townName, c.uid)} aria-label={carDef(c.model).name}>
+            <Thumb car={c} size="sm" />
+          </button>
+        ))}
       </div>
       <div className="leader-acts">
         <LikeButton owner={d.ownerId} />
@@ -121,13 +127,16 @@ export function MeetPanel() {
     fetchMeet().then(setRows).catch(() => setRows([]))
   }, [])
   return (
-    <Panel title="Car Meet" wide>
-      <SocialTabs current="meet" />
-      <MyDisplay />
-      <div className="meet-list">
-        {!rows && <LoadingBand label="Loading the car meet" />}
-        {rows?.map((d) => <DisplayRow key={d.ownerId} d={d} />)}
-      </div>
-    </Panel>
+    <>
+      <Panel title="Car Meet" wide>
+        <SocialTabs current="meet" />
+        <MyDisplay />
+        <div className="meet-list">
+          {!rows && <LoadingBand label="Loading the car meet" />}
+          {rows?.map((d) => <DisplayRow key={d.ownerId} d={d} />)}
+        </div>
+      </Panel>
+      <PlayerCardPopup />
+    </>
   )
 }

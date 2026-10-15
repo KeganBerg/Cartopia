@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { supabase } from './supabase'
 import { signedInUser, flushSave } from './cloud'
 import { displayName } from './names'
+import { sfx } from './sound'
 import { useGame } from '../game/store'
 
 // Amounts are fixed server-side in supabase/migrations/0025_friend_gifts.sql; these are for labels.
@@ -47,6 +48,7 @@ export async function sendGift(to: string, item: GiftItem) {
   if (data === 'limit') return toast("That's all 10 gifts for today")
   useGifts.setState((g) => ({ sent: { ...g.sent, [to]: true } }))
   if (data === 'sent') {
+    sfx.send()
     toast(`Sent ${GIFTS[item].icon} ${GIFTS[item].amount} ${GIFTS[item].label}!`)
     useGame.getState().befriend(to, 'gift')
   }

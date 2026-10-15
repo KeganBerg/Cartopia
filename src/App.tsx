@@ -27,6 +27,7 @@ import { ThoughtBubble } from './ui/Thought'
 import { NeedPanel } from './ui/Need'
 import { UpgradePanel } from './ui/Upgrade'
 import { BankPanel } from './ui/Bank'
+import { CarPacksPanel } from './ui/CarPacks'
 import { DealsPanel } from './ui/Deals'
 import { LevelUpSplash } from './ui/LevelUp'
 import { PurchaseSplash } from './ui/PurchaseSplash'
@@ -191,6 +192,7 @@ export default function App() {
       {panel === 'upgrade' && <UpgradePanel />}
       {panel === 'rescue' && <RescuePanel />}
       {panel === 'bank' && <BankPanel />}
+      {panel === 'carpacks' && <CarPacksPanel />}
       {panel === 'deals' && <DealsPanel />}
       {panel === 'crates' && <CratesPanel />}
       {panel === 'battle' && <BattlePanel />}
