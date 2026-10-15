@@ -295,7 +295,7 @@ function PirateShip({ m }: { m: Mat }) {
 }
 
 // A rock mountain with a cave the back lane runs into and a waterfall into the lagoon.
-function Mountain({ m, bulb }: { m: Mat; bulb: ReactNode }) {
+function Mountain({ m }: { m: Mat }) {
   return (
     <group>
       <mesh position={[0, 0.5, 0]} scale={[1, 1, 0.62]} castShadow receiveShadow>
@@ -306,10 +306,14 @@ function Mountain({ m, bulb }: { m: Mat; bulb: ReactNode }) {
         <cylinderGeometry args={[0.1, 0.34, 0.74, 6]} />
         {m('#a1887f')}
       </mesh>
-      <mesh position={[0, 1.0, 0]} castShadow><coneGeometry args={[0.14, 0.14, 7]} />{m(SNOW ? '#f4f8fb' : '#6d4c41')}</mesh>
-      {/* The waterfall down the front face into the lagoon. */}
-      <Box m={m} at={[-0.12, 0.5, 0.25]} rot={[0.42, 0, 0]} s={[0.16, 0.74, 0.03]} c="#81d4fa" />
-      <mesh position={[-0.12, 0.85, 0.12]}><boxGeometry args={[0.2, 0.05, 0.08]} />{bulb}</mesh>
+      <mesh position={[0, 1.0, 0]} scale={[1, 1, 0.62]} castShadow><coneGeometry args={[0.14, 0.14, 7]} />{m(SNOW ? '#f4f8fb' : '#6d4c41')}</mesh>
+      {/* The waterfall down the front face into the lagoon: laid on the face left of the
+          front ridge (in the rock's unsquashed frame, so it stays flat on it). */}
+      <group scale={[1, 1, 0.62]}>
+        <group rotation-y={-Math.PI / 7}>
+          <Box m={m} at={[0, 0.46, 0.321]} rot={[-0.346, 0, 0]} s={[0.12, 0.72, 0.03]} c="#81d4fa" />
+        </group>
+      </group>
     </group>
   )
 }
@@ -355,7 +359,7 @@ function MiniGolf({ k, def, lvl }: { k: K; def: BuildingDef; lvl: number }) {
       <Water m={m} x0={-0.44} x1={1.14} z0={-0.36} z1={0.44} y={0.066} />
       <group position={[-0.18, 0.05, 0.02]}><Lighthouse m={m} bulb={bulb} /></group>
       {st >= 2 && <group position={[0.62, 0.05, 0.08]} rotation-y={-0.3}><PirateShip m={m} /></group>}
-      {st >= 3 && <group position={[0.62, 0.05, -0.62]}><Mountain m={m} bulb={bulb} /></group>}
+      {st >= 3 && <group position={[0.62, 0.05, -0.62]}><Mountain m={m} /></group>}
       {st >= 3 && <Hole m={m} at={[0.95, 0.2]} c={flags[3]} />}
       {/* Patio: a putter rack, the ball dispenser, a bench and the lamps. */}
       {!ghost && (
@@ -376,7 +380,8 @@ function MiniGolf({ k, def, lvl }: { k: K; def: BuildingDef; lvl: number }) {
           {st >= 2 && <Bulbs from={[-0.6, 1.0, 0.56]} to={[1.3, 1.0, 0.56]} n={11} posts={0.95} sag={0.06} />}
           {st >= 2 && <Lamp m={m} bulb={bulb} at={[1.28, 0.05, -0.45]} ghost={ghost} />}
           {st >= 3 && <Palm m={m} at={[-0.58, 0.05, -0.2]} />}
-          {st >= 3 && <Palm m={m} at={[1.3, 0.05, 0.3]} s={0.9} lean={-0.12} />}
+          {/* In the gap between the front and side lanes, its fronds clear of the windmill's sails. */}
+          {st >= 3 && <Palm m={m} at={[1.29, 0.05, 0.9]} s={0.9} lean={-0.12} />}
         </group>
       )}
     </group>
@@ -610,17 +615,17 @@ function SwingRide({ m, bulb, c }: { m: Mat; bulb: ReactNode; c: string }) {
   )
 }
 
-// Drop tower: a tall lattice mast with a ring of seats halfway up.
+// Drop tower: a tall lattice mast with a ring of seats hauled up near the top.
 function DropTower({ m, bulb, c }: { m: Mat; bulb: ReactNode; c: string }) {
   return (
     <Upright>
       <Cyl m={m} at={[0, 0.06, 0]} r={0.34} h={0.12} c="#d7ccc8" seg={12} />
       <Box m={m} at={[0, 1.6, 0]} s={[0.16, 3.0, 0.16]} c={c} />
       {[0.6, 1.2, 1.8, 2.4].map((y) => <Box key={y} m={m} at={[0, y, 0]} s={[0.2, 0.04, 0.2]} c={WHITE} shadow={false} />)}
-      <Cyl m={m} at={[0, 1.9, 0]} r={0.3} h={0.14} c="#fdd835" seg={12} />
+      <Cyl m={m} at={[0, 2.5, 0]} r={0.3} h={0.14} c="#fdd835" seg={12} />
       {[0, 1, 2, 3, 4, 5].map((i) => (
         <group key={i} rotation-y={(i / 6) * TAU}>
-          <Box m={m} at={[0, 1.78, 0.28]} s={[0.12, 0.12, 0.06]} c={RIDE_COLORS[i]} />
+          <Box m={m} at={[0, 2.38, 0.28]} s={[0.12, 0.12, 0.06]} c={RIDE_COLORS[i]} />
         </group>
       ))}
       <Cyl m={m} at={[0, 3.14, 0]} r={0.16} h={0.08} c={WHITE} seg={10} />
@@ -658,16 +663,23 @@ function Funfair({ k, def, lvl }: { k: K; def: BuildingDef; lvl: number }) {
               <mesh position={[0.05, 0.42, 0]}><sphereGeometry args={[0.08, 8, 6]} />{m('#f8bbd0')}</mesh>
             </group>
             {[[0.7, -0.6], [1.5, -0.6]].map(([x, z]) => (
+              // Picnic table: the top on slim legs, a bench each side on a crossbar at seat height.
               <group key={x} position={[x, 0.05, z]}>
-                <Box m={m} at={[0, 0.2, 0]} s={[0.44, 0.03, 0.24]} c="#8d6e63" />
-                {[-0.18, 0.18].map((dz) => <Box key={dz} m={m} at={[0, 0.11, dz]} s={[0.44, 0.025, 0.08]} c="#8d6e63" />)}
-                {[-0.17, 0.17].map((dx) => <Box key={dx} m={m} at={[dx, 0.1, 0]} s={[0.03, 0.2, 0.42]} c="#5d4037" shadow={false} />)}
+                <Box m={m} at={[0, 0.29, 0]} s={[0.5, 0.03, 0.26]} c="#8d6e63" />
+                {[-0.22, 0.22].map((dz) => <Box key={dz} m={m} at={[0, 0.17, dz]} s={[0.5, 0.025, 0.09]} c="#8d6e63" />)}
+                {[-0.19, 0.19].map((dx) => (
+                  <group key={dx}>
+                    <Box m={m} at={[dx, 0.15, 0]} s={[0.03, 0.025, 0.56]} c="#5d4037" shadow={false} />
+                    {[-0.09, 0.09].map((dz) => <Box key={dz} m={m} at={[dx, 0.145, dz]} s={[0.03, 0.29, 0.03]} c="#5d4037" shadow={false} />)}
+                  </group>
+                ))}
               </group>
             ))}
           </group>
         )
       )}
-      {st >= 3 && <group position={[0.15, 0.05, -1.55]}><DropTower m={m} bulb={bulb} c={def.roof} /></group>}
+      {/* Clear of the Ferris wheel beside it and the swing ride's chairs. */}
+      {st >= 3 && <group position={[0.25, 0.05, -1.55]}><DropTower m={m} bulb={bulb} c={def.roof} /></group>}
       {/* Entrance: the gateway arch and the ticket booth. */}
       <group position={[-0.4, 0.05, 1.9]}>
         <Upright>

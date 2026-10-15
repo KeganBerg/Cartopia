@@ -90,9 +90,12 @@ function DogPark({ m, bulb, ghost }: EdgeProps) {
           {[-1, 1].map((sd) => <Box key={sd} m={m} at={[sd * 1.125, y, 1.85]} s={[1.45, 0.012, 0.012]} c="#78909c" shadow={false} />)}
         </group>
       ))}
+      {/* Each leaf a framed chain-link gate like the fence, swung open on its post. */}
       {[-0.4, 0.4].map((x) => (
         <group key={x} position={[x, 0, 1.85]} rotation-y={x < 0 ? 0.5 : -0.5}>
-          <Box m={m} at={[-Math.sign(x) * -0.2, 0.3, 0]} s={[0.38, 0.5, 0.02]} c="#90a4ae" />
+          <Cyl m={m} at={[0, 0.3, 0]} r={0.02} h={0.6} c="#607d8b" seg={5} />
+          {[0.08, 0.3, 0.52].map((y) => <Box key={y} m={m} at={[Math.sign(x) * 0.2, y, 0]} s={[0.38, 0.016, 0.016]} c="#78909c" shadow={false} />)}
+          <Box m={m} at={[Math.sign(x) * 0.38, 0.3, 0]} s={[0.016, 0.46, 0.016]} c="#78909c" shadow={false} />
         </group>
       ))}
       <group position={[-1.1, 0, 1.92]}>

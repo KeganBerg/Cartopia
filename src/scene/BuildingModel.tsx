@@ -384,17 +384,18 @@ function GasGrown({ m, lvl, cl, ghost, roof }: { m: ReturnType<typeof useMat>; l
   if (ghost) return null
   return (
     <group>
-      <Pylon m={m} at={[-1.55, 0, -0.85]} h={big ? 3.4 : 2.6} w={0.9} text={big ? 'TRAVEL' : 'GAS'} bg={roof} fg="#ffffff" frame="#fafafa">
+      {/* Out in the corner, its posts well clear of the canopy's edge. */}
+      <Pylon m={m} at={[-1.62, 0, -0.85]} h={big ? 3.4 : 2.6} w={0.6} text={big ? 'TRAVEL' : 'GAS'} bg={roof} fg="#ffffff" frame="#fafafa">
         <group position={[0, big ? 3.0 : 2.2, 0.03]}>
-          <mesh><boxGeometry args={[0.7, 0.28, 0.06]} />{m('#263238')}</mesh>
-          <mesh position={[0, 0, 0.035]}><planeGeometry args={[0.62, 0.22]} /><meshBasicMaterial map={signTexture('⛽ 1.89', '#263238', '#ffca28', 0.62 / 0.22)} /></mesh>
+          <mesh><boxGeometry args={[0.46, 0.22, 0.06]} />{m('#263238')}</mesh>
+          <mesh position={[0, 0, 0.035]}><planeGeometry args={[0.4, 0.16]} /><meshBasicMaterial map={signTexture('⛽ 1.89', '#263238', '#ffca28', 0.4 / 0.16)} /></mesh>
         </group>
       </Pylon>
       {big && (
         <group>
-          {/* Solar panels across the canopy roof. */}
+          {/* Solar panels laid flat in a neat grid across the canopy roof. */}
           {[-0.75, -0.25, 0.25, 0.75].flatMap((x) => [-0.55, 0.05].map((z) => (
-            <mesh key={`${x}${z}`} position={[x, 1.66 + cl, -0.2 + z + 0.25]} rotation-x={-0.25}>
+            <mesh key={`${x}${z}`} position={[x, 1.615 + cl, -0.2 + z + 0.25]}>
               <boxGeometry args={[0.44, 0.02, 0.5]} />
               <meshStandardMaterial color="#1a237e" metalness={0.4} roughness={0.3} />
             </mesh>
@@ -533,11 +534,12 @@ function CrewHouse({ m, ghost, sign, bulb, win }: { m: ReturnType<typeof useMat>
               {[-0.26, 0.26].map((x) => <mesh key={x} position={[x, 0.075, z]}><boxGeometry args={[0.04, 0.15, 0.08]} />{m('#6d4c41')}</mesh>)}
             </group>
           ))}
-          <group position={[0.62, 0, 0.55]}>
+          {/* Out at the front of the deck, clear of the light-string post on its corner. */}
+          <group position={[0.2, 0, 0.65]}>
             <mesh position={[0, 0.2, 0]} castShadow><cylinderGeometry args={[0.13, 0.13, 0.4, 12]} />{m('#455a64')}</mesh>
             <mesh position={[0, 0.41, 0]} rotation-x={-Math.PI / 2}><circleGeometry args={[0.11, 12]} />{bulb}</mesh>
           </group>
-          <LightPool r={0.6} x={0.62} z={0.55} />
+          <LightPool r={0.6} x={0.2} z={0.65} />
         </group>
       )}
       {!ghost && <CrewDeck />}
@@ -661,12 +663,21 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             <capsuleGeometry args={[0.2, 1.1, 4, 10]} />
             {m(def.color)}
           </mesh>
-          <mesh position={[0.35, 0.85, 0]} rotation-z={-0.2} castShadow>
-            <capsuleGeometry args={[0.12, 0.45, 4, 8]} />
+          {/* Each arm grows out of the trunk, bends at an elbow and turns up. */}
+          <mesh position={[0.24, 0.7, 0]} rotation-z={Math.PI / 2} castShadow>
+            <capsuleGeometry args={[0.11, 0.22, 4, 8]} />
             {m(def.roof)}
           </mesh>
-          <mesh position={[-0.32, 1.05, 0]} rotation-z={0.25} castShadow>
-            <capsuleGeometry args={[0.11, 0.35, 4, 8]} />
+          <mesh position={[0.4, 0.91, 0]} castShadow>
+            <capsuleGeometry args={[0.11, 0.42, 4, 8]} />
+            {m(def.roof)}
+          </mesh>
+          <mesh position={[-0.22, 0.98, 0]} rotation-z={Math.PI / 2} castShadow>
+            <capsuleGeometry args={[0.1, 0.2, 4, 8]} />
+            {m(def.roof)}
+          </mesh>
+          <mesh position={[-0.35, 1.13, 0]} castShadow>
+            <capsuleGeometry args={[0.1, 0.3, 4, 8]} />
             {m(def.roof)}
           </mesh>
           <mesh position={[0, 0.06, 0]}>
@@ -1197,10 +1208,11 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
                 {m('#fafafa')}
               </mesh>
             )}
-            {trim && lvl >= 8 && <Flag x={1.4} y={shopH + 0.09} z={-0.8} color={def.roof} star={lvl >= 10} />}
+            {/* Toward the far corner, flying away from the canopy. */}
+            {trim && lvl >= 8 && <Flag x={1.65} y={shopH + 0.09} z={-0.8} color={def.roof} star={lvl >= 10} />}
           </group>
-          {/* Price sign on a pole. */}
-          {!ghost && (
+          {/* Price sign on a pole (the grown station's pylon shows the price instead). */}
+          {!ghost && lvl < 4 && (
             <group position={[-1.75, 0, -0.7]}>
               <mesh position={[0, 0.8, -0.03]} castShadow>
                 <cylinderGeometry args={[0.04, 0.04, 1.6]} />

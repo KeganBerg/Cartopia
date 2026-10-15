@@ -67,8 +67,9 @@ function Garden({ def, level, ghost, m, bulb, children }: Props) {
       {/* Level 5: lamps either side of the gate and more trees along the back. */}
       {level >= 5 && (
         <>
-          {/* (The koi garden's own red gate stands in its opening, with stone lanterns, so it skips these.) */}
-          {def.id !== 'koi' && [-1, 1].map((sx) => <Lamp key={`l${sx}`} x={sx * hw * 0.22} z={hd} m={m} bulb={bulb} lit={!ghost} />)}
+          {/* (The koi garden's red gate and the botanical garden's rose arch stand in the opening,
+              with their own lanterns and lamps, so they skip these.) */}
+          {def.id !== 'koi' && def.id !== 'garden' && [-1, 1].map((sx) => <Lamp key={`l${sx}`} x={sx * hw * 0.22} z={hd} m={m} bulb={bulb} lit={!ghost} />)}
           {[-1, 1].map((sx) => <Lamp key={`b${sx}`} x={sx * hw} z={0} m={m} bulb={bulb} lit={!ghost} />)}
           {def.w > 1 && [-0.35, 0.35].map((t) => <Tree key={`bt${t}`} x={t * hw * 2} z={-hd + 0.3} s={1} m={m} />)}
         </>
