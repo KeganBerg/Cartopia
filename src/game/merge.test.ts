@@ -140,10 +140,26 @@ describe('merged buildings in the store', () => {
     expect(mergeGroups(g().buildings).groups.size).toBe(1)
   })
 
-  it("won't move or bulldoze part of a merged block", () => {
+  it('moves the whole block when any of its buildings is dragged, and keeps it merged', () => {
     const town = setup()
     const g = () => useGame.getState()
-    expect(g().moveBuilding(town[1].uid, 12, 12)).toBe(false)
+    useGame.setState({ roads: [] })
+    const land = g().land
+    // Grabbed by the bottom-right building, dropped two tiles over and three down.
+    expect(g().moveBuilding(town[3].uid, 5, 6)).toBe(true)
+    expect(g().buildings.map((o) => [o.x, o.z])).toEqual([[4, 5], [5, 5], [4, 6], [5, 6]])
+    expect([...mergeGroups(g().buildings).groups.values()][0]).toMatchObject({ code: 2, x: 4, z: 5 })
+    // Not onto another building, and not off the town's land.
+    useGame.setState({ buildings: [...g().buildings, b('house', 8, 8)] })
+    expect(g().moveBuilding(town[0].uid, 7, 7)).toBe(false)
+    expect(g().moveBuilding(town[0].uid, 900, 900)).toBe(false)
+    expect(g().buildings[0]).toMatchObject({ x: 4, z: 5 })
+    expect(g().land).toBe(land)
+  })
+
+  it("won't bulldoze part of a merged block", () => {
+    const town = setup()
+    const g = () => useGame.getState()
     g().bulldoze(3, 3)
     expect(g().buildings).toHaveLength(4)
     g().splitBlock(town[3].uid)

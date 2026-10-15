@@ -1,4 +1,4 @@
-import { groupOf, mergeCandidates } from '../game/merge'
+import { mergeCandidates } from '../game/merge'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useGame, hasRusty, buildPrice, type OwnedCar, type PlacedBuilding } from '../game/store'
 import { raceCarOf } from '../game/raceCar'
@@ -145,7 +145,6 @@ function EditBar() {
   const tutCard = useGame(tutorialShowing)
   // During the tutorial the bar keeps to placing and moving; roads, land and the rest come after.
   const all = useGame((s) => s.tutorial >= 99)
-  const pickedMerged = useGame((s) => !!s.selected && !!groupOf(s.buildings, s.selected))
   const canMerge = useGame((s) => (s.mode === 'merge' ? mergeCandidates(s.buildings).length > 0 || s.buildings.some((b) => b.merge) : true))
   const hint =
     mode === 'expand' ? 'Tap a For Sale sign to buy land'
@@ -153,7 +152,7 @@ function EditBar() {
     : mode === 'road' ? 'Drag to lay road · $10 a tile'
     : mode === 'bulldoze' ? 'Drag to remove · buildings go to Inventory'
     : mode === 'move' && again && selected ? 'Built! Drag or rotate it'
-    : mode === 'move' ? (selected ? (pickedMerged ? 'Rotate turns the whole block. Split it to move it' : 'Drag to move, or rotate it') : 'Drag a building, or tap one to pick it')
+    : mode === 'move' ? (selected ? 'Drag to move, or rotate it' : 'Drag a building, or tap one to pick it')
     : `${TOUCH ? 'Tap to preview, tap again to build' : 'Click to place'} ${placing ? BUILDINGS.find((b) => b.id === placing)?.name : ''}`
   return (
     <div className="edit-bar">

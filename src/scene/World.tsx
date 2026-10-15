@@ -5,7 +5,7 @@ import { AnchorProjector, anchorEls } from './anchors'
 import { useThree, type ThreeEvent } from '@react-three/fiber'
 import { MeshStandardMaterial, Plane, Vector3, type TOUCH } from 'three'
 import { create } from 'zustand'
-import { useGame, buildPrice, canPlace, buyablePlots, lotSize, movable, type PlacedBuilding } from '../game/store'
+import { useGame, buildPrice, canPlace, canPlaceBlock, buyablePlots, lotSize, movable, type PlacedBuilding } from '../game/store'
 import { TILE, PLOT, PLOT_MIN, PLOT_MAX, START_LAND, RUSTY_LOT, buildingDef, buildingLevel } from '../game/data'
 import { BuildingModel } from './BuildingModel'
 import { rotateCurrent, setGhostTurn, turnOf } from '../game/placement'
@@ -220,12 +220,14 @@ function BuildingLot({ b, turn, group, picked, city }: BuildingProps) {
   // Four max-level houses in a square are a landmark built for a 2x2 lot, not a scaled-up house.
   const mark = group && isLandmark(group)
   const k = mark ? group.cols / 2 : 1
-  // Hidden while dragged away; the ghost shows where it would land.
-  const away = useDrag((g) => g.drag?.uid === b.uid && (g.drag.x !== b.x || g.drag.z !== b.z))
-  if (away) return null
+  // How far it's been dragged, in tiles. A building hides while dragged away and
+  // the ghost shows where it would land; a merged block slides along itself.
+  const off = useDrag((g) => (g.drag?.uid === b.uid ? `${g.drag.x - b.x},${g.drag.z - b.z}` : '0,0'))
+  if (off !== '0,0' && !group) return null
+  const [dx, dz] = off.split(',').map(Number)
   return (
     <group
-      position={[cx, 0, cz]}
+      position={[cx + dx * TILE, 0, cz + dz * TILE]}
       rotation-y={(turn * Math.PI) / 2}
       userData={{ hours: { seed: seedOf(b.uid), kind: hoursOf(b.def) }, noBatch: !!picked }}
       onPointerDown={(e) => {
@@ -236,14 +238,12 @@ function BuildingLot({ b, turn, group, picked, city }: BuildingProps) {
         if (!tapOwnedBy(e.intersections, e.eventObject)) return
         if (s.mode === 'play') {
           held = false
-          if (movable(b.def) && !group) holdToMove(b, e)
+          if (movable(b.def)) holdToMove(b, e)
           return
         }
         if (s.mode !== 'move') return
         e.stopPropagation()
         if (!movable(b.def)) return s.toast(`Tap the ${d.name.toLowerCase()} in play mode to clear it`)
-        // A merged block can be picked to turn it, but only moves once split.
-        if (group) return s.select(b.uid)
         startDrag(b, groundTile(e), e.pointerId)
       }}
       onClick={(e) => {
@@ -520,10 +520,10 @@ function Interaction() {
     touch.current = e.pointerType === 'touch'
     if (mode === 'move' && selected && e.button === 0) {
       // Grabbing the ground inside the picked building's lot drags it too.
-      const b = buildings.find((o) => o.uid === selected)
+      // A merged block is dragged by its top-left building, which stands in for the whole block.
+      const b = pickedBlock ? pickedBlock.anchor : buildings.find((o) => o.uid === selected)
       const t = tileOf(e)
-      const [w, h] = b ? lotSize(b.def, b.rot) : [0, 0]
-      if (pickedBlock) return
+      const [w, h] = pickedBlock ? [pickedBlock.w, pickedBlock.h] : b ? lotSize(b.def, b.rot) : [0, 0]
       if (b && t[0] >= b.x && t[0] < b.x + w && t[1] >= b.z && t[1] < b.z + h) startDrag(b, t, e.pointerId)
       return
     }
@@ -588,12 +588,17 @@ function Interaction() {
       </group>
     )
   } else if (pickedBlock) {
-    // A picked merged block: highlight its whole footprint.
-    const [cx, cz] = groupCenter(pickedBlock)
+    // A picked merged block: highlight its whole footprint, where it would land while dragged.
+    const g = pickedBlock
+    const x = drag?.uid === g.anchor.uid ? drag.x : g.x
+    const z = drag?.uid === g.anchor.uid ? drag.z : g.z
+    const moved = x !== g.x || z !== g.z
+    const valid = !moved || canPlaceBlock({ roads, buildings, land }, g, x, z)
+    const [cx, cz] = groupCenter({ x, z, w: g.w, h: g.h })
     ghost = (
       <mesh rotation-x={-Math.PI / 2} position={[cx, 0.05, cz]}>
-        <planeGeometry args={[pickedBlock.w * TILE, pickedBlock.h * TILE]} />
-        <meshBasicMaterial color="#ffd54f" transparent opacity={0.45} />
+        <planeGeometry args={[g.w * TILE, g.h * TILE]} />
+        <meshBasicMaterial color={!moved ? '#ffd54f' : valid ? '#66bb6a' : '#ef5350'} transparent opacity={0.45} />
       </mesh>
     )
   } else if (mode === 'move' && selected) {
