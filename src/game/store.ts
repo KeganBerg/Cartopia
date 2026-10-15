@@ -923,14 +923,21 @@ export const useGame = create<GameState>()(
         sfx.error()
         set((st) => ({ need: { res, missing: Math.max(0, Math.ceil(missing)), what }, ...navTo(st, 'need'), mode: 'play', placing: null, selected: null }))
       },
-      openPanel: (panel) => set((s) => ({ ...navTo(s, panel), mode: 'play', placing: null, placingStored: null, selected: null, shopFocus: null })),
+      openPanel: (panel) => set((s) => {
+        if (s.panel !== panel) sfx.menuOpen()
+        return { ...navTo(s, panel), mode: 'play', placing: null, placingStored: null, selected: null, shopFocus: null }
+      }),
       closePanel: () =>
         set((s) => {
           const back = s.panelBack.slice(0, -1)
           const prev = s.panel ? s.panelBack[s.panelBack.length - 1] ?? null : null
+          if (s.panel) sfx.menuClose()
           return { panel: prev, panelBack: prev ? back : [], mode: 'play', placing: null, placingStored: null, selected: null, shopFocus: null }
         }),
-      swapPanel: (panel) => set((s) => ({ panel, panelBack: s.panelBack.filter((p) => p !== panel), mode: 'play', placing: null, placingStored: null, selected: null, shopFocus: null })),
+      swapPanel: (panel) => set((s) => {
+        if (s.panel !== panel) sfx.tab()
+        return { panel, panelBack: s.panelBack.filter((p) => p !== panel), mode: 'play', placing: null, placingStored: null, selected: null, shopFocus: null }
+      }),
       openShop: (focus) => set((s) => ({ ...navTo(s, 'shop'), mode: 'play', placing: null, selected: null, shopFocus: focus ?? null })),
       selectCar: (selectedCar) => set({ selectedCar }),
       toast: (text) => {
@@ -1411,6 +1418,7 @@ export const useGame = create<GameState>()(
           showcase: (s.showcase ?? []).filter((u) => u !== cuid), ...(s.raceCar === cuid ? { raceCar: null } : {}),
           updatedAt: Date.now(),
         })
+        sfx.coin()
       },
 
       finishRace: (won, reward, opts = {}) => {
@@ -1498,6 +1506,7 @@ export const useGame = create<GameState>()(
         const d = kind === 'trail' ? TRAILS.find((t) => t.id === id) : CHEERS.find((c) => c.id === id)
         if (!d || !flairOpen(d.challenge, s)) return
         set({ [kind]: id, updatedAt: Date.now() })
+        sfx.equip()
       },
       dailyResult: (time) => {
         const s = get()
@@ -1535,11 +1544,12 @@ export const useGame = create<GameState>()(
         }))
       },
 
-      renameTown: (townName) => set({ townName: townName.slice(0, 24) || 'My Town', updatedAt: Date.now() }),
-      setLights: (l) => set((s) => ({ lights: cleanLights({ ...DEFAULT_LIGHTS, ...s.lights, ...l }), updatedAt: Date.now() })),
-      setCityTheme: (id) => set({ cityTheme: colorTheme(id)?.id, updatedAt: Date.now() }),
+      renameTown: (townName) => (sfx.equip(), set({ townName: townName.slice(0, 24) || 'My Town', updatedAt: Date.now() })),
+      setLights: (l) => (sfx.equip(), set((s) => ({ lights: cleanLights({ ...DEFAULT_LIGHTS, ...s.lights, ...l }), updatedAt: Date.now() }))),
+      setCityTheme: (id) => (sfx.equip(), set({ cityTheme: colorTheme(id)?.id, updatedAt: Date.now() })),
       // A merged block takes the theme as one building.
       setBuildingTint: (uid, id) => set((s) => {
+        sfx.equip()
         const ids = new Set(groupOf(s.buildings, uid)?.members.map((o) => o.uid) ?? [uid])
         const tint = colorTheme(id)?.id
         return { buildings: s.buildings.map((o) => (ids.has(o.uid) ? cleanTint({ ...o, tint }) : o)), updatedAt: Date.now() }
@@ -1738,6 +1748,7 @@ export const useGame = create<GameState>()(
           updatedAt: Date.now(),
         }))
         if (tow) requestTrip(cuid, 'tow')
+        else sfx.buy()
         s.toast(tow ? `Rusty towed it in and patched it up. +${xp} XP` : `Tire fixed for $${cost}`)
       },
 
@@ -1791,12 +1802,14 @@ export const useGame = create<GameState>()(
         const s = get()
         if (!s.cars.some((c) => c.uid === cuid)) return
         set({ showcase: togglePick(s.showcase ?? [], cuid), updatedAt: Date.now() })
+        sfx.equip()
       },
 
       setRaceCar: (cuid) => {
         const s = get()
         if (s.raceCar === cuid || !s.cars.some((c) => c.uid === cuid)) return
         set({ raceCar: cuid, updatedAt: Date.now() })
+        sfx.equip()
       },
 
       markHelped: (ownerId) => {
@@ -1825,14 +1838,17 @@ export const useGame = create<GameState>()(
         if (!car || (!paint && job.color !== car.color && !(hasCustomPaint(s) && isHexColor(job.color))) || !fin || !STRIPES.includes(job.stripe)) return false
         if (job.color !== car.color && !paintOpen(s, job.color)) {
           const r = rivalForPaint(job.color)
+          sfx.error()
           s.toast(r ? `Beat ${r.name} to unlock ${paint!.name}` : paint?.earn ? `${paint.name}: ${earnHint(job.color)}` : 'That colour is locked')
           return false
         }
         if (s.level < fin.unlockLevel && fin.id !== (car.finish ?? 'gloss')) {
+          sfx.error()
           s.toast(`${fin.name} unlocks at level ${fin.unlockLevel}`)
           return false
         }
         if (fin.mastery && carClassTier(s.mastery, car.model) < fin.mastery && fin.id !== car.finish) {
+          sfx.error()
           s.toast(fin.blurb)
           return false
         }
@@ -1872,24 +1888,29 @@ export const useGame = create<GameState>()(
           // Rival colours stay locked panel by panel too, but a panel keeps the colour it has.
           if (v.color && v.color !== was?.[pn.id]?.color && !paintOpen(s, v.color)) {
             const r = rivalForPaint(v.color)
+            sfx.error()
             s.toast(r ? `Beat ${r.name} to unlock that colour` : earnHint(v.color) || 'That colour is locked')
             return false
           }
           const pat = v.pattern ? PATTERNS.find((p) => p.id === v.pattern) : undefined
           if (v.pattern && !pat) return false
           if (pat?.trial && !((s.tuner?.[pat.trial] ?? 0) > 0) && was?.[pn.id]?.pattern !== pat.id) {
+            sfx.error()
             s.toast(`Win ${tunerTrial(pat.trial)?.name ?? 'a Tuner Trial'} to unlock ${pat.name}`)
             return false
           }
           if (pat?.mastery && masteryTier(s.mastery, car.model) < pat.mastery && was?.[pn.id]?.pattern !== pat.id) {
+            sfx.error()
             s.toast(`Reach ${pat.name} mastery in this car to unlock it`)
             return false
           }
           if (pat?.road && !roadOpen(s.roadItems, pat.id) && was?.[pn.id]?.pattern !== pat.id) {
+            sfx.error()
             s.toast(`${pat.name}: Trophy Road mystery prize`)
             return false
           }
           if (pat && s.level < pat.unlockLevel && was?.[pn.id]?.pattern !== pat.id) {
+            sfx.error()
             s.toast(`${pat.name} unlocks at level ${pat.unlockLevel}`)
             return false
           }
@@ -1919,6 +1940,7 @@ export const useGame = create<GameState>()(
         const now = was + FRIEND_POINTS[act]
         set({ friendship: { ...s.friendship, [id]: now }, updatedAt: Date.now() })
         const lv = friendLevel(now)
+        if (lv > friendLevel(was)) sfx.reward()
         if (lv > friendLevel(was)) s.toast(`${FRIEND_LEVELS[lv].icon} ${name ?? 'Your friend'} is now your ${FRIEND_LEVELS[lv].name}!`)
       },
 
@@ -1946,6 +1968,7 @@ export const useGame = create<GameState>()(
         const presets = Array.from({ length: PRESET_SLOTS }, (_, i) => s.presets?.[i] ?? null)
         presets[slot] = { color: car.color, ...(car.finish ? { finish: car.finish } : {}), ...(car.stripe ? { stripe: car.stripe } : {}), ...(car.panels ? { panels: car.panels } : {}), ...(car.trim ? { trim: car.trim } : {}) }
         set({ presets, updatedAt: Date.now() })
+        sfx.equip()
         s.toast(`Look saved to slot ${slot + 1}`)
       },
 
@@ -2048,8 +2071,9 @@ export const useGame = create<GameState>()(
         const next = want ? cleanHat(want) : null
         if (!car || (want && !next) || sameHat(car.hat, next)) return false
         const d = hatDef(next?.id)
-        if (d && !ownedHats(s).includes(d.id)) { s.toast(`🔒 ${d.name}`); return false }
+        if (d && !ownedHats(s).includes(d.id)) { sfx.error(); s.toast(`🔒 ${d.name}`); return false }
         set({ cars: s.cars.map((c) => (c.uid === cuid ? { ...c, hat: next ?? undefined } : c)), updatedAt: Date.now() })
+        sfx.equip()
         s.toast(d ? `${d.icon} ${d.name} on!` : 'Hat off')
         return true
       },
@@ -2440,6 +2464,7 @@ export const useGame = create<GameState>()(
       abandonSearch: () => {
         const s = get()
         if (s.search?.flat) s.toast('The tow truck limped home empty-handed.')
+        sfx.menuClose()
         set({ search: null })
       },
 
