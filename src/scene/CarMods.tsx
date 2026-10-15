@@ -158,8 +158,9 @@ const archOf = (f: Frame) => roomOf(f).arch || (FLARED.includes(f.body) ? f.whee
 // On a low car with a trunk a wing whose top stands this far up the deck would tower over the
 // roof: the wing comes down on shorter posts until its top sits just over the roof line, keeping
 // its lowest piece (low, up from the deck) clear above any kit arch over the rear wheels.
+// A wing up on the roof (no trunk) stands on short posts, its lowest piece just clear of the roof.
 const wingDrop = (f: Frame, top: number, low: number) =>
-  f.deck < f.roof - 0.05 ? Math.min(top * 0.45, archOf(f) ? f.deck + low - f.wheel - archOf(f) - 0.06 : 1, Math.max(0, f.deck + top - f.roof - 0.03)) : 0
+  f.deck < f.roof - 0.05 ? Math.min(top * 0.45, archOf(f) ? f.deck + low - f.wheel - archOf(f) - 0.06 : 1, Math.max(0, f.deck + top - f.roof - 0.03)) : Math.min(top * 0.45, low - 0.03)
 // The stretches of [x0, x1] left after cutting out a gap round each exhaust tip.
 function aroundTips(f: Frame, x0: number, x1: number, pad = 0.012): [number, number][] {
   let out: [number, number][] = [[x0, x1]]
