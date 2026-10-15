@@ -19,15 +19,17 @@ const THEME: Record<string, { bg: string; streak: string; glow: string }> = {
   vanta: { bg: '#4527a0, #00acc1', streak: '#e0f7fa', glow: '#00e5ff' },
 }
 
+const now = () => window.performance.now()
+
 // Counts up to n once the card appears; with reduced motion it simply shows n.
 function useCountUp(n: number, ms = 900) {
   const [v, setV] = useState(() => (reducedMotion() ? n : 0))
   useEffect(() => {
     if (reducedMotion()) return setV(n)
     let raf = 0
-    const t0 = performance_now()
+    const t0 = now()
     const step = () => {
-      const k = Math.min(1, (performance_now() - t0) / ms)
+      const k = Math.min(1, (now() - t0) / ms)
       setV(Math.round(n * (1 - (1 - k) ** 3)))
       if (k < 1) raf = requestAnimationFrame(step)
     }
@@ -36,7 +38,6 @@ function useCountUp(n: number, ms = 900) {
   }, [n, ms])
   return v
 }
-const performance_now = () => (typeof window === 'undefined' ? Date.now() : window.performance.now())
 
 function PackCard({ p, i, owned, pending, onBuy }: { p: BucksPack; i: number; owned: boolean; pending: boolean; onBuy: () => void }) {
   const car = carDef(p.car!)
