@@ -1,3 +1,4 @@
+import { fairNow } from '../game/fairRace'
 import { useGame } from '../game/store'
 import { CARS, RACE_FUEL, carDef, performance } from '../game/data'
 import { RIVALS, RIVAL_VISITS, currentRival, rivalLadderPi, rivalPi, rivalPrize, rivalShift, type RivalDef } from '../game/rivals'
@@ -17,14 +18,17 @@ const bestPi = (s: ReturnType<typeof useGame.getState>) => Math.max(10, ...s.car
 
 // The race against this rival on this visit, in a car close to your best one (myPi).
 export function rivalMatch(def: RivalDef, visit: number, level: number, myPi?: number): RivalMatch {
-  const pi = rivalPi(def, visit, myPi)
-  const car = [...CARS].sort((a, b) => Math.abs(performance(a, zero) - pi) - Math.abs(performance(b, zero) - pi))[0]
+  const ladder = rivalPi(def, visit, myPi)
+  const car = [...CARS].sort((a, b) => Math.abs(performance(a, zero) - ladder) - Math.abs(performance(b, zero) - ladder))[0]
   const idx = RIVALS.indexOf(def)
+  const skill = idx >= 2 || visit === RIVAL_VISITS - 1 ? car.skill : undefined
+  // Never more than the race car can beat with perfect driving (game/fairPi.ts).
+  const pi = fairNow(ladder, rivalShift(def, visit), skill)
   return {
     def, visit, prize: rivalPrize(rivalLadderPi(def, visit)),
     rival: {
       id: `rival-${def.id}`, town: `${def.icon} ${def.name}`, level: Math.max(level, def.unlockLevel), carName: car.name, color: def.color, pi,
-      online: false, body: car.body, model: car.id, skill: idx >= 2 || visit === RIVAL_VISITS - 1 ? car.skill : undefined, shift: rivalShift(def, visit), boss: visit === RIVAL_VISITS - 1,
+      online: false, body: car.body, model: car.id, skill, shift: rivalShift(def, visit), boss: visit === RIVAL_VISITS - 1,
     },
   }
 }

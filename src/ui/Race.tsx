@@ -4,6 +4,7 @@ import { useGame, spendFuel, type OwnedCar } from '../game/store'
 import { LIVE_LOSS_SHARE, LOSS_SHARE } from '../game/boosts'
 import { bestCar, carPi, raceCarOf } from '../game/raceCar'
 import { carNear, fairNow, tourPayNow } from '../game/fairRace'
+import { fairRivalPi } from '../game/fairPi'
 import { CARS, SKILLS, carDef, performance, RACE_FUEL, GP_SERIES, GP_ROUNDS, gpRivalPi, gpReward, CAMPAIGN, CAMPAIGN_RACES, campaignRaceId, campaignRivalPi, campaignShift, rookieRace, ROOKIE_SHIFT, campaignRivalSkills, campaignReward, campaignCleared, type CampaignChapter, skillBoost, skillDrag, liveSkillBoost, smoothShift, type Body, type GpSeries, type SkillId } from '../game/data'
 import { TRACK, freshRacer, stepRacer, shiftQuality, shiftBand, launchRacer, revLaunch, shiftRacer, fireBoost, aiReaction, AI_BOOST_GEAR, TOP_GEAR, LAUNCH_BAND, IDLE, REV_UP, REV_DOWN, RACE_DT } from '../game/race'
 import { CarThumb } from '../scene/BuildingPreview'
@@ -81,6 +82,10 @@ const pi = (c: OwnedCar) => performance(carDef(c.model), c.upgrades, c.mods)
 const liveReward = (oppPi: number) => 300 + oppPi * 8
 const reward = (r: Rival) => (r.id.startsWith('live:') ? liveReward(r.pi) : Math.round((150 + r.pi * 6) * (r.id.startsWith('chal-') ? CHALLENGER_BONUS : 1)))
 const performance_now = () => window.performance.now()
+
+// Caps an AI rival at what the race car can beat with perfect driving (game/fairPi.ts).
+// The ladder's PI still sets the rival's car and the prize.
+const fair = (r: Rival): Rival => ({ ...r, pi: fairNow(r.pi, r.shift ?? 1, r.skill) })
 
 const GP_CUP = ['🥉', '🏆', '🏆', '👑']
 
@@ -847,7 +852,7 @@ export function RacePanel() {
                 </div>
               )
             })}
-            {[...online, ...rivals].map((r) => (
+            {[...online, ...rivals.map(fair)].map((r) => (
               <div key={r.id} className="rm-qc" style={{ ['--qc' as string]: r.color }}>
                 <span className="rm-qc-top"><CarThumb size="sm" color={r.color} body={r.body} mods={r.mods} />{r.online && <span className="tag">PLAYER</span>}</span>
                 <span className="rm-qc-body">
@@ -924,10 +929,6 @@ function GrandPrix({ onRace }: { onRace: (s: GpSeries, r: Rival, prize: number) 
     </div>
   )
 }
-
-// Caps an AI rival at what the race car can beat with perfect driving (game/fairPi.ts).
-// The ladder's PI still sets the rival's car and the prize.
-const fair = (r: Rival): Rival => ({ ...r, pi: fairNow(r.pi, r.shift ?? 1, r.skill) })
 
 function campaignRival(ch: CampaignChapter, chIndex: number, i: number): Rival {
   const target = campaignRivalPi(ch, i)
@@ -1363,7 +1364,11 @@ type RunStats = { launch: string; perfect: number; shifts: number; top: number }
 export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title, venueId, trial, resultView, night, weatherSeed, sky, next, dist }: { car: OwnedCar; rival: Rival; onExit: () => void; next?: NextPick | null; live?: LiveRace; prize?: number; onFinish?: (won: boolean, myTime: number, theirTime: number) => number | void; title?: string; venueId?: string; trial?: { target: number; mine?: boolean; seed?: string; key?: string }; resultView?: (r: Result) => ReactNode; night?: boolean; weatherSeed?: string; sky?: WeatherKind; dist?: RaceDist }) {
   // A signed-in live rival's PI comes from the server, not from their browser.
   const [serverRivalPi, setServerRivalPi] = useState<number | null>(null)
-  const rival = useMemo(() => (serverRivalPi === null ? shownRival : { ...shownRival, pi: serverRivalPi }), [shownRival, serverRivalPi])
+  // Every AI rival is one this car can beat with perfect driving (game/fairPi.ts); the menus show
+  // the same eased PI, this makes sure of it for every race. Live rivals and ghosts race as they are.
+  const rival = useMemo(() => (serverRivalPi !== null ? { ...shownRival, pi: serverRivalPi }
+    : live || trial ? shownRival
+    : { ...shownRival, pi: fairRivalPi(shownRival.pi, pi(car), shownRival.shift ?? 1, shownRival.skill) }), [shownRival, serverRivalPi, live, trial, car])
   const payout = prize ?? reward(rival)
   const rivalRef = useRef(rival)
   rivalRef.current = rival

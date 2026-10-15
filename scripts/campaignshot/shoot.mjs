@@ -1,4 +1,4 @@
-// Screenshots for the campaign difficulty pass: Desert Strip's rows at level 8 in a PI 47 car, and
+// Screenshots for the campaign difficulty pass: Desert Strip's rows at level 8 (CAR=pip for a weak car), and
 // the loss card. Needs `npx vite` running. node scripts/campaignshot/shoot.mjs <out dir>
 import { createRequire } from 'node:module'
 const { chromium } = createRequire('/opt/node22/lib/node_modules/')('playwright')
@@ -12,7 +12,7 @@ for (const [form, size] of [['desktop', { width: 1280, height: 800 }], ['phone',
   await p.waitForFunction(() => window.__game, null, { timeout: 120000 })
   await p.waitForTimeout(3000)
   const done = Object.fromEntries(['c1', 'c2'].flatMap((c) => [0, 1, 2, 3, 4].map((i) => [`${c}-${i}`, 3])))
-  await p.evaluate((campaign) => window.__game.setState({ tutorial: 99, level: 8, coins: 25000, panel: null, campaign, raceCar: null, cars: [{ uid: 'x1', model: 'crusher', color: '#e65100', upgrades: { engine: 0, turbo: 0, tires: 0, weight: 0 } }] }), done)
+  await p.evaluate(([campaign, model]) => window.__game.setState({ tutorial: 99, level: 8, coins: 25000, panel: null, campaign, raceCar: null, cars: [{ uid: 'x1', model, color: '#e65100', upgrades: { engine: 0, turbo: 0, tires: 0, weight: 0 } }] }), [done, process.env.CAR ?? 'crusher'])
   for (let tries = 0; tries < 3 && !(await p.$('.rm-rows')); tries++) {
     await p.evaluate(async () => { (await import('/src/ui/raceNav.ts')).openRaceTab('campaign') })
     await p.waitForTimeout(2500)
