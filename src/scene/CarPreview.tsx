@@ -2,7 +2,7 @@ import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type
 import { createPortal } from 'react-dom'
 import { useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
-import { MOUSE, TOUCH, Vector3, type Group, type Mesh, type PerspectiveCamera } from 'three'
+import { MOUSE, TOUCH, Vector3, type Group, type PerspectiveCamera } from 'three'
 import type { Body, Finish, SkinnedSlot, Panels } from '../game/data'
 import { CarModel, carFrame } from './CarModel'
 import type { HatFit } from '../game/hats'
@@ -12,12 +12,16 @@ import type { Trim } from '../game/trim'
 import { BACKDROPS, FILTERS, backdrop, compose, photoFilter, savePhoto, type Backdrop } from './photo'
 import { useGame } from '../game/store'
 import { Preview } from './Stage'
+import { CAM_REACH, CAM_TOP, Showroom, ShowroomLights, TT_R, contactTex, discTex } from './Showroom'
+import { decal } from './layers'
 
 type Look = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; panels?: Panels | null; stripe?: string | null; mods?: string[] | null; trim?: Trim | null; hat?: HatFit | null }
 
 // How big the car's bounding sphere is made, so long trucks and tiny bubble cars both fill the view.
 const FIT = 1.05
 const VIEW = new Vector3(2.7, 1.9, 2.7)
+// In the Showroom the camera sits lower, so the room shows behind the car.
+const ROOM_VIEW = new Vector3(2.9, 1.15, 2.9)
 // Drawn in the shared turntable canvas (scene/Stage.tsx): a canvas of its own meant a new
 // WebGL context, and every car shader compiled again, each time the garage opened.
 const CAM = { position: VIEW.toArray(), fov: 35, near: 0.1, far: 1000 }
@@ -76,11 +80,25 @@ function Rollers({ body, roll }: { body: Body; roll: React.RefObject<Group | nul
   )
 }
 
-function Viewer({ look, handle, onTouch, dyno, floorSize, photo }: { look: Look; handle: React.RefObject<Handle | null>; onTouch: (on: boolean) => void; dyno?: DynoFeed | null; floorSize: number; photo?: Backdrop | null }) {
+// The soft shadow under the car, in the car's own units so it turns and sizes with it.
+function Contact({ body }: { body: Body }) {
+  const f = carFrame(body)
+  return (
+    <mesh rotation-x={-Math.PI / 2} position-y={0.004} userData={{ noFit: true }} renderOrder={1}>
+      <planeGeometry args={[f.wid * 1.5, f.len * 1.25]} />
+      <meshBasicMaterial map={contactTex()} transparent depthWrite={false} {...decal(2)} />
+    </mesh>
+  )
+}
+
+// `room`: the car stands on the Showroom's turntable (scene/Showroom.tsx), else on a plain disc
+// for photo mode's coloured backdrops.
+function Viewer({ look, handle, onTouch, dyno, floorSize, photo, room }: { look: Look; handle: React.RefObject<Handle | null>; onTouch: (on: boolean) => void; dyno?: DynoFeed | null; floorSize: number; photo?: Backdrop | null; room: boolean }) {
   const turn = useRef<Group>(null)
-  const floor = useRef<Mesh>(null)
+  const floor = useRef<Group>(null)
   const roll = useRef<Group>(null)
   const onDyno = useRef(false)
+  const contact = useRef<Group>(null)
   const inner = useRef<Group>(null)
   const orbit = useRef<Orbit>(null)
   const bounds = useRef<Bounds>({ r: 1, h: 1 })
@@ -99,20 +117,21 @@ function Viewer({ look, handle, onTouch, dyno, floorSize, photo }: { look: Look;
     t.rotation.y = 0
     bounds.current = seat(g, t, (b) => FIT / Math.max(0.05, Math.hypot(b.r, b.h / 2)))
     camera.aspect = size.width / Math.max(1, size.height)
-    const at = frame(camera, bounds.current, VIEW, { pad: 0.1 })
+    const at = frame(camera, bounds.current, room ? ROOM_VIEW : VIEW, { pad: 0.1 })
     const d = camera.position.distanceTo(at)
     c.target.copy(at)
     c.minDistance = d * NEAR
     c.maxDistance = d * FAR
     // Zoomed right in, the near plane must not slice the car.
     camera.near = Math.min(camera.near, d * NEAR * 0.25)
-    camera.far = Math.max(camera.far, d * FAR + 4)
+    // In the Showroom the camera must see the far walls, not just the car.
+    camera.far = Math.max(camera.far, d * FAR + 4, room ? 40 : 0)
     camera.updateProjectionMatrix()
     c.update()
     c.saveState()
     spinning.current = true
   }
-  useLayoutEffect(fitView, [look.body, size.width, size.height])
+  useLayoutEffect(fitView, [look.body, size.width, size.height, room])
   // Re-centre for a fitted or tried part without moving the camera.
   useLayoutEffect(() => {
     const g = inner.current
@@ -148,7 +167,12 @@ function Viewer({ look, handle, onTouch, dyno, floorSize, photo }: { look: Look;
     }
     const g = inner.current
     const drop = dyno && g ? g.scale.x * carFrame(look.body).wheel : 0
-    if (floor.current) floor.current.position.y += (-drop - floor.current.position.y) * Math.min(1, dt * 10)
+    if (floor.current) {
+      floor.current.position.y += (-drop - floor.current.position.y) * Math.min(1, dt * 10)
+      // The turntable turns with the car.
+      if (room) floor.current.rotation.y = t.rotation.y
+    }
+    if (contact.current) contact.current.visible = !dyno && (floor.current?.position.y ?? 0) > -0.01
     if (roll.current) roll.current.visible = !!dyno || (floor.current?.position.y ?? 0) < -0.01
     if (dyno) {
       t.rotation.y += (SIDE_ON - t.rotation.y) * Math.min(1, dt * 6)
@@ -168,10 +192,19 @@ function Viewer({ look, handle, onTouch, dyno, floorSize, photo }: { look: Look;
     const flat = Math.hypot(t.x, t.z)
     const k = flat > r * 0.7 ? (r * 0.7) / flat : 1
     want.set(t.x * k, Math.min(Math.max(t.y, 0), h * 1.1), t.z * k)
-    if (want.distanceToSquared(t) < 1e-10) return
-    const shift = want.sub(t)
-    t.add(shift)
-    c.object.position.add(shift)
+    if (want.distanceToSquared(t) >= 1e-10) {
+      const shift = want.sub(t)
+      t.add(shift)
+      c.object.position.add(shift)
+    }
+    // In the Showroom, pull the camera in before it reaches the walls, a prop or the ceiling.
+    if (!room) return
+    const p = c.object.position
+    const off = p.clone().sub(t)
+    let pull = 1
+    if (off.y > 0 && t.y + off.y > CAM_TOP) pull = Math.min(pull, (CAM_TOP - t.y) / off.y)
+    if (Math.hypot(p.x, p.z) > CAM_REACH) pull = Math.min(pull, (CAM_REACH - Math.hypot(t.x, t.z)) / Math.max(1e-6, Math.hypot(off.x, off.z)))
+    if (pull < 1) p.copy(t).addScaledVector(off, Math.max(pull, 0.2))
   }
 
   return (
@@ -192,12 +225,30 @@ function Viewer({ look, handle, onTouch, dyno, floorSize, photo }: { look: Look;
         onStart={() => { spinning.current = false; onTouch(true) }}
         onChange={clamp}
       />
-      <mesh ref={floor} rotation-x={-Math.PI / 2}>
-        <circleGeometry args={[floorSize, 48]} />
-        <meshStandardMaterial color={photo?.floor ?? '#cfd8dc'} />
-      </mesh>
+      <group ref={floor}>
+        {room ? (
+          <>
+            <mesh rotation-x={-Math.PI / 2}>
+              <circleGeometry args={[TT_R, 64]} />
+              <meshStandardMaterial map={discTex()} color="#79838f" metalness={0.5} roughness={0.45} envMapIntensity={0.5} />
+            </mesh>
+            {/* The disc's edge, seen as it sinks into the pit. */}
+            <mesh position-y={-0.06}>
+              <cylinderGeometry args={[TT_R - 0.004, TT_R - 0.004, 0.12, 64, 1, true]} />
+              <meshStandardMaterial color="#4a535d" metalness={0.6} roughness={0.4} />
+            </mesh>
+          </>
+        ) : (
+          <mesh rotation-x={-Math.PI / 2}>
+            <circleGeometry args={[floorSize, 48]} />
+            <meshStandardMaterial color={photo?.floor ?? '#cfd8dc'} />
+          </mesh>
+        )}
+      </group>
+      {room && <Showroom />}
       <group ref={turn}>
         <group ref={inner}>
+          {room && <group ref={contact}><Contact body={look.body} /></group>}
           <CarModel {...look} beams={!!photo?.beams} />
           <Rollers body={look.body} roll={roll} />
         </group>
@@ -225,14 +276,19 @@ function Turntable({ look, big, onExpand, dyno, photo, snap }: { look: Look; big
   const handle = useRef<Handle>(null)
   const [touched, setTouched] = useState(false)
   const bd = photo ?? BACKDROPS[0]
+  const room = bd.id === 'showroom'
   return (
     <>
       <Preview.StageSlot cam={big ? BIG_CAM : CAM}>
         <SkyEnv />
-        {bd.bg && <color attach="background" args={[bd.bg]} />}
-        <hemisphereLight args={[bd.fill[0], bd.fill[1], bd.fill[2]]} />
-        <directionalLight position={[3, 5, 2]} intensity={bd.key[1]} color={bd.key[0]} />
-        <Viewer look={look} handle={handle} onTouch={setTouched} dyno={dyno} floorSize={big ? 3 : 1.5} photo={photo} />
+        {room ? <ShowroomLights /> : (
+          <>
+            {bd.bg && <color attach="background" args={[bd.bg]} />}
+            <hemisphereLight args={[bd.fill[0], bd.fill[1], bd.fill[2]]} />
+            <directionalLight position={[3, 5, 2]} intensity={bd.key[1]} color={bd.key[0]} />
+          </>
+        )}
+        <Viewer look={look} handle={handle} onTouch={setTouched} dyno={dyno} floorSize={big ? 3 : 1.5} photo={photo} room={room} />
         {snap && <Snapper snap={snap} />}
       </Preview.StageSlot>
       {photo ? null : !dyno && <div className="cp-tools">
@@ -248,7 +304,7 @@ function Turntable({ look, big, onExpand, dyno, photo, snap }: { look: Look; big
 // opens photo mode (scene/photo.ts): pick a backdrop and a filter, line the car up, and snap.
 export function CarInspect({ title, onClose, ...look }: Look & { title: string; onClose: () => void }) {
   const [photo, setPhoto] = useState(false)
-  const [bd, setBd] = useState('studio')
+  const [bd, setBd] = useState('showroom')
   const [fl, setFl] = useState('none')
   const [flash, setFlash] = useState(0)
   const snap = useRef<(() => HTMLCanvasElement) | null>(null)
