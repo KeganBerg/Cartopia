@@ -633,7 +633,6 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .car-packs { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 12px; }
 .car-pack .car-thumb, .car-pack canvas { max-width: 100%; }
 .car-pack .pack-name { font-size: 14px; line-height: 1.15; min-height: 2.3em; display: grid; place-items: center; }
-.car-pack.locked { filter: saturate(.55); }
 .car-pack .buy:disabled { opacity: 1; background: #cfd8dc; color: #455a64; box-shadow: none; }
 .bank-free { margin-top: 12px; }
 .bank-notice { z-index: 160; }

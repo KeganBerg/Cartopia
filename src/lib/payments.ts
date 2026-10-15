@@ -8,7 +8,7 @@ import { flushSave, signedInUser } from './cloud'
 // sends the player to Stripe; stripe-webhook.mts records the paid pack in the purchases table
 // (purchase_record()), and syncPurchases() adds rows the save hasn't counted yet. The save guard
 // only lets the gems in when the row is there, so a page can't grant itself a pack.
-export type PurchaseResult = { ok: true } | { ok: false; reason: 'not-connected' | 'sign-in' | 'blocked' | 'level' | 'owned' | 'failed' }
+export type PurchaseResult = { ok: true } | { ok: false; reason: 'not-connected' | 'sign-in' | 'blocked' | 'owned' | 'failed' }
 
 export async function purchase(pack: BucksPack): Promise<PurchaseResult> {
   if (!supabase) return { ok: false, reason: 'not-connected' }
@@ -23,9 +23,8 @@ export async function purchase(pack: BucksPack): Promise<PurchaseResult> {
     })
     if (res.status === 503 || res.status === 404) return { ok: false, reason: 'not-connected' }
     if (res.status === 401) return { ok: false, reason: 'sign-in' }
-    const { url, error } = (await res.json().catch(() => ({}))) as { url?: string; error?: string }
-    // A car pack below its level, or one this account already has.
-    if (error === 'level') return { ok: false, reason: 'level' }
+    const { url } = (await res.json().catch(() => ({}))) as { url?: string }
+    // A car pack this account already has.
     if (res.status === 409) return { ok: false, reason: 'owned' }
     // A refunded or charged-back pack's gems were already spent on this account.
     if (res.status === 403) return { ok: false, reason: 'blocked' }

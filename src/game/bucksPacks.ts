@@ -10,9 +10,8 @@
 // Checkout stamps the buyer's level on the Stripe session, so the webhook grants what the shop showed.
 export type BucksPack = {
   id: string; name: string; price: number; bucks: number; bonus: number; coinGems?: number; parts?: number; tag?: string; art: string
-  // Car packs: the pack-only car it brings (a CARS id with `pack: true`) and the level it goes on sale
-  // at (the car's unlockLevel; data.test.ts keeps the two in step). One per account.
-  car?: string; unlock?: number
+  // Car packs: the pack-only car it brings (a CARS id with `pack: true`). One per account.
+  car?: string
 }
 export const BUCKS_PACKS: BucksPack[] = [
   { id: 'handful', name: 'Handful of Gems', price: 1.99, bucks: 10, bonus: 10, art: '💎' },
@@ -24,12 +23,12 @@ export const BUCKS_PACKS: BucksPack[] = [
 ]
 
 // Car packs: a car you can only get here, a little quicker than the Showroom's best at its level,
-// plus gems. On sale once you reach the car's level, so money never skips progression.
+// plus gems. On sale at any level (Kegan chose no level lock, 2026-10-15).
 export const CAR_PACKS: BucksPack[] = [
-  { id: 'car-firebolt', name: 'Hot Rod Pack', price: 4.99, bucks: 25, bonus: 0, car: 'firebolt', unlock: 8, art: '🔥' },
-  { id: 'car-kaze', name: 'Time Attack Pack', price: 9.99, bucks: 50, bonus: 0, car: 'kaze', unlock: 15, art: '🏁' },
-  { id: 'car-sturm', name: 'Rally Legend Pack', price: 19.99, bucks: 100, bonus: 0, car: 'sturm', unlock: 25, art: '🏔️' },
-  { id: 'car-vanta', name: 'Hypercar Pack', price: 49.99, bucks: 250, bonus: 0, car: 'vanta', unlock: 40, tag: 'Fastest car', art: '⚡' },
+  { id: 'car-firebolt', name: 'Hot Rod Pack', price: 4.99, bucks: 25, bonus: 0, car: 'firebolt', art: '🔥' },
+  { id: 'car-kaze', name: 'Time Attack Pack', price: 9.99, bucks: 50, bonus: 0, car: 'kaze', art: '🏁' },
+  { id: 'car-sturm', name: 'Rally Legend Pack', price: 19.99, bucks: 100, bonus: 0, car: 'sturm', art: '🏔️' },
+  { id: 'car-vanta', name: 'Hypercar Pack', price: 49.99, bucks: 250, bonus: 0, car: 'vanta', tag: 'Fastest car', art: '⚡' },
 ]
 export const ALL_PACKS = [...BUCKS_PACKS, ...CAR_PACKS]
 

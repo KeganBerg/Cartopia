@@ -78,13 +78,12 @@ describe('stripe checkout', () => {
 })
 
 describe('car packs', () => {
-  it('each sells one pack-only car, on sale at that car\'s level', async () => {
+  it('each sells one pack-only car', async () => {
     const { CAR_PACKS } = await import('../game/bucksPacks')
     const { CARS, carDef } = await import('../game/data')
     expect(CAR_PACKS.map((p) => p.car).sort()).toEqual(CARS.filter((c) => c.pack).map((c) => c.id).sort())
     for (const p of CAR_PACKS) {
       expect(carDef(p.car!).pack, p.id).toBe(true)
-      expect(p.unlock, p.id).toBe(carDef(p.car!).unlockLevel)
       expect(packById(p.id)).toBe(p)
       expect(sessionForm(p, 'u1', 'https://cartopia.lol').get('line_items[0][price_data][product_data][name]')).toContain('car +')
     }
