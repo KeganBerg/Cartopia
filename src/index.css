@@ -1232,7 +1232,7 @@ html.calm .callout { animation: none !important; }
 .theme-strip { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 10px 0 2px; }
 .theme-dot { width: 34px; height: 34px; border-radius: 50%; border: 2px solid rgba(0,0,0,.18); padding: 0; cursor: pointer; font-size: 16px; line-height: 1; background: #fff; }
 .theme-dot.sel { border-color: #ff8f00; box-shadow: 0 0 0 3px rgba(255,143,0,.35); }
-/* Menu > Town: picture cards for lamp posts and town colours, glowing bulbs for the light colour. */
+/* Menu > Town: picture cards for lamp posts and town colours, flat swatches for the light colour. */
 .cl-head { margin: 16px 0 8px; font-size: 18px; }
 .tn-row { gap: 8px; }
 .tn-row input { flex: 1 1 0; width: auto; margin: 0; min-width: 0; font: 800 17px Nunito, sans-serif; padding: 10px 12px; border-radius: 12px; }
@@ -1249,9 +1249,9 @@ html.calm .callout { animation: none !important; }
 .cl-card.sel::after { content: '✔'; position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border-radius: 50%; background: #ff8f00; color: #fff; font: 900 14px/24px Nunito, sans-serif; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.35); }
 .cl-bulbs { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 12px; }
 .cl-bulb { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 6px 0; border: 0; background: none; cursor: pointer; min-width: 0; }
-.cl-bulb i { width: 36px; height: 36px; border-radius: 50%; background: radial-gradient(circle at 38% 34%, #fff 0 18%, var(--c) 55%); box-shadow: 0 0 10px var(--c), inset 0 -3px 0 rgba(0,0,0,.18); border: 3px solid #fff; outline: 2px solid rgba(20,33,61,.18); }
+.cl-bulb i { width: 36px; height: 36px; border-radius: 50%; background: var(--c); border: 3px solid #fff; outline: 2px solid rgba(20,33,61,.18); }
 .cl-bulb span { font: 800 12px Nunito, sans-serif; color: #4a6283; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.cl-bulb.sel i { outline: 3px solid #ff8f00; box-shadow: 0 0 18px 4px var(--c), inset 0 -3px 0 rgba(0,0,0,.18); }
+.cl-bulb.sel i { outline: 3px solid #ff8f00; }
 .cl-bulb.sel span { color: #14213d; }
 @media (max-width: 560px) {
   .cl-grid { gap: 8px; }
