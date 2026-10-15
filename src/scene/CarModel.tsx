@@ -52,7 +52,6 @@ type Shape = {
   roofwing?: boolean // spoiler on the back edge of a hatchback's roof
   vee?: boolean // flat van nose with a big chrome V and round badge
   spare?: boolean // spare tyre hung on the tailgate
-  frontbar?: boolean // one light strip across the nose instead of a grille
   ornament?: boolean // tall chrome grille with a hood ornament
   bus?: boolean // window posts down the sides, rub rails, stop arm and roof warning lamps
   plates?: boolean // armoured scout: wheels clear of the hull under faceted fenders, a raked prow, a roll hoop and a rear turret, no windshield
@@ -87,7 +86,7 @@ const SHAPES: Record<Body, Shape> = {
   hatch: { len: 1.06, wid: 0.68, body: 0.25, lift: 0.09, cabinLen: 0.66, cabinH: 0.25, cabinZ: -0.13, taper: 0.84, hood: 0.02, wheel: 0.15, drop: 0.05, nose: 0.05, roofwing: true },
   van: { len: 1.28, wid: 0.72, body: 0.27, lift: 0.12, cabinLen: 1.08, cabinH: 0.33, cabinZ: -0.06, taper: 0.97, hood: 0, wheel: 0.15, drop: 0, nose: 0.02, vee: true },
   suv: { len: 1.18, wid: 0.74, body: 0.3, lift: 0.17, cabinLen: 0.7, cabinH: 0.27, cabinZ: -0.14, taper: 0.95, hood: 0, wheel: 0.19, drop: 0.03, nose: 0.03, spare: true },
-  ev: { len: 1.26, wid: 0.72, body: 0.21, lift: 0.08, cabinLen: 0.74, cabinH: 0.22, cabinZ: -0.08, taper: 0.6, hood: 0, wheel: 0.16, drop: 0.03, nose: 0.07, lightbar: true, frontbar: true },
+  ev: { len: 1.26, wid: 0.72, body: 0.21, lift: 0.08, cabinLen: 0.74, cabinH: 0.22, cabinZ: -0.08, taper: 0.6, hood: 0, wheel: 0.16, drop: 0.03, nose: 0.07, lightbar: true },
   luxury: { len: 1.5, wid: 0.74, body: 0.28, lift: 0.1, cabinLen: 0.62, cabinH: 0.25, cabinZ: -0.18, taper: 0.84, hood: 0, wheel: 0.17, drop: 0.02, nose: 0.02, ornament: true },
   bus: { len: 1.8, wid: 0.8, body: 0.34, lift: 0.14, cabinLen: 1.46, cabinH: 0.32, cabinZ: -0.13, taper: 0.99, hood: 0, wheel: 0.18, drop: 0.1, nose: 0.06, bus: true },
   tusker: { len: 1.42, wid: 0.6, body: 0.2, lift: 0.2, cabinLen: 0.44, cabinH: 0.2, cabinZ: -0.02, taper: 1, hood: 0, wheel: 0.22, drop: 0.02, nose: 0.1, open: true, plates: true, track: 0.42 },
@@ -468,7 +467,9 @@ function formulaGeo(key: string, fit: Partial<Record<ModSlot, string>>): CarGeo 
   // Front wing with endplates, rear wing on a pillar.
   k.add('paint', box(s.wid * 0.74, 0.015, 0.12), [0, 0.05, s.len / 2 - 0.04])
   k.add('black', box(s.wid * 0.7, 0.012, 0.06), [0, 0.07, s.len / 2 - 0.08], [0.25, 0, 0])
-  for (const sd of [-1, 1]) k.add('black', box(0.015, 0.07, 0.15), [sd * s.wid * 0.37, 0.07, s.len / 2 - 0.05])
+  // Endplates start ahead of the tyres; two pylons hang the wing from the nose.
+  for (const sd of [-1, 1]) k.add('black', box(0.015, 0.07, 0.12), [sd * s.wid * 0.37, 0.07, s.len / 2 - 0.035])
+  for (const sd of [-1, 1]) k.add('black', box(0.012, 0.07, 0.05), [sd * 0.03, 0.09, s.len / 2 - 0.06])
   if (!fit.spoiler) {
     k.add('paint', box(0.52, 0.02, 0.13), [0, 0.42, -s.len / 2 + 0.07], [0.12, 0, 0])
     k.add('black', box(0.52, 0.015, 0.06), [0, 0.45, -s.len / 2 + 0.03], [0.4, 0, 0])
@@ -702,7 +703,7 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
       k.add('chrome', new TorusGeometry(s.wid * 0.3, 0.025, 6, 16, Math.PI), [0, top + 0.1, s.cabinZ - 0.18])
       // Light bar across the roll bar with four spot lamps.
       k.add('black', box(s.wid * 0.5, 0.05, 0.05), [0, top + 0.1 + s.wid * 0.3, s.cabinZ - 0.18])
-      for (const x of [-0.15, -0.05, 0.05, 0.15]) k.add('lamp', disc(0.02, 10), [x * s.wid * 2, top + 0.1 + s.wid * 0.3, s.cabinZ - 0.1525])
+      for (const x of [-0.18, -0.06, 0.06, 0.18]) k.add('lamp', disc(0.02, 10), [x * s.wid, top + 0.1 + s.wid * 0.3, s.cabinZ - 0.1525])
     }
   } else {
     const cb = 0.025
@@ -983,15 +984,18 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
   }
   if (s.dog) {
     // Shaggy tufts all over the sides, a big black nose, a lolling tongue and a tail (unless a bigger one is fitted).
+    // Tufts stay on the painted sides below the windows, and out of the wheel arches.
     for (let i = 0; i < 28; i++) {
       const sd = i % 2 ? 1 : -1
       const z = -s.len * 0.42 + ((i * 0.37) % 1) * s.len * 0.8
-      const y = s.lift + 0.06 + ((i * 0.61) % 1) * (s.body + 0.18)
+      const y = s.lift + 0.06 + ((i * 0.61) % 1) * (top - s.lift - 0.11)
+      if (y < s.wheel * 2 + 0.02 && Math.abs(Math.abs(z) - wz) < s.wheel * 1.2) continue
       k.add(i % 3 ? 'paint' : 'dark', rbox(0.03, 0.07, 0.08, 0.012), [sd * (s.wid / 2 + 0.008), y, z], [0, 0, sd * (0.2 + ((i * 0.29) % 1) * 0.3)])
     }
     k.add('black', new SphereGeometry(0.055, 12, 10), [0, top - 0.04, front + 0.03], [0, 0, 0], [1.3, 1, 1])
     k.add('tail', rbox(0.07, 0.012, 0.12, 0.005), [0, s.lift + 0.1, front + 0.05], [1.1, 0, 0])
-    if (!fit.spoiler) k.add('paint', cyl(0.02, 0.035, 0.24, 8), [0, top + 0.12, -front - 0.04], [-0.6, 0, 0])
+    // The tail sprouts from the tailgate and sweeps up and back, clear of the back window.
+    if (!fit.spoiler) k.add('paint', cyl(0.02, 0.035, 0.24, 8), [0, top - 0.03, -front - 0.05], [-1.1, 0, 0])
   }
   if (s.frog) {
     // Front wings standing above the hood, each ending in an upright round headlight.
@@ -1034,10 +1038,10 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
     // Tall chrome grille standing up from the bumper and a little figure on the hood.
     k.add('chrome', rbox(0.2, 0.14, 0.03, 0.01), [0, lightY + 0.02, front + 0.008])
     for (let i = -3; i <= 3; i++) k.add('dark', box(0.008, 0.12, 0.006), [i * 0.025, lightY + 0.02, front + 0.025])
-    k.add('chrome', box(0.012, 0.05, 0.03), [0, hoodY + 0.025, front - 0.04], [-0.4, 0, 0])
+    // (A model with its own ornament trim wears that one instead.)
+    if (!hasTrim(model, 'ornament')) k.add('chrome', box(0.012, 0.05, 0.03), [0, hoodY + 0.025, front - 0.04], [-0.4, 0, 0])
     for (const sd of [-1, 1]) k.add('chrome', box(0.008, 0.014, s.len * 0.7), [sd * (s.wid / 2 + 0.005), s.lift + s.body * 0.7, 0])
   }
-  if (s.frontbar) onNose('lamp', plane(s.wid * 0.82, 0.014), 0, lightY + 0.03, 0.006)
   if (s.ducktail && !fit.spoiler) k.add('paint', box(s.wid * 0.84, 0.03, 0.1), [0, top + 0.015, -s.len / 2 + 0.07], [0.35, 0, 0])
   if (s.flares && !fit.kit) {
     for (const sd of [-1, 1]) {
@@ -1139,7 +1143,11 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
       onNose('amber', plane(0.045, 0.022), sd * s.wid * 0.43, lightY - 0.04, 0.0115)
       k.add('amber', plane(0.04, 0.018), [sd * (s.wid / 2 + 0.0065), lightY - 0.02, front - 0.09], [0, (sd * Math.PI) / 2, 0])
       // Fog lamps low on the bumper of off-roaders and rally cars.
-      if (RUGGED.includes(body)) k.add('lamp', disc(0.025, 10), [sd * s.wid * 0.3, s.lift + 0.07, front + 0.0275])
+      // Each sits in a black bezel set into the bumper's flat face, so neither hangs past its edges.
+      if (RUGGED.includes(body)) {
+        k.add('black', cyl(0.02, 0.02, 0.016, 12), [sd * s.wid * 0.3, bumperY, front + 0.03], [Math.PI / 2, 0, 0])
+        k.add('lamp', disc(0.015, 12), [sd * s.wid * 0.3, bumperY, front + 0.041])
+      }
     }
     if (!sleek && !s.frog) {
       // Grille: a surround with a mesh of slats and bars behind it.
