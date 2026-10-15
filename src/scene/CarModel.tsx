@@ -25,6 +25,7 @@ import { HatModel } from './CarHat'
 import type { HatFit } from '../game/hats'
 import { ODDBALL } from './oddballCars'
 import { RESTO } from './restoCars'
+import { PACK_CARS } from './packCars'
 
 type Shape = {
   len: number; wid: number
@@ -118,6 +119,13 @@ const SHAPES: Record<Body, Shape> = {
   pontoon: { len: 1.36, wid: 0.76, body: 0.16, lift: 0.08, cabinLen: 0.3, cabinH: 0.1, cabinZ: -0.05, taper: 0.7, hood: 0, wheel: 0.14, drop: 0.02, nose: 0.06, open: true },
   stepnose: { len: 1.3, wid: 0.76, body: 0.25, lift: 0.08, cabinLen: 0.62, cabinH: 0.19, cabinZ: -0.14, taper: 0.8, hood: 0, wheel: 0.15, drop: 0.01, nose: 0.05 },
   restomuscle: { len: 1.42, wid: 0.8, body: 0.25, lift: 0.08, cabinLen: 0.62, cabinH: 0.17, cabinZ: -0.22, taper: 0.8, hood: 0.03, wheel: 0.155, drop: 0.01, nose: 0.03 },
+  // Car pack cars: drawn by packCars/, same as the exotics.
+  highboy: { len: 1.36, wid: 0.78, body: 0.24, lift: 0.1, cabinLen: 0.36, cabinH: 0.17, cabinZ: -0.16, taper: 0.9, hood: 0.055, wheel: 0.16, drop: 0, nose: 0.02, open: true },
+  timeattack: { len: 1.4, wid: 0.82, body: 0.22, lift: 0.06, cabinLen: 0.56, cabinH: 0.17, cabinZ: -0.1, taper: 0.7, fastback: 0.5, hood: 0.01, wheel: 0.147, drop: 0.02, nose: 0.06 },
+  ponycar: { len: 1.34, wid: 0.74, body: 0.24, lift: 0.09, cabinLen: 0.5, cabinH: 0.19, cabinZ: -0.14, taper: 0.74, fastback: 0.45, hood: 0.04, wheel: 0.155, drop: 0.02, nose: 0.05 },
+  gtcoupe: { len: 1.3, wid: 0.74, body: 0.2, lift: 0.08, cabinLen: 0.5, cabinH: 0.18, cabinZ: -0.14, taper: 0.68, fastback: 0.4, hood: 0.03, wheel: 0.15, drop: 0.03, nose: 0.06 },
+  groupb: { len: 1.34, wid: 0.84, body: 0.24, lift: 0.08, cabinLen: 0.56, cabinH: 0.18, cabinZ: -0.06, taper: 0.75, fastback: 0.5, hood: 0, wheel: 0.15, drop: 0.01, nose: 0.05 },
+  longtail: { len: 1.5, wid: 0.82, body: 0.2, lift: 0.05, cabinLen: 0.5, cabinH: 0.15, cabinZ: 0.02, taper: 0.4, fastback: 0.8, hood: 0, wheel: 0.145, drop: 0.03, nose: 0.1 },
 }
 
 // Motorcycles. head = steering head [y, z]; seat = seat top [y, z].
@@ -555,7 +563,7 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
   if (hit) return hit
   if (body === 'formula') return formulaGeo(key, fit)
   const s = shapeOf(body)
-  const exotic = EXOTIC[body] ?? ODDBALL[body] ?? RESTO[body]
+  const exotic = EXOTIC[body] ?? ODDBALL[body] ?? RESTO[body] ?? PACK_CARS[body]
   if (exotic) {
     const k = new Kit()
     exotic(k, fit, { seat, steering, brakes, bar })

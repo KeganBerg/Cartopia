@@ -6,6 +6,7 @@ import { PAL } from './season'
 import { asphaltTex, brickTex, grassTex, paverTex, sidingTex, shingleTex } from './textures'
 import { Box, Cyl, Sign, Pool, Bulbs, Flag, ShellBuilding, BlockCar, GOLD, SNOW, type Mat, type V3 } from './NewBuildings'
 import { Crowd, LearnerCar, StudentCars } from './CampusLife'
+import { waterKinds } from './liveWater'
 import { loop, smoothLoop, track, playMove, routeMove } from './campusPaths'
 
 // Schools, the university and the driving academy: the big late-game lots.
@@ -414,7 +415,9 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
           {/* Fountain where the paths cross. */}
           <group position={[0, 0.08, 0.6]}>
             <Cyl m={m} at={[0, 0.07, 0]} r={0.5} h={0.14} c="#cfd8dc" seg={20} />
-            <mesh position={[0, 0.13, 0]} rotation-x={-Math.PI / 2}><circleGeometry args={[0.44, 20]} />{m('#4fc3f7')}</mesh>
+            {live
+              ? <mesh position={[0, 0.13, 0]} rotation-x={-Math.PI / 2} material={waterKinds().basin}><circleGeometry args={[0.44, 24]} /></mesh>
+              : <mesh position={[0, 0.13, 0]} rotation-x={-Math.PI / 2}><circleGeometry args={[0.44, 20]} />{m('#4fc3f7')}</mesh>}
             <Cyl m={m} at={[0, 0.3, 0]} r={0.06} h={0.36} c="#cfd8dc" seg={8} />
             <Cyl m={m} at={[0, 0.45, 0]} r={0.2} r2={0.12} h={0.06} c="#cfd8dc" seg={14} />
             <mesh position={[0, 0.56, 0]}><sphereGeometry args={[0.07, 8, 6]} />{m('#b3e5fc')}</mesh>

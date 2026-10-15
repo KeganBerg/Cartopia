@@ -34,10 +34,12 @@ function upgrades(d: BuildingDef) {
 // economy.test.ts fails when data.ts changes without the SQL copy.
 export function econCatalog() {
   const cars = Object.fromEntries(
-    CARS.map((c) => [c.id, { name: c.name, body: c.body, price: c.price, bucks: c.bucks ?? 0, power: c.power, grip: c.grip, weight: c.weight, unlock: c.season ? 0 : c.secret ? 999 : c.unlockLevel }]),
+    CARS.map((c) => [c.id, { name: c.name, body: c.body, price: c.price, bucks: c.bucks ?? 0, power: c.power, grip: c.grip, weight: c.weight, unlock: c.season ? 0 : c.secret || c.pack ? 999 : c.unlockLevel }]),
   )
   const buildings = Object.fromEntries(
-    BUILDINGS.map((b) => [b.id, { price: b.price, obstacle: b.kind === 'obstacle', fuelCap: b.fuelCap ?? 0, ...(upgradable(b) ? { up: upgrades(b) } : {}) }]),
+    // Wild obstacles are left out: the guard reads a def it doesn't know as an obstacle worth
+    // nothing, the same as listing them, without a catalog migration for every new kind.
+    BUILDINGS.filter((b) => !b.wild).map((b) => [b.id, { price: b.price, obstacle: b.kind === 'obstacle', fuelCap: b.fuelCap ?? 0, ...(upgradable(b) ? { up: upgrades(b) } : {}) }]),
   )
   const goals = Object.fromEntries(GOALS.map((g) => [g.id, { coins: g.coins, xp: g.xp, bucks: g.bucks ?? 0 }]))
   const gp = Object.fromEntries(

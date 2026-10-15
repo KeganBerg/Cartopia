@@ -29,7 +29,7 @@ function rng(seed: number) {
 }
 
 // A tall spinning wash brush: a core wrapped in coloured bristle bands.
-function Brush({ x, z, spin, flat }: { x: number; z: number; spin: number; flat?: boolean }) {
+export function Brush({ x, z, spin, flat }: { x: number; z: number; spin: number; flat?: boolean }) {
   const g = useRef<Group>(null)
   useFrame((_, dt) => { if (g.current) g.current.rotation.y += Math.min(dt, 0.05) * spin })
   const bands = ['#1e88e5', '#e53935', '#fdd835', '#43a047', '#1e88e5', '#e53935', '#fdd835']

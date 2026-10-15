@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "oxlint && tsc -b && vite build",
+    "build": "oxlint && tsc -b && vite build && node scripts/check-dist.mjs",
+    "smoke": "node scripts/smoke.mjs",
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run"
@@ -32,6 +33,7 @@
     "@vitejs/plugin-react": "^6.1.1",
     "jsdom": "^26.1.0",
     "oxlint": "^1.81.0",
+    "playwright": "^1.64.1",
     "typescript": "~6.0.2",
     "vite": "^8.3.0",
     "vitest": "^5.0.3"
