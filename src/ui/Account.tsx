@@ -71,7 +71,7 @@ export function AccountPanel() {
       {tab === 'town' && <>
       <button className="buy bank-menu-btn" onClick={() => openPanel('bank')}>🏦 Bank · get gems</button>
       <h3 className="cl-head">🏙️ Town name</h3>
-      <div className="row town-name">
+      <div className="row tn-row">
         <input value={name} maxLength={24} aria-label="Town name" onChange={(e) => setName(e.target.value)} />
         <button className="buy" disabled={!name.trim() || name === townName} onClick={() => (isCleanName(name) ? rename(name) : useGame.getState().toast(NAME_REJECTED))}>Save</button>
       </div>
