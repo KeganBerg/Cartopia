@@ -38,8 +38,14 @@
 @media (max-width: 600px) {
   .garage-env { --hole: 40dvh; }
   /* The room only fills the top: the sheet below covers the rest, and a full-screen canvas there would draw for nothing. */
-  .garage-env .garage { display: block; overflow-y: auto; overscroll-behavior: contain; padding: 0; }
-  .garage-env .garage-scene { bottom: auto; height: calc(var(--hole) + 70px); }
+  /* pointer-events back on: iOS Safari won't touch-scroll a container that has them off, even when
+     its children take touches. Touches on the car area still reach the room (the hole passes them
+     through, and the scene paints above this box). */
+  .garage-env .garage { display: block; overflow-y: auto; overscroll-behavior: contain; padding: 0; pointer-events: auto; }
+  /* Sticky inside the scroller (not absolute to the panel) so a swipe that starts on the car scrolls it too. */
+  .garage-env .garage-scene { position: sticky; inset: auto; top: 0; height: calc(var(--hole) + 70px); margin-bottom: calc(-1 * (var(--hole) + 70px)); }
+  /* The car fills half the screen here, so an up/down swipe on it scrolls the sheet; side swipes and pinches still spin and zoom it. */
+  .garage-env .garage-scene .car-preview, .garage-env .garage-scene .car-preview .rf-canvas { touch-action: pan-y !important; } /* !important beats the orbit controls' inline touch-action: none */
   .garage-env .garage-scene .cp-tools { right: 10px; top: 58px; }
   .garage-env .garage-scene .cp-hint { left: 50%; bottom: 30px; }
   .garage-env .garage-hole { height: var(--hole); margin: 0 10px; }
