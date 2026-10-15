@@ -40,6 +40,7 @@ export type DynoFeed = { rpm: number; speed: number }
 const SIDE_ON = -Math.PI / 4
 
 type Orbit = ComponentRef<typeof OrbitControls>
+type Frame = React.RefObject<HTMLElement | null>
 type Handle = { reset: () => void }
 
 // The dyno: a deck with a roller under each axle, in the car's own units.
@@ -93,7 +94,9 @@ function Contact({ body }: { body: Body }) {
 
 // `room`: the car stands on the Showroom's turntable (scene/Showroom.tsx), else on a plain disc
 // for photo mode's coloured backdrops.
-function Viewer({ look, handle, onTouch, dyno, floorSize, photo, room }: { look: Look; handle: React.RefObject<Handle | null>; onTouch: (on: boolean) => void; dyno?: DynoFeed | null; floorSize: number; photo?: Backdrop | null; room: boolean }) {
+// `frameIn`: an element over the canvas whose box the car is framed in (the open part of a menu
+// laid over a full-screen view), instead of the whole canvas.
+function Viewer({ look, handle, onTouch, dyno, floorSize, photo, room, frameIn }: { look: Look; handle: React.RefObject<Handle | null>; onTouch: (on: boolean) => void; dyno?: DynoFeed | null; floorSize: number; photo?: Backdrop | null; room: boolean; frameIn?: Frame }) {
   const turn = useRef<Group>(null)
   const floor = useRef<Group>(null)
   const roll = useRef<Group>(null)
@@ -105,6 +108,7 @@ function Viewer({ look, handle, onTouch, dyno, floorSize, photo, room }: { look:
   const spinning = useRef(true)
   const camera = useThree((s) => s.camera as PerspectiveCamera)
   const size = useThree((s) => s.size)
+  const gl = useThree((s) => s.gl)
   const modKey = (look.mods ?? []).join(',') + (look.hat ? `|${look.hat.id}` : '')
 
   // Seat the car on the turntable and fit the camera to it. A new body or a
@@ -116,7 +120,21 @@ function Viewer({ look, handle, onTouch, dyno, floorSize, photo, room }: { look:
     if (!g || !t || !c) return
     t.rotation.y = 0
     bounds.current = seat(g, t, (b) => FIT / Math.max(0.05, Math.hypot(b.r, b.h / 2)))
-    camera.aspect = size.width / Math.max(1, size.height)
+    // Framed in part of the canvas: the camera sees that box as its whole view, and the
+    // canvas around it as more of the same picture (a view offset reaching past the box).
+    const box = frameIn?.current?.getBoundingClientRect()
+    const can = gl.domElement.getBoundingClientRect()
+    const fx = box && can.width > 0 ? Math.max(box.left, can.left) - can.left : 0
+    const fy = box && can.height > 0 ? Math.max(box.top, can.top) - can.top : 0
+    const fw = box ? Math.min(box.right, can.right) - can.left - fx : 0
+    const fh = box ? Math.min(box.bottom, can.bottom) - can.top - fy : 0
+    if (fw > 40 && fh > 40) {
+      camera.aspect = fw / fh
+      camera.setViewOffset(fw, fh, -fx, -fy, can.width, can.height)
+    } else {
+      camera.clearViewOffset()
+      camera.aspect = size.width / Math.max(1, size.height)
+    }
     const at = frame(camera, bounds.current, room ? ROOM_VIEW : VIEW, { pad: 0.1 })
     const d = camera.position.distanceTo(at)
     c.target.copy(at)
@@ -132,6 +150,30 @@ function Viewer({ look, handle, onTouch, dyno, floorSize, photo, room }: { look:
     spinning.current = true
   }
   useLayoutEffect(fitView, [look.body, size.width, size.height, room])
+  // The framing box can change size on its own (a menu growing beside it); the shared camera
+  // never keeps this view's offset once it has gone.
+  useEffect(() => {
+    const el = frameIn?.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    let w = 0, h = 0
+    const ro = new ResizeObserver(([e]) => {
+      const r = e.contentRect
+      if (Math.abs(r.width - w) < 1 && Math.abs(r.height - h) < 1) return
+      const first = !w
+      w = r.width
+      h = r.height
+      if (!first) fitView()
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [frameIn])
+  useEffect(() => () => {
+    camera.clearViewOffset()
+    const c = gl.domElement
+    camera.aspect = c.clientWidth / Math.max(1, c.clientHeight)
+    camera.updateProjectionMatrix()
+  }, [camera, gl])
   // Re-centre for a fitted or tried part without moving the camera.
   useLayoutEffect(() => {
     const g = inner.current
@@ -272,7 +314,7 @@ function Snapper({ snap }: { snap: React.RefObject<(() => HTMLCanvasElement) | n
   return null
 }
 
-function Turntable({ look, big, onExpand, dyno, photo, snap }: { look: Look; big?: boolean; onExpand?: () => void; dyno?: DynoFeed | null; photo?: Backdrop | null; snap?: React.RefObject<(() => HTMLCanvasElement) | null> }) {
+function Turntable({ look, big, onExpand, dyno, photo, snap, frameIn }: { look: Look; big?: boolean; onExpand?: () => void; dyno?: DynoFeed | null; photo?: Backdrop | null; snap?: React.RefObject<(() => HTMLCanvasElement) | null>; frameIn?: Frame }) {
   const handle = useRef<Handle>(null)
   const [touched, setTouched] = useState(false)
   const bd = photo ?? BACKDROPS[0]
@@ -288,7 +330,7 @@ function Turntable({ look, big, onExpand, dyno, photo, snap }: { look: Look; big
             <directionalLight position={[3, 5, 2]} intensity={bd.key[1]} color={bd.key[0]} />
           </>
         )}
-        <Viewer look={look} handle={handle} onTouch={setTouched} dyno={dyno} floorSize={big ? 3 : 1.5} photo={photo} room={room} />
+        <Viewer look={look} handle={handle} onTouch={setTouched} dyno={dyno} floorSize={big ? 3 : 1.5} photo={photo} room={room} frameIn={frameIn} />
         {snap && <Snapper snap={snap} />}
       </Preview.StageSlot>
       {photo ? null : !dyno && <div className="cp-tools">
@@ -354,10 +396,10 @@ export function CarInspect({ title, onClose, ...look }: Look & { title: string; 
 // Turntable view of a car, used in the garage and when a restored car rolls out.
 // Drag to orbit, pinch or scroll to zoom; `onExpand` adds a full-screen button.
 // With `dyno` the car sits side-on on spinning rollers, and `children` draw over it.
-export function CarPreview({ onExpand, dyno, children, ...look }: Look & { onExpand?: () => void; dyno?: DynoFeed | null; children?: React.ReactNode }) {
+export function CarPreview({ onExpand, dyno, children, frameIn, ...look }: Look & { onExpand?: () => void; dyno?: DynoFeed | null; children?: React.ReactNode; frameIn?: Frame }) {
   return (
     <div className="car-preview">
-      <Turntable look={look} onExpand={onExpand} dyno={dyno} />
+      <Turntable look={look} onExpand={onExpand} dyno={dyno} frameIn={frameIn} />
       {children}
     </div>
   )
