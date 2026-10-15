@@ -234,7 +234,8 @@ export function legalHtml(doc: LegalDoc, other: LegalDoc): string {
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${esc(doc.title)} · Cartopia</title>
 <meta name="description" content="${esc(doc.intro)}" />
-<link rel="icon" href="/favicon.svg" />
+<link rel="icon" href="/favicon.ico" sizes="48x48" />
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
 <style>
 body { margin: 0; background: #e8f4fd; color: #263238; font: 16px/1.6 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
 header { background: linear-gradient(#42a5f5, #1e88e5); color: #fff; padding: 22px 16px 18px; text-align: center; }

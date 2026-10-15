@@ -24,7 +24,6 @@ export function openLegal(id: LegalDoc['id']) {
 export function AccountPanel() {
   const townName = useGame((s) => s.townName)
   const rename = useGame((s) => s.renameTown)
-  const openPanel = useGame((s) => s.openPanel)
   const [user, setUser] = useState<User | null>(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -69,7 +68,6 @@ export function AccountPanel() {
     <Panel title="Menu">
       <SheetTabs items={MENU_TABS} value={tab} onChange={(t) => { lastTab = t; setTab(t) }} />
       {tab === 'town' && <>
-      <button className="buy bank-menu-btn" onClick={() => openPanel('bank')}>🏦 Bank · get gems</button>
       <h3 className="cl-head">🏙️ Town name</h3>
       <div className="row tn-row">
         <input value={name} maxLength={24} aria-label="Town name" onChange={(e) => setName(e.target.value)} />
