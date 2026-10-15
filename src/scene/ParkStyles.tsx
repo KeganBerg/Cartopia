@@ -154,6 +154,11 @@ function DogPark({ m, bulb, ghost }: EdgeProps) {
 
 // The half-pipe's cross-section, in its own frame: across (u) and up (v).
 const HP = { r: 0.55, flat: 0.5, deck: 0.28, w: 1.7 }
+// The pipe stands a clear step above the park's slab (top at 0.06), so its
+// flat bottom never lies flush with the slab and flickers; its base reaches
+// down into the slab so it doesn't float (see coplanar.test.tsx).
+const PIPE_Y = 0.072
+const PIPE_BASE = -0.03
 const hpHalf = HP.flat / 2 + HP.r + HP.deck
 // Graffiti tags on the half-pipe's sides: [along, up, radius].
 const TAGS: [number, number, number][] = [[-0.98, 0.14, 0.1], [-0.83, 0.36, 0.13], [0.84, 0.17, 0.16], [0.97, 0.41, 0.1]]
@@ -161,7 +166,7 @@ const TAGS: [number, number, number][] = [[-0.98, 0.14, 0.1], [-0.83, 0.36, 0.13
 function halfPipeGeometry() {
   const { r, flat, w } = HP
   const s = new Shape()
-  s.moveTo(-hpHalf, 0)
+  s.moveTo(-hpHalf, PIPE_BASE)
   s.lineTo(-hpHalf, r)
   s.lineTo(-flat / 2 - r, r)
   // Down the left wall (a quarter circle, hollow side up), across the flat, up the right.
@@ -175,8 +180,8 @@ function halfPipeGeometry() {
     s.lineTo(flat / 2 + r * Math.sin(a), r - r * Math.cos(a))
   }
   s.lineTo(hpHalf, r)
-  s.lineTo(hpHalf, 0)
-  s.lineTo(-hpHalf, 0)
+  s.lineTo(hpHalf, PIPE_BASE)
+  s.lineTo(-hpHalf, PIPE_BASE)
   const g = new ExtrudeGeometry(s, { depth: w, bevelEnabled: false, curveSegments: 1 })
   g.translate(0, 0, -w / 2)
   return g
@@ -227,14 +232,15 @@ function SkatePark({ m, bulb, ghost }: EdgeProps) {
     <group>
       <Box m={m} at={[0, 0.03, 0]} s={[3.9, 0.06, 3.9]} c="#ffffff" t={concreteTex(4, 4)} shadow={false} />
       {/* Half-pipe across the back, running front to back, with coping and decks. */}
-      <group position={[-0.55, 0.06, -0.8]}>
+      <group position={[-0.55, PIPE_Y, -0.8]}>
         <mesh geometry={pipe} rotation-y={Math.PI / 2} castShadow receiveShadow>
           {m('#cfd8dc', concreteTex(1, 1))}
         </mesh>
         {[-1, 1].map((sd) => (
           <group key={sd}>
-            {/* Square coping, posts and rails: merged, they run the pipe's whole width. */}
-            <Box m={m} at={[0, HP.r + 0.012, sd * (hpHalf - HP.deck)]} s={[HP.w, 0.034, 0.034]} c="#b0bec5" />
+            {/* Square coping, posts and rails: merged, they run the pipe's whole width.
+                The coping stops just short of the side walls so its ends don't lie flush with them. */}
+            <Box m={m} at={[0, HP.r + 0.012, sd * (hpHalf - HP.deck)]} s={[HP.w - 0.01, 0.034, 0.034]} c="#b0bec5" />
             {[-0.8, 0, 0.8].map((x) => <Box key={x} m={m} at={[x, HP.r + 0.18, sd * (hpHalf - 0.03)]} s={[0.022, 0.36, 0.022]} c="#78909c" shadow={false} />)}
             <Box m={m} at={[0, HP.r + 0.34, sd * (hpHalf - 0.03)]} s={[HP.w, 0.02, 0.02]} c="#78909c" />
           </group>
@@ -281,7 +287,7 @@ function SkatePark({ m, bulb, ghost }: EdgeProps) {
       </group>
       {!ghost && (
         <group>
-          <group position={[-0.1, 0.06 + HP.r, -0.8 - hpHalf + 0.12]} rotation-y={0.5}>
+          <group position={[-0.1, PIPE_Y + HP.r, -0.8 - hpHalf + 0.12]} rotation-y={0.5}>
             <Box m={m} at={[0, 0.05, 0]} s={[0.08, 0.1, 0.06]} c="#1565c0" />
             <Box m={m} at={[0, 0.16, 0]} s={[0.08, 0.14, 0.06]} c="#43a047" />
             <Ball m={m} at={[0, 0.27, 0]} r={0.04} c="#8d5524" />
