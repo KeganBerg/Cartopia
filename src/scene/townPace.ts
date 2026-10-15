@@ -54,3 +54,16 @@ export function paceDown(): boolean {
   }
   return true
 }
+
+// A 2x screen already draws four pixels per point, so 2x edge smoothing on top of that looks
+// the same as 4x for half the work; at 2x a laptop's 4x frame was ~170 MB of graphics memory.
+// From the screen, not the current sharpness, so a step down never rebuilds the effects (a freeze).
+export const samplesFor = (tier: 'high' | 'low' | 'off', screenDpr: number) => (tier !== 'high' ? 2 : screenDpr >= 1.75 ? 2 : 4)
+// A computer's town gives up sharpness below 50 frames a second; fewer frames (30) and fewer
+// effects still wait for below 40, as on phones (a 45 fps desktop is smoother than a 30 fps one).
+export const phoneSize = () => typeof window !== 'undefined' && (Math.min(window.innerWidth, window.innerHeight) < 700 || /iPhone|iPod|Android.*Mobile/.test(navigator.userAgent))
+export function lowestFps(town: boolean | undefined, pace: number, phone: boolean, screenDpr: number) {
+  if (town && PACES[pace].fps < 60) return 22
+  const next = town && !phone ? nextPace(pace, screenDpr) : null
+  return next != null && PACES[next].fps === PACES[pace].fps ? 50 : 40
+}

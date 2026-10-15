@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { CountFrames, FpsMeter } from './ui/FpsMeter'
 import { SharedShapes } from './scene/sharedShapes'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { NeutralToneMapping, type Material, type Mesh } from 'three'
@@ -168,11 +169,13 @@ export default function App() {
         }}
       >
         <SharedShapes />
+        <CountFrames />
         <World />
         <SplashHandoff />
         <FrameCap fps={graphics === 'saver' ? 30 : graphics === 'auto' ? pace.fps : 60} paused={townPaused} />
         <ShadowSwitch on={graphics !== 'saver'} />
       </Canvas>
+      <FpsMeter />
       <TechnoLayer />
       <Badges />
       <VisitorBadges />

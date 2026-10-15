@@ -28,11 +28,13 @@ export type Prefs = {
   steerSet: boolean
   // The ghost racing line on kart tracks: green where it's flat out, red before a hard bend.
   kartLine: boolean
+  // A frame-rate readout on the town, so a player can tell us how smooth it runs.
+  fps: boolean
 }
 export type Steer = 'smooth' | 'sharp' | 'buttons'
 
 const KEY = 'cartopia-prefs'
-const DEFAULTS: Prefs = { graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: false, muteTaunts: false, askLeave: true, askSell: true, steer: 'smooth', steerSet: false, kartLine: true }
+const DEFAULTS: Prefs = { graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: false, muteTaunts: false, askLeave: true, askSell: true, steer: 'smooth', steerSet: false, kartLine: true, fps: false }
 
 export function parsePrefs(raw: string | null): Prefs {
   try {
@@ -51,6 +53,7 @@ export function parsePrefs(raw: string | null): Prefs {
       steer: p.steer === 'sharp' ? 'sharp' : p.steer === 'buttons' && p.steerSet === true ? 'buttons' : 'smooth',
       steerSet: p.steerSet === true,
       kartLine: p.kartLine !== false,
+      fps: p.fps === true,
     }
   } catch {
     return { ...DEFAULTS }
