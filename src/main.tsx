@@ -26,6 +26,9 @@ startLiveEvents()
 startUpdateCheck()
 startRepWatch()
 startRecapWatch()
+// The game never scrolls the page itself; if something does (a focus, a menu sliding in),
+// put it back so the HUD and menu headers stay on screen.
+addEventListener('scroll', () => { if (scrollX || scrollY) scrollTo(0, 0) }, { passive: true })
 
 // Dev builds only: lets screenshot scripts open menus and seed a save.
 if (import.meta.env.DEV) import('./game/store').then(({ useGame }) => Object.assign(window, { __game: useGame }))

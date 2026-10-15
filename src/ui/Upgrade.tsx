@@ -15,7 +15,8 @@ import { frame, seat } from '../scene/fit'
 import { Panel } from './Menus'
 import { RaveButton } from './Techno'
 import { Preview } from '../scene/Stage'
-import { COLOR_THEMES } from '../game/cityLook'
+import { COLOR_THEMES, themeFor, type ColorTheme } from '../game/cityLook'
+import { Tint } from '../scene/CityTint'
 
 const n = (v: number) => v.toLocaleString()
 // The extra tourist odds a grown garden or statue adds, as a share of the usual odds.
@@ -29,7 +30,7 @@ const VIEW = new Vector3(3.4, 2.6, 3.4)
 // Drawn in the shared turntable canvas (scene/Stage.tsx), not a new one each time the panel opens.
 const CAM = { position: VIEW.toArray(), fov: 35, near: 0.1, far: 1000 }
 
-function Spinner({ def, level, landmark }: { def: BuildingDef; level: number; landmark?: boolean }) {
+function Spinner({ def, level, landmark, theme }: { def: BuildingDef; level: number; landmark?: boolean; theme: ColorTheme | null }) {
   const ref = useRef<Group>(null)
   const inner = useRef<Group>(null)
   const disc = useRef<Mesh>(null)
@@ -54,7 +55,8 @@ function Spinner({ def, level, landmark }: { def: BuildingDef; level: number; la
       </mesh>
       <group ref={ref} rotation-y={-0.5}>
         <group ref={inner}>
-          {landmark ? <VanguardTower /> : <BuildingModel def={def} level={level} />}
+          {/* In the colours it wears in town. */}
+          <Tint theme={theme}>{landmark ? <VanguardTower /> : <BuildingModel def={def} level={level} />}</Tint>
         </group>
       </group>
     </>
@@ -62,14 +64,14 @@ function Spinner({ def, level, landmark }: { def: BuildingDef; level: number; la
 }
 
 // `landmark`: the block is (or this upgrade makes it) a Vanguard Tower, so show that instead of one house.
-function LevelPreview({ def, level, landmark }: { def: BuildingDef; level: number; landmark?: boolean }) {
+function LevelPreview({ def, level, landmark, theme }: { def: BuildingDef; level: number; landmark?: boolean; theme: ColorTheme | null }) {
   const scene = useMemo(() => (
     <>
       <hemisphereLight args={['#ffffff', '#90a4ae', 1]} />
       <directionalLight position={[3, 5, 2]} intensity={1.4} />
-      <Spinner def={def} level={level} landmark={landmark} />
+      <Spinner def={def} level={level} landmark={landmark} theme={theme} />
     </>
-  ), [def, level, landmark])
+  ), [def, level, landmark, theme])
   return (
     <div className="upgrade-preview">
       <Preview.StageSlot cam={CAM}>{scene}</Preview.StageSlot>
@@ -217,7 +219,7 @@ export function UpgradePanel() {
   return (
     <Panel title={canUp ? `${name} · Level ${lvl}` : name} onClose={close}>
       <div className="upgrade">
-        <LevelPreview def={d} level={canUp ? next : lvl} landmark={becomes} />
+        <LevelPreview def={d} level={canUp ? next : lvl} landmark={becomes} theme={themeFor(b.tint, s.cityTheme, d.kind === 'decor')} />
         {canUp && <Pips level={lvl} max={maxLevel(d)} />}
         {gain && <p className="merge-boost" title="Merge bonus">🧩 ×{k} · {gain} +{Math.round(boost * 100)}%</p>}
         {!canUp ? null : max ? (
