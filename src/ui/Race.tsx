@@ -5,7 +5,7 @@ import { useGame, spendFuel, type OwnedCar } from '../game/store'
 import { LIVE_LOSS_SHARE, LOSS_SHARE } from '../game/boosts'
 import { bestCar, carPi, raceCarOf } from '../game/raceCar'
 import { carNear, fairNow, tourPayNow } from '../game/fairRace'
-import { fairRivalPi } from '../game/fairPi'
+import { buildPi, fairRivalPi } from '../game/fairPi'
 import { CARS, SKILLS, carDef, performance, RACE_FUEL, GP_SERIES, GP_ROUNDS, gpRivalPi, gpReward, CAMPAIGN, CAMPAIGN_RACES, campaignRaceId, campaignRivalPi, campaignShift, rookieRace, ROOKIE_SHIFT, campaignRivalSkills, campaignReward, campaignCleared, type CampaignChapter, skillBoost, skillDrag, liveSkillBoost, smoothShift, type Body, type GpSeries, type SkillId } from '../game/data'
 import { TRACK, freshRacer, stepRacer, shiftQuality, shiftBand, launchRacer, revLaunch, shiftRacer, fireBoost, aiReaction, AI_BOOST_GEAR, TOP_GEAR, LAUNCH_BAND, IDLE, REV_UP, REV_DOWN, RACE_DT } from '../game/race'
 import { CarThumb } from '../scene/BuildingPreview'
@@ -86,7 +86,7 @@ const performance_now = () => window.performance.now()
 
 // Caps an AI rival at what the race car can beat with perfect driving (game/fairPi.ts).
 // The ladder's PI still sets the rival's car and the prize.
-const fair = (r: Rival): Rival => ({ ...r, pi: fairNow(r.pi, r.shift ?? 1, r.skill) })
+const fair = (r: Rival, track?: number): Rival => ({ ...r, pi: fairNow(r.pi, r.shift ?? 1, r.skill, track) })
 
 const GP_CUP = ['🥉', '🏆', '🏆', '👑']
 
@@ -1063,7 +1063,7 @@ function tourRival(race: number): Rival {
   return fair({
     id: `tour-${race}`, town: tourRivalName(race), level: Math.min(99, 3 + leg * 2 + (race % TOUR_RACES)), carName: car.name, color: car.colors[race % car.colors.length],
     pi: target, online: false, body: car.body, model: car.id, skill: tourSkills(race) ? car.skill : undefined, shift: tourShift(race), boss: tourIsBoss(race),
-  })
+  }, DIST[tourDist(race)].m)
 }
 
 const SKY_ICON: Record<WeatherKind, string> = { clear: '☀️', rain: '🌧️', storm: '⛈️', drizzle: '🌦️', fog: '🌫️', wind: '💨', snow: '🌨️', blizzard: '❄️', dust: '🌪️', mist: '🌁', clearing: '🌈', heat: '🔆' }
@@ -1369,7 +1369,8 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   // the same eased PI, this makes sure of it for every race. Live rivals and ghosts race as they are.
   const rival = useMemo(() => (serverRivalPi !== null ? { ...shownRival, pi: serverRivalPi }
     : live || trial ? shownRival
-    : { ...shownRival, pi: fairRivalPi(shownRival.pi, pi(car), shownRival.shift ?? 1, shownRival.skill) }), [shownRival, serverRivalPi, live, trial, car])
+    : { ...shownRival, pi: fairRivalPi(shownRival.pi, dist ? buildPi(pi(car), character(carStats(carDef(car.model), car.upgrades, car.mods)), DIST[dist].m) : pi(car), shownRival.shift ?? 1, shownRival.skill) }),
+  [shownRival, serverRivalPi, live, trial, car, dist])
   const payout = prize ?? reward(rival)
   const rivalRef = useRef(rival)
   rivalRef.current = rival

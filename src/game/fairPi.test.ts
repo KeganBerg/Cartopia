@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { CARS, SKILLS, type CarDef, type SkillId } from './data'
-import { fairMargin, fairRivalPi } from './fairPi'
+import { DIST } from './distance'
+import { buildPi, fairMargin, fairRivalPi } from './fairPi'
 import { perfectDuel, rng } from './raceSim'
 import { tourPrize, tourRivalPi } from './tour'
 
@@ -37,6 +38,21 @@ describe('fair AI rivals', () => {
           if (winRate(my, rp, c, skill, 3) < 0.85 || winRate(my, rp, c, skill, 1) < 0.7) misses.push(`${skill ?? 'none'} at ${c} with PI ${my} vs ${rp}`)
         }
     expect(misses).toEqual([])
+  }, 60000)
+
+  it('counts a build over a set distance: sprinters in a mile, long-haulers off the line', () => {
+    const misses: string[] = []
+    for (const build of [-1, 0, 1]) for (const d of ['quarter', 'mile'] as const) for (const c of [0.5, 1]) for (const skill of [undefined, 'slipstream'] as const) {
+      const track = DIST[d].m
+      const my = 70
+      const rp = fairRivalPi(999, buildPi(my, build, track), c, skill)
+      const roll = rng(5)
+      let wins = 0
+      for (let k = 0; k < 30; k++) if (perfectDuel(plain, my, 'main', rp, plain, c, skill, 3, roll, build, track)) wins++
+      if (wins / 30 < 0.85) misses.push(`build ${build} ${d} at ${c} ${skill ?? 'none'}: ${wins}/30`)
+    }
+    expect(misses).toEqual([])
+    expect(buildPi(70, -1, DIST.mile.m)).toBeLessThan(70)
   }, 60000)
 
   it('pays a Pro Tour race at the PI raced, never above the ladder', () => {

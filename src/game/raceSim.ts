@@ -2,7 +2,8 @@
 // ui/Race.tsx, its AI rival included), with us driving perfectly. Tests use it to check that AI
 // rivals stay beatable (see fairPi.ts and campaign.test.ts).
 import { skillBoost, skillDrag, smoothShift, type CarDef, type SkillId } from './data'
-import { AI_BOOST_GEAR, TOP_GEAR, aiReaction, fireBoost, freshRacer, launchRacer, revLaunch, shiftBand, shiftQuality, shiftRacer, stepRacer } from './race'
+import { characterMul } from './distance'
+import { AI_BOOST_GEAR, TRACK, TOP_GEAR, aiReaction, fireBoost, freshRacer, launchRacer, revLaunch, shiftBand, shiftQuality, shiftRacer, stepRacer } from './race'
 import { conditions, gripMul } from './grip'
 import type { VenueId } from '../scene/venues'
 
@@ -14,7 +15,7 @@ export function rng(seed: number) {
 
 // One race on a clear day: we launch perfectly, shift perfectly (mid-band) and fire the boost in
 // `boostGear`, with no car skill. The rival drives as the race screen's AI does. True if we win.
-export function perfectDuel(me: CarDef, myPi: number, venue: VenueId, rivalPi: number, rival: CarDef, cleanness: number, skill: SkillId | undefined, boostGear: number, roll: () => number) {
+export function perfectDuel(me: CarDef, myPi: number, venue: VenueId, rivalPi: number, rival: CarDef, cleanness: number, skill: SkillId | undefined, boostGear: number, roll: () => number, build: number | null = null, track = TRACK) {
   const grip = conditions('clear', venue, me.grip)
   const theirGrip = conditions('clear', venue, rival.grip)
   const shiftAt = Array.from({ length: TOP_GEAR }, (_, g) => {
@@ -34,7 +35,7 @@ export function perfectDuel(me: CarDef, myPi: number, venue: VenueId, rivalPi: n
       if (a.rpm >= (band.lo + band.hi) / 2) shiftRacer(a, shiftQuality(a.rpm, band.lo, band.hi).q)
     }
     if (a.gear >= boostGear) fireBoost(a)
-    stepRacer(a, myPi, dt, t, skillDrag(skill, a, t) * gripMul(grip, a.gear, a.rpm, t))
+    stepRacer(a, myPi, dt, t, skillDrag(skill, a, t) * gripMul(grip, a.gear, a.rpm, t) * (build === null ? 1 : characterMul(build, a.gear, a.dist)), track)
     if (!b.launched && t >= reaction) launchRacer(b, reaction)
     if (b.launched && b.gear < TOP_GEAR && b.rpm >= shiftAt[b.gear]) {
       const band = shiftBand(b.gear, theirGrip.lo, theirGrip.hi)
@@ -42,7 +43,7 @@ export function perfectDuel(me: CarDef, myPi: number, venue: VenueId, rivalPi: n
       shiftRacer(b, smoothShift(skill) && q.label === 'Good' ? 1.08 : q.q)
     }
     if (b.gear >= AI_BOOST_GEAR) fireBoost(b)
-    stepRacer(b, rivalPi, dt, t, skillBoost(skill, b, a) * gripMul(theirGrip, b.gear, b.rpm, t))
+    stepRacer(b, rivalPi, dt, t, skillBoost(skill, b, a) * gripMul(theirGrip, b.gear, b.rpm, t), track)
   }
   return a.finished! < b.finished!
 }
