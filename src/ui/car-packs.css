@@ -1,4 +1,6 @@
 /* Car Packs menu: one animated stage per pack (a spinning in-game render over streaks racing past). */
+.pk-tier { display: grid; gap: 8px; margin-bottom: 14px; }
+.pk-tier h3 { margin: 0; font: 20px/1.2 var(--display); color: #263238; }
 .pk-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .pk-card { position: relative; display: flex; flex-direction: column; border-radius: 18px; overflow: hidden; background: #fff; border: 3px solid #e0e0e0; animation: pkIn .5s cubic-bezier(.2, .9, .3, 1.2) both; animation-delay: calc(var(--pk-i) * 90ms); }
 .pk-card.featured { border-color: #ffca28; animation: pkIn .5s cubic-bezier(.2, .9, .3, 1.2) both, pkPulse 2.4s ease-in-out .6s infinite; animation-delay: calc(var(--pk-i) * 90ms), .6s; }
@@ -34,6 +36,7 @@
 
 @media (max-width: 640px) {
   .pk-grid { gap: 8px; }
+  .pk-tier h3 { font-size: 17px; }
   .pk-stage { height: 128px; }
   .pk-car { transform: scale(1.12) translateY(4px); }
   .pk-car .thumb3d { --th: 116px; }

@@ -78,12 +78,19 @@ describe('stripe checkout', () => {
 })
 
 describe('car packs', () => {
-  it('each sells one pack-only car', async () => {
+  it('sells every pack-only car, and Showroom cars only in street packs', async () => {
     const { CAR_PACKS } = await import('../game/bucksPacks')
-    const { CARS, carDef } = await import('../game/data')
-    expect(CAR_PACKS.map((p) => p.car).sort()).toEqual(CARS.filter((c) => c.pack).map((c) => c.id).sort())
+    const { CARS, carDef, performance } = await import('../game/data')
+    const zero = { engine: 0, turbo: 0, tires: 0, weight: 0 }
+    expect(CARS.filter((c) => c.pack).every((c) => CAR_PACKS.some((p) => p.car === c.id))).toBe(true)
+    expect(new Set(CAR_PACKS.map((p) => p.car)).size).toBe(CAR_PACKS.length)
     for (const p of CAR_PACKS) {
-      expect(carDef(p.car!).pack, p.id).toBe(true)
+      const car = carDef(p.car!)
+      expect(car.id, p.id).toBe(p.car)
+      expect(p.bucks % 5, p.id).toBe(0)
+      const pi = performance(car, zero)
+      if (p.tier === 'super') expect([car.pack, pi >= 100], p.id).toEqual([true, true])
+      else expect([pi >= 50 && pi <= 100, !car.rescueOnly && !car.season && !car.secret], p.id).toEqual([true, true])
       expect(packById(p.id)).toBe(p)
       expect(sessionForm(p, 'u1', 'https://cartopia.lol').get('line_items[0][price_data][product_data][name]')).toContain('car +')
     }

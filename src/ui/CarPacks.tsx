@@ -13,6 +13,12 @@ const ZERO = { engine: 0, turbo: 0, tires: 0, weight: 0 }
 
 // Each pack's stage colours: a backdrop, the streaks racing past, and the car's paint.
 const THEME: Record<string, { bg: string; streak: string; glow: string }> = {
+  charger: { bg: '#1b1b1b, #5d4037', streak: '#ffcc80', glow: '#ffb74d' },
+  stinger: { bg: '#3e2a00, #c88a00', streak: '#fff3c4', glow: '#ffd54f' },
+  gtr: { bg: '#0b2238, #37627f', streak: '#cfe8ff', glow: '#90caf9' },
+  sora: { bg: '#2a0a12, #8e1b2c', streak: '#ffcdd2', glow: '#ef9a9a' },
+  ringmeister: { bg: '#102a1c, #2e7d4f', streak: '#c8f7dc', glow: '#69f0ae' },
+  hyper: { bg: '#2a1a00, #9a5b00', streak: '#ffe0b2', glow: '#ffab40' },
   firebolt: { bg: '#3a0d05, #b4300c', streak: '#ffb74d', glow: '#ff7043' },
   kaze: { bg: '#061a3a, #1565c0', streak: '#e3f2fd', glow: '#4fc3f7' },
   sturm: { bg: '#14260f, #4e6b1e', streak: '#e6d39a', glow: '#c5e1a5' },
@@ -67,13 +73,15 @@ function PackCard({ p, i, owned, pending, onBuy }: { p: BucksPack; i: number; ow
             </div>
           ))}
         </div>
-        <div className="pk-extras"><span>🚗 Pack only</span><span>+ {p.bucks} 💎</span></div>
+        <div className="pk-extras">{car.pack ? <span>🚗 Pack only</span> : <span title={`Normally unlocks at level ${car.unlockLevel}`}>🔓 Lv {car.unlockLevel}</span>}<span>+ {p.bucks} 💎</span></div>
         {owned ? <button className="buy" disabled>✓ In garage</button>
           : <button className="buy" disabled={pending} onClick={onBuy}>{pending ? '...' : `$${p.price.toFixed(2)}`}</button>}
       </div>
     </div>
   )
 }
+
+const TIERS = [['street', '🏁 Street · PI 50-100'], ['super', '🔥 Super & Hyper · PI 100+']] as const
 
 // Car Packs: a menu of its own beside the gem Bank. Each pack is a car you can't get anywhere
 // else plus gems, shown on an animated stage, one per account.
@@ -83,11 +91,16 @@ export function CarPacksPanel() {
   return (
     <Panel title="Car Packs" wide>
       <BankTabs current="carpacks" />
-      <div className="pk-grid">
-        {CAR_PACKS.map((p, i) => (
-          <PackCard key={p.id} p={p} i={i} owned={cars.some((c) => c.model === p.car)} pending={pending === p.id} onBuy={() => buy(p)} />
-        ))}
-      </div>
+      {TIERS.map(([tier, head]) => (
+        <section key={tier} className="pk-tier">
+          <h3>{head}</h3>
+          <div className="pk-grid">
+            {CAR_PACKS.filter((p) => (p.tier ?? 'street') === tier).map((p, i) => (
+              <PackCard key={p.id} p={p} i={i} owned={cars.some((c) => c.model === p.car)} pending={pending === p.id} onBuy={() => buy(p)} />
+            ))}
+          </div>
+        </section>
+      ))}
       <p className="hint">One of each per account · Prices in USD · 🔒 Stripe</p>
       {notice}
     </Panel>

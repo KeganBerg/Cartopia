@@ -402,7 +402,7 @@ export const CARS: CarDef[] = [
   { id: 'pontone', name: 'Corvara Pontone 58', body: 'pontoon', price: 170000, unlockLevel: 18, secret: true, power: 122, grip: 118, weight: 26, skill: 'slipstream', likes: ['stadium', 'diner', 'motel'], colors: ['#b71c1c', '#cfd8dc', '#1b5e20'] },
   // Car packs (2026-10-15): cars only sold in the Bank's car packs, each a little quicker than the
   // Showroom's best at its level (see packCars.ts for the bodies).
-  { id: 'stinger', name: 'Liberty Stinger SS', body: 'ponycar', price: 0, unlockLevel: 12, pack: true, power: 78, grip: 48, weight: 52, skill: 'torque', likes: ['diner', 'gas', 'lube'], colors: ['#ffb300', '#212121', '#c62828'] },
+  { id: 'stinger', name: 'Liberty Stinger SS', body: 'ponycar', price: 0, unlockLevel: 12, pack: true, power: 78, grip: 48, weight: 52, skill: 'torque', likes: ['diner', 'burger', 'tires'], colors: ['#ffb300', '#212121', '#c62828'] },
   { id: 'sora', name: 'Kazumi Sora GT', body: 'gtcoupe', price: 0, unlockLevel: 20, pack: true, power: 84, grip: 72, weight: 40, skill: 'smooth', likes: ['tuner', 'arcade', 'parts'], colors: ['#c62828', '#eceff1', '#1565c0'] },
   { id: 'firebolt', name: 'Liberty Firebolt Highboy', body: 'highboy', price: 0, unlockLevel: 8, pack: true, power: 122, grip: 70, weight: 40, skill: 'launch', likes: ['diner', 'burger', 'lube'], colors: ['#b71c1c', '#212121', '#ffb300'] },
   { id: 'kaze', name: 'Kazumi Kaze TA-R', body: 'timeattack', price: 0, unlockLevel: 15, pack: true, power: 114, grip: 96, weight: 36, skill: 'smooth', likes: ['tuner', 'parts', 'arcade'], colors: ['#eceff1', '#0d47a1', '#ff6d00'] },
@@ -836,7 +836,7 @@ export const CAR_SETS: CarSet[] = [
   { id: 'oddballs', name: 'Oddballs', icon: '🍦', cars: ['scoops', 'courier', 'crusher'], coins: 4000, bucks: 3, trophies: 8, xp: 120 },
   { id: 'restomods', name: 'Resto Garage', icon: '🧩', cars: ['sprint', 'revenant', 'pontone'], coins: 30000, bucks: 15, trophies: 40, xp: 500 },
   { id: 'exotica', name: 'Exotica', icon: '👑', cars: ['fulmine', 'eclat', 'orafo'], coins: 40000, bucks: 20, trophies: 50, xp: 600 },
-  { id: 'carpacks', name: 'Pack Legends', icon: '💳', cars: ['firebolt', 'kaze', 'sturm', 'vanta'], coins: 40000, bucks: 20, trophies: 50, xp: 600 },
+  { id: 'carpacks', name: 'Pack Legends', icon: '💳', cars: ['stinger', 'sora', 'firebolt', 'kaze', 'sturm', 'vanta'], coins: 40000, bucks: 20, trophies: 50, xp: 600 },
   // Season track prizes; each season adds its car here.
   { id: 'seasons', name: 'Season Rides', icon: '🏁', cars: ['nightfall'], coins: 5000, bucks: 3, trophies: 10, xp: 150 },
 ]
