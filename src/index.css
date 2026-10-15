@@ -630,10 +630,6 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .pack-extras { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; font-size: 12px; font-weight: 800; color: #6d4c41; }
 .pack-extras span { background: #fff3e0; border-radius: 8px; padding: 1px 6px; }
 .bank-pack .buy { margin-top: 6px; width: 100%; font-size: 18px; }
-.car-packs { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 12px; }
-.car-pack .car-thumb, .car-pack canvas { max-width: 100%; }
-.car-pack .pack-name { font-size: 14px; line-height: 1.15; min-height: 2.3em; display: grid; place-items: center; }
-.car-pack .buy:disabled { opacity: 1; background: #cfd8dc; color: #455a64; box-shadow: none; }
 .bank-free { margin-top: 12px; }
 .bank-notice { z-index: 160; }
 .bank-menu-btn { width: 100%; margin-bottom: 4px; background: linear-gradient(#ffd54f, #ff8f00); }
@@ -805,7 +801,6 @@ html.calm *, html.calm *::before, html.calm *::after { animation-duration: .001m
   .leader { grid-template-columns: 30px 1fr auto; }
   .rusty-lock { grid-template-columns: auto 1fr; }
   .bank-packs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-  .car-packs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pack-bucks { font-size: 24px; }
   .pack-art { font-size: 32px; }
   button.pill { font-size: 13px; }
