@@ -17,15 +17,19 @@ const torque = (rpm: number) => 0.62 + 0.55 * rpm - 0.25 * rpm * rpm
 const GEAR_PULL = RATIO.map((k) => (1 / k) ** 0.55)
 // Revs at a standstill: the needle never drops below this.
 export const IDLE = 0.25
-// The perfect band narrows gear by gear (as a share of the band from grip.ts), so a slower
-// needle in a tall gear still gives about the same fraction of a second to hit it.
-export const BAND = [1, 0.55, 0.32, 0.22, 0.16]
-export function shiftBand(gear: number, lo = 0.78, hi = 0.93) {
-  return { lo: hi - (hi - lo) * BAND[Math.min(gear, BAND.length - 1)], hi }
+// The perfect band narrows gear by gear (as a share of the band from grip.ts), since the needle
+// climbs slower in a tall gear. The player's band (BAND) is wider than AI rivals' (AI_BAND), which
+// keeps the rivals' pace, and the fair-rival margins measured from it, as they were.
+export const BAND = [1.2, 0.85, 0.65, 0.5, 0.42]
+export const AI_BAND = [1, 0.55, 0.32, 0.22, 0.16]
+export function shiftBand(gear: number, lo = 0.78, hi = 0.93, bands = BAND) {
+  return { lo: hi - (hi - lo) * bands[Math.min(gear, bands.length - 1)], hi }
 }
 // Holding the pedal before GO revs the engine; where the needle sits at GO sets the launch.
-export const LAUNCH_BAND = { lo: 0.55, hi: 0.75 }
-export const REV_UP = 1.5
+// Inside the band the needle climbs at REV_HOLD of its speed, so it's easy to hold in the green.
+export const LAUNCH_BAND = { lo: 0.5, hi: 0.8 }
+export const REV_UP = 1.3
+export const REV_HOLD = 0.4
 export const REV_DOWN = 1.2
 
 // Boost: how hard it pushes in each gear (it only spins the tires in first), and how long a full tank lasts.
@@ -73,12 +77,15 @@ export function stepRacer(r: Racer, piVal: number, dt: number, t: number, mul = 
   if (r.dist >= track) r.finished = t
 }
 
-// lo..hi is the perfect window; rain and snow narrow it (see grip.ts).
-export function shiftQuality(rpm: number, lo = 0.78, hi = 0.93) {
+// lo..hi is the perfect window; rain and snow narrow it (see grip.ts). The player (soft) also gets
+// a Good just past the band and smaller losses for a late or early shift; AI rivals keep the strict
+// calls, so their pace doesn't change.
+export function shiftQuality(rpm: number, lo = 0.78, hi = 0.93, soft = true) {
   if (rpm >= lo && rpm <= hi) return { q: 1.08, label: 'PERFECT!' }
   if (rpm >= 0.65 && rpm < lo) return { q: 0.97, label: 'Good' }
-  if (rpm > hi) return { q: 0.88, label: 'Late' }
-  return { q: 0.8, label: 'Early' }
+  if (soft && rpm > hi && rpm <= hi + 0.05) return { q: 0.97, label: 'Good' }
+  if (rpm > hi) return { q: soft ? 0.92 : 0.88, label: 'Late' }
+  return { q: soft ? 0.88 : 0.8, label: 'Early' }
 }
 
 // Off the line `reaction` seconds after GO (negative: a jump start, which the caller holds until
@@ -111,12 +118,12 @@ export function revLaunch(r: Racer, rpm: number) {
     r.boost = LAUNCH_FILL.perfect
     return 'PERFECT LAUNCH!'
   }
-  if (rpm >= lo - 0.15 && rpm <= hi + 0.12) {
-    r.quality = 0.95
+  if (rpm >= lo - 0.2 && rpm <= hi + 0.15) {
+    r.quality = 0.97
     r.boost = LAUNCH_FILL.good
     return 'Good launch'
   }
-  r.quality = rpm > hi ? 0.82 : 0.86
+  r.quality = rpm > hi ? 0.88 : 0.9
   r.boost = 0
   return rpm > hi ? 'WHEELSPIN!' : 'Bogged down'
 }

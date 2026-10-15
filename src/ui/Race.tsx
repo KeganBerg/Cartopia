@@ -7,7 +7,7 @@ import { bestCar, carPi, raceCarOf } from '../game/raceCar'
 import { carNear, fairNow, tourPayNow } from '../game/fairRace'
 import { buildPi, fairRivalPi } from '../game/fairPi'
 import { CARS, SKILLS, carDef, performance, RACE_FUEL, GP_SERIES, GP_ROUNDS, gpRivalPi, gpReward, CAMPAIGN, CAMPAIGN_RACES, campaignRaceId, campaignRivalPi, campaignShift, rookieRace, ROOKIE_SHIFT, campaignRivalSkills, campaignReward, campaignCleared, type CampaignChapter, skillBoost, skillDrag, liveSkillBoost, smoothShift, type Body, type GpSeries, type SkillId } from '../game/data'
-import { TRACK, freshRacer, stepRacer, shiftQuality, shiftBand, launchRacer, revLaunch, shiftRacer, fireBoost, aiReaction, AI_BOOST_GEAR, TOP_GEAR, LAUNCH_BAND, IDLE, REV_UP, REV_DOWN, RACE_DT } from '../game/race'
+import { TRACK, freshRacer, stepRacer, shiftQuality, shiftBand, launchRacer, revLaunch, shiftRacer, fireBoost, aiReaction, AI_BOOST_GEAR, TOP_GEAR, LAUNCH_BAND, AI_BAND, IDLE, REV_UP, REV_HOLD, REV_DOWN, RACE_DT } from '../game/race'
 import { CarThumb } from '../scene/BuildingPreview'
 import { supabase } from '../lib/supabase'
 import { Panel, openGarageTab } from './Menus'
@@ -1479,7 +1479,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   // one (campaign rivals early on) too early.
   const cleanness = shownRival.shift ?? 1
   const skill = useMemo(() => Array.from({ length: TOP_GEAR }, (_, g) => {
-    const b = shiftBand(g, theirGrip.lo, theirGrip.hi)
+    const b = shiftBand(g, theirGrip.lo, theirGrip.hi, AI_BAND)
     return b.lo + (b.hi - b.lo) * (0.25 + 0.6 * Math.random()) - (1 - cleanness) * (0.06 + 0.1 * Math.random())
   }), [cleanness, theirGrip])
   // How long the AI rival takes to react to GO: clean drivers are quicker off the line.
@@ -1682,8 +1682,8 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       } else {
         if (!th.launched && t.current >= theirReaction) launchRacer(th, theirReaction)
         if (th.launched && th.gear < TOP_GEAR && th.rpm >= skill[th.gear]) {
-          const band = shiftBand(th.gear, theirGrip.lo, theirGrip.hi)
-          const q = shiftQuality(th.rpm, band.lo, band.hi)
+          const band = shiftBand(th.gear, theirGrip.lo, theirGrip.hi, AI_BAND)
+          const q = shiftQuality(th.rpm, band.lo, band.hi, false)
           shiftRacer(th, smoothShift(theirSkill) && q.label === 'Good' ? 1.08 : q.q)
           sound.current?.shift('them', th.gear, Math.min(1, rivalRef.current.pi / 200))
         }
@@ -1749,7 +1749,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       last = now
       const r = me.current
       if (r.launched) return
-      r.rpm = Math.max(IDLE, Math.min(1.02, r.rpm + (pedal.current ? REV_UP : -REV_DOWN) * dt))
+      r.rpm = Math.max(IDLE, Math.min(1.02, r.rpm + (pedal.current ? REV_UP * (r.rpm >= LAUNCH_BAND.lo && r.rpm <= LAUNCH_BAND.hi ? REV_HOLD : 1) : -REV_DOWN) * dt))
       sound.current?.rev(r.rpm)
       force((n) => n + 1)
       raf = requestAnimationFrame(rev)
@@ -1826,7 +1826,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   // On the line it shows the launch band instead, and lights green while the revs sit in it.
   const onLine = !me.current.launched
   const band = onLine ? LAUNCH_BAND : shiftBand(me.current.gear, grip.lo, grip.hi)
-  const light = me.current.finished !== null || (!onLine && me.current.gear >= TOP_GEAR) || (onLine && countdown === 99) ? '' : rpm >= band.lo && rpm <= band.hi ? ' now' : rpm > band.hi ? ' late' : rpm >= band.lo - 0.12 && !onLine ? ' soon' : ''
+  const light = me.current.finished !== null || (!onLine && me.current.gear >= TOP_GEAR) || (onLine && countdown === 99) ? '' : rpm >= band.lo && rpm <= band.hi ? ' now' : rpm > band.hi ? ' late' : rpm >= band.lo - 0.12 ? ' soon' : ''
   const close = live ? onExit : () => useGame.getState().openPanel(null)
   // One full-screen view: the street fills the screen and the controls float over it.
   return (
