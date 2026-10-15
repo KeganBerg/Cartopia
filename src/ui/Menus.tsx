@@ -1,11 +1,12 @@
 import { groupOf, mergeCandidates } from '../game/merge'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useGame, hasRusty, buildPrice, type OwnedCar, type PlacedBuilding } from '../game/store'
 import { raceCarOf } from '../game/raceCar'
 import { stackCars, stackFace } from '../game/garageStacks'
 import { reducedMotion } from '../game/fx'
 import { activeEvent, garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, carDef, performance, upgradeCost, buildingDef, upgradable, loves, readySets, isBike, FEATURES, type BuildingDef } from '../game/data'
 import { CarInspect, CarPreview, type DynoFeed } from '../scene/CarPreview'
+import { usePauseTownUnder } from '../scene/renderGate'
 import type { DynoRun } from './Dyno'
 import { onDemand } from './lazy'
 import { CollectAllButton } from './CollectAll'
@@ -35,6 +36,7 @@ import { buildingIcon } from './buildingIcons'
 import { useTipTarget, type TipTarget } from './Tips'
 import { setFreeCam, useFreeCam } from '../scene/freeCam'
 import { Confirm, useAsk } from './Confirm'
+import { AutoJobsButton } from './AutoJobs'
 import { useUnlock, freshClass } from '../game/unlocks'
 
 // The dyno run and its engine sound load the first time an upgrade shows on the dyno.
@@ -173,6 +175,11 @@ function EditBar() {
   )
 }
 
+// A menu that takes another's place (a tab between sibling menus, or going back to the
+// previous menu) appears in place: replaying the slide-in made the menu flash down and up.
+let panelsUp = 0
+let panelGoneAt = -Infinity
+
 // onBack: shows a back button before the title (a sub-screen of the panel).
 // head: extra bits in the title bar, before the close button.
 export function Panel({ title, children, wide, onClose, onBack, head, className }: { title: string; children: React.ReactNode; wide?: boolean; onClose?: () => void; onBack?: () => void; head?: React.ReactNode; className?: string }) {
@@ -182,16 +189,27 @@ export function Panel({ title, children, wide, onClose, onBack, head, className 
   const [closing, setClosing] = useState(false)
   const timer = useRef(0)
   useEffect(() => () => clearTimeout(timer.current), [])
+  const box = useRef<HTMLDivElement>(null)
+  usePauseTownUnder(box)
+  const [still] = useState(() => panelsUp > 0 || Date.now() - panelGoneAt < 250)
+  useLayoutEffect(() => {
+    panelsUp++
+    return () => {
+      panelsUp--
+      panelGoneAt = Date.now()
+    }
+  }, [])
   const close = (_: null) => {
     const done = () => (onClose ? onClose() : closePanel())
-    if (reducedMotion()) return done()
+    // Going back to the previous menu: swap straight to it rather than slide away and back.
+    if (reducedMotion() || (!onClose && useGame.getState().panelBack.length > 0)) return done()
     if (closing) return
     setClosing(true)
     timer.current = window.setTimeout(done, 170)
   }
   return (
-    <div className={closing ? 'overlay closing' : 'overlay'} onClick={() => close(null)}>
-      <div className={`${wide ? 'panel wide' : 'panel'}${className ? ` ${className}` : ''}`} onClick={(e) => e.stopPropagation()}>
+    <div className={closing ? 'overlay closing' : still ? 'overlay still' : 'overlay'} onClick={() => close(null)}>
+      <div ref={box} className={`${wide ? 'panel wide' : 'panel'}${className ? ` ${className}` : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="panel-head">
           {onBack && <button className="panel-back" aria-label="Back" onClick={onBack}><Icon name="back" size={18} /></button>}
           {/* long titles (a garage with its stats) step down a size so they don't cut off */}
@@ -246,8 +264,16 @@ export function SheetTabs<T extends string>({ items, value, onChange }: { items:
       ro?.disconnect()
     }
   }, [items.length])
+  // Bring the picked tab into view by scrolling only the row: scrollIntoView would also
+  // scroll the page while a menu slides in, pushing its header off the top.
   useEffect(() => {
-    row.current?.querySelector<HTMLElement>('.sel')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+    const el = row.current
+    const sel = el?.querySelector<HTMLElement>('.sel')
+    if (!el || !sel) return
+    const r = el.getBoundingClientRect()
+    const t = sel.getBoundingClientRect()
+    if (t.left < r.left) el.scrollLeft -= r.left - t.left
+    else if (t.right > r.right) el.scrollLeft += t.right - r.right
   }, [value])
   return (
     <div ref={row} className="sheet-tabs" role="tablist">
@@ -421,7 +447,7 @@ const SALE_SORTS: { id: SaleSort; label: string }[] = [
 ]
 // The For Sale tab reopens with the filter and order it was left on.
 let saleView: { kind: string; sort: SaleSort } = { kind: 'all', sort: 'level' }
-const FOR_SALE = CARS.filter((c) => !c.rescueOnly && !c.season && !c.secret)
+const FOR_SALE = CARS.filter((c) => !c.rescueOnly && !c.season && !c.secret && !c.pack)
 
 export function ShowroomPanel() {
   const level = useGame((s) => s.level)
@@ -752,7 +778,7 @@ export function GaragePanel() {
     setDyno((d) => ({ id: Date.now(), car: car.uid, model: car.model, mods: car.mods, before: d && d.car === car.uid ? d.before : was.pi, after: pi }))
   }, [car?.uid, pi])
   return (
-    <Panel title="Cars" wide head={<span className="cars-power" title="Garage power">⚡{garagePower(cars)}</span>}>
+    <Panel title="Cars" wide head={<><span className="cars-power" title="Garage power">⚡{garagePower(cars)}</span><AutoJobsButton /></>}>
       <CarsTabs current="garage" />
       <div className={picking ? 'garage picking' : 'garage'}>
         <div className="garage-list">
@@ -816,13 +842,13 @@ export function GaragePanel() {
                 {tab === 'paint' && <div className="paint-sweep" key={`${look!.color}|${look!.finish}|${look!.stripe}|${look!.skin ?? ''}`} aria-hidden />}
                 {tab === 'custom' && <div className="paint-sweep" key={JSON.stringify(look!.panels ?? {})} aria-hidden />}
                 {tab === 'trim' && <div className="paint-sweep" key={JSON.stringify(look!.trim ?? {})} aria-hidden />}
+                {!dyno && <div className="car-pi" title="Performance Index"><b>{pi}</b><small>PI</small></div>}
               </div>
             )}
             {copies.length > 1 && <CopyBubbles copies={copies} selected={car.uid} onPick={select} />}
             <h3 className="garage-name">{def.name}{car.plate && <span className="mini-plate">{car.plate}</span>}</h3>
-            {/* Under the preview: the PI tile, then the car's traits, then its two toggles. */}
+            {/* Under the preview (PI sits on the preview itself): the car's traits, then its two toggles. */}
             <div className="car-sum">
-              <div className="car-pi" title="Performance Index"><b>{pi}</b><small>PI</small></div>
               <div className="car-traits">
                 <SkillTag model={car.model} />
                 <DriverRow car={car.uid} model={car.model} />

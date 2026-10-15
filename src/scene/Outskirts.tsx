@@ -13,6 +13,9 @@ import { gravelTex, waterTex } from './textures'
 import { toWorld } from './grid'
 import { LAYER } from './layers'
 import { VIEW, isFree, useFreeCam } from './freeCam'
+import { diskGeometry, liveWater, splash } from './liveWater'
+import { LakeLife } from './LakeLife'
+import { useGame } from '../game/store'
 
 // Everything past the edge of the player's land: wild meadow on the plots they
 // could still buy (cleared the moment they buy one), a split-rail fence along
@@ -345,26 +348,39 @@ function Farm() {
   )
 }
 
-// A lake in the western clearing with a little dock and a rowboat; it ices
-// over in winter.
+// A lake in the western clearing with a little dock, a fisherman out in his
+// rowboat, gulls and a family of ducks (LakeLife.tsx); the water is live
+// (liveWater.ts) and it ices over in winter. Tap the water and it ripples.
+const LAKE_LIFE = { x: LAKE.x, z: LAKE.z, rx: LAKE.rx, rz: LAKE.rz, y: -0.032, dock: [LAKE.x + LAKE.rx - 2.5, LAKE.z + 2] as [number, number] }
 function Lake() {
-  const map = useMemo(() => waterTex('lake', LAKE.rx / 4, LAKE.rz / 4), [])
   const frozen = SEASON === 'winter'
-  useFrame((_, dt) => {
-    if (frozen) return
-    map.offset.x += dt * 0.01
-    map.offset.y += dt * 0.004
-  })
+  const ice = useMemo(() => (frozen ? waterTex('lake', LAKE.rx / 4, LAKE.rz / 4) : null), [frozen])
+  const water = useMemo(() => (frozen ? null : { geo: diskGeometry(LAKE.rx, LAKE.rz), mat: liveWater({ deep: '#1f5f8f', shallow: '#4f9fb8', verts: true, edge: 0.95 }) }), [frozen])
+  useEffect(() => () => { water?.geo.dispose(); water?.mat.dispose() }, [water])
   return (
     <group>
       <mesh rotation-x={-Math.PI / 2} position={[LAKE.x, -0.044, LAKE.z]} scale={[LAKE.rx + 1.2, LAKE.rz + 1.2, 1]}>
         <circleGeometry args={[1, 40]} />
         <meshStandardMaterial color={frozen ? '#cfd8dc' : '#b6a27a'} />
       </mesh>
-      <mesh rotation-x={-Math.PI / 2} position={[LAKE.x, -0.032, LAKE.z]} scale={[LAKE.rx, LAKE.rz, 1]}>
-        <circleGeometry args={[1, 40]} />
-        <meshStandardMaterial map={map} color={frozen ? '#dcecf7' : '#ffffff'} roughness={frozen ? 0.15 : 0.25} metalness={0.05} />
-      </mesh>
+      {water ? (
+        <mesh
+          geometry={water.geo}
+          material={water.mat}
+          position={[LAKE.x, LAKE_LIFE.y, LAKE.z]}
+          receiveShadow
+          onClick={(e) => {
+            if (e.delta > 6 || useGame.getState().mode !== 'play') return
+            splash(e.point.x, e.point.z, 1.3)
+          }}
+        />
+      ) : (
+        <mesh rotation-x={-Math.PI / 2} position={[LAKE.x, -0.032, LAKE.z]} scale={[LAKE.rx, LAKE.rz, 1]}>
+          <circleGeometry args={[1, 40]} />
+          <meshStandardMaterial map={ice} color="#dcecf7" roughness={0.15} metalness={0.05} />
+        </mesh>
+      )}
+      <LakeLife lake={LAKE_LIFE} frozen={frozen} />
       <Batch version={1}>
         {/* Wooden dock from the town-side shore. */}
         <group position={[LAKE.x + LAKE.rx - 2.5, 0, LAKE.z + 2]}>
@@ -372,14 +388,6 @@ function Lake() {
           {[-2, -0.6, 0.8].map((x) => [-0.5, 0.5].map((z) => <Cyl key={`${x}${z}`} p={[x, 0.1, z]} r={0.06} h={0.4} c="#5d4037" seg={6} />))}
           {[-1.8, -1.2, -0.6, 0, 0.6, 1.2, 1.8].map((x) => <Box key={x} p={[x, 0.205, 0]} s={[0.04, 0.01, 1.1]} c="#6d4c41" />)}
         </group>
-        {!frozen && (
-          <group position={[LAKE.x + LAKE.rx - 4.6, 0, LAKE.z + 3.4]} rotation-y={0.3}>
-            <Box p={[0, 0.06, 0]} s={[1.5, 0.16, 0.6]} c="#eceff1" />
-            <Box p={[0, 0.16, 0]} s={[1.36, 0.06, 0.46]} c="#1565c0" />
-            <Box p={[0, 0.18, 0]} s={[0.12, 0.04, 0.5]} c="#8d6e63" />
-            <Box p={[0.15, 0.22, 0.32]} s={[0.9, 0.02, 0.04]} c="#8d6e63" />
-          </group>
-        )}
         {/* A cabin on the far shore. */}
         <group position={[LAKE.x - 6, 0, LAKE.z - LAKE.rz - 4]} rotation-y={0.2}>
           <BuildingModel def={buildingDef('house')} />

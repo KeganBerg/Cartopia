@@ -37,6 +37,12 @@ export default async (req: Request) => {
   // The pack's coins and parts grow with the buyer's level (game_saves.level, kept by the save guard).
   const save = await fetch(`${url}/rest/v1/game_saves?select=level&owner_id=eq.${user}&limit=1`, { headers: { apikey: anon, Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(6000) })
   const level = save.ok ? ((await save.json()) as { level?: number }[])[0]?.level ?? 1 : 1
+  // Each account gets a car pack's car once. Any level can buy one (Kegan, 2026-10-15).
+  if (pack.car) {
+    const had = await fetch(`${url}/rest/v1/purchases?select=seq&pack=eq.${pack.id}&limit=1`, { headers: { apikey: anon, Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(6000) })
+    if (!had.ok) return json({ error: 'off' }, 503)
+    if (((await had.json()) as unknown[]).length) return json({ error: 'owned' }, 409)
+  }
 
   const origin = new URL(req.url).origin
   const res = await fetch('https://api.stripe.com/v1/checkout/sessions', {

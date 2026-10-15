@@ -5,6 +5,7 @@ import { PAL } from './season'
 import { CarModel } from './CarModel'
 import { decal, LAYER } from './layers'
 import { manholeTex } from './textures'
+import { fallingWater, waterKinds } from './liveWater'
 import { Upright, useMergeScale } from './mergeScale'
 
 // Small dressing that makes buildings and props read as lived-in: trims,
@@ -309,14 +310,13 @@ export function FountainDetail({ stone }: { stone: string }) {
   return (
     <group>
       <mesh position={[0, 0.92, 0]} castShadow><cylinderGeometry args={[0.38, 0.2, 0.12, 20]} />{c(stone)}</mesh>
-      <mesh position={[0, 0.985, 0]}><cylinderGeometry args={[0.32, 0.32, 0.02, 20]} />{c('#b3e5fc')}</mesh>
+      <mesh position={[0, 0.985, 0]} material={waterKinds().bowl}><cylinderGeometry args={[0.32, 0.32, 0.02, 24]} /></mesh>
       {/* Water spilling over the bowl's rim in arcs down to the pool. */}
       {Array.from({ length: 8 }, (_, i) => (
         <group key={i} rotation-y={(i / 8) * Math.PI * 2}>
           {SPILL.map(([z0, y0, z1, y1], j) => (
-            <mesh key={j} position={[0, (y0 + y1) / 2, (z0 + z1) / 2]} rotation-x={Math.atan2(z0 - z1, y0 - y1)}>
+            <mesh key={j} position={[0, (y0 + y1) / 2, (z0 + z1) / 2]} rotation-x={Math.atan2(z0 - z1, y0 - y1)} material={fallingWater()}>
               <cylinderGeometry args={[0.022 - j * 0.004, 0.026 - j * 0.004, Math.hypot(z1 - z0, y1 - y0) + 0.02, 6]} />
-              {c('#b3e5fc')}
             </mesh>
           ))}
         </group>
