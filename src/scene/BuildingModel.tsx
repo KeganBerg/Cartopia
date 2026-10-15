@@ -1072,10 +1072,13 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
     case 'gas': {
       // A merged block's last form is a whole travel stop, built for the block.
       if (isTravelCenter(def.id, lvl, mergeScale)) return <TravelCenter def={def} m={m} win={win} bulb={bulb} level={lvl} ghost={ghost} />
-      // Canopy rises half as fast as the shop grows.
-      const cl = lift * 0.5
+      // Each level adds a little height: the shop gains a storey of windows by
+      // level 7 and the canopy rises a touch, so a level 10 station is still a
+      // believable forecourt (not a brick tower beside a canopy on stilts).
+      const shopH = 1.1 + 0.045 * (lvl - 1)
+      const cl = 0.035 * (lvl - 1)
       const gasRows: number[] = []
-      for (let y = 1.05; y + 0.2 <= 1.1 + lift - 0.1; y += 0.55) gasRows.push(y)
+      for (let y = 1.05; y + 0.2 <= shopH - 0.1; y += 0.55) gasRows.push(y)
       return (
         <group>
           {/* Forecourt slab. */}
@@ -1109,11 +1112,11 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
           {/* Little shop tucked in the back corner, with a striped awning: one
               piece with its windows, so a merged pair keeps them on its walls. */}
           <group>
-            <mesh position={[1.53, (1.1 + lift) / 2, -0.65]} castShadow receiveShadow>
-              <boxGeometry args={[0.75, 1.1 + lift, 0.6]} />
-              {m(def.color, brickTex(1, 1.2 + lift))}
+            <mesh position={[1.53, shopH / 2, -0.65]} castShadow receiveShadow>
+              <boxGeometry args={[0.75, shopH, 0.6]} />
+              {m(def.color, brickTex(1, shopH + 0.1))}
             </mesh>
-            <mesh position={[1.53, 1.14 + lift, -0.65]} castShadow>
+            <mesh position={[1.53, shopH + 0.04, -0.65]} castShadow>
               <boxGeometry args={[0.82, 0.1, 0.68]} />
               {m(def.roof)}
             </mesh>
@@ -1137,12 +1140,12 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             ])}
             {/* Upgrades: a white band under the roof and a flag on top. */}
             {trim && lvl >= 3 && (
-              <mesh position={[1.53, 1.06 + lift, -0.65]}>
+              <mesh position={[1.53, shopH - 0.04, -0.65]}>
                 <boxGeometry args={[0.79, 0.06, 0.64]} />
                 {m('#fafafa')}
               </mesh>
             )}
-            {trim && lvl >= 8 && <Flag x={1.4} y={1.19 + lift} z={-0.8} color={def.roof} star={lvl >= 10} />}
+            {trim && lvl >= 8 && <Flag x={1.4} y={shopH + 0.09} z={-0.8} color={def.roof} star={lvl >= 10} />}
           </group>
           {/* Price sign on a pole. */}
           {!ghost && (
