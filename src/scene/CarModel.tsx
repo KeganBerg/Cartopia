@@ -660,14 +660,23 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
     const ws: V3 = [0, top + s.cabinH * 0.45, s.cabinZ + s.cabinLen * 0.5]
     if (!s.plates) k.add('screen', box(s.wid * 0.86, s.cabinH * 0.9, 0.02), ws, [-0.5, 0, 0])
     if (!s.plates) k.add('black', box(s.wid * 0.9, 0.025, 0.03), [0, ws[1] + Math.cos(0.5) * s.cabinH * 0.45, ws[2] - Math.sin(0.5) * s.cabinH * 0.45], [-0.5, 0, 0])
-    // The seats sit down in a dark cockpit well (standing clear of any deck stripes), so only their
-    // backs and headrests show above the body, as in a real open car.
-    const sink = 0.09
+    // Dark cockpit floor (standing clear of any deck stripes) with two slim bucket seats on it: a thin
+    // cushion with side bolsters, a raked shell back with wings, and a small headrest.
+    const fl = top + 0.012
     k.add('black', box(s.wid * 0.7, 0.016, s.cabinLen * 0.62), [0, top + 0.004, base[2] + 0.02])
+    const sw = s.wid * 0.25
+    const hb = Math.min(0.13, s.cabinH * 0.75)
+    const rake = -0.22
     for (const sd of [-1, 1]) {
-      k.add('seat', rbox(s.wid * 0.28, 0.16, 0.16, 0.04), [sd * s.wid * 0.2, base[1] + 0.06 - sink, base[2]])
-      k.add('seat', rbox(s.wid * 0.26, 0.2, 0.05, 0.02), [sd * s.wid * 0.2, base[1] + 0.14 - sink, base[2] - 0.08], [-0.15, 0, 0])
-      k.add('seat', rbox(s.wid * 0.14, 0.07, 0.05, 0.02), [sd * s.wid * 0.2, base[1] + 0.27 - sink, base[2] - 0.1])
+      const x = sd * s.wid * 0.2
+      const z = base[2] + 0.01
+      k.add('seat', rbox(sw * 0.8, 0.026, 0.12, 0.01), [x, fl + 0.016, z + 0.02])
+      for (const e of [-1, 1]) k.add('seat', rbox(sw * 0.13, 0.04, 0.13, 0.01), [x + e * sw * 0.42, fl + 0.022, z + 0.02])
+      const by = fl + 0.03 + hb / 2
+      const bz = z - 0.05 - Math.sin(-rake) * hb * 0.5
+      k.add('seat', rbox(sw * 0.82, hb, 0.026, 0.01), [x, by, bz], [rake, 0, 0])
+      for (const e of [-1, 1]) k.add('seat', rbox(sw * 0.13, hb * 0.85, 0.05, 0.01), [x + e * sw * 0.43, by - hb * 0.05, bz + 0.012], [rake, 0, 0])
+      k.add('seat', rbox(sw * 0.5, 0.045, 0.03, 0.012), [x, fl + 0.03 + hb + 0.03, bz - Math.sin(-rake) * (hb * 0.5 + 0.03)], [rake, 0, 0])
     }
     k.add('black', rbox(s.wid * 0.78, 0.06, 0.08, 0.02), [0, top + 0.03, s.cabinZ + s.cabinLen * 0.38])
     // Two round gauges and a row of switches on the dash.
