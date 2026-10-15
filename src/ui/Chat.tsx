@@ -151,7 +151,6 @@ function ChatRoom({ room }: { room: Room }) {
                 <button className="chat-who" onClick={() => setMenu(menu === m.id ? null : m.id)}>
                   <ClanTag clan={m.crew} small />
                   <b>{senderName(m)}</b>
-                  {m.mod && <span className="chat-mod" title="Cartopia team" aria-label="Cartopia team">✔</span>}
                   <small>Lv {m.level} · {ago(m.at)}</small>
                 </button>
               )}

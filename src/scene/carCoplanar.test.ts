@@ -26,8 +26,8 @@ type Piece = { look: string; open: boolean; flat: boolean; solid?: boolean; at: 
 // Where in the car code a piece was added: the first frame outside the Kit and this file.
 function source() {
   const lines = (new Error().stack ?? '').split('\n').slice(1)
-  const l = lines.find((s) => /(CarModel|carTrim|exoticCars|oddballCars|restoCars|packCars\/\w+)\.tsx?:\d+/.test(s) && !/Kit\.add|at bar |at Surface\./.test(s)) ?? ''
-  const m = l.match(/(CarModel|carTrim|exoticCars|oddballCars|restoCars|packCars\/\w+)\.tsx?:(\d+)/)
+  const l = lines.find((s) => /(CarModel|carTrim|exoticCars|oddballCars|restoCars)\.tsx?:\d+/.test(s) && !/Kit\.add|at bar |at Surface\./.test(s)) ?? ''
+  const m = l.match(/(CarModel|carTrim|exoticCars|oddballCars|restoCars)\.tsx?:(\d+)/)
   return m ? `${m[1]}:${m[2]}` : '?'
 }
 const pieces: Piece[] = []
