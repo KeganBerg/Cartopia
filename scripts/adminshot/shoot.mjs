@@ -33,12 +33,17 @@ for (const [form, size] of forms) {
       { id: 2, at: new Date(now - 600000).toISOString(), action: 'live_start', target: null, name: null, detail: { kind: 'weather', minutes: 15 } },
       { id: 1, at: new Date(now - 7200000).toISOString(), action: 'mute', target: 'b', name: 'TurboBob', detail: { minutes: 60, reason: 'spam' } },
     ])
+    admin.grant = (_id, c, g) => {
+      bob.coins = Math.min(1e12, Math.max(0, bob.coins + c))
+      bob.gems = Math.min(1e12, Math.max(0, bob.gems + g))
+      return ok(bob)
+    }
     window.__admin = admin
     window.__game.setState({ tutorial: 99 })
   })
   // The Daily Spin opens on its own once the tutorial is done; shut it for the shots.
   await p.waitForTimeout(2500)
-  await p.evaluate(() => window.__game.setState({ panel: null, panelBack: [] }))
+  await p.evaluate(() => window.__game.setState({ panel: null, panelBack: [], coins: 1e12, bucks: 1e12 }))
   await p.waitForTimeout(1000)
   await p.screenshot({ path: `${out}/${form}-0-banner.png` })
   await p.evaluate(() => window.__game.getState().openPanel('admin'))
@@ -54,7 +59,11 @@ for (const [form, size] of forms) {
   await p.waitForTimeout(2500)
   await p.locator('.adm-input').first().fill('bug refund')
   await p.locator('.adm-step').first().click()
+  await p.locator('.adm-max').nth(1).click()
   await p.screenshot({ path: `${out}/${form}-3-player.png` })
+  await p.locator('.adm-give').click()
+  await p.waitForTimeout(800)
+  await p.screenshot({ path: `${out}/${form}-3b-given.png` })
   await p.locator('.panel-body').evaluate((el) => (el.scrollTop = el.scrollHeight))
   await p.locator('input[aria-label="Find a car"]').fill('st')
   await p.waitForTimeout(2500)

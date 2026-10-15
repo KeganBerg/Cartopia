@@ -43,7 +43,7 @@ export function adminError(message: string | undefined) {
   if (m.includes('last car')) return "Can't take their last car"
   if (m.includes('not yourself')) return "Can't mute yourself"
   if (m.includes('no save')) return 'No town saved yet'
-  if (m.includes('too much')) return 'Amount too big'
+  if (m.includes('bad amount')) return 'Bad amount'
   if (m.includes('bad car')) return 'Unknown car'
   return 'Failed'
 }

@@ -189,8 +189,13 @@ function PlayersTab({ confirm }: { confirm: (a: Ask) => void }) {
   )
 }
 
-const COIN_STEPS = [1000, 10000, 100000]
-const GEM_STEPS = [10, 50, 100]
+const COIN_STEPS = [10_000, 1_000_000]
+const GEM_STEPS = [100, 10_000]
+// The most a balance can hold (0096: the economy guard counts saves up to this). MAX fills
+// a balance to it on Give and empties it on Take.
+const TOP = 1e12
+const amount = (v: string) => Math.min(TOP, Number(v.replace(/\D/g, '')) || 0)
+const shown = (n: number) => (n >= TOP ? 'MAX' : n || '')
 const MUTES: [number | null, string][] = [[15, '15m'], [60, '1h'], [1440, '1d'], [null, '∞']]
 
 function PlayerView({ id, onBack, confirm }: { id: string; onBack: () => void; confirm: (a: Ask) => void }) {
@@ -227,7 +232,7 @@ function PlayerView({ id, onBack, confirm }: { id: string; onBack: () => void; c
   const money = (sign: 1 | -1) => {
     const c = sign * coins
     const g = sign * gems
-    const label = `${c ? `${c > 0 ? '+' : ''}${compact(c)} 🪙 ` : ''}${g ? `${g > 0 ? '+' : ''}${g} 💎` : ''}`.trim()
+    const label = `${c ? `${c > 0 ? '+' : ''}${compact(c)} 🪙 ` : ''}${g ? `${g > 0 ? '+' : ''}${compact(g)} 💎` : ''}`.trim()
     const go = () => void run(() => admin.grant(p.id, c, g, why), `✔ ${label}`).then(() => { setCoins(0); setGems(0) })
     if (sign < 0) confirm({ icon: '➖', title: `Take ${label.replace(/-/g, '')}?`, ok: 'Take', run: go })
     else go()
@@ -250,12 +255,14 @@ function PlayerView({ id, onBack, confirm }: { id: string; onBack: () => void; c
 
       <h3 className="cl-head">💰 Coins and gems</h3>
       <div className="adm-money">
-        <label className="adm-amt"><CoinIcon /><input type="number" min={0} value={coins || ''} placeholder="0" aria-label="Coins" onChange={(e) => setCoins(Math.max(0, Math.floor(+e.target.value || 0)))} /></label>
-        {COIN_STEPS.map((n) => <button key={n} className="adm-step" onClick={() => setCoins((c) => c + n)}>+{compact(n)}</button>)}
+        <label className="adm-amt"><CoinIcon /><input inputMode="numeric" value={shown(coins)} placeholder="0" aria-label="Coins" onChange={(e) => setCoins(amount(e.target.value))} /></label>
+        {COIN_STEPS.map((n) => <button key={n} className="adm-step" onClick={() => setCoins((c) => Math.min(TOP, c + n))}>+{compact(n)}</button>)}
+        <button className={`adm-step adm-max${coins === TOP ? ' sel' : ''}`} onClick={() => setCoins(TOP)}>MAX</button>
       </div>
       <div className="adm-money">
-        <label className="adm-amt"><BuckIcon /><input type="number" min={0} value={gems || ''} placeholder="0" aria-label="Gems" onChange={(e) => setGems(Math.max(0, Math.floor(+e.target.value || 0)))} /></label>
-        {GEM_STEPS.map((n) => <button key={n} className="adm-step" onClick={() => setGems((g) => g + n)}>+{n}</button>)}
+        <label className="adm-amt"><BuckIcon /><input inputMode="numeric" value={shown(gems)} placeholder="0" aria-label="Gems" onChange={(e) => setGems(amount(e.target.value))} /></label>
+        {GEM_STEPS.map((n) => <button key={n} className="adm-step" onClick={() => setGems((g) => Math.min(TOP, g + n))}>+{compact(n)}</button>)}
+        <button className={`adm-step adm-max${gems === TOP ? ' sel' : ''}`} onClick={() => setGems(TOP)}>MAX</button>
       </div>
       <div className="adm-pair">
         <button className="sell adm-take" disabled={busy || noWhy || (!coins && !gems)} onClick={() => money(-1)}>➖ Take</button>
