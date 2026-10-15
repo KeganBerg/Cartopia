@@ -10,7 +10,7 @@ import { Upright, useBays, useMergeScale } from './mergeScale'
 import { ObstacleDetail, BillboardDetail, DriveInDetail, FountainDetail, GarageDetail, HouseDetail, PondDetail, ShopDetail, ShopLot, GasLot, GarageLot, CrewDeck, SpeedwayDetail, SpeedwayStands, StatueDetail } from './BuildingDetail'
 import { NEW_MODELS, NewBuildingModel } from './NewBuildings'
 import { PropMesh } from './propKit'
-import { DECOR_PROPS, benchBin } from './decorProps'
+import { DECOR_PROPS, WILD_PROPS, benchBin } from './decorProps'
 import { Bulbs } from './edgeKit'
 import { OFFICE_MODELS, OfficeModel } from './OfficeBuildings'
 import { CAMPUS_MODELS, CampusModel } from './CampusBuildings'
@@ -612,6 +612,19 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
           {!ghost && <ObstacleDetail id={def.id} />}
         </group>
       )
+    // Wild land's old trees: bigger than the park ones, standing in their own undergrowth.
+    case 'wildoak':
+    case 'wildpine':
+      return (
+        <group>
+          <group scale={def.id === 'wildoak' ? 1.36 : 1.6}>
+            <PropMesh parts={def.id === 'wildoak' ? DECOR_PROPS.oak() : DECOR_PROPS.pine()} />
+          </group>
+          {!ghost && <PropMesh parts={def.id === 'wildoak' ? WILD_PROPS.oak() : WILD_PROPS.pine()} />}
+        </group>
+      )
+    case 'wildrock':
+      return <PropMesh parts={WILD_PROPS.boulder()} />
     case 'rock':
       return (
         <group>
