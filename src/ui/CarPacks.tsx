@@ -16,7 +16,7 @@ const THEME: Record<string, { bg: string; streak: string; glow: string }> = {
   firebolt: { bg: '#3a0d05, #b4300c', streak: '#ffb74d', glow: '#ff7043' },
   kaze: { bg: '#061a3a, #1565c0', streak: '#e3f2fd', glow: '#4fc3f7' },
   sturm: { bg: '#14260f, #4e6b1e', streak: '#e6d39a', glow: '#c5e1a5' },
-  vanta: { bg: '#0d0618, #4a148c', streak: '#ea80fc', glow: '#b388ff' },
+  vanta: { bg: '#4527a0, #00acc1', streak: '#e0f7fa', glow: '#00e5ff' },
 }
 
 // Counts up to n once the card appears; with reduced motion it simply shows n.
