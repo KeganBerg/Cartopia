@@ -271,7 +271,7 @@ export type Body = 'compact' | 'sedan' | 'sports' | 'muscle' | 'truck' | 'super'
   | 'hatch' | 'van' | 'suv' | 'ev' | 'luxury' | 'formula' | 'bus' | 'tusker' | 'dogvan' | 'rearengine' | 'longnose' | 'prototype'
   | 'scissor' | 'horseshoe' | 'teardrop' | 'icecream' | 'monster' | 'parcel'
   | 'pontoon' | 'stepnose' | 'restomuscle'
-  | 'highboy' | 'timeattack' | 'groupb' | 'longtail'
+  | 'highboy' | 'timeattack' | 'groupb' | 'longtail' | 'ponycar' | 'gtcoupe'
 // Two-wheelers: drawn as motorcycles with a rider, and only take exhaust and rim mods.
 export const BIKES: Body[] = ['scooter', 'chopper', 'sportbike']
 export const isBike = (body: Body) => BIKES.includes(body)
@@ -402,10 +402,12 @@ export const CARS: CarDef[] = [
   { id: 'pontone', name: 'Corvara Pontone 58', body: 'pontoon', price: 170000, unlockLevel: 18, secret: true, power: 122, grip: 118, weight: 26, skill: 'slipstream', likes: ['stadium', 'diner', 'motel'], colors: ['#b71c1c', '#cfd8dc', '#1b5e20'] },
   // Car packs (2026-10-15): cars only sold in the Bank's car packs, each a little quicker than the
   // Showroom's best at its level (see packCars.ts for the bodies).
-  { id: 'firebolt', name: 'Liberty Firebolt Highboy', body: 'highboy', price: 0, unlockLevel: 8, pack: true, power: 56, grip: 40, weight: 40, skill: 'launch', likes: ['diner', 'burger', 'lube'], colors: ['#b71c1c', '#212121', '#ffb300'] },
-  { id: 'kaze', name: 'Kazumi Kaze TA-R', body: 'timeattack', price: 0, unlockLevel: 15, pack: true, power: 68, grip: 62, weight: 38, skill: 'smooth', likes: ['tuner', 'parts', 'arcade'], colors: ['#eceff1', '#0d47a1', '#ff6d00'] },
-  { id: 'sturm', name: 'Falke Sturm S1', body: 'groupb', price: 0, unlockLevel: 25, pack: true, power: 88, grip: 76, weight: 34, skill: 'torque', likes: ['tires', 'stadium', 'junkyard'], colors: ['#fafafa', '#c62828', '#1b5e20'] },
-  { id: 'vanta', name: 'Aether Vanta LT', body: 'longtail', price: 0, unlockLevel: 40, pack: true, power: 104, grip: 100, weight: 28, skill: 'nitro', likes: ['glasstower', 'helipad', 'club'], colors: ['#263238', '#00e5ff', '#e0e0e0'] },
+  { id: 'stinger', name: 'Liberty Stinger SS', body: 'ponycar', price: 0, unlockLevel: 12, pack: true, power: 78, grip: 48, weight: 52, skill: 'torque', likes: ['diner', 'gas', 'lube'], colors: ['#ffb300', '#212121', '#c62828'] },
+  { id: 'sora', name: 'Kazumi Sora GT', body: 'gtcoupe', price: 0, unlockLevel: 20, pack: true, power: 84, grip: 72, weight: 40, skill: 'smooth', likes: ['tuner', 'arcade', 'parts'], colors: ['#c62828', '#eceff1', '#1565c0'] },
+  { id: 'firebolt', name: 'Liberty Firebolt Highboy', body: 'highboy', price: 0, unlockLevel: 8, pack: true, power: 122, grip: 70, weight: 40, skill: 'launch', likes: ['diner', 'burger', 'lube'], colors: ['#b71c1c', '#212121', '#ffb300'] },
+  { id: 'kaze', name: 'Kazumi Kaze TA-R', body: 'timeattack', price: 0, unlockLevel: 15, pack: true, power: 114, grip: 96, weight: 36, skill: 'smooth', likes: ['tuner', 'parts', 'arcade'], colors: ['#eceff1', '#0d47a1', '#ff6d00'] },
+  { id: 'sturm', name: 'Falke Sturm S1', body: 'groupb', price: 0, unlockLevel: 25, pack: true, power: 120, grip: 100, weight: 40, skill: 'torque', likes: ['tires', 'stadium', 'junkyard'], colors: ['#fafafa', '#c62828', '#1b5e20'] },
+  { id: 'vanta', name: 'Aether Vanta LT', body: 'longtail', price: 0, unlockLevel: 40, pack: true, power: 130, grip: 110, weight: 30, skill: 'nitro', likes: ['glasstower', 'helipad', 'club'], colors: ['#263238', '#00e5ff', '#e0e0e0'] },
   { id: 'bug', name: 'Bumble Bubble', body: 'bubble', price: 1200, unlockLevel: 1, rescueOnly: true, power: 20, grip: 34, weight: 28, skill: 'freeze', likes: ['icecream', 'donut', 'coffee'], colors: ['#80cbc4', '#ffcc80', '#ef9a9a'] },
   { id: 'woodie', name: 'Lakeside Woodie Wagon', body: 'wagon', price: 2200, unlockLevel: 1, rescueOnly: true, power: 25, grip: 31, weight: 56, skill: 'slipstream', likes: ['diner', 'hospital', 'market'], colors: ['#fafafa', '#fff59d', '#4db6ac'] },
   { id: 'hauler', name: 'Old Faithful Hauler', body: 'truck', price: 3000, unlockLevel: 1, rescueOnly: true, power: 40, grip: 40, weight: 70, skill: 'torque', likes: ['carwash', 'junkyard', 'tacos'], colors: ['#558b2f', '#e65100', '#1565c0'] },

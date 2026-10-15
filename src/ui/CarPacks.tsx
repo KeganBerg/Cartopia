@@ -63,7 +63,7 @@ function PackCard({ p, i, owned, pending, onBuy }: { p: BucksPack; i: number; ow
           {stats.map(([ico, name, v]) => (
             <div key={name} className="pk-stat" title={name}>
               <span>{ico}</span>
-              <i><em style={{ width: `${Math.min(100, v)}%` }} /></i>
+              <i><em style={{ width: `${Math.min(100, (v / 140) * 100)}%` }} /></i>
             </div>
           ))}
         </div>

@@ -121,6 +121,8 @@ const SHAPES: Record<Body, Shape> = {
   // Car pack cars: drawn by packCars/, same as the exotics.
   highboy: { len: 1.36, wid: 0.78, body: 0.24, lift: 0.1, cabinLen: 0.36, cabinH: 0.17, cabinZ: -0.16, taper: 0.9, hood: 0.055, wheel: 0.16, drop: 0, nose: 0.02, open: true },
   timeattack: { len: 1.4, wid: 0.82, body: 0.22, lift: 0.06, cabinLen: 0.56, cabinH: 0.17, cabinZ: -0.1, taper: 0.7, fastback: 0.5, hood: 0.01, wheel: 0.147, drop: 0.02, nose: 0.06 },
+  ponycar: { len: 1.34, wid: 0.74, body: 0.24, lift: 0.09, cabinLen: 0.5, cabinH: 0.19, cabinZ: -0.14, taper: 0.74, fastback: 0.45, hood: 0.04, wheel: 0.155, drop: 0.02, nose: 0.05 },
+  gtcoupe: { len: 1.3, wid: 0.74, body: 0.2, lift: 0.08, cabinLen: 0.5, cabinH: 0.18, cabinZ: -0.14, taper: 0.68, fastback: 0.4, hood: 0.03, wheel: 0.15, drop: 0.03, nose: 0.06 },
   groupb: { len: 1.34, wid: 0.84, body: 0.24, lift: 0.08, cabinLen: 0.56, cabinH: 0.18, cabinZ: -0.06, taper: 0.75, fastback: 0.5, hood: 0, wheel: 0.15, drop: 0.01, nose: 0.05 },
   longtail: { len: 1.5, wid: 0.82, body: 0.2, lift: 0.05, cabinLen: 0.5, cabinH: 0.15, cabinZ: 0.02, taper: 0.4, fastback: 0.8, hood: 0, wheel: 0.145, drop: 0.03, nose: 0.1 },
 }
