@@ -7,7 +7,7 @@ vi.mock('./cloud', () => ({ signedInUser: () => 'me' }))
 
 const { likeDisplay, useMeet } = await import('./meet')
 
-const sql = readFileSync(new URL('../../supabase/migrations/0091_one_like_per_town.sql', import.meta.url), 'utf8')
+const sql = readFileSync(new URL('../../supabase/migrations/0092_one_like_per_town.sql', import.meta.url), 'utf8')
 
 describe('town likes', () => {
   beforeEach(() => {

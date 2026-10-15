@@ -65,7 +65,7 @@ export async function refreshLikes(owners: string[]) {
 // Likes still waiting on the server, so a fast double tap sends one like.
 const pending = new Set<string>()
 
-// One like per town, ever (the server enforces it too, migration 0091).
+// One like per town, ever (the server enforces it too, migration 0092).
 export async function likeDisplay(owner: string) {
   const toast = useGame.getState().toast
   const cur = useMeet.getState().likes[owner] ?? { likes: 0, liked: false }
