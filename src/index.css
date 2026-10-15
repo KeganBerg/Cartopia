@@ -2049,7 +2049,7 @@ button.book-car { font: inherit; color: inherit; }
 
 /* Panels rise in and drop away (phones: the sheet slides up from the bottom). */
 .overlay:has(> .panel) { animation: ov-in .2s ease-out both; }
-.overlay > .panel { animation: panel-in .28s cubic-bezier(.2,1.25,.4,1) both; }
+.overlay > .panel { animation: panel-in .26s cubic-bezier(.2,1,.3,1) both; }
 .overlay.closing { animation: ov-out .17s ease-in both; pointer-events: none; }
 .overlay.closing > .panel { animation: panel-out .17s ease-in both; }
 @keyframes ov-in { from { opacity: 0; } }
@@ -2062,6 +2062,8 @@ button.book-car { font: inherit; color: inherit; }
   @keyframes sheet-in { from { transform: translateY(100%); } }
   @keyframes sheet-out { to { transform: translateY(100%); } }
 }
+/* A menu taking another's place (Panel's `still`) is just there. */
+.overlay.still:has(> .panel), .overlay.still > .panel { animation: none; }
 
 /* Garage paint: a shine sweeps across the car whenever the colour changes. */
 .preview-wrap { position: relative; }
