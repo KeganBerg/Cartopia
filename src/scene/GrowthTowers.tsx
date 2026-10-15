@@ -420,7 +420,7 @@ function PoliceModel({ def, ghost, m, win, bulb, level }: Props) {
       {[0, 1, 2].map((i) => <Box key={i} m={m} at={[0, 0.03 + i * 0.05, z + 0.57 - i * 0.1]} s={[1.0, 0.06 + i * 0.05, 0.12]} c="#e0e0e0" shadow={false} />)}
       {!ghost && [-0.32, 0.32].map((x) => <mesh key={x} position={[x, 0.78, z + 0.08]}><sphereGeometry args={[0.07, 10, 8]} /><meshStandardMaterial color="#42a5f5" emissive="#1e88e5" emissiveIntensity={0.6} /></mesh>)}
       {!ghost && (
-        <group position={[-1.3, LAYER.lot, z + 0.4]}>
+        <group position={[-1.37, LAYER.lot, z + 0.4]}>
           <Upright>
             <group rotation-y={Math.PI / 2} userData={PEOPLE_SIZED}>
               <CarModel body="sedan" color="#fafafa" stripe="#1a237e" />
@@ -463,7 +463,8 @@ function PoliceModel({ def, ghost, m, win, bulb, level }: Props) {
       {[-1.25, -0.65, 0.65, 1.25].map((x) => <mesh key={x} position={[x, 0.6, 0.377]}><planeGeometry args={[0.42, 0.5]} />{win}</mesh>)}
       <mesh position={[0, 0.42, 0.378]}><planeGeometry args={[0.44, 0.74]} />{m('#37474f')}</mesh>
       <Box m={m} at={[0, 1.12, -0.3]} s={[3.66, 0.06, 1.41]} c={navy} />
-      {!ghost && <LitSign text="POLICE HQ" w={1.2} at={[0.9, 0.88, 0.385]} bg={navy} fg="#ffffff" m={m} />}
+      {/* Clear of the portico, so the whole name shows. */}
+      {!ghost && <LitSign text="POLICE HQ" w={1.0} at={[1.17, 0.88, 0.385]} bg={navy} fg="#ffffff" m={m} />}
       <StoneShaft k={k} x={0} z={-0.45} y0={y0} w={1.9} d={1.0} h={h} stone="#cfd8dc" tint="#90caf9" pier="#eceff1" bays={4} />
       <Box m={m} at={[0, y0 + h - 0.2, 0.08]} s={[1.95, 0.1, 0.02]} c="#1565c0" shadow={false} />
       {front(0.35)}
@@ -500,7 +501,7 @@ function Landmark({ m, id, at, s }: { m: Mat; id: string; at: V3; s: number }) {
     <Upright>
     <group scale={s}>
       {/* A low plinth bolts the landmark to the roof. */}
-      {id !== 'tires' && <Cyl m={m} at={[0, 0.03, 0]} r={0.42} r2={0.46} h={0.06} c="#78909c" seg={16} />}
+      {id !== 'tires' && <Cyl m={m} at={[0, 0.03, 0]} r={id === 'lube' ? 0.31 : 0.42} r2={id === 'lube' ? 0.33 : 0.46} h={0.06} c="#78909c" seg={16} />}
       {id === 'tires' && (
         <group position={[0, 0.62, 0]}>
           <mesh castShadow><torusGeometry args={[0.42, 0.2, 12, 24]} />{m('#212121')}</mesh>
@@ -601,7 +602,7 @@ function AutoModel({ def, ghost, m, win, bulb, level }: Props) {
       )}
       <RoofSign m={m} text={a.sign} w={wide ? 1.7 : 1.2} at={[wide ? -0.6 : 0, h + up + 0.08, zf - 0.15]} bg="#fffde7" fg={a.signFg} board={a.board} ghost={ghost} />
       {/* Sized and placed to stay on the roof (the giant tyre stands wide, so it sits nearer the middle). */}
-      <Landmark m={m} id={def.id} at={[wide ? 1.05 : def.id === 'tires' ? 0.2 : 0.45, h + up + 0.08, z0 - 0.1]} s={st === 3 ? 1.2 : 0.8} />
+      <Landmark m={m} id={def.id} at={[wide ? 1.05 : def.id === 'tires' ? 0.2 : def.id === 'lube' ? 0.28 : 0.45, h + up + 0.08, z0 - (def.id === 'lube' ? 0.15 : 0.1)]} s={st === 3 ? 1.2 : 0.8} />
       {/* Forecourt: cones, a tyre stack or oil drums by the door. */}
       {!ghost && (
         <group>

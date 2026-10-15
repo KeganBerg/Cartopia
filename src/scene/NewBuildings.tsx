@@ -352,7 +352,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
               <mesh key={i} position={[Math.sin(i * 2) * 0.04, 0.5 + i * 0.105, 0]}><sphereGeometry args={[0.06 + i * 0.015, 8, 6]} />{m('#eceff1')}</mesh>
             ))}
           </group>
-          {!ghost && [-0.62, 0.62].map((x) => <Parasol key={x} m={m} at={[x, 0, 0.75]} c="#2e7d32" />)}
+          {!ghost && [-0.72, 0.72].map((x) => <Parasol key={x} m={m} at={[x, 0, 0.8]} c="#2e7d32" />)}
         </ShellBuilding>
       )
     }
@@ -639,7 +639,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
       const st = growthStage(lvl)
       const th = h + (st === 3 ? 2.6 : st === 2 ? 1.7 : 0.9)
       return (
-        <ShellBuilding {...shell} w={3.5} d={1.4} h0={1.5} z0={-0.25} wall="#c62828" roof="#37474f" sign={st === 3 ? undefined : 'FIRE STATION'} signBg="#fafafa" signFg="#c62828" shopfront={null}>
+        <ShellBuilding {...shell} w={3.5} d={1.4} h0={1.5} z0={-0.25} rowFrom={1.62} wall="#c62828" roof="#37474f" sign={st === 3 ? undefined : 'FIRE STATION'} signBg="#fafafa" signFg="#c62828" shopfront={null}>
           {/* Two tall engine bays with white trim. */}
           {[-0.9, 0.3].map((x) => (
             <group key={x}>
@@ -771,7 +771,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           ))}
           {/* A patrol car parked out front, light bar on the roof. */}
           {!ghost && (
-            <group position={[-1.25, LAYER.lot, 0.72]}>
+            <group position={[-1.37, LAYER.lot, 0.72]}>
               <Upright>
                 {/* Car and light bar kept true size together in a 2x2 or 4x4 block. */}
                 <group rotation-y={Math.PI / 2} userData={PEOPLE_SIZED}>
@@ -1017,7 +1017,8 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
     case 'parkade': {
       // A concrete deck for every two levels, cars parked on each.
       const decks = 2 + Math.floor((lvl - 1) / 2)
-      const DH = 0.55
+      // Twice a car's height between slabs, so the parked cars show over the parapets.
+      const DH = 0.66
       const top = decks * DH
       const cars = ['#e53935', '#1e88e5', '#fdd835', '#43a047', '#fafafa', '#212121', '#8e24aa', '#ff7043']
       return (
@@ -1046,7 +1047,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           <Box m={m} at={[1.45, (top + 0.6) / 2, -1.495]} s={[0.55, top + 0.6, 0.49]} c="#9e9e9e" />
           <mesh position={[1.45, top + 0.1, -1.245]}><planeGeometry args={[0.3, 0.4]} />{win}</mesh>
           {/* Ramp up the right side. */}
-          <mesh position={[1.2, DH / 2 + 0.05, 0.3]} rotation-x={-0.32} castShadow receiveShadow>
+          <mesh position={[1.2, DH / 2 + 0.05, 0.3]} rotation-x={-Math.asin(DH / 1.7)} castShadow receiveShadow>
             <boxGeometry args={[0.6, 0.06, 1.7]} />
             {m('#9e9e9e')}
           </mesh>
@@ -1150,8 +1151,8 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           {stones.map(([x, z, h, tilt], i) => (
             <group key={i} position={[x, 0, z]} rotation={[0, 0, tilt]}>
               <Box m={m} at={[0, h / 2, 0]} s={[0.36, h, 0.1]} c="#9e9e9e" />
-              <mesh position={[0, h, 0]} rotation-x={Math.PI / 2} castShadow><cylinderGeometry args={[0.18, 0.18, 0.1, 12, 1, false, -Math.PI / 2, Math.PI]} />{m('#9e9e9e')}</mesh>
-              <Box m={m} at={[0, h * 0.65, 0.052]} s={[0.18, 0.03, 0.01]} c="#616161" shadow={false} />
+              <mesh position={[0, h, 0]} rotation-x={-Math.PI / 2} castShadow><cylinderGeometry args={[0.18, 0.18, 0.1, 12, 1, false, -Math.PI / 2, Math.PI]} />{m('#9e9e9e')}</mesh>
+              <mesh position={[0, h * 0.65, 0.052]}><planeGeometry args={[0.18, 0.03]} />{m('#616161')}</mesh>
               <Box m={m} at={[0, 0.07, 0.3]} s={[0.34, 0.06, 0.4]} c="#5d4037" shadow={false} />
             </group>
           ))}
@@ -1180,7 +1181,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
         [1.42, 0.1, 0.95, 0.55], [1.32, Math.PI, 0.9, 0.5], [1.55, -1.2, 0.3, 0.45], [1.18, 2.3, 0.6, 0.4],
       ]
       // Along the upper trunk's leaning axis.
-      const onTrunk = (y: number): [number, number, number] => [0.06 + (y - 1.3) * 0.15, y, 0]
+      const onTrunk = (y: number): [number, number, number] => [0.045 + (y - 1.35) * 0.15, y, 0]
       const along = ([y, yaw, lean]: (typeof branches)[number], d: number): [number, number, number] => {
         const [x0, y0, z0] = onTrunk(y)
         return [x0 + Math.sin(lean) * Math.cos(yaw) * d, y0 + Math.cos(lean) * d, z0 + Math.sin(lean) * Math.sin(yaw) * d]
@@ -1188,7 +1189,8 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
       return (
         <group>
           <Cyl m={m} at={[0, 0.55, 0]} r={0.1} r2={0.2} h={1.1} c="#3e2723" seg={7} />
-          <Cyl m={m} at={[0.06, 1.3, 0]} r={0.07} r2={0.1} h={0.6} c="#3e2723" seg={7} rot={[0, 0, -0.15]} />
+          {/* Upper trunk: from the lower one's top, narrowing to the top branch's width. */}
+          <Cyl m={m} at={[0.039, 1.31, 0]} r={0.055} r2={0.1} h={0.52} c="#3e2723" seg={7} rot={[0, 0, -0.15]} />
           {branches.map(([y, yaw, lean, len], i) => (
             <group key={i} position={onTrunk(y)} rotation-y={-yaw}>
               <group rotation-z={-lean}>
@@ -1200,11 +1202,12 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
               </group>
             </group>
           ))}
-          {[0, 1, 3].map((b) => {
-            const [x, y, z] = along(branches[b], branches[b][3] * 0.8)
+          {/* The low branch's lantern hangs near its tip, clear of the trunk, and lower than its neighbour's. */}
+          {[[0, 0.8, 0.22], [1, 0.8, 0.22], [3, 0.95, 0.3]].map(([b, at, drop]) => {
+            const [x, y, z] = along(branches[b], branches[b][3] * at)
             return (
-              <group key={b} position={[x, y - 0.22, z]}>
-                <Cyl m={m} at={[0, 0.12, 0]} r={0.006} h={0.22} c="#212121" seg={4} />
+              <group key={b} position={[x, y - drop, z]}>
+                <Cyl m={m} at={[0, (drop + 0.02) / 2, 0]} r={0.006} h={drop} c="#212121" seg={4} />
                 <mesh position={[0, -0.04, 0]}><sphereGeometry args={[0.07, 8, 6]} />{bulb}</mesh>
               </group>
             )
@@ -1340,8 +1343,8 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
             <mesh position={[0, 1.25, -0.18]} rotation-x={Math.PI / 2}><planeGeometry args={[1.2, 0.4]} />{bulb}</mesh>
             <mesh position={[0.655, 0.66, -0.2]} rotation-y={-Math.PI / 2}><planeGeometry args={[0.3, 0.6]} />{bulb}</mesh>
             <group position={[0.6, 0, 0.55]}>
-              <mesh position={[0, 1.45, 0]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.18, 0.18, 0.03, 16]} />{m('#1e88e5')}</mesh>
-              <mesh position={[0, 1.45, 0.032]}>
+              <mesh position={[0, 1.55, 0]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.18, 0.18, 0.03, 16]} />{m('#1e88e5')}</mesh>
+              <mesh position={[0, 1.55, 0.032]}>
                 <planeGeometry args={[0.3, 0.075]} />
                 <meshBasicMaterial map={signTexture('BUS', '#1e88e5', '#ffffff')} toneMapped={false} />
               </mesh>
@@ -1364,9 +1367,9 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           {!ghost && (
             <group position={[0.6, 0, 0.55]}>
               <Cyl m={m} at={[0, 0.75, 0]} r={0.03} h={1.5} c="#90a4ae" seg={6} />
-              <mesh position={[0, 1.45, 0]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.18, 0.18, 0.03, 16]} />{m('#1e88e5')}</mesh>
+              <mesh position={[0, 1.55, 0]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.18, 0.18, 0.03, 16]} />{m('#1e88e5')}</mesh>
               {/* Lettering on the disc's face, clear of the pole. */}
-              <mesh position={[0, 1.45, 0.032]}>
+              <mesh position={[0, 1.55, 0.032]}>
                 <planeGeometry args={[0.3, 0.075]} />
                 <meshBasicMaterial map={signTexture('BUS', '#1e88e5', '#ffffff')} toneMapped={false} />
               </mesh>
