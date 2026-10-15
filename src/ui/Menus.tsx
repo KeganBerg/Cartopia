@@ -28,6 +28,7 @@ import { useCrewGoal } from './CrewGoal'
 import { useCrewBattle } from '../lib/battles'
 import { useChat } from '../lib/chat'
 import { useRivalWaiting } from './Rivals'
+import { showTip, SkillTip, LovesTip } from './TapTip'
 import { ShowcaseToggle } from './Meet'
 import { tutTarget, tutorialShowing, type TutTarget } from './Tutorial'
 import { buildingIcon } from './buildingIcons'
@@ -469,7 +470,11 @@ export function ShowroomPanel() {
 export function SkillTag({ model }: { model: string }) {
   const sk = carDef(model).skill
   if (!sk) return null
-  return <span className="skill-tag" title={SKILLS[sk].text}>{SKILLS[sk].icon} {SKILLS[sk].name}</span>
+  return (
+    <button type="button" className="skill-tag" aria-label={`${SKILLS[sk].name}: ${SKILLS[sk].text}`} onClick={(e) => showTip(e.currentTarget, <SkillTip sk={sk} />)}>
+      {SKILLS[sk].icon} {SKILLS[sk].name}
+    </button>
+  )
 }
 
 // The businesses a car loves to drive for, as one row of icons: ❤️ 🍕 🍩 🎬.
@@ -478,9 +483,9 @@ export function LovesTag({ model }: { model: string }) {
   if (!likes.length) return null
   const names = likes.map((id) => buildingDef(id).name)
   return (
-    <div className="loves-tag" title={`+25% coins per job at: ${names.join(', ')}`} aria-label={`Loves ${names.join(', ')}`}>
-      ❤️{likes.map((id, i) => <span key={id} className="loves-ico" title={names[i]}>{buildingIcon(id)}</span>)}
-    </div>
+    <button type="button" className="loves-tag" aria-label={`Loves ${names.join(', ')}: +25% coins per job`} onClick={(e) => showTip(e.currentTarget, <LovesTip likes={likes} />)}>
+      ❤️{likes.map((id) => <span key={id} className="loves-ico">{buildingIcon(id)}</span>)}
+    </button>
   )
 }
 

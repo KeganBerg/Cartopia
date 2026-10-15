@@ -34,7 +34,7 @@ function lootLabel(l: Loot) {
 const RARITY_ORDER: Record<Rarity, number> = { common: 0, scarce: 1, rare: 2 }
 
 function RarityTag({ r }: { r: Rarity }) {
-  return <span className={`rarity rarity-${r}`}>{RARITY[r].name}</span>
+  return <span className={`rarity rarity-${r}`} title={`${RARITY[r].name}: ${RARITY[r].weight}% of finds · ${RARITY[r].minutes >= 60 ? `${RARITY[r].minutes / 60} h` : `${RARITY[r].minutes} min`} restore · ♻ ${RARITY[r].scrapParts} parts`}>{RARITY[r].name}</span>
 }
 
 // The restore bay, the hero of Rusty's: a lit garage with the car up on the
@@ -157,7 +157,7 @@ function Lot({ onFind }: { onFind: () => void }) {
         <div className={`lot-pick rr-${picked.rarity}`}>
           <div className="lot-pick-info">
             <b>{d.name}</b>
-            <div className="junk-tags"><RarityTag r={picked.rarity} /><SkillTag model={picked.model} />{d.rescueOnly && <span className="classic-tag">Classic</span>}</div>
+            <div className="junk-tags"><RarityTag r={picked.rarity} /><SkillTag model={picked.model} />{d.rescueOnly && <span className="classic-tag" title="Classic: only found at Rusty's, never in the shop">Classic</span>}</div>
             <div className="junk-meta">
               <span>PI {performance(d, { engine: 0, turbo: 0, tires: 0, weight: 0 })}</span>
               <span>⏱ {restoreTime(RARITY[picked.rarity].minutes)}</span>

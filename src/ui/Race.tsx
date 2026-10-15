@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { SkillIcon } from './TapTip'
 import { useTouchLock } from './DriveControls'
 import { useGame, spendFuel, type OwnedCar } from '../game/store'
 import { LIVE_LOSS_SHARE, LOSS_SHARE } from '../game/boosts'
@@ -855,7 +856,7 @@ export function RacePanel() {
                 <span className="rm-qc-top"><CarThumb size="sm" color={r.color} body={r.body} mods={r.mods} />{r.online && <span className="tag">PLAYER</span>}</span>
                 <span className="rm-qc-body">
                   <b>{r.online ? <PlayerName id={r.id} town={r.town} /> : r.town}</b>
-                  <span className="rm-qc-chips"><span>Lv {r.level}</span><span className="rm-pi">PI {r.pi}</span>{r.skill && <span title={`${SKILLS[r.skill].name}: ${SKILLS[r.skill].text}`}>{SKILLS[r.skill].icon}</span>}</span>
+                  <span className="rm-qc-chips"><span>Lv {r.level}</span><span className="rm-pi">PI {r.pi}</span>{r.skill && <SkillIcon sk={r.skill} className="" />}</span>
                   <button className="buy small" onClick={() => start(r)}>🏁 ${reward(r)} <small>⛽{RACE_FUEL}</small></button>
                 </span>
               </div>
@@ -1002,7 +1003,7 @@ function Campaign({ sel, setSel, onRace, onTour }: { sel: number; setSel: (ci: n
                   <CarThumb size="xs" color={r.color} body={r.body} model={r.model} />
                   <div className="rm-who">
                     <b>{r.town}</b>
-                    <small>{n > 0 && <Stars n={n} />} PI {r.pi}{r.skill && <span className="rival-skill" title={`${SKILLS[r.skill].name}: ${SKILLS[r.skill].text}`}> {SKILLS[r.skill].icon}</span>}</small>
+                    <small>{n > 0 && <Stars n={n} />} PI {r.pi}{r.skill && <> <SkillIcon sk={r.skill} /></>}</small>
                   </div>
                   <button className={`buy small${n > 0 ? ' alt' : ''}`} disabled={!can} onClick={() => onRace(sel, i)}>
                     {!can ? '🔒' : `${n > 0 ? '↻' : '🏁'} $${prize.toLocaleString()}`}
@@ -1118,7 +1119,7 @@ function Tour({ onRace, onCampaign }: { onRace: () => void; onCampaign: () => vo
                   <CarThumb size="xs" color={r.color} body={r.body} model={r.model} />
                   <div className="rm-who">
                     <b>{r.town}</b>
-                    <small><DistChip d={tourDist(race)} /> PI {r.pi}{r.skill && <span className="rival-skill" title={`${SKILLS[r.skill].name}: ${SKILLS[r.skill].text}`}> {SKILLS[r.skill].icon}</span>}</small>
+                    <small><DistChip d={tourDist(race)} /> PI {r.pi}{r.skill && <> <SkillIcon sk={r.skill} /></>}</small>
                   </div>
                   {beat ? <span className="tour-beat" title="Beaten">✔</span> : (
                     <button className="buy small" disabled={!next} onClick={onRace}>
@@ -1193,7 +1194,7 @@ function WeeklyEvent({ base, car }: { base: number; car: OwnedCar | undefined })
               <>
                 <span className="ev-vs-tag">VS</span>
                 <b>{vs.town}</b>
-                {vs.skill && <span className="rival-skill" title={`${SKILLS[vs.skill].name}: ${SKILLS[vs.skill].text}`}>{SKILLS[vs.skill].icon}</span>}
+                {vs.skill && <SkillIcon sk={vs.skill} />}
               </>
             ) : <b>🏆 {EVENT_RACES}/{EVENT_RACES}</b>}
           </div>

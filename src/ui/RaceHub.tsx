@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { SkillIcon } from './TapTip'
 import { useGame, type OwnedCar } from '../game/store'
 import { type CarDef, CAMPAIGN, CAMPAIGN_RACES, GP_ROUNDS, GP_SERIES, RACE_FUEL, SKILLS, campaignCleared, campaignRaceId, campaignReward, carDef, carStats, msToNextWeek, performance, skinDef } from '../game/data'
 import { BUILDS, DIST, buildOf, character, fit, tourDist, type RaceDist } from '../game/distance'
@@ -220,13 +221,12 @@ export function RaceBar({ cars, car, onPick, go, note, dist, loaner }: { cars: O
   if (!car) return null
   const d = carDef(car.model)
   const pi = (c: OwnedCar) => performance(carDef(c.model), c.upgrades, c.mods)
-  const skill = d.skill ? SKILLS[d.skill] : null
   // The build tag, with a tick or a cross for how it suits the next race's distance.
   const tag = (c: OwnedCar) => {
     if (dist === undefined) return null
     const b = buildOf(character(carStats(carDef(c.model), c.upgrades, c.mods)))
     const f = dist ? fit(b, dist) : null
-    return <span className={`rm-build${f ? ` ${f}` : ''}`} title={`${BUILDS[b].name}: ${BUILDS[b].text}`}>{BUILDS[b].icon}{f === 'good' ? '✓' : f === 'bad' ? '✗' : ''}</span>
+    return <span className={`rm-build${f ? ` ${f}` : ''}`} data-tap-tip title={`${BUILDS[b].name}: ${BUILDS[b].text}`}>{BUILDS[b].icon}{f === 'good' ? '✓' : f === 'bad' ? '✗' : ''}</span>
   }
   return (
     <div className="rm-bar">
@@ -245,7 +245,7 @@ export function RaceBar({ cars, car, onPick, go, note, dist, loaner }: { cars: O
         <span className="rm-car-txt">
           <small className="rm-car-lbl">🏁 Racing with</small>
           <b>{d.name} <MasteryMedal model={car.model} /></b>
-          <small><span className="rm-pi">PI {pi(car)}</span>{skill && <> {skill.icon} {skill.name}</>}{tag(car)}</small>
+          <small><span className="rm-pi">PI {pi(car)}</span>{d.skill && <> <SkillIcon sk={d.skill} className="" named /></>}{tag(car)}</small>
         </span>
         {cars.length > 1 && <span className="rm-swap" aria-hidden>{open ? 'Done' : 'Change'}</span>}
       </button>
