@@ -280,6 +280,8 @@ export type ModFrame = {
   body: Body; len: number; wid: number; lift: number; wheel: number; wz: number; wx: number
   bodyW: number; side: number; front: number; rear: number; pipeY: number
   deck: number; deckZ: number; deckW: number; hoodTop: number; hoodZ: number; hs: number
+  // How wide the surface under a wing's posts is, where it is narrower than the wing.
+  postW?: number
   // The top of the hard roof (the deck on bodies without one), where it runs, and how wide it is.
   roof: number; roofZ: number; roofLen: number; roofW: number
   // The outside of the windshield and back window, on closed cabins.
@@ -301,8 +303,9 @@ export function carFrame(body: Body): ModFrame {
   }
   if (body === 'formula') {
     return {
-      body, len: s.len, wid: s.wid, lift: s.lift, wheel: s.wheel, wz: s.len * 0.33, wx: s.track!, bodyW: 0.5, side: 0.25, front: s.len / 2, rear: -s.len / 2 + 0.05, pipeY: 0.24,
-      deck: 0.27, deckZ: -s.len / 2 + 0.08, deckW: 0.56, hoodTop: 0.36, hoodZ: -0.17, hs: 0.55,
+      // Rear mods sit on the narrow engine cover: wings on posts close together, tips out of its tail.
+      body, len: s.len, wid: s.wid, lift: s.lift, wheel: s.wheel, wz: s.len * 0.33, wx: s.track!, bodyW: 0.3, side: 0.25, front: s.len / 2, rear: -0.56, pipeY: 0.19,
+      deck: 0.24, deckZ: -0.48, deckW: 0.56, postW: 0.3, hoodTop: 0.36, hoodZ: -0.17, hs: 0.55,
       roof: 0.27, roofZ: -0.1, roofLen: 0.3, roofW: 0.3,
     }
   }

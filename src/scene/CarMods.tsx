@@ -76,8 +76,10 @@ function pipe(r: number, len: number, x: number, y: number, z: number, r2 = r) {
 function frontLip(f: Frame, p: Parts, k: Kind, w: number, t: number, d: number, y: number, z: number, sweep: boolean) {
   const mid = sweep ? 0.72 : 1
   p[k].push(box(w * mid, t, d, 0, y, z))
-  if (sweep) for (const sd of [-1, 1]) p[k].push(box(w * 0.2, t - 0.005, d * 0.8, sd * w * 0.43, y, z - d * 0.08, 0, sd * 0.22))
-  p.carbon.push(box(w * mid - 0.02, 0.014, 0.008, 0, y + t / 2 + 0.004, z + d / 2 - 0.007))
+  // The corners stop inside the body's sides, clear of the wheel wells.
+  const out = Math.min(w, f.bodyW) * 0.49
+  if (sweep) for (const sd of [-1, 1]) p[k].push(box(w * 0.18, t - 0.009, d * 0.8, sd * (out - w * 0.09), y - 0.002, z - d * 0.08, 0, sd * 0.22))
+  p.carbon.push(box(w * mid - 0.02, 0.014, 0.008, 0, y + t / 2 + 0.006, z + d / 2 - 0.007))
   for (let i = -2; i <= 2; i++) p.chrome.push(post(0.0055, 0.008, i * w * 0.15, y + t / 2 + 0.002, z - d * 0.12, 8))
   for (const sd of [-1, 1]) p.chrome.push(tube(0.005, [sd * w * 0.24, y + t / 2 - 0.002, z + d * 0.18], [sd * w * 0.24, y + 0.06, f.front - 0.006], 6))
 }
@@ -103,7 +105,7 @@ function clearOf(c: number, w: number, lines: number[]) {
 
 // Room the other fitted mods need: where exhaust tips come out at the back (x, radius), and how far
 // a body kit's skirts stand out from the body side.
-type Room = { tips: [number, number][]; skirt: number; arch: number }
+type Room = { tips: [number, number][]; skirt: number; arch: number; out: number }
 const TIPS: Record<string, (f: Frame) => [number, number][]> = {
   twintips: (f) => [-1, 1].map((sd) => [sd * f.bodyW * 0.26, 0.028]),
   quadtips: (f) => (f.bodyW < 0.3 ? [] : [-0.33, -0.2, 0.2, 0.33].map((k) => [k * f.bodyW, 0.026])),
@@ -113,18 +115,34 @@ const TIPS: Record<string, (f: Frame) => [number, number][]> = {
 // How far out from the body side each kit's skirts reach.
 const SKIRT: Record<string, number> = { streetkit: 0.027, widebody: 0.045, carbonkit: 0.038, rallykit: 0.027, boxflares: 0.046, aerokit: 0.043 }
 // Noses that curve away at the corners, leaving nothing for canards to bolt to.
-const ROUND_NOSE: Body[] = ['horseshoe', 'scissor', 'teardrop']
+const ROUND_NOSE: Body[] = ['horseshoe', 'scissor', 'teardrop', 'formula', 'pontoon']
+// Where valances and diffusers hang at the tail: off the floor, or up at the tail where it sits
+// high above the floor (the formula car's engine cover).
+const rearLift = (f: Frame) => Math.max(f.lift, f.pipeY - 0.1)
 // How far the hood sits below the usual hood line where hood mods go, on bodies drawn with
 // their own curved hoods.
-const HOOD_DROP: Partial<Record<Body, number>> = { restomuscle: 0.024, horseshoe: 0.014, teardrop: 0.01, longnose: 0.012 }
+const HOOD_DROP: Partial<Record<Body, number>> = { restomuscle: 0.024, horseshoe: 0.021, teardrop: 0.01, longnose: 0.02 }
+// How far a curved roof falls away under a roof bar's feet.
+const ROOF_DROP: Partial<Record<Body, number>> = { horseshoe: 0.056, teardrop: 0.047, scissor: 0.023 }
+const TUCK_FOG: Body[] = ['teardrop', 'pontoon']
+// Bodies drawn narrower than their wheels (the monster truck), or whose sills tuck in under the
+// widest point: side kits, pipes and neon sit on the body itself.
+const BODY_SIDE: Partial<Record<Body, { side: number; bodyW?: number }>> = {
+  monster: { side: 0.34, bodyW: 0.68 },
+}
+const SILL_IN: Partial<Record<Body, number>> = { tank: 0.03, icecream: 0.014, pontoon: 0.02 }
 function withRoom(f: Frame, all: string[]): Frame & { room: Room } {
   // How far a kit's wheel arches reach along the car from each axle.
   const arch = all.includes('boxflares') ? f.wheel * 1.28 : all.includes('widebody') ? f.wheel * 1.2 + 0.035 : 0
-  return { ...f, hoodTop: f.hoodTop - (HOOD_DROP[f.body] ?? 0), room: { tips: all.flatMap((id) => TIPS[id]?.(f) ?? []), skirt: Math.max(0, ...all.map((id) => SKIRT[id] ?? 0)), arch } }
+  const bs = BODY_SIDE[f.body]
+  const g: Frame = { ...f, ...bs, side: (bs?.side ?? f.side) - (SILL_IN[f.body] ?? 0), hoodTop: f.hoodTop - (HOOD_DROP[f.body] ?? 0) }
+  // How far out a kit's arches reach from the middle of the car.
+  const out = all.includes('boxflares') ? Math.max(g.wx + 0.05, g.side + 0.03) + 0.045 : all.includes('widebody') ? Math.max(g.wx + 0.055, g.side + 0.035) + 0.052 : 0
+  return { ...g, room: { tips: all.flatMap((id) => TIPS[id]?.(g) ?? []), skirt: Math.max(0, ...all.map((id) => SKIRT[id] ?? 0)), arch, out } }
 }
 // The frame a mod is built on, with room left for the others fitted with it.
 export const modFrame = (body: Body, all: string[]) => withRoom(carFrame(body), all)
-const roomOf = (f: Frame): Room => (f as Frame & { room?: Room }).room ?? { tips: [], skirt: 0, arch: 0 }
+const roomOf = (f: Frame): Room => (f as Frame & { room?: Room }).room ?? { tips: [], skirt: 0, arch: 0, out: 0 }
 // The stretches of [x0, x1] left after cutting out a gap round each exhaust tip.
 function aroundTips(f: Frame, x0: number, x1: number, pad = 0.012): [number, number][] {
   let out: [number, number][] = [[x0, x1]]
@@ -148,7 +166,9 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
   gtwing: (f, p) => {
     const z = f.deckZ
     for (const sd of [-1, 1]) {
-      p.carbon.push(box(0.03, 0.17, 0.05, sd * f.deckW * 0.3, f.deck + 0.085, z))
+      // On a round body the posts reach down into a deck that falls away at the sides.
+      const deep = f.body === 'bubble' ? 0.02 : 0
+      p.carbon.push(box(0.03, 0.17 + deep, 0.05, sd * (f.postW ?? f.deckW) * 0.3, f.deck + 0.085 - deep / 2, z))
       p.carbon.push(box(0.015, 0.07, 0.18, sd * f.deckW * 0.49, f.deck + 0.18, z))
     }
     p.paint.push(box(f.deckW * 0.98, 0.025, 0.17, 0, f.deck + 0.18, z, 0.12))
@@ -156,7 +176,7 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
   attackwing: (f, p) => {
     const z = f.deckZ - 0.03
     for (const sd of [-1, 1]) {
-      p.carbon.push(box(0.025, 0.28, 0.056, sd * f.deckW * 0.22, f.deck + 0.14, z))
+      p.carbon.push(box(0.025, 0.28, 0.056, sd * (f.postW ?? f.deckW) * 0.22, f.deck + 0.14, z))
       p.paint.push(box(0.016, 0.12, 0.24, sd * f.deckW * 0.56, f.deck + 0.27, z))
     }
     p.carbon.push(box(f.deckW * 1.12, 0.024, 0.2, 0, f.deck + 0.28, z, 0.18))
@@ -169,15 +189,21 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
   },
   sidepipes: (f, p) => {
     // Between the wheels (and any kit's arches), out past a body kit's skirts.
+    // Where a kit's arches leave too little room between them, the pipes run outside the arches.
     const clear = Math.max(f.wheel * 1.3, roomOf(f).arch + 0.015)
-    const zb = Math.max(-f.len * 0.25, -f.wz + clear)
-    const zf = Math.min(f.len * 0.22, f.wz - clear)
+    const outside = roomOf(f).out > 0 && f.wz * 2 - clear * 2 < 0.2
+    const zb = Math.max(-f.len * 0.25, outside ? -f.len : -f.wz + clear)
+    const zf = Math.min(f.len * 0.22, outside ? f.len : f.wz - clear)
     for (const sd of [-1, 1]) {
-      const x = sd * (f.side + Math.max(0.039, roomOf(f).skirt + 0.031))
+      const x = sd * (outside ? roomOf(f).out + 0.031 : f.side + Math.max(0.039, roomOf(f).skirt + 0.031))
       // Runs into the tip up to where the tip has the same width.
       p.chrome.push(pipe(0.028, zf - 0.06 - zb, x, f.pipeY - 0.015, (zf - 0.06 + zb) / 2))
-      p.carbon.push(box(0.02, 0.05, (zf - zb) * 0.68, x + sd * 0.02, f.pipeY - 0.007, (zf + zb) / 2 - 0.03))
+      // The heat shield stops short of the flared tip.
+      p.carbon.push(box(0.02, 0.05, zf - zb - 0.105, x + sd * 0.02, f.pipeY - 0.009, (zf + zb) / 2 - 0.0225))
       p.chrome.push(pipe(0.022, 0.06, x, f.pipeY - 0.015, zf - 0.03, 0.034))
+      // Two hangers reach in to the body, which tucks in at the bottom on rounder cars (a kit's
+      // skirt holds them otherwise).
+      if (!roomOf(f).skirt) for (const z of [zb + 0.07, zf - 0.14]) p.carbon.push(box(0.09, 0.014, 0.022, x - sd * 0.045, f.pipeY - 0.015, z))
     }
   },
   flamepipes: (f, p) => {
@@ -196,9 +222,9 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
   // Body kits.
   streetkit: (f, p) => {
     // A body-colour lip with swept corners.
-    frontLip(f, p, 'paint', f.bodyW * 0.98, 0.025, 0.08, f.lift + 0.025, f.front + 0.015, true)
+    frontLip(f, p, 'paint', f.bodyW * 0.98, 0.028, 0.08, f.lift + 0.025, f.front + 0.015, true)
     // The rear valance parts round the exhaust tips.
-    for (const [a, b] of aroundTips(f, -f.bodyW * 0.35, f.bodyW * 0.35)) p.carbon.push(box(b - a, 0.03, 0.07, (a + b) / 2, f.lift + 0.03, f.rear - 0.01))
+    for (const [a, b] of aroundTips(f, -f.bodyW * 0.35, f.bodyW * 0.35)) p.carbon.push(box(b - a, 0.03, 0.07, (a + b) / 2, rearLift(f) + 0.03, f.rear - 0.01))
     for (const sd of [-1, 1]) p.paint.push(box(0.0375, 0.05, f.len * 0.42, sd * (f.side + 0.00825), f.lift + 0.055, 0))
   },
   widebody: (f, p) => {
@@ -208,8 +234,11 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
         const g = new TorusGeometry(f.wheel * 1.2, 0.035, 6, 14, Math.PI)
         g.scale(1, 1, 1.7)
         g.rotateY(Math.PI / 2)
-        g.translate(sd * Math.max(f.wx + 0.055, f.side + 0.035), f.wheel, z)
+        const ax = Math.max(f.wx + 0.055, f.side + 0.035)
+        g.translate(sd * ax, f.wheel, z)
         p.paint.push(g)
+        // Wheels standing clear of the body: each arch is held on a strut from the body.
+        if (f.wx > f.side + 0.05) p.carbon.push(tube(0.012, [sd * ax, f.wheel * 2.1, z], [sd * f.bodyW * 0.3, f.lift + 0.15, Math.max(f.rear + 0.05, Math.min(z, f.len * 0.2))], 8))
       }
       p.paint.push(box(0.0555, 0.053, f.wz * 2 - f.wheel * 2.6, sd * (f.side + 0.01725), f.lift + 0.0555, 0))
     }
@@ -223,8 +252,8 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
       if (!ROUND_NOSE.includes(f.body)) p.carbon.push(box(0.1, 0.012, 0.06, sd * (f.bodyW / 2 - 0.02), f.lift + 0.13, f.front - 0.02, 0, sd * 0.4))
     }
     // The diffuser parts round the exhaust tips, and drops the fins that would meet one.
-    for (const [a, b] of aroundTips(f, -f.bodyW * 0.4, f.bodyW * 0.4)) p.carbon.push(box(b - a, 0.025, 0.1, (a + b) / 2, f.lift + 0.03, f.rear - 0.033))
-    for (const x of [-0.2, 0, 0.2]) if (!nearTip(f, x * f.bodyW, 0.006)) p.carbon.push(box(0.012, 0.066, 0.1, x * f.bodyW, f.lift + 0.057, f.rear - 0.033))
+    for (const [a, b] of aroundTips(f, -f.bodyW * 0.4, f.bodyW * 0.4)) p.carbon.push(box(b - a, 0.025, 0.1, (a + b) / 2, rearLift(f) + 0.03, f.rear - 0.033))
+    for (const x of [-0.2, 0, 0.2]) if (!nearTip(f, x * f.bodyW, 0.006)) p.carbon.push(box(0.012, 0.066, 0.1, x * f.bodyW, rearLift(f) + 0.057, f.rear - 0.033))
   },
 
   // Hoods, sized to the car's width.
@@ -267,7 +296,7 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
     const z = f.deckZ + 0.01
     const y = f.deck + 0.17
     for (const sd of [-1, 1]) {
-      const x = sd * f.deckW * 0.2
+      const x = sd * (f.postW ?? f.deckW) * 0.2
       p.carbon.push(box(0.024, 0.2, 0.04, x, f.deck + 0.1, z + 0.035))
       p.carbon.push(box(0.024, 0.026, 0.1, x, f.deck + 0.205, z - 0.005, -0.35))
       p.carbon.push(box(0.024, 0.05, 0.03, x, y + 0.03, z - 0.045))
@@ -280,7 +309,7 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
     // Two stacked elements between tall end plates, on four pylons.
     const z = f.deckZ - 0.02
     for (const sd of [-1, 1]) {
-      for (const k of [0.12, 0.28]) p.carbon.push(box(0.022, 0.22, 0.05, clearOf(sd * f.deckW * k, 0.011, hoodLines(f)), f.deck + 0.11, z + 0.02))
+      for (const k of [0.12, 0.28]) p.carbon.push(box(0.022, 0.22, 0.05, clearOf(sd * (f.postW ?? f.deckW) * k, 0.011, hoodLines(f)), f.deck + 0.11, z + 0.02))
       p.carbon.push(box(0.014, 0.19, 0.28, sd * f.deckW * 0.54, f.deck + 0.25, z - 0.04))
       p.chrome.push(box(0.018, 0.016, 0.03, sd * f.deckW * 0.54, f.deck + 0.355, z - 0.13))
     }
@@ -324,7 +353,9 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
     // Out past a body kit's skirts.
     const side = f.side + roomOf(f).skirt
     for (const sd of [-1, 1]) {
-      p.carbon.push(box(0.03, 0.06, 0.16, sd * (side + 0.018), f.lift + 0.075, z0 - 0.09))
+      // The collector runs back in under the body, which tucks in at the bottom on rounder cars.
+      const w = roomOf(f).skirt ? 0.03 : 0.07
+      p.carbon.push(box(w, 0.06, 0.16, sd * (side + 0.033 - w / 2), f.lift + 0.075, z0 - 0.09))
       for (let i = 0; i < 4; i++) {
         const z = z0 - i * 0.042
         const a: [number, number, number] = [sd * (side + 0.02), f.lift + 0.08, z]
@@ -363,7 +394,7 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
     // Skid plate tucked under the nose, rising to the bumper, held by two bolts.
     p.chrome.push(box(f.bodyW * 0.7, 0.012, 0.15, 0, f.lift + 0.018, f.front - 0.045, -0.35))
     for (const sd of [-1, 1]) p.carbon.push(post(0.008, 0.008, sd * f.bodyW * 0.22, f.lift + 0.0155, f.front - 0.075, 8))
-    for (const [a, b] of aroundTips(f, -f.bodyW * 0.25, f.bodyW * 0.25)) p.carbon.push(box(b - a, 0.03, 0.04, (a + b) / 2, f.lift + 0.02, f.rear - 0.012))
+    for (const [a, b] of aroundTips(f, -f.bodyW * 0.24, f.bodyW * 0.24)) p.carbon.push(box(b - a, 0.05, 0.04, (a + b) / 2, rearLift(f) + 0.029, f.rear - 0.012))
   },
   boxflares: (f, p) => {
     // Square bolt-on flares over each wheel, joined by skirts, with a chrome bolt at each corner.
@@ -397,8 +428,8 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
       p.paint.push(box(0.035, 0.012, f.len * 0.42, sd * (f.side + 0.025), f.lift + 0.056, 0))
     }
     // Narrow enough to pass between the stock tailpipes; its fins sit between a stock diffuser's.
-    for (const [a, b] of aroundTips(f, -f.bodyW * 0.23, f.bodyW * 0.23)) p.carbon.push(box(b - a, 0.02, 0.12, (a + b) / 2, f.lift + 0.016, f.rear + 0.045, 0.25))
-    for (let k = -2; k < 2; k++) if (!nearTip(f, (k + 0.5) * 0.11 * f.bodyW, 0.005)) p.carbon.push(box(0.01, 0.07, 0.13, (k + 0.5) * 0.11 * f.bodyW, f.lift + 0.047, f.rear + 0.02))
+    for (const [a, b] of aroundTips(f, -f.bodyW * 0.23, f.bodyW * 0.23)) p.carbon.push(box(b - a, 0.02, 0.12, (a + b) / 2, rearLift(f) + 0.016, f.rear + 0.045, 0.25))
+    for (let k = -2; k < 2; k++) if (!nearTip(f, (k + 0.5) * 0.11 * f.bodyW, 0.005)) p.carbon.push(box(0.01, 0.07, 0.13, (k + 0.5) * 0.11 * f.bodyW, rearLift(f) + 0.047, f.rear + 0.02))
   },
   bullbar: (f, p) => {
     // Chrome bull bar standing off the nose, with a black skid plate under it.
@@ -426,16 +457,14 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
     p.paint.push(box(sw, 0.05 * h, front - back, 0, f.hoodTop + 0.012 * h, mid, 0.12))
     p.carbon.push(box(sw * 0.78, 0.03 * h, 0.01, 0, f.hoodTop + 0.03 * h, back + 0.006))
     // Hood pins just ahead of the bulge, where the hood is flat.
-    for (const sd of [-1, 1]) p.chrome.push(post(0.009, 0.04, sd * sw * 0.32, f.hoodTop - 0.004, front + 0.03, 8))
+    for (const sd of [-1, 1]) p.chrome.push(post(0.009, 0.026, sd * sw * 0.32, f.hoodTop, front + 0.03, 8))
   },
   louvres: (f, p) => {
     const h = f.hs
     // Two banks of tilted slats either side of the middle.
     for (const sd of [-1, 1]) {
       const x = clearOf(sd * 0.125 * h, 0.045 * h, hoodLines(f))
-      for (let k = 0; k < 5; k++) p.carbon.push(box(0.09 * h, 0.01, 0.034 * h, x, f.hoodTop + 0.004, f.hoodZ + (0.07 - k * 0.032) * h, -0.55))
-      // The vent opening the slats sit in, set into the hood so it follows a curved one.
-      p.carbon.push(box(0.1 * h, 0.03, 0.17 * h, x, f.hoodTop - 0.0125, f.hoodZ + 0.006 * h))
+      for (let k = 0; k < 5; k++) p.carbon.push(box(0.09 * h, 0.01, 0.034 * h, x, f.hoodTop, f.hoodZ + (0.07 - k * 0.032) * h, -0.55))
     }
   },
   twinturbo: (f, p) => {
@@ -457,17 +486,22 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
   // Lights.
   foglamps: (f, p) => {
     for (const sd of [-1, 1]) {
-      const x = sd * f.bodyW * 0.37
+      // Set in and back on noses that curve away at the corners.
+      const tuck = TUCK_FOG.includes(f.body)
+      const x = sd * f.bodyW * (tuck ? 0.3 : 0.37)
       const y = f.lift + 0.075
-      p.carbon.push(pipe(0.03, 0.05, x, y, f.front + 0.012))
-      p.lamp.push(lens(0.023, x, y, f.front + 0.0405))
+      const z = f.front + (tuck ? -0.006 : 0.012)
+      p.carbon.push(pipe(0.03, 0.05, x, y, z))
+      p.lamp.push(lens(0.023, x, y, z + 0.0285))
     }
   },
   roofbar: (f, p) => {
     // A bar of six spot lamps across the front of the roof, on two feet.
     const z = f.roofZ + f.roofLen * 0.32
     const y = f.roof + 0.036
-    for (const sd of [-1, 1]) p.carbon.push(box(0.03, 0.04, 0.03, sd * f.roofW * 0.32, f.roof + 0.004, z))
+    // The feet reach down to a roof that curves away at the sides.
+    const drop = ROOF_DROP[f.body] ?? 0
+    for (const sd of [-1, 1]) p.carbon.push(box(0.03, 0.04 + drop, 0.03, sd * f.roofW * (drop ? 0.22 : 0.32), f.roof + 0.004 - drop / 2, z))
     p.carbon.push(box(f.roofW * 0.86, 0.034, 0.04, 0, y, z))
     for (let i = 0; i < 6; i++) {
       const x = (i - 2.5) * f.roofW * 0.14
@@ -478,9 +512,9 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
   underglow: (f, p) => {
     // Neon tubes round the underside (the light they throw on the road is drawn on its own).
     // Tall enough to reach up into a body whose floor sits a little higher.
-    const y = f.lift + 0.003
-    for (const sd of [-1, 1]) p.neon.push(box(0.012, 0.034, f.len * 0.62, sd * (f.side - 0.04), y, 0))
-    for (const zz of [f.len * 0.33, -f.len * 0.33]) p.neon.push(box(f.bodyW * 0.62, 0.034, 0.012, 0, y, zz))
+    const y = f.lift - 0.003
+    for (const sd of [-1, 1]) p.neon.push(box(0.012, 0.022, f.len * 0.62, sd * (f.side - 0.04), y, 0))
+    for (const zz of [f.len * 0.33, -f.len * 0.33]) p.neon.push(box(f.bodyW * 0.62, 0.022, 0.012, 0, y, zz))
   },
 
   // School bus specials.
@@ -494,7 +528,7 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
     }
     for (const z of [-0.45, -0.15, 0.15, 0.45]) p.chrome.push(box(f.bodyW * 0.72, 0.015, 0.015, 0, f.deck + 0.045, z0 + z * L))
     // A floor across the slats, so every bag stands on something.
-    p.carbon.push(box(f.bodyW * 0.72, 0.01, L * 0.92, 0, f.deck + 0.0525, z0))
+    p.carbon.push(box(f.bodyW * 0.7, 0.014, L * 0.86, 0, f.deck + 0.0505, z0))
     const bags: [number, number, number, number, number, number, Kind][] = [
       [0.2, 0.1, 0.16, -0.12, -0.3, 0.2, 'paint'],
       [0.16, 0.14, 0.12, 0.13, -0.32, -0.1, 'carbon'],
@@ -536,7 +570,7 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
       for (const [y, dz] of [[f.lift * 0.5 + 0.005, 0], [f.lift + 0.1, 0.06]]) p.paint.push(box(len, 0.022, 0.025, sd * f.bodyW * 0.24, y, tip - 0.075 - dz, 0, sd * a))
     }
     // Bolted to the bus by a beam across the bumper.
-    p.carbon.push(box(f.bodyW * 0.96, 0.04, 0.03, 0, f.lift + 0.1, f.front + 0.01))
+    p.carbon.push(box(f.bodyW * 0.96, 0.04, 0.03, 0, f.lift + 0.1, f.front + 0.004))
   },
   disco: (f, p) => {
     // Mirror ball spinning on a pole over the front of the roof.
