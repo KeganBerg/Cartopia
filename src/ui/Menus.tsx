@@ -263,8 +263,16 @@ export function SheetTabs<T extends string>({ items, value, onChange }: { items:
       ro?.disconnect()
     }
   }, [items.length])
+  // Bring the picked tab into view by scrolling only the row: scrollIntoView would also
+  // scroll the page while a menu slides in, pushing its header off the top.
   useEffect(() => {
-    row.current?.querySelector<HTMLElement>('.sel')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+    const el = row.current
+    const sel = el?.querySelector<HTMLElement>('.sel')
+    if (!el || !sel) return
+    const r = el.getBoundingClientRect()
+    const t = sel.getBoundingClientRect()
+    if (t.left < r.left) el.scrollLeft -= r.left - t.left
+    else if (t.right > r.right) el.scrollLeft += t.right - r.right
   }, [value])
   return (
     <div ref={row} className="sheet-tabs" role="tablist">
