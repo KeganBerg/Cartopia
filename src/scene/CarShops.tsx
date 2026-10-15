@@ -793,7 +793,7 @@ function RaceFab({ k }: { k: K }) {
       {/* The race car out of its bay, on the apron. */}
       {!ghost && <Car at={[-1.35, 0.05, 0.12]} rot={0} body="formula" color={red} stripe="#fafafa" />}
       {/* Tyre stacks and a tool chest by the bays. */}
-      {!ghost && [[-0.45, 0.0], [-0.2, 0.1], [-0.45, 0.28]].map(([x, z], i) => <Tyres key={i} m={m} at={[x, 0.05, z]} n={4} band={i % 2 ? '#fafafa' : red} />)}
+      {!ghost && [[-0.45, -0.05], [-0.2, 0.08], [0.02, -0.02]].map(([x, z], i) => <Tyres key={i} m={m} at={[x, 0.05, z]} n={4} band={i % 2 ? '#fafafa' : red} />)}
       {!ghost && (
         <group position={[0.35, 0.05, -0.05]} userData={PEOPLE_SIZED}>
           <Box m={m} at={[0, 0.22, 0]} s={[0.4, 0.44, 0.22]} c={red} />
@@ -848,14 +848,16 @@ function RaceFab({ k }: { k: K }) {
       {!ghost && <Lamp m={m} bulb={bulb} ghost={ghost} at={[0.75, 0, 0.55]} arm={-Math.PI / 2} />}
       {!ghost && <Pool r={1.0} x={-0.9} z={0.1} />}
       {/* Level 4: a second car on stands; level 7: the HQ tower and team flags on the pit wall. */}
-      {st >= 2 && !ghost && <Car at={[-0.45, 0.05, 1.0]} rot={Math.PI / 2} body="prototype" color="#fafafa" stripe={red} />}
+      {st >= 2 && !ghost && <Car at={[-0.52, 0.05, 0.82]} rot={Math.PI / 2} body="prototype" color="#fafafa" stripe={red} />}
       {st === 3 && (
         <group position={[0.35, top, z0 - 0.15]}>
           <Box m={m} at={[0, tower / 2, 0]} s={[1.1, tower, 1.1]} c="#212121" />
           {[0.25, 0.6].map((y) => (
             <group key={y}>
-              <mesh position={[0, y, 0.556]}><planeGeometry args={[1.0, 0.24]} />{win}</mesh>
-              <mesh position={[0.556, y, 0]} rotation-y={Math.PI / 2}><planeGeometry args={[1.0, 0.24]} />{win}</mesh>
+              {/* Window bands on all four faces, so it isn't a blank slab from behind. */}
+              {[0, 1, 2, 3].map((i) => (
+                <mesh key={i} position={[Math.sin((i * Math.PI) / 2) * 0.556, y, Math.cos((i * Math.PI) / 2) * 0.556]} rotation-y={(i * Math.PI) / 2}><planeGeometry args={[1.0, 0.24]} />{win}</mesh>
+              ))}
             </group>
           ))}
           <Box m={m} at={[0, tower + 0.04, 0]} s={[1.18, 0.08, 1.18]} c={red} />
