@@ -119,10 +119,9 @@ function rollBarnCar(): JunkCar {
   return { uid: `j${Date.now()}${Math.floor(Math.random() * 1e6)}`, model: c.model, rarity: c.rarity }
 }
 
-const roomForBarn = () => {
-  const s = useGame.getState()
-  return s.buildings.some((b) => b.def === 'rescue') && s.junkyard.length < STORAGE_MAX
-}
+// Rusty's free-car tips are off (Kegan 2026-10-15: no Free car pill). The server only
+// sends one when asked (p_barn), so never asking switches them off.
+const roomForBarn = () => false
 
 // Is the town in a state to have a visitor turn up? Not while visiting a friend, building, or
 // still in the tutorial; and only with a few roads to drive on.
