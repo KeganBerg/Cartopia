@@ -369,6 +369,34 @@ export function freshGeo(body: Body, fit: Partial<Record<ModSlot, string>>, mode
   return isBike(body) ? bikeGeo(body as BikeBody, fit, model) : carGeo(body, fit, model)
 }
 
+// How high a vehicle (with its mods) reaches within `reach` either side of its middle, front to
+// back, in its own units: what a part shown turning over the car has to clear, seen from the
+// front. A tall whip off to one side doesn't count.
+export function carTop(body: Body, model: string | undefined, mods: string[] | null | undefined, reach: number) {
+  const fit = fittedMods(mods, body)
+  const g = isBike(body) ? bikeGeo(body as BikeBody, fit, model) : carGeo(body, fit, model)
+  const m = modGeo(body, modIds(fit))
+  let top = 0
+  for (const geo of [...Object.values(g.parts), ...Object.values(m)]) {
+    const pos = geo?.getAttribute('position')
+    if (!pos) continue
+    // By triangle, so a long bar whose corners all lie outside the reach still counts.
+    const idx = geo!.index
+    const n = idx ? idx.count : pos.count
+    for (let i = 0; i < n; i += 3) {
+      let x0 = Infinity, x1 = -Infinity, y = -Infinity
+      for (let j = i; j < i + 3; j++) {
+        const v = idx ? idx.getX(j) : j
+        x0 = Math.min(x0, pos.getX(v))
+        x1 = Math.max(x1, pos.getX(v))
+        y = Math.max(y, pos.getY(v))
+      }
+      if (y > top && x0 < reach && x1 > -reach) top = y
+    }
+  }
+  return top
+}
+
 // Open-wheel racer: needle nose, sidepods, airbox, halo, front and rear wings, wheels on arms.
 function formulaGeo(key: string, fit: Partial<Record<ModSlot, string>>): CarGeo {
   const s = SHAPES.formula
@@ -554,7 +582,12 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
   for (const z of [wz, -wz]) for (const sd of [-1, 1]) {
     k.add('black', new CircleGeometry(s.wheel * 1.18, 18, 0, Math.PI), [sd * (s.wid / 2 + 0.0045), s.wheel, z], [0, (sd * Math.PI) / 2, 0])
     // Rugged bodies get chunky black fender flares round the arches.
-    if (RUGGED.includes(body) && !fit.kit) k.add('black', new TorusGeometry(s.wheel * 1.2, 0.03, 5, 14, Math.PI), [sd * (s.wid / 2 + 0.01), s.wheel, z], [0, (sd * Math.PI) / 2, 0], [1, 1, 1.6])
+    // The open buggy's are slimmer and stop short of the axle line, so they read as flares on its
+    // tub rather than mudguards hanging down past the tyres.
+    if (RUGGED.includes(body) && !fit.kit) {
+      if (body === 'offroad') k.add('black', new TorusGeometry(s.wheel * 1.2, 0.022, 5, 14, Math.PI * 0.8), [sd * (s.wid / 2 + 0.01), s.wheel, z], [0, (sd * Math.PI) / 2, Math.PI * 0.1], [1, 1, 1.4])
+      else k.add('black', new TorusGeometry(s.wheel * 1.2, 0.03, 5, 14, Math.PI), [sd * (s.wid / 2 + 0.01), s.wheel, z], [0, (sd * Math.PI) / 2, 0], [1, 1, 1.6])
+    }
   }
 
   if (s.round) {

@@ -10,7 +10,7 @@ import { liveTraffic, crossingSignal } from './traffic/live'
 import { useThought, placeChip } from '../game/thoughts'
 import { SEASON } from './season'
 import { SHIRTS, PANTS, SKIN, HAIR, BEANIES } from './people'
-import { dogGeo, headGeo, leashGeo, legGeo, torsoGeo } from './peopleGeo'
+import { dogGeo, headGeo, leashGeo, legGeo, torsoGeo, PERSON } from './peopleGeo'
 import { dayPhase, nightAmount } from './dayNight'
 import { isNight } from '../game/clock'
 import { CLUB } from './clubLayout'
@@ -31,9 +31,9 @@ const SMALL = typeof window !== 'undefined' && Math.min(window.innerWidth, windo
 const MAX_PEOPLE = SMALL ? 20 : 44
 // Extra residents as the town levels up: one more for every two levels.
 const extraPeople = (level: number) => Math.min(10, Math.floor(level / 2))
-const LEG = 0.24
+const LEG = PERSON.leg
 // Figures are modelled at race-crowd proportions and drawn a little bigger so they read from the town camera.
-const SCALE = 1.3
+const SCALE = PERSON.scale
 const TORSO = torsoGeo()
 const HEAD = headGeo()
 const LEGS = legGeo(LEG)

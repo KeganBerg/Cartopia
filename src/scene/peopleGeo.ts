@@ -77,3 +77,9 @@ export function dogGeo(scale: number) {
 export function leashGeo() {
   return new BoxGeometry(0.009, 0.009, 1).translate(0, 0, 0.5)
 }
+
+// Townspeople proportions, shared by every figure that should match them:
+// parts are placed from the hip up, in model units, and drawn `scale` bigger.
+export const PERSON = { scale: 1.3, leg: 0.24, torso: 0.15, head: 0.36, hair: 0.385 }
+// A standing townsperson's height in world units, feet to the top of the hair.
+export const PERSON_H = (PERSON.leg + PERSON.hair + 0.085 * 0.8) * PERSON.scale

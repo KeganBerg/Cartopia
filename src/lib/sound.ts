@@ -167,8 +167,21 @@ export function onMuteChange(l: () => void) {
   return () => listeners.delete(l)
 }
 
+// Sounds that a slider, a burst of chat messages or a run of taps could fire
+// many times over: once per `ms` at most.
+const lastPlayed = new Map<string, number>()
+function throttled(key: string, ms: number) {
+  const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
+  if (now - (lastPlayed.get(key) ?? -Infinity) < ms) return true
+  lastPlayed.set(key, now)
+  return false
+}
+
 // Each effect is played on a little instrument (see instruments.ts) rather than a raw beep.
 function play(f: (d: { ctx: BaseAudioContext; out: AudioNode }, t: number) => void, delay = 0) {
+  // Before the player's first tap the context can't run yet, and anything queued
+  // (a menu opening on load, a gift arriving) would burst out on that first tap.
+  if (typeof navigator !== 'undefined' && navigator.userActivation?.hasBeenActive === false) return
   const a = audio()
   if (!a || !effects) return
   f({ ctx: a, out: effects }, a.currentTime + 0.005 + delay)
@@ -296,6 +309,24 @@ export const sfx = {
     if (k > 2) shaker(d, t + 0.08, 0.025, 0.06 * k, 6500)
   }),
   start: () => play(arp(['G4', 'D5'], 0.08, marimba, 0.12)),
+  // The lightning button: a woodblock tap per repair, a marimba lift for jobs
+  // restarted, then the coin cascade for what it collected, all on one chord.
+  sweep: (collected: number, started: number, fixed: number) => play((d, t) => {
+    let at = t
+    for (let i = 0; i < Math.min(3, fixed); i++, at += 0.07) woodblock(d, at, 900 + i * 220, 0.08)
+    if (started) {
+      const lift = ['C5', 'E5', 'G5']
+      lift.forEach((n, i) => marimba(d, at + i * 0.06, hz(n), 0.1, 0.4))
+      at += 0.16
+    }
+    if (collected) {
+      const k = Math.max(1, Math.min(6, collected))
+      coinChime(d, at, 1)
+      const run = ['G6', 'B6', 'D7', 'E7', 'G7']
+      for (let i = 1; i < k; i++) glock(d, at + 0.1 + i * 0.055, hz(run[i - 1]), 0.035, 0.5)
+      if (k > 2) shaker(d, at + 0.08, 0.025, 0.06 * k, 6500)
+    } else glock(d, at + 0.04, hz('C6'), 0.06, 0.8)
+  }),
   // Another player wants to race: two quick start-light pips, then a bright
   // rising call. Short and friendly, so it reads as an invite, not an alarm.
   challenge: () => play((d, t) => {
@@ -304,6 +335,60 @@ export const sfx = {
     arp(['D5', 'A5'], 0.07, pluck, 0.18)(d, t + 0.28)
     glock(d, t + 0.35, hz('D7'), 0.055, 1)
     vibes(d, t + 0.35, hz('F#5'), 0.07, 1.2)
+  }),
+  // A menu sliding open or shut: one soft wooden tock, up to open and down to close.
+  menuOpen: () => !throttled('menu', 120) && play((d, t) => {
+    marimba(d, t, hz('G4'), 0.05, 0.25)
+    marimba(d, t + 0.045, hz('D5'), 0.06, 0.3)
+  }),
+  menuClose: () => !throttled('menu', 120) && play((d, t) => {
+    marimba(d, t, hz('D5'), 0.045, 0.25)
+    marimba(d, t + 0.045, hz('G4'), 0.05, 0.3)
+  }),
+  // Switching tabs inside a menu: the lightest tick.
+  tab: () => !throttled('tab', 60) && play((d, t) => woodblock(d, t, 1500, 0.06)),
+  // Putting something on: a hat, a trail, a colour theme, the race car.
+  equip: () => !throttled('equip', 150) && play((d, t) => {
+    marimba(d, t, hz('E5'), 0.09, 0.4)
+    marimba(d, t + 0.06, hz('B5'), 0.08, 0.45)
+    glock(d, t + 0.06, hz('E7'), 0.025, 0.6)
+    shaker(d, t + 0.06, 0.012, 0.05, 8000)
+  }),
+  // Something arrived for you (a gift, a friend request, a postcard): a warm doorbell.
+  notify: () => !throttled('notify', 1500) && play((d, t) => {
+    vibes(d, t, hz('E5'), 0.1, 1.4)
+    vibes(d, t + 0.16, hz('A5'), 0.1, 1.8)
+    glock(d, t + 0.16, hz('A6'), 0.04, 1.2)
+  }),
+  // A new chat message: a single soft pluck with a sparkle, at most every few seconds.
+  message: () => !throttled('message', 4000) && play((d, t) => {
+    pluck(d, t, hz('B5'), 0.12)
+    glock(d, t + 0.05, hz('F#6'), 0.04, 0.7)
+  }),
+  // Sending something (a chat line, a postcard, a gift, a part): a quick upward flick.
+  send: () => !throttled('send', 150) && play((d, t) => {
+    pluck(d, t, hz('A4'), 0.08)
+    pluck(d, t + 0.05, hz('E5'), 0.08)
+    shaker(d, t + 0.02, 0.014, 0.08, 6000)
+  }),
+  // A small win that isn't coins: parts from the crew, a friendship level, the season recap.
+  reward: () => !throttled('reward', 300) && play((d, t) => {
+    for (const n of ['C5', 'E5', 'G5']) marimba(d, t, hz(n), 0.07, 0.6)
+    glock(d, t + 0.09, hz('C7'), 0.045, 1.2)
+    glock(d, t + 0.16, hz('G6'), 0.035, 1)
+  }),
+  // Something new opened up (a feature, a title): a rising sparkle with a breath of choir.
+  unlock: () => !throttled('unlock', 600) && play((d, t) => {
+    for (const [i, n] of ['C6', 'E6', 'G6', 'C7'].entries()) glock(d, t + i * 0.07, hz(n), 0.045, 1.1)
+    marimba(d, t, hz('C5'), 0.07, 0.5)
+    vibes(d, t + 0.21, hz('E5'), 0.06, 1.6)
+    choir(d, t + 0.05, [hz('C5'), hz('G5')], 0.014, 1.2)
+  }),
+  // A tutorial step done: a short two-note nod.
+  step: () => play((d, t) => {
+    marimba(d, t, hz('C5'), 0.08, 0.35)
+    marimba(d, t + 0.08, hz('G5'), 0.08, 0.5)
+    glock(d, t + 0.08, hz('G6'), 0.025, 0.6)
   }),
   // A gentle "uh-uh": low enough to read as no, an octave up so phones play it.
   error: () => play((d, t) => {
@@ -550,4 +635,12 @@ export function onStopEngine(f: () => void) {
 }
 export function stopEngine() {
   engineStop?.()
+}
+
+// Every tab row in the game ticks when you switch to another tab.
+if (typeof window !== 'undefined') {
+  window.addEventListener('click', (e) => {
+    const tab = e.target instanceof Element ? e.target.closest('[role="tab"]') : null
+    if (tab && tab.getAttribute('aria-selected') !== 'true' && !tab.hasAttribute('disabled')) sfx.tab()
+  }, true)
 }

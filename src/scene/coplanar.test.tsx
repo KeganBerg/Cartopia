@@ -2,7 +2,7 @@
 import './testCanvas'
 import { beforeAll, describe, expect, it } from 'vitest'
 import ReactThreeTestRenderer from '@react-three/test-renderer'
-import { Box3, BoxGeometry, CircleGeometry, CylinderGeometry, Matrix3, Mesh, Object3D, PlaneGeometry, Vector3, type Material } from 'three'
+import { Box3, BoxGeometry, CircleGeometry, CylinderGeometry, ExtrudeGeometry, Matrix3, Mesh, Object3D, PlaneGeometry, ShapeGeometry, Triangle, Vector3, type Material } from 'three'
 import { BUILDINGS, TILE } from '../game/data'
 import { mergeable } from '../game/merge'
 import { BuildingModel } from './BuildingModel'
@@ -99,6 +99,25 @@ function faces(o: Object3D): Face[] {
     // Cap ends: the top one faces +axis (in its own frame).
     if (radiusTop > 0.001) add(d[0], d[1], true)
     if (radiusBottom > 0.001) add(d[0], (-d[1]) as 1 | -1, true)
+  } else if (g instanceof ExtrudeGeometry || g instanceof ShapeGeometry) {
+    // Shapes drawn from an outline (a half-pipe, a ramp): every flat triangle
+    // squared up with the world is a face, as big as the triangle's own box.
+    const pos = g.getAttribute('position')
+    const idx = g.index
+    const n = idx ? idx.count : pos.count
+    const tri = new Triangle()
+    const nrm = new Vector3()
+    const p = [new Vector3(), new Vector3(), new Vector3()]
+    for (let t = 0; t + 2 < n; t += 3) {
+      for (let k = 0; k < 3; k++) p[k].fromBufferAttribute(pos, idx ? idx.getX(t + k) : t + k).applyMatrix4(o.matrixWorld)
+      tri.set(p[0], p[1], p[2])
+      if (tri.getArea() < 1e-6) continue
+      const d = along(tri.getNormal(nrm))
+      if (!d) continue
+      const [u, v] = [0, 1, 2].filter((k) => k !== d[0]) as [number, number]
+      const c = p.map((q) => q.toArray())
+      out.push({ axis: d[0], sign: d[1], at: c[0][d[0]], lo: [Math.min(...c.map((q) => q[u])), Math.min(...c.map((q) => q[v]))], hi: [Math.max(...c.map((q) => q[u])), Math.max(...c.map((q) => q[v]))], who, off, mesh: o, look, glass })
+    }
   }
   return out
 }
