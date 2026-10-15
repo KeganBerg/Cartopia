@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { Vector3, type Group, type Mesh, type PerspectiveCamera } from 'three'
 import { useGame } from '../game/store'
 import {
-  buildingDef, buildingLevel, upgradable, upgradePayout, upgradeXp, upgradeJobSeconds, upgradeFuelCap,
+  buildingDef, buildingLevel, upgradable, upgradePayout, jobXp, upgradeJobSeconds, upgradeFuelCap,
   buildingUpgradeCost, maxLevel, themable, decorGrows, TOURIST_PER_LEVEL, VISITORS, houseResidents, levelName, buildingUpgradeXp, BUILDINGS, CARS, takesDriver, loves, driverPayout, mergedParts, mergedFuelExtra, mergeBonus, mergeGain, carDef, type BuildingDef,
 } from '../game/data'
 import { workingDriver, type PlacedBuilding } from '../game/store'
@@ -195,7 +195,7 @@ export function UpgradePanel() {
     rows.push({ label: driver ? 'Coins per job (with driver)' : 'Coins per job', now: `$${n(sum((o) => driverPayout(d, lvl, workingDriver(s, o), boost)))}`, next: `$${n(sum((o) => driverPayout(d, next, workingDriver(s, o), boost)))}` })
     if (d.partsPayout) rows.push({ label: 'Parts per job', now: `⚙ ${mergedParts(d, lvl, boost) * k}`, next: `⚙ ${mergedParts(d, next, boost) * k}` })
     rows.push({ label: 'Job time', now: time(upgradeJobSeconds(d, lvl)), next: time(upgradeJobSeconds(d, next)) })
-    rows.push({ label: 'XP per job', now: `${upgradeXp(d, lvl) * k}`, next: `${upgradeXp(d, next) * k}` })
+    rows.push({ label: 'XP per job', now: `${jobXp(d, lvl, s.level) * k}`, next: `${jobXp(d, next, s.level) * k}` })
   }
   // Grown decor draws more tourists (see touristWeight in data.ts).
   if (decorGrows(d)) rows.push({ label: '📸 Tourists', now: `+${tourPct(lvl) * k}%`, next: `+${tourPct(next) * k}%` })

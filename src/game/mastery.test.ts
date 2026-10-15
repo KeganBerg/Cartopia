@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useGame } from './store'
 import { boostsSpent } from './boosts'
-import { CARS, PAINTS, PATTERNS } from './data'
+import { CARS, PAINTS, PATTERNS, xpToNext } from './data'
 import { CAR_CLASSES, carsInClass, classOf, classesOf, inClass } from './classes'
 import { CLASS_GOLD, MASTERY_TIERS, carClassTier, classTier, firstPaint, galaxy, masteryMode, noteRace, tierReached, type Mastery } from './mastery'
 import { MYSTERY_EVERY, ROAD_POOL, ROAD_STEP, ROAD_STOPS, roadClaim, roadPay, roadReached } from './trophyRoad'
@@ -73,7 +73,7 @@ describe('mastery', () => {
     useGame.setState({ bucks: 0, trophies: 0, mastery: {}, masteryPrize: null })
     for (let i = 0; i < 10; i++) g().masteryRace('pip', false, 'drag', false)
     expect(g().bucks).toBe(MASTERY_TIERS[0].bucks)
-    expect(g().masteryPrize).toEqual({ model: 'pip', tier: 1, classes: [], galaxy: false, first: [] })
+    expect(g().masteryPrize).toEqual({ model: 'pip', tier: 1, classes: [], galaxy: false, first: [], xp: Math.round(0.02 * xpToNext(g().level)) })
     g().masteryRace('pip', false, 'drag', false)
     expect(g().bucks).toBe(MASTERY_TIERS[0].bucks)
     expect(g().mastery?.pip.races).toBe(11)
