@@ -14,7 +14,7 @@ import { ClubLife } from './ClubLife'
 import { CLUB } from './clubLayout'
 import { ledFront, ledWindow } from './clubLeds'
 import { WavingFlag } from './WavingFlag'
-import { MeshBasicMaterial, MeshStandardMaterial, Color } from 'three'
+import { MeshBasicMaterial, MeshStandardMaterial, Color, Euler, Quaternion, Vector3 } from 'three'
 import { PAL, SEASON } from './season'
 import { LAYER, decal } from './layers'
 import { Bulbs as EdgeBulbs } from './edgeKit'
@@ -58,6 +58,18 @@ export function Cyl({ m, at, r, r2 = r, h, c, seg = 12, rot }: { m: Mat; at: V3;
     </mesh>
   )
 }
+
+// The pumpkin patch's carved pumpkin: radius, and its eyes laid on the squashed sphere's skin
+// (a point and the rotation that faces it along the surface normal, in units of the radius).
+const BIG = 0.38
+const PATCH_EYES = [-1, 1].map((sd): [V3, Euler] => {
+  const x = sd * 0.31
+  const y = 0.17
+  const z = Math.sqrt(1 - x * x - (y / 0.72) ** 2)
+  const n = new Vector3(x, y / 0.5184, z).normalize()
+  const p: V3 = [x + n.x * 0.012, y + n.y * 0.012, z + n.z * 0.012]
+  return [p, new Euler().setFromQuaternion(new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), n))]
+})
 
 export function Sign({ text, w, at, bg, fg }: { text: string; w: number; at: V3; bg: string; fg: string }) {
   return (
@@ -1085,7 +1097,8 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
 
     // ---- Spooky Season decorations ----
     case 'pumpkins': {
-      const pumpkins: [number, number, number][] = [[-0.45, -0.35, 0.34], [0.4, -0.45, 0.26], [0.5, 0.35, 0.3], [-0.5, 0.45, 0.22], [0.02, 0.05, 0.42]]
+      // Set apart so none sinks into its neighbour; the big carved one in the middle.
+      const pumpkins: [number, number, number][] = [[-0.52, -0.45, 0.32], [0.35, -0.55, 0.22], [0.55, 0.45, 0.28], [-0.5, 0.5, 0.22], [0, 0.05, BIG]]
       return (
         <group>
           <Box m={m} at={[0, 0.03, 0]} s={[1.75, 0.06, 1.75]} c="#5d4037" shadow={false} />
@@ -1099,12 +1112,14 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
               <Cyl m={m} at={[0, r * 0.78, 0]} r={r * 0.12} r2={r * 0.16} h={r * 0.4} c="#33691e" seg={5} />
             </group>
           ))}
-          {/* The big one is carved: its face glows after dark. */}
-          <group position={[0.02, 0.42 * 0.72, 0.05 + 0.4]}>
-            {[-0.13, 0.13].map((x) => (
-              <mesh key={x} position={[x, 0.07, 0.004]} rotation-z={Math.PI}><circleGeometry args={[0.07, 3]} />{bulb}</mesh>
+          {/* The big one is carved: its face, laid on the skin, glows after dark. */}
+          <group position={[0, BIG * 0.72, 0.05]}>
+            {PATCH_EYES.map(([p, e], i) => (
+              <group key={i} position={[p[0] * BIG, p[1] * BIG, p[2] * BIG]} rotation={e}>
+                <mesh rotation-z={Math.PI}><circleGeometry args={[BIG * 0.17, 3]} />{bulb}</mesh>
+              </group>
             ))}
-            <mesh position={[0, -0.09, 0.004]} scale={[1, 0.45, 1]}><circleGeometry args={[0.17, 7, Math.PI, Math.PI]} />{bulb}</mesh>
+            <mesh scale={[1, 0.72, 1]}><sphereGeometry args={[BIG * 1.012, 10, 3, Math.PI / 2 - 0.45, 0.9, 1.78, 0.28]} />{bulb}</mesh>
           </group>
           {trim && <Box m={m} at={[0.75, 0.2, -0.75]} s={[0.36, 0.26, 0.26]} c="#e0c068" />}
         </group>
