@@ -31,11 +31,12 @@ float skFbm(vec2 p) {
 }
 vec3 skHue(float h) { return clamp(abs(mod(h * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0); }
 
-// Which axis skPlane looks down: 0 x, 1 y, 2 z, set by skinBlend for each pass.
-int skAx = 2;
 // A face's own 2D coordinates: the object-space point seen down the face's main axis.
+// One projection per pixel: blending two (to soften the seam on curved panels) ran the
+// whole skin twice, doubling its compile and paint cost, and phones lost the 3D view in races.
 vec2 skPlane(vec3 q, vec3 n) {
-  return skAx == 0 ? q.zy : skAx == 1 ? q.xz : q.xy;
+  vec3 a = abs(n);
+  return a.x > a.y && a.x > a.z ? q.zy : a.y > a.z ? q.xz : q.xy;
 }
 // Where the view ray reaches depth d under the paint, in the face's coordinates.
 vec2 skAt(vec3 p, vec3 n, vec3 v, float d) { return skPlane(p + v * (d / max(-dot(v, n), 0.3)), n); }
@@ -832,33 +833,6 @@ void skinShade(int id, vec3 p, vec3 n, vec3 v, float t, inout vec3 col, inout ve
   }
 }
 
-// skinShade on a box mapping that never shows a hard seam: where a curved panel turns from
-// facing one axis to another (a rounded nose, a fender's shoulder), the two projections
-// cross-fade instead of cutting. Only pixels on that turn pay for the second pass.
-void skinBlend(int id, vec3 p, vec3 n, vec3 v, float t, inout vec3 col, inout vec3 glow, inout float rough) {
-  vec3 a = abs(n);
-  int i1 = a.x > a.y && a.x > a.z ? 0 : a.y > a.z ? 1 : 2;
-  float m1 = i1 == 0 ? a.x : i1 == 1 ? a.y : a.z;
-  int i2 = i1 == 0 ? (a.y > a.z ? 1 : 2) : i1 == 1 ? (a.x > a.z ? 0 : 2) : (a.x > a.y ? 0 : 1);
-  float m2 = i2 == 0 ? a.x : i2 == 1 ? a.y : a.z;
-  float w = 0.5 * smoothstep(0.22, 0.0, m1 - m2);
-  vec3 c1 = col, g1 = glow;
-  float r1 = rough;
-  skAx = i1;
-  skinShade(id, p, n, v, t, c1, g1, r1);
-  if (w > 0.004) {
-    vec3 c2 = col, g2 = glow;
-    float r2 = rough;
-    skAx = i2;
-    skinShade(id, p, n, v, t, c2, g2, r2);
-    c1 = mix(c1, c2, w);
-    g1 = mix(g1, g2, w);
-    r1 = mix(r1, r2, w);
-  }
-  col = c1;
-  glow = g1;
-  rough = r1;
-}
 `
 
 // The point, normal and view direction in the car's own space, for skinShade.
@@ -898,7 +872,7 @@ export function withSkin(sh: WebGLProgramParametersWithUniforms, id: string, att
       int skId = ${id};
       if (skId > 0) {
         vec3 skCol = diffuseColor.rgb;
-        skinBlend(skId, vSkP, normalize(vSkN) * (gl_FrontFacing ? 1.0 : -1.0), normalize(vSkV), uSkinT, skCol, skGlow, roughnessFactor);
+        skinShade(skId, vSkP, normalize(vSkN) * (gl_FrontFacing ? 1.0 : -1.0), normalize(vSkV), uSkinT, skCol, skGlow, roughnessFactor);
         diffuseColor.rgb = skCol;
       }
     }
