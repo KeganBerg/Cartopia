@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createHmac } from 'node:crypto'
-import { BUCKS_PACKS } from '../game/bucksPacks'
+import { BUCKS_PACKS, packGrant } from '../game/bucksPacks'
 import { cents, packById, paidSession, reversedPayment, sessionForm, validSignature } from './stripeCheckout'
 import { useGame } from '../game/store'
 
@@ -20,6 +20,21 @@ describe('stripe checkout', () => {
     expect(taxed.has('managed_payments[enabled]')).toBe(false)
     expect(packById('free-gems')).toBeNull()
     for (const p of BUCKS_PACKS) expect(Number.isInteger(cents(p))).toBe(true)
+    expect(f.get('metadata[level]')).toBe('1')
+    expect(sessionForm(bag, 'u1', 'https://cartopia.lol', undefined, 23).get('metadata[level]')).toBe('23')
+  })
+
+  it("grows a pack's coins and parts with the buyer's level, never its gems", () => {
+    const vault = packById('vault')!
+    expect(packGrant(vault, 1)).toEqual({ bucks: 260, coins: 10000, parts: 40 })
+    expect(packGrant(vault, 20)).toEqual({ bucks: 260, coins: 57500, parts: 115 })
+    expect(packGrant(vault, 'junk')).toEqual(packGrant(vault, 1))
+    expect(packGrant(packById('handful')!, 30)).toEqual({ bucks: 20, coins: 0, parts: 0 })
+    // Shop numbers end in 5 or 0 at every level.
+    for (const p of BUCKS_PACKS) for (const l of [1, 3, 7, 20, 33, 60]) for (const n of Object.values(packGrant(p, l))) expect(n % 5).toBe(0)
+    // Every bigger pack gives more gems per dollar.
+    const rate = BUCKS_PACKS.map((p) => packGrant(p, 1).bucks / p.price)
+    for (let i = 1; i < rate.length; i++) expect(rate[i]).toBeGreaterThan(rate[i - 1])
   })
 
   it('accepts a fresh, correctly signed body only', async () => {
@@ -35,7 +50,8 @@ describe('stripe checkout', () => {
 
   it('grants only paid sessions at the pack price', () => {
     const ev = (o: Record<string, unknown>) => ({ type: 'checkout.session.completed', data: { object: { id: 'cs_1', payment_status: 'paid', currency: 'usd', amount_total: 999, metadata: { user: 'u1', pack: 'bag' }, ...o } } })
-    expect(paidSession(ev({}))).toMatchObject({ session: 'cs_1', user: 'u1', amount: 999 })
+    expect(paidSession(ev({}))).toMatchObject({ session: 'cs_1', user: 'u1', amount: 999, level: 1 })
+    expect(paidSession(ev({ metadata: { user: 'u1', pack: 'bag', level: '31' } }))?.level).toBe(31)
     expect(paidSession(ev({ payment_status: 'unpaid' }))).toBeNull()
     expect(paidSession(ev({ amount_total: 199 }))).toBeNull()
     expect(paidSession(ev({ metadata: { user: 'u1', pack: 'nope' } }))).toBeNull()

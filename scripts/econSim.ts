@@ -9,8 +9,9 @@
 // goals that need them are claimed on a timer as a stand-in.
 import {
   BUILDINGS, GOALS, CARS, DAILY_BONUS, QUEST_PAY, payAt, xpToNext, baseFuelCap, buildingUpgradeCost, upgradePayout, upgradeXp,
-  upgradeJobSeconds, upgradeFuelCap, BUCKS_PACKS, refillBucks, upgradePartsPayout, buildingUpgradeXp, MAX_BUILDING_LEVEL, type BuildingDef,
+  upgradeJobSeconds, upgradeFuelCap, refillBucks, upgradePartsPayout, buildingUpgradeXp, MAX_BUILDING_LEVEL, type BuildingDef,
 } from '../src/game/data'
+import { BUCKS_PACKS, packGrant } from '../src/game/bucksPacks'
 
 const CHECK = Number(process.env.CHECK ?? 60)
 const AWAKE = Number(process.env.AWAKE ?? 12)
@@ -21,8 +22,8 @@ type B = { d: BuildingDef; level: number; endsAt: number | null; pay: number; xp
 let coins = 2500, xp = 0, level = 1, fuel = 25, parts = 10, bucks = 10
 // SPEND20=1: the player buys the $19.99 Vault of Bucks on day one and spends every buck on refills.
 const SPEND20 = !!process.env.SPEND20
-const vault = BUCKS_PACKS.find((p) => p.id === 'vault')!
-if (SPEND20) { bucks += vault.bucks + vault.bonus; coins += vault.coins ?? 0; parts += vault.parts ?? 0 }
+const vault = packGrant(BUCKS_PACKS.find((p) => p.id === 'vault')!, 1)
+if (SPEND20) { bucks += vault.bucks; coins += vault.coins; parts += vault.parts }
 let earned = 0, jobs = 0, built = 0, upgrades = 0
 const town: B[] = []
 const claimed = new Set<string>()

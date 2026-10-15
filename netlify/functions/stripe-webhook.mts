@@ -11,6 +11,7 @@
 // checkout.session.completed, checkout.session.async_payment_succeeded, charge.refunded and
 // charge.dispute.created.
 import { paidSession, reversedPayment, validSignature } from '../../src/lib/stripeCheckout'
+import { packGrant } from '../../src/game/bucksPacks'
 
 export default async (req: Request) => {
   const secret = process.env.STRIPE_WEBHOOK_SECRET
@@ -54,10 +55,11 @@ export default async (req: Request) => {
   // Other events, unpaid sessions and price mismatches are acknowledged and ignored.
   if (!paid) return new Response('ignored')
 
-  const p = paid.pack
+  // Paid at the level checkout stamped on the session, so it matches what the shop showed.
+  const g = packGrant(paid.pack, paid.level)
   const res = await rpc('purchase_record', {
-    p_session: paid.session, p_user: paid.user, p_pack: p.id, p_cents: paid.amount,
-    p_bucks: p.bucks + p.bonus, p_coins: p.coins ?? 0, p_parts: p.parts ?? 0,
+    p_session: paid.session, p_user: paid.user, p_pack: paid.pack.id, p_cents: paid.amount,
+    p_bucks: g.bucks, p_coins: g.coins, p_parts: g.parts,
   })
   return res.ok ? new Response('ok') : retry('purchase_record', res)
 }
