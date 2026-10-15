@@ -296,6 +296,15 @@ export const sfx = {
     if (k > 2) shaker(d, t + 0.08, 0.025, 0.06 * k, 6500)
   }),
   start: () => play(arp(['G4', 'D5'], 0.08, marimba, 0.12)),
+  // Another player wants to race: two quick start-light pips, then a bright
+  // rising call. Short and friendly, so it reads as an invite, not an alarm.
+  challenge: () => play((d, t) => {
+    glock(d, t, hz('A5'), 0.07, 0.25)
+    glock(d, t + 0.13, hz('A5'), 0.07, 0.25)
+    arp(['D5', 'A5'], 0.07, pluck, 0.18)(d, t + 0.28)
+    glock(d, t + 0.35, hz('D7'), 0.055, 1)
+    vibes(d, t + 0.35, hz('F#5'), 0.07, 1.2)
+  }),
   // A gentle "uh-uh": low enough to read as no, an octave up so phones play it.
   error: () => play((d, t) => {
     marimba(d, t, hz('E4'), 0.1, 0.3)
