@@ -6,6 +6,9 @@ import { SEASON } from '../scene/season'
 import './loading.css'
 import type React from 'react'
 
+// Tall screens get the town's centre crop (town.mjs), the same pick as the splash.
+const townCrop = () => (innerWidth < innerHeight * 0.7 ? '-p' : '')
+
 // Loading states drawn like the link-preview cards and the reload splash
 // (scripts/splash/build.mjs), from the same renders in public/splash/: the
 // player's own race car in their paint, the town in the real season and time
@@ -100,7 +103,7 @@ export function LoadingScene({ ready, label, max = 6000, onReady, onClose }: { r
     // Taps on the cover don't reach the game underneath (swipes, tap to skip).
     <div ref={el} className={`load-scene ${tod}${done ? ' out' : ''}`} role="status" aria-live="polite"
       onPointerDown={stop} onPointerUp={stop} onClick={stop}>
-      <div className="ls-town" style={{ backgroundImage: `url(/splash/town-${SEASON}-${tod}.webp)` }} />
+      <div className="ls-town" style={{ backgroundImage: `url(/splash/town-${SEASON}-${tod}${townCrop()}.webp)` }} />
       <div className="ls-sun" />
       <div className="ls-car"><PaintedCar kind="hero" model={model} color={color} /></div>
       <span className="ls-pill"><span className="lb-tire" />{label}…</span>

@@ -28,6 +28,9 @@ function price(m: ModDef, coins = m.coins) {
   return `$${coins.toLocaleString()}${m.parts ? ` + ${m.parts}⚙` : ''}`
 }
 
+// Cheapest first, coin parts before gem parts, so each card along the row is a step up.
+const byPrice = (a: ModDef, b: ModDef) => Math.sign(a.bucks) - Math.sign(b.bucks) || a.bucks - b.bucks || a.coins - b.coins
+
 // The slot the next Mods tab opens on (a daily deal sends you to its part's slot).
 let nextModSlot: ModSlot = 'spoiler'
 export function openModSlot(slot: ModSlot) {
@@ -73,7 +76,7 @@ export function ModShop({ car, trying, setTrying, skinTry, setSkinTry }: {
       </div>
       <p className="mod-hint">{info.stat}</p>
       <div className="mod-list">
-        {MODS.filter((m) => m.slot === slot && modFits(m, def.body)).map((m) => {
+        {MODS.filter((m) => m.slot === slot && modFits(m, def.body)).sort(byPrice).map((m) => {
           const fitted = fit[slot] === m.id
           const have = owned.includes(m.id)
           const locked = !have && level < m.unlockLevel

@@ -40,6 +40,24 @@ export const GROWTH: Record<string, [string, string]> = {
   parts: ['Parts Center', 'Parts Superstore'],
   bodyshop: ['Paint Center', 'Custom Paint Studio'],
   rescue: ["Rusty's Recovery Yard", "Rusty's Restoration Works"],
+  // Third wave.
+  muffler: ['Exhaust Center', 'Exhaust Works'],
+  brakes: ['Brake Center', 'Brake & Align Works'],
+  wraps: ['Wrap Studio', 'Custom Wrap Works'],
+  dynolab: ['Dyno Center', 'Performance Lab'],
+  engines: ['Engine Center', 'Engine Factory'],
+  racefab: ['Race Fab Works', 'Race Team HQ'],
+  laundry: ['Laundry Block', 'Laundry Tower'],
+  vet: ['Animal Clinic', 'Animal Hospital'],
+  postoffice: ['Mail Center', 'Sorting Hub'],
+  library: ['Library & Archive', 'Grand Library'],
+  busdepot: ['Transit Center', 'Grand Terminal'],
+  cityhall: ['Civic Center', 'Capitol Hall'],
+  minigolf: ['Mini Golf Plaza', 'Adventure Golf'],
+  pool: ['Aquatic Center', 'Olympic Pool'],
+  funfair: ['Fairground', 'Amusement Park'],
+  waterpark: ['Slide Park', 'Mega Water Park'],
+  haunted: ['Haunted Mansion', 'Haunted Castle'],
 }
 
 export const grows = (id: string) => id in GROWTH

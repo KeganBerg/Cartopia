@@ -1,0 +1,52 @@
+/* My Cars as a garage you stand in: the Showroom fills the whole menu and the menu floats over it,
+   like the garage screen of a racing game. Wide screens: car list on the left, the car's
+   upgrades and paint on the right, the car in the open middle. Phones: the car fills the top and
+   the details are a sheet below that scrolls up over the room. The car is framed in .garage-hole. */
+.garage-env { --gl: 260px; --gd: 400px; --env-bg: #0f141d; --glass: rgba(242, 246, 251, .9); }
+.overlay:has(> .panel.garage-env) { padding: 0; place-items: stretch; }
+.panel.wide.garage-env { width: 100%; height: 100%; max-height: none; border: 0; border-radius: 0; background: var(--env-bg); box-shadow: none; }
+.garage-env > .panel-body { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+
+/* Category tabs as a dark strip over the room. */
+.garage-env .sheet-tabs { position: relative; top: 0; z-index: 3; margin: 0; padding: 8px 14px; background: rgba(15, 20, 29, .72); border-bottom: 0; }
+.garage-env .sheet-tabs button:not(.sel) { background: rgba(255, 255, 255, .88); }
+
+.garage-env .garage { position: static; flex: 1; min-height: 0; display: grid; grid-template-columns: var(--gl) 1fr var(--gd); grid-template-rows: minmax(0, 1fr); gap: 12px; padding: 12px; pointer-events: none; }
+.garage-env .garage > * { pointer-events: auto; }
+
+/* The room, behind everything (the tabs included). */
+.garage-env .garage-scene { position: absolute; inset: 0; z-index: 0; }
+.garage-env .garage-scene .car-preview { position: absolute; inset: 0; height: 100%; margin: 0; border-radius: 0; background: var(--env-bg); }
+.garage-env .garage-scene .cp-tools { top: 12px; right: calc(var(--gd) + 24px); }
+.garage-env .garage-scene .cp-hint { left: calc(var(--gl) + (100% - var(--gl) - var(--gd)) / 2); bottom: 16px; font-size: 13px; padding: 4px 12px; }
+
+/* The open middle: drags pass through to the room, the PI badge and the dyno sit on it. */
+.garage-env .garage-hole { grid-column: 2; grid-row: 1; position: relative; z-index: 1; pointer-events: none; min-width: 0; }
+.garage-env .garage-hole > * { pointer-events: auto; }
+.garage-env .garage-hole > .car-pi { top: 0; left: 0; pointer-events: none; }
+.garage-env .garage-hole > .paint-sweep { border-radius: 16px; }
+
+.garage-env .garage-list, .garage-env .garage-detail { position: relative; z-index: 1; min-height: 0; max-height: none; overflow: auto; background: var(--glass); border: 0; border-radius: 16px; box-shadow: 0 6px 18px rgba(0, 0, 0, .35); }
+.garage-env .garage-list { grid-column: 1; grid-row: 1; padding: 8px; }
+.garage-env .garage-detail { grid-column: 3; grid-row: 1; padding: 12px; }
+.garage-env .garage-detail .garage-name { margin-top: 0; }
+
+@media (min-width: 601px) and (max-width: 980px) {
+  .garage-env { --gl: 210px; --gd: 340px; }
+}
+
+@media (max-width: 600px) {
+  .garage-env { --hole: 40dvh; }
+  /* The room only fills the top: the sheet below covers the rest, and a full-screen canvas there would draw for nothing. */
+  .garage-env .garage { display: block; overflow-y: auto; overscroll-behavior: contain; padding: 0; }
+  .garage-env .garage-scene { bottom: auto; height: calc(var(--hole) + 70px); }
+  .garage-env .garage-scene .cp-tools { right: 10px; top: 58px; }
+  .garage-env .garage-scene .cp-hint { left: 50%; bottom: 30px; }
+  .garage-env .garage-hole { height: var(--hole); margin: 0 10px; }
+  .garage-env .garage-hole > .car-pi { top: 10px; left: 0; }
+  .garage-env .garage-list, .garage-env .garage-detail { overflow: visible; border-radius: 20px 20px 0 0; margin-top: 0; }
+  .garage-env .garage-list { display: none; }
+  .garage-env .garage.picking .garage-list { display: grid; max-height: none; overflow: visible; border-radius: 20px 20px 0 0; }
+  .garage-env .garage.picking .garage-detail { border-radius: 0; }
+  .garage-env .garage-detail { min-height: 60dvh; padding-bottom: calc(16px + var(--sab)); background: var(--sheet); box-shadow: 0 -6px 18px rgba(0, 0, 0, .35); }
+}

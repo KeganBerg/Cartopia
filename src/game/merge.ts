@@ -36,7 +36,7 @@ const lot = (b: PlacedBuilding): [number, number] => {
 // no sense as one bigger thing, so they never merge. Only these area-like
 // ones do: parks and beds, which just grow into a bigger patch. A new decor
 // stays unmergeable unless it's added here.
-const MERGING_DECOR = new Set(['flowers', 'pumpkins', 'pond', 'playground', 'dogpark', 'skatepark', 'koi', 'garden'])
+const MERGING_DECOR = new Set(['flowers', 'pumpkins', 'pond', 'playground', 'dogpark', 'skatepark', 'koi', 'garden', 'tennis', 'cornmaze'])
 
 export function mergeable(def: string) {
   const d = buildingDef(def)

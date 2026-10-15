@@ -5,7 +5,9 @@ import { PAL } from './season'
 import { CarModel } from './CarModel'
 import { decal, LAYER } from './layers'
 import { manholeTex } from './textures'
+import { fallingWater, waterKinds } from './liveWater'
 import { Upright, useMergeScale } from './mergeScale'
+import { ARC, ARC0, DECK, TERRACE, TRACK } from './speedwayLayout'
 
 // Small dressing that makes buildings and props read as lived-in: trims,
 // pipes, bins, curbs and so on. Everything here is static and reuses the
@@ -78,58 +80,52 @@ export function ShopDetail({ W, D, h, F, roof, rows, cols, awning, mullions }: {
   )
 }
 
-// The Speedway's seating: three stepped tiers inside the stand wall, the
-// lowest nearest the track. Each runs from the track up its riser and out
-// along its tread to the next riser (the top one to the wall), so every tier
-// stands on the track and meets the next.
-const TIER_R = [1.7, 1.775, 1.845, 1.95]
-const TIER_A0 = Math.PI * 0.15, TIER_ARC = Math.PI * 1.1
-export const speedwayTiers = (sh: number) => [0.3, 0.55, 0.8].map((y, i) => ({ r0: TIER_R[i], r1: TIER_R[i + 1], h: (y * sh) / 0.9 + 0.03 }))
-
-export function SpeedwayStands({ sh, colors }: { sh: number; colors: ReactNode[] }) {
-  const tiers = useMemo(() => speedwayTiers(sh).map(({ r0, r1, h }) => [new Vector2(r0, 0.06), new Vector2(r0, h), new Vector2(r1, h)]), [sh])
+// The Speedway's seating: two stepped terraces inside the glass wall, low
+// enough to see the race over and through. The front one is a standing rail
+// at the track's edge, the back one a raised row of seats out to the wall
+// (fans in SpeedwayLife.tsx). From level 9 an upper deck hangs off the wall.
+export function SpeedwayStands({ colors, deck }: { colors: ReactNode[]; deck: boolean }) {
+  const tiers = useMemo(() => {
+    const { front, back, edge } = TERRACE
+    return [
+      [new Vector2(TRACK.outer, 0.06), new Vector2(TRACK.outer, front.y), new Vector2(edge, front.y)],
+      [new Vector2(edge, front.y), new Vector2(edge, back.y), new Vector2(1.95, back.y)],
+    ]
+  }, [])
+  const slab = useMemo(() => [new Vector2(DECK.r0, DECK.y - DECK.t / 2), new Vector2(1.95, DECK.y - DECK.t / 2), new Vector2(1.95, DECK.y + DECK.t / 2), new Vector2(DECK.r0, DECK.y + DECK.t / 2), new Vector2(DECK.r0, DECK.y - DECK.t / 2)], [])
   return (
     <group>
       {tiers.map((pts, i) => (
         <mesh key={i} castShadow receiveShadow>
-          <latheGeometry args={[pts, 40, TIER_A0, TIER_ARC]} />
+          <latheGeometry args={[pts, 40, ARC0, ARC]} />
           {colors[i]}
         </mesh>
       ))}
+      {deck && (
+        <mesh castShadow receiveShadow>
+          <latheGeometry args={[slab, 40, ARC0, ARC]} />
+          {colors[2]}
+        </mesh>
+      )}
     </group>
   )
 }
 
-// Speedway: red and white curbs round the infield, a crowd in the stands and a
-// timing tower by the start line.
-export function SpeedwayDetail({ sh, roof }: { sh: number; roof: string }) {
+// Speedway: red and white curbs round the infield and a timing tower by the
+// start line, out past the track in the open side of the stands.
+export function SpeedwayDetail({ roof }: { roof: string }) {
   const kerbs = Array.from({ length: 28 }, (_, i) => (i / 28) * Math.PI * 2)
-  const crowd: { p: V3; k: number }[] = []
-  // A fan in every seat along each tier's tread.
-  speedwayTiers(sh).forEach(({ r0, r1, h }, row) => {
-    for (let i = 0; i < 26; i++) {
-      const a = Math.PI * 0.17 + (Math.PI * 1.06 * (i + (row % 2) * 0.5)) / 26
-      const r = row === 2 ? r0 + 0.04 : (r0 + r1) / 2
-      crowd.push({ p: [Math.sin(a) * r, h + 0.04, Math.cos(a) * r], k: (i * 7 + row * 3) % 4 })
-    }
-  })
-  const shirts = ['#ef5350', '#fafafa', '#42a5f5', '#ffca28']
+  const tower = Math.PI * 1.9
   return (
     <group>
       {kerbs.map((a, i) => (
-        <mesh key={i} position={[Math.sin(a) * 1.22, 0.095, Math.cos(a) * 1.22]} rotation-y={a}>
-          <boxGeometry args={[0.24, 0.03, 0.06]} />
+        <mesh key={i} position={[Math.sin(a) * (TRACK.inner + 0.02), 0.095, Math.cos(a) * (TRACK.inner + 0.02)]} rotation-y={a}>
+          <boxGeometry args={[0.22, 0.03, 0.06]} />
           {c(i % 2 ? '#fafafa' : '#ef5350')}
         </mesh>
       ))}
-      {crowd.map(({ p, k }, i) => (
-        <mesh key={i} position={p}>
-          <boxGeometry args={[0.06, 0.08, 0.06]} />
-          {c(shirts[k])}
-        </mesh>
-      ))}
-      {/* Timing tower in the open corner, its cab glazed all round. */}
-      <group position={[-1.55, 0, 0.75]}>
+      {/* Timing tower, its cab glazed all round. */}
+      <group position={[Math.sin(tower) * 1.85, 0, Math.cos(tower) * 1.85]} rotation-y={tower}>
         <Box p={[0, 0.5, 0]} s={[0.28, 1, 0.28]} cast>{c('#eceff1')}</Box>
         <Box p={[0, 1.12, 0]} s={[0.4, 0.24, 0.4]} cast>{c('#37474f')}</Box>
         {[0, 1, 2, 3].map((i) => (
@@ -309,14 +305,13 @@ export function FountainDetail({ stone }: { stone: string }) {
   return (
     <group>
       <mesh position={[0, 0.92, 0]} castShadow><cylinderGeometry args={[0.38, 0.2, 0.12, 20]} />{c(stone)}</mesh>
-      <mesh position={[0, 0.985, 0]}><cylinderGeometry args={[0.32, 0.32, 0.02, 20]} />{c('#b3e5fc')}</mesh>
+      <mesh position={[0, 0.985, 0]} material={waterKinds().bowl}><cylinderGeometry args={[0.32, 0.32, 0.02, 24]} /></mesh>
       {/* Water spilling over the bowl's rim in arcs down to the pool. */}
       {Array.from({ length: 8 }, (_, i) => (
         <group key={i} rotation-y={(i / 8) * Math.PI * 2}>
           {SPILL.map(([z0, y0, z1, y1], j) => (
-            <mesh key={j} position={[0, (y0 + y1) / 2, (z0 + z1) / 2]} rotation-x={Math.atan2(z0 - z1, y0 - y1)}>
+            <mesh key={j} position={[0, (y0 + y1) / 2, (z0 + z1) / 2]} rotation-x={Math.atan2(z0 - z1, y0 - y1)} material={fallingWater()}>
               <cylinderGeometry args={[0.022 - j * 0.004, 0.026 - j * 0.004, Math.hypot(z1 - z0, y1 - y0) + 0.02, 6]} />
-              {c('#b3e5fc')}
             </mesh>
           ))}
         </group>

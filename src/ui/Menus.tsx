@@ -36,7 +36,9 @@ import { buildingIcon } from './buildingIcons'
 import { useTipTarget, type TipTarget } from './Tips'
 import { setFreeCam, useFreeCam } from '../scene/freeCam'
 import { Confirm, useAsk } from './Confirm'
+import { AutoJobsButton } from './AutoJobs'
 import { useUnlock, freshClass } from '../game/unlocks'
+import './garage-env.css'
 
 // The dyno run and its engine sound load the first time an upgrade shows on the dyno.
 const DynoOverlay = onDemand(() => import('./Dyno'), (m) => m.DynoOverlay)
@@ -263,8 +265,16 @@ export function SheetTabs<T extends string>({ items, value, onChange }: { items:
       ro?.disconnect()
     }
   }, [items.length])
+  // Bring the picked tab into view by scrolling only the row: scrollIntoView would also
+  // scroll the page while a menu slides in, pushing its header off the top.
   useEffect(() => {
-    row.current?.querySelector<HTMLElement>('.sel')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+    const el = row.current
+    const sel = el?.querySelector<HTMLElement>('.sel')
+    if (!el || !sel) return
+    const r = el.getBoundingClientRect()
+    const t = sel.getBoundingClientRect()
+    if (t.left < r.left) el.scrollLeft -= r.left - t.left
+    else if (t.right > r.right) el.scrollLeft += t.right - r.right
   }, [value])
   return (
     <div ref={row} className="sheet-tabs" role="tablist">
@@ -276,13 +286,15 @@ export function SheetTabs<T extends string>({ items, value, onChange }: { items:
   )
 }
 
+// Businesses that work on cars sit with the car shops.
+const CAR_CARE = new Set(['carwash', 'bodyshop'])
 type ShopTab = 'cars' | 'business' | 'services' | 'rec' | 'event' | 'upgrades'
 const SHOP_GROUPS: { id: Exclude<ShopTab, 'upgrades'>; label: React.ReactNode; filter: (b: BuildingDef) => boolean }[] = [
-  { id: 'cars', label: '🔧 Car shops', filter: (b) => b.id === 'rescue' || b.kind === 'parts' },
-  { id: 'business', label: '🍕 Businesses', filter: (b) => b.kind === 'business' && b.id !== 'rescue' && b.id !== 'crew' && !b.service },
+  { id: 'cars', label: '🔧 Car shops', filter: (b) => b.id === 'rescue' || b.kind === 'parts' || CAR_CARE.has(b.id) },
+  { id: 'business', label: '🍕 Businesses', filter: (b) => b.kind === 'business' && b.id !== 'rescue' && b.id !== 'crew' && !b.service && !b.rec && !b.event && !CAR_CARE.has(b.id) },
   // Homes sit with the gas stations: both keep the town fuelled.
   { id: 'services', label: '⛽ Services', filter: (b) => b.kind === 'gas' || b.kind === 'house' || b.id === 'crew' || !!b.service },
-  { id: 'rec', label: <>🎡 Rec<span className="tab-long">reation</span></>, filter: (b) => b.kind === 'decor' && !b.event },
+  { id: 'rec', label: <>🎡 Rec<span className="tab-long">reation</span></>, filter: (b) => (b.kind === 'decor' || !!b.rec) && !b.event },
   // Limited-time decorations for the running event (the tab only shows while it runs).
   { id: 'event', label: '🎃 Spooky', filter: (b) => !!b.event && b.event === activeEvent()?.id },
 ]
@@ -345,7 +357,7 @@ export function ShopPanel() {
     // Ready to build first, then short of money, then locked by level, built last.
     const rank = owned ? 3 : locked ? 2 : broke ? 1 : 0
     return { b, locked, sale, brokeGems, broke, owned, rank }
-  }).sort((x, y) => (y.rank < 2 ? featureRank(y.b) : 0) - (x.rank < 2 ? featureRank(x.b) : 0) || x.rank - y.rank || (x.rank === 2 ? x.b.unlockLevel - y.b.unlockLevel : 0))
+  }).sort((x, y) => (y.rank < 2 ? featureRank(y.b) : 0) - (x.rank < 2 ? featureRank(x.b) : 0) || x.rank - y.rank || x.b.unlockLevel - y.b.unlockLevel || x.b.price - y.b.price)
   return (
     <Panel title="Shop" wide>
       <SheetTabs items={tabs} value={tab} onChange={(t) => { setFind(''); setTab(t) }} />
@@ -438,7 +450,7 @@ const SALE_SORTS: { id: SaleSort; label: string }[] = [
 ]
 // The For Sale tab reopens with the filter and order it was left on.
 let saleView: { kind: string; sort: SaleSort } = { kind: 'all', sort: 'level' }
-const FOR_SALE = CARS.filter((c) => !c.rescueOnly && !c.season && !c.secret)
+const FOR_SALE = CARS.filter((c) => !c.rescueOnly && !c.season && !c.secret && !c.pack)
 
 export function ShowroomPanel() {
   const level = useGame((s) => s.level)
@@ -722,6 +734,7 @@ export function GaragePanel() {
   const tryMod = trying && trying.car === car?.uid && tab === 'mods' ? trying.mod : null
   const [inspect, setInspect] = useState(false)
   const [picking, setPicking] = useState(false)
+  const hole = useRef<HTMLDivElement>(null)
   // Arrows step through the filtered, sorted stacks, landing on each one's top-PI copy.
   const pos = stacks.findIndex((s) => s.copies.some((r) => r.c.uid === car?.uid))
   const copies = pos < 0 ? [] : stacks[pos].copies
@@ -769,9 +782,30 @@ export function GaragePanel() {
     setDyno((d) => ({ id: Date.now(), car: car.uid, model: car.model, mods: car.mods, before: d && d.car === car.uid ? d.before : was.pi, after: pi }))
   }, [car?.uid, pi])
   return (
-    <Panel title="Cars" wide head={<span className="cars-power" title="Garage power">⚡{garagePower(cars)}</span>}>
+    <Panel title="Cars" wide className="garage-env" head={<><span className="cars-power" title="Garage power">⚡{garagePower(cars)}</span><AutoJobsButton /></>}>
       <CarsTabs current="garage" />
       <div className={picking ? 'garage picking' : 'garage'}>
+        {/* The car stands in the Showroom, which fills the whole menu; the list and the car's
+            details float over it, and this hole is the part of the room the car is framed in. */}
+        {car && def && look && (
+          <div className="garage-scene">
+            {inspect ? null : (
+              <CarPreview {...look} onExpand={() => setInspect(true)} dyno={dyno ? feed : null} frameIn={hole} />
+            )}
+          </div>
+        )}
+        <div className="garage-hole" ref={hole} onClickCapture={() => { tapped.current = Date.now() }}>
+          {car && def && look && !inspect && (
+            <>
+              {dyno && <DynoOverlay key={dyno.id} run={dyno} feed={feed} onDone={() => setDyno(null)} />}
+              {tab === 'paint' && <div className="paint-sweep" key={`${look.color}|${look.finish}|${look.stripe}|${look.skin ?? ''}`} aria-hidden />}
+              {tab === 'custom' && <div className="paint-sweep" key={JSON.stringify(look.panels ?? {})} aria-hidden />}
+              {tab === 'trim' && <div className="paint-sweep" key={JSON.stringify(look.trim ?? {})} aria-hidden />}
+              {!dyno && <div className="car-pi" title="Performance Index"><b>{pi}</b><small>PI</small></div>}
+            </>
+          )}
+        </div>
+        {inspect && car && def && <CarInspect title={def.name} {...look!} onClose={() => setInspect(false)} />}
         <div className="garage-list">
           <div className="garage-filter">
             <label className="gf-pick">
@@ -820,26 +854,10 @@ export function GaragePanel() {
               </button>
               <button aria-label="Next car" onClick={() => step(1)} disabled={stacks.length < (pos < 0 ? 1 : 2)}>›</button>
             </div>
-            {inspect ? (
-              <>
-                <div className="car-preview" />
-                <CarInspect title={def.name} {...look!} onClose={() => setInspect(false)} />
-              </>
-            ) : (
-              <div className="preview-wrap">
-                <CarPreview {...look!} onExpand={() => setInspect(true)} dyno={dyno ? feed : null}>
-                  {dyno && <DynoOverlay key={dyno.id} run={dyno} feed={feed} onDone={() => setDyno(null)} />}
-                </CarPreview>
-                {tab === 'paint' && <div className="paint-sweep" key={`${look!.color}|${look!.finish}|${look!.stripe}|${look!.skin ?? ''}`} aria-hidden />}
-                {tab === 'custom' && <div className="paint-sweep" key={JSON.stringify(look!.panels ?? {})} aria-hidden />}
-                {tab === 'trim' && <div className="paint-sweep" key={JSON.stringify(look!.trim ?? {})} aria-hidden />}
-              </div>
-            )}
             {copies.length > 1 && <CopyBubbles copies={copies} selected={car.uid} onPick={select} />}
             <h3 className="garage-name">{def.name}{car.plate && <span className="mini-plate">{car.plate}</span>}</h3>
-            {/* Under the preview: the PI tile, then the car's traits, then its two toggles. */}
+            {/* Under the preview (PI sits on the preview itself): the car's traits, then its two toggles. */}
             <div className="car-sum">
-              <div className="car-pi" title="Performance Index"><b>{pi}</b><small>PI</small></div>
               <div className="car-traits">
                 <SkillTag model={car.model} />
                 <DriverRow car={car.uid} model={car.model} />

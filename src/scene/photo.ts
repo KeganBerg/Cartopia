@@ -4,7 +4,9 @@
 // bg: the background colour (null: the usual light gradient behind the canvas). beams: the
 // headlights shine on the floor. key/fill: the main light's colour and strength, and the sky light's.
 export type Backdrop = { id: string; name: string; icon: string; bg: string | null; floor: string; key: [string, number]; fill: [string, string, number]; beams?: boolean }
+// The Showroom (scene/Showroom.tsx) is the room every car preview stands in; it brings its own lights.
 export const BACKDROPS: Backdrop[] = [
+  { id: 'showroom', name: 'Showroom', icon: '🏁', bg: '#0f141d', floor: '#59626e', key: ['#ffffff', 1.45], fill: ['#dfe8ff', '#262c36', 0.85] },
   { id: 'studio', name: 'Studio', icon: '💡', bg: null, floor: '#cfd8dc', key: ['#ffffff', 1.4], fill: ['#ffffff', '#90a4ae', 1] },
   { id: 'sunset', name: 'Sunset', icon: '🌅', bg: '#f08a5d', floor: '#b8664a', key: ['#ffb070', 1.6], fill: ['#ffd1a8', '#5a3a4a', 0.8] },
   { id: 'night', name: 'Night', icon: '🌙', bg: '#0b1430', floor: '#1c2740', key: ['#9fb7ff', 0.7], fill: ['#5d7bd6', '#0b1430', 0.45], beams: true },
