@@ -9,6 +9,7 @@ import { UsernameRow } from './Username'
 import { AccountData, Group, GuestData, HelpTab, LegalView, SettingsTab } from './Settings'
 import { LEGAL, type LegalDoc } from '../legal/legal'
 import { CityLook } from './CityLook'
+import { useIsAdmin } from '../lib/admin'
 
 type MenuTab = 'town' | 'settings' | 'account' | 'help'
 const MENU_TABS = [{ id: 'town', label: '🏠 Town' }, { id: 'settings', label: '⚙️ Settings' }, { id: 'account', label: '👤 Account' }, { id: 'help', label: '❓ Help' }] as const
@@ -30,6 +31,7 @@ export function AccountPanel() {
   const [password, setPassword] = useState('')
   const [msg, setMsg] = useState('')
   const [tab, setTab] = useState<MenuTab>(lastTab)
+  const isAdmin = useIsAdmin()
   const [legal, setLegal] = useState<LegalDoc['id'] | null>(() => {
     const id = pendingLegal
     pendingLegal = null
@@ -69,6 +71,7 @@ export function AccountPanel() {
     <Panel title="Menu">
       <SheetTabs items={MENU_TABS} value={tab} onChange={(t) => { lastTab = t; setTab(t) }} />
       {tab === 'town' && <>
+      {isAdmin && <button className="buy adm-menu-btn" title="Admin: live events, players, chat" onClick={() => openPanel('admin')}>🛡 Admin</button>}
       <button className="buy bank-menu-btn" onClick={() => openPanel('bank')}>🏦 Bank · get gems</button>
       <h3 className="cl-head">🏙️ Town name</h3>
       <div className="row tn-row">
