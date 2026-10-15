@@ -3,6 +3,8 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { PerspectiveCamera, Vector3, type Group, type Mesh } from 'three'
 import type { Body, BuildingDef, Finish, SkinnedSlot, Panels } from '../game/data'
 import { BuildingModel } from './BuildingModel'
+import { Tint } from './CityTint'
+import type { ColorTheme } from '../game/cityLook'
 import { Grounded } from './ServiceVehicles'
 import { CarModel } from './CarModel'
 import { HatModel } from './CarHat'
@@ -36,8 +38,12 @@ type Item = { key: string; model: () => ReactNode; view?: SceneView }
 // the picture (0 = middle, 0.5 = half way to the top), clear of text drawn over the bottom.
 export type SceneView = { dir: [number, number, number]; at: [number, number, number]; halfW: number; halfH: number; rise?: number; fov?: number }
 
-function buildingItem(def: BuildingDef, level?: number): Item {
-  return { key: `b|${def.id}|${level ?? 1}|${SEASON}`, model: () => <Grounded.Provider value><BuildingModel def={def} level={level} /></Grounded.Provider> }
+// `theme`: the colour theme the building wears in town, so the thumb matches it.
+function buildingItem(def: BuildingDef, level?: number, theme?: ColorTheme | null): Item {
+  return {
+    key: `b|${def.id}|${level ?? 1}|${SEASON}|${theme?.id ?? ''}`,
+    model: () => <Grounded.Provider value><Tint theme={theme ?? null}><BuildingModel def={def} level={level} /></Tint></Grounded.Provider>,
+  }
 }
 
 type CarLook = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; panels?: Panels | null; stripe?: string | null; rusty?: boolean; mods?: string[] | null; trim?: Trim | null; hat?: HatFit | null }
@@ -335,8 +341,8 @@ function Thumb({ item, size, className }: { item: Item; size?: Size; className?:
 }
 
 // A building or decoration floating and turning, exactly as it looks in town.
-export function BuildingThumb({ def, level }: { def: BuildingDef; level?: number }) {
-  return <Thumb item={buildingItem(def, level)} />
+export function BuildingThumb({ def, level, theme }: { def: BuildingDef; level?: number; theme?: ColorTheme | null }) {
+  return <Thumb item={buildingItem(def, level, theme)} />
 }
 
 // Scaled up to about a car's size, so it floats and frames like the other thumbs.
