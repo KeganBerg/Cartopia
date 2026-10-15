@@ -1349,7 +1349,7 @@ function LeanCar({ parts, looks, casters, mods, modPaint, highlight, wheels, rad
     const groups: [string[], number][] = [[plain, 0], ...skinned.map(([id, n]): [string[], number] => [[id], n])]
     for (const [ids, skin] of groups) {
       if (!ids.length) continue
-      const m = modGeo(mods.body, ids)
+      const m = modGeo(mods.body, ids, mods.ids)
       // Body-colour parts with no mod skin wear the body's skin (modPaint.skin).
       if (m.paint) shade.push([m.paint, { ...modPaint, skin: skin || modPaint.skin || 0 }])
       if (m.carbon) shade.push([m.carbon, { ...finishOf(carbon), skin }])
