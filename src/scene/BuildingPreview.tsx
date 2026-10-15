@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { SharedShapes } from './sharedShapes'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { PerspectiveCamera, Vector3, type Group, type Mesh } from 'three'
 import type { Body, BuildingDef, Finish, SkinnedSlot, Panels } from '../game/data'
@@ -315,6 +316,7 @@ export function ThumbRenderer() {
         gl.domElement.addEventListener('webglcontextrestored', () => clearTimeout(t))
       }}
     >
+      <SharedShapes />
       <Renderer />
     </Canvas>
   )
