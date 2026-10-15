@@ -28,6 +28,16 @@ export const GROWTH: Record<string, [string, string]> = {
   hospital: ['Medical Center', 'Medical Tower'],
   hq: ['HQ Campus', 'Twin Towers'],
   glasstower: ['Sky Garden Tower', 'Twisting Supertall'],
+  // Homes grow in their own style (the plain House and Trailer keep theirs in data.ts).
+  cottage: ['Garden Cottage', 'Cottage Lane'],
+  bungalow: ['Craftsman Bungalow', 'Bungalow Court'],
+  townhouse: ['Row Houses', 'Brownstone Tower'],
+  cabin: ['Timber Lodge', 'Mountain Lodge'],
+  duplex: ['Modern Fourplex', 'Modern Lofts'],
+  victorian: ['Grand Victorian', 'Victorian Terrace'],
+  condos: ['Lakeview Residences', 'Lakeview Towers'],
+  villa: ['Villa Estate', 'Grand Villa'],
+  mansion: ['Goldcrest Estate', 'Goldcrest Palace'],
   // Grand forms for places that wouldn't make sense as towers.
   tacos: ['Taqueria', 'Cantina'],
   firehouse: ['Fire Station & Drill Tower', 'Fire HQ'],
