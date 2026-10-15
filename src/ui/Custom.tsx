@@ -39,7 +39,7 @@ function PartIcon({ part, color, body }: { part: PanelId; color: string; body: s
 }
 
 // A pattern drawn small in a colour, close to how the paint shader draws it.
-function PatternSwatch({ id, color }: { id: string | null; color: string }) {
+export function PatternSwatch({ id, color }: { id: string | null; color: string }) {
   const dk = shade(color, -0.45)
   const dd = shade(color, -0.74)
   const lt = shade(color, 0.4)
