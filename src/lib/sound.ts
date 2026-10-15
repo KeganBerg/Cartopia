@@ -296,6 +296,24 @@ export const sfx = {
     if (k > 2) shaker(d, t + 0.08, 0.025, 0.06 * k, 6500)
   }),
   start: () => play(arp(['G4', 'D5'], 0.08, marimba, 0.12)),
+  // The lightning button: a woodblock tap per repair, a marimba lift for jobs
+  // restarted, then the coin cascade for what it collected, all on one chord.
+  sweep: (collected: number, started: number, fixed: number) => play((d, t) => {
+    let at = t
+    for (let i = 0; i < Math.min(3, fixed); i++, at += 0.07) woodblock(d, at, 900 + i * 220, 0.08)
+    if (started) {
+      const lift = ['C5', 'E5', 'G5']
+      lift.forEach((n, i) => marimba(d, at + i * 0.06, hz(n), 0.1, 0.4))
+      at += 0.16
+    }
+    if (collected) {
+      const k = Math.max(1, Math.min(6, collected))
+      coinChime(d, at, 1)
+      const run = ['G6', 'B6', 'D7', 'E7', 'G7']
+      for (let i = 1; i < k; i++) glock(d, at + 0.1 + i * 0.055, hz(run[i - 1]), 0.035, 0.5)
+      if (k > 2) shaker(d, at + 0.08, 0.025, 0.06 * k, 6500)
+    } else glock(d, at + 0.04, hz('C6'), 0.06, 0.8)
+  }),
   // Another player wants to race: two quick start-light pips, then a bright
   // rising call. Short and friendly, so it reads as an invite, not an alarm.
   challenge: () => play((d, t) => {
