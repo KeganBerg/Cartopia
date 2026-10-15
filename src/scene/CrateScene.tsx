@@ -24,6 +24,7 @@ import { crateOpenSound } from '../lib/crateOpenSfx'
 import { crateSfx, sfx } from '../lib/sound'
 import { landClink } from '../lib/crateClinks'
 import { PartPrize } from './PartPrize'
+import { pinPrograms, warmShaders } from './warm'
 
 // The Crate Depot: a warehouse loading bay at night where crates are opened. The crate sits on a
 // hazard-striped lift under a work lamp, racking full of stock either side, a forklift parked up,
@@ -1032,6 +1033,19 @@ const AIM = new Vector3()
 // One crate on the lift, from dropping in to its prize: remounted for every crate.
 function Stage({ def, phase, drop, prizeCar, onReveal, skip, base, baseQ, pace = 'full' }: StageProps & { base: React.RefObject<Vector3>; baseQ: React.RefObject<Quaternion> }) {
   const camera = useThree((s) => s.camera)
+  const gl = useThree((s) => s.gl)
+  const scene = useThree((s) => s.scene)
+  const get = useThree((s) => s.get)
+  // Remounted for every opening: keep this one's shaders, or the next opening compiles the
+  // crate, its burst and its prize all over again and freezes just before the prize shows.
+  useLayoutEffect(() => () => pinPrograms(gl), [gl])
+  // The prize is known once the roll comes back, a few seconds before it rises out of the
+  // crate: compile its shaders then (in the background where the browser can), not on reveal.
+  useEffect(() => {
+    if (!drop) return
+    const id = setTimeout(() => void warmShaders(gl, scene, camera, get().internal.priority > 0).catch(() => {}))
+    return () => clearTimeout(id)
+  }, [drop, prizeCar, gl, scene, camera, get])
   const style = OPEN_STYLE[def.id]
   const drama = DRAMA[style]
   const show = pace === 'show'
@@ -1058,6 +1072,8 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base, baseQ, pace =
   const showCar = (drop?.kind === 'car' || drop?.kind === 'dupe' || drop?.kind === 'skin' || drop?.kind === 'skindupe' || drop?.kind === 'hat' || drop?.kind === 'piece' || drop?.kind === 'mod') && !!prizeCar
   const key = useRef<PointLight>(null)
   const rim = useRef<PointLight>(null)
+  const lamps = useRef<Group>(null)
+  const partKey = useRef<PointLight>(null)
 
   useFrame((state, rawDt) => {
     const s = st.current
@@ -1211,8 +1227,15 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base, baseQ, pace =
         g.scale.setScalar(Math.max(0.01, ease))
         g.rotation.y = coins && !showCar ? Math.pow(1 - r, 3) * Math.PI * 4 : -0.6 + after * 0.55
         // The prize's own lights: a soft white key from the camera's side and a rim in its tier's colour.
+        const l = lamps.current
+        if (l) {
+          l.position.copy(g.position)
+          l.rotation.copy(g.rotation)
+          l.scale.copy(g.scale)
+        }
         if (key.current) key.current.intensity = ease * 7
         if (rim.current) rim.current.intensity = ease * 9
+        if (partKey.current) partKey.current.intensity = part ? ease * 5 : 0
       }
       if (!s.revealed && after > P.settle - P.charge) {
         s.revealed = true
@@ -1243,6 +1266,9 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base, baseQ, pace =
       camera.quaternion.copy(baseQ.current)
       if (beam.current) beam.current.visible = false
       if (prize.current) prize.current.visible = false
+      if (key.current) key.current.intensity = 0
+      if (rim.current) rim.current.intensity = 0
+      if (partKey.current) partKey.current.intensity = 0
     }
   })
 
@@ -1262,15 +1288,21 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base, baseQ, pace =
       {!show && <Burst start={burstAt} glow={glow} amount={drama.confetti} />}
       {!show && style === 'shatter' && <Shards start={burstAt} glow={glow} />}
       {!show && (coins || gems) && <CoinBurst start={coinAt} gems={gems} big={big} style={style} />}
-      <group ref={prize} visible={false}>
+      {/* The prize's lights follow it but are never hidden: a light appearing changes the
+          scene's light count, and every material in the depot would recompile on the reveal. */}
+      <group ref={lamps}>
         <pointLight ref={key} position={[0.8, 2.6, 3.2]} intensity={0} distance={9} color="#fff4e0" />
         <pointLight ref={rim} position={[0, 2.4, -2.4]} intensity={0} distance={7} color={glow} />
+        {/* PartPrize's own key light, where it sits: on its own, or small over the car wearing it. */}
+        <pointLight ref={partKey} position={prizeCar ? [0.25, 2.12, 0.67] : [0.6, 2.55, 1.6]} intensity={0} distance={prizeCar ? 2.1 : 5} color="#fff8e1" />
+      </group>
+      <group ref={prize} visible={false}>
         {showCar && prizeCar && <PrizeCar look={prizeCar} />}
         {coins && !showCar && <CoinPile />}
         {/* A part floats over the car wearing it, smaller, still turning; with no car to show, on its own. */}
         {part && (prizeCar ? (
-          <group position-y={1.05} scale={0.42}><PartPrize id={part} body={prizeCar.body} tint={prizeCar.color} /></group>
-        ) : <PartPrize id={part} tint="#90a4ae" />)}
+          <group position-y={1.05} scale={0.42}><PartPrize id={part} body={prizeCar.body} tint={prizeCar.color} lit={false} /></group>
+        ) : <PartPrize id={part} tint="#90a4ae" lit={false} />)}
         {/* A slowly turning ring of light under the prize. */}
         <mesh rotation-x={-Math.PI / 2} position-y={0.02}>
           <ringGeometry args={[1.05, 1.2, 48]} />

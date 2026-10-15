@@ -1,8 +1,8 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Canvas, useThree } from '@react-three/fiber'
-import { ACESFilmicToneMapping, NeutralToneMapping, PCFSoftShadowMap, type PerspectiveCamera, type ToneMapping, type WebGLProgram, type WebGLRenderer } from 'three'
-import { quietShaders, warmShaders } from './warm'
+import { ACESFilmicToneMapping, NeutralToneMapping, PCFSoftShadowMap, type PerspectiveCamera, type ToneMapping, type WebGLRenderer } from 'three'
+import { pinPrograms, quietShaders, warmShaders } from './warm'
 import { useCanvasDpr } from '../lib/prefs'
 import { create } from 'zustand'
 
@@ -67,17 +67,9 @@ function makeStage(tone: ToneMapping) {
     else setTimeout(go, 300)
   }
 
-  // Three frees a shader program once no material uses it, and every race's materials
-  // go when it ends, so the next race would compile them all again. Holding one extra use
-  // of each program keeps them for the canvas's lifetime (a few dozen, one per look).
+  // Every race's materials go when it ends; pinning keeps their shaders for the next one.
   let renderer: WebGLRenderer | null = null
-  function pinPrograms() {
-    for (const p of (renderer?.info.programs ?? []) as (WebGLProgram & { usedTimes: number; pinned?: boolean })[]) {
-      if (p.pinned) continue
-      p.pinned = true
-      p.usedTimes++
-    }
-  }
+  const pinStage = () => pinPrograms(renderer)
 
   // A picture of what the canvas shows right now (the snapshot button after a win).
   let snap: (() => Promise<Blob | null>) | null = null
@@ -172,7 +164,7 @@ function makeStage(tone: ToneMapping) {
       moveTo(entry.el, entry.through)
       useStage.setState({ slot: entry.el, cam, run, used: true, ready: -1, node: children })
       return () => {
-        pinPrograms()
+        pinStage()
         open.splice(open.indexOf(entry), 1)
         if (useStage.getState().run !== run) return
         const back = open[open.length - 1]
