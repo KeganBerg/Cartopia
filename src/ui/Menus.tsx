@@ -423,7 +423,7 @@ const SALE_SORTS: { id: SaleSort; label: string }[] = [
 ]
 // The For Sale tab reopens with the filter and order it was left on.
 let saleView: { kind: string; sort: SaleSort } = { kind: 'all', sort: 'level' }
-const FOR_SALE = CARS.filter((c) => !c.rescueOnly && !c.season && !c.secret)
+const FOR_SALE = CARS.filter((c) => !c.rescueOnly && !c.season && !c.secret && !c.pack)
 
 export function ShowroomPanel() {
   const level = useGame((s) => s.level)

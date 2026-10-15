@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import '../scene/testCanvas'
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { describe, expect, it } from 'vitest'
