@@ -46,6 +46,7 @@ import { hoursOf, seedOf } from '../game/hours'
 import { VIEW, isFree, useFreeCam } from './freeCam'
 import { FreeCam } from './FreeCam'
 import { TutorialCamera } from './TutorialCamera'
+import { VisitCamera } from './VisitCamera'
 import { RustyLot } from './RustyLot'
 import { TownTouch, townFingers } from './TownTouch'
 import { tapOwnedBy } from './pick'
@@ -769,6 +770,7 @@ export const World = memo(function World() {
           <ResponsiveZoom />
           <ExpandZoom />
           <TutorialCamera />
+          <VisitCamera />
           <RustyLot />
           <Interaction />
         </>
