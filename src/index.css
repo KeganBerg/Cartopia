@@ -1880,6 +1880,37 @@ button.book-car { font: inherit; color: inherit; }
   .meet-row .leader-acts { grid-row: 1; grid-column: 2; }
 }
 .meet-spot.empty { justify-content: center; min-height: 100px; border: 2px dashed #90a4ae; border-radius: 10px; background: none; color: #cfd8dc; font-size: 28px; cursor: pointer; }
+/* Car Meet: a player's name or car opens their profile card (ui/PlayerCard.tsx). */
+.meet-who { all: unset; display: block; min-width: 0; cursor: pointer; border-radius: 8px; padding: 2px 4px; margin: -2px -4px; }
+.meet-who b { color: #1e5fbf; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.meet-who:hover, .meet-who:focus-visible { background: #e3f2fd; }
+.meet-car { all: unset; cursor: pointer; border-radius: 8px; }
+.meet-car:hover .thumb3d, .meet-car:focus-visible .thumb3d { box-shadow: 0 0 0 2px #2f7ff0; }
+.pc-overlay { z-index: 120; }
+.pc-card { width: min(460px, 100%); }
+.pc-card .panel-body { display: flex; flex-direction: column; gap: 8px; }
+.pc-crew { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 800; color: #263238; background: #fff; border: 2px solid var(--crew, #607d8b); border-radius: 999px; padding: 2px 12px 2px 4px; }
+.pc-emblem { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--crew, #607d8b); font-size: 15px; }
+.pc-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.pc-stat { display: flex; flex-direction: column; align-items: center; background: #fff; border: 2px solid #d5e2f3; border-radius: 12px; padding: 4px 2px; }
+.pc-stat span { font-size: 20px; line-height: 1.2; }
+.pc-stat b { font: 20px var(--display); color: #14213d; }
+.pc-view { position: relative; }
+.pc-view .car-preview { height: 210px; margin: 0; background: radial-gradient(ellipse at 50% 75%, #ffffff 0 30%, #dbe8f7 80%); }
+.pc-car-name { position: absolute; left: 10px; top: 8px; right: 60px; flex-wrap: wrap; display: flex; align-items: center; gap: 6px; pointer-events: none; }
+.pc-car-name b { font: 17px var(--display); color: #14213d; text-shadow: 0 1px 0 #fff; }
+.pc-pi { background: #14213d; color: #ffd84a; border-radius: 6px; padding: 1px 6px; font: 900 13px Nunito, sans-serif; white-space: nowrap; }
+.pc-strip { display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 4px; scroll-snap-type: x proximity; }
+.pc-chip { flex: none; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 2px; border: 2px solid #e0e0e0; border-radius: 10px; background: #fff; cursor: pointer; scroll-snap-align: start; }
+.pc-chip.on { border-color: #2f7ff0; background: #e3f2fd; }
+.pc-chip small { font: 900 13px Nunito, sans-serif; color: #14213d; }
+.pc-chip small i { font-style: normal; font-size: 11px; margin-right: 2px; }
+.pc-empty { text-align: center; font-size: 34px; padding: 18px 0; }
+.pc-acts { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.pc-visit { flex: 1; font-size: 20px; padding: 10px 14px; }
+@media (max-width: 560px) {
+  .pc-view .car-preview { height: 190px; }
+}
 /* Friend ghost races */
 .ghost-btn { background: #7e57c2; }
 .ghost-times { display: flex; gap: 8px; justify-content: center; margin: 2px 0 10px; }
