@@ -363,15 +363,27 @@ export function CratesPanel() {
       // Not remembered.
     }
   }
-  // The latest phase, for Again: its delayed go() comes from the render where the prize was still open.
+  // The latest phase, so a second tap can't start a second open.
   const phaseNow = useRef(phase)
   useEffect(() => { phaseNow.current = phase }, [phase])
-  const go = async (count = 1) => {
-    if (phaseNow.current !== 'idle') return
+  // Again chains straight into the next open: the prizes clear, a fresh crate drops on the lift and
+  // shakes while the server rolls, and the menu only comes back if the open fails.
+  const [chained, setChained] = useState(false)
+  const go = async (count = 1, chain = false) => {
+    if (phaseNow.current !== (chain ? 'open' : 'idle')) return
     phaseNow.current = 'wait'
     const before = useGame.getState().cars
+    if (chain) {
+      setChained(true)
+      setShown(false)
+      setQueue([])
+      setTen(null)
+      setSummary(null)
+      setRun((r) => r + 1)
+    }
     setPhase('wait')
     const got = await openCrate(pick, count > 1 ? undefined : free, count)
+    setChained(false)
     if (!got?.length) {
       setPhase('idle')
       return
@@ -405,8 +417,8 @@ export function CratesPanel() {
     setPhase('idle')
   }
   const again = (count = 1) => {
-    next()
-    if (queue.length <= 1) setTimeout(() => go(count), 650)
+    if (queue.length > 1) next()
+    else go(count, true)
   }
   // ×10: the next crate, or after the last one the summary, with the rarest prize on the lift.
   const tenNext = useCallback(() => {
@@ -495,7 +507,7 @@ export function CratesPanel() {
           </div>
         </div>
       )}
-      {phase !== 'open' && (
+      {phase !== 'open' && !chained && (
         <div className="crate-dock" onClick={(e) => e.stopPropagation()}>
           <div className="crate-pick">
             {CRATES.map((c) => (

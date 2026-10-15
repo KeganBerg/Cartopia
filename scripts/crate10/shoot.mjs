@@ -1,4 +1,4 @@
-// node scripts/crate10/shoot.mjs <outDir> [single|ten]   (needs vite on :5173).
+// node scripts/crate10/shoot.mjs <outDir> [single|ten|again]   (needs vite on :5173).
 // The Crate Depot's reveal of a part prize, and the ×10 open: mid sequence, the last pull and the summary.
 import { createRequire } from 'node:module'
 const { chromium } = createRequire('/opt/node-tools/node_modules/')('playwright')
@@ -41,7 +41,7 @@ for (const form of forms) {
     const fix = (o) => JSON.parse(JSON.stringify(o).replace('__skin__', skin.id).replace('__mod2__', mod2).replace('__hat__', hat))
     window.__ten = fix(ten)
     window.__stub = () => m.setCrateOpener(async (crate, free, count) => {
-      await new Promise((r) => setTimeout(r, 300))
+      await new Promise((r) => setTimeout(r, window.__delay ?? 300))
       const cost = { coins: 0, bucks: 25 }
       return count && count > 1 ? window.__ten.map((o) => ({ ...o, crate, cost })) : [{ seq: 101, crate, cost, drop: window.__ten[1].drop }]
     })
@@ -58,6 +58,24 @@ for (const form of forms) {
     await p.waitForSelector('.crate-prize', { timeout: 30000 })
     await p.waitForTimeout(1500)
     await p.screenshot({ path: `${out}/${form}-1-single-part.png` })
+  } else if (mode === 'again') {
+    // Again ×10 from the summary goes straight into the next ten: the menu never comes back.
+    await p.click('.crate-open.ten')
+    await p.click('.crate-ten-skip', { timeout: 30000 })
+    await p.waitForSelector('.crate-sum', { timeout: 30000 })
+    await p.waitForTimeout(1500)
+    await p.evaluate(() => { window.__delay = 1500 })
+    await p.click('.crate-sum .cp-actions .buy')
+    let dock = 0
+    for (let i = 0; i < 12; i++) {
+      if (await p.$('.crate-dock')) dock++
+      if (i === 3) await p.screenshot({ path: `${out}/${form}-5-again-wait.png` })
+      await p.waitForTimeout(150)
+    }
+    await p.waitForSelector('.crate-ten-strip', { timeout: 30000 })
+    await p.waitForTimeout(1200)
+    await p.screenshot({ path: `${out}/${form}-6-again-running.png` })
+    console.log(form, 'dock seen in', dock, 'of 12 samples')
   } else {
     await p.click('.crate-open.ten')
     await p.waitForTimeout(2600)
