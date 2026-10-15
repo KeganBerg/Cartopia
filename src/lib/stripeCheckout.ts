@@ -1,8 +1,8 @@
 // Stripe Checkout for gem packs, shared by the Netlify functions (checkout.mts, stripe-webhook.mts)
 // and their tests. No Stripe SDK: two REST calls and a signature check are all the game needs.
-import { BUCKS_PACKS, packLevel, type BucksPack } from '../game/bucksPacks'
+import { ALL_PACKS, packLevel, type BucksPack } from '../game/bucksPacks'
 
-export const packById = (id: unknown): BucksPack | null => BUCKS_PACKS.find((p) => p.id === id) ?? null
+export const packById = (id: unknown): BucksPack | null => ALL_PACKS.find((p) => p.id === id) ?? null
 export const cents = (p: BucksPack) => Math.round(p.price * 100)
 
 // The form body for POST /v1/checkout/sessions. The price comes from the pack table here, never the page.
@@ -23,7 +23,7 @@ export function sessionForm(p: BucksPack, user: string, origin: string, taxCode?
     'line_items[0][quantity]': '1',
     'line_items[0][price_data][currency]': 'usd',
     'line_items[0][price_data][unit_amount]': String(cents(p)),
-    'line_items[0][price_data][product_data][name]': `${p.name} (${gems} gems)`,
+    'line_items[0][price_data][product_data][name]': p.car ? `${p.name} (car + ${gems} gems)` : `${p.name} (${gems} gems)`,
     success_url: `${origin}/?bank=paid`,
     cancel_url: `${origin}/?bank=cancel`,
   })
