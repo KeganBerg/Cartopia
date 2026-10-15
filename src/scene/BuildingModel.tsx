@@ -862,7 +862,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
       )
     case 'stadium': {
       // Upgrades raise the stands and the floodlights. The wall is glass on a
-      // low base in the building's colour, so the race and the crowd inside
+      // low base in the building's colour, so the race and the seats inside
       // (SpeedwayLife) show from the street.
       const sh = 0.9 + lift * 0.5
       const base = 0.3
