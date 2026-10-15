@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { SharedShapes } from './scene/sharedShapes'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { NeutralToneMapping, type Material, type Mesh } from 'three'
 import { World } from './scene/World'
@@ -166,6 +167,7 @@ export default function App() {
           gl.domElement.addEventListener('webglcontextrestored', () => location.reload())
         }}
       >
+        <SharedShapes />
         <World />
         <SplashHandoff />
         <FrameCap fps={graphics === 'saver' ? 30 : graphics === 'auto' ? pace.fps : 60} paused={townPaused} />
