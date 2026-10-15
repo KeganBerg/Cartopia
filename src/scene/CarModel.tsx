@@ -277,6 +277,8 @@ const SLEEK: Body[] = ['super', 'wedge', 'bubble', 'ev', 'prototype']
 const ROUND_LAMPS: Body[] = ['rearengine', 'bubble', 'classic', 'offroad', 'compact', 'truck', 'van', 'suv', 'bus', 'dogvan', 'tusker']
 const BIG_GRILLE: Body[] = ['muscle', 'truck', 'classic', 'wagon', 'luxury', 'bus']
 const LOW: Body[] = ['sports', 'super', 'wedge', 'coupe', 'hatch', 'rearengine', 'longnose', 'prototype']
+// Low cars carry a slim bumper set lower (see bumperY), which mods on the nose fit round.
+export const lowBumper = (b: Body) => LOW.includes(b) || SLEEK.includes(b)
 const RUGGED: Body[] = ['truck', 'offroad', 'rally', 'suv']
 const VINTAGE: Body[] = ['classic', 'wagon', 'bubble', 'luxury', 'van', 'dogvan', 'bus']
 const FOUR_DOOR: Body[] = ['sedan', 'wagon', 'suv', 'luxury', 'ev', 'van', 'dogvan']
@@ -591,7 +593,7 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
   const cowl = s.cabinZ + s.cabinLen / 2
   const hoodFront = s.len / 2 - s.len * 0.1
   const front = s.len / 2
-  const low = LOW.includes(body) || SLEEK.includes(body)
+  const low = lowBumper(body)
   // Front bumper: slimmer and lower on low cars so the headlights clear it.
   const bumperH = low ? 0.05 : 0.07
   const bumperY = s.lift + (low ? 0.055 : 0.07)

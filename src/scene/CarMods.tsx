@@ -5,7 +5,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { modDef, type Body, type ModSlot, type SkinnedSlot } from '../game/data'
 import type { RimStyle } from './carWheels'
 import { withSkin } from './skins'
-import { carFrame, type ModFrame } from './CarModel'
+import { carFrame, lowBumper, type ModFrame } from './CarModel'
 import { decal } from './layers'
 import { glowTex } from './textures'
 
@@ -54,8 +54,9 @@ function tube(r: number, a: [number, number, number], b: [number, number, number
   return g
 }
 
-function box(w: number, h: number, d: number, x: number, y: number, z: number, rx = 0, ry = 0) {
+function box(w: number, h: number, d: number, x: number, y: number, z: number, rx = 0, ry = 0, rz = 0) {
   const g = new BoxGeometry(w, h, d)
+  if (rz) g.rotateZ(rz)
   if (rx) g.rotateX(rx)
   if (ry) g.rotateY(ry)
   g.translate(x, y, z)
@@ -119,6 +120,9 @@ const ROUND_NOSE: Body[] = ['horseshoe', 'scissor', 'teardrop', 'formula', 'pont
 // Where valances and diffusers hang at the tail: off the floor, or up at the tail where it sits
 // high above the floor (the formula car's engine cover).
 const rearLift = (f: Frame) => Math.max(f.lift, f.pipeY - 0.1)
+// On a low car with a trunk a wing whose top stands this far up the deck would tower over the
+// roof: the wing comes down on shorter posts until its top sits just over the roof line.
+const wingDrop = (f: Frame, top: number) => (f.deck < f.roof - 0.05 ? Math.min(top * 0.45, Math.max(0, f.deck + top - f.roof - 0.03)) : 0)
 // How far the hood sits below the usual hood line where hood mods go, on bodies drawn with
 // their own curved hoods.
 const HOOD_DROP: Partial<Record<Body, number>> = { restomuscle: 0.024, horseshoe: 0.021, teardrop: 0.01, longnose: 0.02, longtail: 0.026 }
@@ -173,22 +177,25 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
   },
   gtwing: (f, p) => {
     const z = f.deckZ
+    const d = wingDrop(f, 0.2)
     for (const sd of [-1, 1]) {
       // On a round body the posts reach down into a deck that falls away at the sides.
       const deep = POST_DEEP[f.body] ?? 0
-      p.carbon.push(box(0.03, 0.17 + deep, 0.05, sd * (f.postW ?? f.deckW) * 0.3, f.deck + 0.085 - deep / 2, z))
-      p.carbon.push(box(0.015, 0.07, 0.18, sd * f.deckW * 0.49, f.deck + 0.18, z))
+      p.carbon.push(box(0.03, 0.17 - d + deep, 0.05, sd * (f.postW ?? f.deckW) * 0.3, f.deck + (0.17 - d) / 2 - deep / 2, z))
+      p.carbon.push(box(0.015, 0.07, 0.18, sd * f.deckW * 0.49, f.deck + 0.18 - d, z))
     }
-    p.paint.push(box(f.deckW * 0.98, 0.025, 0.17, 0, f.deck + 0.18, z, 0.12))
+    p.paint.push(box(f.deckW * 0.98, 0.025, 0.17, 0, f.deck + 0.18 - d, z, 0.12))
   },
   attackwing: (f, p) => {
     const z = f.deckZ - 0.03
+    const d = wingDrop(f, 0.35)
     for (const sd of [-1, 1]) {
-      p.carbon.push(box(0.025, 0.28 + (POST_DEEP[f.body] ?? 0), 0.056, sd * (f.postW ?? f.deckW) * 0.22, f.deck + 0.14 - (POST_DEEP[f.body] ?? 0) / 2, z))
-      p.paint.push(box(0.016, 0.12, 0.24, sd * f.deckW * 0.56, f.deck + 0.27, z))
+      const deep = POST_DEEP[f.body] ?? 0
+      p.carbon.push(box(0.025, 0.28 - d + deep, 0.056, sd * (f.postW ?? f.deckW) * 0.22, f.deck + (0.28 - d) / 2 - deep / 2, z))
+      p.paint.push(box(0.016, 0.12, 0.24, sd * f.deckW * 0.56, f.deck + 0.27 - d, z))
     }
-    p.carbon.push(box(f.deckW * 1.12, 0.024, 0.2, 0, f.deck + 0.28, z, 0.18))
-    p.carbon.push(box(f.deckW * 1.12, 0.018, 0.1, 0, f.deck + 0.33, z - 0.07, 0.45))
+    p.carbon.push(box(f.deckW * 1.12, 0.024, 0.2, 0, f.deck + 0.28 - d, z, 0.18))
+    p.carbon.push(box(f.deckW * 1.12, 0.018, 0.1, 0, f.deck + 0.33 - d, z - 0.07, 0.45))
   },
 
   // Exhausts.
@@ -278,6 +285,9 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
     const sw = clearOf(0.11 * h, 0, [...hoodLines(f), ...grilleLines(f)]) * 2
     p.paint.push(box(sw, 0.06 * h, 0.2 * h, 0, f.hoodTop + 0.02 * h, f.hoodZ, -0.12))
     p.carbon.push(box(0.17 * h, 0.04 * h, 0.01, 0, f.hoodTop + 0.035 * h, f.hoodZ + 0.1 * h))
+    // A chrome grille of three bars across the mouth, under a chrome rim.
+    for (const x of [-0.045, 0, 0.045]) p.chrome.push(box(0.008, 0.032 * h, 0.008, x * h, f.hoodTop + 0.035 * h, f.hoodZ + 0.1 * h + 0.005))
+    p.chrome.push(box(0.18 * h, 0.008, 0.012, 0, f.hoodTop + 0.055 * h + 0.002, f.hoodZ + 0.1 * h))
   },
   blower: (f, p) => {
     const h = f.hs
@@ -297,18 +307,28 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
     const [sd, sz] = span(0.146 * h)
     const lines = sz - sd / 2 < cowl + 0.03 ? [...hoodLines(f), ...cowlLines(f)] : hoodLines(f)
     for (const x of [-0.045, 0, 0.045]) p.chrome.push(box(x ? 0.012 : 0.0165, 0.1 * h + 0.007, sd, x ? clearOf(x * h, 0.006, lines) : 0, f.hoodTop + 0.05 * h - 0.0005, sz))
-    p.carbon.push(box(0.18 * h, 0.06 * h, 0.1 * h, 0, f.hoodTop + 0.12 * h, f.hoodZ + 0.01, -0.15))
+    // A drive pulley and belt on the front of the case.
+    const z1 = bz + bd / 2
+    p.chrome.push(pipe(0.032 * h, 0.014, 0, f.hoodTop + 0.06 * h, z1 + 0.007))
+    p.carbon.push(box(0.028 * h, 0.06 * h, 0.008, 0, f.hoodTop + 0.03 * h - 0.004, z1 + 0.007))
+    // The injector hat: a plate across the fin tops and a chrome scoop with a dark mouth and two butterflies.
+    p.carbon.push(box(0.15 * h, 0.016 * h, 0.1 * h, 0, f.hoodTop + 0.108 * h, bz))
+    const hz = bz + 0.005
+    p.chrome.push(box(0.12 * h, 0.05 * h, 0.08 * h, 0, f.hoodTop + 0.141 * h - 0.002, hz))
+    p.carbon.push(box(0.1 * h, 0.032 * h, 0.006, 0, f.hoodTop + 0.143 * h, hz + 0.04 * h + 0.002))
+    for (const x of [-0.025, 0.025]) p.chrome.push(box(0.004, 0.03 * h, 0.006, x * h, f.hoodTop + 0.143 * h, hz + 0.04 * h + 0.005))
   },
 
   // Batch 3 spoilers.
   swanneck: (f, p) => {
     // The wing hangs from two curved necks that rise behind it and hook over onto its top.
     const z = f.deckZ + 0.01
-    const y = f.deck + 0.17
+    const d = wingDrop(f, 0.22)
+    const y = f.deck + 0.17 - d
     for (const sd of [-1, 1]) {
       const x = sd * (f.postW ?? f.deckW) * 0.2
-      p.carbon.push(box(0.024, 0.2, 0.04, x, f.deck + 0.1, z + 0.035))
-      p.carbon.push(box(0.024, 0.026, 0.1, x, f.deck + 0.205, z - 0.005, -0.35))
+      p.carbon.push(box(0.024, 0.2 - d, 0.04, x, f.deck + (0.2 - d) / 2, z + 0.035))
+      p.carbon.push(box(0.024, 0.026, 0.1, x, f.deck + 0.205 - d, z - 0.005, -0.35))
       p.carbon.push(box(0.024, 0.05, 0.03, x, y + 0.03, z - 0.045))
       p.carbon.push(box(0.014, 0.11, 0.23, sd * f.deckW * 0.53, y + 0.005, z - 0.05))
     }
@@ -318,13 +338,14 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
   skydeck: (f, p) => {
     // Two stacked elements between tall end plates, on four pylons.
     const z = f.deckZ - 0.02
+    const d = wingDrop(f, 0.36)
     for (const sd of [-1, 1]) {
-      for (const k of [0.12, 0.28]) p.carbon.push(box(0.022, 0.22, 0.05, clearOf(sd * (f.postW ?? f.deckW) * k, 0.011, hoodLines(f)), f.deck + 0.11, z + 0.02))
-      p.carbon.push(box(0.014, 0.19, 0.28, sd * f.deckW * 0.54, f.deck + 0.25, z - 0.04))
-      p.chrome.push(box(0.018, 0.016, 0.03, sd * f.deckW * 0.54, f.deck + 0.355, z - 0.13))
+      for (const k of [0.12, 0.28]) p.carbon.push(box(0.022, 0.22 - d, 0.05, clearOf(sd * (f.postW ?? f.deckW) * k, 0.011, hoodLines(f)), f.deck + (0.22 - d) / 2, z + 0.02))
+      p.carbon.push(box(0.014, 0.19, 0.28, sd * f.deckW * 0.54, f.deck + 0.25 - d, z - 0.04))
+      p.chrome.push(box(0.018, 0.016, 0.03, sd * f.deckW * 0.54, f.deck + 0.355 - d, z - 0.13))
     }
-    p.paint.push(box(f.deckW * 1.08, 0.024, 0.2, 0, f.deck + 0.22, z - 0.02, 0.1))
-    p.carbon.push(box(f.deckW * 1.08, 0.018, 0.12, 0, f.deck + 0.3, z - 0.1, 0.42))
+    p.paint.push(box(f.deckW * 1.08, 0.024, 0.2, 0, f.deck + 0.22 - d, z - 0.02, 0.1))
+    p.carbon.push(box(f.deckW * 1.08, 0.018, 0.12, 0, f.deck + 0.3 - d, z - 0.1, 0.42))
   },
   roofrack: (f, p) => {
     // A chrome rack on the roof rails, loaded with a spare wheel, jerry cans and a cargo box.
@@ -416,14 +437,20 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
     const x = (x0 + x1) / 2
     const w = x1 - x0
     const top = f.wheel * 2 + 0.02
+    // The outer top edge is bevelled, so the flare reads as a pressed panel and not a box.
+    const c = 0.04
+    const wi = w - c * 0.7
+    const xi = x - c * 0.35
     for (const sd of [-1, 1]) {
       for (const zz of [f.wz, -f.wz]) {
         const L = f.wheel * 2.56
-        p.paint.push(box(w, 0.028, L, sd * x, top, zz))
+        p.paint.push(box(wi, 0.028, L, sd * xi, top, zz))
+        p.paint.push(box(c, 0.028, L - 0.006, sd * (x1 - c * 0.42), top - 0.011, zz, 0, 0, -sd * 0.62))
         for (const e of [-1, 1]) {
           const yb = f.lift + 0.03
-          p.paint.push(box(w, top - yb, 0.026, sd * x, (top + yb) / 2, zz + e * (L / 2 - 0.013)))
-          p.chrome.push(post(0.008, 0.012, sd * (x1 - 0.015), top + 0.016, zz + e * (L / 2 - 0.02), 6))
+          p.paint.push(box(w, top - 0.03 - yb, 0.026, sd * x, (top - 0.03 + yb) / 2, zz + e * (L / 2 - 0.013)))
+          p.paint.push(box(wi, 0.03, 0.026, sd * xi, top - 0.015, zz + e * (L / 2 - 0.013)))
+          p.chrome.push(post(0.008, 0.012, sd * (x1 - c - 0.012), top + 0.016, zz + e * (L / 2 - 0.02), 6))
         }
       }
       p.paint.push(box(0.06, 0.04, f.wz * 2 - f.wheel * 2.56, sd * (f.side + 0.016), f.lift + 0.034, 0))
@@ -500,11 +527,14 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
     for (const sd of [-1, 1]) {
       // Set in and back on noses that curve away at the corners.
       const tuck = TUCK_FOG.includes(f.body)
+      // On a low car's slim bumper smaller lamps sit in the bar itself instead of riding over its top.
+      const low = lowBumper(f.body)
+      const r = low ? 0.021 : 0.03
       const x = sd * f.bodyW * (tuck ? 0.3 : 0.37)
-      const y = f.lift + 0.075
+      const y = f.lift + (low ? 0.055 : 0.075)
       const z = f.front + (tuck ? -0.006 : 0.012)
-      p.carbon.push(pipe(0.03, 0.05, x, y, z))
-      p.lamp.push(lens(0.023, x, y, z + 0.0285))
+      p.carbon.push(pipe(r, 0.05, x, y, z))
+      p.lamp.push(lens(r - 0.007, x, y, z + 0.0285))
     }
   },
   roofbar: (f, p) => {
