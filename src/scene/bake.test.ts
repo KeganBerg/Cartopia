@@ -92,6 +92,24 @@ function slowBake(parts: [BufferGeometry, Finish, Matrix4?][], uvs = false) {
   return mergeGeometries(list)!
 }
 
+// What the shader reads: packed attributes come back as the floats they stand for.
+const values = (a: BufferAttribute) => Array.from({ length: a.count * a.itemSize }, (_, i) => a.getComponent(Math.floor(i / a.itemSize), i % a.itemSize))
+// How close a packed attribute comes: a normal to within 1/127, a 0..1 setting to 1/255, a colour to 1/65535.
+const CLOSE: Record<string, number> = { normal: 0.5 / 127 + 1e-6, look: 0.5 / 255 + 1e-6, color: 0.5 / 65535 + 1e-6, emissive: 0.5 / 65535 + 1e-6 }
+
+describe('packed attributes', () => {
+  it('stores normals, colours and settings small, and leaves glow brighter than white alone', () => {
+    const g = bake([[new BoxGeometry(1, 1, 1), { color: '#ff8800', rough: 0.3 }]])
+    expect(g.getAttribute('normal').array).toBeInstanceOf(Int8Array)
+    expect(g.getAttribute('color').array).toBeInstanceOf(Uint16Array)
+    expect(g.getAttribute('look').array).toBeInstanceOf(Uint8Array)
+    expect((g.getAttribute('normal') as BufferAttribute).normalized).toBe(true)
+    const bright = bake([[new BoxGeometry(1, 1, 1), { color: new Color(3, 3, 3), unlit: true }]])
+    expect(bright.getAttribute('color').array).toBeInstanceOf(Float32Array)
+    expect(bright.getAttribute('color').getX(0)).toBe(3)
+  })
+})
+
 describe('single-pass bake', () => {
   const at = (x: number, ry: number, s: number) => new Matrix4().compose(new Vector3(x, 1, -2), new Quaternion().setFromEuler(new Euler(0.3, ry, 0)), new Vector3(s, s * 0.5, s))
   const uvAt = new Texture()
@@ -107,10 +125,10 @@ describe('single-pass bake', () => {
       [new SphereGeometry(1, 7, 5), { color: '#888888', rough: 0.9 }, at(0, 2, 2)],
     ]
     for (const attr of ['position', 'normal', 'color', 'emissive', 'look', 'skin']) {
-      const fast = bake(parts).getAttribute(attr).array
-      const slow = slowBake(parts).getAttribute(attr).array
+      const fast = values(bake(parts).getAttribute(attr) as BufferAttribute)
+      const slow = values(slowBake(parts).getAttribute(attr) as BufferAttribute)
       expect(fast.length, attr).toBe(slow.length)
-      for (let i = 0; i < fast.length; i++) expect(fast[i], `${attr}[${i}]`).toBeCloseTo(slow[i], 5)
+      for (let i = 0; i < fast.length; i++) expect(Math.abs(fast[i] - slow[i]), `${attr}[${i}]`).toBeLessThanOrEqual(CLOSE[attr] ?? 1e-5)
     }
     expect([...bake(parts).index!.array]).toEqual([...slowBake(parts).index!.array])
   })
@@ -125,9 +143,9 @@ describe('single-pass bake', () => {
     // Single-sided, everything lines up with the old bake, UVs included.
     const single = bake(parts.map(([g, f, m]) => [g, { ...f, double: false }, m]), true)
     for (const attr of ['position', 'normal', 'uv', 'color', 'look']) {
-      const a = single.getAttribute(attr).array
-      const b = slow.getAttribute(attr).array
-      for (let i = 0; i < a.length; i++) expect(a[i], `${attr}[${i}]`).toBeCloseTo(b[i], 5)
+      const a = values(single.getAttribute(attr) as BufferAttribute)
+      const b = values(slow.getAttribute(attr) as BufferAttribute)
+      for (let i = 0; i < a.length; i++) expect(Math.abs(a[i] - b[i]), `${attr}[${i}]`).toBeLessThanOrEqual(CLOSE[attr] ?? 1e-5)
     }
     // The back faces carry UVs too (the old bake left them short, shifting every later part's).
     const verts = fast.getAttribute('position').count

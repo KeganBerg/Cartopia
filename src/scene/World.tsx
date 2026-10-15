@@ -809,12 +809,12 @@ export const World = memo(function World() {
       {fixed.controls}
       {/* Ground and buildings merge separately, and only what changed is merged
           again (see Batch): laying road re-merges the road's patch of ground. */}
-      <Batch version={`${roadsList.join()}/${land.join()}/${shape}/${post}`} cell={24} freeze>
+      <Batch version={`${roadsList.join()}/${land.join()}/${shape}/${post}`} cell={24} freeze release>
         {fixed.land}
         {tufts}
         {fixed.roads}
       </Batch>
-      <Batch version={`${shape}/${turns.join('')}/${popping}|${picked ?? ''}|${city ?? ''}|${post}`} cell={24} freeze>
+      <Batch version={`${shape}/${turns.join('')}/${popping}|${picked ?? ''}|${city ?? ''}|${post}`} cell={24} freeze release>
         {buildings.map((b, i) =>
           merges.owner.has(b.uid) && !merges.groups.has(b.uid) ? null : <Building key={b.uid} b={b} turn={turns[i]} group={merges.groups.get(b.uid)} picked={b.uid === picked} city={city} />,
         )}

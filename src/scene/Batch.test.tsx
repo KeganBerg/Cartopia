@@ -2,7 +2,7 @@
 import './testCanvas'
 import { describe, expect, it } from 'vitest'
 import ReactThreeTestRenderer from '@react-three/test-renderer'
-import { BoxGeometry, type Mesh, type Object3D } from 'three'
+import { BoxGeometry, type BufferAttribute, type Mesh, type Object3D } from 'three'
 import { Batch } from './Batch'
 
 function Town({ picked, off }: { picked: string; off?: boolean }) {
@@ -192,5 +192,28 @@ describe('Batch prune', () => {
     await r.unmount()
     expect(crate.visible).toBe(true)
     expect(lid.visible).toBe(true)
+  })
+})
+
+describe('Batch release', () => {
+  it('lets a merged mesh drop its vertices once the GPU has them, bounds kept', async () => {
+    const r = await ReactThreeTestRenderer.create(
+      <Batch version={1} release>
+        <mesh name="box">
+          <boxGeometry />
+          <meshStandardMaterial color="#c0504d" />
+        </mesh>
+      </Batch>,
+    )
+    const merged = mergedMeshes(r.scene.instance as Object3D)
+    expect(merged.length).toBe(1)
+    const g = merged[0].geometry
+    expect(g.boundingSphere).not.toBeNull()
+    const pos = g.getAttribute('position') as BufferAttribute
+    pos.onUploadCallback()
+    expect(pos.array).toBeNull()
+    // The hidden original keeps its own, so taps still find it.
+    const box = r.scene.instance.getObjectByName('box') as Mesh
+    expect(box.geometry.getAttribute('position').array).not.toBeNull()
   })
 })
