@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
   PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, FUEL_REGEN_SECONDS,
-  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, jobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, maxLevel, themable, RESCUE_SPOTS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, refillBucks, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, activeEvent, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modFits, ownedMods, driverPayout, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, CREW_CHEST, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower, seasonNumber, seasonOf, SEASON_STARS, skinDef, ownedSkins, seasonSkin, modSkinDef, ownedModSkins, seasonModSkin, SKINNED_SLOTS, type SkinnedSlot, fittedMods, SEASON_TIERS, STARS_PER_TIER, SEASON_CAR_BUCKS, dealsFor, dealOffer, type DealDef, type DealKind,
+  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, upgradeXp, jobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, maxLevel, themable, RESCUE_SPOTS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, refillBucks, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, activeEvent, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modFits, ownedMods, driverPayout, mergedParts, mergeBonus, mergeGain, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, CREW_CHEST, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower, seasonNumber, seasonOf, SEASON_STARS, skinDef, ownedSkins, seasonSkin, modSkinDef, ownedModSkins, seasonModSkin, SKINNED_SLOTS, type SkinnedSlot, fittedMods, SEASON_TIERS, STARS_PER_TIER, SEASON_CAR_BUCKS, dealsFor, dealOffer, type DealDef, type DealKind,
 } from './data'
 import { PAINT_COST, hasCustomPaint, isHexColor, PANELS, PATTERNS, STARTER_PAINTS, isBike, panelJobCost, tidyPanels, type Panels, RUSTY_SETS, hotSpot, rarityWeight, truckOf, TRUCK, BAY2_LEVEL } from './data'
 import { cleanHat, earnedHats, hatDef, hatQuestOf, newHatQuest, ownedHats, sameHat, type HatFit, type HatQuest } from './hats'
@@ -22,7 +22,7 @@ import { tunerPrize, tunerTrial } from './tuner'
 import { tourIsBoss, tourLegBonus, tourLegOf, tourPrize } from './tour'
 import { EVENT_RACES, eventBonus, eventFor, eventIsBoss, eventPrize, eventProgress, type EventProgress } from './events'
 import { trialWeek } from './trial'
-import { groupOf, groupTurn, mergeCandidates, applyMerge, applySplit, rotateGroup, isLandmark, LANDMARK_NAME } from './merge'
+import { groupOf, groupTurn, mergeCandidates, mergeBoosts, mergeFuel, applyMerge, applySplit, rotateGroup, isLandmark, LANDMARK_NAME } from './merge'
 import { togglePick } from './meet'
 import { crateCost, crateDef, crateOwnedSkins, pityHit, rollCrate, rollSourcePiece, type CrateId, type CrateOpen } from './crates'
 import { pieceId } from './resto'
@@ -216,6 +216,8 @@ type UiState = {
   // Building type just placed, so the edit bar can offer to build another.
   again: string | null
   panel: Panel
+  // Menus opened on the way to this one, so closing it goes back a step instead of to the town.
+  panelBack: Exclude<Panel, null>[]
   selectedCar: string | null
   toasts: { id: number; text: string }[]
   visiting: VisitedTown | null
@@ -249,10 +251,26 @@ type UiState = {
   levelUp: { from: number; to: number; coins: number; bucks: number } | null
 }
 
+// Opening a menu from another one remembers the way back. Opening from the town (or
+// going to the town) starts a fresh trail; reopening a menu already on the trail cuts
+// back to it, so the trail never loops.
+export function navTo(s: { panel: Panel; panelBack: Exclude<Panel, null>[] }, next: Panel): { panel: Panel; panelBack: Exclude<Panel, null>[] } {
+  if (!next || !s.panel) return { panel: next, panelBack: [] }
+  if (next === s.panel) return { panel: next, panelBack: s.panelBack }
+  const at = s.panelBack.indexOf(next)
+  // A not-enough popup is a stop on the way, not a menu to come back to.
+  const keep = s.panel === 'need' ? s.panelBack : [...s.panelBack, s.panel]
+  return { panel: next, panelBack: at >= 0 ? s.panelBack.slice(0, at) : keep }
+}
+
 type Actions = {
   setMode: (m: Mode, placing?: string | null) => void
   showNeed: (res: Resource, missing: number, what?: string) => void
   openPanel: (p: Panel) => void
+  // Close the open menu: back to the one it was opened from, or the town.
+  closePanel: () => void
+  // Switch to a sibling menu from a tab row (Garage / Showroom / Crates, Friends / Crew): same place in the trail.
+  swapPanel: (p: Exclude<Panel, null>) => void
   openShop: (focus?: string) => void
   selectCar: (uid: string | null) => void
   toast: (text: string) => void
@@ -448,6 +466,7 @@ const noUpgrades = (): Record<UpgradeSlot, number> => ({ engine: 0, turbo: 0, ti
 
 export function fuelCap(s: Pick<SaveState, 'level' | 'buildings'>) {
   const gas = s.buildings.reduce((n, b) => n + upgradeFuelCap(buildingDef(b.def), buildingLevel(b)), 0)
+    + (s.buildings.some((b) => b.merge) ? mergeFuel(s.buildings) : 0)
   return baseFuelCap(s.level) + gas
 }
 
@@ -588,6 +607,7 @@ export type ReadyReport = { jobs: { def: string; n: number; coins: number }[]; c
 export function readyRewards(s: Pick<SaveState, 'buildings' | 'cars' | 'level'>, now: number): ReadyReport {
   const r: ReadyReport = { jobs: [], coins: 0, parts: 0, xp: 0, collected: 0, cleared: 0, filled: 0 }
   const byDef = new Map<string, { def: string; n: number; coins: number }>()
+  const boost = mergeBoosts(s.buildings)
   for (const b of s.buildings) {
     const d = buildingDef(b.def)
     if (!d.jobSeconds || b.jobEndsAt === null || now < b.jobEndsAt) continue
@@ -597,9 +617,9 @@ export function readyRewards(s: Pick<SaveState, 'buildings' | 'cars' | 'level'>,
       continue
     }
     const lvl = jobLevel(b)
-    const pay = driverPayout(d, lvl, workingDriver(s, b))
+    const pay = driverPayout(d, lvl, workingDriver(s, b), boost.get(b.uid))
     r.coins += pay
-    r.parts += upgradePartsPayout(d, lvl)
+    r.parts += mergedParts(d, lvl, boost.get(b.uid))
     r.xp += upgradeXp(d, lvl)
     r.collected++
     const row = byDef.get(d.id) ?? { def: d.id, n: 0, coins: 0 }
@@ -746,9 +766,10 @@ function tapMerged(s: GameState, set: (p: Partial<GameState>) => void, uids: str
   const ready = members.filter((o) => o.jobEndsAt !== null && now >= o.jobEndsAt)
   if (ready.length) {
     let pay = 0, parts = 0, xp = 0
+    const boost = mergeBoosts(s.buildings)
     for (const o of ready) {
-      pay += driverPayout(d, jobLevel(o), workingDriver(s, o))
-      parts += upgradePartsPayout(d, jobLevel(o))
+      pay += driverPayout(d, jobLevel(o), workingDriver(s, o), boost.get(o.uid))
+      parts += mergedParts(d, jobLevel(o), boost.get(o.uid))
       xp += upgradeXp(d, jobLevel(o))
     }
     const done = new Set(ready.map((o) => o.uid))
@@ -865,6 +886,7 @@ export const useGame = create<GameState>()(
       placingStored: null,
       again: null,
       panel: null,
+      panelBack: [],
       selectedCar: null,
       toasts: [],
       visiting: null,
@@ -893,10 +915,17 @@ export const useGame = create<GameState>()(
       setPlaceRot: (placeRot) => set({ placeRot }),
       showNeed: (res, missing, what) => {
         sfx.error()
-        set({ need: { res, missing: Math.max(0, Math.ceil(missing)), what }, panel: 'need', mode: 'play', placing: null, selected: null })
+        set((st) => ({ need: { res, missing: Math.max(0, Math.ceil(missing)), what }, ...navTo(st, 'need'), mode: 'play', placing: null, selected: null }))
       },
-      openPanel: (panel) => set({ panel, mode: 'play', placing: null, placingStored: null, selected: null, shopFocus: null }),
-      openShop: (focus) => set({ panel: 'shop', mode: 'play', placing: null, selected: null, shopFocus: focus ?? null }),
+      openPanel: (panel) => set((s) => ({ ...navTo(s, panel), mode: 'play', placing: null, placingStored: null, selected: null, shopFocus: null })),
+      closePanel: () =>
+        set((s) => {
+          const back = s.panelBack.slice(0, -1)
+          const prev = s.panel ? s.panelBack[s.panelBack.length - 1] ?? null : null
+          return { panel: prev, panelBack: prev ? back : [], mode: 'play', placing: null, placingStored: null, selected: null, shopFocus: null }
+        }),
+      swapPanel: (panel) => set((s) => ({ panel, panelBack: s.panelBack.filter((p) => p !== panel), mode: 'play', placing: null, placingStored: null, selected: null, shopFocus: null })),
+      openShop: (focus) => set((s) => ({ ...navTo(s, 'shop'), mode: 'play', placing: null, selected: null, shopFocus: focus ?? null })),
       selectCar: (selectedCar) => set({ selectedCar }),
       toast: (text) => {
         const id = Date.now() + Math.random()
@@ -1039,7 +1068,9 @@ export const useGame = create<GameState>()(
         if (!c) return
         sfx.buy()
         const d = buildingDef(c.anchor.def)
-        s.toast(isLandmark(c) && size === 2 ? `Four Sky Towers became the ${LANDMARK_NAME}!` : size === 4 ? `Giant ${isLandmark(c) ? LANDMARK_NAME : d.name}! 16 in one.` : `Merged ${c.members.length} into one big ${d.name}!`)
+        const gain = mergeGain(d)
+        const bonus = gain ? ` ${gain} +${Math.round(mergeBonus(c.members.length) * 100)}%` : ''
+        s.toast((isLandmark(c) && size === 2 ? `Four Sky Towers became the ${LANDMARK_NAME}!` : size === 4 ? `Giant ${isLandmark(c) ? LANDMARK_NAME : d.name}! 16 in one.` : `Merged ${c.members.length} into one big ${d.name}!`) + bonus)
         set({ buildings: applyMerge(s.buildings, c), updatedAt: Date.now() })
       },
 
@@ -1228,6 +1259,7 @@ export const useGame = create<GameState>()(
         let earned = 0
         const removed = new Set<string>()
         const paid: string[] = []
+        const boost = mergeBoosts(s.buildings)
         let buildings = s.buildings.map((b) => {
           const d = buildingDef(b.def)
           if (!d.jobSeconds || b.jobEndsAt === null || now < b.jobEndsAt) return b
@@ -1239,10 +1271,10 @@ export const useGame = create<GameState>()(
             return b
           }
           const lvl = jobLevel(b)
-          const pay = driverPayout(d, lvl, workingDriver(s, b))
+          const pay = driverPayout(d, lvl, workingDriver(s, b), boost.get(b.uid))
           coins += pay
           earned += pay
-          parts += upgradePartsPayout(d, lvl)
+          parts += mergedParts(d, lvl, boost.get(b.uid))
           xp += upgradeXp(d, lvl)
           paid.push(b.uid)
           collected++

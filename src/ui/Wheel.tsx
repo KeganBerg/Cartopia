@@ -147,7 +147,7 @@ export function WheelPanel() {
   }
 
 
-  const close = () => useGame.getState().openPanel(null)
+  const close = () => useGame.getState().closePanel()
   const collect = () => {
     const o = result?.open
     if (o) {

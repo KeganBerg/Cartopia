@@ -316,7 +316,7 @@ export function CratesPanel() {
   const cars = useGame((s) => s.cars)
   // Free crates waiting (Class Cup and weekly arcade prizes, see game/cups.ts), each of its own crate.
   const freeCrates = useGame((s) => s.freeCrates) ?? []
-  const close = () => useGame.getState().openPanel(null)
+  const close = () => useGame.getState().closePanel()
   const [pick, setPick] = useState<CrateId>(() => {
     if (freeCrates.length) return freeCrateOf(freeCrates[0])
     try {

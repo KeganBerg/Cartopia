@@ -41,7 +41,7 @@ export function GhostRacePanel() {
   // Your fastest car: the one the server times you with.
   const car = useMemo(() => [...cars].sort((a, b) => pi(b) - pi(a))[0], [cars])
   if (!ghost || !car) return null
-  const exit = () => useGame.getState().openPanel(null)
+  const exit = () => useGame.getState().closePanel()
   return (
     <DragRace
       key={n}
