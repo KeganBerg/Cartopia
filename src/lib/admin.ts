@@ -8,7 +8,7 @@ import { supabase } from './supabase'
 export type AdminCar = { uid: string; model: string; color: string }
 export type AdminChat = { id: number; room: string; body: string; at: string }
 export type AdminPlayer = {
-  id: string; username: string | null; town: string | null; level: number; coins: number; gems: number
+  id: string; username: string | null; town: string | null; level: number; coins: number; gems: number; parts?: number
   cars: AdminCar[]; muted: string | true | null; admin: boolean; joined: string; seen: string | null; chat?: AdminChat[]
 }
 export type AdminLogRow = { id: number; at: string; action: string; target: string | null; name: string | null; detail: Record<string, unknown> }
@@ -43,7 +43,7 @@ export function adminError(message: string | undefined) {
   if (m.includes('last car')) return "Can't take their last car"
   if (m.includes('not yourself')) return "Can't mute yourself"
   if (m.includes('no save')) return 'No town saved yet'
-  if (m.includes('too much')) return 'Amount too big'
+  if (m.includes('bad amount')) return 'Bad amount'
   if (m.includes('bad car')) return 'Unknown car'
   return 'Failed'
 }
@@ -62,8 +62,8 @@ export const admin = {
   liveEnd: (kind: string | null = null) => call<number>('admin_live_end', { p_kind: kind }),
   find: (q: string) => call<AdminPlayer[]>('admin_find', { p_q: q }),
   player: (id: string) => call<AdminPlayer>('admin_player', { p_uid: id }),
-  grant: (id: string, coins: number, gems: number, reason: string) =>
-    call<AdminPlayer>('admin_grant', { p_uid: id, p_coins: coins, p_gems: gems, p_reason: reason }),
+  grant: (id: string, coins: number, gems: number, parts: number, reason: string) =>
+    call<AdminPlayer>('admin_grant', { p_uid: id, p_coins: coins, p_gems: gems, p_parts: parts, p_reason: reason }),
   giveCar: (id: string, model: string, reason: string) => call<AdminPlayer>('admin_give_car', { p_uid: id, p_model: model, p_reason: reason }),
   takeCar: (id: string, car: string, reason: string) => call<AdminPlayer>('admin_take_car', { p_uid: id, p_car: car, p_reason: reason }),
   mute: (id: string, minutes: number | null, reason: string) => call<AdminPlayer>('admin_mute', { p_uid: id, p_minutes: minutes, p_reason: reason }),
