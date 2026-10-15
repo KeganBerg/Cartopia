@@ -261,7 +261,7 @@ export function SheetTabs<T extends string>({ items, value, onChange }: { items:
 
 type ShopTab = 'cars' | 'business' | 'services' | 'rec' | 'event' | 'upgrades'
 const SHOP_GROUPS: { id: Exclude<ShopTab, 'upgrades'>; label: React.ReactNode; filter: (b: BuildingDef) => boolean }[] = [
-  { id: 'cars', label: '🔧 Cars & parts', filter: (b) => b.id === 'rescue' || b.kind === 'parts' },
+  { id: 'cars', label: '🔧 Car shops', filter: (b) => b.id === 'rescue' || b.kind === 'parts' },
   { id: 'business', label: '🍕 Businesses', filter: (b) => b.kind === 'business' && b.id !== 'rescue' && b.id !== 'crew' && !b.service },
   // Homes sit with the gas stations: both keep the town fuelled.
   { id: 'services', label: '⛽ Services', filter: (b) => b.kind === 'gas' || b.kind === 'house' || b.id === 'crew' || !!b.service },
@@ -311,20 +311,37 @@ export function ShopPanel() {
   }, [focus])
   const ev = activeEvent()
   const tabs: { id: ShopTab; label: React.ReactNode }[] = [...SHOP_GROUPS.filter((g) => g.id !== 'event' || ev), ...(canUpgrade ? [{ id: 'upgrades' as const, label: '⬆️ Upgrades' }] : [])]
-  const group = SHOP_GROUPS.find((g) => g.id === tab)
+  // A search looks through every tab at once.
+  const [find, setFind] = useState('')
+  const term = find.trim().toLowerCase()
+  const group = term ? null : SHOP_GROUPS.find((g) => g.id === tab)
+  const shown = term
+    ? BUILDINGS.filter((b) => b.unlockLevel < 99 && b.name.toLowerCase().includes(term) && SHOP_GROUPS.some((g) => (g.id !== 'event' || ev) && g.filter(b)))
+    : group ? BUILDINGS.filter((b) => b.unlockLevel < 99 && group.filter(b)) : []
+  const rows = shown.map((b) => {
+    const locked = level < b.unlockLevel
+    const sale = buildPrice({ deals, level }, b.id)
+    // Gem decor (the statue, the arch) is short on gems, not coins.
+    const brokeGems = bucks < sale.bucks
+    const broke = coins < sale.coins || brokeGems
+    const owned = !!b.unique && [...buildings, ...stored].some((o) => o.def === b.id)
+    // Ready to build first, then short of money, then locked by level, built last.
+    const rank = owned ? 3 : locked ? 2 : broke ? 1 : 0
+    return { b, locked, sale, brokeGems, broke, owned, rank }
+  }).sort((x, y) => (y.rank < 2 ? featureRank(y.b) : 0) - (x.rank < 2 ? featureRank(x.b) : 0) || x.rank - y.rank || (x.rank === 2 ? x.b.unlockLevel - y.b.unlockLevel : 0))
   return (
     <Panel title="Shop" wide>
-      <SheetTabs items={tabs} value={tab} onChange={setTab} />
-      {tab === 'upgrades' && <ShopUpgrades />}
-      {group && (
+      <SheetTabs items={tabs} value={tab} onChange={(t) => { setFind(''); setTab(t) }} />
+      <label className="shop-find">
+        <span aria-hidden>🔍</span>
+        <input type="search" value={find} placeholder="Find a building" aria-label="Find a building" onChange={(e) => setFind(e.target.value)} />
+        {find && <button aria-label="Clear" onClick={() => setFind('')}>✕</button>}
+      </label>
+      {!term && tab === 'upgrades' && <ShopUpgrades />}
+      {term && !rows.length && <p className="shop-none">🔍 No match</p>}
+      {(group || term) && (
           <div className="cards rows">
-            {BUILDINGS.filter((b) => b.unlockLevel < 99 && group.filter(b)).sort((a, b) => featureRank(b) - featureRank(a)).map((b) => {
-              const locked = level < b.unlockLevel
-              const sale = buildPrice({ deals, level }, b.id)
-              // Gem decor (the statue, the arch) is short on gems, not coins.
-              const brokeGems = bucks < sale.bucks
-              const broke = coins < sale.coins || brokeGems
-              const owned = !!b.unique && [...buildings, ...stored].some((o) => o.def === b.id)
+            {rows.map(({ b, locked, sale, brokeGems, broke, owned }) => {
               const highlight = b.id === 'rescue' && !rusty
               const feature = !highlight && !locked && !!FEATURES[b.id] && !buildings.some((o) => o.def === b.id)
               const focused = b.id === focus
@@ -395,8 +412,22 @@ function CarsTabs({ current, onShowroom }: { current: CarsTab; onShowroom?: (t: 
   return <SheetTabs items={tabs} value={current} onChange={pick} />
 }
 
+const BODY_LABEL: Record<string, string> = { dogvan: 'Dog van', ev: 'EV', suv: 'SUV', icecream: 'Ice cream', parcel: 'Parcel van', monster: 'Monster truck' }
+const bodyLabel = (b: string) => BODY_LABEL[b] ?? b[0].toUpperCase() + b.slice(1)
+
+type SaleSort = 'level' | 'cheap' | 'dear' | 'pi' | 'name'
+const SALE_SORTS: { id: SaleSort; label: string }[] = [
+  { id: 'level', label: 'Level' }, { id: 'cheap', label: 'Price ↑' }, { id: 'dear', label: 'Price ↓' }, { id: 'pi', label: 'Top PI' }, { id: 'name', label: 'A–Z' },
+]
+// The For Sale tab reopens with the filter and order it was left on.
+let saleView: { kind: string; sort: SaleSort } = { kind: 'all', sort: 'level' }
+const FOR_SALE = CARS.filter((c) => !c.rescueOnly && !c.season && !c.secret && !c.pack)
+
 export function ShowroomPanel() {
   const level = useGame((s) => s.level)
+  const coins = useGame((s) => s.coins)
+  const bucks = useGame((s) => s.bucks)
+  const cars = useGame((s) => s.cars)
   const buyCar = useGame((s) => s.buyCar)
   const rusty = useGame((s) => hasRusty(s))
   const openShop = useGame((s) => s.openShop)
@@ -411,12 +442,51 @@ export function ShowroomPanel() {
     lastShowroomTab = t
     setTab(t)
   }
+  // A car being shown is never hidden by the filter.
+  const [view, setViewState] = useState(() => (focus ? (saleView = { ...saleView, kind: 'all' }) : saleView))
+  const setView = (v: Partial<typeof view>) => setViewState((o) => (saleView = { ...o, ...v }))
   const find = useFindCar((model) => {
     pickTab('shop')
+    setView({ kind: 'all' })
     useGame.setState({ shopFocus: model })
   })
+  const owned = useMemo(() => {
+    const n = new Map<string, number>()
+    for (const c of cars) n.set(c.model, (n.get(c.model) ?? 0) + 1)
+    return n
+  }, [cars])
+  const afford = (c: typeof CARS[0]) => coins >= c.price && bucks >= (c.bucks ?? 0)
+  const canBuy = (c: typeof CARS[0]) => rusty && level >= c.unlockLevel && afford(c)
+  // Filters with counts; a body type is offered only when more than one car has it.
+  const kinds = useMemo(() => {
+    const n = new Map<string, number>()
+    for (const c of FOR_SALE) n.set(c.body, (n.get(c.body) ?? 0) + 1)
+    const out = [
+      { id: 'all', label: `All (${FOR_SALE.length})` },
+      { id: 'buy', label: `Can buy (${FOR_SALE.filter(canBuy).length})` },
+      { id: 'new', label: `Not owned (${FOR_SALE.filter((c) => !owned.has(c.id)).length})` },
+    ]
+    for (const [b, k] of [...n].sort((a, z) => a[0].localeCompare(z[0]))) if (k > 1) out.push({ id: b, label: `${bodyLabel(b)} (${k})` })
+    return out
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [owned, coins, bucks, level, rusty])
+  const kind = kinds.some((k) => k.id === view.kind) ? view.kind : 'all'
+  const list = useMemo(() => {
+    const keep = FOR_SALE.filter((c) => kind === 'all' || (kind === 'buy' ? canBuy(c) : kind === 'new' ? !owned.has(c.id) : c.body === kind))
+      .map((c, i) => ({ c, i, gate: level < c.unlockLevel ? c.unlockLevel : 0, pi: performance(c, { engine: 0, turbo: 0, tires: 0, weight: 0 }), cost: c.price + (c.bucks ?? 0) * 1000 }))
+    const by: Record<SaleSort, (a: typeof keep[0], b: typeof keep[0]) => number> = {
+      // Cars you can buy now first, then level-locked ones by the level they open at.
+      level: (a, b) => a.gate - b.gate || a.i - b.i,
+      cheap: (a, b) => a.cost - b.cost,
+      dear: (a, b) => b.cost - a.cost,
+      pi: (a, b) => b.pi - a.pi,
+      name: (a, b) => a.c.name.localeCompare(b.c.name),
+    }
+    return keep.sort(by[view.sort])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kind, view.sort, owned, level, coins, bucks, rusty])
   return (
-    <Panel title="Showroom" wide>
+    <Panel title="Cars" wide>
       <CarsTabs current={tab} onShowroom={pickTab} />
       {tab === 'book' && <CollectionBook onFind={find} />}
       {tab === 'shop' && <>
@@ -429,20 +499,31 @@ export function ShowroomPanel() {
           <button className="buy" onClick={() => openShop('rescue')}>Build · $1,000</button>
         </div>
       )}
+      <div className="garage-filter sale-filter">
+        <label className="gf-pick">
+          <Icon name="filter" />
+          <select aria-label="Show" value={kind} onChange={(e) => setView({ kind: e.target.value })}>
+            {kinds.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
+          </select>
+        </label>
+        <label className="gf-pick">
+          <Icon name="sort" />
+          <select aria-label="Sort" value={view.sort} onChange={(e) => setView({ sort: e.target.value as SaleSort })}>
+            {SALE_SORTS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+          </select>
+        </label>
+      </div>
       <div ref={body} className={rusty ? 'cards' : 'cards dimmed'}>
-        {/* Cars you can buy now first, then level-locked ones by the level they open at. */}
-        {CARS.filter((c) => !c.rescueOnly && !c.season && !c.secret && !c.pack)
-          .map((c, i) => ({ c, i, gate: level < c.unlockLevel ? c.unlockLevel : 0 }))
-          .sort((a, b) => a.gate - b.gate || a.i - b.i)
-          .map(({ c }) => {
+        {list.map(({ c, pi }) => {
           const locked = level < c.unlockLevel
           const color = colorFor[c.id] ?? c.colors[0]
-          const pi = performance(c, { engine: 0, turbo: 0, tires: 0, weight: 0 })
+          const have = owned.get(c.id) ?? 0
           return (
             <div key={c.id} data-id={c.id} className={`card car-card ${locked ? 'locked' : ''} ${focus === c.id ? 'focus' : ''}`}>
               <button className="thumb-look" aria-label={`Take a closer look at the ${c.name}`} onClick={() => setInspect(c.id)}>
                 <CarThumb color={color} body={c.body} model={c.id} />
                 <span className="look-badge">🔍</span>
+                {have > 0 && <span className="owned-badge" title="In your garage">✔{have > 1 ? ` ×${have}` : ''}</span>}
               </button>
               <div className="card-name">{c.name}{c.legendary && <> <span className="rarity rarity-legendary">Legendary</span></>}</div>
               <div className="card-stat">PI {pi} · {c.body}</div>
@@ -456,7 +537,7 @@ export function ShowroomPanel() {
               {locked ? (
                 <button className="price locked-btn" onClick={() => buyCar(c.id, color)}>🔒 Level {c.unlockLevel}</button>
               ) : (
-                <button className="buy" disabled={!rusty} onClick={() => buyCar(c.id, color)}>Buy {price(c)}</button>
+                <button className={afford(c) ? 'buy' : 'buy broke'} disabled={!rusty} onClick={() => buyCar(c.id, color)}>Buy {price(c)}</button>
               )}
             </div>
           )
@@ -546,8 +627,6 @@ const CAR_SORTS: { id: CarSort; label: string }[] = [
   { id: 'pi', label: 'Top PI' }, { id: 'pi-low', label: 'Low PI' }, { id: 'name', label: 'A–Z' }, { id: 'new', label: 'Newest' },
 ]
 let garageView: { kind: string; sort: CarSort } = { kind: 'all', sort: 'pi' }
-const BODY_LABEL: Record<string, string> = { dogvan: 'Dog van', ev: 'EV', suv: 'SUV', icecream: 'Ice cream', parcel: 'Parcel van', monster: 'Monster truck' }
-const bodyLabel = (b: string) => BODY_LABEL[b] ?? b[0].toUpperCase() + b.slice(1)
 
 function useGarageList(cars: OwnedCar[]) {
   const [view, setViewState] = useState(garageView)
@@ -673,7 +752,7 @@ export function GaragePanel() {
     setDyno((d) => ({ id: Date.now(), car: car.uid, model: car.model, mods: car.mods, before: d && d.car === car.uid ? d.before : was.pi, after: pi }))
   }, [car?.uid, pi])
   return (
-    <Panel title={`My Garage · ${cars.length} cars · ⚡${garagePower(cars)}`} wide>
+    <Panel title="Cars" wide head={<span className="cars-power" title="Garage power">⚡{garagePower(cars)}</span>}>
       <CarsTabs current="garage" />
       <div className={picking ? 'garage picking' : 'garage'}>
         <div className="garage-list">

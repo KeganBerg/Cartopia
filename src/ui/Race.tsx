@@ -4,6 +4,8 @@ import { useTouchLock } from './DriveControls'
 import { useGame, spendFuel, type OwnedCar } from '../game/store'
 import { LIVE_LOSS_SHARE, LOSS_SHARE } from '../game/boosts'
 import { bestCar, carPi, raceCarOf } from '../game/raceCar'
+import { carNear, fairNow, tourPayNow } from '../game/fairRace'
+import { buildPi, fairRivalPi } from '../game/fairPi'
 import { CARS, SKILLS, carDef, performance, RACE_FUEL, GP_SERIES, GP_ROUNDS, gpRivalPi, gpReward, CAMPAIGN, CAMPAIGN_RACES, campaignRaceId, campaignRivalPi, campaignShift, rookieRace, ROOKIE_SHIFT, campaignRivalSkills, campaignReward, campaignCleared, type CampaignChapter, skillBoost, skillDrag, liveSkillBoost, smoothShift, type Body, type GpSeries, type SkillId } from '../game/data'
 import { TRACK, freshRacer, stepRacer, shiftQuality, shiftBand, launchRacer, revLaunch, shiftRacer, fireBoost, aiReaction, AI_BOOST_GEAR, TOP_GEAR, LAUNCH_BAND, IDLE, REV_UP, REV_DOWN, RACE_DT } from '../game/race'
 import { CarThumb } from '../scene/BuildingPreview'
@@ -48,7 +50,7 @@ import { LiveKartParty } from './LiveKartParty'
 import { BLAST_PI, TRACKS, gpField, gpTrack, partyPrize, type KartRules } from '../game/kart'
 import { gpClearPi } from '../game/gpBeat'
 import { look as kartLook } from './ArcadeBits'
-import { TOUR_RACES, tourLeg, tourLegOf, tourIsBoss, tourRivalPi, tourShift, tourSkills, tourRivalName, tourPrize, tourLegBonus } from '../game/tour'
+import { TOUR_RACES, tourLeg, tourLegOf, tourIsBoss, tourRivalPi, tourShift, tourSkills, tourRivalName, tourLegBonus } from '../game/tour'
 import type { WeatherKind } from '../game/weather'
 import { WEEKLY_EVENTS, EVENT_RACES, eventBonus, eventFor, eventIsBoss, eventPrize, eventProgress, eventRivalPi, eventShift, nextEventWeek } from '../game/events'
 import { msToNextWeek, skinDef, SKIN_TIERS, carStats } from '../game/data'
@@ -82,11 +84,11 @@ const liveReward = (oppPi: number) => 300 + oppPi * 8
 const reward = (r: Rival) => (r.id.startsWith('live:') ? liveReward(r.pi) : Math.round((150 + r.pi * 6) * (r.id.startsWith('chal-') ? CHALLENGER_BONUS : 1)))
 const performance_now = () => window.performance.now()
 
-const GP_CUP = ['🥉', '🏆', '🏆', '👑']
+// Caps an AI rival at what the race car can beat with perfect driving (game/fairPi.ts).
+// The ladder's PI still sets the rival's car and the prize.
+const fair = (r: Rival, track?: number): Rival => ({ ...r, pi: fairNow(r.pi, r.shift ?? 1, r.skill, track) })
 
-function carNear(target: number) {
-  return [...CARS].sort((a, b) => Math.abs(performance(a, zero) - target) - Math.abs(performance(b, zero) - target))[0]
-}
+const GP_CUP = ['🥉', '🏆', '🏆', '👑']
 
 function gpRival(series: GpSeries, round: number, clears: number): Rival {
   const target = gpRivalPi(series, round, clears)
@@ -564,14 +566,14 @@ export function RacePanel() {
         key={seq}
         car={car}
         rival={tRace.rival}
-        next={{ label: tRace.race < tourWon ? `▶ Next · $${tourPrize(tourWon).toLocaleString()}` : '↻ Retry', go: () => { setTRace(null); startTour() } }}
+        next={{ label: tRace.race < tourWon ? `▶ Next · $${tourPayNow(tourWon).toLocaleString()}` : '↻ Retry', go: () => { setTRace(null); startTour() } }}
         prize={tRace.prize}
         venueId={leg.venue}
         night={leg.night}
         weatherSeed={`tour-${tRace.race}`}
         dist={tourDist(tRace.race)}
         title={`${leg.night ? '🌙' : '🌍'} Pro Tour · Leg ${leg.index + 1} · ${tourIsBoss(tRace.race) ? 'Boss race' : `Race ${step + 1} of ${TOUR_RACES}`} · ${DIST[tourDist(tRace.race)].label}`}
-        onFinish={(won) => tourResult(won)}
+        onFinish={(won) => tourResult(won, tRace.rival.pi)}
         onExit={() => { setTRace(null); setTab('tour') }}
       />
     )
@@ -649,7 +651,7 @@ export function RacePanel() {
     if (!spendFuel(RACE_FUEL)) return useGame.getState().showNeed('fuel', RACE_FUEL - useGame.getState().fuel, 'a Pro Tour race')
     const won = useGame.getState().tour ?? 0
     setSeq((n) => n + 1)
-    setTRace({ race: won, rival: tourRival(won), prize: tourPrize(won) })
+    setTRace({ race: won, rival: tourRival(won), prize: tourPayNow(won) })
   }
   function startEvent() {
     if (waiting()) return
@@ -713,7 +715,7 @@ export function RacePanel() {
     return Array.from({ length: CAMPAIGN_RACES }, (_, i) => done[campaignRaceId(ch, i)] ?? 0).findIndex((n) => n === 0)
   })()
   const go = tab === 'campaign' && campNext >= 0 ? { label: `$${campaignReward(CAMPAIGN[campSel], campNext, true).toLocaleString()}`, onClick: () => startCampaign(campSel, campNext) }
-    : tab === 'tour' && campaignCleared(done, CAMPAIGN[0]) ? { label: `$${tourPrize(tourWon).toLocaleString()}`, onClick: startTour }
+    : tab === 'tour' && campaignCleared(done, CAMPAIGN[0]) ? { label: `$${tourPayNow(tourWon).toLocaleString()}`, onClick: startTour }
     : tab === 'event' && (ev?.won ?? 0) < EVENT_RACES ? { label: `$${eventPrize(evBase, ev?.won ?? 0).toLocaleString()}`, onClick: startEvent }
     : tab === 'rivals' ? { label: `$${rowPrizeOf(paintRival(rowSel)!, rivalRow).toLocaleString()}`, onClick: () => startRow(rowSel) }
     : tab === 'tuner' && car ? (buildChecks(tunerTrial(trialSel)!, car).every((c) => c.ok)
@@ -851,7 +853,7 @@ export function RacePanel() {
                 </div>
               )
             })}
-            {[...online, ...rivals].map((r) => (
+            {[...online, ...rivals.map(fair)].map((r) => (
               <div key={r.id} className="rm-qc" style={{ ['--qc' as string]: r.color }}>
                 <span className="rm-qc-top"><CarThumb size="sm" color={r.color} body={r.body} mods={r.mods} />{r.online && <span className="tag">PLAYER</span>}</span>
                 <span className="rm-qc-body">
@@ -932,10 +934,10 @@ function GrandPrix({ onRace }: { onRace: (s: GpSeries, r: Rival, prize: number) 
 function campaignRival(ch: CampaignChapter, chIndex: number, i: number): Rival {
   const target = campaignRivalPi(ch, i)
   const car = (ch.cars?.[i] && CARS.find((c) => c.id === ch.cars![i])) || carNear(target)
-  return {
+  return fair({
     id: `camp-${ch.id}-${i}`, town: ch.rivals[i], level: ch.unlockLevel + i * 2, carName: car.name, color: car.colors[(chIndex + i) % car.colors.length],
     pi: target, online: false, body: car.body, model: car.id, skill: campaignRivalSkills(chIndex, i) ? car.skill : undefined, shift: rookieRace(chIndex, i, useGame.getState().racesWon) ? ROOKIE_SHIFT : campaignShift(chIndex, i), boss: i === CAMPAIGN_RACES - 1,
-  }
+  })
 }
 
 function Stars({ n, big }: { n: number; big?: boolean }) {
@@ -1022,46 +1024,46 @@ function Campaign({ sel, setSel, onRace, onTour }: { sel: number; setSel: (ci: n
 
 function rowRival(r: PaintRival): Rival {
   const car = carDef(r.car)
-  return {
+  return fair({
     id: `row-${r.id}`, town: `${r.icon} ${r.name}`, level: r.tier * 8, carName: car.name, color: r.paint, pi: r.pi, online: false,
     body: car.body, model: car.id, skill: rowSkills(r) ? car.skill : undefined, shift: rowShift(r), boss: r.tier === 5,
-  }
+  })
 }
 
 // A World Tour racer in a random car near their PI (game/worldTour.ts).
 function worldRival(i: number): Rival {
   const r = WORLD_TOUR[i]
   const car = worldCar(i)
-  return {
+  return fair({
     id: `world-${i}`, town: `${r.flag} ${r.name}`, level: 5 + i * 5, carName: car.name, color: car.colors[Math.floor(Math.random() * car.colors.length)], pi: r.pi, online: false,
     body: car.body, model: car.id, skill: i >= 3 ? car.skill : undefined, shift: worldShift(i), boss: i === WORLD_TOUR.length - 1,
-  }
+  })
 }
 
 function trialRival(t: TunerTrial): Rival {
   const car = carDef(t.car)
-  return {
+  return fair({
     id: `tuner-${t.id}`, town: `${t.icon} ${t.host}`, level: t.tier * 10, carName: car.name, color: t.color, pi: t.pi, online: false,
     body: car.body, model: car.id, mods: hostMods(t), skill: t.tier >= 2 ? car.skill : undefined, shift: tunerShift(t), boss: t.tier === 3,
-  }
+  })
 }
 
 function cupRival(r: CupRace): Rival {
   const car = carDef(r.car)
-  return {
+  return fair({
     id: `cup-${r.id}`, town: `${carClass(r.cls).icon} ${car.name}`, level: r.tier * 10, carName: car.name, color: r.color, pi: r.pi, online: false,
     body: car.body, model: car.id, skill: r.tier >= 2 ? car.skill : undefined, shift: cupShift(r), boss: r.tier === 3,
-  }
+  })
 }
 
 function tourRival(race: number): Rival {
   const target = tourRivalPi(race)
   const car = carNear(target)
   const leg = tourLegOf(race)
-  return {
+  return fair({
     id: `tour-${race}`, town: tourRivalName(race), level: Math.min(99, 3 + leg * 2 + (race % TOUR_RACES)), carName: car.name, color: car.colors[race % car.colors.length],
     pi: target, online: false, body: car.body, model: car.id, skill: tourSkills(race) ? car.skill : undefined, shift: tourShift(race), boss: tourIsBoss(race),
-  }
+  }, DIST[tourDist(race)].m)
 }
 
 const SKY_ICON: Record<WeatherKind, string> = { clear: '☀️', rain: '🌧️', storm: '⛈️', drizzle: '🌦️', fog: '🌫️', wind: '💨', snow: '🌨️', blizzard: '❄️', dust: '🌪️', mist: '🌁', clearing: '🌈', heat: '🔆' }
@@ -1125,7 +1127,7 @@ function Tour({ onRace, onCampaign }: { onRace: () => void; onCampaign: () => vo
                   </div>
                   {beat ? <span className="tour-beat" title="Beaten">✔</span> : (
                     <button className="buy small" disabled={!next} onClick={onRace}>
-                      {next ? `🏁 $${tourPrize(race).toLocaleString()}` : '🔒'}
+                      {next ? `🏁 $${tourPayNow(race).toLocaleString()}` : '🔒'}
                     </button>
                   )}
                 </div>
@@ -1142,10 +1144,10 @@ function eventRival(base: number, race: number): Rival {
   const e = eventFor()
   const target = eventRivalPi(base, race)
   const car = carNear(target)
-  return {
+  return fair({
     id: `event-${e.id}-${race}`, town: e.rivals[race], level: 0, carName: car.name, color: car.colors[race % car.colors.length],
     pi: target, online: false, body: car.body, model: car.id, skill: race >= 2 ? car.skill : undefined, shift: eventShift(race), boss: eventIsBoss(race),
-  }
+  })
 }
 
 // Weekly event (game/events.ts): this week's venue, its five rivals as a ladder of
@@ -1363,7 +1365,12 @@ type RunStats = { launch: string; perfect: number; shifts: number; top: number }
 export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish, title, venueId, trial, resultView, night, weatherSeed, sky, next, dist }: { car: OwnedCar; rival: Rival; onExit: () => void; next?: NextPick | null; live?: LiveRace; prize?: number; onFinish?: (won: boolean, myTime: number, theirTime: number) => number | void; title?: string; venueId?: string; trial?: { target: number; mine?: boolean; seed?: string; key?: string }; resultView?: (r: Result) => ReactNode; night?: boolean; weatherSeed?: string; sky?: WeatherKind; dist?: RaceDist }) {
   // A signed-in live rival's PI comes from the server, not from their browser.
   const [serverRivalPi, setServerRivalPi] = useState<number | null>(null)
-  const rival = useMemo(() => (serverRivalPi === null ? shownRival : { ...shownRival, pi: serverRivalPi }), [shownRival, serverRivalPi])
+  // Every AI rival is one this car can beat with perfect driving (game/fairPi.ts); the menus show
+  // the same eased PI, this makes sure of it for every race. Live rivals and ghosts race as they are.
+  const rival = useMemo(() => (serverRivalPi !== null ? { ...shownRival, pi: serverRivalPi }
+    : live || trial ? shownRival
+    : { ...shownRival, pi: fairRivalPi(shownRival.pi, dist ? buildPi(pi(car), character(carStats(carDef(car.model), car.upgrades, car.mods)), DIST[dist].m) : pi(car), shownRival.shift ?? 1, shownRival.skill) }),
+  [shownRival, serverRivalPi, live, trial, car, dist])
   const payout = prize ?? reward(rival)
   const rivalRef = useRef(rival)
   rivalRef.current = rival

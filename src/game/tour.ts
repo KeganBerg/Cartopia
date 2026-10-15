@@ -47,6 +47,8 @@ export function tourRivalName(race: number) {
   return `${FIRST[h % FIRST.length]} ${HANDLE[(h >>> 8) % HANDLE.length]}`
 }
 // The prize for winning a race (losses pay a tenth, like every race).
-export const tourPrize = (race: number) => Math.round((150 + tourRivalPi(race) * 8) / 10) * 10
+// pi: the PI actually raced, when the rival was eased to the player's car (game/fairPi.ts), so a
+// slower car earns what its own races are worth.
+export const tourPrize = (race: number, pi = tourRivalPi(race)) => Math.round((150 + Math.min(pi, tourRivalPi(race)) * 8) / 10) * 10
 // The one-time bonus for beating a leg's boss. Coins only.
 export const tourLegBonus = (leg: number) => 500 + leg * 300
