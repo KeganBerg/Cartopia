@@ -120,14 +120,6 @@ const ROUND_NOSE: Body[] = ['horseshoe', 'scissor', 'teardrop', 'formula', 'pont
 // Where valances and diffusers hang at the tail: off the floor, or up at the tail where it sits
 // high above the floor (the formula car's engine cover).
 const rearLift = (f: Frame) => Math.max(f.lift, f.pipeY - 0.1)
-// Bodies whose own flares bulge up over the rear wheels like a kit's arches.
-const FLARED: Body[] = ['groupb']
-const archOf = (f: Frame) => roomOf(f).arch || (FLARED.includes(f.body) ? f.wheel * 1.2 + 0.035 : 0)
-// On a low car with a trunk a wing whose top stands this far up the deck would tower over the
-// roof: the wing comes down on shorter posts until its top sits just over the roof line, keeping
-// its lowest piece (low, up from the deck) clear above any kit arch over the rear wheels.
-const wingDrop = (f: Frame, top: number, low: number) =>
-  f.deck < f.roof - 0.05 ? Math.min(top * 0.45, archOf(f) ? f.deck + low - f.wheel - archOf(f) - 0.06 : 1, Math.max(0, f.deck + top - f.roof - 0.03)) : 0
 // How far the hood sits below the usual hood line where hood mods go, on bodies drawn with
 // their own curved hoods.
 const HOOD_DROP: Partial<Record<Body, number>> = { restomuscle: 0.024, horseshoe: 0.021, teardrop: 0.01, longnose: 0.02, longtail: 0.026 }
@@ -160,6 +152,14 @@ function withRoom(f: Frame, all: string[]): Frame & { room: Room } {
 // The frame a mod is built on, with room left for the others fitted with it.
 export const modFrame = (body: Body, all: string[]) => withRoom(carFrame(body), all)
 const roomOf = (f: Frame): Room => (f as Frame & { room?: Room }).room ?? { tips: [], skirt: 0, arch: 0, out: 0 }
+// Bodies whose own flares bulge up over the rear wheels like a kit's arches.
+const FLARED: Body[] = ['groupb']
+const archOf = (f: Frame) => roomOf(f).arch || (FLARED.includes(f.body) ? f.wheel * 1.2 + 0.035 : 0)
+// On a low car with a trunk a wing whose top stands this far up the deck would tower over the
+// roof: the wing comes down on shorter posts until its top sits just over the roof line, keeping
+// its lowest piece (low, up from the deck) clear above any kit arch over the rear wheels.
+const wingDrop = (f: Frame, top: number, low: number) =>
+  f.deck < f.roof - 0.05 ? Math.min(top * 0.45, archOf(f) ? f.deck + low - f.wheel - archOf(f) - 0.06 : 1, Math.max(0, f.deck + top - f.roof - 0.03)) : 0
 // The stretches of [x0, x1] left after cutting out a gap round each exhaust tip.
 function aroundTips(f: Frame, x0: number, x1: number, pad = 0.012): [number, number][] {
   let out: [number, number][] = [[x0, x1]]
