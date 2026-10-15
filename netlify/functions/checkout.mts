@@ -34,11 +34,15 @@ export default async (req: Request) => {
   const owed = await fetch(`${url}/rest/v1/purchases?select=seq&short=gt.0&limit=1`, { headers: { apikey: anon, Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(6000) })
   if (owed.ok && ((await owed.json()) as unknown[]).length) return json({ error: 'blocked' }, 403)
 
+  // The pack's coins and parts grow with the buyer's level (game_saves.level, kept by the save guard).
+  const save = await fetch(`${url}/rest/v1/game_saves?select=level&owner_id=eq.${user}&limit=1`, { headers: { apikey: anon, Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(6000) })
+  const level = save.ok ? ((await save.json()) as { level?: number }[])[0]?.level ?? 1 : 1
+
   const origin = new URL(req.url).origin
   const res = await fetch('https://api.stripe.com/v1/checkout/sessions', {
     method: 'POST',
     headers: { Authorization: `Bearer ${stripe}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: sessionForm(pack, user, origin, process.env.STRIPE_TAX_CODE || undefined),
+    body: sessionForm(pack, user, origin, process.env.STRIPE_TAX_CODE || undefined, level),
     signal: AbortSignal.timeout(10000),
   })
   if (!res.ok) {

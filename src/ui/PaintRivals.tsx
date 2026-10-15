@@ -1,6 +1,7 @@
 import { useGame, type OwnedCar } from '../game/store'
+import { SkillIcon } from './TapTip'
 import { raceCarOf } from '../game/raceCar'
-import { CARS, PAINTS, SKILLS, carDef } from '../game/data'
+import { CARS, PAINTS, carDef } from '../game/data'
 import { DIST } from '../game/distance'
 import { PAINT_RIVALS, PAINTS_TO_COLLECT, TIERS, paintRival, paintsOpen, rowPrize, rowSkills, type PaintRival } from '../game/paintRivals'
 import { venue as venueById } from '../scene/venues'
@@ -51,7 +52,7 @@ export function PaintRivals({ sel, setSel, car }: { sel: string; setSel: (id: st
           <span className="rm-chips">
             <span title={TIERS[r.tier]}>{flames(r)}</span>
             <span>PI {r.pi}</span>
-            {rowSkills(r) && rc.skill && <span title={`${SKILLS[rc.skill].name}: ${SKILLS[rc.skill].text}`}>{SKILLS[rc.skill].icon}</span>}
+            {rowSkills(r) && rc.skill && <SkillIcon sk={rc.skill} className="" />}
             <span className={beaten ? 'got' : ''}>{beaten ? `✔ ×${row[r.id]}` : `🏁 ${money(rowPrizeOf(r, row))}`}</span>
           </span>
         </div>

@@ -1,6 +1,6 @@
 // Stripe Checkout for gem packs, shared by the Netlify functions (checkout.mts, stripe-webhook.mts)
 // and their tests. No Stripe SDK: two REST calls and a signature check are all the game needs.
-import { BUCKS_PACKS, type BucksPack } from '../game/bucksPacks'
+import { BUCKS_PACKS, packLevel, type BucksPack } from '../game/bucksPacks'
 
 export const packById = (id: unknown): BucksPack | null => BUCKS_PACKS.find((p) => p.id === id) ?? null
 export const cents = (p: BucksPack) => Math.round(p.price * 100)
@@ -9,7 +9,8 @@ export const cents = (p: BucksPack) => Math.round(p.price * 100)
 // Stripe turns Managed Payments on by default for new accounts, and it refuses a line item without a
 // product tax code. With a code (Netlify env STRIPE_TAX_CODE) the session keeps Managed Payments;
 // without one it's switched off for the session, as Stripe's error suggests.
-export function sessionForm(p: BucksPack, user: string, origin: string, taxCode?: string): URLSearchParams {
+// The buyer's level rides along in the metadata: the pack's coins and parts are paid at that level.
+export function sessionForm(p: BucksPack, user: string, origin: string, taxCode?: string, level = 1): URLSearchParams {
   const gems = p.bucks + p.bonus
   const tax: Record<string, string> = taxCode ? { 'line_items[0][price_data][product_data][tax_code]': taxCode } : { 'managed_payments[enabled]': 'false' }
   return new URLSearchParams({
@@ -18,6 +19,7 @@ export function sessionForm(p: BucksPack, user: string, origin: string, taxCode?
     client_reference_id: user,
     'metadata[user]': user,
     'metadata[pack]': p.id,
+    'metadata[level]': String(packLevel(level)),
     'line_items[0][quantity]': '1',
     'line_items[0][price_data][currency]': 'usd',
     'line_items[0][price_data][unit_amount]': String(cents(p)),
@@ -28,7 +30,7 @@ export function sessionForm(p: BucksPack, user: string, origin: string, taxCode?
 }
 
 // What a paid checkout.session.completed event grants, or null when it shouldn't grant anything.
-export type Paid = { session: string; user: string; pack: BucksPack; amount: number }
+export type Paid = { session: string; user: string; pack: BucksPack; amount: number; level: number }
 export function paidSession(event: unknown): Paid | null {
   const e = event as { type?: string; data?: { object?: Record<string, unknown> } }
   if (e?.type !== 'checkout.session.completed' && e?.type !== 'checkout.session.async_payment_succeeded') return null
@@ -40,7 +42,7 @@ export function paidSession(event: unknown): Paid | null {
   if (!pack || typeof user !== 'string' || typeof o.id !== 'string') return null
   // A session paid at another price (an old price table, or a tampered session) grants nothing.
   if (o.amount_total !== cents(pack) || o.currency !== 'usd') return null
-  return { session: o.id, user, pack, amount: o.amount_total as number }
+  return { session: o.id, user, pack, amount: o.amount_total as number, level: packLevel(meta.level) }
 }
 
 // A refund or chargeback on a payment: what it was and the payment intent it was on, or null for any
