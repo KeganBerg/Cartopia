@@ -12,8 +12,7 @@ import { wheelGeo } from './carWheels'
 
 // How big the shown part is: its longest side, in metres.
 const SIZE = 2
-export const PART_SIZE = SIZE
-// How high its middle sits, and a wheel prize's radius as drawn (R scaled up 1.5).
+// How high its middle sits.
 export const PART_LIFT = 1.15
 
 const rubber = new MeshStandardMaterial({ color: '#1c1c1e', roughness: 0.9 })
@@ -47,6 +46,54 @@ function centred(geos: (BufferGeometry | undefined)[]) {
   return { mid, scale: SIZE / Math.max(0.05, size.x, size.y, size.z) }
 }
 
+// How a bolt-on prize tips toward the camera as it turns (PartPrize).
+const TIP = 0.3
+// A wheel prize's radius and width (drawn 1.5 times bigger).
+const R = 0.5
+const W = 0.3
+
+// How far a part prize reaches as it turns and tips, in its own units round its middle (at
+// PART_LIFT): how far its lowest point dips below the middle, and how far it swings out to
+// either side. What a part floating over a car has to clear (CrateScene).
+const reaches = new Map<string, { below: number; reach: number }>()
+export function partReach(id: string, body?: Body) {
+  const key = `${id}|${body ?? ''}`
+  const hit = reaches.get(key)
+  if (hit) return hit
+  const slot = modDef(id)?.slot
+  let out: { below: number; reach: number }
+  if (slot === 'rims' || slot === 'tires') {
+    // Upright, turning about its middle: the tyre (and tread) is the lowest and widest point.
+    out = { below: (R + 0.06) * 1.5, reach: Math.hypot(R + 0.06, W / 2 + 0.02) * 1.5 }
+  } else if (slot === 'stance') {
+    const tall = id === 'lifted' ? 1.5 : id === 'slammed' ? 0.8 : 1
+    const h = (0.55 * tall + 0.03) * 1.2
+    const r = (id === 'slammed' ? 0.29 : 0.24) * 1.2
+    out = { below: h * Math.cos(TIP) + r * Math.sin(TIP), reach: r }
+  } else {
+    // A corner h above the middle and rho out from the turning axis dips lowest, h cos(tip) - rho sin(tip),
+    // when the turn swings it to the far side of the tip.
+    const g = modGeo(bodyFor(id, body), [id])
+    const geos = SOLID_KINDS.map((k) => g[k])
+    const { mid, scale } = centred(geos)
+    let below = 0
+    let reach = 0
+    for (const geo of geos) {
+      const pos = geo?.getAttribute('position')
+      if (!pos) continue
+      for (let i = 0; i < pos.count; i++) {
+        const h = (pos.getY(i) - mid.y) * scale
+        const rho = Math.hypot(pos.getX(i) - mid.x, pos.getZ(i) - mid.z) * scale
+        below = Math.max(below, rho * Math.sin(TIP) - h * Math.cos(TIP))
+        reach = Math.max(reach, rho)
+      }
+    }
+    out = { below, reach }
+  }
+  reaches.set(key, out)
+  return out
+}
+
 export function BoltOn({ id, body, tint }: { id: string; body: Body; tint: string }) {
   const g = modGeo(bodyFor(id, body), [id])
   const { mid, scale } = useMemo(() => centred(SOLID_KINDS.map((k) => g[k])), [g])
@@ -63,9 +110,6 @@ export function BoltOn({ id, body, tint }: { id: string; body: Body; tint: strin
 }
 
 // A full wheel standing up, axle across: a rims prize in its finish, or a tyre prize with its tread.
-const R = 0.5
-const W = 0.3
-export const PART_WHEEL = R * 1.5
 function WheelPrize({ id }: { id: string }) {
   const rim = RIM_LOOK[id]
   const tread = TREAD[id]
@@ -186,7 +230,7 @@ export function PartPrize({ id, body, tint, lit = true }: { id: string; body?: B
       {/* A soft key light so thin parts (pipes, flares) still catch the eye. */}
       {lit && <pointLight position={[0.6, 1.4, 1.6]} intensity={5} distance={5} color="#fff8e1" />}
       {/* Tipped toward the camera so parts that lie flat on a car read from above. */}
-      <group rotation-x={wheel ? 0 : 0.3}>
+      <group rotation-x={wheel ? 0 : TIP}>
         <group ref={turn} scale={wheel ? 1.5 : 1}>{wheel ? <WheelPrize id={id} /> : slot === 'stance' ? <StancePrize id={id} /> : <BoltOn id={id} body={body ?? 'sedan'} tint={tint} />}</group>
       </group>
     </group>

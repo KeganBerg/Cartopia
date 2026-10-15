@@ -92,7 +92,7 @@ function clearOf(c: number, w: number, lines: number[]) {
 const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
   // Spoilers sit on the rear deck (or the roof, on cars with no trunk).
   ducktail: (f, p) => {
-    p.paint.push(box(f.deckW * 0.86, 0.035, 0.13, 0, f.deck + 0.02, f.deckZ, 0.35))
+    p.paint.push(box(f.deckW * 0.86, 0.035, 0.13, 0, f.deck + 0.039, f.deckZ, 0.35))
   },
   gtwing: (f, p) => {
     const z = f.deckZ
@@ -655,13 +655,38 @@ const FLAME_Z = 0.096
 
 const cache = new Map<string, Partial<Record<Kind, BufferGeometry>>>()
 
+// Hood parts sized for a mid-size car reach back into the windshield of a truck or van with a
+// short hood, and a ducktail into the back window of a hatch: slide the part forward (or back)
+// until it clears the glass.
+const GLASS_GAP = 0.004
+function clearGlass(f: Frame, slot: ModSlot | undefined, p: Parts) {
+  if (!f.glass || (slot !== 'hood' && slot !== 'spoiler')) return
+  const pane = slot === 'hood' ? f.glass.front : f.glass.back
+  const dir = slot === 'hood' ? 1 : -1
+  let need = 0
+  for (const list of Object.values(p)) for (const g of list) {
+    const pos = g.getAttribute('position')
+    for (let i = 0; i < pos.count; i++) {
+      const y = pos.getY(i)
+      if (y < pane.lo || y > pane.hi) continue
+      need = Math.max(need, (pane.at(y) - pos.getZ(i)) * dir + GLASS_GAP)
+    }
+  }
+  if (need > 0) for (const list of Object.values(p)) for (const g of list) g.translate(0, 0, need * dir)
+}
+
 export function modGeo(body: Body, ids: string[]) {
   const key = `${body}|${ids.join(',')}`
   const hit = cache.get(key)
   if (hit) return hit
   const f = carFrame(body)
   const parts: Parts = { paint: [], carbon: [], chrome: [], glass: [], flame: [], lamp: [], neon: [], ti: [] }
-  for (const id of ids) BUILD[id]?.(f, parts)
+  for (const id of ids) {
+    const own: Parts = { paint: [], carbon: [], chrome: [], glass: [], flame: [], lamp: [], neon: [], ti: [] }
+    BUILD[id]?.(f, own)
+    clearGlass(f, modDef(id)?.slot, own)
+    for (const k of Object.keys(own) as Kind[]) parts[k].push(...own[k])
+  }
   const out: Partial<Record<Kind, BufferGeometry>> = {}
   for (const k of Object.keys(parts) as Kind[]) {
     const list = parts[k]

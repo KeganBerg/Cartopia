@@ -3,6 +3,14 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import type { Kit, Part } from './CarModel'
 import type { RimStyle } from './carWheels'
 
+// The outside face of a closed cabin's windshield (front) or back window (CarModel cabinPanes):
+// where the glass is at height y (z), the way out of it (ny, nz), and the tilt (about x) that lays
+// a flat part on it. lo and hi bound its flat run, from its foot to where it rounds into the roof.
+export type Pane = { at: (y: number) => number; ny: number; nz: number; tilt: number; lo: number; hi: number }
+export type Panes = { front: Pane; back: Pane }
+// A point lying d out from the pane's face at height y.
+export const onPane = (p: Pane, x: number, y: number, d: number): [number, number, number] => [x, y + p.ny * d, p.at(y) + p.nz * d]
+
 // Per-model trim: the bits that make two cars on the same body tell apart up
 // close (a sunroof, hood pins, a roof rack, a spare wheel, a gold bird on the
 // hood). Everything is added to the car's Kit in a look the car already has
@@ -32,6 +40,7 @@ export type TrimFrame = {
   hood: boolean // a hood mod is fitted
   roofMod: boolean // a roof rack or roof light bar mod is fitted (it replaces the roof gear below)
   closed: boolean
+  glass: Panes | null // the outside of the windshield and back window, on closed cabins
 }
 
 type Feature =
@@ -218,9 +227,10 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
       for (const sd of SIDES) k.add('black', box(0.03, 0.025, wz * 2 - wheel * 2.44), [sd * (wid / 2 + 0.0075), lift + 0.035, 0])
       return
     case 'rearWiper': {
-      if (!roof) return
-      const z0 = roofZ - roofLen / 2 - 0.02
-      k.add('black', box(0.12, 0.008, 0.01), [0.03, (roofY + top) / 2 - 0.02, (z0 + t.cabinZ - t.cabinLen / 2) / 2 - 0.012], [0, 0, 0.3])
+      // Lying on the outside of the back window, following its slope.
+      if (!roof || !t.glass) return
+      const g = t.glass.back
+      k.add('black', box(0.12, 0.01, 0.006), onPane(g, 0.03, (Math.min(roofY, g.hi) + top) / 2 - 0.02, 0.006), [g.tilt, 0, 0.3])
       return
     }
     case 'diffuserFins':
@@ -251,9 +261,13 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
       return
     case 'fuelCap':
       // Racing filler on the left rear quarter.
-      k.add('chrome', cyl(0.03, 0.03, 0.014, 16), [-wid * 0.36, top + 0.002, -front + 0.2])
-      k.add('black', disc(0.012, 8), [-wid * 0.36, top + 0.0115, -front + 0.2], [-Math.PI / 2, 0, 0])
+    {
+      // Clear of the back window, on cars whose cabin runs far back.
+      const z = Math.min(-front + 0.2, t.glass ? t.glass.back.at(top) - 0.04 : Infinity)
+      k.add('chrome', cyl(0.03, 0.03, 0.014, 16), [-wid * 0.36, top + 0.002, z])
+      k.add('black', disc(0.012, 8), [-wid * 0.36, top + 0.0115, z], [-Math.PI / 2, 0, 0])
       return
+    }
     case 'towStrap':
       k.add('tail', box(0.035, 0.05, 0.008), [wid * 0.3, lift + 0.05, front + 0.03])
       return
@@ -390,11 +404,22 @@ function feature(k: Kit, f: Feature, t: TrimFrame) {
       return
     }
     case 'deckLouvers':
-      for (let i = 0; i < 5; i++) k.add('black', box(wid * 0.56, 0.006, 0.016), [0, top + 0.006, -front + 0.12 + i * 0.035])
+      // As many rows as fit between the tail and the back window.
+      for (let i = 0; i < 5; i++) {
+        const z = -front + 0.12 + i * 0.035
+        if (!t.glass || z + 0.012 < t.glass.back.at(top)) k.add('black', box(wid * 0.56, 0.006, 0.016), [0, top + 0.006, z])
+      }
       return
     case 'sharkFin':
-      k.add('paint', rbox(0.014, 0.08, len * 0.3, 0.006), [0, top + 0.035, -len * 0.26])
+    {
+      // On the deck behind the back window, or along the back of the roof when the window
+      // leaves too little deck for it.
+      const gz = t.glass ? t.glass.back.at(top - 0.005) - 0.006 : Infinity
+      const fl = Math.min(len * 0.3, gz + front - 0.04)
+      if (fl > len * 0.18) k.add('paint', rbox(0.014, 0.08, fl, 0.006), [0, top + 0.035, Math.min(-len * 0.26, gz - fl / 2)])
+      else if (roof) k.add('paint', rbox(0.014, 0.05, roofLen * 0.5, 0.006), [0, roofY + 0.02, roofZ - roofLen * 0.22])
       return
+    }
     case 'tailBand':
       k.add('black', box(wid + 0.008, 0.05, 0.16), [0, top - 0.03, -front + 0.08])
       return
