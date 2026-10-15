@@ -48,7 +48,7 @@ function SetRow({ set, onFind }: { set: CarSet; onFind: (model: string) => void 
           if (mine) {
             return (
               <div key={m} className="book-car" title={def.name}>
-                <CarThumb size="sm" color={mine.color} body={def.body} model={def.id} stripe={mine.stripe} mods={mine.mods} />
+                <CarThumb size="sm" color={mine.color} finish={mine.finish} skin={mine.skin} modSkin={mine.modSkin} panels={mine.panels} trim={mine.trim} hat={mine.hat} body={def.body} model={def.id} stripe={mine.stripe} mods={mine.mods} />
                 <span className="book-car-name">{def.name}</span>
               </div>
             )
