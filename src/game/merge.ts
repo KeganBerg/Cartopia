@@ -172,6 +172,15 @@ export function applySplit(buildings: PlacedBuilding[], g: MergeGroup): PlacedBu
   return buildings.map((b) => (quads.has(b.uid) ? { ...b, merge: 2 } : ids.has(b.uid) ? unflag(b) : b))
 }
 
+// Saves with the whole block shifted so its top-left corner sits at x, z. Every
+// building keeps its place in the block, so it stays merged.
+export function moveGroup(buildings: PlacedBuilding[], g: MergeGroup, x: number, z: number): PlacedBuilding[] {
+  const dx = x - g.x
+  const dz = z - g.z
+  const ids = new Set(g.members.map((o) => o.uid))
+  return buildings.map((b) => (ids.has(b.uid) ? { ...b, x: b.x + dx, z: b.z + dz } : b))
+}
+
 function unflag(b: PlacedBuilding): PlacedBuilding {
   if (b.merge == null && b.mturn == null) return b
   const { merge: _, mturn: __, ...rest } = b

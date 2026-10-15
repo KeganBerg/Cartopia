@@ -24,7 +24,7 @@ import { tunerPrize, tunerTrial } from './tuner'
 import { tourIsBoss, tourLegBonus, tourLegOf, tourPrize } from './tour'
 import { EVENT_RACES, eventBonus, eventFor, eventIsBoss, eventPrize, eventProgress, type EventProgress } from './events'
 import { trialWeek } from './trial'
-import { groupOf, groupTurn, mergeCandidates, mergeBoosts, mergeFuel, applyMerge, applySplit, rotateGroup, isLandmark, LANDMARK_NAME } from './merge'
+import { groupOf, groupTurn, mergeCandidates, mergeBoosts, mergeFuel, applyMerge, applySplit, rotateGroup, moveGroup, isLandmark, LANDMARK_NAME, type MergeGroup } from './merge'
 import { togglePick } from './meet'
 import { crateCost, crateDef, crateOwnedSkins, pityHit, rollCrate, rollSourcePiece, type CrateId, type CrateOpen } from './crates'
 import { pieceId } from './resto'
@@ -516,6 +516,19 @@ export function buyablePlots(land: string[]) {
 export function canPlace(s: Pick<SaveState, 'roads' | 'buildings' | 'land'>, def: string, x: number, z: number, rot?: number, ignore?: string) {
   const occ = occupancy(s, ignore)
   return footprint(def, x, z, rot).every(([tx, tz]) => owns(s.land, tx, tz) && !occ.has(key(tx, tz)))
+}
+
+// Whether a merged block fits with its top-left corner at x, z (its own buildings don't get in the way).
+export function canPlaceBlock(s: Pick<SaveState, 'roads' | 'buildings' | 'land'>, g: Pick<MergeGroup, 'w' | 'h' | 'members'>, x: number, z: number) {
+  const ids = new Set(g.members.map((o) => o.uid))
+  const occ = occupancy(s)
+  for (let i = 0; i < g.w; i++) {
+    for (let j = 0; j < g.h; j++) {
+      const o = occ.get(key(x + i, z + j))
+      if (!owns(s.land, x + i, z + j) || (o && !ids.has(o))) return false
+    }
+  }
+  return true
 }
 
 // Obstacles get cleared, not moved.
@@ -1030,7 +1043,16 @@ export const useGame = create<GameState>()(
         const s = get()
         const b = s.buildings.find((o) => o.uid === buid)
         if (!b || !movable(b.def)) return false
-        if (groupOf(s.buildings, buid)) return false
+        // Moving any building of a merged block moves the whole block with it.
+        const g = groupOf(s.buildings, buid)
+        if (g) {
+          if (rot != null && rot !== b.rot) return false
+          const gx = g.x + x - b.x
+          const gz = g.z + z - b.z
+          if (!canPlaceBlock(s, g, gx, gz)) return false
+          if (gx !== g.x || gz !== g.z) set({ buildings: moveGroup(s.buildings, g, gx, gz), updatedAt: Date.now() })
+          return true
+        }
         const turn = rot ?? b.rot
         if (!canPlace(s, b.def, x, z, turn, buid)) return false
         if (b.x === x && b.z === z && b.rot === turn) return true
