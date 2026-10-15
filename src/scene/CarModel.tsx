@@ -1466,8 +1466,11 @@ function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight,
   const st = fit.stance ? STANCE[fit.stance] : undefined
   const tyre = st?.tyre ?? 1
   const wr = s.wheel * tyre
-  const rise = (st?.rise ?? 0) + wr - s.wheel
   const ww = (s.tyre ?? (s.track ? 0.16 : 0.14)) * tyre
+  // A drop never brings a tyre's top (tipped up at its edge by camber) above where the stock tyre
+  // sat, so it never comes up through a fender, whatever the wheel size.
+  const drop = Math.max(st?.rise ?? 0, -(s.wheel * (1 - tyre) + 0.004 - (ww / 2) * Math.sin(st?.camber ?? 0)))
+  const rise = drop + wr - s.wheel
   // Rusty finds keep a hint of their paint under brown, matte rust.
   const tint = useMemo(() => (rusty ? '#' + new Color(color).lerp(new Color('#8a5a3c'), 0.72).getHexString() : color), [color, rusty])
   const dark = useMemo(() => '#' + new Color(tint).multiplyScalar(0.6).getHexString(), [tint])
