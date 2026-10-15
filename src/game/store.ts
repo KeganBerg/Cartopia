@@ -8,6 +8,7 @@ import { PAINT_COST, hasCustomPaint, isHexColor, PANELS, PATTERNS, STARTER_PAINT
 import { cleanHat, earnedHats, hatDef, hatQuestOf, newHatQuest, ownedHats, sameHat, type HatFit, type HatQuest } from './hats'
 import { raceCarOf } from './raceCar'
 import { sfx } from '../lib/sound'
+import { applyAutoJobs, autoJobs, autoJobsChange } from './autoJobs'
 import { fx } from './fx'
 import { opensLabel } from './clock'
 import { requestTrip, requestVisit } from './trips'
@@ -293,6 +294,8 @@ type Actions = {
   upgradeBuilding: (uid: string) => boolean
   // Put a car to work at a business (null takes the driver off).
   assignCar: (buildingUid: string, carUid: string | null) => void
+  // Puts the best working car on every business (game/autoJobs.ts).
+  autoAssign: () => void
   buyCar: (model: string, color: string) => boolean
   upgradeCar: (uid: string, slot: UpgradeSlot) => boolean
   sellCar: (uid: string) => void
@@ -1260,6 +1263,16 @@ export const useGame = create<GameState>()(
           requestVisit(car.uid, buid)
         }
         set({ buildings, updatedAt: Date.now() })
+      },
+      autoAssign: () => {
+        const s = get()
+        if (s.visiting) return
+        const plan = autoJobs(s.buildings, s.cars)
+        if (!autoJobsChange(plan)) return
+        sfx.dispatch(plan.filter((p) => p.car !== p.was).length)
+        // The cars with a new job drive over to it.
+        for (const p of plan) if (p.car !== p.was) requestVisit(p.car, p.building)
+        set({ buildings: applyAutoJobs(s.buildings, plan), updatedAt: Date.now() })
       },
 
       // One tap does every chore: fix flats, fill up cars out of gas, collect

@@ -35,6 +35,7 @@ import { buildingIcon } from './buildingIcons'
 import { useTipTarget, type TipTarget } from './Tips'
 import { setFreeCam, useFreeCam } from '../scene/freeCam'
 import { Confirm, useAsk } from './Confirm'
+import { AutoJobsButton } from './AutoJobs'
 import { useUnlock, freshClass } from '../game/unlocks'
 
 // The dyno run and its engine sound load the first time an upgrade shows on the dyno.
@@ -752,7 +753,7 @@ export function GaragePanel() {
     setDyno((d) => ({ id: Date.now(), car: car.uid, model: car.model, mods: car.mods, before: d && d.car === car.uid ? d.before : was.pi, after: pi }))
   }, [car?.uid, pi])
   return (
-    <Panel title="Cars" wide head={<span className="cars-power" title="Garage power">⚡{garagePower(cars)}</span>}>
+    <Panel title="Cars" wide head={<><span className="cars-power" title="Garage power">⚡{garagePower(cars)}</span><AutoJobsButton /></>}>
       <CarsTabs current="garage" />
       <div className={picking ? 'garage picking' : 'garage'}>
         <div className="garage-list">
