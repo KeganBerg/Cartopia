@@ -302,7 +302,8 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .bay-lift .thumb3d { position: relative; z-index: 1; background: none; animation: bayLift 2.6s ease-in-out infinite; }
 .bay-lift::before { content: ''; position: absolute; left: 12px; right: 12px; bottom: 10px; height: 4px; border-radius: 2px; background: #ffb300; box-shadow: 0 0 0 1.5px #14213d; }
 @keyframes bayLift { 50% { transform: translateY(-3px); } }
-.bay-spark { position: absolute; z-index: 2; right: 14px; bottom: 16px; width: 6px; height: 6px; border-radius: 50%; background: #fff59d; box-shadow: 0 0 8px 3px #ffca28; animation: baySpark .9s steps(2) infinite; }
+/* Welding sparks sit on the car: --car is the car render's size in that bay (matches .thumb3d --th). */
+.bay-spark { position: absolute; z-index: 2; left: calc(50% + var(--car, 150px) * .24); top: calc(50% + var(--car, 150px) * .08); width: 6px; height: 6px; border-radius: 50%; background: #fff59d; box-shadow: 0 0 8px 3px #ffca28; animation: baySpark .9s steps(2) infinite; }
 @keyframes baySpark { 50% { opacity: 0; transform: translate(-30px, 4px) scale(.6); } }
 .bay-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .bay-info b { font: 17px var(--display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 2px 0 rgba(0,0,0,.35); }
@@ -329,7 +330,7 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .bayhero .bay-stage::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 10px; background: repeating-linear-gradient(-45deg, #ffca28 0 8px, #263238 8px 16px); }
 .bayhero .bay-stage::before { content: ''; position: absolute; left: 14%; right: 14%; bottom: 18px; height: 6px; border-radius: 3px; background: #ffb300; box-shadow: 0 0 0 2px #14213d; }
 .bayhero .bay-stage .thumb3d { --th: 150px; position: relative; z-index: 1; width: 100%; background: none; animation: bayLift 2.6s ease-in-out infinite; margin-bottom: 14px; }
-.bayhero .bay-spark.b { right: auto; left: 22%; bottom: 46%; animation-delay: .45s; }
+.bayhero .bay-spark.b { left: calc(50% - var(--car, 150px) * .22); top: calc(50% - var(--car, 150px) * .12); animation-delay: .45s; }
 .bay-side { display: flex; flex-direction: column; gap: 10px; min-width: 0; align-items: flex-start; }
 .bay-side b { font: 22px var(--display); max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 2px 0 rgba(0,0,0,.35); }
 .bay-side small { font: 14px var(--display); color: #cfe0ff; }
@@ -349,7 +350,7 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .bayhero.empty .bay-stage { height: 110px; }
 .bayhero.empty .bay-wrench { font-size: 40px; margin-bottom: 14px; }
 .bayhero.compact { grid-template-columns: auto minmax(0, 1fr); gap: 12px; padding: 8px; margin: 10px 0 8px; }
-.bayhero.compact .bay-stage { width: 92px; height: 66px; }
+.bayhero.compact .bay-stage { width: 92px; height: 66px; --car: 52px; }
 .bayhero.compact .bay-stage::before { bottom: 12px; height: 4px; }
 .bayhero.compact .bay-stage::after { height: 7px; }
 .bayhero.compact .bay-stage .thumb3d { --th: 52px; margin-bottom: 8px; }
@@ -382,7 +383,7 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 @media (max-width: 640px) {
   .bayhero:not(.compact) { grid-template-columns: minmax(0, 1fr); }
   .bayhero:not(.compact) { gap: 8px; padding: 10px; }
-  .bayhero .bay-stage { height: 112px; }
+  .bayhero .bay-stage { height: 112px; --car: 96px; }
   .bayhero .bay-stage .thumb3d { --th: 96px; margin-bottom: 10px; }
   .bayhero.empty .bay-stage { height: 76px; }
   .bayhero.empty .bay-wrench { font-size: 30px; margin-bottom: 10px; }
@@ -920,6 +921,11 @@ html.calm *, html.calm *::before, html.calm *::after { animation-duration: .001m
 .collect-all.cooling .collect-ico { opacity: .45; }
 .collect-time { position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); background: #263238; color: #fff; font: 12px var(--display); padding: 1px 6px; border-radius: 8px; }
 .collect-badge { position: absolute; top: -4px; right: -4px; min-width: 20px; height: 20px; border-radius: 10px; background: #e53935; color: #fff; font: 12px var(--display); display: grid; place-items: center; border: 2px solid #fff; }
+/* Chores Collect All had to skip: struck fuel or coin chips to its left for a few seconds. */
+.collect-skips { position: absolute; right: calc(100% + 6px); top: 50%; transform: translateY(-50%); display: flex; gap: 4px; pointer-events: auto; animation: collect-skip-in .25s ease-out; }
+.collect-skip { position: relative; width: 26px; height: 26px; border-radius: 50%; background: #fff; border: 2px solid #e53935; display: grid; place-items: center; box-shadow: 0 2px 0 rgba(0,0,0,.25); }
+.collect-skip::after { content: ''; position: absolute; left: 3px; right: 3px; top: 50%; height: 2.5px; margin-top: -1.25px; background: #e53935; border-radius: 2px; transform: rotate(-45deg); }
+@keyframes collect-skip-in { from { opacity: 0; transform: translate(8px, -50%) scale(.6); } }
 /* Goals checklist docked straight above Collect All. */
 .goals-btn.goals-dock { position: absolute; z-index: 51; right: calc(26px + var(--sar)); bottom: calc(176px + var(--sab)); width: 60px; height: 60px; font-size: 26px; border-radius: 16px; }
 /* Free camera toggle, docked above Goals. Lit blue while the free view is on. */
@@ -2080,7 +2086,7 @@ button.book-car { font: inherit; color: inherit; }
 
 /* Panels rise in and drop away (phones: the sheet slides up from the bottom). */
 .overlay:has(> .panel) { animation: ov-in .2s ease-out both; }
-.overlay > .panel { animation: panel-in .28s cubic-bezier(.2,1.25,.4,1) both; }
+.overlay > .panel { animation: panel-in .26s cubic-bezier(.2,1,.3,1) both; }
 .overlay.closing { animation: ov-out .17s ease-in both; pointer-events: none; }
 .overlay.closing > .panel { animation: panel-out .17s ease-in both; }
 @keyframes ov-in { from { opacity: 0; } }
@@ -2093,6 +2099,8 @@ button.book-car { font: inherit; color: inherit; }
   @keyframes sheet-in { from { transform: translateY(100%); } }
   @keyframes sheet-out { to { transform: translateY(100%); } }
 }
+/* A menu taking another's place (Panel's `still`) is just there. */
+.overlay.still:has(> .panel), .overlay.still > .panel { animation: none; }
 
 /* Garage paint: a shine sweeps across the car whenever the colour changes. */
 .preview-wrap { position: relative; }
@@ -2351,6 +2359,10 @@ body:has(.race-full) .toasts { display: none; }
 .stunt-pads small { font: 15px var(--display); margin-top: 2px; }
 .stunt-slow::after { content: ''; position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 80px 10px rgba(0,0,0,.35); }
 
+/* Delivery Dash: the round clock, big, ticking when it's nearly out. */
+.arc-hud > .dash-clock { font-size: 1.35em; min-width: 4.2em; }
+.arc-hud > .dash-clock.low { animation: dash-tick 1s steps(2) infinite; }
+@keyframes dash-tick { 50% { scale: 1.12; } }
 /* Delivery Dash: the hot-pizza timer under the HUD while an order is on board. */
 .dash-hot { position: absolute; top: calc(94px + var(--sat)); left: 50%; translate: -50% 0; display: flex; align-items: center; gap: 6px; pointer-events: none; }
 .dash-hot b { font-size: 20px; }

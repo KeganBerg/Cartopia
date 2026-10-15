@@ -749,8 +749,9 @@ export function splitSkinned(ids: string[], skins?: Partial<Record<SkinnedSlot, 
 }
 
 // skins: a mod skin number per slot. Skinned parts cost a few extra draws here; town
-// cars bake them instead (see LeanCar in CarModel.tsx).
-export function CarMods({ body, fit, tint, metal, flames, skins }: { body: Body; fit: Partial<Record<ModSlot, string>>; tint: string; metal: number; flames?: boolean; skins?: Partial<Record<SkinnedSlot, number>> }) {
+// cars bake them instead (see LeanCar in CarModel.tsx). skin: the body's own skin, worn by
+// body-colour parts that have no mod skin, so a scoop or flare doesn't show up as bare paint.
+export function CarMods({ body, fit, tint, metal, flames, skins, skin = 0 }: { body: Body; fit: Partial<Record<ModSlot, string>>; tint: string; metal: number; flames?: boolean; skins?: Partial<Record<SkinnedSlot, number>>; skin?: number }) {
   const all = modIds(fit)
   if (!all.length) return null
   const { skinned, plain: ids } = splitSkinned(all, skins)
@@ -760,7 +761,7 @@ export function CarMods({ body, fit, tint, metal, flames, skins }: { body: Body;
   return (
     <group>
       {skinned.map(([id, n]) => <SkinnedPart key={id} body={body} id={id} n={n} tint={tint} metal={metal} />)}
-      {g.paint && <mesh geometry={g.paint} castShadow><meshStandardMaterial color={tint} metalness={metal} roughness={0.3} /></mesh>}
+      {g.paint && <mesh geometry={g.paint} castShadow>{skin ? <SkinnedMat n={skin} color={tint} metal={metal} rough={0.3} /> : <meshStandardMaterial color={tint} metalness={metal} roughness={0.3} />}</mesh>}
       {g.carbon && <mesh geometry={g.carbon} material={carbon} castShadow />}
       {g.chrome && <mesh geometry={g.chrome} material={chrome} />}
       {g.ti && <mesh geometry={g.ti} material={ti} />}
