@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import { SkillIcon } from './TapTip'
 import { useGame, type OwnedCar } from '../game/store'
-import { type CarDef, CAMPAIGN, CAMPAIGN_RACES, GP_ROUNDS, GP_SERIES, RACE_FUEL, SKILLS, campaignCleared, campaignRaceId, campaignReward, carDef, carStats, msToNextWeek, performance, skinDef } from '../game/data'
-import { BUILDS, DIST, buildOf, character, fit, tourDist, type RaceDist } from '../game/distance'
+import { type CarDef, CAMPAIGN, CAMPAIGN_RACES, GP_ROUNDS, GP_SERIES, RACE_FUEL, SKILLS, campaignCleared, campaignRaceId, campaignReward, carDef, msToNextWeek, performance, skinDef } from '../game/data'
+import { BUILDS, DIST, buildOf, raceCharacter, fit, tourDist, type RaceDist } from '../game/distance'
 import { EVENT_RACES, eventFor, eventPrize, eventProgress } from '../game/events'
 import { TOUR_RACES, tourLeg, tourLegOf, tourRivalName } from '../game/tour'
 import { tourPayNow } from '../game/fairRace'
@@ -225,7 +225,7 @@ export function RaceBar({ cars, car, onPick, go, note, dist, loaner }: { cars: O
   // The build tag, with a tick or a cross for how it suits the next race's distance.
   const tag = (c: OwnedCar) => {
     if (dist === undefined) return null
-    const b = buildOf(character(carStats(carDef(c.model), c.upgrades, c.mods)))
+    const b = buildOf(raceCharacter(carDef(c.model)))
     const f = dist ? fit(b, dist) : null
     return <span className={`rm-build${f ? ` ${f}` : ''}`} data-tap-tip title={`${BUILDS[b].name}: ${BUILDS[b].text}`}>{BUILDS[b].icon}{f === 'good' ? '✓' : f === 'bad' ? '✗' : ''}</span>
   }

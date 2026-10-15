@@ -1,6 +1,6 @@
 // The live side of fairPi.ts: caps an AI rival at what the player's race car can beat right now.
-import { CARS, carDef, carStats, performance, type CarDef, type SkillId } from './data'
-import { DIST, character, tourDist } from './distance'
+import { CARS, carDef, performance, type CarDef, type SkillId } from './data'
+import { DIST, raceCharacter, tourDist } from './distance'
 import { buildPi, fairRivalPi } from './fairPi'
 import { carPi, raceCarOf } from './raceCar'
 import { useGame } from './store'
@@ -14,7 +14,7 @@ export function raceCarPi(track?: number) {
   const g = useGame.getState()
   const c = raceCarOf(g.cars, g.raceCar)
   if (!c) return null
-  return track ? buildPi(carPi(c), character(carStats(carDef(c.model), c.upgrades, c.mods)), track) : carPi(c)
+  return track ? buildPi(carPi(c), raceCharacter(carDef(c.model)), track) : carPi(c)
 }
 
 // The rival PI to race: the ladder's, or less when the race car couldn't beat that.
