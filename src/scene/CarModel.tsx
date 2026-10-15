@@ -1302,7 +1302,8 @@ function LeanCar({ parts, looks, casters, mods, modPaint, highlight, wheels, rad
     for (const [ids, skin] of groups) {
       if (!ids.length) continue
       const m = modGeo(mods.body, ids)
-      if (m.paint) shade.push([m.paint, { ...modPaint, skin }])
+      // Body-colour parts with no mod skin wear the body's skin (modPaint.skin).
+      if (m.paint) shade.push([m.paint, { ...modPaint, skin: skin || modPaint.skin || 0 }])
       if (m.carbon) shade.push([m.carbon, { ...finishOf(carbon), skin }])
       if (m.ti) shade.push([m.ti, { ...finishOf(KIND_MAT.ti), skin }])
       if (m.chrome) rest.push([m.chrome, { ...finishOf(KIND_MAT.chrome), skin }])
@@ -1437,7 +1438,7 @@ function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight,
       pink: finishOf(MAT.pink), mint: finishOf(MAT.mint), cream: finishOf(MAT.cream), waffle: finishOf(MAT.waffle),
     }
     return (
-      <LeanCar parts={p} looks={looks} casters={['paint', 'glass']} mods={{ body, ids: modIds(fit), skins: msk }} modPaint={{ color: tint, metal: rusty ? 0.1 : 0.4, rough: 0.3 }} highlight={highlight}
+      <LeanCar parts={p} looks={looks} casters={['paint', 'glass']} mods={{ body, ids: modIds(fit), skins: msk }} modPaint={{ color: tint, metal: rusty ? 0.1 : 0.4, rough: 0.3, ...(sk ? { skin: sk } : {}) }} highlight={highlight}
         wheels={[[-wx, wr, wz], [wx, wr, wz], [-wx, wr, -wz], [wx, wr, -wz]]} radius={wr} width={(s.tyre ?? 0.14) * tyre} rims={fit.rims} rimColor={rimColor} rig={rig} beams={<>{beam}{pool}</>} rise={rise}
         extra={<>{own && <mesh geometry={p.paint} castShadow><PaintMaterial color={tint} finish={finish} highlight={highlight} skin={chromed ? 0 : sk} panels={pan} zones={g.zones} /></mesh>}{topper}</>} />
     )
@@ -1464,7 +1465,7 @@ function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight,
         {p.glass && <mesh geometry={p.glass} material={glass.see} castShadow />}
         {p.cabin && <mesh geometry={p.cabin} material={matOf('seat', look.seat ?? '#2b2b2b', 0, 0.75)} />}
         {p.caliper && <mesh geometry={p.caliper} material={matOf('cal', look.caliper ?? '#4a4d52', look.caliper ? 0.2 : 0.5, 0.45)} />}
-        <CarMods body={body} fit={fit} tint={tint} metal={rusty ? 0.1 : 0.4} flames={flames} skins={msk} />
+        <CarMods body={body} fit={fit} tint={tint} metal={rusty ? 0.1 : 0.4} flames={flames} skins={msk} skin={sk} />
         {topper}
       </group>
       {/* Headlight beams on the road, visible after dark. */}
@@ -1769,7 +1770,7 @@ function BikeModel({ body, model, color, finish, skin, modSkin, panels, highligh
       lamp: finishOf(lamp), tail: finishOf(MAT.tail), amber: finishOf(MAT.amber), display: finishOf(MAT.display), caliper: finishOf(cal),
     }
     return (
-      <LeanCar parts={p} looks={looks} casters={['paint', 'black']} mods={{ body, ids: modIds(fit), skins: msk }} modPaint={{ color: tint, metal: rusty ? 0.1 : 0.4, rough: 0.3 }} highlight={highlight}
+      <LeanCar parts={p} looks={looks} casters={['paint', 'black']} mods={{ body, ids: modIds(fit), skins: msk }} modPaint={{ color: tint, metal: rusty ? 0.1 : 0.4, rough: 0.3, ...(sk ? { skin: sk } : {}) }} highlight={highlight}
         wheels={[[0, r, wz], [0, r, -wz]]} radius={r} width={0.07} rims={fit.rims} rimColor={rimColor} rig={rig} beams={beam}
         extra={<>{own && <mesh geometry={p.paint} castShadow><PaintMaterial color={tint} finish={finish} highlight={highlight} skin={chromed ? 0 : sk} panels={pan} /></mesh>}{topper}</>} />
     )
@@ -1787,7 +1788,7 @@ function BikeModel({ body, model, color, finish, skin, modSkin, panels, highligh
       {shared.map((k) => <mesh key={k} geometry={p[k]} material={MAT[k]} castShadow={k === 'black'} />)}
       {p.lamp && <mesh geometry={p.lamp} material={lamp} />}
       {p.caliper && <mesh geometry={p.caliper} material={cal} />}
-      <CarMods body={body} fit={fit} tint={tint} metal={rusty ? 0.1 : 0.4} flames={flames} skins={msk} />
+      <CarMods body={body} fit={fit} tint={tint} metal={rusty ? 0.1 : 0.4} flames={flames} skins={msk} skin={sk} />
       {topper}
       {beam}
       {[wz, -wz].map((z, i) => (

@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react'
+import { useEffect, useSyncExternalStore, type RefObject } from 'react'
 
 // Lets a full-screen 3D view (the race) pause the town canvas underneath it,
 // so phones only draw one scene at a time.
@@ -42,4 +42,36 @@ export function useTownPaused(): boolean {
     },
     () => holds > 0 || drawHolds > 0,
   )
+}
+
+// A menu that covers most of the screen (most panels on a phone) pauses the town's drawing
+// behind it: the town's last frame stays under the menu, and the phone's GPU goes to the menu's
+// own 3D views and scrolling. Layout size, not the on-screen box, so the slide-in doesn't count.
+export const COVERS = 0.85
+export function coversScreen(w: number, h: number, vw: number, vh: number): boolean {
+  return vw > 0 && vh > 0 && (w * h) / (vw * vh) >= COVERS
+}
+export function usePauseTownUnder(ref: RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    let release: (() => void) | undefined
+    const sync = () => {
+      const on = coversScreen(el.offsetWidth, el.offsetHeight, window.innerWidth, window.innerHeight)
+      if (on && !release) release = pauseTownDraw()
+      else if (!on && release) {
+        release()
+        release = undefined
+      }
+    }
+    sync()
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(sync)
+    ro?.observe(el)
+    window.addEventListener('resize', sync)
+    return () => {
+      ro?.disconnect()
+      window.removeEventListener('resize', sync)
+      release?.()
+    }
+  }, [ref])
 }

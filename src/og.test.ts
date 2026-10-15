@@ -31,4 +31,14 @@ describe('link preview', () => {
   it('fills in the site URL at build time', () => {
     expect(readFileSync(new URL('../vite.config.ts', import.meta.url), 'utf8')).toContain("replaceAll('%SITE_URL%'")
   })
+
+  it('names the tab "Cartopia" and every icon it links exists', () => {
+    expect(html.match(/<title>([^<]*)<\/title>/)?.[1]).toBe('Cartopia')
+    const hrefs = [...html.matchAll(/<link rel="(?:icon|apple-touch-icon)"[^>]*href="([^"]+)"/g)].map((m) => m[1])
+    expect(hrefs).toContain('/favicon.ico')
+    expect(hrefs).toContain('/icons/apple-touch-icon.png')
+    for (const h of hrefs) expect(existsSync(new URL(`../public${h}`, import.meta.url)), h).toBe(true)
+    const manifest = JSON.parse(readFileSync(new URL('../public/manifest.webmanifest', import.meta.url), 'utf8')) as { icons: { src: string }[] }
+    for (const i of manifest.icons) expect(existsSync(new URL(`../public${i.src}`, import.meta.url)), i.src).toBe(true)
+  })
 })

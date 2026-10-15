@@ -20,7 +20,8 @@ export function showTip(anchor: Element, body: ReactNode) {
   const r = anchor.getBoundingClientRect()
   useTapTip.setState({ tip: { x: r.left + r.width / 2, top: r.top, bottom: r.bottom, body, key: ++seq } })
 }
-export const hideTip = () => useTapTip.setState({ tip: null })
+// Runs on every tap and scroll, so it only touches the store when a bubble is up.
+export const hideTip = () => { if (useTapTip.getState().tip) useTapTip.setState({ tip: null }) }
 
 // What each skill does in a drag race, as two chips: the effect and when it kicks in.
 // Numbers match skillBoost/skillDrag in game/data.ts (checked in TapTip.test.ts).
