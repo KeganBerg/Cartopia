@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  BLOCK, DASH_MAX, DASH_TIME, GRID, STREET, TOWN, blockCentre, clockBonus, dropBonus, brakeDistance, dashStars, flips, gunTimes, insideBlock, jumpLength, jumpScore, kerbSpot,
+  BLOCK, DASH_MAX, DASH_TIME, GRID, STREET, TOWN, blockCentre, clockBonus, dropBonus, hotWindow, trafficPace, brakeDistance, dashStars, flips, gunTimes, insideBlock, jumpLength, jumpScore, kerbSpot,
   landed, pitCall, pitStars, stopGrade, stopPenalty, starReward, stuntStars, washStars, scrubNeed, washBonus,
 } from './arcadeMore'
 import { chaseReward } from './arcade'
@@ -91,5 +91,12 @@ describe('Delivery Dash clock', () => {
       if (left > 0) expect(t + left).toBeLessThanOrEqual(DASH_MAX)
     }
     expect(left).toBeLessThanOrEqual(0)
+  })
+  it('gets harder with every delivery', () => {
+    expect(trafficPace(0)).toBe(1)
+    expect(trafficPace(5)).toBeGreaterThan(trafficPace(2))
+    expect(trafficPace(50)).toBe(1.6)
+    expect(hotWindow(20, 4)).toBeLessThan(hotWindow(20, 0))
+    expect(hotWindow(20, 99)).toBeCloseTo(hotWindow(20, 0) * 0.55)
   })
 })

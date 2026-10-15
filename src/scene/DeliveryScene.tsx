@@ -8,7 +8,7 @@ import { Batch } from './Batch'
 import { LAYER, decal } from './layers'
 import { asphaltTex, grassTex, paverTex } from './textures'
 import { ArcadeSky, Bin, CarShadow, Crowd, Hydrant, K, Lamp, useArcadeLook, useTownPool, type Person } from './ArcadeScenery'
-import { BLOCK, DASH_TIME, DROP_LINE, DROP_R, GRID, STREET, TOWN, TOWN_SOLIDS, TRAFFIC_HIT, atDrop, blockCentre, clockBonus, dropBonus, hotTime, kerbSpot, roadLine } from '../game/arcadeMore'
+import { BLOCK, DASH_TIME, DROP_LINE, DROP_R, GRID, STREET, TOWN, TOWN_SOLIDS, TRAFFIC_HIT, atDrop, blockCentre, clockBonus, dropBonus, hotWindow, kerbSpot, roadLine, trafficPace } from '../game/arcadeMore'
 import { carBox, circlePush, step, type Footprint } from '../game/collide'
 import { Footprinted, frameFootprint, scaled } from './footprint'
 import { buildingDef, CARS, isBike, TILE } from '../game/data'
@@ -303,7 +303,7 @@ export function DeliveryScene({ me, input, running, onHud, onEnd }: {
     const mine = carBox(s.pose, foot.current)
     s.movers.forEach((m, i) => {
       if (live) {
-        m.pos += m.dir * m.speed * dt
+        m.pos += m.dir * m.speed * trafficPace(s.drops) * dt
         if (m.pos > TOWN / 2 + 2) m.pos -= TOWN + 4
         if (m.pos < -TOWN / 2 - 2) m.pos += TOWN + 4
       }
@@ -344,7 +344,7 @@ export function DeliveryScene({ me, input, running, onHud, onEnd }: {
           dingSound()
           s.carrying = true
           s.target = pickFar(HOUSE_SPOTS, s.pose.x, s.pose.z)
-          s.hotFor = hotTime(Math.hypot(s.target.x - s.pose.x, s.target.z - s.pose.z))
+          s.hotFor = hotWindow(Math.hypot(s.target.x - s.pose.x, s.target.z - s.pose.z), s.drops)
           s.hotUntil = s.t + s.hotFor
         }
       }

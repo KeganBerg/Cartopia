@@ -80,6 +80,9 @@ export const DASH_TIME = 60
 // Bumping traffic costs time.
 export const DASH_MAX = 80
 export const hotTime = (dist: number) => 4 + dist / 4.5
+// It gets harder as you go: each delivery speeds the traffic up and shortens the hot window.
+export const trafficPace = (drops: number) => Math.min(1.6, 1 + 0.08 * drops)
+export const hotWindow = (dist: number, drops: number) => hotTime(dist) * Math.max(0.55, 1 - 0.07 * drops)
 export function dropBonus(hot: boolean, streak: number) {
   return hot ? 2 + Math.min(3, streak) : 0
 }
@@ -87,7 +90,7 @@ export function dropBonus(hot: boolean, streak: number) {
 export function clockBonus(bonus: number, t: number, left: number) {
   return Math.max(0, Math.floor(Math.min(bonus, DASH_MAX - t - left)))
 }
-export const TRAFFIC_HIT = 2
+export const TRAFFIC_HIT = 3
 export function dashStars(drops: number) {
   return drops >= 6 ? 3 : drops >= 4 ? 2 : drops >= 2 ? 1 : 0
 }
