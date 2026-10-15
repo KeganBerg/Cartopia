@@ -66,11 +66,34 @@ const move = (el: HTMLElement, x: number, y: number) => {
   el.style.transform = at
 }
 
+// Ready coins and flat-tyre bubbles bob up and down here, not in CSS. The town redraws every
+// frame, and a CSS animation then made the browser restyle every coin every frame: a town
+// full of finished jobs got slower each minute as coins piled up. Moving the bubble's own
+// box costs a fraction of that. A new coin pops in first (badge-in), then bobs.
+const BOB_MS = 900
+const BOBS: [string, number][] = [['badge-ready', 500], ['badge-flat', 0]]
+const bobSince = new WeakMap<HTMLElement, number>()
+const stillPref = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null
+// Up to 6px above its spot, eased in and out like the old CSS bob.
+export const bobAt = (ms: number) => (ms <= 0 ? 0 : -3 + 3 * Math.cos((ms / BOB_MS) * 2 * Math.PI))
+const bob = (el: HTMLElement, now: number) => {
+  const c = el.firstElementChild?.classList
+  const kind = c && !stillPref?.matches ? BOBS.find(([k]) => c.contains(k)) : undefined
+  if (!kind) {
+    bobSince.delete(el)
+    return 0
+  }
+  let t0 = bobSince.get(el)
+  if (t0 === undefined) bobSince.set(el, (t0 = now + kind[1]))
+  return bobAt(now - t0)
+}
+
 export function AnchorProjector() {
   const camera = useThree((s) => s.camera)
   const size = useThree((s) => s.size)
   useFrame((_, delta) => {
     placed.length = 0
+    const now = performance.now()
     const slide = Math.min(1, delta * 14)
     if (hudAge-- <= 0) {
       hudAge = 20
@@ -181,7 +204,7 @@ export function AnchorProjector() {
         a.x = a.x0 + n.x
         a.y = a.y0 + n.y
       }
-      move(a.el, a.x, a.y)
+      move(a.el, a.x, a.y + bob(a.el, now))
     }
   })
   return null

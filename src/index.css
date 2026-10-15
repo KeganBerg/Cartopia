@@ -75,7 +75,7 @@ input { font: inherit; padding: 8px 10px; border-radius: 10px; border: 2px solid
 .badge::after { content: ''; position: absolute; left: 50%; bottom: -9px; transform: translateX(-50%); border: 6px solid transparent; border-top-color: #fff; }
 .badge-idle { background: #eceff1; color: var(--ink); }
 .badge-working { background: #263238; color: #fff; }
-.badge-ready { background: radial-gradient(#fff8e1, #ffecb3); padding: 4px; border-radius: 50%; animation: bob 0.9s ease-in-out infinite; }
+.badge-ready { background: radial-gradient(#fff8e1, #ffecb3); padding: 4px; border-radius: 50%; }
 .coin { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font: 22px var(--display); color: #8d5a00; background: radial-gradient(#ffe082, #f9a825); border: 2px solid #fff3c4; }
 .bar { width: 46px; height: 8px; background: #546e7a; border-radius: 4px; overflow: hidden; }
 .bar span { display: block; height: 100%; background: #76ff03; }
@@ -179,7 +179,7 @@ button.card:hover:not(:disabled) { border-color: var(--accent); }
 .goal.done { border-color: var(--green); background: #f1f8e9; }
 .goal-main small { color: #546e7a; font-weight: 800; font-size: 12px; }
 .bar.wide { width: 100%; margin: 4px 0; height: 10px; }
-.badge-flat { background: #ffebee; color: #c62828; animation: bob 0.9s ease-in-out infinite; }
+.badge-flat { background: #ffebee; color: #c62828; }
 
 .race-3d { position: relative; height: 260px; border-radius: 12px; overflow: hidden; margin-bottom: 8px; background: #8fd3ff; }
 .countdown.big { position: absolute; inset: 0; display: grid; place-items: center; font-size: 96px; color: #fff; text-shadow: 0 4px 0 #c62828; pointer-events: none; }
@@ -2093,7 +2093,8 @@ button.book-car { font: inherit; color: inherit; }
 @media (max-width: 600px) { .fly-label { font-size: 18px; } }
 
 /* A finished job's coin pops up, then bobs and spins now and then. */
-.badge-ready { animation: badge-in .5s cubic-bezier(.2,1.7,.4,1) both, bob .9s ease-in-out .5s infinite; }
+/* The bob after the pop-in is in anchors.ts: a CSS loop here restyled every coin every frame. */
+.badge-ready { animation: badge-in .5s cubic-bezier(.2,1.7,.4,1) both; }
 .badge-ready .coin { animation: coin-spin 2.6s ease-in-out .6s infinite; }
 @keyframes badge-in { 0% { transform: scale(0) translateY(10px); } 60% { transform: scale(1.25) translateY(-6px); } 100% { transform: scale(1); } }
 @keyframes coin-spin { 0%, 70% { transform: rotateY(0); } 85% { transform: rotateY(180deg); } 100% { transform: rotateY(360deg); } }
