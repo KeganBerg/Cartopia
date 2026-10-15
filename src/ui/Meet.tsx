@@ -27,7 +27,7 @@ export function LikeButton({ owner, mine }: { owner: string; mine?: boolean }) {
   const n = l?.likes ?? 0
   if (mine) return <span className="meet-likes" title="Likes on your display">❤️ {n}</span>
   return (
-    <button className={l?.liked ? 'buy small alt meet-like liked' : 'buy small meet-like'} disabled={l?.liked} onClick={() => likeDisplay(owner)} title={l?.liked ? 'Liked today' : 'Like this display'}>
+    <button className={l?.liked ? 'buy small alt meet-like liked' : 'buy small meet-like'} disabled={l?.liked} onClick={() => likeDisplay(owner)} title={l?.liked ? 'Liked' : 'Like this town'}>
       {l?.liked ? '❤️' : '🤍'} {n}
     </button>
   )
