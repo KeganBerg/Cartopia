@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useGame } from '../game/store'
 import { CAR_PACKS, type BucksPack } from '../game/bucksPacks'
 import { carDef, performance } from '../game/data'
-import { classOf } from '../game/classes'
 import { reducedMotion } from '../game/fx'
 import { CarThumb } from '../scene/BuildingPreview'
 import { Panel } from './Menus'
@@ -45,62 +44,109 @@ function useCountUp(n: number, ms = 900) {
   return v
 }
 
-function PackCard({ p, i, owned, pending, onBuy }: { p: BucksPack; i: number; owned: boolean; pending: boolean; onBuy: () => void }) {
+const tierOf = (car: { pack?: boolean }, pi: number) => (pi >= 115 ? 'Hyper' : pi >= 100 ? 'Super' : car.pack ? 'New' : 'Street')
+
+function Stage({ car, big }: { car: ReturnType<typeof carDef>; big?: boolean }) {
+  return (
+    <>
+      <div className="pk-streaks" />
+      <div className="pk-floor" />
+      <div className={big ? 'pk-car big' : 'pk-car'}><CarThumb size="lg" body={car.body} model={car.id} color={car.colors[0]} /></div>
+    </>
+  )
+}
+
+function BuyButton({ p, owned, pending, onBuy }: { p: BucksPack; owned: boolean; pending: boolean; onBuy: () => void }) {
+  return owned ? <button className="buy pk-buy" disabled>✓ In garage</button>
+    : <button className="buy pk-buy" disabled={pending} onClick={onBuy}>{pending ? '...' : `$${p.price.toFixed(2)}`}</button>
+}
+
+const vars = (id: string, i = 0) => {
+  const t = THEME[id] ?? THEME.vanta
+  return { '--pk-bg': t.bg, '--pk-streak': t.streak, '--pk-glow': t.glow, '--pk-i': i } as React.CSSProperties
+}
+
+// The showcase: the super and hyper cars take turns on a big stage, or the one the player taps.
+function Showcase({ packs, owns, pending, buy }: { packs: BucksPack[]; owns: (p: BucksPack) => boolean; pending: string | null; buy: (p: BucksPack) => void }) {
+  const [at, setAt] = useState(packs.length - 1)
+  const [held, setHeld] = useState(false)
+  useEffect(() => {
+    if (held || reducedMotion()) return
+    const id = window.setInterval(() => setAt((n) => (n + 1) % packs.length), 4500)
+    return () => window.clearInterval(id)
+  }, [held, packs.length])
+  const p = packs[at]
   const car = carDef(p.car!)
   const pi = performance(car, ZERO)
   const shown = useCountUp(pi)
-  const t = THEME[car.id] ?? THEME.vanta
-  const cls = classOf(car.id)
-  const stats: [string, string, number][] = [['🔥', 'Power', car.power], ['🛞', 'Grip', car.grip], ['🪶', 'Light', 100 - car.weight]]
-  const style = { '--pk-bg': t.bg, '--pk-streak': t.streak, '--pk-glow': t.glow, '--pk-i': i } as React.CSSProperties
   return (
-    <div className={`pk-card${p.tag ? ' featured' : ''}${owned ? ' owned' : ''}`} style={style}>
+    <div className="pk-hero" style={vars(car.id)}>
       <div className="pk-stage">
         <div className="pk-streaks" />
-        <div className="pk-floor" />
-        {p.tag && <span className="pk-ribbon">{p.tag}</span>}
-        <span className="pk-pi"><b>{shown}</b><small>PI</small></span>
-        <span className="pk-class" title={cls.name}>{cls.icon}</span>
-        <div className="pk-car"><CarThumb size="lg" body={car.body} model={car.id} color={car.colors[0]} /></div>
+        <span key={pi} className="pk-bignum" aria-hidden>{pi}</span>
+        {/* Every car stays mounted, so its render is ready the moment it slides in. */}
+        {packs.map((q, i) => <div key={q.id} className={i === at ? 'pk-swap on' : 'pk-swap'}><Stage car={carDef(q.car!)} big /></div>)}
       </div>
-      <div className="pk-info">
-        <div className="pk-name">{car.name}</div>
-        <div className="pk-stats">
-          {stats.map(([ico, name, v]) => (
-            <div key={name} className="pk-stat" title={name}>
-              <span>{ico}</span>
-              <i><em style={{ width: `${Math.min(100, (v / 140) * 100)}%` }} /></i>
-            </div>
-          ))}
+      <div key={`i${car.id}`} className="pk-hero-info">
+        <span className={`pk-tiertag ${tierOf(car, pi).toLowerCase()}`}>{tierOf(car, pi)}</span>
+        <div className="pk-hero-name">{car.name}</div>
+        <div className="pk-hero-row">
+          <span className="pk-hero-pi"><b>{shown}</b> PI</span>
+          <span className="pk-gems">+ {p.bucks} 💎</span>
         </div>
-        <div className="pk-extras">{car.pack ? <span>🚗 Pack only</span> : <span title={`Normally unlocks at level ${car.unlockLevel}`}>🔓 Lv {car.unlockLevel}</span>}<span>+ {p.bucks} 💎</span></div>
-        {owned ? <button className="buy" disabled>✓ In garage</button>
-          : <button className="buy" disabled={pending} onClick={onBuy}>{pending ? '...' : `$${p.price.toFixed(2)}`}</button>}
+        <BuyButton p={p} owned={owns(p)} pending={pending === p.id} onBuy={() => buy(p)} />
+      </div>
+      <div className="pk-dots">
+        {packs.map((q, i) => <button key={q.id} aria-label={carDef(q.car!).name} className={i === at ? 'on' : ''} onClick={() => { setHeld(true); setAt(i) }} />)}
       </div>
     </div>
   )
 }
 
-const TIERS = [['street', '🏁 Street · PI 50-100'], ['super', '🔥 Super & Hyper · PI 100+']] as const
+function PackCard({ p, i, owned, pending, onBuy }: { p: BucksPack; i: number; owned: boolean; pending: boolean; onBuy: () => void }) {
+  const car = carDef(p.car!)
+  const pi = performance(car, ZERO)
+  const shown = useCountUp(pi)
+  const tier = tierOf(car, pi)
+  return (
+    <div className={`pk-card ${tier.toLowerCase()}${p.tag ? ' featured' : ''}${owned ? ' owned' : ''}`} style={vars(car.id, i)}>
+      <div className="pk-stage">
+        <Stage car={car} />
+        {p.tag && <span className="pk-ribbon">{p.tag}</span>}
+        <span className="pk-pi"><b>{shown}</b><small>PI</small></span>
+        <span className="pk-gems">+ {p.bucks} 💎</span>
+        <div className="pk-name">{car.name}</div>
+      </div>
+      <div className="pk-foot">
+        {car.pack ? <span className={`pk-tiertag ${tier.toLowerCase()}`}>{tier === 'New' ? 'Pack only' : tier}</span>
+          : <span className="pk-tiertag lv" title={`Normally unlocks at level ${car.unlockLevel}`}>🔓 Lv {car.unlockLevel}</span>}
+        <BuyButton p={p} owned={owned} pending={pending} onBuy={onBuy} />
+      </div>
+    </div>
+  )
+}
 
-// Car Packs: a menu of its own beside the gem Bank. Each pack is a car you can't get anywhere
-// else plus gems, shown on an animated stage, one per account.
+// Car Packs: a menu of its own beside the gem Bank. The super and hyper cars rotate on a big
+// showcase stage; every pack below is a card with its car turning on an animated stage.
 export function CarPacksPanel() {
   const cars = useGame((s) => s.cars)
   const { pending, buy, notice } = useBuy()
+  const owns = (p: BucksPack) => cars.some((c) => c.model === p.car)
+  const top = CAR_PACKS.filter((p) => p.tier === 'super')
+  const street = CAR_PACKS.filter((p) => p.tier !== 'super')
+  const grid = (packs: BucksPack[], cls: string) => (
+    <div className={`pk-grid ${cls}`}>
+      {packs.map((p, i) => <PackCard key={p.id} p={p} i={i} owned={owns(p)} pending={pending === p.id} onBuy={() => buy(p)} />)}
+    </div>
+  )
   return (
-    <Panel title="Car Packs" wide>
+    <Panel title="Car Packs" wide className="pk-panel">
       <BankTabs current="carpacks" />
-      {TIERS.map(([tier, head]) => (
-        <section key={tier} className="pk-tier">
-          <h3>{head}</h3>
-          <div className="pk-grid">
-            {CAR_PACKS.filter((p) => (p.tier ?? 'street') === tier).map((p, i) => (
-              <PackCard key={p.id} p={p} i={i} owned={cars.some((c) => c.model === p.car)} pending={pending === p.id} onBuy={() => buy(p)} />
-            ))}
-          </div>
-        </section>
-      ))}
+      <Showcase packs={top} owns={owns} pending={pending} buy={buy} />
+      <h3 className="pk-head super">🔥 Super & Hyper</h3>
+      {grid(top, 'four')}
+      <h3 className="pk-head">🏁 Street</h3>
+      {grid(street, 'three')}
       <p className="hint">One of each per account · Prices in USD · 🔒 Stripe</p>
       {notice}
     </Panel>
