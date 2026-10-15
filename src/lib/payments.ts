@@ -8,7 +8,7 @@ import { flushSave, signedInUser } from './cloud'
 // sends the player to Stripe; stripe-webhook.mts records the paid pack in the purchases table
 // (purchase_record()), and syncPurchases() adds rows the save hasn't counted yet. The save guard
 // only lets the gems in when the row is there, so a page can't grant itself a pack.
-export type PurchaseResult = { ok: true } | { ok: false; reason: 'not-connected' | 'sign-in' | 'blocked' | 'failed' }
+export type PurchaseResult = { ok: true } | { ok: false; reason: 'not-connected' | 'sign-in' | 'blocked' | 'level' | 'owned' | 'failed' }
 
 export async function purchase(pack: BucksPack): Promise<PurchaseResult> {
   if (!supabase) return { ok: false, reason: 'not-connected' }
@@ -23,9 +23,12 @@ export async function purchase(pack: BucksPack): Promise<PurchaseResult> {
     })
     if (res.status === 503 || res.status === 404) return { ok: false, reason: 'not-connected' }
     if (res.status === 401) return { ok: false, reason: 'sign-in' }
+    const { url, error } = (await res.json().catch(() => ({}))) as { url?: string; error?: string }
+    // A car pack below its level, or one this account already has.
+    if (error === 'level') return { ok: false, reason: 'level' }
+    if (res.status === 409) return { ok: false, reason: 'owned' }
     // A refunded or charged-back pack's gems were already spent on this account.
     if (res.status === 403) return { ok: false, reason: 'blocked' }
-    const { url } = (await res.json()) as { url?: string }
     if (!res.ok || !url) return { ok: false, reason: 'failed' }
     // Whatever was just earned lands before the player leaves for Stripe.
     await flushSave()
@@ -44,13 +47,14 @@ let missing = false
 export async function syncPurchases(): Promise<number> {
   if (!supabase || !signedInUser() || missing) return 0
   const from = useGame.getState().purchases ?? 0
-  const { data, error } = await supabase.from('purchases').select('seq, pack, bucks, coins, parts').gt('seq', from).order('seq')
+  // Every column, so a server without the car column (0090) still pays gem packs.
+  const { data, error } = await supabase.from('purchases').select('*').gt('seq', from).order('seq')
   if (error) {
     // Not on this server yet.
     if (error.code === '42P01' || error.code === 'PGRST205') missing = true
     return 0
   }
-  const rows = ((data ?? []) as Purchase[]).filter((r) => r.seq > from)
+  const rows = ((data ?? []) as Purchase[]).filter((r) => r.seq > from).map(({ seq, pack, bucks, coins, parts, car }) => ({ seq, pack, bucks, coins, parts, ...(car ? { car } : {}) }))
   const gems = useGame.getState().applyPurchases(rows)
   if (gems) {
     useBought.setState({ rows })

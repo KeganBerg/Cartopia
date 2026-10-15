@@ -76,3 +76,26 @@ describe('stripe checkout', () => {
     expect([s.bucks, s.coins, s.purchases]).toEqual([75, 2600, 2])
   })
 })
+
+describe('car packs', () => {
+  it('each sells one pack-only car, on sale at that car\'s level', async () => {
+    const { CAR_PACKS } = await import('../game/bucksPacks')
+    const { CARS, carDef } = await import('../game/data')
+    expect(CAR_PACKS.map((p) => p.car).sort()).toEqual(CARS.filter((c) => c.pack).map((c) => c.id).sort())
+    for (const p of CAR_PACKS) {
+      expect(carDef(p.car!).pack, p.id).toBe(true)
+      expect(p.unlock, p.id).toBe(carDef(p.car!).unlockLevel)
+      expect(packById(p.id)).toBe(p)
+      expect(sessionForm(p, 'u1', 'https://cartopia.lol').get('line_items[0][price_data][product_data][name]')).toContain('car +')
+    }
+  })
+
+  it('adds a car pack\'s car to the garage once, as pk-<seq>', () => {
+    useGame.setState({ bucks: 0, coins: 0, parts: 0, purchases: 0, cars: [] })
+    const rows = [{ seq: 4, pack: 'car-kaze', bucks: 50, coins: 0, parts: 0, car: 'kaze' }]
+    expect(useGame.getState().applyPurchases(rows)).toBe(50)
+    useGame.setState({ purchases: 0 })
+    useGame.getState().applyPurchases(rows)
+    expect(useGame.getState().cars.map((c) => [c.uid, c.model])).toEqual([['pk-4', 'kaze']])
+  })
+})

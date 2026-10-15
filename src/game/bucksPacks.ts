@@ -8,7 +8,12 @@
 // The coins and parts grow with the buyer's level, the way everything else they earn does: coins are
 // worth `coinGems` gems at that level (gemCoins), parts grow 10% a level like building parts payouts.
 // Checkout stamps the buyer's level on the Stripe session, so the webhook grants what the shop showed.
-export type BucksPack = { id: string; name: string; price: number; bucks: number; bonus: number; coinGems?: number; parts?: number; tag?: string; art: string }
+export type BucksPack = {
+  id: string; name: string; price: number; bucks: number; bonus: number; coinGems?: number; parts?: number; tag?: string; art: string
+  // Car packs: the pack-only car it brings (a CARS id with `pack: true`) and the level it goes on sale
+  // at (the car's unlockLevel; data.test.ts keeps the two in step). One per account.
+  car?: string; unlock?: number
+}
 export const BUCKS_PACKS: BucksPack[] = [
   { id: 'handful', name: 'Handful of Gems', price: 1.99, bucks: 10, bonus: 10, art: '💎' },
   { id: 'stack', name: 'Stack of Gems', price: 4.99, bucks: 25, bonus: 30, coinGems: 3, art: '💎💎' },
@@ -17,6 +22,16 @@ export const BUCKS_PACKS: BucksPack[] = [
   { id: 'truck', name: 'Truckload of Gems', price: 49.99, bucks: 250, bonus: 450, coinGems: 70, parts: 120, art: '🚚' },
   { id: 'tanker', name: 'Golden Tanker', price: 99.99, bucks: 500, bonus: 1000, coinGems: 160, parts: 300, tag: 'Best value', art: '🏆' },
 ]
+
+// Car packs: a car you can only get here, a little quicker than the Showroom's best at its level,
+// plus gems. On sale once you reach the car's level, so money never skips progression.
+export const CAR_PACKS: BucksPack[] = [
+  { id: 'car-firebolt', name: 'Hot Rod Pack', price: 4.99, bucks: 25, bonus: 0, car: 'firebolt', unlock: 8, art: '🔥' },
+  { id: 'car-kaze', name: 'Time Attack Pack', price: 9.99, bucks: 50, bonus: 0, car: 'kaze', unlock: 15, art: '🏁' },
+  { id: 'car-sturm', name: 'Rally Legend Pack', price: 19.99, bucks: 100, bonus: 0, car: 'sturm', unlock: 25, art: '🏔️' },
+  { id: 'car-vanta', name: 'Hypercar Pack', price: 49.99, bucks: 250, bonus: 0, car: 'vanta', unlock: 40, tag: 'Fastest car', art: '⚡' },
+]
+export const ALL_PACKS = [...BUCKS_PACKS, ...CAR_PACKS]
 
 // Roughly what a gem buys at this level, in coins (five fuel's worth of jobs).
 export const GEM_COINS = { base: 300, perLevel: 100 }

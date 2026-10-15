@@ -72,7 +72,8 @@ export type Quests = {
 }
 export type Period = 'daily' | 'weekly'
 // A paid gem pack, as the server's purchases table records it (src/lib/payments.ts).
-export type Purchase = { seq: number; pack?: string; bucks: number; coins: number; parts: number }
+// car: a car pack's car, which joins the garage as uid pk-<seq> (the save guard checks that pairing).
+export type Purchase = { seq: number; pack?: string; bucks: number; coins: number; parts: number; car?: string | null }
 
 export type SaveState = {
   version: 1
@@ -1682,8 +1683,12 @@ export const useGame = create<GameState>()(
         const fresh = rows.filter((r) => r.seq > from).sort((a, b) => a.seq - b.seq)
         if (!fresh.length) return 0
         const sum = (k: 'bucks' | 'coins' | 'parts') => fresh.reduce((a, r) => a + r[k], 0)
+        const cars: OwnedCar[] = fresh
+          .filter((r) => r.car && !s.cars.some((c) => c.uid === `pk-${r.seq}`))
+          .map((r) => ({ uid: `pk-${r.seq}`, model: r.car!, color: carDef(r.car!).colors[0], upgrades: { engine: 0, turbo: 0, tires: 0, weight: 0 } }))
         set({
           bucks: s.bucks + sum('bucks'), coins: s.coins + sum('coins'), parts: s.parts + sum('parts'),
+          ...(cars.length ? { cars: [...s.cars, ...cars] } : {}),
           purchases: fresh[fresh.length - 1].seq,
           updatedAt: Date.now(),
         })

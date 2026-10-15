@@ -23,6 +23,9 @@
 .buy-item { display: flex; flex-direction: column; align-items: center; gap: 6px; animation: lvl-thump .5s ease-out both; animation-delay: calc(1.7s + var(--i) * 150ms); }
 .buy-item .ico { width: 56px; height: 56px; font-size: 30px; box-shadow: none; }
 .buy-item b { font: 30px/1 var(--display); color: #263238; }
+.buy-car { flex-basis: 100%; }
+.buy-car b { font-size: 20px; }
+.buy-pack { flex-wrap: wrap; }
 .buy-fly { position: absolute; left: 50%; top: 30%; font-size: 22px; font-style: normal; pointer-events: none; opacity: 0;
   animation: buy-fly 1s ease-out both; animation-delay: calc(1.75s + var(--i) * 150ms + var(--k) * 60ms); }
 @keyframes buy-fly {
