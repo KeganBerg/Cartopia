@@ -17,6 +17,7 @@ const TIPS: Tip[] = [
   { id: 'gems', icon: '💎', text: 'Gems are rare. Use them to skip waits, refill fuel and open Gold crates.', target: 'gems', when: () => true },
   { id: 'goals', icon: '📋', text: 'Not sure what to do next? Goals show the way and pay coins.', target: 'goals', when: (s) => (s.stats.jobs ?? 0) >= 8 },
   { id: 'garage', icon: '🔧', text: 'Upgrade your car under CARS to win more races.', target: 'cars', when: (s) => (s.stats.races ?? 0) >= 1 && (s.stats.upgrades ?? 0) === 0, go: (s) => s.openPanel('garage') },
+  { id: 'taptip', icon: '👆', text: 'Tap any badge or icon to see what it does.', target: 'cars', when: (s) => (s.stats.races ?? 0) >= 1, go: (s) => s.openPanel('garage') },
   { id: 'fuel', icon: '⛽', text: 'Jobs burn fuel. It refills by itself over time.', target: 'fuel', when: (s) => s.fuel <= 3 },
   { id: 'tires', icon: '🛞', text: `Build a Tire Shop: ${FEATURES.tires}.`, target: 'shop', when: (s) => s.level >= 2 && !owns(s, 'tires'), go: build('tires') },
   { id: 'crates', icon: '📦', text: 'Crates under CARS hold cars, parts and skins.', target: 'cars', when: () => true, go: (s) => s.openPanel('crates') },

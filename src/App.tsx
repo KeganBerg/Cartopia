@@ -7,6 +7,7 @@ import { FlyLayer } from './ui/Fly'
 import { ThumbRenderer } from './scene/BuildingPreview'
 import { Preview, StageCanvas } from './scene/Stage'
 import { quietShaders } from './scene/warm'
+import { TapTips } from './ui/TapTip'
 import { BottomBar, ShopPanel, ShowroomPanel, GaragePanel, Toasts } from './ui/Menus'
 import { InventoryPanel } from './ui/Inventory'
 import { PaintPrizePopup } from './ui/PaintRivals'
@@ -225,6 +226,7 @@ export default function App() {
       <LevelUpSplash />
       <PurchaseSplash />
       <Toasts />
+      <TapTips />
       <FlyLayer />
       <RaveHeadsUp />
       <FlashWarning />
