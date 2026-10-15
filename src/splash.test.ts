@@ -35,7 +35,7 @@ describe('loading screen', () => {
 
   // The town behind the splash, for every season and time of day (town.mjs).
   it('has a town for every season and time of day', () => {
-    const files = ['spring', 'summer', 'fall', 'winter'].flatMap((s) => ['day', 'dusk', 'night'].map((t) => `town-${s}-${t}.webp`))
+    const files = ['spring', 'summer', 'fall', 'winter'].flatMap((s) => ['day', 'dusk', 'night'].flatMap((t) => ['', '-p'].map((c) => `town-${s}-${t}${c}.webp`)))
     expect(files.filter((f) => !existsSync(new URL(`../public/splash/${f}`, import.meta.url)))).toEqual([])
   })
 })
