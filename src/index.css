@@ -1747,7 +1747,10 @@ button.book-car { font: inherit; color: inherit; }
 .badge-visitor-racer { background: linear-gradient(#ff7043, #d84315); color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,.4); }
 .badge-visitor-tourist { background: radial-gradient(#fff8e1, #ffecb3); color: var(--ink); }
 .badge-visitor-mystery { background: linear-gradient(#5e35b1, #311b92); color: #fff; animation: badgepulse .6s ease-in-out infinite; }
-.badge-visitor-barn { background: #fff3e0; color: #5d4037; }
+.badge-visitor-barn { background: linear-gradient(#ffb74d, #ef6c00); color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,.4); display: inline-flex; align-items: center; gap: 5px; padding-left: 4px; }
+.badge-visitor-barn .barn-pic { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; border: 2px solid #fff; }
+.badge-visitor-barn .time { font-size: 12px; opacity: .9; }
+:root .badge-visitor-barn { --tail: #ef6c00; }
 /* Off screen: pinned to the edge, smaller and without its pointer. */
 .anchor.edge .badge-visitor { transform: scale(.85); opacity: .92; }
 .anchor.edge .badge-visitor::after { display: none; }
