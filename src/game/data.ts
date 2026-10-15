@@ -41,6 +41,8 @@ export type BuildingDef = {
   nightOnly?: boolean
   // Stand-in for a building this build doesn't know (see buildingDef).
   parked?: boolean
+  // A wild obstacle left out of the server's catalog (see econCatalog.ts).
+  wild?: boolean
   // Sold only while this event runs (see EVENTS). Ones already placed stay.
   event?: EventId
 }
@@ -105,7 +107,12 @@ export const BUILDINGS: BuildingDef[] = [
   { id: 'highschool', name: 'High School', kind: 'business', w: 3, h: 2, price: 110000, unlockLevel: 25, jobSeconds: 2700, fuelCost: 13, payout: 7400, xp: 430, color: '#a1887f', roof: '#2e7d32', sign: 'HIGH SCHOOL' },
   { id: 'university', name: 'Ridgemont University', kind: 'business', w: 3, h: 3, price: 240000, unlockLevel: 32, unique: true, jobSeconds: 3600, fuelCost: 16, payout: 11000, xp: 560, color: '#d7ccc8', roof: '#6a1b9a', sign: 'RIDGEMONT UNIVERSITY' },
 
-  // Obstacles on newly bought land: pay to clear, wait, then tap to remove.
+  // Obstacles on newly bought land (game/wildLand.ts): bulldoze them for coins to make room.
+  // The wild ones aren't in the server's catalog: it already treats a def it doesn't know as
+  // an obstacle worth nothing, which is exactly what these are (see econCatalog.ts).
+  { id: 'wildoak', name: 'Old Oak', kind: 'obstacle', wild: true, w: 1, h: 1, price: 200, unlockLevel: 99, jobSeconds: 60, xp: 10, color: '#43a047', roof: '#6f4a30' },
+  { id: 'wildpine', name: 'Tall Pine', kind: 'obstacle', wild: true, w: 1, h: 1, price: 150, unlockLevel: 99, jobSeconds: 60, xp: 8, color: '#2e7d32', roof: '#5d4037' },
+  { id: 'wildrock', name: 'Mossy Boulder', kind: 'obstacle', wild: true, w: 1, h: 1, price: 250, unlockLevel: 99, jobSeconds: 60, xp: 12, color: '#9e9e9e', roof: '#6a8f3a' },
   { id: 'bush', name: 'Bushes', kind: 'obstacle', w: 1, h: 1, price: 150, unlockLevel: 99, jobSeconds: 30, xp: 5, color: '#558b2f', roof: '#33691e' },
   { id: 'rock', name: 'Boulder', kind: 'obstacle', w: 1, h: 1, price: 400, unlockLevel: 99, jobSeconds: 120, xp: 12, color: '#9e9e9e', roof: '#757575' },
   { id: 'cactus', name: 'Cactus', kind: 'obstacle', w: 1, h: 1, price: 1500, unlockLevel: 99, jobSeconds: 600, xp: 40, color: '#43a047', roof: '#2e7d32' },

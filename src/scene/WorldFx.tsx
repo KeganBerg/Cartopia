@@ -81,6 +81,7 @@ const GOLD = [new Color('#ffd54f'), new Color('#fff59d'), new Color('#ffffff')]
 const LEAF = [new Color('#7cb342'), new Color('#558b2f'), new Color('#9ccc65')]
 // Thank-you sparkles over a business you helped in a friend's town.
 const THANKS = [new Color('#ff80ab'), new Color('#69f0ae'), new Color('#ffd54f'), new Color('#ffffff')]
+const WOOD = [new Color('#7cb342'), new Color('#6f4a30'), new Color('#558b2f'), new Color('#a1887f')]
 const STONE = [new Color('#9e9e9e'), new Color('#bdbdbd'), new Color('#757575')]
 const pick = (c: Color[]) => c[(Math.random() * c.length) | 0]
 
@@ -174,7 +175,7 @@ export function WorldFx({ small }: { small: boolean }) {
           const b = town.find((o) => o.uid === e.uid)
           if (!b) return
           const f = footprint(b.def, b.x, b.z, b.rot)
-          const bits = b.def === 'rock' ? STONE : LEAF
+          const bits = b.def.endsWith('rock') ? STONE : b.def.startsWith('wild') ? WOOD : LEAF
           for (let i = 0; i < (small ? 16 : 24); i++) {
             const a = Math.random() * Math.PI * 2
             const sp = 0.6 + Math.random() * 1.6

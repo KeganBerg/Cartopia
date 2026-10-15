@@ -3,6 +3,7 @@ import { memo, useMemo, useState, type CSSProperties } from 'react'
 import { useGame, buyablePlots, today, type PlacedBuilding } from '../game/store'
 import { buildingDef, buildingLevel, jobLevel, carDef, loves, levelLift, plotPrice, START_LAND, jobSeconds, isOpen, mergeBonus, mergeGain } from '../game/data'
 import { msUntilNight } from '../game/clock'
+import { clearCost } from '../game/wildLand'
 import { anchors, anchorRef } from '../scene/anchors'
 import { centerOf, groupCenter, plotCenter } from '../scene/World'
 import { mergeGroups, mergeCandidates, type MergeGroup } from '../game/merge'
@@ -53,6 +54,7 @@ const JobBadge = memo(function JobBadge({ b, now, g, members = [b] }: JobProps) 
   const k = g ? lift(g) : 1
   const [cx, cz] = g ? groupCenter(g) : centerOf(b.def, b.x, b.z, b.rot)
   const jobsDone = useGame((s) => s.stats.jobs ?? 0)
+  const playerLvl = useGame((s) => s.level)
   const lvl = buildingLevel(b)
   anchors.set(b.uid, new Vector3(cx, ((d.w > 1 ? 2.6 : 2.2) + levelLift(lvl)) * k, cz))
   const ready = members.some((o) => o.jobEndsAt !== null && now >= o.jobEndsAt)
@@ -63,7 +65,7 @@ const JobBadge = memo(function JobBadge({ b, now, g, members = [b] }: JobProps) 
   const pct = working ? Math.max(0, 1 - left / jobSeconds(d, jobLevel(b), jobsDone)) : 0
   return (
     <div className="anchor" ref={anchorRef(b.uid)}>
-      <button className={`badge ${ready ? 'badge-ready' : working ? 'badge-working' : 'badge-idle'}${lit ? ' badge-pulse' : ''}`} onClick={() => tap(b.uid)} title={d.name}>
+      <button className={`badge ${ready ? 'badge-ready' : working ? 'badge-working' : 'badge-idle'}${lit ? ' badge-pulse' : ''}`} onClick={() => tap(b.uid)} title={d.kind === 'obstacle' ? `${d.name}: bulldoze for coins` : d.name}>
         {ready ? (
           <span className="coin">{d.kind === 'obstacle' ? '✔' : '$'}</span>
         ) : working ? (
@@ -76,7 +78,7 @@ const JobBadge = memo(function JobBadge({ b, now, g, members = [b] }: JobProps) 
         ) : !isOpen(d, now) ? (
           <span className="start">🌙 {fmt(Math.max(1, Math.ceil(msUntilNight(now) / 1000)))}</span>
         ) : d.kind === 'obstacle' ? (
-          <span className="start">🪓 ${d.price.toLocaleString()}</span>
+          <span className="start">🚜 {clearCost(d, playerLvl).toLocaleString()}</span>
         ) : (
           <span className="start">⛽ {(d.fuelCost ?? 0) * idle}</span>
         )}
