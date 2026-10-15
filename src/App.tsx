@@ -27,7 +27,6 @@ import { ThoughtBubble } from './ui/Thought'
 import { NeedPanel } from './ui/Need'
 import { UpgradePanel } from './ui/Upgrade'
 import { BankPanel } from './ui/Bank'
-import { CarPacksPanel } from './ui/CarPacks'
 import { DealsPanel } from './ui/Deals'
 import { LevelUpSplash } from './ui/LevelUp'
 import { PurchaseSplash } from './ui/PurchaseSplash'
@@ -53,6 +52,7 @@ import { startTechnoMusic } from './lib/technoMusic'
 import { TechnoLayer } from './ui/Techno'
 import { FlashWarning, RaveHeadsUp, flashWarningOpen, openDaily } from './ui/FlashWarning'
 import { useTownPaused } from './scene/renderGate'
+import { PACES, useTownPace } from './scene/townPace'
 import { useCrewGoalWatcher } from './ui/CrewGoal'
 import { useCrewBattleWatcher } from './ui/crewBattleWatch'
 import { VisitorBadges, StreetRaceCard } from './ui/Visitors'
@@ -91,11 +91,9 @@ const prefetchPanels = () => {
   else go()
 }
 
-// Phones get a lighter renderer: lower pixel ratio keeps iOS from dropping the WebGL context.
-const SMALL = typeof window !== 'undefined' && Math.min(window.innerWidth, window.innerHeight) < 700
-
 export default function App() {
   const panel = useGame((s) => s.panel)
+  const pace = PACES[useTownPace((p) => p.step)]
   const liveRace = useLive((l) => l.race)
   // Race prizes: their popups load with the Race menu's code, so they mount only when won.
   const gpPrize = useGame((s) => !!s.gpPrize)
@@ -154,7 +152,7 @@ export default function App() {
   return (
     <>
       {/* Camera sits well back with a tight near/far range so depth stays precise and flat layers never flicker. */}
-      <Canvas shadows={graphics !== 'saver'} orthographic camera={{ position: [75, 80, 75], zoom: 36, near: 1, far: 320 }} dpr={graphics === 'saver' ? 1 : SMALL && graphics === 'auto' ? [1, 1.5] : [1, 2]} gl={{ toneMapping: NeutralToneMapping }} frameloop={townPaused ? 'never' : 'demand'}
+      <Canvas shadows={graphics !== 'saver'} orthographic camera={{ position: [75, 80, 75], zoom: 36, near: 1, far: 320 }} dpr={graphics === 'saver' ? 1 : graphics === 'auto' ? [1, pace.dpr] : [1, 2]} gl={{ toneMapping: NeutralToneMapping }} frameloop={townPaused ? 'never' : 'demand'}
         onCreated={({ gl }) => {
           quietShaders(gl)
           splashProgress(0.9)
@@ -165,7 +163,7 @@ export default function App() {
       >
         <World />
         <SplashHandoff />
-        <FrameCap fps={graphics === 'saver' ? 30 : 60} paused={townPaused} />
+        <FrameCap fps={graphics === 'saver' ? 30 : graphics === 'auto' ? pace.fps : 60} paused={townPaused} />
         <ShadowSwitch on={graphics !== 'saver'} />
       </Canvas>
       <TechnoLayer />
@@ -193,7 +191,6 @@ export default function App() {
       {panel === 'upgrade' && <UpgradePanel />}
       {panel === 'rescue' && <RescuePanel />}
       {panel === 'bank' && <BankPanel />}
-      {panel === 'carpacks' && <CarPacksPanel />}
       {panel === 'deals' && <DealsPanel />}
       {panel === 'crates' && <CratesPanel />}
       {panel === 'battle' && <BattlePanel />}

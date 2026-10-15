@@ -36,3 +36,15 @@ export function warmShaders(gl: WebGLRenderer, scene: Object3D, camera: Camera, 
   }
   return done
 }
+
+// Three frees a shader program once no material uses it, so a scene that remounts (each
+// race, each crate opening) would compile its shaders all over again: a freeze every time.
+// Holding one extra use of each program keeps it for the canvas's lifetime (a few dozen,
+// one per look).
+export function pinPrograms(gl: WebGLRenderer | null) {
+  for (const p of (gl?.info.programs ?? []) as unknown as { usedTimes: number; pinned?: boolean }[]) {
+    if (p.pinned) continue
+    p.pinned = true
+    p.usedTimes++
+  }
+}

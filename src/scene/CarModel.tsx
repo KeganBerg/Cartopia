@@ -25,7 +25,6 @@ import { HatModel } from './CarHat'
 import type { HatFit } from '../game/hats'
 import { ODDBALL } from './oddballCars'
 import { RESTO } from './restoCars'
-import { PACK_CARS } from './packCars'
 
 type Shape = {
   len: number; wid: number
@@ -118,13 +117,6 @@ const SHAPES: Record<Body, Shape> = {
   pontoon: { len: 1.36, wid: 0.76, body: 0.16, lift: 0.08, cabinLen: 0.3, cabinH: 0.1, cabinZ: -0.05, taper: 0.7, hood: 0, wheel: 0.14, drop: 0.02, nose: 0.06, open: true },
   stepnose: { len: 1.3, wid: 0.76, body: 0.25, lift: 0.08, cabinLen: 0.62, cabinH: 0.19, cabinZ: -0.14, taper: 0.8, hood: 0, wheel: 0.15, drop: 0.01, nose: 0.05 },
   restomuscle: { len: 1.42, wid: 0.8, body: 0.25, lift: 0.08, cabinLen: 0.62, cabinH: 0.17, cabinZ: -0.22, taper: 0.8, hood: 0.03, wheel: 0.155, drop: 0.01, nose: 0.03 },
-  // Car pack cars: drawn by packCars/, same as the exotics.
-  highboy: { len: 1.36, wid: 0.78, body: 0.24, lift: 0.1, cabinLen: 0.36, cabinH: 0.17, cabinZ: -0.16, taper: 0.9, hood: 0.055, wheel: 0.16, drop: 0, nose: 0.02, open: true },
-  timeattack: { len: 1.4, wid: 0.82, body: 0.22, lift: 0.06, cabinLen: 0.56, cabinH: 0.17, cabinZ: -0.1, taper: 0.7, fastback: 0.5, hood: 0.01, wheel: 0.147, drop: 0.02, nose: 0.06 },
-  ponycar: { len: 1.34, wid: 0.74, body: 0.24, lift: 0.09, cabinLen: 0.5, cabinH: 0.19, cabinZ: -0.14, taper: 0.74, fastback: 0.45, hood: 0.04, wheel: 0.155, drop: 0.02, nose: 0.05 },
-  gtcoupe: { len: 1.3, wid: 0.74, body: 0.2, lift: 0.08, cabinLen: 0.5, cabinH: 0.18, cabinZ: -0.14, taper: 0.68, fastback: 0.4, hood: 0.03, wheel: 0.15, drop: 0.03, nose: 0.06 },
-  groupb: { len: 1.34, wid: 0.84, body: 0.24, lift: 0.08, cabinLen: 0.56, cabinH: 0.18, cabinZ: -0.06, taper: 0.75, fastback: 0.5, hood: 0, wheel: 0.15, drop: 0.01, nose: 0.05 },
-  longtail: { len: 1.5, wid: 0.82, body: 0.2, lift: 0.05, cabinLen: 0.5, cabinH: 0.15, cabinZ: 0.02, taper: 0.4, fastback: 0.8, hood: 0, wheel: 0.145, drop: 0.03, nose: 0.1 },
 }
 
 // Motorcycles. head = steering head [y, z]; seat = seat top [y, z].
@@ -529,7 +521,7 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
   if (hit) return hit
   if (body === 'formula') return formulaGeo(key, fit)
   const s = shapeOf(body)
-  const exotic = EXOTIC[body] ?? ODDBALL[body] ?? RESTO[body] ?? PACK_CARS[body]
+  const exotic = EXOTIC[body] ?? ODDBALL[body] ?? RESTO[body]
   if (exotic) {
     const k = new Kit()
     exotic(k, fit, { seat, steering, brakes, bar })
@@ -1302,7 +1294,8 @@ function LeanCar({ parts, looks, casters, mods, modPaint, highlight, wheels, rad
     for (const [ids, skin] of groups) {
       if (!ids.length) continue
       const m = modGeo(mods.body, ids)
-      if (m.paint) shade.push([m.paint, { ...modPaint, skin }])
+      // Body-colour parts with no mod skin wear the body's skin (modPaint.skin).
+      if (m.paint) shade.push([m.paint, { ...modPaint, skin: skin || modPaint.skin || 0 }])
       if (m.carbon) shade.push([m.carbon, { ...finishOf(carbon), skin }])
       if (m.ti) shade.push([m.ti, { ...finishOf(KIND_MAT.ti), skin }])
       if (m.chrome) rest.push([m.chrome, { ...finishOf(KIND_MAT.chrome), skin }])
@@ -1437,7 +1430,7 @@ function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight,
       pink: finishOf(MAT.pink), mint: finishOf(MAT.mint), cream: finishOf(MAT.cream), waffle: finishOf(MAT.waffle),
     }
     return (
-      <LeanCar parts={p} looks={looks} casters={['paint', 'glass']} mods={{ body, ids: modIds(fit), skins: msk }} modPaint={{ color: tint, metal: rusty ? 0.1 : 0.4, rough: 0.3 }} highlight={highlight}
+      <LeanCar parts={p} looks={looks} casters={['paint', 'glass']} mods={{ body, ids: modIds(fit), skins: msk }} modPaint={{ color: tint, metal: rusty ? 0.1 : 0.4, rough: 0.3, ...(sk ? { skin: sk } : {}) }} highlight={highlight}
         wheels={[[-wx, wr, wz], [wx, wr, wz], [-wx, wr, -wz], [wx, wr, -wz]]} radius={wr} width={(s.tyre ?? 0.14) * tyre} rims={fit.rims} rimColor={rimColor} rig={rig} beams={<>{beam}{pool}</>} rise={rise}
         extra={<>{own && <mesh geometry={p.paint} castShadow><PaintMaterial color={tint} finish={finish} highlight={highlight} skin={chromed ? 0 : sk} panels={pan} zones={g.zones} /></mesh>}{topper}</>} />
     )
@@ -1464,7 +1457,7 @@ function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight,
         {p.glass && <mesh geometry={p.glass} material={glass.see} castShadow />}
         {p.cabin && <mesh geometry={p.cabin} material={matOf('seat', look.seat ?? '#2b2b2b', 0, 0.75)} />}
         {p.caliper && <mesh geometry={p.caliper} material={matOf('cal', look.caliper ?? '#4a4d52', look.caliper ? 0.2 : 0.5, 0.45)} />}
-        <CarMods body={body} fit={fit} tint={tint} metal={rusty ? 0.1 : 0.4} flames={flames} skins={msk} />
+        <CarMods body={body} fit={fit} tint={tint} metal={rusty ? 0.1 : 0.4} flames={flames} skins={msk} skin={sk} />
         {topper}
       </group>
       {/* Headlight beams on the road, visible after dark. */}
@@ -1769,7 +1762,7 @@ function BikeModel({ body, model, color, finish, skin, modSkin, panels, highligh
       lamp: finishOf(lamp), tail: finishOf(MAT.tail), amber: finishOf(MAT.amber), display: finishOf(MAT.display), caliper: finishOf(cal),
     }
     return (
-      <LeanCar parts={p} looks={looks} casters={['paint', 'black']} mods={{ body, ids: modIds(fit), skins: msk }} modPaint={{ color: tint, metal: rusty ? 0.1 : 0.4, rough: 0.3 }} highlight={highlight}
+      <LeanCar parts={p} looks={looks} casters={['paint', 'black']} mods={{ body, ids: modIds(fit), skins: msk }} modPaint={{ color: tint, metal: rusty ? 0.1 : 0.4, rough: 0.3, ...(sk ? { skin: sk } : {}) }} highlight={highlight}
         wheels={[[0, r, wz], [0, r, -wz]]} radius={r} width={0.07} rims={fit.rims} rimColor={rimColor} rig={rig} beams={beam}
         extra={<>{own && <mesh geometry={p.paint} castShadow><PaintMaterial color={tint} finish={finish} highlight={highlight} skin={chromed ? 0 : sk} panels={pan} /></mesh>}{topper}</>} />
     )
@@ -1787,7 +1780,7 @@ function BikeModel({ body, model, color, finish, skin, modSkin, panels, highligh
       {shared.map((k) => <mesh key={k} geometry={p[k]} material={MAT[k]} castShadow={k === 'black'} />)}
       {p.lamp && <mesh geometry={p.lamp} material={lamp} />}
       {p.caliper && <mesh geometry={p.caliper} material={cal} />}
-      <CarMods body={body} fit={fit} tint={tint} metal={rusty ? 0.1 : 0.4} flames={flames} skins={msk} />
+      <CarMods body={body} fit={fit} tint={tint} metal={rusty ? 0.1 : 0.4} flames={flames} skins={msk} skin={sk} />
       {topper}
       {beam}
       {[wz, -wz].map((z, i) => (

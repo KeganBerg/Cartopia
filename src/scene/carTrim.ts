@@ -611,8 +611,6 @@ const STYLES: Record<string, CarStyle> = {
   charger: { rim: 'deep', rimColor: '#5f6368', caliper: '#e53935', seat: '#1c1c1c' },
   hellcat: { rim: 'split', rimColor: '#2b2b2b', caliper: '#e53935', seat: '#4a1010' },
   gtr: { rim: 'mesh', rimColor: '#b08d57', caliper: '#ff6d00', seat: '#1c1c1c' },
-  sora: { rim: 'split', rimColor: '#3a3d42', seat: '#1c1c1c' },
-  stinger: { rim: 'split', rimColor: '#2b2b2b', caliper: '#e53935', seat: '#1c1c1c' },
   tomahawk: { rim: 'beadlock', rimColor: '#3a3a3a', seat: '#3e2723' },
   camper: { rim: 'steel', rimColor: '#f5f5f5', ww: true, seat: '#a1887f' },
   hotshot: { rim: 'mesh', rimColor: '#f5f5f5', caliper: '#e53935', seat: '#212121' },

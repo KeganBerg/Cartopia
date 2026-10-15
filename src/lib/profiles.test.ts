@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { RESERVED, townLabel, USERNAME_MAX, USERNAME_MIN, daysUntilChange, usernameProblem } from './profiles'
+import { RESERVED, USERNAME_MAX, USERNAME_MIN, daysUntilChange, usernameProblem } from './profiles'
 import { seenAgo } from './friendsList'
 
 describe('usernameProblem', () => {
@@ -35,13 +35,5 @@ describe('time helpers', () => {
     expect(seenAgo('2026-10-11T11:59:50Z', now)).toBe('1m ago')
     expect(seenAgo('2026-10-11T09:00:00Z', now)).toBe('3h ago')
     expect(seenAgo('2026-10-08T12:00:00Z', now)).toBe('3d ago')
-  })
-})
-
-describe('townLabel', () => {
-  it('drops a leading @ so a town name never looks like a username', () => {
-    expect(townLabel('@KBerg', 'abcd')).toBe('KBerg')
-    expect(townLabel('  ＠KBerg', 'abcd')).toBe('KBerg')
-    expect(townLabel('Maple @ Main', 'abcd')).toBe('Maple @ Main')
   })
 })

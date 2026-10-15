@@ -282,7 +282,15 @@ export const DECOR_PROPS = {
     k.sphere(L(gold, 0.3, 0.6), 0.06, [0, 2.86, 0], [1, 1, 1], 10, 6)
     k.box(L('#9e9e9e', 0.4, 0.6), [0.02, 0.06, 0.02], [0.045, 0.9, 0])
     k.rod(L('#f5f5f5', 0.8), [0.03, 0.92, 0], [0.03, 2.7, 0], 0.003, 3)
-    // The flag itself waves in the wind: WavingFlag.tsx, drawn by the Flag Pole model.
+    // A flag in waving strips: green over white, a gold car disc in the middle.
+    for (let i = 0; i < 6; i++) {
+      const x = 0.06 + i * 0.11 + 0.055
+      const z = Math.sin(i * 1.2) * 0.06
+      const ry = -Math.cos(i * 1.2) * 0.35
+      k.box(cast(L('#2e7d32', 0.8)), [0.115, 0.22, 0.012], [x, 2.6, z], [0, ry, 0])
+      k.box(cast(L('#fafafa', 0.8)), [0.115, 0.22, 0.012], [x, 2.38, z], [0, ry, 0])
+      if (i === 2 || i === 3) k.box(L(gold, 0.4, 0.4), [0.08, 0.14, 0.02], [x + (i === 2 ? 0.015 : -0.015), 2.49, z], [0, ry, 0])
+    }
     if (!SNOW) {
       const pal = SEASON === 'fall' ? ['#ff8f00', '#c62828', '#fbc02d'] : ['#e91e63', '#ffeb3b', '#ab47bc']
       for (let i = 0; i < 8; i++) {
@@ -377,3 +385,77 @@ export const DECOR_PROPS = {
 
 // The litter bin that stands beside a park bench.
 export const benchBin = () => STREET_PROPS.bin()
+
+// Wild land (game/wildLand.ts): what grows round an old tree or a boulder that
+// was never cleared. Long grass in clumps of blades, a fern, toadstools on a
+// fallen branch, pine cones and pebbles, all inside the tile and on the ground.
+const WILD_GRASS: Record<string, string[]> = {
+  spring: ['#5fae3a', '#76c043', '#4e9a2f'],
+  summer: ['#4e9a2f', '#5fae3a', '#3f8a26'],
+  fall: ['#a7a03c', '#8c9a43', '#c2a34a'],
+  winter: ['#b9a98a', '#a1907a', '#cbbd9f'],
+}
+
+function grass(k: PropKit, x: number, z: number, n: number, h: number, seed: number) {
+  const g = WILD_GRASS[SEASON] ?? WILD_GRASS.summer
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + seed
+    const lean = 0.25 + jit(seed, i) * 0.3
+    const hh = h * (0.75 + jit(i, seed) * 0.5)
+    k.cone(L(g[i % 3], 0.9), 0.03, hh, [x + Math.cos(a) * 0.04, hh / 2 - 0.01, z + Math.sin(a) * 0.04], [Math.sin(a) * lean, 0, -Math.cos(a) * lean], 4)
+  }
+  if (SNOW) k.ico(L('#f4f8fb', 0.8), 0.07, [x, 0.02, z], [1.4, 0.35, 1.4], 0)
+}
+
+function undergrowth(k: PropKit, kind: 'oak' | 'pine' | 'rock') {
+  const tufts: [number, number][] = kind === 'rock' ? [[-0.62, 0.42], [0.55, 0.6], [0.7, -0.35], [-0.5, -0.62]] : [[-0.66, 0.38], [0.58, 0.56], [0.62, -0.52], [-0.4, -0.7], [0.1, 0.78]]
+  tufts.forEach(([x, z], i) => grass(k, x, z, 9, 0.42, i * 3 + 1))
+  // Pebbles half sunk in the ground.
+  for (const [x, z, r] of [[0.78, 0.15, 0.06], [-0.78, -0.12, 0.05], [0.32, -0.8, 0.045]] as const) {
+    k.ico(L('#8a8a8a', 0.95), r, [x, r * 0.35, z], [1.2, 0.7, 1], 0)
+  }
+  if (kind === 'rock') return
+  if (kind === 'pine') {
+    // Pine cones dropped round the trunk.
+    for (let i = 0; i < 6; i++) {
+      const a = i * 1.9 + 0.4, d = 0.32 + (i % 3) * 0.13
+      k.ico(L('#7a5236', 0.9), 0.035, [Math.cos(a) * d, 0.03, Math.sin(a) * d], [0.75, 0.75, 1.25], 0)
+    }
+    return
+  }
+  // A fallen branch with toadstools growing on it, and a fern beside the trunk.
+  const bark = L('#6b4a32', 0.95)
+  k.rod(cast(bark), [0.12, 0.08, 0.72], [0.82, 0.08, 0.2], 0.08, 8)
+  k.cyl(L('#c8a27a', 0.9), 0.07, 0.07, 0.01, [0.825, 0.08, 0.197], [0, -0.64, Math.PI / 2], 8)
+  k.rod(bark, [0.5, 0.12, 0.45], [0.6, 0.3, 0.6], 0.025, 5)
+  if (!SNOW) {
+    for (const [x, z, s] of [[-0.2, 0.62, 1], [-0.05, 0.75, 0.8], [0.72, -0.62, 0.9]] as const) {
+      k.cyl(L('#f5ecd7', 0.8), 0.02 * s, 0.026 * s, 0.1 * s, [x, 0.05 * s, z], undefined, 6)
+      k.sphere(L('#d32f2f', 0.6), 0.065 * s, [x, 0.1 * s, z], [1, 0.8, 1], 10, 4, Math.PI / 2)
+    }
+    const fern = WILD_GRASS[SEASON] ?? WILD_GRASS.summer
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2
+      k.box(L(fern[i % 3], 0.85), [0.07, 0.014, 0.36], [-0.5 + Math.sin(a) * 0.15, 0.1, 0.2 + Math.cos(a) * 0.15], [0.45, a, 0])
+    }
+  }
+}
+
+export const WILD_PROPS = {
+  oak: () => prop(`wild-oak|${SEASON}`, (k) => undergrowth(k, 'oak')),
+  pine: () => prop(`wild-pine|${SEASON}`, (k) => undergrowth(k, 'pine')),
+  // A big lichen-spotted boulder with a smaller one leaning on it, moss on top
+  // and grass round the foot.
+  boulder: () => prop(`wild-rock|${SEASON}`, (k) => {
+    const stone = ['#a39e93', '#8d877c', '#b0aa9e']
+    k.ico(cast(L(stone[0], 0.95)), 0.62, [0, 0.38, 0], [1.1, 0.78, 0.95], 1)
+    k.ico(cast(L(stone[1], 0.95)), 0.34, [0.5, 0.2, 0.36], [1, 0.8, 1.1], 0)
+    k.ico(L(stone[2], 0.95), 0.2, [-0.48, 0.1, 0.42], [1.2, 0.7, 1], 0)
+    // Moss over the crown (snow in winter) and lichen spots on the sides.
+    k.ico(L(SNOW ? '#f4f8fb' : '#6a8f3a', 0.9), 0.4, [-0.06, 0.78, 0.02], [1.15, 0.28, 1], 1)
+    for (const [x, y, z] of [[0.52, 0.45, -0.25], [-0.4, 0.5, 0.42], [0.1, 0.3, 0.6]] as const) {
+      k.ico(L('#c5c98a', 0.9), 0.07, [x, y, z], [1, 0.6, 1], 0)
+    }
+    undergrowth(k, 'rock')
+  }),
+}

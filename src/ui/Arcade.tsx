@@ -15,6 +15,7 @@ import { Cost, Countdown, Result, look, payFuel, pi, useStable } from './ArcadeB
 import { STAR_GAMES, StarGame } from './ArcadeMore'
 import { loadStars, type StarGameId } from '../game/arcadeMore'
 import { LoadingScene } from './Loading'
+import { ArcadeCardScene } from '../scene/ArcadeCards'
 import { StageSlot, useStageReady } from '../scene/Stage'
 import { startArcadeRun, submitArcadeRun } from '../lib/arcadeBoard'
 import { ClaimPrizes, WeeklyBoards, WeekPlace, useBoardsOn } from './ArcadeBoards'
@@ -33,6 +34,7 @@ export function ArcadePanel() {
   // Starts on your race car; picking another here only lasts for this visit.
   const [carId, setCarId] = useState(() => raceCarOf(cars, useGame.getState().raceCar)?.uid)
   const car = cars.find((c) => c.uid === carId) ?? bestCar(cars)
+  const me = useMemo(() => (car ? look(car) : null), [car])
   const [playing, setPlaying] = useState<Playing | null>(null)
   const [lots, setLots] = useState(false)
   const [boards, setBoards] = useState(false)
@@ -88,6 +90,7 @@ export function ArcadePanel() {
       ) : (
         <div className="arc-games">
           <div className="arc-tile chase">
+            {me && <ArcadeCardScene game="chase" me={me} />}
             <div className="arc-art">🚓💨🚗</div>
             <b>Getaway Chase</b>
             <small>Near misses, nitro, lose the cop</small>
@@ -95,6 +98,7 @@ export function ArcadePanel() {
             <button className="buy" disabled={!car} onClick={() => { if (payFuel('a getaway', 'chase')) setPlaying({ game: 'chase' }) }}>Play · <Cost game="chase" /></button>
           </div>
           <div className="arc-tile park">
+            {me && <ArcadeCardScene game="park" me={me} />}
             <div className="arc-art">🅿️🚙</div>
             <b>Parking Pro</b>
             <small>Steer into the spot</small>
@@ -106,6 +110,7 @@ export function ArcadePanel() {
             const best = b.best ? (g.id === 'pit' ? `⏱ ${b.best}s` : g.id === 'delivery' ? `🍕 ${b.best}` : g.id === 'stunt' ? `🔥 ${b.best.toLocaleString()}` : `🚗 ${b.best}`) : ''
             return (
               <div key={g.id} className={`arc-tile ${g.id}`}>
+                {me && <ArcadeCardScene game={g.id} me={me} />}
                 <div className="arc-art">{g.art}</div>
                 <b>{g.name}</b>
                 <small>{g.tip}</small>

@@ -89,7 +89,7 @@ export const modWorth = (m: ModDef) => m.coins + m.parts * PART_COINS + m.bucks 
 // stay out of crates, like event skins: they're only won on the season track.
 const home = (worth: number, gems: boolean, max: (c: CrateDef) => number | undefined): CrateId =>
   CRATES.find((c) => (!gems || c.pay === 'bucks') && worth <= (max(c) ?? Infinity))!.id
-export const carCrate = (car: CarDef): CrateId | null => (car.parked || car.season || car.secret || car.pack ? null : home(carWorth(car), !!car.bucks, (c) => c.carMax))
+export const carCrate = (car: CarDef): CrateId | null => (car.parked || car.season || car.secret ? null : home(carWorth(car), !!car.bucks, (c) => c.carMax))
 export const modCrate = (m: ModDef): CrateId => home(modWorth(m), m.bucks > 0, (c) => c.modMax)
 export const homeCars = (c: CrateDef) => CARS.filter((car) => carCrate(car) === c.id)
 export const homeMods = (c: CrateDef) => MODS.filter((m) => modCrate(m) === c.id)

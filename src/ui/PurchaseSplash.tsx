@@ -1,8 +1,6 @@
 import { useEffect } from 'react'
 import type { Purchase } from '../game/store'
-import { ALL_PACKS } from '../game/bucksPacks'
-import { carDef } from '../game/data'
-import { CarThumb } from '../scene/BuildingPreview'
+import { BUCKS_PACKS } from '../game/bucksPacks'
 import { useBought } from '../lib/payments'
 import { rescueSfx } from '../lib/sound'
 import './purchase.css'
@@ -29,7 +27,7 @@ function Splash({ rows }: { rows: Purchase[] }) {
   }, [close])
 
   const packs = rows.slice(-3)
-  const title = rows.length > 1 ? `${rows.length} packs` : (ALL_PACKS.find((p) => p.id === rows[0].pack)?.name ?? 'Gem pack')
+  const title = rows.length > 1 ? `${rows.length} packs` : (BUCKS_PACKS.find((p) => p.id === rows[0].pack)?.name ?? 'Gem pack')
 
   return (
     <div className="overlay lvl-overlay buy-overlay" onClick={close}>
@@ -46,7 +44,6 @@ function Splash({ rows }: { rows: Purchase[] }) {
         <div className="buy-packs">
           {packs.map((row, i) => (
             <div key={row.seq} className="buy-pack" style={{ '--i': i } as React.CSSProperties}>
-              {row.car && <div className="buy-item buy-car"><CarThumb size="sm" body={carDef(row.car).body} model={row.car} color={carDef(row.car).colors[0]} /><b>{carDef(row.car).name}</b></div>}
               <div className="buy-item"><span className="ico buck-ico">💎</span><b>{row.bucks.toLocaleString()}</b></div>
               {row.coins > 0 && <div className="buy-item"><span className="ico coin-ico">$</span><b>{row.coins.toLocaleString()}</b></div>}
               {row.parts > 0 && <div className="buy-item"><span className="ico parts-ico">⚙</span><b>{row.parts.toLocaleString()}</b></div>}

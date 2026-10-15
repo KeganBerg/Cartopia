@@ -41,6 +41,8 @@ export type BuildingDef = {
   nightOnly?: boolean
   // Stand-in for a building this build doesn't know (see buildingDef).
   parked?: boolean
+  // A wild obstacle left out of the server's catalog (see econCatalog.ts).
+  wild?: boolean
   // Sold only while this event runs (see EVENTS). Ones already placed stay.
   event?: EventId
 }
@@ -105,7 +107,12 @@ export const BUILDINGS: BuildingDef[] = [
   { id: 'highschool', name: 'High School', kind: 'business', w: 3, h: 2, price: 110000, unlockLevel: 25, jobSeconds: 2700, fuelCost: 13, payout: 7400, xp: 430, color: '#a1887f', roof: '#2e7d32', sign: 'HIGH SCHOOL' },
   { id: 'university', name: 'Ridgemont University', kind: 'business', w: 3, h: 3, price: 240000, unlockLevel: 32, unique: true, jobSeconds: 3600, fuelCost: 16, payout: 11000, xp: 560, color: '#d7ccc8', roof: '#6a1b9a', sign: 'RIDGEMONT UNIVERSITY' },
 
-  // Obstacles on newly bought land: pay to clear, wait, then tap to remove.
+  // Obstacles on newly bought land (game/wildLand.ts): bulldoze them for coins to make room.
+  // The wild ones aren't in the server's catalog: it already treats a def it doesn't know as
+  // an obstacle worth nothing, which is exactly what these are (see econCatalog.ts).
+  { id: 'wildoak', name: 'Old Oak', kind: 'obstacle', wild: true, w: 1, h: 1, price: 200, unlockLevel: 99, jobSeconds: 60, xp: 10, color: '#43a047', roof: '#6f4a30' },
+  { id: 'wildpine', name: 'Tall Pine', kind: 'obstacle', wild: true, w: 1, h: 1, price: 150, unlockLevel: 99, jobSeconds: 60, xp: 8, color: '#2e7d32', roof: '#5d4037' },
+  { id: 'wildrock', name: 'Mossy Boulder', kind: 'obstacle', wild: true, w: 1, h: 1, price: 250, unlockLevel: 99, jobSeconds: 60, xp: 12, color: '#9e9e9e', roof: '#6a8f3a' },
   { id: 'bush', name: 'Bushes', kind: 'obstacle', w: 1, h: 1, price: 150, unlockLevel: 99, jobSeconds: 30, xp: 5, color: '#558b2f', roof: '#33691e' },
   { id: 'rock', name: 'Boulder', kind: 'obstacle', w: 1, h: 1, price: 400, unlockLevel: 99, jobSeconds: 120, xp: 12, color: '#9e9e9e', roof: '#757575' },
   { id: 'cactus', name: 'Cactus', kind: 'obstacle', w: 1, h: 1, price: 1500, unlockLevel: 99, jobSeconds: 600, xp: 40, color: '#43a047', roof: '#2e7d32' },
@@ -275,7 +282,6 @@ export type Body = 'compact' | 'sedan' | 'sports' | 'muscle' | 'truck' | 'super'
   | 'hatch' | 'van' | 'suv' | 'ev' | 'luxury' | 'formula' | 'bus' | 'tusker' | 'dogvan' | 'rearengine' | 'longnose' | 'prototype'
   | 'scissor' | 'horseshoe' | 'teardrop' | 'icecream' | 'monster' | 'parcel'
   | 'pontoon' | 'stepnose' | 'restomuscle'
-  | 'highboy' | 'timeattack' | 'groupb' | 'longtail' | 'ponycar' | 'gtcoupe'
 // Two-wheelers: drawn as motorcycles with a rider, and only take exhaust and rim mods.
 export const BIKES: Body[] = ['scooter', 'chopper', 'sportbike']
 export const isBike = (body: Body) => BIKES.includes(body)
@@ -345,9 +351,6 @@ export type CarDef = {
   // Resto-mod: never sold, never a whole-car crate prize; only built from its four crate
   // pieces (game/resto.ts). Its unlock level is when its pieces start dropping.
   secret?: boolean
-  // Car pack car: only ever comes in its real-money car pack (bucksPacks.ts), never the
-  // Showroom or a crate. Its unlock level is when the pack goes on sale to you.
-  pack?: boolean
 }
 
 // Parodies of real cars: the shapes and stats nod to the real thing, but the
@@ -404,14 +407,6 @@ export const CARS: CarDef[] = [
   { id: 'sprint', name: 'Valtorre Sprint 65', body: 'stepnose', price: 70000, unlockLevel: 10, secret: true, power: 110, grip: 104, weight: 30, skill: 'smooth', likes: ['coffee', 'cinema', 'tuner'], colors: ['#1b4d3e', '#efe7d2', '#6d1b2b'] },
   { id: 'revenant', name: "Liberty Revenant '69", body: 'restomuscle', price: 110000, unlockLevel: 14, secret: true, power: 130, grip: 92, weight: 56, skill: 'torque', likes: ['burger', 'lube', 'bodyshop'], colors: ['#8d9094', '#1c1c1c', '#0d2a5c'] },
   { id: 'pontone', name: 'Corvara Pontone 58', body: 'pontoon', price: 170000, unlockLevel: 18, secret: true, power: 122, grip: 118, weight: 26, skill: 'slipstream', likes: ['stadium', 'diner', 'motel'], colors: ['#b71c1c', '#cfd8dc', '#1b5e20'] },
-  // Car packs (2026-10-15): cars only sold in the Bank's car packs, each a little quicker than the
-  // Showroom's best at its level (see packCars.ts for the bodies).
-  { id: 'stinger', name: 'Liberty Stinger SS', body: 'ponycar', price: 0, unlockLevel: 12, pack: true, power: 78, grip: 48, weight: 52, skill: 'torque', likes: ['diner', 'burger', 'tires'], colors: ['#ffb300', '#212121', '#c62828'] },
-  { id: 'sora', name: 'Kazumi Sora GT', body: 'gtcoupe', price: 0, unlockLevel: 20, pack: true, power: 84, grip: 72, weight: 40, skill: 'smooth', likes: ['tuner', 'arcade', 'parts'], colors: ['#c62828', '#eceff1', '#1565c0'] },
-  { id: 'firebolt', name: 'Liberty Firebolt Highboy', body: 'highboy', price: 0, unlockLevel: 8, pack: true, power: 122, grip: 70, weight: 40, skill: 'launch', likes: ['diner', 'burger', 'lube'], colors: ['#b71c1c', '#212121', '#ffb300'] },
-  { id: 'kaze', name: 'Kazumi Kaze TA-R', body: 'timeattack', price: 0, unlockLevel: 15, pack: true, power: 114, grip: 96, weight: 36, skill: 'smooth', likes: ['tuner', 'parts', 'arcade'], colors: ['#eceff1', '#0d47a1', '#ff6d00'] },
-  { id: 'sturm', name: 'Falke Sturm S1', body: 'groupb', price: 0, unlockLevel: 25, pack: true, power: 120, grip: 100, weight: 40, skill: 'torque', likes: ['tires', 'stadium', 'junkyard'], colors: ['#fafafa', '#c62828', '#1b5e20'] },
-  { id: 'vanta', name: 'Aether Vanta LT', body: 'longtail', price: 0, unlockLevel: 40, pack: true, power: 130, grip: 110, weight: 30, skill: 'nitro', likes: ['glasstower', 'helipad', 'club'], colors: ['#263238', '#00e5ff', '#e0e0e0'] },
   { id: 'bug', name: 'Bumble Bubble', body: 'bubble', price: 1200, unlockLevel: 1, rescueOnly: true, power: 20, grip: 34, weight: 28, skill: 'freeze', likes: ['icecream', 'donut', 'coffee'], colors: ['#80cbc4', '#ffcc80', '#ef9a9a'] },
   { id: 'woodie', name: 'Lakeside Woodie Wagon', body: 'wagon', price: 2200, unlockLevel: 1, rescueOnly: true, power: 25, grip: 31, weight: 56, skill: 'slipstream', likes: ['diner', 'hospital', 'market'], colors: ['#fafafa', '#fff59d', '#4db6ac'] },
   { id: 'hauler', name: 'Old Faithful Hauler', body: 'truck', price: 3000, unlockLevel: 1, rescueOnly: true, power: 40, grip: 40, weight: 70, skill: 'torque', likes: ['carwash', 'junkyard', 'tacos'], colors: ['#558b2f', '#e65100', '#1565c0'] },
@@ -852,7 +847,6 @@ export const CAR_SETS: CarSet[] = [
   { id: 'oddballs', name: 'Oddballs', icon: '🍦', cars: ['scoops', 'courier', 'crusher'], coins: 4000, bucks: 3, trophies: 8, xp: 120 },
   { id: 'restomods', name: 'Resto Garage', icon: '🧩', cars: ['sprint', 'revenant', 'pontone'], coins: 30000, bucks: 15, trophies: 40, xp: 500 },
   { id: 'exotica', name: 'Exotica', icon: '👑', cars: ['fulmine', 'eclat', 'orafo'], coins: 40000, bucks: 20, trophies: 50, xp: 600 },
-  { id: 'carpacks', name: 'Pack Legends', icon: '💳', cars: ['stinger', 'sora', 'firebolt', 'kaze', 'sturm', 'vanta'], coins: 40000, bucks: 20, trophies: 50, xp: 600 },
   // Season track prizes; each season adds its car here.
   { id: 'seasons', name: 'Season Rides', icon: '🏁', cars: ['nightfall'], coins: 5000, bucks: 3, trophies: 10, xp: 150 },
 ]
@@ -865,7 +859,6 @@ export const readySets = (s: { cars: { model: string }[]; claimedSets?: string[]
 export function carSource(car: CarDef): { icon: string; text: string } {
   if (car.season) return { icon: '🏁', text: `Season ${car.season} prize` }
   if (car.secret) return { icon: '🧩', text: 'Crate pieces' }
-  if (car.pack) return { icon: '💳', text: 'Car pack' }
   if (car.rescueOnly) {
     const spot = RESCUE_SPOTS.filter((sp) => sp.cars.some((c) => c.model === car.id)).sort((a, b) => a.unlockLevel - b.unlockLevel)[0]
     return { icon: '🔧', text: spot ? `Rusty's · ${spot.name}` : "Rusty's" }
