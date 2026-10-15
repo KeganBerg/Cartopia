@@ -53,7 +53,7 @@ describe('crates', () => {
       const home = carCrate(car)
       // Season prize cars are only won on the season track.
       // Resto-mods are only built from pieces.
-      if (car.season || car.parked || car.secret || car.pack) { expect(home).toBeNull(); continue }
+      if (car.season || car.parked || car.secret) { expect(home).toBeNull(); continue }
       expect(home, car.id).not.toBeNull()
       if (car.bucks) expect(crateDef(home!)!.pay).toBe('bucks')
     }

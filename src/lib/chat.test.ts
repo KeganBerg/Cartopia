@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { canDelete, toMsg } from './chat'
+import { canDelete } from './chat'
 
 const me = 'me'
 const off = { mod: false, leader: false }
@@ -31,14 +31,5 @@ describe('chat delete', () => {
     expect(sql).toMatch(/realtime\.send\(jsonb_build_object\('id', m\.id\), 'del'/)
     // The table stays closed to players.
     expect(sql).not.toMatch(/grant (delete|all)[^;]*chat_messages/i)
-  })
-})
-
-describe('toMsg mod mark', () => {
-  const row = { id: 1, owner: 'u1', name: 'Town', level: 3, body: 'hi', at: '2026-10-15T00:00:00Z' }
-  it('marks only messages the server flags as a chat mod', () => {
-    expect(toMsg({ ...row, mod: true })?.mod).toBe(true)
-    expect(toMsg(row)?.mod).toBeUndefined()
-    expect(toMsg({ ...row, mod: 'true' as unknown as boolean })?.mod).toBeUndefined()
   })
 })

@@ -35,7 +35,6 @@ import { buildingIcon } from './buildingIcons'
 import { useTipTarget, type TipTarget } from './Tips'
 import { setFreeCam, useFreeCam } from '../scene/freeCam'
 import { Confirm, useAsk } from './Confirm'
-import { AutoJobsButton } from './AutoJobs'
 import { useUnlock, freshClass } from '../game/unlocks'
 
 // The dyno run and its engine sound load the first time an upgrade shows on the dyno.
@@ -422,7 +421,7 @@ const SALE_SORTS: { id: SaleSort; label: string }[] = [
 ]
 // The For Sale tab reopens with the filter and order it was left on.
 let saleView: { kind: string; sort: SaleSort } = { kind: 'all', sort: 'level' }
-const FOR_SALE = CARS.filter((c) => !c.rescueOnly && !c.season && !c.secret && !c.pack)
+const FOR_SALE = CARS.filter((c) => !c.rescueOnly && !c.season && !c.secret)
 
 export function ShowroomPanel() {
   const level = useGame((s) => s.level)
@@ -753,7 +752,7 @@ export function GaragePanel() {
     setDyno((d) => ({ id: Date.now(), car: car.uid, model: car.model, mods: car.mods, before: d && d.car === car.uid ? d.before : was.pi, after: pi }))
   }, [car?.uid, pi])
   return (
-    <Panel title="Cars" wide head={<><span className="cars-power" title="Garage power">⚡{garagePower(cars)}</span><AutoJobsButton /></>}>
+    <Panel title="Cars" wide head={<span className="cars-power" title="Garage power">⚡{garagePower(cars)}</span>}>
       <CarsTabs current="garage" />
       <div className={picking ? 'garage picking' : 'garage'}>
         <div className="garage-list">
@@ -817,13 +816,13 @@ export function GaragePanel() {
                 {tab === 'paint' && <div className="paint-sweep" key={`${look!.color}|${look!.finish}|${look!.stripe}|${look!.skin ?? ''}`} aria-hidden />}
                 {tab === 'custom' && <div className="paint-sweep" key={JSON.stringify(look!.panels ?? {})} aria-hidden />}
                 {tab === 'trim' && <div className="paint-sweep" key={JSON.stringify(look!.trim ?? {})} aria-hidden />}
-                {!dyno && <div className="car-pi" title="Performance Index"><b>{pi}</b><small>PI</small></div>}
               </div>
             )}
             {copies.length > 1 && <CopyBubbles copies={copies} selected={car.uid} onPick={select} />}
             <h3 className="garage-name">{def.name}{car.plate && <span className="mini-plate">{car.plate}</span>}</h3>
-            {/* Under the preview (PI sits on the preview itself): the car's traits, then its two toggles. */}
+            {/* Under the preview: the PI tile, then the car's traits, then its two toggles. */}
             <div className="car-sum">
+              <div className="car-pi" title="Performance Index"><b>{pi}</b><small>PI</small></div>
               <div className="car-traits">
                 <SkillTag model={car.model} />
                 <DriverRow car={car.uid} model={car.model} />

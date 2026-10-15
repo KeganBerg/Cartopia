@@ -12,7 +12,6 @@ import { glowMats, onNight } from './dayNight'
 import { ClubLife } from './ClubLife'
 import { CLUB } from './clubLayout'
 import { ledFront, ledWindow } from './clubLeds'
-import { WavingFlag } from './WavingFlag'
 import { MeshBasicMaterial, MeshStandardMaterial, Color } from 'three'
 import { PAL, SEASON } from './season'
 import { LAYER, decal } from './layers'
@@ -1410,12 +1409,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
         </group>
       )
     case 'flagpole':
-      if (!ghost) return (
-        <group>
-          <PropMesh parts={DECOR_PROPS.flagpole(GOLD)} />
-          <WavingFlag gold={GOLD} at={[0.035, 2.49, 0]} />
-        </group>
-      )
+      if (!ghost) return <PropMesh parts={DECOR_PROPS.flagpole(GOLD)} />
       return (
         <group>
           <Cyl m={m} at={[0, 0.1, 0]} r={0.36} r2={0.42} h={0.2} c="#cfd8dc" seg={12} />

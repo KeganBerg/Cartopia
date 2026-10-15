@@ -27,7 +27,6 @@ import { ThoughtBubble } from './ui/Thought'
 import { NeedPanel } from './ui/Need'
 import { UpgradePanel } from './ui/Upgrade'
 import { BankPanel } from './ui/Bank'
-import { CarPacksPanel } from './ui/CarPacks'
 import { DealsPanel } from './ui/Deals'
 import { LevelUpSplash } from './ui/LevelUp'
 import { PurchaseSplash } from './ui/PurchaseSplash'
@@ -51,7 +50,6 @@ import { startAmbience } from './lib/ambience'
 import { startMusic } from './lib/townMusic'
 import { startTechnoMusic } from './lib/technoMusic'
 import { TechnoLayer } from './ui/Techno'
-import { LiveBanner } from './ui/LiveBanner'
 import { FlashWarning, RaveHeadsUp, flashWarningOpen, openDaily } from './ui/FlashWarning'
 import { useTownPaused } from './scene/renderGate'
 import { useCrewGoalWatcher } from './ui/CrewGoal'
@@ -80,8 +78,6 @@ const ArcadePanel = onDemand(loadArcade, (m) => m.ArcadePanel)
 const WheelPanel = onDemand(loadWheel, (m) => m.WheelPanel)
 const BattlePanel = onDemand(loadBattle, (m) => m.BattlePanel)
 const RacePanel = onDemand(loadRace, (m) => m.RacePanel)
-// Only admins ever open it, so nobody else downloads it.
-const AdminPanel = onDemand(() => import('./ui/Admin'), (m) => m.AdminPanel)
 const LiveRaceOverlay = onDemand(loadRace, (m) => m.LiveRaceOverlay)
 const InvitesPanel = onDemand(loadRace, (m) => m.InvitesPanel)
 const PrizePopup = onDemand(loadRace, (m) => m.PrizePopup)
@@ -179,7 +175,6 @@ export default function App() {
       <StageCanvas />
       <Preview.StageCanvas />
       <Hud />
-      <LiveBanner />
       <BottomBar />
       {panel === 'shop' && <ShopPanel />}
       {panel === 'inventory' && <InventoryPanel />}
@@ -197,7 +192,6 @@ export default function App() {
       {panel === 'upgrade' && <UpgradePanel />}
       {panel === 'rescue' && <RescuePanel />}
       {panel === 'bank' && <BankPanel />}
-      {panel === 'carpacks' && <CarPacksPanel />}
       {panel === 'deals' && <DealsPanel />}
       {panel === 'crates' && <CratesPanel />}
       {panel === 'battle' && <BattlePanel />}
@@ -220,7 +214,6 @@ export default function App() {
       {panel === 'taunts' && <TauntsPanel />}
       {panel === 'ghost' && <GhostRacePanel />}
       {panel === 'arcade' && <ArcadePanel />}
-      {panel === 'admin' && <AdminPanel />}
       {gpPrize && <PrizePopup />}
       {campaignPrize && <CampaignPrizePopup />}
       {tourPrize && <TourPrizePopup />}

@@ -60,8 +60,6 @@ export default async (req: Request) => {
   const res = await rpc('purchase_record', {
     p_session: paid.session, p_user: paid.user, p_pack: paid.pack.id, p_cents: paid.amount,
     p_bucks: g.bucks, p_coins: g.coins, p_parts: g.parts,
-    // A car pack's car joins the garage as uid pk-<seq>; the save guard lets it in from this row (0090).
-    ...(paid.pack.car ? { p_car: paid.pack.car } : {}),
   })
   return res.ok ? new Response('ok') : retry('purchase_record', res)
 }
