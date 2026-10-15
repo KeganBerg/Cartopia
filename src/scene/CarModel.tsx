@@ -290,6 +290,8 @@ export type ModFrame = {
   deck: number; deckZ: number; deckW: number; hoodTop: number; hoodZ: number; hs: number
   // How wide the surface under a wing's posts is, where it is narrower than the wing.
   postW?: number
+  // Where side exhausts meet the body, when side kits stand further out than the body itself.
+  pipeSide?: number
   // The top of the hard roof (the deck on bodies without one), where it runs, and how wide it is.
   roof: number; roofZ: number; roofLen: number; roofW: number
   // The outside of the windshield and back window, on closed cabins.
