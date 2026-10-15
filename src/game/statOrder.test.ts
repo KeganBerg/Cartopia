@@ -58,10 +58,10 @@ describe('car mods', () => {
 
 describe('engines', () => {
   // Cylinders as the engine voice plays them (electric cars don't count). Resto-mods (crate-built,
-  // top of their class) and the tank (no engine name) sit outside the ladder.
+  // top of their class), the tank (no engine name) and pack-only cars (bought outright, no level) sit outside the ladder.
   const cyl = (c: CarDef) => (engineProfile(c.id).electric ? 0 : engineProfile(c.id).ppr * 2)
   const cost = (c: CarDef) => c.price + (c.bucks ?? 0) * gemCoins(c.unlockLevel)
-  const ladder = CARS.filter((c) => !c.secret && c.body !== 'tank')
+  const ladder = CARS.filter((c) => !c.secret && !(c as { pack?: boolean }).pack && c.body !== 'tank')
   it('never give a bigger engine less power than a smaller one that comes earlier for less', () => {
     for (const big of ladder) for (const small of ladder) {
       if (cyl(small) > 0 && cyl(big) > cyl(small) && carLevel(small) <= carLevel(big) && cost(small) <= cost(big)) {
