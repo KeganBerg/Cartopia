@@ -277,6 +277,8 @@ const SLEEK: Body[] = ['super', 'wedge', 'bubble', 'ev', 'prototype']
 const ROUND_LAMPS: Body[] = ['rearengine', 'bubble', 'classic', 'offroad', 'compact', 'truck', 'van', 'suv', 'bus', 'dogvan', 'tusker']
 const BIG_GRILLE: Body[] = ['muscle', 'truck', 'classic', 'wagon', 'luxury', 'bus']
 const LOW: Body[] = ['sports', 'super', 'wedge', 'coupe', 'hatch', 'rearengine', 'longnose', 'prototype']
+// Low cars carry a slim bumper set lower (see bumperY), which mods on the nose fit round.
+export const lowBumper = (b: Body) => LOW.includes(b) || SLEEK.includes(b)
 const RUGGED: Body[] = ['truck', 'offroad', 'rally', 'suv']
 const VINTAGE: Body[] = ['classic', 'wagon', 'bubble', 'luxury', 'van', 'dogvan', 'bus']
 const FOUR_DOOR: Body[] = ['sedan', 'wagon', 'suv', 'luxury', 'ev', 'van', 'dogvan']
@@ -288,6 +290,10 @@ export type ModFrame = {
   body: Body; len: number; wid: number; lift: number; wheel: number; wz: number; wx: number
   bodyW: number; side: number; front: number; rear: number; pipeY: number
   deck: number; deckZ: number; deckW: number; hoodTop: number; hoodZ: number; hs: number
+  // How wide the surface under a wing's posts is, where it is narrower than the wing.
+  postW?: number
+  // Where side exhausts meet the body, when side kits stand further out than the body itself.
+  pipeSide?: number
   // The top of the hard roof (the deck on bodies without one), where it runs, and how wide it is.
   roof: number; roofZ: number; roofLen: number; roofW: number
   // The outside of the windshield and back window, on closed cabins.
@@ -309,8 +315,9 @@ export function carFrame(body: Body): ModFrame {
   }
   if (body === 'formula') {
     return {
-      body, len: s.len, wid: s.wid, lift: s.lift, wheel: s.wheel, wz: s.len * 0.33, wx: s.track!, bodyW: 0.5, side: 0.25, front: s.len / 2, rear: -s.len / 2 + 0.05, pipeY: 0.24,
-      deck: 0.27, deckZ: -s.len / 2 + 0.08, deckW: 0.56, hoodTop: 0.36, hoodZ: -0.17, hs: 0.55,
+      // Rear mods sit on the narrow engine cover: wings on posts close together, tips out of its tail.
+      body, len: s.len, wid: s.wid, lift: s.lift, wheel: s.wheel, wz: s.len * 0.33, wx: s.track!, bodyW: 0.3, side: 0.25, front: s.len / 2, rear: -0.56, pipeY: 0.19,
+      deck: 0.24, deckZ: -0.48, deckW: 0.56, postW: 0.3, hoodTop: 0.36, hoodZ: -0.17, hs: 0.55,
       roof: 0.27, roofZ: -0.1, roofLen: 0.3, roofW: 0.3,
     }
   }
@@ -586,7 +593,7 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
   const cowl = s.cabinZ + s.cabinLen / 2
   const hoodFront = s.len / 2 - s.len * 0.1
   const front = s.len / 2
-  const low = LOW.includes(body) || SLEEK.includes(body)
+  const low = lowBumper(body)
   // Front bumper: slimmer and lower on low cars so the headlights clear it.
   const bumperH = low ? 0.05 : 0.07
   const bumperY = s.lift + (low ? 0.055 : 0.07)
@@ -1357,7 +1364,7 @@ function LeanCar({ parts, looks, casters, mods, modPaint, highlight, wheels, rad
     const groups: [string[], number][] = [[plain, 0], ...skinned.map(([id, n]): [string[], number] => [[id], n])]
     for (const [ids, skin] of groups) {
       if (!ids.length) continue
-      const m = modGeo(mods.body, ids)
+      const m = modGeo(mods.body, ids, mods.ids)
       // Body-colour parts with no mod skin wear the body's skin (modPaint.skin).
       if (m.paint) shade.push([m.paint, { ...modPaint, skin: skin || modPaint.skin || 0 }])
       if (m.carbon) shade.push([m.carbon, { ...finishOf(carbon), skin }])
