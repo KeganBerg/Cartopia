@@ -13,7 +13,8 @@ import type { ClanBadge } from './clans'
 // Realtime topic chat:<room>. Rooms: 'global', and 'crew:<clan id>' for the player's crew.
 
 export type Room = 'global' | 'crew'
-export type ChatMsg = { id: number; owner: string; name: string; level: number; crew: ClanBadge | null; body: string; at: number }
+// mod: the server says this is a chat mod (the Cartopia team), shown with a check mark.
+export type ChatMsg = { id: number; owner: string; name: string; level: number; crew: ClanBadge | null; body: string; at: number; mod?: boolean }
 
 type ChatState = {
   uid: string | null
@@ -52,7 +53,7 @@ const KEEP = 80
 export const senderName = (m: Pick<ChatMsg, 'name' | 'owner'>) => playerName(m.owner, m.name)
 
 // Rows come from the server, but keep only well-formed ones and run the filters again.
-type Row = { id: number; owner: string; name: string; level: number; body: string; at: string; tag?: string | null; emblem?: string | null; color?: string | null }
+type Row = { id: number; owner: string; name: string; level: number; body: string; at: string; tag?: string | null; emblem?: string | null; color?: string | null; mod?: boolean }
 export function toMsg(r: Row): ChatMsg | null {
   if (!r || typeof r.id !== 'number' || typeof r.body !== 'string' || typeof r.owner !== 'string') return null
   const crew = r.tag && isCleanName(r.tag) && /^#[0-9a-f]{6}$/i.test(r.color ?? '')
@@ -62,6 +63,7 @@ export function toMsg(r: Row): ChatMsg | null {
     id: r.id, owner: r.owner, name: String(r.name ?? ''), level: Number(r.level) || 1, crew,
     body: isCleanChat(r.body) ? r.body.slice(0, MAX_CHAT) : '•••',
     at: Date.parse(r.at) || Date.now(),
+    ...(r.mod === true ? { mod: true } : {}),
   }
 }
 
