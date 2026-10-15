@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, type ReactNode } from 'react'
 import { BufferAttribute, BufferGeometry, Color, Group, Matrix4, Mesh, Object3D, Texture, Vector3, type Material } from 'three'
+import { prunedSet } from './pruned'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { glowMats } from './dayNight'
 import { addHours } from './closingTime'
@@ -75,8 +76,6 @@ const spotWorld = new Matrix4()
 // New objects mounted between rebuilds (R3F and three both announce them with
 // 'childadded') get their lot updated on the next frame, so nothing shows up at
 // the origin.
-// Groups a pruning Batch hid (kept here, not in userData, which React may replace).
-const prunedSet = new WeakSet<Object3D>()
 const dispatch = Object3D.prototype.dispatchEvent
 Object3D.prototype.dispatchEvent = function (this: Object3D, e: Parameters<typeof dispatch>[0]) {
   if (e.type === 'childadded') {

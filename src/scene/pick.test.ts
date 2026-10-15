@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { BoxGeometry, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, PlaneGeometry } from 'three'
 import { firstSolid, tapOwnedBy } from './pick'
+import { prunedSet } from './pruned'
 
 // Two buildings, the front one overlapping the back one on screen.
 function town() {
@@ -25,6 +26,15 @@ describe('tap picking', () => {
     const { front, back, shadow, lamp, wall } = town()
     const hits = [{ object: shadow }, { object: lamp }, { object: wall }]
     expect(firstSolid(hits)?.object).toBe(wall)
+    expect(tapOwnedBy(hits, back)).toBe(true)
+    expect(tapOwnedBy(hits, front)).toBe(false)
+  })
+
+  it('still picks a merged wall when the merge also hid its emptied group', () => {
+    const { front, back, shadow, wall } = town()
+    back.visible = false
+    prunedSet.add(back)
+    const hits = [{ object: shadow }, { object: wall }]
     expect(tapOwnedBy(hits, back)).toBe(true)
     expect(tapOwnedBy(hits, front)).toBe(false)
   })
