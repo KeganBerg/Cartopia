@@ -3,6 +3,7 @@ import { PLOT, TILE } from '../game/data'
 import { lotSize, type PlacedBuilding } from '../game/store'
 import { toWorld } from './grid'
 import { PAL, SEASON } from './season'
+import { cycle } from '../lib/cycle'
 import { shade } from './flora'
 import { Scatter, push, type Shape, type Spot } from './Outskirts'
 
@@ -48,7 +49,7 @@ export function GrassTufts({ land, roads, buildings }: { land: string[]; roads: 
           const tufts = winter ? Math.floor(hash(x, z, 0) * 2) : 3 + Math.floor(hash(x, z, 0) * 3)
           for (let t = 0; t < tufts; t++) {
             const [cx, cz] = spot(wx, wz, x, z, t + 1)
-            push(sets, 'tuft', { x: cx, z: cz, ry: hash(x, z, t + 30) * 6, s: 1 + hash(x, z, t + 40) * 0.6, sy: 0.7 + hash(x, z, t + 50) * 0.6, tint: GREENS[(x + z + t) % GREENS.length] })
+            push(sets, 'tuft', { x: cx, z: cz, ry: hash(x, z, t + 30) * 6, s: 1 + hash(x, z, t + 40) * 0.6, sy: 0.7 + hash(x, z, t + 50) * 0.6, tint: cycle(GREENS, x + z + t) })
           }
           const roll = hash(x, z, 7)
           if (BLOOMS.length && roll < 0.22) {

@@ -30,6 +30,7 @@ import { Manhole } from './BuildingDetail'
 import { GrassTufts } from './Tufts'
 import { Outskirts } from './Outskirts'
 import { townExits } from './townExits'
+import { cycle } from '../lib/cycle'
 import { RoadWear, StreetProp, PROPS, Hydrant, StreetLamp, Sidewalk, CornerCurb, CornerFillet, ENDS, type End } from './Roadside'
 import { toWorld, toTile, DIRS } from './grid'
 import { grassTex, paverTex, meadowTex } from './textures'
@@ -411,10 +412,10 @@ const RoadTile = memo(function RoadTile({ t, asphalt }: { t: Tile; asphalt: Mesh
       {/* A lamp lighting the corner where a side road meets the street. */}
       {junction && arms.filter(Boolean).length === 3 && <StreetLamp side={SIDES[arms.indexOf(false)]} />}
       {avenue && outer && !xing.some(Boolean) && (x * 7 + z * 5) % 3 === 0 && <StreetLamp side={outer} />}
-      <RoadWear kerbs={SIDES.filter((_, i) => !arms[i])} plain={plain} alongX={!!straightX} h={((x * 73 + z * 151) % 97) / 97} />
+      <RoadWear kerbs={SIDES.filter((_, i) => !arms[i])} plain={plain} alongX={!!straightX} h={(((x * 73 + z * 151) % 97) + 97) % 97 / 97} />
       {/* Sidewalk furniture on some straight stretches, on the side without a lamp. */}
       {plain && (x * 11 + z * 13) % 4 === 0 && (
-        <StreetProp kind={PROPS[(x * 5 + z * 3) % PROPS.length]} side={straightX ? ((x + z) % 2 ? 'n' : 's') : ((x + z) % 2 ? 'w' : 'e')} at={-0.2} />
+        <StreetProp kind={cycle(PROPS, x * 5 + z * 3)} side={straightX ? ((x + z) % 2 ? 'n' : 's') : ((x + z) % 2 ? 'w' : 'e')} at={-0.2} />
       )}
       {(straightX || straightZ) && <Dashes alongX={straightX} />}
       {avenue && <Dashes alongX={oneWay < 2} />}

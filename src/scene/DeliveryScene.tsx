@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
+import { cycle } from '../lib/cycle'
 import { useFrame, useThree } from '@react-three/fiber'
 import { AdditiveBlending, Group, InstancedMesh, MeshBasicMaterial, Object3D, Vector3 } from 'three'
 import { CarModel, carFrame } from './CarModel'
@@ -75,7 +76,7 @@ function Paint({ x, z, w, l, color = '#fafafa', ry = 0 }: { x: number; z: number
 function Block({ bx, bz, pool }: { bx: number; bz: number; pool: string[] }) {
   const cx = blockCentre(bx), cz = blockCentre(bz)
   const shops = isShops(bx, bz)
-  const defs = useMemo(() => [0, 1, 2, 3].map((k) => (shops ? pool[(bx * 5 + bz * 3 + k) % pool.length] : 'house')), [shops, pool, bx, bz])
+  const defs = useMemo(() => [0, 1, 2, 3].map((k) => (shops ? cycle(pool, bx * 5 + bz * 3 + k) : 'house')), [shops, pool, bx, bz])
   const pave = useMemo(() => paverTex(BLOCK / 0.8, WALK / 0.8), [])
   return (
     <group position={[cx, 0, cz]}>
