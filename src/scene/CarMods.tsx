@@ -122,9 +122,9 @@ const ROUND_NOSE: Body[] = ['horseshoe', 'scissor', 'teardrop', 'formula', 'pont
 const rearLift = (f: Frame) => Math.max(f.lift, f.pipeY - 0.1)
 // On a low car with a trunk a wing whose top stands this far up the deck would tower over the
 // roof: the wing comes down on shorter posts until its top sits just over the roof line, keeping
-// its lowest piece (low, up from the deck) clear above the tallest kit arch over the rear wheels.
+// its lowest piece (low, up from the deck) clear above any kit arch over the rear wheels.
 const wingDrop = (f: Frame, top: number, low: number) =>
-  f.deck < f.roof - 0.05 ? Math.min(top * 0.45, f.deck + low - f.wheel * 2.2 - 0.06, Math.max(0, f.deck + top - f.roof - 0.03)) : 0
+  f.deck < f.roof - 0.05 ? Math.min(top * 0.45, roomOf(f).arch ? f.deck + low - f.wheel - roomOf(f).arch - 0.06 : 1, Math.max(0, f.deck + top - f.roof - 0.03)) : 0
 // How far the hood sits below the usual hood line where hood mods go, on bodies drawn with
 // their own curved hoods.
 const HOOD_DROP: Partial<Record<Body, number>> = { restomuscle: 0.024, horseshoe: 0.021, teardrop: 0.01, longnose: 0.02, longtail: 0.026 }
