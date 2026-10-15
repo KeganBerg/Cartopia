@@ -1,0 +1,65 @@
+<!doctype html>
+<!-- The desktop app opens here first: it checks the game is reachable, then moves on to it.
+     With no connection it shows the offline screen and keeps trying. -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cartopia</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #3f8f3a; color: #fff; font-family: system-ui, 'Segoe UI', sans-serif; user-select: none; -webkit-user-select: none; overflow: hidden }
+      body::before { content: ''; position: fixed; left: 50%; top: 42%; width: 300vmax; height: 300vmax; translate: -50% -50%; background: repeating-conic-gradient(rgba(255,255,255,.08) 0 6deg, transparent 6deg 15deg); animation: spin 90s linear infinite }
+      @keyframes spin { to { rotate: 360deg } }
+      main { position: relative; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px }
+      img { width: 168px; height: 168px; border-radius: 38px; box-shadow: 0 10px 0 rgba(0,0,0,.18) }
+      .dots { display: flex; gap: 10px; height: 18px }
+      .dots i { width: 14px; height: 14px; border-radius: 50%; background: #fff; animation: hop .9s ease-in-out infinite }
+      .dots i:nth-child(2) { animation-delay: .15s }
+      .dots i:nth-child(3) { animation-delay: .3s }
+      @keyframes hop { 50% { translate: 0 -8px; opacity: .6 } }
+      #off { display: none; flex-direction: column; align-items: center; gap: 14px }
+      #off b { font-size: 30px; font-weight: 900; letter-spacing: .5px; text-shadow: 0 3px 0 rgba(0,0,0,.2) }
+      #off .ico { font-size: 56px; line-height: 1 }
+      button { font: inherit; font-size: 22px; font-weight: 900; color: #fff; background: #ff8a1f; border: 0; border-radius: 16px; padding: 14px 40px; box-shadow: 0 6px 0 #c25e00; cursor: pointer }
+      button:active { translate: 0 4px; box-shadow: 0 2px 0 #c25e00 }
+      body.offline .dots { display: none }
+      body.offline #off { display: flex }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="icon.png" alt="Cartopia" />
+      <div class="dots" aria-label="Loading"><i></i><i></i><i></i></div>
+      <div id="off" role="alert">
+        <span class="ico" aria-hidden="true">📡</span>
+        <b>No connection</b>
+        <button id="retry">↻ Retry</button>
+      </div>
+    </main>
+    <script>
+      const GAME = window.__CARTOPIA_URL__ || 'https://cartopia.lol'
+      let busy = false
+      async function go() {
+        if (busy) return
+        busy = true
+        document.body.classList.remove('offline')
+        try {
+          const ctrl = new AbortController()
+          const t = setTimeout(() => ctrl.abort(), 8000)
+          // Any answer at all means the game is reachable.
+          await fetch(GAME + '/version.json', { cache: 'no-store', mode: 'no-cors', signal: ctrl.signal })
+          clearTimeout(t)
+          location.replace(GAME + '/')
+          return
+        } catch {
+          document.body.classList.add('offline')
+        }
+        busy = false
+      }
+      document.getElementById('retry').onclick = go
+      window.addEventListener('online', go)
+      setInterval(() => { if (document.body.classList.contains('offline')) go() }, 5000)
+      go()
+    </script>
+  </body>
+</html>

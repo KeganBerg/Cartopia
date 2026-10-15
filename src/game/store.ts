@@ -10,6 +10,7 @@ import { raceCarOf } from './raceCar'
 import { sfx } from '../lib/sound'
 import { applyAutoJobs, autoJobs, autoJobsChange } from './autoJobs'
 import { fx } from './fx'
+import { clearCost, wildPlot } from './wildLand'
 import { opensLabel } from './clock'
 import { requestTrip, requestVisit } from './trips'
 import { trialPrize } from './trial'
@@ -817,6 +818,19 @@ let lastRaceXp = 0
 export const lastRaceXpPaid = () => lastRaceXp
 export const resetRaceXp = () => { lastRaceXp = 0 }
 
+// Bulldoze a wild obstacle (a tap in play mode or the Bulldoze tool): pay its clearing cost,
+// get its XP, and the tile is free at once. One already paid for under the old timed clearing
+// goes for free.
+function clearObstacle(s: GameState, set: (p: Partial<GameState>) => void, b: PlacedBuilding) {
+  const d = buildingDef(b.def)
+  const cost = b.jobEndsAt === null ? clearCost(d, s.level) : 0
+  if (s.coins < cost) return s.showNeed('coins', cost - s.coins, `bulldozing the ${d.name.toLowerCase()}`)
+  sfx.bulldoze(b.def.endsWith('rock'))
+  fx({ kind: 'cleared', uid: b.uid })
+  fx({ kind: 'collect', uids: [b.uid], coins: 0, parts: 0, xp: d.xp ?? 0 })
+  set(withXp(s, d.xp ?? 0, { coins: s.coins - cost, buildings: s.buildings.filter((o) => o.uid !== b.uid), updatedAt: Date.now() }))
+}
+
 function withXp(s: GameState, amount: number, patch: Partial<GameState>): Partial<GameState> {
   return { ...patch, ...addXp({ ...s, ...patch }, amount) }
 }
@@ -1047,7 +1061,7 @@ export const useGame = create<GameState>()(
         // Rusty's holds the lot and the restore bay, so losing it would strand those cars.
         if (b.def === 'rescue') return s.toast(`${d.name} can't be removed. Use Move to put it somewhere else.`)
         if (d.parked) return s.toast('This one is coming in a future update, so it stays put')
-        if (d.kind === 'obstacle') return s.toast(`Tap the ${d.name.toLowerCase()} in play mode to clear it`)
+        if (d.kind === 'obstacle') return clearObstacle(s, set, b)
         if (groupOf(s.buildings, b.uid)) return s.toast(`Split your merged ${d.name} first (Edit, then Merge)`)
         // It goes to the inventory with its level, theme and any job; its driver goes back to the garage.
         const { car: _driver, ...kept } = b
@@ -1136,20 +1150,7 @@ export const useGame = create<GameState>()(
         if (d.kind === 'garage') return s.openPanel('garage')
         if (b.def === 'rescue') return s.openPanel('rescue')
         if (b.def === 'crew') return s.openPanel('clan')
-        if (d.kind === 'obstacle') {
-          const now = Date.now()
-          if (b.jobEndsAt === null) {
-            if (s.coins < d.price) return s.showNeed('coins', d.price - s.coins, `clearing the ${d.name.toLowerCase()}`)
-            sfx.start()
-            return set({ coins: s.coins - d.price, buildings: s.buildings.map((o) => (o.uid === buid ? { ...o, jobEndsAt: now + d.jobSeconds! * 1000 } : o)), updatedAt: now })
-          }
-          if (now < b.jobEndsAt) return
-          sfx.coin()
-          fx({ kind: 'cleared', uid: buid })
-          fx({ kind: 'collect', uids: [buid], coins: 0, parts: 0, xp: d.xp ?? 0 })
-          s.toast(`Cleared! +${d.xp} XP`)
-          return set(withXp(s, d.xp!, { buildings: s.buildings.filter((o) => o.uid !== buid), updatedAt: now }))
-        }
+        if (d.kind === 'obstacle') return clearObstacle(s, set, b)
         // Gas stations, houses and decor have no jobs; a tap shows their upgrades and colour themes.
         if (!d.jobSeconds) return s.openUpgrade(buid)
         const merged = groupOf(s.buildings, buid)
@@ -1210,7 +1211,8 @@ export const useGame = create<GameState>()(
         const s = get()
         const b = s.buildings.find((o) => o.uid === buid)
         if (!b || s.visiting || !themable(buildingDef(b.def))) return
-        set({ panel: 'upgrade', upgrading: groupOf(s.buildings, buid)?.anchor.uid ?? buid })
+        // Through navTo, so closing it goes back to the menu it was opened from (the Shop's Upgrades list, Goals, a car's job).
+        set({ ...navTo(s, 'upgrade'), upgrading: groupOf(s.buildings, buid)?.anchor.uid ?? buid })
       },
 
       upgradeBuilding: (buid) => {
@@ -2422,20 +2424,10 @@ export const useGame = create<GameState>()(
         if (!buyablePlots(s.land).some(([x, z]) => x === px && z === pz)) return
         const cost = plotPrice(s.land.length - START_LAND.length)
         if (s.coins < cost) return s.showNeed('coins', cost - s.coins, 'more land')
-        // Scatter a few obstacles on the new plot.
-        const obstacles: PlacedBuilding[] = []
-        const used = new Set<string>()
-        const count = 3 + Math.floor(Math.random() * 4)
-        while (obstacles.length < count) {
-          const x = px * PLOT + Math.floor(Math.random() * PLOT)
-          const z = pz * PLOT + Math.floor(Math.random() * PLOT)
-          if (used.has(key(x, z))) continue
-          used.add(key(x, z))
-          const r = Math.random()
-          obstacles.push({ uid: uid(), def: r < 0.5 ? 'bush' : r < 0.85 ? 'rock' : 'cactus', x, z, jobEndsAt: null })
-        }
+        // The new plot comes wild: trees, boulders and bushes to bulldoze (game/wildLand.ts).
+        const obstacles: PlacedBuilding[] = wildPlot(px, pz).map((w) => ({ uid: uid(), def: w.def, x: w.x, z: w.z, jobEndsAt: null }))
         sfx.buy()
-        s.toast('New land! Clear the obstacles to make room.')
+        s.toast('New land! Bulldoze the trees and rocks to build')
         set(withXp(s, 50, {
           coins: s.coins - cost,
           land: [...s.land, `${px},${pz}`],

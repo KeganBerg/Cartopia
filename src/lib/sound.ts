@@ -309,6 +309,21 @@ export const sfx = {
     if (k > 2) shaker(d, t + 0.08, 0.025, 0.06 * k, 6500)
   }),
   start: () => play(arp(['G4', 'D5'], 0.08, marimba, 0.12)),
+  // Bulldozing wild land: a low engine push, then a tree's crack and fall or a boulder's
+  // crunch into gravel, and a little rising marimba for the cleared tile.
+  bulldoze: (rock: boolean) => play((d, t) => {
+    marimba(d, t, hz('D2'), 0.12, 0.35)
+    softKick(d, t + 0.02, 0.1)
+    if (rock) {
+      knock(d, t + 0.12, 300, 0.16)
+      shaker(d, t + 0.14, 0.05, 0.35, 2600)
+    } else {
+      woodblock(d, t + 0.1, 900, 0.1)
+      whoosh(d, t + 0.14, 0.4, 2400, 500, 0.05)
+      softKick(d, t + 0.52, 0.14)
+    }
+    arp(['G4', 'B4', 'D5'], 0.06, marimba, 0.08)(d, t + 0.6)
+  }),
   // The lightning button: a woodblock tap per repair, a marimba lift for jobs
   // restarted, then the coin cascade for what it collected, all on one chord.
   sweep: (collected: number, started: number, fixed: number) => play((d, t) => {
