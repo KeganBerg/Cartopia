@@ -1,5 +1,4 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { SharedShapes } from './sharedShapes'
 import { createPortal } from 'react-dom'
 import { Canvas, useThree } from '@react-three/fiber'
 import { ACESFilmicToneMapping, NeutralToneMapping, PCFSoftShadowMap, type PerspectiveCamera, type ToneMapping, type WebGLRenderer } from 'three'
@@ -103,7 +102,6 @@ function makeStage(tone: ToneMapping) {
           gl.domElement.addEventListener('webglcontextrestored', () => clearTimeout(t))
         }}
       >
-        <SharedShapes />
         <Rig run={run} />
         <StageRun run={run}>{node}</StageRun>
       </Canvas>,
