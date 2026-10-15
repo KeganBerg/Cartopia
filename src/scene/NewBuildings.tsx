@@ -1473,7 +1473,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
             </mesh>
           ))}
           {[-0.5, -0.25, 0, 0.25, 0.5].map((x) => (
-            <mesh key={x} position={[x, 1.62, 0.09]}><sphereGeometry args={[0.05, 8, 6]} />{bulb}</mesh>
+            <mesh key={x} position={[x, 1.635, 0.09]}><sphereGeometry args={[0.05, 8, 6]} />{bulb}</mesh>
           ))}
           <mesh position={[0, LAYER.lot + 0.01, 0]} rotation-x={-Math.PI / 2}>
             <planeGeometry args={[1.5, 0.22]} />
