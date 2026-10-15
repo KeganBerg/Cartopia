@@ -4,7 +4,7 @@
 // parts. Cars only come once your level has unlocked them, so a crate never skips a level gate. A signed-in player's crates are
 // rolled by the server (crate_open(), newest copy in supabase/migrations/0085_crate_value_fixes.sql, same tables and
 // rules); guests roll here. crates.test.ts keeps the server's tables in step.
-import { CARS, CUSTOM_PAINT, CUSTOM_PAINT_CRATE, MODS, MOD_SKINS, SKINS, carDef, hasCustomPaint, ownedSkins, modDef, modFits, ownedMods, type CarDef, type ModDef, type SkinDef, type SkinTier } from './data'
+import { CARS, CUSTOM_PAINT, carLevel, CUSTOM_PAINT_CRATE, MODS, MOD_SKINS, SKINS, carDef, hasCustomPaint, ownedSkins, modDef, modFits, ownedMods, type CarDef, type ModDef, type SkinDef, type SkinTier } from './data'
 import { PIECE_COUNT, PIECE_SOURCES, pieceId, piecePool } from './resto'
 import { crateHats, hatDef } from './hats'
 import { GEM_COINS, gemCoins } from './bucksPacks'
@@ -98,9 +98,10 @@ export const homeMods = (c: CrateDef) => MODS.filter((m) => modCrate(m) === c.id
 // ones from the crate below instead, so a Diamond Crate at level 10 still holds cars.
 export const crateBelow = (c: CrateDef): CrateDef | undefined => CRATES[CRATES.indexOf(c) - 1]
 
-// Cars a crate can hold at this level: its own cars your level has unlocked.
+// Cars a crate can hold at this level: its own cars your level has reached (carLevel: a Rusty-only
+// classic waits for the first search spot that finds it).
 export function crateCars(c: CrateDef, level: number): CarDef[] {
-  const cars = homeCars(c).filter((car) => car.unlockLevel <= level)
+  const cars = homeCars(c).filter((car) => carLevel(car) <= level)
   const below = crateBelow(c)
   return cars.length || !below ? cars : crateCars(below, level)
 }
@@ -354,7 +355,7 @@ export function crateTables() {
     // Every car's body (parts are rolled for any car you own); `crate` is its home crate, if any.
     // A crate rolls from its own cars or parts, and from `below` when none are in reach.
     cars: Object.fromEntries(CARS.map((car) => [car.id, {
-      body: car.body, crate: carCrate(car), unlock: car.unlockLevel, price: car.price, bucks: car.bucks ?? 0, colors: car.colors,
+      body: car.body, crate: carCrate(car), unlock: carLevel(car), price: car.price, bucks: car.bucks ?? 0, colors: car.colors,
       ...(car.secret ? { secret: true } : {}),
     }])),
     mods: Object.fromEntries(MODS.map((m) => [m.id, {
