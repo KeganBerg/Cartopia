@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useGame } from './store'
+import { buildingDef, themable } from './data'
 
 const g = () => useGame.getState()
 
@@ -56,5 +57,25 @@ describe('closing a menu goes back to the one it came from', () => {
     g().openPanel('shop')
     g().closePanel()
     expect(g().panel).toBe(null)
+  })
+
+  it("a building's upgrade menu goes back to the Shop's Upgrades list it was opened from", () => {
+    const b = g().buildings.find((o) => themable(buildingDef(o.def)))!
+    g().openPanel('shop')
+    g().openUpgrade(b.uid)
+    expect(g().panel).toBe('upgrade')
+    // Not enough coins: the popup returns to the upgrade, which returns to the Shop.
+    g().showNeed('coins', 500)
+    g().closePanel()
+    expect(g().panel).toBe('upgrade')
+    expect(g().upgrading).toBe(b.uid)
+    g().closePanel()
+    expect(g().panel).toBe('shop')
+  })
+
+  it('a building tapped in the town closes back to the town', () => {
+    const b = g().buildings.find((o) => themable(buildingDef(o.def)))!
+    g().openUpgrade(b.uid)
+    expect(g().panelBack).toEqual([])
   })
 })
