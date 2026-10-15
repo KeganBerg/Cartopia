@@ -8,7 +8,7 @@ import { Batch } from './Batch'
 import { LAYER, decal } from './layers'
 import { asphaltTex, grassTex, paverTex } from './textures'
 import { ArcadeSky, Bin, CarShadow, Crowd, Hydrant, K, Lamp, useArcadeLook, useTownPool, type Person } from './ArcadeScenery'
-import { BLOCK, DASH_TIME, DROP_LINE, DROP_R, GRID, STREET, TOWN, TOWN_SOLIDS, TRAFFIC_HIT, atDrop, blockCentre, dropBonus, hotTime, kerbSpot, roadLine } from '../game/arcadeMore'
+import { BLOCK, DASH_TIME, DROP_LINE, DROP_R, GRID, STREET, TOWN, TOWN_SOLIDS, TRAFFIC_HIT, atDrop, blockCentre, clockBonus, dropBonus, hotTime, kerbSpot, roadLine } from '../game/arcadeMore'
 import { carBox, circlePush, step, type Footprint } from '../game/collide'
 import { Footprinted, frameFootprint, scaled } from './footprint'
 import { buildingDef, CARS, isBike, TILE } from '../game/data'
@@ -333,11 +333,11 @@ export function DeliveryScene({ me, input, running, onHud, onEnd }: {
         if (s.carrying) {
           const hot = s.t <= s.hotUntil
           s.streak = hot ? s.streak + 1 : 0
-          const bonus = dropBonus(hot, s.streak - 1)
+          const bonus = clockBonus(dropBonus(hot, s.streak - 1), s.t, s.left)
           s.drops++
           s.left += bonus
           dingSound(hot ? 1.2 + Math.min(3, s.streak) * 0.12 : 1)
-          s.pop = { id: ++s.popId, text: hot ? `🔥 Hot! +${bonus}s${s.streak > 1 ? `  ×${s.streak}` : ''}` : `+${bonus}s`, kind: hot ? 'hot' : 'drop' }
+          s.pop = { id: ++s.popId, text: hot ? `🔥 Hot!${bonus ? ` +${bonus}s` : ''}${s.streak > 1 ? `  ×${s.streak}` : ''}` : '🍕 +1', kind: hot ? 'hot' : 'drop' }
           s.carrying = false
           s.target = pickFar(SHOP_SPOTS, s.pose.x, s.pose.z)
         } else {

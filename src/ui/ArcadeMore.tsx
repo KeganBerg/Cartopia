@@ -214,7 +214,7 @@ function DeliveryGame({ car, running, onDone }: GameProps) {
     <>
       <StageSlot cam={DASH_CAM}>{scene}</StageSlot>
       <div className="arc-hud">
-        <span className={hud.time < 8 ? 'arc-time low' : 'arc-time'}>⏱ {Math.ceil(hud.time)}s</span>
+        <span className={hud.time < 10 ? 'arc-time dash-clock low' : 'arc-time dash-clock'}>⏱ {Math.ceil(hud.time)}s</span>
         <span className={hud.carrying ? 'arc-spot in' : 'arc-spot'}>{hud.carrying ? '🏠 Deliver' : '🍕 Pick up'}</span>
         <span>✅ {hud.drops}</span>
       </div>

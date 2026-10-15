@@ -26,10 +26,17 @@ for (const form of (process.env.FORMS ?? 'phone,desktop').split(',')) {
     s.streak = 2
     s.hotFor = 10
     s.hotUntil = s.t + 6
-    s.pop = { id: 9, text: '🔥 Hot! +19s  ×2', kind: 'hot' }
+    s.pop = { id: 9, text: '🔥 Hot! +3s  ×2', kind: 'hot' }
   })
   await p.waitForTimeout(700)
   await p.screenshot({ path: `${out}/${form}-dash.png` })
+  // Nearly out of time, then the clock runs out and the run ends.
+  await p.evaluate(() => { window.__dash.left = 7; window.__dash.drops = 5 })
+  await p.waitForTimeout(1200)
+  await p.screenshot({ path: `${out}/${form}-dash-low.png` })
+  await p.evaluate(() => { window.__dash.left = 0.05 })
+  await p.waitForTimeout(4000)
+  await p.screenshot({ path: `${out}/${form}-dash-end.png` })
   console.log(form)
   await p.close()
 }

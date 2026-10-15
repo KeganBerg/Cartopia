@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  BLOCK, GRID, STREET, TOWN, blockCentre, brakeDistance, dashStars, flips, gunTimes, insideBlock, jumpLength, jumpScore, kerbSpot,
+  BLOCK, DASH_MAX, DASH_TIME, GRID, STREET, TOWN, blockCentre, clockBonus, dropBonus, brakeDistance, dashStars, flips, gunTimes, insideBlock, jumpLength, jumpScore, kerbSpot,
   landed, pitCall, pitStars, stopGrade, stopPenalty, starReward, stuntStars, washStars, scrubNeed, washBonus,
 } from './arcadeMore'
 import { chaseReward } from './arcade'
@@ -71,5 +71,25 @@ describe('arcade second wave', () => {
     expect(stuntStars(4 * jumpScore(jumpLength(1), Math.PI * 2, Math.PI * 2, true))).toBe(3)
     expect(stuntStars(4 * jumpScore(jumpLength(1), Math.PI * 2))).toBe(2)
     expect(stuntStars(100)).toBe(0)
+  })
+})
+
+describe('Delivery Dash clock', () => {
+  it('only hot drops add time, a little more for a streak', () => {
+    expect([dropBonus(false, 0), dropBonus(true, 0), dropBonus(true, 1), dropBonus(true, 9)]).toEqual([0, 2, 3, 5])
+  })
+  it('never lets a run go past DASH_MAX', () => {
+    expect(clockBonus(5, 10, 20)).toBe(5)
+    expect(clockBonus(5, DASH_MAX - 22, 20)).toBe(2)
+    expect(clockBonus(5, DASH_MAX - 20, 20)).toBe(0)
+    // Even a perfect run of hot drops every 3 seconds runs out.
+    let t = 0, left = DASH_TIME
+    while (left > 0 && t < 1000) {
+      t += 3
+      left -= 3
+      if (left > 0) left += clockBonus(dropBonus(true, 3), t, left)
+      if (left > 0) expect(t + left).toBeLessThanOrEqual(DASH_MAX)
+    }
+    expect(left).toBeLessThanOrEqual(0)
   })
 })

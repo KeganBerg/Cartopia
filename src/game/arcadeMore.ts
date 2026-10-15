@@ -72,14 +72,20 @@ export function washStars(cars: number) {
 }
 
 // ---------- Delivery Dash ----------
-// Pick up at the pizza place, drop at the glowing house, beat the clock. Each drop adds time.
-export const DASH_TIME = 45
-export const DASH_BONUS = 12
-// Hot pizza: drop it off within hotTime of picking up (longer for a further house) and the
-// clock gets extra seconds, more for every hot drop in a row. Bumping traffic costs time.
+// Pick up at the pizza place, drop at the glowing house, as many as you can before the clock
+// runs out. Drops don't refill the clock, so every run ends.
+export const DASH_TIME = 60
+// Hot pizza: drop it off within hotTime of picking up (longer for a further house) for a few
+// extra seconds, more for every hot drop in a row, but no run lasts past DASH_MAX in all.
+// Bumping traffic costs time.
+export const DASH_MAX = 80
 export const hotTime = (dist: number) => 4 + dist / 4.5
 export function dropBonus(hot: boolean, streak: number) {
-  return DASH_BONUS + (hot ? 3 + 2 * Math.min(3, streak) : 0)
+  return hot ? 2 + Math.min(3, streak) : 0
+}
+// The seconds a drop actually adds, t into the run with `left` still on the clock.
+export function clockBonus(bonus: number, t: number, left: number) {
+  return Math.max(0, Math.floor(Math.min(bonus, DASH_MAX - t - left)))
 }
 export const TRAFFIC_HIT = 2
 export function dashStars(drops: number) {
