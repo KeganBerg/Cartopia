@@ -77,11 +77,16 @@ describe('scheduling', () => {
     expect(flyByGap(0)).toBeGreaterThanOrEqual(45)
     expect(flyByGap(1)).toBeLessThanOrEqual(120)
   })
-  it('flies balloons only on fair days, rarely a rocket, nothing in a storm', () => {
+  it('flies balloons, banners and the blimp only on fair days, rarely a rocket, nothing in a storm', () => {
     expect(pickFlyBy(0.5, 0.1, 0, true)).toBe('balloon')
     expect(pickFlyBy(0.5, 0.1, 1, true)).toBe('plane')
     expect(pickFlyBy(0.5, 0.1, 0, false)).toBe('plane')
     expect(pickFlyBy(0.01, 0.9, 1, true)).toBe('rocket')
+    expect(pickFlyBy(0.5, 0.3, 0, true)).toBe('banner')
+    expect(pickFlyBy(0.5, 0.45, 0, true)).toBe('blimp')
+    expect(pickFlyBy(0.5, 0.45, 1, true)).toBe('plane')
+    expect(pickFlyBy(0.5, 0.3, 0, false)).toBe('plane')
+    expect(pickFlyBy(0.5, 0.9, 1, false)).toBe('heli')
     expect(pickFlyBy(0.5, 0.1, 0, true, true)).toBeNull()
     let rockets = 0
     for (let i = 0; i < 1000; i++) if (pickFlyBy(i / 1000, 0.9, 0, true) === 'rocket') rockets++
