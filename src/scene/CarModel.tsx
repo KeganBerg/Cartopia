@@ -663,7 +663,13 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
     // Dark cockpit floor (standing clear of any deck stripes) with two slim bucket seats on it: a thin
     // cushion with side bolsters, a raked shell back with wings, and a small headrest.
     const fl = top + 0.012
-    k.add('black', box(s.wid * 0.7, 0.016, s.cabinLen * 0.62), [0, top + 0.004, base[2] + 0.02])
+    const cw = s.wid * 0.7
+    const cl = s.cabinLen * 0.62
+    const cz = base[2] + 0.02
+    k.add('black', box(cw, 0.016, cl), [0, top + 0.004, cz])
+    // Padded rim round the sides and back of the cockpit, so the seats sit inside it.
+    for (const sd of [-1, 1]) k.add('black', rbox(0.032, 0.034, cl + 0.02, 0.014), [sd * (cw / 2 + 0.006), top + 0.02, cz])
+    k.add('black', rbox(cw + 0.044, 0.034, 0.032, 0.014), [0, top + 0.02, cz - cl / 2 - 0.006])
     const sw = s.wid * 0.25
     const hb = Math.min(0.13, s.cabinH * 0.75)
     const rake = -0.22
