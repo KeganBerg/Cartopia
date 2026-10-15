@@ -19,17 +19,17 @@ export const CAR_CLASSES: CarClass[] = [
 
 const CLASS_OF_BODY: Partial<Record<Body, CarClassId>> = {
   compact: 'compact', sedan: 'compact', hatch: 'compact', wagon: 'compact', ev: 'compact',
-  muscle: 'muscle', widebody: 'muscle', longnose: 'muscle', classic: 'muscle',
-  sports: 'sport', coupe: 'sport', roadster: 'sport', rearengine: 'sport', luxury: 'sport',
-  super: 'super', wedge: 'super', prototype: 'super', scissor: 'super', horseshoe: 'super', teardrop: 'super',
-  truck: 'offroad', rally: 'offroad', suv: 'offroad', offroad: 'offroad',
+  muscle: 'muscle', widebody: 'muscle', longnose: 'muscle', classic: 'muscle', highboy: 'muscle',
+  sports: 'sport', coupe: 'sport', roadster: 'sport', rearengine: 'sport', luxury: 'sport', timeattack: 'sport',
+  super: 'super', wedge: 'super', prototype: 'super', scissor: 'super', horseshoe: 'super', teardrop: 'super', longtail: 'super',
+  truck: 'offroad', rally: 'offroad', groupb: 'offroad', suv: 'offroad', offroad: 'offroad',
   // Everything else (bus, tank, dog van, Tusker, bikes, formula, bubble, van) is an oddball.
 }
 
 // A second tag for cars that fit two classes (at most two per car).
 const SECOND_CLASS: Record<string, CarClassId> = {
   tusker: 'offroad', tomahawk: 'offroad', monoposto: 'super', bug: 'compact', cottonmouth: 'sport',
-  shinden: 'sport', rally: 'sport', lemans: 'muscle',
+  shinden: 'sport', rally: 'sport', lemans: 'muscle', sturm: 'sport',
 }
 
 const FALLBACK = CAR_CLASSES[CAR_CLASSES.length - 1]

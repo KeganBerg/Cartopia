@@ -1334,7 +1334,7 @@ export const useGame = create<GameState>()(
       buyCar: (model, color) => {
         const s = get()
         const c = carDef(model)
-        if (c.season || c.rescueOnly || c.secret) return false
+        if (c.season || c.rescueOnly || c.secret || c.pack) return false
         if (s.level < c.unlockLevel) {
           s.showNeed('level', c.unlockLevel, c.name)
           return false

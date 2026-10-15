@@ -271,6 +271,7 @@ export type Body = 'compact' | 'sedan' | 'sports' | 'muscle' | 'truck' | 'super'
   | 'hatch' | 'van' | 'suv' | 'ev' | 'luxury' | 'formula' | 'bus' | 'tusker' | 'dogvan' | 'rearengine' | 'longnose' | 'prototype'
   | 'scissor' | 'horseshoe' | 'teardrop' | 'icecream' | 'monster' | 'parcel'
   | 'pontoon' | 'stepnose' | 'restomuscle'
+  | 'highboy' | 'timeattack' | 'groupb' | 'longtail'
 // Two-wheelers: drawn as motorcycles with a rider, and only take exhaust and rim mods.
 export const BIKES: Body[] = ['scooter', 'chopper', 'sportbike']
 export const isBike = (body: Body) => BIKES.includes(body)
@@ -340,6 +341,9 @@ export type CarDef = {
   // Resto-mod: never sold, never a whole-car crate prize; only built from its four crate
   // pieces (game/resto.ts). Its unlock level is when its pieces start dropping.
   secret?: boolean
+  // Car pack car: only ever comes in its real-money car pack (bucksPacks.ts), never the
+  // Showroom or a crate. Its unlock level is when the pack goes on sale to you.
+  pack?: boolean
 }
 
 // Parodies of real cars: the shapes and stats nod to the real thing, but the
@@ -396,6 +400,12 @@ export const CARS: CarDef[] = [
   { id: 'sprint', name: 'Valtorre Sprint 65', body: 'stepnose', price: 70000, unlockLevel: 10, secret: true, power: 110, grip: 104, weight: 30, skill: 'smooth', likes: ['coffee', 'cinema', 'tuner'], colors: ['#1b4d3e', '#efe7d2', '#6d1b2b'] },
   { id: 'revenant', name: "Liberty Revenant '69", body: 'restomuscle', price: 110000, unlockLevel: 14, secret: true, power: 130, grip: 92, weight: 56, skill: 'torque', likes: ['burger', 'lube', 'bodyshop'], colors: ['#8d9094', '#1c1c1c', '#0d2a5c'] },
   { id: 'pontone', name: 'Corvara Pontone 58', body: 'pontoon', price: 170000, unlockLevel: 18, secret: true, power: 122, grip: 118, weight: 26, skill: 'slipstream', likes: ['stadium', 'diner', 'motel'], colors: ['#b71c1c', '#cfd8dc', '#1b5e20'] },
+  // Car packs (2026-10-15): cars only sold in the Bank's car packs, each a little quicker than the
+  // Showroom's best at its level (see packCars.ts for the bodies).
+  { id: 'firebolt', name: 'Liberty Firebolt Highboy', body: 'highboy', price: 0, unlockLevel: 8, pack: true, power: 56, grip: 40, weight: 40, skill: 'launch', likes: ['diner', 'burger', 'lube'], colors: ['#b71c1c', '#212121', '#ffb300'] },
+  { id: 'kaze', name: 'Kazumi Kaze TA-R', body: 'timeattack', price: 0, unlockLevel: 15, pack: true, power: 68, grip: 62, weight: 38, skill: 'smooth', likes: ['tuner', 'parts', 'arcade'], colors: ['#eceff1', '#0d47a1', '#ff6d00'] },
+  { id: 'sturm', name: 'Falke Sturm S1', body: 'groupb', price: 0, unlockLevel: 25, pack: true, power: 88, grip: 76, weight: 34, skill: 'torque', likes: ['tires', 'stadium', 'junkyard'], colors: ['#fafafa', '#c62828', '#1b5e20'] },
+  { id: 'vanta', name: 'Aether Vanta LT', body: 'longtail', price: 0, unlockLevel: 40, pack: true, power: 104, grip: 100, weight: 28, skill: 'nitro', likes: ['glasstower', 'helipad', 'club'], colors: ['#263238', '#00e5ff', '#e0e0e0'] },
   { id: 'bug', name: 'Bumble Bubble', body: 'bubble', price: 1200, unlockLevel: 1, rescueOnly: true, power: 20, grip: 34, weight: 28, skill: 'freeze', likes: ['icecream', 'donut', 'coffee'], colors: ['#80cbc4', '#ffcc80', '#ef9a9a'] },
   { id: 'woodie', name: 'Lakeside Woodie Wagon', body: 'wagon', price: 2200, unlockLevel: 1, rescueOnly: true, power: 25, grip: 31, weight: 56, skill: 'slipstream', likes: ['diner', 'hospital', 'market'], colors: ['#fafafa', '#fff59d', '#4db6ac'] },
   { id: 'hauler', name: 'Old Faithful Hauler', body: 'truck', price: 3000, unlockLevel: 1, rescueOnly: true, power: 40, grip: 40, weight: 70, skill: 'torque', likes: ['carwash', 'junkyard', 'tacos'], colors: ['#558b2f', '#e65100', '#1565c0'] },
@@ -836,6 +846,7 @@ export const readySets = (s: { cars: { model: string }[]; claimedSets?: string[]
 export function carSource(car: CarDef): { icon: string; text: string } {
   if (car.season) return { icon: '🏁', text: `Season ${car.season} prize` }
   if (car.secret) return { icon: '🧩', text: 'Crate pieces' }
+  if (car.pack) return { icon: '💳', text: 'Car pack' }
   if (car.rescueOnly) {
     const spot = RESCUE_SPOTS.filter((sp) => sp.cars.some((c) => c.model === car.id)).sort((a, b) => a.unlockLevel - b.unlockLevel)[0]
     return { icon: '🔧', text: spot ? `Rusty's · ${spot.name}` : "Rusty's" }
