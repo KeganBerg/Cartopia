@@ -287,7 +287,9 @@ function SkatePark({ m, bulb, ghost }: EdgeProps) {
         {/* Steps overlap the next one, so their widths differ a hair: no shared side planes. */}
         {[0, 1, 2].map((i) => <Box key={i} m={m} at={[0, 0.05 + i * 0.07, -0.25 + i * 0.12]} s={[0.6 - (i % 2) * 0.008, 0.1 + i * 0.14, 0.14]} c="#9e9e9e" t={concreteTex(1, 1)} />)}
         <Box m={m} at={[0, 0.36, 0.25]} s={[0.584, 0.2, 0.3]} c="#9e9e9e" t={concreteTex(1, 1)} />
-        <Cyl m={m} at={[0, 0.42, 0.02]} r={0.012} h={0.62} c="#ffb300" seg={6} rot={[-0.55, 0, 0]} />
+        {/* Hand rail down the middle of the stairs, on a post at each end. */}
+        <Cyl m={m} at={[0, 0.5, -0.025]} r={0.012} h={0.6} c="#ffb300" seg={6} rot={[0.896, 0, 0]} />
+        {([[-0.25, 0.21], [0.2, 0.57]] as const).map(([z, y]) => <Box key={z} m={m} at={[0, y, z]} s={[0.02, 0.22, 0.02]} c="#ffb300" shadow={false} />)}
       </group>
       {/* Grind rail and a kicker in the middle. */}
       <group position={[-1.3, 0.06, 1.1]} rotation-y={0.4}>

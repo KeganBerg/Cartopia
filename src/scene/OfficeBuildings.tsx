@@ -580,9 +580,10 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
           {/* Under the canopy, over the bay door. */}
           <LitSign text="EMERGENCY" w={0.84} at={[1.2, 0.6, zf + 0.906]} bg="#c62828" fg="#ffffff" ghost={ghost} m={m} />
           <mesh position={[1.2, 0.25, zf + 0.904]}><planeGeometry args={[0.8, 0.4]} />{m('#37474f')}</mesh>
-          <Box m={m} at={[1.2, 0.74, zf + 1.4]} s={[1.5, 0.05, 1.0]} c="#d32f2f" />
-          {[0.52, 1.88].flatMap((x) => [zf + 1.05, zf + 1.85].map((z) => <Cyl key={`${x}${z}`} m={m} at={[x, 0.37, z]} r={0.025} h={0.74} c="#eceff1" seg={6} />))}
-          <mesh position={[1.2, 0.715, zf + 1.4]}><boxGeometry args={[0.04, 0.012, 0.9]} />{bulb}</mesh>
+          {/* The bay canopy stands clear of the ambulance's roof and light bar, level with the wing's roof. */}
+          <Box m={m} at={[1.2, 1.0, zf + 1.4]} s={[1.5, 0.05, 1.0]} c="#d32f2f" />
+          {[0.52, 1.88].flatMap((x) => [zf + 1.05, zf + 1.85].map((z) => <Cyl key={`${x}${z}`} m={m} at={[x, 0.5, z]} r={0.025} h={1.0} c="#eceff1" seg={6} />))}
+          <mesh position={[1.2, 0.975, zf + 1.4]}><boxGeometry args={[0.04, 0.012, 0.9]} />{bulb}</mesh>
           {!ghost && (
             <group position={[1.2, 0.05, zf + 1.38]}>
               <Upright>

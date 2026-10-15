@@ -420,7 +420,8 @@ function DriveInGrown({ m, lvl, sl, ghost, roof }: { m: ReturnType<typeof useMat
   const big = growthStage(lvl) === 3
   return (
     <group>
-      <Pylon m={m} at={[1.4, 0, 1.55]} h={big ? 2.4 : 1.8} w={1.0} text="MOVIES" bg="#fafafa" fg="#3e2723" frame={roof} />
+      {/* At the lot's front edge, clear of the popcorn kiosk behind it. */}
+      <Pylon m={m} at={[1.4, 0, 1.95]} h={big ? 2.4 : 1.8} w={1.0} text="MOVIES" bg="#fafafa" fg="#3e2723" frame={roof} />
       {big && [-1.75, 1.75].map((x) => (
         // Grows to a merged pair's height, so the light string still runs top to top.
         <group key={x} position={[x, 0, -1.5]} userData={{ stretch: true }}><Upright tall><group position={[-x, 0, 1.5]}>
@@ -1045,7 +1046,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
               </mesh>
             </group>
           ))}
-          {sign && <Sign text="SHOWROOM" w={2.4} y={2.05} z={1.72} bg="#eceff1" fg="#37474f" />}
+          {sign && <Sign text="SHOWROOM" w={2.4} y={2.05} z={1.75} bg="#eceff1" fg="#37474f" />}
         </group>
       )
     case 'garage':
@@ -1469,8 +1470,9 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             </mesh>
           ))}</group>}
           {def.id === 'carwash' && !ghost && [-0.45, 0.45].map((x) => (
-            <mesh key={x} position={[x, 0.525, F + 0.15]} castShadow>
-              <cylinderGeometry args={[0.13, 0.13, 1.05, 10]} />
+            // Short enough to stand under the sloping awning rather than through it.
+            <mesh key={x} position={[x, 0.36, F + 0.15]} castShadow>
+              <cylinderGeometry args={[0.13, 0.13, 0.72, 10]} />
               <meshStandardMaterial color={x < 0 ? '#29b6f6' : '#ffca28'} roughness={1} />
             </mesh>
           ))}

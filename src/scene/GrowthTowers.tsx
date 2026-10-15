@@ -382,7 +382,8 @@ function TunerModel({ def, ghost, m, win, bulb, level }: Props) {
               return (
                 <group key={i} position={[cx, 0, cz]}>
                   <Cyl m={m} at={[0, y, 0]} r={r} h={0.05} c="#37474f" seg={20} />
-                  <Cyl m={m} at={[0, y + 0.12, 0]} r={r + 0.01} h={0.015} c="#cfd8dc" seg={20} />
+                  {/* Guard rail round the deck's edge: a ring, so it passes outside the parked cars. */}
+                  <mesh position={[0, y + 0.12, 0]} rotation-x={Math.PI / 2}><torusGeometry args={[r - 0.02, 0.01, 4, 32]} />{m('#cfd8dc')}</mesh>
                   {!ghost && [0, 1, 2, 3].map((j) => {
                     const a = (j / 4) * Math.PI * 2 + i * 0.6
                     return <BlockCar key={j} m={m} at={[Math.sin(a) * 0.55, y + 0.025, Math.cos(a) * 0.55]} c={CAR_COLS[(i * 4 + j) % CAR_COLS.length]} rot={a + Math.PI / 2} />

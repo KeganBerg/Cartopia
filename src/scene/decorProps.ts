@@ -443,8 +443,9 @@ export const WILD_PROPS = {
     k.ico(cast(L(stone[0], 0.95)), 0.62, [0, 0.38, 0], [1.1, 0.78, 0.95], 1)
     k.ico(cast(L(stone[1], 0.95)), 0.34, [0.5, 0.2, 0.36], [1, 0.8, 1.1], 0)
     k.ico(L(stone[2], 0.95), 0.2, [-0.48, 0.1, 0.42], [1.2, 0.7, 1], 0)
-    // Moss over the crown (snow in winter) and lichen spots on the sides.
-    k.ico(L(SNOW ? '#f4f8fb' : '#6a8f3a', 0.9), 0.4, [-0.06, 0.78, 0.02], [1.15, 0.28, 1], 1)
+    // Moss over the crown (snow in winter): a smaller copy of the boulder's shape set just
+    // proud of its top, so it hugs the stone instead of sitting on it like a lid. Lichen on the sides.
+    k.ico(L(SNOW ? '#f4f8fb' : '#6a8f3a', 0.9), 0.62, [0, 0.55, 0], [0.8, 0.55, 0.69], 1)
     for (const [x, y, z] of [[0.52, 0.45, -0.25], [-0.4, 0.5, 0.42], [0.1, 0.3, 0.6]] as const) {
       k.ico(L('#c5c98a', 0.9), 0.07, [x, y, z], [1, 0.6, 1], 0)
     }

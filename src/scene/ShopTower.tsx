@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { UnderTower } from './underTower'
 import { TILE, type BuildingDef } from '../game/data'
 import { BuildingModel } from './BuildingModel'
 import { Box, Neon, Flag, GOLD, type Mat } from './NewBuildings'
@@ -42,13 +43,15 @@ export function ShopTower({ def, ghost, m, win, bulb, level, look }: Props) {
   const H = y0 + fl * FH
   // The shop's own sign stands on its roof in front of the tower; no balconies behind it.
   const clear = def.sign ? 0.43 + Math.min(W * 0.8, 2.4) / 8 : 0
-  const blade = fl * FH - 0.12 - clear - 0.1
+  const room = fl * FH - 0.12 - clear - 0.1
   const letters = [...look.sign]
-  const step = Math.min(0.42, blade / letters.length)
+  const step = Math.min(0.42, room / letters.length)
+  // The blade is as long as its letters need, hung from the top of the room it has.
+  const blade = Math.min(room, letters.length * step + 0.12)
   return (
     <group>
       {/* Its roof prop moves up to the tower top as the giant one. */}
-      <BuildingModel def={{ ...def, prop: undefined }} level={1} ghost={ghost} />
+      <UnderTower.Provider value={true}><BuildingModel def={{ ...def, prop: undefined }} level={1} ghost={ghost} /></UnderTower.Provider>
       <BrickFloors k={k} w={tw} d={td} z0={tz} y0={y0} floors={fl} fh={FH} wall={look.brick} trim="#f5f5f5" />
       {/* Balconies on every other window, staggered floor to floor; the left column carries the blade. */}
       <Facade at={[0, 0, zf]} len={tw}>
@@ -63,7 +66,7 @@ export function ShopTower({ def, ghost, m, win, bulb, level, look }: Props) {
       {!ghost && (
         <>
           {/* The blade: a long lit sign standing out from the wall like an old theatre's, the name in upright letters down both faces. */}
-          <group position={[-tw / 2 + 0.2, y0 + clear + blade / 2 + 0.05, zf + 0.3]}>
+          <group position={[-tw / 2 + 0.2, y0 + clear + room - blade / 2 + 0.05, zf + 0.3]}>
             <Upright>
               <group rotation-y={Math.PI / 2}>
                 <Box m={m} at={[0, 0, 0]} s={[0.54, blade + 0.1, 0.06]} c={look.color} shadow={false} />
@@ -71,7 +74,7 @@ export function ShopTower({ def, ghost, m, win, bulb, level, look }: Props) {
                   <group key={sd} rotation-y={sd > 0 ? 0 : Math.PI}>
                     <Box m={m} at={[0, 0, 0.032]} s={[0.46, blade, 0.004]} c="#212121" shadow={false} />
                     {letters.map((ch, i) => ch !== ' ' && (
-                      <LitSign key={i} text={ch} w={step} h={step} at={[0, blade / 2 - (i + 0.5) * step - 0.04, 0.04]} bg="#212121" fg="#fffde7" m={m} />
+                      <LitSign key={i} text={ch} w={step} h={step} at={[0, (letters.length / 2 - i - 0.5) * step, 0.04]} bg="#212121" fg="#fffde7" m={m} />
                     ))}
                   </group>
                 ))}

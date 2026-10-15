@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { OpenRoof } from './underTower'
 import type { Texture } from 'three'
 import { levelLift, type BuildingDef } from '../game/data'
 import { growthStage } from '../game/growth'
@@ -620,12 +621,14 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
               <Box m={m} at={[0, 0.065, 0.02]} s={[0.08, 0.07, 0.2]} c="#e53935" shadow={false} />
             </group>
           ))}
-          {/* Giant apple on the roof. */}
-          <group position={[-1.2, h + 0.14, -0.6]}>
-            <mesh position={[0, 0.25, 0]} castShadow scale={[1, 0.9, 1]}><sphereGeometry args={[0.27, 14, 10]} />{m('#e53935')}</mesh>
-            <Cyl m={m} at={[0, 0.52, 0]} r={0.02} h={0.12} c="#5d4037" seg={6} />
-            <mesh position={[0.08, 0.53, 0]} rotation-z={-0.6}><boxGeometry args={[0.14, 0.02, 0.07]} />{m('#43a047')}</mesh>
-          </group>
+          {/* Giant apple on the roof (the grown tower carries its own on top instead). */}
+          <OpenRoof>
+            <group position={[-1.2, h + 0.14, -0.6]}>
+              <mesh position={[0, 0.25, 0]} castShadow scale={[1, 0.9, 1]}><sphereGeometry args={[0.27, 14, 10]} />{m('#e53935')}</mesh>
+              <Cyl m={m} at={[0, 0.52, 0]} r={0.02} h={0.12} c="#5d4037" seg={6} />
+              <mesh position={[0.08, 0.53, 0]} rotation-z={-0.6}><boxGeometry args={[0.14, 0.02, 0.07]} />{m('#43a047')}</mesh>
+            </group>
+          </OpenRoof>
         </ShellBuilding>
       )
     }
@@ -1377,8 +1380,9 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
         return (
           <group>
             <PropMesh parts={DECOR_PROPS.hotdog()} />
-            <Cyl m={m} at={[0, 1.0, 0]} r={0.02} h={0.7} c="#eceff1" seg={6} />
-            <mesh position={[0, 1.35, 0]} castShadow>
+            {/* The umbrella stands at the back of the cart, behind the big hot dog. */}
+            <Cyl m={m} at={[0, 1.0, -0.2]} r={0.02} h={0.7} c="#eceff1" seg={6} />
+            <mesh position={[0, 1.35, -0.2]} castShadow>
               <coneGeometry args={[0.6, 0.22, 16]} />
               {m('#ffffff', awningTex('#fdd835', '#e53935'))}
             </mesh>
@@ -1396,8 +1400,8 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           <Box m={m} at={[0, 0.65, 0]} s={[0.94, 0.04, 0.54]} c="#b0bec5" />
           {[-1, 1].map((sd) => <Cyl key={sd} m={m} at={[-0.2, 0.17, sd * 0.27]} r={0.16} h={0.05} c="#37474f" seg={12} rot={[Math.PI / 2, 0, 0]} />)}
           <Box m={m} at={[0.55, 0.38, 0]} s={[0.3, 0.03, 0.03]} c="#78909c" />
-          <Cyl m={m} at={[0, 1.0, 0]} r={0.02} h={0.7} c="#eceff1" seg={6} />
-          <mesh position={[0, 1.35, 0]} castShadow>
+          <Cyl m={m} at={[0, 1.0, -0.2]} r={0.02} h={0.7} c="#eceff1" seg={6} />
+          <mesh position={[0, 1.35, -0.2]} castShadow>
             <coneGeometry args={[0.6, 0.22, 10]} />
             {m('#ffffff', awningTex('#fdd835', '#e53935'))}
           </mesh>

@@ -477,7 +477,7 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
               </group>
             ))}
             <Box m={m} at={[0, 1.05, 0]} s={[1.5, 0.3, 0.08]} c="#6a1b9a" />
-            {live && <Sign text="RIDGEMONT UNIVERSITY" w={1.38} at={[0, 1.05, 0.045]} bg="#6a1b9a" fg="#fafafa" />}
+            {live && <Sign text="RIDGEMONT UNIVERSITY" w={0.96} at={[0, 1.05, 0.045]} bg="#6a1b9a" fg="#fafafa" />}
           </group>
           {/* Trees down the walk, benches and lamps round the quad. */}
           {live && [[-0.75, 1.55], [0.75, 1.55], [-0.75, 2.3], [0.75, 2.3], [-2.6, 2.2], [2.6, 2.2], [-2.55, -2.4]].map(([x, z]) => <Tree key={`${x}${z}`} m={m} at={[x, 0.06, z]} s={0.85} />)}
