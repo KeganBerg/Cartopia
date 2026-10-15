@@ -62,17 +62,33 @@ export async function refreshLikes(owners: string[]) {
   useMeet.setState((m) => ({ live: true, likes: { ...m.likes, ...Object.fromEntries(rows.map((r) => [r.owner, { likes: r.likes, liked: r.liked }])) } }))
 }
 
+// Likes still waiting on the server, so a fast double tap sends one like.
+const pending = new Set<string>()
+
+// One like per town, ever (the server enforces it too, migration 0092).
 export async function likeDisplay(owner: string) {
   const toast = useGame.getState().toast
   const cur = useMeet.getState().likes[owner] ?? { likes: 0, liked: false }
-  if (cur.liked) return
-  const bump = () => useMeet.setState((m) => ({ likes: { ...m.likes, [owner]: { likes: cur.likes + 1, liked: true } } }))
+  if (cur.liked || pending.has(owner) || owner === signedInUser()) return
+  const mark = (add: number) =>
+    useMeet.setState((m) => {
+      const now = m.likes[owner] ?? cur
+      return { likes: { ...m.likes, [owner]: { likes: now.likes + add, liked: true } } }
+    })
   // Neighbours take a like on this device only.
-  if (owner.startsWith('demo-')) return bump()
-  if (!supabase || !signedInUser()) return toast('Sign in to like displays')
-  const { data, error } = await supabase.rpc('like_display', { p_owner: owner })
-  if (error || data === 'no') return toast("Couldn't like that right now")
-  if (data === 'limit') return toast("That's all 40 likes for today")
-  if (data === 'liked') bump()
-  else useMeet.setState((m) => ({ likes: { ...m.likes, [owner]: { ...cur, liked: true } } }))
+  if (owner.startsWith('demo-')) return mark(1)
+  if (!supabase || !signedInUser()) return toast('Sign in to like towns')
+  pending.add(owner)
+  try {
+    const { data, error } = await supabase.rpc('like_display', { p_owner: owner })
+    if (error || data === 'no') return toast("Couldn't like that right now")
+    if (data === 'limit') return toast("That's all 40 likes for today")
+    if (data === 'liked') mark(1)
+    else {
+      mark(0)
+      await refreshLikes([owner])
+    }
+  } finally {
+    pending.delete(owner)
+  }
 }

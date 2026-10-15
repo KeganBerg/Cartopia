@@ -66,16 +66,19 @@ export const usernameOf = (id: string | null | undefined) => (id ? useNames.getS
 
 // THE display-name helper for other players: "@username" once they've picked one, else their
 // (filtered) town name. Call loadUsernames() or usePlayerName() so the name gets fetched.
+// "@" marks a real username, so a town name can't start with one (no "@KBerg" towns).
+export const townLabel = (townName: string, id: string | null | undefined) => displayName(townName.replace(/^[\s@＠﹫]+/u, ''), id ?? 'x')
+
 export function playerName(id: string | null | undefined, townName: string): string {
   const u = usernameOf(id)
-  return u ? `@${u}` : displayName(townName, id ?? 'x')
+  return u ? `@${u}` : townLabel(townName, id)
 }
 
 // React version of playerName(): fetches the username and re-renders when it arrives.
 export function usePlayerName(id: string | null | undefined, townName: string): string {
   const u = useNames((s) => (id ? s.byId[id] : undefined))
   useEffect(() => loadUsernames([id]), [id])
-  return u ? `@${u}` : displayName(townName, id ?? 'x')
+  return u ? `@${u}` : townLabel(townName, id)
 }
 
 // Loads (or clears, on sign-out) the signed-in player's own username.
