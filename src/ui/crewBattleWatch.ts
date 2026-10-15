@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useGame } from '../game/store'
 import { supabase } from '../lib/supabase'
 import { battleChests, demoBattle, refreshCrewBattle, useCrewBattle } from '../lib/battles'
+import { sfx } from '../lib/sound'
 
 // Keeps the battle fresh while the crew screens are open, and says when a victory chest is waiting.
 let toldWeek = ''
@@ -21,6 +22,7 @@ export function useCrewBattleWatcher() {
       const due = b && b.payable ? battleChests(b.last, b.rules) : []
       if (due.length && b!.last && toldWeek !== b!.last.week) {
         toldWeek = b!.last.week
+        sfx.notify()
         useGame.getState().toast(b!.last.result === 'win' ? '⚔️ Your crew won its battle! Claim your victory chest.' : '⚔️ Your crew battle ended in a draw. Claim your chest.')
       }
     }, 5000))

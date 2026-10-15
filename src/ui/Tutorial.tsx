@@ -3,6 +3,7 @@ import { useGame, fuelCap } from '../game/store'
 import { FUEL_REGEN_SECONDS, PAINTS, RACE_FUEL, STARTER_PAINTS, buildingDef, carDef, upgradeFuelCap } from '../game/data'
 import { raceCarOf } from '../game/raceCar'
 import { CarThumb } from '../scene/BuildingPreview'
+import { sfx } from '../lib/sound'
 
 type Game = ReturnType<typeof useGame.getState>
 // What the current step points at: it pulses so the player knows where to tap.
@@ -105,7 +106,11 @@ export function Tutorial() {
     if (!cur?.done) return
     const check = () => {
       const s = useGame.getState()
-      if (s.tutorial === step && cur.done!(s)) setStep(step + 1)
+      if (s.tutorial === step && cur.done!(s)) {
+        // A little nod once the action's own sound has played.
+        setTimeout(sfx.step, 250)
+        setStep(step + 1)
+      }
     }
     check()
     return useGame.subscribe(check)

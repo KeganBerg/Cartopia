@@ -12,6 +12,8 @@ const KIND: Record<string, HoursKind> = {
   offices: 'office', hq: 'office', glasstower: 'office',
   coffee: 'early', donut: 'early',
   tires: 'shop', lube: 'shop', parts: 'shop', tuner: 'shop', bodyshop: 'shop', carwash: 'shop', junkyard: 'shop', academy: 'shop',
+  muffler: 'shop', brakes: 'shop', wraps: 'shop', dynolab: 'shop', engines: 'shop', racefab: 'shop', vet: 'shop', postoffice: 'office', library: 'shop', cityhall: 'office',
+  laundry: 'late', minigolf: 'evening', pool: 'shop', funfair: 'evening', waterpark: 'shop', haunted: 'evening',
   school: 'school', highschool: 'school', university: 'school',
   pizza: 'evening', burger: 'evening', tacos: 'evening', icecream: 'evening', arcade: 'evening', bowling: 'evening', cinema: 'evening', market: 'evening', stadium: 'evening', crew: 'evening',
   diner: 'late',

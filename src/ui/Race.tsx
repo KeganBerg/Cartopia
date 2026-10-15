@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { SkillIcon } from './TapTip'
 import { useTouchLock } from './DriveControls'
-import { useGame, spendFuel, type OwnedCar } from '../game/store'
+import { useGame, spendFuel, lastRaceXpPaid, resetRaceXp, type OwnedCar } from '../game/store'
 import { LIVE_LOSS_SHARE, LOSS_SHARE } from '../game/boosts'
 import { bestCar, carPi, raceCarOf } from '../game/raceCar'
 import { carNear, fairNow, tourPayNow } from '../game/fairRace'
@@ -1722,6 +1722,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
         if (won) sfx.win()
         else sfx.lose()
         sound.current?.finish(won)
+        resetRaceXp()
         const stars = finishCb.current ? finishCb.current(won, me.current.finished, theirTime) : finishRace(won, reward(rivalRef.current))
         noteMastery(won)
         if (trial) saveBestSplits(splitKey, me.current.finished, mySplits.current)
@@ -1879,7 +1880,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
           if (!finishView.busy) setCardUp(true)
         }}><span>⏭</span></button>
       ) : result && resultView ? resultView(result) : result ? (
-        <RaceResult won={result.won} myTime={result.myTime} theirTime={result.theirTime} cash={result.counted === false ? 0 : result.won ? payout : Math.round(payout * (live ? LIVE_LOSS_SHARE : LOSS_SHARE))} xp={result.counted === false ? 0 : result.won ? 30 : 8} rival={rival.town} note={result.note} noContest={result.counted === false} stars={result.stars} stats={stats.current} pi={trial ? undefined : { me: myPi, them: rival.pi }} onUpgrade={live ? undefined : () => { useGame.getState().selectCar(car.uid); openGarageTab('tune') }} next={(typeof next === 'function' ? next(result.won) : next) ?? undefined} onExit={onExit} bet={stake ? (result.counted === false ? 0 : result.won ? stake : -stake) : undefined} />
+        <RaceResult won={result.won} myTime={result.myTime} theirTime={result.theirTime} cash={result.counted === false ? 0 : result.won ? payout : Math.round(payout * (live ? LIVE_LOSS_SHARE : LOSS_SHARE))} xp={result.counted === false ? 0 : lastRaceXpPaid()} rival={rival.town} note={result.note} noContest={result.counted === false} stars={result.stars} stats={stats.current} pi={trial ? undefined : { me: myPi, them: rival.pi }} onUpgrade={live ? undefined : () => { useGame.getState().selectCar(car.uid); openGarageTab('tune') }} next={(typeof next === 'function' ? next(result.won) : next) ?? undefined} onExit={onExit} bet={stake ? (result.counted === false ? 0 : result.won ? stake : -stake) : undefined} />
       ) : (
         // Two thumbs: BOOST under the left, the tach in the middle, a big SHIFT under the right.
         <div className="rf-bottom">

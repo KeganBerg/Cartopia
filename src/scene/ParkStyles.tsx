@@ -5,6 +5,7 @@ import { SEASON, PAL } from './season'
 import { Upright } from './mergeScale'
 import { brickTex, concreteTex, gravelTex, grassTex, paverTex, soilTex } from './textures'
 import { Ball, Bench, Box, Cyl, Lamp, Patch, Sign, Tree, type EdgeProps, type Mat, type V3 } from './edgeKit'
+import { Figure } from './Figure'
 
 // Park styles (2x2 decorations, front +z): a dog park, a skate park, a koi
 // garden and a botanical garden. Static pieces bake into Batch; the few
@@ -154,6 +155,11 @@ function DogPark({ m, bulb, ghost }: EdgeProps) {
 
 // The half-pipe's cross-section, in its own frame: across (u) and up (v).
 const HP = { r: 0.55, flat: 0.5, deck: 0.28, w: 1.7 }
+// The pipe stands a clear step above the park's slab (top at 0.06), so its
+// flat bottom never lies flush with the slab and flickers; its base reaches
+// down into the slab so it doesn't float (see coplanar.test.tsx).
+const PIPE_Y = 0.072
+const PIPE_BASE = -0.03
 const hpHalf = HP.flat / 2 + HP.r + HP.deck
 // Graffiti tags on the half-pipe's sides: [along, up, radius].
 const TAGS: [number, number, number][] = [[-0.98, 0.14, 0.1], [-0.83, 0.36, 0.13], [0.84, 0.17, 0.16], [0.97, 0.41, 0.1]]
@@ -161,7 +167,7 @@ const TAGS: [number, number, number][] = [[-0.98, 0.14, 0.1], [-0.83, 0.36, 0.13
 function halfPipeGeometry() {
   const { r, flat, w } = HP
   const s = new Shape()
-  s.moveTo(-hpHalf, 0)
+  s.moveTo(-hpHalf, PIPE_BASE)
   s.lineTo(-hpHalf, r)
   s.lineTo(-flat / 2 - r, r)
   // Down the left wall (a quarter circle, hollow side up), across the flat, up the right.
@@ -175,8 +181,8 @@ function halfPipeGeometry() {
     s.lineTo(flat / 2 + r * Math.sin(a), r - r * Math.cos(a))
   }
   s.lineTo(hpHalf, r)
-  s.lineTo(hpHalf, 0)
-  s.lineTo(-hpHalf, 0)
+  s.lineTo(hpHalf, PIPE_BASE)
+  s.lineTo(-hpHalf, PIPE_BASE)
   const g = new ExtrudeGeometry(s, { depth: w, bevelEnabled: false, curveSegments: 1 })
   g.translate(0, 0, -w / 2)
   return g
@@ -193,16 +199,29 @@ function hpSurface(u: number): [number, number] {
   return [y, Math.sign(u) * Math.atan(slope)]
 }
 
+// A skateboard: deck, trucks and four wheels, about a third of a person long.
+function Board({ m }: { m: Mat }) {
+  return (
+    <group>
+      <Box m={m} at={[0, 0.052, 0]} s={[0.1, 0.014, 0.36]} c="#212121" />
+      {[-0.12, 0.12].map((z) => (
+        <group key={z}>
+          <Box m={m} at={[0, 0.037, z]} s={[0.07, 0.016, 0.03]} c="#9e9e9e" shadow={false} />
+          {[-1, 1].map((sd) => <Cyl key={sd} m={m} at={[sd * 0.04, 0.016, z]} r={0.016} h={0.02} c="#fafafa" seg={8} rot={[0, 0, Math.PI / 2]} />)}
+        </group>
+      ))}
+    </group>
+  )
+}
+
+// A skater riding sideways on a board, as big as the townspeople.
 function Skater({ m, shirt }: { m: Mat; shirt: string }) {
   return (
     <group>
-      <Box m={m} at={[0, 0.02, 0]} s={[0.07, 0.015, 0.24]} c="#212121" />
-      {[-0.08, 0.08].map((z) => <Cyl key={z} m={m} at={[0, 0.008, z]} r={0.012} h={0.08} c="#fafafa" seg={6} rot={[0, 0, Math.PI / 2]} />)}
-      {[-0.05, 0.05].map((z) => <Box key={z} m={m} at={[0, 0.1, z]} s={[0.035, 0.15, 0.035]} c="#1565c0" rot={[z * 3, 0, 0]} />)}
-      <Box m={m} at={[0, 0.25, 0]} s={[0.08, 0.15, 0.06]} c={shirt} />
-      <Box m={m} at={[0, 0.25, 0]} s={[0.22, 0.03, 0.03]} c={shirt} rot={[0, 0.3, 0.3]} />
-      <Ball m={m} at={[0, 0.36, 0]} r={0.04} c="#ffcc80" />
-      <mesh position={[0, 0.375, 0]} castShadow><sphereGeometry args={[0.045, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2]} />{m('#e53935')}</mesh>
+      <Board m={m} />
+      <group position-y={0.059} rotation-y={Math.PI / 2}>
+        <Figure shirt={shirt} pants="#1565c0" skin="#ffcc80" hat="#e53935" />
+      </group>
     </group>
   )
 }
@@ -227,14 +246,15 @@ function SkatePark({ m, bulb, ghost }: EdgeProps) {
     <group>
       <Box m={m} at={[0, 0.03, 0]} s={[3.9, 0.06, 3.9]} c="#ffffff" t={concreteTex(4, 4)} shadow={false} />
       {/* Half-pipe across the back, running front to back, with coping and decks. */}
-      <group position={[-0.55, 0.06, -0.8]}>
+      <group position={[-0.55, PIPE_Y, -0.8]}>
         <mesh geometry={pipe} rotation-y={Math.PI / 2} castShadow receiveShadow>
           {m('#cfd8dc', concreteTex(1, 1))}
         </mesh>
         {[-1, 1].map((sd) => (
           <group key={sd}>
-            {/* Square coping, posts and rails: merged, they run the pipe's whole width. */}
-            <Box m={m} at={[0, HP.r + 0.012, sd * (hpHalf - HP.deck)]} s={[HP.w, 0.034, 0.034]} c="#b0bec5" />
+            {/* Square coping, posts and rails: merged, they run the pipe's whole width.
+                The coping stops just short of the side walls so its ends don't lie flush with them. */}
+            <Box m={m} at={[0, HP.r + 0.012, sd * (hpHalf - HP.deck)]} s={[HP.w - 0.01, 0.034, 0.034]} c="#b0bec5" />
             {[-0.8, 0, 0.8].map((x) => <Box key={x} m={m} at={[x, HP.r + 0.18, sd * (hpHalf - 0.03)]} s={[0.022, 0.36, 0.022]} c="#78909c" shadow={false} />)}
             <Box m={m} at={[0, HP.r + 0.34, sd * (hpHalf - 0.03)]} s={[HP.w, 0.02, 0.02]} c="#78909c" />
           </group>
@@ -281,11 +301,10 @@ function SkatePark({ m, bulb, ghost }: EdgeProps) {
       </group>
       {!ghost && (
         <group>
-          <group position={[-0.1, 0.06 + HP.r, -0.8 - hpHalf + 0.12]} rotation-y={0.5}>
-            <Box m={m} at={[0, 0.05, 0]} s={[0.08, 0.1, 0.06]} c="#1565c0" />
-            <Box m={m} at={[0, 0.16, 0]} s={[0.08, 0.14, 0.06]} c="#43a047" />
-            <Ball m={m} at={[0, 0.27, 0]} r={0.04} c="#8d5524" />
-            <Box m={m} at={[0.12, 0.01, 0.05]} s={[0.24, 0.015, 0.07]} c="#ffb300" rot={[0, 1.2, 0]} />
+          {/* A second skater waiting on the deck, board at their feet. */}
+          <group position={[-0.1, PIPE_Y + HP.r, -0.8 - hpHalf + 0.14]} rotation-y={0.5}>
+            <Figure shirt="#43a047" pants="#37474f" skin="#8d5524" hat="#212121" />
+            <group position={[0.2, 0, 0.02]} rotation-y={1.2}><Board m={m} /></group>
           </group>
           {[[1.7, 1.7], [-1.7, -1.7]].map(([x, z]) => <Lamp key={x} m={m} at={[x, 0.06, z]} h={1.4} bulb={bulb} />)}
           <Cyl m={m} at={[1.75, 0.2, -0.15]} r={0.08} h={0.28} c="#455a64" seg={8} />

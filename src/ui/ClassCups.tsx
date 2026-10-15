@@ -201,7 +201,8 @@ export function MasteryPrizePopup() {
       <div className="prize pr-prize ms-prize">
         <h2>{title}</h2>
         <CarThumb size="lg" color={color} body={d.body} model={d.id} mods={car?.mods} {...look} />
-        {t && <h3>{d.name} · 💎 +{t.bucks}{t.trophies ? ` · 🏆 +${t.trophies}` : ''}</h3>}
+        {t && <h3>{d.name} · 💎 {t.bucks}{t.trophies ? ` · 🏆 ${t.trophies}` : ''}</h3>}
+        {!!p.xp && <h3>⭐ {p.xp.toLocaleString()} XP</h3>}
         {p.first.map((c) => <h3 key={c}>🎨 {carClass(c).name} colour unlocked</h3>)}
         {t && <MasteryLadder model={p.model} />}
         <div className="row"><button className="buy" onClick={close}>Nice!</button></div>

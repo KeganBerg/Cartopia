@@ -20,7 +20,9 @@ describe('arcade', () => {
     expect(chaseReward(0, 1).coins).toBe(0)
     expect(chaseReward(100000, 1).coins).toBe(160)
     expect(chaseReward(100000, 10).coins).toBe(520)
-    expect(chaseReward(100000, 10).xp).toBe(25)
+    expect(chaseReward(100000, 1).xp).toBe(25)
+    // XP grows with level past 4, like race XP.
+    expect(chaseReward(100000, 10).xp).toBe(83)
   })
 
   it('detects box collisions at any angle', () => {

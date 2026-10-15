@@ -46,7 +46,9 @@ export function skyFx(w: Weather, phase: number, season: Season = SEASON, out: S
   // The sun only shows through broken cloud.
   const sunny = day * (1 - rainy) * (1 - smooth(0.4, 0.8, w.cloud))
   out.rainbow = season === 'winter' ? 0 : clearing * smooth(0.12, 0.4, w.wet) * smooth(0.5, 0.8, day)
-  out.glint = sunny * smooth(0.05, 0.4, w.wet) * (1 - 0.6 * fog)
+  // Sparkles only off standing puddles: a road that has nearly dried shows none,
+  // or they read as raindrops on a dry street.
+  out.glint = sunny * smooth(0.35, 0.7, w.wet) * (1 - 0.6 * fog)
   out.heat = w.mix.heat * day
   const lamps = Math.max(night, gloomOf(w) * 0.8)
   // Broken cloud on a sunny day; none under overcast, in fog, or after dark.

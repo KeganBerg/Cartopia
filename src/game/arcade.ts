@@ -4,6 +4,7 @@
 // Payouts are small coins and XP, like a quick race, so the server's usual earning limits cover them.
 
 import { boxPush, corners, hits, type Box, type Solid } from './collide'
+import { playXp } from './data'
 
 export type ArcadeId = 'chase' | 'park'
 export const ARCADE_FUEL = 2
@@ -37,7 +38,7 @@ export const COP_DODGE_POINTS = 120
 
 export function chaseReward(score: number, level: number) {
   const cap = 120 + 40 * level
-  return { coins: Math.min(cap, Math.floor(score / 6)), xp: Math.min(25, 4 + Math.floor(score / 150)) }
+  return { coins: Math.min(cap, Math.floor(score / 6)), xp: playXp(Math.min(25, 4 + Math.floor(score / 150)), level) }
 }
 
 // One row of the road ahead: which lanes hold a car, and which lane holds a line of coins
@@ -191,7 +192,7 @@ export function parkStars(time: number, bumps: number, par: number) {
 export function parkReward(lot: number, stars: number, level: number) {
   if (stars <= 0) return { coins: 0, xp: 0 }
   const base = (90 + 30 * level) * (1 + lot * 0.12)
-  return { coins: Math.round((base * [0, 0.5, 0.75, 1][stars]) / 5) * 5, xp: 6 + stars * 4 + lot }
+  return { coins: Math.round((base * [0, 0.5, 0.75, 1][stars]) / 5) * 5, xp: playXp(6 + stars * 4 + lot, level) }
 }
 
 // Best scores and lot stars stay on this device; they're bragging rights, not currency.
