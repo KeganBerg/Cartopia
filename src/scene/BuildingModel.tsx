@@ -892,7 +892,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             </mesh>
           )}
           {/* The grandstand: barrier wall, rows of seats and (level 7 up) the upper deck. */}
-          {!ghost && <SpeedwayStands deck={deckAt(lvl)} colors={['#ffca28', '#42a5f5', '#ef5350', '#eceff1'].map((c) => <meshStandardMaterial key={c} color={c} side={2} />)} />}
+          {!ghost && <SpeedwayStands deck={deckAt(lvl)} colors={['#b0bec5', '#c5ced3', '#b0bec5', '#eceff1'].map((c) => <meshStandardMaterial key={c} color={c} side={2} />)} />}
           {/* Floodlight towers that light the track at night, on every corner
               but the one facing the camera so none stands in front of the sign.
               They rise over the roof once it closes into a ring. */}
