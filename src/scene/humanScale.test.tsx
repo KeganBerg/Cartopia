@@ -8,6 +8,7 @@ import { mergeable } from '../game/merge'
 import { BuildingModel } from './BuildingModel'
 import { KeepShapes, MergeScale } from './mergeScale'
 import { GROUND, HUMAN, limitFor, moving } from './keepShape'
+import { PERSON_H } from './peopleGeo'
 
 // People don't grow when buildings merge. A 2x2 or 4x4 block draws the
 // building 2x or 4x, but a pump, a parked car, a bench or a townsperson
@@ -176,6 +177,33 @@ describe('people stay people-sized in merged blocks', () => {
         }
       }
       expect([...bad]).toEqual([])
+    })
+  }
+})
+
+// The test above only checks that people don't grow in a merge; a person
+// modelled too small (the skate park's skaters were half height) passes it.
+// Every Figure (Figure.tsx) must stand exactly as tall as a townsperson, alone
+// and in every merged block.
+describe('figures stand as tall as the townspeople', () => {
+  for (const def of BUILDINGS.filter((d) => !d.parked)) {
+    it(def.id, async () => {
+      const bad: string[] = []
+      for (const level of LEVELS) {
+        for (const k of mergeable(def.id) ? [1, ...BLOCKS] : [1]) {
+          const r = await draw(def, level, k)
+          const root = (r.scene.instance as Object3D).children[0]
+          root.updateMatrixWorld(true)
+          root.traverse((o) => {
+            if (!o.userData.figure) return
+            const b = new Box3().setFromObject(o)
+            const h = b.max.y - b.min.y
+            if (Math.abs(h - PERSON_H) > 0.04) bad.push(`L${level} ${k}x${k}: ${label(o)} is ${h.toFixed(2)} tall, townspeople are ${PERSON_H.toFixed(2)}`)
+          })
+          await r.unmount()
+        }
+      }
+      expect(bad).toEqual([])
     })
   }
 })
