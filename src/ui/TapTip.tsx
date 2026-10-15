@@ -50,7 +50,7 @@ const pct = (n: number) => `+${Math.round(n * 100)}%`
 export function LovesTip({ likes }: { likes: string[] }) {
   return (
     <>
-      <b className="tt-head"><span aria-hidden>❤️</span> Loves driving for</b>
+      <b className="tt-head"><span aria-hidden>❤️</span> Favorite Job</b>
       <span className="tt-loves">
         {likes.map((id) => <span key={id}><i aria-hidden>{buildingIcon(id)}</i>{buildingDef(id).name}</span>)}
       </span>

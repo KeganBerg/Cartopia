@@ -9,6 +9,14 @@ import { useVisitors, tapVisitor, leave } from '../lib/visitors'
 import { openStreetRace } from './raceNav'
 import { Panel } from './Menus'
 
+// What each visitor is, shown by TapTips when the badge is held.
+const VISITOR_TIPS: Record<string, string> = {
+  racer: 'Street racer: tap to race for a bonus, no fuel',
+  tourist: 'Tourists: tap for a coin tip',
+  mystery: 'Mystery car: tap before it drives off for coins and parts',
+  barn: "Rusty's Rescue: tap and Rusty tows a free car to your storage to restore",
+}
+
 // The bubble over a visitor in town: over its car, or over Rusty's for a barn tip.
 export function VisitorBadges() {
   const v = useVisitors((s) => s.visitor)
@@ -28,11 +36,11 @@ export function VisitorBadges() {
   const label = v.kind === 'racer' ? '🏁 Race me!'
     : v.kind === 'tourist' ? <>📸 <span className="coin">$</span></>
     : v.kind === 'mystery' ? <>❓ <span className="time">{left}s</span></>
-    : '📞 Barn tip!'
+    : '🛻 Free car'
   return (
     <div className="badges">
       <div className="anchor" data-clamp ref={anchorRef(id)}>
-        <button className={`badge badge-visitor badge-visitor-${v.kind}`} disabled={busy} onClick={tapVisitor}>{label}</button>
+        <button className={`badge badge-visitor badge-visitor-${v.kind}`} disabled={busy} onClick={tapVisitor} title={VISITOR_TIPS[v.kind]}>{label}</button>
       </div>
     </div>
   )

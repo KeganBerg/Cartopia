@@ -594,7 +594,7 @@ export function LovesTag({ model }: { model: string }) {
   if (!likes.length) return null
   const names = likes.map((id) => buildingDef(id).name)
   return (
-    <button type="button" className="loves-tag" aria-label={`Loves ${names.join(', ')}: +25% coins per job`} onClick={(e) => showTip(e.currentTarget, <LovesTip likes={likes} />)}>
+    <button type="button" className="loves-tag" aria-label={`Favorite Job: ${names.join(', ')}: +25% coins per job`} onClick={(e) => showTip(e.currentTarget, <LovesTip likes={likes} />)}>
       ❤️{likes.map((id) => <span key={id} className="loves-ico">{buildingIcon(id)}</span>)}
     </button>
   )

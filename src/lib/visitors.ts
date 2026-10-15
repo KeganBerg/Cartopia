@@ -119,10 +119,9 @@ function rollBarnCar(): JunkCar {
   return { uid: `j${Date.now()}${Math.floor(Math.random() * 1e6)}`, model: c.model, rarity: c.rarity }
 }
 
-const roomForBarn = () => {
-  const s = useGame.getState()
-  return s.buildings.some((b) => b.def === 'rescue') && s.junkyard.length < STORAGE_MAX
-}
+// Rusty's free-car tips are off (Kegan 2026-10-15: no Free car pill). The server only
+// sends one when asked (p_barn), so never asking switches them off.
+const roomForBarn = () => false
 
 // Is the town in a state to have a visitor turn up? Not while visiting a friend, building, or
 // still in the tutorial; and only with a few roads to drive on.
@@ -166,7 +165,7 @@ const HELLO: Record<VisitorKind, string> = {
   racer: '🏁 A street racer rolled into town!',
   tourist: '📸 Tourists are driving around town!',
   mystery: '❓ A mystery car! Tap it before it leaves!',
-  barn: '📞 Rusty got a tip about a barn find!',
+  barn: '📞 Rusty got a tip about a free car!',
 }
 
 function arrived() {
@@ -224,7 +223,7 @@ export async function claim(): Promise<boolean> {
 
 function thanks(v: Visitor, p: { coins: number; parts: number; bucks: number; xp: number; car?: JunkCar | null }) {
   const bits = [p.coins && `+$${p.coins.toLocaleString()}`, p.parts && `+${p.parts} parts`, p.bucks && `+${p.bucks} gems`, p.xp && `+${p.xp} XP`].filter(Boolean).join(', ')
-  if (v.kind === 'barn' && p.car) return `🚜 Rusty towed a ${carDef(p.car.model).name} home from an old barn! It's in storage.`
+  if (v.kind === 'barn' && p.car) return `🛻 Rusty towed a ${carDef(p.car.model).name} home! It's in storage.`
   if (v.kind === 'racer') return `🏁 You beat the street racer! Bonus ${bits}`
   if (v.kind === 'tourist') return `📸 The tourists loved your town! Tip: ${bits}`
   return `❓ Caught the mystery car! ${bits}`
