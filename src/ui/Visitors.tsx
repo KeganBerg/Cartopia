@@ -14,7 +14,7 @@ const VISITOR_TIPS: Record<string, string> = {
   racer: 'Street racer: tap to race for a bonus, no fuel',
   tourist: 'Tourists: tap for a coin tip',
   mystery: 'Mystery car: tap before it drives off for coins and parts',
-  barn: "Barn find: tap and Rusty tows a free old car to your storage to restore",
+  barn: "Rusty's Rescue: tap and Rusty tows a free car to your storage to restore",
 }
 
 // The bubble over a visitor in town: over its car, or over Rusty's for a barn tip.
@@ -36,7 +36,7 @@ export function VisitorBadges() {
   const label = v.kind === 'racer' ? '🏁 Race me!'
     : v.kind === 'tourist' ? <>📸 <span className="coin">$</span></>
     : v.kind === 'mystery' ? <>❓ <span className="time">{left}s</span></>
-    : <><img className="barn-pic" src="/rescue/farm-day.webp" alt="" />🚗 Free car <span className="time">{Math.ceil(left / 60)}m</span></>
+    : '🛻 Free car'
   return (
     <div className="badges">
       <div className="anchor" data-clamp ref={anchorRef(id)}>

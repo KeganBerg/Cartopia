@@ -166,7 +166,7 @@ const HELLO: Record<VisitorKind, string> = {
   racer: '🏁 A street racer rolled into town!',
   tourist: '📸 Tourists are driving around town!',
   mystery: '❓ A mystery car! Tap it before it leaves!',
-  barn: '📞 Rusty got a tip about a barn find!',
+  barn: '📞 Rusty got a tip about a free car!',
 }
 
 function arrived() {
@@ -224,7 +224,7 @@ export async function claim(): Promise<boolean> {
 
 function thanks(v: Visitor, p: { coins: number; parts: number; bucks: number; xp: number; car?: JunkCar | null }) {
   const bits = [p.coins && `+$${p.coins.toLocaleString()}`, p.parts && `+${p.parts} parts`, p.bucks && `+${p.bucks} gems`, p.xp && `+${p.xp} XP`].filter(Boolean).join(', ')
-  if (v.kind === 'barn' && p.car) return `🚜 Rusty towed a ${carDef(p.car.model).name} home from an old barn! It's in storage.`
+  if (v.kind === 'barn' && p.car) return `🛻 Rusty towed a ${carDef(p.car.model).name} home! It's in storage.`
   if (v.kind === 'racer') return `🏁 You beat the street racer! Bonus ${bits}`
   if (v.kind === 'tourist') return `📸 The tourists loved your town! Tip: ${bits}`
   return `❓ Caught the mystery car! ${bits}`
