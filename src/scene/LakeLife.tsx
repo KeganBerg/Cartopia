@@ -1,7 +1,7 @@
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import {
-  BoxGeometry, BufferAttribute, BufferGeometry, CapsuleGeometry, Color, ConeGeometry, CylinderGeometry, DoubleSide, Line, LineBasicMaterial, Matrix4, MeshStandardMaterial,
+  BoxGeometry, BufferAttribute, BufferGeometry, CapsuleGeometry, Color, ConeGeometry, CylinderGeometry, DoubleSide, Line, LineBasicMaterial, Matrix4, MeshBasicMaterial, MeshStandardMaterial,
   Object3D, SphereGeometry, Vector3, type Group, type InstancedMesh, type Mesh,
 } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
@@ -10,6 +10,11 @@ import { weatherNow } from '../game/weather'
 import { PERSON } from './peopleGeo'
 import { DuckFamily, type DuckKind } from './Ducks'
 import { floatOn, floaters, heightAt, splash, wake } from './liveWater'
+
+const smoothstep = (a: number, b: number, x: number) => {
+  const u = Math.min(1, Math.max(0, (x - a) / (b - a)))
+  return u * u * (3 - 2 * u)
+}
 
 // Life on the outskirts lake: a fisherman rowing his boat out, casting, waiting
 // on a bite and reeling one in; gulls wheeling overhead that come down to sit
@@ -72,12 +77,13 @@ const BOAT_LEN = 1.7
 const BOAT_BEAM = 0.64
 const OARLOCK: [number, number, number] = [0.31, 0.19, 0.1]
 
+// Sections from stern to bow: [z, half-beam, keel depth, sheer height].
+const HULL: [number, number, number, number][] = [
+  [-0.85, 0.22, -0.05, 0.17], [-0.6, 0.29, -0.08, 0.16], [-0.25, 0.32, -0.09, 0.155], [0.1, 0.32, -0.09, 0.16],
+  [0.4, 0.28, -0.08, 0.175], [0.62, 0.2, -0.06, 0.2], [0.78, 0.1, -0.03, 0.23], [0.86, 0.015, 0.0, 0.25],
+]
+
 function hullGeo(paintHex: string) {
-  // Sections from stern to bow: [z, half-beam, keel depth, sheer height].
-  const S: [number, number, number, number][] = [
-    [-0.85, 0.22, -0.05, 0.17], [-0.6, 0.29, -0.08, 0.16], [-0.25, 0.32, -0.09, 0.155], [0.1, 0.32, -0.09, 0.16],
-    [0.4, 0.28, -0.08, 0.175], [0.62, 0.2, -0.06, 0.2], [0.78, 0.1, -0.03, 0.23], [0.86, 0.015, 0.0, 0.25],
-  ]
   // Round the bilge: points across a section, from port gunwale to starboard.
   const ring = ([z, w, keel, top]: [number, number, number, number], k: number) => {
     const pts: [number, number, number][] = []
@@ -92,12 +98,12 @@ function hullGeo(paintHex: string) {
   }
   const shell = (k: number, hex: string) => {
     const pos: number[] = []
-    for (let j = 0; j < S.length - 1; j++) {
-      const a = ring(S[j], k), b = ring(S[j + 1], k)
+    for (let j = 0; j < HULL.length - 1; j++) {
+      const a = ring(HULL[j], k), b = ring(HULL[j + 1], k)
       for (let i = 0; i < a.length - 1; i++) pos.push(...a[i], ...b[i], ...b[i + 1], ...a[i], ...b[i + 1], ...a[i + 1])
     }
     // Transom across the stern.
-    const t = ring(S[0], k)
+    const t = ring(HULL[0], k)
     for (let i = 1; i < t.length - 1; i++) pos.push(...t[0], ...t[i + 1], ...t[i])
     const g = new BufferGeometry()
     g.setAttribute('position', new BufferAttribute(new Float32Array(pos), 3))
@@ -106,9 +112,9 @@ function hullGeo(paintHex: string) {
   }
   const parts = [shell(1, paintHex), shell(0.92, '#b08a64')]
   // Gunwale rails along the sheer, a stripe below them, and the keel strip.
-  for (let j = 0; j < S.length - 1; j++)
+  for (let j = 0; j < HULL.length - 1; j++)
     for (const sd of [-1, 1]) {
-      const [z0, w0, , t0] = S[j], [z1, w1, , t1] = S[j + 1]
+      const [z0, w0, , t0] = HULL[j], [z1, w1, , t1] = HULL[j + 1]
       const ax = sd * w0, bx = sd * w1
       const len = Math.hypot(bx - ax, z1 - z0, t1 - t0)
       const yaw = Math.atan2(bx - ax, z1 - z0)
@@ -131,6 +137,20 @@ function hullGeo(paintHex: string) {
   parts.push(paint(put(new BoxGeometry(0.07, 0.012, 0.07), 0.17, 0.51, -0.72), '#37474f'))
   parts.push(paint(put(new ConeGeometry(0.05, 0.04, 4), 0.17, 0.605, -0.72, { r: [0, Math.PI / 4, 0] }), '#37474f'))
   return merge(parts)
+}
+
+// A lid across the hull at the gunwales that only writes depth. Drawn after the boat and
+// before the lake, it keeps the lake from showing through inside the open hull.
+function hullLidGeo() {
+  const pos: number[] = []
+  const at = ([z, w, , top]: (typeof HULL)[number], sd: number) => [sd * w * 0.94, top - 0.012, z]
+  for (let j = 0; j < HULL.length - 1; j++) {
+    const a0 = at(HULL[j], -1), a1 = at(HULL[j], 1), b0 = at(HULL[j + 1], -1), b1 = at(HULL[j + 1], 1)
+    pos.push(...a0, ...b0, ...b1, ...a0, ...b1, ...a1)
+  }
+  const g = new BufferGeometry()
+  g.setAttribute('position', new BufferAttribute(new Float32Array(pos), 3))
+  return g
 }
 
 // ---- The fisherman ----------------------------------------------------------------------------
@@ -297,7 +317,8 @@ export function LakeLife({ lake, frozen }: { lake: LakeShape; frozen: boolean })
     // His legs never move on the seat, so they're part of the boat; his arms lean with him.
     hull: merge([hullGeo('#2e7d6b'), legsGeo().scale(PERSON.scale, PERSON.scale, PERSON.scale).rotateY(Math.PI).translate(0, 0, 0.06)]),
     body: merge([bodyGeo(), armsGeo()]), rod: rodGeo(), oar: oarGeo(), bobber: bobberGeo(), fish: fishGeo(),
-    gull: gullBodyGeo(), wing: gullWingGeo(),
+    gull: gullBodyGeo(), wing: gullWingGeo(), lid: hullLidGeo(),
+    lidMat: new MeshBasicMaterial({ colorWrite: false, side: DoubleSide }),
     mat: new MeshStandardMaterial({ vertexColors: true, roughness: 0.75 }),
     hullMat: new MeshStandardMaterial({ vertexColors: true, roughness: 0.6, side: DoubleSide }),
     wingMat: new MeshStandardMaterial({ vertexColors: true, roughness: 0.85, side: DoubleSide }),
@@ -393,24 +414,16 @@ export function LakeLife({ lake, frozen }: { lake: LakeShape; frozen: boolean })
           f.mode = 'row'
         }
       }
+      const prevPh = f.stroke
       if (f.mode === 'row') {
         const dx = f.tx - f.x, dz = f.tz - f.z, dist = Math.hypot(dx, dz)
         const want = Math.atan2(dx, dz)
         const err = ((want - f.h + Math.PI * 3) % (Math.PI * 2)) - Math.PI
         f.turn = Math.max(-0.5, Math.min(0.5, err * 0.8))
         // Strokes: a drive that pulls the boat on, then the recovery.
-        const prev = f.stroke
         f.stroke = (f.stroke + dt / 1.7) % 1
         const ph = f.stroke
         drive = ph < 0.45 ? Math.sin((ph / 0.45) * Math.PI) : 0
-        if (prev < 0.03 && ph >= 0.03) {
-          // Blades bite the water.
-          for (const sd of [-1, 1]) {
-            v.set(sd * 1.25, 0, OARLOCK[2] + 0.2)
-            B.localToWorld(v)
-            splash(v.x, v.z, 0.35)
-          }
-        }
         if (dist < 0.6 || (dist < 2 && Math.abs(err) > 1.2)) {
           f.mode = 'cast'
           f.t0 = t
@@ -455,13 +468,24 @@ export function LakeLife({ lake, frozen }: { lake: LakeShape; frozen: boolean })
         const rowing = f.mode === 'row'
         const ph = f.stroke
         const sweep = rowing ? (ph < 0.45 ? -0.55 + (ph / 0.45) * 1.1 : 0.55 - ((ph - 0.45) / 0.55) * 1.1) : 1.35
-        const dip = rowing ? (ph < 0.45 ? -0.2 : 0.08) : 0.04
+        // The blades drop in square at the catch, pull through under the surface, lift out at the
+        // finish and swing back feathered flat, clear of the water.
+        const inW = rowing ? smoothstep(0, 0.06, ph) * (1 - smoothstep(0.38, 0.46, ph)) : 0
+        const dip = rowing ? 0.1 - inW * 0.42 : 0.04
+        const feather = rowing ? smoothstep(0.42, 0.52, ph) * (1 - smoothstep(0.88, 0.98, ph)) : 0
+        const square = rowing ? (Math.PI / 2) * (1 - feather) : 0
         for (const [i, sd] of [[0, 1], [1, -1]] as const) {
           w.position.set(sd * OARLOCK[0], OARLOCK[1], OARLOCK[2])
-          w.rotation.set(0, sd * -sweep, sd * dip, 'YXZ')
+          w.rotation.set(square, sd * -sweep, sd * dip, 'YZX')
           w.scale.set(sd, 1, 1)
           w.updateMatrix()
           O.setMatrixAt(i, w.matrix)
+          // A splash where each blade goes in, a smaller one where it comes out.
+          const catchIn = prevPh < 0.04 && ph >= 0.04, out = prevPh < 0.42 && ph >= 0.42
+          if (rowing && (catchIn || out)) {
+            B.localToWorld(v.set(0.86, 0, 0).applyMatrix4(w.matrix))
+            splash(v.x, v.z, catchIn ? 0.4 : 0.22)
+          }
         }
         O.instanceMatrix.needsUpdate = true
       }
@@ -666,8 +690,9 @@ export function LakeLife({ lake, frozen }: { lake: LakeShape; frozen: boolean })
       {!frozen && (
         <>
           <group ref={boat}>
-            <mesh geometry={g.hull} material={g.hullMat} castShadow raycast={() => null} />
-            <mesh position={[0.17, 0.555, -0.72]} material={glowMats.bulb} raycast={() => null}>
+            <mesh geometry={g.hull} material={g.hullMat} castShadow renderOrder={-2} raycast={() => null} />
+            <mesh geometry={g.lid} material={g.lidMat} renderOrder={-1} raycast={() => null} />
+            <mesh position={[0.17, 0.555, -0.72]} material={glowMats.bulb} renderOrder={-2} raycast={() => null}>
               <sphereGeometry args={[0.028, 8, 6]} />
             </mesh>
             {/* Seated on the middle thwart facing the stern, as a rower sits. */}
@@ -675,11 +700,11 @@ export function LakeLife({ lake, frozen }: { lake: LakeShape; frozen: boolean })
               <group scale={PERSON.scale}>
                 <group ref={lean} position-y={HIP}>
                   <group position-y={-HIP}>
-                    <mesh geometry={g.body} material={g.mat} castShadow raycast={() => null} />
+                    <mesh geometry={g.body} material={g.mat} castShadow renderOrder={-2} raycast={() => null} />
                     <group position={GRIP}>
                       <group scale={1 / PERSON.scale}>
                         <group ref={rod}>
-                          <mesh geometry={g.rod} material={g.mat} raycast={() => null} />
+                          <mesh geometry={g.rod} material={g.mat} renderOrder={-2} raycast={() => null} />
                         </group>
                       </group>
                     </group>
@@ -687,10 +712,10 @@ export function LakeLife({ lake, frozen }: { lake: LakeShape; frozen: boolean })
                 </group>
               </group>
             </group>
-            <instancedMesh ref={oars} args={[g.oar, g.mat, 2]} frustumCulled={false} castShadow raycast={() => null} />
+            <instancedMesh ref={oars} args={[g.oar, g.mat, 2]} frustumCulled={false} castShadow renderOrder={-2} raycast={() => null} />
           </group>
-          <mesh ref={bobber} geometry={g.bobber} material={g.mat} raycast={() => null} />
-          <mesh ref={fish} geometry={g.fish} material={g.mat} visible={false} raycast={() => null} />
+          <mesh ref={bobber} geometry={g.bobber} material={g.mat} renderOrder={-2} raycast={() => null} />
+          <mesh ref={fish} geometry={g.fish} material={g.mat} visible={false} renderOrder={-2} raycast={() => null} />
           <primitive object={line} />
           <group position={[lake.x, lake.y, lake.z]}>
             <DuckFamily kinds={LAKE_DUCKS} rx={lake.rx} rz={lake.rz} y={0} seed={4} cx={-lake.rx * 0.35} cz={lake.rz * 0.2} spread={0.45} />
