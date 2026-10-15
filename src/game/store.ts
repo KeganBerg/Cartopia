@@ -72,7 +72,8 @@ export type Quests = {
 }
 export type Period = 'daily' | 'weekly'
 // A paid gem pack, as the server's purchases table records it (src/lib/payments.ts).
-export type Purchase = { seq: number; pack?: string; bucks: number; coins: number; parts: number }
+// car: a car pack's car, which joins the garage as uid pk-<seq> (the save guard checks that pairing).
+export type Purchase = { seq: number; pack?: string; bucks: number; coins: number; parts: number; car?: string | null }
 
 export type SaveState = {
   version: 1
@@ -199,7 +200,7 @@ export type Mode = 'play' | 'place' | 'move' | 'road' | 'bulldoze' | 'expand' | 
 export type Resource = 'coins' | 'parts' | 'fuel' | 'bucks' | 'level'
 export type Need = { res: Resource; missing: number; what?: string }
 
-export type Panel = null | 'need' | 'shop' | 'garage' | 'showroom' | 'race' | 'account' | 'goals' | 'daily' | 'flat' | 'friends' | 'rescue' | 'bank' | 'invites' | 'leaders' | 'clan' | 'upgrade' | 'welcome' | 'gifts' | 'season' | 'deals' | 'ghost' | 'taunts' | 'meet' | 'arcade' | 'crates' | 'battle' | 'chat' | 'inventory'
+export type Panel = null | 'need' | 'shop' | 'garage' | 'showroom' | 'race' | 'account' | 'goals' | 'daily' | 'flat' | 'friends' | 'rescue' | 'bank' | 'invites' | 'leaders' | 'clan' | 'upgrade' | 'welcome' | 'gifts' | 'season' | 'deals' | 'ghost' | 'taunts' | 'meet' | 'arcade' | 'crates' | 'battle' | 'chat' | 'inventory' | 'carpacks'
 
 // A read-only copy of another player's town while visiting it.
 export type VisitedTown = { ownerId: string; townName: string; level: number; trophies: number; roads: string[]; buildings: PlacedBuilding[]; cars: OwnedCar[]; land?: string[]; showcase?: string[] }
@@ -1407,7 +1408,7 @@ export const useGame = create<GameState>()(
       buyCar: (model, color) => {
         const s = get()
         const c = carDef(model)
-        if (c.season || c.rescueOnly || c.secret) return false
+        if (c.season || c.rescueOnly || c.secret || c.pack) return false
         if (s.level < c.unlockLevel) {
           s.showNeed('level', c.unlockLevel, c.name)
           return false
@@ -1765,8 +1766,12 @@ export const useGame = create<GameState>()(
         const fresh = rows.filter((r) => r.seq > from).sort((a, b) => a.seq - b.seq)
         if (!fresh.length) return 0
         const sum = (k: 'bucks' | 'coins' | 'parts') => fresh.reduce((a, r) => a + r[k], 0)
+        const cars: OwnedCar[] = fresh
+          .filter((r) => r.car && !s.cars.some((c) => c.uid === `pk-${r.seq}`))
+          .map((r) => ({ uid: `pk-${r.seq}`, model: r.car!, color: carDef(r.car!).colors[0], upgrades: { engine: 0, turbo: 0, tires: 0, weight: 0 } }))
         set({
           bucks: s.bucks + sum('bucks'), coins: s.coins + sum('coins'), parts: s.parts + sum('parts'),
+          ...(cars.length ? { cars: [...s.cars, ...cars] } : {}),
           purchases: fresh[fresh.length - 1].seq,
           updatedAt: Date.now(),
         })
