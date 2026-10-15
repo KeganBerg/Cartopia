@@ -232,7 +232,7 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
           {live && <Lamp m={m} bulb={bulb} ghost={ghost} at={[1.85, 0.06, 0.2]} />}
           {live && <Lamp m={m} bulb={bulb} ghost={ghost} at={[-1.85, 0.06, 1.85]} />}
           {live && <StudentCars n={lvl >= 7 ? 3 : 2} drive={weave} />}
-          {live && <Crowd n={2} move={(i, t) => [-0.6 + i * 0.3 + Math.sin(t * 0.3 + i) * 0.1, -0.45 + Math.cos(t * 0.25 + i) * 0.05]} hours="campus" />}
+          {live && <Crowd n={2} move={(i, t) => [-0.6 + i * 0.3 + Math.sin(t * 0.3 + i) * 0.1, -0.15 + Math.cos(t * 0.25 + i) * 0.05]} hours="campus" />}
         </group>
       )
     }
@@ -297,12 +297,13 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
             {[[-0.13, -0.13], [0.13, -0.13], [-0.13, 0.13], [0.13, 0.13]].map(([x, z]) => <Box key={`${x}${z}`} m={m} at={[x, 0.165, z]} s={[0.035, 0.33, 0.035]} c="#1e88e5" />)}
             <Box m={m} at={[0.32, 0.18, 0]} rot={[0, 0, -0.6]} s={[0.46, 0.03, 0.18]} c="#43a047" />
           </group>
-          {/* Welcome sign with this week's news, a bench and a bike rack. */}
+          {/* Welcome sign with this week's news, a bench and a bike rack. Tall
+              enough to read over the bus parked in front. */}
           {live && (
             <group position={[-1.45, 0.06, 0.85]}>
-              {[-0.3, 0.3].map((x) => <Box key={x} m={m} at={[x, 0.2, 0]} s={[0.06, 0.4, 0.06]} c="#5d4037" />)}
-              <Box m={m} at={[0, 0.48, -0.02]} s={[0.78, 0.3, 0.05]} c="#1565c0" />
-              <Sign text="SPELLING BEE FRI" w={0.72} at={[0, 0.48, 0.01]} bg="#fffde7" fg="#1565c0" />
+              {[-0.3, 0.3].map((x) => <Box key={x} m={m} at={[x, 0.36, 0]} s={[0.06, 0.72, 0.06]} c="#5d4037" />)}
+              <Box m={m} at={[0, 0.76, -0.02]} s={[0.78, 0.3, 0.05]} c="#1565c0" />
+              <Sign text="SPELLING BEE FRI" w={0.72} at={[0, 0.76, 0.01]} bg="#fffde7" fg="#1565c0" />
             </group>
           )}
           {live && <Bench m={m} at={[-1.45, 0.06, 0.25]} rot={Math.PI / 2} />}
@@ -477,7 +478,7 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
               </group>
             ))}
             <Box m={m} at={[0, 1.05, 0]} s={[1.5, 0.3, 0.08]} c="#6a1b9a" />
-            {live && <Sign text="RIDGEMONT UNIVERSITY" w={1.38} at={[0, 1.05, 0.045]} bg="#6a1b9a" fg="#fafafa" />}
+            {live && <Sign text="RIDGEMONT UNIVERSITY" w={0.96} at={[0, 1.05, 0.045]} bg="#6a1b9a" fg="#fafafa" />}
           </group>
           {/* Trees down the walk, benches and lamps round the quad. */}
           {live && [[-0.75, 1.55], [0.75, 1.55], [-0.75, 2.3], [0.75, 2.3], [-2.6, 2.2], [2.6, 2.2], [-2.55, -2.4]].map(([x, z]) => <Tree key={`${x}${z}`} m={m} at={[x, 0.06, z]} s={0.85} />)}

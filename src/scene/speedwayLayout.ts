@@ -1,7 +1,7 @@
 import { Color, DoubleSide, MeshStandardMaterial } from 'three'
 
 // The Speedway's layout, shared by its model (BuildingModel, BuildingDetail)
-// and the race and crowd inside it (SpeedwayLife).
+// and the race and seats inside it (SpeedwayLife).
 
 // Track and terraces, in the model's own units (see the 'stadium' model).
 export const TRACK = { inner: 1.04, outer: 1.7, lane: 1.4 }

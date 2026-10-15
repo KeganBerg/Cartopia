@@ -81,8 +81,8 @@ export function ShopDetail({ W, D, h, F, roof, rows, cols, awning, mullions }: {
 }
 
 // The Speedway's grandstand: a barrier wall at the track's edge, then three
-// stepped rows of seats out to the glass, one colour each (fans in
-// SpeedwayLife.tsx sit on them). From level 7 a stepped upper deck with two
+// stepped concrete rows out to the glass (the seats in
+// SpeedwayLife.tsx stand on them). From level 7 a stepped upper deck with two
 // more rows hangs off the wall.
 export function SpeedwayStands({ colors, deck }: { colors: ReactNode[]; deck: boolean }) {
   const shapes = useMemo(() => {
@@ -90,7 +90,9 @@ export function SpeedwayStands({ colors, deck }: { colors: ReactNode[]; deck: bo
     const wall = [new Vector2(r, 0.06), new Vector2(r + t, 0.06), new Vector2(r + t, h), new Vector2(r, h), new Vector2(r, 0.06)]
     const rows = TIERS.map(({ r0, r1, y }) => [new Vector2(r0, 0.06), new Vector2(r0, y), new Vector2(r1, y)])
     const [a, b] = DECK.rows
-    const balcony = [new Vector2(a.r0, a.y - DECK.t), new Vector2(b.r1, a.y - DECK.t), new Vector2(b.r1, b.y), new Vector2(b.r0, b.y), new Vector2(b.r0, a.y), new Vector2(a.r0, a.y), new Vector2(a.r0, a.y - DECK.t)]
+    // Its back stops just short of the glass, so the two never fight.
+    const back = b.r1 - 0.005
+    const balcony = [new Vector2(a.r0, a.y - DECK.t), new Vector2(back, a.y - DECK.t), new Vector2(back, b.y), new Vector2(b.r0, b.y), new Vector2(b.r0, a.y), new Vector2(a.r0, a.y), new Vector2(a.r0, a.y - DECK.t)]
     return { wall, rows, balcony }
   }, [])
   return (
@@ -444,8 +446,8 @@ export function ObstacleDetail({ id }: { id: string }) {
   if (id === 'cactus')
     return (
       <group>
-        <mesh position={[0, 1.38, 0]}><icosahedronGeometry args={[0.09, 0]} />{flat('#ff4081')}</mesh>
-        <mesh position={[0.37, 1.13, 0]}><icosahedronGeometry args={[0.06, 0]} />{flat('#ffeb3b')}</mesh>
+        <mesh position={[0, 1.5, 0]}><icosahedronGeometry args={[0.09, 0]} />{flat('#ff4081')}</mesh>
+        <mesh position={[0.4, 1.24, 0]}><icosahedronGeometry args={[0.06, 0]} />{flat('#ffeb3b')}</mesh>
         {[[0.4, 0.3], [-0.35, 0.35], [0.1, -0.45]].map(([x, z], i) => (
           <mesh key={i} position={[x, 0.13, z]} rotation={[i, i, 0]}><dodecahedronGeometry args={[0.06, 0]} />{c('#9e9e9e')}</mesh>
         ))}

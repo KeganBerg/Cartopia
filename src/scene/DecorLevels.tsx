@@ -67,7 +67,9 @@ function Garden({ def, level, ghost, m, bulb, children }: Props) {
       {/* Level 5: lamps either side of the gate and more trees along the back. */}
       {level >= 5 && (
         <>
-          {[-1, 1].map((sx) => <Lamp key={`l${sx}`} x={sx * hw * 0.22} z={hd} m={m} bulb={bulb} lit={!ghost} />)}
+          {/* (The koi garden's red gate and the botanical garden's rose arch stand in the opening,
+              with their own lanterns and lamps, so they skip these.) */}
+          {def.id !== 'koi' && def.id !== 'garden' && [-1, 1].map((sx) => <Lamp key={`l${sx}`} x={sx * hw * 0.22} z={hd} m={m} bulb={bulb} lit={!ghost} />)}
           {[-1, 1].map((sx) => <Lamp key={`b${sx}`} x={sx * hw} z={0} m={m} bulb={bulb} lit={!ghost} />)}
           {def.w > 1 && [-0.35, 0.35].map((t) => <Tree key={`bt${t}`} x={t * hw * 2} z={-hd + 0.3} s={1} m={m} />)}
         </>
@@ -76,7 +78,7 @@ function Garden({ def, level, ghost, m, bulb, children }: Props) {
   )
 }
 
-function Statue({ level, ghost, m, bulb, children }: Props) {
+function Statue({ def, level, ghost, m, bulb, children }: Props) {
   // A stepped plinth that gets taller with each level.
   const steps = Math.min(3, level - 1)
   const rise = steps * 0.1
@@ -97,14 +99,15 @@ function Statue({ level, ghost, m, bulb, children }: Props) {
           <mesh position={[0, 0.36, 0]}><coneGeometry args={[0.06, 0.26, 8]} />{m('#b3e5fc')}</mesh>
         </group>
       ))}
-      {/* Level 4: lamps on the plinth's sides. */}
-      {level >= 4 && [[0, -1], [0, 1], [-1, 0], [1, 0]].map(([sx, sz], i) => <Lamp key={`l${i}`} x={sx * 0.86} z={sz * 0.86} m={m} bulb={bulb} lit={!ghost} h={0.9} />)}
+      {/* Level 4: a lamp each side, standing on the bottom step clear of the next one and of
+          the plaque at the front (a fountain's basin fills the plinth, so it has none). */}
+      {level >= 4 && def.id !== 'fountain' && [-1, 1].map((sx) => <Lamp key={`l${sx}`} x={sx * 0.905} z={0} m={m} bulb={bulb} lit={!ghost} h={0.9} />)}
       {/* Level 5: a gold band round the top step and flowers round the base. */}
       {level >= 5 && (
         <>
           <mesh position={[0, rise + 0.01, 0]}><boxGeometry args={[1.58, 0.03, 1.58]} />{m('#ffc107')}</mesh>
           {Array.from({ length: 12 }, (_, i) => {
-            const a = (i / 12) * Math.PI * 2
+            const a = ((i + 0.5) / 12) * Math.PI * 2
             return <mesh key={`r${i}`} position={[Math.cos(a) * 0.95, 0.08, Math.sin(a) * 0.95]}><sphereGeometry args={[0.07, 8, 6]} />{m(FLOWERS[i % FLOWERS.length])}</mesh>
           })}
         </>

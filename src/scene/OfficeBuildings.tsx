@@ -434,7 +434,6 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
                 </Upright>
               </group>
               <Planter m={m} at={[-0.5, 0.04, 0.82]} />
-              <Planter m={m} at={[0.9, 0.04, 0.82]} />
               <Pool r={0.8} x={0.2} z={0.85} />
             </group>
           )}
@@ -580,9 +579,10 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
           {/* Under the canopy, over the bay door. */}
           <LitSign text="EMERGENCY" w={0.84} at={[1.2, 0.6, zf + 0.906]} bg="#c62828" fg="#ffffff" ghost={ghost} m={m} />
           <mesh position={[1.2, 0.25, zf + 0.904]}><planeGeometry args={[0.8, 0.4]} />{m('#37474f')}</mesh>
-          <Box m={m} at={[1.2, 0.74, zf + 1.4]} s={[1.5, 0.05, 1.0]} c="#d32f2f" />
-          {[0.52, 1.88].flatMap((x) => [zf + 1.05, zf + 1.85].map((z) => <Cyl key={`${x}${z}`} m={m} at={[x, 0.37, z]} r={0.025} h={0.74} c="#eceff1" seg={6} />))}
-          <mesh position={[1.2, 0.715, zf + 1.4]}><boxGeometry args={[0.04, 0.012, 0.9]} />{bulb}</mesh>
+          {/* The bay canopy stands clear of the ambulance's roof and light bar, level with the wing's roof. */}
+          <Box m={m} at={[1.2, 1.0, zf + 1.4]} s={[1.5, 0.05, 1.0]} c="#d32f2f" />
+          {[0.52, 1.88].flatMap((x) => [zf + 1.05, zf + 1.85].map((z) => <Cyl key={`${x}${z}`} m={m} at={[x, 0.5, z]} r={0.025} h={1.0} c="#eceff1" seg={6} />))}
+          <mesh position={[1.2, 0.975, zf + 1.4]}><boxGeometry args={[0.04, 0.012, 0.9]} />{bulb}</mesh>
           {!ghost && (
             <group position={[1.2, 0.05, zf + 1.38]}>
               <Upright>
@@ -695,12 +695,14 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
           <Box m={m} at={[-0.65, 0.66, -0.4]} s={[0.8, 0.04, 0.4]} c="#ff6f00" />
           <mesh position={[-0.65, 0.28, -0.594]}><planeGeometry args={[0.36, 0.5]} />{m('#263238')}</mesh>
           {!ghost && (
-            <group position={[-1.05, th + 0.255, -0.62]}>
+            // Up on legs, clear of the roof's light string.
+            <group position={[-1.05, th + 0.45, -0.62]}>
+              {[-1, 1].map((sd) => <Box key={sd} m={m} at={[sd * 0.45, -0.23, -0.08]} s={[0.04, 0.36, 0.04]} c="#455a64" shadow={false} />)}
               <Box m={m} at={[0, 0, -0.03]} s={[1.24, 0.35, 0.05]} c="#ff6f00" shadow={false} />
               <Sign text="HELIPORT" w={1.16} at={[0, 0, 0]} bg="#fafafa" fg="#e65100" />
             </group>
           )}
-          <group position={[-1.6, 0, -1.55]}>
+          <group position={[-0.55, 0, -1.55]}>
             <Cyl m={m} at={[0, ct / 2, 0]} r={0.2} h={ct} c="#eceff1" seg={10} />
             <Cyl m={m} at={[0, ct + 0.05, 0]} r={0.36} r2={0.24} h={0.1} c="#455a64" seg={8} />
             <mesh position={[0, ct + 0.25, 0]}>
@@ -761,7 +763,7 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
               </group>
             </group>
           )}
-          {!ghost && <Trims m={m} lvl={lvl} w={1.6} d={1.2} h={th + 0.04} z0={-1.2} flag="#ff6f00" />}
+          {!ghost && <group position={[-1.05, 0, 0]}><Trims m={m} lvl={lvl} w={1.6} d={1.2} h={th + 0.04} z0={-1.2} flag="#ff6f00" /></group>}
           {/* The working helicopter: parks on the pad, then flies laps of town. */}
           <group position={[pad[0], 0.1, pad[2]]} scale={0.8}>
             <Helicopter look={{ body: '#ff6f00', stripe: '#fafafa' }} fly={!ghost} seed={0} radius={8} height={7} ghost={ghost} />

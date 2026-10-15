@@ -427,13 +427,11 @@ function feature(k: Kit, f: Feature, t: TrimFrame, all: Feature[]) {
       k.add('chrome', disc(wheel * 0.35, 14), [0, lift + 0.12, -front - 0.110], [0, Math.PI, 0])
       return
     case 'spare': {
-      // Closed cars hang it on the tail, high enough to clear the tail lights and bumper;
-      // open ones stand it up on the rear deck behind the seats.
-      // (A wing mod's posts stand on that deck, so the spare comes off when one is fitted.)
-      if (!t.closed && t.spoiler) return
+      // Closed cars hang it on the tail, high enough to clear the tail lights and bumper.
+      // Open ones have no clean spot: the roll hoop or a wing mod's posts stand where it would go.
+      if (!t.closed) return
       const r = wheel * 0.85
-      const [y, z, dz] = t.closed ? [Math.max(lift + t.body * 0.55, t.ty + 0.045 + r), -front - 0.06, -1] : [top + r, -front + 0.08, -1]
-      if (!t.closed) k.add('black', box(0.09, 0.03, 0.12), [0, top + 0.012, z])
+      const [y, z, dz] = [Math.max(lift + t.body * 0.55, t.ty + 0.045 + r), -front - 0.06, -1]
       // A tyre with a dark rim dish inside a bright lip, and a domed hub cap.
       k.add('black', cyl(r, r, 0.1, 18), [0, y, z], [Math.PI / 2, 0, 0])
       k.add('black', disc(r * 0.65, 16), [0, y, z + dz * 0.0525], [0, Math.PI, 0])
@@ -507,10 +505,11 @@ function feature(k: Kit, f: Feature, t: TrimFrame, all: Feature[]) {
       if (t.kit) return
       const z = front + 0.07
       const y = t.lightY + 0.06
-      k.add('black', box(wid * 0.74, 0.026, 0.026), [0, y, z])
+      // The hoop stays between the headlights so it never crosses a lamp.
+      k.add('black', box(wid * 0.38, 0.026, 0.026), [0, y, z])
       k.add('black', box(wid * 0.82, 0.026, 0.026), [0, lift + 0.05, z])
-      for (const sd of SIDES) bar(k, 'black', [sd * wid * 0.22, lift + 0.05, z], [sd * wid * 0.22, y, z], 0.026)
-      for (const sd of SIDES) bar(k, 'black', [sd * wid * 0.22, lift + 0.05, z], [sd * wid * 0.22, lift + 0.05, front - 0.02], 0.022)
+      for (const sd of SIDES) bar(k, 'black', [sd * wid * 0.17, lift + 0.05, z], [sd * wid * 0.17, y, z], 0.026)
+      for (const sd of SIDES) bar(k, 'black', [sd * wid * 0.17, lift + 0.05, z], [sd * wid * 0.17, lift + 0.05, front - 0.02], 0.022)
       return
     }
     case 'overriders':

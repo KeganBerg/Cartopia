@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { AdditiveBlending, CanvasTexture, Color, MeshBasicMaterial, MeshStandardMaterial, RepeatWrapping, SRGBColorSpace, type Material, type Texture } from 'three'
+import { AdditiveBlending, CanvasTexture, Color, Euler, MeshBasicMaterial, MeshStandardMaterial, Quaternion, RepeatWrapping, SRGBColorSpace, Vector3, type Material, type Texture } from 'three'
 import { levelLift } from '../game/data'
 import { growthStage } from '../game/growth'
 import { Box, Cyl, Sign, Flag, GOLD, type Mat, type NewModelProps, type V3 } from './NewBuildings'
@@ -117,6 +117,16 @@ function Gable({ m, len, hw, rise, over = 0.08, wall, wallTex, roof, ridge = '#1
   )
 }
 
+// Where a point (x, y) on the front of a pumpkin of radius 1 (squashed to 0.75 tall) lies, lifted
+// a little off it, and the turn that lays a flat piece on the skin there.
+function onSkin(x: number, y: number): [V3, V3] {
+  const z = Math.sqrt(1 - x * x - (y / 0.75) ** 2)
+  const n = new Vector3(x, y / 0.5625, z).normalize()
+  const e = new Euler().setFromQuaternion(new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), n))
+  return [[x + n.x * 0.025, y + n.y * 0.025, z + n.z * 0.025], [e.x, e.y, e.z]]
+}
+const EYES = [-1, 1].map((sd) => onSkin(sd * 0.32, 0.16))
+
 function JackO({ m, gl, at, r, face = true, rot = 0, c = '#ef6c00' }: { m: Mat; gl: Gl; at: V3; r: number; face?: boolean; rot?: number; c?: string }) {
   const cy = r * 0.75
   return (
@@ -125,10 +135,13 @@ function JackO({ m, gl, at, r, face = true, rot = 0, c = '#ef6c00' }: { m: Mat; 
       <Cyl m={m} at={[0, cy * 2 + r * 0.1, 0]} r={r * 0.1} r2={r * 0.14} h={r * 0.36} c="#33691e" seg={5} />
       {face && (
         <group position={[0, cy, 0]}>
-          {[-1, 1].map((sd) => (
-            <mesh key={sd} position={[sd * r * 0.32, r * 0.16, r * 0.94]} rotation-z={Math.PI}><circleGeometry args={[r * 0.2, 3]} />{gl('ember', '#3a1600')}</mesh>
+          {/* Eyes laid on the skin, and the grin a strip of the skin itself, so nothing stands off the curve. */}
+          {EYES.map(([p, e], i) => (
+            <group key={i} position={[p[0] * r, p[1] * r, p[2] * r]} rotation={e}>
+              <mesh rotation-z={Math.PI}><circleGeometry args={[r * 0.17, 3]} />{gl('ember', '#3a1600')}</mesh>
+            </group>
           ))}
-          <mesh position={[0, -r * 0.16, r * 0.99]} scale={[1, 0.5, 1]}><circleGeometry args={[r * 0.42, 7, Math.PI, Math.PI]} />{gl('ember', '#3a1600')}</mesh>
+          <mesh scale={[1, 0.75, 1]}><sphereGeometry args={[r * 1.012, 10, 3, Math.PI / 2 - 0.5, 1.0, 1.72, 0.28]} />{gl('ember', '#3a1600')}</mesh>
         </group>
       )}
     </group>
@@ -219,7 +232,8 @@ function Haunted({ ghost, m, lvl, gl, bulb }: { ghost?: boolean; m: Mat; lvl: nu
   const amber = gl('winAmber', '#b8b0d0', windowTex())
   const green = gl('winGreen', '#b8b0d0', windowTex())
   const paneAt = (i: number) => ((i * 7 + 3) % 3 === 0 ? green : amber)
-  // Tower sizes.
+  // Tower sizes. The castle's round tower sits back on the end wall, taking in its back corner.
+  const tz = castle ? -0.4 : TZ
   const TR = castle ? 0.55 : st === 2 ? 0.48 : 0.45
   const tSeg = castle ? 12 : 8
   const th = castle ? H + 1.1 : H + 0.95 + (lift - (st === 2 ? 0.78 : 0)) * 0.5
@@ -428,10 +442,11 @@ function Haunted({ ghost, m, lvl, gl, bulb }: { ghost?: boolean; m: Mat; lvl: nu
           {/* Flat stone roof inside the battlements. */}
           <mesh position={[HX, H + 0.004, HZ]} rotation-x={-Math.PI / 2}><planeGeometry args={[HW - 0.02, HD - 0.02]} />{m('#5a5566')}</mesh>
           <Box m={m} at={[HX, H + 0.05, HZ - HD / 2 + 0.05]} s={[HW, 0.1, 0.1]} c={wall} />
-          {[-1, 1].map((sd) => <Box key={sd} m={m} at={[HX + sd * (HW / 2 - 0.05), H + 0.05, HZ]} s={[0.1, 0.1, HD - 0.2]} c={wall} />)}
+          {/* The right end is inside the round tower. */}
+          <Box m={m} at={[HX - (HW / 2 - 0.05), H + 0.05, HZ]} s={[0.1, 0.1, HD - 0.2]} c={wall} />
         </group>
       )}
-      {tower(TX, TZ, TR, th, tSeg, coneR, coneH, true)}
+      {tower(TX, tz, TR, th, tSeg, coneR, coneH, true)}
       {st >= 2 && tower(LX, LZ, LR, lth, lSeg, castle ? 0.36 : LR + 0.08, castle ? 1.0 : 0.8, false)}
       {/* Ticket booth by the gate. */}
       <group position={[-1.5, G0, 0.5]}>
@@ -461,8 +476,8 @@ function Haunted({ ghost, m, lvl, gl, bulb }: { ghost?: boolean; m: Mat; lvl: nu
               ))}
             </group>
           )}
-          <Bat m={m} at={[TX - 0.7, th + 0.5, TZ + 0.35]} rot={0.4} />
-          <Bat m={m} at={[TX + 0.15, th + 1.05, TZ + 0.45]} rot={-0.5} s={0.8} />
+          <Bat m={m} at={[TX - 0.7, th + 0.5, tz + 0.35]} rot={0.4} />
+          <Bat m={m} at={[TX + 0.15, th + 1.05, tz + 0.45]} rot={-0.5} s={0.8} />
           <Bat m={m} at={[HX - 0.6, H + 1.0, HZ + 0.4]} rot={0.9} s={0.9} />
           <Glowpool gl={gl} k="poolAmber" r={0.6} x={HX} z={0.62} y={G0 + 0.014} />
           <Glowpool gl={gl} k="poolGreen" r={0.55} x={TX} z={0.55} y={G0 + 0.018} />

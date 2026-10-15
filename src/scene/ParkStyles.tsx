@@ -90,9 +90,12 @@ function DogPark({ m, bulb, ghost }: EdgeProps) {
           {[-1, 1].map((sd) => <Box key={sd} m={m} at={[sd * 1.125, y, 1.85]} s={[1.45, 0.012, 0.012]} c="#78909c" shadow={false} />)}
         </group>
       ))}
+      {/* Each leaf a framed chain-link gate like the fence, swung open on its post. */}
       {[-0.4, 0.4].map((x) => (
         <group key={x} position={[x, 0, 1.85]} rotation-y={x < 0 ? 0.5 : -0.5}>
-          <Box m={m} at={[-Math.sign(x) * -0.2, 0.3, 0]} s={[0.38, 0.5, 0.02]} c="#90a4ae" />
+          <Cyl m={m} at={[0, 0.3, 0]} r={0.02} h={0.6} c="#607d8b" seg={5} />
+          {[0.08, 0.3, 0.52].map((y) => <Box key={y} m={m} at={[Math.sign(x) * 0.2, y, 0]} s={[0.38, 0.016, 0.016]} c="#78909c" shadow={false} />)}
+          <Box m={m} at={[Math.sign(x) * 0.38, 0.3, 0]} s={[0.016, 0.46, 0.016]} c="#78909c" shadow={false} />
         </group>
       ))}
       <group position={[-1.1, 0, 1.92]}>
@@ -287,7 +290,9 @@ function SkatePark({ m, bulb, ghost }: EdgeProps) {
         {/* Steps overlap the next one, so their widths differ a hair: no shared side planes. */}
         {[0, 1, 2].map((i) => <Box key={i} m={m} at={[0, 0.05 + i * 0.07, -0.25 + i * 0.12]} s={[0.6 - (i % 2) * 0.008, 0.1 + i * 0.14, 0.14]} c="#9e9e9e" t={concreteTex(1, 1)} />)}
         <Box m={m} at={[0, 0.36, 0.25]} s={[0.584, 0.2, 0.3]} c="#9e9e9e" t={concreteTex(1, 1)} />
-        <Cyl m={m} at={[0, 0.42, 0.02]} r={0.012} h={0.62} c="#ffb300" seg={6} rot={[-0.55, 0, 0]} />
+        {/* Hand rail down the middle of the stairs, on a post at each end. */}
+        <Cyl m={m} at={[0, 0.5, -0.025]} r={0.012} h={0.6} c="#ffb300" seg={6} rot={[0.896, 0, 0]} />
+        {([[-0.25, 0.21], [0.2, 0.57]] as const).map(([z, y]) => <Box key={z} m={m} at={[0, y, z]} s={[0.02, 0.22, 0.02]} c="#ffb300" shadow={false} />)}
       </group>
       {/* Grind rail and a kicker in the middle. */}
       <group position={[-1.3, 0.06, 1.1]} rotation-y={0.4}>
