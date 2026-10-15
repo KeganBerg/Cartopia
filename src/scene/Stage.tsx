@@ -86,6 +86,9 @@ function makeStage(tone: ToneMapping) {
         className="rf-canvas"
         camera={{ position: [0, 2, -4], fov: 55, near: 0.3, far: 150 }}
         dpr={dpr}
+        // Measure the layout size, not the drawn one: a menu sliding in is scaled down, and the
+        // canvas used to keep that smaller size until the window next changed.
+        resize={{ offsetSize: true }}
         gl={{ toneMapping: tone }}
         frameloop={slot && node && ready === run ? 'always' : 'never'}
         onCreated={({ gl }) => {
