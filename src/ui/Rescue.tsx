@@ -63,7 +63,8 @@ function BayHero({ bay = 0, onCollect, compact }: { bay?: Bay; onCollect: () => 
   const rush = useGame((s) => s.rushRestore)
   if (!r)
     return compact ? null : (
-      <div className="bayhero empty">
+      // Tapping a free bay brings the lot's Restore button into view.
+      <div className="bayhero empty" onClick={() => document.querySelector('.lot-pick')?.scrollIntoView({ block: 'center', behavior: 'smooth' })}>
         <div className="bay-stage"><span className="bay-wrench">🔧</span></div>
         <div className="bay-side">
           <b>{bay ? 'Bay 2 is free' : 'Bay is free'}</b>
@@ -128,6 +129,7 @@ function Lot({ onFind }: { onFind: () => void }) {
   const restore = useGame((s) => s.restoreCar)
   const scrap = useGame((s) => s.scrapCar)
   const [sel, setSel] = useState<string | null>(null)
+  const pickRef = useRef<HTMLDivElement>(null)
   const best = [...junk].sort((a, b) => RARITY_ORDER[b.rarity] - RARITY_ORDER[a.rarity])[0]
   const picked = junk.find((c) => c.uid === sel) ?? best
   const empty = Math.max(0, STORAGE_MAX - junk.length)
@@ -136,25 +138,9 @@ function Lot({ onFind }: { onFind: () => void }) {
   return (
     <div className="lot">
       <div className="lot-head"><b>Your lot</b><span>{junk.length ? 'Tap a car to fix it up' : 'Rusty tows finds here'}</span></div>
-      <div className="lot-spots">
-        {junk.map((c) => {
-          const cd = carDef(c.model)
-          return (
-            <button key={c.uid} className={`lot-spot rr-${c.rarity}${picked?.uid === c.uid ? ' sel' : ''}`} onClick={() => setSel(c.uid)} aria-pressed={picked?.uid === c.uid}>
-              <CarThumb color={cd.colors[0]} body={cd.body} model={cd.id} rusty />
-              <span className="lot-name">{cd.name}</span>
-              <RarityTag r={c.rarity} />
-            </button>
-          )
-        })}
-        {Array.from({ length: empty }, (_, i) => (
-          <button key={`e${i}`} className="lot-spot open" onClick={onFind} aria-label="Empty spot: search for cars">
-            <span>P</span>
-          </button>
-        ))}
-      </div>
-      {picked && d ? (
-        <div className={`lot-pick rr-${picked.rarity}`}>
+      {/* The picked car and its Restore button sit above the spots, so they're on screen when a car is tapped. */}
+      {picked && d && (
+        <div ref={pickRef} className={`lot-pick rr-${picked.rarity}`}>
           <div className="lot-pick-info">
             <b>{d.name}</b>
             <div className="junk-tags"><RarityTag r={picked.rarity} /><SkillTag model={picked.model} />{d.rescueOnly && <span className="classic-tag" title="Classic: only found at Rusty's, never in the shop">Classic</span>}</div>
@@ -170,9 +156,25 @@ function Lot({ onFind }: { onFind: () => void }) {
             </button>
           </div>
         </div>
-      ) : (
-        <button className="buy alt lot-find" onClick={onFind}>🔍 Search a lot for cars</button>
       )}
+      <div className="lot-spots">
+        {junk.map((c) => {
+          const cd = carDef(c.model)
+          return (
+            <button key={c.uid} className={`lot-spot rr-${c.rarity}${picked?.uid === c.uid ? ' sel' : ''}`} onClick={() => { setSel(c.uid); requestAnimationFrame(() => pickRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })) }} aria-pressed={picked?.uid === c.uid}>
+              <CarThumb color={cd.colors[0]} body={cd.body} model={cd.id} rusty />
+              <span className="lot-name">{cd.name}</span>
+              <RarityTag r={c.rarity} />
+            </button>
+          )
+        })}
+        {Array.from({ length: empty }, (_, i) => (
+          <button key={`e${i}`} className="lot-spot open" onClick={onFind} aria-label="Empty spot: search for cars">
+            <span>P</span>
+          </button>
+        ))}
+      </div>
+      {!picked && <button className="buy alt lot-find" onClick={onFind}>🔍 Search a lot for cars</button>}
     </div>
   )
 }
