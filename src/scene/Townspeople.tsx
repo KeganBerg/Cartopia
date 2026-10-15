@@ -119,8 +119,12 @@ const LINGER: Record<string, [number, number]> = {
 const PARKS = new Set(['bench', 'fountain', 'flowers', 'tree', 'palm', 'statue', 'pond', 'pine', 'picnic', 'busstop', 'hotdog', 'flagpole', 'gazebo', 'clocktower', 'pumpkins', 'scarecrow', 'graves', 'deadtree'])
 // Big decorations people walk up to, like the duck pond.
 const BIG_PARKS = new Set(['pond', 'playground', 'dogpark', 'skatepark', 'koi', 'garden'])
-// Seats: benches and the bus stop face out the front; at a picnic table people face the table.
-const SEATS: Record<string, 'out' | 'in'> = { bench: 'out', busstop: 'out', picnic: 'in' }
+// Seats: the bus stop's sitters face out its open front (its turn side); a park bench's backrest
+// is on its turn side, so its sitters sit against it facing the other way. At a picnic table
+// people face the table.
+const SEATS: Record<string, 'out' | 'back' | 'in'> = { bench: 'back', busstop: 'out', picnic: 'in' }
+// Which way someone sits, as a quarter-turn side (SIDES), on a seat facing out or with its back to the turn side.
+const seatFacing = (seat: 'out' | 'back', turn: number) => (seat === 'back' ? (turn + 2) % 4 : turn)
 // Walled on three sides: people go in and out through the open front only.
 const FRONT_DOOR = new Set(['busstop', 'gazebo'])
 const doorOf = (n: Extract<WalkNode, { kind: 't' }>): Pt => [n.center[0] + SIDES[n.turn][0] * 0.95, n.center[1] + SIDES[n.turn][1] * 0.95]
@@ -647,7 +651,7 @@ function settle(p: Person, n: Extract<WalkNode, { kind: 't' }>) {
   const entry = p.steps.length ? p.steps[p.steps.length - 1].p : p.pos
   const c = n.center
   const seat = SEATS[n.decor ?? '']
-  const bench = seat === 'out'
+  const bench = seat === 'out' || seat === 'back'
   // Picnic benches run along the front and back of the table.
   const near = sideOf(c, entry)
   const front = FRONT_DOOR.has(n.decor ?? '')
@@ -704,7 +708,9 @@ function arrive(ctx: Ctx, p: Person, night: boolean) {
     p.timer = rand(lo, hi)
     if (node?.kind === 't') {
       p.sit = !!SEATS[d.def]
-      p.face = SEATS[d.def] === 'out' ? Math.atan2(SIDES[node.turn][0], SIDES[node.turn][1]) : Math.atan2(node.center[0] - p.pos[0], node.center[1] - p.pos[1])
+      const seat = SEATS[d.def]
+      const [fx, fz] = seat === 'out' || seat === 'back' ? SIDES[seatFacing(seat, node.turn)] : [node.center[0] - p.pos[0], node.center[1] - p.pos[1]]
+      p.face = Math.atan2(fx, fz)
       // A hot dog to go.
       if (ITEMS[d.def]) {
         p.item = d.def
