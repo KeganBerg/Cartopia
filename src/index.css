@@ -2351,6 +2351,10 @@ body:has(.race-full) .toasts { display: none; }
 .stunt-pads small { font: 15px var(--display); margin-top: 2px; }
 .stunt-slow::after { content: ''; position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 80px 10px rgba(0,0,0,.35); }
 
+/* Delivery Dash: the round clock, big, ticking when it's nearly out. */
+.arc-hud > .dash-clock { font-size: 1.35em; min-width: 4.2em; }
+.arc-hud > .dash-clock.low { animation: dash-tick 1s steps(2) infinite; }
+@keyframes dash-tick { 50% { scale: 1.12; } }
 /* Delivery Dash: the hot-pizza timer under the HUD while an order is on board. */
 .dash-hot { position: absolute; top: calc(94px + var(--sat)); left: 50%; translate: -50% 0; display: flex; align-items: center; gap: 6px; pointer-events: none; }
 .dash-hot b { font-size: 20px; }
