@@ -22,7 +22,7 @@ for (const [form, size] of forms) {
       { id: 2, kind: 'weather', payload: { kind: 'fog' }, from: now - 60000, to: now + 900000 },
     ])
     syncHandlers()
-    const bob = { id: 'b', username: 'TurboBob', town: 'Bobville', level: 23, coins: 184200, gems: 45, muted: new Date(now + 3600000).toISOString(), admin: false, joined: '', seen: '',
+    const bob = { id: 'b', username: 'TurboBob', town: 'Bobville', level: 23, coins: 184200, gems: 45, parts: 320, muted: new Date(now + 3600000).toISOString(), admin: false, joined: '', seen: '',
       cars: [{ uid: 'c1', model: 'pip', color: '#e53935' }, { uid: 'c2', model: 'stallion', color: '#1e88e5' }, { uid: 'c3', model: 'zenith', color: '#fdd835' }],
       chat: [{ id: 9, room: 'global', body: 'race me noobs', at: '' }, { id: 8, room: 'global', body: 'anyone selling a zenith?', at: '' }] }
     const ok = (data) => Promise.resolve({ data, error: null })
@@ -33,7 +33,8 @@ for (const [form, size] of forms) {
       { id: 2, at: new Date(now - 600000).toISOString(), action: 'live_start', target: null, name: null, detail: { kind: 'weather', minutes: 15 } },
       { id: 1, at: new Date(now - 7200000).toISOString(), action: 'mute', target: 'b', name: 'TurboBob', detail: { minutes: 60, reason: 'spam' } },
     ])
-    admin.grant = (_id, c, g) => {
+    admin.grant = (_id, c, g, pt) => {
+      bob.parts = Math.min(1e12, Math.max(0, (bob.parts ?? 0) + pt))
       bob.coins = Math.min(1e12, Math.max(0, bob.coins + c))
       bob.gems = Math.min(1e12, Math.max(0, bob.gems + g))
       return ok(bob)
@@ -60,6 +61,7 @@ for (const [form, size] of forms) {
   await p.locator('.adm-input').first().fill('bug refund')
   await p.locator('.adm-step').first().click()
   await p.locator('.adm-max').nth(1).click()
+  await p.locator('.adm-step', { hasText: '+10K' }).nth(2).click()
   await p.screenshot({ path: `${out}/${form}-3-player.png` })
   await p.locator('.adm-give').click()
   await p.waitForTimeout(800)

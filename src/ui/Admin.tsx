@@ -7,7 +7,7 @@ import { admin, type AdminLogRow, type AdminPlayer, type LiveKind } from '../lib
 import { useNow } from '../scene/useNow'
 import { CarThumb } from '../scene/BuildingPreview'
 import { Panel, SheetTabs } from './Menus'
-import { CoinIcon, BuckIcon } from './Icon'
+import { CoinIcon, BuckIcon, PartsIcon } from './Icon'
 import { compact } from './format'
 import './confirm.css'
 import './admin.css'
@@ -180,6 +180,7 @@ function PlayersTab({ confirm }: { confirm: (a: Ask) => void }) {
             <span className="adm-who"><b>{p.username ?? '—'}</b><small>{p.town ?? ''}</small></span>
             <span className="adm-stat"><CoinIcon />{compact(p.coins)}</span>
             <span className="adm-stat"><BuckIcon />{compact(p.gems)}</span>
+            <span className="adm-stat"><PartsIcon />{compact(p.parts ?? 0)}</span>
             {p.muted && <span title="Muted in chat">🔇</span>}
             {p.admin && <span title="Admin">🛡</span>}
           </button>
@@ -191,6 +192,7 @@ function PlayersTab({ confirm }: { confirm: (a: Ask) => void }) {
 
 const COIN_STEPS = [10_000, 1_000_000]
 const GEM_STEPS = [100, 10_000]
+const PART_STEPS = [100, 10_000]
 // The most a balance can hold (0096: the economy guard counts saves up to this). MAX fills
 // a balance to it on Give and empties it on Take.
 const TOP = 1e12
@@ -203,6 +205,7 @@ function PlayerView({ id, onBack, confirm }: { id: string; onBack: () => void; c
   const [reason, setReason] = useState('')
   const [coins, setCoins] = useState(0)
   const [gems, setGems] = useState(0)
+  const [parts, setParts] = useState(0)
   const [carQ, setCarQ] = useState('')
   const [busy, setBusy] = useState(false)
   const load = useCallback(async () => {
@@ -232,8 +235,10 @@ function PlayerView({ id, onBack, confirm }: { id: string; onBack: () => void; c
   const money = (sign: 1 | -1) => {
     const c = sign * coins
     const g = sign * gems
-    const label = `${c ? `${c > 0 ? '+' : ''}${compact(c)} 🪙 ` : ''}${g ? `${g > 0 ? '+' : ''}${compact(g)} 💎` : ''}`.trim()
-    const go = () => void run(() => admin.grant(p.id, c, g, why), `✔ ${label}`).then(() => { setCoins(0); setGems(0) })
+    const pt = sign * parts
+    const part = (n: number, icon: string) => (n ? `${n > 0 ? '+' : ''}${compact(n)} ${icon}` : '')
+    const label = [part(c, '🪙'), part(g, '💎'), part(pt, '⚙️')].filter(Boolean).join(' ')
+    const go = () => void run(() => admin.grant(p.id, c, g, pt, why), `✔ ${label}`).then(() => { setCoins(0); setGems(0); setParts(0) })
     if (sign < 0) confirm({ icon: '➖', title: `Take ${label.replace(/-/g, '')}?`, ok: 'Take', run: go })
     else go()
   }
@@ -248,12 +253,13 @@ function PlayerView({ id, onBack, confirm }: { id: string; onBack: () => void; c
         <span className="adm-who"><b>{p.username ?? '—'}</b><small>{p.town ?? ''}</small></span>
         <span className="adm-stat"><CoinIcon />{compact(p.coins)}</span>
         <span className="adm-stat"><BuckIcon />{compact(p.gems)}</span>
+        <span className="adm-stat"><PartsIcon />{compact(p.parts ?? 0)}</span>
         {muted && <span className="adm-muted" title="Muted until">🔇 {muted}</span>}
       </div>
 
       <input className={`adm-input${noWhy ? ' need' : ''}`} value={reason} maxLength={120} placeholder="📝 Reason (logged)" aria-label="Reason" onChange={(e) => setReason(e.target.value)} />
 
-      <h3 className="cl-head">💰 Coins and gems</h3>
+      <h3 className="cl-head">💰 Coins, gems, parts</h3>
       <div className="adm-money">
         <label className="adm-amt"><CoinIcon /><input inputMode="numeric" value={shown(coins)} placeholder="0" aria-label="Coins" onChange={(e) => setCoins(amount(e.target.value))} /></label>
         {COIN_STEPS.map((n) => <button key={n} className="adm-step" onClick={() => setCoins((c) => Math.min(TOP, c + n))}>+{compact(n)}</button>)}
@@ -264,9 +270,14 @@ function PlayerView({ id, onBack, confirm }: { id: string; onBack: () => void; c
         {GEM_STEPS.map((n) => <button key={n} className="adm-step" onClick={() => setGems((g) => Math.min(TOP, g + n))}>+{compact(n)}</button>)}
         <button className={`adm-step adm-max${gems === TOP ? ' sel' : ''}`} onClick={() => setGems(TOP)}>MAX</button>
       </div>
+      <div className="adm-money">
+        <label className="adm-amt"><PartsIcon /><input inputMode="numeric" value={shown(parts)} placeholder="0" aria-label="Parts" onChange={(e) => setParts(amount(e.target.value))} /></label>
+        {PART_STEPS.map((n) => <button key={n} className="adm-step" onClick={() => setParts((v) => Math.min(TOP, v + n))}>+{compact(n)}</button>)}
+        <button className={`adm-step adm-max${parts === TOP ? ' sel' : ''}`} onClick={() => setParts(TOP)}>MAX</button>
+      </div>
       <div className="adm-pair">
-        <button className="sell adm-take" disabled={busy || noWhy || (!coins && !gems)} onClick={() => money(-1)}>➖ Take</button>
-        <button className="buy adm-give" disabled={busy || noWhy || (!coins && !gems)} onClick={() => money(1)}>➕ Give</button>
+        <button className="sell adm-take" disabled={busy || noWhy || (!coins && !gems && !parts)} onClick={() => money(-1)}>➖ Take</button>
+        <button className="buy adm-give" disabled={busy || noWhy || (!coins && !gems && !parts)} onClick={() => money(1)}>➕ Give</button>
       </div>
 
       <h3 className="cl-head">🚗 Cars · {p.cars.length}</h3>
@@ -334,7 +345,7 @@ function logLine(r: AdminLogRow) {
   switch (r.action) {
     case 'live_start': return `${KIND_ICON[String(d.kind)] ?? ''} ${d.kind} · ${d.minutes}m`
     case 'live_end': return `${d.kind ?? 'all'} · ${d.ended}`
-    case 'grant': return [d.coins ? `${sign(d.coins)} 🪙` : '', d.gems ? `${sign(d.gems)} 💎` : ''].filter(Boolean).join(' ')
+    case 'grant': return [d.coins ? `${sign(d.coins)} 🪙` : '', d.gems ? `${sign(d.gems)} 💎` : '', d.parts ? `${sign(d.parts)} ⚙️` : ''].filter(Boolean).join(' ')
     case 'give_car': case 'take_car': return carDef(String(d.model)).name
     case 'mute': return d.minutes ? `${d.minutes}m` : '∞'
     case 'chat_purge': return `${d.deleted}`
