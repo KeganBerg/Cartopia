@@ -738,12 +738,14 @@ function SlideTower({ m, bulb, st, roof }: { m: Mat; bulb: ReactNode; st: number
   const T = 0.55 * levels
   const top = T + 0.04
   // Slides start at the top deck and twist down into the splash pool in front (+z).
+  // The yellow one coils three-quarters round beside the tower, eighth by eighth.
+  const coil: V3[] = Array.from({ length: 7 }, (_, i) => [-0.62 + 0.34 * Math.cos((i * Math.PI) / 4), top + 0.07 - ((top - 0.33) * i) / 6, 0.1 - 0.34 * Math.sin((i * Math.PI) / 4)])
   const slides: V3[][] = [
-    [[-0.2, top + 0.07, 0.24], [-0.55, top * 0.85, 0.3], [-0.7, top * 0.62, -0.05], [-0.45, top * 0.42, -0.25], [-0.85, top * 0.25, 0.1], [-0.65, 0.18, 0.75], [-0.6, 0.1, 1.05]],
+    [...coil, [-0.5, 0.15, 0.95], [-0.42, 0.1, 1.15]],
     [[0.2, top + 0.07, 0.24], [0.42, top * 0.8, 0.45], [0.2, top * 0.55, 0.75], [0.45, top * 0.3, 0.95], [0.25, 0.1, 1.15]],
   ]
   if (st >= 2) slides.push([[0.24, T * 0.5 + 0.11, 0], [0.42, T * 0.4, -0.05], [0.45, T * 0.22, 0.45], [0.1, 0.12, 0.9], [-0.15, 0.1, 1.05]])
-  if (st >= 3) slides.push([[-0.24, top + 0.07, -0.1], [-0.5, top * 0.7, -0.35], [-0.95, top * 0.45, -0.2], [-1.0, top * 0.2, 0.4], [-0.95, 0.1, 0.95]])
+  if (st >= 3) slides.push([[-0.28, top + 0.07, -0.15], [-0.7, top * 0.92, -0.38], [-1.25, top * 0.6, -0.15], [-1.35, top * 0.3, 0.45], [-1.15, 0.22, 0.95], [-0.9, 0.1, 1.2]])
   return (
     <Upright>
       {[[-0.24, -0.24], [0.24, -0.24], [-0.24, 0.24], [0.24, 0.24]].map(([x, z]) => <Box key={`${x}${z}`} m={m} at={[x, (T + 0.5) / 2, z]} s={[0.06, T + 0.5, 0.06]} c={WHITE} />)}

@@ -56,7 +56,7 @@ export const DECOR_PROPS = {
       const y = 0.42 + i * 0.085
       k.box(cast(slat(i + 1)), [1.06, 0.065, 0.022], [0, y, 0.155 + (y - 0.3) * 0.19], [-0.19, 0, 0])
     }
-    k.box(L('#c9a227', 0.35, 0.6), [0.12, 0.03, 0.004], [0, 0.505, 0.162], [-0.19, 0, 0])
+    k.box(L('#c9a227', 0.35, 0.6), [0.12, 0.03, 0.004], [0.23, 0.502, 0.179], [-0.19, 0, 0])
   }),
 
   // Flower bed: a timber sleeper border, a mounded bed of soil and clumps of blooms.
@@ -142,15 +142,18 @@ export const DECOR_PROPS = {
   // both sides, and a cluster of coconuts.
   palm: () => prop(`palm|${SEASON}`, (k) => {
     const bark = ['#8d6e63', '#a1887f']
-    let x = 0
+    // Segments stand end to end, each leaning a little further, with a ring at
+    // each joint tilted to match.
+    let x = 0, y = 0.01
     for (let i = 0; i < 9; i++) {
-      const y = 0.1 + i * 0.18
-      const nx = i * i * 0.0028
-      k.cyl(cast(L(bark[i % 2], 0.95)), 0.085 - i * 0.004, 0.1 - i * 0.004, 0.19, [nx, y, 0], [0, 0, -0.02 - i * 0.012], 8)
-      k.torus(L('#6d4c41', 0.95), 0.095 - i * 0.004, 0.012, [nx, y - 0.09, 0], [Math.PI / 2, 0, 0], Math.PI * 2, 8, 3)
-      x = nx
+      const t = 0.02 + i * 0.012
+      const dx = Math.sin(t) * 0.18, dy = Math.cos(t) * 0.18
+      k.cyl(cast(L(bark[i % 2], 0.95)), 0.085 - i * 0.004, 0.1 - i * 0.004, 0.19, [x + dx / 2, y + dy / 2, 0], [0, 0, -t], 8)
+      k.torus(L('#6d4c41', 0.95), 0.095 - i * 0.004, 0.012, [x, y, 0], [t - Math.PI / 2, Math.PI / 2, 0], Math.PI * 2, 8, 3)
+      x += dx
+      y += dy
     }
-    const top: [number, number, number] = [x + 0.03, 1.72, 0]
+    const top: [number, number, number] = [x + 0.03, y + 0.085, 0]
     const leaf = PAL.fronds
     for (let f = 0; f < 8; f++) {
       const a = (f / 8) * Math.PI * 2 + 0.2
@@ -275,9 +278,10 @@ export const DECOR_PROPS = {
 
   // Flag pole: stepped plinth, cleat and halyard, a gold ball, a waving flag and flower clumps round the base.
   flagpole: (gold: string) => prop(`flagpole|${gold}|${SEASON}`, (k) => {
-    k.cyl(cast(L('#cfd8dc', 0.9)), 0.36, 0.42, 0.14, [0, 0.07, 0], undefined, 16)
+    // Turned so a flat face looks to the front, where the plaque lies on its slope.
+    k.cyl(cast(L('#cfd8dc', 0.9)), 0.36, 0.42, 0.14, [0, 0.07, 0], [0, Math.PI / 16, 0], 16)
     k.cyl(L('#b0bec5', 0.9), 0.24, 0.28, 0.08, [0, 0.18, 0], undefined, 16)
-    k.box(L('#c9a227', 0.35, 0.6), [0.16, 0.08, 0.004], [0, 0.07, 0.395], [-0.15, 0, 0])
+    k.box(L('#c9a227', 0.35, 0.6), [0.14, 0.08, 0.004], [0, 0.0716, 0.386], [-0.4, 0, 0])
     k.cyl(cast(L('#eceff1', 0.35, 0.5)), 0.025, 0.04, 2.6, [0, 1.52, 0], undefined, 10)
     k.sphere(L(gold, 0.3, 0.6), 0.06, [0, 2.86, 0], [1, 1, 1], 10, 6)
     k.box(L('#9e9e9e', 0.4, 0.6), [0.02, 0.06, 0.02], [0.045, 0.9, 0])
@@ -365,10 +369,13 @@ export const DECOR_PROPS = {
         k.cyl(white, 0.012, 0.016, 0.22, [x, 0.29, z], undefined, 6)
       }
       k.box(white, [0.7, 0.03, 0.035], [Math.sin(mid) * 0.62, 0.19, Math.cos(mid) * 0.62], [0, mid, 0])
-      // A bench seat along the three back sides.
+      // A bench seat along the three back sides: a backrest on its back edge,
+      // just inside the balusters, and a leg at each end.
       if (i === 1 || i === 2 || i === 3) {
-        k.box(cast(L('#8d6e63', 0.8)), [0.6, 0.03, 0.14], [Math.sin(mid) * 0.5, 0.36, Math.cos(mid) * 0.5], [0, mid, 0])
-        k.box(L('#795548', 0.8), [0.5, 0.18, 0.02], [Math.sin(mid) * 0.46, 0.26, Math.cos(mid) * 0.46], [0, mid, 0])
+        const at = (r: number, t: number, y: number): [number, number, number] => [Math.sin(mid) * r + Math.cos(mid) * t, y, Math.cos(mid) * r - Math.sin(mid) * t]
+        k.box(cast(L('#8d6e63', 0.8)), [0.6, 0.03, 0.14], at(0.5, 0, 0.36), [0, mid, 0])
+        k.box(L('#795548', 0.8), [0.6, 0.13, 0.02], at(0.565, 0, 0.435), [0, mid, 0])
+        for (const t of [-0.25, 0.25]) k.box(L('#795548', 0.8), [0.03, 0.19, 0.1], at(0.5, t, 0.25), [0, mid, 0])
       }
     }
     k.cone(L('#c9a227', 0.35, 0.6), 0.02, 0.16, [0, 2.24, 0], undefined, 6)

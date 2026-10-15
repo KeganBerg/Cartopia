@@ -97,7 +97,9 @@ function RoofProp({ prop, y }: { prop: NonNullable<BuildingDef['prop']>; y: numb
   switch (prop) {
     case 'donut':
       return (
-        <group position={[0, y + 0.45, -0.1]}>
+        <group position={[0, y + 0.55, -0.1]}>
+          {/* Under the ring's low point, which the tilt brings forward. */}
+          <group position-z={0.09}><Stand y={-0.55} h={0.13} /></group>
           <mesh rotation-x={-0.3} castShadow><torusGeometry args={[0.32, 0.15, 12, 24]} /><meshStandardMaterial color="#d7a86e" /></mesh>
           <mesh rotation-x={-0.3} position={[0, 0.05, 0.02]}><torusGeometry args={[0.32, 0.12, 12, 24]} /><meshStandardMaterial color="#f06292" /></mesh>
         </group>
