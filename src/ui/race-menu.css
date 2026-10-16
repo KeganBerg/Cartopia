@@ -27,7 +27,7 @@
 .rm-qc-top .rm-mi { position: absolute; inset: 0; display: grid; place-items: center; font-size: 54px; filter: drop-shadow(0 4px 6px rgba(0,0,0,.5)); }
 .rm-cc-gem { position: absolute; z-index: 2; top: 7px; left: 7px; width: 28px; height: 28px; display: grid; place-items: center; font-size: 15px; border-radius: 50%; background: rgba(8,14,32,.55); border: 2px solid var(--cc-edge, #fff); }
 .rm-qc-body { position: relative; z-index: 2; padding: 22px 10px 10px; margin-top: -18px; display: flex; flex-direction: column; gap: 6px; background: linear-gradient(180deg, rgba(6,10,26,0), rgba(6,10,26,.78) 30%, rgba(6,10,26,.9)); }
-.rm-qc-body b { font: 18px var(--display); line-height: 1.1; color: #fff; text-shadow: 0 2px 0 #14213d; -webkit-text-stroke: .6px #14213d; letter-spacing: .2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rm-qc-body b { font: 18px var(--display); line-height: 1.1; padding-inline: 1px; margin-inline: -1px; color: #fff; text-shadow: 0 2px 0 #14213d; -webkit-text-stroke: .6px #14213d; letter-spacing: .2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rm-qc-chips { display: flex; gap: 5px; align-items: center; font: 900 12px Nunito, sans-serif; color: #dfe9ff; }
 .rm-qc-chips > span:first-child { background: rgba(255,255,255,.16); border-radius: 6px; padding: 0 6px; }
 .rm-qc-body .buy { margin-top: auto; width: 100%; }
