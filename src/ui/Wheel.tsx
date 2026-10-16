@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGame, today, spinWheel } from '../game/store'
 import { modDef, skinDef, modSkinDef, SKINS } from '../game/data'
-import { WHEEL, TIER_COLOR, wheelCoins, wheelPct, wheelSlice, spinGems, type WheelSlice, type WheelSpin } from '../game/wheel'
+import { WHEEL, TIER_COLOR, gemPile, wheelCoins, wheelPct, wheelSlice, spinGems, type WheelSlice, type WheelSpin } from '../game/wheel'
 import { raceCarOf } from '../game/raceCar'
 import { prizeLook } from '../scene/CrateScene'
 import { WheelScene, type WheelDrive } from '../scene/WheelScene'
@@ -39,7 +39,7 @@ function Stack({ n, gem, size }: { n: number; gem?: boolean; size: number }) {
 
 function SliceIcon({ s, size = 26 }: { s: WheelSlice; size?: number }) {
   if (s.kind === 'coins') return <Stack n={s.mult < 0.5 ? 1 : s.mult < 1 ? 2 : 3} size={size} />
-  if (s.kind === 'gems') return <Stack n={Math.min(s.gems, 3)} gem size={size} />
+  if (s.kind === 'gems') return <Stack n={gemPile(s.gems)} gem size={size} />
   if (s.kind === 'jackpot') return <span className="wh-jackpot"><span className="wh-crown">👑</span><Stack n={3} gem size={size} /></span>
   if (s.kind === 'part') return <PartsIcon size={size + 2} />
   return <span className="wh-swatch" style={{ width: size, height: size, background: SKIN_SWATCH }} />

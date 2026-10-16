@@ -148,7 +148,7 @@ export function engineProfile(modelId?: string, body?: Body): EngineProfile {
 // 0 (cheapest runabout) to 1 (hypercar): pricier cars get a richer, smoother, layered engine.
 export function carQuality(def?: CarDef) {
   if (!def) return 0.4
-  const worth = def.price + (def.bucks ?? 0) * 1500
+  const worth = def.price + (def.bucks ?? 0) * 150
   return Math.min(1, Math.max(0, Math.log10(Math.max(800, worth) / 800) / Math.log10(75)))
 }
 

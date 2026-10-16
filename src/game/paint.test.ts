@@ -11,8 +11,8 @@ describe('paintJobCost', () => {
   it('charges each changed part once', () => {
     expect(paintJobCost(car, { color: '#1e88e5', finish: 'chrome', stripe: '#fafafa' })).toEqual({ coins: PAINT_COST + chrome + STRIPE_COST, bucks: 0 })
   })
-  it('charges a buck, not coins, for neon colours', () => {
-    expect(paintJobCost(car, { color: '#76ff03', finish: 'gloss', stripe: null })).toEqual({ coins: 0, bucks: 1 })
+  it('charges gems, not coins, for neon colours', () => {
+    expect(paintJobCost(car, { color: '#76ff03', finish: 'gloss', stripe: null })).toEqual({ coins: 0, bucks: 10 })
   })
   it('lets a car keep its finish and take stripes off for free', () => {
     expect(paintJobCost({ color: '#e53935', finish: 'matte', stripe: '#fafafa' }, { color: '#e53935', finish: 'matte', stripe: null })).toEqual({ coins: 0, bucks: 0 })

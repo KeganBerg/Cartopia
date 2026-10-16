@@ -24,10 +24,10 @@ export type MasteryTier = {
   need: { races?: number; wins?: number; modes?: number; upsets?: number }
 }
 export const MASTERY_TIERS: MasteryTier[] = [
-  { id: 'bronze', name: 'Bronze', icon: '🥉', bucks: 1, trophies: 0, need: { races: 10 } },
-  { id: 'silver', name: 'Silver', icon: '🥈', bucks: 1, trophies: 0, need: { wins: 10 } },
-  { id: 'signature', name: 'Signature', icon: '✍️', bucks: 1, trophies: 0, need: { modes: 3 } },
-  { id: 'master', name: 'Master', icon: '🎖️', bucks: 2, trophies: 5, need: { upsets: 5 } },
+  { id: 'bronze', name: 'Bronze', icon: '🥉', bucks: 15, trophies: 0, need: { races: 10 } },
+  { id: 'silver', name: 'Silver', icon: '🥈', bucks: 15, trophies: 0, need: { wins: 10 } },
+  { id: 'signature', name: 'Signature', icon: '✍️', bucks: 15, trophies: 0, need: { modes: 3 } },
+  { id: 'master', name: 'Master', icon: '🎖️', bucks: 30, trophies: 5, need: { upsets: 5 } },
 ]
 
 // XP for each step, as a share of the level you're on (so it means the same at level 5 or 40):
