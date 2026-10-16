@@ -142,8 +142,8 @@ describe('crates', () => {
   it('holds every body and part skin in some crate, and pays coins for ones you have', () => {
     const anywhere = new Set(CRATES.flatMap((c) => crateSkins(c).map((x) => (x.part ? 'p:' : 'b:') + x.id)))
     // Weekly event skins are only won in their event, and level skins only by reaching the level.
-    for (const d of SKINS) expect(anywhere.has('b:' + d.id), d.id).toBe(!('event' in d.unlock) && !('level' in d.unlock))
-    for (const d of MOD_SKINS) expect(anywhere.has('p:' + d.id), d.id).toBe(!('level' in d.unlock))
+    for (const d of SKINS) expect(anywhere.has('b:' + d.id), d.id).toBe(!('event' in d.unlock) && !('season' in d.unlock) && !('level' in d.unlock))
+    for (const d of MOD_SKINS) expect(anywhere.has('p:' + d.id), d.id).toBe(!('season' in d.unlock) && !('level' in d.unlock))
     for (const c of CRATES) {
       const odds = skinOdds(c)
       if (odds.length) expect(odds.reduce((a, x) => a + x.p, 0)).toBeCloseTo(1)
