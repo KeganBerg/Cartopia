@@ -2675,10 +2675,27 @@ export const useGame = create<GameState>()(
       name: 'cartopia-save',
       partialize: (s) => saveOf(s),
       // A town saved before paint rivals has no oldPaints and keeps its colours.
-      merge: (persisted, current) => (persisted ? { ...current, ...starterDefaults(), ...unfoldStored(persisted as Partial<SaveState>), hatQuest: hatQuestOf(persisted as Partial<SaveState>), oldPaints: (persisted as Partial<SaveState>).oldPaints ?? true } : current),
+      merge: (persisted, current) => (persisted ? { ...current, ...starterDefaults(), ...unfoldStored(gemsX10(persisted as Partial<SaveState>)), hatQuest: hatQuestOf(persisted as Partial<SaveState>), oldPaints: (persisted as Partial<SaveState>).oldPaints ?? true } : (gemsX10(null), current)),
     },
   ),
 )
+
+// Gems x10 (2026-10-16): every gem price and reward is ten times bigger, so a guest town's saved gems
+// are multiplied by ten once, the first time this version loads it. A signed-in town's gems are scaled
+// on the server (SQL 0104) and come down with the cloud copy, so it's left alone here. The marker is
+// set either way, so nothing is ever scaled twice.
+const GEMS_X10_KEY = 'cartopia-gems-x10'
+export function gemsX10<T extends { bucks?: number } | null>(save: T, store: Pick<Storage, 'getItem' | 'setItem'> | null = typeof localStorage === 'undefined' ? null : localStorage): T {
+  try {
+    if (!store || store.getItem(GEMS_X10_KEY)) return save
+    store.setItem(GEMS_X10_KEY, '1')
+    // cartopia-save-owner names the account a town belongs to (lib/cloud.ts); a guest town has none.
+    const guest = !store.getItem('cartopia-save-owner')
+    return save && guest && typeof save.bucks === 'number' ? { ...save, bucks: save.bucks * 10 } : save
+  } catch {
+    return save
+  }
+}
 
 export function saveOf(s: GameState): SaveState {
   const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, restoring2, truck, gp, campaign, claimedSets, crewChests, visits, crates, cratePity, boosts, wagers, purchases, season, deals, trials, rivals, rivalRow, tuner, mastery, road, roadItems, freeCrates, trail, cheer, flairSeen, daily, repSeen, worldTour, presets, seasonBase, recap, friendship, cups, freePaint, oldPaints, tour, event, showcase, raceCar, skins, modSkins, hats, hatQuest, lights, cityTheme, restoParts, land, stored, updatedAt } = s
