@@ -11,7 +11,7 @@ import {
   carDef, takesDriver, SEASON_STARS, activeEvent, eventEndsAt, plotPrice, START_LAND, type StatKey, type GoalDef, flatFixCost, servicePay, serviceXp, gasCanCost,
 } from '../game/data'
 import { Panel, SheetTabs, openGarageTab } from './Menus'
-import { openRaceTab } from './raceNav'
+import { openRaceTab, type RaceTab } from './raceNav'
 import { useNow } from '../scene/useNow'
 import { Icon } from './Icon'
 import { CrewGoalMini } from './CrewGoal'
@@ -49,6 +49,14 @@ function goTo(stat: StatKey, def?: string): void {
       if (s.coins < d.price) return s.showNeed('coins', d.price - s.coins, d.name)
       return s.openShop(d.id)
     }
+    case 'cratesOpened':
+      return s.openPanel('crates')
+    case 'arcadePlays': {
+      const b = s.buildings.find((o) => o.def === 'arcade')
+      return b ? s.openUpgrade(b.uid) : s.openShop('arcade')
+    }
+    case 'dailyRuns':
+      return openRaceTab('daily')
     case 'searches':
     case 'rescued':
       return s.buildings.some((b) => b.def === 'rescue') ? s.openPanel('rescue') : goTo('rusty')
@@ -111,8 +119,10 @@ function goTo(stat: StatKey, def?: string): void {
 const ENDLESS_GO: Partial<Record<EndlessKind, StatKey>> = {
   jobs: 'jobs', coins: 'coinsEarned', races: 'races', wins: 'racesWon', campaign: 'campaignWins', search: 'searches', service: 'serviced',
   upgrades: 'upgrades', mods: 'modsBought', paint: 'painted', gp: 'gpWins', stars: 'stars', build: 'owns', cars: 'carsOwned', land: 'plots',
-  drivers: 'drivers', level: 'level',
+  drivers: 'drivers', level: 'level', restore: 'rescued', flats: 'flatsFixed', power: 'power',
 }
+// Kinds played from a Race menu tab.
+const ENDLESS_TAB: Partial<Record<EndlessKind, RaceTab>> = { dailyRun: 'daily', trophies: 'road', proTour: 'tour', worldTour: 'world', cups: 'cups', paintRival: 'rivals', tuner: 'tuner' }
 function goToEndless(g: EndlessGoal) {
   const s = useGame.getState()
   if (g.kind === 'bldgUp') {
@@ -123,6 +133,13 @@ function goToEndless(g: EndlessGoal) {
   if (g.kind === 'carUp') {
     if (g.def) s.selectCar(g.def)
     return openGarageTab('tune')
+  }
+  const tab = ENDLESS_TAB[g.kind]
+  if (tab) return openRaceTab(tab)
+  if (g.kind === 'crates') return s.openPanel('crates')
+  if (g.kind === 'arcade') {
+    const b = s.buildings.find((o) => o.def === 'arcade')
+    return b ? s.openUpgrade(b.uid) : s.openShop('arcade')
   }
   const stat = ENDLESS_GO[g.kind]
   if (stat) goTo(stat, g.def)
