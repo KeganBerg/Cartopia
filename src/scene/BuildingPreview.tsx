@@ -14,7 +14,7 @@ import { SEASON } from './season'
 import { frame, seat, type Bounds } from './fit'
 import { reduceMotionOn } from '../lib/prefs'
 import { quietShaders } from './warm'
-import { copyThumbs } from './thumbCopy'
+import { copyThumbs, pickThumbs, type Slot } from './thumbCopy'
 import type { Trim } from '../game/trim'
 
 // Shop, showroom and garage thumbnails are live 3D renders. One hidden WebGL
@@ -59,8 +59,7 @@ function carItem(c: CarLook, stand?: boolean): Item {
   }
 }
 
-// Every thumbnail on the page, and the models they need mounted.
-type Slot = { key: string; canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D | null; seen: boolean }
+// Every thumbnail on the page (see Slot in thumbCopy.ts), and the models they need mounted.
 const slots = new Set<Slot>()
 const models = new Map<string, { item: Item; uses: number }>()
 // Models stay mounted after their thumbnail goes, so reopening the Shop reuses
@@ -86,11 +85,12 @@ function fit(slot: Slot, w: number, h: number) {
   if (slot.canvas.width === pw && slot.canvas.height === ph) return
   slot.canvas.width = pw
   slot.canvas.height = ph
+  slot.fresh = true
   dirty = true
 }
 
-function attach(item: Item, canvas: HTMLCanvasElement) {
-  const slot: Slot = { key: item.key, canvas, ctx: canvas.getContext('2d'), seen: typeof IntersectionObserver === 'undefined' }
+function attach(item: Item, canvas: HTMLCanvasElement, still: boolean) {
+  const slot: Slot = { key: item.key, canvas, ctx: canvas.getContext('2d'), seen: typeof IntersectionObserver === 'undefined', still, fresh: true }
   slots.add(slot)
   byCanvas.set(canvas, slot)
   const m = models.get(item.key)
@@ -134,6 +134,15 @@ function attach(item: Item, canvas: HTMLCanvasElement) {
     for (const [k] of idle.slice(0, Math.max(0, idle.length - KEEP_IDLE))) models.delete(k)
     changed()
   }
+}
+
+// A still thumbnail turns while the pointer is over its card (desktop), and settles back.
+export function spinThumb(canvas: Element | null | undefined, on: boolean) {
+  const s = canvas && byCanvas.get(canvas)
+  if (!s || s.still !== on) return
+  s.still = !on
+  s.fresh = true
+  dirty = true
 }
 
 // The atlas grows to fit whatever is on screen and never shrinks; rows wrap at this width.
@@ -181,19 +190,8 @@ function Renderer() {
     if (!dirty && (still || now - last.current < 1000 / FPS - 4)) return
     last.current = now
     dirty = false
-    // Largest on-screen size per model; the same car in two sizes renders once.
-    const need = new Map<string, { w: number; h: number; x: number; y: number; slots: Slot[] }>()
-    for (const s of slots) {
-      if (!s.seen || !s.ctx || s.canvas.width < 2) continue
-      const n = need.get(s.key)
-      if (n) {
-        n.w = Math.max(n.w, s.canvas.width)
-        n.h = Math.max(n.h, s.canvas.height)
-        n.slots.push(s)
-      } else if (groups.current.has(s.key)) {
-        need.set(s.key, { w: s.canvas.width, h: s.canvas.height, x: 0, y: 0, slots: [s] })
-      } else dirty = true // its model isn't mounted yet: try again next frame
-    }
+    const { need, waiting } = pickThumbs(slots, (k) => groups.current.has(k))
+    if (waiting) dirty = true
     if (!need.size) return
 
     // Lay the models out in rows across the atlas.
@@ -224,8 +222,10 @@ function Renderer() {
     for (const g of groups.current.values()) g.visible = false
     gl.setScissorTest(true)
     gl.setClearColor(0x000000, 0)
-    for (const [key, n] of need) {
+    for (const n of need.values()) {
+      const { key } = n
       const g = groups.current.get(key)!
+      const hold = still || n.still
       const c = cam.current
       c.aspect = n.w / n.h
       const view = models.get(key)?.item.view
@@ -242,11 +242,11 @@ function Renderer() {
         const stand = models.get(key)?.item.stand
         g.visible = true
         // Held still, a standing car shows its front three quarters rather than its nose.
-        g.rotation.y = stand && still ? 0 : turn * Math.PI * 2
-        g.position.y = stand ? 0 : lift
+        g.rotation.y = stand && hold ? 0 : (hold ? 0.12 : turn) * Math.PI * 2
+        g.position.y = stand ? 0 : hold ? (LO + HI) / 2 : lift
         if (shadow.current) {
           shadow.current.visible = true
-          shadow.current.scale.setScalar(b.r * 0.8 * (stand ? 1 : 1 - lift * 0.5))
+          shadow.current.scale.setScalar(b.r * 0.8 * (stand ? 1 : 1 - (hold ? (LO + HI) / 2 : lift) * 0.5))
         }
         c.fov = 30
         if (stand) frame(c, b, STAND, { floor: b.r * 0.8, pad: 0.04 })
@@ -263,6 +263,7 @@ function Renderer() {
 
     // Copy in the same frame, before the browser discards the drawing buffer.
     copyThumbs(src, width, height, need.values())
+    for (const n of need.values()) if (n.still) for (const s of n.slots) s.fresh = false
   }, 1)
 
   return (
@@ -326,7 +327,7 @@ export function ThumbRenderer() {
 
 type Size = 'xs' | 'sm' | 'lg'
 
-function Thumb({ item, size, className }: { item: Item; size?: Size; className?: string }) {
+function Thumb({ item, size, className, still = false }: { item: Item; size?: Size; className?: string; still?: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null)
   const latest = useRef(item)
   useEffect(() => {
@@ -335,7 +336,8 @@ function Thumb({ item, size, className }: { item: Item; size?: Size; className?:
   const key = item.key
   useEffect(() => {
     const canvas = ref.current
-    if (canvas && key) return attach(latest.current, canvas)
+    if (canvas && key) return attach(latest.current, canvas, still)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
   return (
     <div className={className ?? (size ? `thumb3d ${size}` : 'thumb3d')}>
@@ -345,8 +347,9 @@ function Thumb({ item, size, className }: { item: Item; size?: Size; className?:
 }
 
 // A building or decoration floating and turning, exactly as it looks in town.
-export function BuildingThumb({ def, level, theme }: { def: BuildingDef; level?: number; theme?: ColorTheme | null }) {
-  return <Thumb item={buildingItem(def, level, theme)} />
+// `still`: drawn once and held (see Slot), for pages with lots of them.
+export function BuildingThumb({ def, level, theme, still }: { def: BuildingDef; level?: number; theme?: ColorTheme | null; still?: boolean }) {
+  return <Thumb item={buildingItem(def, level, theme)} still={still} />
 }
 
 // Scaled up to about a car's size, so it floats and frames like the other thumbs.
