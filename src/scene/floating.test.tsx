@@ -6,6 +6,7 @@ import type { Object3D } from 'three'
 import { BUILDINGS } from '../game/data'
 import { BuildingModel } from './BuildingModel'
 import { VanguardTower } from './Landmark'
+import { GlobeTower } from './GlobeTower'
 import { KeepShapes, MergeScale } from './mergeScale'
 import { limitFor } from './keepShape'
 import { describe, floating, hovering, REST, TOUCH } from './floating'
@@ -63,11 +64,11 @@ group('nothing floats', () => {
 })
 
 group('nothing floats on landmarks', () => {
-  it('vanguard tower', async () => {
+  it.each([['vanguard tower', <VanguardTower />], ['globe tower', <GlobeTower />]] as const)('%s', async (_, el) => {
     const bad = new Set<string>()
     for (const time of [NOON, MIDNIGHT]) {
       vi.spyOn(Date, 'now').mockReturnValue(time)
-      const r = await ReactThreeTestRenderer.create(<VanguardTower />)
+      const r = await ReactThreeTestRenderer.create(el)
       await ReactThreeTestRenderer.act(async () => r.advanceFrames(2, 1 / 60))
       for (const p of floating(r.scene.instance as Object3D)) bad.add(`${time === MIDNIGHT ? 'night' : 'day'}: ${describe(p)}`)
       await r.unmount()

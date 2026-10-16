@@ -25,7 +25,7 @@ import { tunerPrize, tunerTrial } from './tuner'
 import { tourIsBoss, tourLegBonus, tourLegOf, tourPrize } from './tour'
 import { EVENT_RACES, eventBonus, eventFor, eventIsBoss, eventPrize, eventProgress, type EventProgress } from './events'
 import { trialWeek } from './trial'
-import { groupOf, groupTurn, mergeCandidates, mergeBoosts, mergeFuel, applyMerge, applySplit, rotateGroup, moveGroup, isLandmark, LANDMARK_NAME, type MergeGroup } from './merge'
+import { groupOf, groupTurn, mergeCandidates, mergeBoosts, mergeFuel, applyMerge, applySplit, rotateGroup, moveGroup, isLandmark, isGlobe, LANDMARK_NAME, GLOBE_NAME, type MergeGroup } from './merge'
 import { togglePick } from './meet'
 import { crateCost, crateDef, crateOwnedSkins, pityHit, rollCrate, rollSourcePiece, type CrateId, type CrateOpen } from './crates'
 import { pieceId } from './resto'
@@ -1147,7 +1147,7 @@ export const useGame = create<GameState>()(
         const d = buildingDef(c.anchor.def)
         const gain = mergeGain(d)
         const bonus = gain ? ` ${gain} +${Math.round(mergeBonus(c.members.length) * 100)}%` : ''
-        s.toast((isLandmark(c) && size === 2 ? `Four Sky Towers became the ${LANDMARK_NAME}!` : size === 4 ? `Giant ${isLandmark(c) ? LANDMARK_NAME : d.name}! 16 in one.` : `Merged ${c.members.length} into one big ${d.name}!`) + bonus)
+        s.toast((isGlobe(c) ? `Two ${LANDMARK_NAME}s became the ${GLOBE_NAME}!` : isLandmark(c) && size === 2 ? `Four Sky Towers became the ${LANDMARK_NAME}!` : size === 4 ? `Giant ${isLandmark(c) ? LANDMARK_NAME : d.name}! 16 in one.` : `Merged ${c.members.length} into one big ${d.name}!`) + bonus)
         set({ buildings: applyMerge(s.buildings, c), updatedAt: Date.now() })
       },
 
