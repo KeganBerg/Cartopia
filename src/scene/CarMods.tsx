@@ -74,16 +74,27 @@ function pipe(r: number, len: number, x: number, y: number, z: number, r2 = r) {
 
 // A front lip: a blade under the nose with a raised fence along its leading edge, bolted on
 // across the top and braced up to the bumper by two struts. Swept lips fold their corners back.
+// Under a nose that tapers in, the blade is cut to the nose's own width and tucked back under
+// it, bolted straight to its floor (struts out in front of a low pointed nose read as stilts).
 function frontLip(f: Frame, p: Parts, k: Kind, w: number, t: number, d: number, y: number, z: number, sweep: boolean) {
+  if (f.nose !== undefined) {
+    w = Math.min(w, f.nose * 2)
+    y += noseLift(f) - f.lift
+    z = Math.min(z, f.front + 0.05 - d / 2)
+  }
   const mid = sweep ? 0.72 : 1
   p[k].push(box(w * mid, t, d, 0, y, z))
-  // The corners stop inside the body's sides, clear of the wheel wells.
+  // The corners stop inside the body's sides and ahead of the wheel wells.
   const out = Math.min(w, f.bodyW) * 0.49
-  if (sweep) for (const sd of [-1, 1]) p[k].push(box(w * 0.18, t - 0.009, d * 0.8, sd * (out - w * 0.09), y - 0.002, z - d * 0.08, 0, sd * 0.22))
+  if (sweep) for (const sd of [-1, 1]) p[k].push(box(w * 0.18, t - 0.009, d * 0.6, sd * (out - w * 0.09), y - 0.002, z + d * 0.05, 0, sd * 0.22))
   p.carbon.push(box(w * mid - 0.02, 0.014, 0.008, 0, y + t / 2 + 0.006, z + d / 2 - 0.007))
+  if (f.nose !== undefined) return
   for (let i = -2; i <= 2; i++) p.chrome.push(post(0.0055, 0.012, i * w * 0.14, y + t / 2, z - d * 0.12, 8))
   for (const sd of [-1, 1]) p.chrome.push(tube(0.005, [sd * w * 0.24, y + t / 2 - 0.002, z + d * 0.18], [sd * w * 0.24, y + 0.06, f.front - 0.006], 6))
 }
+// The bottom of the nose, where front lips and splitters bolt on, and how wide it is.
+const noseLift = (f: Frame) => (f.noseY === undefined ? f.lift : f.noseY - 0.009)
+const noseW = (f: Frame) => (f.nose === undefined ? f.bodyW : f.nose * 2)
 
 
 // Hood parts keep their sides clear of the long edges on the stock hood: the racing
@@ -116,7 +127,7 @@ const TIPS: Record<string, (f: Frame) => [number, number][]> = {
 // How far out from the body side each kit's skirts reach.
 const SKIRT: Record<string, number> = { streetkit: 0.027, widebody: 0.045, carbonkit: 0.038, rallykit: 0.027, boxflares: 0.046, aerokit: 0.043 }
 // Noses that curve away at the corners, leaving nothing for canards to bolt to.
-const ROUND_NOSE: Body[] = ['horseshoe', 'scissor', 'teardrop', 'formula', 'pontoon', 'highboy']
+const ROUND_NOSE: Body[] = ['horseshoe', 'scissor', 'teardrop', 'formula', 'pontoon', 'highboy', 'longtail', 'bubble']
 // Where valances and diffusers hang at the tail: off the floor, or up at the tail where it sits
 // high above the floor (the formula car's engine cover).
 const rearLift = (f: Frame) => Math.max(f.lift, f.pipeY - 0.1)
@@ -136,8 +147,21 @@ const POST_DEEP: Partial<Record<Body, number>> = { bubble: 0.02, highboy: 0.03 }
 const BODY_SIDE: Partial<Record<Body, Partial<Frame>>> = {
   monster: { side: 0.34, bodyW: 0.68 },
   highboy: { lift: 0.152, side: 0.345, pipeSide: 0.279, bodyW: 0.56, front: 0.63, rear: -0.665, pipeY: 0.27, postW: 0.4 },
-  timeattack: { side: 0.38 },
-  longtail: { front: 0.68, rear: -0.84 },
+  timeattack: { side: 0.38, nose: 0.37, noseY: 0.078 },
+  longtail: { front: 0.68, rear: -0.84, nose: 0.255, noseY: 0.072 },
+  // Noses that taper in toward the front: the bottom's half width 3 cm back from the tip, and
+  // its height (measured from each body's geometry; see modFit's lip check).
+  scissor: { nose: 0.274, noseY: 0.073 },
+  horseshoe: { nose: 0.26, noseY: 0.081 },
+  teardrop: { nose: 0.241, noseY: 0.081 },
+  pontoon: { nose: 0.205, noseY: 0.091 },
+  midship: { nose: 0.318, noseY: 0.074 },
+  popup: { nose: 0.308, noseY: 0.085 },
+  ponycar: { nose: 0.309, noseY: 0.102 },
+  stepnose: { nose: 0.317, noseY: 0.087 },
+  gtcoupe: { nose: 0.317, noseY: 0.078 },
+  restomuscle: { nose: 0.349, noseY: 0.094 },
+  musclecoupe: { nose: 0.331, noseY: 0.115 },
   // Side kits go on the armour skirts over the tracks (see the tank in CarModel), not down
   // among the road wheels.
   tank: { sill: 0.52, sillY: 0.215 },
@@ -275,14 +299,14 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
       }
       p.paint.push(box(0.0555, 0.053, f.wz * 2 - f.wheel * 2.64, sd * (sillX(f) + 0.01725), sillY(f) + 0.0555, 0))
     }
-    p.carbon.push(box(f.bodyW * 1.05, 0.025, 0.1, 0, f.lift + 0.025, f.front + 0.02))
+    p.carbon.push(box((f.nose === undefined ? f.bodyW * 1.05 : noseW(f) - 0.012), 0.025, 0.1, 0, noseLift(f) + 0.025, f.front + 0.02 - (f.nose === undefined ? 0 : 0.02)))
   },
   carbonkit: (f, p) => {
-    frontLip(f, p, 'carbon', f.bodyW * 1.08, 0.022, 0.14, f.lift + 0.022, f.front + 0.03, true)
+    frontLip(f, p, 'carbon', f.bodyW * 1.08, 0.022, 0.12, f.lift + 0.022, f.front + 0.015, true)
     for (const sd of [-1, 1]) {
       p.carbon.push(box(0.0485, 0.05, f.len * 0.46, sd * (sillX(f) + 0.01375), sillY(f) + 0.053, 0))
       // Canards on the front corners, where the nose is square enough to hold them.
-      if (!ROUND_NOSE.includes(f.body)) p.carbon.push(box(0.1, 0.012, 0.06, sd * (f.bodyW / 2 - 0.02), f.lift + 0.13, f.front - 0.02, 0, sd * 0.4))
+      if (!ROUND_NOSE.includes(f.body)) p.carbon.push(box(0.1, 0.012, 0.06, sd * (noseW(f) / 2 - 0.02), f.lift + 0.13, f.front - 0.02, 0, sd * 0.4))
     }
     // The diffuser parts round the exhaust tips, and drops the fins that would meet one.
     for (const [a, b] of aroundTips(f, -f.bodyW * 0.4, f.bodyW * 0.4)) p.carbon.push(box(b - a, 0.025, 0.1, (a + b) / 2, rearLift(f) + 0.03, f.rear - 0.033))
@@ -442,8 +466,8 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
       p.carbon.push(box(0.0375, 0.04, f.wz * 2 - f.wheel * 2.9, sd * (sillX(f) + 0.00825), sillY(f) + 0.03, 0))
     }
     // Skid plate tucked under the nose, rising to the bumper, held by two bolts.
-    p.chrome.push(box(f.bodyW * 0.7, 0.012, 0.15, 0, f.lift + 0.018, f.front - 0.045, -0.35))
-    for (const sd of [-1, 1]) p.carbon.push(post(0.008, 0.008, sd * f.bodyW * 0.22, f.lift + 0.0155, f.front - 0.075, 8))
+    p.chrome.push(box(Math.min(f.bodyW * 0.7, noseW(f) * 0.9), 0.012, 0.15, 0, noseLift(f) + 0.018, f.front - 0.045, -0.35))
+    for (const sd of [-1, 1]) p.carbon.push(post(0.008, 0.008, sd * Math.min(f.bodyW * 0.22, noseW(f) * 0.28), noseLift(f) + 0.0155, f.front - 0.075, 8))
     for (const [a, b] of aroundTips(f, -f.bodyW * 0.24, f.bodyW * 0.24)) p.carbon.push(box(b - a, 0.05, 0.04, (a + b) / 2, rearLift(f) + 0.029, f.rear - 0.012))
   },
   boxflares: (f, p) => {
@@ -465,21 +489,26 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
         p.paint.push(box(c, 0.028, L - 0.006, sd * (x1 - c * 0.42), top - 0.011, zz, 0, 0, -sd * 0.62))
         for (const e of [-1, 1]) {
           const yb = f.lift + 0.03
-          p.paint.push(box(w, top - 0.03 - yb, 0.026, sd * x, (top - 0.03 + yb) / 2, zz + e * (L / 2 - 0.013)))
-          p.paint.push(box(wi, 0.03, 0.026, sd * xi, top - 0.015, zz + e * (L / 2 - 0.013)))
+          // Ahead of the front wheels a tapering nose has already turned in: the end panel
+          // closes the flare back in to it, so its corner doesn't stand off in the air.
+          const xa = zz > 0 && e > 0 && f.nose !== undefined ? Math.min(x0, f.nose - 0.01) : x0
+          p.paint.push(box(x1 - xa, top - 0.03 - yb, 0.026, sd * (x1 + xa) / 2, (top - 0.03 + yb) / 2, zz + e * (L / 2 - 0.013)))
+          p.paint.push(box(x1 - xa - c * 0.7, 0.03, 0.026, sd * (xa + x1 - c * 0.7) / 2, top - 0.015, zz + e * (L / 2 - 0.013)))
           p.chrome.push(post(0.008, 0.012, sd * (x1 - c - 0.02), top + 0.016, zz + e * (L / 2 - 0.02), 6))
         }
       }
       p.paint.push(box(0.06, 0.04, f.wz * 2 - f.wheel * 2.56, sd * (f.side + 0.016), f.lift + 0.034, 0))
     }
-    p.carbon.push(box(f.bodyW * 1.04, 0.03, 0.1, 0, f.lift + 0.03, f.front + 0.02))
+    p.carbon.push(box((f.nose === undefined ? f.bodyW * 1.04 : noseW(f) - 0.012), 0.03, 0.1, 0, noseLift(f) + (f.nose === undefined ? 0.03 : 0.022), f.front + 0.02 - (f.nose === undefined ? 0 : 0.02)))
   },
   aerokit: (f, p) => {
     // Front splitter with end plates and stacked canards, slim skirts, and a finned diffuser.
-    frontLip(f, p, 'carbon', f.bodyW * 1.1, 0.016, 0.16, f.lift + 0.012, f.front + 0.035, false)
+    frontLip(f, p, 'carbon', f.bodyW * 1.1, 0.016, 0.13, f.lift + 0.012, f.front + 0.02, false)
     for (const sd of [-1, 1]) {
-      p.carbon.push(box(0.012, 0.05, 0.12, sd * f.bodyW * 0.55, f.lift + 0.03, f.front + 0.035))
-      if (!ROUND_NOSE.includes(f.body)) for (const [y, k] of [[0.11, 0], [0.16, 1]]) p.carbon.push(box(0.09, 0.01, 0.05, sd * (f.bodyW / 2 - 0.025 - k * 0.01), f.lift + y, f.front - 0.015 - k * 0.01, 0, sd * 0.45))
+      // End plates at the blade's tips (tucked in under a tapering nose with the blade).
+      if (f.nose === undefined) p.carbon.push(box(0.012, 0.05, 0.1, sd * f.bodyW * 0.55, f.lift + 0.03, f.front + 0.03))
+      else p.carbon.push(box(0.012, 0.03, 0.1, sd * (noseW(f) / 2 - 0.006), noseLift(f) + 0.024, f.front + 0.0))
+      if (!ROUND_NOSE.includes(f.body)) for (const [y, k] of [[0.11, 0], [0.16, 1]]) p.carbon.push(box(0.09, 0.01, 0.05, sd * (noseW(f) / 2 - 0.025 - k * 0.01), f.lift + y, f.front - 0.015 - k * 0.01, 0, sd * 0.45))
       p.carbon.push(box(0.045, 0.03, f.len * 0.48, sd * (f.side + 0.0125), f.lift + 0.035, 0))
       p.paint.push(box(0.035, 0.012, f.len * 0.42, sd * (f.side + 0.025), f.lift + 0.056, 0))
     }

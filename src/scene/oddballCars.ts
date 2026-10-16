@@ -1,7 +1,7 @@
 import { BoxGeometry, CircleGeometry, CylinderGeometry, PlaneGeometry, Shape, ShapeGeometry, SphereGeometry, TorusGeometry, Vector2 } from 'three'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import type { Kit } from './CarModel'
-import type { ExoticFit, ExoticHelpers } from './exoticCars'
+import { wellGeo, wellOutline, type ExoticFit, type ExoticHelpers } from './exoticCars'
 import type { Body } from '../game/data'
 
 // Oddballs: goofy vehicles that wouldn't normally race (an ice cream truck, a monster
@@ -24,8 +24,17 @@ const side = (sd: number): [number, number, number] => [0, (sd * Math.PI) / 2, 0
 const BACK: [number, number, number] = [0, Math.PI, 0]
 
 // Dark wells behind the tyres so the wheels sit in the body, like every road car.
-function arches(k: Kit, hw: number, wz: number, r: number) {
-  for (const z of [wz, -wz]) for (const sd of [-1, 1]) k.add('black', new CircleGeometry(r * 1.18, 18, 0, Math.PI), [sd * (hw + 0.003), r, z], side(sd))
+// Each stops short of the rounded corners at the ends of the body (front, back), of the seams
+// between its boxes (at the z listed in gaps), and of a nose narrower than the body (in from
+// nose on).
+function arches(k: Kit, hw: number, wz: number, r: number, front: number, back: number, gaps: number[] = [], nose = Infinity) {
+  for (const z of [wz, -wz]) for (const sd of [-1, 1]) {
+    const ok = (lx: number) => {
+      const wz2 = z - sd * lx
+      return wz2 < Math.min(front - 0.06, nose) && wz2 > back + 0.06 && gaps.every((gz) => Math.abs(wz2 - gz) > 0.05)
+    }
+    k.add('black', wellGeo(wellOutline(r * 1.18, r, ok)), [sd * (hw + 0.003), r, z], side(sd))
+  }
 }
 
 // Round headlamp in a chrome ring, on a face looking +z.
@@ -50,7 +59,7 @@ export function iceCreamGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   k.add('paint', rbox(wid, 0.51, 0.3, 0.05), [0, bot + 0.255, 0.31])
   k.add('paint', rbox(wid, 0.27, 0.28, 0.05), [0, bot + 0.135, 0.56])
   k.add('dark', rbox(wid * 1.01, 0.06, len * 0.8, 0.025), [0, 0.16, 0])
-  arches(k, hw * 1.01, wz, r)
+  arches(k, hw * 1.01, wz, r, front, -front, [0.44])
   // A pink trim band round the roof edge.
   k.add('pink', rbox(wid + 0.012, 0.035, 0.935, 0.012), [0, top - 0.012, -0.24])
 
@@ -171,7 +180,7 @@ export function parcelGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   k.add('paint', rbox(wid * 0.98, 0.27, 0.28, 0.045), [0, bot + 0.135, front - 0.14])
   k.add('dark', rbox(wid * 1.01, 0.06, len * 0.82, 0.025), [0, 0.16, 0])
   // Out past the skirt and the parcels in the open doorway.
-  arches(k, hw * 1.01 + 0.005, wz, r)
+  arches(k, hw * 1.01 + 0.008, wz, r, front, -front, [0.41], front - 0.28)
   const fz = 0.42
   // Windshield in two flat panes with a post between them, and a dark visor over them.
   k.add('glass', plane(wid * 0.86, 0.3), [0, 0.64, fz + 0.002])

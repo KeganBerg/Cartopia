@@ -1,8 +1,8 @@
-import { BufferGeometry, CircleGeometry, CylinderGeometry, Float32BufferAttribute, TorusGeometry, Vector3 } from 'three'
+import { BufferGeometry, CircleGeometry, CylinderGeometry, Float32BufferAttribute, Vector3 } from 'three'
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import type { Kit, Part } from '../CarModel'
 import { Loft } from '../loft'
-import { Surface, bodyRing, box, disc, glassRing, greenhouse, honey, plane, poly, rbox, slab, vent, type ExoticFit, type ExoticHelpers } from '../exoticCars'
+import { Surface, bodyRing, box, disc, glassRing, greenhouse, honey, plane, poly, rbox, slab, vent, type ExoticFit, type ExoticHelpers, flatWell } from '../exoticCars'
 
 // ---------------------------------------------------------------------------
 // Nordwerk Kestrel GT: an entry mid-engine sports car. A short low nose between two
@@ -188,10 +188,7 @@ export function midshipGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   const cy = r - 0.004
   for (const zz of [wz, -wz]) {
     const x = wellX(S, zz, R)
-    for (const sd of SIDES) {
-      k.add('black', new CircleGeometry(R, 20, 0, Math.PI), [sd * x, cy, zz], [0, (sd * Math.PI) / 2, 0])
-      k.add('dark', new TorusGeometry(R, 0.008, 4, 20, Math.PI), [sd * (x + 0.003), cy, zz], [0, (sd * Math.PI) / 2, 0])
-    }
+    flatWell(k, S, zz, cy, R, r, x)
   }
 
   // Sides: a deep intake ahead of each rear wheel with fins in its mouth, door cut and a
