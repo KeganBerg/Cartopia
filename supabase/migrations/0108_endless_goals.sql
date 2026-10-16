@@ -1,4 +1,5 @@
--- Endless goals: generated goals that never run out (src/game/endless.ts). Builds on 0104 (gems x10):
+-- Endless goals: generated goals that never run out (src/game/endless.ts). DRAFT built on the gems x10 guard (a1eab079);
+-- economy rebuilds this block on the live guard and this file is replaced with theirs, byte for byte.
 -- the same econ_guard with one more block, after the daily and weekly tasks, that pays endless goals.
 -- Runs BEFORE the endless-goals client ships (a guard without it trims their coins); a save without
 -- `endless` is left alone, so it's safe to run early.
