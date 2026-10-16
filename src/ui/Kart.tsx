@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { CamButton } from './CamButton'
 import { StageSlot, useStageReady } from '../scene/Stage'
 import type { OwnedCar } from '../game/store'
 import { carDef } from '../game/data'
@@ -214,6 +215,7 @@ export function KartGame({ car, title, track, reverse, field, prize, next, onFin
       {drawn && !ready && (live?.lobby ?? <div className="kt-wait">⏳ {live?.loading}</div>)}
       <div className="rf-top">
         <h2>{title}</h2>
+        <CamButton kind="kart" />
         <button className="close" onClick={onExit} aria-label="Close">✕</button>
       </div>
       {hud && !end && ready && (

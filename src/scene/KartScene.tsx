@@ -9,6 +9,7 @@ import { holdTown } from './renderGate'
 import { ArcadeSky, CarShadow, Grandstand, Lamp, TyreStack, useArcadeLook, useTownPool, type Person } from './ArcadeScenery'
 import { Box, Cone, Cyl, Palm, Scatter, Water, rand } from './RaceVenues'
 import { dprFor, usePrefs } from '../lib/prefs'
+import { VIEW_GLIDE } from './raceCam'
 import { FansEvery, FansFar, local, nearZone, useFansEvery, useFansFar, useFanZones, useSpots, ZONE_R } from './kartSpots'
 import { KartHorizon } from './KartHorizon'
 import { CommonExtras, DesertExtras, DocksExtras, Fans, SpectatorBoats, TownExtras, boatPeople, type BoatSpot } from './KartExtras'
@@ -1182,9 +1183,11 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
   const views = useRef<{ root: Group | null; body: Group | null; fx: KartFx }[]>([])
   const setters = useMemo(() => looks.map((_, i) => (g: { root: Group | null; body: Group | null; fx: KartFx }) => { views.current[i] = g }), [looks])
   // hero: seconds into the finish hero shot (heroShot.ts), -1 before it, -2 once it's over.
-  const st = useRef({ acc: 0, hudAt: 0, finished: false, camPos: new Vector3(), camAt: new Vector3(), fov: 0, init: false, shake: 0, kick: 0, hero: -1 })
+  const st = useRef({ acc: 0, hudAt: 0, finished: false, camPos: new Vector3(), camAt: new Vector3(), fov: 0, init: false, shake: 0, kick: 0, hero: -1, view: '', viewT: 0 })
   const inputs = useMemo(() => race.karts.map(() => input), [race, input])
   const tmpV = useMemo(() => new Vector3(), [])
+  const tmpA = useMemo(() => new Vector3(), [])
+  const tmpF = useMemo(() => new Vector3(), [])
   const poses = useMemo(() => drawnPoses(race), [race])
   // Every kart lays a glowing ribbon behind it on a boost: nitro, a drift turbo, a boost pad.
   const trails = useMemo(() => looks.map(() => new BoostTrail()), [looks])
@@ -1309,9 +1312,14 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
       }
     })
 
-    // Camera: on the drawn kart.
+    // Camera: on the drawn kart, from the view the player picked (🎥 / C).
+    const kartView = usePrefs.getState().kartView
+    if (kartView !== s.view) {
+      s.view = kartView
+      s.viewT = 0
+    }
     const pm = poses.drawn[me]
-    const fwd = tmpV.set(Math.sin(pm.h), 0, Math.cos(pm.h))
+    const fwd = tmpF.set(Math.sin(pm.h), 0, Math.cos(pm.h))
     const mv = Math.hypot(mine.vx, mine.vz)
     if (cam === 'sky') {
       // Dev overview: ?ang turns round the middle, ?at=x,z&d=dist looks at one spot.
@@ -1322,14 +1330,17 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
       camera.fov = 55
       camera.far = 600
       state.scene.fog = null
-    } else if (cam === 'top') {
-      const want = new Vector3(pm.x, tall ? 30 : 24, pm.z - (tall ? 9 : 11))
+    } else if (cam === 'top' || (kartView === 'top' && s.hero < 0)) {
+      // Overhead: the whole bend ahead and the karts round it, turned to face the way the kart drives.
+      const want = tmpV.set(pm.x - fwd.x * (tall ? 9 : 11), tall ? 30 : 24, pm.z - fwd.z * (tall ? 9 : 11))
       if (!s.init) s.camPos.copy(want)
       s.camPos.lerp(want, Math.min(1, dt * 4))
       camera.position.copy(s.camPos)
       camera.up.set(0, 1, 0)
-      camera.lookAt(pm.x, 0, pm.z + 1.5)
+      s.camAt.lerp(tmpA.set(pm.x + fwd.x * 6, 0, pm.z + fwd.z * 6), s.init ? Math.min(1, dt * 6) : 1)
+      camera.lookAt(s.camAt)
       camera.fov = tall ? 62 : 46
+      s.fov = camera.fov
     } else if (s.hero >= 0 && !heroShot.skip && s.hero + dt < HERO_TIME) {
       s.hero += dt
       heroCam(s.hero, pm.x, pm.y, pm.z, pm.h, KART_LEN, 1, KART_LEN * 2.2, s.camPos, s.camAt)
@@ -1345,13 +1356,17 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
         heroShot.on = false
       }
       // Behind and above the kart; swings a little wide in a drift, pulls back on a boost.
-      const back = (tall ? 7.4 : 6.0) + (mine.boost > 0 ? 0.6 : 0)
-      const up = tall ? 3.7 : 3.0
-      const swing = mine.drift * 0.35
+      // Wide sits higher and further back; Bumper rides on the nose, locked to it once the switch has eased over.
+      const bumper = kartView === 'bumper'
+      const far = kartView === 'far'
+      const back = bumper ? -KART_LEN * 0.55 : (far ? (tall ? 12 : 10.5) : tall ? 7.4 : 6.0) + (mine.boost > 0 ? 0.6 : 0)
+      const up = bumper ? 0.62 : far ? (tall ? 6.4 : 5.2) : tall ? 3.7 : 3.0
+      const swing = bumper ? 0 : mine.drift * 0.35
       const hx = Math.sin(pm.h - swing), hz = Math.cos(pm.h - swing)
-      const want = new Vector3(pm.x - hx * back, up + pm.y * 0.6, pm.z - hz * back)
+      const want = tmpV.set(pm.x - hx * back, up + pm.y * (bumper ? 1 : 0.6), pm.z - hz * back)
       if (!s.init) s.camPos.copy(want)
-      s.camPos.lerp(want, Math.min(1, dt * 7))
+      s.viewT += dt
+      s.camPos.lerp(want, bumper && s.viewT > VIEW_GLIDE ? 1 : Math.min(1, dt * 7))
       // Never let the camera sink into a barrier: keep it a little above the wall top.
       camera.position.copy(s.camPos)
       if (s.shake > 0) {
@@ -1360,11 +1375,12 @@ function KartSceneImpl({ race, looks, me, input, running, cam = (DEV?.get('cam')
         camera.position.z += (Math.random() - 0.5) * s.shake
       }
       camera.up.set(0, 1, 0)
-      const at = new Vector3(pm.x + fwd.x * 4, 0.55 + pm.y * 0.8, pm.z + fwd.z * 4)
+      const ahead = bumper ? 12 : 4
+      const at = tmpA.set(pm.x + fwd.x * ahead, (bumper ? 0.5 : 0.55) + pm.y * 0.8, pm.z + fwd.z * ahead)
       if (!s.init) s.camAt.copy(at)
-      s.camAt.lerp(at, Math.min(1, dt * 10))
+      s.camAt.lerp(at, bumper && s.viewT > VIEW_GLIDE ? 1 : Math.min(1, dt * 10))
       camera.lookAt(s.camAt)
-      const fov = (tall ? 70 : 58) + (mine.boost > 0 ? 7 : 0) + Math.min(5, mv * 0.2)
+      const fov = (tall ? 70 : 58) + (bumper ? 6 : far ? -4 : 0) + (mine.boost > 0 ? 7 : 0) + Math.min(5, mv * 0.2)
       s.fov += (fov - s.fov) * Math.min(1, dt * 4)
       camera.fov = (s.fov || fov) + s.kick
     }

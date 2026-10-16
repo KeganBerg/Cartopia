@@ -35,12 +35,13 @@ import { Celebration } from './celebration'
 import { cheerDef, myCheer, myTrail, trailDef } from '../game/flair'
 import { reducedMotion } from '../game/fx'
 import { TOP_GEAR } from '../game/race'
-import { ANGLE_FOV, angleCam, damp, direct, ease, freshDirector, type Angle } from './raceCam'
+import { ANGLE_FOV, DRAG_VIEWS, VIEW_GLIDE, angleCam, damp, direct, dragViewCam, photoCam, ease, freshDirector, type Angle, type DragView } from './raceCam'
+import { usePrefs } from '../lib/prefs'
 import type { Trim } from '../game/trim'
 
 // burning: the boost is firing (the chase camera punches in); gear: the camera cuts to cinematic angles in top gear.
 export type RacerView = { dist: number; burning?: boolean; gear?: number }
-type CamMode = 'chase' | 'hero' | 'side' | Angle
+type CamMode = DragView | 'hero' | 'side' | Angle
 const SCALE = 0.25 // metres of race distance per world unit
 // How far past the finish line (race metres) a car has to coast and brake to a stop.
 const RUN_OUT = 150
@@ -685,21 +686,23 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
     }
     if (mode === 'chase' && f.side) {
       mode = 'side'
-      // Low on the kerb just past the line, looking back across it as the noses arrive. A tall phone
-      // screen stands back a little and looks down more, so the cars fill it rather than the sky.
-      if (tall) c.pos.set(ROAD + 0.5, 1.15, len + 3.9)
-      else c.pos.set(ROAD + 0.55, 0.7, len + 2.6)
-      c.at.set(-0.3, tall ? 0.05 : 0.3, len - 0.5)
-      shotFov = tall ? fov : 34
+      shotFov = photoCam(len, ROAD, tall, c.pos, c.at) ?? fov
     }
     // Top gear: nothing left to shift, so the camera cuts round a few angles until just before the line.
     const eta = ra.cross < 0 && ra.v > 1 ? (track - shown[0]) / ra.v : 0
     const inTop = (me.current?.gear ?? 0) >= TOP_GEAR
-    cut = direct(c.dir, dt, inTop, eta, mode === 'chase' && f.phase === 'race' && ra.cross < 0 && !reducedMotion())
+    // The view the player picked (🎥 / C); the top-gear angles only take over the chase view.
+    const view = usePrefs.getState().dragView
+    cut = direct(c.dir, dt, inTop, eta, view === 'chase' && mode === 'chase' && f.phase === 'race' && ra.cross < 0 && !reducedMotion())
     if (mode === 'chase' && c.dir.angle) {
       mode = c.dir.angle
       angleCam(c.dir.angle, c.dir.t, car.x, car.z, noses[0], ROAD, tall, c.pos, c.at)
       shotFov = want + ANGLE_FOV[c.dir.angle]
+    }
+    if (mode === 'chase' && view !== 'chase') {
+      mode = view
+      const rival = themRef.current?.position
+      shotFov = want + dragViewCam(view, car.x, car.z, rival?.x ?? -LANE, rival?.z ?? car.z, noses[0], ROAD, tall, c.pos, c.at)
     }
     if (mode === 'chase') {
       c.pos.copy(c.chasePos)
@@ -709,7 +712,9 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
     // Changing shot: the photo-finish camera and the top-gear angles cut; into and out of the hero
     // shot the camera eases from where it was, carried along with the car so it never drops behind.
     if (mode !== c.mode) {
-      const glide = mode === 'hero' ? 0.8 : c.mode === 'hero' ? 0.8 : 0
+      // A view the player switched to glides over; the hero shot eases in and out.
+      const picked = (m: CamMode) => DRAG_VIEWS.includes(m as DragView)
+      const glide = mode === 'hero' ? 0.8 : c.mode === 'hero' ? 0.8 : picked(mode) && picked(c.mode) ? VIEW_GLIDE : 0
       if (c.mode === 'side' && mode === 'chase') c.chaseRel.copy(c.chase).setZ(c.chase.z - target)
       if (glide > 0) {
         c.fromPos.copy(c.lastPos).setZ(c.lastPos.z - car.z)
@@ -724,7 +729,7 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
       c.mode = mode
     }
     // Field of view: eased on the chase (faster when the boost punches in), set outright on a cut.
-    if (cut || mode === 'hero' || mode === 'side') c.fov = shotFov
+    if (cut || mode === 'hero' || mode === 'side' || (c.blendFor > 0 && c.blend === 0)) c.fov = shotFov
     else c.fov += (shotFov - c.fov) * damp(boosting ? 8 : 3, dt)
     let shownFov = c.fov
     if (c.blendFor > 0) {
@@ -743,7 +748,7 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
     }
     cam.position.copy(c.pos)
     // A faint road buzz at speed, stronger under boost and down low behind the car; gone once the cars are over the line.
-    const buzz = mode === 'low' ? 1.4 : mode === 'chase' ? 1 : 0
+    const buzz = mode === 'low' || mode === 'bumper' ? 1.4 : mode === 'chase' ? 1 : mode === 'far' ? 0.5 : 0
     f.shake += ((ra.cross < 0 ? (pace * 0.012 + (boosting ? 0.02 : 0)) * buzz : 0) - f.shake) * damp(6, dt)
     if (f.shake > 0.0005) cam.position.y += Math.sin(f.st * 53) * f.shake + Math.sin(f.st * 31) * f.shake * 0.6
     cam.lookAt(c.at)

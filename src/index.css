@@ -2421,3 +2421,8 @@ body:has(.race-full) .toasts { display: none; }
 .arc-top-row { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 8px; }
 .arc-top-row .arc-weekly { margin: 0; }
 .arc-claim { font: 16px var(--display); background: #43a047; color: #fff; border: none; border-radius: 999px; padding: 6px 14px; box-shadow: 0 3px 0 rgba(0,0,0,.2); animation: pop .3s ease-out; }
+/* Race camera button beside the ✕, and the picked view's name flashing under the title. */
+.rf-top .cam-btn { pointer-events: auto; flex: none; width: 40px; height: 40px; border-radius: 50%; border: 2px solid #fff; background: rgba(16, 32, 56, .72); color: #fff; font-size: 19px; line-height: 1; padding: 0; touch-action: manipulation; }
+.rf-top .cam-btn:active { transform: scale(.92); }
+.cam-flash { position: absolute; top: calc(100% - 6px); right: calc(12px + var(--sar)); padding: 5px 12px; border-radius: 999px; background: rgba(16, 32, 56, .82); color: #fff; font: 15px var(--display); animation: cam-flash 1.2s ease-out forwards; pointer-events: none; }
+@keyframes cam-flash { 0% { opacity: 0; transform: translateY(-6px); } 12% { opacity: 1; transform: none; } 75% { opacity: 1; } 100% { opacity: 0; } }

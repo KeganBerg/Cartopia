@@ -104,7 +104,7 @@ export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival, onBlast,
         <span className="rm-meta">Chapter {ci + 1} of {CAMPAIGN.length} · ⭐ {stars}/{maxStars}</span>
         <span className="rm-progress"><i style={{ width: `${(stars / maxStars) * 100}%` }} /></span>
         {next >= 0 && (
-          <span className="rm-cta"><span>{ch.rivals[next]}</span><button className="buy small" onClick={stop(() => onCampaign(ci, next))}>{money(campaignPayNow(ci, next, true))}</button></span>
+          <span className="rm-cta"><span>{ch.rivals[next]}</span><button className="buy small" onClick={stop(() => onCampaign(ci, next))}>{money(campaignPayNow(ci, next, true))}<small>⛽{RACE_FUEL}</small></button></span>
         )}
       </div>
 
@@ -115,7 +115,7 @@ export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival, onBlast,
         {tourOpen ? (
           <>
             <span className="rm-meta">Leg {leg.index + 1}{leg.night ? ' · 🌙' : ''} · {DIST[tourDist(won)].label} <Pips n={won % TOUR_RACES} of={TOUR_RACES} /></span>
-            <span className="rm-cta"><span>{tourRivalName(won)}</span><button className="buy small" onClick={stop(onTour)}>{money(tourPayNow(won))}</button></span>
+            <span className="rm-cta"><span>{tourRivalName(won)}</span><button className="buy small" onClick={stop(onTour)}>{money(tourPayNow(won))}<small>⛽{RACE_FUEL}</small></button></span>
           </>
         ) : <span className="rm-meta">🔒 Clear Back Streets to open</span>}
       </div>
