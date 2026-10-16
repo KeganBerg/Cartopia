@@ -1,6 +1,9 @@
 import { supabase } from './supabase'
 import { flushSave, signedInUser } from './cloud'
 import { trialWeek } from '../game/trial'
+import { CARS, carDef, performance, type Body } from '../game/data'
+import { DEMO, demoTown } from './friends'
+import type { OwnedCar } from '../game/store'
 
 // The weekly time trial board (supabase/migrations/0026_time_trials.sql). Signed-in players
 // post times; everyone can look. Guests and offline players keep a best on this device only.
@@ -64,4 +67,53 @@ export function saveLocalBest(t: number, week = trialWeek()) {
   } catch {
     // Storage blocked: the board still has it if signed in.
   }
+}
+
+const piOf = (c: OwnedCar) => performance(carDef(c.model), c.upgrades, c.mods)
+const demoBest = (d: (typeof DEMO)[number]) => demoTown(d).cars.reduce((a, b) => (piOf(b) > piOf(a) ? b : a))
+// Paint for a car whose save can't be read.
+const PAINT = ['#d32f2f', '#1565c0', '#2e7d32', '#ff8f00', '#6a1b9a', '#00838f']
+
+// The car each board row set its time in, for the podium and the rows' thumbs: the model by the
+// name the board kept, the paint and mods from that player's saved best car.
+export type BoardCar = { body: Body; model?: string; color: string; mods?: string[] }
+export async function fetchBoardCars(rows: BoardRow[]): Promise<Record<string, BoardCar>> {
+  const out: Record<string, BoardCar> = {}
+  const real = rows.filter((r) => !r.owner.startsWith('demo-'))
+  for (const r of rows) {
+    const d = CARS.find((c) => c.name === r.car)
+    if (d) out[r.owner] = { body: d.body, model: d.id, color: PAINT[r.place % PAINT.length] }
+    const demo = DEMO.find((x) => x.id === r.owner)
+    const c = demo && demoBest(demo)
+    if (c) out[r.owner] = { body: carDef(c.model).body, model: c.model, color: c.color, ...(c.mods ? { mods: c.mods } : {}) }
+  }
+  if (!supabase || real.length === 0) return out
+  const { data, error } = await supabase.from('game_saves').select('owner_id, best_car').in('owner_id', real.map((r) => r.owner))
+  if (error || !data) return out
+  for (const s of data as { owner_id: string; best_car: Record<string, unknown> | null }[]) {
+    const b = s.best_car
+    if (!b) continue
+    const row = real.find((r) => r.owner === s.owner_id)
+    const def = CARS.find((c) => c.name === (row?.car ?? b.name)) ?? CARS.find((c) => c.name === b.name)
+    if (!def) continue
+    const same = b.name === def.name
+    out[s.owner_id] = {
+      body: def.body,
+      model: def.id,
+      color: typeof b.color === 'string' ? b.color : out[s.owner_id]?.color ?? PAINT[0],
+      ...(same && Array.isArray(b.mods) ? { mods: (b.mods as unknown[]).filter((m): m is string => typeof m === 'string') } : {}),
+    }
+  }
+  return out
+}
+
+// Offline (no server): the demo neighbours' times, so the board, podium and their profiles
+// still show. Never used when the game has a server.
+export function demoBoard(week = trialWeek()): Board {
+  const base = 7.1
+  const top = DEMO.map((d, i) => {
+    const c = demoBest(d)
+    return { owner: d.id, town: d.name, t: Math.round((base + i * 0.137 + (d.seed % 5) * 0.011) * 1000) / 1000, pi: piOf(c), car: carDef(c.model).name, place: 0 }
+  }).sort((a, b) => a.t - b.t).map((r, i) => ({ ...r, place: i + 1 }))
+  return { week, total: top.length, top, me: null }
 }
