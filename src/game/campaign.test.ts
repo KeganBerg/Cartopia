@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CARS, CAMPAIGN, CAMPAIGN_RACES, campaignRivalPi, campaignRivalSkills, campaignShift, carDef, performance, type CarDef } from './data'
+import { CARS, CAMPAIGN, CAMPAIGN_RACES, campaignOpen, campaignRaceId, campaignReward, campaignStarsNeed, campaignRivalPi, campaignRivalSkills, campaignShift, carDef, performance, type CarDef } from './data'
 import { perfectDuel, rng } from './raceSim'
 import type { VenueId } from '../scene/venues'
 
@@ -15,7 +15,7 @@ const bestAt = (level: number) =>
 
 function winRate(ci: number, i: number, margin: number, boostGear: number) {
   const ch = CAMPAIGN[ci]
-  const me = bestAt(ch.unlockLevel)
+  const me = bestAt(ch.tuned)
   const rival = carDef(ch.cars![i])
   const skill = campaignRivalSkills(ci, i) ? rival.skill : undefined
   const roll = rng(7 + ci * 31 + i)
@@ -45,6 +45,37 @@ describe('campaign difficulty', () => {
   })
 
   it('never puts a rival far above the cars the player can own yet', () => {
-    for (const ch of CAMPAIGN) for (let i = 0; i < CAMPAIGN_RACES; i++) expect(campaignRivalPi(ch, i)).toBeLessThanOrEqual(piOf(bestAt(ch.unlockLevel)) + 8)
+    for (const ch of CAMPAIGN) for (let i = 0; i < CAMPAIGN_RACES; i++) expect(campaignRivalPi(ch, i)).toBeLessThanOrEqual(piOf(bestAt(ch.tuned)) + 8)
+  })
+})
+
+describe('campaign gates', () => {
+  const won = (ci: number, stars: number) => Object.fromEntries(Array.from({ length: CAMPAIGN_RACES }, (_, i) => [campaignRaceId(CAMPAIGN[ci], i), stars]))
+  it('opens chapters on the boss before and stars, never on level', () => {
+    expect(campaignOpen({}, 0, 1)).toBe(true)
+    // A high level alone opens nothing.
+    expect(campaignOpen({}, 1, 99)).toBe(false)
+    // Boss beaten but only one star a race: 5 of the 10 needed.
+    expect(campaignOpen(won(0, 1), 1, 1)).toBe(false)
+    // Two stars a race at level 1: open.
+    expect(campaignOpen(won(0, 2), 1, 1)).toBe(true)
+    // Stars from earlier chapters count, but the chapter before still needs its boss.
+    expect(campaignOpen({ ...won(0, 3), ...won(1, 3) }, 3, 1)).toBe(false)
+  })
+  it('asks for more stars each chapter, always reachable with two a race', () => {
+    for (let ci = 1; ci < CAMPAIGN.length; ci++) {
+      expect(campaignStarsNeed(ci)).toBeGreaterThan(campaignStarsNeed(ci - 1))
+      expect(campaignStarsNeed(ci)).toBeLessThanOrEqual(ci * CAMPAIGN_RACES * 2)
+    }
+  })
+  it('lets the admin past every gate', () => {
+    for (let ci = 0; ci < CAMPAIGN.length; ci++) expect(campaignOpen({}, ci, Infinity)).toBe(true)
+  })
+  it('pays a first win on the PI raced when the rival was eased', () => {
+    const ch = CAMPAIGN[6]
+    const full = campaignReward(ch, 0, true)
+    expect(campaignReward(ch, 0, true, campaignRivalPi(ch, 0))).toBe(full)
+    expect(campaignReward(ch, 0, true, campaignRivalPi(ch, 0) / 2)).toBeLessThan(full * 0.6)
+    expect(campaignReward(ch, 0, true, 1)).toBeGreaterThan(0)
   })
 })

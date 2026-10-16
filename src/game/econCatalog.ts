@@ -3,7 +3,7 @@ import {
   upgradeFuelCap, upgradeJobSeconds, FAVORITE_BONUS, DEAL_SLOTS, dealSave, QUEST_PAY, CREW_CHEST, TASKS_PER_PERIOD, upgradePartsPayout, upgradePayout, upgradeXp, type BuildingDef,
   SEASON_START, SEASON_DAYS, STARS_PER_TIER, SEASON_STARS, SEASON_TIERS, SEASON_CAR_BUCKS, seasonCars,
 } from './data'
-import { RIVALS } from './rivals'
+import { RIVALS, RIVAL_LEVEL } from './rivals'
 import { MASTERY_TIERS } from './mastery'
 import { ROAD_STEP, ROAD_STOPS, roadPay } from './trophyRoad'
 
@@ -59,8 +59,9 @@ export function econCatalog() {
     MODS.map((m) => [m.id, { slot: m.slot, coins: m.coins, parts: m.parts, bucks: m.bucks, power: m.power, grip: m.grip, weight: m.weight, xp: modXp(m.id), ...(m.only ? { only: m.only } : {}), ...(m.notOn ? { notOn: m.notOn } : {}) }]),
   )
   // Campaign chapters: the one-time bonuses for clearing one and for three stars on all its races.
+  // No level locks: chapters open on stars and the chapter before (campaignOpen), so unlock is 1.
   const campaign = Object.fromEntries(CAMPAIGN.map((c) => [c.id, {
-    unlock: c.unlockLevel, races: Array.from({ length: CAMPAIGN_RACES }, (_, i) => campaignRaceId(c, i)),
+    unlock: 1, races: Array.from({ length: CAMPAIGN_RACES }, (_, i) => campaignRaceId(c, i)),
     coins: c.coins, bucks: c.bucks, trophies: c.trophies, starBucks: c.starBucks,
   }]))
   // Collection book sets: the cars each needs and its one-time reward.
@@ -82,8 +83,8 @@ export function econCatalog() {
   }
   // Crew chests: paid once per chest the server recorded in public.crew_chests.
   const crew = { chest: CREW_CHEST }
-  // Town rivals: each pays its one-time bonus when first beaten three times, from its unlock level.
-  const rivals = Object.fromEntries(RIVALS.map((r) => [r.id, { unlock: r.unlockLevel, coins: r.coins, bucks: r.bucks, trophies: r.trophies }]))
+  // Town rivals: each pays its one-time bonus when first beaten three times, once rivals start (RIVAL_LEVEL).
+  const rivals = Object.fromEntries(RIVALS.map((r) => [r.id, { unlock: RIVAL_LEVEL, coins: r.coins, bucks: r.bucks, trophies: r.trophies }]))
   // A driver adds at most this share to a business's coins (see driverPayout).
   // Car mastery: each tier's gems and trophies, paid once per car model, and what it needs
   // (counted per model; the needs of earlier tiers carry on).

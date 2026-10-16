@@ -44,7 +44,8 @@ function unlocksBetween(from: number, to: number, rusty: boolean, focus: ReturnT
       art: <div className="lvl-emoji">{r.icon}</div>,
       go: () => (rusty ? focus('rescue', null) : focus('shop', 'rescue')),
     })),
-    ...GP_SERIES.filter((g) => inRange(g.unlockLevel)).map((g): Unlock => ({
+    // Only the first series waits on a level; the rest open by winning the one before (gpOpen).
+    ...GP_SERIES.slice(0, 1).filter((g) => inRange(g.unlockLevel)).map((g): Unlock => ({
       key: `g-${g.id}`,
       name: g.name,
       level: g.unlockLevel,
