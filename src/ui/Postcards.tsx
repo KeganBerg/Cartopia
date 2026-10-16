@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
-import { CARDS, MESSAGES, cardOf, seePostcards, sendPostcard, usePostcards, type Postcard } from '../lib/postcards'
-import { PlayerName } from './Username'
+import { CARDS, MESSAGES, cardOf, sendPostcard, usePostcards, type Postcard } from '../lib/postcards'
 
 // Postcards (lib/postcards.ts): 💌 on a friend's row opens the picker; cards you've been
 // sent show at the top of the gifts inbox.
@@ -54,7 +53,7 @@ function PostcardPicker({ to, name, onClose }: { to: string; name: string; onClo
   )
 }
 
-function CardFace({ card, msg, from }: { card: string; msg: number; from: React.ReactNode }) {
+export function CardFace({ card, msg, from }: { card: string; msg: number; from: React.ReactNode }) {
   const c = cardOf(card)
   return (
     <div className="pc-face" style={{ background: c.bg }}>
@@ -62,21 +61,6 @@ function CardFace({ card, msg, from }: { card: string; msg: number; from: React.
       <b>{MESSAGES[msg] ?? MESSAGES[0]}</b>
       <small>from {from}</small>
     </div>
-  )
-}
-
-// The cards in the inbox, newest first; opening it marks them seen.
-export function PostcardList() {
-  const inbox = usePostcards((p) => p.inbox)
-  useEffect(() => { if (inbox.length) seePostcards() }, [inbox])
-  if (!inbox.length) return null
-  return (
-    <>
-      <h4>💌 Postcards</h4>
-      <div className="pc-list">
-        {inbox.map((p: Postcard) => <CardFace key={p.id} card={p.card} msg={p.msg} from={<PlayerName id={p.from} town={p.fromName} />} />)}
-      </div>
-    </>
   )
 }
 
