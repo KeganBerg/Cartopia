@@ -1,5 +1,5 @@
 // Call Cards: animated backgrounds a player's car stands on in other players' Quick Race menus.
-// Pure looks, no stats. Every player has the Showroom card; the rest only drop from crates, a
+// Pure looks, no stats. Every player has the Showroom card; the 32 others only drop from crates, a
 // slice of each crate's coin prizes (CALL_ODDS in crates.ts), rarer tiers less likely. Only
 // cards the player doesn't have drop, so there are no duplicates; with all of a crate's cards
 // owned, that slice stays coins. The server rolls the same (crateTables() callCards) and keeps
@@ -25,14 +25,34 @@ export const CALL_CARDS: CallCardDef[] = [
   { id: 'raincheck', name: 'Rain Check', icon: '🌧️', tier: 'rare' },
   { id: 'sunsetstrip', name: 'Sunset Strip', icon: '🌅', tier: 'rare' },
   { id: 'checkerrush', name: 'Checker Rush', icon: '🏁', tier: 'rare' },
+  { id: 'tiresmoke', name: 'Tire Smoke', icon: '🛞', tier: 'rare' },
+  { id: 'hazard', name: 'Hazard Zone', icon: '🚧', tier: 'rare' },
+  { id: 'oceandrive', name: 'Ocean Drive', icon: '🌊', tier: 'rare' },
+  { id: 'snowday', name: 'Snow Day', icon: '❄️', tier: 'rare' },
+  { id: 'autumnlane', name: 'Autumn Lane', icon: '🍂', tier: 'rare' },
+  { id: 'dragtree', name: 'Christmas Tree', icon: '🚦', tier: 'rare' },
+  { id: 'bubblepop', name: 'Bubble Pop', icon: '🫧', tier: 'rare' },
+  { id: 'pixelpark', name: 'Pixel Park', icon: '👾', tier: 'rare' },
   { id: 'ravelights', name: 'Rave Lights', icon: '🪩', tier: 'epic' },
   { id: 'warpspeed', name: 'Warp Speed', icon: '💨', tier: 'epic' },
   { id: 'polarglow', name: 'Polar Glow', icon: '🌌', tier: 'epic' },
   { id: 'midnightgrid', name: 'Midnight Grid', icon: '🕹️', tier: 'epic' },
+  { id: 'plasma', name: 'Plasma Swirl', icon: '🌀', tier: 'epic' },
+  { id: 'lasergrid', name: 'Laser Scan', icon: '🔴', tier: 'epic' },
+  { id: 'circuitry', name: 'Circuit Rush', icon: '🔌', tier: 'epic' },
+  { id: 'deepsea', name: 'Deep Sea', icon: '🐠', tier: 'epic' },
+  { id: 'fireworks', name: 'Fireworks', icon: '🎆', tier: 'epic' },
+  { id: 'comettrail', name: 'Comet Trail', icon: '☄️', tier: 'epic' },
+  { id: 'discoball', name: 'Disco Ball', icon: '🕺', tier: 'epic' },
+  { id: 'sakura', name: 'Sakura Drift', icon: '🌸', tier: 'epic' },
   { id: 'thunderroad', name: 'Thunder Road', icon: '⚡', tier: 'legendary' },
   { id: 'inferno', name: 'Inferno', icon: '🔥', tier: 'legendary' },
   { id: 'starwarp', name: 'Star Warp', icon: '✨', tier: 'legendary' },
   { id: 'goldrush', name: 'Gold Rush', icon: '🏆', tier: 'legendary' },
+  { id: 'blackhole', name: 'Black Hole', icon: '🕳️', tier: 'legendary' },
+  { id: 'magmacore', name: 'Magma Core', icon: '🌋', tier: 'legendary' },
+  { id: 'diamondrain', name: 'Diamond Rain', icon: '💎', tier: 'legendary' },
+  { id: 'championlap', name: "Champion's Lap", icon: '📸', tier: 'legendary' },
 ]
 
 export const TIER_ICON: Record<CallCardTier, string> = { rare: '🔷', epic: '💜', legendary: '🌟' }

@@ -241,7 +241,7 @@ div.rm-node { cursor: default; }
 .rm-box .thumb3d.sm { --tw: 120px; --th: 94px; }
 .rm-rival .rm-ttl { flex-wrap: wrap; row-gap: 2px; }
 @media (max-width: 600px), (max-height: 500px) {
-  .rm-q-grid { --qc-h: 250px; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+  .rm-q-grid { --qc-h: 250px; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; grid-auto-rows: var(--qc-h); min-height: 0; }
   .rm-qc { border-radius: 16px; }
   .rm-qc::after { border-radius: 13px; }
   .rm-qc-body { padding: 16px 8px 8px; gap: 4px; }
