@@ -123,6 +123,10 @@ const SHAPES: Record<Body, Shape> = {
   timeattack: { len: 1.4, wid: 0.82, body: 0.22, lift: 0.06, cabinLen: 0.56, cabinH: 0.17, cabinZ: -0.1, taper: 0.7, fastback: 0.5, hood: 0.01, wheel: 0.147, drop: 0.02, nose: 0.06 },
   ponycar: { len: 1.34, wid: 0.74, body: 0.24, lift: 0.09, cabinLen: 0.5, cabinH: 0.19, cabinZ: -0.14, taper: 0.74, fastback: 0.45, hood: 0.04, wheel: 0.155, drop: 0.02, nose: 0.05 },
   gtcoupe: { len: 1.3, wid: 0.74, body: 0.2, lift: 0.08, cabinLen: 0.5, cabinH: 0.18, cabinZ: -0.14, taper: 0.68, fastback: 0.4, hood: 0.03, wheel: 0.15, drop: 0.03, nose: 0.06 },
+  hothatch: { len: 1.12, wid: 0.72, body: 0.245, lift: 0.08, cabinLen: 0.74, cabinH: 0.172, cabinZ: -0.16, taper: 0.635, fastback: 0.43, hood: 0, wheel: 0.14, drop: 0.012, nose: 0.04 },
+  musclecoupe: { len: 1.42, wid: 0.76, body: 0.26, lift: 0.09, cabinLen: 0.5, cabinH: 0.16, cabinZ: -0.16, taper: 0.76, fastback: 0.45, hood: 0.018, wheel: 0.155, drop: 0.01, nose: 0.04 },
+  popup: { len: 1.32, wid: 0.76, body: 0.22, lift: 0.08, cabinLen: 0.62, cabinH: 0.145, cabinZ: -0.14, taper: 0.6, fastback: 0.5, hood: 0, wheel: 0.15, drop: 0.075, nose: 0.06 },
+  midship: { len: 1.34, wid: 0.78, body: 0.24, lift: 0.07, cabinLen: 0.68, cabinH: 0.117, cabinZ: -0.04, taper: 0.5, fastback: 0.4, hood: 0, wheel: 0.15, drop: 0.08, nose: 0.05 },
   groupb: { len: 1.34, wid: 0.84, body: 0.24, lift: 0.08, cabinLen: 0.56, cabinH: 0.18, cabinZ: -0.06, taper: 0.75, fastback: 0.5, hood: 0, wheel: 0.15, drop: 0.01, nose: 0.05 },
   longtail: { len: 1.5, wid: 0.82, body: 0.2, lift: 0.05, cabinLen: 0.5, cabinH: 0.15, cabinZ: 0.02, taper: 0.4, fastback: 0.8, hood: 0, wheel: 0.145, drop: 0.03, nose: 0.1 },
 }

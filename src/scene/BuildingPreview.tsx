@@ -33,7 +33,8 @@ const DPR = typeof window === 'undefined' ? 1 : Math.min(window.devicePixelRatio
 // Each model is measured once it's mounted and the camera is fitted to it, so
 // tall towers, wide lots and long trucks all fill their box whole.
 // A scene (an arcade card) instead stands still under a fixed camera and moves itself.
-type Item = { key: string; model: () => ReactNode; view?: SceneView }
+// `stand`: the model sits on the ground, seen from lower down, filling its box (the Car Packs cards).
+type Item = { key: string; model: () => ReactNode; view?: SceneView; stand?: boolean }
 
 // A camera looking at `at` from direction `dir`, backed off until a box halfW wide and
 // halfH tall round `at` fits whatever shape the picture is. `rise` lifts the subject up
@@ -50,9 +51,10 @@ function buildingItem(def: BuildingDef, level?: number, theme?: ColorTheme | nul
 
 type CarLook = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; panels?: Panels | null; stripe?: string | null; rusty?: boolean; mods?: string[] | null; trim?: Trim | null; hat?: HatFit | null }
 
-function carItem(c: CarLook): Item {
+function carItem(c: CarLook, stand?: boolean): Item {
   return {
-    key: `c|${c.body}|${c.model ?? ''}|${c.color}|${c.finish ?? ''}|${c.skin ?? ''}|${JSON.stringify(c.modSkin ?? {})}|${c.stripe ?? ''}|${c.rusty ? 1 : 0}|${c.rusty ? '' : (c.mods ?? []).join(',')}|${c.panels ? JSON.stringify(c.panels) : ''}|${c.trim ? JSON.stringify(c.trim) : ''}|${c.hat && !c.rusty ? JSON.stringify(c.hat) : ''}`,
+    stand,
+    key: `${stand ? 's' : ''}c|${c.body}|${c.model ?? ''}|${c.color}|${c.finish ?? ''}|${c.skin ?? ''}|${JSON.stringify(c.modSkin ?? {})}|${c.stripe ?? ''}|${c.rusty ? 1 : 0}|${c.rusty ? '' : (c.mods ?? []).join(',')}|${c.panels ? JSON.stringify(c.panels) : ''}|${c.trim ? JSON.stringify(c.trim) : ''}|${c.hat && !c.rusty ? JSON.stringify(c.hat) : ''}`,
     model: () => <CarModel body={c.body} model={c.model} color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} panels={c.panels} trim={c.trim} stripe={c.stripe} rusty={c.rusty} mods={c.mods} hat={c.hat} />,
   }
 }
@@ -142,6 +144,8 @@ const aim = new Vector3()
 const back = new Vector3()
 const LO = 0.19
 const HI = 0.31
+// A standing model is seen lower down, so it fills a wide box without bobbing.
+const STAND = new Vector3(1, 0.42, 1)
 
 function aimScene(c: PerspectiveCamera, v: SceneView) {
   c.fov = v.fov ?? 30
@@ -235,15 +239,18 @@ function Renderer() {
           b = seat(g.children[0], g)
           sizes.current.set(g, b)
         }
+        const stand = models.get(key)?.item.stand
         g.visible = true
-        g.rotation.y = turn * Math.PI * 2
-        g.position.y = lift
+        // Held still, a standing car shows its front three quarters rather than its nose.
+        g.rotation.y = stand && still ? 0 : turn * Math.PI * 2
+        g.position.y = stand ? 0 : lift
         if (shadow.current) {
           shadow.current.visible = true
-          shadow.current.scale.setScalar(b.r * 0.8 * (1 - lift * 0.5))
+          shadow.current.scale.setScalar(b.r * 0.8 * (stand ? 1 : 1 - lift * 0.5))
         }
         c.fov = 30
-        frame(c, b, VIEW, { lo: LO, hi: HI, floor: b.r * 0.8 })
+        if (stand) frame(c, b, STAND, { floor: b.r * 0.8, pad: 0.04 })
+        else frame(c, b, VIEW, { lo: LO, hi: HI, floor: b.r * 0.8 })
       }
       // WebGL counts rows from the bottom; the atlas is laid out from the top.
       gl.setViewport(n.x, ah - n.y - n.h, n.w, n.h)
@@ -353,8 +360,8 @@ export function HatThumb({ hat, size }: { hat: HatFit; size?: Size }) {
 }
 
 // A car floating and turning. Rusty finds show the real model in dull, rusted paint.
-export function CarThumb({ size, ...look }: CarLook & { size?: Size }) {
-  return <Thumb item={carItem(look)} size={size} />
+export function CarThumb({ size, stand, ...look }: CarLook & { size?: Size; stand?: boolean }) {
+  return <Thumb item={carItem(look, stand)} size={size} />
 }
 
 // A little scene that animates itself under a fixed camera (the arcade cards).

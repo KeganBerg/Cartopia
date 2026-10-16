@@ -1,8 +1,10 @@
 // Stripe Checkout for gem packs, shared by the Netlify functions (checkout.mts, stripe-webhook.mts)
 // and their tests. No Stripe SDK: two REST calls and a signature check are all the game needs.
-import { ALL_PACKS, packLevel, type BucksPack } from '../game/bucksPacks'
+import { ALL_PACKS, RETIRED_PACKS, packLevel, type BucksPack } from '../game/bucksPacks'
 
+// Packs on sale (checkout). A paid session may also name a retired pack, bought just before it left.
 export const packById = (id: unknown): BucksPack | null => ALL_PACKS.find((p) => p.id === id) ?? null
+const paidPackById = (id: unknown) => packById(id) ?? RETIRED_PACKS.find((p) => p.id === id) ?? null
 export const cents = (p: BucksPack) => Math.round(p.price * 100)
 
 // The form body for POST /v1/checkout/sessions. The price comes from the pack table here, never the page.
@@ -37,7 +39,7 @@ export function paidSession(event: unknown): Paid | null {
   const o = e.data?.object
   if (!o || o.payment_status !== 'paid') return null
   const meta = (o.metadata ?? {}) as Record<string, string>
-  const pack = packById(meta.pack)
+  const pack = paidPackById(meta.pack)
   const user = meta.user ?? o.client_reference_id
   if (!pack || typeof user !== 'string' || typeof o.id !== 'string') return null
   // A session paid at another price (an old price table, or a tampered session) grants nothing.
