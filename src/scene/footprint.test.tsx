@@ -34,7 +34,8 @@ describe('car footprints', () => {
       expect(plain.w, c.body).toBeGreaterThanOrEqual(f.wid * 0.9)
       expect(Math.abs(plain.cz), c.body).toBeLessThan(0.1)
     }
-  })
+    // Two full renders per body: over vitest's 5 s default on CI runners now there are more bodies.
+  }, 30000)
 
   it('fits every car in a parking lot car space', async () => {
     for (const c of bodies) {

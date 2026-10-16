@@ -34,7 +34,8 @@ import { SPLIT_MARKS, crossings, refSplits, splitDelta, splitLabel } from '../ga
 import { bestSplits, saveBestSplits } from '../lib/bestSplits'
 import { raceWeather } from '../game/weather'
 import { carGrip, conditions, conditionsNote, gripMul, spinning } from '../game/grip'
-import { TrialTab, TrialResult, beginTrialRun, commitTrialRun, type TrialRun } from './TimeTrial'
+import { TrialTab, TrialResult, beginTrialRun, commitTrialRun, trialRunFor, type TrialRun } from './TimeTrial'
+import { PlayerCardPopup } from './PlayerCard'
 import { claim as claimVisitor, leave as leaveVisitor, setRacing, type Visitor } from '../lib/visitors'
 import { RivalResult, type RivalMatch, type RivalBonus } from './Rivals'
 import { RaceBar, RaceHub, Rounds, campaignFocus } from './RaceHub'
@@ -756,6 +757,7 @@ export function RacePanel() {
     : tab === 'cups' && car ? (cupFits(cupRace(cupSel)!, car.model)
       ? { label: `$${cupPrizeOf(cupRace(cupSel)!, cups).toLocaleString()}`, onClick: () => startCup(cupSel) }
       : { label: `${carClass(cupRace(cupSel)!.cls).icon} ${carClass(cupRace(cupSel)!.cls).name} car`, onClick: () => startCup(cupSel), fix: true })
+    : tab === 'trial' && car ? { label: 'Run', onClick: () => startTrial(trialRunFor(pi(car))) }
     : tab === 'daily' ? { label: dailyPaid ? 'Run' : `$${DAILY_PAY[0].toLocaleString()}`, onClick: () => startDaily(today) }
     : tab === 'road' && roadReady(trophies, roadClaimed) > 0 ? { label: `🎁 Claim ${roadReady(trophies, roadClaimed)}`, onClick: () => useGame.getState().claimRoad() }
     : null
@@ -773,6 +775,7 @@ export function RacePanel() {
     : null
 
   return (
+    <>
     <Panel title={TITLES[tab]} wide className="race-panel" onBack={tab === 'hub' ? undefined : () => setTab('hub')}
       head={tab === 'quick' ? <MyCardChip onOpen={() => setCardsOpen(true)} /> : chip && <span className="rm-head-chip">{chip}</span>}>
       {customOpen && <CustomKart onGo={(p) => startParty(p, true)} onClose={() => setCustomOpen(false)} />}
@@ -801,7 +804,7 @@ export function RacePanel() {
         ) : tab === 'event' ? (
           <WeeklyEvent base={evBase} car={car} />
         ) : tab === 'trial' ? (
-          car && <TrialTab myPi={pi(car)} onRun={startTrial} />
+          car && <TrialTab car={car} myPi={pi(car)} />
         ) : tab === 'gp' ? (
           <GrandPrix onRace={startGp} />
         ) : (
@@ -909,6 +912,8 @@ export function RacePanel() {
       <RaceBar cars={cars} car={car} onPick={setRaceCar} go={go} note={tab === 'gp' ? 'Races every round' : tab === 'event' ? 'Back next week' : undefined}
         dist={tab === 'tour' ? tourDist(tourWon) : tab === 'gp' ? null : undefined} loaner={tab === 'daily' ? today : undefined} />
     </Panel>
+    {tab === 'trial' && <PlayerCardPopup />}
+    </>
   )
 }
 
