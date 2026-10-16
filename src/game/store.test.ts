@@ -44,6 +44,15 @@ describe('level-up bonuses', () => {
     expect(s.coins).toBe(2500 - cost.coins + 200)
     expect(s.parts).toBe(10 - cost.parts)
   })
+
+  it('make top cars cost more parts to max than cheap ones, within reach (Kegan, 2026-10-16)', () => {
+    const maxParts = (id: string) => [0, 1, 2, 3, 4].reduce((a, l) => a + upgradeCost(carDef(id), l).parts * 4, 0)
+    expect(maxParts('pip')).toBe(160)
+    expect(maxParts('zenith')).toBeGreaterThanOrEqual(1000)
+    for (const id of ['zenith', 'vanta', 'pontone']) expect(maxParts(id)).toBeLessThanOrEqual(1600)
+    // Pack cars pay coins for upgrades like the Showroom car they beat, not 200 a step.
+    expect(upgradeCost(carDef('vanta'), 4).coins).toBeGreaterThan(upgradeCost(carDef('zenith'), 4).coins / 2)
+  })
 })
 
 describe('car mods', () => {

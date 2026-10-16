@@ -623,10 +623,29 @@ export const UPGRADE_SLOTS: { id: UpgradeSlot; name: string }[] = [
 ]
 export const MAX_UPGRADE = 5
 
-export const upgradeCost = (car: CarDef, level: number) => ({
-  coins: Math.round((car.price + (car.bucks ?? 0) * GEM_BUILD_COINS) * 0.15 * (level + 1) + 200),
-  parts: 2 + level * 3,
-})
+// Base PI of a car with no upgrades or mods (performance() without carStats, which comes later).
+const basePi = (car: CarDef) => Math.round(car.power * 0.6 + car.grip * 0.3 + (100 - car.weight) * 0.1)
+// Parts to upgrade grow with the car's tier (Kegan, 2026-10-16: maxing a top car should be a grind,
+// not an hour): PI 50 and under pay the base 2 / 5 / 8 / 11 / 14, PI 75 three times that, PI 96
+// about eight times, capped at ten (1,600 parts to max every slot). Rounded to 5 above the base.
+export const upgradePartsMult = (car: CarDef) => Math.min(10, 1 + 8 * Math.max(0, (basePi(car) - 50) / 50) ** 2)
+// Pack cars have no coin price, so their upgrades are priced like the dearest Showroom car they
+// match or beat (before, a pack car maxed for 4,000 coins).
+let showroomByPi: { pi: number; price: number }[] | null = null
+const upgradeValue = (car: CarDef) => {
+  if (!car.pack) return car.price + (car.bucks ?? 0) * GEM_BUILD_COINS
+  showroomByPi ??= CARS.filter((c) => c.price > 0 && !c.pack && !c.rescueOnly && !c.season && !c.secret && !c.parked).map((c) => ({ pi: basePi(c), price: c.price }))
+  const pi = basePi(car)
+  return showroomByPi.reduce((best, c) => (c.pi <= pi && c.price > best ? c.price : best), 0)
+}
+export const upgradeCost = (car: CarDef, level: number) => {
+  const mult = upgradePartsMult(car)
+  const parts = 2 + level * 3
+  return {
+    coins: Math.round(upgradeValue(car) * 0.15 * (level + 1) + 200),
+    parts: mult <= 1 ? parts : Math.round((parts * mult) / 5) * 5,
+  }
+}
 
 // Car mods: bolt-on parts you can see on the car (in town, in races and in
 // every preview), one per slot. Unlike Garage upgrades, which tune what's under
@@ -845,6 +864,8 @@ export const refillBucks = (fuelToAdd: number) => Math.max(REFILL_BUCKS, REFILL_
 
 // Grand Prix: six races in a row against tougher and tougher rivals. Win
 // all six for a mystery box car. Each repeat of a series gets harder.
+// A series opens by winning the one before it, or at its level, whichever comes first (gpOpen).
+// Only the first series waits on a level alone.
 export type GpSeries = { id: string; name: string; unlockLevel: number; minCars: number; basePi: number; step: number; prize: number; box: string[]; rivals: string[] }
 export const GP_SERIES: GpSeries[] = [
   { id: 'rookie', name: 'Rookie Cup', unlockLevel: 2, minCars: 3, basePi: 22, step: 3, prize: 200, box: ['trail', 'miata', 'woodie', 'cruiser'], rivals: ['Dusty Dan', 'Penny Pistons', 'Lugnut Lou', 'Speedy Sue', 'Gearhead Gus', 'Champ Chuck'] },
@@ -853,6 +874,12 @@ export const GP_SERIES: GpSeries[] = [
   { id: 'legends', name: 'Legends Series', unlockLevel: 26, minCars: 6, basePi: 72, step: 3, prize: 1800, box: ['gtr', 'gullwing', 'shinden', 'lambo'], rivals: ['Ghost Rider', 'Lady Luck', 'The Baron', 'Silver Fox', 'Mad Max', 'The Legend'] },
 ]
 export const GP_ROUNDS = 6
+// Is series si open? The first opens at its level; each one after opens once the one before has
+// been won, or at its own level, or once it's been raced (so nobody loses a series they had).
+// level: gateLevel() (Infinity for the admin, who skips every lock).
+export const gpOpen = (gp: Record<string, { round?: number; clears?: number } | undefined>, si: number, level: number) =>
+  level === Infinity || (level >= GP_SERIES[0].unlockLevel && (si === 0 || level >= GP_SERIES[si].unlockLevel
+    || (gp[GP_SERIES[si - 1].id]?.clears ?? 0) >= 1 || (gp[GP_SERIES[si].id]?.round ?? 0) > 0 || (gp[GP_SERIES[si].id]?.clears ?? 0) > 0))
 // Rival PI for a round; each completed run of the series adds 8%.
 export const gpRivalPi = (s: GpSeries, round: number, clears: number) => Math.round((s.basePi + round * s.step) * (1 + clears * 0.08))
 export const gpReward = (s: GpSeries, round: number) => s.prize + round * Math.round(s.prize / 4)
@@ -860,9 +887,15 @@ export const gpReward = (s: GpSeries, round: number) => s.prize + round * Math.r
 // Campaign: a single-player ladder of chapters, five races each, the last
 // one a boss. Rivals get faster and shift cleaner the further you go, and
 // rewards climb with them. Clearing a chapter pays a one-time bonus, and
-// three stars on every race in it pays extra bucks.
+// three stars on every race in it pays extra bucks. There are no level locks:
+// a chapter opens once the one before it is cleared and the campaign has
+// enough stars (campaignOpen), so there's always a race to play and the way
+// on is a faster car, not a wait.
 export type CampaignChapter = {
-  id: string; name: string; blurb: string; unlockLevel: number
+  id: string; name: string; blurb: string
+  // The level its rivals are tuned for (the best Showroom car there wins every race). Also a
+  // shortcut: reaching it opens the chapter without the stars (campaignOpen).
+  tuned: number
   venue: string // where its races run (scene/venues.ts)
   pi: [number, number] // rival PI from the first race to the boss
   // The PI the prizes are worked out from, when it differs from the rivals' (later chapters' rivals
@@ -874,13 +907,13 @@ export type CampaignChapter = {
 }
 export const CAMPAIGN_RACES = 5
 export const CAMPAIGN: CampaignChapter[] = [
-  { id: 'c1', name: 'Back Streets', blurb: 'Local kids with something to prove.', unlockLevel: 1, venue: 'main', pi: [22, 32], rivals: ['Scooter Steve', 'Bubblegum Bea', 'Hubcap Hal', 'Lil Lugnut', 'Big Mike'], cars: ['pip', 'bug', 'civic', 'buggy', 'hauler'], coins: 1000, bucks: 15, trophies: 3, starBucks: 15 },
-  { id: 'c2', name: 'Harbor Run', blurb: 'Dockworkers race the night shift home.', unlockLevel: 4, venue: 'docks', pi: [32, 44], rivals: ['Salty Pete', 'Crane Carla', 'Rusty Anchor', 'Tugboat Ted', 'Captain Kidd'], cars: ['civic', 'trail', 'schoolbus', 'shaggy', 'hotshot'], coins: 2000, bucks: 15, trophies: 3, starBucks: 15 },
-  { id: 'c3', name: 'Desert Strip', blurb: 'Long straights, hot tarmac, no mercy.', unlockLevel: 8, venue: 'desert', pi: [44, 54], payPi: [44, 58], rivals: ['Dusty Dakota', 'Mirage Mo', 'Sidewinder Sal', 'Coyote Cass', 'The Scorpion'], cars: ['hotshot', 'crusher', 'cruiser', 'kitsune', 'bandit'], coins: 3500, bucks: 30, trophies: 4, starBucks: 15 },
-  { id: 'c4', name: 'Mountain Pass', blurb: 'Thin air and thinner margins.', unlockLevel: 13, venue: 'snow', pi: [56, 61], payPi: [58, 72], rivals: ['Summit Sue', 'Avalanche Al', 'Ridge Runner', 'Peak Paulie', 'The Yeti'], cars: ['rally', 'stomper', 'charger', 'speedster', 'kreis'], coins: 5500, bucks: 30, trophies: 5, starBucks: 30 },
-  { id: 'c5', name: 'Sunset Boardwalk', blurb: 'Beach crowds, big money, bigger engines.', unlockLevel: 19, venue: 'beach', pi: [62, 67], payPi: [72, 88], rivals: ['Surfer Sid', 'Sandy Shores', 'Tidal Tom', 'Riptide Rita', 'Big Kahuna'], cars: ['current', 'hellcat', 'bergmeister', 'lemans', 'gtr'], coins: 8000, bucks: 45, trophies: 6, starBucks: 30 },
-  { id: 'c6', name: 'Harvest Backroads', blurb: 'Farm-tough racers who never lift.', unlockLevel: 26, venue: 'farm', pi: [68, 78], payPi: [88, 104], rivals: ['Hayride Hank', 'Tractor Tina', 'Combine Carl', 'Silo Sam', 'The Scarecrow'], cars: ['tusker', 'rattler', 'cottonmouth', 'lemans', 'gtr'], coins: 12000, bucks: 45, trophies: 8, starBucks: 30 },
-  { id: 'c7', name: 'Champions Speedway', blurb: 'The best drivers in the land. Only one leaves a legend.', unlockLevel: 33, venue: 'main', pi: [78, 91], payPi: [104, 124], rivals: ['Golden Gabe', 'Iron Ivy', 'Thunder Thea', 'Velvet Vince', 'The Champion'], cars: ['cottonmouth', 'shinden', 'hyper', 'monoposto', 'raiden'], coins: 20000, bucks: 75, trophies: 10, starBucks: 45 },
+  { id: 'c1', name: 'Back Streets', blurb: 'Local kids with something to prove.', tuned: 1, venue: 'main', pi: [22, 32], rivals: ['Scooter Steve', 'Bubblegum Bea', 'Hubcap Hal', 'Lil Lugnut', 'Big Mike'], cars: ['pip', 'bug', 'civic', 'buggy', 'hauler'], coins: 1000, bucks: 15, trophies: 3, starBucks: 15 },
+  { id: 'c2', name: 'Harbor Run', blurb: 'Dockworkers race the night shift home.', tuned: 4, venue: 'docks', pi: [32, 44], rivals: ['Salty Pete', 'Crane Carla', 'Rusty Anchor', 'Tugboat Ted', 'Captain Kidd'], cars: ['civic', 'trail', 'schoolbus', 'shaggy', 'hotshot'], coins: 2000, bucks: 15, trophies: 3, starBucks: 15 },
+  { id: 'c3', name: 'Desert Strip', blurb: 'Long straights, hot tarmac, no mercy.', tuned: 8, venue: 'desert', pi: [44, 54], payPi: [44, 58], rivals: ['Dusty Dakota', 'Mirage Mo', 'Sidewinder Sal', 'Coyote Cass', 'The Scorpion'], cars: ['hotshot', 'crusher', 'cruiser', 'kitsune', 'bandit'], coins: 3500, bucks: 30, trophies: 4, starBucks: 15 },
+  { id: 'c4', name: 'Mountain Pass', blurb: 'Thin air and thinner margins.', tuned: 13, venue: 'snow', pi: [56, 61], payPi: [58, 72], rivals: ['Summit Sue', 'Avalanche Al', 'Ridge Runner', 'Peak Paulie', 'The Yeti'], cars: ['rally', 'stomper', 'charger', 'speedster', 'kreis'], coins: 5500, bucks: 30, trophies: 5, starBucks: 30 },
+  { id: 'c5', name: 'Sunset Boardwalk', blurb: 'Beach crowds, big money, bigger engines.', tuned: 19, venue: 'beach', pi: [62, 67], payPi: [72, 88], rivals: ['Surfer Sid', 'Sandy Shores', 'Tidal Tom', 'Riptide Rita', 'Big Kahuna'], cars: ['current', 'hellcat', 'bergmeister', 'lemans', 'gtr'], coins: 8000, bucks: 45, trophies: 6, starBucks: 30 },
+  { id: 'c6', name: 'Harvest Backroads', blurb: 'Farm-tough racers who never lift.', tuned: 26, venue: 'farm', pi: [68, 78], payPi: [88, 104], rivals: ['Hayride Hank', 'Tractor Tina', 'Combine Carl', 'Silo Sam', 'The Scarecrow'], cars: ['tusker', 'rattler', 'cottonmouth', 'lemans', 'gtr'], coins: 12000, bucks: 45, trophies: 8, starBucks: 30 },
+  { id: 'c7', name: 'Champions Speedway', blurb: 'The best drivers in the land. Only one leaves a legend.', tuned: 33, venue: 'main', pi: [78, 91], payPi: [104, 124], rivals: ['Golden Gabe', 'Iron Ivy', 'Thunder Thea', 'Velvet Vince', 'The Champion'], cars: ['cottonmouth', 'shinden', 'hyper', 'monoposto', 'raiden'], coins: 20000, bucks: 75, trophies: 10, starBucks: 45 },
 ]
 export const campaignRaceId = (ch: CampaignChapter, i: number) => `${ch.id}-${i}`
 const ramp = ([a, b]: [number, number], i: number) => Math.round(a + ((b - a) * i) / (CAMPAIGN_RACES - 1))
@@ -898,8 +931,12 @@ export const rookieRace = (chIndex: number, i: number, racesWon: number) => chIn
 // Rivals use their car's skill from the third chapter on; bosses always do.
 export const campaignRivalSkills = (chIndex: number, i: number) => chIndex >= 2 || i === CAMPAIGN_RACES - 1
 // The first win of each race pays the most; replays pay about a quick race.
-export const campaignReward = (ch: CampaignChapter, i: number, first: boolean) => {
-  const full = 100 + ramp(ch.payPi ?? ch.pi, i) * 10
+// raced: the PI actually raced, when the rival was eased to a slower race car (game/fairPi.ts),
+// so a slower car earns what its own race is worth (as Pro Tour pays).
+export const campaignReward = (ch: CampaignChapter, i: number, first: boolean, raced?: number) => {
+  const ladder = campaignRivalPi(ch, i)
+  const share = raced === undefined ? 1 : Math.max(0.3, Math.min(1, raced / ladder))
+  const full = Math.round(((100 + ramp(ch.payPi ?? ch.pi, i) * 10) * share) / 10) * 10
   return first ? full : Math.round((full * 0.6) / 10) * 10
 }
 // Stars for a win: one for winning, two for beating them by 3% of their time, three for 6%.
@@ -910,6 +947,18 @@ export const campaignStars = (myTime: number, theirTime: number) => {
 }
 export const campaignCleared = (done: Record<string, number>, ch: CampaignChapter) =>
   Array.from({ length: CAMPAIGN_RACES }, (_, i) => done[campaignRaceId(ch, i)] ?? 0).every((n) => n >= 1)
+// Stars needed to open a chapter: two a race, on average, over every chapter before it.
+export const CAMPAIGN_STAR_STEP = 10
+export const campaignStarsNeed = (ci: number) => ci * CAMPAIGN_STAR_STEP
+export const campaignStarTotal = (done: Record<string, number>) =>
+  CAMPAIGN.reduce((n, ch) => n + Array.from({ length: CAMPAIGN_RACES }, (_, i) => Math.min(3, done[campaignRaceId(ch, i)] ?? 0)).reduce((a, b) => a + b, 0), 0)
+// Is chapter ci open? Once the boss before it is beaten: with enough stars, or at the level it was
+// tuned for, whichever comes first, so nobody loses a chapter the old level locks gave them. A
+// chapter already raced stays open. level: gateLevel(), Infinity for the admin, who skips every lock.
+export const campaignOpen = (done: Record<string, number>, ci: number, level = 1) =>
+  ci === 0 || level === Infinity
+  || Array.from({ length: CAMPAIGN_RACES }, (_, i) => done[campaignRaceId(CAMPAIGN[ci], i)] ?? 0).some((n) => n > 0)
+  || (campaignCleared(done, CAMPAIGN[ci - 1]) && (campaignStarTotal(done) >= campaignStarsNeed(ci) || level >= CAMPAIGN[ci].tuned))
 export const campaignPerfect = (done: Record<string, number>, ch: CampaignChapter) =>
   Array.from({ length: CAMPAIGN_RACES }, (_, i) => done[campaignRaceId(ch, i)] ?? 0).every((n) => n >= 3)
 
@@ -1405,6 +1454,8 @@ export const seasonSkin = (tier: number) => SKINS.find((d) => 'season' in d.unlo
 // and each car's choices in `modSkin` (by slot).
 export type SkinnedSlot = 'spoiler' | 'exhaust' | 'kit' | 'hood'
 export const SKINNED_SLOTS: SkinnedSlot[] = ['spoiler', 'exhaust', 'kit', 'hood']
+// A car's mod skins by slot, and its track skin (tracked bodies only) under `tracks`.
+export type ModSkins = Partial<Record<SkinnedSlot | 'tracks', string>>
 export const MOD_SKINS: SkinDef[] = [
   { id: 'ember', n: 11, name: 'Ember', tier: 'rare', blurb: 'Flames rolling back off the part', unlock: { level: 5 },
     swatch: 'linear-gradient(0deg, #2a0700, #ff3d00 40%, #ffb300 70%, #fff3b0)' },
@@ -1443,6 +1494,61 @@ export const modSkinNumber = (id?: string | null) => modSkinDef(id)?.n ?? 0
 export const ownedModSkins = (s: { level: number; claimedSets?: string[]; modSkins?: string[] }) =>
   ownedSkins({ level: s.level, claimedSets: s.claimedSets, skins: s.modSkins }, MOD_SKINS)
 export const seasonModSkin = (tier: number) => MOD_SKINS.find((d) => 'season' in d.unlock && d.unlock.season === tier)
+
+// A tracked body's own names for some mod slots and parts (looks only: ids and stats stay the
+// same, so saves and the server catalog don't change). On the Tomahawk the rims are its track's
+// road wheels, the tires its track pads, and the hood parts its cannon.
+type SlotInfo = { name: string; icon: string; stat: string }
+const BODY_SLOTS: Partial<Record<Body, Partial<Record<ModSlot, SlotInfo>>>> = {
+  tank: {
+    rims: { name: 'Tracks', icon: '⛓️', stat: 'Lighter road wheels' },
+    tires: { name: 'Pads', icon: '🌧️', stat: 'Hold the strip in rain, snow and sand' },
+    hood: { name: 'Cannons', icon: '💥', stat: 'A bigger gun for more power' },
+  },
+}
+const BODY_MOD_NAMES: Partial<Record<Body, Record<string, string>>> = {
+  tank: {
+    chrome: 'Chrome Tracks', goldmesh: 'Gold Mesh Tracks', forged: 'Forged Black Tracks', candy: 'Candy Tracks',
+    beadlock: 'Bronze Tracks', turbine: 'Turbine Tracks', goldwire: 'Gold Wire Tracks',
+    raintires: 'Rubber Pads', sandtires: 'Sand Paddles', snowstuds: 'Snow Studs', allweather: 'All-Weather Pads',
+    vented: 'Stub Howitzer', cowl: 'Field Gun', ramscoop: 'Long Gun', louvres: 'Sleeved Cannon', blower: 'Twin Autocannon', twinturbo: 'Heavy Cannon',
+  },
+}
+export const slotInfo = (slot: ModSlot, body: Body): SlotInfo & { id: ModSlot } => ({ ...MOD_SLOTS.find((s) => s.id === slot)!, ...BODY_SLOTS[body]?.[slot] })
+export const modName = (m: ModDef, body: Body) => BODY_MOD_NAMES[body]?.[m.id] ?? m.name
+
+// Track skins: colours for the links of a tracked body's tracks (the Tomahawk only), kept per car
+// in `modSkin.tracks`. Free by level, so they need nothing from the server.
+export type TrackLook = { plate: string; grouser: string; horn: string; pin: string; pad: string; stud: string }
+export type TrackSkinDef = SkinDef & { look: TrackLook; metal: number; rough: number; glow?: { role: 'grouser' | 'pin' | 'stud'; color: string }; alt?: [string, string] }
+export const TRACK_STEEL: { look: TrackLook; metal: number; rough: number } = {
+  look: { plate: '#3d4147', grouser: '#565b62', horn: '#2c2f33', pin: '#8d939b', pad: '#1c1c1e', stud: '#c9ced6' }, metal: 0.6, rough: 0.55,
+}
+export const TRACK_SKINS: TrackSkinDef[] = [
+  { id: 'desertstorm', n: 1, name: 'Desert Storm', tier: 'rare', blurb: 'Sand-blasted links', unlock: { level: 36 }, metal: 0.3, rough: 0.8,
+    look: { plate: '#b59a6a', grouser: '#8f7650', horn: '#6e5a3c', pin: '#d8c9a3', pad: '#3b3226', stud: '#e8dcc0' },
+    swatch: 'repeating-linear-gradient(90deg, #b59a6a 0 6px, #8f7650 6px 8px)' },
+  { id: 'arcticops', n: 2, name: 'Arctic Ops', tier: 'rare', blurb: 'Snow-white links, ice-blue pins', unlock: { level: 38 }, metal: 0.4, rough: 0.6,
+    look: { plate: '#e9eef2', grouser: '#c3ccd4', horn: '#9aa6b1', pin: '#6ec6ff', pad: '#4a5560', stud: '#ffffff' },
+    swatch: 'repeating-linear-gradient(90deg, #e9eef2 0 6px, #6ec6ff 6px 8px)' },
+  { id: 'hazard', n: 3, name: 'Hazard', tier: 'rare', blurb: 'Yellow and black, link by link', unlock: { level: 40 }, metal: 0.35, rough: 0.6, alt: ['#ffcc00', '#2a2a2a'],
+    look: { plate: '#ffffff', grouser: '#e6e6e6', horn: '#9a9a9a', pin: '#d0d0d0', pad: '#3a3a3a', stud: '#ffffff' },
+    swatch: 'repeating-linear-gradient(90deg, #ffcc00 0 6px, #2a2a2a 6px 12px)' },
+  { id: 'gunmetalgold', n: 4, name: 'Gunmetal Gold', tier: 'epic', blurb: 'Black links with gold pins', unlock: { level: 42 }, metal: 0.85, rough: 0.3,
+    look: { plate: '#202226', grouser: '#c9a227', horn: '#15161a', pin: '#ffd34d', pad: '#121214', stud: '#ffe082' },
+    swatch: 'repeating-linear-gradient(90deg, #202226 0 6px, #ffd34d 6px 8px)' },
+  { id: 'magma', n: 5, name: 'Magma', tier: 'epic', blurb: 'Glowing grousers like cooling lava', unlock: { level: 44 }, metal: 0.2, rough: 0.85, glow: { role: 'grouser', color: '#ff6a1a' },
+    look: { plate: '#1a1412', grouser: '#ff6a1a', horn: '#120d0b', pin: '#5a2a18', pad: '#1a1412', stud: '#ff9a3c' },
+    swatch: 'repeating-linear-gradient(90deg, #1a1412 0 6px, #ff6a1a 6px 8px)' },
+  { id: 'neongrid', n: 6, name: 'Neon Grid', tier: 'legendary', blurb: 'Dark links with glowing cyan pins', unlock: { level: 47 }, metal: 0.5, rough: 0.4, glow: { role: 'pin', color: '#2be8ff' },
+    look: { plate: '#14161f', grouser: '#252a3a', horn: '#0c0d13', pin: '#2be8ff', pad: '#14161f', stud: '#2be8ff' },
+    swatch: 'repeating-linear-gradient(90deg, #14161f 0 6px, #2be8ff 6px 7px)' },
+  { id: 'chromecrawler', n: 7, name: 'Chrome Crawler', tier: 'legendary', blurb: 'Every link polished to a mirror', unlock: { level: 50 }, metal: 1, rough: 0.12,
+    look: { plate: '#e3e7ec', grouser: '#f4f6f8', horn: '#b9c0c8', pin: '#ffffff', pad: '#30343a', stud: '#ffffff' },
+    swatch: 'linear-gradient(135deg, #8a93a0, #f2f4f7 40%, #6b7380 60%, #e6e9ee)' },
+]
+export const trackSkinDef = (id?: string | null) => (id ? TRACK_SKINS.find((s) => s.id === id) : undefined)
+export const ownedTrackSkins = (level: number) => ownedSkins({ level }, TRACK_SKINS)
 
 // Garage power: the combined PI of a player's five best cars.
 export const POWER_CARS = 5

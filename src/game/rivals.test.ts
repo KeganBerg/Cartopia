@@ -18,8 +18,8 @@ describe('town rivals', () => {
     }
   })
 
-  it('arrive in level order and get tougher each visit', () => {
-    for (let i = 1; i < RIVALS.length; i++) expect(RIVALS[i].unlockLevel).toBeGreaterThan(RIVALS[i - 1].unlockLevel)
+  it('arrive in PI order and get tougher each visit', () => {
+    for (let i = 1; i < RIVALS.length; i++) expect(RIVALS[i].pi[0]).toBeGreaterThan(RIVALS[i - 1].pi[1])
     for (const r of RIVALS) {
       for (let v = 1; v < RIVAL_VISITS; v++) {
         expect(rivalPi(r, v)).toBeGreaterThan(rivalPi(r, v - 1))
@@ -60,6 +60,12 @@ describe('town rivals', () => {
     expect(currentRival(5, { vinnie: { beaten: 1, back: 100 } }, 50)).toMatchObject({ def: RIVALS[0], visit: 1, away: 100 })
     expect(currentRival(5, { vinnie: { beaten: 3 } }, 0)).toMatchObject({ def: RIVALS[1], visit: 0, locked: false, away: 0 })
     expect(currentRival(99, Object.fromEntries(RIVALS.map((r) => [r.id, { beaten: 3 }])), 0)).toBeNull()
+  })
+
+  it('never waits on a level once rivals have started', () => {
+    const last = RIVALS[RIVALS.length - 1]
+    const beatenAllBut = Object.fromEntries(RIVALS.filter((r) => r !== last).map((r) => [r.id, { beaten: 3 }]))
+    expect(currentRival(2, beatenAllBut, 0)).toMatchObject({ def: last, locked: false })
   })
 
   it('pay the race, send the rival away, and pay the bonus once on the third win', () => {

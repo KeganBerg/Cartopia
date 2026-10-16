@@ -1,0 +1,61 @@
+/* Shop > Upgrades (Upgrade.tsx ShopUpgrades): the town's totals, then 3D building cards. */
+.ug { display: flex; flex-direction: column; gap: 10px; }
+
+/* The town each hour: coins, parts, and fuel used against fuel refilled, with the tank size. */
+.ug-town { display: grid; grid-template-columns: auto auto 1fr; gap: 8px; }
+.ug-tile, .ug-fuel { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border: 3px solid var(--line, #14213d); border-radius: 16px; box-shadow: 0 3px 0 rgba(20,33,61,.35); }
+.ug-tile b, .ug-fuel b { font: 26px var(--display); line-height: 1; white-space: nowrap; }
+.ug-tile small, .ug-fuel small { font: 900 14px Nunito, sans-serif; opacity: .8; }
+.ug-tile i, .ug-fuel i { font-style: normal; font-size: 24px; line-height: 1; }
+.ug-coins { background: #ffc533; color: var(--line, #14213d); }
+.ug-parts { background: #546e7a; color: #fff; }
+.ug-fuel { flex-direction: column; align-items: stretch; gap: 6px; background: #fff; color: var(--line, #14213d); padding: 6px 14px 8px; }
+.ug-fuel-nums { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ug-use { display: flex; align-items: center; gap: 4px; color: #d32f2f; }
+.ug-in { display: flex; align-items: baseline; gap: 2px; color: #2e7d32; }
+.ug-tank { margin-left: auto; display: flex; align-items: center; gap: 4px; padding: 2px 10px; background: #eef3fa; border-radius: 999px; font: 900 16px Nunito, sans-serif; }
+.ug-tank b { font-size: 18px; }
+.ug-bar { position: relative; height: 10px; background: #ffcdd2; border-radius: 999px; overflow: hidden; }
+.ug-bar i { position: absolute; inset: 0 auto 0 0; background: #43a047; border-radius: 999px; }
+
+/* Building cards: the model at its level, a level badge, name, pips and the next price. */
+.ug-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.ug-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 8px 10px; background: #fff; border: 3px solid var(--line, #14213d); border-radius: 18px; box-shadow: 0 4px 0 rgba(20,33,61,.3); cursor: pointer; text-align: center; color: var(--line, #14213d); }
+.ug-card:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(20,33,61,.3); }
+.ug-card .thumb3d { --th: 104px; width: 100%; background: #dcecfb; border-radius: 12px; }
+.ug-card.ready { background: #eaffe4; border-color: #1d6b22; }
+.ug-card.ready .thumb3d { background: #c8f2bd; }
+.ug-name { font: 17px var(--display); line-height: 1.1; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ug-card .upgrade-pips { gap: 3px; }
+.ug-card .upgrade-pips i { width: 11px; height: 7px; }
+.ug-lv { position: absolute; top: 4px; left: 4px; min-width: 32px; height: 32px; padding: 0 6px; display: grid; place-items: center; background: #2f7ff0; color: #fff; border: 3px solid var(--line, #14213d); border-radius: 999px; font: 17px var(--display); }
+.ug-k { position: absolute; top: 4px; right: 4px; padding: 2px 8px; background: #7e57c2; color: #fff; border: 2px solid var(--line, #14213d); border-radius: 999px; font: 900 14px Nunito, sans-serif; }
+.ug-n { position: absolute; top: 78px; right: 4px; padding: 2px 9px; background: var(--line, #14213d); color: #fff; border: 2px solid #fff; border-radius: 999px; font: 16px var(--display); }
+/* A stack of identical buildings: two card edges peek out underneath. */
+.ug-card.stack { box-shadow: 0 4px 0 rgba(20,33,61,.3), 5px 7px 0 -1px #fff, 5px 7px 0 2px var(--line, #14213d), 10px 13px 0 -2px #fff, 10px 13px 0 1px var(--line, #14213d); margin: 0 10px 12px 0; }
+.ug-card.stack:active { box-shadow: 0 2px 0 rgba(20,33,61,.3); }
+.ug-price { padding: 3px 12px; background: #eef3fa; border-radius: 999px; font: 900 16px Nunito, sans-serif; white-space: nowrap; }
+.ug-card.ready .ug-price { background: #43a047; color: #fff; }
+
+/* Maxed buildings: smaller cards, no price. */
+.ug-head { margin: 4px 2px 0; font: 18px var(--display); color: var(--line, #14213d); }
+.ug-maxed { grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 8px; }
+.ug-maxed .ug-card { padding: 6px 6px 8px; background: #fff8e1; }
+.ug-maxed .thumb3d { --th: 72px; background: #ffecb3; }
+.ug-maxed .ug-lv { background: #ffc533; min-width: 28px; height: 28px; font-size: 14px; }
+.ug-maxed .ug-name { font-size: 14px; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.ug-maxed .ug-n { top: 50px; font-size: 13px; }
+
+@media (max-width: 600px) {
+  .ug-town { grid-template-columns: 1fr 1fr; }
+  .ug-fuel { grid-column: 1 / -1; }
+  .ug-tile { justify-content: center; padding: 6px 10px; }
+  .ug-tile b, .ug-fuel b { font-size: 22px; }
+  .ug-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .ug-card .thumb3d { --th: 88px; }
+  .ug-maxed { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ug-maxed .thumb3d { --th: 60px; }
+  .ug-maxed .ug-name { font-size: 13px; }
+  .ug-n { top: 64px; }
+  .ug-maxed .ug-n { top: 40px; }
+}

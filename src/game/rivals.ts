@@ -14,17 +14,20 @@ export type RivalLines = {
   quit: string // third loss
 }
 export type RivalDef = {
-  id: string; name: string; icon: string; color: string; unlockLevel: number; pi: [number, number] // PI on the first visit and the last
+  id: string; name: string; icon: string; color: string; pi: [number, number] // PI on the first visit and the last
   coins: number; bucks: number; trophies: number; lines: RivalLines
 }
 
 export const RIVAL_VISITS = 3
+// Rivals start turning up at this level; after that each one rolls in when the one before
+// quits (no level locks), so the next rival is always on the way.
+export const RIVAL_LEVEL = 2
 // How long a beaten rival spends tuning before coming back.
 export const RIVAL_BACK_MS = 30 * 60 * 1000
 
 export const RIVALS: RivalDef[] = [
   {
-    id: 'vinnie', name: 'Vinnie Vroom', icon: '😎', color: '#ff7043', unlockLevel: 2, pi: [26, 34], coins: 1500, bucks: 15, trophies: 3,
+    id: 'vinnie', name: 'Vinnie Vroom', icon: '😎', color: '#ff7043', pi: [26, 34], coins: 1500, bucks: 15, trophies: 3,
     lines: {
       intro: 'Cute town. Shame about the slow cars.',
       back: ['New spark plugs. Bad news for you.', 'Mom let me borrow her turbo. Last chance.'],
@@ -37,7 +40,7 @@ export const RIVALS: RivalDef[] = [
     },
   },
   {
-    id: 'polly', name: 'Polly Pistonbroke', icon: '💅', color: '#ec407a', unlockLevel: 5, pi: [36, 44], coins: 2500, bucks: 15, trophies: 3,
+    id: 'polly', name: 'Polly Pistonbroke', icon: '💅', color: '#ec407a', pi: [36, 44], coins: 2500, bucks: 15, trophies: 3,
     lines: {
       intro: 'I\'ve seen faster lawn mowers in this town.',
       back: ['I polished every bolt. Twice.', 'Custom exhaust. Try to keep up.'],
@@ -50,7 +53,7 @@ export const RIVALS: RivalDef[] = [
     },
   },
   {
-    id: 'duke', name: 'Duke Dragsworth', icon: '🎩', color: '#7e57c2', unlockLevel: 9, pi: [48, 58], coins: 4000, bucks: 30, trophies: 4,
+    id: 'duke', name: 'Duke Dragsworth', icon: '🎩', color: '#7e57c2', pi: [48, 58], coins: 4000, bucks: 30, trophies: 4,
     lines: {
       intro: 'A town this small needs a proper champion. Me.',
       back: ['My butler tuned the gearbox.', 'I bought a faster engine. And a faster butler.'],
@@ -63,7 +66,7 @@ export const RIVALS: RivalDef[] = [
     },
   },
   {
-    id: 'roxy', name: 'Roxy Revs', icon: '🔥', color: '#ef5350', unlockLevel: 14, pi: [64, 76], coins: 6500, bucks: 30, trophies: 5,
+    id: 'roxy', name: 'Roxy Revs', icon: '🔥', color: '#ef5350', pi: [64, 76], coins: 6500, bucks: 30, trophies: 5,
     lines: {
       intro: 'Heard you\'re fast. I\'m faster.',
       back: ['New tires. Still hot.', 'Full nitro. No more games.'],
@@ -76,7 +79,7 @@ export const RIVALS: RivalDef[] = [
     },
   },
   {
-    id: 'clutchula', name: 'Count Clutchula', icon: '🧛', color: '#5c6bc0', unlockLevel: 20, pi: [84, 96], coins: 10000, bucks: 45, trophies: 6,
+    id: 'clutchula', name: 'Count Clutchula', icon: '🧛', color: '#5c6bc0', pi: [84, 96], coins: 10000, bucks: 45, trophies: 6,
     lines: {
       intro: 'I have come from Transamsylvania to drain your trophies.',
       back: ['I rested in my garage. I am refreshed.', 'A full moon tonight. I am at full power.'],
@@ -89,7 +92,7 @@ export const RIVALS: RivalDef[] = [
     },
   },
   {
-    id: 'nova', name: 'Nova Nightshift', icon: '🌙', color: '#26c6da', unlockLevel: 27, pi: [104, 118], coins: 15000, bucks: 45, trophies: 8,
+    id: 'nova', name: 'Nova Nightshift', icon: '🌙', color: '#26c6da', pi: [104, 118], coins: 15000, bucks: 45, trophies: 8,
     lines: {
       intro: 'Every town has a fastest racer. Not yours.',
       back: ['I rebuilt the engine overnight.', 'This is my best car. Ready?'],
@@ -106,13 +109,13 @@ export const RIVALS: RivalDef[] = [
 export type RivalProgress = { beaten: number; back?: number }
 
 // The rival in town now: the first one not yet beaten three times.
-// locked: their level isn't reached yet. away: tuning until this time.
+// locked: rivals haven't started turning up yet (level below RIVAL_LEVEL). away: tuning until this time.
 export function currentRival(level: number, progress: Record<string, RivalProgress>, now: number) {
   const def = RIVALS.find((r) => (progress[r.id]?.beaten ?? 0) < RIVAL_VISITS)
   if (!def) return null
   const p = progress[def.id] ?? { beaten: 0 }
   const away = p.back && p.back > now ? p.back : 0
-  return { def, visit: p.beaten, locked: level < def.unlockLevel, away }
+  return { def, visit: p.beaten, locked: level < RIVAL_LEVEL, away }
 }
 
 // Each comeback is in a faster car, so beating a rival three times takes upgrades along the way.
@@ -124,6 +127,6 @@ export const rivalPi = (def: RivalDef, visit: number, myPi = Infinity) =>
   Math.max(10, Math.min(rivalLadderPi(def, visit), Math.round(myPi * RIVAL_PI_STEP[visit])))
 // Shift cleanly from 0 (sloppy) to 1 (perfect); they practice between visits.
 export const rivalShift = (def: RivalDef, visit: number) => Math.min(1, 0.45 + RIVALS.indexOf(def) * 0.05 + visit * 0.15)
-// A rival race pays a bit more than a quick race (on their ladder PI, so a closer car doesn't pay
-// less). The rematch stakes the same again.
+// A rival race pays a bit more than a quick race, on the PI raced (so an eased rival pays what the
+// race was worth, as Pro Tour does). The rematch stakes the same again.
 export const rivalPrize = (pi: number) => Math.round((200 + pi * 8) / 10) * 10

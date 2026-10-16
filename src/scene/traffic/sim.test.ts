@@ -372,6 +372,61 @@ describe('town traffic', () => {
     expect([...bumps]).toEqual([])
   })
 
+  // Kegan (2026-10-16): towed cars stayed hitched and got dragged round town for good.
+  // Every towed car must be dropped at Rusty's curb, unhooked, and then drive on by itself.
+  for (const seed of [3, 11, 21, 34, 55]) {
+    it(`every towed car ends unhitched at Rusty's within a minute and a half (seed ${seed})`, () => {
+      seedRandom(seed)
+      const t = new Traffic()
+      const roads = grid(3, 5)
+      const rescue = { uid: 'r', def: 'rescue', x: 4, z: 8, rot: 2 }
+      t.setTown(roads, [{ uid: 'g', def: 'gas', x: 9, z: 3, rot: 2 }, rescue, { uid: 't', def: 'tires', x: 4, z: 3, rot: 2 }], turnOf)
+      expect(t.net.stops.map((st) => st.def).sort()).toEqual(['gas', 'rescue', 'tires'])
+      const n = 18
+      t.setCars(cars(n, 5), n)
+      run(t, 20, () => {})
+      // Flats fixed by a tow, all at once (the Lightning button), while others go for gas.
+      t.setCars(cars(n, 0), n)
+      const towed = ['c00', 'c01', 'c02', 'c03', 'c04']
+      for (const uid of towed) t.requestTrip(uid, 'tow')
+      for (const uid of ['c05', 'c06', 'c07']) t.requestTrip(uid, 'gas')
+      const dropped = new Map<string, number>()
+      const free = new Map<string, number>()
+      const odoAtFree = new Map<string, number>()
+      run(t, 120, (tr, at) => {
+        for (const uid of towed) {
+          const a = tr.agents.get(uid)
+          if (!a) continue
+          if (a.parked > 0 && a.parkedAt?.stopKind === 'tow' && a.tow) dropped.set(uid, at)
+          if (dropped.has(uid) && !a.tow && !free.has(uid)) {
+            free.set(uid, at)
+            odoAtFree.set(uid, a.odo)
+          }
+        }
+      })
+      for (const uid of towed) {
+        expect(dropped.get(uid), `${uid} reached Rusty's`).toBeLessThan(90)
+        expect(free.get(uid), `${uid} unhooked`).toBeLessThan(95)
+        expect(t.agents.get(uid)!.tow, `${uid} no truck now`).toBe(0)
+        // ... and drives off on its own afterwards.
+        expect(t.agents.get(uid)!.odo - odoAtFree.get(uid)!, `${uid} drove away`).toBeGreaterThan(1)
+      }
+    })
+  }
+
+  it('with no Rusty\'s (or tire shop) in town, a tow never hitches a truck', () => {
+    seedRandom(4)
+    const t = new Traffic()
+    t.setTown(grid(2, 8), [{ uid: 'g', def: 'gas', x: 5, z: 1, rot: 0 }], turnOf)
+    t.setCars(cars(4), 4)
+    run(t, 5, () => {})
+    t.requestTrip('c00', 'tow')
+    let truck = 0
+    run(t, 30, (tr) => void (truck = Math.max(truck, tr.agents.get('c00')!.truck)))
+    expect(truck).toBe(0)
+    expect(t.agents.get('c00')!.tow).toBe(0)
+  })
+
   // Wide roads: a two-lane avenue through a grid, and a 4x4 square of road where
   // four streets meet.
   const avenueTown = () => {
