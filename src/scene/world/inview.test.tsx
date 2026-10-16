@@ -26,9 +26,17 @@ export async function inView(id: string, race: number) {
     cam.position.set(0.4, 2.2, z - 4)
     cam.lookAt(0.4, 1.2, z + 20)
     cam.updateMatrixWorld()
+    // Let the scene's own per-frame work (distance cut-offs) see this camera.
+    const state = (scene as unknown as { __r3f?: { root: { getState: () => { camera: PerspectiveCamera } } } }).__r3f?.root.getState()
+    if (state) {
+      state.camera.position.copy(cam.position)
+      await r.advanceFrames(1, 0.016)
+    }
+    scene.updateMatrixWorld(true)
     const fr = new Frustum().setFromProjectionMatrix(new Matrix4().multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse))
     let draws = 0
     let tris = 0
+    const top: [number, string][] = []
     scene.traverseVisible((o) => {
       const m = o as Mesh
       if (!m.isMesh) return
@@ -41,8 +49,11 @@ export async function inView(id: string, race: number) {
       // in the first view, which is the honest worst case for it.
       if (m.frustumCulled !== false && !fr.intersectsSphere(new Sphere().copy(bs).applyMatrix4(m.matrixWorld))) return
       draws++
-      tris += ((g.index ? g.index.count : g.getAttribute('position').count) / 3) * (im.isInstancedMesh ? im.count : 1)
+      const t = ((g.index ? g.index.count : g.getAttribute('position').count) / 3) * (im.isInstancedMesh ? im.count : 1)
+      tris += t
+      if (process.env.INVIEW_TOP && f === Number(process.env.INVIEW_TOP)) top.push([t, `${im.isInstancedMesh ? im.count : 1} x ${Math.round(t / (im.isInstancedMesh ? im.count : 1))}`])
     })
+    if (top.length) console.log(top.sort((a, b) => b[0] - a[0]).slice(0, 12).map(([t, l]) => `${Math.round(t / 1000)}k ${l}`).join('\n'))
     out.push({ draws, tris })
   }
   await r.unmount()
@@ -56,11 +67,11 @@ describe('World Tour venues in a phone view', () => {
       if (only && !only.includes(id)) continue
       const views = await inView(id, race)
       lines.push(`${id.padEnd(9)} ${views.map((v) => `${v.draws}/${Math.round(v.tris / 1000)}k`).join(' ')}`)
+      console.log(lines[lines.length - 1])
       for (const v of views) {
         expect(v.draws, id).toBeLessThan(DRAWS)
         expect(v.tris, id).toBeLessThan(TRIS)
       }
     }
-    console.log('\n' + lines.join('\n'))
   }, 600000)
 })
