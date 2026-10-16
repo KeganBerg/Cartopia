@@ -1084,7 +1084,7 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base, baseQ, pace =
   // A part shows the part itself; cars and paints show the car.
   const part = drop?.kind === 'mod' ? drop.mod : null
   // A part also shows on the car it's for (prizeLook fits it), so its shape reads at a glance.
-  const showCar = (drop?.kind === 'car' || drop?.kind === 'dupe' || drop?.kind === 'skin' || drop?.kind === 'skindupe' || drop?.kind === 'hat' || drop?.kind === 'piece' || drop?.kind === 'mod') && !!prizeCar
+  const showCar = (drop?.kind === 'car' || drop?.kind === 'dupe' || drop?.kind === 'skin' || drop?.kind === 'skindupe' || drop?.kind === 'hat' || drop?.kind === 'callcard' || drop?.kind === 'piece' || drop?.kind === 'mod') && !!prizeCar
   const key = useRef<PointLight>(null)
   const rim = useRef<PointLight>(null)
   const lamps = useRef<Group>(null)
@@ -1338,12 +1338,12 @@ export function prizeLook(drop: CrateDrop | null, cars: { uid: string; model: st
   if (drop.kind === 'car') return { body: carDef(drop.model).body, model: drop.model, color: drop.color }
   // A resto-mod piece shows its secret car as a dark shadow; the fourth piece shows it built.
   if (drop.kind === 'piece') return { body: carDef(drop.model).body, model: drop.model, color: drop.uid && drop.color ? drop.color : '#263238' }
-  if (drop.kind === 'hat') {
-    // A hat, on your own car.
+  if (drop.kind === 'hat' || drop.kind === 'callcard') {
+    // A hat, on your own car; a Call Card shows your car too (the card itself is under the reveal).
     const owned = cars.filter((c) => !carDef(c.model).parked)
     const car = owned.find((c) => c.uid === mine) ?? owned[0] ?? { model: 'civic', color: '#eceff1' }
     const d = carDef(car.model)
-    return { body: d.body, model: car.model, color: car.color, finish: car.finish, stripe: car.stripe, mods: car.mods, hat: { id: drop.hat } }
+    return { body: d.body, model: car.model, color: car.color, finish: car.finish, stripe: car.stripe, mods: car.mods, ...(drop.kind === 'hat' ? { hat: { id: drop.hat } } : {}) }
   }
   if (drop.kind === 'dupe') {
     const d = carDef(drop.model)

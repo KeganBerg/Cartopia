@@ -10,6 +10,10 @@ import { buildPi, fairRivalPi } from '../game/fairPi'
 import { CARS, SKILLS, carDef, performance, RACE_FUEL, GP_SERIES, GP_ROUNDS, gpOpen, gpRivalPi, gpReward, CAMPAIGN, CAMPAIGN_RACES, campaignRaceId, campaignRivalPi, campaignShift, rookieRace, ROOKIE_SHIFT, campaignRivalSkills, campaignReward, campaignCleared, campaignOpen, campaignStarTotal, campaignStarsNeed, type CampaignChapter, skillBoost, skillDrag, liveSkillBoost, smoothShift, type Body, type GpSeries, type SkillId } from '../game/data'
 import { TRACK, freshRacer, stepRacer, shiftQuality, shiftBand, launchRacer, revLaunch, shiftRacer, fireBoost, aiReaction, AI_BOOST_GEAR, TOP_GEAR, LAUNCH_BAND, AI_BAND, IDLE, REV_UP, REV_HOLD, REV_DOWN, RACE_DT } from '../game/race'
 import { CarThumb } from '../scene/BuildingPreview'
+import { CallCardArt, callCardTier, callCardTip } from './CallCard'
+import { CallCardPopup } from './CallCardPicker'
+import { callCardDef } from '../game/callCards'
+import { serverCallCard } from '../lib/serverCar'
 import { supabase } from '../lib/supabase'
 import { Panel, openGarageTab } from './Menus'
 import { StageSlot, useStageReady, warmStage } from '../scene/Stage'
@@ -76,7 +80,7 @@ import { usePrefs } from '../lib/prefs'
 
 // skill: the rival car's race skill. AI rivals use it; live players use theirs on their own device.
 // shift: how cleanly an AI rival shifts, 0 (sloppy) to 1 (always perfect, the default).
-type Rival = { id: string; town: string; level: number; carName: string; color: string; pi: number; online: boolean; body: Body; model?: string; mods?: string[]; skill?: SkillId; shift?: number; boss?: boolean }
+type Rival = { id: string; town: string; level: number; carName: string; color: string; pi: number; online: boolean; body: Body; model?: string; mods?: string[]; skill?: SkillId; shift?: number; boss?: boolean; callCard?: string }
 
 const TOWNS = ['Transamsylvania', 'Gearville', 'Piston Peak', 'Nitro Bay', 'Chrome City', 'Rustbelt Row', 'Turbo Falls', 'Muffler Hills']
 const zero = { engine: 0, turbo: 0, tires: 0, weight: 0 }
@@ -149,11 +153,34 @@ function makeRivals(myPi: number, level: number): Rival[] {
   })
 }
 
+// A Quick Race card's backdrop: the player's Call Card (rivals and players without one: the
+// Showroom in their car's colour), with its tier gem in the corner.
+function CardArt({ id, color }: { id?: string; color: string }) {
+  const d = callCardDef(id)
+  return (
+    <>
+      <CallCardArt id={id} tint={color} />
+      {d?.tier && <span className="rm-cc-gem" title={callCardTip(id)}>{d.icon}</span>}
+    </>
+  )
+}
+const modelNamed = (name: string) => CARS.find((c) => c.name === name)?.id
+
+// The player's own Call Card, top of Quick Race: what others see behind their car. Opens the picker.
+function MyCardChip({ onOpen }: { onOpen: () => void }) {
+  const id = useGame((s) => s.callCard)
+  return (
+    <button className="rm-my-card" onClick={onOpen} title="Your Call Card: what other players see behind your car">
+      <span className="cc-chip"><CallCardArt id={id} still /></span>🃏
+    </button>
+  )
+}
+
 // Real players' best cars, from their cloud saves.
 async function fetchOnlineRivals(): Promise<Rival[]> {
   if (!supabase) return []
   const { data: auth } = await supabase.auth.getUser()
-  let q = supabase.from('game_saves').select('owner_id, town_name, level, best_car').order('updated_at', { ascending: false }).limit(12)
+  let q = supabase.from('game_saves').select('owner_id, town_name, level, best_car, call_card:state->callCard, call_cards:state->callCards').order('updated_at', { ascending: false }).limit(12)
   if (auth.user) q = q.neq('owner_id', auth.user.id)
   const { data, error } = await q
   if (error || !data) return []
@@ -171,6 +198,7 @@ async function fetchOnlineRivals(): Promise<Rival[]> {
       model: CARS.find((c) => c.name === r.best_car.name)?.id,
       mods: Array.isArray(r.best_car.mods) ? r.best_car.mods : undefined,
       skill: CARS.find((c) => c.name === r.best_car.name)?.skill,
+      callCard: serverCallCard(r),
     }))
 }
 
@@ -220,6 +248,7 @@ export function RacePanel() {
   const [kRace, setKRace] = useState<{ def: TunerTrial; rival: Rival; prize: number } | null>(null)
   const [party, setParty] = useState<Party | null>(null)
   const [customOpen, setCustomOpen] = useState(false)
+  const [cardsOpen, setCardsOpen] = useState(false)
   const tuner = useGame((s) => s.tuner)
   const [trialSel, setTrialSel] = useState(() => firstTrialPick(useGame.getState().tuner))
   const [uRace, setURace] = useState<{ def: CupRace; rival: Rival; prize: number } | null>(null)
@@ -744,8 +773,10 @@ export function RacePanel() {
     : null
 
   return (
-    <Panel title={TITLES[tab]} wide className="race-panel" onBack={tab === 'hub' ? undefined : () => setTab('hub')} head={chip && <span className="rm-head-chip">{chip}</span>}>
+    <Panel title={TITLES[tab]} wide className="race-panel" onBack={tab === 'hub' ? undefined : () => setTab('hub')}
+      head={tab === 'quick' ? <MyCardChip onOpen={() => setCardsOpen(true)} /> : chip && <span className="rm-head-chip">{chip}</span>}>
       {customOpen && <CustomKart onGo={(p) => startParty(p, true)} onClose={() => setCustomOpen(false)} />}
+      {cardsOpen && <CallCardPopup onClose={() => setCardsOpen(false)} />}
       <div className={`rm-screen rm-s-${tab}`}>
         {tab === 'hub' ? (
           <RaceHub onOpen={setTab} onCampaign={startCampaign} onTour={startTour} onEvent={startEvent} onRival={(m) => startRival(m)} onBlast={() => startParty(blastPick(), false)} onCustom={() => setCustomOpen(true)} />
@@ -777,12 +808,14 @@ export function RacePanel() {
           <div className="rm-q-grid">
             {supabase && !liveSignedIn && (
               <button className="rm-qc rm-qc-live rm-qc-signin" onClick={() => useGame.getState().openPanel('account')}>
+                <CallCardArt tint="#2f9e35" />
                 <span className="rm-qc-top"><span className="rm-mi">🟢</span><span className="tag live">LIVE</span></span>
                 <span className="rm-qc-body"><b>Race players live</b><span className="buy small alt">Sign in</span></span>
               </button>
             )}
             {supabase && livePlayers.filter((p) => !mutedIds[p.id] && !p.closed).length >= 2 && (
               <div className={`rm-qc rm-qc-live rm-qc-party${pick ? ' on' : ''}`}>
+                <CallCardArt id="ravelights" />
                 <span className="rm-qc-top"><span className="rm-mi">🏎️</span><span className="tag live">👥 {PARTY_MAX}</span></span>
                 <span className="rm-qc-body">
                   <b>Kart party</b>
@@ -803,9 +836,10 @@ export function RacePanel() {
                 const on = pick.includes(p.id)
                 const full = !on && pick.length >= PARTY_MAX - 1
                 return (
-                  <button key={p.id} className={`rm-qc rm-qc-live rm-qc-pick${on ? ' on' : ''}`} style={{ ['--qc' as string]: p.color }} disabled={full}
+                  <button key={p.id} className={`rm-qc rm-qc-live rm-qc-pick${callCardTier(p.callCard)}${on ? ' on' : ''}`} style={{ ['--qc' as string]: p.color }} disabled={full}
                     onClick={() => setPick(on ? pick.filter((x) => x !== p.id) : [...pick, p.id])} aria-pressed={on}>
-                    <span className="rm-qc-top"><CarThumb size="sm" color={p.color} body={p.body} mods={p.mods} /><span className="rm-pick-tick">{on ? '✅' : '➕'}</span></span>
+                    <CardArt id={p.callCard} color={p.color} />
+                    <span className="rm-qc-top"><CarThumb stand color={p.color} body={p.body} model={modelNamed(p.carName)} mods={p.mods} /><span className="rm-pick-tick">{on ? '✅' : '➕'}</span></span>
                     <span className="rm-qc-body">
                       <b><PlayerName id={p.uid} town={p.town} /></b>
                       <span className="rm-qc-chips"><span>Lv {p.level}</span><span className="rm-pi">PI {p.pi}</span></span>
@@ -815,8 +849,9 @@ export function RacePanel() {
               }
               const stakes = wagersOn() ? stakesFor(level, p.level, coins) : []
               if (betFor === p.id) return (
-                <div key={p.id} className="rm-qc rm-qc-live rm-qc-bet" style={{ ['--qc' as string]: p.color }}>
-                  <span className="rm-qc-top"><CarThumb size="sm" color={p.color} body={p.body} mods={p.mods} /><span className="tag bet">🪙 BET</span></span>
+                <div key={p.id} className={`rm-qc rm-qc-live rm-qc-bet${callCardTier(p.callCard)}`} style={{ ['--qc' as string]: p.color }}>
+                  <CardArt id={p.callCard} color={p.color} />
+                  <span className="rm-qc-top"><CarThumb stand color={p.color} body={p.body} model={modelNamed(p.carName)} mods={p.mods} /><span className="tag bet">🪙 BET</span></span>
                   <span className="rm-qc-body">
                     <b><PlayerName id={p.uid} town={p.town} /></b>
                     <span className="rm-bet-chips">
@@ -829,9 +864,10 @@ export function RacePanel() {
                 </div>
               )
               return (
-                <div key={p.id} className="rm-qc rm-qc-live" style={{ ['--qc' as string]: p.color }}>
+                <div key={p.id} className={`rm-qc rm-qc-live${callCardTier(p.callCard)}`} style={{ ['--qc' as string]: p.color }}>
+                  <CardArt id={p.callCard} color={p.color} />
                   <span className="rm-qc-top">
-                    <CarThumb size="sm" color={p.color} body={p.body} mods={p.mods} /><span className="tag live">LIVE</span>
+                    <CarThumb stand color={p.color} body={p.body} model={modelNamed(p.carName)} mods={p.mods} /><span className="tag live">LIVE</span>
                     {!p.closed && !wait && !outgoing && stakes.length > 0 && (
                       <button className="rm-bet-btn" onClick={() => setBetFor(p.id)} title="Wager match: bet coins, winner takes both" aria-label="Wager match">🪙</button>
                     )}
@@ -857,8 +893,9 @@ export function RacePanel() {
               )
             })}
             {[...online, ...rivals.map(fair)].map((r) => (
-              <div key={r.id} className="rm-qc" style={{ ['--qc' as string]: r.color }}>
-                <span className="rm-qc-top"><CarThumb size="sm" color={r.color} body={r.body} mods={r.mods} />{r.online && <span className="tag">PLAYER</span>}</span>
+              <div key={r.id} className={`rm-qc${callCardTier(r.callCard)}`} style={{ ['--qc' as string]: r.color }}>
+                <CardArt id={r.callCard} color={r.color} />
+                <span className="rm-qc-top"><CarThumb stand color={r.color} body={r.body} model={r.model} mods={r.mods} />{r.online && <span className="tag">PLAYER</span>}</span>
                 <span className="rm-qc-body">
                   <b>{r.online ? <PlayerName id={r.id} town={r.town} /> : r.town}</b>
                   <span className="rm-qc-chips"><span>Lv {r.level}</span><span className="rm-pi">PI {r.pi}</span>{r.skill && <SkillIcon sk={r.skill} className="" />}</span>

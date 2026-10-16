@@ -5,7 +5,8 @@ import { useGame } from '../game/store'
 import { CARS, MODS, carDef, performance, type Body } from '../game/data'
 import { displayName, isCleanName } from './names'
 import { joinRefereed } from './referee'
-import { SERVER_CAR_COLUMNS, serverCar } from './serverCar'
+import { SERVER_CAR_COLUMNS, serverCallCard, serverCar } from './serverCar'
+import { callCardDef } from '../game/callCards'
 import { raceCarOf } from '../game/raceCar'
 import { loadUsernames, playerName } from './profiles'
 import { acceptWager, offerWager, startWagers, syncWagers, voidWager } from './wagers'
@@ -21,7 +22,7 @@ import { sfx } from './sound'
 
 // uid: the signed-in account. Town, level and car shown to others come from its server save.
 // car: the uid of the car they race with, so a lobby that saw an older pick knows to look again.
-export type LivePlayer = { id: string; uid?: string | null; town: string; level: number; carName: string; color: string; body: Body; pi: number; mods?: string[]; car?: string | null; closed?: boolean }
+export type LivePlayer = { id: string; uid?: string | null; town: string; level: number; carName: string; color: string; body: Body; pi: number; mods?: string[]; car?: string | null; closed?: boolean; callCard?: string }
 // drag: the classic head-to-head strip. kart: a kart circuit race, the two of you plus AI.
 export type LiveMode = 'drag' | 'kart'
 // stake: coins each racer puts up in a wager race; the winner takes both.
@@ -113,12 +114,13 @@ export function cleanCard(p: unknown): LivePlayer | null {
     mods: Array.isArray(c.mods) ? c.mods.filter((m): m is string => typeof m === 'string' && MOD_IDS.has(m)).slice(0, 8) : undefined,
     car: typeof c.car === 'string' ? c.car.slice(0, 64) : undefined,
     closed: c.closed === true,
+    ...(typeof c.callCard === 'string' && callCardDef(c.callCard) ? { callCard: c.callCard } : {}),
   }
 }
 
 // What other players see of each account comes from its server save (town name, level and the
 // guard-checked car they race with), never from what a browser says about itself.
-type ServerCard = Pick<LivePlayer, 'town' | 'level' | 'carName' | 'color' | 'body' | 'pi' | 'mods' | 'car'>
+type ServerCard = Pick<LivePlayer, 'town' | 'level' | 'carName' | 'color' | 'body' | 'pi' | 'mods' | 'car' | 'callCard'>
 const known = new Map<string, { at: number; card: ServerCard | null }>()
 // players: lobby cards, so a player whose card names a different race car than we last read is
 // read again (after a few seconds, once their save has reached the server).
@@ -138,7 +140,7 @@ async function lookUp(players: Pick<LivePlayer, 'uid' | 'car'>[]) {
   for (const r of data ?? []) {
     const c = serverCar(r)
     if (!c) continue
-    known.set(r.owner_id, { at, card: { town: r.town_name, level: r.level, carName: c.name, color: c.color, body: c.body, pi: c.pi, mods: c.mods, car: c.uid } })
+    known.set(r.owner_id, { at, card: { town: r.town_name, level: r.level, carName: c.name, color: c.color, body: c.body, pi: c.pi, mods: c.mods, car: c.uid, callCard: serverCallCard(r) } })
   }
 }
 // A lobby card with the server's details, or null for anyone who isn't a known signed-in player.
