@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { StageSlot, useStageReady } from '../scene/Stage'
-import { useGame, hasRusty, type Loot } from '../game/store'
+import { useGame, gateLevel, hasRusty, type Loot } from '../game/store'
 import { RESCUE_SPOTS, RARITY, STORAGE_MAX, carDef, performance, restoreCost, rushBucks, type Rarity, RUSTY_SETS, rustySetId, hotSpot, HOT_RARE, TRUCK, truckOf, BAY2_LEVEL } from '../game/data'
 import { flushSave } from '../lib/cloud'
 import { useNow } from '../scene/useNow'
@@ -55,7 +55,7 @@ function Ring({ pct, children }: { pct: number; children: React.ReactNode }) {
 type Bay = 0 | 1
 const bayKey = (bay: Bay) => (bay ? 'restoring2' : 'restoring') as 'restoring' | 'restoring2'
 // A car can go into a bay: the first is free, or the second is open and free.
-const bayFree = (s: { restoring: unknown; restoring2: unknown; level: number }) => !s.restoring || (!s.restoring2 && s.level >= BAY2_LEVEL)
+const bayFree = (s: { restoring: unknown; restoring2: unknown; level: number; admin?: boolean }) => !s.restoring || (!s.restoring2 && gateLevel(s) >= BAY2_LEVEL)
 
 function BayHero({ bay = 0, onCollect, compact }: { bay?: Bay; onCollect: () => void; compact?: boolean }) {
   const now = useNow()
@@ -98,7 +98,7 @@ function BayHero({ bay = 0, onCollect, compact }: { bay?: Bay; onCollect: () => 
 
 // Both bays: the second opens at BAY2_LEVEL; before then a lock shows when it opens.
 function Bays({ onCollect, compact }: { onCollect: (bay: Bay) => void; compact?: boolean }) {
-  const open2 = useGame((s) => s.level >= BAY2_LEVEL)
+  const open2 = useGame((s) => gateLevel(s) >= BAY2_LEVEL)
   const busy1 = useGame((s) => !!s.restoring)
   return (
     <div className={compact ? 'bays compact' : 'bays'}>
@@ -194,7 +194,7 @@ const spotArt = (id: string, night: boolean) => `/rescue/${id}-${night ? 'night'
 // Rusty's tow truck: its level as pips, spots per search, and the next upgrade's parts.
 function TruckRow() {
   const truck = useGame((s) => s.truck ?? 0)
-  const level = useGame((s) => s.level)
+  const level = useGame(gateLevel)
   const parts = useGame((s) => s.parts)
   const up = useGame((s) => s.upgradeTruck)
   const [busy, setBusy] = useState(false)
@@ -230,6 +230,7 @@ function TruckRow() {
 
 function SpotList() {
   const level = useGame((s) => s.level)
+  const gate = useGame(gateLevel)
   const coins = useGame((s) => s.coins)
   const full = useGame((s) => s.junkyard.length >= STORAGE_MAX)
   const start = useGame((s) => s.startSearch)
@@ -249,7 +250,7 @@ function SpotList() {
       <TruckRow />
       <div className="rsc-spots">
         {RESCUE_SPOTS.map((sp) => {
-          const locked = level < sp.unlockLevel
+          const locked = gate < sp.unlockLevel
           const set = RUSTY_SETS.find((x) => x.id === rustySetId(sp.id))!
           const n = set.cars.filter((m) => have.has(m)).length
           const done = n === set.cars.length

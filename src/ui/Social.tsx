@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useGame, type Panel as PanelId } from '../game/store'
+import { useGame, type Panel as PanelId, gateLevel } from '../game/store'
 import { BUILDINGS, CLAN_CAP, CLAN_COLORS, CLAN_COST, CLAN_EMBLEMS, garagePower } from '../game/data'
 import { supabase } from '../lib/supabase'
 import { townToVisit } from '../lib/friends'
@@ -287,7 +287,7 @@ function CrewHouseNudge() {
   const hasCrew = useGame((s) => s.buildings.some((b) => b.def === 'crew'))
   const setMode = useGame((s) => s.setMode)
   const coins = useGame((s) => s.coins)
-  const level = useGame((s) => s.level)
+  const level = useGame(gateLevel)
   const showNeed = useGame((s) => s.showNeed)
   const def = BUILDINGS.find((b) => b.id === 'crew')!
   if (hasCrew) return null

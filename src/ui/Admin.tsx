@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useGame } from '../game/store'
 import { CARS, carDef } from '../game/data'
@@ -193,6 +193,7 @@ function PlayersTab({ confirm }: { confirm: (a: Ask) => void }) {
 const COIN_STEPS = [10_000, 1_000_000]
 const GEM_STEPS = [100, 10_000]
 const PART_STEPS = [100, 10_000]
+const XP_STEPS = [1_000, 100_000]
 // The most a balance can hold (0096: the economy guard counts saves up to this). MAX fills
 // a balance to it on Give and empties it on Take.
 const TOP = 1e12
@@ -206,8 +207,10 @@ function PlayerView({ id, onBack, confirm }: { id: string; onBack: () => void; c
   const [coins, setCoins] = useState(0)
   const [gems, setGems] = useState(0)
   const [parts, setParts] = useState(0)
+  const [xp, setXp] = useState(0)
   const [carQ, setCarQ] = useState('')
   const [busy, setBusy] = useState(false)
+  const whyBox = useRef<HTMLInputElement>(null)
   const load = useCallback(async () => {
     const r = await admin.player(id)
     if (r.error) toast(`⚠️ ${r.error}`)
@@ -236,13 +239,20 @@ function PlayerView({ id, onBack, confirm }: { id: string; onBack: () => void; c
     const c = sign * coins
     const g = sign * gems
     const pt = sign * parts
+    const x = sign * xp
     const part = (n: number, icon: string) => (n ? `${n > 0 ? '+' : ''}${compact(n)} ${icon}` : '')
-    const label = [part(c, '🪙'), part(g, '💎'), part(pt, '⚙️')].filter(Boolean).join(' ')
-    const go = () => void run(() => admin.grant(p.id, c, g, pt, why), `✔ ${label}`).then(() => { setCoins(0); setGems(0); setParts(0) })
+    const label = [part(c, '🪙'), part(g, '💎'), part(pt, '⚙️'), part(x, '⭐')].filter(Boolean).join(' ')
+    const go = () => void run(() => admin.grant(p.id, c, g, pt, why, x), `✔ ${label}`).then(() => { setCoins(0); setGems(0); setParts(0); setXp(0) })
     if (sign < 0) confirm({ icon: '➖', title: `Take ${label.replace(/-/g, '')}?`, ok: 'Take', run: go })
     else go()
   }
   const noWhy = why.length < 3
+  // Every action is logged with a reason. Tapping one before typing it points at the box.
+  const act = (go: () => void) => () => {
+    if (!noWhy) return go()
+    toast('📝 Add a reason first')
+    whyBox.current?.focus()
+  }
   const muted = p.muted === true ? '∞' : p.muted ? new Date(p.muted).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : null
 
   return (
@@ -257,9 +267,9 @@ function PlayerView({ id, onBack, confirm }: { id: string; onBack: () => void; c
         {muted && <span className="adm-muted" title="Muted until">🔇 {muted}</span>}
       </div>
 
-      <input className={`adm-input${noWhy ? ' need' : ''}`} value={reason} maxLength={120} placeholder="📝 Reason (logged)" aria-label="Reason" onChange={(e) => setReason(e.target.value)} />
+      <input ref={whyBox} className={`adm-input${noWhy ? ' need' : ''}`} value={reason} maxLength={120} placeholder="📝 Reason (logged)" aria-label="Reason" onChange={(e) => setReason(e.target.value)} />
 
-      <h3 className="cl-head">💰 Coins, gems, parts</h3>
+      <h3 className="cl-head">💰 Coins, gems, parts, XP</h3>
       <div className="adm-money">
         <label className="adm-amt"><CoinIcon /><input inputMode="numeric" value={shown(coins)} placeholder="0" aria-label="Coins" onChange={(e) => setCoins(amount(e.target.value))} /></label>
         {COIN_STEPS.map((n) => <button key={n} className="adm-step" onClick={() => setCoins((c) => Math.min(TOP, c + n))}>+{compact(n)}</button>)}
@@ -275,9 +285,14 @@ function PlayerView({ id, onBack, confirm }: { id: string; onBack: () => void; c
         {PART_STEPS.map((n) => <button key={n} className="adm-step" onClick={() => setParts((v) => Math.min(TOP, v + n))}>+{compact(n)}</button>)}
         <button className={`adm-step adm-max${parts === TOP ? ' sel' : ''}`} onClick={() => setParts(TOP)}>MAX</button>
       </div>
+      <div className="adm-money">
+        <label className="adm-amt"><span className="adm-xp" aria-hidden>⭐</span><input inputMode="numeric" value={shown(xp)} placeholder="0" aria-label="XP" onChange={(e) => setXp(amount(e.target.value))} /></label>
+        {XP_STEPS.map((n) => <button key={n} className="adm-step" onClick={() => setXp((v) => Math.min(TOP, v + n))}>+{compact(n)}</button>)}
+        <button className={`adm-step adm-max${xp === TOP ? ' sel' : ''}`} onClick={() => setXp(TOP)}>MAX</button>
+      </div>
       <div className="adm-pair">
-        <button className="sell adm-take" disabled={busy || noWhy || (!coins && !gems && !parts)} onClick={() => money(-1)}>➖ Take</button>
-        <button className="buy adm-give" disabled={busy || noWhy || (!coins && !gems && !parts)} onClick={() => money(1)}>➕ Give</button>
+        <button className="sell adm-take" disabled={busy || (!coins && !gems && !parts && !xp)} onClick={act(() => money(-1))}>➖ Take</button>
+        <button className="buy adm-give" disabled={busy || (!coins && !gems && !parts && !xp)} onClick={act(() => money(1))}>➕ Give</button>
       </div>
 
       <h3 className="cl-head">🚗 Cars · {p.cars.length}</h3>
@@ -288,8 +303,8 @@ function PlayerView({ id, onBack, confirm }: { id: string; onBack: () => void; c
             <div key={c.uid} className="adm-car" title={d.name}>
               <CarThumb size="sm" color={c.color} body={d.body} model={d.id} />
               <small>{d.name}</small>
-              <button className="adm-x" aria-label={`Take ${d.name}`} disabled={busy || noWhy || p.cars.length <= 1}
-                onClick={() => confirm({ icon: '🚗', title: `Take ${d.name}?`, ok: 'Take', run: () => void run(() => admin.takeCar(p.id, c.uid, why), `✔ −${d.name}`) })}>✖</button>
+              <button className="adm-x" aria-label={`Take ${d.name}`} disabled={busy || p.cars.length <= 1}
+                onClick={act(() => confirm({ icon: '🚗', title: `Take ${d.name}?`, ok: 'Take', run: () => void run(() => admin.takeCar(p.id, c.uid, why), `✔ −${d.name}`) }))}>✖</button>
             </div>
           )
         })}
@@ -298,8 +313,8 @@ function PlayerView({ id, onBack, confirm }: { id: string; onBack: () => void; c
       {carHits.length > 0 && (
         <div className="adm-cars">
           {carHits.map((d) => (
-            <button key={d.id} className="adm-car pick" disabled={busy || noWhy} title={d.name}
-              onClick={() => confirm({ icon: '🎁', title: `Give ${d.name}?`, ok: 'Give', run: () => void run(() => admin.giveCar(p.id, d.id, why), `✔ +${d.name}`).then(() => setCarQ('')) })}>
+            <button key={d.id} className="adm-car pick" disabled={busy} title={d.name}
+              onClick={act(() => confirm({ icon: '🎁', title: `Give ${d.name}?`, ok: 'Give', run: () => void run(() => admin.giveCar(p.id, d.id, why), `✔ +${d.name}`).then(() => setCarQ('')) }))}>
               <CarThumb size="sm" color="#e53935" body={d.body} model={d.id} />
               <small>{d.name}</small>
             </button>
@@ -310,8 +325,8 @@ function PlayerView({ id, onBack, confirm }: { id: string; onBack: () => void; c
       <h3 className="cl-head">💬 Chat</h3>
       <div className="adm-chips">
         {MUTES.map(([m, label]) => (
-          <button key={label} disabled={busy || noWhy || p.admin} title={m ? `Mute ${label}` : 'Mute for good'}
-            onClick={() => confirm({ icon: '🔇', title: `Mute ${p.username ?? 'player'} · ${label}?`, ok: 'Mute', run: () => void run(() => admin.mute(p.id, m, why), `🔇 ${label}`) })}>🔇 {label}</button>
+          <button key={label} disabled={busy || p.admin} title={m ? `Mute ${label}` : 'Mute for good'}
+            onClick={act(() => confirm({ icon: '🔇', title: `Mute ${p.username ?? 'player'} · ${label}?`, ok: 'Mute', run: () => void run(() => admin.mute(p.id, m, why), `🔇 ${label}`) }))}>🔇 {label}</button>
         ))}
         {muted && <button className="sel" disabled={busy} onClick={() => void run(() => admin.unmute(p.id), '🔊 Unmuted')}>🔊</button>}
       </div>
@@ -345,7 +360,7 @@ function logLine(r: AdminLogRow) {
   switch (r.action) {
     case 'live_start': return `${KIND_ICON[String(d.kind)] ?? ''} ${d.kind} · ${d.minutes}m`
     case 'live_end': return `${d.kind ?? 'all'} · ${d.ended}`
-    case 'grant': return [d.coins ? `${sign(d.coins)} 🪙` : '', d.gems ? `${sign(d.gems)} 💎` : '', d.parts ? `${sign(d.parts)} ⚙️` : ''].filter(Boolean).join(' ')
+    case 'grant': return [d.coins ? `${sign(d.coins)} 🪙` : '', d.gems ? `${sign(d.gems)} 💎` : '', d.parts ? `${sign(d.parts)} ⚙️` : '', d.xp ? `${sign(d.xp)} ⭐` : ''].filter(Boolean).join(' ')
     case 'give_car': case 'take_car': return carDef(String(d.model)).name
     case 'mute': return d.minutes ? `${d.minutes}m` : '∞'
     case 'chat_purge': return `${d.deleted}`
