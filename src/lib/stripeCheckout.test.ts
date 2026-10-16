@@ -78,7 +78,7 @@ describe('stripe checkout', () => {
 })
 
 describe('car packs', () => {
-  it('sells every pack-only car, and Showroom cars only in street packs', async () => {
+  it('sells only pack-only cars, each in exactly one pack', async () => {
     const { CAR_PACKS } = await import('../game/bucksPacks')
     const { CARS, carDef, performance } = await import('../game/data')
     const zero = { engine: 0, turbo: 0, tires: 0, weight: 0 }
@@ -89,8 +89,10 @@ describe('car packs', () => {
       expect(car.id, p.id).toBe(p.car)
       expect(p.bucks % 5, p.id).toBe(0)
       const pi = performance(car, zero)
-      if (p.tier === 'super') expect([car.pack, pi >= 100], p.id).toEqual([true, true])
-      else expect([pi >= 50 && pi <= 100, !car.rescueOnly && !car.season && !car.secret], p.id).toEqual([true, true])
+      // Every pack is a pack-only car (Kegan, 2026-10-15): nothing a player could also unlock by level.
+      expect(car.pack, p.id).toBe(true)
+      if (p.tier === 'super') expect(pi, p.id).toBeGreaterThanOrEqual(100)
+      else expect([pi >= 50, pi < 100], p.id).toEqual([true, true])
       expect(packById(p.id)).toBe(p)
       expect(sessionForm(p, 'u1', 'https://cartopia.lol').get('line_items[0][price_data][product_data][name]')).toContain('car +')
     }

@@ -23,15 +23,15 @@ export const BUCKS_PACKS: BucksPack[] = [
 ]
 
 // Car packs, one of each per account, on sale at any level (Kegan chose no level lock, 2026-10-15).
-// Street packs (PI 50-100): Showroom cars bought early, and two plain pack-only sports and muscle cars.
+// Every pack is a pack-only car (Kegan, 2026-10-15). Street packs: plain sports and muscle cars, PI 50-99.
 // Super and hyper packs: pack-only cars above the Showroom (supercars from PI 100, hypercars from 115).
 export const CAR_PACKS: BucksPack[] = [
-  { id: 'car-brawler', name: 'Brawler Pack', price: 2.99, bucks: 15, bonus: 0, car: 'charger', art: '🚗' },
+  { id: 'car-scatto', name: 'Scatto Pack', price: 2.99, bucks: 15, bonus: 0, car: 'scatto', art: '🚗' },
   { id: 'car-stinger', name: 'Stinger Pack', price: 4.99, bucks: 25, bonus: 0, car: 'stinger', art: '🚗' },
-  { id: 'car-ronin', name: 'Ronin Pack', price: 5.99, bucks: 30, bonus: 0, car: 'gtr', art: '🚗' },
+  { id: 'car-thunderjet', name: 'Thunderjet Pack', price: 5.99, bucks: 30, bonus: 0, car: 'thunderjet', art: '🚗' },
   { id: 'car-sora', name: 'Sora Pack', price: 7.99, bucks: 40, bonus: 0, car: 'sora', art: '🚗' },
-  { id: 'car-ring', name: 'Ring V10 Pack', price: 9.99, bucks: 50, bonus: 0, car: 'ringmeister', art: '🚗' },
-  { id: 'car-hyperion', name: 'Hyperion Pack', price: 12.99, bucks: 65, bonus: 0, car: 'hyper', art: '🚗' },
+  { id: 'car-hayate', name: 'Hayate Pack', price: 9.99, bucks: 50, bonus: 0, car: 'hayate', art: '🚗' },
+  { id: 'car-kestrel', name: 'Kestrel Pack', price: 12.99, bucks: 65, bonus: 0, car: 'kestrel', art: '🚗' },
   { id: 'car-firebolt', name: 'Hot Rod Pack', price: 14.99, bucks: 75, bonus: 0, car: 'firebolt', art: '🔥', tier: 'super' },
   { id: 'car-kaze', name: 'Time Attack Pack', price: 19.99, bucks: 100, bonus: 0, car: 'kaze', art: '🏁', tier: 'super' },
   { id: 'car-sturm', name: 'Rally Legend Pack', price: 29.99, bucks: 150, bonus: 0, car: 'sturm', art: '🏔️', tier: 'super' },
