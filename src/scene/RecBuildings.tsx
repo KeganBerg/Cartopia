@@ -774,6 +774,9 @@ function HotDogKiosk({ m, bulb, win }: { m: Mat; bulb: ReactNode; win: ReactNode
   )
 }
 
+// One pennant, hanging down from the string (y = 0.05 at its top edge), both faces.
+const PENNANT = new Float32Array([-0.04, 0.05, 0, 0.04, 0.05, 0, 0, -0.05, 0, 0.04, 0.05, 0, -0.04, 0.05, 0, 0, -0.05, 0])
+
 // A string of triangle pennants slung between two posts' tops.
 function Pennants({ m, from, to, n }: { m: Mat; from: V3; to: V3; n: number }) {
   const len = Math.hypot(to[0] - from[0], to[1] - from[1], to[2] - from[2])
@@ -795,8 +798,6 @@ function Pennants({ m, from, to, n }: { m: Mat; from: V3; to: V3; n: number }) {
     </group>
   )
 }
-// One pennant, hanging down from the string (y = 0.05 at its top edge), both faces.
-const PENNANT = new Float32Array([-0.04, 0.05, 0, 0.04, 0.05, 0, 0, -0.05, 0, 0.04, 0.05, 0, -0.04, 0.05, 0, 0, -0.05, 0])
 
 // Tethered balloon ride: the basket waits on its pad, the envelope floats
 // above on its rigging.
