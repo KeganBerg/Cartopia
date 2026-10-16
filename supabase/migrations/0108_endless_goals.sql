@@ -1,13 +1,14 @@
--- Endless goals: generated goals that never run out (src/game/endless.ts). DRAFT built on the gems x10 guard (a1eab079);
--- economy rebuilds this block on the live guard and this file is replaced with theirs, byte for byte.
--- the same econ_guard with one more block, after the daily and weekly tasks, that pays endless goals.
--- Runs BEFORE the endless-goals client ships (a guard without it trims their coins); a save without
--- `endless` is left alone, so it's safe to run early.
---
--- What each endless goal pays. ENDLESS_PAY in src/game/endless.ts must match (endless.test.ts checks).
+-- 0108 Endless goals (2026-10-16; thread "Endless generated goals", PR #582; reviewed and rebuilt on the live
+-- guard by "Cheat-proof economy"). Generated goals that never run out (src/game/endless.ts).
+--  1. econ_private.endless_pay(): what each endless goal pays. ENDLESS_PAY in src/game/endless.ts must match
+--     (endless.test.ts checks). 1 gem every 10th until gems x10 (0109) makes it 10.
+--  2. econ_guard(): live 16ae57a8 with one more block, after the daily and weekly tasks, crew chests and
+--     visitors, that pays endless goals by count: at most 12 a UTC day, level clamped like tasks.
+-- RUN ORDER: BEFORE the endless-goals game update ships (a guard without it trims their coins). A save
+-- without `endless` is left alone, so it's safe to run early.
 create or replace function econ_private.endless_pay() returns jsonb
 language sql immutable set search_path = '' as $endless$
-  select '{"coins":200,"coinsPerLevel":60,"xp":25,"xpPerLevel":6,"parts":5,"partsEvery":5,"bucks":10,"bucksEvery":10,"perDay":12}'::jsonb
+  select '{"coins":200,"coinsPerLevel":60,"xp":25,"xpPerLevel":6,"parts":5,"partsEvery":5,"bucks":1,"bucksEvery":10,"perDay":12}'::jsonb
 $endless$;
 -- The guard runs as the player, so players may read it (it's only these numbers).
 revoke all on function econ_private.endless_pay() from public;
@@ -421,11 +422,11 @@ begin
         q_bucks := q_bucks + (vp ->> 'bucks')::numeric;
       end if;
     end if;
-    -- Endless goals (0105): `endless` is {day, today, n, goals}. n counts the endless goals this town has
+    -- Endless goals (0108): `endless` is {day, today, n, goals}. n counts the endless goals this town has
     -- collected and today those collected on `day` (UTC). Each one newly counted pays
     -- econ_private.endless_pay() at the save's level: coins and XP, parts every partsEvery-th and gems
     -- every bucksEvery-th. At most perDay a day; n and today only go up within a day, the day only moves
-    -- forward (to tomorrow at most), and a new day may also carry the last day's unsaved ones.
+    -- forward (to tomorrow at most), and a new day may also carry the last day's unsaved ones (up to that day's perDay).
     -- A save without it (a client older than endless goals) keeps the saved one.
     en_o := case when jsonb_typeof(o -> 'endless') = 'object' then o -> 'endless' else '{}' end;
     if jsonb_typeof(s -> 'endless') is distinct from 'object' then
@@ -443,7 +444,7 @@ begin
         null; -- nothing collected
       elsif en_day is null or en_day !~ '^\d{4}-\d{2}-\d{2}$' or en_day > to_char((now() at time zone 'utc') + interval '1 day', 'YYYY-MM-DD')
          or (en_oday is not null and en_day < en_oday) or en_n < en_on or en_t < en_ot or en_t > (en_pay ->> 'perDay')::int
-         or en_n - en_on > en_t - en_ot + (case when en_day is distinct from en_oday then (en_pay ->> 'perDay')::int else 0 end) then
+         or en_n - en_on > en_t - en_ot + (case when en_day is distinct from en_oday then greatest((en_pay ->> 'perDay')::int - floor(public.econ_num(en_o, 'today'))::int, 0) else 0 end) then
         -- A bad count or day keeps the saved count and day (the goals on the board stay as sent).
         s := jsonb_set(s, '{endless}', en_s || jsonb_build_object('n', en_on, 'day', coalesce(en_o -> 'day', '""'), 'today', coalesce(en_o -> 'today', '0')));
         fixes := fixes || '{"endless":"kept saved endless goals"}';
@@ -589,6 +590,7 @@ begin
         end if;
         streak := mod(greatest(floor(public.econ_num(s, 'dailyStreak'))::int, 1) - 1, 5) + 1;
         daily_coins := (array[200, 400, 600, 800 + 5 * 50, 1200])[streak];
+        daily_bucks := case when streak = 5 then 1 else 0 end;
       else
         s := s || jsonb_build_object('lastDaily', o -> 'lastDaily', 'dailyStreak', coalesce(o -> 'dailyStreak', '0'));
         fixes := fixes || '{"lastDaily":"already claimed"}';
@@ -748,7 +750,7 @@ begin
           limit 1;
         if out_car is not null then
           rc := cat -> 'cars' -> (o -> bk ->> 'model');
-          owed := greatest(200, round(((rc ->> 'price')::numeric + coalesce((rc ->> 'bucks')::numeric, 0) * 100) * 0.25 / 10) * 10)
+          owed := greatest(200, round(((rc ->> 'price')::numeric + coalesce((rc ->> 'bucks')::numeric, 0) * 1000) * 0.25 / 10) * 10)
                 + coalesce((select f.cost from econ_private.rescue_find(out_car) f), 0);
           spent := coalesce((e ->> 'spent')::numeric, 50000);
           restore_value := restore_value + greatest((rc ->> 'price')::numeric - greatest(owed - spent, 0), 0);
@@ -893,7 +895,7 @@ begin
     -- Bucks-only mods bought since the last save are paid for too.
     bucks_cost := bucks_cost + coalesce((select sum(n.bucks) from public.econ_new_bucks_mods(cars, o, cat) n
                                            where not cr_mods @> jsonb_build_array(jsonb_build_object('car', n.uid, 'mod', n.id))), 0);
-    max_bucks := greatest(public.econ_num(o, 'bucks'), 0) + (n_lvl - o_lvl) * 15 + goal_bucks + daily_bucks + camp_bucks + set_bucks + q_bucks + sea_bucks + tr_bucks + ms_bucks + pay_bucks - bucks_cost - cr_bucks;
+    max_bucks := greatest(public.econ_num(o, 'bucks'), 0) + (n_lvl - o_lvl) + goal_bucks + daily_bucks + camp_bucks + set_bucks + q_bucks + sea_bucks + tr_bucks + ms_bucks + pay_bucks - bucks_cost - cr_bucks;
     if max_bucks < 0 then
       -- Unpaid bucks-only mods come off first, then unpaid bucks-only cars.
       for r2 in select * from public.econ_new_bucks_mods(cars, o, cat) n
@@ -1060,5 +1062,3 @@ begin
     where cat -> 'cars' ? (x ->> 'model') order by public.econ_car_pi(x, cat) desc limit 1;
   return new;
 end $function$;
-
-
