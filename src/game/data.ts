@@ -1002,14 +1002,14 @@ export { BUCKS_PACKS, type BucksPack } from './bucksPacks'
 // Counted on the save as the player does things.
 export type CounterKey =
   | 'jobs' | 'carsBought' | 'upgrades' | 'racesWon' | 'built' | 'roads' | 'coinsEarned' | 'flatsFixed' | 'rescued' | 'searches' | 'gpWins'
-  | 'races' | 'campaignWins' | 'painted' | 'modsBought' | 'serviced'
+  | 'races' | 'campaignWins' | 'painted' | 'modsBought' | 'serviced' | 'cratesOpened' | 'arcadePlays' | 'dailyRuns'
 // Read off the town itself, so towns that did these before the goal existed still get credit.
 // owns: has a `def` building; bldgLevel: highest building level; stars/chapters: campaign; power: garage power.
 export type DerivedKey = 'spooky' | 'rusty' | 'level' | 'carsOwned' | 'drivers' | 'plots' | 'bldgLevel' | 'stars' | 'chapters' | 'power' | 'owns'
 export type StatKey = CounterKey | DerivedKey
 export const COUNTERS: CounterKey[] = [
   'jobs', 'carsBought', 'upgrades', 'racesWon', 'built', 'roads', 'coinsEarned', 'flatsFixed', 'rescued', 'searches', 'gpWins',
-  'races', 'campaignWins', 'painted', 'modsBought', 'serviced',
+  'races', 'campaignWins', 'painted', 'modsBought', 'serviced', 'cratesOpened', 'arcadePlays', 'dailyRuns',
 ]
 
 // level: the goal stays hidden until then. def: the building an `owns` goal asks for.
@@ -1093,14 +1093,17 @@ const round = (n: number, to: number) => Math.max(to, Math.round(n / to) * to)
 export const DAILY_TASKS: TaskDef[] = [
   { id: 'jobs', icon: '🍕', stat: 'jobs', text: 'Collect from # businesses', n: (l) => Math.min(8 + l * 2, 40) },
   { id: 'coins', icon: '💰', stat: 'coinsEarned', text: 'Earn # coins', n: (l) => round(1500 + l * 700, 500) },
-  { id: 'races', icon: '🏁', stat: 'races', text: 'Race # times', n: () => 3 },
-  { id: 'wins', icon: '🏆', stat: 'racesWon', text: 'Win # races', n: () => 2 },
+  { id: 'races', icon: '🏁', stat: 'races', text: 'Race # times', n: (l) => 3 + Math.floor(l / 10) },
+  { id: 'wins', icon: '🏆', stat: 'racesWon', text: 'Win # races', n: (l) => 2 + Math.floor(l / 10) },
   { id: 'campaign', icon: '🗺', stat: 'campaignWins', text: 'Win # campaign race', n: () => 1 },
   { id: 'search', icon: '🔍', stat: 'searches', text: "Search # time at Rusty's", n: () => 1, needs: 'rescue' },
   { id: 'upgrade', icon: '⬆', stat: 'upgrades', text: 'Do # upgrade', n: () => 1 },
   { id: 'build', icon: '🏗', stat: 'built', text: 'Place # new building', n: () => 1 },
   { id: 'service', icon: '⛽', stat: 'serviced', text: 'Service # stranded cars', n: () => 2, needs: 'gas' },
   { id: 'paint', icon: '🎨', stat: 'painted', text: 'Paint # car', n: () => 1, level: 2 },
+  { id: 'crate', icon: '📦', stat: 'cratesOpened', text: 'Open # crate', n: () => 1, level: 2 },
+  { id: 'arcade', icon: '🕹', stat: 'arcadePlays', text: 'Play # arcade games', n: () => 2, needs: 'arcade' },
+  { id: 'dailyrun', icon: '⏱', stat: 'dailyRuns', text: 'Drive the Daily Run', n: () => 1, level: 3 },
 ]
 export const WEEKLY_TASKS: TaskDef[] = [
   { id: 'jobs', icon: '🍕', stat: 'jobs', text: 'Collect from # businesses', n: (l) => Math.min(60 + l * 10, 250) },
@@ -1112,6 +1115,9 @@ export const WEEKLY_TASKS: TaskDef[] = [
   { id: 'build', icon: '🏗', stat: 'built', text: 'Place # new buildings', n: () => 5 },
   { id: 'gp', icon: '🏆', stat: 'gpWins', text: 'Win # Grand Prix series', n: () => 1, level: 2 },
   { id: 'mods', icon: '🪽', stat: 'modsBought', text: 'Fit # car mods', n: () => 2, level: 3 },
+  { id: 'crates', icon: '📦', stat: 'cratesOpened', text: 'Open # crates', n: () => 5, level: 2 },
+  { id: 'arcade', icon: '🕹', stat: 'arcadePlays', text: 'Play # arcade games', n: () => 10, needs: 'arcade' },
+  { id: 'dailyrun', icon: '⏱', stat: 'dailyRuns', text: 'Drive the Daily Run # times', n: () => 4, level: 3 },
 ]
 export const TASKS_PER_PERIOD = 3
 // What each task and each chest pays. The server guard reads these from econ_catalog().quests.

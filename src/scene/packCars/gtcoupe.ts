@@ -1,8 +1,8 @@
-import { BufferGeometry, CircleGeometry, CylinderGeometry, Float32BufferAttribute, TorusGeometry } from 'three'
+import { BufferGeometry, CircleGeometry, CylinderGeometry, Float32BufferAttribute } from 'three'
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import type { Kit } from '../CarModel'
 import { Loft } from '../loft'
-import { Surface, bodyRing, box, disc, glassRing, greenhouse, honey, interior, plane, poly, rbox, slab, type ExoticFit, type ExoticHelpers } from '../exoticCars'
+import { Surface, bodyRing, box, disc, glassRing, greenhouse, honey, interior, plane, poly, rbox, slab, type ExoticFit, type ExoticHelpers, flatWell } from '../exoticCars'
 
 // ---------------------------------------------------------------------------
 // Kazumi Sora GT: an everyday front-engine 2+2 sports coupe. A long low hood between
@@ -172,10 +172,7 @@ export function gtcoupeGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   const cy = r - 0.004
   for (const zz of [wz, -wz]) {
     const x = wellX(S, zz, R)
-    for (const sd of SIDES) {
-      k.add('black', new CircleGeometry(R, 20, 0, Math.PI), [sd * x, cy, zz], [0, (sd * Math.PI) / 2, 0])
-      k.add('dark', new TorusGeometry(R, 0.008, 4, 20, Math.PI), [sd * (x + 0.003), cy, zz], [0, (sd * Math.PI) / 2, 0])
-    }
+    flatWell(k, S, zz, cy, R, r, x)
   }
 
   // Sides: door cut and handle, a small gill behind each front wheel, a black sill, a

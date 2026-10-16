@@ -1,7 +1,7 @@
-import { CircleGeometry, CylinderGeometry, TorusGeometry } from 'three'
+import { CylinderGeometry, TorusGeometry } from 'three'
 import type { Kit, Part } from '../CarModel'
 import { Loft, type Pt, type Section } from '../loft'
-import { Surface, bodyRing, box, disc, ellipse, glassRing, greenhouse, honey, interior, plane, poly, rbox, slab, vent, type ExoticFit, type ExoticHelpers } from '../exoticCars'
+import { Surface, bodyRing, box, disc, ellipse, glassRing, greenhouse, honey, interior, plane, poly, rbox, slab, vent, type ExoticFit, type ExoticHelpers, flatWell } from '../exoticCars'
 
 // Kazumi Kaze TA-R: an invented late-90s time-attack hatchback coupe. A low two-door
 // shell with box over-fenders bolted on front and rear (riveted to the body), a vented
@@ -23,10 +23,7 @@ const wellX = (S: Surface, zz: number, R: number) => {
 function wells(k: Kit, S: Surface, wz: number, R: number, cy: number) {
   for (const zz of [wz, -wz]) {
     const x = wellX(S, zz, R) - 0.003
-    for (const sd of SIDES) {
-      k.add('black', new CircleGeometry(R, 20, 0, Math.PI), [sd * (x + 0.003), cy, zz], [0, (sd * Math.PI) / 2, 0])
-      k.add('dark', new TorusGeometry(R, 0.011, 4, 20, Math.PI), [sd * (x + 0.006), cy, zz], [0, (sd * Math.PI) / 2, 0])
-    }
+    flatWell(k, S, zz, cy, R, R / 1.2, x + 0.003, 'dark', 0.011)
   }
 }
 

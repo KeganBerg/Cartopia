@@ -7,10 +7,11 @@ import {
   buildingUpgradeCost, maxLevel, themable, decorGrows, TOURIST_PER_LEVEL, VISITORS, houseResidents, levelName, buildingUpgradeXp, BUILDINGS, CARS, takesDriver, loves, driverPayout, mergedParts, mergedFuelExtra, mergeBonus, mergeGain, carDef, type BuildingDef,
 } from '../game/data'
 import { workingDriver, type PlacedBuilding } from '../game/store'
-import { groupOf, isLandmark, LANDMARK_NAME, mergeGroups } from '../game/merge'
+import { groupOf, isLandmark, landmarkName, GLOBE_NAME, mergeGroups } from '../game/merge'
 import { BuildingThumb, CarThumb } from '../scene/BuildingPreview'
 import { BuildingModel } from '../scene/BuildingModel'
 import { VanguardTower } from '../scene/Landmark'
+import { GlobeTower } from '../scene/GlobeTower'
 import { frame, seat } from '../scene/fit'
 import { Panel } from './Menus'
 import { RaveButton } from './Techno'
@@ -34,7 +35,7 @@ const VIEW = new Vector3(3.4, 2.6, 3.4)
 // Drawn in the shared turntable canvas (scene/Stage.tsx), not a new one each time the panel opens.
 const CAM = { position: VIEW.toArray(), fov: 35, near: 0.1, far: 1000 }
 
-function Spinner({ def, level, landmark, theme }: { def: BuildingDef; level: number; landmark?: boolean; theme: ColorTheme | null }) {
+function Spinner({ def, level, landmark, theme }: { def: BuildingDef; level: number; landmark?: string | null; theme: ColorTheme | null }) {
   const ref = useRef<Group>(null)
   const inner = useRef<Group>(null)
   const disc = useRef<Mesh>(null)
@@ -60,15 +61,15 @@ function Spinner({ def, level, landmark, theme }: { def: BuildingDef; level: num
       <group ref={ref} rotation-y={-0.5}>
         <group ref={inner}>
           {/* In the colours it wears in town. */}
-          <Tint theme={theme}>{landmark ? <VanguardTower /> : <BuildingModel def={def} level={level} />}</Tint>
+          <Tint theme={theme}>{landmark === GLOBE_NAME ? <GlobeTower /> : landmark ? <VanguardTower /> : <BuildingModel def={def} level={level} />}</Tint>
         </group>
       </group>
     </>
   )
 }
 
-// `landmark`: the block is (or this upgrade makes it) a Vanguard Tower, so show that instead of one house.
-function LevelPreview({ def, level, landmark, theme }: { def: BuildingDef; level: number; landmark?: boolean; theme: ColorTheme | null }) {
+// `landmark`: the landmark the block is (or this upgrade makes it), shown instead of one house.
+function LevelPreview({ def, level, landmark, theme }: { def: BuildingDef; level: number; landmark?: string | null; theme: ColorTheme | null }) {
   const scene = useMemo(() => (
     <>
       <hemisphereLight args={['#ffffff', '#90a4ae', 1]} />
@@ -79,7 +80,7 @@ function LevelPreview({ def, level, landmark, theme }: { def: BuildingDef; level
   return (
     <div className="upgrade-preview">
       <Preview.StageSlot cam={CAM}>{scene}</Preview.StageSlot>
-      <span className="upgrade-tag">{landmark ? LANDMARK_NAME : `Level ${level}${level > 1 ? ' look' : ''}`}</span>
+      <span className="upgrade-tag">{landmark ? landmark : `Level ${level}${level > 1 ? ' look' : ''}`}</span>
     </div>
   )
 }
@@ -212,15 +213,15 @@ export function UpgradePanel() {
   // A business that rebuilds into its next form says what it becomes.
   if (d.kind !== 'house' && levelName(d, next) !== levelName(d, lvl)) rows.push({ label: 'Building', now: levelName(d, lvl), next: levelName(d, next) })
   const block = groupOf(s.buildings, b.uid)
-  const landmark = !!block && isLandmark(block)
-  // A merged square of houses reaching level 10 becomes the Vanguard Tower.
-  const becomes = !!block && isLandmark({ ...block, anchor: { ...block.anchor, level: next } })
+  const landmark = block && isLandmark(block) ? landmarkName(block) : null
+  // A merged block of houses reaching level 10 becomes a landmark (a Vanguard or Globe Tower).
+  const becomes = block && isLandmark({ ...block, anchor: { ...block.anchor, level: next } }) ? landmarkName(block) : null
   if (d.kind === 'house') {
-    rows.push({ label: 'Building', now: landmark ? LANDMARK_NAME : levelName(d, lvl), next: becomes ? LANDMARK_NAME : levelName(d, next) })
+    rows.push({ label: 'Building', now: landmark ?? levelName(d, lvl), next: becomes ?? levelName(d, next) })
     rows.push({ label: 'Residents', now: `${houseResidents(lvl) * k}`, next: `${houseResidents(next) * k}` })
     rows.push({ label: 'Upgrade XP', now: '', next: `+${buildingUpgradeXp(lvl) * k}` })
   }
-  const name = landmark ? LANDMARK_NAME : levelName(d, lvl) + (k > 1 ? ` ×${k}` : '')
+  const name = landmark ? landmark : levelName(d, lvl) + (k > 1 ? ` ×${k}` : '')
 
   return (
     <Panel title={canUp ? `${name} · Level ${lvl}` : name} onClose={close}>

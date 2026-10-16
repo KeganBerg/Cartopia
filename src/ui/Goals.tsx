@@ -2,19 +2,21 @@ import { useState } from 'react'
 import { flyFrom, openChestFx, type Amounts } from './Fly'
 import {
   useGame, activeGoals, eventGoals, goalOpen, goalDone, statValue, claimable, taskDef, taskText, taskProgress, periodSlots, periodDone, chestOpened,
+  activeEndless, endlessReady, endlessTown,
   type Period, type GameState,
 } from '../game/store'
+import { ENDLESS_PAY, KINDS, endlessCapped, endlessHave, endlessPay, endlessText, type EndlessGoal, type EndlessKind } from '../game/endless'
 import {
   GOALS, QUEST_PAY, TASKS_PER_PERIOD, payAt, msToNextDay, msToNextWeek, buildingDef, buildingLevel, upgradable, maxLevel,
   carDef, takesDriver, SEASON_STARS, activeEvent, eventEndsAt, plotPrice, START_LAND, type StatKey, type GoalDef, flatFixCost, servicePay, serviceXp, gasCanCost,
 } from '../game/data'
 import { Panel, SheetTabs, openGarageTab } from './Menus'
-import { openRaceTab } from './raceNav'
+import { openRaceTab, type RaceTab } from './raceNav'
 import { useNow } from '../scene/useNow'
 import { Icon } from './Icon'
 import { CrewGoalMini } from './CrewGoal'
 import { useTipTarget } from './Tips'
-import { CarThumb } from '../scene/BuildingPreview'
+import { BuildingThumb, CarThumb } from '../scene/BuildingPreview'
 
 // Sits in its own dock above Collect All, next to the Race button, so it's always in thumb reach.
 export function GoalsButton() {
@@ -47,6 +49,14 @@ function goTo(stat: StatKey, def?: string): void {
       if (s.coins < d.price) return s.showNeed('coins', d.price - s.coins, d.name)
       return s.openShop(d.id)
     }
+    case 'cratesOpened':
+      return s.openPanel('crates')
+    case 'arcadePlays': {
+      const b = s.buildings.find((o) => o.def === 'arcade')
+      return b ? s.openUpgrade(b.uid) : s.openShop('arcade')
+    }
+    case 'dailyRuns':
+      return openRaceTab('daily')
     case 'searches':
     case 'rescued':
       return s.buildings.some((b) => b.def === 'rescue') ? s.openPanel('rescue') : goTo('rusty')
@@ -105,6 +115,46 @@ function goTo(stat: StatKey, def?: string): void {
   }
 }
 
+// Where each kind of endless goal gets done: the story-goal stat that goes the same place.
+const ENDLESS_GO: Partial<Record<EndlessKind, StatKey>> = {
+  jobs: 'jobs', coins: 'coinsEarned', races: 'races', wins: 'racesWon', campaign: 'campaignWins', search: 'searches', service: 'serviced',
+  upgrades: 'upgrades', mods: 'modsBought', paint: 'painted', gp: 'gpWins', stars: 'stars', build: 'owns', cars: 'carsOwned', land: 'plots',
+  drivers: 'drivers', level: 'level', restore: 'rescued', flats: 'flatsFixed', power: 'power',
+}
+// Kinds played from a Race menu tab.
+const ENDLESS_TAB: Partial<Record<EndlessKind, RaceTab>> = { dailyRun: 'daily', trophies: 'road', proTour: 'tour', worldTour: 'world', cups: 'cups', paintRival: 'rivals', tuner: 'tuner' }
+function goToEndless(g: EndlessGoal) {
+  const s = useGame.getState()
+  if (g.kind === 'bldgUp') {
+    // The lowest-level one of that building, so the upgrade counts.
+    const b = s.buildings.filter((o) => o.def === g.def).sort((a, c) => buildingLevel(a) - buildingLevel(c))[0]
+    return b ? s.openUpgrade(b.uid) : s.openShop(g.def)
+  }
+  if (g.kind === 'carUp') {
+    if (g.def) s.selectCar(g.def)
+    return openGarageTab('tune')
+  }
+  const tab = ENDLESS_TAB[g.kind]
+  if (tab) return openRaceTab(tab)
+  if (g.kind === 'crates') return s.openPanel('crates')
+  if (g.kind === 'arcade') {
+    const b = s.buildings.find((o) => o.def === 'arcade')
+    return b ? s.openUpgrade(b.uid) : s.openShop('arcade')
+  }
+  const stat = ENDLESS_GO[g.kind]
+  if (stat) goTo(stat, g.def)
+}
+// A building or car goal shows the real thing; the rest show their icon.
+function EndlessIcon({ g }: { g: EndlessGoal }) {
+  const car = useGame((s) => (g.kind === 'carUp' ? s.cars.find((c) => c.uid === g.def) : undefined))
+  if ((g.kind === 'build' || g.kind === 'bldgUp') && g.def) return <BuildingThumb def={buildingDef(g.def)} level={g.kind === 'bldgUp' ? g.n : undefined} />
+  if (car) {
+    const d = carDef(car.model)
+    return <CarThumb size="sm" color={car.color} finish={car.finish} skin={car.skin} body={d.body} model={d.id} stripe={car.stripe} />
+  }
+  return <>{KINDS[g.kind]?.icon ?? '♾'}</>
+}
+
 const n = (v: number) => v.toLocaleString()
 const left = (ms: number) => {
   const m = Math.max(1, Math.ceil(ms / 60000))
@@ -122,12 +172,12 @@ function Reward({ coins, xp, bucks, parts, stars }: { coins: number; xp?: number
   )
 }
 
-function Row({ icon, text, have, target, done, claimed, onGo, onClaim, pay, children }: {
-  icon: string; text: string; have: number; target: number; done: boolean; claimed?: boolean; onGo: () => void; onClaim: () => void; pay?: Amounts; children: React.ReactNode
+function Row({ icon, text, have, target, done, claimed, wait, onGo, onClaim, pay, children }: {
+  icon: React.ReactNode; text: string; have: number; target: number; done: boolean; claimed?: boolean; wait?: string; onGo: () => void; onClaim: () => void; pay?: Amounts; children: React.ReactNode
 }) {
   return (
     <div className={claimed ? 'goal claimed' : done ? 'goal done' : 'goal'}>
-      <span className="goal-icon">{icon}</span>
+      <span className={typeof icon === 'string' ? 'goal-icon' : 'goal-icon goal-thumb'}>{icon}</span>
       <div className="goal-main" role="button" onClick={() => !done && onGo()}>
         <b>{text}</b>
         <div className="goal-line">
@@ -138,7 +188,9 @@ function Row({ icon, text, have, target, done, claimed, onGo, onClaim, pay, chil
       </div>
       {claimed
         ? <span className="goal-check">✔</span>
-        : done
+        : done && wait
+          ? <button className="buy small" disabled title="Endless goals: back tomorrow (UTC)">🔒 {wait}</button>
+          : done
           ? <button className="buy small" onClick={(e) => { if (pay) flyFrom(e.currentTarget, pay); onClaim() }}>Collect</button>
           : <button className="buy small alt" onClick={onGo}>Go ›</button>}
     </div>
@@ -148,16 +200,17 @@ function Row({ icon, text, have, target, done, claimed, onGo, onClaim, pay, chil
 function StoryGoals() {
   const s = useGame()
   const goals = activeGoals(s)
-  const total = GOALS.length
-  const claimed = s.claimedGoals.filter((id) => GOALS.some((g) => g.id === id)).length
-  const next = GOALS.find((g) => !s.claimedGoals.includes(g.id) && s.level < (g.level ?? 1))
+  // Event goals have their own tab, so they don't count toward the story.
+  const story = GOALS.filter((g) => !g.event)
+  const total = story.length
+  const claimed = s.claimedGoals.filter((id) => story.some((g) => g.id === id)).length
+  const endless = activeEndless(s)
   return (
     <>
       <div className="goal-head">
-        <span>Story {claimed}/{total}</span>
+        <span>{claimed >= total ? '✔' : ''} Story {claimed}/{total}</span>
         <div className="bar"><span style={{ width: `${(claimed / total) * 100}%` }} /></div>
       </div>
-      {goals.length === 0 && <p className="hint">{next ? `🔒 More at level ${next.level}` : '✔ Story complete'}</p>}
       <div className="goals">
         {goals.map((g: GoalDef) => (
           <Row key={g.id} icon={g.icon} text={g.text} have={statValue(s, g.stat, g.def)} target={g.target} done={goalDone(s, g)}
@@ -165,8 +218,43 @@ function StoryGoals() {
             <Reward coins={g.coins} xp={g.xp} bucks={g.bucks} />
           </Row>
         ))}
+        {endless.length > 0 && <EndlessHead />}
+        {endless.map((g) => <EndlessRow key={g.k} g={g} />)}
       </div>
     </>
+  )
+}
+
+// Endless goals so far, and the pips toward the next parts (5th) and gems (10th) bonus.
+function EndlessHead() {
+  const done = useGame((s) => s.endless?.n ?? 0)
+  const at = done % ENDLESS_PAY.bucksEvery
+  return (
+    <div className="endless-head" title={`Endless goals: ${n(done)} done · every ${ENDLESS_PAY.partsEvery}th +${ENDLESS_PAY.parts} parts · every ${ENDLESS_PAY.bucksEvery}th +${ENDLESS_PAY.bucks} gems`}>
+      <b>♾ {n(done)}</b>
+      <span className="endless-pips">
+        {Array.from({ length: ENDLESS_PAY.bucksEvery }, (_, i) => {
+          const k = i + 1
+          const mark = k % ENDLESS_PAY.bucksEvery === 0 ? '💎' : k % ENDLESS_PAY.partsEvery === 0 ? '⚙' : null
+          return <i key={i} className={(i < at ? 'on' : '') + (mark ? ' mark' : '')}>{mark}</i>
+        })}
+      </span>
+    </div>
+  )
+}
+
+function EndlessRow({ g }: { g: EndlessGoal }) {
+  const s = useGame()
+  const now = useNow()
+  const have = endlessHave(endlessTown(s), g)
+  const done = endlessReady(s, g)
+  const pay = endlessPay((s.endless?.n ?? 0) + 1, s.level)
+  return (
+    <Row icon={<EndlessIcon g={g} />} text={endlessText(g, s.cars)} have={have} target={g.n} done={done}
+      wait={endlessCapped(s.endless, now) ? left(msToNextDay(now)) : undefined}
+      onGo={() => goToEndless(g)} onClaim={() => s.claimEndless(g.k)} pay={{ coins: pay.coins, xp: pay.xp, parts: pay.parts, bucks: pay.bucks }}>
+      <Reward coins={pay.coins} xp={pay.xp} parts={pay.parts} bucks={pay.bucks} />
+    </Row>
   )
 }
 
@@ -252,7 +340,7 @@ export function GoalsPanel() {
   const [tab, setTabState] = useState<GoalsTab>(() => {
     const has = (p: Period) => periodSlots(s.quests, p).some((t) => !periodDone(s.quests, p).includes(t.id) && taskProgress(s, p, t) >= t.n)
       || (periodDone(s.quests, p).length >= TASKS_PER_PERIOD && !chestOpened(s.quests, p))
-    if (activeGoals(s).some((g) => goalDone(s, g))) return 'story'
+    if (activeGoals(s).some((g) => goalDone(s, g)) || (!endlessCapped(s.endless) && activeEndless(s).some((g) => endlessReady(s, g)))) return 'story'
     if (eventDot) return 'event'
     if (has('daily')) return 'daily'
     if (has('weekly')) return 'weekly'
@@ -264,7 +352,7 @@ export function GoalsPanel() {
     const c = periodSlots(s.quests, p).filter((t) => !done.includes(t.id) && taskProgress(s, p, t) >= t.n).length + (done.length >= TASKS_PER_PERIOD && !chestOpened(s.quests, p) ? 1 : 0)
     return c ? <span className="tab-dot">{c}</span> : null
   }
-  const storyDot = activeGoals(s).filter((g) => goalDone(s, g)).length
+  const storyDot = activeGoals(s).filter((g) => goalDone(s, g)).length + (endlessCapped(s.endless) ? 0 : activeEndless(s).filter((g) => endlessReady(s, g)).length)
   return (
     <Panel title="Goals">
       <SheetTabs value={tab} onChange={setTab} items={[
@@ -282,13 +370,18 @@ export function GoalsPanel() {
 export function GoalTracker() {
   const s = useGame()
   // A finished goal shows first, so the tracker turns green when there's something to collect.
-  const goals = activeGoals(s)
-  const g = goals.find((o) => goalDone(s, o)) ?? goals[0]
+  // Endless goals count too, so the tracker never runs out once the story does.
+  const capped = endlessCapped(s.endless)
+  const rows = [
+    ...activeGoals(s).map((g) => ({ icon: g.icon, text: g.text, have: statValue(s, g.stat, g.def), target: g.target, go: () => goTo(g.stat, g.def), ready: true })),
+    ...activeEndless(s).map((g) => ({ icon: KINDS[g.kind]?.icon ?? '♾', text: endlessText(g, s.cars), have: endlessHave(endlessTown(s), g), target: g.n, go: () => goToEndless(g), ready: !capped })),
+  ]
+  const g = rows.find((o) => o.ready && o.have >= o.target) ?? rows.find((o) => o.have < o.target) ?? rows[0]
   if (!g || s.visiting || s.mode !== 'play' || s.tutorial < 99) return null
-  const have = Math.min(g.target, statValue(s, g.stat, g.def))
+  const have = Math.min(g.target, g.have)
   const done = have >= g.target
   return (
-    <button className={done ? 'goal-tracker done' : 'goal-tracker'} onClick={() => (done ? s.openPanel('goals') : goTo(g.stat, g.def))}>
+    <button className={done ? 'goal-tracker done' : 'goal-tracker'} onClick={() => (done ? s.openPanel('goals') : g.go())}>
       <span className="gt-icon">{done ? '✔' : g.icon}</span>
       <span className="gt-text">{g.text}</span>
       <span className="gt-bar"><i style={{ width: `${(have / g.target) * 100}%` }} /></span>

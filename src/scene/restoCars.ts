@@ -1,4 +1,4 @@
-import { CircleGeometry, CylinderGeometry, TorusGeometry, type BufferGeometry } from 'three'
+import { CylinderGeometry, TorusGeometry, type BufferGeometry } from 'three'
 import { Loft, type Section } from './loft'
 import type { Kit, Part } from './CarModel'
 import type { Body } from '../game/data'
@@ -14,8 +14,7 @@ const SIDES = [-1, 1] as const
 // A black wheel well behind each tyre with a thin dark lip, radius R centred cy up.
 function arches(S: Surface, wz: number, R: number, cy: number, lip: Part = 'dark') {
   for (const zz of [wz, -wz]) for (const sd of SIDES) {
-    S.wall('black', new CircleGeometry(R, 20, 0, Math.PI), sd, zz, cy, 0.002)
-    S.wall(lip, new TorusGeometry(R, 0.008, 4, 20, Math.PI), sd, zz, cy, 0.004)
+    S.well(sd, zz, cy, R, R / 1.2, 20, lip, 0.008, 0.002)
   }
 }
 
@@ -214,7 +213,7 @@ export function pontoneGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
     }
   }
   S.top('chrome', disc(0.032, 18), -0.2, -0.47, 0.003)
-  S.top('dark', disc(0.022, 14), -0.2, -0.47, 0.005)
+  S.top('dark', disc(0.022, 14), -0.2, -0.47, 0.0065)
   // Racing stripe down the nose and the tail (drawn only when painted on).
   for (let z = 0.65; z > 0.53; z -= 0.04) S.top('stripe', plane(0.08, 0.042), 0, z, 0.005)
   for (let z = -0.36; z > -0.66; z -= 0.04) S.top('stripe', plane(0.08, 0.042), -0.08, z, 0.004)
@@ -366,7 +365,7 @@ export function sprintGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   // Racing stripes over the roof and trunk (the hood's ride on its lid; drawn only when painted on).
   for (const x of [-0.05, 0.05]) {
     for (let z = 0; z > -0.36; z -= 0.05) k.add('stripe', box(0.05, 0.004, 0.052), [x, glass.near(z).pts[4][1] + 0.011, z])
-    for (let z = -0.54; z > -0.64; z -= 0.05) S.top('stripe', plane(0.05, 0.052), x, z, 0.005)
+    for (let z = -0.54; z > -0.64; z -= 0.05) S.top('stripe', plane(0.05, 0.052), x, z, 0.0065)
   }
   cabin(k, h, 0.215, -0.16, 0.33, 0.13, 0.56)
   h.brakes(k, SPRINT.wid / 2 - 0.02, wz, r, 0.14)

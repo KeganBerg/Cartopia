@@ -336,7 +336,9 @@ function SumTile({ open, sel, paintCar, onPick, onDone }: { open: CrateOpen; sel
 }
 
 // embedded: drawn inside the Cars page (under its header and tabs) instead of over the whole screen.
-export function CratesPanel({ embedded = false }: { embedded?: boolean }) {
+// There the page walks in from its Showroom while the depot gets ready (no loading screen), and
+// `onReady` says when the depot can be shown.
+export function CratesPanel({ embedded = false, onReady }: { embedded?: boolean; onReady?: () => void }) {
   const level = useGame((s) => s.level)
   const coins = useGame((s) => s.coins)
   const bucks = useGame((s) => s.bucks)
@@ -490,6 +492,21 @@ export function CratesPanel({ embedded = false }: { embedded?: boolean }) {
     [run, shownDef, phase, drop, prizeCar, onReveal, skip, pace],
   )
   const stageReady = useStageReady()
+  // The first render can still see the stage's last scene as ready: wait a render for this one's.
+  const [armed, setArmed] = useState(false)
+  useEffect(() => setArmed(true), [])
+  const ready = useRef(onReady)
+  useEffect(() => void (ready.current = onReady))
+  // Compiled is not drawn: the first frames (shadows, the glow pass) come a few frames after.
+  useEffect(() => {
+    if (!armed || !stageReady) return
+    let n = 0
+    let id = requestAnimationFrame(function tick() {
+      if (++n >= 4) return ready.current?.()
+      id = requestAnimationFrame(tick)
+    })
+    return () => cancelAnimationFrame(id)
+  }, [armed, stageReady])
 
   const locked = !free && level < def.unlockLevel
   const tenLocked = level < def.unlockLevel
@@ -505,7 +522,7 @@ export function CratesPanel({ embedded = false }: { embedded?: boolean }) {
     <div className={embedded ? 'race-full crate-full embedded' : 'race-full crate-full'} onClick={tap}>
       {/* Taps go through the canvas to the screen behind it: "Tap to skip". */}
       <StageSlot cam={CRATE_CAM} through>{scene}</StageSlot>
-      <LoadingScene ready={stageReady} label="Opening the Crate Depot" onClose={close} />
+      {!embedded && <LoadingScene ready={stageReady} label="Opening the Crate Depot" onClose={close} />}
       <div className="rf-top">
         <h2>📦 Crate Depot</h2>
         <span className="crate-wallet"><span><CoinIcon size={16} />{compact(coins)}</span><span><BuckIcon size={16} />{compact(bucks)}</span></span>

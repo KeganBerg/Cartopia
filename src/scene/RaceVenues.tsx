@@ -17,7 +17,7 @@ import type { VenueId } from './venues'
 
 export const ROAD = 1.6 // half width of the street
 export const WALK = 1.0 // shoulder / sidewalk width
-const EDGE = ROAD + WALK
+export const EDGE = ROAD + WALK
 
 // Deterministic so a venue looks the same every race.
 export function rand(seed: number) {
@@ -64,7 +64,7 @@ export function Flat({ x, z, w, d, c, y = 0.015 }: { x: number; z: number; w: nu
 
 // Far-off scenery that rides along with the camera, like the town's downtown:
 // too distant to show parallax, so the horizon is never empty.
-function Horizon({ children }: { children: ReactNode }) {
+export function Horizon({ children }: { children: ReactNode }) {
   const ref = useRef<Group>(null)
   useFrame(({ camera }) => ref.current?.position.set(0, 0, camera.position.z))
   return (
@@ -75,7 +75,7 @@ function Horizon({ children }: { children: ReactNode }) {
 }
 
 // Steps along the strip on both sides, handing out positions to dress.
-function along(len: number, step: (r: () => number) => number, seed: number, from = -14, to = len + 45) {
+export function along(len: number, step: (r: () => number) => number, seed: number, from = -14, to = len + 45) {
   const r = rand(seed)
   const out: { z: number; side: -1 | 1; r: () => number }[] = []
   for (const side of [-1, 1] as const) for (let z = from + (side > 0 ? 1.3 : 0); z < to; z += step(r)) out.push({ z, side, r })
@@ -926,13 +926,13 @@ function Docks({ len }: { len: number }) {
 }
 
 // Spread across the far end of the view.
-function spread(n: number, seed: number) {
+export function spread(n: number, seed: number) {
   const r = rand(seed)
   return Array.from({ length: n }, (_, i) => ({ x: (i / (n - 1) - 0.5) * 130 + (r() - 0.5) * 8, z: 62 + r() * 14, a: r(), b: r() }))
 }
 
 // Glints on the water ahead of the camera.
-function Sparkles({ edge }: { edge: number }) {
+export function Sparkles({ edge }: { edge: number }) {
   const ref = useRef<InstancedMesh>(null)
   const N = 70
   const spots = useMemo(() => {
@@ -966,7 +966,7 @@ function Sparkles({ edge }: { edge: number }) {
 }
 
 // Gulls wheeling over the water.
-function Gulls({ x }: { x: number }) {
+export function Gulls({ x }: { x: number }) {
   const refs = useRef<(Group | null)[]>([])
   const birds = useMemo(() => Array.from({ length: 6 }, (_, i) => ({ r: 3 + (i % 3) * 1.5, y: 3.5 + (i % 2) * 1.2, ph: i * 1.1, z: 8 + i * 4 })), [])
   useFrame(({ camera, clock }) => {

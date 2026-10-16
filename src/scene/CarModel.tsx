@@ -20,7 +20,7 @@ import { bake, finishOf, type Finish as Look } from './bake'
 import { carStyle, hasTrim, onPane, trimBike, trimCar, type CarStyle, type Pane, type Panes } from './carTrim'
 import { brakeGeo, wheelGeo, type RimStyle } from './carWheels'
 import { PEOPLE_SIZED } from './keepShape'
-import { EXOTIC } from './exoticCars'
+import { EXOTIC, lipGeo, wellGeo, wellOutline } from './exoticCars'
 import { tintDef, trimDef, type Trim } from '../game/trim'
 import { HatModel } from './CarHat'
 import type { HatFit } from '../game/hats'
@@ -301,6 +301,9 @@ export type ModFrame = {
   // Where side skirts bolt on, when that's not the bottom of the body side: the outer face and
   // the foot of the tank's armour skirts, out over its tracks.
   sill?: number; sillY?: number
+  // Noses that taper in at the front: the half width of the bottom of the nose, and its height
+  // (front lips, splitters and skid plates are cut to these instead of the body's full width).
+  nose?: number; noseY?: number
   // The top of the hard roof (the deck on bodies without one), where it runs, and how wide it is.
   roof: number; roofZ: number; roofLen: number; roofW: number
   // The outside of the windshield and back window, on closed cabins.
@@ -639,8 +642,26 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
   // Dark rocker panel along the bottom.
   k.add('dark', rbox(s.wid + 0.005, 0.06, s.len * 0.8, 0.025), [0, s.lift + 0.04, 0])
   // Wheel arches: dark wells behind each tyre so the wheels sit in the body.
+  // Each stops where the side it's on ends: under the nose and tail as they round off, under a
+  // frog's wings and a prototype's pods (which cover the tyre from above) and inside a flare.
+  const outline = lower.sh.getPoints(12)
+  const sideTop = (z: number) => {
+    let y = -Infinity
+    for (let i = 0; i < outline.length; i++) {
+      const a = outline[i], c = outline[(i + 1) % outline.length]
+      if ((a.x - z) * (c.x - z) > 0 || a.x === c.x) continue
+      y = Math.max(y, a.y + ((c.y - a.y) * (z - a.x)) / (c.x - a.x))
+    }
+    return y + b
+  }
+  const wells = new Map<string, [number, number][]>()
   for (const z of [wz, -wz]) for (const sd of [-1, 1]) {
-    k.add('black', new CircleGeometry(s.wheel * 1.18, 18, 0, Math.PI), [sd * (s.wid / 2 + 0.0045), s.wheel, z], [0, (sd * Math.PI) / 2, 0])
+    const cap = s.frog && z > 0 ? hoodY - 0.034 : s.lmp ? top - 0.024 : Infinity
+    // Flares (the body's own or a model's boxed arches) hug the tyre, so the well hides behind it.
+    const R = s.flares || hasTrim(model, 'boxFlares') ? s.wheel : s.wheel * 1.18
+    const pts = wellOutline(R, s.wheel, (lx, ly) => s.wheel + ly <= Math.min(cap, sideTop(z - sd * lx) - b - 0.012))
+    wells.set(`${z}|${sd}`, pts)
+    k.add('black', wellGeo(pts), [sd * (s.wid / 2 + 0.0045), s.wheel, z], [0, (sd * Math.PI) / 2, 0])
     // Rugged bodies get chunky black fender flares round the arches.
     // The open buggy's are slimmer and stop short of the axle line, so they read as flares on its
     // tub rather than mudguards hanging down past the tyres.
@@ -829,8 +850,10 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
   }
   if (s.hood > 0) k.add('paint', rbox(s.wid * 0.5, s.hood * 2, s.len * 0.26, s.hood * 0.9), [0, hoodY, s.len * 0.3])
   if (s.scoop && !fit.hood) {
-    k.add('black', rbox(0.16, 0.07, 0.16, 0.025), [0, hoodY + s.hood + 0.02, s.len * 0.27])
-    k.add('black', box(0.12, 0.03, 0.01), [0, hoodY + s.hood + 0.03, s.len * 0.27 + 0.082])
+    // A body-colour scoop with a black mouth, low on the hood (a tall black brick read as a box
+    // dropped on it).
+    k.add('paint', rbox(0.13, 0.045, 0.14, 0.018), [0, hoodY + s.hood + 0.015, s.len * 0.27])
+    k.add('black', rbox(0.1, 0.024, 0.012, 0.006), [0, hoodY + s.hood + 0.02, s.len * 0.27 + 0.066])
   }
   if (s.bed) {
     k.add('black', box(s.wid * 0.84, 0.03, s.len * 0.4), [0, top + 0.01, -s.len * 0.27])
@@ -997,7 +1020,7 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
       const sd = i % 2 ? 1 : -1
       const z = -s.len * 0.42 + ((i * 0.37) % 1) * s.len * 0.8
       const y = s.lift + 0.06 + ((i * 0.61) % 1) * (top - s.lift - 0.11)
-      if (y < s.wheel * 2 + 0.02 && Math.abs(Math.abs(z) - wz) < s.wheel * 1.2) continue
+      if (y - 0.035 < s.wheel * 2.18 + 0.01 && Math.abs(Math.abs(z) - wz) < s.wheel * 1.2 + 0.04) continue
       k.add(i % 3 ? 'paint' : 'dark', rbox(0.03, 0.07, 0.08, 0.012), [sd * (s.wid / 2 + 0.008), y, z], [0, 0, sd * (0.2 + ((i * 0.29) % 1) * 0.3)])
     }
     k.add('black', new SphereGeometry(0.055, 12, 10), [0, top - 0.04, front + 0.03], [0, 0, 0], [1.3, 1, 1])
@@ -1008,10 +1031,12 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
   if (s.frog) {
     // Front wings standing above the hood, each ending in an upright round headlight.
     for (const sd of [-1, 1]) {
-      const x = sd * (s.wid / 2 - 0.04)
-      k.add('paint', new SphereGeometry(1, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2), [x, hoodY - 0.03, wz + 0.02], [0, 0, 0], [0.105, 0.11, 0.24])
-      const ly = hoodY + 0.01
-      const lz = wz + 0.02 + 0.24 * Math.cos(0.62) - 0.008
+      // Centred over the tyre and tall and wide enough to cover its top, standing out past the side.
+      const x = sd * wheelX(s)
+      k.add('paint', new SphereGeometry(1, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2), [x, hoodY - 0.03, wz + 0.02], [0, 0, 0], [0.12, 0.135, 0.24])
+      // The lamp sits on the wing's front, a little way up its curve.
+      const ly = hoodY - 0.03 + 0.135 * Math.sin(0.5)
+      const lz = wz + 0.02 + 0.24 * Math.cos(0.5) - 0.012
       k.add('black', cyl(0.05, 0.05, 0.03, 16), [x, ly, lz], [Math.PI / 2 - 0.45, 0, 0])
       // Lens, ring and centre cap each a clear step out from the lamp bucket's face.
       const out = (d: number): [number, number] => [ly + Math.sin(0.45) * d, lz + Math.cos(0.45) * d]
@@ -1020,7 +1045,8 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
       k.add('chrome', disc(0.012, 10), [x, ...out(0.0195)], [-0.45, 0, 0])
     }
     // Rear haunches swelling over the back wheels.
-    for (const sd of [-1, 1]) k.add('paint', new SphereGeometry(1, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2), [sd * (s.wid / 2 - 0.04), top - 0.05, -wz], [0, 0, 0], [0.1, 0.1, 0.26])
+    // Over the tyre, like the front wings, and high enough to cover its top.
+    for (const sd of [-1, 1]) k.add('paint', new SphereGeometry(1, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2), [sd * wheelX(s), top - 0.05, -wz], [0, 0, 0], [0.12, 0.12, 0.26])
   }
   if (s.lmp) {
     // Wheel pods: a tall rounded fairing over each tyre, with louvres on the front pods to vent the brakes.
@@ -1108,13 +1134,12 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
     for (const sd of [-1, 1]) {
       const x = sd * s.wid * 0.3
       if (s.quad) {
-        // Two round lamps each side in a black bezel; the inner left one is an air intake.
+        // Two round lamps each side in a black bezel.
         onNose('black', rbox(0.17, 0.07, 0.01, 0.01), x, lightY, 0.002)
         for (const lx of [0.37, 0.23]) {
-          const intake = sd < 0 && lx === 0.23
-          onNose(intake ? 'black' : 'lamp', disc(0.028, 14), sd * s.wid * lx, lightY, 0.009)
-          onNose(intake ? 'chrome' : 'chrome', new TorusGeometry(0.031, 0.005, 4, 16), sd * s.wid * lx, lightY, 0.01)
-          if (!intake) onNose('chrome', disc(0.009, 8), sd * s.wid * lx, lightY, 0.011)
+          onNose('lamp', disc(0.028, 14), sd * s.wid * lx, lightY, 0.009)
+          onNose('chrome', new TorusGeometry(0.031, 0.005, 4, 16), sd * s.wid * lx, lightY, 0.01)
+          onNose('chrome', disc(0.009, 8), sd * s.wid * lx, lightY, 0.011)
         }
       } else if (s.frog) {
         // The headlights stand up in the front wings (see above).
@@ -1251,7 +1276,10 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
     const half = (wheelX(s) + 0.076 - s.wid / 2) / 2
     for (const z of [wz, -wz]) for (const sd of [-1, 1]) {
       if (s.inset) k.add('dark', new TorusGeometry(s.wheel * 1.2, 0.008, 8, 28, Math.PI), [sd * (s.wid / 2 + 0.001 + half), s.wheel, z], [0, (sd * Math.PI) / 2, 0], [1, 1, half / 0.008])
-      else k.add('dark', new TorusGeometry(s.wheel * 1.2, 0.008, 3, 14, Math.PI), [sd * (s.wid / 2 + 0.004), s.wheel, z], [0, (sd * Math.PI) / 2, 0], [1, 1, 0.6])
+      else {
+        const l = lipGeo(wells.get(`${z}|${sd}`)!, 0.006, s.wheel * 1.18)
+        if (l) k.add('dark', l, [sd * (s.wid / 2 + 0.0055), s.wheel, z], [0, (sd * Math.PI) / 2, 0])
+      }
     }
   }
   if (!s.tracks) brakes(k, wheelX(s), wz, s.wheel, 0.14)

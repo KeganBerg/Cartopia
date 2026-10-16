@@ -25,6 +25,7 @@ import { crateSfx, sfx } from '../lib/sound'
 import { landClink } from '../lib/crateClinks'
 import { PART_LIFT, PartPrize, partReach } from './PartPrize'
 import { pinPrograms, warmShaders } from './warm'
+import { DEPOT_WALK, depotWalk } from './doorTrip'
 
 // The Crate Depot: a warehouse loading bay at night where crates are opened. The crate sits on a
 // hazard-striped lift under a work lamp, racking full of stock either side, a forklift parked up,
@@ -1036,6 +1037,20 @@ type StageProps = {
   pace?: CratePace
 }
 
+// Walking in from the Cars page's Showroom (scene/doorTrip.ts): how far back the camera starts.
+const WALK = new Vector3(-0.8, 0.45, 3.4)
+function walkBack(dt: number) {
+  const w = depotWalk
+  if (w.go === 'hold') return 1
+  if (w.go !== 'in' && w.go !== 'out') return 0
+  w.p = Math.min(1, w.p + dt / DEPOT_WALK)
+  if (w.go === 'in') {
+    if (w.p >= 1) w.go = null
+    return (1 - w.p) ** 3
+  }
+  return w.p * w.p
+}
+
 // Diamond's camera swing turns about the crate.
 const PIVOT = new Vector3(0, 1, 0)
 const UP = new Vector3(0, 1, 0)
@@ -1277,7 +1292,7 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base, baseQ, pace =
       }
       camera.lookAt(AIM)
     } else {
-      camera.position.copy(base.current)
+      camera.position.copy(base.current).addScaledVector(WALK, walkBack(dt))
       camera.quaternion.copy(baseQ.current)
       if (beam.current) beam.current.visible = false
       if (prize.current) prize.current.visible = false
