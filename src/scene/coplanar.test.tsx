@@ -7,6 +7,7 @@ import { BUILDINGS, TILE } from '../game/data'
 import { mergeable } from '../game/merge'
 import { BuildingModel } from './BuildingModel'
 import { VanguardTower } from './Landmark'
+import { GlobeTower } from './GlobeTower'
 import { LAYER } from './layers'
 import { applyNight } from './dayNight'
 import { KeepShapes, MergeScale } from './mergeScale'
@@ -222,5 +223,8 @@ describe('no flickering flat faces', () => {
 describe('no flickering flat faces on landmarks', () => {
   it('vanguard tower', async () => {
     expect(await scan(BUILDINGS.find((d) => d.id === 'house')!, 10, <VanguardTower />, [2, 2])).toEqual([])
+  })
+  it('globe tower', async () => {
+    expect(await scan(BUILDINGS.find((d) => d.id === 'house')!, 10, <GlobeTower />, [4, 2])).toEqual([])
   })
 })
