@@ -21,3 +21,21 @@ describe('gateLevel', () => {
     expect(needs).toEqual(['level'])
   })
 })
+
+describe('race locks open for the admin only', () => {
+  it("rivals, campaign, Grand Prix and Rusty's spots, bay 2 and truck", async () => {
+    const { currentRival, RIVALS } = await import('./rivals')
+    const { CAMPAIGN, GP_SERIES, RESCUE_SPOTS, TRUCK, BAY2_LEVEL } = await import('./data')
+    const player = gateLevel({ level: 1 })
+    const admin = gateLevel({ level: 1, admin: true })
+    expect(currentRival(player, {}, 0)?.locked).toBe(RIVALS[0].unlockLevel > 1)
+    expect(currentRival(admin, {}, 0)?.locked).toBe(false)
+    expect(CAMPAIGN.filter((c) => player < c.unlockLevel).length).toBeGreaterThan(0)
+    expect(CAMPAIGN.filter((c) => admin < c.unlockLevel)).toEqual([])
+    expect(GP_SERIES.filter((s) => player < s.unlockLevel).length).toBeGreaterThan(0)
+    expect(GP_SERIES.filter((s) => admin < s.unlockLevel)).toEqual([])
+    expect(RESCUE_SPOTS.filter((s) => admin < s.unlockLevel)).toEqual([])
+    expect(TRUCK.filter((t) => admin < t.level)).toEqual([])
+    expect(admin >= BAY2_LEVEL && player < BAY2_LEVEL).toBe(true)
+  })
+})

@@ -2508,7 +2508,7 @@ export const useGame = create<GameState>()(
         const spot = RESCUE_SPOTS.find((o) => o.id === spotId)
         if (!spot) return
         if (!hasRusty(s)) return s.toast("Build Rusty's Rescue first")
-        if (s.level < spot.unlockLevel) return s.showNeed('level', spot.unlockLevel, spot.name)
+        if (gateLevel(s) < spot.unlockLevel) return s.showNeed('level', spot.unlockLevel, spot.name)
         if (s.junkyard.length >= STORAGE_MAX) return s.toast('Storage is full. Restore or scrap a car first.')
         if (s.coins < spot.cost) return s.showNeed('coins', spot.cost - s.coins, `a search in the ${spot.name}`)
         const go = (res: ServerSearch | null) => {
@@ -2606,7 +2606,7 @@ export const useGame = create<GameState>()(
         const car = s.junkyard.find((c) => c.uid === juid)
         if (!car) return
         if (carDef(car.model).parked) return s.toast('This car is coming in a future update. Check back soon!')
-        const bay = !s.restoring ? 'restoring' : !s.restoring2 && s.level >= BAY2_LEVEL ? 'restoring2' : null
+        const bay = !s.restoring ? 'restoring' : !s.restoring2 && gateLevel(s) >= BAY2_LEVEL ? 'restoring2' : null
         if (!bay) return s.toast('The restore bay is busy. Finish that car first.')
         const cost = restoreCost(carDef(car.model))
         if (s.coins < cost) return s.showNeed('coins', cost - s.coins, `restoring the ${carDef(car.model).name}`)
@@ -2653,7 +2653,7 @@ export const useGame = create<GameState>()(
         const s = get()
         const next = TRUCK[(s.truck ?? 0) + 1]
         if (!next) return
-        if (s.level < next.level) return s.showNeed('level', next.level, 'the next tow truck upgrade')
+        if (gateLevel(s) < next.level) return s.showNeed('level', next.level, 'the next tow truck upgrade')
         if (s.parts < next.parts) return s.showNeed('parts', next.parts - s.parts, 'the next tow truck upgrade')
         sfx.buy()
         set({ parts: s.parts - next.parts, truck: (s.truck ?? 0) + 1, updatedAt: Date.now() })
