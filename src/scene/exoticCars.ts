@@ -65,8 +65,10 @@ export class Surface {
     g.computeBoundingBox()
     const bb = g.boundingBox!
     // Small parts bend too, so one laid over a long one keeps its height above it.
-    if (Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z) > 0.03) {
-      const fine = new TessellateModifier(0.015, 6).modify(g)
+    // Only flat decals (a few triangles) are cut up: solid parts stay whole for the phone's
+    // vertex budget, their corners still set down on the surface below.
+    if (g.getAttribute('position').count <= 24 && Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z) > 0.05) {
+      const fine = new TessellateModifier(0.025, 4).modify(g)
       if (fine !== g) g.dispose()
       g = fine
     }
@@ -676,7 +678,7 @@ export function orafoGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   // Chrome bonnet pins, and an oval badge on the nose.
   for (const sd of [-1, 1]) S.top('chrome', disc(0.008, 10), sd * 0.13, 0.6, 0.003)
   S.top('chrome', poly(ellipse(0.022, 0.014, 14)), 0, 0.665, 0.005)
-  S.top('dash', poly(ellipse(0.016, 0.009, 14)), 0, 0.665, 0.007)
+  S.top('dash', poly(ellipse(0.016, 0.009, 14)), 0, 0.665, 0.0095)
   // Louvres across the rear deck.
   for (let i = 0; i < 5; i++) S.top('black', box(0.26 - i * 0.02, 0.01, 0.004), 0, -0.56 - i * 0.022, 0.003)
 

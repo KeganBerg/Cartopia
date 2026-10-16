@@ -72,6 +72,9 @@ function pipe(r: number, len: number, x: number, y: number, z: number, r2 = r) {
   return g
 }
 
+// The bottom of the nose, where front lips and splitters bolt on, and how wide it is.
+const noseLift = (f: Frame) => (f.noseY === undefined ? f.lift : f.noseY - 0.009)
+const noseW = (f: Frame) => (f.nose === undefined ? f.bodyW : f.nose * 2)
 // A front lip: a blade under the nose with a raised fence along its leading edge, bolted on
 // across the top and braced up to the bumper by two struts. Swept lips fold their corners back.
 // Under a nose that tapers in, the blade is cut to the nose's own width and tucked back under
@@ -92,9 +95,6 @@ function frontLip(f: Frame, p: Parts, k: Kind, w: number, t: number, d: number, 
   for (let i = -2; i <= 2; i++) p.chrome.push(post(0.0055, 0.012, i * w * 0.14, y + t / 2, z - d * 0.12, 8))
   for (const sd of [-1, 1]) p.chrome.push(tube(0.005, [sd * w * 0.24, y + t / 2 - 0.002, z + d * 0.18], [sd * w * 0.24, y + 0.06, f.front - 0.006], 6))
 }
-// The bottom of the nose, where front lips and splitters bolt on, and how wide it is.
-const noseLift = (f: Frame) => (f.noseY === undefined ? f.lift : f.noseY - 0.009)
-const noseW = (f: Frame) => (f.nose === undefined ? f.bodyW : f.nose * 2)
 
 
 // Hood parts keep their sides clear of the long edges on the stock hood: the racing
@@ -506,9 +506,10 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
     frontLip(f, p, 'carbon', f.bodyW * 1.1, 0.016, 0.13, f.lift + 0.012, f.front + 0.02, false)
     for (const sd of [-1, 1]) {
       // End plates at the blade's tips (tucked in under a tapering nose with the blade).
-      if (f.nose === undefined) p.carbon.push(box(0.012, 0.05, 0.1, sd * f.bodyW * 0.55, f.lift + 0.03, f.front + 0.03))
+      if (f.nose === undefined) p.carbon.push(box(0.012, 0.05, 0.11, sd * f.bodyW * 0.55, f.lift + 0.03, f.front + 0.025))
       else p.carbon.push(box(0.012, 0.03, 0.1, sd * (noseW(f) / 2 - 0.006), noseLift(f) + 0.024, f.front + 0.0))
-      if (!ROUND_NOSE.includes(f.body)) for (const [y, k] of [[0.11, 0], [0.16, 1]]) p.carbon.push(box(0.09, 0.01, 0.05, sd * (noseW(f) / 2 - 0.025 - k * 0.01), f.lift + y, f.front - 0.015 - k * 0.01, 0, sd * 0.45))
+      // Each canard runs back into the nose's corner (a wheel well behind it is no mount).
+      if (!ROUND_NOSE.includes(f.body)) for (const [y, k] of [[0.11, 0], [0.14, 1]]) p.carbon.push(box(0.12, 0.01, 0.05, sd * (noseW(f) / 2 - 0.04 - k * 0.01), f.lift + y, f.front - 0.015 - k * 0.01, 0, sd * 0.45))
       p.carbon.push(box(0.045, 0.03, f.len * 0.48, sd * (f.side + 0.0125), f.lift + 0.035, 0))
       p.paint.push(box(0.035, 0.012, f.len * 0.42, sd * (f.side + 0.025), f.lift + 0.056, 0))
     }
