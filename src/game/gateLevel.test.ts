@@ -24,18 +24,35 @@ describe('gateLevel', () => {
 
 describe('race locks open for the admin only', () => {
   it("rivals, campaign, Grand Prix and Rusty's spots, bay 2 and truck", async () => {
-    const { currentRival, RIVALS } = await import('./rivals')
-    const { CAMPAIGN, GP_SERIES, RESCUE_SPOTS, TRUCK, BAY2_LEVEL } = await import('./data')
+    const { currentRival, RIVAL_LEVEL } = await import('./rivals')
+    const { CAMPAIGN, GP_SERIES, RESCUE_SPOTS, TRUCK, BAY2_LEVEL, campaignOpen, gpOpen } = await import('./data')
     const player = gateLevel({ level: 1 })
     const admin = gateLevel({ level: 1, admin: true })
-    expect(currentRival(player, {}, 0)?.locked).toBe(RIVALS[0].unlockLevel > 1)
+    expect(currentRival(player, {}, 0)?.locked).toBe(RIVAL_LEVEL > 1)
     expect(currentRival(admin, {}, 0)?.locked).toBe(false)
-    expect(CAMPAIGN.filter((c) => player < c.unlockLevel).length).toBeGreaterThan(0)
-    expect(CAMPAIGN.filter((c) => admin < c.unlockLevel)).toEqual([])
-    expect(GP_SERIES.filter((s) => player < s.unlockLevel).length).toBeGreaterThan(0)
-    expect(GP_SERIES.filter((s) => admin < s.unlockLevel)).toEqual([])
+    expect(CAMPAIGN.filter((_, ci) => !campaignOpen({}, ci, player)).length).toBeGreaterThan(0)
+    expect(CAMPAIGN.filter((_, ci) => !campaignOpen({}, ci, admin))).toEqual([])
+    expect(GP_SERIES.filter((_, si) => !gpOpen({}, si, player)).length).toBeGreaterThan(0)
+    expect(GP_SERIES.filter((_, si) => !gpOpen({}, si, admin))).toEqual([])
     expect(RESCUE_SPOTS.filter((s) => admin < s.unlockLevel)).toEqual([])
     expect(TRUCK.filter((t) => admin < t.level)).toEqual([])
     expect(admin >= BAY2_LEVEL && player < BAY2_LEVEL).toBe(true)
+  })
+})
+
+describe('Grand Prix series chain', () => {
+  it('opens each series by winning the one before, or at its old level', async () => {
+    const { GP_SERIES, gpOpen } = await import('./data')
+    const lv = GP_SERIES[0].unlockLevel
+    expect(gpOpen({}, 0, lv - 1)).toBe(false)
+    expect(gpOpen({}, 0, lv)).toBe(true)
+    expect(gpOpen({}, 1, lv)).toBe(false)
+    expect(gpOpen({ [GP_SERIES[0].id]: { clears: 1 } }, 1, lv)).toBe(true)
+    expect(gpOpen({ [GP_SERIES[0].id]: { clears: 1 } }, 2, lv)).toBe(false)
+    // The old level still opens it, so nobody loses a series they had.
+    for (let si = 1; si < GP_SERIES.length; si++) {
+      expect(gpOpen({}, si, GP_SERIES[si].unlockLevel)).toBe(true)
+      expect(gpOpen({ [GP_SERIES[si].id]: { round: 2 } }, si, lv)).toBe(true)
+    }
   })
 })

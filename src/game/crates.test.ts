@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { PIECE_SOURCES, restoTables } from './resto'
 import { CARS, CUSTOM_PAINT, MODS, MOD_SKINS, SKINS, carDef, modDef, modFits } from './data'
 import { crateHats, HATS } from './hats'
+import { crateCallCards } from './callCards'
 import { CRATES, HAT_ODDS, cratePrice, dropTier, carCrate, carValue, carWorth, crateCars, crateDef, crateOdds, crateOddsShown, crateSkins, crateTables, crateValue, homeCars, homeMods, modChoices, modCrate, modWorth, rollCrate, rollSourcePiece, skinOdds, type CrateDrop } from './crates'
 
 const dir = new URL('../../supabase/migrations/', import.meta.url)
@@ -122,6 +123,8 @@ describe('crates', () => {
           if (d.kind === 'piecedupe') expect(d.coins).toBeGreaterThan(0)
         } else if (d.kind === 'hat') {
           expect(crateHats(c.id).map((h) => h.id)).toContain(d.hat)
+        } else if (d.kind === 'callcard') {
+          expect(crateCallCards(c.id).map((x) => x.id)).toContain(d.card)
         } else {
           expect(d.coins).toBeGreaterThan(0)
         }
@@ -165,7 +168,7 @@ describe('crates', () => {
           const d = rollCrate(c, level, garage, rand)
           if (d.kind === 'coins' || d.kind === 'dupe') total += d.coins
           // Parts are counted at about a crate's worth, cars at their price.
-          else if (d.kind === 'mod' || d.kind === 'skin' || d.kind === 'skindupe' || d.kind === 'hat') total += d.kind === 'skindupe' ? d.coins : v
+          else if (d.kind === 'mod' || d.kind === 'skin' || d.kind === 'skindupe' || d.kind === 'hat' || d.kind === 'callcard') total += d.kind === 'skindupe' ? d.coins : v
           else total += carValue(CARS.find((x) => x.id === d.model)!, level)
         }
         const ev = total / n / v

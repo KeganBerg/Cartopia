@@ -1,7 +1,7 @@
 import { fairNow } from '../game/fairRace'
 import { useGame, gateLevel } from '../game/store'
 import { CARS, RACE_FUEL, carDef, performance } from '../game/data'
-import { RIVALS, RIVAL_VISITS, currentRival, rivalLadderPi, rivalPi, rivalPrize, rivalShift, type RivalDef } from '../game/rivals'
+import { RIVALS, RIVAL_LEVEL, RIVAL_VISITS, currentRival, rivalPi, rivalPrize, rivalShift, type RivalDef } from '../game/rivals'
 import { CarThumb } from '../scene/BuildingPreview'
 import { useNow } from '../scene/useNow'
 import { PAINT_RIVALS } from '../game/paintRivals'
@@ -25,9 +25,9 @@ export function rivalMatch(def: RivalDef, visit: number, level: number, myPi?: n
   // Never more than the race car can beat with perfect driving (game/fairPi.ts).
   const pi = fairNow(ladder, rivalShift(def, visit), skill)
   return {
-    def, visit, prize: rivalPrize(rivalLadderPi(def, visit)),
+    def, visit, prize: rivalPrize(pi),
     rival: {
-      id: `rival-${def.id}`, town: `${def.icon} ${def.name}`, level: Math.max(level, def.unlockLevel), carName: car.name, color: def.color, pi,
+      id: `rival-${def.id}`, town: `${def.icon} ${def.name}`, level: Math.max(level, RIVAL_LEVEL), carName: car.name, color: def.color, pi,
       online: false, body: car.body, model: car.id, skill, shift: rivalShift(def, visit), boss: visit === RIVAL_VISITS - 1,
     },
   }
@@ -59,7 +59,7 @@ export function RivalCard({ onRace }: { onRace: (m: RivalMatch) => void }) {
   const { def, visit, locked, away } = cur
   const m = rivalMatch(def, visit, level, myPi)
   const left = Math.max(0, Math.ceil((away - now) / 60000))
-  const line = locked ? `Rolls into town at level ${def.unlockLevel}.` : away ? `Tuning up. Back in ${left}m.` : visit === 0 ? def.lines.intro : def.lines.back[visit - 1]
+  const line = locked ? `Rolls into town at level ${RIVAL_LEVEL}.` : away ? `Tuning up. Back in ${left}m.` : visit === 0 ? def.lines.intro : def.lines.back[visit - 1]
   return (
     <div className={`rv-card${locked || away ? ' rv-idle' : ''}`} style={{ ['--rv' as string]: def.color }}>
       <span className="rv-face" aria-hidden>{locked ? '❔' : def.icon}</span>
@@ -76,7 +76,7 @@ export function RivalCard({ onRace }: { onRace: (m: RivalMatch) => void }) {
         )}
       </div>
       {locked ? (
-        <button className="buy small alt" onClick={() => showNeed('level', def.unlockLevel, def.name)}>🔒 Lv{def.unlockLevel}</button>
+        <button className="buy small alt" onClick={() => showNeed('level', RIVAL_LEVEL, def.name)}>🔒 Lv{RIVAL_LEVEL}</button>
       ) : away ? (
         <button className="buy small alt" disabled>⏱ {left}m</button>
       ) : (
@@ -163,7 +163,7 @@ export function RivalTile({ onRace, onOpen }: { onRace: (m: RivalMatch) => void;
   const { def, visit, locked, away } = cur
   const m = rivalMatch(def, visit, level, myPi)
   const left = Math.max(0, Math.ceil((away - now) / 60000))
-  const line = locked ? `Rolls into town at level ${def.unlockLevel}.` : away ? `Tuning up. Back in ${left}m.` : visit === 0 ? def.lines.intro : def.lines.back[visit - 1]
+  const line = locked ? `Rolls into town at level ${RIVAL_LEVEL}.` : away ? `Tuning up. Back in ${left}m.` : visit === 0 ? def.lines.intro : def.lines.back[visit - 1]
   return (
     <div className={`rm-tile rm-rival${locked || away ? ' rv-idle' : ''}`} style={{ ['--rv' as string]: def.color }} {...open}>
       <span className="rm-face" aria-hidden>{locked ? '❔' : def.icon}</span>
@@ -174,7 +174,7 @@ export function RivalTile({ onRace, onOpen }: { onRace: (m: RivalMatch) => void;
         {strip}
       </div>
       {locked ? (
-        <button className="buy small alt" onClick={stop(() => showNeed('level', def.unlockLevel, def.name))}>🔒 Lv{def.unlockLevel}</button>
+        <button className="buy small alt" onClick={stop(() => showNeed('level', RIVAL_LEVEL, def.name))}>🔒 Lv{RIVAL_LEVEL}</button>
       ) : away ? (
         <button className="buy small alt" disabled onClick={(e) => e.stopPropagation()}>⏱ {left}m</button>
       ) : (

@@ -52,3 +52,14 @@ export function tourRivalName(race: number) {
 export const tourPrize = (race: number, pi = tourRivalPi(race)) => Math.round((150 + Math.min(pi, tourRivalPi(race)) * 8) / 10) * 10
 // The one-time bonus for beating a leg's boss. Coins only.
 export const tourLegBonus = (leg: number) => 500 + leg * 300
+// Tour ranks: every five legs climbs a rank, so the endless ladder has milestones to chase.
+// Just for show (no pay), on the leg strip, the banner and the boss prize card.
+export const TOUR_RANK_LEGS = 5
+export const TOUR_RANKS = [
+  { name: 'Bronze', icon: '🥉' }, { name: 'Silver', icon: '🥈' }, { name: 'Gold', icon: '🥇' },
+  { name: 'Platinum', icon: '🏅' }, { name: 'Diamond', icon: '💠' }, { name: 'Legend', icon: '👑' },
+] as const
+export const tourRankOf = (leg: number) => Math.min(Math.floor(leg / TOUR_RANK_LEGS), TOUR_RANKS.length - 1)
+export const tourRank = (leg: number) => TOUR_RANKS[tourRankOf(leg)]
+// Legs left in this rank (0 once Legend, the top).
+export const tourLegsToRank = (leg: number) => (tourRankOf(leg) >= TOUR_RANKS.length - 1 ? 0 : TOUR_RANK_LEGS - (leg % TOUR_RANK_LEGS))

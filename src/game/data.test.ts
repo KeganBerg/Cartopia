@@ -217,7 +217,7 @@ describe('campaign ladder', () => {
       }
       if (ci > 0) {
         expect(ch.coins).toBeGreaterThan(CAMPAIGN[ci - 1].coins)
-        expect(ch.unlockLevel).toBeGreaterThan(CAMPAIGN[ci - 1].unlockLevel)
+        expect(ch.tuned).toBeGreaterThan(CAMPAIGN[ci - 1].tuned)
       }
     })
     expect(lastPi).toBeLessThanOrEqual(MAX_RACE_PI)

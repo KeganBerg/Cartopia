@@ -138,15 +138,21 @@ const BODY_SIDE: Partial<Record<Body, Partial<Frame>>> = {
   highboy: { lift: 0.152, side: 0.345, pipeSide: 0.279, bodyW: 0.56, front: 0.63, rear: -0.665, pipeY: 0.27, postW: 0.4 },
   timeattack: { side: 0.38 },
   longtail: { front: 0.68, rear: -0.84 },
+  // Side kits go on the armour skirts over the tracks (see the tank in CarModel), not down
+  // among the road wheels.
+  tank: { sill: 0.52, sillY: 0.215 },
 }
 const SILL_IN: Partial<Record<Body, number>> = { tank: 0.03, icecream: 0.014, pontoon: 0.02 }
+// Where side skirts bolt on: the body side, or the face of whatever stands out over the wheels.
+const sillX = (f: Frame) => f.sill ?? f.side
+const sillY = (f: Frame) => f.sillY ?? f.lift
 function withRoom(f: Frame, all: string[]): Frame & { room: Room } {
   // How far a kit's wheel arches reach along the car from each axle.
   const arch = all.includes('boxflares') ? f.wheel * 1.28 : all.includes('widebody') ? f.wheel * 1.2 + 0.035 : 0
   const bs = BODY_SIDE[f.body]
   const g: Frame = { ...f, ...bs, side: (bs?.side ?? f.side) - (SILL_IN[f.body] ?? 0), hoodTop: f.hoodTop - (HOOD_DROP[f.body] ?? 0) }
   // How far out a kit's arches reach from the middle of the car.
-  const out = all.includes('boxflares') ? Math.max(g.wx + 0.05, g.side + 0.03) + 0.045 : all.includes('widebody') ? Math.max(g.wx + 0.055, g.side + 0.035) + 0.052 : 0
+  const out = all.includes('boxflares') ? Math.max(g.wx + 0.05, sillX(g) + 0.03) + 0.045 : all.includes('widebody') ? Math.max(g.wx + 0.055, sillX(g) + 0.035) + 0.052 : 0
   return { ...g, room: { tips: all.flatMap((id) => TIPS[id]?.(g) ?? []), skirt: Math.max(0, ...all.map((id) => SKIRT[id] ?? 0)), arch, out } }
 }
 // The frame a mod is built on, with room left for the others fitted with it.
@@ -250,7 +256,7 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
     frontLip(f, p, 'paint', f.bodyW * 0.98, 0.028, 0.08, f.lift + 0.025, f.front + 0.015, true)
     // The rear valance parts round the exhaust tips.
     for (const [a, b] of aroundTips(f, -f.bodyW * 0.35, f.bodyW * 0.35)) p.carbon.push(box(b - a, 0.03, 0.07, (a + b) / 2, rearLift(f) + 0.03, f.rear - 0.01))
-    for (const sd of [-1, 1]) p.paint.push(box(0.0375, 0.05, f.len * 0.42, sd * (f.side + 0.00825), f.lift + 0.055, 0))
+    for (const sd of [-1, 1]) p.paint.push(box(0.0375, 0.05, f.len * 0.42, sd * (sillX(f) + 0.00825), sillY(f) + 0.055, 0))
   },
   widebody: (f, p) => {
     for (const sd of [-1, 1]) {
@@ -259,22 +265,22 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
         const g = new TorusGeometry(f.wheel * 1.2, 0.035, 6, 14, Math.PI)
         g.scale(1, 1, 1.7)
         g.rotateY(Math.PI / 2)
-        const ax = Math.max(f.wx + 0.055, f.side + 0.035)
+        const ax = Math.max(f.wx + 0.055, sillX(f) + 0.035)
         g.translate(sd * ax, f.wheel, z)
         p.paint.push(g)
         // Wheels standing clear of the body: each arch is held on a strut from the body.
         // The strut leaves the arch on the side toward the middle of the car and runs in, low, to the body.
         const zi = -Math.sign(z)
-        if (f.wx > f.side + 0.05) p.carbon.push(tube(0.012, [sd * ax, f.wheel * 1.77, z + zi * f.wheel * 0.92], [sd * f.bodyW * 0.15, f.lift + 0.12, z + zi * f.wheel * 1.3], 8))
+        if (f.wx > sillX(f) + 0.05) p.carbon.push(tube(0.012, [sd * ax, f.wheel * 1.77, z + zi * f.wheel * 0.92], [sd * f.bodyW * 0.15, f.lift + 0.12, z + zi * f.wheel * 1.3], 8))
       }
-      p.paint.push(box(0.0555, 0.053, f.wz * 2 - f.wheel * 2.64, sd * (f.side + 0.01725), f.lift + 0.0555, 0))
+      p.paint.push(box(0.0555, 0.053, f.wz * 2 - f.wheel * 2.64, sd * (sillX(f) + 0.01725), sillY(f) + 0.0555, 0))
     }
     p.carbon.push(box(f.bodyW * 1.05, 0.025, 0.1, 0, f.lift + 0.025, f.front + 0.02))
   },
   carbonkit: (f, p) => {
     frontLip(f, p, 'carbon', f.bodyW * 1.08, 0.022, 0.14, f.lift + 0.022, f.front + 0.03, true)
     for (const sd of [-1, 1]) {
-      p.carbon.push(box(0.0485, 0.05, f.len * 0.46, sd * (f.side + 0.01375), f.lift + 0.053, 0))
+      p.carbon.push(box(0.0485, 0.05, f.len * 0.46, sd * (sillX(f) + 0.01375), sillY(f) + 0.053, 0))
       // Canards on the front corners, where the nose is square enough to hold them.
       if (!ROUND_NOSE.includes(f.body)) p.carbon.push(box(0.1, 0.012, 0.06, sd * (f.bodyW / 2 - 0.02), f.lift + 0.13, f.front - 0.02, 0, sd * 0.4))
     }
@@ -424,7 +430,8 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
     const h = Math.max(0.05, Math.min(0.17, top - 0.03))
     const x = Math.min(f.wx, f.side - 0.06)
     for (const sd of [-1, 1]) {
-      for (const zz of [f.wz, -f.wz]) {
+      // Tracks run where the flaps would hang.
+      if (f.sill === undefined) for (const zz of [f.wz, -f.wz]) {
         const z = Math.max(zz - f.wheel * 1.32, f.rear - 0.004)
         if (z > zz - f.wheel - 0.015) continue
         // Wheels standing out past the body leave nothing behind them to hang a back flap from.
@@ -432,7 +439,7 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
         p.paint.push(box(0.1, h, 0.012, sd * x, top - h / 2, z))
         p.chrome.push(box(0.104, 0.012, 0.016, sd * x, top - h + 0.008, z))
       }
-      p.carbon.push(box(0.0375, 0.04, f.wz * 2 - f.wheel * 2.9, sd * (f.side + 0.00825), f.lift + 0.03, 0))
+      p.carbon.push(box(0.0375, 0.04, f.wz * 2 - f.wheel * 2.9, sd * (sillX(f) + 0.00825), sillY(f) + 0.03, 0))
     }
     // Skid plate tucked under the nose, rising to the bumper, held by two bolts.
     p.chrome.push(box(f.bodyW * 0.7, 0.012, 0.15, 0, f.lift + 0.018, f.front - 0.045, -0.35))
@@ -848,10 +855,87 @@ function clearGlass(f: Frame, slot: ModSlot | undefined, p: Parts) {
   if (need > 0) for (const list of Object.values(p)) for (const g of list) g.translate(0, 0, need * dir)
 }
 
+// On a tracked body (the Tomahawk) the hood parts are guns: a cast mantlet bolted to the hood with
+// trunnion caps either side, and a barrel running forward past the nose. Each hood part keeps its
+// id and stats; only what it looks like changes. Barrels are built along +z from the mantlet's face.
+type Gun = { len: number; r: number; tip: number; mant: number; muzzle: 'ring' | 'flare' | 'brake' | 'bigbrake' | 'none'; sleeves?: number; evac?: boolean; twin?: boolean; shield?: boolean }
+const GUNS: Record<string, Gun> = {
+  vented: { len: 0.2, r: 0.034, tip: 0.032, mant: 1, muzzle: 'ring' },
+  cowl: { len: 0.34, r: 0.022, tip: 0.018, mant: 0.86, muzzle: 'flare', shield: true },
+  ramscoop: { len: 0.46, r: 0.022, tip: 0.018, mant: 1, muzzle: 'brake' },
+  louvres: { len: 0.42, r: 0.023, tip: 0.02, mant: 1, muzzle: 'ring', sleeves: 3 },
+  blower: { len: 0.36, r: 0.011, tip: 0.01, mant: 0.95, muzzle: 'none', twin: true },
+  twinturbo: { len: 0.5, r: 0.028, tip: 0.024, mant: 1.15, muzzle: 'bigbrake', evac: true },
+}
+function gun(f: Frame, p: Parts, g: Gun) {
+  const h = f.hs
+  const m = g.mant
+  const top = f.hoodTop
+  const mz = f.hoodZ - 0.03
+  // The mantlet: a low cast block with a rounded front, sunk a touch into the hood.
+  const mw = 0.2 * h * m, mh = 0.075 * h * m, md = 0.15 * h * m
+  p.paint.push(box(mw, mh + 0.004, md, 0, top + mh / 2 - 0.002, mz, 0))
+  const nose = new CylinderGeometry(mh / 2, mh / 2, mw * 0.86, 16, 1, false, 0, Math.PI)
+  nose.rotateZ(Math.PI / 2)
+  nose.rotateX(Math.PI / 2)
+  nose.translate(0, top + mh / 2, mz + md / 2)
+  p.paint.push(nose)
+  // Trunnion caps on each side, with a bolt ring.
+  for (const sd of [-1, 1]) {
+    const cap = new CylinderGeometry(mh * 0.34, mh * 0.38, 0.016, 12)
+    cap.rotateZ(Math.PI / 2)
+    cap.translate(sd * (mw / 2 + 0.006), top + mh / 2, mz)
+    p.carbon.push(cap)
+    const bolt = new CylinderGeometry(0.008, 0.008, 0.006, 6)
+    bolt.rotateZ(Math.PI / 2)
+    bolt.translate(sd * (mw / 2 + 0.0155), top + mh / 2, mz)
+    p.chrome.push(bolt)
+  }
+  const y = top + mh / 2
+  const z0 = mz + md / 2 + mh / 2 - 0.01
+  const xs = g.twin ? [-0.034 * h, 0.034 * h] : [0]
+  // The barrels are built level, then raised a few degrees about the mantlet so their muzzles ride clear of the nose.
+  const before = Object.fromEntries(Object.entries(p).map(([k, v]) => [k, v.length])) as Record<keyof Parts, number>
+  for (const x of xs) {
+    // Barrel root collar in the mantlet's face, then the barrel tapering to the muzzle.
+    p.carbon.push(pipe(g.r * 1.7, 0.05 * h, x, y, z0 + 0.02 * h))
+    const L = g.len * h
+    p.carbon.push(pipe(g.r, L, x, y, z0 + 0.045 * h + L / 2, g.tip))
+    if (g.twin) {
+      // Perforated cooling jacket over the root of each autocannon barrel.
+      p.chrome.push(pipe(g.r * 1.7, 0.12 * h, x, y, z0 + 0.105 * h))
+      for (let k = 0; k < 4; k++) p.carbon.push(box(0.006, g.r * 3.6, 0.012, x, y, z0 + 0.065 * h + k * 0.026 * h))
+    }
+    for (let k = 0; k < (g.sleeves ?? 0); k++) p.paint.push(pipe(g.r * 1.28, 0.07 * h, x, y, z0 + 0.1 * h + k * 0.11 * h))
+    if (g.evac) p.carbon.push(pipe(g.r * 1.6, 0.09 * h, x, y, z0 + 0.045 * h + L * 0.55, g.r * 1.6))
+    const end = z0 + 0.045 * h + L
+    if (g.muzzle === 'ring') p.chrome.push(pipe(g.tip * 1.3, 0.03 * h, x, y, end - 0.012 * h))
+    if (g.muzzle === 'flare') p.chrome.push(pipe(g.tip * 1.05, 0.04 * h, x, y, end - 0.016 * h, g.tip * 1.5))
+    if (g.muzzle === 'brake' || g.muzzle === 'bigbrake') {
+      // A muzzle brake: a block with ports cut out of both sides, and a dark bore at the front.
+      const k = g.muzzle === 'bigbrake' ? 1.25 : 1
+      const bw = g.tip * 3.2 * k, bh = g.tip * 2.5 * k, bd = 0.07 * h * k
+      p.carbon.push(box(bw, bh, bd, x, y, end + bd / 2 - 0.01))
+      for (const sd of [-1, 1]) for (const dz of [-0.2, 0.2]) p.chrome.push(box(0.004, bh * 0.6, bd * 0.24, x + sd * (bw / 2 + 0.0015), y, end + bd / 2 - 0.01 + dz * bd))
+      p.carbon.push(lens(g.tip * 0.9, x, y, end + bd - 0.01))
+    } else {
+      // The dark bore just in front of the muzzle's face.
+      const dz = g.muzzle === 'none' ? 0.002 : g.muzzle === 'flare' ? 0.01 : 0.003 * h
+      p.carbon.push(lens(g.tip * 0.75, x, y, end + dz))
+    }
+  }
+  for (const k of Object.keys(p) as (keyof Parts)[]) for (const piece of p[k].slice(before[k])) piece.translate(0, -y, -z0).rotateX(-0.08).translate(0, y, z0)
+  if (g.twin) p.carbon.push(box(0.05 * h, 0.05 * h, 0.08 * h, 0.075 * h, top + mh + 0.022 * h, mz - 0.01))
+  // A small gun shield across the mantlet's face, the field gun's.
+  if (g.shield) p.paint.push(box(mw * 1.5, mh * 1.3, 0.012, 0, top + mh * 0.62, z0 + 0.06 * h, -0.12))
+}
+
 // One mod's pieces on a body, each piece on its own (the fit tests look at them one by one).
 export function modParts(f: Frame, id: string): Parts {
   const own: Parts = { paint: [], carbon: [], chrome: [], glass: [], flame: [], lamp: [], neon: [], ti: [] }
-  BUILD[id]?.(f, own)
+  const g = f.body === 'tank' ? GUNS[id] : undefined
+  if (g) gun(f, own, g)
+  else BUILD[id]?.(f, own)
   clearGlass(f, modDef(id)?.slot, own)
   return own
 }
