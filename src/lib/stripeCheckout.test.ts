@@ -58,6 +58,16 @@ describe('stripe checkout', () => {
     expect(paidSession({ ...ev({}), type: 'charge.refunded' })).toBeNull()
   })
 
+  it('still delivers a retired car pack paid after it left the shop, but never sells one', async () => {
+    const { RETIRED_PACKS } = await import('../game/bucksPacks')
+    for (const p of RETIRED_PACKS) {
+      expect(packById(p.id), p.id).toBeNull()
+      const ev = { type: 'checkout.session.completed', data: { object: { id: 'cs_9', payment_status: 'paid', currency: 'usd', amount_total: cents(p), metadata: { user: 'u1', pack: p.id } } } }
+      expect(paidSession(ev)?.pack.car, p.id).toBe(p.car)
+    }
+    expect(RETIRED_PACKS.map((p) => p.id)).toEqual(['car-brawler', 'car-ronin', 'car-ring', 'car-hyperion'])
+  })
+
   it('takes a pack back on a refund or an opened chargeback only', () => {
     const ev = (type: string, o: Record<string, unknown> = { payment_intent: 'pi_1' }) => ({ type, data: { object: o } })
     expect(reversedPayment(ev('charge.refunded'))).toEqual({ reason: 'refund', paymentIntent: 'pi_1' })
@@ -78,7 +88,7 @@ describe('stripe checkout', () => {
 })
 
 describe('car packs', () => {
-  it('sells every pack-only car, and Showroom cars only in street packs', async () => {
+  it('sells only pack-only cars, each in exactly one pack', async () => {
     const { CAR_PACKS } = await import('../game/bucksPacks')
     const { CARS, carDef, performance } = await import('../game/data')
     const zero = { engine: 0, turbo: 0, tires: 0, weight: 0 }
@@ -89,8 +99,10 @@ describe('car packs', () => {
       expect(car.id, p.id).toBe(p.car)
       expect(p.bucks % 5, p.id).toBe(0)
       const pi = performance(car, zero)
-      if (p.tier === 'super') expect([car.pack, pi >= 100], p.id).toEqual([true, true])
-      else expect([pi >= 50 && pi <= 100, !car.rescueOnly && !car.season && !car.secret], p.id).toEqual([true, true])
+      // Every pack is a pack-only car (Kegan, 2026-10-15): nothing a player could also unlock by level.
+      expect(car.pack, p.id).toBe(true)
+      if (p.tier === 'super') expect(pi, p.id).toBeGreaterThanOrEqual(100)
+      else expect([pi >= 50, pi < 100], p.id).toEqual([true, true])
       expect(packById(p.id)).toBe(p)
       expect(sessionForm(p, 'u1', 'https://cartopia.lol').get('line_items[0][price_data][product_data][name]')).toContain('car +')
     }

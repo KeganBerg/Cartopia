@@ -12,12 +12,12 @@ const ZERO = { engine: 0, turbo: 0, tires: 0, weight: 0 }
 
 // Each pack's stage colours: a backdrop, the streaks racing past, and the car's paint.
 const THEME: Record<string, { bg: string; streak: string; glow: string }> = {
-  charger: { bg: '#1b1b1b, #5d4037', streak: '#ffcc80', glow: '#ffb74d' },
+  scatto: { bg: '#2a0606, #b71c1c', streak: '#ffcdd2', glow: '#ff8a80' },
   stinger: { bg: '#3e2a00, #c88a00', streak: '#fff3c4', glow: '#ffd54f' },
-  gtr: { bg: '#0b2238, #37627f', streak: '#cfe8ff', glow: '#90caf9' },
+  thunderjet: { bg: '#0d2410, #2e7d32', streak: '#ffe0b2', glow: '#ffb74d' },
   sora: { bg: '#2a0a12, #8e1b2c', streak: '#ffcdd2', glow: '#ef9a9a' },
-  ringmeister: { bg: '#102a1c, #2e7d4f', streak: '#c8f7dc', glow: '#69f0ae' },
-  hyper: { bg: '#2a1a00, #9a5b00', streak: '#ffe0b2', glow: '#ffab40' },
+  hayate: { bg: '#1c0b2e, #6a1b9a', streak: '#e1bee7', glow: '#ce93d8' },
+  kestrel: { bg: '#04221f, #00796b', streak: '#b2dfdb', glow: '#64ffda' },
   firebolt: { bg: '#3a0d05, #b4300c', streak: '#ffb74d', glow: '#ff7043' },
   kaze: { bg: '#061a3a, #1565c0', streak: '#e3f2fd', glow: '#4fc3f7' },
   sturm: { bg: '#14260f, #4e6b1e', streak: '#e6d39a', glow: '#c5e1a5' },
@@ -44,14 +44,14 @@ function useCountUp(n: number, ms = 900) {
   return v
 }
 
-const tierOf = (car: { pack?: boolean }, pi: number) => (pi >= 115 ? 'Hyper' : pi >= 100 ? 'Super' : car.pack ? 'New' : 'Street')
+const tierOf = (pi: number) => (pi >= 115 ? 'Hyper' : pi >= 100 ? 'Super' : 'New')
 
 function Stage({ car, big }: { car: ReturnType<typeof carDef>; big?: boolean }) {
   return (
     <>
       <div className="pk-streaks" />
       <div className="pk-floor" />
-      <div className={big ? 'pk-car big' : 'pk-car'}><CarThumb size="lg" body={car.body} model={car.id} color={car.colors[0]} /></div>
+      <div className={big ? 'pk-car big' : 'pk-car'}><CarThumb stand body={car.body} model={car.id} color={car.colors[0]} /></div>
     </>
   )
 }
@@ -83,15 +83,14 @@ function Showcase({ packs, owns, pending, buy }: { packs: BucksPack[]; owns: (p:
     <div className="pk-hero" style={vars(car.id)}>
       <div className="pk-stage">
         <div className="pk-streaks" />
-        <span key={pi} className="pk-bignum" aria-hidden>{pi}</span>
         {/* Every car stays mounted, so its render is ready the moment it slides in. */}
         {packs.map((q, i) => <div key={q.id} className={i === at ? 'pk-swap on' : 'pk-swap'}><Stage car={carDef(q.car!)} big /></div>)}
       </div>
       <div key={`i${car.id}`} className="pk-hero-info">
-        <span className={`pk-tiertag ${tierOf(car, pi).toLowerCase()}`}>{tierOf(car, pi)}</span>
+        <span className={`pk-tiertag ${tierOf(pi).toLowerCase()}`}>{tierOf(pi)}</span>
         <div className="pk-hero-name">{car.name}</div>
         <div className="pk-hero-row">
-          <span className="pk-hero-pi"><b>{shown}</b> PI</span>
+          <span key={pi} className="pk-bignum">{shown}<small>PI</small></span>
           <span className="pk-gems">+ {p.bucks} 💎</span>
         </div>
         <BuyButton p={p} owned={owns(p)} pending={pending === p.id} onBuy={() => buy(p)} />
@@ -107,19 +106,18 @@ function PackCard({ p, i, owned, pending, onBuy }: { p: BucksPack; i: number; ow
   const car = carDef(p.car!)
   const pi = performance(car, ZERO)
   const shown = useCountUp(pi)
-  const tier = tierOf(car, pi)
+  const tier = tierOf(pi)
   return (
     <div className={`pk-card ${tier.toLowerCase()}${p.tag ? ' featured' : ''}${owned ? ' owned' : ''}`} style={vars(car.id, i)}>
+      {/* The badges sit in a strip of their own above the car, so the car never runs under them. */}
       <div className="pk-stage">
         <Stage car={car} />
-        {p.tag && <span className="pk-ribbon">{p.tag}</span>}
-        <span className="pk-pi"><b>{shown}</b><small>PI</small></span>
+        <span className="pk-pi"><b>{shown}</b> PI</span>
         <span className="pk-gems">+ {p.bucks} 💎</span>
-        <div className="pk-name">{car.name}</div>
       </div>
+      <div className="pk-name">{car.name}</div>
       <div className="pk-foot">
-        {car.pack ? <span className={`pk-tiertag ${tier.toLowerCase()}`}>{tier === 'New' ? 'Pack only' : tier}</span>
-          : <span className="pk-tiertag lv" title={`Normally unlocks at level ${car.unlockLevel}`}>🔓 Lv {car.unlockLevel}</span>}
+        <span className={`pk-tiertag ${p.tag ? 'top' : tier.toLowerCase()}`}>{p.tag ?? (tier === 'New' ? 'Pack only' : tier)}</span>
         <BuyButton p={p} owned={owned} pending={pending} onBuy={onBuy} />
       </div>
     </div>

@@ -330,6 +330,7 @@ export type Body = 'compact' | 'sedan' | 'sports' | 'muscle' | 'truck' | 'super'
   | 'scissor' | 'horseshoe' | 'teardrop' | 'icecream' | 'monster' | 'parcel'
   | 'pontoon' | 'stepnose' | 'restomuscle'
   | 'highboy' | 'timeattack' | 'groupb' | 'longtail' | 'ponycar' | 'gtcoupe'
+  | 'hothatch' | 'musclecoupe' | 'popup' | 'midship'
 // Two-wheelers: drawn as motorcycles with a rider, and only take exhaust and rim mods.
 export const BIKES: Body[] = ['scooter', 'chopper', 'sportbike']
 export const isBike = (body: Body) => BIKES.includes(body)
@@ -462,6 +463,10 @@ export const CARS: CarDef[] = [
   // Showroom's best at its level (see packCars.ts for the bodies).
   { id: 'stinger', name: 'Liberty Stinger SS', body: 'ponycar', price: 0, unlockLevel: 12, pack: true, power: 78, grip: 48, weight: 52, skill: 'torque', likes: ['diner', 'burger', 'tires'], colors: ['#ffb300', '#212121', '#c62828'] },
   { id: 'sora', name: 'Kazumi Sora GT', body: 'gtcoupe', price: 0, unlockLevel: 20, pack: true, power: 84, grip: 72, weight: 40, skill: 'smooth', likes: ['tuner', 'arcade', 'parts'], colors: ['#c62828', '#eceff1', '#1565c0'] },
+  { id: 'scatto', name: 'Vetta Scatto HF', body: 'hothatch', price: 0, unlockLevel: 13, pack: true, power: 61, grip: 58, weight: 40, skill: 'launch', likes: ['coffee', 'arcade', 'tires'], colors: ['#d32f2f', '#fafafa', '#1e88e5'] },
+  { id: 'thunderjet', name: 'Liberty Thunderjet 440', body: 'musclecoupe', price: 0, unlockLevel: 22, pack: true, power: 90, grip: 52, weight: 56, skill: 'torque', likes: ['burger', 'lube', 'bodyshop'], colors: ['#2e7d32', '#ff8f00', '#212121'] },
+  { id: 'hayate', name: 'Kazumi Hayate RS', body: 'popup', price: 0, unlockLevel: 28, pack: true, power: 96, grip: 72, weight: 44, skill: 'smooth', likes: ['tuner', 'parts', 'arcade'], colors: ['#6a1b9a', '#eceff1', '#212121'] },
+  { id: 'kestrel', name: 'Nordwerk Kestrel GT', body: 'midship', price: 0, unlockLevel: 33, pack: true, power: 100, grip: 82, weight: 40, skill: 'slipstream', likes: ['glasstower', 'parkade', 'hq'], colors: ['#00897b', '#eceff1', '#212121'] },
   { id: 'firebolt', name: 'Liberty Firebolt Highboy', body: 'highboy', price: 0, unlockLevel: 8, pack: true, power: 122, grip: 70, weight: 40, skill: 'launch', likes: ['diner', 'burger', 'lube'], colors: ['#b71c1c', '#212121', '#ffb300'] },
   { id: 'kaze', name: 'Kazumi Kaze TA-R', body: 'timeattack', price: 0, unlockLevel: 15, pack: true, power: 114, grip: 96, weight: 36, skill: 'smooth', likes: ['tuner', 'parts', 'arcade'], colors: ['#eceff1', '#0d47a1', '#ff6d00'] },
   { id: 'sturm', name: 'Falke Sturm S1', body: 'groupb', price: 0, unlockLevel: 25, pack: true, power: 120, grip: 100, weight: 40, skill: 'torque', likes: ['tires', 'stadium', 'junkyard'], colors: ['#fafafa', '#c62828', '#1b5e20'] },
@@ -907,7 +912,7 @@ export const CAR_SETS: CarSet[] = [
   { id: 'oddballs', name: 'Oddballs', icon: '🍦', cars: ['scoops', 'courier', 'crusher'], coins: 4000, bucks: 3, trophies: 8, xp: 120 },
   { id: 'restomods', name: 'Resto Garage', icon: '🧩', cars: ['sprint', 'revenant', 'pontone'], coins: 30000, bucks: 15, trophies: 40, xp: 500 },
   { id: 'exotica', name: 'Exotica', icon: '👑', cars: ['fulmine', 'eclat', 'orafo'], coins: 40000, bucks: 20, trophies: 50, xp: 600 },
-  { id: 'carpacks', name: 'Pack Legends', icon: '💳', cars: ['stinger', 'sora', 'firebolt', 'kaze', 'sturm', 'vanta'], coins: 40000, bucks: 20, trophies: 50, xp: 600 },
+  { id: 'carpacks', name: 'Pack Legends', icon: '💳', cars: ['scatto', 'stinger', 'thunderjet', 'sora', 'hayate', 'kestrel', 'firebolt', 'kaze', 'sturm', 'vanta'], coins: 40000, bucks: 20, trophies: 50, xp: 600 },
   // Season track prizes; each season adds its car here.
   { id: 'seasons', name: 'Season Rides', icon: '🏁', cars: ['nightfall'], coins: 5000, bucks: 3, trophies: 10, xp: 150 },
 ]
