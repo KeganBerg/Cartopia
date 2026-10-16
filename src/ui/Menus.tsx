@@ -6,6 +6,7 @@ import { raceCarOf } from '../game/raceCar'
 import { stackCars, stackFace } from '../game/garageStacks'
 import { reducedMotion } from '../game/fx'
 import { activeEvent, GEM_BUILD_COINS, garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, carDef, performance, upgradeCost, buildingDef, upgradable, loves, readySets, isBike, FEATURES, type BuildingDef } from '../game/data'
+import { compact } from './format'
 import { CarInspect, CarPreview, type DynoFeed } from '../scene/CarPreview'
 import { DOOR_FLY, depotWalk, doorTrip } from '../scene/doorTrip'
 import { usePauseTownUnder } from '../scene/renderGate'
@@ -41,6 +42,7 @@ import { Confirm, useAsk } from './Confirm'
 import { AutoJobsButton } from './AutoJobs'
 import { useUnlock, freshClass } from '../game/unlocks'
 import './garage-env.css'
+import './shop.css'
 
 // The dyno run and its engine sound load the first time an upgrade shows on the dyno.
 const DynoOverlay = onDemand(() => import('./Dyno'), (m) => m.DynoOverlay)
@@ -159,8 +161,14 @@ function EditBar() {
     : `${TOUCH ? 'Tap to preview, tap again to build' : 'Click to place'} ${placing ? BUILDINGS.find((b) => b.id === placing)?.name : ''}`
   return (
     <div className="edit-bar">
-      {!tutCard && <div className="edit-hint">{hint}</div>}
-      {!tutCard && all && <TrafficMeter />}
+      {/* The hint and the traffic meter share one row over the tools; buying land and merging
+          don't change traffic, so those modes show the hint alone and keep the town clear. */}
+      {!tutCard && (
+        <div className="edit-info">
+          <div className="edit-hint">{hint}</div>
+          {all && mode !== 'expand' && mode !== 'merge' && <TrafficMeter />}
+        </div>
+      )}
       <div className="edit-tools">
         {all && <button className={mode === 'road' ? 'tool active' : 'tool'} onClick={() => setMode('road')}><Icon name="road" size={22} /><span>Road</span></button>}
         {all && <button className={mode === 'bulldoze' ? 'tool active' : 'tool'} onClick={() => setMode('bulldoze')}><Icon name="bulldoze" size={22} /><span>Bulldoze</span></button>}
@@ -372,36 +380,37 @@ export function ShopPanel() {
       {tab === 'upgrades' && <ShopUpgrades find={term} />}
       {term && tab !== 'upgrades' && !rows.length && <p className="shop-none">🔍 No match</p>}
       {(group || (term && tab !== 'upgrades')) && (
-          <div className="cards rows">
+          <div className="shop-grid">
             {rows.map(({ b, locked, sale, brokeGems, broke, owned }) => {
               const highlight = b.id === 'rescue' && !rusty
               const feature = !highlight && !locked && !!FEATURES[b.id] && !buildings.some((o) => o.def === b.id)
               const focused = b.id === focus
+              const every = b.jobSeconds ? (b.jobSeconds >= 60 ? `${b.jobSeconds / 60}m` : `${b.jobSeconds}s`) : null
               return (
                 <button
                   key={b.id}
                   ref={focused ? focusRef : undefined}
-                  className={`card ${locked ? 'locked' : ''} ${broke && !locked ? 'broke' : ''} ${highlight ? 'start-here' : ''} ${focused ? 'focus' : ''}`}
+                  className={`card shop-card ${locked ? 'locked' : ''} ${broke && !locked ? 'broke' : ''} ${highlight ? 'start-here' : ''} ${focused ? 'focus' : ''}`}
                   disabled={owned}
+                  title={FEATURES[b.id] ? FEATURES[b.id][0].toUpperCase() + FEATURES[b.id].slice(1) : undefined}
                   onClick={() => (locked ? showNeed('level', b.unlockLevel, b.name) : brokeGems ? showNeed('bucks', sale.bucks - bucks, b.name) : broke ? showNeed('coins', sale.coins - coins, b.name) : setMode('place', b.id))}
                 >
                   {highlight && <span className="ribbon">START HERE</span>}
-                  {feature && <span className="ribbon feature">★ NEW FEATURE</span>}
+                  {feature && <span className="ribbon feature">★ NEW</span>}
                   {sale.deal && !locked && <span className="ribbon deal">DEAL</span>}
                   {b.event && <span className="ribbon spooky">LIMITED</span>}
                   <BuildingThumb def={b} />
-                  <div className="card-text">
-                    <div className="card-name">{b.name}</div>
-                    {b.jobSeconds && (
-                      <div className="card-stat">
-                        ${b.payout}{b.partsPayout ? ` +${b.partsPayout}⚙` : ''} every {b.jobSeconds >= 60 ? `${b.jobSeconds / 60}m` : `${b.jobSeconds}s`} · ⛽{b.fuelCost}
-                      </div>
-                    )}
-                    {b.nightOnly && <div className="card-stat">🌙 Open at night only</div>}
-                    {FEATURES[b.id] && <div className="card-stat feature-line">✨ {FEATURES[b.id][0].toUpperCase() + FEATURES[b.id].slice(1)}</div>}
-                    {b.fuelCap && <div className="card-stat">+{b.fuelCap} max fuel</div>}
+                  <div className="card-name">{b.name}</div>
+                  {/* What it makes, as icons and numbers: coins (and parts) per job, how often, the fuel each job takes. */}
+                  <div className="shop-chips">
+                    {!!b.jobSeconds && <span className="c-coin">${compact(b.payout ?? 0)}{b.partsPayout ? <em>+{b.partsPayout}⚙</em> : null}</span>}
+                    {every && <span title="Every job">⏱{every}</span>}
+                    {!!b.jobSeconds && <span className="c-fuel" title="Fuel per job">⛽{b.fuelCost}</span>}
+                    {b.nightOnly && <span title="Open at night only">🌙</span>}
+                    {b.fuelCap && <span className="c-cap" title="Max fuel">⛽+{b.fuelCap}</span>}
                   </div>
-                  {owned ? <span className="price">✔ Built</span> : locked ? <span className="price">🔒 Level {b.unlockLevel}</span> : price(b, sale.deal && sale)}
+                  {(highlight || feature) && <div className="card-stat feature-line">✨ {FEATURES[b.id][0].toUpperCase() + FEATURES[b.id].slice(1)}</div>}
+                  {owned ? <span className="price">✔ Built</span> : locked ? <span className="price">🔒 Lv {b.unlockLevel}</span> : price(b, sale.deal && sale)}
                 </button>
               )
             })}
@@ -569,10 +578,11 @@ function SaleSection({ onPick }: { onPick: () => void }) {
               <button className="buy" onClick={() => openShop('rescue')}>Build · $1,000</button>
             </div>
           )}
-          {locked ? (
+          {/* One button at a time: until Rusty's is built, building it is the only thing to press. */}
+          {!rusty ? null : locked ? (
             <button className="price locked-btn sale-buy" onClick={() => buyCar(c.id, color)}>🔒 Level {c.unlockLevel}</button>
           ) : (
-            <button className={afford(c) ? 'buy sale-buy' : 'buy broke sale-buy'} disabled={!rusty} onClick={() => buyCar(c.id, color)}>Buy {price(c)}</button>
+            <button className={afford(c) ? 'buy sale-buy' : 'buy broke sale-buy'} onClick={() => buyCar(c.id, color)}>Buy {price(c)}</button>
           )}
         </div>
       )}

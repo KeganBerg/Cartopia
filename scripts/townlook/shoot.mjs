@@ -10,8 +10,8 @@ const b = await chromium.launch({ executablePath: process.env.CHROME ?? '/opt/pw
 const base = 'http://localhost:5173/scripts/townlook/render.html'
 const TONES = ['warm', 'white', 'amber', 'ice', 'mint', 'violet', 'rose']
 const jobs = []
-for (const t of ['own', 'white', 'pastel', 'sand', 'mint', 'rose', 'noir']) jobs.push([`theme-${t}`, 360, 220, `what=theme&theme=${t}`])
-for (const post of ['auto', 'cobra', 'lantern', 'globe']) for (const tone of TONES) jobs.push([`lamp-${post}-${tone}`, 240, 220, `what=lamp&post=${post}&tone=${tone}`])
+for (const t of ['own', 'white', 'pastel', 'sand', 'mint', 'rose', 'noir']) jobs.push([`theme-${t}`, 720, 440, `what=theme&theme=${t}`])
+for (const post of ['auto', 'cobra', 'lantern', 'globe']) for (const tone of TONES) jobs.push([`lamp-${post}-${tone}`, 480, 480, `what=lamp&post=${post}&tone=${tone}`])
 for (const [name, W, H, query] of jobs.filter(([n]) => !only || n.startsWith(only))) {
   const p = await b.newPage({ viewport: { width: W, height: H } })
   p.on('pageerror', (e) => console.log('error', e.message))
