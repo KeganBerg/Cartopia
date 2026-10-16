@@ -17,6 +17,7 @@ import { SPOOKY_MODELS, SpookyModel } from './SpookyBuildings'
 import { COZY_HOMES, CozyHomeModel } from './CozyHomes'
 import { CITY_HOMES, CityHomeModel } from './CityHomes'
 import { GRAND_HOMES, GrandHomeModel } from './GrandHomes'
+import { HomeBlock } from './HomeBlock'
 import { PropMesh } from './propKit'
 import { DECOR_PROPS, WILD_PROPS, benchBin } from './decorProps'
 import { Bulbs } from './edgeKit'
@@ -616,9 +617,9 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
   if (SERVICE_MODELS.has(def.id)) return <ServiceModel def={def} ghost={ghost} valid={valid} m={m} win={win} bulb={bulb} level={lvl} />
   if (REC_MODELS.has(def.id)) return <RecModel def={def} ghost={ghost} valid={valid} m={m} win={win} bulb={bulb} level={lvl} />
   if (SPOOKY_MODELS.has(def.id)) return <SpookyModel def={def} ghost={ghost} valid={valid} m={m} win={win} bulb={bulb} level={lvl} />
-  if (COZY_HOMES.has(def.id)) return <CozyHomeModel def={def} ghost={ghost} valid={valid} m={m} win={win} bulb={bulb} level={lvl} />
-  if (CITY_HOMES.has(def.id)) return <CityHomeModel def={def} ghost={ghost} valid={valid} m={m} win={win} bulb={bulb} level={lvl} />
-  if (GRAND_HOMES.has(def.id)) return <GrandHomeModel def={def} ghost={ghost} valid={valid} m={m} win={win} bulb={bulb} level={lvl} />
+  if (COZY_HOMES.has(def.id)) return <HomeBlock def={def}><CozyHomeModel def={def} ghost={ghost} valid={valid} m={m} win={win} bulb={bulb} level={lvl} /></HomeBlock>
+  if (CITY_HOMES.has(def.id)) return <HomeBlock def={def}><CityHomeModel def={def} ghost={ghost} valid={valid} m={m} win={win} bulb={bulb} level={lvl} /></HomeBlock>
+  if (GRAND_HOMES.has(def.id)) return <HomeBlock def={def}><GrandHomeModel def={def} ghost={ghost} valid={valid} m={m} win={win} bulb={bulb} level={lvl} /></HomeBlock>
   if (OFFICE_MODELS.has(def.id)) return <OfficeModel def={def} ghost={ghost} m={m} bulb={bulb} level={lvl} />
   if (TRAILER_JUNK.has(def.id)) return <TrailerJunkModel id={def.id} m={m} win={win} bulb={bulb} ghost={ghost} lvl={lvl} lift={lift} roof={def.roof} color={def.color} />
   if (PARK_STYLES.has(def.id)) return <ParkStyleModel id={def.id} m={m} win={win} bulb={bulb} ghost={ghost} lvl={lvl} lift={lift} roof={def.roof} color={def.color} />
