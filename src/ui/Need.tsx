@@ -1,5 +1,5 @@
 import { useGame, fuelCap, gateLevel } from '../game/store'
-import { buildingDef, isOpen, xpToNext, raceXp, FUEL_REGEN_SECONDS, RACE_FUEL, refillBucks, type BuildingDef } from '../game/data'
+import { buildingDef, isOpen, xpToNext, raceXp, fuelRegenSeconds, fuelPerMin, nextFuelStep, RACE_FUEL, refillBucks, type BuildingDef } from '../game/data'
 import { useNow } from '../scene/useNow'
 import { Panel } from './Menus'
 
@@ -56,15 +56,16 @@ export function NeedPanel() {
     ]
   } else if (need.res === 'fuel') {
     const cap = fuelCap(s)
-    const next = s.fuel >= cap ? null : Math.max(0, FUEL_REGEN_SECONDS - Math.floor((now - s.fuelUpdatedAt) / 1000))
+    const next = s.fuel >= cap ? null : Math.max(0, fuelRegenSeconds(s.level) - Math.floor((now - s.fuelUpdatedAt) / 1000))
     summary = need.missing ? `You need ${need.missing} more fuel${need.what ? ` for ${need.what}` : ''}. You have ${s.fuel}/${cap}.` : `You have ${s.fuel}/${cap} fuel.`
     const refill = refillBucks(cap - s.fuel)
+    const step = nextFuelStep(s.level)
     sources = [
       { icon: '⛽', title: `Fill up with gems · 💎 ${refill}`, detail: s.fuel >= cap ? 'Your tank is full.' : `Fill your tank to ${cap} right now. You have ${s.bucks} gems.`, action: { label: `Fill up · 💎 ${refill}`, run: s.refillFuel, disabled: s.fuel >= cap } },
-      { icon: '⏱', title: 'Wait for a refill', detail: next === null ? 'Your tank is full.' : `Fuel refills 1 every minute. Next one in ${next}s.` },
+      { icon: '⏱', title: `Wait for a refill · ${fuelPerMin(s.level)}⛽/min`, detail: next === null ? 'Your tank is full.' : `Next one in ${next}s.` },
       { icon: '⛽', title: 'Build a Gas Station', detail: `Each one adds +10 to your max fuel. You have ${owned('gas')}.`, action: build('gas') },
       ...(owned('house') ? [{ icon: '🏡', title: 'Upgrade your homes', detail: 'Every home level adds +1 to your max fuel. Find them under Upgrades in the Shop.', action: { label: 'Upgrades', run: () => s.openShop('upgrades') } }] : []),
-      { icon: '⭐', title: 'Level up', detail: 'Leveling up refills your tank and raises the max.' },
+      { icon: '⭐', title: 'Level up', detail: `Refills your tank and raises the max.${step ? ` ${step.perMin}⛽/min at level ${step.level}.` : ''}` },
       { icon: '📅', title: 'Daily bonus day 3', detail: '+5 fuel on the third day of your streak.' },
     ]
   } else if (need.res === 'bucks') {
