@@ -29,12 +29,12 @@ for (const [form, size] of [['phone', { width: 390, height: 844 }], ['desktop', 
   await p.screenshot({ path: `${out}/${form}-1-trial.png`, timeout: 90000 })
   if (process.env.BEFORE) { await p.close(); continue }
   // The #1 car on the podium opens its owner's profile too.
-  const box = await p.locator('.wt-stage').boundingBox()
+  const box = await p.locator('.ttr-stage').boundingBox()
   await p.mouse.click(box.x + box.width * 0.5, box.y + box.height * (form === 'phone' ? 0.52 : 0.5), { noWaitAfter: true, timeout: 60000 }).catch((e) => console.log('podium click', e.message.split('\n')[0]))
   await p.waitForTimeout(4000)
   console.log(form, 'podium tap opens', await p.evaluate(() => document.querySelector('.pc-card h2')?.textContent ?? 'nothing'))
   if (await p.locator('.pc-card').count()) await tap(p.locator('.pc-card .close'))
-  await tap(p.locator('.wt-row').nth(1))
+  await tap(p.locator('.ttr-row').nth(1))
   await p.waitForSelector('.pc-card .pc-stats', { timeout: 30000 })
   await p.waitForTimeout(5000)
   await p.screenshot({ path: `${out}/${form}-2-profile.png`, timeout: 90000 })

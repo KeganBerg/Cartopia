@@ -9,8 +9,9 @@ import { useGame, buildPrice, canPlace, canPlaceBlock, buyablePlots, lotSize, mo
 import { TILE, PLOT, PLOT_MIN, PLOT_MAX, START_LAND, RUSTY_LOT, buildingDef, buildingLevel } from '../game/data'
 import { BuildingModel } from './BuildingModel'
 import { rotateCurrent, setGhostTurn, turnOf } from '../game/placement'
-import { mergeGroups, groupOf, groupTurn, groupScale, isLandmark, type MergeGroup } from '../game/merge'
+import { mergeGroups, groupOf, groupTurn, groupParts, isGlobe, isLandmark, isTwin, type MergeGroup } from '../game/merge'
 import { VanguardTower, launchTower } from './Landmark'
+import { GlobeTower, spinGlobe } from './GlobeTower'
 import { KeepShapes, MergeScale } from './mergeScale'
 import { limitFor } from './keepShape'
 import { sfx } from '../lib/sound'
@@ -217,10 +218,15 @@ const Building = memo(BuildingLot, sameBuilding)
 function BuildingLot({ b, turn, group, picked, city }: BuildingProps) {
   const d = buildingDef(b.def)
   const [cx, cz] = group ? groupCenter(group) : centerOf(b.def, b.x, b.z, b.rot)
-  const [sx, sy, sz] = group ? groupScale(group, turn) : [1, 1, 1]
+  // A 2x4 block draws as two 2x2s side by side (unless it's the Globe Tower, built for the
+  // whole block); every other block is one model grown to fill it.
+  const globe = !!group && isGlobe(group)
+  const parts = group && !globe ? groupParts(group, turn) : [{ at: [0, 0] as [number, number], scale: [1, 1, 1] as [number, number, number] }]
+  const [sx, , sz] = parts[0].scale
   // Four max-level houses in a square are a landmark built for a 2x2 lot, not a scaled-up house.
   const mark = group && isLandmark(group)
-  const k = mark ? group.cols / 2 : 1
+  const k = mark ? Math.min(group.cols, group.rows) / 2 : 1
+  const twin = !!group && isTwin(group)
   // How far it's been dragged, in tiles. A building hides while dragged away and
   // the ghost shows where it would land; a merged block slides along itself.
   const off = useDrag((g) => (g.drag?.uid === b.uid ? `${g.drag.x - b.x},${g.drag.z - b.z}` : '0,0'))
@@ -229,7 +235,6 @@ function BuildingLot({ b, turn, group, picked, city }: BuildingProps) {
   return (
     <group
       position={[cx + dx * TILE, 0, cz + dz * TILE]}
-      rotation-y={(turn * Math.PI) / 2}
       userData={{ hours: { seed: seedOf(b.uid), kind: hoursOf(b.def) }, noBatch: !!picked }}
       onPointerDown={(e) => {
         const s = useGame.getState()
@@ -263,7 +268,8 @@ function BuildingLot({ b, turn, group, picked, city }: BuildingProps) {
         }
         if (s.mode !== 'play' || s.visiting || e.delta > 6) return
         e.stopPropagation()
-        if (mark) launchTower(b.uid)
+        if (globe) spinGlobe(b.uid)
+        else if (mark) launchTower(b.uid)
         s.tapBuilding(b.uid)
       }}
       onPointerOver={() => {
@@ -274,22 +280,27 @@ function BuildingLot({ b, turn, group, picked, city }: BuildingProps) {
       onPointerOut={() => (document.body.style.cursor = '')}
     >
       {d.kind !== 'decor' && d.kind !== 'obstacle' && (
-        <mesh rotation-x={-Math.PI / 2} position-y={LAYER.lot} receiveShadow>
-          <planeGeometry args={[d.w * TILE * sx - 0.1, d.h * TILE * sz - 0.1]} />
-          <meshStandardMaterial map={paverTex(d.w * sx, d.h * sz)} />
+        // One paved lot under the whole block, a 2x4's two halves included.
+        <mesh rotation-x={-Math.PI / 2} rotation-z={twin ? 0 : (turn * Math.PI) / 2} position-y={LAYER.lot} receiveShadow>
+          <planeGeometry args={twin ? [group.w * TILE - 0.1, group.h * TILE - 0.1] : [d.w * TILE * sx - 0.1, d.h * TILE * sz - 0.1]} />
+          <meshStandardMaterial map={twin ? paverTex(group.w, group.h) : paverTex(d.w * sx, d.h * sz)} />
         </mesh>
       )}
-      <group scale={mark ? [k, k, k] : [sx, sy, sz]}>
-        <MergeScale.Provider value={mark ? [k, k, k] : group ? [sx, sy, sz] : ONE}>
-          <PopGroup uid={b.uid}>
-            <KeepShapes limit={limitFor(d)}>
-              <Tint theme={themeFor(b.tint, city, d.kind === 'decor')}>
-                {mark ? <VanguardTower uid={b.uid} /> : <BuildingModel def={d} level={buildingLevel(b)} />}
-              </Tint>
-            </KeepShapes>
-          </PopGroup>
-        </MergeScale.Provider>
-      </group>
+      {parts.map(({ at, scale }, i) => (
+        <group key={i} position={[at[0] * TILE, 0, at[1] * TILE]} rotation-y={(turn * Math.PI) / 2}>
+          <group scale={mark ? [k, k, k] : scale}>
+            <MergeScale.Provider value={mark ? [k, k, k] : group ? scale : ONE}>
+              <PopGroup uid={b.uid}>
+                <KeepShapes limit={limitFor(d)}>
+                  <Tint theme={themeFor(b.tint, city, d.kind === 'decor')}>
+                    {globe ? <GlobeTower uid={b.uid} /> : mark ? <VanguardTower uid={b.uid} /> : <BuildingModel def={d} level={buildingLevel(b)} />}
+                  </Tint>
+                </KeepShapes>
+              </PopGroup>
+            </MergeScale.Provider>
+          </group>
+        </group>
+      ))}
     </group>
   )
 }

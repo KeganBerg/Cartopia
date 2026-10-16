@@ -1,7 +1,7 @@
 import { naturalPhase } from './clock'
 import { activeEvent } from './liveEvents'
 import { SEASON, type Season } from '../scene/season'
-import type { VenueId } from '../scene/venues'
+import { baseOf, type AnyVenueId, type VenueId } from '../scene/venues'
 
 // Town weather. Like the clock, it's worked out from the real time, so every
 // player sees the same shower at the same moment. Time is cut into spells of a
@@ -301,7 +301,9 @@ function rollVenue(venue: VenueId, roll: number): WeatherKind {
 }
 
 // `force`: a sky the race always has (weekly events), kept as it is at every venue.
-export function raceWeather(venue: VenueId, seed?: string, force?: WeatherKind): Weather {
+// World Tour venues roll the skies of the original venue they're based on.
+export function raceWeather(at: AnyVenueId, seed?: string, force?: WeatherKind): Weather {
+  const venue = baseOf(at)
   let kind: WeatherKind
   const town = weatherNow()
   if (PIN) kind = town.kind

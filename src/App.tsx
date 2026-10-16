@@ -191,7 +191,7 @@ export default function App() {
       {panel === 'shop' && <ShopPanel />}
       {panel === 'inventory' && <InventoryPanel />}
       {/* My Cars, For Sale, Collection and Crates are one page that stays up while its tabs switch. */}
-      {(panel === 'garage' || panel === 'showroom' || panel === 'crates') && <CarsPage crates={panel === 'crates' ? <CratesPanel embedded /> : null} />}
+      {(panel === 'garage' || panel === 'showroom' || panel === 'crates') && <CarsPage crates={(onReady) => <CratesPanel embedded onReady={onReady} />} />}
       {panel === 'race' && !liveRace && <RacePanel />}
       {liveRace && <LiveRaceOverlay />}
       {panel === 'invites' && <InvitesPanel />}

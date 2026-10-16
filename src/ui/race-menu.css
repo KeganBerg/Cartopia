@@ -10,25 +10,34 @@
 .rm-screen { flex: 1; min-height: 0; overflow: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
 .rm-s-quick { display: block; }
 
-/* ---------- quick race: one card per rival ---------- */
-.rm-q-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
-.rm-qc { --qc: #5aa9ff; border: 3px solid var(--line, #14213d); border-radius: 18px; background: #fff; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 0 rgba(0,0,0,.3); min-width: 0; padding: 0; font: inherit; text-align: left; color: inherit; }
-.rm-qc-top { position: relative; height: 74px; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 50% 120%, rgba(255,255,255,.85), rgba(255,255,255,0) 60%), linear-gradient(135deg, color-mix(in srgb, var(--qc) 55%, #fff), color-mix(in srgb, var(--qc) 80%, #14213d)); box-shadow: inset 0 3px 0 rgba(255,255,255,.3); }
-.rm-qc-top .tag { position: absolute; top: 6px; right: 6px; }
-.rm-qc-top .rm-mi { font-size: 34px; }
-.rm-qc-live .rm-qc-top { background: linear-gradient(135deg, #7ee05a, #2f9e35); }
-.rm-qc-body { flex: 1; padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 6px; }
-.rm-qc-body b { font: 900 15px Nunito, sans-serif; color: var(--ink, #1b2a4a); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rm-qc-chips { display: flex; gap: 5px; align-items: center; font-size: 12px; font-weight: 800; color: #4a6283; }
+/* ---------- quick race: one card per rival ----------
+   Each card is the racer's Call Card (CallCard.tsx: an animated scene) with their car standing on
+   it, name and stats over a dark fade, and the race button. Rows stretch to fill the panel. */
+.rm-s-quick { display: block; }
+.rm-q-grid { --qc-h: 280px; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); grid-auto-rows: minmax(var(--qc-h), 1fr); gap: 12px; min-height: 100%; }
+.rm-qc { --qc: #5aa9ff; position: relative; isolation: isolate; border: 3px solid var(--line, #14213d); border-radius: 18px; background: #0b1430; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 0 rgba(0,0,0,.35); min-width: 0; padding: 0; font: inherit; text-align: left; color: #fff; }
+/* The frame: a thin light edge, in the tier's colour for a crate card. */
+.rm-qc::after { content: ''; position: absolute; inset: 0; z-index: 3; border-radius: 15px; pointer-events: none; box-shadow: inset 0 0 0 2px var(--cc-edge, rgba(255,255,255,.16)), inset 0 2px 0 rgba(255,255,255,.22); }
+.rm-qc.cc-tier-legendary::after { box-shadow: inset 0 0 0 2px var(--cc-edge), inset 0 0 14px rgba(255,213,79,.55), inset 0 2px 0 rgba(255,255,255,.3); }
+.rm-qc-top { position: relative; z-index: 1; flex: 1; min-height: 96px; }
+/* The car's shadow on the card's floor. */
+.rm-qc-top::before { content: ''; position: absolute; left: 14%; right: 14%; bottom: 4%; height: 14%; border-radius: 50%; background: radial-gradient(closest-side, rgba(0,0,0,.55), rgba(0,0,0,0)); }
+.rm-qc-top .thumb3d { position: absolute; left: 0; right: 0; bottom: 0; width: auto; height: auto; aspect-ratio: 4 / 3; max-height: 100%; margin: 0 auto; --th: 100%; background: none; border-radius: 0; }
+.rm-qc-top .tag { position: absolute; top: 8px; right: 8px; z-index: 2; box-shadow: 0 2px 0 rgba(0,0,0,.35); }
+.rm-qc-top .rm-mi { position: absolute; inset: 0; display: grid; place-items: center; font-size: 54px; filter: drop-shadow(0 4px 6px rgba(0,0,0,.5)); }
+.rm-cc-gem { position: absolute; z-index: 2; top: 7px; left: 7px; width: 28px; height: 28px; display: grid; place-items: center; font-size: 15px; border-radius: 50%; background: rgba(8,14,32,.55); border: 2px solid var(--cc-edge, #fff); }
+.rm-qc-body { position: relative; z-index: 2; padding: 22px 10px 10px; margin-top: -18px; display: flex; flex-direction: column; gap: 6px; background: linear-gradient(180deg, rgba(6,10,26,0), rgba(6,10,26,.78) 30%, rgba(6,10,26,.9)); }
+.rm-qc-body b { font: 18px var(--display); line-height: 1.1; color: #fff; text-shadow: 0 2px 0 #14213d; -webkit-text-stroke: .6px #14213d; letter-spacing: .2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rm-qc-chips { display: flex; gap: 5px; align-items: center; font: 900 12px Nunito, sans-serif; color: #dfe9ff; }
+.rm-qc-chips > span:first-child { background: rgba(255,255,255,.16); border-radius: 6px; padding: 0 6px; }
 .rm-qc-body .buy { margin-top: auto; width: 100%; }
 .rm-qc-body .buy small { opacity: .85; font-size: 11px; }
 /* Wider screens: a few big cards across the whole panel, not a row of small ones in the corner. */
 @media (min-width: 601px) and (min-height: 501px) {
-  .rm-q-grid { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
-  .rm-qc-top { height: 140px; }
-  .rm-qc-top .thumb3d.sm { --tw: 170px; --th: 120px; }
-  .rm-qc-body { padding: 10px 12px 12px; gap: 8px; }
-  .rm-qc-body b { font-size: 19px; }
+  .rm-q-grid { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+  .rm-qc-body { padding: 26px 12px 12px; gap: 8px; }
+  .rm-qc-body b { font-size: 22px; }
+  .rm-qc-chips { font-size: 13px; }
 }
 /* Live player: drag challenge and kart challenge side by side. */
 .rm-qc-pair { margin-top: auto; display: flex; gap: 6px; }
@@ -232,11 +241,12 @@ div.rm-node { cursor: default; }
 .rm-box .thumb3d.sm { --tw: 120px; --th: 94px; }
 .rm-rival .rm-ttl { flex-wrap: wrap; row-gap: 2px; }
 @media (max-width: 600px), (max-height: 500px) {
-  .rm-q-grid { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 8px; }
-  .rm-qc-top { height: 76px; }
-  .rm-qc-top .thumb3d.sm { --tw: 104px; --th: 72px; }
-  .rm-qc-body { padding: 6px 8px 8px; gap: 4px; }
-  .rm-qc-body b { font-size: 14px; }
+  .rm-q-grid { --qc-h: 250px; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; grid-auto-rows: var(--qc-h); min-height: 0; }
+  .rm-qc { border-radius: 16px; }
+  .rm-qc::after { border-radius: 13px; }
+  .rm-qc-body { padding: 16px 8px 8px; gap: 4px; }
+  .rm-qc-body b { font-size: 15px; }
+  .rm-cc-gem { width: 24px; height: 24px; font-size: 13px; top: 5px; left: 5px; }
   .rm-box .thumb3d.sm { --tw: 66px; --th: 52px; }
 }
 
@@ -682,13 +692,12 @@ div.rm-node { cursor: default; }
   .rm-gpc-top .rm-ttl { padding-right: 0; }
 }
 /* Kart party: the card that starts one, and the player cards while picking who to invite. */
-.rm-qc-party .rm-qc-top { background: radial-gradient(circle at 50% 120%, rgba(255,255,255,.7), rgba(255,255,255,0) 60%), linear-gradient(135deg, #b388ff, #5e35b1); }
 .rm-qc-party.on { border-color: #5e35b1; }
 .rm-qc-party button, .rm-qc-pick { min-height: 44px; }
 .rm-qc-pick { cursor: pointer; }
 .rm-qc-pick.on { border-color: #2f9e35; box-shadow: 0 0 0 3px #7ee05a, 0 4px 0 rgba(0,0,0,.3); }
 .rm-qc-pick:disabled { opacity: .5; cursor: default; }
-.rm-pick-tick { position: absolute; top: 6px; right: 6px; font-size: 24px; line-height: 1; }
+.rm-pick-tick { position: absolute; z-index: 2; top: 6px; right: 6px; font-size: 24px; line-height: 1; }
 
 /* ---------- phone audit (2026-10-12): nothing on a hub tile is ever clipped ----------
    Phones size each row to its tiles instead of squeezing them into fixed shares of the
@@ -848,6 +857,71 @@ div.rm-node { cursor: default; }
 .wt-info small { font: 800 12px Nunito, sans-serif; color: #4a6283; }
 .wt-line { font: italic 700 12px Nunito, sans-serif; color: #31445f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wt-lock { font-size: 20px; }
+
+/* ---------- race modes build-out: gates, ranks, tiers, big prize cars ---------- */
+/* Campaign: a locked chapter is a star ring and the two things that open it. */
+.rm-gate { gap: 12px; color: var(--ink, #1b2a4a); }
+.rm-ring { --p: 0; width: 132px; height: 132px; border-radius: 50%; display: grid; place-items: center; position: relative;
+  background: conic-gradient(#ffb300 calc(var(--p) * 360deg), #e3ebf6 0); box-shadow: 0 3px 0 rgba(0,0,0,.18); }
+.rm-ring::before { content: ''; position: absolute; inset: 12px; border-radius: 50%; background: #fff; box-shadow: inset 0 2px 0 #e3ebf6; }
+.rm-ring > * { position: relative; }
+.rm-ring > span { position: absolute; top: 22px; font-size: 26px; color: #ffb300; text-shadow: 0 1px 0 #e65100; }
+.rm-ring b { font: 900 34px/1 Nunito, sans-serif; margin-top: 22px; font-variant-numeric: tabular-nums; }
+.rm-ring b small { font-size: 18px; color: #7d8fa8; }
+.rm-gate-steps { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.rm-gate-steps > span { padding: 4px 11px; border-radius: 999px; background: #eef3fa; border: 2px solid #c6d7ee; font: 900 14px Nunito, sans-serif; color: #4a6283; }
+.rm-gate-steps > span.ok { background: #eaffe4; border-color: #8fd694; color: #1d6b22; }
+.rm-gate .buy:not(.small) { min-width: 200px; font-size: 18px; }
+.rm-node.gold > span { border-color: #ffb300; box-shadow: 0 2px 0 #e65100, 0 0 10px rgba(255,179,0,.6); }
+.rm-row .stars { font-size: 13px; }
+/* Boss rows read as the big race of the chapter or leg. */
+.rm-row.boss { background: linear-gradient(90deg, #fff1c9, #fff 70%); }
+.rm-row.boss.next { background: linear-gradient(90deg, #ffe38a, #fff6d6 70%); }
+.rm-row.boss .rm-step { background: linear-gradient(#ffd84a, #ffa41a); color: #14213d; box-shadow: 0 2px 0 #b06a00; }
+.rm-row.boss .thumb3d.xs { --tw: 92px; --th: 60px; }
+.rm-row.boss .rm-who b { font-size: 18px; }
+.rm-row.boss.locked { opacity: .8; }
+.rm-row.boss.locked .thumb3d { filter: none; }
+/* Pro Tour ranks. */
+.rm-node .rm-rank { position: absolute; top: -8px; right: -10px; font-style: normal; font-size: 16px; filter: drop-shadow(0 1px 0 rgba(0,0,0,.35)); }
+.rm-chips > span.rm-rankchip { background: rgba(255, 190, 30, .92); color: #14213d; border-color: rgba(255,255,255,.6); }
+.tour-rankup { margin: -4px 0 4px; font: 900 22px Nunito, sans-serif; color: #b06a00; }
+/* Grand Prix: the mystery box car fills its card and turns through the box. */
+.rm-box { position: relative; overflow: hidden; background: radial-gradient(ellipse at 50% 70%, #fff 0 30%, #e3edf9 80%); }
+.rm-box .thumb3d.sm { --tw: 100%; --th: 100%; width: 100%; height: auto; flex: 1 1 0; min-height: 60px; background: none; }
+.rm-box.dim .thumb3d { filter: grayscale(.6); opacity: .8; }
+.rm-box-dots { display: flex; gap: 4px; }
+.rm-box-dots i { width: 7px; height: 7px; border-radius: 50%; background: #c6d7ee; }
+.rm-box-dots i.on { background: #2f7ff0; }
+/* Paint rivals: tier headers and the next rival to beat. */
+.pr-tier { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; padding: 2px 6px 0; }
+.pr-tier b { font: 900 14px Nunito, sans-serif; color: var(--ink, #1b2a4a); }
+.pr-tier small { font: 900 13px Nunito, sans-serif; color: #4a6283; background: #eef3fa; border-radius: 999px; padding: 1px 8px; }
+.pr-tier.done small { background: #fff1c9; }
+.pr-tile.next:not(.sel) { border-color: #ff9f1a; animation: prNext 1.6s ease-in-out infinite; }
+@keyframes prNext { 50% { box-shadow: 0 0 0 4px rgba(255,159,26,.35), 0 2px 0 #c6d7ee; } }
+@media (max-width: 600px), (max-height: 500px) {
+  .rm-ring { width: 96px; height: 96px; }
+  .rm-ring::before { inset: 9px; }
+  .rm-ring > span { top: 14px; font-size: 18px; }
+  .rm-ring b { font-size: 24px; margin-top: 16px; }
+  .rm-ring b small { font-size: 13px; }
+  .rm-gate { gap: 8px; padding: 10px; }
+  .rm-gate .buy:not(.small) { min-width: 0; font-size: 16px; }
+  .rm-row.boss .thumb3d.xs { --tw: 70px; --th: 46px; }
+  .rm-row.boss .rm-who b { font-size: 16px; }
+  .rm-box .thumb3d.sm { --tw: 100%; --th: 100%; min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) { .pr-tile.next:not(.sel) { animation: none; } }
+/* Phones stack the rival screen: the banner and prize keep their size and the grid scrolls under them. */
+@media (max-width: 600px) {
+  .rm-prow .rm-left { flex: none; }
+  .rm-prow .rm-right { flex: 1; min-height: 0; }
+  .pr-tier { padding: 0 4px; }
+  .pr-tier b { font-size: 12.5px; }
+  .pr-tier small { font-size: 11.5px; }
+}
+.rm-gate-steps .rm-or { align-self: center; font: 900 14px Nunito, sans-serif; color: #7d8fa8; font-style: normal; margin: 0 -2px; }
 
 /* Phones, with the big race button in the bar too: the car gets the whole first row, the race
    button a full-width row under it, so neither is cut short. */

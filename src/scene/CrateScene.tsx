@@ -25,6 +25,7 @@ import { crateSfx, sfx } from '../lib/sound'
 import { landClink } from '../lib/crateClinks'
 import { PART_LIFT, PartPrize, partReach } from './PartPrize'
 import { pinPrograms, warmShaders } from './warm'
+import { DEPOT_WALK, depotWalk } from './doorTrip'
 
 // The Crate Depot: a warehouse loading bay at night where crates are opened. The crate sits on a
 // hazard-striped lift under a work lamp, racking full of stock either side, a forklift parked up,
@@ -1036,6 +1037,20 @@ type StageProps = {
   pace?: CratePace
 }
 
+// Walking in from the Cars page's Showroom (scene/doorTrip.ts): how far back the camera starts.
+const WALK = new Vector3(-0.8, 0.45, 3.4)
+function walkBack(dt: number) {
+  const w = depotWalk
+  if (w.go === 'hold') return 1
+  if (w.go !== 'in' && w.go !== 'out') return 0
+  w.p = Math.min(1, w.p + dt / DEPOT_WALK)
+  if (w.go === 'in') {
+    if (w.p >= 1) w.go = null
+    return (1 - w.p) ** 3
+  }
+  return w.p * w.p
+}
+
 // Diamond's camera swing turns about the crate.
 const PIVOT = new Vector3(0, 1, 0)
 const UP = new Vector3(0, 1, 0)
@@ -1084,7 +1099,7 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base, baseQ, pace =
   // A part shows the part itself; cars and paints show the car.
   const part = drop?.kind === 'mod' ? drop.mod : null
   // A part also shows on the car it's for (prizeLook fits it), so its shape reads at a glance.
-  const showCar = (drop?.kind === 'car' || drop?.kind === 'dupe' || drop?.kind === 'skin' || drop?.kind === 'skindupe' || drop?.kind === 'hat' || drop?.kind === 'piece' || drop?.kind === 'mod') && !!prizeCar
+  const showCar = (drop?.kind === 'car' || drop?.kind === 'dupe' || drop?.kind === 'skin' || drop?.kind === 'skindupe' || drop?.kind === 'hat' || drop?.kind === 'callcard' || drop?.kind === 'piece' || drop?.kind === 'mod') && !!prizeCar
   const key = useRef<PointLight>(null)
   const rim = useRef<PointLight>(null)
   const lamps = useRef<Group>(null)
@@ -1277,7 +1292,7 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base, baseQ, pace =
       }
       camera.lookAt(AIM)
     } else {
-      camera.position.copy(base.current)
+      camera.position.copy(base.current).addScaledVector(WALK, walkBack(dt))
       camera.quaternion.copy(baseQ.current)
       if (beam.current) beam.current.visible = false
       if (prize.current) prize.current.visible = false
@@ -1338,12 +1353,12 @@ export function prizeLook(drop: CrateDrop | null, cars: { uid: string; model: st
   if (drop.kind === 'car') return { body: carDef(drop.model).body, model: drop.model, color: drop.color }
   // A resto-mod piece shows its secret car as a dark shadow; the fourth piece shows it built.
   if (drop.kind === 'piece') return { body: carDef(drop.model).body, model: drop.model, color: drop.uid && drop.color ? drop.color : '#263238' }
-  if (drop.kind === 'hat') {
-    // A hat, on your own car.
+  if (drop.kind === 'hat' || drop.kind === 'callcard') {
+    // A hat, on your own car; a Call Card shows your car too (the card itself is under the reveal).
     const owned = cars.filter((c) => !carDef(c.model).parked)
     const car = owned.find((c) => c.uid === mine) ?? owned[0] ?? { model: 'civic', color: '#eceff1' }
     const d = carDef(car.model)
-    return { body: d.body, model: car.model, color: car.color, finish: car.finish, stripe: car.stripe, mods: car.mods, hat: { id: drop.hat } }
+    return { body: d.body, model: car.model, color: car.color, finish: car.finish, stripe: car.stripe, mods: car.mods, ...(drop.kind === 'hat' ? { hat: { id: drop.hat } } : {}) }
   }
   if (drop.kind === 'dupe') {
     const d = carDef(drop.model)

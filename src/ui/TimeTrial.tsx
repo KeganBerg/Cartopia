@@ -112,24 +112,24 @@ export function TrialTab({ car, myPi }: { car: OwnedCar; myPi: number }) {
   useEffect(() => { sfx.start() }, [])
 
   return (
-    <div className="wt">
-      <div className="wt-stage">
+    <div className="ttr">
+      <div className="ttr-stage">
         <StageSlot cam={TRIAL_CAM}>{scene}</StageSlot>
-        <div className="wt-top">
-          <span className="wt-chip">{v.icon} {v.name}</span>
-          <span className="wt-chip wt-left" title="Board resets in">⏳ {shortLeft(msToNextWeek())}</span>
+        <div className="ttr-top">
+          <span className="ttr-chip">{v.icon} {v.name}</span>
+          <span className="ttr-chip ttr-left" title="Board resets in">⏳ {shortLeft(msToNextWeek())}</span>
         </div>
-        <div className="wt-prizes" title="Prizes when the week ends">
-          {TRIAL_PRIZES.slice(0, 3).map((p, i) => <span key={i} className={`wt-prize p${i + 1}`}><i>{MEDAL[i]}</i><Bucks n={p.bucks} /></span>)}
-          <span className="wt-prize p10"><i>🔟</i><Bucks n={TRIAL_PRIZES[3].bucks} /></span>
+        <div className="ttr-prizes" title="Prizes when the week ends">
+          {TRIAL_PRIZES.slice(0, 3).map((p, i) => <span key={i} className={`ttr-prize p${i + 1}`}><i>{MEDAL[i]}</i><Bucks n={p.bucks} /></span>)}
+          <span className="ttr-prize p10"><i>🔟</i><Bucks n={TRIAL_PRIZES[3].bucks} /></span>
         </div>
       </div>
-      <div className="wt-side">
+      <div className="ttr-side">
         {unclaimed.map((p) => {
           const prize = trialPrize(p.place)
           return (
-            <div key={p.week} className="wt-claim">
-              <span className="wt-claim-medal">{place(p.place)}</span>
+            <div key={p.week} className="ttr-claim">
+              <span className="ttr-claim-medal">{place(p.place)}</span>
               <div><b>{weekOf(p.week)}</b><small>{p.t.toFixed(3)}s</small></div>
               {prizes?.ready ? (
                 <button className="buy small" onClick={() => { sfx.reward(); claim(p.week, p.place) }}>
@@ -139,17 +139,17 @@ export function TrialTab({ car, myPi }: { car: OwnedCar; myPi: number }) {
             </div>
           )
         })}
-        <div className="wt-board" role="list" aria-label="This week's times">
+        <div className="ttr-board" role="list" aria-label="This week's times">
           {board === undefined && <LoadingBand label="Loading lap times" />}
-          {board === null && <div className="wt-empty" title="Couldn't load the board">📡 ✖</div>}
-          {board && rows.length === 0 && <div className="wt-empty" title="No times yet this week">🏁 1st?</div>}
+          {board === null && <div className="ttr-empty" title="Couldn't load the board">📡 ✖</div>}
+          {board && rows.length === 0 && <div className="ttr-empty" title="No times yet this week">🏁 1st?</div>}
           {rows.map((r) => <Row key={r.owner} r={r} name={nameOf(r)} car={cars[r.owner] ?? (r.owner === uid ? lookOf(car) : undefined)} leader={leader} mine={r.owner === uid} />)}
           {board?.me && !meShown && uid && (
             <Row r={{ owner: uid, town: townName, t: board.me.t, pi: myPi, car: carDef(car.model).name, place: board.me.place }} name={playerName(uid, townName)} car={lookOf(car)} leader={leader} mine />
           )}
         </div>
         {supabase && !uid && (
-          <button className="buy alt wt-signin" onClick={() => openPanel('account')} title="Sign in to post times and win prizes">👤 Sign in</button>
+          <button className="buy alt ttr-signin" onClick={() => openPanel('account')} title="Sign in to post times and win prizes">👤 Sign in</button>
         )}
       </div>
     </div>
@@ -159,18 +159,18 @@ export function TrialTab({ car, myPi }: { car: OwnedCar; myPi: number }) {
 function Row({ r, name, car, leader, mine }: { r: BoardRow; name: string; car?: BoardCar; leader: number | null; mine?: boolean }) {
   const gap = leader !== null && r.place > 1 ? r.t - leader : null
   return (
-    <button role="listitem" className={`wt-row r${Math.min(r.place, 4)}${mine ? ' mine' : ''}`} onClick={() => pick(r)} aria-label={`${name}, ${r.t.toFixed(3)} seconds, place ${r.place}`}>
-      <span className="wt-rank">{r.place <= 3 ? MEDAL[r.place - 1] : r.place}</span>
-      <span className="wt-car">{car && <CarThumb size="xs" body={car.body} model={car.model} color={car.color} mods={car.mods} />}</span>
-      <span className="wt-who">
+    <button role="listitem" className={`ttr-row r${Math.min(r.place, 4)}${mine ? ' mine' : ''}`} onClick={() => pick(r)} aria-label={`${name}, ${r.t.toFixed(3)} seconds, place ${r.place}`}>
+      <span className="ttr-rank">{r.place <= 3 ? MEDAL[r.place - 1] : r.place}</span>
+      <span className="ttr-car">{car && <CarThumb size="xs" body={car.body} model={car.model} color={car.color} mods={car.mods} />}</span>
+      <span className="ttr-who">
         <b>{name}</b>
-        <small>{r.car && <span className="wt-model">{r.car}</span>}<span className="rm-pi">PI {r.pi}</span></small>
+        <small>{r.car && <span className="ttr-model">{r.car}</span>}<span className="rm-pi">PI {r.pi}</span></small>
       </span>
-      <span className="wt-time">
+      <span className="ttr-time">
         <b>{r.t.toFixed(3)}</b>
         {gap !== null && <small>+{gap.toFixed(3)}</small>}
       </span>
-      <span className="wt-go" aria-hidden>›</span>
+      <span className="ttr-go" aria-hidden>›</span>
     </button>
   )
 }

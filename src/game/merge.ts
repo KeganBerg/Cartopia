@@ -1,9 +1,10 @@
 // Merged buildings: two matching buildings side by side can be merged into one
 // wide building (1x2), four standing in a square into one big building (2x2),
-// and four of those into a giant one (4x4), so a packed town still reads from
+// two of those side by side into a long one (2x4), and four of them into a
+// giant one (4x4), so a packed town still reads from
 // far out. One tap works the lot, and every building stays in the save with its
 // own job, level and driver, but each earns the block's merge bonus on top
-// (MERGE_BONUS in data.ts: +10% a pair, +25% a 2x2, +50% a 4x4). The
+// (MERGE_BONUS in data.ts: +10% a pair, +25% a 2x2, +35% a 2x4, +50% a 4x4). The
 // top-left building of the block carries `merge` (see MERGE_CODES); the rest are found by
 // position. A block that no longer lines up (moved on an older build, levels
 // differ) simply shows as separate buildings again.
@@ -12,8 +13,11 @@ import { buildingDef, buildingLevel, MAX_BUILDING_LEVEL, mergeBonus, mergedFuelE
 import type { PlacedBuilding } from './store'
 
 // Save value -> buildings across and down: 2 is a 2x2 square, 4 a 4x4, 21 two
-// side by side along x and 12 two along z.
-export const MERGE_CODES: Record<number, [number, number]> = { 4: [4, 4], 2: [2, 2], 21: [2, 1], 12: [1, 2] }
+// side by side along x and 12 two along z, 42 two 2x2 squares side by side
+// along x and 24 two along z.
+export const MERGE_CODES: Record<number, [number, number]> = { 4: [4, 4], 42: [4, 2], 24: [2, 4], 2: [2, 2], 21: [2, 1], 12: [1, 2] }
+// A 2x4: two merged squares drawn side by side as one block.
+export const isTwin = (g: Pick<MergeGroup, 'code'>) => g.code === 42 || g.code === 24
 export type MergeGroup = {
   anchor: PlacedBuilding
   code: number
@@ -81,7 +85,7 @@ export function mergeGroups(buildings: PlacedBuilding[]): Merges {
   const groups = new Map<string, MergeGroup>()
   const owner = new Map<string, string>()
   // Biggest first, so a stale smaller flag inside a bigger block is ignored.
-  for (const code of [4, 2, 21, 12]) {
+  for (const code of [4, 42, 24, 2, 21, 12]) {
     const [cols, rows] = MERGE_CODES[code]
     for (const b of buildings) {
       if (b.merge !== code || !mergeable(b.def) || owner.has(b.uid)) continue
@@ -151,6 +155,12 @@ export function mergeCandidates(buildings: PlacedBuilding[], merges = mergeGroup
       return q && q.code === 2 && alike(g.anchor, q.anchor) ? q : null
     })
     if (quads.every(Boolean)) out.push(group(g.anchor, 4, quads.flatMap((q) => q!.members)))
+    // Two matching squares side by side: one to the right (42) or one below (24).
+    for (const [code, i, j] of [[42, 1, 0], [24, 0, 1]]) {
+      const o = at.get(`${g.x + i * g.w},${g.z + j * g.h}`)
+      const q = o && merges.groups.get(o.uid)
+      if (q && q.code === 2 && alike(g.anchor, q.anchor)) out.push(group(g.anchor, code, [...g.members, ...q.members]))
+    }
   }
   return out
 }
@@ -161,10 +171,10 @@ export function applyMerge(buildings: PlacedBuilding[], c: MergeGroup): PlacedBu
   return buildings.map((b) => (b.uid === c.anchor.uid ? { ...unflag(b), merge: c.code } : ids.has(b.uid) ? unflag(b) : b))
 }
 
-// Saves with the block split one step: a 4x4 back into four 2x2s, a 2x2 or a pair back into loose buildings.
+// Saves with the block split one step: a 4x4 or 2x4 back into 2x2s, a 2x2 or a pair back into loose buildings.
 export function applySplit(buildings: PlacedBuilding[], g: MergeGroup): PlacedBuilding[] {
   const quads = new Set<string>()
-  if (g.code === 4) {
+  if (g.code === 4 || isTwin(g)) {
     const [w, h] = lot(g.anchor)
     for (const b of g.members) if ((b.x - g.x) % (w * 2) === 0 && (b.z - g.z) % (h * 2) === 0) quads.add(b.uid)
   }
@@ -200,7 +210,7 @@ export function rotateGroup(buildings: PlacedBuilding[], g: MergeGroup, turn: nu
   if (square && g.cols === g.rows) return buildings.map((b) => (b.uid === g.anchor.uid ? { ...b, mturn: to } : b))
   const cols = g.rows
   const rows = g.cols
-  const code = cols === rows ? g.code : cols > rows ? 21 : 12
+  const code = cols === rows ? g.code : isTwin(g) ? (cols > rows ? 42 : 24) : cols > rows ? 21 : 12
   const [mw, mh] = square || to % 2 === 0 ? [d.w, d.h] : [d.h, d.w]
   const W = mw * cols
   const H = mh * rows
@@ -257,9 +267,21 @@ export function groupTurn(g: MergeGroup, roads: Set<string>) {
 // its walls repeat more bays rather than growing taller (see useBays).
 export function groupScale(g: MergeGroup, turn: number): [number, number, number] {
   if (g.cols === g.rows) return [g.cols, g.cols, g.cols]
+  // Each half of a 2x4 is a 2x2 (see groupParts).
+  if (isTwin(g)) return [2, 2, 2]
   // The model's own x runs along world x when it faces north or south.
   const alongX = g.cols > g.rows
   return alongX === (turn % 2 === 0) ? [2, 1, 1] : [1, 1, 2]
+}
+
+// Where each copy of the model stands in a block, in tiles from the block's
+// middle (world axes), and how much it grows: one copy for most blocks, two
+// 2x2s side by side for a 2x4.
+export function groupParts(g: MergeGroup, turn: number): { at: [number, number]; scale: [number, number, number] }[] {
+  const scale = groupScale(g, turn)
+  if (!isTwin(g)) return [{ at: [0, 0], scale }]
+  const [dx, dz] = g.code === 42 ? [g.w / 4, 0] : [0, g.h / 4]
+  return [{ at: [-dx, -dz], scale }, { at: [dx, dz], scale }]
 }
 
 // Four level 10 houses merged into a square become a landmark skyscraper
@@ -267,4 +289,8 @@ export function groupScale(g: MergeGroup, turn: number): [number, number, number
 // Four of those merged again make a giant one.
 export const LANDMARK_NAME = 'Vanguard Tower'
 export const isLandmark = (g: Pick<MergeGroup, 'anchor' | 'cols' | 'rows'>) =>
-  g.anchor.def === 'house' && buildingLevel(g.anchor) >= MAX_BUILDING_LEVEL && g.cols === g.rows
+  g.anchor.def === 'house' && buildingLevel(g.anchor) >= MAX_BUILDING_LEVEL && (g.cols === g.rows || g.cols * g.rows === 8)
+// Two Vanguard Towers merged side by side (a 2x4) become the Globe Tower (src/scene/GlobeTower.tsx).
+export const GLOBE_NAME = 'Globe Tower'
+export const isGlobe = (g: Pick<MergeGroup, 'anchor' | 'cols' | 'rows'>) => isLandmark(g) && g.cols * g.rows === 8
+export const landmarkName = (g: Pick<MergeGroup, 'anchor' | 'cols' | 'rows'>) => (isGlobe(g) ? GLOBE_NAME : LANDMARK_NAME)

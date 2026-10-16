@@ -3,6 +3,8 @@ import { StageSlot, useStageReady } from '../scene/Stage'
 import { useGame, openCrate } from '../game/store'
 import { CUSTOM_PAINT, CUSTOM_PAINT_SHOW, MOD_SLOTS, SKINNED_SLOTS, carDef, fittedMods, modDef, ownedModSkins, type ModDef } from '../game/data'
 import { crateHats, hatDef } from '../game/hats'
+import { CALL_WEIGHT, TIER_NAME, callCardDef, crateCallCards } from '../game/callCards'
+import { CallCardArt, CallCardShowcase, callCardTier } from './CallCard'
 import { CRATES, carOdds, crateCost, crateOwnedSkins, crateDef, crateOddsShown, dropTier, homeCars, homeMods, modChoices, pityLeft, revealOrder, skinOdds, skinOf, type CrateDef, type CrateDrop, type CrateId, type CrateOpen } from '../game/crates'
 import { SKIN_TIERS } from '../game/data'
 import { CrateScene, TIER_GLOW, prizeLook, type CratePace, type CratePhase } from '../scene/CrateScene'
@@ -39,12 +41,17 @@ function CrateIcon({ c }: { c: CrateDef }) {
 // they pay coins instead; the crate's own cars your level hasn't reached yet show a lock. The parts slice turns to coins
 // once no part in it fits a car of yours.
 function Odds({ c, level }: { c: CrateDef; level: number }) {
-  const [open, setOpen] = useState<'mod' | 'car' | 'skin' | 'piece' | 'hat' | null>(null)
+  const [open, setOpen] = useState<'mod' | 'car' | 'skin' | 'piece' | 'hat' | 'card' | null>(null)
   const restoParts = useGame((s) => s.restoParts)
   const hatIds = useGame((s) => s.hats)
   // The crate's hats you don't have yet: only those drop, so with none left the slice is coins.
   const hats = useMemo(() => crateHats(c.id).map((h) => ({ h, have: (hatIds ?? []).includes(h.id) })), [c.id, hatIds])
-  const o = crateOddsShown(c, level, hats.some((x) => !x.have))
+  const cardIds = useGame((s) => s.callCards)
+  // The crate's Call Cards you don't have yet: the same, only those drop.
+  const cards = useMemo(() => crateCallCards(c.id).map((x) => ({ x, have: (cardIds ?? []).includes(x.id) })), [c.id, cardIds])
+  const cardsLeft = cards.filter((y) => !y.have)
+  const cardW = cardsLeft.reduce((a, y) => a + CALL_WEIGHT[y.x.tier!], 0)
+  const o = crateOddsShown(c, level, hats.some((x) => !x.have), cardsLeft.length > 0)
   const cars = useGame((s) => s.cars)
   const skinIds = useGame((s) => s.skins)
   const modSkinIds = useGame((s) => s.modSkins)
@@ -66,13 +73,14 @@ function Odds({ c, level }: { c: CrateDef; level: number }) {
   const locked = useMemo(() => homeCars(c).filter((d) => d.unlockLevel > level).sort((a, b) => a.unlockLevel - b.unlockLevel), [c, level])
   const skins = useMemo(() => skinOdds(c).sort((a, b) => b.p - a.p), [c])
   const pct = (p: number) => (p < 0.1 ? p.toFixed(2) : p.toFixed(p < 1 ? 1 : 0))
-  const toggle = (k: 'mod' | 'car' | 'skin' | 'piece' | 'hat') => setOpen(open === k ? null : k)
+  const toggle = (k: 'mod' | 'car' | 'skin' | 'piece' | 'hat' | 'card') => setOpen(open === k ? null : k)
   const slot = (m: ModDef) => MOD_SLOTS.find((x) => x.id === m.slot)?.icon
   return (
     <div className="crate-odds">
       <div className="crate-odds-row">
         <span className="odd coins" style={{ flex: o.coins }}><b>🪙</b>{o.coins}%</span>
         {o.hat > 0 && <button className="odd hat" style={{ flex: Math.max(o.hat, 14) }} onClick={() => toggle('hat')} aria-expanded={open === 'hat'}><b>🎩</b>{o.hat}%<small>{open === 'hat' ? '▴' : '▾'}</small></button>}
+        {o.card > 0 && <button className="odd card" style={{ flex: Math.max(o.card, 14) }} onClick={() => toggle('card')} aria-expanded={open === 'card'} title="Call Cards"><b>🃏</b>{o.card}%<small>{open === 'card' ? '▴' : '▾'}</small></button>}
         <button className={`odd mod${noParts ? ' spent' : ''}`} style={{ flex: Math.max(o.mod, 14) }} onClick={() => toggle('mod')} aria-expanded={open === 'mod'} title={noParts ? 'No parts left to fit your cars: pays coins' : undefined}><b>{noParts ? '🔧🪙' : '🔧'}</b>{o.mod}%<small>{open === 'mod' ? '▴' : '▾'}</small></button>
         {o.skin > 0 && <button className="odd skin" style={{ flex: Math.max(o.skin, 14) }} onClick={() => toggle('skin')} aria-expanded={open === 'skin'}><b>✨</b>{o.skin}%<small>{open === 'skin' ? '▴' : '▾'}</small></button>}
         <button className="odd car" style={{ flex: Math.max(o.car, 14) }} onClick={() => toggle('car')} aria-expanded={open === 'car'}><b>🚗</b>{o.car}%<small>{open === 'car' ? '▴' : '▾'}</small></button>
@@ -119,6 +127,16 @@ function Odds({ c, level }: { c: CrateDef; level: number }) {
             <span key={h.id} className={`crate-car hat${have ? ' owned' : ''}`} title={have ? `${h.name} (owned)` : h.name}>
               <i>{h.icon}</i>
               <small>{have ? '✔' : `${pct((o.hat / hats.filter((x) => !x.have).length))}%`}</small>
+            </span>
+          ))}
+        </div>
+      )}
+      {open === 'card' && (
+        <div className="crate-cars">
+          {cards.map(({ x, have }) => (
+            <span key={x.id} className={`crate-car crate-cc${callCardTier(x.id)}${have ? ' owned' : ''}`} title={`${x.name} · ${TIER_NAME[x.tier!]}${have ? ' (owned)' : ''}`}>
+              <i><CallCardArt id={x.id} still /></i>
+              <small>{have ? '✔' : `${pct((o.card * CALL_WEIGHT[x.tier!]) / cardW)}%`}</small>
             </span>
           ))}
         </div>
@@ -200,6 +218,11 @@ function usePrizeInfo(d: CrateDrop) {
     icon = h?.icon ?? '🎩'
     title = h?.name ?? 'Hat'
     sub = 'New hat!'
+  } else if (d.kind === 'callcard') {
+    const c = callCardDef(d.card)
+    icon = <CallCardShowcase id={d.card} className="cp-card" />
+    title = c?.name ?? 'Call Card'
+    sub = `🃏 ${c?.tier ? TIER_NAME[c.tier] : ''} Call Card`
   } else {
     const car = cars.find((c) => c.uid === d.car)
     icon = '⚙️'
@@ -227,8 +250,10 @@ function PrizeActions({ d, paintCar, onDone, small }: { d: CrateDrop; paintCar: 
     openGarageTab('mods', { car: paintCar, modSkin: { slot, skin } })
   }
   const cls = small ? 'buy tiny' : 'buy small'
+  const worn = useGame((s) => s.callCard)
   return (
     <>
+      {d.kind === 'callcard' && <button className={`${cls} alt`} disabled={worn === d.card} onClick={() => useGame.getState().equipCallCard(d.card)}>{worn === d.card ? '✔' : 'Use it'}</button>}
       {d.kind === 'mod' && <button className={cls} onClick={() => { onDone(); openModSlot(modDef(d.mod)?.slot ?? 'spoiler'); openGarageTab('mods', { car: d.car, mod: d.mod }) }}>Fit it</button>}
       {d.kind === 'skin' && paintCar && <button className={`${cls} alt`} onClick={() => wearSkin(d.skin, d.part)}>Use it</button>}
       {d.kind === 'hat' && paintCar && <button className={`${cls} alt`} onClick={() => { onDone(); openGarageTab('hats', { car: paintCar, hat: d.hat }) }}>Wear it</button>}
@@ -257,7 +282,7 @@ function Prize({ open, onAgain, onDone, again, paintCar }: { open: CrateOpen; on
 }
 
 // Each kind of prize as an icon, for the ×10 progress strip.
-const DROP_ICON: Record<CrateDrop['kind'], string> = { coins: '🪙', dupe: '🪙', skindupe: '🪙', piecedupe: '🪙', mod: '⚙️', skin: '🎨', car: '🚗', hat: '🎩', piece: '🧩' }
+const DROP_ICON: Record<CrateDrop['kind'], string> = { coins: '🪙', dupe: '🪙', skindupe: '🪙', piecedupe: '🪙', mod: '⚙️', skin: '🎨', car: '🚗', hat: '🎩', callcard: '🃏', piece: '🧩' }
 
 // A ×10 open's progress strip: a slot per crate, lit with its prize's icon once it's shown.
 function TenStrip({ opens, at }: { opens: CrateOpen[]; at: number }) {
@@ -291,7 +316,8 @@ function SumTile({ open, sel, paintCar, onPick, onDone }: { open: CrateOpen; sel
   const look = useMemo(() => prizeLook(d, cars, paintCar), [d, cars, paintCar])
   const { title } = usePrizeInfo(d)
   const coins = 'coins' in d ? d.coins : 0
-  const art = d.kind === 'piece' || d.kind === 'piecedupe'
+  const art = d.kind === 'callcard' ? <CallCardShowcase id={d.card} still className="cs-card" />
+    : d.kind === 'piece' || d.kind === 'piecedupe'
     ? <BuildArt model={d.model} have={piecesOf(restoParts, d.model)} done={d.kind === 'piece' && !!d.uid} size="xs" />
     : look ? <CarThumb size="sm" {...look} />
     : <span className={`cs-coin${d.kind === 'coins' && d.jackpot ? ' jackpot' : ''}`}><CoinIcon size={34} /></span>
@@ -302,7 +328,7 @@ function SumTile({ open, sel, paintCar, onPick, onDone }: { open: CrateOpen; sel
     : d.kind === 'skin' ? skinOf(d.skin, d.part)?.name ?? title : title
   return (
     <div className={`crate-sum-tile tier${tier}${sel ? ' sel' : ''}`} style={{ '--glow': TIER_GLOW[tier] } as React.CSSProperties} onClick={onPick} title={title}>
-      <span className="cs-art">{art}{d.kind === 'mod' && <em className="cs-badge">⚙️</em>}{(d.kind === 'skin' || d.kind === 'skindupe') && <em className="cs-badge">🎨</em>}{d.kind === 'hat' && <em className="cs-badge">🎩</em>}{(d.kind === 'dupe' || d.kind === 'skindupe') && <em className="cs-badge left">🔁</em>}</span>
+      <span className="cs-art">{art}{d.kind === 'mod' && <em className="cs-badge">⚙️</em>}{(d.kind === 'skin' || d.kind === 'skindupe') && <em className="cs-badge">🎨</em>}{d.kind === 'hat' && <em className="cs-badge">🎩</em>}{d.kind === 'callcard' && <em className="cs-badge">🃏</em>}{(d.kind === 'dupe' || d.kind === 'skindupe') && <em className="cs-badge left">🔁</em>}</span>
       <small>{line}</small>
       <span className="cs-act" onClick={(e) => e.stopPropagation()}><PrizeActions d={d} paintCar={paintCar} onDone={onDone} small /></span>
     </div>
@@ -310,7 +336,9 @@ function SumTile({ open, sel, paintCar, onPick, onDone }: { open: CrateOpen; sel
 }
 
 // embedded: drawn inside the Cars page (under its header and tabs) instead of over the whole screen.
-export function CratesPanel({ embedded = false }: { embedded?: boolean }) {
+// There the page walks in from its Showroom while the depot gets ready (no loading screen), and
+// `onReady` says when the depot can be shown.
+export function CratesPanel({ embedded = false, onReady }: { embedded?: boolean; onReady?: () => void }) {
   const level = useGame((s) => s.level)
   const coins = useGame((s) => s.coins)
   const bucks = useGame((s) => s.bucks)
@@ -464,6 +492,21 @@ export function CratesPanel({ embedded = false }: { embedded?: boolean }) {
     [run, shownDef, phase, drop, prizeCar, onReveal, skip, pace],
   )
   const stageReady = useStageReady()
+  // The first render can still see the stage's last scene as ready: wait a render for this one's.
+  const [armed, setArmed] = useState(false)
+  useEffect(() => setArmed(true), [])
+  const ready = useRef(onReady)
+  useEffect(() => void (ready.current = onReady))
+  // Compiled is not drawn: the first frames (shadows, the glow pass) come a few frames after.
+  useEffect(() => {
+    if (!armed || !stageReady) return
+    let n = 0
+    let id = requestAnimationFrame(function tick() {
+      if (++n >= 4) return ready.current?.()
+      id = requestAnimationFrame(tick)
+    })
+    return () => cancelAnimationFrame(id)
+  }, [armed, stageReady])
 
   const locked = !free && level < def.unlockLevel
   const tenLocked = level < def.unlockLevel
@@ -479,7 +522,7 @@ export function CratesPanel({ embedded = false }: { embedded?: boolean }) {
     <div className={embedded ? 'race-full crate-full embedded' : 'race-full crate-full'} onClick={tap}>
       {/* Taps go through the canvas to the screen behind it: "Tap to skip". */}
       <StageSlot cam={CRATE_CAM} through>{scene}</StageSlot>
-      <LoadingScene ready={stageReady} label="Opening the Crate Depot" onClose={close} />
+      {!embedded && <LoadingScene ready={stageReady} label="Opening the Crate Depot" onClose={close} />}
       <div className="rf-top">
         <h2>📦 Crate Depot</h2>
         <span className="crate-wallet"><span><CoinIcon size={16} />{compact(coins)}</span><span><BuckIcon size={16} />{compact(bucks)}</span></span>

@@ -1,5 +1,5 @@
 import { useGame, type OwnedCar } from '../game/store'
-import { CAR_SETS, MOD_SKINS, SKINS, SKIN_TIERS, ownedModSkins, ownedSkins, type SkinDef, type SkinnedSlot } from '../game/data'
+import { CAR_SETS, MOD_SKINS, SKINS, SKIN_TIERS, TRACK_SKINS, ownedModSkins, ownedSkins, ownedTrackSkins, type SkinDef, type SkinnedSlot } from '../game/data'
 
 // Where a locked skin comes from, as a short tag.
 export function skinSource(d: SkinDef) {
@@ -94,5 +94,16 @@ export function ModSkinPicker({ car, slot, trying, setTrying }: { car: OwnedCar;
   return (
     <SkinChooser title={<>Mod skin <small>{owned.length}/{MOD_SKINS.length}</small></>} defs={MOD_SKINS} owned={owned}
       now={car.modSkin?.[slot] ?? null} trying={trying} setTrying={setTrying} apply={(id) => skinMod(car.uid, slot, id)} />
+  )
+}
+
+// Track skins for a tracked car (the Tomahawk): free by level, kept in the car's modSkin.tracks.
+export function TrackSkinPicker({ car, trying, setTrying }: { car: OwnedCar; trying: Trying; setTrying: (id: Trying) => void }) {
+  const level = useGame((s) => s.level)
+  const skinTracks = useGame((s) => s.skinTracks)
+  const owned = ownedTrackSkins(level)
+  return (
+    <SkinChooser title={<>Track skin <small>{owned.length}/{TRACK_SKINS.length}</small></>} defs={TRACK_SKINS} owned={owned}
+      now={car.modSkin?.tracks ?? null} trying={trying} setTrying={setTrying} apply={(id) => skinTracks(car.uid, id)} />
   )
 }

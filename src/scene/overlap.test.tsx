@@ -6,6 +6,7 @@ import { Box3, Matrix4, Vector3, type Material, type Mesh, type Object3D, type T
 import { BUILDINGS, TILE } from '../game/data'
 import { BuildingModel } from './BuildingModel'
 import { VanguardTower } from './Landmark'
+import { GlobeTower } from './GlobeTower'
 import { DAY_MS } from '../game/clock'
 
 // Noon and midnight on the town clock.
@@ -133,13 +134,13 @@ describe('nothing off the lot or cut off', () => {
 })
 
 describe('nothing off the lot on landmarks', () => {
-  it('vanguard tower', async () => {
+  it.each([['vanguard tower', <VanguardTower />, 2], ['globe tower', <GlobeTower />, 4]] as const)('%s', async (_, el, cols) => {
     const bad = new Set<string>()
     for (const time of [NOON, MIDNIGHT]) {
       vi.spyOn(Date, 'now').mockReturnValue(time)
-      const r = await ReactThreeTestRenderer.create(<VanguardTower />)
+      const r = await ReactThreeTestRenderer.create(el)
       await ReactThreeTestRenderer.act(async () => r.advanceFrames(2, 1 / 60))
-      for (const p of problems(r.scene.instance as Object3D, 2 * TILE, 2 * TILE)) bad.add(`${time === MIDNIGHT ? 'night ' : ''}${p}`)
+      for (const p of problems(r.scene.instance as Object3D, cols * TILE, 2 * TILE)) bad.add(`${time === MIDNIGHT ? 'night ' : ''}${p}`)
       await r.unmount()
       vi.restoreAllMocks()
     }

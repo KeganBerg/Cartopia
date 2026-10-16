@@ -1,4 +1,4 @@
-import { BufferGeometry, CircleGeometry, CylinderGeometry, Float32BufferAttribute, TorusGeometry, Vector3 } from 'three'
+import { BufferGeometry, CircleGeometry, CylinderGeometry, ExtrudeGeometry, Float32BufferAttribute, Shape, Vector3 } from 'three'
 import type { Kit } from '../CarModel'
 import { Loft } from '../loft'
 import { Surface, bodyRing, box, disc, glassRing, greenhouse, honey, plane, poly, rbox, slab, spine, vent, type ExoticFit, type ExoticHelpers } from '../exoticCars'
@@ -54,8 +54,8 @@ export function longtailGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   // z, half width, bottom, shoulder, fender top, crease x, middle height
   const body = new Loft([
     bodyRing(front, 0.25, 0.075, 0.1, 0.118, 0.12, 0.11),
-    bodyRing(0.63, 0.34, 0.066, 0.155, 0.178, 0.17, 0.135),
-    bodyRing(0.565, 0.392, 0.062, 0.25, 0.276, 0.2, 0.168),
+    bodyRing(0.63, 0.35, 0.066, 0.2, 0.222, 0.17, 0.135),
+    bodyRing(0.565, 0.4, 0.062, 0.285, 0.308, 0.2, 0.168),
     bodyRing(0.49, 0.408, 0.062, 0.305, 0.326, 0.21, 0.2),
     bodyRing(0.38, 0.405, 0.062, 0.29, 0.312, 0.21, 0.22),
     bodyRing(0.24, 0.39, 0.062, 0.24, 0.27, 0.2, 0.235),
@@ -121,8 +121,7 @@ export function longtailGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   // Wheel arches: faceted black wells with a crisp dark lip.
   for (const zz of [wz, -wz]) for (const sd of [-1, 1]) {
     const R = r * 1.2
-    S.wall('black', new CircleGeometry(R, 6, 0, Math.PI), sd, zz, r - 0.012, 0.003)
-    S.wall('dark', new TorusGeometry(R, 0.01, 4, 6, Math.PI), sd, zz, r - 0.012, 0.004)
+    S.well(sd, zz, r - 0.012, R, r, 6, 'dark', 0.01)
   }
 
   // Sides: an intake scooped into each door, a sill blade, door cut and a front marker.
@@ -149,8 +148,17 @@ export function longtailGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   honey(k, 0, 0.095, front + 0.001, 0.3, 0.03, 0.008, 1)
   for (const sd of [-1, 1]) k.add('black', poly([[0.17, -0.016], [0.25, -0.012], [0.25, 0.012], [0.18, 0.018]].map(([x, y]) => [x * sd, y])), [0, 0.094, front + 0.003])
   if (!fit.kit) {
-    k.add('black', box(0.6, 0.01, 0.08), [0, 0.068, front - 0.025])
-    for (const sd of [-1, 1]) k.add('black', box(0.06, 0.005, 0.035), [sd * 0.33, 0.11, 0.625], [0, sd * 0.6, sd * -0.25])
+    // Splitter: a plate cut to the nose's own plan (a straight bar stood out past the
+    // tapering corners), tucked up against the floor and lipped just past the mouth.
+    const out = new Shape()
+    const zs = [0.56, 0.6, 0.63, 0.66, front]
+    zs.forEach((z, i) => (i ? out.lineTo : out.moveTo).call(out, body.near(z).pts[1][0] - 0.004, -z))
+    out.lineTo(body.near(front).pts[1][0] - 0.03, -(front + 0.014))
+    out.lineTo(-(body.near(front).pts[1][0] - 0.03), -(front + 0.014))
+    for (const z of [...zs].reverse()) out.lineTo(-(body.near(z).pts[1][0] - 0.004), -z)
+    k.add('black', new ExtrudeGeometry(out, { depth: 0.008, bevelEnabled: false }), [0, body.near(front).pts[0][1] - 0.006, 0], [-Math.PI / 2, 0, 0])
+    // Canards stand straight out of the nose's corner walls.
+    for (const sd of [-1, 1]) S.wall('black', box(0.05, 0.005, 0.04), sd, 0.62, 0.115, 0.016, 0.25)
   }
   // Headlights: a slim LED slash in a black slit on each fender, and a short daytime tick.
   for (const sd of [-1, 1]) {
@@ -158,8 +166,9 @@ export function longtailGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
     const z = 0.575
     const turn = sd * -0.35
     S.top('black', poly([[-0.085, -0.008], [0.08, -0.013], [0.09, 0.009], [-0.075, 0.013]]), x, z, 0.002, turn)
-    S.top('lamp', box(0.15, 0.006, 0.004), x, z, 0.004, turn)
-    S.top('lamp', box(0.004, 0.026, 0.004), x - sd * 0.075, z - 0.005 - 0.026, 0.004, turn)
+    // The LED lies flat in the slit, following the fender's curve (a raised bar read as a rod).
+    S.top('lamp', poly([[-0.078, -0.004], [0.075, -0.007], [0.082, 0.004], [-0.07, 0.007]]), x, z, 0.0045, turn)
+    S.top('lamp', poly([[-0.003, -0.013], [0.003, -0.013], [0.003, 0.013], [-0.003, 0.013]]), x - sd * 0.075, z - 0.005 - 0.026, 0.0045, turn)
   }
   // Hood: two ducts each side of the middle and a cowl strip at the canopy's foot.
   if (!fit.hood) for (const sd of [-1, 1]) {

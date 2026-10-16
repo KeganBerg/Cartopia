@@ -1,5 +1,7 @@
-import { BoxGeometry, BufferGeometry, CircleGeometry, CylinderGeometry, Euler, ExtrudeGeometry, Matrix4, PlaneGeometry, Shape, ShapeGeometry, TorusGeometry, Vector2, Vector3 } from 'three'
+import { BoxGeometry, BufferGeometry, CircleGeometry, CylinderGeometry, ExtrudeGeometry, Matrix4, PlaneGeometry, Shape, ShapeGeometry, TorusGeometry, Vector2, Vector3 } from 'three'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { TessellateModifier } from 'three/examples/jsm/modifiers/TessellateModifier.js'
 import { Loft, type Pt, type Section } from './loft'
 import type { Kit, Part } from './CarModel'
 import type { Body } from '../game/data'
@@ -55,8 +57,30 @@ export class Surface {
     const f = new Vector3(0, 0, 1).addScaledVector(n, -n.z).normalize()
     const r = new Vector3().crossVectors(f, n)
     const m = new Matrix4().makeBasis(r, f, n).multiply(new Matrix4().makeRotationZ(turn))
-    const rot = new Euler().setFromRotationMatrix(m)
-    this.k.add(part, geo, [x + n.x * out, y + n.y * out, z + n.z * out], [rot.x, rot.y, rot.z])
+    m.setPosition(x + n.x * out, y + n.y * out, z + n.z * out)
+    let g = (geo.index ? geo.toNonIndexed() : geo).applyMatrix4(m)
+    // Bent to follow the surface where it curves away under a long part (a lamp slash or a
+    // vent across a crowned fender), so neither end lifts off nor the middle sinks in: cut
+    // into small pieces first, so it can bend.
+    g.computeBoundingBox()
+    const bb = g.boundingBox!
+    // Small parts bend too, so one laid over a long one keeps its height above it.
+    // Only flat decals (a few triangles) are cut up: solid parts stay whole for the phone's
+    // vertex budget, their corners still set down on the surface below.
+    if (g.getAttribute('position').count <= 24 && Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z) > 0.05) {
+      const fine = new TessellateModifier(0.025, 4).modify(g)
+      if (fine !== g) g.dispose()
+      g = fine
+    }
+    {
+      const pos = g.getAttribute('position')
+      for (let i = 0; i < pos.count; i++) {
+        const vx = pos.getX(i), vz = pos.getZ(i)
+        pos.setY(i, pos.getY(i) + this.y(vx, vz) - (y + dx * (vx - x) + dz * (vz - z)))
+      }
+      pos.needsUpdate = true
+    }
+    this.k.add(part, g)
   }
   // Half width of the upright side wall at z.
   side(z: number) { return this.loft.near(z).pts[this.sideAt][0] }
@@ -68,10 +92,85 @@ export class Surface {
     const e = 0.01
     return Math.atan2(this.side(z + e) - this.side(z - e), 2 * e)
   }
+  // Height of the top of the upright side wall at z.
+  wallTop(z: number) { return this.loft.near(z).pts[this.sideAt][1] }
+  // A wheel well on the side wall round the axle at z, height y: a half disc of radius R cut
+  // back to where the wall still runs behind it (not out past a nose or tail that narrows
+  // away, nor up over the shoulder where the body curves in).
+  well(sd: number, z: number, y: number, R: number, tyre: number, seg = 18, lip: Part = 'dark', t = 0.009, out = 0.003, part: Part = 'black') {
+    // The well is flat, turned with the wall at the axle: where the side curves away from that
+    // plane (in toward a narrowing nose, or out to a wider waist), the well stops.
+    const w = this.side(z)
+    const yaw = this.yaw(z)
+    const ok = (lx: number, ly: number) => {
+      const wz = z - lx * Math.cos(yaw)
+      return Math.abs(w - lx * Math.sin(yaw) - this.side(wz)) <= 0.008 && y + ly <= this.wallTop(wz) - 0.004 - t
+    }
+    const pts = wellOutline(R, tyre, ok, seg)
+    this.wall(part, wellGeo(pts), sd, z, y, out)
+    const l = lipGeo(pts, t, R)
+    if (l) this.wall(lip, l, sd, z, y, out + 0.001)
+  }
   wall(part: Part, geo: BufferGeometry, sd: number, z: number, y: number, out = 0.003, rz = 0) {
     const yaw = this.yaw(z)
     if (rz) geo.rotateZ(rz)
     this.k.add(part, sd < 0 ? mirrorX(geo) : geo, [sd * (this.side(z) + out), y, z], [0, sd * (Math.PI / 2 + yaw), 0])
+  }
+}
+
+// A wheel well's outline: a half disc of radius R round the axle (seg steps from front to
+// back), cut back at each step (never inside the tyre) to where ok(x, y) says the side it lies on
+// still runs behind it.
+export function wellOutline(R: number, tyre: number, ok: (x: number, y: number) => boolean, seg = 18) {
+  const pts: [number, number][] = []
+  for (let i = 0; i <= seg; i++) {
+    const a = (i / seg) * Math.PI
+    let r = R
+    while (r > tyre * 1.02 && !ok(Math.cos(a) * r, Math.sin(a) * r)) r -= 0.004
+    pts.push([Math.cos(a) * r, Math.sin(a) * r])
+  }
+  return pts
+}
+export function wellGeo(pts: [number, number][]) {
+  const sh = new Shape()
+  sh.moveTo(0, 0)
+  for (const [x, y] of pts) sh.lineTo(x, y)
+  return new ShapeGeometry(sh)
+}
+// The lip round a well's edge: a round bar of radius t along the outline where it runs at its
+// full radius R (left off where the well is cut back, so it never stands out in steps).
+export function lipGeo(pts: [number, number][], t: number, R: number) {
+  const bars: BufferGeometry[] = []
+  for (let i = 1; i < pts.length; i++) {
+    const [x0, y0] = pts[i - 1]
+    const [x1, y1] = pts[i]
+    const l = Math.hypot(x1 - x0, y1 - y0)
+    if (l < 1e-5 || Math.hypot(x0, y0) < R - 0.002 || Math.hypot(x1, y1) < R - 0.002) continue
+    const g = new CylinderGeometry(t, t, l + t, 4)
+    g.rotateZ(Math.atan2(y1 - y0, x1 - x0) - Math.PI / 2)
+    g.translate((x0 + x1) / 2, (y0 + y1) / 2, 0)
+    bars.push(g.index ? g.toNonIndexed() : g)
+  }
+  if (!bars.length) return null
+  const out = mergeGeometries(bars)!
+  bars.forEach((g) => g.dispose())
+  return out
+}
+
+// A wheel well standing square to the car at x out from the middle (as wide as the widest
+// side round the arch): a flat half disc round the axle at zz, height cy, cut back on each side
+// to where the body's side still runs close behind it and below its shoulder, with a
+// dark lip of radius t round what's left.
+export function flatWell(k: Kit, S: Surface, zz: number, cy: number, R: number, tyre: number, x: number, lip: Part = 'dark', t = 0.008) {
+  for (const sd of [-1, 1]) {
+    const ok = (lx: number, ly: number) => {
+      const z = zz - sd * lx
+      return S.side(z) >= x - 0.006 && cy + ly <= S.wallTop(z) - 0.004 - t
+    }
+    const pts = wellOutline(R, tyre, ok)
+    k.add('black', wellGeo(pts), [sd * x, cy, zz], [0, (sd * Math.PI) / 2, 0])
+    const l = lipGeo(pts, t, R)
+    if (l) k.add(lip, l, [sd * (x + 0.001), cy, zz], [0, (sd * Math.PI) / 2, 0])
   }
 }
 
@@ -223,8 +322,7 @@ export function fulmineGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   // Hexagonal wheel arches: a black well behind each tyre with a crisp body-dark lip.
   for (const zz of [wz, -wz]) for (const sd of [-1, 1]) {
     const R = r * 1.2
-    S.wall('black', new CircleGeometry(R, 3, 0, Math.PI), sd, zz, r - 0.012, 0.003)
-    S.wall('dark', new TorusGeometry(R, 0.011, 4, 3, Math.PI), sd, zz, r - 0.012, 0.004)
+    S.well(sd, zz, r - 0.012, R, r, 3, 'dark', 0.011)
   }
   // Side: a sill blade, the door's cut line, and a big intake scooping air in ahead of the rear wheel.
   for (const sd of [-1, 1]) {
@@ -266,7 +364,7 @@ export function fulmineGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
     S.top('lamp', box(0.06, 0.008, 0.004), x + sd * 0.035, z, 0.004)
   }
   // Two ducts on the roof, a fuel cap on the right haunch.
-  for (const sd of [-1, 1]) G.top('black', poly([[-0.012, -0.04], [0.012, -0.04], [0.02, 0.03], [-0.02, 0.03]]), sd * 0.07, -0.12, 0.012)
+  for (const sd of [-1, 1]) G.top('black', poly([[-0.012, -0.04], [0.012, -0.04], [0.02, 0.03], [-0.02, 0.03]]), sd * 0.07, -0.12, 0.016)
   S.top('dark', new CircleGeometry(0.02, 6), 0.33, -0.44, 0.003)
   // Hood: two vents in the channel and a crease down the middle.
   for (const sd of [-1, 1]) S.top('black', poly([[-0.025, -0.04], [0.02, -0.04], [0.03, 0.04], [-0.02, 0.04]].map(([x, y]) => [-sd * x, y])), sd * 0.07, 0.47, 0.0065)
@@ -344,8 +442,7 @@ export function interior(k: Kit, h: ExoticHelpers, seatZ: number, dashZ: number)
 // Round wheel arches: a black well behind each tyre and a thin dark lip.
 export function roundArches(S: Surface, wz: number, r: number) {
   for (const zz of [wz, -wz]) for (const sd of [-1, 1]) {
-    S.wall('black', new CircleGeometry(r * 1.2, 18, 0, Math.PI), sd, zz, r - 0.01, 0.003)
-    S.wall('dark', new TorusGeometry(r * 1.2, 0.009, 4, 18, Math.PI), sd, zz, r - 0.01, 0.004)
+    S.well(sd, zz, r - 0.01, r * 1.2, r, 18, 'dark', 0.009)
   }
 }
 
@@ -434,7 +531,7 @@ export function eclatGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   // Creases running back over the hood from each headlight to the windshield.
   for (const sd of [-1, 1]) for (let z = 0.56; z > 0.33; z -= 0.035) S.top('dark', box(0.005, 0.036, 0.003), sd * (0.17 - (0.56 - z) * 0.12), z, 0.0015, sd * 0.12)
   // Engine grille: a honeycomb panel on the rear deck behind the glass.
-  S.top('black', poly([[-0.17, -0.05], [0.17, -0.05], [0.15, 0.05], [-0.15, 0.05]]), 0, -0.57, 0.002)
+  S.top('black', poly([[-0.17, -0.05], [0.17, -0.05], [0.15, 0.05], [-0.15, 0.05]]), 0, -0.57, 0.003)
   for (const x of [-0.12, -0.06, 0, 0.06, 0.12]) for (const dz of [-0.025, 0.012]) S.top('dash', new CircleGeometry(0.014, 6), x + (dz > 0 ? 0.03 : 0), -0.57 + dz, 0.005)
   // Two roof intakes either side of the fin.
   for (const sd of [-1, 1]) G.top('black', poly(ellipse(0.025, 0.05, 12)), sd * 0.06, -0.33, 0.004)
@@ -581,7 +678,7 @@ export function orafoGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   // Chrome bonnet pins, and an oval badge on the nose.
   for (const sd of [-1, 1]) S.top('chrome', disc(0.008, 10), sd * 0.13, 0.6, 0.003)
   S.top('chrome', poly(ellipse(0.022, 0.014, 14)), 0, 0.665, 0.005)
-  S.top('dash', poly(ellipse(0.016, 0.009, 14)), 0, 0.665, 0.007)
+  S.top('dash', poly(ellipse(0.016, 0.009, 14)), 0, 0.665, 0.0095)
   // Louvres across the rear deck.
   for (let i = 0; i < 5; i++) S.top('black', box(0.26 - i * 0.02, 0.01, 0.004), 0, -0.56 - i * 0.022, 0.003)
 

@@ -24,7 +24,8 @@ import { StreetShops, type Slot } from './StreetShops'
 import { Manhole } from './BuildingDetail'
 import { BUILDINGS, TILE, buildingDef } from '../game/data'
 import { VenueScenery, VenueBackdrop, ROAD, WALK } from './RaceVenues'
-import type { Venue } from './venues'
+import type { Venue, VenueId } from './venues'
+import { WorldVenue } from './world/WorldVenue'
 import { RaceWeather, raceWeather } from './Weather'
 import { gloomOf, weatherLook, wetRoad } from './weatherLook'
 import type { Weather as WeatherState } from '../game/weather'
@@ -761,15 +762,15 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
       {/* Ground, sidewalks and the street itself. */}
       <mesh rotation-x={-Math.PI / 2} position={[0, LAYER.outer, far / 2]}>
         <planeGeometry args={[300, far + 140]} />
-        {venue.id === 'desert' ? (
+        {venue.base === 'desert' ? (
           <meshStandardMaterial map={sandTex(38, (far + 140) / 8)} />
-        ) : venue.id === 'beach' ? (
+        ) : venue.base === 'beach' ? (
           <meshStandardMaterial map={beachSandTex(38, (far + 140) / 8)} />
-        ) : venue.id === 'snow' ? (
+        ) : venue.base === 'snow' ? (
           <meshStandardMaterial map={snowTex(38, (far + 140) / 8)} />
-        ) : venue.id === 'docks' ? (
+        ) : venue.base === 'docks' ? (
           <meshStandardMaterial map={concreteTex(60, (far + 140) / 5)} />
-        ) : venue.id === 'farm' ? (
+        ) : venue.base === 'farm' ? (
           <meshStandardMaterial map={grassTex(38, (far + 140) / 8)} />
         ) : (
           <meshStandardMaterial color={venue.ground ?? PAL.ground} />
@@ -822,18 +823,18 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
           )
         }) : (
           <>
-            <VenueScenery id={venue.id} len={dress} />
+            {!venue.world && <VenueScenery id={venue.id as VenueId} len={dress} />}
             {Array.from({ length: Math.ceil((far + 40) / 9) }, (_, i) => shotClear(i * 9 - 6, i % 2 ? 1 : -1, len) ? null : <Lamp key={i} z={i * 9 - 6} side={i % 2 ? 1 : -1} pole={venue.pole} />)}
           </>
         )}
         <StreetDressing len={len} far={far} city={city} />
       </Batch>
       {city && <StreetShops slots={slots} />}
-      <Spectators len={len} cold={venue.id === 'snow' || SEASON === 'winter'} />
+      <Spectators len={len} cold={venue.base === 'snow' || SEASON === 'winter'} />
       <StartLights />
       <LaunchSmoke me={me} them={them} len={len} />
       <FinishFlag len={len} me={me} them={them} />
-      {city ? <Skyline len={dress} edge={ROAD + WALK + 4.2} night={night} /> : <VenueBackdrop id={venue.id} len={dress} />}
+      {city ? <Skyline len={dress} edge={ROAD + WALK + 4.2} night={night} /> : venue.world ? <WorldVenue id={venue.id} len={dress} race={len} /> : <VenueBackdrop id={venue.id as VenueId} len={dress} />}
       {trails.map((t, i) => <primitive key={i} object={t.mesh} dispose={null} />)}
       <primitive object={cheer.mesh} dispose={null} />
       {/* Soft shadows under the racers. */}

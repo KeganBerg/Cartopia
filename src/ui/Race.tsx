@@ -7,9 +7,13 @@ import { LIVE_LOSS_SHARE, LOSS_SHARE } from '../game/boosts'
 import { bestCar, carPi, raceCarOf } from '../game/raceCar'
 import { carNear, fairNow, tourPayNow } from '../game/fairRace'
 import { buildPi, fairRivalPi } from '../game/fairPi'
-import { CARS, SKILLS, carDef, performance, RACE_FUEL, GP_SERIES, GP_ROUNDS, gpRivalPi, gpReward, CAMPAIGN, CAMPAIGN_RACES, campaignRaceId, campaignRivalPi, campaignShift, rookieRace, ROOKIE_SHIFT, campaignRivalSkills, campaignReward, campaignCleared, type CampaignChapter, skillBoost, skillDrag, liveSkillBoost, smoothShift, type Body, type GpSeries, type SkillId } from '../game/data'
+import { CARS, SKILLS, carDef, performance, RACE_FUEL, GP_SERIES, GP_ROUNDS, gpOpen, gpRivalPi, gpReward, CAMPAIGN, CAMPAIGN_RACES, campaignRaceId, campaignRivalPi, campaignShift, rookieRace, ROOKIE_SHIFT, campaignRivalSkills, campaignReward, campaignCleared, campaignOpen, campaignStarTotal, campaignStarsNeed, type CampaignChapter, skillBoost, skillDrag, liveSkillBoost, smoothShift, type Body, type GpSeries, type SkillId } from '../game/data'
 import { TRACK, freshRacer, stepRacer, shiftQuality, shiftBand, launchRacer, revLaunch, shiftRacer, fireBoost, aiReaction, AI_BOOST_GEAR, TOP_GEAR, LAUNCH_BAND, AI_BAND, IDLE, REV_UP, REV_HOLD, REV_DOWN, RACE_DT } from '../game/race'
 import { CarThumb } from '../scene/BuildingPreview'
+import { CallCardArt, callCardTier, callCardTip } from './CallCard'
+import { CallCardPopup } from './CallCardPicker'
+import { callCardDef } from '../game/callCards'
+import { serverCallCard } from '../lib/serverCar'
 import { supabase } from '../lib/supabase'
 import { Panel, openGarageTab } from './Menus'
 import { StageSlot, useStageReady, warmStage } from '../scene/Stage'
@@ -52,7 +56,7 @@ import { LiveKartParty } from './LiveKartParty'
 import { BLAST_PI, TRACKS, gpField, gpTrack, partyPrize, type KartRules } from '../game/kart'
 import { gpClearPi } from '../game/gpBeat'
 import { look as kartLook } from './ArcadeBits'
-import { TOUR_RACES, tourLeg, tourLegOf, tourIsBoss, tourRivalPi, tourShift, tourSkills, tourRivalName, tourLegBonus } from '../game/tour'
+import { TOUR_RACES, TOUR_RANK_LEGS, tourLeg, tourLegOf, tourIsBoss, tourRivalPi, tourShift, tourSkills, tourRivalName, tourLegBonus, tourRank, tourRankOf, tourLegsToRank } from '../game/tour'
 import type { WeatherKind } from '../game/weather'
 import { WEEKLY_EVENTS, EVENT_RACES, eventBonus, eventFor, eventIsBoss, eventPrize, eventProgress, eventRivalPi, eventShift, nextEventWeek } from '../game/events'
 import { msToNextWeek, skinDef, SKIN_TIERS } from '../game/data'
@@ -77,7 +81,7 @@ import { usePrefs } from '../lib/prefs'
 
 // skill: the rival car's race skill. AI rivals use it; live players use theirs on their own device.
 // shift: how cleanly an AI rival shifts, 0 (sloppy) to 1 (always perfect, the default).
-type Rival = { id: string; town: string; level: number; carName: string; color: string; pi: number; online: boolean; body: Body; model?: string; mods?: string[]; skill?: SkillId; shift?: number; boss?: boolean }
+type Rival = { id: string; town: string; level: number; carName: string; color: string; pi: number; online: boolean; body: Body; model?: string; mods?: string[]; skill?: SkillId; shift?: number; boss?: boolean; callCard?: string }
 
 const TOWNS = ['Transamsylvania', 'Gearville', 'Piston Peak', 'Nitro Bay', 'Chrome City', 'Rustbelt Row', 'Turbo Falls', 'Muffler Hills']
 const zero = { engine: 0, turbo: 0, tires: 0, weight: 0 }
@@ -150,11 +154,34 @@ function makeRivals(myPi: number, level: number): Rival[] {
   })
 }
 
+// A Quick Race card's backdrop: the player's Call Card (rivals and players without one: the
+// Showroom in their car's colour), with its tier gem in the corner.
+function CardArt({ id, color }: { id?: string; color: string }) {
+  const d = callCardDef(id)
+  return (
+    <>
+      <CallCardArt id={id} tint={color} />
+      {d?.tier && <span className="rm-cc-gem" title={callCardTip(id)}>{d.icon}</span>}
+    </>
+  )
+}
+const modelNamed = (name: string) => CARS.find((c) => c.name === name)?.id
+
+// The player's own Call Card, top of Quick Race: what others see behind their car. Opens the picker.
+function MyCardChip({ onOpen }: { onOpen: () => void }) {
+  const id = useGame((s) => s.callCard)
+  return (
+    <button className="rm-my-card" onClick={onOpen} title="Your Call Card: what other players see behind your car">
+      <span className="cc-chip"><CallCardArt id={id} still /></span>🃏
+    </button>
+  )
+}
+
 // Real players' best cars, from their cloud saves.
 async function fetchOnlineRivals(): Promise<Rival[]> {
   if (!supabase) return []
   const { data: auth } = await supabase.auth.getUser()
-  let q = supabase.from('game_saves').select('owner_id, town_name, level, best_car').order('updated_at', { ascending: false }).limit(12)
+  let q = supabase.from('game_saves').select('owner_id, town_name, level, best_car, call_card:state->callCard, call_cards:state->callCards').order('updated_at', { ascending: false }).limit(12)
   if (auth.user) q = q.neq('owner_id', auth.user.id)
   const { data, error } = await q
   if (error || !data) return []
@@ -172,6 +199,7 @@ async function fetchOnlineRivals(): Promise<Rival[]> {
       model: CARS.find((c) => c.name === r.best_car.name)?.id,
       mods: Array.isArray(r.best_car.mods) ? r.best_car.mods : undefined,
       skill: CARS.find((c) => c.name === r.best_car.name)?.skill,
+      callCard: serverCallCard(r),
     }))
 }
 
@@ -221,6 +249,7 @@ export function RacePanel() {
   const [kRace, setKRace] = useState<{ def: TunerTrial; rival: Rival; prize: number } | null>(null)
   const [party, setParty] = useState<Party | null>(null)
   const [customOpen, setCustomOpen] = useState(false)
+  const [cardsOpen, setCardsOpen] = useState(false)
   const tuner = useGame((s) => s.tuner)
   const [trialSel, setTrialSel] = useState(() => firstTrialPick(useGame.getState().tuner))
   const [uRace, setURace] = useState<{ def: CupRace; rival: Rival; prize: number } | null>(null)
@@ -469,7 +498,7 @@ export function RacePanel() {
         prize={cRace.prize}
         venueId={cRace.chapter.venue}
         title={`${cRace.chapter.name} · ${cRace.race === CAMPAIGN_RACES - 1 ? 'Boss race' : `Race ${cRace.race + 1} of ${CAMPAIGN_RACES}`}`}
-        onFinish={(_, myTime, theirTime) => campaignResult(cRace.chapter.id, cRace.race, myTime, theirTime)}
+        onFinish={(_, myTime, theirTime) => campaignResult(cRace.chapter.id, cRace.race, myTime, theirTime, cRace.rival.pi)}
         onExit={() => { setCRace(null); setTab('campaign') }}
       />
     )
@@ -614,7 +643,8 @@ export function RacePanel() {
     if (!spendFuel(RACE_FUEL)) return useGame.getState().showNeed('fuel', RACE_FUEL - useGame.getState().fuel, 'a campaign race')
     const stars = useGame.getState().campaign
     setSeq((n) => n + 1)
-    setCRace({ chapter: ch, race: i, rival: campaignRival(ch, ci, i), prize: campaignReward(ch, i, (stars[campaignRaceId(ch, i)] ?? 0) === 0) })
+    const rival = campaignRival(ch, ci, i)
+    setCRace({ chapter: ch, race: i, rival, prize: campaignReward(ch, i, (stars[campaignRaceId(ch, i)] ?? 0) === 0, rival.pi) })
   }
   function startRow(id: string) {
     const def = paintRival(id)
@@ -734,7 +764,7 @@ export function RacePanel() {
   const stars = Object.values(done).reduce((a, n) => a + n, 0)
   const TITLES: Record<RaceTab, string> = { hub: 'Race', quick: 'Quick Race', campaign: 'Campaign', tour: 'Pro Tour', gp: 'Grand Prix', trial: 'Time Trial', event: 'Weekly Event', rivals: 'Rivals', tuner: 'Tuner Trials', cups: 'Class Cups', road: 'Trophy Road', flair: 'Flair', daily: 'Daily Run', world: 'World Tour' }
   const chip = tab === 'campaign' ? `⭐ ${stars}/${CAMPAIGN.length * CAMPAIGN_RACES * 3}`
-    : tab === 'tour' ? `🌍 ${tourWon.toLocaleString()} wins`
+    : tab === 'tour' ? `${tourRank(tourLegOf(tourWon)).icon} ${tourRank(tourLegOf(tourWon)).name} · 🌍 ${tourWon.toLocaleString()}`
     : tab === 'gp' ? `🏁 ×${GP_ROUNDS} → 🎁`
     : tab === 'event' ? `⏳ ${shortLeft(msToNextWeek())}`
     : tab === 'rivals' ? rowChip(rivalRow, oldPaints)
@@ -746,8 +776,10 @@ export function RacePanel() {
 
   return (
     <>
-    <Panel title={TITLES[tab]} wide className="race-panel" onBack={tab === 'hub' ? undefined : () => setTab('hub')} head={chip && <span className="rm-head-chip">{chip}</span>}>
+    <Panel title={TITLES[tab]} wide className="race-panel" onBack={tab === 'hub' ? undefined : () => setTab('hub')}
+      head={tab === 'quick' ? <MyCardChip onOpen={() => setCardsOpen(true)} /> : chip && <span className="rm-head-chip">{chip}</span>}>
       {customOpen && <CustomKart onGo={(p) => startParty(p, true)} onClose={() => setCustomOpen(false)} />}
+      {cardsOpen && <CallCardPopup onClose={() => setCardsOpen(false)} />}
       <div className={`rm-screen rm-s-${tab}`}>
         {tab === 'hub' ? (
           <RaceHub onOpen={setTab} onCampaign={startCampaign} onTour={startTour} onEvent={startEvent} onRival={(m) => startRival(m)} onBlast={() => startParty(blastPick(), false)} onCustom={() => setCustomOpen(true)} />
@@ -779,12 +811,14 @@ export function RacePanel() {
           <div className="rm-q-grid">
             {supabase && !liveSignedIn && (
               <button className="rm-qc rm-qc-live rm-qc-signin" onClick={() => useGame.getState().openPanel('account')}>
+                <CallCardArt tint="#2f9e35" />
                 <span className="rm-qc-top"><span className="rm-mi">🟢</span><span className="tag live">LIVE</span></span>
                 <span className="rm-qc-body"><b>Race players live</b><span className="buy small alt">Sign in</span></span>
               </button>
             )}
             {supabase && livePlayers.filter((p) => !mutedIds[p.id] && !p.closed).length >= 2 && (
               <div className={`rm-qc rm-qc-live rm-qc-party${pick ? ' on' : ''}`}>
+                <CallCardArt id="ravelights" />
                 <span className="rm-qc-top"><span className="rm-mi">🏎️</span><span className="tag live">👥 {PARTY_MAX}</span></span>
                 <span className="rm-qc-body">
                   <b>Kart party</b>
@@ -805,9 +839,10 @@ export function RacePanel() {
                 const on = pick.includes(p.id)
                 const full = !on && pick.length >= PARTY_MAX - 1
                 return (
-                  <button key={p.id} className={`rm-qc rm-qc-live rm-qc-pick${on ? ' on' : ''}`} style={{ ['--qc' as string]: p.color }} disabled={full}
+                  <button key={p.id} className={`rm-qc rm-qc-live rm-qc-pick${callCardTier(p.callCard)}${on ? ' on' : ''}`} style={{ ['--qc' as string]: p.color }} disabled={full}
                     onClick={() => setPick(on ? pick.filter((x) => x !== p.id) : [...pick, p.id])} aria-pressed={on}>
-                    <span className="rm-qc-top"><CarThumb size="sm" color={p.color} body={p.body} mods={p.mods} /><span className="rm-pick-tick">{on ? '✅' : '➕'}</span></span>
+                    <CardArt id={p.callCard} color={p.color} />
+                    <span className="rm-qc-top"><CarThumb stand color={p.color} body={p.body} model={modelNamed(p.carName)} mods={p.mods} /><span className="rm-pick-tick">{on ? '✅' : '➕'}</span></span>
                     <span className="rm-qc-body">
                       <b><PlayerName id={p.uid} town={p.town} /></b>
                       <span className="rm-qc-chips"><span>Lv {p.level}</span><span className="rm-pi">PI {p.pi}</span></span>
@@ -817,8 +852,9 @@ export function RacePanel() {
               }
               const stakes = wagersOn() ? stakesFor(level, p.level, coins) : []
               if (betFor === p.id) return (
-                <div key={p.id} className="rm-qc rm-qc-live rm-qc-bet" style={{ ['--qc' as string]: p.color }}>
-                  <span className="rm-qc-top"><CarThumb size="sm" color={p.color} body={p.body} mods={p.mods} /><span className="tag bet">🪙 BET</span></span>
+                <div key={p.id} className={`rm-qc rm-qc-live rm-qc-bet${callCardTier(p.callCard)}`} style={{ ['--qc' as string]: p.color }}>
+                  <CardArt id={p.callCard} color={p.color} />
+                  <span className="rm-qc-top"><CarThumb stand color={p.color} body={p.body} model={modelNamed(p.carName)} mods={p.mods} /><span className="tag bet">🪙 BET</span></span>
                   <span className="rm-qc-body">
                     <b><PlayerName id={p.uid} town={p.town} /></b>
                     <span className="rm-bet-chips">
@@ -831,9 +867,10 @@ export function RacePanel() {
                 </div>
               )
               return (
-                <div key={p.id} className="rm-qc rm-qc-live" style={{ ['--qc' as string]: p.color }}>
+                <div key={p.id} className={`rm-qc rm-qc-live${callCardTier(p.callCard)}`} style={{ ['--qc' as string]: p.color }}>
+                  <CardArt id={p.callCard} color={p.color} />
                   <span className="rm-qc-top">
-                    <CarThumb size="sm" color={p.color} body={p.body} mods={p.mods} /><span className="tag live">LIVE</span>
+                    <CarThumb stand color={p.color} body={p.body} model={modelNamed(p.carName)} mods={p.mods} /><span className="tag live">LIVE</span>
                     {!p.closed && !wait && !outgoing && stakes.length > 0 && (
                       <button className="rm-bet-btn" onClick={() => setBetFor(p.id)} title="Wager match: bet coins, winner takes both" aria-label="Wager match">🪙</button>
                     )}
@@ -859,8 +896,9 @@ export function RacePanel() {
               )
             })}
             {[...online, ...rivals.map(fair)].map((r) => (
-              <div key={r.id} className="rm-qc" style={{ ['--qc' as string]: r.color }}>
-                <span className="rm-qc-top"><CarThumb size="sm" color={r.color} body={r.body} mods={r.mods} />{r.online && <span className="tag">PLAYER</span>}</span>
+              <div key={r.id} className={`rm-qc${callCardTier(r.callCard)}`} style={{ ['--qc' as string]: r.color }}>
+                <CardArt id={r.callCard} color={r.color} />
+                <span className="rm-qc-top"><CarThumb stand color={r.color} body={r.body} model={r.model} mods={r.mods} />{r.online && <span className="tag">PLAYER</span>}</span>
                 <span className="rm-qc-body">
                   <b>{r.online ? <PlayerName id={r.id} town={r.town} /> : r.town}</b>
                   <span className="rm-qc-chips"><span>Lv {r.level}</span><span className="rm-pi">PI {r.pi}</span>{r.skill && <SkillIcon sk={r.skill} className="" />}</span>
@@ -889,6 +927,24 @@ function TrackChip({ round }: { round: number }) {
   return <span className="rm-dist rm-track" title={`${def.name}${reverse ? ', the other way round' : ''}`}>{def.short}{reverse ? ' ↺' : ''}</span>
 }
 
+// A mystery box's cars, one at a time, big and turning: what a series can give you.
+function BoxCar({ s, dim }: { s: GpSeries; dim: boolean }) {
+  const [k, setK] = useState(0)
+  useEffect(() => {
+    if (s.box.length < 2) return
+    const t = window.setInterval(() => setK((n) => (n + 1) % s.box.length), 2800)
+    return () => window.clearInterval(t)
+  }, [s.box.length])
+  const car = carDef(s.box[k])
+  return (
+    <span className={`rm-box${dim ? ' dim' : ''}`} title={`Mystery box: ${s.box.map((m) => carDef(m).name).join(', ')}`}>
+      <CarThumb size="sm" color={car.colors[0]} body={car.body} model={car.id} />
+      <small>🎁 {car.name}</small>
+      <span className="rm-box-dots" aria-hidden>{s.box.map((m, i) => <i key={m} className={i === k ? 'on' : ''} />)}</span>
+    </span>
+  )
+}
+
 function GrandPrix({ onRace }: { onRace: (s: GpSeries, r: Rival, prize: number) => void }) {
   const level = useGame(gateLevel)
   const carCount = useGame((s) => s.cars.length)
@@ -901,12 +957,12 @@ function GrandPrix({ onRace }: { onRace: (s: GpSeries, r: Rival, prize: number) 
     <div className="rm-gp-grid">
       {GP_SERIES.map((s, si) => {
         const prog = gp[s.id] ?? { round: 0, clears: 0 }
-        const locked = level < s.unlockLevel
+        const locked = !gpOpen(gp, si, level)
         const short = carCount < s.minCars
         const rival = gpRival(s, prog.round, prog.clears)
         const prize = gpReward(s, prog.round)
         const need = gpFinalNeed(s, prog.clears, prog.round)
-        const box = carDef(s.box[0])
+        const prev = GP_SERIES[si - 1]
         return (
           <div key={s.id} className={`rm-gpc rm-gp-${si}${locked ? ' locked' : ''}`}>
             <div className="rm-gpc-top">
@@ -917,12 +973,11 @@ function GrandPrix({ onRace }: { onRace: (s: GpSeries, r: Rival, prize: number) 
             </div>
             <div className="rm-gpc-body">
               <span className="rm-next"><TrackChip round={prog.round} /> Race {prog.round + 1}: <b>{rival.town}</b> · PI {rival.pi}</span>
-              <span className="rm-box" title={`Mystery box: ${s.box.map((m) => carDef(m).name).join(', ')}`}>
-                <CarThumb size="sm" color={box.colors[0]} body={box.body} model={box.id} />
-                <small>🎁 {box.name}{s.box.length > 1 ? ` +${s.box.length - 1}` : ''}</small>
-              </span>
+              <BoxCar s={s} dim={locked} />
               {locked ? (
-                <button className="buy small locked-btn" onClick={() => showNeed('level', s.unlockLevel, s.name)}>🔒 Level {s.unlockLevel}</button>
+                level < GP_SERIES[0].unlockLevel || !prev
+                  ? <button className="buy small locked-btn" onClick={() => showNeed('level', s.unlockLevel, s.name)}>🔒 Level {s.unlockLevel}</button>
+                  : <button className="buy small locked-btn" title={`Win the ${prev.name} once, or reach level ${s.unlockLevel}`} onClick={() => showNeed('level', s.unlockLevel, s.name)}>🔒 {GP_CUP[si - 1] ?? '🏆'} ×1 · Lv{s.unlockLevel}</button>
               ) : need > myBest ? (
                 <button className="buy small locked-btn" onClick={() => openPanel('garage')}>🔒 Final needs PI {need}</button>
               ) : short ? (
@@ -942,7 +997,7 @@ function campaignRival(ch: CampaignChapter, chIndex: number, i: number): Rival {
   const target = campaignRivalPi(ch, i)
   const car = (ch.cars?.[i] && CARS.find((c) => c.id === ch.cars![i])) || carNear(target)
   return fair({
-    id: `camp-${ch.id}-${i}`, town: ch.rivals[i], level: ch.unlockLevel + i * 2, carName: car.name, color: car.colors[(chIndex + i) % car.colors.length],
+    id: `camp-${ch.id}-${i}`, town: ch.rivals[i], level: ch.tuned + i * 2, carName: car.name, color: car.colors[(chIndex + i) % car.colors.length],
     pi: target, online: false, body: car.body, model: car.id, skill: campaignRivalSkills(chIndex, i) ? car.skill : undefined, shift: rookieRace(chIndex, i, useGame.getState().racesWon) ? ROOKIE_SHIFT : campaignShift(chIndex, i), boss: i === CAMPAIGN_RACES - 1,
   })
 }
@@ -951,10 +1006,54 @@ function Stars({ n, big }: { n: number; big?: boolean }) {
   return <span className={big ? 'stars big' : 'stars'} aria-label={`${n} of 3 stars`}>{[0, 1, 2].map((i) => <i key={i} className={i < n ? 'on' : ''}>★</i>)}</span>
 }
 
+// Where to earn stars: the first open race that still has stars to win (null when every open race has three).
+export function starRace(done: Record<string, number>, level: number): [number, number] | null {
+  for (let ci = 0; ci < CAMPAIGN.length && campaignOpen(done, ci, level); ci++) {
+    for (let i = 0; i < CAMPAIGN_RACES; i++) {
+      const n = done[campaignRaceId(CAMPAIGN[ci], i)] ?? 0
+      if (n < 3 && (i === 0 || (done[campaignRaceId(CAMPAIGN[ci], i - 1)] ?? 0) > 0)) return [ci, i]
+    }
+  }
+  return null
+}
+
+const STAR_TIP = '★ win · ★★ by 3% · ★★★ by 6%'
+
+// A locked chapter: the boss to beat and the stars to earn, each ticked off, and a race that earns them.
+function ChapterGate({ ci, onRace, onTour }: { ci: number; onRace: (ci: number, race: number) => void; onTour: () => void }) {
+  const level = useGame(gateLevel)
+  const done = useGame((s) => s.campaign)
+  const have = campaignStarTotal(done)
+  const need = campaignStarsNeed(ci)
+  const prev = CAMPAIGN[ci - 1]
+  const boss = campaignCleared(done, prev)
+  const focus = campaignFocus(done, level)
+  // Before the boss falls, the next race on the way to it; after, a race with stars still to win.
+  const go = boss ? starRace(done, level) : focus.next >= 0 ? [focus.ci, focus.next] as const : null
+  return (
+    <div className="rm-locked-box rm-gate">
+      <div className="rm-ring" style={{ ['--p' as string]: Math.min(1, have / need) }} title={STAR_TIP}>
+        <span>★</span><b>{have}<small>/{need}</small></b>
+      </div>
+      <div className="rm-gate-steps">
+        <span className={boss ? 'ok' : ''}>{boss ? '✔' : '👑'} {prev.rivals[CAMPAIGN_RACES - 1]}</span>
+        <span className={have >= need ? 'ok' : ''}>{have >= need ? '✔' : '★'} {need}</span>
+        <i className="rm-or" aria-label="or">/</i>
+        <span title={`Or reach level ${CAMPAIGN[ci].tuned}`}>Lv {CAMPAIGN[ci].tuned}</span>
+      </div>
+      {go && (
+        <button className="buy" onClick={() => onRace(go[0], go[1])}>
+          {boss ? '★' : '🏁'} {venueById(CAMPAIGN[go[0]].venue).icon} {CAMPAIGN[go[0]].rivals[go[1]]}
+        </button>
+      )}
+      {campaignCleared(done, CAMPAIGN[0]) && <button className="buy small alt" onClick={onTour}>🌍 Pro Tour</button>}
+    </div>
+  )
+}
+
 function Campaign({ sel, setSel, onRace, onTour }: { sel: number; setSel: (ci: number) => void; onRace: (ci: number, race: number) => void; onTour: () => void }) {
   const level = useGame(gateLevel)
   const done = useGame((s) => s.campaign)
-  const showNeed = useGame((s) => s.showNeed)
   // The race car's PI: a rival above it shows its PI in red.
   const myPi = useGame((s) => { const c = raceCarOf(s.cars, s.raceCar); return c ? carPi(c) : 0 })
   const { opened } = campaignFocus(done, level)
@@ -973,10 +1072,10 @@ function Campaign({ sel, setSel, onRace, onTour }: { sel: number; setSel: (ci: n
             const n = starsOf(c).reduce((a, x) => a + x, 0)
             return (
               <button key={c.id} role="tab" aria-selected={ci === sel} aria-label={c.name}
-                className={`rm-node${ci === sel ? ' sel' : ''}${open ? '' : ' locked'}${campaignCleared(done, c) ? ' done' : ''}`}
+                className={`rm-node${ci === sel ? ' sel' : ''}${open ? '' : ' locked'}${campaignCleared(done, c) ? ' done' : ''}${n >= CAMPAIGN_RACES * 3 ? ' gold' : ''}`}
                 onClick={() => setSel(ci)}>
                 <span>{open ? venueById(c.venue).icon : '🔒'}</span>
-                <small>{open ? `★${n}` : `Lv${c.unlockLevel}`}</small>
+                <small>★{open ? n : campaignStarsNeed(ci)}</small>
               </button>
             )
           })}
@@ -993,19 +1092,12 @@ function Campaign({ sel, setSel, onRace, onTour }: { sel: number; setSel: (ci: n
       </div>
       <div className="rm-right">
         {!opened(sel) ? (
-          <div className="rm-locked-box">
-            {level < ch.unlockLevel
-              ? <>
-                  <button className="buy small alt" onClick={() => showNeed('level', ch.unlockLevel, ch.name)}>🔒 Opens at level {ch.unlockLevel}</button>
-                  {campaignCleared(done, CAMPAIGN[0]) && <button className="buy small" onClick={onTour}>🌍 Race the Pro Tour</button>}
-                </>
-              : <span>🔒 Beat {CAMPAIGN[sel - 1].rivals[CAMPAIGN_RACES - 1]} to open</span>}
-          </div>
+          <ChapterGate ci={sel} onRace={onRace} onTour={onTour} />
         ) : (
           <div className="rm-rows">
             {stars.map((n, i) => {
               const r = campaignRival(ch, sel, i)
-              const prize = campaignReward(ch, i, n === 0)
+              const prize = campaignReward(ch, i, n === 0, r.pi)
               const can = i === 0 || stars[i - 1] > 0
               const next = can && n === 0
               return (
@@ -1014,10 +1106,10 @@ function Campaign({ sel, setSel, onRace, onTour }: { sel: number; setSel: (ci: n
                   <CarThumb size="xs" color={r.color} body={r.body} model={r.model} />
                   <div className="rm-who">
                     <b>{r.town}</b>
-                    <small>{n > 0 && <Stars n={n} />} <span className={r.pi > myPi ? 'rm-pi-up' : undefined} title={r.pi > myPi ? `Your PI is ${myPi}` : undefined}>PI {r.pi}</span>{r.skill && <> <SkillIcon sk={r.skill} /></>}</small>
+                    <small><span title={STAR_TIP}><Stars n={n} /></span> <span className={r.pi > myPi ? 'rm-pi-up' : undefined} title={r.pi > myPi ? `Your PI is ${myPi}` : undefined}>PI {r.pi}</span>{r.skill && <> <SkillIcon sk={r.skill} /></>}</small>
                   </div>
                   <button className={`buy small${n > 0 ? ' alt' : ''}`} disabled={!can} onClick={() => onRace(sel, i)}>
-                    {!can ? '🔒' : `${n > 0 ? '↻' : '🏁'} $${prize.toLocaleString()}`}
+                    {!can ? '🔒' : `${n > 0 ? (n < 3 ? '★' : '↻') : '🏁'} $${prize.toLocaleString()}`}
                   </button>
                 </div>
               )
@@ -1097,6 +1189,7 @@ function Tour({ onRace, onCampaign }: { onRace: () => void; onCampaign: () => vo
             return (
               <div key={k} className={`rm-node${k === cur ? ' sel' : ''}${k < cur ? ' done' : ''}${k > cur ? ' locked' : ''}${l.night ? ' night' : ''}`}>
                 <span>{k < cur ? '✔' : venueById(l.venue).icon}</span>
+                {k % TOUR_RANK_LEGS === TOUR_RANK_LEGS - 1 && tourRankOf(k + 1) > tourRankOf(k) && <i className="rm-rank" title={`${tourRank(k + 1).name} rank`}>{tourRank(k + 1).icon}</i>}
                 <small>Leg {k + 1}</small>
               </div>
             )
@@ -1109,6 +1202,9 @@ function Tour({ onRace, onCampaign }: { onRace: () => void; onCampaign: () => vo
           <span className="rm-chips">
             <span title="Beat the boss for this bonus">👑 Boss bonus ${tourLegBonus(cur).toLocaleString()}</span>
             <span>{won - first} of {TOUR_RACES} won</span>
+            <span className="rm-rankchip" title={tourLegsToRank(cur) ? `${tourLegsToRank(cur)} legs to ${tourRank(cur + tourLegsToRank(cur)).name}` : 'Top rank'}>
+              {tourRank(cur).icon} {tourRank(cur).name}{tourLegsToRank(cur) > 0 && <> · {tourRank(cur + tourLegsToRank(cur)).icon} {tourLegsToRank(cur)}</>}
+            </span>
           </span>
         </div>
       </div>
@@ -1259,13 +1355,15 @@ export function TourPrizePopup() {
   const prize = useGame((s) => s.tourPrize)
   const close = useGame((s) => s.closeTourPrize)
   if (!prize) return null
+  const rankUp = tourRankOf(prize.leg + 1) > tourRankOf(prize.leg)
   const next = tourLeg(prize.leg + 1)
   const nv = venueById(next.venue)
   return (
     <div className="overlay prize-overlay">
       <div className="prize">
         <h2>Leg {prize.leg + 1} cleared!</h2>
-        <div className="mystery-box" aria-hidden>👑</div>
+        <div className="mystery-box" aria-hidden>{rankUp ? tourRank(prize.leg + 1).icon : '👑'}</div>
+        {rankUp && <h3 className="tour-rankup">{tourRank(prize.leg + 1).name} rank!</h3>}
         <p className="camp-prize"><span>💵 +${prize.coins.toLocaleString()}</span></p>
         <p>Next up: {nv.icon} {next.night ? `${nv.name} at Midnight 🌙` : `${nv.name} ${next.name}`}</p>
         <div className="row">
@@ -1296,7 +1394,7 @@ export function CampaignPrizePopup() {
         {prize.cleared && (
           <p className="camp-prize">
             {prize.perfect && <span title="Three-star bonus">★★★</span>}
-            {next ? <span>⏭ {next.name}{next.unlockLevel > gateLevel(useGame.getState()) && ` · 🔒 Lv ${next.unlockLevel}`}</span> : <span>🏆 Campaign done · 🌍 Pro Tour</span>}
+            {next ? <span>⏭ {next.name}{!campaignOpen(useGame.getState().campaign, CAMPAIGN.indexOf(next), gateLevel(useGame.getState())) && ` · 🔒 ★${campaignStarsNeed(CAMPAIGN.indexOf(next))}`}</span> : <span>🏆 Campaign done · 🌍 Pro Tour</span>}
           </p>
         )}
         <div className="row">

@@ -1,16 +1,17 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { chromeEnv } from './chromeEnv'
 import {
   BoxGeometry, BufferGeometry, CircleGeometry, Color, CylinderGeometry, DoubleSide, Euler, ExtrudeGeometry, Matrix4,
-  Mesh, MeshBasicMaterial, MeshStandardMaterial, PlaneGeometry, Quaternion, Raycaster, Shape as ThreeShape, SphereGeometry, TorusGeometry, Vector3,
+  InstancedMesh, Mesh, MeshBasicMaterial, MeshStandardMaterial, PlaneGeometry, Quaternion, Raycaster, Shape as ThreeShape, SphereGeometry, TorusGeometry, Vector3,
   type Group,
 } from 'three'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { wheelTex } from './textures'
 import { glowMats } from './dayNight'
-import { FINISH_LOOK, SKINNED_SLOTS, STANCE, fittedMods, isBike, modSkinNumber, skinNumber, type Body, type Finish, type ModSlot, type Panels, type SkinnedSlot } from '../game/data'
+import { FINISH_LOOK, SKINNED_SLOTS, STANCE, TRACK_STEEL, fittedMods, isBike, modSkinNumber, skinNumber, trackSkinDef, type Body, type Finish, type ModSkins, type ModSlot, type Panels, type SkinnedSlot } from '../game/data'
+import { PLATE, glowLink, linkCount, padsFor, paintedLink, placeLinks, rollers, sprocketGeo, trackLoop } from './tankTrack'
 import { paintsPanels, panelUniforms, setPanels, withPanels, type Zones } from './panelPaint'
 import { tickSkins, withSkin } from './skins'
 import { CarMods, KIND_MAT, RIM_LOOK, RIM_STYLE, UnderglowPool, carbon, modGeo, modIds, splitSkinned } from './CarMods'
@@ -19,7 +20,7 @@ import { bake, finishOf, type Finish as Look } from './bake'
 import { carStyle, hasTrim, onPane, trimBike, trimCar, type CarStyle, type Pane, type Panes } from './carTrim'
 import { brakeGeo, wheelGeo, type RimStyle } from './carWheels'
 import { PEOPLE_SIZED } from './keepShape'
-import { EXOTIC } from './exoticCars'
+import { EXOTIC, lipGeo, wellGeo, wellOutline } from './exoticCars'
 import { tintDef, trimDef, type Trim } from '../game/trim'
 import { HatModel } from './CarHat'
 import type { HatFit } from '../game/hats'
@@ -297,6 +298,12 @@ export type ModFrame = {
   postW?: number
   // Where side exhausts meet the body, when side kits stand further out than the body itself.
   pipeSide?: number
+  // Where side skirts bolt on, when that's not the bottom of the body side: the outer face and
+  // the foot of the tank's armour skirts, out over its tracks.
+  sill?: number; sillY?: number
+  // Noses that taper in at the front: the half width of the bottom of the nose, and its height
+  // (front lips, splitters and skid plates are cut to these instead of the body's full width).
+  nose?: number; noseY?: number
   // The top of the hard roof (the deck on bodies without one), where it runs, and how wide it is.
   roof: number; roofZ: number; roofLen: number; roofW: number
   // The outside of the windshield and back window, on closed cabins.
@@ -570,7 +577,7 @@ export function brakes(k: Kit, wx: number | ((z: number) => number), wz: number,
 function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: string): CarGeo {
   // A roof rack or roof light bar mod takes the place of the model's own roof gear.
   const roofMod = fit.spoiler === 'roofrack' || fit.lights === 'roofbar'
-  const key = `${body}|${model ?? ''}|${fit.spoiler ? 1 : 0}${fit.hood ? 1 : 0}${fit.exhaust ? 1 : 0}${fit.kit ? 1 : 0}${roofMod ? 1 : 0}`
+  const key = `${body}|${model ?? ''}|${fit.spoiler ? 1 : 0}${fit.hood ? 1 : 0}${fit.exhaust ? 1 : 0}${fit.kit === 'reactive' ? 2 : fit.kit ? 1 : 0}${roofMod ? 1 : 0}`
   const hit = geoCache.get(key)
   if (hit) return hit
   if (body === 'formula') return formulaGeo(key, fit)
@@ -635,8 +642,26 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
   // Dark rocker panel along the bottom.
   k.add('dark', rbox(s.wid + 0.005, 0.06, s.len * 0.8, 0.025), [0, s.lift + 0.04, 0])
   // Wheel arches: dark wells behind each tyre so the wheels sit in the body.
+  // Each stops where the side it's on ends: under the nose and tail as they round off, under a
+  // frog's wings and a prototype's pods (which cover the tyre from above) and inside a flare.
+  const outline = lower.sh.getPoints(12)
+  const sideTop = (z: number) => {
+    let y = -Infinity
+    for (let i = 0; i < outline.length; i++) {
+      const a = outline[i], c = outline[(i + 1) % outline.length]
+      if ((a.x - z) * (c.x - z) > 0 || a.x === c.x) continue
+      y = Math.max(y, a.y + ((c.y - a.y) * (z - a.x)) / (c.x - a.x))
+    }
+    return y + b
+  }
+  const wells = new Map<string, [number, number][]>()
   for (const z of [wz, -wz]) for (const sd of [-1, 1]) {
-    k.add('black', new CircleGeometry(s.wheel * 1.18, 18, 0, Math.PI), [sd * (s.wid / 2 + 0.0045), s.wheel, z], [0, (sd * Math.PI) / 2, 0])
+    const cap = s.frog && z > 0 ? hoodY - 0.034 : s.lmp ? top - 0.024 : Infinity
+    // Flares (the body's own or a model's boxed arches) hug the tyre, so the well hides behind it.
+    const R = s.flares || hasTrim(model, 'boxFlares') ? s.wheel : s.wheel * 1.18
+    const pts = wellOutline(R, s.wheel, (lx, ly) => s.wheel + ly <= Math.min(cap, sideTop(z - sd * lx) - b - 0.012))
+    wells.set(`${z}|${sd}`, pts)
+    k.add('black', wellGeo(pts), [sd * (s.wid / 2 + 0.0045), s.wheel, z], [0, (sd * Math.PI) / 2, 0])
     // Rugged bodies get chunky black fender flares round the arches.
     // The open buggy's are slimmer and stop short of the axle line, so they read as flares on its
     // tub rather than mudguards hanging down past the tyres.
@@ -825,8 +850,10 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
   }
   if (s.hood > 0) k.add('paint', rbox(s.wid * 0.5, s.hood * 2, s.len * 0.26, s.hood * 0.9), [0, hoodY, s.len * 0.3])
   if (s.scoop && !fit.hood) {
-    k.add('black', rbox(0.16, 0.07, 0.16, 0.025), [0, hoodY + s.hood + 0.02, s.len * 0.27])
-    k.add('black', box(0.12, 0.03, 0.01), [0, hoodY + s.hood + 0.03, s.len * 0.27 + 0.082])
+    // A body-colour scoop with a black mouth, low on the hood (a tall black brick read as a box
+    // dropped on it).
+    k.add('paint', rbox(0.13, 0.045, 0.14, 0.018), [0, hoodY + s.hood + 0.015, s.len * 0.27])
+    k.add('black', rbox(0.1, 0.024, 0.012, 0.006), [0, hoodY + s.hood + 0.02, s.len * 0.27 + 0.066])
   }
   if (s.bed) {
     k.add('black', box(s.wid * 0.84, 0.03, s.len * 0.4), [0, top + 0.01, -s.len * 0.27])
@@ -993,7 +1020,7 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
       const sd = i % 2 ? 1 : -1
       const z = -s.len * 0.42 + ((i * 0.37) % 1) * s.len * 0.8
       const y = s.lift + 0.06 + ((i * 0.61) % 1) * (top - s.lift - 0.11)
-      if (y < s.wheel * 2 + 0.02 && Math.abs(Math.abs(z) - wz) < s.wheel * 1.2) continue
+      if (y - 0.035 < s.wheel * 2.18 + 0.01 && Math.abs(Math.abs(z) - wz) < s.wheel * 1.2 + 0.04) continue
       k.add(i % 3 ? 'paint' : 'dark', rbox(0.03, 0.07, 0.08, 0.012), [sd * (s.wid / 2 + 0.008), y, z], [0, 0, sd * (0.2 + ((i * 0.29) % 1) * 0.3)])
     }
     k.add('black', new SphereGeometry(0.055, 12, 10), [0, top - 0.04, front + 0.03], [0, 0, 0], [1.3, 1, 1])
@@ -1004,10 +1031,12 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
   if (s.frog) {
     // Front wings standing above the hood, each ending in an upright round headlight.
     for (const sd of [-1, 1]) {
-      const x = sd * (s.wid / 2 - 0.04)
-      k.add('paint', new SphereGeometry(1, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2), [x, hoodY - 0.03, wz + 0.02], [0, 0, 0], [0.105, 0.11, 0.24])
-      const ly = hoodY + 0.01
-      const lz = wz + 0.02 + 0.24 * Math.cos(0.62) - 0.008
+      // Centred over the tyre and tall and wide enough to cover its top, standing out past the side.
+      const x = sd * wheelX(s)
+      k.add('paint', new SphereGeometry(1, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2), [x, hoodY - 0.03, wz + 0.02], [0, 0, 0], [0.12, 0.135, 0.24])
+      // The lamp sits on the wing's front, a little way up its curve.
+      const ly = hoodY - 0.03 + 0.135 * Math.sin(0.5)
+      const lz = wz + 0.02 + 0.24 * Math.cos(0.5) - 0.012
       k.add('black', cyl(0.05, 0.05, 0.03, 16), [x, ly, lz], [Math.PI / 2 - 0.45, 0, 0])
       // Lens, ring and centre cap each a clear step out from the lamp bucket's face.
       const out = (d: number): [number, number] => [ly + Math.sin(0.45) * d, lz + Math.cos(0.45) * d]
@@ -1016,7 +1045,8 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
       k.add('chrome', disc(0.012, 10), [x, ...out(0.0195)], [-0.45, 0, 0])
     }
     // Rear haunches swelling over the back wheels.
-    for (const sd of [-1, 1]) k.add('paint', new SphereGeometry(1, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2), [sd * (s.wid / 2 - 0.04), top - 0.05, -wz], [0, 0, 0], [0.1, 0.1, 0.26])
+    // Over the tyre, like the front wings, and high enough to cover its top.
+    for (const sd of [-1, 1]) k.add('paint', new SphereGeometry(1, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2), [sd * wheelX(s), top - 0.05, -wz], [0, 0, 0], [0.12, 0.12, 0.26])
   }
   if (s.lmp) {
     // Wheel pods: a tall rounded fairing over each tyre, with louvres on the front pods to vent the brakes.
@@ -1054,20 +1084,14 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
     }
   }
   if (s.tracks) {
-    const tx = s.wid / 2 - 0.02
+    // The tracks themselves move, so they're drawn on their own (TankTracks); the armour
+    // skirt over their top run stands just clear of the links' outer edge.
+    const tx = wheelX(s)
+    // Reactive armour hangs its own bricks there instead; other kits' skirts bolt to its face.
     for (const sd of [-1, 1]) {
-      const x = sd * tx
-      // Track loop: a band round each end wheel joined by top and bottom runs, with cleats on top.
-      for (const zz of [wz, -wz]) k.add('black', new CylinderGeometry(s.wheel + 0.016, s.wheel + 0.016, 0.16, 18, 1, true), [x, s.wheel, zz], [0, 0, Math.PI / 2])
-      for (const y of [0.008, s.wheel * 2 + 0.008]) k.add('black', box(0.16, 0.016, wz * 2), [x, y, 0])
-      for (let i = -4; i <= 4; i++) k.add('dark', box(0.165, 0.012, 0.03), [x, s.wheel * 2 + 0.02, (i * wz) / 4.5])
-      // Middle road wheel between the two real ones.
-      k.add('dark', disc(s.wheel * 0.75, 14), [sd * (tx + 0.072), s.wheel, 0], [0, (sd * Math.PI) / 2, 0])
-      k.add('chrome', disc(0.035, 10), [sd * (tx + 0.074), s.wheel, 0], [0, (sd * Math.PI) / 2, 0])
-      // Armour skirt over the top of the track, with a row of rivets.
-      if (!fit.kit) {
-        k.add('paint', rbox(0.03, s.wheel * 0.62, wz * 2 + s.wheel * 1.7, 0.012), [sd * (tx + 0.085), s.wheel * 1.62, 0])
-        for (let i = -3; i <= 3; i++) k.add('chrome', disc(0.011, 6), [sd * (tx + 0.1025), s.wheel * 1.75, (i * wz) / 3], [0, (sd * Math.PI) / 2, 0])
+      if (fit.kit !== 'reactive') {
+        k.add('paint', rbox(0.03, s.wheel * 0.62, wz * 2 + s.wheel * 1.7, 0.012), [sd * (tx + 0.105), s.wheel * 1.62, 0])
+        for (let i = -3; i <= 3; i++) k.add('chrome', disc(0.011, 6), [sd * (tx + 0.1225), s.wheel * 1.75, (i * wz) / 3], [0, (sd * Math.PI) / 2, 0])
       }
     }
   }
@@ -1110,13 +1134,12 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
     for (const sd of [-1, 1]) {
       const x = sd * s.wid * 0.3
       if (s.quad) {
-        // Two round lamps each side in a black bezel; the inner left one is an air intake.
+        // Two round lamps each side in a black bezel.
         onNose('black', rbox(0.17, 0.07, 0.01, 0.01), x, lightY, 0.002)
         for (const lx of [0.37, 0.23]) {
-          const intake = sd < 0 && lx === 0.23
-          onNose(intake ? 'black' : 'lamp', disc(0.028, 14), sd * s.wid * lx, lightY, 0.009)
-          onNose(intake ? 'chrome' : 'chrome', new TorusGeometry(0.031, 0.005, 4, 16), sd * s.wid * lx, lightY, 0.01)
-          if (!intake) onNose('chrome', disc(0.009, 8), sd * s.wid * lx, lightY, 0.011)
+          onNose('lamp', disc(0.028, 14), sd * s.wid * lx, lightY, 0.009)
+          onNose('chrome', new TorusGeometry(0.031, 0.005, 4, 16), sd * s.wid * lx, lightY, 0.01)
+          onNose('chrome', disc(0.009, 8), sd * s.wid * lx, lightY, 0.011)
         }
       } else if (s.frog) {
         // The headlights stand up in the front wings (see above).
@@ -1253,7 +1276,10 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
     const half = (wheelX(s) + 0.076 - s.wid / 2) / 2
     for (const z of [wz, -wz]) for (const sd of [-1, 1]) {
       if (s.inset) k.add('dark', new TorusGeometry(s.wheel * 1.2, 0.008, 8, 28, Math.PI), [sd * (s.wid / 2 + 0.001 + half), s.wheel, z], [0, (sd * Math.PI) / 2, 0], [1, 1, half / 0.008])
-      else k.add('dark', new TorusGeometry(s.wheel * 1.2, 0.008, 3, 14, Math.PI), [sd * (s.wid / 2 + 0.004), s.wheel, z], [0, (sd * Math.PI) / 2, 0], [1, 1, 0.6])
+      else {
+        const l = lipGeo(wells.get(`${z}|${sd}`)!, 0.006, s.wheel * 1.18)
+        if (l) k.add('dark', l, [sd * (s.wid / 2 + 0.0055), s.wheel, z], [0, (sd * Math.PI) / 2, 0])
+      }
     }
   }
   if (!s.tracks) brakes(k, wheelX(s), wz, s.wheel, 0.14)
@@ -1366,6 +1392,141 @@ function Wheels({ at, r, w, rig, rims, rimColor, rusty, look, camber = 0 }: { at
   )
 }
 
+// The rim material a wheel wears: rust, a custom rim colour, a rims mod's finish or the car's stock rim.
+function rimMaterial(rims: string | undefined, rimColor: string | undefined, rusty: boolean | undefined, look: CarStyle) {
+  const mod = rims ? RIM_LOOK[rims] : undefined
+  return rusty ? matOf('rim', '#7a5a44', 0.2, 0.9) : rimColor ? rimPaint(rimColor, mod) : mod ? matOf('rim', mod[0], Math.max(0.6, mod[1] + 0.4), mod[2]) : matOf('rim', look.rimColor ?? '#d5d9de', 0.75, 0.28)
+}
+
+// One material per track skin palette finish (the colours ride on the link's vertices).
+const trackMats = new Map<string, MeshStandardMaterial | MeshBasicMaterial>()
+const trackMat = (metal: number, rough: number) => {
+  const key = `${metal}|${rough}`
+  let m = trackMats.get(key)
+  if (!m) trackMats.set(key, (m = new MeshStandardMaterial({ vertexColors: true, metalness: metal, roughness: rough })))
+  return m
+}
+const sprocketMat = new MeshStandardMaterial({ color: '#6b7178', metalness: 0.75, roughness: 0.38 })
+const glowMat = (color: string) => {
+  let m = trackMats.get(color)
+  if (!m) trackMats.set(color, (m = new MeshBasicMaterial({ color, toneMapped: false })))
+  return m
+}
+
+// Tank tracks (see tankTrack.ts): moving links, a toothed drive sprocket at the back, double road
+// wheels and an idler wearing the rims mod's style, and return rollers. Rolls with the rig: the
+// links slide round the loop and every wheel turns, all from how far the rig's wheels rolled.
+// own: give the rig its wheel groups here (a whole car; a lean car's LeanCar already has them).
+function TankTracks({ wheel, wz, tx, rims, rimColor, rusty, look, tires, skin, rig, own }: {
+  wheel: number; wz: number; tx: number; rims?: string; rimColor?: string; rusty?: boolean; look: CarStyle; tires?: string; skin?: string; rig?: WheelRig; own: boolean
+}) {
+  const pads = padsFor(tires)
+  const loop = useMemo(() => trackLoop(wheel, wz, pads), [wheel, wz, pads])
+  const sk = rusty ? undefined : trackSkinDef(skin)
+  const pal = sk ?? TRACK_STEEL
+  const link = paintedLink(pads, pal.look)
+  const glow = sk?.glow ? glowLink(pads, sk.glow.role) : null
+  const n = linkCount(loop) * 2
+  const rolls = useMemo(() => rollers(loop), [loop])
+  const style = (rims && RIM_STYLE[rims]) || look.rim
+  const rw = 0.07
+  const wg = wheelGeo(style, rw, 0.05)
+  const rim = rimMaterial(rims, rimColor, rusty, look)
+  const spr = loop.rc - PLATE / 2 - 0.004
+  const sprocket = sprocketGeo(spr, 13)
+  const links = useRef<InstancedMesh>(null)
+  const glows = useRef<InstancedMesh>(null)
+  const tires2 = useRef<InstancedMesh>(null)
+  const rimL = useRef<InstancedMesh>(null)
+  const rimR = useRef<InstancedMesh>(null)
+  const sprockets = useRef<InstancedMesh>(null)
+  const st = useRef({ dist: 0, last: null as number | null })
+  // Each round wheel: [x, y, z, radius]; the pairs straddle the guide horns, the return rollers ride the middle.
+  const wheels = useMemo(() => {
+    const out: { x: number; y: number; z: number; r: number }[] = []
+    for (const sd of [-1, 1]) for (const [z, y, r] of rolls) {
+      if (r < 0.05) out.push({ x: sd * tx, y, z, r })
+      else for (const dx of [-0.04, 0.04]) out.push({ x: sd * tx + dx, y, z, r })
+    }
+    return out
+  }, [rolls, tx])
+  const place = useCallback(() => {
+    const d = st.current.dist
+    const lm = links.current
+    if (lm) {
+      placeLinks(loop, tx, d, (i, m) => lm.setMatrixAt(i, m))
+      lm.instanceMatrix.needsUpdate = true
+      if (glows.current) glows.current.instanceMatrix.needsUpdate = true
+    }
+    const m = new Matrix4()
+    const q = new Quaternion()
+    const ax = new Vector3(1, 0, 0)
+    const p = new Vector3()
+    const sc = new Vector3()
+    let li = 0
+    let ri = 0
+    wheels.forEach((w, i) => {
+      // Rolling on the track's inside at its speed; the idler is the big one at the front.
+      q.setFromAxisAngle(ax, d / w.r)
+      m.compose(p.set(w.x, w.y, w.z), q, sc.set(1, w.r / rw, w.r / rw))
+      tires2.current?.setMatrixAt(i, m)
+      if (w.x < 0) rimL.current?.setMatrixAt(li++, m)
+      else rimR.current?.setMatrixAt(ri++, m)
+    })
+    for (const im of [tires2.current, rimL.current, rimR.current]) if (im) im.instanceMatrix.needsUpdate = true
+    const sp = sprockets.current
+    if (sp) {
+      q.setFromAxisAngle(ax, d / spr)
+      for (const [i, sd] of [[0, -1], [1, 1]] as const) sp.setMatrixAt(i, m.compose(p.set(sd * tx, loop.cy, -wz), q, sc.set(1, 1, 1)))
+      sp.instanceMatrix.needsUpdate = true
+    }
+  }, [loop, tx, wheels, spr, wz])
+  useLayoutEffect(() => {
+    // The glow draws a skin's lit parts with the links' own placements.
+    if (glows.current && links.current) glows.current.instanceMatrix = links.current.instanceMatrix
+    const lm = links.current
+    if (lm && sk?.alt) {
+      const c = new Color()
+      for (let i = 0; i < n; i++) lm.setColorAt(i, c.set(sk.alt[Math.floor(i / 2) % 2]))
+      if (lm.instanceColor) lm.instanceColor.needsUpdate = true
+    }
+    place()
+  }, [place, sk, n, glow])
+  useFrame(() => {
+    const w = rig?.spin[0]
+    if (!w) return
+    const a = w.rotation.x
+    const s = st.current
+    if (s.last === null) {
+      s.last = a
+      return
+    }
+    // How far the wheels turned since last frame (their angle wraps at a full turn).
+    let da = a - s.last
+    s.last = a
+    if (da > Math.PI) da -= Math.PI * 2
+    else if (da < -Math.PI) da += Math.PI * 2
+    if (!da) return
+    s.dist += da * wheel
+    place()
+  })
+  return (
+    <>
+      {own && rig && [[-tx, wz], [tx, wz], [-tx, -wz], [tx, -wz]].map(([x, z], i) => (
+        <group key={i} position={[x, wheel, z]} ref={i < 2 ? (o) => void (rig.steer[i] = o) : undefined}>
+          <group ref={(o) => void (rig.spin[i] = o)} />
+        </group>
+      ))}
+      <instancedMesh key={`l${n}${link.uuid}${sk?.alt ? 1 : 0}`} ref={links} args={[link, trackMat(pal.metal, pal.rough), n]} castShadow frustumCulled={false} />
+      {glow && sk?.glow && <instancedMesh key={`g${n}${glow.uuid}`} ref={glows} args={[glow, glowMat(sk.glow.color), n]} frustumCulled={false} />}
+      <instancedMesh key={`t${wheels.length}${wg.tire.uuid}`} ref={tires2} args={[wg.tire, MAT.rubber, wheels.length]} castShadow frustumCulled={false} />
+      <instancedMesh key={`a${wheels.length}${wg.rims[0].uuid}`} ref={rimL} args={[wg.rims[0], rim, wheels.length / 2]} frustumCulled={false} />
+      <instancedMesh key={`b${wheels.length}${wg.rims[1].uuid}`} ref={rimR} args={[wg.rims[1], rim, wheels.length / 2]} frustumCulled={false} />
+      <instancedMesh key={`s${sprocket.uuid}`} ref={sprockets} args={[sprocket, rusty ? rim : sprocketMat, 2]} castShadow frustumCulled={false} />
+    </>
+  )
+}
+
 // Handles on a car's wheels so a driving car can steer the front pair and roll all four.
 // `slots`: where a lean car's wheels are drawn in the shared wheel pool (see carBatch.ts).
 export type WheelRig = { steer: (Group | null)[]; spin: (Group | null)[]; radius: number; base: number; slots?: (WheelSlot | null)[] }
@@ -1377,17 +1538,17 @@ export type WheelRig = { steer: (Group | null)[]; spin: (Group | null)[]; radius
 // panels: custom paint on the hood, doors, roof and rims, and a body pattern (game/data.ts PANELS).
 // trim: window tint, headlight colour and door handles (game/trim.ts).
 // hat: the hat it wears (game/hats.ts), on the roof or the rider's helmet.
-type CarProps = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; panels?: Panels | null; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean; rig?: WheelRig; mods?: string[] | null; flames?: boolean; lean?: boolean; trim?: Trim | null; hat?: HatFit | null }
+type CarProps = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: ModSkins | null; panels?: Panels | null; highlight?: boolean; stripe?: string | null; beams?: boolean; rusty?: boolean; rig?: WheelRig; mods?: string[] | null; flames?: boolean; lean?: boolean; trim?: Trim | null; hat?: HatFit | null }
 
 // A lean car: every part baked into two meshes (the parts that cast a shadow and the
 // rest) with the finish it would otherwise be drawn with, except the see-through screen;
 // the wheels' groups stay for steering and rolling but are drawn from the shared wheel pool.
 // `extra` is drawn as is (chrome paint, which mirrors its own studio and can't be baked).
 // rise: how far a stance mod lifts (or drops) the body over its wheels.
-function LeanCar({ parts, looks, casters, mods, modPaint, highlight, wheels, radius, width, rims, rimColor, rig, beams, extra, rise = 0 }: {
+function LeanCar({ parts, looks, casters, mods, modPaint, highlight, wheels, radius, width, rims, rimColor, rig, beams, extra, rise = 0, pooled = true }: {
   parts: Partial<Record<Part, BufferGeometry>>; looks: Partial<Record<Part, Look>>; casters: Part[]
   mods: { body: Body; ids: string[]; skins?: Partial<Record<SkinnedSlot, number>> }; modPaint: Look; highlight?: boolean
-  wheels: V3[]; radius: number; width: number; rims?: string; rimColor?: string; rig: WheelRig; beams: React.ReactNode; extra?: React.ReactNode; rise?: number
+  wheels: V3[]; radius: number; width: number; rims?: string; rimColor?: string; rig: WheelRig; beams: React.ReactNode; extra?: React.ReactNode; rise?: number; pooled?: boolean
 }) {
   const key = (Object.keys(looks) as Part[]).map((k) => `${k}:${parts[k]?.uuid ?? 0}:${JSON.stringify(looks[k])}`).join() + mods.ids.join() + JSON.stringify(mods.skins ?? {}) + JSON.stringify(modPaint)
   const geo = useMemo(() => {
@@ -1418,13 +1579,14 @@ function LeanCar({ parts, looks, casters, mods, modPaint, highlight, wheels, rad
     geo.rest?.dispose()
   }, [geo])
   useEffect(() => {
+    if (!pooled) return
     const mat = wheelMaterial(rims, rimColor)
     rig.slots = wheels.map(() => wheelPool.take(mat, radius, width))
     return () => {
       rig.slots?.forEach((w) => w && wheelPool.give(w))
       rig.slots = undefined
     }
-  }, [rig, rims, rimColor, radius, width, wheels.length]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [rig, rims, rimColor, radius, width, wheels.length, pooled]) // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <group>
       <group position-y={rise}>
@@ -1452,7 +1614,7 @@ export function CarModel(props: CarProps) {
 }
 
 // Mod skin numbers by slot, or undefined when no part wears one.
-function modSkinNumbers(modSkin?: Partial<Record<SkinnedSlot, string>> | null) {
+function modSkinNumbers(modSkin?: ModSkins | null) {
   const out: Partial<Record<SkinnedSlot, number>> = {}
   for (const sl of SKINNED_SLOTS) {
     const n = modSkinNumber(modSkin?.[sl])
@@ -1529,6 +1691,9 @@ function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight,
   const rimColor = pan?.rims?.color
   const topper = hat && !rusty && <Hat hat={hat} spot={hatSpot(body, model, p)} />
   const pool = fit.lights === 'underglow' && <UnderglowPool body={body} />
+  const tracks = (own: boolean) => s.tracks && (
+    <TankTracks wheel={s.wheel} wz={wz} tx={wx} rims={fit.rims} rimColor={rimColor} rusty={rusty} look={look} tires={fit.tires} skin={modSkin?.tracks} rig={rig} own={own} />
+  )
   if (lean && rig) {
     // Chrome (its studio reflections) and custom panels can't be baked: that paint is drawn on its own.
     const chromed = !rusty && finish === 'chrome' && !sk
@@ -1541,7 +1706,7 @@ function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight,
     }
     return (
       <LeanCar parts={p} looks={looks} casters={['paint', 'glass']} mods={{ body, ids: modIds(fit), skins: msk }} modPaint={{ color: tint, metal: rusty ? 0.1 : 0.4, rough: 0.3, ...(sk ? { skin: sk } : {}) }} highlight={highlight}
-        wheels={[[-wx, wr, wz], [wx, wr, wz], [-wx, wr, -wz], [wx, wr, -wz]]} radius={wr} width={(s.tyre ?? 0.14) * tyre} rims={fit.rims} rimColor={rimColor} rig={rig} beams={<>{beam}{pool}</>} rise={rise}
+        wheels={[[-wx, wr, wz], [wx, wr, wz], [-wx, wr, -wz], [wx, wr, -wz]]} radius={wr} width={(s.tyre ?? 0.14) * tyre} rims={fit.rims} rimColor={rimColor} rig={rig} beams={<>{beam}{pool}{tracks(false)}</>} rise={rise} pooled={!s.tracks}
         extra={<>{own && <mesh geometry={p.paint} castShadow><PaintMaterial color={tint} finish={finish} highlight={highlight} skin={chromed ? 0 : sk} panels={pan} zones={g.zones} /></mesh>}{topper}</>} />
     )
   }
@@ -1573,7 +1738,7 @@ function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight,
       {/* Headlight beams on the road, visible after dark. */}
       {beam}
       {pool}
-      <Wheels at={[[-wx, wz], [wx, wz], [-wx, -wz], [wx, -wz]]} r={wr} w={ww} rig={rig} rims={fit.rims} rimColor={rimColor} rusty={rusty} look={look} camber={st?.camber} />
+      {s.tracks ? tracks(true) : <Wheels at={[[-wx, wz], [wx, wz], [-wx, -wz], [wx, -wz]]} r={wr} w={ww} rig={rig} rims={fit.rims} rimColor={rimColor} rusty={rusty} look={look} camber={st?.camber} />}
     </group>
   )
 }

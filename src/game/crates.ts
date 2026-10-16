@@ -2,11 +2,12 @@
 // coins, a part for one of your cars, a car, or a body or part skin. Every car and part has one
 // home crate, picked by what it's worth (see homeCrate), so dearer crates hold dearer cars and
 // parts. Cars only come once your level has unlocked them, so a crate never skips a level gate. A signed-in player's crates are
-// rolled by the server (crate_open(), newest copy in supabase/migrations/0085_crate_value_fixes.sql, same tables and
+// rolled by the server (crate_open(), newest copy in supabase/migrations/0110_season_skins_out_of_crates.sql, same tables and
 // rules); guests roll here. crates.test.ts keeps the server's tables in step.
 import { CARS, CUSTOM_PAINT, carLevel, CUSTOM_PAINT_CRATE, MODS, MOD_SKINS, SKINS, carDef, hasCustomPaint, ownedSkins, modDef, modFits, ownedMods, type CarDef, type ModDef, type SkinDef, type SkinTier } from './data'
 import { PIECE_COUNT, PIECE_SOURCES, pieceId, piecePool } from './resto'
 import { crateHats, hatDef } from './hats'
+import { CALL_CARDS, CALL_CRATE_TIERS, CALL_WEIGHT, callCardDef, crateCallCards } from './callCards'
 import { GEM_COINS, gemCoins } from './bucksPacks'
 
 export type CrateId = 'street' | 'garage' | 'gold' | 'diamond'
@@ -118,9 +119,9 @@ export function carOdds(c: CrateDef, level: number): { model: string; p: number 
 // skins (game/events.ts) are the exception: they're only won by clearing their event. So are
 // skins a level hands out: everyone past it has one, so in a crate it could only pay coins.
 // Custom Colour (CUSTOM_PAINT) rides in one crate's paint slice as a body skin of its tier.
-// Weekly event skins and level skins never go in crates.
+// Weekly event skins, season track skins and level skins never go in crates.
 function inCrates(d: SkinDef) {
-  return !('event' in d.unlock) && !('level' in d.unlock)
+  return !('event' in d.unlock) && !('season' in d.unlock) && !('level' in d.unlock)
 }
 export const SKIN_WEIGHT: Record<SkinTier, number> = { rare: 6, epic: 3, legendary: 1 }
 export type CrateSkin = { id: string; part: boolean; def: SkinDef }
@@ -138,7 +139,7 @@ export function skinOdds(c: CrateDef): (CrateSkin & { p: number })[] {
 export const SKIN_DUPE: Record<SkinTier, number> = { rare: 0.6, epic: 1, legendary: 1.5 }
 // Skins the player already has, body and part (from ownedSkins / ownedModSkins in data.ts), and hats.
 // pieces: resto-mod pieces held ("model:piece"; the server counts its own ledger).
-export type OwnedSkins = { skins: string[]; modSkins: string[]; hats?: string[]; pieces?: string[] }
+export type OwnedSkins = { skins: string[]; modSkins: string[]; hats?: string[]; pieces?: string[]; callCards?: string[] }
 // The body skins a crate counts as yours: ownedSkins plus Custom Colour once won.
 export const crateOwnedSkins = (s: Parameters<typeof ownedSkins>[0]) => [...ownedSkins(s), ...(hasCustomPaint(s) ? [CUSTOM_PAINT.id] : [])]
 
@@ -149,6 +150,10 @@ export const PIECE_DUPE = 1
 // coin prizes. Only hats the player doesn't have drop; with none left it stays coins. The server
 // rolls the same slice (crateTables() hat and hats).
 export const HAT_ODDS: Record<CrateId, number> = { street: 3, garage: 4, gold: 6, diamond: 8 }
+// Call Cards (game/callCards.ts): the same, rolled after the hat slice misses. Only cards the
+// player doesn't have drop (rarer tiers less likely, CALL_WEIGHT); with none left it stays coins.
+// The server rolls the same (crateTables() call, callCards and callWeight).
+export const CALL_ODDS: Record<CrateId, number> = { street: 2, garage: 3, gold: 4, diamond: 5 }
 
 type CarLike = { uid: string; model: string; mods?: string[] | null; ownedMods?: string[] | null }
 
@@ -184,6 +189,7 @@ export type CrateDrop =
   | { kind: 'skin'; skin: string; part: boolean }
   | { kind: 'skindupe'; skin: string; part: boolean; coins: number }
   | { kind: 'hat'; hat: string }
+  | { kind: 'callcard'; card: string }
   // A resto-mod piece (0-3); the fourth one comes with the built car's uid and colour.
   | { kind: 'piece'; model: string; piece: number; uid?: string; color?: string }
   | { kind: 'piecedupe'; model: string; piece: number; coins: number }
@@ -280,6 +286,8 @@ export function rollCrate(c: CrateDef, level: number, cars: CarLike[], rand: () 
     const hats = crateHats(c.id).filter((h) => !(owned.hats ?? []).includes(h.id))
     const coinW = crateOdds(c, level).coins
     if (hats.length && rand() * coinW < HAT_ODDS[c.id]) return { kind: 'hat', hat: hats[Math.floor(rand() * hats.length)].id }
+    const cards = crateCallCards(c.id).filter((x) => !(owned.callCards ?? []).includes(x.id))
+    if (cards.length && rand() * coinW < CALL_ODDS[c.id]) return { kind: 'callcard', card: pickWeighted(cards, (x) => CALL_WEIGHT[x.tier!], rand).id }
   }
   const [lo, hi] = kind === 'jackpot' ? c.jackpotMult : c.coinMult
   return { kind: 'coins', coins: roundCoins(v * (lo + (hi - lo) * rand())), jackpot: kind === 'jackpot' }
@@ -292,6 +300,7 @@ export function dropTier(d: CrateDrop): 0 | 1 | 2 | 3 {
   if (d.kind === 'car') return 3
   if (d.kind === 'piece') return d.uid ? 3 : 2
   if (d.kind === 'hat') return hatDef(d.hat)?.challenge ? 2 : 3
+  if (d.kind === 'callcard') return callCardDef(d.card)?.tier === 'legendary' ? 3 : 2
   if (d.kind === 'skin') return skinOf(d.skin, d.part)?.tier === 'legendary' ? 3 : 2
   if (d.kind === 'mod') return modDef(d.mod)?.bucks ? 2 : 1
   if (d.kind === 'coins' && d.jackpot) return 1
@@ -301,7 +310,7 @@ export function dropTier(d: CrateDrop): 0 | 1 | 2 | 3 {
 // The order a ×10 open shows its prizes in: plain coins first, the rarest last (by dropTier, then
 // cars over paints over hats over pieces over parts over jackpots over coins back for something
 // already yours, then the bigger coin win). Ties keep the order they were opened in.
-const KIND_RANK: Record<CrateDrop['kind'], number> = { coins: 0, dupe: 1, skindupe: 1, piecedupe: 1, mod: 3, piece: 4, hat: 5, skin: 6, car: 7 }
+const KIND_RANK: Record<CrateDrop['kind'], number> = { coins: 0, dupe: 1, skindupe: 1, piecedupe: 1, mod: 3, piece: 4, hat: 5, callcard: 5, skin: 6, car: 7 }
 export function revealOrder<T extends { drop: CrateDrop }>(opens: T[]): T[] {
   const rank = (d: CrateDrop) => dropTier(d) * 100 + KIND_RANK[d.kind] * 10 + (d.kind === 'coins' && d.jackpot ? 5 : 0)
   const won = (d: CrateDrop) => ('coins' in d ? d.coins : 0)
@@ -322,14 +331,16 @@ export function crateOdds(c: CrateDef, level: number): CrateOdds {
 
 // The odds as a player sees them: coins (with jackpots), hats, parts, cars and skins, in whole
 // percent (cars to a tenth below 1%, resto-mod pieces to a hundredth). Hats come out of the coin
-// slice (HAT_ODDS), so pass `hats` false once the player has every hat the crate holds.
-export function crateOddsShown(c: CrateDef, level: number, hats = true) {
+// slice (HAT_ODDS), so pass `hats` false once the player has every hat the crate holds; Call Cards
+// too (CALL_ODDS), with `cards` false once the player has all of the crate's.
+export function crateOddsShown(c: CrateDef, level: number, hats = true, cards = true) {
   const o = crateOdds(c, level)
   const t = o.coins + o.jackpot + o.mod + o.car + o.skin + o.piece
   const pc = (n: number) => Math.round((n / t) * 100)
   const car = (o.car / t) * 100
   const hat = hats && crateHats(c.id).length ? HAT_ODDS[c.id] : 0
-  return { coins: pc(o.coins + o.jackpot - hat), hat: pc(hat), mod: pc(o.mod), car: car < 1 ? Math.round(car * 10) / 10 : Math.round(car), skin: pc(o.skin), piece: Math.round((o.piece / t) * 10000) / 100 }
+  const card = cards && crateCallCards(c.id).length ? CALL_ODDS[c.id] : 0
+  return { coins: pc(o.coins + o.jackpot - hat - card), hat: pc(hat), card: pc(card), mod: pc(o.mod), car: car < 1 ? Math.round(car * 10) / 10 : Math.round(car), skin: pc(o.skin), piece: Math.round((o.piece / t) * 10000) / 100 }
 }
 
 
@@ -342,7 +353,12 @@ export function crateTables() {
       ...(c.pity ? { pity: c.pity } : {}),
       // The hat slice (out of 100, taken from coins) and the hats it can give, in HATS order.
       hat: HAT_ODDS[c.id], hats: crateHats(c.id).map((h) => h.id),
+      // The Call Card slice (out of 100, taken from coins, after the hat slice) and its tiers.
+      call: CALL_ODDS[c.id], callTiers: CALL_CRATE_TIERS[c.id],
     }])),
+    // Call Cards by id: tier, and each tier's weight.
+    callCards: Object.fromEntries(CALL_CARDS.filter((d) => d.tier).map((d) => [d.id, d.tier])),
+    callWeight: CALL_WEIGHT,
     // Body skins by id, part skins by id: tier, and the level or collection set that also unlocks one.
     skinWeight: SKIN_WEIGHT,
     skinDupe: SKIN_DUPE,

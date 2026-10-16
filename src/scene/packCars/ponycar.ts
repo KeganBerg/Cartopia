@@ -1,4 +1,4 @@
-import { BufferGeometry, CircleGeometry, CylinderGeometry, Float32BufferAttribute, TorusGeometry, Vector3 } from 'three'
+import { BufferGeometry, CylinderGeometry, Float32BufferAttribute, Vector3 } from 'three'
 import type { Kit, Part } from '../CarModel'
 import { Loft, type Pt, type Section } from '../loft'
 import { Surface, box, disc, glassRing, greenhouse, honey, plane, poly, rbox, slab, vent, type ExoticFit, type ExoticHelpers } from '../exoticCars'
@@ -166,9 +166,8 @@ export function ponycarGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   const R = 0.176
   const cy = r - 0.008
   for (const zz of [wz, -wz]) for (const sd of SIDES) {
-    S.wall('black', new CircleGeometry(R, 20, 0, Math.PI), sd, zz, cy, 0.003)
+    S.well(sd, zz, cy, R, r, 20, 'dark', 0.009)
     if (!fit.kit) S.wall('black', plane(R * 2, cy - 0.094), sd, zz, (cy + 0.094) / 2, 0.003)
-    S.wall('dark', new TorusGeometry(R, 0.009, 4, 20, Math.PI), sd, zz, cy, 0.004)
   }
 
   // Sides: door cuts, a flush handle, a gill behind each front wheel, markers, a sill
