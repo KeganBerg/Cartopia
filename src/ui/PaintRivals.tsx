@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import { useGame, type OwnedCar } from '../game/store'
 import { SkillIcon } from './TapTip'
 import { raceCarOf } from '../game/raceCar'
@@ -41,6 +42,8 @@ export function PaintRivals({ sel, setSel, car }: { sel: string; setSel: (id: st
   const v = venueById(r.venue)
   const rc = carDef(r.car)
   const d = car ? carDef(car.model) : CARS[0]
+  // The easiest rival not yet beaten glows, so there's always an obvious next race.
+  const nextUp = PAINT_RIVALS.find((x) => !((row[x.id] ?? 0) > 0))?.id
   return (
     <div className="rm-split rm-prow" style={{ '--pr': r.paint } as React.CSSProperties}>
       <div className="rm-left">
@@ -69,12 +72,20 @@ export function PaintRivals({ sel, setSel, car }: { sel: string; setSel: (id: st
       </div>
       <div className="rm-right">
         <div className="pr-grid" role="listbox" aria-label="Paint rivals">
-          {PAINT_RIVALS.map((x) => {
+          {PAINT_RIVALS.map((x, i) => {
             const won = (row[x.id] ?? 0) > 0
             const xc = carDef(x.car)
+            const tier = PAINT_RIVALS.filter((o) => o.tier === x.tier)
+            const tierWon = tier.filter((o) => (row[o.id] ?? 0) > 0).length
             return (
-              <button key={x.id} role="option" aria-selected={x.id === r.id} aria-label={x.name} title={`${x.name} · ${TIERS[x.tier]}`}
-                className={`pr-tile t${x.tier}${x.id === r.id ? ' sel' : ''}${won ? ' done' : ''}`} style={{ '--pr': x.paint } as React.CSSProperties}
+              <Fragment key={x.id}>
+              {(i === 0 || PAINT_RIVALS[i - 1].tier !== x.tier) && (
+                <span className={`pr-tier${tierWon === tier.length ? ' done' : ''}`}>
+                  <b>{flames(x)} {TIERS[x.tier]}</b><small>{tierWon === tier.length ? '👑' : `${tierWon}/${tier.length}`}</small>
+                </span>
+              )}
+              <button role="option" aria-selected={x.id === r.id} aria-label={x.name} title={`${x.name} · ${TIERS[x.tier]}`}
+                className={`pr-tile t${x.tier}${x.id === r.id ? ' sel' : ''}${won ? ' done' : ''}${x.id === nextUp ? ' next' : ''}`} style={{ '--pr': x.paint } as React.CSSProperties}
                 onClick={() => setSel(x.id)}>
                 <CarThumb size="xs" color={x.paint} body={xc.body} model={xc.id} />
                 <span className="pr-face" aria-hidden>{x.icon}</span>
@@ -82,6 +93,7 @@ export function PaintRivals({ sel, setSel, car }: { sel: string; setSel: (id: st
                 <small>{flames(x)}</small>
                 <b>PI {x.pi}</b>
               </button>
+              </Fragment>
             )
           })}
         </div>

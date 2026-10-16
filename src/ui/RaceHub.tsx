@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
 import { SkillIcon } from './TapTip'
 import { useGame, gateLevel, type OwnedCar } from '../game/store'
-import { type CarDef, CAMPAIGN, CAMPAIGN_RACES, GP_ROUNDS, GP_SERIES, RACE_FUEL, SKILLS, campaignCleared, campaignRaceId, campaignReward, carDef, msToNextWeek, performance, skinDef } from '../game/data'
+import { type CarDef, CAMPAIGN, CAMPAIGN_RACES, GP_ROUNDS, GP_SERIES, RACE_FUEL, SKILLS, campaignCleared, campaignOpen, campaignRaceId, gpOpen, carDef, msToNextWeek, performance, skinDef } from '../game/data'
 import { BUILDS, DIST, buildOf, raceCharacter, fit, tourDist, type RaceDist } from '../game/distance'
 import { EVENT_RACES, eventFor, eventPrize, eventProgress } from '../game/events'
 import { TOUR_RACES, tourLeg, tourLegOf, tourRivalName } from '../game/tour'
-import { tourPayNow } from '../game/fairRace'
+import { campaignPayNow, tourPayNow } from '../game/fairRace'
 import { shortLeft, trialVenue, trialWeek } from '../game/trial'
 import { localBest } from '../lib/trialServer'
 import { useLive } from '../lib/live'
@@ -32,7 +32,7 @@ const money = (n: number) => (n >= 10000 ? `$${Math.round(n / 1000)}k` : `$${n.t
 
 // The chapter the campaign should open on (the first open, uncleared one) and its next race (-1: none left).
 export function campaignFocus(done: Record<string, number>, level: number) {
-  const opened = (ci: number) => level >= CAMPAIGN[ci].unlockLevel && (ci === 0 || campaignCleared(done, CAMPAIGN[ci - 1]))
+  const opened = (ci: number) => campaignOpen(done, ci, level)
   const first = CAMPAIGN.findIndex((ch, ci) => opened(ci) && !campaignCleared(done, ch))
   const ci = first === -1 ? CAMPAIGN.reduce((n, _, i) => (opened(i) ? i : n), 0) : first
   const next = first === -1 ? -1 : Array.from({ length: CAMPAIGN_RACES }, (_, i) => done[campaignRaceId(CAMPAIGN[ci], i)] ?? 0).findIndex((n) => n === 0)
@@ -72,9 +72,10 @@ export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival, onBlast,
   // The next leg's sky, rolled from its number as the race itself rolls it, so the clip shows it.
   const tourSky = useMemo(() => raceWeather(leg.venue, `tour-${won}`).kind, [leg.venue, won])
 
-  // The Grand Prix series most worth showing: one under way, else the first that can be entered.
-  const series = GP_SERIES.find((s) => (gp[s.id]?.round ?? 0) > 0 && level >= s.unlockLevel)
-    ?? GP_SERIES.find((s) => level >= s.unlockLevel && carCount >= s.minCars) ?? GP_SERIES[0]
+  // The Grand Prix series most worth showing: one under way, else the newest open one not yet won, else the newest open.
+  const series = GP_SERIES.find((s, si) => (gp[s.id]?.round ?? 0) > 0 && gpOpen(gp, si, level))
+    ?? [...GP_SERIES].reverse().find((s) => gpOpen(gp, GP_SERIES.indexOf(s), level) && carCount >= s.minCars && !(gp[s.id]?.clears))
+    ?? [...GP_SERIES].reverse().find((s) => gpOpen(gp, GP_SERIES.indexOf(s), level)) ?? GP_SERIES[0]
   const round = gp[series.id]?.round ?? 0
 
   const cars = useGame((s) => s.cars)
@@ -103,7 +104,7 @@ export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival, onBlast,
         <span className="rm-meta">Chapter {ci + 1} of {CAMPAIGN.length} · ⭐ {stars}/{maxStars}</span>
         <span className="rm-progress"><i style={{ width: `${(stars / maxStars) * 100}%` }} /></span>
         {next >= 0 && (
-          <span className="rm-cta"><span>{ch.rivals[next]}</span><button className="buy small" onClick={stop(() => onCampaign(ci, next))}>{money(campaignReward(ch, next, true))}</button></span>
+          <span className="rm-cta"><span>{ch.rivals[next]}</span><button className="buy small" onClick={stop(() => onCampaign(ci, next))}>{money(campaignPayNow(ci, next, true))}</button></span>
         )}
       </div>
 
@@ -138,7 +139,7 @@ export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival, onBlast,
           : <span className="rm-ev-done">✔ Cleared</span>}
       </div>
 
-      <div className={`rm-tile rm-gp rm-photo${level < series.unlockLevel ? ' rm-locked' : ''}`} style={artStyle('gp')} {...tile('gp')}>
+      <div className={`rm-tile rm-gp rm-photo${gpOpen(gp, GP_SERIES.indexOf(series), level) ? '' : ' rm-locked'}`} style={artStyle('gp')} {...tile('gp')}>
         <TileClip mode="gp" />
         <span className="rm-tag">GRAND PRIX</span>
         <b className="rm-ttl">{series.name}</b>

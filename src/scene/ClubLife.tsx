@@ -1,24 +1,57 @@
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { AdditiveBlending, CanvasTexture, Color, DoubleSide, MeshBasicMaterial, Object3D } from 'three'
+import { AdditiveBlending, CanvasTexture, Color, DoubleSide, MeshBasicMaterial, MeshStandardMaterial, Object3D, Vector3 } from 'three'
 import type { Group, InstancedMesh } from 'three'
 import { dayPhase, isNight, nightAmount } from '../game/clock'
 import { CLUB } from './clubLayout'
 import { clubPulse } from '../lib/clubBeat'
 import { driveClubLeds, shownNow } from './clubLeds'
 import { newDance, stepDance } from './danceClock'
+import { legGeo, PERSON, torsoGeo } from './peopleGeo'
+import { clubArmGeo, clubFigureMat, clubHeadGeo, skinOf } from './clubPeople'
+import { doorNear, type Door } from './clubDoor'
 
 // The moving parts of the nightclub, shown only while it's open: people
-// dancing on the rooftop floor, the bouncer at the door and two searchlights
-// sweeping the sky. Instanced meshes (four draws for every figure) that Batch
-// leaves alone, so they can move.
+// dancing on the rooftop floor, the bouncer at the rope and two searchlights
+// sweeping the sky. The people are the townspeople's own detailed parts
+// (clubPeople.ts) in instanced meshes (four draws for every figure) that
+// Batch leaves alone, so they can move.
 
 const SHIRTS = ['#ff2bd6', '#00e5ff', '#ffea00', '#76ff03', '#ff6d00', '#fafafa', '#7c4dff', '#ff1744', '#18ffff', '#f50057']
 const PANTS = ['#212121', '#263238', '#3949ab', '#1a237e', '#4e342e', '#37474f']
-const SKIN = ['#f5d0b5', '#e0ac8a', '#c68863', '#8d5a3b', '#5c3a24', '#f1c27d']
 // Townspeople proportions, drawn at the same size as the ones walking about.
-const SCALE = 1.3
-const HIP = 0.24
+const SCALE = PERSON.scale
+const HIP = PERSON.leg
+const TORSO = torsoGeo(false)
+const HEAD = clubHeadGeo()
+const ARM = clubArmGeo()
+const LEG = legGeo(HIP)
+const plainMat = new MeshStandardMaterial({ vertexColors: true })
+const figureMat = clubFigureMat()
+// Where the arms swing from, beside the top of the torso (model units, from the hip).
+const SHOULDER_X = 0.107
+const SHOULDER_Y = PERSON.torso + 0.1
+
+// The bouncer: a big man in black by his podium on the near side of the red
+// carpet (lot units, see clubLayout), across from the head of the line.
+const BOUNCER = { x: -1.44, z: 0.74, wide: 1.2, deep: 1.1, arms: 1.25 }
+// Where he faces: down the street toward the line, square on to whoever's at
+// the front of the rope, and his head turned to the door as he waves them in.
+const FACE = { idle: 0.75, line: Math.atan2(CLUB.queueX - BOUNCER.x, CLUB.queueZ - BOUNCER.z), door: 0.65 }
+// Seconds his "go on in" wave takes: arm out, hold, back to his hands.
+const WAVE = { up: 0.35, hold: 1.4, down: 0.5 }
+
+// An arm's roll (out to the side) and pitch (forward is negative) to point
+// its hand along (x, y, z) in the figure's own frame (facing +z).
+function aim(x: number, y: number, z: number): [number, number] {
+  const l = Math.hypot(x, y, z)
+  return [Math.asin(x / l), Math.atan2(-z / l, -y / l)]
+}
+// Hands clasped in front at the belt (the right arm, on his +x side; the left
+// mirrors it), and the right arm swept out toward the door.
+const CLASP = aim(-0.11, -0.18, 0.14)
+const POINT = aim(0.7, 0.1, 0.7)
+const smooth = (t: number) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t))
 
 // One beam material for every club; its strength follows the night. The beam
 // is brightest at the lamp and fades out into the sky.
@@ -40,8 +73,9 @@ type Props = { lvl: number; roofY: number; roofZ: number; floorY: number; floorZ
 
 export function ClubLife({ lvl, roofY, roofZ, floorY, floorZ, floorW, floorD }: Props) {
   // More dancers as the club levels up: 5 at level 1, 10 at level 10.
-  const dancers = 5 + Math.floor(lvl / 2)
-  const n = dancers + 1 // the last figure is the bouncer
+  const dancers = Math.min(5 + Math.floor(lvl / 2), 15)
+  const n = dancers + 1 // figure 0 is the bouncer
+  const root = useRef<Group>(null)
   const torso = useRef<InstancedMesh>(null)
   const head = useRef<InstancedMesh>(null)
   const arms = useRef<InstancedMesh>(null)
@@ -49,6 +83,9 @@ export function ClubLife({ lvl, roofY, roofZ, floorY, floorZ, floorW, floorD }: 
   const beams = useRef<Group[]>([])
   const dummy = useMemo(() => new Object3D(), [])
   const dance = useMemo(() => newDance(), [])
+  // What the bouncer is up to: where he faces, where he looks, and his door.
+  const bouncer = useRef({ heading: 0, look: 0, door: undefined as Door | undefined, seek: 0, waved: 0, wave: -99 })
+  const here = useMemo(() => new Vector3(), [])
   // The spot each figure stands on, so a merged club keeps them in one piece on the floor.
   const spot = useMemo(() => new Float32Array(n * 3), [n])
   const feet = useMemo(() => ({ noBatch: true, feet: (i: number) => spot.subarray(i * 3, i * 3 + 3) }), [spot])
@@ -67,20 +104,23 @@ export function ClubLife({ lvl, roofY, roofZ, floorY, floorZ, floorW, floorD }: 
     })
   }, [dancers, floorW, floorD, floorZ])
 
+  // Shirts on the torso and the arms' sleeves, trousers on the legs; skin and
+  // hair come from the figure's own look (clubPeople.ts).
   useLayoutEffect(() => {
     const color = new Color()
     for (let i = 0; i < n; i++) {
-      const bouncer = i === dancers
-      torso.current?.setColorAt(i, color.set(bouncer ? '#2b2b36' : SHIRTS[i % SHIRTS.length]))
-      head.current?.setColorAt(i, color.set(SKIN[(i * 7) % SKIN.length]))
-      arms.current?.setColorAt(i * 2, color.set(bouncer ? '#2b2b36' : SHIRTS[i % SHIRTS.length]))
+      const b = i === 0
+      color.set(b ? '#4a4f5e' : SHIRTS[i % SHIRTS.length])
+      torso.current?.setColorAt(i, color)
+      arms.current?.setColorAt(i * 2, color)
       arms.current?.setColorAt(i * 2 + 1, color)
-      color.set(bouncer ? '#151515' : PANTS[i % PANTS.length])
+      head.current?.setColorAt(i, color.set(skinOf(i)))
+      color.set(b ? '#2e3039' : PANTS[i % PANTS.length])
       legs.current?.setColorAt(i * 2, color)
       legs.current?.setColorAt(i * 2 + 1, color)
     }
     for (const m of [torso.current, head.current, arms.current, legs.current]) if (m?.instanceColor) m.instanceColor.needsUpdate = true
-  }, [n, dancers])
+  }, [n])
 
   useFrame(({ clock }, dt) => {
     const now = shownNow()
@@ -114,85 +154,108 @@ export function ClubLife({ lvl, roofY, roofZ, floorY, floorZ, floorW, floorD }: 
     ar.count = lg.count = count * 2
     if (!open) return
     const time = clock.elapsedTime
+    const wall = performance.now() / 1000
+
+    // The bouncer hears from the line at his rope (Townspeople's bouncers()).
+    const bc = bouncer.current
+    if (!bc.door || wall > bc.seek) {
+      root.current?.getWorldPosition(here)
+      bc.door = doorNear(here.x, here.z)
+      bc.seek = wall + 1
+    }
+    if (bc.door && bc.door.admitted !== bc.waved) {
+      bc.waved = bc.door.admitted
+      bc.wave = wall
+    }
+    const since = wall - bc.wave
+    const waving = since < WAVE.up + WAVE.hold + WAVE.down
+    const raise = smooth(since / WAVE.up) * (1 - smooth((since - WAVE.up - WAVE.hold) / WAVE.down))
+    // Faces the head of the line and waves them toward the door; with no one
+    // waiting, keeps an eye up and down the street.
+    const waiting = !!bc.door?.waiting
+    const faceTo = waving || waiting ? FACE.line : FACE.idle
+    const lookTo = waving ? FACE.door * raise : waiting ? Math.sin(time * 0.35) * 0.15 : Math.sin(time * 0.3) * 0.7 + Math.sin(time * 0.71) * 0.2
+    bc.heading += (faceTo - bc.heading) * Math.min(1, dt * 3)
+    bc.look += (lookTo - bc.look) * Math.min(1, dt * 4)
+
+    const place = (m: InstancedMesh, at: number, x: number, y: number, z: number, h: number, sx = 1, sy = 1, sz = 1) => {
+      dummy.position.set(x, y, z)
+      dummy.rotation.set(0, h, 0)
+      dummy.scale.set(sx, sy, sz)
+      dummy.updateMatrix()
+      m.setMatrixAt(at, dummy.matrix)
+    }
     for (let i = 0; i < n; i++) {
-      const bouncer = i === dancers
-      let x: number, z: number, heading: number, bob: number, lift: number, wave: number
-      if (bouncer) {
-        // Arms folded, watching the line.
-        x = CLUB.doorX - 0.34
-        z = CLUB.doorZ + 0.22
-        heading = Math.PI / 2 + Math.sin(time * 0.4) * 0.5
-        bob = 0
-        lift = 0.6
-        wave = 0
+      const isB = i === 0
+      let x: number, z: number, heading: number, dip: number, look: number
+      // Each arm's roll and pitch, left then right.
+      let lr: number, lp: number, rr: number, rp: number
+      if (isB) {
+        x = BOUNCER.x
+        z = BOUNCER.z
+        heading = bc.heading
+        dip = 0
+        look = bc.look
+        // Left hand stays at the belt; the right sweeps out toward the door and back.
+        lr = -CLASP[0]
+        lp = CLASP[1]
+        rr = CLASP[0] + (POINT[0] - CLASP[0]) * raise
+        rp = CLASP[1] + (POINT[1] - CLASP[1]) * raise
       } else {
+        const d = i - 1
         const beat = beats * Math.PI
-        x = spots[i][0] + Math.sin(time * 0.7 + i) * 0.05
-        z = spots[i][1] + Math.cos(time * 0.6 + i * 2) * 0.04
+        x = spots[d][0] + Math.sin(time * 0.7 + i) * 0.05
+        z = spots[d][1] + Math.cos(time * 0.6 + i * 2) * 0.04
         heading = i * 1.3 + Math.sin(time * 1.4 + i) * 0.9
-        bob = Math.sin((beats - Math.floor(beats)) * Math.PI) * 0.07
+        // Knees bend on the beat.
+        dip = (1 - Math.sin((beats - Math.floor(beats)) * Math.PI)) * 0.03
+        look = Math.sin(time * 0.9 + i * 2.1) * 0.35
         // Some wave their arms in the air, some keep them low and pump, and
         // some throw their hands up on the claps.
-        lift = i % 3 === 0 ? 2.6 - clap * 0.5 : i % 3 === 1 ? 2.2 + Math.sin(beat) * 0.5 : 1.1 + Math.sin(beat * 2) * 0.4 + clap * 1.2
-        wave = Math.sin(beat * 0.5 + i * 1.7) * 0.25
+        const lift = i % 3 === 0 ? 2.6 - clap * 0.5 : i % 3 === 1 ? 2.2 + Math.sin(beat) * 0.5 : 1.1 + Math.sin(beat * 2) * 0.4 + clap * 1.2
+        const wave = Math.sin(beat * 0.5 + i * 1.7) * 0.25
+        const pump = i % 3 === 2 ? -0.5 - Math.sin(beat * 2) * 0.3 : -0.15
+        lr = -(lift - wave)
+        rr = lift + wave
+        lp = rp = pump
       }
-      const baseY = bouncer ? 0 : floorY
+      const baseY = isB ? 0 : floorY / SCALE
       const sx = x / SCALE
       const sz = z / SCALE
-      const y = baseY / SCALE + HIP + bob
-      spot.set([sx, baseY / SCALE, sz], i * 3)
+      const hip = baseY + HIP - dip
+      spot.set([sx, baseY, sz], i * 3)
       const sin = Math.sin(heading)
       const cos = Math.cos(heading)
-      dummy.rotation.set(0, heading, 0)
-      dummy.scale.set(bouncer ? 1.25 : 1, 1, bouncer ? 1.25 : 1)
-      dummy.position.set(sx, y + 0.08, sz)
-      dummy.updateMatrix()
-      t.setMatrixAt(i, dummy.matrix)
-      dummy.scale.set(1, 1, 1)
-      dummy.position.set(sx, y + 0.29, sz)
-      dummy.updateMatrix()
-      hd.setMatrixAt(i, dummy.matrix)
-      // Arms hang from the shoulders and swing up (lift) to either side.
+      const wide = isB ? BOUNCER.wide : 1
+      const deep = isB ? BOUNCER.deep : 1
+      place(t, i, sx, hip + PERSON.torso, sz, heading, wide, 1, deep)
+      place(hd, i, sx, hip + PERSON.head, sz, heading + look)
       for (const side of [-1, 1]) {
-        const a = side * (lift + (side > 0 ? wave : -wave))
-        const ox = side * 0.1
-        const dx = Math.sin(a) * 0.09
-        const dy = -Math.cos(a) * 0.09
-        dummy.position.set(sx + cos * (ox + dx), y + 0.2 + dy, sz - sin * (ox + dx))
-        dummy.rotation.set(0, heading, a, 'YXZ')
+        const k = i * 2 + (side > 0 ? 1 : 0)
+        // Arms swing from the shoulders.
+        const ox = side * SHOULDER_X * wide
+        dummy.position.set(sx + cos * ox, hip + SHOULDER_Y, sz - sin * ox)
+        dummy.rotation.set(side > 0 ? rp : lp, heading, side > 0 ? rr : lr, 'YXZ')
+        const thick = isB ? BOUNCER.arms : 1
+        dummy.scale.set(thick, 1, thick)
         dummy.updateMatrix()
-        ar.setMatrixAt(i * 2 + (side > 0 ? 1 : 0), dummy.matrix)
+        ar.setMatrixAt(k, dummy.matrix)
+        dummy.rotation.set(0, 0, 0, 'XYZ')
         // Legs from the floor up to the hip, bending with the bounce.
-        dummy.position.set(sx + cos * side * 0.045, baseY / SCALE + (HIP + bob) / 2, sz - sin * side * 0.045)
-        dummy.rotation.set(0, heading, 0)
-        dummy.scale.set(1, (HIP + bob) / HIP, 1)
-        dummy.updateMatrix()
-        lg.setMatrixAt(i * 2 + (side > 0 ? 1 : 0), dummy.matrix)
-        dummy.scale.set(1, 1, 1)
+        const lx = side * 0.045 * wide
+        place(lg, k, sx + cos * lx, baseY + (HIP - dip) / 2, sz - sin * lx, heading, isB ? 1.15 : 1, (HIP - dip) / HIP, isB ? 1.1 : 1)
       }
     }
     for (const m of [t, hd, ar, lg]) m.instanceMatrix.needsUpdate = true
   })
 
   return (
-    <group>
+    <group ref={root}>
       <group scale={SCALE}>
-        <instancedMesh ref={torso} args={[undefined, undefined, n]} frustumCulled={false} userData={feet}>
-          <capsuleGeometry args={[0.085, 0.16, 3, 8]} />
-          <meshStandardMaterial />
-        </instancedMesh>
-        <instancedMesh ref={head} args={[undefined, undefined, n]} frustumCulled={false} userData={feet}>
-          <sphereGeometry args={[0.08, 10, 8]} />
-          <meshStandardMaterial />
-        </instancedMesh>
-        <instancedMesh ref={arms} args={[undefined, undefined, n * 2]} frustumCulled={false} userData={armFeet}>
-          <boxGeometry args={[0.045, 0.18, 0.045]} />
-          <meshStandardMaterial />
-        </instancedMesh>
-        <instancedMesh ref={legs} args={[undefined, undefined, n * 2]} frustumCulled={false} userData={armFeet}>
-          <boxGeometry args={[0.055, HIP, 0.055]} />
-          <meshStandardMaterial />
-        </instancedMesh>
+        <instancedMesh ref={torso} args={[TORSO, plainMat, n]} frustumCulled={false} userData={feet} dispose={null} />
+        <instancedMesh ref={head} args={[HEAD, figureMat, n]} frustumCulled={false} userData={feet} dispose={null} />
+        <instancedMesh ref={arms} args={[ARM, figureMat, n * 2]} frustumCulled={false} userData={armFeet} dispose={null} />
+        <instancedMesh ref={legs} args={[LEG, plainMat, n * 2]} frustumCulled={false} userData={armFeet} dispose={null} />
       </group>
       {/* Searchlights on the roof, sweeping the sky (left out of preview framing). */}
       {[-1, 1].map((sd, k) => (
