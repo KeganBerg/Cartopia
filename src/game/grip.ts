@@ -7,13 +7,14 @@
 // 1.08 for a perfect shift, and every multiplier is at most 1), so the referee's
 // time floors from raceFloor() stay safe without knowing the weather. grip.test.ts checks.
 import { FEEL, type WeatherKind } from './weather'
-import type { VenueId } from '../scene/venues'
+import { baseOf, type AnyVenueId } from '../scene/venues'
 import { fittedMods, modDef, modStats, type CarDef, type UpgradeSlot } from './data'
 
 // How slick the strip is, each 0..1.
 export type Surface = { wet: number; snow: number; dust: number }
 
-export function surfaceOf(kind: WeatherKind, venue: VenueId): Surface {
+export function surfaceOf(kind: WeatherKind, at: AnyVenueId): Surface {
+  const venue = baseOf(at)
   const f = FEEL[kind]
   return {
     wet: f.rain > 0 ? 0.6 + 0.4 * f.rain : 0,
@@ -41,7 +42,7 @@ export type Conditions = {
 
 export const CLEAR: Conditions = { surface: { wet: 0, snow: 0, dust: 0 }, lo: 0.78, hi: 0.93, spin: 0, dust: 0 }
 
-export function conditions(kind: WeatherKind, venue: VenueId, grip: number, mods?: string[] | null): Conditions {
+export function conditions(kind: WeatherKind, venue: AnyVenueId, grip: number, mods?: string[] | null): Conditions {
   const raw = surfaceOf(kind, venue)
   // The fitted tires (the mod's `tread`: how much of each slick surface they cancel).
   const tire = (Array.isArray(mods) ? mods : []).map((id) => modDef(id)).find((m) => m?.slot === 'tires')?.tread ?? {}

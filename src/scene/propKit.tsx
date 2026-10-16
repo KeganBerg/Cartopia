@@ -1,4 +1,4 @@
-import { BoxGeometry, BufferAttribute, BufferGeometry, ConeGeometry, CylinderGeometry, Euler, IcosahedronGeometry, Matrix4, MeshStandardMaterial, Quaternion, SphereGeometry, TorusGeometry, Vector3 } from 'three'
+import { type Material, BoxGeometry, BufferAttribute, BufferGeometry, ConeGeometry, CylinderGeometry, Euler, IcosahedronGeometry, Matrix4, MeshStandardMaterial, Quaternion, SphereGeometry, TorusGeometry, Vector3 } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { glowMats } from './dayNight'
 
@@ -10,7 +10,8 @@ import { glowMats } from './dayNight'
 
 // glow: a lamp lens, drawn with the town's night-lit bulb material.
 // glow 'lamp': a street lamp's lens, in the city's chosen light colour.
-export type Look = { c: string; r?: number; m?: number; e?: string; cast?: boolean; glow?: boolean | 'lamp' }
+// use: a shared material of its own (lit windows, neon), drawn as it is.
+export type Look = { c: string; r?: number; m?: number; e?: string; cast?: boolean; glow?: boolean | 'lamp'; use?: Material }
 type V3 = [number, number, number]
 
 const q = new Quaternion()
@@ -29,7 +30,8 @@ const shape = (k: string, make: () => BufferGeometry) => {
 
 const mats = new Map<string, MeshStandardMaterial>()
 // One material per look, shared everywhere, so Batch's look cache hits.
-export function propMat(l: Look) {
+export function propMat(l: Look): Material {
+  if (l.use) return l.use
   if (l.glow) return l.glow === 'lamp' ? glowMats.lamp : glowMats.bulb
   const k = `${l.c}|${l.r ?? 0.8}|${l.m ?? 0}|${l.e ?? ''}`
   let m = mats.get(k)
@@ -41,7 +43,7 @@ export class PropKit {
   private parts = new Map<string, { look: Look; geos: BufferGeometry[] }>()
 
   private set(look: Look) {
-    const k = look.glow ? `glow${look.glow}` : `${look.c}|${look.r ?? 0.8}|${look.m ?? 0}|${look.e ?? ''}|${look.cast ? 1 : 0}`
+    const k = look.use ? `use${look.use.uuid}|${look.cast ? 1 : 0}` : look.glow ? `glow${look.glow}` : `${look.c}|${look.r ?? 0.8}|${look.m ?? 0}|${look.e ?? ''}|${look.cast ? 1 : 0}`
     let set = this.parts.get(k)
     if (!set) this.parts.set(k, (set = { look, geos: [] }))
     return set
