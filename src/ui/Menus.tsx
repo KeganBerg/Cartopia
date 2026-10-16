@@ -1,12 +1,13 @@
 import { mergeCandidates } from '../game/merge'
 import { CallCardPicker } from './CallCardPicker'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useGame, hasRusty, buildPrice, gateLevel, type OwnedCar, type PlacedBuilding } from '../game/store'
 import { raceCarOf } from '../game/raceCar'
 import { stackCars, stackFace } from '../game/garageStacks'
 import { reducedMotion } from '../game/fx'
 import { activeEvent, garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, carDef, performance, upgradeCost, buildingDef, upgradable, loves, readySets, isBike, FEATURES, type BuildingDef } from '../game/data'
 import { CarInspect, CarPreview, type DynoFeed } from '../scene/CarPreview'
+import { DOOR_FLY, depotWalk, doorTrip } from '../scene/doorTrip'
 import { usePauseTownUnder } from '../scene/renderGate'
 import type { DynoRun } from './Dyno'
 import { onDemand } from './lazy'
@@ -437,6 +438,8 @@ function CarsTabs({ current, onShowroom }: { current: CarsTab; onShowroom?: (t: 
     { id: 'crates', label: <><span className="tab-emo">📦 </span>Crates</> },
   ]
   const pick = (t: CarsTab) => {
+    // Out of the depot: the room's camera comes back in through the roller door.
+    if (current === 'crates' && t !== 'crates') doorTrip.go = 'back'
     if (t === 'garage' || t === 'crates') return openPanel(t)
     if (onShowroom) return onShowroom(t)
     lastShowroomTab = t
@@ -968,7 +971,13 @@ function GarageSection() {
 // Crate Depot are sections of it under one row of tabs. Each section keeps its own menu id
 // (garage, showroom, crates) so goals and tips can open it, but they all draw this one page, which
 // stays up while the tabs switch. The Crate Depot is lazy-loaded, so App hands it in.
-export function CarsPage({ crates }: { crates?: React.ReactNode }) {
+// The room the Cars page draws for each tab but Crates (which is through the roller door).
+type Room = Exclude<CarsTab, 'crates'>
+let lastRoom: Room = 'garage'
+// How long the depot takes to fade in over the room, or out of it (ms; garage-env.css too).
+const DEPOT_FADE = 420
+
+export function CarsPage({ crates }: { crates?: (onReady: () => void) => React.ReactNode }) {
   const panel = useGame((s) => s.panel)
   const cars = useGame((s) => s.cars)
   const swap = useGame((s) => s.swapPanel)
@@ -978,6 +987,84 @@ export function CarsPage({ crates }: { crates?: React.ReactNode }) {
   useEffect(() => { if (focus) setShowTab('shop') }, [focus])
   const section: CarsTab = panel === 'showroom' ? showTab : panel === 'crates' ? 'crates' : 'garage'
   useEffect(() => { if (section !== 'crates') lastCars = section === 'garage' ? 'garage' : 'showroom' }, [section])
+  // Crates is another part of the same place: the camera walks from the car to the roller door
+  // while the depot gets ready behind it, then the depot fades in as its camera walks in (and the
+  // other way back). Opened straight onto Crates, the page starts in the room and walks the same way.
+  const [room, setRoom] = useState<Room | null>(() => (section === 'crates' ? lastRoom : section))
+  const [depot, setDepot] = useState(section === 'crates')
+  // out: walking to the door, the depot getting ready unseen; in: the depot fading in;
+  // wait: leaving it, until the room draws again; back: the depot fading off the room.
+  const [trip, setTrip] = useState<'out' | 'in' | 'wait' | 'back' | null>(null)
+  const [flown, setFlown] = useState(false)
+  const [depotReady, setDepotReady] = useState(false)
+  const depotOn = useRef(depot)
+  useEffect(() => {
+    if (section === 'crates') {
+      depotOn.current = true
+      setDepot(true)
+      setDepotReady(false)
+      setFlown(false)
+      setTrip('out')
+      doorTrip.go = 'out'
+      doorTrip.on = (e) => { if (e === 'there') setFlown(true) }
+      depotWalk.go = 'hold'
+      depotWalk.p = 0
+      document.querySelector('.cars-page div.garage')?.scrollTo({ top: 0, behavior: 'smooth' })
+      // No room view to walk (a car looked at full screen): go anyway.
+      const t = setTimeout(() => setFlown(true), 5000)
+      return () => clearTimeout(t)
+    }
+    lastRoom = section
+    setRoom(section)
+    if (!depotOn.current) return
+    depotOn.current = false
+    setTrip('wait')
+    doorTrip.on = (e) => { if (e === 'back') setTrip('back') }
+    depotWalk.go = 'out'
+    depotWalk.p = 0
+    const t = setTimeout(() => setTrip((v) => (v === 'wait' ? 'back' : v)), 4000)
+    return () => clearTimeout(t)
+  }, [section])
+  useEffect(() => {
+    if (trip !== 'out' || !flown || !depotReady) return
+    setTrip('in')
+    depotWalk.go = 'in'
+    depotWalk.p = 0
+  }, [trip, flown, depotReady])
+  useEffect(() => {
+    if (trip === 'in') {
+      const t = setTimeout(() => {
+        setRoom(null)
+        setTrip(null)
+        doorTrip.go = null
+      }, DEPOT_FADE)
+      return () => clearTimeout(t)
+    }
+    if (trip === 'back') {
+      const t = setTimeout(() => setDepot(false), DEPOT_FADE)
+      const u = setTimeout(() => setTrip(null), DOOR_FLY * 1000)
+      return () => { clearTimeout(t); clearTimeout(u) }
+    }
+  }, [trip])
+  // A depot that never says it's ready (its code failed to load) still comes in, late.
+  useEffect(() => {
+    if (trip !== 'out') return
+    const t = setTimeout(() => setDepotReady(true), 15000)
+    return () => clearTimeout(t)
+  }, [trip])
+  useEffect(() => () => { doorTrip.go = null; doorTrip.on = undefined; depotWalk.go = null }, [])
+  const onDepotReady = useCallback(() => setDepotReady(true), [])
+  // The depot sits under the tabs, over the room.
+  const [tabsH, setTabsH] = useState(0)
+  useLayoutEffect(() => {
+    const el = document.querySelector<HTMLElement>('.cars-page .sheet-tabs')
+    if (!el) return
+    setTabsH(el.offsetHeight)
+    if (typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => setTabsH(el.offsetHeight))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
   const toShowroom = (t: ShowTab) => {
     lastShowroomTab = t
     setShowTab(t)
@@ -991,13 +1078,13 @@ export function CarsPage({ crates }: { crates?: React.ReactNode }) {
   // Phones: a car picked from the grid goes up on the turntable, so scroll back up to it.
   const top = () => document.querySelector('.cars-page div.garage')?.scrollTo({ top: 0, behavior: 'smooth' })
   return (
-    <Panel title="Cars" wide className={`garage-env cars-page sec-${section}`} head={<><span className="cars-power" title="Garage power">⚡{garagePower(cars)}</span><AutoJobsButton /></>}>
+    <Panel title="Cars" wide className={`garage-env cars-page sec-${room ?? 'crates'}${trip ? ` trip-${trip}` : ''}`} head={<><span className="cars-power" title="Garage power">⚡{garagePower(cars)}</span><AutoJobsButton /></>}>
       <CarsTabs current={section} onShowroom={toShowroom} />
-      {section === 'garage' && <GarageSection />}
-      {section === 'shop' && <SaleSection onPick={top} />}
-      {section === 'book' && <BookSection onFind={find} />}
-      {section === 'cards' && <CardsSection onCrates={() => swap('crates')} />}
-      {section === 'crates' && <div className="cars-crates">{crates}</div>}
+      {room === 'garage' && <GarageSection />}
+      {room === 'shop' && <SaleSection onPick={top} />}
+      {room === 'book' && <BookSection onFind={find} />}
+      {room === 'cards' && <CardsSection onCrates={() => swap('crates')} />}
+      {depot && <div className="cars-crates" style={{ top: tabsH }} aria-hidden={trip === 'out' || trip === 'wait' || trip === 'back' || undefined}>{crates?.(onDepotReady)}</div>}
     </Panel>
   )
 }

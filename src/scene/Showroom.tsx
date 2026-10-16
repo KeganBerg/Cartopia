@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { Batch } from './Batch'
-import { BackSide, CanvasTexture, DoubleSide, RepeatWrapping, SRGBColorSpace } from 'three'
+import { BackSide, CanvasTexture, DoubleSide, RepeatWrapping, SRGBColorSpace, Vector3 } from 'three'
 import { decal } from './layers'
 import { brickTex, checkerTex, corrugatedTex, glowTex, shutterTex } from './textures'
 import { signTexture } from './signTexture'
@@ -32,6 +32,10 @@ export const CAM_REACH = 5.4
 export const CAM_TOP = 3.0
 // The camera starts looking from +x+z, so the room is turned to put its back wall behind the car.
 const TURN = Math.PI / 4
+// The open half of the roller door (BAY 1, under the half-up shutter) in scene units, and the way
+// into the room from it: the Cars page's camera walks out through it to the Crate Depot and back.
+export const DOOR_AT = new Vector3(Math.cos(TURN), 0, -Math.sin(TURN)).multiplyScalar((HALF - 0.17) * S).setY(1.1 * S)
+export const DOOR_IN = new Vector3(-Math.cos(TURN), 0, Math.sin(TURN))
 
 export const SHOWROOM_BG = '#0f141d'
 
