@@ -3,6 +3,9 @@ import { useGame } from '../game/store'
 import { supabase } from '../lib/supabase'
 import { MAX_CHAT, canDelete, deleteChat, firstRoom, sendChat, senderName, setMuted, useChat, viewRoom, type ChatMsg, type Room } from '../lib/chat'
 import { useNames } from '../lib/profiles'
+import { mentions } from '../lib/mentions'
+import { MentionInput, MentionText } from './MentionInput'
+import { PlayerCardPopup } from './PlayerCard'
 import { Panel } from './Menus'
 import { ClanTag, useVisit } from './Social'
 import './chat.css'
@@ -16,10 +19,13 @@ const ago = (at: number) => {
 // Messages from the same player close together share one name line.
 const grouped = (prev: ChatMsg | undefined, m: ChatMsg) => !!prev && prev.owner === m.owner && m.at - prev.at < 180000
 
+const At = () => <i className="chat-at" title="You were mentioned" aria-label="mentioned you">@</i>
+
 export function ChatPanel() {
   const uid = useChat((c) => c.uid)
   const crewRoom = useChat((c) => c.crewRoom)
   const unread = useChat((c) => c.unread)
+  const pinged = useChat((c) => c.pinged)
   const badge = useGame((s) => s.clanBadge)
   const openPanel = useGame((s) => s.openPanel)
   const [room, setRoom] = useState<Room>(firstRoom)
@@ -46,10 +52,10 @@ export function ChatPanel() {
         <div className="chat">
           <div className="seg chat-rooms" role="tablist">
             <button role="tab" aria-selected={room === 'global'} className={room === 'global' ? 'sel' : ''} onClick={() => setRoom('global')}>
-              🌍 Global{unread.global > 0 && <i className="chat-new" aria-label="new messages" />}
+              🌍 Global{pinged.global > 0 ? <At /> : unread.global > 0 && <i className="chat-new" aria-label="new messages" />}
             </button>
             <button role="tab" aria-selected={room === 'crew'} className={room === 'crew' ? 'sel' : ''} onClick={() => setRoom('crew')}>
-              {badge ? <ClanTag clan={{ id: '', ...badge }} small /> : '🛡️'} Crew{unread.crew > 0 && <span className="tab-dot">{unread.crew > 9 ? '9+' : unread.crew}</span>}
+              {badge ? <ClanTag clan={{ id: '', ...badge }} small /> : '🛡️'} Crew{pinged.crew > 0 ? <At /> : unread.crew > 0 && <span className="tab-dot">{unread.crew > 9 ? '9+' : unread.crew}</span>}
             </button>
           </div>
           {room === 'crew' && !crewRoom ? (
@@ -63,9 +69,11 @@ export function ChatPanel() {
           )}
         </div>
       )}
+      <PlayerCardPopup />
     </Panel>
   )
 }
+
 
 function ChatRoom({ room }: { room: Room }) {
   const uid = useChat((c) => c.uid)
@@ -74,6 +82,7 @@ function ChatRoom({ room }: { room: Room }) {
   const powers = useChat((c) => c.powers)
   // Re-render when senders' usernames arrive.
   useNames((n) => n.byId)
+  const myName = useNames((n) => n.mine?.username)
   const toast = useGame((s) => s.toast)
   const go = useVisit()
   const [text, setText] = useState('')
@@ -146,7 +155,7 @@ function ChatRoom({ room }: { room: Room }) {
           const del = canDelete(room, m, { uid, powers })
           const has = del || !mine
           return (
-            <div key={m.id} className={`chat-msg${mine ? ' mine' : ''}${first ? ' first' : ''}${menu === m.id ? ' open' : ''}`}>
+            <div key={m.id} className={`chat-msg${mine ? ' mine' : ''}${first ? ' first' : ''}${menu === m.id ? ' open' : ''}${!mine && mentions(m.body, myName) ? ' ping' : ''}`}>
               {first && !mine && (
                 <button className="chat-who" onClick={() => setMenu(menu === m.id ? null : m.id)}>
                   <ClanTag clan={m.crew} small />
@@ -168,7 +177,7 @@ function ChatRoom({ room }: { room: Room }) {
                 </div>
               )}
               <div className="chat-line">
-                <p className="chat-bubble" {...holdProps(m, has)}>{m.body}{mine && first && <small>{ago(m.at)}</small>}</p>
+                <p className="chat-bubble" {...holdProps(m, has)}><MentionText text={m.body} me={myName} />{mine && first && <small>{ago(m.at)}</small>}</p>
                 {has && menu !== m.id && (
                   <button className="chat-more" aria-label="Message options" onClick={() => setMenu(m.id)}>⋯</button>
                 )}
@@ -183,13 +192,13 @@ function ChatRoom({ room }: { room: Room }) {
         )}
       </div>
       <form className="chat-send" onSubmit={send}>
-        <input
+        <MentionInput
           value={text}
           maxLength={MAX_CHAT}
           enterKeyHint="send"
-          placeholder={room === 'crew' ? 'Message your crew' : 'Message everyone'}
+          placeholder={room === 'crew' ? 'Message your crew · @ a friend' : 'Message everyone · @ a friend'}
           aria-label="Message"
-          onChange={(e) => setText(e.target.value)}
+          onChange={setText}
         />
         <button className="buy" disabled={busy || !text.trim()} aria-label="Send">➤</button>
       </form>
