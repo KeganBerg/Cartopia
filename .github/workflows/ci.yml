@@ -30,3 +30,5 @@ jobs:
         run: |
           npx playwright install --with-deps chromium-headless-shell
           npm run smoke
+      - name: Car Packs layout (every car fits its card at phone and desktop size)
+        run: npm run check:packs

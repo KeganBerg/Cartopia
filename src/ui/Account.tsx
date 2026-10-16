@@ -9,7 +9,6 @@ import { UsernameRow } from './Username'
 import { AccountData, Group, GuestData, HelpTab, LegalView, SettingsTab } from './Settings'
 import { LEGAL, type LegalDoc } from '../legal/legal'
 import { CityLook } from './CityLook'
-import { useIsAdmin } from '../lib/admin'
 import { TwoStepGate } from './TwoStep'
 
 type MenuTab = 'town' | 'settings' | 'account' | 'help'
@@ -32,7 +31,7 @@ export function AccountPanel() {
   const [password, setPassword] = useState('')
   const [msg, setMsg] = useState('')
   const [tab, setTab] = useState<MenuTab>(lastTab)
-  const isAdmin = useIsAdmin()
+  const isAdmin = useGame((s) => s.admin)
   const [legal, setLegal] = useState<LegalDoc['id'] | null>(() => {
     const id = pendingLegal
     pendingLegal = null

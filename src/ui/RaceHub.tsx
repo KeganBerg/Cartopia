@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { SkillIcon } from './TapTip'
-import { useGame, type OwnedCar } from '../game/store'
+import { useGame, gateLevel, type OwnedCar } from '../game/store'
 import { type CarDef, CAMPAIGN, CAMPAIGN_RACES, GP_ROUNDS, GP_SERIES, RACE_FUEL, SKILLS, campaignCleared, campaignRaceId, campaignReward, carDef, msToNextWeek, performance, skinDef } from '../game/data'
 import { BUILDS, DIST, buildOf, raceCharacter, fit, tourDist, type RaceDist } from '../game/distance'
 import { EVENT_RACES, eventFor, eventPrize, eventProgress } from '../game/events'
@@ -44,7 +44,7 @@ export function Pips({ n, of, dark }: { n: number; of: number; dark?: boolean })
 }
 
 export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival, onBlast, onCustom }: { onOpen: (t: HubTab) => void; onCampaign: (ci: number, race: number) => void; onTour: () => void; onEvent: () => void; onRival: (m: RivalMatch) => void; onBlast: () => void; onCustom: () => void }) {
-  const level = useGame((s) => s.level)
+  const level = useGame(gateLevel)
   const done = useGame((s) => s.campaign)
   const won = useGame((s) => s.tour ?? 0)
   const gp = useGame((s) => s.gp)

@@ -1,5 +1,5 @@
 import { fairNow } from '../game/fairRace'
-import { useGame } from '../game/store'
+import { useGame, gateLevel } from '../game/store'
 import { CARS, RACE_FUEL, carDef, performance } from '../game/data'
 import { RIVALS, RIVAL_VISITS, currentRival, rivalLadderPi, rivalPi, rivalPrize, rivalShift, type RivalDef } from '../game/rivals'
 import { CarThumb } from '../scene/BuildingPreview'
@@ -37,7 +37,7 @@ export function rivalMatch(def: RivalDef, visit: number, level: number, myPi?: n
 export function useRivalWaiting() {
   const now = useNow(15000)
   return useGame((s) => {
-    const c = currentRival(s.level, s.rivals ?? NONE, now)
+    const c = currentRival(gateLevel(s), s.rivals ?? NONE, now)
     return !!c && !c.locked && !c.away
   })
 }
@@ -50,10 +50,11 @@ function Pips({ n }: { n: number }) {
 export function RivalCard({ onRace }: { onRace: (m: RivalMatch) => void }) {
   const now = useNow(1000)
   const level = useGame((s) => s.level)
+  const gate = useGame(gateLevel)
   const progress = useGame((s) => s.rivals ?? NONE)
   const showNeed = useGame((s) => s.showNeed)
   const myPi = useGame(bestPi)
-  const cur = currentRival(level, progress, now)
+  const cur = currentRival(gate, progress, now)
   if (!cur) return <div className="rv-card rv-done">🏆 <b>Town champ!</b> <small>No rival dares race you.</small></div>
   const { def, visit, locked, away } = cur
   const m = rivalMatch(def, visit, level, myPi)
@@ -137,11 +138,12 @@ export function RivalResult({ match, won, bet, bonus, myTime, theirTime, onBet, 
 export function RivalTile({ onRace, onOpen }: { onRace: (m: RivalMatch) => void; onOpen: () => void }) {
   const now = useNow(1000)
   const level = useGame((s) => s.level)
+  const gate = useGame(gateLevel)
   const progress = useGame((s) => s.rivals ?? NONE)
   const row = useGame((s) => s.rivalRow ?? NONE)
   const showNeed = useGame((s) => s.showNeed)
   const myPi = useGame(bestPi)
-  const cur = currentRival(level, progress, now)
+  const cur = currentRival(gate, progress, now)
   const open = { role: 'button', tabIndex: 0, onClick: onOpen, onKeyDown: (e: React.KeyboardEvent) => (e.key === 'Enter' || e.key === ' ') && onOpen() }
   const stop = (fn: () => void) => (e: React.MouseEvent) => { e.stopPropagation(); fn() }
   const strip = (

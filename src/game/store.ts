@@ -224,6 +224,8 @@ type UiState = {
   selectedCar: string | null
   toasts: { id: number; text: string }[]
   visiting: VisitedTown | null
+  // Signed in as an admin (server says so: public.is_admin()). Not saved.
+  admin: boolean
   need: Need | null
   search: Search | null
   // Building types whose bubbles pulse after a "Show me" tap.
@@ -431,6 +433,10 @@ type Actions = {
 }
 
 export type GameState = SaveState & UiState & Actions
+
+// The level that level locks check. The admin account skips them all (the server keeps
+// cars it buys above its level, 0099); everyone else uses their own level.
+export const gateLevel = (s: { level: number; admin?: boolean }) => (s.admin ? Infinity : s.level)
 
 // Cars a signed-in player's search finds come from the server (rescue_roll() in
 // supabase/migrations/0022_rescue_rolls.sql), which keeps them so the guard can tell real
@@ -933,6 +939,7 @@ export const useGame = create<GameState>()(
       selectedCar: null,
       toasts: [],
       visiting: null,
+      admin: false,
       need: null,
       search: null,
       highlight: null,
@@ -1446,7 +1453,7 @@ export const useGame = create<GameState>()(
         const s = get()
         const c = carDef(model)
         if (c.season || c.rescueOnly || c.secret || c.pack) return false
-        if (s.level < c.unlockLevel) {
+        if (gateLevel(s) < c.unlockLevel) {
           s.showNeed('level', c.unlockLevel, c.name)
           return false
         }
@@ -1944,7 +1951,7 @@ export const useGame = create<GameState>()(
           s.toast(r ? `Beat ${r.name} to unlock ${paint!.name}` : paint?.earn ? `${paint.name}: ${earnHint(job.color)}` : 'That colour is locked')
           return false
         }
-        if (s.level < fin.unlockLevel && fin.id !== (car.finish ?? 'gloss')) {
+        if (gateLevel(s) < fin.unlockLevel && fin.id !== (car.finish ?? 'gloss')) {
           sfx.error()
           s.toast(`${fin.name} unlocks at level ${fin.unlockLevel}`)
           return false
@@ -2011,7 +2018,7 @@ export const useGame = create<GameState>()(
             s.toast(`${pat.name}: Trophy Road mystery prize`)
             return false
           }
-          if (pat && s.level < pat.unlockLevel && was?.[pn.id]?.pattern !== pat.id) {
+          if (pat && gateLevel(s) < pat.unlockLevel && was?.[pn.id]?.pattern !== pat.id) {
             sfx.error()
             s.toast(`${pat.name} unlocks at level ${pat.unlockLevel}`)
             return false
@@ -2200,7 +2207,7 @@ export const useGame = create<GameState>()(
           s.toast(`${m.name} back on!`)
           return true
         }
-        if (s.level < m.unlockLevel) {
+        if (gateLevel(s) < m.unlockLevel) {
           s.showNeed('level', m.unlockLevel, m.name)
           return false
         }
@@ -2501,7 +2508,7 @@ export const useGame = create<GameState>()(
         const spot = RESCUE_SPOTS.find((o) => o.id === spotId)
         if (!spot) return
         if (!hasRusty(s)) return s.toast("Build Rusty's Rescue first")
-        if (s.level < spot.unlockLevel) return s.showNeed('level', spot.unlockLevel, spot.name)
+        if (gateLevel(s) < spot.unlockLevel) return s.showNeed('level', spot.unlockLevel, spot.name)
         if (s.junkyard.length >= STORAGE_MAX) return s.toast('Storage is full. Restore or scrap a car first.')
         if (s.coins < spot.cost) return s.showNeed('coins', spot.cost - s.coins, `a search in the ${spot.name}`)
         const go = (res: ServerSearch | null) => {
@@ -2599,7 +2606,7 @@ export const useGame = create<GameState>()(
         const car = s.junkyard.find((c) => c.uid === juid)
         if (!car) return
         if (carDef(car.model).parked) return s.toast('This car is coming in a future update. Check back soon!')
-        const bay = !s.restoring ? 'restoring' : !s.restoring2 && s.level >= BAY2_LEVEL ? 'restoring2' : null
+        const bay = !s.restoring ? 'restoring' : !s.restoring2 && gateLevel(s) >= BAY2_LEVEL ? 'restoring2' : null
         if (!bay) return s.toast('The restore bay is busy. Finish that car first.')
         const cost = restoreCost(carDef(car.model))
         if (s.coins < cost) return s.showNeed('coins', cost - s.coins, `restoring the ${carDef(car.model).name}`)
@@ -2646,7 +2653,7 @@ export const useGame = create<GameState>()(
         const s = get()
         const next = TRUCK[(s.truck ?? 0) + 1]
         if (!next) return
-        if (s.level < next.level) return s.showNeed('level', next.level, 'the next tow truck upgrade')
+        if (gateLevel(s) < next.level) return s.showNeed('level', next.level, 'the next tow truck upgrade')
         if (s.parts < next.parts) return s.showNeed('parts', next.parts - s.parts, 'the next tow truck upgrade')
         sfx.buy()
         set({ parts: s.parts - next.parts, truck: (s.truck ?? 0) + 1, updatedAt: Date.now() })

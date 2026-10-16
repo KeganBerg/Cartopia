@@ -1,4 +1,4 @@
-import { useGame, fuelCap } from '../game/store'
+import { useGame, fuelCap, gateLevel } from '../game/store'
 import { buildingDef, isOpen, xpToNext, raceXp, FUEL_REGEN_SECONDS, RACE_FUEL, refillBucks, type BuildingDef } from '../game/data'
 import { useNow } from '../scene/useNow'
 import { Panel } from './Menus'
@@ -17,7 +17,7 @@ export function NeedPanel() {
 
   const build = (id: string): Source['action'] => {
     const d: BuildingDef = buildingDef(id)
-    if (s.level < d.unlockLevel) return { label: `🔒 Level ${d.unlockLevel}`, run: () => {}, disabled: true }
+    if (gateLevel(s) < d.unlockLevel) return { label: `🔒 Level ${d.unlockLevel}`, run: () => {}, disabled: true }
     if (d.unique && [...s.buildings, ...(s.stored ?? [])].some((b) => b.def === id)) return { label: '✔ Built', run: () => {}, disabled: true }
     return { label: `Build · $${d.price.toLocaleString()}`, run: () => s.openShop(id) }
   }
@@ -41,7 +41,7 @@ export function NeedPanel() {
       { icon: '🔍', title: "Search at Rusty's", detail: 'Searches can turn up coin stashes along with cars.', action: owned('rescue') ? { label: "Rusty's", run: () => s.openPanel('rescue') } : build('rescue') },
       { icon: '🏆', title: 'Win drag races', detail: `Each race costs ${RACE_FUEL} fuel and pays a few hundred coins.`, action: { label: 'Race', run: () => s.openPanel('race') } },
       { icon: '📋', title: 'Finish goals', detail: 'Goals pay coins, XP and sometimes gems.', action: { label: 'Goals', run: () => s.openPanel('goals') } },
-      { icon: '👫', title: 'Help other towns', detail: 'Visit a town and tap its shops to help.', action: { label: 'Friends', run: () => s.openPanel('friends') } },
+      { icon: '👫', title: 'Help other towns', detail: 'Visit a town and tap its shops to help.', action: { label: 'Social', run: () => s.openPanel('friends') } },
       { icon: '📅', title: 'Daily bonus', detail: 'Come back every day for up to $1,200.' },
     ]
   } else if (need.res === 'parts') {

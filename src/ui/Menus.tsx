@@ -1,6 +1,6 @@
 import { mergeCandidates } from '../game/merge'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { useGame, hasRusty, buildPrice, type OwnedCar, type PlacedBuilding } from '../game/store'
+import { useGame, hasRusty, buildPrice, gateLevel, type OwnedCar, type PlacedBuilding } from '../game/store'
 import { raceCarOf } from '../game/raceCar'
 import { stackCars, stackFace } from '../game/garageStacks'
 import { reducedMotion } from '../game/fx'
@@ -74,7 +74,7 @@ export function BottomBar() {
       <div className="bottom-bar">
         {shop.on && <button className={`icon-btn${pulse('shop')}${freshClass(shop.fresh)}`} onClick={() => openPanel('shop')}><span className="i i-shop"><Icon name="shop" /></span>SHOP</button>}
         {cars.on && <button className={`icon-btn${pulse('cars')}${freshClass(cars.fresh)}`} onClick={() => openCars(setsReady > 0)}><span className="i i-showroom"><Icon name="car" />{setsReady > 0 && <span className="btn-dot">{setsReady}</span>}</span>CARS</button>}
-        {social.on && <button className={`icon-btn${freshClass(social.fresh)}`} onClick={() => openPanel(crewChests > 0 ? 'clan' : 'friends')}><span className="i i-friends"><Icon name="friends" />{crewChests > 0 && <span className="btn-dot">{crewChests}</span>}</span>FRIENDS</button>}
+        {social.on && <button className={`icon-btn${freshClass(social.fresh)}`} onClick={() => openPanel('friends')}><span className="i i-friends"><Icon name="friends" />{crewChests > 0 && <span className="btn-dot">{crewChests}</span>}</span>SOCIAL</button>}
         {social.on && <button className={`icon-btn${freshClass(social.fresh)}`} onClick={() => openPanel('chat')}><span className="i i-chat"><Icon name="chat" />{crewChat > 0 ? <span className="btn-dot">{crewChat > 9 ? '9+' : crewChat}</span> : globalChat && <span className="btn-dot new" />}</span>CHAT</button>}
         {edit.on && <button className={`icon-btn${freshClass(edit.fresh)}`} onClick={() => setMode(useGame.getState().tutorial >= 99 ? 'road' : 'move')}><span className="i i-edit"><Icon name="cone" /></span>EDIT</button>}
         {race.on && <button className={`big-btn race-btn${pulse('race')}${freshClass(race.fresh)}`} onClick={() => openPanel('race')}><span className="i"><Icon name="flag" />{rival && <span className="btn-dot" title="Your rival is in town">!</span>}</span>RACE</button>}
@@ -314,6 +314,7 @@ const featureRank = (b: { id: string }) => (b.id === 'rescue' ? 2 : FEATURES[b.i
 
 export function ShopPanel() {
   const level = useGame((s) => s.level)
+  const gate = useGame(gateLevel)
   const coins = useGame((s) => s.coins)
   const bucks = useGame((s) => s.bucks)
   const setMode = useGame((s) => s.setMode)
@@ -347,7 +348,7 @@ export function ShopPanel() {
     ? BUILDINGS.filter((b) => b.unlockLevel < 99 && b.name.toLowerCase().includes(term) && SHOP_GROUPS.some((g) => (g.id !== 'event' || ev) && g.filter(b)))
     : group ? BUILDINGS.filter((b) => b.unlockLevel < 99 && group.filter(b)) : []
   const rows = shown.map((b) => {
-    const locked = level < b.unlockLevel
+    const locked = gate < b.unlockLevel
     const sale = buildPrice({ deals, level }, b.id)
     // Gem decor (the statue, the arch) is short on gems, not coins.
     const brokeGems = bucks < sale.bucks
@@ -452,7 +453,7 @@ let saleView: { kind: string; sort: SaleSort } = { kind: 'all', sort: 'level' }
 const FOR_SALE = CARS.filter((c) => !c.rescueOnly && !c.season && !c.secret && !c.pack)
 
 export function ShowroomPanel() {
-  const level = useGame((s) => s.level)
+  const level = useGame(gateLevel) // only for level locks here
   const coins = useGame((s) => s.coins)
   const bucks = useGame((s) => s.bucks)
   const cars = useGame((s) => s.cars)

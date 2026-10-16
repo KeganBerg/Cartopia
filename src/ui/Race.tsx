@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { SkillIcon } from './TapTip'
 import { useTouchLock } from './DriveControls'
-import { useGame, spendFuel, lastRaceXpPaid, resetRaceXp, type OwnedCar } from '../game/store'
+import { useGame, gateLevel, spendFuel, lastRaceXpPaid, resetRaceXp, type OwnedCar } from '../game/store'
 import { LIVE_LOSS_SHARE, LOSS_SHARE } from '../game/boosts'
 import { bestCar, carPi, raceCarOf } from '../game/raceCar'
 import { carNear, fairNow, tourPayNow } from '../game/fairRace'
@@ -203,6 +203,7 @@ export function RacePanel() {
   usePauseTownUnderMenu()
   const cars = useGame((s) => s.cars)
   const level = useGame((s) => s.level)
+  const gate = useGame(gateLevel)
   const best = useMemo(() => bestCar(cars), [cars])
   const raceCar = useGame((s) => s.raceCar)
   const setRaceCar = useGame((s) => s.setRaceCar)
@@ -236,7 +237,7 @@ export function RacePanel() {
   const gpState = useGame((s) => s.gp)
   const tourWon = useGame((s) => s.tour ?? 0)
   // The campaign chapter on show; it opens on the first one not yet cleared.
-  const [campSel, setCampSel] = useState(() => campaignFocus(done, level).ci)
+  const [campSel, setCampSel] = useState(() => campaignFocus(done, gate).ci)
   const [street, setStreet] = useState<Visitor | null>(() => {
     const v = takeStreetRace()
     if (v) setRacing(true)
@@ -711,7 +712,7 @@ export function RacePanel() {
   // The bar's big button: the next race on this screen, if it has one.
   const campNext = (() => {
     const ch = CAMPAIGN[campSel]
-    if (!campaignFocus(done, level).opened(campSel)) return -1
+    if (!campaignFocus(done, gate).opened(campSel)) return -1
     return Array.from({ length: CAMPAIGN_RACES }, (_, i) => done[campaignRaceId(ch, i)] ?? 0).findIndex((n) => n === 0)
   })()
   const go = tab === 'campaign' && campNext >= 0 ? { label: `$${campaignReward(CAMPAIGN[campSel], campNext, true).toLocaleString()}`, onClick: () => startCampaign(campSel, campNext) }
@@ -883,7 +884,7 @@ function TrackChip({ round }: { round: number }) {
 }
 
 function GrandPrix({ onRace }: { onRace: (s: GpSeries, r: Rival, prize: number) => void }) {
-  const level = useGame((s) => s.level)
+  const level = useGame(gateLevel)
   const carCount = useGame((s) => s.cars.length)
   const gp = useGame((s) => s.gp)
   const showNeed = useGame((s) => s.showNeed)
@@ -945,7 +946,7 @@ function Stars({ n, big }: { n: number; big?: boolean }) {
 }
 
 function Campaign({ sel, setSel, onRace, onTour }: { sel: number; setSel: (ci: number) => void; onRace: (ci: number, race: number) => void; onTour: () => void }) {
-  const level = useGame((s) => s.level)
+  const level = useGame(gateLevel)
   const done = useGame((s) => s.campaign)
   const showNeed = useGame((s) => s.showNeed)
   // The race car's PI: a rival above it shows its PI in red.
@@ -1289,7 +1290,7 @@ export function CampaignPrizePopup() {
         {prize.cleared && (
           <p className="camp-prize">
             {prize.perfect && <span title="Three-star bonus">★★★</span>}
-            {next ? <span>⏭ {next.name}{next.unlockLevel > useGame.getState().level && ` · 🔒 Lv ${next.unlockLevel}`}</span> : <span>🏆 Campaign done · 🌍 Pro Tour</span>}
+            {next ? <span>⏭ {next.name}{next.unlockLevel > gateLevel(useGame.getState()) && ` · 🔒 Lv ${next.unlockLevel}`}</span> : <span>🏆 Campaign done · 🌍 Pro Tour</span>}
           </p>
         )}
         <div className="row">

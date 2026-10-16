@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useGame, type OwnedCar } from '../game/store'
+import { useGame, type OwnedCar, gateLevel } from '../game/store'
 import { earnHint, paintOpen, rivalForPaint } from '../game/paintRivals'
 import { openPaintRival } from './PaintRivals'
 import { openTunerTrial } from './TunerTrials'
@@ -92,7 +92,7 @@ function PatternSwatch({ id, color }: { id: string | null; color: string }) {
 // Custom paint for one car, part by part: pick a part, then a pattern and a colour to try
 // on the preview, then buy the lot.
 export function CustomShop({ car, panels, setPanels }: { car: OwnedCar; panels: Panels | undefined; setPanels: (p: Panels | null) => void }) {
-  const level = useGame((s) => s.level)
+  const gate = useGame(gateLevel)
   const paintPanels = useGame((s) => s.paintPanels)
   const rivalRow = useGame((s) => s.rivalRow)
   const oldPaints = useGame((s) => s.oldPaints)
@@ -163,7 +163,7 @@ export function CustomShop({ car, panels, setPanels }: { car: OwnedCar; panels: 
             const on = (mine?.pattern ?? null) === id
             const had = now?.[info.id]?.pattern === id
             const earn = pt && !earned(info.id, pt) ? (pt.mastery ? `🔒 ${MASTERY_TIERS[pt.mastery - 1].icon}` : '🔒 🛣️') : null
-            const locked = (!!pt && level < pt.unlockLevel && !had) || !!earn
+            const locked = (!!pt && gate < pt.unlockLevel && !had) || !!earn
             const trial = pt ? shut(info.id, pt.id) : undefined
             return (
               <button key={id ?? 'solid'} className={`pat-opt${on ? ' sel' : ''}${locked ? ' locked' : ''}`} disabled={locked} onClick={() => pick({ pattern: id })} title={pt?.name ?? 'Solid'}>
