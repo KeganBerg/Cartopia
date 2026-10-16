@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { TRIAL_PRIZES, trialPrize, trialWeek, trialVenue, ghostDist, shortLeft } from './trial'
 import { TRACK } from './race'
 
-// The newest migration holding trial_prize_table()'s prizes (0026, then 0109 for gems x10).
+// The newest migration holding trial_prize_table()'s prizes (0026, then 0111 for gems x10).
 const dir = new URL('../../supabase/migrations/', import.meta.url)
 const sql = readdirSync(dir).sort().map((f) => readFileSync(new URL(f, dir), 'utf8')).filter((s) => s.includes('$prizes$')).pop()!
 

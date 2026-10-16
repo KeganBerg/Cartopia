@@ -275,3 +275,13 @@ describe('crate pity', () => {
     expect(pityLeft(crateDef('street')!, 50)).toBeNull()
   })
 })
+
+describe('crate x10 prices', () => {
+  // Kegan, 2026-10-16: ten crates for about $5. Gold x10 is the $4.99 Stack (800 gems); Diamond x10 2,500.
+  it('Gold x10 costs 800 gems and Diamond x10 2,500 at any level', () => {
+    for (const level of [1, 30, 99]) {
+      expect(cratePrice(crateDef('gold')!, level) * 10).toBe(800)
+      expect(cratePrice(crateDef('diamond')!, level) * 10).toBe(2500)
+    }
+  })
+})
