@@ -10,7 +10,7 @@ import { ThumbRenderer } from './scene/BuildingPreview'
 import { Preview, StageCanvas } from './scene/Stage'
 import { quietShaders } from './scene/warm'
 import { TapTips } from './ui/TapTip'
-import { BottomBar, ShopPanel, ShowroomPanel, GaragePanel, Toasts } from './ui/Menus'
+import { BottomBar, ShopPanel, CarsPage, Toasts } from './ui/Menus'
 import { InventoryPanel } from './ui/Inventory'
 import { PaintPrizePopup } from './ui/PaintRivals'
 import { RecapPopup } from './ui/Recap'
@@ -190,8 +190,8 @@ export default function App() {
       <BottomBar />
       {panel === 'shop' && <ShopPanel />}
       {panel === 'inventory' && <InventoryPanel />}
-      {panel === 'showroom' && <ShowroomPanel />}
-      {panel === 'garage' && <GaragePanel />}
+      {/* My Cars, For Sale, Collection and Crates are one page that stays up while its tabs switch. */}
+      {(panel === 'garage' || panel === 'showroom' || panel === 'crates') && <CarsPage crates={panel === 'crates' ? <CratesPanel embedded /> : null} />}
       {panel === 'race' && !liveRace && <RacePanel />}
       {liveRace && <LiveRaceOverlay />}
       {panel === 'invites' && <InvitesPanel />}
@@ -206,7 +206,6 @@ export default function App() {
       {panel === 'bank' && <BankPanel />}
       {panel === 'carpacks' && <CarPacksPanel />}
       {panel === 'deals' && <DealsPanel />}
-      {panel === 'crates' && <CratesPanel />}
       {panel === 'battle' && <BattlePanel />}
       <VisitBanner />
       <Tutorial />

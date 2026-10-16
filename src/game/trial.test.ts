@@ -1,9 +1,11 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { TRIAL_PRIZES, trialPrize, trialWeek, trialVenue, ghostDist, shortLeft } from './trial'
 import { TRACK } from './race'
 
-const sql = readFileSync(new URL('../../supabase/migrations/0026_time_trials.sql', import.meta.url), 'utf8')
+// The newest migration holding trial_prize_table()'s prizes (0026, then 0104 for gems x10).
+const dir = new URL('../../supabase/migrations/', import.meta.url)
+const sql = readdirSync(dir).sort().map((f) => readFileSync(new URL(f, dir), 'utf8')).filter((s) => s.includes('$prizes$')).pop()!
 
 describe('weekly time trial', () => {
   it('has the same prizes as the server', () => {

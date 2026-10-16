@@ -56,6 +56,7 @@ export function BottomBar() {
   const crewChests = useCrewGoal((g) => g.ready) + useCrewBattle((b) => b.ready)
   const crewChat = useChat((c) => c.unread.crew)
   const globalChat = useChat((c) => c.unread.global > 0)
+  const chatPing = useChat((c) => c.pinged.global + c.pinged.crew > 0)
   const rival = useRivalWaiting()
   const tut = useGame(tutTarget)
   const tip = useTipTarget()
@@ -75,7 +76,7 @@ export function BottomBar() {
         {shop.on && <button className={`icon-btn${pulse('shop')}${freshClass(shop.fresh)}`} onClick={() => openPanel('shop')}><span className="i i-shop"><Icon name="shop" /></span>SHOP</button>}
         {cars.on && <button className={`icon-btn${pulse('cars')}${freshClass(cars.fresh)}`} onClick={() => openCars(setsReady > 0)}><span className="i i-showroom"><Icon name="car" />{setsReady > 0 && <span className="btn-dot">{setsReady}</span>}</span>CARS</button>}
         {social.on && <button className={`icon-btn${freshClass(social.fresh)}`} onClick={() => openPanel('friends')}><span className="i i-friends"><Icon name="friends" />{crewChests > 0 && <span className="btn-dot">{crewChests}</span>}</span>SOCIAL</button>}
-        {social.on && <button className={`icon-btn${freshClass(social.fresh)}`} onClick={() => openPanel('chat')}><span className="i i-chat"><Icon name="chat" />{crewChat > 0 ? <span className="btn-dot">{crewChat > 9 ? '9+' : crewChat}</span> : globalChat && <span className="btn-dot new" />}</span>CHAT</button>}
+        {social.on && <button className={`icon-btn${freshClass(social.fresh)}`} onClick={() => openPanel('chat')}><span className="i i-chat"><Icon name="chat" />{chatPing ? <span className="btn-dot" title="You were mentioned">@</span> : crewChat > 0 ? <span className="btn-dot">{crewChat > 9 ? '9+' : crewChat}</span> : globalChat && <span className="btn-dot new" />}</span>CHAT</button>}
         {edit.on && <button className={`icon-btn${freshClass(edit.fresh)}`} onClick={() => setMode(useGame.getState().tutorial >= 99 ? 'road' : 'move')}><span className="i i-edit"><Icon name="cone" /></span>EDIT</button>}
         {race.on && <button className={`big-btn race-btn${pulse('race')}${freshClass(race.fresh)}`} onClick={() => openPanel('race')}><span className="i"><Icon name="flag" />{rival && <span className="btn-dot" title="Your rival is in town">!</span>}</span>RACE</button>}
       </div>
@@ -452,7 +453,10 @@ const SALE_SORTS: { id: SaleSort; label: string }[] = [
 let saleView: { kind: string; sort: SaleSort } = { kind: 'all', sort: 'level' }
 const FOR_SALE = CARS.filter((c) => !c.rescueOnly && !c.season && !c.secret && !c.pack)
 
-export function ShowroomPanel() {
+// For Sale as a dealership in the Showroom: the car picked stands on the turntable, the list of
+// cars is on the left (phones: a grid under the sheet) and its colours and Buy button on the right.
+let lastSale: string | null = null
+function SaleSection({ onPick }: { onPick: () => void }) {
   const level = useGame(gateLevel) // only for level locks here
   const coins = useGame((s) => s.coins)
   const bucks = useGame((s) => s.bucks)
@@ -461,24 +465,12 @@ export function ShowroomPanel() {
   const rusty = useGame((s) => hasRusty(s))
   const openShop = useGame((s) => s.openShop)
   const [colorFor, setColorFor] = useState<Record<string, string>>({})
-  const [inspect, setInspect] = useState<string | null>(null)
+  const [inspect, setInspect] = useState(false)
+  const hole = useRef<HTMLDivElement>(null)
   const { body, focus } = useShopFocus()
-  const look = inspect ? carDef(inspect) : null
-  // Opened to show a car (level-up splash, a driver's fans): the For Sale tab, where it is.
-  const [tab, setTab] = useState<'shop' | 'book'>(() => (focus ? 'shop' : lastShowroomTab))
-  useEffect(() => { lastCars = 'showroom' }, [])
-  const pickTab = (t: 'shop' | 'book') => {
-    lastShowroomTab = t
-    setTab(t)
-  }
   // A car being shown is never hidden by the filter.
   const [view, setViewState] = useState(() => (focus ? (saleView = { ...saleView, kind: 'all' }) : saleView))
   const setView = (v: Partial<typeof view>) => setViewState((o) => (saleView = { ...o, ...v }))
-  const find = useFindCar((model) => {
-    pickTab('shop')
-    setView({ kind: 'all' })
-    useGame.setState({ shopFocus: model })
-  })
   const owned = useMemo(() => {
     const n = new Map<string, number>()
     for (const c of cars) n.set(c.model, (n.get(c.model) ?? 0) + 1)
@@ -514,67 +506,117 @@ export function ShowroomPanel() {
     return keep.sort(by[view.sort])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind, view.sort, owned, level, coins, bucks, rusty])
+  // The car on the turntable: one sent here (level-up splash, the Collection), else the last one looked at.
+  const [sel, setSel] = useState<string | null>(() => focus ?? lastSale)
+  useEffect(() => { if (focus) setSel(focus) }, [focus])
+  const at = Math.max(0, list.findIndex((r) => r.c.id === sel))
+  const row = list.find((r) => r.c.id === sel) ?? list[0]
+  const c = row?.c
+  useEffect(() => { lastSale = c?.id ?? null }, [c?.id])
+  const pick = (id: string) => {
+    setSel(id)
+    onPick()
+  }
+  const step = (d: number) => list.length && setSel(list[(at + d + list.length) % list.length].c.id)
+  const color = c ? colorFor[c.id] ?? c.colors[0] : ''
+  const locked = !!c && level < c.unlockLevel
+  const have = c ? owned.get(c.id) ?? 0 : 0
   return (
-    <Panel title="Cars" wide>
-      <CarsTabs current={tab} onShowroom={pickTab} />
-      {tab === 'book' && <CollectionBook onFind={find} />}
-      {tab === 'shop' && <>
-      {!rusty && (
-        <div className="rusty-lock">
-          <span className="rusty-icon">🔧</span>
-          <div>
-            <b>Build Rusty's Rescue first</b>
-          </div>
-          <button className="buy" onClick={() => openShop('rescue')}>Build · $1,000</button>
+    <div className="garage sale">
+      {c && (
+        <div className="garage-scene">
+          {inspect ? null : <CarPreview body={c.body} model={c.id} color={color} onExpand={() => setInspect(true)} frameIn={hole} />}
         </div>
       )}
-      <div className="garage-filter sale-filter">
-        <label className="gf-pick">
-          <Icon name="filter" />
-          <select aria-label="Show" value={kind} onChange={(e) => setView({ kind: e.target.value })}>
-            {kinds.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
-          </select>
-        </label>
-        <label className="gf-pick">
-          <Icon name="sort" />
-          <select aria-label="Sort" value={view.sort} onChange={(e) => setView({ sort: e.target.value as SaleSort })}>
-            {SALE_SORTS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
-          </select>
-        </label>
+      <div className="garage-hole" ref={hole}>
+        {c && !inspect && <div className="car-pi" title="Performance Index"><b>{row.pi}</b><small>PI</small></div>}
+        {c && !inspect && have > 0 && <span className="hole-owned" title="In your garage">✔{have > 1 ? ` ×${have}` : ''}</span>}
       </div>
-      <div ref={body} className={rusty ? 'cards' : 'cards dimmed'}>
-        {list.map(({ c, pi }) => {
-          const locked = level < c.unlockLevel
-          const color = colorFor[c.id] ?? c.colors[0]
-          const have = owned.get(c.id) ?? 0
-          return (
-            <div key={c.id} data-id={c.id} className={`card car-card ${locked ? 'locked' : ''} ${focus === c.id ? 'focus' : ''}`}>
-              <button className="thumb-look" aria-label={`Take a closer look at the ${c.name}`} onClick={() => setInspect(c.id)}>
-                <CarThumb color={color} body={c.body} model={c.id} />
-                <span className="look-badge">🔍</span>
-                {have > 0 && <span className="owned-badge" title="In your garage">✔{have > 1 ? ` ×${have}` : ''}</span>}
-              </button>
-              <div className="card-name">{c.name}{c.legendary && <> <span className="rarity rarity-legendary">Legendary</span></>}</div>
-              <div className="card-stat">PI {pi} · {c.body}</div>
+      {inspect && c && <CarInspect title={c.name} body={c.body} model={c.id} color={color} onClose={() => setInspect(false)} />}
+      {c && (
+        <div className="garage-detail">
+          <div className="car-switch">
+            <button aria-label="Previous car" onClick={() => step(-1)} disabled={list.length < 2}>‹</button>
+            {/* Phones: the grid of cars is under this sheet; the name jumps down to it. */}
+            <button className="car-switch-name" onClick={() => body.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+              <b>{c.name}</b><small>{at + 1}/{list.length} ▾</small>
+            </button>
+            <button aria-label="Next car" onClick={() => step(1)} disabled={list.length < 2}>›</button>
+          </div>
+          <h3 className="garage-name">{c.name}{c.legendary && <> <span className="rarity rarity-legendary">Legendary</span></>}</h3>
+          <div className="car-sum">
+            <div className="car-traits">
+              <span className="body-chip">{bodyLabel(c.body)}</span>
               <SkillTag model={c.id} />
               <LovesTag model={c.id} />
-              <div className="colors">
-                {c.colors.map((col) => (
-                  <button key={col} className={col === color ? 'dot sel' : 'dot'} style={{ background: col }} onClick={() => setColorFor({ ...colorFor, [c.id]: col })} />
-                ))}
-              </div>
-              {locked ? (
-                <button className="price locked-btn" onClick={() => buyCar(c.id, color)}>🔒 Level {c.unlockLevel}</button>
-              ) : (
-                <button className={afford(c) ? 'buy' : 'buy broke'} disabled={!rusty} onClick={() => buyCar(c.id, color)}>Buy {price(c)}</button>
-              )}
             </div>
+          </div>
+          <div className="colors sale-colors">
+            {c.colors.map((col) => (
+              <button key={col} aria-label="Colour" className={col === color ? 'dot sel' : 'dot'} style={{ background: col }} onClick={() => setColorFor({ ...colorFor, [c.id]: col })} />
+            ))}
+          </div>
+          {!rusty && (
+            <div className="rusty-lock">
+              <span className="rusty-icon">🔧</span>
+              <div><b>Build Rusty's Rescue first</b></div>
+              <button className="buy" onClick={() => openShop('rescue')}>Build · $1,000</button>
+            </div>
+          )}
+          {locked ? (
+            <button className="price locked-btn sale-buy" onClick={() => buyCar(c.id, color)}>🔒 Level {c.unlockLevel}</button>
+          ) : (
+            <button className={afford(c) ? 'buy sale-buy' : 'buy broke sale-buy'} disabled={!rusty} onClick={() => buyCar(c.id, color)}>Buy {price(c)}</button>
+          )}
+        </div>
+      )}
+      <div className="garage-list" ref={body}>
+        <div className="garage-filter sale-filter">
+          <label className="gf-pick">
+            <Icon name="filter" />
+            <select aria-label="Show" value={kind} onChange={(e) => setView({ kind: e.target.value })}>
+              {kinds.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
+            </select>
+          </label>
+          <label className="gf-pick">
+            <Icon name="sort" />
+            <select aria-label="Sort" value={view.sort} onChange={(e) => setView({ sort: e.target.value as SaleSort })}>
+              {SALE_SORTS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+            </select>
+          </label>
+        </div>
+        {list.map(({ c: x, pi }) => {
+          const n = owned.get(x.id) ?? 0
+          const lock = level < x.unlockLevel
+          return (
+            <button key={x.id} data-id={x.id} className={`garage-item sale-item${x.id === c?.id ? ' sel' : ''}${lock ? ' locked' : ''}${focus === x.id ? ' focus' : ''}`} onClick={() => pick(x.id)}>
+              <CarThumb size="sm" color={colorFor[x.id] ?? x.colors[0]} body={x.body} model={x.id} />
+              <span>{x.name}{n > 0 && <i className="sale-owned" aria-label="In your garage">✔{n > 1 ? `×${n}` : ''}</i>}</span>
+              <small>{lock ? `🔒 Lv ${x.unlockLevel}` : <>PI {pi} · {price(x)}</>}</small>
+            </button>
           )
         })}
       </div>
-      </>}
-      {look && <CarInspect title={look.name} body={look.body} model={look.id} color={colorFor[look.id] ?? look.colors[0]} onClose={() => setInspect(null)} />}
-    </Panel>
+    </div>
+  )
+}
+
+// The Collection in the Showroom: your car stays on the turntable, the book is the sheet beside it.
+function BookSection({ onFind }: { onFind: (model: string) => void }) {
+  const cars = useGame((s) => s.cars)
+  const selected = useGame((s) => s.selectedCar)
+  const car = cars.find((c) => c.uid === selected) ?? cars[0]
+  const def = car && carDef(car.model)
+  const hole = useRef<HTMLDivElement>(null)
+  const [inspect, setInspect] = useState(false)
+  const look = car && def && { body: def.body, model: def.id, ...jobOf(car), skin: car.skin, modSkin: car.modSkin, panels: car.panels, trim: car.trim, mods: car.mods, hat: car.hat }
+  return (
+    <div className="garage book-sec">
+      {look && <div className="garage-scene">{inspect ? null : <CarPreview {...look} onExpand={() => setInspect(true)} frameIn={hole} />}</div>}
+      <div className="garage-hole" ref={hole} />
+      {inspect && look && def && <CarInspect title={def.name} {...look} onClose={() => setInspect(false)} />}
+      <div className="garage-detail"><CollectionBook onFind={onFind} /></div>
+    </div>
   )
 }
 
@@ -708,7 +750,7 @@ function CopyBubbles({ copies, selected, onPick }: { copies: GarageRow[]; select
   )
 }
 
-export function GaragePanel() {
+function GarageSection() {
   const cars = useGame((s) => s.cars)
   const selected = useGame((s) => s.selectedCar)
   const select = useGame((s) => s.selectCar)
@@ -718,7 +760,6 @@ export function GaragePanel() {
   const { stacks, kinds, kind, sort, setView } = useGarageList(cars)
   const car = cars.find((c) => c.uid === selected) ?? stacks[0]?.top.c ?? cars[0]
   const def = car && carDef(car.model)
-  useEffect(() => { lastCars = 'garage' }, [])
   const [tab, setTab] = useState<GarageTab>(() => {
     const t = nextGarageTab
     nextGarageTab = 'tune'
@@ -782,127 +823,161 @@ export function GaragePanel() {
     setDyno((d) => ({ id: Date.now(), car: car.uid, model: car.model, mods: car.mods, before: d && d.car === car.uid ? d.before : was.pi, after: pi }))
   }, [car?.uid, pi])
   return (
-    <Panel title="Cars" wide className="garage-env" head={<><span className="cars-power" title="Garage power">⚡{garagePower(cars)}</span><AutoJobsButton /></>}>
-      <CarsTabs current="garage" />
-      <div className={picking ? 'garage picking' : 'garage'}>
-        {/* The car stands in the Showroom, which fills the whole menu; the list and the car's
-            details float over it, and this hole is the part of the room the car is framed in. */}
-        {car && def && look && (
-          <div className="garage-scene">
-            {inspect ? null : (
-              <CarPreview {...look} onExpand={() => setInspect(true)} dyno={dyno ? feed : null} frameIn={hole} />
-            )}
-          </div>
-        )}
-        <div className="garage-hole" ref={hole} onClickCapture={() => { tapped.current = Date.now() }}>
-          {car && def && look && !inspect && (
-            <>
-              {dyno && <DynoOverlay key={dyno.id} run={dyno} feed={feed} onDone={() => setDyno(null)} />}
-              {tab === 'paint' && <div className="paint-sweep" key={`${look.color}|${look.finish}|${look.stripe}|${look.skin ?? ''}`} aria-hidden />}
-              {tab === 'custom' && <div className="paint-sweep" key={JSON.stringify(look.panels ?? {})} aria-hidden />}
-              {tab === 'trim' && <div className="paint-sweep" key={JSON.stringify(look.trim ?? {})} aria-hidden />}
-              {!dyno && <div className="car-pi" title="Performance Index"><b>{pi}</b><small>PI</small></div>}
-            </>
+    <div className={picking ? 'garage picking' : 'garage'}>
+      {/* The car stands in the Showroom, which fills the whole menu; the list and the car's
+          details float over it, and this hole is the part of the room the car is framed in. */}
+      {car && def && look && (
+        <div className="garage-scene">
+          {inspect ? null : (
+            <CarPreview {...look} onExpand={() => setInspect(true)} dyno={dyno ? feed : null} frameIn={hole} />
           )}
         </div>
-        {inspect && car && def && <CarInspect title={def.name} {...look!} onClose={() => setInspect(false)} />}
-        <div className="garage-list">
-          <div className="garage-filter">
-            <label className="gf-pick">
-              <Icon name="filter" />
-              <select aria-label="Show" value={kind} onChange={(e) => setView({ kind: e.target.value })}>
-                {kinds.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
-              </select>
-            </label>
-            <label className="gf-pick">
-              <Icon name="sort" />
-              <select aria-label="Sort" value={sort} onChange={(e) => setView({ sort: e.target.value as CarSort })}>
-                {CAR_SORTS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
-              </select>
-            </label>
+      )}
+      <div className="garage-hole" ref={hole} onClickCapture={() => { tapped.current = Date.now() }}>
+        {car && def && look && !inspect && (
+          <>
+            {dyno && <DynoOverlay key={dyno.id} run={dyno} feed={feed} onDone={() => setDyno(null)} />}
+            {tab === 'paint' && <div className="paint-sweep" key={`${look.color}|${look.finish}|${look.stripe}|${look.skin ?? ''}`} aria-hidden />}
+            {tab === 'custom' && <div className="paint-sweep" key={JSON.stringify(look.panels ?? {})} aria-hidden />}
+            {tab === 'trim' && <div className="paint-sweep" key={JSON.stringify(look.trim ?? {})} aria-hidden />}
+            {!dyno && <div className="car-pi" title="Performance Index"><b>{pi}</b><small>PI</small></div>}
+          </>
+        )}
+      </div>
+      {inspect && car && def && <CarInspect title={def.name} {...look!} onClose={() => setInspect(false)} />}
+      <div className="garage-list">
+        <div className="garage-filter">
+          <label className="gf-pick">
+            <Icon name="filter" />
+            <select aria-label="Show" value={kind} onChange={(e) => setView({ kind: e.target.value })}>
+              {kinds.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
+            </select>
+          </label>
+          <label className="gf-pick">
+            <Icon name="sort" />
+            <select aria-label="Sort" value={sort} onChange={(e) => setView({ sort: e.target.value as CarSort })}>
+              {CAR_SORTS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+            </select>
+          </label>
+        </div>
+        {stacks.map((s) => {
+          const { c, d, pi: p } = stackFace(s, car?.uid)
+          const on = c.uid === car?.uid
+          const main = (
+            <>
+              <CarThumb size="sm" color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} panels={c.panels} trim={c.trim} hat={c.hat} body={d.body} model={d.id} stripe={c.stripe} mods={c.mods} />
+              <span>{d.name}{c.plate && <span className="mini-plate">{c.plate}</span>}</span>
+              <small>PI {p}</small>
+            </>
+          )
+          const open = (uid: string) => { select(uid); setPicking(false) }
+          if (s.copies.length < 2) return <button key={s.model} className={on ? 'garage-item sel' : 'garage-item'} onClick={() => open(c.uid)}>{main}</button>
+          return (
+            <div key={s.model} className={on ? 'garage-item stack sel' : 'garage-item stack'}>
+              <button className="stack-main" onClick={() => open(c.uid)}>
+                {main}
+                <b className="stack-count">×{s.copies.length}</b>
+              </button>
+              <CopyBubbles copies={s.copies} selected={car?.uid} onPick={open} />
+            </div>
+          )
+        })}
+      </div>
+      {car && def && (
+        <div className="garage-detail" onClickCapture={() => { tapped.current = Date.now() }}>
+          {/* Phones: step through cars here, or open the grid of all of them. */}
+          <div className="car-switch">
+            <button aria-label="Previous car" onClick={() => step(-1)} disabled={stacks.length < (pos < 0 ? 1 : 2)}>‹</button>
+            <button className="car-switch-name" onClick={() => setPicking((p) => !p)} aria-expanded={picking}>
+              <b>{def.name}</b><small>{pos < 0 ? '–' : pos + 1}/{stacks.length} {picking ? '▴' : '▾'}</small>
+            </button>
+            <button aria-label="Next car" onClick={() => step(1)} disabled={stacks.length < (pos < 0 ? 1 : 2)}>›</button>
           </div>
-          {stacks.map((s) => {
-            const { c, d, pi: p } = stackFace(s, car?.uid)
-            const on = c.uid === car?.uid
-            const main = (
-              <>
-                <CarThumb size="sm" color={c.color} finish={c.finish} skin={c.skin} modSkin={c.modSkin} panels={c.panels} trim={c.trim} hat={c.hat} body={d.body} model={d.id} stripe={c.stripe} mods={c.mods} />
-                <span>{d.name}{c.plate && <span className="mini-plate">{c.plate}</span>}</span>
-                <small>PI {p}</small>
-              </>
-            )
-            const open = (uid: string) => { select(uid); setPicking(false) }
-            if (s.copies.length < 2) return <button key={s.model} className={on ? 'garage-item sel' : 'garage-item'} onClick={() => open(c.uid)}>{main}</button>
+          {copies.length > 1 && <CopyBubbles copies={copies} selected={car.uid} onPick={select} />}
+          <h3 className="garage-name">{def.name}{car.plate && <span className="mini-plate">{car.plate}</span>}</h3>
+          {/* Under the preview (PI sits on the preview itself): the car's traits, then its two toggles. */}
+          <div className="car-sum">
+            <div className="car-traits">
+              <SkillTag model={car.model} />
+              <DriverRow car={car.uid} model={car.model} />
+            </div>
+            <div className="car-toggles">
+              <RaceCarToggle car={car.uid} />
+              <ShowcaseToggle car={car.uid} />
+            </div>
+          </div>
+          <div className="garage-tabs" role="tablist">
+            {([['tune', '🔧', 'Upgrades'], ['mods', '🪽', 'Mods'], ['paint', '🎨', 'Paint'], ['custom', '🖌️', 'Custom'], ['trim', '✨', 'Trim'], ['hats', '🎩', 'Hats']] as const).map(([id, icon, label]) => (
+              <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'sel' : ''} onClick={() => setTab(id)}><i aria-hidden>{icon}</i>{label}</button>
+            ))}
+          </div>
+          {tab === 'mods' && <ModShop car={car} trying={tryMod} setTrying={(id) => setTrying(id ? { car: car.uid, mod: id } : null)} skinTry={tryModSkin} setSkinTry={(t) => setModSkinning(t ? { car: car.uid, ...t } : null)} />}
+          {tab === 'tune' && UPGRADE_SLOTS.map((u) => {
+            const lvl = car.upgrades[u.id]
+            const cost = upgradeCost(def, lvl)
             return (
-              <div key={s.model} className={on ? 'garage-item stack sel' : 'garage-item stack'}>
-                <button className="stack-main" onClick={() => open(c.uid)}>
-                  {main}
-                  <b className="stack-count">×{s.copies.length}</b>
-                </button>
-                <CopyBubbles copies={s.copies} selected={car?.uid} onPick={open} />
+              <div key={u.id} className="upgrade-row">
+                <span className="up-name">{u.name}</span>
+                <span className="pips">{Array.from({ length: MAX_UPGRADE }, (_, i) => <i key={i} className={i < lvl ? 'on' : ''} />)}</span>
+                {lvl < MAX_UPGRADE ? (
+                  <button className="buy small" onClick={() => upgrade(car.uid, u.id)}>${cost.coins.toLocaleString()} + {cost.parts}⚙</button>
+                ) : (
+                  <span className="maxed">MAX</span>
+                )}
               </div>
             )
           })}
+          {tab === 'paint' && <SkinPicker car={car} trying={trySkin} setTrying={(skin) => setSkinning(skin === undefined ? null : { car: car.uid, skin })} />}
+          {tab === 'custom' && <CustomShop car={car} panels={tryPanels ?? car.panels} setPanels={(panels) => setCustomising(panels ? { car: car.uid, panels } : null)} />}
+          {tab === 'trim' && <TrimShop car={car} trim={tryTrim ?? car.trim} setTrim={(trim) => setTrimming(trim ? { car: car.uid, trim } : null)} />}
+          {tab === 'hats' && <HatShop car={car} trying={tryHat} setTrying={(hat) => setHatting(hat === undefined ? null : { car: car.uid, hat })} />}
+          {tab === 'paint' && <PaintShop car={car} job={tryJob ?? jobOf(car)} setJob={(job) => setPainting(job ? { car: car.uid, job } : null)} />}
+          {!def.bucks && <button className="sell" onClick={() => { const uid = car.uid; sellAsk.ask(() => sell(uid)) }}>Sell for ${Math.floor(def.price * 0.5).toLocaleString()}</button>}
+          {sellAsk.open && (
+            <Confirm pref="askSell" icon="💰" title="Sell this car?" ok={`Sell · $${Math.floor(def.price * 0.5).toLocaleString()}`} onOk={sellAsk.yes} onCancel={sellAsk.close}>
+              <CarThumb size="sm" color={car.color} finish={car.finish} skin={car.skin} modSkin={car.modSkin} panels={car.panels} trim={car.trim} body={def.body} model={def.id} stripe={car.stripe} mods={car.mods} />
+              <b>{def.name}</b>
+            </Confirm>
+          )}
         </div>
-        {car && def && (
-          <div className="garage-detail" onClickCapture={() => { tapped.current = Date.now() }}>
-            {/* Phones: step through cars here, or open the grid of all of them. */}
-            <div className="car-switch">
-              <button aria-label="Previous car" onClick={() => step(-1)} disabled={stacks.length < (pos < 0 ? 1 : 2)}>‹</button>
-              <button className="car-switch-name" onClick={() => setPicking((p) => !p)} aria-expanded={picking}>
-                <b>{def.name}</b><small>{pos < 0 ? '–' : pos + 1}/{stacks.length} {picking ? '▴' : '▾'}</small>
-              </button>
-              <button aria-label="Next car" onClick={() => step(1)} disabled={stacks.length < (pos < 0 ? 1 : 2)}>›</button>
-            </div>
-            {copies.length > 1 && <CopyBubbles copies={copies} selected={car.uid} onPick={select} />}
-            <h3 className="garage-name">{def.name}{car.plate && <span className="mini-plate">{car.plate}</span>}</h3>
-            {/* Under the preview (PI sits on the preview itself): the car's traits, then its two toggles. */}
-            <div className="car-sum">
-              <div className="car-traits">
-                <SkillTag model={car.model} />
-                <DriverRow car={car.uid} model={car.model} />
-              </div>
-              <div className="car-toggles">
-                <RaceCarToggle car={car.uid} />
-                <ShowcaseToggle car={car.uid} />
-              </div>
-            </div>
-            <div className="garage-tabs" role="tablist">
-              {([['tune', '🔧', 'Upgrades'], ['mods', '🪽', 'Mods'], ['paint', '🎨', 'Paint'], ['custom', '🖌️', 'Custom'], ['trim', '✨', 'Trim'], ['hats', '🎩', 'Hats']] as const).map(([id, icon, label]) => (
-                <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'sel' : ''} onClick={() => setTab(id)}><i aria-hidden>{icon}</i>{label}</button>
-              ))}
-            </div>
-            {tab === 'mods' && <ModShop car={car} trying={tryMod} setTrying={(id) => setTrying(id ? { car: car.uid, mod: id } : null)} skinTry={tryModSkin} setSkinTry={(t) => setModSkinning(t ? { car: car.uid, ...t } : null)} />}
-            {tab === 'tune' && UPGRADE_SLOTS.map((u) => {
-              const lvl = car.upgrades[u.id]
-              const cost = upgradeCost(def, lvl)
-              return (
-                <div key={u.id} className="upgrade-row">
-                  <span className="up-name">{u.name}</span>
-                  <span className="pips">{Array.from({ length: MAX_UPGRADE }, (_, i) => <i key={i} className={i < lvl ? 'on' : ''} />)}</span>
-                  {lvl < MAX_UPGRADE ? (
-                    <button className="buy small" onClick={() => upgrade(car.uid, u.id)}>${cost.coins.toLocaleString()} + {cost.parts}⚙</button>
-                  ) : (
-                    <span className="maxed">MAX</span>
-                  )}
-                </div>
-              )
-            })}
-            {tab === 'paint' && <SkinPicker car={car} trying={trySkin} setTrying={(skin) => setSkinning(skin === undefined ? null : { car: car.uid, skin })} />}
-            {tab === 'custom' && <CustomShop car={car} panels={tryPanels ?? car.panels} setPanels={(panels) => setCustomising(panels ? { car: car.uid, panels } : null)} />}
-            {tab === 'trim' && <TrimShop car={car} trim={tryTrim ?? car.trim} setTrim={(trim) => setTrimming(trim ? { car: car.uid, trim } : null)} />}
-            {tab === 'hats' && <HatShop car={car} trying={tryHat} setTrying={(hat) => setHatting(hat === undefined ? null : { car: car.uid, hat })} />}
-            {tab === 'paint' && <PaintShop car={car} job={tryJob ?? jobOf(car)} setJob={(job) => setPainting(job ? { car: car.uid, job } : null)} />}
-            {!def.bucks && <button className="sell" onClick={() => { const uid = car.uid; sellAsk.ask(() => sell(uid)) }}>Sell for ${Math.floor(def.price * 0.5).toLocaleString()}</button>}
-            {sellAsk.open && (
-              <Confirm pref="askSell" icon="💰" title="Sell this car?" ok={`Sell · $${Math.floor(def.price * 0.5).toLocaleString()}`} onOk={sellAsk.yes} onCancel={sellAsk.close}>
-                <CarThumb size="sm" color={car.color} finish={car.finish} skin={car.skin} modSkin={car.modSkin} panels={car.panels} trim={car.trim} body={def.body} model={def.id} stripe={car.stripe} mods={car.mods} />
-                <b>{def.name}</b>
-              </Confirm>
-            )}
-          </div>
-        )}
-      </div>
+      )}
+    </div>
+  )
+}
+
+// The CARS button's one page: the Showroom fills it, and My Cars, For Sale, the Collection and the
+// Crate Depot are sections of it under one row of tabs. Each section keeps its own menu id
+// (garage, showroom, crates) so goals and tips can open it, but they all draw this one page, which
+// stays up while the tabs switch. The Crate Depot is lazy-loaded, so App hands it in.
+export function CarsPage({ crates }: { crates?: React.ReactNode }) {
+  const panel = useGame((s) => s.panel)
+  const cars = useGame((s) => s.cars)
+  const swap = useGame((s) => s.swapPanel)
+  const focus = useGame((s) => s.shopFocus)
+  const [showTab, setShowTab] = useState<'shop' | 'book'>(() => (focus ? 'shop' : lastShowroomTab))
+  // Opened from elsewhere onto For Sale or the Collection: the tab it was asked for.
+  useEffect(() => { if (focus) setShowTab('shop') }, [focus])
+  const section: CarsTab = panel === 'showroom' ? showTab : panel === 'crates' ? 'crates' : 'garage'
+  useEffect(() => { if (section !== 'crates') lastCars = section === 'garage' ? 'garage' : 'showroom' }, [section])
+  const toShowroom = (t: 'shop' | 'book') => {
+    lastShowroomTab = t
+    setShowTab(t)
+    if (panel !== 'showroom') swap('showroom')
+  }
+  const find = useFindCar((model) => {
+    saleView = { ...saleView, kind: 'all' }
+    useGame.setState({ shopFocus: model })
+    toShowroom('shop')
+  })
+  // Phones: a car picked from the grid goes up on the turntable, so scroll back up to it.
+  const top = () => document.querySelector('.cars-page div.garage')?.scrollTo({ top: 0, behavior: 'smooth' })
+  return (
+    <Panel title="Cars" wide className={`garage-env cars-page sec-${section}`} head={<><span className="cars-power" title="Garage power">⚡{garagePower(cars)}</span><AutoJobsButton /></>}>
+      <CarsTabs current={section} onShowroom={toShowroom} />
+      {section === 'garage' && <GarageSection />}
+      {section === 'shop' && <SaleSection onPick={top} />}
+      {section === 'book' && <BookSection onFind={find} />}
+      {section === 'crates' && <div className="cars-crates">{crates}</div>}
     </Panel>
   )
 }

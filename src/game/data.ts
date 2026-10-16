@@ -616,10 +616,29 @@ export const UPGRADE_SLOTS: { id: UpgradeSlot; name: string }[] = [
 ]
 export const MAX_UPGRADE = 5
 
-export const upgradeCost = (car: CarDef, level: number) => ({
-  coins: Math.round((car.price + (car.bucks ?? 0) * 1000) * 0.15 * (level + 1) + 200),
-  parts: 2 + level * 3,
-})
+// Base PI of a car with no upgrades or mods (performance() without carStats, which comes later).
+const basePi = (car: CarDef) => Math.round(car.power * 0.6 + car.grip * 0.3 + (100 - car.weight) * 0.1)
+// Parts to upgrade grow with the car's tier (Kegan, 2026-10-16: maxing a top car should be a grind,
+// not an hour): PI 50 and under pay the base 2 / 5 / 8 / 11 / 14, PI 75 three times that, PI 96
+// about eight times, capped at ten (1,600 parts to max every slot). Rounded to 5 above the base.
+export const upgradePartsMult = (car: CarDef) => Math.min(10, 1 + 8 * Math.max(0, (basePi(car) - 50) / 50) ** 2)
+// Pack cars have no coin price, so their upgrades are priced like the dearest Showroom car they
+// match or beat (before, a pack car maxed for 4,000 coins).
+let showroomByPi: { pi: number; price: number }[] | null = null
+const upgradeValue = (car: CarDef) => {
+  if (!car.pack) return car.price + (car.bucks ?? 0) * 1000
+  showroomByPi ??= CARS.filter((c) => c.price > 0 && !c.pack && !c.rescueOnly && !c.season && !c.secret && !c.parked).map((c) => ({ pi: basePi(c), price: c.price }))
+  const pi = basePi(car)
+  return showroomByPi.reduce((best, c) => (c.pi <= pi && c.price > best ? c.price : best), 0)
+}
+export const upgradeCost = (car: CarDef, level: number) => {
+  const mult = upgradePartsMult(car)
+  const parts = 2 + level * 3
+  return {
+    coins: Math.round(upgradeValue(car) * 0.15 * (level + 1) + 200),
+    parts: mult <= 1 ? parts : Math.round((parts * mult) / 5) * 5,
+  }
+}
 
 // Car mods: bolt-on parts you can see on the car (in town, in races and in
 // every preview), one per slot. Unlike Garage upgrades, which tune what's under
