@@ -106,6 +106,35 @@ button.cl-name { padding: 0; border: 0; background: none; cursor: pointer; text-
 .cr-goal-nums > small { font: 800 11px Nunito, sans-serif; color: #5d4a1a; }
 .cr-goal .rm-cta .goal-pay { font-size: 12px; }
 
+/* ---------- members (bottom of the Crew window) ---------- */
+.cr-home .cm { cursor: default; gap: 8px; background: linear-gradient(160deg, #2b4a7d, #1b2f55); color: #fff; }
+.cm-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.cm-head .rm-tag { align-self: center; }
+.cm-list, .cm-asks { display: flex; flex-direction: column; gap: 5px; }
+.cm-asks { padding-bottom: 8px; border-bottom: 2px dashed rgba(255,255,255,.35); }
+.cm-ask-tag { background: #ffd84a; }
+.cm-row { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 48px; padding: 4px 6px; border: 2px solid var(--line, #14213d); border-radius: 12px; background: rgba(255,255,255,.96); color: var(--ink, #1b2a4a); }
+.cm-row.me { box-shadow: inset 4px 0 0 #c2185b; }
+.cm-row.ask { background: #fff7d6; }
+.cm-rank { width: 34px; height: 34px; display: grid; place-items: center; font-size: 19px; line-height: 1; border-radius: 50%; border: 2px solid var(--line, #14213d); background: #dfe7f3; }
+.cm-rank.r-leader { background: #ffd84a; }
+.cm-rank.r-co_leader { background: #b3e5fc; }
+.cm-rank.ask { background: #fff; }
+.cm-main { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+.cm-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 900 14px Nunito, sans-serif; color: inherit; }
+button.cm-name { padding: 0; border: 0; background: none; cursor: pointer; text-align: left; }
+.cm-row.me .cm-name { color: #c2185b; }
+.cm-main small { display: flex; align-items: center; gap: 4px; max-width: 100%; overflow: hidden; white-space: nowrap; font: 800 12px Nunito, sans-serif; color: #4a6283; }
+.cm-rk { font-style: normal; font-size: 10px; letter-spacing: .5px; text-transform: uppercase; padding: 0 5px; border-radius: 5px; border: 1.5px solid var(--line, #14213d); color: var(--line, #14213d); }
+.cm-rk.r-leader { background: #ffd84a; }
+.cm-rk.r-co_leader { background: #b3e5fc; }
+.cm-on { width: 9px; height: 9px; flex: none; border-radius: 50%; background: #66e36a; border: 2px solid var(--line, #14213d); }
+.cm-acts { display: flex; gap: 4px; flex-wrap: nowrap; }
+.cm-acts button, .cm-more { min-width: 38px; min-height: 34px; padding: 2px 8px; font-size: 15px; }
+.cm .buy.gold { background: linear-gradient(#ffe066, #ff9f1a); color: var(--line, #14213d); }
+.cm-mode { width: 100%; }
+.cm-mode button { flex: 1; }
+
 @media (max-width: 720px) {
   .cr-grid { grid-template-columns: minmax(0, 1fr); }
 }
@@ -121,4 +150,7 @@ button.cl-name { padding: 0; border: 0; background: none; cursor: pointer; text-
   .cl-step { min-height: 92px; }
   .cl-spot.p1 .cl-step { min-height: 106px; }
   .cl-race { padding: 3px 7px; font-size: 13px; }
+  .cm-row { grid-template-columns: 30px minmax(0, 1fr) auto; gap: 6px; }
+  .cm-rank { width: 30px; height: 30px; font-size: 16px; }
+  .cm-acts button, .cm-more { min-width: 34px; padding: 2px 6px; }
 }

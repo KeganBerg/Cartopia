@@ -3,7 +3,7 @@ import { useGame, today } from '../game/store'
 import { fetchLeaderboard, townToVisit, demoLeaders, type Leader } from '../lib/friends'
 import { supabase } from '../lib/supabase'
 import { FreeCamButton, Panel } from './Menus'
-import { SocialTabs, useUserId } from './Social'
+import { SOCIAL_TITLE, SocialTabs, useUserId } from './Social'
 import { useFriends, refreshFriends, addFriend, respondFriend, removeFriend, seenAgo, MAX_FRIENDS, type Friend } from '../lib/friendsList'
 import { useNames, loadUsernames, usePlayerName } from '../lib/profiles'
 import { useLive, challenge, cancelChallenge, refreshPresence, type LivePlayer } from '../lib/live'
@@ -53,7 +53,7 @@ export function FriendsPanel() {
   }
 
   return (
-    <Panel title="Friends" wide>
+    <Panel title={SOCIAL_TITLE} wide>
       <SocialTabs current="friends" />
       {supabase && uid === null && (
         <div className="fr-signin">

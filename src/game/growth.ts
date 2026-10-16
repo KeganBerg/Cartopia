@@ -31,7 +31,7 @@ export const GROWTH: Record<string, [string, string]> = {
   // Homes grow in their own style (the plain House and Trailer keep theirs in data.ts).
   cottage: ['Garden Cottage', 'Cottage Lane'],
   bungalow: ['Craftsman Bungalow', 'Bungalow Court'],
-  townhouse: ['Row Houses', 'Brownstone Tower'],
+  townhouse: ['Row Houses', 'Brownstone Terrace'],
   cabin: ['Timber Lodge', 'Mountain Lodge'],
   duplex: ['Modern Fourplex', 'Modern Lofts'],
   victorian: ['Grand Victorian', 'Victorian Terrace'],

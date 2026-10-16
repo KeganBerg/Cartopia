@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useGame, hasRusty } from '../game/store'
-import { BUILDINGS, CARS, RESCUE_SPOTS, GP_SERIES, baseFuelCap } from '../game/data'
+import { BUILDINGS, CARS, RESCUE_SPOTS, GP_SERIES, baseFuelCap, fuelPerMin, nextFuelStep } from '../game/data'
 import { BuildingThumb, CarThumb } from '../scene/BuildingPreview'
 import { sfx } from '../lib/sound'
 
@@ -84,6 +84,10 @@ function Splash({ from, to, coins, bucks }: { from: number; to: number; coins: n
     return at ? { at, items: unlocksBetween(at - 1, at, rusty, focus) } : null
   })
   const fuel = baseFuelCap(to) - baseFuelCap(from)
+  // Fuel refills faster at milestones: celebrate a step, otherwise show the next one to aim for.
+  const rate = fuelPerMin(to)
+  const rateUp = rate > fuelPerMin(from)
+  const rateNext = nextFuelStep(to)
   // A short fanfare as the badge rolls over to the new level.
   useEffect(() => {
     const timer = setTimeout(sfx.levelUp, 250)
@@ -115,6 +119,11 @@ function Splash({ from, to, coins, bucks }: { from: number; to: number; coins: n
           {bucks > 0 && <span className="lvl-chip"><span className="ico buck-ico">💎</span>+{bucks}</span>}
           {fuel > 0 && <span className="lvl-chip">⛽ +{fuel} max fuel</span>}
           <span className="lvl-chip">⛽ Tank filled</span>
+          {rateUp ? (
+            <span className="lvl-chip lvl-rate up" title="Fuel refill rate">⏱ {rate}⛽/min ⬆</span>
+          ) : rateNext && (
+            <span className="lvl-chip lvl-rate" title={`Fuel refill rate: ${rateNext.perMin}/min at level ${rateNext.level}`}>⏱ {rate}⛽/min · 🔒 {rateNext.perMin} at Lv {rateNext.level}</span>
+          )}
         </div>
 
         {items.length > 0 ? (

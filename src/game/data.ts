@@ -815,7 +815,19 @@ export const SERVICE_XP = { gas: 8, tires: 12, tow: 15, fix: 5 } as const
 export const serviceXp = (kind: keyof typeof SERVICE_XP, level: number) => playXp(SERVICE_XP[kind], level)
 
 export const baseFuelCap = (level: number) => 15 + level * 2
-export const FUEL_REGEN_SECONDS = 60
+// Fuel refills faster at level milestones: 1 a minute, then 2 at level 15, 3 at 30, 4 at 50, 5 at 75.
+export const FUEL_RATE_STEPS = [
+  { level: 1, perMin: 1 },
+  { level: 15, perMin: 2 },
+  { level: 30, perMin: 3 },
+  { level: 50, perMin: 4 },
+  { level: 75, perMin: 5 },
+] as const
+export const fuelPerMin = (level: number) => FUEL_RATE_STEPS.reduce((n, st) => (level >= st.level ? st.perMin : n), 1)
+/** Seconds for one fuel to come back at this level (60, 30, 20, 15, 12). */
+export const fuelRegenSeconds = (level: number) => 60 / fuelPerMin(level)
+/** The next level where fuel refills faster, or null past the last step. */
+export const nextFuelStep = (level: number) => FUEL_RATE_STEPS.find((st) => st.level > level) ?? null
 export const RACE_FUEL = 3
 // Bucks to fill the tank to the cap in one go: at least 3, and 1 per 5 fuel it adds.
 export const REFILL_BUCKS = 3

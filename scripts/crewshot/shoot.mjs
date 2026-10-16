@@ -1,0 +1,45 @@
+// Crew window bottom: members with ranks, join requests, a row's actions, crew settings; and the
+// SOCIAL nav tile. Uses the signed-out demo crew (?crew=demo).
+// node scripts/crewshot/shoot.mjs <outDir>   (needs `npx vite` on :5173)
+import { chromium } from 'playwright'
+const [, , out = 'crewshot-out'] = process.argv
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] })
+for (const [form, size] of [['desktop', { width: 1280, height: 800 }], ['phone', { width: 390, height: 844 }]]) {
+  const p = await b.newPage({ viewport: size, deviceScaleFactor: form === 'phone' ? 2 : 1, isMobile: form === 'phone', hasTouch: form === 'phone' })
+  p.on('pageerror', (e) => console.log('pageerror', e.message))
+  await p.addInitScript(() => localStorage.setItem('cartopia-flash-warning-hide', '1'))
+  await p.goto('http://localhost:5173/?time=0.3&season=fall&crew=demo')
+  await p.waitForFunction(() => window.__game, null, { timeout: 120000 })
+  await p.waitForTimeout(3000)
+  await p.evaluate(() => window.__game.setState({ tutorial: 99, level: 25, panel: null }))
+  await p.waitForTimeout(1500)
+  await p.screenshot({ path: `${out}/${form}-0-nav.png` })
+  // The SOCIAL tile opens Friends first.
+  await p.locator('.bottom-bar .icon-btn', { hasText: 'SOCIAL' }).dispatchEvent('click')
+  await p.waitForTimeout(1500)
+  console.log(form, 'opened panel', await p.evaluate(() => window.__game.getState().panel))
+  await p.screenshot({ path: `${out}/${form}-1-social-friends.png` })
+  await p.evaluate(() => window.__game.getState().swapPanel('clan'))
+  await p.waitForSelector('.cm', { timeout: 60000 })
+  await p.waitForTimeout(3000)
+  await p.screenshot({ path: `${out}/${form}-2-crew-top.png` })
+  const show = (sel) => p.evaluate((s) => document.querySelector(s).scrollIntoView({ block: 'center' }), sel)
+  await show('.cm')
+  await p.waitForTimeout(800)
+  await p.screenshot({ path: `${out}/${form}-3-members.png` })
+  // Open the Co-Leader's row as the Leader.
+  await p.locator('.cm-more').first().dispatchEvent('click')
+  await p.waitForTimeout(300)
+  await show('.cm-row.open')
+  await p.waitForTimeout(500)
+  await p.screenshot({ path: `${out}/${form}-4-row-actions.png` })
+  await p.locator('.clan-actions .buy', { hasText: 'Crew settings' }).dispatchEvent('click')
+  await p.waitForTimeout(800)
+  await show('.clan-form')
+  await p.waitForTimeout(500)
+  await p.screenshot({ path: `${out}/${form}-5-settings.png` })
+  const wide = await p.evaluate(() => [...document.querySelectorAll('.cm-row, .clan-form')].filter((e) => e.scrollWidth > e.clientWidth + 1).length)
+  console.log(form, 'overflowing rows', wide)
+  await p.close()
+}
+await b.close()
