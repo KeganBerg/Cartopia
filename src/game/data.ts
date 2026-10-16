@@ -159,7 +159,7 @@ export const BUILDINGS: BuildingDef[] = [
   { id: 'lamp', name: 'Street Lamp', kind: 'decor', w: 1, h: 1, price: 60, unlockLevel: 1, color: '#37474f', roof: '#fff59d' },
   { id: 'bench', name: 'Park Bench', kind: 'decor', w: 1, h: 1, price: 70, unlockLevel: 2, color: '#8d6e63', roof: '#424242' },
   { id: 'billboard', name: 'Billboard', kind: 'decor', w: 1, h: 1, price: 600, unlockLevel: 3, color: '#eceff1', roof: '#1e88e5' },
-  { id: 'statue', name: 'Golden Car Statue', kind: 'decor', w: 1, h: 1, price: 0, bucks: 3, unlockLevel: 5, color: '#ffd700', roof: '#9e9e9e' },
+  { id: 'statue', name: 'Golden Car Statue', kind: 'decor', w: 1, h: 1, price: 0, bucks: 30, unlockLevel: 5, color: '#ffd700', roof: '#9e9e9e' },
   { id: 'pond', name: 'Duck Pond', kind: 'decor', w: 2, h: 2, price: 1500, unlockLevel: 4, color: '#4fc3f7', roof: '#81c784' },
   { id: 'pine', name: 'Pine Tree', kind: 'decor', w: 1, h: 1, price: 60, unlockLevel: 1, color: '#2e7d32', roof: '#6d4c41' },
   { id: 'hedge', name: 'Hedge', kind: 'decor', solid: true, w: 1, h: 1, price: 40, unlockLevel: 1, color: '#33691e', roof: '#558b2f' },
@@ -168,7 +168,7 @@ export const BUILDINGS: BuildingDef[] = [
   { id: 'busstop', name: 'Bus Stop', kind: 'decor', w: 1, h: 1, price: 200, unlockLevel: 2, color: '#90caf9', roof: '#37474f' },
   { id: 'hotdog', name: 'Hot Dog Cart', kind: 'decor', w: 1, h: 1, price: 350, unlockLevel: 3, color: '#eceff1', roof: '#fdd835' },
   { id: 'flagpole', name: 'Flag Pole', kind: 'decor', w: 1, h: 1, price: 300, unlockLevel: 3, color: '#2e7d32', roof: '#eceff1' },
-  { id: 'arch', name: 'Finish Line Arch', kind: 'decor', solid: true, w: 1, h: 1, price: 0, bucks: 2, unlockLevel: 4, color: '#212121', roof: '#e53935' },
+  { id: 'arch', name: 'Finish Line Arch', kind: 'decor', solid: true, w: 1, h: 1, price: 0, bucks: 20, unlockLevel: 4, color: '#212121', roof: '#e53935' },
   { id: 'playground', name: 'Playground', kind: 'decor', w: 2, h: 2, price: 1800, unlockLevel: 5, color: '#ef9a9a', roof: '#1e88e5' },
   { id: 'gazebo', name: 'Gazebo', kind: 'decor', w: 1, h: 1, price: 1200, unlockLevel: 6, color: '#fafafa', roof: '#2e7d32' },
   { id: 'clocktower', name: 'Clock Tower', kind: 'decor', w: 1, h: 1, price: 3500, unlockLevel: 8, color: '#b0796b', roof: '#37474f' },
@@ -300,8 +300,11 @@ export const upgradeFuelCap = (d: BuildingDef, level: number) =>
 // Cost to go from `level` to `level + 1`: 75% of the build price, 50% more each
 // level, plus parts from level 4 up. Houses are cheap to build but end up as
 // skyscrapers, so theirs start at $300 (or a quarter of a pricier home's price) and grow 55% a level. Decor bought with gems (the
-// Golden Car Statue) counts each gem as $1,000 of build price.
-const upgradeBase = (d: BuildingDef) => (d.price || (decorGrows(d) ? (d.bucks ?? 0) * 1000 : 0))
+// Golden Car Statue) counts each gem as $100 of build price (GEM_BUILD_COINS).
+// What a gem counts as when a coin price is worked out from a gem price (restores, upgrades,
+// gem decor). Was 1000 before gems went x10 (2026-10-16), so coin prices stay put.
+export const GEM_BUILD_COINS = 100
+const upgradeBase = (d: BuildingDef) => (d.price || (decorGrows(d) ? (d.bucks ?? 0) * GEM_BUILD_COINS : 0))
 export const buildingUpgradeCost = (d: BuildingDef, level: number) => ({
   coins: d.kind === 'house'
     ? Math.round((Math.max(300, d.price * 0.25) * Math.pow(1.55, level - 1)) / 50) * 50
@@ -429,14 +432,14 @@ export const CARS: CarDef[] = [
   { id: 'ridgeback', name: 'Kodiak Ridgeback 4x4', body: 'suv', price: 10000, unlockLevel: 6, power: 46, grip: 48, weight: 62, skill: 'torque', likes: ['tires', 'parts', 'firehouse'], colors: ['#ff6f00', '#33691e', '#eceff1'] },
   { id: 'kitsune', name: 'Kazumi Kitsune Drift', body: 'coupe', price: 19000, unlockLevel: 9, power: 51, grip: 59, weight: 30, skill: 'smooth', likes: ['tuner', 'dynolab', 'bodyshop'], colors: ['#fafafa', '#212121', '#ff4081'] },
   { id: 'current', name: 'Sparkline Current', body: 'ev', price: 49000, unlockLevel: 16, power: 72, grip: 52, weight: 50, skill: 'launch', likes: ['university', 'market', 'parkade'], colors: ['#eceff1', '#b71c1c', '#263238'] },
-  { id: 'salon', name: 'Regent Grand Salon', body: 'luxury', price: 0, bucks: 40, unlockLevel: 11, power: 65, grip: 51, weight: 70, skill: 'slipstream', likes: ['motel', 'hq', 'cityhall'], colors: ['#1a1a2e', '#eceff1', '#6d1b1b'] },
+  { id: 'salon', name: 'Regent Grand Salon', body: 'luxury', price: 0, bucks: 400, unlockLevel: 11, power: 65, grip: 51, weight: 70, skill: 'slipstream', likes: ['motel', 'hq', 'cityhall'], colors: ['#1a1a2e', '#eceff1', '#6d1b1b'] },
   { id: 'stomper', name: 'Ironside Dune Stomper', body: 'truck', price: 30000, unlockLevel: 12, power: 70, grip: 47, weight: 72, skill: 'torque', likes: ['tires', 'stadium', 'engines'], colors: ['#424242', '#1565c0', '#ff6d00'] },
   { id: 'monoposto', name: 'Veloce Monoposto 1', body: 'formula', price: 200000, unlockLevel: 30, power: 90, grip: 90, weight: 20, skill: 'smooth', likes: ['racefab', 'tuner', 'parkade'], colors: ['#d50000', '#eceff1', '#00897b'] },
   { id: 'zenith', name: 'Aether Zenith R', body: 'super', price: 440000, unlockLevel: 40, legendary: true, power: 100, grip: 96, weight: 26, skill: 'nitro', likes: ['stadium', 'glasstower', 'police'], colors: ['#212121', '#1e88e5', '#ff6d00'] },
   { id: 'schoolbus', name: 'Ironside Scholar 72', body: 'bus', price: 5300, unlockLevel: 4, power: 45, grip: 40, weight: 90, skill: 'slipstream', likes: ['diner', 'busdepot', 'school'], colors: ['#fbc02d', '#ff8f00', '#eceff1'] },
   { id: 'shaggy', name: 'Lakeside Shaggy Hound', body: 'dogvan', price: 8100, unlockLevel: 5, power: 44, grip: 47, weight: 66, skill: 'oil', likes: ['burger', 'vet', 'icecream'], colors: ['#d7ccc8', '#a1887f', '#9e9e9e'] },
   { id: 'tusker', name: 'Kodiak Tusker Scout', body: 'tusker', price: 85000, unlockLevel: 20, power: 72, grip: 74, weight: 58, skill: 'torque', likes: ['police', 'helipad', 'tires'], colors: ['#6b7a3a', '#c2a36b', '#eceff1'] },
-  { id: 'lambo', name: 'Veloce Corrida V12', body: 'wedge', price: 0, bucks: 70, unlockLevel: 26, power: 92, grip: 72, weight: 34, skill: 'oil', likes: ['cinema', 'club', 'parkade'], colors: ['#fdd835', '#d50000', '#fafafa'] },
+  { id: 'lambo', name: 'Veloce Corrida V12', body: 'wedge', price: 0, bucks: 700, unlockLevel: 26, power: 92, grip: 72, weight: 34, skill: 'oil', likes: ['cinema', 'club', 'parkade'], colors: ['#fdd835', '#d50000', '#fafafa'] },
   { id: 'hyper', name: 'Veloce Hyperion', body: 'super', price: 250000, unlockLevel: 33, power: 98, grip: 86, weight: 32, skill: 'nitro', likes: ['stadium', 'tuner', 'parkade'], colors: ['#1a237e', '#212121', '#d50000'] },
   // Gap fillers (2026-10-12): one car for each stretch of levels the Showroom had nothing new at.
   { id: 'kreis', name: 'Brandt Kreis S', body: 'sedan', price: 40000, unlockLevel: 14, power: 64, grip: 60, weight: 44, skill: 'smooth', likes: ['tuner', 'offices', 'parts'], colors: ['#eceff1', '#0d47a1', '#212121'] },
@@ -445,12 +448,12 @@ export const CARS: CarDef[] = [
   { id: 'cottonmouth', name: 'Liberty Cottonmouth ACR', body: 'longnose', price: 145000, unlockLevel: 25, power: 91, grip: 65, weight: 46, skill: 'torque', likes: ['club', 'lube', 'stadium'], colors: ['#0d47a1', '#b71c1c', '#fdd835'] },
   { id: 'ringmeister', name: 'Nordwerk Ring V10', body: 'super', price: 175000, unlockLevel: 28, power: 90, grip: 84, weight: 40, skill: 'slipstream', likes: ['glasstower', 'parkade', 'hq'], colors: ['#9e9e9e', '#d32f2f', '#212121'] },
   { id: 'raiden', name: 'Kazumi Raiden R26', body: 'prototype', price: 225000, unlockLevel: 32, power: 92, grip: 92, weight: 24, skill: 'smooth', likes: ['stadium', 'tuner', 'parts'], colors: ['#00897b', '#ff6d00', '#eceff1'] },
-  { id: 'sovereign', name: 'Moreau Sovereign 16', body: 'super', price: 0, bucks: 100, unlockLevel: 34, power: 100, grip: 88, weight: 44, skill: 'slipstream', likes: ['hq', 'glasstower', 'cinema'], colors: ['#1a237e', '#90a4ae', '#b71c1c'] },
+  { id: 'sovereign', name: 'Moreau Sovereign 16', body: 'super', price: 0, bucks: 1000, unlockLevel: 34, power: 100, grip: 88, weight: 44, skill: 'slipstream', likes: ['hq', 'glasstower', 'cinema'], colors: ['#1a237e', '#90a4ae', '#b71c1c'] },
   { id: 'wraith', name: 'Nordvik Wraith', body: 'wedge', price: 395000, unlockLevel: 38, legendary: true, power: 100, grip: 92, weight: 30, skill: 'oil', likes: ['club', 'glasstower', 'helipad'], colors: ['#eceff1', '#ff6f00', '#212121'] },
   // Exotics (2026-10-12): hard-to-get top-tier cars on their own lofted bodies (see exoticCars.ts).
-  { id: 'fulmine', name: 'Veloce Fulmine V12', body: 'scissor', price: 0, bucks: 220, unlockLevel: 40, legendary: true, power: 100, grip: 95, weight: 30, skill: 'launch', likes: ['club', 'stadium', 'glasstower'], colors: ['#c6ff00', '#ff6d00', '#eceff1'] },
+  { id: 'fulmine', name: 'Veloce Fulmine V12', body: 'scissor', price: 0, bucks: 2200, unlockLevel: 40, legendary: true, power: 100, grip: 95, weight: 30, skill: 'launch', likes: ['club', 'stadium', 'glasstower'], colors: ['#c6ff00', '#ff6d00', '#eceff1'] },
   { id: 'eclat', name: 'Moreau Eclat W16', body: 'horseshoe', price: 650000, unlockLevel: 42, legendary: true, power: 100, grip: 99, weight: 40, skill: 'slipstream', likes: ['hq', 'glasstower', 'helipad'], colors: ['#0d47a1', '#212121', '#b0bec5'] },
-  { id: 'orafo', name: 'Aurelio Orafo V12', body: 'teardrop', price: 0, bucks: 180, unlockLevel: 39, legendary: true, power: 100, grip: 96, weight: 28, skill: 'smooth', likes: ['cinema', 'club', 'glasstower'], colors: ['#eceff1', '#bf360c', '#37474f'] },
+  { id: 'orafo', name: 'Aurelio Orafo V12', body: 'teardrop', price: 0, bucks: 1800, unlockLevel: 39, legendary: true, power: 100, grip: 96, weight: 28, skill: 'smooth', likes: ['cinema', 'club', 'glasstower'], colors: ['#eceff1', '#bf360c', '#37474f'] },
   // Oddballs (2026-10-12): goofy vehicles that wouldn't normally race, on their own bodies (see oddballCars.ts).
   { id: 'scoops', name: 'Lakeside Sundae Wagon', body: 'icecream', price: 5300, unlockLevel: 4, power: 39, grip: 45, weight: 70, skill: 'freeze', likes: ['icecream', 'school', 'funfair'], colors: ['#fafafa', '#f8bbd0', '#b2ebf2'] },
   { id: 'courier', name: 'Ironside Doorstep Express', body: 'parcel', price: 3900, unlockLevel: 3, power: 37, grip: 39, weight: 74, skill: 'slipstream', likes: ['market', 'postoffice', 'parts'], colors: ['#5d4037', '#eceff1', '#1b5e20'] },
@@ -520,11 +523,11 @@ export const RESCUE_PINS = 8
 // Rusty's sets: every car a spot can turn up, restored and in the garage, pays a one-time reward
 // (claimed like a collection book set, through claimedSets; the save guard pays it from econ_catalog()).
 export const RUSTY_SET_PAY: Record<string, { coins: number; bucks: number; trophies: number; xp: number }> = {
-  suburbs: { coins: 2500, bucks: 2, trophies: 5, xp: 80 },
-  farm: { coins: 5000, bucks: 3, trophies: 8, xp: 120 },
-  downtown: { coins: 10000, bucks: 4, trophies: 12, xp: 180 },
-  desert: { coins: 20000, bucks: 6, trophies: 20, xp: 260 },
-  track: { coins: 40000, bucks: 10, trophies: 30, xp: 400 },
+  suburbs: { coins: 2500, bucks: 30, trophies: 5, xp: 80 },
+  farm: { coins: 5000, bucks: 45, trophies: 8, xp: 120 },
+  downtown: { coins: 10000, bucks: 60, trophies: 12, xp: 180 },
+  desert: { coins: 20000, bucks: 90, trophies: 20, xp: 260 },
+  track: { coins: 40000, bucks: 150, trophies: 30, xp: 400 },
 }
 export const rustySetId = (spot: string) => `rusty-${spot}`
 export const RUSTY_SETS: CarSet[] = RESCUE_SPOTS.map((sp) => ({
@@ -562,8 +565,12 @@ export const STORAGE_MAX = 6
 // search spot that turns it up (crates use this, so they never hand out a car ahead of Rusty's).
 export const carLevel = (car: CarDef) =>
   car.rescueOnly ? Math.min(...RESCUE_SPOTS.filter((s) => s.cars.some((c) => c.model === car.id)).map((s) => s.unlockLevel), 99) : car.unlockLevel
-export const restoreCost = (car: CarDef) => Math.max(200, Math.round((car.price + (car.bucks ?? 0) * 1000) * 0.25 / 10) * 10)
-export const rushBucks = (msLeft: number) => Math.max(1, Math.ceil(msLeft / 1800000))
+export const restoreCost = (car: CarDef) => Math.max(200, Math.round((car.price + (car.bucks ?? 0) * GEM_BUILD_COINS) * 0.25 / 10) * 10)
+// Gems to fix the tow truck's flat during a search at Rusty's.
+export const TOW_FIX_BUCKS = 10
+// Gems to finish a restore now: RUSH_BUCKS per 30 minutes left (at least one lot).
+export const RUSH_BUCKS = 10
+export const rushBucks = (msLeft: number) => RUSH_BUCKS * Math.max(1, Math.ceil(msLeft / 1800000))
 
 // Same idea as buildingDef: a car from a newer build drives as the starter car
 // under a placeholder name, can't be sold or scrapped, and keeps its real id.
@@ -617,7 +624,7 @@ export const UPGRADE_SLOTS: { id: UpgradeSlot; name: string }[] = [
 export const MAX_UPGRADE = 5
 
 export const upgradeCost = (car: CarDef, level: number) => ({
-  coins: Math.round((car.price + (car.bucks ?? 0) * 1000) * 0.15 * (level + 1) + 200),
+  coins: Math.round((car.price + (car.bucks ?? 0) * GEM_BUILD_COINS) * 0.15 * (level + 1) + 200),
   parts: 2 + level * 3,
 })
 
@@ -678,13 +685,13 @@ const NO_AERO: Body[] = [...ODD, 'formula', 'icecream', 'parcel', 'monster']
 export const MODS: ModDef[] = [
   { id: 'ducktail', slot: 'spoiler', notOn: ODD, name: 'Ducktail Lip', unlockLevel: 2, coins: 1200, parts: 0, bucks: 0, power: 0, grip: 2, weight: 0 },
   { id: 'gtwing', slot: 'spoiler', notOn: ODD, name: 'GT Wing', unlockLevel: 5, coins: 4000, parts: 10, bucks: 0, power: 0, grip: 4, weight: 0 },
-  { id: 'attackwing', slot: 'spoiler', notOn: ODD, name: 'Time Attack Wing', unlockLevel: 12, coins: 0, parts: 0, bucks: 12, power: 0, grip: 6, weight: 0 },
+  { id: 'attackwing', slot: 'spoiler', notOn: ODD, name: 'Time Attack Wing', unlockLevel: 12, coins: 0, parts: 0, bucks: 120, power: 0, grip: 6, weight: 0 },
   { id: 'twintips', slot: 'exhaust', name: 'Twin Tips', unlockLevel: 2, coins: 1000, parts: 0, bucks: 0, power: 2, grip: 0, weight: 0 },
   { id: 'sidepipes', slot: 'exhaust', name: 'Side Pipes', unlockLevel: 4, coins: 3500, parts: 8, bucks: 0, power: 4, grip: 0, weight: 0 },
-  { id: 'flamepipes', slot: 'exhaust', name: 'Flame Throwers', unlockLevel: 12, coins: 0, parts: 0, bucks: 10, power: 6, grip: 0, weight: 0 },
+  { id: 'flamepipes', slot: 'exhaust', name: 'Flame Throwers', unlockLevel: 12, coins: 0, parts: 0, bucks: 100, power: 6, grip: 0, weight: 0 },
   { id: 'streetkit', slot: 'kit', notOn: BIKE_BODIES, name: 'Street Kit', unlockLevel: 3, coins: 1500, parts: 0, bucks: 0, power: 0, grip: 1, weight: -2 },
   { id: 'widebody', slot: 'kit', notOn: BIKE_BODIES, name: 'Widebody', unlockLevel: 6, coins: 6000, parts: 15, bucks: 0, power: 0, grip: 3, weight: -3 },
-  { id: 'carbonkit', slot: 'kit', notOn: BIKE_BODIES, name: 'Carbon Race Kit', unlockLevel: 16, coins: 0, parts: 0, bucks: 15, power: 0, grip: 3, weight: -7 },
+  { id: 'carbonkit', slot: 'kit', notOn: BIKE_BODIES, name: 'Carbon Race Kit', unlockLevel: 16, coins: 0, parts: 0, bucks: 150, power: 0, grip: 3, weight: -7 },
   { id: 'vented', slot: 'hood', notOn: [...BIKE_BODIES, 'formula'], name: 'Vented Hood', unlockLevel: 2, coins: 800, parts: 0, bucks: 0, power: 1, grip: 0, weight: -1 },
   { id: 'ramscoop', slot: 'hood', notOn: [...BIKE_BODIES, 'formula'], name: 'Ram Scoop', unlockLevel: 4, coins: 3000, parts: 6, bucks: 0, power: 3, grip: 0, weight: 0 },
   { id: 'blower', slot: 'hood', notOn: [...BIKE_BODIES, 'formula'], name: 'Supercharger', unlockLevel: 7, coins: 8000, parts: 20, bucks: 0, power: 5, grip: 0, weight: 0 },
@@ -694,13 +701,13 @@ export const MODS: ModDef[] = [
   { id: 'luggage', slot: 'spoiler', only: ['bus'], name: 'Roof Luggage Rack', unlockLevel: 3, coins: 2500, parts: 0, bucks: 0, power: 0, grip: 2, weight: 1 },
   { id: 'stacks', slot: 'exhaust', only: ['bus'], name: 'Big Rig Stacks', unlockLevel: 3, coins: 3000, parts: 5, bucks: 0, power: 3, grip: 0, weight: -1 },
   { id: 'cowcatcher', slot: 'kit', only: ['bus'], name: 'Cow Catcher', unlockLevel: 4, coins: 3500, parts: 8, bucks: 0, power: 0, grip: 3, weight: 0 },
-  { id: 'disco', slot: 'hood', only: ['bus'], name: 'Disco Ball', unlockLevel: 5, coins: 0, parts: 0, bucks: 6, power: 4, grip: 0, weight: 0 },
+  { id: 'disco', slot: 'hood', only: ['bus'], name: 'Disco Ball', unlockLevel: 5, coins: 0, parts: 0, bucks: 60, power: 4, grip: 0, weight: 0 },
   { id: 'flag', slot: 'spoiler', only: ['tank'], name: 'Battle Standard', unlockLevel: 10, coins: 6000, parts: 10, bucks: 0, power: 0, grip: 3, weight: 0 },
-  { id: 'smoke', slot: 'exhaust', only: ['tank'], name: 'Smoke Screen Stacks', unlockLevel: 10, coins: 0, parts: 0, bucks: 8, power: 5, grip: 0, weight: 0 },
+  { id: 'smoke', slot: 'exhaust', only: ['tank'], name: 'Smoke Screen Stacks', unlockLevel: 10, coins: 0, parts: 0, bucks: 80, power: 5, grip: 0, weight: 0 },
   { id: 'reactive', slot: 'kit', only: ['tank'], name: 'Reactive Armour', unlockLevel: 10, coins: 9000, parts: 20, bucks: 0, power: 0, grip: 4, weight: -1 },
-  { id: 'watercannon', slot: 'hood', only: ['tank'], name: 'Water Cannon Turret', unlockLevel: 10, coins: 0, parts: 0, bucks: 12, power: 5, grip: 1, weight: 0 },
+  { id: 'watercannon', slot: 'hood', only: ['tank'], name: 'Water Cannon Turret', unlockLevel: 10, coins: 0, parts: 0, bucks: 120, power: 5, grip: 1, weight: 0 },
   { id: 'bigtail', slot: 'spoiler', only: ['dogvan'], name: 'Wagging Tail XL', unlockLevel: 4, coins: 1500, parts: 0, bucks: 0, power: 0, grip: 2, weight: 0 },
-  { id: 'bubbles', slot: 'exhaust', only: ['dogvan'], name: 'Bubble Blower', unlockLevel: 4, coins: 0, parts: 0, bucks: 5, power: 4, grip: 0, weight: 0 },
+  { id: 'bubbles', slot: 'exhaust', only: ['dogvan'], name: 'Bubble Blower', unlockLevel: 4, coins: 0, parts: 0, bucks: 50, power: 4, grip: 0, weight: 0 },
   { id: 'collar', slot: 'kit', only: ['dogvan'], name: 'Spiked Collar', unlockLevel: 4, coins: 2000, parts: 4, bucks: 0, power: 0, grip: 2, weight: 0 },
   { id: 'bone', slot: 'hood', only: ['dogvan'], name: 'Bone Hood Ornament', unlockLevel: 4, coins: 1200, parts: 0, bucks: 0, power: 1, grip: 0, weight: -2 },
   { id: 'radar', slot: 'spoiler', only: ['tusker'], name: 'Radar Dish', unlockLevel: 9, coins: 4500, parts: 10, bucks: 0, power: 0, grip: 3, weight: 0 },
@@ -711,36 +718,36 @@ export const MODS: ModDef[] = [
   { id: 'saddlebags', slot: 'kit', only: BIKE_BODIES, name: 'Saddlebags', unlockLevel: 2, coins: 1800, parts: 0, bucks: 0, power: 0, grip: 1, weight: -1 },
   { id: 'windscreen', slot: 'hood', only: BIKE_BODIES, name: 'Touring Windscreen', unlockLevel: 2, coins: 1200, parts: 0, bucks: 0, power: 1, grip: 0, weight: 0 },
   { id: 'campod', slot: 'hood', only: ['formula'], name: 'Onboard Camera', unlockLevel: 11, coins: 2000, parts: 4, bucks: 0, power: 1, grip: 0, weight: 0 },
-  { id: 'bargeboards', slot: 'kit', only: ['formula'], name: 'Bargeboards', unlockLevel: 11, coins: 0, parts: 0, bucks: 10, power: 0, grip: 4, weight: -1 },
+  { id: 'bargeboards', slot: 'kit', only: ['formula'], name: 'Bargeboards', unlockLevel: 11, coins: 0, parts: 0, bucks: 100, power: 0, grip: 4, weight: -1 },
   { id: 'raintires', slot: 'tires', name: 'Rain Tires', unlockLevel: 3, coins: 2500, parts: 4, bucks: 0, power: 0, grip: 0, weight: 0, tread: { wet: 1 } },
   { id: 'sandtires', slot: 'tires', name: 'Sand Paddles', unlockLevel: 4, coins: 3000, parts: 5, bucks: 0, power: 0, grip: 0, weight: 0, tread: { dust: 1 } },
   { id: 'snowstuds', slot: 'tires', name: 'Studded Snow Tires', unlockLevel: 4, coins: 3500, parts: 6, bucks: 0, power: 0, grip: 0, weight: 0, tread: { snow: 1 } },
-  { id: 'allweather', slot: 'tires', name: 'All-Weather Compound', unlockLevel: 7, coins: 0, parts: 0, bucks: 12, power: 0, grip: 0, weight: 0, tread: { wet: 0.7, snow: 0.7, dust: 0.7 } },
+  { id: 'allweather', slot: 'tires', name: 'All-Weather Compound', unlockLevel: 7, coins: 0, parts: 0, bucks: 120, power: 0, grip: 0, weight: 0, tread: { wet: 0.7, snow: 0.7, dust: 0.7 } },
   { id: 'forged', slot: 'rims', name: 'Forged Black', unlockLevel: 7, coins: 7000, parts: 12, bucks: 0, power: 0, grip: 2, weight: -3 },
   // Batch 3: more of every slot, plus lights and stance.
   { id: 'swanneck', slot: 'spoiler', notOn: ODD, name: 'Swan Neck Wing', unlockLevel: 14, coins: 12000, parts: 25, bucks: 0, power: 0, grip: 5, weight: 0 },
-  { id: 'skydeck', slot: 'spoiler', notOn: ODD, name: 'Twin Deck Wing', unlockLevel: 18, coins: 0, parts: 0, bucks: 16, power: 0, grip: 7, weight: 0 },
+  { id: 'skydeck', slot: 'spoiler', notOn: ODD, name: 'Twin Deck Wing', unlockLevel: 18, coins: 0, parts: 0, bucks: 160, power: 0, grip: 7, weight: 0 },
   { id: 'roofrack', slot: 'spoiler', only: UTILITY, name: 'Roof Rack', unlockLevel: 5, coins: 2500, parts: 4, bucks: 0, power: 0, grip: 3, weight: 1 },
   { id: 'quadtips', slot: 'exhaust', name: 'Quad Tips', unlockLevel: 5, coins: 2200, parts: 4, bucks: 0, power: 3, grip: 0, weight: 0 },
   { id: 'zoomies', slot: 'exhaust', notOn: [...ODD, 'formula'], name: 'Zoomie Headers', unlockLevel: 11, coins: 10000, parts: 20, bucks: 0, power: 5, grip: 0, weight: 0 },
-  { id: 'titan', slot: 'exhaust', name: 'Burnt Titanium', unlockLevel: 15, coins: 0, parts: 0, bucks: 14, power: 6, grip: 0, weight: -1 },
+  { id: 'titan', slot: 'exhaust', name: 'Burnt Titanium', unlockLevel: 15, coins: 0, parts: 0, bucks: 140, power: 6, grip: 0, weight: -1 },
   { id: 'rallykit', slot: 'kit', notOn: [...BIKE_BODIES, 'formula'], name: 'Rally Kit', unlockLevel: 5, coins: 2800, parts: 5, bucks: 0, power: 0, grip: 2, weight: -1 },
   { id: 'boxflares', slot: 'kit', notOn: NO_AERO, name: 'Box Flares', unlockLevel: 11, coins: 11000, parts: 22, bucks: 0, power: 0, grip: 4, weight: -3 },
-  { id: 'aerokit', slot: 'kit', notOn: NO_AERO, name: 'Aero Kit', unlockLevel: 20, coins: 0, parts: 0, bucks: 20, power: 0, grip: 4, weight: -5 },
+  { id: 'aerokit', slot: 'kit', notOn: NO_AERO, name: 'Aero Kit', unlockLevel: 20, coins: 0, parts: 0, bucks: 200, power: 0, grip: 4, weight: -5 },
   { id: 'bullbar', slot: 'kit', only: [...UTILITY, 'offroad'], name: 'Bull Bar', unlockLevel: 4, coins: 2000, parts: 3, bucks: 0, power: 0, grip: 2, weight: 0 },
   { id: 'cowl', slot: 'hood', notOn: [...BIKE_BODIES, 'formula'], name: 'Cowl Hood', unlockLevel: 3, coins: 1800, parts: 2, bucks: 0, power: 2, grip: 0, weight: 0 },
   { id: 'louvres', slot: 'hood', notOn: [...BIKE_BODIES, 'formula'], name: 'Louvred Hood', unlockLevel: 9, coins: 9000, parts: 18, bucks: 0, power: 5, grip: 0, weight: -1 },
-  { id: 'twinturbo', slot: 'hood', notOn: [...BIKE_BODIES, 'formula'], name: 'Twin Turbo', unlockLevel: 16, coins: 0, parts: 0, bucks: 16, power: 6, grip: 0, weight: -1 },
+  { id: 'twinturbo', slot: 'hood', notOn: [...BIKE_BODIES, 'formula'], name: 'Twin Turbo', unlockLevel: 16, coins: 0, parts: 0, bucks: 160, power: 6, grip: 0, weight: -1 },
   { id: 'candy', slot: 'rims', name: 'Candy Fives', unlockLevel: 3, coins: 1500, parts: 2, bucks: 0, power: 0, grip: 0, weight: -2 },
   { id: 'beadlock', slot: 'rims', name: 'Bronze Beadlocks', unlockLevel: 6, coins: 4000, parts: 6, bucks: 0, power: 0, grip: 2, weight: -1 },
   { id: 'turbine', slot: 'rims', name: 'Turbine Fans', unlockLevel: 10, coins: 9000, parts: 15, bucks: 0, power: 0, grip: 2, weight: -4 },
-  { id: 'goldwire', slot: 'rims', name: 'Gold Wire Spokes', unlockLevel: 14, coins: 0, parts: 0, bucks: 10, power: 0, grip: 2, weight: -5 },
+  { id: 'goldwire', slot: 'rims', name: 'Gold Wire Spokes', unlockLevel: 14, coins: 0, parts: 0, bucks: 100, power: 0, grip: 2, weight: -5 },
   { id: 'foglamps', slot: 'lights', notOn: [...BIKE_BODIES, 'formula'], name: 'Fog Lamps', unlockLevel: 3, coins: 1500, parts: 2, bucks: 0, power: 0, grip: 1, weight: 0 },
   { id: 'roofbar', slot: 'lights', notOn: [...ODD, ...NO_ROOF, 'formula'], name: 'Roof Light Bar', unlockLevel: 7, coins: 6000, parts: 10, bucks: 0, power: 0, grip: 2, weight: 0 },
-  { id: 'underglow', slot: 'lights', notOn: FIXED_RIDE, name: 'Neon Underglow', unlockLevel: 10, coins: 0, parts: 0, bucks: 12, power: 1, grip: 1, weight: 0 },
+  { id: 'underglow', slot: 'lights', notOn: FIXED_RIDE, name: 'Neon Underglow', unlockLevel: 10, coins: 0, parts: 0, bucks: 120, power: 1, grip: 1, weight: 0 },
   { id: 'lowered', slot: 'stance', notOn: FIXED_RIDE, name: 'Lowering Springs', unlockLevel: 4, coins: 2500, parts: 4, bucks: 0, power: 0, grip: 1, weight: 0 },
   { id: 'lifted', slot: 'stance', notOn: FIXED_RIDE, name: 'Lift Kit', unlockLevel: 6, coins: 4500, parts: 8, bucks: 0, power: 0, grip: 2, weight: 1 },
-  { id: 'slammed', slot: 'stance', notOn: FIXED_RIDE, name: 'Air Ride', unlockLevel: 12, coins: 0, parts: 0, bucks: 12, power: 0, grip: 2, weight: -1 },
+  { id: 'slammed', slot: 'stance', notOn: FIXED_RIDE, name: 'Air Ride', unlockLevel: 12, coins: 0, parts: 0, bucks: 120, power: 0, grip: 2, weight: -1 },
 ]
 
 // The mod slots a body has parts for (bikes, formula cars and tanks have no lights or stance).
@@ -814,12 +821,15 @@ export const raceXp = (won: boolean, level: number) => playXp(won ? RACE_WIN_XP 
 export const SERVICE_XP = { gas: 8, tires: 12, tow: 15, fix: 5 } as const
 export const serviceXp = (kind: keyof typeof SERVICE_XP, level: number) => playXp(SERVICE_XP[kind], level)
 
+// Gems for each level gained (the server guard mirrors this).
+export const LEVEL_GEMS = 15
 export const baseFuelCap = (level: number) => 15 + level * 2
 export const FUEL_REGEN_SECONDS = 60
 export const RACE_FUEL = 3
-// Bucks to fill the tank to the cap in one go: at least 3, and 1 per 5 fuel it adds.
-export const REFILL_BUCKS = 3
-export const refillBucks = (fuelToAdd: number) => Math.max(REFILL_BUCKS, Math.ceil(fuelToAdd / 5))
+// Gems to fill the tank to the cap in one go: at least REFILL_BUCKS, and REFILL_BUCKS_PER_5 per 5 fuel it adds.
+export const REFILL_BUCKS = 30
+export const REFILL_BUCKS_PER_5 = 10
+export const refillBucks = (fuelToAdd: number) => Math.max(REFILL_BUCKS, REFILL_BUCKS_PER_5 * Math.ceil(fuelToAdd / 5))
 
 // Grand Prix: six races in a row against tougher and tougher rivals. Win
 // all six for a mystery box car. Each repeat of a series gets harder.
@@ -852,13 +862,13 @@ export type CampaignChapter = {
 }
 export const CAMPAIGN_RACES = 5
 export const CAMPAIGN: CampaignChapter[] = [
-  { id: 'c1', name: 'Back Streets', blurb: 'Local kids with something to prove.', unlockLevel: 1, venue: 'main', pi: [22, 32], rivals: ['Scooter Steve', 'Bubblegum Bea', 'Hubcap Hal', 'Lil Lugnut', 'Big Mike'], cars: ['pip', 'bug', 'civic', 'buggy', 'hauler'], coins: 1000, bucks: 1, trophies: 3, starBucks: 1 },
-  { id: 'c2', name: 'Harbor Run', blurb: 'Dockworkers race the night shift home.', unlockLevel: 4, venue: 'docks', pi: [32, 44], rivals: ['Salty Pete', 'Crane Carla', 'Rusty Anchor', 'Tugboat Ted', 'Captain Kidd'], cars: ['civic', 'trail', 'schoolbus', 'shaggy', 'hotshot'], coins: 2000, bucks: 1, trophies: 3, starBucks: 1 },
-  { id: 'c3', name: 'Desert Strip', blurb: 'Long straights, hot tarmac, no mercy.', unlockLevel: 8, venue: 'desert', pi: [44, 54], payPi: [44, 58], rivals: ['Dusty Dakota', 'Mirage Mo', 'Sidewinder Sal', 'Coyote Cass', 'The Scorpion'], cars: ['hotshot', 'crusher', 'cruiser', 'kitsune', 'bandit'], coins: 3500, bucks: 2, trophies: 4, starBucks: 1 },
-  { id: 'c4', name: 'Mountain Pass', blurb: 'Thin air and thinner margins.', unlockLevel: 13, venue: 'snow', pi: [56, 61], payPi: [58, 72], rivals: ['Summit Sue', 'Avalanche Al', 'Ridge Runner', 'Peak Paulie', 'The Yeti'], cars: ['rally', 'stomper', 'charger', 'speedster', 'kreis'], coins: 5500, bucks: 2, trophies: 5, starBucks: 2 },
-  { id: 'c5', name: 'Sunset Boardwalk', blurb: 'Beach crowds, big money, bigger engines.', unlockLevel: 19, venue: 'beach', pi: [62, 67], payPi: [72, 88], rivals: ['Surfer Sid', 'Sandy Shores', 'Tidal Tom', 'Riptide Rita', 'Big Kahuna'], cars: ['current', 'hellcat', 'bergmeister', 'lemans', 'gtr'], coins: 8000, bucks: 3, trophies: 6, starBucks: 2 },
-  { id: 'c6', name: 'Harvest Backroads', blurb: 'Farm-tough racers who never lift.', unlockLevel: 26, venue: 'farm', pi: [68, 78], payPi: [88, 104], rivals: ['Hayride Hank', 'Tractor Tina', 'Combine Carl', 'Silo Sam', 'The Scarecrow'], cars: ['tusker', 'rattler', 'cottonmouth', 'lemans', 'gtr'], coins: 12000, bucks: 3, trophies: 8, starBucks: 2 },
-  { id: 'c7', name: 'Champions Speedway', blurb: 'The best drivers in the land. Only one leaves a legend.', unlockLevel: 33, venue: 'main', pi: [78, 91], payPi: [104, 124], rivals: ['Golden Gabe', 'Iron Ivy', 'Thunder Thea', 'Velvet Vince', 'The Champion'], cars: ['cottonmouth', 'shinden', 'hyper', 'monoposto', 'raiden'], coins: 20000, bucks: 5, trophies: 10, starBucks: 3 },
+  { id: 'c1', name: 'Back Streets', blurb: 'Local kids with something to prove.', unlockLevel: 1, venue: 'main', pi: [22, 32], rivals: ['Scooter Steve', 'Bubblegum Bea', 'Hubcap Hal', 'Lil Lugnut', 'Big Mike'], cars: ['pip', 'bug', 'civic', 'buggy', 'hauler'], coins: 1000, bucks: 15, trophies: 3, starBucks: 15 },
+  { id: 'c2', name: 'Harbor Run', blurb: 'Dockworkers race the night shift home.', unlockLevel: 4, venue: 'docks', pi: [32, 44], rivals: ['Salty Pete', 'Crane Carla', 'Rusty Anchor', 'Tugboat Ted', 'Captain Kidd'], cars: ['civic', 'trail', 'schoolbus', 'shaggy', 'hotshot'], coins: 2000, bucks: 15, trophies: 3, starBucks: 15 },
+  { id: 'c3', name: 'Desert Strip', blurb: 'Long straights, hot tarmac, no mercy.', unlockLevel: 8, venue: 'desert', pi: [44, 54], payPi: [44, 58], rivals: ['Dusty Dakota', 'Mirage Mo', 'Sidewinder Sal', 'Coyote Cass', 'The Scorpion'], cars: ['hotshot', 'crusher', 'cruiser', 'kitsune', 'bandit'], coins: 3500, bucks: 30, trophies: 4, starBucks: 15 },
+  { id: 'c4', name: 'Mountain Pass', blurb: 'Thin air and thinner margins.', unlockLevel: 13, venue: 'snow', pi: [56, 61], payPi: [58, 72], rivals: ['Summit Sue', 'Avalanche Al', 'Ridge Runner', 'Peak Paulie', 'The Yeti'], cars: ['rally', 'stomper', 'charger', 'speedster', 'kreis'], coins: 5500, bucks: 30, trophies: 5, starBucks: 30 },
+  { id: 'c5', name: 'Sunset Boardwalk', blurb: 'Beach crowds, big money, bigger engines.', unlockLevel: 19, venue: 'beach', pi: [62, 67], payPi: [72, 88], rivals: ['Surfer Sid', 'Sandy Shores', 'Tidal Tom', 'Riptide Rita', 'Big Kahuna'], cars: ['current', 'hellcat', 'bergmeister', 'lemans', 'gtr'], coins: 8000, bucks: 45, trophies: 6, starBucks: 30 },
+  { id: 'c6', name: 'Harvest Backroads', blurb: 'Farm-tough racers who never lift.', unlockLevel: 26, venue: 'farm', pi: [68, 78], payPi: [88, 104], rivals: ['Hayride Hank', 'Tractor Tina', 'Combine Carl', 'Silo Sam', 'The Scarecrow'], cars: ['tusker', 'rattler', 'cottonmouth', 'lemans', 'gtr'], coins: 12000, bucks: 45, trophies: 8, starBucks: 30 },
+  { id: 'c7', name: 'Champions Speedway', blurb: 'The best drivers in the land. Only one leaves a legend.', unlockLevel: 33, venue: 'main', pi: [78, 91], payPi: [104, 124], rivals: ['Golden Gabe', 'Iron Ivy', 'Thunder Thea', 'Velvet Vince', 'The Champion'], cars: ['cottonmouth', 'shinden', 'hyper', 'monoposto', 'raiden'], coins: 20000, bucks: 75, trophies: 10, starBucks: 45 },
 ]
 export const campaignRaceId = (ch: CampaignChapter, i: number) => `${ch.id}-${i}`
 const ramp = ([a, b]: [number, number], i: number) => Math.round(a + ((b - a) * i) / (CAMPAIGN_RACES - 1))
@@ -897,24 +907,24 @@ export const campaignPerfect = (done: Record<string, number>, ch: CampaignChapte
 // even if a car from them is sold later.
 export type CarSet = { id: string; name: string; icon: string; cars: string[]; coins: number; bucks: number; trophies: number; xp: number }
 export const CAR_SETS: CarSet[] = [
-  { id: 'daily', name: 'Daily Drivers', icon: '🏘', cars: ['pip', 'civic', 'trail', 'miata'], coins: 1500, bucks: 2, trophies: 5, xp: 60 },
-  { id: 'bikes', name: 'Two Wheels', icon: '🏍', cars: ['zippy', 'baron', 'shinden'], coins: 4000, bucks: 3, trophies: 10, xp: 120 },
-  { id: 'classics', name: "Rusty's Classics", icon: '🔧', cars: ['bug', 'woodie', 'hauler', 'cruiser', 'buggy'], coins: 5000, bucks: 5, trophies: 15, xp: 150 },
-  { id: 'muscle', name: 'Muscle Row', icon: '💪', cars: ['stallion', 'charger', 'hellcat', 'bandit'], coins: 8000, bucks: 5, trophies: 15, xp: 200 },
-  { id: 'track', name: 'Track Legends', icon: '🏁', cars: ['rally', 'vette', 'gtr', 'lemans', 'gullwing'], coins: 15000, bucks: 8, trophies: 25, xp: 300 },
-  { id: 'roadtrip', name: 'Road Trip', icon: '🏕', cars: ['camper', 'ridgeback', 'stomper', 'shaggy'], coins: 6000, bucks: 4, trophies: 12, xp: 160 },
-  { id: 'tuners', name: 'Tuner Alley', icon: '🌀', cars: ['hotshot', 'kitsune', 'current'], coins: 7000, bucks: 4, trophies: 12, xp: 180 },
-  { id: 'grandtour', name: 'Grand Tour', icon: '🎩', cars: ['salon', 'speedster', 'monoposto'], coins: 20000, bucks: 10, trophies: 30, xp: 350 },
-  { id: 'heavy', name: 'Heavy Duty', icon: '🚌', cars: ['schoolbus', 'tusker'], coins: 6000, bucks: 3, trophies: 10, xp: 150 },
-  { id: 'dream', name: 'Dream Garage', icon: '💎', cars: ['lambo', 'hyper', 'tomahawk', 'zenith'], coins: 30000, bucks: 15, trophies: 40, xp: 500 },
-  { id: 'autobahn', name: 'Autobahn Club', icon: '🛣', cars: ['kreis', 'bergmeister', 'ringmeister', 'sovereign'], coins: 20000, bucks: 10, trophies: 30, xp: 350 },
-  { id: 'apex', name: 'Apex Predators', icon: '🐍', cars: ['rattler', 'cottonmouth', 'raiden', 'wraith'], coins: 30000, bucks: 15, trophies: 40, xp: 500 },
-  { id: 'oddballs', name: 'Oddballs', icon: '🍦', cars: ['scoops', 'courier', 'crusher'], coins: 4000, bucks: 3, trophies: 8, xp: 120 },
-  { id: 'restomods', name: 'Resto Garage', icon: '🧩', cars: ['sprint', 'revenant', 'pontone'], coins: 30000, bucks: 15, trophies: 40, xp: 500 },
-  { id: 'exotica', name: 'Exotica', icon: '👑', cars: ['fulmine', 'eclat', 'orafo'], coins: 40000, bucks: 20, trophies: 50, xp: 600 },
-  { id: 'carpacks', name: 'Pack Legends', icon: '💳', cars: ['scatto', 'stinger', 'thunderjet', 'sora', 'hayate', 'kestrel', 'firebolt', 'kaze', 'sturm', 'vanta'], coins: 40000, bucks: 20, trophies: 50, xp: 600 },
+  { id: 'daily', name: 'Daily Drivers', icon: '🏘', cars: ['pip', 'civic', 'trail', 'miata'], coins: 1500, bucks: 30, trophies: 5, xp: 60 },
+  { id: 'bikes', name: 'Two Wheels', icon: '🏍', cars: ['zippy', 'baron', 'shinden'], coins: 4000, bucks: 45, trophies: 10, xp: 120 },
+  { id: 'classics', name: "Rusty's Classics", icon: '🔧', cars: ['bug', 'woodie', 'hauler', 'cruiser', 'buggy'], coins: 5000, bucks: 75, trophies: 15, xp: 150 },
+  { id: 'muscle', name: 'Muscle Row', icon: '💪', cars: ['stallion', 'charger', 'hellcat', 'bandit'], coins: 8000, bucks: 75, trophies: 15, xp: 200 },
+  { id: 'track', name: 'Track Legends', icon: '🏁', cars: ['rally', 'vette', 'gtr', 'lemans', 'gullwing'], coins: 15000, bucks: 120, trophies: 25, xp: 300 },
+  { id: 'roadtrip', name: 'Road Trip', icon: '🏕', cars: ['camper', 'ridgeback', 'stomper', 'shaggy'], coins: 6000, bucks: 60, trophies: 12, xp: 160 },
+  { id: 'tuners', name: 'Tuner Alley', icon: '🌀', cars: ['hotshot', 'kitsune', 'current'], coins: 7000, bucks: 60, trophies: 12, xp: 180 },
+  { id: 'grandtour', name: 'Grand Tour', icon: '🎩', cars: ['salon', 'speedster', 'monoposto'], coins: 20000, bucks: 150, trophies: 30, xp: 350 },
+  { id: 'heavy', name: 'Heavy Duty', icon: '🚌', cars: ['schoolbus', 'tusker'], coins: 6000, bucks: 45, trophies: 10, xp: 150 },
+  { id: 'dream', name: 'Dream Garage', icon: '💎', cars: ['lambo', 'hyper', 'tomahawk', 'zenith'], coins: 30000, bucks: 225, trophies: 40, xp: 500 },
+  { id: 'autobahn', name: 'Autobahn Club', icon: '🛣', cars: ['kreis', 'bergmeister', 'ringmeister', 'sovereign'], coins: 20000, bucks: 150, trophies: 30, xp: 350 },
+  { id: 'apex', name: 'Apex Predators', icon: '🐍', cars: ['rattler', 'cottonmouth', 'raiden', 'wraith'], coins: 30000, bucks: 225, trophies: 40, xp: 500 },
+  { id: 'oddballs', name: 'Oddballs', icon: '🍦', cars: ['scoops', 'courier', 'crusher'], coins: 4000, bucks: 45, trophies: 8, xp: 120 },
+  { id: 'restomods', name: 'Resto Garage', icon: '🧩', cars: ['sprint', 'revenant', 'pontone'], coins: 30000, bucks: 225, trophies: 40, xp: 500 },
+  { id: 'exotica', name: 'Exotica', icon: '👑', cars: ['fulmine', 'eclat', 'orafo'], coins: 40000, bucks: 300, trophies: 50, xp: 600 },
+  { id: 'carpacks', name: 'Pack Legends', icon: '💳', cars: ['scatto', 'stinger', 'thunderjet', 'sora', 'hayate', 'kestrel', 'firebolt', 'kaze', 'sturm', 'vanta'], coins: 40000, bucks: 300, trophies: 50, xp: 600 },
   // Season track prizes; each season adds its car here.
-  { id: 'seasons', name: 'Season Rides', icon: '🏁', cars: ['nightfall'], coins: 5000, bucks: 3, trophies: 10, xp: 150 },
+  { id: 'seasons', name: 'Season Rides', icon: '🏁', cars: ['nightfall'], coins: 5000, bucks: 45, trophies: 10, xp: 150 },
 ]
 export const setOwned = (set: CarSet, cars: { model: string }[]) => set.cars.filter((m) => cars.some((c) => c.model === m)).length
 export const setComplete = (set: CarSet, cars: { model: string }[]) => setOwned(set, cars) === set.cars.length
@@ -935,7 +945,7 @@ export function carSource(car: CarDef): { icon: string; text: string } {
 }
 
 // Bank packs. Bigger packs carry a bigger bonus on top of the base rate of
-// 5 bucks per dollar, plus extra coins and parts.
+// 100 gems per dollar, plus extra coins and parts.
 export { BUCKS_PACKS, type BucksPack } from './bucksPacks'
 
 // Counted on the save as the player does things.
@@ -960,7 +970,7 @@ export type GoalDef = { id: string; icon: string; text: string; stat: StatKey; t
 export const GOALS: GoalDef[] = [
   { id: 'g0', icon: '🔧', text: "Build Rusty's Rescue", stat: 'rusty', target: 1, coins: 200, xp: 20 },
   { id: 'r1', icon: '🔍', text: "Search for cars at Rusty's", stat: 'searches', target: 1, coins: 150, xp: 15 },
-  { id: 'r2', icon: '🛠', text: 'Restore a rescued car', stat: 'rescued', target: 1, coins: 300, xp: 25, bucks: 1 },
+  { id: 'r2', icon: '🛠', text: 'Restore a rescued car', stat: 'rescued', target: 1, coins: 300, xp: 25, bucks: 15 },
   { id: 'g1', icon: '🍕', text: 'Collect from 3 businesses', stat: 'jobs', target: 3, coins: 150, xp: 15 },
   { id: 'g2', icon: '🛣', text: 'Lay 5 road tiles', stat: 'roads', target: 5, coins: 100, xp: 10 },
   { id: 'g3', icon: '🚗', text: 'Get a new car', stat: 'carsBought', target: 1, coins: 300, xp: 25 },
@@ -971,57 +981,57 @@ export const GOALS: GoalDef[] = [
   { id: 'g6', icon: '🏗', text: 'Place 2 new buildings', stat: 'built', target: 2, coins: 300, xp: 25 },
   { id: 'g7', icon: '🛞', text: 'Fix a flat tire', stat: 'flatsFixed', target: 1, coins: 150, xp: 15 },
   { id: 'q3', icon: '🧑‍✈️', text: 'Give a business a driver', stat: 'drivers', target: 1, coins: 300, xp: 25 },
-  { id: 'g8', icon: '🍕', text: 'Collect from 15 businesses', stat: 'jobs', target: 15, coins: 500, xp: 40, bucks: 1 },
+  { id: 'g8', icon: '🍕', text: 'Collect from 15 businesses', stat: 'jobs', target: 15, coins: 500, xp: 40, bucks: 15 },
   { id: 'q4', icon: '⭐', text: 'Reach level 3', stat: 'level', target: 3, coins: 400, xp: 0 },
   { id: 'q5', icon: '🗺', text: 'Clear campaign chapter 1', stat: 'chapters', target: 1, coins: 600, xp: 50 },
   { id: 'g9', icon: '💰', text: 'Earn 5,000 coins', stat: 'coinsEarned', target: 5000, coins: 600, xp: 50 },
   { id: 'q6', icon: '🪽', text: 'Fit a car mod', stat: 'modsBought', target: 1, coins: 500, xp: 40, level: 2 },
   { id: 'q7', icon: '🛞', text: 'Build a Tire Shop', stat: 'owns', def: 'tires', target: 1, coins: 500, xp: 40, level: 2 },
   { id: 'q8', icon: '⛽', text: 'Service 3 stranded cars at your shops', stat: 'serviced', target: 3, coins: 500, xp: 40 },
-  { id: 'g10', icon: '🏁', text: 'Win 5 drag races', stat: 'racesWon', target: 5, coins: 800, xp: 60, bucks: 1 },
+  { id: 'g10', icon: '🏁', text: 'Win 5 drag races', stat: 'racesWon', target: 5, coins: 800, xp: 60, bucks: 15 },
   { id: 'q9', icon: '🌳', text: 'Buy more land', stat: 'plots', target: START_LAND.length + 1, coins: 800, xp: 60 },
   { id: 'q10', icon: '🏢', text: 'Upgrade a building to level 3', stat: 'bldgLevel', target: 3, coins: 800, xp: 60 },
   { id: 'g11', icon: '🚗', text: 'Get 3 new cars', stat: 'carsBought', target: 3, coins: 1000, xp: 70 },
   { id: 'q11', icon: '🅿', text: 'Own 6 cars', stat: 'carsOwned', target: 6, coins: 1000, xp: 70 },
-  { id: 'q12', icon: '⭐', text: 'Reach level 5', stat: 'level', target: 5, coins: 1000, xp: 0, bucks: 1 },
-  { id: 'gp1', icon: '🏆', text: 'Win a Grand Prix series', stat: 'gpWins', target: 1, coins: 2000, xp: 150, bucks: 2, level: 2 },
+  { id: 'q12', icon: '⭐', text: 'Reach level 5', stat: 'level', target: 5, coins: 1000, xp: 0, bucks: 15 },
+  { id: 'gp1', icon: '🏆', text: 'Win a Grand Prix series', stat: 'gpWins', target: 1, coins: 2000, xp: 150, bucks: 30, level: 2 },
   { id: 'q13', icon: '✨', text: 'Earn 9 campaign stars', stat: 'stars', target: 9, coins: 1200, xp: 80 },
-  { id: 'r3', icon: '🛠', text: 'Restore 5 rescued cars', stat: 'rescued', target: 5, coins: 3000, xp: 200, bucks: 2 },
+  { id: 'r3', icon: '🛠', text: 'Restore 5 rescued cars', stat: 'rescued', target: 5, coins: 3000, xp: 200, bucks: 30 },
   { id: 'q14', icon: '🧑‍✈️', text: 'Put 3 drivers to work', stat: 'drivers', target: 3, coins: 1500, xp: 100 },
-  { id: 'g12', icon: '⬆', text: 'Do 10 upgrades', stat: 'upgrades', target: 10, coins: 1200, xp: 80, bucks: 2 },
+  { id: 'g12', icon: '⬆', text: 'Do 10 upgrades', stat: 'upgrades', target: 10, coins: 1200, xp: 80, bucks: 30 },
   { id: 'q15', icon: '🦉', text: 'Build the Neon Owl Nightclub', stat: 'owns', def: 'club', target: 1, coins: 2000, xp: 120, level: 6 },
   { id: 'q16', icon: '🎬', text: 'Build a Drive-In', stat: 'owns', def: 'cinema', target: 1, coins: 2000, xp: 120, level: 6 },
-  { id: 'q17', icon: '🗺', text: 'Clear campaign chapter 3', stat: 'chapters', target: 3, coins: 2500, xp: 150, bucks: 1 },
+  { id: 'q17', icon: '🗺', text: 'Clear campaign chapter 3', stat: 'chapters', target: 3, coins: 2500, xp: 150, bucks: 15 },
   { id: 'g13', icon: '🏗', text: 'Place 10 new buildings', stat: 'built', target: 10, coins: 1500, xp: 100 },
   { id: 'q18', icon: '🪽', text: 'Fit 5 car mods', stat: 'modsBought', target: 5, coins: 2500, xp: 150 },
   { id: 'q19', icon: '💪', text: 'Reach 250 garage power', stat: 'power', target: 250, coins: 2500, xp: 150 },
-  { id: 'g14', icon: '🍕', text: 'Collect from 60 businesses', stat: 'jobs', target: 60, coins: 2500, xp: 150, bucks: 2 },
-  { id: 'q20', icon: '⭐', text: 'Reach level 8', stat: 'level', target: 8, coins: 3000, xp: 0, bucks: 1 },
+  { id: 'g14', icon: '🍕', text: 'Collect from 60 businesses', stat: 'jobs', target: 60, coins: 2500, xp: 150, bucks: 30 },
+  { id: 'q20', icon: '⭐', text: 'Reach level 8', stat: 'level', target: 8, coins: 3000, xp: 0, bucks: 15 },
   { id: 'q21', icon: '🏢', text: 'Upgrade a building to level 5', stat: 'bldgLevel', target: 5, coins: 3000, xp: 200 },
   { id: 'q22', icon: '🅿', text: 'Own 10 cars', stat: 'carsOwned', target: 10, coins: 3000, xp: 200 },
-  { id: 'g15', icon: '💰', text: 'Earn 50,000 coins', stat: 'coinsEarned', target: 50000, coins: 5000, xp: 250, bucks: 3 },
-  { id: 'g16', icon: '🏁', text: 'Win 25 drag races', stat: 'racesWon', target: 25, coins: 5000, xp: 250, bucks: 3 },
-  { id: 'q23', icon: '🗺', text: 'Clear campaign chapter 5', stat: 'chapters', target: 5, coins: 6000, xp: 300, bucks: 2 },
-  { id: 'q24', icon: '🏆', text: 'Win 3 Grand Prix series', stat: 'gpWins', target: 3, coins: 6000, xp: 300, bucks: 2, level: 5 },
-  { id: 'q25', icon: '⭐', text: 'Reach level 10', stat: 'level', target: 10, coins: 6000, xp: 0, bucks: 2 },
+  { id: 'g15', icon: '💰', text: 'Earn 50,000 coins', stat: 'coinsEarned', target: 50000, coins: 5000, xp: 250, bucks: 45 },
+  { id: 'g16', icon: '🏁', text: 'Win 25 drag races', stat: 'racesWon', target: 25, coins: 5000, xp: 250, bucks: 45 },
+  { id: 'q23', icon: '🗺', text: 'Clear campaign chapter 5', stat: 'chapters', target: 5, coins: 6000, xp: 300, bucks: 30 },
+  { id: 'q24', icon: '🏆', text: 'Win 3 Grand Prix series', stat: 'gpWins', target: 3, coins: 6000, xp: 300, bucks: 30, level: 5 },
+  { id: 'q25', icon: '⭐', text: 'Reach level 10', stat: 'level', target: 10, coins: 6000, xp: 0, bucks: 30 },
   { id: 'q26', icon: '🏟', text: 'Build the Speedway', stat: 'owns', def: 'stadium', target: 1, coins: 8000, xp: 400, level: 16 },
-  { id: 'q27', icon: '✨', text: 'Earn 45 campaign stars', stat: 'stars', target: 45, coins: 8000, xp: 400, bucks: 2 },
+  { id: 'q27', icon: '✨', text: 'Earn 45 campaign stars', stat: 'stars', target: 45, coins: 8000, xp: 400, bucks: 30 },
   { id: 'q28', icon: '🅿', text: 'Own 15 cars', stat: 'carsOwned', target: 15, coins: 8000, xp: 400 },
-  { id: 'q29', icon: '🍕', text: 'Collect from 250 businesses', stat: 'jobs', target: 250, coins: 10000, xp: 500, bucks: 2 },
-  { id: 'q30', icon: '🏢', text: 'Upgrade a building to level 10', stat: 'bldgLevel', target: 10, coins: 12000, xp: 600, bucks: 3 },
-  { id: 'q31', icon: '💪', text: 'Reach 450 garage power', stat: 'power', target: 450, coins: 12000, xp: 600, bucks: 2 },
-  { id: 'q32', icon: '🗺', text: 'Clear every campaign chapter', stat: 'chapters', target: 7, coins: 20000, xp: 800, bucks: 5 },
-  { id: 'q33', icon: '🏁', text: 'Win 100 drag races', stat: 'racesWon', target: 100, coins: 20000, xp: 800, bucks: 3 },
-  { id: 'q34', icon: '⭐', text: 'Reach level 15', stat: 'level', target: 15, coins: 20000, xp: 0, bucks: 3 },
-  { id: 'q35', icon: '✨', text: 'Earn all 105 campaign stars', stat: 'stars', target: 105, coins: 30000, xp: 1000, bucks: 5 },
-  { id: 'q36', icon: '💰', text: 'Earn 250,000 coins', stat: 'coinsEarned', target: 250000, coins: 30000, xp: 1000, bucks: 3 },
-  { id: 'q37', icon: '🅿', text: 'Own 20 cars', stat: 'carsOwned', target: 20, coins: 30000, xp: 1000, bucks: 3 },
-  { id: 'q38', icon: '⭐', text: 'Reach level 20', stat: 'level', target: 20, coins: 50000, xp: 0, bucks: 5 },
+  { id: 'q29', icon: '🍕', text: 'Collect from 250 businesses', stat: 'jobs', target: 250, coins: 10000, xp: 500, bucks: 30 },
+  { id: 'q30', icon: '🏢', text: 'Upgrade a building to level 10', stat: 'bldgLevel', target: 10, coins: 12000, xp: 600, bucks: 45 },
+  { id: 'q31', icon: '💪', text: 'Reach 450 garage power', stat: 'power', target: 450, coins: 12000, xp: 600, bucks: 30 },
+  { id: 'q32', icon: '🗺', text: 'Clear every campaign chapter', stat: 'chapters', target: 7, coins: 20000, xp: 800, bucks: 75 },
+  { id: 'q33', icon: '🏁', text: 'Win 100 drag races', stat: 'racesWon', target: 100, coins: 20000, xp: 800, bucks: 45 },
+  { id: 'q34', icon: '⭐', text: 'Reach level 15', stat: 'level', target: 15, coins: 20000, xp: 0, bucks: 45 },
+  { id: 'q35', icon: '✨', text: 'Earn all 105 campaign stars', stat: 'stars', target: 105, coins: 30000, xp: 1000, bucks: 75 },
+  { id: 'q36', icon: '💰', text: 'Earn 250,000 coins', stat: 'coinsEarned', target: 250000, coins: 30000, xp: 1000, bucks: 45 },
+  { id: 'q37', icon: '🅿', text: 'Own 20 cars', stat: 'carsOwned', target: 20, coins: 30000, xp: 1000, bucks: 45 },
+  { id: 'q38', icon: '⭐', text: 'Reach level 20', stat: 'level', target: 20, coins: 50000, xp: 0, bucks: 75 },
   // Spooky Season.
   { id: 'sp1', icon: '🎃', text: 'Place a Pumpkin Patch', stat: 'owns', def: 'pumpkins', target: 1, coins: 300, xp: 25, event: 'spooky' },
-  { id: 'sp2', icon: '👻', text: 'Place 4 spooky decorations', stat: 'spooky', target: 4, coins: 1000, xp: 60, bucks: 1, event: 'spooky' },
+  { id: 'sp2', icon: '👻', text: 'Place 4 spooky decorations', stat: 'spooky', target: 4, coins: 1000, xp: 60, bucks: 15, event: 'spooky' },
   { id: 'sp3', icon: '🌳', text: 'Grow a Haunted Tree', stat: 'owns', def: 'deadtree', target: 1, coins: 1500, xp: 80, event: 'spooky', level: 3 },
-  { id: 'sp4', icon: '🦇', text: 'Place 10 spooky decorations', stat: 'spooky', target: 10, coins: 3000, xp: 150, bucks: 3, event: 'spooky' },
+  { id: 'sp4', icon: '🦇', text: 'Place 10 spooky decorations', stat: 'spooky', target: 10, coins: 3000, xp: 150, bucks: 45, event: 'spooky' },
 ]
 
 // Daily and weekly tasks: three each, drawn per UTC day or ISO week from the pools below,
@@ -1059,11 +1069,11 @@ export type ChestPay = TaskPay & { parts: number; bucks: number; fuel: number }
 export const QUEST_PAY: Record<'daily' | 'weekly', { task: TaskPay; chest: ChestPay }> = {
   daily: {
     task: { coins: 150, coinsPerLevel: 50, xp: 20, xpPerLevel: 5 },
-    chest: { coins: 300, coinsPerLevel: 100, xp: 0, xpPerLevel: 0, parts: 5, bucks: 0, fuel: 10 },
+    chest: { coins: 300, coinsPerLevel: 100, xp: 0, xpPerLevel: 0, parts: 5, bucks: 10, fuel: 10 },
   },
   weekly: {
     task: { coins: 500, coinsPerLevel: 150, xp: 100, xpPerLevel: 20 },
-    chest: { coins: 1000, coinsPerLevel: 250, xp: 0, xpPerLevel: 0, parts: 20, bucks: 3, fuel: 0 },
+    chest: { coins: 1000, coinsPerLevel: 250, xp: 0, xpPerLevel: 0, parts: 20, bucks: 45, fuel: 0 },
   },
 }
 export const payAt = (p: TaskPay, level: number) => ({ coins: p.coins + p.coinsPerLevel * level, xp: p.xp + p.xpPerLevel * level })
@@ -1099,7 +1109,9 @@ export function seasonOf(n: number): SeasonDef {
 }
 export const seasonEndsAt = (n: number) => SEASON_START + n * SEASON_DAYS * 86400000
 // The last tier of a season without its own car pays bucks instead.
-export const SEASON_CAR_BUCKS = 15
+export const SEASON_CAR_BUCKS = 225
+// Gems on every fifth tier: (tier / 5 + 1) lots of this (30, 45, 60, 75, 90).
+export const SEASON_TIER_BUCKS = 15
 export const seasonCars = () => Object.fromEntries(SEASON_NAMES.flatMap((d, i) => (d.car ? [[String(i + 1), d.car]] : [])))
 
 export type SeasonPrize = { coins: number; parts: number; bucks: number; car?: boolean }
@@ -1107,7 +1119,7 @@ export type SeasonPrize = { coins: number; parts: number; bucks: number; car?: b
 export const SEASON_TIERS: SeasonPrize[] = Array.from({ length: 30 }, (_, i): SeasonPrize => {
   const t = i + 1
   if (t === 30) return { coins: 0, parts: 0, bucks: 0, car: true }
-  if (t % 5 === 0) return { coins: 0, parts: 0, bucks: t / 5 + 1 }
+  if (t % 5 === 0) return { coins: 0, parts: 0, bucks: (t / 5 + 1) * SEASON_TIER_BUCKS }
   if (t % 2 === 0) return { coins: 0, parts: 5 + Math.floor(t / 3) * 2, bucks: 0 }
   return { coins: 500 + t * 150, parts: 0, bucks: 0 }
 })
@@ -1145,8 +1157,8 @@ export const PAINTS: { color: string; name: string; bucks?: number; earn?: 'road
   { color: '#ff7a5c', name: 'Coral' }, { color: '#81d4fa', name: 'Sky' }, { color: '#c0703a', name: 'Copper' },
   { color: '#b39ddb', name: 'Lavender' }, { color: '#7d8a2c', name: 'Olive' }, { color: '#8c1d40', name: 'Burgundy' },
   { color: '#00796b', name: 'Deep Teal' },
-  { color: '#ffd700', name: 'Gold Flake', bucks: 1 }, { color: '#76ff03', name: 'Neon Lime', bucks: 1 },
-  { color: '#ff00e5', name: 'Hot Magenta', bucks: 1 }, { color: '#00e5ff', name: 'Ice Neon', bucks: 1 },
+  { color: '#ffd700', name: 'Gold Flake', bucks: 10 }, { color: '#76ff03', name: 'Neon Lime', bucks: 10 },
+  { color: '#ff00e5', name: 'Hot Magenta', bucks: 10 }, { color: '#00e5ff', name: 'Ice Neon', bucks: 10 },
   // Earned only: on the Trophy Road (game/trophyRoad.ts) or by the first win in a car of a class (game/mastery.ts).
   { color: '#6fdcab', name: 'Mint', earn: 'road' }, { color: '#ffb38a', name: 'Peach', earn: 'road' },
   { color: '#2446c8', name: 'Cobalt', earn: 'road' }, { color: '#e0a899', name: 'Rose Gold', earn: 'road' },
@@ -1189,7 +1201,7 @@ export const FINISH_LOOK: Record<Finish, [number, number, number, string?]> = {
 
 export type PaintJob = { color: string; finish: Finish; stripe: string | null }
 // What a paint job costs on a car: each part that changes is charged once. A neon or
-// gold colour costs a buck instead of coins; taking stripes off is free.
+// gold colour costs gems instead of coins; taking stripes off is free.
 export function paintJobCost(car: { color: string; finish?: Finish; stripe?: string | null }, job: PaintJob) {
   let coins = 0
   let bucks = 0
@@ -1256,7 +1268,7 @@ export function tidyPanels(p?: Panels | null): Panels | undefined {
 }
 
 // What changing a car's panels costs: each new colour or pattern once; a gem colour
-// costs a gem instead of coins. Taking one off is free.
+// costs gems instead of coins. Taking one off is free.
 export function panelJobCost(was: Panels | null | undefined, next: Panels | null | undefined) {
   let coins = 0
   let bucks = 0
@@ -1295,7 +1307,7 @@ export const SKINS: SkinDef[] = [
     swatch: 'repeating-linear-gradient(170deg, #062a4a 0 5px, #6fe7ff 6px 7px, #0a3d6b 8px 12px)' },
   { id: 'overclock', n: 2, name: 'Overclock', tier: 'rare', blurb: 'Circuit traces with racing data', unlock: { level: 10 },
     swatch: 'linear-gradient(90deg, transparent 45%, #39ff88 45% 55%, transparent 55%), linear-gradient(0deg, transparent 70%, #39ff88 70% 78%, transparent 78%), #0c2416' },
-  { id: 'static', n: 8, name: 'Static', tier: 'rare', blurb: 'Pixels blinking under the coat', unlock: { bucks: 10 },
+  { id: 'static', n: 8, name: 'Static', tier: 'rare', blurb: 'Pixels blinking under the coat', unlock: { bucks: 100 },
     swatch: 'conic-gradient(#ff29b3 0 25%, #101018 0 50%, #19f2ff 0 75%, #ffe633 0) 0 0 / 10px 10px' },
   { id: 'contour', n: 16, name: 'Contour', tier: 'rare', blurb: 'Glowing map lines over hidden hills', unlock: { set: 'roadtrip' },
     swatch: 'repeating-radial-gradient(circle at 35% 60%, #062022 0 5px, #ffb347 6px 7px, #062022 8px 12px, #1abc9c 13px 14px)' },
@@ -1307,23 +1319,23 @@ export const SKINS: SkinDef[] = [
     swatch: 'radial-gradient(circle at 30% 30%, #fff 0 4%, transparent 5%), radial-gradient(circle at 70% 60%, #cde 0 3%, transparent 4%), radial-gradient(circle at 60% 30%, #7a2aa8, transparent 60%), #05061a' },
   { id: 'faultline', n: 5, name: 'Fault Line', tier: 'epic', blurb: 'Lava glowing through cracked plates', unlock: { set: 'muscle' },
     swatch: 'linear-gradient(120deg, #241612 40%, #ff6a00 42%, #ffd54f 44%, #241612 46%), linear-gradient(30deg, #2e1d17 60%, #ff3d00 61%, #2e1d17 63%)' },
-  { id: 'aurora', n: 6, name: 'Aurora', tier: 'epic', blurb: 'Northern lights swaying deep inside', unlock: { bucks: 20 },
+  { id: 'aurora', n: 6, name: 'Aurora', tier: 'epic', blurb: 'Northern lights swaying deep inside', unlock: { bucks: 200 },
     swatch: 'linear-gradient(170deg, transparent 20%, #3dff9e 40%, transparent 55%, #b24dff 75%, transparent 90%), #051226' },
   { id: 'thunderhead', n: 15, name: 'Thunderhead', tier: 'epic', blurb: 'Storm clouds with lightning inside', unlock: { crate: true },
     swatch: 'linear-gradient(100deg, transparent 46%, #e8f1ff 47% 49%, transparent 50%), radial-gradient(circle at 50% 40%, #5a6380, #121626 70%)' },
   { id: 'biolume', n: 18, name: 'Biolume', tier: 'epic', blurb: 'Glowing jellies drifting in the deep', unlock: { crate: true },
     swatch: 'radial-gradient(circle at 35% 40%, #ff4fc4 0 12%, transparent 22%), radial-gradient(circle at 70% 70%, #8c4dff 0 8%, transparent 16%), radial-gradient(circle at 65% 25%, #33ffd6 0 3%, transparent 4%), #00101c' },
-  { id: 'nightdrive', n: 22, name: 'Night Drive', tier: 'epic', blurb: 'Striped sunset under a neon grid', unlock: { bucks: 20 },
+  { id: 'nightdrive', n: 22, name: 'Night Drive', tier: 'epic', blurb: 'Striped sunset under a neon grid', unlock: { bucks: 200 },
     swatch: 'repeating-linear-gradient(0deg, transparent 0 7px, #ff36d8 7px 8px), radial-gradient(circle at 50% 60%, #ffd84d 0 22%, #ff3d8b 30%, #2a0040 60%)' },
   { id: 'petalstorm', n: 23, name: 'Petal Storm', tier: 'epic', blurb: 'Blossom petals tumbling at dusk', unlock: { crate: true },
     swatch: 'radial-gradient(ellipse 18% 10% at 30% 35%, #ffc1d6 90%, transparent), radial-gradient(ellipse 14% 8% at 70% 65%, #fff0f5 90%, transparent), linear-gradient(180deg, #2a1240, #b0607a)' },
   { id: 'prismatic', n: 4, name: 'Prismatic', tier: 'legendary', blurb: 'Holo foil that shifts as you turn', unlock: { season: 20 },
     swatch: 'linear-gradient(135deg, #ff5f6d, #ffc371, #f9f871, #67f3a4, #4facfe, #b06ab3, #ff5f6d)' },
-  { id: 'horizon', n: 9, name: 'Event Horizon', tier: 'legendary', blurb: 'A turning spiral of fire and violet', unlock: { bucks: 35 },
+  { id: 'horizon', n: 9, name: 'Event Horizon', tier: 'legendary', blurb: 'A turning spiral of fire and violet', unlock: { bucks: 350 },
     swatch: 'radial-gradient(circle, #000 0 18%, #ff7a1a 24%, #9c3dff 38%, #12051f 60%)' },
-  { id: 'coldsnap', n: 10, name: 'Cold Snap', tier: 'legendary', blurb: 'Shattered ice in white and teal', unlock: { bucks: 35 },
+  { id: 'coldsnap', n: 10, name: 'Cold Snap', tier: 'legendary', blurb: 'Shattered ice in white and teal', unlock: { bucks: 350 },
     swatch: 'linear-gradient(115deg, #d9eef0 0 28%, #0d2a33 29% 30%, #7fc3cb 31% 52%, #0d2a33 53% 54%, #3f8e99 55% 74%, #0d2a33 75% 76%, #eef8f9 77%)' },
-  { id: 'quicksilver', n: 20, name: 'Quicksilver', tier: 'legendary', blurb: 'Liquid chrome with rippling drops', unlock: { bucks: 35 },
+  { id: 'quicksilver', n: 20, name: 'Quicksilver', tier: 'legendary', blurb: 'Liquid chrome with rippling drops', unlock: { bucks: 350 },
     swatch: 'radial-gradient(circle at 50% 50%, #fff 0 6%, #8a93a0 10%, #f2f4f7 16%, #6b7380 24%, #e6e9ee 34%, #4a515c 60%)' },
   { id: 'wyrmscale', n: 21, name: 'Wyrmscale', tier: 'legendary', blurb: 'Dragon scales with embers in the seams', unlock: { crate: true },
     swatch: 'radial-gradient(circle at 50% 0, #e6b830 0 30%, #0f5a33 55%, #ff5a00 58% 62%, transparent 63%) 0 0 / 12px 10px, #071a10' },
@@ -1392,7 +1404,7 @@ export const MOD_SKINS: SkinDef[] = [
     swatch: 'linear-gradient(90deg, transparent 20%, #ff2a10 60%, #fff3d6 70%, transparent 71%) 0 3px / 100% 8px, #08080c' },
   { id: 'checkered', n: 27, name: 'Checkered', tier: 'rare', blurb: 'A chequered flag rippling in the wind', unlock: { set: 'track' },
     swatch: 'conic-gradient(#f2f2f2 0 25%, #111 0 50%, #f2f2f2 0 75%, #111 0) 0 0 / 10px 10px' },
-  { id: 'goldleaf', n: 14, name: 'Gold Leaf', tier: 'epic', blurb: 'Gold flakes glinting at every depth', unlock: { bucks: 20 },
+  { id: 'goldleaf', n: 14, name: 'Gold Leaf', tier: 'epic', blurb: 'Gold flakes glinting at every depth', unlock: { bucks: 200 },
     swatch: 'radial-gradient(circle at 30% 30%, #fff8d0 0 6%, transparent 7%), radial-gradient(circle at 65% 60%, #fff 0 4%, transparent 5%), linear-gradient(135deg, #8a5a00, #ffd34d 50%, #a06a00)' },
   { id: 'carbonprism', n: 13, name: 'Carbon Prism', tier: 'epic', blurb: 'Carbon weave over a rainbow sheen', unlock: { season: 15 },
     swatch: 'repeating-linear-gradient(45deg, rgba(0,0,0,.75) 0 3px, transparent 3px 6px), linear-gradient(135deg, #ff5f6d, #f9f871, #67f3a4, #4facfe, #b06ab3)' },
@@ -1404,11 +1416,11 @@ export const MOD_SKINS: SkinDef[] = [
     swatch: 'linear-gradient(100deg, transparent 46%, #e8f1ff 47% 49%, transparent 50%), radial-gradient(circle at 50% 40%, #5a6380, #121626 70%)' },
   { id: 'biobloom', n: 18, name: 'Biobloom', tier: 'epic', blurb: 'Deep-sea glow to match Biolume', unlock: { crate: true },
     swatch: 'radial-gradient(circle at 35% 40%, #ff4fc4 0 12%, transparent 22%), radial-gradient(circle at 65% 25%, #33ffd6 0 3%, transparent 4%), #00101c' },
-  { id: 'holofoil', n: 4, name: 'Holo Foil', tier: 'legendary', blurb: 'Rainbow foil that rolls as you turn', unlock: { bucks: 35 },
+  { id: 'holofoil', n: 4, name: 'Holo Foil', tier: 'legendary', blurb: 'Rainbow foil that rolls as you turn', unlock: { bucks: 350 },
     swatch: 'linear-gradient(135deg, #ff5f6d, #ffc371, #f9f871, #67f3a4, #4facfe, #b06ab3)' },
-  { id: 'rime', n: 10, name: 'Rime', tier: 'legendary', blurb: 'Shattered ice to match Cold Snap', unlock: { bucks: 35 },
+  { id: 'rime', n: 10, name: 'Rime', tier: 'legendary', blurb: 'Shattered ice to match Cold Snap', unlock: { bucks: 350 },
     swatch: 'linear-gradient(115deg, #d9eef0 0 28%, #0d2a33 29% 30%, #7fc3cb 31% 52%, #0d2a33 53% 54%, #3f8e99 55% 74%, #0d2a33 75% 76%, #eef8f9 77%)' },
-  { id: 'mercury', n: 20, name: 'Mercury', tier: 'legendary', blurb: 'Liquid chrome to match Quicksilver', unlock: { bucks: 35 },
+  { id: 'mercury', n: 20, name: 'Mercury', tier: 'legendary', blurb: 'Liquid chrome to match Quicksilver', unlock: { bucks: 350 },
     swatch: 'radial-gradient(circle at 50% 50%, #fff 0 6%, #8a93a0 10%, #f2f4f7 16%, #6b7380 24%, #e6e9ee 34%, #4a515c 60%)' },
   { id: 'dragonhide', n: 21, name: 'Dragonhide', tier: 'legendary', blurb: 'Ember-seamed scales to match Wyrmscale', unlock: { crate: true },
     swatch: 'radial-gradient(circle at 50% 0, #e6b830 0 30%, #0f5a33 55%, #ff5a00 58% 62%, transparent 63%) 0 0 / 12px 10px, #071a10' },
@@ -1470,6 +1482,8 @@ export const dealsFor = (day: string): DealDef[] => {
 }
 
 const off10 = (n: number, off: number) => Math.round((n * (1 - off)) / 10) * 10
+// A gem price with the deal off: rounded to 5, and never under 10.
+export const offGems = (n: number, off: number) => Math.max(10, Math.round((n * (1 - off)) / 5) * 5)
 export type DealOffer = { name: string; icon: string; unlockLevel: number; was: { coins: number; bucks: number }; now: { coins: number; bucks: number }; parts: number }
 // What a deal sells and for how much. `parts` is the parts price of a mod (never discounted).
 export function dealOffer(d: DealDef): DealOffer {
@@ -1479,13 +1493,13 @@ export function dealOffer(d: DealDef): DealOffer {
       return { name: `${n} Parts`, icon: '⚙', unlockLevel: 1, was: { coins: n * 50, bucks: 0 }, now: { coins: off10(n * 50, d.off), bucks: 0 }, parts: 0 }
     }
     case 'fuel':
-      return { name: 'Full tank', icon: '⛽', unlockLevel: 1, was: { coins: 0, bucks: REFILL_BUCKS }, now: { coins: 0, bucks: Math.max(1, Math.round(REFILL_BUCKS * (1 - d.off))) }, parts: 0 }
+      return { name: 'Full tank', icon: '⛽', unlockLevel: 1, was: { coins: 0, bucks: REFILL_BUCKS }, now: { coins: 0, bucks: offGems(REFILL_BUCKS, d.off) }, parts: 0 }
     case 'decor': {
       const b = buildingDef(d.item ?? '')
       return {
         name: b.name, icon: '🌳', unlockLevel: b.unlockLevel,
         was: { coins: b.price, bucks: b.bucks ?? 0 },
-        now: { coins: off10(b.price, d.off), bucks: b.bucks ? Math.max(1, Math.round(b.bucks * (1 - d.off))) : 0 },
+        now: { coins: off10(b.price, d.off), bucks: b.bucks ? offGems(b.bucks, d.off) : 0 },
         parts: 0,
       }
     }
@@ -1511,7 +1525,7 @@ export const dealSave = (d: DealDef) => {
 // (supabase/migrations/0027_crew_weekly_goal.sql, crew_goal_rules()); these copies are for display.
 export const CREW_POINTS = { job: 1, race: 3 }
 // What a crew chest pays. The server guard reads this from econ_catalog().crew.
-export const CREW_CHEST: ChestPay = { coins: 1500, coinsPerLevel: 300, xp: 0, xpPerLevel: 0, parts: 25, bucks: 5, fuel: 0 }
+export const CREW_CHEST: ChestPay = { coins: 1500, coinsPerLevel: 300, xp: 0, xpPerLevel: 0, parts: 25, bucks: 75, fuel: 0 }
 
 // Surprise visitors in town (src/lib/visitors.ts). For signed-in players the server picks who comes
 // and fixes the prize (supabase/migrations/0032_town_visitors.sql, visitor_next()); guests roll here.
@@ -1520,6 +1534,8 @@ export const CREW_CHEST: ChestPay = { coins: 1500, coinsPerLevel: 300, xp: 0, xp
 //   mystery: a mystery car drives by; tap it before it leaves
 //   barn: Rusty hears of a barn find and tows the car home to storage (needs Rusty's Rescue)
 export type VisitorKind = 'racer' | 'tourist' | 'mystery' | 'barn'
+// Gems a lucky visitor leaves (bucksChance is the odds).
+export const VISITOR_BUCKS = 15
 export type VisitorPay = { coins: number; coinsPerLevel: number; xp: number; xpPerLevel: number; parts: number; bucksChance: number }
 export const VISITORS: Record<VisitorKind, { weight: number; minutes: number; pay: VisitorPay }> = {
   racer: { weight: 30, minutes: 5, pay: { coins: 60, coinsPerLevel: 15, xp: 0, xpPerLevel: 0, parts: 3, bucksChance: 0.05 } },
@@ -1556,6 +1572,6 @@ export const visitorPrize = (kind: VisitorKind, level: number, roll = Math.rando
     coins: Math.round(p.coins + p.coinsPerLevel * level),
     xp: Math.round(p.xp + p.xpPerLevel * level),
     parts: p.parts,
-    bucks: roll < p.bucksChance ? 1 : 0,
+    bucks: roll < p.bucksChance ? VISITOR_BUCKS : 0,
   }
 }

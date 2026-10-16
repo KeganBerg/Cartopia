@@ -34,7 +34,7 @@ describe('stripe webhook: refunds and chargebacks', () => {
     const calls = setup([])
     const res = await post({ type: 'checkout.session.completed', data: { object: { id: 'cs_2', payment_status: 'paid', currency: 'usd', amount_total: 1999, metadata: { user: 'u1', pack: 'vault', level: '20' } } } })
     expect(res.status).toBe(200)
-    expect(calls[0]).toEqual({ url: 'https://db/rest/v1/rpc/purchase_record', body: { p_session: 'cs_2', p_user: 'u1', p_pack: 'vault', p_cents: 1999, p_bucks: 260, p_coins: 57500, p_parts: 115 } })
+    expect(calls[0]).toEqual({ url: 'https://db/rest/v1/rpc/purchase_record', body: { p_session: 'cs_2', p_user: 'u1', p_pack: 'vault', p_cents: 1999, p_bucks: 3750, p_coins: 57500, p_parts: 115 } })
   })
 
   it('takes back the pack bought in the refunded payment', async () => {

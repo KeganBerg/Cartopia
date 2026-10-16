@@ -91,7 +91,7 @@ function Showcase({ packs, owns, pending, buy }: { packs: BucksPack[]; owns: (p:
         <div className="pk-hero-name">{car.name}</div>
         <div className="pk-hero-row">
           <span key={pi} className="pk-bignum">{shown}<small>PI</small></span>
-          <span className="pk-gems">+ {p.bucks} 💎</span>
+          <span className="pk-gems">+ {p.bucks.toLocaleString()} 💎</span>
         </div>
         <BuyButton p={p} owned={owns(p)} pending={pending === p.id} onBuy={() => buy(p)} />
       </div>
@@ -113,7 +113,7 @@ function PackCard({ p, i, owned, pending, onBuy }: { p: BucksPack; i: number; ow
       <div className="pk-stage">
         <Stage car={car} />
         <span className="pk-pi"><b>{shown}</b> PI</span>
-        <span className="pk-gems">+ {p.bucks} 💎</span>
+        <span className="pk-gems">+ {p.bucks.toLocaleString()} 💎</span>
       </div>
       <div className="pk-name">{car.name}</div>
       <div className="pk-foot">

@@ -31,7 +31,7 @@ function unlocksBetween(from: number, to: number, rusty: boolean, focus: ReturnT
       name: c.name,
       level: c.unlockLevel,
       tag: 'Car',
-      price: c.bucks ? `💎 ${c.bucks}` : `$ ${c.price.toLocaleString()}`,
+      price: c.bucks ? `💎 ${c.bucks.toLocaleString()}` : `$ ${c.price.toLocaleString()}`,
       art: <CarThumb color={c.colors[0]} body={c.body} model={c.id} />,
       go: () => focus('showroom', c.id),
     })),

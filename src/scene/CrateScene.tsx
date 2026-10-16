@@ -15,7 +15,7 @@ import { concreteTex, corrugatedTex, glowTex, shutterTex } from './textures'
 import { signTexture } from './signTexture'
 import { ToolChest, TyreStack, useFitCamera } from './ArcadeScenery'
 import { tickSkins, withSkin } from './skins'
-import { CUSTOM_PAINT, CUSTOM_PAINT_SHOW, MODS, SKINNED_SLOTS, carDef, fittedMods, modFits, modSkinNumber, skinNumber, type Body, type Finish, type SkinnedSlot, type Panels } from '../game/data'
+import { CUSTOM_PAINT, CUSTOM_PAINT_SHOW, GEM_BUILD_COINS, MODS, SKINNED_SLOTS, carDef, fittedMods, modFits, modSkinNumber, skinNumber, type Body, type Finish, type SkinnedSlot, type Panels } from '../game/data'
 import type { HatFit } from '../game/hats'
 import { dropTier, type CrateDef, type CrateDrop, type CrateId } from '../game/crates'
 import { calmFlashing } from '../game/flashing'
@@ -1362,7 +1362,7 @@ export function prizeLook(drop: CrateDrop | null, cars: { uid: string; model: st
 
 // The showiest part for a slot on this body: the dearest one that fits.
 const bestPart = (slot: SkinnedSlot, body: Body) =>
-  MODS.filter((m) => m.slot === slot && modFits(m, body)).sort((a, b) => b.coins + b.bucks * 1000 - (a.coins + a.bucks * 1000))[0]?.id
+  MODS.filter((m) => m.slot === slot && modFits(m, body)).sort((a, b) => b.coins + b.bucks * GEM_BUILD_COINS - (a.coins + a.bucks * GEM_BUILD_COINS))[0]?.id
 // A skin prize, on one of the player's cars. A car paint covers the bare body with no parts on,
 // so the whole car moves; a mod paint goes on a fully kitted car (every paintable part slot
 // filled), and only those parts move while the body keeps its own colour.

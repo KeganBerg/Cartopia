@@ -12,9 +12,9 @@ describe('weekly time trial', () => {
   })
 
   it('pays by place', () => {
-    expect(trialPrize(1).bucks).toBe(10)
-    expect(trialPrize(3).bucks).toBe(5)
-    expect(trialPrize(10).bucks).toBe(2)
+    expect(trialPrize(1).bucks).toBe(150)
+    expect(trialPrize(3).bucks).toBe(75)
+    expect(trialPrize(10).bucks).toBe(30)
     expect(trialPrize(11).bucks).toBe(0)
     expect(trialPrize(500).coins).toBe(500)
   })

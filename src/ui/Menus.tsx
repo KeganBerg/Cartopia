@@ -4,7 +4,7 @@ import { useGame, hasRusty, buildPrice, gateLevel, type OwnedCar, type PlacedBui
 import { raceCarOf } from '../game/raceCar'
 import { stackCars, stackFace } from '../game/garageStacks'
 import { reducedMotion } from '../game/fx'
-import { activeEvent, garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, carDef, performance, upgradeCost, buildingDef, upgradable, loves, readySets, isBike, FEATURES, type BuildingDef } from '../game/data'
+import { activeEvent, GEM_BUILD_COINS, garagePower, BUILDINGS, CARS, SKILLS, UPGRADE_SLOTS, MAX_UPGRADE, carDef, performance, upgradeCost, buildingDef, upgradable, loves, readySets, isBike, FEATURES, type BuildingDef } from '../game/data'
 import { CarInspect, CarPreview, type DynoFeed } from '../scene/CarPreview'
 import { usePauseTownUnder } from '../scene/renderGate'
 import type { DynoRun } from './Dyno'
@@ -242,7 +242,7 @@ function useShopFocus() {
 }
 
 function price(def: { price: number; bucks?: number }, sale?: { coins: number; bucks: number } | null) {
-  if (def.bucks) return <span className="price bucks">{sale && <s>💎 {def.bucks}</s>} 💎 {sale ? sale.bucks : def.bucks}</span>
+  if (def.bucks) return <span className="price bucks">{sale && <s>💎 {def.bucks.toLocaleString()}</s>} 💎 {(sale ? sale.bucks : def.bucks).toLocaleString()}</span>
   return <span className="price">{sale && <s>$ {def.price.toLocaleString()}</s>} $ {(sale ? sale.coins : def.price).toLocaleString()}</span>
 }
 
@@ -502,7 +502,7 @@ export function ShowroomPanel() {
   const kind = kinds.some((k) => k.id === view.kind) ? view.kind : 'all'
   const list = useMemo(() => {
     const keep = FOR_SALE.filter((c) => kind === 'all' || (kind === 'buy' ? canBuy(c) : kind === 'new' ? !owned.has(c.id) : c.body === kind))
-      .map((c, i) => ({ c, i, gate: level < c.unlockLevel ? c.unlockLevel : 0, pi: performance(c, { engine: 0, turbo: 0, tires: 0, weight: 0 }), cost: c.price + (c.bucks ?? 0) * 1000 }))
+      .map((c, i) => ({ c, i, gate: level < c.unlockLevel ? c.unlockLevel : 0, pi: performance(c, { engine: 0, turbo: 0, tires: 0, weight: 0 }), cost: c.price + (c.bucks ?? 0) * GEM_BUILD_COINS }))
     const by: Record<SaleSort, (a: typeof keep[0], b: typeof keep[0]) => number> = {
       // Cars you can buy now first, then level-locked ones by the level they open at.
       level: (a, b) => a.gate - b.gate || a.i - b.i,

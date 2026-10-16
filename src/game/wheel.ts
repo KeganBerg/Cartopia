@@ -22,11 +22,11 @@ export const WHEEL: WheelSlice[] = [
   { id: 'coins-s', kind: 'coins', mult: 0.3, weight: 31, tier: 'common' },
   { id: 'part', kind: 'part', weight: 14, tier: 'uncommon' },
   { id: 'coins-m', kind: 'coins', mult: 0.7, weight: 22, tier: 'common' },
-  { id: 'gems-1', kind: 'gems', gems: 1, weight: 12, tier: 'uncommon' },
+  { id: 'gems-1', kind: 'gems', gems: 15, weight: 12, tier: 'uncommon' },
   { id: 'coins-l', kind: 'coins', mult: 2, weight: 9, tier: 'rare' },
   { id: 'skin', kind: 'skin', weight: 4, tier: 'epic' },
-  { id: 'gems-3', kind: 'gems', gems: 3, weight: 7, tier: 'rare' },
-  { id: 'jackpot', kind: 'jackpot', gems: 15, weight: 1, tier: 'legendary' },
+  { id: 'gems-3', kind: 'gems', gems: 45, weight: 7, tier: 'rare' },
+  { id: 'jackpot', kind: 'jackpot', gems: 250, weight: 1, tier: 'legendary' },
 ]
 
 // What a part or skin slice pays when there's no part left to fit or no skin to give, and what a
@@ -37,6 +37,9 @@ export const WHEEL_DUPE = 'coins-l'
 export const TIER_COLOR: Record<WheelTier, string> = {
   common: '#42a5f5', uncommon: '#43c463', rare: '#ab47bc', epic: '#ff7043', legendary: '#ffc400',
 }
+
+// How many gems a gem slice draws: one for the small slice, three for the bigger one.
+export const gemPile = (gems: number) => (gems < 30 ? 1 : 3)
 
 export const wheelSlice = (id: string) => WHEEL.find((s) => s.id === id)
 const roundCoins = (n: number) => Math.max(10, Math.round(n / 10) * 10)
