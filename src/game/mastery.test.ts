@@ -137,6 +137,8 @@ describe('Trophy Road', () => {
     expect(roadReached(24)).toBe(0)
     expect(roadReached(50)).toBe(2)
     expect(roadPay(1).coins).toBeGreaterThan(roadPay(0).coins)
+    // Progressive: each stop adds at least as much as the one before, all the way to the cap.
+    for (let i = 1; i < ROAD_STOPS; i++) expect(roadPay(i + 1).coins - roadPay(i).coins).toBeGreaterThanOrEqual(roadPay(i).coins - roadPay(i - 1).coins)
     expect(roadPay(ROAD_STOPS + 5)).toEqual(roadPay(ROAD_STOPS))
   })
   it('draws mystery cosmetics only from earned-only ones, never twice', () => {
