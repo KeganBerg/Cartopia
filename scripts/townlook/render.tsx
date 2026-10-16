@@ -82,6 +82,9 @@ function Theme() {
 // A street corner at night: pavement and kerb, a brick shopfront behind with a lit window, a
 // bench and hydrant, a car parked at the kerb and the side street's zebra crossing. The lamp
 // (both designs for Mixed) lights it all in the chosen colour, framed close so it reads on a phone.
+// Where each design's bulb hangs, matching LampPost's heads.
+const HEAD_AT: Record<'cobra' | 'lantern' | 'globe', [number, number, number]> = { cobra: [0, 1.66, -0.44], lantern: [0, 1.56, -0.4], globe: [0, 1.68, 0] }
+
 function Lamp() {
   const post = q.get('post') ?? 'cobra'
   const designs = (post === 'auto' ? ['cobra', 'lantern'] : [post]) as ('cobra' | 'lantern' | 'globe')[]
@@ -193,9 +196,6 @@ function Lamp() {
     </>
   )
 }
-
-// Where each design's bulb hangs, matching LampPost's heads.
-const HEAD_AT: Record<'cobra' | 'lantern' | 'globe', [number, number, number]> = { cobra: [0, 1.66, -0.44], lantern: [0, 1.56, -0.4], globe: [0, 1.68, 0] }
 
 // After the scene settles, hands the frame to shoot.mjs as WebP.
 function Export() {
