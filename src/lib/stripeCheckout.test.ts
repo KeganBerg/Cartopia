@@ -58,6 +58,16 @@ describe('stripe checkout', () => {
     expect(paidSession({ ...ev({}), type: 'charge.refunded' })).toBeNull()
   })
 
+  it('still delivers a retired car pack paid after it left the shop, but never sells one', async () => {
+    const { RETIRED_PACKS } = await import('../game/bucksPacks')
+    for (const p of RETIRED_PACKS) {
+      expect(packById(p.id), p.id).toBeNull()
+      const ev = { type: 'checkout.session.completed', data: { object: { id: 'cs_9', payment_status: 'paid', currency: 'usd', amount_total: cents(p), metadata: { user: 'u1', pack: p.id } } } }
+      expect(paidSession(ev)?.pack.car, p.id).toBe(p.car)
+    }
+    expect(RETIRED_PACKS.map((p) => p.id)).toEqual(['car-brawler', 'car-ronin', 'car-ring', 'car-hyperion'])
+  })
+
   it('takes a pack back on a refund or an opened chargeback only', () => {
     const ev = (type: string, o: Record<string, unknown> = { payment_intent: 'pi_1' }) => ({ type, data: { object: o } })
     expect(reversedPayment(ev('charge.refunded'))).toEqual({ reason: 'refund', paymentIntent: 'pi_1' })

@@ -38,6 +38,14 @@ export const CAR_PACKS: BucksPack[] = [
   { id: 'car-vanta', name: 'Hypercar Pack', price: 49.99, bucks: 250, bonus: 0, car: 'vanta', tag: 'Fastest car', art: '⚡', tier: 'super' },
 ]
 export const ALL_PACKS = [...BUCKS_PACKS, ...CAR_PACKS]
+// Car packs no longer sold (Showroom cars, replaced by pack-only cars 2026-10-16). A checkout opened
+// on the old site and paid after a deploy still has to deliver, so the webhook keeps knowing them.
+export const RETIRED_PACKS: BucksPack[] = [
+  { id: 'car-brawler', name: 'Brawler Pack', price: 2.99, bucks: 15, bonus: 0, car: 'charger', art: '🚗' },
+  { id: 'car-ronin', name: 'Ronin Pack', price: 5.99, bucks: 30, bonus: 0, car: 'gtr', art: '🚗' },
+  { id: 'car-ring', name: 'Ring V10 Pack', price: 9.99, bucks: 50, bonus: 0, car: 'ringmeister', art: '🚗' },
+  { id: 'car-hyperion', name: 'Hyperion Pack', price: 12.99, bucks: 65, bonus: 0, car: 'hyper', art: '🚗' },
+]
 
 // Roughly what a gem buys at this level, in coins (five fuel's worth of jobs).
 export const GEM_COINS = { base: 300, perLevel: 100 }
