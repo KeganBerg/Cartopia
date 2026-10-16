@@ -47,7 +47,7 @@ export function useCrewGoalWatcher() {
 
 function left(ms: number) {
   const h = Math.max(1, Math.ceil(ms / 3600000))
-  return h > 24 ? `${Math.floor(h / 24)}d ${h % 24}h` : `${h}h`
+  return h > 24 ? `${Math.floor(h / 24)}d${h % 24 ? ` ${h % 24}h` : ''}` : `${h}h`
 }
 
 export function Pay() {
