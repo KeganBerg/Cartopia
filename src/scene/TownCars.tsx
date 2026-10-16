@@ -42,9 +42,16 @@ const MAX_VISIBLE = 30
 // Cars under this PI are the town's beaters, at home in the trailer homes.
 const LOW_PI = 40
 
+// Roll a rig's wheels for `v` (units a second) over `dt`; `scale` is what the car is drawn at.
+export function rollWheels(rig: WheelRig, v: number, dt: number, scale: number) {
+  const roll = (v * Math.min(dt, 0.1)) / (rig.radius * scale)
+  for (const w of rig.spin) if (w) w.rotation.x = (w.rotation.x + roll) % (Math.PI * 2)
+}
+
 // Tow truck facing +z, drawn at its own spot on the road just ahead of the towed car.
 // `crane` leaves off the fixed boom for scenes that animate their own.
-export function TowTruck({ rig, crane }: { rig?: WheelRig; crane?: boolean }) {
+// `rig` is required: its owner rolls the wheels (rollWheels), so they never sit still on the move.
+export function TowTruck({ rig, crane }: { rig: WheelRig; crane?: boolean }) {
   return (
     <group>
       <group scale={GARAGE}>
@@ -73,6 +80,7 @@ const TownCar = memo(function TownCar({ car, onTap }: { car: OwnedCar; onTap?: (
   const truck = useRef<Group>(null)
   const def = carDef(car.model)
   const rig = useMemo(() => wheelRig(def.body), [def.body])
+  const truckRig = useMemo(() => wheelRig('truck'), [])
   const k = bodyScale(def.body)
   const selected = useGame((s) => s.selectedCar === car.uid)
   useEffect(() => () => void anchors.delete(`car:${car.uid}`), [car.uid])
@@ -97,8 +105,7 @@ const TownCar = memo(function TownCar({ car, onTap }: { car: OwnedCar; onTap?: (
     // Front wheels steer into the bend; all four roll with the road.
     const steer = a.v > 0.01 || a.parked ? sim.steerOf(a, rig.base * k) : null
     for (const w of rig.steer) if (w && steer !== null) w.rotation.y += (steer - w.rotation.y) * Math.min(1, Math.min(dt, 0.1) * 10)
-    const roll = (a.v * Math.min(dt, 0.1)) / (rig.radius * k)
-    for (const w of rig.spin) if (w) w.rotation.x = (w.rotation.x + roll) % (Math.PI * 2)
+    rollWheels(rig, a.v, dt, k)
     rig.slots?.forEach((w, i) => w && wheelPool.place(w, rig.spin[i]))
     const tp = sim.truckPose(a)
     const t = truck.current
@@ -107,6 +114,8 @@ const TownCar = memo(function TownCar({ car, onTap }: { car: OwnedCar; onTap?: (
       t.position.set(tp.x, 0.02, tp.z)
       t.rotation.y = tp.yaw
       t.scale.setScalar(Math.max(0.001, tp.scale))
+      // The truck's wheels roll with the car it's pulling.
+      if (t.visible) rollWheels(truckRig, a.v, dt, bodyScale('truck'))
     }
     const p = anchors.get(`car:${car.uid}`) ?? new Vector3()
     anchors.set(`car:${car.uid}`, p.set(a.x, 1.1, a.z))
@@ -132,7 +141,7 @@ const TownCar = memo(function TownCar({ car, onTap }: { car: OwnedCar; onTap?: (
       </group>
       <group ref={truck} visible={false}>
         <group scale={bodyScale('truck') / GARAGE}>
-          <TowTruck />
+          <TowTruck rig={truckRig} />
         </group>
       </group>
     </>

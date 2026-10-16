@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useGame, fuelCap } from '../game/store'
-import { FUEL_REGEN_SECONDS, PAINTS, RACE_FUEL, STARTER_PAINTS, buildingDef, carDef, upgradeFuelCap } from '../game/data'
+import { fuelPerMin, PAINTS, RACE_FUEL, STARTER_PAINTS, buildingDef, carDef, upgradeFuelCap } from '../game/data'
 import { raceCarOf } from '../game/raceCar'
 import { CarThumb } from '../scene/BuildingPreview'
 import { sfx } from '../lib/sound'
@@ -70,10 +70,11 @@ const GAS_CAP = upgradeFuelCap(buildingDef('gas'), 1)
 function GasFacts() {
   const fuel = useGame((s) => Math.floor(s.fuel))
   const cap = useGame(fuelCap)
+  const perMin = useGame((s) => fuelPerMin(s.level))
   return (
     <div className="tut-chips">
       <span title="Each race">🏁 −{RACE_FUEL}⛽</span>
-      <span title="Refills over time">⏱ +1⛽/{FUEL_REGEN_SECONDS / 60}m</span>
+      <span title="Refills over time, faster at levels 15, 30, 50 and 75">⏱ +{perMin}⛽/m</span>
       <span title="Your tank">⛽ {fuel}/{cap}</span>
       <span title="Each Gas Station adds">⛽🏪 +{GAS_CAP}</span>
     </div>

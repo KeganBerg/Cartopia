@@ -59,6 +59,7 @@ export type Agent = {
   nextVisit: number
   tow: 0 | 1 | 2 | 3 // none, waiting for room, towing, unhooking
   truck: number // 0..1 how much of the tow truck is showing
+  towT: number // seconds on the hook
   ot: null | { target: string; start: number; merge: number }
   approach: null | { dist: number; chain: Leg[] } // junction tiles it is waiting to cross, nose distance to the first
   arrived: number | null // when it pulled up asking to cross, for first come first served
@@ -84,6 +85,7 @@ const UTURN_V = 0.7
 const LOT_V = 1.0
 const SWING = 1.0 // distance over which an overtaking car changes lane
 const TRUCK = { len: 1.0, gap: 0.1 } // the tow truck at its town size (TownCars townScale)
+const TOW_MAX = 120 // seconds a car can be on the hook before it gives up and respawns
 const PASS_V = 1.5
 // Our directions (east, west, south, north) as walkGraph's crosswalk sides (south, east, north, west).
 const SIDE = [1, 3, 0, 2]
@@ -317,7 +319,7 @@ export class Traffic {
         x: p[0], z: p[1], yaw: 0, hx: 0, hz: 1,
         stalled: false, parked: 0, parkedAt: null, wait: 0,
         plan: [], trip: null, nextVisit: 10 + rand() * 40,
-        tow: 0, truck: 0, ot: null, rerouteAt: 0, pend: null, approach: null, arrived: null, halt: null, boxes: [], claim: [], gapTo: null, gap: Infinity,
+        tow: 0, truck: 0, towT: 0, ot: null, rerouteAt: 0, pend: null, approach: null, arrived: null, halt: null, boxes: [], claim: [], gapTo: null, gap: Infinity,
         show: 0, leaving: false, queuedAt: -1, pull: null,
       }
       this.agents.set(a.uid, a)
@@ -723,7 +725,8 @@ export class Traffic {
     const trip = this.trips.get(a.uid)
     if (trip && !a.parked) {
       const stop = this.stopFor(trip)
-      if (trip === 'tow' && !a.tow) {
+      // (No Rusty's or tire shop to take it to: no truck.)
+      if (trip === 'tow' && stop && !a.tow) {
         a.tow = 1
         a.truck = 0
       }
@@ -735,10 +738,22 @@ export class Traffic {
       const stop = this.net.stops.find((s) => s.uid === visit)
       if (!stop || this.startTrip(a, stop, 'visit')) this.visits.delete(a.uid)
     }
+    // Lost the way to its stop (the plan there got dropped): plan it again.
+    if (a.trip && !a.parked && !a.plan.length && !a.legs.slice(a.ci).some((l) => l.stopKind) && !this.trips.has(a.uid)) {
+      if (a.trip.kind === 'visit') a.trip = null
+      else this.trips.set(a.uid, a.trip.kind)
+    }
     if (a.tow === 1 && this.roomAhead(a, a.len / 2 + TRUCK.gap + TRUCK.len + 0.1) && (a.pull === null || this.laneClear(a))) a.tow = 2
     // Nowhere left to tow it to (the town changed under it): unhook.
     if (a.tow && a.tow !== 3 && !a.trip && !this.trips.has(a.uid) && !a.parked) a.tow = 3
     if (a.tow === 2) a.truck = Math.min(1, a.truck + dt * 2.5)
+    // Last resort: a tow that still hasn't reached Rusty's fades out and comes back unhitched.
+    a.towT = a.tow ? a.towT + dt : 0
+    if (a.towT > TOW_MAX && !a.parked && !a.leaving) {
+      a.trip = null
+      a.plan = []
+      a.leaving = true
+    }
     if (a.tow === 3) {
       a.truck = Math.max(0, a.truck - dt * 2)
       if (!a.truck) a.tow = 0
