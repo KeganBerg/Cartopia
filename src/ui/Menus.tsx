@@ -681,7 +681,7 @@ function DriverRow({ car, model }: { car: string; model: string }) {
 }
 
 // A car's mod skins with one slot changed (null takes that slot's skin off).
-const withSlot = (m: OwnedCar['modSkin'], slot: SkinnedSlot, skin: string | null) => {
+const withSlot = (m: OwnedCar['modSkin'], slot: SkinnedSlot | 'tracks', skin: string | null) => {
   const next = { ...m }
   if (skin) next[slot] = skin
   else delete next[slot]
@@ -816,7 +816,7 @@ function GarageSection() {
   const [skinning, setSkinning] = useState<{ car: string; skin: string | null } | null>(pre?.skin ? { car: pre.car, skin: pre.skin } : null)
   const trySkin = skinning && skinning.car === car?.uid && tab === 'paint' ? skinning.skin : undefined
   // A mod skin being tried on one slot's part, cleared when another car is picked.
-  const [modSkinning, setModSkinning] = useState<{ car: string; slot: SkinnedSlot; skin: string | null } | null>(pre?.modSkin ? { car: pre.car, ...pre.modSkin } : null)
+  const [modSkinning, setModSkinning] = useState<{ car: string; slot: SkinnedSlot | 'tracks'; skin: string | null } | null>(pre?.modSkin ? { car: pre.car, ...pre.modSkin } : null)
   const tryModSkin = modSkinning && modSkinning.car === car?.uid && tab === 'mods' ? modSkinning : null
   // Custom panel paint being tried on, cleared when another car is picked.
   const [customising, setCustomising] = useState<{ car: string; panels: Panels } | null>(null)
