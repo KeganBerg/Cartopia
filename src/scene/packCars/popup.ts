@@ -2,7 +2,7 @@ import { BufferGeometry, CircleGeometry, CylinderGeometry, Float32BufferAttribut
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import type { Kit } from '../CarModel'
 import { Loft } from '../loft'
-import { Surface, bodyRing, box, disc, glassRing, greenhouse, honey, interior, plane, poly, rbox, slab, vent, type ExoticFit, type ExoticHelpers } from '../exoticCars'
+import { Surface, bodyRing, box, disc, glassRing, greenhouse, honey, interior, plane, poly, rbox, slab, vent, type ExoticFit, type ExoticHelpers, flatWell } from '../exoticCars'
 
 // ---------------------------------------------------------------------------
 // Kazumi Hayate RS: a 1990s twin-turbo front-engine sports coupe. A low wedge nose with
@@ -35,23 +35,6 @@ function sheet(grid: V3[][], dir: V3) {
   g.dispose()
   m.computeVertexNormals()
   return m
-}
-
-// A flat fan from a centre point round a ring of world points, turned to face dir.
-function fan(c: V3, ring: V3[], dir: V3) {
-  const pos: number[] = []
-  for (let i = 0; i + 1 < ring.length; i++) {
-    const [a, b] = [ring[i], ring[i + 1]]
-    const ux = a[0] - c[0], uy = a[1] - c[1], uz = a[2] - c[2]
-    const vx = b[0] - c[0], vy = b[1] - c[1], vz = b[2] - c[2]
-    const d = (uy * vz - uz * vy) * dir[0] + (uz * vx - ux * vz) * dir[1] + (ux * vy - uy * vx) * dir[2]
-    pos.push(...c, ...(d < 0 ? [...b, ...a] : [...a, ...b]))
-  }
-  const g = new BufferGeometry()
-  g.setAttribute('position', new Float32BufferAttribute(pos, 3))
-  g.setAttribute('uv', new Float32BufferAttribute(new Array((pos.length / 3) * 2).fill(0), 2))
-  g.computeVertexNormals()
-  return g
 }
 
 // A patch lying on the body's top, following it: a four-cornered outline in (x, z),
@@ -153,35 +136,12 @@ export function popupGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
   // Cabin: two buckets with a small bench behind, dash, wheel and console.
   interior(k, h, -0.1, 0.1)
 
-  // Wheel arches: a black well and a dark lip round each tyre. The well is cut off just
-  // over the shoulder, so where the arch runs up into the fender it never stands in the air
-  // above the body; the lip follows the arch only below that.
+  // Wheel arches: a black well and a dark lip round each tyre, cut back where the body runs out
+  // from behind it (see flatWell).
   const R = 0.172
   const cy = r - 0.004
   for (const zz of [wz, -wz]) {
-    const x = wellX(S, zz, R)
-    const arc: V3[] = []
-    for (let i = 0; i <= 20; i++) {
-      const a = (i / 20) * Math.PI
-      const z = zz + Math.cos(a) * R
-      const cap = body.near(z).pts[3][1] + 0.004
-      arc.push([x, Math.min(cy + Math.sin(a) * R, cap), z])
-    }
-    for (const sd of SIDES) {
-      const m = (v: V3): V3 => [sd * v[0], v[1], v[2]]
-      k.add('black', fan(m([x, cy, zz]), arc.map(m), [sd, 0, 0]))
-      // The lip: a flat dark band round the arch's edge, left out where the arch is cut off.
-      const rim = (i: number, d: number): V3 => {
-        const t = (i / 20) * Math.PI
-        return m([x + 0.0035, cy + Math.sin(t) * (R + d), zz + Math.cos(t) * (R + d)])
-      }
-      const quads: V3[][] = []
-      for (let i = 0; i < 20; i++) {
-        const top = Math.max(rim(i, 0.004)[1], rim(i + 1, 0.004)[1])
-        if (top < body.near(zz + Math.cos(((i + 0.5) / 20) * Math.PI) * R).pts[3][1]) quads.push([rim(i, -0.008), rim(i + 1, -0.008), rim(i + 1, 0.004), rim(i, 0.004)])
-      }
-      for (const q of quads) k.add('dark', fan(q[0], q.slice(1), [sd, 0, 0]))
-    }
+    flatWell(k, S, zz, cy, R, r, wellX(S, zz, R))
   }
 
   // Sides: door cuts and a flush handle, the sculpted intake between door and rear wheel

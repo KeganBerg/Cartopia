@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useGame } from '../game/store'
 import { raceCarOf } from '../game/raceCar'
 import { CARS, carDef } from '../game/data'
@@ -6,6 +7,7 @@ import { REP_TITLES } from '../game/reputation'
 import { TOUR_BLUE, WORLD_TOUR, WORLD_TOUR_REP, worldDone, worldPrize } from '../game/worldTour'
 import { venue as venueById } from '../scene/venues'
 import { CarThumb } from '../scene/BuildingPreview'
+import { warmWorldVenue } from '../scene/world/WorldVenue'
 import { openGarageTab } from './Menus'
 import { useRep } from './Reputation'
 
@@ -24,6 +26,12 @@ export function WorldTour({ onRace }: { onRace: (i: number) => void }) {
   const car = raceCarOf(cars, raceCar)
   const d = car ? carDef(car.model) : CARS[0]
   const need = REP_TITLES[WORLD_TOUR_REP]
+  // Fetch the next stop's scenery while the player reads the list, so the strip is dressed
+  // by the time the lights go green.
+  const nextVenue = open && !done ? WORLD_TOUR[beaten]?.venue : undefined
+  useEffect(() => {
+    if (nextVenue) warmWorldVenue(nextVenue)
+  }, [nextVenue])
   return (
     <div className="wt">
       <div className={`ev-reward pr-reward${done ? ' got' : ''}`}>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useGame, type OwnedCar } from '../game/store'
 import { carDef } from '../game/data'
 import { townToVisit } from '../lib/friends'
+import { signedInUser } from '../lib/cloud'
 import { carPi, closePlayerCard, fetchPlayerCard, usePlayerCard, type PlayerCard } from '../lib/playerCard'
 import { CarThumb } from '../scene/BuildingPreview'
 import { CarInspect, CarPreview } from '../scene/CarPreview'
@@ -88,7 +89,7 @@ function Body({ card, start }: { card: PlayerCard; start?: string }) {
       )}
       <div className="pc-acts">
         <LikeButton owner={card.ownerId} />
-        <button className="buy pc-visit" onClick={go}>🏘️ Visit</button>
+        {card.ownerId !== signedInUser() && <button className="buy pc-visit" onClick={go}>🏘️ Visit</button>}
       </div>
     </>
   )

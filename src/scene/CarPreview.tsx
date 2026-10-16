@@ -12,8 +12,9 @@ import type { Trim } from '../game/trim'
 import { BACKDROPS, FILTERS, backdrop, compose, photoFilter, savePhoto, type Backdrop } from './photo'
 import { useGame } from '../game/store'
 import { Preview } from './Stage'
-import { CAM_REACH, CAM_TOP, Showroom, ShowroomLights, TT_R, contactTex, discTex } from './Showroom'
+import { CAM_REACH, CAM_TOP, DOOR_AT, DOOR_IN, Showroom, ShowroomLights, TT_R, contactTex, discTex } from './Showroom'
 import { decal } from './layers'
+import { DOOR_FLY, doorTrip } from './doorTrip'
 import { pauseTownDraw } from './renderGate'
 
 type Look = { body: Body; model?: string; color: string; finish?: Finish | null; skin?: string | null; modSkin?: Partial<Record<SkinnedSlot, string>> | null; panels?: Panels | null; stripe?: string | null; mods?: string[] | null; trim?: Trim | null; hat?: HatFit | null }
@@ -39,6 +40,10 @@ const HINT = TOUCHY ? 'Drag to spin · pinch to zoom · two fingers to move' : '
 export type DynoFeed = { rpm: number; speed: number }
 // On the dyno the car turns side-on to the camera and the floor drops by a roller's height.
 const SIDE_ON = -Math.PI / 4
+
+// Standing just inside the door, looking out through it.
+const DOOR_CAM = DOOR_AT.clone().addScaledVector(DOOR_IN, 1.3).setY(DOOR_AT.y * 1.25)
+type Fly = { dir: 'out' | 'back'; p: number; fromP: Vector3; fromT: Vector3; toP: Vector3; toT: Vector3 }
 
 type Orbit = ComponentRef<typeof OrbitControls>
 type Frame = React.RefObject<HTMLElement | null>
@@ -107,6 +112,7 @@ function Viewer({ look, handle, onTouch, dyno, floorSize, photo, room, frameIn }
   const orbit = useRef<Orbit>(null)
   const bounds = useRef<Bounds>({ r: 1, h: 1 })
   const spinning = useRef(true)
+  const fly = useRef<Fly | null>(null)
   const camera = useThree((s) => s.camera as PerspectiveCamera)
   const size = useThree((s) => s.size)
   const gl = useThree((s) => s.gl)
@@ -149,6 +155,12 @@ function Viewer({ look, handle, onTouch, dyno, floorSize, photo, room, frameIn }
     c.update()
     c.saveState()
     spinning.current = true
+    // Back in from the Crate Depot: start at the door (walk() flies in to here).
+    if (room && doorTrip.go === 'back') {
+      camera.position.copy(DOOR_CAM)
+      c.target.copy(DOOR_AT)
+      camera.lookAt(DOOR_AT)
+    }
   }
   useLayoutEffect(fitView, [look.body, size.width, size.height, room])
   // The framing box can change size on its own (a menu growing beside it); the shared camera
@@ -193,7 +205,42 @@ function Viewer({ look, handle, onTouch, dyno, floorSize, photo, room, frameIn }
     },
   }), [onTouch])
 
+  // The walk to or from the roller door: the player's controls are off until it ends.
+  const walk = (dt: number) => {
+    const c = orbit.current
+    if (!c || !room) return
+    if (doorTrip.go === 'out' && fly.current?.dir !== 'out') {
+      fly.current = { dir: 'out', p: 0, fromP: camera.position.clone(), fromT: c.target.clone(), toP: DOOR_CAM, toT: DOOR_AT }
+      c.enabled = false
+    } else if (doorTrip.go === 'back') {
+      // From wherever the camera is (the door, or part way there) back to the fitted view.
+      doorTrip.go = null
+      // To the fitted view as it is each frame: the view can refit (the canvas settling into
+      // its new place) while the camera is on its way.
+      fly.current = { dir: 'back', p: 0, fromP: camera.position.clone(), fromT: c.target.clone(), toP: c.position0, toT: c.target0 }
+      c.enabled = false
+      doorTrip.on?.('back')
+    }
+    const f = fly.current
+    if (!f) return
+    if (f.p >= 1) return
+    f.p = Math.min(1, f.p + dt / DOOR_FLY)
+    // Out: a smooth walk up to the door. Back: in quick from the door, settling gently at the car.
+    const e = f.dir === 'out' ? f.p * f.p * (3 - 2 * f.p) : 1 - (1 - f.p) ** 3
+    camera.position.lerpVectors(f.fromP, f.toP, e)
+    c.target.lerpVectors(f.fromT, f.toT, e)
+    camera.lookAt(c.target)
+    if (f.p < 1) return
+    if (f.dir === 'out') doorTrip.on?.('there')
+    else {
+      fly.current = null
+      c.enabled = true
+      c.update()
+    }
+  }
+
   useFrame((state, dt) => {
+    walk(Math.min(dt, 1 / 20))
     const t = turn.current
     if (!t) return
     if (dyno && !onDyno.current) {
@@ -228,7 +275,8 @@ function Viewer({ look, handle, onTouch, dyno, floorSize, photo, room, frameIn }
   // Keep the aim on the car, so panning can never lose it off screen.
   const clamp = () => {
     const c = orbit.current
-    if (!c) return
+    // Not while walking to or from the door (nor waiting at it to walk back in).
+    if (!c || fly.current || doorTrip.go) return
     const { r, h } = bounds.current
     const t = c.target
     const want = new Vector3()

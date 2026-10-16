@@ -2,7 +2,7 @@
 // coins, a part for one of your cars, a car, or a body or part skin. Every car and part has one
 // home crate, picked by what it's worth (see homeCrate), so dearer crates hold dearer cars and
 // parts. Cars only come once your level has unlocked them, so a crate never skips a level gate. A signed-in player's crates are
-// rolled by the server (crate_open(), newest copy in supabase/migrations/0085_crate_value_fixes.sql, same tables and
+// rolled by the server (crate_open(), newest copy in supabase/migrations/0110_season_skins_out_of_crates.sql, same tables and
 // rules); guests roll here. crates.test.ts keeps the server's tables in step.
 import { CARS, CUSTOM_PAINT, carLevel, CUSTOM_PAINT_CRATE, MODS, MOD_SKINS, SKINS, carDef, hasCustomPaint, ownedSkins, modDef, modFits, ownedMods, type CarDef, type ModDef, type SkinDef, type SkinTier } from './data'
 import { PIECE_COUNT, PIECE_SOURCES, pieceId, piecePool } from './resto'
@@ -119,9 +119,9 @@ export function carOdds(c: CrateDef, level: number): { model: string; p: number 
 // skins (game/events.ts) are the exception: they're only won by clearing their event. So are
 // skins a level hands out: everyone past it has one, so in a crate it could only pay coins.
 // Custom Colour (CUSTOM_PAINT) rides in one crate's paint slice as a body skin of its tier.
-// Weekly event skins and level skins never go in crates.
+// Weekly event skins, season track skins and level skins never go in crates.
 function inCrates(d: SkinDef) {
-  return !('event' in d.unlock) && !('level' in d.unlock)
+  return !('event' in d.unlock) && !('season' in d.unlock) && !('level' in d.unlock)
 }
 export const SKIN_WEIGHT: Record<SkinTier, number> = { rare: 6, epic: 3, legendary: 1 }
 export type CrateSkin = { id: string; part: boolean; def: SkinDef }

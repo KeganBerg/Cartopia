@@ -65,7 +65,8 @@ const TRIMS: Record<string, Feature[]> = {
   rally: ['lightPods', 'roofScoop', 'roundel', 'splitter', 'towStrap', 'fuelCap'],
   vette: ['sideExhaust', 'fenderVents', 'ttop', 'popups', 'quadTails'],
   charger: ['tailBand', 'hoodPins', 'chromeBelt', 'fuelCap', 'hoodCreases'],
-  hellcat: ['hoodVents', 'splitter', 'canards', 'diffuserFins'],
+  // No canards: the flares cover the nose's corners where they'd bolt on.
+  hellcat: ['hoodVents', 'splitter', 'diffuserFins'],
   gtr: ['splitter', 'canards', 'fenderVents', 'sunroof', 'quadTails', 'sideSkirts'],
   tomahawk: ['stowage', 'spare', 'beacon'],
   lambo: ['deckLouvers', 'roofScoop', 'splitter', 'popups', 'diffuserFins', 'centerExhaust'],
@@ -493,9 +494,9 @@ function feature(k: Kit, f: Feature, t: TrimFrame, all: Feature[]) {
       }
       return
     case 'splitter':
-      // Kept 0.003 inside a body kit's front lip (0.49 of the width) at the sides.
-      k.add('black', box(wid * 0.98 - 0.006, 0.012, 0.07), [0, lift + 0.012, front + 0.015])
-      for (const sd of SIDES) k.add('black', box(0.012, 0.032, 0.07), [sd * (wid * 0.49 - 0.009), lift + 0.024, front + 0.015])
+      // Tucked under the bumper, its lip just showing ahead of it, and inside the nose's corners.
+      k.add('black', box(wid * 0.94 - 0.006, 0.012, 0.07), [0, lift + 0.012, front + 0.004])
+      for (const sd of SIDES) k.add('black', box(0.012, 0.032, 0.07), [sd * (wid * 0.47 - 0.009), lift + 0.024, front + 0.004])
       return
     case 'canards':
       for (const sd of SIDES) for (const dy of [0, -0.035]) k.add('black', box(0.012, 0.006, 0.07), [sd * (wid / 2 + 0.002), t.lightY - 0.04 + dy, front - 0.04], [0, 0, sd * -0.3])
