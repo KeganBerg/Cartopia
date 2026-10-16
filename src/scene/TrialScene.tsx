@@ -5,14 +5,15 @@ import { RaceScene, type RacerView } from './RaceScene'
 import { CarModel } from './CarModel'
 import type { Venue } from './venues'
 import { TRACK } from '../game/race'
-import type { Body } from '../game/data'
+import type { BoardCar } from '../lib/trialServer'
 
 // The Weekly Time Trial (ui/TimeTrial.tsx) staged on the week's venue: the player's car on the
 // line beside its white ghost, a three-step podium up the strip with this week's top three cars
 // (tap one to open that player's profile), each under a name tag with its time, and a
 // scoreboard behind it with the player's best and place.
 
-export type TrialLook = { body: Body; model?: string; color: string; mods?: string[] }
+// A car as its owner saved it: paint, finish, skins, panels, trim, mods and hat.
+export type TrialLook = BoardCar
 export type PodiumCar = { look: TrialLook; name: string; t: number; owner: string; mine: boolean }
 
 const FONT = '"Arial Black", Impact, system-ui, sans-serif'
@@ -148,7 +149,7 @@ function Step({ i, car, onPick }: { i: number; car?: PodiumCar; onPick?: (owner:
             rotation-y={s.ry}
             onClick={onPick && ((e) => { e.stopPropagation(); onPick(car.owner) })}
           >
-            <CarModel body={car.look.body} model={car.look.model} color={car.look.color} mods={car.look.mods} lean />
+            <CarModel {...car.look} lean />
           </group>
           <sprite position={[0, s.h + 0.9, 0]} scale={[0.98, 0.38, 1]}>
             <spriteMaterial map={tagTex(car.name, car.t, i, car.mine)} toneMapped={false} fog={false} />
