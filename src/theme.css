@@ -30,7 +30,7 @@ html {
 }
 :root .pill { padding-left: 2px; }
 :root .plus { width: 18px; height: 18px; border-radius: 6px; background: linear-gradient(#7ee05a, #2fa52f); border: 2px solid var(--line); margin-left: 4px; box-shadow: inset 0 1.5px 0 rgba(255,255,255,.45); }
-:root .town-name { -webkit-text-stroke: 1.5px var(--line); text-shadow: 0 4px 0 var(--line); }
+:root .town-name { -webkit-text-stroke: 1.5px var(--line); text-shadow: 0 4px 0 var(--line); padding-inline: 2px; margin-inline: -2px; }
 :root .speedo svg circle:first-child { stroke: var(--line); }
 :root .speedo-xp { background: linear-gradient(#34507f, #1f3358); border-color: var(--line); }
 :root .speedo-menu { background: linear-gradient(#ffd43b, #ff9f1a); border: 2.5px solid var(--line); color: var(--line); box-shadow: inset 0 2px 0 rgba(255,255,255,.5), 0 2px 0 rgba(0,0,0,.35); }
@@ -71,7 +71,9 @@ html {
   background: linear-gradient(#5aa9ff, #2263d6); border-bottom: 3px solid var(--line); padding: 8px 10px 8px 18px;
   box-shadow: inset 0 3px 0 rgba(255,255,255,.35), inset 0 -4px 0 rgba(0,0,0,.15);
 }
-:root .panel-head h2 { font-size: 32px; line-height: 1.05; letter-spacing: .5px; padding: 2px 4px 4px 0; color: #fff; -webkit-text-stroke: 6px var(--line); paint-order: stroke fill; text-shadow: 0 4px 0 var(--line); transform-origin: 0 60%; animation: head-in .38s cubic-bezier(.3, 1.6, .5, 1) both; }
+/* the h2 clips (overflow: hidden for long titles), so it keeps room for half the outline on the left;
+   the negative margin leaves the letters where they were */
+:root .panel-head h2 { font-size: 32px; line-height: 1.05; letter-spacing: .5px; padding: 2px 4px 4px; margin-left: -4px; color: #fff; -webkit-text-stroke: 6px var(--line); paint-order: stroke fill; text-shadow: 0 4px 0 var(--line); transform-origin: 0 60%; animation: head-in .38s cubic-bezier(.3, 1.6, .5, 1) both; }
 /* every menu opens by announcing its name: the title pops in like a game banner */
 @keyframes head-in { from { transform: scale(.55) rotate(-4deg); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { :root .panel-head h2 { animation: none; } }
