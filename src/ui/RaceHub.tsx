@@ -230,7 +230,7 @@ export function RaceBar({ cars, car, onPick, go, note, dist, loaner }: { cars: O
     return <span className={`rm-build${f ? ` ${f}` : ''}`} data-tap-tip title={`${BUILDS[b].name}: ${BUILDS[b].text}`}>{BUILDS[b].icon}{f === 'good' ? '✓' : f === 'bad' ? '✗' : ''}</span>
   }
   return (
-    <div className="rm-bar">
+    <div className={go ? 'rm-bar has-go' : 'rm-bar'}>
       {open && (
         <div className="rm-picker" role="listbox" aria-label="Pick the car you race with">
           {[...cars].sort((a, b) => pi(b) - pi(a)).map((c) => (
