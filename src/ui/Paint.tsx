@@ -91,7 +91,7 @@ export function PaintShop({ car, job, setJob }: { car: OwnedCar; job: PaintJob; 
           return (
             <button
               key={p.color}
-              title={`${p.name}${p.bucks ? ' (1 gem)' : r ? ` · beat ${r.name}` : locked && p.earn ? ` · ${earnHint(p.color)}` : ''}`}
+              title={`${p.name}${p.bucks ? ` (${p.bucks} gems)` : r ? ` · beat ${r.name}` : locked && p.earn ? ` · ${earnHint(p.color)}` : ''}`}
               aria-label={locked ? `${p.name}, locked` : p.name}
               className={`dot big${p.color === job.color ? ' sel' : ''}${p.bucks ? ' premium' : ''}${locked ? ' locked' : ''}`}
               style={{ backgroundColor: p.color, backgroundImage: SHEEN[job.finish] }}

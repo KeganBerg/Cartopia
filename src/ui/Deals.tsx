@@ -1,6 +1,6 @@
 import { Icon } from './Icon'
 import { useGame, dealUsed, openDeals, today } from '../game/store'
-import { DEAL_SLOTS, buildingDef, carDef, dealOffer, dealsFor, modDef, msToNextDay, type DealDef } from '../game/data'
+import { DEAL_SLOTS, GEM_BUILD_COINS, buildingDef, carDef, dealOffer, dealsFor, modDef, msToNextDay, type DealDef } from '../game/data'
 import { useNow } from '../scene/useNow'
 import { BuildingThumb, CarThumb } from '../scene/BuildingPreview'
 import { Panel, openGarageTab } from './Menus'
@@ -45,7 +45,7 @@ function DealCard({ deal, slot }: { deal: DealDef; slot: string }) {
   const o = dealOffer(deal)
   const used = dealUsed(s, deal.id)
   const locked = s.level < o.unlockLevel
-  const pct = Math.round((1 - (o.now.coins + o.now.bucks * 1000) / (o.was.coins + o.was.bucks * 1000)) * 100)
+  const pct = Math.round((1 - (o.now.coins + o.now.bucks * GEM_BUILD_COINS) / (o.was.coins + o.was.bucks * GEM_BUILD_COINS)) * 100)
   const go = () => {
     if (deal.kind === 'parts' || deal.kind === 'fuel') return s.buyDeal(deal.id)
     if (deal.kind === 'decor') {

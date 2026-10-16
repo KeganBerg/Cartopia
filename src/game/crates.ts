@@ -56,12 +56,12 @@ export const CRATES: CrateDef[] = [
     carMax: 40000, modMax: 10000, skins: ['rare', 'epic'], look: { wood: '#2e7d4f', band: '#cfd8dc', glow: '#69f0ae' },
   },
   {
-    id: 'gold', name: 'Gold Crate', pay: 'bucks', unlockLevel: 1, base: 8, perLevel: 0,
+    id: 'gold', name: 'Gold Crate', pay: 'bucks', unlockLevel: 1, base: 80, perLevel: 0,
     odds: { coins: 33.95, jackpot: 6, mod: 30, car: 20, skin: 10, piece: 0.05 }, carShare: 0.15, coinMult: [0.45, 0.85], jackpotMult: [2, 3],
     carMax: 130000, modMax: 15000, skins: ['rare', 'epic', 'legendary'], pity: { every: 8 }, look: { wood: '#d4a017', band: '#7a4b12', glow: '#ffd54f' },
   },
   {
-    id: 'diamond', name: 'Diamond Crate', pay: 'bucks', unlockLevel: 1, base: 25, perLevel: 0,
+    id: 'diamond', name: 'Diamond Crate', pay: 'bucks', unlockLevel: 1, base: 250, perLevel: 0,
     odds: { coins: 23.9, jackpot: 6, mod: 24, car: 32, skin: 14, piece: 0.1 }, carShare: 0.2, coinMult: [0.7, 1.1], jackpotMult: [2.5, 3.5],
      skins: ['epic', 'legendary'], pity: { every: 10, tier: 'legendary' }, look: { wood: '#4fc3f7', band: '#e1f5fe', glow: '#b388ff' },
   },

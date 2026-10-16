@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { StageSlot, useStageReady } from '../scene/Stage'
 import { useGame, gateLevel, hasRusty, type Loot } from '../game/store'
-import { RESCUE_SPOTS, RARITY, STORAGE_MAX, carDef, performance, restoreCost, rushBucks, type Rarity, RUSTY_SETS, rustySetId, hotSpot, HOT_RARE, TRUCK, truckOf, BAY2_LEVEL } from '../game/data'
+import { RESCUE_SPOTS, RARITY, STORAGE_MAX, carDef, performance, restoreCost, rushBucks, TOW_FIX_BUCKS, type Rarity, RUSTY_SETS, rustySetId, hotSpot, HOT_RARE, TRUCK, truckOf, BAY2_LEVEL } from '../game/data'
 import { flushSave } from '../lib/cloud'
 import { useNow } from '../scene/useNow'
 import { dayPhase, nightAmount } from '../game/clock'
@@ -487,7 +487,7 @@ function SearchScreen({ onHaul }: { onHaul: (r: Recap) => void }) {
           <div className="flat-pop rs-flat">
             <b>🛞 Flat tire!</b>
             <div className="row">
-              <button className="buy" onClick={fix}>Fix · 💎 1{bucks < 1 ? ' (need 1)' : ''}</button>
+              <button className="buy" onClick={fix}>Fix · 💎 {TOW_FIX_BUCKS}{bucks < TOW_FIX_BUCKS ? ` (need ${TOW_FIX_BUCKS - bucks})` : ''}</button>
               <button className="sell" onClick={leave}>Go home</button>
             </div>
           </div>

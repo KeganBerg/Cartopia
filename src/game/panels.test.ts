@@ -18,8 +18,8 @@ describe('panelJobCost', () => {
     expect(panelJobCost(was, was)).toEqual({ coins: 0, bucks: 0 })
     expect(panelJobCost(was, {})).toEqual({ coins: 0, bucks: 0 })
   })
-  it('charges a gem for a gem colour', () => {
-    expect(panelJobCost(undefined, { doors: { color: '#76ff03' } })).toEqual({ coins: 0, bucks: 1 })
+  it('charges gems for a gem colour', () => {
+    expect(panelJobCost(undefined, { doors: { color: '#76ff03' } })).toEqual({ coins: 0, bucks: 10 })
   })
 })
 

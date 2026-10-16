@@ -8,10 +8,11 @@
 // Races, Rusty's, GP and the campaign are left out (they cost fuel too); story
 // goals that need them are claimed on a timer as a stand-in.
 import {
-  BUILDINGS, GOALS, CARS, DAILY_BONUS, QUEST_PAY, payAt, xpToNext, baseFuelCap, buildingUpgradeCost, upgradePayout, upgradeXp,
+  BUILDINGS, GOALS, CARS, LEVEL_GEMS, QUEST_PAY, payAt, xpToNext, baseFuelCap, buildingUpgradeCost, upgradePayout, upgradeXp,
   upgradeJobSeconds, upgradeFuelCap, refillBucks, upgradePartsPayout, buildingUpgradeXp, MAX_BUILDING_LEVEL, type BuildingDef,
 } from '../src/game/data'
 import { BUCKS_PACKS, packGrant } from '../src/game/bucksPacks'
+import { WHEEL } from '../src/game/wheel'
 
 const CHECK = Number(process.env.CHECK ?? 60)
 const AWAKE = Number(process.env.AWAKE ?? 12)
@@ -19,7 +20,7 @@ const DAYS = Number(process.env.DAYS ?? 60)
 
 type B = { d: BuildingDef; level: number; endsAt: number | null; pay: number; xp: number }
 // The starting town (public.econ_starter on the server).
-let coins = 2500, xp = 0, level = 1, fuel = 25, parts = 10, bucks = 10
+let coins = 2500, xp = 0, level = 1, fuel = 25, parts = 10, bucks = 100
 // SPEND20=1: the player buys the $19.99 Vault of Bucks on day one and spends every buck on refills.
 const SPEND20 = !!process.env.SPEND20
 const vault = packGrant(BUCKS_PACKS.find((p) => p.id === 'vault')!, 1)
@@ -39,7 +40,7 @@ function addXp(n: number) {
   while (xp >= xpToNext(level)) {
     xp -= xpToNext(level)
     level++
-    bucks++
+    bucks += LEVEL_GEMS
     coins += level * 100
     fuel = Math.max(fuel, cap())
     for (const m of [3, 5, 8, 10, 12, 15, 20, 26, 30, 36, 40]) if (level === m) out[`L${m}`] = `day ${(t / 1440 + 1).toFixed(1)}`
@@ -130,7 +131,10 @@ function buy() {
   }
 }
 
-let lastDay = -1, streak = 0
+let lastDay = -1
+// The daily wheel's gems, as an average a day (its coins, parts and skins are left out).
+const wheelGems = WHEEL.reduce((a, w) => a + ('gems' in w ? w.gems * w.weight : 0), 0) / WHEEL.reduce((a, w) => a + w.weight, 0)
+let wheelBucks = 0
 const hourly: Record<number, number> = {}
 for (t = 0; t < DAYS * 1440; t += CHECK) {
   const day = Math.floor(t / 1440)
@@ -139,12 +143,10 @@ for (t = 0; t < DAYS * 1440; t += CHECK) {
   if (minOfDay >= AWAKE * 60) continue
   if (day !== lastDay) {
     lastDay = day
-    streak = Math.min(streak + 1, DAILY_BONUS.length)
-    const db = DAILY_BONUS[streak - 1] as { coins: number; bucks?: number; parts?: number }
-    earn(db.coins); bucks += db.bucks ?? 0; parts += db.parts ?? 0
+    wheelBucks += wheelGems
     // Daily tasks + chest (assume all three done); weekly on day 7, 14, ...
     const dt = payAt(QUEST_PAY.daily.task, level), dc = payAt(QUEST_PAY.daily.chest, level)
-    earn(dt.coins * 3 + dc.coins); addXp(dt.xp * 3 + dc.xp); parts += QUEST_PAY.daily.chest.parts
+    earn(dt.coins * 3 + dc.coins); addXp(dt.xp * 3 + dc.xp); parts += QUEST_PAY.daily.chest.parts; bucks += QUEST_PAY.daily.chest.bucks
     if (day % 7 === 6) {
       const wt = payAt(QUEST_PAY.weekly.task, level), wc = payAt(QUEST_PAY.weekly.chest, level)
       earn(wt.coins * 3 + wc.coins); addXp(wt.xp * 3); parts += QUEST_PAY.weekly.chest.parts; bucks += QUEST_PAY.weekly.chest.bucks
@@ -161,7 +163,7 @@ const topCar = CARS.filter((c) => !c.rescueOnly && !c.season).sort((a, b) => b.u
 const newestCar = (l: number) => CARS.filter((c) => !c.bucks && !c.rescueOnly && !c.season && c.unlockLevel <= l).sort((a, b) => b.price - a.price)[0]
 console.log(JSON.stringify({
   reached: out,
-  finalLevel: level, coins: Math.round(coins), earned: Math.round(earned), bucks, buildings: town.length,
+  finalLevel: level, coins: Math.round(coins), earned: Math.round(earned), bucks, wheelBucks: Math.round(wheelBucks), buildings: town.length,
   coinsPerPlayHour: hourly,
   topCar: `${topCar.name} unlocks at level ${topCar.unlockLevel}: ${out[`L${topCar.unlockLevel}`] ?? 'not reached'}`,
   newestCarAtL5: newestCar(5).name + ' ' + newestCar(5).price,

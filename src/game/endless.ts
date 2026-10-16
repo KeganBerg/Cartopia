@@ -21,7 +21,7 @@ export type Endless = { n: number; day: string; today: number; goals: EndlessGoa
 
 // What each one pays. The 5th, 10th, 15th... collected also pays parts, and every 10th gems.
 // The guard reads these from econ_private.endless_pay(), which endless.test.ts checks against the migration.
-export const ENDLESS_PAY = { coins: 200, coinsPerLevel: 60, xp: 25, xpPerLevel: 6, parts: 5, partsEvery: 5, bucks: 1, bucksEvery: 10, perDay: 12 }
+export const ENDLESS_PAY = { coins: 200, coinsPerLevel: 60, xp: 25, xpPerLevel: 6, parts: 5, partsEvery: 5, bucks: 10, bucksEvery: 10, perDay: 12 }
 // num: which endless goal this is to be collected, counting from 1 over the town's life.
 export const endlessPay = (num: number, level: number) => ({
   coins: ENDLESS_PAY.coins + ENDLESS_PAY.coinsPerLevel * level,

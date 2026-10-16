@@ -12,10 +12,10 @@ export const TRIAL_FUEL = RACE_FUEL
 // (null: everyone who set a time). public.trial_prize_table() holds the same list; trial.test.ts checks.
 export type TrialPrize = { upTo: number | null; bucks: number; coins: number; trophies: number }
 export const TRIAL_PRIZES: TrialPrize[] = [
-  { upTo: 1, bucks: 10, coins: 10000, trophies: 5 },
-  { upTo: 2, bucks: 7, coins: 6000, trophies: 4 },
-  { upTo: 3, bucks: 5, coins: 4000, trophies: 3 },
-  { upTo: 10, bucks: 2, coins: 2000, trophies: 2 },
+  { upTo: 1, bucks: 150, coins: 10000, trophies: 5 },
+  { upTo: 2, bucks: 105, coins: 6000, trophies: 4 },
+  { upTo: 3, bucks: 75, coins: 4000, trophies: 3 },
+  { upTo: 10, bucks: 30, coins: 2000, trophies: 2 },
   { upTo: null, bucks: 0, coins: 500, trophies: 1 },
 ]
 export const trialPrize = (place: number) => TRIAL_PRIZES.find((p) => p.upTo === null || place <= p.upTo)!

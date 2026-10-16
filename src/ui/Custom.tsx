@@ -185,7 +185,7 @@ export function CustomShop({ car, panels, setPanels }: { car: OwnedCar; panels: 
             return (
               <button
                 key={p.color}
-                title={`${p.name}${p.bucks ? ' (1 gem)' : r ? ` · beat ${r.name}` : locked && p.earn ? ` · ${earnHint(p.color)}` : ''}`}
+                title={`${p.name}${p.bucks ? ` (${p.bucks} gems)` : r ? ` · beat ${r.name}` : locked && p.earn ? ` · ${earnHint(p.color)}` : ''}`}
                 aria-label={locked ? `${p.name}, locked` : p.name}
                 className={`dot big${mine?.color === p.color ? ' sel' : ''}${p.bucks ? ' premium' : ''}${locked ? ' locked' : ''}`}
                 style={{ backgroundColor: p.color }}

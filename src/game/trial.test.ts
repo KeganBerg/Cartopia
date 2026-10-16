@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { TRIAL_PRIZES, trialPrize, trialWeek, trialVenue, ghostDist, shortLeft } from './trial'
 import { TRACK } from './race'
 
-// The newest migration holding trial_prize_table()'s prizes (0026, then 0104 for gems x10).
+// The newest migration holding trial_prize_table()'s prizes (0026, then 0111 for gems x10).
 const dir = new URL('../../supabase/migrations/', import.meta.url)
 const sql = readdirSync(dir).sort().map((f) => readFileSync(new URL(f, dir), 'utf8')).filter((s) => s.includes('$prizes$')).pop()!
 
@@ -14,9 +14,9 @@ describe('weekly time trial', () => {
   })
 
   it('pays by place', () => {
-    expect(trialPrize(1).bucks).toBe(10)
-    expect(trialPrize(3).bucks).toBe(5)
-    expect(trialPrize(10).bucks).toBe(2)
+    expect(trialPrize(1).bucks).toBe(150)
+    expect(trialPrize(3).bucks).toBe(75)
+    expect(trialPrize(10).bucks).toBe(30)
     expect(trialPrize(11).bucks).toBe(0)
     expect(trialPrize(500).coins).toBe(500)
   })

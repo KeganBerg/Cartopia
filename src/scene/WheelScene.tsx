@@ -23,7 +23,7 @@ import { Dust, HangingLamp, hazardTex } from './CrateScene'
 import { BoltOn } from './PartPrize'
 import { tickSkins, withSkin } from './skins'
 import { skinNumber } from '../game/data'
-import { WHEEL, TIER_COLOR, wheelCoins, type WheelSlice } from '../game/wheel'
+import { WHEEL, TIER_COLOR, gemPile, wheelCoins, type WheelSlice } from '../game/wheel'
 import { calmFlashing } from '../game/flashing'
 
 // What the panel moves: the wheel's turn (degrees, clockwise as you look at it), when the flapper
@@ -237,7 +237,7 @@ function SkinOrb() {
 
 function Prize({ s }: { s: WheelSlice }) {
   if (s.kind === 'coins') return <CoinPile n={s.mult < 0.5 ? 1 : s.mult < 1 ? 2 : 3} />
-  if (s.kind === 'gems') return <Gems n={s.gems} />
+  if (s.kind === 'gems') return <Gems n={gemPile(s.gems)} />
   if (s.kind === 'jackpot') return <group><Crown /><group position-y={-0.08}><Gems n={5} /></group></group>
   if (s.kind === 'part') return <group rotation={[0.85, -0.55, 0.1]} scale={0.34}><BoltOn id="gtwing" body="sports" tint="#e53935" /></group>
   return <SkinOrb />
