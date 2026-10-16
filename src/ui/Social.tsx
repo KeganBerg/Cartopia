@@ -5,8 +5,8 @@ import { supabase } from '../lib/supabase'
 import { townToVisit } from '../lib/friends'
 import {
   METRICS, demoRows, fetchBoard, fetchClans, fetchMyClan, rankOf, statOf,
-  createClan, joinClan, leaveClan, kickMember, updateClan,
-  type BoardRow, type Clan, type ClanBadge, type Metric, type MyClan, type Period,
+  createClan, askJoin, cancelRequest, fetchMyRequests, leaveClan, updateClan, isOfficer, JOIN_MODES,
+  type BoardRow, type Clan, type ClanBadge, type JoinMode, type Metric, type MyClan, type Period,
 } from '../lib/clans'
 import { Panel, SheetTabs } from './Menus'
 import { isCleanName, NAME_REJECTED } from '../lib/names'
@@ -15,12 +15,13 @@ import { refreshChatRooms } from '../lib/chat'
 import { onDemand } from './lazy'
 import { demoBattle, refreshCrewBattle, useCrewBattle } from '../lib/battles'
 import { PlayerName } from './Username'
-import { playerName } from '../lib/profiles'
 import { LoadingBand } from './Loading'
 import { CrewLadder, demoCrew } from './CrewLadder'
 import { CrewBattleTile, CrewGoalTile, CrewHero, LastWeekChests } from './CrewHub'
 import { CrewPartsTile } from './CrewParts'
 import { CREW_DEMO, useCrewMates } from '../lib/crewRaces'
+import { CrewMembers } from './CrewMembers'
+import { sfx } from '../lib/sound'
 
 // The crew battle strip brings the battle screen's code; it loads when a battle shows.
 const CrewBattleCard = onDemand(() => import('./CrewBattle'), (m) => m.CrewBattleCard)
@@ -38,15 +39,16 @@ export function useUserId() {
   return uid
 }
 
-// Friends, Leaderboards, Crew and Meet share one window with tabs across the top.
+// The Social menu: Friends, Crew, Meet and Leaderboards share one window with tabs across the top.
+export const SOCIAL_TITLE = 'Social'
 export function SocialTabs({ current }: { current: PanelId }) {
   const openPanel = useGame((s) => s.swapPanel)
   const chests = useCrewGoal((g) => g.ready) + useCrewBattle((b) => b.ready)
   const tabs: { id: PanelId; label: React.ReactNode }[] = [
     { id: 'friends', label: '👫 Friends' },
-    { id: 'leaders', label: '🏅 Leaderboards' },
     { id: 'clan', label: <>🛡️ Crew{chests > 0 && <span className="tab-dot">{chests}</span>}</> },
     { id: 'meet', label: '🚗 Meet' },
+    { id: 'leaders', label: '🏅 Leaderboards' },
   ]
   return <SheetTabs items={tabs as { id: Exclude<PanelId, null>; label: React.ReactNode }[]} value={current ?? 'friends'} onChange={(id) => openPanel(id)} />
 }
@@ -163,7 +165,7 @@ export function LeadersPanel() {
 
   const unit = METRICS.find((m) => m.id === metric)!
   return (
-    <Panel title="Leaderboards" wide>
+    <Panel title={SOCIAL_TITLE} wide>
       <SocialTabs current="leaders" />
       <MetricPicker metric={metric} setMetric={setMetric} period={period} setPeriod={setPeriod}>
         <div className="seg scope">
@@ -252,12 +254,12 @@ export function ClanPanel() {
   useEffect(() => { if (uid !== undefined) reload() }, [uid, reload])
 
   return (
-    <Panel title="Crew" wide>
+    <Panel title={SOCIAL_TITLE} wide>
       <SocialTabs current="clan" />
       {/* ?battle=demo: the battle strip for trying it signed out. */}
       {uid === null && demoBattle() && !CREW_DEMO && <CrewBattleCard />}
       {CREW_DEMO && !uid ? (
-        <ClanHome data={demoCrew()} uid="me" onChange={() => {}} />
+        <ClanHome data={demoCrew()} uid="me" onChange={() => {}} demo />
       ) : !supabase ? (
         <div className="inv-empty" title="Crews need an internet connection"><span className="empty-ico">📡</span><div>No connection</div></div>
       ) : uid === null ? (
@@ -304,10 +306,9 @@ function CrewHouseNudge() {
   )
 }
 
-function ClanHome({ data, uid, onChange }: { data: MyClan; uid: string; onChange: () => void }) {
+function ClanHome({ data, uid, onChange, demo = false }: { data: MyClan; uid: string; onChange: () => void; demo?: boolean }) {
   const { clan, members, role } = data
   const toast = useGame((s) => s.toast)
-  const go = useVisit()
   const [confirmLeave, setConfirmLeave] = useState(false)
   const [editing, setEditing] = useState(false)
   const [rank, setRank] = useState<number | null>(null)
@@ -346,32 +347,17 @@ function ClanHome({ data, uid, onChange }: { data: MyClan; uid: string; onChange
         </div>
       </div>
 
-      {editing && role === 'leader' && (
-        <>
-          <ClanEditor clan={clan} onDone={() => { setEditing(false); onChange() }} />
-          <div className="leaders">
-            {members.filter((m) => m.ownerId !== uid).map((m) => (
-              <div key={m.ownerId} className="leader member-row">
-                <span className="rank">{m.level}</span>
-                <div className="leader-main">
-                  <b><PlayerName id={m.ownerId} town={m.townName} /></b>
-                  <div className="card-stat">Lvl {m.level} · ⚡ {n(m.power)} · 🏁 {n(m.raceWins)}</div>
-                </div>
-                <button className="buy small" onClick={() => go(m.ownerId)}>Visit</button>
-                <button className="sell small" disabled={busy} onClick={() => act(() => kickMember(m.ownerId), `${playerName(m.ownerId, m.townName)} was removed`)}>Remove</button>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
+      {editing && isOfficer(role) && <ClanEditor clan={clan} onDone={() => { setEditing(false); onChange() }} />}
+
+      <CrewMembers data={data} uid={uid} onChange={onChange} demo={demo} />
 
       <div className="clan-actions">
-        {role === 'leader' && !editing && <button className="buy small alt" onClick={() => setEditing(true)}>✏️ Edit crew & members</button>}
+        {isOfficer(role) && !editing && <button className="buy small alt" onClick={() => setEditing(true)}>⚙️ Crew settings</button>}
         {!confirmLeave ? (
           <button className="sell" onClick={() => setConfirmLeave(true)}>Leave crew</button>
         ) : (
           <div className="confirm">
-            <span>{leaderLeaving ? 'Leadership passes to your longest-serving member.' : members.length === 1 ? 'You are the last member, so the crew will close.' : 'Leave this crew?'}</span>
+            <span>{leaderLeaving ? `👑 passes to ${members.some((m) => m.role === 'co_leader') ? 'your oldest Co-Leader' : 'your oldest Member'}.` : members.length === 1 ? 'You are the last member, so the crew will close.' : 'Leave this crew?'}</span>
             <button className="sell" disabled={busy} onClick={() => act(leaveClan, `You left ${clan.name}`)}>Yes, leave</button>
             <button className="buy small alt" onClick={() => setConfirmLeave(false)}>Stay</button>
           </div>
@@ -387,10 +373,12 @@ function ClanEditor({ clan, onDone }: { clan: Clan; onDone: () => void }) {
   const [emblem, setEmblem] = useState(clan.emblem)
   const [color, setColor] = useState(clan.color)
   const [minLevel, setMinLevel] = useState(clan.minLevel)
+  const [joinMode, setJoinMode] = useState<JoinMode>(clan.joinMode)
   const save = async () => {
     if (!isCleanName(description)) return toast(NAME_REJECTED)
     try {
-      await updateClan({ description, emblem, color, minLevel })
+      await updateClan({ description, emblem, color, minLevel, joinMode })
+      sfx.unlock()
       toast('Crew updated')
       onDone()
     } catch (e) {
@@ -399,6 +387,7 @@ function ClanEditor({ clan, onDone }: { clan: Clan; onDone: () => void }) {
   }
   return (
     <div className="clan-form">
+      <label>Who can join<JoinModePicker value={joinMode} onChange={setJoinMode} /></label>
       <EmblemPicker emblem={emblem} setEmblem={setEmblem} color={color} setColor={setColor} />
       <label>Motto<input value={description} maxLength={140} onChange={(e) => setDescription(e.target.value)} /></label>
       <label>Level needed to join<input type="number" min={1} max={99} value={minLevel} onChange={(e) => setMinLevel(Math.max(1, Math.min(99, Number(e.target.value) || 1)))} /></label>
@@ -406,6 +395,19 @@ function ClanEditor({ clan, onDone }: { clan: Clan; onDone: () => void }) {
         <button className="buy" onClick={save}>Save</button>
         <button className="buy alt" onClick={onDone}>Cancel</button>
       </div>
+    </div>
+  )
+}
+
+// Who may join: Open, Request or Closed.
+function JoinModePicker({ value, onChange }: { value: JoinMode; onChange: (m: JoinMode) => void }) {
+  return (
+    <div className="seg cm-mode" role="radiogroup" aria-label="Who can join">
+      {JOIN_MODES.map((m) => (
+        <button key={m.id} role="radio" aria-checked={m.id === value} className={m.id === value ? 'sel' : ''} title={m.tip} onClick={() => { sfx.click(); onChange(m.id) }}>
+          <span className="seg-ico">{m.icon}</span>{m.label}
+        </button>
+      ))}
     </div>
   )
 }
@@ -433,6 +435,7 @@ function ClanBrowser({ onJoined }: { onJoined: () => void }) {
   const toast = useGame((s) => s.toast)
   const showNeed = useGame((s) => s.showNeed)
   const [clans, setClans] = useState<Clan[] | null>(null)
+  const [asked, setAsked] = useState<Set<string>>(new Set())
   const [search, setSearch] = useState('')
   const [creating, setCreating] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -440,12 +443,25 @@ function ClanBrowser({ onJoined }: { onJoined: () => void }) {
 
   useEffect(() => {
     fetchClans('power', 'all').then(setClans).catch(() => setClans([]))
+    fetchMyRequests().then((ids) => setAsked(new Set(ids))).catch(() => {})
   }, [])
 
   const join = async (c: Clan) => {
     setBusy(true)
     try {
-      await joinClan(c.id)
+      if (asked.has(c.id)) {
+        await cancelRequest(c.id)
+        sfx.click()
+        setAsked((a) => { const b = new Set(a); b.delete(c.id); return b })
+        return
+      }
+      if (await askJoin(c.id) === 'requested') {
+        sfx.send()
+        toast(`✋ Asked to join ${c.name}`)
+        setAsked((a) => new Set(a).add(c.id))
+        return
+      }
+      sfx.unlock()
       toast(`Welcome to ${c.name}!`)
       onJoined()
     } catch (e) {
@@ -513,19 +529,23 @@ function ClanBrowser({ onJoined }: { onJoined: () => void }) {
         {shown?.map((c) => {
           const full = c.members >= c.memberCap
           const low = level < c.minLevel
+          const closed = c.joinMode === 'closed'
+          const sent = asked.has(c.id)
+          const mode = JOIN_MODES.find((m) => m.id === c.joinMode)!
           return (
             <div key={c.id} className="leader clan-row">
               <span className="clan-emblem big" style={{ background: c.color }}>{c.emblem}</span>
               <div className="leader-main">
                 <b>{c.name} <span className="clan-tag small" style={{ background: c.color }}>{c.tag}</span></b>
-                <div className="card-stat">{c.members}/{c.memberCap} members · ⚡ {n(c.total.power)}{c.minLevel > 1 ? ` · Lvl ${c.minLevel}+` : ''}</div>
+                <div className="card-stat"><span title={mode.tip}>{mode.icon}</span> {c.members}/{c.memberCap} members · ⚡ {n(c.total.power)}{c.minLevel > 1 ? ` · Lvl ${c.minLevel}+` : ''}</div>
                 {c.description && <div className="clan-motto">{c.description}</div>}
               </div>
               <button
-                className="buy small"
-                disabled={busy || full}
-                onClick={() => (low ? showNeed('level', c.minLevel, c.name) : join(c))}
-              >{full ? 'Full' : low ? `🔒 Lvl ${c.minLevel}` : 'Join'}</button>
+                className={sent ? 'buy small alt' : 'buy small'}
+                disabled={busy || (!sent && (full || closed))}
+                title={sent ? 'Cancel request' : closed ? mode.tip : undefined}
+                onClick={() => (low && !sent ? showNeed('level', c.minLevel, c.name) : join(c))}
+              >{sent ? '⏳ Sent' : closed ? '🔒' : full ? 'Full' : low ? `🔒 Lvl ${c.minLevel}` : c.joinMode === 'request' ? '✋ Ask' : 'Join'}</button>
             </div>
           )
         })}
