@@ -20,13 +20,13 @@ const GOLD = ['#ffc533', '#cfd8dc', '#e0874a']
 const TRIM = ['#b8860b', '#78909c', '#9c4f1f']
 // Podium steps, by place: x across the road (the camera looks up the strip, so +x is screen
 // left), the step's height, and how the car on it is turned to face the camera.
-const STEP: { x: number; h: number; ry: number }[] = [
+export const STEP: { x: number; h: number; ry: number }[] = [
   { x: 0, h: 0.62, ry: Math.PI + 0.55 },
   { x: 1.07, h: 0.42, ry: Math.PI - 0.6 },
   { x: -1.07, h: 0.27, ry: Math.PI + 0.6 },
 ]
 const PODIUM_Z = 6.6
-const W = 1.04
+export const W = 1.04
 const D = 1.25
 
 const texs = new Map<string, CanvasTexture>()
@@ -54,22 +54,29 @@ function fit(g: CanvasRenderingContext2D, text: string, size: number, room: numb
   }
 }
 
-// A step's face: its big place number on the medal colour.
-const stepTex = (i: number) => tex(`step${i}`, 256, 192, (g) => {
-  g.fillStyle = GOLD[i]
-  g.fillRect(0, 0, 256, 192)
-  g.fillStyle = TRIM[i]
-  g.fillRect(0, 0, 256, 14)
-  g.textAlign = 'center'
-  g.textBaseline = 'middle'
-  g.font = `900 150px ${FONT}`
-  g.lineJoin = 'round'
-  g.lineWidth = 18
-  g.strokeStyle = '#14213d'
-  g.strokeText(String(i + 1), 128, 106)
-  g.fillStyle = '#ffffff'
-  g.fillText(String(i + 1), 128, 106)
-})
+// A step's face: its big place number on the medal colour. The canvas has the face's own shape
+// (wide and short on the low steps), so the number keeps its proportions instead of being
+// squashed to fit a fixed-size texture (trialScene.test.tsx checks every text face).
+const STEP_PX = 160
+const stepTex = (i: number) => {
+  const h = STEP_PX
+  const w = Math.round((STEP_PX * W) / STEP[i].h)
+  return tex(`step${i}`, w, h, (g) => {
+    g.fillStyle = GOLD[i]
+    g.fillRect(0, 0, w, h)
+    g.fillStyle = TRIM[i]
+    g.fillRect(0, 0, w, 10)
+    g.textAlign = 'center'
+    g.textBaseline = 'middle'
+    g.font = `900 ${Math.round(h * 0.78)}px ${FONT}`
+    g.lineJoin = 'round'
+    g.lineWidth = Math.round(h * 0.1)
+    g.strokeStyle = '#14213d'
+    g.strokeText(String(i + 1), w / 2, h * 0.58)
+    g.fillStyle = '#ffffff'
+    g.fillText(String(i + 1), w / 2, h * 0.58)
+  })
+}
 
 // The tag over a podium car: the player's name, and their time in amber digits.
 const tagTex = (name: string, t: number, i: number, mine: boolean) => tex(`tag|${name}|${t}|${i}|${mine}`, 512, 200, (g) => {
@@ -210,6 +217,16 @@ function TrialCam() {
   return null
 }
 
+// The podium with its cars and tags, and the scoreboard: everything this scene adds to the strip.
+export function PodiumSet({ podium, best, place, onPick }: { podium: PodiumCar[]; best: number | null; place: number | null; onPick?: (owner: string) => void }) {
+  return (
+    <>
+      {STEP.map((_, i) => <Step key={i} i={i} car={podium[i]} onPick={onPick} />)}
+      <TimingTower best={best} place={place} />
+    </>
+  )
+}
+
 export function TrialScene({ venue, seed, car, podium, best, place, onPick }: {
   venue: Venue; seed: string; car: Parameters<typeof RaceScene>[0]['mine']; podium: PodiumCar[]; best: number | null; place: number | null; onPick?: (owner: string) => void
 }) {
@@ -219,8 +236,7 @@ export function TrialScene({ venue, seed, car, podium, best, place, onPick }: {
   return (
     <>
       <RaceScene track={TRACK} me={me} them={them} mine={car} theirs={ghost} venue={venue} weatherSeed={seed} />
-      {STEP.map((_, i) => <Step key={i} i={i} car={podium[i]} onPick={onPick} />)}
-      <TimingTower best={best} place={place} />
+      <PodiumSet podium={podium} best={best} place={place} onPick={onPick} />
       <TrialCam />
     </>
   )
