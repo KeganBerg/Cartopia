@@ -805,16 +805,17 @@ div.rm-node { cursor: default; }
   .fl-grid { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
 }
 
-/* Daily Run (DailyRun.tsx): venue photo on the left; the loaner, medal times and today's best on the right. */
-.dr .rm-right { justify-content: space-between; }
-.dr-car { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 10px; background: #fff; border: 2px solid #c6d7ee; border-radius: 16px; box-shadow: 0 3px 0 #c6d7ee; text-align: center; min-height: 0; }
-.dr-car .thumb3d.lg { --tw: 240px; --th: 150px; max-width: 100%; }
-.dr-car b { font: 22px var(--display); line-height: 1.1; }
-.dr-tags { display: flex; gap: 6px; font: 900 14px Nunito, sans-serif; color: #4a6283; }
-.dr-tags > span:not(.rm-pi) { background: #eef3fa; border-radius: 999px; padding: 1px 9px; }
-.dr-medals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.dr-medals > span { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 4px; background: #fff; border: 2px solid #c6d7ee; border-radius: 14px; box-shadow: 0 3px 0 #c6d7ee; }
-.dr-medals > span.got { border-color: #2fae35; background: #eaffe4; box-shadow: 0 3px 0 #1d6b22; }
+/* Daily Run (DailyRun.tsx): the day's start line in 3D fills the screen, chips over it. */
+.rm-s-daily { padding: 0; }
+.dr { position: relative; flex: 1; min-height: 300px; overflow: hidden; background: #9cc7e8; }
+.dr .stage-slot { position: absolute; inset: 0; }
+.dr-top { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; gap: 6px; align-items: center; pointer-events: none; }
+.dr-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 11px; background: #14213d; color: #fff; border: 2px solid #fff; border-radius: 999px; font: 900 15px Nunito, sans-serif; line-height: 22px; white-space: nowrap; }
+.dr-left { background: #311b92; }
+.dr-share { margin-left: auto; pointer-events: auto; cursor: pointer; background: #2f7ff0; font-size: 18px; padding: 3px 12px; }
+.dr-medals { position: absolute; left: 10px; right: 10px; bottom: 10px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; pointer-events: none; }
+.dr-medals > span { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 4px; background: #fff; border: 3px solid var(--line, #14213d); border-radius: 14px; box-shadow: 0 3px 0 rgba(20,33,61,.45); }
+.dr-medals > span.got { background: #45b649; color: #fff; }
 .dr-medals i { font-style: normal; font-size: 24px; line-height: 1; }
 .dr-medals b { font: 20px var(--display); white-space: nowrap; }
 .dr-best { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #fff; border: 2px solid #c6d7ee; border-radius: 16px; box-shadow: 0 3px 0 #c6d7ee; }
@@ -822,11 +823,9 @@ div.rm-node { cursor: default; }
 .dr-best small { font: 900 13px Nunito, sans-serif; color: #4a6283; }
 .dr-best b { font: 28px var(--display); }
 @media (max-width: 600px) {
-  .dr .rm-right { flex: none; }
-  .rm-prow.dr .rm-banner { flex: 1; min-height: 150px; }
-  .dr-car { padding: 8px; }
-  .dr-car .thumb3d.lg { --th: 100px; }
-  .dr-car b { font-size: 19px; }
+  .dr-chip { font-size: 13px; padding: 2px 9px; }
+  .dr-medals { gap: 6px; }
+  .dr-medals i { font-size: 20px; }
   .dr-medals b { font-size: 17px; }
 }
 

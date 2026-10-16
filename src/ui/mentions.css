@@ -1,0 +1,11 @@
+/* @mentions (src/ui/MentionInput.tsx): the pick list above the text box, and tappable names in text. */
+.mention-box { position: relative; display: flex; flex: 1; min-width: 0; }
+.mention-box > input { flex: 1; min-width: 0; width: 100%; }
+.mention-list { position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); z-index: 5; display: flex; flex-direction: column; padding: 4px; background: #fff; border: 2px solid #b9cde8; border-radius: 14px; box-shadow: 0 6px 18px rgba(31, 42, 51, .18); }
+.mention-list button { display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 4px 10px; border: none; border-radius: 10px; background: none; color: var(--ink); text-align: left; }
+.mention-list button.sel { background: #e8f1fc; }
+.mention-list b { font: 15px var(--display); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mention-list small { margin-left: auto; color: #78909c; font-size: 12px; white-space: nowrap; }
+.mention-friend { font-size: 13px; }
+.mention { display: inline; margin: 0; padding: 0 3px; border: none; border-radius: 6px; background: rgba(30, 136, 229, .14); color: #1565c0; font: inherit; font-weight: 800; line-height: inherit; cursor: pointer; user-select: none; -webkit-user-select: none; }
+.mention.you { background: #ffca28; color: #4e342e; }

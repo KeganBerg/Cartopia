@@ -7,7 +7,7 @@ import { fetchMeet, likeDisplay, refreshLikes, useMeet, type Display } from '../
 import { signedInUser } from '../lib/cloud'
 import { CarThumb } from '../scene/BuildingPreview'
 import { Panel } from './Menus'
-import { SocialTabs } from './Social'
+import { SOCIAL_TITLE, SocialTabs } from './Social'
 import { PlayerName } from './Username'
 import { LoadingBand } from './Loading'
 import { PlayerCardPopup } from './PlayerCard'
@@ -128,7 +128,7 @@ export function MeetPanel() {
   }, [])
   return (
     <>
-      <Panel title="Car Meet" wide>
+      <Panel title={SOCIAL_TITLE} wide>
         <SocialTabs current="meet" />
         <MyDisplay />
         <div className="meet-list">
