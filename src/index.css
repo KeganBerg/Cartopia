@@ -1256,7 +1256,7 @@ html.calm .callout { animation: none !important; }
 .cl-lamps { grid-template-columns: repeat(4, 1fr); }
 .cl-themes { grid-template-columns: repeat(4, 1fr); }
 .cl-card { position: relative; display: flex; flex-direction: column; padding: 0; border: 3px solid rgba(20,33,61,.14); border-radius: 14px; background: #fff; overflow: hidden; cursor: pointer; }
-.cl-card img { display: block; width: 100%; aspect-ratio: 240 / 220; object-fit: cover; background: #141a33; }
+.cl-card img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; background: #141a33; }
 .cl-themes .cl-card img { aspect-ratio: 360 / 220; background: #bfe3f7; }
 .cl-name { font: 800 15px Nunito, sans-serif; color: #14213d; padding: 6px 4px 7px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cl-card.sel { border-color: #ff8f00; box-shadow: 0 0 0 3px rgba(255,143,0,.3); }
@@ -1552,7 +1552,7 @@ html.calm .callout { animation: none !important; }
 .preset { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 4px; border-radius: 12px; border: 1.5px solid #dfe5ea; background: #fff; min-width: 0; }
 .preset.empty { justify-content: center; min-height: 92px; border-style: dashed; }
 .preset-row { display: flex; gap: 4px; }
-@media (max-width: 520px) { .patterns, .trim-opts { grid-template-columns: repeat(3, 1fr); } .garage-tabs { grid-template-columns: repeat(3, 1fr); } .garage-tabs button { font-size: 12px; padding: 6px 1px; } }
+@media (max-width: 520px) { .patterns, .trim-opts { grid-template-columns: repeat(3, 1fr); } .garage-tabs { gap: 2px; padding: 3px; } .garage-tabs button { font-size: 11px; letter-spacing: -.2px; padding: 5px 0; } .garage-tabs button i { font-size: 20px; } }
 
 /* Skins: a wrapping grid of animated chips edged in their tier colour, try-on bar under it. */
 .garage-detail { min-width: 0; }
