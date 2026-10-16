@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { SkillIcon } from './TapTip'
 import { useTouchLock } from './DriveControls'
+import { BoostButton, GAIN_MS, nextGain, type BoostGain } from './BoostButton'
 import { useGame, gateLevel, spendFuel, lastRaceXpPaid, resetRaceXp, type OwnedCar } from '../game/store'
 import { LIVE_LOSS_SHARE, LOSS_SHARE } from '../game/boosts'
 import { bestCar, carPi, raceCarOf } from '../game/raceCar'
@@ -1463,6 +1464,14 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
     return () => clearTimeout(id)
   }, [split])
   const [call, pop] = useCallout()
+  // The tank's last top-up, floated off the boost ring for a moment.
+  const [gain, setGain] = useState<BoostGain | null>(null)
+  const noteGain = (before: number) => setGain((g) => nextGain(g, before, me.current.boost))
+  useEffect(() => {
+    if (!gain) return
+    const id = setTimeout(() => setGain(null), GAIN_MS)
+    return () => clearTimeout(id)
+  }, [gain])
   const flash = (text: string, ms = 800) => {
     setLabel(text)
     clearTimeout(labelTimer.current)
@@ -1470,7 +1479,9 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   }
   // Off the line at GO, on the revs the driver is holding.
   const callLaunch = () => {
+    const before = me.current.boost
     const call = revLaunch(me.current, me.current.rpm)
+    noteGain(before)
     pedal.current = false
     stats.current.launch = call
     sfx.shift(call.startsWith('PERFECT'))
@@ -1773,7 +1784,9 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
     let s = shiftQuality(r.rpm, band.lo, band.hi)
     if (smoothShift(def.skill) && s.label === 'Good') s = { q: 1.08, label: 'SMOOTH!' }
     sfx.shift(s.q >= 1)
+    const before = r.boost
     shiftRacer(r, s.q)
+    noteGain(before)
     stats.current.shifts++
     if (s.q >= 1) stats.current.perfect++
     sound.current?.shift('me', r.gear, Math.min(1, myPi / 200))
@@ -1885,7 +1898,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       ) : (
         // Two thumbs: BOOST under the left, the tach in the middle, a big SHIFT under the right.
         <div className="rf-bottom">
-          <BoostButton r={me.current} onFire={boost} ready={countdown === 0} />
+          <BoostButton r={me.current} onFire={boost} ready={countdown === 0} gain={gain} />
           <div className="rf-dial">
             <div className="rf-speed">{Math.round(me.current.speed * 3.6)}<small> km/h</small></div>
             <svg viewBox="0 0 120 120" className={`tach${light}`}>
@@ -1921,25 +1934,6 @@ function pedalPad(down: () => void, up: () => void) {
     onLostPointerCapture: up,
     onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
   }
-}
-
-// The boost tank as a ring that fills with clean driving; tap it once to fire.
-function BoostButton({ r, onFire, ready }: { r: { boost: number; burning: boolean; boostUsed: boolean; launched: boolean }; onFire: () => void; ready: boolean }) {
-  const spent = r.boostUsed && !r.burning
-  const fill = Math.round(r.boost * 100)
-  return (
-    <button
-      className={`boost-btn${r.burning ? ' burning' : ''}${!spent && fill >= 99 ? ' full' : ''}`}
-      style={{ ['--fill' as string]: `${fill}%` }}
-      onPointerDown={(e) => { e.preventDefault(); onFire() }}
-      onContextMenu={(e) => e.preventDefault()}
-      disabled={!ready || spent || !r.launched || r.boost <= 0}
-      aria-label={`Boost, ${fill}% full`}
-    >
-      <span>🔥</span>
-      <small>{spent ? 'USED' : 'BOOST'}</small>
-    </button>
-  )
 }
 
 // Counts a number up from zero once it appears.
