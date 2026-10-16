@@ -25,8 +25,10 @@ for (const [form, size] of [['desktop', { width: 1280, height: 800 }], ['phone',
     await p.waitForTimeout(3000)
     await p.evaluate((s) => window.__game.setState(s), seed)
     await p.addStyleTag({ content: '*{animation-duration:0s!important;transition:none!important}' })
-    await p.evaluate(async (t) => { (await import('/src/ui/raceNav.ts')).openRaceTab(t) }, tab.split('-')[0])
-    await p.waitForTimeout(2500)
+    for (let tries = 0; tries < 3 && !(await p.$('.race-panel .rm-split, .race-panel .rm-gp-grid')); tries++) {
+      await p.evaluate(async (t) => { (await import('/src/ui/raceNav.ts')).openRaceTab(t) }, tab.split('-')[0])
+      await p.waitForTimeout(2500)
+    }
     if (tab === 'campaign') await p.click('[aria-label="Mountain Pass"]')
     if (tab === 'campaign-open') await p.click('[aria-label="Desert Strip"]')
     await p.waitForTimeout(4000)

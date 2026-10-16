@@ -43,7 +43,8 @@ export function econCatalog() {
   )
   const goals = Object.fromEntries(GOALS.map((g) => [g.id, { coins: g.coins, xp: g.xp, bucks: g.bucks ?? 0 }]))
   const gp = Object.fromEntries(
-    GP_SERIES.map((s) => [s.id, { unlock: s.unlockLevel, box: s.box }]),
+    // unlock: the first series' level; later series open on wins too (gpOpen), so the bonus can't wait on level.
+    GP_SERIES.map((s) => [s.id, { unlock: GP_SERIES[0].unlockLevel, box: s.box }]),
   )
   // The lowest level at which Rusty can find each car.
   const rescue: Record<string, number> = {}

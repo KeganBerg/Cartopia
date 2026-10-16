@@ -41,14 +41,18 @@ describe('race locks open for the admin only', () => {
 })
 
 describe('Grand Prix series chain', () => {
-  it('opens each series by winning the one before, not by level', async () => {
+  it('opens each series by winning the one before, or at its old level', async () => {
     const { GP_SERIES, gpOpen } = await import('./data')
     const lv = GP_SERIES[0].unlockLevel
     expect(gpOpen({}, 0, lv - 1)).toBe(false)
     expect(gpOpen({}, 0, lv)).toBe(true)
-    expect(gpOpen({}, 1, 99)).toBe(false)
+    expect(gpOpen({}, 1, lv)).toBe(false)
     expect(gpOpen({ [GP_SERIES[0].id]: { clears: 1 } }, 1, lv)).toBe(true)
     expect(gpOpen({ [GP_SERIES[0].id]: { clears: 1 } }, 2, lv)).toBe(false)
-    for (let si = 1; si < GP_SERIES.length; si++) expect(GP_SERIES[si].unlockLevel).toBe(lv)
+    // The old level still opens it, so nobody loses a series they had.
+    for (let si = 1; si < GP_SERIES.length; si++) {
+      expect(gpOpen({}, si, GP_SERIES[si].unlockLevel)).toBe(true)
+      expect(gpOpen({ [GP_SERIES[si].id]: { round: 2 } }, si, lv)).toBe(true)
+    }
   })
 })

@@ -93,7 +93,7 @@ const GP_CUP = ['🥉', '🏆', '🏆', '👑']
 function gpRival(series: GpSeries, round: number, clears: number): Rival {
   const target = gpRivalPi(series, round, clears)
   const car = carNear(target)
-  return { id: `gp-${series.id}-${round}`, town: series.rivals[round], level: 2 + GP_SERIES.indexOf(series) * 8 + round, carName: car.name, color: car.colors[round % car.colors.length], pi: target, online: false, body: car.body, model: car.id, skill: car.skill }
+  return { id: `gp-${series.id}-${round}`, town: series.rivals[round], level: series.unlockLevel + round, carName: car.name, color: car.colors[round % car.colors.length], pi: target, online: false, body: car.body, model: car.id, skill: car.skill }
 }
 
 // A Grand Prix race's grid: the round's named rival in their usual car and PI, the rest
@@ -932,9 +932,9 @@ function GrandPrix({ onRace }: { onRace: (s: GpSeries, r: Rival, prize: number) 
               <span className="rm-next"><TrackChip round={prog.round} /> Race {prog.round + 1}: <b>{rival.town}</b> · PI {rival.pi}</span>
               <BoxCar s={s} dim={locked} />
               {locked ? (
-                level < s.unlockLevel || !prev
+                level < GP_SERIES[0].unlockLevel || !prev
                   ? <button className="buy small locked-btn" onClick={() => showNeed('level', s.unlockLevel, s.name)}>🔒 Level {s.unlockLevel}</button>
-                  : <button className="buy small locked-btn" title={`Win the ${prev.name} once`}>🔒 {GP_CUP[si - 1] ?? '🏆'} ×1</button>
+                  : <button className="buy small locked-btn" title={`Win the ${prev.name} once, or reach level ${s.unlockLevel}`} onClick={() => showNeed('level', s.unlockLevel, s.name)}>🔒 {GP_CUP[si - 1] ?? '🏆'} ×1 · Lv{s.unlockLevel}</button>
               ) : need > myBest ? (
                 <button className="buy small locked-btn" onClick={() => openPanel('garage')}>🔒 Final needs PI {need}</button>
               ) : short ? (
@@ -994,7 +994,9 @@ function ChapterGate({ ci, onRace, onTour }: { ci: number; onRace: (ci: number, 
       </div>
       <div className="rm-gate-steps">
         <span className={boss ? 'ok' : ''}>{boss ? '✔' : '👑'} {prev.rivals[CAMPAIGN_RACES - 1]}</span>
-        <span className={have >= need ? 'ok' : ''}>{have >= need ? '✔' : '★'} {need} stars</span>
+        <span className={have >= need ? 'ok' : ''}>{have >= need ? '✔' : '★'} {need}</span>
+        <i className="rm-or" aria-label="or">/</i>
+        <span title={`Or reach level ${CAMPAIGN[ci].tuned}`}>Lv {CAMPAIGN[ci].tuned}</span>
       </div>
       {go && (
         <button className="buy" onClick={() => onRace(go[0], go[1])}>

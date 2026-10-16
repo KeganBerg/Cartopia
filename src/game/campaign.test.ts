@@ -62,6 +62,12 @@ describe('campaign gates', () => {
     // Stars from earlier chapters count, but the chapter before still needs its boss.
     expect(campaignOpen({ ...won(0, 3), ...won(1, 3) }, 3, 1)).toBe(false)
   })
+  it('never takes away a chapter the old level locks gave', () => {
+    // At the level a chapter was tuned for, beating the boss before is enough.
+    for (let ci = 1; ci < CAMPAIGN.length; ci++) expect(campaignOpen(won(ci - 1, 1), ci, CAMPAIGN[ci].tuned)).toBe(true)
+    // A chapter already raced stays open.
+    expect(campaignOpen({ [campaignRaceId(CAMPAIGN[4], 0)]: 1 }, 4, 1)).toBe(true)
+  })
   it('asks for more stars each chapter, always reachable with two a race', () => {
     for (let ci = 1; ci < CAMPAIGN.length; ci++) {
       expect(campaignStarsNeed(ci)).toBeGreaterThan(campaignStarsNeed(ci - 1))

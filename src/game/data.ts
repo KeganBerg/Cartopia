@@ -835,19 +835,22 @@ export const refillBucks = (fuelToAdd: number) => Math.max(REFILL_BUCKS, Math.ce
 
 // Grand Prix: six races in a row against tougher and tougher rivals. Win
 // all six for a mystery box car. Each repeat of a series gets harder.
-// A series opens once the one before it has been won (gpOpen); only the first waits on a level.
+// A series opens by winning the one before it, or at its level, whichever comes first (gpOpen).
+// Only the first series waits on a level alone.
 export type GpSeries = { id: string; name: string; unlockLevel: number; minCars: number; basePi: number; step: number; prize: number; box: string[]; rivals: string[] }
 export const GP_SERIES: GpSeries[] = [
   { id: 'rookie', name: 'Rookie Cup', unlockLevel: 2, minCars: 3, basePi: 22, step: 3, prize: 200, box: ['trail', 'miata', 'woodie', 'cruiser'], rivals: ['Dusty Dan', 'Penny Pistons', 'Lugnut Lou', 'Speedy Sue', 'Gearhead Gus', 'Champ Chuck'] },
-  { id: 'street', name: 'Street Kings', unlockLevel: 2, minCars: 4, basePi: 40, step: 3, prize: 450, box: ['stallion', 'rally', 'buggy', 'bandit'], rivals: ['Nitro Nina', 'Torque Tony', 'Drift Dee', 'Boost Bo', 'Redline Rae', 'King Kurt'] },
-  { id: 'pro', name: 'Pro Circuit', unlockLevel: 2, minCars: 5, basePi: 56, step: 3, prize: 900, box: ['vette', 'charger', 'lemans'], rivals: ['Apex Ava', 'Slick Sam', 'Turbo Tess', 'Clutch Cole', 'Vroom Val', 'Ace Axel'] },
-  { id: 'legends', name: 'Legends Series', unlockLevel: 2, minCars: 6, basePi: 72, step: 3, prize: 1800, box: ['gtr', 'gullwing', 'shinden', 'lambo'], rivals: ['Ghost Rider', 'Lady Luck', 'The Baron', 'Silver Fox', 'Mad Max', 'The Legend'] },
+  { id: 'street', name: 'Street Kings', unlockLevel: 8, minCars: 4, basePi: 40, step: 3, prize: 450, box: ['stallion', 'rally', 'buggy', 'bandit'], rivals: ['Nitro Nina', 'Torque Tony', 'Drift Dee', 'Boost Bo', 'Redline Rae', 'King Kurt'] },
+  { id: 'pro', name: 'Pro Circuit', unlockLevel: 15, minCars: 5, basePi: 56, step: 3, prize: 900, box: ['vette', 'charger', 'lemans'], rivals: ['Apex Ava', 'Slick Sam', 'Turbo Tess', 'Clutch Cole', 'Vroom Val', 'Ace Axel'] },
+  { id: 'legends', name: 'Legends Series', unlockLevel: 26, minCars: 6, basePi: 72, step: 3, prize: 1800, box: ['gtr', 'gullwing', 'shinden', 'lambo'], rivals: ['Ghost Rider', 'Lady Luck', 'The Baron', 'Silver Fox', 'Mad Max', 'The Legend'] },
 ]
 export const GP_ROUNDS = 6
-// Is series si open? Past the level, the series before it needs one win. level: gateLevel()
-// (Infinity for the admin, who skips every lock).
-export const gpOpen = (gp: Record<string, { clears?: number } | undefined>, si: number, level: number) =>
-  level === Infinity || (level >= GP_SERIES[si].unlockLevel && (si === 0 || (gp[GP_SERIES[si - 1].id]?.clears ?? 0) >= 1))
+// Is series si open? The first opens at its level; each one after opens once the one before has
+// been won, or at its own level, or once it's been raced (so nobody loses a series they had).
+// level: gateLevel() (Infinity for the admin, who skips every lock).
+export const gpOpen = (gp: Record<string, { round?: number; clears?: number } | undefined>, si: number, level: number) =>
+  level === Infinity || (level >= GP_SERIES[0].unlockLevel && (si === 0 || level >= GP_SERIES[si].unlockLevel
+    || (gp[GP_SERIES[si - 1].id]?.clears ?? 0) >= 1 || (gp[GP_SERIES[si].id]?.round ?? 0) > 0 || (gp[GP_SERIES[si].id]?.clears ?? 0) > 0))
 // Rival PI for a round; each completed run of the series adds 8%.
 export const gpRivalPi = (s: GpSeries, round: number, clears: number) => Math.round((s.basePi + round * s.step) * (1 + clears * 0.08))
 export const gpReward = (s: GpSeries, round: number) => s.prize + round * Math.round(s.prize / 4)
@@ -861,7 +864,9 @@ export const gpReward = (s: GpSeries, round: number) => s.prize + round * Math.r
 // on is a faster car, not a wait.
 export type CampaignChapter = {
   id: string; name: string; blurb: string
-  tuned: number // the level its rivals are tuned for (the best Showroom car there wins every race); not a lock
+  // The level its rivals are tuned for (the best Showroom car there wins every race). Also a
+  // shortcut: reaching it opens the chapter without the stars (campaignOpen).
+  tuned: number
   venue: string // where its races run (scene/venues.ts)
   pi: [number, number] // rival PI from the first race to the boss
   // The PI the prizes are worked out from, when it differs from the rivals' (later chapters' rivals
@@ -918,9 +923,13 @@ export const CAMPAIGN_STAR_STEP = 10
 export const campaignStarsNeed = (ci: number) => ci * CAMPAIGN_STAR_STEP
 export const campaignStarTotal = (done: Record<string, number>) =>
   CAMPAIGN.reduce((n, ch) => n + Array.from({ length: CAMPAIGN_RACES }, (_, i) => Math.min(3, done[campaignRaceId(ch, i)] ?? 0)).reduce((a, b) => a + b, 0), 0)
-// Is chapter ci open? level: gateLevel(), which is Infinity for the admin, who skips every lock.
+// Is chapter ci open? Once the boss before it is beaten: with enough stars, or at the level it was
+// tuned for, whichever comes first, so nobody loses a chapter the old level locks gave them. A
+// chapter already raced stays open. level: gateLevel(), Infinity for the admin, who skips every lock.
 export const campaignOpen = (done: Record<string, number>, ci: number, level = 1) =>
-  ci === 0 || level === Infinity || (campaignCleared(done, CAMPAIGN[ci - 1]) && campaignStarTotal(done) >= campaignStarsNeed(ci))
+  ci === 0 || level === Infinity
+  || Array.from({ length: CAMPAIGN_RACES }, (_, i) => done[campaignRaceId(CAMPAIGN[ci], i)] ?? 0).some((n) => n > 0)
+  || (campaignCleared(done, CAMPAIGN[ci - 1]) && (campaignStarTotal(done) >= campaignStarsNeed(ci) || level >= CAMPAIGN[ci].tuned))
 export const campaignPerfect = (done: Record<string, number>, ch: CampaignChapter) =>
   Array.from({ length: CAMPAIGN_RACES }, (_, i) => done[campaignRaceId(ch, i)] ?? 0).every((n) => n >= 3)
 
