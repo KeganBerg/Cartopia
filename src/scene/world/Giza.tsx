@@ -877,7 +877,7 @@ export default function Giza({ len, race }: WorldProps) {
       if (Math.abs(z - gate) < 10 || (z > race - 1 && z < race + 18)) continue
       feats.push({ kind: i % 4, z })
     }
-    const busy = (x: number, z: number) => (x < EDGE + 10.5 && feats.some((f) => Math.abs(f.z - z) < 5.2)) || (x < EDGE + 7 && z > race - 11 && z < race + 17)
+    const busy = (x: number, z: number) => (x < EDGE + 10.5 && feats.some((f) => Math.abs(f.z - z) < 5.2)) || (x < EDGE + 7 && z > race - 11 && z < race + 17) || (x < EDGE + 9 && Math.abs(z - gate) < 5)
     // The left side: an unbroken row of houses, gaps only for the mosque and the gateway.
     const rows: Spot[][] = HOUSES.map(() => [])
     for (let z = -14; z < len + 40;) {
@@ -938,6 +938,8 @@ export default function Giza({ len, race }: WorldProps) {
       if (Math.abs(z - gate) < 7.5 || (z > race - 10 && z < race + 5) || CARTS.some((c) => Math.abs(c * race - z) < 1.6)) continue
       rams.push({ x: EDGE + 1.3, z, ry: -Math.PI / 2 })
     }
+    // Up to the gateway's towers, clear of its obelisks.
+    for (const dz of [-3.95, -2.4, 2.4, 3.95]) rams.push({ x: EDGE + 1.3, z: gate + dz, ry: -Math.PI / 2 })
     // The enclosure wall behind them, broken here and there.
     const walls: Spot[] = []
     for (let z = 20; z < len + 30; z += 4.2) {
@@ -961,6 +963,8 @@ export default function Giza({ len, race }: WorldProps) {
         locals.push({ x: EDGE + 4.3, z: f.z - 1.2, ry: -Math.PI / 2 })
       }
     }
+    // Seated kings flanking the gateway, outside its towers.
+    for (const dz of [-3.2, 3.2]) kings.push({ x: EDGE + 6.6, z: gate + dz, ry: -Math.PI / 2 })
     // Behind the finish crowd: a souvenir market, and two seated kings guarding the big sphinx.
     for (let z = race - 9, i = 0; z < race + 4; z += 2.1, i++) stallAt[i % 4].push({ x: EDGE + 3.4, z, ry: -Math.PI / 2 })
     for (const dz of [5.5, 14]) kings.push({ x: EDGE + 5.3, z: race + dz, ry: -Math.PI / 2 })
