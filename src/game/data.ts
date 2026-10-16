@@ -37,6 +37,8 @@ export type BuildingDef = {
   service?: boolean
   // A business listed under Recreation in the Shop (mini golf, pools, the fair).
   rec?: boolean
+  // Fuel a pricier home holds from level 1 (see upgradeFuelCap).
+  homeFuel?: number
   // A small decoration townspeople can't stroll across (it fills its tile edge to edge).
   solid?: boolean
   // Only open at night (the nightclub): jobs can only start after dark.
@@ -173,6 +175,17 @@ export const BUILDINGS: BuildingDef[] = [
   // Edge of town: trailer homes (a cheap home the town's beaters keep driving
   // back to), a scrapyard that strips wrecks for parts, and bigger park styles.
   { id: 'trailer', name: 'Trailer Home', kind: 'house', w: 1, h: 1, price: 200, unlockLevel: 2, color: '#e0f2f1', roof: '#b0bec5' },
+  // More homes, from a rose cottage to a hilltop mansion. Pricier homes hold
+  // more fuel from day one and grow in their own style rather than into towers.
+  { id: 'cottage', name: 'Rose Cottage', kind: 'house', w: 1, h: 1, price: 500, unlockLevel: 2, homeFuel: 1, color: '#fce4ec', roof: '#5d4037' },
+  { id: 'bungalow', name: 'Sunny Bungalow', kind: 'house', w: 1, h: 1, price: 1200, unlockLevel: 4, homeFuel: 1, color: '#fff59d', roof: '#546e7a' },
+  { id: 'townhouse', name: 'Brick Townhouse', kind: 'house', w: 1, h: 1, price: 2500, unlockLevel: 6, homeFuel: 2, color: '#a1503a', roof: '#37474f' },
+  { id: 'cabin', name: 'Log Cabin', kind: 'house', w: 1, h: 1, price: 4000, unlockLevel: 9, homeFuel: 2, color: '#8d5a3b', roof: '#33691e' },
+  { id: 'duplex', name: 'Modern Duplex', kind: 'house', w: 1, h: 1, price: 7000, unlockLevel: 12, homeFuel: 3, color: '#eceff1', roof: '#263238' },
+  { id: 'victorian', name: 'Painted Lady', kind: 'house', w: 1, h: 1, price: 12000, unlockLevel: 16, homeFuel: 3, color: '#b39ddb', roof: '#4a148c' },
+  { id: 'condos', name: 'Lakeview Condos', kind: 'house', w: 2, h: 1, price: 20000, unlockLevel: 20, homeFuel: 4, color: '#b2dfdb', roof: '#00695c' },
+  { id: 'villa', name: 'Hillcrest Villa', kind: 'house', w: 2, h: 2, price: 35000, unlockLevel: 25, homeFuel: 5, color: '#ffe0b2', roof: '#bf360c' },
+  { id: 'mansion', name: 'Goldcrest Mansion', kind: 'house', w: 2, h: 2, price: 60000, unlockLevel: 30, unique: true, homeFuel: 6, color: '#f5f5f5', roof: '#263238' },
   { id: 'junkyard', name: 'Junkyard', kind: 'parts', w: 2, h: 2, price: 21000, unlockLevel: 9, jobSeconds: 900, fuelCost: 6, payout: 300, partsPayout: 32, xp: 105, color: '#8d6e63', roof: '#ffb300', sign: 'JUNKYARD' },
   { id: 'dogpark', name: 'Dog Park', kind: 'decor', w: 2, h: 2, price: 1600, unlockLevel: 4, color: '#7cb342', roof: '#8d6e63' },
   { id: 'skatepark', name: 'Skate Park', kind: 'decor', w: 2, h: 2, price: 2400, unlockLevel: 6, color: '#b0bec5', roof: '#ff7043' },
@@ -279,18 +292,19 @@ export const QUICK_JOB_SECONDS = 25
 export const jobSeconds = (d: BuildingDef, level: number, jobsDone: number) =>
   jobsDone < QUICK_JOBS ? Math.min(QUICK_JOB_SECONDS, upgradeJobSeconds(d, level)) : upgradeJobSeconds(d, level)
 // Max fuel a building adds: a gas station's tank grows 2 a level; every house
-// level above 1 adds 1 (residents chip in with their own gas cans).
+// level above 1 adds 1 (residents chip in with their own gas cans), on top of
+// what a pricier home holds from the start.
 export const upgradeFuelCap = (d: BuildingDef, level: number) =>
-  d.fuelCap ? d.fuelCap + 2 * (level - 1) : d.kind === 'house' ? level - 1 : 0
+  d.fuelCap ? d.fuelCap + 2 * (level - 1) : d.kind === 'house' ? (d.homeFuel ?? 0) + level - 1 : 0
 
 // Cost to go from `level` to `level + 1`: 75% of the build price, 50% more each
 // level, plus parts from level 4 up. Houses are cheap to build but end up as
-// skyscrapers, so theirs start at $300 and grow 55% a level. Decor bought with gems (the
+// skyscrapers, so theirs start at $300 (or a quarter of a pricier home's price) and grow 55% a level. Decor bought with gems (the
 // Golden Car Statue) counts each gem as $1,000 of build price.
 const upgradeBase = (d: BuildingDef) => (d.price || (decorGrows(d) ? (d.bucks ?? 0) * 1000 : 0))
 export const buildingUpgradeCost = (d: BuildingDef, level: number) => ({
   coins: d.kind === 'house'
-    ? Math.round((300 * Math.pow(1.55, level - 1)) / 50) * 50
+    ? Math.round((Math.max(300, d.price * 0.25) * Math.pow(1.55, level - 1)) / 50) * 50
     : Math.max(100, Math.round((upgradeBase(d) * 0.75 * Math.pow(1.5, level - 1)) / 50) * 50),
   parts: level >= 4 ? (level - 2) * 2 : 0,
 })
@@ -306,7 +320,7 @@ const RESIDENTS = [2, 3, 4, 6, 8, 10, 13, 16, 20, 24]
 export const houseResidents = (level: number) => RESIDENTS[Math.min(MAX_BUILDING_LEVEL, Math.max(1, level)) - 1]
 // What a building is called at a level: homes and growing businesses (game/growth.ts) change name.
 export const levelName = (d: BuildingDef, level: number) =>
-  d.kind !== 'house' ? growthName(d.id, d.name, level) : (d.id === 'trailer' ? TRAILER_NAMES : HOME_NAMES)[homeStage(level)]
+  d.id === 'house' ? HOME_NAMES[homeStage(level)] : d.id === 'trailer' ? TRAILER_NAMES[homeStage(level)] : growthName(d.id, d.name, level)
 export const buildingUpgradeXp = (level: number) => 10 + level * 5
 // Extra model height an upgraded building gains, on the same lot.
 export const levelLift = (level = 1) => 0.26 * (Math.min(MAX_BUILDING_LEVEL, Math.max(1, level)) - 1)

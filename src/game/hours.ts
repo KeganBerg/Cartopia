@@ -17,7 +17,7 @@ const KIND: Record<string, HoursKind> = {
   school: 'school', highschool: 'school', university: 'school',
   pizza: 'evening', burger: 'evening', tacos: 'evening', icecream: 'evening', arcade: 'evening', bowling: 'evening', cinema: 'evening', market: 'evening', stadium: 'evening', crew: 'evening',
   diner: 'late',
-  house: 'home', trailer: 'home',
+  house: 'home', trailer: 'home', cottage: 'home', bungalow: 'home', townhouse: 'home', cabin: 'home', duplex: 'home', victorian: 'home', condos: 'home', villa: 'home', mansion: 'home',
 }
 
 export const hoursOf = (id: string): number => HOURS[KIND[id] ?? 'always']
