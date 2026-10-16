@@ -330,6 +330,7 @@ export type Body = 'compact' | 'sedan' | 'sports' | 'muscle' | 'truck' | 'super'
   | 'scissor' | 'horseshoe' | 'teardrop' | 'icecream' | 'monster' | 'parcel'
   | 'pontoon' | 'stepnose' | 'restomuscle'
   | 'highboy' | 'timeattack' | 'groupb' | 'longtail' | 'ponycar' | 'gtcoupe'
+  | 'hothatch' | 'musclecoupe' | 'popup' | 'midship'
 // Two-wheelers: drawn as motorcycles with a rider, and only take exhaust and rim mods.
 export const BIKES: Body[] = ['scooter', 'chopper', 'sportbike']
 export const isBike = (body: Body) => BIKES.includes(body)
@@ -462,6 +463,10 @@ export const CARS: CarDef[] = [
   // Showroom's best at its level (see packCars.ts for the bodies).
   { id: 'stinger', name: 'Liberty Stinger SS', body: 'ponycar', price: 0, unlockLevel: 12, pack: true, power: 78, grip: 48, weight: 52, skill: 'torque', likes: ['diner', 'burger', 'tires'], colors: ['#ffb300', '#212121', '#c62828'] },
   { id: 'sora', name: 'Kazumi Sora GT', body: 'gtcoupe', price: 0, unlockLevel: 20, pack: true, power: 84, grip: 72, weight: 40, skill: 'smooth', likes: ['tuner', 'arcade', 'parts'], colors: ['#c62828', '#eceff1', '#1565c0'] },
+  { id: 'scatto', name: 'Vetta Scatto HF', body: 'hothatch', price: 0, unlockLevel: 13, pack: true, power: 61, grip: 58, weight: 40, skill: 'launch', likes: ['coffee', 'arcade', 'tires'], colors: ['#d32f2f', '#fafafa', '#1e88e5'] },
+  { id: 'thunderjet', name: 'Liberty Thunderjet 440', body: 'musclecoupe', price: 0, unlockLevel: 22, pack: true, power: 90, grip: 52, weight: 56, skill: 'torque', likes: ['burger', 'lube', 'bodyshop'], colors: ['#2e7d32', '#ff8f00', '#212121'] },
+  { id: 'hayate', name: 'Kazumi Hayate RS', body: 'popup', price: 0, unlockLevel: 28, pack: true, power: 96, grip: 72, weight: 44, skill: 'smooth', likes: ['tuner', 'parts', 'arcade'], colors: ['#6a1b9a', '#eceff1', '#212121'] },
+  { id: 'kestrel', name: 'Nordwerk Kestrel GT', body: 'midship', price: 0, unlockLevel: 33, pack: true, power: 100, grip: 82, weight: 40, skill: 'slipstream', likes: ['glasstower', 'parkade', 'hq'], colors: ['#00897b', '#eceff1', '#212121'] },
   { id: 'firebolt', name: 'Liberty Firebolt Highboy', body: 'highboy', price: 0, unlockLevel: 8, pack: true, power: 122, grip: 70, weight: 40, skill: 'launch', likes: ['diner', 'burger', 'lube'], colors: ['#b71c1c', '#212121', '#ffb300'] },
   { id: 'kaze', name: 'Kazumi Kaze TA-R', body: 'timeattack', price: 0, unlockLevel: 15, pack: true, power: 114, grip: 96, weight: 36, skill: 'smooth', likes: ['tuner', 'parts', 'arcade'], colors: ['#eceff1', '#0d47a1', '#ff6d00'] },
   { id: 'sturm', name: 'Falke Sturm S1', body: 'groupb', price: 0, unlockLevel: 25, pack: true, power: 120, grip: 100, weight: 40, skill: 'torque', likes: ['tires', 'stadium', 'junkyard'], colors: ['#fafafa', '#c62828', '#1b5e20'] },
@@ -611,10 +616,29 @@ export const UPGRADE_SLOTS: { id: UpgradeSlot; name: string }[] = [
 ]
 export const MAX_UPGRADE = 5
 
-export const upgradeCost = (car: CarDef, level: number) => ({
-  coins: Math.round((car.price + (car.bucks ?? 0) * 1000) * 0.15 * (level + 1) + 200),
-  parts: 2 + level * 3,
-})
+// Base PI of a car with no upgrades or mods (performance() without carStats, which comes later).
+const basePi = (car: CarDef) => Math.round(car.power * 0.6 + car.grip * 0.3 + (100 - car.weight) * 0.1)
+// Parts to upgrade grow with the car's tier (Kegan, 2026-10-16: maxing a top car should be a grind,
+// not an hour): PI 50 and under pay the base 2 / 5 / 8 / 11 / 14, PI 75 three times that, PI 96
+// about eight times, capped at ten (1,600 parts to max every slot). Rounded to 5 above the base.
+export const upgradePartsMult = (car: CarDef) => Math.min(10, 1 + 8 * Math.max(0, (basePi(car) - 50) / 50) ** 2)
+// Pack cars have no coin price, so their upgrades are priced like the dearest Showroom car they
+// match or beat (before, a pack car maxed for 4,000 coins).
+let showroomByPi: { pi: number; price: number }[] | null = null
+const upgradeValue = (car: CarDef) => {
+  if (!car.pack) return car.price + (car.bucks ?? 0) * 1000
+  showroomByPi ??= CARS.filter((c) => c.price > 0 && !c.pack && !c.rescueOnly && !c.season && !c.secret && !c.parked).map((c) => ({ pi: basePi(c), price: c.price }))
+  const pi = basePi(car)
+  return showroomByPi.reduce((best, c) => (c.pi <= pi && c.price > best ? c.price : best), 0)
+}
+export const upgradeCost = (car: CarDef, level: number) => {
+  const mult = upgradePartsMult(car)
+  const parts = 2 + level * 3
+  return {
+    coins: Math.round(upgradeValue(car) * 0.15 * (level + 1) + 200),
+    parts: mult <= 1 ? parts : Math.round((parts * mult) / 5) * 5,
+  }
+}
 
 // Car mods: bolt-on parts you can see on the car (in town, in races and in
 // every preview), one per slot. Unlike Garage upgrades, which tune what's under
@@ -810,7 +834,19 @@ export const SERVICE_XP = { gas: 8, tires: 12, tow: 15, fix: 5 } as const
 export const serviceXp = (kind: keyof typeof SERVICE_XP, level: number) => playXp(SERVICE_XP[kind], level)
 
 export const baseFuelCap = (level: number) => 15 + level * 2
-export const FUEL_REGEN_SECONDS = 60
+// Fuel refills faster at level milestones: 1 a minute, then 2 at level 15, 3 at 30, 4 at 50, 5 at 75.
+export const FUEL_RATE_STEPS = [
+  { level: 1, perMin: 1 },
+  { level: 15, perMin: 2 },
+  { level: 30, perMin: 3 },
+  { level: 50, perMin: 4 },
+  { level: 75, perMin: 5 },
+] as const
+export const fuelPerMin = (level: number) => FUEL_RATE_STEPS.reduce((n, st) => (level >= st.level ? st.perMin : n), 1)
+/** Seconds for one fuel to come back at this level (60, 30, 20, 15, 12). */
+export const fuelRegenSeconds = (level: number) => 60 / fuelPerMin(level)
+/** The next level where fuel refills faster, or null past the last step. */
+export const nextFuelStep = (level: number) => FUEL_RATE_STEPS.find((st) => st.level > level) ?? null
 export const RACE_FUEL = 3
 // Bucks to fill the tank to the cap in one go: at least 3, and 1 per 5 fuel it adds.
 export const REFILL_BUCKS = 3
@@ -907,7 +943,7 @@ export const CAR_SETS: CarSet[] = [
   { id: 'oddballs', name: 'Oddballs', icon: '🍦', cars: ['scoops', 'courier', 'crusher'], coins: 4000, bucks: 3, trophies: 8, xp: 120 },
   { id: 'restomods', name: 'Resto Garage', icon: '🧩', cars: ['sprint', 'revenant', 'pontone'], coins: 30000, bucks: 15, trophies: 40, xp: 500 },
   { id: 'exotica', name: 'Exotica', icon: '👑', cars: ['fulmine', 'eclat', 'orafo'], coins: 40000, bucks: 20, trophies: 50, xp: 600 },
-  { id: 'carpacks', name: 'Pack Legends', icon: '💳', cars: ['stinger', 'sora', 'firebolt', 'kaze', 'sturm', 'vanta'], coins: 40000, bucks: 20, trophies: 50, xp: 600 },
+  { id: 'carpacks', name: 'Pack Legends', icon: '💳', cars: ['scatto', 'stinger', 'thunderjet', 'sora', 'hayate', 'kestrel', 'firebolt', 'kaze', 'sturm', 'vanta'], coins: 40000, bucks: 20, trophies: 50, xp: 600 },
   // Season track prizes; each season adds its car here.
   { id: 'seasons', name: 'Season Rides', icon: '🏁', cars: ['nightfall'], coins: 5000, bucks: 3, trophies: 10, xp: 150 },
 ]

@@ -18,9 +18,9 @@ export const CAR_CLASSES: CarClass[] = [
 ]
 
 const CLASS_OF_BODY: Partial<Record<Body, CarClassId>> = {
-  compact: 'compact', sedan: 'compact', hatch: 'compact', wagon: 'compact', ev: 'compact',
-  muscle: 'muscle', widebody: 'muscle', longnose: 'muscle', classic: 'muscle', highboy: 'muscle', ponycar: 'muscle',
-  sports: 'sport', coupe: 'sport', roadster: 'sport', rearengine: 'sport', luxury: 'sport', timeattack: 'sport', gtcoupe: 'sport',
+  compact: 'compact', sedan: 'compact', hatch: 'compact', hothatch: 'compact', wagon: 'compact', ev: 'compact',
+  muscle: 'muscle', widebody: 'muscle', longnose: 'muscle', classic: 'muscle', highboy: 'muscle', ponycar: 'muscle', musclecoupe: 'muscle',
+  sports: 'sport', coupe: 'sport', roadster: 'sport', rearengine: 'sport', luxury: 'sport', timeattack: 'sport', gtcoupe: 'sport', popup: 'sport', midship: 'sport',
   super: 'super', wedge: 'super', prototype: 'super', scissor: 'super', horseshoe: 'super', teardrop: 'super', longtail: 'super',
   truck: 'offroad', rally: 'offroad', groupb: 'offroad', suv: 'offroad', offroad: 'offroad',
   // Everything else (bus, tank, dog van, Tusker, bikes, formula, bubble, van) is an oddball.

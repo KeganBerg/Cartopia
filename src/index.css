@@ -1809,7 +1809,11 @@ button.book-car { font: inherit; color: inherit; }
 .race-full .countdown.big.go { color: #76ff03; text-shadow: 0 4px 0 #1b5e20; animation: pop .15s ease-out; }
 .race-full .shift-btn.launch { background: linear-gradient(#76ff03, #2e7d32); }
 .boost-btn { position: relative; width: 84px; height: 84px; flex: none; border-radius: 50%; border: 3px solid #fff; padding: 0; display: grid; place-content: center; color: #fff; font-family: var(--display); cursor: pointer;
-  background: radial-gradient(circle, #263238 0 56%, transparent 57%), conic-gradient(#ff9100 0 var(--fill), rgba(255,255,255,.18) var(--fill) 100%); box-shadow: 0 4px 0 rgba(0,0,0,.35); }
+  background: radial-gradient(circle closest-side, #263238 0 70%, transparent 71%), conic-gradient(#ff9100 0 var(--fill), rgba(255,255,255,.22) var(--fill) 100%); box-shadow: 0 4px 0 rgba(0,0,0,.35); }
+/* Each shift's top-up floats off the ring (BoostButton.tsx). The ring is a share of the
+   button (closest-side), so it reads as thick on a big desktop screen as on a phone. */
+.boost-gain { position: absolute; left: 50%; bottom: 100%; margin-bottom: 4px; transform: translateX(-50%); padding: 2px 8px; border-radius: 10px; background: #ff9100; color: #fff; font: 18px var(--display); font-weight: normal; white-space: nowrap; pointer-events: none; box-shadow: 0 2px 0 rgba(0,0,0,.35); animation: boost-gain .9s ease-out both; }
+@keyframes boost-gain { from { transform: translate(-50%, 10px) scale(.7); opacity: 0; } 20% { transform: translate(-50%, 0) scale(1.1); opacity: 1; } 70% { opacity: 1; } to { transform: translate(-50%, -14px); opacity: 0; } }
 .boost-btn span { font-size: 28px; line-height: 1; }
 .boost-btn small { font-size: 12px; letter-spacing: .5px; }
 .boost-btn:disabled { opacity: .55; cursor: default; }
@@ -1822,7 +1826,7 @@ button.book-car { font: inherit; color: inherit; }
   -webkit-mask: radial-gradient(ellipse at 50% 55%, transparent 38%, #000 75%); mask: radial-gradient(ellipse at 50% 55%, transparent 38%, #000 75%);
   animation: boost-streak .12s linear infinite; }
 @keyframes boost-streak { 50% { transform: scale(1.04); opacity: .8; } }
-@media (prefers-reduced-motion: reduce) { .rf-boost-fx { animation: none; } .boost-btn.full:not(:disabled) { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .rf-boost-fx { animation: none; } .boost-btn.full:not(:disabled) { animation: none; } .boost-gain { animation: none; } }
 /* The finish hero shot: tap anywhere below the top bar to skip it; a small skip mark in the corner. */
 .hero-skip { position: absolute; z-index: 5; top: calc(56px + var(--sat)); left: 0; right: 0; bottom: 0; margin: 0; padding: 0 calc(16px + var(--sar)) calc(16px + var(--sab)) 0; border: 0; background: none; display: flex; align-items: flex-end; justify-content: flex-end; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .hero-skip span { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; background: rgba(10,20,40,.45); color: #fff; font-size: 20px; }
@@ -1843,6 +1847,10 @@ button.book-car { font: inherit; color: inherit; }
   .rf-bottom .boost-btn { justify-self: end; }
   .rf-bottom .shift-btn { justify-self: start; }
   .rf-dial .tach { width: 170px; height: 170px; }
+  .race-full .boost-btn { width: 124px; height: 124px; }
+  .race-full .boost-btn span { font-size: 40px; }
+  .race-full .boost-btn small { font-size: 15px; }
+  .boost-gain { font-size: 24px; padding: 3px 10px; }
   .rf-speed { font-size: 40px; }
   .race-full .rf-hold { bottom: calc(256px + var(--sab)); }
 }

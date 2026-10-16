@@ -5,7 +5,9 @@ import { sfx } from './sound'
 import { useGame } from '../game/store'
 import { CLAN_EMBLEMS } from '../game/data'
 import { isCleanChat, isCleanName } from './names'
-import { loadUsernames, playerName } from './profiles'
+import { loadUsernames, playerName, useNames } from './profiles'
+import { mentions } from './mentions'
+import { useFriends } from './friendsList'
 import type { ClanBadge } from './clans'
 
 // Global chat and crew chat (supabase/migrations/0048_chat.sql). Messages are sent through
@@ -23,6 +25,8 @@ type ChatState = {
   msgs: Record<Room, ChatMsg[]>
   // Messages that came in while that room wasn't on screen.
   unread: Record<Room, number>
+  // Messages naming the player (@username) that came in while that room wasn't on screen.
+  pinged: Record<Room, number>
   // The room on screen, or null while the chat is closed.
   viewing: Room | null
   // Players this browser hides.
@@ -41,7 +45,7 @@ const loadMuted = (): Record<string, string> => {
 }
 
 export const useChat = create<ChatState>(() => ({
-  uid: null, crewRoom: null, msgs: { global: [], crew: [] }, unread: { global: 0, crew: 0 }, viewing: null, muted: loadMuted(),
+  uid: null, crewRoom: null, msgs: { global: [], crew: [] }, unread: { global: 0, crew: 0 }, pinged: { global: 0, crew: 0 }, viewing: null, muted: loadMuted(),
   powers: { mod: false, leader: false },
 }))
 
@@ -79,26 +83,42 @@ const loaded: Partial<Record<Room, boolean>> = {}
 function add(room: Room, list: ChatMsg[], history = false) {
   loadUsernames(list.map((m) => m.owner))
   let ping = false
+  let tagged = null as ChatMsg | null
+  let away = false
+  const myName = useNames.getState().mine?.username
   useChat.setState((s) => {
     const from = history ? (list.length ? Math.min(...list.map((m) => m.id)) : -Infinity) : Infinity
     const byId = new Map(s.msgs[room].filter((m) => m.id < from).map((m) => [m.id, m]))
     const had = new Set(s.msgs[room].map((m) => m.id))
     const count = !!loaded[room]
     let fresh = 0
+    let named = 0
     for (const m of list) {
-      if (!had.has(m.id) && count) fresh += m.owner === s.uid || s.muted[m.owner] ? 0 : 1
+      if (!had.has(m.id) && count && m.owner !== s.uid && !s.muted[m.owner]) {
+        fresh++
+        if (mentions(m.body, myName)) {
+          named++
+          tagged = m
+        }
+      }
       byId.set(m.id, m)
     }
     const merged = [...byId.values()].sort((a, b) => a.id - b.id).slice(-KEEP)
     // Your crew talking: a soft pluck (the busy global room stays quiet).
     ping = room === 'crew' && fresh > 0
     const seen = s.viewing === room
+    away = !seen
     return {
       msgs: { ...s.msgs, [room]: merged },
       unread: { ...s.unread, [room]: seen ? 0 : s.unread[room] + fresh },
+      pinged: { ...s.pinged, [room]: seen ? 0 : s.pinged[room] + named },
     }
   })
-  if (ping) sfx.message()
+  // Someone @mentioned you: a ping and a note saying who, wherever you are.
+  if (tagged) {
+    sfx.notify()
+    if (away) useGame.getState().toast(`💬 ${senderName(tagged)} mentioned you`)
+  } else if (ping) sfx.message()
 }
 
 const channels: Partial<Record<Room, RealtimeChannel>> = {}
@@ -150,7 +170,7 @@ export async function refreshChatRooms() {
   const crewRoom = data?.clan_id ? `crew:${data.clan_id}` : null
   if (crewRoom !== useChat.getState().crewRoom) {
     leave('crew')
-    useChat.setState((s) => ({ crewRoom, msgs: { ...s.msgs, crew: [] }, unread: { ...s.unread, crew: 0 } }))
+    useChat.setState((s) => ({ crewRoom, msgs: { ...s.msgs, crew: [] }, unread: { ...s.unread, crew: 0 }, pinged: { ...s.pinged, crew: 0 } }))
   }
   void join('global')
   if (crewRoom) void join('crew')
@@ -172,7 +192,7 @@ export function startChat() {
     if (uid === useChat.getState().uid) return
     leave('global')
     leave('crew')
-    useChat.setState({ uid, crewRoom: null, msgs: { global: [], crew: [] }, unread: { global: 0, crew: 0 }, powers: { mod: false, leader: false } })
+    useChat.setState({ uid, crewRoom: null, msgs: { global: [], crew: [] }, unread: { global: 0, crew: 0 }, pinged: { global: 0, crew: 0 }, powers: { mod: false, leader: false } })
     if (uid) void refreshChatRooms()
   }
   supabase.auth.getUser().then(({ data }) => onUser(data.user?.id ?? null))
@@ -195,13 +215,14 @@ export function openChat(room: Room) {
 }
 // The room the chat window opens on: the one asked for, else crew when it has news.
 export function firstRoom(): Room {
-  const r = pickedRoom ?? (useChat.getState().unread.crew > 0 ? 'crew' : 'global')
+  const { unread, pinged } = useChat.getState()
+  const r = pickedRoom ?? (pinged.global > 0 && !pinged.crew ? 'global' : unread.crew > 0 ? 'crew' : 'global')
   pickedRoom = null
   return r
 }
 
 export function viewRoom(room: Room | null) {
-  useChat.setState((s) => ({ viewing: room, unread: room ? { ...s.unread, [room]: 0 } : s.unread }))
+  useChat.setState((s) => ({ viewing: room, unread: room ? { ...s.unread, [room]: 0 } : s.unread, pinged: room ? { ...s.pinged, [room]: 0 } : s.pinged }))
   if (room) void loadRecent(room)
 }
 
@@ -273,6 +294,8 @@ export function chatDemo() {
     ['me', 'My Town', 18, 'just unlocked the Cold Snap skin 🔥', 'ACE'],
     ['c', 'Neon Heights', 44, 'trailer park looks so good at night', 'VRM'],
     ['a', 'Polio Folio', 31, 'invite me, I am online now', 'ACE'],
+    ['k', 'KBerg Town', 200, 'Tomahawk tank, enjoy @Gabe', null],
+    ['b', 'Rustville', 12, 'race me later @Racer_K?', null],
   ]
   const make = (i: number, [o, name, level, body, tag]: (typeof rows)[number]): ChatMsg => ({
     id: i + 1, owner: o, name, level, body, at: now - (rows.length - i) * 95000,
@@ -285,5 +308,13 @@ export function chatDemo() {
       crew: [make(10, ['a', 'Polio Folio', 31, 'crew goal is almost there, 20 more points', 'ACE']), make(11, ['me', 'My Town', 18, 'on it, racing now', 'ACE'])],
     },
     unread: { global: 0, crew: 2 },
+  })
+  // You and a few friends, so "@" has names to offer.
+  useNames.setState((s) => ({ mine: { uid: 'me', username: 'Racer_K', changedAt: null }, byId: { ...s.byId, k: 'KBerg', b: 'Rusty_B', 'demo-nitro': 'Gabe' } }))
+  useFriends.setState({
+    loaded: true,
+    list: [['demo-nitro', 'Gabe', 'Nitro Bay', 12], ['g2', 'Gabriel_GT', 'Grand Bay', 22], ['u', 'Bubba', 'Bubba Bay', 51]].map(([id, username, townName, level]) => ({
+      id: id as string, username: username as string, townName: townName as string, level: level as number, carName: null, status: 'friend' as const, lastSeen: null,
+    })),
   })
 }

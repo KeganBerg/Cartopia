@@ -21,7 +21,7 @@ export function paint(g: BufferGeometry, hex: string) {
 export const at = (g: BufferGeometry, x: number, y: number, z: number, rz = 0) => g.rotateZ(rz).translate(x, y, z)
 
 // Body: torso with sleeved arms hanging at the sides and a belt. Without
-// `arms`, figures that move their arms add their own (clubArmGeo, clubPeople.ts).
+// `arms`, for a figure that moves its arms itself (armGeo, handGeo, clubArmGeo).
 export function torsoGeo(arms = true) {
   return mergeGeometries([
     paint(new CapsuleGeometry(0.085, 0.16, 3, 10), '#ffffff'),
@@ -31,7 +31,7 @@ export function torsoGeo(arms = true) {
 }
 
 // Head: face with eyes, nose, mouth and ears, a neck, and the hands (they ride
-// with the head's instance, at the ends of the arms).
+// with the head's instance, at the ends of the arms; left off without `hands`).
 export function headGeo(hands = true) {
   return mergeGeometries(headParts(hands))!
 }
@@ -46,6 +46,12 @@ export function headParts(hands = true) {
     ...(hands ? [-1, 1].map((s) => paint(at(new SphereGeometry(0.026, 6, 5), s * 0.118, -0.285, 0.005), '#ffffff')) : []),
   ]
 }
+
+// A loose sleeved arm hung from its shoulder at the origin, and the hand at its
+// end, for figures that move their arms (torsoGeo(false), headGeo(false)).
+export const ARM_LEN = 0.196
+export const armGeo = () => paint(new CapsuleGeometry(0.028, 0.14, 2, 6).translate(0, -ARM_LEN / 2, 0), '#f2f2f2')
+export const handGeo = () => paint(new SphereGeometry(0.026, 6, 5).translate(0, -ARM_LEN - 0.006, 0.005), '#ffffff')
 
 // Leg: trouser leg with a shoe at the foot, toe forward.
 export function legGeo(len: number) {

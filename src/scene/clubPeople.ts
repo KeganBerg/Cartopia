@@ -1,7 +1,7 @@
 import { BufferAttribute, CapsuleGeometry, Color, CylinderGeometry, InstancedBufferAttribute, MeshStandardMaterial, SphereGeometry, type BufferGeometry } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { HAIR, SKIN } from './people'
-import { at, headParts, paint } from './peopleGeo'
+import { ARM_LEN, at, headParts, paint } from './peopleGeo'
 
 // The nightclub's people (the bouncer at the rope and the rooftop dancers),
 // built from the townspeople's own parts so they look as detailed as the
@@ -34,7 +34,7 @@ export const skinOf = (i: number) => (i === 0 ? '#a86f4c' : SKIN[(i * 7) % SKIN.
 // Shoulder to hand, hanging down from the shoulder at the origin: a short
 // sleeve (shirt), the bare arm and a hand (skin). The bouncer's waving arm
 // wears door staff's hi-vis band round the sleeve, so he reads at night.
-export const ARM_LEN = 0.2
+export { ARM_LEN }
 export function clubArmGeo() {
   const g = mergeGeometries([
     tag(paint(new SphereGeometry(0.036, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2), '#ffffff'), OWN),

@@ -1,6 +1,6 @@
 import { useGame, fuelCap } from '../game/store'
 import { UpdatePill } from './UpdatePill'
-import { xpToNext, FUEL_REGEN_SECONDS } from '../game/data'
+import { xpToNext, fuelRegenSeconds, fuelPerMin } from '../game/data'
 import { useNow } from '../scene/useNow'
 import { GoalTracker } from './Goals'
 import { SeasonButton } from './Season'
@@ -56,7 +56,7 @@ export function Hud() {
   const tip = useTipTarget()
   const now = useNow()
   const cap = fuelCap(s)
-  const nextIn = s.fuel >= cap ? null : Math.max(0, FUEL_REGEN_SECONDS - Math.floor((now - s.fuelUpdatedAt) / 1000))
+  const nextIn = s.fuel >= cap ? null : Math.max(0, fuelRegenSeconds(s.level) - Math.floor((now - s.fuelUpdatedAt) / 1000))
   // New players start with coins and their level; the rest arrives as it's needed (src/game/unlocks.ts).
   const fuel = useUnlock('fuel')
   const gems = useUnlock('gems')
@@ -90,7 +90,7 @@ export function Hud() {
           </div>
           <span className="ico cur-ico"><FuelIcon /></span>
         </button>
-        <div className="fuel-sub">{nextIn === null ? 'Fuel full' : `+1 fuel in ${nextIn}s`}</div></>}
+        <div className="fuel-sub" title="Fuel refill rate: faster at levels 15, 30, 50 and 75">{nextIn === null ? 'Fuel full' : `+1 fuel in ${nextIn}s`} · {fuelPerMin(s.level)}/min</div></>}
         <div className="hud-right-row">
           {trophies.on && <button className={`pill trophies${freshClass(trophies.fresh)}`} title="Leaderboards" onClick={() => s.openPanel('leaders')}><Icon name="trophy" size={16} /> {compact(s.trophies)}</button>}
           {gems.on && <button className={`goals-btn bank-btn${tip === 'gems' ? ' tut-pulse' : ''}${freshClass(gems.fresh)}`} onClick={() => s.openPanel('bank')} title="Bank" aria-label="Bank"><Icon name="bank" /></button>}
