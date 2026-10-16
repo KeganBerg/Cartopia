@@ -28,7 +28,7 @@ function Gain({ def, n, on }: { def: string; n: number; on?: boolean }) {
 }
 
 // Badge height over a merged block: as tall as its model grows (see groupScale).
-const lift = (g: MergeGroup) => (g.cols === g.rows ? g.cols : 1)
+const lift = (g: MergeGroup) => (g.cols === g.rows ? g.cols : Math.min(g.cols, g.rows))
 
 type JobProps = { b: PlacedBuilding; now: number; g?: MergeGroup; members?: PlacedBuilding[] }
 
