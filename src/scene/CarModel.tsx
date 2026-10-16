@@ -657,7 +657,8 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
     const R = s.flares || hasTrim(model, 'boxFlares') ? s.wheel : s.wheel * 1.18
     const pts = wellOutline(R, s.wheel, (lx, ly) => s.wheel + ly <= Math.min(cap, sideTop(z - sd * lx) - b - 0.012))
     wells.set(`${z}|${sd}`, pts)
-    k.add('black', wellGeo(pts), [sd * (s.wid / 2 + 0.0045), s.wheel, z], [0, (sd * Math.PI) / 2, 0])
+    // A tank's track loop and armour skirt cover that spot, so it has no wells to show.
+    if (!s.tracks) k.add('black', wellGeo(pts), [sd * (s.wid / 2 + 0.0045), s.wheel, z], [0, (sd * Math.PI) / 2, 0])
     // Rugged bodies get chunky black fender flares round the arches.
     // The open buggy's are slimmer and stop short of the axle line, so they read as flares on its
     // tub rather than mudguards hanging down past the tyres.
