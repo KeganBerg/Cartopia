@@ -1,5 +1,5 @@
-// Trophy Road: every ROAD_STEP trophies is a stop. Every stop pays coins and parts, rising for
-// the first ROAD_STOPS stops and then the same for ever. Every MYSTERY_EVERY-th stop also opens a
+// Trophy Road: every ROAD_STEP trophies is a stop. Every stop pays coins and parts, rising faster
+// the further along it is (Kegan, 2026-10-16) for the first ROAD_STOPS stops, then the same for ever. Every MYSTERY_EVERY-th stop also opens a
 // mystery cosmetic, like a loot crate: a random one, not yet won, from ROAD_POOL (colours from
 // data.ts PAINTS with earn 'road', for the body, a panel or the wheels, and patterns from PATTERNS
 // with road), none of which can be bought. Trophies are never spent: the save keeps how many stops
@@ -9,13 +9,15 @@
 import { PAINTS, PATTERNS } from './data'
 
 export const ROAD_STEP = 25
-export const ROAD_STOPS = 20
+export const ROAD_STOPS = 60
 export const MYSTERY_EVERY = 3
 
-// Coins and parts at stop i (0-based: stop 0 is at ROAD_STEP trophies).
+// Coins and parts at stop i (0-based: stop 0 is at ROAD_STEP trophies). Coins grow with the square
+// of the stop, so a stop deep in the road is worth a good share of what a town of that level makes
+// in the half hour or so of racing it took (350 trophies: 28K, 1,000: 121K, the cap at 1,525: 236K).
 export const roadPay = (i: number) => {
-  const n = Math.min(i, ROAD_STOPS)
-  return { coins: 2000 + 400 * n, parts: 5 + n }
+  const n = Math.min(Math.max(i, 0), ROAD_STOPS)
+  return { coins: Math.round((2000 + 1500 * n + 40 * n * n) / 100) * 100, parts: 5 + Math.round(1.5 * n) }
 }
 export const roadMystery = (i: number) => i % MYSTERY_EVERY === MYSTERY_EVERY - 1
 export const roadTrophies = (i: number) => (i + 1) * ROAD_STEP
