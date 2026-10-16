@@ -1448,6 +1448,8 @@ export const seasonSkin = (tier: number) => SKINS.find((d) => 'season' in d.unlo
 // and each car's choices in `modSkin` (by slot).
 export type SkinnedSlot = 'spoiler' | 'exhaust' | 'kit' | 'hood'
 export const SKINNED_SLOTS: SkinnedSlot[] = ['spoiler', 'exhaust', 'kit', 'hood']
+// A car's mod skins by slot, and its track skin (tracked bodies only) under `tracks`.
+export type ModSkins = Partial<Record<SkinnedSlot | 'tracks', string>>
 export const MOD_SKINS: SkinDef[] = [
   { id: 'ember', n: 11, name: 'Ember', tier: 'rare', blurb: 'Flames rolling back off the part', unlock: { level: 5 },
     swatch: 'linear-gradient(0deg, #2a0700, #ff3d00 40%, #ffb300 70%, #fff3b0)' },
@@ -1486,6 +1488,61 @@ export const modSkinNumber = (id?: string | null) => modSkinDef(id)?.n ?? 0
 export const ownedModSkins = (s: { level: number; claimedSets?: string[]; modSkins?: string[] }) =>
   ownedSkins({ level: s.level, claimedSets: s.claimedSets, skins: s.modSkins }, MOD_SKINS)
 export const seasonModSkin = (tier: number) => MOD_SKINS.find((d) => 'season' in d.unlock && d.unlock.season === tier)
+
+// A tracked body's own names for some mod slots and parts (looks only: ids and stats stay the
+// same, so saves and the server catalog don't change). On the Tomahawk the rims are its track's
+// road wheels, the tires its track pads, and the hood parts its cannon.
+type SlotInfo = { name: string; icon: string; stat: string }
+const BODY_SLOTS: Partial<Record<Body, Partial<Record<ModSlot, SlotInfo>>>> = {
+  tank: {
+    rims: { name: 'Tracks', icon: '⛓️', stat: 'Lighter road wheels' },
+    tires: { name: 'Pads', icon: '🌧️', stat: 'Hold the strip in rain, snow and sand' },
+    hood: { name: 'Cannons', icon: '💥', stat: 'A bigger gun for more power' },
+  },
+}
+const BODY_MOD_NAMES: Partial<Record<Body, Record<string, string>>> = {
+  tank: {
+    chrome: 'Chrome Tracks', goldmesh: 'Gold Mesh Tracks', forged: 'Forged Black Tracks', candy: 'Candy Tracks',
+    beadlock: 'Bronze Tracks', turbine: 'Turbine Tracks', goldwire: 'Gold Wire Tracks',
+    raintires: 'Rubber Pads', sandtires: 'Sand Paddles', snowstuds: 'Snow Studs', allweather: 'All-Weather Pads',
+    vented: 'Stub Howitzer', cowl: 'Field Gun', ramscoop: 'Long Gun', louvres: 'Sleeved Cannon', blower: 'Twin Autocannon', twinturbo: 'Heavy Cannon',
+  },
+}
+export const slotInfo = (slot: ModSlot, body: Body): SlotInfo & { id: ModSlot } => ({ ...MOD_SLOTS.find((s) => s.id === slot)!, ...BODY_SLOTS[body]?.[slot] })
+export const modName = (m: ModDef, body: Body) => BODY_MOD_NAMES[body]?.[m.id] ?? m.name
+
+// Track skins: colours for the links of a tracked body's tracks (the Tomahawk only), kept per car
+// in `modSkin.tracks`. Free by level, so they need nothing from the server.
+export type TrackLook = { plate: string; grouser: string; horn: string; pin: string; pad: string; stud: string }
+export type TrackSkinDef = SkinDef & { look: TrackLook; metal: number; rough: number; glow?: { role: 'grouser' | 'pin' | 'stud'; color: string }; alt?: [string, string] }
+export const TRACK_STEEL: { look: TrackLook; metal: number; rough: number } = {
+  look: { plate: '#3d4147', grouser: '#565b62', horn: '#2c2f33', pin: '#8d939b', pad: '#1c1c1e', stud: '#c9ced6' }, metal: 0.6, rough: 0.55,
+}
+export const TRACK_SKINS: TrackSkinDef[] = [
+  { id: 'desertstorm', n: 1, name: 'Desert Storm', tier: 'rare', blurb: 'Sand-blasted links', unlock: { level: 36 }, metal: 0.3, rough: 0.8,
+    look: { plate: '#b59a6a', grouser: '#8f7650', horn: '#6e5a3c', pin: '#d8c9a3', pad: '#3b3226', stud: '#e8dcc0' },
+    swatch: 'repeating-linear-gradient(90deg, #b59a6a 0 6px, #8f7650 6px 8px)' },
+  { id: 'arcticops', n: 2, name: 'Arctic Ops', tier: 'rare', blurb: 'Snow-white links, ice-blue pins', unlock: { level: 38 }, metal: 0.4, rough: 0.6,
+    look: { plate: '#e9eef2', grouser: '#c3ccd4', horn: '#9aa6b1', pin: '#6ec6ff', pad: '#4a5560', stud: '#ffffff' },
+    swatch: 'repeating-linear-gradient(90deg, #e9eef2 0 6px, #6ec6ff 6px 8px)' },
+  { id: 'hazard', n: 3, name: 'Hazard', tier: 'rare', blurb: 'Yellow and black, link by link', unlock: { level: 40 }, metal: 0.35, rough: 0.6, alt: ['#ffcc00', '#2a2a2a'],
+    look: { plate: '#ffffff', grouser: '#e6e6e6', horn: '#9a9a9a', pin: '#d0d0d0', pad: '#3a3a3a', stud: '#ffffff' },
+    swatch: 'repeating-linear-gradient(90deg, #ffcc00 0 6px, #2a2a2a 6px 12px)' },
+  { id: 'gunmetalgold', n: 4, name: 'Gunmetal Gold', tier: 'epic', blurb: 'Black links with gold pins', unlock: { level: 42 }, metal: 0.85, rough: 0.3,
+    look: { plate: '#202226', grouser: '#c9a227', horn: '#15161a', pin: '#ffd34d', pad: '#121214', stud: '#ffe082' },
+    swatch: 'repeating-linear-gradient(90deg, #202226 0 6px, #ffd34d 6px 8px)' },
+  { id: 'magma', n: 5, name: 'Magma', tier: 'epic', blurb: 'Glowing grousers like cooling lava', unlock: { level: 44 }, metal: 0.2, rough: 0.85, glow: { role: 'grouser', color: '#ff6a1a' },
+    look: { plate: '#1a1412', grouser: '#ff6a1a', horn: '#120d0b', pin: '#5a2a18', pad: '#1a1412', stud: '#ff9a3c' },
+    swatch: 'repeating-linear-gradient(90deg, #1a1412 0 6px, #ff6a1a 6px 8px)' },
+  { id: 'neongrid', n: 6, name: 'Neon Grid', tier: 'legendary', blurb: 'Dark links with glowing cyan pins', unlock: { level: 47 }, metal: 0.5, rough: 0.4, glow: { role: 'pin', color: '#2be8ff' },
+    look: { plate: '#14161f', grouser: '#252a3a', horn: '#0c0d13', pin: '#2be8ff', pad: '#14161f', stud: '#2be8ff' },
+    swatch: 'repeating-linear-gradient(90deg, #14161f 0 6px, #2be8ff 6px 7px)' },
+  { id: 'chromecrawler', n: 7, name: 'Chrome Crawler', tier: 'legendary', blurb: 'Every link polished to a mirror', unlock: { level: 50 }, metal: 1, rough: 0.12,
+    look: { plate: '#e3e7ec', grouser: '#f4f6f8', horn: '#b9c0c8', pin: '#ffffff', pad: '#30343a', stud: '#ffffff' },
+    swatch: 'linear-gradient(135deg, #8a93a0, #f2f4f7 40%, #6b7380 60%, #e6e9ee)' },
+]
+export const trackSkinDef = (id?: string | null) => (id ? TRACK_SKINS.find((s) => s.id === id) : undefined)
+export const ownedTrackSkins = (level: number) => ownedSkins({ level }, TRACK_SKINS)
 
 // Garage power: the combined PI of a player's five best cars.
 export const POWER_CARS = 5
