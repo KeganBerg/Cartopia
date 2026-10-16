@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { mergeGroups, mergeCandidates, applyMerge, applySplit, groupTurn, groupScale, rotateGroup, isLandmark, mergeBoosts } from './merge'
+import { mergeGroups, mergeCandidates, applyMerge, applySplit, groupTurn, groupScale, groupParts, rotateGroup, isLandmark, mergeBoosts } from './merge'
 import { useGame, readyRewards, fuelCap, type PlacedBuilding } from './store'
 import { buildingDef, buildingUpgradeCost, upgradePayout, upgradeFuelCap, MERGE_BONUS } from './data'
 
@@ -89,6 +89,50 @@ describe('merging buildings', () => {
     const m = mergeGroups(sq)
     expect([...m.groups.values()].map((g) => g.code)).toEqual([2])
     expect(m.owner.size).toBe(4)
+  })
+
+  // Two merged 2x2s next to each other were stuck as two separate blocks (Kegan, 2026-10-16: "these should merge").
+  const squares = (def: string, i: number, j: number, extra: Partial<PlacedBuilding> = {}) => {
+    const d = buildingDef(def)
+    let town = [...square(def, 0, 0, 2, extra), ...square(def, i * 2 * d.w, j * 2 * d.h, 2, extra)]
+    for (const at of [town[0], town[4]]) town = applyMerge(town, mergeCandidates(town).find((c) => c.code === 2 && c.anchor.uid === at.uid)!)
+    return town
+  }
+
+  it('merges two merged squares side by side into a 2x4, and splits it back into the two squares', () => {
+    for (const [i, j, code, w, h] of [[1, 0, 42, 4, 2], [0, 1, 24, 2, 4]]) {
+      let town = squares('tuner', i, j)
+      expect(mergeGroups(town).groups.size).toBe(2)
+      const c = mergeCandidates(town).find((o) => o.code === code)
+      expect(c, `code ${code}`).toBeDefined()
+      town = applyMerge(town, c!)
+      const m = mergeGroups(town)
+      expect(m.groups.size).toBe(1)
+      const g = [...m.groups.values()][0]
+      const d = buildingDef('tuner')
+      expect(g).toMatchObject({ code, w: w * d.w, h: h * d.h })
+      expect(g.members).toHaveLength(8)
+      expect(m.owner.size).toBe(8)
+      // It earns the 2x4 bonus, between a 2x2's and a 4x4's.
+      expect(mergeBoosts(town).get(town[7].uid)).toBe(MERGE_BONUS[8])
+      // Drawn as two 2x2s side by side along its length.
+      const parts = groupParts(g, groupTurn(g, new Set()))
+      expect(parts.map((p) => p.scale)).toEqual([[2, 2, 2], [2, 2, 2]])
+      expect(parts[0].at[code === 42 ? 0 : 1]).toBeLessThan(0)
+      town = applySplit(town, g)
+      expect([...mergeGroups(town).groups.values()].map((o) => o.code)).toEqual([2, 2])
+    }
+  })
+
+  it('only merges squares that match, and turns a 2x4 into a 4x2 and back', () => {
+    let town = squares('pizza', 1, 0)
+    expect(mergeCandidates(squares('pizza', 1, 0, {}).map((o, k) => (k >= 4 ? { ...o, level: 2 } : o))).some((c) => c.code === 42)).toBe(false)
+    town = applyMerge(town, mergeCandidates(town).find((c) => c.code === 42)!)
+    const one = () => [...mergeGroups(town).groups.values()][0]
+    town = rotateGroup(town, one(), groupTurn(one(), new Set()), () => true)!
+    expect(one()).toMatchObject({ code: 24, w: 2, h: 4 })
+    for (let k = 0; k < 3; k++) town = rotateGroup(town, one(), groupTurn(one(), new Set()), () => true)!
+    expect(one()).toMatchObject({ code: 42, w: 4, h: 2, x: 0, z: 0 })
   })
 
   it('stretches a pair along its length', () => {
@@ -261,7 +305,8 @@ describe('merge bonus', () => {
   it('grows with the block: a pair, a 2x2, a giant 4x4', () => {
     expect(MERGE_BONUS[2]).toBeGreaterThan(0)
     expect(MERGE_BONUS[4]).toBeGreaterThan(MERGE_BONUS[2])
-    expect(MERGE_BONUS[16]).toBeGreaterThan(MERGE_BONUS[4])
+    expect(MERGE_BONUS[8]).toBeGreaterThan(MERGE_BONUS[4])
+    expect(MERGE_BONUS[16]).toBeGreaterThan(MERGE_BONUS[8])
   })
 
   it('a merged block earns more than the same buildings left loose', () => {
@@ -300,7 +345,7 @@ describe('merge bonus on the server', () => {
     const dir = `${process.cwd()}/supabase/migrations`
     const sql = readdirSync(dir).sort().map((f) => readFileSync(`${dir}/${f}`, 'utf8')).filter((q) => q.includes('-- merge:begin')).pop()!
     const block = sql.slice(sql.indexOf('-- merge:begin'), sql.indexOf('-- merge:end'))
-    const codes: Record<string, number> = { 21: 2, 12: 2, 2: 4, 4: 16 }
+    const codes: Record<string, number> = { 21: 2, 12: 2, 2: 4, 42: 8, 24: 8, 4: 16 }
     for (const [code, n] of Object.entries(codes)) expect(block).toContain(`when '${code}' then ${n} * ${MERGE_BONUS[n]}`)
     expect(sql).toContain(`least(m.want, ${MERGE_BONUS[16]} * m.n)`)
   })

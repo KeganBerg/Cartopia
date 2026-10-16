@@ -27,7 +27,7 @@ vi.mock('./supabase', () => ({
     }),
   },
 }))
-vi.mock('./serverCar', () => ({ SERVER_CAR_COLUMNS: '', serverCar: () => ({ name: 'Car', color: '#ffffff', body: 'sedan', pi: 100, uid: null }) }))
+vi.mock('./serverCar', () => ({ SERVER_CAR_COLUMNS: '', serverCar: () => ({ name: 'Car', color: '#ffffff', body: 'sedan', pi: 100, uid: null }), serverCallCard: () => undefined }))
 vi.mock('./referee', () => ({ joinRefereed: async () => true }))
 vi.mock('./cloud', () => ({ signedInUser: () => UID_ME }))
 vi.mock('./wagers', () => ({ acceptWager: async () => true, offerWager: async () => true, startWagers: () => {}, syncWagers: async () => 0, voidWager: async () => 0 }))

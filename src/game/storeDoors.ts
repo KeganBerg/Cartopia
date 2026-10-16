@@ -1,5 +1,5 @@
 import { buildingLevel } from './data'
-import { mergeGroups, groupScale, groupTurn } from './merge'
+import { mergeGroups, groupParts, groupScale, groupTurn } from './merge'
 import type { PlacedBuilding } from './store'
 import { toWorld } from '../scene/grid'
 import { isTravelCenter, travelLayout } from './travelCenter'
@@ -29,12 +29,17 @@ export function storeDoors(buildings: PlacedBuilding[], roads: Set<string>) {
     const scale = groupScale(g, turn)
     if (!kind.is(g.anchor.def, buildingLevel(g.anchor), scale)) continue
     const t = kind.door(scale[0], scale[2])
-    const [cx, cz] = toWorld(g.x + (g.w - 1) / 2, g.z + (g.h - 1) / 2)
     const a = (turn * Math.PI) / 2
     const c = Math.cos(a), s = Math.sin(a)
-    const at = ([x, z]: Pt): Pt => [cx + x * c + z * s, cz - x * s + z * c]
-    const walk = [at([t.door[0], t.D / 2 - 0.12]), at(t.door)]
-    for (const b of g.members) out.set(`b${b.uid}`, walk)
+    // A 2x4 is two stores side by side: each building walks to the doors of its own half.
+    const parts = groupParts(g, turn)
+    const walks = parts.map(({ at: [px, pz] }) => {
+      const [cx, cz] = toWorld(g.x + (g.w - 1) / 2 + px, g.z + (g.h - 1) / 2 + pz)
+      const at = ([x, z]: Pt): Pt => [cx + x * c + z * s, cz - x * s + z * c]
+      return [at([t.door[0], t.D / 2 - 0.12]), at(t.door)]
+    })
+    const mx = g.x + g.w / 2, mz = g.z + g.h / 2
+    for (const b of g.members) out.set(`b${b.uid}`, walks[parts.length > 1 && (g.code === 42 ? b.x >= mx : b.z >= mz) ? 1 : 0])
   }
   return out
 }

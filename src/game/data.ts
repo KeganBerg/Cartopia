@@ -605,7 +605,7 @@ export const driverPayout = (d: BuildingDef, level: number, car: CarDef | null, 
 // parts per job, and a merged house or gas station holds this much more fuel,
 // keyed by how many buildings went in (a pair, a 2x2, a giant 4x4). The server
 // guard banks the same extra (supabase/migrations/0088_merge_bonus.sql).
-export const MERGE_BONUS: Record<number, number> = { 2: 0.1, 4: 0.25, 16: 0.5 }
+export const MERGE_BONUS: Record<number, number> = { 2: 0.1, 4: 0.25, 8: 0.35, 16: 0.5 }
 export const mergeBonus = (members: number) => MERGE_BONUS[members] ?? 0
 export const mergedParts = (d: BuildingDef, level: number, boost = 0) => Math.round(upgradePartsPayout(d, level) * (1 + boost))
 // Extra fuel a merged block of `n` houses or gas stations holds, rounded up for the whole block.
