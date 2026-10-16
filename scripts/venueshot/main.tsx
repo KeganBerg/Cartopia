@@ -36,6 +36,16 @@ function Shooter() {
       return gl.domElement.toDataURL('image/png')
     })
     ;(window as unknown as { __scene: unknown }).__scene = scene
+    ;(window as unknown as { __perf: () => { ms: number; calls: number; tris: number } }).__perf = () => {
+      const t: number[] = []
+      for (let i = 0; i < 12; i++) {
+        const a = performance.now()
+        gl.render(scene, camera)
+        t.push(performance.now() - a)
+      }
+      t.sort((x, y) => x - y)
+      return { ms: t[6], calls: gl.info.render.calls, tris: gl.info.render.triangles }
+    }
     w.ready = true
   }, [gl, scene, camera])
   return null

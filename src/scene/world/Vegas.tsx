@@ -2,7 +2,7 @@ import { useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { CanvasTexture, CylinderGeometry, MeshStandardMaterial, Object3D, SRGBColorSpace, type InstancedMesh } from 'three'
 import { Batch } from '../Batch'
-import { EDGE, Horizon, Many, PropMesh, Scatter, coconutPalm, frustum, glow, prop, rand, useProp, type Look, type PropKit, type Spot, type V3 } from './kit'
+import { EDGE, Horizon, Many, PropMesh, Scatter, archTop, coconutPalm, frustum, glow, prop, rand, useProp, type Look, type PropKit, type Spot, type V3 } from './kit'
 import type { WorldProps } from './WorldVenue'
 
 // USA, Neon Mile: a mile down the desert strip in the sun. The welcome sign stands at the
@@ -28,38 +28,138 @@ const CASINOS = [
   { w: 10, h: 18, tower: '#2f3640', band: '#c77dff', glass: '#1f2a36' },
 ]
 const CD = 10
+// Plain finishes for the parts repeated down the mile (posts, rails), so each casino stays a
+// handful of draws: its painted body, its glass, and three neons.
+const STEEL: Look = { c: '#d4d8dc', r: 0.35, m: 0.25 }
+const BRASS: Look = { c: '#c9a24a', r: 0.4, m: 0.25 }
+// Plain colour billboards: a field, a big shape and a stripe, no lettering.
+const BOARDS = [
+  { bg: '#1e5aa8', fg: '#ffd23f', bar: '#ffffff' },
+  { bg: '#d32f2f', fg: '#ffffff', bar: '#1b1b1b' },
+  { bg: '#ffd23f', fg: '#d32f2f', bar: '#1e5aa8' },
+  { bg: '#1b1b1b', fg: '#ff3d7f', bar: '#3de0ff' },
+  { bg: '#2e7d32', fg: '#ffd23f', bar: '#ffffff' },
+]
+function billboard(k: PropKit, idx: number, p: V3, ry: number) {
+  const b = BOARDS[idx % BOARDS.length]
+  const c = Math.cos(ry)
+  const s = Math.sin(ry)
+  // Offsets in the board's own frame: x across, z out of the face.
+  const at = (x: number, y: number, z: number): V3 => [p[0] + x * c + z * s, p[1] + y, p[2] - x * s + z * c]
+  for (const x of [-1.6, 1.6]) k.box(DARK, [0.14, 2.2, 0.14], at(x, -1.1, -0.2), [0, ry, 0])
+  k.box({ c: '#e8e8e8', r: 0.8 }, [4.4, 2.2, 0.14], at(0, 0.9, -0.02), [0, ry, 0])
+  k.box({ c: b.bg, r: 0.7 }, [4.2, 2.0, 0.04], at(0, 0.9, 0.07), [0, ry, 0])
+  k.cyl({ c: b.fg, r: 0.7 }, 0.75, 0.75, 0.03, at(idx % 2 ? 1.0 : -1.0, 0.95, 0.1), [Math.PI / 2, ry, 0], 10)
+  if (idx % 3 === 0) k.box({ c: b.fg, r: 0.7 }, [0.9, 0.9, 0.03], at(idx % 2 ? 1.0 : -1.0, 0.95, 0.105), [0, ry, Math.PI / 4])
+  k.box({ c: b.bar, r: 0.7 }, [2.0, 0.28, 0.03], at(idx % 2 ? -0.8 : 0.8, 1.2, 0.1), [0, ry, 0])
+  k.box({ c: b.bar, r: 0.7 }, [1.5, 0.16, 0.03], at(idx % 2 ? -1.05 : 1.05, 0.7, 0.1), [0, ry, 0])
+  k.box(DARK, [4.4, 0.06, 0.5], at(0, -0.15, 0.2), [0, ry, 0])
+}
 function casino(k: PropKit, c: (typeof CASINOS)[number], idx: number) {
   const tower: Look = { c: c.tower, r: 0.6, m: 0.15 }
   const glass: Look = { c: c.glass, r: 0.2, m: 0.5 }
+  const band = neon(c.band)
+  const acc = neon(NEON[(idx + 2) % NEON.length])
+  const bulb = neon('#fff2c0')
+  const venice = idx === 1
   const f = CD / 2
   // The tower set back on the lot, wings either side of a taller core, glass bands per floor.
   const tw = c.w * 0.6
   k.box(tower, [tw, c.h, 3.4], [0, c.h / 2, -2.4])
   k.box(tower, [tw * 0.4, c.h + 2, 3.6], [0, (c.h + 2) / 2, -2.4])
   for (let y = 3.6; y < c.h - 0.6; y += 1.15) k.box(glass, [tw + 0.04, 0.55, 3.44], [0, y, -2.4])
-  k.box(neon(c.band), [tw * 0.4 + 0.06, 0.4, 3.66], [0, c.h + 1.6, -2.4])
-  // The podium: casino floor behind gold glass, neon trim, the marquee over the doors.
+  // Vertical neon fins up the core.
+  for (const s of [-1, 1]) k.box(band, [0.1, c.h - 3, 0.1], [s * tw * 0.2, (c.h - 3) / 2 + 2.8, -0.58])
+  // The crown: two setbacks on the core and a lit cap, the wings' parapets.
+  k.box(tower, [tw * 0.3, 1.6, 2.8], [0, c.h + 2.8, -2.4])
+  k.box(tower, [tw * 0.18, 1.2, 2.0], [0, c.h + 4.2, -2.4])
+  k.box(acc, [tw * 0.3 + 0.06, 0.16, 2.86], [0, c.h + 3.5, -2.4])
+  k.cyl(STEEL, 0.03, 0.08, 2.4, [0, c.h + 6, -2.4], undefined, 6)
+  k.box(band, [tw * 0.4 + 0.06, 0.4, 3.66], [0, c.h + 1.6, -2.4])
+  for (const s of [-1, 1]) k.box(tower, [tw * 0.3, 0.4, 3.5], [s * tw * 0.35, c.h + 0.2, -2.4])
+  // The podium: casino floor behind gold glass, neon trim, a billboard on its roof.
   k.box({ c: '#e9e2d4', r: 0.8 }, [c.w, 2.6, 5], [0, 1.3, f - 2.5])
   k.box(glass, [c.w - 1, 1.3, 0.04], [0, 0.8, f + 0.01])
-  k.box(neon(c.band), [c.w + 0.04, 0.12, 0.04], [0, 2.3, f + 0.02])
-  k.box(neon(NEON[(idx + 2) % NEON.length]), [c.w + 0.04, 0.08, 0.04], [0, 2.05, f + 0.02])
-  // Entrance canopy on chrome posts, bulbs underneath.
+  k.box(band, [c.w + 0.04, 0.12, 0.04], [0, 2.3, f + 0.02])
+  k.box(acc, [c.w + 0.04, 0.08, 0.04], [0, 2.05, f + 0.02])
+  billboard(k, idx, [venice ? c.w / 2 - 2.6 : -c.w / 2 + 2.6, 4.8, f - 1.2], 0)
+  // Entrance canopy on steel posts, bulbs underneath and a row of bulbs along its front edge.
   k.box(WHITE, [4, 0.25, 2.4], [0, 1.9, f + 1.2])
-  for (const x of [-1.8, 1.8]) for (const z of [f + 0.4, f + 2.3]) k.cyl(CHROME, 0.06, 0.06, 1.8, [x, 0.9, z], undefined, 8)
-  for (let i = 0; i < 7; i++) for (let j = 0; j < 3; j++) k.sphere(neon('#fff2c0'), 0.06, [-1.6 + i * 0.53, 1.75, f + 0.5 + j * 0.7], [1, 1, 1], 6, 4)
-  // The pylon sign: a tall column, a big lit panel, a marquee board, and a crown of colour.
+  k.box(band, [4.04, 0.06, 2.44], [0, 2.0, f + 1.2])
+  for (const x of [-1.8, 1.8]) for (const z of [f + 0.4, f + 2.3]) k.cyl(STEEL, 0.06, 0.06, 1.8, [x, 0.9, z], undefined, 8)
+  for (let i = 0; i < 7; i++) for (let j = 0; j < 3; j++) k.sphere(bulb, 0.06, [-1.6 + i * 0.53, 1.75, f + 0.5 + j * 0.7], [1, 1, 1], 4, 3)
+  for (let i = 0; i < 9; i++) k.box(bulb, [0.08, 0.08, 0.04], [-1.8 + i * 0.45, 1.9, f + 2.42])
+  // The valet stand by the doors: a little lectern, its key box, a red parasol.
+  const vx = 3.0
+  const vz = f + 1.6
+  k.box({ c: '#5a3a24', r: 0.7 }, [0.45, 0.8, 0.35], [vx, 0.4, vz])
+  k.box(BRASS, [0.5, 0.05, 0.4], [vx, 0.82, vz])
+  k.box(DARK, [0.25, 0.3, 0.06], [vx, 1.05, vz - 0.12])
+  k.rod(STEEL, [vx + 0.3, 0, vz], [vx + 0.3, 1.6, vz], 0.025, 5)
+  k.cone({ c: '#c62828', r: 0.8 }, 0.5, 0.28, [vx + 0.3, 1.68, vz], undefined, 8)
+  // The Venetian one: a canal across its frontage, a humped stone bridge to the doors, a moored
+  // gondola, and the brick bell tower at the corner.
+  const sz = venice ? f + 4.4 : f + 3.2
+  if (venice) {
+    const water: Look = { c: '#3f8fb0', r: 0.15 }
+    const stone: Look = { c: '#e6dccb', r: 0.85 }
+    const cz = f + 3.1
+    k.box(water, [c.w, 0.03, 1.2], [0, 0.005, cz])
+    for (const s of [-1, 1]) k.box(stone, [c.w, 0.18, 0.16], [0, 0.09, cz + s * 0.68])
+    // Bridge: a humped stone arch over the canal, its dark arch opening, a balustrade each side.
+    archTop(k, stone, 1.4, 1.5, [0, 0, cz], Math.PI / 2, 0.6)
+    for (const s of [-1, 1]) {
+      archTop(k, DARK, 0.9, 0.02, [s * 0.755, 0, cz], Math.PI / 2, 0.45)
+      const hp = (t: number): V3 => [s * 0.68, 0.42 * Math.sin(t) + 0.3, cz + 0.7 * Math.cos(t)]
+      for (let i = 0; i < 6; i++) {
+        const t0 = (i / 6) * Math.PI
+        const t1 = ((i + 1) / 6) * Math.PI
+        k.rod(stone, hp(t0), hp(t1), 0.04, 5)
+        const b = hp(t0)
+        k.box(stone, [0.06, 0.3, 0.06], [b[0], b[1] - 0.15, b[2]])
+      }
+    }
+    // Gondola: a long black hull, the steel prow comb, a red seat.
+    const gx = -c.w / 2 + 1.6
+    k.sphere(DARK, 1, [gx, 0.08, cz], [1.3, 0.18, 0.24], 10, 4)
+    k.rod(STEEL, [gx + 1.2, 0.12, cz], [gx + 1.38, 0.5, cz], 0.025, 4)
+    for (let i = 0; i < 3; i++) k.box(STEEL, [0.1, 0.03, 0.02], [gx + 1.3 + 0.03 * i, 0.32 + i * 0.06, cz])
+    k.box({ c: '#b71c1c', r: 0.8 }, [0.4, 0.12, 0.3], [gx - 0.2, 0.22, cz])
+    for (const s of [-1, 1]) {
+      k.cyl({ c: '#f2efe8', r: 0.6 }, 0.05, 0.05, 1.6, [gx + s * 1.5, 0.8, cz - 0.5], undefined, 6)
+      for (let i = 0; i < 2; i++) k.cyl({ c: '#1e5aa8', r: 0.6 }, 0.052, 0.052, 0.3, [gx + s * 1.5, 0.45 + i * 0.6, cz - 0.5], undefined, 6)
+    }
+    // The bell tower.
+    const bx = -c.w / 2 + 0.9
+    const bz = f - 0.6
+    const brick: Look = { c: '#b4573f', r: 0.9 }
+    k.box(brick, [1.4, 10, 1.4], [bx, 5, bz])
+    for (const s of [-1, 1]) k.box(stone, [0.12, 10, 1.44], [bx + s * 0.6, 5, bz])
+    k.box(stone, [1.6, 0.25, 1.6], [bx, 10.1, bz])
+    k.box(stone, [1.4, 1.6, 1.4], [bx, 11.0, bz])
+    for (const ry of [0, Math.PI / 2]) k.box(DARK, [0.8, 1.1, 1.42], [bx, 10.95, bz], [0, ry, 0])
+    k.box(stone, [1.6, 0.25, 1.6], [bx, 11.9, bz])
+    k.box(brick, [1.2, 0.8, 1.2], [bx, 12.4, bz])
+    k.cone({ c: '#4f8a6e', r: 0.6 }, 0.9, 3.0, [bx, 14.3, bz], [0, Math.PI / 4, 0], 4)
+    k.sphere(BRASS, 0.18, [bx, 15.9, bz], [1, 1, 1], 6, 4)
+  }
+  // The pylon sign: a tall column, a big lit panel ringed with bulbs, the marquee board, a crown.
   const sx = c.w / 2 - 0.9
-  const sz = f + 3.2
   k.box(DARK, [0.5, 6, 0.5], [sx, 3, sz])
-  k.box(neon(c.band), [2.2, 2.4, 0.3], [sx, 6.6, sz])
+  k.box(band, [2.2, 2.4, 0.3], [sx, 6.6, sz])
   k.box(DARK, [2.4, 2.6, 0.26], [sx, 6.6, sz - 0.04])
-  k.box(neon('#fff2c0'), [1.8, 0.9, 0.3], [sx, 4.6, sz])
+  k.box(bulb, [1.8, 0.9, 0.3], [sx, 4.6, sz])
   k.box(DARK, [1.96, 1.04, 0.26], [sx, 4.6, sz - 0.04])
   for (let i = 0; i < 4; i++) k.box(DARK, [1.5, 0.06, 0.02], [sx, 4.32 + i * 0.19, sz + 0.16])
-  k.sphere(neon(NEON[(idx + 4) % NEON.length]), 0.55, [sx, 8.3, sz], [1, 1, 0.5], 12, 8)
+  for (const y of [4.1, 5.1]) k.box(acc, [1.9, 0.06, 0.04], [sx, y, sz + 0.155])
+  k.sphere(acc, 0.55, [sx, 8.3, sz], [1, 1, 0.5], 12, 8)
+  for (let i = 0; i < 6; i++) {
+    const a = -Math.PI / 2 + (i / 5) * Math.PI
+    k.box(band, [0.08, 0.5, 0.08], [sx + Math.sin(a) * 0.78, 8.3 + Math.cos(a) * 0.62, sz], [0, 0, -a])
+  }
   for (let i = 0; i < 14; i++) {
     const a = (i / 14) * Math.PI * 2
-    k.sphere(neon('#ffe9a8'), 0.07, [sx + Math.cos(a) * 1.2, 6.6 + Math.sin(a) * 1.3, sz + 0.18], [1, 1, 1], 6, 4)
+    k.sphere(bulb, 0.07, [sx + Math.cos(a) * 1.2, 6.6 + Math.sin(a) * 1.3, sz + 0.18], [1, 1, 1], 4, 3)
   }
 }
 
@@ -256,8 +356,56 @@ function chapel(k: PropKit) {
   for (const x of [-1, 1]) k.box({ c: '#9fc3d1', r: 0.2, m: 0.3 }, [0.4, 0.8, 0.04], [x, 1.2, 2.01])
   for (const s of [-1, 1]) k.sphere(neon('#ff3d7f'), 0.32, [s * 0.22, 3.4, 1.97], [1, 1, 0.3], 10, 6)
   k.box(neon('#ff3d7f'), [0.44, 0.44, 0.1], [0, 3.22, 1.97], [0, 0, Math.PI / 4])
-  for (let i = 0; i < 6; i++) k.cyl({ c: '#f5f5f5', r: 0.6 }, 0.04, 0.04, 0.8, [-1.6 + i * 0.64, 0.4, 3.0], undefined, 5)
-  k.box({ c: '#f5f5f5', r: 0.6 }, [3.4, 0.06, 0.06], [0, 0.8, 3.0])
+  // White picket fence with a gap for the flower arch, and a stone path to the door.
+  const picket: Look = { c: '#f5f5f5', r: 0.6 }
+  for (const s of [-1, 1]) {
+    for (let i = 0; i < 5; i++) {
+      const x = s * (0.75 + i * 0.24)
+      k.box(picket, [0.08, 0.7, 0.03], [x, 0.35, 3.0])
+      k.cone(picket, 0.057, 0.1, [x, 0.75, 3.0], [0, Math.PI / 4, 0], 4)
+    }
+    for (const y of [0.25, 0.55]) k.box(picket, [1.05, 0.06, 0.03], [s * 1.23, y, 2.97])
+  }
+  k.box({ c: '#d8cbb3', r: 0.9 }, [0.8, 0.02, 1.2], [0, 0.015, 2.6])
+  // The wedding arch: a white hoop on two posts, wound with roses and leaves.
+  const ax = 0.58
+  for (const s of [-1, 1]) k.box(picket, [0.08, 1.4, 0.08], [s * ax, 0.7, 3.0])
+  k.torus(picket, ax, 0.04, [0, 1.4, 3.0], [0, 0, 0], Math.PI, 12, 4)
+  const roses = ['#e91e63', '#ffffff', '#f48fb1', '#c2185b']
+  for (let i = 0; i < 15; i++) {
+    const t = (i / 14) * Math.PI
+    k.ico({ c: '#3f7f3a', r: 1 }, 0.09, [Math.cos(t) * ax, 1.4 + Math.sin(t) * ax, 3.0], [1, 1, 0.8], 0)
+    k.sphere({ c: roses[i % 4], r: 0.7 }, 0.06, [Math.cos(t + 0.1) * (ax + 0.03), 1.4 + Math.sin(t + 0.1) * (ax + 0.03), 3.05], [1, 1, 1], 6, 4)
+  }
+  for (const s of [-1, 1]) for (let j = 0; j < 4; j++) {
+    k.ico({ c: '#3f7f3a', r: 1 }, 0.08, [s * ax, 0.4 + j * 0.3, 3.0], [1, 1, 0.8], 0)
+    k.sphere({ c: roses[(j + 1) % 4], r: 0.7 }, 0.055, [s * (ax + 0.03), 0.5 + j * 0.3, 3.06], [1, 1, 1], 6, 4)
+  }
+  // Pots of white flowers either side of the door.
+  for (const s of [-1, 1]) {
+    k.cyl({ c: '#e9e3d6', r: 0.7 }, 0.18, 0.13, 0.3, [s * 0.75, 0.15, 2.3], undefined, 8)
+    k.ico({ c: '#3f7f3a', r: 1 }, 0.22, [s * 0.75, 0.42, 2.3], [1, 0.8, 1], 0)
+    for (let j = 0; j < 4; j++) k.sphere(picket, 0.05, [s * 0.75 + Math.cos(j * 1.6) * 0.13, 0.55, 2.3 + Math.sin(j * 1.6) * 0.13], [1, 1, 1], 6, 4)
+  }
+}
+
+// A desert patch beyond the lots: a tall saguaro with its arms, a barrel cactus, a creosote
+// bush and a couple of red rocks.
+function cactus(k: PropKit) {
+  const green: Look = { c: '#5f7d45', r: 0.9 }
+  k.cyl(green, 0.22, 0.26, 3.6, [0, 1.8, 0], undefined, 7)
+  k.sphere(green, 0.22, [0, 3.6, 0], [1, 1, 1], 7, 3, Math.PI / 2)
+  for (const [s, y0, h] of [[1, 1.4, 1.3], [-1, 1.9, 1.0]] as const) {
+    k.rod(green, [0, y0, 0], [s * 0.55, y0 + 0.15, 0], 0.15, 6)
+    k.sphere(green, 0.15, [s * 0.55, y0 + 0.15, 0], [1, 1, 1], 6, 4)
+    k.rod(green, [s * 0.55, y0 + 0.15, 0], [s * 0.55, y0 + 0.15 + h, 0], 0.15, 6)
+    k.sphere(green, 0.15, [s * 0.55, y0 + 0.15 + h, 0], [1, 1, 1], 6, 3, Math.PI / 2)
+  }
+  k.sphere(green, 0.32, [1.3, 0.22, 0.8], [1, 0.8, 1], 7, 5)
+  for (let i = 0; i < 3; i++) k.box({ c: '#f2c230', r: 0.7 }, [0.07, 0.05, 0.07], [1.3 + Math.cos(i * 2.1) * 0.09, 0.47, 0.8 + Math.sin(i * 2.1) * 0.09])
+  k.ico({ c: '#8a8f5a', r: 1 }, 0.55, [-1.2, 0.35, -0.6], [1.2, 0.7, 1], 0)
+  k.ico({ c: '#a8553a', r: 1 }, 0.5, [0.6, 0.2, -1.1], [1.4, 0.6, 1], 0)
+  k.ico({ c: '#b5653b', r: 1 }, 0.3, [1.0, 0.12, -1.5], [1, 0.7, 1.3], 0)
 }
 
 // A motel sign: a tall pole, an arrow of bulbs bending towards the road, the vacancy board.
@@ -316,7 +464,7 @@ function Fountains({ x, z, w }: { x: number; z: number; w: number }) {
 }
 
 export default function Vegas({ len, race }: WorldProps) {
-  const casinos = useMemo(() => CASINOS.map((c, i) => prop(`vegas-casino-${i}`, (k) => casino(k, c, i))), [])
+  const casinos = useMemo(() => CASINOS.map((c, i) => prop(`vegas-casino-d2-${i}`, (k) => casino(k, c, i))), [])
   const palmP = useProp('vegas-palm', coconutPalm)
   const frameP = useProp('vegas-welcome', welcomeFrame)
   const pyrP = useProp('vegas-pyramid', pyramid)
@@ -324,8 +472,9 @@ export default function Vegas({ len, race }: WorldProps) {
   const lakeP = useProp('vegas-lake', lakeHotel)
   const libP = useProp('vegas-liberty', liberty)
   const castleP = useProp('vegas-castle', castle)
-  const chapelP = useProp('vegas-chapel', chapel)
+  const chapelP = useProp('vegas-chapel-d2', chapel)
   const motelP = useProp('vegas-motel', motel)
+  const cactusP = useProp('vegas-cactus', cactus)
   const sign = useMemo(() => signMat(), [])
   useLayoutEffect(() => () => sign.dispose(), [sign])
   // Landmarks, by side: + is the left of the screen, - the right.
@@ -359,7 +508,14 @@ export default function Vegas({ len, race }: WorldProps) {
     for (let z = 18; z < MOTELS; z += 16) motels.push({ x: -(EDGE + 1.6), z, ry: Math.PI / 2 })
     const rr = rand(17)
     const scrub = Array.from({ length: 160 }, () => ({ x: (rr() < 0.5 ? 1 : -1) * (EDGE + 18 + rr() * 30), z: rr() * (len + 60) - 14, s: 0.6 + rr() * 0.8, ry: rr() * 6 }))
-    return { rows, palms, motels, scrub }
+    const cacti: Spot[] = []
+    for (let z = -10; z < len + 40; z += 15 + rr() * 12) {
+      const side = rr() < 0.5 ? 1 : -1
+      const x = side * (EDGE + 17.5 + rr() * 26)
+      if ((side > 0 && Math.abs(z - L.pyramid.z) < 17) || (side < 0 && Math.abs(z - L.liberty.z) < 12)) continue
+      cacti.push({ x, z, ry: rr() * 6, s: 0.8 + rr() * 0.5 })
+    }
+    return { rows, palms, motels, scrub, cacti }
   }, [len, L, MOTELS])
 
   return (
@@ -400,6 +556,7 @@ export default function Vegas({ len, race }: WorldProps) {
       {casinos.map((c, i) => <Many key={i} parts={c} at={geo.rows[i]} />)}
       <Many parts={palmP} at={geo.palms} />
       <Many parts={motelP} at={geo.motels} />
+      <Many parts={cactusP} at={geo.cacti} />
       <Fountains x={L.lake.x} z={L.lake.z} w={30} />
       <FarVegas />
     </>

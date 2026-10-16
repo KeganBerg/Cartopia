@@ -1,6 +1,6 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { CanvasTexture, ExtrudeGeometry, MeshStandardMaterial, RepeatWrapping, Shape, SRGBColorSpace, type Mesh } from 'three'
+import { CanvasTexture, ExtrudeGeometry, MeshStandardMaterial, RepeatWrapping, Shape, SphereGeometry, SRGBColorSpace, type Mesh } from 'three'
 import { glowMats } from '../dayNight'
 import { Batch } from '../Batch'
 import { EDGE, Horizon, coconutPalm, Many, PropMesh, Scatter, Sparkles, Water, frustum, glow, prop, rand, useProp, type Look, type PropKit, type Spot } from './kit'
@@ -17,8 +17,21 @@ const WIN: Look = { c: '#ffffff', use: glowMats.window }
 const WHITE: Look = { c: '#f1eee6', r: 0.85 }
 const CREAM: Look = { c: '#e4dccb', r: 0.9 }
 const DARK: Look = { c: '#26292c', r: 1 }
-const GLASS: Look = { c: '#5d7a86', r: 0.15, m: 0.4 }
-const BULBS = ['#ff4f7b', '#ffd23f', '#3ddc97', '#4fc3ff', '#ff8a3d', '#c77dff'].map((c) => glow(c, 0.15, 1.8))
+// Glass for the props repeated down the mile: a plain finish, so it folds into the prop's one
+// painted mesh rather than costing a draw of its own in every stretch.
+const GLASS_P: Look = { c: '#6f8e9a', r: 0.2, m: 0.2 }
+const BULBS = ['#ff4f7b', '#ffd23f', '#3ddc97', '#4fc3ff'].map((c) => glow(c, 0.15, 1.8))
+const FLAGS = ['#e53935', '#fdd835', '#43a047', '#1e88e5', '#8e24aa', '#fb8c00', '#ffffff']
+const LEAFY = ['#2f7d3b', '#3a8f45', '#4c9a3a']
+// A carnival pennant: a flat triangle hanging point down from its top edge.
+const PENNANT = (() => {
+  const t = new Shape()
+  t.moveTo(-0.5, 0)
+  t.lineTo(0.5, 0)
+  t.lineTo(0, -1)
+  t.closePath()
+  return new ExtrudeGeometry(t, { depth: 0.01, bevelEnabled: false })
+})()
 
 // A beach hotel facing +z: a tall slab with a balcony band on every floor and lit rooms, a
 // glass lobby under an awning, and a lit sign on the roof.
@@ -38,17 +51,18 @@ function hotel(k: PropKit, h: (typeof HOTELS)[number]) {
   const H = 1.5 + h.n * fl
   k.box(wall, [h.w, H, HD], [0, H / 2, 0])
   // Lobby: a glass front under a deep awning, the hotel's name lit along its edge.
-  k.box(GLASS, [h.w - 0.6, 1.0, 0.04], [0, 0.6, f + 0.01])
+  const sign = glow(h.sign, 0.2, 1.5)
+  k.box(GLASS_P, [h.w - 0.6, 1.0, 0.04], [0, 0.6, f + 0.01])
   k.box(DARK, [0.5, 0.9, 0.05], [0, 0.55, f + 0.02])
   k.box(band, [h.w + 0.1, 0.12, 1.2], [0, 1.3, f + 0.6])
-  k.box(glow(h.sign, 0.2, 1.4), [h.w - 0.4, 0.08, 0.02], [0, 1.3, f + 1.21])
+  k.box(sign, [h.w - 0.4, 0.08, 0.02], [0, 1.3, f + 1.21])
   for (const s of [-1, 1]) k.box(band, [0.08, 1.2, 0.08], [s * (h.w / 2 - 0.1), 0.65, f + 1.15])
   // Floors: a balcony slab with a glass rail running the full width, rooms behind it.
   const bays = Math.round(h.w / 0.85)
   for (let i = 0; i < h.n; i++) {
     const y = 1.5 + i * fl
     k.box(band, [h.w + 0.04, 0.1, 0.5], [0, y, f + 0.24])
-    k.box(GLASS, [h.w, 0.32, 0.02], [0, y + 0.21, f + 0.48])
+    k.box(GLASS_P, [h.w, 0.32, 0.02], [0, y + 0.21, f + 0.48])
     k.box(band, [h.w + 0.04, 0.04, 0.04], [0, y + 0.39, f + 0.48])
     for (let b = 0; b < bays; b++) {
       const x = -h.w / 2 + (h.w / bays) * (b + 0.5)
@@ -56,13 +70,18 @@ function hotel(k: PropKit, h: (typeof HOTELS)[number]) {
     }
     // Dividers between the balconies.
     for (let b = 1; b < bays; b += 2) k.box(band, [0.05, 0.4, 0.48], [-h.w / 2 + (h.w / bays) * b, y + 0.25, f + 0.24])
+    // Balcony life: a potted palm or bush here and there.
+    for (let b = 0; b < bays; b++) {
+      const x = -h.w / 2 + (h.w / bays) * (b + 0.5)
+      if ((i * 7 + b * 3 + h.n) % 5 === 0 && i % 2 === 0) k.ico({ c: LEAFY[(i + b) % 3], r: 1 }, 0.17, [x - 0.18, y + 0.3, f + 0.34], [1, (i + b) % 2 ? 1.8 : 1.3, 1], 0)
+    }
   }
   // Roof: parapet, plant room, the sign on its frame.
   k.box(band, [h.w + 0.08, 0.3, HD + 0.08], [0, H + 0.15, 0])
   k.box(CREAM, [1.6, 0.8, 1.4], [h.w / 4, H + 0.4, -0.6])
   k.box(DARK, [0.05, 0.6, 0.05], [-h.w / 4 - 0.8, H + 0.6, f - 0.4])
   k.box(DARK, [0.05, 0.6, 0.05], [-h.w / 4 + 0.8, H + 0.6, f - 0.4])
-  k.box(glow(h.sign, 0.25, 1.6), [1.8, 0.5, 0.06], [-h.w / 4, H + 1.05, f - 0.4])
+  k.box(sign, [1.8, 0.5, 0.06], [-h.w / 4, H + 1.05, f - 0.4])
   k.box(DARK, [1.9, 0.6, 0.04], [-h.w / 4, H + 1.05, f - 0.45])
 }
 
@@ -87,6 +106,46 @@ function kiosk(k: PropKit) {
       k.box(WHITE, [0.04, 0.3, 0.26], [x + s * 0.6, 0.45, z])
     }
   }
+  // The coconut-water cart: a green barrow on two wheels, a pile of green coconuts, its parasol.
+  const cx = -1.5
+  const cz = 0.9
+  k.box({ c: '#1f8a4c', r: 0.7 }, [0.6, 0.45, 1.0], [cx, 0.55, cz])
+  k.box(WHITE, [0.62, 0.06, 1.02], [cx, 0.8, cz])
+  for (const s of [-1, 1]) k.cyl(DARK, 0.2, 0.2, 0.05, [cx + s * 0.33, 0.2, cz - 0.15], [0, 0, Math.PI / 2], 8)
+  k.rod(DARK, [cx, 0.4, cz + 0.5], [cx, 0.1, cz + 0.62], 0.02, 4)
+  for (const [x, y, z] of [[-0.12, 0, -0.22], [0.12, 0, -0.18], [-0.1, 0, 0.25], [0.13, 0, 0.27], [0.01, 0.13, 0.03]]) k.sphere({ c: '#5f9e3a', r: 0.8 }, 0.11, [cx + x, 0.92 + y, cz + z], [1, 0.9, 1], 6, 4)
+  k.rod(WHITE, [cx + 0.25, 0.8, cz + 0.4], [cx + 0.25, 2.0, cz + 0.4], 0.02, 4)
+  k.cone({ c: '#fdd835', r: 0.8 }, 0.7, 0.3, [cx + 0.25, 2.1, cz + 0.4], undefined, 8)
+  // A rack of surfboards standing on end behind the counter.
+  for (const z of [-2.25, -0.95]) k.box(DARK, [0.05, 0.75, 0.05], [-0.5, 0.375, z])
+  k.box(DARK, [0.05, 0.05, 1.35], [-0.5, 0.72, -1.6])
+  k.box(DARK, [0.3, 0.05, 1.35], [-0.42, 0.06, -1.6])
+  ;['#ff8a3d', '#4fc3ff', '#ffffff', '#ff4f7b'].forEach((c, i) => k.sphere({ c, r: 0.5 }, 1, [-0.42 + i * 0.1, 0.95, -1.6 + (i - 1.5) * 0.3], [0.03, 0.95, 0.2], 8, 5))
+}
+
+// Rented beach chairs: three open parasols in the sand, each with a pair of loungers and a
+// cool box under it.
+const SHADES = [['#e53935', '#ffffff'], ['#1e88e5', '#fdd835'], ['#43a047', '#ffffff'], ['#fb8c00', '#1e88e5']]
+function parasols(k: PropKit) {
+  ;[[0, 0, 0], [0.4, 3.0, 1], [-0.3, -3.1, 2]].forEach(([x, z, i]) => {
+    const [a, b] = SHADES[i % SHADES.length]
+    k.rod(WHITE, [x, 0, z], [x + 0.08, 2.0, z], 0.025, 5)
+    // Canopy in alternating panels: two cones of eight sides, turned half a panel apart.
+    k.cone({ c: a, r: 0.8 }, 1.05, 0.36, [x + 0.08, 2.05, z], [0, 0, 0], 8)
+    k.cone({ c: b, r: 0.8 }, 1.06, 0.355, [x + 0.08, 2.05, z], [0, Math.PI / 8, 0], 8)
+    k.cyl({ c: a, r: 0.8 }, 1.06, 1.06, 0.12, [x + 0.08, 1.81, z], undefined, 8)
+    k.cone(WHITE, 0.05, 0.1, [x + 0.08, 2.27, z], undefined, 4)
+    for (const s of [-1, 1]) {
+      const lx = x + 0.6
+      const lz = z + s * 0.45
+      k.box(WHITE, [1.3, 0.05, 0.5], [lx, 0.25, lz])
+      k.box(WHITE, [0.05, 0.25, 0.5], [lx - 0.6, 0.13, lz])
+      k.box(WHITE, [0.05, 0.25, 0.5], [lx + 0.6, 0.13, lz])
+      k.box(WHITE, [0.5, 0.05, 0.5], [lx - 0.85, 0.45, lz], [0, 0, -0.8])
+      k.box({ c: s > 0 ? a : b, r: 0.9 }, [1.1, 0.03, 0.42], [lx + 0.08, 0.29, lz])
+    }
+    k.box({ c: '#1e88e5', r: 0.6 }, [0.4, 0.3, 0.28], [x - 0.5, 0.15, z + 0.2])
+  })
 }
 
 // A lifeguard post on stilts, white with a blue band, its flag flying.
@@ -94,7 +153,7 @@ function lifeguard(k: PropKit) {
   for (const x of [-0.5, 0.5]) for (const z of [-0.5, 0.5]) k.cyl(WHITE, 0.05, 0.05, 1.8, [x, 0.9, z], undefined, 6)
   k.box(WHITE, [1.4, 1.0, 1.4], [0, 2.3, 0])
   k.box({ c: '#1e5aa8', r: 0.6 }, [1.42, 0.22, 1.42], [0, 2.05, 0])
-  k.box(GLASS, [1.0, 0.4, 0.02], [0, 2.45, 0.71])
+  k.box(GLASS_P, [1.0, 0.4, 0.02], [0, 2.45, 0.71])
   k.box(WHITE, [1.7, 0.1, 1.7], [0, 2.85, 0])
   for (let i = 0; i < 7; i++) k.box(WHITE, [0.5, 0.04, 0.16], [0, 0.18 + i * 0.25, 0.9 + i * 0.12], [0.45, 0, 0])
   k.cyl(DARK, 0.03, 0.03, 1.4, [0.6, 3.5, -0.6], undefined, 5)
@@ -108,6 +167,22 @@ function volley(k: PropKit) {
   k.box({ c: '#1b1b1b', r: 1 }, [0.02, 0.5, 4.4], [0, 1.3, 0])
   k.box(WHITE, [0.03, 0.05, 4.4], [0, 1.56, 0])
   k.sphere({ c: '#ffd23f', r: 0.7 }, 0.1, [0.8, 0.1, 0.6], [1, 1, 1], 10, 6)
+  // Beside it a beach football pitch: two small goals with their nets, a ball, corner flags.
+  const gx = -4
+  for (const s of [-1, 1]) {
+    const z = s * 4.5
+    for (const t of [-1, 1]) k.cyl(WHITE, 0.04, 0.04, 1.0, [gx + t * 0.9, 0.5, z], undefined, 6)
+    k.rod(WHITE, [gx - 0.9, 1.0, z], [gx + 0.9, 1.0, z], 0.04, 6)
+    for (const t of [-1, 1]) k.rod(WHITE, [gx + t * 0.9, 1.0, z], [gx + t * 0.9, 0, z + s * 0.6], 0.025, 4)
+    // The net: a coarse mesh of cords down the back.
+    for (let t = 1; t < 6; t++) k.rod({ c: '#e8e8e8', r: 1 }, [gx - 0.9 + t * 0.3, 1.0, z], [gx - 0.9 + t * 0.3, 0, z + s * 0.6], 0.01, 3)
+    for (const u of [0.33, 0.66]) k.rod({ c: '#e8e8e8', r: 1 }, [gx - 0.9, 1.0 - u, z + s * 0.6 * u], [gx + 0.9, 1.0 - u, z + s * 0.6 * u], 0.01, 3)
+    for (const t of [-1, 1]) {
+      k.rod(DARK, [gx + t * 1.8, 0, z], [gx + t * 1.8, 0.6, z], 0.015, 4)
+      k.box({ c: '#e53935', r: 0.8 }, [0.01, 0.14, 0.2], [gx + t * 1.8, 0.52, z - s * 0.1])
+    }
+  }
+  k.sphere(WHITE, 0.09, [gx + 0.4, 0.09, -1.2], [1, 1, 1], 8, 6)
 }
 
 // A string of coloured festoon bulbs across the avenue, sagging between the lamp posts.
@@ -127,7 +202,16 @@ function festoon(k: PropKit) {
       const y2 = 5 - Math.sin(((i + 1) / N) * Math.PI) * 0.7
       k.rod(DARK, [x, y, 0], [x2, y2, 0], 0.012, 4)
     }
-    if (i > 0 && i < N) k.sphere(BULBS[i % BULBS.length], 0.085, [x, y - 0.1, 0], [1, 1.2, 1], 8, 6)
+    if (i > 0 && i < N) k.sphere(BULBS[i % BULBS.length], 0.085, [x, y - 0.1, 0], [1, 1.2, 1], 6, 4)
+  }
+  // A second, higher line of carnival pennants in every colour.
+  const M = 12
+  const py = (t: number) => 5.25 - Math.sin(t * Math.PI) * 0.45
+  for (let i = 0; i < M; i++) {
+    const t0 = i / M
+    const t1 = (i + 1) / M
+    k.rod(DARK, [-span / 2 + span * t0, py(t0), 0], [-span / 2 + span * t1, py(t1), 0], 0.01, 3)
+    if (i > 0) k.add({ c: FLAGS[i % FLAGS.length], r: 0.9 }, PENNANT, [-span / 2 + span * t0, py(t0) - 0.01, -0.005], [0, 0, 0], [0.34, 0.38, 1])
   }
 }
 
@@ -154,6 +238,38 @@ function aqueduct(k: PropKit) {
   k.rod(DARK, [4.5, 10.6, 0], [3.3, 11.3, 0], 0.02, 4)
   k.box(glow('#fff2c0', 0.1, 1.2), [0.04, 0.16, 0.2], [2.38, 9.8, 0])
 }
+// A samba school's parade float parked by the aqueduct for the night, facing +z: a gold-skirted
+// trailer, a tiered stage, a giant sun-mask with gold rays and a fan of feathers, rows of bulbs.
+const FEATHER = new SphereGeometry(1, 6, 4)
+function samba(k: PropKit) {
+  const gold: Look = { c: '#e0b23a', r: 0.5 }
+  const pink: Look = { c: '#e0407a', r: 0.7 }
+  k.box(gold, [1.8, 0.5, 4.6], [0, 0.35, 0])
+  for (let i = 0; i < 12; i++) k.box(i % 2 ? pink : gold, [1.84, 0.2, 0.38], [0, 0.2, -2.09 + i * 0.38])
+  for (const z of [-1.6, 1.6]) for (const s of [-1, 1]) k.cyl(DARK, 0.2, 0.2, 0.1, [s * 0.86, 0.2, z], [0, 0, Math.PI / 2], 10)
+  k.box({ c: '#7b1fa2', r: 0.7 }, [1.6, 0.35, 3.4], [0, 0.78, -0.3])
+  const mz = 1.2
+  const my = 2.75
+  k.cyl(pink, 0.65, 0.75, 0.5, [0, 1.2, mz - 0.3], undefined, 14)
+  k.cyl(gold, 0.5, 0.55, 0.35, [0, 1.62, mz - 0.3], undefined, 14)
+  k.cyl(gold, 0.08, 0.12, 0.95, [0, 2.0, mz - 0.1], undefined, 8)
+  // Feathers fanning out behind the mask.
+  for (let i = 0; i < 13; i++) {
+    const a = -Math.PI * 0.45 + (i / 12) * Math.PI * 0.9
+    k.add({ c: FLAGS[i % 6], r: 0.8 }, FEATHER, [Math.sin(a) * 1.05, my + Math.cos(a) * 1.05, mz - 0.14], [0, 0, -a], [0.17, 0.7, 0.03])
+  }
+  // The sun-mask: a gold disc, rays all round, eyes and a red smile.
+  k.cyl(gold, 0.62, 0.62, 0.1, [0, my, mz], [Math.PI / 2, 0, 0], 18)
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2
+    k.cone(gold, 0.09, 0.3, [Math.sin(a) * 0.76, my + Math.cos(a) * 0.76, mz], [0, 0, -a], 4)
+  }
+  for (const s of [-1, 1]) k.sphere(DARK, 0.07, [s * 0.2, my + 0.12, mz + 0.06], [1, 0.6, 0.5], 8, 5)
+  k.torus({ c: '#c62828', r: 0.6 }, 0.16, 0.035, [0, my - 0.12, mz + 0.06], [0, 0, Math.PI], Math.PI, 10, 4)
+  // Bulbs round the deck edge.
+  for (let i = 0; i < 10; i++) for (const s of [-1, 1]) k.sphere(BULBS[1], 0.05, [s * 0.92, 0.62, -2.1 + i * 0.47], [1, 1, 1], 6, 4)
+}
+
 // A flat wall `w` wide and `h` tall with round-topped openings between the given x ranges,
 // thick `d` along z (1 here: scaled at placement); each opening's straight sides rise to
 // `spring` of its width before the round top.
@@ -250,14 +366,16 @@ function waveMat() {
 }
 
 export default function Rio({ len, race }: WorldProps) {
-  const hotels = useMemo(() => HOTELS.map((h, i) => prop(`rio-hotel-${i}`, (k) => hotel(k, h))), [])
+  const hotels = useMemo(() => HOTELS.map((h, i) => prop(`rio-hotel-d2-${i}`, (k) => hotel(k, h))), [])
   const palmP = useProp('rio-palm', coconutPalm)
-  const kioskP = useProp('rio-kiosk', kiosk)
-  const guardP = useProp('rio-lifeguard', lifeguard)
-  const volleyP = useProp('rio-volley', volley)
-  const festoonP = useProp('rio-festoon', festoon)
+  const kioskP = useProp('rio-kiosk-d2', kiosk)
+  const guardP = useProp('rio-lifeguard-d2', lifeguard)
+  const volleyP = useProp('rio-volley-goals', volley)
+  const shadeP = useProp('rio-parasols', parasols)
+  const festoonP = useProp('rio-festoon-d2', festoon)
   const aqueductP = useProp('rio-aqueduct', aqueduct)
   const stairP = useProp('rio-stairway', stairway)
+  const sambaP = useProp('rio-samba', samba)
   const gz = race * 0.5
   const sz = race + 8
   const PROM = 3.2
@@ -276,23 +394,29 @@ export default function Rio({ len, race }: WorldProps) {
     }
     const palms: Spot[] = []
     for (let z = -12; z < len + 40; z += 5 + r() * 3) {
-      if (Math.abs(z - gz) < 2) continue
+      if (z > gz - 4.8 && z < gz + 2) continue
       palms.push({ x: SAND0 - 0.5, z, ry: Math.PI + (r() - 0.5) * 0.8, s: 0.9 + r() * 0.3 })
     }
     for (let z = -6; z < len + 40; z += 9 + r() * 8) if (Math.abs(z - gz) > 2 && Math.abs(z - sz) > 4) palms.push({ x: EDGE + 1.0, z, ry: (r() - 0.5) * 6, s: 0.85 + r() * 0.2 })
     const kiosks: Spot[] = []
     const guards: Spot[] = []
     const nets: Spot[] = []
-    for (let z = 6; z < len + 40; z += 18 + r() * 8) kiosks.push({ x: SAND0 - 2.2, z, ry: r() * 6 })
+    for (let z = 6; z < len + 40; z += 18 + r() * 8) if (Math.abs(z - gz) > 6) kiosks.push({ x: SAND0 - 2.2, z, ry: r() * 6 })
     for (let z = 30; z < len + 40; z += 70) guards.push({ x: SHORE + 4, z, ry: -Math.PI / 2 })
     for (let z = 14; z < len + 40; z += 26 + r() * 12) nets.push({ x: SAND0 - 7 - r() * 2, z, ry: 0 })
+    const shades: Spot[] = []
+    for (let z = -4; z < len + 40; z += 7 + r() * 4) {
+      const x = SAND0 - 5.4 - r() * 2.4
+      if (nets.some((n) => Math.abs(n.z - z) < 6.2) || kiosks.some((q) => Math.abs(q.z - z) < 4) || (z > gz - 6 && z < gz + 3)) continue
+      shades.push({ x, z, ry: (r() - 0.5) * 0.5 })
+    }
     const strings: Spot[] = []
     for (let z = 12; z < len + 30; z += 12) if (Math.abs(z - gz) > 4) strings.push({ x: 0, z })
     // Footprints, shells and towels scattered on the sand.
     const rr = rand(91)
     const sand = Array.from({ length: 260 }, () => ({ x: SAND0 - 1 - rr() * 12, z: rr() * (len + 60) - 14, s: 0.6 + rr() * 0.8, ry: rr() * 6, y: 0.01 }))
     const towels = Array.from({ length: 50 }, () => ({ x: SAND0 - 3 - rr() * 8, z: rr() * (len + 50) - 10, ry: rr() * 0.6, y: 0.02 }))
-    return { rows, palms, kiosks, guards, nets, strings, sand, towels }
+    return { rows, palms, kiosks, guards, nets, shades, strings, sand, towels }
   }, [len, gz, sz, SAND0, SHORE])
 
   const wave = useMemo(() => {
@@ -314,6 +438,7 @@ export default function Rio({ len, race }: WorldProps) {
           <meshStandardMaterial color="#e8d3a2" />
         </mesh>
         <group position={[0, 0, gz]}><PropMesh parts={aqueductP} /></group>
+        <group position={[-6.5, 0, gz - 1.6]} rotation-y={Math.PI}><PropMesh parts={sambaP} /></group>
         <group position={[EDGE + 2.2, 0, sz]} rotation-y={-Math.PI / 2}><PropMesh parts={stairP} /></group>
         <Scatter spots={geo.sand} colors={['#d9c08c', '#f1e2bb', '#cbb07a']}>
           <boxGeometry args={[0.14, 0.02, 0.22]} />
@@ -330,6 +455,7 @@ export default function Rio({ len, race }: WorldProps) {
       <Many parts={kioskP} at={geo.kiosks} />
       <Many parts={guardP} at={geo.guards} />
       <Many parts={volleyP} at={geo.nets} />
+      <Many parts={shadeP} at={geo.shades} />
       <Many parts={festoonP} at={geo.strings} />
       <Surf x={SHORE} len={len} />
       <Water x={SHORE - 40} z={len / 2} w={80} d={len + 240} id="rio" color="#3f6f86" rough={0.15} />
@@ -366,7 +492,7 @@ function Surf({ x, len }: { x: number; len: number }) {
 // green ridge behind the town, its tallest peak carrying the lit open-armed statue, and the
 // hillside houses' lights.
 function FarRio() {
-  const parts = useProp('rio-far', (k) => {
+  const parts = useProp('rio-far-d2', (k) => {
     const rock: Look = { c: '#6d6a5e', r: 1 }
     const rockD: Look = { c: '#57544a', r: 1 }
     const green: Look = { c: '#2f5a33', r: 1 }
@@ -411,6 +537,8 @@ function FarRio() {
       const y = Math.max(0.5, (1 - Math.abs(x - 46) / 20) * 12 * rr())
       k.box(glow(tones[i % tones.length], 0.05, 1.3), [0.5, 0.35, 0.05], [x, y, z - 4])
       k.box({ c: ['#c9a27a', '#d98c5f', '#8fb3c9', '#e0c27a'][i % 4], r: 1 }, [1.1, 0.8, 0.9], [x, y - 0.1, z - 3.5])
+      k.box({ c: i % 3 ? '#a8553a' : '#8a8a80', r: 1 }, [1.2, 0.1, 1.0], [x, y + 0.35, z - 3.5])
+      if (i % 4 === 1) k.box({ c: ['#c9a27a', '#e0c27a', '#d98c5f'][i % 3], r: 1 }, [0.7, 0.55, 0.7], [x + 0.15, y + 0.67, z - 3.4])
     }
     // The city's towers along the shore beyond the hotels.
     for (let i = 0; i < 10; i++) {
