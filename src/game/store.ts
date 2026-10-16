@@ -711,8 +711,9 @@ export function statValue(s: StatSource, key: StatKey, def?: string): number {
 export const goalDone = (s: StatSource, g: GoalDef) => statValue(s, g.stat, g.def) >= g.target
 
 // Endless goals showing now: as many as endlessSlots() allows next to the story goals.
-type EndlessSource = StatSource & Pick<SaveState, 'claimedGoals' | 'xp' | 'endless' | 'tutorial'>
-export const endlessTown = (s: StatSource & Pick<SaveState, 'xp'>): EndlessTown => ({ ...s, value: (stat, def) => statValue(s, stat, def) })
+type TownExtras = 'xp' | 'trophies' | 'tour' | 'worldTour' | 'cups' | 'rivals' | 'rivalRow' | 'tuner'
+type EndlessSource = StatSource & Pick<SaveState, 'claimedGoals' | 'endless' | 'tutorial' | TownExtras>
+export const endlessTown = (s: StatSource & Pick<SaveState, TownExtras>): EndlessTown => ({ ...s, value: (stat, def) => statValue(s, stat, def) })
 const endlessRoom = (s: EndlessSource) => (s.tutorial < 99 ? 0 : endlessSlots(activeGoals(s).length, s.level))
 export const activeEndless = (s: EndlessSource): EndlessGoal[] => (s.endless?.goals ?? []).slice(0, endlessRoom(s))
 export const endlessReady = (s: EndlessSource, g: EndlessGoal) => endlessDone(endlessTown(s), g)
@@ -1646,7 +1647,7 @@ export const useGame = create<GameState>()(
         const run = dailyRun()
         const was = s.daily?.day === run.day ? s.daily : { day: run.day, best: null, paid: false }
         const best = was.best === null ? time : Math.min(was.best, time)
-        set({ daily: { day: run.day, best, paid: true } })
+        set({ daily: { day: run.day, best, paid: true }, stats: { ...s.stats, dailyRuns: (s.stats.dailyRuns ?? 0) + 1 } })
         if (was.paid) return
         const medal = dailyMedal(run, time)
         s.finishRace(medal < DAILY_MEDALS.length, DAILY_PAY[Math.min(medal, DAILY_MEDALS.length - 1)], { loss: DAILY_PAY[DAILY_MEDALS.length] })
@@ -1672,7 +1673,7 @@ export const useGame = create<GameState>()(
           hatQuest: { ...q, arcade: q.arcade + 1 },
           coins: s.coins + coins,
           boosts: b.next,
-          stats: { ...s.stats, coinsEarned: (s.stats.coinsEarned ?? 0) + coins },
+          stats: { ...s.stats, coinsEarned: (s.stats.coinsEarned ?? 0) + coins, arcadePlays: (s.stats.arcadePlays ?? 0) + 1 },
           updatedAt: Date.now(),
         }))
       },
@@ -1836,7 +1837,7 @@ export const useGame = create<GameState>()(
           ...(d.kind === 'callcard' && callCardDef(d.card) && !(s.callCards ?? []).includes(d.card) ? { callCards: [...(s.callCards ?? []), d.card] } : {}),
           crates: o.seq ?? s.crates ?? 0,
           ...(def?.pity ? { cratePity: { ...s.cratePity, [o.crate]: pityHit(def, d) ? 0 : (s.cratePity?.[o.crate as CrateId] ?? 0) + 1 } } : {}),
-          stats: { ...s.stats, ...(won ? { coinsEarned: (s.stats.coinsEarned ?? 0) + won } : {}), ...(newCar ? { carsBought: (s.stats.carsBought ?? 0) + 1 } : {}) },
+          stats: { ...s.stats, cratesOpened: (s.stats.cratesOpened ?? 0) + 1, ...(won ? { coinsEarned: (s.stats.coinsEarned ?? 0) + won } : {}), ...(newCar ? { carsBought: (s.stats.carsBought ?? 0) + 1 } : {}) },
           updatedAt: Date.now(),
         })
       },

@@ -9,6 +9,7 @@ const town = (over: Partial<EndlessTown> = {}): EndlessTown => ({
   level: 12, xp: 0, stats: { jobs: 40, coinsEarned: 9000, races: 10, racesWon: 6 }, land: ['0,0', '0,1'], campaign: {},
   buildings: [{ uid: 'b1', def: 'pizza', level: 2 }, { uid: 'b2', def: 'rescue' }, { uid: 'b3', def: 'gas' }],
   cars: [{ uid: 'c1', model: 'civic', upgrades: { engine: 1, turbo: 0, tires: 0, weight: 0 } }],
+  trophies: 40, tour: 3, rivalRow: {},
   value: () => 0,
   ...over,
 })
@@ -94,6 +95,23 @@ describe('endless goals', () => {
     expect(JSON.parse(json)).toEqual(ENDLESS_PAY)
   })
 
+})
+
+describe('endless goal variety', () => {
+  it('covers every mode a level 30 town with an arcade has open', () => {
+    const t = town({ level: 30, buildings: [...town().buildings, { uid: 'b4', def: 'arcade' }] })
+    const seen = new Set<string>()
+    for (let k = 1; k < 3000; k++) seen.add(drawEndless(t, k).kind)
+    const want = ['crates', 'arcade', 'dailyRun', 'restore', 'flats', 'trophies', 'proTour', 'worldTour', 'cups', 'paintRival', 'tuner', 'power']
+    expect(want.filter((k) => !seen.has(k))).toEqual([])
+  })
+
+  it('counts tallies like Pro Tour wins from when the goal was drawn', () => {
+    const g = drawEndless(town(), 1, Object.keys(KINDS).filter((k) => k !== 'proTour') as never)
+    expect(g).toMatchObject({ kind: 'proTour', base: 3 })
+    expect(endlessDone(town({ tour: 5 }), g)).toBe(true)
+    expect(endlessDone(town({ tour: 4 }), g)).toBe(false)
+  })
 })
 
 describe('endless goals in the store', () => {
