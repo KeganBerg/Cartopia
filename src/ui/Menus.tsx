@@ -1,4 +1,5 @@
 import { mergeCandidates } from '../game/merge'
+import { CallCardPicker } from './CallCardPicker'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useGame, hasRusty, buildPrice, gateLevel, type OwnedCar, type PlacedBuilding } from '../game/store'
 import { raceCarOf } from '../game/raceCar'
@@ -410,7 +411,8 @@ export function ShopPanel() {
 }
 
 // The Showroom reopens on the tab it was left on.
-let lastShowroomTab: 'shop' | 'book' = 'shop'
+type ShowTab = 'shop' | 'book' | 'cards'
+let lastShowroomTab: ShowTab = 'shop'
 // The CARS button reopens whichever of the Garage and Showroom was used last.
 let lastCars: 'garage' | 'showroom' = 'garage'
 
@@ -420,10 +422,10 @@ function openCars(setsReady: boolean) {
   useGame.getState().openPanel(setsReady ? 'showroom' : lastCars)
 }
 
-type CarsTab = 'garage' | 'shop' | 'book' | 'crates'
+type CarsTab = 'garage' | 'shop' | 'book' | 'cards' | 'crates'
 
 // My Garage, the Showroom and the Crate Depot share one row of tabs, opened from the CARS button.
-function CarsTabs({ current, onShowroom }: { current: CarsTab; onShowroom?: (t: 'shop' | 'book') => void }) {
+function CarsTabs({ current, onShowroom }: { current: CarsTab; onShowroom?: (t: ShowTab) => void }) {
   // Tabs swap between sibling menus, so closing still goes back to where the player came from.
   const openPanel = useGame((s) => s.swapPanel)
   const ready = useGame((s) => readySets(s).length)
@@ -431,6 +433,7 @@ function CarsTabs({ current, onShowroom }: { current: CarsTab; onShowroom?: (t: 
     { id: 'garage', label: <><span className="tab-emo">🔧 </span>My Cars</> },
     { id: 'shop', label: <><span className="tab-emo">🚘 </span>For Sale</> },
     { id: 'book', label: <><span className="tab-emo">📖 </span>Collection{ready > 0 && <span className="tab-dot">{ready}</span>}</> },
+    { id: 'cards', label: <><span className="tab-emo">🃏 </span>Call Cards</> },
     { id: 'crates', label: <><span className="tab-emo">📦 </span>Crates</> },
   ]
   const pick = (t: CarsTab) => {
@@ -616,6 +619,22 @@ function BookSection({ onFind }: { onFind: (model: string) => void }) {
       <div className="garage-hole" ref={hole} />
       {inspect && look && def && <CarInspect title={def.name} {...look} onClose={() => setInspect(false)} />}
       <div className="garage-detail"><CollectionBook onFind={onFind} /></div>
+    </div>
+  )
+}
+
+// Call Cards in the Showroom: your car on the turntable, the card picker as the sheet beside it.
+// The turntable has the race car, the one other players see on the card.
+function CardsSection({ onCrates }: { onCrates: () => void }) {
+  const car = useGame((s) => raceCarOf(s.cars, s.raceCar))
+  const def = car && carDef(car.model)
+  const hole = useRef<HTMLDivElement>(null)
+  const look = car && def && { body: def.body, model: def.id, ...jobOf(car), skin: car.skin, modSkin: car.modSkin, panels: car.panels, trim: car.trim, mods: car.mods, hat: car.hat }
+  return (
+    <div className="garage cards-sec">
+      {look && <div className="garage-scene"><CarPreview {...look} frameIn={hole} /></div>}
+      <div className="garage-hole" ref={hole} />
+      <div className="garage-detail"><CallCardPicker onCrates={onCrates} /></div>
     </div>
   )
 }
@@ -954,12 +973,12 @@ export function CarsPage({ crates }: { crates?: React.ReactNode }) {
   const cars = useGame((s) => s.cars)
   const swap = useGame((s) => s.swapPanel)
   const focus = useGame((s) => s.shopFocus)
-  const [showTab, setShowTab] = useState<'shop' | 'book'>(() => (focus ? 'shop' : lastShowroomTab))
+  const [showTab, setShowTab] = useState<ShowTab>(() => (focus ? 'shop' : lastShowroomTab))
   // Opened from elsewhere onto For Sale or the Collection: the tab it was asked for.
   useEffect(() => { if (focus) setShowTab('shop') }, [focus])
   const section: CarsTab = panel === 'showroom' ? showTab : panel === 'crates' ? 'crates' : 'garage'
   useEffect(() => { if (section !== 'crates') lastCars = section === 'garage' ? 'garage' : 'showroom' }, [section])
-  const toShowroom = (t: 'shop' | 'book') => {
+  const toShowroom = (t: ShowTab) => {
     lastShowroomTab = t
     setShowTab(t)
     if (panel !== 'showroom') swap('showroom')
@@ -977,6 +996,7 @@ export function CarsPage({ crates }: { crates?: React.ReactNode }) {
       {section === 'garage' && <GarageSection />}
       {section === 'shop' && <SaleSection onPick={top} />}
       {section === 'book' && <BookSection onFind={find} />}
+      {section === 'cards' && <CardsSection onCrates={() => swap('crates')} />}
       {section === 'crates' && <div className="cars-crates">{crates}</div>}
     </Panel>
   )
