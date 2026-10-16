@@ -245,6 +245,14 @@ export const startLights = { n: 99 }
 const LIT = ['#ff1744', '#ff1744', '#ffab00']
 const OFF = new Color('#3a1010')
 
+// The chase camera's height (tall phones ride higher). Bunting hangs well clear of it: strung at
+// 3.1 its flags sat right at 2.7, so on phones the camera flew through every line and a pennant
+// filled the screen as a big yellow triangle.
+export const CHASE_Y = { tall: 2.7, wide: 2.2 }
+const BUNTING_Y = 3.85
+const BUNTING_SAG = 0.3
+export const BUNTING_LOW = BUNTING_Y - BUNTING_SAG - 0.24
+
 // A light bar hanging under the START banner: reds come on with the countdown, all green on GO.
 function StartLights() {
   const lamps = useMemo(() => Array.from({ length: 3 }, () => new MeshBasicMaterial({ color: OFF, toneMapped: false })), [])
@@ -410,7 +418,7 @@ function StreetDressing({ len, far, city }: { len: number; far: number; city: bo
           {Array.from({ length: 13 }, (_, i) => {
             const t = i / 12
             const x = -ROAD - 0.6 + t * (ROAD + 0.6) * 2
-            const y = 3.1 - Math.sin(t * Math.PI) * 0.45
+            const y = BUNTING_Y - Math.sin(t * Math.PI) * BUNTING_SAG
             return (
               <mesh key={i} position={[x, y - 0.12, 0]} rotation-z={Math.PI}>
                 <coneGeometry args={[0.12, 0.24, 3]} />
@@ -419,7 +427,7 @@ function StreetDressing({ len, far, city }: { len: number; far: number; city: bo
             )
           })}
           {[-1, 1].map((sd) => (
-            <mesh key={sd} position={[sd * (ROAD + 0.6), 1.6, 0]}><cylinderGeometry args={[0.04, 0.05, 3.2, 6]} /><meshStandardMaterial color="#37474f" /></mesh>
+            <mesh key={sd} position={[sd * (ROAD + 0.6), BUNTING_Y / 2, 0]}><cylinderGeometry args={[0.04, 0.05, BUNTING_Y, 6]} /><meshStandardMaterial color="#37474f" /></mesh>
           ))}
         </group>
       ))}
@@ -657,7 +665,7 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
     // Tall phone screens get a higher, further-back chase view.
     // It rides with the car rather than trailing it, so at speed the world rushes past a car that holds
     // its place in the frame; it eases back a little as the speed builds, and settles in as the car stops.
-    c.chase.set(tall ? 0 : LANE * 0.5, tall ? 2.7 : 2.2, target - (tall ? 5.2 : 4.2) - pace * 0.8)
+    c.chase.set(tall ? 0 : LANE * 0.5, tall ? CHASE_Y.tall : CHASE_Y.wide, target - (tall ? 5.2 : 4.2) - pace * 0.8)
     if (!c.started) {
       c.started = true
       c.chaseRel.copy(cam.position).setZ(cam.position.z - target)

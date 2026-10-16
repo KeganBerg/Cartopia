@@ -7,6 +7,7 @@ import { Pool as Glow, Lamp, Bench, Tree } from './edgeKit'
 import { TrueSize, Upright, useMergeScale } from './mergeScale'
 import { PEOPLE_SIZED } from './keepShape'
 import { PAL } from './season'
+import { FairCrowd, type Visitor } from './FairCrowd'
 import { awningTex, concreteTex, grassTex, paverTex, sandTex } from './textures'
 
 // Recreation from the third wave of buildings (mini golf, pool, funfair, water park, courts).
@@ -634,6 +635,220 @@ function DropTower({ m, bulb, c }: { m: Mat; bulb: ReactNode; c: string }) {
   )
 }
 
+// Teacups: four spinning cups on saucers round a teapot, on a lit turntable.
+function Teacups({ m, bulb }: { m: Mat; bulb: ReactNode }) {
+  const CUPS = ['#f06292', '#4fc3f7', '#ffd54f', '#81c784']
+  return (
+    <Upright>
+      <Cyl m={m} at={[0, 0.03, 0]} r={0.4} h={0.06} c="#d7ccc8" seg={24} />
+      <Cyl m={m} at={[0, 0.07, 0]} r={0.37} h={0.02} c="#ab47bc" seg={24} />
+      {Array.from({ length: 16 }, (_, i) => {
+        const a = (i / 16) * TAU
+        return <mesh key={i} position={[Math.cos(a) * 0.385, 0.065, Math.sin(a) * 0.385]}><sphereGeometry args={[0.018, 6, 5]} />{bulb}</mesh>
+      })}
+      {/* The teapot in the middle, spout and handle. */}
+      <Cyl m={m} at={[0, 0.13, 0]} r={0.08} r2={0.09} h={0.1} c={WHITE} seg={14} />
+      <mesh position={[0, 0.2, 0]} castShadow><sphereGeometry args={[0.1, 14, 10]} />{m('#ec407a')}</mesh>
+      <mesh position={[0, 0.29, 0]}><sphereGeometry args={[0.035, 8, 6]} />{m(GOLD)}</mesh>
+      <Cyl m={m} at={[0.12, 0.23, 0]} r={0.016} r2={0.026} h={0.12} c="#ec407a" seg={6} rot={[0, 0, -0.9]} />
+      <mesh position={[-0.1, 0.21, 0]} rotation-y={Math.PI / 2}><torusGeometry args={[0.045, 0.012, 6, 12]} />{m('#ec407a')}</mesh>
+      {CUPS.map((c, i) => {
+        const a = (i / 4) * TAU + Math.PI / 4
+        return (
+          <group key={c} position={[Math.cos(a) * 0.24, 0.08, Math.sin(a) * 0.24]}>
+            <Cyl m={m} at={[0, 0.01, 0]} r={0.11} h={0.02} c={WHITE} seg={16} />
+            <Cyl m={m} at={[0, 0.085, 0]} r={0.095} r2={0.065} h={0.13} c={c} seg={16} />
+            <mesh position={[0, 0.15, 0]} rotation-x={Math.PI / 2}><torusGeometry args={[0.093, 0.009, 5, 18]} />{m(WHITE)}</mesh>
+            <mesh position={[0.1, 0.09, 0]}><torusGeometry args={[0.035, 0.01, 5, 10]} />{m(c)}</mesh>
+            <Cyl m={m} at={[0, 0.03, 0]} r={0.02} h={0.02} c={GOLD} seg={8} />
+          </group>
+        )
+      })}
+    </Upright>
+  )
+}
+
+// A cart on two wheels with a striped canopy on poles; `top` is what it sells
+// (a glass case of popcorn, a candy floss drum). Faces +z.
+function SnackCart({ m, c, stripe, top }: { m: Mat; c: string; stripe: string; top: 'popcorn' | 'floss' }) {
+  return (
+    <group userData={PEOPLE_SIZED}>
+      <Box m={m} at={[0, 0.22, 0]} s={[0.46, 0.26, 0.28]} c={c} />
+      <Box m={m} at={[0, 0.36, 0]} s={[0.5, 0.025, 0.32]} c={WHITE} />
+      {[-0.16, 0.16].map((x) => <Cyl key={x} m={m} at={[x, 0.07, 0.15]} r={0.07} h={0.03} c={DARK} seg={10} rot={[Math.PI / 2, 0, 0]} />)}
+      {[-0.16, 0.16].map((x) => <Cyl key={`h${x}`} m={m} at={[x, 0.07, 0.168]} r={0.025} h={0.01} c={GOLD} seg={8} rot={[Math.PI / 2, 0, 0]} />)}
+      <Box m={m} at={[0, 0.1, -0.11]} s={[0.04, 0.12, 0.04]} c={DARK} />
+      {[-0.22, 0.22].map((x) => <Box key={x} m={m} at={[x, 0.58, -0.12]} s={[0.02, 0.42, 0.02]} c={WHITE} />)}
+      <Box m={m} at={[0, 0.8, -0.04]} rot={[0.15, 0, 0]} s={[0.54, 0.03, 0.38]} c="#ffffff" t={awningTex(stripe)} />
+      {top === 'popcorn' ? (
+        <group>
+          {/* Glass case with popcorn heaped inside and a red striped box on the counter. */}
+          <Box m={m} at={[0, 0.39, 0.02]} s={[0.32, 0.03, 0.2]} c="#c62828" />
+          <Box m={m} at={[0, 0.46, 0.02]} s={[0.3, 0.1, 0.18]} c="#fff59d" />
+          {[[-0.08, 0.04], [0.05, -0.03], [0.1, 0.05], [-0.02, 0.0]].map(([x, z]) => (
+            <mesh key={`${x}${z}`} position={[x, 0.52, 0.02 + z]}><sphereGeometry args={[0.035, 6, 5]} />{m('#fff9c4')}</mesh>
+          ))}
+          {[-0.155, 0.155].map((x) => <Box key={x} m={m} at={[x, 0.5, 0.02]} s={[0.012, 0.2, 0.2]} c="#c62828" shadow={false} />)}
+          <Box m={m} at={[0, 0.605, 0.02]} s={[0.32, 0.02, 0.21]} c="#c62828" />
+          <Cyl m={m} at={[0.19, 0.42, 0.08]} r={0.03} r2={0.022} h={0.08} c="#ffffff" seg={8} />
+        </group>
+      ) : (
+        <group>
+          <Cyl m={m} at={[0, 0.43, 0]} r={0.12} h={0.12} c={STEEL} seg={14} />
+          <mesh position={[0, 0.52, 0]}><sphereGeometry args={[0.1, 10, 8]} />{m('#f8bbd0')}</mesh>
+          {[-0.17, 0.17].map((x) => (
+            <group key={x} position={[x, 0.38, 0.06]}>
+              <Cyl m={m} at={[0, 0.05, 0]} r={0.006} h={0.1} c={WHITE} seg={4} />
+              <mesh position={[0, 0.13, 0]}><sphereGeometry args={[0.045, 8, 6]} />{m(x < 0 ? '#ce93d8' : '#81d4fa')}</mesh>
+            </group>
+          ))}
+        </group>
+      )}
+    </group>
+  )
+}
+
+// Balloon stand: a pole on a weighted base, a bunch of balloons tied to its top.
+function BalloonStand({ m }: { m: Mat }) {
+  const B: [number, number, number, string][] = [[0, 0.98, 0, '#e53935'], [0.1, 0.94, 0.04, '#fdd835'], [-0.09, 0.95, 0.05, '#1e88e5'], [0.04, 1.05, -0.07, '#43a047'], [-0.05, 1.06, -0.05, '#ec407a'], [0.11, 1.04, -0.04, '#8e24aa'], [-0.11, 1.03, 0.0, '#ff7043']]
+  return (
+    <Upright>
+      <Cyl m={m} at={[0, 0.03, 0]} r={0.09} h={0.06} c={DARK} seg={10} />
+      <Cyl m={m} at={[0, 0.4, 0]} r={0.012} h={0.74} c={WHITE} seg={5} />
+      {B.map(([x, y, z, c]) => {
+        const len = Math.hypot(x, y - 0.77 - 0.06, z)
+        return (
+          <group key={c}>
+            <mesh position={[x, y, z]} scale={[1, 1.18, 1]} castShadow><sphereGeometry args={[0.055, 10, 8]} />{m(c)}</mesh>
+            <mesh position={[x / 2, (y - 0.06 + 0.77) / 2, z / 2]} rotation={[Math.atan2(z, y - 0.83), 0, -Math.atan2(x, y - 0.83)]}>
+              <cylinderGeometry args={[0.003, 0.003, len, 3]} />{m(WHITE)}
+            </mesh>
+          </group>
+        )
+      })}
+    </Upright>
+  )
+}
+
+// High striker: hit the pad, ring the bell. Faces +z.
+function HighStriker({ m, bulb }: { m: Mat; bulb: ReactNode }) {
+  return (
+    <Upright>
+      <Box m={m} at={[0, 0.04, 0]} s={[0.26, 0.08, 0.26]} c="#6d4c41" />
+      <Box m={m} at={[0, 0.1, 0.06]} s={[0.12, 0.04, 0.1]} c="#e53935" />
+      <Box m={m} at={[0, 0.52, -0.07]} s={[0.12, 0.88, 0.05]} c={WHITE} />
+      {['#43a047', '#9ccc65', '#fdd835', '#ffa000', '#e53935'].map((c, i) => (
+        <Box key={c} m={m} at={[0, 0.2 + i * 0.16, -0.042]} s={[0.1, 0.13, 0.006]} c={c} shadow={false} />
+      ))}
+      <Cyl m={m} at={[0, 0.52, -0.035]} r={0.008} h={0.86} c={STEEL} seg={4} />
+      <Box m={m} at={[0, 0.38, -0.028]} s={[0.05, 0.03, 0.01]} c={DARK} shadow={false} />
+      <mesh position={[0, 1.0, -0.06]} castShadow><sphereGeometry args={[0.07, 12, 8, 0, TAU, 0, Math.PI / 2]} />{m(GOLD)}</mesh>
+      <Box m={m} at={[0, 0.98, -0.07]} s={[0.16, 0.02, 0.06]} c={DARK} />
+      <mesh position={[0, 1.09, -0.06]}><sphereGeometry args={[0.03, 6, 5]} />{bulb}</mesh>
+      {/* The mallet, leaning on the base. */}
+      <Box m={m} at={[0.17, 0.2, 0.06]} rot={[0, 0, -0.25]} s={[0.018, 0.34, 0.018]} c="#a1887f" />
+      <Box m={m} at={[0.21, 0.37, 0.06]} rot={[0, 0, -0.25]} s={[0.1, 0.05, 0.05]} c="#5d4037" />
+    </Upright>
+  )
+}
+
+// Hot dog kiosk with a giant hot dog on its roof. Serves out of +z.
+function HotDogKiosk({ m, bulb, win }: { m: Mat; bulb: ReactNode; win: ReactNode }) {
+  return (
+    <Upright>
+      <Box m={m} at={[0, 0.27, -0.02]} s={[0.46, 0.54, 0.32]} c="#fff8e1" />
+      <Box m={m} at={[0, 0.56, -0.02]} s={[0.52, 0.04, 0.38]} c="#ffb300" />
+      <mesh position={[0, 0.36, 0.143]}><planeGeometry args={[0.32, 0.16]} />{win}</mesh>
+      <Box m={m} at={[0, 0.27, 0.17]} s={[0.4, 0.025, 0.07]} c={WHITE} />
+      <Box m={m} at={[0, 0.13, 0.142]} s={[0.46, 0.18, 0.006]} c="#e53935" shadow={false} />
+      <Box m={m} at={[0, 0.48, 0.2]} rot={[0.35, 0, 0]} s={[0.5, 0.025, 0.16]} c="#ffffff" t={awningTex('#e53935')} />
+      {/* The hot dog: bun, sausage and a squiggle of mustard. */}
+      <group position={[0, 0.61, -0.02]}>
+        <Box m={m} at={[0, 0.0, 0]} s={[0.1, 0.06, 0.08]} c={DARK} />
+        <mesh position={[0, 0.07, 0]} rotation-z={Math.PI / 2} scale={[1, 1, 1.25]} castShadow><capsuleGeometry args={[0.055, 0.26, 4, 10]} />{m('#f6c27a')}</mesh>
+        <mesh position={[0, 0.115, 0]} rotation-z={Math.PI / 2}><capsuleGeometry args={[0.035, 0.34, 4, 10]} />{m('#c0392b')}</mesh>
+        {[-0.1, 0, 0.1].map((x) => <Box key={x} m={m} at={[x, 0.148, 0]} rot={[0, x * 4 + 0.6, 0]} s={[0.07, 0.012, 0.014]} c="#fdd835" shadow={false} />)}
+      </group>
+      {[-0.2, 0.2].map((x) => <mesh key={x} position={[x, 0.6, 0.17]}><sphereGeometry args={[0.025, 6, 5]} />{bulb}</mesh>)}
+    </Upright>
+  )
+}
+
+// One pennant, hanging down from the string (y = 0.05 at its top edge), both faces.
+const PENNANT = new Float32Array([-0.04, 0.05, 0, 0.04, 0.05, 0, 0, -0.05, 0, 0.04, 0.05, 0, -0.04, 0.05, 0, 0, -0.05, 0])
+
+// A string of triangle pennants slung between two posts' tops.
+function Pennants({ m, from, to, n }: { m: Mat; from: V3; to: V3; n: number }) {
+  const len = Math.hypot(to[0] - from[0], to[1] - from[1], to[2] - from[2])
+  const yaw = Math.atan2(to[0] - from[0], to[2] - from[2])
+  return (
+    <group position={from} rotation-y={yaw} userData={STRETCH}>
+      <mesh position={[0, 0, len / 2]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.005, 0.005, len, 4, 1, true]} />{m(WHITE)}</mesh>
+      {Array.from({ length: n }, (_, i) => {
+        const z = ((i + 0.5) / n) * len
+        return (
+          <mesh key={i} position={[0, -0.05, z]} rotation-y={Math.PI / 2}>
+            <bufferGeometry>
+              <bufferAttribute attach="attributes-position" args={[PENNANT, 3]} />
+            </bufferGeometry>
+            {m(RIDE_COLORS[i % RIDE_COLORS.length])}
+          </mesh>
+        )
+      })}
+    </group>
+  )
+}
+
+// Tethered balloon ride: the basket waits on its pad, the envelope floats
+// above on its rigging.
+function BalloonRide({ m, bulb }: { m: Mat; bulb: ReactNode }) {
+  const top = 1.95
+  return (
+    <Upright>
+      <Cyl m={m} at={[0, 0.03, 0]} r={0.24} h={0.06} c="#d7ccc8" seg={14} />
+      <Box m={m} at={[0, 0.17, 0]} s={[0.22, 0.22, 0.22]} c="#8d6e63" />
+      <Box m={m} at={[0, 0.29, 0]} s={[0.24, 0.03, 0.24]} c="#5d4037" />
+      {[-0.06, 0.06].map((y) => <Box key={y} m={m} at={[0, 0.17 + y, 0]} s={[0.226, 0.012, 0.226]} c="#6d4c41" shadow={false} />)}
+      {/* The four corner ropes up to the envelope's skirt. */}
+      {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sz]) => {
+        const dx = sx * 0.06, dz = sz * 0.06
+        const h = top - 0.36 - 0.3
+        return <Box key={`${sx}${sz}`} m={m} at={[sx * 0.11 + dx / 2, 0.3 + h / 2, sz * 0.11 + dz / 2]} rot={[Math.atan2(dz, h) * -1, 0, Math.atan2(dx, h)]} s={[0.008, h, 0.008]} c={STEEL} shadow={false} />
+      })}
+      <Cyl m={m} at={[0, top - 0.32, 0]} r={0.17} r2={0.13} h={0.12} c="#fdd835" seg={16} />
+      <mesh position={[0, top, 0]} scale={[1, 1.12, 1]} castShadow>
+        <sphereGeometry args={[0.32, 16, 12, 0, TAU, 0, Math.PI * 0.82]} />
+        {m('#ffffff', awningTex('#e53935'))}
+      </mesh>
+      <mesh position={[0, top + 0.37, 0]}><sphereGeometry args={[0.03, 6, 5]} />{bulb}</mesh>
+    </Upright>
+  )
+}
+
+// What the fair adds as it levels: every level brings something new to the
+// midway, and more visitors.
+const FAIR_VISITORS: Visitor[] = [
+  { lvl: 1, x: -1.27, z: 0.45, face: -Math.PI / 2 },
+  { lvl: 1, x: -1.27, z: 1.3, face: -Math.PI / 2 },
+  { lvl: 1, walk: 0.2, speed: 0.045 },
+  { lvl: 2, x: -0.4, z: 1.43, face: Math.PI },
+  { lvl: 2, walk: 1.1, speed: 0.05 },
+  { lvl: 3, x: 0.25, z: 0.18, face: -Math.PI / 2 - 0.4 },
+  { lvl: 3, x: 0.2, z: 0.95, face: -Math.PI / 2 },
+  { lvl: 4, x: 0.17, z: 0.55, face: -Math.PI / 2 },
+  { lvl: 4, x: -0.15, z: 0.12, face: Math.PI },
+  { lvl: 5, walk: 0.65, speed: 0.04 },
+  { lvl: 5, walk: 1.55, speed: 0.055 },
+  { lvl: 6, x: -0.58, z: -0.12, face: -Math.PI / 2 },
+  { lvl: 6, walk: 0.9, speed: 0.035 },
+  { lvl: 7, x: -1.27, z: -0.38, face: -Math.PI / 2 },
+  { lvl: 8, x: 1.17, z: 1.58, face: Math.PI / 2 },
+  { lvl: 8, walk: 1.35, speed: 0.06 },
+  { lvl: 9, x: 0.08, z: 1.76, face: Math.PI },
+  { lvl: 10, walk: 0.05, speed: 0.05 },
+  { lvl: 10, walk: 1.8, speed: 0.04 },
+]
+
 function Funfair({ k, def, lvl }: { k: K; def: BuildingDef; lvl: number }) {
   const { m, bulb, ghost } = k
   const st = growthStage(lvl)
@@ -655,13 +870,7 @@ function Funfair({ k, def, lvl }: { k: K; def: BuildingDef; lvl: number }) {
         !ghost && (
           <group>
             {/* Snack corner: a candy floss cart and picnic tables. */}
-            <group position={[1.15, 0.05, -1.35]} userData={PEOPLE_SIZED}>
-              <Box m={m} at={[0, 0.2, 0]} s={[0.46, 0.26, 0.28]} c="#f48fb1" />
-              {[-0.16, 0.16].map((x) => <Cyl key={x} m={m} at={[x, 0.07, 0.15]} r={0.07} h={0.03} c={DARK} seg={10} rot={[Math.PI / 2, 0, 0]} />)}
-              {[-0.2, 0.2].map((x) => <Box key={x} m={m} at={[x, 0.5, 0]} s={[0.02, 0.34, 0.02]} c={WHITE} />)}
-              <Box m={m} at={[0, 0.68, 0]} s={[0.5, 0.03, 0.34]} c="#ffffff" t={awningTex('#ec407a')} />
-              <mesh position={[0.05, 0.42, 0]}><sphereGeometry args={[0.08, 8, 6]} />{m('#f8bbd0')}</mesh>
-            </group>
+            <group position={[1.15, 0.05, -1.35]}><SnackCart m={m} c="#f48fb1" stripe="#ec407a" top="floss" /></group>
             {[[0.7, -0.6], [1.5, -0.6]].map(([x, z]) => (
               // Picnic table: the top on slim legs, a bench each side on a crossbar at seat height.
               <group key={x} position={[x, 0.05, z]}>
@@ -708,7 +917,42 @@ function Funfair({ k, def, lvl }: { k: K; def: BuildingDef; lvl: number }) {
           <Bulbs from={[0.1, 1.05, 1.45]} to={[0.1, 1.05, -0.35]} n={12} posts={1.0} sag={0.08} />
           <Bulbs from={[-0.9, 1.05, 1.45]} to={[-0.9, 1.05, -0.35]} n={12} posts={1.0} sag={0.08} />
           {st >= 2 && <Bulbs from={[-0.9, 1.05, -0.35]} to={[0.1, 1.05, -0.35]} n={7} sag={0.06} />}
-          <Bench m={m} at={[-0.4, 0.05, 0.2]} rot={0} />
+          {lvl < 4 && <Bench m={m} at={[-0.4, 0.05, 0.2]} rot={0} />}
+          {/* The midway fills up level by level. */}
+          {lvl >= 2 && <group position={[-0.4, 0.05, 1.15]}><SnackCart m={m} c="#c62828" stripe="#e53935" top="popcorn" /></group>}
+          {lvl >= 3 && <group position={[0.32, 0.05, -0.12]}><BalloonStand m={m} /></group>}
+          {lvl >= 4 && <group position={[-0.4, 0.05, 0.55]}><Teacups m={m} bulb={bulb} /></group>}
+          {lvl >= 4 && <group position={[-0.15, 0.05, -0.15]}><SnackCart m={m} c="#f48fb1" stripe="#ec407a" top="floss" /></group>}
+          {lvl >= 5 && [[0.2, -0.35], [-1.5, 0.875]].map(([x, z]) => (
+            <group key={x} position={[x, 0.05, z]} userData={PEOPLE_SIZED}>
+              <Cyl m={m} at={[0, 0.11, 0]} r={0.055} r2={0.048} h={0.22} c="#2e7d32" seg={10} />
+              <Cyl m={m} at={[0, 0.23, 0]} r={0.06} h={0.025} c={DARK} seg={10} />
+            </group>
+          ))}
+          {st >= 2 && (
+            // Picnic table between the big rides, once the swing ride takes the snack corner.
+            <group position={[-0.05, 0.05, -0.85]} rotation-y={0.3}>
+              <Box m={m} at={[0, 0.29, 0]} s={[0.5, 0.03, 0.26]} c="#8d6e63" />
+              {[-0.22, 0.22].map((dz) => <Box key={dz} m={m} at={[0, 0.17, dz]} s={[0.5, 0.025, 0.09]} c="#8d6e63" />)}
+              {[-0.19, 0.19].map((dx) => (
+                <group key={dx}>
+                  <Box m={m} at={[dx, 0.15, 0]} s={[0.03, 0.025, 0.56]} c="#5d4037" shadow={false} />
+                  {[-0.09, 0.09].map((dz) => <Box key={dz} m={m} at={[dx, 0.145, dz]} s={[0.03, 0.29, 0.03]} c="#5d4037" shadow={false} />)}
+                </group>
+              ))}
+            </group>
+          )}
+          {lvl >= 6 && <group position={[-0.8, 0.05, -0.08]} rotation-y={Math.PI / 2}><HighStriker m={m} bulb={bulb} /></group>}
+          {lvl >= 8 && <group position={[1.55, 0.05, 1.58]} rotation-y={-Math.PI / 2}><HotDogKiosk m={m} bulb={bulb} win={k.win} /></group>}
+          {lvl >= 9 && (
+            <group>
+              <Pennants m={m} from={[-0.9, 1.06, 1.45]} to={[0.1, 1.06, 1.45]} n={9} />
+              <Pennants m={m} from={[-0.9, 1.06, 1.45]} to={[0.1, 1.06, -0.35]} n={14} />
+              <Pennants m={m} from={[0.1, 1.06, 1.45]} to={[-0.9, 1.06, -0.35]} n={14} />
+            </group>
+          )}
+          {lvl >= 10 && <group position={[1.68, 0.05, -1.72]}><BalloonRide m={m} bulb={bulb} /></group>}
+          <group position-y={0.05}><FairCrowd lvl={lvl} visitors={FAIR_VISITORS} /></group>
           <Lamp m={m} bulb={bulb} at={[-1.75, 0.05, 1.92]} ghost={ghost} />
           <Lamp m={m} bulb={bulb} at={[1.88, 0.05, -0.3]} ghost={ghost} />
           {st < 3 && <Tree m={m} at={[1.62, 0.05, 1.68]} s={0.8} leaves={PAL.leaves} bare={PAL.bare} />}

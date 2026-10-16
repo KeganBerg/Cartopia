@@ -16,12 +16,11 @@
 .cr-crest-in i { font-style: normal; font-size: calc(var(--cs) * .48); line-height: 1; margin-top: -6%; filter: drop-shadow(0 2px 0 rgba(0,0,0,.35)); }
 
 /* Hero banner */
-.cr-hero { position: relative; display: flex; align-items: center; gap: 14px; padding: 12px 14px; border: 3px solid var(--line, #14213d); border-radius: 18px; color: #fff; overflow: hidden;
+.cr-hero { position: relative; display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 3px solid var(--line, #14213d); border-radius: 18px; color: #fff; overflow: hidden;
   background: repeating-linear-gradient(115deg, rgba(255,255,255,.07) 0 14px, transparent 14px 28px), linear-gradient(120deg, color-mix(in srgb, var(--crew) 70%, #fff), var(--crew) 45%, color-mix(in srgb, var(--crew) 55%, #0b1630));
   box-shadow: inset 0 3px 0 rgba(255,255,255,.3), 0 4px 0 rgba(0,0,0,.35); }
 .cr-hero-mid { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 5px; }
-.cr-hero .rm-ttl { font-size: 28px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cr-hero .rm-bub { max-width: 100%; }
+.cr-hero .rm-ttl { font-size: 26px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cr-chips { display: flex; flex-wrap: wrap; gap: 5px; }
 .cr-chip { background: rgba(10,22,48,.55); border: 2px solid rgba(20,33,61,.7); border-radius: 999px; padding: 1px 8px; font: 900 12px Nunito, sans-serif; white-space: nowrap; }
 .cr-chip em { font-style: normal; color: #b9f6ca; margin-left: 3px; font-size: 11px; }
@@ -30,10 +29,15 @@
 .cr-chat span:not(.tab-dot) { font-size: 13px; }
 .cr-chat .tab-dot { position: absolute; top: -8px; right: -8px; }
 
-/* Ladder on the left, battle and goal stacked on the right */
-.cr-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 12px; align-items: stretch; }
-.cr-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.cr-side .rm-tile { flex: 1; }
+/* One section at a time under the banner: Ladder, This week, Members */
+.cr-tabs { width: 100%; }
+.cr-tabs button { flex: 1; position: relative; min-height: 40px; font-size: 15px; }
+.cr-tabs .tab-dot { position: absolute; top: -6px; right: -4px; }
+/* This week: battle and goal side by side, part requests under them */
+.cr-week { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: stretch; }
+.cr-week .cr-parts { grid-column: 1 / -1; }
+.cr-week .rm-tile { min-height: 168px; }
+.cr-week .cr-parts { min-height: 0; }
 
 /* ---------- ladder ---------- */
 .cl { gap: 8px; padding: 10px; }
@@ -74,7 +78,6 @@ button.cl-name { padding: 0; border: 0; background: none; cursor: pointer; text-
 .cl-me { text-shadow: none; }
 .cl-me b { color: #c2185b; font-weight: 900; }
 .cl-me .cl-race { margin: 0; }
-.cl-foot { font: 800 11px Nunito, sans-serif; text-align: center; opacity: .85; text-shadow: 0 1px 2px rgba(0,0,0,.7); }
 
 /* ---------- battle ---------- */
 .cr-battle { gap: 6px; }
@@ -87,6 +90,8 @@ button.cl-name { padding: 0; border: 0; background: none; cursor: pointer; text-
 .cr-bside b.lead { color: #ffd84a; }
 .cr-bside small { font: 900 11px Nunito, sans-serif; letter-spacing: 1px; opacity: .9; }
 .cr-vs { font: 20px var(--display); color: #ffd84a; -webkit-text-stroke: .8px var(--line, #14213d); text-shadow: 0 2px 0 var(--line, #14213d); }
+.cr-bfoot { display: flex; align-items: center; justify-content: space-between; gap: 6px; font: 900 13px Nunito, sans-serif; text-shadow: 0 1px 2px rgba(0,0,0,.7); }
+.cr-bfoot b { font-size: 22px; line-height: 1; }
 .cr-tug { position: relative; display: block; height: 12px; border-radius: 99px; border: 2px solid var(--line, #14213d); overflow: hidden; background: var(--them); flex: none; }
 .cr-tug i:first-child { position: absolute; inset: 0 auto 0 0; width: var(--split); background: linear-gradient(color-mix(in srgb, var(--us) 60%, #fff), var(--us)); border-right: 2px solid #fff; transition: width .6s; }
 .cr-tug i:last-child { position: absolute; inset: 0 0 0 auto; width: calc(100% - var(--split)); background: linear-gradient(color-mix(in srgb, var(--them) 60%, #fff), var(--them)); }
@@ -136,14 +141,13 @@ button.cm-name { padding: 0; border: 0; background: none; cursor: pointer; text-
 .cm-mode button { flex: 1; }
 
 @media (max-width: 720px) {
-  .cr-grid { grid-template-columns: minmax(0, 1fr); }
+  .cr-week { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 520px) {
   .cr-hero { gap: 10px; padding: 10px; }
   .cr-hero .rm-ttl { font-size: 22px; }
-  .cr-hero .cr-crest { --cs: 56px !important; }
+  .cr-hero .cr-crest { --cs: 50px !important; }
   .cr-chat { padding: 4px 8px; font-size: 16px; }
-  .cr-chip[data-m='trophies'], .cr-chip[data-m='level'] { display: none; }
   .cl-row { grid-template-columns: 16px 50px minmax(0, 1fr) auto auto; gap: 4px; }
   .cl-row .cl-car .thumb3d { --tw: 50px; --th: 38px; }
   .cl-row .cl-time { font-size: 13px; }

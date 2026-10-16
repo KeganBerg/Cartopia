@@ -938,9 +938,18 @@ html.calm *, html.calm *::before, html.calm *::after { animation-duration: .001m
 /* Free camera toggle, docked above Goals. Lit blue while the free view is on. */
 .goals-btn.cam-dock { position: absolute; z-index: 51; right: calc(26px + var(--sar)); bottom: calc(248px + var(--sab)); width: 60px; height: 60px; border-radius: 16px; }
 .goals-btn.cam-dock.on { background: linear-gradient(#6ab4ff 0 50%, #3a86ea 50%); color: #fff; }
+/* Screenshot mode (src/ui/ShotMode.tsx): hide-everything and save-picture, left of the camera toggle in the free view. */
+.shot-dock { position: absolute; z-index: 51; right: calc(96px + var(--sar)); bottom: calc(248px + var(--sab)); display: flex; gap: 10px; }
+.shot-dock .goals-btn { position: static; width: 60px; height: 60px; border-radius: 16px; }
+/* While on, only the town's 3D view is left: every other layer of the page is hidden and lets touches through. */
+html.shot #root > :not(.town-3d):not(.shot-ui), html.shot #root > :not(.town-3d):not(.shot-ui) *, html.shot body > :not(#root), html.shot body > :not(#root) * { visibility: hidden !important; pointer-events: none !important; }
+.shot-ui { position: absolute; z-index: 60; left: 50%; bottom: calc(24px + var(--sab)); transform: translateX(-50%); padding: 6px 14px; border-radius: 14px; background: rgba(0,0,0,.45); color: #fff; font: 15px var(--display); pointer-events: none; transition: opacity .6s; }
+.shot-ui.gone { opacity: 0; }
 @media (max-width: 700px) {
   .goals-btn.goals-dock { width: 52px; height: 52px; right: calc(10px + var(--sar)); bottom: calc(140px + var(--sab)); border-radius: 14px; }
   .goals-btn.cam-dock { width: 52px; height: 52px; right: calc(10px + var(--sar)); bottom: calc(202px + var(--sab)); border-radius: 14px; }
+  .shot-dock { right: calc(70px + var(--sar)); bottom: calc(202px + var(--sab)); gap: 8px; }
+  .shot-dock .goals-btn { width: 52px; height: 52px; border-radius: 14px; }
   .collect-all { width: 52px; height: 52px; right: calc(10px + var(--sar)); bottom: calc(76px + var(--sab)); }
   .collect-ico { font-size: 24px; }
 }
@@ -948,6 +957,8 @@ html.calm *, html.calm *::before, html.calm *::after { animation-duration: .001m
 @media (max-height: 500px) {
   .goals-btn.goals-dock { width: 44px; height: 44px; font-size: 20px; border-radius: 12px; right: calc(34px + var(--sar)); bottom: calc(164px + var(--sab)); }
   .goals-btn.cam-dock { width: 44px; height: 44px; border-radius: 12px; right: calc(34px + var(--sar)); bottom: calc(216px + var(--sab)); }
+  .shot-dock { right: calc(86px + var(--sar)); bottom: calc(216px + var(--sab)); gap: 6px; }
+  .shot-dock .goals-btn { width: 44px; height: 44px; border-radius: 12px; }
   .collect-all { width: 48px; height: 48px; right: calc(32px + var(--sar)); bottom: calc(110px + var(--sab)); border-width: 2.5px; }
   .collect-all::before { inset: 4px; }
   .collect-ico { font-size: 22px; }
@@ -1256,7 +1267,7 @@ html.calm .callout { animation: none !important; }
 .cl-lamps { grid-template-columns: repeat(4, 1fr); }
 .cl-themes { grid-template-columns: repeat(4, 1fr); }
 .cl-card { position: relative; display: flex; flex-direction: column; padding: 0; border: 3px solid rgba(20,33,61,.14); border-radius: 14px; background: #fff; overflow: hidden; cursor: pointer; }
-.cl-card img { display: block; width: 100%; aspect-ratio: 240 / 220; object-fit: cover; background: #141a33; }
+.cl-card img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; background: #141a33; }
 .cl-themes .cl-card img { aspect-ratio: 360 / 220; background: #bfe3f7; }
 .cl-name { font: 800 15px Nunito, sans-serif; color: #14213d; padding: 6px 4px 7px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cl-card.sel { border-color: #ff8f00; box-shadow: 0 0 0 3px rgba(255,143,0,.3); }
@@ -1552,7 +1563,7 @@ html.calm .callout { animation: none !important; }
 .preset { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 4px; border-radius: 12px; border: 1.5px solid #dfe5ea; background: #fff; min-width: 0; }
 .preset.empty { justify-content: center; min-height: 92px; border-style: dashed; }
 .preset-row { display: flex; gap: 4px; }
-@media (max-width: 520px) { .patterns, .trim-opts { grid-template-columns: repeat(3, 1fr); } .garage-tabs { grid-template-columns: repeat(3, 1fr); } .garage-tabs button { font-size: 12px; padding: 6px 1px; } }
+@media (max-width: 520px) { .patterns, .trim-opts { grid-template-columns: repeat(3, 1fr); } .garage-tabs { gap: 2px; padding: 3px; } .garage-tabs button { font-size: 11px; letter-spacing: -.2px; padding: 5px 0; } .garage-tabs button i { font-size: 20px; } }
 
 /* Skins: a wrapping grid of animated chips edged in their tier colour, try-on bar under it. */
 .garage-detail { min-width: 0; }
@@ -1921,7 +1932,7 @@ button.book-car { font: inherit; color: inherit; }
 .meet-car { all: unset; cursor: pointer; border-radius: 8px; }
 .meet-car:hover .thumb3d, .meet-car:focus-visible .thumb3d { box-shadow: 0 0 0 2px #2f7ff0; }
 .pc-overlay { z-index: 120; }
-.pc-card { width: min(460px, 100%); }
+.pc-card { width: min(820px, 100%); }
 .pc-card .panel-body { display: flex; flex-direction: column; gap: 8px; }
 .pc-crew { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 800; color: #263238; background: #fff; border: 2px solid var(--crew, #607d8b); border-radius: 999px; padding: 2px 12px 2px 4px; }
 .pc-emblem { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--crew, #607d8b); font-size: 15px; }
@@ -1930,9 +1941,9 @@ button.book-car { font: inherit; color: inherit; }
 .pc-stat span { font-size: 20px; line-height: 1.2; }
 .pc-stat b { font: 20px var(--display); color: #14213d; }
 .pc-view { position: relative; }
-.pc-view .car-preview { height: 210px; margin: 0; background: radial-gradient(ellipse at 50% 75%, #ffffff 0 30%, #dbe8f7 80%); }
+.pc-view .car-preview { height: clamp(260px, 50vh, 470px); margin: 0; background: radial-gradient(ellipse at 50% 75%, #ffffff 0 30%, #dbe8f7 80%); }
 .pc-car-name { position: absolute; left: 10px; top: 8px; right: 60px; flex-wrap: wrap; display: flex; align-items: center; gap: 6px; pointer-events: none; }
-.pc-car-name b { font: 17px var(--display); color: #14213d; text-shadow: 0 1px 0 #fff; }
+.pc-car-name b { font: 20px var(--display); color: #14213d; text-shadow: 0 1px 0 #fff; }
 .pc-pi { background: #14213d; color: #ffd84a; border-radius: 6px; padding: 1px 6px; font: 900 13px Nunito, sans-serif; white-space: nowrap; }
 .pc-strip { display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 4px; scroll-snap-type: x proximity; }
 .pc-chip { flex: none; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 2px; border: 2px solid #e0e0e0; border-radius: 10px; background: #fff; cursor: pointer; scroll-snap-align: start; }
@@ -1943,7 +1954,7 @@ button.book-car { font: inherit; color: inherit; }
 .pc-acts { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .pc-visit { flex: 1; font-size: 20px; padding: 10px 14px; }
 @media (max-width: 560px) {
-  .pc-view .car-preview { height: 190px; }
+  .pc-view .car-preview { height: clamp(240px, 44vh, 400px); }
 }
 /* Friend ghost races */
 .ghost-btn { background: #7e57c2; }
@@ -2426,3 +2437,11 @@ body:has(.race-full) .toasts { display: none; }
 .rf-top .cam-btn:active { transform: scale(.92); }
 .cam-flash { position: absolute; top: calc(100% - 6px); right: calc(12px + var(--sar)); padding: 5px 12px; border-radius: 999px; background: rgba(16, 32, 56, .82); color: #fff; font: 15px var(--display); animation: cam-flash 1.2s ease-out forwards; pointer-events: none; }
 @keyframes cam-flash { 0% { opacity: 0; transform: translateY(-6px); } 12% { opacity: 1; transform: none; } 75% { opacity: 1; } 100% { opacity: 0; } }
+
+/* Social rows keep one compact action on the row instead of a full-width button under it. */
+.board-name { padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; text-align: left; }
+@media (max-width: 600px) {
+  .fr-row.fr-sug { grid-template-columns: 32px minmax(0, 1fr) auto; }
+  .fr-row.fr-sug .leader-acts { grid-column: auto; }
+  .fr-sug .leader-acts > .buy:last-child { flex: none; }
+}
