@@ -25,7 +25,7 @@
 .ug-card .thumb3d { --th: 104px; width: 100%; background: #dcecfb; border-radius: 12px; }
 .ug-card.ready { background: #eaffe4; border-color: #1d6b22; }
 .ug-card.ready .thumb3d { background: #c8f2bd; }
-.ug-name { font: 17px var(--display); line-height: 1.1; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ug-name { font: 17px var(--display); line-height: 1.1; width: 100%; min-height: 2.2em; display: flex; align-items: center; justify-content: center; text-wrap: balance; overflow-wrap: anywhere; }
 .ug-card .upgrade-pips { gap: 3px; }
 .ug-card .upgrade-pips i { width: 11px; height: 7px; }
 .ug-lv { position: absolute; top: 4px; left: 4px; min-width: 32px; height: 32px; padding: 0 6px; display: grid; place-items: center; background: #2f7ff0; color: #fff; border: 3px solid var(--line, #14213d); border-radius: 999px; font: 17px var(--display); }
