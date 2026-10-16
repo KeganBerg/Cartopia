@@ -43,6 +43,9 @@ for (const [form, size] of [['desktop', { width: 1280, height: 800 }], ['phone',
     if (!shot.towing && st.tow === 2 && st.truck === 1 && !st.parked) {
       shot.towing = true
       await p.screenshot({ path: `${out}/${form}-1-towing.png`, timeout: 180000 })
+      // A beat later, for the wheels: same truck, tyres turned.
+      await p.screenshot({ path: `${out}/${form}-1-towing-b.png`, timeout: 180000 })
+      console.log(form, 'towing at', JSON.stringify(st))
     }
     if (!shot.dropped && st.at === 'tow' && st.parked) {
       shot.dropped = true
