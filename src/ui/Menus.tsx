@@ -364,12 +364,12 @@ export function ShopPanel() {
       <SheetTabs items={tabs} value={tab} onChange={(t) => { setFind(''); setTab(t) }} />
       <label className="shop-find">
         <span aria-hidden>🔍</span>
-        <input type="search" value={find} placeholder="Find a building" aria-label="Find a building" onChange={(e) => setFind(e.target.value)} />
+        <input type="search" value={find} placeholder={tab === 'upgrades' ? 'Find your building' : 'Find a building'} aria-label="Find a building" onChange={(e) => setFind(e.target.value)} />
         {find && <button aria-label="Clear" onClick={() => setFind('')}>✕</button>}
       </label>
-      {!term && tab === 'upgrades' && <ShopUpgrades />}
-      {term && !rows.length && <p className="shop-none">🔍 No match</p>}
-      {(group || term) && (
+      {tab === 'upgrades' && <ShopUpgrades find={term} />}
+      {term && tab !== 'upgrades' && !rows.length && <p className="shop-none">🔍 No match</p>}
+      {(group || (term && tab !== 'upgrades')) && (
           <div className="cards rows">
             {rows.map(({ b, locked, sale, brokeGems, broke, owned }) => {
               const highlight = b.id === 'rescue' && !rusty

@@ -37,6 +37,7 @@ export function NeedPanel() {
     summary = need.missing ? `You need ${need.missing.toLocaleString()} more coins${need.what ? ` for ${need.what}` : ''}.` : `You have ${s.coins.toLocaleString()} coins. Here's how to earn more.`
     sources = [
       { icon: '🏪', title: 'Run jobs at your businesses', detail: `Tap the ⛽ bubble to start a job, then the $ bubble to collect. ${ready} ready to collect, ${idle} idle right now.`, action: { label: 'Show me', run: showJobs } },
+      { icon: '🎁', title: 'Open crates', detail: 'Coin crates can pay big coin prizes.', action: { label: 'Crates', run: () => s.swapPanel('crates') } },
       ...(upgradableOwned ? [{ icon: '⬆', title: 'Upgrade your businesses', detail: 'Upgraded businesses pay more coins per job and finish sooner. Find them under Upgrades in the Shop.', action: { label: 'Upgrades', run: () => s.openShop('upgrades') } }] : []),
       { icon: '🔍', title: "Search at Rusty's", detail: 'Searches can turn up coin stashes along with cars.', action: owned('rescue') ? { label: "Rusty's", run: () => s.openPanel('rescue') } : build('rescue') },
       { icon: '🏆', title: 'Win drag races', detail: `Each race costs ${RACE_FUEL} fuel and pays a few hundred coins.`, action: { label: 'Race', run: () => s.openPanel('race') } },

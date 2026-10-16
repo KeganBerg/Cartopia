@@ -8,7 +8,7 @@ import {
 } from '../game/data'
 import { workingDriver, type PlacedBuilding } from '../game/store'
 import { groupOf, isLandmark, LANDMARK_NAME, mergeGroups } from '../game/merge'
-import { CarThumb } from '../scene/BuildingPreview'
+import { BuildingThumb, CarThumb } from '../scene/BuildingPreview'
 import { BuildingModel } from '../scene/BuildingModel'
 import { VanguardTower } from '../scene/Landmark'
 import { frame, seat } from '../scene/fit'
@@ -17,6 +17,10 @@ import { RaveButton } from './Techno'
 import { Preview } from '../scene/Stage'
 import { COLOR_THEMES, themeFor, type ColorTheme } from '../game/cityLook'
 import { Tint } from '../scene/CityTint'
+import { townRates } from '../game/townRates'
+import { compact } from './format'
+import { CoinIcon } from './Icon'
+import './upgrades.css'
 
 const n = (v: number) => v.toLocaleString()
 // The extra tourist odds a grown garden or statue adds, as a share of the usual odds.
@@ -268,11 +272,39 @@ function ThemeStrip({ uid, tint }: { uid: string; tint?: string }) {
   )
 }
 
-// Shop section listing what the player owns that can still be upgraded.
-export function ShopUpgrades() {
+// What the whole town makes and burns an hour with every job running (game/townRates.ts):
+// coins and parts in, the fuel the jobs take against the fuel that refills, and the tank.
+function TownRates() {
+  const level = useGame((s) => s.level)
+  const buildings = useGame((s) => s.buildings)
+  const cars = useGame((s) => s.cars)
+  const r = useMemo(() => townRates({ level, buildings, cars }), [level, buildings, cars])
+  // How much of the jobs' fuel the refill covers.
+  const covered = r.fuelUse ? Math.min(1, r.fuelIn / r.fuelUse) : 1
+  return (
+    <div className="ug-town" aria-label="Your town each hour">
+      <div className="ug-tile ug-coins" title="Coins an hour, every job running"><CoinIcon size={26} /><b>{compact(r.coins)}</b><small>/h</small></div>
+      <div className="ug-tile ug-parts" title="Parts an hour, every job running"><i>⚙</i><b>{compact(r.parts)}</b><small>/h</small></div>
+      <div className="ug-fuel">
+        <div className="ug-fuel-nums">
+          <span className="ug-use" title="Fuel your jobs use an hour"><i>⛽</i><b>−{compact(r.fuelUse)}</b><small>/h</small></span>
+          <span className="ug-in" title="Fuel that refills on its own an hour"><b>+{compact(r.fuelIn)}</b><small>/h</small></span>
+          <span className="ug-tank" title="Max fuel">🛢️ <b>{compact(r.tank)}</b></span>
+        </div>
+        <span className="ug-bar" aria-hidden><i style={{ width: `${covered * 100}%` }} /></span>
+      </div>
+    </div>
+  )
+}
+
+// Shop > Upgrades: the town's totals on top, then a card per building (or merged block) with its
+// 3D model at its level, the level pips and the next upgrade's price; maxed ones sit together
+// at the bottom. `find` (the Shop's search box) narrows it by name.
+export function ShopUpgrades({ find = '' }: { find?: string }) {
   const buildings = useGame((s) => s.buildings)
   const coins = useGame((s) => s.coins)
   const parts = useGame((s) => s.parts)
+  const city = useGame((s) => s.cityTheme)
   const openUpgrade = useGame((s) => s.openUpgrade)
   const order = (id: string) => BUILDINGS.findIndex((d) => d.id === id)
   // Cheapest next upgrade first; maxed-out buildings last.
@@ -282,28 +314,55 @@ export function ShopUpgrades() {
     buildingLevel(b) >= maxLevel(buildingDef(b.def)) ? Infinity : buildingUpgradeCost(buildingDef(b.def), buildingLevel(b)).coins * size(b)
   const sorted = buildings
     .filter((b) => upgradable(buildingDef(b.def)) && (!merges.owner.has(b.uid) || merges.groups.has(b.uid)))
+    .filter((b) => !find || levelName(buildingDef(b.def), buildingLevel(b)).toLowerCase().includes(find))
     .sort((a, b) => costOf(a) - costOf(b) || order(a.def) - order(b.def))
-  if (!sorted.length) return null
+  // Identical buildings (same kind, level, colours and block size) stack on one card; a tap
+  // opens the first, and upgrading it moves it to its own card.
+  const stacks: { b: (typeof buildings)[number]; n: number }[] = []
+  const seen = new Map<string, { b: (typeof buildings)[number]; n: number }>()
+  for (const b of sorted) {
+    const key = `${b.def}|${buildingLevel(b)}|${b.tint ?? ''}|${size(b)}`
+    const hit = seen.get(key)
+    if (hit) hit.n++
+    else {
+      const st = { b, n: 1 }
+      seen.set(key, st)
+      stacks.push(st)
+    }
+  }
+  const open = stacks.filter((t) => costOf(t.b) < Infinity)
+  const maxed = stacks.filter((t) => costOf(t.b) === Infinity)
+  const card = ({ b, n: count }: { b: (typeof buildings)[number]; n: number }) => {
+    const d = buildingDef(b.def)
+    const lvl = buildingLevel(b)
+    const max = lvl >= maxLevel(d)
+    const k = size(b)
+    const one = buildingUpgradeCost(d, lvl)
+    const cost = { coins: one.coins * k, parts: one.parts * k }
+    const afford = coins >= cost.coins && parts >= cost.parts
+    return (
+      <button key={b.uid} className={`ug-card${max ? ' max' : afford ? ' ready' : ''}${count > 1 ? ' stack' : ''}`} onClick={() => openUpgrade(b.uid)}>
+        <BuildingThumb def={d} level={lvl} theme={themeFor(b.tint, city, d.kind === 'decor')} />
+        {k > 1 && <span className="ug-k" title="Merged block">🧩×{k}</span>}
+        {count > 1 && <span className="ug-n" title={`${count} the same`}>×{count}</span>}
+        <span className="ug-lv">{max ? '⭐' : lvl}</span>
+        <b className="ug-name">{levelName(d, lvl)}</b>
+        {!max && <Pips level={lvl} max={maxLevel(d)} />}
+        {!max && <span className="ug-price">⬆ ${compact(cost.coins)}{cost.parts ? ` ⚙${compact(cost.parts)}` : ''}</span>}
+      </button>
+    )
+  }
   return (
-    <section>
-      <div className="upgrade-list">
-        {sorted.map((b) => {
-          const d = buildingDef(b.def)
-          const lvl = buildingLevel(b)
-          const max = lvl >= maxLevel(d)
-          const k = size(b)
-          const one = buildingUpgradeCost(d, lvl)
-          const cost = { coins: one.coins * k, parts: one.parts * k }
-          const afford = coins >= cost.coins && parts >= cost.parts
-          return (
-            <button key={b.uid} className={`upgrade-row${afford && !max ? ' ready' : ''}`} onClick={() => openUpgrade(b.uid)}>
-              <span className="upgrade-row-name">{levelName(d, lvl)}{k > 1 ? ` ×${k}` : ''}</span>
-              <Pips level={lvl} max={maxLevel(d)} />
-              <span className="price">{max ? '⭐ Max' : `$${n(cost.coins)}${cost.parts ? ` ⚙${cost.parts}` : ''}`}</span>
-            </button>
-          )
-        })}
-      </div>
+    <section className="ug">
+      <TownRates />
+      {!sorted.length && <p className="shop-none">🔍 No match</p>}
+      {open.length > 0 && <div className="ug-grid">{open.map(card)}</div>}
+      {maxed.length > 0 && (
+        <>
+          <h4 className="ug-head">⭐ Max · {maxed.reduce((t, x) => t + x.n, 0)}</h4>
+          <div className="ug-grid ug-maxed">{maxed.map(card)}</div>
+        </>
+      )}
     </section>
   )
 }
