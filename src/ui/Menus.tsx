@@ -1,6 +1,6 @@
 import { mergeCandidates } from '../game/merge'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { useGame, hasRusty, buildPrice, type OwnedCar, type PlacedBuilding } from '../game/store'
+import { useGame, hasRusty, buildPrice, gateLevel, type OwnedCar, type PlacedBuilding } from '../game/store'
 import { raceCarOf } from '../game/raceCar'
 import { stackCars, stackFace } from '../game/garageStacks'
 import { reducedMotion } from '../game/fx'
@@ -314,6 +314,7 @@ const featureRank = (b: { id: string }) => (b.id === 'rescue' ? 2 : FEATURES[b.i
 
 export function ShopPanel() {
   const level = useGame((s) => s.level)
+  const gate = useGame(gateLevel)
   const coins = useGame((s) => s.coins)
   const bucks = useGame((s) => s.bucks)
   const setMode = useGame((s) => s.setMode)
@@ -347,7 +348,7 @@ export function ShopPanel() {
     ? BUILDINGS.filter((b) => b.unlockLevel < 99 && b.name.toLowerCase().includes(term) && SHOP_GROUPS.some((g) => (g.id !== 'event' || ev) && g.filter(b)))
     : group ? BUILDINGS.filter((b) => b.unlockLevel < 99 && group.filter(b)) : []
   const rows = shown.map((b) => {
-    const locked = level < b.unlockLevel
+    const locked = gate < b.unlockLevel
     const sale = buildPrice({ deals, level }, b.id)
     // Gem decor (the statue, the arch) is short on gems, not coins.
     const brokeGems = bucks < sale.bucks
@@ -452,7 +453,7 @@ let saleView: { kind: string; sort: SaleSort } = { kind: 'all', sort: 'level' }
 const FOR_SALE = CARS.filter((c) => !c.rescueOnly && !c.season && !c.secret && !c.pack)
 
 export function ShowroomPanel() {
-  const level = useGame((s) => s.level)
+  const level = useGame(gateLevel) // only for level locks here
   const coins = useGame((s) => s.coins)
   const bucks = useGame((s) => s.bucks)
   const cars = useGame((s) => s.cars)

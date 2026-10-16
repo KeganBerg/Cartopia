@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
+import { useGame } from '../game/store'
 
 // The admin panel's server calls (supabase/migrations/0095_admin_panel.sql). Every
 // admin_* RPC checks public.is_admin() (0094) itself, so useIsAdmin
@@ -14,9 +15,14 @@ export type AdminPlayer = {
 export type AdminLogRow = { id: number; at: string; action: string; target: string | null; name: string | null; detail: Record<string, unknown> }
 export type LiveKind = 'night' | 'day' | 'rave' | 'weather' | 'banner'
 
-// Asks the server once per sign-in. A refusal or no table yet reads as "not an admin".
-export function useIsAdmin() {
+// Asks the server once per sign-in and keeps the answer in the store (game.admin), where the
+// 🛡 button and the level locks (gateLevel) read it. A refusal or no table yet reads as "not an admin".
+// Mounted once, in App.
+export function useAdminCheck() {
   const [admin, setAdmin] = useState(false)
+  useEffect(() => {
+    useGame.setState({ admin })
+  }, [admin])
   useEffect(() => {
     if (!supabase) return
     let live = true
@@ -62,8 +68,8 @@ export const admin = {
   liveEnd: (kind: string | null = null) => call<number>('admin_live_end', { p_kind: kind }),
   find: (q: string) => call<AdminPlayer[]>('admin_find', { p_q: q }),
   player: (id: string) => call<AdminPlayer>('admin_player', { p_uid: id }),
-  grant: (id: string, coins: number, gems: number, parts: number, reason: string) =>
-    call<AdminPlayer>('admin_grant', { p_uid: id, p_coins: coins, p_gems: gems, p_parts: parts, p_reason: reason }),
+  grant: (id: string, coins: number, gems: number, parts: number, reason: string, xp = 0) =>
+    call<AdminPlayer>('admin_grant', { p_uid: id, p_coins: coins, p_gems: gems, p_parts: parts, p_reason: reason, ...(xp ? { p_xp: xp } : {}) }),
   giveCar: (id: string, model: string, reason: string) => call<AdminPlayer>('admin_give_car', { p_uid: id, p_model: model, p_reason: reason }),
   takeCar: (id: string, car: string, reason: string) => call<AdminPlayer>('admin_take_car', { p_uid: id, p_car: car, p_reason: reason }),
   mute: (id: string, minutes: number | null, reason: string) => call<AdminPlayer>('admin_mute', { p_uid: id, p_minutes: minutes, p_reason: reason }),

@@ -66,6 +66,7 @@ import { hideSplash, splashProgress } from './lib/splash'
 import { rememberSplashCar } from './lib/splashCar'
 import { usePrefs } from './lib/prefs'
 import { onDemand, reopenAfterReload } from './ui/lazy'
+import { useAdminCheck } from './lib/admin'
 
 // Rusty's yard, the crate depot and the arcade each bring their own 3D scenes,
 // so they load on first open instead of with the town. Once the town is up they
@@ -98,6 +99,7 @@ const prefetchPanels = () => {
 }
 
 export default function App() {
+  useAdminCheck()
   const panel = useGame((s) => s.panel)
   const pace = PACES[useTownPace((p) => p.step)]
   const liveRace = useLive((l) => l.race)

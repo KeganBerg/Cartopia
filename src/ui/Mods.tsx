@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useGame, modPrice, type OwnedCar } from '../game/store'
+import { useGame, modPrice, type OwnedCar, gateLevel } from '../game/store'
 import { ModSkinPicker } from './Skins'
 import { MODS, MOD_SLOTS, SKINNED_SLOTS, modSlotsFor, type SkinnedSlot, carDef, modFits, fittedMods, modDef, ownedMods, performance, type ModDef, type ModSlot } from '../game/data'
 
@@ -44,6 +44,7 @@ export function ModShop({ car, trying, setTrying, skinTry, setSkinTry }: {
   skinTry: { slot: SkinnedSlot; skin: string | null } | null; setSkinTry: (t: { slot: SkinnedSlot; skin: string | null } | null) => void
 }) {
   const level = useGame((s) => s.level)
+  const gate = useGame(gateLevel)
   const modCar = useGame((s) => s.modCar)
   const deals = useGame((s) => s.deals)
   const def = carDef(car.model)
@@ -79,7 +80,7 @@ export function ModShop({ car, trying, setTrying, skinTry, setSkinTry }: {
         {MODS.filter((m) => m.slot === slot && modFits(m, def.body)).sort(byPrice).map((m) => {
           const fitted = fit[slot] === m.id
           const have = owned.includes(m.id)
-          const locked = !have && level < m.unlockLevel
+          const locked = !have && gate < m.unlockLevel
           const pi = performance(def, car.upgrades, withMod(car.mods, m.id))
           const gain = pi - basePi
           const deal = modPrice({ deals, level }, m.id)

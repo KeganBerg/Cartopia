@@ -1,4 +1,4 @@
-import { useGame, liveDeal, paintPrice, type OwnedCar } from '../game/store'
+import { useGame, liveDeal, paintPrice, type OwnedCar, gateLevel } from '../game/store'
 import { FINISHES, PAINTS, STRIPES, dealOffer, finishDef, paintJobCost, type Finish, type PaintJob } from '../game/data'
 import { CLASS_TIERS, carClassTier } from '../game/mastery'
 import { PAINTS_TO_COLLECT, earnHint, paintOpen, paintsOpen, rivalForPaint } from '../game/paintRivals'
@@ -22,6 +22,7 @@ const SHEEN = {
 // Paint shop for one car: tap a colour, finish or stripe to try it on the preview, then buy the lot.
 export function PaintShop({ car, job, setJob }: { car: OwnedCar; job: PaintJob; setJob: (j: PaintJob | null) => void }) {
   const level = useGame((s) => s.level)
+  const gate = useGame(gateLevel)
   const paintCar = useGame((s) => s.paintCar)
   const deals = useGame((s) => s.deals)
   const rivalRow = useGame((s) => s.rivalRow)
@@ -67,7 +68,7 @@ export function PaintShop({ car, job, setJob }: { car: OwnedCar; job: PaintJob; 
         {FINISHES.map((f) => {
           const earn = f.mastery ? CLASS_TIERS[f.mastery - 1] : undefined
           const shut = !!earn && tier < f.mastery! && now.finish !== f.id
-          const locked = (level < f.unlockLevel && now.finish !== f.id) || shut
+          const locked = (gate < f.unlockLevel && now.finish !== f.id) || shut
           return (
             <button
               key={f.id}

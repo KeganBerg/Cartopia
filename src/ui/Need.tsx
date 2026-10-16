@@ -1,4 +1,4 @@
-import { useGame, fuelCap } from '../game/store'
+import { useGame, fuelCap, gateLevel } from '../game/store'
 import { buildingDef, isOpen, xpToNext, raceXp, FUEL_REGEN_SECONDS, RACE_FUEL, refillBucks, type BuildingDef } from '../game/data'
 import { useNow } from '../scene/useNow'
 import { Panel } from './Menus'
@@ -17,7 +17,7 @@ export function NeedPanel() {
 
   const build = (id: string): Source['action'] => {
     const d: BuildingDef = buildingDef(id)
-    if (s.level < d.unlockLevel) return { label: `🔒 Level ${d.unlockLevel}`, run: () => {}, disabled: true }
+    if (gateLevel(s) < d.unlockLevel) return { label: `🔒 Level ${d.unlockLevel}`, run: () => {}, disabled: true }
     if (d.unique && [...s.buildings, ...(s.stored ?? [])].some((b) => b.def === id)) return { label: '✔ Built', run: () => {}, disabled: true }
     return { label: `Build · $${d.price.toLocaleString()}`, run: () => s.openShop(id) }
   }
