@@ -2432,3 +2432,11 @@ body:has(.race-full) .toasts { display: none; }
 .arc-top-row { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 8px; }
 .arc-top-row .arc-weekly { margin: 0; }
 .arc-claim { font: 16px var(--display); background: #43a047; color: #fff; border: none; border-radius: 999px; padding: 6px 14px; box-shadow: 0 3px 0 rgba(0,0,0,.2); animation: pop .3s ease-out; }
+
+/* Social rows keep one compact action on the row instead of a full-width button under it. */
+.board-name { padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; text-align: left; }
+@media (max-width: 600px) {
+  .fr-row.fr-sug { grid-template-columns: 32px minmax(0, 1fr) auto; }
+  .fr-row.fr-sug .leader-acts { grid-column: auto; }
+  .fr-sug .leader-acts > .buy:last-child { flex: none; }
+}

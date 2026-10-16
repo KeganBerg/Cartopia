@@ -17,7 +17,7 @@ export function CrewPartsTile({ uid }: { uid: string | null }) {
   }
   return (
     <div className="rm-tile cr-parts">
-      <span className="rm-tag">PART REQUESTS</span>
+      <span className="rm-tag" title={`Ask your crew for ${CREW_ASK} parts once a day`}>PART REQUESTS</span>
       {mine ? (
         <span className="rm-cta">
           <span>Your ask: ⚙ {mine.given}/{mine.want}</span>
@@ -25,7 +25,7 @@ export function CrewPartsTile({ uid }: { uid: string | null }) {
         </span>
       ) : (
         <span className="rm-cta">
-          <span>Need parts? Ask your crew for {CREW_ASK}.</span>
+          <span>⚙ ×{CREW_ASK}</span>
           <button className="buy small" disabled={busy} onClick={() => run(askCrewParts)}>Ask</button>
         </span>
       )}
