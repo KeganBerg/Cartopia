@@ -309,7 +309,8 @@ function SumTile({ open, sel, paintCar, onPick, onDone }: { open: CrateOpen; sel
   )
 }
 
-export function CratesPanel() {
+// embedded: drawn inside the Cars page (under its header and tabs) instead of over the whole screen.
+export function CratesPanel({ embedded = false }: { embedded?: boolean }) {
   const level = useGame((s) => s.level)
   const coins = useGame((s) => s.coins)
   const bucks = useGame((s) => s.bucks)
@@ -475,14 +476,14 @@ export function CratesPanel() {
     } else if (!ten && !shown) setSkip((k) => k + 1)
   }
   return (
-    <div className="race-full crate-full" onClick={tap}>
+    <div className={embedded ? 'race-full crate-full embedded' : 'race-full crate-full'} onClick={tap}>
       {/* Taps go through the canvas to the screen behind it: "Tap to skip". */}
       <StageSlot cam={CRATE_CAM} through>{scene}</StageSlot>
       <LoadingScene ready={stageReady} label="Opening the Crate Depot" onClose={close} />
       <div className="rf-top">
         <h2>📦 Crate Depot</h2>
         <span className="crate-wallet"><span><CoinIcon size={16} />{compact(coins)}</span><span><BuckIcon size={16} />{compact(bucks)}</span></span>
-        <button className="close" onClick={close} aria-label="Close"><Icon name="close" size={16} /></button>
+        {!embedded && <button className="close" onClick={close} aria-label="Close"><Icon name="close" size={16} /></button>}
       </div>
       {phase === 'open' && !shown && !ten && <div className="crate-skip">Tap to skip</div>}
       {phase === 'open' && shown && open && !ten && (

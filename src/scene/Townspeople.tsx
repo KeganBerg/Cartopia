@@ -14,6 +14,7 @@ import { dogGeo, dogMaterial, headGeo, leashGeo, legGeo, torsoGeo, PERSON } from
 import { dayPhase, nightAmount } from './dayNight'
 import { isNight } from '../game/clock'
 import { CLUB } from './clubLayout'
+import { clubDoors, door } from './clubDoor'
 import { storeDoors, STORE_DEFS } from '../game/storeDoors'
 
 const LEG_SIDES = [-1, 1]
@@ -864,20 +865,27 @@ function bouncers(ctx: Ctx, dt: number) {
         p.timer = rand(0.3, 2)
       }
       ctx.queues.delete(key)
+      const d = clubDoors.get(key)
+      if (d) d.waiting = false
       continue
     }
     const left = (ctx.gates.get(key) ?? rand(6, 10)) - dt
     ctx.gates.set(key, left)
     const first = q[0]
+    // The bouncer (ClubLife) watches whoever's at the front of the rope.
+    const d = door(key, c.center[0], c.center[1])
+    d.waiting = !!first && first.face !== null
     // Only once they've made it to the front of the rope.
-    if (left > 0 || !first || first.face === null) continue
+    if (left > 0 || !d.waiting) continue
     q.shift()
     first.queue = null
     first.face = null
     first.dest = { kind: 'door', key, def: c.dest.def }
-    first.steps = [{ p: clubPoint(c, CLUB.doorX, CLUB.queueZ) }, { p: clubPoint(c, CLUB.doorX, CLUB.doorZ) }]
+    // Round the end of the rope and in front of the canopy pole, then up the carpet.
+    first.steps = [CLUB.inPath.map(([x, z]) => ({ p: clubPoint(c, x, z) })), { p: clubPoint(c, CLUB.doorX, CLUB.doorZ) }].flat()
     first.si = 0
     first.state = 'walk'
+    d.admitted = performance.now() / 1000
     ctx.gates.set(key, rand(8, 15))
   }
 }

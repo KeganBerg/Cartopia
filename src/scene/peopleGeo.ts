@@ -8,7 +8,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 // a fixed shade should come out (eyes, belt, soles), since the tint multiplies.
 
 const c = new Color()
-function paint(g: BufferGeometry, hex: string) {
+export function paint(g: BufferGeometry, hex: string) {
   const geo = g.index ? g.toNonIndexed() : g
   c.set(hex)
   const n = geo.getAttribute('position').count
@@ -18,14 +18,14 @@ function paint(g: BufferGeometry, hex: string) {
   geo.deleteAttribute('uv')
   return geo
 }
-const at = (g: BufferGeometry, x: number, y: number, z: number, rz = 0) => g.rotateZ(rz).translate(x, y, z)
+export const at = (g: BufferGeometry, x: number, y: number, z: number, rz = 0) => g.rotateZ(rz).translate(x, y, z)
 
 // Body: torso with sleeved arms hanging at the sides and a belt. Without
-// `arms`, for a figure that moves its arms itself (armGeo, handGeo).
+// `arms`, for a figure that moves its arms itself (armGeo, handGeo, clubArmGeo).
 export function torsoGeo(arms = true) {
   return mergeGeometries([
     paint(new CapsuleGeometry(0.085, 0.16, 3, 10), '#ffffff'),
-    ...(arms ? [-1, 1] : []).map((s) => paint(at(new CapsuleGeometry(0.028, 0.14, 2, 6), s * 0.107, 0.03, 0, s * 0.12), '#f2f2f2')),
+    ...(arms ? [-1, 1].map((s) => paint(at(new CapsuleGeometry(0.028, 0.14, 2, 6), s * 0.107, 0.03, 0, s * 0.12), '#f2f2f2')) : []),
     paint(at(new CylinderGeometry(0.088, 0.088, 0.022, 10, 1, true), 0, -0.085, 0), '#3a3a3a'),
   ])!
 }
@@ -33,15 +33,18 @@ export function torsoGeo(arms = true) {
 // Head: face with eyes, nose, mouth and ears, a neck, and the hands (they ride
 // with the head's instance, at the ends of the arms; left off without `hands`).
 export function headGeo(hands = true) {
-  return mergeGeometries([
+  return mergeGeometries(headParts(hands))!
+}
+export function headParts(hands = true) {
+  return [
     paint(new SphereGeometry(0.08, 12, 9), '#ffffff'),
     paint(at(new SphereGeometry(0.014, 6, 4), 0, -0.006, 0.079), '#f0f0f0'),
     ...[-1, 1].map((s) => paint(at(new SphereGeometry(0.019, 6, 4), s * 0.078, 0, -0.004), '#eeeeee')),
     ...[-1, 1].map((s) => paint(at(new SphereGeometry(0.011, 6, 4), s * 0.028, 0.014, 0.07), '#1a1a1a')),
     paint(at(new BoxGeometry(0.03, 0.006, 0.01), 0, -0.03, 0.073), '#8a4a4a'),
     paint(at(new CylinderGeometry(0.032, 0.036, 0.05, 8, 1, true), 0, -0.085, 0), '#e6e6e6'),
-    ...(hands ? [-1, 1] : []).map((s) => paint(at(new SphereGeometry(0.026, 6, 5), s * 0.118, -0.285, 0.005), '#ffffff')),
-  ])!
+    ...(hands ? [-1, 1].map((s) => paint(at(new SphereGeometry(0.026, 6, 5), s * 0.118, -0.285, 0.005), '#ffffff')) : []),
+  ]
 }
 
 // A loose sleeved arm hung from its shoulder at the origin, and the hand at its

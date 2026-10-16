@@ -14,6 +14,7 @@ import { SEASON } from './season'
 import { frame, seat, type Bounds } from './fit'
 import { reduceMotionOn } from '../lib/prefs'
 import { quietShaders } from './warm'
+import { copyThumbs } from './thumbCopy'
 import type { Trim } from '../game/trim'
 
 // Shop, showroom and garage thumbnails are live 3D renders. One hidden WebGL
@@ -261,13 +262,7 @@ function Renderer() {
     gl.setScissorTest(false)
 
     // Copy in the same frame, before the browser discards the drawing buffer.
-    for (const n of need.values()) {
-      for (const s of n.slots) {
-        const ctx = s.ctx!
-        ctx.clearRect(0, 0, s.canvas.width, s.canvas.height)
-        ctx.drawImage(src, n.x, n.y, n.w, n.h, 0, 0, s.canvas.width, s.canvas.height)
-      }
-    }
+    copyThumbs(src, width, height, need.values())
   }, 1)
 
   return (
