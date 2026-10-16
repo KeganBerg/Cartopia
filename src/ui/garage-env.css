@@ -51,10 +51,18 @@
 .garage-env.sec-book div.garage { grid-template-columns: 0 1fr min(560px, 46vw); }
 .garage-env.sec-book .garage-detail .book { padding: 0; }
 
-/* Crate Depot: drawn inside the page under the header and tabs, not over the whole screen. */
-.cars-crates { position: relative; flex: 1; min-height: 0; }
+/* Crate Depot: through the room's roller door, drawn under the tabs (top set by CarsPage) and over
+   the room. It waits unseen while the camera walks to the door, then fades in (DEPOT_FADE). */
+.cars-crates { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; transition: opacity .42s ease; }
 .cars-crates > .crate-full.embedded { position: absolute; inset: 0; z-index: 0; }
 .crate-full.embedded .rf-top h2 { visibility: hidden; }
+.trip-out .cars-crates, .trip-back .cars-crates { opacity: 0; pointer-events: none; }
+.trip-wait .cars-crates { pointer-events: none; }
+/* On the walk out the room's menus step aside; on the way back they return as the camera arrives. */
+.garage-env div.garage > :not(.garage-scene), .garage-env .cp-tools, .garage-env .cp-hint { transition: opacity .3s ease; }
+:is(.trip-out, .trip-in, .trip-wait) :is(div.garage > :not(.garage-scene), .cp-tools, .cp-hint) { opacity: 0; pointer-events: none !important; }
+.trip-back div.garage > :not(.garage-scene), .trip-back .cp-tools, .trip-back .cp-hint { animation: trip-ui-in .4s .45s both; }
+@keyframes trip-ui-in { from { opacity: 0; } }
 
 @media (min-width: 601px) and (max-width: 980px) {
   .garage-env { --gl: 210px; --gd: 340px; }
