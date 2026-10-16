@@ -71,7 +71,9 @@ export function SpeedwayLife({ lvl }: { lvl: number }) {
   const [sx, , sz] = useMergeScale()
   // A bigger block has a longer track and longer terraces: fill them, don't grow anyone.
   const k = (sx + sz) / 2
-  const cars = Math.round((2 + Math.ceil(lvl / 2)) * k)
+  // A small field with room between cars (Kegan: fewer cars): 2 at level 1
+  // up to 4 at level 10, more on a merged block's longer lap.
+  const cars = Math.round((2 + Math.floor(lvl / 4)) * k)
   const { seats, aisles, fans } = useMemo(() => speedwayStands(lvl, k), [k, lvl])
   const ns = seats.length, na = aisles.length, n = fans.length
 

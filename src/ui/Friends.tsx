@@ -187,7 +187,7 @@ function FriendRow({ f, on, helped, onVisit }: { f: Friend; on?: LivePlayer; hel
               : <button className="buy small fr-race" disabled={!!outgoing || on.closed || cooldown} onClick={() => void challenge(on.id)} title={on.closed ? 'Not taking races' : 'Challenge to a live race'}>🏁</button>)}
             <GiftButton to={f.id} />
             <PostcardButton to={f.id} name={f.username ? `@${f.username}` : f.townName} />
-            <button className="buy small" onClick={onVisit}>{helped ? 'Visit' : 'Visit & help'}</button>
+            <VisitBtn helped={helped} onVisit={onVisit} />
             <button className="fr-more" aria-label="Unfriend" title="Unfriend" onClick={() => setConfirm(true)}>⋯</button>
           </>
         )}
@@ -196,12 +196,17 @@ function FriendRow({ f, on, helped, onVisit }: { f: Friend; on?: LivePlayer; hel
   )
 }
 
+// Visit a town; 🤝 while its shops can still be helped today.
+function VisitBtn({ helped, onVisit }: { helped: boolean; onVisit: () => void }) {
+  return <button className="buy small alt fr-visit" title={helped ? 'Visit their town' : `Visit and help ${HELPS_PER_TOWN} shops for coins`} onClick={onVisit}>{helped ? '🏠' : '🤝'} Visit</button>
+}
+
 function SuggestRow({ o, canAdd, helped, onVisit }: { o: Leader; canAdd: boolean; helped: boolean; onVisit: () => void }) {
   const name = usePlayerName(o.demo ? null : o.ownerId, o.townName)
   const [sent, setSent] = useState(false)
   const hasName = name.startsWith('@')
   return (
-    <div className="leader fr-row">
+    <div className="leader fr-row fr-sug">
       <Avatar name={name} />
       <div className="leader-main">
         <b>{name}</b>
@@ -211,7 +216,7 @@ function SuggestRow({ o, canAdd, helped, onVisit }: { o: Leader; canAdd: boolean
         {canAdd && hasName && (
           <button className="buy small alt" disabled={sent} onClick={async () => setSent(await addFriend({ id: o.ownerId }))}>{sent ? 'Sent' : '+ Add'}</button>
         )}
-        <button className="buy small" onClick={onVisit}>{helped ? 'Visit' : 'Visit & help'}</button>
+        <VisitBtn helped={helped} onVisit={onVisit} />
       </div>
     </div>
   )

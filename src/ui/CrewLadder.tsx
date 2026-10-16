@@ -9,7 +9,7 @@ import { DEMO } from '../lib/friends'
 import type { Member, MyClan } from '../lib/clans'
 import { useCrewGoal } from './CrewGoal'
 import { PlayerName } from './Username'
-import { useVisit } from './Social'
+import { openPlayerCard } from '../lib/playerCard'
 import { LoadingBand } from './Loading'
 import { artStyle } from './venueArt'
 import './crew.css'
@@ -43,7 +43,7 @@ function RaceBtn({ r, me, online }: { r: Racer; me: string; online: Map<string, 
 }
 
 function Name({ r, me }: { r: Racer; me: string }) {
-  const go = useVisit()
+  const go = (id: string) => openPlayerCard(id, r.name)
   if (r.id === me) return <b className="cl-name">You</b>
   return <button className="cl-name link" onClick={() => !r.demo && go(r.id)}><PlayerName id={r.demo ? null : r.id} town={r.name} /></button>
 }
@@ -81,7 +81,7 @@ export function CrewLadder({ members, uid }: { members: Mate[]; uid: string }) {
 
   return (
     <div className="rm-tile rm-photo cl" style={artStyle('camp', 'main')}>
-      <span className="rm-tag">CREW LADDER</span>
+      <span className="rm-tag" title="Crew races count for the weekly goal and the battle">CREW LADDER</span>
       <div className={`cl-podium n${order.length}`}>
         {order.map((r) => {
           const rank = ladder.indexOf(r)
@@ -122,7 +122,6 @@ export function CrewLadder({ members, uid }: { members: Mate[]; uid: string }) {
           {up && myRank > 1 && <RaceBtn r={up.racer} me={uid} online={online} />}
         </span>
       )}
-      <span className="cl-foot">🛡️ Crew races count for the weekly goal and the battle</span>
     </div>
   )
 }

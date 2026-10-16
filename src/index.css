@@ -1921,7 +1921,7 @@ button.book-car { font: inherit; color: inherit; }
 .meet-car { all: unset; cursor: pointer; border-radius: 8px; }
 .meet-car:hover .thumb3d, .meet-car:focus-visible .thumb3d { box-shadow: 0 0 0 2px #2f7ff0; }
 .pc-overlay { z-index: 120; }
-.pc-card { width: min(460px, 100%); }
+.pc-card { width: min(820px, 100%); }
 .pc-card .panel-body { display: flex; flex-direction: column; gap: 8px; }
 .pc-crew { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 800; color: #263238; background: #fff; border: 2px solid var(--crew, #607d8b); border-radius: 999px; padding: 2px 12px 2px 4px; }
 .pc-emblem { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--crew, #607d8b); font-size: 15px; }
@@ -1930,9 +1930,9 @@ button.book-car { font: inherit; color: inherit; }
 .pc-stat span { font-size: 20px; line-height: 1.2; }
 .pc-stat b { font: 20px var(--display); color: #14213d; }
 .pc-view { position: relative; }
-.pc-view .car-preview { height: 210px; margin: 0; background: radial-gradient(ellipse at 50% 75%, #ffffff 0 30%, #dbe8f7 80%); }
+.pc-view .car-preview { height: clamp(260px, 50vh, 470px); margin: 0; background: radial-gradient(ellipse at 50% 75%, #ffffff 0 30%, #dbe8f7 80%); }
 .pc-car-name { position: absolute; left: 10px; top: 8px; right: 60px; flex-wrap: wrap; display: flex; align-items: center; gap: 6px; pointer-events: none; }
-.pc-car-name b { font: 17px var(--display); color: #14213d; text-shadow: 0 1px 0 #fff; }
+.pc-car-name b { font: 20px var(--display); color: #14213d; text-shadow: 0 1px 0 #fff; }
 .pc-pi { background: #14213d; color: #ffd84a; border-radius: 6px; padding: 1px 6px; font: 900 13px Nunito, sans-serif; white-space: nowrap; }
 .pc-strip { display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 4px; scroll-snap-type: x proximity; }
 .pc-chip { flex: none; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 2px; border: 2px solid #e0e0e0; border-radius: 10px; background: #fff; cursor: pointer; scroll-snap-align: start; }
@@ -1943,7 +1943,7 @@ button.book-car { font: inherit; color: inherit; }
 .pc-acts { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .pc-visit { flex: 1; font-size: 20px; padding: 10px 14px; }
 @media (max-width: 560px) {
-  .pc-view .car-preview { height: 190px; }
+  .pc-view .car-preview { height: clamp(240px, 44vh, 400px); }
 }
 /* Friend ghost races */
 .ghost-btn { background: #7e57c2; }
@@ -2421,3 +2421,11 @@ body:has(.race-full) .toasts { display: none; }
 .arc-top-row { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 8px; }
 .arc-top-row .arc-weekly { margin: 0; }
 .arc-claim { font: 16px var(--display); background: #43a047; color: #fff; border: none; border-radius: 999px; padding: 6px 14px; box-shadow: 0 3px 0 rgba(0,0,0,.2); animation: pop .3s ease-out; }
+
+/* Social rows keep one compact action on the row instead of a full-width button under it. */
+.board-name { padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; text-align: left; }
+@media (max-width: 600px) {
+  .fr-row.fr-sug { grid-template-columns: 32px minmax(0, 1fr) auto; }
+  .fr-row.fr-sug .leader-acts { grid-column: auto; }
+  .fr-sug .leader-acts > .buy:last-child { flex: none; }
+}

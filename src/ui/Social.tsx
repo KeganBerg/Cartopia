@@ -20,7 +20,9 @@ import { CrewLadder, demoCrew } from './CrewLadder'
 import { CrewBattleTile, CrewGoalTile, CrewHero, LastWeekChests } from './CrewHub'
 import { CrewPartsTile } from './CrewParts'
 import { CREW_DEMO, useCrewMates } from '../lib/crewRaces'
-import { CrewMembers } from './CrewMembers'
+import { CrewMembers, useRequests } from './CrewMembers'
+import { PlayerCardPopup } from './PlayerCard'
+import { openPlayerCard } from '../lib/playerCard'
 import { sfx } from '../lib/sound'
 
 // The crew battle strip brings the battle screen's code; it loads when a battle shows.
@@ -185,14 +187,16 @@ export function LeadersPanel() {
               <div key={l.ownerId} className={l.mine ? 'leader board-row mine' : 'leader board-row'}>
                 <span className={`rank r${i + 1}`}>{i + 1}</span>
                 <div className="leader-main">
-                  <b><PlayerName id={l.demo ? null : l.ownerId === 'me' ? uid : l.ownerId} town={l.townName} />{l.mine ? ' (you)' : ''}</b>
+                  <b>{l.demo || l.mine ? <PlayerName id={l.demo ? null : l.ownerId === 'me' ? uid : l.ownerId} town={l.townName} /> : (
+                    <button className="link board-name" onClick={() => openPlayerCard(l.ownerId, l.townName)}><PlayerName id={l.ownerId} town={l.townName} /></button>
+                  )}{l.mine ? ' (you)' : ''}</b>
                   <div className="card-stat">
                     <ClanTag clan={l.clan} small /> Lvl {l.level}{l.demo ? ' · neighbour' : ''}
                   </div>
                 </div>
                 <span className="board-value">{unit.icon} {period === 'week' ? '+' : ''}{n(statOf(l, metric, period))}</span>
                 {!l.mine ? (
-                  <button className="buy small" onClick={() => go(l.ownerId)}>Visit</button>
+                  <button className="buy small alt" title="Visit their town" onClick={() => go(l.ownerId)}>🏠</button>
                 ) : <span />}
               </div>
             ))}
@@ -225,6 +229,7 @@ export function LeadersPanel() {
           </div>
         </>
       )}
+      <PlayerCardPopup />
     </Panel>
   )
 }
@@ -280,6 +285,7 @@ export function ClanPanel() {
       ) : (
         <><CrewHouseNudge /><LastWeekChests /><ClanBrowser onJoined={changed} /></>
       )}
+      <PlayerCardPopup />
     </Panel>
   )
 }
@@ -306,6 +312,16 @@ function CrewHouseNudge() {
   )
 }
 
+// The crew home shows one section at a time: the ladder, this week (battle, goal, parts), members.
+type CrewSub = 'ladder' | 'week' | 'members'
+const CREW_SUBS: { id: CrewSub; icon: string; label: string }[] = [
+  { id: 'ladder', icon: '🏁', label: 'Ladder' },
+  { id: 'week', icon: '⚔️', label: 'This week' },
+  { id: 'members', icon: '👥', label: 'Members' },
+]
+// The section stays picked while the window is closed and reopened.
+let lastSub: CrewSub = 'ladder'
+
 function ClanHome({ data, uid, onChange, demo = false }: { data: MyClan; uid: string; onChange: () => void; demo?: boolean }) {
   const { clan, members, role } = data
   const toast = useGame((s) => s.toast)
@@ -313,6 +329,11 @@ function ClanHome({ data, uid, onChange, demo = false }: { data: MyClan; uid: st
   const [editing, setEditing] = useState(false)
   const [rank, setRank] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
+  const [sub, setSub] = useState<CrewSub>(lastSub)
+  const [reloadAsks, setReloadAsks] = useState(0)
+  const [asks, setAsks] = useRequests(isOfficer(role), demo, reloadAsks)
+  const chests = useCrewGoal((g) => g.ready) + useCrewBattle((b) => b.ready)
+  const pick = (s: CrewSub) => { sfx.click(); lastSub = s; setSub(s) }
 
   useEffect(() => {
     fetchClans('power', 'all').then((cs) => {
@@ -338,18 +359,29 @@ function ClanHome({ data, uid, onChange, demo = false }: { data: MyClan; uid: st
   return (
     <div className="clan-home cr-home">
       <CrewHero clan={clan} rank={rank} />
-      <div className="cr-grid">
-        <CrewLadder members={members} uid={uid} />
-        <div className="cr-side">
+      <div className="seg cr-tabs" role="tablist">
+        {CREW_SUBS.map((s) => {
+          const dot = s.id === 'week' ? chests : s.id === 'members' ? asks.length : 0
+          return (
+            <button key={s.id} role="tab" aria-selected={sub === s.id} className={sub === s.id ? 'sel' : ''} onClick={() => pick(s.id)}>
+              <span className="seg-ico">{s.icon}</span>{s.label}{dot > 0 && <span className="tab-dot">{dot}</span>}
+            </button>
+          )
+        })}
+      </div>
+
+      {sub === 'ladder' && <CrewLadder members={members} uid={uid} />}
+      {sub === 'week' && (
+        <div className="cr-week">
           <CrewBattleTile />
           <CrewGoalTile />
           <CrewPartsTile uid={uid} />
         </div>
-      </div>
-
+      )}
+      {sub === 'members' && (<>
       {editing && isOfficer(role) && <ClanEditor clan={clan} onDone={() => { setEditing(false); onChange() }} />}
 
-      <CrewMembers data={data} uid={uid} onChange={onChange} demo={demo} />
+      <CrewMembers data={data} uid={uid} onChange={onChange} demo={demo} requests={{ asks, setAsks, reload: () => setReloadAsks((k) => k + 1) }} />
 
       <div className="clan-actions">
         {isOfficer(role) && !editing && <button className="buy small alt" onClick={() => setEditing(true)}>⚙️ Crew settings</button>}
@@ -363,6 +395,7 @@ function ClanHome({ data, uid, onChange, demo = false }: { data: MyClan; uid: st
           </div>
         )}
       </div>
+      </>)}
     </div>
   )
 }

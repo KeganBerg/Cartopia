@@ -4,11 +4,11 @@ import { sfx } from '../lib/sound'
 import { useLive } from '../lib/live'
 import { playerName } from '../lib/profiles'
 import {
-  JOIN_MODES, RANKS, canRemove, canSetRank, fetchCrewRequests, fetchPlayers, isOfficer, kickMember, respondRequest, setRank,
+  JOIN_MODES, RANKS, canRemove, canSetRank, fetchCrewRequests, fetchPlayers, kickMember, respondRequest, setRank,
   type BoardRow, type Member, type MyClan, type Rank,
 } from '../lib/clans'
 import { PlayerName } from './Username'
-import { useVisit } from './Social'
+import { openPlayerCard } from '../lib/playerCard'
 import './crew.css'
 
 // The bottom of the Crew window: join requests for the Leader and Co-Leaders, then every member
@@ -16,7 +16,7 @@ import './crew.css'
 
 const n = (v: number) => v.toLocaleString()
 
-type Ask = { id: string; row: BoardRow | null }
+export type Ask = { id: string; row: BoardRow | null }
 
 export function RankBadge({ rank }: { rank: Rank }) {
   const r = RANKS[rank]
@@ -29,7 +29,7 @@ const DEMO_ASKS: Ask[] = [
 ]
 
 // Join requests waiting on this crew. Officers only; the demo crew shows two.
-function useRequests(on: boolean, demo: boolean, key: number) {
+export function useRequests(on: boolean, demo: boolean, key: number) {
   const [asks, setAsks] = useState<Ask[]>([])
   useEffect(() => {
     if (!on) return setAsks([])
@@ -46,14 +46,15 @@ function useRequests(on: boolean, demo: boolean, key: number) {
   return [asks, setAsks] as const
 }
 
-export function CrewMembers({ data, uid, onChange, demo = false }: { data: MyClan; uid: string; onChange: () => void; demo?: boolean }) {
+type Requests = { asks: Ask[]; setAsks: (f: (l: Ask[]) => Ask[]) => void; reload: () => void }
+
+export function CrewMembers({ data, uid, onChange, demo = false, requests }: { data: MyClan; uid: string; onChange: () => void; demo?: boolean; requests: Requests }) {
   const { clan, members, role } = data
   const toast = useGame((s) => s.toast)
-  const go = useVisit()
+  const go = (id: string, town: string) => openPlayerCard(id, town)
   const players = useLive((l) => l.players)
   const online = useMemo(() => new Set(players.map((p) => p.uid).filter(Boolean)), [players])
-  const [reload, setReload] = useState(0)
-  const [asks, setAsks] = useRequests(isOfficer(role), demo, reload)
+  const { asks, setAsks, reload } = requests
   const [open, setOpen] = useState<string | null>(null)
   // A second tap on the same action confirms it (Remove, hand over the lead).
   const [sure, setSure] = useState<string | null>(null)
@@ -71,7 +72,7 @@ export function CrewMembers({ data, uid, onChange, demo = false }: { data: MyCla
       setOpen(null)
       setSure(null)
       onChange()
-      setReload((k) => k + 1)
+      reload()
     } catch (e) {
       sfx.error()
       toast((e as Error).message)
@@ -128,7 +129,7 @@ export function CrewMembers({ data, uid, onChange, demo = false }: { data: MyCla
             <div key={a.id} className="cm-row ask">
               <span className="cm-rank ask" aria-hidden>✋</span>
               <div className="cm-main">
-                <button className="cm-name link" onClick={() => !demo && go(a.id)}><PlayerName id={demo ? null : a.id} town={a.row?.townName ?? 'Driver'} /></button>
+                <button className="cm-name link" onClick={() => !demo && go(a.id, a.row?.townName ?? 'Driver')}><PlayerName id={demo ? null : a.id} town={a.row?.townName ?? 'Driver'} /></button>
                 <small>⭐ {a.row?.level ?? '?'} · ⚡ {n(a.row?.power ?? 0)}</small>
               </div>
               <div className="cm-acts">
@@ -142,7 +143,6 @@ export function CrewMembers({ data, uid, onChange, demo = false }: { data: MyCla
 
       <div className="cm-head">
         <span className="rm-tag">MEMBERS</span>
-        <span className="cr-chip" title="Members">👥 {members.length}/{clan.memberCap}</span>
         <span className="cr-chip" title={mode.tip}>{mode.icon} {mode.label}</span>
       </div>
       <div className="cm-list">
@@ -154,11 +154,11 @@ export function CrewMembers({ data, uid, onChange, demo = false }: { data: MyCla
               <RankBadge rank={m.role} />
               <div className="cm-main">
                 {me ? <b className="cm-name">You</b> : (
-                  <button className="cm-name link" onClick={() => !demo && go(m.ownerId)}>
+                  <button className="cm-name link" onClick={() => !demo && go(m.ownerId, m.townName)}>
                     <PlayerName id={demo ? null : m.ownerId} town={m.townName} />
                   </button>
                 )}
-                <small>{online.has(m.ownerId) && !me && <i className="cm-on" title="Online" />}{m.role !== 'member' && <em className={`cm-rk r-${m.role}`}>{RANKS[m.role].label}</em>}⭐ {m.level} · ⚡ {n(m.power)} · 🏁 {n(m.raceWins)}</small>
+                <small>{online.has(m.ownerId) && !me && <i className="cm-on" title="Online" />}{m.role !== 'member' && <em className={`cm-rk r-${m.role}`}>{RANKS[m.role].label}</em>}⭐ {m.level} · ⚡ {n(m.power)}</small>
               </div>
               {acts.length > 0 && (
                 open === m.ownerId
