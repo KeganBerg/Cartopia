@@ -28,17 +28,14 @@ export function CrewHero({ clan, rank }: { clan: Clan; rank: number | null }) {
   const unread = useChat((c) => c.unread.crew)
   return (
     <div className="cr-hero" style={{ '--crew': clan.color } as React.CSSProperties}>
-      <Crest emblem={clan.emblem} color={clan.color} size={78} />
+      <Crest emblem={clan.emblem} color={clan.color} size={60} />
       <div className="cr-hero-mid">
-        <span className="rm-tag">CREW · {clan.tag}</span>
-        <b className="rm-ttl">{clan.name}</b>
-        {clan.description && <span className="rm-bub">{clan.description}</span>}
+        <b className="rm-ttl" title={clan.description || undefined}>{clan.name}</b>
         <span className="cr-chips">
-          <span className="cr-chip">👥 {clan.members}/{clan.memberCap}</span>
-          {rank && <span className="cr-chip gold">#{rank}</span>}
-          {METRICS.map((m) => (
-            <span key={m.id} className="cr-chip" data-m={m.id} title={m.label}>{m.icon} {compact(clan.total[m.id])}{clan.week[m.id] > 0 && <em>+{compact(clan.week[m.id])}</em>}</span>
-          ))}
+          <span className="cr-chip" title="Crew tag">{clan.tag}</span>
+          <span className="cr-chip" title="Members">👥 {clan.members}/{clan.memberCap}</span>
+          {rank && <span className="cr-chip gold" title="Crew rank by power">#{rank}</span>}
+          <span className="cr-chip" title={`Power${clan.week.power > 0 ? `: +${compact(clan.week.power)} this week` : ''}`}>{METRICS[0].icon} {compact(clan.total.power)}</span>
         </span>
       </div>
       <button className="buy alt cr-chat" onClick={() => openChat('crew')}>💬<span>Chat</span>{unread > 0 && <span className="tab-dot">{unread > 9 ? '9+' : unread}</span>}</button>
@@ -75,7 +72,7 @@ export function CrewBattleTile() {
         <Side s={b.them} score={b.them.score} lead={b.them.score > b.us.score} />
       </div>
       <span className="cr-tug" style={{ '--us': b.us.color, '--them': b.them.color, '--split': `${(share * 100).toFixed(1)}%` } as React.CSSProperties}><i /><i /></span>
-      <span className="rm-cta"><span>vs {b.them.name} · {v.icon} {v.name}</span><button className="buy small" onClick={(e) => { e.stopPropagation(); openPanel('battle') }}>Open</button></span>
+      <span className="cr-bfoot">{v.icon} {v.name}<b>›</b></span>
     </div>
   )
 }
@@ -100,7 +97,7 @@ export function CrewGoalTile() {
         <span className="cr-goal-nums">
           <b className="rm-ttl">{w.points.toLocaleString()}<small> / {w.target.toLocaleString()}</small></b>
           <span className="rm-progress"><i style={{ width: `${pct}%` }} /></span>
-          <small>🍕 job +{CREW_POINTS.job} · 🏁 race +{CREW_POINTS.race} · you {w.mine}</small>
+          <small title={`🍕 job +${CREW_POINTS.job} · 🏁 race +${CREW_POINTS.race}`}>You {w.mine.toLocaleString()}</small>
         </span>
       </div>
       {last ? (

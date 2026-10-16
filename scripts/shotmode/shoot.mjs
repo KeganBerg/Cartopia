@@ -1,0 +1,33 @@
+// Screenshot mode in the free camera: menus on, menus hidden, and back after a tap.
+// node scripts/shotmode/shoot.mjs <outDir>   (needs `npx vite` on :5173)
+import { chromium } from 'playwright'
+const [, , out] = process.argv
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] })
+for (const [form, size] of [['desktop', { width: 1280, height: 800 }], ['phone', { width: 390, height: 844 }]]) {
+  const p = await b.newPage({ viewport: size, deviceScaleFactor: form === 'phone' ? 2 : 1, isMobile: form === 'phone', hasTouch: form === 'phone' })
+  await p.addInitScript(() => { localStorage.setItem('cartopia-flash-warning-hide', '1'); localStorage.setItem('cartopia-freecam-tips', '9') })
+  p.on('pageerror', (e) => console.log('error', e.message))
+  await p.goto('http://localhost:5173/?time=0.35&season=fall')
+  await p.waitForFunction(() => window.__game, null, { timeout: 120000 })
+  await p.waitForTimeout(3000)
+  await p.evaluate(() => window.__game.setState({ tutorial: 99, level: 24, coins: 250000, panel: null, lastDaily: new Date().toISOString().slice(0, 10) }))
+  await p.waitForTimeout(1500)
+  await p.$eval('.cam-dock', (el) => el.click())
+  await p.waitForTimeout(6000)
+  await p.evaluate(() => window.__game.getState().toast('Toasts hide too'))
+  await p.waitForTimeout(500)
+  await p.screenshot({ path: `${out}/${form}-1-free-cam.png`, timeout: 180000 })
+  await p.$eval('[aria-label="Screenshot mode"]', (el) => el.click())
+  await p.waitForTimeout(400)
+  await p.screenshot({ path: `${out}/${form}-2-hint.png`, timeout: 180000 })
+  await p.waitForTimeout(2500)
+  await p.screenshot({ path: `${out}/${form}-3-screenshot-mode.png`, timeout: 180000 })
+  console.log(form, 'hidden', await p.evaluate(() => document.documentElement.classList.contains('shot')))
+  if (form === 'phone') await p.touchscreen.tap(200, 400)
+  else await p.keyboard.press('Escape')
+  await p.waitForTimeout(800)
+  console.log(form, 'after', await p.evaluate(() => ({ shot: document.documentElement.classList.contains('shot'), free: !!document.querySelector('.cam-dock.on'), panel: window.__game.getState().panel })))
+  await p.screenshot({ path: `${out}/${form}-4-back.png`, timeout: 180000 })
+  await p.close()
+}
+await b.close()

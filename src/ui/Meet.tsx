@@ -115,7 +115,7 @@ function DisplayRow({ d }: { d: Display }) {
       </div>
       <div className="leader-acts">
         <LikeButton owner={d.ownerId} />
-        <button className="buy small" onClick={go}>Visit</button>
+        <button className="buy small alt" title="Visit their town" onClick={go}>🏠 Visit</button>
       </div>
     </div>
   )

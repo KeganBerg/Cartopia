@@ -1,0 +1,32 @@
+/* Shop building tabs (Menus.tsx ShopPanel): a grid of cards, each a big 3D model, its name, what it
+   makes as icon chips, and one price button. Matches the Upgrades tab's cards. */
+.shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(178px, 1fr)); gap: 12px 10px; padding-top: 6px; }
+:root .shop-card { justify-content: flex-start; gap: 5px; padding: 8px 8px 10px; border: 3px solid var(--line, #14213d); border-radius: 18px; box-shadow: 0 4px 0 rgba(20,33,61,.3); color: var(--line, #14213d); }
+:root button.shop-card:hover:not(:disabled) { border-color: #2f7ff0; box-shadow: 0 4px 0 #2f7ff0; }
+.shop-card:active:not(:disabled) { transform: translateY(2px); }
+.shop-card .thumb3d { --th: 112px; width: 100%; background: #dcecfb; border-radius: 12px; }
+.shop-card.broke .thumb3d { background: #fde3e5; }
+.shop-card .card-name { font-size: 17px; line-height: 1.1; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shop-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; min-height: 22px; }
+.shop-chips span { display: inline-flex; align-items: center; gap: 1px; padding: 2px 6px; background: #eef3fa; border-radius: 999px; font: 900 13px Nunito, sans-serif; white-space: nowrap; }
+.shop-chips .c-coin { background: #fff2c2; color: #7a5200; }
+.shop-chips .c-coin em { font-style: normal; color: #455a64; margin-left: 2px; }
+.shop-chips .c-fuel { background: #ffe5e3; color: #b3261e; }
+.shop-chips .c-cap { background: #e3f6e4; color: #1d6b22; }
+.shop-card .feature-line { font-size: 12px; line-height: 1.2; }
+.shop-card > .price { margin-top: auto; align-self: stretch; padding: 6px 10px; border-radius: 12px; font: 17px var(--display); color: #fff; background: linear-gradient(#8ef05c, #2fae35); border: 2px solid #1d6b22; text-shadow: 0 1.5px 0 rgba(0,0,0,.35); box-shadow: inset 0 2px 0 rgba(255,255,255,.4), 0 2px 0 rgba(0,0,0,.2); }
+.shop-card > .price s { opacity: .75; font-size: 13px; margin-right: 4px; }
+.shop-card > .price.bucks { background: linear-gradient(#5aa9ff, #2263d6); border-color: #123d8a; }
+.shop-card.broke > .price { background: linear-gradient(#ff8a8a, #d6283b); border-color: #8a1020; }
+.shop-card.locked > .price, .shop-card:disabled > .price { background: #eceff1; border-color: #b0bec5; color: #546e7a; text-shadow: none; }
+/* Pills sit on the card's top edge. */
+.shop-card .ribbon { top: -11px; z-index: 1; font: 12px/1 var(--display); letter-spacing: .5px; padding: 4px 10px; border: 2px solid var(--line, #14213d); border-radius: 9px; }
+.shop-card .ribbon.deal { left: auto; right: 8px; transform: none; }
+
+@media (max-width: 600px) {
+  .shop-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 8px; }
+  .shop-card .thumb3d { --th: 92px; }
+  .shop-card .card-name { font-size: 15px; }
+  .shop-chips span { font-size: 12px; padding: 2px 5px; }
+  .shop-card > .price { font-size: 15px; }
+}
