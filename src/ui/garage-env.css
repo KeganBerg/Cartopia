@@ -9,9 +9,9 @@
 
 /* Category tabs as a dark strip over the room. */
 .garage-env .sheet-tabs { position: relative; top: 0; z-index: 3; margin: 0; padding: 8px 14px; background: rgba(15, 20, 29, .72); border-bottom: 0; }
-.garage-env .sheet-tabs button:not(.sel):not(.sheet-more) { background: rgba(255, 255, 255, .88); }
-/* The "more tabs" arrow stays the blue round button, fading into the dark bar instead of a white glow. */
-:root .garage-env .sheet-tabs .sheet-more { box-shadow: -14px 0 12px 4px rgba(15, 20, 29, .9), 0 3px 0 rgba(0,0,0,.3); }
+.garage-env .sheet-tabs button:not(.sel, .sheet-more) { background: rgba(255, 255, 255, .88); }
+/* The More-tabs arrow keeps its own blue and blends into this strip, not the light sheet. */
+.garage-env .sheet-tabs .sheet-more { box-shadow: -14px 0 12px 4px rgba(15, 20, 29, .9), 0 3px 0 rgba(0,0,0,.3); }
 
 .garage-env div.garage { position: static; flex: 1; min-height: 0; display: grid; grid-template-columns: var(--gl) 1fr var(--gd); grid-template-rows: minmax(0, 1fr); gap: 12px; padding: 12px; pointer-events: none; }
 .garage-env div.garage > * { pointer-events: auto; }
@@ -19,7 +19,8 @@
 /* The room, behind everything (the tabs included). */
 .garage-env .garage-scene { position: absolute; inset: 0; z-index: 0; }
 .garage-env .garage-scene .car-preview { position: absolute; inset: 0; height: 100%; margin: 0; border-radius: 0; background: var(--env-bg); }
-.garage-env .garage-scene .cp-tools { top: 12px; right: calc(var(--gd) + 24px); }
+/* The room runs under the tab strip, so the tools sit below it (not hidden behind it). */
+.garage-env .garage-scene .cp-tools { top: 76px; right: calc(var(--gd) + 24px); }
 .garage-env .garage-scene .cp-hint { left: calc(var(--gl) + (100% - var(--gl) - var(--gd)) / 2); bottom: 16px; font-size: 13px; padding: 4px 12px; }
 
 /* The open middle: drags pass through to the room, the PI badge and the dyno sit on it. */

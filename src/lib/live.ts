@@ -303,7 +303,7 @@ async function openLobby(uid: string) {
         return
       }
       if (!payload.accept) {
-        useLive.setState((l) => ({ cooldownTo: { ...l.cooldownTo, [out.to]: Date.now() + COOLDOWN_MS } }))
+        startCooldown(out.to)
         sfx.error()
         return useGame.getState().toast('Challenge declined')
       }
@@ -324,6 +324,21 @@ export function leaveLobby() {
 
 export function refreshPresence() {
   lobby?.track(myCard())
+}
+
+// No re-challenging someone for a minute after they decline or ignore you. The entry is dropped when
+// it ends so the store changes and every Live button (friends, crew ladder, race menu) turns back on;
+// they read it with Date.now() while rendering, so nothing else would redraw them.
+export function startCooldown(to: string) {
+  const until = Date.now() + COOLDOWN_MS
+  useLive.setState((l) => ({ cooldownTo: { ...l.cooldownTo, [to]: until } }))
+  setTimeout(() => {
+    if (useLive.getState().cooldownTo[to] !== until) return
+    useLive.setState((l) => {
+      const { [to]: _, ...rest } = l.cooldownTo
+      return { cooldownTo: rest }
+    })
+  }, COOLDOWN_MS + 50)
 }
 
 // stake: coins to bet on a drag race (wager match), held by the server once they accept.
@@ -353,7 +368,8 @@ export async function challenge(to: string, mode: LiveMode = 'drag', stake?: num
   // Give up if nobody answers.
   setTimeout(() => {
     if (useLive.getState().outgoing?.raceId === raceId) {
-      useLive.setState((s) => ({ outgoing: null, cooldownTo: { ...s.cooldownTo, [to]: Date.now() + COOLDOWN_MS } }))
+      useLive.setState({ outgoing: null })
+      startCooldown(to)
       useGame.getState().toast('No answer to your challenge')
     }
   }, INVITE_MS)
