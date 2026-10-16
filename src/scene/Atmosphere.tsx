@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import {
-  AdditiveBlending, BufferAttribute, Color, DoubleSide, InstancedBufferAttribute, InstancedBufferGeometry, Mesh, Object3D, OrthographicCamera,
+  AdditiveBlending, BufferAttribute, Color, DoubleSide, InstancedBufferAttribute, InstancedBufferGeometry, Mesh, Object3D, type Camera,
   ShaderMaterial, Vector3,
 } from 'three'
 import { weatherNow } from '../game/weather'
 import { dayPhase, lampHalo, nightAmount } from './dayNight'
 import { lightDir } from './look'
 import { skyUniforms } from './weatherLook'
-import { frameFor, type Frame } from './Weather'
 import { isFree } from './freeCam'
 import { lowSun, sky, skyFx } from './skyFx'
 import { fogUniforms } from './heightFog'
@@ -82,6 +81,19 @@ function GroundFog() {
 }
 
 // ---------- Rainbow ----------
+// Seen from above the bow is a fixed size in the world, arched over the middle of town.
+export const BOW_RADIUS = 18
+const bowUp = new Vector3()
+const bowBack = new Vector3()
+export function placeBow(obj: Object3D, camera: Camera) {
+  bowUp.set(0, 1, 0).applyQuaternion(camera.quaternion)
+  camera.getWorldDirection(bowBack)
+  obj.quaternion.copy(camera.quaternion)
+  // Feet a little below the town centre on screen, pulled towards the camera so it hangs over the roofs.
+  obj.position.set(0, 0, 0).addScaledVector(bowUp, -BOW_RADIUS * 0.25).addScaledVector(bowBack, -40)
+  obj.scale.setScalar(BOW_RADIUS)
+}
+
 // A bow over the town once a shower passes and the sun comes out. Seen from
 // above it arches across the top of the screen; in the free view it stands far
 // off, opposite the sun.
@@ -135,8 +147,6 @@ function Rainbow() {
     return mesh
   }, [])
   useEffect(() => () => { mesh.geometry.dispose(); (mesh.material as ShaderMaterial).dispose() }, [mesh])
-  const frame = useMemo<Frame>(() => ({ center: new Vector3(), span: 60, top: 22, px: 0.03 }), [])
-  const up = useMemo(() => new Vector3(), [])
   const away = useMemo(() => new Vector3(), [])
   useFrame(() => {
     const o = sky.rainbow
@@ -154,19 +164,9 @@ function Rainbow() {
       mat.uniforms.uOpacity.value = o * 0.32
       return
     }
-    // From above: in the air between the camera and the town, arching over the top of the screen.
-    frameFor(camera, frame, false)
-    const cam = camera as OrthographicCamera
-    const h = (cam.top - cam.bottom) / cam.zoom
-    const w = (cam.right - cam.left) / cam.zoom
-    up.set(0, 1, 0).applyQuaternion(cam.quaternion)
-    // Its top sits in the upper part of the view, both feet in sight.
-    const r = Math.min(w * 0.4, h * 0.75)
-    mesh.quaternion.copy(cam.quaternion)
-    mesh.position.copy(frame.center).addScaledVector(up, h * 0.3 - r * 0.96)
-    // Pulled towards the camera so it hangs in the air over the roofs.
-    mesh.position.addScaledVector(cam.getWorldDirection(away), -40)
-    mesh.scale.setScalar(r)
+    // From above: a fixed bow standing over the town, so zooming and panning
+    // move past it like everything else instead of resizing it.
+    placeBow(mesh, camera)
     mat.depthTest = false
     mat.uniforms.uOpacity.value = o * 0.55
   })
