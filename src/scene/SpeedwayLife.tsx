@@ -1,22 +1,23 @@
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { BoxGeometry, BufferAttribute, Color, CylinderGeometry, Object3D, type BufferGeometry, type InstancedMesh } from 'three'
+import { BoxGeometry, BufferAttribute, Color, CylinderGeometry, Matrix4, Object3D, type BufferGeometry, type InstancedMesh } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { useMergeScale } from './mergeScale'
-import { ARC, ARC0, DECK, TIERS, TRACK, deckAt } from './speedwayLayout'
+import { HAIR, PANTS, SKIN } from './people'
+import { ARC, ARC0, TRACK } from './speedwayLayout'
+import { armMatrix, seatMatrix, seatParts, fanBody, speedwayStands } from './speedwayCrowd'
 
 // The moving parts of the Speedway, seen through its glass walls: race cars
-// lapping the track nose to tail past empty grandstand seats. Instanced meshes
-// that Batch leaves alone (noBatch), a handful of draws however big the block.
-// Cars are true size: a merged block draws more of them, not bigger ones
-// (keepInstances in keepShape.ts keeps each one round its `feet`).
+// lapping the track nose to tail, and fans standing at their grandstand seats
+// (speedwayCrowd.ts) who throw their arms up as the cars come past and when
+// the wave goes round. Instanced meshes that Batch leaves alone (noBatch), a
+// handful of draws however big the block. Cars, seats and fans are true size:
+// a merged block draws more of them, not bigger ones (keepInstances in
+// keepShape.ts keeps each one round its `feet`).
 
-// Seats: one every SEAT_W along a row, in blocks of BLOCK with an aisle (a
-// seat's width, marked by a white stair nosing) between blocks.
-const SEAT_W = 0.12
-const BLOCK = 6
 // Seat colours, one a row from the front (the deck's two rows last).
 const SEAT_COLORS = ['#1e88e5', '#fdd835', '#e53935', '#1e88e5', '#fdd835']
+const SHIRTS = ['#e53935', '#fafafa', '#1e88e5', '#fdd835', '#43a047', '#ff7043', '#8e24aa', '#26c6da']
 const PAINT = ['#d32f2f', '#1565c0', '#fdd835', '#2e7d32', '#fafafa', '#ff6d00', '#6a1b9a', '#212121', '#00acc1', '#c2185b']
 
 // One lap every ~3 s, the cars nose to tail.
@@ -35,10 +36,12 @@ function paint(g: BufferGeometry, hex: string) {
 }
 const box = (w: number, h: number, d: number, x: number, y: number, z: number, hex: string) => paint(new BoxGeometry(w, h, d).translate(x, y, z), hex)
 
-// Seat pan and back, facing +z (the track); white takes the row's colour.
+// Seat cushion and back, facing +z (the track); white takes the row's colour.
 let seatGeo: BufferGeometry | null = null
 function seatShape() {
-  seatGeo ??= mergeGeometries([box(0.085, 0.02, 0.055, 0, 0.03, 0.005, '#ffffff'), box(0.085, 0.07, 0.014, 0, 0.065, -0.03, '#ffffff'), box(0.06, 0.02, 0.03, 0, 0.01, 0, '#455a64')])!
+  if (seatGeo) return seatGeo
+  const { shell, post } = seatParts()
+  seatGeo = mergeGeometries([...shell.map((g) => paint(g, '#ffffff')), paint(post, '#455a64')])!
   return seatGeo
 }
 
@@ -64,38 +67,25 @@ function raceCar() {
   return carGeo
 }
 
-type Seat = { a: number; r: number; y: number; row: number }
-
 export function SpeedwayLife({ lvl }: { lvl: number }) {
   const [sx, , sz] = useMergeScale()
   // A bigger block has a longer track and longer terraces: fill them, don't grow anyone.
   const k = (sx + sz) / 2
   const cars = Math.round((2 + Math.ceil(lvl / 2)) * k)
-  // Rows of seats in blocks with aisles between, lined up row over row.
-  const { seats, aisles } = useMemo(() => {
-    const seats: Seat[] = [], aisles: Seat[] = []
-    const rows = deckAt(lvl) ? [...TIERS, ...DECK.rows] : TIERS
-    // Same slot count every row (set by the front row), so the aisles run straight up.
-    const slots = Math.floor((ARC * (TIERS[0].r0 + 0.04) * k) / SEAT_W)
-    rows.forEach(({ r0, y }, row) => {
-      for (let i = 0; i < slots; i++) {
-        const a = ARC0 + (ARC * (i + 0.5)) / slots
-        const at = { a, r: r0 + 0.04, y, row }
-        if (i % (BLOCK + 1) === BLOCK) {
-          aisles.push(at)
-          continue
-        }
-        seats.push(at)
-      }
-    })
-    return { seats, aisles }
-  }, [k, lvl])
-  const ns = seats.length, na = aisles.length
+  const { seats, aisles, fans } = useMemo(() => speedwayStands(lvl, k), [k, lvl])
+  const ns = seats.length, na = aisles.length, n = fans.length
 
   const body = useRef<InstancedMesh>(null)
   const seatMesh = useRef<InstancedMesh>(null)
   const stairMesh = useRef<InstancedMesh>(null)
+  const shirt = useRef<InstancedMesh>(null)
+  const pants = useRef<InstancedMesh>(null)
+  const skin = useRef<InstancedMesh>(null)
+  const hair = useRef<InstancedMesh>(null)
+  const arms = useRef<InstancedMesh>(null)
+  const hands = useRef<InstancedMesh>(null)
   const dummy = useMemo(() => new Object3D(), [])
+  const arm = useMemo(() => new Matrix4(), [])
   // Where each car is, so a merged block keeps it whole on that spot.
   const carSpot = useMemo(() => new Float32Array(cars * 3), [cars])
   const carFeet = useMemo(() => ({ noBatch: true, feet: (i: number) => carSpot.subarray(i * 3, i * 3 + 3) }), [carSpot])
@@ -103,24 +93,46 @@ export function SpeedwayLife({ lvl }: { lvl: number }) {
   const stairSpot = useMemo(() => Float32Array.from(aisles.flatMap(({ a, r, y }) => [Math.sin(a) * r, y, Math.cos(a) * r])), [aisles])
   const seatFeet = useMemo(() => ({ noBatch: true, feet: (i: number) => seatSpot.subarray(i * 3, i * 3 + 3) }), [seatSpot])
   const stairFeet = useMemo(() => ({ noBatch: true, feet: (i: number) => stairSpot.subarray(i * 3, i * 3 + 3) }), [stairSpot])
+  // A fan is kept whole round their seat's spot; both arms round the same one.
+  const fanFeet = useMemo(() => ({ noBatch: true, feet: (i: number) => seatSpot.subarray(fans[i] * 3, fans[i] * 3 + 3) }), [seatSpot, fans])
+  const armFeet = useMemo(() => ({ noBatch: true, feet: (i: number) => seatSpot.subarray(fans[i >> 1] * 3, fans[i >> 1] * 3 + 3) }), [seatSpot, fans])
+  // Each fan's seat transform: the body is drawn with exactly it, the arms off it.
+  const fanAt = useMemo(() => fans.map((s) => seatMatrix(seats[s], sx, sz)), [fans, seats, sx, sz])
 
   // Seats and stair nosings don't move: placed once, facing the track as the block draws it.
   useLayoutEffect(() => {
-    const o = new Object3D()
+    const m = new Matrix4()
     for (const [mesh, list, hex] of [[seatMesh.current, seats, ''], [stairMesh.current, aisles, '#fafafa']] as const) {
       if (!mesh) continue
-      list.forEach(({ a, r, y, row }, i) => {
-        const x = Math.sin(a) * r, z = Math.cos(a) * r
-        o.position.set(x, y, z)
-        o.rotation.set(0, Math.atan2(-x * sx, -z * sz), 0)
-        o.updateMatrix()
-        mesh.setMatrixAt(i, o.matrix)
-        mesh.setColorAt(i, c.set(hex || SEAT_COLORS[row]))
+      list.forEach((seat, i) => {
+        mesh.setMatrixAt(i, seatMatrix(seat, sx, sz, m))
+        mesh.setColorAt(i, c.set(hex || SEAT_COLORS[seat.row]))
       })
       mesh.instanceMatrix.needsUpdate = true
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
     }
   }, [seats, aisles, sx, sz])
+
+  // Fans stand still at their seats: placed once, coloured once.
+  useLayoutEffect(() => {
+    fanAt.forEach((m, i) => {
+      for (const mesh of [shirt.current, pants.current, skin.current, hair.current]) mesh?.setMatrixAt(i, m)
+      const tee = SHIRTS[(i * 5 + 1) % SHIRTS.length]
+      shirt.current?.setColorAt(i, c.set(tee))
+      arms.current?.setColorAt(i * 2, c)
+      arms.current?.setColorAt(i * 2 + 1, c)
+      pants.current?.setColorAt(i, c.set(PANTS[i % PANTS.length]))
+      skin.current?.setColorAt(i, c.set(SKIN[(i * 7 + 2) % SKIN.length]))
+      hands.current?.setColorAt(i * 2, c)
+      hands.current?.setColorAt(i * 2 + 1, c)
+      hair.current?.setColorAt(i, c.set(HAIR[(i * 3) % HAIR.length]))
+    })
+    for (const mesh of [shirt.current, pants.current, skin.current, hair.current, arms.current, hands.current]) {
+      if (!mesh) continue
+      mesh.instanceMatrix.needsUpdate = true
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
+    }
+  }, [fanAt])
 
   useLayoutEffect(() => {
     for (let i = 0; i < cars; i++) body.current?.setColorAt(i, c.set(PAINT[(i * 3) % PAINT.length]))
@@ -149,6 +161,31 @@ export function SpeedwayLife({ lvl }: { lvl: number }) {
     }
     b.instanceMatrix.needsUpdate = true
 
+    // Arms: down at their sides, thrown up as a car comes past and as the
+    // wave sweeps the stands. Feet stay on the step.
+    const ar = arms.current, hn = hands.current
+    if (!ar || !hn) return
+    const sweep = ((time / 7) % 1) * 1.6 - 0.3
+    for (let i = 0; i < n; i++) {
+      const s = seats[fans[i]]
+      let near = Math.PI
+      for (let j = 0; j < cars; j++) {
+        const d = Math.abs(((((s.a - Math.atan2(carSpot[j * 3], carSpot[j * 3 + 2])) % (Math.PI * 2)) + Math.PI * 3) % (Math.PI * 2)) - Math.PI)
+        if (d < near) near = d
+      }
+      const pep = (i * 0.618) % 1
+      const w = Math.exp(-((((s.a - ARC0) / ARC - sweep) / 0.07) ** 2))
+      const cheer = Math.min(1, Math.max(w, Math.exp(-((near / 0.4) ** 2)) * (0.5 + pep * 0.5)))
+      for (const side of [-1, 1] as const) {
+        const wave = Math.sin(time * 9 + i * 2 + side)
+        armMatrix(side, cheer, wave, arm)
+        arm.premultiply(fanAt[i])
+        ar.setMatrixAt(i * 2 + (side > 0 ? 1 : 0), arm)
+        hn.setMatrixAt(i * 2 + (side > 0 ? 1 : 0), arm)
+      }
+    }
+    ar.instanceMatrix.needsUpdate = true
+    hn.instanceMatrix.needsUpdate = true
   })
 
   return (
@@ -156,13 +193,31 @@ export function SpeedwayLife({ lvl }: { lvl: number }) {
       <instancedMesh ref={body} args={[raceCar(), undefined, cars]} frustumCulled={false} castShadow userData={carFeet}>
         <meshStandardMaterial vertexColors roughness={0.35} metalness={0.2} />
       </instancedMesh>
-      <instancedMesh ref={seatMesh} args={[seatShape(), undefined, ns]} frustumCulled={false} userData={seatFeet}>
+      <instancedMesh name="speedway-seats" ref={seatMesh} args={[seatShape(), undefined, ns]} frustumCulled={false} userData={seatFeet}>
         <meshStandardMaterial vertexColors roughness={0.6} />
       </instancedMesh>
       {/* Stair nosings: a white strip at the front of each step in the aisles. */}
       <instancedMesh ref={stairMesh} args={[undefined, undefined, na]} frustumCulled={false} userData={stairFeet}>
         <boxGeometry args={[0.09, 0.008, 0.02]} />
         <meshStandardMaterial />
+      </instancedMesh>
+      <instancedMesh name="fan-shirt" ref={shirt} args={[fanBody().shirt, undefined, n]} frustumCulled={false} userData={fanFeet}>
+        <meshStandardMaterial vertexColors roughness={0.8} />
+      </instancedMesh>
+      <instancedMesh name="fan-pants" ref={pants} args={[fanBody().pants, undefined, n]} frustumCulled={false} userData={fanFeet}>
+        <meshStandardMaterial vertexColors roughness={0.8} />
+      </instancedMesh>
+      <instancedMesh name="fan-skin" ref={skin} args={[fanBody().skin, undefined, n]} frustumCulled={false} userData={fanFeet}>
+        <meshStandardMaterial vertexColors roughness={0.7} />
+      </instancedMesh>
+      <instancedMesh name="fan-hair" ref={hair} args={[fanBody().hair, undefined, n]} frustumCulled={false} userData={fanFeet}>
+        <meshStandardMaterial roughness={0.9} />
+      </instancedMesh>
+      <instancedMesh name="fan-arms" ref={arms} args={[fanBody().arm, undefined, n * 2]} frustumCulled={false} userData={armFeet}>
+        <meshStandardMaterial vertexColors roughness={0.8} />
+      </instancedMesh>
+      <instancedMesh name="fan-hands" ref={hands} args={[fanBody().hand, undefined, n * 2]} frustumCulled={false} userData={armFeet}>
+        <meshStandardMaterial vertexColors roughness={0.7} />
       </instancedMesh>
     </group>
   )
