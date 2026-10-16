@@ -6,7 +6,8 @@
 .shop-card:active:not(:disabled) { transform: translateY(2px); }
 .shop-card .thumb3d { --th: 112px; width: 100%; background: #dcecfb; border-radius: 12px; }
 .shop-card.broke .thumb3d { background: #fde3e5; }
-.shop-card .card-name { font-size: 17px; line-height: 1.1; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Long names wrap to a second line (never "..."); every card keeps room for two so rows line up. */
+.shop-card .card-name { font-size: 17px; line-height: 1.1; width: 100%; min-height: 2.2em; display: flex; align-items: center; justify-content: center; text-wrap: balance; overflow-wrap: anywhere; }
 .shop-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; min-height: 22px; }
 .shop-chips span { display: inline-flex; align-items: center; gap: 1px; padding: 2px 6px; background: #eef3fa; border-radius: 999px; font: 900 13px Nunito, sans-serif; white-space: nowrap; }
 .shop-chips .c-coin { background: #fff2c2; color: #7a5200; }
