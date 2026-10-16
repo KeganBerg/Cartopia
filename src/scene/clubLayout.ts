@@ -11,6 +11,9 @@ export const CLUB = {
   queueX: -0.5, // first in line, then one step of `gap` further from the door each
   gap: 0.3,
   queueMax: 8,
+  // The way in once the bouncer waves you through: out round the canopy's
+  // front pole (at doorX + 0.3, z 0.8), then up the red carpet to the door.
+  inPath: [[-0.55, 0.98], [-1.0, 0.98]] as [number, number][],
   lampX: 1.45, // searchlights on the roof's back corners: ±lampX, and lampZ from the building's middle
   lampZ: -0.43,
 }
