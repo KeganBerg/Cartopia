@@ -132,11 +132,11 @@ let demoCache: MyClan | null = null
 export function demoCrew(): MyClan {
   if (demoCache) return demoCache
   const s = useGame.getState()
-  const row = (id: string, townName: string, level: number, power: number, week: number): Member => ({
+  const row = (id: string, townName: string, level: number, power: number, week: number, i = 0): Member => ({
     ownerId: id, townName, level, trophies: level * 6, raceWins: level * 9, power,
-    week: { power: 0, race_wins: week, trophies: 0, level: 0 }, clan: null, role: id === 'me' ? 'leader' : 'member', joinedAt: '2026-10-01',
+    week: { power: 0, race_wins: week, trophies: 0, level: 0 }, clan: null, role: id === 'me' ? 'leader' : i === 0 ? 'co_leader' : 'member', joinedAt: '2026-10-01',
   })
-  const members = [row('me', s.townName || 'Your town', s.level, 320, 12), ...DEMO.map((d, i) => row(d.id, d.name, d.level, 150 + d.level * 22, 4 + i * 3))]
+  const members = [row('me', s.townName || 'Your town', s.level, 320, 12), ...DEMO.map((d, i) => row(d.id, d.name, d.level, 150 + d.level * 22, 4 + i * 3, i))]
   // Outside render: the Crew window calls this while drawing.
   setTimeout(() => useCrewGoal.setState({
     failed: false, ready: 0,
@@ -148,6 +148,6 @@ export function demoCrew(): MyClan {
   const total = { power: 1231, race_wins: 384, trophies: 564, level: members.reduce((a, m) => a + m.level, 0) }
   return demoCache = {
     role: 'leader', members,
-    clan: { id: 'demo-crew', name: 'Night Shift', tag: 'NSH', emblem: CLAN_EMBLEMS[0], color: '#1e88e5', description: 'Fast cars, faster friends', leaderId: 'me', memberCap: 20, minLevel: 1, members: members.length, total, week: { power: 40, race_wins: 19, trophies: 22, level: 1 } },
+    clan: { id: 'demo-crew', name: 'Night Shift', tag: 'NSH', emblem: CLAN_EMBLEMS[0], color: '#1e88e5', description: 'Fast cars, faster friends', leaderId: 'me', memberCap: 20, minLevel: 1, joinMode: 'request', members: members.length, total, week: { power: 40, race_wins: 19, trophies: 22, level: 1 } },
   }
 }

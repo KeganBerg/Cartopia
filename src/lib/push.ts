@@ -6,7 +6,7 @@
 import { create } from 'zustand'
 import { supabase } from './supabase'
 import { useGame, fuelCap, type GameState } from '../game/store'
-import { buildingDef, FUEL_REGEN_SECONDS } from '../game/data'
+import { buildingDef, fuelRegenSeconds } from '../game/data'
 
 const KEY = 'cartopia-alerts'
 const ASKED = 'cartopia-alerts-asked'
@@ -31,7 +31,7 @@ export function alertsFor(s: Pick<GameState, 'buildings' | 'restoring' | 'fuel' 
   if (s.restoring && s.restoring.endsAt > now) add('restore', s.restoring.endsAt, 'Restoration finished 🔧', 'Rusty has your car ready.')
   if (s.restoring2 && s.restoring2.endsAt > now) add('restore', s.restoring2.endsAt, 'Restoration finished 🔧', 'Rusty has your car ready.')
   const cap = fuelCap(s)
-  if (s.fuel < cap) add('fuel', s.fuelUpdatedAt + (cap - s.fuel) * FUEL_REGEN_SECONDS * 1000, 'Fuel is full ⛽', `Time to run some jobs in ${town}.`)
+  if (s.fuel < cap) add('fuel', s.fuelUpdatedAt + (cap - s.fuel) * fuelRegenSeconds(s.level) * 1000, 'Fuel is full ⛽', `Time to run some jobs in ${town}.`)
   return out.sort((a, b) => a.at - b.at)
 }
 
