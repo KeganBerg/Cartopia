@@ -44,7 +44,7 @@ export type Clan = {
   week: Record<Metric, number>
 }
 
-// Who may join (supabase/migrations/0102_crew_ranks.sql): anyone, by request, or nobody new.
+// Who may join (supabase/migrations/0103_crew_ranks.sql): anyone, by request, or nobody new.
 export type JoinMode = 'open' | 'request' | 'closed'
 export const JOIN_MODES: { id: JoinMode; icon: string; label: string; tip: string }[] = [
   { id: 'open', icon: '🔓', label: 'Open', tip: 'Open: anyone at the level joins' },

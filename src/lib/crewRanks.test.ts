@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { JOIN_MODES, RANKS, byRank, canRemove, canSetRank, isOfficer, type Member, type Rank } from './clans'
 
-const sql = readFileSync('supabase/migrations/0102_crew_ranks.sql', 'utf8')
+const sql = readFileSync('supabase/migrations/0103_crew_ranks.sql', 'utf8')
 const fn = (name: string) => sql.match(new RegExp(`function public\\.${name}\\([\\s\\S]*?end \\$\\$;`))![0]
 
 describe('crew ranks', () => {
