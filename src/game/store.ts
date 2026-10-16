@@ -27,6 +27,7 @@ import { EVENT_RACES, eventBonus, eventFor, eventIsBoss, eventPrize, eventProgre
 import { trialWeek } from './trial'
 import { groupOf, groupTurn, mergeCandidates, mergeBoosts, mergeFuel, applyMerge, applySplit, rotateGroup, moveGroup, isLandmark, isGlobe, LANDMARK_NAME, GLOBE_NAME, type MergeGroup } from './merge'
 import { togglePick } from './meet'
+import { endlessCapped, endlessDone, endlessPay, endlessSlots, endlessToday, filledEndless, type Endless, type EndlessGoal, type EndlessTown } from './endless'
 import { crateCost, crateDef, crateOwnedSkins, pityHit, rollCrate, rollSourcePiece, type CrateId, type CrateOpen } from './crates'
 import { pieceId } from './resto'
 import { rollWheel, type WheelSpin } from './wheel'
@@ -96,6 +97,9 @@ export type SaveState = {
   stats: Record<CounterKey, number>
   claimedGoals: string[]
   quests: Quests | null
+  // Endless goals (game/endless.ts): made up from the town once the story leaves room. The server
+  // guard pays at most ENDLESS_PAY.perDay a UTC day, by `n` and `today`.
+  endless?: Endless | null
   lastDaily: string | null
   dailyStreak: number
   helped: Record<string, string>
@@ -336,6 +340,7 @@ type Actions = {
   setBuildingTint: (uid: string, id: string | null) => void
   claimGoal: (id: string) => void
   claimTask: (period: Period, id: string) => void
+  claimEndless: (k: number) => void
   claimChest: (period: Period) => void
   claimTier: (tier: number) => void
   claimSet: (id: string) => void
@@ -705,6 +710,15 @@ export function statValue(s: StatSource, key: StatKey, def?: string): number {
 }
 export const goalDone = (s: StatSource, g: GoalDef) => statValue(s, g.stat, g.def) >= g.target
 
+// Endless goals showing now: as many as endlessSlots() allows next to the story goals.
+type EndlessSource = StatSource & Pick<SaveState, 'claimedGoals' | 'xp' | 'endless' | 'tutorial'>
+export const endlessTown = (s: StatSource & Pick<SaveState, 'xp'>): EndlessTown => ({ ...s, value: (stat, def) => statValue(s, stat, def) })
+const endlessRoom = (s: EndlessSource) => (s.tutorial < 99 ? 0 : endlessSlots(activeGoals(s).length, s.level))
+export const activeEndless = (s: EndlessSource): EndlessGoal[] => (s.endless?.goals ?? []).slice(0, endlessRoom(s))
+export const endlessReady = (s: EndlessSource, g: EndlessGoal) => endlessDone(endlessTown(s), g)
+// The board topped up and stale goals swapped, or null when it's fine as it is.
+export const rolledEndless = (s: EndlessSource) => (endlessRoom(s) ? filledEndless(s.endless, endlessTown(s), endlessRoom(s)) : null)
+
 // Tasks: what's drawn for the current day and week, and progress since each began.
 export const taskPool = (period: Period) => (period === 'daily' ? DAILY_TASKS : WEEKLY_TASKS)
 export const taskDef = (period: Period, id: string) => taskPool(period).find((t) => t.id === id)
@@ -754,6 +768,7 @@ export function rolledQuests(s: Pick<SaveState, 'quests' | 'stats' | 'level' | '
 // Everything ready to collect: finished story goals, tasks and chests.
 export function claimable(s: GameState) {
   const goals = [...activeGoals(s), ...eventGoals()].filter((g) => goalOpen(s, g) && goalDone(s, g)).length
+    + (endlessCapped(s.endless) ? 0 : activeEndless(s).filter((g) => endlessReady(s, g)).length)
   let tasks = 0
   for (const p of ['daily', 'weekly'] as const) {
     const done = periodDone(s.quests, p)
@@ -1004,6 +1019,8 @@ export const useGame = create<GameState>()(
         const s = get()
         const quests = rolledQuests(s, now)
         if (quests) set({ quests })
+        const endless = rolledEndless(get())
+        if (endless) set({ endless })
         const cap = fuelCap(s)
         if (s.fuel >= cap) {
           if (s.fuelUpdatedAt !== now) set({ fuelUpdatedAt: now })
@@ -1683,6 +1700,27 @@ export const useGame = create<GameState>()(
           claimedGoals: [...s.claimedGoals, id],
           updatedAt: Date.now(),
         }))
+      },
+
+      claimEndless: (k) => {
+        const s = get()
+        const g = activeEndless(s).find((o) => o.k === k)
+        if (!g || !endlessReady(s, g) || endlessCapped(s.endless)) return
+        const e = s.endless!
+        const now = Date.now()
+        const num = e.n + 1
+        const pay = endlessPay(num, s.level)
+        sfx.coin()
+        if (pay.parts) setTimeout(sfx.levelUp, 150)
+        s.toast(`Goal complete! +${pay.coins.toLocaleString()} coins${pay.parts ? `, +${pay.parts} parts` : ''}${pay.bucks ? `, +${pay.bucks} gems` : ''}, +${pay.xp} XP`)
+        set(withXp(s, pay.xp, {
+          coins: s.coins + pay.coins, parts: s.parts + pay.parts, bucks: s.bucks + pay.bucks,
+          endless: { ...e, n: num, day: dayKey(now), today: endlessToday(e, now) + 1, goals: e.goals.filter((o) => o.k !== k), last: g.kind },
+          updatedAt: now,
+        }))
+        // Draw the next one straight away, from the town as it is now.
+        const next = rolledEndless(get())
+        if (next) set({ endless: next })
       },
 
       claimTask: (period, id) => {
@@ -2716,8 +2754,8 @@ export const useGame = create<GameState>()(
 )
 
 export function saveOf(s: GameState): SaveState {
-  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, restoring2, truck, gp, campaign, claimedSets, crewChests, visits, crates, cratePity, boosts, wagers, purchases, season, deals, trials, rivals, rivalRow, tuner, mastery, road, roadItems, freeCrates, trail, cheer, flairSeen, daily, repSeen, worldTour, presets, seasonBase, recap, friendship, cups, freePaint, oldPaints, tour, event, showcase, raceCar, skins, modSkins, hats, hatQuest, callCards, callCard, lights, cityTheme, restoParts, land, stored, updatedAt } = s
-  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings: foldStored(buildings, stored), cars, stats, claimedGoals, quests, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, restoring2: restoring2 ?? null, truck: truck ?? 0, gp, campaign, claimedSets, crewChests, visits, crates, cratePity: cratePity ?? {}, boosts: boosts ?? emptyBoosts(), ...(wagers ? { wagers } : {}), ...(purchases ? { purchases } : {}), season, deals, trials, rivals, rivalRow, tuner: tuner ?? {}, mastery: mastery ?? {}, road: road ?? 0, roadItems: roadItems ?? [], freeCrates: freeCrates ?? [], ...(trail ? { trail } : {}), ...(cheer ? { cheer } : {}), ...(flairSeen ? { flairSeen } : {}), ...(daily ? { daily } : {}), ...(repSeen !== undefined ? { repSeen } : {}), ...(worldTour ? { worldTour } : {}), ...(presets?.some(Boolean) ? { presets } : {}), ...(seasonBase ? { seasonBase } : {}), ...(recap ? { recap } : {}), ...(friendship ? { friendship } : {}), cups: cups ?? {}, ...(freePaint ? { freePaint } : {}), oldPaints: !!oldPaints, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, hats: hats ?? [], hatQuest: hatQuestOf({ stats, hatQuest }), ...(callCards?.length ? { callCards } : {}), ...(callCard && callCards?.includes(callCard) ? { callCard } : {}), ...(cleanLights(lights) ? { lights: cleanLights(lights) } : {}), ...(colorTheme(cityTheme) ? { cityTheme } : {}), ...(restoParts?.length ? { restoParts } : {}), land, updatedAt }
+  const { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings, cars, stats, claimedGoals, quests, endless, lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, restoring2, truck, gp, campaign, claimedSets, crewChests, visits, crates, cratePity, boosts, wagers, purchases, season, deals, trials, rivals, rivalRow, tuner, mastery, road, roadItems, freeCrates, trail, cheer, flairSeen, daily, repSeen, worldTour, presets, seasonBase, recap, friendship, cups, freePaint, oldPaints, tour, event, showcase, raceCar, skins, modSkins, hats, hatQuest, callCards, callCard, lights, cityTheme, restoParts, land, stored, updatedAt } = s
+  return { version, townName, level, xp, coins, bucks, parts, fuel, fuelUpdatedAt, trophies, racesWon, roads, buildings: foldStored(buildings, stored), cars, stats, claimedGoals, quests, ...(endless ? { endless } : {}), lastDaily, dailyStreak, helped, tutorial, junkyard, restoring, restoring2: restoring2 ?? null, truck: truck ?? 0, gp, campaign, claimedSets, crewChests, visits, crates, cratePity: cratePity ?? {}, boosts: boosts ?? emptyBoosts(), ...(wagers ? { wagers } : {}), ...(purchases ? { purchases } : {}), season, deals, trials, rivals, rivalRow, tuner: tuner ?? {}, mastery: mastery ?? {}, road: road ?? 0, roadItems: roadItems ?? [], freeCrates: freeCrates ?? [], ...(trail ? { trail } : {}), ...(cheer ? { cheer } : {}), ...(flairSeen ? { flairSeen } : {}), ...(daily ? { daily } : {}), ...(repSeen !== undefined ? { repSeen } : {}), ...(worldTour ? { worldTour } : {}), ...(presets?.some(Boolean) ? { presets } : {}), ...(seasonBase ? { seasonBase } : {}), ...(recap ? { recap } : {}), ...(friendship ? { friendship } : {}), cups: cups ?? {}, ...(freePaint ? { freePaint } : {}), oldPaints: !!oldPaints, tour, event, showcase, ...(raceCar ? { raceCar } : {}), skins, modSkins, hats: hats ?? [], hatQuest: hatQuestOf({ stats, hatQuest }), ...(callCards?.length ? { callCards } : {}), ...(callCard && callCards?.includes(callCard) ? { callCard } : {}), ...(cleanLights(lights) ? { lights: cleanLights(lights) } : {}), ...(colorTheme(cityTheme) ? { cityTheme } : {}), ...(restoParts?.length ? { restoParts } : {}), land, updatedAt }
 }
 
 // The inventory travels inside `buildings`, flagged, so the server's guard sees the same town worth
@@ -2733,9 +2771,9 @@ export function unfoldStored<T extends Partial<SaveState>>(save: T): T & { store
 }
 
 // Fields added after launch, so older saves load with sensible values.
-function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'quests' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'restoring2' | 'truck' | 'gp' | 'campaign' | 'claimedSets' | 'crewChests' | 'visits' | 'crates' | 'cratePity' | 'boosts' | 'wagers' | 'purchases' | 'season' | 'deals' | 'trials' | 'rivals' | 'rivalRow' | 'tuner' | 'mastery' | 'road' | 'cups' | 'tour' | 'event' | 'showcase' | 'skins' | 'modSkins' | 'hats' | 'land' | 'stored'> {
+function starterDefaults(): Pick<SaveState, 'stats' | 'claimedGoals' | 'quests' | 'endless' | 'lastDaily' | 'dailyStreak' | 'helped' | 'tutorial' | 'junkyard' | 'restoring' | 'restoring2' | 'truck' | 'gp' | 'campaign' | 'claimedSets' | 'crewChests' | 'visits' | 'crates' | 'cratePity' | 'boosts' | 'wagers' | 'purchases' | 'season' | 'deals' | 'trials' | 'rivals' | 'rivalRow' | 'tuner' | 'mastery' | 'road' | 'cups' | 'tour' | 'event' | 'showcase' | 'skins' | 'modSkins' | 'hats' | 'land' | 'stored'> {
   // Saves from before the tutorial existed skip it.
-  return { stats: emptyStats(), claimedGoals: [], quests: null, lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, restoring2: null, truck: 0, gp: {}, campaign: {}, claimedSets: [], crewChests: 0, visits: 0, crates: 0, cratePity: {}, boosts: emptyBoosts(), wagers: 0, purchases: 0, season: null, deals: null, trials: { claimed: {} }, rivals: {}, rivalRow: {}, tuner: {}, mastery: {}, road: 0, cups: {}, tour: 0, event: null, showcase: [], skins: [], modSkins: [], hats: [], land: [...START_LAND], stored: [] }
+  return { stats: emptyStats(), claimedGoals: [], quests: null, endless: null, lastDaily: null, dailyStreak: 0, helped: {}, tutorial: 99, junkyard: [], restoring: null, restoring2: null, truck: 0, gp: {}, campaign: {}, claimedSets: [], crewChests: 0, visits: 0, crates: 0, cratePity: {}, boosts: emptyBoosts(), wagers: 0, purchases: 0, season: null, deals: null, trials: { claimed: {} }, rivals: {}, rivalRow: {}, tuner: {}, mastery: {}, road: 0, cups: {}, tour: 0, event: null, showcase: [], skins: [], modSkins: [], hats: [], land: [...START_LAND], stored: [] }
 }
 
 
