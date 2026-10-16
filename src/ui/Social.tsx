@@ -39,16 +39,16 @@ export function useUserId() {
   return uid
 }
 
-// The Social menu: Friends, Leaderboards, Crew and Meet share one window with tabs across the top.
+// The Social menu: Friends, Crew, Meet and Leaderboards share one window with tabs across the top.
 export const SOCIAL_TITLE = 'Social'
 export function SocialTabs({ current }: { current: PanelId }) {
   const openPanel = useGame((s) => s.swapPanel)
   const chests = useCrewGoal((g) => g.ready) + useCrewBattle((b) => b.ready)
   const tabs: { id: PanelId; label: React.ReactNode }[] = [
     { id: 'friends', label: '👫 Friends' },
-    { id: 'leaders', label: '🏅 Leaderboards' },
     { id: 'clan', label: <>🛡️ Crew{chests > 0 && <span className="tab-dot">{chests}</span>}</> },
     { id: 'meet', label: '🚗 Meet' },
+    { id: 'leaders', label: '🏅 Leaderboards' },
   ]
   return <SheetTabs items={tabs as { id: Exclude<PanelId, null>; label: React.ReactNode }[]} value={current ?? 'friends'} onChange={(id) => openPanel(id)} />
 }
