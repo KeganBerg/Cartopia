@@ -38,14 +38,40 @@ export type Clan = {
   leaderId: string
   memberCap: number
   minLevel: number
+  joinMode: JoinMode
   members: number
   total: Record<Metric, number>
   week: Record<Metric, number>
 }
 
-export type Member = BoardRow & { role: 'leader' | 'member'; joinedAt: string }
+// Who may join (supabase/migrations/0102_crew_ranks.sql): anyone, by request, or nobody new.
+export type JoinMode = 'open' | 'request' | 'closed'
+export const JOIN_MODES: { id: JoinMode; icon: string; label: string; tip: string }[] = [
+  { id: 'open', icon: '🔓', label: 'Open', tip: 'Open: anyone at the level joins' },
+  { id: 'request', icon: '✋', label: 'Request', tip: 'Request to join: a Leader or Co-Leader accepts' },
+  { id: 'closed', icon: '🔒', label: 'Closed', tip: 'Closed: nobody new can join' },
+]
 
-export type MyClan = { clan: Clan; members: Member[]; role: 'leader' | 'member' }
+// Leader: everything. Co-Leader: settings, requests, removing Members. Member: racing.
+export type Rank = 'leader' | 'co_leader' | 'member'
+export const RANKS: Record<Rank, { icon: string; label: string; order: number }> = {
+  leader: { icon: '👑', label: 'Leader', order: 0 },
+  co_leader: { icon: '🎖️', label: 'Co-Leader', order: 1 },
+  member: { icon: '🛡️', label: 'Member', order: 2 },
+}
+export const isOfficer = (r: Rank) => r === 'leader' || r === 'co_leader'
+// What the viewer may do to a crewmate. Nobody acts on the Leader; Co-Leaders only on Members.
+export const canRemove = (me: Rank, them: Rank) => them !== 'leader' && (me === 'leader' || (me === 'co_leader' && them === 'member'))
+export const canSetRank = (me: Rank, them: Rank) => me === 'leader' && them !== 'leader'
+const asRank = (r: string): Rank => (r === 'leader' || r === 'co_leader' ? r : 'member')
+
+export type Member = BoardRow & { role: Rank; joinedAt: string }
+
+export type MyClan = { clan: Clan; members: Member[]; role: Rank }
+
+// Leader, then Co-Leaders, then Members; strongest garage first within a rank.
+export const byRank = (a: Member, b: Member) => RANKS[a.role].order - RANKS[b.role].order || b.power - a.power
+
 
 type PlayerRow = {
   owner_id: string
@@ -83,6 +109,7 @@ type ClanRow = {
   week_race_wins: number
   week_trophies: number
   week_levels: number
+  join_mode?: string
 }
 
 const cleanTag = (t: string) => (isCleanName(t) ? t : '??')
@@ -110,6 +137,8 @@ const toClan = (r: ClanRow): Clan => ({
   leaderId: r.leader_id,
   memberCap: r.member_cap,
   minLevel: r.min_level,
+  // Before 0102 runs every crew is open.
+  joinMode: r.join_mode === 'request' || r.join_mode === 'closed' ? r.join_mode : 'open',
   members: r.members,
   total: { power: r.power, race_wins: r.race_wins, trophies: r.trophies, level: r.levels },
   week: { power: r.week_power, race_wins: r.week_race_wins, trophies: r.week_trophies, level: r.week_levels },
@@ -177,11 +206,11 @@ export async function fetchMyClan(uid: string): Promise<MyClan | null> {
       ownerId: r.owner_id, townName: 'New member', level: 1, trophies: 0, raceWins: 0, power: 0,
       week: { power: 0, race_wins: 0, trophies: 0, level: 0 }, clan: null,
     }),
-    role: r.role as Member['role'],
+    role: asRank(r.role),
     joinedAt: r.joined_at,
   }))
-  members.sort((a, b) => Number(b.role === 'leader') - Number(a.role === 'leader') || b.power - a.power)
-  return { clan: toClan(c as ClanRow), members, role: mine.role as Member['role'] }
+  members.sort(byRank)
+  return { clan: toClan(c as ClanRow), members, role: asRank(mine.role) }
 }
 
 // Keep the Crew House sign in step with the player's clan.
@@ -204,8 +233,18 @@ export const createClan = (a: { name: string; tag: string; emblem: string; color
 export const joinClan = (id: string) => rpc('join_clan', { p_clan: id })
 export const leaveClan = () => rpc('leave_clan')
 export const kickMember = (id: string) => rpc('kick_clan_member', { p_member: id })
-export const updateClan = (a: { description: string; emblem: string; color: string; minLevel: number }) =>
-  rpc('update_clan', { p_description: a.description, p_emblem: a.emblem, p_color: a.color, p_min_level: a.minLevel })
+export const updateClan = (a: { description: string; emblem: string; color: string; minLevel: number; joinMode: JoinMode }) =>
+  rpc('update_clan', { p_description: a.description, p_emblem: a.emblem, p_color: a.color, p_min_level: a.minLevel, p_join_mode: a.joinMode })
+
+// Join an open crew or ask a request one.
+export const askJoin = (id: string) => rpc<'joined' | 'requested'>('crew_ask_join', { p_clan: id })
+export const cancelRequest = (id: string) => rpc('crew_cancel_request', { p_clan: id })
+export const fetchMyRequests = () => rpc<string[]>('crew_my_requests')
+export type JoinRequest = { id: string; at: string }
+// Requests waiting on a Leader or Co-Leader; empty for everyone else.
+export const fetchCrewRequests = () => rpc<JoinRequest[]>('crew_requests')
+export const respondRequest = (id: string, accept: boolean) => rpc<'joined' | 'declined' | 'gone'>('crew_respond', { p_owner: id, p_accept: accept })
+export const setRank = (id: string, rank: Rank) => rpc('crew_set_rank', { p_member: id, p_rank: rank })
 
 // Crew weekly goal (supabase/migrations/0027_crew_weekly_goal.sql). Weeks are named by their Monday (UTC).
 export type CrewWeek = {
@@ -229,3 +268,11 @@ export const chestsReady = (g: CrewGoal | null) =>
   !g || !g.payable ? 0 : [g.current, g.last].filter((w) => w && w.reached && !w.opened && w.mine >= g.rules.minPoints).length
 
 export const openCrewChestOn = (week: string) => rpc<number>('open_crew_chest', { p_week: week })
+
+// Board rows for players by id (join requests show who is asking).
+export async function fetchPlayers(ids: string[]): Promise<Map<string, BoardRow>> {
+  if (!supabase || !ids.length) return new Map()
+  const { data, error } = await supabase.from('player_leaderboard').select('*').in('owner_id', ids)
+  if (error) throw error
+  return new Map((data as PlayerRow[]).map((r) => [r.owner_id, toRow(r)]))
+}
