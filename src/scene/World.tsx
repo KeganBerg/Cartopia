@@ -9,8 +9,9 @@ import { useGame, buildPrice, canPlace, canPlaceBlock, buyablePlots, lotSize, mo
 import { TILE, PLOT, PLOT_MIN, PLOT_MAX, START_LAND, RUSTY_LOT, buildingDef, buildingLevel } from '../game/data'
 import { BuildingModel } from './BuildingModel'
 import { rotateCurrent, setGhostTurn, turnOf } from '../game/placement'
-import { mergeGroups, groupOf, groupTurn, groupParts, isLandmark, isTwin, type MergeGroup } from '../game/merge'
+import { mergeGroups, groupOf, groupTurn, groupParts, isGlobe, isLandmark, isTwin, type MergeGroup } from '../game/merge'
 import { VanguardTower, launchTower } from './Landmark'
+import { GlobeTower, spinGlobe } from './GlobeTower'
 import { KeepShapes, MergeScale } from './mergeScale'
 import { limitFor } from './keepShape'
 import { sfx } from '../lib/sound'
@@ -217,8 +218,10 @@ const Building = memo(BuildingLot, sameBuilding)
 function BuildingLot({ b, turn, group, picked, city }: BuildingProps) {
   const d = buildingDef(b.def)
   const [cx, cz] = group ? groupCenter(group) : centerOf(b.def, b.x, b.z, b.rot)
-  // A 2x4 block draws as two 2x2s side by side; every other block is one model grown to fill it.
-  const parts = group ? groupParts(group, turn) : [{ at: [0, 0] as [number, number], scale: [1, 1, 1] as [number, number, number] }]
+  // A 2x4 block draws as two 2x2s side by side (unless it's the Globe Tower, built for the
+  // whole block); every other block is one model grown to fill it.
+  const globe = !!group && isGlobe(group)
+  const parts = group && !globe ? groupParts(group, turn) : [{ at: [0, 0] as [number, number], scale: [1, 1, 1] as [number, number, number] }]
   const [sx, , sz] = parts[0].scale
   // Four max-level houses in a square are a landmark built for a 2x2 lot, not a scaled-up house.
   const mark = group && isLandmark(group)
@@ -265,7 +268,8 @@ function BuildingLot({ b, turn, group, picked, city }: BuildingProps) {
         }
         if (s.mode !== 'play' || s.visiting || e.delta > 6) return
         e.stopPropagation()
-        if (mark) launchTower(b.uid)
+        if (globe) spinGlobe(b.uid)
+        else if (mark) launchTower(b.uid)
         s.tapBuilding(b.uid)
       }}
       onPointerOver={() => {
@@ -289,7 +293,7 @@ function BuildingLot({ b, turn, group, picked, city }: BuildingProps) {
               <PopGroup uid={b.uid}>
                 <KeepShapes limit={limitFor(d)}>
                   <Tint theme={themeFor(b.tint, city, d.kind === 'decor')}>
-                    {mark ? <VanguardTower uid={b.uid} /> : <BuildingModel def={d} level={buildingLevel(b)} />}
+                    {globe ? <GlobeTower uid={b.uid} /> : mark ? <VanguardTower uid={b.uid} /> : <BuildingModel def={d} level={buildingLevel(b)} />}
                   </Tint>
                 </KeepShapes>
               </PopGroup>

@@ -290,3 +290,7 @@ export function groupParts(g: MergeGroup, turn: number): { at: [number, number];
 export const LANDMARK_NAME = 'Vanguard Tower'
 export const isLandmark = (g: Pick<MergeGroup, 'anchor' | 'cols' | 'rows'>) =>
   g.anchor.def === 'house' && buildingLevel(g.anchor) >= MAX_BUILDING_LEVEL && (g.cols === g.rows || g.cols * g.rows === 8)
+// Two Vanguard Towers merged side by side (a 2x4) become the Globe Tower (src/scene/GlobeTower.tsx).
+export const GLOBE_NAME = 'Globe Tower'
+export const isGlobe = (g: Pick<MergeGroup, 'anchor' | 'cols' | 'rows'>) => isLandmark(g) && g.cols * g.rows === 8
+export const landmarkName = (g: Pick<MergeGroup, 'anchor' | 'cols' | 'rows'>) => (isGlobe(g) ? GLOBE_NAME : LANDMARK_NAME)

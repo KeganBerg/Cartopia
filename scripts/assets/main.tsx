@@ -2,7 +2,7 @@
 // Dev only: `npm run dev`, then `node scripts/assets/shoot.mjs` captures every
 // building at L1/L4/L7/L10 and as a merged pair.
 // ?id=<building>&level=1..10&pair=0|1|2|4&night=0|1&side=0..3
-// pair: 1 a 1x2 pair, 2 a 2x2 block, 4 a 4x4 block.
+// pair: 1 a 1x2 pair, 2 a 2x2 block, 4 a 4x4 block. land=vanguard|globe draws that landmark instead.
 import { createRoot } from 'react-dom/client'
 import { useEffect, useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
@@ -15,6 +15,8 @@ import { limitFor } from '../../src/scene/keepShape'
 import { applyNight } from '../../src/scene/dayNight'
 import { Batch } from '../../src/scene/Batch'
 import { paverTex } from '../../src/scene/textures'
+import { VanguardTower } from '../../src/scene/Landmark'
+import { GlobeTower } from '../../src/scene/GlobeTower'
 
 const q = new URLSearchParams(location.search)
 const def = BUILDINGS.find((d) => d.id === (q.get('id') ?? 'bowling'))!
@@ -24,6 +26,9 @@ const night = q.get('night') === '1'
 const side = Number(q.get('side') ?? 0)
 const mark = q.get('mark') === '1'
 const zoomIn = Number(q.get('zoom') ?? 1)
+const land = q.get('land')
+// The landmark's lot in units (the Globe Tower's runs along x).
+const LAND: Record<string, [number, number]> = { vanguard: [4, 4], globe: [8, 4] }
 const scale: [number, number, number] = pair === 1 ? [2, 1, 1] : pair > 1 ? [pair, pair, pair] : [1, 1, 1]
 applyNight(night ? 1 : 0)
 
@@ -33,8 +38,8 @@ function Cam() {
     const c = camera as OrthographicCamera
     const a = Math.PI / 4 + (side * Math.PI) / 2
     c.position.set(Math.sin(a) * 60, 52, Math.cos(a) * 60)
-    c.lookAt(0, 1.2 * scale[1], 0)
-    const span = Math.max(def.w * TILE * scale[0], def.h * TILE * scale[2], 3) * 1.6 + 1.5
+    c.lookAt(0, land ? Number(q.get('look') ?? 7) : 1.2 * scale[1], 0)
+    const span = land ? 21 : Math.max(def.w * TILE * scale[0], def.h * TILE * scale[2], 3) * 1.6 + 1.5
     c.zoom = (Math.min(size.width, size.height) / span) * zoomIn
     c.updateProjectionMatrix()
   }, [camera, size])
@@ -68,7 +73,7 @@ function Person({ at }: { at: [number, number, number] }) {
 
 function App() {
   const root = useRef<Group>(null)
-  const W = def.w * TILE * scale[0], D = def.h * TILE * scale[2]
+  const [W, D] = land ? LAND[land] : [def.w * TILE * scale[0], def.h * TILE * scale[2]]
   return (
     <Canvas shadows orthographic camera={{ position: [60, 52, 60], zoom: 60, near: 1, far: 400 }} gl={{ toneMapping: NeutralToneMapping, preserveDrawingBuffer: true }}>
       <color attach="background" args={[night ? '#1c2533' : '#9fb8c8']} />
@@ -82,13 +87,13 @@ function App() {
       </mesh>
       <mesh rotation-x={-Math.PI / 2} position-y={0.004} receiveShadow>
         <planeGeometry args={[W - 0.1, D - 0.1]} />
-        <meshStandardMaterial map={paverTex(def.w * scale[0], def.h * scale[2])} />
+        <meshStandardMaterial map={paverTex(W / TILE, D / TILE)} />
       </mesh>
       <Batch version={1} off={mark}>
         <group scale={scale} ref={root}>
           <MergeScale.Provider value={scale}>
             <KeepShapes limit={limitFor(def)}>
-              <BuildingModel def={def} level={level} />
+              {land === 'globe' ? <GlobeTower /> : land ? <VanguardTower /> : <BuildingModel def={def} level={level} />}
             </KeepShapes>
           </MergeScale.Provider>
         </group>

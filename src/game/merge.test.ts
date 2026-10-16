@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { mergeGroups, mergeCandidates, applyMerge, applySplit, groupTurn, groupScale, groupParts, rotateGroup, isLandmark, mergeBoosts } from './merge'
+import { mergeGroups, mergeCandidates, applyMerge, applySplit, groupTurn, groupScale, groupParts, rotateGroup, isLandmark, isGlobe, landmarkName, mergeBoosts } from './merge'
 import { useGame, readyRewards, fuelCap, type PlacedBuilding } from './store'
 import { buildingDef, buildingUpgradeCost, upgradePayout, upgradeFuelCap, MERGE_BONUS } from './data'
 
@@ -294,6 +294,18 @@ describe('landmark', () => {
     expect(isLandmark(mergeGroups(pair).groups.get(pair[0].uid)!)).toBe(false)
     const shops = [b('pizza', 0, 0, { level: 10, merge: 2 }), b('pizza', 1, 0, { level: 10 }), b('pizza', 0, 1, { level: 10 }), b('pizza', 1, 1, { level: 10 })]
     expect(isLandmark(mergeGroups(shops).groups.get(shops[0].uid)!)).toBe(false)
+  })
+  it('two Vanguard Towers merged side by side become the Globe Tower', () => {
+    const tower = (x: number, level = 10) => [b('house', x, 0, { level, merge: 2 }), b('house', x + 1, 0, { level }), b('house', x, 1, { level }), b('house', x + 1, 1, { level })]
+    const two = [...tower(0), ...tower(2)]
+    const c = mergeCandidates(two).find((o) => o.code === 42)!
+    const g = mergeGroups(applyMerge(two, c)).groups.get(two[0].uid)!
+    expect(isGlobe(g)).toBe(true)
+    expect(landmarkName(g)).toBe('Globe Tower')
+    expect(landmarkName(block(10))).toBe('Vanguard Tower')
+    expect(isGlobe(block(10))).toBe(false)
+    const low = [...tower(0, 9), ...tower(2, 9)]
+    expect(isGlobe(mergeGroups(applyMerge(low, mergeCandidates(low).find((o) => o.code === 42)!)).groups.get(low[0].uid)!)).toBe(false)
   })
 })
 
