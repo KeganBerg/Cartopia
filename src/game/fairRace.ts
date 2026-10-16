@@ -1,5 +1,5 @@
 // The live side of fairPi.ts: caps an AI rival at what the player's race car can beat right now.
-import { CARS, carDef, performance, type CarDef, type SkillId } from './data'
+import { CAMPAIGN, CARS, ROOKIE_SHIFT, campaignReward, campaignRivalPi, campaignRivalSkills, campaignShift, carDef, performance, rookieRace, type CarDef, type SkillId } from './data'
 import { DIST, raceCharacter, tourDist } from './distance'
 import { buildPi, fairRivalPi } from './fairPi'
 import { carPi, raceCarOf } from './raceCar'
@@ -31,4 +31,13 @@ export const carNear = (target: number): CarDef =>
 export function tourPayNow(race: number) {
   const ladder = tourRivalPi(race)
   return tourPrize(race, fairNow(ladder, tourShift(race), tourSkills(race) ? carNear(ladder).skill : undefined, DIST[tourDist(race)].m))
+}
+
+// What a campaign race pays the race car now: the ladder's prize, or the eased rival's (as ui/Race.tsx races it).
+export function campaignPayNow(ci: number, i: number, first: boolean) {
+  const ch = CAMPAIGN[ci]
+  const ladder = campaignRivalPi(ch, i)
+  const car = (ch.cars?.[i] && CARS.find((c) => c.id === ch.cars![i])) || carNear(ladder)
+  const shift = rookieRace(ci, i, useGame.getState().racesWon) ? ROOKIE_SHIFT : campaignShift(ci, i)
+  return campaignReward(ch, i, first, fairNow(ladder, shift, campaignRivalSkills(ci, i) ? car.skill : undefined))
 }

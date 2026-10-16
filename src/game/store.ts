@@ -385,7 +385,8 @@ type Actions = {
   // A Grand Prix race finished: won, and the place out of how many karts (for what a loss pays).
   gpResult: (series: string, won: boolean, place?: number, of?: number) => void
   // Records a campaign race; returns the stars earned (0 for a loss).
-  campaignResult: (chapter: string, race: number, myTime: number, theirTime: number) => number
+  // pi: the PI raced, when the rival was eased to a slower race car (pays what that race is worth).
+  campaignResult: (chapter: string, race: number, myTime: number, theirTime: number, pi?: number) => number
   closeCampaignPrize: () => void
   // Records the next Pro Tour race.
   // pi: the rival PI raced (lower than the ladder's when it was eased to the player's car).
@@ -2281,14 +2282,14 @@ export const useGame = create<GameState>()(
         }))
       },
 
-      campaignResult: (chapterId, i, myTime, theirTime) => {
+      campaignResult: (chapterId, i, myTime, theirTime, pi) => {
         const s = get()
         const ch = CAMPAIGN.find((o) => o.id === chapterId)
         if (!ch) return 0
         const id = campaignRaceId(ch, i)
         const before = s.campaign[id] ?? 0
         const stars = campaignStars(myTime, theirTime)
-        s.finishRace(stars > 0, campaignReward(ch, i, before === 0))
+        s.finishRace(stars > 0, campaignReward(ch, i, before === 0, pi))
         if (stars > 0) set((g) => ({ stats: { ...g.stats, campaignWins: (g.stats.campaignWins ?? 0) + 1 } }))
         if (stars <= before) return stars
         const campaign = { ...s.campaign, [id]: stars }
