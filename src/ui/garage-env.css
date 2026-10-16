@@ -11,8 +11,8 @@
 .garage-env .sheet-tabs { position: relative; top: 0; z-index: 3; margin: 0; padding: 8px 14px; background: rgba(15, 20, 29, .72); border-bottom: 0; }
 .garage-env .sheet-tabs button:not(.sel) { background: rgba(255, 255, 255, .88); }
 
-.garage-env .garage { position: static; flex: 1; min-height: 0; display: grid; grid-template-columns: var(--gl) 1fr var(--gd); grid-template-rows: minmax(0, 1fr); gap: 12px; padding: 12px; pointer-events: none; }
-.garage-env .garage > * { pointer-events: auto; }
+.garage-env div.garage { position: static; flex: 1; min-height: 0; display: grid; grid-template-columns: var(--gl) 1fr var(--gd); grid-template-rows: minmax(0, 1fr); gap: 12px; padding: 12px; pointer-events: none; }
+.garage-env div.garage > * { pointer-events: auto; }
 
 /* The room, behind everything (the tabs included). */
 .garage-env .garage-scene { position: absolute; inset: 0; z-index: 0; }
@@ -21,7 +21,7 @@
 .garage-env .garage-scene .cp-hint { left: calc(var(--gl) + (100% - var(--gl) - var(--gd)) / 2); bottom: 16px; font-size: 13px; padding: 4px 12px; }
 
 /* The open middle: drags pass through to the room, the PI badge and the dyno sit on it. */
-.garage-env .garage-hole { grid-column: 2; grid-row: 1; position: relative; z-index: 1; pointer-events: none; min-width: 0; }
+.garage-env div.garage > .garage-hole { grid-column: 2; grid-row: 1; position: relative; z-index: 1; pointer-events: none; min-width: 0; }
 .garage-env .garage-hole > * { pointer-events: auto; }
 .garage-env .garage-hole > .car-pi { top: 0; left: 0; pointer-events: none; }
 .garage-env .garage-hole > .paint-sweep { border-radius: 16px; }
@@ -30,6 +30,31 @@
 .garage-env .garage-list { grid-column: 1; grid-row: 1; padding: 8px; }
 .garage-env .garage-detail { grid-column: 3; grid-row: 1; padding: 12px; }
 .garage-env .garage-detail .garage-name { margin-top: 0; }
+
+/* For Sale: the dealership. Cars list left, the picked car's colours and Buy right. */
+.garage-env .garage-item.locked { opacity: .6; }
+.garage-env .garage-item.focus { border-color: var(--accent); animation: collect-pulse 1s ease-in-out 3; }
+.garage-env .sale-item { grid-template-columns: 56px 1fr; column-gap: 8px; row-gap: 0; }
+.garage-env .sale-item > :first-child { grid-row: span 2; }
+.garage-env .sale-item small { grid-column: 2; white-space: nowrap; font-size: 13px; }
+.garage-env div.garage.sale .garage-detail { align-self: start; }
+.garage-env .sale-item .price { font-weight: 800; }
+.garage-env .sale-owned { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: #2e8b34; color: #fff; font: 900 11px Nunito, sans-serif; font-style: normal; vertical-align: 2px; }
+.garage-env .hole-owned { position: absolute; left: 0; top: 64px; padding: 3px 10px; border-radius: 999px; background: #2e8b34; color: #fff; font: 900 13px Nunito, sans-serif; border: 2px solid #fff; pointer-events: none; }
+.garage-env .body-chip { display: inline-flex; align-items: center; height: 30px; padding: 0 10px; border-radius: 999px; background: #eceff1; color: #37474f; font: 800 13px Nunito, sans-serif; }
+.garage-env .sale-colors { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0 12px; }
+.garage-env .sale-colors .dot { width: 34px; height: 34px; border-width: 3px; }
+.garage-env .sale-buy { display: block; width: 100%; min-height: 54px; font: 22px var(--display); }
+.garage-env .locked-btn.sale-buy { border-radius: 14px; background: #eceff1; text-decoration: none; color: #546e7a; }
+
+/* Collection: the book is a wide sheet beside your car. */
+.garage-env.sec-book div.garage { grid-template-columns: 0 1fr min(560px, 46vw); }
+.garage-env.sec-book .garage-detail .book { padding: 0; }
+
+/* Crate Depot: drawn inside the page under the header and tabs, not over the whole screen. */
+.cars-crates { position: relative; flex: 1; min-height: 0; }
+.cars-crates > .crate-full.embedded { position: absolute; inset: 0; z-index: 0; }
+.crate-full.embedded .rf-top h2 { visibility: hidden; }
 
 @media (min-width: 601px) and (max-width: 980px) {
   .garage-env { --gl: 210px; --gd: 340px; }
@@ -41,7 +66,7 @@
   /* pointer-events back on: iOS Safari won't touch-scroll a container that has them off, even when
      its children take touches. Touches on the car area still reach the room (the hole passes them
      through, and the scene paints above this box). */
-  .garage-env .garage { display: block; overflow-y: auto; overscroll-behavior: contain; padding: 0; pointer-events: auto; }
+  .garage-env div.garage { display: block; overflow-y: auto; overscroll-behavior: contain; padding: 0; pointer-events: auto; }
   /* Sticky inside the scroller (not absolute to the panel) so a swipe that starts on the car scrolls it too. */
   .garage-env .garage-scene { position: sticky; inset: auto; top: 0; height: calc(var(--hole) + 70px); margin-bottom: calc(-1 * (var(--hole) + 70px)); }
   /* The car fills half the screen here, so an up/down swipe on it scrolls the sheet; side swipes and pinches still spin and zoom it. */
@@ -52,7 +77,16 @@
   .garage-env .garage-hole > .car-pi { top: 10px; left: 0; }
   .garage-env .garage-list, .garage-env .garage-detail { overflow: visible; border-radius: 20px 20px 0 0; margin-top: 0; }
   .garage-env .garage-list { display: none; }
-  .garage-env .garage.picking .garage-list { display: grid; max-height: none; overflow: visible; border-radius: 20px 20px 0 0; }
-  .garage-env .garage.picking .garage-detail { border-radius: 0; }
+  .garage-env div.garage.picking .garage-list { display: grid; max-height: none; overflow: visible; border-radius: 20px 20px 0 0; }
+  .garage-env div.garage.picking .garage-detail { border-radius: 0; }
+  /* For Sale: the grid of every car sits under the Buy sheet. */
+  .garage-env div.garage.sale .garage-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; padding: 8px 10px 16px; border-radius: 0; background: var(--sheet); scroll-margin-top: 0; }
+  .garage-env div.garage.sale .garage-list .garage-filter { grid-column: 1 / -1; }
+  .garage-env div.garage.sale .garage-item { grid-template-columns: 1fr; justify-items: center; text-align: center; padding: 4px; font-size: 12px; line-height: 1.15; }
+  .garage-env div.garage.sale .garage-item .sale-owned { display: none; }
+  .garage-env div.garage.sale .sale-item > :first-child { grid-row: auto; }
+  .garage-env div.garage.sale .sale-item small { grid-column: auto; }
+  .garage-env div.garage.sale .garage-detail { min-height: 0; padding-bottom: 12px; box-shadow: 0 -6px 18px rgba(0, 0, 0, .35); }
+  .garage-env.sec-book div.garage { display: block; }
   .garage-env .garage-detail { min-height: 60dvh; padding-bottom: calc(16px + var(--sab)); background: var(--sheet); box-shadow: 0 -6px 18px rgba(0, 0, 0, .35); }
 }
