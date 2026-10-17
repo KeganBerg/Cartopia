@@ -57,7 +57,7 @@ function cleanSetup(raw: unknown): Setup | null {
 
 const racerOf = (p: LivePlayer): KartRacer => ({
   name: playerName(p.uid, p.town), pi: p.pi, ai: false,
-  look: { body: p.body, model: CARS.find((c) => c.name === p.carName)?.id, color: p.color, mods: p.mods },
+  look: { body: p.body, model: CARS.find((c) => c.name === p.carName)?.id, color: p.color, mods: p.mods, skin: p.skin, modSkin: p.modSkin },
 })
 const ORD = (n: number) => `${n}${n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'}`
 const PLACEHOLDER = { race: new KartRace(buildTrack(TRACKS[0], false), [{ name: 'You', pi: 1, ai: false }], 1) }
@@ -265,7 +265,7 @@ export function LiveKartParty({ live, car, onExit, deps = REAL }: { live: LiveRa
           const st = p.id === me || (live.host ? !!here[p.id] : true) ? 'in' : party?.answers[p.id] === false ? 'out' : 'wait'
           return (
             <div key={p.id} className={`kp-row ${st}`}>
-              <CarThumb size="sm" color={p.color} body={p.body} mods={p.mods} />
+              <CarThumb size="sm" color={p.color} body={p.body} mods={p.mods} skin={p.skin} modSkin={p.modSkin} />
               <b>{p.id === me ? 'You' : playerName(p.uid, p.town)}</b>
               <span className="kp-pi">PI {p.pi}</span>
               <span className="kp-st" aria-label={st}>{st === 'in' ? '✅' : st === 'out' ? '❌' : '⏳'}</span>

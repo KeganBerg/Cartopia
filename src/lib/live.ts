@@ -2,10 +2,10 @@ import { create } from 'zustand'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import { useGame } from '../game/store'
-import { CARS, MODS, carDef, performance, type Body } from '../game/data'
+import { CARS, MODS, carDef, performance, type Body, type ModSkins } from '../game/data'
 import { displayName, isCleanName } from './names'
 import { joinRefereed } from './referee'
-import { SERVER_CAR_COLUMNS, serverCallCard, serverCar } from './serverCar'
+import { SERVER_CAR_COLUMNS, cleanSkins, serverCallCard, serverCar } from './serverCar'
 import { callCardDef } from '../game/callCards'
 import { raceCarOf } from '../game/raceCar'
 import { loadUsernames, playerName } from './profiles'
@@ -22,7 +22,7 @@ import { sfx } from './sound'
 
 // uid: the signed-in account. Town, level and car shown to others come from its server save.
 // car: the uid of the car they race with, so a lobby that saw an older pick knows to look again.
-export type LivePlayer = { id: string; uid?: string | null; town: string; level: number; carName: string; color: string; body: Body; pi: number; mods?: string[]; car?: string | null; closed?: boolean; callCard?: string }
+export type LivePlayer = { id: string; uid?: string | null; town: string; level: number; carName: string; color: string; body: Body; pi: number; mods?: string[]; skin?: string; modSkin?: ModSkins; car?: string | null; closed?: boolean; callCard?: string }
 // drag: the classic head-to-head strip. kart: a kart circuit race, the two of you plus AI.
 export type LiveMode = 'drag' | 'kart'
 // stake: coins each racer puts up in a wager race; the winner takes both.
@@ -118,12 +118,13 @@ export function cleanCard(p: unknown): LivePlayer | null {
     car: typeof c.car === 'string' ? c.car.slice(0, 64) : undefined,
     closed: c.closed === true,
     ...(typeof c.callCard === 'string' && callCardDef(c.callCard) ? { callCard: c.callCard } : {}),
+    ...cleanSkins(c),
   }
 }
 
 // What other players see of each account comes from its server save (town name, level and the
 // guard-checked car they race with), never from what a browser says about itself.
-type ServerCard = Pick<LivePlayer, 'town' | 'level' | 'carName' | 'color' | 'body' | 'pi' | 'mods' | 'car' | 'callCard'>
+type ServerCard = Pick<LivePlayer, 'town' | 'level' | 'carName' | 'color' | 'body' | 'pi' | 'mods' | 'skin' | 'modSkin' | 'car' | 'callCard'>
 const known = new Map<string, { at: number; card: ServerCard | null }>()
 // players: lobby cards, so a player whose card names a different race car than we last read is
 // read again (after a few seconds, once their save has reached the server).
@@ -143,7 +144,7 @@ async function lookUp(players: Pick<LivePlayer, 'uid' | 'car'>[]) {
   for (const r of data ?? []) {
     const c = serverCar(r)
     if (!c) continue
-    known.set(r.owner_id, { at, card: { town: r.town_name, level: r.level, carName: c.name, color: c.color, body: c.body, pi: c.pi, mods: c.mods, car: c.uid, callCard: serverCallCard(r) } })
+    known.set(r.owner_id, { at, card: { town: r.town_name, level: r.level, carName: c.name, color: c.color, body: c.body, pi: c.pi, mods: c.mods, skin: c.skin, modSkin: c.modSkin, car: c.uid, callCard: serverCallCard(r) } })
   }
 }
 // A lobby card with the server's details, or null for anyone who isn't a known signed-in player.
@@ -182,7 +183,7 @@ function myCard(): LivePlayer {
   const s = useGame.getState()
   const car = raceCarOf(s.cars, s.raceCar)!
   const d = carDef(car.model)
-  return { id: myId, uid: authUid, town: displayName(s.townName, myId), level: s.level, carName: d.name, color: car.color, body: d.body, pi: performance(d, car.upgrades, car.mods), mods: car.mods, car: car.uid, closed: useLive.getState().closed }
+  return { id: myId, uid: authUid, town: displayName(s.townName, myId), level: s.level, carName: d.name, color: car.color, body: d.body, pi: performance(d, car.upgrades, car.mods), mods: car.mods, ...cleanSkins(car), car: car.uid, closed: useLive.getState().closed }
 }
 
 // Joins the lobby whenever someone is signed in, and leaves it on sign-out.

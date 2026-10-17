@@ -1,10 +1,19 @@
-import { CARS, carDef, performance, type Body } from '../game/data'
+import { CARS, SKINNED_SLOTS, carDef, modSkinDef, performance, skinDef, type Body, type ModSkins } from '../game/data'
 import { callCardDef } from '../game/callCards'
 
 // The car another player races with, as their server save has it. game_saves.best_car is the
 // guard's own pick (their highest PI); their picked race car comes from the guard-checked cars
 // in the save, and its PI is never shown above best_car's.
-export type ServerCar = { uid: string | null; name: string; color: string; body: Body; pi: number; mods?: string[] }
+export type ServerCar = { uid: string | null; name: string; color: string; body: Body; pi: number; mods?: string[]; skin?: string; modSkin?: ModSkins }
+
+// A car's skins as another browser or the server sent them, kept to ones this game knows,
+// so everyone sees a player's car in the animated skin it wears.
+export function cleanSkins(c: { skin?: unknown; modSkin?: unknown }): { skin?: string; modSkin?: ModSkins } {
+  const skin = typeof c.skin === 'string' && skinDef(c.skin) ? c.skin : undefined
+  const m = c.modSkin && typeof c.modSkin === 'object' ? (c.modSkin as Record<string, unknown>) : {}
+  const modSkin = Object.fromEntries(SKINNED_SLOTS.flatMap((sl) => (typeof m[sl] === 'string' && modSkinDef(m[sl] as string) ? [[sl, m[sl]]] : [])))
+  return { ...(skin ? { skin } : {}), ...(Object.keys(modSkin).length ? { modSkin: modSkin as ModSkins } : {}) }
+}
 
 // The game_saves columns serverCar() reads.
 export const SERVER_CAR_COLUMNS = 'best_car, race_car:state->raceCar, cars:state->cars, call_card:state->callCard, call_cards:state->callCards'
@@ -25,7 +34,16 @@ export function serverCar(row: Row): ServerCar | null {
   const lvl = (k: string) => (typeof up[k] === 'number' ? (up[k] as number) : 0)
   const pi = performance(d, { engine: lvl('engine'), turbo: lvl('turbo'), tires: lvl('tires'), weight: lvl('weight') }, mods)
   if (!Number.isFinite(pi)) return best
-  return { uid: row.race_car, name: d.name, color: typeof c.color === 'string' ? c.color : best.color, body: d.body, pi: Math.min(pi, best.pi), ...(mods?.length ? { mods } : {}) }
+  return { uid: row.race_car, name: d.name, color: typeof c.color === 'string' ? c.color : best.color, body: d.body, pi: Math.min(pi, best.pi), ...(mods?.length ? { mods } : {}), ...cleanSkins(c) }
+}
+
+// The skins on another player's best car (game_saves.best_car, which the guard builds without
+// them): the car in their save with that name and paint.
+export function bestCarSkins(row: Row) {
+  const b = (row.best_car ?? {}) as Record<string, unknown>
+  if (!Array.isArray(row.cars)) return {}
+  const c = row.cars.find((x) => x && typeof x === 'object' && KNOWN.has((x as { model?: string }).model ?? '') && carDef((x as { model: string }).model).name === b.name && (x as { color?: unknown }).color === b.color)
+  return c ? cleanSkins(c as Record<string, unknown>) : {}
 }
 
 // The Call Card another player shows (game/callCards.ts): the one their save wears, when the save

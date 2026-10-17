@@ -68,7 +68,7 @@ import { VisitorBadges, StreetRaceCard } from './ui/Visitors'
 import { visitorTick, forceVisitor } from './lib/visitors'
 import type { VisitorKind } from './game/data'
 import { hideSplash, splashProgress } from './lib/splash'
-import { rememberSplashCar } from './lib/splashCar'
+import { rememberSplashCar, skinSplashCar } from './lib/splashCar'
 import { usePrefs } from './lib/prefs'
 import { onDemand, reopenAfterReload } from './ui/lazy'
 import { useAdminCheck } from './lib/admin'
@@ -141,6 +141,7 @@ export default function App() {
     // The loading screen leaves after the town's first frames; this is the fallback if they never come.
     const splashFallback = setTimeout(hideSplash, 15000)
     const prefetch = setTimeout(prefetchPanels, 6000)
+    skinSplashCar()
     const stopSplashCar = rememberSplashCar()
     // Checked again when it fires: a cloud save may have loaded since, already claimed today.
     // On first launch it waits for the flashing-lights warning (FlashWarning opens it after).
