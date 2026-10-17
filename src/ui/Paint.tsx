@@ -59,7 +59,7 @@ export function PaintShop({ car, job, setJob }: { car: OwnedCar; job: PaintJob; 
           {lockedBy ? (
             <button className="buy small paint-rival-go" onClick={() => openPaintRival(lockedBy.id)} title={`Beat ${lockedBy.name} to unlock`}>🏁 {lockedBy.icon} {lockedBy.name.split(' ')[0]}</button>
           ) : (
-            <button className={cost.bucks ? 'buy small premium' : 'buy small'} onClick={() => { if (paintCar(car.uid, job)) setJob(null) }}>{cost.deal && <span className="deal-tag">DEAL</span>}{cost.free && '🎁 '}Buy · {cost.deal && <s>${full.coins.toLocaleString()}</s>} {price}</button>
+            <button className={cost.bucks ? 'buy small premium' : 'buy small'} onClick={() => { if (paintCar(car.uid, job)) setJob(null) }}>{cost.deal && <span className="deal-tag">DEAL</span>}{cost.free && '🎁 '}{cost.deal && <s>${full.coins.toLocaleString()}</s>} {price}</button>
           )}
         </div>
       )}

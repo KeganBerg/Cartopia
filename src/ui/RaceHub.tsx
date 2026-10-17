@@ -208,7 +208,7 @@ export function RaceBar({ cars, car, onPick, go, note, dist, loaner }: { cars: O
     : go ? <button className="buy rm-race" onClick={go.onClick}>🏁 {go.label}<small>⛽{RACE_FUEL}</small></button>
     : note ? <span className="rm-note">{note}</span> : null
   if (loaner) return (
-    <div className="rm-bar">
+    <div className={go ? 'rm-bar has-go' : 'rm-bar'}>
       <div className="rm-car">
         <CarThumb size="xs" color={loaner.color} body={loaner.car.body} model={loaner.car.id} />
         <span className="rm-car-txt">

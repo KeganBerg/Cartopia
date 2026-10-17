@@ -100,8 +100,16 @@ if (typeof document !== 'undefined') document.addEventListener('visibilitychange
 // The shared context and master output for other synthesised audio; null while muted.
 export const audioContext = () => audio()
 export const audioOut = (): AudioNode | null => (audio() ? master : null)
+// When an effect last played, so a menu button with no sound of its own gets a soft tap.
+let playedAt = -Infinity
+const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now())
+
 // The effects fader: sound effects, engines and the arcade play through this.
-export const sfxOut = (): AudioNode | null => (audio() ? effects : null)
+export const sfxOut = (): AudioNode | null => {
+  if (!audio()) return null
+  playedAt = now()
+  return effects
+}
 
 // iPhone: audio may only start inside a tap, and the ring/silent switch mutes
 // web audio unless the page asks for media playback.
@@ -184,6 +192,7 @@ function play(f: (d: { ctx: BaseAudioContext; out: AudioNode }, t: number) => vo
   if (typeof navigator !== 'undefined' && navigator.userActivation?.hasBeenActive === false) return
   const a = audio()
   if (!a || !effects) return
+  playedAt = now()
   f({ ctx: a, out: effects }, a.currentTime + 0.005 + delay)
 }
 
@@ -667,5 +676,11 @@ if (typeof window !== 'undefined') {
   window.addEventListener('click', (e) => {
     const tab = e.target instanceof Element ? e.target.closest('[role="tab"]') : null
     if (tab && tab.getAttribute('aria-selected') !== 'true' && !tab.hasAttribute('disabled')) sfx.tab()
+    // Any other button in a menu or popup that plays nothing itself gets a soft woodblock tap,
+    // so no press feels dead. Sounds a handler plays right around the press win.
+    const btn = !tab && e.target instanceof Element ? e.target.closest('button') : null
+    if (!btn || btn.disabled || !btn.closest('.panel, [role="dialog"]')) return
+    const at = now()
+    setTimeout(() => playedAt < at - 250 && sfx.click(), 40)
   }, true)
 }

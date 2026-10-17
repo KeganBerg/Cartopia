@@ -4,7 +4,7 @@
 // and the save's level, at most ENDLESS_PAY.perDay a UTC day (econ_private.endless_pay()).
 import { WORLD_TOUR } from './worldTour'
 import {
-  BUILDINGS, MAX_UPGRADE, UPGRADE_SLOTS, buildingDef, buildingLevel, carDef, dayKey, maxLevel, performance, takesDriver, upgradable, xpToNext,
+  BUILDINGS, MAX_UPGRADE, UPGRADE_SLOTS, buildingDef, buildingLevel, carDef, dayKey, maxLevel, performance, takesDriver, upgradable, xpGain, xpToNext,
   type CounterKey, type StatKey, type UpgradeSlot,
 } from './data'
 
@@ -29,6 +29,12 @@ export const endlessPay = (num: number, level: number) => ({
   parts: num % ENDLESS_PAY.partsEvery === 0 ? ENDLESS_PAY.parts : 0,
   bucks: num % ENDLESS_PAY.bucksEvery === 0 ? ENDLESS_PAY.bucks : 0,
 })
+// The XP a goal actually gives: the boosted base, or a share of the level, whichever is more, so a
+// goal still moves the bar at level 30 or 50 where the base alone is a sliver. Client-only, like the
+// chests' level share (CHEST_XP_SHARE): the server's XP bank (a level every 20 minutes) covers it.
+export const ENDLESS_XP_SHARE = 0.01
+export const endlessXp = (level: number) =>
+  Math.max(xpGain(level, ENDLESS_PAY.xp + ENDLESS_PAY.xpPerLevel * level), Math.round((ENDLESS_XP_SHARE * xpToNext(level)) / 10) * 10)
 
 // The town as the goals see it. value() reads a story-goal stat (statValue in the store).
 type Car = { uid: string; model: string; upgrades: Record<UpgradeSlot, number>; mods?: string[] }

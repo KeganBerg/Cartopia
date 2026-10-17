@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { readdirSync, readFileSync } from 'node:fs'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { ENDLESS_PAY, KINDS, drawEndless, endlessCapped, endlessDone, endlessPay, endlessSlots, endlessText, filledEndless, type EndlessTown } from './endless'
-import { BUILDINGS, GOALS } from './data'
+import { ENDLESS_PAY, ENDLESS_XP_SHARE, KINDS, endlessXp, drawEndless, endlessCapped, endlessDone, endlessPay, endlessSlots, endlessText, filledEndless, type EndlessTown } from './endless'
+import { BUILDINGS, GOALS, xpGain, xpToNext } from './data'
 
 const dir = `${process.cwd()}/supabase/migrations`
 const town = (over: Partial<EndlessTown> = {}): EndlessTown => ({
@@ -89,6 +89,15 @@ describe('endless goals', () => {
     expect(endlessCapped({ n: 30, day: '2026-10-15', today: ENDLESS_PAY.perDay, goals: [] }, now)).toBe(false)
   })
 
+  it('XP still moves the level bar late in the game: at least a share of the level, never under the boosted base', () => {
+    for (const l of [3, 10, 20, 30, 50, 70]) {
+      expect(endlessXp(l)).toBeGreaterThanOrEqual(Math.round(ENDLESS_XP_SHARE * xpToNext(l)) - 5)
+      expect(endlessXp(l)).toBeGreaterThanOrEqual(xpGain(l, endlessPay(1, l).xp))
+    }
+    // Twelve a day stays well under a level, so goals help without skipping the curve.
+    for (const l of [10, 30, 50]) expect((12 * endlessXp(l)) / xpToNext(l)).toBeLessThan(0.25)
+  })
+
   it('matches what the server guard pays (econ_private.endless_pay)', () => {
     const sql = readdirSync(dir).sort().map((f) => readFileSync(`${dir}/${f}`, 'utf8')).filter((s) => s.includes('$endless$')).pop()!
     const json = sql.match(/\$endless\$\s*select '([^']+)'::jsonb/)![1]
@@ -134,6 +143,7 @@ describe('endless goals in the store', () => {
     expect(after.endless!.n).toBe(1)
     expect(after.endless!.today).toBe(1)
     expect(after.coins).toBe(endlessPay(1, 20).coins)
+    expect(after.xp - s.xp).toBe(endlessXp(20))
     expect(activeEndless(after)).toHaveLength(3)
     expect(activeEndless(after).some((o) => o.k === g.k)).toBe(false)
   })

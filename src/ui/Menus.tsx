@@ -283,15 +283,18 @@ export function SheetTabs<T extends string>({ items, value, onChange }: { items:
     if (!el || !sel) return
     const r = el.getBoundingClientRect()
     const t = sel.getBoundingClientRect()
+    // Keep it clear of the › strip too, which covers the row's right edge.
+    const edge = r.right - (el.querySelector('.sheet-more-bar')?.getBoundingClientRect().width ?? 0)
     if (t.left < r.left) el.scrollLeft -= r.left - t.left
-    else if (t.right > r.right) el.scrollLeft += t.right - r.right
+    else if (t.right > edge) el.scrollLeft += t.right - edge
   }, [value])
   return (
     <div ref={row} className="sheet-tabs" role="tablist">
       {items.map((t) => (
         <button key={t.id} role="tab" aria-selected={t.id === value} className={t.id === value ? 'sel' : ''} onClick={() => onChange(t.id)}>{t.label}</button>
       ))}
-      {more && <button className="sheet-more" aria-label="More tabs" onClick={() => row.current?.scrollBy({ left: row.current.clientWidth * 0.7, behavior: 'smooth' })}>›</button>}
+      {/* The arrow sits on a strip of the row's colour, so the next tab fades out behind it. */}
+      {more && <span className="sheet-more-bar"><button className="sheet-more" aria-label="More tabs" onClick={() => row.current?.scrollBy({ left: row.current.clientWidth * 0.7, behavior: 'smooth' })}>›</button></span>}
     </div>
   )
 }

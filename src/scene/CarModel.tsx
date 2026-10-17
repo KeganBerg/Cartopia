@@ -11,7 +11,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { wheelTex } from './textures'
 import { glowMats } from './dayNight'
 import { FINISH_LOOK, SKINNED_SLOTS, STANCE, TRACK_STEEL, fittedMods, isBike, modSkinNumber, skinNumber, trackSkinDef, type Body, type Finish, type ModSkins, type ModSlot, type Panels, type SkinnedSlot } from '../game/data'
-import { PLATE, armsGeo, glowLink, idlerGeo, linkCount, padsFor, paintedLink, placeLinks, roadWheelGeo, rollers, sprocketGeo, trackLoop, type GearLook } from './tankTrack'
+import { armsGeo, gearLayout, sprocketR, glowLink, idlerGeo, linkCount, padsFor, paintedLink, placeLinks, roadWheelGeo, rollers, sprocketGeo, trackLoop, type GearLook } from './tankTrack'
 import { paintsPanels, panelUniforms, setPanels, withPanels, type Zones } from './panelPaint'
 import { tickSkins, withSkin } from './skins'
 import { CarMods, KIND_MAT, RIM_LOOK, RIM_STYLE, UnderglowPool, carbon, modGeo, modIds, splitSkinned } from './CarMods'
@@ -1108,6 +1108,12 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
         k.add('paint', rbox(0.03, s.wheel * 0.62, wz * 2 + s.wheel * 1.7, 0.012), [sd * (tx + 0.105), s.wheel * 1.62, 0])
         for (let i = -3; i <= 3; i++) k.add('chrome', disc(0.011, 6), [sd * (tx + 0.1225), s.wheel * 1.75, (i * wz) / 3], [0, (sd * Math.PI) / 2, 0])
       }
+      // Track guard: a flat plate over the top run from inside the hull side out to the skirt,
+      // so the links run under it rather than in and out of the hull. The treads' tips reach
+      // two wheel heights up whatever the pads (see trackLoop).
+      const gi = s.wid / 2 - 0.012
+      const go = tx + 0.12
+      k.add('paint', rbox(go - gi, 0.014, wz * 2 + s.wheel * 1.7, 0.005), [sd * (gi + go) / 2, s.wheel * 2 + 0.011, 0])
     }
   }
   if (s.armor) {
@@ -1458,7 +1464,7 @@ function TankTracks({ wheel, wz, tx, rusty, tires, skin, rig, own }: {
   const gl = gearLook(skin, rusty)
   const road = roadWheelGeo(0.05, ROAD_R, gl)
   const idler = idlerGeo(0.045, Math.max(...rolls.map(([, , r]) => r)), gl)
-  const spr = loop.rc - PLATE / 2 - 0.004
+  const spr = sprocketR(loop)
   const sprocket = sprocketGeo(spr, 13)
   const links = useRef<InstancedMesh>(null)
   const glows = useRef<InstancedMesh>(null)
@@ -1466,19 +1472,8 @@ function TankTracks({ wheel, wz, tx, rusty, tires, skin, rig, own }: {
   const idlers = useRef<InstancedMesh>(null)
   const sprockets = useRef<InstancedMesh>(null)
   const st = useRef({ dist: 0, last: null as number | null })
-  // Each round wheel: [x, y, z, radius]; the road wheel pairs straddle the guide horns, the
-  // return rollers ride the middle, and the idler (the big one at the front) is drawn on its own.
-  const { wheels, idle } = useMemo(() => {
-    const wheels: { x: number; y: number; z: number; r: number }[] = []
-    const idle: { x: number; y: number; z: number; r: number }[] = []
-    const big = Math.max(...rolls.map(([, , r]) => r))
-    for (const sd of [-1, 1]) for (const [z, y, r] of rolls) {
-      if (r === big) idle.push({ x: sd * tx, y, z, r })
-      else if (r < 0.05) wheels.push({ x: sd * tx, y, z, r })
-      else for (const dx of [-0.04, 0.04]) wheels.push({ x: sd * tx + dx, y, z, r })
-    }
-    return { wheels, idle }
-  }, [rolls, tx])
+  // Each round wheel: [x, y, z, radius] (see gearLayout); the idler is drawn on its own.
+  const { wheels, idle } = useMemo(() => gearLayout(loop, tx), [loop, tx])
   const arms = useMemo(() => {
     const at = rolls.filter(([, , r]) => r >= 0.05 && r < Math.max(...rolls.map(([, , q]) => q))).map(([z, y]) => [z, y] as [number, number])
     return armsGeo(at, [-(tx - 0.076), tx - 0.076], gl)

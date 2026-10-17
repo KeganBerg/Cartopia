@@ -166,7 +166,9 @@ export function TauntsPanel() {
   }
   return (
     <Panel title="👻 Ghost races">
-      {shown.length === 0 ? <p className="hint">No taunts. Visit a friend's town and tap 👻 Race to send one.</p> : (
+      {shown.length === 0 ? (
+        <div className="inv-empty" title="Visit a friend's town and tap 👻 Race to send one"><span className="empty-ico">👻</span><div>No ghost races yet</div></div>
+      ) : (
         <div className="cards rows taunt-list">
           {shown.map((t) => (
             <div key={t.id} className="card taunt-note">

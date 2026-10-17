@@ -23,9 +23,10 @@ function statLine(m: ModDef) {
     .join(' · ')
 }
 
+// The parts a mod also costs sit on a line of their own under the coins, so the price shows whole.
 function price(m: ModDef, coins = m.coins) {
   if (m.bucks) return `💎 ${m.bucks}`
-  return `$${coins.toLocaleString()}${m.parts ? ` + ${m.parts}⚙` : ''}`
+  return <>${coins.toLocaleString()}{m.parts ? <small className="mod-parts">+&nbsp;{m.parts}⚙</small> : null}</>
 }
 
 // Cheapest first, coin parts before gem parts, so each card along the row is a step up.
@@ -103,7 +104,7 @@ export function ModShop({ car, trying, setTrying, skinTry, setSkinTry }: {
                 <button
                   className={m.bucks ? 'buy small premium' : 'buy small'}
                   onClick={(e) => { e.stopPropagation(); if (modCar(car.uid, m.id)) setTrying(null) }}
-                >{deal.deal && <span className="deal-tag">DEAL</span>}Buy · {price(m, deal.coins)}</button>
+                >{deal.deal && <span className="deal-tag">DEAL</span>}{price(m, deal.coins)}</button>
               )}
             </div>
           )
