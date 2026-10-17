@@ -1,4 +1,4 @@
-// The crew war screen (?battle=demo, ?battle=won) on phone and desktop: board, war chest track, crews, log, you.
+// The crew war screen (?battle=demo, ?battle=won) on phone and desktop: war map (and a rival picked), crews, log.
 // node scripts/warshot/shoot.mjs <outDir>   (needs `npx vite` on :5173)
 import { chromium } from 'playwright'
 const [, , out = 'warshot-out'] = process.argv
@@ -14,9 +14,16 @@ for (const mode of ['demo', 'won']) {
     await p.waitForFunction(() => document.querySelector('.cb-dock'), null, { timeout: 60000 })
     await p.waitForTimeout(9000)
     await p.screenshot({ path: `${out}/${mode}-${form}.png` })
-    await p.locator('.cb-tabs button').nth(1).dispatchEvent('click')
-    await p.waitForTimeout(1200)
-    await p.screenshot({ path: `${out}/${mode}-${form}-log.png` })
+    if (await p.locator('.wm-spot.them').count()) {
+      await p.locator('.wm-spot.them').nth(1).dispatchEvent('click')
+      await p.waitForTimeout(800)
+      await p.screenshot({ path: `${out}/${mode}-${form}-pick.png` })
+    }
+    for (const [i, name] of [[1, 'crews'], [2, 'log']]) {
+      await p.locator('.cb-tabs button').nth(i).dispatchEvent('click')
+      await p.waitForTimeout(1200)
+      await p.screenshot({ path: `${out}/${mode}-${form}-${name}.png` })
+    }
     const wide = await p.evaluate(() => [...document.querySelectorAll('.cb-dock *')].filter((e) => e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflowX === 'visible' && e.clientWidth > 0).map((e) => e.className + ':' + e.scrollWidth + '/' + e.clientWidth))
     console.log(mode, form, 'overflowing', wide)
     await p.close()

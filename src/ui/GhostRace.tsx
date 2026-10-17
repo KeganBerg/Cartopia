@@ -10,6 +10,8 @@ import { Panel } from './Menus'
 import { PlayerName } from './Username'
 import { isCrewMate } from '../lib/crewRaces'
 import { usePrefs } from '../lib/prefs'
+import { submitWarRun, warStars, type WarResult } from '../lib/warMap'
+import './war-result.css'
 
 // The race itself loads with the Race menu's code, the first time a ghost race starts.
 const DragRace = onDemand(() => import('./Race'), (m) => m.DragRace)
@@ -32,7 +34,7 @@ export function GhostButton({ town }: { town: { ownerId: string; townName: strin
 }
 
 // The last run's post to the server, started as it crossed the line (null: kept on this device).
-let posting: { t: number; posted: Promise<GhostResult | null> | null } | null = null
+let posting: { t: number; posted: Promise<GhostResult | null> | null; war?: Promise<WarResult | null> | null } | null = null
 
 export function GhostRacePanel() {
   const ghost = useGhost((g) => g.ghost)
@@ -49,13 +51,20 @@ export function GhostRacePanel() {
       rival={{ id: 'ghost', town: `👻 ${ghost.town}`, level: 0, carName: ghost.car, color: ghost.color, pi: ghost.pi, online: false, body: ghost.body }}
       trial={{ target: ghost.target }}
       venueId="main"
-      title={isCrewMate(ghost.owner) ? `🛡️ Crew race · ${ghost.town}` : `👻 ${ghost.town}'s ${ghost.par ? 'par time' : 'best run'}`}
+      title={ghost.war ? `⚔️ War race · ${ghost.town}` : isCrewMate(ghost.owner) ? `🛡️ Crew race · ${ghost.town}` : `👻 ${ghost.town}'s ${ghost.par ? 'par time' : 'best run'}`}
       onFinish={(_won, myTime) => {
+        if (ghost.war) {
+          useGame.getState().crewRace()
+          posting = { t: myTime, posted: null, war: ghost.real ? submitWarRun(myTime) : null }
+          return
+        }
         if (ghost.real && isCrewMate(ghost.owner)) useGame.getState().crewRace()
         // Posted at the line, so closing before the result card can't lose the run.
         posting = { t: myTime, posted: ghost.real && signedInUser() ? submitRun(myTime) : null }
       }}
-      resultView={(r) => <GhostResultCard myTime={r.myTime} onAgain={() => runGhost(ghost)} onExit={exit} />}
+      resultView={(r) => ghost.war
+        ? <WarResultCard myTime={r.myTime} onMap={() => useGame.getState().openPanel('battle')} />
+        : <GhostResultCard myTime={r.myTime} onAgain={() => runGhost(ghost)} onExit={exit} />}
       onExit={exit}
     />
   )
@@ -107,6 +116,38 @@ function GhostResultCard({ myTime, onAgain, onExit }: { myTime: number; onAgain:
         <div className="row trial-row">
           <button className="buy alt rr-go" onClick={onExit}>Done</button>
           <button className="buy rr-go" onClick={onAgain}>↻ Again · ⛽{GHOST_FUEL}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// The end of a war race: the stars taken off the rival and the war points they add.
+function WarResultCard({ myTime, onMap }: { myTime: number; onMap: () => void }) {
+  const ghost = useGhost((g) => g.ghost)!
+  const [run] = useState(() => (posting?.t === myTime ? posting.war ?? null : null))
+  const [posted, setPosted] = useState<WarResult | null | undefined>(run ? undefined : null)
+  useEffect(() => {
+    let live = true
+    run?.then((r) => live && setPosted(r))
+    return () => { live = false }
+  }, [run])
+  const time = posted?.kept ?? myTime
+  const their = posted?.their ?? ghost.target
+  const won = posted ? posted.won : time < their
+  const stars = posted ? posted.stars : warStars(time, their)
+  return (
+    <div className={won ? 'rr win' : 'rr lose'}>
+      <div className="rr-card ghost-card war-card">
+        <div className="war-stars" aria-label={`${stars} stars`}>{[1, 2, 3].map((i) => <span key={i} className={i <= stars ? 'on' : ''}>★</span>)}</div>
+        <h3 className="rr-title">{won ? `${ghost.town.toUpperCase()} BEATEN!` : 'HELD THEIR GROUND'}</h3>
+        <div className="ghost-times">
+          <span className={won ? 'win' : ''}><small>You</small><b>{secs(time)}</b></span>
+          <span className={won ? '' : 'win'}><small>⚔️ {ghost.town}</small><b>{secs(their)}</b></span>
+        </div>
+        <p className="rr-sub war-pts" title="Each star is 5 war points. Win by 1% for 2 stars, 3% for 3">{posted === undefined ? 'Posting...' : `⚔️ +${posted?.points ?? stars * 5} for ${ghost.war?.tag ?? 'your crew'}`}</p>
+        <div className="row trial-row">
+          <button className="buy rr-go" onClick={onMap}>🗺️ War map</button>
         </div>
       </div>
     </div>
