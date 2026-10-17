@@ -838,7 +838,7 @@ export const playXp = (base: number, level: number) => Math.round(base * playXpM
 // steady mid-game and a longer late game. x1 up to level 3 (the first ten minutes unlock one
 // feature at a time on them), x1.5, x2, x2.5 to x3 at 7-10, then easing off as 3 x sqrt(10/level)
 // (x2.1 at 20, x1.7 at 30, x1.3 at 50, never under x1). For a typical hour of play a day: level 10 on day 6,
-// 20 in about 4 weeks, 30 in 2 months, 50 in 6 (scripts/xpAudit.ts).
+// 20 in about 4 weeks, 30 in 2 months, 50 in about 5 with endless goals (scripts/xpAudit.ts).
 // Client-only: the server guard banks a level every 20 minutes, up to 3, far above this.
 export const levelXpBoost = (level: number) =>
   level <= 3 ? 1 : level < 10 ? Math.min(3, 1 + 0.5 * (level - 3)) : Math.max(1, 3 * Math.sqrt(10 / level))

@@ -5,7 +5,7 @@ import {
   activeEndless, endlessReady, endlessTown,
   type Period, type GameState,
 } from '../game/store'
-import { ENDLESS_PAY, KINDS, endlessCapped, endlessHave, endlessPay, endlessText, type EndlessGoal, type EndlessKind } from '../game/endless'
+import { ENDLESS_PAY, KINDS, endlessCapped, endlessHave, endlessPay, endlessXp, endlessText, type EndlessGoal, type EndlessKind } from '../game/endless'
 import {
   GOALS, QUEST_PAY, TASKS_PER_PERIOD, payAt, msToNextDay, msToNextWeek, buildingDef, buildingLevel, upgradable, maxLevel,
   carDef, takesDriver, SEASON_STARS, activeEvent, eventEndsAt, plotPrice, START_LAND, type StatKey, type GoalDef, flatFixCost, servicePay, serviceXp, xpGain, chestXp, gasCanCost,
@@ -175,8 +175,8 @@ function Reward({ coins, xp, exactXp, bucks, parts, stars }: { coins: number; xp
   )
 }
 
-function Row({ icon, text, have, target, done, claimed, wait, onGo, onClaim, pay, children }: {
-  icon: React.ReactNode; text: string; have: number; target: number; done: boolean; claimed?: boolean; wait?: string; onGo: () => void; onClaim: () => void; pay?: Amounts; children: React.ReactNode
+function Row({ icon, text, have, target, done, claimed, wait, onGo, onClaim, pay, exactXp, children }: {
+  icon: React.ReactNode; text: string; have: number; target: number; done: boolean; claimed?: boolean; wait?: string; onGo: () => void; onClaim: () => void; pay?: Amounts; exactXp?: boolean; children: React.ReactNode
 }) {
   const level = useGame((s) => s.level)
   return (
@@ -195,7 +195,7 @@ function Row({ icon, text, have, target, done, claimed, wait, onGo, onClaim, pay
         : done && wait
           ? <button className="buy small" disabled title="Endless goals: back tomorrow (UTC)">🔒 {wait}</button>
           : done
-          ? <button className="buy small" onClick={(e) => { if (pay) flyFrom(e.currentTarget, pay.xp ? { ...pay, xp: xpGain(level, pay.xp) } : pay); onClaim() }}>Collect</button>
+          ? <button className="buy small" onClick={(e) => { if (pay) flyFrom(e.currentTarget, pay.xp && !exactXp ? { ...pay, xp: xpGain(level, pay.xp) } : pay); onClaim() }}>Collect</button>
           : <button className="buy small alt" onClick={onGo}>Go ›</button>}
     </div>
   )
@@ -209,12 +209,19 @@ function StoryGoals() {
   const total = story.length
   const claimed = s.claimedGoals.filter((id) => story.some((g) => g.id === id)).length
   const endless = activeEndless(s)
+  // Once the story is done its full bar says nothing new: a small ✔ chip joins the endless
+  // header instead, so the tab opens on one progress line, the one still moving.
+  const storyDone = claimed >= total
   return (
     <>
-      <div className="goal-head">
-        <span>{claimed >= total ? '✔' : ''} Story {claimed}/{total}</span>
-        <div className="bar"><span style={{ width: `${(claimed / total) * 100}%` }} /></div>
-      </div>
+      {storyDone
+        ? <EndlessHead story={total} />
+        : (
+          <div className="goal-head">
+            <span>Story {claimed}/{total}</span>
+            <div className="bar"><span style={{ width: `${(claimed / total) * 100}%` }} /></div>
+          </div>
+        )}
       <div className="goals">
         {goals.map((g: GoalDef) => (
           <Row key={g.id} icon={g.icon} text={g.text} have={statValue(s, g.stat, g.def)} target={g.target} done={goalDone(s, g)}
@@ -222,7 +229,7 @@ function StoryGoals() {
             <Reward coins={g.coins} xp={g.xp} bucks={g.bucks} />
           </Row>
         ))}
-        {endless.length > 0 && <EndlessHead />}
+        {!storyDone && endless.length > 0 && <EndlessHead />}
         {endless.map((g) => <EndlessRow key={g.k} g={g} />)}
       </div>
     </>
@@ -230,11 +237,12 @@ function StoryGoals() {
 }
 
 // Endless goals so far, and the pips toward the next parts (5th) and gems (10th) bonus.
-function EndlessHead() {
+function EndlessHead({ story }: { story?: number }) {
   const done = useGame((s) => s.endless?.n ?? 0)
   const at = done % ENDLESS_PAY.bucksEvery
   return (
-    <div className="endless-head" title={`Endless goals: ${n(done)} done · every ${ENDLESS_PAY.partsEvery}th +${ENDLESS_PAY.parts} parts · every ${ENDLESS_PAY.bucksEvery}th +${ENDLESS_PAY.bucks} gems`}>
+    <div className={story ? 'endless-head top' : 'endless-head'} title={`Endless goals: ${n(done)} done · every ${ENDLESS_PAY.partsEvery}th +${ENDLESS_PAY.parts} parts · every ${ENDLESS_PAY.bucksEvery}th +${ENDLESS_PAY.bucks} gems`}>
+      {!!story && <span className="story-done" title={`Story ${story}/${story}`}>📖 ✔</span>}
       <b>♾ {n(done)}</b>
       <span className="endless-pips">
         {Array.from({ length: ENDLESS_PAY.bucksEvery }, (_, i) => {
@@ -253,11 +261,12 @@ function EndlessRow({ g }: { g: EndlessGoal }) {
   const have = endlessHave(endlessTown(s), g)
   const done = endlessReady(s, g)
   const pay = endlessPay((s.endless?.n ?? 0) + 1, s.level)
+  const xp = endlessXp(s.level)
   return (
     <Row icon={<EndlessIcon g={g} />} text={endlessText(g, s.cars)} have={have} target={g.n} done={done}
       wait={endlessCapped(s.endless, now) ? left(msToNextDay(now)) : undefined}
-      onGo={() => goToEndless(g)} onClaim={() => s.claimEndless(g.k)} pay={{ coins: pay.coins, xp: pay.xp, parts: pay.parts, bucks: pay.bucks }}>
-      <Reward coins={pay.coins} xp={pay.xp} parts={pay.parts} bucks={pay.bucks} />
+      onGo={() => goToEndless(g)} onClaim={() => s.claimEndless(g.k)} pay={{ coins: pay.coins, xp, parts: pay.parts, bucks: pay.bucks }} exactXp>
+      <Reward coins={pay.coins} exactXp={xp} parts={pay.parts} bucks={pay.bucks} />
     </Row>
   )
 }
