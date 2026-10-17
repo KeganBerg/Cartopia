@@ -86,7 +86,7 @@ fc, last = [], '0:v'
 for k, (c, a, b) in enumerate(cards, 1):
     inputs += ['-loop', '1', '-t', str(total), '-framerate', str(FPS), '-i', f'{OV}/{O}-{c}.png']
     fo = f',fade=t=out:st={b - 0.15}:d=0.15:alpha=1' if b < total - 0.01 else ''
-    fc.append(f"[{k}:v]format=rgba,fade=t=in:st={a}:d=0.08:alpha=1{fo},scale=w='trunc(iw*(1+0.3*max(0,1-(t-{a})/0.18))/2)*2':h=-2:eval=frame[o{k}]")
+    fc.append(f"[{k}:v]format=rgba,fade=t=in:st={a}:d=0.08:alpha=1{fo},scale=w='trunc(iw*(1+0.3*clip(1-(t-{a})/0.18,0,1))/2)*2':h=-2:eval=frame[o{k}]")
     fc.append(f"[{last}][o{k}]overlay=x='(W-w)/2':y='(H-h)/2':format=auto[v{k}]")
     last = f'v{k}'
 # White flashes on the hits: the logo, the drop, the end card.
