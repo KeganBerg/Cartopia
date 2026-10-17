@@ -1,0 +1,60 @@
+// A car given from the admin panel turns up in the player's open game, and Give with XP confirms the level.
+// node scripts/adminshot/gift.mjs <outDir>   (needs `npm run dev` on :5173)
+import { chromium } from 'playwright'
+const [, , out = 'admin-out'] = process.argv
+const b = await chromium.launch({ executablePath: process.env.CHROME ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] })
+const forms = [['desktop', { width: 1280, height: 800 }], ['phone', { width: 390, height: 844 }]].filter(([f]) => !process.env.FORM || process.env.FORM === f)
+for (const [form, size] of forms) {
+  const p = await b.newPage({ viewport: size, deviceScaleFactor: form === 'phone' ? 2 : 1 })
+  p.on('pageerror', (e) => console.log('error', e.message))
+  await p.addInitScript(() => localStorage.setItem('cartopia-flash-warning-hide', '1'))
+  await p.goto('http://localhost:5173/?time=0.3&season=fall')
+  await p.waitForFunction(() => window.__game, null, { timeout: 90000 })
+  await p.locator('#splash button.ld').click({ timeout: 60000 }).catch(() => {})
+  await p.waitForSelector('#splash', { state: 'detached', timeout: 20000 }).catch(() => {})
+  await p.waitForTimeout(2500)
+  await p.evaluate(async () => {
+    const { admin } = await import('/src/lib/admin.ts')
+    const gabe = { id: 'g', username: 'Gabe', town: 'Gabeville', level: 19, coins: 1200, gems: 5, parts: 3, muted: null, admin: false, joined: '', seen: '',
+      cars: [{ uid: 'c1', model: 'pip', color: '#e53935' }], chat: [] }
+    const ok = (data) => Promise.resolve({ data, error: null })
+    admin.find = () => ok([gabe])
+    admin.player = () => ok(gabe)
+    window.__game.setState({ tutorial: 99, panel: null, panelBack: [], admin: true })
+  })
+  await p.evaluate(() => window.__game.getState().openPanel('admin'))
+  await p.waitForTimeout(1200)
+  await p.locator('.sheet-tabs button', { hasText: 'Players' }).click()
+  await p.locator('.adm-input').fill('gabe')
+  await p.waitForTimeout(900)
+  await p.locator('.adm-row').first().click()
+  await p.waitForTimeout(1500)
+  await p.locator('.adm-input').first().fill('gift')
+  await p.locator('.adm-money').nth(3).locator('.adm-step').nth(1).click()
+  await p.locator('.adm-give').click()
+  await p.waitForTimeout(500)
+  await p.screenshot({ path: `${out}/${form}-xp-confirm.png` })
+  await p.locator('.cf-no').click()
+  await p.locator('.adm-max').nth(3).click()
+  await p.locator('.adm-give').click()
+  await p.waitForTimeout(500)
+  await p.screenshot({ path: `${out}/${form}-xp-max-confirm.png` })
+  await p.locator('.cf-no').click()
+  // The server adds a car to this player's cloud town; the open game takes it in without a reload.
+  await p.evaluate(() => window.__game.setState({ panel: null, panelBack: [], admin: false }))
+  const took = await p.evaluate(async () => {
+    const { saveOf } = await import('/src/game/store.ts')
+    const { adoptServer } = await import('/src/lib/cloud.ts')
+    const s = saveOf(window.__game.getState())
+    const car = { uid: 'adm-1', model: 'vanta', color: '#e53935', upgrades: { engine: 0, turbo: 0, tires: 0, weight: 0 } }
+    return adoptServer({ ...s, cars: [...s.cars, car] }, 'x')
+  })
+  console.log(form, 'adopted', took)
+  await p.waitForTimeout(600)
+  await p.screenshot({ path: `${out}/${form}-gift-toast.png` })
+  await p.evaluate(() => window.__game.getState().openPanel('garage'))
+  await p.waitForTimeout(3000)
+  await p.screenshot({ path: `${out}/${form}-gift-garage.png` })
+  await p.close()
+}
+await b.close()

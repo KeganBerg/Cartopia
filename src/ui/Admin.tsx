@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useGame } from '../game/store'
-import { CARS, carDef } from '../game/data'
+import { CARS, carDef, xpToNext } from '../game/data'
 import { activeEvent, liveEvents } from '../game/liveEvents'
 import { admin, type AdminLogRow, type AdminPlayer, type LiveKind } from '../lib/admin'
 import { useNow } from '../scene/useNow'
@@ -199,6 +199,16 @@ const XP_STEPS = [1_000, 100_000]
 const TOP = 1e12
 const amount = (v: string) => Math.min(TOP, Number(v.replace(/\D/g, '')) || 0)
 const shown = (n: number) => (n >= TOP ? 'MAX' : n || '')
+// econ_level_for tops out here.
+const MAX_LEVEL = 200
+// The level a player reaches with `add` more XP, counting from the start of their level (the panel
+// doesn't see XP into the level, so this is the least they'll reach). Same curve as econ_level_for.
+export function levelAfter(level: number, add: number) {
+  let l = level
+  let left = add
+  while (l < MAX_LEVEL && left >= xpToNext(l)) left -= xpToNext(l++)
+  return l
+}
 const MUTES: [number | null, string][] = [[15, '15m'], [60, '1h'], [1440, '1d'], [null, '∞']]
 
 function PlayerView({ id, onBack, confirm }: { id: string; onBack: () => void; confirm: (a: Ask) => void }) {
@@ -244,6 +254,8 @@ function PlayerView({ id, onBack, confirm }: { id: string; onBack: () => void; c
     const label = [part(c, '🪙'), part(g, '💎'), part(pt, '⚙️'), part(x, '⭐')].filter(Boolean).join(' ')
     const go = () => void run(() => admin.grant(p.id, c, g, pt, why, x), `✔ ${label}`).then(() => { setCoins(0); setGems(0); setParts(0); setXp(0) })
     if (sign < 0) confirm({ icon: '➖', title: `Take ${label.replace(/-/g, '')}?`, ok: 'Take', run: go })
+    // XP can jump a player many levels (and levels never go back down), so Give shows where it lands.
+    else if (x) confirm({ icon: '⭐', title: `Lv ${p.level} → ${levelAfter(p.level, x)}?`, ok: 'Give', run: go })
     else go()
   }
   const noWhy = why.length < 3
