@@ -409,7 +409,8 @@ function BisonHead({ m }: { m: Mat }) {
 // The tall sign by the road: the bison on top, the name and today's price below.
 function Pylon({ m, t, level }: { m: Mat; t: TravelLayout; level: number }) {
   const [x, z] = t.pylon
-  const h = Math.min(2.6 + t.L * 0.12, 4.6) + (level - 7) * 0.12
+  // A roadside sign, not a tower: it tops out a little over the store roof.
+  const h = Math.min(1.3 + t.L * 0.06, 2.4) + (level - 7) * 0.03
   const w = 1.1
   return (
     <group position={[x, 0, z]}>
