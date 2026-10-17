@@ -98,7 +98,7 @@ export function badWells(model: string) {
   const def = CARS.find((c) => c.id === model)!
   pieces = []
   freshGeo(def.body, {}, model)
-  const f = carFrame(def.body)
+  const f = carFrame(def.body, model)
   const all = pieces.filter((p) => p.look !== 'glass')
   const bad: string[] = []
   for (const p of pieces) {

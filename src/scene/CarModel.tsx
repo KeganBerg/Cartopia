@@ -27,8 +27,9 @@ import type { HatFit } from '../game/hats'
 import { ODDBALL } from './oddballCars'
 import { RESTO } from './restoCars'
 import { PACK_CARS } from './packCars'
+import { MODEL_SHAPE } from './carLooks'
 
-type Shape = {
+export type Shape = {
   len: number; wid: number
   body: number // lower body height
   lift: number // ground clearance
@@ -45,6 +46,10 @@ type Shape = {
   wood?: boolean // wood side panels
   wing?: boolean // tall rally wing
   quad?: boolean // four round headlights, the inner left one an air intake
+  // Headlights other than the body's own: round sealed beams, a slim strip, projectors in a
+  // housing, or hidden behind a grille that runs the full width of the nose.
+  lamps?: 'round' | 'strip' | 'housing' | 'hidden'
+  grille?: 'big' | 'small' | 'none' // the grille, when it isn't the body's own
   flares?: boolean // bolt-on wide arches over each tyre
   ducktail?: boolean // small kicked-up lip on the trunk
   lightbar?: boolean // one full-width tail light
@@ -141,7 +146,13 @@ const BIKE: Record<BikeBody, { wz: number; head: [number, number]; seat: [number
 }
 
 // A body this build doesn't know (another player's newer car) draws as a sedan.
-const shapeOf = (body: Body) => SHAPES[body] ?? SHAPES.sedan
+// A model's own proportions on its body (see carLooks.ts): only where it's drawn on that body, so
+// another body's car with the same id never picks them up.
+const shapeOf = (body: Body, model?: string): Shape => {
+  const base = SHAPES[body] ?? SHAPES.sedan
+  const own = model ? MODEL_SHAPE[model] : undefined
+  return own && own.body === body ? { ...base, ...own.shape } : base
+}
 
 // Side profile of the lower body: a high rear deck, a hood that drops toward
 // the nose, and rounded corners. u runs along the car (+ is the front).
@@ -311,8 +322,9 @@ export type ModFrame = {
   // The outside of the windshield and back window, on closed cabins.
   glass?: Panes
 }
-export function carFrame(body: Body): ModFrame {
-  const s = shapeOf(body)
+// model: the car drawn on the body, when it has its own proportions (carLooks.ts).
+export function carFrame(body: Body, model?: string): ModFrame {
+  const s = shapeOf(body, model)
   if (isBike(body)) {
     const b = BIKE[body as BikeBody]
     const r = s.wheel
@@ -375,7 +387,7 @@ function hatSpot(body: Body, model: string | undefined, parts: Partial<Record<Pa
   const key = `${body}|${model ?? ''}`
   const hit = hatSpots.get(key)
   if (hit) return hit
-  const s = shapeOf(body)
+  const s = shapeOf(body, model)
   let spot: HatSpot
   if (isBike(body)) {
     // The rider's helmet (see bikeGeo): the hat sits over its top half.
@@ -436,7 +448,7 @@ export function freshGeo(body: Body, fit: Partial<Record<ModSlot, string>>, mode
 export function carTop(body: Body, model: string | undefined, mods: string[] | null | undefined, reach: number) {
   const fit = fittedMods(mods, body)
   const g = isBike(body) ? bikeGeo(body as BikeBody, fit, model) : carGeo(body, fit, model)
-  const m = modGeo(body, modIds(fit))
+  const m = modGeo(body, modIds(fit), undefined, model)
   let top = 0
   for (const geo of [...Object.values(g.parts), ...Object.values(m)]) {
     const pos = geo?.getAttribute('position')
@@ -583,7 +595,7 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
   const hit = geoCache.get(key)
   if (hit) return hit
   if (body === 'formula') return formulaGeo(key, fit)
-  const s = shapeOf(body)
+  const s = shapeOf(body, model)
   const exotic = EXOTIC[body] ?? ODDBALL[body] ?? RESTO[body] ?? PACK_CARS[body]
   if (exotic) {
     const k = new Kit()
@@ -1119,16 +1131,21 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
   for (const x of [-0.07, 0.07]) {
     k.add('stripe', box(0.066, 0.006, hoodFront - cowl), [x, hoodY + 0.003, (hoodFront + cowl) / 2])
     // The deck stripe stops at the back window rather than running on under the cabin.
-    const z1 = glass ? Math.min(cowl, glass.back.at(top) - 0.004) : cowl
+    // It also stops short of the trunk lid's front edge (the panel line drawn below).
+    const lid = !s.open && !s.round && !s.bed && !s.tracks && s.cabinZ - s.cabinLen / 2 + front - 0.04 > 0.16 ? s.cabinZ - s.cabinLen / 2 - 0.004 : cowl
+    const z1 = Math.min(lid, glass ? Math.min(cowl, glass.back.at(top) - 0.004) : cowl)
     if (z1 + s.len / 2 - 0.05 > 0.03) k.add('stripe', box(0.066, 0.006, z1 + s.len / 2 - 0.05), [x, top + 0.003, (z1 - s.len / 2) / 2])
     if (roofLen > 0) k.add('stripe', box(0.066, 0.006, roofLen * 0.95), [x, roofY + 0.003, roofZ])
   }
 
   if (!s.plates) k.add('chrome', rbox(s.wid * 0.96, 0.07, 0.06, 0.028), [0, s.lift + 0.07, -front + 0.005])
   // The armoured scout has its own nose (see the plates section above).
-  const roundLamps = ROUND_LAMPS.includes(body)
-  const bigGrille = BIG_GRILLE.includes(body)
+  const roundLamps = s.lamps ? s.lamps === 'round' : ROUND_LAMPS.includes(body)
+  const hidden = s.lamps === 'hidden'
+  const bigGrille = !hidden && (s.grille ? s.grille === 'big' : BIG_GRILLE.includes(body))
   const sleek = SLEEK.includes(body)
+  const stripLamps = s.lamps ? s.lamps === 'strip' : sleek
+  const grille = !s.frog && (hidden || (s.grille ? s.grille !== 'none' : !sleek))
   if (!s.plates) {
     // Bumpers, with a black lower lip and a lower air intake on the front.
     k.add('chrome', rbox(s.wid * 0.96, bumperH, 0.06, 0.024), [0, bumperY, front - 0.005])
@@ -1144,8 +1161,8 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
           onNose('chrome', new TorusGeometry(0.031, 0.005, 4, 16), sd * s.wid * lx, lightY, 0.01)
           onNose('chrome', disc(0.009, 8), sd * s.wid * lx, lightY, 0.011)
         }
-      } else if (s.frog) {
-        // The headlights stand up in the front wings (see above).
+      } else if (s.frog || hidden) {
+        // The headlights stand up in the front wings (see above), or sit behind the grille.
       } else if (roundLamps) {
         // Sealed-beam lamp: black bucket, chrome ring, lens and a bulb shield in the middle.
         onNose('black', disc(0.058, 18), x, lightY, 0.003)
@@ -1153,7 +1170,7 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
         onNose('chrome', new TorusGeometry(0.049, 0.006, 4, 20), x, lightY, 0.007)
         onNose('chrome', disc(0.014, 10), x, lightY, 0.0075)
         for (const a of [-0.5, 0.5]) onNose('chrome', plane(0.002, 0.07), x, lightY, 0.0075, a)
-      } else if (sleek) {
+      } else if (stripLamps) {
         // Slim slanted LED strip with a row of projector dots under it.
         onNose('black', plane(0.17, 0.042), x, lightY, 0.003, sd * 0.16)
         onNose('lamp', plane(0.16, 0.009), x, lightY + 0.013, 0.005, sd * 0.16, lightY)
@@ -1179,10 +1196,11 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
         k.add('lamp', disc(0.015, 12), [sd * s.wid * 0.3, bumperY, front + 0.041])
       }
     }
-    if (!sleek && !s.frog) {
-      // Grille: a surround with a mesh of slats and bars behind it.
-      const gw = s.wid * (bigGrille ? 0.42 : 0.3)
-      const gh = bigGrille ? 0.075 : 0.05
+    if (grille) {
+      // Grille: a surround with a mesh of slats and bars behind it. Hidden headlights sit behind
+      // one that runs the whole width of the nose.
+      const gw = s.wid * (hidden ? 0.86 : bigGrille ? 0.42 : 0.3)
+      const gh = hidden ? 0.07 : bigGrille ? 0.075 : 0.05
       // Kept below the hood line so the surround's top never pokes up level with the hood stripes.
       const gy = Math.min(Math.max(bumperY + bumperH / 2 + gh / 2 - 0.005, lightY - 0.005), lower.hoodRaw - gh / 2 - 0.012)
       onNose('dark', plane(gw * 0.94, gh * 0.86), 0, gy, 0.005)
@@ -1193,7 +1211,7 @@ function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: strin
       }
       const n = bigGrille ? 4 : 3
       for (let i = 0; i < n; i++) onNose(bigGrille ? 'chrome' : 'black', box(gw * 0.9, 0.005, 0.006), 0, gy - gh / 2 + (gh * (i + 1)) / (n + 1) - 0.004, 0.008, 0, gy)
-      for (let i = 1; i < 6; i++) onNose('black', box(0.004, gh * 0.8, 0.004), (i / 6 - 0.5) * gw * 0.9, gy, 0.007)
+      for (let i = 1; i < (hidden ? 14 : 6); i++) onNose('black', box(0.004, gh * 0.8, 0.004), (i / (hidden ? 14 : 6) - 0.5) * gw * 0.9, gy, 0.007)
     }
   }
   if (sleek && body !== 'bubble') {
@@ -1561,7 +1579,7 @@ type CarProps = { body: Body; model?: string; color: string; finish?: Finish | n
 // rise: how far a stance mod lifts (or drops) the body over its wheels.
 function LeanCar({ parts, looks, casters, mods, modPaint, highlight, wheels, radius, width, rims, rimColor, rig, beams, extra, rise = 0, pooled = true }: {
   parts: Partial<Record<Part, BufferGeometry>>; looks: Partial<Record<Part, Look>>; casters: Part[]
-  mods: { body: Body; ids: string[]; skins?: Partial<Record<SkinnedSlot, number>> }; modPaint: Look; highlight?: boolean
+  mods: { body: Body; model?: string; ids: string[]; skins?: Partial<Record<SkinnedSlot, number>> }; modPaint: Look; highlight?: boolean
   wheels: V3[]; radius: number; width: number; rims?: string; rimColor?: string; rig: WheelRig; beams: React.ReactNode; extra?: React.ReactNode; rise?: number; pooled?: boolean
 }) {
   const key = (Object.keys(looks) as Part[]).map((k) => `${k}:${parts[k]?.uuid ?? 0}:${JSON.stringify(looks[k])}`).join() + mods.ids.join() + JSON.stringify(mods.skins ?? {}) + JSON.stringify(modPaint)
@@ -1575,7 +1593,7 @@ function LeanCar({ parts, looks, casters, mods, modPaint, highlight, wheels, rad
     const groups: [string[], number][] = [[plain, 0], ...skinned.map(([id, n]): [string[], number] => [[id], n])]
     for (const [ids, skin] of groups) {
       if (!ids.length) continue
-      const m = modGeo(mods.body, ids, mods.ids)
+      const m = modGeo(mods.body, ids, mods.ids, mods.model)
       // Body-colour parts with no mod skin wear the body's skin (modPaint.skin).
       if (m.paint) shade.push([m.paint, { ...modPaint, skin: skin || modPaint.skin || 0 }])
       if (m.carbon) shade.push([m.carbon, { ...finishOf(carbon), skin }])
@@ -1671,7 +1689,7 @@ function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight,
   const sk = rusty ? 0 : skinNumber(skin)
   const msk = useMemo(() => (rusty ? undefined : modSkinNumbers(modSkin)), [rusty, modSkin])
   useFrame(() => void ((sk || msk) && tickSkins()))
-  const s = shapeOf(body)
+  const s = shapeOf(body, model)
   const g = carGeo(body, fit, model)
   const p = g.parts
   // Stance: the body rides higher or lower over its wheels; a lift kit also fits bigger tyres.
@@ -1719,7 +1737,7 @@ function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight,
       pink: finishOf(MAT.pink), mint: finishOf(MAT.mint), cream: finishOf(MAT.cream), waffle: finishOf(MAT.waffle),
     }
     return (
-      <LeanCar parts={p} looks={looks} casters={['paint', 'glass']} mods={{ body, ids: modIds(fit), skins: msk }} modPaint={{ color: tint, metal: rusty ? 0.1 : 0.4, rough: 0.3, ...(sk ? { skin: sk } : {}) }} highlight={highlight}
+      <LeanCar parts={p} looks={looks} casters={['paint', 'glass']} mods={{ body, model, ids: modIds(fit), skins: msk }} modPaint={{ color: tint, metal: rusty ? 0.1 : 0.4, rough: 0.3, ...(sk ? { skin: sk } : {}) }} highlight={highlight}
         wheels={[[-wx, wr, wz], [wx, wr, wz], [-wx, wr, -wz], [wx, wr, -wz]]} radius={wr} width={(s.tyre ?? 0.14) * tyre} rims={fit.rims} rimColor={rimColor} rig={rig} beams={<>{beam}{pool}{tracks(false)}</>} rise={rise} pooled={!s.tracks}
         extra={<>{own && <mesh geometry={p.paint} castShadow><PaintMaterial color={tint} finish={finish} highlight={highlight} skin={chromed ? 0 : sk} panels={pan} zones={g.zones} /></mesh>}{topper}</>} />
     )
@@ -1746,7 +1764,7 @@ function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight,
         {p.glass && <mesh geometry={p.glass} material={glass.see} castShadow />}
         {p.cabin && <mesh geometry={p.cabin} material={matOf('seat', look.seat ?? '#2b2b2b', 0, 0.75)} />}
         {p.caliper && <mesh geometry={p.caliper} material={matOf('cal', look.caliper ?? '#4a4d52', look.caliper ? 0.2 : 0.5, 0.45)} />}
-        <CarMods body={body} fit={fit} tint={tint} metal={rusty ? 0.1 : 0.4} flames={flames} skins={msk} skin={sk} />
+        <CarMods body={body} model={model} fit={fit} tint={tint} metal={rusty ? 0.1 : 0.4} flames={flames} skins={msk} skin={sk} />
         {topper}
       </group>
       {/* Headlight beams on the road, visible after dark. */}
@@ -2051,7 +2069,7 @@ function BikeModel({ body, model, color, finish, skin, modSkin, panels, highligh
       lamp: finishOf(lamp), tail: finishOf(MAT.tail), amber: finishOf(MAT.amber), display: finishOf(MAT.display), caliper: finishOf(cal),
     }
     return (
-      <LeanCar parts={p} looks={looks} casters={['paint', 'black']} mods={{ body, ids: modIds(fit), skins: msk }} modPaint={{ color: tint, metal: rusty ? 0.1 : 0.4, rough: 0.3, ...(sk ? { skin: sk } : {}) }} highlight={highlight}
+      <LeanCar parts={p} looks={looks} casters={['paint', 'black']} mods={{ body, model, ids: modIds(fit), skins: msk }} modPaint={{ color: tint, metal: rusty ? 0.1 : 0.4, rough: 0.3, ...(sk ? { skin: sk } : {}) }} highlight={highlight}
         wheels={[[0, r, wz], [0, r, -wz]]} radius={r} width={0.07} rims={fit.rims} rimColor={rimColor} rig={rig} beams={beam}
         extra={<>{own && <mesh geometry={p.paint} castShadow><PaintMaterial color={tint} finish={finish} highlight={highlight} skin={chromed ? 0 : sk} panels={pan} /></mesh>}{topper}</>} />
     )
@@ -2069,7 +2087,7 @@ function BikeModel({ body, model, color, finish, skin, modSkin, panels, highligh
       {shared.map((k) => <mesh key={k} geometry={p[k]} material={MAT[k]} castShadow={k === 'black'} />)}
       {p.lamp && <mesh geometry={p.lamp} material={lamp} />}
       {p.caliper && <mesh geometry={p.caliper} material={cal} />}
-      <CarMods body={body} fit={fit} tint={tint} metal={rusty ? 0.1 : 0.4} flames={flames} skins={msk} skin={sk} />
+      <CarMods body={body} model={model} fit={fit} tint={tint} metal={rusty ? 0.1 : 0.4} flames={flames} skins={msk} skin={sk} />
       {topper}
       {beam}
       {[wz, -wz].map((z, i) => (

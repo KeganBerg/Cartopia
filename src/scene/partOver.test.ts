@@ -63,7 +63,7 @@ function partSpan(id: string, body: (typeof CARS)[number]['body'], y: number) {
 function carHigh(model: string, body: (typeof CARS)[number]['body'], mods: string[], r: number) {
   const fit = fittedMods(mods, body)
   const sc = prizeScale(body)
-  const geos = [...Object.values(freshGeo(body, fit, model).parts), ...Object.values(modGeo(body, modIds(fit)))]
+  const geos = [...Object.values(freshGeo(body, fit, model).parts), ...Object.values(modGeo(body, modIds(fit), modIds(fit), model))]
   let high = 0
   for (const geo of geos) {
     const pos = geo?.getAttribute('position')

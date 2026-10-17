@@ -46,8 +46,8 @@ function hit(q: number[], axis: 1 | 2, sign: number, tris: ArrayLike<number>[]) 
 }
 
 // The blades: wide flat kit pieces low down at the front.
-function blades(body: Parameters<typeof modFrame>[0], id: string) {
-  const f = modFrame(body, [id])
+function blades(body: Parameters<typeof modFrame>[0], id: string, model?: string) {
+  const f = modFrame(body, [id], model)
   const out: { lo: number[]; hi: number[]; pos: ArrayLike<number> }[] = []
   for (const [kind, list] of Object.entries(modParts(f, id))) {
     if (kind === 'flame' || kind === 'glass') continue
@@ -72,7 +72,7 @@ describe('front lips sit under the nose', () => {
       const parts = freshGeo(body, {}, model).parts
       const tris = SKIN.flatMap((p) => (parts[p] ? [flatten(parts[p]!)] : []))
       const bad: string[] = []
-      for (const id of kits) for (const b of blades(body, id)) {
+      for (const id of kits) for (const b of blades(body, id, model)) {
         // Points over the blade's top, in from its edges.
         let worst = ''
         for (let i = 0; i <= 8; i++) for (let j = 0; j <= 4; j++) {

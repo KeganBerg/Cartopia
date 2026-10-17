@@ -287,7 +287,7 @@ function check(model: string, body: Body, fit: Partial<Record<ModSlot, string>>)
   const list = [...pieces]
   const ids = modIds(fit)
   if (ids.length) {
-    const g = modGeo(body, ids)
+    const g = modGeo(body, ids, ids, model)
     for (const [kind, geo] of Object.entries(g)) if (geo && MOD_LOOK[kind]) list.push({ look: MOD_LOOK[kind], open: false, flat: false, at: `mod ${kind}`, pos: geo.getAttribute('position').array })
   }
   const tag = ids.length ? ` +${ids.join('+')}` : ''
