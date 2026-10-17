@@ -14,6 +14,11 @@ type Game = ReturnType<typeof useGame.getState>
 // Tutorial steps (src/ui/Tutorial.tsx): 1 first job, 3 build Rusty's, 4 find cars,
 // 5 restore, 6 paint, 8 race; 99 is done.
 const DONE = 99
+
+// The one Crew House check, shared by crews and real-money buys (src/game/payGate.ts): built or packed
+// away, and the admin always counts. Use it as useGame(hasCrewHouse).
+export const hasCrewHouse = (s: Pick<Game, 'buildings' | 'stored' | 'admin'>) => canBuyPacks(s)
+
 export const UNLOCKS = {
   fuel: (s: Game) => s.tutorial >= 1,
   shop: (s: Game) => s.tutorial >= 3,
@@ -29,10 +34,6 @@ export const UNLOCKS = {
   bank: (s: Game) => s.tutorial >= DONE && hasCrewHouse(s),
 } satisfies Record<string, (s: Game) => boolean>
 export type Unlock = keyof typeof UNLOCKS
-
-// The one Crew House check, shared by crews and real-money buys (src/game/payGate.ts): built or packed
-// away, and the admin always counts. Use it as useGame(hasCrewHouse).
-export const hasCrewHouse = (s: Pick<Game, 'buildings' | 'stored' | 'admin'>) => canBuyPacks(s)
 
 export const unlocked = (s: Game, id: Unlock) => (id !== 'bank' && !!s.visiting) || UNLOCKS[id](s)
 
