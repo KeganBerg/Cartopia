@@ -6,7 +6,8 @@
 --     friend ghost races). A street crew's drivers race a par for the attacker's own car, tougher for its stronger
 --     drivers. Timed like ghost races: war_attack_start before the countdown, war_attack_submit after the line; the
 --     time can't beat the wall clock between them and is raised to race_floor() of the attacker's saved best car.
---  2. Stars: a win is 1 star, 2 by 1% or more, 3 by 3% or more; each star is 5 war points. 3 attacks a player a UTC day.
+--  2. Stars: a win is 1 star, 2 by 1% or more, 3 by 3% or more; each star is 5 war points. 3 attacks a player a UTC day;
+--     an attack started and not finished counts as a loss when the next one starts.
 --  3. Both crews see every attack: crew_battle() gains "attacks" (this war's, newest first, from this crew's side),
 --     "attacksLeft" and each real side's full "roster" (every member with their ghost's car and time), so the map
 --     shows who beat whom and who is still standing.
@@ -69,18 +70,24 @@ declare
   their numeric;
   w numeric;
   i int;
-  prev timestamptz;
+  old public.war_runs;
 begin
   if me is null then raise exception 'Sign in to race in the crew war' using errcode = 'insufficient_privilege'; end if;
   select clan_id into cid from public.clan_members where owner_id = me;
   if cid is null then raise exception 'Join a crew to race in the crew war'; end if;
+  select (g.best_car ->> 'pi')::int into my_pi from public.game_saves g where g.owner_id = me and g.best_car ? 'pi';
+  if my_pi is null then raise exception 'no saved car' using errcode = 'no_data_found'; end if;
+  -- An attack started and never finished counts as a lost one, so a bad run can't be dropped and raced again.
+  select * into old from public.war_runs where owner_id = me for update;
+  if old.owner_id is not null then
+    if old.started_at > now() - interval '3 seconds' then raise exception 'slow down' using errcode = 'check_violation'; end if;
+    insert into public.war_attacks (battle_id, attacker, attacker_clan, target, won, t, their, stars, points, at)
+      values (old.battle_id, me, old.clan_id, old.target, false, old.their, old.their, 0, 0, old.started_at);
+    delete from public.war_runs where owner_id = me;
+  end if;
   if econ_private.war_attacks_today(me) >= (rules ->> 'attacksPerDay')::int then
     raise exception 'No war races left today' using errcode = 'check_violation';
   end if;
-  select (g.best_car ->> 'pi')::int into my_pi from public.game_saves g where g.owner_id = me and g.best_car ? 'pi';
-  if my_pi is null then raise exception 'no saved car' using errcode = 'no_data_found'; end if;
-  select started_at into prev from public.war_runs where owner_id = me;
-  if prev > now() - interval '3 seconds' then raise exception 'slow down' using errcode = 'check_violation'; end if;
   x := public.crew_battle_of(cid);
   if x.id is null then raise exception 'No crew war this week'; end if;
   if x.bot is not null then
