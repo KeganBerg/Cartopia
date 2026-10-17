@@ -9,8 +9,8 @@ import { sfx } from './sound'
 // followed (?ref=username, a friend request once they sign in) and which crew asked them (?join=TAG;
 // ?crew=demo is the signed-out demo crew).
 
-// The Discord server's invite. Empty hides the button in Settings.
-export const DISCORD_INVITE = ''
+// The Discord server's invite (a never-expiring one). Empty hides the Help row.
+export const DISCORD_INVITE = 'https://discord.gg/eMjZhe7z'
 
 const ARRIVAL_KEY = 'cartopia.arrival'
 const CREW_KEY = 'cartopia.crewInvite'

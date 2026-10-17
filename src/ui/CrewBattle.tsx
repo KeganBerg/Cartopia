@@ -4,7 +4,7 @@ import { useGame, type OwnedCar } from '../game/store'
 import { CARS, CLAN_COLORS, CLAN_EMBLEMS, CREW_CHEST, carDef, msToNextWeek, payAt } from '../game/data'
 import { signedInUser } from '../lib/cloud'
 import { useLive, challenge } from '../lib/live'
-import { BATTLE_RULES, battleChests, battleShare, claimBattle, demoBattle, refreshCrewBattle, useCrewBattle, type Battle, type BattleSide } from '../lib/battles'
+import { BATTLE_RULES, battleChests, battleShare, claimBattle, claimWarTier, demoBattle, refreshCrewBattle, useCrewBattle, warLeague, warTiers, type Battle, type BattleRecord, type BattleRules, type BattleSide, type WarLog } from '../lib/battles'
 import { BattleScene } from '../scene/BattleScene'
 import { venue as venueOf } from '../scene/venues'
 import { useNow } from '../scene/useNow'
@@ -65,7 +65,7 @@ export function CrewBattleCard() {
   return (
     <button className={`cb-card${ready ? ' ready' : ''}`} onClick={() => openPanel('battle')}>
       <div className="cb-card-head">
-        <b>⚔️ Crew battle {ready > 0 && <span className="tab-dot">!</span>}</b>
+        <b>⚔️ Crew war {ready > 0 && <span className="tab-dot">!</span>}</b>
         <span className="crew-goal-reset">⏱ {left(msToNextWeek(now))}</span>
       </div>
       <div className="cb-card-row">
@@ -118,12 +118,15 @@ function LastBattle({ b, payable }: { b: Battle; payable: boolean }) {
   const toast = useGame((s) => s.toast)
   const [busy, setBusy] = useState(false)
   const due = payable ? battleChests(b) : []
+  // War chests the crew reached last week and this player hasn't opened yet.
+  const tiers = payable ? warTiers(b).filter((t) => t.claimable) : []
   const claim = async () => {
-    if (demoBattle()) return toast('This is a demo battle')
+    if (demoBattle()) return toast('This is a demo war')
     setBusy(true)
     try {
-      await claimBattle(b.week)
-      toast(due.includes('mvp') ? '🧰🧰 Victory and MVP chests opened!' : '🧰 Victory chest opened!')
+      if (due.length) await claimBattle(b.week)
+      for (const t of tiers) await claimWarTier(b.week, t.tier)
+      toast(`${'🧰'.repeat(due.length + tiers.length)} Chests opened!`)
     } catch (e) {
       toast((e as Error).message)
     } finally {
@@ -137,8 +140,8 @@ function LastBattle({ b, payable }: { b: Battle; payable: boolean }) {
         <b>{head}</b>
         <small>Last week · {n(b.us.score)}–{n(b.them.score)} vs {b.them.tag}</small>
       </div>
-      {due.length > 0
-        ? <button className="cb-claim" disabled={busy} onClick={claim}>{due.map((k) => (k === 'mvp' ? '👑' : '🧰')).join('')} Claim<ChestPay /></button>
+      {due.length + tiers.length > 0
+        ? <button className="cb-claim" disabled={busy} onClick={claim}>{[...due.map((k) => (k === 'mvp' ? '👑' : '🏆')), ...tiers.map(() => '🧰')].join('')} Claim<ChestPay /></button>
         : b.result !== 'loss' && b.mine < BATTLE_RULES.minPoints
           ? <small className="cb-last-note">Score {BATTLE_RULES.minPoints}+ to earn chests</small>
           : b.claimed.length > 0 ? <span className="goal-check">✔</span> : null}
@@ -167,11 +170,90 @@ function NoCrew({ onFind, children }: { onFind: () => void; children?: React.Rea
           <span className="cr-vs">VS</span>
           <Crest emblem="❔" color="#546e7a" size={76} />
         </div>
-        <b className="rm-ttl">Crew Battles</b>
-        <span className="cb-none-sub">⚔️ Weekly crew vs crew · 🧰 victory chests</span>
+        <b className="rm-ttl">Crew Wars</b>
+        <span className="cb-none-sub">⚔️ Weekly crew war · 🧰 war chests</span>
         <button className="buy cb-none-go" onClick={onFind}>🛡️ Find a crew</button>
         {children}
       </div>
+    </div>
+  )
+}
+
+// The war chest track: the crew's score climbing to par, a chest at each tier. Every member who has scored
+// enough opens each chest the crew reaches, win or lose.
+function WarTrack({ b, rules }: { b: Battle; rules: BattleRules }) {
+  const toast = useGame((s) => s.toast)
+  const [busy, setBusy] = useState(false)
+  const tiers = warTiers(b, rules)
+  if (!tiers.length) return null
+  const par = b.par!
+  const pct = (v: number) => `${Math.min(100, (v / par) * 100).toFixed(1)}%`
+  const claim = async (tier: 1 | 2) => {
+    if (demoBattle()) return toast('This is a demo war')
+    setBusy(true)
+    try {
+      await claimWarTier(b.week, tier)
+      toast('🧰 War chest opened!')
+    } catch (e) {
+      toast((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="cb-track" style={{ '--us': b.us.color } as React.CSSProperties}>
+      <div className="cb-track-bar" title={`Crew war points ${n(b.us.score)} of ${n(par)}`}>
+        <i style={{ width: pct(b.us.score) }} />
+        {tiers.map((t) => (
+          <button key={t.tier} className={`cb-node${t.reached ? ' on' : ''}${t.claimable ? ' ready' : ''}${t.claimed ? ' done' : ''}`}
+            style={{ left: pct(t.need) }} disabled={busy || !t.claimable}
+            title={t.claimed ? 'Opened' : t.reached ? (b.mine < rules.minPoints ? `Score ${rules.minPoints} to open` : 'Open') : `Crew reaches ${n(t.need)}`}
+            onClick={() => claim(t.tier)}>
+            {t.claimed ? '✔' : '🧰'}
+            <small>{compact(t.need)}</small>
+          </button>
+        ))}
+      </div>
+      <span className="cb-track-end" title="Win the war: victory chest. Top scorer: MVP chest">🏆</span>
+    </div>
+  )
+}
+
+// The player's part in the war: their points toward the member cap, what each race adds, and the race button.
+function YourPart({ b, rules }: { b: Battle; rules: BattleRules }) {
+  const openPanel = useGame((s) => s.openPanel)
+  const meRow = b.us.members.find((m) => m.id === (demoBattle() ? 'me' : signedInUser()))
+  return (
+    <div className="cb-you">
+      <div className="cb-you-main">
+        <div className="cb-you-head"><b>You</b><span>{n(b.mine)}<small>/{n(rules.memberCap)}</small></span></div>
+        <div className="cb-you-bar"><i style={{ width: `${Math.min(100, (b.mine / rules.memberCap) * 100)}%` }} /></div>
+        <div className="cb-you-gain">
+          <span title={`Any race · ${meRow?.races ?? 0} this war`}>🏁 +{rules.race}</span>
+          <span title={`Race won · ${meRow?.wins ?? 0} this war`}>🏆 +{rules.race + rules.win}</span>
+          <span title="Live race won">⚡ +{rules.live}</span>
+          <span className="h2h" title="Live race won against the rival crew">⚔️ +{rules.h2h}</span>
+        </div>
+      </div>
+      <button className="cb-race" onClick={() => openPanel('race')}>🏁 Race</button>
+    </div>
+  )
+}
+
+// The crew's past wars, newest first.
+function WarLogList({ log, record }: { log: WarLog[]; record: BattleRecord }) {
+  if (!log.length) return <span className="cb-empty">📜 Finished wars show here</span>
+  return (
+    <div className="cb-log">
+      <div className="cb-log-sum">{record.wins}W {record.losses}L{record.draws ? ` ${record.draws}D` : ''}{record.streak > 1 ? ` · 🔥${record.streak}` : ''}</div>
+      {log.map((w) => (
+        <div key={w.week} className={`cb-log-row ${w.result ?? ''}`}>
+          <i>{w.result === 'win' ? '🏆' : w.result === 'draw' ? '🤝' : '💥'}</i>
+          <Badge s={{ ...w.rival, score: 0, members: [] }} />
+          <em>{w.rival.name}</em>
+          <b>{n(w.us)}–{n(w.them)}</b>
+        </div>
+      ))}
     </div>
   )
 }
@@ -197,6 +279,7 @@ export function BattlePanel() {
       us={{ tag: b.us.tag, color: b.us.color }} them={{ tag: b.them.tag, color: b.them.color }} />
   ), [b, car, rival])
   const stageReady = useStageReady()
+  const [tab, setTab] = useState<'crews' | 'log'>('crews')
   useEffect(() => {
     if (!battle) refreshCrewBattle()
   }, [battle])
@@ -206,7 +289,7 @@ export function BattlePanel() {
       <div className="race-full cb-full">
         {/* No crew now (never had one, or left): last week's chests, if any, still claim here. */}
         {noCrew && <NoCrew onFind={() => openPanel('clan')}>{battle?.last && <LastBattle b={battle.last} payable={battle.payable} />}</NoCrew>}
-        <div className="rf-top"><h2>⚔️ Crew Battle</h2><button className="close" onClick={close} aria-label="Close"><Icon name="close" size={16} /></button></div>
+        <div className="rf-top"><h2>⚔️ Crew War</h2><button className="close" onClick={close} aria-label="Close"><Icon name="close" size={16} /></button></div>
         {!noCrew && <LoadingScene key="cb" ready={false} max={Infinity} label="Finding your rival crew" onClose={close} />}
       </div>
     )
@@ -214,12 +297,14 @@ export function BattlePanel() {
   const me = demoBattle() ? 'me' : signedInUser()
   const v = venueOf(b.venue)
   const rec = battle!.record
+  const rules = { ...BATTLE_RULES, ...battle!.rules }
+  const league = warLeague(rec)
   return (
     <div className="race-full cb-full">
       <StageSlot cam={BATTLE_CAM}>{scene}</StageSlot>
       <LoadingScene key="cb" ready={stageReady} label="Finding your rival crew" onClose={close} />
       <div className="rf-top">
-        <h2>⚔️ Crew Battle</h2>
+        <h2>⚔️ Crew War <span className="cb-league" title={`War league · rating ${league.rating}${league.next ? ` · ${league.next.name} at ${league.next.min}` : ''}`}>{league.icon} {league.name}</span></h2>
         <button className="close" onClick={close} aria-label="Close"><Icon name="close" size={16} /></button>
       </div>
       <div className="cb-board">
@@ -240,21 +325,18 @@ export function BattlePanel() {
       </div>
       <div className="cb-dock">
         {battle!.last && <LastBattle b={battle!.last} payable={battle!.payable} />}
-        <div className="cb-rosters">
-          <Roster s={b.us} side="us" me={me} online={online} />
-          <Roster s={b.them} side="them" me={me} online={online} />
+        <WarTrack b={b} rules={rules} />
+        <div className="seg cb-tabs">
+          <button className={tab === 'crews' ? 'sel' : ''} onClick={() => setTab('crews')}>⚔️ Crews</button>
+          <button className={tab === 'log' ? 'sel' : ''} onClick={() => setTab('log')}>📜 Log</button>
         </div>
-        <div className="cb-legend">
-          <span title="Any race">🏁 +{BATTLE_RULES.race}</span>
-          <span title="Race won">🏆 +{BATTLE_RULES.win}</span>
-          <span title="Live race won">⚡ +{BATTLE_RULES.live}</span>
-          <span title="Live race won against the rival crew" className="h2h">⚔️ +{BATTLE_RULES.h2h}</span>
-        </div>
-        <div className="cb-actions">
-          <span className="cb-record" title="Battles won, lost and drawn">{rec.wins}W {rec.losses}L{rec.draws ? ` ${rec.draws}D` : ''}{rec.streak > 1 ? ` · 🔥${rec.streak}` : ''}</span>
-          <span className="cb-prize">🏆 <ChestPay /></span>
-          <button className="cb-race" onClick={() => openPanel('race')}>🏁 Race</button>
-        </div>
+        {tab === 'crews' ? (
+          <div className="cb-rosters">
+            <Roster s={b.us} side="us" me={me} online={online} />
+            <Roster s={b.them} side="them" me={me} online={online} />
+          </div>
+        ) : <WarLogList log={battle!.log ?? []} record={rec} />}
+        <YourPart b={b} rules={rules} />
       </div>
     </div>
   )
