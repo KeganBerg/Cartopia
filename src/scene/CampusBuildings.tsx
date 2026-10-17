@@ -8,6 +8,7 @@ import { Box, Cyl, Sign, Pool, Bulbs, Flag, ShellBuilding, BlockCar, GOLD, SNOW,
 import { Crowd, LearnerCar, StudentCars } from './CampusLife'
 import { waterKinds } from './liveWater'
 import { loop, smoothLoop, track, playMove, routeMove } from './campusPaths'
+import { doorTag } from './doors'
 
 // Schools, the university and the driving academy: the big late-game lots.
 // Static pieces share the town's colours so Batch merges them; the people and
@@ -67,7 +68,8 @@ function Lamp({ m, bulb, at, ghost, banner }: { m: Mat; bulb: ReactNode; at: V3;
       <Cyl m={m} at={[0, 0.5, 0]} r={0.025} r2={0.035} h={1} c="#263238" seg={6} />
       <mesh position={[0, 1.04, 0]}><sphereGeometry args={[0.07, 8, 6]} />{bulb}</mesh>
       {banner && <Box m={m} at={[0.08, 0.72, 0.006]} s={[0.12, 0.3, 0.012]} c={banner} shadow={false} />}
-      {!ghost && <Pool r={0.5} />}
+      {/* The light's pool lies just over the paths, low enough to walk through. */}
+      {!ghost && <group position-y={-0.04}><Pool r={0.5} /></group>}
     </group>
   )
 }
@@ -142,9 +144,10 @@ function FrontWindows({ m, win, xs, y, z, w = 0.34, h = 0.36 }: { m: Mat; win: R
 function Portico({ m, x, z, w, h, n, c = '#fafafa' }: { m: Mat; x: number; z: number; w: number; h: number; n: number; c?: string }) {
   return (
     <group position={[x, 0, z]}>
-      {[0, 1, 2].map((i) => <Box key={i} m={m} at={[0, 0.033 + i * 0.05, 0.12 - i * 0.07 + 0.12]} s={[w + 0.3 - i * 0.1, 0.066 + i * 0.05, 0.3]} c="#e0e0e0" shadow={false} />)}
+      {/* Three low steps, each an easy stride, the columns on the top one. */}
+      {[0.04, 0.078, 0.115].map((sh, i) => <Box key={i} m={m} at={[0, sh / 2, 0.12 - i * 0.07 + 0.12]} s={[w + 0.3 - i * 0.1, sh, 0.3]} c="#e0e0e0" shadow={false} />)}
       {Array.from({ length: n }, (_, i) => (
-        <Cyl key={i} m={m} at={[-w / 2 + (w * i) / (n - 1), h / 2 + 0.12, 0]} r={0.06} r2={0.07} h={h - 0.12} c={c} seg={10} />
+        <Cyl key={i} m={m} at={[-w / 2 + (w * i) / (n - 1), (h - 0.05) / 2 + 0.11, 0]} r={0.06} r2={0.07} h={h - 0.05} c={c} seg={10} />
       ))}
       <Box m={m} at={[0, h + 0.1, -0.08]} s={[w + 0.22, 0.14, 0.42]} c={c} />
       <mesh position={[0, h + 0.27, -0.08]} rotation={[-Math.PI / 2, 0, 0]} scale={[(w + 0.22) / 0.416, 1, 0.83]} castShadow>
@@ -171,9 +174,11 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
       // along the front where townspeople come and go at the doors, and of the
       // office, signs and parking box; the two lanes sit far enough apart that
       // passing cars never touch (checked frame by frame against car boxes).
+      // The west turn is pulled in to leave the walk to the office door, down the
+      // west edge, clear.
       const weave = smoothLoop([
-        [-1, 0.43], [-0.8, 0.36], [-0.4, 0.43], [0, 0.5], [0.4, 0.43], [0.8, 0.36], [1, 0.43], [1.27, 0.54],
-        [1.39, 0.81], [1.27, 1.09], [1, 1.2], [0, 1.2], [-1, 1.2], [-1.27, 1.09], [-1.39, 0.81], [-1.27, 0.54],
+        [-0.75, 0.43], [-0.6, 0.37], [-0.4, 0.43], [0, 0.5], [0.4, 0.43], [0.8, 0.36], [1, 0.43], [1.27, 0.54],
+        [1.39, 0.81], [1.27, 1.09], [1, 1.2], [0, 1.2], [-0.75, 1.2], [-1.02, 1.09], [-1.14, 0.81], [-1.02, 0.54],
       ])
       return (
         <group>
@@ -183,8 +188,8 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
           <Paint m={m} at={[0, 0.062, -0.3]} s={[3.8, 0.04]} />
           {[-1, 1].map((sd) => <Paint key={sd} m={m} at={[sd * 1.9, 0.062, 0.8]} s={[0.04, 2.2]} />)}
           {/* Cones on the island between the two lanes. */}
-          <Paint m={m} at={[0, 0.062, 0.82]} s={[2.0, 0.02]} c={YELLOW} />
-          {[-0.8, 0.8].map((x) => <Cone key={x} m={m} at={[x, 0.06, 0.82]} />)}
+          <Paint m={m} at={[0.125, 0.062, 0.82]} s={[1.75, 0.02]} c={YELLOW} />
+          {[-0.4, 0.6].map((x) => <Cone key={x} m={m} at={[x, 0.06, 0.82]} />)}
           {[-0.25, 0, 0.25, 0.5].map((x) => <Paint key={x} m={m} at={[x - 1.0, 0.063, 0.0]} s={[0.12, 0.42]} />)}
           <Paint m={m} at={[-0.4, 0.063, -0.08]} s={[0.06, 0.4]} />
           {/* Parallel parking box with cones at its corners. */}
@@ -204,7 +209,7 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
             <Cyl m={m} at={[0, 0.35, 0]} r={0.015} h={0.7} c="#9e9e9e" seg={6} />
             <mesh position={[0, 0.72, 0.02]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.1, 0.1, 0.015, 8]} />{m('#d32f2f')}</mesh>
           </group>
-          <group position={[-1.85, 0.06, -0.15]}>
+          <group position={[-1.87, 0.06, -0.15]}>
             <Cyl m={m} at={[0, 0.4, 0]} r={0.02} h={0.8} c="#37474f" seg={6} />
             <Box m={m} at={[0, 0.88, 0]} s={[0.12, 0.3, 0.1]} c="#212121" />
             {[['#e53935', 0.97], [YELLOW, 0.88], ['#43a047', 0.79]].map(([c, y]) => (
@@ -212,7 +217,7 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
             ))}
           </group>
           {/* The office, with a giant learner plate on the roof. */}
-          <ShellBuilding {...shell} w={1.9} d={1.2} h0={1.15} x0={-0.95} z0={-1.3} wall="#eceff1" tex="siding" roof="#ff6f00" sign="DRIVING ACADEMY" signBg="#ff6f00" signFg="#ffffff" shopfront="#ff6f00" />
+          <ShellBuilding {...shell} w={1.9} d={1.2} h0={1.15} x0={-0.95} z0={-1.3} wall="#eceff1" tex="siding" roof="#ff6f00" sign="DRIVING ACADEMY" signBg="#ff6f00" signFg="#ffffff" shopfront="#ff6f00" doorAt={-0.7} />
           {live && (
             <group position={[-0.95, h + 0.15, -1.65]} rotation-x={-0.25}>
               <Box m={m} at={[0, 0.25, -0.03]} s={[0.56, 0.56, 0.04]} c="#d50000" />
@@ -228,9 +233,9 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
             {live && <group position={[-0.4, 0.06, 0.05]}><Upright><LearnerCar i={1} rot={Math.PI} /></Upright></group>}
             {live && lvl < 7 && <group position={[0.4, 0.06, 0.05]}><Upright><LearnerCar i={0} rot={Math.PI} /></Upright></group>}
           </group>
-          {live && <Tree m={m} at={[-1.66, 0.06, -0.55]} s={0.7} />}
+          {live && <Tree m={m} at={[-1.05, 0.06, -0.4]} s={0.7} />}
           {live && <Lamp m={m} bulb={bulb} ghost={ghost} at={[1.85, 0.06, 0.2]} />}
-          {live && <Lamp m={m} bulb={bulb} ghost={ghost} at={[-1.85, 0.06, 1.85]} />}
+          {live && <Lamp m={m} bulb={bulb} ghost={ghost} at={[-1.25, 0.06, 1.85]} />}
           {live && <StudentCars n={lvl >= 7 ? 3 : 2} drive={weave} />}
           {live && <Crowd n={2} move={(i, t) => [-0.6 + i * 0.3 + Math.sin(t * 0.3 + i) * 0.1, -0.15 + Math.cos(t * 0.25 + i) * 0.05]} hours="campus" />}
         </group>
@@ -247,18 +252,19 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
           {/* Bus loop along the front with a yellow curb. */}
           <Box m={m} at={[0, 0.035, 1.5]} s={[3.9, 0.07, 0.8]} c="#ffffff" t={asphaltTex()} shadow={false} />
           <Box m={m} at={[0, 0.06, 1.08]} s={[3.88, 0.05, 0.06]} c={YELLOW} shadow={false} />
-          <Paint m={m} at={[-0.6, 0.075, 1.82]} s={[0.9, 0.18]} c={YELLOW} />
-          <SchoolBus m={m} at={[-0.95, 0.07, 1.5]} rot={Math.PI / 2} />
-          {lvl >= 5 && <SchoolBus m={m} at={[0.75, 0.07, 1.5]} rot={Math.PI / 2} />}
+          {/* Buses park either side of the walk up to the door. */}
+          <Paint m={m} at={[-1.25, 0.075, 1.82]} s={[0.9, 0.18]} c={YELLOW} />
+          <SchoolBus m={m} at={[-1.3, 0.07, 1.5]} rot={Math.PI / 2} />
+          {lvl >= 5 && <SchoolBus m={m} at={[0.4, 0.07, 1.5]} rot={Math.PI / 2} />}
           {/* Path to the door and a flag out front. */}
-          <Box m={m} at={[-0.5, 0.04, 0.33]} s={[0.55, 0.08, 1.5]} c="#ffffff" t={paverTex(1, 3)} shadow={false} />
+          <Box m={m} at={[-0.44, 0.04, 0.33]} s={[0.55, 0.08, 1.5]} c="#ffffff" t={paverTex(1, 3)} shadow={false} />
           {live && <Flag at={[-1.1, 0.06, 0.6]} color="#1565c0" tall={1.5} star={lvl >= 10} />}
           {/* The schoolhouse. */}
           <ShellBuilding {...shell} w={2.9} d={1.4} h0={1.3} x0={-0.5} z0={-1.15} wall="#c1694f" roof="#1565c0" sign="ELEMENTARY" signBg="#fffde7" signFg="#1565c0" shopfront={null}>
             <FrontWindows m={m} win={win} xs={[-1.15, -0.75, 0.75, 1.15]} y={0.55} z={-0.44} />
-            <Portico m={m} x={0} z={-0.3} w={0.7} h={0.95} n={2} />
-            <mesh position={[0, 0.4, -0.443]}><planeGeometry args={[0.46, 0.7]} />{m('#5d4037')}</mesh>
-            <Box m={m} at={[0, 0.4, -0.438]} s={[0.02, 0.7, 0.01]} c="#3e2723" shadow={false} />
+            <Portico m={m} x={0.06} z={-0.3} w={0.7} h={0.95} n={2} />
+            <mesh position={[0.06, 0.4, -0.443]} userData={doorTag('double')}><planeGeometry args={[0.46, 0.7]} />{m('#5d4037')}</mesh>
+            <Box m={m} at={[0.06, 0.4, -0.441]} s={[0.02, 0.7, 0.004]} c="#3e2723" shadow={false} />
             {/* Bell cupola on the ridge. */}
             <group position={[0, h + 0.14, -1.15]}>
               <Box m={m} at={[0, 0.15, 0]} s={[0.36, 0.3, 0.36]} c="#fafafa" />
@@ -331,18 +337,20 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
           <Box m={m} at={[0, 0.03, 0]} s={[5.894, 0.06, 3.9]} c="#ffffff" t={grassTex(3, 2)} shadow={false} />
           {/* Student parking in front: stalls, a few cars and a bus at the kerb. */}
           <Box m={m} at={[-1.45, 0.035, 1.2]} s={[2.95, 0.07, 1.45]} c="#ffffff" t={asphaltTex()} shadow={false} />
-          {[-2.6, -2.1, -1.6, -1.1, -0.6].map((x) => <Paint key={x} m={m} at={[x, 0.075, 0.85]} s={[0.03, 0.55]} />)}
+          {[-2.6, -2.1, -1.6, -1.1, -0.6, -0.1].map((x) => <Paint key={x} m={m} at={[x, 0.075, 0.85]} s={[0.03, 0.55]} />)}
           {live && ([[-2.35, '#e53935'], [-1.85, '#fafafa'], [-0.85, '#1e88e5']] as const).map(([x, c]) => <BlockCar key={x} m={m} at={[x, 0.07, 0.85]} c={c} rot={Math.PI} />)}
-          {live && lvl >= 4 && <BlockCar m={m} at={[-1.35, 0.07, 0.85]} c="#43a047" rot={Math.PI} />}
-          <SchoolBus m={m} at={[-1.6, 0.07, 1.6]} rot={Math.PI / 2} />
-          {lvl >= 6 && <SchoolBus m={m} at={[-0.35, 0.07, 1.6]} rot={Math.PI / 2} />}
+          {/* The stall in front of the doors stays empty: it's the walk in. */}
+          {live && lvl >= 4 && <BlockCar m={m} at={[-0.35, 0.07, 0.85]} c="#43a047" rot={Math.PI} />}
+          <SchoolBus m={m} at={[-2.28, 0.07, 1.6]} rot={Math.PI / 2} />
+          {lvl >= 6 && <SchoolBus m={m} at={[-0.6, 0.07, 1.6]} rot={Math.PI / 2} />}
           {/* The school, with a glass entrance block and a mascot banner. */}
           <ShellBuilding {...shell} w={3.1} d={1.5} h0={1.75} x0={-1.4} z0={-1.15} wall="#a1887f" roof="#2e7d32" sign="HIGH SCHOOL" signBg="#fffde7" signFg="#2e7d32" shopfront={null}>
             <FrontWindows m={m} win={win} xs={[-1.25, -0.85, 0.85, 1.25]} y={0.55} z={-0.394} />
             <Box m={m} at={[0, 0.6, -0.25]} s={[1.0, 1.2, 0.3]} c="#cfd8dc" />
             <mesh position={[0, 0.55, -0.098]}><planeGeometry args={[0.85, 1.0]} />{win}</mesh>
             <Box m={m} at={[0, 1.24, -0.05]} s={[1.2, 0.06, 0.5]} c="#2e7d32" />
-            <mesh position={[0, 0.3, -0.094]}><planeGeometry args={[0.4, 0.58]} />{m('#37474f')}</mesh>
+            <mesh position={[0, 0.3, -0.094]} userData={doorTag('double')}><planeGeometry args={[0.46, 0.58]} />{m('#37474f')}</mesh>
+            <Box m={m} at={[0, 0.3, -0.092]} s={[0.012, 0.58, 0.003]} c="#cfd8dc" shadow={false} />
             {/* Hung between the upper windows, clear of their sills. */}
             <group position={[0.8, h - 0.5, -0.38]}>
               <Box m={m} at={[0, 0, 0]} s={[0.42, 0.62, 0.02]} c="#2e7d32" shadow={false} />
@@ -392,7 +400,7 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
           {live && <Pool r={1.4} x={cx} z={-0.7} />}
           {live && <Pool r={1.4} x={cx} z={0.7} />}
           {live && <Tree m={m} at={[-2.66, 0.06, -0.15]} s={0.7} />}
-          {live && <Lamp m={m} bulb={bulb} ghost={ghost} at={[0.1, 0.06, 1.85]} />}
+          {live && <Lamp m={m} bulb={bulb} ghost={ghost} at={[0.2, 0.06, 1.85]} />}
           {live && <Crowd n={runners} move={routeMove(track(cx, 0, straight, r + 0.14), 16, 0.03)} hours="school" uniform="#2e7d32" />}
           {live && <Crowd n={4} move={routeMove(loop([[-1.4, 0.2], [-0.2, 0.3], [-0.2, 1.95], [-2.8, 1.95], [-2.8, 0.3]]), 40)} hours="campus" />}
         </group>
@@ -477,6 +485,8 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
                 <Box m={m} at={[sd * 1.85, 0.36, -0.12]} s={[2.1, 0.24, 0.16]} c={PAL.bush[0]} />
               </group>
             ))}
+            {/* The way onto campus: a stone threshold across the gate. */}
+            <mesh position={[0, 0.027, 0]} receiveShadow userData={doorTag('gate')}><boxGeometry args={[0.96, 0.01, 0.24]} />{m('#e0d6c8')}</mesh>
             <Box m={m} at={[0, 1.05, 0]} s={[1.5, 0.3, 0.08]} c="#6a1b9a" />
             {live && <Sign text="RIDGEMONT UNIVERSITY" w={0.96} at={[0, 1.05, 0.045]} bg="#6a1b9a" fg="#fafafa" />}
           </group>

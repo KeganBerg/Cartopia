@@ -1,8 +1,8 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Atmosphere } from './Atmosphere'
 import { AnchorProjector, anchorEls } from './anchors'
 import { useThree, type ThreeEvent } from '@react-three/fiber'
-import { MeshStandardMaterial, Plane, Vector3, type TOUCH } from 'three'
+import { MeshStandardMaterial, Plane, Vector3, type Object3D, type TOUCH } from 'three'
 import { create } from 'zustand'
 import { useGame, buildPrice, canPlace, canPlaceBlock, buyablePlots, lotSize, movable, type PlacedBuilding } from '../game/store'
 import { TILE, PLOT, PLOT_MIN, PLOT_MAX, START_LAND, RUSTY_LOT, buildingDef, buildingLevel } from '../game/data'
@@ -24,6 +24,7 @@ import { SeasonFx } from './SeasonFx'
 import { TownCars } from './TownCars'
 import { Townspeople } from './Townspeople'
 import { Batch } from './Batch'
+import { lotRoots } from './doors'
 import { LampTone, Tint } from './CityTint'
 import { lampPost, themeFor } from '../game/cityLook'
 import { Manhole } from './BuildingDetail'
@@ -230,10 +231,20 @@ function BuildingLot({ b, turn, group, picked, city }: BuildingProps) {
   // How far it's been dragged, in tiles. A building hides while dragged away and
   // the ghost shows where it would land; a merged block slides along itself.
   const off = useDrag((g) => (g.drag?.uid === b.uid ? `${g.drag.x - b.x},${g.drag.z - b.z}` : '0,0'))
+  // Townspeople find this lot's doors in what it draws (see doors.ts).
+  const uid = b.uid
+  const register = useCallback((g: Object3D | null) => {
+    if (!g) return
+    lotRoots.set(uid, g)
+    return () => {
+      if (lotRoots.get(uid) === g) lotRoots.delete(uid)
+    }
+  }, [uid])
   if (off !== '0,0' && !group) return null
   const [dx, dz] = off.split(',').map(Number)
   return (
     <group
+      ref={register}
       position={[cx + dx * TILE, 0, cz + dz * TILE]}
       userData={{ hours: { seed: seedOf(b.uid), kind: hoursOf(b.def) }, noBatch: !!picked }}
       onPointerDown={(e) => {

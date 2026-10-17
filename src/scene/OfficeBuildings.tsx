@@ -11,6 +11,7 @@ import { PAL, SEASON } from './season'
 import { closingGlow } from './closingTime'
 import { brickTex, concreteTex, corrugatedTex, curtainGlowTex, curtainTex, gravelTex, helipadTex, paverTex } from './textures'
 import { Helicopter, AmbulanceModel } from './ServiceVehicles'
+import { doorTag } from './doors'
 
 // Offices, the hospital and the heliport: the big-town end of the shop.
 // Static pieces are plain meshes that Batch merges into the town's draws; glass
@@ -253,11 +254,12 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
           </mesh>
           {/* Glass atrium with the entrance, a canopy and sliding doors. */}
           <GlassBlock m={m} ghost={ghost} x={1.38} z={-0.2} w={0.9} d={1.1} h={ah} tint="#b3e5fc" frame="#455a64" />
-          <Box m={m} at={[1.38, 0.62, 0.58]} s={[1.0, 0.05, 0.4]} c="#455a64" />
-          {[1.0, 1.76].map((x) => <Cyl key={x} m={m} at={[x, 0.3, 0.74]} r={0.022} h={0.6} c="#90a4ae" seg={6} />)}
-          <mesh position={[1.38, 0.27, 0.36]}><planeGeometry args={[0.44, 0.52]} />{m('#263238')}</mesh>
+          {/* The canopy clears a walker's head on the way in. */}
+          <Box m={m} at={[1.38, 0.65, 0.58]} s={[1.0, 0.05, 0.4]} c="#455a64" />
+          {[1.0, 1.76].map((x) => <Cyl key={x} m={m} at={[x, 0.315, 0.74]} r={0.022} h={0.63} c="#90a4ae" seg={6} />)}
+          <mesh position={[1.38, 0.27, 0.36]} userData={doorTag('slide')}><planeGeometry args={[0.44, 0.52]} />{m('#263238')}</mesh>
           <Box m={m} at={[1.38, 0.28, 0.362]} s={[0.012, 0.52, 0.01]} c="#b0bec5" shadow={false} />
-          <mesh position={[1.38, 0.66, 0.79]}><boxGeometry args={[0.7, 0.02, 0.02]} />{bulb}</mesh>
+          <mesh position={[1.38, 0.65, 0.79]}><boxGeometry args={[0.7, 0.02, 0.02]} />{bulb}</mesh>
           {/* Walk to the street, lawn strips, planters, a bike rack and the monument sign. */}
           <Box m={m} at={[0, 0.02, 0.68]} s={[3.9, 0.04, 0.62]} c="#ffffff" t={paverTex(4, 1)} shadow={false} />
           <Box m={m} at={[-0.55, 0.045, 0.6]} s={[2.4, 0.03, 0.34]} c={PAL.grass} shadow={false} />
@@ -349,11 +351,13 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
           <Glass m={m} ghost={ghost} at={[0.2, 0.4, 0.452]} w={2.6} h={0.62} tint="#cfd8dc" />
           {[-1.05, -0.4, 0.25, 0.9, 1.5].map((x) => <Box key={x} m={m} at={[x, 0.4, 0.47]} s={[0.04, 0.66, 0.04]} c="#263238" shadow={false} />)}
           <Box m={m} at={[0, ph + 0.03, -0.25]} s={[3.66, 0.06, 1.46]} c="#263238" />
-          {/* Cantilevered entrance canopy with a revolving door under it. */}
+          {/* Cantilevered entrance canopy over a revolving door and sliding doors beside it. */}
           <Box m={m} at={[0.2, 0.7, 0.75]} s={[1.3, 0.05, 0.6]} c="#263238" />
           <mesh position={[0.2, 0.672, 1.035]}><boxGeometry args={[1.24, 0.015, 0.02]} />{bulb}</mesh>
-          <mesh position={[0.2, 0.3, 0.55]}><cylinderGeometry args={[0.22, 0.22, 0.58, 16, 1, true]} />{ghost ? m('#90a4ae') : <primitive object={glassMat('#cfd8dc')} attach="material" dispose={null} />}</mesh>
-          <Cyl m={m} at={[0.2, 0.6, 0.55]} r={0.24} h={0.04} c="#263238" seg={16} />
+          <mesh position={[0.575, 0.3, 0.55]}><cylinderGeometry args={[0.22, 0.22, 0.58, 16, 1, true]} />{ghost ? m('#90a4ae') : <primitive object={glassMat('#cfd8dc')} attach="material" dispose={null} />}</mesh>
+          <Cyl m={m} at={[0.575, 0.6, 0.55]} r={0.24} h={0.04} c="#263238" seg={16} />
+          <mesh position={[-0.075, 0.3, 0.458]} userData={doorTag('slide')}><planeGeometry args={[0.5, 0.56]} />{m('#263238')}</mesh>
+          <Box m={m} at={[-0.075, 0.3, 0.46]} s={[0.012, 0.56, 0.01]} c="#b0bec5" shadow={false} />
           {st < 3 ? (
             <group>
               {/* The tower: dark glass between slim aluminium fins. */}
@@ -470,7 +474,7 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
           <GlassBlock m={m} ghost={ghost} x={0} z={tz} w={2.5} d={2.3} h={lob} tint="#e0f2f1" frame="#263238" />
           <Box m={m} at={[0, lob + 0.04, tz + 1.3]} s={[1.4, 0.06, 0.5]} c="#263238" />
           <mesh position={[0, lob + 0.01, tz + 1.535]}><boxGeometry args={[1.36, 0.015, 0.02]} />{bulb}</mesh>
-          <mesh position={[0, 0.3, tz + 1.156]}><planeGeometry args={[0.6, 0.56]} />{m('#1c2a33')}</mesh>
+          <mesh position={[0, 0.3, tz + 1.156]} userData={doorTag('slide')}><planeGeometry args={[0.6, 0.56]} />{m('#1c2a33')}</mesh>
           {/* Shaft (whole, split by a sky garden, or twisting), upper setback and crown band. */}
           {st === 1 && <GlassBlock m={m} ghost={ghost} x={0} z={tz} y0={lob + 0.08} w={2.1} d={1.9} h={H - lob} tint="#7fd1c7" frame="#eceff1" />}
           {st === 2 && (
@@ -519,7 +523,7 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
                 <Cyl m={m} at={[0, 0.2, 0]} r={0.05} h={0.18} c="#78909c" seg={8} />
               </group>
               {[[-1.7, 0.6], [1.7, 0.6], [-1.7, -1.7], [1.7, -1.7]].map(([x, z]) => <Planter key={`${x}${z}`} m={m} at={[x, 0.05, z]} big />)}
-              <Bench m={m} at={[-0.15, 0.05, 1.25]} ry={Math.PI / 2} />
+              <Bench m={m} at={[-0.22, 0.05, 1.25]} ry={Math.PI / 2} />
               <Bench m={m} at={[-1.0, 0.05, 1.8]} />
               {[-1.75, 1.75].map((x) => <Lamp key={x} m={m} bulb={bulb} at={[x, 0.05, 1.55]} />)}
               {/* Drop-off lane down the right side with a taxi at the kerb. */}
@@ -580,6 +584,7 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
           <LitSign text="HOSPITAL" w={1.5} at={[-0.6, h - 0.42, zf + 0.03]} bg="#fafafa" fg="#c62828" ghost={ghost} m={m} />
           {/* Main entrance: glass vestibule, canopy on posts, a drop-off kerb. */}
           <GlassBlock m={m} ghost={ghost} x={-0.95} z={zf + 0.25} w={1.0} d={0.5} h={0.6} tint="#b2dfdb" frame="#90a4ae" />
+          <mesh position={[-0.95, 0.3, zf + 0.506]} userData={doorTag('slide')}><planeGeometry args={[0.5, 0.5]} />{m('#37474f')}</mesh>
           <Box m={m} at={[-0.95, 0.72, zf + 0.65]} s={[1.3, 0.05, 0.85]} c="#90a4ae" />
           {[-1.5, -0.4].map((x) => <Cyl key={x} m={m} at={[x, 0.36, zf + 1.0]} r={0.025} h={0.72} c="#eceff1" seg={6} />)}
           <mesh position={[-0.95, 0.69, zf + 1.07]}><boxGeometry args={[1.2, 0.015, 0.02]} />{bulb}</mesh>
@@ -691,7 +696,8 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
             <circleGeometry args={[1.2, 28]} />
             {m('#ffffff', helipadTex('#ffca28', '#fafafa'))}
           </mesh>
-          {!ghost && <PadLights bulb={bulb} x={pad[0]} z={pad[2]} r={1.28} n={14} y={0.11} />}
+          {/* Low enough to step over on the way to the terminal. */}
+          {!ghost && <PadLights bulb={bulb} x={pad[0]} z={pad[2]} r={1.28} n={14} y={0.098} />}
           {/* Taxiway to the hangar with blue edge lights. */}
           <Box m={m} at={[1.25, 0.052, -0.85]} s={[0.7, 0.01, 0.9]} c="#607d8b" shadow={false} />
           {!ghost && [-1.25, -0.95, -0.65].flatMap((z) => [0.88, 1.62].map((x) => (
@@ -702,8 +708,9 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
           <Glass m={m} ghost={ghost} at={[-1.05, th / 2 + 0.02, -0.596]} w={1.4} h={th - 0.25} tint="#90caf9" />
           <Box m={m} at={[-1.05, th + 0.04, -1.2]} s={[1.66, 0.08, 1.26]} c="#ff6f00" />
           <mesh position={[-1.05, th + 0.084, -1.2]} rotation-x={-Math.PI / 2}><planeGeometry args={[1.6, 1.2]} />{m(ROOF, SNOW ? undefined : gravelTex(2, 1))}</mesh>
+          {/* The doors at the right end, clear of the second pad's rotor on the walk in. */}
           <Box m={m} at={[-0.65, 0.66, -0.4]} s={[0.8, 0.04, 0.4]} c="#ff6f00" />
-          <mesh position={[-0.65, 0.28, -0.594]}><planeGeometry args={[0.36, 0.5]} />{m('#263238')}</mesh>
+          <mesh position={[-0.53, 0.28, -0.594]} userData={doorTag('slide')}><planeGeometry args={[0.36, 0.5]} />{m('#263238')}</mesh>
           {!ghost && (
             // Up on legs, clear of the roof's light string.
             <group position={[-1.05, th + 0.45, -0.62]}>
@@ -741,7 +748,7 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
               </group>
             )}
           </group>
-          {/* Windsock, fuel bowser and a perimeter fence along the back. */}
+          {/* Windsock, fuel bowser (between the terminal and the hangar) and a perimeter fence along the back. */}
           {!ghost && (
             <group>
               <group position={[-1.85, 0, -0.3]}>
@@ -750,7 +757,7 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
                   <Cyl key={i} m={m} at={[0.08 + i * 0.1, 1.04 - i * 0.025, 0]} r={0.075 - i * 0.012} r2={0.065 - i * 0.012} h={0.1} c={i % 2 ? '#fafafa' : '#ff6f00'} seg={10} rot={[0, 0, Math.PI / 2 + 0.25]} />
                 ))}
               </group>
-              <group position={[-0.25, 0.05, 1.68]} rotation-y={1.3}>
+              <group position={[0.12, 0.05, -1.35]} rotation-y={0.3}>
                 <Box m={m} at={[0, 0.2, -0.15]} s={[0.36, 0.26, 0.5]} c="#eceff1" />
                 <Cyl m={m} at={[0, 0.25, -0.17]} r={0.13} h={0.46} c="#c62828" seg={12} rot={[Math.PI / 2, 0, 0]} />
                 <Box m={m} at={[0, 0.22, 0.2]} s={[0.36, 0.3, 0.22]} c="#c62828" />
@@ -774,8 +781,9 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
             </group>
           )}
           {!ghost && <group position={[-1.05, 0, 0]}><Trims m={m} lvl={lvl} w={1.6} d={1.2} h={th + 0.04} z0={-1.2} flag="#ff6f00" /></group>}
-          {/* The working helicopter: parks on the pad, then flies laps of town. */}
-          <group position={[pad[0], 0.1, pad[2]]} scale={0.8}>
+          {/* The working helicopter: parks on the pad (tail to the right, clear of
+              the walk to the terminal), then flies laps of town. */}
+          <group position={[pad[0], 0.1, pad[2]]} rotation-y={Math.PI} scale={0.8}>
             <Helicopter look={{ body: '#ff6f00', stripe: '#fafafa' }} fly={!ghost} seed={0} radius={8} height={7} ghost={ghost} />
           </group>
         </group>

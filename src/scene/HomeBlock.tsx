@@ -1,6 +1,13 @@
-import type { ReactNode } from 'react'
+import { createContext, useContext, type ReactNode } from 'react'
 import { TILE, type BuildingDef } from '../game/data'
 import { TrueSize, useMergeScale } from './mergeScale'
+import { doorTag, type DoorKind } from './doors'
+
+// Rows in the middle of a big block face a lane inside it, out of the street's
+// reach: their doors are drawn but not offered to townspeople (doors.ts).
+const InnerRow = createContext(false)
+// A home's front-door tag, or none for a home on an inner row.
+export const useDoorTag = (kind?: DoorKind) => (useContext(InnerRow) ? undefined : doorTag(kind))
 
 // Merged homes are a street of real-size homes, never one home blown up: a
 // pair is two homes side by side, a 2x2 four homes back to back, a 4x4 four
@@ -17,7 +24,7 @@ export function HomeBlock({ def, children }: { def: BuildingDef; children: React
     const away = nz > 1 && (nz - 1 - j) % 2 === 1
     homes.push(
       <group key={`${i},${j}`} position={[(i - (nx - 1) / 2) * W, 0, (j - (nz - 1) / 2) * D]} rotation-y={away ? Math.PI : 0}>
-        {children}
+        <InnerRow.Provider value={j > 0 && j < nz - 1}>{children}</InnerRow.Provider>
       </group>,
     )
   }

@@ -7,6 +7,7 @@ import { decal } from './layers'
 import { concreteTex, corrugatedTex, gravelTex } from './textures'
 import { Crane, Crusher } from './TrailerJunkyard'
 import { growthStage } from '../game/growth'
+import { doorTag } from './doors'
 
 // Rusty's Rescue: a rust-red Quonset workshop with a car up on the lift out
 // front, his tow truck parked by the gate and a fenced junkyard full of crushed
@@ -28,6 +29,10 @@ const QR = 0.92
 const QZ0 = -0.92 // back
 const QZ1 = 0.22 // front, where the bay door is
 const QY = 0.06
+// The front porch, where people walk in: a little boarded entry on the gable's left.
+const PX = QX - 0.62
+const PW = 0.44
+const PTOP = 0.81
 
 function Box({ m, at, s, c, t, rot, shadow = true }: { m: Mat; at: V3; s: V3; c: string; t?: Texture; rot?: V3; shadow?: boolean }) {
   return (
@@ -142,13 +147,28 @@ export function RustysYard({ m, ghost, sign, bulb, win, lvl, lift }: Props) {
       {[-0.46, 0.46].map((x) => (
         <Box key={x} m={m} at={[QX + x, QY + 0.34, QZ1 + 0.02]} s={[0.05, 0.68, 0.04]} c="#fafafa" />
       ))}
-      {/* Round porthole windows either side, and a lamp over the door. */}
-      {[-0.66, 0.66].map((x) => (
-        <group key={x} position={[QX + x, QY + 0.38, QZ1 + 0.006]}>
+      {/* Round porthole windows: one on the gable, one on the porch's side. */}
+      {[[QX + 0.66, QY + 0.38, QZ1 + 0.006, 0], [PX - PW / 2 - 0.002, 0.48, QZ1 + 0.09, -Math.PI / 2]].map(([x, y, z, ry]) => (
+        <group key={x} position={[x, y, z]} rotation-y={ry}>
           <mesh><circleGeometry args={[0.1, 14]} />{m('#fafafa')}</mesh>
           <mesh position-z={0.002}><circleGeometry args={[0.075, 14]} />{win}</mesh>
         </group>
       ))}
+      {/* The porch: painted boards like the gable under a rust tin roof, a
+          white-framed door, a concrete step and a lamp. */}
+      <Box m={m} at={[PX, (0.05 + PTOP) / 2, QZ1 + 0.08]} s={[PW, PTOP - 0.05, 0.26]} c="#efe2c8" />
+      <Box m={m} at={[PX, PTOP + 0.025, QZ1 + 0.09]} s={[PW + 0.06, 0.05, 0.32]} c="#7a3518" />
+      <Box m={m} at={[PX, 0.385, QZ1 + 0.214]} s={[0.36, 0.67, 0.006]} c="#fafafa" shadow={false} />
+      <mesh position={[PX, 0.36, QZ1 + 0.219]} userData={doorTag()}>
+        <planeGeometry args={[0.3, 0.6]} />
+        {m('#8f4422')}
+      </mesh>
+      <Box m={m} at={[PX + 0.1, 0.37, QZ1 + 0.223]} s={[0.03, 0.05, 0.006]} c="#cfd8dc" shadow={false} />
+      <Box m={m} at={[PX, 0.07, QZ1 + 0.27]} s={[0.4, 0.04, 0.1]} c="#9e9e9e" />
+      <mesh position={[PX, 0.75, QZ1 + 0.237]}>
+        <boxGeometry args={[0.1, 0.04, 0.05]} />
+        {bulb}
+      </mesh>
       <mesh position={[QX, QY + 0.74, QZ1 + 0.06]}>
         <boxGeometry args={[0.18, 0.05, 0.08]} />
         {bulb}
@@ -228,7 +248,7 @@ export function RustysYard({ m, ghost, sign, bulb, win, lvl, lift }: Props) {
               </group>
             ))}
           </group>
-          <Tyre m={m} at={[-0.58, 0.06, 0.2]} rot={[-Math.PI / 2, 0, 0]} />
+          <Tyre m={m} at={[-0.12, 0.06, 0.32]} rot={[-Math.PI / 2, 0, 0]} />
         </group>
       )}
       {/* Oil stain under the lift. */}
@@ -351,6 +371,8 @@ export function RustysYard({ m, ghost, sign, bulb, win, lvl, lift }: Props) {
       {/* Upgrade trimmings: bulbs round the arch (5), a flag (8, star at 10). */}
       {lvl >= 5 && !ghost && Array.from({ length: 11 }, (_, i) => {
         const a = Math.PI * (0.06 + (i / 10) * 0.88)
+        // None buried in the porch.
+        if (Math.abs(QX + Math.cos(a) * QR - PX) < PW / 2 + 0.04 && QY + Math.sin(a) * QR < PTOP + 0.08) return null
         return (
           <mesh key={i} position={[QX + Math.cos(a) * (QR + 0.02), QY + Math.sin(a) * (QR + 0.02), QZ1 + 0.03]}>
             <sphereGeometry args={[0.03, 6, 5]} />

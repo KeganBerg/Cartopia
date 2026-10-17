@@ -21,6 +21,7 @@ import { Bulbs as EdgeBulbs } from './edgeKit'
 import { brickTex, sidingTex, gravelTex, awningTex, paverTex, shutterTex, shingleTex, checkerTex } from './textures'
 import { Generator, Sandwich, ShopLot } from './BuildingDetail'
 import { PEOPLE_SIZED } from './keepShape'
+import { doorTag, type DoorKind } from './doors'
 
 // Models for the second wave of shop items: businesses and services (coffee,
 // tacos, oil change, arcade, body shop, market, fire and police stations,
@@ -171,13 +172,18 @@ type Shell = {
   signFg?: string
   // Ground floor: a shop window, door and awning, or nothing (the model draws its own).
   shopfront?: string | null
+  // How the shop front's door opens (glass automatic doors for a supermarket),
+  // or null when the lot's way in is elsewhere (a venue's gate).
+  door?: DoorKind | null
+  // Where the door sits along the front (0 is the middle).
+  doorAt?: number
   // How much of the usual upgrade height it gains (low-rise lots like the schools grow slower).
   grow?: number
   children?: ReactNode
 }
 
 // A flat-roofed building that grows a floor of windows every other upgrade level.
-export function ShellBuilding({ m, win, bulb, ghost, lvl, w, d, h0, z0 = -0.15, x0 = 0, wall, tex = 'brick', roof, sign, signBg = '#fffde7', signFg = '#c62828', shopfront, grow = 1, rowFrom = 1.25, winAt, children }: Shell) {
+export function ShellBuilding({ m, win, bulb, ghost, lvl, w, d, h0, z0 = -0.15, x0 = 0, wall, tex = 'brick', roof, sign, signBg = '#fffde7', signFg = '#c62828', shopfront, door = 'swing', doorAt = 0, grow = 1, rowFrom = 1.25, winAt, children }: Shell) {
   const pane = (i: number) => (winAt ? winAt(i) : win)
   const h = h0 + levelLift(lvl) * grow
   const zf = z0 + d / 2
@@ -203,24 +209,29 @@ export function ShellBuilding({ m, win, bulb, ghost, lvl, w, d, h0, z0 = -0.15, 
             {win}
           </mesh>
           <Box m={m} at={[0, 0.08, zf + 0.015]} s={[w, 0.16, 0.03]} c="#eceff1" shadow={false} />
+          <group position-x={doorAt}>
           <Box m={m} at={[0, 0.33, zf + 0.02]} s={[0.48, 0.66, 0.02]} c="#eceff1" shadow={false} />
-          <mesh position={[0, 0.32, zf + 0.032]}>
+          <mesh position={[0, 0.32, zf + 0.032]} userData={door ? doorTag(door) : undefined}>
             <planeGeometry args={[0.38, 0.6]} />
             {m('#4e342e')}
           </mesh>
           {/* The door's glass, its push bar and a kick plate. */}
           <mesh position={[0, 0.45, zf + 0.034]}><planeGeometry args={[0.26, 0.24]} />{win}</mesh>
-          <Box m={m} at={[0, 0.3, zf + 0.04]} s={[0.28, 0.018, 0.014]} c="#cfd8dc" shadow={false} />
+          <Box m={m} at={[0, 0.3, zf + 0.037]} s={[0.17, 0.018, 0.006]} c="#cfd8dc" shadow={false} />
           <mesh position={[0, 0.14, zf + 0.034]}><planeGeometry args={[0.36, 0.08]} />{m('#b0bec5')}</mesh>
+          </group>
           <Box m={m} at={[0, 0.82, zf + 0.2]} rot={[0.45, 0, 0]} s={[w * 0.92, 0.03, 0.44]} c="#ffffff" t={awningTex(shopfront)} />
-          <Box m={m} at={[0, 0.05, zf + 0.12]} s={[0.6, 0.1, 0.22]} c="#cfd8dc" />
-          {[-0.34, 0.34].map((x) => (
-            <mesh key={x} position={[x, 0.7, zf + 0.05]}>
+          <group position-x={doorAt}>
+          {/* A door set near a corner gets a narrower step and its lamps drawn in. */}
+          <Box m={m} at={[0, 0.05, zf + 0.12]} s={[doorAt ? 0.46 : 0.6, 0.1, 0.22]} c="#cfd8dc" />
+          {[-1, 1].map((sd) => (
+            <mesh key={sd} position={[sd * (doorAt ? 0.18 : 0.34), 0.7, zf + (doorAt ? 0.06 : 0.05)]}>
               <boxGeometry args={[0.08, 0.1, 0.08]} />
               {bulb}
             </mesh>
           ))}
           {!ghost && <Pool r={0.7} z={zf + 0.35} />}
+          </group>
         </group>
       )}
       {/* Side windows, then a row of windows for each upper floor. */}
@@ -401,7 +412,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
                 <Box m={m} at={[x, 0.22, 0.125]} s={[0.38, 0.04, 0.05]} c="#5d4037" shadow={false} />
               </group>
             ))}
-            <mesh position={[0, 0.33, 0.106]}><planeGeometry args={[0.32, 0.62]} />{m('#5d4037')}</mesh>
+            <mesh position={[0, 0.33, 0.106]} userData={doorTag()}><planeGeometry args={[0.32, 0.62]} />{m('#5d4037')}</mesh>
             <Box m={m} at={[0, 0.8, 0.3]} rot={[0.5, 0, 0]} s={[1.5, 0.03, 0.42]} c="#ffffff" t={awningTex('#ff7043', '#ffd54f')} />
             {st === 3 && (
               <group>
@@ -457,12 +468,17 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
             <Box m={m} at={[0.62, 0.44, 0]} s={[0.42, 0.46, 0.76]} c="#ff7043" />
             <Box m={m} at={[0.62, 0.78, 0]} s={[0.38, 0.24, 0.72]} c="#b3e5fc" />
             <Box m={m} at={[-0.15, 0.23, 0]} s={[1.2, 0.06, 0.8]} c="#ff7043" />
-            <mesh position={[-0.15, 0.66, 0.395]}>
-              <planeGeometry args={[0.8, 0.32]} />
+            <mesh position={[-0.47, 0.66, 0.395]}>
+              <planeGeometry args={[0.46, 0.32]} />
               {m('#3e2723')}
             </mesh>
-            <Box m={m} at={[-0.15, 0.8, 0.5]} rot={[0.6, 0, 0]} s={[0.86, 0.03, 0.3]} c="#ffffff" t={awningTex('#ff7043', '#ffd54f')} />
-            <Box m={m} at={[-0.15, 0.48, 0.44]} s={[0.84, 0.04, 0.1]} c="#bdbdbd" />
+            <Box m={m} at={[-0.47, 0.8, 0.5]} rot={[0.6, 0, 0]} s={[0.52, 0.03, 0.3]} c="#ffffff" t={awningTex('#ff7043', '#ffd54f')} />
+            <Box m={m} at={[-0.47, 0.48, 0.44]} s={[0.5, 0.04, 0.1]} c="#bdbdbd" />
+            {/* The crew's door beside the hatch, and a step box on the ground below it. */}
+            <mesh position={[-0.05, 0.52, 0.404]} userData={doorTag()}><planeGeometry args={[0.3, 0.66]} />{m('#ff7043')}</mesh>
+            <mesh position={[-0.05, 0.7, 0.406]}><planeGeometry args={[0.16, 0.16]} />{m('#b3e5fc')}</mesh>
+            <Box m={m} at={[0.06, 0.48, 0.41]} s={[0.018, 0.06, 0.008]} c="#bdbdbd" shadow={false} />
+            <Box m={m} at={[-0.05, 0.08, 0.47]} s={[0.32, 0.06, 0.13]} c="#bdbdbd" />
             {[[-0.55, 0.38], [0.6, 0.38], [-0.55, -0.38], [0.6, -0.38]].map(([x, z]) => <Wheel key={`${x}${z}`} m={m} at={[x, 0.12, z]} />)}
             {/* Giant taco on the roof. */}
             <group position={[-0.2, 0.995, 0]}>
@@ -480,7 +496,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           {!ghost && <Parasol m={m} at={[-0.55, 0, 0.62]} c="#ff7043" />}
           {/* The truck's generator out back, and the day's menu out front. */}
           {!ghost && <group position={[0.68, 0.05, -0.8]}><Generator /></group>}
-          {!ghost && <Sandwich at={[0.25, 0.05, 0.82]} board="#263238" />}
+          {!ghost && <Sandwich at={[0.32, 0.05, 0.82]} board="#263238" />}
           {trim && lvl >= 3 && <Parasol m={m} at={[0.55, 0, 0.62]} c="#43a047" />}
           {trim && lvl >= 5 && (
             <Upright>
@@ -512,17 +528,22 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           </mesh>
           <Box m={m} at={[-0.3, 1.02, 0.52]} s={[1, 0.08, 0.05]} c="#ffb300" />
           <mesh position={[-0.3, 1.12, 0.53]}><boxGeometry args={[0.16, 0.06, 0.08]} />{bulb}</mesh>
-          <mesh position={[0.55, 0.55, 0.505]}>
-            <planeGeometry args={[0.45, 0.42]} />
+          <mesh position={[0.71, 0.6, 0.505]}>
+            <planeGeometry args={[0.2, 0.36]} />
             {win}
           </mesh>
-          <mesh position={[0.55, 0.22, 0.508]}>
-            <planeGeometry args={[0.3, 0.42]} />
+          {/* Office door: frame, a glass slot and a handle. */}
+          <mesh position={[0.4, 0.29, 0.508]} userData={doorTag()}>
+            <planeGeometry args={[0.3, 0.56]} />
             {m('#455a64')}
           </mesh>
+          <Box m={m} at={[0.4, 0.58, 0.508]} s={[0.36, 0.03, 0.012]} c="#ffb300" shadow={false} />
+          {[-0.168, 0.168].map((dx) => <Box key={dx} m={m} at={[0.4 + dx, 0.29, 0.508]} s={[0.03, 0.58, 0.012]} c="#ffb300" shadow={false} />)}
+          <mesh position={[0.4, 0.42, 0.51]}><planeGeometry args={[0.16, 0.14]} />{win}</mesh>
+          <Box m={m} at={[0.5, 0.27, 0.518]} s={[0.018, 0.06, 0.014]} c="#cfd8dc" shadow={false} />
           <Box m={m} at={[0, 0.03, 0.78]} s={[1.6, 0.05, 0.5]} c="#ffffff" t={paverTex(2, 1)} shadow={false} />
           {/* Oil drums by the door and a giant oil drop on the roof. */}
-          {!ghost && <group userData={PEOPLE_SIZED}>{[[0.72, 0.68, '#c62828'], [0.48, 0.78, '#1565c0'], [0.66, 0.9, '#ffb300']].map(([x, z, c]) => (
+          {!ghost && <group userData={PEOPLE_SIZED}>{[[0.67, 0.7, '#c62828'], [0.88, 0.7, '#1565c0'], [0.775, 0.89, '#ffb300']].map(([x, z, c]) => (
             <Cyl key={c as string} m={m} at={[x as number, 0.17, z as number]} r={0.1} h={0.34} c={c as string} seg={10} />
           ))}</group>}
           <group position={[0.4, h + 0.14, -0.45]}>
@@ -575,10 +596,10 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
             <planeGeometry args={[0.7, 0.5]} />
             {win}
           </mesh>
-          <mesh position={[1.1, 0.25, 0.358]}><planeGeometry args={[0.3, 0.46]} />{m('#37474f')}</mesh>
+          <mesh position={[1.1, 0.25, 0.358]} userData={doorTag()}><planeGeometry args={[0.3, 0.46]} />{m('#37474f')}</mesh>
           {/* Office door: frame, a glass slot and a handle. */}
           <Box m={m} at={[1.1, 0.48, 0.358]} s={[0.36, 0.03, 0.012]} c="#eceff1" shadow={false} />
-          {[-0.165, 0.165].map((dx) => <Box key={dx} m={m} at={[1.1 + dx, 0.24, 0.358]} s={[0.03, 0.48, 0.012]} c="#eceff1" shadow={false} />)}
+          {[-0.168, 0.168].map((dx) => <Box key={dx} m={m} at={[1.1 + dx, 0.24, 0.358]} s={[0.03, 0.48, 0.012]} c="#eceff1" shadow={false} />)}
           <mesh position={[1.1, 0.36, 0.36]}><planeGeometry args={[0.16, 0.12]} />{win}</mesh>
           <Box m={m} at={[1.2, 0.24, 0.368]} s={[0.018, 0.06, 0.014]} c="#cfd8dc" shadow={false} />
           {/* Lift handles along the foot of each roller door. */}
@@ -615,7 +636,7 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
     case 'market': {
       const h = 1.45 + lift
       return (
-        <ShellBuilding {...shell} w={3.5} d={1.3} h0={1.45} z0={-0.3} wall="#fff8e1" roof="#2e7d32" sign="FRESH MART" signFg="#2e7d32" shopfront="#43a047">
+        <ShellBuilding {...shell} w={3.5} d={1.3} h0={1.45} z0={-0.3} wall="#fff8e1" roof="#2e7d32" sign="FRESH MART" signFg="#2e7d32" shopfront="#43a047" door="slide">
           {/* Produce stands out front. */}
           {!ghost && [-1.25, 1.25].map((x) => (
             <group key={x} position={[x, 0, 0.66]}>
@@ -663,7 +684,13 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
               <mesh position={[x, 1.32, 0.47]}><boxGeometry args={[0.14, 0.06, 0.08]} />{bulb}</mesh>
             </group>
           ))}
-          <mesh position={[1.3, 0.55, 0.455]}><planeGeometry args={[0.5, 0.5]} />{win}</mesh>
+          <mesh position={[1.48, 0.55, 0.455]}><planeGeometry args={[0.36, 0.5]} />{win}</mesh>
+          {/* The crew's door: white trim like the bays, a glass slot, a handle and a lamp. */}
+          <Box m={m} at={[1.05, 0.33, 0.445]} s={[0.44, 0.66, 0.03]} c="#fafafa" shadow={false} />
+          <mesh position={[1.05, 0.31, 0.462]} userData={doorTag()}><planeGeometry args={[0.34, 0.6]} />{m('#37474f')}</mesh>
+          <mesh position={[1.05, 0.48, 0.464]}><planeGeometry args={[0.16, 0.14]} />{win}</mesh>
+          <Box m={m} at={[1.16, 0.3, 0.468]} s={[0.018, 0.06, 0.012]} c="#cfd8dc" shadow={false} />
+          <mesh position={[1.05, 0.74, 0.47]}><boxGeometry args={[0.1, 0.05, 0.06]} />{bulb}</mesh>
           {/* Hose tower at the back corner. */}
           <Box m={m} at={[1.35, th / 2, -0.55]} s={[0.6, th, 0.6]} c="#c62828" t={brickTex(1, Math.max(1, Math.round(th)))} />
           <mesh position={[1.35, th + 0.22, -0.55]} rotation-y={Math.PI / 4} castShadow>
@@ -773,10 +800,11 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           {[-1.25, -0.65, 0.65, 1.25].map((x) => (
             <mesh key={x} position={[x, 0.6, 0.377]}><planeGeometry args={[0.42, 0.5]} />{win}</mesh>
           ))}
-          <mesh position={[0, 0.42, 0.378]}><planeGeometry args={[0.44, 0.74]} />{m('#37474f')}</mesh>
+          <mesh position={[0, 0.42, 0.378]} userData={doorTag()}><planeGeometry args={[0.44, 0.74]} />{m('#37474f')}</mesh>
           <Box m={m} at={[0, 1.0, 0.6]} s={[1.1, 0.1, 0.5]} c="#eceff1" />
           {[-0.45, 0.45].map((x) => <Cyl key={x} m={m} at={[x, 0.5, 0.78]} r={0.06} h={0.95} c="#fafafa" seg={10} />)}
-          {[0, 1, 2].map((i) => <Box key={i} m={m} at={[0, 0.03 + i * 0.05, 0.92 - i * 0.1]} s={[1.0, 0.06 + i * 0.05, 0.12]} c="#e0e0e0" shadow={false} />)}
+          {/* Low steps, an easy stride each. */}
+          {[0.04, 0.078, 0.115].map((sh, i) => <Box key={i} m={m} at={[0, sh / 2, 0.92 - i * 0.1]} s={[1.0, sh, 0.12]} c="#e0e0e0" shadow={false} />)}
           {/* Blue lamps either side of the door. */}
           {!ghost && [-0.32, 0.32].map((x) => (
             <mesh key={x} position={[x, 0.78, 0.45]}><sphereGeometry args={[0.07, 10, 8]} /><meshStandardMaterial color="#42a5f5" emissive="#1e88e5" emissiveIntensity={0.6} /></mesh>
@@ -1058,6 +1086,13 @@ export function NewBuildingModel({ def, ghost, valid, m, win, bulb, level = 1 }:
           ))}
           <Box m={m} at={[1.45, (top + 0.6) / 2, -1.495]} s={[0.55, top + 0.6, 0.49]} c="#9e9e9e" />
           <mesh position={[1.45, top + 0.1, -1.245]}><planeGeometry args={[0.3, 0.4]} />{win}</mesh>
+          {/* Stair lobby out front, clear of the decks: the way in on foot. */}
+          <Box m={m} at={[-1.15, 0.31, 1.71]} s={[0.5, 0.62, 0.28]} c="#9e9e9e" />
+          <Box m={m} at={[-1.15, 0.645, 1.71]} s={[0.56, 0.044, 0.34]} c="#1565c0" />
+          <Box m={m} at={[-1.15, 0.32, 1.854]} s={[0.38, 0.52, 0.008]} c="#e0e0e0" shadow={false} />
+          <mesh position={[-1.15, 0.3, 1.86]} userData={doorTag()}><planeGeometry args={[0.3, 0.48]} />{m('#1565c0')}</mesh>
+          <mesh position={[-1.15, 0.43, 1.862]}><planeGeometry args={[0.16, 0.14]} />{win}</mesh>
+          <Box m={m} at={[-1.04, 0.29, 1.864]} s={[0.018, 0.06, 0.006]} c="#cfd8dc" shadow={false} />
           {/* Ramp up the right side. */}
           <mesh position={[1.2, DH / 2 + 0.05, 0.3]} rotation-x={-Math.asin(DH / 1.7)} castShadow receiveShadow>
             <boxGeometry args={[0.6, 0.06, 1.7]} />
