@@ -955,3 +955,32 @@ div.rm-node { cursor: default; }
   }
 }
 @keyframes rmHubEnd { 0%, 96% { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 44px), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 44px), transparent); } 100% { -webkit-mask-image: none; mask-image: none; } }
+
+/* Tuner Trials hero: your car against the host's, PI bars, the easy-win warning and the prize. */
+.tt-twist { position: absolute; top: 10px; right: 10px; width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-size: 28px; background: #fff; border: 3px solid var(--line, #14213d); box-shadow: 0 3px 0 rgba(0,0,0,.3), 0 0 0 4px color-mix(in srgb, var(--pr) 70%, transparent); cursor: help; }
+.rm-chips .tt-skill { display: inline-grid; place-items: center; background: rgba(10,20,45,.6); border: 1.5px solid rgba(255,255,255,.25); border-radius: 999px; padding: 2px 9px; font-size: 15px; }
+.rm-tuner .rm-right { gap: 8px; }
+.rm-tuner .tt-grid { flex: none; overflow: visible; }
+.tt-vs { position: relative; flex: 1; min-height: 180px; display: grid; grid-template-columns: 1fr auto 1fr; grid-template-rows: minmax(0, 1fr) auto; align-items: center; gap: 4px 6px; padding: 10px 12px 12px; background: radial-gradient(ellipse at 50% 40%, #fff 0 22%, color-mix(in srgb, var(--pr) 26%, #e8f1fc) 78%); border: 3px solid var(--line, #14213d); border-radius: 18px; box-shadow: 0 3px 0 rgba(0,0,0,.3); color: var(--ink, #1b2a4a); }
+.tt-side { min-width: 0; height: 100%; display: flex; flex-direction: column; align-items: stretch; gap: 4px; }
+.tt-side .thumb3d.lg { --tw: 100%; --th: 100%; width: 100%; height: auto; flex: 1 1 0; min-height: 70px; background: none; }
+.tt-side.host .thumb3d.lg { transform: scaleX(-1); }
+.tt-pi { flex: none; position: relative; overflow: hidden; height: 26px; border-radius: 999px; background: #dfe7f2; border: 2px solid var(--line, #14213d); display: grid; place-items: center; font: 900 15px Nunito, sans-serif; isolation: isolate; }
+.tt-pi i { position: absolute; left: 0; top: 0; bottom: 0; z-index: -1; background: #2fae35; }
+.tt-side.host .tt-pi i { background: var(--pr); opacity: .8; }
+.tt-vs-mark { font: 34px var(--display); color: #fff; -webkit-text-stroke: 5px var(--line, #14213d); paint-order: stroke fill; transform: rotate(-8deg); }
+.tt-easy { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); padding: 3px 12px; border-radius: 999px; background: #ffd84a; border: 2.5px solid var(--line, #14213d); font: 900 14px Nunito, sans-serif; white-space: nowrap; box-shadow: 0 2px 0 rgba(0,0,0,.25); }
+.tt-prize { grid-column: 1 / -1; display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap; }
+.tt-coins { padding: 4px 18px 5px; border-radius: 14px; background: #ffd84a; border: 3px solid var(--line, #14213d); font: 30px var(--display); line-height: 1.1; box-shadow: 0 3px 0 rgba(0,0,0,.3); }
+.tt-vs.got .tt-coins { background: #fff3c4; }
+.tt-pat { padding: 4px 12px; border-radius: 12px; background: #fff; border: 2.5px solid var(--line, #14213d); font: 900 16px Nunito, sans-serif; }
+@media (max-width: 600px), (max-height: 500px) {
+  .tt-twist { width: 40px; height: 40px; font-size: 21px; top: 8px; right: 8px; }
+  .rm-tuner .rm-banner { min-height: 130px; }
+  .tt-vs { min-height: 176px; padding: 6px 8px 8px; }
+  .tt-vs-mark { font-size: 24px; -webkit-text-stroke-width: 4px; }
+  .tt-pi { height: 22px; font-size: 13px; }
+  .tt-coins { font-size: 22px; padding: 2px 12px 3px; }
+  .tt-pat { font-size: 13px; }
+  .tt-easy { font-size: 12px; top: 4px; }
+}

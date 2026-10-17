@@ -1,5 +1,5 @@
 // Screenshots for the race modes build-out: Campaign star gate, Pro Tour ranks, Grand Prix chain
-// and big box cars, paint rival tiers. Needs `npx vite` running. node scripts/racemodes/shoot.mjs <out dir>
+// and big box cars, paint rival tiers, Tuner Trials (tuner-easy: a PI 160 car against Boost Box). Needs `npx vite` running. node scripts/racemodes/shoot.mjs <out dir>
 // One fresh page per screen: swiftshader can drop the WebGL context, and the game reloads on restore.
 import { createRequire } from 'node:module'
 const { chromium } = createRequire('/opt/node22/lib/node_modules/')('playwright')
@@ -13,9 +13,12 @@ const seed = {
   tour: 23, gp: { rookie: { round: 1, clears: 1 } },
   rivalRow: { sunny: 1, penny: 1, gus: 1, moss: 1, violet: 1 },
   cars: [car('x1', 'stallion'), car('x2', 'miata'), car('x3', 'trail'), car('x4', 'civic')],
+  tuner: { boostbox: 1 },
 }
+// Kegan's case: a maxed Vanta picked as the race car.
+const easy = { raceCar: 'v1', cars: [...seed.cars, { ...car('v1', 'vanta'), upgrades: { engine: 5, turbo: 5, tires: 5, weight: 5 } }] }
 for (const [form, size] of [['desktop', { width: 1280, height: 800 }], ['phone', { width: 390, height: 844 }]]) {
-  for (const tab of ['campaign', 'campaign-open', 'tour', 'gp', 'rivals']) {
+  for (const tab of ['campaign', 'campaign-open', 'tour', 'gp', 'rivals', 'tuner', 'tuner-easy']) {
     if (only && !tab.startsWith(only)) continue
     const p = await b.newPage({ viewport: size, deviceScaleFactor: form === 'phone' ? 2 : 1, isMobile: form === 'phone', hasTouch: form === 'phone' })
     await p.addInitScript(() => localStorage.setItem('cartopia-flash-warning-hide', '1'))
@@ -23,7 +26,7 @@ for (const [form, size] of [['desktop', { width: 1280, height: 800 }], ['phone',
     await p.goto('http://localhost:5173/?time=0.3&season=fall')
     await p.waitForFunction(() => window.__game, null, { timeout: 120000 })
     await p.waitForTimeout(3000)
-    await p.evaluate((s) => window.__game.setState(s), seed)
+    await p.evaluate((s) => window.__game.setState(s), tab === 'tuner-easy' ? { ...seed, ...easy } : seed)
     await p.addStyleTag({ content: '*{animation-duration:0s!important;transition:none!important}' })
     for (let tries = 0; tries < 3 && !(await p.$('.race-panel .rm-split, .race-panel .rm-gp-grid')); tries++) {
       await p.evaluate(async (t) => { (await import('/src/ui/raceNav.ts')).openRaceTab(t) }, tab.split('-')[0])
@@ -31,6 +34,7 @@ for (const [form, size] of [['desktop', { width: 1280, height: 800 }], ['phone',
     }
     if (tab === 'campaign') await p.click('[aria-label="Mountain Pass"]')
     if (tab === 'campaign-open') await p.click('[aria-label="Desert Strip"]')
+    if (tab === 'tuner') await p.click('[aria-label="Downforce Dash"]')
     await p.waitForTimeout(4000)
     await p.screenshot({ path: `${out}/${form}-${tab}.png` })
     await p.close()
