@@ -90,11 +90,13 @@ export const nextView = <T extends string>(list: readonly T[], cur: T): T => lis
 export function dragViewCam(v: Exclude<DragView, 'chase'>, x: number, z: number, rx: number, rz: number, nose: number, road: number, tall: boolean, pos: Vector3, at: Vector3): number {
   if (v === 'far') {
     // High and well back over the middle of the road: both cars, both lanes and the street ahead.
-    // It takes in the rival too while it's within a few car lengths either way.
-    const lo = Math.max(Math.min(z, rz), z - 6)
-    const hi = Math.min(Math.max(z, rz), z + 6)
-    pos.set(0, tall ? 4.4 : 2.9, lo - (tall ? 8.6 : 6))
-    at.set(0, 0.2, hi + (tall ? 4 : 4.5))
+    // It takes in the rival too while it's close, but my car stays the subject: a rival falling far
+    // behind drops out of the frame rather than dragging the camera back past it.
+    const lo = Math.max(Math.min(z, rz), z - 2.5)
+    const hi = Math.min(Math.max(z, rz), z + 5)
+    // A wide screen looks down a little more, so the cars sit above the tach in the middle of the HUD.
+    pos.set(0, tall ? 4.4 : 3.2, lo - (tall ? 8.6 : 6.5))
+    at.set(0, 0.2, hi + (tall ? 4 : 1.2))
     return tall ? 0 : -2
   }
   if (v === 'bumper') {

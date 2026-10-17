@@ -83,7 +83,7 @@ describe('picked race views', () => {
     const at = new Vector3()
     for (const tall of [true, false]) for (const v of DRAG_VIEWS.filter((x) => x !== 'chase') as Exclude<DragView, 'chase'>[]) {
       // Side by side, me well ahead, the rival well ahead.
-      for (const [z, rz] of [[20, 20], [40, 30], [30, 40]]) {
+      for (const [z, rz] of [[20, 20], [40, 30], [30, 40], [60, 20]]) {
         const fov = dragViewCam(v, LANE, z, -LANE, rz, nose, ROAD, tall, pos, at)
         expect(Math.abs(fov)).toBeLessThan(15)
         // Above the road, never inside either car's box (1.4x model: ~0.6 tall, nose each way).
@@ -97,6 +97,8 @@ describe('picked race views', () => {
         // Never looking back past my car, except the TV camera that pans back across the pair.
         if (v !== 'tv') expect(at.z).toBeGreaterThan(pos.z)
         else expect(at.z).toBeLessThan(pos.z)
+        // My car stays the subject: never more than a few car lengths from the lens in the wide view.
+        if (v === 'far') expect(z - pos.z).toBeLessThan(12)
         // A tall phone keeps both lanes in the narrow frame from the wide view.
         if (v === 'far') expect(Math.abs(at.x)).toBeLessThan(0.3)
       }
