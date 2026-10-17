@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { BATTLE_RULES, battleChests, battleShare, warLeague, warPoints, warTiers, type Battle } from './battles'
+import { BATTLE_RULES, WAR_RULES, battleChests, battleShare, warLeague, warPoints, warTiers, type Battle } from './battles'
 
 const side = { bot: false, name: 'A', tag: 'AA', emblem: '🏁', color: '#ff7043', score: 0, members: [] }
 const battle = (b: Partial<Battle>): Battle => ({ week: '2026-10-05', venue: 'main', result: null, mine: 50, mvp: false, us: side, them: side, claimed: [], ...b })
@@ -11,6 +11,8 @@ describe('crew battles', () => {
     const sql = readFileSync('supabase/migrations/0113_crew_war_chests_log.sql', 'utf8')
     const rules = JSON.parse(sql.match(/crew_battle_rules\(\)[\s\S]*?select '(\{.*?\})'::jsonb/)![1])
     for (const [k, v] of Object.entries(BATTLE_RULES)) expect(rules[k], k).toEqual(v)
+    const war = readFileSync('supabase/migrations/0114_crew_war_map.sql', 'utf8')
+    expect(JSON.parse(war.match(/crew_war_rules\(\)[\s\S]*?select '(\{.*?\})'::jsonb/)![1])).toEqual(WAR_RULES)
   })
 
   it('owes chests only to scorers on the winning or drawing side', () => {
