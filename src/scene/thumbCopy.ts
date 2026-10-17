@@ -45,18 +45,24 @@ export type Slot = { key: string; canvas: HTMLCanvasElement; ctx: CanvasRenderin
 export const STILL_PER_FRAME = 4
 
 // Which thumbnails to draw this frame: every turning one on screen, and the next few still
-// ones that haven't been drawn. Keyed by model (and still), so one model at two sizes draws once.
+// ones that haven't been drawn. Keyed by model, still and shape, so one model at two sizes of
+// the same shape draws once. Two shapes draw twice: a wide drawing copied into a narrower box
+// squeezed the car (the Car Packs showcase and the card below it show the same car).
 type Need = { key: string; still: boolean; w: number; h: number; x: number; y: number; slots: Slot[] }
+// Boxes whose width-to-height differ by under about 2% share a drawing.
+export const shapeOf = (w: number, h: number) => Math.round(Math.log(w / h) * 50)
 export function pickThumbs(all: Iterable<Slot>, mounted: (key: string) => boolean, budget = STILL_PER_FRAME) {
   const need = new Map<string, Need>()
   let waiting = false
   for (const s of all) {
     if (!s.seen || !s.ctx || s.canvas.width < 2 || (s.still && !s.fresh)) continue
-    const id = s.still ? `${s.key}|still` : s.key
+    const id = `${s.key}|${s.still ? 'still' : ''}|${shapeOf(s.canvas.width, s.canvas.height)}`
     const n = need.get(id)
     if (n) {
-      n.w = Math.max(n.w, s.canvas.width)
-      n.h = Math.max(n.h, s.canvas.height)
+      // Grow to the bigger box, keeping this drawing's shape.
+      const k = Math.max(s.canvas.width / n.w, s.canvas.height / n.h, 1)
+      n.w = Math.round(n.w * k)
+      n.h = Math.round(n.h * k)
       n.slots.push(s)
     } else if (!mounted(s.key)) waiting = true // its model isn't mounted yet: try again next frame
     else if (s.still && budget <= 0) waiting = true
