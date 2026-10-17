@@ -2,7 +2,7 @@ import './lux.css'
 
 // How much a pack shows off, 0 to 5, by its price among the packs on the same screen: the
 // cheapest stays plain and each step up adds glow, a shine, a spinning gold rim, sparkles,
-// and on the top pack a holo rim and a float (Kegan, 2026-10-17).
+// and on the top pack a holo rim and the biggest glow (Kegan, 2026-10-17).
 export const LUX_TOP = 5
 export function luxLevels(prices: number[]): number[] {
   const steps = [...new Set(prices)].sort((a, b) => a - b)

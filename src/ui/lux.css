@@ -1,6 +1,7 @@
 /* Pack cards get richer with price (src/ui/Lux.tsx): 1 a soft gold glow, 2 a shine sweep,
    3 a gold comet circling the rim, 4 sparkles and a breathing glow, 5 a holo rim, more
-   sparkles and a float. Transforms and opacity only, so phones stay smooth. */
+   sparkles and the biggest glow. Transforms and opacity only, so phones stay smooth. The card
+   itself never moves: a moving card can't be tapped or scrolled to reliably. */
 .lux-fx { position: absolute; inset: 0; z-index: 4; border-radius: inherit; overflow: hidden; pointer-events: none; }
 .lux-shine { position: absolute; inset: 0; background: linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, .5) 50%, transparent 62%); transform: translateX(-130%); animation: luxShine 5.5s ease-in-out 1s infinite; }
 .lux-4 .lux-shine { animation-duration: 4s; }
@@ -26,14 +27,13 @@
 .lux.lux.lux-5 { box-shadow: 0 0 30px 6px rgba(255, 215, 64, .85); border-color: #fff176; z-index: 1; }
 @keyframes luxGlow4 { 50% { box-shadow: 0 0 30px 6px rgba(255, 193, 7, .9); } }
 @keyframes luxGlow5 { 50% { box-shadow: 0 0 44px 12px rgba(255, 215, 64, 1), 0 0 18px 4px rgba(224, 64, 251, .6); } }
-@keyframes luxFloat { 50% { transform: translateY(-4px) scale(1.025); } }
 
 /* Car Packs cards keep their pop-in; the glow and float follow it. */
 .pk-card.lux.lux { animation: pkIn .5s cubic-bezier(.2, .9, .3, 1.2) both; animation-delay: calc(var(--pk-i) * 80ms); }
 .pk-card.lux.lux-4 { animation: pkIn .5s cubic-bezier(.2, .9, .3, 1.2) both, luxGlow4 2.2s ease-in-out infinite; animation-delay: calc(var(--pk-i) * 80ms), .6s; }
-.pk-card.lux.lux-5 { animation: pkIn .5s cubic-bezier(.2, .9, .3, 1.2) both, luxGlow5 2.4s ease-in-out infinite, luxFloat 2.4s ease-in-out infinite; animation-delay: calc(var(--pk-i) * 80ms), .6s, .6s; }
+.pk-card.lux.lux-5 { animation: pkIn .5s cubic-bezier(.2, .9, .3, 1.2) both, luxGlow5 2.4s ease-in-out infinite; animation-delay: calc(var(--pk-i) * 80ms), .6s; }
 .bank-pack.lux.lux-4 { animation: luxGlow4 2.2s ease-in-out infinite; }
-.bank-pack.lux.lux-5 { animation: luxGlow5 2.4s ease-in-out infinite, luxFloat 2.4s ease-in-out infinite; }
+.bank-pack.lux.lux-5 { animation: luxGlow5 2.4s ease-in-out infinite; }
 
 /* The Bank's ribbon stays on top of the shine. */
 .bank-pack.lux .ribbon { z-index: 5; }
