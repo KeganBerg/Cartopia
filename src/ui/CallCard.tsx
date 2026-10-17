@@ -17,10 +17,19 @@ export function CallCardArt({ id, tint, still }: { id?: string | null; tint?: st
   )
 }
 
-// The tier class for a card's frame (cc-tier-rare...), or '' for the Showroom.
+// The classes for whatever holds a card: its tier frame (cc-tier-rare...; none for the Showroom)
+// and its stage (cc-on-neonalley...: where its ground is and the colour of its light, call-cards.css).
 export const callCardTier = (id?: string | null) => {
-  const t = callCardDef(callCardOr(id))?.tier
-  return t ? ` cc-tier-${t}` : ''
+  const cid = callCardOr(id)
+  const t = callCardDef(cid)?.tier
+  return `${t ? ` cc-tier-${t}` : ''} cc-on-${cid}`
+}
+
+// Under a car on a card (a holder with the cc-stage class): the pool of the card's light on its
+// ground, the shadow the car casts there and the glow behind it, so the car stands in the scene
+// rather than in front of it. One still layer.
+export function CallCardGround({ tint }: { tint?: string }) {
+  return <i className="cc-ground" style={tint ? { ['--cc' as string]: tint } : undefined} aria-hidden />
 }
 
 // "Call Card: Neon Alley · Rare", for a tap tip.
@@ -34,8 +43,9 @@ export function CallCardShowcase({ id, still, className }: { id?: string | null;
   const car = useGame((s) => raceCarOf(s.cars, s.raceCar))
   const d = car ? carDef(car.model) : null
   return (
-    <span className={`cc-show${callCardTier(id)}${className ? ` ${className}` : ''}`}>
+    <span className={`cc-show cc-stage${callCardTier(id)}${className ? ` ${className}` : ''}`}>
       <CallCardArt id={id} tint={car?.color} still={still} />
+      {car && d && <CallCardGround tint={car.color} />}
       {car && d && (
         <span className="cc-show-car">
           <CarThumb stand body={d.body} model={d.id} color={car.color} finish={car.finish} skin={car.skin} modSkin={car.modSkin} panels={car.panels} trim={car.trim} stripe={car.stripe} mods={car.mods} hat={car.hat} />
