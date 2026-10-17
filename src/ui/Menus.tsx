@@ -1,6 +1,6 @@
 import { mergeCandidates } from '../game/merge'
 import { CallCardPicker } from './CallCardPicker'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useGame, hasRusty, buildPrice, gateLevel, type OwnedCar, type PlacedBuilding } from '../game/store'
 import { raceCarOf } from '../game/raceCar'
 import { stackCars, stackFace } from '../game/garageStacks'
@@ -193,10 +193,15 @@ function EditBar() {
 let panelsUp = 0
 let panelGoneAt = -Infinity
 
+// Inside a menu that keeps its window while its tabs swap (Social), a tab's own Panel is just
+// its contents: a whole new window for each tab made the sheet and its tab row jump.
+export const InShell = createContext(false)
+
 // onBack: shows a back button before the title (a sub-screen of the panel). Without it, a menu
 // opened from another menu still gets one, back to that menu; the X closes to the town.
 // head: extra bits in the title bar, before the close button.
 export function Panel({ title, children, wide, onClose, onBack, head, className }: { title: string; children: React.ReactNode; wide?: boolean; onClose?: () => void; onBack?: () => void; head?: React.ReactNode; className?: string }) {
+  const shelled = useContext(InShell)
   const closePanel = useGame((s) => s.closePanel)
   const closeMenus = useGame((s) => s.closeMenus)
   const trail = useGame((s) => s.panelBack.length > 0)
@@ -226,6 +231,7 @@ export function Panel({ title, children, wide, onClose, onBack, head, className 
   }
   // A tap beside the menu steps back like the back button: straight to the previous menu, no slide.
   const tapOut = () => (!onClose && trail ? closePanel() : close())
+  if (shelled) return <>{children}</>
   return (
     <div className={closing ? 'overlay closing' : still ? 'overlay still' : 'overlay'} onClick={tapOut}>
       <div ref={box} className={`${wide ? 'panel wide' : 'panel'}${className ? ` ${className}` : ''}`} onClick={(e) => e.stopPropagation()}>

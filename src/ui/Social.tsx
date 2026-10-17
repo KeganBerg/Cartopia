@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useContext, useEffect, useState } from 'react'
 import { useGame, type Panel as PanelId, gateLevel } from '../game/store'
 import { BUILDINGS, CLAN_CAP, CLAN_COLORS, CLAN_COST, CLAN_EMBLEMS, garagePower } from '../game/data'
 import { supabase } from '../lib/supabase'
@@ -8,7 +8,7 @@ import {
   createClan, askJoin, cancelRequest, fetchMyRequests, leaveClan, updateClan, isOfficer, JOIN_MODES,
   type BoardRow, type Clan, type ClanBadge, type JoinMode, type Metric, type MyClan, type Period,
 } from '../lib/clans'
-import { Panel, SheetTabs } from './Menus'
+import { InShell, Panel, SheetTabs } from './Menus'
 import { isCleanName, NAME_REJECTED } from '../lib/names'
 import { refreshCrewGoal, useCrewGoal } from './CrewGoal'
 import { refreshChatRooms } from '../lib/chat'
@@ -47,6 +47,8 @@ export function useUserId() {
 // The Social menu: Friends, Crew, Meet and Leaderboards share one window with tabs across the top.
 export const SOCIAL_TITLE = 'Social'
 export function SocialTabs({ current }: { current: PanelId }) {
+  // In SocialPanel the window's own tab row stays put; the tab's copy steps aside.
+  const shelled = useContext(InShell)
   const openPanel = useGame((s) => s.swapPanel)
   const chests = useCrewGoal((g) => g.ready) + useCrewBattle((b) => b.ready)
   const locked = useGame((s) => !hasCrewHouse(s) && !s.clanBadge)
@@ -56,6 +58,7 @@ export function SocialTabs({ current }: { current: PanelId }) {
     { id: 'meet', label: '🚗 Meet' },
     { id: 'leaders', label: '🏅 Leaderboards' },
   ]
+  if (shelled) return null
   return <SheetTabs items={tabs as { id: Exclude<PanelId, null>; label: React.ReactNode }[]} value={current ?? 'friends'} onChange={(id) => openPanel(id)} />
 }
 

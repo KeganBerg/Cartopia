@@ -16,7 +16,7 @@ import { addFog } from './heightFog'
 export const skinClock = { value: 0 }
 export const tickSkins = () => void (skinClock.value = (performance.now() / 1000) % 3600)
 
-const GLSL = /* glsl */ `
+export const SKIN_GLSL = /* glsl */ `
 float skH(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 vec2 skH2(vec2 p) { return fract(sin(vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)))) * 43758.5453); }
 float skNoise(vec2 p) {
@@ -866,7 +866,7 @@ export function withSkin(sh: WebGLProgramParametersWithUniforms, id: string, att
     .replace('#include <common>', `#include <common>\n${VARYINGS}${space ? '\nuniform vec3 uSkO;\nuniform float uSkK;' : ''}${attr ? '\nattribute float skin;\nflat varying float vSkin;' : ''}`)
     .replace('#include <begin_vertex>', `#include <begin_vertex>\n${space ? VERTEX_WORLD : VERTEX}${attr ? '\nvSkin = skin;' : ''}`)
   sh.fragmentShader = sh.fragmentShader
-    .replace('#include <common>', `#include <common>\n${VARYINGS}${attr ? '\nflat varying float vSkin;' : ''}\n${GLSL}`)
+    .replace('#include <common>', `#include <common>\n${VARYINGS}${attr ? '\nflat varying float vSkin;' : ''}\n${SKIN_GLSL}`)
     .replace('#include <normal_fragment_begin>', /* glsl */ `vec3 skGlow = vec3(0.0);
     {
       int skId = ${id};

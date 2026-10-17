@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { memo, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { SharedShapes } from './sharedShapes'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { PerspectiveCamera, Vector3, type Group, type Mesh } from 'three'
@@ -14,7 +14,7 @@ import { SEASON } from './season'
 import { frame, seat, type Bounds } from './fit'
 import { reduceMotionOn } from '../lib/prefs'
 import { quietShaders } from './warm'
-import { chooseFocus, copyThumbs, pickThumbs, spinsFor, type Slot } from './thumbCopy'
+import { chooseFocus, copyThumbs, nextMounts, pickThumbs, spinsFor, type Slot } from './thumbCopy'
 import type { Trim } from '../game/trim'
 
 // Shop, showroom and garage thumbnails are live 3D renders. One hidden WebGL
@@ -189,9 +189,20 @@ function aimScene(c: PerspectiveCamera, v: SceneView) {
   c.projectionMatrixInverse.copy(c.projectionMatrix).invert()
 }
 
+// The models in the scene so far (see nextMounts).
+const inScene = new Set<string>()
+
+// Each model renders once when it goes in, not again every time a thumbnail comes or goes.
+const Model = memo(function Model({ item }: { item: Item }) {
+  return <group>{item.model()}</group>
+})
+
 function Renderer() {
   const { gl, scene } = useThree()
   const groups = useRef(new Map<string, Group>())
+  const [, mounted] = useState(0)
+  // A rebuilt canvas (the phone dropped the old one) starts with an empty scene.
+  useEffect(() => () => inScene.clear(), [])
   // Each model's size, measured the first time it's drawn.
   const sizes = useRef(new WeakMap<Group, Bounds>())
   const shadow = useRef<Mesh>(null)
@@ -205,6 +216,12 @@ function Renderer() {
   const cost = useRef(2)
   // Priority 1 takes over rendering from the default loop.
   useFrame(() => {
+    for (const k of inScene) if (!models.has(k)) inScene.delete(k)
+    const add = nextMounts(slots, (k) => models.has(k), inScene)
+    if (add.length) {
+      for (const k of add) inScene.add(k)
+      mounted((v) => v + 1)
+    }
     const now = performance.now()
     const still = reduceMotionOn()
     const over = hover && slots.has(hover) ? hover : null
@@ -320,7 +337,7 @@ function Renderer() {
         <circleGeometry args={[1, 32]} />
         <meshBasicMaterial color="#000000" transparent opacity={0.16} depthWrite={false} />
       </mesh>
-      {[...models.values()].map(({ item }) => (
+      {[...models.values()].filter(({ item }) => inScene.has(item.key)).map(({ item }) => (
         <group
           key={item.key}
           visible={false}
@@ -329,7 +346,7 @@ function Renderer() {
             else groups.current.delete(item.key)
           }}
         >
-          <group>{item.model()}</group>
+          <Model item={item} />
         </group>
       ))}
     </>

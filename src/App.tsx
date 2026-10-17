@@ -8,6 +8,7 @@ import { Hud } from './ui/Hud'
 import { FlyLayer } from './ui/Fly'
 import { ThumbRenderer } from './scene/BuildingPreview'
 import { Preview, StageCanvas } from './scene/Stage'
+import { WarmPreview } from './scene/WarmPreview'
 import { quietShaders } from './scene/warm'
 import { TapTips } from './ui/TapTip'
 import { BottomBar, ShopPanel, CarsPage, Toasts } from './ui/Menus'
@@ -20,9 +21,8 @@ import { CupPrizePopup, MasteryPrizePopup } from './ui/ClassCups'
 import { joinLobby, useLive } from './lib/live'
 import { chatDemo, startChat } from './lib/chat'
 import { ChatPanel } from './ui/Chat'
-import { FriendsPanel, VisitBanner } from './ui/Friends'
-import { LeadersPanel, ClanPanel } from './ui/Social'
-import { MeetPanel } from './ui/Meet'
+import { VisitBanner } from './ui/Friends'
+import { SocialPanel, isSocialTab } from './ui/SocialPanel'
 import { Tutorial } from './ui/Tutorial'
 import { TutHand } from './ui/TutHand'
 import { Tips } from './ui/Tips'
@@ -69,7 +69,7 @@ import { VisitorBadges, StreetRaceCard } from './ui/Visitors'
 import { visitorTick, forceVisitor } from './lib/visitors'
 import type { VisitorKind } from './game/data'
 import { hideSplash, splashProgress } from './lib/splash'
-import { rememberSplashCar } from './lib/splashCar'
+import { rememberSplashCar, skinSplashCar } from './lib/splashCar'
 import { usePrefs } from './lib/prefs'
 import { onDemand, reopenAfterReload } from './ui/lazy'
 import { useAdminCheck } from './lib/admin'
@@ -145,6 +145,7 @@ export default function App() {
     // The loading screen leaves after the town's first frames; this is the fallback if they never come.
     const splashFallback = setTimeout(hideSplash, 15000)
     const prefetch = setTimeout(prefetchPanels, 6000)
+    skinSplashCar()
     const stopSplashCar = rememberSplashCar()
     // Checked again when it fires: a cloud save may have loaded since, already claimed today.
     // On first launch it waits for the flashing-lights warning (FlashWarning opens it after).
@@ -203,6 +204,7 @@ export default function App() {
       <ThumbRenderer />
       <StageCanvas />
       <Preview.StageCanvas />
+      <WarmPreview />
       <Hud />
       <LiveBanner />
       <BottomBar />
@@ -213,10 +215,8 @@ export default function App() {
       {panel === 'race' && !liveRace && <RacePanel />}
       {liveRace && <LiveRaceOverlay />}
       {panel === 'invites' && <InvitesPanel />}
-      {panel === 'friends' && <FriendsPanel />}
-      {panel === 'leaders' && <LeadersPanel />}
-      {panel === 'clan' && <ClanPanel />}
-      {panel === 'meet' && <MeetPanel />}
+      {/* Friends, Crew, Meet and Leaderboards: one window that stays up while its tabs switch. */}
+      {isSocialTab(panel) && <SocialPanel tab={panel} />}
       {panel === 'chat' && <ChatPanel />}
       {panel === 'need' && <NeedPanel />}
       {panel === 'upgrade' && <UpgradePanel />}
