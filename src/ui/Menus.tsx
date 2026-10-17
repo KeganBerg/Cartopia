@@ -291,7 +291,8 @@ export function SheetTabs<T extends string>({ items, value, onChange }: { items:
       {items.map((t) => (
         <button key={t.id} role="tab" aria-selected={t.id === value} className={t.id === value ? 'sel' : ''} onClick={() => onChange(t.id)}>{t.label}</button>
       ))}
-      {more && <button className="sheet-more" aria-label="More tabs" onClick={() => row.current?.scrollBy({ left: row.current.clientWidth * 0.7, behavior: 'smooth' })}>›</button>}
+      {/* The arrow sits on a strip of the row's colour, so the next tab fades out behind it. */}
+      {more && <span className="sheet-more-bar"><button className="sheet-more" aria-label="More tabs" onClick={() => row.current?.scrollBy({ left: row.current.clientWidth * 0.7, behavior: 'smooth' })}>›</button></span>}
     </div>
   )
 }

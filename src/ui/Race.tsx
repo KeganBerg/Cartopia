@@ -1211,17 +1211,14 @@ function Tour({ onRace, onCampaign }: { onRace: () => void; onCampaign: () => vo
         </div>
       </div>
       <div className="rm-right">
-        {!open ? (
-          <div className="rm-locked-box">
-            <button className="buy small alt" onClick={onCampaign}>🔒 Clear Back Streets to open</button>
-          </div>
-        ) : (
+        {/* Locked: the first leg's rivals show greyed out, with the way in on top. */}
+        <div className={open ? 'rm-tgate' : 'rm-tgate shut'}>
           <div className="rm-rows">
             {Array.from({ length: TOUR_RACES }, (_, i) => {
               const race = first + i
               const r = tourRival(race)
-              const beat = race < won
-              const next = race === won
+              const beat = open && race < won
+              const next = open && race === won
               return (
                 <div key={race} className={`rm-row${r.boss ? ' boss' : ''}${!beat && !next ? ' locked' : ''}${next ? ' next' : ''}${beat ? ' done' : ''}`}>
                   <span className="rm-step">{beat ? '✔' : r.boss ? '👑' : i + 1}</span>
@@ -1239,7 +1236,8 @@ function Tour({ onRace, onCampaign }: { onRace: () => void; onCampaign: () => vo
               )
             })}
           </div>
-        )}
+          {!open && <button className="buy rm-tgate-btn" onClick={onCampaign}>🔒 Clear Back Streets to open</button>}
+        </div>
       </div>
     </div>
   )

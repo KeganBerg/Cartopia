@@ -278,7 +278,7 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .tut-actions { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .tut-skip { background: none; border: none; padding: 2px 4px; color: #b0bec5; font-weight: 800; font-size: 12px; text-decoration: underline; }
 .tut-car { flex: none; align-self: center; }
-.tut-car .thumb3d { --tw: 64px; --th: 48px; width: var(--tw); height: var(--th); background: radial-gradient(ellipse at 50% 70%, #fff 0 35%, #cfd8dc 80%); border-radius: 10px; }
+.tut-car .thumb3d.xs { --tw: 104px; --th: 76px; width: var(--tw); height: var(--th); background: radial-gradient(ellipse at 50% 70%, #fff 0 35%, #cfd8dc 80%); border-radius: 10px; }
 .tut-swatches { display: flex; align-items: center; gap: 8px; margin: 0 0 5px; }
 .tut-swatches .dot { width: 24px; height: 24px; }
 .tut-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 5px; }
@@ -829,7 +829,7 @@ html.calm *, html.calm *::before, html.calm *::after { animation-duration: .001m
   body:has(.tutorial) .toasts { bottom: calc(146px + var(--sab)); }
   .tutorial p { font-size: 13px; margin-bottom: 4px; }
   .tut-icon { width: 34px; height: 34px; font-size: 18px; }
-  .tut-car .thumb3d { --tw: 52px; --th: 40px; }
+  .tut-car .thumb3d.xs { --tw: 84px; --th: 64px; }
   .tut-swatches { gap: 6px; }
   .rival .buy { grid-column: 1 / -1; }
 
