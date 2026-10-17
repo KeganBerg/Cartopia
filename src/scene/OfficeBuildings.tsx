@@ -386,7 +386,7 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
               {trim && lvl >= 8 && <Flag at={[tx - 0.55, top + 0.5, tz - 0.3]} color="#1e3a5f" star={lvl >= 10} />}
             </group>
           ) : (() => {
-            // Twin Towers: two glass towers on the podium joined by a sky bridge.
+            // Skybridge Towers: two glass towers on the podium joined by a sky bridge.
             const t2 = towerFloors(lvl) * 0.34
             const bridge = ph + t2 * 0.62
             return (
