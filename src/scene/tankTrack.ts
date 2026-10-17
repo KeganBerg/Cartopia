@@ -39,7 +39,8 @@ export function linkGeo(pads: Pads) {
   const hit = linkCache.get(pads)
   if (hit) return hit
   const L: [BufferGeometry, LinkRole][] = []
-  const d = PITCH * 0.9
+  // Nearly the full pitch, so no gaps open between links for the gear to show through.
+  const d = PITCH * 0.96
   const w = TRACK_W
   const top = PLATE / 2
   // The plate, with a slight bevel, and the hinge knuckles at each end with their pins.
@@ -310,4 +311,47 @@ export function armsGeo(at: [number, number][], xs: number[], look: GearLook) {
   const g = paint(L, look)
   gearCache.set(key, g)
   return g
+}
+
+// Where the running gear sits for a loop with its middle at x = ±tx: the road wheel and
+// return roller pairs straddle the links' guide horns (which run between them), and the
+// idler at the front is drawn on its own. Shared by the tracks and their clearance test.
+export type Wheel = { x: number; y: number; z: number; r: number }
+export const PAIR = 0.04 // road wheel halves either side of the horns
+export const ROLLER_PAIR = 0.042 // return roller halves: a little wider, their hubs clear the horns
+export const sprocketR = (l: Loop) => l.rc - PLATE / 2 - 0.004
+export function gearLayout(l: Loop, tx: number) {
+  const rolls = rollers(l)
+  const big = Math.max(...rolls.map(([, , r]) => r))
+  const wheels: Wheel[] = []
+  const idle: Wheel[] = []
+  for (const sd of [-1, 1]) for (const [z, y, r] of rolls) {
+    if (r === big) idle.push({ x: sd * tx, y, z, r })
+    else for (const dx of r < 0.05 ? [-ROLLER_PAIR, ROLLER_PAIR] : [-PAIR, PAIR]) wheels.push({ x: sd * tx + dx, y, z, r })
+  }
+  return { wheels, idle }
+}
+
+// The solid parts of the running gear as round slabs (axle along x) for the clearance test:
+// what roadWheelGeo, idlerGeo and sprocketGeo build, at their full radius and width.
+export type Slab = { name: string; x0: number; x1: number; y: number; z: number; r: number }
+export function gearSlabs(l: Loop, tx: number, w = 0.05, iw = 0.045): Slab[] {
+  const out: Slab[] = []
+  const { wheels, idle } = gearLayout(l, tx)
+  const slab = (name: string, x: number, half: number, y: number, z: number, r: number) => out.push({ name, x0: x - half, x1: x + half, y, z, r })
+  for (const g of wheels) {
+    slab(g.r < 0.05 ? 'return roller' : 'road wheel', g.x, w / 2, g.y, g.z, g.r)
+    slab(g.r < 0.05 ? 'return roller hub' : 'road wheel hub', g.x, w * 0.62, g.y, g.z, g.r * 0.23)
+  }
+  for (const g of idle) {
+    for (const sx of [-1, 1]) {
+      slab('idler', g.x + sx * 0.035, iw / 2, g.y, g.z, g.r)
+      slab('idler rim', g.x + sx * 0.035, iw * 0.6, g.y, g.z, g.r * 0.82)
+    }
+    slab('idler hub', g.x, 0.035 + iw / 2 + 0.008, g.y, g.z, g.r * 0.19)
+  }
+  const spr = sprocketR(l)
+  for (const sd of [-1, 1]) for (const sx of [-1, 1]) slab('sprocket', sd * tx + sx * 0.04, 0.015, l.cy, -l.wz, spr * 0.98)
+  for (const sd of [-1, 1]) slab('sprocket hub', sd * tx, 0.055, l.cy, -l.wz, spr * 0.32)
+  return out
 }
