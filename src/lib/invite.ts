@@ -1,6 +1,9 @@
 import { useGame } from '../game/store'
 import { useNames } from './profiles'
 import { addFriend } from './friendsList'
+import { supabase } from './supabase'
+import { flushSave, signedInUser } from './cloud'
+import { sfx } from './sound'
 
 // Links that bring players in: where a new player came from (?from=tiktok), whose invite they
 // followed (?ref=username, a friend request once they sign in) and which crew asked them (?join=TAG;
@@ -12,7 +15,7 @@ export const DISCORD_INVITE = ''
 const ARRIVAL_KEY = 'cartopia.arrival'
 const CREW_KEY = 'cartopia.crewInvite'
 
-export type Arrival = { from: string | null; ref: string | null; at: number; refSent?: boolean }
+export type Arrival = { from: string | null; ref: string | null; at: number; refSent?: boolean; recorded?: boolean }
 
 const clean = (v: string | null, max: number) => {
   const s = (v ?? '').trim().replace(/^@/, '').toLowerCase()
@@ -60,19 +63,70 @@ export function captureArrival(url: URL = new URL(location.href)) {
   }
 }
 
-// Once the invited player is signed in with a name of their own, they send the inviter a friend
-// request (or accept the one waiting). Only once, and never to themselves.
+// The invite reward each side gets once the new player reaches INVITE_LEVEL (claim_invite_rewards()
+// in supabase/migrations/0112_invite_rewards.sql pays it; the numbers here are only for the screen).
+export const INVITE_GEMS = 100
+export const INVITE_LEVEL = 5
+
+// Tells the server where this account came from, once (record_arrival()). Kept until the server
+// has it, so an old server just means trying again next time.
+async function recordArrival(a: Arrival) {
+  if (!supabase || a.recorded) return
+  const { data, error } = await supabase.rpc('record_arrival', { p_source: a.from, p_ref: a.ref })
+  if (!error && (data === 'ok' || data === 'exists')) write(ARRIVAL_KEY, { ...(arrival() ?? a), recorded: true })
+}
+
+// Collects any invite gems waiting for this player. The server writes them into the save, so the
+// game takes its gem count and updatedAt at once, before its next save could overwrite them.
+let claiming = false
+export async function claimInviteRewards() {
+  if (!supabase || !signedInUser() || claiming) return
+  claiming = true
+  try {
+    await flushSave()
+    const { data, error } = await supabase.rpc('claim_invite_rewards')
+    if (error) return
+    const d = data as { gems: number; bucks: number; updatedAt?: number }
+    if (!(d.gems > 0) || typeof d.updatedAt !== 'number') return
+    useGame.setState({ bucks: d.bucks, updatedAt: d.updatedAt })
+    sfx.reward()
+    useGame.getState().toast(`🎁 +${d.gems} Gems · invite reward`)
+  } finally {
+    claiming = false
+  }
+}
+
+export type InviteStats = { joined: number; paid: number; gems: number; waiting: number }
+export async function myInvites(): Promise<InviteStats | null> {
+  if (!supabase || !signedInUser()) return null
+  const { data, error } = await supabase.rpc('my_invites')
+  return error ? null : (data as InviteStats)
+}
+
+// Once the invited player is signed in, the server hears where they came from, and they send the
+// inviter a friend request (or accept the one waiting): only once, and never to themselves.
+// Signing in and reaching the reward level collect any invite gems waiting.
 export function startInviteFollowUp() {
+  let signedIn: string | null = null
   const check = () => {
     const a = arrival()
     const mine = useNames.getState().mine
-    if (!a?.ref || a.refSent || !mine) return
-    if (mine.username?.toLowerCase() === a.ref) return write(ARRIVAL_KEY, { ...a, refSent: true })
+    if (!mine) return
+    if (signedIn !== mine.uid) {
+      signedIn = mine.uid
+      if (a) void recordArrival(a)
+      void claimInviteRewards()
+    }
+    if (!a?.ref || a.refSent) return
     write(ARRIVAL_KEY, { ...a, refSent: true })
-    void addFriend({ username: a.ref })
+    if (mine.username?.toLowerCase() !== a.ref) void addFriend({ username: a.ref })
   }
   check()
-  return useNames.subscribe(check)
+  const stopNames = useNames.subscribe(check)
+  const stopLevel = useGame.subscribe((s, prev) => {
+    if (s.level >= INVITE_LEVEL && prev.level < INVITE_LEVEL) setTimeout(() => void claimInviteRewards(), 2000)
+  })
+  return () => { stopNames(); stopLevel() }
 }
 
 const site = () => (/^https?:\/\/(localhost|127\.|192\.168\.)/.test(location.origin) ? 'https://cartopia.lol' : location.origin)

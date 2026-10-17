@@ -18,7 +18,8 @@ import { signedInUser } from '../lib/cloud'
 import { LikeButton } from './Meet'
 import { GhostButton } from './GhostRace'
 import { LoadingBand } from './Loading'
-import { inviteLink, shareLink } from '../lib/invite'
+import { INVITE_GEMS, INVITE_LEVEL, claimInviteRewards, inviteLink, myInvites, shareLink, type InviteStats } from '../lib/invite'
+import { BuckIcon } from './Icon'
 import { INVITE_TEXT } from './Settings'
 
 export function FriendsPanel() {
@@ -32,12 +33,14 @@ export function FriendsPanel() {
   // Players to add: the leaderboard's real players plus the neighbour towns.
   const [others, setOthers] = useState<Leader[]>(demoLeaders)
   const [query, setQuery] = useState('')
+  const [invites, setInvites] = useState<InviteStats | null>(null)
 
   useEffect(() => {
     fetchLeaderboard().then(setOthers).catch(() => {})
     refreshGifts().catch(() => {})
     void refreshFriends()
     refreshPresence()
+    void claimInviteRewards().then(myInvites).then(setInvites)
   }, [])
   useEffect(() => loadUsernames(others.map((o) => o.ownerId)), [others])
 
@@ -78,7 +81,14 @@ export function FriendsPanel() {
         </div>
       )}
 
-      <button className="buy fr-invite" title="Invite: your link sends you a friend request when they sign in" onClick={() => void shareLink(INVITE_TEXT, inviteLink(mine?.username))}>🔗 Invite friends</button>
+      <div className="fr-invite">
+        <button className="buy" title={`Invite: you both get ${INVITE_GEMS} Gems when they reach level ${INVITE_LEVEL}`} onClick={() => void shareLink(INVITE_TEXT, inviteLink(mine?.username))}>
+          🔗 Invite friends <span className="fr-invite-prize"><BuckIcon size={16} />{INVITE_GEMS}</span>
+        </button>
+        {invites && invites.joined > 0 && (
+          <span className="fr-invite-stats" title={`Invited: ${invites.joined} joined, ${invites.paid} reached level ${INVITE_LEVEL}`}>👥 {invites.joined} · ⭐ {invites.paid} · <BuckIcon size={14} />{invites.gems}</span>
+        )}
+      </div>
 
       {incoming.length > 0 && (
         <>

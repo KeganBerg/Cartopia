@@ -3,7 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const addFriend = vi.fn(async () => true)
 vi.mock('./friendsList', () => ({ addFriend }))
-const { arrival, captureArrival, crewInvite, gameLink, startInviteFollowUp } = await import('./invite')
+let reply: Record<string, unknown> = {}
+const rpc = vi.fn(async (name: string) => ({ data: reply[name] ?? null, error: null }))
+vi.mock('./supabase', () => ({ supabase: { rpc } }))
+vi.mock('./cloud', () => ({ flushSave: async () => {}, signedInUser: () => 'u1' }))
+const { arrival, captureArrival, claimInviteRewards, crewInvite, gameLink, startInviteFollowUp } = await import('./invite')
+const { useGame } = await import('../game/store')
 const { useNames } = await import('./profiles')
 
 const open = (path: string) => {
@@ -15,6 +20,8 @@ describe('invite and source links', () => {
   beforeEach(() => {
     localStorage.clear()
     addFriend.mockClear()
+    rpc.mockClear()
+    reply = {}
     useNames.setState({ mine: undefined })
   })
 
@@ -55,11 +62,35 @@ describe('invite and source links', () => {
 
     localStorage.clear()
     addFriend.mockClear()
+    rpc.mockClear()
+    reply = {}
     useNames.setState({ mine: { uid: 'u1', username: 'newbie', changedAt: null } })
     open('/?ref=newbie')
     const stop2 = startInviteFollowUp()
     expect(addFriend).not.toHaveBeenCalled()
     stop2()
+  })
+
+  it('tells the server the first touch once, after sign-in', async () => {
+    reply = { record_arrival: 'ok' }
+    open('/?from=tiktok&ref=speedy')
+    const stop = startInviteFollowUp()
+    useNames.setState({ mine: { uid: 'u1', username: 'newbie', changedAt: null } })
+    await new Promise((r) => setTimeout(r, 0))
+    expect(rpc).toHaveBeenCalledWith('record_arrival', { p_source: 'tiktok', p_ref: 'speedy' })
+    expect(arrival()?.recorded).toBe(true)
+    stop()
+  })
+
+  it('takes the gem count and save time the server wrote, so the next save keeps the reward', async () => {
+    useGame.setState({ bucks: 40, updatedAt: 1 })
+    reply = { claim_invite_rewards: { gems: 100, bucks: 140, updatedAt: 5000 } }
+    await claimInviteRewards()
+    expect(useGame.getState()).toMatchObject({ bucks: 140, updatedAt: 5000 })
+    reply = { claim_invite_rewards: { gems: 0, bucks: 140 } }
+    useGame.setState({ bucks: 150, updatedAt: 6000 })
+    await claimInviteRewards()
+    expect(useGame.getState()).toMatchObject({ bucks: 150, updatedAt: 6000 })
   })
 
   it('tags shared links and points local builds at the live site', () => {
