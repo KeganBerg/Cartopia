@@ -117,8 +117,8 @@ export function dragViewCam(v: Exclude<DragView, 'chase'>, x: number, z: number,
 // in the top third over a wall of empty road). Returns its field of view, or undefined for the race's own.
 export function photoCam(len: number, road: number, tall: boolean, pos: Vector3, at: Vector3): number | undefined {
   if (tall) {
-    pos.set(road - 0.12, 1.25, len + 4.6)
-    at.set(-0.15, 0.3, len - 0.3)
+    pos.set(road - 0.12, 1.05, len + 4.4)
+    at.set(-0.15, 0.25, len - 2.6)
     return undefined
   }
   pos.set(road - 0.1, 0.7, len + 2.8)
