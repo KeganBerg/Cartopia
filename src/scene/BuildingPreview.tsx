@@ -14,7 +14,7 @@ import { SEASON } from './season'
 import { frame, seat, type Bounds } from './fit'
 import { reduceMotionOn } from '../lib/prefs'
 import { quietShaders } from './warm'
-import { copyThumbs, pickThumbs, type Slot } from './thumbCopy'
+import { chooseFocus, copyThumbs, pickThumbs, type Slot } from './thumbCopy'
 import type { Trim } from '../game/trim'
 
 // Shop, showroom and garage thumbnails are live 3D renders. One hidden WebGL
@@ -23,9 +23,10 @@ import type { Trim } from '../game/trim'
 // pictures, so they scroll without lag, and the spin is a real rotation rather
 // than baked frames.
 const SPIN_MS = 8000
-// A slow spin on a small picture looks smooth at this rate; drawing them all at the
-// screen's 60-120 Hz kept a phone (or laptop) busy the whole time the Shop was open.
+// The arcade cards' own animations draw at this rate. The one turning thumbnail (see Slot in
+// thumbCopy.ts) draws at up to SPIN_FPS: at 24 a big car's turn looked choppy.
 const FPS = 24
+const SPIN_FPS = 60
 // With reduced motion they stand still, so they're redrawn only when something changes.
 let dirty = true
 const DPR = typeof window === 'undefined' ? 1 : Math.min(window.devicePixelRatio || 1, 1.5)
@@ -96,7 +97,8 @@ function attach(item: Item, canvas: HTMLCanvasElement, still: boolean) {
   // A thumb that swaps model (the Grand Prix prize box cycles cars) re-attaches the same canvas. The
   // observer doesn't always report a target that's unobserved and observed again, so it keeps
   // whether it was on screen; otherwise the new car never draws and the box stays blank.
-  const slot: Slot = { key: item.key, canvas, ctx: canvas.getContext('2d'), seen: typeof IntersectionObserver === 'undefined' || wasSeen.get(canvas) === true, still, fresh: true }
+  // Held, a standing car shows its front three quarters, a floating model the three quarters view.
+  const slot: Slot = { key: item.key, canvas, ctx: canvas.getContext('2d'), seen: typeof IntersectionObserver === 'undefined' || wasSeen.get(canvas) === true, still, scene: !!item.view, angle: item.stand ? 0 : REST, fresh: true }
   slots.add(slot)
   byCanvas.set(canvas, slot)
   const m = models.get(item.key)
@@ -143,12 +145,13 @@ function attach(item: Item, canvas: HTMLCanvasElement, still: boolean) {
   }
 }
 
-// A still thumbnail turns while the pointer is over its card (desktop), and settles back.
+// The thumbnail under the mouse (desktop) turns instead, and holds where it got to when the mouse leaves.
+let hover: Slot | null = null
 export function spinThumb(canvas: Element | null | undefined, on: boolean) {
   const s = canvas && byCanvas.get(canvas)
-  if (!s || s.still !== on) return
-  s.still = !on
-  s.fresh = true
+  if (!s) return
+  if (on) hover = s
+  else if (hover === s) hover = null
   dirty = true
 }
 
@@ -160,6 +163,9 @@ const aim = new Vector3()
 const back = new Vector3()
 const LO = 0.19
 const HI = 0.31
+// The turn a held floating model shows, and its bob height at a given turn (middle at REST).
+const REST = 0.12
+const liftAt = (angle: number) => (LO + HI) / 2 + Math.sin((angle - REST) * Math.PI * 4) * ((HI - LO) / 2)
 // A standing model is seen lower down, so it fills a wide box without bobbing.
 const STAND = new Vector3(1, 0.42, 1)
 
@@ -190,14 +196,32 @@ function Renderer() {
   useSyncExternalStore(subscribe, () => version)
 
   const last = useRef(-Infinity)
+  const lastScene = useRef(-Infinity)
+  const focus = useRef<{ slot: Slot | null; at: number }>({ slot: null, at: -Infinity })
   // Priority 1 takes over rendering from the default loop.
   useFrame(() => {
     const now = performance.now()
     const still = reduceMotionOn()
-    if (!dirty && (still || now - last.current < 1000 / FPS - 4)) return
+    // Which thumbnail turns, looked at a few times a second (it reads their places on the page).
+    const f = focus.current
+    if (still) f.slot = null
+    else if (hover && slots.has(hover)) f.slot = hover
+    else if (dirty || now - f.at > 250 || (f.slot && !slots.has(f.slot))) {
+      f.at = now
+      const cands: { slot: Slot; box: DOMRect }[] = []
+      for (const s of slots) if (s.seen && !s.still && !s.scene) cands.push({ slot: s, box: s.canvas.getBoundingClientRect() })
+      f.slot = chooseFocus(cands, window.innerWidth, window.innerHeight)
+    }
+    const turning = f.slot && f.slot.seen ? f.slot : null
+    const scenes = !still && now - lastScene.current >= 1000 / FPS - 4
+    const due = !!turning && now - last.current >= 1000 / SPIN_FPS - 4
+    if (!dirty && !due && !scenes) return
+    // The turning one goes round at the same speed whatever the frame rate.
+    if (turning) turning.angle = (turning.angle + Math.min(now - last.current, 100) / SPIN_MS) % 1
     last.current = now
+    if (scenes) lastScene.current = now
     dirty = false
-    const { need, waiting } = pickThumbs(slots, (k) => groups.current.has(k))
+    const { need, waiting } = pickThumbs(slots, (k) => groups.current.has(k), { focus: turning, scenes })
     if (waiting) dirty = true
     if (!need.size) return
 
@@ -224,15 +248,12 @@ function Renderer() {
     if (width > src.width || height > src.height) gl.setSize(Math.max(src.width, width), Math.max(src.height, height), false)
     const ah = src.height
 
-    const turn = still ? 0.12 : (now % SPIN_MS) / SPIN_MS
-    const lift = (LO + HI) / 2 + Math.sin(turn * Math.PI * 4) * ((HI - LO) / 2)
     for (const g of groups.current.values()) g.visible = false
     gl.setScissorTest(true)
     gl.setClearColor(0x000000, 0)
     for (const n of need.values()) {
       const { key } = n
       const g = groups.current.get(key)!
-      const hold = still || n.still
       const c = cam.current
       c.aspect = n.w / n.h
       const view = models.get(key)?.item.view
@@ -248,12 +269,12 @@ function Renderer() {
         }
         const stand = models.get(key)?.item.stand
         g.visible = true
-        // Held still, a standing car shows its front three quarters rather than its nose.
-        g.rotation.y = stand && hold ? 0 : (hold ? 0.12 : turn) * Math.PI * 2
-        g.position.y = stand ? 0 : hold ? (LO + HI) / 2 : lift
+        const lift = stand ? 0 : liftAt(n.angle)
+        g.rotation.y = n.angle * Math.PI * 2
+        g.position.y = lift
         if (shadow.current) {
           shadow.current.visible = true
-          shadow.current.scale.setScalar(b.r * 0.8 * (stand ? 1 : 1 - (hold ? (LO + HI) / 2 : lift) * 0.5))
+          shadow.current.scale.setScalar(b.r * 0.8 * (1 - lift * 0.5))
         }
         c.fov = 30
         if (stand) frame(c, b, STAND, { floor: b.r * 0.8, pad: 0.04 })
@@ -270,7 +291,7 @@ function Renderer() {
 
     // Copy in the same frame, before the browser discards the drawing buffer.
     copyThumbs(src, width, height, need.values())
-    for (const n of need.values()) if (n.still) for (const s of n.slots) s.fresh = false
+    for (const n of need.values()) for (const s of n.slots) s.fresh = false
   }, 1)
 
   return (
