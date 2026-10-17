@@ -24,6 +24,7 @@ import { FriendsPanel, VisitBanner } from './ui/Friends'
 import { LeadersPanel, ClanPanel } from './ui/Social'
 import { MeetPanel } from './ui/Meet'
 import { Tutorial } from './ui/Tutorial'
+import { TutHand } from './ui/TutHand'
 import { Tips } from './ui/Tips'
 import { Badges } from './ui/Badges'
 import { ThoughtBubble } from './ui/Thought'
@@ -219,6 +220,7 @@ export default function App() {
       {panel === 'battle' && <BattlePanel />}
       <VisitBanner />
       <Tutorial />
+      <TutHand />
       <Tips />
       <GoalSplash />
       <AlertsCard />

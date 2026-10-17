@@ -27,7 +27,7 @@ const STEPS: Step[] = [
   { icon: '💰', text: () => 'When the gold $ pops up, tap it to collect.', target: () => 'pizza', done: (s) => s.stats.jobs > 0 },
   {
     icon: '🔧',
-    text: (s) => s.mode === 'place' ? (TOUCH ? "Tap the see-through Rusty's to build it." : "Click the see-through Rusty's to build it.") : "Build Rusty's Rescue: tap SHOP, then START HERE.",
+    text: (s) => s.mode === 'place' ? (TOUCH ? "Tap the glowing lot to build Rusty's there." : "Click the glowing lot to build Rusty's there.") : "Build Rusty's Rescue: tap SHOP, then START HERE.",
     target: (s) => (editing(s) ? null : 'shop'), done: (s) => s.buildings.some((b) => b.def === 'rescue'),
   },
   {
@@ -42,7 +42,8 @@ const STEPS: Step[] = [
   },
   { icon: '🎨', text: () => 'Make it yours: one paint, one set of rims.', pick: true },
   { icon: '⛽', text: () => 'Races use gas. It refills, and Gas Stations hold more.', gas: true },
-  { icon: '🏁', text: () => 'While Rusty works, tap RACE for your first race!', target: () => 'race', done: (s) => s.panel === 'race' || (s.stats.races ?? 0) > 0 },
+  // Done after the first race, not on opening the menu: the hand leads the way to it there.
+  { icon: '🏁', text: () => 'While Rusty works, tap RACE for your first race!', target: () => 'race', done: (s) => (s.stats.races ?? 0) > 0 },
 ]
 
 // After the last step the goal screen shows (GoalSplash), then the tutorial is done (99).
@@ -53,6 +54,40 @@ export function tutTarget(s: Game): TutTarget | null {
   const st = STEPS[s.tutorial]
   if (!st?.target || s.visiting || s.panel) return null
   return st.target(s)
+}
+
+// The menus each step works in. Any other menu a new player wanders into points them at its close button.
+const STEP_PANELS: Record<string, number[]> = { shop: [3], rescue: [4, 5], race: [8] }
+const CLOSE = ['.overlay .close', '.race-full .close', '.close']
+
+// Where the pointing hand goes (ui/TutHand.tsx): CSS selectors tried in order, the first one
+// on screen wins (the one nearest the middle when several match); 'lot' for the see-through
+// Rusty's while placing it; null to rest. Every step has one, so there's always a next tap shown.
+export function handTarget(s: Game): string[] | 'lot' | null {
+  if (!STEPS[s.tutorial] || s.visiting || s.levelUp) return null
+  const step = s.tutorial
+  if (s.panel) {
+    if (!STEP_PANELS[s.panel]?.includes(step)) return CLOSE
+    if (s.panel === 'shop') return ['.start-here']
+    // The race menu: the first campaign race. In the race: the pedal on the line, then SHIFT
+    // each time its light says now (the hand comes and goes with it).
+    if (s.panel === 'race') return ['.rm-camp .rm-cta .buy', '.shift-btn.launch:not(:disabled)', '.shift-btn.now']
+    // At a lot: Search all finds the car for sure, then tow it home.
+    if (s.search) return ['.rs-auto:not(.on):not(:disabled)', '.rs-home.ready:not(:disabled)']
+    if (step === 4) return ['.rsc-spot:not(.locked):not(.broke)']
+    // Fix up the find: the haul's button, then a car on the lot, then Restore (or the lot's tab).
+    return ['.junk-go:not(:disabled)', '.lot-spot:not(.open)', '.haul-fix', '.sheet-tabs [role=tab]:nth-child(2)']
+  }
+  if (s.mode === 'place') return step === 3 && s.placing === 'rescue' ? 'lot' : ['.edit-bar .done']
+  if (s.mode !== 'play') return ['.edit-bar .done']
+  const t = STEPS[step].target?.(s)
+  if (t === 'pizza') return [step === 1 ? '.badge-pulse.badge-idle' : '.badge-pulse.badge-ready']
+  if (t === 'shop' || t === 'race') return ['.bottom-bar .tut-pulse .i', '.bottom-bar .tut-pulse']
+  if (t === 'rescue') return ['.badge-pulse']
+  if (t === 'done') return ['.edit-bar .tut-pulse']
+  // The paint pick: a colour in each row still unpicked, then Done. Other steps: Next.
+  if (STEPS[step].pick) return ['.tut-swatches:not(:has(.sel)) .dot:nth-child(3)', '.tutorial .buy:not(:disabled)']
+  return STEPS[step].done ? null : ['.tutorial .buy']
 }
 
 // Is the tutorial card on screen? Other hints stay quiet so one instruction shows at a time.

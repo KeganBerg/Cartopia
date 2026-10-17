@@ -147,6 +147,8 @@ function EditBar() {
   })
   const storedCount = useGame((s) => s.stored?.length ?? 0)
   const tutDone = useGame((s) => tutTarget(s) === 'done')
+  // Placing Rusty's in the tutorial, a green Done read as the next tap and left without building.
+  const tutPlacing = useGame((s) => s.tutorial === 3 && s.mode === 'place' && s.placing === 'rescue')
   const tutCard = useGame(tutorialShowing)
   // During the tutorial the bar keeps to placing and moving; roads, land and the rest come after.
   const all = useGame((s) => s.tutorial >= 99)
@@ -180,7 +182,7 @@ function EditBar() {
         {mode === 'move' && again && <button className="tool" onClick={() => setMode('place', again)}><Icon name="plus" size={22} /><span>Again</span></button>}
         {all && <button className="tool" onClick={() => openPanel('inventory')}><Icon name="box" size={22} /><span>Inventory</span>{storedCount > 0 && <b className="tool-count">{storedCount}</b>}</button>}
         {all && <button className="tool" onClick={() => openPanel('shop')}><Icon name="shop" size={22} /><span>Shop</span></button>}
-        <button className={tutDone ? 'tool done tut-pulse' : 'tool done'} onClick={() => setMode('play')}><Icon name="check" size={22} /><span>Done</span></button>
+        <button className={tutDone ? 'tool done tut-pulse' : tutPlacing ? 'tool done tut-quiet' : 'tool done'} onClick={() => setMode('play')}><Icon name="check" size={22} /><span>Done</span></button>
       </div>
     </div>
   )
