@@ -190,3 +190,6 @@
   .crate-odds-row { gap: 3px; }
   .crate-odds .odd { padding: 3px; gap: 2px; }
 }
+
+/* Rare prizes: 📸 on the card's corner shares the drop with the depot behind it. */
+.crate-prize .snap-btn { top: -18px; right: -8px; width: 40px; height: 40px; font-size: 18px; }

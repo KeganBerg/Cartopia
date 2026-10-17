@@ -13,6 +13,7 @@ import { LEGAL, DRAFT_NOTE, type LegalDoc } from '../legal/legal'
 import { setCalmFlashing, useCalmFlashing } from '../game/flashing'
 import { showFlashWarning } from './FlashWarning'
 import { useTouchDevice } from './DriveControls'
+import { DISCORD_INVITE, inviteLink, shareLink } from '../lib/invite'
 
 // The Windows app (desktop/) opens the live game, so this download never needs replacing for a deploy.
 export const DESKTOP_DOWNLOAD = 'https://github.com/KeganBerg/Cartopia/releases/latest/download/Cartopia-Setup.exe'
@@ -20,6 +21,7 @@ const showDesktopApp = () => typeof navigator !== 'undefined' && /Windows/.test(
 
 // Contact address for the Help tab. Empty hides the row until the owner sets one.
 export const SUPPORT_EMAIL = 'support@cartopia.lol'
+export const INVITE_TEXT = 'Build a town and race me in Cartopia 🏁'
 
 export function Switch({ on, onChange, label, disabled }: { on: boolean; onChange: (on: boolean) => void; label: string; disabled?: boolean }) {
   return (
@@ -297,6 +299,8 @@ export function HelpTab({ openLegal }: { openLegal: (id: LegalDoc['id']) => void
         {SUPPORT_EMAIL && <a className="set-link" href={`mailto:${SUPPORT_EMAIL}?subject=Cartopia%20help%20(${__BUILD_ID__})`}><span>✉️ Contact us</span><b>›</b></a>}
         <button className="set-link" onClick={showFlashWarning}><span>⚡ Photosensitivity warning</span><b>›</b></button>
         <button className="set-link" onClick={() => openPanel('chat')}><span>🗨️ Ask other players in chat</span><b>›</b></button>
+        {DISCORD_INVITE && <a className="set-link" href={DISCORD_INVITE} target="_blank" rel="noreferrer"><span>🎮 Join our Discord</span><b>›</b></a>}
+        <button className="set-link" onClick={() => void shareLink(INVITE_TEXT, inviteLink(useNames.getState().mine?.username))}><span>🔗 Invite friends</span><b>›</b></button>
         <Row label="Version"><code className="set-ver">{__BUILD_ID__.slice(0, 7)}</code></Row>
       </Group>
       <Group icon="⚖️" title="Legal">

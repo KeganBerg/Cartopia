@@ -4,6 +4,9 @@ import { BUCKS_PACKS, packGrant, type BucksPack } from '../game/bucksPacks'
 import { purchase } from '../lib/payments'
 import { Panel, SheetTabs } from './Menus'
 import { CONTACT } from '../legal/legal'
+import { LuxFx, luxClass, luxLevels } from './Lux'
+
+const LUX = luxLevels(BUCKS_PACKS.map((p) => p.price))
 
 const NOTICE = {
   'not-connected': ['Coming soon', "Gem packs aren't on sale yet. You weren't charged."],
@@ -33,11 +36,12 @@ export function BankPanel() {
         </div>
       </div>
       <div className="bank-packs">
-        {BUCKS_PACKS.map((p) => {
+        {BUCKS_PACKS.map((p, i) => {
           const { bucks: total, coins, parts } = packGrant(p, level)
           const pct = Math.round((p.bonus / p.bucks) * 100)
           return (
-            <div key={p.id} className={`bank-pack${p.tag ? ' featured' : ''}`}>
+            <div key={p.id} className={`bank-pack${p.tag ? ' featured' : ''}${luxClass(LUX[i])}`}>
+              <LuxFx n={LUX[i]} />
               {p.tag && <span className="ribbon">{p.tag}</span>}
               <div className="pack-art">{p.art}</div>
               <div className="pack-name">{p.name}</div>

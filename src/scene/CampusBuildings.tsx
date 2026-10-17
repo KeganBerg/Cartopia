@@ -7,7 +7,7 @@ import { asphaltTex, brickTex, grassTex, paverTex, sidingTex, shingleTex } from 
 import { Box, Cyl, Sign, Pool, Bulbs, Flag, ShellBuilding, BlockCar, GOLD, SNOW, type Mat, type V3 } from './NewBuildings'
 import { Crowd, LearnerCar, StudentCars } from './CampusLife'
 import { waterKinds } from './liveWater'
-import { loop, smoothLoop, track, playMove, routeMove } from './campusPaths'
+import { loop, nearestD, smoothLoop, track, playMove, routeMove } from './campusPaths'
 
 // Schools, the university and the driving academy: the big late-game lots.
 // Static pieces share the town's colours so Batch merges them; the people and
@@ -155,6 +155,27 @@ function Portico({ m, x, z, w, h, n, c = '#fafafa' }: { m: Mat; x: number; z: nu
   )
 }
 
+// The academy's circuit: two straights joined by half circles round a kerbed
+// island, run anticlockwise seen from above (east along the near straight, back
+// west along the far one). Sized for the learner cars at town size (about 0.53
+// wide, up to 0.98 long): the island clears the inside of every bend, the
+// outside of the bends stays clear of the lamps and the front strip where
+// townspeople walk, and the near straight stays clear of the parking bay.
+const ISLAND = 0.1 // half the island's width (and its round ends' radius)
+const STOP_X = -0.1 // the stop line across the near straight
+const BAY_X = 0.86 // middle of the parking bay
+const COURSE = (() => {
+  const near = 0.38, far = 1.3, half = 0.95
+  const mid = (near + far) / 2, r = (far - near) / 2
+  const pts: [number, number][] = []
+  for (let x = -half; x < half; x += 0.38) pts.push([x, near])
+  for (let a = 0; a < 6; a++) pts.push([half + Math.sin((a * Math.PI) / 6) * r, mid - Math.cos((a * Math.PI) / 6) * r])
+  for (let x = half; x > -half; x -= 0.38) pts.push([x, far])
+  for (let a = 0; a < 6; a++) pts.push([-half - Math.sin((a * Math.PI) / 6) * r, mid + Math.cos((a * Math.PI) / 6) * r])
+  const drive = smoothLoop(pts)
+  return { near, far, half, mid, drive, stop: nearestD(drive, STOP_X, near) }
+})()
+
 export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
   const lvl = Math.min(10, Math.max(1, Math.floor(level) || 1))
   // Schools spread out more than up: half the usual upgrade height.
@@ -166,44 +187,46 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
     // ---- Driving Academy: an office, a carport of learner cars and a cone course ----
     case 'academy': {
       const h = 1.15 + lift
-      // Learners weave east along the near lane, swing round the far end and
-      // cruise back along the outer lane. The course keeps clear of the strip
-      // along the front where townspeople come and go at the doors, and of the
-      // office, signs and parking box; the two lanes sit far enough apart that
-      // passing cars never touch (checked frame by frame against car boxes).
-      const weave = smoothLoop([
-        [-1, 0.43], [-0.8, 0.36], [-0.4, 0.43], [0, 0.5], [0.4, 0.43], [0.8, 0.36], [1, 0.43], [1.27, 0.54],
-        [1.39, 0.81], [1.27, 1.09], [1, 1.2], [0, 1.2], [-1, 1.2], [-1.27, 1.09], [-1.39, 0.81], [-1.27, 0.54],
-      ])
       return (
         <group>
           <Box m={m} at={[0, 0.03, 0]} s={[3.9, 0.06, 3.9]} c="#ffffff" t={asphaltTex()} shadow={false} />
-          {/* Course markings: an outer lane, the slalom line, a stop line and a crosswalk. */}
+          {/* Lot edge lines along the front and both sides. */}
           <Paint m={m} at={[0, 0.062, 1.9]} s={[3.8, 0.04]} />
-          <Paint m={m} at={[0, 0.062, -0.3]} s={[3.8, 0.04]} />
-          {[-1, 1].map((sd) => <Paint key={sd} m={m} at={[sd * 1.9, 0.062, 0.8]} s={[0.04, 2.2]} />)}
-          {/* Cones on the island between the two lanes. */}
-          <Paint m={m} at={[0, 0.062, 0.82]} s={[2.0, 0.02]} c={YELLOW} />
-          {[-0.8, 0.8].map((x) => <Cone key={x} m={m} at={[x, 0.06, 0.82]} />)}
-          {[-0.25, 0, 0.25, 0.5].map((x) => <Paint key={x} m={m} at={[x - 1.0, 0.063, 0.0]} s={[0.12, 0.42]} />)}
-          <Paint m={m} at={[-0.4, 0.063, -0.08]} s={[0.06, 0.4]} />
-          {/* Parallel parking box with cones at its corners. */}
-          <Paint m={m} at={[0.85, 0.063, 0.02]} s={[1.0, 0.03]} c={YELLOW} />
-          <Paint m={m} at={[0.85, 0.063, -0.22]} s={[1.0, 0.03]} c={YELLOW} />
-          <Cone m={m} at={[0.33, 0.06, -0.15]} />
-          <Cone m={m} at={[1.37, 0.06, -0.15]} />
-          {/* Skid pad from level 4: a wet-look circle with a painted ring. */}
-          {lvl >= 4 && (
-            <group>
-              <Disc m={m} at={[1.45, 0.066, -0.55]} r={0.36} c={PAINT} />
-              <Disc m={m} at={[1.45, 0.068, -0.55]} r={0.33} c="#78909c" />
+          {[-1, 1].map((sd) => <Paint key={sd} m={m} at={[sd * 1.9, 0.062, 0.6]} s={[0.04, 2.6]} />)}
+          {/* The circuit: a kerbed island the learners lap, with cones along it. */}
+          {/* A yellow kerb round a raised concrete top. */}
+          <Box m={m} at={[0, 0.075, COURSE.mid]} s={[COURSE.half * 2, 0.03, ISLAND * 2]} c={YELLOW} />
+          <Box m={m} at={[0, 0.077, COURSE.mid]} s={[COURSE.half * 2 - 0.02, 0.034, ISLAND * 2 - 0.05]} c="#cfd8dc" />
+          {[-1, 1].map((sd) => (
+            <group key={sd}>
+              <Cyl m={m} at={[sd * COURSE.half, 0.075, COURSE.mid]} r={ISLAND} h={0.03} c={YELLOW} seg={16} />
+              <Cyl m={m} at={[sd * COURSE.half, 0.077, COURSE.mid]} r={ISLAND - 0.025} h={0.034} c="#cfd8dc" seg={16} />
             </group>
-          )}
-          {/* Stop sign and a little set of training lights at the stop line. */}
-          <group position={[-0.05, 0.06, -0.25]}>
-            <Cyl m={m} at={[0, 0.35, 0]} r={0.015} h={0.7} c="#9e9e9e" seg={6} />
-            <mesh position={[0, 0.72, 0.02]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.1, 0.1, 0.015, 8]} />{m('#d32f2f')}</mesh>
+          ))}
+          {[-1, -0.5, 0.5, 1].map((x) => <Cone key={x} m={m} at={[x * COURSE.half * (Math.abs(x) < 1 ? 1.05 : 1), 0.094, COURSE.mid]} />)}
+          {/* Lane arrows on the asphalt, the way the class goes round. */}
+          {[[-0.55, COURSE.near, 0], [0.55, COURSE.far, Math.PI]].map(([x, z, r]) => (
+            <group key={x} position={[x, 0.063, z]} rotation-y={r + Math.PI / 2}>
+              <Paint m={m} at={[0, 0, -0.06]} s={[0.035, 0.16]} />
+              <mesh position={[0, 0, 0.05]} rotation-x={-Math.PI / 2}><circleGeometry args={[0.06, 3, -Math.PI / 2]} />{m(PAINT)}</mesh>
+            </group>
+          ))}
+          {/* Stop line and a crosswalk just past it, on the near straight. */}
+          <Paint m={m} at={[STOP_X, 0.063, COURSE.near]} s={[0.05, 0.56]} />
+          {[-2, -1, 0, 1, 2].map((i) => <Paint key={i} m={m} at={[STOP_X + 0.28, 0.063, COURSE.near + i * 0.105]} s={[0.26, 0.05]} />)}
+          {/* Parallel parking bay with cones at its four corners. */}
+          {[-0.12, -0.68].map((z) => <Paint key={z} m={m} at={[BAY_X, 0.063, z]} s={[1.08, 0.03]} c={YELLOW} />)}
+          {[-0.54, 0.54].map((x) => <Paint key={x} m={m} at={[BAY_X + x, 0.063, -0.4]} s={[0.03, 0.59]} c={YELLOW} />)}
+          {[-0.62, 0.62].map((x) => [-0.1, -0.7].map((z) => <Cone key={`${x}${z}`} m={m} at={[BAY_X + x, 0.06, z]} />))}
+          {/* From level 4 a learner practises in the bay. */}
+          {live && lvl >= 4 && <group position={[BAY_X, 0.06, -0.4]}><Upright><LearnerCar i={3} rot={Math.PI / 2} /></Upright></group>}
+          {/* Stop sign on the island at the stop line, facing the oncoming class. */}
+          <group position={[STOP_X + 0.03, 0.094, COURSE.mid - 0.02]}>
+            <Cyl m={m} at={[0, 0.33, 0]} r={0.015} h={0.66} c="#9e9e9e" seg={6} />
+            <mesh position={[-0.02, 0.68, 0]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.1, 0.1, 0.015, 8]} />{m('#d32f2f')}</mesh>
+            <mesh position={[-0.031, 0.68, 0]} rotation-y={-Math.PI / 2}><planeGeometry args={[0.15, 0.06]} /><meshBasicMaterial map={signTexture('STOP', '#d32f2f', '#ffffff', 2.5)} toneMapped={false} /></mesh>
           </group>
+          {/* A little set of training lights by the office. */}
           <group position={[-1.85, 0.06, -0.15]}>
             <Cyl m={m} at={[0, 0.4, 0]} r={0.02} h={0.8} c="#37474f" seg={6} />
             <Box m={m} at={[0, 0.88, 0]} s={[0.12, 0.3, 0.1]} c="#212121" />
@@ -231,7 +254,7 @@ export function CampusModel({ def, ghost, m, win, bulb, level = 1 }: Props) {
           {live && <Tree m={m} at={[-1.66, 0.06, -0.55]} s={0.7} />}
           {live && <Lamp m={m} bulb={bulb} ghost={ghost} at={[1.85, 0.06, 0.2]} />}
           {live && <Lamp m={m} bulb={bulb} ghost={ghost} at={[-1.85, 0.06, 1.85]} />}
-          {live && <StudentCars n={lvl >= 7 ? 3 : 2} drive={weave} />}
+          {live && <StudentCars n={lvl >= 7 ? 3 : 2} drive={COURSE.drive} stop={COURSE.stop} />}
           {live && <Crowd n={2} move={(i, t) => [-0.6 + i * 0.3 + Math.sin(t * 0.3 + i) * 0.1, -0.15 + Math.cos(t * 0.25 + i) * 0.05]} hours="campus" />}
         </group>
       )

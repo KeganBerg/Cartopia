@@ -16,6 +16,7 @@ import { openModSlot } from './Mods'
 import { raceCarOf } from '../game/raceCar'
 import { freeCrateOf } from '../game/cups'
 import './crates.css'
+import { SnapshotButton } from './Snapshot'
 import { LoadingScene } from './Loading'
 import { BuildArt } from './Resto'
 import { PIECE_COUNT, RESTO_PIECES, piecesOf, restoCars } from '../game/resto'
@@ -270,6 +271,7 @@ function Prize({ open, onAgain, onDone, again, paintCar }: { open: CrateOpen; on
   const { title, sub, icon } = usePrizeInfo(d)
   return (
     <div className={`crate-prize tier${tier}`} style={{ '--glow': TIER_GLOW[tier] } as React.CSSProperties}>
+      {tier >= 2 && <SnapshotButton caption={`${tier === 3 ? '🌟' : '✨'} ${title}`} />}
       <span className="cp-icon">{icon}</span>
       <div className="cp-text"><small>{sub}</small><b>{title}</b></div>
       <div className="cp-actions">
