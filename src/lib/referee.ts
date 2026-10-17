@@ -43,6 +43,14 @@ const toVerdict = (v: View): Verdict => ({
   void: v.void,
 })
 
+// Whether the server has already called this race off: the other racer cancelled before we got
+// onto the race channel, so their "leave" never reached us.
+export async function raceCalledOff(raceId: string): Promise<boolean> {
+  if (!supabase) return false
+  const { data, error } = await supabase.rpc('race_status', { race_id: raceId })
+  return !error && !!(data as View | null)?.void
+}
+
 // Reports our finish time, retrying through short connection drops, then waits for the
 // result. Null means the server couldn't be reached at all.
 export async function reportFinish(raceId: string, t: number, signal: { cancelled: boolean }): Promise<Verdict | null> {

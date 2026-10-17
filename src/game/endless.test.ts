@@ -138,3 +138,18 @@ describe('endless goals in the store', () => {
     expect(activeEndless(after).some((o) => o.k === g.k)).toBe(false)
   })
 })
+
+// Found by the two-player test (scripts/twoplayer): a fresh board's blank day made the server send a
+// correction (0108 reads it as a bad count next to a saved town with no board), and the page reloaded.
+describe('the endless board as saved', () => {
+  it('never goes to the server with a blank day', async () => {
+    const { datedEndless } = await import('./endless')
+    const { saveOf, useGame } = await import('./store')
+    const now = Date.UTC(2026, 9, 17, 13, 0)
+    expect(datedEndless({ n: 0, day: '', today: 0, goals: [] }, now).day).toBe('2026-10-17')
+    const collected = { n: 3, day: '2026-10-15', today: 1, goals: [] }
+    expect(datedEndless(collected, now)).toBe(collected)
+    useGame.setState({ endless: { n: 0, day: '', today: 0, goals: [{ k: 1, kind: 'drivers', n: 1, base: 0 }] } })
+    expect(saveOf(useGame.getState()).endless?.day).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+})

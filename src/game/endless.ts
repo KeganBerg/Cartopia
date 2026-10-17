@@ -205,6 +205,11 @@ export function drawEndless(t: EndlessTown, k: number, avoid: EndlessKind[] = []
 export const endlessSlots = (story: number, level: number) => Math.max(3 - story, level >= 5 ? 1 : 0)
 export const emptyEndless = (): Endless => ({ n: 0, day: '', today: 0, goals: [] })
 
+// The board as saved. A board nobody has collected from yet has no day, and the server (0108) reads a
+// blank day next to a saved town without a board as a bad count: it sent a correction, and the page
+// reloaded, on the first save after the tutorial. Today's date there counts for nothing, so it's sent instead.
+export const datedEndless = (e: Endless, now = Date.now()): Endless => (e.day ? e : { ...e, day: dayKey(now) })
+
 // The board topped up to `slots` goals, stale ones swapped out. Null when nothing changed.
 export function filledEndless(e: Endless | null | undefined, t: EndlessTown, slots: number): Endless | null {
   const cur = e ?? emptyEndless()

@@ -27,9 +27,9 @@ import { pickVenue, venue as venueById } from '../scene/venues'
 import { sfx } from '../lib/sound'
 import { raceAudio, type RaceAudio } from '../lib/engineAudio'
 import { PlayerName } from './Username'
-import { useLive, challenge, cancelChallenge, refreshPresence, raceChannel, endLiveRace, answer, mute, hostParty, INVITE_MS, PARTY_MAX, type LiveRace } from '../lib/live'
+import { useLive, challenge, cancelChallenge, refreshPresence, raceChannel, endLiveRace, voidUnlessRacing, answer, mute, hostParty, INVITE_MS, PARTY_MAX, type LiveRace } from '../lib/live'
 import { displayName } from '../lib/names'
-import { joinRefereed, reportFinish, serverPi, type Verdict } from '../lib/referee'
+import { joinRefereed, raceCalledOff, reportFinish, serverPi, type Verdict } from '../lib/referee'
 import { ghostDist, shortLeft, trialWeek, TRIAL_FUEL } from '../game/trial'
 import { SPLIT_MARKS, crossings, refSplits, splitDelta, splitLabel } from '../game/splits'
 import { bestSplits, saveBestSplits } from '../lib/bestSplits'
@@ -64,7 +64,7 @@ import { msToNextWeek, skinDef, SKIN_TIERS } from '../game/data'
 import { DIST, raceCharacter, characterMul, tourDist, type RaceDist } from '../game/distance'
 import { playerName } from '../lib/profiles'
 import { LoadingScene } from './Loading'
-import { settleWager, startWager, startWagers, voidWager, wagersOn } from '../lib/wagers'
+import { settleWager, startWager, startWagers, wagersOn } from '../lib/wagers'
 import { shortCoins, stakesFor } from '../game/wager'
 import { masteryMode } from '../game/mastery'
 import { carClass } from '../game/classes'
@@ -896,7 +896,8 @@ export function RacePanel() {
                 </div>
               )
             })}
-            {[...online, ...rivals.map(fair)].map((r) => (
+            {/* Someone in the lobby races live: their offline PLAYER card would be the same town twice. */}
+            {[...online.filter((r) => !livePlayers.some((p) => p.uid === r.id)), ...rivals.map(fair)].map((r) => (
               <div key={r.id} className={`rm-qc${callCardTier(r.callCard)}`} style={{ ['--qc' as string]: r.color }}>
                 <CardArt id={r.callCard} color={r.color} />
                 <span className="rm-qc-top"><CarThumb stand color={r.color} body={r.body} model={r.model} mods={r.mods} />{r.online && <span className="tag">PLAYER</span>}</span>
@@ -1681,9 +1682,19 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
         },
       })
       channel.current = ch
-      // Keep pinging until the race starts in case the first message was missed.
+      // Keep pinging until the race starts in case the first message was missed, and every few
+      // seconds ask the server whether the other racer already called it off.
+      let n = 0
       ping = setInterval(() => {
-        if (!started) ch?.send({ type: 'broadcast', event: 'ready', payload: {} })
+        if (started) return
+        ch?.send({ type: 'broadcast', event: 'ready', payload: {} })
+        if (n++ % 3 === 0) {
+          void raceCalledOff(live.raceId).then((off) => {
+            if (!off || started || disposed) return
+            useGame.getState().toast(`${live.opponent.town} called off the race`)
+            onExit()
+          })
+        }
       }, 1000)
     })
     if (uid) serverPi(uid).then((p) => p !== null && setServerRivalPi(p)).catch(() => {})
@@ -1693,7 +1704,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       // Leaving before the start tells the other player instead of leaving them waiting.
       if (!started) ch?.send({ type: 'broadcast', event: 'leave', payload: {} })
       // A bet on a race that never started is called off, so both stakes come straight back.
-      if (!started && live.stake) void voidWager(live.raceId)
+      if (!started && live.stake) voidUnlessRacing(live.raceId)
       if (ch && supabase) supabase.removeChannel(ch)
     }
   }, [live])

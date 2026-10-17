@@ -27,11 +27,12 @@ export async function offerWager(raceId: string, stake: number): Promise<boolean
 
 // Holds both stakes. stake: what the challenge showed; the server checks it's what was offered.
 // False: the wager expired, doesn't match, or someone can't cover it any more.
-export async function acceptWager(raceId: string, stake: number): Promise<boolean> {
+// 'limit': the daily cap on bets (0059: 3 a day between the same two players, 10 a day each).
+export async function acceptWager(raceId: string, stake: number): Promise<boolean | 'limit'> {
   if (!supabase || !signedInUser()) return false
   await flushSave()
   const { error } = await supabase.rpc('wager_accept', { race_id: raceId, stake })
-  if (error) return fail(error.code)
+  if (error) return error.message.includes('wager limit') ? 'limit' : fail(error.code)
   await syncWagers()
   return true
 }
