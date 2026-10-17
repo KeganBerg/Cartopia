@@ -459,14 +459,17 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
     case 'glasstower': {
       const tz = -0.55
       const lob = 0.75
-      // Level 7-10: two-floor slabs, each turned a little more, 6 to 13 of them.
-      const segs = Math.round(towerFloors(lvl) / 1.45)
-      const twist = (4 * Math.PI) / 180
-      const H = st === 3 ? lob + 0.08 + segs * 0.6 : 3.4 + lift * 1.3
-      const turn = st === 3 ? (segs - 1) * twist : 0
+      // Level 7-10: a straight supertall, 3.6 to 7.8 high, in two setback
+      // tiers under the crown, a white spine running up the front of each.
+      const S = Math.round(towerFloors(lvl) / 1.45) * 0.6
+      const H = st === 3 ? lob + 0.08 + S : 3.4 + lift * 1.3
+      const hA = Math.round(S * 5.8) / 10
+      const yB = lob + 0.08 + hA + 0.08
+      // The top of the shaft the crown band's lights run along.
+      const topW = st === 3 ? 1.8 : 2.1
+      const topD = st === 3 ? 0.81 : 0.96
       // Level 4-6: an open sky garden splits the shaft.
       const g1 = lob + 0.08 + (H - lob) * 0.52
-      const crown = (kids: ReactNode) => (turn ? <group position={[0, 0, tz]} rotation-y={turn}><group position={[0, 0, -tz]}>{kids}</group></group> : kids)
       return (
         <group>
           <Box m={m} at={[0, 0.025, 0]} s={[3.9, 0.05, 3.9]} c="#ffffff" t={paverTex(4, 4)} shadow={false} />
@@ -475,7 +478,7 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
           <Box m={m} at={[0, lob + 0.04, tz + 1.3]} s={[1.4, 0.06, 0.5]} c="#263238" />
           <mesh position={[0, lob + 0.01, tz + 1.535]}><boxGeometry args={[1.36, 0.015, 0.02]} />{bulb}</mesh>
           <mesh position={[0, 0.3, tz + 1.156]} userData={doorTag('slide')}><planeGeometry args={[0.6, 0.56]} />{m('#1c2a33')}</mesh>
-          {/* Shaft (whole, split by a sky garden, or twisting), upper setback and crown band. */}
+          {/* Shaft (whole, split by a sky garden, or in setback tiers), upper setback and crown band. */}
           {st === 1 && <GlassBlock m={m} ghost={ghost} x={0} z={tz} y0={lob + 0.08} w={2.1} d={1.9} h={H - lob} tint="#7fd1c7" frame="#eceff1" />}
           {st === 2 && (
             <group>
@@ -487,17 +490,19 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
               <GlassBlock m={m} ghost={ghost} x={0} z={tz} y0={g1 + 0.5} w={2.1} d={1.9} h={H - g1 - 0.42} tint="#7fd1c7" frame="#eceff1" />
             </group>
           )}
-          {st === 3 && Array.from({ length: segs }, (_, i) => (
-            <group key={i} position={[0, 0, tz]} rotation-y={i * twist}>
-              <GlassBlock m={m} ghost={ghost} x={0} z={0} y0={lob + 0.08 + i * 0.6} w={2.1} d={1.9} h={i === segs - 1 ? 0.68 : 0.56} tint="#7fd1c7" frame="#eceff1" roof="#eceff1" />
-            </group>
-          ))}
-          {!ghost && <LitSign text="HORIZON" w={1.0} at={[0, lob + 0.17, tz + 1.552]} bg="#004d40" fg="#e0f2f1" m={m} />}
-          {crown(
+          {st === 3 && (
             <group>
+              <GlassBlock m={m} ghost={ghost} x={0} z={tz} y0={lob + 0.08} w={2.1} d={1.9} h={hA} tint="#7fd1c7" frame="#eceff1" roof="#eceff1" />
+              <GlassBlock m={m} ghost={ghost} x={0} z={tz} y0={yB} w={1.8} d={1.6} h={H - yB + 0.08} tint="#7fd1c7" frame="#eceff1" roof="#eceff1" />
+              {[[0.95, lob + 0.08, hA], [0.8, yB, H - yB + 0.08]].map(([d2, y0, h]) => (
+                <Box key={y0} m={m} at={[0, y0 + h / 2 + 0.02, tz + d2 + 0.02]} s={[0.14, h + 0.04, 0.06]} c="#eceff1" />
+              ))}
+            </group>
+          )}
+          {!ghost && <LitSign text="HORIZON" w={1.0} at={[0, lob + 0.17, tz + 1.552]} bg="#004d40" fg="#e0f2f1" m={m} />}
+          <group>
           <GlassBlock m={m} ghost={ghost} x={0} z={tz} y0={H + 0.16} w={1.5} d={1.3} h={0.7} tint="#7fd1c7" frame="#eceff1" />
-          <mesh position={[0, H + 0.2, tz + 0.96]}><boxGeometry args={[2.1, 0.03, 0.02]} />{bulb}</mesh>
-          <mesh position={[0, H + 0.2, tz - 0.96]}><boxGeometry args={[2.1, 0.03, 0.02]} />{bulb}</mesh>
+          {[1, -1].map((sz) => <mesh key={sz} position={[0, H + 0.2, tz + sz * topD]}><boxGeometry args={[topW, 0.03, 0.02]} />{bulb}</mesh>)}
           {/* Spire with an aircraft warning light. */}
           <Box m={m} at={[0, H + 0.98, tz]} s={[0.7, 0.16, 0.6]} c="#eceff1" />
           <Beacon m={m} at={[0, H + 1.05, tz]} h={0.9} r={0.02} r2={0.07} c="#eceff1" />
@@ -511,8 +516,7 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
           )}
           {trim && lvl >= 4 && [-0.45, 0.45].map((x) => <Planter key={x} m={m} at={[x, H + 0.86, tz + 0.4]} />)}
           {!ghost && <Trims m={m} lvl={lvl} w={1.5} d={1.3} h={H + 0.86} z0={tz} flag="#004d40" />}
-            </group>,
-          )}
+          </group>
           {/* Plaza: reflecting pool, a sculpture, planters, benches and a taxi waiting. */}
           {!ghost && (
             <group>

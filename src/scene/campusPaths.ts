@@ -133,3 +133,15 @@ export function smoothLoop(pts: XZ[], per = 20): Drive {
   }
   return { len, at, bend }
 }
+
+// How far along `drive` its nearest point to (x, z) is.
+export function nearestD(drive: Drive, x: number, z: number) {
+  const p: DrivePose = { x: 0, z: 0, yaw: 0, curv: 0 }
+  let best = 0, gap = Infinity
+  for (let d = 0; d < drive.len; d += 0.005) {
+    drive.at(d, p)
+    const g = Math.hypot(p.x - x, p.z - z)
+    if (g < gap) [gap, best] = [g, d]
+  }
+  return best
+}

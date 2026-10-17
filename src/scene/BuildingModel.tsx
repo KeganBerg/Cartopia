@@ -391,9 +391,11 @@ function GasGrown({ m, lvl, cl, ghost, roof }: { m: ReturnType<typeof useMat>; l
   if (ghost) return null
   return (
     <group>
-      {/* Out in the corner, its posts well clear of the canopy's edge. */}
-      <Pylon m={m} at={[-1.62, 0, -0.85]} h={big ? 3.4 : 2.6} w={0.6} text={big ? 'TRAVEL' : 'GAS'} bg={roof} fg="#ffffff" frame="#fafafa">
-        <group position={[0, big ? 3.0 : 2.2, 0.03]}>
+      {/* Down by the road in the front corner, clear of the canopy's edge, and
+          only a little taller than the canopy: at the back it stood against
+          whatever was behind and read as that building's tower sign. */}
+      <Pylon m={m} at={[-1.6, 0, 0.78]} h={big ? 2.2 : 1.9} w={0.6} text={big ? 'TRAVEL' : 'GAS'} bg={roof} fg="#ffffff" frame="#fafafa">
+        <group position={[0, big ? 1.8 : 1.5, 0.03]}>
           <mesh><boxGeometry args={[0.46, 0.22, 0.06]} />{m('#263238')}</mesh>
           <mesh position={[0, 0, 0.035]}><planeGeometry args={[0.4, 0.16]} /><meshBasicMaterial map={signTexture('⛽ 1.89', '#263238', '#ffca28', 0.4 / 0.16)} /></mesh>
         </group>

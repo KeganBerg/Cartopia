@@ -1,4 +1,5 @@
 import { Box3, Matrix4, Vector3, type Material, type Mesh, type Object3D } from 'three'
+import { lots } from './WorldFx'
 
 // The doors townspeople use. A building model marks the mesh that is its
 // front door with `userData={doorTag()}`; the walkers (Townspeople.tsx) find
@@ -62,9 +63,6 @@ export function doorsIn(root: Object3D, frame: Object3D | null): DoorSpot[] {
   return out
 }
 
-// Each drawn lot by building uid (World registers them). A merged block draws
-// once, under the uid of its first building.
-export const lotRoots = new Map<string, Object3D>()
 
 // Anything this low (a step, a mat) or this high (an awning) doesn't stop a door swinging.
 const LOW = 0.12
@@ -108,7 +106,7 @@ function swingSide(root: Object3D, frame: Object3D | null, d: DoorSpot): 0 | 1 |
 // door. A swing door with no room to swing either way slides instead.
 const found = new WeakMap<Object3D, { at: number; doors: DoorSpot[] }>()
 export function lotDoors(uid: string): DoorSpot[] {
-  const root = lotRoots.get(uid)
+  const root = lots.get(uid)
   if (!root?.parent) return []
   const now = performance.now()
   const was = found.get(root)

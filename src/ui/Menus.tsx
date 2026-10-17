@@ -147,6 +147,8 @@ function EditBar() {
   })
   const storedCount = useGame((s) => s.stored?.length ?? 0)
   const tutDone = useGame((s) => tutTarget(s) === 'done')
+  // Placing Rusty's in the tutorial, a green Done read as the next tap and left without building.
+  const tutPlacing = useGame((s) => s.tutorial === 3 && s.mode === 'place' && s.placing === 'rescue')
   const tutCard = useGame(tutorialShowing)
   // During the tutorial the bar keeps to placing and moving; roads, land and the rest come after.
   const all = useGame((s) => s.tutorial >= 99)
@@ -180,7 +182,7 @@ function EditBar() {
         {mode === 'move' && again && <button className="tool" onClick={() => setMode('place', again)}><Icon name="plus" size={22} /><span>Again</span></button>}
         {all && <button className="tool" onClick={() => openPanel('inventory')}><Icon name="box" size={22} /><span>Inventory</span>{storedCount > 0 && <b className="tool-count">{storedCount}</b>}</button>}
         {all && <button className="tool" onClick={() => openPanel('shop')}><Icon name="shop" size={22} /><span>Shop</span></button>}
-        <button className={tutDone ? 'tool done tut-pulse' : 'tool done'} onClick={() => setMode('play')}><Icon name="check" size={22} /><span>Done</span></button>
+        <button className={tutDone ? 'tool done tut-pulse' : tutPlacing ? 'tool done tut-quiet' : 'tool done'} onClick={() => setMode('play')}><Icon name="check" size={22} /><span>Done</span></button>
       </div>
     </div>
   )
@@ -191,10 +193,14 @@ function EditBar() {
 let panelsUp = 0
 let panelGoneAt = -Infinity
 
-// onBack: shows a back button before the title (a sub-screen of the panel).
+// onBack: shows a back button before the title (a sub-screen of the panel). Without it, a menu
+// opened from another menu still gets one, back to that menu; the X closes to the town.
 // head: extra bits in the title bar, before the close button.
 export function Panel({ title, children, wide, onClose, onBack, head, className }: { title: string; children: React.ReactNode; wide?: boolean; onClose?: () => void; onBack?: () => void; head?: React.ReactNode; className?: string }) {
   const closePanel = useGame((s) => s.closePanel)
+  const closeMenus = useGame((s) => s.closeMenus)
+  const trail = useGame((s) => s.panelBack.length > 0)
+  const back = onBack ?? (!onClose && trail ? closePanel : undefined)
   // Slides away before it unmounts; the timer dies with the panel, so a panel
   // swapped in meanwhile is never closed by it.
   const [closing, setClosing] = useState(false)
@@ -210,23 +216,25 @@ export function Panel({ title, children, wide, onClose, onBack, head, className 
       panelGoneAt = Date.now()
     }
   }, [])
-  const close = (_: null) => {
-    const done = () => (onClose ? onClose() : closePanel())
-    // Going back to the previous menu: swap straight to it rather than slide away and back.
-    if (reducedMotion() || (!onClose && useGame.getState().panelBack.length > 0)) return done()
+  // The X: slides away to the town.
+  const close = () => {
+    const done = () => (onClose ? onClose() : closeMenus())
+    if (reducedMotion()) return done()
     if (closing) return
     setClosing(true)
     timer.current = window.setTimeout(done, 170)
   }
+  // A tap beside the menu steps back like the back button: straight to the previous menu, no slide.
+  const tapOut = () => (!onClose && trail ? closePanel() : close())
   return (
-    <div className={closing ? 'overlay closing' : still ? 'overlay still' : 'overlay'} onClick={() => close(null)}>
+    <div className={closing ? 'overlay closing' : still ? 'overlay still' : 'overlay'} onClick={tapOut}>
       <div ref={box} className={`${wide ? 'panel wide' : 'panel'}${className ? ` ${className}` : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="panel-head">
-          {onBack && <button className="panel-back" aria-label="Back" onClick={onBack}><Icon name="back" size={18} /></button>}
+          {back && <button className="panel-back" aria-label="Back" onClick={back}><Icon name="back" size={18} /></button>}
           {/* long titles (a garage with its stats) step down a size so they don't cut off */}
           <h2 className={title.length > 14 ? 'long' : undefined} title={title}>{title}</h2>
           {head}
-          <button className="close" aria-label="Close" onClick={() => close(null)}><Icon name="close" size={16} /></button>
+          <button className="close" aria-label="Close" onClick={close}><Icon name="close" size={16} /></button>
         </div>
         <div className="panel-body">{children}</div>
       </div>

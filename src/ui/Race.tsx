@@ -9,7 +9,7 @@ import { bestCar, carPi, raceCarOf } from '../game/raceCar'
 import { carNear, fairNow, tourPayNow } from '../game/fairRace'
 import { buildPi, fairRivalPi } from '../game/fairPi'
 import { CARS, SKILLS, carDef, performance, RACE_FUEL, GP_SERIES, GP_ROUNDS, gpOpen, gpRivalPi, gpReward, CAMPAIGN, CAMPAIGN_RACES, campaignRaceId, campaignRivalPi, campaignShift, rookieRace, ROOKIE_SHIFT, campaignRivalSkills, campaignReward, campaignCleared, campaignOpen, campaignStarTotal, campaignStarsNeed, type CampaignChapter, skillBoost, skillDrag, liveSkillBoost, smoothShift, type Body, type GpSeries, type SkillId } from '../game/data'
-import { TRACK, freshRacer, stepRacer, shiftQuality, shiftBand, launchRacer, revLaunch, shiftRacer, fireBoost, aiReaction, AI_BOOST_GEAR, TOP_GEAR, LAUNCH_BAND, AI_BAND, IDLE, REV_UP, REV_HOLD, REV_DOWN, RACE_DT } from '../game/race'
+import { TRACK, freshRacer, stepRacer, shiftQuality, shiftBand, launchRacer, revLaunch, shiftRacer, fireBoost, aiReaction, AI_BOOST_GEAR, TOP_GEAR, LAUNCH_BAND, AI_BAND, IDLE, REV_UP, REV_HOLD, REV_DOWN, RACE_DT, kmh } from '../game/race'
 import { CarThumb } from '../scene/BuildingPreview'
 import { CallCardArt, CallCardGround, callCardTier, callCardTip } from './CallCard'
 import { CallCardPopup } from './CallCardPicker'
@@ -2015,7 +2015,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
         <div className="rf-bottom">
           <BoostButton r={me.current} onFire={boost} ready={countdown === 0} gain={gain} />
           <div className="rf-dial">
-            <div className="rf-speed">{Math.round(me.current.speed * 3.6)}<small> km/h</small></div>
+            <div className="rf-speed">{kmh(me.current.speed)}<small> km/h</small></div>
             <svg viewBox="0 0 120 120" className={`tach${light}`}>
               <circle cx="60" cy="60" r="56" fill="#1b1f24" fillOpacity="0.85" stroke="#cfd8dc" strokeWidth="3" />
               <path d={arcPath(60, 60, 46, -210 + band.lo * 240, -210 + band.hi * 240)} stroke={onLine ? '#ffd54f' : '#76ff03'} strokeWidth="10" fill="none" />
@@ -2110,7 +2110,7 @@ export function RaceResult({ won, myTime, theirTime, cash, xp, rival, note, noCo
           <div className="rr-stats">
             <span className={stats.launch.startsWith('PERFECT') ? 'good' : stats.launch.startsWith('Good') ? '' : 'bad'}><small>Launch</small>{stats.launch.startsWith('PERFECT') ? 'Perfect' : stats.launch.startsWith('Good') ? 'Good' : stats.launch.startsWith('WHEEL') ? 'Spin' : 'Bogged'}</span>
             <span className={stats.shifts > 0 && stats.perfect === stats.shifts ? 'good' : ''}><small>Perfect</small>{stats.perfect}/{Math.max(stats.shifts, 1)}</span>
-            <span><small>Top speed</small>{Math.round(stats.top * 3.6)}<i> km/h</i></span>
+            <span><small>Top speed</small>{kmh(stats.top)}<i> km/h</i></span>
           </div>
         )}
         {!won && !noContest && pi && pi.me < pi.them && (

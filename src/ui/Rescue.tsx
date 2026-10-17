@@ -6,6 +6,7 @@ import { flushSave } from '../lib/cloud'
 import { useNow } from '../scene/useNow'
 import { dayPhase, nightAmount } from '../game/clock'
 import { CoinIcon } from './Icon'
+import { MenuBack } from './MenuBack'
 import { CarPreview } from '../scene/CarPreview'
 import { Panel, SheetTabs, SkillTag } from './Menus'
 import { CarThumb } from '../scene/BuildingPreview'
@@ -463,8 +464,9 @@ function SearchScreen({ onHaul }: { onHaul: (r: Recap) => void }) {
       <StageSlot cam={RESCUE_CAM}>{scene}</StageSlot>
       <LoadingScene ready={stageReady} label={`Heading to ${spot.name}`} onClose={closePanel} />
       <div className="rf-top">
+        <MenuBack />
         <h2>{spot.icon} {spot.name}</h2>
-        <button className="close" onClick={closePanel} aria-label="Close">✕</button>
+        <button className="close" onClick={() => useGame.getState().closeMenus()} aria-label="Close">✕</button>
       </div>
       <div className="rs-dots" aria-label={`${left} spots left`}>
         {q.revealed.map((r, i) => {
@@ -571,7 +573,7 @@ function HaulCard({ items, piece, onDone }: Recap & { onDone: (next: 'find' | 's
       </div>
       <div className="row haul-go">
         {cars.length ? (
-          <button className="buy" onClick={() => onDone('storage')}>🔧 Fix one up</button>
+          <button className="buy haul-fix" onClick={() => onDone('storage')}>🔧 Fix one up</button>
         ) : (
           <button className="buy" onClick={() => onDone('find')}>🔍 Search again</button>
         )}

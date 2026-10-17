@@ -1,8 +1,8 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { Atmosphere } from './Atmosphere'
 import { AnchorProjector, anchorEls } from './anchors'
 import { useThree, type ThreeEvent } from '@react-three/fiber'
-import { MeshStandardMaterial, Plane, Vector3, type Object3D, type TOUCH } from 'three'
+import { MeshStandardMaterial, Plane, Vector3, type TOUCH } from 'three'
 import { create } from 'zustand'
 import { useGame, buildPrice, canPlace, canPlaceBlock, buyablePlots, lotSize, movable, type PlacedBuilding } from '../game/store'
 import { TILE, PLOT, PLOT_MIN, PLOT_MAX, START_LAND, RUSTY_LOT, buildingDef, buildingLevel } from '../game/data'
@@ -24,15 +24,14 @@ import { SeasonFx } from './SeasonFx'
 import { TownCars } from './TownCars'
 import { Townspeople } from './Townspeople'
 import { Batch } from './Batch'
-import { lotRoots } from './doors'
 import { LampTone, Tint } from './CityTint'
 import { lampPost, themeFor } from '../game/cityLook'
 import { Manhole } from './BuildingDetail'
 import { GrassTufts } from './Tufts'
 import { Outskirts } from './Outskirts'
 import { townExits } from './townExits'
-import { cycle } from '../lib/cycle'
-import { RoadWear, StreetProp, PROPS, Hydrant, StreetLamp, Sidewalk, CornerCurb, CornerFillet, ENDS, type End } from './Roadside'
+import { RoadWear, Furnishings, Sidewalk, CornerCurb, CornerFillet, ENDS, type End } from './Roadside'
+import { furnitureOf } from '../game/streetFurniture'
 import { toWorld, toTile, DIRS } from './grid'
 import { grassTex, paverTex, meadowTex } from './textures'
 import { cloudyGround, roadMat } from './weatherLook'
@@ -41,7 +40,7 @@ import { SkyExtras } from './SkyExtras'
 import { layoutRoads } from './traffic/layout'
 import { LAYER, decal } from './layers'
 import { Ear } from './Ear'
-import { WorldFx, PopGroup, usePops } from './WorldFx'
+import { WorldFx, PopGroup, usePops, lots } from './WorldFx'
 import { helpable } from '../game/help'
 import { helpBuilding } from '../lib/help'
 import { hoursOf, seedOf } from '../game/hours'
@@ -231,20 +230,15 @@ function BuildingLot({ b, turn, group, picked, city }: BuildingProps) {
   // How far it's been dragged, in tiles. A building hides while dragged away and
   // the ghost shows where it would land; a merged block slides along itself.
   const off = useDrag((g) => (g.drag?.uid === b.uid ? `${g.drag.x - b.x},${g.drag.z - b.z}` : '0,0'))
-  // Townspeople find this lot's doors in what it draws (see doors.ts).
-  const uid = b.uid
-  const register = useCallback((g: Object3D | null) => {
-    if (!g) return
-    lotRoots.set(uid, g)
-    return () => {
-      if (lotRoots.get(uid) === g) lotRoots.delete(uid)
-    }
-  }, [uid])
   if (off !== '0,0' && !group) return null
   const [dx, dz] = off.split(',').map(Number)
   return (
     <group
-      ref={register}
+      ref={(o) => {
+        if (!o) return
+        lots.set(b.uid, o)
+        return () => void (lots.get(b.uid) === o && lots.delete(b.uid))
+      }}
       position={[cx + dx * TILE, 0, cz + dz * TILE]}
       userData={{ hours: { seed: seedOf(b.uid), kind: hoursOf(b.def) }, noBatch: !!picked }}
       onPointerDown={(e) => {
@@ -412,8 +406,6 @@ const RoadTile = memo(function RoadTile({ t, asphalt }: { t: Tile; asphalt: Mesh
   const straightZ = !junction && (s || nn) && !e && !w
   const avenue = oneWay >= 0
   const plain = (straightX || straightZ) && !xing.some(Boolean)
-  // Lamps go on the outside edge of an avenue.
-  const outer = avenue ? SIDES[mate ^ 1] : null
   return (
     <group position={[wx, 0, wz]}>
       <mesh rotation-x={-Math.PI / 2} position-y={LAYER.lot} receiveShadow>
@@ -423,22 +415,12 @@ const RoadTile = memo(function RoadTile({ t, asphalt }: { t: Tile; asphalt: Mesh
       {/* Drains and manholes only on plain straight stretches, clear of crossings. */}
       {SIDES.map((sd, i) => !arms[i] && <Sidewalk key={sd} side={sd} ends={endsOf(arms, xing, i)} drain={plain && (x * 2 + z + i) % 4 === 0} />)}
       {corners.map((c, i) => (c === 'curb' ? <CornerCurb key={i} turn={i} /> : c === 'fillet' ? <CornerFillet key={i} turn={i} /> : null))}
-      {(straightX || straightZ) && (x * 5 + z * 3) % 7 === 0 && <Hydrant side={straightX ? ((x + z) % 2 ? 'n' : 's') : ((x + z) % 2 ? 'w' : 'e')} />}
       {plain && (x * 3 + z * 7) % 5 === 1 && <Manhole x={straightX ? 0 : 0.45} z={straightX ? 0.45 : 0} />}
       {SIDES.map((sd, i) => xing[i] && <Crosswalk key={sd} side={sd} />)}
       {xing.map((on, i) => on && (oneWay < 0 || oneWay === i) && <StopLine key={i} side={i} />)}
-      {/* Street lamps every few tiles along straight roads, alternating sides. */}
-      {(straightX || straightZ) && !xing.some(Boolean) && (x * 7 + z * 5) % 3 === 0 && (
-        <StreetLamp side={straightX ? ((x + z) % 2 ? 's' : 'n') : ((x + z) % 2 ? 'e' : 'w')} />
-      )}
-      {/* A lamp lighting the corner where a side road meets the street. */}
-      {junction && arms.filter(Boolean).length === 3 && <StreetLamp side={SIDES[arms.indexOf(false)]} />}
-      {avenue && outer && !xing.some(Boolean) && (x * 7 + z * 5) % 3 === 0 && <StreetLamp side={outer} />}
+      {/* Lamps, hydrants and sidewalk furniture (streetFurniture.ts, which townspeople walk round). */}
+      <Furnishings list={furnitureOf(t)} />
       <RoadWear kerbs={SIDES.filter((_, i) => !arms[i])} plain={plain} alongX={!!straightX} h={(((x * 73 + z * 151) % 97) + 97) % 97 / 97} />
-      {/* Sidewalk furniture on some straight stretches, on the side without a lamp. */}
-      {plain && (x * 11 + z * 13) % 4 === 0 && (
-        <StreetProp kind={cycle(PROPS, x * 5 + z * 3)} side={straightX ? ((x + z) % 2 ? 'n' : 's') : ((x + z) % 2 ? 'w' : 'e')} at={-0.2} />
-      )}
       {(straightX || straightZ) && <Dashes alongX={straightX} />}
       {avenue && <Dashes alongX={oneWay < 2} />}
       {avenue && (mate === 0 || mate === 2) && <Median side={mate} />}

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Color, IcosahedronGeometry, InstancedMesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, OctahedronGeometry, type Group } from 'three'
+import { Box3, Color, IcosahedronGeometry, InstancedMesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, OctahedronGeometry, Vector3, type Group } from 'three'
 import { create } from 'zustand'
 import { onFx, reducedMotion } from '../game/fx'
 import { useGame, lotSize } from '../game/store'
@@ -84,6 +84,33 @@ const THANKS = [new Color('#ff80ab'), new Color('#69f0ae'), new Color('#ffd54f')
 const WOOD = [new Color('#7cb342'), new Color('#6f4a30'), new Color('#558b2f'), new Color('#a1887f')]
 const STONE = [new Color('#9e9e9e'), new Color('#bdbdbd'), new Color('#757575')]
 const pick = (c: Color[]) => c[(Math.random() * c.length) | 0]
+
+// Each building lot's root group by uid (World registers them), so smoke can
+// rise from the model's real roof rather than a guess.
+export const lots = new Map<string, Object3D>()
+const tops = new Map<string, number>()
+const box = new Box3()
+function modelTop(uid: string, key: string): number | null {
+  const at = `${uid}:${key}`
+  const known = tops.get(at)
+  if (known !== undefined) return known
+  const o = lots.get(uid)
+  if (!o) return null
+  box.setFromObject(o)
+  if (box.isEmpty()) return null
+  const top = box.max.y - o.getWorldPosition(new Vector3()).y
+  // Mid-drop or mid-bounce it's the wrong height: measure again next time.
+  if (!usePops.getState().pops[uid]) tops.set(at, top)
+  return top
+}
+
+// Where a busy business's chimney smoke starts: on the low roof the old guess
+// fits, or not at all on a tower (it showed as a puff stuck halfway up the
+// glass) or a lot drawn by its merged block.
+export function smokeFrom(guess: number, top: number | null): number | null {
+  // A flag or a beacon on a low roof stays under the allowance.
+  return top === null || top > guess + 1.6 ? null : guess
+}
 
 function footprint(def: string, x: number, z: number, rot?: number) {
   const [w, h] = lotSize(def, rot)
@@ -205,10 +232,10 @@ export function WorldFx({ small }: { small: boolean }) {
         const f = footprint(b.def, b.x, b.z, b.rot)
         const wash = b.def === 'carwash'
         const wind = weatherNow(now).wind
-        const top = (d.w > 1 ? 2.1 : 1.7) + (b.level ?? 1) * 0.04
-        add(0, {
+        const top = wash ? 0.8 : smokeFrom((d.w > 1 ? 2.1 : 1.7) + (b.level ?? 1) * 0.04, modelTop(b.uid, `${b.level}:${b.merge ?? ''}`))
+        if (top !== null) add(0, {
           x: f.cx + f.w * (wash ? 0 : 0.28) + (Math.random() - 0.5) * 0.2,
-          y: wash ? 0.8 : top,
+          y: top,
           z: f.cz - f.h * (wash ? 0 : 0.2) + (Math.random() - 0.5) * 0.2,
           vx: 0.15 + wind * 1.2 + (wash ? (Math.random() - 0.5) * 1.2 : 0),
           vy: wash ? 0.9 : 0.6,

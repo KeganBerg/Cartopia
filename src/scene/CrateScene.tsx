@@ -42,7 +42,7 @@ export const LIFT = 0.14
 export type CratePace = 'full' | 'quick' | 'show'
 const PACE = {
   full: { drop: 0.55, charge: 1.15, rise: 0.25, lift: 0.9, settle: 2.35, hops: [0.35, 0.68, 0.95] },
-  quick: { drop: 0.28, charge: 0.36, rise: 0.04, lift: 0.5, settle: 0.86, hops: [0.1, 0.22] },
+  quick: { drop: 0.28, charge: 0.36, rise: 0.04, lift: 0.5, settle: 0.86, hops: [] as number[] },
 } as const
 export const REVEAL_AT = PACE.full.settle
 // How long the crate's bounce lasts once it lands on the lift.
@@ -1126,8 +1126,9 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base, baseQ, pace =
     const root = p.root
     if (!root) return
     root.visible = !show
-    // A quick open starts straining as soon as it lands.
-    if (phase === 'open' && s.openAt < 0) s.openAt = pace === 'quick' ? now + Math.max(0, P.drop - (now - s.born)) : now
+    // A quick open bursts as its landing bounce ends (no strain hops); a full one starts straining
+    // once it has landed and bounced. Hops on top of the landing bounce read as a double bounce.
+    if (phase === 'open' && s.openAt < 0) s.openAt = Math.max(now, s.born + P.drop + (pace === 'quick' ? 0 : BOUNCE))
     // A tap to skip lands the crate at once and jumps to the burst: it never bursts in mid-air
     // with the prize rising from an empty lift under it.
     if (skip !== s.skipped) {

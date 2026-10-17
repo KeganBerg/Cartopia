@@ -340,7 +340,7 @@ body:has(.edit-bar) .tutorial { bottom: calc(150px + var(--sab)); }
 /* Touch screens: 44px tap targets (docs/ui-rules.md) for the panel close button, the top
    tabs, segmented switches and small buttons, which were 24-36px tall on phones. */
 @media (pointer: coarse) {
-  :root .panel-head .close { width: 44px; height: 44px; }
+  :root .panel-head .close, :root .panel-head .panel-back, :root .rf-top .panel-back { width: 44px; height: 44px; }
   :root .sheet-tabs button { min-height: 44px; }
   :root .seg button { min-height: 44px; }
   :root .buy.small, :root .sell.small { min-height: 44px; }
@@ -379,6 +379,10 @@ body:has(.edit-bar) .tutorial { bottom: calc(150px + var(--sab)); }
 @media (max-width: 600px) { :root .panel-head h2.long { font-size: 22px; -webkit-text-stroke-width: 4.5px; } }
 :root .ribbon { font: 12px/1 var(--display); letter-spacing: .6px; padding: 4px 10px; border: 2px solid var(--line); border-radius: 9px; box-shadow: inset 0 2px 0 rgba(255,255,255,.4), 0 2px 0 rgba(0,0,0,.25); text-shadow: 0 1px 0 rgba(0,0,0,.35); top: -12px; }
 @media (min-width: 601px) {
-  :root .panel-head .close { width: 42px; height: 42px; }
+  :root .panel-head .close, :root .panel-head .panel-back { width: 42px; height: 42px; }
   :root .sheet-tabs button { font-size: 15px; }
 }
+
+/* Placing Rusty's in the tutorial: Done steps back so the glowing lot is the one thing to tap. */
+:root .tool.done.tut-quiet { background: none; border-color: transparent; box-shadow: none; color: inherit; text-shadow: none; }
+:root .tool.done.tut-quiet .gi { color: inherit; filter: none; }
