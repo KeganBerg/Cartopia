@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ambientMix, noiseBuffer } from './ambience'
+import { ambientMix, keptBuffer, noiseBuffer } from './ambience'
 
 describe('ambientMix', () => {
   it('plays crickets on summer nights and traffic by day', () => {
@@ -73,5 +73,26 @@ describe('noiseBuffer', () => {
       for (let i = 1; i < d.length; i++) step = Math.max(step, Math.abs(d[i] - d[i - 1]))
       expect(Math.abs(d[d.length - 1] - d[0])).toBeLessThanOrEqual(step)
     }
+  })
+})
+
+// Leaving the Crate Depot restarts the town's sounds; building their noise and echo again froze the page.
+describe('keptBuffer', () => {
+  it('builds each sound buffer once per audio context', () => {
+    let n = 0
+    const a = {} as BaseAudioContext
+    const b = {} as BaseAudioContext
+    const make = () => ({ n: ++n }) as unknown as AudioBuffer
+    expect(keptBuffer(a, 'room', make)).toBe(keptBuffer(a, 'room', make))
+    expect(n).toBe(1)
+    keptBuffer(b, 'room', make)
+    keptBuffer(a, 'hall', make)
+    expect(n).toBe(3)
+  })
+
+  it('is what the town sounds and music use', async () => {
+    const { readFileSync } = await import('node:fs')
+    expect(readFileSync('src/lib/ambience.ts', 'utf8')).not.toMatch(/= (noiseBuffer|echoTail)\(ctx/)
+    expect(readFileSync('src/lib/townMusic.ts', 'utf8')).not.toMatch(/= hallBuffer\(ctx/)
   })
 })

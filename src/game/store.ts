@@ -27,7 +27,7 @@ import { EVENT_RACES, eventBonus, eventFor, eventIsBoss, eventPrize, eventProgre
 import { trialWeek } from './trial'
 import { groupOf, groupTurn, mergeCandidates, mergeBoosts, mergeFuel, applyMerge, applySplit, rotateGroup, moveGroup, isLandmark, isGlobe, LANDMARK_NAME, GLOBE_NAME, type MergeGroup } from './merge'
 import { togglePick } from './meet'
-import { endlessCapped, endlessDone, endlessPay, endlessSlots, endlessToday, filledEndless, type Endless, type EndlessGoal, type EndlessTown } from './endless'
+import { endlessCapped, endlessDone, endlessPay, endlessXp, endlessSlots, endlessToday, filledEndless, type Endless, type EndlessGoal, type EndlessTown } from './endless'
 import { crateCost, crateDef, crateOwnedSkins, pityHit, rollCrate, rollSourcePiece, type CrateId, type CrateOpen } from './crates'
 import { pieceId } from './resto'
 import { rollWheel, type WheelSpin } from './wheel'
@@ -1716,14 +1716,15 @@ export const useGame = create<GameState>()(
         const now = Date.now()
         const num = e.n + 1
         const pay = endlessPay(num, s.level)
+        const xp = endlessXp(s.level)
         sfx.coin()
         if (pay.parts) setTimeout(sfx.levelUp, 150)
-        s.toast(`Goal complete! +${pay.coins.toLocaleString()} coins${pay.parts ? `, +${pay.parts} parts` : ''}${pay.bucks ? `, +${pay.bucks} gems` : ''}, +${xpGain(s.level, pay.xp)} XP`)
-        set(withXp(s, pay.xp, {
+        s.toast(`Goal complete! +${pay.coins.toLocaleString()} coins${pay.parts ? `, +${pay.parts} parts` : ''}${pay.bucks ? `, +${pay.bucks} gems` : ''}, +${xp.toLocaleString()} XP`)
+        set(withXp(s, xp, {
           coins: s.coins + pay.coins, parts: s.parts + pay.parts, bucks: s.bucks + pay.bucks,
           endless: { ...e, n: num, day: dayKey(now), today: endlessToday(e, now) + 1, goals: e.goals.filter((o) => o.k !== k), last: g.kind },
           updatedAt: now,
-        }))
+        }, true))
         // Draw the next one straight away, from the town as it is now.
         const next = rolledEndless(get())
         if (next) set({ endless: next })

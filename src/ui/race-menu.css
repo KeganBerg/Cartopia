@@ -23,7 +23,9 @@
 .rm-qc.cc-tier-legendary::after { box-shadow: inset 0 0 0 2px var(--cc-edge), inset 0 0 14px rgba(255,213,79,.55), inset 0 2px 0 rgba(255,255,255,.3); }
 .rm-qc-top { position: relative; z-index: 1; flex: 1; min-height: 96px; }
 /* The car's shadow on the card's floor. */
-.rm-qc-top::before { content: ''; position: absolute; left: 14%; right: 14%; bottom: 4%; height: 14%; border-radius: 50%; background: radial-gradient(closest-side, rgba(0,0,0,.55), rgba(0,0,0,0)); }
+/* A car card's car stands on its Call Card's ground (.cc-stage in call-cards.css), not in this box. */
+.rm-qc.cc-stage { --g: .56; --car-h: 52cqh; }
+.rm-qc-top:has(> .thumb3d) { position: static; }
 .rm-qc-top .thumb3d { position: absolute; left: 0; right: 0; bottom: 0; width: auto; height: auto; aspect-ratio: 4 / 3; max-height: 100%; margin: 0 auto; --th: 100%; background: none; border-radius: 0; }
 .rm-qc-top .tag { position: absolute; top: 8px; right: 8px; z-index: 2; box-shadow: 0 2px 0 rgba(0,0,0,.35); }
 .rm-qc-top .rm-mi { position: absolute; inset: 0; display: grid; place-items: center; font-size: 54px; filter: drop-shadow(0 4px 6px rgba(0,0,0,.5)); }
@@ -249,6 +251,7 @@ div.rm-node { cursor: default; }
 @media (max-width: 600px), (max-height: 500px) {
   .rm-q-grid { --qc-h: 250px; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; grid-auto-rows: var(--qc-h); min-height: 0; }
   .rm-qc { border-radius: 16px; }
+  .rm-qc.cc-stage { --g: .5; --car-h: 40cqh; }
   .rm-qc::after { border-radius: 13px; }
   .rm-qc-body { padding: 16px 8px 8px; gap: 4px; }
   .rm-qc-body b { font-size: 15px; }
