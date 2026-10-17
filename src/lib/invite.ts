@@ -86,8 +86,8 @@ export async function claimInviteRewards() {
     await flushSave()
     const { data, error } = await supabase.rpc('claim_invite_rewards')
     if (error) return
-    const d = data as { gems: number; bucks: number; updatedAt?: number }
-    if (!(d.gems > 0) || typeof d.updatedAt !== 'number') return
+    const d = data as { gems?: number; bucks?: number; updatedAt?: number } | null
+    if (!d || !(Number(d.gems) > 0) || typeof d.bucks !== 'number' || typeof d.updatedAt !== 'number') return
     useGame.setState({ bucks: d.bucks, updatedAt: d.updatedAt })
     sfx.reward()
     useGame.getState().toast(`🎁 +${d.gems} Gems · invite reward`)
