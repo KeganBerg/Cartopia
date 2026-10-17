@@ -40,7 +40,7 @@ import { SkyExtras } from './SkyExtras'
 import { layoutRoads } from './traffic/layout'
 import { LAYER, decal } from './layers'
 import { Ear } from './Ear'
-import { WorldFx, PopGroup, usePops } from './WorldFx'
+import { WorldFx, PopGroup, usePops, lots } from './WorldFx'
 import { helpable } from '../game/help'
 import { helpBuilding } from '../lib/help'
 import { hoursOf, seedOf } from '../game/hours'
@@ -234,6 +234,11 @@ function BuildingLot({ b, turn, group, picked, city }: BuildingProps) {
   const [dx, dz] = off.split(',').map(Number)
   return (
     <group
+      ref={(o) => {
+        if (!o) return
+        lots.set(b.uid, o)
+        return () => void (lots.get(b.uid) === o && lots.delete(b.uid))
+      }}
       position={[cx + dx * TILE, 0, cz + dz * TILE]}
       userData={{ hours: { seed: seedOf(b.uid), kind: hoursOf(b.def) }, noBatch: !!picked }}
       onPointerDown={(e) => {
