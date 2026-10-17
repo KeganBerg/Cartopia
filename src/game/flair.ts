@@ -42,7 +42,7 @@ export const CHEERS: CheerDef[] = [
   { id: 'confetti', name: 'Confetti', icon: '🎊', colors: ['#ff5252', '#ffd740', '#69f0ae', '#40c4ff', '#e040fb'] },
   { id: 'sparks', name: 'Sparkler', icon: '✨', colors: ['#fff8e1', '#ffd740', '#ffab40'], challenge: ch('🗺', 'Win 25 campaign races', 'campaignWins', 25) },
   { id: 'hearts', name: 'Hearts', icon: '💖', colors: ['#ff4081', '#ff80ab', '#f8bbd0'], challenge: ch('🏆', 'Win 6 Class Cup races', 'cupRaces', 6) },
-  { id: 'coins', name: 'Coin Shower', icon: '🪙', colors: ['#ffd740', '#ffc400', '#fff59d'], challenge: ch('💰', 'Earn 250,000 coins', 'coinsEarned', 250000) },
+  { id: 'coins', name: 'Coin Rain', icon: '🪙', colors: ['#ffd740', '#ffc400', '#fff59d'], challenge: ch('💰', 'Earn 250,000 coins', 'coinsEarned', 250000) },
   { id: 'fireworks', name: 'Fireworks', icon: '🎆', colors: ['#ff1744', '#00e5ff', '#76ff03', '#ffea00', '#d500f9'], challenge: ch('🏆', 'Reach 500 trophies', 'trophies', 500) },
   { id: 'stars', name: 'Star Burst', icon: '🌟', colors: ['#ffffff', '#fff176', '#80d8ff'], challenge: ch('🎖️', 'Master 5 cars', 'masterCars', 5) },
 ]
