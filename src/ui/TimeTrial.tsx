@@ -92,7 +92,7 @@ export function TrialTab({ car, myPi }: { car: OwnedCar; myPi: number }) {
   })
   // The podium only fills once every car on it is known, so no step pops in on its own.
   const shownPodium = podium.length === Math.min(3, rows.length) ? podium : []
-  const podKey = shownPodium.map((p) => `${p.owner}${p.name}${p.t}${p.look.model}${p.look.color}`).join()
+  const podKey = shownPodium.map((p) => `${p.owner}${p.name}${p.t}${JSON.stringify(p.look)}`).join()
   const myLook = useMemo(() => lookOf(car), [car])
   const scene = useMemo(
     () => (
@@ -161,7 +161,7 @@ function Row({ r, name, car, leader, mine }: { r: BoardRow; name: string; car?: 
   return (
     <button role="listitem" className={`ttr-row r${Math.min(r.place, 4)}${mine ? ' mine' : ''}`} onClick={() => pick(r)} aria-label={`${name}, ${r.t.toFixed(3)} seconds, place ${r.place}`}>
       <span className="ttr-rank">{r.place <= 3 ? MEDAL[r.place - 1] : r.place}</span>
-      <span className="ttr-car">{car && <CarThumb size="xs" body={car.body} model={car.model} color={car.color} mods={car.mods} />}</span>
+      <span className="ttr-car">{car && <CarThumb size="xs" {...car} />}</span>
       <span className="ttr-who">
         <b>{name}</b>
         <small>{r.car && <span className="ttr-model">{r.car}</span>}<span className="rm-pi">PI {r.pi}</span></small>

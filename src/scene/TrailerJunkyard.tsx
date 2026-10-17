@@ -590,6 +590,61 @@ function Junkyard({ m, win, bulb, ghost, lvl, lift }: EdgeProps) {
           <group position={[-1.3, 0.05, 0.05]} rotation-y={Math.PI / 2 + 0.15}>
             <Upright><group scale={0.5}><CarModel body="truck" color="#8d6e63" rusty /></group></Upright>
           </group>
+          {/* More wrecks in the middle of the yard as it grows, the second on the first's roof. */}
+          {lvl >= 3 && (
+            <group position={[-0.35, 0.05, -0.15]} rotation-y={0.45}>
+              <Upright>
+                <group scale={0.5}><CarModel body="compact" color="#7b8f6a" rusty /></group>
+                {lvl >= 7 && <group position={[0, 0.3, 0.02]} rotation-y={0.1} scale={0.5}><CarModel body="classic" color="#b39b5a" rusty /></group>}
+              </Upright>
+            </group>
+          )}
+          {/* Salvage racks along the right fence: engines, gearboxes and batteries pulled for sale. */}
+          {lvl >= 4 && (
+            <group position={[1.62, 0.05, -0.15]}>
+              <Upright>
+                {[-0.4, 0, 0.4].map((z) => [-0.13, 0.13].map((x) => <Box key={`${x}${z}`} m={m} at={[x, 0.36, z]} s={[0.03, 0.72, 0.03]} c="#37474f" />))}
+                {[0.12, 0.38, 0.64].map((y, r) => (
+                  <group key={y}>
+                    <Box m={m} at={[0, y, 0]} s={[0.3, 0.025, 0.86]} c={r === 2 ? '#1565c0' : '#455a64'} />
+                    {[-0.27, 0, 0.27].map((z, i) => (r * 3 + i) % 4 === 3 ? null : (
+                      <group key={z} position={[0, y + 0.0125, z]}>
+                        {r === 0 ? (
+                          // Engine blocks: the block, its head and a pulley.
+                          <group>
+                            <Box m={m} at={[0, 0.065, 0]} s={[0.17, 0.13, 0.15]} c={['#607d8b', '#78909c', '#546e7a'][i]} />
+                            <Box m={m} at={[0, 0.145, 0]} s={[0.13, 0.03, 0.17]} c="#455a64" />
+                            <Cyl m={m} at={[0, 0.07, 0.085]} r={0.035} h={0.02} c="#263238" seg={10} rot={[Math.PI / 2, 0, 0]} />
+                          </group>
+                        ) : r === 1 ? (
+                          // Gearboxes: a tapered case on its side.
+                          <Cyl m={m} at={[0, 0.06, 0]} r={0.06} r2={0.04} h={0.2} c="#90a4ae" seg={8} rot={[Math.PI / 2, 0, 0]} />
+                        ) : (
+                          // Batteries with their terminals.
+                          <group>
+                            <Box m={m} at={[0, 0.06, 0]} s={[0.12, 0.12, 0.17]} c="#212121" />
+                            {[-0.05, 0.05].map((dz, t) => <Cyl key={dz} m={m} at={[0, 0.13, dz]} r={0.012} h={0.02} c={t ? '#c62828' : '#1565c0'} seg={6} />)}
+                          </group>
+                        )}
+                      </group>
+                    ))}
+                  </group>
+                ))}
+              </Upright>
+            </group>
+          )}
+          {/* A scrap heap by the drive: bent panels, a door, a hood and a wheel. */}
+          {lvl >= 8 && (
+            <group position={[-0.62, 0.05, 0.42]}>
+              <Upright>
+                <mesh position={[0, 0.1, 0]} scale={[1, 0.55, 0.85]} castShadow><sphereGeometry args={[0.28, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2]} />{m('#6d5d4f')}</mesh>
+                {[[-0.12, 0.17, 0.05, '#a35d3a'], [0.1, 0.15, -0.06, '#6a7f99'], [0.0, 0.2, 0.12, '#b39b5a'], [0.15, 0.12, 0.12, '#8a6f8f'], [-0.15, 0.12, -0.1, '#90a4ae']].map(([x, y, z, c], i) => (
+                  <Box key={i} m={m} at={[x as number, y as number, z as number]} s={[0.2, 0.025, 0.14]} c={c as string} rot={[i * 0.5 - 0.6, i * 1.1, i * 0.35 - 0.4]} />
+                ))}
+                <mesh position={[0.05, 0.19, -0.1]} rotation={[0.9, 0.3, 0]} castShadow><torusGeometry args={[0.07, 0.03, 6, 10]} />{m('#263238')}</mesh>
+              </Upright>
+            </group>
+          )}
           {/* Tyre piles, drums, engine blocks and a heap of scrap. */}
           <Tyres m={m} at={[1.55, 0, -1.5]} n={4 + Math.min(4, Math.floor(lvl / 3))} />
           <Tyres m={m} at={[1.3, 0, -1.55]} n={3} />

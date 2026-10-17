@@ -23,3 +23,19 @@ describe('cleanCard', () => {
     expect(cleanCard(card)).toEqual(card)
   })
 })
+
+describe('challenge cooldown', () => {
+  it('drops the cooldown when it ends so Live buttons turn back on', async () => {
+    const { vi } = await import('vitest')
+    const { startCooldown, useLive } = await import('./live')
+    vi.useFakeTimers()
+    try {
+      startCooldown('p9')
+      expect(useLive.getState().cooldownTo.p9).toBeGreaterThan(Date.now())
+      vi.advanceTimersByTime(61000)
+      expect(useLive.getState().cooldownTo.p9).toBeUndefined()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
