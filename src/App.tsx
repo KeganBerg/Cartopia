@@ -72,6 +72,7 @@ import { rememberSplashCar } from './lib/splashCar'
 import { usePrefs } from './lib/prefs'
 import { onDemand, reopenAfterReload } from './ui/lazy'
 import { useAdminCheck } from './lib/admin'
+import { captureArrival, startInviteFollowUp } from './lib/invite'
 
 // Rusty's yard, the crate depot and the arcade each bring their own 3D scenes,
 // so they load on first open instead of with the town. Once the town is up they
@@ -125,6 +126,7 @@ export default function App() {
   useCrewBattleWatcher()
 
   useEffect(() => {
+    captureArrival()
     startCloudSync()
     startPurchaseSync()
     startAmbience()
@@ -155,6 +157,7 @@ export default function App() {
     // ?visitor=racer|tourist|mystery|barn brings a guest's visitor right away (for testing).
     const forced = new URLSearchParams(location.search).get('visitor') as VisitorKind | null
     if (forced) setTimeout(() => forceVisitor(forced), 2500)
+    const stopInvite = startInviteFollowUp()
     const id = setInterval(() => {
       tick(Date.now())
       visitorTick()
@@ -163,6 +166,7 @@ export default function App() {
       clearInterval(id)
       clearTimeout(splashFallback)
       unsubDaily()
+      stopInvite()
       clearTimeout(prefetch)
       stopSplashCar()
     }
