@@ -1,6 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { Atmosphere } from './Atmosphere'
-import { MapControls } from '@react-three/drei'
 import { AnchorProjector, anchorEls } from './anchors'
 import { useThree, type ThreeEvent } from '@react-three/fiber'
 import { MeshStandardMaterial, Plane, Vector3, type TOUCH } from 'three'
@@ -45,7 +44,8 @@ import { WorldFx, PopGroup, usePops } from './WorldFx'
 import { helpable } from '../game/help'
 import { helpBuilding } from '../lib/help'
 import { hoursOf, seedOf } from '../game/hours'
-import { VIEW, isFree, useFreeCam } from './freeCam'
+import { VIEW, freeFingers, isFree, useFreeCam } from './freeCam'
+import { TownControls } from './TownControls'
 import { FreeCam } from './FreeCam'
 import { TutorialCamera } from './TutorialCamera'
 import { VisitCamera } from './VisitCamera'
@@ -182,7 +182,7 @@ function holdToMove(b: PlacedBuilding, e: ThreeEvent<PointerEvent>) {
     watch.stop()
     const s = useGame.getState()
     // A finger resting on a building while another pinches is zooming, not picking it up.
-    if (s.mode !== 'play' || s.panel || s.visiting || townFingers() > 1) return
+    if (s.mode !== 'play' || s.panel || s.visiting || townFingers() + freeFingers() > 1) return
     held = true
     navigator.vibrate?.(15)
     sfx.click()
@@ -669,9 +669,8 @@ function Interaction() {
         <primitive object={meadow(ALL / 16)} attach="material" dispose={null} />
       </mesh>
       {ghost}
-      <MapControls
+      <TownControls
         ref={shareView}
-        makeDefault
         // The free view steers itself (FreeCam.tsx); these stay in charge of the bird's-eye view.
         enabled={!(free || mode === 'road' || mode === 'bulldoze' || drag)}
         enableRotate={false}

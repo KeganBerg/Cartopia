@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { DRAG_VIEWS, KART_VIEWS, type DragView, type KartView } from '../scene/raceCam'
 
 // Player settings that live on this device only (they never go into the save):
 // graphics quality, reduced motion, phone vibration, muted ghost race taunts, kart steering, the kart racing line and
@@ -30,11 +31,14 @@ export type Prefs = {
   kartLine: boolean
   // A frame-rate readout on the town, so a player can tell us how smooth it runs.
   fps: boolean
+  // The race camera the player last picked (🎥 / C), one for drag races and one for kart races.
+  dragView: DragView
+  kartView: KartView
 }
 export type Steer = 'smooth' | 'sharp' | 'buttons'
 
 const KEY = 'cartopia-prefs'
-const DEFAULTS: Prefs = { graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: false, muteTaunts: false, askLeave: true, askSell: true, steer: 'smooth', steerSet: false, kartLine: true, fps: false }
+const DEFAULTS: Prefs = { graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: false, muteTaunts: false, askLeave: true, askSell: true, steer: 'smooth', steerSet: false, kartLine: true, fps: false, dragView: 'chase', kartView: 'chase' }
 
 export function parsePrefs(raw: string | null): Prefs {
   try {
@@ -54,6 +58,8 @@ export function parsePrefs(raw: string | null): Prefs {
       steerSet: p.steerSet === true,
       kartLine: p.kartLine !== false,
       fps: p.fps === true,
+      dragView: DRAG_VIEWS.includes(p.dragView as DragView) ? (p.dragView as DragView) : 'chase',
+      kartView: KART_VIEWS.includes(p.kartView as KartView) ? (p.kartView as KartView) : 'chase',
     }
   } catch {
     return { ...DEFAULTS }

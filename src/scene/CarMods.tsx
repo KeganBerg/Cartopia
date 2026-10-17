@@ -170,6 +170,25 @@ const SILL_IN: Partial<Record<Body, number>> = { tank: 0.03, icecream: 0.014, po
 // Where side skirts bolt on: the body side, or the face of whatever stands out over the wheels.
 const sillX = (f: Frame) => f.sill ?? f.side
 const sillY = (f: Frame) => f.sillY ?? f.lift
+// On the tank, kits don't hang skirts: they bolt appliqué armour over its own armour skirt.
+// `plates` panels side by side along the skirt (a gap between each), standing a little proud
+// of its face, with a bolt at every corner. The skirt's height and length come from the tank
+// in CarModel (centred at 1.62 wheel heights, 0.62 wheels tall, wz * 2 + 1.7 wheels long).
+function tankArmour(f: Frame, p: Parts, plates: number) {
+  const len = f.wz * 2 + f.wheel * 1.5
+  const gap = 0.014
+  const seg = (len - gap * (plates - 1)) / plates
+  const t = 0.016
+  const h = f.wheel * 0.46
+  const y = f.wheel * 1.6
+  for (const sd of [-1, 1]) for (let i = 0; i < plates; i++) {
+    const z = -len / 2 + seg / 2 + i * (seg + gap)
+    p.paint.push(box(t, h, seg, sd * (sillX(f) + t / 2), y, z))
+    // A bevel along the top edge, leaning back to the skirt.
+    p.paint.push(box(t * 0.6, 0.012, seg, sd * (sillX(f) + t * 0.3), y + h / 2 + 0.004, z, 0, 0, sd * 0.6))
+    for (const dy of [-1, 1]) for (const dz of [-1, 1]) p.chrome.push(box(0.006, 0.012, 0.012, sd * (sillX(f) + t + 0.002), y + dy * (h / 2 - 0.014), z + dz * (seg / 2 - 0.016)))
+  }
+}
 function withRoom(f: Frame, all: string[]): Frame & { room: Room } {
   // How far a kit's wheel arches reach along the car from each axle.
   const arch = all.includes('boxflares') ? f.wheel * 1.28 : all.includes('widebody') ? f.wheel * 1.2 + 0.035 : 0
@@ -280,10 +299,13 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
     frontLip(f, p, 'paint', f.bodyW * 0.98, 0.028, 0.08, f.lift + 0.025, f.front + 0.015, true)
     // The rear valance parts round the exhaust tips.
     for (const [a, b] of aroundTips(f, -f.bodyW * 0.35, f.bodyW * 0.35)) p.carbon.push(box(b - a, 0.03, 0.07, (a + b) / 2, rearLift(f) + 0.03, f.rear - 0.01))
-    for (const sd of [-1, 1]) p.paint.push(box(0.0375, 0.05, f.len * 0.42, sd * (sillX(f) + 0.00825), sillY(f) + 0.055, 0))
+    if (f.body === 'tank') tankArmour(f, p, 2)
+    else for (const sd of [-1, 1]) p.paint.push(box(0.0375, 0.05, f.len * 0.42, sd * (sillX(f) + 0.00825), sillY(f) + 0.055, 0))
   },
   widebody: (f, p) => {
-    for (const sd of [-1, 1]) {
+    // A tank has no wheel arches to widen: its kit is armour over the skirt.
+    if (f.body === 'tank') tankArmour(f, p, 3)
+    else for (const sd of [-1, 1]) {
       for (const z of [f.wz, -f.wz]) {
         // Bolt-on arch over each tyre: a flattened half ring on the side of the car.
         const g = new TorusGeometry(f.wheel * 1.2, 0.035, 6, 14, Math.PI)
@@ -302,9 +324,10 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
     p.carbon.push(box((f.nose === undefined ? f.bodyW * 1.05 : noseW(f) - 0.012), 0.025, 0.1, 0, noseLift(f) + 0.025, f.front + 0.02 - (f.nose === undefined ? 0 : 0.02)))
   },
   carbonkit: (f, p) => {
+    if (f.body === 'tank') tankArmour(f, p, 4)
     frontLip(f, p, 'carbon', f.bodyW * 1.08, 0.022, 0.12, f.lift + 0.022, f.front + 0.015, true)
     for (const sd of [-1, 1]) {
-      p.carbon.push(box(0.0485, 0.05, f.len * 0.46, sd * (sillX(f) + 0.01375), sillY(f) + 0.053, 0))
+      if (f.body !== 'tank') p.carbon.push(box(0.0485, 0.05, f.len * 0.46, sd * (sillX(f) + 0.01375), sillY(f) + 0.053, 0))
       // Canards on the front corners, where the nose is square enough to hold them.
       if (!ROUND_NOSE.includes(f.body)) p.carbon.push(box(0.1, 0.012, 0.06, sd * (noseW(f) / 2 - 0.02), f.lift + 0.13, f.front - 0.02, 0, sd * 0.4))
     }
@@ -453,6 +476,7 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
     const top = f.lift + 0.03
     const h = Math.max(0.05, Math.min(0.17, top - 0.03))
     const x = Math.min(f.wx, f.side - 0.06)
+    if (f.body === 'tank') tankArmour(f, p, 5)
     for (const sd of [-1, 1]) {
       // Tracks run where the flaps would hang.
       if (f.sill === undefined) for (const zz of [f.wz, -f.wz]) {
@@ -463,7 +487,7 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
         p.paint.push(box(0.1, h, 0.012, sd * x, top - h / 2, z))
         p.chrome.push(box(0.104, 0.012, 0.016, sd * x, top - h + 0.008, z))
       }
-      p.carbon.push(box(0.0375, 0.04, f.wz * 2 - f.wheel * 2.9, sd * (sillX(f) + 0.00825), sillY(f) + 0.03, 0))
+      if (f.body !== 'tank') p.carbon.push(box(0.0375, 0.04, f.wz * 2 - f.wheel * 2.9, sd * (sillX(f) + 0.00825), sillY(f) + 0.03, 0))
     }
     // Skid plate tucked under the nose, rising to the bumper, held by two bolts.
     p.chrome.push(box(Math.min(f.bodyW * 0.7, noseW(f) * 0.9), 0.012, 0.15, 0, noseLift(f) + 0.018, f.front - 0.045, -0.35))
@@ -481,6 +505,7 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
     // The outer top edge is bevelled, so the flare reads as a pressed panel and not a box.
     const c = 0.04
     const wi = w - c * 0.7
+    if (f.body === 'tank') tankArmour(f, p, 3)
     const xi = x - c * 0.35
     for (const sd of [-1, 1]) {
       for (const zz of [f.wz, -f.wz]) {
@@ -497,11 +522,12 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
           p.chrome.push(post(0.008, 0.012, sd * (x1 - c - 0.02), top + 0.016, zz + e * (L / 2 - 0.02), 6))
         }
       }
-      p.paint.push(box(0.06, 0.04, f.wz * 2 - f.wheel * 2.56, sd * (f.side + 0.016), f.lift + 0.034, 0))
+      if (f.body !== 'tank') p.paint.push(box(0.06, 0.04, f.wz * 2 - f.wheel * 2.56, sd * (f.side + 0.016), f.lift + 0.034, 0))
     }
     p.carbon.push(box((f.nose === undefined ? f.bodyW * 1.04 : noseW(f) - 0.012), 0.03, 0.1, 0, noseLift(f) + (f.nose === undefined ? 0.03 : 0.022), f.front + 0.02 - (f.nose === undefined ? 0 : 0.02)))
   },
   aerokit: (f, p) => {
+    if (f.body === 'tank') tankArmour(f, p, 4)
     // Front splitter with end plates and stacked canards, slim skirts, and a finned diffuser.
     frontLip(f, p, 'carbon', f.bodyW * 1.1, 0.016, 0.13, f.lift + 0.012, f.front + 0.02, false)
     for (const sd of [-1, 1]) {
@@ -510,8 +536,10 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
       else p.carbon.push(box(0.012, 0.03, 0.1, sd * (noseW(f) / 2 - 0.006), noseLift(f) + 0.024, f.front + 0.0))
       // Each canard runs back into the nose's corner (a wheel well behind it is no mount).
       if (!ROUND_NOSE.includes(f.body)) for (const [y, k] of [[0.11, 0], [0.14, 1]]) p.carbon.push(box(0.12, 0.01, 0.05, sd * (noseW(f) / 2 - 0.04 - k * 0.01), f.lift + y, f.front - 0.015 - k * 0.01, 0, sd * 0.45))
-      p.carbon.push(box(0.045, 0.03, f.len * 0.48, sd * (f.side + 0.0125), f.lift + 0.035, 0))
-      p.paint.push(box(0.035, 0.012, f.len * 0.42, sd * (f.side + 0.025), f.lift + 0.056, 0))
+      if (f.body !== 'tank') {
+        p.carbon.push(box(0.045, 0.03, f.len * 0.48, sd * (f.side + 0.0125), f.lift + 0.035, 0))
+        p.paint.push(box(0.035, 0.012, f.len * 0.42, sd * (f.side + 0.025), f.lift + 0.056, 0))
+      }
     }
     // Narrow enough to pass between the stock tailpipes; its fins sit between a stock diffuser's.
     for (const [a, b] of aroundTips(f, -f.bodyW * 0.23, f.bodyW * 0.23)) p.carbon.push(box(b - a, 0.02, 0.12, (a + b) / 2, rearLift(f) + 0.016, f.rear + 0.045, 0.25))

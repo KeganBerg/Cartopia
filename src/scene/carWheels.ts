@@ -55,6 +55,8 @@ export function wheelGeo(style: RimStyle, r: number, w: number, whitewall = fals
   const face = rimFace(style, ri, h)
   const right = face.clone().rotateZ(-Math.PI / 2)
   const left = face.rotateZ(Math.PI / 2)
+  // Tagged so tests can tell a car wheel from anything else (no tracked body may draw one).
+  for (const g of [tire, left, right]) g.userData.carWheel = true
   const out = { tire, rims: [left, right] as [BufferGeometry, BufferGeometry] }
   cache.set(key, out)
   return out

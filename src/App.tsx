@@ -56,8 +56,10 @@ import { startTechnoMusic } from './lib/technoMusic'
 import { TechnoLayer } from './ui/Techno'
 import { LiveBanner } from './ui/LiveBanner'
 import { FlashWarning, RaveHeadsUp, flashWarningOpen, openDaily } from './ui/FlashWarning'
-import { useTownPaused } from './scene/renderGate'
+import { useTownPaused, useTownSlowed } from './scene/renderGate'
 import { PACES, useTownPace } from './scene/townPace'
+import { FrameCap, isDesktop, townFps } from './scene/frameCap'
+import { useFreeCam } from './scene/freeCam'
 import { useCrewGoalWatcher } from './ui/CrewGoal'
 import { useCrewBattleWatcher } from './ui/crewBattleWatch'
 import { VisitorBadges, StreetRaceCard } from './ui/Visitors'
@@ -102,7 +104,9 @@ const prefetchPanels = () => {
 export default function App() {
   useAdminCheck()
   const panel = useGame((s) => s.panel)
-  const pace = PACES[useTownPace((p) => p.step)]
+  const paceStep = useTownPace((p) => p.step)
+  const pace = PACES[paceStep]
+  const free = useFreeCam((f) => f.on)
   const liveRace = useLive((l) => l.race)
   // Race prizes: their popups load with the Race menu's code, so they mount only when won.
   const gpPrize = useGame((s) => !!s.gpPrize)
@@ -111,6 +115,7 @@ export default function App() {
   const eventPrize = useGame((s) => !!s.eventPrize)
   const tick = useGame((s) => s.tick)
   const townPaused = useTownPaused()
+  const townSlowed = useTownSlowed()
   const graphics = usePrefs((p) => p.graphics)
   useCrewGoalWatcher()
   useCrewBattleWatcher()
@@ -172,11 +177,11 @@ export default function App() {
         }}
       >
         <SharedShapes />
-        <CountFrames />
+        <CountFrames view="town" />
         <World />
         <SplashHandoff />
         <ShotGrabber />
-        <FrameCap fps={graphics === 'saver' ? 30 : graphics === 'auto' ? pace.fps : 60} paused={townPaused} />
+        <FrameCap fps={townSlowed ? Math.min(30, pace.fps) : townFps(graphics, pace.fps, paceStep === 0, free, isDesktop())} paused={townPaused} />
         <ShadowSwitch on={graphics !== 'saver'} />
       </Canvas>
       <FpsMeter />
@@ -257,26 +262,6 @@ function SplashHandoff() {
   useFrame(() => {
     if (++frames.current === 3) hideSplash()
   })
-  return null
-}
-
-// Draws the town at most about 60 times a second (30 on battery saver). Left to the screen,
-// a 120 or 144 Hz laptop drew it twice as often for no visible gain, and kept its CPU busy.
-function FrameCap({ fps, paused }: { fps: number; paused: boolean }) {
-  const invalidate = useThree((s) => s.invalidate)
-  useEffect(() => {
-    if (paused) return
-    // A little under the gap, so a 60 Hz screen still gets every frame and 144 Hz gets every other.
-    const gap = 800 / fps
-    let last = -Infinity
-    let id = requestAnimationFrame(function step(t) {
-      id = requestAnimationFrame(step)
-      if (t - last < gap) return
-      last = t
-      invalidate()
-    })
-    return () => cancelAnimationFrame(id)
-  }, [invalidate, fps, paused])
   return null
 }
 

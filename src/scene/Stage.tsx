@@ -5,6 +5,8 @@ import { Canvas, useThree } from '@react-three/fiber'
 import { ACESFilmicToneMapping, NeutralToneMapping, PCFSoftShadowMap, type PerspectiveCamera, type ToneMapping, type WebGLRenderer } from 'three'
 import { pinPrograms, quietShaders, warmShaders } from './warm'
 import { useCanvasDpr } from '../lib/prefs'
+import { FrameCap } from './frameCap'
+import { CountFrames } from '../ui/FpsMeter'
 import { create } from 'zustand'
 
 // The race (and the Crate Depot) draws in its own full-screen canvas. Building a fresh canvas for every race
@@ -27,7 +29,8 @@ type Entry = { run: number; el: HTMLElement; cam: Cam; node: ReactNode; through?
 
 let runs = 0
 
-function makeStage(tone: ToneMapping) {
+// `cap`: the most frames a second the view draws (none: every screen refresh, for races).
+function makeStage(tone: ToneMapping, view: string, cap?: number) {
   const useStage = create<StageState>(() => ({ node: null, slot: null, cam: { position: [0, 2, -4], fov: 55, near: 0.3, far: 150 }, run: 0, ready: -1, used: false, gen: 0 }))
   const open: Entry[] = []
 
@@ -81,6 +84,7 @@ function makeStage(tone: ToneMapping) {
     const { node, used, slot, run, ready, gen, cam } = useStage()
     const dpr = useCanvasDpr(cam.dpr)
     if (!used) return null
+    const live = !!(slot && node && ready === run)
     return createPortal(
       <Canvas
         key={gen}
@@ -91,7 +95,7 @@ function makeStage(tone: ToneMapping) {
         // canvas used to keep that smaller size until the window next changed.
         resize={{ offsetSize: true }}
         gl={{ toneMapping: tone }}
-        frameloop={slot && node && ready === run ? 'always' : 'never'}
+        frameloop={!live ? 'never' : cap ? 'demand' : 'always'}
         onCreated={({ gl }) => {
           quietShaders(gl)
           // A phone can take the context back while the canvas waits between races;
@@ -104,6 +108,8 @@ function makeStage(tone: ToneMapping) {
         }}
       >
         <SharedShapes />
+        <CountFrames view={view} />
+        {cap ? <FrameCap fps={cap} paused={!live} /> : null}
         <Rig run={run} />
         <StageRun run={run}>{node}</StageRun>
       </Canvas>,
@@ -218,7 +224,7 @@ export function StageRun({ run, children }: { run: number; children: ReactNode }
 }
 
 // The full-screen views: races, crates, Rusty's yard, the prize wheel, arcade, crew battle.
-export const { StageCanvas, StageSlot, useStageReady, warmStage, stageSnapshot } = makeStage(NeutralToneMapping)
+export const { StageCanvas, StageSlot, useStageReady, warmStage, stageSnapshot } = makeStage(NeutralToneMapping, 'race')
 
 // The small turntables (they've always drawn with three's filmic look, so they keep it).
-export const Preview = makeStage(ACESFilmicToneMapping)
+export const Preview = makeStage(ACESFilmicToneMapping, 'preview', 60)

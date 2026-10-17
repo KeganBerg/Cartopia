@@ -56,6 +56,64 @@ function bestCar(s: SaveState) {
 // has it, so a tab left open on another device can never overwrite newer play from here.
 let cloudAt: string | null = null
 let pushing: Promise<void> | null = null
+// The same, kept across reloads. When the row has moved on but its town's updatedAt hasn't, the server
+// wrote to it (an admin gift, say) and the cloud copy must win, or this browser's next save erases it.
+const CLOUD_AT_KEY = 'cartopia-cloud-at'
+
+function readCloudAt(uid: string): string | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(CLOUD_AT_KEY) ?? 'null')
+    return v?.uid === uid && typeof v.at === 'string' ? v.at : null
+  } catch {
+    return null
+  }
+}
+
+function setCloudAt(at: string | null) {
+  cloudAt = at
+  try {
+    if (at && userId) localStorage.setItem(CLOUD_AT_KEY, JSON.stringify({ uid: userId, at }))
+  } catch {
+    // Without it, sign-in sync just can't spot server writes made while the game was closed.
+  }
+}
+
+// What the server may change in a town while it's open (admin gifts and takes). A cloud copy that
+// differs from this browser's only in these is taken in place, without a reload.
+const LIVE_KEYS = new Set(['cars', 'coins', 'bucks', 'parts', 'xp', 'level', 'raceCar', 'showcase'])
+// Set while a server copy is being taken in, so taking it in doesn't count as play to upload.
+let adopting = false
+
+// Deep equal that ignores key order (Postgres jsonb sorts keys) and treats a missing key as undefined.
+function same(a: unknown, b: unknown): boolean {
+  if (a === b) return true
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false
+  if (Array.isArray(a) !== Array.isArray(b)) return false
+  const ka = Object.keys(a).filter((k) => (a as Record<string, unknown>)[k] !== undefined)
+  const kb = Object.keys(b).filter((k) => (b as Record<string, unknown>)[k] !== undefined)
+  return ka.length === kb.length && ka.every((k) => same((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]))
+}
+
+// Takes in a cloud copy the server changed while this town was open, when only LIVE_KEYS differ.
+// False when anything else differs: the caller reloads into the cloud town instead.
+export function adoptServer(cloud: SaveState, at: string): boolean {
+  const s = useGame.getState()
+  const local = saveOf(s) as unknown as Record<string, unknown>
+  const next = cloud as unknown as Record<string, unknown>
+  const changed = [...new Set([...Object.keys(local), ...Object.keys(next)])].filter((k) => k !== 'updatedAt' && !same(local[k], next[k]))
+  if (changed.some((k) => !LIVE_KEYS.has(k))) return false
+  setCloudAt(at)
+  if (!changed.length) return true
+  const gifts = (cloud.cars ?? []).filter((c) => !s.cars.some((o) => o.uid === c.uid))
+  adopting = true
+  try {
+    useGame.setState({ ...Object.fromEntries(changed.map((k) => [k, next[k]])), updatedAt: cloud.updatedAt ?? s.updatedAt } as Partial<SaveState>)
+  } finally {
+    adopting = false
+  }
+  if (gifts.length) s.toast(`🎁 ${gifts.map((c) => carDef(c.model).name).join(', ')}`)
+  return true
+}
 
 function rowOf(uid: string, s: SaveState) {
   return {
@@ -86,7 +144,7 @@ function loadCloud(cloud: SaveState, at: string, message: string) {
   storage?.setItem(name!, { state: cloud, version: version ?? 0 })
   // Freeze this browser's copy at the cloud town so nothing that happens before the reload replaces it.
   useGame.persist.setOptions({ storage: { getItem: () => null, setItem: () => {}, removeItem: () => {} } })
-  cloudAt = at
+  setCloudAt(at)
   try {
     sessionStorage.setItem(TOAST_KEY, message)
   } catch {
@@ -111,7 +169,7 @@ async function pushSave(): Promise<void> {
     // 23505: row created elsewhere first. 23514: the server refused to lower your level.
     if (error && error.code !== '23505' && error.code !== '23514') return console.warn('Cloud save failed', error.message)
     if (!error && data && data.length) {
-      cloudAt = data[0].updated_at
+      setCloudAt(data[0].updated_at)
       // The server trimmed something it couldn't verify (see 0005_economy_guard.sql): play on from its copy.
       if (data[0].corrections) await pullNewer(uid, true, 'Your town was synced with the server')
       return
@@ -141,12 +199,25 @@ export async function flushSave() {
   }
 }
 
+// How often an open game checks whether its cloud row changed (just its timestamp, so it's cheap).
+const SERVER_CHECK_MS = 60_000
+
+async function checkServer() {
+  if (!supabase || !userId || reloading || syncingFor || saveTimer || pushing) return
+  const uid = userId
+  const { data, error } = await supabase.from('game_saves').select('updated_at').eq('owner_id', uid).maybeSingle()
+  if (error || !data || userId !== uid || data.updated_at === cloudAt) return
+  await pullNewer(uid)
+}
+
 // Load the cloud town when another device has saved since this one last synced.
 async function pullNewer(uid: string, force = false, message = 'Loaded your latest town from another device') {
   if (!supabase) return
   const { data, error } = await supabase.from('game_saves').select('state, updated_at').eq('owner_id', uid).maybeSingle()
   if (error || !data || userId !== uid) return
   if (!force && data.updated_at === cloudAt) return
+  // Nothing waiting to save here: a server-side change (an admin gift) can be taken in place.
+  if (!force && !saveTimer && !pushing && adoptServer(data.state as SaveState, data.updated_at)) return
   if (saveTimer) clearTimeout(saveTimer)
   loadCloud(data.state as SaveState, data.updated_at, message)
 }
@@ -173,14 +244,17 @@ async function syncOnSignIn(uid: string) {
   const localIsTheirs = owner === uid
   // A guest town (no owner) can move into a brand-new account; another account's town never can.
   const localMayMove = owner === null || localIsTheirs
+  // The row changed since this browser last saw it: another device or the server (an admin gift) wrote it.
+  const lastAt = readCloudAt(uid)
+  const cloudMoved = !!data && lastAt !== null && lastAt !== data.updated_at
   const keepLocal =
     (!cloud && localMayMove) ||
-    (!!cloud && localIsTheirs && local.updatedAt > cloud.updatedAt && progressScore(local) >= progressScore(cloud))
+    (!!cloud && localIsTheirs && !cloudMoved && local.updatedAt > cloud.updatedAt && progressScore(local) >= progressScore(cloud))
   userId = uid
   cloudAt = data?.updated_at ?? null
   writeOwner(uid)
   // This browser already shows the cloud town, e.g. right after the reload below.
-  if (cloud && localIsTheirs && local.updatedAt === cloud.updatedAt) return
+  if (cloud && localIsTheirs && local.updatedAt === cloud.updatedAt && !cloudMoved) return setCloudAt(cloudAt)
   if (!cloud && !localMayMove) {
     // New account in a browser holding someone else's town: give it its own starter town.
     const fresh = starterTown()
@@ -223,12 +297,19 @@ export function startCloudSync() {
     }
   })
   useGame.subscribe((s, prev) => {
-    if (reloading || !userId || s.updatedAt === prev.updatedAt) return
+    if (adopting || reloading || !userId || s.updatedAt === prev.updatedAt) return
     if (saveTimer) clearTimeout(saveTimer)
-    saveTimer = setTimeout(pushSave, 3000)
+    saveTimer = setTimeout(() => {
+      saveTimer = null
+      void pushSave()
+    }, 3000)
   })
   // Coming back to a tab that sat open while you played elsewhere picks up that newer town.
   if (typeof document !== 'undefined') {
+    // While the game shows, a gift from the admin panel turns up within a minute, without a reload.
+    setInterval(() => {
+      if (document.visibilityState === 'visible') void checkServer()
+    }, SERVER_CHECK_MS)
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible' && userId && !syncingFor) pullNewer(userId)
       // Leaving the tab (e.g. to pick up another device) saves right away instead of in 3s.

@@ -347,3 +347,62 @@ describe('reset account', () => {
     expect(after.useGame.getState().level).toBe(1)
   })
 })
+
+describe('server-side gifts (admin panel)', () => {
+  const vanta = { uid: 'adm-1', model: 'vanta', color: '#e53935', upgrades: { engine: 0, turbo: 0, tires: 0, weight: 0 } }
+  type Car = { uid: string; model: string }
+  // What admin_give_car does: adds the car and touches the row, but not the town's own updatedAt.
+  // Postgres also hands the town back with its keys in its own order.
+  function adminGives(uid: string) {
+    const row = db.get(uid)!
+    const state = row.state as Row['state'] & { cars: Car[] }
+    const sorted = Object.fromEntries(Object.entries({ ...state, cars: [...state.cars, vanta] }).sort(([a], [b]) => a.length - b.length || (a < b ? -1 : 1)))
+    db.set(uid, { ...row, state: sorted as Row['state'], updated_at: stamp(new Date(Date.now() + 7).toISOString()) })
+  }
+  const hasVanta = (cars: Car[]) => cars.some((c) => c.uid === 'adm-1')
+  const visible = () => Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
+
+  it('shows a car given while the game was closed, and the next save keeps it', async () => {
+    let phone = await openGame({})
+    phone = await signIn(phone, 'gabe')
+    await play(phone, { level: 3, townName: 'Gabe Town' })
+    const closed = phone.snapshot()
+
+    adminGives('gabe')
+    let again = await openGame(closed)
+    again = await signIn(again, 'gabe')
+    expect(hasVanta(again.useGame.getState().cars)).toBe(true)
+    await play(again, { level: 3, townName: 'Gabe Town 2' })
+    expect(hasVanta((db.get('gabe')!.state as unknown as { cars: Car[] }).cars)).toBe(true)
+  })
+
+  it('shows a car given while the game is open, without a reload, and the next save keeps it', async () => {
+    visible()
+    let phone = await openGame({})
+    phone = await signIn(phone, 'gabe')
+    await play(phone, { level: 3, townName: 'Gabe Town' })
+
+    adminGives('gabe')
+    await vi.advanceTimersByTimeAsync(61_000)
+    expect(phone.reloads).toBe(0)
+    expect(hasVanta(phone.useGame.getState().cars)).toBe(true)
+    expect(phone.useGame.getState().townName).toBe('Gabe Town')
+
+    const writes = serverWrites
+    await play(phone, { level: 3, townName: 'Gabe Town 2' })
+    expect(serverWrites).toBe(writes + 1)
+    expect(phone.reloads).toBe(0)
+    expect(hasVanta((db.get('gabe')!.state as unknown as { cars: Car[] }).cars)).toBe(true)
+  })
+
+  it('still reloads when the cloud town changed in ways it cannot take in place', async () => {
+    visible()
+    let phone = await openGame({})
+    phone = await signIn(phone, 'gabe')
+    await play(phone, { level: 3, townName: 'Gabe Town' })
+    const row = db.get('gabe')!
+    db.set('gabe', { ...row, state: { ...row.state, townName: 'Renamed' }, updated_at: stamp(new Date(Date.now() + 7).toISOString()) })
+    await vi.advanceTimersByTimeAsync(61_000)
+    expect(phone.reloads).toBe(1)
+  })
+})

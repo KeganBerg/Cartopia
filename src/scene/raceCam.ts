@@ -73,3 +73,57 @@ export function angleCam(a: Angle, t: number, x: number, z: number, nose: number
     at.set(x - 0.05, 0.32, z - nose)
   }
 }
+
+// The views a player can pick by the 🎥 button (or C) during a race, remembered on this device
+// (prefs.dragView / prefs.kartView). The finish hero shot and photo finish still play over any of them;
+// the top-gear angles only cut in from the chase view, so a picked view stays put.
+export type DragView = 'chase' | 'far' | 'bumper' | 'tv'
+export type KartView = 'chase' | 'far' | 'bumper' | 'top'
+export const DRAG_VIEWS: DragView[] = ['chase', 'far', 'bumper', 'tv']
+export const KART_VIEWS: KartView[] = ['chase', 'far', 'bumper', 'top']
+export const VIEW_NAME: Record<DragView | KartView, string> = { chase: 'Chase', far: 'Wide', bumper: 'Bumper', tv: 'TV', top: 'Top' }
+export const VIEW_GLIDE = 0.45 // seconds to ease from one picked view to the next
+export const nextView = <T extends string>(list: readonly T[], cur: T): T => list[(list.indexOf(cur) + 1) % list.length]
+
+// Where a picked drag view (other than the chase) puts the camera. Me at (x, z), the rival at (rx, rz),
+// `nose` from a car's centre to its bumper, `road` the street's half width. Returns the extra field of view.
+export function dragViewCam(v: Exclude<DragView, 'chase'>, x: number, z: number, rx: number, rz: number, nose: number, road: number, tall: boolean, pos: Vector3, at: Vector3): number {
+  if (v === 'far') {
+    // High and well back over the middle of the road: both cars, both lanes and the street ahead.
+    // It takes in the rival too while it's close, but my car stays the subject: a rival falling far
+    // behind drops out of the frame rather than dragging the camera back past it.
+    const lo = Math.max(Math.min(z, rz), z - 2.5)
+    const hi = Math.min(Math.max(z, rz), z + 5)
+    // A wide screen looks down a little more, so the cars sit above the tach in the middle of the HUD.
+    pos.set(0, tall ? 4.4 : 3.2, lo - (tall ? 8.6 : 6.5))
+    at.set(0, 0.2, hi + (tall ? 4 : 1.2))
+    return tall ? 0 : -2
+  }
+  if (v === 'bumper') {
+    // Just off the front bumper at headlight height, looking down the lane: the road rushes at the lens.
+    pos.set(x, 0.3, z + nose + 0.06)
+    at.set(x * 0.85, 0.26, z + nose + 12)
+    return 6
+  }
+  // TV: a broadcast camera up over the kerb on my side, panning with the pair a little ahead of them.
+  const mid = (z + rz) / 2
+  const spread = Math.min(6, Math.abs(z - rz))
+  pos.set(road + (tall ? 0.85 : 1.2), tall ? 3.1 : 2.4, mid + (tall ? 4.4 : 4) + spread * 0.3)
+  at.set((x + rx) / 2, 0.25, mid - 0.4)
+  return tall ? -6 : -12
+}
+
+// The photo-finish camera: low on the kerb just past the line, looking back across it as the noses
+// arrive. It stands on the tarmac's edge, inside the barriers, so no kerbside prop fills the lens. A tall
+// phone screen stands further back and higher with the cars in the middle of the frame (they used to sit
+// in the top third over a wall of empty road). Returns its field of view, or undefined for the race's own.
+export function photoCam(len: number, road: number, tall: boolean, pos: Vector3, at: Vector3): number | undefined {
+  if (tall) {
+    pos.set(road - 0.12, 1.05, len + 4.4)
+    at.set(-0.15, 0.25, len - 2.6)
+    return undefined
+  }
+  pos.set(road - 0.1, 0.7, len + 2.8)
+  at.set(-0.3, 0.3, len - 0.5)
+  return 34
+}

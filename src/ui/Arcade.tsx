@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGame, type OwnedCar } from '../game/store'
 import { bestCar, raceCarOf } from '../game/raceCar'
-import { carDef } from '../game/data'
+import { carDef, xpGain } from '../game/data'
 import {
   CHASE_HEARTS, PARK_LOTS, PARK_MAX_BUMPS, chaseReward, chaseScore, loadBests, lotOpen, parkReward, parkStars, saveBests,
 } from '../game/arcade'
@@ -224,7 +224,7 @@ function ChaseGame({ car, onExit }: { car: OwnedCar; onExit: () => void }) {
             <button className="buy" onClick={again}>Again · <Cost game="chase" /></button>
           </>}>
           <div className="arc-big">{end.score.toLocaleString()}</div>
-          <div className="arc-pay"><span>🪙 +{end.coins}</span><span>⭐ +{end.xp} XP</span></div>
+          <div className="arc-pay"><span>🪙 +{end.coins}</span><span>⭐ +{xpGain(level, end.xp)} XP</span></div>
           {end.place && <WeekPlace place={end.place} />}
         </Result>
       )}
@@ -296,7 +296,7 @@ function ParkGame({ car, lot, onExit, onLot }: { car: OwnedCar; lot: number; onE
           </>}>
           {end.parked && <div className="arc-stars">{[1, 2, 3].map((n) => <span key={n} className={n <= end.stars ? 'on' : ''}>★</span>)}</div>}
           <div className="arc-sub">⏱ {end.time.toFixed(1)}s · 💥 {end.bumps}</div>
-          {end.parked && <div className="arc-pay"><span>🪙 +{end.coins}</span><span>⭐ +{end.xp} XP</span></div>}
+          {end.parked && <div className="arc-pay"><span>🪙 +{end.coins}</span><span>⭐ +{xpGain(level, end.xp)} XP</span></div>}
         </Result>
       )}
     </div>
