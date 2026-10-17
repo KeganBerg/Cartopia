@@ -3,6 +3,7 @@ import { buildingDef, isOpen, xpToNext, raceXp, xpGain, fuelRegenSeconds, fuelPe
 import { useNow } from '../scene/useNow'
 import { Panel } from './Menus'
 import { WHEEL } from '../game/wheel'
+import { unlocked } from '../game/unlocks'
 
 const WHEEL_TOP_GEMS = Math.max(...WHEEL.map((w) => ('gems' in w ? w.gems : 0)))
 
@@ -75,7 +76,7 @@ export function NeedPanel() {
   } else if (need.res === 'bucks') {
     summary = need.missing ? `You need ${need.missing} more gems${need.what ? ` for ${need.what}` : ''}.` : `You have ${s.bucks.toLocaleString()} gems.`
     sources = [
-      { icon: '🏦', title: 'Visit the Bank', detail: 'Buy gems in packs. Bigger packs come with bonus gems, coins and parts.', action: { label: 'Bank', run: () => s.openPanel('bank') } },
+      ...(unlocked(s, 'bank') ? [{ icon: '🏦', title: 'Visit the Bank', detail: 'Buy gems in packs. Bigger packs come with bonus gems, coins and parts.', action: { label: 'Bank', run: () => s.openPanel('bank') } }] : []),
       { icon: '⭐', title: 'Level up', detail: `Every new level gives +${LEVEL_GEMS} gems.` },
       { icon: '📋', title: 'Finish goals', detail: 'Bigger goals pay gems.', action: { label: 'Goals', run: () => s.openPanel('goals') } },
       { icon: '🎡', title: 'Spin the daily wheel', detail: `Gem slices pay up to ${WHEEL_TOP_GEMS} gems.` },

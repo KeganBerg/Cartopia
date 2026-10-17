@@ -1341,7 +1341,9 @@ html.calm .callout { animation: none !important; }
 .mod-stats { font: 800 12px Nunito, sans-serif; color: #2e7d32; }
 .mod-pi { font-size: 12px; color: #607d8b; flex: 1; }
 .mod-pi b { color: #2e7d32; }
-.mod-card button { margin-top: 4px; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Prices show whole, never "...": the parts go on a second line (Mods.tsx price). */
+.mod-card button { margin-top: 4px; width: 100%; white-space: nowrap; line-height: 1.15; }
+.mod-parts { display: block; font-size: .78em; opacity: .9; }
 .mod-remove { border: 0; border-radius: 9px; padding: 6px 4px; background: #c5e1a5; color: #33691e; font: 800 12px Nunito, sans-serif; cursor: pointer; }
 .buy.premium { background: linear-gradient(#ab47bc, #7b1fa2); }
 @media (max-width: 520px) {
@@ -1553,10 +1555,10 @@ html.calm .callout { animation: none !important; }
 .pat-opt.locked { opacity: .55; }
 .pattern-swatch { width: 100%; max-width: 46px; aspect-ratio: 40 / 24; border-radius: 7px; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
 /* Trim: tint, headlight and handle tiles, then the saved looks (ui/Trim.tsx). */
-.trim-opts { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.trim-opts { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; }
 .trim-opt { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 5px 2px; border-radius: 12px; border: 1.5px solid #dfe5ea; background: #fff; font: 12px var(--display); color: #37474f; min-width: 0; cursor: pointer; }
-.trim-opt b { font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.trim-opt small { font: 700 11px Nunito, sans-serif; color: #607d8b; }
+.trim-opt b { font-weight: 400; max-width: 100%; text-align: center; line-height: 1.1; text-wrap: balance; }
+.trim-opt small { font: 700 11px Nunito, sans-serif; color: #607d8b; white-space: nowrap; }
 .trim-opt.sel { border-color: var(--blue); box-shadow: 0 0 0 2px var(--blue) inset; }
 .trim-opt.locked { opacity: .55; }
 .trim-chip { width: 34px; height: 20px; border-radius: 7px; box-shadow: 0 1px 3px rgba(0,0,0,.3); }

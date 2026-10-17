@@ -62,7 +62,10 @@ export function chooseFocus<T>(cands: { slot: T; box: Box }[], vw: number, vh: n
 
 // Which thumbnails to draw this frame: the turning one, the self-animating scenes when they're
 // due, and the next few held ones that haven't been drawn. Held ones of the same model at the
-// same angle (one car at two sizes) draw once.
+// same angle and shape (one car at two sizes) draw once. Two shapes draw twice: a wide drawing
+// copied into a narrower box squeezed the car (the Car Packs showcase and the card below it).
+// Boxes whose width-to-height differ by under about 2% share a drawing.
+export const shapeOf = (w: number, h: number) => Math.round(Math.log(w / h) * 50)
 type Need = { key: string; angle: number; spin: boolean; w: number; h: number; x: number; y: number; slots: Slot[] }
 export function pickThumbs(all: Iterable<Slot>, mounted: (key: string) => boolean, { focus = null as Slot | null, scenes = true, budget = STILL_PER_FRAME } = {}) {
   const need = new Map<string, Need>()
@@ -71,11 +74,13 @@ export function pickThumbs(all: Iterable<Slot>, mounted: (key: string) => boolea
     if (!s.seen || !s.ctx || s.canvas.width < 2) continue
     const spin = s === focus || s.scene
     if (s.scene ? !scenes && !s.fresh : !spin && !s.fresh) continue
-    const id = s === focus ? `${s.key}|turn` : s.scene ? s.key : `${s.key}|${s.angle.toFixed(3)}`
+    const id = `${s === focus ? `${s.key}|turn` : s.scene ? s.key : `${s.key}|${s.angle.toFixed(3)}`}|${shapeOf(s.canvas.width, s.canvas.height)}`
     const n = need.get(id)
     if (n) {
-      n.w = Math.max(n.w, s.canvas.width)
-      n.h = Math.max(n.h, s.canvas.height)
+      // Grow to the bigger box, keeping this drawing's shape.
+      const k = Math.max(s.canvas.width / n.w, s.canvas.height / n.h, 1)
+      n.w = Math.round(n.w * k)
+      n.h = Math.round(n.h * k)
       n.slots.push(s)
     } else if (!mounted(s.key)) waiting = true // its model isn't mounted yet: try again next frame
     else if (!spin && budget <= 0) waiting = true

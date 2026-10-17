@@ -58,3 +58,32 @@ describe('thumbnails: one turns, the rest hold', () => {
     expect(readFileSync('src/ui/Upgrade.tsx', 'utf8')).toMatch(/<BuildingThumb [^>]*\bstill\b/)
   })
 })
+
+// Kegan 10-16/10-17 "still being squished": the Car Packs showcase (wide) and the pack card
+// (squarer) show the same car, were drawn once at the bigger of each side, and the card's copy
+// came out squeezed. Every copy must keep the shape it was drawn at.
+describe('thumbnail shape', () => {
+  const sized = (key: string, width: number, height: number) => slot(key, { canvas: { width, height } as HTMLCanvasElement })
+  const ratio = (w: number, h: number) => w / h
+
+  it('draws one model separately for boxes of different shapes', () => {
+    const { need } = pickThumbs([sized('sc|vanta', 520, 200), sized('sc|vanta', 190, 130)], () => true)
+    expect(need.size).toBe(2)
+  })
+
+  it('never copies a drawing into a box of another shape, the turning one included', () => {
+    const sizes = [[520, 200], [190, 130], [180, 120], [96, 96], [300, 210], [150, 60], [600, 600], [64, 48]]
+    const { need } = pickThumbs(sizes.map(([w, h]) => sized('c|car', w, h)), () => true, { budget: 99 })
+    for (const n of need.values()) for (const s of n.slots) {
+      const off = ratio(s.canvas.width, s.canvas.height) / ratio(n.w, n.h)
+      expect(Math.abs(off - 1), `${s.canvas.width}x${s.canvas.height} from ${n.w}x${n.h}`).toBeLessThan(0.03)
+      expect(n.w).toBeGreaterThanOrEqual(s.canvas.width - 1)
+    }
+  })
+
+  it('still draws one model once for two boxes of the same shape', () => {
+    const { need } = pickThumbs([sized('c|car', 100, 80), sized('c|car', 200, 160)], () => true)
+    expect(need.size).toBe(1)
+    expect([...need.values()][0]).toMatchObject({ w: 200, h: 160 })
+  })
+})

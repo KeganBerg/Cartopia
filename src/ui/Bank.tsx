@@ -10,6 +10,7 @@ const NOTICE = {
   'sign-in': ['Sign in first', 'Gems go to your account. Sign in from the Menu.'],
   blocked: ['Purchases paused', `Contact ${CONTACT}`],
   owned: ['Already yours', 'Check your garage.'],
+  crew: ['Saving your town', 'Try again in a moment.'],
   failed: ["Couldn't open checkout", "You weren't charged. Try again."],
 } as const
 

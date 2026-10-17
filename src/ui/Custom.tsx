@@ -142,7 +142,7 @@ export function CustomShop({ car, panels, setPanels }: { car: OwnedCar; panels: 
           ) : lockedBy ? (
             <button className="buy small paint-rival-go" onClick={() => openPaintRival(lockedBy.id)} title={`Beat ${lockedBy.name} to unlock`}>🏁 {lockedBy.icon} {lockedBy.name.split(' ')[0]}</button>
           ) : (
-            <button className={cost.bucks ? 'buy small premium' : 'buy small'} onClick={() => { if (paintPanels(car.uid, panels ?? {})) setPanels(null) }}>Buy · {price}</button>
+            <button className={cost.bucks ? 'buy small premium' : 'buy small'} onClick={() => { if (paintPanels(car.uid, panels ?? {})) setPanels(null) }}>{price}</button>
           )}
         </div>
       )}
