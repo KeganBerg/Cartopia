@@ -12,7 +12,7 @@ import { dayPhase, nightAmount } from '../game/clock'
 import { SEASON, type Season } from '../scene/season'
 import { onTownHold, townHeld } from '../scene/renderGate'
 import { weatherNow } from '../game/weather'
-import { clubOpen } from './ambience'
+import { clubOpen, keptBuffer } from './ambience'
 import { onTechnoChange, technoOn } from '../game/techno'
 
 type Lead = 'epiano' | 'vibes' | 'flute'
@@ -247,7 +247,7 @@ export class TownMusic {
     this.input.connect(tone).connect(this.songGain).connect(glue).connect(this.out)
     // A big, soft hall: the dreamy space the music floats in.
     const hall = ctx.createConvolver()
-    hall.buffer = hallBuffer(ctx, 3.2)
+    hall.buffer = keptBuffer(ctx, 'music-hall', () => hallBuffer(ctx, 3.2))
     const hallGain = ctx.createGain()
     hallGain.gain.value = 0.42
     this.input.connect(hall).connect(hallGain).connect(this.songGain)
