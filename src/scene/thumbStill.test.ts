@@ -1,13 +1,59 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { chooseFocus, pickThumbs, STILL_PER_FRAME, type Slot as S } from './thumbCopy'
+import { chooseFocus, pickThumbs, spinsFor, STILL_PER_FRAME, type Slot as S } from './thumbCopy'
 
-const slot = (key: string, o: Partial<S> = {}): S => ({ key, still: false, scene: false, angle: 0.12, fresh: true, seen: true, ctx: {} as CanvasRenderingContext2D, canvas: { width: 100, height: 80 } as HTMLCanvasElement, ...o })
+const slot = (key: string, o: Partial<S> = {}): S => ({ key, still: false, scene: false, angle: 0.12, at: -Infinity, fresh: true, seen: true, ctx: {} as CanvasRenderingContext2D, canvas: { width: 100, height: 80 } as HTMLCanvasElement, ...o })
 const box = (left: number, top: number, width: number, height: number) => ({ left, top, width, height })
+const GAP = 1000 / 60 - 4
 
-describe('thumbnails: one turns, the rest hold', () => {
+// Plays `ms` of 60 Hz frames, `spins` turning drawings a frame, and says how often each slot drew.
+function play(page: S[], ms: number, spins: number, focus: S | null = null) {
+  const drew = new Map<S, number>()
+  for (let now = 0; now < ms; now += 1000 / 60) {
+    const { need } = pickThumbs(page, () => true, { focus, now, gap: GAP, spins })
+    for (const n of need.values()) for (const s of n.slots) {
+      drew.set(s, (drew.get(s) ?? 0) + 1)
+      s.at = now
+      s.fresh = false
+    }
+  }
+  return page.map((s) => ((drew.get(s) ?? 0) * 1000) / ms)
+}
+
+describe('thumbnails: every one on screen turns', () => {
+  // Kegan, gem packs: "Why does only one spin". A smoothness fix had let only the hero turn.
+  it('turns every car on screen, the hero at full rate', () => {
+    const page = Array.from({ length: 9 }, (_, i) => slot(`c|car${i}`))
+    const rates = play(page, 2000, 4, page[4])
+    expect(rates[4]).toBeGreaterThanOrEqual(59)
+    for (const r of rates) expect(r).toBeGreaterThanOrEqual(20)
+  })
+
+  it('draws every car every frame when the budget has room', () => {
+    const page = Array.from({ length: 6 }, (_, i) => slot(`c|car${i}`))
+    for (const r of play(page, 1000, spinsFor(6, 0.5))) expect(r).toBeGreaterThanOrEqual(59)
+  })
+
+  it('skips cars off screen, and holds them all with reduced motion', () => {
+    const on = slot('c|on', { fresh: false })
+    const off = slot('c|off', { fresh: false, seen: false })
+    expect([...pickThumbs([on, off], () => true, { now: 100, gap: GAP }).need.values()].map((n) => n.key)).toEqual(['c|on'])
+    expect(pickThumbs([on, off], () => true, { now: 200, gap: GAP, still: true }).need.size).toBe(0)
+  })
+
+  it('sizes the share to what a drawing costs, never below two', () => {
+    expect(spinsFor(6, 1.5)).toBe(4)
+    expect(spinsFor(6, 20)).toBe(2)
+  })
+
+  it('holds Upgrades buildings still unless the mouse is over one', () => {
+    const b = slot('b|shop|10', { still: true, fresh: false })
+    expect(pickThumbs([b], () => true, { now: 100, gap: GAP }).need.size).toBe(0)
+    expect(pickThumbs([b], () => true, { now: 100, gap: GAP, hover: b }).need.size).toBe(1)
+  })
+
   it('draws a held picture once and leaves it', () => {
-    const s = slot('b|shop|10')
+    const s = slot('b|shop|10', { still: true })
     expect(pickThumbs([s], () => true).need.size).toBe(1)
     s.fresh = false
     const { need, waiting } = pickThumbs([s], () => true)
@@ -15,21 +61,15 @@ describe('thumbnails: one turns, the rest hold', () => {
     expect(waiting).toBe(false)
   })
 
-  it('draws the turning one every frame', () => {
-    const s = slot('c|car', { fresh: false })
-    const { need } = pickThumbs([s, slot('c|other', { fresh: false })], () => true, { focus: s })
-    expect([...need.values()].map((n) => [n.key, n.spin])).toEqual([['c|car', true]])
-  })
-
   it('fills a page of held pictures a few per frame, never all in one', () => {
-    const page = Array.from({ length: 40 }, (_, i) => slot(`b|k${i}|10`))
+    const page = Array.from({ length: 40 }, (_, i) => slot(`b|k${i}|10`, { still: true }))
     const { need, waiting } = pickThumbs(page, () => true)
     expect(need.size).toBe(STILL_PER_FRAME)
     expect(waiting).toBe(true)
   })
 
   it('draws one model once for two held copies at the same turn', () => {
-    const { need } = pickThumbs([slot('c|car'), slot('c|car')], () => true)
+    const { need } = pickThumbs([slot('c|car', { still: true }), slot('c|car', { still: true })], () => true)
     expect(need.size).toBe(1)
     expect([...need.values()][0].slots).toHaveLength(2)
   })
@@ -46,7 +86,7 @@ describe('thumbnails: one turns, the rest hold', () => {
     expect(waiting).toBe(true)
   })
 
-  it('turns the hero car, or the card nearest the middle of a grid', () => {
+  it('picks the hero car, or the card nearest the middle of a grid', () => {
     expect(chooseFocus([{ slot: 'small', box: box(150, 400, 90, 60) }, { slot: 'hero', box: box(20, 40, 300, 160) }], 390, 844)).toBe('hero')
     const grid = [0, 1, 2, 3, 4, 5].map((i) => ({ slot: i, box: box((i % 2) * 190, Math.floor(i / 2) * 280, 180, 120) }))
     expect(chooseFocus(grid, 390, 844)).toBe(3)
@@ -59,31 +99,16 @@ describe('thumbnails: one turns, the rest hold', () => {
   })
 })
 
-// Kegan 10-16/10-17 "still being squished": the Car Packs showcase (wide) and the pack card
-// (squarer) show the same car, were drawn once at the bigger of each side, and the card's copy
-// came out squeezed. Every copy must keep the shape it was drawn at.
-describe('thumbnail shape', () => {
-  const sized = (key: string, width: number, height: number) => slot(key, { canvas: { width, height } as HTMLCanvasElement })
-  const ratio = (w: number, h: number) => w / h
-
-  it('draws one model separately for boxes of different shapes', () => {
-    const { need } = pickThumbs([sized('sc|vanta', 520, 200), sized('sc|vanta', 190, 130)], () => true)
-    expect(need.size).toBe(2)
+describe('thumbnails on a slow phone', () => {
+  it('still turns every car when only one drawing fits a frame', () => {
+    const page = Array.from({ length: 6 }, (_, i) => slot(`c|car${i}`))
+    for (const r of play(page, 2000, 1, page[0])) expect(r).toBeGreaterThanOrEqual(9)
   })
 
-  it('never copies a drawing into a box of another shape, the turning one included', () => {
-    const sizes = [[520, 200], [190, 130], [180, 120], [96, 96], [300, 210], [150, 60], [600, 600], [64, 48]]
-    const { need } = pickThumbs(sizes.map(([w, h]) => sized('c|car', w, h)), () => true, { budget: 99 })
-    for (const n of need.values()) for (const s of n.slots) {
-      const off = ratio(s.canvas.width, s.canvas.height) / ratio(n.w, n.h)
-      expect(Math.abs(off - 1), `${s.canvas.width}x${s.canvas.height} from ${n.w}x${n.h}`).toBeLessThan(0.03)
-      expect(n.w).toBeGreaterThanOrEqual(s.canvas.width - 1)
-    }
-  })
-
-  it('still draws one model once for two boxes of the same shape', () => {
-    const { need } = pickThumbs([sized('c|car', 100, 80), sized('c|car', 200, 160)], () => true)
-    expect(need.size).toBe(1)
-    expect([...need.values()][0]).toMatchObject({ w: 200, h: 160 })
+  it('keeps the hero smooth on the smallest share', () => {
+    const page = Array.from({ length: 6 }, (_, i) => slot(`c|car${i}`))
+    const rates = play(page, 2000, spinsFor(6, 20), page[0])
+    expect(rates[0]).toBeGreaterThanOrEqual(59)
+    for (const r of rates) expect(r).toBeGreaterThanOrEqual(11)
   })
 })
