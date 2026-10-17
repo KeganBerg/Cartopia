@@ -6,6 +6,7 @@ import { reducedMotion } from '../game/fx'
 import { CarThumb } from '../scene/BuildingPreview'
 import { Panel } from './Menus'
 import { BankTabs, useBuy } from './Bank'
+import { LuxFx, luxClass, luxLevels } from './Lux'
 import './car-packs.css'
 
 const ZERO = { engine: 0, turbo: 0, tires: 0, weight: 0 }
@@ -102,13 +103,15 @@ function Showcase({ packs, owns, pending, buy }: { packs: BucksPack[]; owns: (p:
   )
 }
 
-function PackCard({ p, i, owned, pending, onBuy }: { p: BucksPack; i: number; owned: boolean; pending: boolean; onBuy: () => void }) {
+function PackCard({ p, i, lux, owned, pending, onBuy }: { p: BucksPack; i: number; lux: number; owned: boolean; pending: boolean; onBuy: () => void }) {
   const car = carDef(p.car!)
   const pi = performance(car, ZERO)
   const shown = useCountUp(pi)
   const tier = tierOf(pi)
+  const n = owned ? 0 : lux
   return (
-    <div className={`pk-card ${tier.toLowerCase()}${p.tag ? ' featured' : ''}${owned ? ' owned' : ''}`} style={vars(car.id, i)}>
+    <div className={`pk-card ${tier.toLowerCase()}${p.tag ? ' featured' : ''}${owned ? ' owned' : ''}${luxClass(n)}`} style={vars(car.id, i)}>
+      <LuxFx n={n} />
       {/* The badges sit in a strip of their own above the car, so the car never runs under them. */}
       <div className="pk-stage">
         <Stage car={car} />
@@ -132,9 +135,12 @@ export function CarPacksPanel() {
   const owns = (p: BucksPack) => cars.some((c) => c.model === p.car)
   const top = CAR_PACKS.filter((p) => p.tier === 'super')
   const street = CAR_PACKS.filter((p) => p.tier !== 'super')
+  // One price ladder over every car pack, so the dearest pack in the whole menu shines most.
+  const levels = luxLevels(CAR_PACKS.map((p) => p.price))
+  const lux = (p: BucksPack) => levels[CAR_PACKS.indexOf(p)]
   const grid = (packs: BucksPack[], cls: string) => (
     <div className={`pk-grid ${cls}`}>
-      {packs.map((p, i) => <PackCard key={p.id} p={p} i={i} owned={owns(p)} pending={pending === p.id} onBuy={() => buy(p)} />)}
+      {packs.map((p, i) => <PackCard key={p.id} p={p} i={i} lux={lux(p)} owned={owns(p)} pending={pending === p.id} onBuy={() => buy(p)} />)}
     </div>
   )
   return (

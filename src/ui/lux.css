@@ -1,0 +1,44 @@
+/* Pack cards get richer with price (src/ui/Lux.tsx): 1 a soft gold glow, 2 a shine sweep,
+   3 a gold comet circling the rim, 4 sparkles and a breathing glow, 5 a holo rim, more
+   sparkles and the biggest glow. Transforms and opacity only, so phones stay smooth. The card
+   itself never moves: a moving card can't be tapped or scrolled to reliably. */
+.lux-fx { position: absolute; inset: 0; z-index: 4; border-radius: inherit; overflow: hidden; pointer-events: none; }
+.lux-shine { position: absolute; inset: 0; background: linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, .5) 50%, transparent 62%); transform: translateX(-130%); animation: luxShine 5.5s ease-in-out 1s infinite; }
+.lux-4 .lux-shine { animation-duration: 4s; }
+.lux-5 .lux-shine { animation-duration: 3s; background: linear-gradient(105deg, transparent 36%, rgba(255, 255, 255, .55) 50%, transparent 64%); }
+@keyframes luxShine { 0% { transform: translateX(-130%); } 35%, 100% { transform: translateX(130%); } }
+
+.lux-ring { position: absolute; inset: 0; border-radius: inherit; padding: 3px; overflow: hidden; -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
+.lux-ring::before { content: ''; position: absolute; left: 50%; top: 50%; width: 300%; aspect-ratio: 1; margin: -150% 0 0 -150%; background: conic-gradient(transparent 0 55%, #ffb300 72%, #fff8e1 80%, #ffb300 88%, transparent 100%); animation: luxSpin 3.2s linear infinite; }
+.lux-4 .lux-ring::before { animation-duration: 2.4s; background: conic-gradient(transparent 0 20%, #ffb300 30%, #fff8e1 36%, #ffb300 42%, transparent 52% 70%, #ffb300 80%, #fff8e1 86%, #ffb300 92%, transparent); }
+.lux-5 .lux-ring { padding: 4px; }
+.lux-5 .lux-ring::before { animation-duration: 2s; background: conic-gradient(#ff4081, #ffd740, #69f0ae, #40c4ff, #e040fb, #ff4081); }
+@keyframes luxSpin { to { transform: rotate(1turn); } }
+
+.lux-spark { position: absolute; width: 16px; height: 16px; margin: -8px 0 0 -8px; background: radial-gradient(circle, #fff 0 25%, #ffe082 45%, #ffb300 70%); clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%); opacity: 0; animation: luxTwinkle 3.2s ease-in-out infinite; }
+.lux-5 .lux-spark { width: 22px; height: 22px; margin: -11px 0 0 -11px; animation-duration: 2.4s; }
+@keyframes luxTwinkle { 0%, 40%, 100% { opacity: 0; transform: scale(0) rotate(0); } 18% { opacity: 1; transform: scale(1) rotate(60deg); } }
+
+/* The glow round the card. Doubled .lux beats each card's own border and featured rules. */
+.lux.lux.lux-1 { box-shadow: 0 0 12px 1px rgba(255, 202, 40, .45); }
+.lux.lux.lux-2 { box-shadow: 0 0 16px 2px rgba(255, 202, 40, .6); border-color: #ffe082; }
+.lux.lux.lux-3 { box-shadow: 0 0 18px 2px rgba(255, 202, 40, .6); border-color: #ffca28; }
+.lux.lux.lux-4 { box-shadow: 0 0 22px 3px rgba(255, 193, 7, .7); border-color: #ffc107; }
+.lux.lux.lux-5 { box-shadow: 0 0 30px 6px rgba(255, 215, 64, .85); border-color: #fff176; z-index: 1; }
+@keyframes luxGlow4 { 50% { box-shadow: 0 0 30px 6px rgba(255, 193, 7, .9); } }
+@keyframes luxGlow5 { 50% { box-shadow: 0 0 44px 12px rgba(255, 215, 64, 1), 0 0 18px 4px rgba(224, 64, 251, .6); } }
+
+/* Car Packs cards keep their pop-in; the glow and float follow it. */
+.pk-card.lux.lux { animation: pkIn .5s cubic-bezier(.2, .9, .3, 1.2) both; animation-delay: calc(var(--pk-i) * 80ms); }
+.pk-card.lux.lux-4 { animation: pkIn .5s cubic-bezier(.2, .9, .3, 1.2) both, luxGlow4 2.2s ease-in-out infinite; animation-delay: calc(var(--pk-i) * 80ms), .6s; }
+.pk-card.lux.lux-5 { animation: pkIn .5s cubic-bezier(.2, .9, .3, 1.2) both, luxGlow5 2.4s ease-in-out infinite; animation-delay: calc(var(--pk-i) * 80ms), .6s; }
+.bank-pack.lux.lux-4 { animation: luxGlow4 2.2s ease-in-out infinite; }
+.bank-pack.lux.lux-5 { animation: luxGlow5 2.4s ease-in-out infinite; }
+
+/* The Bank's ribbon stays on top of the shine. */
+.bank-pack.lux .ribbon { z-index: 5; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lux.lux.lux, .lux-ring::before { animation: none; }
+  .lux-shine, .lux-spark { display: none; }
+}
