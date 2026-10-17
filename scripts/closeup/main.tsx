@@ -37,26 +37,30 @@ type View = { az: number; el: number; d: number; at?: [number, number, number] }
 function Shooter({ root }: { root: React.RefObject<Group | null> }) {
   const { gl, scene, camera } = useThree()
   useEffect(() => {
-    ;(window as unknown as { shoot: (v: View[]) => string[] }).shoot = (views) => {
-      const box = new Box3().setFromObject(root.current!)
+    const box = new Box3()
+    const aim = (v: View) => {
+      box.setFromObject(root.current!)
       const size = box.getSize(new Vector3())
       const r = Math.max(size.x, size.y, size.z) / 2
       const cam = camera as PerspectiveCamera
-      return views.map((v) => {
-        const [fx, fy, fz] = v.at ?? [0.5, 0.4, 0.5]
-        const look = new Vector3(box.min.x + size.x * fx, box.min.y + size.y * fy, box.min.z + size.z * fz)
-        const az = (v.az * Math.PI) / 180
-        const el = (v.el * Math.PI) / 180
-        const dist = r * v.d
-        cam.position.set(look.x + Math.sin(az) * Math.cos(el) * dist, look.y + Math.sin(el) * dist, look.z + Math.cos(az) * Math.cos(el) * dist)
-        cam.near = dist / 50
-        cam.far = dist * 50
-        cam.lookAt(look)
+      const [fx, fy, fz] = v.at ?? [0.5, 0.4, 0.5]
+      const look = new Vector3(box.min.x + size.x * fx, box.min.y + size.y * fy, box.min.z + size.z * fz)
+      const az = (v.az * Math.PI) / 180
+      const el = (v.el * Math.PI) / 180
+      const dist = r * v.d
+      cam.position.set(look.x + Math.sin(az) * Math.cos(el) * dist, look.y + Math.sin(el) * dist, look.z + Math.cos(az) * Math.cos(el) * dist)
+      cam.near = dist / 50
+      cam.far = dist * 50
+      cam.lookAt(look)
         cam.updateProjectionMatrix()
-        gl.render(scene, cam)
-        return gl.domElement.toDataURL('image/png')
-      })
     }
+    ;(window as unknown as { shoot: (v: View[]) => string[] }).shoot = (views) => views.map((v) => {
+      aim(v)
+      gl.render(scene, camera)
+      return gl.domElement.toDataURL('image/png')
+    })
+    // ?live=1 (clips): point the camera once and let the scene run.
+    ;(window as unknown as { aim: (v: View) => void }).aim = aim
     ;(window as unknown as { ready: boolean }).ready = true
   }, [gl, scene, camera, root])
   return null
@@ -102,7 +106,7 @@ function Lot() {
 function App() {
   const root = useRef<Group>(null)
   return (
-    <Canvas shadows frameloop="demand" dpr={1} camera={{ fov: 35, position: [3, 2, 3] }} gl={{ toneMapping: NeutralToneMapping, preserveDrawingBuffer: true }}>
+    <Canvas shadows frameloop={q.get('live') ? 'always' : 'demand'} dpr={1} camera={{ fov: 35, position: [3, 2, 3] }} gl={{ toneMapping: NeutralToneMapping, preserveDrawingBuffer: true }}>
       <SharedShapes />
       <color attach="background" args={[night ? '#1c2533' : '#a9bfcc']} />
       <ambientLight intensity={night ? 0.35 : 0.8} />
