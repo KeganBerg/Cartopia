@@ -65,7 +65,7 @@ export function CrewBattleTile() {
   const share = battleShare(b.us.score, b.them.score)
   return (
     <div className="rm-tile rm-photo cr-battle" style={artStyle('tour', b.venue, true)} role="button" tabIndex={0} onClick={() => openPanel('battle')}>
-      <span className="rm-tag">CREW BATTLE · ⏳ {shortLeft(msToNextWeek(now))}{ready > 0 && ' · 🧰!'}</span>
+      <span className="rm-tag">CREW WAR · ⏳ {shortLeft(msToNextWeek(now))}{ready > 0 && ' · 🧰!'}</span>
       <div className="cr-bscore">
         <Side s={b.us} score={b.us.score} lead={b.us.score >= b.them.score} />
         <span className="cr-vs">VS</span>

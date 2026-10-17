@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useGame } from '../game/store'
 import { supabase } from '../lib/supabase'
-import { battleChests, demoBattle, refreshCrewBattle, useCrewBattle } from '../lib/battles'
+import { battleChests, demoBattle, refreshCrewBattle, useCrewBattle, warPoints } from '../lib/battles'
 import { sfx } from '../lib/sound'
 
 // Keeps the battle fresh while the crew screens are open, and says when a victory chest is waiting.
@@ -28,6 +28,18 @@ export function useCrewBattleWatcher() {
     }, 5000))
     return () => sub.data.subscription.unsubscribe()
   }, [])
+  // Every race counts for the war: say how much, for which crew, as the race ends. The server adds the
+  // points when the town saves, so the board refreshes a little later.
+  useEffect(() => useGame.subscribe((s, p) => {
+    const races = (s.stats.races ?? 0) - (p.stats.races ?? 0)
+    if (races <= 0 || s.visiting) return
+    const b = useCrewBattle.getState().battle
+    const cur = b?.current
+    if (!cur || cur.result) return
+    const pts = warPoints(races, Math.max(0, (s.racesWon ?? 0) - (p.racesWon ?? 0)), b!.rules)
+    useGame.getState().toast(`⚔️ +${pts} war points for ${cur.us.tag}`)
+    if (!demoBattle()) setTimeout(refreshCrewBattle, 15_000)
+  }), [])
   useEffect(() => {
     if (panel !== 'clan' && panel !== 'battle') return
     refreshCrewBattle()
