@@ -981,11 +981,11 @@ function GrandPrix({ onRace }: { onRace: (s: GpSeries, r: Rival, prize: number) 
               {locked ? (
                 level < GP_SERIES[0].unlockLevel || !prev
                   ? <button className="buy small locked-btn" onClick={() => showNeed('level', s.unlockLevel, s.name)}>🔒 Level {s.unlockLevel}</button>
-                  : <button className="buy small locked-btn" title={`Win the ${prev.name} once, or reach level ${s.unlockLevel}`} onClick={() => showNeed('level', s.unlockLevel, s.name)}>🔒 {GP_CUP[si - 1] ?? '🏆'} ×1 · Lv{s.unlockLevel}</button>
+                  : <button className="buy small locked-btn" title={`Win the ${prev.name} once, or reach level ${s.unlockLevel}`} onClick={() => showNeed('level', s.unlockLevel, s.name)}>🔒 Lv {s.unlockLevel}</button>
               ) : need > myBest ? (
                 <button className="buy small locked-btn" onClick={() => openPanel('garage')}>🔒 Final needs PI {need}</button>
               ) : short ? (
-                <button className="buy small alt" onClick={() => openPanel('rescue')}>Need {s.minCars} cars ({carCount})</button>
+                <button className="buy small alt" title={`This cup needs ${s.minCars} cars in your garage`} onClick={() => openPanel('rescue')}>🚗 {carCount}/{s.minCars} cars</button>
               ) : (
                 <button className="buy small" onClick={() => onRace(s, rival, prize)}>🏁 ${prize.toLocaleString()}<small>⛽{RACE_FUEL}</small></button>
               )}

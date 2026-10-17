@@ -65,8 +65,8 @@ export function WorldTour({ onRace }: { onRace: (i: number) => void }) {
               </span>
               {won ? (
                 <button className="buy small alt" disabled={!open} onClick={() => onRace(i)}>↻ ${worldPrize(i, false).toLocaleString()}</button>
-              ) : next ? (
-                <button className="buy small" disabled={!open} onClick={() => onRace(i)}>🏁 ${worldPrize(i, true).toLocaleString()}<small>⛽{RACE_FUEL}</small></button>
+              ) : next && open ? (
+                <button className="buy small" onClick={() => onRace(i)}>🏁 ${worldPrize(i, true).toLocaleString()}<small>⛽{RACE_FUEL}</small></button>
               ) : (
                 <span className="wt-lock" aria-label="Locked">🔒</span>
               )}
