@@ -109,3 +109,16 @@ export function pickThumbs(all: Iterable<Slot>, mounted: (key: string) => boolea
   }
   return { need, waiting }
 }
+
+// New models go into the scene one a frame, on-screen ones first: a menu full of cars not
+// built yet (Car Packs, the Cars page) built them all in one go, one long freeze as it opened.
+export const MOUNTS_PER_FRAME = 1
+// Which models to add to the scene this frame; `inScene` says which are in it already.
+export function nextMounts(all: Iterable<Slot>, has: (key: string) => boolean, inScene: Set<string>, max = MOUNTS_PER_FRAME) {
+  const add: string[] = []
+  for (const seen of [true, false]) for (const s of all) {
+    if (add.length >= max) return add
+    if (s.seen === seen && has(s.key) && !inScene.has(s.key) && !add.includes(s.key)) add.push(s.key)
+  }
+  return add
+}

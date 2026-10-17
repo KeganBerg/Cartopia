@@ -1,6 +1,6 @@
 import { mergeCandidates } from '../game/merge'
 import { CallCardPicker } from './CallCardPicker'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useGame, hasRusty, buildPrice, gateLevel, type OwnedCar, type PlacedBuilding } from '../game/store'
 import { raceCarOf } from '../game/raceCar'
 import { stackCars, stackFace } from '../game/garageStacks'
@@ -191,9 +191,14 @@ function EditBar() {
 let panelsUp = 0
 let panelGoneAt = -Infinity
 
+// Inside a menu that keeps its window while its tabs swap (Social), a tab's own Panel is just
+// its contents: a whole new window for each tab made the sheet and its tab row jump.
+export const InShell = createContext(false)
+
 // onBack: shows a back button before the title (a sub-screen of the panel).
 // head: extra bits in the title bar, before the close button.
 export function Panel({ title, children, wide, onClose, onBack, head, className }: { title: string; children: React.ReactNode; wide?: boolean; onClose?: () => void; onBack?: () => void; head?: React.ReactNode; className?: string }) {
+  const shelled = useContext(InShell)
   const closePanel = useGame((s) => s.closePanel)
   // Slides away before it unmounts; the timer dies with the panel, so a panel
   // swapped in meanwhile is never closed by it.
@@ -218,6 +223,7 @@ export function Panel({ title, children, wide, onClose, onBack, head, className 
     setClosing(true)
     timer.current = window.setTimeout(done, 170)
   }
+  if (shelled) return <>{children}</>
   return (
     <div className={closing ? 'overlay closing' : still ? 'overlay still' : 'overlay'} onClick={() => close(null)}>
       <div ref={box} className={`${wide ? 'panel wide' : 'panel'}${className ? ` ${className}` : ''}`} onClick={(e) => e.stopPropagation()}>

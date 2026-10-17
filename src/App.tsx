@@ -8,6 +8,7 @@ import { Hud } from './ui/Hud'
 import { FlyLayer } from './ui/Fly'
 import { ThumbRenderer } from './scene/BuildingPreview'
 import { Preview, StageCanvas } from './scene/Stage'
+import { WarmPreview } from './scene/WarmPreview'
 import { quietShaders } from './scene/warm'
 import { TapTips } from './ui/TapTip'
 import { BottomBar, ShopPanel, CarsPage, Toasts } from './ui/Menus'
@@ -20,9 +21,8 @@ import { CupPrizePopup, MasteryPrizePopup } from './ui/ClassCups'
 import { joinLobby, useLive } from './lib/live'
 import { chatDemo, startChat } from './lib/chat'
 import { ChatPanel } from './ui/Chat'
-import { FriendsPanel, VisitBanner } from './ui/Friends'
-import { LeadersPanel, ClanPanel } from './ui/Social'
-import { MeetPanel } from './ui/Meet'
+import { VisitBanner } from './ui/Friends'
+import { SocialPanel, isSocialTab } from './ui/SocialPanel'
 import { Tutorial } from './ui/Tutorial'
 import { Tips } from './ui/Tips'
 import { Badges } from './ui/Badges'
@@ -195,6 +195,7 @@ export default function App() {
       <ThumbRenderer />
       <StageCanvas />
       <Preview.StageCanvas />
+      <WarmPreview />
       <Hud />
       <LiveBanner />
       <BottomBar />
@@ -205,10 +206,8 @@ export default function App() {
       {panel === 'race' && !liveRace && <RacePanel />}
       {liveRace && <LiveRaceOverlay />}
       {panel === 'invites' && <InvitesPanel />}
-      {panel === 'friends' && <FriendsPanel />}
-      {panel === 'leaders' && <LeadersPanel />}
-      {panel === 'clan' && <ClanPanel />}
-      {panel === 'meet' && <MeetPanel />}
+      {/* Friends, Crew, Meet and Leaderboards: one window that stays up while its tabs switch. */}
+      {isSocialTab(panel) && <SocialPanel tab={panel} />}
       {panel === 'chat' && <ChatPanel />}
       {panel === 'need' && <NeedPanel />}
       {panel === 'upgrade' && <UpgradePanel />}
