@@ -5,6 +5,7 @@ import type { BufferGeometry } from 'three'
 import { CARS, MODS, isBike, modFits, type Body, type ModSlot } from '../game/data'
 import { Kit, freshGeo, type Part } from './CarModel'
 import { modFrame, modParts } from './CarMods'
+import { MODEL_SHAPE } from './carLooks'
 
 // Every mod sits on every car it fits: each piece is fixed to the car (or to another piece of
 // the same mod), and with a full set on, no two mods run into each other.
@@ -118,8 +119,8 @@ function sunk(a: Piece, b: Piece) {
   return worst
 }
 
-function modPieces(body: Body, id: string, all = [id]) {
-  const own = modParts(modFrame(body, all), id)
+function modPieces(body: Body, model: string, id: string, all = [id]) {
+  const own = modParts(modFrame(body, all, model), id)
   const out: Piece[] = []
   for (const [kind, list] of Object.entries(own)) {
     if (kind === 'flame' || kind === 'glass') continue
@@ -129,8 +130,8 @@ function modPieces(body: Body, id: string, all = [id]) {
 }
 
 // Each mod's pieces that hang in the air: not joined to the car, even through the mod's other pieces.
-function floating(body: Body, id: string, car: Piece[]) {
-  const ps = modPieces(body, id)
+function floating(body: Body, model: string, id: string, car: Piece[]) {
+  const ps = modPieces(body, model, id)
   const held = new Set<number>()
   ps.forEach((p, i) => { if (car.some((c) => touch(p, c))) held.add(i) })
   for (let grew = true; grew;) {
@@ -156,22 +157,24 @@ const SLOTS: ModSlot[] = ['spoiler', 'exhaust', 'kit', 'hood', 'lights']
 const fitting = (body: Body) => MODS.filter((m) => SLOTS.includes(m.slot) && modFits(m, body))
 
 describe('mods sit on every car they fit', () => {
+  // The first car on each body, and every car with its own proportions on its body (carLooks.ts).
   const bodies = [...new Set(CARS.map((c) => c.body))].filter((b) => !isBike(b))
-  for (const body of bodies) {
-    const model = CARS.find((c) => c.body === body)!.id
+  const runs = new Map<string, Body>(bodies.map((b) => [CARS.find((c) => c.body === b)!.id, b]))
+  for (const c of CARS) if (MODEL_SHAPE[c.id]?.body === c.body) runs.set(c.id, c.body)
+  for (const [model, body] of runs) {
     it(`${body} (${model})`, () => {
       const bad: string[] = []
       for (const m of fitting(body)) {
         carPieces = []
         freshGeo(body, { [m.slot]: m.id }, model)
         const car = carPieces
-        for (const f of floating(body, m.id, car)) bad.push(`${m.id}: ${f} floats`)
+        for (const f of floating(body, model, m.id, car)) bad.push(`${m.id}: ${f} floats`)
       }
       // Full sets: every slot's n-th mod together; no two run into each other.
       const ms = fitting(body)
       for (let n = 0; n < 6; n++) {
         const set = SLOTS.map((s) => ms.filter((m) => m.slot === s)).filter((l) => l.length).map((l) => l[n % l.length].id)
-        const ps = set.map((id) => modPieces(body, id, set))
+        const ps = set.map((id) => modPieces(body, model, id, set))
         for (let i = 0; i < ps.length; i++) for (let j = i + 1; j < ps.length; j++) for (const a of ps[i]) for (const b of ps[j]) {
           const d = Math.max(sunk(a, b), sunk(b, a))
           if (d > CLASH) bad.push(`${a.name} runs ${d.toFixed(3)} into ${b.name}`)

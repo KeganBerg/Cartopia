@@ -67,7 +67,7 @@ const TRIMS: Record<string, Feature[]> = {
   charger: ['tailBand', 'hoodPins', 'chromeBelt', 'fuelCap', 'hoodCreases'],
   // No canards: the flares cover the nose's corners where they'd bolt on.
   hellcat: ['hoodVents', 'splitter', 'diffuserFins'],
-  gtr: ['splitter', 'canards', 'fenderVents', 'sunroof', 'quadTails', 'sideSkirts'],
+  gtr: ['splitter', 'canards', 'fenderVents', 'trunkWing', 'quadTails', 'sideSkirts'],
   tomahawk: ['stowage', 'spare', 'beacon'],
   lambo: ['deckLouvers', 'roofScoop', 'splitter', 'popups', 'diffuserFins', 'centerExhaust'],
   hyper: ['sharkFin', 'hoodVents', 'canards', 'splitter', 'diffuserFins', 'sideSkirts'],
@@ -76,14 +76,14 @@ const TRIMS: Record<string, Feature[]> = {
   hauler: ['beacon', 'crates', 'towHitch', 'bullBar', 'tailgateLettering', 'stepBars'],
   cruiser: ['twoTone', 'continental', 'chromeBelt', 'chromeTrimWindow', 'hoodCreases'],
   buggy: ['whip', 'spare', 'bullBar'],
-  bandit: ['hoodChevron', 'ttop', 'louvers', 'meshGrille', 'sideSkirts'],
+  bandit: ['hoodChevron', 'ttop', 'louvers', 'sideSkirts'],
   lemans: ['roundel', 'splitter', 'sharkFin', 'lightPods', 'fuelCap', 'diffuserFins'],
   gullwing: ['eyebrows', 'hoodBulges', 'chromeBelt', 'chromeTrimWindow', 'roofSeams'],
   // Cars from the More cars set.
   camper: ['roofRack', 'surfboard', 'overriders', 'ladder', 'chromeTrimWindow'],
   hotshot: ['hoodVents', 'sideStripe', 'roundel', 'meshGrille', 'towStrap', 'rearWiper'],
   ridgeback: ['roofRack', 'snorkel', 'bullBar', 'towHitch', 'stepBars', 'rearWiper'],
-  kitsune: ['canards', 'fenderVents', 'sideStripe', 'splitter', 'towStrap', 'sideSkirts'],
+  kitsune: ['popups', 'sideStripe', 'towStrap', 'rearWiper', 'lipSpoiler'],
   current: ['panoRoof', 'sideStripe', 'chargePort', 'hoodCreases'],
   salon: ['ornament', 'chromeBelt', 'twoTone', 'chromeTrimWindow', 'hoodCreases'],
   stomper: ['lightBar', 'bullBar', 'snorkel', 'crates', 'stepBars', 'tailgateLettering'],
@@ -96,7 +96,7 @@ const TRIMS: Record<string, Feature[]> = {
   // Gap fillers.
   kreis: ['boxFlares', 'trunkWing', 'splitter', 'sideSkirts', 'roundel'],
   bergmeister: ['deckLouvers', 'sideStripe', 'fuelCap'],
-  rattler: ['hoodVents', 'splitter', 'tripleTails', 'sideStripe', 'fenderVents'],
+  rattler: ['sideExhaust', 'roundel', 'hoodPins', 'quadTails', 'splitter'],
   cottonmouth: ['hoodVents', 'sideExhaust', 'fenderVents', 'splitter', 'canards', 'diffuserFins'],
   ringmeister: ['lipSpoiler', 'sideBlade', 'diffuserFins', 'deckLouvers', 'sideSkirts'],
   raiden: ['sharkFin', 'roofScoop', 'roundel', 'splitter', 'canards', 'diffuserFins'],
@@ -457,6 +457,8 @@ function feature(k: Kit, f: Feature, t: TrimFrame, all: Feature[]) {
       k.add('tail', box(0.004, 0.06, 0.11), [-wid * 0.36, top + 0.56, -front + 0.1 - 0.058])
       return
     case 'sideExhaust':
+      // An exhaust mod takes the place of the stock side pipes.
+      if (t.exhaust) return
       for (const sd of SIDES) {
         k.add('chrome', cyl(0.022, 0.022, wz * 1.2, 10), [sd * (wid / 2 + 0.028), lift + 0.05, 0], [Math.PI / 2, 0, 0])
         k.add('black', box(0.012, 0.03, wz * 0.9), [sd * (wid / 2 + 0.05), lift + 0.05, 0])

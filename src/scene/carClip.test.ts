@@ -113,7 +113,7 @@ function check(model: string, body: Body, fit: Partial<Record<ModSlot, string>>)
   // The greenhouse: the glass shell extruded from the cabin's side profile.
   const shells = list.filter((p) => p.look === 'glass' && p.geo === 'ExtrudeGeometry')
   const ids = modIds(fit)
-  if (ids.length) for (const [kind, geo] of Object.entries(modGeo(body, ids))) if (geo && kind !== 'glass') list.push({ look: `mod ${kind}`, at: `mod ${ids.join('+')}`, geo: '', pos: geo.getAttribute('position').array })
+  if (ids.length) for (const [kind, geo] of Object.entries(modGeo(body, ids, ids, model))) if (geo && kind !== 'glass') list.push({ look: `mod ${kind}`, at: `mod ${ids.join('+')}`, geo: '', pos: geo.getAttribute('position').array })
   const bad: string[] = []
   for (const g of shells) for (const p of list) {
     if (INSIDE.has(p.look) || p.look === 'mod flame') continue

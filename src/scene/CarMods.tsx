@@ -180,7 +180,7 @@ function withRoom(f: Frame, all: string[]): Frame & { room: Room } {
   return { ...g, room: { tips: all.flatMap((id) => TIPS[id]?.(g) ?? []), skirt: Math.max(0, ...all.map((id) => SKIRT[id] ?? 0)), arch, out } }
 }
 // The frame a mod is built on, with room left for the others fitted with it.
-export const modFrame = (body: Body, all: string[]) => withRoom(carFrame(body), all)
+export const modFrame = (body: Body, all: string[], model?: string) => withRoom(carFrame(body, model), all)
 const roomOf = (f: Frame): Room => (f as Frame & { room?: Room }).room ?? { tips: [], skirt: 0, arch: 0, out: 0 }
 // Bodies whose own flares bulge up over the rear wheels like a kit's arches.
 const FLARED: Body[] = ['groupb']
@@ -972,11 +972,12 @@ export function modParts(f: Frame, id: string): Parts {
 
 // all: every mod fitted to the car, when ids is only some of them (parts wearing a mod skin are
 // drawn on their own), so each part still leaves room for the others.
-export function modGeo(body: Body, ids: string[], all: string[] = ids) {
-  const key = `${body}|${ids.join(',')}|${all.join(',')}`
+// model: the car on the body, when it has its own proportions (carLooks.ts).
+export function modGeo(body: Body, ids: string[], all: string[] = ids, model?: string) {
+  const key = `${body}|${model ?? ''}|${ids.join(',')}|${all.join(',')}`
   const hit = cache.get(key)
   if (hit) return hit
-  const f = withRoom(carFrame(body), all)
+  const f = withRoom(carFrame(body, model), all)
   const parts: Parts = { paint: [], carbon: [], chrome: [], glass: [], flame: [], lamp: [], neon: [], ti: [] }
   for (const id of ids) {
     const own = modParts(f, id)
@@ -1015,8 +1016,8 @@ function SkinnedMat({ n, color, metal, rough }: { n: number; color: string; meta
 
 // The parts wearing a mod skin, drawn one part at a time (paint, carbon, chrome and
 // titanium all take the skin; glass, lamps, neon and flames don't).
-function SkinnedPart({ body, id, all, n, tint, metal }: { body: Body; id: string; all: string[]; n: number; tint: string; metal: number }) {
-  const g = modGeo(body, [id], all)
+function SkinnedPart({ body, model, id, all, n, tint, metal }: { body: Body; model?: string; id: string; all: string[]; n: number; tint: string; metal: number }) {
+  const g = modGeo(body, [id], all, model)
   const hex = (m: MeshStandardMaterial) => '#' + m.color.getHexString()
   return (
     <>
@@ -1046,16 +1047,16 @@ export function splitSkinned(ids: string[], skins?: Partial<Record<SkinnedSlot, 
 // skins: a mod skin number per slot. Skinned parts cost a few extra draws here; town
 // cars bake them instead (see LeanCar in CarModel.tsx). skin: the body's own skin, worn by
 // body-colour parts that have no mod skin, so a scoop or flare doesn't show up as bare paint.
-export function CarMods({ body, fit, tint, metal, flames, skins, skin = 0 }: { body: Body; fit: Partial<Record<ModSlot, string>>; tint: string; metal: number; flames?: boolean; skins?: Partial<Record<SkinnedSlot, number>>; skin?: number }) {
+export function CarMods({ body, model, fit, tint, metal, flames, skins, skin = 0 }: { body: Body; model?: string; fit: Partial<Record<ModSlot, string>>; tint: string; metal: number; flames?: boolean; skins?: Partial<Record<SkinnedSlot, number>>; skin?: number }) {
   const all = modIds(fit)
   if (!all.length) return null
   const { skinned, plain: ids } = splitSkinned(all, skins)
-  const g = ids.length ? modGeo(body, ids, all) : {}
+  const g = ids.length ? modGeo(body, ids, all, model) : {}
   // Flames come from the exhaust, skinned or not.
-  const fl = modGeo(body, all).flame
+  const fl = modGeo(body, all, all, model).flame
   return (
     <group>
-      {skinned.map(([id, n]) => <SkinnedPart key={id} body={body} id={id} all={all} n={n} tint={tint} metal={metal} />)}
+      {skinned.map(([id, n]) => <SkinnedPart key={id} body={body} model={model} id={id} all={all} n={n} tint={tint} metal={metal} />)}
       {g.paint && <mesh geometry={g.paint} castShadow>{skin ? <SkinnedMat n={skin} color={tint} metal={metal} rough={0.3} /> : <meshStandardMaterial color={tint} metalness={metal} roughness={0.3} />}</mesh>}
       {g.carbon && <mesh geometry={g.carbon} material={carbon} castShadow />}
       {g.chrome && <mesh geometry={g.chrome} material={chrome} />}
