@@ -14,8 +14,31 @@ import { compact } from './format'
 import { useTipTarget } from './Tips'
 import { useUnlock, freshClass } from '../game/unlocks'
 import { TechnoTag } from './Techno'
+import { useEffect, useRef, useState } from 'react'
+import { onFx } from '../game/fx'
 
 const n = (v: number) => v.toLocaleString()
+
+// Floats every XP gain by the gauge; gains close together add up into one pop.
+function XpPop() {
+  const [pop, setPop] = useState<{ amount: number; key: number } | null>(null)
+  const last = useRef(0)
+  useEffect(() => {
+    let timer = 0
+    const off = onFx((e) => {
+      if (e.kind !== 'xp') return
+      const now = Date.now()
+      const join = now - last.current < 1200
+      last.current = now
+      setPop((p) => ({ amount: (join && p ? p.amount : 0) + e.amount, key: join && p ? p.key : now }))
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => setPop(null), 1800)
+    })
+    return () => { off(); window.clearTimeout(timer) }
+  }, [])
+  if (!pop) return null
+  return <span key={pop.key} className="xp-pop" aria-live="polite">⭐ {n(pop.amount)} XP</span>
+}
 
 // The level gauge doubles as the Menu button.
 function Speedometer({ level, xp, onClick }: { level: number; xp: number; onClick: () => void }) {
@@ -46,6 +69,7 @@ function Speedometer({ level, xp, onClick }: { level: number; xp: number; onClic
       </svg>
       <div className="speedo-level">{level}</div>
       <div className="speedo-xp">{n(xp)} XP</div>
+      <XpPop />
       <span className="speedo-menu" aria-hidden><Icon name="menu" size={14} /></span>
     </button>
   )

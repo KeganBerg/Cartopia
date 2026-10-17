@@ -9,6 +9,8 @@ export type FxEvent =
   | { kind: 'built'; uid: string }
   | { kind: 'upgraded'; uids: string[] }
   | { kind: 'cleared'; uid: string }
+  // XP just gained, after the level boost: the HUD floats it by the speedometer.
+  | { kind: 'xp'; amount: number }
   // You helped a business in a friend's town; `el` is the badge you tapped.
   | { kind: 'helped'; uid: string; coins: number; parts: number; xp: number; el: Element | null }
 

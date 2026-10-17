@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGame, type OwnedCar } from '../game/store'
+import { xpGain } from '../game/data'
 import {
   DASH_TIME, STUNT_JUMPS, WASH_SPOTS, WASH_TIME, targetX,
   dashStars, pitStars, recordStars, starReward, stuntStars, washStars, type StarGameId,
@@ -82,7 +83,7 @@ export function StarGame({ id, car, onExit }: { id: StarGameId; car: OwnedCar; o
           </>}>
           <div className="arc-stars">{[1, 2, 3].map((n) => <span key={n} className={n <= end.stars ? 'on' : ''}>★</span>)}</div>
           <div className="arc-sub">{end.line}</div>
-          {end.stars > 0 && <div className="arc-pay"><span>🪙 +{end.coins}</span><span>⭐ +{end.xp} XP</span></div>}
+          {end.stars > 0 && <div className="arc-pay"><span>🪙 +{end.coins}</span><span>⭐ +{xpGain(level, end.xp)} XP</span></div>}
           {end.place && <WeekPlace place={end.place} />}
         </Result>
       )}

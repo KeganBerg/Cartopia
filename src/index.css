@@ -27,6 +27,9 @@ input { font: inherit; padding: 8px 10px; border-radius: 10px; border: 2px solid
 .speedo-menu { position: absolute; top: -6px; right: -16px; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; line-height: 1; color: #fff; background: linear-gradient(#5c9ded, #1e5fbf); border: 2px solid #fff; box-shadow: 0 2px 0 rgba(0,0,0,.3); }
 .speedo-level { position: absolute; top: 59px; left: 0; width: 88px; text-align: center; font: 20px/1 var(--display); color: #fff; }
 .speedo-xp { position: absolute; top: 84px; left: 4px; width: 80px; text-align: center; font: 12px var(--display); background: #1b1f24; color: #fff; border-radius: 6px; border: 2px solid #cfd8dc; }
+.xp-pop { position: absolute; top: 106px; left: 0; z-index: 3; white-space: nowrap; pointer-events: none; font: 15px/1 var(--display); color: #fff; background: #1b1f24; border: 2px solid #ffd54f; border-radius: 999px; padding: 4px 10px; animation: xp-pop 1.8s ease-out both; }
+@keyframes xp-pop { 0% { transform: scale(.85); } 12% { transform: scale(1.08); } 22% { transform: none; } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .xp-pop { animation: none; } }
 .pills { display: flex; flex-direction: column; gap: 5px; margin-top: 4px; }
 .pill { display: flex; align-items: center; gap: 6px; min-width: 120px; padding: 2px 12px 2px 3px; background: rgba(27,31,36,.85); color: #fff; font: 17px var(--display); border-radius: 20px; border: 2px solid #cfd8dc; }
 .ico { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font: 14px var(--display); color: #fff; flex: none; }
@@ -722,6 +725,7 @@ html.calm *, html.calm *::before, html.calm *::after { animation-duration: .001m
   .hud-strip .speedo svg { width: 50px; height: 50px; }
   .hud-strip .speedo-level { top: 32px; width: 50px; font-size: 13px; line-height: 1; }
   .hud-strip .speedo-xp { display: none; }
+  .hud-strip .xp-pop { top: 54px; font-size: 12px; padding: 3px 8px; }
   /* Menu badge sits in the gap beside the gauge, centred on it, so it never straddles the rim. */
   .hud-strip .speedo-menu { width: 18px; height: 18px; font-size: 10px; top: 16px; right: -20px; border-width: 1.5px; }
   .hud-chips { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; min-width: 0; }

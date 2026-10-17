@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
   PLOT, PLOT_MIN, PLOT_MAX, START_LAND, plotPrice, buildingDef, carDef, xpToNext, baseFuelCap, fuelRegenSeconds,
-  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, jobXp, raceXp, serviceXp, jobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, maxLevel, themable, RESCUE_SPOTS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, refillBucks, LEVEL_GEMS, TOW_FIX_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, activeEvent, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modFits, ownedMods, driverPayout, mergedParts, mergeBonus, mergeGain, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, CREW_CHEST, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower, seasonNumber, seasonOf, SEASON_STARS, skinDef, ownedSkins, seasonSkin, modSkinDef, ownedModSkins, seasonModSkin, SKINNED_SLOTS, type SkinnedSlot, type ModSkins, trackSkinDef, ownedTrackSkins, fittedMods, SEASON_TIERS, STARS_PER_TIER, SEASON_CAR_BUCKS, dealsFor, dealOffer, type DealDef, type DealKind,
+  upgradeCost, MAX_UPGRADE, upgradable, buildingLevel, jobLevel, upgradePartsPayout, jobXp, raceXp, serviceXp, xpGain, chestXp, jobSeconds, upgradeFuelCap, buildingUpgradeCost, buildingUpgradeXp, maxLevel, themable, RESCUE_SPOTS, RESCUE_CAR_CHANCE, STORAGE_MAX, RARITY, restoreCost, rushBucks, refillBucks, LEVEL_GEMS, TOW_FIX_BUCKS, GP_SERIES, GP_ROUNDS, gpReward, CAMPAIGN, campaignRaceId, campaignReward, campaignStars, campaignCleared, campaignPerfect, type Rarity, GOALS, activeEvent, PAINTS, STRIPES, FINISHES, paintJobCost, type Finish, type PaintJob, FLAT_CHANCE, LOW_FUEL_CHANCE, servicePay, gasCanCost, flatFixCost, type UpgradeSlot, type StatKey, modDef, modXp, modFits, ownedMods, driverPayout, mergedParts, mergeBonus, mergeGain, takesDriver, loves, isOpen, type CarDef, CAR_SETS, setComplete, type CounterKey, type GoalDef, COUNTERS, DAILY_TASKS, WEEKLY_TASKS, QUEST_PAY, CREW_CHEST, TASKS_PER_PERIOD, payAt, dayKey, weekKey, drawTasks, garagePower, seasonNumber, seasonOf, SEASON_STARS, skinDef, ownedSkins, seasonSkin, modSkinDef, ownedModSkins, seasonModSkin, SKINNED_SLOTS, type SkinnedSlot, type ModSkins, trackSkinDef, ownedTrackSkins, fittedMods, SEASON_TIERS, STARS_PER_TIER, SEASON_CAR_BUCKS, dealsFor, dealOffer, type DealDef, type DealKind,
 } from './data'
 import { PAINT_COST, hasCustomPaint, isHexColor, PANELS, PATTERNS, STARTER_PAINTS, isBike, panelJobCost, tidyPanels, type Panels, RUSTY_SETS, hotSpot, rarityWeight, truckOf, TRUCK, BAY2_LEVEL } from './data'
 import { STOCK_CARD, callCardDef, ownedCallCards } from './callCards'
@@ -673,6 +673,7 @@ export function readyRewards(s: Pick<SaveState, 'buildings' | 'cars' | 'level'>,
     r.xp += r.filled * serviceXp('gas', s.level)
   }
   r.jobs = [...byDef.values()].sort((a, b) => b.coins - a.coins)
+  r.xp = xpGain(s.level, r.xp)
   return r
 }
 
@@ -825,8 +826,8 @@ function tapMerged(s: GameState, set: (p: Partial<GameState>) => void, uids: str
     }
     const done = new Set(ready.map((o) => o.uid))
     sfx.coin()
-    fx({ kind: 'collect', uids: [members[0].uid, ...uids], coins: pay, parts, xp })
-    s.toast(`+${pay.toLocaleString()} coins${parts ? `, +${parts} parts` : ''}, +${xp} XP`)
+    fx({ kind: 'collect', uids: [members[0].uid, ...uids], coins: pay, parts, xp: xpGain(s.level, xp) })
+    s.toast(`+${pay.toLocaleString()} coins${parts ? `, +${parts} parts` : ''}, +${xpGain(s.level, xp)} XP`)
     return set(withXp(s, xp, {
       coins: s.coins + pay,
       parts: s.parts + parts,
@@ -872,12 +873,16 @@ function clearObstacle(s: GameState, set: (p: Partial<GameState>) => void, b: Pl
   if (s.coins < cost) return s.showNeed('coins', cost - s.coins, `bulldozing the ${d.name.toLowerCase()}`)
   sfx.bulldoze(b.def.endsWith('rock'))
   fx({ kind: 'cleared', uid: b.uid })
-  fx({ kind: 'collect', uids: [b.uid], coins: 0, parts: 0, xp: d.xp ?? 0 })
+  fx({ kind: 'collect', uids: [b.uid], coins: 0, parts: 0, xp: xpGain(s.level, d.xp ?? 0) })
   set(withXp(s, d.xp ?? 0, { coins: s.coins - cost, buildings: s.buildings.filter((o) => o.uid !== b.uid), updatedAt: Date.now() }))
 }
 
-function withXp(s: GameState, amount: number, patch: Partial<GameState>): Partial<GameState> {
-  return { ...patch, ...addXp({ ...s, ...patch }, amount) }
+// `amount` is the base XP; the level boost (levelXpBoost) is added here, so every source gets it.
+// `exact` skips the boost for XP already sized to the level (mastery).
+function withXp(s: GameState, amount: number, patch: Partial<GameState>, exact = false): Partial<GameState> {
+  const gain = exact ? Math.round(amount) : xpGain(s.level, amount)
+  if (gain > 0) fx({ kind: 'xp', amount: gain })
+  return { ...patch, ...addXp({ ...s, ...patch }, gain) }
 }
 
 export const cleanPlate = (p: string) => p.toUpperCase().replace(/[^A-Z0-9 ]/g, '').trim().slice(0, 7)
@@ -1242,8 +1247,8 @@ export const useGame = create<GameState>()(
           const parts = upgradePartsPayout(d, jobLvl)
           const xp = jobXp(d, jobLvl, s.level)
           sfx.coin()
-          fx({ kind: 'collect', uids: [buid], coins: pay, parts, xp })
-          s.toast(`+${pay} coins${parts ? `, +${parts} parts` : ''}, +${xp} XP`)
+          fx({ kind: 'collect', uids: [buid], coins: pay, parts, xp: xpGain(s.level, xp) })
+          s.toast(`+${pay} coins${parts ? `, +${parts} parts` : ''}, +${xpGain(s.level, xp)} XP`)
           // Sometimes a car out on the job comes back with a flat (never during the tutorial).
           let cars = s.cars
           const rolling = cars.filter((c) => !c.flat && !c.lowFuel)
@@ -1452,7 +1457,7 @@ export const useGame = create<GameState>()(
         setLastCollectAll(now, { fuel: noFuel, coins: noCoins })
         sfx.sweep(collected + cleared, started, fixed + filled)
         for (const u of removed) fx({ kind: 'cleared', uid: u })
-        if (paid.length || earned) fx({ kind: 'collect', uids: paid, coins: earned, parts: parts - s.parts, xp })
+        if (paid.length || earned) fx({ kind: 'collect', uids: paid, coins: earned, parts: parts - s.parts, xp: xpGain(s.level, xp) })
         const bits = [
           collected && `${collected} collected`,
           started && `${started} started`,
@@ -1562,8 +1567,8 @@ export const useGame = create<GameState>()(
         const coins = Math.round(base * b.mult)
         // Boosts (first win of the day, welcome back, weekend, streaks) multiply the XP too.
         const xp = Math.round(raceXp(won, s.level) * b.mult)
-        lastRaceXp = xp
-        if (b.mult > 1) s.toast(`${boostLabel(b)}: +${coins} coins, +${xp} XP`)
+        lastRaceXp = xpGain(s.level, xp)
+        if (b.mult > 1) s.toast(`${boostLabel(b)}: +${coins} coins, +${xpGain(s.level, xp)} XP`)
         set(withXp(s, xp, {
           ...(won ? { hatQuest: hatRaceWin(s) } : {}),
           coins: s.coins + coins,
@@ -1597,7 +1602,7 @@ export const useGame = create<GameState>()(
           ...(reached.length ? { bucks: s.bucks + bucks, trophies: s.trophies + trophies } : {}),
           ...(news ? { masteryPrize: { model, tier: reached.length ? next.tier : 0, classes, galaxy: sky, first, xp } } : {}),
           updatedAt: Date.now(),
-        }))
+        }, true))
       },
 
       closeMasteryPrize: () => set({ masteryPrize: null }),
@@ -1667,7 +1672,7 @@ export const useGame = create<GameState>()(
         const b = boostFor(s.boosts, 'arcade', pay > 0, Date.now(), pay > 0)
         const coins = Math.round(pay * b.mult)
         const gain = Math.round(xp * b.mult)
-        if (b.mult > 1) s.toast(`${boostLabel(b)}: +${coins} coins, +${gain} XP`)
+        if (b.mult > 1) s.toast(`${boostLabel(b)}: +${coins} coins, +${xpGain(s.level, gain)} XP`)
         const q = hatQuestOf(s)
         set(withXp(s, gain, {
           hatQuest: { ...q, arcade: q.arcade + 1 },
@@ -1694,7 +1699,7 @@ export const useGame = create<GameState>()(
         const g = GOALS.find((o) => o.id === id)
         if (!g || !goalOpen(s, g) || !goalDone(s, g)) return
         sfx.coin()
-        s.toast(`Goal complete! +${g.coins} coins${g.bucks ? `, +${g.bucks} gems` : ''}, +${g.xp} XP`)
+        s.toast(`Goal complete! +${g.coins} coins${g.bucks ? `, +${g.bucks} gems` : ''}, +${xpGain(s.level, g.xp)} XP`)
         set(withXp(s, g.xp, {
           coins: s.coins + g.coins,
           bucks: s.bucks + (g.bucks ?? 0),
@@ -1713,7 +1718,7 @@ export const useGame = create<GameState>()(
         const pay = endlessPay(num, s.level)
         sfx.coin()
         if (pay.parts) setTimeout(sfx.levelUp, 150)
-        s.toast(`Goal complete! +${pay.coins.toLocaleString()} coins${pay.parts ? `, +${pay.parts} parts` : ''}${pay.bucks ? `, +${pay.bucks} gems` : ''}, +${pay.xp} XP`)
+        s.toast(`Goal complete! +${pay.coins.toLocaleString()} coins${pay.parts ? `, +${pay.parts} parts` : ''}${pay.bucks ? `, +${pay.bucks} gems` : ''}, +${xpGain(s.level, pay.xp)} XP`)
         set(withXp(s, pay.xp, {
           coins: s.coins + pay.coins, parts: s.parts + pay.parts, bucks: s.bucks + pay.bucks,
           endless: { ...e, n: num, day: dayKey(now), today: endlessToday(e, now) + 1, goals: e.goals.filter((o) => o.k !== k), last: g.kind },
@@ -1733,7 +1738,7 @@ export const useGame = create<GameState>()(
         const pay = payAt(QUEST_PAY[period].task, s.level)
         sfx.coin()
         const stars = period === 'daily' ? SEASON_STARS.dailyTask : SEASON_STARS.weeklyTask
-        s.toast(`Task done! +${pay.coins.toLocaleString()} coins, +${pay.xp} XP, +${stars} ⭐`)
+        s.toast(`Task done! +${pay.coins.toLocaleString()} coins, +${xpGain(s.level, pay.xp)} XP, +${stars} ⭐`)
         const quests = period === 'daily' ? { ...q, dayDone: [...done, id] } : { ...q, weekDone: [...done, id] }
         set(withXp(s, pay.xp, { coins: s.coins + pay.coins, quests, season: addStars(s, stars), updatedAt: Date.now() }))
       },
@@ -1746,12 +1751,13 @@ export const useGame = create<GameState>()(
         const pay = payAt(c, s.level)
         setTimeout(sfx.levelUp, 150)
         const stars = period === 'daily' ? SEASON_STARS.dailyChest : SEASON_STARS.weeklyChest
-        s.toast(`Chest opened! +${pay.coins.toLocaleString()} coins, +${c.parts} parts${c.bucks ? `, +${c.bucks} gems` : ''}${c.fuel ? `, +${c.fuel} fuel` : ''}, +${stars} ⭐`)
+        const xp = chestXp(period, s.level)
+        s.toast(`Chest opened! +${pay.coins.toLocaleString()} coins, +${c.parts} parts${c.bucks ? `, +${c.bucks} gems` : ''}${c.fuel ? `, +${c.fuel} fuel` : ''}, +${xp.toLocaleString()} XP, +${stars} ⭐`)
         const quests = period === 'daily' ? { ...q, dayChest: true } : { ...q, weekChest: true }
-        set(withXp(s, pay.xp, {
+        set(withXp(s, xp, {
           coins: s.coins + pay.coins, parts: s.parts + c.parts, bucks: s.bucks + c.bucks, fuel: s.fuel + c.fuel,
           quests, season: addStars(s, stars), updatedAt: Date.now(),
-        }))
+        }, true))
       },
 
       claimTier: (tier) => {
@@ -1909,7 +1915,7 @@ export const useGame = create<GameState>()(
         }))
         if (tow) requestTrip(cuid, 'tow')
         else sfx.buy()
-        s.toast(tow ? `Rusty towed it in and patched it up. +${xp} XP` : `Tire fixed for $${cost}`)
+        s.toast(tow ? `Rusty towed it in and patched it up. +${xpGain(s.level, xp)} XP` : `Tire fixed for $${cost}`)
       },
 
       serviceCar: (cuid, how) => {
@@ -1923,7 +1929,7 @@ export const useGame = create<GameState>()(
           const pay = servicePay(s.level, 'tires')
           sfx.coin()
           const xp = serviceXp('tires', s.level)
-          s.toast(`Your Tire Shop fixed it! +${pay} coins, +${xp} XP`)
+          s.toast(`Your Tire Shop fixed it! +${pay} coins, +${xpGain(s.level, xp)} XP`)
           requestTrip(cuid, 'tires')
           return set(withXp(s, xp, {
             coins: s.coins + pay,
@@ -1939,7 +1945,7 @@ export const useGame = create<GameState>()(
           const pay = servicePay(s.level, 'gas')
           sfx.coin()
           const xp = serviceXp('gas', s.level)
-          s.toast(`Filled up at your Gas Station! +${pay} coins, +${xp} XP`)
+          s.toast(`Filled up at your Gas Station! +${pay} coins, +${xpGain(s.level, xp)} XP`)
           requestTrip(cuid, 'gas')
           return set(withXp(s, xp, {
             coins: s.coins + pay,

@@ -834,6 +834,13 @@ export const xpToNext = (level: number) => Math.round(100 * Math.pow(Math.min(le
 // every 20 minutes, up to 3 banked) sits far above any of this, so it needs no SQL.
 export const playXpMult = (level: number) => Math.max(1, (12 * level - 20) / 30)
 export const playXp = (base: number, level: number) => Math.round(base * playXpMult(level))
+// Every XP gain is multiplied by this, so levels past the first few stop feeling like a grind:
+// x1 up to level 3 (the first ten minutes unlock one feature at a time on them), then x1.5, x2,
+// x2.5 and x3 from level 7. A typical hour of play now covers a level at 10 in about 1.2 hours
+// and a level at 40 in about 3 (scripts/xpAudit.ts). Client-only: the server guard banks a level
+// every 20 minutes, up to 3, far above this.
+export const levelXpBoost = (level: number) => (level <= 3 ? 1 : Math.min(3, 1 + 0.5 * (level - 3)))
+export const xpGain = (level: number, base: number) => Math.round(base * levelXpBoost(level))
 export const RACE_WIN_XP = 30
 export const RACE_LOSS_XP = 8
 export const raceXp = (won: boolean, level: number) => playXp(won ? RACE_WIN_XP : RACE_LOSS_XP, level)
@@ -1143,6 +1150,10 @@ export const QUEST_PAY: Record<'daily' | 'weekly', { task: TaskPay; chest: Chest
     chest: { coins: 1000, coinsPerLevel: 250, xp: 0, xpPerLevel: 0, parts: 20, bucks: 45, fuel: 0 },
   },
 }
+// Chests now pay XP too: a share of the level you're on (on top of any listed XP, boosted).
+export const CHEST_XP_SHARE = { daily: 0.1, weekly: 0.3 } as const
+export const chestXp = (period: 'daily' | 'weekly', level: number) =>
+  xpGain(level, QUEST_PAY[period].chest.xp + QUEST_PAY[period].chest.xpPerLevel * level) + Math.round(CHEST_XP_SHARE[period] * xpToNext(level))
 export const payAt = (p: TaskPay, level: number) => ({ coins: p.coins + p.coinsPerLevel * level, xp: p.xp + p.xpPerLevel * level })
 
 // UTC calendar keys: the day like 2026-10-11 and the ISO week like 2026-W41.

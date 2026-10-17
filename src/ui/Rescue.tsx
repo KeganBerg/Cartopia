@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { StageSlot, useStageReady } from '../scene/Stage'
 import { useGame, gateLevel, hasRusty, type Loot } from '../game/store'
-import { RESCUE_SPOTS, RARITY, STORAGE_MAX, carDef, performance, restoreCost, rushBucks, TOW_FIX_BUCKS, type Rarity, RUSTY_SETS, rustySetId, hotSpot, HOT_RARE, TRUCK, truckOf, BAY2_LEVEL } from '../game/data'
+import { RESCUE_SPOTS, RARITY, STORAGE_MAX, carDef, performance, restoreCost, rushBucks, TOW_FIX_BUCKS, type Rarity, RUSTY_SETS, rustySetId, hotSpot, HOT_RARE, TRUCK, truckOf, BAY2_LEVEL, xpGain } from '../game/data'
 import { flushSave } from '../lib/cloud'
 import { useNow } from '../scene/useNow'
 import { dayPhase, nightAmount } from '../game/clock'
@@ -528,7 +528,8 @@ function HaulCard({ items, piece, onDone }: Recap & { onDone: (next: 'find' | 's
     sum.fuel > 0 && { k: 'fuel', icon: <span>⛽</span>, n: sum.fuel },
     sum.trophy > 0 && { k: 'trophy', icon: <span>🏆</span>, n: sum.trophy },
   ].filter((x): x is { k: string; icon: React.ReactElement; n: number } => !!x)
-  const xp = 10 + cars.length * 10
+  const level = useGame((s) => s.level)
+  const xp = xpGain(level, 10 + cars.length * 10)
   const total = cars.length + smalls.length
   // Each find lands on a beat; the counts roll up as their chip appears.
   const [shown, setShown] = useState(0)
