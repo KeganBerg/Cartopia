@@ -27,7 +27,7 @@ export const GROWTH: Record<string, [string, string]> = {
   offices: ['Office Block', 'Business Tower'],
   hospital: ['Medical Center', 'Medical Tower'],
   hq: ['HQ Campus', 'Skybridge Towers'],
-  glasstower: ['Sky Garden Tower', 'Twisting Supertall'],
+  glasstower: ['Sky Garden Tower', 'Horizon Supertall'],
   // Homes grow in their own style (the plain House and Trailer keep theirs in data.ts).
   cottage: ['Garden Cottage', 'Cottage Lane'],
   bungalow: ['Craftsman Bungalow', 'Bungalow Court'],
