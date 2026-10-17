@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Vector3, type Group, type Mesh, type PerspectiveCamera } from 'three'
 import { useGame } from '../game/store'
@@ -8,7 +8,7 @@ import {
 } from '../game/data'
 import { workingDriver, type PlacedBuilding } from '../game/store'
 import { groupOf, isLandmark, landmarkName, GLOBE_NAME, mergeGroups } from '../game/merge'
-import { BuildingThumb, CarThumb } from '../scene/BuildingPreview'
+import { BuildingThumb, CarThumb, spinThumb } from '../scene/BuildingPreview'
 import { BuildingModel } from '../scene/BuildingModel'
 import { VanguardTower } from '../scene/Landmark'
 import { GlobeTower } from '../scene/GlobeTower'
@@ -331,6 +331,11 @@ export function ShopUpgrades({ find = '' }: { find?: string }) {
       stacks.push(st)
     }
   }
+  // A late-game town fills this page with detailed buildings, so they're still pictures;
+  // the one under the mouse turns.
+  const hover = (on: boolean) => (e: PointerEvent<HTMLElement>) => {
+    if (e.pointerType === 'mouse') spinThumb(e.currentTarget.querySelector('canvas'), on)
+  }
   const open = stacks.filter((t) => costOf(t.b) < Infinity)
   const maxed = stacks.filter((t) => costOf(t.b) === Infinity)
   const card = ({ b, n: count }: { b: (typeof buildings)[number]; n: number }) => {
@@ -342,8 +347,8 @@ export function ShopUpgrades({ find = '' }: { find?: string }) {
     const cost = { coins: one.coins * k, parts: one.parts * k }
     const afford = coins >= cost.coins && parts >= cost.parts
     return (
-      <button key={b.uid} className={`ug-card${max ? ' max' : afford ? ' ready' : ''}${count > 1 ? ' stack' : ''}`} onClick={() => openUpgrade(b.uid)}>
-        <BuildingThumb def={d} level={lvl} theme={themeFor(b.tint, city, d.kind === 'decor')} />
+      <button key={b.uid} className={`ug-card${max ? ' max' : afford ? ' ready' : ''}${count > 1 ? ' stack' : ''}`} onClick={() => openUpgrade(b.uid)} onPointerEnter={hover(true)} onPointerLeave={hover(false)}>
+        <BuildingThumb def={d} level={lvl} theme={themeFor(b.tint, city, d.kind === 'decor')} still />
         {k > 1 && <span className="ug-k" title="Merged block">🧩×{k}</span>}
         {count > 1 && <span className="ug-n" title={`${count} the same`}>×{count}</span>}
         <span className="ug-lv">{max ? '⭐' : lvl}</span>

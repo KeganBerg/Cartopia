@@ -27,6 +27,26 @@ export function pauseTownDraw(): () => void {
   }
 }
 
+// Draws the town at half rate: a menu covers most of it (a desktop Shop), but its edges still show.
+let slowHolds = 0
+export function slowTownDraw(): () => void {
+  slowHolds++
+  emit()
+  return () => {
+    slowHolds--
+    emit()
+  }
+}
+export function useTownSlowed(): boolean {
+  return useSyncExternalStore(
+    (l) => {
+      listeners.add(l)
+      return () => listeners.delete(l)
+    },
+    () => slowHolds > 0,
+  )
+}
+
 // For non-React listeners (the town's ambient sounds go quiet during a race).
 export const townHeld = () => holds > 0
 export function onTownHold(l: () => void) {
@@ -47,21 +67,34 @@ export function useTownPaused(): boolean {
 // A menu that covers most of the screen (most panels on a phone) pauses the town's drawing
 // behind it: the town's last frame stays under the menu, and the phone's GPU goes to the menu's
 // own 3D views and scrolling. Layout size, not the on-screen box, so the slide-in doesn't count.
+// One covering over half the screen (most panels on a desktop) slows it to half rate instead.
 export const COVERS = 0.85
+export const HALF = 0.5
 export function coversScreen(w: number, h: number, vw: number, vh: number): boolean {
   return vw > 0 && vh > 0 && (w * h) / (vw * vh) >= COVERS
+}
+export function coversHalf(w: number, h: number, vw: number, vh: number): boolean {
+  return vw > 0 && vh > 0 && (w * h) / (vw * vh) >= HALF
 }
 export function usePauseTownUnder(ref: RefObject<HTMLElement | null>) {
   useEffect(() => {
     const el = ref.current
     if (!el) return
     let release: (() => void) | undefined
+    let unslow: (() => void) | undefined
     const sync = () => {
-      const on = coversScreen(el.offsetWidth, el.offsetHeight, window.innerWidth, window.innerHeight)
+      const size = [el.offsetWidth, el.offsetHeight, window.innerWidth, window.innerHeight] as const
+      const on = coversScreen(...size)
       if (on && !release) release = pauseTownDraw()
       else if (!on && release) {
         release()
         release = undefined
+      }
+      const slow = !on && coversHalf(...size)
+      if (slow && !unslow) unslow = slowTownDraw()
+      else if (!slow && unslow) {
+        unslow()
+        unslow = undefined
       }
     }
     sync()
@@ -72,6 +105,7 @@ export function usePauseTownUnder(ref: RefObject<HTMLElement | null>) {
       ro?.disconnect()
       window.removeEventListener('resize', sync)
       release?.()
+      unslow?.()
     }
   }, [ref])
 }

@@ -2,7 +2,7 @@ import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { CylinderGeometry, PlaneGeometry, type Group } from 'three'
 import { Batch } from '../Batch'
-import { EDGE, Horizon, Many, PropMesh, Scatter, Water, archTop, frustum, prop, rand, useProp, type Look, type PropKit, type Spot, type V3 } from './kit'
+import { EDGE, Horizon, Many, PropMesh, Scatter, Water, archTop, frustum, person, prop, rand, useProp, type Dress, type Look, type PropKit, type Spot, type V3 } from './kit'
 import type { WorldProps } from './WorldVenue'
 
 // Egypt, Pyramid Road: the strip runs out of an old mud-brick quarter towards the pyramids.
@@ -639,6 +639,209 @@ const BACK = [1, 3, 4]
 // Where the donkey carts stand, as fractions of the race.
 const CARTS = [0.22, 0.37, 0.66, 0.84]
 
+
+// The ruins side of the road (right, +x), so it is never an empty plain: an avenue of
+// ram-headed sphinxes along the kerb, a broken temple enclosure wall behind them, then temple
+// colonnades, seated colossi and Bedouin camps among the palms, with dunes closing the view.
+
+// A ram-headed sphinx crouching on its plinth, facing +z (turned to face the road).
+function ramSphinx(k: PropKit) {
+  const body: Look = { c: '#cfa872', r: 1 }
+  const worn: Look = { c: '#b88f5c', r: 1 }
+  k.box(STONE_D, [0.72, 0.34, 1.75], [0, 0.17, 0])
+  k.box(STONE_L, [0.76, 0.05, 1.79], [0, 0.36, 0])
+  for (let i = 0; i < 3; i++) k.box(GLYPH, [0.16, 0.14, 0.006], [-0.22 + i * 0.22, 0.18, 0.878])
+  // Lion body lying along the plinth, haunches at the back, paws stretched forward.
+  k.sphere(body, 1, [0, 0.62, -0.25], [0.27, 0.25, 0.62], 8, 5)
+  k.sphere(worn, 1, [0, 0.58, -0.6], [0.29, 0.22, 0.3], 7, 4)
+  for (const f of [-1, 1]) {
+    k.box(body, [0.13, 0.14, 0.62], [f * 0.16, 0.45, 0.5])
+    k.box(worn, [0.14, 0.12, 0.42], [f * 0.24, 0.45, -0.55])
+  }
+  // Chest, then the ram's head: long muzzle and the horns curling round its ears.
+  k.box(body, [0.3, 0.36, 0.3], [0, 0.72, 0.25])
+  k.sphere(body, 0.15, [0, 0.95, 0.36], [1, 1, 1.15], 7, 5)
+  k.box(body, [0.14, 0.15, 0.26], [0, 0.9, 0.52], [0.2, 0, 0])
+  k.box(DARK, [0.1, 0.02, 0.02], [0, 0.86, 0.645])
+  for (const f of [-1, 1]) {
+    k.torus(worn, 0.08, 0.03, [f * 0.15, 0.95, 0.34], [0, Math.PI / 2, 0], Math.PI * 1.6, 7, 3)
+    k.box(DARK, [0.02, 0.025, 0.02], [f * 0.07, 0.98, 0.5])
+    // Headcloth flaps down to the chest.
+    k.box(STONE_L, [0.06, 0.26, 0.16], [f * 0.13, 0.8, 0.3])
+  }
+  k.box(worn, [0.1, 0.36, 0.06], [0, 0.42, -0.86], [-0.3, 0, 0])
+}
+
+// A ruined temple colonnade along the road (long side on z): two rows of fat papyrus columns
+// with carved bands and bud capitals, lintels still bridging some, one column fallen.
+function colonnade(k: PropKit) {
+  const paint: Look = { c: '#3f6f8f', r: 0.95 }
+  const ochre: Look = { c: '#b5532f', r: 0.95 }
+  k.box(STONE_D, [3.6, 0.22, 8.4], [0, 0.11, 0])
+  k.box(STONE_L, [3.7, 0.04, 8.5], [0, 0.23, 0])
+  const H = 3.1
+  const at: [number, number, number][] = []
+  for (const x of [-0.95, 0.95]) for (const z of [-3.15, -1.05, 1.05, 3.15]) at.push([x, z, x > 0 && z > 3 ? 1.3 : H])
+  for (const [x, z, h] of at) {
+    k.cyl(STONE_D, 0.46, 0.5, 0.18, [x, 0.33, z], undefined, 10)
+    k.cyl(STONE, 0.36, 0.42, h, [x, 0.42 + h / 2, z], undefined, 10)
+    // Carved bands round the shaft, and painted rings near the top.
+    for (const y of [0.9, 1.5, 2.1]) if (y < h) k.cyl(GLYPH, 0.4 - y * 0.012, 0.405 - y * 0.012, 0.22, [x, 0.42 + y, z], undefined, 10)
+    if (h < H) {
+      // The broken stump: a jagged top.
+      k.cyl(STONE_L, 0.3, 0.38, 0.14, [x, 0.42 + h + 0.07, z], [0.2, 0, 0.15], 7)
+      continue
+    }
+    k.cyl(paint, 0.372, 0.375, 0.07, [x, 0.42 + H - 0.25, z], undefined, 10)
+    k.cyl(ochre, 0.372, 0.375, 0.06, [x, 0.42 + H - 0.15, z], undefined, 10)
+    // The closed papyrus bud capital and its square abacus.
+    k.cyl(STONE_L, 0.28, 0.4, 0.42, [x, 0.42 + H + 0.21, z], undefined, 10)
+    k.cyl(STONE_L, 0.2, 0.28, 0.16, [x, 0.42 + H + 0.5, z], undefined, 10)
+    k.box(STONE, [0.62, 0.16, 0.62], [x, 0.42 + H + 0.66, z])
+  }
+  // Lintels: across the rows at three bays, and two along the left row.
+  const top = 0.42 + H + 0.74 + 0.22
+  for (const z of [-3.15, -1.05, 1.05]) {
+    k.box(STONE, [2.5, 0.44, 0.62], [0, top, z])
+    k.box(paint, [2.3, 0.06, 0.006], [0, top + 0.05, z + 0.313])
+    k.box(ochre, [2.3, 0.05, 0.006], [0, top - 0.1, z + 0.313])
+  }
+  for (const z of [-2.1, 0]) k.box(STONE, [0.6, 0.44, 2.7], [-0.95, top + 0.44, z])
+  // The fallen column: drums lying in a row in the sand, a capital tipped beside them.
+  for (let i = 0; i < 3; i++) k.cyl(STONE, 0.36, 0.38, 0.62, [1.95 + i * 0.05, 0.37, 2.4 - i * 0.66], [Math.PI / 2, 0.15, 0], 10)
+  k.cyl(STONE_L, 0.28, 0.4, 0.42, [2.25, 0.38, 0.3], [Math.PI / 2, 0.9, 0], 10)
+  k.box(STONE_D, [0.7, 0.32, 0.5], [-2.1, 0.16, -2.6], [0, 0.4, 0])
+}
+
+// A seated king in stone on his throne, hands on his knees, facing +z.
+function colossus(k: PropKit) {
+  const body: Look = { c: '#c9a06c', r: 1 }
+  const worn: Look = { c: '#b28a58', r: 1 }
+  k.box(STONE_D, [1.5, 0.4, 2.1], [0, 0.2, 0])
+  for (let i = 0; i < 4; i++) k.box(GLYPH, [0.18, 0.2, 0.006], [-0.5 + i * 0.33, 0.2, 1.053])
+  // The throne: a block with carved sides.
+  k.box(STONE, [1.3, 1.3, 1.3], [0, 1.05, -0.25])
+  for (const f of [-1, 1]) {
+    k.box(GLYPH, [0.006, 0.8, 0.9], [f * 0.653, 1.05, -0.25])
+    k.box(STONE_L, [0.007, 0.6, 0.12], [f * 0.654, 1.05, -0.25])
+  }
+  k.box(STONE, [1.3, 1.4, 0.3], [0, 1.6, -0.75])
+  // Legs: thighs on the seat, shins straight down, big feet side by side.
+  for (const f of [-1, 1]) {
+    k.box(body, [0.36, 0.34, 1.0], [f * 0.22, 1.85, 0.15])
+    k.box(body, [0.32, 1.25, 0.36], [f * 0.22, 1.02, 0.5])
+    k.box(worn, [0.34, 0.12, 0.5], [f * 0.22, 0.46, 0.6])
+    // Forearms resting along the thighs, hands flat on the knees.
+    k.box(body, [0.2, 0.18, 0.8], [f * 0.42, 2.1, 0.2])
+    k.box(worn, [0.22, 0.12, 0.26], [f * 0.42, 2.06, 0.6])
+    k.box(body, [0.18, 0.62, 0.2], [f * 0.5, 2.38, -0.2])
+  }
+  // Kilt, torso, broad collar, then the headcloth and the false beard.
+  k.box(STONE_L, [0.8, 0.32, 0.9], [0, 1.95, 0.05])
+  k.box(body, [0.78, 0.95, 0.5], [0, 2.55, -0.25])
+  k.box({ c: '#4f7f9a', r: 0.95 }, [0.72, 0.16, 0.06], [0, 2.88, 0.01])
+  k.box(body, [0.3, 0.22, 0.3], [0, 3.1, -0.25])
+  k.box(body, [0.46, 0.55, 0.48], [0, 3.42, -0.22])
+  frustum(k, STONE_L, 0.62, 0.58, 0.3, 0.75, [0, 3.62, -0.26])
+  for (const f of [-1, 1]) {
+    k.box(STONE_L, [0.16, 0.6, 0.18], [f * 0.29, 3.2, -0.14], [0, 0, f * 0.12])
+    for (let i = 0; i < 3; i++) k.box(GLYPH, [0.17, 0.04, 0.19], [f * (0.29 + i * 0.012), 3.0 + i * 0.16, -0.14], [0, 0, f * 0.12])
+    k.box({ c: '#5b4128', r: 1 }, [0.1, 0.04, 0.02], [f * 0.1, 3.5, 0.025])
+  }
+  k.box(worn, [0.08, 0.14, 0.08], [0, 3.38, 0.04])
+  k.box(worn, [0.12, 0.2, 0.1], [0, 3.06, -0.02])
+}
+
+// A Bedouin camp, front at +z: a low goat-hair tent open at the front on poles, carpets and
+// cushions inside, a brass tray of tea, and a fire ring of stones with its kettle.
+function bedouinTent(k: PropKit) {
+  const hair: Look = { c: '#6b5140', r: 1 }
+  const stripe: Look = { c: '#efe3c8', r: 1 }
+  for (const x of [-1.6, -0.55, 0.55, 1.6]) {
+    k.rod(WOOD, [x, 0, 0.75], [x, 0.85, 0.75], 0.03, 5)
+    k.rod(WOOD, [x, 0, -0.6], [x, 1.05, -0.6], 0.03, 5)
+  }
+  // The roof sloping from the back ridge to the front poles, a woven stripe across it.
+  k.box(hair, [3.5, 0.04, 1.42], [0, 0.97, 0.08], [-0.15, 0, 0])
+  for (const z of [0.35, -0.2]) k.box(stripe, [3.52, 0.045, 0.1], [0, 0.95 + (0.35 - z) * 0.15, z], [-0.15, 0, 0])
+  for (let i = 0; i < 4; i++) k.box(stripe, [0.1, 0.9, 0.045], [-1.3 + i * 0.86, 0.52, -0.6])
+  k.box(hair, [3.5, 1.05, 0.04], [0, 0.52, -0.62])
+  for (const f of [-1, 1]) wedgeSide(k, hair, f * 1.75)
+  // Guy ropes and pegs out to the sides.
+  for (const f of [-1, 1]) for (const z of [0.75, -0.6]) k.rod({ c: '#c8b48a', r: 1 }, [f * 1.6, 0.85, z], [f * 2.3, 0, z + 0.2], 0.008, 3)
+  // Carpets, cushions and the tea tray.
+  const rugs = ['#9e2a2b', '#1f3f6f', '#c4862a']
+  rugs.forEach((c, i) => {
+    k.box({ c, r: 1 }, [1.05, 0.02, 1.15], [-1.1 + i * 1.1, 0.012 + i * 0.003, 0.08])
+    k.box({ c: '#e0c27a', r: 1 }, [0.5, 0.025, 0.5], [-1.1 + i * 1.1, 0.02 + i * 0.003, 0.08], [0, Math.PI / 4, 0])
+  })
+  for (let i = 0; i < 5; i++) k.box({ c: ['#c62828', '#fbc02d', '#2e7d32', '#6a1b9a', '#ef6c00'][i], r: 1 }, [0.42, 0.18, 0.26], [-1.45 + i * 0.72, 0.11, -0.42])
+  k.cyl(BRASS, 0.24, 0.24, 0.03, [0.3, 0.06, 0.2], undefined, 12)
+  k.sphere(BRASS, 0.07, [0.3, 0.13, 0.2], [1, 0.9, 1], 8, 5)
+  k.rod(BRASS, [0.36, 0.14, 0.2], [0.44, 0.2, 0.2], 0.012, 4)
+  for (const a of [0, 2, 4]) k.cyl({ c: '#e8f0f0', r: 0.3 }, 0.022, 0.018, 0.06, [0.3 + Math.cos(a) * 0.15, 0.08, 0.2 + Math.sin(a) * 0.15], undefined, 6)
+  // Fire ring out front: a circle of stones, charred logs and a blackened kettle on a tripod.
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2
+    k.ico({ c: i % 2 ? '#8d7a66' : '#a18d76', r: 1 }, 0.08, [1.0 + Math.cos(a) * 0.3, 0.05, 1.35 + Math.sin(a) * 0.3], [1, 0.7, 1], 0)
+  }
+  for (const a of [0.3, 1.9]) k.rod({ c: '#2b211b', r: 1 }, [1.0 - Math.cos(a) * 0.2, 0.05, 1.35 - Math.sin(a) * 0.2], [1.0 + Math.cos(a) * 0.2, 0.08, 1.35 + Math.sin(a) * 0.2], 0.035, 5)
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * Math.PI * 2
+    k.rod(DARK, [1.0 + Math.cos(a) * 0.28, 0, 1.35 + Math.sin(a) * 0.28], [1.0, 0.55, 1.35], 0.012, 3)
+  }
+  k.sphere({ c: '#262626', r: 0.7 }, 0.09, [1.0, 0.36, 1.35], [1, 0.85, 1], 8, 5)
+}
+// A tent's end wall: a quarter-triangle of cloth from the front poles up to the back ridge.
+function wedgeSide(k: PropKit, look: Look, x: number) {
+  k.box(look, [0.04, 0.85, 1.36], [x, 0.43, 0.07])
+  k.box(look, [0.04, 0.22, 1.2], [x, 0.94, 0.0], [-0.15, 0, 0])
+}
+
+// A long low dune, its windward slope rippled.
+function dune(k: PropKit) {
+  k.sphere({ c: '#ddb67c', r: 1 }, 1, [0, -0.15, 0], [5.4, 1.7, 3.2], 14, 5, Math.PI / 2)
+  k.sphere({ c: '#e6c48e', r: 1 }, 1, [1.4, -0.1, -0.6], [3.2, 1.45, 2.2], 12, 4, Math.PI / 2)
+  for (let i = 0; i < 4; i++) k.box({ c: '#cfa66e', r: 1 }, [3.6 - i * 0.5, 0.03, 0.08], [-0.6, 0.55 + i * 0.28, 1.95 - i * 0.42], [-0.45, 0.05 * i, 0])
+}
+
+// A broken stretch of the temple enclosure wall: mud brick, its top worn into steps.
+function enclosure(k: PropKit) {
+  const mud: Look = { c: '#b48a5c', r: 1 }
+  const dry: Look = { c: '#c79c6a', r: 1 }
+  const tops = [0.95, 0.8, 0.62, 0.86, 0.5, 0.7]
+  tops.forEach((h, i) => {
+    k.box(i % 2 ? mud : dry, [0.5, h, 0.68], [0, h / 2, -1.75 + i * 0.7])
+    // Brick courses showing where the plaster is gone.
+    for (let y = 0.18; y < h - 0.05; y += 0.18) k.box(STONE_D, [0.505, 0.015, 0.4], [0, y, -1.75 + i * 0.7 + ((y * 10) % 2 ? 0.1 : -0.1)])
+  })
+  for (let i = 0; i < 4; i++) k.box(mud, [0.24, 0.16, 0.3], [0.35 + (i % 2) * 0.2, 0.08, -1.4 + i * 0.9], [0, i, 0])
+}
+
+const PEOPLE_EG: Dress[] = [
+  { top: '#f4efe4', low: '#f4efe4', skin: '#9c6b46', hair: '#1f1a17', robe: true, hat: 'kufi', hatC: '#fafafa' },
+  { top: '#5d6d7e', low: '#5d6d7e', skin: '#8a5a3c', hair: '#1f1a17', robe: true, hat: 'turban', hatC: '#efe9dc' },
+  { top: '#2c3e50', low: '#2c3e50', skin: '#a8744e', hair: '#1f1a17', robe: true, hat: 'scarf', hatC: '#7b1fa2' },
+  { top: '#8d6e63', low: '#8d6e63', skin: '#7a4f33', hair: '#1f1a17', robe: true, hat: 'scarf', hatC: '#1a1a1a' },
+  { top: '#e57373', low: '#c8b89a', skin: '#f1c9a5', hair: '#c9a15a', hat: 'cap', hatC: '#fafafa', wave: true },
+  { top: '#4fc3f7', low: '#e8dcc4', skin: '#e9b98f', hair: '#5a3a22', hat: 'cap', hatC: '#ef6c00' },
+  { top: '#aed581', low: '#5d4037', skin: '#c68e63', hair: '#2b1d14' },
+  { top: '#fff59d', low: '#455a64', skin: '#f3d1b5', hair: '#8d5524', wave: true },
+]
+// Clusters of people: a tour group round its guide and his flag, and locals at a tent.
+function tourGroup(k: PropKit) {
+  person(k, PEOPLE_EG[0], 0, 0.5, Math.PI)
+  k.rod(DARK, [0.2, 0.3, 0.45], [0.2, 1.5, 0.45], 0.012, 4)
+  k.box({ c: '#ffb300', r: 0.9 }, [0.004, 0.18, 0.28], [0.2, 1.4, 0.32])
+  const spots = [[-0.5, -0.4, 0.3], [0, -0.6, 0], [0.5, -0.35, -0.3], [-0.85, 0.15, 0.9], [0.85, 0.05, -0.8]]
+  spots.forEach(([x, z, ry], i) => person(k, PEOPLE_EG[4 + (i % 4)], x, z, ry))
+}
+function campLocals(k: PropKit) {
+  person(k, PEOPLE_EG[1], 0, 0, 0.3)
+  person(k, PEOPLE_EG[2], 0.5, 0.15, -0.4)
+  person(k, PEOPLE_EG[3], -0.45, 0.3, 0.6)
+}
+
 export default function Giza({ len, race }: WorldProps) {
   const houses = useMemo(() => HOUSES.map((h, i) => prop(`giza-house-${i}`, (k) => house(k, h))), [])
   const backs = useMemo(() => BACK.map((i) => prop(`giza-back-${i}`, (k) => house(k, HOUSES[i], true))), [])
@@ -654,11 +857,27 @@ export default function Giza({ len, race }: WorldProps) {
   const papyrusP = useProp('giza-papyrus', papyrus)
   const donkeyP = useProp('giza-donkey', donkeyCart)
   const cafeP = useProp('giza-cafe', cafe)
+  const ramP = useProp('giza-ram-sphinx', ramSphinx)
+  const colP = useProp('giza-colonnade', colonnade)
+  const kingP = useProp('giza-colossus', colossus)
+  const tentP = useProp('giza-tent', bedouinTent)
+  const duneP = useProp('giza-dune', dune)
+  const wallP = useProp('giza-enclosure', enclosure)
+  const tourP = useProp('giza-tour-group', tourGroup)
+  const localsP = useProp('giza-camp-locals', campLocals)
   const gate = race * 0.5
   const mosqueZ = race * 0.28 + 4
 
   const geo = useMemo(() => {
     const r = rand(311)
+    // The ruins side: features down the road every ~15, skipping the gateway and the big sphinx.
+    const fr = rand(907)
+    const feats: { kind: number; z: number }[] = []
+    for (let z = 24, i = 0; z < len + 30; z += 13 + fr() * 5, i++) {
+      if (Math.abs(z - gate) < 10 || (z > race - 1 && z < race + 18)) continue
+      feats.push({ kind: i % 4, z })
+    }
+    const busy = (x: number, z: number) => (x < EDGE + 10.5 && feats.some((f) => Math.abs(f.z - z) < 5.2)) || (x < EDGE + 7 && z > race - 11 && z < race + 17) || (x < EDGE + 9 && Math.abs(z - gate) < 5)
     // The left side: an unbroken row of houses, gaps only for the mosque and the gateway.
     const rows: Spot[][] = HOUSES.map(() => [])
     for (let z = -14; z < len + 40;) {
@@ -688,6 +907,7 @@ export default function Giza({ len, race }: WorldProps) {
       const x = EDGE + 4 + r() * 9
       const p = { x, z, ry: r() * 6, s: 0.9 + r() * 0.3 }
       const k = Math.floor(r() * 3)
+      if (busy(x, z)) continue
       if (x > EDGE + 8.5) farAt.push(p)
       else palmAt[k].push(p)
     }
@@ -697,8 +917,9 @@ export default function Giza({ len, race }: WorldProps) {
     const up: Spot[] = []
     const down: Spot[] = []
     for (let z = 16; z < len + 30; z += 5 + r() * 7) {
-      const x = EDGE + 2.6 + r() * 6
+      const x = EDGE + 3.8 + r() * 5
       const ry = r() * 6
+      if (busy(x, z)) continue
       // Keep clear of the donkey carts waiting by the road.
       if (!CARTS.some((c) => Math.abs(c * race - z) < 2.5)) (r() < 0.45 ? up : down).push({ x, z, ry })
     }
@@ -711,7 +932,47 @@ export default function Giza({ len, race }: WorldProps) {
     // Papyrus thick along the water's edge.
     const reeds: Spot[] = []
     for (let z = -12; z < len + 60; z += 1.6 + r() * 2.4) reeds.push({ x: -(EDGE + 11 + r() * 0.5), z, ry: r() * 6, s: 0.8 + r() * 0.45 })
-    return { rows, back, stallAt, palmAt, farAt, up, down, reeds, grass: near(360, 0.2, 16).filter((p) => p.x > 0), rocks: near(200, 0.2, 18).filter((p) => p.x > 0) }
+    // The avenue of ram sphinxes along the kerb, clear of the carts, gateway and finish crowd.
+    const rams: Spot[] = []
+    for (let z = 18.5; z < len + 30; z += 1.55) {
+      if (Math.abs(z - gate) < 7.5 || (z > race - 10 && z < race + 5) || CARTS.some((c) => Math.abs(c * race - z) < 1.6)) continue
+      rams.push({ x: EDGE + 1.3, z, ry: -Math.PI / 2 })
+    }
+    // Up to the gateway's towers, clear of its obelisks.
+    for (const dz of [-3.95, -2.4, 2.4, 3.95]) rams.push({ x: EDGE + 1.3, z: gate + dz, ry: -Math.PI / 2 })
+    // The enclosure wall behind them, broken here and there.
+    const walls: Spot[] = []
+    for (let z = 20; z < len + 30; z += 4.2) {
+      if (Math.abs(z - gate) < 8 || (z > race - 11 && z < race + 5) || fr() < 0.18) continue
+      walls.push({ x: EDGE + 2.75, z, ry: 0 })
+    }
+    const cols: Spot[] = []
+    const kings: Spot[] = []
+    const tents: Spot[] = []
+    const tours: Spot[] = []
+    const locals: Spot[] = []
+    for (const f of feats) {
+      if (f.kind === 0 || f.kind === 2) {
+        cols.push({ x: EDGE + 6.6, z: f.z, ry: 0 })
+        tours.push({ x: EDGE + 4.2, z: f.z + (f.kind ? 2 : -2), ry: -Math.PI / 2 + 0.3 })
+      } else if (f.kind === 1) {
+        for (const dz of [-1.4, 1.4]) kings.push({ x: EDGE + 5.4, z: f.z + dz, ry: -Math.PI / 2 })
+        tours.push({ x: EDGE + 3.9, z: f.z + 3.4, ry: -Math.PI / 2 - 0.4 })
+      } else {
+        tents.push({ x: EDGE + 6.4, z: f.z, ry: -Math.PI / 2 })
+        locals.push({ x: EDGE + 4.3, z: f.z - 1.2, ry: -Math.PI / 2 })
+      }
+    }
+    // Seated kings flanking the gateway, outside its towers.
+    for (const dz of [-3.2, 3.2]) kings.push({ x: EDGE + 6.6, z: gate + dz, ry: -Math.PI / 2 })
+    // Behind the finish crowd: a souvenir market, and two seated kings guarding the big sphinx.
+    for (let z = race - 9, i = 0; z < race + 4; z += 2.1, i++) stallAt[i % 4].push({ x: EDGE + 3.4, z, ry: -Math.PI / 2 })
+    for (const dz of [5.5, 14]) kings.push({ x: EDGE + 5.3, z: race + dz, ry: -Math.PI / 2 })
+    tours.push({ x: EDGE + 3.4, z: race + 9.5, ry: -Math.PI / 2 })
+    // Dunes rolling away behind the groves, so the plain never runs empty to the sky.
+    const dunes: Spot[] = []
+    for (let z = -20; z < len + 70; z += 6 + fr() * 4) dunes.push({ x: EDGE + 17 + fr() * 14, z, ry: fr() * 0.8 - 0.4, s: 1 + fr() * 1.2 })
+    return { rams, walls, cols, kings, tents, tours, locals, dunes, rows, back, stallAt, palmAt, farAt, up, down, reeds, grass: near(360, 0.2, 16).filter((p) => p.x > 0), rocks: near(200, 0.2, 18).filter((p) => p.x > 0) }
   }, [len, race, gate, mosqueZ])
 
   return (
@@ -761,9 +1022,17 @@ export default function Giza({ len, race }: WorldProps) {
       {stalls.map((s, i) => <Many key={i} parts={s} at={geo.stallAt[i]} />)}
       {palms.map((p, i) => <Many key={i} parts={p} at={geo.palmAt[i]} />)}
       <Many parts={farPalm} at={geo.farAt} />
-      <Many parts={camelUp} at={geo.up} />
-      <Many parts={camelDown} at={geo.down} />
+      <Many parts={camelUp} at={geo.up} near={80} />
+      <Many parts={camelDown} at={geo.down} near={80} />
       <Many parts={papyrusP} at={geo.reeds} />
+      <Many parts={ramP} at={geo.rams} near={80} />
+      <Many parts={wallP} at={geo.walls} near={80} />
+      <Many parts={colP} at={geo.cols} />
+      <Many parts={kingP} at={geo.kings} />
+      <Many parts={tentP} at={geo.tents} near={80} />
+      <Many parts={tourP} at={geo.tours} near={70} />
+      <Many parts={localsP} at={geo.locals} near={70} />
+      <Many parts={duneP} at={geo.dunes} />
       <Water x={-(EDGE + 19.6)} z={len / 2} w={17} d={len + 220} id="giza" color="#7fb5a8" rough={0.3} />
       <Feluccas len={len} />
       <Pyramids />

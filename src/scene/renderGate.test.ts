@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { coversScreen, pauseTownDraw, holdTown, townHeld } from './renderGate'
+import { coversHalf, coversScreen, pauseTownDraw, holdTown, townHeld } from './renderGate'
 
 describe('menus that cover the town', () => {
   it('pauses for a phone panel, not a desktop one', () => {
@@ -19,5 +19,14 @@ describe('menus that cover the town', () => {
     const hold = holdTown()
     expect(townHeld()).toBe(true)
     hold()
+  })
+})
+
+// A desktop Shop covers about two thirds of the screen: the town behind it draws at half rate.
+describe('town under a big desktop menu', () => {
+  it('slows for a panel over half the screen, not for a small one', () => {
+    expect(coversHalf(852, 760, 1280, 800)).toBe(true)
+    expect(coversScreen(852, 760, 1280, 800)).toBe(false)
+    expect(coversHalf(400, 500, 1280, 800)).toBe(false)
   })
 })
