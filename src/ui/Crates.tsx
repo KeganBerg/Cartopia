@@ -10,6 +10,7 @@ import { SKIN_TIERS } from '../game/data'
 import { CrateScene, TIER_GLOW, prizeLook, type CratePace, type CratePhase } from '../scene/CrateScene'
 import { CarThumb } from '../scene/BuildingPreview'
 import { BuckIcon, CoinIcon, Icon } from './Icon'
+import { MenuBack } from './MenuBack'
 import { compact } from './format'
 import { openGarageTab } from './Menus'
 import { openModSlot } from './Mods'
@@ -538,9 +539,10 @@ export function CratesPanel({ embedded = false, onReady }: { embedded?: boolean;
       <StageSlot cam={CRATE_CAM} through>{scene}</StageSlot>
       {!embedded && <LoadingScene ready={stageReady} label="Opening the Crate Depot" onClose={close} />}
       <div className="rf-top">
+        {!embedded && <MenuBack />}
         <h2>📦 Crate Depot</h2>
         {wallet('top')}
-        {!embedded && <button className="close" onClick={close} aria-label="Close"><Icon name="close" size={16} /></button>}
+        {!embedded && <button className="close" onClick={(e) => { e.stopPropagation(); useGame.getState().closeMenus() }} aria-label="Close"><Icon name="close" size={16} /></button>}
       </div>
       {phase === 'open' && open?.drop.kind === 'callcard' && (shown || summary != null) && <CardOnLift key={`${run}-${open.drop.card}`} card={open.drop.card} inSum={summary != null} />}
       {phase === 'open' && !shown && !ten && <div className="crate-skip">Tap to skip</div>}

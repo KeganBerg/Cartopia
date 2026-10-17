@@ -49,6 +49,7 @@ import { useGame } from './game/store'
 import { setCalmSky } from './game/weather'
 import { startCloudSync } from './lib/cloud'
 import { startPurchaseSync } from './lib/payments'
+import { startMenuHistory } from './lib/menuHistory'
 import './lib/rescue'
 import './lib/crates'
 import './lib/accountSwitch'
@@ -127,6 +128,7 @@ export default function App() {
   useEffect(() => {
     startCloudSync()
     startPurchaseSync()
+    const stopMenuHistory = startMenuHistory()
     startAmbience()
     startMusic()
     startTechnoMusic()
@@ -165,6 +167,7 @@ export default function App() {
       unsubDaily()
       clearTimeout(prefetch)
       stopSplashCar()
+      stopMenuHistory()
     }
   }, [tick])
 
